@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄｜白盒横版叙事解谜</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260731b">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260731c">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄白盒">
@@ -24,23 +24,23 @@
         <article class="titleCopy">
           <p class="eyebrow"><i></i> 一九四二年 · 冀中平原 · 程序化分层景深</p>
           <h1>地道战<br><em>高家庄</em></h1>
-          <p class="titleLead">按电影五幕走：挖通土洞、夜袭敲钟、改建翻口、神出鬼没、拔掉黑风口。玩法形式对齐《勇敢的心：世界大战》——叙事面板、横版关卡、地道剖视，不是平台跳跃闯关。</p>
+          <p class="titleLead">地道不是开局送的。下地窖只有几格空腔，其余全是软土——按住铁锨一格一格挖穿，连通、挖厢室、上挖竖井、绕硬夯土钻炮楼根。形式对齐《勇敢的心：世界大战》的挖土解谜。</p>
           <div class="titleActions">
             <button id="BeginButton" class="primaryButton" type="button"><span>开始第一幕</span><small>约 20 分钟 · 自动存档</small></button>
             <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续检查点</button>
             <button id="OpenHistoryButton" class="secondaryButton" type="button">史实与创作边界</button>
           </div>
-          <p class="technicalNote">白盒零贴图 · 远景/中景/前景视差 · 地道土壤剖视 · 土塞只能挖不能跳 · 键鼠与触屏</p>
+          <p class="technicalNote">白盒零贴图 · 土壤格网挖掘 · 连通/厢室/竖井解谜 · 分层景深剖视 · 键鼠与触屏</p>
         </article>
         <aside class="fieldNote" aria-label="五幕提纲">
           <div class="notePin" aria-hidden="true"></div>
           <p>电影骨架</p>
           <ol>
-            <li><span>土洞相连</span><b>挖通</b><small>土塞 · 非跳跃</small></li>
-            <li><span>钟声</span><b>夜袭</b><small>高老忠敲钟</small></li>
-            <li><span>能藏能打</span><b>翻口</b><small>识破特务</small></li>
-            <li><span>神出鬼没</span><b>换位</b><small>三口出击</small></li>
-            <li><span>黑风口</span><b>拔点</b><small>药室总攻</small></li>
+            <li><span>土洞相连</span><b>挖通</b><small>三窖连通</small></li>
+            <li><span>钟声</span><b>夜袭</b><small>先挖东窖</small></li>
+            <li><span>能藏能打</span><b>翻口</b><small>挖厢室</small></li>
+            <li><span>神出鬼没</span><b>竖井</b><small>上挖三口</small></li>
+            <li><span>黑风口</span><b>绕挖</b><small>硬土迷宫</small></li>
           </ol>
           <blockquote>“先通三家。通了，人就有地方藏。”</blockquote>
           <footer>高老忠 · 党支部书记</footer>
@@ -48,7 +48,7 @@
       </div>
       <footer class="titleFooter">
         <span>剧情骨架取自电影《地道战》 · 形式致敬 Valiant Hearts · 白盒程序化绘制</span>
-        <span>土塞不可跳过 · 地道口按 E 切换层</span>
+        <span>地道要挖 · 硬块绕开 · 井口按 E 切换层</span>
       </footer>
     </section>
 
@@ -125,9 +125,9 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作说明</h2>
-        <p><b>移动</b> A/D 或 ←/→　<b>跳</b> 空格/W　<b>蹲</b> S　<b>互动</b> E/F　<b>挖掘</b> 按住 J 或 Shift　Esc 暂停</p>
-        <p><b>地道口</b> 走到发光井口按 E，黑场切换地面/地道剖视层——不是跳进洞。</p>
-        <p><b>土塞</b> 地道里画着斜线的土墙只能挖开，跳不过去。短沙袋可以跳。</p>
+        <p><b>移动</b> A/D　<b>跳</b> 空格　<b>下挖</b> S+J　<b>上挖</b> W+J　<b>互动</b> E　<b>挖掘</b> 按住 J/Shift　Esc 暂停</p>
+        <p><b>地道口</b> 按 E 下地窖。开局只有小空腔，黄色虚线是待挖区域，灰色硬块挖不动。</p>
+        <p><b>解谜</b> 连通两口、挖出厢室格数、上挖竖井——清单勾完才算完成本幕。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>明白了</span></button>
         </div>
@@ -160,6 +160,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄（白盒）</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260731b"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260731c"></script>
 </body>
 </html>

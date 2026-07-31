@@ -1,29 +1,21 @@
-/** Film-faithful beats for 地道战, told in Valiant Hearts chapter cadence. */
+/** Film beats — dig system is the spine of every underground act. */
 
-export const SAVE_KEY = "tunnelheart1942_v2";
-export const CACHE_BUST = "20260731b";
+export const SAVE_KEY = "tunnelheart1942_v3";
+export const CACHE_BUST = "20260731c";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
-  subtitle: "白盒 · 横版叙事解谜（Valiant Hearts 形式）",
-  tagline: "铁锨、钟声、翻口与黑风口——按电影五幕走完高家庄。",
+  subtitle: "白盒 · 挖地道解谜（Valiant Hearts 形式）",
+  tagline: "地窖只是起点。地道，是一锨一锨挖出来的。",
   yearLabel: "一九四二年 · 冀中高家庄",
 };
 
 /**
  * @typedef {{ id: string, speaker: string, text: string, mood?: string }} Panel
  * @typedef {{
- *   id: string,
- *   act: number,
- *   title: string,
- *   timeLabel: string,
- *   cast: string,
- *   objective: string,
- *   goals: string[],
- *   openPanels: Panel[],
- *   closePanels: Panel[],
- *   night?: boolean,
- *   startTunnel?: boolean,
+ *   id: string, act: number, title: string, timeLabel: string, cast: string,
+ *   objective: string, goals: string[], openPanels: Panel[], closePanels: Panel[],
+ *   night?: boolean, startTunnel?: boolean,
  * }} Chapter
  */
 
@@ -35,25 +27,25 @@ export const CHAPTERS = [
     title: "土洞相连",
     timeLabel: "一九四二年 · 春",
     cast: "高传宝",
-    objective: "听高老忠交代，下地道挖通两处土塞，让三家地窖通气。",
-    goals: ["talk_laozhong", "enter_hatch", "dig_west", "dig_east"],
+    objective: "下地窖，把三家互不相通的土洞一锨锨挖穿。",
+    goals: ["talk_laozhong", "enter_hatch", "link_ab", "link_bc"],
     openPanels: [
       {
         id: "p1a",
         speaker: "旁白",
-        text: "冀中平原，一马平川。鬼子的炮楼看得见庄稼，庄稼却藏不住人。",
+        text: "冀中平原藏不住人。高家庄三家各挖了个土洞——可洞与洞之间，仍是实土。",
         mood: "wide",
       },
       {
         id: "p1b",
         speaker: "高老忠",
-        text: "传宝，别先想着打。先把几家土洞挖通——人能藏，才谈得上活。",
+        text: "传宝，地道不是天生的。下洞去，对着软土按住铁锨——一格一格挖，把三家通气。",
         mood: "talk",
       },
       {
         id: "p1c",
         speaker: "提示",
-        text: "←→ 移动　空格跳　E 互动　按住 J 挖掘。地道口按 E 下井，土塞要挖开，不是跳过去。",
+        text: "下地窖后：对准软土按住 J 挖掘。S 向下挖，W 向上挖。硬砖挖不动。连通目标看左上清单。",
         mood: "tip",
       },
     ],
@@ -61,7 +53,7 @@ export const CHAPTERS = [
       {
         id: "p1z",
         speaker: "林霞",
-        text: "气通了。可只能藏、不能打——夜里要是来抄，钟谁敲？",
+        text: "三家通气了。可只能藏、不能打——夜里来抄，钟谁敲？",
         mood: "talk",
       },
     ],
@@ -73,45 +65,39 @@ export const CHAPTERS = [
     timeLabel: "一九四二年 · 夜袭",
     cast: "高传宝",
     night: true,
-    objective: "把三户乡亲送进地道，再冲到村口大槐树下——钟，必须响。",
-    goals: ["shelter_a", "shelter_b", "shelter_c", "reach_bell"],
+    objective: "先挖出东侧避难窖并挖通，再送乡亲入洞，最后敲响警钟。",
+    goals: ["dig_safe_room", "link_safe", "shelter_a", "shelter_b", "shelter_c", "reach_bell"],
     openPanels: [
       {
         id: "p2a",
         speaker: "旁白",
-        text: "黑风口据点的灯火一闪。狗叫先于枪声。",
+        text: "黑风口灯火一闪。西口地窖还在，东侧避难窖——还没挖出来。",
         mood: "wide",
       },
       {
         id: "p2b",
         speaker: "高老忠",
-        text: "快送人进洞！钟——我去敲。你们记住：人比地道金贵。",
+        text: "先把东窖挖开通气！人才能藏。钟——我去敲。",
         mood: "talk",
       },
       {
         id: "p2c",
-        speaker: "高传宝",
-        text: "爹——",
-        mood: "talk",
-      },
-      {
-        id: "p2d",
-        speaker: "高老忠",
-        text: "少说话。去！",
-        mood: "talk",
+        speaker: "提示",
+        text: "下西口，向东挖穿硬土绕路，把东侧厢室挖成空腔并连通。未连通前乡亲不肯进洞。",
+        mood: "tip",
       },
     ],
     closePanels: [
       {
         id: "p2z1",
         speaker: "旁白",
-        text: "钟声裂开夜色。高老忠拉响了最后一颗手榴弹。",
+        text: "钟声裂开夜色。高老忠拉响了最后一颗手榴弹。地道被搅了——可人还在。",
         mood: "wide",
       },
       {
         id: "p2z2",
         speaker: "高传宝",
-        text: "地道被搅烂了……可人还在。只藏不够——要能打。",
+        text: "只藏不够。要把地道改成能打的。",
         mood: "talk",
       },
     ],
@@ -123,26 +109,26 @@ export const CHAPTERS = [
     timeLabel: "一九四三年 · 初夏",
     cast: "高传宝",
     startTunnel: true,
-    objective: "在地道里修好翻口，盘问可疑来客，引他们到翻口下将其制服。",
-    goals: ["build_flip", "expose_spy", "trap_spy"],
+    objective: "挖出翻口厢室、打通卡口巷道，识破特务并翻口制服。",
+    goals: ["dig_alcove", "build_flip", "link_trap", "expose_spy", "trap_spy"],
     openPanels: [
       {
         id: "p3a",
         speaker: "林霞",
-        text: "《论持久战》摊在炕桌上。教训写得很清楚：要有翻口、射击孔、迷惑岔道。",
+        text: "要有翻口厢室。先挖出空间，再改翻口——空手套白狼不行。",
         mood: "talk",
       },
       {
         id: "p3b",
         speaker: "高传宝",
-        text: "灌水、放火、搜洞——都得防。先把翻口改起来。",
+        text: "我先把厢室和卡口巷挖通。上面那两个“武工队”，回头盘问。",
         mood: "talk",
       },
       {
         id: "p3c",
-        speaker: "旁白",
-        text: "庄外来了两个“武工队员”。口音飘，路线熟——不对劲。",
-        mood: "wide",
+        speaker: "提示",
+        text: "黄色虚线框是待挖厢室。挖够格数才能改建翻口；再挖通到卡口，才能翻口制敌。",
+        mood: "tip",
       },
     ],
     closePanels: [
@@ -160,19 +146,19 @@ export const CHAPTERS = [
     title: "神出鬼没",
     timeLabel: "一九四三年 · 夏",
     cast: "高传宝",
-    objective: "从三处出击口轮流开火，打散山田的报复队，别在同一口子恋战。",
-    goals: ["shot_a", "shot_b", "shot_c", "break_patrol"],
+    objective: "从主巷上挖三处出击竖井，再轮流开火打散巡逻。",
+    goals: ["enter_spine", "dig_shaft_a", "dig_shaft_b", "dig_shaft_c", "shot_a", "shot_b", "shot_c", "break_patrol"],
     openPanels: [
       {
         id: "p4a",
         speaker: "旁白",
-        text: "山田纠集兵力进村。民兵却像从井口、灶台、墙根里冒出来。",
+        text: "山田进村。出击口不能是送的——要从主巷一锨锨往上挖穿。",
         mood: "wide",
       },
       {
         id: "p4b",
         speaker: "高传宝",
-        text: "打一枪，换一个地方！让他们打空气。",
+        text: "按住 W+J 往上挖。井口、墙根、灶台——三口都挖穿，才能打一枪换一处。",
         mood: "talk",
       },
     ],
@@ -180,7 +166,7 @@ export const CHAPTERS = [
       {
         id: "p4z",
         speaker: "林霞",
-        text: "气焰压下去了。下一步：地道出村，咬住黑风口。",
+        text: "气焰压下去了。下一步：把地道往炮楼根下挖。",
         mood: "talk",
       },
     ],
@@ -192,20 +178,20 @@ export const CHAPTERS = [
     timeLabel: "反攻前夜",
     cast: "高传宝",
     startTunnel: true,
-    objective: "在地道里挖开炮楼根的土塞，安放炸药，再上地表发出总攻信号。",
-    goals: ["dig_under", "plant_charge", "signal_assault"],
+    objective: "绕开硬地基挖到炮楼根药室，安放炸药后回地面发信号。",
+    goals: ["dig_charge_room", "link_charge", "plant_charge", "signal_assault"],
     openPanels: [
       {
         id: "p5a",
         speaker: "赵平原",
-        text: "围点打援。民兵地道先咬住炮楼根基，主力与游击队再合围。",
+        text: "炮楼脚下尽是硬夯土。软土里绕，挖出药室，再上信号。",
         mood: "talk",
       },
       {
         id: "p5b",
-        speaker: "高传宝",
-        text: "明白。挖到药室，安好，我亲自上去鸣枪。",
-        mood: "talk",
+        speaker: "提示",
+        text: "灰色硬块挖不动。看剖视层找软土绕路，挖通药室并连通进攻端。",
+        mood: "tip",
       },
     ],
     closePanels: [
@@ -218,7 +204,7 @@ export const CHAPTERS = [
       {
         id: "p5z2",
         speaker: "高传宝",
-        text: "地道不是为了炫技。是为了人，还能回家。",
+        text: "地道是挖出来的。人，也是挖出来的活路。",
         mood: "talk",
       },
     ],

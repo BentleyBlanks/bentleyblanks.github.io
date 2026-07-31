@@ -1,17 +1,25 @@
 import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
-import { BuildLevel, SURFACE_Y, TUNNEL_FLOOR, VIEW_W } from "./Script_World.mjs";
+import {
+  CarveCell,
+  PickDigTarget,
+  RebuildTunnelSolids,
+  SetCell,
+  AIR,
+} from "./Script_Dig.mjs";
+import { BuildLevel, EvalDigGoals, SURFACE_Y, VIEW_W } from "./Script_World.mjs";
 
 export const PLAYER_W = 26;
 export const PLAYER_H = 48;
 export const GRAVITY = 1850;
-export const MOVE_SPEED = 230;
-export const JUMP_VEL = 700; // apex ≈ 132px — clears 36px rubble, not dig seals
-export const DIG_RATE = 0.7;
+export const MOVE_SPEED = 220;
+export const JUMP_VEL = 680;
+export const DIG_RATE = 0.85;
 
 export function CreateInputState() {
   return {
     left: false,
     right: false,
+    up: false,
     jump: false,
     jumpPressed: false,
     dig: false,
@@ -27,7 +35,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
   const level = BuildLevel(chapter.id);
   const tunnel = !!level.spawn.tunnel;
   return {
-    phase: "title", // title | panels | play | closePanels | ending
+    phase: "title",
     panelIndex: 0,
     chapterIndex: idx,
     chapterId: chapter.id,
@@ -43,12 +51,13 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       crouching: false,
       digging: false,
       digProgress: 0,
+      digTarget: null,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
     },
     cameraX: Math.max(0, level.spawn.x - VIEW_W * 0.35),
-    cameraY: tunnel ? TUNNEL_FLOOR - 320 : SURFACE_Y - 360,
+    cameraY: tunnel ? level.tunnelFloor - 300 : SURFACE_Y - 360,
     level,
     interactHint: "",
     subtitle: null,
@@ -57,9 +66,9 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     failed: false,
     completed: false,
     pauseOpen: false,
-    transition: 0, // hatch blackout 0..1..0
+    transition: 0,
     input: CreateInputState(),
-    stats: { digs: 0, interactions: 0, shots: 0 },
+    stats: { digs: 0, interactions: 0, shots: 0, cellsCarved: 0 },
   };
 }
 
@@ -86,14 +95,13 @@ function ResolvePhysics(state, dt) {
   player.vx = move * speed;
   if (move) player.facing = move;
 
-  if (input.jumpPressed && player.onGround && !player.crouching) {
+  if (input.jumpPressed && player.onGround && !player.crouching && !input.dig) {
     player.vy = -JUMP_VEL;
     player.onGround = false;
   }
 
   player.vy += GRAVITY * dt;
 
-  // --- X axis ---
   player.x += player.vx * dt;
   player.x = Math.max(20, Math.min(level.width - 20, player.x));
   let aabb = PlayerAabb(player);
@@ -102,50 +110,27 @@ function ResolvePhysics(state, dt) {
     if (player.vx > 0) player.x = s.x - PLAYER_W / 2;
     else if (player.vx < 0) player.x = s.x + s.w + PLAYER_W / 2;
     else {
-      // pushed into seal — exit toward nearer side
       const mid = s.x + s.w / 2;
       player.x = player.x < mid ? s.x - PLAYER_W / 2 : s.x + s.w + PLAYER_W / 2;
     }
     aabb = PlayerAabb(player);
   }
 
-  // --- Y axis ---
   const prevY = player.y;
   player.y += player.vy * dt;
   aabb = PlayerAabb(player);
   player.onGround = false;
   for (const s of SolidsFor(state)) {
     if (!RectsOverlap(aabb, s)) continue;
-    const prevBottom = prevY;
-    const prevTop = prevY - aabb.h;
-    if (player.vy >= 0 && prevBottom <= s.y + 6) {
+    if (player.vy >= 0 && prevY <= s.y + 6) {
       player.y = s.y;
       player.vy = 0;
       player.onGround = true;
-    } else if (player.vy < 0 && prevTop >= s.y + s.h - 6) {
+    } else if (player.vy < 0 && prevY - aabb.h >= s.y + s.h - 6) {
       player.y = s.y + s.h + aabb.h;
       player.vy = 0;
-    } else if (!s.digOnly) {
-      // sideways trap — nudge out
-      const mid = s.x + s.w / 2;
-      player.x = player.x < mid ? s.x - PLAYER_W / 2 : s.x + s.w + PLAYER_W / 2;
     }
     aabb = PlayerAabb(player);
-  }
-
-  const floor = player.inTunnel ? level.tunnelFloor : level.surfaceY;
-  if (player.y > floor) {
-    player.y = floor;
-    player.vy = 0;
-    player.onGround = true;
-  }
-  if (player.inTunnel) {
-    const minY = level.tunnelCeil + aabb.h + 2;
-    // feet y minimum when head would hit ceiling mid-jump
-    if (player.y - aabb.h < level.tunnelCeil) {
-      player.y = minY;
-      if (player.vy < 0) player.vy = 0;
-    }
   }
 
   if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
@@ -154,12 +139,8 @@ function ResolvePhysics(state, dt) {
 function Near(player, ent, radius = 48) {
   const ex = ent.x + (ent.w || 28) / 2;
   const r = ent.radius || radius;
-  // Hatches / shafts span surface↔tunnel — only X matters.
-  if (ent.type === "hatch" || ent.layer === "both") {
-    return Math.abs(player.x - ex) < r;
-  }
-  const ey = ent.y;
-  return Math.hypot(player.x - ex, player.y - ey) < r;
+  if (ent.type === "hatch" || ent.layer === "both") return Math.abs(player.x - ex) < r;
+  return Math.hypot(player.x - ex, player.y - ent.y) < r;
 }
 
 function LayerOk(player, ent) {
@@ -180,50 +161,90 @@ function SetSubtitle(state, speaker, text, time = 3.0) {
   state.subtitleTimer = time;
 }
 
+function SyncDigGoals(state) {
+  const evaled = EvalDigGoals(state.level);
+  for (const [goal, ok] of Object.entries(evaled)) {
+    if (ok) MarkGoal(state, goal);
+  }
+  // Ensure link endpoints become AIR once their zone is satisfied
+  for (const zone of state.level.digZones || []) {
+    if (!state.goalsDone[zone.goal]) continue;
+    const cc = zone.c + Math.floor(zone.w / 2);
+    const rr = zone.r + Math.floor(zone.h / 2);
+    SetCell(state.level.soil, cc, rr, AIR);
+  }
+}
+
 function TryDig(state, dt) {
   const { player, level, input } = state;
   player.digging = false;
-  if (!input.dig || !player.onGround || state.transition > 0) {
+  player.digTarget = null;
+  if (!input.dig || !player.inTunnel || !level.soil || state.transition > 0) {
     player.digProgress = 0;
     return;
   }
-  const layer = player.inTunnel ? "tunnel" : "surface";
-  const target = level.digSpots.find(
-    (d) => !d.done && d.layer === layer && Math.abs(player.x - d.x) < 72,
+
+  const target = PickDigTarget(
+    level.soil,
+    player.x,
+    player.y,
+    player.facing,
+    !!input.crouch,
+    !!input.up || (!!input.jump && !player.onGround) || (!!input.jump && !!input.dig),
   );
-  if (!target) {
+  // Prefer explicit up while holding dig on ground
+  const target2 =
+    target ||
+    (input.up || (input.jump && input.dig)
+      ? PickDigTarget(level.soil, player.x, player.y, player.facing, false, true)
+      : null);
+  const dig = target2 || target;
+  if (!dig) {
     player.digProgress = 0;
+    state.interactHint = input.up || input.jump ? "上方不是软土 / 挖不动" : "对准软土按住 J（S下挖 W上挖）";
     return;
   }
+
   player.digging = true;
+  player.digTarget = dig;
   player.digProgress = Math.min(1, player.digProgress + DIG_RATE * dt);
-  state.interactHint = `${target.hint} ${Math.floor(player.digProgress * 100)}%`;
+  state.interactHint = `挖掘软土… ${Math.floor(player.digProgress * 100)}%`;
   if (player.digProgress < 1) return;
 
-  target.done = true;
-  player.digProgress = 0;
-  state.stats.digs += 1;
-  if (target.clears) {
-    const solids = level.tunnelSolids;
-    const idx = solids.findIndex((s) => s.id === target.clears);
-    if (idx >= 0) solids.splice(idx, 1);
+  if (CarveCell(level.soil, dig.c, dig.r)) {
+    state.stats.digs += 1;
+    state.stats.cellsCarved += 1;
+    RebuildTunnelSolids(level);
+    SyncDigGoals(state);
+    SetSubtitle(state, "高传宝", "再挖。", 1.0);
   }
-  if (target.goal) MarkGoal(state, target.goal);
-  SetSubtitle(state, "高传宝", target.line, 2.4);
+  player.digProgress = 0;
 }
 
-function BeginHatchTransition(state, goingDown) {
+function BeginHatchTransition(state, goingDown, ent) {
   state.transition = 0.01;
   state._hatchDir = goingDown ? "down" : "up";
+  state._hatchEnt = ent;
 }
 
 function FinishHatch(state) {
   const goingDown = state._hatchDir === "down";
+  const ent = state._hatchEnt;
   state.player.inTunnel = goingDown;
-  state.player.y = goingDown ? state.level.tunnelFloor : state.level.surfaceY;
+  if (goingDown) {
+    state.player.x = ent?.tunnelX ?? state.player.x;
+    state.player.y = ent?.tunnelY ?? state.level.tunnelFloor;
+  } else {
+    state.player.y = SURFACE_Y;
+  }
   state.player.vy = 0;
   state.player.onGround = true;
-  SetSubtitle(state, "地道口", goingDown ? "下到地道里。" : "回到地面。", 1.6);
+  SetSubtitle(state, "地道口", goingDown ? "下到地窖——前面是实土，自己挖。" : "回到地面。", 2.0);
+}
+
+function GoalReady(state, ent) {
+  if (!ent.requiresGoal) return true;
+  return !!state.goalsDone[ent.requiresGoal];
 }
 
 function TryInteract(state) {
@@ -236,16 +257,20 @@ function TryInteract(state) {
     if (!LayerOk(player, ent)) continue;
     if (!Near(player, ent, ent.radius || 52)) continue;
 
+    if (!GoalReady(state, ent) && ent.type !== "hatch" && ent.type !== "talk") {
+      SetSubtitle(state, "提示", "还没挖到位——先完成地道目标。", 2.2);
+      return;
+    }
+
     if (ent.type === "talk") {
       ent.done = true;
-      SetSubtitle(state, ent.speaker, ent.line, 3.4);
+      SetSubtitle(state, ent.speaker, ent.line, 3.6);
       if (ent.goal) MarkGoal(state, ent.goal);
       return;
     }
 
     if (ent.type === "hatch") {
-      const goingDown = !player.inTunnel;
-      BeginHatchTransition(state, goingDown);
+      BeginHatchTransition(state, !player.inTunnel, ent);
       if (ent.goal) MarkGoal(state, ent.goal);
       return;
     }
@@ -269,7 +294,7 @@ function TryInteract(state) {
       ent.done = true;
       for (const f of level.entities) if (f.type === "flip_trap") f.armed = true;
       if (ent.goal) MarkGoal(state, ent.goal);
-      SetSubtitle(state, "林霞", "翻口好了。上去盘问，再引到卡口。", 3.0);
+      SetSubtitle(state, "林霞", "翻口好了。巷道再挖通到卡口。", 3.0);
       return;
     }
 
@@ -287,7 +312,7 @@ function TryInteract(state) {
         return;
       }
       const spy = level.entities.find((e) => e.type === "spy" && e.exposed && !e.trapped);
-      if (!spy || Math.abs(spy.x - ent.x) > 80) {
+      if (!spy || Math.abs(spy.x - ent.x) > 90) {
         SetSubtitle(state, "提示", "等特务走到翻口上方。", 2.0);
         return;
       }
@@ -312,24 +337,17 @@ function TryInteract(state) {
         }
       }
       SetSubtitle(state, "高传宝", "打一枪，换一个地方！", 1.8);
-      if (ent.exitTo != null) {
-        player.x = ent.exitTo;
-        // slip into nearest hatch feeling — stay on surface but move
-      }
+      if (ent.exitTo != null) player.x = ent.exitTo;
       return;
     }
 
     if (ent.type === "charge" || ent.type === "signal") {
-      if (ent.needsGoal && !state.goalsDone[ent.needsGoal]) {
-        SetSubtitle(state, "提示", ent.type === "charge" ? "先挖开炮楼根土塞。" : "先安放炸药。", 2.2);
-        return;
-      }
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetSubtitle(
         state,
         ent.type === "charge" ? "高传宝" : "赵平原",
-        ent.type === "charge" ? "药室安好。上去发信号！" : "总攻——黑风口！",
+        ent.type === "charge" ? "药室安好。回地面发信号！" : "总攻——黑风口！",
         2.8,
       );
       return;
@@ -353,7 +371,7 @@ function UpdateActors(state, dt) {
           player.hp -= 1;
           player.invuln = 1.25;
           player.vy = -300;
-          SetSubtitle(state, "危险", "被发现了——蹲下或钻进地道口。", 2.2);
+          SetSubtitle(state, "危险", "被发现了——蹲下或钻地道。", 2.2);
           if (player.hp <= 0) state.failed = true;
         }
       }
@@ -369,10 +387,8 @@ function UpdateCamera(state, dt) {
   const { player, level } = state;
   const targetX = player.x - VIEW_W * 0.38;
   state.cameraX += (Math.max(0, Math.min(level.width - VIEW_W, targetX)) - state.cameraX) * Math.min(1, dt * 6);
-
-  // Vertical framing: keep a Valiant Hearts stage band with sky/soil depth
-  const targetY = player.inTunnel ? TUNNEL_FLOOR - 300 : SURFACE_Y - 360;
-  state.cameraY += (targetY - state.cameraY) * Math.min(1, dt * 4);
+  const targetY = player.inTunnel ? player.y - 280 : SURFACE_Y - 360;
+  state.cameraY += (targetY - state.cameraY) * Math.min(1, dt * 5);
 }
 
 function UpdateTransition(state, dt) {
@@ -385,11 +401,38 @@ function UpdateTransition(state, dt) {
   if (state.transition >= 1) {
     state.transition = 0;
     state._hatchFlipped = false;
+    state._hatchEnt = null;
   }
 }
 
 function AllGoalsDone(state) {
   return Object.values(state.goalsDone).every(Boolean);
+}
+
+function RefreshHint(state) {
+  if (state.player.digging) return;
+  if (!state.interactHint || state.interactHint.includes("挖掘") || state.interactHint.includes("软土")) {
+    state.interactHint = "";
+  }
+  for (const ent of state.level.entities) {
+    if (ent.hidden || ent.done) continue;
+    if (!LayerOk(state.player, ent)) continue;
+    if (Near(state.player, ent, ent.radius || 52)) {
+      state.interactHint = ent.hint || "互动";
+      return;
+    }
+  }
+  if (state.player.inTunnel && state.level.soil) {
+    const dig = PickDigTarget(
+      state.level.soil,
+      state.player.x,
+      state.player.y,
+      state.player.facing,
+      !!state.input.crouch,
+      !!state.input.up,
+    );
+    if (dig) state.interactHint = "按住 J 挖掘软土";
+  }
 }
 
 export function StepPlay(state, dt) {
@@ -400,28 +443,8 @@ export function StepPlay(state, dt) {
   ResolvePhysics(state, clamped);
   TryDig(state, clamped);
   TryInteract(state);
-
-  if (!playerDiggingHint(state)) {
-    state.interactHint = "";
-    for (const dig of state.level.digSpots) {
-      const layer = state.player.inTunnel ? "tunnel" : "surface";
-      if (!dig.done && dig.layer === layer && Math.abs(state.player.x - dig.x) < 72) {
-        state.interactHint = dig.hint;
-        break;
-      }
-    }
-    if (!state.interactHint) {
-      for (const ent of state.level.entities) {
-        if (ent.hidden || ent.done) continue;
-        if (!LayerOk(state.player, ent)) continue;
-        if (Near(state.player, ent, ent.radius || 52)) {
-          state.interactHint = ent.hint || "互动";
-          break;
-        }
-      }
-    }
-  }
-
+  SyncDigGoals(state);
+  RefreshHint(state);
   UpdateActors(state, clamped);
   UpdateCamera(state, clamped);
 
@@ -440,10 +463,6 @@ export function StepPlay(state, dt) {
   return state;
 }
 
-function playerDiggingHint(state) {
-  return state.player.digging;
-}
-
 export function AdvancePanels(state) {
   const chapter = CHAPTERS[state.chapterIndex];
   const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
@@ -455,14 +474,11 @@ export function AdvancePanels(state) {
     state.phase = "play";
     return state;
   }
-  // close panels done
   if (state.chapterIndex >= CHAPTERS.length - 1) {
     state.phase = "ending";
     return state;
   }
-  const next = CreateCampaignState(state.chapterIndex + 1, {
-    unlockedActs: state.unlockedActs,
-  });
+  const next = CreateCampaignState(state.chapterIndex + 1, { unlockedActs: state.unlockedActs });
   next.phase = "panels";
   next.panelIndex = 0;
   return next;
@@ -475,11 +491,7 @@ export function RestartChapter(state) {
 }
 
 export function SerializeProgress(state) {
-  return {
-    v: 2,
-    chapterIndex: state.chapterIndex,
-    unlockedActs: state.unlockedActs,
-  };
+  return { v: 3, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
 }
 
 export function LoadProgress(raw) {
@@ -521,7 +533,46 @@ export function GoalsRemaining(state) {
     .map(([id]) => id);
 }
 
-/** Pure helper: max jump height under current gravity. */
-export function JumpApexHeight() {
-  return (JUMP_VEL * JUMP_VEL) / (2 * GRAVITY);
+/** Test helper: BFS-carve through SOFT (skips HARD) between two cells. */
+export function DebugCarvePath(state, c0, r0, c1, r1) {
+  const soil = state.level.soil;
+  const key = (c, r) => `${c},${r}`;
+  const prev = new Map();
+  const q = [[c0, r0]];
+  prev.set(key(c0, r0), null);
+  const dirs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  let found = false;
+  while (q.length) {
+    const [c, r] = q.shift();
+    if (c === c1 && r === r1) {
+      found = true;
+      break;
+    }
+    for (const [dc, dr] of dirs) {
+      const nc = c + dc;
+      const nr = r + dr;
+      const k = key(nc, nr);
+      if (prev.has(k)) continue;
+      const cell = soil.cells[nr]?.[nc];
+      if (cell === undefined || cell === 2) continue; // HARD
+      prev.set(k, [c, r]);
+      q.push([nc, nr]);
+    }
+  }
+  if (found) {
+    let cur = [c1, r1];
+    while (cur) {
+      CarveCell(soil, cur[0], cur[1]);
+      const p = prev.get(key(cur[0], cur[1]));
+      cur = p;
+    }
+  }
+  RebuildTunnelSolids(state.level);
+  SyncDigGoals(state);
+  return found;
 }

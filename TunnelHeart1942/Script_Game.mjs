@@ -9,7 +9,8 @@ import {
   SaveToStorage,
   StepPlay,
 } from "./Script_Rules.mjs";
-import { SURFACE_Y, TUNNEL_CEIL, TUNNEL_FLOOR, VIEW_H, VIEW_W } from "./Script_World.mjs";
+import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
+import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("GameCanvas");
@@ -59,21 +60,30 @@ function SetModal(which) {
 function GoalLabel(id) {
   const map = {
     talk_laozhong: "听取高老忠交代",
-    enter_hatch: "从地窖口下地道",
-    dig_west: "挖开西口土塞",
-    dig_east: "挖开东口土塞",
+    enter_hatch: "下地窖（开始挖）",
+    link_ab: "挖通：高家 ↔ 邻家",
+    link_bc: "挖通：邻家 ↔ 东家",
+    dig_safe_room: "挖出东侧避难窖空腔",
+    link_safe: "挖通西口 ↔ 东窖",
     shelter_a: "护送第一户入洞",
     shelter_b: "护送第二户入洞",
     shelter_c: "护送第三户入洞",
     reach_bell: "赶到村口敲钟",
+    dig_alcove: "挖出翻口厢室",
     build_flip: "改建战斗翻口",
+    link_trap: "挖通卡口巷道",
     expose_spy: "盘问并识破特务",
     trap_spy: "翻口制服特务",
+    enter_spine: "进入主巷",
+    dig_shaft_a: "上挖井口竖井",
+    dig_shaft_b: "上挖墙根竖井",
+    dig_shaft_c: "上挖灶台竖井",
     shot_a: "井口出击",
     shot_b: "墙根出击",
     shot_c: "灶台出击",
     break_patrol: "打散报复巡逻",
-    dig_under: "挖开炮楼根土塞",
+    dig_charge_room: "挖出炮楼根药室",
+    link_charge: "挖通进攻端 ↔ 药室",
     plant_charge: "安放药室炸药",
     signal_assault: "发出总攻信号",
   };
@@ -121,7 +131,9 @@ function SyncHud() {
     .map(([id, done]) => `<li class="${done ? "done" : ""}">${done ? "✓" : "○"} ${GoalLabel(id)}</li>`)
     .join("")}`;
   $("HpRow").innerHTML = [0, 1, 2].map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`).join("");
-  $("LayerTag").textContent = state.player.inTunnel ? "地道层 · 剖视" : "地面层 · 纵深";
+  $("LayerTag").textContent = state.player.inTunnel
+    ? `地道剖视 · 已挖 ${state.stats.cellsCarved || 0} 格`
+    : "地面层 · 纵深";
 
   if (state.subtitle) {
     Show($("SubtitlePanel"), true);
@@ -365,17 +377,8 @@ function DrawProp(prop, pal) {
 function DrawShaft(shaft) {
   const s = Scale();
   const x = WX(shaft.x);
-  if (state.player.inTunnel) {
-    const top = WY(SURFACE_Y);
-    const bot = WY(TUNNEL_FLOOR);
-    ctx.fillStyle = "rgba(20,14,10,.55)";
-    ctx.fillRect(x - 14 * s, top, 28 * s, bot - top);
-    ctx.strokeStyle = "#c9a45a";
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(x - 14 * s, top, 28 * s, bot - top);
-    ctx.setLineDash([]);
-  } else {
-    const y = WY(SURFACE_Y);
+  const y = WY(SURFACE_Y);
+  if (!state.player.inTunnel) {
     ctx.fillStyle = "#2a1c12";
     ctx.fillRect(x - 18 * s, y - 6 * s, 36 * s, 10 * s);
     ctx.strokeStyle = "#c9a45a";
@@ -383,78 +386,89 @@ function DrawShaft(shaft) {
     ctx.fillStyle = "rgba(239,224,197,.8)";
     ctx.font = `${11 * s}px IBM Plex Sans, sans-serif`;
     ctx.fillText(shaft.label || "地道口", x - 20 * s, y - 12 * s);
+  } else {
+    ctx.fillStyle = "rgba(239,224,197,.55)";
+    ctx.font = `${11 * s}px IBM Plex Sans, sans-serif`;
+    ctx.fillText(shaft.label || "井口", x - 16 * s, WY(state.level.soil?.originY || 72) - 8);
   }
 }
 
-function DrawSolids() {
+function DrawSoilGrid(pal) {
+  const soil = state.level.soil;
+  if (!soil) return;
   const s = Scale();
-  const solids = state.player.inTunnel ? state.level.tunnelSolids : state.level.surfaceSolids;
-  for (const solid of solids) {
-    if (solid.id === "sg" || solid.id === "tg" || solid.id === "tc") continue;
-    const x = WX(solid.x);
-    const y = WY(solid.y); // solid.y is top face
-    ctx.fillStyle = solid.digOnly ? "#6a4a32" : "#7a7264";
-    ctx.strokeStyle = "#1c1712";
-    ctx.lineWidth = 2;
-    ctx.fillRect(x, y, solid.w * s, solid.h * s);
-    ctx.strokeRect(x, y, solid.w * s, solid.h * s);
-    if (solid.digOnly) {
-      ctx.strokeStyle = "#c9a45a";
-      ctx.beginPath();
-      for (let i = 8; i < solid.w; i += 12) {
-        ctx.moveTo(x + i * s, y + 6 * s);
-        ctx.lineTo(x + (i - 8) * s, y + solid.h * s - 6 * s);
+  const cam0 = state.cameraX - 40;
+  const cam1 = state.cameraX + VIEW_W + 40;
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      const rect = CellWorldRect(soil, c, r);
+      if (rect.x + rect.w < cam0 || rect.x > cam1) continue;
+      const type = soil.cells[r][c];
+      const x = WX(rect.x);
+      const y = WY(rect.y);
+      const w = rect.w * s;
+      const h = rect.h * s;
+      if (type === AIR) {
+        ctx.fillStyle = pal.air || "#2a2118";
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = "rgba(90,70,45,.25)";
+        ctx.strokeRect(x, y, w, h);
+      } else if (type === SOFT) {
+        ctx.fillStyle = pal.soft || "#9a6b3e";
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = "rgba(40,24,12,.35)";
+        ctx.strokeRect(x, y, w, h);
+        ctx.strokeStyle = "rgba(60,36,18,.2)";
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + h - 4);
+        ctx.lineTo(x + w - 4, y + 4);
+        ctx.stroke();
+      } else if (type === HARD) {
+        ctx.fillStyle = pal.hard || "#4a4540";
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = "rgba(0,0,0,.45)";
+        ctx.strokeRect(x, y, w, h);
       }
-      ctx.stroke();
-      ctx.fillStyle = "rgba(239,224,197,.9)";
-      ctx.font = `600 ${12 * s}px IBM Plex Sans, sans-serif`;
-      ctx.fillText("土塞 · 挖开（不能跳过）", x + 4 * s, y - 8 * s);
     }
   }
-}
-
-function DrawTunnelCorridor(w, h) {
-  // Hollow the play corridor so depth bands read as surrounding earth
-  const s = Scale();
-  const top = WY(TUNNEL_CEIL);
-  const bot = WY(TUNNEL_FLOOR);
-  const left = WX(state.cameraX - 20);
-  const width = (VIEW_W + 40) * s;
-  ctx.fillStyle = "#2a2118";
-  ctx.globalAlpha = 0.92;
-  ctx.fillRect(left, top, width, bot - top);
-  ctx.globalAlpha = 1;
-  // floor plank tone
-  ctx.fillStyle = "#3a2a1c";
-  ctx.fillRect(left, bot - 6 * s, width, 10 * s);
-  // ceiling beams
-  ctx.strokeStyle = "rgba(90,70,45,.7)";
-  ctx.lineWidth = 3 * s;
-  for (let x = state.cameraX; x < state.cameraX + VIEW_W; x += 80) {
-    const sx = WX(x);
-    ctx.beginPath();
-    ctx.moveTo(sx, top);
-    ctx.lineTo(sx, top + 16 * s);
-    ctx.stroke();
+  for (const zone of state.level.digZones || []) {
+    if (state.goalsDone[zone.goal]) continue;
+    const rect = CellWorldRect(soil, zone.c, zone.r);
+    const x = WX(rect.x);
+    const y = WY(rect.y);
+    const w = zone.w * soil.cell * s;
+    const h = zone.h * soil.cell * s;
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = "#c9a45a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "rgba(201,164,90,.12)";
+    ctx.fillRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(239,224,197,.9)";
+    ctx.font = `600 ${11 * s}px IBM Plex Sans, sans-serif`;
+    ctx.fillText("待挖区域", x + 4, y - 6);
+    ctx.restore();
+  }
+  const dig = state.player.digTarget;
+  if (dig) {
+    ctx.strokeStyle = "#f0c27a";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(WX(dig.rect.x), WY(dig.rect.y), dig.rect.w * s, dig.rect.h * s);
   }
 }
 
-function DrawDigSpots() {
+function DrawSurfaceExtras() {
   const s = Scale();
-  const layer = state.player.inTunnel ? "tunnel" : "surface";
-  for (const dig of state.level.digSpots) {
-    if (dig.done || dig.layer !== layer) continue;
-    const x = WX(dig.x);
-    const y = WY(dig.y);
-    ctx.save();
-    ctx.strokeStyle = "#c9a45a";
-    ctx.fillStyle = "rgba(201,164,90,.2)";
-    ctx.setLineDash([5, 4]);
-    ctx.lineWidth = 2;
-    ctx.fillRect(x - 22 * s, y - 50 * s, 44 * s, 50 * s);
-    ctx.strokeRect(x - 22 * s, y - 50 * s, 44 * s, 50 * s);
-    ctx.setLineDash([]);
-    ctx.restore();
+  for (const solid of state.level.surfaceSolids) {
+    if (solid.id === "sg") continue;
+    const x = WX(solid.x);
+    const y = WY(solid.y);
+    ctx.fillStyle = "#7a7264";
+    ctx.strokeStyle = "#1c1712";
+    ctx.fillRect(x, y, solid.w * s, solid.h * s);
+    ctx.strokeRect(x, y, solid.w * s, solid.h * s);
   }
 }
 
@@ -614,7 +628,7 @@ function Render() {
 
   if (state.player.inTunnel && state.phase === "play") {
     DrawSoilCutaway(w, h, camX, pal);
-    DrawTunnelCorridor(w, h);
+    DrawSoilGrid(pal);
   } else {
     DrawSky(w, h, pal);
     DrawFieldBands(w, h, camX, pal);
@@ -624,16 +638,14 @@ function Render() {
   if (state.phase === "play" || state.phase === "panels" || state.phase === "closePanels") {
     if (!state.player.inTunnel) {
       for (const prop of state.level.props) DrawProp(prop, pal);
+      DrawSurfaceExtras();
     } else {
-      // blockhouse / houses as faint silhouettes above cut line when underground
-      ctx.globalAlpha = 0.25;
+      ctx.globalAlpha = 0.22;
       for (const prop of state.level.props) DrawProp(prop, pal);
       ctx.globalAlpha = 1;
     }
 
     for (const shaft of state.level.shafts) DrawShaft(shaft);
-    DrawSolids();
-    DrawDigSpots();
     for (const ent of state.level.entities) DrawEntity(ent);
     if (state.phase === "play") DrawPlayer();
 
@@ -670,6 +682,7 @@ function BindInput() {
     if (["arrowright", "d"].includes(k)) input.right = down;
     if (["arrowdown", "s"].includes(k)) input.crouch = down;
     if (["j", "shift"].includes(k)) input.dig = down;
+    if (["w", "arrowup"].includes(k)) input.up = down;
     if (down && [" ", "w", "arrowup"].includes(k)) {
       if (state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
