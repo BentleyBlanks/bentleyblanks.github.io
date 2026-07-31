@@ -11,6 +11,7 @@ import {
   CountAirInRect,
   RebuildTunnelSolids,
 } from "./Script_Dig.mjs";
+import { SeedDepthDecor } from "./Script_Depth.mjs";
 import { ITEM_CHARGE, ITEM_GRENADE, ITEM_SHOVEL, PickupEntity } from "./Script_Items.mjs";
 
 function PlacePickup(x, y, itemId, layer = "both") {
@@ -592,7 +593,9 @@ const BUILDERS = {
 };
 
 export function BuildLevel(chapterId) {
-  return (BUILDERS[chapterId] || BuildAct1)();
+  const level = (BUILDERS[chapterId] || BuildAct1)();
+  SeedDepthDecor(level);
+  return level;
 }
 
 export function EvalDigGoals(level) {

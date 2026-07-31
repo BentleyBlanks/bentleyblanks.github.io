@@ -1,6 +1,7 @@
 import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
 import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
+import { PropsBehind, PropsFront } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   CreateCampaignState,
@@ -169,6 +170,20 @@ function TestAct5PlantNeedsCharge() {
   Assert(state.player.held == null, "hands empty after plant");
 }
 
+function TestDepthLayers() {
+  const level = BuildLevel("act1_connect");
+  Assert(PropsBehind(level.props).length > 3, "back depth props exist");
+  Assert(PropsFront(level.props).length > 5, "front occluder props exist");
+  Assert(
+    level.props.some((p) => p.kind === "house" && (p.depth ?? 0) < 0),
+    "houses sit behind play plane",
+  );
+  Assert(
+    level.props.some((p) => (p.depth ?? 0) >= 2 || p.kind === "mudbank" || p.kind === "bush"),
+    "near-camera occluders seeded",
+  );
+}
+
 function TestChaptersHaveSoil() {
   Assert(CHAPTERS.length === 5, "five acts");
   for (const ch of CHAPTERS) {
@@ -187,6 +202,7 @@ function TestChaptersHaveSoil() {
 
 function Main() {
   TestChaptersHaveSoil();
+  TestDepthLayers();
   TestSoilNotGifted();
   TestCarveConnectsAct1();
   TestNoJump();
@@ -200,7 +216,7 @@ function Main() {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 item-carry smoke OK");
+  console.log("\nTunnelHeart1942 depth-layers smoke OK");
 }
 
 Main();

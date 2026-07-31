@@ -42,9 +42,8 @@ button { font: inherit; cursor: pointer; }
 
 /* ── Title ── */
 .titleScreen {
-  background:
-    linear-gradient(105deg, rgba(12,10,8,.92) 0%, rgba(12,10,8,.4) 55%, rgba(12,10,8,.15) 100%),
-    linear-gradient(180deg, #8fa7b0 0%, #d7c3a0 50%, #7a6248 100%);
+  /* Let the canvas 2.5D depth stack show through — only a readable veil on the copy side */
+  background: linear-gradient(105deg, rgba(12,10,8,.78) 0%, rgba(12,10,8,.28) 48%, rgba(12,10,8,.05) 100%);
 }
 .projectMark {
   position: absolute; top: clamp(14px, 3vw, 28px); left: clamp(14px, 3vw, 28px);

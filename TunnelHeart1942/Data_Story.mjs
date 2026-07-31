@@ -1,7 +1,7 @@
 /** Film beats — dig system is the spine of every underground act. */
 
 export const SAVE_KEY = "tunnelheart1942_v4";
-export const CACHE_BUST = "20260731e";
+export const CACHE_BUST = "20260731f";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",

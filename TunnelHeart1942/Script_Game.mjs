@@ -10,6 +10,15 @@ import {
   StepPlay,
 } from "./Script_Rules.mjs";
 import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
+import {
+  ParallaxOf,
+  PropsBehind,
+  PropsFront,
+  PropsPlay,
+  ScaleOf,
+  TintAlpha,
+  YLiftOf,
+} from "./Script_Depth.mjs";
 import { ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
@@ -140,164 +149,273 @@ function WY(y) {
   return (y - state.cameraY) * Scale();
 }
 
-// ─── Valiant Hearts-style layered depth ─────────────────────────
+// ─── Valiant Hearts 2.5D depth stack ─────────────────────────────
+function DepthWX(worldX, depth) {
+  const factor = ParallaxOf(depth);
+  return (worldX - state.cameraX * factor) * Scale();
+}
+
+function DepthWY(depth) {
+  const s = Scale();
+  return WY(SURFACE_Y) + YLiftOf(depth, s);
+}
+
 function DrawSky(w, h, pal) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
+  const g = ctx.createLinearGradient(0, 0, 0, h * 0.72);
   g.addColorStop(0, pal.skyTop);
-  g.addColorStop(0.55, pal.skyBot);
-  g.addColorStop(1, pal.earth);
+  g.addColorStop(0.7, pal.skyBot);
+  g.addColorStop(1, pal.haze);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  // soft sun / moon
-  ctx.globalAlpha = pal.night ? 0.35 : 0.5;
+  // Cloud slabs — slowest parallax band
+  const scroll = state.cameraX * 0.05 * Scale();
+  ctx.fillStyle = pal.night ? "rgba(200,210,230,.08)" : "rgba(255,248,230,.28)";
+  for (let i = 0; i < 6; i++) {
+    const x = ((i * 220 - scroll) % (w + 260)) - 80;
+    const y = h * (0.1 + (i % 3) * 0.05);
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(x, y, 70 + i * 8, 16 + (i % 3) * 4, 0, 0, Math.PI * 2);
+    else ctx.arc(x, y, 40, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = pal.night ? 0.4 : 0.55;
   ctx.fillStyle = pal.night ? "#d9e2f0" : "#f0d9a0";
   ctx.beginPath();
-  ctx.arc(w * 0.78, h * 0.18, pal.night ? 22 : 34, 0, Math.PI * 2);
+  ctx.arc(w * 0.8, h * 0.14, pal.night ? 20 : 32, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 }
 
-function DrawParallaxHills(w, h, camX, pal, factor, yBase, amp, color) {
+function DrawRidge(w, h, camX, factor, yFrac, amp, color, alpha = 1) {
   const scale = Scale();
-  const scroll = camX * factor;
+  const scroll = camX * factor * scale;
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(0, h);
-  for (let i = 0; i <= w + 40; i += 20) {
+  ctx.moveTo(-20, h);
+  for (let i = -20; i <= w + 40; i += 16) {
     const wx = i + scroll;
-    const n =
-      Math.sin(wx * 0.0031) * amp +
-      Math.sin(wx * 0.007) * amp * 0.45 +
-      Math.sin(wx * 0.013) * amp * 0.2;
-    const y = yBase + n * scale;
-    ctx.lineTo(i, y);
+    const n = Math.sin(wx * 0.0028) * amp + Math.sin(wx * 0.0065) * amp * 0.4 + Math.sin(wx * 0.015) * amp * 0.18;
+    ctx.lineTo(i, h * yFrac + n * scale);
   }
-  ctx.lineTo(w, h);
+  ctx.lineTo(w + 40, h);
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = 1;
 }
 
-function DrawFarVillage(w, h, camX, pal) {
-  const scale = Scale();
-  const scroll = camX * 0.42;
-  const baseY = h * 0.58;
-  ctx.fillStyle = pal.night ? "#243028" : "#5a6a4e";
-  for (let i = -2; i < 18; i++) {
-    const x = ((i * 140 - scroll) % (w + 200)) - 40;
-    const bw = 28 + ((i * 17) % 22);
-    const bh = 36 + ((i * 13) % 40);
-    ctx.globalAlpha = 0.55;
-    ctx.fillRect(x, baseY - bh * scale, bw * scale, bh * scale);
-    // roof triangle
+/** Far → near atmospheric bands (no gameplay props). */
+function DrawDepthBackdrop(w, h, camX, pal) {
+  DrawRidge(w, h, camX, 0.08, 0.48, 22, pal.haze, 0.95);
+  DrawRidge(w, h, camX, 0.18, 0.54, 16, pal.night ? "#2a342c" : "#6a7d58", 0.9);
+  // Distant village tooth-row on the second ridge
+  const baseY = h * 0.54;
+  const scroll = camX * 0.22 * Scale();
+  ctx.fillStyle = pal.night ? "#1c241e" : "#4a5a42";
+  for (let i = -3; i < 22; i++) {
+    const x = ((i * 110 - scroll) % (w + 180)) - 40;
+    const bw = 18 + ((i * 11) % 16);
+    const bh = 24 + ((i * 9) % 28);
+    ctx.globalAlpha = 0.65;
+    ctx.fillRect(x, baseY - bh, bw, bh);
     ctx.beginPath();
-    ctx.moveTo(x - 4 * scale, baseY - bh * scale);
-    ctx.lineTo(x + bw * 0.5 * scale, baseY - (bh + 16) * scale);
-    ctx.lineTo(x + (bw + 4) * scale, baseY - bh * scale);
+    ctx.moveTo(x - 3, baseY - bh);
+    ctx.lineTo(x + bw * 0.5, baseY - bh - 12);
+    ctx.lineTo(x + bw + 3, baseY - bh);
     ctx.closePath();
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  DrawRidge(w, h, camX, 0.4, 0.62, 12, pal.field, 1);
+  DrawRidge(w, h, camX, 0.62, 0.7, 8, pal.earth, 1);
 }
 
-function DrawFieldBands(w, h, camX, pal) {
-  DrawParallaxHills(w, h, camX, pal, 0.12, h * 0.5, 18, pal.haze);
-  DrawParallaxHills(w, h, camX, pal, 0.28, h * 0.56, 14, pal.field);
-  DrawFarVillage(w, h, camX, pal);
-  DrawParallaxHills(w, h, camX, pal, 0.55, h * 0.64, 10, pal.earth);
-}
+/** Perspective stage floor — VH walk plane with foreshortening stripes. */
+function DrawStageFloor(w, h, pal) {
+  const s = Scale();
+  const y = WY(SURFACE_Y);
+  // Receding dirt plate behind the walk line
+  const back = ctx.createLinearGradient(0, y - 70 * s, 0, y);
+  back.addColorStop(0, pal.night ? "rgba(42,50,40,.0)" : "rgba(120,140,90,.0)");
+  back.addColorStop(0.55, pal.night ? "#2e382c" : "#7a8f5c");
+  back.addColorStop(1, pal.night ? "#3a3228" : "#8b6a45");
+  ctx.fillStyle = back;
+  ctx.fillRect(0, y - 70 * s, w, 70 * s);
 
-function DrawForeground(w, h, camX, pal) {
-  const scale = Scale();
-  const scroll = camX * 1.35;
-  ctx.strokeStyle = pal.night ? "rgba(180,200,160,.25)" : "rgba(40,50,30,.35)";
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 40; i++) {
-    const x = ((i * 55 - scroll) % (w + 60)) - 20;
-    const hgt = (18 + (i % 5) * 6) * scale;
-    ctx.globalAlpha = 0.45;
+  // Walk strip toward camera (darker = nearer)
+  const near = ctx.createLinearGradient(0, y, 0, h);
+  near.addColorStop(0, pal.night ? "#3a3228" : "#8b6a45");
+  near.addColorStop(0.35, pal.night ? "#2a241c" : "#6a4e34");
+  near.addColorStop(1, pal.night ? "#12100e" : "#3a2818");
+  ctx.fillStyle = near;
+  ctx.fillRect(0, y, w, h - y + 4);
+
+  // Perspective hatch lines — sell the 2.5D ground plane
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.28)" : "rgba(40,28,16,.22)";
+  ctx.lineWidth = 1;
+  for (let i = -6; i < 18; i++) {
+    const x0 = WX(state.cameraX + i * 70);
     ctx.beginPath();
-    ctx.moveTo(x, h * 0.92);
-    ctx.quadraticCurveTo(x + 4, h * 0.92 - hgt * 0.5, x - 2, h * 0.92 - hgt);
+    ctx.moveTo(x0, y);
+    ctx.lineTo(w * 0.5 + (x0 - w * 0.5) * 1.45, h);
     ctx.stroke();
   }
-  // fence posts
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#3a2a1c";
-  for (let i = 0; i < 12; i++) {
-    const x = ((i * 160 - scroll * 0.9) % (w + 80)) - 30;
-    ctx.fillRect(x, h * 0.78, 4 * scale, h * 0.14);
-  }
-  ctx.globalAlpha = 1;
+  // Horizon seam
+  ctx.strokeStyle = "rgba(20,14,10,.55)";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(w, y);
+  ctx.stroke();
 }
 
 function DrawSoilCutaway(w, h, camX, pal) {
-  // Cross-section depth bands — the VH digging-scene feel
-  const bands = [
-    { y0: 0.0, y1: 0.22, c: pal.skyTop, a: 0.35 },
-    { y0: 0.18, y1: 0.38, c: pal.earth, a: 0.55 },
-    { y0: 0.34, y1: 0.55, c: pal.soilLight, a: 0.85 },
-    { y0: 0.5, y1: 0.72, c: pal.soilMid, a: 1 },
-    { y0: 0.68, y1: 1, c: pal.soilDeep, a: 1 },
-  ];
-  for (const b of bands) {
-    ctx.globalAlpha = b.a;
-    ctx.fillStyle = b.c;
-    ctx.fillRect(0, h * b.y0, w, h * (b.y1 - b.y0));
-  }
-  ctx.globalAlpha = 1;
+  // Layered earth cross-section: sky lip → surface ridge → soil strata
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, pal.skyTop);
+  g.addColorStop(0.2, pal.skyBot);
+  g.addColorStop(0.28, pal.earth);
+  g.addColorStop(0.45, pal.soilLight);
+  g.addColorStop(0.7, pal.soilMid);
+  g.addColorStop(1, pal.soilDeep);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
 
-  // tiny surface silhouettes along the cut line
-  const cutY = h * 0.34;
-  ctx.fillStyle = "rgba(30,40,28,.55)";
-  const scroll = camX * 0.5;
-  for (let i = 0; i < 14; i++) {
-    const x = ((i * 120 - scroll) % (w + 100)) - 20;
-    ctx.fillRect(x, cutY - 28, 22, 28);
+  const cutY = WY(SURFACE_Y);
+  // Mini surface diorama ABOVE the cut — back houses on the ridge
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, Math.max(0, cutY));
+  ctx.clip();
+  DrawDepthBackdrop(w, h, camX, pal);
+  for (const prop of PropsBehind(state.level.props)) {
+    DrawProp(prop, pal, 0.55);
   }
-  ctx.strokeStyle = "rgba(20,14,10,.5)";
+  ctx.restore();
+
+  // Thick cut lip (front edge of the surface plane)
+  ctx.fillStyle = pal.night ? "#2a2218" : "#5a3e28";
+  ctx.fillRect(0, cutY - 6, w, 14);
+  ctx.strokeStyle = "#1a1410";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(0, cutY);
   ctx.lineTo(w, cutY);
   ctx.stroke();
-  ctx.fillStyle = "rgba(239,224,197,.55)";
-  ctx.font = "600 12px IBM Plex Sans, sans-serif";
-  ctx.fillText("地面剖线", 16, cutY - 8);
+  // Soil grain under cut
+  ctx.strokeStyle = "rgba(20,12,8,.2)";
+  for (let i = 0; i < 30; i++) {
+    const x = ((i * 48 - camX * 0.3) % (w + 40)) - 10;
+    ctx.beginPath();
+    ctx.moveTo(x, cutY + 20);
+    ctx.lineTo(x + 30, cutY + 80 + (i % 5) * 10);
+    ctx.stroke();
+  }
 }
 
-function DrawProp(prop, pal) {
-  const s = Scale();
-  const x = WX(prop.x);
-  const y = WY(SURFACE_Y);
+function DrawProp(prop, pal, alphaMul = 1) {
+  const depth = prop.depth ?? 0;
+  const s = Scale() * ScaleOf(depth);
+  const x = DepthWX(prop.x, depth);
+  const y = DepthWY(depth);
+  if (x < -200 || x > (canvas.clientWidth || innerWidth) + 200) return;
+
   ctx.save();
   ctx.translate(x, y);
-  ctx.lineWidth = 2.5 * s;
-  ctx.strokeStyle = "#1c1712";
-  if (prop.kind === "house") {
-    const bw = 90 * s;
-    const bh = 70 * s;
-    ctx.fillStyle = prop.variant ? "#b8956a" : "#c4a27a";
+  ctx.globalAlpha = TintAlpha(depth) * alphaMul;
+  ctx.lineWidth = Math.max(1.5, 2.4 * s);
+  ctx.strokeStyle = depth >= 1 ? "#0e0a08" : "#1c1712";
+
+  const cool = depth < 0;
+  const ink = cool ? (pal.night ? "#1a221c" : "#3a4a38") : "#1c1712";
+
+  if (prop.kind === "house" || prop.kind === "farHouse") {
+    const bw = (prop.kind === "farHouse" ? 42 : 96) * s;
+    const bh = (prop.kind === "farHouse" ? 34 : 74) * s;
+    ctx.fillStyle = cool ? (pal.night ? "#2a3228" : "#7a6a52") : prop.variant ? "#b8956a" : "#c4a27a";
     ctx.fillRect(-bw / 2, -bh, bw, bh);
+    ctx.strokeStyle = ink;
     ctx.strokeRect(-bw / 2, -bh, bw, bh);
-    ctx.fillStyle = "#6e2a1c";
+    ctx.fillStyle = cool ? "#3a2820" : "#6e2a1c";
     ctx.beginPath();
     ctx.moveTo(-bw / 2 - 6 * s, -bh);
-    ctx.lineTo(0, -bh - 28 * s);
+    ctx.lineTo(0, -bh - (prop.kind === "farHouse" ? 14 : 28) * s);
     ctx.lineTo(bw / 2 + 6 * s, -bh);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#3a2418";
-    ctx.fillRect(-10 * s, -36 * s, 20 * s, 36 * s);
+    if (prop.kind === "house") {
+      ctx.fillStyle = "#3a2418";
+      ctx.fillRect(-10 * s, -36 * s, 20 * s, 36 * s);
+    }
+  } else if (prop.kind === "shed") {
+    ctx.fillStyle = cool ? "#5a4a38" : "#8a7355";
+    ctx.fillRect(-28 * s, -36 * s, 56 * s, 36 * s);
+    ctx.strokeRect(-28 * s, -36 * s, 56 * s, 36 * s);
+    ctx.fillStyle = "#4a3020";
+    ctx.fillRect(-32 * s, -44 * s, 64 * s, 10 * s);
+  } else if (prop.kind === "stack") {
+    ctx.fillStyle = "#6a5a40";
+    ctx.fillRect(-14 * s, -22 * s, 28 * s, 22 * s);
+    ctx.strokeRect(-14 * s, -22 * s, 28 * s, 22 * s);
   } else if (prop.kind === "tree") {
-    ctx.fillStyle = "#5c4030";
-    ctx.fillRect(-5 * s, -90 * s, 10 * s, 90 * s);
-    ctx.fillStyle = "#4f6344";
+    ctx.fillStyle = depth >= 1 ? "#2a1c12" : "#5c4030";
+    const trunkH = (depth >= 2 ? 130 : 100) * s;
+    ctx.fillRect(-7 * s, -trunkH, 14 * s, trunkH);
+    ctx.fillStyle = depth >= 1 ? "#2a3828" : "#4f6344";
     ctx.beginPath();
-    ctx.arc(0, -100 * s, 36 * s, 0, Math.PI * 2);
+    ctx.arc(0, -trunkH - 8 * s, (depth >= 2 ? 48 : 36) * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  } else if (prop.kind === "bush") {
+    const bh = (prop.tall ? 56 : 34) * s;
+    ctx.fillStyle = depth >= 2 ? "#152016" : "#2a3824";
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -bh * 0.35, 40 * s, bh * 0.6, 0, 0, Math.PI * 2);
+    else ctx.arc(0, -bh * 0.35, 32 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Second lobe — denser silhouette
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(16 * s, -bh * 0.25, 26 * s, bh * 0.45, 0, 0, Math.PI * 2);
+    else ctx.arc(16 * s, -bh * 0.25, 20 * s, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (prop.kind === "wheat") {
+    ctx.strokeStyle = depth >= 1 ? "#2a1e0c" : "#6a5a28";
+    ctx.fillStyle = depth >= 1 ? "#3a2a12" : "#7a6a30";
+    ctx.lineWidth = 2.5 * s;
+    for (let i = -5; i <= 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 5 * s, 4 * s);
+      ctx.quadraticCurveTo(i * 5 * s + 4 * s, -28 * s, i * 5 * s - 2 * s, -52 * s);
+      ctx.stroke();
+    }
+  } else if (prop.kind === "post") {
+    ctx.fillStyle = "#1a120c";
+    ctx.fillRect(-4 * s, -62 * s, 8 * s, 62 * s);
+    ctx.fillRect(-22 * s, -58 * s, 44 * s, 5 * s);
+  } else if (prop.kind === "mudbank") {
+    const mw = (prop.w || 80) * s;
+    ctx.fillStyle = depth >= 2 ? "#1a120c" : "#2a1c12";
+    ctx.beginPath();
+    ctx.moveTo(-mw / 2, 14 * s);
+    ctx.lineTo(-mw / 2 + 8 * s, -44 * s);
+    ctx.lineTo(mw / 2 - 10 * s, -38 * s);
+    ctx.lineTo(mw / 2 + 10 * s, 16 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Lit lip so it reads as volume toward camera
+    ctx.fillStyle = "#3a2a18";
+    ctx.fillRect(-mw * 0.35, -18 * s, mw * 0.5, 8 * s);
+  } else if (prop.kind === "lantern") {
+    ctx.fillStyle = "#c9a45a";
+    ctx.globalAlpha *= 0.7;
+    ctx.beginPath();
+    ctx.arc(0, -40 * s, 5 * s, 0, Math.PI * 2);
+    ctx.fill();
   } else if (prop.kind === "well") {
     ctx.fillStyle = "#7a7264";
     ctx.fillRect(-16 * s, -18 * s, 32 * s, 18 * s);
@@ -314,7 +432,7 @@ function DrawProp(prop, pal) {
     ctx.fill();
     ctx.stroke();
   } else if (prop.kind === "blockhouse") {
-    ctx.fillStyle = "#5a5852";
+    ctx.fillStyle = cool ? "#3a3834" : "#5a5852";
     ctx.fillRect(-70 * s, -150 * s, 140 * s, 150 * s);
     ctx.fillStyle = "#3e3c38";
     ctx.fillRect(-45 * s, -200 * s, 90 * s, 50 * s);
@@ -322,6 +440,48 @@ function DrawProp(prop, pal) {
     ctx.strokeRect(-45 * s, -200 * s, 90 * s, 50 * s);
   }
   ctx.restore();
+}
+
+/** Front soil lips that paint OVER the digger — tunnel 2.5D occlusion. */
+function DrawTunnelFrontLips(pal) {
+  const soil = state.level.soil;
+  if (!soil) return;
+  const s = Scale();
+  const cam0 = state.cameraX - 40;
+  const cam1 = state.cameraX + VIEW_W + 40;
+  const px = state.player.x;
+  const py = state.player.y;
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      if (soil.cells[r][c] === AIR) continue;
+      const rect = CellWorldRect(soil, c, r);
+      if (rect.x + rect.w < cam0 || rect.x > cam1) continue;
+      // Only lips near the player column — frame the corridor
+      if (Math.abs(rect.x + rect.w / 2 - px) > 140) continue;
+      if (rect.y > py + 20 || rect.y + rect.h < py - 70) continue;
+      const x = WX(rect.x);
+      const y = WY(rect.y);
+      const rw = rect.w * s;
+      const rh = rect.h * s;
+      ctx.fillStyle = "rgba(20,12,8,.42)";
+      ctx.fillRect(x, y, rw, Math.min(10 * s, rh * 0.35));
+      ctx.fillStyle = "rgba(10,6,4,.35)";
+      ctx.fillRect(x, y + rh - 8 * s, rw, 8 * s);
+    }
+  }
+  // Near camera dirt clumps along bottom of view
+  const scroll = state.cameraX * 1.4;
+  ctx.fillStyle = "rgba(18,12,8,.75)";
+  for (let i = 0; i < 10; i++) {
+    const x = ((i * 130 - scroll) % (VIEW_W * Scale() + 100)) - 40;
+    const y = (canvas.clientHeight || innerHeight) * 0.88;
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(x, y, 40, 18, 0, 0, Math.PI * 2);
+    else {
+      ctx.arc(x, y, 28, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
 }
 
 function DrawShaft(shaft) {
@@ -771,20 +931,65 @@ function DrawProjectiles() {
   }
 }
 
-function DrawGroundStrip(w, h, pal) {
-  // Play-depth ground plane shadow under feet — anchors the stage
-  const y = WY(SURFACE_Y);
-  const g = ctx.createLinearGradient(0, y - 10, 0, h);
-  g.addColorStop(0, pal.night ? "rgba(30,28,24,.0)" : "rgba(80,60,40,.0)");
-  g.addColorStop(0.05, pal.night ? "#2a3228" : "#7a6248");
-  g.addColorStop(1, pal.night ? "#1a1814" : "#4a3828");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, y, w, h - y + 4);
-  ctx.strokeStyle = "rgba(28,23,18,.45)";
+function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
+  const playable = !!opts.playable;
+  // 1 far sky + ridge bands
+  DrawSky(w, h, pal);
+  DrawDepthBackdrop(w, h, camX, pal);
+  // 2 stage floor (perspective plate)
+  DrawStageFloor(w, h, pal);
+  // 3 BACK props (houses behind walk plane)
+  for (const prop of PropsBehind(state.level.props)) DrawProp(prop, pal);
+  if (playable) DrawSurfaceExtras();
+  // 4 play-plane props
+  for (const prop of PropsPlay(state.level.props)) DrawProp(prop, pal);
+  if (playable) {
+    for (const shaft of state.level.shafts) DrawShaft(shaft);
+    for (const ent of state.level.entities) DrawEntity(ent);
+    DrawProjectiles();
+    DrawPlayer();
+    DrawSpeechBubble();
+    DrawInteractPromptWorld();
+  }
+  // 5 FRONT occluders — paint AFTER player (real 2.5D cover)
+  for (const prop of PropsFront(state.level.props)) DrawProp(prop, pal);
+  // Near camera dirt skirt — solid bottom plane like VH stage edge
+  ctx.fillStyle = pal.night ? "#0e0c0a" : "#2a1c12";
   ctx.beginPath();
-  ctx.moveTo(0, y);
-  ctx.lineTo(w, y);
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, h * 0.9);
+  for (let i = 0; i <= w; i += 40) {
+    const wave = Math.sin((i + camX * 1.5) * 0.02) * 10;
+    ctx.lineTo(i, h * 0.88 + wave);
+  }
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#0a0806";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.88);
+  for (let i = 0; i <= w; i += 40) {
+    ctx.lineTo(i, h * 0.88 + Math.sin((i + camX * 1.5) * 0.02) * 10);
+  }
   ctx.stroke();
+}
+
+function RenderTunnelStack(w, h, camX, pal) {
+  DrawSoilCutaway(w, h, camX, pal);
+  // Back wall of soil (dimmer grid)
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  DrawSoilGrid(pal);
+  ctx.restore();
+  for (const shaft of state.level.shafts) DrawShaft(shaft);
+  for (const ent of state.level.entities) DrawEntity(ent);
+  DrawProjectiles();
+  DrawPlayer();
+  DrawSpeechBubble();
+  DrawInteractPromptWorld();
+  // Front lips / dirt clumps occlude the digger
+  DrawTunnelFrontLips(pal);
 }
 
 function Render() {
@@ -793,51 +998,20 @@ function Render() {
   const pal = state.level.palette;
   const camX = state.cameraX;
 
-  if (state.player.inTunnel && state.phase === "play") {
-    DrawSoilCutaway(w, h, camX, pal);
-    DrawSoilGrid(pal);
+  if (state.phase === "title" || state.phase === "ending") {
+    RenderSurfaceStack(w, h, camX * 0.35, pal, { playable: false });
+  } else if (state.player.inTunnel && state.phase === "play") {
+    RenderTunnelStack(w, h, camX, pal);
   } else {
-    DrawSky(w, h, pal);
-    DrawFieldBands(w, h, camX, pal);
-    DrawGroundStrip(w, h, pal);
+    // play / comic panels — full depth stack; actors only while playing
+    RenderSurfaceStack(w, h, camX, pal, { playable: state.phase === "play" });
   }
 
-  if (state.phase === "play" || state.phase === "panels" || state.phase === "closePanels") {
-    if (!state.player.inTunnel) {
-      for (const prop of state.level.props) DrawProp(prop, pal);
-      DrawSurfaceExtras();
-    } else {
-      ctx.globalAlpha = 0.22;
-      for (const prop of state.level.props) DrawProp(prop, pal);
-      ctx.globalAlpha = 1;
-    }
-
-    for (const shaft of state.level.shafts) DrawShaft(shaft);
-    for (const ent of state.level.entities) DrawEntity(ent);
-    if (state.phase === "play") {
-      DrawProjectiles();
-      DrawPlayer();
-      DrawSpeechBubble();
-      DrawInteractPromptWorld();
-    }
-
-    if (!state.player.inTunnel && state.phase === "play") {
-      DrawForeground(w, h, camX, pal);
-    }
-  } else if (state.phase === "title" || state.phase === "ending") {
-    DrawSky(w, h, pal);
-    DrawFieldBands(w, h, camX * 0.2, pal);
-    DrawGroundStrip(w, h, pal);
-    DrawForeground(w, h, camX * 0.2, pal);
-  }
-
-  // hatch transition veil
   if (state.transition > 0) {
     const a = state.transition < 0.5 ? state.transition * 2 : (1 - state.transition) * 2;
     ctx.fillStyle = `rgba(10,8,6,${Math.min(1, a)})`;
     ctx.fillRect(0, 0, w, h);
   }
-
 }
 
 function BindInput() {
@@ -998,6 +1172,30 @@ async function Main() {
   BindUi();
   SyncPhaseUi();
   document.title = `地道战 · 高家庄｜白盒 ${CACHE_BUST}`;
+
+  // Agent / QA: /TunnelHeart1942/?preview=play boots straight into act1 surface
+  const preview = new URLSearchParams(location.search).get("preview");
+  if (preview === "play" || preview === "tunnel") {
+    BeginFrom(0);
+    state.phase = "play";
+    state.player.inTunnel = preview === "tunnel";
+    if (preview === "play") {
+      state.player.x = 420;
+      state.player.y = SURFACE_Y;
+      state.player.held = ITEM_SHOVEL;
+      state.cameraX = 180;
+    } else {
+      const hatch = state.level.entities.find((e) => e.type === "hatch");
+      if (hatch) {
+        state.player.x = hatch.tunnelX || hatch.x;
+        state.player.y = hatch.tunnelY || state.level.tunnelFloor;
+        state.cameraX = Math.max(0, state.player.x - 300);
+      }
+      state.player.held = ITEM_SHOVEL;
+    }
+    SyncPhaseUi();
+  }
+
   requestAnimationFrame(Frame);
 }
 
