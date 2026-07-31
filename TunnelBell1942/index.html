@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="《地道战·钟声》：Three.js 横版叙事冒险白盒。冀中高家庄，地表潜行与地道转移，勇敢的心式的三幕结构。">
+  <meta property="og:title" content="地道战 · 钟声">
+  <meta property="og:description" content="一口钟救了一个村子。地表躲搜索，地下走转移。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/TunnelBell1942/">
+  <title>地道战 · 钟声</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260731a">
+</head>
+<body>
+<main id="GameShell" class="gameShell">
+  <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="高家庄横版场景"></canvas>
+  <div class="letterbox" aria-hidden="true"><i></i><i></i></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- ── 标题 ── -->
+  <section id="TitleScreen" class="screen titleScreen">
+    <a class="siteMark" href="../">← 返回站点</a>
+    <div class="titleInner">
+      <p class="eyebrow">一九四二年 · 冀中 · 高家庄</p>
+      <h1>地道战<em>钟声</em></h1>
+      <p class="lead">土是软的，人是硬的。<br>钟一响，全村就往地下走。</p>
+      <div class="titleActions">
+        <button id="BeginButton" class="btnPrimary" type="button">开始</button>
+        <button id="ContinueButton" class="btnGhost" type="button" hidden>继续</button>
+        <button id="HelpButton" class="btnGhost" type="button">操作</button>
+      </div>
+      <p class="titleFoot">程序化白盒 · 无美术资源 · Three.js</p>
+    </div>
+  </section>
+
+  <!-- ── 幕间 ── -->
+  <section id="ChapterScreen" class="screen chapterScreen" hidden>
+    <div class="chapterInner">
+      <p id="ChapterIndex" class="chapterIndex">第一幕</p>
+      <h2 id="ChapterTitle">钟声</h2>
+      <p id="ChapterSubtitle" class="chapterSubtitle"></p>
+      <p id="ChapterEpilogue" class="chapterEpilogue"></p>
+      <button id="ChapterGoButton" class="btnPrimary" type="button">继续</button>
+    </div>
+  </section>
+
+  <!-- ── 漫画气泡（剧情） ── -->
+  <section id="PanelScreen" class="screen panelScreen" hidden>
+    <article id="PanelCard" class="panelCard" data-mood="talk">
+      <div class="panelPortrait" id="PanelPortrait" aria-hidden="true"></div>
+      <div class="panelBubble">
+        <p id="PanelSpeaker" class="panelSpeaker"></p>
+        <p id="PanelText" class="panelText"></p>
+        <div id="PanelIcons" class="panelIcons" aria-hidden="true"></div>
+      </div>
+      <button id="PanelNext" class="panelNext" type="button" aria-label="继续">▸</button>
+    </article>
+  </section>
+
+  <!-- ── 史料 ── -->
+  <section id="CodexScreen" class="screen codexScreen" hidden>
+    <article class="codexCard">
+      <p class="codexKicker">史料</p>
+      <h3 id="CodexTitle"></h3>
+      <p id="CodexBody"></p>
+      <button id="CodexClose" class="btnPrimary" type="button">收起</button>
+    </article>
+  </section>
+
+  <!-- ── 操作说明 ── -->
+  <section id="HelpScreen" class="screen helpScreen" hidden>
+    <article class="helpCard">
+      <h3>操作</h3>
+      <ul class="keyList">
+        <li><b>A D</b> / <b>← →</b><span>走</span></li>
+        <li><b>S</b> / <b>↓</b><span>猫腰 · 下地道 · 下竖井</span></li>
+        <li><b>W</b> / <b>↑</b><span>上竖井 · 出地道</span></li>
+        <li><b>Shift</b><span>放轻脚步</span></li>
+        <li><b>E</b> / <b>空格</b><span>用（开口 / 敲钟 / 拉闸 / 捡 / 藏）</span></li>
+        <li><b>Q</b><span>放下手里的东西</span></li>
+        <li><b>F</b><span>招呼乡亲跟上（会出声）</span></li>
+        <li><b>R</b><span>回到上一个安全点</span></li>
+      </ul>
+      <p class="helpNote">没有攻击键。这里打不赢，只能躲、堵、引、走。</p>
+      <button id="HelpClose" class="btnPrimary" type="button">知道了</button>
+    </article>
+  </section>
+
+  <!-- ── HUD ── -->
+  <div id="Hud" class="hud" hidden>
+    <div class="hudTop">
+      <p id="HudObjective" class="hudObjective"></p>
+      <div class="hudRight">
+        <span id="HudVillagers" class="hudChip" hidden></span>
+        <span id="HudCarry" class="hudChip" hidden></span>
+        <button id="HudMenu" class="hudIconBtn" type="button" aria-label="菜单">≡</button>
+      </div>
+    </div>
+    <div id="HudAlert" class="hudAlert" aria-hidden="true"><i id="HudAlertFill"></i></div>
+    <p id="HudPrompt" class="hudPrompt" hidden><b></b><span></span></p>
+    <p id="HudToast" class="hudToast" hidden></p>
+  </div>
+
+  <!-- ── 触摸操作 ── -->
+  <div id="TouchPad" class="touchPad" hidden>
+    <div class="touchLeft">
+      <button class="tBtn" data-hold="left">◀</button>
+      <button class="tBtn" data-hold="right">▶</button>
+    </div>
+    <div class="touchRight">
+      <button class="tBtn" data-hold="up">▲</button>
+      <button class="tBtn" data-hold="down">▼</button>
+      <button class="tBtn tBtnUse" data-tap="interact">用</button>
+      <button class="tBtn tBtnSmall" data-hold="sneak">轻</button>
+    </div>
+  </div>
+
+  <!-- ── 幕终 ── -->
+  <section id="EndScreen" class="screen endScreen" hidden>
+    <div class="endInner">
+      <h2 id="EndTitle"></h2>
+      <p id="EndBody"></p>
+      <div class="titleActions">
+        <button id="EndNext" class="btnPrimary" type="button">继续</button>
+        <button id="EndRetry" class="btnGhost" type="button">重玩本幕</button>
+      </div>
+    </div>
+  </section>
+
+  <p id="BootError" class="bootError" hidden></p>
+</main>
+
+<script type="module" src="./Script_Main.mjs?v=20260731a"></script>
+<noscript><p style="color:#e8dcc8;padding:2rem">这个白盒需要开启 JavaScript。</p></noscript>
+</body>
+</html>
