@@ -2916,18 +2916,26 @@ function BotThreat(state) {
 function BotHopSafe(state, fromX, toX, stealth) {
   const p = state.player;
   const scale = stealth ? SENSE.crouchVisibility * SENSE.sneakVisibility : 1;
-  const lo = Math.min(fromX, toX) - 1.2;
-  const hi = Math.max(fromX, toX) + 1.2;
+  const speed = stealth ? PLAYER.crouchSpeed * 0.72 : PLAYER.walkSpeed;
+  const dir = toX >= fromX ? 1 : -1;
+  const hopSec = Math.abs(toX - fromX) / Math.max(0.5, speed) + 0.4;
   for (const e of state.enemies) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue;
     if (e.alertness >= 0.3) return false; // 已经起疑了，别动
     const eff = e.visionRange * scale + 1.4;
-    const gap = e.x < lo ? lo - e.x : e.x > hi ? e.x - hi : 0;
-    if (gap > eff) continue; // 照不到这段路
-    // 他面朝这段路吗（人在段里就是照得到）
-    const facingSeg = gap === 0 || (e.x < lo ? e.facing > 0 : e.facing < 0);
-    if (facingSeg) return false;
+    const eSpeed = e.patrol ? e.patrol.speed : 1.2;
+    // 这一跳里我离他最近能有多近（把他朝我走过来的可能也算上）
+    const near = Math.min(Math.abs(e.x - fromX), Math.abs(e.x - toX)) - eSpeed * hopSec;
+    if (near > eff) continue; // 全程都在他视距外，随便走
+
+    // 够近了，就只能指望"我一直在他背后"。
+    // 他在我前面、朝着我要去的方向走，而且我不会超过他 → 我一路跟在他背后，安全。
+    const aheadOfMe = (e.x - fromX) * dir > 0;
+    const stayBehind = aheadOfMe && (e.x - toX) * dir > 0 && e.facing === dir;
+    // 他在我后面、背朝我 → 也安全。
+    const behindMe = !aheadOfMe && e.facing !== dir;
+    if (!stayBehind && !behindMe) return false;
   }
   return true;
 }

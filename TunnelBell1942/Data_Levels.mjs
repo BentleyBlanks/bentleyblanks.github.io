@@ -33,14 +33,26 @@ const FORE = LAYER_Z.FORE;
 //   x 50–78   用。院门（lever gateOpen）+ 柴垛（hide）；两个兵交叉视线。
 //   x 78–106  综合。长矮墙 84–100（净空 1.30）+ 军犬（hearing 10.5），全程猫腰。
 //   x 106–128 钟 → 追逐 → 出不去。
-// 结局不是玩家失误：敲钟后 a1_t_chase 生成 a1_e_blocker（山田）站死地道口，
-// 这是叙事必然，Rules 层不要把它当成惩罚。
+// 结局不是玩家失误，也不是秒杀：
+//   敲钟（a1_pr_bell.data.spawn）当场唤出三个人，把 x90–125 连成一条不断线的封锁：
+//     a1_e_chase2  90–106   从西边压过来，断掉往村里退的路
+//     a1_e_chase1  103–116  贴着老槐树扫，逼他往东
+//     a1_e_blocker 117–125  山田站死碾盘那个口（出口 125 在他巡逻区间正中）
+//   钟在 x112.5。山田视距 15，猫腰后的有效视距约 8.65 米 ——
+//   玩家最多摸到 x≈116 就再也过不去，离那个口还差 9 米。
+//   x≥113 一个藏身点都没有（有意清空），但西边 110 还留着最后一垛柴，
+//   所以他能躲一下、被逼出来、再试一次：15–25 秒的徒劳，然后被抓。
+//   敲钟后不再放检查点——这一段没有"重来"。
 // ===========================================================================
 const act1 = {
   id: "act1",
   chapterId: "act1",
   title: "钟声",
   actor: "laozhong",
+  // 本幕的结局是"被抓"，不是"到达出口"。exit 只是他想去、也确实没去成的那个口，
+  // 玩法层看见 endKind:"captured" 就不要再把 atExit 当通关条件——
+  // 钟已敲响 + 玩家被抓 → 发 { kind:"won" } 并播 a1_close。
+  endKind: "captured",
   bounds: { x0: 0, x1: 128, yTop: 8, yBottom: -6 },
   startX: 4,
   startY: 0,
@@ -141,15 +153,12 @@ const act1 = {
     { id: "a1_pr_sign2", x: 107, y: 0, z: PLAY, kind: "sign", facing: 1, interact: "read", data: { codexId: "codex_tonghuo" }, label: "祠堂告示" },
     { id: "a1_pr_tree", x: 112, y: 0, z: PLAY, kind: "tree", facing: 1, interact: "none", data: null, label: null },
     // 钟挂在树上，互动点是树下垂到地面的绳，所以 y = 0。
-    { id: "a1_pr_bell", x: 112.5, y: 0, z: PLAY, kind: "bell", facing: 1, interact: "bell", data: { rings: 3 }, label: "老槐树上的钟" },
+    { id: "a1_pr_bell", x: 112.5, y: 0, z: PLAY, kind: "bell", facing: 1, interact: "bell",
+      data: { rings: 3, panels: ["a1_p11", "a1_p12"], spawn: ["a1_e_chase1", "a1_e_chase2", "a1_e_blocker"], objective: "往回跑" },
+      label: "老槐树上的钟" },
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
-    { id: "a1_pr_haystack4", x: 122, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_trough_h2", x: 116, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
-    { id: "a1_pr_vat_ch1", x: 114, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
-    { id: "a1_pr_trough_ch1", x: 115.5, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
-    { id: "a1_pr_vat_ch2", x: 118, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
-    { id: "a1_pr_cart_ch1", x: 120, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
     { id: "a1_pr_haystack5", x: 110, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_millstone", x: 125, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hatch", data: { hatchId: "a1_h_exit" }, label: "碾盘下的地道口" },
   ],
@@ -188,19 +197,26 @@ const act1 = {
       vision: { range: 8, halfAngleDeg: 44, height: 0.7 },
       hearing: 10.5, probeAt: null,
     },
-    // —— 以下两个由 a1_t_chase 的 emit.spawn 唤出，之前应视为不存在 ——
+    // —— 以下三个由 a1_pr_bell.data.spawn 唤出（敲钟那一下才有），之前应视为不存在 ——
+    // 钟响之前它们不存在，所以玩家不可能"先引出追兵再回头敲钟"。
     {
-      id: "a1_e_chase1", x: 108, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 106, x1: 113, speed: 2.2, pauseSec: 0.3 },
-      vision: { range: 12, halfAngleDeg: 36, height: 1.6 },
+      id: "a1_e_chase1", x: 103, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 103, x1: 116, speed: 2.2, pauseSec: 0.3 },
+      vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
+      hearing: 7.5, probeAt: null,
+    },
+    {
+      id: "a1_e_chase2", x: 90, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 90, x1: 106, speed: 2.1, pauseSec: 0.3 },
+      vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.0, probeAt: null,
     },
-    // 山田：敲钟后堵死碾盘那个口。玩家做对一切也过不去——这是叙事必然。
+    // 山田：出口 x125 就在他巡逻区间里。玩家做对一切也过不去——这是叙事必然。
     {
-      id: "a1_e_blocker", x: 117, y: 0, kind: "officer", facing: -1,
-      patrol: { x0: 115, x1: 119, speed: 1.6, pauseSec: 0.9 },
-      vision: { range: 14, halfAngleDeg: 40, height: 1.65 },
-      hearing: 7.0, probeAt: null,
+      id: "a1_e_blocker", x: 125, y: 0, kind: "officer", facing: -1,
+      patrol: { x0: 117, x1: 125, speed: 1.6, pauseSec: 0.9 },
+      vision: { range: 15, halfAngleDeg: 40, height: 1.65 },
+      hearing: 7.5, probeAt: null,
     },
   ],
 
@@ -221,14 +237,11 @@ const act1 = {
     { id: "a1_t_yard2clear", x0: 76, x1: 79.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p6"], reveal: [], arm: [], spawn: [], objective: "有狗 —— 全程猫腰", checkpoint: true, win: false } },
     { id: "a1_t_dog", x0: 83, x1: 86, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p7"], reveal: [], arm: [], spawn: [], objective: "贴着墙根走完这条街", checkpoint: false, win: false } },
+      emit: { panels: ["a1_p7", "a1_p10"], reveal: [], arm: [], spawn: [], objective: "贴着墙根走完这条街", checkpoint: false, win: false } },
     { id: "a1_t_tree", x0: 104, x1: 107.5, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p8"], reveal: [], arm: [], spawn: [], objective: "敲响老槐树上的钟", checkpoint: true, win: false } },
-    // 过了钟才触发。敲钟的巨响把所有人引过来，同时唤出堵口的山田。
-    { id: "a1_t_chase", x0: 114, x1: 118, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p9", "a1_p10"], reveal: ["a1_h_exit"], arm: [], spawn: ["a1_e_chase1", "a1_e_blocker"], objective: "跑，碾盘下有地道口", checkpoint: true, win: false } },
-    { id: "a1_t_end", x0: 123, x1: 128, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p11", "a1_p12", "a1_close"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
+      emit: { panels: ["a1_p8", "a1_p9"], reveal: [], arm: [], spawn: [], objective: "敲响老槐树上的钟", checkpoint: true, win: false } },
+    // 敲钟之后没有触发器、没有检查点、也没有 win:true。
+    // 这一幕怎么收由 endKind:"captured" 决定，a1_close 由玩法层在被抓时播。
   ],
 
   checkpoints: [
@@ -236,7 +249,6 @@ const act1 = {
     { id: "a1_cp2", x: 50.5, y: 0.35, label: "头道院" },
     { id: "a1_cp3", x: 78.5, y: 0, label: "二道院" },
     { id: "a1_cp4", x: 106.5, y: 0, label: "老槐树下" },
-    { id: "a1_cp5", x: 115, y: 0, label: "钟声之后" },
   ],
 
   objectives: [
@@ -354,7 +366,7 @@ const act2 = {
     { id: "a2_pr_beam5", x: 46, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_fanko", x: 50, y: -8.0, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a2_h_fanko" }, label: "翻口" },
     { id: "a2_pr_crock3", x: 66, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
-    { id: "a2_pr_loophole1", x: 70, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: null },
+    { id: "a2_pr_loophole1", x: 55, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: "枪眼" },
     { id: "a2_pr_beam6", x: 73, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
 
     // —— 藏身洞 s2：头顶刺刀。通气孔标出危险的 x，炕洞是安全格。 ——
@@ -437,10 +449,12 @@ const act2 = {
   ],
 
   npcs: [
-    { id: "a2_n_child", x: 58.5, y: -3.8, name: "小豆子", role: "child", follow: false, rescued: false },
-    { id: "a2_n_elder", x: 94, y: -3.8, name: "王大爷", role: "elder", follow: false, rescued: false },
-    { id: "a2_n_v1", x: 105, y: -8.0, name: "秀兰", role: "villager", follow: false, rescued: false },
-    { id: "a2_n_v2", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false },
+    { id: "a2_n_wangdaniang", x: 35, y: -3.8, name: "王大娘", role: "elder", follow: false, rescued: false },
+    { id: "a2_n_shuanzhu", x: 58.5, y: -3.8, name: "栓柱", role: "child", follow: false, rescued: false },
+    { id: "a2_n_ersao", x: 61.5, y: -3.8, name: "二嫂", role: "villager", follow: false, rescued: false },
+    { id: "a2_n_siye", x: 94, y: -3.8, name: "四爷", role: "elder", follow: false, rescued: false },
+    { id: "a2_n_qiulan", x: 105, y: -8.0, name: "秋兰", role: "villager", follow: false, rescued: false },
+    { id: "a2_n_laoshuan", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false },
   ],
 
   hazards: [],
@@ -461,7 +475,7 @@ const act2 = {
     { id: "a2_t_probe", x0: 48, x1: 52, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p7"], reveal: [], arm: [], spawn: [], objective: "刺刀在头顶 —— 别停在通气孔底下", checkpoint: true, win: false } },
     { id: "a2_t_elder", x0: 84, x1: 88, yMin: -5.0, yMax: -2.4, once: true,
-      emit: { panels: ["a2_p8"], reveal: [], arm: [], spawn: [], objective: "王大爷在西院底下", checkpoint: true, win: false } },
+      emit: { panels: ["a2_p8"], reveal: [], arm: [], spawn: [], objective: "四爷在西院底下", checkpoint: true, win: false } },
     { id: "a2_t_mid", x0: 104, x1: 108, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_p9"], reveal: [], arm: [], spawn: [], objective: "人还不齐 —— 别落下谁", checkpoint: true, win: false } },
     { id: "a2_t_street", x0: 116, x1: 120, yMin: -5.0, yMax: -2.4, once: true,
@@ -649,7 +663,7 @@ const act3 = {
     { id: "a3_pr_house_s3", x: 118, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
     { id: "a3_pr_vat_s4", x: 122, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a3_pr_cart_s3", x: 123.2, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
-    { id: "a3_pr_loophole_s3", x: 121, y: 0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_loophole_s3", x: 121, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: "枪眼" },
     { id: "a3_pr_lamp_s3", x: 123, y: 0, z: BACK, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
 
     // —— 地下 d3：汇合段 ——
@@ -732,13 +746,13 @@ const act3 = {
 
   npcs: [
     // 开场就在身边的三位，跟着往前跑
-    { id: "a3_n_v1", x: 9, y: -8.0, name: "秀兰", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_child", x: 12, y: -8.0, name: "小豆子", role: "child", follow: false, rescued: false },
-    { id: "a3_n_elder", x: 15, y: -8.0, name: "王大爷", role: "elder", follow: false, rescued: false },
+    { id: "a3_n_qiulan", x: 9, y: -8.0, name: "秋兰", role: "villager", follow: false, rescued: false },
+    { id: "a3_n_shuanzhu", x: 12, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false },
+    { id: "a3_n_wangdaniang", x: 15, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false },
     // 塌方那头等着的三位，从炕洞下来才碰得上
-    { id: "a3_n_v2", x: 118, y: -8.0, name: "老栓", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_v3", x: 122, y: -8.0, name: "二嫂", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_militia", x: 126, y: -8.0, name: "林霞", role: "militia", follow: false, rescued: false },
+    { id: "a3_n_laoshuan", x: 118, y: -8.0, name: "老栓", role: "villager", follow: false, rescued: false },
+    { id: "a3_n_ersao", x: 123.5, y: -8.0, name: "二嫂", role: "villager", follow: false, rescued: false },
+    { id: "a3_n_siye", x: 127, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false },
   ],
 
   hazards: [
@@ -770,13 +784,23 @@ const act3 = {
     { id: "a3_t_dip", x0: 91, x1: 96, yMin: -6.0, yMax: -3.2, once: true,
       emit: { panels: ["a3_p8"], reveal: ["a3_h_street2"], arm: [], spawn: [], objective: "从水缸底下钻出去", checkpoint: true, win: false } },
     { id: "a3_t_water", x0: 108, x1: 112.5, yMin: -1.0, yMax: 3.0, once: true,
-      emit: { panels: ["a3_p9"], reveal: [], arm: [], spawn: [], objective: "扳辘轳，把水引进他们灌烟的那个洞", checkpoint: true, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "扳辘轳，把水引进他们灌烟的那个洞", checkpoint: true, win: false } },
     { id: "a3_t_flood", x0: 113.5, x1: 117, yMin: -1.0, yMax: 3.0, once: true,
       emit: { panels: ["a3_p10"], reveal: ["a3_h_kang"], arm: ["a3_hz_water"], spawn: [], objective: "下炕洞，跟乡亲汇合", checkpoint: true, win: false } },
-    { id: "a3_t_meet", x0: 117, x1: 122, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a3_p11"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
+    { id: "a3_t_meet", x0: 116.5, x1: 119.5, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_p11"], reveal: [], arm: [], spawn: [], objective: "跟乡亲汇合，一个都不能少", checkpoint: true, win: false } },
+    // 枪眼在 x=121，正上方是 a3_e_s4 的巡逻区（118–123）。
+    // 他来回走，总有背对着枪眼的那几秒——那几秒就是这一幕真正的转折点。
+    { id: "a3_t_loophole", x0: 120, x1: 122.5, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_p9"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
+    // 汇合到摸黑段之间有二十多米一句话没有，林霞在这儿说去处。
+    { id: "a3_t_quiet", x0: 133, x1: 137, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_p13"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
     { id: "a3_t_dark", x0: 145, x1: 150, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p12"], reveal: [], arm: [], spawn: ["a3_e_yamada", "a3_e_s5"], objective: "把马灯放下 —— 摸黑走，认通气孔漏下来的光", checkpoint: true, win: false } },
+    // 摸黑段的尽头。这一格没有台词，只有一个抬头往上看的画面。
+    { id: "a3_t_reeds", x0: 166, x1: 170, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_p14"], reveal: [], arm: [], spawn: [], objective: "到了 —— 一个一个上去", checkpoint: true, win: false } },
     { id: "a3_t_end", x0: 172, x1: 178, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_close"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
   ],
@@ -789,7 +813,9 @@ const act3 = {
     { id: "a3_cp5", x: 89, y: 0.4, label: "街口" },
     { id: "a3_cp6", x: 112, y: 0, label: "水井" },
     { id: "a3_cp7", x: 118, y: -8.0, label: "汇合点" },
-    { id: "a3_cp8", x: 148, y: -8.0, label: "摸黑段前" },
+    { id: "a3_cp8", x: 135, y: -8.0, label: "干线东段" },
+    { id: "a3_cp9", x: 148, y: -8.0, label: "摸黑段前" },
+    { id: "a3_cp10", x: 168, y: -8.0, label: "黑风口前" },
   ],
 
   objectives: [

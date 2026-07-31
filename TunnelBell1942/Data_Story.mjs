@@ -148,7 +148,7 @@ export const PANELS = {
     portrait: "chuanbao",
   },
   a2_p3: {
-    speaker: "王大娘",
+    speaker: "二嫂",
     text: "在后头，扶着四爷。",
     mood: "talk",
     icons: ["lantern", "village"],
@@ -295,20 +295,22 @@ export const PANELS = {
     icons: ["water", "down"],
     portrait: null,
   },
-  // 枪眼里看得见后背。全作的转折点，一个字都不说。
+  // 全作的转折点，一个字都不说。挂在 a3_t_meet：刚跟乡亲汇合，
+  // 枪眼(121,-8)外头一个巡逻兵背对着他。图标顺序就是一句话：看见 → 是个兵 → 打得着。
   a3_p9: {
     speaker: "高传宝",
     text: "",
     mood: "think",
-    icons: ["rifle", "eye"],
+    icons: ["eye", "boot", "rifle"],
     portrait: "chuanbao",
   },
-  // 他没开枪。他把灯灭了。
+  // 他没开枪。他转身去管那盏灯和身后六个人。
+  // 说"捻小"不说"灭"：真正放下马灯是 a3_t_dark 的事，隔着二十几米，不能提前穿帮。
   a3_p10: {
     speaker: "高传宝",
-    text: "灭灯。跟紧俺。",
+    text: "灯捻小。跟紧俺。",
     mood: "talk",
-    icons: ["lantern", "run"],
+    icons: ["lantern", "quiet"],
     portrait: "chuanbao",
   },
   a3_p11: {
@@ -325,6 +327,7 @@ export const PANELS = {
     icons: ["water", "boot"],
     portrait: "yamada",
   },
+  // 摸黑走的第一段：给一个看得见的方向，别的什么都不给。
   a3_p13: {
     speaker: "林霞",
     text: "黑风口。上头是苇子地。",
@@ -332,12 +335,13 @@ export const PANELS = {
     icons: ["up", "village"],
     portrait: "linxia",
   },
-  // 最后一个被拉上去。天在亮。
+  // 摸黑走的第二段，出口竖井底下。全作最后一次沉默：
+  // 别出声 / 娃 / 先上去 —— 跟 codex_zhuanyi 的"老人孩子先走"对得上。
   a3_p14: {
     speaker: "",
     text: "",
     mood: "silent",
-    icons: ["up", "child"],
+    icons: ["quiet", "child", "up"],
     portrait: null,
   },
   // 落点在"人还在"，不在"赢了"。跟 a2_close 一字不差。
