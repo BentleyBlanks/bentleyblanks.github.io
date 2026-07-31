@@ -42,6 +42,7 @@ const SHAFT_GRAB_X = 0.6; // 竖井吸附的水平半径（契约写死 ±0.6）
 const LAND_STUN_SEC = 0.62; // 超过 safeFallSpeed 的硬直
 const LAND_STUMBLE_SEC = 0.16; // 普通落地的小踉跄
 const DEATH_RESPAWN_SEC = 1.5;
+const CAPTURE_HOLD_SEC = 2.4; // 被抓收尾前的停顿，给这一下留点分量
 
 const HEAR_RISE_PER_SEC = 0.78; // 听觉抬警觉的速度
 const HEAR_ALERT_CAP = 0.82; // 光靠听永远抓不到人（>searchAt，<1）
@@ -61,6 +62,10 @@ const HAZARD_RAMP = 0.85; // 浓度爬升（每秒）
 const HAZARD_CLEAR = 1.3; // 封住后浓度回落（每秒）
 
 const CHECKPOINT_RADIUS = 1.7;
+
+const LIGHT_VISIBILITY = 0.6; // 提着马灯，有效视距最多放大到 1.6 倍
+const DARK_VISIBILITY = 0.78; // 灭了灯在地道里摸黑，更难被看见
+const VENT_RANGE = 3.2; // 通气孔：地表与地道之间的声音通道
 
 // ───────────────────────────── 小工具 ─────────────────────────────
 
@@ -152,6 +157,8 @@ function NormalizeLevel(raw, index) {
   level.title = typeof level.title === "string" ? level.title : "";
   level.actor = typeof level.actor === "string" ? level.actor : "chuanbao";
   level.timeOfDay = typeof level.timeOfDay === "string" ? level.timeOfDay : "night";
+  // "captured"：这一幕以主角被抓收场，不是走到出口。第一幕的情感支点。
+  level.endKind = typeof level.endKind === "string" ? level.endKind : null;
 
   const b = level.bounds && typeof level.bounds === "object" ? level.bounds : {};
   level.bounds = {
@@ -468,6 +475,7 @@ export function CreateState(levelIndex = 0) {
       codex: {},
       revealed: {},
       used: {},
+      bellRung: false,
       dropCount: 0,
     },
     story: { chapterId: "act1", queue: [], seen: {}, objectiveText: "" },
@@ -539,7 +547,9 @@ export function ResetLevel(state, levelIndex) {
   state.world.picked = {};
   state.world.revealed = {};
   state.world.used = {};
+  state.world.bellRung = false;
   state.world.dropCount = 0;
+  state.capturedEnding = false;
   // codex 跨幕保留，不清空
 
   // 敌人运行时
@@ -1112,6 +1122,9 @@ function FinishPlayerFrame(state, dt) {
     else base = state.input.sneak ? NOISE.sneak : NOISE.walk * frac;
     if (state.input.sneak && p.posture !== "stand") base *= 0.5; // 猫腰再放轻脚步
   }
+  if (p.carrying === "lantern" && !p.hidden) {
+    base = Math.max(base, NOISE.crouch); // 提着灯就别想彻底无声了
+  }
   p.noise = Clamp(Math.max(base, p.noiseSpike), 0, 1);
 
   // 灯光半径
@@ -1127,7 +1140,7 @@ function UpdatePlayerAnim(state, dt) {
   const speedFrac = Clamp(Math.abs(p.vx) / PLAYER.walkSpeed, 0, 1);
   let name;
 
-  if (p.dead) name = p.deathReason === "spotted" ? "caught" : "dead";
+  if (p.dead) name = p.deathReason === "spotted" || p.deathReason === "captured" ? "caught" : "dead";
   else if (p.hidden) name = "hide";
   else if (p.action === "hatch") name = "dig";
   else if (p.action === "bell") name = "ring";
@@ -1154,7 +1167,14 @@ function UpdateDeadPlayer(state, dt) {
   p.noise = 0;
   p.deathTimer -= dt;
   UpdatePlayerAnim(state, dt);
-  if (p.deathTimer <= 0) RespawnAtCheckpoint(state);
+  if (p.deathTimer > 0) return;
+  if (state.capturedEnding) {
+    // 停一拍再收尾，别一帧切走
+    state.capturedEnding = false;
+    WinLevel(state);
+    return;
+  }
+  RespawnAtCheckpoint(state);
 }
 
 function DoCall(state) {
@@ -1441,10 +1461,38 @@ function CompleteInteract(state, kind, prop) {
     }
     case "bell": {
       state.world.used[prop.id] = true;
+      state.world.bellRung = true;
       const rings = Num(prop.data.rings, 3);
       for (let i = 0; i < rings; i++) Sfx(state, "bell_ring", PropX(state, prop), prop.y);
       Shake(state, 0.4);
       p.noiseSpike = NOISE.bell;
+
+      // 钟声是因，追兵是果。关卡把要触发的东西写在 data 里。
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      for (const id of Arr(prop.data.spawn)) {
+        for (const e of state.enemies) {
+          if (e.id === id && e.dormant) {
+            e.dormant = false;
+            Sfx(state, "boot", e.x, e.y);
+          }
+        }
+      }
+      if (typeof prop.data.objective === "string") {
+        state.story.objectiveText = prop.data.objective;
+        Emit(state, { kind: "objective", text: prop.data.objective });
+      }
+      // 全村都听见了：附近的敌人一律往钟这边扑
+      const bx = PropX(state, prop);
+      for (const e of state.enemies) {
+        if (e.dormant) continue;
+        if (Math.abs(e.x - bx) > 55) continue;
+        e.alertness = Math.max(e.alertness, 0.7);
+        e.lastSeenX = bx;
+        e.lastSeenY = prop.y;
+        e.hasLead = true;
+        e.state = "search";
+        e.facing = bx >= e.x ? 1 : -1;
+      }
       break;
     }
     case "pickup": {
@@ -1695,6 +1743,8 @@ function AllVillagersSafe(state) {
 }
 
 function CheckWin(state, dt) {
+  // 以"被抓"收场的一幕，走到出口不算通关
+  if (state.level.endKind === "captured") return;
   const exit = state.level.exit;
   if (!AtExit(state)) return;
   if (exit.needAllVillagers && !AllVillagersSafe(state)) return;
@@ -1803,6 +1853,10 @@ function VisibilityScale(p) {
   else if (p.posture === "crouch") s *= SENSE.crouchVisibility;
   if (p.sneak) s *= SENSE.sneakVisibility;
   if (Math.abs(p.vx) < 0.05 && p.posture !== "stand") s *= 0.9;
+  // 提着马灯就是自己给自己打光：老远就看得见。
+  // 放下灯摸黑贴着墙走，反而比平时还难被发现——第三幕最后那段就靠这个成立。
+  s *= 1 + Clamp((p.lightRadius - 3.0) / 3.2, 0, 1) * LIGHT_VISIBILITY;
+  if (p.lightRadius < 2.0 && p.layer === "tunnel") s *= DARK_VISIBILITY;
   return s;
 }
 
@@ -1854,8 +1908,20 @@ function CanHear(state, e) {
   const radius = (e.hearing || 6) * p.noise * SENSE.hearingScale;
   if (radius <= 0.1) return false;
   const dx = p.x - e.x;
-  const dy = (p.y - e.y) * 0.6; // 声音跨层传得动，但打折
+  // 声音跨层传得动，但打折；正对着通气孔就不打折——
+  // 通气孔本来就是地表和地道之间的声音通道，摸黑那段的紧张感全在这上面。
+  const vent = NearVent(state, p.x);
+  const dy = (p.y - e.y) * (vent ? 1.0 : 0.6);
   return dx * dx + dy * dy <= radius * radius;
+}
+
+/** 玩家脚下附近有没有通气孔。 */
+function NearVent(state, x) {
+  for (const prop of state.level.props) {
+    if (prop.kind !== "vent") continue;
+    if (Math.abs(PropX(state, prop) - x) <= VENT_RANGE) return true;
+  }
+  return false;
 }
 
 function UpdateEnemies(state, dt) {
@@ -2091,9 +2157,13 @@ function Capture(state, e) {
 function Die(state, reason) {
   const p = state.player;
   if (p.dead) return;
+  // 第一幕：钟敲响之后被抓，就是这一幕该有的结局——不复活，收尾。
+  // （钟还没响就被抓，说明该做的事没做完，正常回检查点。）
+  const capturedEnding = state.level.endKind === "captured" && state.world.bellRung;
   p.dead = true;
-  p.deathReason = reason;
-  p.deathTimer = DEATH_RESPAWN_SEC;
+  p.deathReason = capturedEnding ? "captured" : reason;
+  p.deathTimer = capturedEnding ? CAPTURE_HOLD_SEC : DEATH_RESPAWN_SEC;
+  state.capturedEnding = capturedEnding;
   p.vx = 0;
   p.vy = 0;
   p.hidden = false;
@@ -2103,9 +2173,9 @@ function Die(state, reason) {
   p.action = null;
   p.actionTimer = 0;
   p.noise = 0;
-  state.stats.deaths++;
+  if (!capturedEnding) state.stats.deaths++;
   state.phase = "lost";
-  Emit(state, { kind: "lost", reason });
+  Emit(state, { kind: "lost", reason: p.deathReason });
   Sfx(state, reason === "spotted" ? "alarm" : "heartbeat", p.x, p.y);
   Shake(state, 0.6);
 }
