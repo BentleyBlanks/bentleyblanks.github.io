@@ -2845,12 +2845,18 @@ function BotCoverAt(state, x) {
 
 /**
  * 沿 dir 方向的下一个掩体。掩体接力就靠它。
- * 传了 threat 就不选"要从他身上跨过去"的那个（往回退的时候用）。
+ * 两个讲究：
+ *   - 传了 noCross 就不选"要从他身上跨过去"的（往回退的时候用）；
+ *   - 尽量别选落在他巡逻段里的掩体 —— 躲在他来回踱步的范围内，
+ *     等不到"他背过身"的空窗，出来就是送。实在没有别的才用。
  */
-function BotCoverToward(state, dir, threat) {
+function BotCoverToward(state, dir, noCross, avoid) {
   const p = state.player;
+  const foe = avoid || noCross;
   let best = null;
   let bestD = Infinity;
+  let fallback = null;
+  let fallbackD = Infinity;
   for (const prop of state.level.props) {
     if (prop.interact !== "hide") continue;
     if (!InteractAvailable(state, prop)) continue;
@@ -2858,16 +2864,29 @@ function BotCoverToward(state, dir, threat) {
     const px = PropX(state, prop);
     const d = (px - p.x) * dir;
     if (d < 1.3 || d > 26) continue; // 脚下这个不算，太远的也够不着
-    if (threat) {
-      const toEnemy = (threat.e.x - p.x) * dir;
-      if (toEnemy > 0 && d > toEnemy - 0.8) continue; // 别从他身上跨过去
+    if (noCross) {
+      const toEnemy = (noCross.e.x - p.x) * dir;
+      if (toEnemy > 0 && d > toEnemy - 0.8) continue;
+    }
+    let insidePatrol = false;
+    if (foe && foe.e.patrol) {
+      const lo = Math.min(foe.e.patrol.x0, foe.e.patrol.x1) - 0.5;
+      const hi = Math.max(foe.e.patrol.x0, foe.e.patrol.x1) + 0.5;
+      insidePatrol = px >= lo && px <= hi;
+    }
+    if (insidePatrol) {
+      if (d < fallbackD) {
+        fallbackD = d;
+        fallback = prop;
+      }
+      continue;
     }
     if (d < bestD) {
       bestD = d;
       best = prop;
     }
   }
-  return best;
+  return best || fallback;
 }
 
 /** 找一个能躲的地方：别在敌人另一侧（跑过去等于送），限制在 14 米内。 */
@@ -3146,7 +3165,7 @@ function BotThink(state, bot, dt) {
 
       // 2) 有窗口（或憋太久）→ 起跑，目标是下一个掩体
       if (windowOpen || commit) {
-        const next = shaftHop ? null : BotCoverToward(state, dirToGoal, null);
+        const next = shaftHop ? null : BotCoverToward(state, dirToGoal, null, threat);
         const dashX = next ? PropX(state, next) : localX;
         if (Math.abs(dashX - p.x) > 1.15) bot.dashTo = dashX;
         bot.commitTimer = 0;
@@ -3164,7 +3183,7 @@ function BotThink(state, bot, dt) {
         MaybePress(state, bot, goal, input);
         return;
       }
-      const back = BotCoverToward(state, -dirToGoal, threat);
+      const back = BotCoverToward(state, -dirToGoal, threat, threat);
       if (back) {
         input.crouch = !threat.exposed;
         input.sneak = input.crouch;
