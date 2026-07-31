@@ -760,7 +760,9 @@ function ExtractEarthOutline(level, cfg) {
     for (let t = 0; t < iterations; t++) p = ChaikinClosed(p, 0.26);
     p = Decimate(p, cell * 0.85, 0.0016);
     const isHole = area < 0;
-    p = Roughen(p, isHole ? 0.115 : 0.055, isHole ? 0.55 : 0.28, isHole ? 11.3 : 3.1);
+    // Chaikin 把边缘磨成了圆角，整块土读起来像一条肥皂。土是一锨锨挖出来的，
+    // 边缘必须是碎的 —— 外轮廓的扰动幅度和频率都要够，才有"挖"的手感。
+    p = Roughen(p, isHole ? 0.135 : 0.155, isHole ? 0.55 : 0.85, isHole ? 11.3 : 3.1);
     processed.push({ pts: p, area: SignedArea(p) });
   }
 
@@ -888,6 +890,75 @@ function MakeRig(kind, fallbackMat) {
     }
   }
   return FallbackRig(kind, fallbackMat);
+}
+
+// ---------------------------------------------------------------------------
+// 5.1 角色轮廓边光（契约 6.1：深色主体 + 轮廓边光）
+// ---------------------------------------------------------------------------
+// 夜里地表没有暖光源，深色角色贴在同样暗的背景上是零对比 —— 实测只能靠头上
+// 那块白毛巾找到人。这里给角色材质补一层视角相关的边光：正交相机看向 -Z，
+// 所以"法线越偏离 Z 轴"就越靠近轮廓，用它当 rim 因子最稳。
+// 顺带给每种 kind 一个乘色，8 种角色不再只分得出 3 类。
+//
+// 边光强度是全局共享 uniform（一个对象喂给所有材质），Sync 里改一次就全体生效，
+// 每帧零分配。
+
+/** kind → [tintR, tintG, tintB, rimScale]。 */
+const KIND_TINT = {
+  laozhong: [1.06, 1.02, 0.94, 1.15],
+  chuanbao: [1.00, 1.02, 1.02, 1.15],
+  villager: [0.80, 0.84, 0.96, 0.85],
+  child: [1.10, 0.98, 0.80, 1.05],
+  elder: [0.96, 0.94, 0.90, 0.95],
+  soldier: [0.74, 0.86, 0.70, 0.80],
+  officer: [0.70, 0.78, 0.94, 1.20],
+  dog: [0.92, 0.80, 0.66, 0.80],
+};
+
+const rimUniform = { value: new THREE.Color(0.55, 0.68, 0.92) };
+const rimPowerUniform = { value: 0.55 };
+const patchedActorMats = new WeakSet();
+
+function PatchActorMaterial(mat, kind) {
+  if (!mat || patchedActorMats.has(mat)) return;
+  patchedActorMats.add(mat);
+  const tint = KIND_TINT[kind] || [1, 1, 1, 1];
+  try {
+    mat.onBeforeCompile = function (shader) {
+      shader.uniforms.uRimColor = rimUniform;
+      shader.uniforms.uRimStrength = rimPowerUniform;
+      shader.uniforms.uKindTint = { value: new THREE.Vector3(tint[0], tint[1], tint[2]) };
+      shader.uniforms.uRimScale = { value: tint[3] };
+      shader.fragmentShader = shader.fragmentShader
+        .replace('void main() {', 'uniform vec3 uRimColor;\nuniform float uRimStrength;\nuniform vec3 uKindTint;\nuniform float uRimScale;\nvoid main() {')
+        .replace(
+          '#include <opaque_fragment>',
+          'outgoingLight *= uKindTint;\n' +
+          'float tbRim = 1.0 - abs(normalize(normal).z);\n' +
+          'outgoingLight += uRimColor * pow(clamp(tbRim, 0.0, 1.0), 3.4) * uRimStrength * uRimScale;\n' +
+          '#include <opaque_fragment>'
+        );
+    };
+    // 不给 cacheKey 的话 three 会把"没打补丁"的 program 直接复用过来
+    mat.customProgramCacheKey = function () { return 'tbActorRim'; };
+    mat.needsUpdate = true;
+  } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[Render] 角色边光补丁失败，按原样渲染。', e);
+  }
+}
+
+/** 给一个 rig 的所有材质打边光补丁（材质按 kind 共享，补丁只打一次）。 */
+function ApplyRimLight(rig) {
+  if (!rig || !rig.group) return;
+  const kind = rig.kind || 'villager';
+  rig.group.traverse(function (o) {
+    if (!o.isMesh || !o.material) return;
+    if (Array.isArray(o.material)) {
+      for (let i = 0; i < o.material.length; i++) PatchActorMaterial(o.material[i], kind);
+    } else {
+      PatchActorMaterial(o.material, kind);
+    }
+  });
 }
 
 function PoseRig(rig, anim, facing, time) {
@@ -1433,8 +1504,10 @@ export function CreateRenderer(canvas, options = {}) {
     }),
     fore: new THREE.MeshBasicMaterial({ color: 0x05070d, transparent: true, opacity: 1 }),
     foreTunnel: new THREE.MeshBasicMaterial({ color: 0x0a0704, transparent: true, opacity: 1 }),
-    farSil: new THREE.MeshBasicMaterial({ color: 0x131c2c, fog: false }),
-    backSil: new THREE.MeshBasicMaterial({ color: 0x182233 }),
+    // 远山 / 远村：跟天空 0x0b1220 只差 9 级亮度时等于没画，五层里真正有厚度的
+    // 只剩 PLAY 和土层。拉开明度差，视差才看得出来。
+    farSil: new THREE.MeshBasicMaterial({ color: 0x18243a, fog: false }),
+    backSil: new THREE.MeshBasicMaterial({ color: 0x27364f }),
     sky: new THREE.MeshBasicMaterial({ color: 0x1a2740, map: T('sky') || null, fog: false, depthWrite: false, transparent: true }),
     skyBase: new THREE.MeshBasicMaterial({ color: 0x0b1220, fog: false, depthWrite: false }),
     moon: new THREE.MeshBasicMaterial({ color: 0xdce8fb, fog: false, transparent: true, map: T('glow') || null, blending: THREE.AdditiveBlending, depthWrite: false }),
@@ -1447,13 +1520,15 @@ export function CreateRenderer(canvas, options = {}) {
     // 烟是遮挡物不是光源，additive 会让它读成"亮雾"。
     gas: new THREE.MeshBasicMaterial({ map: T('smoke') || null, vertexColors: true, transparent: true, opacity: 1, depthWrite: false, fog: false }),
     // 灌水：自带一点冷自发光，否则在没有马灯的坑道里是纯黑，等于没画。
+    // 冀中地道里灌进来的是浑水，不是游泳池。压低饱和、往土色偏，
+    // 但保留高光和一点自发光，好让"液面"这条线在没有马灯时也读得出来。
     water: new THREE.MeshPhongMaterial({
-      color: 0x16323f, specular: 0xbfe9ff, shininess: 110,
-      emissive: 0x123344, emissiveIntensity: 0.85,
-      transparent: true, opacity: 0.78, depthWrite: false,
+      color: 0x1b2a2c, specular: 0xa8ccd8, shininess: 110,
+      emissive: 0x101f26, emissiveIntensity: 0.8,
+      transparent: true, opacity: 0.8, depthWrite: false,
     }),
-    waterLine: new THREE.MeshBasicMaterial({ map: T('water') || null, color: 0x8fd6ef, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
-    waterEdge: new THREE.MeshBasicMaterial({ map: T('glow') || null, color: 0x9fe4ff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+    waterLine: new THREE.MeshBasicMaterial({ map: T('water') || null, color: 0x7fc0d6, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+    waterEdge: new THREE.MeshBasicMaterial({ map: T('glow') || null, color: 0x8fcbe0, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
     // 地下暗角：把远离玩家的实心土压下去，同时让"灭灯"真的变暗。
     vignette: new THREE.MeshBasicMaterial({ map: T('vignette') || null, color: 0x02040a, transparent: true, opacity: 0, depthWrite: false, fog: false }),
     dust: new THREE.PointsMaterial({ map: T('glow') || null, vertexColors: true, transparent: true, size: 6, sizeAttenuation: false, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
@@ -1817,6 +1892,23 @@ export function CreateRenderer(canvas, options = {}) {
       if (f.kind === 'tunnel') {
         BucketPush(buckets, 'mudDark', GBox(w, 0.3, 2.6, cx, f.y - 0.15, -0.5));
         BucketPush(buckets, 'mud', GBox(w, 0.06, 2.2, cx, f.y - 0.01, -0.4));
+        // 坑道里的暖底：沿地面和顶板各铺一串极淡的暖光斑。
+        // 没有它，"该走人的空间"是一条纯黑的缝，读起来像"棕墙上挖了道黑槽"，
+        // 而不是"你在一条通道里"——支撑木、粮罐、梯子全在黑里消失。
+        const amb = Math.max(1, Math.round(w / 4.2));
+        for (let k = 0; k < amb; k++) {
+          const gx = f.x0 + w * ((k + 0.5) / amb);
+          glowSources.push({
+            x: gx, y: f.y + 0.28, z: -1.4, size: 5.4, color: 0xd08a42, base: 0.10,
+            lightPower: 0, phase: StrSeed('tfa' + i + k) * 6.28,
+            propId: null, vStart: 0, vCount: 0, on: true, tunnelOnly: true,
+          });
+          glowSources.push({
+            x: gx, y: f.y + 1.92, z: -1.4, size: 4.2, color: 0xb87438, base: 0.055,
+            lightPower: 0, phase: StrSeed('tfb' + i + k) * 6.28,
+            propId: null, vStart: 0, vCount: 0, on: true, tunnelOnly: true,
+          });
+        }
       } else if (f.kind === 'stone') {
         BucketPush(buckets, 'stone', GBox(w, 0.42, 3.0, cx, f.y - 0.21, -0.5));
       } else if (f.kind === 'roof') {
@@ -2111,8 +2203,20 @@ export function CreateRenderer(canvas, options = {}) {
 
     const groundAt = outline ? outline.groundY : function () { return earthGroundRef; };
 
+    /** 到最近一个"绝对不许挡"的点有多远。第三档兜底用它挑最不碍事的位置。 */
+    function HardDist(x) {
+      let d = Infinity;
+      for (let i = 0; i < hard.length; i++) d = Math.min(d, Math.abs(hard[i] - x));
+      for (let i = 0; i < soft.length; i++) d = Math.min(d, Math.abs(soft[i] - x));
+      return d;
+    }
+
     // —— 槽位行军：每 slot 米一格，格内挑一个能落脚的 x ——
-    const slot = Clamp(15 / Math.max(0.35, cfg.foreDensity), 12, 26);
+    // 三档退让，最后一档一定会放东西：不许出现 30 米一处遮挡都没有的段落。
+    //   1 宽（土坡/断墙/柴垛）：让开判读区 5.0m、互动点 3.2m、整段巡逻路线
+    //   2 窄（树干）：只让开 2.6m / 1.5m
+    //   3 苇丛：本身是透光的细杆，挡不住任何判读，挑格子里最空的位置硬放
+    const slot = Clamp(13 / Math.max(0.35, cfg.foreDensity), 11, 24);
     const slots = Math.max(2, Math.round(span / slot));
     for (let i = 0; i < slots; i++) {
       const c0 = bx0 + span * (i / slots);
@@ -2120,9 +2224,7 @@ export function CreateRenderer(canvas, options = {}) {
       const rng = MakeRng(StrSeed('fore' + level.id + i));
       const pick = Hash1(i * 17.3 + StrSeed(String(level.id)) * 7);
 
-      // 先试"宽"的（土坡 / 断墙 / 柴垛），落不下就退化成"窄"的（树干 / 苇丛）——
-      // 窄的只切掉画面一竖条，几乎哪儿都能放，这是保证覆盖率的兜底。
-      let x = -1, wide = false;
+      let x = -1, wide = false, reedOnly = false;
       for (let k = 0; k < 7; k++) {
         const t = (k + 0.5) / 7;
         const cand = c0 + (c1 - c0) * t;
@@ -2135,10 +2237,26 @@ export function CreateRenderer(canvas, options = {}) {
           if (Clear(cand, 2.6, 1.5, false)) { x = cand; break; }
         }
       }
+      if (x < 0) {
+        let best = -1, bestD = -1;
+        for (let k = 0; k < 13; k++) {
+          const cand = c0 + (c1 - c0) * ((k + 0.5) / 13);
+          const d = HardDist(cand);
+          if (d > bestD) { bestD = d; best = cand; }
+        }
+        x = best; reedOnly = true;
+      }
       if (x < 0) continue;
       const gy = groundAt(x);
 
-      if (!wide || pick < 0.30) {
+      if (reedOnly || (wide && pick >= 0.72 && pick < 0.86)) {
+        // 苇丛：一丛细杆，本身是透的，可以高一点
+        for (let k = 0; k < 14; k++) {
+          const h = 1.3 + rng() * 1.1;
+          BucketPush(buckets, 'fore', GBox(0.05, h, 0.05, x + (rng() - 0.5) * 2.6, gy + h / 2 - 0.3, (rng() - 0.5) * 0.8, (rng() - 0.5) * 0.45));
+        }
+        foreOccluders.push({ x, w: 1.0, par: 1 });
+      } else if (!wide || pick < 0.30) {
         // 树干：一根近黑的干把画面切成两半，这是最有效也最安全的一招（窄，不吞人）
         const h = 6.5 + rng() * 3.5;
         const w = 0.5 + rng() * 0.4;
@@ -2164,13 +2282,6 @@ export function CreateRenderer(canvas, options = {}) {
           -w / 2, FORE_BOTTOM, w / 2, FORE_BOTTOM, w / 2, h * 0.35, w * 0.2, h, -w * 0.25, h * 0.8, -w / 2, h * 0.2,
         ], 1.0, x, gy, 0));
         foreOccluders.push({ x, w: w * 0.5, par: 1 });
-      } else if (pick < 0.86) {
-        // 苇丛：一丛细杆，本身是透的，可以高一点
-        for (let k = 0; k < 14; k++) {
-          const h = 1.3 + rng() * 1.1;
-          BucketPush(buckets, 'fore', GBox(0.05, h, 0.05, x + (rng() - 0.5) * 2.6, gy + h / 2 - 0.3, (rng() - 0.5) * 0.8, (rng() - 0.5) * 0.45));
-        }
-        foreOccluders.push({ x, w: 1.0, par: 1 });
       } else {
         // 断墙：齐腰高的残墙，底边同样收住
         const w = 2.4 + rng() * 2.0;
@@ -2181,14 +2292,24 @@ export function CreateRenderer(canvas, options = {}) {
         foreOccluders.push({ x, w: w * 0.55, par: 1 });
       }
 
-      // 画面顶上垂下来的枝叶：只压顶边，碰不到玩法，纯构图，可以随便放
+      // 画面顶上垂下来的枝叶：只压顶边，碰不到玩法，纯构图，可以随便放。
+      // 叶团要互相咬住，不然读成一排飘着的黑六边形。
       if (Hash1(i * 3.7 + 5) > 0.42) {
         const bxc = c0 + (c1 - c0) * (0.15 + Hash1(i * 8.9) * 0.7);
-        const by = gy + 5.4 + rng() * 1.2;
-        BucketPush(buckets, 'fore', GBox(4.0 + rng() * 2.5, 0.28, 0.8, bxc, by, 0, -0.16 + rng() * 0.3));
-        for (let k = 0; k < 5; k++) {
-          BucketPush(buckets, 'fore', GIco(1, 0, bxc + (rng() - 0.5) * 4.0, by - 0.3 - rng() * 0.7, 0,
-            0.9 + rng() * 0.8, 0.45 + rng() * 0.35, 0.6));
+        const by = gy + 5.6 + rng() * 1.0;
+        const tilt = -0.1 + rng() * 0.2;
+        // 主枝：从画面外斜伸进来，分两段，别是一根笔直的板
+        BucketPush(buckets, 'fore', GBox(3.2 + rng() * 1.6, 0.22, 0.8, bxc - 1.4, by + 0.35, 0, tilt));
+        BucketPush(buckets, 'fore', GBox(2.4 + rng() * 1.4, 0.17, 0.8, bxc + 1.3, by + 0.1, 0, tilt - 0.22));
+        // 叶团沿枝排一条弧，互相咬住 60% 以上，silhouette 才是一整片
+        const leaves = 13;
+        for (let k = 0; k < leaves; k++) {
+          const u = (k + 0.5) / leaves;
+          const lx = bxc + (u - 0.5) * 6.4 + (rng() - 0.5) * 0.7;
+          const arc = -Math.sin(u * Math.PI) * 0.85;
+          const ly = by + 0.25 + arc + (rng() - 0.5) * 0.35;
+          BucketPush(buckets, 'fore', GIco(1, cfg.ico, lx, ly, 0,
+            1.15 + rng() * 0.7, 0.62 + rng() * 0.4, 0.6));
         }
       }
     }
@@ -2204,9 +2325,21 @@ export function CreateRenderer(canvas, options = {}) {
         const rng = MakeRng(StrSeed('ft' + i + '_' + k));
         const x = f.x0 + (f.x1 - f.x0) * ((k + 0.5) / count) + (rng() - 0.5) * 3;
         if (!Clear(x, 2.2, 1.3, false)) continue;
-        // 脚下的土堆
-        const w = 1.4 + rng() * 1.6;
-        BucketPush(tunBuckets, 'fore', GPrism([-w / 2, -1, w / 2, -1, w / 2, 0.1, 0, 0.36 + rng() * 0.2, -w / 2, 0.14], 0.8, x, f.y, 0));
+        // 脚下的土堆。旧版是一个 3 米宽、从 -1 到 +0.36 的五边形——那个"底边伸进
+        // 地板下 + 中间一个尖"的组合在坑道里读成一间悬空的黑房子。现在：矮、碎、
+        // 底边只到 -0.28（贴着地板沿），顶是两个不对称的小包。
+        const w = 1.0 + rng() * 0.9;
+        const h1 = 0.20 + rng() * 0.14, h2 = 0.13 + rng() * 0.12;
+        BucketPush(tunBuckets, 'fore', GPrism([
+          -w / 2, -0.28, w / 2, -0.28, w / 2, 0.04,
+          w * 0.22, h1, 0, h1 * 0.55, -w * 0.24, h2, -w / 2, 0.06,
+        ], 0.8, x, f.y, 0));
+        if (rng() > 0.5) {
+          const w2 = 0.6 + rng() * 0.6;
+          BucketPush(tunBuckets, 'fore', GPrism([
+            -w2 / 2, -0.28, w2 / 2, -0.28, w2 / 2, 0.05, 0, 0.13 + rng() * 0.1, -w2 / 2, 0.03,
+          ], 0.8, x + (rng() - 0.5) * 2.2, f.y, 0));
+        }
         // 头顶垂下的树根
         if (rng() > 0.45) {
           for (let r = 0; r < 4; r++) {
@@ -2243,6 +2376,7 @@ export function CreateRenderer(canvas, options = {}) {
       gPlay.add(playerRig.group);
       if (cfg.shadows) playerRig.group.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
     }
+    ApplyRimLight(playerRig);
     blobs.push(MakeBlob(playerRig));
 
     const enemies = Array.isArray(level.enemies) ? level.enemies : [];
@@ -2251,6 +2385,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (!e || e.id == null) continue;
       const rig = MakeRig(ENEMY_RIG[e.kind] || 'soldier', mats.actor);
       if (rig && rig.group) gPlay.add(rig.group);
+      ApplyRimLight(rig);
       enemyRigs.set(e.id, rig);
       blobs.push(MakeBlob(rig));
       // 视锥
@@ -2271,6 +2406,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (!nn || nn.id == null) continue;
       const rig = MakeRig(NPC_RIG[nn.role] || 'villager', mats.actor);
       if (rig && rig.group) gPlay.add(rig.group);
+      ApplyRimLight(rig);
       npcRigs.set(nn.id, rig);
       blobs.push(MakeBlob(rig));
     }
@@ -2337,8 +2473,11 @@ export function CreateRenderer(canvas, options = {}) {
         const vi = 1 + r * (seg + 1) + i;
         const k = vi * 3;
         const sy = Math.sin(a) * range * rr;
+        // 软压扁：近端保持真实张角，远端渐近到上限。硬 clamp 会把扇形削成
+        // 一个方框，读起来像贴了张半透明的矩形贴纸，而不是"视线"。
+        const cap = sy >= 0 ? upCap : downCap;
         pos[k] = Math.cos(a) * range * rr;
-        pos[k + 1] = Clamp(sy, -downCap * rr, upCap * rr);
+        pos[k + 1] = cap * Math.tanh(sy / cap);
         pos[k + 2] = 0;
         const c = vi * 4;
         col[c] = 1; col[c + 1] = 1; col[c + 2] = 1; col[c + 3] = r === 0 ? 0.55 : 0;
@@ -2380,13 +2519,15 @@ export function CreateRenderer(canvas, options = {}) {
    *   spotted  高饱和红 + 脉冲，画面里最亮的东西
    * 元组：[hex, matOpacity, apexAlpha, nearAlpha, farAlpha]
    */
+  // ACES + 曝光 1.25 会把高亮往白/黄压，所以级差不能只靠色相——不透明度必须
+  // 拉开好几倍，spotted 才会真的比 search 刺眼。
   const CONE_LOOK = {
-    idle: [0x8ea4bc, 0.05, 0.5, 0.16, 0.00],
-    patrol: [0x8ea4bc, 0.07, 0.6, 0.22, 0.00],
-    probe: [0xffd27a, 0.16, 0.8, 0.42, 0.05],
-    suspicious: [0xffd050, 0.20, 0.9, 0.55, 0.10],
-    search: [0xff9130, 0.30, 1.0, 0.78, 0.22],
-    spotted: [0xff3a2c, 0.52, 1.0, 0.95, 0.40],
+    idle: [0x8ea4bc, 0.045, 0.5, 0.14, 0.00],
+    patrol: [0x8ea4bc, 0.065, 0.6, 0.20, 0.00],
+    probe: [0xffc46a, 0.100, 0.8, 0.38, 0.04],
+    suspicious: [0xffd050, 0.115, 0.9, 0.50, 0.09],
+    search: [0xff7a18, 0.190, 1.0, 0.74, 0.20],
+    spotted: [0xff1a10, 0.780, 1.0, 1.00, 0.52],
   };
 
   // ---- 危害 ----
@@ -2625,6 +2766,7 @@ export function CreateRenderer(canvas, options = {}) {
     TrackGeo(dustGeo);
     dustPoints = new THREE.Points(dustGeo, mats.dust);
     dustPoints.frustumCulled = false;
+    dustPoints.visible = qualityName !== 'low';
     dustPoints.renderOrder = 24;
     gFx.add(dustPoints);
     dustCursor = 0;
@@ -2738,7 +2880,7 @@ export function CreateRenderer(canvas, options = {}) {
     // 这里按 layerMix 同时压 emissive 和整体乘色（顺带去饱和），把视觉重量还给村庄。
     mats.earth.emissiveIntensity = Lerp(0.42 + lanternAmt * 0.5, 0.10, mix);
     // 乘色同时做压暗和去饱和：R 压得比 GB 多一点，土就不会在地表读成"发红的亮块"
-    mats.earth.color.setRGB(Lerp(1.0, 0.50, mix), Lerp(1.0, 0.475, mix), Lerp(1.0, 0.47, mix));
+    mats.earth.color.setRGB(Lerp(1.0, 0.60, mix), Lerp(1.0, 0.575, mix), Lerp(1.0, 0.565, mix));
     // 坑道背墙：任何时候都是暖的。地表俯看地道口时也不许读成冷蓝（act1 第一次
     // 见到地道的那一帧就栽在这上面）。地下再亮一档，保证腔体比周围实心土亮。
     mats.earthBack.emissiveIntensity = Lerp(0.86, 0.46, mix) * (0.72 + lanternAmt * 0.42);
@@ -2805,6 +2947,11 @@ export function CreateRenderer(canvas, options = {}) {
     // ---- 暖光池：只点亮离相机最近的几盏 ----
     UpdateWarmLights(cx, t, mix);
 
+    // ---- 角色轮廓边光：地表冷月色，地下暖马灯色 ----
+    // 共享 uniform，改一次全体生效；这里一帧只写两个数，零分配。
+    rimUniform.value.setRGB(Lerp(0.62, 0.44, mix), Lerp(0.42, 0.56, mix), Lerp(0.22, 0.86, mix));
+    rimPowerUniform.value = Lerp(0.10 + lanternAmt * 0.10, 0.19, mix);
+
     // ---- 玩家 ----
     // 角色比 PLAY 层道具略靠前一点点：否则站在柴垛/碾盘旁边时会被道具整个吞掉。
     // 仍然远在剖面正面(z=2.25)和 FORE(z=5)之后，所以该被挡的地方照样被挡。
@@ -2844,7 +2991,7 @@ export function CreateRenderer(canvas, options = {}) {
           const look = CONE_LOOK[e.state] || CONE_LOOK.patrol;
           cone.mat.color.setHex(look[0]);
           const alert = Clamp(typeof e.alertness === 'number' ? e.alertness : 0, 0, 1);
-          const pulse = e.state === 'spotted' ? 0.78 + 0.22 * Math.sin(t * 16) : 1;
+          const pulse = e.state === 'spotted' ? 0.72 + 0.28 * Math.sin(t * 16) : 1;
           // 离画面中心越远越淡：屏幕边上半截锥体是纯噪声
           const fade = Clamp(1.25 - Math.abs(ex - cx) / Math.max(4, halfW), 0.25, 1);
           cone.mat.opacity = look[1] * pulse * fade * (0.82 + alert * 0.4);
@@ -3032,7 +3179,9 @@ export function CreateRenderer(canvas, options = {}) {
     for (let i = 0; i < glowSources.length; i++) {
       const g = glowSources[i];
       const fl = 0.82 + 0.13 * Math.sin(t * 8.3 + g.phase) + 0.07 * Math.sin(t * 19.1 + g.phase * 1.7);
-      const a = g.on ? g.base * fl * Lerp(1.0, 0.7, mix) : 0;
+      // 坑道暖底只在地下亮：地表看见一条发光的地缝会很怪
+      const layerK = g.tunnelOnly ? Lerp(1.0, 0.0, mix) : Lerp(1.0, 0.7, mix);
+      const a = g.on ? g.base * fl * layerK : 0;
       for (let k = 0; k < 4; k++) arr[(g.vStart + k) * 4 + 3] = a;
     }
     glowColorAttr.needsUpdate = true;
@@ -3076,22 +3225,24 @@ export function CreateRenderer(canvas, options = {}) {
       const reach = span * lvl;
 
       if (v.kind === 'water') {
-        // 液面高度直接读 level：0 → 脚脖子，1 → 齐胸。这是玩家唯一的判定依据。
-        const h = 0.28 + lvl * 2.0;
+        // 液面高度直接读 level：0 → 脚脖子，1 → 齐胸偏上。
+        // 上限刻意压在坑道净空（约 1.78m）以下——一旦灌到顶，液面线就贴到顶板上
+        // 看不见了，"水在涨"这条唯一的判定信息当场消失。
+        const h = 0.18 + lvl * 1.42;
         v.group.position.set(v.x0, v.y, 1.15);
         const body = v.layers[0];
         body.scale.set(reach, h, 1);
         mats.water.opacity = 0.55 + lvl * 0.3;
-        mats.water.emissiveIntensity = 0.55 + lvl * 0.5;
+        mats.water.emissiveIntensity = 0.8 + lvl * 0.55;
         if (v.band) {
           // 液面线：一条随波动的亮带，位置就是水面
           v.band.position.set(0, h, 0.06);
-          v.band.scale.set(reach, 0.30 + 0.08 * Math.sin(t * 1.9), 1);
+          v.band.scale.set(reach, 0.34 + 0.10 * Math.sin(t * 1.9), 1);
           if (mats.waterLine.map) {
             mats.waterLine.map.offset.x = -t * 0.14;
             mats.waterLine.map.offset.y = Math.sin(t * 0.7) * 0.05;
           }
-          mats.waterLine.opacity = (0.34 + 0.22 * Math.sin(t * 2.3)) * (0.5 + lvl * 0.6);
+          mats.waterLine.opacity = (0.52 + 0.26 * Math.sin(t * 2.3)) * (0.55 + lvl * 0.55);
         }
         if (v.glint) {
           // 液面反光：一道更宽更淡的柔光贴在水面上，读作"这是液体不是色块"
@@ -3126,7 +3277,8 @@ export function CreateRenderer(canvas, options = {}) {
           c *= Lerp(1.0, 0.55, depth);
           // 翻滚：每团自己的呼吸
           const roll = 0.72 + 0.28 * Math.sin(t * (0.8 + pf.drift) + pf.phase);
-          const a = c * lvl * roll * (0.30 - pf.row * 0.045);
+          const rowOff = f.rowLimit != null && pf.row >= f.rowLimit ? 0 : 1;
+          const a = c * lvl * roll * (0.30 - pf.row * 0.045) * rowOff;
           // 上飘：低排慢、高排快，整体缓慢向上循环
           const rise = ((t * pf.drift * 0.45 + pf.phase) % 2.2);
           const yy = pf.y0 + rise * 0.42 + Math.sin(t * 0.6 + pf.phase) * 0.12;
@@ -3138,9 +3290,9 @@ export function CreateRenderer(canvas, options = {}) {
             const ci = (b + q) * 4;
             // 前沿那一圈偏黄绿（更"呛"），后方偏灰绿
             const lead = Clamp(1 - behind / 4.0, 0, 1);
-            col[ci] = 0.56 + lead * 0.24;
-            col[ci + 1] = 0.62 + lead * 0.10;
-            col[ci + 2] = 0.36;
+            col[ci] = 0.50 + lead * 0.30;
+            col[ci + 1] = 0.64 + lead * 0.08;
+            col[ci + 2] = 0.28;
             col[ci + 3] = a * fade;
           }
         }
@@ -3265,14 +3417,17 @@ export function CreateRenderer(canvas, options = {}) {
     if (cfg.texSize !== prevTex) RebuildTextures();
     // 层间空气雾
     gFx.traverse(function (o) { if (o.isMesh && o.material === mats.haze) o.visible = cfg.hazePlanes; });
-    // 毒烟层数
-    for (let i = 0; i < hazardViews.length; i++) {
-      const v = hazardViews[i];
-      if (v.kind !== 'gas') continue;
-      for (let k = 0; k < v.layers.length; k++) v.layers[k].visible = k < cfg.gasLayers;
-    }
     // 暖光池预算
     for (let i = 0; i < warmLights.length; i++) if (i >= cfg.warmLights) warmLights[i].visible = false;
+    // low 档：关掉尘。暗角罩和接触暗斑每帧在 Sync 里按 qualityName 判定，
+    // 这里只处理 Sync 不会重置的那一个。
+    if (dustPoints) dustPoints.visible = qualityName !== 'low';
+    // 毒烟团场：low 档砍掉最上面那一排
+    for (let i = 0; i < hazardViews.length; i++) {
+      const v = hazardViews[i];
+      if (!v.field) continue;
+      v.field.rowLimit = qualityName === 'low' ? 2 : 99;
+    }
     // 剖面细分 / 前景密度 / 纹理尺寸下一次 BuildLevel 才完全生效
   }
 
@@ -3280,6 +3435,8 @@ export function CreateRenderer(canvas, options = {}) {
     ClearLevel();
     scene.remove(gFar); scene.remove(gBack); scene.remove(gMid);
     scene.remove(gPlay); scene.remove(gFore); scene.remove(gFx);
+    scene.remove(vignetteMesh);
+    try { vignetteGeo.dispose(); } catch (e) { /* 忽略 */ }
     const keys = Object.keys(mats);
     for (let i = 0; i < keys.length; i++) { try { mats[keys[i]].dispose(); } catch (e) { /* 忽略 */ } }
     texCache.forEach(function (tex) { if (tex) { try { tex.dispose(); } catch (e) { /* 忽略 */ } } });
