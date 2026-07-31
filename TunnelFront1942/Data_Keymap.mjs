@@ -12,12 +12,13 @@ export const keymap = Object.freeze({
   panLeft: Object.freeze({ code: "KeyA", label: "A", group: "视图", desc: "平移（左）" }),
   panDown: Object.freeze({ code: "KeyS", label: "S", group: "视图", desc: "平移（下）" }),
   panRight: Object.freeze({ code: "KeyD", label: "D", group: "视图", desc: "平移（右）" }),
-  panMouse: Object.freeze({ button: 1, label: "中键拖拽", group: "视图", desc: "平移" }),
+  panMouse: Object.freeze({ button: 1, label: "拖拽", group: "视图",
+                            desc: "平移（左／中／右键按住拖动皆可；触屏单指拖动）" }),
 
   // ---- 选取与下令 ----
-  select: Object.freeze({ button: 0, label: "左键", group: "操作", desc: "选中（单位＞地物＞地形，当前层优先）" }),
+  select: Object.freeze({ button: 0, label: "左键", group: "操作", desc: "单击选中（单位＞地物＞地形，当前层优先）；按住拖动＝平移" }),
   order: Object.freeze({ button: 2, label: "右键", group: "操作",
-                         desc: "移动／下令（降低入口隐蔽的操作需二次右键确认）" }),
+                         desc: "单击移动／下令（降低入口隐蔽的操作需二次右键确认）；按住拖动＝平移" }),
   crossLayerPick: Object.freeze({ button: 0, alt: true, label: "Alt+点击", group: "操作", desc: "强制选取另一层" }),
   nextUnit: Object.freeze({ code: "Tab", label: "Tab", group: "操作", desc: "下一个未行动单位（自动落层跳转）" }),
   cancel: Object.freeze({ code: "Escape", label: "Esc", group: "操作",

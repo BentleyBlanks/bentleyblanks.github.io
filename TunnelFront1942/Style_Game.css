@@ -16,7 +16,8 @@ body {
 }
 
 #app { position: fixed; inset: 0; }
-#worldCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#worldCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#worldCanvas.isPanning { cursor: grabbing; }
 
 /* UI 根层不拦截；各面板自取指针（:where 保持零特异度，防止后续覆盖事故） */
 .ui-root { position: absolute; inset: 0; pointer-events: none; z-index: 10; }

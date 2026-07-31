@@ -776,7 +776,10 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
   // 输入
   // =========================================================================
 
-  const pointerState = { downX: 0, downY: 0, downButton: -1, dragging: false, midPan: false };
+  // 任意键按住拖拽都平移地图（左键为主，中/右键同样可用；触控板与触屏没有中键）。
+  // 判定顺序：按下先只记录；移动超过阈值才升级为拖拽并开始平移；未越过阈值的抬起仍按点击处理。
+  const dragThresholdPixels = 5;
+  const pointerState = { downX: 0, downY: 0, downButton: -1, held: false, dragging: false, pointerId: -1 };
 
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
@@ -784,32 +787,44 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     pointerState.downX = event.clientX;
     pointerState.downY = event.clientY;
     pointerState.downButton = event.button;
+    pointerState.held = true;
     pointerState.dragging = false;
-    if (MouseMatches(keymap.panMouse, event)) {
-      pointerState.midPan = true;
-      canvas.setPointerCapture(event.pointerId);
-      event.preventDefault();
-    }
+    pointerState.pointerId = event.pointerId;
+    if (event.button === keymap.panMouse.button) event.preventDefault();  // 中键不滚屏
   });
 
   canvas.addEventListener("pointermove", (event) => {
-    if (pointerState.midPan) {
-      renderer.PanByPixels(event.movementX, event.movementY);
-      return;
-    }
-    if (Math.hypot(event.clientX - pointerState.downX, event.clientY - pointerState.downY) > 6) {
-      pointerState.dragging = true;
+    if (pointerState.held) {
+      if (!pointerState.dragging
+        && Math.hypot(event.clientX - pointerState.downX, event.clientY - pointerState.downY) > dragThresholdPixels) {
+        pointerState.dragging = true;
+        canvas.setPointerCapture(pointerState.pointerId);
+        canvas.classList.add("isPanning");
+      }
+      if (pointerState.dragging) {
+        renderer.PanByPixels(event.movementX, event.movementY);
+        return;
+      }
     }
     HandleHover(event);
   });
 
-  canvas.addEventListener("pointerup", (event) => {
-    if (pointerState.midPan && event.button === keymap.panMouse.button) {
-      pointerState.midPan = false;
-      canvas.releasePointerCapture(event.pointerId);
-      return;
+  function EndPointer(event) {
+    if (!pointerState.held) return true;
+    pointerState.held = false;
+    if (pointerState.dragging) {
+      pointerState.dragging = false;
+      canvas.classList.remove("isPanning");
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      return true;   // 拖拽结束不派发点击
     }
-    if (pointerState.dragging) return;
+    return false;
+  }
+
+  canvas.addEventListener("pointercancel", (event) => { EndPointer(event); });
+
+  canvas.addEventListener("pointerup", (event) => {
+    if (EndPointer(event)) return;
     const crossLayer = MouseMatches(keymap.crossLayerPick, event);
     const pickLayer = crossLayer ? (renderer.GetLayer() === "surface" ? "under" : "surface") : undefined;
     const pick = renderer.PickAt(event.clientX, event.clientY, { layer: pickLayer });
