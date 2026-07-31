@@ -566,7 +566,7 @@ function BuildHuman(three, kind, sp, assets) {
   return {
     group: group, joints: joints, jointList: list,
     thighLen: thighL, shinLen: shinL, torsoLen: torsoL, chestLen: chestL,
-    upArmLen: upArmL, foreArmLen: foreL, hipY: hipY,
+    upArmLen: upArmL, foreArmLen: foreL, hipY: hipY, propDrop: propDrop,
   };
 }
 
@@ -731,6 +731,7 @@ export function CreateActorRig(kind, three) {
     torsoLen: built.torsoLen,
     chestLen: built.chestLen,
     chestX: built.chestX || 0,
+    propDrop: built.propDrop || sp.height * 0.30,
     upArmLen: built.upArmLen,
     foreArmLen: built.foreArmLen,
     hipY: built.hipY,

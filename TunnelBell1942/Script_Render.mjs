@@ -1687,7 +1687,9 @@ export function CreateRenderer(canvas, options = {}) {
 
     const merged = SafeMerge(geos);
     if (merged) {
-      PaintEarthStrata(merged, earthGroundRef, depth + bevelT + zPos, zPos - bevelT);
+      // 注意：顶点 z 是几何局部坐标（-bevelThickness .. depth+bevelThickness），
+      // 所以假 AO 的深度区间也必须用局部值，不能用世界 z。
+      PaintEarthStrata(merged, earthGroundRef, depth + bevelT, -bevelT);
       const mesh = new THREE.Mesh(merged, mats.earth);
       mesh.position.z = zPos;
       mesh.matrixAutoUpdate = false; mesh.updateMatrix();
