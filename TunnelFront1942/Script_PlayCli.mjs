@@ -14,6 +14,7 @@ import {
   FindEvacuationPaths,
   GetActionTargets,
   GetActionPathPlans,
+  GetActiveCivilianTransitEstimate,
   GetAvailableActions,
   GetCivilianTransitEstimate,
   GetExitWindow,
@@ -78,6 +79,82 @@ function FormatIntent(enemy) {
   return `${enemy.intent.intentId}${target}`;
 }
 
+function FormatActiveRecovery(action, state, estimate) {
+  const labels = {
+    Ambush: "行动组 Ambush/伏击",
+    Attack: "行动组 Attack/压制",
+    Brace: "WorkTeam Brace/支护",
+    ClearSeal: "WorkTeam ClearSeal/抢通",
+    Dig: "WorkTeam Dig/重挖",
+    Recon: "Scout Recon/复查",
+    Trap: "Militia Trap/陷阱",
+  };
+  const targetName = state.tiles[action.targetKey]?.name ?? action.targetKey;
+  const costs = [
+    `AP ${action.cost.ap}`,
+    action.cost.tools ? `工具 ${action.cost.tools}` : null,
+    action.cost.organization ? `组织 ${action.cost.organization}` : null,
+    action.cost.ammo ? `弹药 ${action.cost.ammo}` : null,
+    action.cost.exposure ? `暴露 ${action.cost.exposure > 0 ? "+" : ""}${action.cost.exposure}` : null,
+    action.ifAppliedNow.peopleSafetyCost > 0
+      ? `群众安全 -${action.ifAppliedNow.peopleSafetyCost}`
+      : null,
+  ].filter(Boolean).join("/");
+  const arrival = action.ifAppliedNow.arrivalTurn === null
+    ? "到口 --"
+    : `到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}→T${action.ifAppliedNow.arrivalTurn}`;
+  const safe = action.ifAppliedNow.safeTurn === null
+    ? `仍未形成安全窗口${action.ifAppliedNow.nextConstraintKind ? `，随后仍有 ${action.ifAppliedNow.nextConstraintKind}` : ""}`
+    : `安全 T${action.ifAppliedNow.safeTurn}`;
+  return `${labels[action.actionId] ?? action.actionId}@${targetName}（${costs}；${arrival}；${safe}）`;
+}
+
+function PrintActiveTransitGuidance(state, heading = true) {
+  const active = state.civilians
+    .map((group) => ({
+      group,
+      estimate: GetActiveCivilianTransitEstimate(state, group.groupId),
+    }))
+    .filter(({ estimate }) => estimate);
+  if (!active.length) {
+    return;
+  }
+  if (heading) {
+    console.log("\n在途只读时刻表（不自动执行，不预测未揭示敌情）：");
+  }
+  for (const { group, estimate } of active) {
+    const currentName = state.tiles[estimate.currentTileKey]?.name ?? estimate.currentTileKey;
+    const exitName = state.tiles[estimate.projectedExitKey]?.name ?? estimate.projectedExitKey;
+    const arrival = estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`;
+    const safe = estimate.safeTurn === null ? "尚未形成安全窗口" : `T${estimate.safeTurn}`;
+    const constraint = estimate.nextConstraint
+      ? `${estimate.nextConstraint.kind}@${state.tiles[estimate.nextConstraint.tileKey]?.name ?? estimate.nextConstraint.tileKey}：${estimate.nextConstraint.detail}`
+      : "无公开阻断";
+    console.log(
+      `- ${group.groupId}｜${estimate.status}@${currentName}→${exitName}`
+        + `｜剩 ${estimate.remainingSegments} 段｜到口 ${arrival}｜安全 ${safe}`
+        + `｜拥堵 ${estimate.congestionTurns}`
+        + `｜期限 ${estimate.deadlineRisk ? `当前不能确认 T${state.maxTurns} 前安全` : `可在 T${state.maxTurns} 内`}`
+        + `｜下一约束 ${constraint}`,
+    );
+    if (estimate.recoveryActions.length) {
+      console.log(
+        `  当前合法恢复：${estimate.recoveryActions
+          .map((action) => FormatActiveRecovery(action, state, estimate))
+          .join("；")}`,
+      );
+    } else if (estimate.recoveryNeeds.length) {
+      console.log(`  当前不可执行：${estimate.recoveryNeeds.map((entry) => entry.reason).join("；")}`);
+    } else {
+      console.log(
+        estimate.recoveryState === "NoKnownRecovery"
+          ? "  当前无合法且已知有效的恢复动作"
+          : "  当前无需恢复动作",
+      );
+    }
+  }
+}
+
 function PrintState(state) {
   const objective = GetObjectiveSummary(state);
   console.log(`\n=== ${state.phase === "Player" ? "我方行动" : "敌军行动"} · T${state.turn}/${state.maxTurns} ===`);
@@ -108,12 +185,19 @@ function PrintState(state) {
   console.log("\n群众：");
   for (const group of state.civilians) {
     const route = group.exitKey ? `→${state.tiles[group.exitKey]?.name ?? group.exitKey}` : "";
+    const estimate = GetActiveCivilianTransitEstimate(state, group.groupId);
+    const status = estimate?.status ?? group.status;
     console.log(
-      `- ${group.groupId} ${group.name} ${group.people}人｜${group.status}${route}`
+      `- ${group.groupId} ${group.name} ${group.people}人｜${status}${route}`
         + `｜速 ${group.moveSteps}｜载 ${group.trafficLoad}`
-        + `｜拥堵 ${group.trafficDelays ?? 0}`,
+        + `｜拥堵 ${group.trafficDelays ?? 0}`
+        + (estimate
+          ? `｜到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}`
+            + `｜安全 ${estimate.safeTurn === null ? "待恢复" : `T${estimate.safeTurn}`}`
+          : ""),
     );
   }
+  PrintActiveTransitGuidance(state);
 
   console.log("\n敌情：");
   for (const enemy of state.enemies.filter((entry) => entry.health > 0)) {
@@ -158,6 +242,7 @@ function PrintLegalActions(state, requestedId = "all") {
   if (!units.length) {
     throw new Error(`未知单位：${requestedId}`);
   }
+  PrintActiveTransitGuidance(state);
   for (const unit of units) {
     console.log(`\n${unit.unitId} ${unit.shortName}｜${unit.layer}@${unit.tileKey}｜AP ${unit.actionPoints}`);
     const actions = GetAvailableActions(state, unit.unitId);

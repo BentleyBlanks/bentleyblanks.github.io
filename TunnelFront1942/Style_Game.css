@@ -492,6 +492,12 @@ a:focus-visible {
   border-color: var(--cyan);
 }
 
+.civilianEntry:not(:disabled):hover,
+.civilianEntry:not(:disabled):focus-visible {
+  background: rgba(119, 198, 192, 0.12);
+  border-color: rgba(119, 198, 192, 0.58);
+}
+
 .civilianEntry:disabled {
   cursor: default;
   opacity: 0.68;

@@ -14,6 +14,7 @@ import {
   FindTunnelPath,
   GetActionPathPlans,
   GetActionTargets,
+  GetActiveCivilianTransitEstimate,
   GetAvailableActions,
   GetCombatPreview,
   GetCivilianTransitEstimate,
@@ -930,11 +931,33 @@ function RenderInspector() {
   }
 }
 
-function CivilianStatusLabel(group) {
+function CivilianConstraintLabel(estimate) {
+  if (!estimate?.nextConstraint) {
+    return "当前路况无阻断";
+  }
+  const labels = {
+    Collapse: "塌方",
+    Congestion: "拥堵",
+    Deadline: "期限",
+    Disconnected: "断路",
+    Seal: "封口",
+    Signal: "待信号",
+    Smoke: "烟流",
+    Watched: "敌军占压",
+  };
+  const tileName = gameState.tiles[estimate.nextConstraint.tileKey]?.name
+    ?? estimate.nextConstraint.tileKey;
+  return `${labels[estimate.nextConstraint.kind] ?? estimate.nextConstraint.kind} · ${tileName}`;
+}
+
+function CivilianStatusLabel(group, estimate = null) {
   switch (group.status) {
     case "Safe":
       return "已安全撤出";
     case "Moving":
+      if (estimate?.status === "AtExit") {
+        return `${gameState.tiles[group.exitKey]?.name ?? "出口"}下方 · ${CivilianConstraintLabel(estimate)}`;
+      }
       return group.waitingForSignal
         ? `${gameState.tiles[group.exitKey]?.name ?? "出口"}下方 · 等待信号`
         : `第 ${group.launchOrder ?? "?"} 批 · ${gameState.tiles[group.tileKey]?.name ?? "地下转移"}`;
@@ -945,7 +968,7 @@ function CivilianStatusLabel(group) {
   }
 }
 
-function CivilianMobileStatus(group) {
+function CivilianMobileStatus(group, estimate = null) {
   if (group.status === "Safe") {
     return "已撤";
   }
@@ -953,9 +976,73 @@ function CivilianMobileStatus(group) {
     return "被困";
   }
   if (group.status === "Moving") {
+    if (estimate?.status === "AtExit") {
+      return "到口受阻";
+    }
     return group.waitingForSignal ? "等信号" : `第${group.launchOrder ?? "?"}批`;
   }
   return "待命";
+}
+
+function CivilianActiveTimingText(estimate, compact = false) {
+  if (!estimate) {
+    return "";
+  }
+  const arrival = estimate.arrivalTurn === null ? "到口 --" : `到口 T${estimate.arrivalTurn}`;
+  const safety = estimate.safeTurn === null
+    ? (compact ? "未安全" : "按当前公开条件尚不能安全出洞")
+    : `安全 T${estimate.safeTurn}`;
+  const congestion = estimate.congestionTurns > 0
+    ? `${compact ? "堵" : "预计拥堵 "}${estimate.congestionTurns}`
+    : (compact ? "" : "无新增拥堵");
+  const deadline = estimate.deadlineRisk
+    ? (compact ? "超期风险" : `当前不能确认在 T${gameState.maxTurns} 前安全撤出`)
+    : "";
+  return [arrival, safety, congestion, deadline].filter(Boolean).join(" · ");
+}
+
+function CivilianRecoverySummary(estimate) {
+  if (!estimate) {
+    return "";
+  }
+  const recovery = estimate.recoveryActions[0];
+  if (recovery) {
+    const labels = {
+      Brace: "可立即支护",
+      ClearSeal: "可立即抢通",
+      Dig: "可立即重挖",
+      Recon: "可立即复查",
+      Attack: "可立即压制",
+      Trap: "可立即设陷阱",
+      Ambush: "可立即伏击",
+    };
+    return labels[recovery.actionId] ?? `可立即${recovery.actionId}`;
+  }
+  if (estimate.recoveryNeeds[0]) {
+    return estimate.recoveryNeeds[0].reason;
+  }
+  return estimate.recoveryState === "NoKnownRecovery"
+    ? "当前无已知恢复动作"
+    : "当前无需恢复动作";
+}
+
+function CivilianMobileRecoverySummary(estimate) {
+  const action = estimate?.recoveryActions[0]?.actionId;
+  if (action) {
+    return {
+      Brace: "可支护",
+      ClearSeal: "可抢通",
+      Dig: "可重挖",
+      Recon: "可复查",
+      Attack: "可压制",
+      Trap: "可设陷阱",
+      Ambush: "可伏击",
+    }[action] ?? "可恢复";
+  }
+  if (estimate?.recoveryNeeds.length) {
+    return "恢复待条件";
+  }
+  return estimate?.recoveryState === "NoKnownRecovery" ? "无现成恢复" : "路况可行";
 }
 
 function CivilianShortName(group) {
@@ -1045,16 +1132,34 @@ function RenderHud() {
     selectedEvacGroupId = gameState.civilians.find((group) => group.status === "Waiting")?.groupId
       ?? selectedEvacGroupId;
   }
+  const activeTransitEstimates = new Map(gameState.civilians
+    .filter((group) => ["Moving", "Trapped"].includes(group.status))
+    .map((group) => [
+      group.groupId,
+      GetActiveCivilianTransitEstimate(gameState, group.groupId),
+    ]));
   ui.CivilianLedger.innerHTML = gameState.civilians.map((group) => `
-    <button type="button" data-group="${group.groupId}" class="civilianEntry ${group.status.toLowerCase()} ${group.groupId === selectedEvacGroupId ? "selected" : ""}" ${group.status === "Waiting" ? "" : "disabled"}>
+    <button type="button" data-group="${group.groupId}" class="civilianEntry ${group.status.toLowerCase()} ${group.status === "Waiting" && group.groupId === selectedEvacGroupId ? "selected" : ""}" ${group.status === "Safe" ? "disabled" : ""}>
       <b><span class="desktopCivilianName">${group.name}</span><span class="mobileCivilianName">${CivilianShortName(group)}</span> · ${group.people}人</b>
-      <span>${CivilianStatusLabel(group)}</span>
-      <small class="desktopCivilianSummary">${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${group.logisticsNote ?? "标准转移批次"}</small>
-      <small class="mobileCivilianSummary">${CivilianMobileStatus(group)} · 速${group.moveSteps ?? 2} · 载${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 堵${group.trafficDelays}` : ""}</small>
+      <span>${CivilianStatusLabel(group, activeTransitEstimates.get(group.groupId))}</span>
+      <small class="desktopCivilianSummary">${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${activeTransitEstimates.has(group.groupId)
+    ? `${CivilianActiveTimingText(activeTransitEstimates.get(group.groupId))}<br>${CivilianRecoverySummary(activeTransitEstimates.get(group.groupId))}`
+    : group.logisticsNote ?? "标准转移批次"}</small>
+      <small class="mobileCivilianSummary">${CivilianMobileStatus(group, activeTransitEstimates.get(group.groupId))} · ${activeTransitEstimates.has(group.groupId)
+    ? `到${activeTransitEstimates.get(group.groupId).arrivalTurn === null ? "--" : `T${activeTransitEstimates.get(group.groupId).arrivalTurn}`} · ${CivilianMobileRecoverySummary(activeTransitEstimates.get(group.groupId))}${activeTransitEstimates.get(group.groupId).congestionTurns ? ` · 堵${activeTransitEstimates.get(group.groupId).congestionTurns}` : ""}${activeTransitEstimates.get(group.groupId).deadlineRisk ? " · 超期" : ""}`
+    : `速${group.moveSteps ?? 2} · 载${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 堵${group.trafficDelays}` : ""}`}</small>
     </button>
   `).join("");
   for (const button of ui.CivilianLedger.querySelectorAll("[data-group]")) {
     button.addEventListener("click", () => {
+      const group = gameState.civilians.find((entry) => entry.groupId === button.dataset.group);
+      if (["Moving", "Trapped"].includes(group?.status)) {
+        ShowActiveCivilianPreview(group.groupId);
+        for (const card of ui.CivilianLedger.querySelectorAll(".civilianEntry")) {
+          card.classList.toggle("selected", card === button);
+        }
+        return;
+      }
       selectedEvacGroupId = button.dataset.group;
       actionMode = ActionIds.EVACUATE;
       CancelPreview(false);
@@ -1355,6 +1460,77 @@ function BuildPreview(action) {
   }
 }
 
+function ActiveRecoveryActionText(action, estimate) {
+  const labels = {
+    Ambush: "行动组伏击",
+    Attack: "行动组压制",
+    Brace: "地道队支护",
+    ClearSeal: "地道队抢通",
+    Dig: "地道队重挖",
+    Recon: "交通员复查",
+    Trap: "民兵组设陷阱",
+  };
+  const targetName = gameState.tiles[action.targetKey]?.name ?? action.targetKey;
+  const costs = [
+    `${action.cost.ap} AP`,
+    action.cost.tools > 0 ? `工具 ${action.cost.tools}` : null,
+    action.cost.organization > 0 ? `组织 ${action.cost.organization}` : null,
+    action.cost.ammo > 0 ? `弹药 ${action.cost.ammo}` : null,
+    action.cost.exposure !== 0
+      ? `暴露 ${action.cost.exposure > 0 ? "+" : ""}${action.cost.exposure}`
+      : null,
+    action.ifAppliedNow.peopleSafetyCost > 0
+      ? `群众安全 -${action.ifAppliedNow.peopleSafetyCost}`
+      : null,
+  ].filter(Boolean).join("、");
+  const arrivalChange = action.ifAppliedNow.arrivalTurn === null
+    ? "到口仍未知"
+    : estimate.arrivalTurn === action.ifAppliedNow.arrivalTurn
+      ? `到口仍为 T${action.ifAppliedNow.arrivalTurn}`
+      : `到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}→T${action.ifAppliedNow.arrivalTurn}`;
+  const safeChange = action.ifAppliedNow.safeTurn === null
+    ? `仍不能确认安全出洞${action.ifAppliedNow.nextConstraintKind ? `，随后仍有 ${action.ifAppliedNow.nextConstraintKind}` : ""}`
+    : `安全出洞 T${action.ifAppliedNow.safeTurn}`;
+  return `${labels[action.actionId] ?? action.actionId} ${targetName}（${costs}）：${arrivalChange}，${safeChange}`;
+}
+
+function ShowActiveCivilianPreview(groupId) {
+  const group = gameState.civilians.find((entry) => entry.groupId === groupId);
+  const estimate = GetActiveCivilianTransitEstimate(gameState, groupId);
+  if (!group || !estimate) {
+    return;
+  }
+  previewAction = null;
+  previewTileKey = group.tileKey;
+  const currentName = gameState.tiles[group.tileKey]?.name ?? group.tileKey;
+  const exitName = gameState.tiles[estimate.projectedExitKey]?.name ?? estimate.projectedExitKey;
+  const status = estimate.status === "AtExit"
+    ? "已到出口下方"
+    : estimate.status === "Trapped"
+      ? "被困"
+      : "在途";
+  const constraint = estimate.nextConstraint
+    ? `${CivilianConstraintLabel(estimate)}：${estimate.nextConstraint.detail}`
+    : "当前公开路况未见阻断";
+  const recovery = estimate.recoveryActions.length
+    ? estimate.recoveryActions
+      .map((action) => ActiveRecoveryActionText(action, estimate))
+      .join("；")
+    : estimate.recoveryNeeds.length
+      ? estimate.recoveryNeeds.map((entry) => entry.reason).join("；")
+      : estimate.recoveryState === "NoKnownRecovery"
+        ? "当前无合法且已知有效的恢复动作"
+        : "当前无需恢复动作";
+  ui.PreviewEyebrow.textContent = "在途只读时刻表 · 不自动执行";
+  ui.PreviewTitle.textContent = `${group.name} · ${status} · ${currentName}→${exitName}`;
+  ui.PreviewBody.textContent = `${CivilianActiveTimingText(estimate)}｜剩余 ${estimate.remainingSegments} 段｜${constraint}｜恢复：${recovery}｜${estimate.assumptions}`;
+  ui.CancelPreviewButton.innerHTML = "关闭 <kbd>Esc</kbd>";
+  ui.ConfirmPreviewButton.hidden = true;
+  ui.PreviewPanel.hidden = false;
+  gameShell.classList.add("previewOpen");
+  RenderScene();
+}
+
 function SetPreview(action) {
   let preparedAction = { ...action };
   const pathPlan = IsPathAction(action.actionId)
@@ -1380,6 +1556,8 @@ function SetPreview(action) {
   ui.PreviewEyebrow.textContent = preview.eyebrow;
   ui.PreviewTitle.textContent = preview.title;
   ui.PreviewBody.textContent = preview.body;
+  ui.CancelPreviewButton.innerHTML = "取消 <kbd>Esc</kbd>";
+  ui.ConfirmPreviewButton.hidden = false;
   const steps = preparedAction.targetKeys?.length ?? 1;
   ui.ConfirmPreviewButton.innerHTML = steps > 1
     ? `确认执行 ${steps} 步 <kbd>Enter</kbd>`
@@ -1393,6 +1571,8 @@ function CancelPreview(render = true) {
   previewAction = null;
   previewTileKey = null;
   ui.PreviewPanel.hidden = true;
+  ui.CancelPreviewButton.innerHTML = "取消 <kbd>Esc</kbd>";
+  ui.ConfirmPreviewButton.hidden = false;
   ui.ConfirmPreviewButton.innerHTML = "确认 <kbd>Enter</kbd>";
   gameShell.classList.remove("previewOpen");
   if (render) {

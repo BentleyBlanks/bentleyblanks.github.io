@@ -883,6 +883,789 @@ export function GetCivilianTransitEstimate(state, groupId, exitKey) {
   };
 }
 
+function CreatePublicTransitProjectionState(state) {
+  const projectionState = Clone(state);
+  for (const enemy of projectionState.enemies) {
+    if (!enemy.intentRevealed) {
+      enemy.intent = null;
+    }
+  }
+  return projectionState;
+}
+
+function GetCollapsedConstraintKey(state, group) {
+  if (state.tunnels[group.tileKey]?.collapsed) {
+    return group.tileKey;
+  }
+  return group.path
+    ?.slice((group.pathIndex ?? 0) + 1)
+    .find((tileKey) => state.tunnels[tileKey]?.collapsed) ?? null;
+}
+
+function ActiveCivilianStatus(group) {
+  if (group.status === "Trapped") {
+    return "Trapped";
+  }
+  if (
+    group.status === "Moving"
+    && (
+      group.tileKey === group.exitKey
+      || (group.pathIndex ?? 0) >= (group.path?.length ?? 1) - 1
+    )
+  ) {
+    return "AtExit";
+  }
+  return group.status;
+}
+
+function CreateActiveTransitTrace(state, group) {
+  return {
+    queueDelayTurns: 0,
+    smokeDelayTurns: 0,
+    firstBottleneckKey: null,
+    firstBottleneckCapacity: null,
+    firstBottleneckUsedLoad: null,
+    conflictingGroupIds: [],
+    blockedKey: group.status === "Trapped"
+      ? GetCollapsedConstraintKey(state, group)
+      : null,
+    exitBlocked: false,
+  };
+}
+
+function RunActiveCivilianTransitProjection(inputState, groupId) {
+  const state = CreatePublicTransitProjectionState(inputState);
+  const startingGroup = state.civilians.find((entry) => entry.groupId === groupId);
+  if (!startingGroup || !["Moving", "Trapped"].includes(startingGroup.status)) {
+    return null;
+  }
+  const startingStatus = startingGroup.status;
+  const startingExitKey = startingGroup.exitKey;
+  const trace = CreateActiveTransitTrace(state, startingGroup);
+  const transitTraces = new Map([[groupId, trace]]);
+  let arrivalTurn = startingGroup.exitArrivalTurn ?? null;
+  if (
+    arrivalTurn === null
+    && startingGroup.tileKey === startingGroup.exitKey
+  ) {
+    arrivalTurn = state.turn;
+  }
+  let safeTurn = startingGroup.status === "Safe" ? state.turn : null;
+  let windowSnapshot = null;
+  const maxProjectionTurns = Math.max(
+    24,
+    Object.keys(state.tunnels).length * 3 + state.civilians.length * 4,
+  );
+
+  if (startingStatus !== "Trapped") {
+    for (
+      let phaseTurn = state.turn;
+      phaseTurn < state.turn + maxProjectionTurns;
+      phaseTurn += 1
+    ) {
+      state.turn = phaseTurn;
+      const candidateBeforeAdvance = state.civilians
+        .find((entry) => entry.groupId === groupId);
+      const wasAtExit = candidateBeforeAdvance.tileKey === candidateBeforeAdvance.exitKey
+        || (candidateBeforeAdvance.pathIndex ?? 0)
+          >= (candidateBeforeAdvance.path?.length ?? 1) - 1;
+      if (arrivalTurn === null && wasAtExit) {
+        arrivalTurn = phaseTurn;
+      }
+      ResolveCracksAndSmoke(state);
+      AdvanceCivilians(state, transitTraces);
+      const candidate = state.civilians.find((entry) => entry.groupId === groupId);
+      if (
+        arrivalTurn === null
+        && (
+          candidate.status === "Safe"
+          || candidate.exitArrivalTurn !== null
+        )
+      ) {
+        arrivalTurn = candidate.exitArrivalTurn ?? phaseTurn;
+      }
+      if (candidate.status === "Safe") {
+        safeTurn = phaseTurn;
+        windowSnapshot = BuildExitWindowSnapshot(
+          state,
+          candidate.exitKey,
+          state.exitWindows?.[candidate.exitKey]
+            ?? CreateExitWindowRecord(candidate.exitKey),
+        );
+        break;
+      }
+      if (candidate.status === "Trapped") {
+        trace.blockedKey ??= GetCollapsedConstraintKey(state, candidate);
+        break;
+      }
+      const atExit = candidate.tileKey === candidate.exitKey
+        || (candidate.pathIndex ?? 0) >= (candidate.path?.length ?? 1) - 1;
+      if (atExit) {
+        windowSnapshot = BuildExitWindowSnapshot(
+          state,
+          candidate.exitKey,
+          state.exitWindows?.[candidate.exitKey]
+            ?? CreateExitWindowRecord(candidate.exitKey),
+        );
+        const activeSmokeWarning = state.warnings.some((warning) => (
+          !warning.resolved
+          && warning.kind === "Smoke"
+          && warning.targetKey === candidate.exitKey
+        ));
+        const smokeClearsPassively = (
+          windowSnapshot.status === "Smoking"
+          && (state.tunnels[candidate.exitKey]?.smoke ?? 0) > 0
+          && !state.tunnels[candidate.exitKey]?.sealed
+          && !activeSmokeWarning
+        );
+        if (smokeClearsPassively) {
+          continue;
+        }
+        if (
+          wasAtExit
+          && (windowSnapshot.status !== "Clear" || trace.exitBlocked)
+        ) {
+          break;
+        }
+      }
+      if (trace.exitBlocked) {
+        break;
+      }
+    }
+  }
+
+  const candidate = state.civilians.find((entry) => entry.groupId === groupId);
+  windowSnapshot ??= BuildExitWindowSnapshot(
+    state,
+    candidate.exitKey,
+    state.exitWindows?.[candidate.exitKey]
+      ?? CreateExitWindowRecord(candidate.exitKey),
+  );
+  const newlyTrapped = startingStatus !== "Trapped" && candidate.status === "Trapped";
+  const trapSafetyCost = !newlyTrapped
+    ? 0
+    : trace.blockedKey === candidate.tileKey
+      ? 12
+      : 8;
+  return {
+    arrivalTurn,
+    safeTurn,
+    projectedExitKey: candidate.exitKey,
+    rerouted: candidate.exitKey !== startingExitKey,
+    projectedStatus: ActiveCivilianStatus(candidate),
+    queueDelayTurns: trace.queueDelayTurns,
+    smokeDelayTurns: trace.smokeDelayTurns,
+    peopleSafetyCost: trace.smokeDelayTurns * 5 + trapSafetyCost,
+    bottleneckKey: trace.firstBottleneckKey,
+    bottleneckCapacity: trace.firstBottleneckCapacity,
+    bottleneckUsedLoad: trace.firstBottleneckUsedLoad,
+    conflictingGroupIds: trace.conflictingGroupIds,
+    blockedKey: trace.blockedKey,
+    blockedByCollapse: Boolean(
+      trace.blockedKey && state.tunnels[trace.blockedKey]?.collapsed
+    ),
+    exitBlocked: trace.exitBlocked,
+    windowSnapshot,
+  };
+}
+
+function BuildActiveTransitConstraint(state, group, projection) {
+  const collapsedKey = projection.blockedByCollapse
+    ? projection.blockedKey
+    : group.status === "Trapped"
+      ? GetCollapsedConstraintKey(state, group)
+      : null;
+  if (collapsedKey) {
+    const occupiedCollapse = collapsedKey === group.tileKey;
+    return {
+      kind: "Collapse",
+      tileKey: collapsedKey,
+      detail: occupiedCollapse
+        ? `${state.tiles[collapsedKey]?.name ?? collapsedKey}所在段已塌方`
+        : `${state.tiles[collapsedKey]?.name ?? collapsedKey}前方地道中断`,
+    };
+  }
+  if (projection.exitBlocked) {
+    const exitNode = state.tunnels[projection.projectedExitKey];
+    if (exitNode?.sealed) {
+      return {
+        kind: "Seal",
+        tileKey: projection.projectedExitKey,
+        detail: `${state.tiles[projection.projectedExitKey]?.name ?? projection.projectedExitKey}洞口已经封堵`,
+      };
+    }
+    if (exitNode?.smoke > 0) {
+      return {
+        kind: "Smoke",
+        tileKey: projection.projectedExitKey,
+        detail: `${state.tiles[projection.projectedExitKey]?.name ?? projection.projectedExitKey}洞口烟流未散`,
+      };
+    }
+    return {
+      kind: "Disconnected",
+      tileKey: projection.projectedExitKey,
+      detail: "出口当前不可通行，且没有已接通备用支线",
+    };
+  }
+  if (
+    ActiveCivilianStatus(group) === "AtExit"
+    && (state.tunnels[group.exitKey]?.smoke ?? 0) > 0
+  ) {
+    return {
+      kind: "Smoke",
+      tileKey: group.exitKey,
+      detail: `洞口现有烟流还需自然消散；按当前强度预计安全 T${projection.safeTurn ?? "--"}`,
+    };
+  }
+  if (projection.queueDelayTurns > 0 && projection.bottleneckKey) {
+    return {
+      kind: "Congestion",
+      tileKey: projection.bottleneckKey,
+      detail: `${state.tiles[projection.bottleneckKey]?.name ?? projection.bottleneckKey}容量 ${projection.bottleneckCapacity}，已有负载 ${projection.bottleneckUsedLoad}`,
+    };
+  }
+  if (projection.smokeDelayTurns > 0) {
+    return {
+      kind: "Smoke",
+      tileKey: projection.blockedKey ?? group.tileKey,
+      detail: `现有烟流预计造成 ${projection.smokeDelayTurns} 回合停顿`,
+    };
+  }
+  if (projection.safeTurn === null && projection.arrivalTurn !== null) {
+    const windowState = projection.windowSnapshot;
+    const exitKey = projection.projectedExitKey;
+    if (state.tunnels[exitKey]?.sealed || windowState.status === "Sealing") {
+      return {
+        kind: "Seal",
+        tileKey: exitKey,
+        detail: windowState.detail,
+      };
+    }
+    if (state.tunnels[exitKey]?.smoke > 0 || windowState.status === "Smoking") {
+      return {
+        kind: "Smoke",
+        tileKey: exitKey,
+        detail: windowState.detail,
+      };
+    }
+    if (windowState.status === "Watched") {
+      return {
+        kind: "Watched",
+        tileKey: exitKey,
+        detail: windowState.detail,
+      };
+    }
+    return {
+      kind: "Signal",
+      tileKey: exitKey,
+      detail: windowState.detail,
+    };
+  }
+  if (projection.arrivalTurn === null) {
+    return {
+      kind: "Disconnected",
+      tileKey: projection.blockedKey ?? group.tileKey,
+      detail: "按当前公开路况无法到达出口",
+    };
+  }
+  if (projection.safeTurn !== null && projection.safeTurn > state.maxTurns) {
+    return {
+      kind: "Deadline",
+      tileKey: projection.projectedExitKey,
+      detail: `按当前公开条件预计 T${projection.safeTurn} 才能安全，晚于 T${state.maxTurns}`,
+    };
+  }
+  return null;
+}
+
+function RecoveryActionCost(beforeState, afterState, unitId) {
+  const beforeUnit = GetUnit(beforeState, unitId);
+  const afterUnit = GetUnit(afterState, unitId);
+  return {
+    ap: Math.max(0, (beforeUnit?.actionPoints ?? 0) - (afterUnit?.actionPoints ?? 0)),
+    tools: Math.max(0, (beforeState.tools ?? 0) - (afterState.tools ?? 0)),
+    organization: Math.max(
+      0,
+      (beforeState.organization ?? 0) - (afterState.organization ?? 0),
+    ),
+    ammo: Math.max(0, (beforeUnit?.ammo ?? 0) - (afterUnit?.ammo ?? 0)),
+    exposure: (afterState.exposure ?? 0) - (beforeState.exposure ?? 0),
+  };
+}
+
+function BuildRecoveryNeed(state, actionId, unitId, targetKey) {
+  const unit = GetUnit(state, unitId);
+  const targetName = state.tiles[targetKey]?.name ?? targetKey;
+  let reason = "当前条件不足";
+  let canBecomeAvailable = true;
+  if (!IsAlive(unit)) {
+    reason = `${unit?.shortName ?? unitId}已无法行动`;
+    canBecomeAvailable = false;
+  } else if (unit.actionPoints <= 0) {
+    reason = `${unit.shortName}本回合没有 AP`;
+  } else if (actionId === ActionIds.RECON) {
+    if (unit.layer !== LayerIds.SURFACE || unit.tileKey !== targetKey) {
+      reason = `交通员需在${targetName}地面且保留 1 AP`;
+    } else if (state.reconActions > 0 && state.organization < 1) {
+      reason = `复查需要组织 1（当前 ${state.organization}）`;
+      canBecomeAvailable = false;
+    } else if (state.lastReconTurn === state.turn) {
+      reason = "本回合已经侦察过一次";
+    } else {
+      reason = "同一格复查需间隔一回合";
+    }
+  } else if (actionId === ActionIds.CLEAR_SEAL) {
+    if (unit.layer !== LayerIds.TUNNEL || unit.tileKey !== targetKey) {
+      reason = `地道队需到达${targetName}地下且保留 1 AP`;
+    } else {
+      reason = `抢通需要工具 2（当前 ${state.tools}）`;
+      canBecomeAvailable = state.tools >= 2;
+    }
+  } else if (actionId === ActionIds.DIG) {
+    const digCost = SoilCatalog[state.tiles[targetKey]?.soilId]?.digCost ?? 1;
+    if (unit.layer !== LayerIds.TUNNEL || !NeighborKeys(unit.tileKey).includes(targetKey)) {
+      reason = `地道队需在${targetName}相邻地下格且保留 1 AP`;
+    } else {
+      reason = `重挖需要工具 ${digCost}（当前 ${state.tools}）`;
+      canBecomeAvailable = state.tools >= digCost;
+    }
+  } else if (actionId === ActionIds.BRACE) {
+    if (unit.layer !== LayerIds.TUNNEL || unit.tileKey !== targetKey) {
+      reason = `地道队需到达${targetName}地下且保留 1 AP`;
+    } else {
+      reason = `支护需要工具 1（当前 ${state.tools}）`;
+      canBecomeAvailable = state.tools >= 1;
+    }
+  }
+  if (actionId === ActionIds.RECON && state.reconActions > 0 && state.organization < 1) {
+    canBecomeAvailable = false;
+  } else if (actionId === ActionIds.CLEAR_SEAL && state.tools < 2) {
+    canBecomeAvailable = false;
+  } else if (
+    actionId === ActionIds.DIG
+    && state.tools < (SoilCatalog[state.tiles[targetKey]?.soilId]?.digCost ?? 1)
+  ) {
+    canBecomeAvailable = false;
+  } else if (actionId === ActionIds.BRACE && state.tools < 1) {
+    canBecomeAvailable = false;
+  }
+  if (state.turn >= state.maxTurns) {
+    canBecomeAvailable = false;
+    reason = `${reason}；已到 T${state.maxTurns}，不能等待下一回合恢复条件`;
+  }
+  return {
+    actionId,
+    unitId,
+    targetKey,
+    availableNow: false,
+    canBecomeAvailable,
+    reason,
+  };
+}
+
+function ProjectionImprovesRecovery(baseline, candidate, maxTurns) {
+  const baselineMissesDeadline = baseline.safeTurn === null || baseline.safeTurn > maxTurns;
+  const candidateMissesDeadline = candidate.safeTurn === null || candidate.safeTurn > maxTurns;
+  const baselineArrivalMisses = (
+    baseline.arrivalTurn === null || baseline.arrivalTurn > maxTurns
+  );
+  const candidateArrivalHits = (
+    candidate.arrivalTurn !== null && candidate.arrivalTurn <= maxTurns
+  );
+  if (
+    baseline.arrivalTurn === null
+    && candidate.arrivalTurn !== null
+    && candidate.arrivalTurn <= maxTurns
+  ) {
+    return true;
+  }
+  if (baselineArrivalMisses && candidateArrivalHits) {
+    return true;
+  }
+  if (baselineMissesDeadline && candidateMissesDeadline) {
+    return false;
+  }
+  return (
+    (baseline.arrivalTurn === null && candidate.arrivalTurn !== null)
+    || (
+      baseline.arrivalTurn !== null
+      && candidate.arrivalTurn !== null
+      && candidate.arrivalTurn < baseline.arrivalTurn
+    )
+    || (baseline.safeTurn === null && candidate.safeTurn !== null)
+    || (
+      baseline.safeTurn !== null
+      && candidate.safeTurn !== null
+      && candidate.safeTurn < baseline.safeTurn
+    )
+    || candidate.queueDelayTurns < baseline.queueDelayTurns
+  );
+}
+
+function RunImmediatePublicDefenseProjection(inputState, groupId) {
+  const state = CreatePublicTransitProjectionState(inputState);
+  const group = state.civilians.find((entry) => entry.groupId === groupId);
+  if (!group || group.status !== "Moving") {
+    return null;
+  }
+  const resolvingWarnings = state.warnings.filter((warning) => (
+    !warning.resolved
+    && warning.targetKey === group.exitKey
+    && ["Seal", "Smoke"].includes(warning.kind)
+    && warning.resolvesTurn <= state.turn
+  ));
+  if (!resolvingWarnings.length) {
+    return null;
+  }
+  const resolvingEnemyIds = new Set();
+  for (const warning of resolvingWarnings) {
+    const enemy = GetEnemy(state, warning.enemyId);
+    if (!IsAlive(enemy)) {
+      continue;
+    }
+    enemy.intent = {
+      intentId: warning.kind === "Seal"
+        ? EnemyIntentIds.RESOLVE_SEAL
+        : EnemyIntentIds.RESOLVE_SMOKE,
+      targetKey: warning.targetKey,
+      warningId: warning.warningId,
+    };
+    enemy.intentRevealed = true;
+    resolvingEnemyIds.add(enemy.enemyId);
+  }
+  const peopleSafetyBefore = state.peopleSafety;
+  const immediateTrace = CreateActiveTransitTrace(state, group);
+  const transitTraces = new Map([[groupId, immediateTrace]]);
+  ResolveCracksAndSmoke(state);
+  for (const enemy of state.enemies) {
+    if (resolvingEnemyIds.has(enemy.enemyId)) {
+      ResolveEnemyIntent(state, enemy);
+    }
+  }
+  AdvanceCivilians(state, transitTraces);
+  const candidate = state.civilians.find((entry) => entry.groupId === groupId);
+  immediateTrace.blockedKey ??= candidate.status === "Trapped"
+    ? GetCollapsedConstraintKey(state, candidate)
+    : null;
+  const immediatePeopleSafetyCost = Math.max(
+    0,
+    peopleSafetyBefore - state.peopleSafety,
+  );
+  const immediateProjection = {
+    arrivalTurn: candidate.exitArrivalTurn
+      ?? (candidate.tileKey === candidate.exitKey ? state.turn : null),
+    safeTurn: candidate.status === "Safe" ? state.turn : null,
+    projectedExitKey: candidate.exitKey,
+    rerouted: candidate.exitKey !== group.exitKey,
+    projectedStatus: ActiveCivilianStatus(candidate),
+    queueDelayTurns: immediateTrace.queueDelayTurns,
+    smokeDelayTurns: immediateTrace.smokeDelayTurns,
+    peopleSafetyCost: immediatePeopleSafetyCost,
+    bottleneckKey: immediateTrace.firstBottleneckKey,
+    bottleneckCapacity: immediateTrace.firstBottleneckCapacity,
+    bottleneckUsedLoad: immediateTrace.firstBottleneckUsedLoad,
+    conflictingGroupIds: immediateTrace.conflictingGroupIds,
+    blockedKey: immediateTrace.blockedKey,
+    blockedByCollapse: Boolean(
+      immediateTrace.blockedKey
+      && state.tunnels[immediateTrace.blockedKey]?.collapsed
+    ),
+    exitBlocked: immediateTrace.exitBlocked,
+    windowSnapshot: BuildExitWindowSnapshot(
+      state,
+      candidate.exitKey,
+      state.exitWindows?.[candidate.exitKey]
+        ?? CreateExitWindowRecord(candidate.exitKey),
+    ),
+  };
+  if (candidate.status !== "Safe") {
+    state.turn += 1;
+    state.phase = "Player";
+    const continuation = RunActiveCivilianTransitProjection(state, groupId);
+    if (!continuation) {
+      return null;
+    }
+    const useImmediateBottleneck = immediateTrace.firstBottleneckKey !== null;
+    const blockedKey = immediateTrace.blockedKey ?? continuation.blockedKey;
+    return {
+      ...continuation,
+      queueDelayTurns: immediateTrace.queueDelayTurns + continuation.queueDelayTurns,
+      smokeDelayTurns: immediateTrace.smokeDelayTurns + continuation.smokeDelayTurns,
+      peopleSafetyCost: immediatePeopleSafetyCost + continuation.peopleSafetyCost,
+      bottleneckKey: useImmediateBottleneck
+        ? immediateTrace.firstBottleneckKey
+        : continuation.bottleneckKey,
+      bottleneckCapacity: useImmediateBottleneck
+        ? immediateTrace.firstBottleneckCapacity
+        : continuation.bottleneckCapacity,
+      bottleneckUsedLoad: useImmediateBottleneck
+        ? immediateTrace.firstBottleneckUsedLoad
+        : continuation.bottleneckUsedLoad,
+      conflictingGroupIds: useImmediateBottleneck
+        ? immediateTrace.conflictingGroupIds
+        : continuation.conflictingGroupIds,
+      blockedKey,
+      blockedByCollapse: Boolean(
+        blockedKey && state.tunnels[blockedKey]?.collapsed
+      ),
+      exitBlocked: immediateTrace.exitBlocked || continuation.exitBlocked,
+    };
+  }
+  return immediateProjection;
+}
+
+function TryActiveRecoveryAction(state, groupId, baseline, action) {
+  const publicState = CreatePublicTransitProjectionState(state);
+  const available = GetAvailableActions(publicState, action.unitId).includes(action.actionId);
+  const targeted = ![ActionIds.DIG, ActionIds.RECON].includes(action.actionId)
+    || GetActionTargets(publicState, action.unitId, action.actionId).includes(action.targetKey);
+  if (!available || !targeted) {
+    return null;
+  }
+  const result = ApplyPlayerAction(publicState, action);
+  if (!result.ok) {
+    return null;
+  }
+  const immediateDefenseProjection = [ActionIds.TRAP, ActionIds.AMBUSH]
+    .includes(action.actionId)
+    ? RunImmediatePublicDefenseProjection(result.state, groupId)
+    : null;
+  const projection = immediateDefenseProjection
+    ?? RunActiveCivilianTransitProjection(result.state, groupId);
+  if (!projection || !ProjectionImprovesRecovery(baseline, projection, state.maxTurns)) {
+    return null;
+  }
+  const group = result.state.civilians.find((entry) => entry.groupId === groupId);
+  const nextConstraint = BuildActiveTransitConstraint(result.state, group, projection);
+  return {
+    actionId: action.actionId,
+    unitId: action.unitId,
+    targetKey: action.targetKey,
+    availableNow: true,
+    cost: RecoveryActionCost(publicState, result.state, action.unitId),
+    ifAppliedNow: {
+      status: ActiveCivilianStatus(group),
+      arrivalTurn: projection.arrivalTurn,
+      safeTurn: projection.safeTurn,
+      congestionTurns: projection.queueDelayTurns,
+      peopleSafetyCost: projection.peopleSafetyCost,
+      nextConstraintKind: nextConstraint?.kind ?? null,
+      nextConstraintDetail: nextConstraint?.detail ?? null,
+      turnsSaved: (
+        baseline.arrivalTurn !== null
+        && projection.arrivalTurn !== null
+      )
+        ? Math.max(0, baseline.arrivalTurn - projection.arrivalTurn)
+        : 0,
+    },
+  };
+}
+
+export function GetActiveCivilianTransitEstimate(state, groupId) {
+  const group = state.civilians.find((entry) => entry.groupId === groupId);
+  if (!group || !["Moving", "Trapped"].includes(group.status)) {
+    return null;
+  }
+  const baseline = RunActiveCivilianTransitProjection(state, groupId);
+  const nextConstraint = BuildActiveTransitConstraint(state, group, baseline);
+  const recoveryActions = [];
+  const recoveryNeeds = [];
+  const workTeam = GetUnit(state, "WorkTeam");
+  const scout = GetUnit(state, "Scout");
+  const recoveryCandidates = [];
+
+  if (nextConstraint?.kind === "Congestion") {
+    recoveryCandidates.push({
+      actionId: ActionIds.BRACE,
+      unitId: "WorkTeam",
+      targetKey: GetAvailableActions(state, "WorkTeam").includes(ActionIds.BRACE)
+        ? workTeam.tileKey
+        : nextConstraint.tileKey,
+    });
+  }
+  if (nextConstraint?.kind === "Signal") {
+    recoveryCandidates.push({
+      actionId: ActionIds.RECON,
+      unitId: "Scout",
+      targetKey: baseline.projectedExitKey,
+    });
+  }
+  const recoveryExitKeys = [...new Set([
+    baseline.projectedExitKey,
+    group.exitKey,
+  ].filter(Boolean))];
+  for (const exitKey of recoveryExitKeys) {
+    if (state.tunnels[exitKey]?.sealed) {
+      recoveryCandidates.push({
+        actionId: ActionIds.CLEAR_SEAL,
+        unitId: "WorkTeam",
+        targetKey: exitKey,
+      });
+    }
+    const publicExitWarning = state.warnings.find((warning) => (
+      !warning.resolved
+      && warning.targetKey === exitKey
+      && ["Seal", "Smoke"].includes(warning.kind)
+    ));
+    if (publicExitWarning) {
+      for (const unitId of ["Militia", "Guerrilla"]) {
+        const unit = GetUnit(state, unitId);
+        const available = GetAvailableActions(state, unitId);
+        if (unit?.layer !== LayerIds.TUNNEL || unit.tileKey !== exitKey) {
+          continue;
+        }
+        if (available.includes(ActionIds.TRAP)) {
+          recoveryCandidates.push({
+            actionId: ActionIds.TRAP,
+            unitId,
+            targetKey: exitKey,
+          });
+        }
+        if (available.includes(ActionIds.AMBUSH)) {
+          recoveryCandidates.push({
+            actionId: ActionIds.AMBUSH,
+            unitId,
+            targetKey: exitKey,
+          });
+        }
+      }
+    }
+    const exitWindow = BuildExitWindowSnapshot(
+      state,
+      exitKey,
+      state.exitWindows?.[exitKey] ?? CreateExitWindowRecord(exitKey),
+    );
+    if (exitWindow.status === "Watched" && exitWindow.blockingEnemyId) {
+      const blockingEnemy = GetEnemy(state, exitWindow.blockingEnemyId);
+      if (blockingEnemy) {
+        for (const unit of state.units.filter(IsAlive)) {
+          if (GetAttackTargets(state, unit.unitId).includes(blockingEnemy.tileKey)) {
+            recoveryCandidates.push({
+              actionId: ActionIds.ATTACK,
+              unitId: unit.unitId,
+              targetKey: blockingEnemy.tileKey,
+            });
+          }
+        }
+      }
+    }
+  }
+  const occupiedCollapse = (
+    group.status === "Trapped"
+    && nextConstraint?.kind === "Collapse"
+    && nextConstraint.tileKey === group.tileKey
+  );
+  if (occupiedCollapse) {
+    recoveryCandidates.push({
+      actionId: ActionIds.DIG,
+      unitId: "WorkTeam",
+      targetKey: group.tileKey,
+    });
+  }
+  if (nextConstraint?.kind === "Collapse" && group.status === "Moving") {
+    const constraintNode = state.tunnels[nextConstraint.tileKey];
+    recoveryCandidates.push({
+      actionId: constraintNode?.collapsed ? ActionIds.DIG : ActionIds.BRACE,
+      unitId: "WorkTeam",
+      targetKey: nextConstraint.tileKey,
+    });
+  }
+
+  recoveryCandidates.sort((first, second) => {
+    const firstKey = `${first.actionId}\u0000${first.unitId}\u0000${first.targetKey ?? ""}`;
+    const secondKey = `${second.actionId}\u0000${second.unitId}\u0000${second.targetKey ?? ""}`;
+    return firstKey < secondKey ? -1 : firstKey > secondKey ? 1 : 0;
+  });
+
+  for (const candidate of recoveryCandidates) {
+    const currentlyLegal = GetAvailableActions(state, candidate.unitId)
+      .includes(candidate.actionId)
+      && (
+        ![ActionIds.DIG, ActionIds.RECON].includes(candidate.actionId)
+        || GetActionTargets(state, candidate.unitId, candidate.actionId)
+          .includes(candidate.targetKey)
+      );
+    const recovery = TryActiveRecoveryAction(state, groupId, baseline, candidate);
+    if (recovery) {
+      recoveryActions.push(recovery);
+    } else if (currentlyLegal) {
+      recoveryNeeds.push({
+        actionId: candidate.actionId,
+        unitId: candidate.unitId,
+        targetKey: candidate.targetKey,
+        availableNow: true,
+        canBecomeAvailable: false,
+        reason: baseline.safeTurn === null || baseline.safeTurn > state.maxTurns
+          ? "该动作虽合法，但按当前公开条件仍不能在 T11 前安全撤出"
+          : "该动作虽合法，但单独执行仍不能解除下一约束",
+      });
+    } else {
+      recoveryNeeds.push(BuildRecoveryNeed(
+        state,
+        candidate.actionId,
+        candidate.unitId,
+        candidate.targetKey,
+      ));
+    }
+  }
+
+  let recoveryState = "NoRecoveryNeeded";
+  if (recoveryActions.length) {
+    recoveryState = "RecoverableNow";
+  } else if (recoveryNeeds.some((entry) => entry.canBecomeAvailable)) {
+    recoveryState = "RecoverableAfterPositioning";
+  } else if (
+    recoveryNeeds.length
+    || baseline.safeTurn === null
+    || baseline.safeTurn > state.maxTurns
+    || group.status === "Trapped"
+  ) {
+    recoveryState = "NoKnownRecovery";
+  }
+  const remainingSegments = Math.max(
+    0,
+    (group.path?.length ?? 1) - 1 - (group.pathIndex ?? 0),
+  );
+  const arrivalDeadlineSlack = baseline.arrivalTurn === null
+    ? null
+    : state.maxTurns - baseline.arrivalTurn;
+  const safeDeadlineSlack = baseline.safeTurn === null
+    ? null
+    : state.maxTurns - baseline.safeTurn;
+  return {
+    groupId,
+    status: ActiveCivilianStatus(group),
+    sourceStatus: group.status,
+    currentTileKey: group.tileKey,
+    exitKey: group.exitKey,
+    projectedExitKey: baseline.projectedExitKey,
+    rerouted: baseline.rerouted,
+    remainingSegments,
+    arrivalTurn: baseline.arrivalTurn,
+    safeTurn: baseline.safeTurn,
+    deadlineSlack: safeDeadlineSlack,
+    arrivalDeadlineSlack,
+    safeDeadlineSlack,
+    deadlineRisk: baseline.safeTurn === null || baseline.safeTurn > state.maxTurns,
+    congestionTurns: baseline.queueDelayTurns,
+    smokeDelayTurns: baseline.smokeDelayTurns,
+    peopleSafetyCost: baseline.peopleSafetyCost,
+    bottleneckKey: baseline.bottleneckKey,
+    bottleneckCapacity: baseline.bottleneckCapacity,
+    bottleneckUsedLoad: baseline.bottleneckUsedLoad,
+    conflictingGroupIds: baseline.conflictingGroupIds,
+    nextConstraint,
+    recoveryState,
+    recoveryActions,
+    recoveryNeeds,
+    assumptions: "只按当前已知地道、烟流、封口、塌方、公开预警与在途队列投影；不预测未揭示敌情、未来新增反制或玩家后续行动",
+    actors: {
+      workTeamAlive: IsAlive(workTeam),
+      scoutAlive: IsAlive(scout),
+    },
+  };
+}
+
 export function GetReconTargets(state, unitId) {
   const unit = GetUnit(state, unitId);
   if (
@@ -952,6 +1735,7 @@ export function GetAvailableActions(state, unitId) {
     unit.role === "Digger"
     && unit.layer === LayerIds.TUNNEL
     && tunnel
+    && !tunnel.collapsed
     && !tunnel.braced
     && state.tools >= 1
   ) {
@@ -1192,6 +1976,7 @@ function ApplyBrace(state, unit) {
     unit.role !== "Digger"
     || unit.layer !== LayerIds.TUNNEL
     || !node
+    || node.collapsed
     || node.braced
     || state.tools < 1
   ) {
@@ -3148,7 +3933,12 @@ function BuildExitWindowSnapshot(state, exitKey, record) {
       enemy,
       distance: HexDistance(enemy.tileKey, exitKey),
     }))
-    .sort((first, second) => first.distance - second.distance);
+    .sort((first, second) => (
+      first.distance - second.distance
+      || (first.enemy.enemyId < second.enemy.enemyId
+        ? -1
+        : first.enemy.enemyId > second.enemy.enemyId ? 1 : 0)
+    ));
   const nearest = activeThreats[0] ?? null;
   const blockingThreat = activeThreats.find(({ distance }) => distance <= 1) ?? null;
   const incomingThreat = activeThreats.find(({ enemy }) => (
@@ -3184,6 +3974,7 @@ function BuildExitWindowSnapshot(state, exitKey, record) {
     detail,
     connected: Boolean(node),
     threatEnemyId: nearest?.enemy.enemyId ?? null,
+    blockingEnemyId: (incomingThreat ?? blockingThreat)?.enemy.enemyId ?? null,
     threatName: nearest?.enemy.name ?? null,
     threatDistance: nearest?.distance ?? null,
     threatEta,
@@ -3296,6 +4087,7 @@ export function CreateRulesApi() {
     GetAttackTargets,
     GetEvacuationTargets,
     GetCivilianTransitEstimate,
+    GetActiveCivilianTransitEstimate,
     GetReconTargets,
     GetRouteSurvey,
     FindTunnelPath,

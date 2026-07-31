@@ -17,6 +17,7 @@ import {
   EvaluateMission,
   FindEvacuationPaths,
   FindTunnelPath,
+  GetActiveCivilianTransitEstimate,
   GetAttackTargets,
   GetActionPathPlans,
   GetAvailableActions,
@@ -2345,6 +2346,801 @@ Test("transit forecasts ignore unrevealed enemy intentions", () => {
   assert.equal(revealedEstimate.signalStatusAtReady, "Watched");
 });
 
+Test("active convoy forecasts stay pure and expose legal brace timing relief", () => {
+  let state = CreateLogisticsState(false);
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  state = End(state);
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Families");
+  state = End(state);
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Contacts");
+  const workTeam = state.units.find((unit) => unit.unitId === "WorkTeam");
+  workTeam.layer = LayerIds.TUNNEL;
+  workTeam.tileKey = "2,1";
+  workTeam.actionPoints = workTeam.maxActionPoints;
+
+  const pristine = Clone(state);
+  const estimate = GetActiveCivilianTransitEstimate(state, "Contacts");
+  assert.deepEqual(state, pristine);
+  assert.deepEqual(GetActiveCivilianTransitEstimate(state, "Contacts"), estimate);
+  assert.deepEqual(
+    GetActiveCivilianTransitEstimate(
+      DeserializeState(SerializeState(state)),
+      "Contacts",
+    ),
+    estimate,
+  );
+  assert.equal(estimate.status, "Moving");
+  assert.equal(estimate.currentTileKey, "6,2");
+  assert.equal(estimate.remainingSegments, 5);
+  assert.equal(estimate.arrivalTurn, 10);
+  assert.equal(estimate.safeTurn, 10);
+  assert.equal(estimate.congestionTurns, 4);
+  assert.equal(estimate.nextConstraint.kind, "Congestion");
+  assert.equal(estimate.nextConstraint.tileKey, "5,1");
+  const brace = estimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.BRACE
+  ));
+  assert.ok(brace);
+  assert.equal(brace.unitId, "WorkTeam");
+  assert.equal(brace.targetKey, "2,1");
+  assert.equal(brace.availableNow, true);
+  assert.equal(brace.ifAppliedNow.arrivalTurn, 9);
+  assert.equal(brace.ifAppliedNow.safeTurn, 9);
+  assert.equal(brace.ifAppliedNow.congestionTurns, 3);
+  assert.equal(brace.ifAppliedNow.turnsSaved, 1);
+
+  const braced = Apply(state, "WorkTeam", ActionIds.BRACE);
+  const bracedEstimate = GetActiveCivilianTransitEstimate(braced, "Contacts");
+  assert.equal(bracedEstimate.arrivalTurn, brace.ifAppliedNow.arrivalTurn);
+  assert.equal(bracedEstimate.safeTurn, brace.ifAppliedNow.safeTurn);
+  assert.equal(bracedEstimate.congestionTurns, brace.ifAppliedNow.congestionTurns);
+
+  const tooLate = Clone(state);
+  tooLate.turn = 11;
+  tooLate.exitWindows["2,1"].checkedUntilTurn = 30;
+  const lateEstimate = GetActiveCivilianTransitEstimate(tooLate, "Contacts");
+  assert.equal(lateEstimate.deadlineRisk, true);
+  assert.equal(lateEstimate.safeTurn > tooLate.maxTurns, true);
+  assert.equal(lateEstimate.deadlineSlack, tooLate.maxTurns - lateEstimate.safeTurn);
+  assert.equal(lateEstimate.arrivalDeadlineSlack, tooLate.maxTurns - lateEstimate.arrivalTurn);
+  assert.equal(lateEstimate.safeDeadlineSlack, lateEstimate.deadlineSlack);
+  assert.equal(lateEstimate.recoveryState, "NoKnownRecovery");
+  assert.equal(lateEstimate.recoveryActions.length, 0);
+  assert.match(lateEstimate.recoveryNeeds[0].reason, /仍不能在 T11 前安全撤出/);
+  assert.equal(Object.hasOwn(lateEstimate.recoveryNeeds[0], "ifAppliedNow"), false);
+
+  const crackedTransit = CreateLogisticsState(false);
+  crackedTransit.turn = 5;
+  const crackedWounded = crackedTransit.civilians.find((entry) => entry.groupId === "Wounded");
+  crackedWounded.status = "Moving";
+  crackedWounded.path = [...northEvacuationPath];
+  crackedWounded.pathIndex = 3;
+  crackedWounded.tileKey = "4,1";
+  crackedWounded.exitKey = "2,1";
+  crackedWounded.launchTurn = 4;
+  crackedWounded.launchOrder = 1;
+  crackedTransit.tunnels["3,1"].cracked = true;
+  crackedTransit.tunnels["3,1"].braced = false;
+  crackedTransit.tunnels["3,1"].dugTurn = 1;
+  const crackedDigger = crackedTransit.units.find((unit) => unit.unitId === "WorkTeam");
+  crackedDigger.layer = LayerIds.TUNNEL;
+  crackedDigger.tileKey = "3,1";
+  crackedDigger.actionPoints = crackedDigger.maxActionPoints;
+  const crackedEstimate = GetActiveCivilianTransitEstimate(crackedTransit, "Wounded");
+  assert.equal(crackedEstimate.nextConstraint.kind, "Collapse");
+  const preventiveBrace = crackedEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.BRACE
+  ));
+  assert.ok(preventiveBrace);
+  assert.equal(preventiveBrace.targetKey, "3,1");
+  assert.equal(preventiveBrace.ifAppliedNow.arrivalTurn <= crackedTransit.maxTurns, true);
+  assert.equal(preventiveBrace.ifAppliedNow.nextConstraintKind, null);
+
+  let exactStepArrival = CreateLogisticsState(false);
+  exactStepArrival.turn = 7;
+  const exactFamilies = exactStepArrival.civilians.find((entry) => entry.groupId === "Families");
+  exactFamilies.status = "Moving";
+  exactFamilies.path = [...northEvacuationPath];
+  exactFamilies.pathIndex = 3;
+  exactFamilies.tileKey = "4,1";
+  exactFamilies.exitKey = "2,1";
+  exactFamilies.launchTurn = 5;
+  exactFamilies.launchOrder = 1;
+  const beforeArrival = GetActiveCivilianTransitEstimate(exactStepArrival, "Families");
+  assert.equal(beforeArrival.arrivalTurn, 8);
+  assert.equal(beforeArrival.safeTurn, 8);
+  exactStepArrival = End(exactStepArrival);
+  assert.equal(exactStepArrival.civilians.find((entry) => entry.groupId === "Families").status, "Moving");
+  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").status, "AtExit");
+  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").arrivalTurn, 8);
+  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").safeTurn, 8);
+});
+
+Test("active exit forecasts distinguish arrival from Recon and ClearSeal recovery", () => {
+  function CreateAtExitState() {
+    const state = CreateLogisticsState(false);
+    state.turn = 6;
+    const group = state.civilians.find((entry) => entry.groupId === "Contacts");
+    group.status = "Moving";
+    group.path = [...northEvacuationPath];
+    group.pathIndex = northEvacuationPath.length - 1;
+    group.tileKey = "2,1";
+    group.exitKey = "2,1";
+    group.launchTurn = 4;
+    group.launchOrder = 1;
+    group.exitArrivalTurn = 6;
+    group.waitingForSignal = true;
+    state.civilianLaunchSerial = 2;
+    return state;
+  }
+
+  let signalState = CreateAtExitState();
+  signalState.exitWindows["2,1"] = {
+    exitKey: "2,1",
+    checkedTurn: 0,
+    checkedUntilTurn: 0,
+    signalCount: 0,
+  };
+  signalState.reconActions = 1;
+  signalState.lastReconTurn = 0;
+  signalState.reconTileTurns["2,1"] = 0;
+  signalState.organization = 1;
+  const scout = signalState.units.find((unit) => unit.unitId === "Scout");
+  scout.layer = LayerIds.SURFACE;
+  scout.tileKey = "2,1";
+  scout.actionPoints = scout.maxActionPoints;
+  const signalEstimate = GetActiveCivilianTransitEstimate(signalState, "Contacts");
+  assert.equal(signalEstimate.status, "AtExit");
+  assert.equal(signalEstimate.arrivalTurn, 6);
+  assert.equal(signalEstimate.safeTurn, null);
+  assert.equal(signalEstimate.nextConstraint.kind, "Signal");
+  const recon = signalEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.RECON
+  ));
+  assert.ok(recon);
+  assert.equal(recon.cost.organization, 1);
+  assert.equal(recon.ifAppliedNow.safeTurn, 6);
+  signalState = Apply(signalState, "Scout", ActionIds.RECON, "2,1");
+  const signaledActual = RunEnemyPhase(signalState);
+  assert.equal(signaledActual.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  const noOrganization = CreateAtExitState();
+  noOrganization.exitWindows["2,1"].checkedUntilTurn = 0;
+  noOrganization.exitWindows["2,1"].signalCount = 0;
+  noOrganization.reconActions = 1;
+  noOrganization.organization = 0;
+  const blockedScout = noOrganization.units.find((unit) => unit.unitId === "Scout");
+  blockedScout.layer = LayerIds.SURFACE;
+  blockedScout.tileKey = "2,1";
+  blockedScout.actionPoints = blockedScout.maxActionPoints;
+  const noOrganizationEstimate = GetActiveCivilianTransitEstimate(
+    noOrganization,
+    "Contacts",
+  );
+  assert.equal(noOrganizationEstimate.recoveryActions.length, 0);
+  assert.match(
+    noOrganizationEstimate.recoveryNeeds.find((entry) => entry.actionId === ActionIds.RECON).reason,
+    /组织 1/,
+  );
+  assert.equal(Object.hasOwn(
+    noOrganizationEstimate.recoveryNeeds.find((entry) => entry.actionId === ActionIds.RECON),
+    "ifAppliedNow",
+  ), false);
+
+  let sealedState = CreateAtExitState();
+  sealedState.tunnels["2,1"].sealed = true;
+  sealedState.exitWindows["2,1"].checkedUntilTurn = 20;
+  const sealedWorkTeam = sealedState.units.find((unit) => unit.unitId === "WorkTeam");
+  sealedWorkTeam.layer = LayerIds.TUNNEL;
+  sealedWorkTeam.tileKey = "2,1";
+  sealedWorkTeam.actionPoints = sealedWorkTeam.maxActionPoints;
+  const toolsBefore = sealedState.tools;
+  const exposureBefore = sealedState.exposure;
+  const sealedEstimate = GetActiveCivilianTransitEstimate(sealedState, "Contacts");
+  assert.equal(sealedEstimate.nextConstraint.kind, "Seal");
+  const clearSeal = sealedEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.CLEAR_SEAL
+  ));
+  assert.ok(clearSeal);
+  assert.equal(clearSeal.cost.tools, 2);
+  assert.equal(clearSeal.cost.exposure, 10);
+  assert.equal(clearSeal.ifAppliedNow.safeTurn, 6);
+  sealedState = Apply(sealedState, "WorkTeam", ActionIds.CLEAR_SEAL);
+  assert.equal(sealedState.tools, toolsBefore - 2);
+  assert.equal(sealedState.exposure, exposureBefore + 10);
+  const clearedActual = RunEnemyPhase(sealedState);
+  assert.equal(clearedActual.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  let passiveSmoke = CreateAtExitState();
+  passiveSmoke.tunnels["2,1"].smoke = 2;
+  const passiveSmokeEstimate = GetActiveCivilianTransitEstimate(passiveSmoke, "Contacts");
+  assert.equal(passiveSmokeEstimate.nextConstraint.kind, "Smoke");
+  assert.equal(passiveSmokeEstimate.safeTurn, 7);
+  assert.equal(passiveSmokeEstimate.recoveryState, "NoRecoveryNeeded");
+  passiveSmoke = End(passiveSmoke);
+  assert.equal(passiveSmoke.civilians.find((entry) => entry.groupId === "Contacts").status, "Moving");
+  passiveSmoke = End(passiveSmoke);
+  assert.equal(passiveSmoke.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  let smokySeal = CreateAtExitState();
+  smokySeal.tunnels["2,1"].sealed = true;
+  smokySeal.tunnels["2,1"].smoke = 3;
+  const smokyWorkTeam = smokySeal.units.find((unit) => unit.unitId === "WorkTeam");
+  smokyWorkTeam.layer = LayerIds.TUNNEL;
+  smokyWorkTeam.tileKey = "2,1";
+  smokyWorkTeam.actionPoints = smokyWorkTeam.maxActionPoints;
+  const smokyClear = GetActiveCivilianTransitEstimate(smokySeal, "Contacts")
+    .recoveryActions.find((entry) => entry.actionId === ActionIds.CLEAR_SEAL);
+  assert.ok(smokyClear);
+  assert.equal(smokyClear.ifAppliedNow.safeTurn, 7);
+  smokySeal = Apply(smokySeal, "WorkTeam", ActionIds.CLEAR_SEAL);
+  smokySeal = End(smokySeal);
+  smokySeal = End(smokySeal);
+  assert.equal(smokySeal.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  let watchedState = CreateAtExitState();
+  const blockingPatrol = watchedState.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+  blockingPatrol.health = 1;
+  blockingPatrol.tileKey = "2,2";
+  blockingPatrol.intent = null;
+  blockingPatrol.intentRevealed = false;
+  const guerrilla = watchedState.units.find((unit) => unit.unitId === "Guerrilla");
+  guerrilla.layer = LayerIds.SURFACE;
+  guerrilla.tileKey = "3,2";
+  guerrilla.actionPoints = guerrilla.maxActionPoints;
+  guerrilla.ammo = 1;
+  const watchedEstimate = GetActiveCivilianTransitEstimate(watchedState, "Contacts");
+  assert.equal(watchedEstimate.nextConstraint.kind, "Watched");
+  const attack = watchedEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.ATTACK
+  ));
+  assert.ok(attack);
+  assert.equal(attack.unitId, "Guerrilla");
+  assert.equal(attack.targetKey, "2,2");
+  assert.equal(attack.cost.ammo, 1);
+  assert.equal(attack.ifAppliedNow.safeTurn, 6);
+  watchedState = Apply(watchedState, "Guerrilla", ActionIds.ATTACK, "2,2");
+  watchedState = End(watchedState);
+  assert.equal(watchedState.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  const deadlineNoAp = CreateAtExitState();
+  deadlineNoAp.turn = deadlineNoAp.maxTurns;
+  deadlineNoAp.exitWindows["2,1"] = {
+    exitKey: "2,1",
+    checkedTurn: 0,
+    checkedUntilTurn: 0,
+    signalCount: 0,
+  };
+  deadlineNoAp.reconActions = 1;
+  deadlineNoAp.lastReconTurn = 0;
+  deadlineNoAp.reconTileTurns["2,1"] = 0;
+  deadlineNoAp.organization = 1;
+  const deadlineScout = deadlineNoAp.units.find((unit) => unit.unitId === "Scout");
+  deadlineScout.layer = LayerIds.SURFACE;
+  deadlineScout.tileKey = "2,1";
+  deadlineScout.health = deadlineScout.maxHealth;
+  deadlineScout.actionPoints = 0;
+  const deadlineEstimate = GetActiveCivilianTransitEstimate(deadlineNoAp, "Contacts");
+  assert.equal(deadlineEstimate.safeTurn, null);
+  assert.equal(deadlineEstimate.deadlineRisk, true);
+  assert.equal(deadlineEstimate.recoveryActions.length, 0);
+  assert.equal(deadlineEstimate.recoveryState, "NoKnownRecovery");
+  const deadlineReconNeed = deadlineEstimate.recoveryNeeds.find((entry) => (
+    entry.actionId === ActionIds.RECON
+  ));
+  assert.ok(deadlineReconNeed);
+  assert.equal(deadlineReconNeed.canBecomeAvailable, false);
+  assert.equal(Object.hasOwn(deadlineReconNeed, "ifAppliedNow"), false);
+
+  const tiedThreats = CreateAtExitState();
+  for (const [enemyId, tileKey] of [
+    ["NorthPatrol", "2,2"],
+    ["BridgePatrol", "3,1"],
+  ]) {
+    const enemy = tiedThreats.enemies.find((entry) => entry.enemyId === enemyId);
+    enemy.health = enemy.maxHealth;
+    enemy.defeated = false;
+    enemy.tileKey = tileKey;
+    enemy.inactiveUntilTurn = 0;
+    enemy.stunnedUntilTurn = 0;
+    enemy.intent = null;
+    enemy.intentRevealed = false;
+  }
+  for (const unit of tiedThreats.units) {
+    unit.actionPoints = 0;
+    if (Object.hasOwn(unit, "ammo")) {
+      unit.ammo = 0;
+    }
+  }
+  const tiedBaseline = GetActiveCivilianTransitEstimate(tiedThreats, "Contacts");
+  const tiedReversed = Clone(tiedThreats);
+  tiedReversed.enemies.reverse();
+  assert.deepEqual(
+    GetActiveCivilianTransitEstimate(tiedReversed, "Contacts"),
+    tiedBaseline,
+  );
+
+  const twoAttackers = CreateAtExitState();
+  const watched = twoAttackers.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+  watched.health = 1;
+  watched.defeated = false;
+  watched.tileKey = "2,2";
+  watched.inactiveUntilTurn = 0;
+  watched.stunnedUntilTurn = 0;
+  watched.intent = null;
+  watched.intentRevealed = false;
+  const militia = twoAttackers.units.find((unit) => unit.unitId === "Militia");
+  Object.assign(militia, {
+    layer: LayerIds.SURFACE,
+    tileKey: "2,3",
+    actionPoints: 2,
+    ammo: 1,
+  });
+  const secondGuerrilla = twoAttackers.units.find((unit) => unit.unitId === "Guerrilla");
+  Object.assign(secondGuerrilla, {
+    layer: LayerIds.SURFACE,
+    tileKey: "3,2",
+    actionPoints: 2,
+    ammo: 1,
+  });
+  const attackerBaseline = GetActiveCivilianTransitEstimate(twoAttackers, "Contacts");
+  assert.deepEqual(
+    attackerBaseline.recoveryActions
+      .filter((entry) => entry.actionId === ActionIds.ATTACK)
+      .map((entry) => entry.unitId),
+    ["Guerrilla", "Militia"],
+  );
+  const attackersReversed = Clone(twoAttackers);
+  attackersReversed.units.reverse();
+  assert.deepEqual(
+    GetActiveCivilianTransitEstimate(attackersReversed, "Contacts"),
+    attackerBaseline,
+  );
+
+  let warnedSeal = CreateAtExitState();
+  const sapper = warnedSeal.enemies.find((enemy) => enemy.enemyId === "Sapper");
+  sapper.health = sapper.maxHealth;
+  sapper.inactiveUntilTurn = 0;
+  sapper.tileKey = "3,1";
+  sapper.intentRevealed = true;
+  sapper.intent = {
+    intentId: EnemyIntentIds.RESOLVE_SEAL,
+    targetKey: "2,1",
+    warningId: "ActiveForecastSeal",
+  };
+  warnedSeal.warnings = [{
+    warningId: "ActiveForecastSeal",
+    kind: "Seal",
+    targetKey: "2,1",
+    resolvesTurn: warnedSeal.turn,
+    resolved: false,
+    enemyId: sapper.enemyId,
+    text: "工兵准备封堵北枣窖",
+  }];
+  const warnedMilitia = warnedSeal.units.find((unit) => unit.unitId === "Militia");
+  warnedMilitia.layer = LayerIds.TUNNEL;
+  warnedMilitia.tileKey = "2,1";
+  warnedMilitia.actionPoints = warnedMilitia.maxActionPoints;
+  warnedMilitia.ammo = 1;
+  warnedSeal.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
+  const warnedSealEstimate = GetActiveCivilianTransitEstimate(warnedSeal, "Contacts");
+  assert.equal(warnedSealEstimate.nextConstraint.kind, "Seal");
+  const trap = warnedSealEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.TRAP
+  ));
+  assert.ok(trap);
+  assert.equal(trap.unitId, "Militia");
+  assert.equal(trap.cost.tools, 1);
+  assert.equal(trap.ifAppliedNow.safeTurn, 6);
+  warnedSeal = Apply(warnedSeal, "Militia", ActionIds.TRAP);
+  warnedSeal = End(warnedSeal);
+  assert.equal(warnedSeal.warnings.find((entry) => entry.warningId === "ActiveForecastSeal").resolved, true);
+  assert.equal(warnedSeal.trapsTriggered, 1);
+  assert.equal(warnedSeal.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  function CreateDualAtExitState() {
+    const state = CreateDualRouteLogisticsState();
+    state.turn = 10;
+    const group = state.civilians.find((entry) => entry.groupId === "Contacts");
+    group.status = "Moving";
+    group.path = [...northEvacuationPath];
+    group.pathIndex = northEvacuationPath.length - 1;
+    group.tileKey = "2,1";
+    group.exitKey = "2,1";
+    group.launchTurn = 8;
+    group.launchOrder = 1;
+    group.exitArrivalTurn = 10;
+    group.waitingForSignal = true;
+    state.civilianLaunchSerial = 2;
+    state.exitWindows["2,1"].checkedUntilTurn = 20;
+    state.exitWindows["0,5"].checkedUntilTurn = 20;
+    return state;
+  }
+
+  function AddResolvingNorthSealWarning(state) {
+    const warningSapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
+    warningSapper.health = warningSapper.maxHealth;
+    warningSapper.inactiveUntilTurn = 0;
+    warningSapper.stunnedUntilTurn = 0;
+    warningSapper.tileKey = "3,1";
+    warningSapper.intentRevealed = true;
+    warningSapper.intent = {
+      intentId: EnemyIntentIds.RESOLVE_SEAL,
+      targetKey: "2,1",
+      warningId: "RerouteSeal",
+    };
+    state.warnings = [{
+      warningId: "RerouteSeal",
+      kind: "Seal",
+      targetKey: "2,1",
+      resolvesTurn: state.turn,
+      resolved: false,
+      enemyId: warningSapper.enemyId,
+      text: "工兵准备封堵北枣窖",
+    }];
+    return state;
+  }
+
+  let trapBeforeReroute = AddResolvingNorthSealWarning(CreateDualAtExitState());
+  const rerouteMilitia = trapBeforeReroute.units.find((unit) => unit.unitId === "Militia");
+  rerouteMilitia.layer = LayerIds.TUNNEL;
+  rerouteMilitia.tileKey = "2,1";
+  rerouteMilitia.actionPoints = rerouteMilitia.maxActionPoints;
+  rerouteMilitia.ammo = 1;
+  const rerouteBaseline = GetActiveCivilianTransitEstimate(
+    trapBeforeReroute,
+    "Contacts",
+  );
+  assert.equal(rerouteBaseline.rerouted, true);
+  assert.equal(rerouteBaseline.projectedExitKey, "0,5");
+  assert.equal(rerouteBaseline.safeTurn > trapBeforeReroute.maxTurns, true);
+  const rerouteTrap = rerouteBaseline.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.TRAP
+    && entry.unitId === "Militia"
+    && entry.targetKey === "2,1"
+  ));
+  assert.ok(rerouteTrap);
+  assert.equal(rerouteTrap.ifAppliedNow.safeTurn, 10);
+  trapBeforeReroute = Apply(trapBeforeReroute, "Militia", ActionIds.TRAP);
+  trapBeforeReroute = End(trapBeforeReroute);
+  assert.equal(
+    trapBeforeReroute.civilians.find((entry) => entry.groupId === "Contacts").status,
+    "Safe",
+  );
+
+  const ambushBeforeReroute = AddResolvingNorthSealWarning(CreateDualAtExitState());
+  const rerouteGuerrilla = ambushBeforeReroute.units.find((unit) => (
+    unit.unitId === "Guerrilla"
+  ));
+  rerouteGuerrilla.layer = LayerIds.TUNNEL;
+  rerouteGuerrilla.tileKey = "2,1";
+  rerouteGuerrilla.actionPoints = rerouteGuerrilla.maxActionPoints;
+  rerouteGuerrilla.ammo = 1;
+  const rerouteAmbush = GetActiveCivilianTransitEstimate(
+    ambushBeforeReroute,
+    "Contacts",
+  ).recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.AMBUSH
+    && entry.unitId === "Guerrilla"
+    && entry.targetKey === "2,1"
+  ));
+  assert.ok(rerouteAmbush);
+  assert.equal(rerouteAmbush.ifAppliedNow.safeTurn, 10);
+  let ambushActual = Apply(ambushBeforeReroute, "Guerrilla", ActionIds.AMBUSH);
+  ambushActual = End(ambushActual);
+  assert.equal(
+    ambushActual.civilians.find((entry) => entry.groupId === "Contacts").status,
+    "Safe",
+  );
+
+  let clearBeforeReroute = CreateDualAtExitState();
+  clearBeforeReroute.tunnels["2,1"].sealed = true;
+  const rerouteWorkTeam = clearBeforeReroute.units.find((unit) => (
+    unit.unitId === "WorkTeam"
+  ));
+  rerouteWorkTeam.layer = LayerIds.TUNNEL;
+  rerouteWorkTeam.tileKey = "2,1";
+  rerouteWorkTeam.actionPoints = rerouteWorkTeam.maxActionPoints;
+  const sealedRerouteBaseline = GetActiveCivilianTransitEstimate(
+    clearBeforeReroute,
+    "Contacts",
+  );
+  assert.equal(sealedRerouteBaseline.rerouted, true);
+  assert.equal(sealedRerouteBaseline.projectedExitKey, "0,5");
+  const rerouteClear = sealedRerouteBaseline.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.CLEAR_SEAL
+    && entry.unitId === "WorkTeam"
+    && entry.targetKey === "2,1"
+  ));
+  assert.ok(rerouteClear);
+  assert.equal(rerouteClear.ifAppliedNow.safeTurn, 10);
+  clearBeforeReroute = Apply(clearBeforeReroute, "WorkTeam", ActionIds.CLEAR_SEAL);
+  clearBeforeReroute = End(clearBeforeReroute);
+  assert.equal(
+    clearBeforeReroute.civilians.find((entry) => entry.groupId === "Contacts").status,
+    "Safe",
+  );
+
+  const movingBeforeReroute = AddResolvingNorthSealWarning(
+    CreateDualRouteLogisticsState(),
+  );
+  movingBeforeReroute.turn = 6;
+  movingBeforeReroute.warnings[0].resolvesTurn = 6;
+  const movingWounded = movingBeforeReroute.civilians.find((entry) => (
+    entry.groupId === "Wounded"
+  ));
+  movingWounded.status = "Moving";
+  movingWounded.path = [...northEvacuationPath];
+  movingWounded.pathIndex = 0;
+  movingWounded.tileKey = "6,2";
+  movingWounded.exitKey = "2,1";
+  movingWounded.launchTurn = 5;
+  movingWounded.launchOrder = 1;
+  movingWounded.exitArrivalTurn = null;
+  for (const unitId of ["Militia", "Guerrilla"]) {
+    const defender = movingBeforeReroute.units.find((unit) => unit.unitId === unitId);
+    defender.layer = LayerIds.TUNNEL;
+    defender.tileKey = "2,1";
+    defender.actionPoints = defender.maxActionPoints;
+    defender.ammo = 1;
+  }
+  const movingRerouteEstimate = GetActiveCivilianTransitEstimate(
+    movingBeforeReroute,
+    "Wounded",
+  );
+  assert.equal(movingRerouteEstimate.rerouted, true);
+  assert.equal(movingRerouteEstimate.projectedExitKey, "0,5");
+  assert.equal(movingRerouteEstimate.arrivalTurn, 12);
+  assert.equal(movingRerouteEstimate.safeTurn > movingBeforeReroute.maxTurns, true);
+  for (const [actionId, unitId] of [
+    [ActionIds.TRAP, "Militia"],
+    [ActionIds.AMBUSH, "Guerrilla"],
+  ]) {
+    const defense = movingRerouteEstimate.recoveryActions.find((entry) => (
+      entry.actionId === actionId
+      && entry.unitId === unitId
+      && entry.targetKey === "2,1"
+    ));
+    assert.ok(defense, JSON.stringify({
+      actionId,
+      unitId,
+      recoveryActions: movingRerouteEstimate.recoveryActions,
+      recoveryNeeds: movingRerouteEstimate.recoveryNeeds,
+    }));
+    assert.equal(defense.ifAppliedNow.arrivalTurn, 11);
+    assert.equal(defense.ifAppliedNow.safeTurn, null);
+    assert.equal(defense.ifAppliedNow.nextConstraintKind, "Watched");
+    let defended = Apply(movingBeforeReroute, unitId, actionId);
+    defended = End(defended);
+    assert.equal(
+      defended.civilians.find((entry) => entry.groupId === "Wounded").exitKey,
+      "2,1",
+    );
+    assert.equal(
+      defended.civilians.find((entry) => entry.groupId === "Wounded").tileKey,
+      "6,1",
+    );
+    assert.equal(defended.tunnels["2,1"].sealed, false);
+    assert.equal(defended.warnings.find((warning) => warning.warningId === "RerouteSeal").resolved, true);
+  }
+
+  let smokyDefenseState = Clone(movingBeforeReroute);
+  smokyDefenseState.tunnels["6,1"].smoke = 2;
+  const smokyDefenseEstimate = GetActiveCivilianTransitEstimate(
+    smokyDefenseState,
+    "Wounded",
+  );
+  const smokyTrap = smokyDefenseEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.TRAP
+    && entry.unitId === "Militia"
+    && entry.targetKey === "2,1"
+  ));
+  assert.ok(smokyTrap);
+  assert.equal(smokyTrap.ifAppliedNow.peopleSafetyCost, 5);
+  const safetyBeforeSmoke = smokyDefenseState.peopleSafety;
+  smokyDefenseState = Apply(smokyDefenseState, "Militia", ActionIds.TRAP);
+  smokyDefenseState = End(smokyDefenseState);
+  assert.equal(safetyBeforeSmoke - smokyDefenseState.peopleSafety, 5);
+});
+
+Test("active trapped forecasts model occupied-node Dig but not forward-obstruction rescue", () => {
+  function CreateTrappedState(groupTileKey, collapsedTileKey) {
+    const state = CreateLogisticsState(false);
+    state.turn = 5;
+    state.peopleSafety = 88;
+    const group = state.civilians.find((entry) => entry.groupId === "Wounded");
+    group.status = "Trapped";
+    group.path = [...northEvacuationPath];
+    group.pathIndex = northEvacuationPath.indexOf(groupTileKey);
+    group.tileKey = groupTileKey;
+    group.exitKey = "2,1";
+    group.launchTurn = 4;
+    group.launchOrder = 1;
+    group.delayed = true;
+    group.exitArrivalTurn = null;
+    state.tunnels[collapsedTileKey].collapsed = true;
+    const workTeam = state.units.find((unit) => unit.unitId === "WorkTeam");
+    workTeam.layer = LayerIds.TUNNEL;
+    workTeam.tileKey = "6,2";
+    workTeam.actionPoints = workTeam.maxActionPoints;
+    return state;
+  }
+
+  let occupiedCollapse = CreateTrappedState("6,1", "6,1");
+  const pristine = Clone(occupiedCollapse);
+  const occupiedEstimate = GetActiveCivilianTransitEstimate(
+    occupiedCollapse,
+    "Wounded",
+  );
+  assert.deepEqual(occupiedCollapse, pristine);
+  assert.equal(occupiedEstimate.status, "Trapped");
+  assert.equal(occupiedEstimate.nextConstraint.kind, "Collapse");
+  assert.equal(occupiedEstimate.nextConstraint.tileKey, "6,1");
+  assert.equal(occupiedEstimate.recoveryState, "RecoverableNow");
+  const dig = occupiedEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.DIG
+  ));
+  assert.ok(dig);
+  assert.equal(dig.targetKey, "6,1");
+  assert.equal(dig.cost.tools, 1);
+  assert.equal(dig.cost.ap, 1);
+  assert.equal(dig.cost.exposure, 11);
+  assert.equal(dig.ifAppliedNow.status, "Moving");
+  assert.equal(dig.ifAppliedNow.safeTurn, 9);
+
+  const toolsBefore = occupiedCollapse.tools;
+  const exposureBefore = occupiedCollapse.exposure;
+  occupiedCollapse = Apply(occupiedCollapse, "WorkTeam", ActionIds.DIG, "6,1");
+  assert.equal(occupiedCollapse.tools, toolsBefore - 1);
+  assert.equal(occupiedCollapse.exposure, exposureBefore + 11);
+  assert.equal(occupiedCollapse.peopleSafety, 88);
+  assert.equal(occupiedCollapse.civilians.find((entry) => entry.groupId === "Wounded").status, "Moving");
+  assert.equal(
+    GetActiveCivilianTransitEstimate(occupiedCollapse, "Wounded").safeTurn,
+    dig.ifAppliedNow.safeTurn,
+  );
+  while (!occupiedCollapse.outcome && occupiedCollapse.turn <= dig.ifAppliedNow.safeTurn) {
+    occupiedCollapse = End(occupiedCollapse);
+  }
+  assert.equal(occupiedCollapse.civilians.find((entry) => entry.groupId === "Wounded").status, "Safe");
+  assert.equal(occupiedCollapse.peopleSafety, 88);
+
+  const needsPositioning = CreateTrappedState("6,1", "6,1");
+  needsPositioning.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "4,1";
+  const positioningEstimate = GetActiveCivilianTransitEstimate(needsPositioning, "Wounded");
+  assert.equal(positioningEstimate.recoveryState, "RecoverableAfterPositioning");
+  assert.equal(positioningEstimate.recoveryActions.length, 0);
+  assert.equal(positioningEstimate.recoveryNeeds.some((entry) => Object.hasOwn(entry, "ifAppliedNow")), false);
+
+  const deadDigger = CreateTrappedState("6,1", "6,1");
+  deadDigger.units.find((unit) => unit.unitId === "WorkTeam").health = 0;
+  const deadDiggerEstimate = GetActiveCivilianTransitEstimate(deadDigger, "Wounded");
+  assert.equal(deadDiggerEstimate.recoveryState, "NoKnownRecovery");
+  assert.equal(deadDiggerEstimate.recoveryActions.length, 0);
+  assert.equal(deadDiggerEstimate.recoveryNeeds[0].canBecomeAvailable, false);
+
+  const forwardObstruction = CreateTrappedState("6,1", "5,1");
+  const forwardEstimate = GetActiveCivilianTransitEstimate(forwardObstruction, "Wounded");
+  assert.equal(forwardEstimate.recoveryState, "NoKnownRecovery");
+  assert.equal(forwardEstimate.recoveryActions.length, 0);
+  assert.equal(forwardEstimate.nextConstraint.tileKey, "5,1");
+
+  let movingObstruction = CreateLogisticsState(false);
+  movingObstruction.turn = 6;
+  const movingContacts = movingObstruction.civilians.find((entry) => entry.groupId === "Contacts");
+  movingContacts.status = "Moving";
+  movingContacts.path = [...northEvacuationPath];
+  movingContacts.pathIndex = 1;
+  movingContacts.tileKey = "6,1";
+  movingContacts.exitKey = "2,1";
+  movingContacts.launchTurn = 4;
+  movingContacts.launchOrder = 1;
+  movingObstruction.tunnels["5,1"].collapsed = true;
+  const movingDigger = movingObstruction.units.find((unit) => unit.unitId === "WorkTeam");
+  movingDigger.layer = LayerIds.TUNNEL;
+  movingDigger.tileKey = "6,1";
+  movingDigger.actionPoints = movingDigger.maxActionPoints;
+  const movingEstimate = GetActiveCivilianTransitEstimate(movingObstruction, "Contacts");
+  assert.equal(movingEstimate.nextConstraint.kind, "Collapse");
+  assert.equal(movingEstimate.nextConstraint.tileKey, "5,1");
+  assert.equal(movingEstimate.peopleSafetyCost, 8);
+  const preventiveDig = movingEstimate.recoveryActions.find((entry) => (
+    entry.actionId === ActionIds.DIG
+  ));
+  assert.ok(preventiveDig);
+  assert.equal(preventiveDig.targetKey, "5,1");
+  assert.equal(preventiveDig.ifAppliedNow.safeTurn, 7);
+
+  const collapsedBraceState = Clone(movingObstruction);
+  const collapsedBraceDigger = collapsedBraceState.units.find((unit) => (
+    unit.unitId === "WorkTeam"
+  ));
+  collapsedBraceDigger.tileKey = "5,1";
+  assert.equal(
+    GetAvailableActions(collapsedBraceState, "WorkTeam").includes(ActionIds.BRACE),
+    false,
+  );
+  const collapsedBraceResult = ApplyPlayerAction(collapsedBraceState, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.BRACE,
+  });
+  assert.equal(collapsedBraceResult.ok, false);
+  assert.deepEqual(collapsedBraceResult.state, collapsedBraceState);
+
+  const unrescued = End(movingObstruction);
+  assert.equal(unrescued.peopleSafety, movingObstruction.peopleSafety - 8);
+  movingObstruction = Apply(movingObstruction, "WorkTeam", ActionIds.DIG, "5,1");
+  movingObstruction = End(movingObstruction);
+  movingObstruction = End(movingObstruction);
+  assert.equal(movingObstruction.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
+
+  let reroute = CreateDualRouteLogisticsState();
+  reroute.turn = 6;
+  const reroutingWounded = reroute.civilians.find((entry) => entry.groupId === "Wounded");
+  reroutingWounded.status = "Moving";
+  reroutingWounded.path = [...northEvacuationPath];
+  reroutingWounded.pathIndex = 0;
+  reroutingWounded.tileKey = "6,2";
+  reroutingWounded.exitKey = "2,1";
+  reroutingWounded.launchTurn = 4;
+  reroutingWounded.launchOrder = 1;
+  reroute.tunnels["5,1"].collapsed = true;
+  const rerouteEstimate = GetActiveCivilianTransitEstimate(reroute, "Wounded");
+  assert.equal(rerouteEstimate.rerouted, true);
+  assert.equal(rerouteEstimate.projectedExitKey, "0,5");
+  assert.notEqual(rerouteEstimate.nextConstraint?.kind, "Collapse");
+});
+
+Test("active forecasts include public reroutes and smoke without hidden-intent leakage", () => {
+  let rerouting = CreateDualRouteLogisticsState();
+  rerouting = Apply(rerouting, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  rerouting.warnings = [{
+    warningId: "VisibleSeal",
+    kind: "Seal",
+    targetKey: "2,1",
+    resolvesTurn: rerouting.turn + 1,
+    resolved: false,
+    enemyId: "Sapper",
+    text: "工兵准备封堵北枣窖",
+  }];
+  const warned = GetActiveCivilianTransitEstimate(rerouting, "Wounded");
+  assert.equal(warned.projectedExitKey, "0,5");
+  assert.equal(warned.rerouted, true);
+
+  const smoky = CreateLogisticsState(false);
+  let smokyMoving = Apply(smoky, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  smokyMoving.tunnels["6,1"].smoke = 2;
+  const smokyEstimate = GetActiveCivilianTransitEstimate(smokyMoving, "Wounded");
+  assert.equal(smokyEstimate.smokeDelayTurns > 0, true);
+  assert.equal(smokyEstimate.peopleSafetyCost > 0, true);
+
+  const publicState = Clone(rerouting);
+  publicState.warnings = [];
+  const patrol = publicState.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+  patrol.health = patrol.maxHealth;
+  patrol.tileKey = "0,0";
+  patrol.intent = null;
+  patrol.intentRevealed = false;
+  const publicEstimate = GetActiveCivilianTransitEstimate(publicState, "Wounded");
+  for (let index = 0; index < 1000; index += 1) {
+    const hidden = Clone(publicState);
+    hidden.seed = index + 100;
+    const hiddenPatrol = hidden.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+    hiddenPatrol.intent = {
+      intentId: index % 2 ? EnemyIntentIds.PREPARE_SEAL : EnemyIntentIds.SEARCH,
+      targetKey: "2,1",
+    };
+    hiddenPatrol.intentRevealed = false;
+    if (index % 2) {
+      hidden.enemies.reverse();
+    }
+    assert.deepEqual(
+      GetActiveCivilianTransitEstimate(hidden, "Wounded"),
+      publicEstimate,
+    );
+  }
+});
+
 Test("launch forecasts warn before an optimistic remaining schedule becomes impossible", () => {
   let south = CreateSouthLogisticsState();
   const t4Families = GetCivilianTransitEstimate(south, "Families", "0,5");
@@ -3036,6 +3832,13 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(gameSource, /三批全撤 · 速度\/负载各异/);
   assert.match(gameSource, /约 T.*进入出洞窗口/);
   assert.match(gameSource, /首个冲突：/);
+  assert.match(gameSource, /GetActiveCivilianTransitEstimate/);
+  assert.match(gameSource, /在途只读时刻表 · 不自动执行/);
+  assert.match(gameSource, /ConfirmPreviewButton\.hidden = true/);
+  assert.match(gameSource, /\["Moving", "Trapped"\]\.includes\(group\?\.status\)/);
+  assert.match(gameSource, /CivilianMobileRecoverySummary/);
+  assert.match(gameSource, /action\.ifAppliedNow\.peopleSafetyCost/);
+  assert.match(gameSource, /群众安全 -\$\{action\.ifAppliedNow\.peopleSafetyCost\}/);
   assert.match(gameSource, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
   assert.match(gameSource, /按当前已通路线且下一批前不再开路\/抢通/);
   assert.doesNotMatch(gameSource, /最乐观排班仍会/);
@@ -3064,6 +3867,11 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(cliSource, /case "path"/);
   assert.match(cliSource, /ApplyPlayerActionPath/);
   assert.match(cliSource, /GetCivilianTransitEstimate/);
+  assert.match(cliSource, /GetActiveCivilianTransitEstimate/);
+  assert.match(cliSource, /在途只读时刻表/);
+  assert.match(cliSource, /当前合法恢复/);
+  assert.match(cliSource, /action\.ifAppliedNow\.peopleSafetyCost/);
+  assert.match(cliSource, /群众安全 -\$\{action\.ifAppliedNow\.peopleSafetyCost\}/);
   assert.match(cliSource, /排班风险/);
   assert.match(cliSource, /下一批前不再开路\/抢通/);
 });

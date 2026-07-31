@@ -51,6 +51,12 @@
   未揭示的敌军意图不得改变出口窗口或预测。`remainingSchedule` 是“当前候选批次占用本回合发车位后”的
   剩余排班条件下界：固定当前已通路线，假设下一批前不再开路/抢通，且不计敌军、拥堵与其他新风险；
   UI/CLI 必须连同这些条件展示，不能把它表述成无条件必败或胜利承诺。
+- **在途预测**：`GetActiveCivilianTransitEstimate` 只接受 `Moving` / `Trapped` 批次，必须把到口回合与安全回合分开，
+  保留当前队列、路径位置、烟流、封口、塌方及公开预警，并忽略未揭示意图和未来 `PlanEnemyTurn`。
+  `recoveryActions[].ifAppliedNow` 只允许来自当前真实合法动作的反事实：支护、出口复查、抢通、重挖、
+  公开预警绑定的设陷/伏击或地面压制；预计造成的不可逆群众安全损失也必须在 UI/CLI 成本中明示。
+  尚需移动/资源时只能列 `recoveryNeeds`，不得承诺 ETA。`Trapped` 不等于终态：群众所在格塌方可由相邻地道队重挖恢复，
+  但前方格中断的现行规则没有已知恢复动作。UI 在途/被困卡可点开只读时刻表，Safe 卡保持禁用；CLI `show` / `legal` 同步输出。
 - **敌军意图**（`EnemyIntentIds`，明牌可预读）：Patrol / Investigate / Attack / PrepareSeal→ResolveSeal
   封堵出口 / PrepareSmoke→ResolveSmoke 灌烟 / Search / Stalled。**两段式意图（Prepare→Resolve）是
   玩家的反制窗口**，不得改成一回合完成。工兵在多个已确认洞口间先比较未过期公开证据强度、
