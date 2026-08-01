@@ -1,6 +1,12 @@
 # Claude Code local settings (may contain secrets)
 .claude/settings.local.json
 
+# 带斜杠只匹配目录。worktree 里为了复用主检出的依赖常会建一个同名软链
+# （mode 120000），那种形态不被 node_modules/ 匹配，会被 git add -A 收进来。
+# 推上去就是一条指向本机绝对路径的断链，Jekyll 解析它时整个 Pages 构建会挂：
+#   Error: No such file or directory @ rb_check_realpath_internal - /github/workspace/node_modules
+# 两种形态都要挡。
+node_modules
 node_modules/
 # 仓库约定不落 lockfile（纯静态站，只有测试用 devDependencies）
 package-lock.json
