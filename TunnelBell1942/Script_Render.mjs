@@ -58,9 +58,41 @@ const _vecB = new THREE.Vector3();
 
 /** 长焦透视的半视角正切，全篇的距离换算都用它。 */
 const TAN_HALF_FOV = Math.tan((CAMERA.fovDeg * Math.PI) / 180 / 2);
-/** z=0 平面上要看到 vh 那么高时，相机该站多远。这是 viewHeight 语义的唯一实现。 */
-function CameraDistanceFor(vh) { return (vh * 0.5) / TAN_HALF_FOV; }
-/** 距相机 dist 处的可视半高。暗角罩、天幕这些"贴屏"的东西靠它定尺寸。 */
+
+// ---------------------------------------------------------------------------
+// 俯角（AGENTS.md 2.1）。这是纵深感最大的一块，不是锦上添花。
+//
+// 纯水平看 -Z 时**地面永远只是一条边**：台面、车辙、垄沟、坑道里前后两榀
+// 支撑木全部藏在那条边里，做了也看不见。给 6° 俯角，地面立刻摊开成一块
+// 向后退的台面，「平行线向灭点收敛」这条最强的深度信号才真正生效。
+//
+// 代价是竖直线朝灭点收敛，所以 8° 是硬上限，且要实测画面上下缘的竖直边
+// 偏离铅垂线 ≤ 2.5°（健康检查里有这条）。
+//
+// 几何（相机无 roll 无 yaw，只绕 X 转 -p）：
+//   · 相机看向 (0, -sin p, -cos p)，视线正中打在 (camX, camY, 0) 上；
+//   · 相机站在  C = (camX, camY + camLiftY, L·cos p)，L 是沿视线到 z=0 的距离；
+//   · z=0 平面上的可视高度（viewHeight 的语义，一个字都不许改）：
+//         H = L·cos p · ( tan(p+h) − tan(p−h) )        h = fov/2
+//     反解出 L = vh / ( cos p · (tan(p+h) − tan(p−h)) )；
+//   · 让这段可视高度**正好以 camY 为中心**（玩法层的夹紧全建立在这上面）：
+//         camLiftY = L·cos p · ( tan(p+h) + tan(p−h) ) / 2
+//   · 世界 z=Z 处的视深（近大远小的分母）不再是 camDist−Z，而是
+//         camDist − Z·cos p    ← ViewDepthAt()
+//     p=0 时两式相同，所以旧的推导是它的特例。
+// ---------------------------------------------------------------------------
+const PITCH_DEG = Math.min(8, Math.max(0, typeof CAMERA.pitchDeg === 'number' ? CAMERA.pitchDeg : 0));
+const PITCH = (PITCH_DEG * Math.PI) / 180;
+const COS_PITCH = Math.cos(PITCH);
+const SIN_PITCH = Math.sin(PITCH);
+const HALF_FOV = (CAMERA.fovDeg * Math.PI) / 180 / 2;
+const TAN_LO = Math.tan(PITCH - HALF_FOV);   // 画面上缘那条边（俯角下多半是负的）
+const TAN_HI = Math.tan(PITCH + HALF_FOV);   // 画面下缘那条边
+/** z=0 平面上要看到 vh 那么高时，相机沿视线该站多远。viewHeight 语义的唯一实现。 */
+function CameraDistanceFor(vh) { return (vh * 0.5) / (COS_PITCH * (TAN_HI - TAN_LO) * 0.5); }
+/** 相机相对「视线落点」要抬多高，才能让可视高度正好以 camY 为中心。 */
+function CameraLiftFor(dist) { return dist * COS_PITCH * (TAN_HI + TAN_LO) * 0.5; }
+/** 距相机 dist（沿视线）处的可视半高。暗角罩、天幕这些"贴屏"的东西靠它定尺寸。 */
 function HalfHeightAt(dist) { return Math.max(0.01, dist) * TAN_HALF_FOV; }
 
 /** 地下剖面正面（朝观众那一面）所在的 z。 */
@@ -148,6 +180,29 @@ const DEPTH_LAYER_Z = {
  * 最紧的情况是地表标称视口（camDist 32.6），代进去 z=-31 得 y_max ≈ 5.9。
  */
 const MOON_CLEAR_NDC = 0.35;
+
+/** 月亮的屏幕高度（ndc_y）。俯角把远景整体往上推，月亮得跟着让位。
+ *  p=0 时回到 0.50，6° 时约 0.73。半径 0.115，所以底边约在 0.62。 */
+const MOON_NDC_Y = Math.min(0.74, 0.50 + (SIN_PITCH / Math.max(1e-6, COS_PITCH)) / TAN_HALF_FOV * 0.40);
+
+/**
+ * 建造期用的"屏幕高度 → 世界 y"反解（俯角版）。
+ *
+ * 相机瞄准 (·, camY, 0)，站在 (·, camY + camLiftY, camDist·cos p)。
+ * 世界点 (·, Y, Z) 的视空间：dy = Y − Cy，dz = Z − camZ
+ *     Vy = dy·cos p − dz·sin p ,  w = −(dy·sin p + dz·cos p) ,  ndc = Vy /(w·tan h)
+ * 解出：dy = dz·(sin p − ndc·tan h·cos p) / (cos p + ndc·tan h·sin p)
+ *
+ * 一律按**地表标称视口 + 玩家站在 y=0** 算，跟建造时相机恰好在哪一档无关，
+ * 结果是确定性的。p=0 时退化成旧的线性式子。
+ */
+function NominalSkyY(ndc, z) {
+  const dist = CameraDistanceFor(CAMERA.viewHeight);
+  const cy = CAMERA.surfaceLift + CameraLiftFor(dist);
+  const dz = z - dist * COS_PITCH;
+  const k = ndc * TAN_HALF_FOV;
+  return cy + dz * (SIN_PITCH - k * COS_PITCH) / (COS_PITCH + k * SIN_PITCH);
+}
 
 /**
  * 浮尘分层。z 越靠前 → 点越大、飘得越快、数量越少。
@@ -1829,10 +1884,20 @@ export function CreateRenderer(canvas, options = {}) {
   // 长焦透视。FOV 窄到 20°，相机拉到三十多米开外：竖直边缘几乎不外扩，
   // 横版仍然成立，但层与层之间有了真实的近大远小和视差。
   const camera = new THREE.PerspectiveCamera(CAMERA.fovDeg, 16 / 9, CAMERA.near, CAMERA.far);
+  /** 沿视线到 z=0 落点的距离。所有"近大远小"的分母都从它推。 */
   let camDist = CameraDistanceFor(viewHeight);
-  camera.position.set(0, 0, camDist);
-  camera.rotation.set(0, 0, 0);          // 永远看向 -Z，永远不转
+  /** 相机世界 z（= camDist·cos p）。跟世界 z 做差时用它，别用 camDist。 */
+  let camZ = camDist * COS_PITCH;
+  /** 相机比"视线落点"高多少，见上面的推导。 */
+  let camLiftY = CameraLiftFor(camDist);
+  camera.position.set(0, camLiftY, camZ);
+  // 只绕 X 转（俯角），**永远不 roll、永远不偏航**。绕 X 转不会破坏横版：
+  // 竖直线仍然基本竖直（实测上下缘偏离铅垂线 < 2°），但地面摊开了。
+  camera.rotation.set(-PITCH, 0, 0);
   scene.add(camera);
+
+  /** 世界 z=Z 处的视深。俯角下不再是 camDist−Z（p=0 时两者相同）。 */
+  function ViewDepthAt(z) { return Math.max(0.5, camDist - z * COS_PITCH); }
 
   // ---- 天幕：挂在相机下面，等于无穷远。它不许有任何视差 ----
   const gSky = new THREE.Group();
@@ -2464,7 +2529,10 @@ export function CreateRenderer(canvas, options = {}) {
     const halfH = HalfHeightAt(SKY_DEPTH);
     const halfW = halfH * Math.max(0.4, camera.aspect || 16 / 9);
     const mx = -Math.min(halfW, halfH * 1.15) * 0.60;
-    const my = halfH * 0.50;
+    // 俯角把整片背景往画面上方推（远处的地面朝灭点收敛，灭点在 ndc_y=tan p/tan h）。
+    // 月亮挂在相机下面，本身不受影响，所以必须**主动抬高**，否则远山会顶到它身上。
+    // 抬多少跟俯角挂钩，p=0 时回到原来的 0.50。
+    const my = halfH * MOON_NDC_Y;
     skyMoon[0].position.x = mx; skyMoon[0].position.y = my;
     skyMoon[1].position.x = mx; skyMoon[1].position.y = my;
   }
@@ -2755,6 +2823,30 @@ export function CreateRenderer(canvas, options = {}) {
     }
   }
 
+  /**
+   * 把一层背景剪影整体按 Y 压扁，保证它的最高点不超过屏幕 ndc_y = cap。
+   *
+   * 为什么需要：俯角一上来，**z 越远的层在屏幕上抬得越高**（远处的地面朝
+   * 灭点收敛，这正是我们要的纵深），但天幕和月亮是构图锚。实测 6° 下
+   * 原来的远山（6.4 米）从 ndc 0.43 抬到 0.69，直接骑到月亮上面去。
+   * 这里按每层自己的 z 反解出限高再整体缩，所以俯角改成几度都自洽，
+   * p=0 时缩放系数恒为 1，一个顶点都不动。
+   */
+  function CapSkylineY(geo, z, cap, groundY) {
+    if (!geo || !geo.attributes || !geo.attributes.position) return 1;
+    const pos = geo.attributes.position;
+    let maxY = -Infinity;
+    for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); if (y > maxY) maxY = y; }
+    const h = maxY - groundY;
+    if (!(h > 0.01)) return 1;
+    const s = Math.min(1, (NominalSkyY(cap, z) - groundY) / h);
+    if (!(s > 0.05) || s >= 0.999) return 1;
+    geo.translate(0, -groundY, 0);
+    geo.scale(1, s, 1);
+    geo.translate(0, groundY, 0);
+    return s;
+  }
+
   // ---- 远山 + 远处村舍剪影 ----
   function BuildBackdrop(bx0, bx1, outline) {
     const span = bx1 - bx0;
@@ -2782,6 +2874,8 @@ export function CreateRenderer(canvas, options = {}) {
     ridge.push(GPrism(ptsB, 0.4, 0, 0, 5));
     const rm = SafeMerge(ridge);
     if (rm) {
+      // 这块几何的 y 是相对 0 的（mesh 自己再平移到 earthGroundRef）
+      CapSkylineY(rm, LAYER_Z.FAR, 0.50, 0);
       const mesh = new THREE.Mesh(rm, mats.farSil);
       mesh.position.y = earthGroundRef;
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
@@ -2813,6 +2907,7 @@ export function CreateRenderer(canvas, options = {}) {
     }
     const hm = SafeMerge(houses);
     if (hm) {
+      CapSkylineY(hm, LAYER_Z.BACK, 0.56, earthGroundRef);
       const mesh = new THREE.Mesh(hm, mats.backSil);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
       gBack.add(mesh); TrackGeo(hm);
@@ -2864,7 +2959,8 @@ export function CreateRenderer(canvas, options = {}) {
     //    第一版给到 9.4 米，实测直接把月亮啃掉半个，构图当场垮掉。
     const deep = [];
     const segD = Math.max(18, Math.floor(span / 9));
-    const deepCap = MOON_CLEAR_NDC * HalfHeightAt(CameraDistanceFor(CAMERA.viewHeight) - DEPTH_LAYER_Z.RIDGE_FAR)
+    const deepCap = MOON_CLEAR_NDC
+      * HalfHeightAt(CameraDistanceFor(CAMERA.viewHeight) - DEPTH_LAYER_Z.RIDGE_FAR * COS_PITCH)
       + CAMERA.surfaceLift;
     const ptsD = [];
     for (let i = 0; i <= segD; i++) {
@@ -3175,11 +3271,15 @@ export function CreateRenderer(canvas, options = {}) {
   //     中心**放大的——低于相机中心的东西会被压得更低。底边尤其危险，
   //     旧的 -0.55 投出来是 -1.0，会顺着地表线往坑道里扎，所以收到 -0.30。
   // 按地表标称视口算，跟建造时相机恰好在哪一档无关（确定性）
-  const FORE_MAG = CameraDistanceFor(CAMERA.viewHeight) /
-    Math.max(1, CameraDistanceFor(CAMERA.viewHeight) - LAYER_Z.FORE);
+  const FORE_NOMINAL = CameraDistanceFor(CAMERA.viewHeight);
+  const FORE_MAG = FORE_NOMINAL / Math.max(1, FORE_NOMINAL - LAYER_Z.FORE * COS_PITCH);
   const FORE_SHRINK = 1 / FORE_MAG;                 // ≈0.85
   const FORE_TOP_LIMIT = 1.15 * FORE_SHRINK;        // 投影后仍然只遮到腰
-  const FORE_BOTTOM = -0.30;                        // 投影后底边落在 gy-0.55 上下
+  // 底边：俯角把近处的东西往画面下方推得更狠（同一个 y，z 越近投得越低）。
+  // 实测 6° 下旧的 -0.30 投出来比地表线低 73 像素（无俯角时只有 45），
+  // 前景剪影的下摆又开始往地道剖面里扎。反解"投影后仍落在 gy-0.55 附近"
+  // 得到的值基本就是 0，所以带俯角时收到 -0.04。
+  const FORE_BOTTOM = PITCH_DEG > 0.5 ? -0.04 : -0.30;
 
   function BuildForeground(bx0, bx1, outline) {
     const buckets = NewBuckets();
@@ -3878,7 +3978,7 @@ export function CreateRenderer(canvas, options = {}) {
       const band = L.band;
       // 这一层所在深度上的可视范围。乘 2.2 让盒子明显大于画面，取模的接缝
       // 就落在画外；再配合边缘淡出，任何机位都看不见"忽然冒出来一个点"。
-      const halfH = HalfHeightAt(camDist - band.z);
+      const halfH = HalfHeightAt(ViewDepthAt(band.z));
       const W = halfH * (viewW / Math.max(1, viewH)) * 2.2;
       const H = halfH * 2.2;
       const pos = L.pos, col = L.col, seed = L.seed;
@@ -4043,8 +4143,10 @@ export function CreateRenderer(canvas, options = {}) {
     const cx = (typeof cam.x === 'number' ? cam.x : 0) + sx;
     const cy = (typeof cam.y === 'number' ? cam.y : 0) + sy;
     camera.position.x = cx;
-    camera.position.y = cy;
-    camera.position.z = camDist;
+    // 俯角下相机要抬到视线落点上方 camLiftY，可视高度才**仍然以 camY 为中心**。
+    // 忘了这一项，整幅画会整体下沉，玩家贴着画面上缘走。
+    camera.position.y = cy + camLiftY;
+    camera.position.z = camZ;
     camera.rotation.z = shake * 0.012 * Math.sin(t * 26.1);
     camera.updateMatrixWorld();
 
@@ -4152,11 +4254,11 @@ export function CreateRenderer(canvas, options = {}) {
     // "躲在后面"必须按**投影后**判，不能比世界坐标。前景在 z=+5，比玩家所在的
     // 平面近 4.5 米，横向位移被放大 ~18%：世界坐标上还差 1 米的柴垛，屏幕上
     // 可能已经压在人身上了。把每个遮挡物换算成"它在玩法平面上等效的 x"。
-    const foreToPlay = (camDist - ACTOR_Z_PLAYER);
+    const foreToPlay = ViewDepthAt(ACTOR_Z_PLAYER);
     let nearestFore = 99;
     for (let i = 0; i < foreOccluders.length; i++) {
       const oc = foreOccluders[i];
-      const k = foreToPlay / Math.max(1, camDist - oc.z);
+      const k = foreToPlay / Math.max(1, ViewDepthAt(oc.z));
       const ox = cx + (oc.x - cx) * k;
       const d = Math.abs(ox - px) - oc.w * k;
       if (d < nearestFore) nearestFore = d;
@@ -4347,7 +4449,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (vignetteMesh.visible) {
       // 罩子在 z=3.4，比玩法平面近 3.4 米，透视下会被放大——尺寸得按它自己
       // 那个深度上的可视范围算。照 viewHeight 直接算会小一圈，四角漏出来。
-      const halfH = HalfHeightAt(camDist - 3.4);
+      const halfH = HalfHeightAt(ViewDepthAt(3.4));
       const halfWv = halfH * (viewW / Math.max(1, viewH));
       const rad = Math.max(halfWv, halfH) * Lerp(2.05, 2.75, lanternAmt);
       vignetteMesh.position.set(px, py + 0.7, 3.4);
@@ -4439,7 +4541,10 @@ export function CreateRenderer(canvas, options = {}) {
     camera.near = CAMERA.near;
     camera.far = CAMERA.far;
     camDist = CameraDistanceFor(viewHeight);
-    camera.position.z = camDist;
+    camZ = camDist * COS_PITCH;
+    camLiftY = CameraLiftFor(camDist);
+    camera.position.z = camZ;
+    camera.rotation.x = -PITCH;
     camera.updateProjectionMatrix();
     PlaceSkyMoon();
   }
