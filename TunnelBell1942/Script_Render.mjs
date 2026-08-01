@@ -1390,6 +1390,29 @@ const KIND_TINT = {
 
 const rimUniform = { value: new THREE.Color(0.55, 0.68, 0.92) };
 const rimPowerUniform = { value: 0.55 };
+
+/**
+ * 乡亲的保底照明（AGENTS.md 0.0 / 第 2 幕的情绪主体）。
+ *
+ * 实测过一次血淋淋的：第二幕地道里，二嫂站在那儿和把她挪走 300 米，
+ * 同一竖条像素的 mean 只差 **0.80/255**，max 差 0。她比她挡住的那块土还暗，
+ * 对比度 0.3%——rig 在、visible 为 true、测试全绿，玩家眼里她根本不存在。
+ * 而这一幕的目标就是把六位乡亲带走，HUD 上一直挂着「乡亲 0/6」。
+ *
+ * 解法必须满足两条：
+ *  1) **只给乡亲**（villager / child / elder）。敌人躲在暗处是对的，
+ *     给敌人保底照明等于把潜行送掉。
+ *  2) **不许把地道打亮**。暗的应该是空间，不是人。所以不加环境光、不加点光，
+ *     只在乡亲自己的着色里加一层"身上带着点光"的项——0 个 draw call，
+ *     一盏灯都不多，照到的只有他们自己。
+ *
+ * 强度按 layerMix 走：地下给满（那儿才是问题），地表几乎关掉
+ * （月光已经够，再加就成了会发光的鬼）。
+ */
+const npcLitUniform = { value: 0 };
+const npcLitColorUniform = { value: new THREE.Color(1.0, 0.74, 0.46) };
+const NPC_SELF_LIT = { villager: 1.0, child: 1.0, elder: 1.0 };
+
 const patchedActorMats = new WeakSet();
 
 function PatchActorMaterial(mat, kind) {
@@ -1402,13 +1425,32 @@ function PatchActorMaterial(mat, kind) {
       shader.uniforms.uRimStrength = rimPowerUniform;
       shader.uniforms.uKindTint = { value: new THREE.Vector3(tint[0], tint[1], tint[2]) };
       shader.uniforms.uRimScale = { value: tint[3] };
+      shader.uniforms.uNpcLit = npcLitUniform;
+      shader.uniforms.uNpcLitColor = npcLitColorUniform;
+      shader.uniforms.uNpcLitScale = { value: NPC_SELF_LIT[kind] || 0 };
       shader.fragmentShader = shader.fragmentShader
-        .replace('void main() {', 'uniform vec3 uRimColor;\nuniform float uRimStrength;\nuniform vec3 uKindTint;\nuniform float uRimScale;\nvoid main() {')
+        .replace('void main() {',
+          'uniform vec3 uRimColor;\nuniform float uRimStrength;\nuniform vec3 uKindTint;\n' +
+          'uniform float uRimScale;\nuniform float uNpcLit;\nuniform vec3 uNpcLitColor;\n' +
+          'uniform float uNpcLitScale;\nvoid main() {')
         .replace(
           '#include <opaque_fragment>',
           'outgoingLight *= uKindTint;\n' +
           'float tbRim = 1.0 - abs(normalize(normal).z);\n' +
           'outgoingLight += uRimColor * pow(clamp(tbRim, 0.0, 1.0), 3.4) * uRimStrength * uRimScale;\n' +
+          // 乡亲保底照明。按法线的"朝上程度"加权，不是平铺一层——平铺会把
+          // 形体压平，人就成了一张亮纸片；朝上加权读起来像"脚边有盏灯"。
+          'float tbUp = clamp(normalize(normal).y * 0.5 + 0.5, 0.0, 1.0);\n' +
+          'outgoingLight += uNpcLitColor * (uNpcLit * uNpcLitScale) * (0.34 + 0.66 * tbUp);\n' +
+          // 再补一道**稍宽**的暖边光（指数 2.6，比上面那道 3.4 铺得开一点）。
+          // 光靠整体提亮救不了"背景本来就亮"的机位：老栓站在马灯旁边时
+          // 实测 Δmean 只有 1.4。轮廓亮边是局部对比，背景多亮都压不住它。
+          //
+          // 强度是拿眼睛校过的，不是拿数字校的：倍率给到 3.2 时 A/B 差值很好看
+          // （Δmax 125），画面上二嫂却变成一根发光的白柱子——低模的侧面法线
+          // 几乎全是掠射角，"边光"会把整个身子一起点亮。1.2 是"看得见轮廓、
+          // 仍然是个人"的那一档。
+          'outgoingLight += uNpcLitColor * pow(clamp(tbRim, 0.0, 1.0), 2.6) * (uNpcLit * uNpcLitScale) * 1.2;\n' +
           '#include <opaque_fragment>'
         );
     };
@@ -2125,16 +2167,23 @@ export function CreateRenderer(canvas, options = {}) {
     //   硬面 = 一层层错缝的砖 / 青石条，冷、齐、砌死的
     // 两者都自带自发光：地道环境光只有 0x1a1008，不给底色它们在画面上是纯黑，
     // 区分得再好也白搭。
+    // 色温是第二道保险，而且在暗场里比明度更耐得住：整条地道是暖赭褐的，
+    // 一面**冷灰蓝**的石头面在里面是刺眼的异类，一眼就知道"这不是土"。
     digSoft: new THREE.MeshLambertMaterial({
-      color: 0x8a6034, map: T('mud') || null,
-      emissive: 0x4a2c12, emissiveIntensity: 0.72,
+      color: 0x9a6a38, map: T('mud') || null,
+      emissive: 0x6a3c16, emissiveIntensity: 0.95,
     }),
     digHard: new THREE.MeshLambertMaterial({
-      color: 0x6a6f78, map: T('stone') || null,
-      emissive: 0x1b2028, emissiveIntensity: 0.62,
+      color: 0x707c8c, map: T('stone') || null,
+      emissive: 0x223040, emissiveIntensity: 0.9,
     }),
     digJoint: new THREE.MeshLambertMaterial({
-      color: 0x2b2f36, emissive: 0x0d1014, emissiveIntensity: 0.5,
+      color: 0x20242c, emissive: 0x090c12, emissiveIntensity: 0.5,
+    }),
+    // 硬面上的刨痕：铁器在石头上刮出来的亮口子。**有人试过，没刨动**——
+    // 这一笔既是叙事也是判读，比任何图标都省事。
+    digScar: new THREE.MeshLambertMaterial({
+      color: 0xc8d2e0, emissive: 0x6f8098, emissiveIntensity: 0.85,
     }),
     // 挖出来的土：这是玩家**自己制造的破绽**，看不见就没法管理，
     // 所以要比周围亮一档。它比 digSoft 还新还松，颜色更浅。
@@ -4034,13 +4083,27 @@ export function CreateRenderer(canvas, options = {}) {
       const dir = s.dir === 'left' ? -1 : s.dir === 'right' ? 1 : 0;
       const vertical = s.dir === 'up' || s.dir === 'down';
       const rng = MakeRng(StrSeed(s.id || ('dig' + i)));
-      // 面的位置：左右挖 → 挡在侧前方的一堵墙；上下挖 → 顶板 / 地板上的一块
-      const fx = vertical ? sx : sx + dir * 0.82;
-      const fy = vertical ? (s.dir === 'up' ? sy + 1.92 : sy - 0.06) : sy + 0.95;
-      const fw = vertical ? 1.55 : 0.34;          // 竖直面很薄，水平面是一块板
-      const fh = vertical ? 0.30 : 1.85;
-      const fd = 2.35;                            // 沿 Z 的进深：它是一段墙，不是一张片
-      const fz = -0.35;
+      // 位置必须**贴着已挖开那段的端头往里退一点**，不能拿 digSpot.x 往外推。
+      // 往外推那一点已经是实心土，剖面挤出体（正面在 z=2.25）会把整面挡得
+      // 一干二净——第一版就是这么"画了等于没画"的。
+      let endX = sx;
+      let bestGap = Infinity;
+      const dfloors = Array.isArray(level.floors) ? level.floors : [];
+      for (let k = 0; k < dfloors.length; k++) {
+        const f = dfloors[k];
+        if (!f || f.kind !== 'tunnel') continue;
+        if (Math.abs((f.y || 0) - sy) > 0.7) continue;
+        const edge = dir > 0 ? f.x1 : f.x0;
+        const gap = Math.abs(edge - sx);
+        if (gap < bestGap && gap < 3.0) { bestGap = gap; endX = edge; }
+      }
+      // 面的位置：左右挖 → 堵在通道端头的一堵墙；上下挖 → 顶板 / 地板上的一块
+      const fx = vertical ? sx : endX - dir * 0.28;
+      const fy = vertical ? (s.dir === 'up' ? sy + 1.86 : sy - 0.04) : sy + 0.92;
+      const fw = vertical ? 1.55 : 0.30;          // 竖直面很薄，水平面是一块板
+      const fh = vertical ? 0.26 : 1.80;
+      const fd = 2.20;                            // 沿 Z 的进深：它是一段墙，不是一张片
+      const fz = -0.25;
 
       if (s.soft) {
         // —— 软面：新翻的松土 ——
@@ -4097,6 +4160,16 @@ export function CreateRenderer(canvas, options = {}) {
         // 压顶的一条整石：告诉玩家这不是砖垛，是有人认真砌过的
         BucketPush(buckets, 'digHard', GBox(fw * 1.16, rowH * 0.5, fd * 1.02,
           fx, fy + fh / 2 - rowH * 0.2, fz));
+        // 刨痕（亮口子）：铁器刮在石头上留下的白印。**有人试过，没刨动**。
+        // 软面上的刨痕是暗槽（刨得进去），硬面上的是亮划痕（刨不进去），
+        // 一暗一亮，是这两种面之间最省事的一条判读。
+        for (let k = 0; k < 5; k++) {
+          const len = 0.16 + rng() * 0.22;
+          BucketPush(buckets, 'digScar', GBox(0.03, len, 0.045,
+            fx - dir * 0.02,
+            fy + (rng() - 0.5) * fh * 0.7,
+            fz + (rng() - 0.5) * fd * 0.8, 0.7 + rng() * 0.6));
+        }
       }
     }
     FlushBuckets(buckets, gPlay, 0);
@@ -4695,6 +4768,13 @@ export function CreateRenderer(canvas, options = {}) {
     // 共享 uniform，改一次全体生效；这里一帧只写两个数，零分配。
     rimUniform.value.setRGB(Lerp(0.62, 0.44, mix), Lerp(0.42, 0.56, mix), Lerp(0.22, 0.86, mix));
     rimPowerUniform.value = Lerp(0.10 + lanternAmt * 0.10, 0.19, mix);
+
+    // ---- 乡亲保底照明 ----
+    // 地下给满：那儿是"看不见人"的地方（实测对比度只有 0.3%）。
+    // 地表几乎关掉：月光已经够，再加就成了会发光的鬼。
+    // 手里有马灯时反而收一档——真有光源照着的时候不需要这层假的。
+    npcLitUniform.value = Lerp(0.135 - lanternAmt * 0.030, 0.012, mix);
+    npcLitColorUniform.value.setRGB(1.0, Lerp(0.72, 0.80, mix), Lerp(0.44, 0.92, mix));
 
     // ---- 玩家 ----
     // 角色比 PLAY 层道具略靠前一点点：否则站在柴垛/碾盘旁边时会被道具整个吞掉。
