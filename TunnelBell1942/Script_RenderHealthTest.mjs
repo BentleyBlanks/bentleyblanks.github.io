@@ -137,6 +137,27 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   Assert(Math.abs(lens.ratio - 1) < 0.06,
     `${tag}: 画面边缘不畸变，横版成立（边缘/中心 ${lens.ratio.toFixed(3)}）`);
 
+  // 新增一种敌人 kind 却忘了给它 rig 映射，是不会报错的：它会静默退化成 soldier。
+  // 汤丙会就这么当了一整轮日军——伪军长得跟占领军一样，这个角色就白加了。
+  const rigMap = await page.evaluate(() => {
+    const handle = window.TunnelBell.render;
+    if (typeof handle.RigKindFor !== "function") return null;
+    const kinds = [...new Set((window.TunnelBell.state.level.enemies || []).map((e) => e.kind))];
+    const out = {};
+    for (const k of kinds) out[k] = handle.RigKindFor(k);
+    return out;
+  });
+  if (rigMap) {
+    for (const [enemyKind, rigKind] of Object.entries(rigMap)) {
+      Assert(!!rigKind, `${tag}: 敌人 kind "${enemyKind}" 有 rig 映射`);
+      // guard/search 共用 soldier 是有意的；puppet/officer/dog 必须各自独立
+      if (["puppet", "officer", "dog"].includes(enemyKind)) {
+        Assert(rigKind === enemyKind,
+          `${tag}: "${enemyKind}" 用自己的 rig 而不是退化成 ${rigKind}`);
+      }
+    }
+  }
+
   // 跑 3 秒真实帧，看有没有累积泄漏 / 崩溃
   const after = await page.evaluate(async () => {
     const handle = window.TunnelBell.render;
