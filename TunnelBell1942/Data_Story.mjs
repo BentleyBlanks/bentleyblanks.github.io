@@ -5,7 +5,7 @@
 // 语域（AGENTS.md §4.1，改过一次，别改回去）：形式仍是《勇敢的心》的漫画气泡 +
 // 象形符号，但**声音必须是电影《地道战》的**——集体的、明确的、带教学腔的。
 // 早期版本按 VH 的极端克制写（24 字硬上限、全作 1 条旁白、44 条里 12 条纯图标），
-// 结果把电影的声音过滤干净了。现在 110 条气泡，地道里口令此起彼伏。
+// 结果把电影的声音过滤干净了。现在 112 条气泡，地道里口令此起彼伏。
 //
 // 论点（AGENTS.md §0.1）：地道要「能藏、能打、能防」。
 // **论点靠演示，不靠宣告**——总结句一个字都不许进台词。
@@ -29,21 +29,46 @@ export const PANELS = {
   // ══════════════════════ 第 1 幕 · 钟声 ══════════════════════
   // 钟第一次响：示警。高老忠拿命换的。
 
+  // —— 开场的因果顺序：地方 → 人 → 规矩 → 不对劲 → 威胁。 ——
+  // 这四条走 CHAPTERS[0].opening，在玩家接手之前放完；
+  // 敌人（a1_cs_open）必须挪到"狗不叫了"之后才准出现，不然玩家不知道自己是谁、
+  // 也不知道那口钟是干什么的，看敲钟只觉得"这人在敲个铁片"。
+
+  // 1 地方与时间。大远景横摇过整条街，一个活物都没有。
   a1_open: {
     speaker: "",
-    text: "夜里三更。村口的狗先不叫了，接着是碾道上的那条。",
+    text: "一九四二年冬，冀中平原。高家庄一条街，四十来户人家，都睡熟了。",
     mood: "narrate",
     kind: "narrate",
     icons: ["village", "quiet"],
     portrait: null,
   },
-  // 钟的规矩必须在钟响之前立起来，不然 a1_p11 只是个响声。
+  // 2 你是谁——不用旁白介绍。让村里人先叫出他的名字。
+  a1_night1: {
+    speaker: "王大娘",
+    text: "老忠叔？是你不？",
+    mood: "talk",
+    kind: "beat",
+    icons: ["lantern", "village"],
+    portrait: "villager",
+  },
+  // 3 他替她把门闩插上了，然后接着走。夜里替全村守着这件事，一句都不用解释。
+  a1_night2: {
+    speaker: "高老忠",
+    text: "我。闩插上了。睡你的。",
+    mood: "talk",
+    kind: "beat",
+    icons: ["quiet", "village"],
+    portrait: "laozhong",
+  },
+  // 4 规矩。由他每天夜里的那个抬头动作带出来——
+  // 钟必须在威胁出现之前就有意义，a1_p11 才不是一声响。
   a1_narr1: {
     speaker: "",
-    text: "老槐树上那口钟，是全村的口令。一气儿连着敲，就是鬼子进村。",
+    text: "走到街口他总要抬头看一眼——老槐树上那口钟。一气儿连着敲，就是鬼子进村。",
     mood: "narrate",
     kind: "narrate",
-    icons: ["bell", "village"],
+    icons: ["bell", "up"],
     portrait: null,
   },
 
@@ -89,10 +114,11 @@ export const PANELS = {
     portrait: null,
   },
 
+  // 5 不对劲。全幕的转折点，用他自己的半句话，不用旁白。
   a1_p1: {
     speaker: "高老忠",
-    text: "",
-    mood: "silent",
+    text: "……狗今儿个不叫。",
+    mood: "talk",
     kind: "beat",
     icons: ["quiet", "eye"],
     portrait: "laozhong",
@@ -1021,7 +1047,7 @@ export const CHAPTERS = [
     title: "钟声",
     subtitle: "一九四二年 · 冀中 · 高家庄",
     openingCutscene: "a1_cs_open",
-    opening: ["a1_open", "a1_narr1"],
+    opening: ["a1_open", "a1_night1", "a1_night2", "a1_narr1"],
     closing: ["a1_close"],
     epilogue: "那口钟响了三下。人没下来。",
   },

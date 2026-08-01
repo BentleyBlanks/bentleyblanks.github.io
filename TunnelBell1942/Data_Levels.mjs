@@ -103,6 +103,7 @@ const act1 = {
   props: [
     // —— 起点：无威胁直路，远景是钟 ——
     { id: "a1_pr_sign", x: 6, y: 0, z: PLAY, kind: "sign", facing: 1, interact: "read", data: { codexId: "codex_zhuanyi" }, label: "村口木牌" },
+    { id: "a1_pr_gate0", x: 9.4, y: 0, z: PLAY, kind: "gate", facing: 1, interact: "none", data: null, label: "院门" },
     { id: "a1_pr_lamp1", x: 11, y: 0, z: PLAY, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_house1", x: 15, y: 0, z: MID, kind: "house", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_trough1", x: 19.5, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "none", data: null, label: null },
@@ -258,9 +259,11 @@ const act1 = {
 
   triggers: [
     { id: "a1_t_open", x0: 0, x1: 7, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p1"], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_open", objective: "进村看看", checkpoint: false, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_prologue", objective: "照例查一遍各家的门", checkpoint: false, win: false } },
+    { id: "a1_t_intrude", x0: 20, x1: 23, yMin: -1, yMax: 4, once: true,
+      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_open", objective: "鬼子摸进村了 —— 去敲老槐树上的钟", checkpoint: true, win: false } },
     { id: "a1_t_corpse", x0: 24, x1: 27.5, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_p2"], reveal: [], arm: [], spawn: [], objective: "鬼子摸进村了 —— 别出声", checkpoint: true, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "别出声。贴着墙根走", checkpoint: true, win: false } },
     { id: "a1_t_wall1", x0: 30.5, x1: 33.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p3"], reveal: [], arm: [], spawn: [], objective: "猫腰，从墙根过去", checkpoint: false, win: false } },
     { id: "a1_t_yard1clear", x0: 48, x1: 51.5, yMin: -1, yMax: 4, once: true,
@@ -291,8 +294,10 @@ const act1 = {
   // ═══════════ 机位区：玩的过程里镜头就在说话 ═══════════
   // 定镜头（anchorX）= 镜头钉死，人走进构图。每一段都写了为什么换机位。
   shots: [
-    { id: "a1_sh_open", x0: 3, x1: 22, viewHeight: 12.6, lift: 2.4, anchorX: null, ease: 1.4,
-      reason: "村子还睡着：拉开留出天和远处那棵老槐树的剪影，让玩家先看见目标再走路" },
+    { id: "a1_sh_open", x0: 3, x1: 16, viewHeight: 12.6, lift: 2.4, anchorX: null, ease: 1.4,
+      reason: "村子还睡着：拉开留出天和各家的门，先让玩家认这条他走了半辈子的路" },
+    { id: "a1_sh_bellfar", x0: 16, x1: 20, viewHeight: 13.0, lift: 2.6, anchorX: 18, ease: 1.6,
+      reason: "序幕之后再看一眼那口钟：镜头钉住，他走进画面，远景层的老槐树在另一头等着 —— 这一眼是后面敲钟的全部意义" },
     { id: "a1_sh_wall", x0: 33, x1: 41, viewHeight: 8.0, lift: 1.2, anchorX: null, ease: 1.0,
       reason: "矮墙猫腰段：推近压低，画面跟着人一起蹲下去" },
     { id: "a1_sh_yard2", x0: 50, x1: 78, viewHeight: 13.2, lift: 2.6, anchorX: null, ease: 1.2,
@@ -308,36 +313,74 @@ const act1 = {
   cutscenes: {
     // 山田带队夜里摸进村。那句台词在原片里是一道要命的命令，不是梗：
     // 夜、压低的声音、队列无声散开。镜头全程慢，没有一个滑稽的节拍。
+    // 序幕。顺序是电影式的：地方与时间 → 你是谁 → 规矩 → 不对劲。
+    // 敌人一个都不出现——那句"悄悄地进村"要留到玩家已经知道钟意味着什么之后，
+    // 它才是转折，而不是开场。身份不用旁白介绍，用动作立：查院门、听动静、
+    // 走一条他闭着眼都认得的路，最后照例抬头看一眼那口钟。
+    a1_cs_prologue: {
+      id: "a1_cs_prologue", letterbox: "full", skippable: true,
+      steps: [
+        // 1) 地方与时间：拉到最开，先让村子睡着
+        { kind: "camera", to: { x: 10, y: 3.4, viewHeight: 15.0 }, sec: 0.01, ease: "inOut" },
+        { kind: "fade", to: 0, sec: 1.8 },
+        { kind: "wait", sec: 0.6 },
+        { kind: "panel", id: "a1_cs_open_p1" },
+        { kind: "camera", to: { x: 15, y: 3.2, viewHeight: 14.0 }, sec: 3.2, ease: "inOut" },
+        // 2) 你是谁：推到他身上，看他查院门——身份是动作立起来的
+        { kind: "camera", to: { x: 7.5, y: 1.8, viewHeight: 7.4 }, sec: 2.4, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 7.6 }, sec: 1.8, anim: "walk", facing: 1 },
+        { kind: "sfx", id: "cloth" },
+        { kind: "actor", id: "player", to: { x: 9.2 }, sec: 1.6, anim: "walk", facing: 1 },
+        { kind: "sfx", id: "hatch_open" },
+        { kind: "panel", id: "a1_p1" },
+        // 3) 规矩：定镜头。镜头钉住不动，他从左边走进画面，
+        //    远景层那棵老槐树和树上的钟在画面另一头等着——他每夜都要看这一眼。
+        { kind: "camera", to: { x: 19, y: 2.6, viewHeight: 13.0 }, sec: 2.2, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 16.8 }, sec: 3.0, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a1_p2" },
+        { kind: "wait", sec: 0.6 },
+        // 4) 不对劲：狗不叫了。转折点，但威胁还没露面。
+        { kind: "sfx", id: "dog" },
+        { kind: "wait", sec: 0.5 },
+        { kind: "camera", to: { x: 17.5, y: 1.9, viewHeight: 8.6 }, sec: 1.6, ease: "inOut" },
+        { kind: "panel", id: "a1_cs_open_p4" },
+        { kind: "wait", sec: 0.7 },
+        // 交还镜头，玩家接手走这段熟路
+        { kind: "actor", id: "player", to: { x: 6 }, sec: 0.01, anim: "idle", facing: 1 },
+        { kind: "camera", to: { x: 6, y: 1.6, viewHeight: 11.5 }, sec: 1.2, ease: "inOut" },
+      ],
+    },
+    // 威胁。玩家已经走过一段熟路、已经知道钟是干什么的——
+    // 现在才切回村西门：他们是**从他背后**摸进来的。
+    // 镜头调度原样保留（摇 → 推到 vh 6.0 → 拉到 vh 13.0），只是位置往后挪。
     a1_cs_open: {
       id: "a1_cs_open", letterbox: "full", skippable: true,
       steps: [
         { kind: "camera", to: { x: 6, y: 2.2, viewHeight: 9.0 }, sec: 0.01, ease: "inOut" },
         { kind: "fade", to: 0, sec: 1.6 },
-        { kind: "wait", sec: 0.8 },
+        { kind: "wait", sec: 0.4 },
         { kind: "sfx", id: "boot" },
-        { kind: "actor", id: "a1_e_tang", to: { x: 9 }, sec: 3.2, anim: "sneak", facing: 1 },
-        { kind: "actor", id: "a1_e_blocker", to: { x: 6.6 }, sec: 3.4, anim: "sneak", facing: 1 },
-        { kind: "camera", to: { x: 11, y: 2.0, viewHeight: 8.4 }, sec: 3.2, ease: "inOut" },
-        { kind: "panel", id: "a1_cs_open_p1" },
+        { kind: "actor", id: "a1_e_tang", to: { x: 9 }, sec: 2.4, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_blocker", to: { x: 6.6 }, sec: 2.6, anim: "sneak", facing: 1 },
+        { kind: "camera", to: { x: 11, y: 2.0, viewHeight: 8.4 }, sec: 2.6, ease: "inOut" },
         { kind: "panel", id: "a1_brief1" },
-        { kind: "actor", id: "a1_e_tang", to: { x: 12 }, sec: 1.6, anim: "walk", facing: 1 },
-        { kind: "wait", sec: 0.6 },
+        { kind: "actor", id: "a1_e_tang", to: { x: 12 }, sec: 1.2, anim: "walk", facing: 1 },
+        { kind: "wait", sec: 0.4 },
         { kind: "camera", to: { x: 8.2, y: 1.8, viewHeight: 6.0 }, sec: 2.0, ease: "inOut" },
         { kind: "panel", id: "a1_cs_open_p2" },
         { kind: "panel", id: "a1_cs_open_p3" },
-        { kind: "wait", sec: 0.6 },
+        { kind: "wait", sec: 0.4 },
         { kind: "camera", to: { x: 10.5, y: 1.8, viewHeight: 6.6 }, sec: 1.4, ease: "inOut" },
         { kind: "panel", id: "a1_tang3" },
         { kind: "actor", id: "a1_e_tang", to: { x: 13.6 }, sec: 1.4, anim: "walk", facing: 1 },
         { kind: "panel", id: "a1_tang4" },
-        { kind: "wait", sec: 0.9 },
+        { kind: "wait", sec: 0.5 },
         { kind: "sfx", id: "cloth" },
-        { kind: "actor", id: "a1_e_chase1", to: { x: 17 }, sec: 2.6, anim: "sneak", facing: 1 },
-        { kind: "actor", id: "a1_e_chase3", to: { x: 14 }, sec: 2.6, anim: "sneak", facing: 1 },
-        { kind: "camera", to: { x: 20, y: 3.0, viewHeight: 13.0 }, sec: 3.6, ease: "inOut" },
-        { kind: "panel", id: "a1_cs_open_p4" },
-        { kind: "wait", sec: 1.2 },
-        { kind: "fade", to: 1, sec: 1.4 },
+        { kind: "actor", id: "a1_e_chase1", to: { x: 17 }, sec: 2.0, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_chase3", to: { x: 14 }, sec: 2.0, anim: "sneak", facing: 1 },
+        { kind: "camera", to: { x: 20, y: 3.0, viewHeight: 13.0 }, sec: 3.0, ease: "inOut" },
+        { kind: "wait", sec: 0.8 },
+        { kind: "fade", to: 1, sec: 1.2 },
         { kind: "actor", id: "a1_e_tang", to: { x: 121 }, sec: 0.01, anim: "idle", facing: -1 },
         { kind: "actor", id: "a1_e_blocker", to: { x: 125 }, sec: 0.01, anim: "idle", facing: 1 },
         { kind: "actor", id: "a1_e_chase1", to: { x: 85 }, sec: 0.01, anim: "idle", facing: 1 },
@@ -376,7 +419,7 @@ const act1 = {
   ],
 
   objectives: [
-    { id: "a1_o1", text: "进村看看", doneWhen: { trigger: "a1_t_corpse" } },
+    { id: "a1_o1", text: "照例查一遍各家的门", doneWhen: { trigger: "a1_t_intrude" } },
     { id: "a1_o2", text: "绕过搜村的鬼子", doneWhen: { trigger: "a1_t_yard2clear" } },
     { id: "a1_o3", text: "到老槐树下", doneWhen: { trigger: "a1_t_tree" } },
     { id: "a1_o4", text: "敲响钟", doneWhen: { propUsed: "a1_pr_bell" } },

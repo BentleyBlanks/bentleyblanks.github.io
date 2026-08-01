@@ -388,6 +388,13 @@ function StartLevel(levelIndex) {
       el("Hud").hidden = false;
       touchPad.hidden = !isTouch;
       const chapter = CHAPTERS[levelIndex];
+      // 开场过场要排在幕级气泡前面：先演，再说。反过来就成了
+      // "先听人解释规矩、再看演出"，因果是倒的。
+      if (chapter && chapter.openingCutscene && typeof Rules.StartCutscene === "function") {
+        Rules.StartCutscene(state, chapter.openingCutscene);
+        DispatchEvents(Rules.DrainEvents(state));
+        SyncCutscene();
+      }
       QueuePanels(chapter ? chapter.opening : []);
       canvas.focus();
       running = true;
@@ -521,6 +528,13 @@ function DispatchEvents(events) {
       case "panel": QueuePanels([event.id]); break;
       // 事件对象本身带 { x, y }，直接透传给音频层做空间化
       case "sfx": PlaySfx(event.id, event); break;
+      // Rules 只把过场排进 pendingCutscene 并发这个事件，故意不在 StepPlay 里
+      // 自己夺走控制权（那会打断一切"跑 N 帧"的测试与机器人）。真正开演是集成层的活。
+      // 早先漏了这个 case，结果全部过场从来没在浏览器里播过——玩家只看到
+      // 幕间卡、旁白、然后直接开打，难怪"没有前因后果"。
+      case "cutscene":
+        if (typeof Rules.StartCutscene === "function") Rules.StartCutscene(state, event.id);
+        break;
       case "codex": OpenCodex(event.id); break;
       // 新目标不弹居中大字：左上角那行已经写着同样的话，弹一次等于把同一句话说两遍。
       // 改成让角落那行闪一下，玩家的眼睛会跟过去。
@@ -552,6 +566,12 @@ function Frame(now) {
       input.itemPressed = false;
       input.callPressed = false;
       DispatchEvents(Rules.DrainEvents(state));
+      // 兜底：万一某条 pendingCutscene 没走事件（或事件在别处被吞了），
+      // 这里补开一次。少播一段过场是"剧情没头没尾"，代价太大。
+      if (state.pendingCutscene && !state.cutscene && typeof Rules.StartCutscene === "function") {
+        Rules.StartCutscene(state, state.pendingCutscene);
+        DispatchEvents(Rules.DrainEvents(state));
+      }
       SyncCutscene();
       SyncHud();
     }
