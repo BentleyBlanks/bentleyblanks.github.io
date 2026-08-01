@@ -229,6 +229,75 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   Assert(after.textures - after.before.textures < 10, `${tag}: 纹理没有逐帧泄漏（+${after.textures - after.before.textures}）`);
 }
 
+// ---- 乡亲必须看得见 ----
+//
+// 「乡亲人呢？」这句抱怨有两个原因，挖洞 bug 只是其中一个。另一个是：
+// 人画出来了、rig 在、visible 为 true，但他比他挡住的那块土还暗——
+// A/B 实测过一次，那一竖条在她在与不在之间只差 −0.80/255，对比度 0.3%。
+// 「有没有画」是查不出这种 bug 的，只有「拿走再量一次」能。
+// 第二幕的 216 米地道里挂着「乡亲 0/6」的 HUD，那六个人是这一幕的情绪主体，
+// 不是背景板；照明可以暗，暗的必须是空间，不是人。
+{
+  const NEED_MEAN = 6;                    // 均值差绝对值下限（/255）
+  const NEED_MAX = 20;                    // 或者最亮点差
+  await page.evaluate(async () => {
+    const T = window.TunnelBell;
+    T.Begin(1);
+    const go = document.getElementById("ChapterGoButton");
+    if (go && !document.getElementById("ChapterScreen").hidden) go.click();
+    T.SkipCutscenes(); T.SkipPanels();
+    await new Promise((r) => setTimeout(r, 400));
+    T.SkipCutscenes(); T.SkipPanels();
+  });
+
+  const target = await page.evaluate(() => {
+    const T = window.TunnelBell;
+    const n = (T.state.npcs || []).find((a) => a.role === "villager" && a.y < -1);
+    if (!n) return null;
+    // 站到她旁边，等镜头收敛到地道取景（viewHeight 会从 11.5 降到 7.2）
+    T.Rules.DebugTeleport(T.state, n.x - 1.5, n.y);
+    T.Advance(2.5, {});
+    const h = T.render;
+    const cv = document.getElementById("GameCanvas");
+    const W = cv.clientWidth; const H = cv.clientHeight;
+    const V = h.three.Vector3;
+    const proj = (x, y) => {
+      const v = new V(x, y, 0).project(h.camera);
+      return { x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H };
+    };
+    const head = proj(n.x, n.y + 1.75);
+    const feet = proj(n.x, n.y - 0.05);
+    return {
+      id: n.id, name: n.name,
+      box: {
+        x: Math.max(0, Math.round(head.x - 30)), y: Math.max(0, Math.round(head.y)),
+        width: 60, height: Math.round(Math.min(feet.y - head.y, H - head.y)),
+      },
+    };
+  });
+
+  if (!target || target.box.width < 8 || target.box.height < 20) {
+    Assert(false, `乡亲可读性：找不到可量的地道乡亲（${target ? JSON.stringify(target.box) : "无"}）`);
+  } else {
+    await page.waitForTimeout(300);
+    const withNpc = await SamplePixels(page, target.box);
+    // 只把人挪走，光照、土体、道具、镜头一律不动——差值就只可能来自她本人
+    await page.evaluate((id) => {
+      const T = window.TunnelBell;
+      const n = T.state.npcs.find((a) => a.id === id);
+      n.x = 4000;
+      T.Advance(0.2, {});
+    }, target.id);
+    await page.waitForTimeout(300);
+    const without = await SamplePixels(page, target.box);
+    const dMean = Math.abs(withNpc.mean - without.mean);
+    const dMax = Math.abs(withNpc.max - without.max);
+    Assert(dMean >= NEED_MEAN || dMax >= NEED_MAX,
+      `乡亲在画面里看得见（${target.name}：Δmean ${dMean.toFixed(2)} / Δmax ${dMax}，` +
+      `需要 Δmean≥${NEED_MEAN} 或 Δmax≥${NEED_MAX}）`);
+  }
+}
+
 // 重复 BuildLevel 不许泄漏
 const leak = await page.evaluate(async () => {
   const handle = window.TunnelBell.render;
