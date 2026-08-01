@@ -133,6 +133,10 @@ const CHECKPOINT_RADIUS = 1.7;
 const LIGHT_VISIBILITY = 0.6; // 提着马灯，有效视距最多放大到 1.6 倍
 const DARK_VISIBILITY = 0.78; // 灭了灯在地道里摸黑，更难被看见
 const VENT_RANGE = 3.2; // 通气孔：地表与地道之间的声音通道
+// **全文件唯一的"跨层"判据**。竖直差超过它，就认为中间隔着土：
+// 声音要靠通气孔才传得过去（CanHear），刺刀也要靠通气孔才捅得下来（ProbeHit）。
+// 两处必须共用这一个数，否则同一个文件里会立两套跨层标准。
+const CROSSLAYER_GAP = 1.5;
 // 隔着土层，脚步声是**闷**的。原来这里把竖直距离乘 0.6（= 更容易听见），
 // 跟注释写的"打折"正好相反：结果地道里跑一步，头顶街上的兵反而先听见。
 // 那条 bug 直接否掉了"从地下绕过去"——绕过去等于自报家门。
@@ -3717,6 +3721,107 @@ function CanSeePoint(state, e, x, y) {
   return true;
 }
 
+// ─────────── 跟随的乡亲也在场（AGENTS.md 0.0：护送是玩法，不是演出）───────────
+//
+// 改这条之前实测过：`CanSee` / `CanHear` 的目标写死 `state.player`，
+// 没有任何一处提升 alertness 的代码遍历 `state.npcs`。也就是说
+// **带着六个人从哨兵眼皮底下走过去，在数值上完全免费**——
+// 第二幕链三和第三幕护送段的紧张感有一半是演出，不是规则。
+//
+// 但六个人全按玩家的标准判定会把第三幕直接变成不可能（他们踩着你的面包屑走，
+// 你安全通过的那一秒，队尾还留在原地）。所以这套判定有三条纪律：
+//
+//   1. **只看不抓。** 判定被抓那一步写死了要 `seeing`（看见玩家本人）：
+//        if (e.alertness >= 1 && seeing) next = "spotted";
+//      所以看见乡亲**在结构上**永远不可能直接把人抓走，跟 `NPC_ALERT_CAP` 调多少无关。
+//      cap 管的是另一件事：一次目击最多吃掉玩家多少余量。压在 `searchAt` 下面一点，
+//      意味着队伍**单独**一项不会让他发起搜索，但警觉被顶在 0.58——
+//      这时候你再踩响一步、再被扫到一眼，立刻过线。这就是护送该有的代价。
+//   2. **队尾才是暴露的那个。** 队伍中间的人前后有人挡着、贴着墙走；
+//      队尾身后没人，他还留在你两秒前才离开的地方。所以折扣分两档
+//      （`NPC_VISIBILITY` 0.55 / 队尾再乘 `NPC_TAIL_EXPOSED` ≈ 0.99）。
+//      队越长尾巴拖得越远，风险随人数自然上升——这正是"六个人不是一起走的"要的压力。
+//   3. **带队的人一伏，整队跟着伏**（`NPC_LEAD_*`）。这是玩家手上的那张牌。
+//
+// ── 实测（三幕 × 两种策略，关卡数据冻结在同一份上跑的 A/B）──
+//
+// · 这套判定**是活的**，不是摆设：act3 的跟随帧里有 2.6%（active）/ 5.2%（sneak）
+//   落在敌人视锥里，act2 是 9.1%。改之前这三个数字全是 0——
+//   `CanSee`/`CanHear` 的目标写死玩家，没有任何一处提升 alertness 的代码遍历 npcs。
+// · 通关没有退步：act3 两种策略仍然 6/6 通关，active 反而从 183.0s 快到 171.8s；
+//   act2 active 从 232s 到 225.4s，也是 6/6。
+// · **可见度有一道悬崖，而且很陡。** 队尾有效可见度 ≈1.0 时 act3 稳稳通关；
+//   推到 1.26（vis 0.7×tail 1.8）仍然通关；推到 1.3 就断崖：目击率从 5% 跳到 59%，
+//   act3 两种策略全部 0/6 通不了关。所以 0.55/1.8 不是随手填的，
+//   它离悬崖还有一档余量，而且 0.40/0.55/0.70 × tail 1.0/1.8 六组全部通关——
+//   这是一片高原，不是一个走运的点。
+// · **`NPC_LEAD_HIDDEN` 是安全阀，别把它当成可调的手感参数。** 在现在这档可见度下，
+//   它取 0.06 还是 0.45 几乎没区别（act3 完全一样）；但取 1.0（= 藏起来完全不保护队伍）
+//   时 act3 两种策略双双崩掉：目击率 85.9% / 88.4%，0/6。
+//   根因是正反馈：玩家藏起来→队伍还站在原地→被看见→敌人走过来→连玩家一起看见。
+//   早期用更高可见度（vis 0.85/1.0 平摊、不分队尾）试过，正是这条把 act3 锁死的。
+const NPC_VISIBILITY = 0.55; // 队伍中间：前后有人、贴着墙走
+const NPC_TAIL_EXPOSED = 1.8; // 队尾没人替他挡着（0.55 × 1.8 ≈ 0.99，跟站着的玩家一档）
+const NPC_LEAD_CROUCH = 0.72; // 玩家猫腰 → 整队跟着压低
+const NPC_LEAD_HIDDEN = 0.06; // 玩家钻进掩体 → 后面的人各自贴住墙根（安全阀，别调高，见上）
+const NPC_STUCK_VISIBILITY = 1.7; // 掉队卡住的人站在原地不动，没人给他打掩护
+const NPC_SEE_RISE = 0.62; // 看见乡亲时警觉爬升（比看见玩家的 1/1.25 慢两成）
+// 0.58：卡在 searchAt(0.62) 下面。实测在现在这档可见度下它没被顶到过
+//（0.58 / 0.76 / 0.95 三档跑出来的通关数据几乎一样），所以它是**上限**不是手感旋钮。
+// 留在门槛下面的意义是：无论关卡以后怎么加人加兵，"一队人走过去"都不会**单独**
+// 把哨兵变成搜索状态。这条保证是免费的，别为了让某一段更紧张而把它抬过 searchAt。
+const NPC_ALERT_CAP = SENSE.searchAt - 0.04;
+
+/** 这个跟随者此刻有多容易被看见。 */
+function NpcVisibility(state, n, isTail) {
+  const p = state.player;
+  let s = NPC_VISIBILITY;
+  if (isTail) s *= NPC_TAIL_EXPOSED;
+  if (n.posture === "crawl") s *= SENSE.crouchVisibility * 0.85;
+  else if (n.posture === "crouch") s *= SENSE.crouchVisibility;
+  // 带队的人一伏，整条队伍跟着伏——这是"藏"在护送段唯一说得通的意义
+  if (p.hidden) s *= NPC_LEAD_HIDDEN;
+  else if (p.posture !== "stand") s *= NPC_LEAD_CROUCH;
+  // 卡住的人不在队形里：他站在原地，谁也挡不住他
+  if (n.stuckReason) s *= NPC_STUCK_VISIBILITY;
+  return s;
+}
+
+/**
+ * 这个兵此刻看得见哪个跟随者（挑最显眼的那个）。返回 npc 或 null。
+ * 几何判定跟 `CanSee` 完全一致（视距 / 视锥 / 土层 / 倒下的墙），只换了目标和折扣。
+ */
+function SeesVillager(state, e) {
+  const ax = e.x;
+  const ay = e.y + e.visionHeight;
+  const scale = e.visionRange * EnemyVisionScale(e);
+  if (scale <= 0.05) return null;
+  let best = null;
+  let bestVis = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    const vis = NpcVisibility(state, n, n.id === state.followTailId);
+    if (vis <= 0.001 || vis <= bestVis) continue;
+    const range = scale * vis;
+    if (range <= 0.05) continue;
+    const bx = n.x;
+    const by = n.y + (n.height || PLAYER.standHeight) * 0.55;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > range) continue;
+    if (dist > 0.001) {
+      const cos = (dx * e.facing) / dist;
+      if (Math.acos(Clamp(cos, -1, 1)) * (180 / Math.PI) > e.visionHalfAngleDeg) continue;
+    }
+    if (EarthBetween(state.level, ax, ay, bx, by)) continue;
+    if (BlockBetween(state, ax, ay, bx, by)) continue;
+    best = n;
+    bestVis = vis;
+  }
+  return best;
+}
+
 function CanHear(state, e) {
   const p = state.player;
   if (p.noise <= 0.02) return false;
@@ -3727,8 +3832,8 @@ function CanHear(state, e) {
   // 这条是"从地道绕过去"能不能成立的地基——绕后不该等于自报家门。
   // 通气孔是唯一的例外：那本来就是打通的声音通道，摸黑那段的紧张感全在这上面。
   const gap = Math.abs(p.y - e.y);
-  const vent = gap > 1.5 ? NearVent(state, p.x) : true;
-  const dy = (p.y - e.y) * (gap > 1.5 && !vent ? CROSSLAYER_MUFFLE : 1);
+  const vent = gap > CROSSLAYER_GAP ? NearVent(state, p.x) : true;
+  const dy = (p.y - e.y) * (gap > CROSSLAYER_GAP && !vent ? CROSSLAYER_MUFFLE : 1);
   return dx * dx + dy * dy <= radius * radius;
 }
 
@@ -3777,7 +3882,55 @@ function NearVent(state, x) {
   return false;
 }
 
+/**
+ * 落点 x 底下，哪些孔的下口是**朝这一层敞着的**（刺刀能顺着下来的那条道）。
+ *
+ * 判据两条，缺一不可：
+ *   1. 孔口在兵脚下、在这一层头顶——它得真的夹在两个人中间；
+ *   2. 孔口和这一层之间不能再隔着一层地板（`EarthBetween`）。
+ *      第二条是全部的重量所在：a2 那几个 y=-2.6 的孔通的是 -3.8 的支道，
+ *      再往下还压着一层 -3.8 的地板，所以捅不到 -8.0 的干线。
+ *      而 a3 在 -6.22 另外补了孔，干线就仍然被钉死——两件事同时成立。
+ *
+ * 竖井同理：井筒本来就是通的，但要求它**同时够到两头**，
+ * 而且没开的翻口不算——盖着的口子不是孔。
+ */
+function ProbeChannelsTo(state, x, fromY, toY, out) {
+  const list = out || [];
+  for (const s of state.level.shafts) {
+    if (Math.abs(s.x - x) > VENT_RANGE) continue;
+    if (s.yTop < fromY - 0.6) continue; // 够不到兵脚下
+    if (s.yBottom > toY + 0.6) continue; // 够不到这一层
+    if (!ShaftUsable(state, s)) continue;
+    list.push({ x: s.x, y: Math.max(s.yBottom, toY) });
+  }
+  for (const prop of state.level.props) {
+    if (prop.kind !== "vent") continue;
+    const vx = PropX(state, prop);
+    if (Math.abs(vx - x) > VENT_RANGE) continue;
+    const vy = Num(prop.y, 0);
+    if (vy >= fromY - 0.2) continue; // 孔口得在兵脚下
+    if (vy <= toY - 0.2) continue; // 也得在这一层的头顶
+    if (EarthBetween(state.level, vx, vy, x, toY)) continue; // 中间还隔一层土
+    list.push({ x: vx, y: vy });
+  }
+  return list;
+}
+
 function UpdateEnemies(state, dt) {
+  // 队尾是谁：每帧算一次，别在 SeesVillager 里按敌人重复排序（那是每帧十几次分配）。
+  // 面包屑弧长最小的那个就是掉在最后面的人。
+  let tail = null;
+  let tailD = Infinity;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    const d = typeof n.trailD === "number" ? n.trailD : 0;
+    if (d < tailD || (d === tailD && tail && n.id < tail)) {
+      tailD = d;
+      tail = n.id;
+    }
+  }
+  state.followTailId = tail;
   for (const e of state.enemies) UpdateEnemy(state, e, dt);
 }
 
@@ -3841,6 +3994,8 @@ function UpdateEnemy(state, e, dt) {
   const alive = state.phase === "play" && !p.dead;
   const seeing = alive && CanSee(state, e);
   const hearing = alive && !seeing && CanHear(state, e);
+  // 队伍是第三个感知源。它排在玩家后面：真看见/听见玩家时，乡亲就不重要了。
+  const villager = alive && !seeing && !hearing ? SeesVillager(state, e) : null;
   const prevState = e.state;
   const prevAlert = e.alertness;
 
@@ -3848,6 +4003,7 @@ function UpdateEnemy(state, e, dt) {
   // 不能只活在这一帧的局部变量里。
   e.seesPlayer = !!seeing;
   e.hearsPlayer = !!hearing;
+  e.seesVillagerId = villager ? villager.id : null;
 
   if (seeing) {
     e.alertness = Clamp(e.alertness + dt / SENSE.alertRiseSec, 0, 1);
@@ -3861,9 +4017,23 @@ function UpdateEnemy(state, e, dt) {
     e.lastSeenY = p.y;
     e.hasLead = true;
     e.facing = p.x >= e.x ? 1 : -1;
+  } else if (villager) {
+    // 看见的是队伍里的人：警觉往 NPC_ALERT_CAP 爬，**永远够不到 1**。
+    // 他会朝那个乡亲走过去搜，不会当场按住玩家——护送因此变成"要付出代价"，
+    // 而不是"一被看见就重来"。
+    e.alertness = Clamp(Math.min(e.alertness + NPC_SEE_RISE * dt, NPC_ALERT_CAP), 0, 1);
+    e.lastSeenX = villager.x;
+    e.lastSeenY = villager.y;
+    e.hasLead = true;
+    e.facing = villager.x >= e.x ? 1 : -1;
+    if (!e.sawVillager) {
+      e.sawVillager = true;
+      Emit(state, { kind: "villagerSeen", enemyId: e.id, npcId: villager.id, x: villager.x, y: villager.y });
+    }
   } else {
     e.alertness = Clamp(e.alertness - SENSE.alertFallPerSec * dt, 0, 1);
     if (e.alertness < SENSE.suspiciousAt * 0.5) e.hasLead = false;
+    if (e.alertness < SENSE.suspiciousAt * 0.5) e.sawVillager = false;
   }
 
   // 「引」的余额。一旦真看见/听见玩家，石头就不重要了——引不是脱身卡。
@@ -3896,7 +4066,7 @@ function UpdateEnemy(state, e, dt) {
   else e.suspectTimer = Math.max(0, (e.suspectTimer || 0) - dt);
   e.linger = Clamp(Math.max(e.huntTimer / HUNT_PERSIST_SEC, e.suspectTimer / SUSPECT_PERSIST_SEC), 0, 1);
 
-  EmitAlertStages(state, e, prevAlert, seeing || hearing);
+  EmitAlertStages(state, e, prevAlert, seeing || hearing || !!villager);
 
   // 状态机
   let next;
@@ -4035,6 +4205,32 @@ function EnemySearch(state, e, dt) {
   }
 }
 
+/**
+ * 前摇时给底下每一层敞着孔的地道发一次预警（土 + 声音）。
+ * 跟 `ProbeHit` 走同一个 `ProbeChannelsTo`，所以"哪里会死"和"哪里有警告"
+ * 永远是同一份判断——不会再出现"警告在街上、人死在八米下"。
+ */
+function ProbeWarnChannels(state, e, targetX) {
+  const layers = {};
+  const mouths = [];
+  for (const f of state.level.floors) {
+    if (targetX < f.x0 - 0.9 || targetX > f.x1 + 0.9) continue;
+    if (f.y > e.y - 0.6) continue;
+    const key = f.y.toFixed(2);
+    if (layers[key]) continue;
+    layers[key] = true;
+    ProbeChannelsTo(state, targetX, e.y, f.y, mouths);
+  }
+  const fired = {};
+  for (const m of mouths) {
+    const key = m.x.toFixed(2) + "|" + m.y.toFixed(2);
+    if (fired[key]) continue;
+    fired[key] = true;
+    Dust(state, m.x, m.y - 0.15, 0.5);
+    Sfx(state, "dig", m.x, m.y);
+  }
+}
+
 function EnemyProbe(state, e, dt) {
   const list = e.probeAt;
   if (!list || list.length === 0) {
@@ -4055,6 +4251,11 @@ function EnemyProbe(state, e, dt) {
         // 前摇：声音 + 尘土，至少 1 秒预警
         Sfx(state, "dig", targetX, e.y);
         Dust(state, targetX, e.y - 0.4, 0.45);
+        // **预警必须发在被捅的人看得见的地方**。地道视口只有 7.2 米高，
+        // 街面上那团土在 y=-8.0 的干线里是看不见的。所以顺着每一条敞开的孔
+        // 再发一次：土从通气孔簌簌落下来——这就是刺刀要下来的唯一信号，
+        // 也是电影里那个镜头。孔敞到哪一层，警告就落到哪一层，跟杀伤范围严丝合缝。
+        ProbeWarnChannels(state, e, targetX);
         Emit(state, { kind: "shake", power: 0.12 });
         SetAnim(e, "dig", 0, dt);
       }
@@ -4269,12 +4470,31 @@ function UpdateDownedEnemy(state, e, dt) {
   }
 }
 
+/**
+ * 刺刀捅下来。
+ *
+ * 以前这里唯一的竖直条件是"玩家比敌人低 0.6 米"，没有上限也不看中间隔着什么——
+ * 站在 y=0 街面的兵能捅穿 8 米夯土、穿过一整层 y=-3.8 的支道地板，
+ * 杀死 y=-8.0 干线上的玩家。物理讲不通，而且前摇的尘土发在街面上，
+ * 地道视口只有 7.2 米高，玩家**根本看不见那个预警**——正是契约禁止的
+ * "看不见就会死的陷阱"。
+ *
+ * 现在的规则：**跨层的刺刀只走孔**。同层（竖直差不超过 CROSSLAYER_GAP）照旧；
+ * 跨层则要求落点正上方有一条真敞着的通气孔或竖井（`ProbeChannelsTo`）。
+ * 三件事因此同时成立：物理讲得通（刺刀顺着孔下来）、玩家看得见（孔是画出来的实体，
+ * 前摇的土从孔口落下来）、关卡的封锁保得住（在落点上方补一个孔即可）。
+ *
+ * 注意**不许**改成"低于 N 米就免疫"：act3 的 a3_e_probeM/M2 全在 y=0，
+ * 落点下方只有 y=-8.0 的干线，Δy 一律 8.0——加下界会让那两个敌人变成无害摆设，
+ * 干线 148/150.2 的封锁当场失效。
+ */
 function ProbeHit(state, e, probeX) {
   const p = state.player;
   if (p.dead) return;
   if (p.layer !== "tunnel") return;
   if (p.y > e.y - 0.6) return;
   if (Math.abs(p.x - probeX) > PROBE_RADIUS) return;
+  if (Math.abs(p.y - e.y) > CROSSLAYER_GAP && ProbeChannelsTo(state, probeX, e.y, p.y).length === 0) return;
   Die(state, "probe");
 }
 
@@ -5357,6 +5577,32 @@ function BotNpcGoal(state, which) {
   return { x: best.x, y: best.y, prop: null, npc: best, tag: "npc:" + best.id };
 }
 
+function BotDigPropFor(state, spotId) {
+  for (const prop of state.level.props) {
+    if (prop.interact !== "dig") continue;
+    if (prop.data && prop.data.digSpotId === spotId) return prop;
+  }
+  return null;
+}
+
+/** 背上的土往哪儿倒（最近的、还装得下的那个）。 */
+function BotSinkPropFor(state) {
+  let best = null;
+  let bestD = Infinity;
+  for (const prop of state.level.props) {
+    if (prop.interact !== "dumpSpoil") continue;
+    const sink = prop.data ? state.world.sinks[prop.data.sinkId] : null;
+    if (!sink || sink.filled >= sink.capacity) continue;
+    if (!InteractAvailable(state, prop)) continue;
+    const d = Math.abs(PropX(state, prop) - state.player.x) + Math.abs(prop.y - state.player.y) * 2;
+    if (d < bestD) {
+      bestD = d;
+      best = prop;
+    }
+  }
+  return best;
+}
+
 function BotHatchPropFor(state, hatchId) {
   for (const prop of state.level.props) {
     if (prop.interact !== "hatch") continue;
@@ -5444,7 +5690,74 @@ function BuildNav(state) {
     }
   }
 
+  // ── 还没挖开的软土（AGENTS.md 0.0.2）──
+  // 「挖」以前对机器人根本不存在：`BuildNav` 不看 digSpots，`BotWantsPrompt` 只在
+  // 挖点**正好是当前目标**时才按 E。也就是说只有把挖点写成 objective 机器人才会挖，
+  // 而 objective 又会被 `PendingObjectives` 变成通关硬条件——等于把"挖是另一条解法"判死。
+  // 于是第二幕的 dig 在机器人数据里必然是 0，"active 该比 sneak 快"这条判据
+  // 根本测不到挖掘和绕路的价值。
+  //
+  // 现在软挖点作为一条**有代价的边**进图（代价见 `NavDigCost`：挖的时间 + 倒土的
+  // 往返 + 噪音风险）。三条性质是刻意的：
+  //   · 它只是"还有这么一条路"，不是目标——不进 objectives，就不会变成通关硬条件；
+  //   · 代价是动态算的（有没有铁锨、跟前有没有耳朵），所以机器人会在"绕远比挖开更贵"
+  //     的时候才挖，不会一路挖过去；
+  //   · 挖通之后 `CarveDig` 会把 navNodes 置空，图重建，这条边自然消失换成真地形。
+  for (const spot of level.digSpots) {
+    if (!spot.soft) continue; // 夯土/石头：这是给玩家看的"此路不通"，不是路
+    if (state.world.dug[spot.id]) continue; // 已经挖通了，地形里已经有这条路
+    const a = NavNodeAt(nodes, spot.x, spot.y);
+    const b = NavNodeAt(nodes, spot.toX, spot.toY);
+    if (a < 0 || b < 0 || a === b) continue;
+    // NavNodeAt 永远会**挑一个**最近的节点，落点悬空时会挑到八竿子打不着的那一段。
+    // 两头都得真的落在节点上才连——连错了比不连更糟（机器人会照着一条假路走过去）。
+    if (!NavNodeCovers(nodes[a], spot.x, spot.y)) continue;
+    if (!NavNodeCovers(nodes[b], spot.toX, spot.toY)) continue;
+    AddEdge(a, b, "dig", { spot, x: spot.x });
+  }
+
   return nodes;
+}
+
+/** 这个节点是不是真的罩着 (x,y)（而不只是"最近的那个"）。 */
+function NavNodeCovers(node, x, y) {
+  return x >= node.x0 - 1.2 && x <= node.x1 + 1.2 && Math.abs(node.y - y) <= 1.2;
+}
+
+// 挖一段是全表第二响的动作（NOISE.dig 0.62，仅次于呼喊），而且人钉在原地好几秒。
+// 跟前有耳朵就别想了——这个罚金要比一个哨兵的路段（NAV_DANGER 26）重得多，
+// 否则机器人会当着人的面刨土，然后把"挖"这条路测成不可行。
+const NAV_DIG_NOISE = 120;
+
+/**
+ * 挖开这一段，折成多少"米"的代价（Dijkstra 里的单位是米）。
+ * 三层，跟契约 0.0.2 的三层代价一一对应：
+ *   1. **时间**——挖的秒数按步速折成路程；没铁锨慢一倍（`DIG_BARE_SCALE`）。
+ *   2. **土**——挖出来的土得背到倒土点，来回一趟。装不下了就更贵（背着走）。
+ *   3. **声音**——听得见的范围里有人，直接加重罚。
+ */
+function NavDigCost(state, spot) {
+  const bare = state.player.carrying !== "shovel";
+  let cost = spot.sec * (bare ? DIG_BARE_SCALE : 1) * PLAYER.walkSpeed;
+
+  let sink = Infinity;
+  for (const s of state.level.spoilSinks) {
+    const rec = state.world.sinks[s.id];
+    if (rec && rec.filled >= rec.capacity) continue; // 装满的枯井不算数
+    const d = Math.abs(s.x - spot.x) + Math.abs(s.y - spot.y) * 2;
+    if (d < sink) sink = d;
+  }
+  cost += Number.isFinite(sink) ? sink * 2 : 40;
+
+  const heard = (bare ? DIG_BARE_NOISE : 1) * NOISE.dig * SENSE.hearingScale;
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated) continue;
+    const r = (e.hearing || 6) * heard;
+    const dx = e.x - spot.x;
+    const dy = e.y - spot.y;
+    if (dx * dx + dy * dy <= r * r) cost += NAV_DIG_NOISE;
+  }
+  return cost;
 }
 
 function Nav(state) {
@@ -5562,6 +5875,12 @@ function NavNext(state, goalX, goalY, escort) {
         cost += 2 + usable.cost + Math.abs(edge.shaft.yTop - edge.shaft.yBottom) * 0.4;
         // 带着爬不了竖井的人：竖井不是不能走，是走了就得回来接人。贵，但不封死。
         if (escort && escort.noClimb) cost += NAV_ESCORT;
+      } else if (edge.kind === "dig") {
+        // 「只躲」那条对照组不挖——不挖正是这条对照组的意义（见 DebugAutoPlay 的说明）。
+        if (escort && escort.noDig) continue;
+        cost += NavDigCost(state, edge.spot);
+        // 新挖的洞只有 1.2 米净空（`digSpots.clearance` 的缺省），钻不了矮口的人过不去
+        if (escort && escort.noCrawl) cost += NAV_ESCORT;
       }
       if (escort && escort.noCrawl && nodes[edge.to].clearance < HEADROOM.crouchNeeds) {
         cost += NAV_ESCORT;
@@ -5585,6 +5904,9 @@ function NavNext(state, goalX, goalY, escort) {
   if (!edge) return null;
   if (edge.kind === "shaft") {
     return { kind: "shaft", shaft: edge.shaft, down: edge.shaft.yBottom < nodes[from].y - 0.5 ? true : false, x: edge.shaft.x };
+  }
+  if (edge.kind === "dig") {
+    return { kind: "dig", spot: edge.spot, x: edge.spot.x };
   }
   const target = nodes[node];
   const goRight = target.x0 >= nodes[from].x1 - 0.6;
@@ -5821,6 +6143,11 @@ function BotWantsPrompt(state, bot, prompt, goal) {
   if (prompt.kind === "hide") return bot.hiding;
   if (bot.pressCooldown[prompt.id] > 0) return false;
   if (prompt.kind === "hatch") return true;
+  // 路线上就要挖开的那一段（`NavNext` 给的 dig 跳）。这是"挖"对机器人成立的关键：
+  // 以前只有把挖点写成 objective 才会按，而那等于把它变成通关硬条件。
+  if (prompt.kind === "dig" && bot.digSpotId && prompt.id === bot.digPropId) return true;
+  // 为了那一段土专门去捡的铁锨
+  if (prompt.kind === "pickup" && bot.fetchPropId && prompt.id === bot.fetchPropId) return true;
   if (prompt.kind === "read") return true;
   if (prompt.kind === "bell") return true;
   // 顺手就把口令传了：传令点散在地道支线里，等目标轮到它再回头跑要横穿半张图
@@ -5967,7 +6294,6 @@ export function DebugAutoPlay(state, maxSeconds = 240, options = {}) {
     lures: 0,
     knockouts: 0,
     blocks: 0,
-    digs: 0,
     throwCooldown: 0,
   };
   let t = 0;
@@ -5982,7 +6308,9 @@ export function DebugAutoPlay(state, maxSeconds = 240, options = {}) {
     lures: bot.lures,
     knockouts: bot.knockouts,
     blocks: bot.blocks,
-    digs: bot.digs,
+    // 真正挖通的段数，不是按了几次键：挖是可以被打断再续的，数按键会虚高。
+    digs: Object.keys(state.world.dug || {}).length,
+    spoilLeft: state.world.spoilPiles ? state.world.spoilPiles.length : 0,
     deaths: state.stats.deaths,
   });
 
@@ -6069,6 +6397,8 @@ function BotThink(state, bot, dt) {
 
   // 这一跳该往哪走（导航图算的，可能跟目标方向相反——比如要先绕回去下地道）
   const escort = EscortLimits(state);
+  // 路线约束跟着策略走：「只躲」不挖，所以挖开的那条边对它不存在。
+  escort.noDig = !bot.active;
   const hop = p.onShaft ? null : NavNext(state, goal.x, goal.y, escort);
   const localX = hop ? hop.x : goal.x;
   if (!hop && !p.onShaft && Math.abs(goal.y - p.y) > 1.6) {
@@ -6430,6 +6760,69 @@ function BotThink(state, bot, dt) {
   }
 
   bot.climbTargetY = undefined;
+
+  // 路线上要挖开一段新洞：走到跟前，刨。
+  // 挖的时候人是钉在原地的（`UpdateAction`），所以要按住 stuckTimer，
+  // 否则"长时间没进展"的抖动兜底会把刚起手的挖掘打断，然后永远挖不完。
+  bot.digSpotId = null;
+  bot.digPropId = null;
+  bot.fetchPropId = null;
+  if (hop && hop.kind === "dig") {
+    const spot = hop.spot;
+    const prop = BotDigPropFor(state, spot.id);
+    if (prop) {
+      bot.digSpotId = spot.id;
+      bot.digPropId = prop.id;
+      const targetX = PropX(state, prop);
+      if (p.action === "dig") {
+        bot.stuckTimer = 0; // 正在刨，别抖
+        return;
+      }
+      // 契约 0.0.2：挖掘要带铁锨。没锨也能刨，但慢一倍、还更响（DIG_BARE_*），
+      // 所以只要锨在**顺路**的范围内就先去拿——跟"拉闸缺木塞就先去捡"是同一条路子。
+      if (p.carrying !== "shovel") {
+        const shovel = BotPickupPropFor(state, "shovel");
+        if (shovel) {
+          const sx = PropX(state, shovel);
+          const detour = Math.abs(sx - p.x) + Math.abs(shovel.y - p.y) * 2;
+          if (detour < spot.sec * DIG_BARE_SCALE * PLAYER.walkSpeed) {
+            bot.fetchPropId = shovel.id;
+            if (Math.abs(p.x - sx) > 0.6) {
+              BotWalkTo(state, bot, sx, input);
+              MaybePress(state, bot, goal, input, shovel);
+              return;
+            }
+            MaybePress(state, bot, goal, input, shovel);
+            return;
+          }
+        }
+      }
+      if (Math.abs(p.x - targetX) > 0.6) {
+        BotWalkTo(state, bot, targetX, input);
+        MaybePress(state, bot, goal, input, prop);
+        return;
+      }
+      MaybePress(state, bot, goal, input, prop);
+      bot.stuckTimer = 0;
+      return;
+    }
+  }
+
+  // 背着土：顺路倒掉。留在地上的新土会把路过的兵直接推进搜索（`UpdateSpoilPiles`），
+  // 挖完不管土，等于给搜村的人立了块路标——契约 0.0.2 的第三层代价。
+  if (bot.active && state.player.spoil > 0 && !p.action) {
+    const sink = BotSinkPropFor(state);
+    if (sink) {
+      const sx = PropX(state, sink);
+      if (Math.abs(p.x - sx) > 0.6 || Math.abs(sink.y - p.y) > 1.4) {
+        BotWalkTo(state, bot, sx, input);
+        MaybePress(state, bot, goal, input, sink);
+        return;
+      }
+      MaybePress(state, bot, goal, input, sink);
+      return;
+    }
+  }
 
   // 走地板 + 钻竖井的路线由导航图算（会为了躲岗哨主动绕地道）
   if (hop && hop.kind === "shaft") {
