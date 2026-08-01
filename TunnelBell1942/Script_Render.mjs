@@ -52,14 +52,90 @@ const _colA = new THREE.Color();
 const _colB = new THREE.Color();
 const _colC = new THREE.Color();
 const _colD = new THREE.Color();
+const _colE = new THREE.Color();
 const _vecA = new THREE.Vector3();
 const _vecB = new THREE.Vector3();
 
 /** 长焦透视的半视角正切，全篇的距离换算都用它。 */
 const TAN_HALF_FOV = Math.tan((CAMERA.fovDeg * Math.PI) / 180 / 2);
-/** z=0 平面上要看到 vh 那么高时，相机该站多远。这是 viewHeight 语义的唯一实现。 */
-function CameraDistanceFor(vh) { return (vh * 0.5) / TAN_HALF_FOV; }
-/** 距相机 dist 处的可视半高。暗角罩、天幕这些"贴屏"的东西靠它定尺寸。 */
+
+// ---------------------------------------------------------------------------
+// 俯角（AGENTS.md 2.1）。这是纵深感最大的一块，不是锦上添花。
+//
+// 纯水平看 -Z 时**地面永远只是一条边**：台面、车辙、垄沟、坑道里前后两榀
+// 支撑木全部藏在那条边里，做了也看不见。给 6° 俯角，地面立刻摊开成一块
+// 向后退的台面，「平行线向灭点收敛」这条最强的深度信号才真正生效。
+//
+// 代价是竖直线朝灭点收敛，所以 8° 是硬上限，且要实测画面上下缘的竖直边
+// 偏离铅垂线 ≤ 2.5°（健康检查里有这条）。
+//
+// 几何（相机无 roll 无 yaw，只绕 X 转 -p）：
+//   · 相机看向 (0, -sin p, -cos p)，视线正中打在 (camX, camY, 0) 上；
+//   · 相机站在  C = (camX, camY + camLiftY, L·cos p)，L 是沿视线到 z=0 的距离；
+//   · z=0 平面上的可视高度（viewHeight 的语义，一个字都不许改）：
+//         H = L·cos p · ( tan(p+h) − tan(p−h) )        h = fov/2
+//     反解出 L = vh / ( cos p · (tan(p+h) − tan(p−h)) )；
+//   · 让这段可视高度**正好以 camY 为中心**（玩法层的夹紧全建立在这上面）：
+//         camLiftY = L·cos p · ( tan(p+h) + tan(p−h) ) / 2
+//   · 世界 z=Z 处的视深（近大远小的分母）不再是 camDist−Z，而是
+//         camDist − Z·cos p    ← ViewDepthAt()
+//     p=0 时两式相同，所以旧的推导是它的特例。
+// ---------------------------------------------------------------------------
+const PITCH_DEG = Math.min(8, Math.max(0, typeof CAMERA.pitchDeg === 'number' ? CAMERA.pitchDeg : 0));
+const PITCH = (PITCH_DEG * Math.PI) / 180;
+const HALF_FOV = (CAMERA.fovDeg * Math.PI) / 180 / 2;
+
+/** 一组俯角相关的三角量。俯角在运行期会被 aspect 收窄，所以打包成一份。 */
+function MakePitchTerms(p) {
+  return {
+    rad: p, cos: Math.cos(p), sin: Math.sin(p),
+    tanLo: Math.tan(p - HALF_FOV),   // 画面上缘那条边（俯角下多半是负的）
+    tanHi: Math.tan(p + HALF_FOV),   // 画面下缘那条边
+  };
+}
+/** 标称俯角。**建造期**（限高反解、FORE 标定）一律用它，保证几何是确定性的。 */
+const PITCH_NOMINAL = MakePitchTerms(PITCH);
+const COS_PITCH = PITCH_NOMINAL.cos;
+const SIN_PITCH = PITCH_NOMINAL.sin;
+
+/**
+ * 竖直线偏离铅垂线的闭式估计（推导见下），用来按视口反推俯角上限。
+ *
+ *   偏角 ≈ atan( X·sin p / w )      X = 该点的横向世界偏移，w = 视深
+ *
+ * 画面左右边缘最狠：X = L·tan(h)·aspect，w ≈ L，于是
+ *   偏角_max ≈ atan( tan(h) · aspect · sin p · k )
+ * k 是"最坏采样点"的修正（画面上缘 w 更小、俯角把相机抬高又让 dy 偏负），
+ * 实测 16:9 三幕 k≈1.15。**偏角只跟 aspect 有关，跟 viewHeight 无关**
+ * （X 和 w 同比例缩放），所以一个夹紧就能覆盖所有机位。
+ *
+ * 超宽屏是唯一会越线的情况：6° 在 16:9 实测 2.14°，到 21:9 就是 3.05°。
+ * 与其把俯角一刀砍到 5°（普通屏白白损失纵深），不如按 aspect 自动收——
+ * 契约的 2.5° 是硬红线，这里让它自洽。
+ */
+const LEAN_LIMIT_TAN = Math.tan((2.5 * Math.PI) / 180);
+// k 是"最坏采样点"相对闭式估计的修正系数。别拍脑袋：它随机位而变
+// （地道视口小、lift 小，相机相对抬得更高，画面上缘的视深更小），
+// 16:9 三幕实测 1.15 / 1.29 / 1.30，取 1.35 留一档余量。
+const LEAN_K = 1.35;
+function PitchForAspect(aspect) {
+  const a = Math.max(0.2, aspect || 16 / 9);
+  const maxSin = LEAN_LIMIT_TAN / Math.max(1e-6, TAN_HALF_FOV * a * LEAN_K);
+  if (maxSin >= 1) return PITCH;
+  return Math.min(PITCH, Math.asin(maxSin));
+}
+
+/** z=0 平面上要看到 vh 那么高时，相机沿视线该站多远。viewHeight 语义的唯一实现。 */
+function CameraDistanceFor(vh, terms) {
+  const t = terms || PITCH_NOMINAL;
+  return (vh * 0.5) / (t.cos * (t.tanHi - t.tanLo) * 0.5);
+}
+/** 相机相对「视线落点」要抬多高，才能让可视高度正好以 camY 为中心。 */
+function CameraLiftFor(dist, terms) {
+  const t = terms || PITCH_NOMINAL;
+  return dist * t.cos * (t.tanHi + t.tanLo) * 0.5;
+}
+/** 距相机 dist（沿视线）处的可视半高。暗角罩、天幕这些"贴屏"的东西靠它定尺寸。 */
 function HalfHeightAt(dist) { return Math.max(0.01, dist) * TAN_HALF_FOV; }
 
 /** 地下剖面正面（朝观众那一面）所在的 z。 */
@@ -82,6 +158,9 @@ const QUALITY_PRESET = {
     gridCell: 0.42, chaikin: 1, gasLayers: 2, particles: 90, warmLights: 2,
     shadows: false, foreDensity: 0.45, hazePlanes: false, starCount: 60,
     maxPixelRatio: 1.0, antialias: false, smoothTunnel: 0.55,
+    // 纵深强化四件套（见下面 2.6 节）。low 档只留"地面纵深线"——它是纯几何、
+    // 并进已有的合批，一个 draw call 都不多花，却是最强的深度信号。
+    moteBands: 0, depthLayers: false, groundLines: true, foreBokeh: false,
     film: null,
   },
   medium: {
@@ -89,6 +168,7 @@ const QUALITY_PRESET = {
     gridCell: 0.32, chaikin: 2, gasLayers: 3, particles: 180, warmLights: 3,
     shadows: false, foreDensity: 0.8, hazePlanes: true, starCount: 130,
     maxPixelRatio: 1.5, antialias: true, smoothTunnel: 0.75,
+    moteBands: 3, depthLayers: true, groundLines: true, foreBokeh: false,
     // medium 是触屏档。实测后处理在填充率受限的设备上会把帧时间翻倍
     // （SwiftShader 1920×1080：365ms → 622ms），所以这一档只留最省、
     // 也最像"电影调色"的三样：色调分离 + 颗粒 + 暗角，一个 pass、一次取样。
@@ -100,9 +180,95 @@ const QUALITY_PRESET = {
     gridCell: 0.26, chaikin: 2, gasLayers: 5, particles: 320, warmLights: 5,
     shadows: true, foreDensity: 1.0, hazePlanes: true, starCount: 220,
     maxPixelRatio: 2.0, antialias: true, smoothTunnel: 0.85,
+    moteBands: 4, depthLayers: true, groundLines: true, foreBokeh: true,
     film: { split: 1.0, grain: 1.0, vignette: 1.0, bloom: 1.0, ca: 1.0, trail: 1.0 },
   },
 };
+
+// ---------------------------------------------------------------------------
+// 2.6 纵深（AGENTS.md 2.1 / 2.2）
+//
+// 长焦透视 + 舞台厚度只是**前提**。真正让人读出"深"的，是一串连续的深度
+// 线索，而不是四张卡片：
+//
+//  1) 中间层（`DEPTH_LAYER_Z`）。FAR(-26)/BACK(-14)/MID(-6) 之间是断的，
+//     补进 -31 / -20 / -10 三层，视差与褪色就变成梯度而不是台阶。
+//  2) 空气里的东西（`MOTE_BANDS`）。同一种浮尘按 z 分四层：近的大而快、
+//     远的小而慢。这是最便宜的纵深线索，比任何几何都管用，一层一个 draw call。
+//  3) 体积光。光柱**自带长度**，所以它本身就是纵深。通气孔的一道光改成
+//     前中后三片错开的光锥 + 地面光潭；地表加几道穿过树冠的月光。
+//  4) 地面的纵深线（`groundLines`）。沿 Z 的车辙、垄沟、篱笆桩——
+//     **平行线向纵深收敛**是人眼判断距离最强的信号，而且它并进已有合批。
+//
+// 大气透视也跟着改了做法：三道空气墙不再是均匀的板，而是**带高度梯度**的
+// （贴地最厚、越往上越薄）。这是上一轮的坑：均匀板给到 0.30 会把天幕一起洗，
+// 远山和天空只差 2 级亮度等于没画。带梯度之后可以放心加厚——洗的是景物，
+// 不是天空。
+// ---------------------------------------------------------------------------
+
+/** 补进 FAR/BACK/MID 之间的中景层。键名只是叙述用，真正决定层次的是 z。 */
+const DEPTH_LAYER_Z = {
+  RIDGE_FAR: -31,      // 最远的一道山脊，几乎全被雾吃掉，只剩一线比天空亮
+  GROVE: -20,          // FAR 与 BACK 之间：树线 + 更远的屋顶
+  YARD: -10.8,         // BACK 与 MID 之间：院墙、电线杆、碾道
+  //     ^ 刻意不等于空气墙的 -10：共面的透明面与不透明面深度测试会打架，
+  //       画面上是一块随机忽明忽暗的补丁。
+};
+
+/**
+ * 月亮永远落在画面 ndc y = +0.50、半径 0.115（PlaceSkyMoon 写死的，与视口
+ * 无关）。任何背景剪影的**最高点**都不许越过这条线——月亮是整套夜景的构图
+ * 锚，被啃掉一块的代价远大于多一道山脊。新加的最远山脊按这条线反推限高：
+ *     y_max = camY + MOON_CLEAR_NDC * HalfHeightAt(camDist + |z|)
+ * 最紧的情况是地表标称视口（camDist 32.6），代进去 z=-31 得 y_max ≈ 5.9。
+ */
+const MOON_CLEAR_NDC = 0.35;
+
+/** 月亮的屏幕高度（ndc_y）。俯角把远景整体往上推，月亮得跟着让位。
+ *  p=0 时回到 0.50，6° 时约 0.73。半径 0.115，所以底边约在 0.62。 */
+const MOON_NDC_Y = Math.min(0.74, 0.50 + (SIN_PITCH / Math.max(1e-6, COS_PITCH)) / TAN_HALF_FOV * 0.40);
+
+/**
+ * 建造期用的"屏幕高度 → 世界 y"反解（俯角版）。
+ *
+ * 相机瞄准 (·, camY, 0)，站在 (·, camY + camLiftY, camDist·cos p)。
+ * 世界点 (·, Y, Z) 的视空间：dy = Y − Cy，dz = Z − camZ
+ *     Vy = dy·cos p − dz·sin p ,  w = −(dy·sin p + dz·cos p) ,  ndc = Vy /(w·tan h)
+ * 解出：dy = dz·(sin p − ndc·tan h·cos p) / (cos p + ndc·tan h·sin p)
+ *
+ * 一律按**地表标称视口 + 玩家站在 y=0** 算，跟建造时相机恰好在哪一档无关，
+ * 结果是确定性的。p=0 时退化成旧的线性式子。
+ */
+function NominalSkyY(ndc, z) {
+  const dist = CameraDistanceFor(CAMERA.viewHeight);
+  const cy = CAMERA.surfaceLift + CameraLiftFor(dist);
+  const dz = z - dist * COS_PITCH;
+  const k = ndc * TAN_HALF_FOV;
+  return cy + dz * (SIN_PITCH - k * COS_PITCH) / (COS_PITCH + k * SIN_PITCH);
+}
+
+/**
+ * 浮尘分层。z 越靠前 → 点越大、飘得越快、数量越少。
+ * 每层一个 THREE.Points（1 draw call），位置每帧按 time 解析式算出来，
+ * 零分配、无 Math.random()。地表是冷灰的夜尘，地下换成马灯旁的暖色土屑。
+ */
+const MOTE_BANDS = [
+  { z: -17.0, n: 46, size: 1.6, drift: 0.42, rise: 0.05, aSurf: 0.30, aTun: 0.16 },
+  { z: -6.5, n: 34, size: 2.5, drift: 0.62, rise: 0.09, aSurf: 0.34, aTun: 0.30 },
+  { z: 1.2, n: 24, size: 4.2, drift: 0.95, rise: 0.14, aSurf: 0.30, aTun: 0.40 },
+  { z: 6.4, n: 13, size: 7.0, drift: 1.45, rise: 0.20, aSurf: 0.20, aTun: 0.26 },
+];
+
+/** 挖出来的土堆最多同时存在几堆（对象池上限）。关卡侧一共 11 个挖点，
+ *  留 12 个位子够用，多出来的静默丢掉，绝不动态 new。 */
+const SPOIL_POOL = 12;
+/** 挖通之后延后多久重挖剖面（秒）。压在放锨/镜头抖那一下，最不容易被看见。 */
+const DIG_REBUILD_DELAY = 0.35;
+
+/** 空气墙的几何：高度梯度落在 [groundRef-2.1, groundRef+6]，上面全留给天空。
+ *  下边一路铺到 groundRef-35，地道那一段也要盖住。 */
+const HAZE_H = 42.5;
+const HAZE_TOP_OFF = 7.3;
 
 // ---------------------------------------------------------------------------
 // 2.5 胶片质感（AGENTS.md 6.2）
@@ -286,6 +452,12 @@ void main() {
 const PROP_DEFAULT_Z = {
   house: -2.2, wall: -1.2, fence: -0.8, tree: -1.4, sign: -0.3,
   corpse: -0.4, trough: -0.5, cart: -0.4, kang: -1.6, stove: -1.4,
+};
+
+/** 允许绕 Y 转四分之三角的道具（值是幅度倍率）。见 PropYaw。 */
+const PROP_YAW = {
+  house: 1.0, wall: 0.85, gate: 0.8, kang: 0.7, stove: 0.7,
+  vat: 0.6, cart: 1.0, trough: 0.9, crock: 0.6, millstone: 0.5,
 };
 
 /** 敌人 kind → Actor rig kind。
@@ -553,6 +725,42 @@ const TEX_DRAW = {
     grd.addColorStop(1.00, 'rgba(255,255,255,0.86)');
     g.fillStyle = grd; g.fillRect(0, 0, s, s);
   },
+  // 空气墙的高度梯度：贴地最厚，往上迅速消失。
+  //
+  // 这张图是"能不能把大气透视加狠"的全部关键。以前三道空气墙是均匀的板，
+  // 它们盖在天幕前面，加厚就等于把天空一起洗掉（实测 0.30/0.19/0.10 时
+  // 远山和天空只差 2 级亮度，五层里真正有厚度的只剩两层）。
+  // 换成高度梯度之后，洗的是地平线附近的景物，天空一点不碰——而且这才是
+  // 真实的大气透视：雾在地面附近最浓，山顶总是先露出来。
+  //
+  // 归零点是量出来的，不是拍的。第一版放到 groundRef+9，实测把"天空带"
+  // 整条抬亮 0.6 级，「村庄 > 天空 > 土层」这条明度序位当场翻过来。
+  // 现在 groundRef+6 以上就是 0，满强度收在地平线下面。
+  haze(c, s) {
+    const g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, s);
+    grd.addColorStop(0.00, 'rgba(255,255,255,0)');
+    grd.addColorStop(0.03, 'rgba(255,255,255,0)');
+    grd.addColorStop(0.09, 'rgba(255,255,255,0.30)');
+    grd.addColorStop(0.16, 'rgba(255,255,255,0.86)');
+    grd.addColorStop(0.22, 'rgba(255,255,255,1)');
+    grd.addColorStop(1.00, 'rgba(255,255,255,1)');
+    g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  },
+  // 贴地的一层薄雾。空气墙管"整片背景往雾色收"，这一条管"地平线上有一道
+  // 亮带把中景和远景切开"——《勇敢的心》里最常用的一招，也是真实的夜雾：
+  // 它只有一米来厚，贴着地面浮，村舍的脚全泡在里面。
+  // 上边收得很干净（不许爬进天空），下边一路铺满（反正被台面挡住）。
+  mist(c, s) {
+    const g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, s);
+    grd.addColorStop(0.00, 'rgba(255,255,255,0)');
+    grd.addColorStop(0.30, 'rgba(255,255,255,0.16)');
+    grd.addColorStop(0.58, 'rgba(255,255,255,0.68)');
+    grd.addColorStop(0.80, 'rgba(255,255,255,1)');
+    grd.addColorStop(1.00, 'rgba(255,255,255,0.92)');
+    g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  },
   // 烟团：径向柔边 + 团絮噪声。毒烟由一堆这种柔边团组成，绝不能出现直边。
   smoke(c, s) {
     const g = c.getContext('2d');
@@ -656,6 +864,15 @@ function GQuad(w, h, x, y, z) {
   const g = new THREE.PlaneGeometry(Math.max(1e-3, w), Math.max(1e-3, h));
   g.translate(x || 0, y || 0, z || 0);
   return g;
+}
+
+/** 绕 (x,y,z) 处的竖轴转 a 弧度。四分之三角、斜着往纵深走的车辙都靠它。 */
+function RotYAbout(geo, a, x, y, z) {
+  if (!geo || !a) return geo;
+  geo.translate(-(x || 0), -(y || 0), -(z || 0));
+  geo.rotateY(a);
+  geo.translate(x || 0, y || 0, z || 0);
+  return geo;
 }
 
 /** 归一化到可合并的属性集：非索引 + position/normal/uv。 */
@@ -863,12 +1080,24 @@ function ExtractEarthOutline(level, cfg) {
     if (typeof f.x0 !== 'number' || typeof f.x1 !== 'number' || typeof f.y !== 'number') continue;
     tunnels.push(f);
   }
-  function CeilAt(x, fallback) {
+  /**
+   * 这条地板头上的净空。
+   *
+   * **必须按 floorY 过滤，不能取全局最低。** 一个 x 上可以同时压着深浅两条
+   * 地道的净空：act2 的 x=35 处有 y=-6.22（深层干线）和 y=-2.6（浅层支线）
+   * 两条。取全局最低会把深层的净空当成浅层的顶，挖洞区间变成
+   * 「wy >= -4.1 且 wy <= -6.12」——空集，一格都挖不开，整条浅层支线连同
+   * 里面的乡亲、被褥堆全部封死在实心土里。几何在、栅格在、测试全绿，
+   * 玩家看到的是一屏土。这类 bug 静默得可怕，所以下面还有一条自检。
+   */
+  function CeilAt(x, floorY, fallback) {
     let best = Infinity;
     for (let i = 0; i < ceils.length; i++) {
       const c = ceils[i];
       if (!c || typeof c.y !== 'number') continue;
-      if (x >= c.x0 - 0.05 && x <= c.x1 + 0.05 && c.y < best) best = c.y;
+      if (x < c.x0 - 0.05 || x > c.x1 + 0.05) continue;
+      if (c.y <= floorY) continue;          // 在这条地板下面的净空，不是它的顶
+      if (c.y < best) best = c.y;
     }
     return best === Infinity ? fallback : best;
   }
@@ -895,7 +1124,7 @@ function ExtractEarthOutline(level, cfg) {
       for (let t = 0; t < tunnels.length; t++) {
         const f = tunnels[t];
         if (wx < f.x0 - 0.1 || wx > f.x1 + 0.1) continue;
-        const top = CeilAt(wx, f.y + 2.05);
+        const top = CeilAt(wx, f.y, f.y + 2.05);
         if (wy >= f.y - 0.3 && wy <= top + 0.1) { solid = 0; break; }
       }
       if (solid) {
@@ -911,6 +1140,28 @@ function ExtractEarthOutline(level, cfg) {
       }
       val[j * nx + i] = solid;
     }
+  }
+
+  // --- 自检：每条地道地板都必须真的被挖开了 ---
+  //
+  // "整层封在土里"是这套流水线最恐怖的一类 bug：几何在、栅格在、draw call
+  // 正常、所有测试全绿，玩家看到的却是一屏实心土（act2 的浅层支线就这么
+  // 埋了五位乡亲）。挖洞是一串区间判定，任何一个越界／取错值都会让区间
+  // 变成空集，而空集不抛异常。所以这里按每条地板中点采样一次占用栅格，
+  // 一旦发现"该空的地方是土"就把它记进 outline，交给上层报警。
+  const sealed = [];
+  for (let t = 0; t < tunnels.length; t++) {
+    const f = tunnels[t];
+    const wx = (f.x0 + f.x1) / 2;
+    const wy = f.y + 0.5;                       // 地板往上半米：人站的地方
+    const i = Math.round((wx - x0) / cell);
+    const j = Math.round((wy - yBottom) / cell);
+    if (i <= 0 || i >= nx - 1 || j <= 0 || j >= ny - 1) continue;
+    if (val[j * nx + i] === 1) sealed.push({ x: wx, y: f.y });
+  }
+  if (sealed.length && typeof console !== 'undefined') {
+    console.error('[Render] 地道没挖开：' + sealed.length + ' 条地板中点仍是实心土 → ' +
+      sealed.map(function (s) { return 'x=' + s.x.toFixed(1) + ' y=' + s.y.toFixed(1); }).join(', '));
   }
 
   // --- marching squares ---
@@ -1001,7 +1252,7 @@ function ExtractEarthOutline(level, cfg) {
     }
     if (best >= 0) contours[best].holes.push(holes[h].pts);
   }
-  return { contours, groundY: GroundY, defaultGround, yTopGrid, x0, x1, yBottom };
+  return { contours, groundY: GroundY, defaultGround, yTopGrid, x0, x1, yBottom, sealed };
 }
 
 /** 从轮廓点集造 THREE.Shape。 */
@@ -1026,6 +1277,7 @@ function ShapeFromLoop(pts, holeList) {
 /** 按 y 分带 + 按 z 加深的土层顶点色（黑土 → 黄土 → 沙土）。 */
 function PaintEarthStrata(geo, groundRef, frontZ, backZ) {
   const pos = geo.attributes.position;
+  const nrm = geo.attributes.normal;
   const n = pos.count;
   const arr = new Float32Array(n * 3);
   const topSoil = [0.20, 0.155, 0.115];
@@ -1058,7 +1310,12 @@ function PaintEarthStrata(geo, groundRef, frontZ, backZ) {
     // 整体压暗：土是"地下"的东西，站在地表时它不该跟被月光直照的墙一样亮。
     // 靠近地表的一薄层留亮些，好让 bevel 把地平线那道边勾出来。
     const dim = Lerp(0.80, 0.42, Clamp(depth / 3.2, 0, 1));
-    const k = sp * ao * dim;
+    // 台面顶面（法线朝上）单独提亮。俯角一上来它就从"一条看不见的边"变成了
+    // 画面里最大的一块面，而它跟朝向观众的剖切面共用一套顶点色——照剖面那套
+    // 压暗，地面读成一块死泥。朝上的面本来就该多吃月光，这一提亮同时让
+    // 车辙、垄沟、篱笆桩这些纵深线真正显出来（画在暗地上等于没画）。
+    const up = nrm ? Clamp(nrm.getY(i), 0, 1) : 0;
+    const k = sp * ao * dim * (1 + up * up * 0.55);
     arr[i * 3] = r * k; arr[i * 3 + 1] = g * k; arr[i * 3 + 2] = b * k;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
@@ -1641,7 +1898,13 @@ const PROPS = {
     ctx.E('metal', GBox(0.05, 0.045, dp - 0.1, -0.2, h - 0.1, -0.1));
     ctx.E('metal', GBox(0.05, 0.045, dp - 0.1, 0.2, h - 0.1, -0.1));
     ctx.E('mud', GBox(1.1, 0.14, dp + 0.3, 0, h + 0.07, -0.1));
+    // 体积光：一片贴图不是光柱，是一条亮带。三片在 z 上错开、越靠前越窄，
+    // 透视下它们叠成一个向观众张开的锥——**光柱本身就是纵深，因为它有长度**。
+    // 底下再补一摊地面光潭，把"这束光落到了地上"说死。
+    ctx.Shaft(0, h * 0.5 - 0.1, -0.9, 1.65, h + 0.5, 0xa8c2ea, 0.13);
     ctx.Shaft(0, h * 0.5 - 0.2, 1.1, 0.95, h + 0.3, 0xbcd2f2, 0.30);
+    ctx.Shaft(0, h * 0.5 - 0.35, 2.6, 0.52, h + 0.1, 0xd2e2ff, 0.17);
+    ctx.Glow(0, 0.06, 0.55, 2.5, 0x9fbce8, 0.11, 0);
   },
 
   /** 翻口：地道口的木盖。口子是真的凹下去的，透视下能看见井壁。 */
@@ -1675,6 +1938,8 @@ const PROPS = {
     ctx.E('wood', GBox(0.1, 0.66, 0.5, -0.3, 0, 0));
     ctx.E('wood', GBox(0.1, 0.66, 0.5, 0.3, 0, 0));
     ctx.E('void', GQuad(0.5, 0.46, 0, 0, -0.24));
+    // 同上：两片错开的斜光锥，才读得出"一线光斜插进土层里"
+    ctx.Shaft(0.45, -0.22, -0.4, 0.82, 2.2, 0xa8c2ea, 0.08, -0.85);
     ctx.Shaft(0.6, -0.35, 0.9, 0.5, 1.9, 0xbcd2f2, 0.18, -0.85);
   },
 };
@@ -1723,10 +1988,22 @@ export function CreateRenderer(canvas, options = {}) {
   // 长焦透视。FOV 窄到 20°，相机拉到三十多米开外：竖直边缘几乎不外扩，
   // 横版仍然成立，但层与层之间有了真实的近大远小和视差。
   const camera = new THREE.PerspectiveCamera(CAMERA.fovDeg, 16 / 9, CAMERA.near, CAMERA.far);
-  let camDist = CameraDistanceFor(viewHeight);
-  camera.position.set(0, 0, camDist);
-  camera.rotation.set(0, 0, 0);          // 永远看向 -Z，永远不转
+  /** 运行期实际用的俯角（按 aspect 收窄，见 PitchForAspect）。 */
+  let pitchTerms = PITCH_NOMINAL;
+  /** 沿视线到 z=0 落点的距离。所有"近大远小"的分母都从它推。 */
+  let camDist = CameraDistanceFor(viewHeight, pitchTerms);
+  /** 相机世界 z（= camDist·cos p）。跟世界 z 做差时用它，别用 camDist。 */
+  let camZ = camDist * pitchTerms.cos;
+  /** 相机比"视线落点"高多少，见上面的推导。 */
+  let camLiftY = CameraLiftFor(camDist, pitchTerms);
+  camera.position.set(0, camLiftY, camZ);
+  // 只绕 X 转（俯角），**永远不 roll、永远不偏航**。绕 X 转不破坏横版：
+  // 竖直线仍然基本竖直（16:9 实测最大偏离 2.14°），但地面摊开了。
+  camera.rotation.set(-pitchTerms.rad, 0, 0);
   scene.add(camera);
+
+  /** 世界 z=Z 处的视深。俯角下不再是 camDist−Z（p=0 时两者相同）。 */
+  function ViewDepthAt(z) { return Math.max(0.5, camDist - z * pitchTerms.cos); }
 
   // ---- 天幕：挂在相机下面，等于无穷远。它不许有任何视差 ----
   const gSky = new THREE.Group();
@@ -1737,6 +2014,9 @@ export function CreateRenderer(canvas, options = {}) {
   // ---- 分层 group ----
   const gFar = new THREE.Group(); gFar.name = 'FAR'; gFar.position.z = LAYER_Z.FAR; scene.add(gFar);
   const gBack = new THREE.Group(); gBack.name = 'BACK'; gBack.position.z = LAYER_Z.BACK; scene.add(gBack);
+  // 补进去的中间层。它们不进 LAYER_Z（那是玩法/关卡也认的契约），只是渲染层
+  // 自己在契约的五档之间填出来的梯度，让视差是连续的而不是四张卡片。
+  const gDepth = new THREE.Group(); gDepth.name = 'DEPTH'; scene.add(gDepth);
   const gMid = new THREE.Group(); gMid.name = 'MID'; scene.add(gMid);
   const gPlay = new THREE.Group(); gPlay.name = 'PLAY'; scene.add(gPlay);
   const gFore = new THREE.Group(); gFore.name = 'FORE'; gFore.position.z = 0; scene.add(gFore);
@@ -1765,6 +2045,9 @@ export function CreateRenderer(canvas, options = {}) {
       draw(cv, s);
       tex = new THREE.CanvasTexture(cv);
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      // 单张竖向渐变（空气墙 / 贴地薄雾）必须 clamp：RepeatWrapping 下，
+      // 顶边那一行会跟底边那一行做双线性混合，画面上就是一条横贯全屏的硬边。
+      if (key === 'haze' || key === 'mist') tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.repeat.set(repeatX || 1, repeatY || repeatX || 1);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = qualityName === 'low' ? 1 : 4;
@@ -1776,7 +2059,7 @@ export function CreateRenderer(canvas, options = {}) {
   const texRepeats = {
     mud: 0.42, wood: 0.7, tile: 0.55, stone: 0.4, thatch: 0.9,
     earth: 0.22, paper: 1.0, noise: 1.0, water: 1.0, glow: 1.0,
-    shaft: 1.0, sign: 1.0, sky: 1.0, smoke: 1.0, vignette: 1.0,
+    shaft: 1.0, sign: 1.0, sky: 1.0, smoke: 1.0, vignette: 1.0, haze: 1.0, mist: 1.0,
   };
   function T(key) { const r = texRepeats[key] || 1; return GetTex(key, r, r); }
 
@@ -1834,6 +2117,31 @@ export function CreateRenderer(canvas, options = {}) {
       color: 0x412e1b, map: T('wood') || null,
       emissive: 0x1e1207, emissiveIntensity: 0.6,
     }),
+    // ---- 挖掘（AGENTS.md 0.0.2）----
+    //
+    // 「哪儿能挖」必须是**看得出来的知识**，不是挨个按过去试出来的。
+    // 所以软面和硬面的区别不能只靠颜色，主要靠**形**：
+    //   软面 = 一团团松散的新土块 + 斜着的刨痕，暖、乱、有人刚动过
+    //   硬面 = 一层层错缝的砖 / 青石条，冷、齐、砌死的
+    // 两者都自带自发光：地道环境光只有 0x1a1008，不给底色它们在画面上是纯黑，
+    // 区分得再好也白搭。
+    digSoft: new THREE.MeshLambertMaterial({
+      color: 0x8a6034, map: T('mud') || null,
+      emissive: 0x4a2c12, emissiveIntensity: 0.72,
+    }),
+    digHard: new THREE.MeshLambertMaterial({
+      color: 0x6a6f78, map: T('stone') || null,
+      emissive: 0x1b2028, emissiveIntensity: 0.62,
+    }),
+    digJoint: new THREE.MeshLambertMaterial({
+      color: 0x2b2f36, emissive: 0x0d1014, emissiveIntensity: 0.5,
+    }),
+    // 挖出来的土：这是玩家**自己制造的破绽**，看不见就没法管理，
+    // 所以要比周围亮一档。它比 digSoft 还新还松，颜色更浅。
+    spoil: new THREE.MeshLambertMaterial({
+      color: 0xa87a45, map: T('mud') || null,
+      emissive: 0x60401c, emissiveIntensity: 0.85,
+    }),
     fore: new THREE.MeshBasicMaterial({ color: 0x05070d, transparent: true, opacity: 1 }),
     foreTunnel: new THREE.MeshBasicMaterial({ color: 0x0a0704, transparent: true, opacity: 1 }),
     // 远山 / 远村：跟天空 0x0b1220 只差 9 级亮度时等于没画，五层里真正有厚度的
@@ -1845,6 +2153,19 @@ export function CreateRenderer(canvas, options = {}) {
     //   FAR (z=-26, 雾 75%) → 更淡更冷，但仍明显亮于天幕
     farSil: new THREE.MeshBasicMaterial({ color: 0x33455f, fog: true }),
     backSil: new THREE.MeshBasicMaterial({ color: 0x2a3a55 }),
+    // 补进 FAR/BACK/MID 之间的三层。
+    //
+    // 底色必须**按雾量反解**，不能凭感觉排。雾系数只跟 |z| 有关（near/far 都是
+    // camDist + 常数，所以跟视口无关）：f = (|z| - 0.8) / 33.2
+    //     z=-10.8 → 0.30   z=-14 → 0.40   z=-20 → 0.58   z=-26 → 0.76   z=-31 → 0.91
+    // 夜景里"越远越暗"（都往深色的雾/天空收），所以目标屏幕亮度是
+    //     MID(近乎黑) < YARD < FAR < BACK …… 不是一条单调线，BACK 才是最亮的一档。
+    // 第一版凭感觉给的底色实测下来 YARD 和 BACK 算出来只差 1 级，插层等于白插。
+    // 这三个值是拿 out = (1-f)*base + f*fog 反解出来的：
+    //     YARD  → 屏幕 (26,37,58)    GROVE → (30,43,63)    RIDGE → (23,33,49)
+    ridgeSil: new THREE.MeshBasicMaterial({ color: 0x3c4050, fog: true }),
+    groveSil: new THREE.MeshBasicMaterial({ color: 0x2c3d57, fog: true }),
+    yardSil: new THREE.MeshBasicMaterial({ color: 0x1f2b41, fog: true }),
     sky: new THREE.MeshBasicMaterial({ color: 0x1a2740, map: T('sky') || null, fog: false, depthWrite: false, transparent: true }),
     skyBase: new THREE.MeshBasicMaterial({ color: 0x0b1220, fog: false, depthWrite: false }),
     moon: new THREE.MeshBasicMaterial({ color: 0xdce8fb, fog: false, transparent: true, map: T('glow') || null, blending: THREE.AdditiveBlending, depthWrite: false }),
@@ -1874,14 +2195,45 @@ export function CreateRenderer(canvas, options = {}) {
     blob: new THREE.MeshBasicMaterial({ map: T('glow') || null, color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false }),
     // 大气透视的三道空气墙：越远越厚。雾负责连续衰减，这三层负责把
     // FAR / BACK / MID 之间"啪"地切出可读的层次差——只有雾的话三层会糊成一坨。
-    // 不敢给厚：它们连天幕一起洗，洗过头远山和天空又会撞成同一个色（实测
-    // 0.30/0.19/0.10 三层叠起来把远山和天空压到只差 2 级亮度，等于没画）。
-    hazeFar: new THREE.MeshBasicMaterial({ color: 0x1a2a40, transparent: true, opacity: 0.16, depthWrite: false, fog: false }),
-    hazeMid: new THREE.MeshBasicMaterial({ color: 0x1a2a40, transparent: true, opacity: 0.11, depthWrite: false, fog: false }),
-    hazeNear: new THREE.MeshBasicMaterial({ color: 0x1a2a40, transparent: true, opacity: 0.07, depthWrite: false, fog: false }),
+    //
+    // 现在带 haze 高度梯度贴图（贴地厚、越高越薄），所以敢给厚了：以前不敢
+    // 超过 0.16 是因为均匀板会把天幕一起洗，远山和天空撞成同一个色；带梯度
+    // 之后天空那一段的 alpha 本来就是 0，加厚只作用在地平线附近的景物上。
+    // 强度由 Sync 按 layerMix 在地表/地道两套值之间插（HAZE_A_SURF/TUN）。
+    hazeFar: new THREE.MeshBasicMaterial({ color: 0x1a2a40, map: T('haze') || null, transparent: true, opacity: 0.34, depthWrite: false, fog: false }),
+    hazeMid: new THREE.MeshBasicMaterial({ color: 0x1a2a40, map: T('haze') || null, transparent: true, opacity: 0.22, depthWrite: false, fog: false }),
+    hazeNear: new THREE.MeshBasicMaterial({ color: 0x1a2a40, map: T('haze') || null, transparent: true, opacity: 0.12, depthWrite: false, fog: false }),
+    // 贴地薄雾：一条只有三四米厚、**比雾色亮**的带子，压在地平线上。
+    // 它跟空气墙分工不同——空气墙把整片背景往雾色收（远景变淡），
+    // 这一条把村舍的脚泡掉（层与层之间多一条硬边界），而且因为它够窄，
+    // 抬亮的是"村庄带"而不是天空。颜色每帧在 Sync 里往月色调。
+    mist: new THREE.MeshBasicMaterial({ color: 0x2c3d55, map: T('mist') || null, transparent: true, opacity: 0.22, depthWrite: false, fog: false }),
   };
   mats.foliage.flatShading = true;
   const hazeMats = [mats.hazeFar, mats.hazeMid, mats.hazeNear];
+  /** 空气墙强度：地表 / 地道两套。地道那套跟改造前一致，别把坑道糊成雾。
+   *
+   *  地表这三档同时还是"抬高村庄带"的唯一干净手柄：三道墙都在剖面正面
+   *  (z=2.25) 后面、都在 groundRef+6 以下，所以加厚**只**作用在地平线附近的
+   *  背景上——土层（在它们前面）和天空（在梯度归零区）一点不受影响。
+   *  「村庄 > 天空 > 土层」这条序位就是靠它压住的。 */
+  const HAZE_A_SURF = [0.26, 0.18, 0.11];
+  const HAZE_A_TUN = [0.16, 0.11, 0.07];
+
+  /** 浮尘：每层一个材质（点大小是材质级的，这就是"近大远小"的实现）。 */
+  const moteMats = [];
+  for (let i = 0; i < MOTE_BANDS.length; i++) {
+    moteMats.push(new THREE.PointsMaterial({
+      map: T('glow') || null, vertexColors: true, transparent: true,
+      size: MOTE_BANDS[i].size, sizeAttenuation: false,
+      depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    }));
+  }
+  /** 极近景的失焦叶团：不是剪影，是一团化开的暗。景深的暗示，不是特效。 */
+  mats.foreBokeh = new THREE.MeshBasicMaterial({
+    map: T('glow') || null, color: 0x05070d, transparent: true,
+    opacity: 0.62, depthWrite: false, fog: false,
+  });
 
   // ---- 灯光 ----
   const ambient = new THREE.AmbientLight(0x2a3a52, 3.2);
@@ -2079,6 +2431,21 @@ export function CreateRenderer(canvas, options = {}) {
   let dustPos = null, dustCol = null, dustVel = null, dustLife = null, dustMax = null;
   let dustCursor = 0, dustCapacity = 0;
 
+  // 浮尘（空气里的东西）。每层：一个 Points + 一份预生成的确定性相位表。
+  // 位置每帧由 time 解析式算出来，不积分、不 new、不 Math.random()。
+  const moteLayers = [];         // { points, geo, posAttr, colAttr, seed, band, n }
+
+  // 挖出来的土堆：对象池，Sync 里只改变换，见 UpdateSpoilPiles。
+  const spoilMeshes = [];
+  // 土层剖面那两块 mesh（挤出体 + 背墙）。玩家挖通之后要就地换掉，
+  // 所以单独记着，别混进 levelGeos 的一锅端。
+  const terrainNodes = [];
+  // 地形指纹：玩家挖通之后 Rules 会往 level.floors / level.ceils 里加新段，
+  // 这个数一变就说明"土层剖面已经过时了"，要重挖一次。
+  let terrainStamp = -1;
+  let terrainRebuildAt = -1;
+  let terrainBounds = null;
+
   // Sync 用的暂存
   let shakeExtra = 0;
   let elapsed = 0;
@@ -2087,7 +2454,10 @@ export function CreateRenderer(canvas, options = {}) {
   const warmPick = new Int32Array(QUALITY_PRESET.high.warmLights);
   const warmPickD = new Float32Array(QUALITY_PRESET.high.warmLights);
 
-  const stats = { drawCalls: 0, triangles: 0 };
+  // sealedTunnels：本关有几条地道地板"该是空腔却仍是实心土"。
+  // 正常永远是 0；不是 0 就说明挖洞判定出了问题，那一整层玩家看不见。
+  // 暴露成 stats 是为了**可测**——这类 bug 不抛异常、不掉帧、像素也不全黑。
+  const stats = { drawCalls: 0, triangles: 0, sealedTunnels: 0 };
 
   // ------------------------------------------------------------------
   // 建造工具
@@ -2145,6 +2515,22 @@ export function CreateRenderer(canvas, options = {}) {
     return { buckets, glows, shafts };
   }
 
+  /**
+   * 建筑类道具绕 Y 的偏转角（弧度）。
+   *
+   * 只给"有体量、有侧墙"的东西转：房子、院墙、门楼、灶、炕、碾、水缸、
+   * 车、槽。**不给可互动的判读点转**（转了之后玩家判断"我站的位置对不对"
+   * 会变难），也不给树、招牌、尸体这种本来就没有正面的东西转。
+   * 角度 8–20°，方向按哈希左右各一半——整齐划一地转比不转还假。
+   */
+  function PropYaw(p) {
+    const w = PROP_YAW[p.kind];
+    if (!w) return 0;
+    if (p.interact && p.interact !== 'none' && p.interact !== 'hide') return 0;
+    const h = Hash1(StrSeed((p.id || '') + '|' + p.kind + '|' + (p.x || 0)) * 97.3 + 11);
+    const deg = 8 + h * 12;
+    return ((h > 0.5 ? 1 : -1) * deg * Math.PI) / 180 * w;
+  }
   function PropZ(p) {
     if (typeof p.z === 'number' && isFinite(p.z)) return p.z;
     if (p.interact && p.interact !== 'none') return LAYER_Z.PLAY;
@@ -2179,6 +2565,12 @@ export function CreateRenderer(canvas, options = {}) {
     shaftMesh = null; shaftColorAttr = null;
     levelExitMark = null;
     dustGeo = null; dustPoints = null;
+    moteLayers.length = 0;
+    spoilMeshes.length = 0;
+    terrainNodes.length = 0;
+    terrainStamp = -1;
+    terrainRebuildAt = -1;
+    terrainBounds = null;
 
     foreOccluders.length = 0;
     gasFields.length = 0;
@@ -2187,7 +2579,7 @@ export function CreateRenderer(canvas, options = {}) {
     // 无条件清空：即使上一次 BuildLevel 中途炸了，也不许把残留几何留给下一关。
     // gFore 只清子组的内容，三个子组本身要留着（它们是渲染器级别的骨架）。
     gSky.clear();
-    gFar.clear(); gBack.clear(); gMid.clear(); gPlay.clear(); gFx.clear();
+    gFar.clear(); gBack.clear(); gDepth.clear(); gMid.clear(); gPlay.clear(); gFx.clear();
     gForePar.clear(); gForeFix.clear(); gForeTun.clear();
     for (let i = 0; i < levelGeos.length; i++) { try { levelGeos[i].dispose(); } catch (e) { /* 忽略 */ } }
     levelGeos.length = 0;
@@ -2215,17 +2607,21 @@ export function CreateRenderer(canvas, options = {}) {
 
       // 每个阶段单独兜底：一个阶段炸了不许把整个场景带走。
       let outline = null;
+      terrainBounds = { x0: bx0, x1: bx1, yTop: byTop, yBottom: byBottom };
       Phase('sky', function () { BuildSky(); });
       Phase('earth', function () { outline = BuildEarth(bx0, bx1, byTop, byBottom); });
-      Phase('floors', BuildFloors);
+      Phase('floors', function () { BuildFloors(bx0, bx1, outline); });
       Phase('backdrop', function () { BuildBackdrop(bx0, bx1, outline); });
       Phase('props', BuildProps);
       Phase('foreground', function () { BuildForeground(bx0, bx1, outline); });
       Phase('actors', BuildActors);
       Phase('hazards', BuildHazards);
+      Phase('dig', BuildDigSpots);
+      Phase('spoil', BuildSpoilPiles);
       Phase('exit', BuildExitMark);
       Phase('batches', BuildBatches);
       Phase('dust', BuildDust);
+      Phase('motes', BuildMotes);
     } catch (e) {
       if (typeof console !== 'undefined') console.error('[Render] BuildLevel 失败，场景可能不完整。', e);
     }
@@ -2302,7 +2698,10 @@ export function CreateRenderer(canvas, options = {}) {
     const halfH = HalfHeightAt(SKY_DEPTH);
     const halfW = halfH * Math.max(0.4, camera.aspect || 16 / 9);
     const mx = -Math.min(halfW, halfH * 1.15) * 0.60;
-    const my = halfH * 0.50;
+    // 俯角把整片背景往画面上方推（远处的地面朝灭点收敛，灭点在 ndc_y=tan p/tan h）。
+    // 月亮挂在相机下面，本身不受影响，所以必须**主动抬高**，否则远山会顶到它身上。
+    // 抬多少跟俯角挂钩，p=0 时回到原来的 0.50。
+    const my = halfH * MOON_NDC_Y;
     skyMoon[0].position.x = mx; skyMoon[0].position.y = my;
     skyMoon[1].position.x = mx; skyMoon[1].position.y = my;
   }
@@ -2315,6 +2714,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (typeof console !== 'undefined') console.warn('[Render] 地下剖面提取失败，用平板降级。', e);
     }
     earthGroundRef = outline ? outline.defaultGround : 0;
+    stats.sealedTunnels = outline && outline.sealed ? outline.sealed.length : 0;
 
     const depth = cfg.extrudeDepth;
     const bevelT = 0.45, bevelS = 0.32;
@@ -2355,6 +2755,7 @@ export function CreateRenderer(canvas, options = {}) {
       mesh.frustumCulled = false;
       if (cfg.shadows) mesh.receiveShadow = true;
       gMid.add(mesh);
+      terrainNodes.push(mesh);
       TrackGeo(merged);
     }
 
@@ -2374,6 +2775,7 @@ export function CreateRenderer(canvas, options = {}) {
     bw.matrixAutoUpdate = false; bw.updateMatrix();
     bw.frustumCulled = false;
     gMid.add(bw);
+    terrainNodes.push(bw);
 
     return outline;
   }
@@ -2382,10 +2784,11 @@ export function CreateRenderer(canvas, options = {}) {
   //
   // 玩家站在台面靠前的边缘（z≈0），台面一路退到剖面挤出体的背面。
   // 这是"舞台有厚度"里最便宜也最有效的一条：地面一有进深，画面立刻不平了。
-  function BuildFloors() {
+  function BuildFloors(bx0, bx1, outline) {
     const floors = Array.isArray(level.floors) ? level.floors : [];
     const buckets = NewBuckets();
     const tunnelSlabs = [];
+    const tunnelFloors = [];
     // 台面前沿：略微伸到玩家身前，让"站在台沿上"有个可读的边
     const deckFront = 1.55;
     const deckBack = earthBackZ + 0.25;
@@ -2399,6 +2802,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (w <= 0.01) continue;
       const cx = (f.x0 + f.x1) / 2;
       if (f.kind === 'tunnel') {
+        tunnelFloors.push(f);
         // 坑道地面必须一路铺到挤出体背面。只铺 2.6 米的话，后面那截会直接
         // 看到背墙——坑道就读成"墙上一道缝"，而不是"一条走得进去的通道"。
         tunnelSlabs.push(GBox(w, 0.34, deckDepth, cx, f.y - 0.17, deckZ));
@@ -2490,7 +2894,152 @@ export function CreateRenderer(canvas, options = {}) {
         for (let k = 0; k < rungs; k++) BucketPush(buckets, 'timber', GBox(0.56, 0.07, 0.16, s.x, Math.min(yT, yB) + 0.25 + k * 0.42, -0.32));
       }
     }
+    if (cfg.groundLines) BuildGroundLines(buckets, bx0, bx1, outline, deckFront, deckBack, deckZ, deckDepth, tunnelFloors);
     FlushBuckets(buckets, gPlay, 0);
+  }
+
+  // ---- 地面的纵深线 ----
+  //
+  // **一组沿 Z 的平行线向纵深收敛**是人眼判断距离最强的信号，比大气透视、
+  // 比视差都强，而且它是纯几何——全部并进 BuildFloors 已经在用的合批桶，
+  // 一个 draw call 都不多花。改之前那块台面干净得像张纸，透视全白给了。
+  //
+  // 三样东西：车辙（两道 1.3 米间距的槽）、垄沟（一小片田）、篱笆桩
+  // （**同一个 x 上沿 Z 排开的一列桩子**——近的大远的小，最直接的深度尺）。
+  // 全部压在地表线上 2 厘米，绝不许高到能挡住玩家的脚。
+  function BuildGroundLines(buckets, bx0, bx1, outline, deckFront, deckBack, deckZ, deckDepth, tunnels) {
+    const groundAt = outline && typeof outline.groundY === 'function'
+      ? outline.groundY : function () { return earthGroundRef; };
+    const span = Math.max(1, bx1 - bx0);
+
+    // 避开地道口 / 竖井：那些地方地表是破的，槽画上去会浮在洞口上。
+    const skip = [];
+    const hatches = Array.isArray(level.hatches) ? level.hatches : [];
+    for (let i = 0; i < hatches.length; i++) if (typeof hatches[i].x === 'number') skip.push(hatches[i].x);
+    const shafts = Array.isArray(level.shafts) ? level.shafts : [];
+    for (let i = 0; i < shafts.length; i++) if (shafts[i] && typeof shafts[i].x === 'number') skip.push(shafts[i].x);
+    function Blocked(x, r) {
+      for (let i = 0; i < skip.length; i++) if (Math.abs(skip[i] - x) < r) return true;
+      return false;
+    }
+
+    const zc = deckZ, dz = deckDepth * 0.94;
+    const nSlot = Math.max(3, Math.floor(span / 10.5));
+    for (let i = 0; i < nSlot; i++) {
+      const x = bx0 + span * ((i + 0.5) / nSlot) + (Hash1(i * 4.7 + 1) - 0.5) * 4.5;
+      if (Blocked(x, 3.2)) continue;
+      const gy = groundAt(x);
+      // 地表线塌得厉害的地方（沟、坎）不画：槽是平地上的东西
+      if (Math.abs(gy - groundAt(x + 1.4)) > 0.35 || Math.abs(gy - groundAt(x - 1.4)) > 0.35) continue;
+      const pick = Hash1(i * 9.1 + 6);
+      // **斜着往纵深走比平行更管用**。一组正对 -Z 的平行线只收敛在画面正中
+      // 那一点上；斜着插进去的线两头都在动，一条就能把整块地面撑开。
+      // 每个槽位一个确定性的偏角（±26°），左右各一半。
+      const yaw = (Hash1(i * 13.9 + 2) - 0.5) * 0.92;
+      const Yawed = function (g) { return RotYAbout(g, yaw, x, gy, zc); };
+      if (pick < 0.42) {
+        // 车辙：两道，中间再来一条被牲口踩实的浅印。斜着压过台面。
+        const gap = 1.22 + Hash1(i * 2.3) * 0.22;
+        const len = dz * 1.5;
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.17, 0.05, len, x - gap / 2, gy + 0.012, zc)));
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.17, 0.05, len, x + gap / 2, gy + 0.012, zc)));
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.42, 0.03, len * 0.72, x, gy + 0.006, zc - 0.3)));
+      } else if (pick < 0.74) {
+        // 垄沟：五六条等距的浅槽。等距 + 收敛，这是最"数学"的一条深度线。
+        const rows = 5 + (Hash1(i * 6.1) > 0.5 ? 2 : 0);
+        const step = 0.46;
+        for (let k = 0; k < rows; k++) {
+          BucketPush(buckets, 'mudDark', Yawed(GBox(0.13, 0.045, dz * (1.1 + Hash1(i * 3.1 + k) * 0.3),
+            x + (k - (rows - 1) / 2) * step, gy + 0.010, zc)));
+        }
+      } else {
+        // 篱笆：一列沿 Z 排开、还斜着的桩子。近的大远的小、间距越来越密——
+        // 这是"往里走"最干净的读法，俯角一上来它才真正看得见。
+        const posts = 5;
+        const zl = deckFront - deckBack - 1.0;
+        for (let k = 0; k < posts; k++) {
+          const pz = deckFront - 0.6 - zl * (k / (posts - 1));
+          const ph = 0.52 + Hash1(i * 7.7 + k) * 0.16;
+          BucketPush(buckets, 'woodDark', Yawed(GBox(0.11, ph, 0.11,
+            x + (Hash1(i * 11.3 + k) - 0.5) * 0.18, gy + ph / 2, pz)));
+        }
+        // 横杆：两根，把桩子串成一条向里退的线
+        const zm = (deckFront - 0.6 + deckBack + 0.4) / 2;
+        BucketPush(buckets, 'woodDark', Yawed(GBox(0.07, 0.07, zl, x, gy + 0.46, zm)));
+        BucketPush(buckets, 'woodDark', Yawed(GBox(0.06, 0.06, zl, x, gy + 0.24, zm)));
+      }
+    }
+
+    // 一条**明确斜插进纵深**的土路：比上面那些短槽再长一个量级，横跨好几个
+    // 槽位。俯角下它是整块台面里最强的一条线，一眼把"地面是往里退的"说死。
+    {
+      const rx = bx0 + span * 0.5;
+      const gy = groundAt(rx);
+      const roadYaw = 0.40;
+      const len = (deckFront - deckBack) * 2.6;
+      for (let k = 0; k < 2; k++) {
+        BucketPush(buckets, 'mudDark', RotYAbout(
+          GBox(0.22, 0.05, len, rx + (k - 0.5) * 1.35, gy + 0.014, zc), roadYaw, rx, gy, zc));
+      }
+      BucketPush(buckets, 'mudDark', RotYAbout(
+        GBox(1.9, 0.025, len * 0.9, rx, gy + 0.004, zc), roadYaw, rx, gy, zc));
+    }
+
+    // 坑道：地上的拖痕 + 一串向里退的顶架。
+    // 顶架全部落在 z<-3 的凹进去那一段，永远不会挡住 z≈0.55 的玩家，
+    // 但走起来一榀比一榀小，坑道立刻变成"能走进去的一条道"。
+    for (let i = 0; i < tunnels.length; i++) {
+      const f = tunnels[i];
+      const tw = f.x1 - f.x0;
+      const nRib = Math.max(1, Math.floor(tw / 4.6));
+      for (let k = 0; k < nRib; k++) {
+        const x = f.x0 + tw * ((k + 0.5) / nRib);
+        if (Blocked(x, 1.6)) continue;
+        const ribZ = [-3.6, -6.9];
+        for (let r = 0; r < ribZ.length; r++) {
+          const rz = Math.max(deckBack + 0.5, ribZ[r]);
+          const hw = 1.05;
+          BucketPush(buckets, 'timber', GBox(0.16, 1.9, 0.24, x - hw, f.y + 0.95, rz));
+          BucketPush(buckets, 'timber', GBox(0.16, 1.9, 0.24, x + hw, f.y + 0.95, rz));
+          BucketPush(buckets, 'timber', GBox(hw * 2 + 0.34, 0.18, 0.26, x, f.y + 1.98, rz));
+        }
+        // 顺水木：把两榀连起来，沿 -Z 的两条线就是纵深本身
+        const zm = (ribZ[0] + ribZ[1]) / 2, zl2 = Math.abs(ribZ[0] - ribZ[1]) + 0.3;
+        BucketPush(buckets, 'timber', GBox(0.10, 0.10, zl2, x - 1.05, f.y + 1.88, zm));
+        BucketPush(buckets, 'timber', GBox(0.10, 0.10, zl2, x + 1.05, f.y + 1.88, zm));
+      }
+      // 拖痕：沿 Z 的两道浅槽，坑道地面不再是一块干净的板
+      const nDrag = Math.max(1, Math.floor(tw / 7.5));
+      for (let k = 0; k < nDrag; k++) {
+        const x = f.x0 + tw * ((k + 0.5) / nDrag) + (Hash1(i * 3.7 + k) - 0.5) * 2.4;
+        BucketPush(buckets, 'mudDark', GBox(0.14, 0.05, deckDepth * 0.9, x - 0.35, f.y + 0.015, deckZ));
+        BucketPush(buckets, 'mudDark', GBox(0.14, 0.05, deckDepth * 0.9, x + 0.35, f.y + 0.015, deckZ));
+      }
+    }
+  }
+
+  /**
+   * 把一层背景剪影整体按 Y 压扁，保证它的最高点不超过屏幕 ndc_y = cap。
+   *
+   * 为什么需要：俯角一上来，**z 越远的层在屏幕上抬得越高**（远处的地面朝
+   * 灭点收敛，这正是我们要的纵深），但天幕和月亮是构图锚。实测 6° 下
+   * 原来的远山（6.4 米）从 ndc 0.43 抬到 0.69，直接骑到月亮上面去。
+   * 这里按每层自己的 z 反解出限高再整体缩，所以俯角改成几度都自洽，
+   * p=0 时缩放系数恒为 1，一个顶点都不动。
+   */
+  function CapSkylineY(geo, z, cap, groundY) {
+    if (!geo || !geo.attributes || !geo.attributes.position) return 1;
+    const pos = geo.attributes.position;
+    let maxY = -Infinity;
+    for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); if (y > maxY) maxY = y; }
+    const h = maxY - groundY;
+    if (!(h > 0.01)) return 1;
+    const s = Math.min(1, (NominalSkyY(cap, z) - groundY) / h);
+    if (!(s > 0.05) || s >= 0.999) return 1;
+    geo.translate(0, -groundY, 0);
+    geo.scale(1, s, 1);
+    geo.translate(0, groundY, 0);
+    return s;
   }
 
   // ---- 远山 + 远处村舍剪影 ----
@@ -2520,6 +3069,8 @@ export function CreateRenderer(canvas, options = {}) {
     ridge.push(GPrism(ptsB, 0.4, 0, 0, 5));
     const rm = SafeMerge(ridge);
     if (rm) {
+      // 这块几何的 y 是相对 0 的（mesh 自己再平移到 earthGroundRef）
+      CapSkylineY(rm, LAYER_Z.FAR, 0.50, 0);
       const mesh = new THREE.Mesh(rm, mats.farSil);
       mesh.position.y = earthGroundRef;
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
@@ -2551,6 +3102,7 @@ export function CreateRenderer(canvas, options = {}) {
     }
     const hm = SafeMerge(houses);
     if (hm) {
+      CapSkylineY(hm, LAYER_Z.BACK, 0.56, earthGroundRef);
       const mesh = new THREE.Mesh(hm, mats.backSil);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
       gBack.add(mesh); TrackGeo(hm);
@@ -2558,14 +3110,211 @@ export function CreateRenderer(canvas, options = {}) {
 
     // 大气透视：三道空气墙，越远越厚。雾负责连续衰减，这三道负责把
     // FAR / BACK / MID 之间切出一眼可读的层次差。low 档关掉。
+    //
+    // 每道墙带高度梯度（TEX_DRAW.haze）：满强度落在 groundRef+0.5 以下，
+    // 到 groundRef+9 归零。所以它洗的是地平线附近的景物，天幕一点不碰——
+    // 这才是真实的大气透视（雾在地面最浓，山顶先露出来），也是敢把强度
+    // 从 0.16/0.11/0.07 加到 0.34/0.22/0.12 的原因。
     if (cfg.hazePlanes) {
-      const hazeZ = [LAYER_Z.FAR + 7, LAYER_Z.BACK + 4, LAYER_Z.MID + 2.4];
+      // z 必须全部落在**台面背面之后**。俯角一上来地面就不再是一条边了：
+      // 任何插进台面里的竖直面都会沿着 y=0 露出一条横贯画面的硬边。
+      // 改前那道 z=-3.6 的空气墙正好插在台面中间，等于在地上划了一刀；
+      // 贴地薄雾（原来在 -8）更是直接从地里冒出一团奶白。
+      const zBack = earthBackZ - 0.7;
+      const hazeZ = [
+        Math.min(zBack - 6.0, LAYER_Z.FAR + 7),
+        Math.min(zBack - 2.4, LAYER_Z.BACK + 2),
+        zBack,
+      ];
       for (let i = 0; i < 3; i++) {
-        const q = new THREE.Mesh(TrackGeo(GQuad(span + 400, 140, 0, 0, 0)), hazeMats[i]);
-        q.position.set((bx0 + bx1) / 2, earthGroundRef + 14, hazeZ[i]);
+        const q = new THREE.Mesh(TrackGeo(GQuad(span + 400, HAZE_H, 0, 0, 0)), hazeMats[i]);
+        q.position.set((bx0 + bx1) / 2, earthGroundRef + HAZE_TOP_OFF - HAZE_H / 2, hazeZ[i]);
         q.renderOrder = -60 + i; q.frustumCulled = false;
         q.userData.isHaze = true;
         gFx.add(q);
+      }
+      // 贴地薄雾：只有 4.2 米厚，压在地平线上。窄是关键——宽一点就变成
+      // 第四道空气墙，把天空一起抬亮，「村庄 > 天空」当场翻掉（实测过）。
+      const mq = new THREE.Mesh(TrackGeo(GQuad(span + 400, 4.2, 0, 0, 0)), mats.mist);
+      mq.position.set((bx0 + bx1) / 2, earthGroundRef + 0.4, zBack - 0.35);
+      mq.renderOrder = -57; mq.frustumCulled = false;
+      mq.userData.isHaze = true;
+      gFx.add(mq);
+    }
+
+    // 中间层 / 浮尘 / 失焦叶团一律**照造不误**，靠 visible 开关档位。
+    // 它们都是极小的合并 mesh，造出来放着不画的代价可以忽略；换来的是
+    // SetQuality 双向都立刻生效（否则 low→high 得等下一次 BuildLevel）。
+    BuildDepthLayers(bx0, bx1, span);
+    gDepth.visible = !!cfg.depthLayers;
+    BuildMoonShafts(bx0, bx1, span);
+  }
+
+  // ---- 中间层：把五档层次填成连续梯度 ----
+  //
+  // 改之前 FAR(-26) / BACK(-14) / MID(-6) 之间是断的，三层一样大的卡片
+  // 摆在三个 z 上，眼睛只读到"三张贴纸"。补进 -31 / -20 / -10 三层之后，
+  // 相邻两层的视差速度差从 1.9 倍收到 1.25 倍左右，走起来是连续退去的。
+  // 每层一个合并 mesh = 1 draw call。
+  function BuildDepthLayers(bx0, bx1, span) {
+    // A) -31：最远的一道山脊。这个距离上雾吃掉九成，只剩一线比天空亮的边，
+    //    正是"再远还有山"的那一笔。轮廓要软、要低，不许和 FAR 的山脊撞形。
+    //    限高严格按 MOON_CLEAR_NDC 反推（地表标称视口是最紧的一档）：
+    //    第一版给到 9.4 米，实测直接把月亮啃掉半个，构图当场垮掉。
+    const deep = [];
+    const segD = Math.max(18, Math.floor(span / 9));
+    const deepCap = MOON_CLEAR_NDC
+      * HalfHeightAt(CameraDistanceFor(CAMERA.viewHeight) - DEPTH_LAYER_Z.RIDGE_FAR * COS_PITCH)
+      + CAMERA.surfaceLift;
+    const ptsD = [];
+    for (let i = 0; i <= segD; i++) {
+      const x = bx0 - 180 + (span + 420) * (i / segD);
+      const y = 1.5 + Fbm2(x * 0.011 + 7.3, 22.5, 3) * 2.2 + Math.sin(x * 0.019 + 1.1) * 0.6;
+      ptsD.push(x, Math.min(y, deepCap));
+    }
+    ptsD.push(bx1 + 250, -40, bx0 - 180, -40);
+    deep.push(GPrism(ptsD, 0.4, 0, 0, 0));
+    const dm = SafeMerge(deep);
+    if (dm) {
+      CapSkylineY(dm, DEPTH_LAYER_Z.RIDGE_FAR, 0.38, 0);
+      const mesh = new THREE.Mesh(dm, mats.ridgeSil);
+      mesh.position.set(0, earthGroundRef, DEPTH_LAYER_Z.RIDGE_FAR);
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
+      gDepth.add(mesh); TrackGeo(dm);
+    }
+
+    // B) -20：FAR 与 BACK 之间。树线 + 更远的屋顶 + 一座砖塔。
+    //    这里放"和 BACK 同类但更小"的东西是有意的——同一种物体在两个尺度上
+    //    出现，眼睛立刻把尺寸差读成距离差，比换一种新形状管用得多。
+    const grove = [];
+    const nG = Math.max(9, Math.floor(span / 8.5));
+    for (let i = 0; i < nG; i++) {
+      const x = bx0 - 60 + (span + 120) * ((i + 0.5) / nG) + (Hash1(i * 6.7 + 3) - 0.5) * 6;
+      // 冠顶压在 BACK 那排村舍的屋脊线附近，不许整片顶进天空里——
+      // 每多一块亮剪影伸进天空，「村庄 > 天空」这条序位就少一点余量。
+      const h = 2.9 + Hash1(i * 2.9 + 1) * 2.3;
+      // 树：一根杆 + 三团互相咬住的冠。密度调到冠与冠会重叠——这一层要读成
+      // 一条**树线**，不是一排飘着的菱形；单个 GIco 的剪影就是个菱形。
+      grove.push(GBox(0.28, h, 0.32, x, earthGroundRef + h / 2 - 0.6, 0));
+      // 冠用 cfg.ico 细分：detail=0 的八面体正面就是个菱形，一排菱形读成
+      // "飘着的风筝"而不是树。这一层的冠比 BACK 那排大，菱形边更扎眼。
+      grove.push(GIco(1, cfg.ico, x, earthGroundRef + h - 0.35, 0, 1.55, 1.05, 0.7));
+      grove.push(GIco(1, cfg.ico, x + 0.95, earthGroundRef + h - 0.85, 0.4, 1.15, 0.78, 0.6));
+      grove.push(GIco(1, cfg.ico, x - 0.85, earthGroundRef + h - 0.80, -0.3, 1.05, 0.72, 0.6));
+      if (Hash1(i * 15.1) > 0.62) {
+        const w = 3.6 + Hash1(i * 4.3) * 3.4;
+        const hh = 2.2 + Hash1(i * 8.1) * 1.4;
+        grove.push(GPrism([-w / 2, 0, w / 2, 0, w / 2, hh, 0, hh + 0.8, -w / 2, hh],
+          1.6, x + 4.4 + Hash1(i * 9.3) * 5, earthGroundRef - 0.7, 0));
+      }
+    }
+    // 一座砖塔／烟囱：给这一层一个能记住的地标，走的时候它退得比村舍慢
+    const towerX = bx0 + span * 0.63;
+    grove.push(GBox(1.4, 7.0, 1.4, towerX, earthGroundRef + 3.0, 0));
+    grove.push(GBox(1.9, 0.5, 1.9, towerX, earthGroundRef + 6.7, 0));
+    const gm = SafeMerge(grove);
+    if (gm) {
+      CapSkylineY(gm, DEPTH_LAYER_Z.GROVE, 0.53, earthGroundRef);
+      const mesh = new THREE.Mesh(gm, mats.groveSil);
+      mesh.position.z = DEPTH_LAYER_Z.GROVE;
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
+      gDepth.add(mesh); TrackGeo(gm);
+    }
+
+    // C) -10.8：BACK 与 MID 之间。院墙、电线杆 + 垂弧的线、碾道。
+    //    电线杆是这一层的主角：**一串等间距、等高的东西沿 X 排开**，透视下
+    //    近的高远的矮，是判读距离最直接的尺子；垂下来的线把它们串成一条。
+    //
+    //    两条从实测里学来的规矩：
+    //     1) 杆顶必须压在村舍屋脊线以下。第一版给了 7.4 米，电线直接横穿
+    //        月亮，整幅画被一根线切成两半。
+    //     2) 横担要短、要低于杆顶。长横担顶在杆顶上，剪影就是个十字架——
+    //        一排十字架立在中国村庄的地平线上，是硬伤不是风格。
+    const yard = [];
+    const poleGap = 19.0;
+    const nP = Math.max(3, Math.ceil((span + 60) / poleGap));
+    const pole0 = bx0 - 30;
+    const poleH = 5.0;
+    const wireY = earthGroundRef + poleH - 0.9;
+    for (let i = 0; i < nP; i++) {
+      const x = pole0 + i * poleGap;
+      yard.push(GBox(0.24, poleH, 0.26, x, earthGroundRef + poleH / 2 - 0.4, 0));
+      yard.push(GBox(0.92, 0.13, 0.17, x, wireY, 0));               // 短横担，低于杆顶 0.5
+      yard.push(GBox(0.10, 0.26, 0.12, x - 0.34, wireY + 0.18, 0)); // 瓷瓶
+      yard.push(GBox(0.10, 0.26, 0.12, x + 0.34, wireY + 0.18, 0));
+      // 电线：四段折线近似垂弧。段与段必须接上，否则读成一排短横线。
+      if (i < nP - 1) {
+        for (let k = 0; k < 4; k++) {
+          const u0 = k / 4, u1 = (k + 1) / 4;
+          const sag = 0.72;
+          const y0 = wireY + 0.2 - Math.sin(u0 * Math.PI) * sag;
+          const y1 = wireY + 0.2 - Math.sin(u1 * Math.PI) * sag;
+          const cxw = x + poleGap * (u0 + u1) / 2;
+          const dy = y1 - y0, dx = poleGap * 0.25;
+          yard.push(GBox(Math.sqrt(dx * dx + dy * dy), 0.055, 0.07,
+            cxw, (y0 + y1) / 2, 0, Math.atan2(dy, dx)));
+        }
+      }
+    }
+    // 院墙：长、低、断续、顶边有起伏。它把这一层压在地平线上，村舍不再是
+    // "浮着的剪影"。一整块等高的长条会读成一块蓝色 UI 面板（第一版就是），
+    // 所以拆成几段不等高的墙，段与段之间留豁口。
+    const nW = Math.max(4, Math.floor(span / 22));
+    for (let i = 0; i < nW; i++) {
+      const x = bx0 - 20 + (span + 40) * ((i + 0.5) / nW) + (Hash1(i * 11.7 + 9) - 0.5) * 10;
+      const w = 10 + Hash1(i * 3.3) * 12;
+      const segs = 3;
+      for (let k = 0; k < segs; k++) {
+        const sw = w / segs * (0.82 + Hash1(i * 7.1 + k) * 0.16);
+        const sh = 1.35 + Hash1(i * 4.9 + k * 2.3) * 0.55;
+        const sx = x + (k - (segs - 1) / 2) * (w / segs);
+        yard.push(GBox(sw, sh, 1.0, sx, earthGroundRef + sh / 2 - 0.35, 0));
+        yard.push(GBox(sw + 0.4, 0.22, 1.35, sx, earthGroundRef + sh - 0.28, 0));  // 墙帽
+      }
+      // 门楼：墙上一个可读的凸起，纯剪影也要有内容
+      if (Hash1(i * 5.9) > 0.5) {
+        yard.push(GBox(2.4, 0.9, 1.3, x + w * 0.18, earthGroundRef + 1.45, 0));
+        yard.push(GPrism([-1.6, 0, 1.6, 0, 0, 0.9], 1.6, x + w * 0.18, earthGroundRef + 1.9, 0));
+      }
+    }
+    // 碾道：一盘碾 + 碾架。低矮、圆，跟一堆方剪影拉开形状差。
+    const millX = bx0 + span * 0.31;
+    yard.push(GCylY(1.9, 2.0, 0.5, Math.max(8, cfg.cyl), millX, earthGroundRef - 0.1, 0));
+    yard.push(GCylY(0.55, 0.55, 1.15, Math.max(8, cfg.cyl), millX + 1.0, earthGroundRef + 0.7, 0.5));
+    yard.push(GBox(2.6, 0.16, 0.2, millX + 0.3, earthGroundRef + 1.25, 0.5, 0.12));
+    const ym = SafeMerge(yard);
+    if (ym) {
+      CapSkylineY(ym, DEPTH_LAYER_Z.YARD, 0.44, earthGroundRef);
+      const mesh = new THREE.Mesh(ym, mats.yardSil);
+      mesh.position.z = DEPTH_LAYER_Z.YARD;
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
+      gDepth.add(mesh); TrackGeo(ym);
+    }
+  }
+
+  // ---- 体积光：穿过树冠的月光 ----
+  //
+  // 光柱本身就是纵深，因为它**有长度**：一道从画面外斜插到地面的光，
+  // 一眼给出"这里有很深的一段空气"。全部并进已有的 shaft 合批，0 draw call。
+  // 强度必须极小（0.03–0.06）：月光柱一亮就成了舞台追光，而且会把天空洗白。
+  function BuildMoonShafts(bx0, bx1, span) {
+    const n = Math.max(2, Math.floor(span / 34));
+    for (let i = 0; i < n; i++) {
+      const x = bx0 + span * ((i + 0.5) / n) + (Hash1(i * 21.3 + 4) - 0.5) * 16;
+      const beams = 2 + (Hash1(i * 7.1) > 0.55 ? 1 : 0);
+      for (let k = 0; k < beams; k++) {
+        const h = 11 + Hash1(i * 3.9 + k * 1.7) * 5;
+        // z 拉开：同一束光在两三个深度上各有一片，透视下它们错开成一个楔形，
+        // 这就是"体积"——单独一片永远只是贴在背景上的一条亮带。
+        const z = -12.5 + k * 5.2 + Hash1(i * 5.5 + k) * 2.0;
+        shaftItems.push({
+          x: x + k * 2.3, y: earthGroundRef + 3.2 + Hash1(i * 9.1 + k) * 1.4,
+          z,
+          w: 2.4 + Hash1(i * 13.3 + k) * 2.6, h,
+          color: 0xbcd2f2, alpha: 0.044 - k * 0.009, tilt: -0.30 - Hash1(i * 2.7 + k) * 0.10,
+          phase: StrSeed('ms' + i + '_' + k) * 6.28, vStart: 0, vCount: 0,
+          surfaceOnly: true,
+        });
       }
     }
   }
@@ -2587,7 +3336,13 @@ export function CreateRenderer(canvas, options = {}) {
       const facing = p.facing === -1 ? -1 : 1;
       const local = BuildPropLocal(p);
 
-      mat4.makeRotationY(facing < 0 ? Math.PI : 0);
+      // 四分之三角：把建筑绕 Y 转 8–20°，露出侧墙。
+      //
+      // 20° 长焦下**正面朝相机的体几乎不显透视**——房子有再多进深，正对着
+      // 观众也只看得见一个矩形，读成立牌。经典做法是让结构呈四分之三角：
+      // 转一点点，侧墙就进画了，同一个体量立刻从"一张片"变成"一个盒子"。
+      // 角度按 id 哈希各不相同（整齐划一比不转还假），朝向也左右各一半。
+      mat4.makeRotationY((facing < 0 ? Math.PI : 0) + PropYaw(p));
       mat4b.makeTranslation(px, py, pz);
       mat4.premultiply(mat4b);
 
@@ -2729,15 +3484,24 @@ export function CreateRenderer(canvas, options = {}) {
   //     中心**放大的——低于相机中心的东西会被压得更低。底边尤其危险，
   //     旧的 -0.55 投出来是 -1.0，会顺着地表线往坑道里扎，所以收到 -0.30。
   // 按地表标称视口算，跟建造时相机恰好在哪一档无关（确定性）
-  const FORE_MAG = CameraDistanceFor(CAMERA.viewHeight) /
-    Math.max(1, CameraDistanceFor(CAMERA.viewHeight) - LAYER_Z.FORE);
+  const FORE_NOMINAL = CameraDistanceFor(CAMERA.viewHeight);
+  const FORE_MAG = FORE_NOMINAL / Math.max(1, FORE_NOMINAL - LAYER_Z.FORE * COS_PITCH);
   const FORE_SHRINK = 1 / FORE_MAG;                 // ≈0.85
   const FORE_TOP_LIMIT = 1.15 * FORE_SHRINK;        // 投影后仍然只遮到腰
-  const FORE_BOTTOM = -0.30;                        // 投影后底边落在 gy-0.55 上下
+  // 底边：俯角把近处的东西往画面下方推得更狠（同一个 y，z 越近投得越低）。
+  // 实测 6° 下旧的 -0.30 投出来比地表线低 73 像素（无俯角时只有 45），
+  // 前景剪影的下摆又开始往地道剖面里扎。反解"投影后仍落在 gy-0.55 附近"
+  // 得到的值基本就是 0，所以带俯角时收到 -0.04。
+  const FORE_BOTTOM = PITCH_DEG > 0.5 ? -0.04 : -0.30;
 
   function BuildForeground(bx0, bx1, outline) {
     const buckets = NewBuckets();
     const tunBuckets = NewBuckets();
+    // 极近景的失焦叶团（景深的暗示，不是特效）。真 DoF 要深度缓冲，太贵；
+    // 这里用"比 FORE 还近一点、边缘完全化开的一团暗"代替：眼睛把"化开的边"
+    // 直接读成"离得太近，对不上焦"，纵深立刻多出最前面这一档。
+    // 只挂在画面顶上（树冠那一带），绝不许碰到玩家——FORE 不吞人是红线。
+    const bokehQuads = [];
     const span = bx1 - bx0;
     const S = FORE_SHRINK;
 
@@ -2891,6 +3655,14 @@ export function CreateRenderer(canvas, options = {}) {
           BucketPush(buckets, 'fore', GIco(1, cfg.ico, lx, ly, (rng() - 0.5) * 0.9,
             (1.15 + rng() * 0.7) * S, (0.62 + rng() * 0.4) * S, 0.75));
         }
+        // 更近一档的失焦叶团：两三块化开的暗，压在枝叶更前面
+        if (Hash1(i * 6.3 + 11) > 0.45) {
+          const nb = 2 + (Hash1(i * 12.7) > 0.6 ? 1 : 0);
+          for (let k = 0; k < nb; k++) {
+            const sz = 3.4 + rng() * 2.6;
+            bokehQuads.push(GQuad(sz * 1.5, sz, bxc + (rng() - 0.5) * 7.5, by + 0.9 + (rng() - 0.5) * 1.3, 0));
+          }
+        }
       }
     }
 
@@ -2946,6 +3718,17 @@ export function CreateRenderer(canvas, options = {}) {
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
       gForeTun.add(mesh);
       TrackGeo(mergedTun);
+    }
+    const mergedBokeh = SafeMerge(bokehQuads);
+    if (mergedBokeh) {
+      const mesh = new THREE.Mesh(mergedBokeh, mats.foreBokeh);
+      // 比 FORE 再近 2.4 米：放大率 1.30（FORE 是 1.18），一眼比剪影更"贴脸"
+      mesh.position.z = LAYER_Z.FORE + 2.4;
+      mesh.renderOrder = 12;
+      mesh.visible = !!cfg.foreBokeh;
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
+      gForePar.add(mesh);
+      TrackGeo(mergedBokeh);
     }
   }
 
@@ -3229,6 +4012,214 @@ export function CreateRenderer(canvas, options = {}) {
     return { mesh, puffs, posAttr: pa, colorAttr: ca, x0, x1, span };
   }
 
+  // ---- 挖点：软土 vs 硬面（AGENTS.md 0.0.2）----
+  //
+  // 这一段的唯一目标：**站在跟前不用按键就知道这面能不能挖。**
+  // 十一个挖点里有一半是刨不动的，那是故意的——"知道哪儿能挖"本身是一种
+  // 知识。可要是两种面长得一样，玩家只能挨个按过去试，这个设计点就作废了。
+  //
+  // 所以区别做在**形**上，不是只做在颜色上（暗场里颜色差最先被吃掉）：
+  //   软：一堆大小不一的松土块堆出凹凸的面 + 三四道斜着的刨痕 + 脚下的浮土
+  //   硬：五六层错缝的砖 / 整条青石 + 齐整的横缝竖缝，一条刨痕都没有
+  // 两种面都各自合并成一个 mesh，全关卡各 1 个 draw call。
+  function BuildDigSpots() {
+    const spots = Array.isArray(level.digSpots) ? level.digSpots : [];
+    if (!spots.length) return;
+    const buckets = NewBuckets();
+
+    for (let i = 0; i < spots.length; i++) {
+      const s = spots[i];
+      if (!s || typeof s.x !== 'number') continue;
+      const sx = s.x, sy = typeof s.y === 'number' ? s.y : 0;
+      const dir = s.dir === 'left' ? -1 : s.dir === 'right' ? 1 : 0;
+      const vertical = s.dir === 'up' || s.dir === 'down';
+      const rng = MakeRng(StrSeed(s.id || ('dig' + i)));
+      // 面的位置：左右挖 → 挡在侧前方的一堵墙；上下挖 → 顶板 / 地板上的一块
+      const fx = vertical ? sx : sx + dir * 0.82;
+      const fy = vertical ? (s.dir === 'up' ? sy + 1.92 : sy - 0.06) : sy + 0.95;
+      const fw = vertical ? 1.55 : 0.34;          // 竖直面很薄，水平面是一块板
+      const fh = vertical ? 0.30 : 1.85;
+      const fd = 2.35;                            // 沿 Z 的进深：它是一段墙，不是一张片
+      const fz = -0.35;
+
+      if (s.soft) {
+        // —— 软面：新翻的松土 ——
+        // 底板给一层暖土，再往上垒十来个大小不一的土块。土块要**探出面外**，
+        // 剪影就不是一个矩形而是一团毛边——这是"松"最直接的读法。
+        BucketPush(buckets, 'digSoft', GBox(fw, fh, fd, fx, fy, fz));
+        const lumps = 13;
+        for (let k = 0; k < lumps; k++) {
+          const u = (k + 0.5) / lumps;
+          const r = 0.13 + rng() * 0.17;
+          const ox = vertical ? (u - 0.5) * fw * 0.95 : (rng() - 0.5) * 0.18 + dir * 0.13;
+          const oy = vertical ? (rng() - 0.5) * 0.16 + (s.dir === 'up' ? 0.10 : -0.10)
+            : (u - 0.5) * fh * 0.95;
+          BucketPush(buckets, 'digSoft', GIco(1, cfg.ico,
+            fx + ox, fy + oy, fz + (rng() - 0.5) * fd * 0.75,
+            r * 1.25, r, r * 1.1));
+        }
+        // 刨痕：斜的、不等长、只在软面上有。铁锨刨过的痕迹是最"人干的"的信号。
+        for (let k = 0; k < 4; k++) {
+          const t = (k + 0.5) / 4;
+          const len = 0.5 + rng() * 0.5;
+          const tilt = 0.5 + rng() * 0.5;
+          BucketPush(buckets, 'digJoint', GBox(0.045, len, 0.1,
+            fx + dir * 0.14 + (vertical ? (t - 0.5) * fw * 0.8 : 0),
+            fy + (vertical ? 0 : (t - 0.5) * fh * 0.8),
+            fz + (rng() - 0.5) * 1.5, tilt));
+        }
+        // 脚下的浮土：刨下来还没清走的那一点，把"这儿正在被挖"说完整
+        for (let k = 0; k < 5; k++) {
+          const r = 0.10 + rng() * 0.12;
+          BucketPush(buckets, 'digSoft', GIco(1, 0,
+            sx + dir * (0.45 + rng() * 0.5), sy + r * 0.6, 0.35 + (rng() - 0.5) * 1.4,
+            r * 1.5, r * 0.7, r * 1.2));
+        }
+      } else {
+        // —— 硬面：砌死的砖 / 青石 ——
+        // 关键是**齐**：等高的层、错开一半的竖缝、一条刨痕都没有。
+        // 眼睛对"规则排列"极其敏感，一眼就跟旁边的土墙分开了。
+        BucketPush(buckets, 'digJoint', GBox(fw * 0.9, fh, fd * 0.96, fx, fy, fz));
+        const rows = vertical ? 2 : 6;
+        const rowH = fh / rows;
+        for (let r0 = 0; r0 < rows; r0++) {
+          const ry = fy - fh / 2 + rowH * (r0 + 0.5);
+          const cols = 3;
+          for (let c0 = 0; c0 < cols; c0++) {
+            // 错缝：奇数层整体挪半块，这是"砌"而不是"堆"
+            const off = (r0 % 2) ? 0.5 : 0;
+            const cz = fz - fd / 2 + fd * ((c0 + 0.5 + off) / cols);
+            if (cz < fz - fd / 2 || cz > fz + fd / 2) continue;
+            BucketPush(buckets, 'digHard', GBox(
+              fw * (vertical ? 0.92 : 1.06), rowH * 0.82, fd / cols * 0.86, fx, ry, cz));
+          }
+        }
+        // 压顶的一条整石：告诉玩家这不是砖垛，是有人认真砌过的
+        BucketPush(buckets, 'digHard', GBox(fw * 1.16, rowH * 0.5, fd * 1.02,
+          fx, fy + fh / 2 - rowH * 0.2, fz));
+      }
+    }
+    FlushBuckets(buckets, gPlay, 0);
+  }
+
+  // ---- 玩家挖通之后：把新洞真的挖进土层剖面 ----
+  //
+  // 土层剖面是 BuildLevel 里一次性挤出来的（占用栅格 → marching squares →
+  // ExtrudeGeometry）。玩家挖通一段之后 Rules 会往 `level.floors` /
+  // `level.ceils` 里加新段，剖面必须跟着变——**玩家得看得见自己挖出来的洞**，
+  // 不然挖掘就只是一段读条。
+  //
+  // 做法是"就地重挖"而不是"局部补丁"：
+  //  · 指纹只看 floors / ceils / shafts 的条数，比一次全量比对便宜得多，
+  //    而这三个数组只会因为"挖通"而变长，够用了；
+  //  · 发现变了不当帧重挖，而是**延后一小拍**（DIG_REBUILD_DELAY）。挖通那一
+  //    瞬间玩家正好在放锨、镜头在抖，把几百毫秒的重挖压在那儿最不容易被看见；
+  //  · 重挖只换土层那两块 mesh（挤出体 + 背墙），道具、角色、光、批次全不动；
+  //  · 整段包在 try 里。挖洞重建失败了宁可让剖面停在旧样子，也不许黑屏。
+  function TerrainStamp() {
+    const f = Array.isArray(level.floors) ? level.floors.length : 0;
+    const c = Array.isArray(level.ceils) ? level.ceils.length : 0;
+    const s = Array.isArray(level.shafts) ? level.shafts.length : 0;
+    return f * 1000003 + c * 1009 + s;
+  }
+
+  function CheckTerrainDirty(t) {
+    if (!terrainBounds) return;
+    const stamp = TerrainStamp();
+    if (stamp !== terrainStamp) {
+      terrainStamp = stamp;
+      // 第一次进来只是记下基线，别在开局白重挖一次
+      if (terrainRebuildAt < 0 && terrainNodes.length) { terrainRebuildAt = t + DIG_REBUILD_DELAY; }
+      else if (terrainNodes.length) { terrainRebuildAt = t + DIG_REBUILD_DELAY; }
+      return;
+    }
+    if (terrainRebuildAt > 0 && t >= terrainRebuildAt) {
+      terrainRebuildAt = -1;
+      RecarveTerrain();
+    }
+  }
+
+  function RecarveTerrain() {
+    const b = terrainBounds;
+    if (!b) return;
+    try {
+      for (let i = 0; i < terrainNodes.length; i++) {
+        const n = terrainNodes[i];
+        if (n.parent) n.parent.remove(n);
+        if (n.geometry) {
+          const k = levelGeos.indexOf(n.geometry);
+          if (k >= 0) levelGeos.splice(k, 1);
+          try { n.geometry.dispose(); } catch (e) { /* 忽略 */ }
+        }
+      }
+      terrainNodes.length = 0;
+      BuildEarth(b.x0, b.x1, b.yTop, b.yBottom);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[Render] 挖通后重挖剖面失败，剖面停在旧样子。', e);
+    }
+  }
+
+  // ---- 挖出来的土堆（state.world.spoilPiles）----
+  //
+  // 玩法上这堆土就是**证据**：敌人走到跟前会提高警觉，山田那句「这块地的土
+  // 是新的」挂在它身上。所以它必须显眼——但显眼要靠"新土比周围亮一档"
+  // 这种物理理由，不是靠加一个 UI 记号。
+  //
+  // 数量是动态的（挖一段多一堆、倒掉一堆少一堆），所以用**对象池**：
+  // BuildLevel 时按上限造好，Sync 里只改 position / scale / visible，零分配。
+  function BuildSpoilPiles() {
+    const cap = SPOIL_POOL;
+    for (let i = 0; i < cap; i++) {
+      const rng = MakeRng(StrSeed('spoil' + i));
+      const parts = [];
+      // 一堆散土：底盘一摊 + 七八个大小不一的土块。侧面要毛，别是个圆锥。
+      parts.push(GIco(1, cfg.ico, 0, 0.10, 0, 0.62, 0.20, 0.50));
+      for (let k = 0; k < 8; k++) {
+        const r = 0.10 + rng() * 0.14;
+        parts.push(GIco(1, cfg.ico,
+          (rng() - 0.5) * 0.85, 0.10 + rng() * 0.30, (rng() - 0.5) * 0.7,
+          r * 1.3, r, r * 1.15));
+      }
+      // 散落在外圈的几块：一堆土不会有干净的边
+      for (let k = 0; k < 4; k++) {
+        const r = 0.06 + rng() * 0.07;
+        parts.push(GIco(1, 0,
+          (rng() - 0.5) * 1.7, r * 0.7, (rng() - 0.5) * 1.1, r * 1.4, r * 0.6, r * 1.2));
+      }
+      const merged = SafeMerge(parts);
+      if (!merged) continue;
+      TrackGeo(merged);
+      const mesh = new THREE.Mesh(merged, mats.spoil);
+      mesh.visible = false;
+      if (cfg.shadows) mesh.castShadow = true;
+      gPlay.add(mesh);
+      spoilMeshes.push(mesh);
+    }
+  }
+
+  /** 每帧把 state.world.spoilPiles 摆到池子上。零分配，不写 state。 */
+  function UpdateSpoilPiles(state, t) {
+    if (!spoilMeshes.length) return;
+    const world = state.world || {};
+    const piles = Array.isArray(world.spoilPiles) ? world.spoilPiles : null;
+    const n = piles ? Math.min(piles.length, spoilMeshes.length) : 0;
+    for (let i = 0; i < n; i++) {
+      const p = piles[i];
+      const m = spoilMeshes[i];
+      if (!p || typeof p.x !== 'number') { m.visible = false; continue; }
+      const amount = typeof p.amount === 'number' ? Clamp(p.amount, 0, 6) : 1;
+      if (amount <= 0.01) { m.visible = false; continue; }
+      // 量越大堆越高越宽，但宽长得比高慢——土堆是摊开的，不是垒起来的
+      const sc = 0.72 + Math.min(1.6, amount) * 0.34;
+      m.position.set(p.x, typeof p.y === 'number' ? p.y : 0, 0.45);
+      m.scale.set(sc, sc * 0.82, sc * 0.9);
+      // 极缓的呼吸：静止的新土在暗场里容易被当成背景，一点点起伏就"活"了
+      m.rotation.y = Math.sin(t * 0.21 + i) * 0.05;
+      m.visible = true;
+    }
+    for (let i = n; i < spoilMeshes.length; i++) spoilMeshes[i].visible = false;
+  }
+
   // ---- 出口指示：远处的一点光 ----
   function BuildExitMark() {
     const ex = level.exit;
@@ -3358,6 +4349,84 @@ export function CreateRenderer(canvas, options = {}) {
     dustPoints.renderOrder = 24;
     gFx.add(dustPoints);
     dustCursor = 0;
+  }
+
+  // ---- 浮尘：空气里的东西 ----
+  //
+  // 夜里的浮尘、虫、草籽、灶火飘起的灰。**在多个 z 上各放一层**，近处的
+  // 大而快、远处的小而慢——这是最便宜也最有效的纵深线索，比任何几何都管用。
+  // 地道里同一批点换成暖色（马灯周围的浮尘 + 飘落的土屑），靠 layerMix 过渡。
+  //
+  // 实现上的两条硬要求：
+  //  1) 一层一个 Points = 1 draw call。绝不许一个粒子一个物体。
+  //  2) 位置是 time 的解析函数（不积分、不 new、不 Math.random）：
+  //     世界坐标 = 相位表 + 漂移 * t，再按"以相机为中心的一个盒子"取模回卷。
+  //     取模回卷让它们永远铺满画面，同时**保留世界锚定**，所以视差是真的。
+  function BuildMotes() {
+    for (let b = 0; b < MOTE_BANDS.length; b++) {
+      const band = MOTE_BANDS[b];
+      const n = band.n;
+      const pos = new Float32Array(n * 3);
+      const col = new Float32Array(n * 4);
+      // 相位表：确定性、只算一次。[0]=x 基址 [1]=y 基址 [2]=速度扰动 [3]=摆动相位
+      const seed = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) {
+        seed[i * 4] = Hash1(i * 3.7 + b * 41.3) * 4000;
+        seed[i * 4 + 1] = Hash1(i * 8.9 + b * 17.7) * 4000;
+        seed[i * 4 + 2] = 0.45 + Hash1(i * 5.1 + b * 29.1) * 1.25;
+        seed[i * 4 + 3] = Hash1(i * 11.7 + b * 7.3) * 6.28318;
+        pos[i * 3 + 1] = -9999;
+      }
+      const geo = new THREE.BufferGeometry();
+      const pa = new THREE.BufferAttribute(pos, 3); pa.setUsage(THREE.DynamicDrawUsage);
+      const ca = new THREE.BufferAttribute(col, 4); ca.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute('position', pa);
+      geo.setAttribute('color', ca);
+      TrackGeo(geo);
+      const pts = new THREE.Points(geo, moteMats[b]);
+      pts.frustumCulled = false;
+      pts.renderOrder = 23;
+      pts.visible = b < (cfg.moteBands || 0);
+      gFx.add(pts);
+      moteLayers.push({ geo, pos, col, seed, band, n, posAttr: pa, colAttr: ca, points: pts });
+    }
+  }
+
+  function UpdateMotes(t, cx, cy, mix) {
+    for (let b = 0; b < moteLayers.length; b++) {
+      const L = moteLayers[b];
+      if (!L.points.visible) continue;
+      const band = L.band;
+      // 这一层所在深度上的可视范围。乘 2.2 让盒子明显大于画面，取模的接缝
+      // 就落在画外；再配合边缘淡出，任何机位都看不见"忽然冒出来一个点"。
+      const halfH = HalfHeightAt(ViewDepthAt(band.z));
+      const W = halfH * (viewW / Math.max(1, viewH)) * 2.2;
+      const H = halfH * 2.2;
+      const pos = L.pos, col = L.col, seed = L.seed;
+      // 地表：冷灰蓝的夜尘，缓缓上浮。地道：暖赭的土屑，慢慢往下落。
+      const cr = Lerp(1.00, 0.68, mix), cg = Lerp(0.74, 0.78, mix), cb = Lerp(0.44, 0.92, mix);
+      const alpha = Lerp(band.aTun, band.aSurf, mix);
+      const riseY = Lerp(-band.rise * 1.6, band.rise, mix);
+      for (let i = 0; i < L.n; i++) {
+        const spd = seed[i * 4 + 2];
+        const ph = seed[i * 4 + 3];
+        let dx = seed[i * 4] + t * band.drift * spd + Math.sin(t * 0.31 + ph) * 0.9 - cx;
+        dx -= W * Math.round(dx / W);
+        let dy = seed[i * 4 + 1] + t * riseY * spd * 6 + Math.sin(t * 0.23 + ph * 1.7) * 0.5 - cy;
+        dy -= H * Math.round(dy / H);
+        pos[i * 3] = cx + dx;
+        pos[i * 3 + 1] = cy + dy;
+        pos[i * 3 + 2] = band.z;
+        // 接缝淡出：靠近盒子边缘时把 alpha 收掉
+        const fx = 1 - Math.abs(dx) / (W * 0.5), fy = 1 - Math.abs(dy) / (H * 0.5);
+        const fade = Clamp(Math.min(fx, fy) * 3.2, 0, 1);
+        col[i * 4] = cr; col[i * 4 + 1] = cg; col[i * 4 + 2] = cb;
+        // 每颗自己的明暗呼吸，一层里不许所有点一样亮
+        col[i * 4 + 3] = alpha * fade * (0.55 + 0.45 * Math.sin(t * (0.6 + spd * 0.5) + ph));
+      }
+      L.posAttr.needsUpdate = true;
+      L.colAttr.needsUpdate = true;
+    }
   }
 
   function SpawnDust(x, y, power, kind) {
@@ -3495,8 +4564,10 @@ export function CreateRenderer(canvas, options = {}) {
     const cx = (typeof cam.x === 'number' ? cam.x : 0) + sx;
     const cy = (typeof cam.y === 'number' ? cam.y : 0) + sy;
     camera.position.x = cx;
-    camera.position.y = cy;
-    camera.position.z = camDist;
+    // 俯角下相机要抬到视线落点上方 camLiftY，可视高度才**仍然以 camY 为中心**。
+    // 忘了这一项，整幅画会整体下沉，玩家贴着画面上缘走。
+    camera.position.y = cy + camLiftY;
+    camera.position.z = camZ;
     camera.rotation.z = shake * 0.012 * Math.sin(t * 26.1);
     camera.updateMatrixWorld();
 
@@ -3548,8 +4619,21 @@ export function CreateRenderer(canvas, options = {}) {
     _colD.setHex(palette.sky);
     scene.background.copy(_colB).lerp(_colD, mix);
     mats.skyBase.color.copy(scene.background);
-    // 三道空气墙跟着雾色走：地道里必须是暖褐，不许在坑道上盖一层冷蓝
-    for (let i = 0; i < hazeMats.length; i++) hazeMats[i].color.copy(scene.fog.color);
+    // 三道空气墙跟着雾色走：地道里必须是暖褐，不许在坑道上盖一层冷蓝。
+    //
+    // 强度分地表 / 地道两套。**地表这套试过往月色抬（当"月光下的地面薄雾"），
+    // 实测是个坑**：抬色之后"天空带"跟着涨 6 级，比村庄带涨得还多——因为
+    // 地平线以上那一大片背景也在空气墙的作用范围里，而村庄带有一半是地面
+    // （地面在剖面正面 z=2.25，压根在空气墙前面）。所以这里一律用纯雾色。
+    _colE.copy(scene.fog.color);
+    for (let i = 0; i < hazeMats.length; i++) {
+      hazeMats[i].color.copy(_colE);
+      hazeMats[i].opacity = Lerp(HAZE_A_TUN[i], HAZE_A_SURF[i], mix);
+    }
+    // 贴地薄雾反过来：它必须**亮于**雾色才起作用（月光打在雾上），
+    // 所以往月色抬 34%。地道里整条淡掉——坑道里没有地平线，也没有月亮。
+    mats.mist.color.copy(scene.fog.color).lerp(_colC, 0.34 * mix);
+    mats.mist.opacity = 0.24 * mix * mix;
     // 地平线辉光 / 月色跟着时段走；进地道后天幕整体压暗
     mats.sky.color.copy(_colA);
     mats.sky.opacity = Lerp(0.18, 1.0, mix);
@@ -3591,11 +4675,11 @@ export function CreateRenderer(canvas, options = {}) {
     // "躲在后面"必须按**投影后**判，不能比世界坐标。前景在 z=+5，比玩家所在的
     // 平面近 4.5 米，横向位移被放大 ~18%：世界坐标上还差 1 米的柴垛，屏幕上
     // 可能已经压在人身上了。把每个遮挡物换算成"它在玩法平面上等效的 x"。
-    const foreToPlay = (camDist - ACTOR_Z_PLAYER);
+    const foreToPlay = ViewDepthAt(ACTOR_Z_PLAYER);
     let nearestFore = 99;
     for (let i = 0; i < foreOccluders.length; i++) {
       const oc = foreOccluders[i];
-      const k = foreToPlay / Math.max(1, camDist - oc.z);
+      const k = foreToPlay / Math.max(1, ViewDepthAt(oc.z));
       const ox = cx + (oc.x - cx) * k;
       const d = Math.abs(ox - px) - oc.w * k;
       if (d < nearestFore) nearestFore = d;
@@ -3755,7 +4839,10 @@ export function CreateRenderer(canvas, options = {}) {
       const arr = shaftColorAttr.array;
       for (let i = 0; i < shaftItems.length; i++) {
         const it = shaftItems[i];
-        const a = it.alpha * (0.78 + 0.22 * Math.sin(t * 0.9 + it.phase)) * Lerp(1.15, 0.45, mix);
+        // 通气孔／枪眼漏下来的光在地道里最该看见，所以默认地下更亮；
+        // 穿树冠的月光反过来——钻进地道还看得见月光柱就穿帮了。
+        const env = it.surfaceOnly ? mix * mix : Lerp(1.15, 0.45, mix);
+        const a = it.alpha * (0.78 + 0.22 * Math.sin(t * 0.9 + it.phase)) * env;
         for (let k = 0; k < 4; k++) arr[(it.vStart + k) * 4 + 3] = a;
       }
       shaftColorAttr.needsUpdate = true;
@@ -3772,6 +4859,15 @@ export function CreateRenderer(canvas, options = {}) {
     // ---- 尘 ----
     UpdateDust(dt);
 
+    // ---- 浮尘：空气里的东西（纵深线索的主力）----
+    UpdateMotes(t, cx, cy, mix);
+
+    // ---- 玩家挖出来的土堆 ----
+    UpdateSpoilPiles(state, t);
+
+    // ---- 玩家挖通之后：把新洞真的挖进土层剖面 ----
+    CheckTerrainDirty(t);
+
     // ---- 地下暗角 ----
     // 跟着玩家而不是相机：玩家才是"手里那点光"的中心。
     // 有马灯时罩子松一点，丢了马灯立刻收紧——这就是灭灯在画面上的代价。
@@ -3780,7 +4876,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (vignetteMesh.visible) {
       // 罩子在 z=3.4，比玩法平面近 3.4 米，透视下会被放大——尺寸得按它自己
       // 那个深度上的可视范围算。照 viewHeight 直接算会小一圈，四角漏出来。
-      const halfH = HalfHeightAt(camDist - 3.4);
+      const halfH = HalfHeightAt(ViewDepthAt(3.4));
       const halfWv = halfH * (viewW / Math.max(1, viewH));
       const rad = Math.max(halfWv, halfH) * Lerp(2.05, 2.75, lanternAmt);
       vignetteMesh.position.set(px, py + 0.7, 3.4);
@@ -3871,8 +4967,15 @@ export function CreateRenderer(canvas, options = {}) {
     camera.aspect = viewW / Math.max(1, viewH);
     camera.near = CAMERA.near;
     camera.far = CAMERA.far;
-    camDist = CameraDistanceFor(viewHeight);
-    camera.position.z = camDist;
+    // 俯角按视口收窄：超宽屏上画面边缘离中轴更远，同样的俯角会把竖直线
+    // 拉得更歪。契约的「≤2.5°」是硬红线，这里让它跟着 aspect 自洽，
+    // 而不是为了照顾 21:9 把普通屏的纵深也一起砍掉。
+    pitchTerms = MakePitchTerms(PitchForAspect(camera.aspect));
+    camDist = CameraDistanceFor(viewHeight, pitchTerms);
+    camZ = camDist * pitchTerms.cos;
+    camLiftY = CameraLiftFor(camDist, pitchTerms);
+    camera.position.z = camZ;
+    camera.rotation.x = -pitchTerms.rad;
     camera.updateProjectionMatrix();
     PlaceSkyMoon();
   }
@@ -4161,6 +5264,10 @@ export function CreateRenderer(canvas, options = {}) {
     mats.earthBack.map = T('earth');
     mats.dust.map = T('glow');
     mats.blob.map = T('glow');
+    mats.foreBokeh.map = T('glow');
+    mats.mist.map = T('mist');
+    for (let i = 0; i < hazeMats.length; i++) { hazeMats[i].map = T('haze'); hazeMats[i].needsUpdate = true; }
+    for (let i = 0; i < moteMats.length; i++) { moteMats[i].map = T('glow'); moteMats[i].needsUpdate = true; }
     for (let i = 0; i < old.length; i++) { try { old[i].dispose(); } catch (e) { /* 忽略 */ } }
   }
 
@@ -4182,6 +5289,16 @@ export function CreateRenderer(canvas, options = {}) {
     // low 档：关掉尘。暗角罩和接触暗斑每帧在 Sync 里按 qualityName 判定，
     // 这里只处理 Sync 不会重置的那一个。
     if (dustPoints) dustPoints.visible = qualityName !== 'low';
+    // 纵深强化的三样"贴上去"的东西：档位一降立刻全关。
+    //   浮尘层：按 cfg.moteBands 逐层收（low = 0 层，一颗都不画）
+    //   中间层：整组隐藏（几何还在，下一次 BuildLevel 才真正不造）
+    //   失焦叶团：只在 high 档
+    for (let i = 0; i < moteLayers.length; i++) {
+      const pts = moteLayers[i].points;
+      if (pts) pts.visible = i < (cfg.moteBands || 0);
+    }
+    gDepth.visible = !!cfg.depthLayers;
+    gForePar.traverse(function (o) { if (o.isMesh && o.material === mats.foreBokeh) o.visible = !!cfg.foreBokeh; });
     // 毒烟团场：low 档砍掉最上面那一排
     for (let i = 0; i < hazardViews.length; i++) {
       const v = hazardViews[i];
@@ -4200,10 +5317,11 @@ export function CreateRenderer(canvas, options = {}) {
     const fxMats = [fxComposite, fxBright, fxBlur, fxTrail];
     for (let i = 0; i < fxMats.length; i++) { try { fxMats[i].dispose(); } catch (e) { /* 忽略 */ } }
     camera.remove(gSky);
-    scene.remove(gFar); scene.remove(gBack); scene.remove(gMid);
+    scene.remove(gFar); scene.remove(gBack); scene.remove(gDepth); scene.remove(gMid);
     scene.remove(gPlay); scene.remove(gFore); scene.remove(gFx);
     scene.remove(vignetteMesh);
     try { vignetteGeo.dispose(); } catch (e) { /* 忽略 */ }
+    for (let i = 0; i < moteMats.length; i++) { try { moteMats[i].dispose(); } catch (e) { /* 忽略 */ } }
     const keys = Object.keys(mats);
     for (let i = 0; i < keys.length; i++) { try { mats[keys[i]].dispose(); } catch (e) { /* 忽略 */ } }
     texCache.forEach(function (tex) { if (tex) { try { tex.dispose(); } catch (e) { /* 忽略 */ } } });

@@ -418,6 +418,11 @@ function NormalizeLevel(raw, index) {
       sec: Clamp(Num(s.sec, INTERACT.digSec * 2), 2.5, 6.0),
       spoil: Clamp(Math.round(Num(s.spoil, 1)), 1, 3),
       soft: s.soft === undefined ? true : !!s.soft,
+      // 挖通之后新洞的净空。关卡可以写绝对高度 ceilY，或写净空 clearance；
+      // 都不写就按"一锨一锨掏出来的矮洞"给 1.20 米——只够猫腰，
+      // 跟现成的干线（1.78 以上）在手感上分得开。
+      ceilY: typeof s.ceilY === "number" && Number.isFinite(s.ceilY) ? s.ceilY : null,
+      clearance: Clamp(Num(s.clearance, 1.2), HEADROOM.crawlNeeds, 3.0),
       label: typeof s.label === "string" ? s.label : "这段土",
       kind: typeof s.kind === "string" ? s.kind : "prop_beam",
       hidden: !!s.hidden,
@@ -2515,6 +2520,10 @@ const BLOCKED_PENALTY = 1.4;
 // 但**手上随时有土坷垃可以扔**，柴垛却只有眼前这一个——所以引点永远给藏身点让路。
 // 不加这一条，被追着跑的时候按下去的会是"弄出点动静"，那是致命的误触。
 const LURE_PROP_PENALTY = 1.6;
+// 刨不动的硬面（soft:false）按下去只有一句"刨不动"。它是给玩家看的"此路不通"，
+// 不是一个动作——所以它必须给翻口、藏身洞、传令点让路。支道尽头只有 0.8–1.5 米，
+// 硬面跟这些东西必然挤在同一个互动半径里，这一档惩罚就是那道保险。
+const HARD_FACE_PENALTY = 2.6;
 
 function FindTarget(state) {
   const p = state.player;
@@ -2536,6 +2545,10 @@ function FindTarget(state) {
     else if (ahead < -0.02) d += FACING_BONUS * 0.5;
     if (PropBlocked(state, prop)) d += BLOCKED_PENALTY;
     if (prop.interact === "lure") d += LURE_PROP_PENALTY;
+    if (prop.interact === "dig") {
+      const spot = DigSpotById(state, prop.data.digSpotId);
+      if (spot && !spot.soft) d += HARD_FACE_PENALTY;
+    }
     if (d < bestD) {
       bestD = d;
       best = prop;
@@ -2967,8 +2980,11 @@ function CompleteInteract(state, kind, prop) {
     case "spoil": {
       const pile = SpoilPileById(state, prop.data.pileId);
       if (pile) {
+        // 背土占手：手里有马灯就得先撂下。摸黑走这一趟正是设计要的
+        if (p.carrying && p.carrying !== SPOIL_ITEM) DropCarried(state);
         const take = Math.min(pile.amount, SPOIL_CARRY_MAX - p.spoil);
         p.spoil += take;
+        p.carrying = SPOIL_ITEM;
         pile.amount -= take;
         if (pile.amount <= 0) RemoveSpoilPile(state, pile.id);
       }
@@ -2983,6 +2999,7 @@ function CompleteInteract(state, kind, prop) {
         const put = Math.min(room, p.spoil);
         rec.filled += put;
         p.spoil -= put;
+        if (p.spoil <= 0 && p.carrying === SPOIL_ITEM) p.carrying = null;
         Sfx(state, "dig", p.x, p.y);
         Dust(state, PropX(state, prop), prop.y, 0.5);
         Emit(state, { kind: "spoilDumped", sinkId: sink.id, amount: put, left: p.spoil });
@@ -3125,7 +3142,12 @@ function CompleteInteract(state, kind, prop) {
 // 而"慢一倍 + 更响"已经足够让玩家自己想去找那把锨。
 const DIG_BARE_SCALE = 2.0; // 徒手挖的时长倍率
 const DIG_BARE_NOISE = 1.15; // 徒手挖的音量倍率（刨土比铲土响）
-const SPOIL_CARRY_MAX = 3; // 一趟背得动多少
+// 一趟背得动多少。**背土占手**（p.carrying = "spoil"）——这是这套机制的第二颗牙：
+// 要倒土就得先把马灯放下，摸黑走这一趟。第三幕那个在哨兵视距里的场院倒土点，
+// 全靠这一条才有分量；做成纯计数不占手，它就只是绕个路。
+const SPOIL_ITEM = "spoil";
+const SPOIL_LABEL = "一筐新土";
+const SPOIL_CARRY_MAX = 3;
 const SPOIL_ALERT = SENSE.searchAt + 0.06; // 敌人走到新土堆跟前：直接进搜索
 const SPOIL_NOTICE_X = 2.6; // 走到这么近算看见了
 const SPOIL_NOTICE_Y = 1.6;
@@ -3177,10 +3199,11 @@ function CarveDig(state, spot) {
       level.floors.push({ id: "dugfloor_" + spot.id, x0: spot.toX - 1.2, x1: spot.toX + 1.2, y: yBottom, kind: "tunnel" });
     }
   } else {
+    // floor 和 ceil 必须**成对**补。只补 floor，净空判定会当成敞开的天空；
+    // 只补 ceil（下面没有 floor），渲染会在土层剖面上挖出一个没有底的空洞。
     level.floors.push({ id: "dugfloor_" + spot.id, x0: x0 - 0.4, x1: x1 + 0.4, y: spot.y, kind: "tunnel" });
-    // 新挖的洞是**矮**的：净空只够猫腰。这既是史实（一锨一锨掏出来的），
-    // 也让"挖出来的路"和现成的干线在手感上分得开。
-    level.ceils.push({ x0: x0 - 0.4, x1: x1 + 0.4, y: spot.y + 1.42 });
+    const ceilY = spot.ceilY !== null ? spot.ceilY : spot.y + spot.clearance;
+    level.ceils.push({ x0: x0 - 0.4, x1: x1 + 0.4, y: ceilY });
   }
 
   state.world.dug[spot.id] = true;
@@ -3303,6 +3326,14 @@ function DropCarried(state) {
   const p = state.player;
   const item = p.carrying;
   if (!item) return null;
+  // 背着的土撂下去还是一堆土（还是证据），不是一个凭空的道具
+  if (item === SPOIL_ITEM) {
+    DropSpoilPile(state, p.x, p.y, p.spoil);
+    p.spoil = 0;
+    p.carrying = null;
+    Sfx(state, "cloth", p.x, p.y);
+    return null;
+  }
   const id = "drop_" + item + "_" + state.world.dropCount++;
   const prop = {
     id,
@@ -4898,7 +4929,8 @@ function UpdateHud(state) {
   hud.villagersSafe = state.npcs.reduce((acc, n) => acc + (n.rescued ? 1 : 0), 0);
   hud.codexCount = Object.keys(state.world.codex).length;
   const carry = state.player.carrying;
-  hud.carryLabel = carry && ITEMS[carry] ? ITEMS[carry].label : null;
+  hud.carryLabel =
+    carry === SPOIL_ITEM ? SPOIL_LABEL : carry && ITEMS[carry] ? ITEMS[carry].label : null;
 
   // 引：随时可用的主动动词，UI 要一直看得见落点和冷却
   const p = state.player;
