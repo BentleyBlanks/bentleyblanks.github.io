@@ -906,7 +906,7 @@ const act3 = {
     // —— 民兵支线里的生活/工事痕迹 ——
     { id: "a3_pr_beam_s5a", x: 127, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_crock_s5", x: 134, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_kang_s5", x: 139, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
+    { id: "a3_pr_kang_s5", x: 133, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a3_pr_beam_s6a", x: 153, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_crock_s6", x: 159, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_kang_s6", x: 165, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
@@ -919,6 +919,15 @@ const act3 = {
     { id: "a3_pr_kang4", x: 128, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a3_pr_lantern_spare", x: 131, y: -8.0, z: PLAY, kind: "lantern", facing: 1, interact: "pickup", data: { item: "lantern" }, label: "马灯" },
     { id: "a3_pr_vent2", x: 134, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    // —— 刺刀落点的预警孔（不许有看不见就会死的陷阱）——
+    { id: "a3_pr_ventp1", x: 137.4, y: -2.60, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp2", x: 138.6, y: -2.60, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp3", x: 137.4, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp4", x: 138.6, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp5", x: 148, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp6", x: 150.2, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp7", x: 149.2, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_ventp8", x: 151.2, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_beam6", x: 140, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
 
     // —— 地下 d4：摸黑段。四个通气孔就是这一段唯一的光源和唯一的路标 ——
@@ -929,6 +938,16 @@ const act3 = {
     { id: "a3_pr_vent5", x: 162, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_beam8", x: 165, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_vent6", x: 167, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    // ┌─────────────────────────────────────────────────────────────────────┐
+    // │ 这个 1 米是**故意的**，不是没调好的数值，别把它"修"成安全距离。      │
+    // │ 被褥堆在 167，东头那颗雷在 168。从掩体冲出去 0.57 秒 + 拉雷 0.55 秒 │
+    // │ = 1.12 秒；SENSE.alertRiseSec 是 1.25 秒。也就是说：                │
+    // │ **拉这颗雷的时候你一定会被看见，你只有一次呼吸的时间。**            │
+    // │ 地雷杀伤半径 6.5 米只比"猫腰潜行时被看见的半径"(视距×0.4836) 大一点，│
+    // │ 所以"能安全摸到雷"和"雷炸得到所有堵口的"本来就不可能同时成立——      │
+    // │ 与其把它当成矛盾去调参，不如把它变成这一幕最后一下的心跳。          │
+    // │ 碾道那颗雷（x=145）反过来是安全的：那是"推进"，不是"最后一下"。      │
+    // └─────────────────────────────────────────────────────────────────────┘
     { id: "a3_pr_kang_d4", x: 167, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a3_pr_crock6", x: 170, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_wind", x: 176, y: -8.0, z: PLAY, kind: "sign", facing: 1, interact: "none", data: null, label: "黑风口" },
@@ -980,8 +999,28 @@ const act3 = {
     // 跟山田那条十七米的线摆在一起，谁在指挥一眼看得出来。
     {
       id: "a3_e_tang", x: 137, y: 0, kind: "puppet", facing: -1,
-      patrol: { x0: 134, x1: 140, speed: 1.25, pauseSec: 1.6 },
+      patrol: { x0: 134, x1: 140, speed: 1.25, pauseSec: 1.2 },
       vision: { range: 11, halfAngleDeg: 30, height: 1.6 },
+      hearing: 6.0, probeAt: [137.4, 138.6],
+    },
+    // 街面上捅刺刀的那队（a3_t_counter 唤出）：他们把干线 148/150.2 两处钉死，
+    // 玩家过不去。碾道那颗雷（x=145，向上够 9 米）连人带街面一起掀掉。
+    {
+      id: "a3_e_probeM", x: 149, y: 0, kind: "search", facing: -1,
+      patrol: { x0: 147, x1: 150.8, speed: 1.2, pauseSec: 1.1 },
+      vision: { range: 9, halfAngleDeg: 32, height: 1.6 },
+      hearing: 6.0, probeAt: [148, 150.2],
+    },
+    {
+      id: "a3_e_probeM2", x: 150, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 148.5, x1: 151.5, speed: 1.35, pauseSec: 1.0 },
+      vision: { range: 9, halfAngleDeg: 32, height: 1.6 },
+      hearing: 6.0, probeAt: [149.2, 151.2],
+    },
+    {
+      id: "a3_e_blockM", x: 151.2, y: -8.0, kind: "guard", facing: -1,
+      patrol: { x0: 151, x1: 151.4, speed: 1.1, pauseSec: 1.4 },
+      vision: { range: 12, halfAngleDeg: 32, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     // 堵在黑风口前的两个。他们背朝西（刚从出口那头摸进来，正往里搜），
@@ -1076,8 +1115,8 @@ const act3 = {
     { id: "a3_t_quiet", x0: 133, x1: 137, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p13"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
     // 反击从这儿开始：先把口令传到西头，把他们的退路封掉。
-    { id: "a3_t_counter", x0: 117, x1: 120, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a3_beat1", "a3_brief1"], reveal: [], arm: [], spawn: [], objective: "敲钢轨 —— 三快一慢", checkpoint: true, win: false } },
+    { id: "a3_t_counter", x0: 113, x1: 116.5, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_beat1", "a3_brief1"], reveal: [], arm: [], spawn: ["a3_e_probeM", "a3_e_probeM2", "a3_e_blockM"], objective: "敲钢轨 —— 三快一慢", checkpoint: true, win: false } },
     { id: "a3_t_squad_west", x0: 129, x1: 133, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "西头组：开枪眼，把他们往东赶", checkpoint: true, win: false } },
     { id: "a3_t_squad_east", x0: 155, x1: 159, yMin: -5.0, yMax: -2.4, once: true,
@@ -1192,7 +1231,7 @@ const act3 = {
     { id: "a3_cp6", x: 112, y: 0, label: "水井" },
     { id: "a3_cp7", x: 118, y: -8.0, label: "汇合点" },
     { id: "a3_cp8", x: 135, y: -8.0, label: "干线东段" },
-    { id: "a3_cp9", x: 148, y: -8.0, label: "摸黑段前" },
+    { id: "a3_cp9", x: 143, y: -8.0, label: "碾道口" },
     { id: "a3_cp10", x: 131, y: -3.8, label: "西头组" },
     { id: "a3_cp11", x: 157, y: -3.8, label: "东头组" },
     { id: "a3_cp12", x: 164, y: -8.0, label: "黑风口前" },
@@ -1203,13 +1242,17 @@ const act3 = {
     { id: "a3_o2", text: "封住卡口，把烟挡回去", doneWhen: { propUsed: "a3_pr_choke" } },
     { id: "a3_o3", text: "上地表，摸到水井", doneWhen: { trigger: "a3_t_water" } },
     { id: "a3_o4", text: "引水冲开塌方", doneWhen: { propUsed: "a3_pr_well3" } },
-    { id: "a3_o5", text: "跟乡亲汇合，一个都不能少", doneWhen: { npcRescued: "all" } },
+    { id: "a3_o5", text: "跟乡亲汇合，一个都不能少", doneWhen: { trigger: "a3_t_meet" } },
     // signal / mine / loophole 三个动词已经实现，完成条件从"走到那条支线"
     // 收回"真的用了那个道具"——判定更严格，也才对得上目标文本。
-    { id: "a3_o6", text: "敲钢轨，把口令传遍地道网", doneWhen: { propUsed: "a3_pr_sig_east" } },
-    { id: "a3_o7", text: "东头合围", doneWhen: { propUsed: "a3_pr_lh_east" } },
-    { id: "a3_o8", text: "拉响东头地雷 —— 把黑风口那伙掀掉", doneWhen: { propUsed: "a3_pr_mine_east" } },
-    { id: "a3_o9", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
+    { id: "a3_o6",  text: "传口令：西头组",                 doneWhen: { propUsed: "a3_pr_sig_west" } },
+    { id: "a3_o7",  text: "西头枪眼 —— 把头顶捅刺刀的压下去", doneWhen: { propUsed: "a3_pr_lh_west" } },
+    { id: "a3_o8",  text: "传口令：碾道组",                 doneWhen: { propUsed: "a3_pr_sig_mill" } },
+    { id: "a3_o9",  text: "碾道地雷 —— 炸开去黑风口的路",     doneWhen: { propUsed: "a3_pr_mine_mill" } },
+    { id: "a3_o10", text: "传口令：东头组",                 doneWhen: { propUsed: "a3_pr_sig_east" } },
+    { id: "a3_o11", text: "东头枪眼",                       doneWhen: { propUsed: "a3_pr_lh_east" } },
+    { id: "a3_o12", text: "东头地雷 —— 合围",               doneWhen: { propUsed: "a3_pr_mine_east" } },
+    { id: "a3_o13", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
   ],
 };
 
