@@ -226,28 +226,39 @@ void main() {
     col = texture2D(tDiffuse, uv).rgb;
   }
 
-  // ── 2. 暖光辉光：线性空间相加
+  // ── 2. 暖光辉光：线性空间相加（辉光是光，必须在色调映射之前进来）
   if (uBloom > 0.0001) col += texture2D(tBloom, uv).rgb * uBloom;
 
-  // ── 3. 色调分离：暗部压冷、亮部推暖。乘法做，保住明度序位。
-  float l = dot(col, LUMA);
-  float sw = pow(clamp(1.0 - l * 4.5, 0.0, 1.0), 1.4);
-  float hw = pow(clamp(l * 2.2, 0.0, 1.0), 1.1);
-  col *= mix(vec3(1.0), uShadowTint, sw * uSplit.x);
-  col *= mix(vec3(1.0), uHighTint, hw * uSplit.y);
-
-  // ── 4. 色调映射（接管 three 的那一步）
+  // ── 3. 色调映射（接管 three 的那一步）
   vec3 m = ACESFilmic(col, uExposure);
+
+  // ── 4. 色调分离：暗部压冷、亮部推暖。
+  //   **必须在色调映射之后做。** 这是一部通篇夜景的游戏，线性值几乎全落在
+  //   0.001~0.05，在线性空间里"按亮度分暗部/亮部"等于整幅图都是暗部，
+  //   色调分离退化成一层糊满全屏的蓝，土层直接被压黑（试过，一眼就废）。
+  //   显示空间里明度才真的铺开 0..1，暗部/亮部才分得开。
+  //   两个 tint 都在 CPU 侧归一化到明度 1，所以这一步**只改色相不改明暗**，
+  //   "村庄 > 天空 > 土层"的序位不会被调色推翻。
+  float l = dot(m, LUMA);
+  float sw = pow(1.0 - clamp(l * 1.30, 0.0, 1.0), 2.0);
+  float hw = smoothstep(0.30, 0.92, l);
+  m *= mix(vec3(1.0), uShadowTint, sw * uSplit.x);
+  m *= mix(vec3(1.0), uHighTint, hw * uSplit.y);
 
   // ── 5. 暗角：显示空间乘，最柔
   m *= 1.0 - uVig.x * smoothstep(uVig.y, 1.45, r2);
 
-  // ── 6. 胶片颗粒：动态 + 按亮度加权（暗部多、亮部少）。
-  //      静态噪点是脏屏幕，动态才是胶片；亮部少是因为银盐在高光处密度高。
+  // ── 6. 胶片颗粒：动态 + 按亮度加权。
+  //   银盐的颗粒密度在中低调最高、在高光处最低，纯黑处也压得住——所以权重是
+  //   一条"低调抬起来、高光压下去"的曲线，不是简单的 1-luma。
+  //   直接用 1-luma 的话夜空（几乎纯黑）会变成一屏电视雪花，那是脏屏幕不是胶片。
   if (uGrain.x > 0.0001) {
-    float lm = dot(m, LUMA);
-    float amt = mix(uGrain.x, uGrain.y, clamp(lm * 1.6, 0.0, 1.0));
-    vec2 gp = floor(gl_FragCoord.xy) + vec2(floor(uTime * 24.0) * 37.13, floor(uTime * 24.0) * 61.71);
+    float lm = clamp(l, 0.0, 1.0);
+    float w = mix(0.45, 1.0, smoothstep(0.0, 0.24, lm)) * mix(1.0, 0.30, smoothstep(0.40, 1.0, lm));
+    float amt = mix(uGrain.x, uGrain.y, lm) * w;
+    // 每秒 24 格：跟胶片一个节奏，而且比逐帧跳更稳、更像"片子"
+    float frame = floor(uTime * 24.0);
+    vec2 gp = floor(gl_FragCoord.xy) + vec2(frame * 37.13, frame * 61.71);
     float n = Hash21(gp) + Hash21(gp * 1.37 + 11.3) - 1.0;
     m += n * amt;
   }
@@ -273,8 +284,17 @@ const PROP_DEFAULT_Z = {
   corpse: -0.4, trough: -0.5, cart: -0.4, kang: -1.6, stove: -1.4,
 };
 
-/** 敌人 kind → Actor rig kind。 */
-const ENEMY_RIG = { search: 'soldier', guard: 'soldier', dog: 'dog', officer: 'officer' };
+/** 敌人 kind → Actor rig kind。
+ *
+ *  漏登记一个 kind 不会报错，只会**静默**退回 fallback。puppet（汤丙会）
+ *  就栽在这上面：没有条目 → 退成 'soldier' → 伪军队长长得跟日军一模一样，
+ *  "内部的敌人"这个角色当场作废，山田让他走前头的层级关系也读不出来。
+ *  新增敌人 kind 时先在这里登记；健康检查会拿 RigKindFor 逐个核对。 */
+const ENEMY_RIG = {
+  search: 'soldier', guard: 'soldier', dog: 'dog', officer: 'officer', puppet: 'puppet',
+};
+/** 敌人 kind 没登记时退回哪个 rig。只是兜底，不是设计。 */
+const ENEMY_RIG_FALLBACK = 'soldier';
 /** NPC role → Actor rig kind。 */
 const NPC_RIG = { villager: 'villager', child: 'child', elder: 'elder', militia: 'villager' };
 
@@ -1059,7 +1079,7 @@ const ActorApi = {
   PoseBell: typeof ActorModule.PoseBell === 'function' ? ActorModule.PoseBell : null,
 };
 
-const RIG_HEIGHT = { laozhong: 1.70, chuanbao: 1.72, villager: 1.66, child: 1.18, elder: 1.58, soldier: 1.70, officer: 1.72, dog: 0.72 };
+const RIG_HEIGHT = { laozhong: 1.70, chuanbao: 1.72, villager: 1.66, child: 1.18, elder: 1.58, soldier: 1.70, officer: 1.72, puppet: 1.71, dog: 0.72 };
 
 function FallbackRig(kind, mat) {
   const group = new THREE.Group();
@@ -1105,6 +1125,10 @@ const KIND_TINT = {
   elder: [0.96, 0.94, 0.90, 0.95],
   soldier: [0.74, 0.86, 0.70, 0.80],
   officer: [0.70, 0.78, 0.94, 1.20],
+  // 汤丙会：全场最暖的一个，土黄偏灰褐——比日军的冷绿黄，比村民的青蓝暖。
+  // 缺条目会拿到默认 [1,1,1,1] + rimScale 1，他反而比所有人亮一档、边光最重，
+  // 一个"矮半头的伪军"变成画面里最抢眼的人，正好读反。
+  puppet: [0.94, 0.85, 0.66, 0.92],
   dog: [0.92, 0.80, 0.66, 0.80],
 };
 
@@ -2922,7 +2946,7 @@ export function CreateRenderer(canvas, options = {}) {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       if (!e || e.id == null) continue;
-      const rig = MakeRig(ENEMY_RIG[e.kind] || 'soldier', mats.actor);
+      const rig = MakeRig(RigKindFor(e.kind), mats.actor);
       if (rig && rig.group) gPlay.add(rig.group);
       ApplyRimLight(rig);
       enemyRigs.set(e.id, rig);
@@ -3754,6 +3778,13 @@ export function CreateRenderer(canvas, options = {}) {
    *   hud.suspicion   越紧张暗角收得越紧（镜头语言，不是随机变化）
    *   timeScale       放慢的瞬间才开拖影和更重的颗粒
    */
+  /** 写一个"只改色相、不改明度"的乘色：把 rgb 除以它自己的明度。零分配。 */
+  function NormalizedTint(target, r, g, b) {
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const k = l > 1e-4 ? 1 / l : 1;
+    target.setRGB(r * k, g * k, b * k);
+  }
+
   function UpdateFilm(state, t, dt, mix, lanternAmt) {
     if (!filmOn) { trailAmt = 0; return; }
     const f = cfg.film;
@@ -3764,12 +3795,12 @@ export function CreateRenderer(canvas, options = {}) {
     // —— 1. 色调分离 ——
     // 暗部：地表压冷蓝（月夜），地道压冷褐（土 + 马灯的补色）。
     // 亮部：一律推暖橙——画面里所有亮的东西都是火（窗、马灯、灶），推暖是对的。
-    // 用乘法而不是加法：加法会把黑部整体抬起来，夜景当场变灰。
-    u.uShadowTint.value.setRGB(
-      Lerp(0.94, 0.80, mix), Lerp(0.90, 0.90, mix), Lerp(0.78, 1.20, mix)
-    );
-    u.uHighTint.value.setRGB(1.10, 1.015, 0.86);
-    u.uSplit.value.set(f.split * 0.55, f.split * 0.45);
+    // 两个 tint 都**归一化到明度 1**：调色只许改色相，不许改明暗序位。
+    // 不归一化的话（试过）整幅夜景被乘掉 6%，土层和远山一起沉进黑里。
+    NormalizedTint(u.uShadowTint.value,
+      Lerp(0.96, 0.90, mix), Lerp(0.95, 0.97, mix), Lerp(0.84, 1.16, mix));
+    NormalizedTint(u.uHighTint.value, 1.12, 1.00, 0.82);
+    u.uSplit.value.set(f.split * 0.70, f.split * 0.55);
 
     // —— 2. 颗粒 ——
     // 暗部多、亮部少。地道更粗一点（暗、闭塞、更像老胶片）。
@@ -3777,8 +3808,8 @@ export function CreateRenderer(canvas, options = {}) {
     const ts = typeof state.timeScale === 'number' && isFinite(state.timeScale)
       ? Clamp(state.timeScale, 0.2, 1) : 1;
     const slow = 1 - ts;
-    const gk = f.grain * (1 + slow * 0.5);
-    u.uGrain.value.set(Lerp(0.030, 0.040, 1 - mix) * gk, 0.010 * gk);
+    const gk = f.grain * (1 + slow * 0.6);
+    u.uGrain.value.set(Lerp(0.0165, 0.0225, 1 - mix) * gk, 0.006 * gk);
 
     // —— 3. 暗角（镜头语言）——
     // 基础值很轻，只做取景；suspicion 高时才收紧，收得也很克制。
@@ -4134,6 +4165,19 @@ export function CreateRenderer(canvas, options = {}) {
     try { if (renderer.forceContextLoss) renderer.forceContextLoss(); } catch (e) { /* 忽略 */ }
   }
 
+  /**
+   * 敌人 kind 实际用的是哪个 Actor rig。
+   *
+   * 存在的意义是**可测**。"新 kind 静默退化成另一个 kind"这类 bug 不抛异常、
+   * 不掉帧、像素测试也照样过——只有人盯着画面才会发现"这俩怎么长得一样"。
+   * 健康检查可以拿关卡里出现的每个 enemy kind 调它，比对返回值是否等于自己；
+   * 落到 ENEMY_RIG_FALLBACK 就直接判失败。
+   */
+  function RigKindFor(enemyKind) {
+    const k = ENEMY_RIG[enemyKind];
+    return typeof k === 'string' ? k : ENEMY_RIG_FALLBACK;
+  }
+
   // 初始化尺寸（Resize 里会顺带建起后处理链）
   Resize(viewW, viewH, opts.pixelRatio);
   ApplyCameraLens();
@@ -4141,6 +4185,7 @@ export function CreateRenderer(canvas, options = {}) {
   return {
     scene, camera, renderer, three: THREE,
     BuildLevel, Sync, ConsumeEvent, Resize, SetQuality, Dispose,
+    RigKindFor,
     stats,
   };
 }

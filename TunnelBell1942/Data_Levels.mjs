@@ -734,7 +734,7 @@ const act3 = {
   bounds: { x0: 0, x1: 180, yTop: 8, yBottom: -11 },
   startX: 4,
   startY: -8.0,
-  exit: { x: 174, y: -8.0, radius: 2.6, needAllVillagers: true, label: "黑风口" },
+  exit: { x: 176, y: -8.0, radius: 1.5, needAllVillagers: true, label: "黑风口" },
   timeOfDay: "dawn",
 
   floors: [
@@ -929,8 +929,9 @@ const act3 = {
     { id: "a3_pr_vent5", x: 162, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_beam8", x: 165, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_vent6", x: 167, y: -6.22, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_kang_d4", x: 167, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a3_pr_crock6", x: 170, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_wind", x: 174, y: -8.0, z: PLAY, kind: "sign", facing: 1, interact: "none", data: null, label: "黑风口" },
+    { id: "a3_pr_wind", x: 176, y: -8.0, z: PLAY, kind: "sign", facing: 1, interact: "none", data: null, label: "黑风口" },
 
     // —— 构图件 ——
     { id: "a3_pr_house_t3", x: 156, y: 0, z: MID, kind: "house", facing: 1, interact: "none", data: null, label: null },
@@ -982,6 +983,26 @@ const act3 = {
       patrol: { x0: 134, x1: 140, speed: 1.25, pauseSec: 1.6 },
       vision: { range: 11, halfAngleDeg: 30, height: 1.6 },
       hearing: 6.0, probeAt: null,
+    },
+    // 堵在黑风口前的两个。他们背朝西（刚从出口那头摸进来，正往里搜），
+    // 所以玩家能贴着墙根摸到 x=168 那颗雷跟前——但只要往出口挪一步就必被看见。
+    {
+      id: "a3_e_blockA", x: 171.6, y: -8.0, kind: "search", facing: -1,
+      patrol: { x0: 171, x1: 172.4, speed: 1.3, pauseSec: 1.6 },
+      vision: { range: 16, halfAngleDeg: 38, height: 1.6 },
+      hearing: 6.5, probeAt: null,
+    },
+    {
+      id: "a3_e_blockB", x: 173, y: -8.0, kind: "guard", facing: -1,
+      patrol: { x0: 172.4, x1: 173.6, speed: 1.1, pauseSec: 1.6 },
+      vision: { range: 16, halfAngleDeg: 34, height: 1.6 },
+      hearing: 6.0, probeAt: null,
+    },
+    {
+      id: "a3_e_blockC", x: 174.2, y: -8.0, kind: "search", facing: -1,
+      patrol: { x0: 173.6, x1: 174.5, speed: 1.45, pauseSec: 1.1 },
+      vision: { range: 16, halfAngleDeg: 38, height: 1.6 },
+      hearing: 6.5, probeAt: null,
     },
     // —— 以下两个由 a3_t_dark 的 emit.spawn 唤出。他们在 x=148–168 的街面上，
     //     正对着 d4 的四个通气孔。玩家手里的马灯会从通气孔漏上去 ——
@@ -1060,7 +1081,7 @@ const act3 = {
     { id: "a3_t_squad_west", x0: 129, x1: 133, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "西头组：开枪眼，把他们往东赶", checkpoint: true, win: false } },
     { id: "a3_t_squad_east", x0: 155, x1: 159, yMin: -5.0, yMax: -2.4, once: true,
-      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "东头组：地雷合围", checkpoint: true, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: ["a3_e_blockA", "a3_e_blockB", "a3_e_blockC"], objective: "东头组：地雷合围 —— 黑风口被堵上了", checkpoint: true, win: false } },
     // 汤丙会在通气孔上头喊话劝降。栓柱认得他，林霞按住所有人：钟没响就不动。
     { id: "a3_t_tang_call", x0: 125, x1: 129, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_tang1", "a3_tang2", "a3_tang3"], reveal: [], arm: [], spawn: [], objective: "别应声 —— 钟没响就不动", checkpoint: true, win: false } },
@@ -1072,7 +1093,7 @@ const act3 = {
     // 反击得手：东头地雷响过之后，镜头交给过场。
     { id: "a3_t_strike", x0: 169, x1: 172, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a3_cs_strike", objective: "带全村爬出黑风口", checkpoint: true, win: false } },
-    { id: "a3_t_end", x0: 172, x1: 178, yMin: -9.5, yMax: -6.0, once: true,
+    { id: "a3_t_end", x0: 174.5, x1: 178, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
   ],
 
@@ -1169,12 +1190,12 @@ const act3 = {
     { id: "a3_cp4", x: 63, y: 0, label: "碾盘院" },
     { id: "a3_cp5", x: 89, y: 0.4, label: "街口" },
     { id: "a3_cp6", x: 112, y: 0, label: "水井" },
-    { id: "a3_cp7", x: 126.5, y: -8.0, label: "汇合点" },
+    { id: "a3_cp7", x: 118, y: -8.0, label: "汇合点" },
     { id: "a3_cp8", x: 135, y: -8.0, label: "干线东段" },
     { id: "a3_cp9", x: 148, y: -8.0, label: "摸黑段前" },
     { id: "a3_cp10", x: 131, y: -3.8, label: "西头组" },
     { id: "a3_cp11", x: 157, y: -3.8, label: "东头组" },
-    { id: "a3_cp12", x: 163, y: -8.0, label: "黑风口前" },
+    { id: "a3_cp12", x: 164, y: -8.0, label: "黑风口前" },
   ],
 
   objectives: [
@@ -1187,7 +1208,8 @@ const act3 = {
     // 收回"真的用了那个道具"——判定更严格，也才对得上目标文本。
     { id: "a3_o6", text: "敲钢轨，把口令传遍地道网", doneWhen: { propUsed: "a3_pr_sig_east" } },
     { id: "a3_o7", text: "东头合围", doneWhen: { propUsed: "a3_pr_lh_east" } },
-    { id: "a3_o8", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
+    { id: "a3_o8", text: "拉响东头地雷 —— 把黑风口那伙掀掉", doneWhen: { propUsed: "a3_pr_mine_east" } },
+    { id: "a3_o9", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
   ],
 };
 
