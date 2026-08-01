@@ -89,7 +89,11 @@ const QUALITY_PRESET = {
     gridCell: 0.32, chaikin: 2, gasLayers: 3, particles: 180, warmLights: 3,
     shadows: false, foreDensity: 0.8, hazePlanes: true, starCount: 130,
     maxPixelRatio: 1.5, antialias: true, smoothTunnel: 0.75,
-    film: { split: 0.85, grain: 0.85, vignette: 0.85, bloom: 0, ca: 0.55, trail: 0 },
+    // medium 是触屏档。实测后处理在填充率受限的设备上会把帧时间翻倍
+    // （SwiftShader 1920×1080：365ms → 622ms），所以这一档只留最省、
+    // 也最像"电影调色"的三样：色调分离 + 颗粒 + 暗角，一个 pass、一次取样。
+    // 色差要三次取样、辉光要三个额外 pass，都只在 high 档开。
+    film: { split: 0.85, grain: 0.8, vignette: 0.85, bloom: 0, ca: 0, trail: 0 },
   },
   high: {
     texSize: 256, cyl: 12, lathe: 16, ico: 1, bevelSeg: 3, extrudeDepth: 12.0,
@@ -1973,7 +1977,10 @@ export function CreateRenderer(canvas, options = {}) {
     depthTest: false, depthWrite: false, toneMapped: false,
   });
   const fxBright = new THREE.ShaderMaterial({
-    uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 0.72 } },
+    // 阈值卡得高：只有真正"在发光"的东西（窗纸后的油灯、马灯火苗、灶火）
+    // 才过得去。压低到 0.7 时互动光晕那圈极淡的暖色边光也会被点着，
+    // 画面上多出一串橙色甜甜圈——那是提示，不是光源，不该辉光。
+    uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 1.15 } },
     vertexShader: FX_VERT, fragmentShader: FX_BRIGHT_FRAG,
     depthTest: false, depthWrite: false, toneMapped: false,
   });

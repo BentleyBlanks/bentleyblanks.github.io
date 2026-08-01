@@ -538,9 +538,27 @@ window.addEventListener("resize", Resize);
 window.addEventListener("orientationchange", () => setTimeout(Resize, 120));
 
 // ─────────────────────────────────────────── 启动
+/**
+ * 后处理是纯填充率开销：真 GPU 上几趟模糊是零点几毫秒，软件光栅上直接翻倍。
+ * 桌面浏览器被拉黑 GPU 时会静默退回 SwiftShader/llvmpipe，用户看不出来，
+ * 只觉得"这游戏怎么这么卡"。开渲染器之前先探一次真实的 renderer 字符串。
+ */
+function DetectQuality() {
+  if (isTouch) return "medium";
+  try {
+    const probe = document.createElement("canvas").getContext("webgl2")
+      || document.createElement("canvas").getContext("webgl");
+    if (!probe) return "low";
+    const ext = probe.getExtension("WEBGL_debug_renderer_info");
+    const name = ext ? String(probe.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : "";
+    if (/swiftshader|llvmpipe|software|basic render/i.test(name)) return "low";
+  } catch { /* 探测失败就按桌面默认走 */ }
+  return "high";
+}
+
 function Boot() {
   try {
-    render = CreateRenderer(canvas, { quality: isTouch ? "medium" : "high" });
+    render = CreateRenderer(canvas, { quality: DetectQuality() });
   } catch (error) {
     ShowBootError("CreateRenderer", error);
     return;

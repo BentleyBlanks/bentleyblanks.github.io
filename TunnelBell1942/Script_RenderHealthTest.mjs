@@ -25,6 +25,11 @@ function Assert(cond, msg) {
 const { page, errors } = await OpenGame(browser, port, { width: 1600, height: 900 });
 Assert(errors.length === 0, `启动无页面错误 ${errors.length ? `→ ${errors[0]}` : ""}`);
 
+// 沙箱是 SwiftShader，Main 会自动降到 low 把后处理整条链关掉。
+// 那样等于永远测不到出货配置——强制 high，让色调分离/辉光/颗粒都真的跑起来。
+await page.evaluate(() => window.TunnelBell.render.SetQuality("high"));
+await page.waitForTimeout(300);
+
 for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   const tag = `act${levelIndex + 1}`;
   await page.evaluate((i) => {
