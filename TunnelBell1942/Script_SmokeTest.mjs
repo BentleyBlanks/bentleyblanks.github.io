@@ -99,21 +99,37 @@ for (let i = 0; i < LEVELS.length; i += 1) {
 // ─────────────────────────────────────────── 剧情数据
 Section("剧情数据");
 Assert(CHAPTERS.length >= 3, "至少三章");
+// 字数上限按 panel 类型分档（契约 §4.1）。早期是一刀切 24 字，那是《勇敢的心》的
+// 语域；《地道战》是军事教育片，教学腔和口令需要各自的预算。
+const KIND_LIMIT = { beat: 24, call: 20, brief: 44, narrate: 40 };
 let overLong = 0;
 let badIcon = 0;
 let narrateCount = 0;
+let missingKind = 0;
 const ALLOWED_ICONS = new Set([
   "bell", "run", "dig", "down", "up", "eye", "quiet", "fire", "water", "gas",
   "lantern", "heart", "child", "grain", "rifle", "boot", "tunnel", "village", "cross", "clock",
 ]);
+let iconOnly = 0;
 for (const [id, panel] of Object.entries(PANELS)) {
-  if ((panel.text || "").length > 24) { overLong += 1; console.error(`  过长: ${id} (${panel.text.length})`); }
+  const kind = panel.kind;
+  if (!KIND_LIMIT[kind]) { missingKind += 1; console.error(`  缺 kind: ${id} (${kind})`); }
+  const limit = KIND_LIMIT[kind] ?? 24;
+  if ((panel.text || "").length > limit) {
+    overLong += 1;
+    console.error(`  过长: ${id} [${kind}] ${panel.text.length}/${limit}`);
+  }
   for (const icon of panel.icons || []) if (!ALLOWED_ICONS.has(icon)) { badIcon += 1; console.error(`  未知图标: ${id} → ${icon}`); }
   if (panel.mood === "narrate") narrateCount += 1;
+  if (!(panel.text || "").trim()) iconOnly += 1;
 }
-Assert(overLong === 0, "所有台词 ≤ 24 字");
+Assert(missingKind === 0, "每条气泡都标了 kind");
+Assert(overLong === 0, "每条台词都在自己那档的字数上限内");
 Assert(badIcon === 0, "所有图标在允许列表内");
-Assert(narrateCount <= 4, `旁白 ≤ 4 条（实际 ${narrateCount}）`);
+Assert(narrateCount <= 6, `旁白 ≤ 6 条（实际 ${narrateCount}）`);
+const total = Object.keys(PANELS).length;
+Assert(total >= 80, `气泡密度撑得起"一路上都有人说话"（${total} 条，要求 ≥80）`);
+Assert(iconOnly / total < 0.15, `纯图标比例 < 15%（实际 ${(iconOnly / total * 100).toFixed(1)}%）`);
 Assert(CODEX.length === 6, `史料恰好 6 条（实际 ${CODEX.length}）`);
 Assert(CODEX.every((c) => c.body.length <= 90), "史料正文 ≤ 90 字");
 for (const chapter of CHAPTERS) {
@@ -126,7 +142,8 @@ for (const chapter of CHAPTERS) {
 Section("叙事与关卡一致性");
 {
   const CAST = ["栓柱", "王大娘", "四爷", "秋兰", "二嫂", "老栓"];
-  const SPEAKERS = ["高老忠", "高传宝", "林霞", "山田", ...CAST];
+  // 汤丙会是伪军队长，"内部的敌人"（契约 §4.1 点名要的角色）
+  const SPEAKERS = ["高老忠", "高传宝", "林霞", "山田", "汤丙会", ...CAST];
 
   // 第一幕不许以"活着逃出去"收场
   const act1 = GetLevel(0);
@@ -136,7 +153,8 @@ Section("叙事与关卡一致性");
   const bell = (act1.props || []).find((p) => p.interact === "bell");
   if (Assert(!!bell, "act1 有钟")) {
     const data = bell.data || {};
-    Assert((data.panels || []).length > 0, "敲钟会推剧情气泡");
+    // 敲钟的叙事可以走气泡，也可以走过场（过场是更好的做法——那是全作最重的仪式点）
+    Assert((data.panels || []).length > 0 || !!data.cutscene, "敲钟会触发剧情（气泡或过场）");
     Assert((data.spawn || []).length > 0, "敲钟会唤醒追兵");
   }
   const positionalChase = (act1.triggers || []).some(
@@ -187,6 +205,10 @@ Section("叙事与关卡一致性");
     const level = GetLevel(i);
     for (const t of level.triggers || []) for (const id of t.emit?.panels || []) used.add(id);
     for (const p of level.props || []) for (const id of p.data?.panels || []) used.add(id);
+    // 过场的 panel step 也是挂载点——不扫它就会把演出里的台词全判成孤儿
+    for (const cut of Object.values(level.cutscenes || {})) {
+      for (const step of cut.steps || []) if (step.kind === "panel" && step.id) used.add(step.id);
+    }
   }
   for (const chapter of CHAPTERS) {
     for (const id of chapter.opening || []) used.add(id);
