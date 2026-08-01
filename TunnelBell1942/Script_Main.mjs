@@ -149,16 +149,44 @@ window.addEventListener("keyup", (e) => { keyState[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keyState) keyState[k] = false; });
 
 // 触摸
+// 长按方向键在移动端会弹系统的选择框/放大镜。CSS 那边关了 user-select 与
+// -webkit-touch-callout，这里再挡住 contextmenu 和 selectstart：
+// Android 的长按走的是 contextmenu，光靠 CSS 挡不干净。
+shell.addEventListener("contextmenu", (e) => e.preventDefault());
+shell.addEventListener("selectstart", (e) => e.preventDefault());
+
 const touchPad = el("TouchPad");
 for (const btn of touchPad.querySelectorAll("[data-hold]")) {
   const name = btn.dataset.hold;
-  const down = (e) => { e.preventDefault(); touchHold[name] = true; };
-  const up = (e) => { e.preventDefault(); touchHold[name] = false; };
+  const down = (e) => {
+    e.preventDefault();
+    touchHold[name] = true;
+    // 抓住这根手指：按住方向键时手指难免滑出圆钮边缘，
+    // 没有捕获就会触发 pointerleave 把移动中断，走两步停一下。
+    if (btn.setPointerCapture) { try { btn.setPointerCapture(e.pointerId); } catch { /* 老浏览器忽略 */ } }
+  };
+  const up = (e) => {
+    e.preventDefault();
+    touchHold[name] = false;
+    if (btn.releasePointerCapture && e.pointerId !== undefined) {
+      try { btn.releasePointerCapture(e.pointerId); } catch { /* 已经释放过 */ }
+    }
+  };
   btn.addEventListener("pointerdown", down);
   btn.addEventListener("pointerup", up);
   btn.addEventListener("pointercancel", up);
+  // 有指针捕获时 pointerleave 不会在按住期间触发；没有捕获的老浏览器仍靠它兜底
   btn.addEventListener("pointerleave", up);
 }
+// 兜底：手指抬起/被系统打断时，无论事件落在谁身上都把所有方向键松开。
+// 卡住不放的方向键是移动端最糟的 bug——人物会自己一直往前走。
+const ReleaseAllHolds = () => { for (const k in touchHold) touchHold[k] = false; };
+window.addEventListener("pointerup", ReleaseAllHolds);
+window.addEventListener("pointercancel", ReleaseAllHolds);
+window.addEventListener("touchend", ReleaseAllHolds);
+window.addEventListener("touchcancel", ReleaseAllHolds);
+document.addEventListener("visibilitychange", () => { if (document.hidden) ReleaseAllHolds(); });
+
 for (const btn of touchPad.querySelectorAll("[data-tap]")) {
   btn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -237,6 +265,13 @@ function QueuePanels(ids, after) {
 }
 
 function ShowNextPanel() {
+  // Rules 自己也维护一份 story.queue（它靠队列空不空决定要不要放行剧情）。
+  // 界面这边翻过一页就得告诉它一声，否则那份队列只进不出，
+  // 会一直卡着一条永远显示不出来的气泡。
+  if (typeof Rules.DismissPanel === "function" && state && state.story
+      && state.story.queue && state.story.queue.length > 0) {
+    Rules.DismissPanel(state);
+  }
   const id = panelQueue.shift();
   if (!id) {
     screens.panel.hidden = true;
@@ -321,7 +356,12 @@ function ShowChapterCard(chapterIndex, onGo) {
   el("ChapterSubtitle").textContent = chapter ? (chapter.subtitle || "") : "";
   el("ChapterEpilogue").textContent = "";
   screens.chapter.hidden = false;
+  // 只认第一次。按钮点两下（或者自动化里 Begin 已经点过、外面又点一次）
+  // 会把整幕重新初始化一遍，开场气泡也跟着排两遍——同一句话连播两次。
+  let entered = false;
   el("ChapterGoButton").onclick = () => {
+    if (entered) return;
+    entered = true;
     screens.chapter.hidden = true;
     onGo();
   };

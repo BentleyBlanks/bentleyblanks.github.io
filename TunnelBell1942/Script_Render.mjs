@@ -512,15 +512,10 @@ const TEX_DRAW = {
     grd.addColorStop(1.0, 'rgba(255,255,255,0)');
     g.fillStyle = grd; g.fillRect(0, 0, s, s);
   },
-  // 圆环（可互动提示用的极淡边光）
-  ring(c, s) {
-    const g = c.getContext('2d');
-    const grd = g.createRadialGradient(s / 2, s / 2, s * 0.30, s / 2, s / 2, s * 0.5);
-    grd.addColorStop(0.0, 'rgba(255,255,255,0)');
-    grd.addColorStop(0.55, 'rgba(255,255,255,0.9)');
-    grd.addColorStop(1.0, 'rgba(255,255,255,0)');
-    g.fillStyle = grd; g.fillRect(0, 0, s, s);
-  },
+  // 曾经有一张 ring 贴图，专给可互动道具套一圈光环。删掉了：
+  // 一屏二十几个可互动物同时套圈，读出来是"一串橙甜甜圈"，比角色还抢眼，
+  // 而且"圈"是游戏 UI 的语言不是电影的语言。现在互动提示改用 glow
+  // （底部地面反光 + 被主体挡掉核心的边缘提亮），见 UpdateHalos。
   // 光柱（通气孔 / 枪眼漏下来的光）
   shaft(c, s) {
     const g = c.getContext('2d');
@@ -1781,7 +1776,7 @@ export function CreateRenderer(canvas, options = {}) {
   const texRepeats = {
     mud: 0.42, wood: 0.7, tile: 0.55, stone: 0.4, thatch: 0.9,
     earth: 0.22, paper: 1.0, noise: 1.0, water: 1.0, glow: 1.0,
-    ring: 1.0, shaft: 1.0, sign: 1.0, sky: 1.0, smoke: 1.0, vignette: 1.0,
+    shaft: 1.0, sign: 1.0, sky: 1.0, smoke: 1.0, vignette: 1.0,
   };
   function T(key) { const r = texRepeats[key] || 1; return GetTex(key, r, r); }
 
@@ -1856,7 +1851,9 @@ export function CreateRenderer(canvas, options = {}) {
     star: new THREE.PointsMaterial({ color: 0xcfe0f6, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.75, fog: false, depthWrite: false }),
     actor: LambertMat(0x22242c, null),
     glowAdd: new THREE.MeshBasicMaterial({ map: T('glow') || null, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
-    haloAdd: new THREE.MeshBasicMaterial({ map: T('ring') || null, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+    // 互动提示：柔光而不是光环。depthTest 保持开着——「边缘提亮」那一片
+    // 就是靠道具自己把柔光的核心挡掉，只漏出一圈轮廓，才读成"被光照到"。
+    haloAdd: new THREE.MeshBasicMaterial({ map: T('glow') || null, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
     shaftAdd: new THREE.MeshBasicMaterial({ map: T('shaft') || null, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }),
     // 毒烟：柔边烟团 + 顶点色（浓度/前锋写在 alpha 里）。普通混合，不发光——
     // 烟是遮挡物不是光源，additive 会让它读成"亮雾"。
@@ -2664,10 +2661,24 @@ export function CreateRenderer(canvas, options = {}) {
         });
       }
 
-      // 可互动 → 极淡暖色边光，玩家不用试错找互动点
+      // 可互动 → 两片柔光，不是一个圈。玩家不用试错找互动点，
+      // 但也不许把画面读成一排橙灯笼（见 UpdateHalos 的距离衰减）。
       if (p.interact && p.interact !== 'none') {
+        const hr = InteractHaloR(p);
+        const ay = py + InteractHaloY(p);
+        // A) 底部地面反光：横宽竖扁的一摊暖光，中心压在地面线上——
+        //    下半片被土层前脸（z=EARTH_FRONT_Z）挡掉，剩下贴地的半月，
+        //    读成"这东西脚下有光"，而不是"这东西被圈起来了"。
         haloItems.push({
-          x: px, y: py + InteractHaloY(p), z: 0, r: InteractHaloR(p),
+          role: 0, peak: 0.135, ay,
+          x: px, y: py + 0.02, z: 0.85, w: hr * 2.35, h: hr * 1.15,
+          propId: p.id, interact: p.interact, vStart: 0, vCount: 0, cur: 0,
+        });
+        // B) 边缘提亮：贴在道具**背面**，主体自己把柔光的核心遮掉，
+        //    只在轮廓外漏一圈很淡的暖边。这是造型和光位的暗示，不是标记。
+        haloItems.push({
+          role: 1, peak: 0.075, ay,
+          x: px, y: ay, z: -0.75, w: hr * 1.7, h: hr * 1.7,
           propId: p.id, interact: p.interact, vStart: 0, vCount: 0, cur: 0,
         });
       }
@@ -3296,12 +3307,19 @@ export function CreateRenderer(canvas, options = {}) {
     }
     if (haloItems.length) {
       const batch = MakeQuadBatch(haloItems,
-        function (it) { return { w: it.r * 2, h: it.r * 2, tilt: 0 }; },
-        function () { return { r: 1, g: 0.52, b: 0.20, a: 0 }; });
+        function (it) { return { w: it.w, h: it.h, tilt: 0 }; },
+        // 地面反光偏灯火色，边缘提亮再淡一档：都往油灯的暖色靠，
+        // 而不是一个饱和到发甜的橙——饱和橙立刻读成 UI 标记。
+        function (it) {
+          return it.role === 0
+            ? { r: 1.0, g: 0.63, b: 0.31, a: 0 }
+            : { r: 1.0, g: 0.72, b: 0.46, a: 0 };
+        });
       if (batch) {
         haloMesh = new THREE.Mesh(batch.geo, mats.haloAdd);
+        // z 逐项写死在顶点里（地面反光在道具前、边缘提亮在道具后），
+        // 所以整块 mesh 不许再整体平移 z。
         haloMesh.renderOrder = 21; haloMesh.frustumCulled = false;
-        haloMesh.position.z = 0.5;
         gFx.add(haloMesh);
         haloColorAttr = batch.colorAttr;
       }
@@ -3906,20 +3924,42 @@ export function CreateRenderer(canvas, options = {}) {
     glowColorAttr.needsUpdate = true;
   }
 
+  /**
+   * 互动提示的亮度。
+   *
+   * 教训写在这儿，免得又被调回去：第一幕光藏身点就有二十多个，只要"在画面里
+   * 就常亮"，一屏立刻排开六七个等亮的暖色团——比玩家还抢眼，而且全亮等于没提示。
+   * 加法混色还有个陷阱：线性 0.055 经 ACES + sRGB 编码出来是屏幕上的 ~27%，
+   * 所谓"极淡"其实一点也不淡。所以现在按距离分三档：
+   *   · < HALO_NEAR：真正亮起来，玩家一眼知道能上手；
+   *   · NEAR→FAR：迅速掉到十几分之一，只剩"那边有点暖"；
+   *   · > HALO_FAR：只留一丝地板色，够把可互动和纯装饰分开，不参与构图。
+   * 同时把玩家的**高度差**算进距离：地表走路时不该点亮脚下坑道里的道具。
+   */
+  const HALO_NEAR = 3.6;      // 米：走到这么近就是"能上手"
+  const HALO_FAR = 8.2;       // 米：出了这个圈只剩底噪
+  const HALO_FLOOR = 0.055;   // 远处保留的比例（乘 peak，不是绝对亮度）
+
   function UpdateHalos(state, px, py, cx, halfW, t) {
     if (!haloMesh || !haloColorAttr) return;
     const world = state.world || {};
     const arr = haloColorAttr.array;
-    const pulse = 0.78 + 0.22 * Math.sin(t * 2.1);
+    // 呼吸压到几乎看不出来：会跳的东西自动读成 UI，油灯只是轻轻晃
+    const pulse = 0.93 + 0.07 * Math.sin(t * 1.35);
     for (let i = 0; i < haloItems.length; i++) {
       const h = haloItems[i];
       let want = 0;
       if (Math.abs(h.x - cx) < halfW) {
         const gone = h.interact === 'pickup' && world.picked && world.picked[h.propId];
         if (!gone) {
-          const d = Math.hypot(h.x - px, (h.y - 0.4) - py);
-          want = 0.055 * pulse;                      // 平时：极淡，不打断沉浸
-          if (d < 3.4) want = 0.055 + 0.26 * (1 - d / 3.4) * pulse;  // 走近：亮起来
+          const dx = h.x - px;
+          const dy = h.ay - 0.6 - py;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          const near = Clamp((HALO_NEAR - d) / HALO_NEAR, 0, 1);
+          const mid = Clamp((HALO_FAR - d) / (HALO_FAR - HALO_NEAR), 0, 1);
+          // 中段给足（走过来的路上就看得出"那儿有东西"），远端塌得很快
+          const k = HALO_FLOOR + 0.32 * Math.pow(mid, 1.6) + 0.63 * Math.pow(near, 1.2);
+          want = h.peak * k * pulse;
         }
       }
       h.cur += (want - h.cur) * 0.16;
@@ -4112,7 +4152,7 @@ export function CreateRenderer(canvas, options = {}) {
     mats.sky.map = T('sky');
     mats.moon.map = T('glow');
     mats.glowAdd.map = T('glow');
-    mats.haloAdd.map = T('ring');
+    mats.haloAdd.map = T('glow');
     mats.shaftAdd.map = T('shaft');
     mats.gas.map = T('smoke');
     mats.waterLine.map = T('water');

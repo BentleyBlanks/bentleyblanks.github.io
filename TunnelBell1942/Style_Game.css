@@ -39,7 +39,11 @@ html, body {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* 长按在移动端会弹选择框/放大镜/系统菜单。user-select 只挡住"选中"，
+     iOS 的 callout 得单独关；两个前缀都要写，Safari 至今只认带前缀的那个。 */
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -395,6 +399,12 @@ body[data-cutscene] .hudAlert { opacity: 0; transition: opacity .35s ease; }
   background: #0b1220a8; border: 1px solid #ffffff2e;
   color: var(--paper); font-size: 1rem; cursor: pointer;
   backdrop-filter: blur(3px);
+  /* 方向键是要按住不放的，长按必须什么都不触发：
+     不选中按钮上的字、不弹 callout、不让浏览器把它当成滚动/缩放的起手势。 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 .tBtn:active { background: var(--warm); color: var(--ink); }
 .tBtnUse { width: 4.4rem; height: 4.4rem; font-size: 1.05rem; border-color: var(--warm); }
