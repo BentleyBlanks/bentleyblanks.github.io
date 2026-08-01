@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#121b22">
+  <meta name="description" content="《地脉：灯火相连》——一部原创的 1942 年华北敌后横版叙事冒险。">
+  <title>地脉：灯火相连</title>
+  <link rel="preload" href="./Assets/Texture_MountainFarV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_VillageMidgroundV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_VillageForegroundV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_TunnelGraphicNovelV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_TunnelMidgroundV3.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_TunnelForegroundV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_CharacterDuXiaomanInjuredV3.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_CharacterPatrolGuardAtlasV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_CharacterGaoChuanbaoPrologueV2.png" as="image">
+  <link rel="preload" href="./Assets/Texture_CharacterGaoLaozhongPrologueV2.png" as="image">
+  <link rel="preload" href="./Assets/Texture_PropPrologueBellFrameV1.png" as="image">
+  <link rel="preload" href="./Assets/Texture_PropPrologueBellBodyV1.png" as="image">
+  <link rel="preload" href="./Assets/Texture_PropPrologueBellRopeV1.png" as="image">
+  <link rel="preload" href="./Assets/Texture_PropIrrigationSluiceV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_PropWaterCartCulvertV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_PropFirewoodCartV2.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_ChapterSetDressFarAtlasV4.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_PropAtlasVillageTunnelV3.webp" as="image">
+  <link rel="preload" href="./Assets/Texture_PropAtlasEvacuationNetworkV3.webp" as="image">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260801g">
+</head>
+<body>
+  <main id="gameShell" aria-label="地脉：灯火相连 游戏区域">
+    <div id="rendererHost" aria-hidden="true"></div>
+    <div id="paperGrain" aria-hidden="true"></div>
+    <div id="colorWash" aria-hidden="true"></div>
+    <div id="dangerVignette" aria-hidden="true"></div>
+    <div id="cinematicBars" aria-hidden="true"><i></i><i></i></div>
+
+    <section id="loadingScreen" class="fullScreen isVisible" aria-live="polite">
+      <div class="loadingMark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p class="eyebrow">高家庄 · 一九四二</p>
+      <p id="loadingStatus">正在铺开这片土地……</p>
+    </section>
+
+    <section id="titleScreen" class="fullScreen" aria-labelledby="gameTitle">
+      <div class="titleFog" aria-hidden="true"></div>
+      <div class="titleCopy">
+        <p class="eyebrow">原创横版叙事冒险</p>
+        <h1 id="gameTitle"><span>地脉</span><small>灯火相连</small></h1>
+        <p class="titleThesis">一条地道，只有每户都知道它为何存在，<br>才真正成为一条路。</p>
+        <div class="titleActions">
+          <button id="startButton" class="primaryButton" type="button"><span>开始故事</span><small>Enter</small></button>
+          <button id="continueButton" class="quietButton" type="button" hidden>继续 · <span></span></button>
+          <button id="chapterButton" class="quietButton" type="button">章节</button>
+          <button id="accessButton" class="quietButton" type="button">辅助选项</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="chapterSelect" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="chapterSelectTitle" hidden>
+      <div class="panelPaper">
+        <p class="eyebrow">灯火所至</p>
+        <h2 id="chapterSelectTitle">章节</h2>
+        <div id="chapterList" class="chapterList"></div>
+        <button class="backButton" data-close-panel type="button">返回</button>
+      </div>
+    </section>
+
+    <section id="accessPanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="accessTitle" hidden>
+      <div class="panelPaper">
+        <p class="eyebrow">辅助选项</p>
+        <h2 id="accessTitle">让线索更清楚</h2>
+        <label class="toggleRow"><span><b>声音字幕</b><small>显示脚步、敲击与结构声方向</small></span><input id="captionToggle" type="checkbox" checked></label>
+        <label class="toggleRow"><span><b>降低动态运动</b><small>减弱镜头震动与视差</small></span><input id="motionToggle" type="checkbox"></label>
+        <label class="toggleRow"><span><b>高对比交互</b><small>延长白灰交互环的显示</small></span><input id="contrastToggle" type="checkbox"></label>
+        <label class="volumeRow" for="volumeSlider"><span><b>声音</b><small>程序化音乐与环境音</small></span><input id="volumeSlider" type="range" min="0" max="100" value="72"></label>
+        <p class="historyScope"><b>创作与史实范围</b><span>本作发生于虚构的华北敌后复合村落。多出口、隐蔽风口、支护、排水和烟封原则取材于敌后地道实践；听瓮、短距回敲与具体信号方式是人物的地方性试验，并非对某一真实村落设施的复刻。</span></p>
+        <button class="backButton" data-close-panel type="button">返回</button>
+      </div>
+    </section>
+
+    <section id="chapterCard" class="chapterCard" aria-live="polite" hidden>
+      <p id="chapterNumber"></p>
+      <h2 id="chapterTitle"></h2>
+      <p id="chapterDate"></p>
+      <span></span>
+      <p id="chapterLocation"></p>
+    </section>
+
+    <header id="gameHeader" hidden>
+      <button id="pauseButton" class="roundButton" type="button" aria-label="暂停"><i></i><i></i></button>
+      <div id="chapterStamp"><small id="chapterStampNumber"></small><span id="chapterStampTitle"></span></div>
+      <div class="headerTools">
+        <button id="hintButton" class="roundButton chalkButton" type="button" aria-label="重看当前目标">？</button>
+        <button id="soundButton" class="roundButton soundButton" type="button" aria-label="静音"><i></i><i></i><i></i></button>
+      </div>
+    </header>
+
+    <button id="prologueSkip" type="button" hidden>跳过序章</button>
+
+    <aside id="objectiveCard" aria-live="polite" hidden>
+      <small>此刻要做的事</small>
+      <p id="objectiveText"></p>
+      <span id="objectiveProgress"></span>
+    </aside>
+
+    <aside id="soundCaption" aria-live="polite" hidden><i></i><span></span></aside>
+
+    <div id="interactionPrompt" hidden>
+      <span id="interactionKey">E</span>
+      <p><b id="interactionVerb"></b><small id="interactionName"></small></p>
+    </div>
+
+    <aside id="worldTaskHud" aria-live="polite" aria-atomic="true" hidden>
+      <small id="worldTaskKicker"></small>
+      <p id="worldTaskTitle"></p>
+      <div id="worldTaskProgress" aria-label="现场动作进度"></div>
+      <span id="worldTaskHint"></span>
+    </aside>
+
+    <section id="dialoguePanel" aria-live="polite" aria-atomic="true" hidden>
+      <div class="speakerMark" aria-hidden="true"></div>
+      <div class="dialogueCopy">
+        <small id="dialogueSpeaker"></small>
+        <p id="dialogueText"></p>
+      </div>
+      <button id="dialogueNext" type="button" aria-label="继续对白"><span>继续</span><i></i></button>
+    </section>
+
+    <section id="challengePanel" class="challengeScreen" role="dialog" aria-modal="true" aria-labelledby="challengeTitle" aria-describedby="challengeBrief" hidden>
+      <div class="challengePaper">
+        <div class="challengeHeading">
+          <div>
+            <p id="challengeKicker" class="eyebrow"></p>
+            <h2 id="challengeTitle"></h2>
+          </div>
+          <button id="challengeCancel" class="challengeClose" type="button" aria-label="暂时收起现场判断">×</button>
+        </div>
+        <p id="challengeBrief" class="challengeBrief"></p>
+        <div id="challengeProgress" class="challengeProgress" aria-label="操作进度"></div>
+        <div id="challengeWorkspace" class="challengeWorkspace"></div>
+        <p id="challengeFeedback" class="challengeFeedback" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="pausePanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+      <div class="panelPaper compactPaper">
+        <p class="eyebrow">故事停在这里</p>
+        <h2 id="pauseTitle">暂停</h2>
+        <button id="resumeButton" class="primaryButton" type="button">继续</button>
+        <button id="restartChapterButton" class="quietButton" type="button">重来本章</button>
+        <button id="pauseAccessButton" class="quietButton" type="button">辅助选项</button>
+        <button id="titleButton" class="quietButton" type="button">回到题页</button>
+      </div>
+    </section>
+
+    <section id="chapterComplete" class="panelScreen" role="dialog" aria-modal="true" aria-live="polite" hidden>
+      <div class="panelPaper completePaper">
+        <p class="eyebrow">这一段路已经接上</p>
+        <h2 id="completeTitle"></h2>
+        <blockquote id="completeQuote"></blockquote>
+        <div id="costLedger" hidden>
+          <small>代价簿 · 不计分</small>
+          <p></p>
+        </div>
+        <button id="nextChapterButton" class="primaryButton" type="button">继续</button>
+      </div>
+    </section>
+
+    <section id="endingScreen" class="fullScreen" hidden>
+      <div class="endingThread" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="endingCopy">
+        <p class="eyebrow">第三幕 · 高家庄 · 西平 · 黑风口</p>
+        <h2>灯火相连</h2>
+        <p id="endingSummary">天快亮了。沿着村路向右走；钟楼、封烟支路、会合队伍、熄灯的黑风口与联防地道网都留在同一幅长镜头里。</p>
+        <p class="endingWalkHint">继续向右移动；人物会在你靠近时回应。</p>
+        <p id="endingBeatText">钟楼下，风又推了一下没有人拉动的钟绳。</p>
+        <blockquote id="endingFinalQuote" hidden><span>石头：“传宝哥，这回地道通到哪儿？”</span><br><b>高传宝：“通到下一户、下一个村，也通到每个愿意回敲的人。”</b></blockquote>
+        <button id="endingChaptersButton" class="quietButton" type="button">重看章节</button>
+        <button id="endingRestartButton" class="primaryButton" type="button">重走序章</button>
+      </div>
+    </section>
+
+    <section id="controlsGuide" aria-live="polite" hidden>
+      <div><kbd>A</kbd><kbd>D</kbd><span>移动</span></div>
+      <div><kbd>S</kbd><span>蹲伏 / 入口</span></div>
+      <div><kbd>E</kbd><span>行动</span></div>
+      <div><kbd>F</kbd><span>观察</span></div>
+    </section>
+
+    <div id="touchControls">
+      <div class="touchMove">
+        <button data-touch="left" type="button" aria-label="向左">‹</button>
+        <button data-touch="right" type="button" aria-label="向右">›</button>
+      </div>
+      <div class="touchActions">
+        <button data-touch="listen" type="button"><span>观察</span></button>
+        <button data-touch="crouch" type="button"><span>蹲伏</span></button>
+        <button data-touch="depth" type="button"><span>下行</span></button>
+        <button data-touch="interact" class="touchPrimary" type="button"><span>行动</span></button>
+      </div>
+    </div>
+
+    <div id="rotateNotice"><span>↻</span><p>横置屏幕能同时看清地上与地下；也可以继续使用当前方向。</p></div>
+    <div id="screenFlash" aria-hidden="true"></div>
+  </main>
+
+  <noscript>本游戏需要 JavaScript 与 WebGL。</noscript>
+  <script type="module" src="./Script_Game.mjs?v=20260801x"></script>
+</body>
+</html>
