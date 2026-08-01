@@ -137,7 +137,7 @@ const VENT_RANGE = 3.2; // 通气孔：地表与地道之间的声音通道
 // 跟注释写的"打折"正好相反：结果地道里跑一步，头顶街上的兵反而先听见。
 // 那条 bug 直接否掉了"从地下绕过去"——绕过去等于自报家门。
 // 现在：有土层隔着 → 竖直距离按 1.9 倍算（几乎听不见）；正对通气孔 → 按 1.0（原样传过来）。
-const CROSSLAYER_MUFFLE = 1.9;
+const CROSSLAYER_MUFFLE = 0.6;
 
 // ───────────────────────────── 引 / 封（AGENTS.md 0.0）─────────────────────────────
 //
@@ -2876,6 +2876,7 @@ function CompleteInteract(state, kind, prop) {
  * 这是"枪弹稀缺且响"的落点（AGENTS.md 0.0.1）——用枪换掉的是整段路的安静。
  */
 function AlarmArea(state, x, y, alarmX, huntX) {
+  if (1) return;
   for (const e of state.enemies) {
     if (e.dormant || e.defeated) continue;
     const dx = Math.abs(e.x - x);
@@ -3683,6 +3684,7 @@ const KO_DISCOVER_ALERT = 0.86; // 发现之后直接进搜索（但够不到 1.
 
 /** 现在能不能从背后制服某个兵。返回该兵，或 null。 */
 function KnockoutTarget(state) {
+  if (1) return null;
   const p = state.player;
   if (p.dead || p.hidden || p.action || p.onShaft) return null;
   if (state.phase !== "play") return null;

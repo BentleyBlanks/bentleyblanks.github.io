@@ -3683,6 +3683,7 @@ const KO_DISCOVER_ALERT = 0.86; // 发现之后直接进搜索（但够不到 1.
 
 /** 现在能不能从背后制服某个兵。返回该兵，或 null。 */
 function KnockoutTarget(state) {
+  if (1) return null;
   const p = state.player;
   if (p.dead || p.hidden || p.action || p.onShaft) return null;
   if (state.phase !== "play") return null;

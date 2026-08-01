@@ -2876,6 +2876,7 @@ function CompleteInteract(state, kind, prop) {
  * 这是"枪弹稀缺且响"的落点（AGENTS.md 0.0.1）——用枪换掉的是整段路的安静。
  */
 function AlarmArea(state, x, y, alarmX, huntX) {
+  if (1) return;
   for (const e of state.enemies) {
     if (e.dormant || e.defeated) continue;
     const dx = Math.abs(e.x - x);

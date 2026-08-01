@@ -686,12 +686,15 @@ const act2 = {
   ],
 
   npcs: [
-    { id: "a2_n_wangdaniang", x: 35, y: -3.8, name: "王大娘", role: "elder", follow: false, rescued: false },
-    { id: "a2_n_shuanzhu", x: 58.5, y: -3.8, name: "栓柱", role: "child", follow: false, rescued: false },
-    { id: "a2_n_ersao", x: 61.5, y: -3.8, name: "二嫂", role: "villager", follow: false, rescued: false },
-    { id: "a2_n_siye", x: 94, y: -3.8, name: "四爷", role: "elder", follow: false, rescued: false },
-    { id: "a2_n_qiulan", x: 105, y: -8.0, name: "秋兰", role: "villager", follow: false, rescued: false },
-    { id: "a2_n_laoshuan", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false },
+    // canCrawl: 钻得过净空 <1.05 的矮口。canClimb: 爬得了竖井。
+    // 老人两样都不行（拄棍、腿脚不便），孩子钻得过但够不着梯子，壮年都行。
+    // 站位据此排：老人在干线上（走得出去），孩子在爬行段那头，壮年在要爬竖井的支道里。
+    { id: "a2_n_wangdaniang", x: 20, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
+    { id: "a2_n_siye", x: 84, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
+    { id: "a2_n_shuanzhu", x: 103, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: false },
+    { id: "a2_n_qiulan", x: 35, y: -3.8, name: "秋兰", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
+    { id: "a2_n_ersao", x: 58.5, y: -3.8, name: "二嫂", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
+    { id: "a2_n_laoshuan", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
   ],
 
   hazards: [
@@ -709,7 +712,7 @@ const act2 = {
     { id: "a2_t_shaft", x0: 28, x1: 32, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_p4"], reveal: [], arm: [], spawn: [], objective: "上竖井，看看藏身洞", checkpoint: false, win: false } },
     { id: "a2_t_hide1", x0: 30, x1: 34, yMin: -5.0, yMax: -2.4, once: true,
-      emit: { panels: ["a2_p5"], reveal: [], arm: [], spawn: [], objective: "上下两层都得记住", checkpoint: true, win: false } },
+      emit: { panels: ["a2_p5"], reveal: [], arm: [], spawn: [], objective: "老人上不了竖井，孩子够不着梯子 —— 得分批带", checkpoint: true, win: false } },
     { id: "a2_t_fanko", x0: 47, x1: 52, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_p6"], reveal: ["a2_h_fanko"], arm: [], spawn: [], objective: "从下头顶开翻口", checkpoint: false, win: false } },
     { id: "a2_t_probe", x0: 48, x1: 52, yMin: -5.0, yMax: -2.4, once: true,
@@ -1187,13 +1190,15 @@ const act3 = {
 
   npcs: [
     // 开场就在身边的三位，跟着往前跑
-    { id: "a3_n_qiulan", x: 9, y: -8.0, name: "秋兰", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_shuanzhu", x: 12, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false },
-    { id: "a3_n_wangdaniang", x: 15, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false },
+    // 跟着往外跑的三个壮年（爬得了竖井，走得了地表那一段）
+    { id: "a3_n_qiulan", x: 9, y: -8.0, name: "秋兰", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
+    { id: "a3_n_ersao", x: 12, y: -8.0, name: "二嫂", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
+    { id: "a3_n_laoshuan", x: 15, y: -8.0, name: "老栓", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
     // 塌方那头等着的三位，从炕洞下来才碰得上
-    { id: "a3_n_laoshuan", x: 118, y: -8.0, name: "老栓", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_ersao", x: 123.5, y: -8.0, name: "二嫂", role: "villager", follow: false, rescued: false },
-    { id: "a3_n_siye", x: 127, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false },
+    // 老人孩子先走一步，在汇合点等着 —— 从这儿到黑风口全程干线，不用爬也不用钻
+    { id: "a3_n_wangdaniang", x: 118, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
+    { id: "a3_n_shuanzhu", x: 123.5, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: false },
+    { id: "a3_n_siye", x: 127, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
   ],
 
   hazards: [
