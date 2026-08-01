@@ -813,11 +813,16 @@ const act2 = {
     // 这正是"穿土衰减 ×1.9"该有的样子（旧版本把引点摆在 -8 却指望叫动 y=0 的人，
     // 数学上一个也叫不动，那两个引点是死的）。
     { id: "a2_pr_lure_s2", x: 46, y: -8.0, z: PLAY, kind: "vent", facing: 1, interact: "lure",
-      data: { radius: 14, panels: [] }, label: "敲通气孔 —— 把他叫到西头来" },
-    // 引点和炕洞是**配对**的：敲完两米半就能钻进去。
-    // 链三（116 的引点 + 118.5 的炕洞）用的是同一套配法，理由是实测出来的：
-    // lureHold 只有 5.6 秒，任何"敲完换一层绕一圈再回来"的回路都要 10 秒以上，跑不完。
-    // 所以「引 + 敲晕」的正确形状是：敲一下 → 就地藏 → 听他走过来 → 从背后出来。
+      data: { radius: 14, panels: ["a2_brief3"] }, label: "敲通气孔 —— 把他叫到西头来" },
+    // 这个炕洞是给**巡逻状态**的他用的：掩体挡得住路过的一眼，正常等窗口照样管用。
+    // 但它**不能跟上面那个引点配着用** —— 这是实测撞出来的，写死在这儿免得下次再踩：
+    //   `Script_Rules.mjs:4077` `else if (e.lured) next = "search"` —— 被引的人进的是 search；
+    //   而 `UpdateHiding` 对 search 状态的兵在 FLUSH_OUT_REACH = 1.5 米内**直接把人揪出来**，
+    //   并把他的警觉抬到 0.92。
+    // a2_e_inside 从 55–61 走到引点 46，路上正好从 48.5 这个炕洞和 52.5 的被褥堆身上碾过去。
+    // 所以「引」和「藏」在这一幕是**互斥**的两手：**引要配换层**（敲完从 50 的翻口上 s2 避开
+    // 他走过来的那一段，等他停在 46 面朝西，再下来落在他背后四米），**藏要配等窗口**。
+    // a2_brief3 就挂在那个引点上，当场把这条规矩讲给玩家。
     { id: "a2_pr_kang_d2", x: 48.5, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "炕洞" },
     { id: "a2_pr_fanko", x: 50, y: -8.0, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a2_h_fanko" }, label: "翻口" },
     { id: "a2_pr_kang_d2b", x: 52.5, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
@@ -873,7 +878,7 @@ const act2 = {
       data: { sinkId: "a2_sink_grain", panels: [] }, label: "把土倒进空粮坑" },
     { id: "a2_pr_kang3", x: 96.5, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a2_pr_dig_s3e", x: 99.8, y: -3.8, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
-      data: { digSpotId: "a2_dig_s3e", panels: [] }, label: "老砖窑的窑壁 —— 从西头掏进窑膛" },
+      data: { digSpotId: "a2_dig_s3e", panels: ["a2_brief4"] }, label: "老砖窑的窑壁 —— 从西头掏进窑膛" },
     // 窑膛里的两件东西：一个倒土的坑，一盏民兵撂下的马灯（挖进来是有回报的，
     // 不是纯粹的过路）。
     { id: "a2_pr_sink_kiln", x: 107, y: -3.8, z: PLAY, kind: "stove", facing: 1, interact: "dumpSpoil",
@@ -1060,7 +1065,7 @@ const act2 = {
       emit: { panels: ["a2_beat5"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
     // 顶开翻口的同时，上头的人也摸下来了。这一幕的转折点。
     { id: "a2_t_fanko", x0: 47, x1: 52, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_p6"], reveal: ["a2_h_fanko"], arm: [], spawn: ["a2_e_inside"], objective: "从下头顶开翻口", checkpoint: false, win: false } },
+      emit: { panels: ["a2_p6", "a2_boot1"], reveal: ["a2_h_fanko"], arm: [], spawn: ["a2_e_inside"], objective: "从下头顶开翻口", checkpoint: false, win: false } },
     { id: "a2_t_probe", x0: 48, x1: 52, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p7"], reveal: [], arm: [], spawn: [], objective: "刺刀在头顶 —— 别停在通气孔底下", checkpoint: true, win: false } },
     // 水从西院灌下来。走进干线这一段才发生，不是刚捡马灯就发生。
@@ -1068,18 +1073,18 @@ const act2 = {
     // 而 90–94 当场悬崖（sneak 300 秒不过、死 13 次）—— 水一旦晚到，玩家已经越过
     // a2_e_pit 的巡逻区，回头拉闸要穿一次他的视线。取 84–88，离悬崖留两档。
     { id: "a2_t_flood", x0: 84, x1: 88, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: [], reveal: [], arm: ["a2_hz_water"], spawn: [], objective: "水灌进干线了 —— 闸把子在东头，得先找把锨", checkpoint: false, win: false } },
+      emit: { panels: ["a2_call5"], reveal: [], arm: ["a2_hz_water"], spawn: [], objective: "水灌进干线了 —— 闸把子在东头，得先找把锨", checkpoint: false, win: false } },
     { id: "a2_t_shuanzhu", x0: 80, x1: 84, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_beat1", "a2_beat2"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
     { id: "a2_t_elder", x0: 84, x1: 88, yMin: -5.0, yMax: -2.4, once: true,
-      emit: { panels: ["a2_p8"], reveal: [], arm: [], spawn: ["a2_e_pit"], objective: "四爷在西院底下", checkpoint: true, win: false } },
+      emit: { panels: ["a2_p8", "a2_boot2"], reveal: [], arm: [], spawn: ["a2_e_pit"], objective: "四爷在西院底下", checkpoint: true, win: false } },
     // 汤丙会在通气孔上头喊四爷的名字。他爹跟四爷一块打过井——最难受的不是敌人，是这个。
     { id: "a2_t_tang", x0: 91, x1: 95, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_tang1", "a2_tang2", "a2_tang3", "a2_tang4"], reveal: [], arm: [], spawn: [], objective: "别应声", checkpoint: true, win: false } },
     { id: "a2_t_carry", x0: 96, x1: 99, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_beat3"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
     { id: "a2_t_mid", x0: 104, x1: 108, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_p9"], reveal: [], arm: [], spawn: ["a2_e_deep"], objective: "人还不齐 —— 别落下谁", checkpoint: true, win: false } },
+      emit: { panels: ["a2_p9", "a2_boot3"], reveal: [], arm: [], spawn: ["a2_e_deep"], objective: "人还不齐 —— 别落下谁", checkpoint: true, win: false } },
     { id: "a2_t_street", x0: 114, x1: 118, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p10"], reveal: [], arm: [], spawn: [], objective: "头顶就是街 —— 爬过去", checkpoint: true, win: false } },
     { id: "a2_t_newdirt", x0: 120, x1: 124, yMin: -5.0, yMax: -2.4, once: true,
