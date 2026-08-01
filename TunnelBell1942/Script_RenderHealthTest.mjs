@@ -221,6 +221,10 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
     };
   });
   Assert(!after.err, `${tag}: 推进 3 秒无异常`);
+  // 「乡亲人呢？」——act2 的浅层支线曾经整层封在实心土里：几何在、栅格在、
+  // draw call 正常、所有断言全绿，玩家看到的是一屏土。剖面自检会把这种情况
+  // 打成 console.error，这里按幕认领它，别让它混在收尾那一堆匿名页面错误里。
+  Assert(!errors.some((e) => /地道没挖开/.test(e)), `${tag}: 每条地道都真的挖开了`);
   Assert(after.geometries - after.before.geometries < 40, `${tag}: 几何没有逐帧泄漏（+${after.geometries - after.before.geometries}）`);
   Assert(after.textures - after.before.textures < 10, `${tag}: 纹理没有逐帧泄漏（+${after.textures - after.before.textures}）`);
 }
