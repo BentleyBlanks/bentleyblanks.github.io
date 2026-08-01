@@ -43,6 +43,13 @@ const FLOOR_SNAP = 0.34; // 站立时脚下地板的吸附容差
 const SHAFT_GRAB_X = 0.78;
 const FLUSH_OUT_REACH = 1.5; // 搜索状态的兵走到这么近，会把藏在道具里的人翻出来
 
+/** 一个 channel 是否已经被打开——拉闸和地雷都算。
+ *  危害的 armAt / sealedBy 都走这里，免得"能炸开的塌方"变成死锁。 */
+function Switched(state, channel) {
+  if (!channel || !state.world) return false;
+  return !!(state.world.levers?.[channel] || state.world.mines?.[channel]);
+}
+
 // 落地硬直。原来是"超过 safeFallSpeed 一律 0.62 秒完全不能动"——
 // 半秒多的输入锁死在没有战斗的游戏里只有惩罚没有博弈，玩家读成"手柄掉线了"。
 // 改成随冲击强度插值的短硬直 + 期间保留一部分操控（踉跄，不是石化）。
@@ -2772,10 +2779,13 @@ function UpdateHazards(state, dt) {
     // 闸门也能启动危害：拉闸引水是玩家的手段，因果必须落在玩家身上，
     // 不能靠某个 trigger 自己走完（armAt 也允许直接写成闸门 channel）。
     if (!h.armed) {
-      if (h.armAt && state.world.levers[h.armAt]) ArmHazard(state, h.id);
+      if (h.armAt && Switched(state, h.armAt)) ArmHazard(state, h.id);
       else if (h.kind === "water" && state.world.levers.waterDivert) ArmHazard(state, h.id);
     }
-    const sealed = h.sealedBy ? !!state.world.levers[h.sealedBy] : false;
+    // sealedBy / armAt 认两种开关：拉闸（world.levers）和地雷（world.mines）。
+    // 原来只查 levers，于是"用地雷炸开塌方"这种设计会静默死锁——
+    // 危害拦得住人，而唯一能解开它的东西根本不被查询，关卡侧只能绕路。
+    const sealed = h.sealedBy ? Switched(state, h.sealedBy) : false;
 
     if (h.warn > 0) {
       h.warn -= dt;
@@ -4036,7 +4046,7 @@ function BotGoal(state) {
   // 1) 有活跃/已武装的危害而且能封 → 优先去封
   for (const h of state.hazards) {
     if (!h.armed) continue;
-    if (!h.sealedBy || state.world.levers[h.sealedBy]) continue;
+    if (!h.sealedBy || Switched(state, h.sealedBy)) continue;
     const lever = BotLeverPropFor(state, h.sealedBy);
     if (lever) return BotPropGoal(state, lever);
   }
