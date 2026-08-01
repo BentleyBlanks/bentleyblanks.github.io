@@ -82,7 +82,11 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
 
 const stats = await page.evaluate(() => {
   const r = window.TunnelBell.render;
-  return r && r.stats ? { ...r.stats } : null;
+  const cam = r && r.camera;
+  return {
+    ...(r && r.stats ? r.stats : {}),
+    lens: cam ? `${cam.isPerspectiveCamera ? "perspective" : "ortho"} fov=${cam.fov ?? "-"}` : "-",
+  };
 });
 
 console.log("\n渲染统计:", JSON.stringify(stats));

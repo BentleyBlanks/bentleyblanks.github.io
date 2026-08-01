@@ -79,15 +79,21 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   Assert(pixelSpread.hues >= 8, `${tag}: 有色彩层次（${pixelSpread.hues} 种色块）`);
 
   // 角色必须在画面里看得见：玩家所在的那一竖条要比同高度的背景更有对比
+  // 投影一律走相机矩阵。以前这里手算正交视锥，换成透视之后那套算法会静默算错，
+  // 得到的截图裁剪框落在别处，"角色有没有对比"就变成了在量一块空地。
   const readable = await page.evaluate(() => {
     const s = window.TunnelBell.state;
-    const c = window.TunnelBell.render.camera;
+    const handle = window.TunnelBell.render;
     const cv = document.getElementById("GameCanvas");
     const W = cv.clientWidth; const H = cv.clientHeight;
-    const sx = (s.player.x - (c.position.x + c.left)) / (c.right - c.left) * W;
-    const syTop = ((c.position.y + c.top) - (s.player.y + 1.9)) / (c.top - c.bottom) * H;
-    const syBot = ((c.position.y + c.top) - (s.player.y - 0.2)) / (c.top - c.bottom) * H;
-    return { sx, syTop, h: syBot - syTop, W, H };
+    const v = new handle.three.Vector3();
+    const project = (wx, wy) => {
+      v.set(wx, wy, 0).project(handle.camera);
+      return { x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H };
+    };
+    const head = project(s.player.x, s.player.y + 1.9);
+    const feet = project(s.player.x, s.player.y - 0.2);
+    return { sx: head.x, syTop: head.y, h: feet.y - head.y, W, H };
   });
   if (readable.sx > 40 && readable.sx < readable.W - 40 && readable.h > 8) {
     const onPlayer = await SamplePixels(page, {
@@ -98,15 +104,38 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
       `${tag}: 角色所在处有对比，不是糊在背景里（${onPlayer.min}→${onPlayer.max}）`);
   }
 
-  // 玩家必须在画面里
+  // 玩家必须在画面里（用真实投影判，不靠视锥假设）
   const onScreen = await page.evaluate(() => {
     const s = window.TunnelBell.state;
-    const cam = s.camera;
-    const dx = Math.abs(s.player.x - cam.x);
-    const dy = Math.abs(s.player.y - cam.y);
-    return { dx, dy, viewHeight: cam.viewHeight };
+    const handle = window.TunnelBell.render;
+    const v = new handle.three.Vector3(s.player.x, s.player.y + 0.85, 0).project(handle.camera);
+    return { ndcX: v.x, ndcY: v.y };
   });
-  Assert(onScreen.dy < onScreen.viewHeight * 0.6, `${tag}: 玩家在摄像机视野内（dy ${onScreen.dy.toFixed(1)}）`);
+  Assert(Math.abs(onScreen.ndcX) < 1 && Math.abs(onScreen.ndcY) < 1,
+    `${tag}: 玩家在画面内（ndc ${onScreen.ndcX.toFixed(2)}, ${onScreen.ndcY.toFixed(2)}）`);
+
+  // 横版判据：长焦透视允许有景深，但不许出现广角畸变。
+  // 同一根一米高的竖直杆，放在画面中心和放在左右边缘，屏幕高度差不能太大。
+  const lens = await page.evaluate(() => {
+    const s = window.TunnelBell.state;
+    const handle = window.TunnelBell.render;
+    const cam = handle.camera;
+    const halfW = s.camera.viewHeight * 0.5 * (cam.aspect || 16 / 9);
+    const a = new handle.three.Vector3();
+    const b = new handle.three.Vector3();
+    const barHeight = (wx) => {
+      a.set(wx, s.player.y, 0).project(cam);
+      b.set(wx, s.player.y + 1, 0).project(cam);
+      return Math.abs(b.y - a.y);
+    };
+    const mid = barHeight(s.camera.x);
+    const edge = barHeight(s.camera.x + halfW * 0.92);
+    return { mid, edge, ratio: edge / Math.max(1e-6, mid), fov: cam.fov, isPerspective: !!cam.isPerspectiveCamera };
+  });
+  Assert(lens.isPerspective, `${tag}: 用的是透视相机（2.5D 的前提）`);
+  Assert(lens.fov > 0 && lens.fov <= 26, `${tag}: 长焦，没有广角（fov ${lens.fov}）`);
+  Assert(Math.abs(lens.ratio - 1) < 0.06,
+    `${tag}: 画面边缘不畸变，横版成立（边缘/中心 ${lens.ratio.toFixed(3)}）`);
 
   // 跑 3 秒真实帧，看有没有累积泄漏 / 崩溃
   const after = await page.evaluate(async () => {
