@@ -132,6 +132,9 @@ const act1 = {
     { id: "a1_pr_house3", x: 60, y: 0.35, z: MID, kind: "house", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_haystack2", x: 62, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_cart1", x: 67, y: 0.35, z: FORE, kind: "cart", facing: 1, interact: "none", data: null, label: null },
+    // 铺垫：全作第一次"传口令"。他敲的是窗根的暗号，不是喊。
+    { id: "a1_pr_sig_yard", x: 69.2, y: 0.35, z: PLAY, kind: "gate", facing: 1, interact: "signal",
+      data: { squadId: "squad_village", panels: ["a1_call1", "a1_call2", "a1_call3", "a1_call4"] }, label: "窗根 —— 敲暗号" },
     { id: "a1_pr_wall2", x: 71, y: 0.35, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_haystack2b", x: 68, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_vat_y2", x: 67, y: 0.35, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
@@ -161,7 +164,8 @@ const act1 = {
     { id: "a1_pr_tree", x: 112, y: 0, z: PLAY, kind: "tree", facing: 1, interact: "none", data: null, label: null },
     // 钟挂在树上，互动点是树下垂到地面的绳，所以 y = 0。
     { id: "a1_pr_bell", x: 112.5, y: 0, z: PLAY, kind: "bell", facing: 1, interact: "bell",
-      data: { rings: 3, panels: ["a1_p11", "a1_p12"], spawn: ["a1_e_chase1", "a1_e_chase2", "a1_e_chase3", "a1_e_blocker"], objective: "往回跑" },
+      data: { rings: 3, cutscene: "a1_cs_bell", panels: ["a1_p11"],
+              spawn: ["a1_e_chase1", "a1_e_chase2", "a1_e_chase3", "a1_e_tang", "a1_e_blocker"], objective: "往回跑" },
       label: "老槐树上的钟" },
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
@@ -233,6 +237,13 @@ const act1 = {
       vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.0, probeAt: null,
     },
+    // 汤丙会：开场过场里带路进村的本村人。正片里跟山田一起，钟响之后才现身。
+    {
+      id: "a1_e_tang", x: 121, y: 0, kind: "puppet", facing: -1,
+      patrol: { x0: 119, x1: 123, speed: 1.3, pauseSec: 1.2 },
+      vision: { range: 10, halfAngleDeg: 32, height: 1.6 },
+      hearing: 6.0, probeAt: null,
+    },
     // 山田：出口 x125 就在他巡逻区间里。玩家做对一切也过不去——这是叙事必然。
     {
       id: "a1_e_blocker", x: 125, y: 0, kind: "officer", facing: 1,
@@ -247,13 +258,24 @@ const act1 = {
 
   triggers: [
     { id: "a1_t_open", x0: 0, x1: 7, yMin: -1, yMax: 4, once: true,
-      emit: { panels: ["a1_open", "a1_p1"], reveal: [], arm: [], spawn: [], objective: "进村看看", checkpoint: false, win: false } },
+      emit: { panels: ["a1_p1"], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_open", objective: "进村看看", checkpoint: false, win: false } },
     { id: "a1_t_corpse", x0: 24, x1: 27.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p2"], reveal: [], arm: [], spawn: [], objective: "鬼子摸进村了 —— 别出声", checkpoint: true, win: false } },
     { id: "a1_t_wall1", x0: 30.5, x1: 33.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p3"], reveal: [], arm: [], spawn: [], objective: "猫腰，从墙根过去", checkpoint: false, win: false } },
     { id: "a1_t_yard1clear", x0: 48, x1: 51.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p4"], reveal: [], arm: [], spawn: [], objective: "开院门，穿过二道院", checkpoint: true, win: false } },
+    // 一路上听得见村子在往地底下钻——这是钟响之前就该有的集体感。
+    { id: "a1_t_cellar", x0: 43, x1: 46, yMin: -1, yMax: 4, once: true,
+      emit: { panels: ["a1_beat1", "a1_beat2"], reveal: [], arm: [], spawn: [], objective: "挨家挨户叫人下窖", checkpoint: false, win: false } },
+    { id: "a1_t_trace", x0: 51, x1: 54, yMin: -1, yMax: 4, once: true,
+      emit: { panels: ["a1_brief3"], reveal: [], arm: [], spawn: [], objective: "别留下热灶和露头的粮", checkpoint: false, win: false } },
+    { id: "a1_t_tang", x0: 56, x1: 59, yMin: -1, yMax: 4, once: true,
+      emit: { panels: ["a1_tang1", "a1_tang2"], reveal: [], arm: [], spawn: [], objective: "叫门的是本村人", checkpoint: false, win: false } },
+    { id: "a1_t_child", x0: 65, x1: 68, yMin: -1, yMax: 4, once: true,
+      emit: { panels: ["a1_beat3"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
+    { id: "a1_t_occupy", x0: 99, x1: 102, yMin: -1, yMax: 4, once: true,
+      emit: { panels: ["a1_brief2"], reveal: [], arm: [], spawn: [], objective: "他们也在往老槐树底下去", checkpoint: false, win: false } },
     { id: "a1_t_gate", x0: 63, x1: 66, yMin: -1, yMax: 4, once: true,
       emit: { panels: ["a1_p5"], reveal: [], arm: [], spawn: [], objective: "两个人的眼睛是交叉的", checkpoint: false, win: false } },
     { id: "a1_t_yard2clear", x0: 76, x1: 79.5, yMin: -1, yMax: 4, once: true,
@@ -265,6 +287,86 @@ const act1 = {
     // 敲钟之后没有触发器、没有检查点、也没有 win:true。
     // 这一幕怎么收由 endKind:"captured" 决定，a1_close 由玩法层在被抓时播。
   ],
+
+  // ═══════════ 机位区：玩的过程里镜头就在说话 ═══════════
+  // 定镜头（anchorX）= 镜头钉死，人走进构图。每一段都写了为什么换机位。
+  shots: [
+    { id: "a1_sh_open", x0: 3, x1: 22, viewHeight: 12.6, lift: 2.4, anchorX: null, ease: 1.4,
+      reason: "村子还睡着：拉开留出天和远处那棵老槐树的剪影，让玩家先看见目标再走路" },
+    { id: "a1_sh_wall", x0: 33, x1: 41, viewHeight: 8.0, lift: 1.2, anchorX: null, ease: 1.0,
+      reason: "矮墙猫腰段：推近压低，画面跟着人一起蹲下去" },
+    { id: "a1_sh_yard2", x0: 50, x1: 78, viewHeight: 13.2, lift: 2.6, anchorX: null, ease: 1.2,
+      reason: "两个哨兵的视线是交叉的：拉开，让玩家一眼看清两个人的位置关系再动" },
+    { id: "a1_sh_dog", x0: 84, x1: 96, viewHeight: 8.8, lift: 1.4, anchorX: null, ease: 1.0,
+      reason: "军犬就在墙那头：收紧画面，这一段该靠听的，不该靠看的" },
+    { id: "a1_sh_bell", x0: 106, x1: 110, viewHeight: 12.0, lift: 2.2, anchorX: 108, ease: 1.6,
+      reason: "第一次真正看见钟：镜头钉住不动，高老忠从左边走进画面，钟在右边等着他" },
+    { id: "a1_sh_sealed", x0: 112, x1: 128, viewHeight: 14.6, lift: 2.8, anchorX: null, ease: 1.2,
+      reason: "钟响之后：拉到最远，让玩家自己看见前后都是人、那个地道口就在够不着的地方" },
+  ],
+
+  cutscenes: {
+    // 山田带队夜里摸进村。那句台词在原片里是一道要命的命令，不是梗：
+    // 夜、压低的声音、队列无声散开。镜头全程慢，没有一个滑稽的节拍。
+    a1_cs_open: {
+      id: "a1_cs_open", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 6, y: 2.2, viewHeight: 9.0 }, sec: 0.01, ease: "inOut" },
+        { kind: "fade", to: 0, sec: 1.6 },
+        { kind: "wait", sec: 0.8 },
+        { kind: "sfx", id: "boot" },
+        { kind: "actor", id: "a1_e_tang", to: { x: 9 }, sec: 3.2, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_blocker", to: { x: 6.6 }, sec: 3.4, anim: "sneak", facing: 1 },
+        { kind: "camera", to: { x: 11, y: 2.0, viewHeight: 8.4 }, sec: 3.2, ease: "inOut" },
+        { kind: "panel", id: "a1_cs_open_p1" },
+        { kind: "panel", id: "a1_brief1" },
+        { kind: "actor", id: "a1_e_tang", to: { x: 12 }, sec: 1.6, anim: "walk", facing: 1 },
+        { kind: "wait", sec: 0.6 },
+        { kind: "camera", to: { x: 8.2, y: 1.8, viewHeight: 6.0 }, sec: 2.0, ease: "inOut" },
+        { kind: "panel", id: "a1_cs_open_p2" },
+        { kind: "panel", id: "a1_cs_open_p3" },
+        { kind: "wait", sec: 0.6 },
+        { kind: "camera", to: { x: 10.5, y: 1.8, viewHeight: 6.6 }, sec: 1.4, ease: "inOut" },
+        { kind: "panel", id: "a1_tang3" },
+        { kind: "actor", id: "a1_e_tang", to: { x: 13.6 }, sec: 1.4, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a1_tang4" },
+        { kind: "wait", sec: 0.9 },
+        { kind: "sfx", id: "cloth" },
+        { kind: "actor", id: "a1_e_chase1", to: { x: 17 }, sec: 2.6, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_chase3", to: { x: 14 }, sec: 2.6, anim: "sneak", facing: 1 },
+        { kind: "camera", to: { x: 20, y: 3.0, viewHeight: 13.0 }, sec: 3.6, ease: "inOut" },
+        { kind: "panel", id: "a1_cs_open_p4" },
+        { kind: "wait", sec: 1.2 },
+        { kind: "fade", to: 1, sec: 1.4 },
+        { kind: "actor", id: "a1_e_tang", to: { x: 121 }, sec: 0.01, anim: "idle", facing: -1 },
+        { kind: "actor", id: "a1_e_blocker", to: { x: 125 }, sec: 0.01, anim: "idle", facing: 1 },
+        { kind: "actor", id: "a1_e_chase1", to: { x: 85 }, sec: 0.01, anim: "idle", facing: 1 },
+        { kind: "actor", id: "a1_e_chase3", to: { x: 7 }, sec: 0.01, anim: "idle", facing: 1 },
+        { kind: "camera", to: { x: 4, y: 1.6, viewHeight: 11.5 }, sec: 0.01, ease: "inOut" },
+        { kind: "fade", to: 0, sec: 1.2 },
+      ],
+    },
+    // 全作最重的仪式点。上树、三下钟、镜头拉开看见全村醒过来。
+    a1_cs_bell: {
+      id: "a1_cs_bell", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 112.4, y: 1.6, viewHeight: 7.2 }, sec: 1.4, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 112.2 }, sec: 0.9, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a1_cs_bell_p1" },
+        { kind: "sfx", id: "cloth" },
+        { kind: "actor", id: "player", to: { x: 112.5, y: 2.6 }, sec: 2.4, anim: "climb", facing: 1 },
+        { kind: "camera", to: { x: 112.5, y: 3.8, viewHeight: 6.2 }, sec: 2.4, ease: "inOut" },
+        { kind: "wait", sec: 0.6 },
+        { kind: "bell", rings: 3 },
+        { kind: "camera", to: { x: 104, y: 4.4, viewHeight: 17.0 }, sec: 3.6, ease: "inOut" },
+        { kind: "sfx", id: "shout" },
+        { kind: "panel", id: "a1_cs_bell_p2" },
+        { kind: "panel", id: "a1_p12" },
+        { kind: "actor", id: "player", to: { x: 112.5, y: 0 }, sec: 1.1, anim: "fall", facing: -1 },
+        { kind: "wait", sec: 0.5 },
+      ],
+    },
+  },
 
   checkpoints: [
     { id: "a1_cp1", x: 26, y: 0, label: "村口" },
@@ -413,6 +515,9 @@ const act2 = {
     { id: "a2_pr_lantern2", x: 86, y: -3.8, z: PLAY, kind: "lantern", facing: 1, interact: "pickup", data: { item: "lantern" }, label: "马灯" },
     { id: "a2_pr_vent6", x: 90, y: -2.60, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_crock6", x: 91, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    // 铺垫：把口令传给暗室里的人。对着通气孔说，不是喊。
+    { id: "a2_pr_sig_hideout", x: 92, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "signal",
+      data: { squadId: "squad_hideout", panels: ["a2_call1", "a2_call2", "a2_call3", "a2_call4"] }, label: "对着通气孔传话" },
     { id: "a2_pr_kang3", x: 96, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a2_pr_beam10", x: 99, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
 
@@ -483,7 +588,7 @@ const act2 = {
 
   triggers: [
     { id: "a2_t_open", x0: 0, x1: 5, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_open", "a2_p1"], reveal: [], arm: [], spawn: [], objective: "跟着那盏马灯的光走", checkpoint: false, win: false } },
+      emit: { panels: ["a2_p1"], reveal: [], arm: [], spawn: [], cutscene: "a2_cs_open", objective: "跟着那盏马灯的光走", checkpoint: false, win: false } },
     { id: "a2_t_low", x0: 5.5, x1: 8, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_p2"], reveal: [], arm: [], spawn: [], objective: "猫腰过去", checkpoint: false, win: false } },
     { id: "a2_t_lantern", x0: 11, x1: 14, yMin: -9.5, yMax: -6.0, once: true,
@@ -496,6 +601,21 @@ const act2 = {
       emit: { panels: ["a2_p6"], reveal: ["a2_h_fanko"], arm: [], spawn: [], objective: "从下头顶开翻口", checkpoint: false, win: false } },
     { id: "a2_t_probe", x0: 48, x1: 52, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p7"], reveal: [], arm: [], spawn: [], objective: "刺刀在头顶 —— 别停在通气孔底下", checkpoint: true, win: false } },
+    { id: "a2_t_bellcode", x0: 16, x1: 19, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a2_brief2"], reveal: [], arm: [], spawn: [], objective: "记住钟点：三慢两快是集合", checkpoint: false, win: false } },
+    { id: "a2_t_shuanzhu", x0: 57, x1: 60, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: ["a2_beat1", "a2_beat2"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
+    { id: "a2_t_three", x0: 46, x1: 49, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: ["a2_beat5"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
+    // 汤丙会在通气孔上头喊四爷的名字。他爹跟四爷一块打过井——最难受的不是敌人，是这个。
+    { id: "a2_t_tang", x0: 91, x1: 95, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: ["a2_tang1", "a2_tang2", "a2_tang3", "a2_tang4"], reveal: [], arm: [], spawn: [], objective: "别应声", checkpoint: true, win: false } },
+    { id: "a2_t_carry", x0: 96, x1: 99, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: ["a2_beat3"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
+    { id: "a2_t_newdirt", x0: 120, x1: 124, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: ["a2_beat4"], reveal: [], arm: [], spawn: [], objective: "头顶的土是新翻的 —— 别停", checkpoint: false, win: false } },
+    { id: "a2_t_choke", x0: 135, x1: 139, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a2_brief1"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: false } },
     { id: "a2_t_elder", x0: 84, x1: 88, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p8"], reveal: [], arm: [], spawn: [], objective: "四爷在西院底下", checkpoint: true, win: false } },
     { id: "a2_t_mid", x0: 104, x1: 108, yMin: -9.5, yMax: -6.0, once: true,
@@ -503,10 +623,69 @@ const act2 = {
     { id: "a2_t_street", x0: 116, x1: 120, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: ["a2_p10"], reveal: [], arm: [], spawn: [], objective: "头顶就是街 —— 爬过去", checkpoint: true, win: false } },
     { id: "a2_t_wellnear", x0: 138, x1: 142, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_p11"], reveal: ["a2_h_well"], arm: [], spawn: [], objective: "到枯井底，人齐了就上去", checkpoint: true, win: false } },
+      emit: { panels: ["a2_p11", "a2_beat6"], reveal: ["a2_h_well"], arm: [], spawn: [], cutscene: "a2_cs_meet", objective: "到枯井底，人齐了就上去", checkpoint: true, win: false } },
     { id: "a2_t_end", x0: 143, x1: 148, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_p12", "a2_close"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
   ],
+
+  shots: [
+    { id: "a2_sh_low", x0: 3, x1: 11.5, viewHeight: 6.8, lift: 0.35, anchorX: null, ease: 1.2,
+      reason: "开场第一段矮道：推到最近，先让玩家憋一下，再给他灯" },
+    { id: "a2_sh_lantern", x0: 12.4, x1: 15.0, viewHeight: 9.0, lift: 0.6, anchorX: 13.7, ease: 1.4,
+      reason: "捡马灯：镜头停住，让那点光在原地亮起来，而不是跟着人晃" },
+    { id: "a2_sh_fork", x0: 26, x1: 40, viewHeight: 11.2, lift: 1.4, anchorX: null, ease: 1.2,
+      reason: "地道网第一个分岔口：拉开，让玩家看见上下两层是怎么接上的（三通里的高低相通）" },
+    { id: "a2_sh_probe", x0: 46, x1: 66, viewHeight: 7.2, lift: 0.4, anchorX: null, ease: 1.0,
+      reason: "头顶就是刺刀：收紧到只看得见眼前两三米，逼玩家去听而不是去看" },
+    { id: "a2_sh_street", x0: 116, x1: 134, viewHeight: 6.2, lift: 0.25, anchorX: null, ease: 1.0,
+      reason: "净空 0.85 的爬行段：推到最紧，画面被土压扁——街就在头顶上" },
+    { id: "a2_sh_count", x0: 142.5, x1: 146.5, viewHeight: 11.5, lift: 0.8, anchorX: 144.5, ease: 1.6,
+      reason: "枯井底点人头：镜头钉住，六个人一个一个走进画面，玩家自己数" },
+  ],
+
+  cutscenes: {
+    // 地道里第一次听见地面的钟。震下来的土、抬头、然后是那三下。
+    a2_cs_open: {
+      id: "a2_cs_open", letterbox: "wide", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 5, y: -7.2, viewHeight: 7.6 }, sec: 0.01, ease: "inOut" },
+        { kind: "fade", to: 0, sec: 1.4 },
+        { kind: "wait", sec: 0.7 },
+        { kind: "camera", to: { x: 6.5, y: -6.4, viewHeight: 6.4 }, sec: 2.4, ease: "inOut" },
+        { kind: "sfx", id: "bell_ring" },
+        { kind: "panel", id: "a2_cs_open_p1" },
+        { kind: "wait", sec: 0.8 },
+        { kind: "actor", id: "player", to: { x: 5.4 }, sec: 1.0, anim: "idle", facing: 1 },
+        { kind: "camera", to: { x: 9, y: -7.0, viewHeight: 8.4 }, sec: 2.6, ease: "inOut" },
+        { kind: "panel", id: "a2_cs_open_p2" },
+        { kind: "panel", id: "a2_cs_open_p3" },
+        { kind: "wait", sec: 0.6 },
+      ],
+    },
+    // 暗室点人头。这一段的重量全在"数"这个动作上。
+    a2_cs_meet: {
+      id: "a2_cs_meet", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 144, y: -7.0, viewHeight: 9.6 }, sec: 1.6, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 142.5 }, sec: 1.2, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a2_cs_meet_p1" },
+        { kind: "actor", id: "a2_n_shuanzhu", to: { x: 143.6 }, sec: 1.0, anim: "walk", facing: 1 },
+        { kind: "actor", id: "a2_n_wangdaniang", to: { x: 144.6 }, sec: 1.4, anim: "walk", facing: 1 },
+        { kind: "actor", id: "a2_n_siye", to: { x: 145.6 }, sec: 1.6, anim: "walk", facing: 1 },
+        { kind: "actor", id: "a2_n_qiulan", to: { x: 146.4 }, sec: 1.8, anim: "walk", facing: 1 },
+        { kind: "actor", id: "a2_n_ersao", to: { x: 147.2 }, sec: 2.0, anim: "walk", facing: 1 },
+        { kind: "actor", id: "a2_n_laoshuan", to: { x: 148 }, sec: 2.2, anim: "walk", facing: 1 },
+        { kind: "wait", sec: 0.6 },
+        { kind: "camera", to: { x: 145.6, y: -7.2, viewHeight: 7.4 }, sec: 2.0, ease: "inOut" },
+        { kind: "panel", id: "a2_cs_meet_p2" },
+        { kind: "wait", sec: 0.7 },
+        { kind: "panel", id: "a2_cs_meet_p3" },
+        { kind: "wait", sec: 0.5 },
+        { kind: "panel", id: "a2_p12" },
+        { kind: "wait", sec: 0.8 },
+      ],
+    },
+  },
 
   checkpoints: [
     { id: "a2_cp1", x: 13, y: -8.0, label: "马灯" },
@@ -567,14 +746,20 @@ const act3 = {
     // 地表
     { id: "a3_f_su1", x0: 60, x1: 88, y: 0, kind: "dirt" },
     { id: "a3_f_su2", x0: 88, x1: 106, y: 0.4, kind: "stone" },
-    { id: "a3_f_su3", x0: 106, x1: 124, y: 0, kind: "dirt" },
+    { id: "a3_f_su3", x0: 106, x1: 142, y: 0, kind: "dirt" },
     // 街道底下的短地道：绕开两个哨兵和一条狗
     { id: "a3_f_dm", x0: 88, x1: 106, y: -4.5, kind: "tunnel" },
     // 地下：东段干线（塌方之后的那一半）
     { id: "a3_f_d3", x0: 110, x1: 148, y: -8.0, kind: "tunnel" },
     { id: "a3_f_d4", x0: 148, x1: 178, y: -8.0, kind: "tunnel" },
+    // 反击段的两条民兵支线：干线在下，民兵蹲在上头的射击位。
+    // 各有两口竖井接回干线，都不是断头路。
+    { id: "a3_f_s5", x0: 126, x1: 142, y: -3.8, kind: "tunnel" },
+    { id: "a3_f_s6", x0: 152, x1: 166, y: -3.8, kind: "tunnel" },
     // 最后一段的地表街面：只承载山田一伙，玩家到不了（有意为之）。
     { id: "a3_f_top3", x0: 146, x1: 168, y: 0, kind: "dirt" },
+    // 灌烟那个洞口的地面：开场过场里山田和汤丙会站这儿，玩家到不了。
+    { id: "a3_f_top0", x0: 2, x1: 26, y: 0, kind: "dirt" },
     // 黑风口外的坡顶
     { id: "a3_f_out", x0: 170, x1: 180, y: 0, kind: "dirt" },
   ],
@@ -597,6 +782,9 @@ const act3 = {
     { x0: 138, x1: 148, y: -6.22 },
     // 摸黑段：干线畅通，净空足，压力全来自头顶的人
     { x0: 148, x1: 178, y: -6.22 },
+    // 民兵支线：净空 1.20，一路猫腰——射击位本来就是蹲着打的
+    { x0: 126, x1: 142, y: -2.60 },
+    { x0: 152, x1: 166, y: -2.60 },
   ],
 
   shafts: [
@@ -606,6 +794,10 @@ const act3 = {
     { id: "a3_sh_m1", x: 88.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street1" },
     { id: "a3_sh_m2", x: 105.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street2" },
     { id: "a3_sh_kang", x: 116, yTop: 0, yBottom: -8.0, kind: "ladder", requiresHatch: "a3_h_kang" },
+    { id: "a3_sh_e1", x: 128, yTop: -3.8, yBottom: -8.0, kind: "ladder", requiresHatch: null },
+    { id: "a3_sh_e2", x: 140, yTop: -3.8, yBottom: -8.0, kind: "dirt", requiresHatch: null },
+    { id: "a3_sh_e3", x: 154, yTop: -3.8, yBottom: -8.0, kind: "ladder", requiresHatch: null },
+    { id: "a3_sh_e4", x: 164, yTop: -3.8, yBottom: -8.0, kind: "dirt", requiresHatch: null },
     { id: "a3_sh_wind", x: 175, yTop: 0, yBottom: -8.0, kind: "dirt", requiresHatch: null },
   ],
 
@@ -689,6 +881,39 @@ const act3 = {
     { id: "a3_pr_lamp_s3", x: 123, y: 0, z: BACK, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
 
     // —— 地下 d3：汇合段 ——
+    // —— 反击：地道里挂的那截钢轨，就是第三次钟声（反击的信号）——
+    { id: "a3_pr_bell3", x: 119, y: -8.0, z: PLAY, kind: "bell", facing: 1, interact: "bell",
+      data: { rings: 3, cutscene: "a3_cs_bell", panels: ["a3_call1"], objective: "西头枪眼，把他们往东赶" }, label: "地道里挂的钢轨" },
+    // —— 反击：传令点。三个组分散在两条支线上，玩家得爬上爬下跑腿 ——
+    { id: "a3_pr_sig_west", x: 131, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "signal",
+      data: { squadId: "squad_west", panels: ["a3_call4"] }, label: "传口令：西头组" },
+    { id: "a3_pr_sig_mill", x: 141, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "signal",
+      data: { squadId: "squad_mill", panels: ["a3_call6", "a3_call7"] }, label: "传口令：碾道组" },
+    { id: "a3_pr_sig_east", x: 157, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "signal",
+      data: { squadId: "squad_east", panels: ["a3_call2", "a3_call3"] }, label: "传口令：东头组" },
+    // —— 反击：枪眼。两个头顶都真的有人在走 ——
+    // 136 上头是汤丙会 [134,140]：枪眼一开，他在土上头喊高传宝的名字。高传宝不出声。
+    { id: "a3_pr_lh_west", x: 136, y: -3.8, z: PLAY, kind: "loophole", facing: 1, interact: "loophole",
+      data: { squadId: "squad_west", panels: ["a3_call5", "a3_tang4", "a3_tang5"] }, label: "西头枪眼" },
+    // 161 上头是山田 [149,166]：挨了冷枪才知道街心有雷。
+    { id: "a3_pr_lh_east", x: 161, y: -3.8, z: PLAY, kind: "loophole", facing: 1, interact: "loophole",
+      data: { squadId: "squad_east", panels: ["a3_beat2"] }, label: "东头枪眼" },
+    // —— 反击：地雷。碾道那颗断他退路，东头那颗合围 ——
+    { id: "a3_pr_mine_mill", x: 145, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "mine",
+      data: { channel: "mineMill", needSquad: "squad_mill", panels: [] }, label: "碾道翻口的雷" },
+    { id: "a3_pr_mine_east", x: 168, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "mine",
+      data: { channel: "mineEast", needSquad: "squad_east", panels: [] }, label: "东头地雷" },
+    // —— 民兵支线里的生活/工事痕迹 ——
+    { id: "a3_pr_beam_s5a", x: 127, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_crock_s5", x: 134, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_kang_s5", x: 139, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
+    { id: "a3_pr_beam_s6a", x: 153, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_crock_s6", x: 159, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_kang_s6", x: 165, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
+    // 灌烟那个洞口（开场过场用），地表 a3_f_top0 上
+    { id: "a3_pr_smokehole", x: 12, y: 0, z: PLAY, kind: "trapdoor", facing: 1, interact: "none", data: null, label: "他们正在往里灌烟的洞口" },
+    { id: "a3_pr_house_t0", x: 18, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
+
     { id: "a3_pr_beam5", x: 120, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_crock5", x: 124, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_kang4", x: 128, y: -8.0, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
@@ -749,6 +974,15 @@ const act3 = {
       vision: { range: 12, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.5, probeAt: null,
     },
+    // 汤丙会（伪军队长）：本村人，认得每一个院子。他不是脸谱化的走狗——
+    // 危险恰恰在于"他知道哪儿有口"。巡逻线只有六米、视距 11，
+    // 跟山田那条十七米的线摆在一起，谁在指挥一眼看得出来。
+    {
+      id: "a3_e_tang", x: 137, y: 0, kind: "puppet", facing: -1,
+      patrol: { x0: 134, x1: 140, speed: 1.25, pauseSec: 1.6 },
+      vision: { range: 11, halfAngleDeg: 30, height: 1.6 },
+      hearing: 6.0, probeAt: null,
+    },
     // —— 以下两个由 a3_t_dark 的 emit.spawn 唤出。他们在 x=148–168 的街面上，
     //     正对着 d4 的四个通气孔。玩家手里的马灯会从通气孔漏上去 ——
     //     这一段的解法是把马灯放下、摸黑走。
@@ -790,7 +1024,9 @@ const act3 = {
 
   triggers: [
     { id: "a3_t_open", x0: 0, x1: 6, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a3_open", "a3_p1"], reveal: [], arm: ["a3_hz_gas"], spawn: [], objective: "烟从后头灌进来了 —— 往前跑", checkpoint: false, win: false } },
+      emit: { panels: ["a3_p1"], reveal: [], arm: ["a3_hz_gas"], spawn: [], cutscene: "a3_cs_open", objective: "烟从后头灌进来了 —— 往前跑", checkpoint: false, win: false } },
+    { id: "a3_t_gasbrief", x0: 12, x1: 16, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_brief3"], reveal: [], arm: [], spawn: [], objective: "湿布捂住口鼻 —— 干布不顶用", checkpoint: false, win: false } },
     { id: "a3_t_grain", x0: 22, x1: 26, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p2"], reveal: [], arm: [], spawn: [], objective: "上粮窖，找块木塞", checkpoint: true, win: false } },
     { id: "a3_t_plug", x0: 33, x1: 37, yMin: -5.6, yMax: -3.0, once: true,
@@ -818,14 +1054,113 @@ const act3 = {
     // 汇合到摸黑段之间有二十多米一句话没有，林霞在这儿说去处。
     { id: "a3_t_quiet", x0: 133, x1: 137, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p13"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
+    // 反击从这儿开始：先把口令传到西头，把他们的退路封掉。
+    { id: "a3_t_counter", x0: 117, x1: 120, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_beat1", "a3_brief1"], reveal: [], arm: [], spawn: [], objective: "敲钢轨 —— 三快一慢", checkpoint: true, win: false } },
+    { id: "a3_t_squad_west", x0: 129, x1: 133, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "西头组：开枪眼，把他们往东赶", checkpoint: true, win: false } },
+    { id: "a3_t_squad_east", x0: 155, x1: 159, yMin: -5.0, yMax: -2.4, once: true,
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "东头组：地雷合围", checkpoint: true, win: false } },
+    // 汤丙会在通气孔上头喊话劝降。栓柱认得他，林霞按住所有人：钟没响就不动。
+    { id: "a3_t_tang_call", x0: 125, x1: 129, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: ["a3_tang1", "a3_tang2", "a3_tang3"], reveal: [], arm: [], spawn: [], objective: "别应声 —— 钟没响就不动", checkpoint: true, win: false } },
     { id: "a3_t_dark", x0: 145, x1: 150, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p12"], reveal: [], arm: [], spawn: ["a3_e_yamada", "a3_e_s5"], objective: "把马灯放下 —— 摸黑走，认通气孔漏下来的光", checkpoint: true, win: false } },
     // 摸黑段的尽头。这一格没有台词，只有一个抬头往上看的画面。
     { id: "a3_t_reeds", x0: 166, x1: 170, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p14"], reveal: [], arm: [], spawn: [], objective: "到了 —— 一个一个上去", checkpoint: true, win: false } },
+    // 反击得手：东头地雷响过之后，镜头交给过场。
+    { id: "a3_t_strike", x0: 169, x1: 172, yMin: -9.5, yMax: -6.0, once: true,
+      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a3_cs_strike", objective: "带全村爬出黑风口", checkpoint: true, win: false } },
     { id: "a3_t_end", x0: 172, x1: 178, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a3_close"], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "", checkpoint: false, win: true } },
   ],
+
+  shots: [
+    { id: "a3_sh_gas", x0: 2, x1: 20, viewHeight: 11.6, lift: 1.0, anchorX: null, ease: 1.2,
+      reason: "毒烟从背后压过来：拉开，让玩家自己看见烟已经吃掉了多少路" },
+    { id: "a3_sh_choke", x0: 48, x1: 56, viewHeight: 7.0, lift: 0.4, anchorX: null, ease: 1.0,
+      reason: "封卡口：推到最近，木塞塞进去那一下要占满画面" },
+    { id: "a3_sh_up", x0: 60, x1: 72, viewHeight: 15.0, lift: 3.0, anchorX: null, ease: 1.6,
+      reason: "从碾盘底下钻出来，天正在亮：拉到最远，一眼看清整条街和街上的人" },
+    { id: "a3_sh_boots", x0: 92.6, x1: 96.4, viewHeight: 11.0, lift: 0.5, anchorX: 94.5, ease: 1.6,
+      reason: "从驴槽底下探头：镜头钉住，让街上的靴子从画面上沿走过去，人不动镜头也不动" },
+    { id: "a3_sh_well", x0: 108, x1: 118, viewHeight: 8.6, lift: 1.6, anchorX: null, ease: 1.0,
+      reason: "扳辘轳引水：推近到看得见绳子在动——水要倒灌进他们灌烟的那个洞" },
+    { id: "a3_sh_net", x0: 118, x1: 145, viewHeight: 12.6, lift: 1.4, anchorX: null, ease: 1.4,
+      reason: "反击开始：拉开，让玩家看清干线和上头两条民兵支线是怎么串成一张网的" },
+    { id: "a3_sh_dark", x0: 148, x1: 166, viewHeight: 7.4, lift: 0.3, anchorX: null, ease: 1.2,
+      reason: "熄了灯摸黑走：推近压低，只剩通气孔漏下来的那几道光" },
+    { id: "a3_sh_out", x0: 168, x1: 172, viewHeight: 12.0, lift: 1.2, anchorX: 170, ease: 1.8,
+      reason: "反击得手、黑风口就在眼前：镜头钉住，六个人一个一个走出画面——收尾不追着人跑" },
+  ],
+
+  cutscenes: {
+    // 山田下令灌烟 / 汤丙会指认地道口。层级关系全在走位上：
+    // 汤丙会走过去指，山田站着不动，只把头转过来。
+    a3_cs_open: {
+      id: "a3_cs_open", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 14, y: 2.4, viewHeight: 10.0 }, sec: 0.01, ease: "inOut" },
+        { kind: "fade", to: 0, sec: 1.4 },
+        { kind: "actor", id: "a3_e_yamada", to: { x: 16 }, sec: 0.01, anim: "idle", facing: -1 },
+        { kind: "actor", id: "a3_e_tang", to: { x: 18 }, sec: 0.01, anim: "idle", facing: -1 },
+        { kind: "wait", sec: 0.7 },
+        { kind: "actor", id: "a3_e_tang", to: { x: 12.8 }, sec: 2.4, anim: "walk", facing: -1 },
+        { kind: "camera", to: { x: 13, y: 1.8, viewHeight: 7.0 }, sec: 2.4, ease: "inOut" },
+        { kind: "panel", id: "a3_cs_open_p1" },
+        { kind: "wait", sec: 0.6 },
+        { kind: "camera", to: { x: 15, y: 1.8, viewHeight: 6.2 }, sec: 1.8, ease: "inOut" },
+        { kind: "actor", id: "a3_e_yamada", to: { x: 15.4 }, sec: 1.4, anim: "walk", facing: -1 },
+        { kind: "panel", id: "a3_cs_open_p2" },
+        { kind: "sfx", id: "gas" },
+        { kind: "wait", sec: 0.9 },
+        { kind: "camera", to: { x: 12, y: -3.0, viewHeight: 15.0 }, sec: 3.4, ease: "inOut" },
+        { kind: "panel", id: "a3_cs_open_p3" },
+        { kind: "wait", sec: 0.8 },
+        { kind: "fade", to: 1, sec: 1.2 },
+        { kind: "actor", id: "a3_e_yamada", to: { x: 158 }, sec: 0.01, anim: "idle", facing: 1 },
+        { kind: "actor", id: "a3_e_tang", to: { x: 137 }, sec: 0.01, anim: "idle", facing: -1 },
+        { kind: "camera", to: { x: 4, y: -7.4, viewHeight: 9.0 }, sec: 0.01, ease: "inOut" },
+        { kind: "panel", id: "a3_open" },
+        { kind: "fade", to: 0, sec: 1.2 },
+      ],
+    },
+    // 第三次钟声：示警（一幕）→ 集合（二幕）→ 动手（这里）。
+    // 敲的是地道里挂的那截钢轨，三快一慢。玩家没有攻击键，他敲的是信号。
+    a3_cs_bell: {
+      id: "a3_cs_bell", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 119, y: -6.8, viewHeight: 7.6 }, sec: 1.4, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 118.8 }, sec: 0.9, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a3_cs_strike_p1" },
+        { kind: "wait", sec: 0.5 },
+        { kind: "camera", to: { x: 126, y: -5.4, viewHeight: 13.0 }, sec: 3.2, ease: "inOut" },
+        { kind: "panel", id: "a3_bell1" },
+        { kind: "sfx", id: "shout" },
+        { kind: "wait", sec: 0.8 },
+      ],
+    },
+    // 反击得手。玩家一直没有攻击键——扣扳机的是全村。
+    // 所以这一段镜头不跟玩家，它去看那些他传过口令的地方。
+    a3_cs_strike: {
+      id: "a3_cs_strike", letterbox: "full", skippable: true,
+      steps: [
+        { kind: "camera", to: { x: 168, y: -6.8, viewHeight: 8.0 }, sec: 1.2, ease: "inOut" },
+        { kind: "sfx", id: "alarm" },
+        { kind: "panel", id: "a3_tang4" },
+        { kind: "camera", to: { x: 160, y: -1.6, viewHeight: 16.0 }, sec: 3.2, ease: "inOut" },
+        { kind: "sfx", id: "shout" },
+        { kind: "wait", sec: 0.6 },
+        { kind: "panel", id: "a3_tang5" },
+        { kind: "wait", sec: 0.8 },
+        { kind: "camera", to: { x: 174, y: -6.6, viewHeight: 9.0 }, sec: 3.0, ease: "inOut" },
+        { kind: "actor", id: "player", to: { x: 172 }, sec: 2.0, anim: "walk", facing: 1 },
+        { kind: "panel", id: "a3_cs_strike_p2" },
+        { kind: "wait", sec: 0.7 },
+      ],
+    },
+  },
 
   checkpoints: [
     { id: "a3_cp1", x: 24, y: -8.0, label: "粮窖口" },
@@ -834,10 +1169,12 @@ const act3 = {
     { id: "a3_cp4", x: 63, y: 0, label: "碾盘院" },
     { id: "a3_cp5", x: 89, y: 0.4, label: "街口" },
     { id: "a3_cp6", x: 112, y: 0, label: "水井" },
-    { id: "a3_cp7", x: 118, y: -8.0, label: "汇合点" },
+    { id: "a3_cp7", x: 126.5, y: -8.0, label: "汇合点" },
     { id: "a3_cp8", x: 135, y: -8.0, label: "干线东段" },
     { id: "a3_cp9", x: 148, y: -8.0, label: "摸黑段前" },
-    { id: "a3_cp10", x: 168, y: -8.0, label: "黑风口前" },
+    { id: "a3_cp10", x: 131, y: -3.8, label: "西头组" },
+    { id: "a3_cp11", x: 157, y: -3.8, label: "东头组" },
+    { id: "a3_cp12", x: 163, y: -8.0, label: "黑风口前" },
   ],
 
   objectives: [
@@ -846,7 +1183,9 @@ const act3 = {
     { id: "a3_o3", text: "上地表，摸到水井", doneWhen: { trigger: "a3_t_water" } },
     { id: "a3_o4", text: "引水冲开塌方", doneWhen: { propUsed: "a3_pr_well3" } },
     { id: "a3_o5", text: "跟乡亲汇合，一个都不能少", doneWhen: { npcRescued: "all" } },
-    { id: "a3_o6", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
+    { id: "a3_o6", text: "敲钢轨，把口令传遍地道网", doneWhen: { trigger: "a3_t_squad_east" } },
+    { id: "a3_o7", text: "东头合围", doneWhen: { trigger: "a3_t_strike" } },
+    { id: "a3_o8", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
   ],
 };
 

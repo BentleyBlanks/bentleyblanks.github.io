@@ -185,7 +185,10 @@ Level = {
   //   data 按 interact 定：
   //     hatch  → { hatchId }
   //     hide   → { capacity:1 }              躲进去后敌人看不见
-  //     bell   → { rings:3 }                 敲钟，触发大事件
+  //     bell   → { rings:3, panels:[id], spawn:[id], objective, cutscene }
+  //                                          敲钟。因果必须挂在这一下：追兵由 spawn 唤醒，
+  //                                          叙事走 panels 或 cutscene（钟是全作最重的仪式点，
+  //                                          优先用 cutscene）。不许退回位置触发。
   //     pickup → { item:"lantern"|"plug"|"shovel"|"grain"|"note" }
   //     lever  → { channel:"gasSeal"|"waterDivert"|"gateOpen", needItem:null|"plug" }
   //     push   → { toX:number }              推到目标 x（堵洞/搭桥）
