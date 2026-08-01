@@ -405,6 +405,12 @@ const PROP_DEFAULT_Z = {
   corpse: -0.4, trough: -0.5, cart: -0.4, kang: -1.6, stove: -1.4,
 };
 
+/** 允许绕 Y 转四分之三角的道具（值是幅度倍率）。见 PropYaw。 */
+const PROP_YAW = {
+  house: 1.0, wall: 0.85, gate: 0.8, kang: 0.7, stove: 0.7,
+  vat: 0.6, cart: 1.0, trough: 0.9, crock: 0.6, millstone: 0.5,
+};
+
 /** 敌人 kind → Actor rig kind。
  *
  *  漏登记一个 kind 不会报错，只会**静默**退回 fallback。puppet（汤丙会）
@@ -811,6 +817,15 @@ function GQuad(w, h, x, y, z) {
   return g;
 }
 
+/** 绕 (x,y,z) 处的竖轴转 a 弧度。四分之三角、斜着往纵深走的车辙都靠它。 */
+function RotYAbout(geo, a, x, y, z) {
+  if (!geo || !a) return geo;
+  geo.translate(-(x || 0), -(y || 0), -(z || 0));
+  geo.rotateY(a);
+  geo.translate(x || 0, y || 0, z || 0);
+  return geo;
+}
+
 /** 归一化到可合并的属性集：非索引 + position/normal/uv。 */
 function NormalizeGeo(geo) {
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
@@ -1016,12 +1031,24 @@ function ExtractEarthOutline(level, cfg) {
     if (typeof f.x0 !== 'number' || typeof f.x1 !== 'number' || typeof f.y !== 'number') continue;
     tunnels.push(f);
   }
-  function CeilAt(x, fallback) {
+  /**
+   * 这条地板头上的净空。
+   *
+   * **必须按 floorY 过滤，不能取全局最低。** 一个 x 上可以同时压着深浅两条
+   * 地道的净空：act2 的 x=35 处有 y=-6.22（深层干线）和 y=-2.6（浅层支线）
+   * 两条。取全局最低会把深层的净空当成浅层的顶，挖洞区间变成
+   * 「wy >= -4.1 且 wy <= -6.12」——空集，一格都挖不开，整条浅层支线连同
+   * 里面的乡亲、被褥堆全部封死在实心土里。几何在、栅格在、测试全绿，
+   * 玩家看到的是一屏土。这类 bug 静默得可怕，所以下面还有一条自检。
+   */
+  function CeilAt(x, floorY, fallback) {
     let best = Infinity;
     for (let i = 0; i < ceils.length; i++) {
       const c = ceils[i];
       if (!c || typeof c.y !== 'number') continue;
-      if (x >= c.x0 - 0.05 && x <= c.x1 + 0.05 && c.y < best) best = c.y;
+      if (x < c.x0 - 0.05 || x > c.x1 + 0.05) continue;
+      if (c.y <= floorY) continue;          // 在这条地板下面的净空，不是它的顶
+      if (c.y < best) best = c.y;
     }
     return best === Infinity ? fallback : best;
   }
@@ -1048,7 +1075,7 @@ function ExtractEarthOutline(level, cfg) {
       for (let t = 0; t < tunnels.length; t++) {
         const f = tunnels[t];
         if (wx < f.x0 - 0.1 || wx > f.x1 + 0.1) continue;
-        const top = CeilAt(wx, f.y + 2.05);
+        const top = CeilAt(wx, f.y, f.y + 2.05);
         if (wy >= f.y - 0.3 && wy <= top + 0.1) { solid = 0; break; }
       }
       if (solid) {
@@ -1064,6 +1091,28 @@ function ExtractEarthOutline(level, cfg) {
       }
       val[j * nx + i] = solid;
     }
+  }
+
+  // --- 自检：每条地道地板都必须真的被挖开了 ---
+  //
+  // "整层封在土里"是这套流水线最恐怖的一类 bug：几何在、栅格在、draw call
+  // 正常、所有测试全绿，玩家看到的却是一屏实心土（act2 的浅层支线就这么
+  // 埋了五位乡亲）。挖洞是一串区间判定，任何一个越界／取错值都会让区间
+  // 变成空集，而空集不抛异常。所以这里按每条地板中点采样一次占用栅格，
+  // 一旦发现"该空的地方是土"就把它记进 outline，交给上层报警。
+  const sealed = [];
+  for (let t = 0; t < tunnels.length; t++) {
+    const f = tunnels[t];
+    const wx = (f.x0 + f.x1) / 2;
+    const wy = f.y + 0.5;                       // 地板往上半米：人站的地方
+    const i = Math.round((wx - x0) / cell);
+    const j = Math.round((wy - yBottom) / cell);
+    if (i <= 0 || i >= nx - 1 || j <= 0 || j >= ny - 1) continue;
+    if (val[j * nx + i] === 1) sealed.push({ x: wx, y: f.y });
+  }
+  if (sealed.length && typeof console !== 'undefined') {
+    console.error('[Render] 地道没挖开：' + sealed.length + ' 条地板中点仍是实心土 → ' +
+      sealed.map(function (s) { return 'x=' + s.x.toFixed(1) + ' y=' + s.y.toFixed(1); }).join(', '));
   }
 
   // --- marching squares ---
@@ -1154,7 +1203,7 @@ function ExtractEarthOutline(level, cfg) {
     }
     if (best >= 0) contours[best].holes.push(holes[h].pts);
   }
-  return { contours, groundY: GroundY, defaultGround, yTopGrid, x0, x1, yBottom };
+  return { contours, groundY: GroundY, defaultGround, yTopGrid, x0, x1, yBottom, sealed };
 }
 
 /** 从轮廓点集造 THREE.Shape。 */
@@ -2312,7 +2361,10 @@ export function CreateRenderer(canvas, options = {}) {
   const warmPick = new Int32Array(QUALITY_PRESET.high.warmLights);
   const warmPickD = new Float32Array(QUALITY_PRESET.high.warmLights);
 
-  const stats = { drawCalls: 0, triangles: 0 };
+  // sealedTunnels：本关有几条地道地板"该是空腔却仍是实心土"。
+  // 正常永远是 0；不是 0 就说明挖洞判定出了问题，那一整层玩家看不见。
+  // 暴露成 stats 是为了**可测**——这类 bug 不抛异常、不掉帧、像素也不全黑。
+  const stats = { drawCalls: 0, triangles: 0, sealedTunnels: 0 };
 
   // ------------------------------------------------------------------
   // 建造工具
@@ -2370,6 +2422,22 @@ export function CreateRenderer(canvas, options = {}) {
     return { buckets, glows, shafts };
   }
 
+  /**
+   * 建筑类道具绕 Y 的偏转角（弧度）。
+   *
+   * 只给"有体量、有侧墙"的东西转：房子、院墙、门楼、灶、炕、碾、水缸、
+   * 车、槽。**不给可互动的判读点转**（转了之后玩家判断"我站的位置对不对"
+   * 会变难），也不给树、招牌、尸体这种本来就没有正面的东西转。
+   * 角度 8–20°，方向按哈希左右各一半——整齐划一地转比不转还假。
+   */
+  function PropYaw(p) {
+    const w = PROP_YAW[p.kind];
+    if (!w) return 0;
+    if (p.interact && p.interact !== 'none' && p.interact !== 'hide') return 0;
+    const h = Hash1(StrSeed((p.id || '') + '|' + p.kind + '|' + (p.x || 0)) * 97.3 + 11);
+    const deg = 8 + h * 12;
+    return ((h > 0.5 ? 1 : -1) * deg * Math.PI) / 180 * w;
+  }
   function PropZ(p) {
     if (typeof p.z === 'number' && isFinite(p.z)) return p.z;
     if (p.interact && p.interact !== 'none') return LAYER_Z.PLAY;
@@ -2545,6 +2613,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (typeof console !== 'undefined') console.warn('[Render] 地下剖面提取失败，用平板降级。', e);
     }
     earthGroundRef = outline ? outline.defaultGround : 0;
+    stats.sealedTunnels = outline && outline.sealed ? outline.sealed.length : 0;
 
     const depth = cfg.extrudeDepth;
     const bevelT = 0.45, bevelS = 0.32;
@@ -2760,34 +2829,57 @@ export function CreateRenderer(canvas, options = {}) {
       // 地表线塌得厉害的地方（沟、坎）不画：槽是平地上的东西
       if (Math.abs(gy - groundAt(x + 1.4)) > 0.35 || Math.abs(gy - groundAt(x - 1.4)) > 0.35) continue;
       const pick = Hash1(i * 9.1 + 6);
+      // **斜着往纵深走比平行更管用**。一组正对 -Z 的平行线只收敛在画面正中
+      // 那一点上；斜着插进去的线两头都在动，一条就能把整块地面撑开。
+      // 每个槽位一个确定性的偏角（±26°），左右各一半。
+      const yaw = (Hash1(i * 13.9 + 2) - 0.5) * 0.92;
+      const Yawed = function (g) { return RotYAbout(g, yaw, x, gy, zc); };
       if (pick < 0.42) {
-        // 车辙：两道，中间再来一条被牲口踩实的浅印
+        // 车辙：两道，中间再来一条被牲口踩实的浅印。斜着压过台面。
         const gap = 1.22 + Hash1(i * 2.3) * 0.22;
-        BucketPush(buckets, 'mudDark', GBox(0.17, 0.05, dz, x - gap / 2, gy + 0.012, zc));
-        BucketPush(buckets, 'mudDark', GBox(0.17, 0.05, dz, x + gap / 2, gy + 0.012, zc));
-        BucketPush(buckets, 'mudDark', GBox(0.42, 0.03, dz * 0.72, x, gy + 0.006, zc - 0.3));
+        const len = dz * 1.5;
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.17, 0.05, len, x - gap / 2, gy + 0.012, zc)));
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.17, 0.05, len, x + gap / 2, gy + 0.012, zc)));
+        BucketPush(buckets, 'mudDark', Yawed(GBox(0.42, 0.03, len * 0.72, x, gy + 0.006, zc - 0.3)));
       } else if (pick < 0.74) {
-        // 垄沟：五六条等距的浅槽。等距 + 沿 Z = 收敛，这是最"数学"的一条深度线
+        // 垄沟：五六条等距的浅槽。等距 + 收敛，这是最"数学"的一条深度线。
         const rows = 5 + (Hash1(i * 6.1) > 0.5 ? 2 : 0);
         const step = 0.46;
         for (let k = 0; k < rows; k++) {
-          BucketPush(buckets, 'mudDark', GBox(0.13, 0.045, dz * (0.8 + Hash1(i * 3.1 + k) * 0.2),
-            x + (k - (rows - 1) / 2) * step, gy + 0.010, zc));
+          BucketPush(buckets, 'mudDark', Yawed(GBox(0.13, 0.045, dz * (1.1 + Hash1(i * 3.1 + k) * 0.3),
+            x + (k - (rows - 1) / 2) * step, gy + 0.010, zc)));
         }
       } else {
-        // 篱笆桩：同一个 x 上沿 Z 排开的一列。它们在屏幕上几乎重合，
-        // 只有高度和间距在变——这就是"往里走"最干净的读法。
+        // 篱笆：一列沿 Z 排开、还斜着的桩子。近的大远的小、间距越来越密——
+        // 这是"往里走"最干净的读法，俯角一上来它才真正看得见。
         const posts = 5;
+        const zl = deckFront - deckBack - 1.0;
         for (let k = 0; k < posts; k++) {
-          const pz = deckFront - 0.6 - (deckFront - deckBack - 1.0) * (k / (posts - 1));
+          const pz = deckFront - 0.6 - zl * (k / (posts - 1));
           const ph = 0.52 + Hash1(i * 7.7 + k) * 0.16;
-          BucketPush(buckets, 'woodDark', GBox(0.11, ph, 0.11, x + (Hash1(i * 11.3 + k) - 0.5) * 0.18, gy + ph / 2, pz));
+          BucketPush(buckets, 'woodDark', Yawed(GBox(0.11, ph, 0.11,
+            x + (Hash1(i * 11.3 + k) - 0.5) * 0.18, gy + ph / 2, pz)));
         }
         // 横杆：两根，把桩子串成一条向里退的线
-        const zl = deckFront - deckBack - 1.0;
-        BucketPush(buckets, 'woodDark', GBox(0.07, 0.07, zl, x, gy + 0.46, (deckFront - 0.6 + deckBack + 0.4) / 2));
-        BucketPush(buckets, 'woodDark', GBox(0.06, 0.06, zl, x, gy + 0.24, (deckFront - 0.6 + deckBack + 0.4) / 2));
+        const zm = (deckFront - 0.6 + deckBack + 0.4) / 2;
+        BucketPush(buckets, 'woodDark', Yawed(GBox(0.07, 0.07, zl, x, gy + 0.46, zm)));
+        BucketPush(buckets, 'woodDark', Yawed(GBox(0.06, 0.06, zl, x, gy + 0.24, zm)));
       }
+    }
+
+    // 一条**明确斜插进纵深**的土路：比上面那些短槽再长一个量级，横跨好几个
+    // 槽位。俯角下它是整块台面里最强的一条线，一眼把"地面是往里退的"说死。
+    {
+      const rx = bx0 + span * 0.5;
+      const gy = groundAt(rx);
+      const roadYaw = 0.40;
+      const len = (deckFront - deckBack) * 2.6;
+      for (let k = 0; k < 2; k++) {
+        BucketPush(buckets, 'mudDark', RotYAbout(
+          GBox(0.22, 0.05, len, rx + (k - 0.5) * 1.35, gy + 0.014, zc), roadYaw, rx, gy, zc));
+      }
+      BucketPush(buckets, 'mudDark', RotYAbout(
+        GBox(1.9, 0.025, len * 0.9, rx, gy + 0.004, zc), roadYaw, rx, gy, zc));
     }
 
     // 坑道：地上的拖痕 + 一串向里退的顶架。
@@ -2921,7 +3013,16 @@ export function CreateRenderer(canvas, options = {}) {
     // 这才是真实的大气透视（雾在地面最浓，山顶先露出来），也是敢把强度
     // 从 0.16/0.11/0.07 加到 0.34/0.22/0.12 的原因。
     if (cfg.hazePlanes) {
-      const hazeZ = [LAYER_Z.FAR + 7, LAYER_Z.BACK + 4, LAYER_Z.MID + 2.4];
+      // z 必须全部落在**台面背面之后**。俯角一上来地面就不再是一条边了：
+      // 任何插进台面里的竖直面都会沿着 y=0 露出一条横贯画面的硬边。
+      // 改前那道 z=-3.6 的空气墙正好插在台面中间，等于在地上划了一刀；
+      // 贴地薄雾（原来在 -8）更是直接从地里冒出一团奶白。
+      const zBack = earthBackZ - 0.7;
+      const hazeZ = [
+        Math.min(zBack - 6.0, LAYER_Z.FAR + 7),
+        Math.min(zBack - 2.4, LAYER_Z.BACK + 2),
+        zBack,
+      ];
       for (let i = 0; i < 3; i++) {
         const q = new THREE.Mesh(TrackGeo(GQuad(span + 400, HAZE_H, 0, 0, 0)), hazeMats[i]);
         q.position.set((bx0 + bx1) / 2, earthGroundRef + HAZE_TOP_OFF - HAZE_H / 2, hazeZ[i]);
@@ -2932,7 +3033,7 @@ export function CreateRenderer(canvas, options = {}) {
       // 贴地薄雾：只有 4.2 米厚，压在地平线上。窄是关键——宽一点就变成
       // 第四道空气墙，把天空一起抬亮，「村庄 > 天空」当场翻掉（实测过）。
       const mq = new THREE.Mesh(TrackGeo(GQuad(span + 400, 4.2, 0, 0, 0)), mats.mist);
-      mq.position.set((bx0 + bx1) / 2, earthGroundRef + 0.4, -8.0);
+      mq.position.set((bx0 + bx1) / 2, earthGroundRef + 0.4, zBack - 0.35);
       mq.renderOrder = -57; mq.frustumCulled = false;
       mq.userData.isHaze = true;
       gFx.add(mq);
@@ -2972,6 +3073,7 @@ export function CreateRenderer(canvas, options = {}) {
     deep.push(GPrism(ptsD, 0.4, 0, 0, 0));
     const dm = SafeMerge(deep);
     if (dm) {
+      CapSkylineY(dm, DEPTH_LAYER_Z.RIDGE_FAR, 0.38, 0);
       const mesh = new THREE.Mesh(dm, mats.ridgeSil);
       mesh.position.set(0, earthGroundRef, DEPTH_LAYER_Z.RIDGE_FAR);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
@@ -3009,6 +3111,7 @@ export function CreateRenderer(canvas, options = {}) {
     grove.push(GBox(1.9, 0.5, 1.9, towerX, earthGroundRef + 6.7, 0));
     const gm = SafeMerge(grove);
     if (gm) {
+      CapSkylineY(gm, DEPTH_LAYER_Z.GROVE, 0.53, earthGroundRef);
       const mesh = new THREE.Mesh(gm, mats.groveSil);
       mesh.position.z = DEPTH_LAYER_Z.GROVE;
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
@@ -3078,6 +3181,7 @@ export function CreateRenderer(canvas, options = {}) {
     yard.push(GBox(2.6, 0.16, 0.2, millX + 0.3, earthGroundRef + 1.25, 0.5, 0.12));
     const ym = SafeMerge(yard);
     if (ym) {
+      CapSkylineY(ym, DEPTH_LAYER_Z.YARD, 0.44, earthGroundRef);
       const mesh = new THREE.Mesh(ym, mats.yardSil);
       mesh.position.z = DEPTH_LAYER_Z.YARD;
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.frustumCulled = false;
@@ -3129,7 +3233,13 @@ export function CreateRenderer(canvas, options = {}) {
       const facing = p.facing === -1 ? -1 : 1;
       const local = BuildPropLocal(p);
 
-      mat4.makeRotationY(facing < 0 ? Math.PI : 0);
+      // 四分之三角：把建筑绕 Y 转 8–20°，露出侧墙。
+      //
+      // 20° 长焦下**正面朝相机的体几乎不显透视**——房子有再多进深，正对着
+      // 观众也只看得见一个矩形，读成立牌。经典做法是让结构呈四分之三角：
+      // 转一点点，侧墙就进画了，同一个体量立刻从"一张片"变成"一个盒子"。
+      // 角度按 id 哈希各不相同（整齐划一比不转还假），朝向也左右各一半。
+      mat4.makeRotationY((facing < 0 ? Math.PI : 0) + PropYaw(p));
       mat4b.makeTranslation(px, py, pz);
       mat4.premultiply(mat4b);
 

@@ -69,6 +69,10 @@ const act1 = {
     { id: "a1_f_yard3", x0: 78, x1: 106, y: 0, kind: "dirt" },
     { id: "a1_f_tree", x0: 106, x1: 128, y: 0, kind: "dirt" },
     // 出口地道口下面的一小段地道，让 a1_s_exit 的两端都贴在真实地板上。
+    // 村底下的地道网。净空 1.20，全程猫腰——地道不是走廊，是他的机动优势。
+    { id: "a1_f_t1", x0: 30, x1: 48, y: -3.8, kind: "tunnel" },   // 绕开头道院的搜索兵
+    { id: "a1_f_t2", x0: 52, x1: 78, y: -3.8, kind: "tunnel" },   // 绕开二道院的兵和哨兵
+    { id: "a1_f_t3", x0: 82, x1: 105, y: -3.8, kind: "tunnel" },  // 绕开三道院的兵和军犬
     { id: "a1_f_stub", x0: 121, x1: 128, y: -4.5, kind: "tunnel" },
   ],
 
@@ -80,14 +84,29 @@ const act1 = {
     // 三道院的长矮墙：军犬段全程猫腰。净空 1.30。
     { x0: 84, x1: 96, y: 1.30 },
     // 出口下的地道存根：净空 1.35。
+    { x0: 30, x1: 48, y: -2.60 },
+    { x0: 52, x1: 78, y: -2.60 },
+    { x0: 82, x1: 105, y: -2.60 },
     { x0: 121, x1: 128, y: -3.15 },
   ],
 
   shafts: [
+    { id: "a1_s_t1w", x: 31.5, yTop: 0,    yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t1w" },
+    { id: "a1_s_t1e", x: 47.2, yTop: 0,    yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t1e" },
+    { id: "a1_s_t2w", x: 52.5, yTop: 0.35, yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t2w" },
+    { id: "a1_s_t2e", x: 76.5, yTop: 0.35, yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t2e" },
+    { id: "a1_s_t3w", x: 82.5, yTop: 0,    yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t3w" },
+    { id: "a1_s_t3e", x: 104.5, yTop: 0,   yBottom: -3.8, kind: "ladder", requiresHatch: "a1_h_t3e" },
     { id: "a1_s_exit", x: 125, yTop: 0, yBottom: -4.5, kind: "ladder", requiresHatch: "a1_h_exit" },
   ],
 
   hatches: [
+    { id: "a1_h_t1w", x: 31.5, shaftId: "a1_s_t1w", hidden: false, opened: false, revealBy: null, label: "炕底下的口", propId: "a1_pr_h_t1w" },
+    { id: "a1_h_t1e", x: 47.2, shaftId: "a1_s_t1e", hidden: false, opened: false, revealBy: null, label: "灶台底下的口", propId: "a1_pr_h_t1e" },
+    { id: "a1_h_t2w", x: 52.5, shaftId: "a1_s_t2w", hidden: false, opened: false, revealBy: null, label: "灶台底下的口", propId: "a1_pr_h_t2w" },
+    { id: "a1_h_t2e", x: 76.5, shaftId: "a1_s_t2e", hidden: false, opened: false, revealBy: null, label: "炕底下的口", propId: "a1_pr_h_t2e" },
+    { id: "a1_h_t3w", x: 82.5, shaftId: "a1_s_t3w", hidden: false, opened: false, revealBy: null, label: "炕底下的口", propId: "a1_pr_h_t3w" },
+    { id: "a1_h_t3e", x: 104.5, shaftId: "a1_s_t3e", hidden: false, opened: false, revealBy: null, label: "碾盘底下的口", propId: "a1_pr_h_t3e" },
     {
       id: "a1_h_exit",
       x: 125,
@@ -171,6 +190,34 @@ const act1 = {
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
     { id: "a1_pr_trough_h2", x: 116, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    // —— 地道口。不藏、不需要解锁：这是高老忠的知识，不是他的战利品 ——
+    { id: "a1_pr_h_t1w", x: 31.5, y: 0, z: PLAY, kind: "kang", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t1w" }, label: "炕底下的口" },
+    { id: "a1_pr_h_t1e", x: 47.2, y: -3.8, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t1e" }, label: "翻口 —— 顶出去是灶台底下" },
+    { id: "a1_pr_h_t2w", x: 52.5, y: 0.35, z: PLAY, kind: "stove", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t2w" }, label: "灶台底下的口" },
+    { id: "a1_pr_h_t2e", x: 76.5, y: -3.8, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t2e" }, label: "翻口 —— 顶出去是炕底下" },
+    { id: "a1_pr_h_t3w", x: 82.5, y: 0, z: PLAY, kind: "kang", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t3w" }, label: "炕底下的口" },
+    { id: "a1_pr_h_t3e", x: 104.5, y: -3.8, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a1_h_t3e" }, label: "翻口 —— 顶出去是碾盘底下" },
+    // —— 引：在地道里敲通气孔，声音从街面出去，把巡逻调到西头，
+    //    玩家从东头的口冒出来。这就是"从敌人脚底下过、从他背后出来" ——
+    { id: "a1_pr_lure_t1", x: 33, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 11, panels: [] }, label: "敲通气孔 —— 把人引到这头" },
+    { id: "a1_pr_lure_t2", x: 55, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 12, panels: [] }, label: "敲通气孔 —— 把人引到这头" },
+    { id: "a1_pr_lure_t3", x: 85, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 12, panels: [] }, label: "敲通气孔 —— 把人引到这头" },
+    { id: "a1_pr_v_t1", x: 33, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_v_t2", x: 55, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_v_t3", x: 85, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_v_t1b", x: 44, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_v_t2b", x: 70, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_v_t3b", x: 99, y: -2.6, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    // —— 地道里的生活痕迹：这不是空管子，是全村藏东西的地方 ——
+    { id: "a1_pr_crock_t1", x: 40, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_beam_t1", x: 36, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_crock_t2", x: 62, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_beam_t2", x: 68, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_crock_t3", x: 92, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_beam_t3", x: 97, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    // —— 封：放倒院墙，把巡逻线掐断。切的是敌人的路——玩家脚底下永远还有地道 ——
+    { id: "a1_pr_block_y2", x: 64, y: 0.35, z: PLAY, kind: "wall", facing: 1, interact: "block", data: { channel: "blockYard2", panels: [] }, label: "推倒这堵院墙" },
+    { id: "a1_pr_block_y3", x: 100, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "block", data: { channel: "blockYard3", panels: [] }, label: "推倒这堵院墙" },
     { id: "a1_pr_millstone", x: 125, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hatch", data: { hatchId: "a1_h_exit" }, label: "碾盘下的地道口" },
   ],
 
@@ -538,6 +585,7 @@ const act2 = {
     { id: "a2_pr_stove_s1", x: 37, y: -3.8, z: PLAY, kind: "stove", facing: 1, interact: "none", data: null, label: null },
 
     // —— 干线 d2：翻口在这儿，互动点在竖井下端（单向，只能从下往上顶）——
+    { id: "a2_pr_lure_s2", x: 44.8, y: -8.0, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 12, panels: [] }, label: "敲通气孔 —— 把头顶的调到这边" },
     { id: "a2_pr_beam5", x: 46, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_fanko", x: 50, y: -8.0, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a2_h_fanko" }, label: "翻口" },
     { id: "a2_pr_crock3", x: 66, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
@@ -573,6 +621,7 @@ const act2 = {
     { id: "a2_pr_beam10", x: 99, y: -3.8, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
 
     // —— 干线 d4 + 枯井 ——
+    { id: "a2_pr_lure_s4", x: 114.5, y: -8.0, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 12, panels: [] }, label: "敲通气孔 —— 把头顶的调到这边" },
     { id: "a2_pr_beam11", x: 116, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_crock7", x: 135, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_chokepoint1", x: 137, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "none", data: null, label: "卡口" },
@@ -799,6 +848,7 @@ const act3 = {
     { id: "a3_f_su2", x0: 88, x1: 106, y: 0.4, kind: "stone" },
     { id: "a3_f_su3", x0: 106, x1: 142, y: 0, kind: "dirt" },
     // 街道底下的短地道：绕开两个哨兵和一条狗
+    { id: "a3_f_dg", x0: 64, x1: 88, y: -4.5, kind: "tunnel" },   // 绕开碾盘院的哨兵
     { id: "a3_f_dm", x0: 88, x1: 106, y: -4.5, kind: "tunnel" },
     // 地下：东段干线（塌方之后的那一半）
     { id: "a3_f_d3", x0: 110, x1: 148, y: -8.0, kind: "tunnel" },
@@ -826,7 +876,8 @@ const act3 = {
     // 粮窖：净空 1.20，猫腰
     { x0: 24, x1: 40, y: -3.00 },
     // 街道底下的短地道：净空 1.20，猫腰
-    { x0: 88, x1: 106, y: -3.30 },
+    { x0: 64, x1: 88, y: -2.65 },
+    { x0: 88, x1: 106, y: -2.65 },
     // 东段干线
     { x0: 110, x1: 130, y: -6.22 },
     { x0: 130, x1: 138, y: -6.90 },
@@ -842,6 +893,8 @@ const act3 = {
     { id: "a3_sh_grain_a", x: 30, yTop: -4.2, yBottom: -8.0, kind: "ladder", requiresHatch: null },
     { id: "a3_sh_grain_b", x: 38, yTop: -4.2, yBottom: -8.0, kind: "dirt", requiresHatch: null },
     { id: "a3_sh_mill", x: 63, yTop: 0, yBottom: -8.0, kind: "ladder", requiresHatch: "a3_h_mill" },
+    { id: "a3_sh_dg_w", x: 64.5, yTop: 0, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_dg_w" },
+    { id: "a3_sh_dg_e", x: 85, yTop: 0, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_dg_e" },
     { id: "a3_sh_m1", x: 88.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street1" },
     { id: "a3_sh_m2", x: 105.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street2" },
     { id: "a3_sh_kang", x: 116, yTop: 0, yBottom: -8.0, kind: "ladder", requiresHatch: "a3_h_kang" },
@@ -854,6 +907,8 @@ const act3 = {
 
   hatches: [
     { id: "a3_h_mill", x: 63, shaftId: "a3_sh_mill", hidden: true, opened: false, revealBy: "a3_t_choke", label: "碾盘下的地道口", propId: "a3_pr_mill_hatch" },
+    { id: "a3_h_dg_w", x: 64.5, shaftId: "a3_sh_dg_w", hidden: false, opened: false, revealBy: null, label: "灶台底下的口", propId: "a3_pr_h_dg_w" },
+    { id: "a3_h_dg_e", x: 85, shaftId: "a3_sh_dg_e", hidden: false, opened: false, revealBy: null, label: "炕底下的口", propId: "a3_pr_h_dg_e" },
     { id: "a3_h_street1", x: 88.5, shaftId: "a3_sh_m1", hidden: true, opened: false, revealBy: "a3_t_street", label: "驴槽底下的口", propId: "a3_pr_trough_hatch" },
     { id: "a3_h_street2", x: 105.5, shaftId: "a3_sh_m2", hidden: true, opened: false, revealBy: "a3_t_dip", label: "水缸底下的翻口", propId: "a3_pr_dip_out" },
     { id: "a3_h_kang", x: 116, shaftId: "a3_sh_kang", hidden: true, opened: false, revealBy: "a3_t_flood", label: "炕下的地道口", propId: "a3_pr_kang3" },
@@ -898,6 +953,12 @@ const act3 = {
     { id: "a3_pr_gate_s1", x: 86.5, y: 0, z: PLAY, kind: "gate", facing: 1, interact: "lever", data: { channel: "gateOpen", needItem: null }, label: "院门" },
 
     // —— 地表 su2：街道，两个哨兵 + 一条狗。驴槽底下有口 ——
+    { id: "a3_pr_h_dg_w", x: 64.5, y: 0, z: PLAY, kind: "stove", facing: 1, interact: "hatch", data: { hatchId: "a3_h_dg_w" }, label: "灶台底下的口" },
+    { id: "a3_pr_h_dg_e", x: 85, y: -4.5, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a3_h_dg_e" }, label: "翻口 —— 顶出去是炕底下" },
+    { id: "a3_pr_lure_dg", x: 70, y: -4.5, z: PLAY, kind: "vent", facing: 1, interact: "lure", data: { radius: 12, panels: [] }, label: "敲通气孔 —— 把哨兵引到这头" },
+    { id: "a3_pr_v_dg", x: 70, y: -2.65, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_beam_dg", x: 78, y: -4.5, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_crock_dg", x: 81, y: -4.5, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_trough_hatch", x: 88.5, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "hatch", data: { hatchId: "a3_h_street1" }, label: "驴槽底下的口" },
     { id: "a3_pr_haystack_gate", x: 89.5, y: 0.4, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_trough_s2", x: 92, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },

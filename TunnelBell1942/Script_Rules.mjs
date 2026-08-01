@@ -126,6 +126,45 @@ const CHECKPOINT_RADIUS = 1.7;
 const LIGHT_VISIBILITY = 0.6; // 提着马灯，有效视距最多放大到 1.6 倍
 const DARK_VISIBILITY = 0.78; // 灭了灯在地道里摸黑，更难被看见
 const VENT_RANGE = 3.2; // 通气孔：地表与地道之间的声音通道
+// 隔着土层，脚步声是**闷**的。原来这里把竖直距离乘 0.6（= 更容易听见），
+// 跟注释写的"打折"正好相反：结果地道里跑一步，头顶街上的兵反而先听见。
+// 那条 bug 直接否掉了"从地下绕过去"——绕过去等于自报家门。
+// 现在：有土层隔着 → 竖直距离按 1.9 倍算（几乎听不见）；正对通气孔 → 按 1.0（原样传过来）。
+const CROSSLAYER_MUFFLE = 1.9;
+
+// ───────────────────────────── 引 / 封（AGENTS.md 0.0）─────────────────────────────
+//
+// 这两个动词存在的理由：**地道是武器，地表是暴露的地方**。一个熟自己村子的人
+// 不该只会贴墙躲，他知道哪块墙一推就倒、知道往哪儿扔块土坷垃能把人调开。
+//
+// 「引」有两种形态，方向相反，别混成一个：
+//   · 扔（Q，随时随地，不需要道具）—— 响在**别处**，把人从我要走的路上调开。
+//     这是玩家最常用的主动动词，所以它不许挂在关卡数据上，否则关卡没写就等于没有。
+//   · lure 道具（E，关卡布置）—— 响在**自己脚下这个点**，把人叫过来。
+//     这是布置陷阱用的：叫到死胡同、叫到雷上、叫到枪眼底下。
+//
+// 代价不是"弹药"，是三样：起手要 0.5 秒站着不能动、有冷却、以及"热度"——
+// 同一片地方扔多了，他们就不再往响声那边跑，改朝**声音的来处**（也就是玩家）搜。
+const LURE_WIND_SEC = 0.5; // 弯腰摸一块土坷垃，抡出去
+const LURE_COOL_SEC = 2.4; // 冷却。连按无效是设计，不是限制
+const LURE_THROW_DIST = 9.5; // 落点离玩家多远（沿面朝方向；撞墙就落在墙根）
+const LURE_MIN_DIST = 2.6; // 比这还近就别扔了，等于把人叫到自己脸上
+const LURE_LOUD = 0.85; // 落点的响度（喂给敌人的 hearing 半径）
+const LURE_SELF_NOISE = 0.18; // 起手那一下自己发出的动静：贴着人扔照样露馅
+const LURE_HOLD_SEC = 4.6; // 走到落点后蹲着查看多久 —— 这段就是玩家挣来的窗口
+const LURE_TRAVEL_MAX = 7.0; // 走过去的时间上限，免得他为一块石头追一辈子
+const LURE_RANGE_SLACK = 17; // 为了查这块石头，他愿意离开巡逻区间多远
+const LURE_FOCUS_VISION = 0.5; // 蹲着盯地上那块石头时，视距对折（这是窗口的来源）
+const LURE_HEAT_FADE = 1 / 15; // 热度每秒退多少
+const LURE_HEAT_WISE = 2.5; // 热度过了这条线，他们不上当，改朝声音来处搜
+const LURE_PROP_HOLD = 5.6; // 关卡布置的 lure 点：叫过来之后停得更久（要够拉雷/开枪眼）
+
+// 「封」：堵街、掩地道口、放倒院墙。切断的是**敌人的**路——
+// 玩家的通行判定（CanWalkTo）永远不看这张表，这是红线，别改。
+const BLOCK_SEC = 0.9; // 放倒一堵墙要点力气
+const BLOCK_NOISE = 0.72; // 而且很响：当着人的面封路是送死
+const BLOCK_HALF_WIDTH = 0.9; // 封口的横向厚度（敌人跨不过去的那一段）
+const BLOCK_REACH_Y = 2.4; // 只对同一层的敌人生效
 
 // ───────────────────────────── 小工具 ─────────────────────────────
 
@@ -589,6 +628,11 @@ export function CreateState(levelIndex = 0) {
       deathTimer: 0,
       noiseSpike: 0,
       stepTimer: 0,
+
+      // 「引」：随时可用的扔，不占携带槽（提着马灯照样扔得动）
+      lureCooldown: 0,
+      lureAimX: 0,
+      lureAimY: 0,
     },
 
     // aspect = 视口宽/高，由集成层在 Resize 时写入，摄像机夹紧要用它
@@ -616,6 +660,13 @@ export function CreateState(levelIndex = 0) {
       used: {},
       bellRung: false,
       dropCount: 0,
+      // 封：channel -> true（渲染层按这个把墙画倒）
+      blocked: {},
+      // 封的几何：敌人跨不过去的那几段。玩家的通行判定不看这张表。
+      blocks: [],
+      // 引的"热度"：同一片地方扔多了就不灵了
+      lureHeat: 0,
+      lureCount: 0,
     },
     story: { chapterId: "act1", queue: [], seen: {}, objectiveText: "" },
     hud: {
@@ -625,6 +676,7 @@ export function CreateState(levelIndex = 0) {
       alertStage: "calm",
       threat: null,
       callHint: null,
+      lure: null, // { ready, cooldown, x, y } —— UI 画准星/冷却圈用
       villagersSafe: 0,
       villagersTotal: 0,
       codexCount: 0,
@@ -722,6 +774,10 @@ export function ResetLevel(state, levelIndex) {
   state.world.used = {};
   state.world.bellRung = false;
   state.world.dropCount = 0;
+  state.world.blocked = {};
+  state.world.blocks = [];
+  state.world.lureHeat = 0;
+  state.world.lureCount = 0;
   state.capturedEnding = false;
   // codex 跨幕保留，不清空
 
@@ -776,6 +832,15 @@ export function ResetLevel(state, levelIndex) {
     probeTimer: 0,
     stepTimer: 0,
     barkTimer: 0,
+
+    // 被"引"过去时的运行时。lured 是给渲染/机器人读的：
+    // 这个兵现在盯着地上一块石头，不是盯着我。
+    lured: false,
+    lureX: 0,
+    lureY: 0,
+    lureTimer: 0, // 还愿意为这块石头花多久（走过去 + 蹲着看）
+    lureHold: 0, // 到了之后还要蹲多久
+    lureAt: false, // 已经到落点了
   }));
 
   // 乡亲运行时
@@ -846,6 +911,9 @@ export function ResetLevel(state, levelIndex) {
   p.noise = 0;
   p.noiseSpike = 0;
   p.stepTimer = 0;
+  p.lureCooldown = 0;
+  p.lureAimX = p.x;
+  p.lureAimY = p.y;
   p.anim.name = "idle";
   p.anim.t = 0;
   p.anim.speed = 0;
@@ -1601,15 +1669,22 @@ function UpdatePlayer(state, dt) {
 
   // 噪音尖峰衰减
   p.noiseSpike = Math.max(0, p.noiseSpike - dt * 0.85);
+  p.lureCooldown = Math.max(0, p.lureCooldown - dt);
+  // 引的"热度"自己会退。停手一会儿，他们就又肯上当了。
+  state.world.lureHeat = Math.max(0, state.world.lureHeat - LURE_HEAT_FADE * dt);
 
   // 呼应
   if (input.callPressed && !p.action && !p.hidden) {
     DoCall(state);
   }
 
-  // 丢下手里的东西
-  if (input.itemPressed && !p.action && p.carrying) {
-    DropCarried(state);
+  // Q：手上这一下。「引」必须随时可用——它要是也得先满足条件，就又变回只能躲了。
+  //   蹲着不动 + 手里有东西 → 把它放在地上（第三幕灭灯摸黑那段的动作就是这个）；
+  //   其余情况 → 弯腰摸一块土坷垃扔出去；
+  //   实在扔不动（冷却中／前面就是墙）而手里有东西 → 退回"放下"。
+  if (input.itemPressed && !p.action && !p.hidden) {
+    if (p.carrying && p.crouch && Math.abs(p.vx) < 0.3) DropCarried(state);
+    else if (!BeginThrow(state) && p.carrying) DropCarried(state);
   }
 
   if (p.hidden) {
@@ -1943,6 +2018,7 @@ function UpdatePlayerAnim(state, dt) {
   else if (p.action === "hatch") name = "dig";
   else if (p.action === "bell") name = "ring";
   else if (p.action === "push") name = "push";
+  else if (p.action === "block") name = "push"; // 放倒院墙 = 推
   else if (p.action === "call") name = "call";
   else if (p.action) name = "use";
   else if (p.onShaft) name = "climb";
@@ -1973,6 +2049,130 @@ function UpdateDeadPlayer(state, dt) {
     return;
   }
   RespawnAtCheckpoint(state);
+}
+
+// ───────────────────────────── 引（扔 / 敲）─────────────────────────────
+
+/**
+ * 石头往面朝方向飞多远才落地。撞上过不去的东西就落在那儿——
+ * 所以隔着一堵实墙引不到对面，但矮墙、院门这种是飞得过去的。
+ */
+function LureLandingX(state) {
+  const p = state.player;
+  const dir = p.facing >= 0 ? 1 : -1;
+  const level = state.level;
+  let x = p.x;
+  for (let d = 0.5; d <= LURE_THROW_DIST + 0.001; d += 0.5) {
+    const nx = p.x + dir * d;
+    if (nx <= level.bounds.x0 + 0.4 || nx >= level.bounds.x1 - 0.4) break;
+    // 用"爬"的净空判定：石头钻得过任何人钻得过的口子
+    if (!CanWalkTo(state, nx, p.y, "crawl")) break;
+    x = nx;
+  }
+  return x;
+}
+
+function LureLandingY(state, x) {
+  const floor = FloorUnder(state.level, x, state.player.y + 1.2, 2.6);
+  return floor ? floor.y : state.player.y;
+}
+
+/** 现在能不能扔。返回 { ok, x, y, reason }。 */
+function LureAim(state) {
+  const p = state.player;
+  const x = LureLandingX(state);
+  const y = LureLandingY(state, x);
+  const far = Math.abs(x - p.x);
+  let reason = null;
+  if (p.dead || p.hidden || p.action || p.onShaft) reason = "busy";
+  else if (state.phase !== "play") reason = "busy";
+  else if (p.lureCooldown > 0) reason = "cooldown";
+  else if (far < LURE_MIN_DIST) reason = "tooClose"; // 前面就是墙，扔了等于在自己脚边响
+  return { ok: !reason, x, y, reason };
+}
+
+/**
+ * 把"这里响了一下"广播出去。lureX/lureY 是**响的地方**，不是玩家的位置——
+ * 这是整个动词成立的关键：敌人得到的线索指向别处。
+ */
+function RaiseLure(state, x, y, loud, holdSec) {
+  const p = state.player;
+  const heat = state.world.lureHeat;
+  // 热度过线：他们不再上当。石头照样响，但他们开始朝**声音的来处**搜，
+  // 也就是朝玩家这边。这是"引"的代价，也是它不能无脑连按的原因。
+  const wised = heat >= LURE_HEAT_WISE;
+  let pulled = 0;
+
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated) continue;
+    const radius = (e.hearing || 6) * loud * SENSE.hearingScale;
+    const dx = x - e.x;
+    const dy = (y - e.y) * (Math.abs(y - e.y) > 1.5 ? CROSSLAYER_MUFFLE : 1);
+    if (dx * dx + dy * dy > radius * radius) continue;
+
+    // 已经咬住我的人不吃这一套：扔石头不是脱身卡。
+    if (e.alertness >= SENSE.searchAt && e.hasLead) continue;
+
+    if (wised) {
+      // 上过当了：这回他们冲着我来
+      e.alertness = Math.max(e.alertness, SENSE.suspiciousAt + 0.06);
+      e.lastSeenX = p.x;
+      e.lastSeenY = p.y;
+      e.hasLead = true;
+      e.facing = p.x >= e.x ? 1 : -1;
+      e.lured = false;
+      e.lureTimer = 0;
+      continue;
+    }
+
+    const travel = Math.abs(x - e.x) / Math.max(0.6, (e.patrol ? e.patrol.speed : 1.4) * SENSE.searchSpeedScale);
+    e.lured = true;
+    e.lureX = x;
+    e.lureY = y;
+    e.lureAt = false;
+    // 热度越高，肯为一块石头花的时间越短——第三次就只是抬头看一眼
+    e.lureHold = Math.max(1.2, holdSec * (1 - heat / LURE_HEAT_WISE * 0.55));
+    e.lureTimer = Math.min(LURE_TRAVEL_MAX, travel + 0.6) + e.lureHold;
+    e.hasLead = false; // 他手上的线索是那块石头，不是我
+    e.lastSeenX = x;
+    e.lastSeenY = y;
+    e.facing = x >= e.x ? 1 : -1;
+    pulled++;
+  }
+
+  state.world.lureHeat += 1;
+  state.world.lureCount++;
+  Emit(state, { kind: "lure", x, y, radius: loud, pulled, wised, heat: state.world.lureHeat });
+  Sfx(state, "pebble", x, y);
+  return pulled;
+}
+
+/** 起手：弯腰摸一块土坷垃。0.5 秒站着不能动，这是它的第一重代价。 */
+function BeginThrow(state) {
+  const p = state.player;
+  const aim = LureAim(state);
+  if (!aim.ok) {
+    if (aim.reason === "tooClose" || aim.reason === "cooldown") Sfx(state, "cloth", p.x, p.y);
+    return false;
+  }
+  p.action = "lure";
+  p.actionTimer = LURE_WIND_SEC;
+  p.actionTotal = LURE_WIND_SEC;
+  p.actionPropId = null;
+  p.lureAimX = aim.x;
+  p.lureAimY = aim.y;
+  p.vx = 0;
+  // 摸石头、起身、抡胳膊：贴着人扔照样露馅
+  p.noiseSpike = Math.max(p.noiseSpike, LURE_SELF_NOISE);
+  Sfx(state, "cloth", p.x, p.y);
+  return true;
+}
+
+function FinishThrow(state) {
+  const p = state.player;
+  p.lureCooldown = LURE_COOL_SEC;
+  // 落点要按**当下**的地形重算一次：起手那 0.5 秒里玩家没动，但敌人动了
+  RaiseLure(state, p.lureAimX, p.lureAimY, LURE_LOUD, LURE_HOLD_SEC);
 }
 
 /** 附近有没有能招呼上的乡亲（F 是本作唯一的"带上人"手段，得让人看得见）。 */
@@ -2103,6 +2303,13 @@ function InteractAvailable(state, prop) {
     }
     case "read":
       return !state.world.codex[prop.data.codexId];
+    // —— 主动动词：引 / 封（AGENTS.md 0.0）——
+    case "lure":
+      // 关卡布置的引点是**一次性**的：敲翻的瓦罐不会自己站回去。
+      // 想反复引，用手上的土坷垃（Q），那个才是随身的。
+      return !state.world.used[prop.id];
+    case "block":
+      return !state.world.blocked[prop.data.channel];
     // —— 反击三件套 ——
     // 提示照常出现（否则玩家不知道这儿有个枪眼），但条件不满足时 blocked=true，
     // 按下去只会得到一句"等他们就位"。跑腿本身就是玩法。
@@ -2214,6 +2421,10 @@ function PromptForProp(state, prop) {
     }
     case "read":
       return { key: "E", label: "查看" + (prop.label || ""), id: prop.id, kind: "read" };
+    case "lure":
+      return { key: "E", label: prop.label ? "敲响" + prop.label : "弄出点动静", id: prop.id, kind: "lure" };
+    case "block":
+      return { key: "E", label: prop.label ? "放倒" + prop.label : "堵上这条路", id: prop.id, kind: "block" };
     case "signal":
       return { key: "E", label: prop.label || "传口令", id: prop.id, kind: "signal" };
     case "mine": {
@@ -2353,9 +2564,15 @@ function UpdateAction(state, dt) {
   if (p.actionTimer > 0) return;
 
   const finished = p.action;
+  const finishedProp = p.actionPropId;
   p.action = null;
   p.actionTimer = 0;
   p.actionPropId = null;
+  // 徒手扔：不挂在任何道具上（这是它的重点——关卡没布置也能用）
+  if (finished === "lure" && !finishedProp) {
+    FinishThrow(state);
+    return;
+  }
   if (finished !== "call" && prop) CompleteInteract(state, finished, prop);
 }
 
