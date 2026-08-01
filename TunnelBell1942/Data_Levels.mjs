@@ -1183,8 +1183,10 @@ const act3 = {
     { id: "a3_o3", text: "上地表，摸到水井", doneWhen: { trigger: "a3_t_water" } },
     { id: "a3_o4", text: "引水冲开塌方", doneWhen: { propUsed: "a3_pr_well3" } },
     { id: "a3_o5", text: "跟乡亲汇合，一个都不能少", doneWhen: { npcRescued: "all" } },
-    { id: "a3_o6", text: "敲钢轨，把口令传遍地道网", doneWhen: { trigger: "a3_t_squad_east" } },
-    { id: "a3_o7", text: "东头合围", doneWhen: { trigger: "a3_t_strike" } },
+    // signal / mine / loophole 三个动词已经实现，完成条件从"走到那条支线"
+    // 收回"真的用了那个道具"——判定更严格，也才对得上目标文本。
+    { id: "a3_o6", text: "敲钢轨，把口令传遍地道网", doneWhen: { propUsed: "a3_pr_sig_east" } },
+    { id: "a3_o7", text: "东头合围", doneWhen: { propUsed: "a3_pr_lh_east" } },
     { id: "a3_o8", text: "带全村爬出黑风口", doneWhen: { atExit: true } },
   ],
 };

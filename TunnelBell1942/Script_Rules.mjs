@@ -37,11 +37,19 @@ const EVENT_CAP = 256;
 
 const STEP_UP = 0.55; // 能自动迈上的台阶高度，超过算墙
 const FLOOR_SNAP = 0.34; // 站立时脚下地板的吸附容差
-const SHAFT_GRAB_X = 0.6; // 竖井吸附的水平半径（契约写死 ±0.6）
+// 竖井吸附的水平半径。0.6 时"看着贴在梯子上却上不去"的死区有 0.35 米宽
+// （玩家半宽 0.26，脚已经压在井口了还抓不住）。0.78 刚好覆盖到人的肩宽外沿，
+// 又远小于道具互动半径 1.61，不会跟旁边的柴垛抢提示。
+const SHAFT_GRAB_X = 0.78;
 const FLUSH_OUT_REACH = 1.5; // 搜索状态的兵走到这么近，会把藏在道具里的人翻出来
 
-const LAND_STUN_SEC = 0.62; // 超过 safeFallSpeed 的硬直
-const LAND_STUMBLE_SEC = 0.16; // 普通落地的小踉跄
+// 落地硬直。原来是"超过 safeFallSpeed 一律 0.62 秒完全不能动"——
+// 半秒多的输入锁死在没有战斗的游戏里只有惩罚没有博弈，玩家读成"手柄掉线了"。
+// 改成随冲击强度插值的短硬直 + 期间保留一部分操控（踉跄，不是石化）。
+const LAND_STUN_MIN_SEC = 0.20;
+const LAND_STUN_MAX_SEC = 0.40;
+const LAND_STUMBLE_SEC = 0.14; // 普通落地的小踉跄
+const STAGGER_CONTROL = 0.34; // 硬直期间还剩多少操控（0 = 完全锁死）
 const DEATH_RESPAWN_SEC = 1.5;
 const CAPTURE_HOLD_SEC = 2.4; // 被抓收尾前的停顿，给这一下留点分量
 
@@ -50,6 +58,46 @@ const HEAR_ALERT_CAP = 0.82; // 光靠听永远抓不到人（>searchAt，<1）
 const SEARCH_LOOK_SEC = 2.4;
 const SUSPICIOUS_HOLD_SEC = 1.1;
 
+// 警觉的分级门槛。契约只给了 suspiciousAt(0.28) / searchAt(0.62) 两档，
+// 中间是一条连续曲线，玩家除了看进度条没有任何"分级的紧张"。
+// 补两头：刚被扫到的第一下，和被抓前的最后一下。
+const ALERT_GLIMPSE = 0.07; // 视线刚扫到（alertRiseSec=1.25 → 约 0.09s）
+const ALERT_FINAL = 0.80; // 最后一秒（约 1.00s，离被抓还剩 0.25s）
+
+// "他还在找我"的余温。**只是信息，不改行为**——这一点是实测逼出来的：
+//
+//   · 把警觉本身冻住半秒 → 探头一眼从 0.99 直接跳到 1.0，契约给的 1.25 秒
+//     反应窗口当场归零（机器人第一幕死亡数 1 → 29）。
+//   · 改成不动警觉、只延长敌人的 search/suspicious 行为 → 搜索态的兵会把
+//     巡逻范围外扩 ±7 米，第一幕 86–103 那段"三个兵 + 一条狗"的走廊立刻
+//     没有空窗，机器人 24 次死亡仍然过不去（0.25 秒都会让它慢 9 秒）。
+//
+// 所以警觉的升降完全照契约不动，这里只记一个"他还没松劲"的计时器，
+// 交给 HUD / 音效去表达。真要让敌人搜得更久，得先让关卡把掩体间距放宽。
+const HUNT_PERSIST_SEC = 1.8; // 掉出 searchAt 之后还惦记多久
+const SUSPECT_PERSIST_SEC = 1.2; // 掉出 suspiciousAt 之后还惦记多久
+
+// 反击三件套（AGENTS.md 0.1 / 5.4）。玩家没有攻击键：他做的是**启动**反击，
+// 扣扳机的是全村。所以这三个动词一律要前提——没传到令的组，枪眼和地雷都按不动。
+const SIGNAL_NOISE = 0.62; // 敲钢轨传令：这是响动，跑腿的风险就在这上面
+const SIGNAL_SEC = 0.7;
+const MINE_SEC = 0.55;
+const LOOPHOLE_SEC = 0.6;
+const MINE_RADIUS_X = 6.5; // 地雷把这个范围里的敌人掀出战场
+// 雷埋在街面下、从地道里拉——所以爆炸要**向上够到地表**。
+// 对称半径在这儿是错的：雷在 y=-8，敌人全在 y=0，差 8 米，
+// 用 4 米的对称半径等于这颗雷永远炸不到任何人。
+const MINE_REACH_UP = 9.0;
+const MINE_REACH_DOWN = 2.5;
+const LOOPHOLE_RANGE_X = 9.0; // 枪眼朝头顶的街面打，够着一段巡逻线
+const RIFLE_SHOTS = 3;
+
+// 招呼（F）：既是唯一的"带上乡亲"手段，也是把掉队的人拉回来的手段。
+const CALL_RECRUIT_RANGE_X = 7.0;
+const CALL_RECRUIT_RANGE_Y = 2.5;
+const CALL_RALLY_SEC = 2.6; // 喊完之后跟随者加速归队的时长
+const CALL_RALLY_SCALE = 1.7; // 归队时的速度倍率
+
 const PROBE_WIND_SEC = 1.0; // 刺刀前摇（契约底线 ≥0.8）
 const PROBE_STRIKE_SEC = 0.28;
 const PROBE_REST_SEC = 1.5;
@@ -57,6 +105,10 @@ const PROBE_RADIUS = 0.8;
 
 const TRAIL_STEP = 0.26; // 面包屑采样间距
 const TRAIL_MAX = 512;
+// 跟随者沿面包屑的"弧长"行进，不是直线扑向目标点。直线会切角：
+// 拐进竖井那一下整队人会斜着穿过土层，看着就是从墙里游过去。
+const FOLLOW_SNAP = 0.10; // 弧长误差小于这个就算到位
+const FOLLOW_SLOT_SLACK = 0.55; // 队形容差：差这么多以内不小跑
 
 const HAZARD_HEIGHT = 2.4; // 危害在竖直方向覆盖多高
 const HAZARD_RAMP = 0.85; // 浓度爬升（每秒）
@@ -148,6 +200,54 @@ function FallbackLevel(index) {
     checkpoints: [{ id: "cp_start", x: 4, y: 0, label: "起点" }],
     objectives: [{ id: "obj_exit", text: "前往村口", doneWhen: { atExit: true } }],
   };
+}
+
+/** 过场脚本归一化。坏数据一律降级成"能放完的空步骤"，绝不让一段过场卡死玩家。 */
+function NormalizeCutscenes(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const id in raw) {
+    if (!Object.prototype.hasOwnProperty.call(raw, id)) continue;
+    const cut = raw[id];
+    if (!cut || typeof cut !== "object") continue;
+    const steps = Arr(cut.steps)
+      .map((s) => NormalizeStep(s))
+      .filter(Boolean);
+    out[id] = {
+      id,
+      letterbox: cut.letterbox === "full" ? "full" : "wide",
+      skippable: cut.skippable === undefined ? true : !!cut.skippable,
+      steps,
+    };
+  }
+  return out;
+}
+
+function NormalizeStep(s) {
+  if (!s || typeof s !== "object" || typeof s.kind !== "string") return null;
+  const to = s.to && typeof s.to === "object" ? s.to : null;
+  const step = {
+    kind: s.kind,
+    // sec 是这一步的时长。0 表示瞬发；panel 步没有时长（等玩家翻页）。
+    sec: Math.max(0, Num(s.sec, 0)),
+    id: typeof s.id === "string" ? s.id : null,
+    ids: Arr(s.ids).filter((x) => typeof x === "string"),
+    ease: s.ease === "linear" ? "linear" : "inOut",
+    anim: typeof s.anim === "string" ? s.anim : null,
+    facing: s.facing === -1 ? -1 : s.facing === 1 ? 1 : null,
+    rings: Math.max(1, Math.round(Num(s.rings, 3))),
+    to: null,
+  };
+  if (to) {
+    step.to = {
+      x: typeof to.x === "number" && Number.isFinite(to.x) ? to.x : null,
+      y: typeof to.y === "number" && Number.isFinite(to.y) ? to.y : null,
+      viewHeight:
+        typeof to.viewHeight === "number" && Number.isFinite(to.viewHeight) ? to.viewHeight : null,
+    };
+  }
+  if (step.kind === "fade") step.fadeTo = Clamp(Num(s.to, 1), 0, 1);
+  return step;
 }
 
 function NormalizeLevel(raw, index) {
@@ -302,9 +402,29 @@ function NormalizeLevel(raw, index) {
         objective: typeof emit.objective === "string" ? emit.objective : null,
         checkpoint: !!emit.checkpoint,
         win: !!emit.win,
+        cutscene: typeof emit.cutscene === "string" ? emit.cutscene : null,
       },
     };
   });
+
+  // 机位区（见 AGENTS.md 2.3）。缺字段一律退回默认跟随的取值，
+  // 关卡少写一个 lift 不该让整段镜头塌成 0。
+  level.shots = Arr(level.shots)
+    .map((s, i) => ({
+      id: typeof s.id === "string" ? s.id : "shot_" + i,
+      x0: Num(s.x0, 0),
+      x1: Num(s.x1, 0),
+      viewHeight: Num(s.viewHeight, 0) > 0 ? Num(s.viewHeight, 0) : null,
+      lift: typeof s.lift === "number" && Number.isFinite(s.lift) ? s.lift : null,
+      anchorX: typeof s.anchorX === "number" && Number.isFinite(s.anchorX) ? s.anchorX : null,
+      ease: Num(s.ease, 1.2) > 0.01 ? Num(s.ease, 1.2) : 1.2,
+      yMin: Num(s.yMin, level.bounds.yBottom),
+      yMax: Num(s.yMax, level.bounds.yTop),
+      reason: typeof s.reason === "string" ? s.reason : "",
+    }))
+    .filter((s) => s.x1 > s.x0);
+
+  level.cutscenes = NormalizeCutscenes(level.cutscenes);
 
   level.checkpoints = Arr(level.checkpoints).map((c, i) => ({
     id: typeof c.id === "string" ? c.id : "cp_" + i,
@@ -465,13 +585,23 @@ export function CreateState(levelIndex = 0) {
     },
 
     // aspect = 视口宽/高，由集成层在 Resize 时写入，摄像机夹紧要用它
-    camera: { x: 0, y: 0, viewHeight: CAMERA.viewHeight, shake: 0, aspect: 16 / 9 },
+    camera: {
+      x: 0,
+      y: 0,
+      viewHeight: CAMERA.viewHeight,
+      shake: 0,
+      aspect: 16 / 9,
+      breathX: 0,
+      breathY: 0,
+    },
     enemies: [],
     npcs: [],
     hazards: [],
     world: {
       hatches: {},
       levers: {},
+      squads: {}, // squadId -> "idle" | "ready" | "fired"
+      mines: {}, // channel -> 已引爆
       pushed: {},
       picked: {},
       codex: {},
@@ -485,6 +615,9 @@ export function CreateState(levelIndex = 0) {
       prompt: null,
       objective: "",
       suspicion: 0,
+      alertStage: "calm",
+      threat: null,
+      callHint: null,
       villagersSafe: 0,
       villagersTotal: 0,
       codexCount: 0,
@@ -503,6 +636,17 @@ export function CreateState(levelIndex = 0) {
     events: [],
     checkpointId: null,
     stats: { deaths: 0, timeInLevel: 0 },
+
+    // 演出（渲染 / 音频只读）
+    cutscene: null,
+    pendingCutscene: null,
+    fade: 0, // 0 = 全亮，1 = 全黑
+    timeScale: 1, // 0.25..1，关键瞬间的张弛
+    timeScaleTimer: 0,
+    timeScaleTarget: 1,
+    slowSpent: 0,
+    camHandback: 0,
+    shot: null, // 当前生效的机位区（id + 权重），UI 调试用
 
     // 内部簿记（渲染层不需要读）
     triggersFired: {},
@@ -533,6 +677,16 @@ export function ResetLevel(state, levelIndex) {
   state.navNodes = null; // 换关卡了，机器人的导航图作废
   state.checkpointId = null;
   state.stats.timeInLevel = 0;
+  state.cutscene = null;
+  state.fade = 0;
+  state.timeScale = 1;
+  state.timeScaleTimer = 0;
+  state.timeScaleTarget = 1;
+  state.slowSpent = 0;
+  state.camHandback = 0;
+  state.shot = null;
+  state.shotId = null;
+  state.shotW = 0;
 
   // 世界持久量
   state.world.hatches = {};
@@ -546,6 +700,15 @@ export function ResetLevel(state, levelIndex) {
     };
   }
   state.world.levers = {};
+  // 各小组一律从 idle 起：反击的前提每一幕都要重新跑腿挣回来
+  state.world.squads = {};
+  state.world.mines = {};
+  for (const prop of level.props) {
+    const sid = prop.data && prop.data.squadId;
+    if (typeof sid === "string" && !state.world.squads[sid]) state.world.squads[sid] = "idle";
+    const need = prop.data && prop.data.needSquad;
+    if (typeof need === "string" && !state.world.squads[need]) state.world.squads[need] = "idle";
+  }
   state.world.pushed = {};
   state.world.picked = {};
   state.world.revealed = {};
@@ -577,6 +740,14 @@ export function ResetLevel(state, levelIndex) {
     visionRange: e.vision.range,
     visionHalfAngleDeg: e.vision.halfAngleDeg,
 
+    // 感知结果（渲染/UI 只读）：谁在看我、现在是哪一档
+    seesPlayer: false,
+    hearsPlayer: false,
+    alertStage: "calm",
+    huntTimer: 0,
+    suspectTimer: 0,
+    linger: 0,
+
     // 内部
     homeX: e.x,
     homeY: e.y,
@@ -591,6 +762,7 @@ export function ResetLevel(state, levelIndex) {
     lastSeenY: e.y,
     hasLead: false,
     dormant: !!spawnGated[e.id],
+    defeated: false,
     probeAt: e.probeAt,
     probeIndex: 0,
     probePhase: "move",
@@ -613,6 +785,15 @@ export function ResetLevel(state, levelIndex) {
     homeX: n.x,
     homeY: n.y,
     order: 0,
+
+    // 跟随运行时（渲染层可读 posture/height/speed/slotError）
+    trailD: 0,
+    slotError: 0,
+    rally: 0,
+    posture: "stand",
+    crouch: false,
+    height: PLAYER.standHeight,
+    speed: 0,
   }));
 
   // 危害运行时（armAt 为 null 视为常驻休眠，只能被 trigger 的 arm 唤醒）
@@ -672,6 +853,10 @@ export function ResetLevel(state, levelIndex) {
     for (const id of chapter.opening) QueuePanel(state, id);
   }
 
+  // 开场过场只挂号，不自动进（理由见 FireTrigger 里 emit.cutscene 的注释）
+  state.pendingCutscene =
+    chapter && typeof chapter.openingCutscene === "string" ? chapter.openingCutscene : null;
+
   state.hud.villagersTotal = state.npcs.length;
   state.hud.villagersSafe = state.npcs.filter((n) => n.rescued).length;
   state.hud.codexCount = Object.keys(state.world.codex).length;
@@ -727,6 +912,8 @@ function SnapCamera(state) {
   state.camera.y = p.y + 0.9;
   state.camera.viewHeight = p.layer === "tunnel" ? CAMERA.tunnelViewHeight : CAMERA.viewHeight;
   state.camera.shake = 0;
+  state.camera.breathX = 0;
+  state.camera.breathY = 0;
   ClampCamera(state);
 }
 
@@ -736,12 +923,76 @@ function UpdateLayer(p) {
 
 // ───────────────────────────── 主循环 ─────────────────────────────
 
+// 时间张弛。三条规矩，都写死在这里而不是交给调用方：
+//   1. 每次不超过 0.8 秒；
+//   2. 只在玩家**不需要操作**的瞬间用（敲钟的定格、被发现的那一下、危害引爆的前摇）；
+//   3. 只减速不加速，且过场里一律 1（过场自己就是节奏）。
+// 每一档的"保持时长 + 缓回常速的时间"都要落进 0.8 秒预算，
+// 所以保持段比看上去短：缓回来那一段也还是慢动作，玩家分不出它属于哪一半。
+//   缓回耗时 = (1 - scale) / recoverPerSec
+const TIME_SLOW = {
+  min: 0.25,
+  spotted: 0.32, // 被发现：此刻玩家已经没有可打的牌，这一下纯粹是演出
+  spottedSec: 0.45, // 0.45 + 0.28 = 0.73s
+  bell: 0.45, // 敲钟：ring 动作本来就锁着玩家
+  bellSec: 0.42, // 0.42 + 0.23 = 0.65s
+  hazard: 0.55, // 危害引爆的前摇（预警阶段，玩家还没被逼着跑）
+  hazardSec: 0.3, // 0.30 + 0.19 = 0.49s
+  recoverPerSec: 2.4,
+};
+
+const TIME_SLOW_BUDGET = 0.8; // 一次**连续**放慢的总上限
+
+function SlowTime(state, scale, seconds) {
+  if (!state || state.cutscene) return;
+  const s = Clamp(Num(scale, 1), TIME_SLOW.min, 1);
+  let sec = Clamp(Num(seconds, 0), 0, TIME_SLOW_BUDGET);
+  if (sec <= 0) return;
+  // 已经在更慢的档上就不打断
+  if (state.timeScaleTimer > 0 && state.timeScaleTarget <= s) return;
+  // 连续放慢的总预算。两个戏剧点凑在一起（敲完钟当场被发现）会各要 0.5 秒，
+  // 叠起来接近一秒的慢动作，玩家读到的不是仪式感是卡顿。
+  const left = TIME_SLOW_BUDGET - Num(state.slowSpent, 0);
+  if (left <= 0.01) return;
+  if (sec > left) sec = left;
+  state.timeScaleTarget = s;
+  state.timeScaleTimer = sec;
+  state.timeScale = s;
+  Emit(state, { kind: "timeScale", scale: s, sec });
+}
+
+function UpdateTimeScale(state, realDt) {
+  if (state.cutscene) {
+    state.timeScale = 1;
+    state.timeScaleTimer = 0;
+    state.slowSpent = 0;
+    return;
+  }
+  if (state.timeScaleTimer > 0) {
+    state.timeScaleTimer = Math.max(0, state.timeScaleTimer - realDt);
+    state.slowSpent = Num(state.slowSpent, 0) + realDt;
+    state.timeScale = state.timeScaleTarget;
+    if (state.timeScaleTimer <= 0) state.timeScaleTarget = 1;
+    return;
+  }
+  if (state.timeScale < 1) {
+    state.timeScale = Math.min(1, state.timeScale + TIME_SLOW.recoverPerSec * realDt);
+    state.slowSpent = Num(state.slowSpent, 0) + realDt;
+  } else {
+    // 回到常速才把预算还回去：这样"连续放慢"的上限是真的连续
+    state.slowSpent = 0;
+  }
+}
+
 /** 推进一帧。dt 秒；内部 clamp 到 ≤1/30，超出分多个子步。确定性，无 Math.random。 */
 export function StepPlay(state, dt) {
   if (!state || !state.level) return;
-  let remain = Num(dt, 0);
-  if (remain <= 0) return;
-  if (remain > 0.5) remain = 0.5; // 掉帧保护：宁可慢放也不穿墙
+  let realDt = Num(dt, 0);
+  if (realDt <= 0) return;
+  if (realDt > 0.5) realDt = 0.5; // 掉帧保护：宁可慢放也不穿墙
+  UpdateTimeScale(state, realDt);
+  // 张弛只缩放**模拟**的推进量；子步上限照旧，所以放慢不会让步长失控
+  let remain = realDt * Clamp(Num(state.timeScale, 1), TIME_SLOW.min, 1);
   let guard = 0;
   while (remain > 1e-6 && guard++ < MAX_SUBSTEPS) {
     const step = remain > MAX_STEP ? MAX_STEP : remain;
@@ -756,6 +1007,21 @@ export function StepPlay(state, dt) {
 
 function SubStep(state, dt) {
   state.time += dt;
+
+  // 过场接管一切：玩家不动、AI 不跑、镜头归脚本。
+  if (state.phase === "cutscene" && state.cutscene) {
+    state.stats.timeInLevel += dt;
+    UpdateCutscene(state, dt);
+    state.camera.shake = Approach(state.camera.shake, 0, CAMERA.shakeDecay, dt);
+    ClampCamera(state);
+    UpdateHud(state);
+    return;
+  }
+
+  // 过场刚放完留下的黑幕自己擦掉，绝不许把玩家关在黑屏里
+  if (state.fade > 0 && !state.cutscene) {
+    state.fade = Math.max(0, state.fade - dt / CUT_FADE_OUT_SEC);
+  }
 
   UpdatePanels(state, dt);
 
@@ -799,6 +1065,473 @@ function UpdatePanels(state, dt) {
   }
 }
 
+// ───────────────────────────── 过场（Cutscene）─────────────────────────────
+//
+// 过场不是"弹一串气泡"：镜头自己走、角色按脚本走位、玩家交出操作权。
+// 见 AGENTS.md 3.1。这里只做状态机与副作用结算，黑边/字幕归 UI。
+//
+// 一条硬规矩：**跳过与放完必须留下一模一样的世界**。
+// 所有会改世界的 step（spawn / reveal / bell）都走同一个 ApplyStep，
+// 跳过时只是把剩下的步骤按顺序瞬发一遍，不走另一条代码路径。
+
+const CUT_HANDBACK_SEC = 1.15; // 过场结束后镜头交还给跟随的缓冲
+const CUT_PANEL_AUTO_PAD = 0.5; // 气泡自动翻页的额外停留（UI 不调 Advance 时的保险）
+const CUT_FADE_OUT_SEC = 0.55; // 收场时把黑幕擦掉的时长
+
+function FindCutsceneDef(state, id) {
+  const table = state.level && state.level.cutscenes ? state.level.cutscenes : null;
+  if (!table || typeof id !== "string") return null;
+  return Object.prototype.hasOwnProperty.call(table, id) ? table[id] : null;
+}
+
+function CutsceneActorRef(state, id) {
+  if (id === "player") return state.player;
+  for (const e of state.enemies) {
+    if (e.id === id) return e;
+  }
+  for (const n of state.npcs) {
+    if (n.id === id) return n;
+  }
+  return null;
+}
+
+/** 进入一段过场。返回是否真的开始了。 */
+export function StartCutscene(state, id) {
+  if (!state || !state.level) return false;
+  const def = FindCutsceneDef(state, id);
+  if (!def || def.steps.length === 0) return false;
+  if (state.cutscene) return false;
+  if (state.player.dead) return false;
+
+  const p = state.player;
+  p.vx = 0;
+  p.vy = 0;
+  p.action = null;
+  p.actionTimer = 0;
+  p.actionPropId = null;
+  p.stagger = 0;
+  p.noise = 0;
+  p.noiseSpike = 0;
+
+  state.phase = "cutscene";
+  state.timeScale = 1;
+  state.cutscene = {
+    // —— 契约字段（渲染 / UI 只读）——
+    id,
+    stepIndex: -1,
+    t: 0,
+    letterbox: def.letterbox,
+    fade: state.fade,
+    skippable: def.skippable,
+    // —— 内部 ——
+    steps: def.steps,
+    stepSec: 0,
+    tweens: [],
+    cam: null,
+    fadeFrom: state.fade,
+    fadeTo: state.fade,
+    fadeSec: 0,
+    fadeT: 0,
+    panelId: null,
+    panelHold: 0,
+    scripted: [],
+    restore: [],
+  };
+  if (state.pendingCutscene === id) state.pendingCutscene = null;
+  Emit(state, { kind: "cutsceneStart", id, letterbox: def.letterbox, skippable: def.skippable });
+  EnterNextStep(state, false);
+  return true;
+}
+
+/** 翻页 / 推进（UI 在玩家按键时调；panel 步之外无效）。 */
+export function AdvanceCutscene(state) {
+  const cs = state && state.cutscene;
+  if (!cs) return false;
+  if (cs.stepSec >= 0) return false; // 不是等翻页的步骤
+  if (cs.panelId) DismissPanelById(state, cs.panelId);
+  EnterNextStep(state, false);
+  return true;
+}
+
+/**
+ * 跳过。把剩余步骤的副作用**全部结算完**再收场。
+ * 少结算一个 spawn/reveal 就等于"一按跳过就卡关"，这条比演出重要得多。
+ */
+export function SkipCutscene(state) {
+  const cs = state && state.cutscene;
+  if (!cs) return false;
+  // 当前这一步的副作用在进入时已经落过了，只要把它的补间走完
+  SettleCutsceneTweens(state);
+  let guard = 0;
+  while (cs.stepIndex + 1 < cs.steps.length && guard++ < 4096) {
+    cs.stepIndex++;
+    ApplyStep(state, cs.steps[cs.stepIndex], true);
+    SettleCutsceneTweens(state);
+  }
+  EndCutscene(state);
+  return true;
+}
+
+/** 当前过场是否停在等翻页的气泡上（UI 用来决定显不显示"继续"）。 */
+export function CutscenePanel(state) {
+  const cs = state && state.cutscene;
+  return cs && cs.stepSec < 0 ? cs.panelId : null;
+}
+
+function EnterNextStep(state, instant) {
+  const cs = state.cutscene;
+  let guard = 0;
+  while (guard++ < 4096) {
+    cs.stepIndex++;
+    if (cs.stepIndex >= cs.steps.length) {
+      EndCutscene(state);
+      return;
+    }
+    cs.t = 0;
+    cs.panelId = null;
+    cs.stepSec = ApplyStep(state, cs.steps[cs.stepIndex], instant);
+    if (cs.stepSec !== 0) return; // 阻塞步骤（>0 计时，<0 等翻页）
+  }
+  EndCutscene(state);
+}
+
+/**
+ * 执行一个步骤。返回这一步要阻塞多久：
+ *   >0 秒数 / 0 瞬发（立刻进下一步）/ <0 等玩家翻页。
+ * `instant=true` 时只落副作用、不阻塞——跳过走的就是这条。
+ * 副作用无论哪条路径都一模一样，这是"跳过 == 放完"的唯一保证。
+ */
+function ApplyStep(state, step, instant) {
+  const cs = state.cutscene;
+  switch (step.kind) {
+    case "camera": {
+      const to = step.to || {};
+      const cam = state.camera;
+      cs.cam = {
+        fromX: cam.x,
+        fromY: cam.y,
+        fromVH: cam.viewHeight,
+        toX: to.x === null || to.x === undefined ? cam.x : to.x,
+        toY: to.y === null || to.y === undefined ? cam.y : to.y,
+        toVH: to.viewHeight === null || to.viewHeight === undefined ? cam.viewHeight : to.viewHeight,
+        sec: step.sec,
+        t: 0,
+        ease: step.ease,
+      };
+      if (instant || step.sec <= 0) {
+        ApplyCutsceneCamera(state, 1);
+        return 0;
+      }
+      return step.sec;
+    }
+    case "actor": {
+      const ref = CutsceneActorRef(state, step.id);
+      if (!ref) return 0;
+      const to = step.to || {};
+      const toX = to.x === null || to.x === undefined ? ref.x : to.x;
+      const toY = to.y === null || to.y === undefined ? ref.y : to.y;
+      if (cs.scripted.indexOf(ref) < 0) {
+        // 休眠的敌人也能当演员（山田、汤丙会在开场戏里摸进村，但那时还没"登场"）。
+        // 记下他原来的岗位与休眠状态：演完要原样还回去，
+        // 否则一段过场就把关卡的敌人配置改写了。
+        cs.scripted.push(ref);
+        ref.cutsceneActive = true;
+        cs.restore.push({
+          ref,
+          x: ref.x,
+          y: ref.y,
+          facing: ref.facing,
+          dormant: ref.dormant === undefined ? null : ref.dormant,
+        });
+      }
+      // 走位是**非阻塞**的：几个人同时动、镜头同时摇，才是一段戏而不是幻灯片。
+      // 要等就在后面写一条 wait。
+      const tween = {
+        ref,
+        fromX: ref.x,
+        fromY: ref.y,
+        toX,
+        toY,
+        sec: instant ? 0 : step.sec,
+        t: 0,
+        anim: step.anim,
+        facing: step.facing,
+      };
+      // 同一个人再下一条走位，覆盖上一条
+      for (let i = cs.tweens.length - 1; i >= 0; i--) {
+        if (cs.tweens[i].ref === ref) cs.tweens.splice(i, 1);
+      }
+      cs.tweens.push(tween);
+      if (step.facing) ref.facing = step.facing;
+      if (step.anim) SetAnim(ref, step.anim, 0.6, 0);
+      if (tween.sec <= 0) ApplyActorTween(tween, 1);
+      return 0;
+    }
+    case "panel": {
+      if (step.id) {
+        cs.panelId = step.id;
+        if (!instant) {
+          QueuePanel(state, step.id);
+          cs.panelHold = PanelDuration(step.id) + CUT_PANEL_AUTO_PAD;
+        }
+      }
+      // 跳过时不再往队列里塞台词——玩家已经说了不想看
+      return instant || !step.id ? 0 : -1;
+    }
+    case "wait":
+      return instant ? 0 : step.sec;
+    case "sfx": {
+      if (step.id) Sfx(state, step.id, state.camera.x, state.camera.y);
+      return 0;
+    }
+    case "bell": {
+      RingBellFromCutscene(state, step.rings);
+      return instant ? 0 : step.sec;
+    }
+    case "spawn": {
+      for (const id of step.ids) WakeEnemy(state, id);
+      return 0;
+    }
+    case "reveal": {
+      for (const id of step.ids) RevealById(state, id);
+      return 0;
+    }
+    case "fade": {
+      cs.fadeFrom = state.fade;
+      cs.fadeTo = step.fadeTo;
+      cs.fadeSec = instant ? 0 : step.sec;
+      cs.fadeT = 0;
+      if (cs.fadeSec <= 0) {
+        state.fade = cs.fadeTo;
+        cs.fade = state.fade;
+        return 0;
+      }
+      return step.sec;
+    }
+    default:
+      return 0;
+  }
+}
+
+function Ease(t, kind) {
+  const x = Clamp(t, 0, 1);
+  if (kind === "linear") return x;
+  return x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x); // inOut quad
+}
+
+function ApplyCutsceneCamera(state, k) {
+  const cs = state.cutscene;
+  const cam = cs.cam;
+  if (!cam) return;
+  const e = Ease(k, cam.ease);
+  const c = state.camera;
+  c.x = Lerp(cam.fromX, cam.toX, e);
+  c.y = Lerp(cam.fromY, cam.toY, e);
+  c.viewHeight = Lerp(cam.fromVH, cam.toVH, e);
+  ClampCamera(state);
+}
+
+function ApplyActorTween(tw, k) {
+  const e = Ease(k, "inOut");
+  tw.ref.x = Lerp(tw.fromX, tw.toX, e);
+  tw.ref.y = Lerp(tw.fromY, tw.toY, e);
+  if (!tw.facing && Math.abs(tw.toX - tw.fromX) > 0.01) {
+    tw.ref.facing = tw.toX > tw.fromX ? 1 : -1;
+  }
+}
+
+/** 把所有还在跑的补间一次性走到底（跳过 / 收场时用）。 */
+function SettleCutsceneTweens(state) {
+  const cs = state.cutscene;
+  if (!cs) return;
+  for (const tw of cs.tweens) ApplyActorTween(tw, 1);
+  cs.tweens.length = 0;
+  if (cs.cam) {
+    ApplyCutsceneCamera(state, 1);
+    cs.cam.t = cs.cam.sec;
+  }
+  if (cs.fadeSec > 0) {
+    state.fade = cs.fadeTo;
+    cs.fade = state.fade;
+    cs.fadeSec = 0;
+  }
+}
+
+function UpdateCutscene(state, dt) {
+  const cs = state.cutscene;
+  if (!cs) return;
+  cs.t += dt;
+
+  // 淡入淡出
+  if (cs.fadeSec > 0) {
+    cs.fadeT += dt;
+    const k = Clamp(cs.fadeT / cs.fadeSec, 0, 1);
+    state.fade = Lerp(cs.fadeFrom, cs.fadeTo, k);
+    if (k >= 1) cs.fadeSec = 0;
+  }
+  cs.fade = state.fade;
+
+  // 角色走位
+  for (let i = cs.tweens.length - 1; i >= 0; i--) {
+    const tw = cs.tweens[i];
+    tw.t += dt;
+    const k = tw.sec <= 0 ? 1 : Clamp(tw.t / tw.sec, 0, 1);
+    ApplyActorTween(tw, k);
+    if (tw.anim) SetAnim(tw.ref, k >= 1 ? "idle" : tw.anim, k >= 1 ? 0 : 0.6, dt);
+    if (k >= 1) cs.tweens.splice(i, 1);
+  }
+
+  // 镜头
+  if (cs.cam) {
+    cs.cam.t += dt;
+    const k = cs.cam.sec <= 0 ? 1 : Clamp(cs.cam.t / cs.cam.sec, 0, 1);
+    ApplyCutsceneCamera(state, k);
+  }
+
+  // 步骤推进
+  if (cs.stepSec < 0) {
+    // 等翻页：UI 不调 AdvanceCutscene 也不许把玩家永远关在这
+    cs.panelHold -= dt;
+    if (cs.panelHold <= 0) AdvanceCutscene(state);
+    return;
+  }
+  if (cs.t >= cs.stepSec) EnterNextStep(state, false);
+}
+
+function EndCutscene(state) {
+  const cs = state.cutscene;
+  if (!cs) return;
+  SettleCutsceneTweens(state);
+
+  for (const ref of cs.scripted) ref.cutsceneActive = false;
+
+  // 还没登场的演员回岗位：他在戏里走到哪儿是演出，不是关卡状态。
+  // 不还原的话，被过场挪到村口的追兵会在真正 spawn 时出现在错误的地方，
+  // 而且"跳过 vs 放完"的位置也对不上。
+  for (const r of cs.restore) {
+    if (r.dormant !== true) continue; // 已经登场的人保留演出留下的站位
+    if (r.ref.defeated) continue;
+    r.ref.x = r.x;
+    r.ref.y = r.y;
+    r.ref.facing = r.facing;
+    SetAnim(r.ref, "idle", 0, 0);
+  }
+
+  // 交还给 AI，但不许"结束瞬间突然发现玩家"：
+  // 警觉一律归零，玩家重新拿到完整的 alertRiseSec 反应窗口。
+  for (const e of state.enemies) {
+    e.alertness = 0;
+    e.hasLead = false;
+    e.seesPlayer = false;
+    e.hearsPlayer = false;
+    e.alertStage = "calm";
+    e.huntTimer = 0;
+    e.suspectTimer = 0;
+    e.linger = 0;
+    e.state = e.probeAt ? "probe" : e.patrol ? "patrol" : "idle";
+  }
+
+  // 跟随者重新贴回队形（过场里玩家可能被脚本挪过位置）
+  const p = state.player;
+  SeedTrailBehind(state, p.x, p.y, -(p.facing >= 0 ? 1 : -1));
+  const headD = TrailHeadD(state);
+  let order = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    order++;
+    n.trailD = Math.max(state.trail[0].d, headD - QueueSpacing(state, state.npcs.length) * order);
+    const at = TrailPointAtD(state, n.trailD);
+    n.x = at.x;
+    n.y = at.y;
+  }
+
+  // 一段戏放完 = 一个节拍完成，就地记检查点。
+  // 顺带解决一件要命的事：过场可能把玩家挪了位置，不落检查点的话
+  // 演完立刻死会被扔回演出之前的地方，而那时世界已经被过场改过了。
+  SetCheckpointNear(state, p.x, p.y, "cut_" + cs.id);
+
+  state.cutscene = null;
+  state.phase = "play";
+  // 镜头不许瞬移回玩家头上：留一段缓冲，让跟随从当前机位缓出去
+  state.camHandback = CUT_HANDBACK_SEC;
+  state.timeScale = 1;
+  state.timeScaleTimer = 0;
+  Emit(state, { kind: "cutsceneEnd", id: cs.id });
+}
+
+/** 敲钟（过场版）。副作用必须和玩家亲手敲一模一样，否则跳过就卡关。 */
+function RingBellFromCutscene(state, rings) {
+  let bellProp = null;
+  for (const prop of state.level.props) {
+    if (prop.interact === "bell") {
+      bellProp = prop;
+      break;
+    }
+  }
+  const bx = bellProp ? PropX(state, bellProp) : state.player.x;
+  const by = bellProp ? bellProp.y : state.player.y;
+  state.world.bellRung = true;
+  if (bellProp) state.world.used[bellProp.id] = true;
+  const count = bellProp ? Num(bellProp.data && bellProp.data.rings, rings) : rings;
+  for (let i = 0; i < count; i++) Sfx(state, "bell_ring", bx, by);
+  Shake(state, 0.4);
+  if (bellProp && bellProp.data) {
+    for (const id of Arr(bellProp.data.spawn)) WakeEnemy(state, id);
+    if (typeof bellProp.data.objective === "string") {
+      state.story.objectiveText = bellProp.data.objective;
+      Emit(state, { kind: "objective", text: bellProp.data.objective });
+    }
+  }
+  for (const e of state.enemies) {
+    if (e.dormant) continue;
+    if (Math.abs(e.x - bx) > 55) continue;
+    e.alertness = Math.max(e.alertness, 0.7);
+    e.lastSeenX = bx;
+    e.lastSeenY = by;
+    e.hasLead = true;
+    e.state = "search";
+    e.facing = bx >= e.x ? 1 : -1;
+  }
+}
+
+function WakeEnemy(state, id) {
+  for (const e of state.enemies) {
+    // 已经被反击掀掉的人不会再爬起来——否则"打赢了"这件事没有任何重量
+    if (e.id === id && e.dormant && !e.defeated) {
+      e.dormant = false;
+      Sfx(state, "boot", e.x, e.y);
+    }
+  }
+}
+
+/**
+ * 把符合条件的敌人移出战场。
+ * 这是全作唯一"敌人被打掉"的入口，而且**只能由反击三件套调用**——
+ * 玩家永远没有攻击键，扣扳机的是全村（AGENTS.md 0.1）。
+ */
+function DefeatEnemies(state, predicate, cause) {
+  let hit = 0;
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated) continue;
+    if (!predicate(e)) continue;
+    e.defeated = true;
+    e.dormant = true;
+    e.alertness = 0;
+    e.hasLead = false;
+    e.seesPlayer = false;
+    e.hearsPlayer = false;
+    e.alertStage = "calm";
+    e.huntTimer = 0;
+    e.suspectTimer = 0;
+    e.linger = 0;
+    e.state = "idle";
+    SetAnim(e, "dead", 0, 0);
+    Emit(state, { kind: "defeat", enemyId: e.id, cause, x: e.x, y: e.y });
+    hit++;
+  }
+  return hit;
+}
+
 /** 消费掉队首的气泡（Main 的 UI 播完一条就调一次）。队列空了自动回到 play。 */
 export function DismissPanel(state) {
   const popped = state.story.queue.length > 0 ? state.story.queue.shift() : null;
@@ -809,6 +1542,12 @@ export function DismissPanel(state) {
 /** 当前该显示的气泡 id（Main 可选用）。 */
 export function CurrentPanel(state) {
   return state.story.queue.length > 0 ? state.story.queue[0] : null;
+}
+
+function DismissPanelById(state, id) {
+  const q = state.story.queue;
+  const i = q.indexOf(id);
+  if (i >= 0) q.splice(i, 1);
 }
 
 // ───────────────────────────── 玩家 ─────────────────────────────
@@ -902,8 +1641,10 @@ function UpdateWalk(state, dt) {
   const stunned = p.stagger > 0;
   if (stunned) p.stagger = Math.max(0, p.stagger - dt);
 
-  const moveX = stunned ? 0 : Clamp(Num(input.moveX, 0), -1, 1);
-  const maxSpeed = MoveSpeedFor(p, input);
+  // 踉跄期间仍然认输入，只是使不上劲。完全清零 moveX 会被读成"手柄掉线"，
+  // 而这游戏没有攻防博弈可以填补那半秒空白。
+  const moveX = Clamp(Num(input.moveX, 0), -1, 1);
+  const maxSpeed = MoveSpeedFor(p, input) * (stunned ? STAGGER_CONTROL : 1);
   const target = moveX * maxSpeed;
 
   // 线性加减速：按下就动，松开 ~0.1 秒停住
@@ -981,9 +1722,15 @@ function Land(state, impact) {
   Dust(state, p.x, p.y, Clamp(impact / PLAYER.maxFallSpeed, 0.1, 1));
   p.noiseSpike = Math.max(p.noiseSpike, NOISE.land * Clamp(impact / PLAYER.safeFallSpeed, 0.25, 1));
   if (impact > PLAYER.safeFallSpeed) {
-    // 摔倒硬直，但不死（这不是马里奥，也不是魂）
-    p.stagger = LAND_STUN_SEC;
-    Shake(state, 0.45);
+    // 摔倒硬直，但不死（这不是马里奥，也不是魂）。
+    // 时长随冲击插值：刚过线的那一下只顿一下，真从高处摔下来才是完整的踉跄。
+    const over = Clamp(
+      (impact - PLAYER.safeFallSpeed) / Math.max(0.001, PLAYER.maxFallSpeed - PLAYER.safeFallSpeed),
+      0,
+      1,
+    );
+    p.stagger = Lerp(LAND_STUN_MIN_SEC, LAND_STUN_MAX_SEC, over);
+    Shake(state, 0.28 + 0.22 * over);
   } else if (impact > PLAYER.safeFallSpeed * 0.45) {
     p.stagger = LAND_STUMBLE_SEC;
     Shake(state, 0.12);
@@ -1209,20 +1956,74 @@ function UpdateDeadPlayer(state, dt) {
   RespawnAtCheckpoint(state);
 }
 
-function DoCall(state) {
+/** 附近有没有能招呼上的乡亲（F 是本作唯一的"带上人"手段，得让人看得见）。 */
+function NearestCallable(state) {
   const p = state.player;
-  p.action = "call";
-  p.actionTimer = 0.55;
-  p.actionTotal = 0.55;
-  p.actionPropId = null;
-  p.noiseSpike = NOISE.call;
-  Sfx(state, "shout", p.x, p.y);
-  // 招呼附近的乡亲
+  let best = null;
+  let bestD = Infinity;
   for (const n of state.npcs) {
     if (n.rescued || n.follow) continue;
-    if (Math.abs(n.x - p.x) > 7 || Math.abs(n.y - p.y) > 2.5) continue;
-    StartFollow(state, n);
+    const dx = Math.abs(n.x - p.x);
+    if (dx > CALL_RECRUIT_RANGE_X || Math.abs(n.y - p.y) > CALL_RECRUIT_RANGE_Y) continue;
+    if (dx < bestD) {
+      bestD = dx;
+      best = n;
+    }
   }
+  return best;
+}
+
+/** 有跟随者掉出队形了吗——决定 F 现在是"喊人"还是"归队"。 */
+function HasStraggler(state) {
+  let slot = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    slot++;
+    if (n.slotError > FOLLOW.spacing + FOLLOW_SLOT_SLACK) return true;
+  }
+  return false;
+}
+
+/**
+ * F 的提示。关卡里没有一个 talk 道具——第二三幕全靠"呼应"把六个人带走，
+ * 这个键要是不出现在 HUD 上，玩家根本不知道自己漏了什么。
+ */
+function CallHint(state) {
+  const p = state.player;
+  if (p.dead || p.hidden || p.action) return null;
+  if (state.phase !== "play") return null;
+  const npc = NearestCallable(state);
+  if (npc) return { key: "F", label: "招呼" + (npc.name || "乡亲"), id: npc.id, kind: "call" };
+  if (HasStraggler(state)) return { key: "F", label: "催一催", id: null, kind: "rally" };
+  return null;
+}
+
+function DoCall(state) {
+  const player = state.player;
+  player.action = "call";
+  player.actionTimer = 0.55;
+  player.actionTotal = 0.55;
+  player.actionPropId = null;
+  player.noiseSpike = NOISE.call;
+  Sfx(state, "shout", player.x, player.y);
+  // 招呼附近的乡亲
+  let recruited = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || n.follow) continue;
+    if (Math.abs(n.x - player.x) > CALL_RECRUIT_RANGE_X) continue;
+    if (Math.abs(n.y - player.y) > CALL_RECRUIT_RANGE_Y) continue;
+    StartFollow(state, n);
+    recruited++;
+  }
+  // 已经在跟的人：喊一嗓子 = 催归队。
+  // 不给这个收益的话，F 在带满六个人之后就是个纯粹会招来敌人的空键。
+  let rallied = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    n.rally = CALL_RALLY_SEC;
+    if (n.slotError > FOLLOW_SNAP) rallied++;
+  }
+  Emit(state, { kind: "call", x: player.x, y: player.y, recruited, rallied });
 }
 
 // ───────────────────────────── 互动 ─────────────────────────────
@@ -1283,10 +2084,48 @@ function InteractAvailable(state, prop) {
     }
     case "read":
       return !state.world.codex[prop.data.codexId];
+    // —— 反击三件套 ——
+    // 提示照常出现（否则玩家不知道这儿有个枪眼），但条件不满足时 blocked=true，
+    // 按下去只会得到一句"等他们就位"。跑腿本身就是玩法。
+    case "signal":
+      return SquadState(state, prop.data.squadId) === "idle";
+    case "mine":
+      return !state.world.mines[prop.data.channel];
+    case "loophole":
+      return SquadState(state, prop.data.squadId) !== "fired";
     default:
       return false;
   }
 }
+
+function SquadState(state, squadId) {
+  if (typeof squadId !== "string" || !squadId) return "idle";
+  return state.world.squads[squadId] || "idle";
+}
+
+/** 这一步的前提够不够（传令到位没有）。 */
+function CounterReady(state, prop) {
+  if (prop.interact === "mine") {
+    const need = prop.data && prop.data.needSquad;
+    return !need || SquadState(state, need) === "ready" || SquadState(state, need) === "fired";
+  }
+  if (prop.interact === "loophole") return SquadState(state, prop.data.squadId) === "ready";
+  return true;
+}
+
+/** 这个道具现在按下去会不会"按了个寂寞"（条件不满足）。 */
+function PropBlocked(state, prop) {
+  if (prop.interact !== "lever") return false;
+  const need = prop.data && prop.data.needItem ? prop.data.needItem : null;
+  return !!need && state.player.carrying !== need;
+}
+
+// 面朝方向的等效"距离折扣"（米）。挑得比常见的道具间距（1–2.5 米）小一半，
+// 保证它只在两个东西**差不多近**的时候起作用，不会让人隔着一个近的去够远的。
+const FACING_BONUS = 0.75;
+// 条件没满足的提示要给条件满足的让路。典型现场：木塞掉在闸门脚下，
+// 结果提示一直写着"需要木塞"，玩家踩在木塞上把自己锁死了。
+const BLOCKED_PENALTY = 1.4;
 
 function FindTarget(state) {
   const p = state.player;
@@ -1295,11 +2134,18 @@ function FindTarget(state) {
   const reach = INTERACT.reach + PLAYER.width * 0.5;
   for (const prop of state.level.props) {
     if (!InteractAvailable(state, prop)) continue;
-    const dx = Math.abs(PropX(state, prop) - p.x);
+    const px = PropX(state, prop);
+    const dx = Math.abs(px - p.x);
     if (dx > reach) continue;
     const dy = Math.abs(prop.y - p.y);
     if (dy > INTERACT.reachY) continue;
-    const d = dx + dy * 0.4;
+    // 打分而不是纯比距离：先看条件满不满足，再看在不在面朝方向，最后才是远近。
+    // 站在两个道具正中间时，玩家心里想的永远是自己正对着的那个。
+    let d = dx + dy * 0.4;
+    const ahead = (px - p.x) * p.facing;
+    if (ahead > 0.02) d -= FACING_BONUS;
+    else if (ahead < -0.02) d += FACING_BONUS * 0.5;
+    if (PropBlocked(state, prop)) d += BLOCKED_PENALTY;
     if (d < bestD) {
       bestD = d;
       best = prop;
@@ -1349,6 +2195,28 @@ function PromptForProp(state, prop) {
     }
     case "read":
       return { key: "E", label: "查看" + (prop.label || ""), id: prop.id, kind: "read" };
+    case "signal":
+      return { key: "E", label: prop.label || "传口令", id: prop.id, kind: "signal" };
+    case "mine": {
+      const ok = CounterReady(state, prop);
+      return {
+        key: "E",
+        label: ok ? "拉响" + (prop.label || "地雷") : "等他们就位",
+        id: prop.id,
+        kind: "mine",
+        blocked: !ok,
+      };
+    }
+    case "loophole": {
+      const ok = CounterReady(state, prop);
+      return {
+        key: "E",
+        label: ok ? "打开" + (prop.label || "枪眼") : "还没传到口令",
+        id: prop.id,
+        kind: "loophole",
+        blocked: !ok,
+      };
+    }
     default:
       return null;
   }
@@ -1376,7 +2244,9 @@ export function CurrentPrompt(state) {
     if (p.y > shaft.yBottom + 0.3) return { key: "S", label: "下去", id: shaft.id, kind: "shaft" };
     if (p.y < shaft.yTop - 0.3) return { key: "W", label: "上去", id: shaft.id, kind: "shaft" };
   }
-  return null;
+  // 没别的可按时，把"呼应"顶上来。第二三幕没有一个 talk 道具，
+  // 六个乡亲全靠 F 才带得走——这个键不出现在提示条上就是隐藏必需品。
+  return CallHint(state);
 }
 
 function BeginInteract(state, prop) {
@@ -1390,9 +2260,17 @@ function BeginInteract(state, prop) {
       return;
     }
   }
+  // 前提没满足就是按不动。这是"反击有前提"的落点，不许悄悄放行。
+  if ((kind === "mine" || kind === "loophole") && !CounterReady(state, prop)) {
+    Sfx(state, "cloth", p.x, p.y);
+    return;
+  }
 
   let duration = 0.35;
   if (kind === "hatch") duration = INTERACT.hatchOpenSec;
+  else if (kind === "signal") duration = SIGNAL_SEC;
+  else if (kind === "mine") duration = MINE_SEC;
+  else if (kind === "loophole") duration = LOOPHOLE_SEC;
   else if (kind === "bell") duration = INTERACT.bellRingSec;
   else if (kind === "push") {
     const toX = Num(prop.data.toX, prop.x);
@@ -1418,6 +2296,10 @@ function BeginInteract(state, prop) {
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.push);
   } else if (kind === "lever") {
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.lever);
+  } else if (kind === "signal") {
+    // 敲钢轨传令是**响的**。跑腿的风险就在这一下上，不许做成静音按钮。
+    Sfx(state, "signal", p.x, p.y);
+    p.noiseSpike = Math.max(p.noiseSpike, SIGNAL_NOISE);
   }
 }
 
@@ -1501,14 +2383,9 @@ function CompleteInteract(state, kind, prop) {
 
       // 钟声是因，追兵是果。关卡把要触发的东西写在 data 里。
       for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
-      for (const id of Arr(prop.data.spawn)) {
-        for (const e of state.enemies) {
-          if (e.id === id && e.dormant) {
-            e.dormant = false;
-            Sfx(state, "boot", e.x, e.y);
-          }
-        }
-      }
+      for (const id of Arr(prop.data.spawn)) WakeEnemy(state, id);
+      // 钟这一下值得停半拍：这是全幕的支点，也是玩家此刻唯一不需要操作的时刻
+      SlowTime(state, TIME_SLOW.bell, TIME_SLOW.bellSec);
       if (typeof prop.data.objective === "string") {
         state.story.objectiveText = prop.data.objective;
         Emit(state, { kind: "objective", text: prop.data.objective });
@@ -1575,6 +2452,66 @@ function CompleteInteract(state, kind, prop) {
       state.world.used[prop.id] = true;
       break;
     }
+    // —— 反击三件套 ——
+    case "signal": {
+      const squadId = prop.data.squadId;
+      if (squadId && SquadState(state, squadId) === "idle") {
+        state.world.squads[squadId] = "ready";
+        Emit(state, { kind: "squad", id: squadId, status: "ready" });
+      }
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      Sfx(state, "signal", p.x, p.y);
+      p.noiseSpike = Math.max(p.noiseSpike, SIGNAL_NOISE);
+      state.world.used[prop.id] = true;
+      break;
+    }
+    case "mine": {
+      const channel = prop.data.channel;
+      if (channel) state.world.mines[channel] = true;
+      const need = prop.data.needSquad;
+      if (need) {
+        state.world.squads[need] = "fired";
+        Emit(state, { kind: "squad", id: need, status: "fired" });
+      }
+      const mx = PropX(state, prop);
+      Sfx(state, "mine", mx, prop.y);
+      Shake(state, 0.75);
+      Dust(state, mx, prop.y + 0.5, 1);
+      // 掀翻这一段里的敌人。玩家没开枪——他拉的是全村埋好的雷。
+      const hit = DefeatEnemies(
+        state,
+        (e) =>
+          Math.abs(e.x - mx) <= MINE_RADIUS_X &&
+          e.y >= prop.y - MINE_REACH_DOWN &&
+          e.y <= prop.y + MINE_REACH_UP,
+        "mine",
+      );
+      Emit(state, { kind: "counter", verb: "mine", x: mx, y: prop.y, hit, channel: channel || null });
+      SlowTime(state, TIME_SLOW.hazard, TIME_SLOW.hazardSec);
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      state.world.used[prop.id] = true;
+      break;
+    }
+    case "loophole": {
+      const squadId = prop.data.squadId;
+      if (squadId) {
+        state.world.squads[squadId] = "fired";
+        Emit(state, { kind: "squad", id: squadId, status: "fired" });
+      }
+      const lx = PropX(state, prop);
+      for (let i = 0; i < RIFLE_SHOTS; i++) Sfx(state, "rifle", lx, prop.y);
+      Shake(state, 0.28);
+      // 枪眼朝**头顶的街面**打：守在后面的民兵放冷枪，玩家只是把枪眼推开。
+      const hit = DefeatEnemies(
+        state,
+        (e) => Math.abs(e.x - lx) <= LOOPHOLE_RANGE_X && e.y > prop.y + 1.0,
+        "rifle",
+      );
+      Emit(state, { kind: "counter", verb: "loophole", x: lx, y: prop.y, hit, squadId: squadId || null });
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      state.world.used[prop.id] = true;
+      break;
+    }
     default:
       break;
   }
@@ -1631,23 +2568,7 @@ function FireTrigger(state, t) {
 
   for (const id of emit.panels) QueuePanel(state, id);
 
-  for (const id of emit.reveal) {
-    state.world.revealed[id] = true;
-    const hatch = state.world.hatches[id];
-    if (hatch) hatch.hidden = false;
-    for (const prop of state.level.props) {
-      if (prop.id === id) prop.hidden = false;
-      // 关卡也可能只 reveal 地道口 id，而道具用 hatchId 指过去
-      if (prop.interact === "hatch" && prop.data && prop.data.hatchId === id) prop.hidden = false;
-    }
-    for (const h of state.level.hatches) {
-      if (h.id === id && h.propId) state.world.revealed[h.propId] = true;
-      if (h.revealBy === t.id) {
-        const rec = state.world.hatches[h.id];
-        if (rec) rec.hidden = false;
-      }
-    }
-  }
+  for (const id of emit.reveal) RevealById(state, id);
   // revealBy 也可能直接写 trigger id
   for (const h of state.level.hatches) {
     if (h.revealBy === t.id) {
@@ -1666,14 +2587,7 @@ function FireTrigger(state, t) {
     if (hz.armAt === t.id) ArmHazard(state, hz.id);
   }
 
-  for (const id of emit.spawn) {
-    for (const e of state.enemies) {
-      if (e.id === id && e.dormant) {
-        e.dormant = false;
-        Sfx(state, "boot", e.x, e.y);
-      }
-    }
-  }
+  for (const id of emit.spawn) WakeEnemy(state, id);
 
   if (emit.objective) {
     state.story.objectiveText = emit.objective;
@@ -1682,12 +2596,35 @@ function FireTrigger(state, t) {
 
   if (emit.checkpoint) SetCheckpointNear(state, (t.x0 + t.x1) * 0.5, state.player.y, t.id);
 
+  // 过场：Rules 只挂号 + 发事件，由集成层决定什么时候把操作权收走。
+  // 不在 StepPlay 里自作主张进过场——那会让任何"跑 N 帧看看"的调用
+  // （测试、机器人、渲染健康检查）在开场就被一段三十秒的戏堵死。
+  if (emit.cutscene) {
+    state.pendingCutscene = emit.cutscene;
+    Emit(state, { kind: "cutscene", id: emit.cutscene });
+  }
+
   if (emit.win) {
     // 触发区说"到这就算通关"，但关卡自己写了 needAllVillagers。
     // AGENTS.md 第 0 节：第三幕结尾必须是一次完整的转移（全员抵达出口）。
     // 所以 win 只是"到地方了"，人没带齐就先记下来，等人齐了再收尾。
     state.winArmed = true;
     CheckWin(state, 0);
+  }
+}
+
+/** 让某个 id（道具 / 地道口）现形。触发区和过场共用这一条路径。 */
+function RevealById(state, id) {
+  state.world.revealed[id] = true;
+  const hatch = state.world.hatches[id];
+  if (hatch) hatch.hidden = false;
+  for (const prop of state.level.props) {
+    if (prop.id === id) prop.hidden = false;
+    // 关卡也可能只 reveal 地道口 id，而道具用 hatchId 指过去
+    if (prop.interact === "hatch" && prop.data && prop.data.hatchId === id) prop.hidden = false;
+  }
+  for (const h of state.level.hatches) {
+    if (h.id === id && h.propId) state.world.revealed[h.propId] = true;
   }
 }
 
@@ -1818,6 +2755,9 @@ function ArmHazard(state, id) {
     Emit(state, { kind: "objective", text: HazardWarnText(h) });
     Shake(state, 0.25);
     Dust(state, h.srcX0, h.y + 0.6, 0.5);
+    // 引爆的那一下顿一顿。危害有 warnLeadSec 的前摇，这 0.35 秒完全落在
+    // "还没开始蔓延"的窗口里，不会吃掉玩家往外跑的时间。
+    SlowTime(state, TIME_SLOW.hazard, TIME_SLOW.hazardSec);
   }
 }
 
@@ -1966,6 +2906,49 @@ function UpdateEnemies(state, dt) {
   for (const e of state.enemies) UpdateEnemy(state, e, dt);
 }
 
+/**
+ * 把 0..1 的连续警觉切成玩家读得懂的五档。
+ * 音效和 UI 挂在档位上，不用各自去猜阈值。
+ */
+function AlertStageOf(alertness) {
+  if (alertness >= ALERT_FINAL) return "final"; // 最后一下：再不动就被抓
+  if (alertness >= SENSE.searchAt) return "hunt"; // 他主动过来搜了
+  if (alertness >= SENSE.suspiciousAt) return "suspect"; // 他停下来怀疑
+  if (alertness >= ALERT_GLIMPSE) return "glimpse"; // 视线刚扫到
+  return "calm";
+}
+
+const ALERT_STAGE_RANK = { calm: 0, glimpse: 1, suspect: 2, hunt: 3, final: 4 };
+
+/**
+ * 警觉跨过档位就发一次事件。只在**升档**时响，降档只更新 stage 不再发声，
+ * 否则一次遭遇会在阈值上来回抖出一串音效。
+ */
+function EmitAlertStages(state, e, prevAlert, sensing) {
+  const prev = AlertStageOf(prevAlert);
+  const now = AlertStageOf(e.alertness);
+  e.alertStage = now;
+  if (now === prev) return;
+  const up = ALERT_STAGE_RANK[now] > ALERT_STAGE_RANK[prev];
+  Emit(state, {
+    kind: "alert",
+    stage: now,
+    rising: up,
+    enemyId: e.id,
+    enemyKind: e.kind,
+    x: e.x,
+    y: e.y,
+    dir: state.player.x >= e.x ? -1 : 1, // 从玩家看过去，威胁在哪一边
+    seeing: !!e.seesPlayer,
+    alertness: e.alertness,
+  });
+  if (!up) return;
+  // 分级音效。suspect / hunt 沿用原来 state 切换时的声音（在下面的状态机里发），
+  // 这里只补两头：第一次被扫到（极轻的布料/呼吸），和最后一下（心跳）。
+  if (now === "glimpse" && sensing) Sfx(state, "cloth", e.x, e.y);
+  else if (now === "final") Sfx(state, "heartbeat", e.x, e.y);
+}
+
 function UpdateEnemy(state, e, dt) {
   if (e.dormant) {
     SetAnim(e, "idle", 0, dt);
@@ -1977,6 +2960,12 @@ function UpdateEnemy(state, e, dt) {
   const seeing = alive && CanSee(state, e);
   const hearing = alive && !seeing && CanHear(state, e);
   const prevState = e.state;
+  const prevAlert = e.alertness;
+
+  // 渲染/UI 要能指出"是谁在看我"，所以感知结果必须落在 enemy 上，
+  // 不能只活在这一帧的局部变量里。
+  e.seesPlayer = !!seeing;
+  e.hearsPlayer = !!hearing;
 
   if (seeing) {
     e.alertness = Clamp(e.alertness + dt / SENSE.alertRiseSec, 0, 1);
@@ -1994,6 +2983,15 @@ function UpdateEnemy(state, e, dt) {
     e.alertness = Clamp(e.alertness - SENSE.alertFallPerSec * dt, 0, 1);
     if (e.alertness < SENSE.suspiciousAt * 0.5) e.hasLead = false;
   }
+
+  // 余温计时器：纯展示，不接进状态机（理由见文件头 HUNT_PERSIST_SEC 的注释）。
+  if (e.alertness >= SENSE.searchAt) e.huntTimer = HUNT_PERSIST_SEC;
+  else e.huntTimer = Math.max(0, (e.huntTimer || 0) - dt);
+  if (e.alertness >= SENSE.suspiciousAt) e.suspectTimer = SUSPECT_PERSIST_SEC;
+  else e.suspectTimer = Math.max(0, (e.suspectTimer || 0) - dt);
+  e.linger = Clamp(Math.max(e.huntTimer / HUNT_PERSIST_SEC, e.suspectTimer / SUSPECT_PERSIST_SEC), 0, 1);
+
+  EmitAlertStages(state, e, prevAlert, seeing || hearing);
 
   // 状态机
   let next;
@@ -2189,6 +3187,9 @@ function Capture(state, e) {
   if (p.dead) return;
   Emit(state, { kind: "spot", enemyId: e.id });
   Sfx(state, "alarm", e.x, e.y);
+  // 被发现的那一下定住半秒。这时候玩家已经没有可打的牌了——
+  // 放慢不占用他的任何操作窗口，只是把这一下的分量留住。
+  SlowTime(state, TIME_SLOW.spotted, TIME_SLOW.spottedSec);
   Die(state, "spotted");
 }
 
@@ -2228,7 +3229,73 @@ function StartFollow(state, npc) {
     if (n.follow && !n.rescued) order++;
   }
   npc.order = order;
+  // 入队时先落到面包屑上最靠近自己的那一点。
+  // 不做这一步的话，刚喊上的人会被分到"队尾"那个槽位，
+  // 于是他做的第一件事是从你身边掉头往回走八米——喊人喊得人跑了。
+  npc.trailD = NearestTrailD(state, npc.x, npc.y);
+  npc.rally = CALL_RALLY_SEC;
   Sfx(state, "cloth", npc.x, npc.y);
+}
+
+/**
+ * 从 (x,y) 出发朝 dir 方向沿地板铺一条假面包屑，够整队人站开。
+ * 复活 / 传送之后用它顶替"真实走过的路"，让队形立刻成立而不是叠在一点。
+ * 遇到没有地板的地方就停——宁可尾巴短一点，也不许把人排进墙里。
+ */
+function TraceFloorRun(state, x, y, dir, need) {
+  const level = state.level;
+  const pts = [];
+  let cy = y;
+  for (let d = TRAIL_STEP; d <= need; d += TRAIL_STEP) {
+    const nx = x + dir * d;
+    if (nx < level.bounds.x0 + 0.3 || nx > level.bounds.x1 - 0.3) break;
+    const floor = FloorUnder(level, nx, cy + STEP_UP, STEP_UP + FLOOR_SNAP);
+    if (!floor) break;
+    if (Math.abs(floor.y - cy) > STEP_UP) break;
+    cy = floor.y;
+    pts.push({ x: nx, y: cy });
+  }
+  return pts;
+}
+
+function SeedTrailBehind(state, x, y, dir) {
+  const need = FOLLOW.spacing * Math.max(1, state.npcs.length) + 1.2;
+  let pts = TraceFloorRun(state, x, y, dir, need);
+  // 身后不够站（出生点贴着关卡边缘、检查点在死胡同里）就往另一头铺。
+  // 队伍站在身前有点怪，但远远好过六个乡亲叠成一个人。
+  if (pts.length * TRAIL_STEP < need * 0.9) {
+    const alt = TraceFloorRun(state, x, y, -dir, need);
+    if (alt.length > pts.length) pts = alt;
+  }
+  // 从尾到头重排成递增弧长
+  const trail = [];
+  let acc = 0;
+  let prev = pts.length ? pts[pts.length - 1] : { x, y };
+  trail.push({ x: prev.x, y: prev.y, d: 0 });
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const q = pts[i];
+    acc += Math.sqrt((q.x - prev.x) ** 2 + (q.y - prev.y) ** 2);
+    trail.push({ x: q.x, y: q.y, d: acc });
+    prev = q;
+  }
+  acc += Math.sqrt((x - prev.x) ** 2 + (y - prev.y) ** 2);
+  trail.push({ x, y, d: acc });
+  state.trail = trail;
+}
+
+/**
+ * 队列间距。面包屑比整队人需要的还短时（刚开局、复活在死角），
+ * 把间距压缩到刚好铺满现有的路，而不是让排不下的人全部堆到队尾那一点上。
+ */
+function QueueSpacing(state, count) {
+  if (count <= 0) return FOLLOW.spacing;
+  const trail = state.trail;
+  const span = trail.length ? trail[trail.length - 1].d - trail[0].d : 0;
+  // 不设有意义的下限：路只有一米时把六个人压成 0.16 米一档，
+  // 依然比"排不下的全部夹到队尾同一点"强，而且玩家往前走一两步面包屑就够长了，
+  // 队形自己会散开。
+  const fit = span / (count + 0.25);
+  return fit < FOLLOW.spacing ? Math.max(0.05, fit) : FOLLOW.spacing;
 }
 
 function UpdateTrail(state) {
@@ -2247,63 +3314,175 @@ function UpdateTrail(state) {
   if (trail.length > TRAIL_MAX) trail.shift();
 }
 
-function TrailPointAt(state, distBehind) {
+function TrailHeadD(state) {
+  const trail = state.trail;
+  return trail.length ? trail[trail.length - 1].d : 0;
+}
+
+/** 弧长 d 处的面包屑坐标（d 是绝对弧长，不是"落后多少"）。 */
+function TrailPointAtD(state, d) {
   const trail = state.trail;
   if (trail.length === 0) return { x: state.player.x, y: state.player.y };
+  if (trail.length === 1 || d <= trail[0].d) return { x: trail[0].x, y: trail[0].y };
   const head = trail[trail.length - 1];
-  const want = head.d - distBehind;
-  if (want <= trail[0].d) return { x: trail[0].x, y: trail[0].y };
+  if (d >= head.d) return { x: head.x, y: head.y };
+  // 从队尾往回找：跟随者都聚在靠近头部的一小段上，倒着找几乎总是几步就命中
   for (let i = trail.length - 1; i > 0; i--) {
     const a = trail[i - 1];
     const b = trail[i];
-    if (want >= a.d && want <= b.d) {
-      const t = b.d - a.d < 1e-6 ? 0 : (want - a.d) / (b.d - a.d);
+    if (d >= a.d && d <= b.d) {
+      const t = b.d - a.d < 1e-6 ? 0 : (d - a.d) / (b.d - a.d);
       return { x: Lerp(a.x, b.x, t), y: Lerp(a.y, b.y, t) };
     }
   }
   return { x: head.x, y: head.y };
 }
 
+function TrailPointAt(state, distBehind) {
+  return TrailPointAtD(state, TrailHeadD(state) - distBehind);
+}
+
+/** 面包屑上离 (x,y) 最近的那一点的弧长。新人入队时用它对齐。 */
+function NearestTrailD(state, x, y) {
+  const trail = state.trail;
+  if (trail.length === 0) return 0;
+  let best = trail[trail.length - 1].d;
+  let bestD2 = Infinity;
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    const dx = t.x - x;
+    const dy = t.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = t.d;
+    }
+  }
+  return best;
+}
+
+/**
+ * 队列排序：按各自在面包屑上的弧长从前往后排，而不是按关卡数组的顺序。
+ * 数组顺序会让"刚喊上的人"抢到最靠前的槽位，于是整队人互相穿过去换位——
+ * 六个乡亲在地道里对穿，这个画面比掉队还糟。
+ */
+function FollowOrder(state) {
+  const out = [];
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    out.push(n);
+  }
+  out.sort((a, b) => {
+    const d = (b.trailD || 0) - (a.trailD || 0);
+    if (Math.abs(d) > 1e-6) return d;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; // 平手时按 id，保证确定性
+  });
+  return out;
+}
+
+/** 跟随者当前所在处的姿态（矮通道里得跟着猫腰，不能站着穿土）。 */
+function NpcPosture(state, n) {
+  const col = Column(state.level, n.x, n.y + 0.15, FLOOR_SNAP + 0.2);
+  if (col.clearance === Infinity) return "stand";
+  return PostureFor(col.clearance, false);
+}
+
+/**
+ * 这个人现在是不是挂在竖井里。
+ * 按几何判，不按"这一帧有没有往上动"——队伍在井里等前面的人时是不动的，
+ * 靠位移判会让半支队伍在半空中摆出站立姿势。
+ */
+function InShaft(state, x, y) {
+  for (const s of state.level.shafts) {
+    if (Math.abs(x - s.x) > SHAFT_GRAB_X) continue;
+    if (y > s.yBottom + 0.35 && y < s.yTop - 0.2) return true;
+  }
+  return false;
+}
+
 function UpdateNpcs(state, dt) {
-  const p = state.player;
   const exit = state.level.exit;
-  let queueIndex = 0;
+  const headD = TrailHeadD(state);
+  const queue = FollowOrder(state);
 
   for (const n of state.npcs) {
     if (n.rescued) {
       SetAnim(n, "idle", 0, dt);
       continue;
     }
-
     if (!n.follow) {
       SetAnim(n, "idle", 0, dt);
+      n.posture = NpcPosture(state, n);
+      n.crouch = n.posture !== "stand";
+      n.height = PostureHeight(n.posture);
+      n.slotError = 0;
       const floor = FloorUnder(state.level, n.x, n.y + 0.6, 1.4);
       if (floor) n.y = floor.y;
-      continue;
     }
+  }
 
-    queueIndex++;
-    const target = TrailPointAt(state, FOLLOW.spacing * queueIndex);
-    const dx = target.x - n.x;
-    const dy = target.y - n.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const lag = Math.abs(p.x - n.x) + Math.abs(p.y - n.y);
-    const speed = lag > FOLLOW.maxLag ? FOLLOW.catchUpSpeed : dist > 2.0 ? FOLLOW.catchUpSpeed * 0.8 : PLAYER.walkSpeed;
+  const spacing = QueueSpacing(state, queue.length);
+  for (let i = 0; i < queue.length; i++) {
+    const n = queue[i];
+    n.rally = Math.max(0, (n.rally || 0) - dt);
 
-    if (dist > 0.12) {
-      const step = Math.min(dist, speed * dt);
-      n.x += (dx / dist) * step;
-      n.y += (dy / dist) * step;
-      n.facing = dx >= 0 ? 1 : -1;
-      SetAnim(n, "walk", Clamp(speed / PLAYER.walkSpeed, 0, 1), dt);
+    const wantD = headD - spacing * (i + 1);
+    const cur = typeof n.trailD === "number" ? n.trailD : wantD;
+    const err = wantD - cur;
+    n.slotError = Math.abs(err);
+
+    // 速度：贴着队形就按玩家步速走，掉出容差就小跑，掉太远（或刚被喊）再快一档。
+    let speed = PLAYER.walkSpeed;
+    if (n.slotError > FOLLOW.maxLag) speed = FOLLOW.catchUpSpeed * 1.25;
+    else if (n.slotError > FOLLOW_SLOT_SLACK) speed = FOLLOW.catchUpSpeed;
+    if (n.rally > 0 && err > 0) speed *= CALL_RALLY_SCALE;
+
+    let nextD = cur;
+    if (Math.abs(err) > FOLLOW_SNAP) {
+      const step = Math.min(Math.abs(err), speed * dt);
+      nextD = cur + Math.sign(err) * step;
     } else {
-      SetAnim(n, "idle", 0, dt);
+      nextD = wantD;
     }
+    // 永远不许越过玩家，也不许掉到面包屑记录范围之外
+    const tail = state.trail.length ? state.trail[0].d : 0;
+    nextD = Clamp(nextD, tail, headD);
+
+    const from = TrailPointAtD(state, cur);
+    const to = TrailPointAtD(state, nextD);
+    n.trailD = nextD;
+    n.x = to.x;
+    n.y = to.y;
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const moved = Math.sqrt(dx * dx + dy * dy);
+    if (Math.abs(dx) > 1e-4) n.facing = dx > 0 ? 1 : -1;
+
+    // 姿态 + 动画。契约的动画名里有 crawl / crouchIdle / climb，
+    // 之前跟随者一律 walk/idle：矮通道里六个人直挺挺穿过一米二的净空，
+    // 竖井里整队人保持走路姿势垂直上升。剪影一眼就穿帮。
+    const climbing =
+      InShaft(state, n.x, n.y) ||
+      (moved > 1e-4 && Math.abs(dy) > Math.abs(dx) * 1.6 && Math.abs(dy) > 0.004);
+    n.posture = climbing ? "crouch" : NpcPosture(state, n);
+    n.crouch = n.posture !== "stand";
+    n.height = PostureHeight(n.posture);
+    n.onShaft = climbing;
+    const frac = Clamp(moved / dt / PLAYER.walkSpeed, 0, 1);
+    let anim;
+    if (climbing) anim = "climb";
+    else if (moved <= 1e-4) anim = n.posture === "stand" ? "idle" : "crouchIdle";
+    else if (n.posture !== "stand") anim = "crawl";
+    else anim = "walk";
+    SetAnim(n, anim, climbing ? 0.6 : frac, dt);
+    n.speed = frac;
 
     // 抵达出口 → 得救
     if (Math.abs(n.x - exit.x) <= Math.max(exit.radius, FOLLOW.arriveRadius) && Math.abs(n.y - exit.y) <= 2.2) {
       n.rescued = true;
       n.follow = false;
+      n.slotError = 0;
       Sfx(state, "cloth", n.x, n.y);
     }
   }
@@ -2328,37 +3507,130 @@ function ClampCamera(state) {
   c.y = loY <= hiY ? Clamp(c.y, loY, hiY) : (b.yBottom + b.yTop) * 0.5;
 }
 
+// ── 镜头语言（AGENTS.md 2.3）──
+//
+// 呼吸感的幅度全在这里，刻意压到"说不出哪里不一样但就是活的"。
+// 这几个数一旦放大就会晕，改之前先在手机上站着看三十秒。
+const BREATH_AMP_X = 0.075; // 静止时的横向漂移（米）
+const BREATH_AMP_Y = 0.045; // 竖向漂移（米）
+const BREATH_PERIOD_X = 7.3; // 秒。和 Y 取互质的周期，避免画圈
+const BREATH_PERIOD_Y = 5.1;
+const BREATH_FADE = 1.6; // 走动时漂移收掉的速度
+const TENSE_TIGHTEN = 0.055; // suspicion 拉满时视口收紧 5.5%
+const HANDBACK_LERP_MIN = 0.42; // 过场交还镜头时的起始跟随强度（比例）
+const ANCHOR_SAFE = 0.82; // 定镜头允许玩家离开画面中心多远（占半宽的比例）
+
+/** 玩家当前落在哪个机位区里。区间重叠时取最后一个（关卡后写的覆盖先写的）。 */
+function ActiveShot(state) {
+  const shots = state.level.shots;
+  if (!shots || shots.length === 0) return null;
+  const p = state.player;
+  let found = null;
+  for (const s of shots) {
+    if (p.x < s.x0 || p.x > s.x1) continue;
+    if (p.y < s.yMin || p.y > s.yMax) continue;
+    found = s;
+  }
+  return found;
+}
+
 function UpdateCamera(state, dt) {
   const p = state.player;
   const c = state.camera;
 
+  // 呼吸偏移是"贴"在跟随结果上的，不是攒在里面的。
+  // 先把上一帧的偏移撕下来，否则每帧都往同一个方向漂，几秒就飞出关卡。
+  c.x -= Num(c.breathX, 0);
+  c.y -= Num(c.breathY, 0);
+  c.breathX = 0;
+  c.breathY = 0;
+
+  // —— 机位区：权重 w 在进出时各用 ease 秒过渡，所以永远不会硬切 ——
+  const shot = ActiveShot(state);
+  const shotId = shot ? shot.id : null;
+  if (shotId !== state.shotId) {
+    // 换区（或离开）：先把旧区的权重退回去，再涨新区的。
+    // 直接跳权重就是硬切，正是 2.3 节点名要避免的"晃"。
+    if (state.shotW <= 0.001 || !state.shotId) {
+      state.shotId = shotId;
+      state.shotW = 0;
+    } else {
+      state.shotW = Math.max(0, state.shotW - dt / Math.max(0.05, ShotEase(state)));
+      if (state.shotW <= 0.001) state.shotId = shotId;
+    }
+  } else if (shotId) {
+    state.shotW = Math.min(1, state.shotW + dt / Math.max(0.05, shot.ease));
+  } else {
+    state.shotW = Math.max(0, state.shotW - dt / 1.2);
+  }
+  const activeShot = state.shotId ? FindShotById(state, state.shotId) : null;
+  const w = activeShot ? Clamp(state.shotW, 0, 1) : 0;
+  state.shot = activeShot ? { id: activeShot.id, weight: w, anchored: activeShot.anchorX !== null } : null;
+
   const speedFrac = Clamp(Math.abs(p.vx) / PLAYER.walkSpeed, 0, 1);
-  const targetX = p.x + p.facing * CAMERA.lookAheadX * speedFrac;
+  let targetX = p.x + p.facing * CAMERA.lookAheadX * speedFrac;
   // 摄像机抬多高分层定，因为两边要看的东西不一样：
   // 地表要把村庄和天空放进上三分之二（+0.9 会把地平线钉在 57.8%，
   //   剩下 42% 全是没内容的实心土，眼睛第一眼落在土上）；
   // 地道净空只有一米七出头，抬太高上下都是土，反而要把净空放到画面中间。
-  const targetY = p.y + (p.layer === "tunnel" ? CAMERA.tunnelLift : CAMERA.surfaceLift);
+  let lift = p.layer === "tunnel" ? CAMERA.tunnelLift : CAMERA.surfaceLift;
+  let targetVH = p.layer === "tunnel" ? CAMERA.tunnelViewHeight : CAMERA.viewHeight;
+  if (activeShot) {
+    if (activeShot.lift !== null) lift = Lerp(lift, activeShot.lift, w);
+    if (activeShot.viewHeight !== null) targetVH = Lerp(targetVH, activeShot.viewHeight, w);
+  }
+  const targetY = p.y + lift;
 
-  const dx = targetX - c.x;
-  if (dx > CAMERA.deadzoneX) c.x = Approach(c.x, targetX - CAMERA.deadzoneX, CAMERA.followLerp, dt);
-  else if (dx < -CAMERA.deadzoneX) c.x = Approach(c.x, targetX + CAMERA.deadzoneX, CAMERA.followLerp, dt);
+  // 紧张时轻轻收一下口。玩家读不出"视口小了 5%"，但读得出"画面绷住了"。
+  const tension = Clamp(Num(state.hud.suspicion, 0), 0, 1);
+  targetVH *= 1 - TENSE_TIGHTEN * tension;
 
+  // 过场交还：跟随强度从低往高爬，镜头是"缓过去"的，不是"弹回去"的
+  let follow = CAMERA.followLerp;
+  if (state.camHandback > 0) {
+    state.camHandback = Math.max(0, state.camHandback - dt);
+    const k = 1 - state.camHandback / CUT_HANDBACK_SEC;
+    follow *= Lerp(HANDBACK_LERP_MIN, 1, Clamp(k, 0, 1));
+  }
+
+  // —— 水平 ——
+  const anchored = activeShot && activeShot.anchorX !== null;
+  if (anchored) {
+    // 定镜头：镜头钉住，玩家走进构图里。仍然按权重混合，进出都是缓的。
+    const dzX = state.shotW > 0.999 ? 0 : CAMERA.deadzoneX * (1 - w);
+    const followX = ApproachDeadzone(c.x, targetX, dzX, follow, dt);
+    let anchorX = activeShot.anchorX;
+    // 定镜头绝不许把玩家挤出画面。关卡是按 16:9 挑的 anchorX，
+    // 竖屏的半宽只有横屏的三分之一——同一个机位在手机上就会把人放到画外。
+    // 所以按**真实** aspect 再夹一次：横屏照旧钉死，窄屏自动让开。
+    const halfW = c.viewHeight * 0.5 * (c.aspect > 0.2 ? c.aspect : 16 / 9);
+    const room = Math.max(0, halfW * ANCHOR_SAFE - PLAYER.width);
+    anchorX = Clamp(anchorX, p.x - room, p.x + room);
+    c.x = Lerp(followX, anchorX, w);
+  } else {
+    c.x = ApproachDeadzone(c.x, targetX, CAMERA.deadzoneX, follow, dt);
+  }
+
+  // —— 竖直 ——
   // 竖直死区只在人离地时才该存在——它是用来吸收跳落和爬梯的抖动的。
   // 站在地上还留着死区，摄像机就会停在 targetY 上下 deadzoneY 的任意位置，
   // 取景高度变成"看你从哪边收敛过来"的随机数，构图根本定不住。
-  const dy = targetY - c.y;
   if (p.onGround && !p.onShaft) {
-    c.y = Approach(c.y, targetY, CAMERA.followLerp, dt);
-  } else if (dy > CAMERA.deadzoneY) {
-    c.y = Approach(c.y, targetY - CAMERA.deadzoneY, CAMERA.followLerp, dt);
-  } else if (dy < -CAMERA.deadzoneY) {
-    c.y = Approach(c.y, targetY + CAMERA.deadzoneY, CAMERA.followLerp, dt);
+    c.y = Approach(c.y, targetY, follow, dt);
+  } else {
+    c.y = ApproachDeadzone(c.y, targetY, CAMERA.deadzoneY, follow, dt);
   }
-  if (p.onShaft) c.y = Approach(c.y, targetY, CAMERA.followLerp * 1.4, dt);
+  if (p.onShaft) c.y = Approach(c.y, targetY, follow * 1.4, dt);
 
-  const targetVH = p.layer === "tunnel" ? CAMERA.tunnelViewHeight : CAMERA.viewHeight;
   c.viewHeight = Approach(c.viewHeight, targetVH, 2.6, dt);
+
+  // —— 呼吸：站定之后镜头极缓地漂，别让画面死在那儿 ——
+  // 用 state.time 驱动，确定性；速度越快权重越低，走起来就收干净。
+  const stillness = Clamp(1 - speedFrac * BREATH_FADE, 0, 1);
+  c.breathX = Math.sin((state.time / BREATH_PERIOD_X) * Math.PI * 2) * BREATH_AMP_X * stillness;
+  c.breathY = Math.sin((state.time / BREATH_PERIOD_Y) * Math.PI * 2 + 1.7) * BREATH_AMP_Y * stillness;
+  c.x += c.breathX;
+  c.y += c.breathY;
 
   c.shake = Approach(c.shake, 0, CAMERA.shakeDecay, dt);
   if (c.shake < 0.004) c.shake = 0;
@@ -2366,7 +3638,75 @@ function UpdateCamera(state, dt) {
   ClampCamera(state);
 }
 
+function ShotEase(state) {
+  const s = FindShotById(state, state.shotId);
+  return s ? s.ease : 1.2;
+}
+
+function FindShotById(state, id) {
+  if (!id) return null;
+  for (const s of state.level.shots) {
+    if (s.id === id) return s;
+  }
+  return null;
+}
+
+/** 带死区的逼近：差值在死区内不动，超出才追。 */
+function ApproachDeadzone(cur, target, deadzone, perSecond, dt) {
+  const d = target - cur;
+  if (d > deadzone) return Approach(cur, target - deadzone, perSecond, dt);
+  if (d < -deadzone) return Approach(cur, target + deadzone, perSecond, dt);
+  return cur;
+}
+
 // ───────────────────────────── HUD ─────────────────────────────
+
+/**
+ * 当前威胁最大的那个敌人。
+ * 排序：正在看着我 > 听见我 > 警觉高 > 离得近。
+ * 只挑一个——HUD 上同时指三个方向等于没指。
+ */
+function PickThreat(state) {
+  const p = state.player;
+  let best = null;
+  let bestScore = -1;
+  for (const e of state.enemies) {
+    if (e.dormant) continue;
+    if (e.alertness < ALERT_GLIMPSE && !e.seesPlayer) continue;
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // 距离只当细微的平手裁决，不该让远处一个已经锁定的兵输给近处一个刚起疑的
+    const score =
+      (e.seesPlayer ? 4 : 0) + (e.hearsPlayer ? 1 : 0) + e.alertness * 2 + 1 / (1 + dist);
+    if (score > bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  if (!best) return null;
+  const dx = best.x - p.x;
+  const dy = best.y - p.y;
+  return {
+    id: best.id,
+    kind: best.kind,
+    x: best.x,
+    y: best.y,
+    dx,
+    dy,
+    // dir 是"从玩家看出去，威胁在左还是右"——UI 画箭头直接用这个
+    dir: dx >= 0 ? 1 : -1,
+    distance: Math.sqrt(dx * dx + dy * dy),
+    facing: best.facing,
+    alertness: best.alertness,
+    stage: best.alertStage || AlertStageOf(best.alertness),
+    state: best.state,
+    seeing: !!best.seesPlayer,
+    hearing: !!best.hearsPlayer,
+    // 同层才谈得上"他就在那边"；隔着一层土的威胁 UI 该换个画法
+    sameLayer: (best.y < -1 ? "tunnel" : "surface") === p.layer,
+  };
+}
 
 function UpdateHud(state) {
   const hud = state.hud;
@@ -2377,6 +3717,9 @@ function UpdateHud(state) {
     if (!e.dormant && e.alertness > sus) sus = e.alertness;
   }
   hud.suspicion = sus;
+  hud.alertStage = AlertStageOf(sus);
+  hud.threat = PickThreat(state);
+  hud.callHint = CallHint(state);
   hud.villagersTotal = state.npcs.length;
   hud.villagersSafe = state.npcs.reduce((acc, n) => acc + (n.rescued ? 1 : 0), 0);
   hud.codexCount = Object.keys(state.world.codex).length;
@@ -2425,6 +3768,12 @@ export function RespawnAtCheckpoint(state) {
     e.y = e.homeY;
     e.facing = e.homeFacing;
     e.alertness = 0;
+    e.seesPlayer = false;
+    e.hearsPlayer = false;
+    e.alertStage = "calm";
+    e.huntTimer = 0;
+    e.suspectTimer = 0;
+    e.linger = 0;
     e.state = e.probeAt ? "probe" : e.patrol ? "patrol" : "idle";
     e.hasLead = false;
     e.lastSeenX = e.homeX;
@@ -2447,16 +3796,28 @@ export function RespawnAtCheckpoint(state) {
     if (h.armed) h.warn = HAZARD.warnLeadSec;
   }
 
-  // 跟随者跟着回到检查点
-  state.trail = [{ x: p.x, y: p.y, d: 0 }];
+  // 跟随者跟着回到检查点。
+  //
+  // 面包屑必须**造出一条尾巴**，不能只留检查点这一个点：
+  // 只有一个点时所有人的目标弧长都被夹到同一处，六个乡亲会在复活的瞬间
+  // 叠成一个人（实测最小间距 0.000 米）。潜行游戏是要反复死的，
+  // 这意味着每死一次全村就叠一次。
+  SeedTrailBehind(state, p.x, p.y, -(p.facing >= 0 ? 1 : -1));
+  const headD = TrailHeadD(state);
   let order = 0;
   for (const n of state.npcs) {
     if (n.rescued || !n.follow) continue;
     order++;
-    n.x = p.x - order * FOLLOW.spacing * (p.facing >= 0 ? 1 : -1);
-    n.y = p.y;
-    const floor = FloorUnder(state.level, n.x, n.y + 0.6, 1.6);
-    if (floor) n.y = floor.y;
+    n.trailD = Math.max(state.trail[0].d, headD - QueueSpacing(state, state.npcs.length) * order);
+    const at = TrailPointAtD(state, n.trailD);
+    n.x = at.x;
+    n.y = at.y;
+    n.slotError = 0;
+    n.rally = 0;
+    n.posture = NpcPosture(state, n);
+    n.crouch = n.posture !== "stand";
+    n.height = PostureHeight(n.posture);
+    SetAnim(n, n.posture === "stand" ? "idle" : "crouchIdle", 0, 0);
   }
 
   // 非 once 的触发区重新可触发
@@ -2550,7 +3911,17 @@ export function DebugTeleport(state, x, y) {
   p.action = null;
   p.actionTimer = 0;
   SnapToFloor(state);
-  state.trail = [{ x: p.x, y: p.y, d: 0 }];
+  SeedTrailBehind(state, p.x, p.y, -(p.facing >= 0 ? 1 : -1));
+  const headD = TrailHeadD(state);
+  let order = 0;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    order++;
+    n.trailD = Math.max(state.trail[0].d, headD - QueueSpacing(state, state.npcs.length) * order);
+    const at = TrailPointAtD(state, n.trailD);
+    n.x = at.x;
+    n.y = at.y;
+  }
   SnapCamera(state);
   UpdateHud(state);
   return state;
@@ -2632,11 +4003,28 @@ function BotLeverPropFor(state, channel) {
   return null;
 }
 
+function BotSignalPropFor(state, squadId) {
+  if (!squadId) return null;
+  for (const prop of state.level.props) {
+    if (prop.interact !== "signal") continue;
+    if (!prop.data || prop.data.squadId !== squadId) continue;
+    if (!InteractAvailable(state, prop)) continue;
+    return prop;
+  }
+  return null;
+}
+
 function BotPropGoal(state, prop) {
   // 拉闸需要道具却没拿 → 先去捡
   if (prop.interact === "lever" && prop.data && prop.data.needItem && state.player.carrying !== prop.data.needItem) {
     const pick = BotPickupPropFor(state, prop.data.needItem);
     if (pick) return { x: PropX(state, pick), y: pick.y, prop: pick, tag: "item:" + prop.data.needItem };
+  }
+  // 地雷/枪眼没传到令 → 先跑一趟传令点。反击的"跑腿"对机器人也一样成立。
+  if ((prop.interact === "mine" || prop.interact === "loophole") && !CounterReady(state, prop)) {
+    const squadId = prop.interact === "mine" ? prop.data.needSquad : prop.data.squadId;
+    const sig = BotSignalPropFor(state, squadId);
+    if (sig) return { x: PropX(state, sig), y: sig.y, prop: sig, tag: "signal:" + squadId };
   }
   return { x: PropX(state, prop), y: prop.y, prop, tag: "prop:" + prop.id };
 }
@@ -3140,6 +4528,8 @@ function BotWantsPrompt(state, bot, prompt, goal) {
   if (prompt.kind === "hatch") return true;
   if (prompt.kind === "read") return true;
   if (prompt.kind === "bell") return true;
+  // 顺手就把口令传了：传令点散在地道支线里，等目标轮到它再回头跑要横穿半张图
+  if (prompt.kind === "signal") return true;
   if (goal && goal.prop && goal.prop.id === prompt.id) return true;
   if (prompt.kind === "talk") return true;
   return false;
@@ -3161,6 +4551,9 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
     evadeTimer: 0,
     dashing: false,
     blockedBy: null,
+    blockedSec: 0,
+    lastBlockedBy: null,
+    lastBlockedT: 0,
     lastGoal: "",
   };
   let t = 0;
@@ -3169,6 +4562,17 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
 
   while (t < limit && guard++ < 200000) {
     if (state.phase === "won") return { won: true, seconds: t, reason: "reached_exit" };
+    // 机器人不看戏：挂号的过场直接开了再跳掉，
+    // 这样"过场的副作用"照样结算（spawn/reveal/敲钟），关卡不会因为没人翻页而卡死。
+    if (state.pendingCutscene && !state.cutscene) {
+      const id = state.pendingCutscene;
+      state.pendingCutscene = null;
+      if (StartCutscene(state, id)) SkipCutscene(state);
+    }
+    if (state.cutscene) {
+      SkipCutscene(state);
+      continue;
+    }
     BotThink(state, bot, dt);
     StepPlay(state, dt);
     t += dt;
@@ -3176,6 +4580,10 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
   }
 
   if (state.phase === "won") return { won: true, seconds: t, reason: "reached_exit" };
+  // blockedBy 只报**当前这一帧**真的挡着路的人。
+  // 以前它是"这一局里任何时候被挡过一次"就一直留着的陈旧值：
+  // 冒烟报 blockedBy=某个兵，实际那人在 y=0、目标在 y=-3.8，隔着 3.8 米土——
+  // 照着这个值查巡逻线只会白查一整轮。真因是目标压在没实现的动词上。
   return {
     won: false,
     seconds: t,
@@ -3186,7 +4594,11 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
       " playerY=" + state.player.y.toFixed(1) +
       " objective=" + ActiveObjective(state) +
       " deaths=" + state.stats.deaths +
-      (bot.blockedBy ? " blockedBy=" + bot.blockedBy : ""),
+      (bot.blockedBy ? " blockedBy=" + bot.blockedBy + "(当前)" : "") +
+      (bot.blockedSec > 0.5 ? " blockedTotal=" + bot.blockedSec.toFixed(1) + "s" : "") +
+      (!bot.blockedBy && bot.lastBlockedBy
+        ? " lastBlockedBy=" + bot.lastBlockedBy + "@" + bot.lastBlockedT.toFixed(0) + "s"
+        : ""),
   };
 }
 
@@ -3194,8 +4606,11 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
 function BotFailKind(bot) {
   if (bot.noRoute > 3) return "no_route";
   if (bot.giveUp && bot.failKind === "geometry") return "stuck_geometry";
+  // 只有"此刻还被挡着"才算被敌人挡住。否则一次擦肩而过就会把
+  // 所有后续的失败都归错类。
   if (bot.blockedBy) return "blocked_by_enemy";
   if (bot.lastGoal && bot.lastGoal.indexOf("propDone:") === 0) return "goal_unreachable";
+  if (bot.lastGoal && bot.lastGoal.indexOf("signal:") === 0) return "squad_unreachable";
   return "timeout";
 }
 
@@ -3203,6 +4618,15 @@ function BotThink(state, bot, dt) {
   const input = state.input;
   const p = state.player;
   ClearInput(input);
+
+  // 每帧先清掉"谁挡着我"，让这一帧的逻辑重新认领。
+  // 不清的话这个字段会一直留着几分钟前擦肩而过的那个兵，报错时指错方向。
+  if (bot.blockedBy) {
+    bot.blockedSec = (bot.blockedSec || 0) + dt;
+    bot.lastBlockedBy = bot.blockedBy;
+    bot.lastBlockedT = state.time;
+  }
+  bot.blockedBy = null;
 
   for (const key in bot.pressCooldown) {
     if (bot.pressCooldown[key] > 0) bot.pressCooldown[key] -= dt;

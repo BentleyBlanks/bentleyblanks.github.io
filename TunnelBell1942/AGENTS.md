@@ -383,7 +383,9 @@ export function StepPlay(state, dt);   // dt 秒；内部 clamp 到 ≤ 1/30，�
 export function DrainEvents(state);    // 返回事件数组并清空
 export function SerializeProgress(state);            // -> JSON string
 export function LoadProgress(raw);     // -> { levelIndex, checkpointId, codex:[] } | null
-export function CurrentPrompt(state);  // -> { key:"E"|"S"|"W", label:"开地道口" } | null
+export function CurrentPrompt(state);  // -> { key:"E"|"S"|"W"|"F", label:"开地道口" } | null
+//   "F"（招呼乡亲）是身边没有可互动物时的兜底提示。第二、三幕没有任何 talk 道具，
+//   F 是集合六位乡亲的唯一手段——不提示等于把通关方式藏起来。
 export function ActiveObjective(state);// -> string
 export function StartCutscene(state, id);   // 进入过场
 export function AdvanceCutscene(state);     // 翻页（panel step 时有效）

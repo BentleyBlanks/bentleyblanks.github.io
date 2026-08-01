@@ -333,6 +333,131 @@ Section("跳过过场不许卡关");
   }
 }
 
+Section("跟随队列不许挤成一团");
+// 复活时轨迹被重置成单个点，六位乡亲的目标会全部夹到同一个坐标——
+// 每死一次就并成一个人。这条锁住"任何时刻都看得出是六个人"。
+{
+  for (const levelIndex of [1, 2]) {
+    const state = Rules.CreateState(levelIndex);
+    let worstGap = Infinity;
+    let standingInLowSpan = 0;
+    let wrongShaftAnim = 0;
+    Rules.DebugAutoPlay(state, 300);
+
+    const sample = () => {
+      const following = state.npcs.filter((n) => n.follow && !n.rescued);
+      for (let a = 0; a < following.length; a += 1) {
+        for (let b = a + 1; b < following.length; b += 1) {
+          const gap = Math.hypot(following[a].x - following[b].x, following[a].y - following[b].y);
+          if (gap < worstGap) worstGap = gap;
+        }
+        const npc = following[a];
+        const ceil = (state.level.ceils || []).find((c) => npc.x >= c.x0 && npc.x <= c.x1);
+        const floor = (state.level.floors || []).find(
+          (f) => npc.x >= f.x0 && npc.x <= f.x1 && Math.abs(f.y - npc.y) < 0.6,
+        );
+        if (ceil && floor && ceil.y - floor.y < HEADROOM.standNeeds) {
+          const anim = npc.anim && npc.anim.name;
+          if (anim === "walk" || anim === "idle") standingInLowSpan += 1;
+        }
+        const shaft = (state.level.shafts || []).find((s) => Math.abs(s.x - npc.x) < 0.5
+          && npc.y > s.yBottom + 0.4 && npc.y < s.yTop - 0.4);
+        if (shaft && npc.anim && npc.anim.name !== "climb") wrongShaftAnim += 1;
+      }
+    };
+
+    // 死一次再看：这是原来最容易把人叠在一起的时刻
+    Rules.DebugKill(state, "test");
+    for (let f = 0; f < 180; f += 1) { Rules.StepPlay(state, 1 / 60); Rules.DrainEvents(state); }
+    sample();
+    for (let f = 0; f < 900; f += 1) {
+      Rules.StepPlay(state, 1 / 60);
+      Rules.DrainEvents(state);
+      if (f % 15 === 0) sample();
+    }
+    const tag = `act${levelIndex + 1}`;
+    if (Number.isFinite(worstGap)) {
+      Assert(worstGap >= 0.5, `${tag}: 跟随者之间始终看得出是两个人（最近 ${worstGap.toFixed(2)}m）`);
+    }
+    Assert(standingInLowSpan === 0, `${tag}: 没人在矮通道里站着走（${standingInLowSpan} 帧）`);
+    Assert(wrongShaftAnim === 0, `${tag}: 竖井里的人都在爬（${wrongShaftAnim} 帧异常）`);
+  }
+}
+
+Section("威胁指示与时间张弛");
+{
+  const state = Rules.CreateState(0);
+  let threatMissing = 0;
+  let dirWrong = 0;
+  let slowRun = 0;
+  let worstSlow = 0;
+  let slowDuringCutscene = 0;
+
+  for (let f = 0; f < 5400; f += 1) {
+    state.input.moveX = f % 200 < 150 ? 1 : 0;
+    Rules.StepPlay(state, 1 / 60);
+    Rules.DrainEvents(state);
+
+    if ((state.hud.suspicion || 0) > 0.07) {
+      const threat = state.hud.threat;
+      if (!threat) threatMissing += 1;
+      else {
+        const enemy = state.enemies.find((e) => e.id === threat.id);
+        if (enemy && Math.sign(enemy.x - state.player.x) !== 0
+            && threat.dir !== Math.sign(enemy.x - state.player.x)) dirWrong += 1;
+      }
+    }
+
+    const ts = state.timeScale === undefined ? 1 : state.timeScale;
+    if (ts < 1) {
+      slowRun += 1 / 60;
+      if (slowRun > worstSlow) worstSlow = slowRun;
+      if (state.phase === "cutscene") slowDuringCutscene += 1;
+    } else slowRun = 0;
+  }
+
+  Assert(threatMissing === 0, `被盯上时一定指得出是谁（缺失 ${threatMissing} 帧）`);
+  Assert(dirWrong === 0, `威胁方位和敌人实际方位一致（错 ${dirWrong} 帧）`);
+  Assert(worstSlow <= 0.85, `慢镜头单次不超过 0.8 秒（最长 ${worstSlow.toFixed(2)}s）`);
+  Assert(slowDuringCutscene === 0, "过场里不叠加慢镜头");
+}
+
+Section("第三幕的高潮是反击，不是溜走");
+// 契约 §0.1：第三幕的高潮从"逃出去"改成"把敌人困在村子里打"。
+// 如果玩家能绕过全部地雷与枪眼直接摸到出口，那这条改动就只是写在文档里。
+{
+  const state = Rules.CreateState(2);
+  const result = Rules.DebugAutoPlay(state, 300);
+  if (Assert(result && result.won, "act3 机器人能通关")) {
+    const fired = Object.values(state.world.squads || {}).filter((s) => s === "fired").length;
+    const mines = Object.keys(state.world.mines || {}).length;
+    Assert(fired > 0 || mines > 0,
+      `通关的路上真的打了（开火小组 ${fired} / 引爆地雷 ${mines}）`);
+    Assert(mines > 0, `地雷是合围的最后一环，通关必须用到（引爆 ${mines}）`);
+  }
+}
+
+Section("反击必须先传令");
+// 反击的前提是跑腿把口令传到位。硬按一个没接到令的枪眼/地雷必须毫无反应——
+// 否则它就只是个换了名字的攻击键。
+{
+  const state = Rules.CreateState(2);
+  const gated = (state.level.props || []).filter(
+    (p) => (p.interact === "mine" || p.interact === "loophole"),
+  );
+  Assert(gated.length > 0, "act3 有需要口令的反击点");
+  let leaked = 0;
+  for (const prop of gated) {
+    const probe = Rules.CreateState(2);
+    Rules.DebugTeleport(probe, prop.x, prop.y);
+    for (let i = 0; i < 8; i += 1) { Rules.DebugPressInteract(probe); Rules.DebugHold(probe, {}, 0.4); }
+    const squadsTouched = Object.values(probe.world.squads || {}).some((s) => s !== "idle");
+    const minesTouched = Object.keys(probe.world.mines || {}).length > 0;
+    if (squadsTouched || minesTouched) { leaked += 1; console.error(`  未传令就生效: ${prop.id}`); }
+  }
+  Assert(leaked === 0, "没接到口令的反击点按不动");
+}
+
 Section("姿态判别的隐式契约");
 // 契约的动画状态名里没有 crouchWalk：猫腰移动和匍匐爬行都发 `crawl`。
 // 动画层靠"归一化速度"把这两个姿态分开（猫腰封顶 crouchSpeed/walkSpeed，
