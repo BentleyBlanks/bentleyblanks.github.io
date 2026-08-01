@@ -259,9 +259,12 @@ const act1 = {
 
   triggers: [
     { id: "a1_t_open", x0: 0, x1: 7, yMin: -1, yMax: 4, once: true,
-      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_prologue", objective: "照例查一遍各家的门", checkpoint: false, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "照例查一遍各家的门", checkpoint: false, win: false } },
+    // 狗不叫了。目标在这儿换档，把玩家从"例行公事"推向"出事了"。
+    { id: "a1_t_quiet", x0: 11, x1: 14, yMin: -1, yMax: 4, once: true,
+      emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "狗不叫了 —— 到村口看看", checkpoint: false, win: false } },
     { id: "a1_t_intrude", x0: 20, x1: 23, yMin: -1, yMax: 4, once: true,
-      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_open", objective: "鬼子摸进村了 —— 去敲老槐树上的钟", checkpoint: true, win: false } },
+      emit: { panels: [], reveal: [], arm: [], spawn: [], cutscene: "a1_cs_intrude", objective: "鬼子摸进村了 —— 去敲老槐树上的钟", checkpoint: true, win: false } },
     { id: "a1_t_corpse", x0: 24, x1: 27.5, yMin: -1, yMax: 4, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "别出声。贴着墙根走", checkpoint: true, win: false } },
     { id: "a1_t_wall1", x0: 30.5, x1: 33.5, yMin: -1, yMax: 4, once: true,
@@ -317,8 +320,8 @@ const act1 = {
     // 敌人一个都不出现——那句"悄悄地进村"要留到玩家已经知道钟意味着什么之后，
     // 它才是转折，而不是开场。身份不用旁白介绍，用动作立：查院门、听动静、
     // 走一条他闭着眼都认得的路，最后照例抬头看一眼那口钟。
-    a1_cs_prologue: {
-      id: "a1_cs_prologue", letterbox: "full", skippable: true,
+    a1_cs_open: {
+      id: "a1_cs_open", letterbox: "full", skippable: true,
       steps: [
         // 1) 地方与时间：拉到最开，先让村子睡着
         { kind: "camera", to: { x: 10, y: 3.4, viewHeight: 15.0 }, sec: 0.01, ease: "inOut" },
@@ -343,8 +346,7 @@ const act1 = {
         { kind: "sfx", id: "dog" },
         { kind: "wait", sec: 0.5 },
         { kind: "camera", to: { x: 17.5, y: 1.9, viewHeight: 8.6 }, sec: 1.6, ease: "inOut" },
-        { kind: "panel", id: "a1_cs_open_p4" },
-        { kind: "wait", sec: 0.7 },
+        { kind: "wait", sec: 0.9 },
         // 交还镜头，玩家接手走这段熟路
         { kind: "actor", id: "player", to: { x: 6 }, sec: 0.01, anim: "idle", facing: 1 },
         { kind: "camera", to: { x: 6, y: 1.6, viewHeight: 11.5 }, sec: 1.2, ease: "inOut" },
@@ -353,20 +355,23 @@ const act1 = {
     // 威胁。玩家已经走过一段熟路、已经知道钟是干什么的——
     // 现在才切回村西门：他们是**从他背后**摸进来的。
     // 镜头调度原样保留（摇 → 推到 vh 6.0 → 拉到 vh 13.0），只是位置往后挪。
-    a1_cs_open: {
-      id: "a1_cs_open", letterbox: "full", skippable: true,
+    a1_cs_intrude: {
+      id: "a1_cs_intrude", letterbox: "full", skippable: true,
       steps: [
         { kind: "camera", to: { x: 6, y: 2.2, viewHeight: 9.0 }, sec: 0.01, ease: "inOut" },
         { kind: "fade", to: 0, sec: 1.6 },
         { kind: "wait", sec: 0.4 },
         { kind: "sfx", id: "boot" },
-        { kind: "actor", id: "a1_e_tang", to: { x: 9 }, sec: 2.4, anim: "sneak", facing: 1 },
-        { kind: "actor", id: "a1_e_blocker", to: { x: 6.6 }, sec: 2.6, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_tang", to: { x: 9 }, sec: 1.9, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_blocker", to: { x: 6.6 }, sec: 2.1, anim: "sneak", facing: 1 },
         { kind: "camera", to: { x: 11, y: 2.0, viewHeight: 8.4 }, sec: 2.6, ease: "inOut" },
         { kind: "panel", id: "a1_brief1" },
         { kind: "actor", id: "a1_e_tang", to: { x: 12 }, sec: 1.2, anim: "walk", facing: 1 },
         { kind: "wait", sec: 0.4 },
         { kind: "camera", to: { x: 8.2, y: 1.8, viewHeight: 6.0 }, sec: 2.0, ease: "inOut" },
+        // 镜头停死在这个近景上，先空一秒再让他开口——
+        // 那句话的杀伤力有一半来自两边的空白，只留一边就成了段子。
+        { kind: "wait", sec: 1.0 },
         { kind: "panel", id: "a1_cs_open_p2" },
         { kind: "panel", id: "a1_cs_open_p3" },
         { kind: "wait", sec: 0.4 },
@@ -374,19 +379,21 @@ const act1 = {
         { kind: "panel", id: "a1_tang3" },
         { kind: "actor", id: "a1_e_tang", to: { x: 13.6 }, sec: 1.4, anim: "walk", facing: 1 },
         { kind: "panel", id: "a1_tang4" },
-        { kind: "wait", sec: 0.5 },
+        { kind: "wait", sec: 0.3 },
         { kind: "sfx", id: "cloth" },
-        { kind: "actor", id: "a1_e_chase1", to: { x: 17 }, sec: 2.0, anim: "sneak", facing: 1 },
-        { kind: "actor", id: "a1_e_chase3", to: { x: 14 }, sec: 2.0, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_chase1", to: { x: 17 }, sec: 1.5, anim: "sneak", facing: 1 },
+        { kind: "actor", id: "a1_e_chase3", to: { x: 14 }, sec: 1.5, anim: "sneak", facing: 1 },
         { kind: "camera", to: { x: 20, y: 3.0, viewHeight: 13.0 }, sec: 3.0, ease: "inOut" },
-        { kind: "wait", sec: 0.8 },
-        { kind: "fade", to: 1, sec: 1.2 },
+        // 命令之后的那片静：队列无声散开。这是那句台词的另一半。
+        { kind: "panel", id: "a1_cs_open_p4" },
+        { kind: "wait", sec: 0.4 },
+        { kind: "fade", to: 1, sec: 1.0 },
         { kind: "actor", id: "a1_e_tang", to: { x: 121 }, sec: 0.01, anim: "idle", facing: -1 },
         { kind: "actor", id: "a1_e_blocker", to: { x: 125 }, sec: 0.01, anim: "idle", facing: 1 },
         { kind: "actor", id: "a1_e_chase1", to: { x: 85 }, sec: 0.01, anim: "idle", facing: 1 },
         { kind: "actor", id: "a1_e_chase3", to: { x: 7 }, sec: 0.01, anim: "idle", facing: 1 },
         { kind: "camera", to: { x: 4, y: 1.6, viewHeight: 11.5 }, sec: 0.01, ease: "inOut" },
-        { kind: "fade", to: 0, sec: 1.2 },
+        { kind: "fade", to: 0, sec: 1.0 },
       ],
     },
     // 全作最重的仪式点。上树、三下钟、镜头拉开看见全村醒过来。
@@ -419,7 +426,8 @@ const act1 = {
   ],
 
   objectives: [
-    { id: "a1_o1", text: "照例查一遍各家的门", doneWhen: { trigger: "a1_t_intrude" } },
+    { id: "a1_o1", text: "照例查一遍各家的门", doneWhen: { trigger: "a1_t_quiet" } },
+    { id: "a1_o1b", text: "狗不叫了 —— 到村口看看", doneWhen: { trigger: "a1_t_intrude" } },
     { id: "a1_o2", text: "绕过搜村的鬼子", doneWhen: { trigger: "a1_t_yard2clear" } },
     { id: "a1_o3", text: "到老槐树下", doneWhen: { trigger: "a1_t_tree" } },
     { id: "a1_o4", text: "敲响钟", doneWhen: { propUsed: "a1_pr_bell" } },
@@ -631,7 +639,7 @@ const act2 = {
 
   triggers: [
     { id: "a2_t_open", x0: 0, x1: 5, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a2_p1"], reveal: [], arm: [], spawn: [], cutscene: "a2_cs_open", objective: "跟着那盏马灯的光走", checkpoint: false, win: false } },
+      emit: { panels: ["a2_p1"], reveal: [], arm: [], spawn: [], objective: "跟着那盏马灯的光走", checkpoint: false, win: false } },
     { id: "a2_t_low", x0: 5.5, x1: 8, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a2_p2"], reveal: [], arm: [], spawn: [], objective: "猫腰过去", checkpoint: false, win: false } },
     { id: "a2_t_lantern", x0: 11, x1: 14, yMin: -9.5, yMax: -6.0, once: true,
@@ -1127,7 +1135,7 @@ const act3 = {
 
   triggers: [
     { id: "a3_t_open", x0: 0, x1: 6, yMin: -9.5, yMax: -6.0, once: true,
-      emit: { panels: ["a3_p1"], reveal: [], arm: ["a3_hz_gas"], spawn: [], cutscene: "a3_cs_open", objective: "烟从后头灌进来了 —— 往前跑", checkpoint: false, win: false } },
+      emit: { panels: ["a3_p1"], reveal: [], arm: ["a3_hz_gas"], spawn: [], objective: "烟从后头灌进来了 —— 往前跑", checkpoint: false, win: false } },
     { id: "a3_t_gasbrief", x0: 12, x1: 16, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_brief3"], reveal: [], arm: [], spawn: [], objective: "湿布捂住口鼻 —— 干布不顶用", checkpoint: false, win: false } },
     { id: "a3_t_grain", x0: 22, x1: 26, yMin: -9.5, yMax: -6.0, once: true,
@@ -1254,12 +1262,9 @@ const act3 = {
       steps: [
         { kind: "camera", to: { x: 168, y: -6.8, viewHeight: 8.0 }, sec: 1.2, ease: "inOut" },
         { kind: "sfx", id: "alarm" },
-        { kind: "panel", id: "a3_tang4" },
         { kind: "camera", to: { x: 160, y: -1.6, viewHeight: 16.0 }, sec: 3.2, ease: "inOut" },
         { kind: "sfx", id: "shout" },
-        { kind: "wait", sec: 0.6 },
-        { kind: "panel", id: "a3_tang5" },
-        { kind: "wait", sec: 0.8 },
+        { kind: "wait", sec: 1.0 },
         { kind: "camera", to: { x: 174, y: -6.6, viewHeight: 9.0 }, sec: 3.0, ease: "inOut" },
         { kind: "actor", id: "player", to: { x: 172 }, sec: 2.0, anim: "walk", facing: 1 },
         { kind: "panel", id: "a3_cs_strike_p2" },
