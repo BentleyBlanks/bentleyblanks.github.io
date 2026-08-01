@@ -1,0 +1,733 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  --ink: #e9e2d2;
+  --muted: #a7afb5;
+  --paper: #e7dfca;
+  --paperInk: #26282a;
+  --amber: #e7a95e;
+  --blue: #74b9d3;
+  --red: #d66f61;
+  --panel: rgba(20, 25, 30, .94);
+  --line: rgba(233, 226, 210, .2);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #11161b;
+  overscroll-behavior: none;
+}
+
+body,
+button,
+canvas,
+#gameShell,
+#touchControls,
+#touchControls * {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+button {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#gameShell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #151b20;
+  touch-action: none;
+  isolation: isolate;
+}
+
+#gameCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#filmGrain {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: .2;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.025) 3px 4px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);
+  mix-blend-mode: soft-light;
+}
+
+#cinematicBars {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+#cinematicBars i {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: clamp(10px, 2.2vh, 24px);
+  background: #070a0c;
+}
+
+#cinematicBars i:first-child { top: 0; }
+#cinematicBars i:last-child { bottom: 0; }
+
+.fullScreen,
+.panelScreen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+}
+
+.fullScreen {
+  background: radial-gradient(circle at 35% 40%, rgba(80, 115, 126, .18), transparent 42%), rgba(13, 17, 21, .91);
+}
+
+#titleScreen {
+  justify-items: start;
+  padding: clamp(32px, 8vw, 130px);
+}
+
+.titleGrid {
+  position: absolute;
+  inset: 0;
+  opacity: .22;
+  background-image:
+    linear-gradient(rgba(116,185,211,.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(116,185,211,.14) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(90deg, black, transparent 74%);
+}
+
+.titleCopy {
+  position: relative;
+  z-index: 1;
+  width: min(680px, 86vw);
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+
+.titleCopy h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  margin: 0;
+  line-height: .92;
+  font-weight: 300;
+}
+
+.titleCopy h1 span {
+  font-size: clamp(76px, 11vw, 162px);
+  letter-spacing: .12em;
+}
+
+.titleCopy h1 small {
+  color: var(--amber);
+  font-size: clamp(24px, 4vw, 54px);
+  font-weight: 400;
+  letter-spacing: .1em;
+}
+
+.titleThesis {
+  margin: 30px 0;
+  color: #c9cdd0;
+  font-size: clamp(14px, 1.45vw, 20px);
+  line-height: 1.9;
+}
+
+.titleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.primaryButton,
+.quietButton,
+.backButton,
+.headerButton {
+  min-height: 44px;
+  padding: 11px 20px;
+  border: 1px solid var(--line);
+  background: rgba(24, 30, 35, .84);
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.primaryButton {
+  color: #181b1d;
+  border-color: var(--amber);
+  background: var(--amber);
+  font-weight: 700;
+}
+
+.quietButton:hover,
+.backButton:hover,
+.headerButton:hover {
+  border-color: rgba(231, 169, 94, .7);
+  background: rgba(62, 55, 45, .9);
+}
+
+.primaryButton:active,
+.quietButton:active,
+.backButton:active,
+.headerButton:active {
+  transform: translateY(1px);
+}
+
+.buildNotice {
+  position: absolute;
+  right: clamp(26px, 5vw, 78px);
+  bottom: clamp(28px, 6vh, 72px);
+  display: grid;
+  gap: 6px;
+  width: min(370px, 36vw);
+  padding: 18px;
+  border-left: 2px solid var(--blue);
+  background: rgba(18, 24, 29, .74);
+  color: #aeb8be;
+  font-size: 12px;
+}
+
+.buildNotice b {
+  margin-bottom: 4px;
+  color: var(--blue);
+  letter-spacing: .12em;
+}
+
+.panelScreen {
+  padding: clamp(18px, 4vw, 56px);
+  background: rgba(7, 10, 12, .78);
+  backdrop-filter: blur(8px);
+}
+
+.panelPaper {
+  width: min(960px, 94vw);
+  max-height: min(860px, 91vh);
+  overflow: auto;
+  padding: clamp(24px, 4vw, 54px);
+  color: var(--paperInk);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(25,28,30,.045) 31px 32px),
+    var(--paper);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, .48);
+}
+
+.compactPaper { width: min(670px, 94vw); }
+
+.panelPaper h2 {
+  margin: 0 0 24px;
+  font-size: clamp(34px, 5vw, 64px);
+  font-weight: 300;
+}
+
+.panelPaper .eyebrow { color: #9c4f43; }
+
+.chapterList {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 24px;
+}
+
+.chapterEntry {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 68px;
+  padding: 12px 16px;
+  text-align: left;
+  color: #2c3032;
+  border-bottom: 1px solid rgba(38, 40, 42, .2);
+  background: rgba(255, 255, 255, .05);
+}
+
+.chapterEntry:hover { background: rgba(156, 79, 67, .08); }
+
+.chapterEntry > b {
+  color: #9c4f43;
+  font-size: 14px;
+  letter-spacing: .08em;
+}
+
+.chapterEntry span {
+  display: grid;
+  gap: 4px;
+}
+
+.chapterEntry strong { font-size: 19px; font-weight: 500; }
+.chapterEntry small { color: #6a6b68; font-size: 11px; }
+.chapterEntry i { font-style: normal; font-size: 22px; }
+
+.backButton {
+  color: #2d3032;
+  border-color: rgba(45,48,50,.3);
+  background: transparent;
+}
+
+.controlList {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 22px;
+}
+
+.controlList div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(35, 38, 40, .18);
+}
+
+.controlList dt { color: #9c4f43; font-weight: 700; }
+.controlList dd { margin: 0; line-height: 1.55; }
+.guideNote { color: #5d615f; line-height: 1.7; }
+
+#gameHeader {
+  position: absolute;
+  top: clamp(18px, 3.2vh, 34px);
+  left: clamp(18px, 2.5vw, 38px);
+  right: clamp(18px, 2.5vw, 38px);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.chapterStamp,
+.statusStrip,
+.headerButton {
+  pointer-events: auto;
+}
+
+.chapterStamp {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--amber);
+  background: rgba(13, 17, 21, .76);
+}
+
+.chapterStamp small { color: var(--amber); font-size: 10px; letter-spacing: .14em; }
+.chapterStamp span { font-size: 15px; }
+
+.statusStrip {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.statusStrip span {
+  min-height: 34px;
+  padding: 9px 12px;
+  color: #bdc6ca;
+  background: rgba(13, 17, 21, .78);
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+
+.headerButton {
+  min-height: 36px;
+  padding: 8px 14px;
+  color: var(--ink);
+}
+
+#objectiveCard {
+  position: absolute;
+  z-index: 13;
+  top: clamp(72px, 11vh, 116px);
+  left: clamp(18px, 2.5vw, 38px);
+  width: min(340px, 40vw);
+  padding: 15px 17px;
+  border: 1px solid rgba(231, 169, 94, .32);
+  background: rgba(17, 22, 27, .9);
+  box-shadow: 0 10px 28px rgba(0,0,0,.24);
+}
+
+#objectiveCard small {
+  color: var(--amber);
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+
+#objectiveCard p {
+  margin: 6px 0 5px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+#objectiveCard span {
+  color: #99a6ad;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#suspicionHud {
+  position: absolute;
+  z-index: 13;
+  top: clamp(76px, 11.5vh, 120px);
+  right: clamp(18px, 2.5vw, 38px);
+  width: 190px;
+  padding: 10px 12px;
+  background: rgba(17, 22, 27, .86);
+}
+
+#suspicionHud span {
+  display: block;
+  margin-bottom: 6px;
+  color: #c8ced1;
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+#suspicionHud i {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(255,255,255,.12);
+}
+
+#suspicionFill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber), var(--red));
+  transition: width .1s linear;
+}
+
+#interactionPrompt {
+  position: absolute;
+  z-index: 14;
+  left: 50%;
+  bottom: clamp(86px, 13vh, 128px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  padding: 9px 12px;
+  background: rgba(12, 16, 19, .9);
+  border: 1px solid rgba(116,185,211,.45);
+}
+
+#interactionPrompt kbd {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: #132027;
+  border-radius: 50%;
+  background: var(--blue);
+  font-weight: 800;
+}
+
+#interactionPrompt p { display: grid; gap: 2px; margin: 0; }
+#interactionPrompt b { font-size: 13px; }
+#interactionPrompt span { color: #9eabb2; font-size: 10px; }
+
+#dialoguePanel {
+  position: absolute;
+  z-index: 25;
+  left: 50%;
+  bottom: clamp(44px, 7vh, 74px);
+  width: min(720px, 88vw);
+  min-height: 104px;
+  padding: 16px 150px 16px 20px;
+  transform: translateX(-50%);
+  border-left: 3px solid var(--amber);
+  background: rgba(13, 17, 21, .96);
+  box-shadow: 0 18px 48px rgba(0,0,0,.36);
+}
+
+#dialoguePanel small { color: var(--amber); font-size: 10px; letter-spacing: .13em; }
+#dialoguePanel p { margin: 8px 0 0; line-height: 1.65; }
+#dialoguePanel button {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  padding: 9px 18px;
+  color: #171b1e;
+  background: var(--amber);
+  font-weight: 700;
+}
+
+.puzzlePaper { width: min(760px, 94vw); }
+.puzzleBrief { margin: -8px 0 22px; color: #555d60; line-height: 1.65; }
+.puzzleOptions { display: grid; gap: 10px; }
+
+.puzzleOption {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 15px 16px;
+  color: #2a2d2f;
+  text-align: left;
+  border: 1px solid rgba(42,45,47,.22);
+  background: rgba(255,255,255,.12);
+}
+
+.puzzleOption:hover { border-color: #9c4f43; background: rgba(156,79,67,.08); }
+.puzzleOption b { font-size: 16px; }
+.puzzleOption span { color: #646968; font-size: 12px; line-height: 1.45; }
+.puzzleFeedback { min-height: 24px; color: #9c4f43; font-weight: 600; }
+.puzzleFeedback.isSuccess { color: #3e735f; }
+
+.completePaper { text-align: center; }
+.completePaper blockquote { margin: 0 0 26px; color: #565d5d; line-height: 1.8; }
+.completePaper .primaryButton,
+.completePaper .quietButton { margin: 4px; }
+
+#endingPanel { z-index: 44; }
+.endingCopy { width: min(680px, 88vw); text-align: center; }
+.endingCopy h2 { margin: 0 0 18px; font-size: clamp(42px, 7vw, 86px); font-weight: 300; }
+.endingCopy p:not(.eyebrow) { color: #b7c0c5; line-height: 1.8; }
+.endingCopy button { margin: 5px; }
+
+#touchControls {
+  position: absolute;
+  z-index: 30;
+  left: max(14px, env(safe-area-inset-left));
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px));
+  display: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.touchMove,
+.touchActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#touchControls button {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  color: #dce2e4;
+  border: 1px solid rgba(220,226,228,.3);
+  border-radius: 50%;
+  background: rgba(19, 25, 30, .88);
+  box-shadow: 0 5px 18px rgba(0,0,0,.24);
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent;
+  cursor: default;
+}
+
+#touchControls button span {
+  pointer-events: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#touchControls button.isHeld {
+  color: #172027;
+  border-color: var(--blue);
+  background: var(--blue);
+  transform: scale(.96);
+}
+
+#touchControls .touchPrimary {
+  color: #1d2225;
+  border-color: var(--amber);
+  background: var(--amber);
+  font-weight: 800;
+}
+
+.touchActions button { width: 54px; height: 54px; font-size: 11px; }
+
+#toast {
+  position: absolute;
+  z-index: 32;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  max-width: min(520px, 80vw);
+  padding: 12px 16px;
+  border: 1px solid rgba(231,169,94,.42);
+  background: rgba(13,17,21,.94);
+  color: #e7dfcf;
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  #touchControls { display: flex; }
+  #interactionPrompt { bottom: 92px; }
+  #dialoguePanel { bottom: 92px; }
+  .buildNotice { display: none; }
+}
+
+@media (max-width: 700px) {
+  #titleScreen {
+    align-items: start;
+    padding: max(36px, env(safe-area-inset-top)) 24px 90px;
+    overflow: auto;
+  }
+
+  .titleCopy { width: 100%; }
+  .titleCopy h1 { gap: 10px; }
+  .titleCopy h1 span { font-size: clamp(60px, 17vw, 96px); }
+  .titleCopy h1 small { font-size: clamp(21px, 7vw, 38px); }
+  .titleThesis { margin: 20px 0; font-size: 13px; }
+  .titleActions { display: grid; grid-template-columns: 1fr 1fr; }
+  .titleActions .primaryButton { grid-column: 1 / -1; }
+
+  .panelScreen { padding: 10px; }
+  .panelPaper { width: 100%; max-height: 96vh; padding: 22px 18px; }
+  .panelPaper h2 { margin-bottom: 16px; font-size: 36px; }
+  .chapterEntry { grid-template-columns: 58px 1fr 18px; gap: 8px; min-height: 60px; padding: 9px 8px; }
+  .chapterEntry strong { font-size: 16px; }
+  .chapterEntry small { font-size: 9px; }
+
+  #gameHeader {
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    gap: 6px;
+  }
+
+  .chapterStamp { padding: 6px 8px; }
+  .chapterStamp small { display: none; }
+  .chapterStamp span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .statusStrip { gap: 0; }
+  .statusStrip span { min-height: 30px; padding: 7px 8px; font-size: 9px; }
+  #scaleStatus { display: none; }
+  .headerButton { min-height: 31px; padding: 6px 9px; font-size: 10px; }
+
+  #objectiveCard {
+    top: 52px;
+    left: 14px;
+    width: min(280px, 64vw);
+    padding: 10px 12px;
+  }
+
+  #objectiveCard p { margin: 4px 0 2px; font-size: 12px; }
+  #objectiveCard span { display: block; max-height: 30px; overflow: hidden; font-size: 9px; }
+
+  #suspicionHud {
+    top: 54px;
+    right: 14px;
+    width: 118px;
+    padding: 7px 8px;
+  }
+
+  #suspicionHud span { margin-bottom: 3px; font-size: 8px; }
+
+  #dialoguePanel {
+    width: calc(100vw - 26px);
+    min-height: 80px;
+    padding: 11px 92px 11px 13px;
+  }
+
+  #dialoguePanel p { margin-top: 4px; font-size: 11px; line-height: 1.5; }
+  #dialoguePanel button { right: 10px; bottom: 12px; padding: 7px 12px; font-size: 11px; }
+
+  #interactionPrompt {
+    bottom: 82px;
+    padding: 6px 8px;
+  }
+
+  #interactionPrompt kbd { width: 25px; height: 25px; font-size: 10px; }
+  #interactionPrompt b { font-size: 10px; }
+  #interactionPrompt span { font-size: 8px; }
+
+  #touchControls { left: 10px; right: 10px; bottom: 10px; }
+  .touchMove, .touchActions { gap: 5px; }
+  #touchControls button { width: 52px; height: 52px; }
+  .touchActions button { width: 46px; height: 46px; font-size: 9px; }
+}
+
+@media (max-height: 460px) {
+  #cinematicBars i { height: 10px; }
+  #gameHeader { top: 12px; }
+  #objectiveCard {
+    top: 48px;
+    width: min(260px, 31vw);
+    padding: 8px 10px;
+  }
+  #objectiveCard p {
+    margin: 3px 0 1px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  #objectiveCard span {
+    display: block;
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #suspicionHud { top: 48px; }
+  #touchControls { bottom: 10px; }
+  #touchControls button { width: 48px; height: 48px; }
+  .touchActions button { width: 44px; height: 44px; }
+  #dialoguePanel { bottom: 68px; }
+  #interactionPrompt { bottom: 68px; }
+}
+
+@media (max-width: 560px) and (orientation: portrait) {
+  .touchActions { display: grid; grid-template-columns: repeat(2, 46px); }
+  #touchControls { align-items: end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

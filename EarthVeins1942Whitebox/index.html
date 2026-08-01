@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#171b20">
+  <meta name="description" content="《地脉：灯火相连》纯 Canvas 2D 玩法白盒。">
+  <title>地脉：灯火相连 · 纯2D白盒</title>
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260802b">
+</head>
+<body>
+  <main id="gameShell" aria-label="地脉：灯火相连 纯2D白盒">
+    <canvas id="gameCanvas" aria-label="程序化绘制的横版玩法区域"></canvas>
+    <div id="filmGrain" aria-hidden="true"></div>
+    <div id="cinematicBars" aria-hidden="true"><i></i><i></i></div>
+
+    <section id="titleScreen" class="fullScreen isVisible" aria-labelledby="gameTitle">
+      <div class="titleGrid" aria-hidden="true"></div>
+      <div class="titleCopy">
+        <p class="eyebrow">PURE 2D GAMEPLAY WHITEBOX · BUILD 01</p>
+        <h1 id="gameTitle"><span>地脉</span><small>灯火相连</small></h1>
+        <p class="titleThesis">先验证人物尺度、移动、潜行、解谜与地上地下切换。<br>本页不加载任何图片、模型、字体或音频素材。</p>
+        <div class="titleActions">
+          <button id="startButton" class="primaryButton" type="button">从序章开始</button>
+          <button id="chapterButton" class="quietButton" type="button">选择章节</button>
+          <button id="guideButton" class="quietButton" type="button">操作说明</button>
+        </div>
+      </div>
+      <aside class="buildNotice">
+        <b>白盒目标</b>
+        <span>统一人物世界身高 1.62–1.76m</span>
+        <span>移动按钮长按不触发选区或系统菜单</span>
+        <span>六章共用同一移动、交互和检查点语法</span>
+      </aside>
+    </section>
+
+    <section id="chapterPanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="chapterTitle" hidden>
+      <div class="panelPaper">
+        <p class="eyebrow">SEQUENCE MAP</p>
+        <h2 id="chapterTitle">序章与六章</h2>
+        <div id="chapterList" class="chapterList"></div>
+        <button class="backButton" data-close-panel type="button">返回</button>
+      </div>
+    </section>
+
+    <section id="guidePanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
+      <div class="panelPaper compactPaper">
+        <p class="eyebrow">INPUT CONTRACT</p>
+        <h2 id="guideTitle">操作说明</h2>
+        <dl class="controlList">
+          <div><dt>A / D</dt><dd>移动；移动端可持续长按左右按钮</dd></div>
+          <div><dt>S</dt><dd>靠近入口时切换地上/地下</dd></div>
+          <div><dt>Shift</dt><dd>蹲伏；躲避巡逻并通过低矮空间</dd></div>
+          <div><dt>E</dt><dd>执行现场动作或打开选择谜题</dd></div>
+          <div><dt>F</dt><dd>观察：显示尺度线、行动依赖和巡逻范围</dd></div>
+        </dl>
+        <p class="guideNote">白盒没有攻击键。失败只回到最近安全位置，不扣分，也不把群众伤亡转化为资源。</p>
+        <button class="backButton" data-close-panel type="button">返回</button>
+      </div>
+    </section>
+
+    <header id="gameHeader" hidden>
+      <div class="chapterStamp"><small id="chapterNumber"></small><span id="chapterName"></span></div>
+      <div class="statusStrip">
+        <span id="layerStatus">地上</span>
+        <span id="scaleStatus">角色标尺 1.62–1.76m</span>
+        <span id="progressStatus">0 / 5</span>
+      </div>
+      <button id="menuButton" class="headerButton" type="button">章节</button>
+    </header>
+
+    <aside id="objectiveCard" hidden>
+      <small>当前目标</small>
+      <p id="objectiveText"></p>
+      <span id="objectiveHint"></span>
+    </aside>
+
+    <aside id="suspicionHud" hidden>
+      <span>暴露度</span>
+      <i><b id="suspicionFill"></b></i>
+    </aside>
+
+    <div id="interactionPrompt" hidden>
+      <kbd>E</kbd>
+      <p><b id="interactionVerb"></b><span id="interactionName"></span></p>
+    </div>
+
+    <section id="dialoguePanel" aria-live="polite" hidden>
+      <small id="dialogueSpeaker">现场回应</small>
+      <p id="dialogueText"></p>
+      <button id="dialogueNext" type="button">继续</button>
+    </section>
+
+    <section id="puzzlePanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="puzzleTitle" hidden>
+      <div class="panelPaper puzzlePaper">
+        <p class="eyebrow">FIELD DECISION</p>
+        <h2 id="puzzleTitle"></h2>
+        <p id="puzzleBrief" class="puzzleBrief"></p>
+        <div id="puzzleOptions" class="puzzleOptions"></div>
+        <p id="puzzleFeedback" class="puzzleFeedback" aria-live="polite"></p>
+        <button id="puzzleCancel" class="backButton" type="button">回到现场</button>
+      </div>
+    </section>
+
+    <section id="chapterComplete" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="completeTitle" hidden>
+      <div class="panelPaper compactPaper completePaper">
+        <p class="eyebrow">ROUTE CONNECTED</p>
+        <h2 id="completeTitle"></h2>
+        <blockquote id="completeThesis"></blockquote>
+        <button id="nextChapterButton" class="primaryButton" type="button">进入下一章</button>
+        <button id="completeChaptersButton" class="quietButton" type="button">选择章节</button>
+      </div>
+    </section>
+
+    <section id="endingPanel" class="fullScreen" hidden>
+      <div class="endingCopy">
+        <p class="eyebrow">WHITEBOX CAMPAIGN COMPLETE</p>
+        <h2>七段路线全部接通</h2>
+        <p>序章与六章的移动、潜行、环境选择、地层切换和群众协作已共用同一套纯 2D 规则。</p>
+        <button id="endingRestartButton" class="primaryButton" type="button">重走序章</button>
+        <button id="endingChaptersButton" class="quietButton" type="button">选择章节</button>
+      </div>
+    </section>
+
+    <div id="touchControls" aria-label="移动端操作">
+      <div class="touchMove">
+        <button data-input="left" type="button" aria-label="持续向左移动"><span>◀</span></button>
+        <button data-input="right" type="button" aria-label="持续向右移动"><span>▶</span></button>
+      </div>
+      <div class="touchActions">
+        <button data-input="observe" type="button"><span>观察</span></button>
+        <button data-input="crouch" type="button"><span>蹲伏</span></button>
+        <button data-input="depth" type="button"><span>下行</span></button>
+        <button data-input="action" class="touchPrimary" type="button"><span>行动</span></button>
+      </div>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+  </main>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260802b"></script>
+</body>
+</html>
