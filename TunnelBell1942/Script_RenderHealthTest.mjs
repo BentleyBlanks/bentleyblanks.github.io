@@ -36,9 +36,18 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
     window.TunnelBell.Begin(i);
     const go = document.getElementById("ChapterGoButton");
     if (go && !document.getElementById("ChapterScreen").hidden) go.click();
+    // 过场期间镜头本来就该离开玩家（那是演出），所以取景类断言必须等它放完。
+    // 早先这里只跳气泡不跳过场——那时过场根本没被启动过，所以看不出问题；
+    // 接线修好之后就会在演出中途量玩家在不在画面里，量的是错的东西。
+    window.TunnelBell.SkipCutscenes();
     window.TunnelBell.SkipPanels();
   }, levelIndex);
   await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    window.TunnelBell.SkipCutscenes();
+    window.TunnelBell.SkipPanels();
+  });
+  await page.waitForTimeout(300);
 
   const probe = await page.evaluate(() => {
     const handle = window.TunnelBell.render;
@@ -114,8 +123,9 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
     const s = window.TunnelBell.state;
     const handle = window.TunnelBell.render;
     const v = new handle.three.Vector3(s.player.x, s.player.y + 0.85, 0).project(handle.camera);
-    return { ndcX: v.x, ndcY: v.y };
+    return { ndcX: v.x, ndcY: v.y, inCutscene: !!s.cutscene };
   });
+  Assert(!onScreen.inCutscene, `${tag}: 取景断言不是在过场里量的`);
   Assert(Math.abs(onScreen.ndcX) < 1 && Math.abs(onScreen.ndcY) < 1,
     `${tag}: 玩家在画面内（ndc ${onScreen.ndcX.toFixed(2)}, ${onScreen.ndcY.toFixed(2)}）`);
 

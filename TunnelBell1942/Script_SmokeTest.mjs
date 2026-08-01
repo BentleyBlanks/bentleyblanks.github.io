@@ -269,6 +269,25 @@ Section("镜头语言与过场");
     for (const shot of shots) {
       Assert(!!shot.reason, `${tag}: 机位 ${shot.id} 写了理由（没理由的机位切换就是晃）`);
       Assert(shot.x1 > shot.x0, `${tag}: 机位 ${shot.id} 的区间有效`);
+      // 竖直方向也要装得下。机位区拉远时 halfH 会超过玩家脚下到关卡底边的空间，
+      // 摄像机夹紧就把镜头往上顶，玩家掉出画面下沿——地道段尤其容易中招，
+      // 因为地下离 bounds.yBottom 很近。
+      if (typeof shot.viewHeight === "number") {
+        const halfH = shot.viewHeight * 0.5;
+        const lift = typeof shot.lift === "number" ? shot.lift : 2.0;
+        const floorsHere = (level.floors || []).filter((f) => f.x1 > shot.x0 && f.x0 < shot.x1);
+        for (const floor of floorsHere) {
+          const want = floor.y + lift;
+          const loY = level.bounds.yBottom + halfH;
+          const hiY = level.bounds.yTop - halfH;
+          const camY = loY <= hiY ? Math.min(Math.max(want, loY), hiY) : (level.bounds.yBottom + level.bounds.yTop) / 2;
+          const eye = floor.y + 0.85;
+          Assert(Math.abs(eye - camY) < halfH * 0.92,
+            `${tag}: 机位 ${shot.id} 在地板 ${floor.id}(y=${floor.y}) 上仍把玩家框在画面里`
+            + `（偏 ${Math.abs(eye - camY).toFixed(1)} / 半高 ${halfH.toFixed(1)}）`);
+        }
+      }
+
       // 定镜头：玩家在整段区间里都必须留在画面内
       if (typeof shot.anchorX === "number") {
         const vh = shot.viewHeight || 11.5;
