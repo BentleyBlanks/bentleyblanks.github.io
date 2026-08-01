@@ -147,6 +147,37 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
     const edge = barHeight(s.camera.x + halfW * 0.92);
     return { mid, edge, ratio: edge / Math.max(1e-6, mid), fov: cam.fov, isPerspective: !!cam.isPerspectiveCamera };
   });
+  // 俯角是纵深感的主要来源，但它会让竖直线朝灭点收敛。8° 是硬上限，
+  // 且画面上下缘的竖直边偏离铅垂线不许超过 2.5°——超了横版就穿帮了。
+  const tilt = await page.evaluate(() => {
+    const handle = window.TunnelBell.render;
+    const s = window.TunnelBell.state;
+    const cam = handle.camera;
+    const a = new handle.three.Vector3();
+    const b = new handle.three.Vector3();
+    // 在画面上缘与下缘各立一根 2 米高的竖直杆，量它投影后偏离铅垂线多少度
+    const lean = (worldY) => {
+      a.set(s.camera.x, worldY, 0).project(cam);
+      b.set(s.camera.x, worldY + 2, 0).project(cam);
+      return Math.abs(Math.atan2(b.x - a.x, Math.abs(b.y - a.y)) * 180 / Math.PI);
+    };
+    const half = s.camera.viewHeight * 0.5;
+    return {
+      pitchDeg: Math.abs(cam.rotation.x * 180 / Math.PI),
+      roll: Math.abs(cam.rotation.z * 180 / Math.PI),
+      yaw: Math.abs(cam.rotation.y * 180 / Math.PI),
+      topLean: lean(s.camera.y + half * 0.8),
+      bottomLean: lean(s.camera.y - half * 0.8),
+    };
+  });
+  Assert(tilt.pitchDeg <= 8.05, `${tag}: 俯角不超过 8 度（实际 ${tilt.pitchDeg.toFixed(1)}）`);
+  // 震屏是用一点点 roll 做的（实测 shake 0.23 对应 0.20°），那是合理的。
+  // 这里禁的是"持续的倾斜"：roll 只许小到看不出来，偏航永远不许有。
+  Assert(tilt.roll <= 1.2, `${tag}: 没有持续的画面倾斜（roll ${tilt.roll.toFixed(2)}°）`);
+  Assert(tilt.yaw < 0.01, `${tag}: 相机不偏航（yaw ${tilt.yaw.toFixed(3)}°）`);
+  Assert(Math.max(tilt.topLean, tilt.bottomLean) <= 2.5,
+    `${tag}: 竖直线仍然是竖直的（上缘 ${tilt.topLean.toFixed(2)}° / 下缘 ${tilt.bottomLean.toFixed(2)}°）`);
+
   Assert(lens.isPerspective, `${tag}: 用的是透视相机（2.5D 的前提）`);
   Assert(lens.fov > 0 && lens.fov <= 26, `${tag}: 长焦，没有广角（fov ${lens.fov}）`);
   Assert(Math.abs(lens.ratio - 1) < 0.06,
