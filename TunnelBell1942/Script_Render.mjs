@@ -83,15 +83,58 @@ const TAN_HALF_FOV = Math.tan((CAMERA.fovDeg * Math.PI) / 180 / 2);
 // ---------------------------------------------------------------------------
 const PITCH_DEG = Math.min(8, Math.max(0, typeof CAMERA.pitchDeg === 'number' ? CAMERA.pitchDeg : 0));
 const PITCH = (PITCH_DEG * Math.PI) / 180;
-const COS_PITCH = Math.cos(PITCH);
-const SIN_PITCH = Math.sin(PITCH);
 const HALF_FOV = (CAMERA.fovDeg * Math.PI) / 180 / 2;
-const TAN_LO = Math.tan(PITCH - HALF_FOV);   // 画面上缘那条边（俯角下多半是负的）
-const TAN_HI = Math.tan(PITCH + HALF_FOV);   // 画面下缘那条边
+
+/** 一组俯角相关的三角量。俯角在运行期会被 aspect 收窄，所以打包成一份。 */
+function MakePitchTerms(p) {
+  return {
+    rad: p, cos: Math.cos(p), sin: Math.sin(p),
+    tanLo: Math.tan(p - HALF_FOV),   // 画面上缘那条边（俯角下多半是负的）
+    tanHi: Math.tan(p + HALF_FOV),   // 画面下缘那条边
+  };
+}
+/** 标称俯角。**建造期**（限高反解、FORE 标定）一律用它，保证几何是确定性的。 */
+const PITCH_NOMINAL = MakePitchTerms(PITCH);
+const COS_PITCH = PITCH_NOMINAL.cos;
+const SIN_PITCH = PITCH_NOMINAL.sin;
+
+/**
+ * 竖直线偏离铅垂线的闭式估计（推导见下），用来按视口反推俯角上限。
+ *
+ *   偏角 ≈ atan( X·sin p / w )      X = 该点的横向世界偏移，w = 视深
+ *
+ * 画面左右边缘最狠：X = L·tan(h)·aspect，w ≈ L，于是
+ *   偏角_max ≈ atan( tan(h) · aspect · sin p · k )
+ * k 是"最坏采样点"的修正（画面上缘 w 更小、俯角把相机抬高又让 dy 偏负），
+ * 实测 16:9 三幕 k≈1.15。**偏角只跟 aspect 有关，跟 viewHeight 无关**
+ * （X 和 w 同比例缩放），所以一个夹紧就能覆盖所有机位。
+ *
+ * 超宽屏是唯一会越线的情况：6° 在 16:9 实测 2.14°，到 21:9 就是 3.05°。
+ * 与其把俯角一刀砍到 5°（普通屏白白损失纵深），不如按 aspect 自动收——
+ * 契约的 2.5° 是硬红线，这里让它自洽。
+ */
+const LEAN_LIMIT_TAN = Math.tan((2.5 * Math.PI) / 180);
+// k 是"最坏采样点"相对闭式估计的修正系数。别拍脑袋：它随机位而变
+// （地道视口小、lift 小，相机相对抬得更高，画面上缘的视深更小），
+// 16:9 三幕实测 1.15 / 1.29 / 1.30，取 1.35 留一档余量。
+const LEAN_K = 1.35;
+function PitchForAspect(aspect) {
+  const a = Math.max(0.2, aspect || 16 / 9);
+  const maxSin = LEAN_LIMIT_TAN / Math.max(1e-6, TAN_HALF_FOV * a * LEAN_K);
+  if (maxSin >= 1) return PITCH;
+  return Math.min(PITCH, Math.asin(maxSin));
+}
+
 /** z=0 平面上要看到 vh 那么高时，相机沿视线该站多远。viewHeight 语义的唯一实现。 */
-function CameraDistanceFor(vh) { return (vh * 0.5) / (COS_PITCH * (TAN_HI - TAN_LO) * 0.5); }
+function CameraDistanceFor(vh, terms) {
+  const t = terms || PITCH_NOMINAL;
+  return (vh * 0.5) / (t.cos * (t.tanHi - t.tanLo) * 0.5);
+}
 /** 相机相对「视线落点」要抬多高，才能让可视高度正好以 camY 为中心。 */
-function CameraLiftFor(dist) { return dist * COS_PITCH * (TAN_HI + TAN_LO) * 0.5; }
+function CameraLiftFor(dist, terms) {
+  const t = terms || PITCH_NOMINAL;
+  return dist * t.cos * (t.tanHi + t.tanLo) * 0.5;
+}
 /** 距相机 dist（沿视线）处的可视半高。暗角罩、天幕这些"贴屏"的东西靠它定尺寸。 */
 function HalfHeightAt(dist) { return Math.max(0.01, dist) * TAN_HALF_FOV; }
 
@@ -1933,20 +1976,22 @@ export function CreateRenderer(canvas, options = {}) {
   // 长焦透视。FOV 窄到 20°，相机拉到三十多米开外：竖直边缘几乎不外扩，
   // 横版仍然成立，但层与层之间有了真实的近大远小和视差。
   const camera = new THREE.PerspectiveCamera(CAMERA.fovDeg, 16 / 9, CAMERA.near, CAMERA.far);
+  /** 运行期实际用的俯角（按 aspect 收窄，见 PitchForAspect）。 */
+  let pitchTerms = PITCH_NOMINAL;
   /** 沿视线到 z=0 落点的距离。所有"近大远小"的分母都从它推。 */
-  let camDist = CameraDistanceFor(viewHeight);
+  let camDist = CameraDistanceFor(viewHeight, pitchTerms);
   /** 相机世界 z（= camDist·cos p）。跟世界 z 做差时用它，别用 camDist。 */
-  let camZ = camDist * COS_PITCH;
+  let camZ = camDist * pitchTerms.cos;
   /** 相机比"视线落点"高多少，见上面的推导。 */
-  let camLiftY = CameraLiftFor(camDist);
+  let camLiftY = CameraLiftFor(camDist, pitchTerms);
   camera.position.set(0, camLiftY, camZ);
-  // 只绕 X 转（俯角），**永远不 roll、永远不偏航**。绕 X 转不会破坏横版：
-  // 竖直线仍然基本竖直（实测上下缘偏离铅垂线 < 2°），但地面摊开了。
-  camera.rotation.set(-PITCH, 0, 0);
+  // 只绕 X 转（俯角），**永远不 roll、永远不偏航**。绕 X 转不破坏横版：
+  // 竖直线仍然基本竖直（16:9 实测最大偏离 2.14°），但地面摊开了。
+  camera.rotation.set(-pitchTerms.rad, 0, 0);
   scene.add(camera);
 
   /** 世界 z=Z 处的视深。俯角下不再是 camDist−Z（p=0 时两者相同）。 */
-  function ViewDepthAt(z) { return Math.max(0.5, camDist - z * COS_PITCH); }
+  function ViewDepthAt(z) { return Math.max(0.5, camDist - z * pitchTerms.cos); }
 
   // ---- 天幕：挂在相机下面，等于无穷远。它不许有任何视差 ----
   const gSky = new THREE.Group();
@@ -4650,11 +4695,15 @@ export function CreateRenderer(canvas, options = {}) {
     camera.aspect = viewW / Math.max(1, viewH);
     camera.near = CAMERA.near;
     camera.far = CAMERA.far;
-    camDist = CameraDistanceFor(viewHeight);
-    camZ = camDist * COS_PITCH;
-    camLiftY = CameraLiftFor(camDist);
+    // 俯角按视口收窄：超宽屏上画面边缘离中轴更远，同样的俯角会把竖直线
+    // 拉得更歪。契约的「≤2.5°」是硬红线，这里让它跟着 aspect 自洽，
+    // 而不是为了照顾 21:9 把普通屏的纵深也一起砍掉。
+    pitchTerms = MakePitchTerms(PitchForAspect(camera.aspect));
+    camDist = CameraDistanceFor(viewHeight, pitchTerms);
+    camZ = camDist * pitchTerms.cos;
+    camLiftY = CameraLiftFor(camDist, pitchTerms);
     camera.position.z = camZ;
-    camera.rotation.x = -PITCH;
+    camera.rotation.x = -pitchTerms.rad;
     camera.updateProjectionMatrix();
     PlaceSkyMoon();
   }

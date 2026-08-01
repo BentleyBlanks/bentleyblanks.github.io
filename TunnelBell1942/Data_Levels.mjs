@@ -504,7 +504,7 @@ const act2 = {
   bounds: { x0: 0, x1: 152, yTop: 3, yBottom: -11 },
   startX: 4,
   startY: -8.0,
-  exit: { x: 145, y: -8.0, radius: 2.4, needAllVillagers: true, label: "村外枯井底" },
+  exit: { x: 145, y: -8.0, radius: 4.5, needAllVillagers: true, label: "村外枯井底" },
   timeOfDay: "night",
 
   floors: [
@@ -689,9 +689,9 @@ const act2 = {
     // canCrawl: 钻得过净空 <1.05 的矮口。canClimb: 爬得了竖井。
     // 老人两样都不行（拄棍、腿脚不便），孩子钻得过但够不着梯子，壮年都行。
     // 站位据此排：老人在干线上（走得出去），孩子在爬行段那头，壮年在要爬竖井的支道里。
-    { id: "a2_n_wangdaniang", x: 20, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
-    { id: "a2_n_siye", x: 84, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
-    { id: "a2_n_shuanzhu", x: 103, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: false },
+    { id: "a2_n_wangdaniang", x: 20, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: true },
+    { id: "a2_n_siye", x: 84, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: true },
+    { id: "a2_n_shuanzhu", x: 88, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: true },
     { id: "a2_n_qiulan", x: 35, y: -3.8, name: "秋兰", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
     { id: "a2_n_ersao", x: 58.5, y: -3.8, name: "二嫂", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
     { id: "a2_n_laoshuan", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
@@ -817,7 +817,7 @@ const act2 = {
     { id: "a2_o1", text: "拿上马灯", doneWhen: { propUsed: "a2_pr_lantern" } },
     { id: "a2_o2", text: "摸清上下两层", doneWhen: { trigger: "a2_t_hide1" } },
     { id: "a2_o3", text: "顶开翻口", doneWhen: { propUsed: "a2_pr_fanko" } },
-    { id: "a2_o4", text: "找齐四位乡亲", doneWhen: { npcRescued: "all" } },
+    { id: "a2_o4", text: "找齐六位乡亲", doneWhen: { npcRescued: "all" } },
     { id: "a2_o5", text: "带他们到村外枯井", doneWhen: { atExit: true } },
   ],
 };
@@ -850,7 +850,7 @@ const act3 = {
   bounds: { x0: 0, x1: 180, yTop: 8, yBottom: -11 },
   startX: 4,
   startY: -8.0,
-  exit: { x: 176, y: -8.0, radius: 1.5, needAllVillagers: true, label: "黑风口" },
+  exit: { x: 176, y: -8.0, radius: 4.5, needAllVillagers: true, label: "黑风口" },
   timeOfDay: "dawn",
 
   floors: [
@@ -1196,9 +1196,9 @@ const act3 = {
     { id: "a3_n_laoshuan", x: 15, y: -8.0, name: "老栓", role: "villager", follow: false, rescued: false, canCrawl: true, canClimb: true },
     // 塌方那头等着的三位，从炕洞下来才碰得上
     // 老人孩子先走一步，在汇合点等着 —— 从这儿到黑风口全程干线，不用爬也不用钻
-    { id: "a3_n_wangdaniang", x: 118, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
-    { id: "a3_n_shuanzhu", x: 123.5, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: false },
-    { id: "a3_n_siye", x: 127, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: false },
+    { id: "a3_n_wangdaniang", x: 118, y: -8.0, name: "王大娘", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: true },
+    { id: "a3_n_shuanzhu", x: 123.5, y: -8.0, name: "栓柱", role: "child", follow: false, rescued: false, canCrawl: true, canClimb: true },
+    { id: "a3_n_siye", x: 127, y: -8.0, name: "四爷", role: "elder", follow: false, rescued: false, canCrawl: false, canClimb: true },
   ],
 
   hazards: [

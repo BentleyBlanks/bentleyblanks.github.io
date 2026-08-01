@@ -2393,6 +2393,10 @@ const FACING_BONUS = 0.75;
 // 条件没满足的提示要给条件满足的让路。典型现场：木塞掉在闸门脚下，
 // 结果提示一直写着"需要木塞"，玩家踩在木塞上把自己锁死了。
 const BLOCKED_PENALTY = 1.4;
+// 「敲通气孔」这类引点常常就布在柴垛、水缸边上（关卡本来也该这么布：把人引开才好躲）。
+// 但**手上随时有土坷垃可以扔**，柴垛却只有眼前这一个——所以引点永远给藏身点让路。
+// 不加这一条，被追着跑的时候按下去的会是"弄出点动静"，那是致命的误触。
+const LURE_PROP_PENALTY = 1.6;
 
 function FindTarget(state) {
   const p = state.player;
@@ -2413,6 +2417,7 @@ function FindTarget(state) {
     if (ahead > 0.02) d -= FACING_BONUS;
     else if (ahead < -0.02) d += FACING_BONUS * 0.5;
     if (PropBlocked(state, prop)) d += BLOCKED_PENALTY;
+    if (prop.interact === "lure") d += LURE_PROP_PENALTY;
     if (d < bestD) {
       bestD = d;
       best = prop;
@@ -4844,6 +4849,13 @@ function BotGoal(state) {
     break;
   }
 
+  // 2.5) 有人卡在矮口/竖井前等着 → 先回去接他。
+  // 「按人分路线」的收场必须是"回头能接上"，不是"走远了才发现少人"。
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow || !n.stuckReason) continue;
+    return { x: n.x, y: n.y, prop: null, npc: n, tag: "rejoin:" + n.id };
+  }
+
   // 3) 出口要求带上所有人
   if (level.exit.needAllVillagers) {
     const npcGoal = BotNpcGoal(state, "all");
@@ -4893,6 +4905,7 @@ function BotHatchPropFor(state, hatchId) {
 const NAV_DANGER = 26; // 一个哨兵覆盖的路段要多付多少代价
 const NAV_HATCH = 6; // 还没开的地道口：能开，但优先走现成的路
 const NAV_HIDDEN = 10; // 还没现形的地道口：更贵，但不是死路
+const NAV_ESCORT = 140; // 身后跟着过不去的人时，那条路要多付这么多（贵，但不封死）
 
 function BuildNav(state) {
   const level = state.level;
@@ -4908,7 +4921,13 @@ function BuildNav(state) {
     cuts.sort((a, b) => a - b);
     for (let i = 0; i < cuts.length - 1; i++) {
       if (cuts[i + 1] - cuts[i] < 0.2) continue;
-      nodes.push({ id: nodes.length, x0: cuts[i], x1: cuts[i + 1], y: f.y, edges: [] });
+      // 这一段最矮的净空。带着钻不了矮口的老人时要绕开它（「按人分路线」）
+      let low = Infinity;
+      for (let s = cuts[i] + 0.2; s < cuts[i + 1]; s += 0.6) {
+        const col = Column(level, s, f.y + 0.15, FLOOR_SNAP + 0.2);
+        if (col.clearance < low) low = col.clearance;
+      }
+      nodes.push({ id: nodes.length, x0: cuts[i], x1: cuts[i + 1], y: f.y, clearance: low, edges: [] });
     }
   }
 
@@ -5015,10 +5034,25 @@ function NavShaftUsable(state, shaft) {
 }
 
 /**
+ * 现在身后跟着的人有什么走不了的路（「按人分路线」）。
+ * 带着爬不了竖井的老人时，走竖井那条捷径等于把人丢在井底。
+ */
+function EscortLimits(state) {
+  let noClimb = false;
+  let noCrawl = false;
+  for (const n of state.npcs) {
+    if (n.rescued || !n.follow) continue;
+    if (!n.canClimb) noClimb = true;
+    if (!n.canCrawl) noCrawl = true;
+  }
+  return { noClimb, noCrawl, any: noClimb || noCrawl };
+}
+
+/**
  * 从玩家当前位置到 (goalX, goalY) 的下一步。
  * 返回 { kind:"walk", x } 或 { kind:"shaft", shaft, down } 或 null（已经在目标那一段上）。
  */
-function NavNext(state, goalX, goalY) {
+function NavNext(state, goalX, goalY, escort) {
   const nodes = Nav(state);
   if (nodes.length === 0) return null;
   const p = state.player;
@@ -5056,6 +5090,11 @@ function NavNext(state, goalX, goalY) {
         const usable = NavShaftUsable(state, edge.shaft);
         if (!usable.ok) continue;
         cost += 2 + usable.cost + Math.abs(edge.shaft.yTop - edge.shaft.yBottom) * 0.4;
+        // 带着爬不了竖井的人：竖井不是不能走，是走了就得回来接人。贵，但不封死。
+        if (escort && escort.noClimb) cost += NAV_ESCORT;
+      }
+      if (escort && escort.noCrawl && nodes[edge.to].clearance < HEADROOM.crouchNeeds) {
+        cost += NAV_ESCORT;
       }
       const nd = dist[cur] + cost;
       if (nd < dist[edge.to]) {
@@ -5424,7 +5463,8 @@ function BotThink(state, bot, dt) {
   bot.lastGoal = goal.tag;
 
   // 这一跳该往哪走（导航图算的，可能跟目标方向相反——比如要先绕回去下地道）
-  const hop = p.onShaft ? null : NavNext(state, goal.x, goal.y);
+  const escort = EscortLimits(state);
+  const hop = p.onShaft ? null : NavNext(state, goal.x, goal.y, escort);
   const localX = hop ? hop.x : goal.x;
   if (!hop && !p.onShaft && Math.abs(goal.y - p.y) > 1.6) {
     // 导航图连不到目标那一层：不是被敌人挡着，是真没路
@@ -5539,10 +5579,16 @@ function BotThink(state, bot, dt) {
 
   // 顺路就把乡亲喊上（有的关卡没有 talk 道具，只能靠"呼应"）。
   // 不这么干的话，等目标轮到"找齐乡亲"时得横穿半张图回头捡人。
+  //
+  // 但**爬不了竖井、钻不了矮口的人不能顺手带**：把老人喊上再钻竖井，
+  // 他就停在井底了。这类人要等到"该带人走了"那一步再接——这正是
+  // 「按人分路线」要玩家做的规划，机器人也得照做。
+  const collecting = goal.tag.indexOf("npc:") === 0 || goal.tag.indexOf("rejoin:") === 0 || goal.tag === "exit";
   if (!p.hidden && !p.action && !(threat && threat.dist < 12)) {
     for (const n of state.npcs) {
       if (n.rescued || n.follow) continue;
       if (Math.abs(n.x - p.x) > 5.5 || Math.abs(n.y - p.y) > 2.2) continue;
+      if (!collecting && (!n.canClimb || !n.canCrawl)) continue;
       input.callPressed = true;
       break;
     }
