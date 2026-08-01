@@ -194,7 +194,7 @@ const SPECS = {
   soldier: {
     height: ADULT * 0.965, build: 1.06, limb: 1.04, headScale: 0.96, waist: 1.02,
     thighRatio: 0.245, shinRatio: 0.235,
-    stoop: 0.00, cadence: 1.02, stepAmp: 1.02, armSwing: 0.78,
+    stoop: 0.00, cadence: 1.02, stepAmp: 1.02, armSwing: 0.78, scan: 0.30,
     yoke: true, capFlap: true, rifle: true, torch: true, puttee: true, boots: 0.55,
     col: { cloth: 0x3d4531, cloth2: 0x2b3122, skin: 0x9c7b62, accent: 0x4b5238, metal: 0x8f959d, dark: 0x14150f },
   },
@@ -202,10 +202,23 @@ const SPECS = {
   officer: {
     height: ADULT * 1.024, build: 0.98, limb: 1.00, headScale: 0.94, waist: 0.88,
     thighRatio: 0.248, shinRatio: 0.240,
-    stoop: 0.10, cadence: 0.74, stepAmp: 0.92, armSwing: 0.50,
+    stoop: 0.10, cadence: 0.74, stepAmp: 0.92, armSwing: 0.50, scan: 0.24,
     yoke: true, peakCap: true, sword: true, torch: true, breeches: true,
-    boots: 0.95, belt: true,
+    boots: 0.95, belt: true, crossBelt: true,
     col: { cloth: 0x363f3b, cloth2: 0x242b28, skin: 0x9c7f68, accent: 0x5a4a2a, metal: 0x9aa2ab, dark: 0x101110 },
+  },
+  // 汤丙会（伪军队长）：穿军装，但形制、料子、精神头都比日军差一截。
+  // 剪影上要卡在「日军」和「村民」中间：软布军帽（不是战斗帽也不是大盖帽）、
+  // 没有长枪只有腰间枪套 + 挎包、肩背塌下来、走路带张望。
+  // 不做丑角——他是本乡人，动机可信，姿态只是「累」和「两头看」，不是滑稽。
+  puppet: {
+    height: ADULT * 0.982, build: 1.00, limb: 0.99, headScale: 0.99, waist: 1.03,
+    thighRatio: 0.244, shinRatio: 0.234,
+    stoop: -0.09, slump: 0.22, scan: 0.78, hesitate: true,
+    cadence: 1.06, stepAmp: 0.86, armSwing: 0.60,
+    softCap: true, holster: true, satchel: true, strap: true, belt: true, boots: 0.35,
+    col: { cloth: 0x4a4436, cloth2: 0x322f26, skin: 0x94745c,
+      accent: 0x5f5949, metal: 0x878c93, dark: 0x1b1914 },
   },
   // 军犬：四足 rig，跟人形完全不同。height 是肩高。
   dog: {
@@ -462,6 +475,14 @@ function BuildHuman(three, kind, sp, assets) {
     Part(three, head, g.box, m.accent, headR * 0.34, headR * 1.55, headR * 1.95,
       -headR * 1.12, headR * 0.72, 0);                     // 屁帘
   }
+  if (sp.softCap) {
+    // 软布军帽：圆顶是软的（用椭球，跟日军的方帽壳、军官的硬盖帽三者分得开），
+    // 帽檐短而略垂，脑后没有屁帘。
+    Part(three, head, g.sphere, m.accent, headR * 2.10, headR * 1.22, headR * 1.98,
+      -headR * 0.06, headR * 1.42, 0);
+    Part(three, head, g.box, m.accent, headR * 0.82, headR * 0.17, headR * 1.42,
+      headR * 1.24, headR * 1.24, 0);                      // 软帽檐，短、略往下
+  }
   if (sp.peakCap) {
     // 大盖帽：帽墙高、帽顶前倾出檐，硬檐往前伸出一大截。
     Part(three, head, g.box, m.dark, headR * 2.05, headR * 0.62, headR * 2.00,
@@ -538,9 +559,21 @@ function BuildHuman(three, kind, sp, assets) {
   }
   if (sp.belt) {
     Part(three, hip, g.box, m.dark, bodyW * 1.04, h * 0.036, bodyD * 2.04, 0, h * 0.02, 0);
-    // 军官的斜挎皮带
+  }
+  if (sp.crossBelt) {
+    // 军官的十字皮带（左肩下来）
     Part(three, chest, g.box, m.dark, bodyW * 0.30, chestL * 1.5, bodyD * 0.30,
       bodyW * 0.42, chestL * 0.45, -shW * 0.42);
+  }
+  if (sp.strap) {
+    // 伪军的挎包背带：走另一侧肩，方向跟军官那条相反，靠近镜头这一面才看得见
+    Part(three, chest, g.box, m.dark, bodyW * 0.28, chestL * 1.55, bodyD * 0.28,
+      bodyW * 0.40, chestL * 0.40, shW * 0.44);
+  }
+  if (sp.satchel) {
+    // 挎包：挂在胯后侧，侧视轮廓上多出一块 —— 日军、军官、村民都没有这个凸起
+    Part(three, hip, g.box, m.cloth2, h * 0.088, h * 0.108, h * 0.070,
+      -h * 0.082, -h * 0.078, -hipW * 1.42);
   }
 
   // —— 配件关节（propA / propB）——
@@ -565,6 +598,11 @@ function BuildHuman(three, kind, sp, assets) {
     // 拐棍握在左手里。
     propA = Joint(three, handL, h * 0.01, -h * 0.03, 0);
     Part(three, propA, g.cyl, m.accent, h * 0.017, h * 0.42, h * 0.017, 0, -h * 0.165, 0);
+  } else if (sp.holster) {
+    propA = Joint(three, hip, -h * 0.012, -h * 0.008, hipW * 1.20);
+    Part(three, propA, g.box, m.dark, h * 0.056, h * 0.090, h * 0.046, 0, -h * 0.050, 0);
+    Part(three, propA, g.box, m.dark, h * 0.030, h * 0.048, h * 0.026,
+      -h * 0.020, h * 0.014, 0);                           // 露在外面的枪柄
   } else if (sp.pouch) {
     // 腰间别着的木塞/手榴弹袋——高传宝的辨识点。
     propA = Joint(three, hip, h * 0.045, -h * 0.005, hipW * 0.95);
@@ -1171,6 +1209,15 @@ function HumanBase(out, rig) {
   SetR(out, J_ARMR, -0.09, 0, 0.05);
   SetRz(out, J_FOREL, 0.17);
   SetRz(out, J_FORER, 0.17);
+  if (sp.slump) {
+    // 含胸、圆背、脖子往前顶出去。跟军官那种挺直的站姿正好相反，
+    // 这是「在两头讨生活」的疲态，不是滑稽——幅度小、不夸张。
+    AddRz(out, J_CHEST, -sp.slump);
+    AddRz(out, J_HEAD, sp.slump * 0.82);
+    AddP(out, J_NECK, rig.height * 0.030 * sp.slump, 0, 0);
+    AddR(out, J_ARML, 0.05, 0, 0.10);
+    AddR(out, J_ARMR, -0.05, 0, 0.10);
+  }
   SetRz(out, J_LEGL, 0.02);
   SetRz(out, J_LEGR, 0.02);
   SetRz(out, J_SHINL, -0.06);
@@ -1193,8 +1240,11 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
       AddRz(out, J_CHEST, br * 0.022);
       AddP(out, J_ROOT, 0, h * 0.004 * br, 0);
       AddR(out, J_HIP, sway * 0.020, sway * 0.026, 0);
-      AddR(out, J_HEAD, 0, sway * 0.10 + (sp.rifle || sp.sword ? Math.sin(time * 0.41) * 0.30 : 0),
-        Math.sin(time * 0.61) * 0.035);
+      const scan = sp.scan
+        ? sp.scan * (Math.sin(time * 0.47) * 0.62 + Math.sin(time * 0.19 + 1.3) * 0.44)
+        : 0;
+      AddR(out, J_HEAD, 0, sway * 0.10 + scan, Math.sin(time * 0.61) * 0.035);
+      if (sp.hesitate) AddR(out, J_CHEST, 0, scan * 0.22, 0);   // 转头带一点肩
       AddRz(out, J_ARML, br * 0.020 - 0.03);
       AddRz(out, J_ARMR, -br * 0.020 - 0.03);
       if (sp.stick) {
@@ -1269,6 +1319,14 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
         SetRz(out, J_FOREL, -0.55);
         AddRz(out, J_ARMR, -0.15);
       }
+      if (sp.hesitate) {
+        // 走两步张望一下：慢频转头，带一点肩，看的时候腰略直起来。
+        // 频率跟步频无关，所以读起来是「他在四下看」，不是走路的机械摆动。
+        const glance = Math.sin(time * 0.55) * 0.62 + Math.sin(time * 0.23 + 2.1) * 0.38;
+        AddR(out, J_HEAD, 0, sp.scan * 0.66 * glance, 0);
+        AddR(out, J_CHEST, 0, sp.scan * 0.20 * glance, 0);
+        AddRz(out, J_TORSO, 0.045 * Math.max(0, glance));
+      }
       if (carry) {
         // 提着东西：右臂垂直、肘微僵，身体向反侧代偿。
         SetR(out, J_ARMR, -0.16, 0, 0.05 + 0.07 * Math.sin(p - 0.6));
@@ -1319,6 +1377,13 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
         SetR(out, J_ARMR, -0.20, 0, 0.55);
         SetRz(out, J_FOREL, -0.85);
         SetRz(out, J_FORER, -0.70);
+      } else if (sp.holster) {
+        // 伪军：一只手按在枪套上，另一只虚护在前面。搜是搜，底气不足。
+        SetR(out, J_ARMR, -0.14, 0, 0.06);
+        SetRz(out, J_FORER, -0.34);
+        SetR(out, J_ARML, 0.20, 0, 0.46);
+        SetRz(out, J_FOREL, -0.72);
+        AddR(out, J_HEAD, 0, sp.scan * 0.5 * Math.sin(time * 0.72), 0);
       }
       break;
     }

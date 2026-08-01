@@ -9,6 +9,7 @@
 import * as Rules from "./Script_Rules.mjs";
 import { CHAPTERS, CODEX, PANELS } from "./Data_Story.mjs";
 import { CreateRenderer } from "./Script_Render.mjs";
+import { CreateAudio } from "./Script_Audio.mjs";
 
 const shell = document.getElementById("GameShell");
 const canvas = document.getElementById("GameCanvas");
@@ -101,6 +102,25 @@ window.addEventListener("keydown", (e) => {
   }
   keyState[e.code] = true;
 
+  // 过场：翻页与跳过。Esc 在过场里是"跳过"，不是"打开帮助"。
+  // typeof 保护是因为过场状态机由并行 agent 实现，接口没到位时不能让整页挂掉。
+  if (state && state.cutscene) {
+    e.preventDefault();
+    if (e.code === "Escape") {
+      if (state.cutscene.skippable && typeof Rules.SkipCutscene === "function") {
+        Rules.SkipCutscene(state);
+        AfterCutsceneInput();
+      }
+      return;
+    }
+    if (KEY_USE.includes(e.code)) {
+      if (!screens.panel.hidden) AdvancePanel();
+      if (typeof Rules.AdvanceCutscene === "function") Rules.AdvanceCutscene(state);
+      AfterCutsceneInput();
+    }
+    return;
+  }
+
   if (!screens.panel.hidden) {
     if (KEY_USE.includes(e.code) || e.code === "Escape") {
       e.preventDefault();
@@ -129,16 +149,44 @@ window.addEventListener("keyup", (e) => { keyState[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keyState) keyState[k] = false; });
 
 // 触摸
+// 长按方向键在移动端会弹系统的选择框/放大镜。CSS 那边关了 user-select 与
+// -webkit-touch-callout，这里再挡住 contextmenu 和 selectstart：
+// Android 的长按走的是 contextmenu，光靠 CSS 挡不干净。
+shell.addEventListener("contextmenu", (e) => e.preventDefault());
+shell.addEventListener("selectstart", (e) => e.preventDefault());
+
 const touchPad = el("TouchPad");
 for (const btn of touchPad.querySelectorAll("[data-hold]")) {
   const name = btn.dataset.hold;
-  const down = (e) => { e.preventDefault(); touchHold[name] = true; };
-  const up = (e) => { e.preventDefault(); touchHold[name] = false; };
+  const down = (e) => {
+    e.preventDefault();
+    touchHold[name] = true;
+    // 抓住这根手指：按住方向键时手指难免滑出圆钮边缘，
+    // 没有捕获就会触发 pointerleave 把移动中断，走两步停一下。
+    if (btn.setPointerCapture) { try { btn.setPointerCapture(e.pointerId); } catch { /* 老浏览器忽略 */ } }
+  };
+  const up = (e) => {
+    e.preventDefault();
+    touchHold[name] = false;
+    if (btn.releasePointerCapture && e.pointerId !== undefined) {
+      try { btn.releasePointerCapture(e.pointerId); } catch { /* 已经释放过 */ }
+    }
+  };
   btn.addEventListener("pointerdown", down);
   btn.addEventListener("pointerup", up);
   btn.addEventListener("pointercancel", up);
+  // 有指针捕获时 pointerleave 不会在按住期间触发；没有捕获的老浏览器仍靠它兜底
   btn.addEventListener("pointerleave", up);
 }
+// 兜底：手指抬起/被系统打断时，无论事件落在谁身上都把所有方向键松开。
+// 卡住不放的方向键是移动端最糟的 bug——人物会自己一直往前走。
+const ReleaseAllHolds = () => { for (const k in touchHold) touchHold[k] = false; };
+window.addEventListener("pointerup", ReleaseAllHolds);
+window.addEventListener("pointercancel", ReleaseAllHolds);
+window.addEventListener("touchend", ReleaseAllHolds);
+window.addEventListener("touchcancel", ReleaseAllHolds);
+document.addEventListener("visibilitychange", () => { if (document.hidden) ReleaseAllHolds(); });
+
 for (const btn of touchPad.querySelectorAll("[data-tap]")) {
   btn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -151,105 +199,18 @@ screens.panel.addEventListener("pointerdown", () => AdvancePanel());
 
 const isTouch = matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-// ─────────────────────────────────────────── 音效（WebAudio 现场合成，无资源文件）
-let audioCtx = null;
-let masterGain = null;
+// ─────────────────────────────────────────── 音频
+// 三层现场合成（环境 / 紧张 / 钟的母题）都在 Script_Audio.mjs 里，
+// 这里只负责解锁、转发事件和每帧推进。模块自带降级：拿不到 AudioContext
+// 会返回一个空壳，所有方法可调用不抛错——绝不能因为没声音就让游戏起不来。
+let audio = null;
+
 function EnsureAudio() {
-  if (audioCtx || bootFailed) return;
-  try {
-    const Ctor = window.AudioContext || window.webkitAudioContext;
-    if (!Ctor) return;
-    audioCtx = new Ctor();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.36;
-    masterGain.connect(audioCtx.destination);
-  } catch {
-    audioCtx = null;
-  }
+  if (audio) audio.Unlock();
 }
 
-let noiseBuffer = null;
-function NoiseBuffer() {
-  if (noiseBuffer || !audioCtx) return noiseBuffer;
-  const len = audioCtx.sampleRate * 1.2;
-  noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  let seed = 12345;
-  for (let i = 0; i < len; i += 1) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    data[i] = (seed / 0x7fffffff) * 2 - 1;
-  }
-  return noiseBuffer;
-}
-
-function Tone(freq, dur, type, gain, sweepTo) {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  osc.type = type || "sine";
-  osc.frequency.setValueAtTime(freq, t);
-  if (sweepTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, sweepTo), t + dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(masterGain);
-  osc.start(t);
-  osc.stop(t + dur + 0.05);
-}
-
-function Noise(dur, gain, filterHz, q) {
-  if (!audioCtx) return;
-  const buf = NoiseBuffer();
-  if (!buf) return;
-  const t = audioCtx.currentTime;
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = filterHz;
-  filter.Q.value = q || 1;
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(gain, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(filter).connect(g).connect(masterGain);
-  src.start(t);
-  src.stop(t + dur);
-}
-
-const SFX = {
-  step_dirt: () => Noise(0.09, 0.16, 320, 1.1),
-  step_stone: () => Noise(0.07, 0.2, 900, 2.0),
-  cloth: () => Noise(0.13, 0.08, 1800, 0.8),
-  dig: () => { Noise(0.18, 0.3, 420, 0.9); Tone(90, 0.14, "triangle", 0.16, 55); },
-  bell_ring: () => {
-    // 铁钟：几个不谐和的分音叠一起才像"铁"，不像"乐器"
-    Tone(524, 2.6, "triangle", 0.34, 512);
-    Tone(786, 2.1, "sine", 0.2, 770);
-    Tone(1247, 1.5, "sine", 0.12, 1220);
-    Tone(262, 3.0, "sine", 0.16, 258);
-    Noise(0.14, 0.22, 2600, 1.4);
-  },
-  hatch_open: () => { Noise(0.42, 0.24, 260, 0.7); Tone(70, 0.3, "triangle", 0.18, 44); },
-  ladder: () => Noise(0.1, 0.13, 700, 1.6),
-  water: () => Noise(0.7, 0.16, 480, 0.5),
-  gas: () => Noise(1.0, 0.13, 260, 0.4),
-  alarm: () => { Tone(880, 0.16, "square", 0.2, 880); setTimeout(() => Tone(660, 0.22, "square", 0.2, 620), 150); },
-  shout: () => { Tone(300, 0.3, "sawtooth", 0.16, 160); Noise(0.24, 0.1, 1100, 0.8); },
-  dog: () => { Tone(240, 0.14, "sawtooth", 0.22, 120); setTimeout(() => Tone(220, 0.12, "sawtooth", 0.18, 110), 130); },
-  pickup: () => { Tone(660, 0.1, "sine", 0.16, 880); Tone(990, 0.14, "sine", 0.1, 1200); },
-  lever: () => { Noise(0.14, 0.24, 380, 1.4); Tone(140, 0.2, "square", 0.12, 90); },
-  push: () => Noise(0.55, 0.2, 190, 0.6),
-  land: () => { Noise(0.13, 0.26, 200, 0.8); Tone(64, 0.16, "sine", 0.2, 42); },
-  breath: () => Noise(0.34, 0.06, 640, 0.5),
-  heartbeat: () => { Tone(58, 0.14, "sine", 0.26, 42); setTimeout(() => Tone(52, 0.16, "sine", 0.18, 38), 190); },
-};
-
-function PlaySfx(id) {
-  EnsureAudio();
-  if (!audioCtx) return;
-  const fn = SFX[id];
-  if (fn) { try { fn(); } catch { /* 音效失败不影响玩法 */ } }
+function PlaySfx(id, at) {
+  if (audio) audio.Play(id, at);
 }
 
 // ─────────────────────────────────────────── 象形图标（气泡里的符号）
@@ -304,6 +265,13 @@ function QueuePanels(ids, after) {
 }
 
 function ShowNextPanel() {
+  // Rules 自己也维护一份 story.queue（它靠队列空不空决定要不要放行剧情）。
+  // 界面这边翻过一页就得告诉它一声，否则那份队列只进不出，
+  // 会一直卡着一条永远显示不出来的气泡。
+  if (typeof Rules.DismissPanel === "function" && state && state.story
+      && state.story.queue && state.story.queue.length > 0) {
+    Rules.DismissPanel(state);
+  }
   const id = panelQueue.shift();
   if (!id) {
     screens.panel.hidden = true;
@@ -318,6 +286,11 @@ function ShowNextPanel() {
   activePanelId = id;
   document.body.dataset.cinematic = "1";
   el("PanelCard").dataset.mood = panel.mood || "talk";
+  // 无字的一拍：有说话人、有图标、没有台词（比如「孩子怕黑」那一下，
+  // 剧情层的原话是"不写形容词，只给图标"）。CSS 已经把空的 .panelText 收掉了，
+  // 但气泡本身还是撑满 62rem —— 一个几乎空着的大框，看着像文案漏了。
+  // 这里给它一个标记，让气泡缩到只包住图标：留白是演出，空框是 bug，两者得长得不一样。
+  el("PanelCard").dataset.wordless = panel.text ? "0" : "1";
   el("PanelSpeaker").textContent = panel.speaker || "";
   el("PanelText").textContent = panel.text || "";
 
@@ -358,6 +331,13 @@ function OpenCodex(id) {
 function CloseCodex() { screens.codex.hidden = true; }
 el("CodexClose").addEventListener("click", CloseCodex);
 
+/** 过场里按了键之后，立刻把事件与画面同步一次，别等下一帧——
+ *  跳过时如果晚一帧，黑边和淡入淡出会闪一下。 */
+function AfterCutsceneInput() {
+  DispatchEvents(Rules.DrainEvents(state));
+  SyncCutscene();
+}
+
 function FlashObjective() {
   const node = el("HudObjective");
   node.dataset.flash = "1";
@@ -381,7 +361,12 @@ function ShowChapterCard(chapterIndex, onGo) {
   el("ChapterSubtitle").textContent = chapter ? (chapter.subtitle || "") : "";
   el("ChapterEpilogue").textContent = "";
   screens.chapter.hidden = false;
+  // 只认第一次。按钮点两下（或者自动化里 Begin 已经点过、外面又点一次）
+  // 会把整幕重新初始化一遍，开场气泡也跟着排两遍——同一句话连播两次。
+  let entered = false;
   el("ChapterGoButton").onclick = () => {
+    if (entered) return;
+    entered = true;
     screens.chapter.hidden = true;
     onGo();
   };
@@ -408,6 +393,13 @@ function StartLevel(levelIndex) {
       el("Hud").hidden = false;
       touchPad.hidden = !isTouch;
       const chapter = CHAPTERS[levelIndex];
+      // 开场过场要排在幕级气泡前面：先演，再说。反过来就成了
+      // "先听人解释规矩、再看演出"，因果是倒的。
+      if (chapter && chapter.openingCutscene && typeof Rules.StartCutscene === "function") {
+        Rules.StartCutscene(state, chapter.openingCutscene);
+        DispatchEvents(Rules.DrainEvents(state));
+        SyncCutscene();
+      }
       QueuePanels(chapter ? chapter.opening : []);
       canvas.focus();
       running = true;
@@ -472,6 +464,31 @@ const hudCarry = el("HudCarry");
 let lastObjective = "";
 let lastPromptKey = "";
 
+// ─────────────────────────────────────────── 过场
+const cutFade = el("CutFade");
+const cutSkip = el("CutSkip");
+let lastCutId = null;
+
+function SyncCutscene() {
+  const cut = state.cutscene;
+  if (!cut) {
+    if (lastCutId !== null) {
+      delete document.body.dataset.cutscene;
+      cutFade.style.opacity = "0";
+      cutSkip.hidden = true;
+      lastCutId = null;
+    }
+    return;
+  }
+  if (cut.id !== lastCutId) {
+    lastCutId = cut.id;
+    document.body.dataset.cutscene = cut.letterbox === "full" ? "full" : "wide";
+    cutSkip.hidden = !cut.skippable;
+  }
+  // fade 由 Rules 推进，这里只把数值搬到画面上
+  cutFade.style.opacity = String(Math.max(0, Math.min(1, cut.fade || 0)));
+}
+
 function SyncHud() {
   const objective = state.hud.objective || "";
   if (objective !== lastObjective) {
@@ -514,14 +531,22 @@ function DispatchEvents(events) {
   for (const event of events) {
     switch (event.kind) {
       case "panel": QueuePanels([event.id]); break;
-      case "sfx": PlaySfx(event.id); break;
+      // 事件对象本身带 { x, y }，直接透传给音频层做空间化
+      case "sfx": PlaySfx(event.id, event); break;
+      // Rules 只把过场排进 pendingCutscene 并发这个事件，故意不在 StepPlay 里
+      // 自己夺走控制权（那会打断一切"跑 N 帧"的测试与机器人）。真正开演是集成层的活。
+      // 早先漏了这个 case，结果全部过场从来没在浏览器里播过——玩家只看到
+      // 幕间卡、旁白、然后直接开打，难怪"没有前因后果"。
+      case "cutscene":
+        if (typeof Rules.StartCutscene === "function") Rules.StartCutscene(state, event.id);
+        break;
       case "codex": OpenCodex(event.id); break;
       // 新目标不弹居中大字：左上角那行已经写着同样的话，弹一次等于把同一句话说两遍。
       // 改成让角落那行闪一下，玩家的眼睛会跟过去。
       case "objective": FlashObjective(); break;
       case "checkpoint": Toast("安全点"); break;
-      case "spot": PlaySfx("alarm"); break;
-      case "lost": PlaySfx("heartbeat"); break;
+      case "spot": PlaySfx("alarm", event); break;
+      case "lost": PlaySfx("death", event); break;
       case "won": FinishLevel(); break;
       default: break;
     }
@@ -546,9 +571,18 @@ function Frame(now) {
       input.itemPressed = false;
       input.callPressed = false;
       DispatchEvents(Rules.DrainEvents(state));
+      // 兜底：万一某条 pendingCutscene 没走事件（或事件在别处被吞了），
+      // 这里补开一次。少播一段过场是"剧情没头没尾"，代价太大。
+      if (state.pendingCutscene && !state.cutscene && typeof Rules.StartCutscene === "function") {
+        Rules.StartCutscene(state, state.pendingCutscene);
+        DispatchEvents(Rules.DrainEvents(state));
+      }
+      SyncCutscene();
       SyncHud();
     }
     render.Sync(state, dt);
+    // 音频每帧都推，不受 running 限制——标题画面和过场里环境层也该继续呼吸
+    if (audio) audio.Sync(state, dt);
   } catch (error) {
     running = false;
     ShowBootError("frame", error);
@@ -569,13 +603,33 @@ window.addEventListener("resize", Resize);
 window.addEventListener("orientationchange", () => setTimeout(Resize, 120));
 
 // ─────────────────────────────────────────── 启动
+/**
+ * 后处理是纯填充率开销：真 GPU 上几趟模糊是零点几毫秒，软件光栅上直接翻倍。
+ * 桌面浏览器被拉黑 GPU 时会静默退回 SwiftShader/llvmpipe，用户看不出来，
+ * 只觉得"这游戏怎么这么卡"。开渲染器之前先探一次真实的 renderer 字符串。
+ */
+function DetectQuality() {
+  if (isTouch) return "medium";
+  try {
+    const probe = document.createElement("canvas").getContext("webgl2")
+      || document.createElement("canvas").getContext("webgl");
+    if (!probe) return "low";
+    const ext = probe.getExtension("WEBGL_debug_renderer_info");
+    const name = ext ? String(probe.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : "";
+    if (/swiftshader|llvmpipe|software|basic render/i.test(name)) return "low";
+  } catch { /* 探测失败就按桌面默认走 */ }
+  return "high";
+}
+
 function Boot() {
   try {
-    render = CreateRenderer(canvas, { quality: isTouch ? "medium" : "high" });
+    render = CreateRenderer(canvas, { quality: DetectQuality() });
   } catch (error) {
     ShowBootError("CreateRenderer", error);
     return;
   }
+  // 音频自带降级，不用包 try——拿不到 AudioContext 会返回空壳
+  audio = CreateAudio({ volume: 0.85 });
   try {
     state = Rules.CreateState(0);
   } catch (error) {
@@ -606,6 +660,18 @@ function Boot() {
       const go = el("ChapterGoButton");
       if (!screens.chapter.hidden) go.click();
     },
+    /** 测试/截图用：把当前过场直接结算掉。有界循环，卡住就退出而不是空转。 */
+    SkipCutscenes(maxRounds = 12) {
+      for (let i = 0; i < maxRounds && state.cutscene; i += 1) {
+        const before = state.cutscene.id;
+        if (typeof Rules.SkipCutscene === "function") Rules.SkipCutscene(state);
+        else if (typeof Rules.AdvanceCutscene === "function") Rules.AdvanceCutscene(state);
+        else break;
+        DispatchEvents(Rules.DrainEvents(state));
+        if (state.cutscene && state.cutscene.id === before) break; // 跳不动就别死循环
+      }
+      SyncCutscene();
+    },
     SkipPanels() {
       panelQueue.length = 0;
       const after = pendingAfterPanels;
@@ -635,7 +701,8 @@ function Boot() {
       render.Sync(state, 1 / 60);
     },
     Teleport(x, y) { Rules.DebugTeleport(state, x, y); render.Sync(state, 1 / 60); },
-    Muted(on) { if (masterGain) masterGain.gain.value = on ? 0 : 0.36; },
+    Muted(on) { if (audio) audio.SetMuted(!!on); },
+    get audio() { return audio; },
     get error() { return window.__tunnelBellError || null; },
     get ready() { return !bootFailed && !!state && !!render; },
   };

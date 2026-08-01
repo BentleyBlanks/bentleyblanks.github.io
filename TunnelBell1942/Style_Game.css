@@ -39,7 +39,11 @@ html, body {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* 长按在移动端会弹选择框/放大镜/系统菜单。user-select 只挡住"选中"，
+     iOS 的 callout 得单独关；两个前缀都要写，Safari 至今只认带前缀的那个。 */
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -63,6 +67,33 @@ html, body {
 .letterbox i:first-child { top: 0; }
 .letterbox i:last-child { bottom: 0; }
 body[data-cinematic="1"] .letterbox i { height: 11vh; }
+/* 过场：黑边压到最大，界面全部让位 */
+body[data-cutscene="wide"] .letterbox i { height: 12vh; }
+body[data-cutscene="full"] .letterbox i { height: 17vh; }
+body[data-cutscene] .hudTop,
+body[data-cutscene] .hudPrompt,
+body[data-cutscene] .hudAlert { opacity: 0; transition: opacity .35s ease; }
+
+/* 过场的淡入淡出（由 Rules 的 fade step 驱动） */
+.cutFade {
+  position: absolute; inset: 0; z-index: 8;
+  background: #05080e; pointer-events: none;
+  opacity: 0;
+}
+
+/* 跳过提示：不抢戏，放在右下角，过一会儿自己淡掉 */
+.cutSkip {
+  position: absolute; right: clamp(1rem, 4vw, 2.6rem); bottom: 14vh;
+  z-index: 9; margin: 0;
+  color: #8d826d; font-size: .76rem; letter-spacing: .18em;
+  pointer-events: none;
+  animation: cutSkipIn .6s ease-out;
+}
+.cutSkip b {
+  color: var(--paper); font-family: ui-monospace, monospace;
+  border: 1px solid #6d5f4880; border-radius: 2px; padding: .1em .45em;
+}
+@keyframes cutSkipIn { from { opacity: 0; } to { opacity: 1; } }
 
 .vignette {
   position: absolute; inset: 0; pointer-events: none; z-index: 3;
@@ -224,6 +255,16 @@ body[data-cinematic="1"] .letterbox i { height: 11vh; }
 }
 .panelCard[data-mood="shout"] .panelText { font-size: clamp(1.2rem, 3.6vw, 1.65rem); letter-spacing: .06em; }
 .panelCard[data-mood="silent"] .panelBubble { background: #d8cbb0; }
+
+/* 无字的一拍：气泡缩到只包住图标，不再撑满整行。
+   判据是「有没有台词」而不是 mood —— 十三条 silent 里有五条是带台词的
+   （那是压着嗓子说话，不是不说话），撑满对它们才是对的。 */
+.panelCard[data-wordless="1"] .panelBubble {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: .8rem 1.05rem;
+}
+
 .panelCard[data-mood="narrate"] .panelBubble {
   background: transparent; box-shadow: none; color: var(--paper);
   border-left: 2px solid var(--warm);
@@ -368,6 +409,12 @@ body[data-cinematic="1"] .letterbox i { height: 11vh; }
   background: #0b1220a8; border: 1px solid #ffffff2e;
   color: var(--paper); font-size: 1rem; cursor: pointer;
   backdrop-filter: blur(3px);
+  /* 方向键是要按住不放的，长按必须什么都不触发：
+     不选中按钮上的字、不弹 callout、不让浏览器把它当成滚动/缩放的起手势。 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 .tBtn:active { background: var(--warm); color: var(--ink); }
 .tBtnUse { width: 4.4rem; height: 4.4rem; font-size: 1.05rem; border-color: var(--warm); }

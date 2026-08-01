@@ -24,6 +24,10 @@ async function Shot(name) {
   console.log("shot:", path.basename(file));
 }
 
+// 沙箱里没有真 GPU，Main 会探到 SwiftShader 自动降到 low（后处理全关）。
+// 截图要看的是真实设备上的样子，所以强制拉回 high——慢，但拍的是对的东西。
+await page.evaluate(() => window.TunnelBell.render.SetQuality("high"));
+
 // 标题页
 await page.waitForTimeout(700);
 await Shot("00_title");
@@ -82,7 +86,11 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
 
 const stats = await page.evaluate(() => {
   const r = window.TunnelBell.render;
-  return r && r.stats ? { ...r.stats } : null;
+  const cam = r && r.camera;
+  return {
+    ...(r && r.stats ? r.stats : {}),
+    lens: cam ? `${cam.isPerspectiveCamera ? "perspective" : "ortho"} fov=${cam.fov ?? "-"}` : "-",
+  };
 });
 
 console.log("\n渲染统计:", JSON.stringify(stats));

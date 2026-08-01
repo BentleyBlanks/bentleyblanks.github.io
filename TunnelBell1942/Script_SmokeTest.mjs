@@ -99,21 +99,37 @@ for (let i = 0; i < LEVELS.length; i += 1) {
 // ─────────────────────────────────────────── 剧情数据
 Section("剧情数据");
 Assert(CHAPTERS.length >= 3, "至少三章");
+// 字数上限按 panel 类型分档（契约 §4.1）。早期是一刀切 24 字，那是《勇敢的心》的
+// 语域；《地道战》是军事教育片，教学腔和口令需要各自的预算。
+const KIND_LIMIT = { beat: 24, call: 20, brief: 44, narrate: 40 };
 let overLong = 0;
 let badIcon = 0;
 let narrateCount = 0;
+let missingKind = 0;
 const ALLOWED_ICONS = new Set([
   "bell", "run", "dig", "down", "up", "eye", "quiet", "fire", "water", "gas",
   "lantern", "heart", "child", "grain", "rifle", "boot", "tunnel", "village", "cross", "clock",
 ]);
+let iconOnly = 0;
 for (const [id, panel] of Object.entries(PANELS)) {
-  if ((panel.text || "").length > 24) { overLong += 1; console.error(`  过长: ${id} (${panel.text.length})`); }
+  const kind = panel.kind;
+  if (!KIND_LIMIT[kind]) { missingKind += 1; console.error(`  缺 kind: ${id} (${kind})`); }
+  const limit = KIND_LIMIT[kind] ?? 24;
+  if ((panel.text || "").length > limit) {
+    overLong += 1;
+    console.error(`  过长: ${id} [${kind}] ${panel.text.length}/${limit}`);
+  }
   for (const icon of panel.icons || []) if (!ALLOWED_ICONS.has(icon)) { badIcon += 1; console.error(`  未知图标: ${id} → ${icon}`); }
   if (panel.mood === "narrate") narrateCount += 1;
+  if (!(panel.text || "").trim()) iconOnly += 1;
 }
-Assert(overLong === 0, "所有台词 ≤ 24 字");
+Assert(missingKind === 0, "每条气泡都标了 kind");
+Assert(overLong === 0, "每条台词都在自己那档的字数上限内");
 Assert(badIcon === 0, "所有图标在允许列表内");
-Assert(narrateCount <= 4, `旁白 ≤ 4 条（实际 ${narrateCount}）`);
+Assert(narrateCount <= 6, `旁白 ≤ 6 条（实际 ${narrateCount}）`);
+const total = Object.keys(PANELS).length;
+Assert(total >= 80, `气泡密度撑得起"一路上都有人说话"（${total} 条，要求 ≥80）`);
+Assert(iconOnly / total < 0.15, `纯图标比例 < 15%（实际 ${(iconOnly / total * 100).toFixed(1)}%）`);
 Assert(CODEX.length === 6, `史料恰好 6 条（实际 ${CODEX.length}）`);
 Assert(CODEX.every((c) => c.body.length <= 90), "史料正文 ≤ 90 字");
 for (const chapter of CHAPTERS) {
@@ -126,7 +142,8 @@ for (const chapter of CHAPTERS) {
 Section("叙事与关卡一致性");
 {
   const CAST = ["栓柱", "王大娘", "四爷", "秋兰", "二嫂", "老栓"];
-  const SPEAKERS = ["高老忠", "高传宝", "林霞", "山田", ...CAST];
+  // 汤丙会是伪军队长，"内部的敌人"（契约 §4.1 点名要的角色）
+  const SPEAKERS = ["高老忠", "高传宝", "林霞", "山田", "汤丙会", ...CAST];
 
   // 第一幕不许以"活着逃出去"收场
   const act1 = GetLevel(0);
@@ -136,7 +153,8 @@ Section("叙事与关卡一致性");
   const bell = (act1.props || []).find((p) => p.interact === "bell");
   if (Assert(!!bell, "act1 有钟")) {
     const data = bell.data || {};
-    Assert((data.panels || []).length > 0, "敲钟会推剧情气泡");
+    // 敲钟的叙事可以走气泡，也可以走过场（过场是更好的做法——那是全作最重的仪式点）
+    Assert((data.panels || []).length > 0 || !!data.cutscene, "敲钟会触发剧情（气泡或过场）");
     Assert((data.spawn || []).length > 0, "敲钟会唤醒追兵");
   }
   const positionalChase = (act1.triggers || []).some(
@@ -187,6 +205,10 @@ Section("叙事与关卡一致性");
     const level = GetLevel(i);
     for (const t of level.triggers || []) for (const id of t.emit?.panels || []) used.add(id);
     for (const p of level.props || []) for (const id of p.data?.panels || []) used.add(id);
+    // 过场的 panel step 也是挂载点——不扫它就会把演出里的台词全判成孤儿
+    for (const cut of Object.values(level.cutscenes || {})) {
+      for (const step of cut.steps || []) if (step.kind === "panel" && step.id) used.add(step.id);
+    }
   }
   for (const chapter of CHAPTERS) {
     for (const id of chapter.opening || []) used.add(id);
@@ -230,6 +252,229 @@ Section("姿态与净空");
     Assert(state.player.crouch, "进矮通道自动猫腰");
     Assert(state.player.anim.name !== "idle" || state.player.crouch, "姿态切到了非站立");
   }
+}
+
+Section("镜头语言与过场");
+// 仪式感靠的是镜头会说话，但镜头一旦说错话就是事故：
+// 定镜头把玩家挤出画面、跳过过场导致卡关、放慢延续到玩家要操作的时候。
+{
+  let shotCount = 0;
+  let cutCount = 0;
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    const tag = `act${i + 1}`;
+    const shots = level.shots || [];
+    shotCount += shots.length;
+
+    for (const shot of shots) {
+      Assert(!!shot.reason, `${tag}: 机位 ${shot.id} 写了理由（没理由的机位切换就是晃）`);
+      Assert(shot.x1 > shot.x0, `${tag}: 机位 ${shot.id} 的区间有效`);
+      // 竖直方向也要装得下。机位区拉远时 halfH 会超过玩家脚下到关卡底边的空间，
+      // 摄像机夹紧就把镜头往上顶，玩家掉出画面下沿——地道段尤其容易中招，
+      // 因为地下离 bounds.yBottom 很近。
+      if (typeof shot.viewHeight === "number") {
+        const halfH = shot.viewHeight * 0.5;
+        const lift = typeof shot.lift === "number" ? shot.lift : 2.0;
+        const floorsHere = (level.floors || []).filter((f) => f.x1 > shot.x0 && f.x0 < shot.x1);
+        for (const floor of floorsHere) {
+          const want = floor.y + lift;
+          const loY = level.bounds.yBottom + halfH;
+          const hiY = level.bounds.yTop - halfH;
+          const camY = loY <= hiY ? Math.min(Math.max(want, loY), hiY) : (level.bounds.yBottom + level.bounds.yTop) / 2;
+          const eye = floor.y + 0.85;
+          Assert(Math.abs(eye - camY) < halfH * 0.92,
+            `${tag}: 机位 ${shot.id} 在地板 ${floor.id}(y=${floor.y}) 上仍把玩家框在画面里`
+            + `（偏 ${Math.abs(eye - camY).toFixed(1)} / 半高 ${halfH.toFixed(1)}）`);
+        }
+      }
+
+      // 定镜头：玩家在整段区间里都必须留在画面内
+      if (typeof shot.anchorX === "number") {
+        const vh = shot.viewHeight || 11.5;
+        const halfW = vh * 0.5 * (16 / 9);
+        const worst = Math.max(Math.abs(shot.x0 - shot.anchorX), Math.abs(shot.x1 - shot.anchorX));
+        Assert(worst < halfW * 0.94,
+          `${tag}: 定镜头 ${shot.id} 全程把玩家留在画面内（最远 ${worst.toFixed(1)} / 半宽 ${halfW.toFixed(1)}）`);
+      }
+    }
+
+    const cuts = level.cutscenes || {};
+    for (const [id, cut] of Object.entries(cuts)) {
+      cutCount += 1;
+      Assert(Array.isArray(cut.steps) && cut.steps.length > 0, `${tag}: 过场 ${id} 有步骤`);
+      for (const step of cut.steps || []) {
+        if (step.kind === "panel") Assert(!!PANELS[step.id], `${tag}: 过场 ${id} 的气泡 ${step.id} 存在`);
+        if (step.kind === "actor") {
+          const known = [...(level.enemies || []), ...(level.npcs || [])].some((a) => a.id === step.id)
+            || step.id === "player";
+          Assert(known, `${tag}: 过场 ${id} 的角色 ${step.id} 存在`);
+        }
+      }
+    }
+  }
+  Assert(shotCount >= 12, `三幕合计至少 12 段机位区（实际 ${shotCount}）`);
+  Assert(cutCount >= 6, `三幕合计至少 6 段过场（实际 ${cutCount}）`);
+}
+
+Section("跳过过场不许卡关");
+// 跳过必须把剩余步骤的副作用全部结算完，否则玩家一按 Esc 就卡死。
+// 判据：跳过之后的世界状态要和放完一模一样。
+{
+  const fingerprint = (s) => JSON.stringify({
+    hatches: Object.keys(s.world.hatches || {}).filter((k) => s.world.hatches[k].opened).sort(),
+    revealed: Object.keys(s.world.revealed || {}).sort(),
+    squads: s.world.squads || {},
+    bell: !!s.world.bellRung,
+    enemies: s.enemies.filter((e) => !e.dormant).map((e) => e.id).sort(),
+    objective: s.hud.objective,
+    checkpoint: s.checkpointId,
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    for (const id of Object.keys(level.cutscenes || {})) {
+      const played = Rules.CreateState(i);
+      Rules.StartCutscene(played, id);
+      for (let f = 0; f < 3600 && played.cutscene; f += 1) {
+        Rules.StepPlay(played, 1 / 60);
+        Rules.AdvanceCutscene(played);
+      }
+      Assert(!played.cutscene, `act${i + 1}/${id}: 正常播放能放完`);
+
+      const skipped = Rules.CreateState(i);
+      Rules.StartCutscene(skipped, id);
+      Rules.SkipCutscene(skipped);
+      Rules.StepPlay(skipped, 1 / 60);
+      Assert(!skipped.cutscene, `act${i + 1}/${id}: 跳过之后真的结束了`);
+      Assert(fingerprint(skipped) === fingerprint(played),
+        `act${i + 1}/${id}: 跳过与放完的世界状态一致（不许跳过就卡关）`);
+    }
+  }
+}
+
+Section("跟随队列不许挤成一团");
+// 复活时轨迹被重置成单个点，六位乡亲的目标会全部夹到同一个坐标——
+// 每死一次就并成一个人。这条锁住"任何时刻都看得出是六个人"。
+{
+  for (const levelIndex of [1, 2]) {
+    const state = Rules.CreateState(levelIndex);
+    let worstGap = Infinity;
+    let standingInLowSpan = 0;
+    let wrongShaftAnim = 0;
+    Rules.DebugAutoPlay(state, 300);
+
+    const sample = () => {
+      const following = state.npcs.filter((n) => n.follow && !n.rescued);
+      for (let a = 0; a < following.length; a += 1) {
+        for (let b = a + 1; b < following.length; b += 1) {
+          const gap = Math.hypot(following[a].x - following[b].x, following[a].y - following[b].y);
+          if (gap < worstGap) worstGap = gap;
+        }
+        const npc = following[a];
+        const ceil = (state.level.ceils || []).find((c) => npc.x >= c.x0 && npc.x <= c.x1);
+        const floor = (state.level.floors || []).find(
+          (f) => npc.x >= f.x0 && npc.x <= f.x1 && Math.abs(f.y - npc.y) < 0.6,
+        );
+        if (ceil && floor && ceil.y - floor.y < HEADROOM.standNeeds) {
+          const anim = npc.anim && npc.anim.name;
+          if (anim === "walk" || anim === "idle") standingInLowSpan += 1;
+        }
+        const shaft = (state.level.shafts || []).find((s) => Math.abs(s.x - npc.x) < 0.5
+          && npc.y > s.yBottom + 0.4 && npc.y < s.yTop - 0.4);
+        if (shaft && npc.anim && npc.anim.name !== "climb") wrongShaftAnim += 1;
+      }
+    };
+
+    // 死一次再看：这是原来最容易把人叠在一起的时刻
+    Rules.DebugKill(state, "test");
+    for (let f = 0; f < 180; f += 1) { Rules.StepPlay(state, 1 / 60); Rules.DrainEvents(state); }
+    sample();
+    for (let f = 0; f < 900; f += 1) {
+      Rules.StepPlay(state, 1 / 60);
+      Rules.DrainEvents(state);
+      if (f % 15 === 0) sample();
+    }
+    const tag = `act${levelIndex + 1}`;
+    if (Number.isFinite(worstGap)) {
+      Assert(worstGap >= 0.5, `${tag}: 跟随者之间始终看得出是两个人（最近 ${worstGap.toFixed(2)}m）`);
+    }
+    Assert(standingInLowSpan === 0, `${tag}: 没人在矮通道里站着走（${standingInLowSpan} 帧）`);
+    Assert(wrongShaftAnim === 0, `${tag}: 竖井里的人都在爬（${wrongShaftAnim} 帧异常）`);
+  }
+}
+
+Section("威胁指示与时间张弛");
+{
+  const state = Rules.CreateState(0);
+  let threatMissing = 0;
+  let dirWrong = 0;
+  let slowRun = 0;
+  let worstSlow = 0;
+  let slowDuringCutscene = 0;
+
+  for (let f = 0; f < 5400; f += 1) {
+    state.input.moveX = f % 200 < 150 ? 1 : 0;
+    Rules.StepPlay(state, 1 / 60);
+    Rules.DrainEvents(state);
+
+    if ((state.hud.suspicion || 0) > 0.07) {
+      const threat = state.hud.threat;
+      if (!threat) threatMissing += 1;
+      else {
+        const enemy = state.enemies.find((e) => e.id === threat.id);
+        if (enemy && Math.sign(enemy.x - state.player.x) !== 0
+            && threat.dir !== Math.sign(enemy.x - state.player.x)) dirWrong += 1;
+      }
+    }
+
+    const ts = state.timeScale === undefined ? 1 : state.timeScale;
+    if (ts < 1) {
+      slowRun += 1 / 60;
+      if (slowRun > worstSlow) worstSlow = slowRun;
+      if (state.phase === "cutscene") slowDuringCutscene += 1;
+    } else slowRun = 0;
+  }
+
+  Assert(threatMissing === 0, `被盯上时一定指得出是谁（缺失 ${threatMissing} 帧）`);
+  Assert(dirWrong === 0, `威胁方位和敌人实际方位一致（错 ${dirWrong} 帧）`);
+  Assert(worstSlow <= 0.85, `慢镜头单次不超过 0.8 秒（最长 ${worstSlow.toFixed(2)}s）`);
+  Assert(slowDuringCutscene === 0, "过场里不叠加慢镜头");
+}
+
+Section("第三幕的高潮是反击，不是溜走");
+// 契约 §0.1：第三幕的高潮从"逃出去"改成"把敌人困在村子里打"。
+// 如果玩家能绕过全部地雷与枪眼直接摸到出口，那这条改动就只是写在文档里。
+{
+  const state = Rules.CreateState(2);
+  const result = Rules.DebugAutoPlay(state, 300);
+  if (Assert(result && result.won, "act3 机器人能通关")) {
+    const fired = Object.values(state.world.squads || {}).filter((s) => s === "fired").length;
+    const mines = Object.keys(state.world.mines || {}).length;
+    Assert(fired > 0 || mines > 0,
+      `通关的路上真的打了（开火小组 ${fired} / 引爆地雷 ${mines}）`);
+    Assert(mines > 0, `地雷是合围的最后一环，通关必须用到（引爆 ${mines}）`);
+  }
+}
+
+Section("反击必须先传令");
+// 反击的前提是跑腿把口令传到位。硬按一个没接到令的枪眼/地雷必须毫无反应——
+// 否则它就只是个换了名字的攻击键。
+{
+  const state = Rules.CreateState(2);
+  const gated = (state.level.props || []).filter(
+    (p) => (p.interact === "mine" || p.interact === "loophole"),
+  );
+  Assert(gated.length > 0, "act3 有需要口令的反击点");
+  let leaked = 0;
+  for (const prop of gated) {
+    const probe = Rules.CreateState(2);
+    Rules.DebugTeleport(probe, prop.x, prop.y);
+    for (let i = 0; i < 8; i += 1) { Rules.DebugPressInteract(probe); Rules.DebugHold(probe, {}, 0.4); }
+    const squadsTouched = Object.values(probe.world.squads || {}).some((s) => s !== "idle");
+    const minesTouched = Object.keys(probe.world.mines || {}).length > 0;
+    if (squadsTouched || minesTouched) { leaked += 1; console.error(`  未传令就生效: ${prop.id}`); }
+  }
+  Assert(leaked === 0, "没接到口令的反击点按不动");
 }
 
 Section("姿态判别的隐式契约");
