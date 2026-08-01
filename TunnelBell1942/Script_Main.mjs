@@ -252,6 +252,10 @@ const PORTRAIT_GLYPH = {
   linxia: "霞",
   villager: "乡",
   yamada: "田",
+  // 汤丙会（伪军队长）。少了这一条，他跨三幕的 11 条气泡全部没脸——
+  // 而 §4.1 点名要他在场。头像是空的时候 portrait.hidden 直接为 true，
+  // 不报错、不留痕，所以这种漏项只能靠数一遍 portrait 值来发现。
+  tangbinghui: "汤",
   child: "娃",
 };
 
