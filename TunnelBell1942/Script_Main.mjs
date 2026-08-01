@@ -101,6 +101,25 @@ window.addEventListener("keydown", (e) => {
   }
   keyState[e.code] = true;
 
+  // 过场：翻页与跳过。Esc 在过场里是"跳过"，不是"打开帮助"。
+  // typeof 保护是因为过场状态机由并行 agent 实现，接口没到位时不能让整页挂掉。
+  if (state && state.cutscene) {
+    e.preventDefault();
+    if (e.code === "Escape") {
+      if (state.cutscene.skippable && typeof Rules.SkipCutscene === "function") {
+        Rules.SkipCutscene(state);
+        AfterCutsceneInput();
+      }
+      return;
+    }
+    if (KEY_USE.includes(e.code)) {
+      if (!screens.panel.hidden) AdvancePanel();
+      if (typeof Rules.AdvanceCutscene === "function") Rules.AdvanceCutscene(state);
+      AfterCutsceneInput();
+    }
+    return;
+  }
+
   if (!screens.panel.hidden) {
     if (KEY_USE.includes(e.code) || e.code === "Escape") {
       e.preventDefault();
@@ -358,6 +377,13 @@ function OpenCodex(id) {
 function CloseCodex() { screens.codex.hidden = true; }
 el("CodexClose").addEventListener("click", CloseCodex);
 
+/** 过场里按了键之后，立刻把事件与画面同步一次，别等下一帧——
+ *  跳过时如果晚一帧，黑边和淡入淡出会闪一下。 */
+function AfterCutsceneInput() {
+  DispatchEvents(Rules.DrainEvents(state));
+  SyncCutscene();
+}
+
 function FlashObjective() {
   const node = el("HudObjective");
   node.dataset.flash = "1";
@@ -472,6 +498,31 @@ const hudCarry = el("HudCarry");
 let lastObjective = "";
 let lastPromptKey = "";
 
+// ─────────────────────────────────────────── 过场
+const cutFade = el("CutFade");
+const cutSkip = el("CutSkip");
+let lastCutId = null;
+
+function SyncCutscene() {
+  const cut = state.cutscene;
+  if (!cut) {
+    if (lastCutId !== null) {
+      delete document.body.dataset.cutscene;
+      cutFade.style.opacity = "0";
+      cutSkip.hidden = true;
+      lastCutId = null;
+    }
+    return;
+  }
+  if (cut.id !== lastCutId) {
+    lastCutId = cut.id;
+    document.body.dataset.cutscene = cut.letterbox === "full" ? "full" : "wide";
+    cutSkip.hidden = !cut.skippable;
+  }
+  // fade 由 Rules 推进，这里只把数值搬到画面上
+  cutFade.style.opacity = String(Math.max(0, Math.min(1, cut.fade || 0)));
+}
+
 function SyncHud() {
   const objective = state.hud.objective || "";
   if (objective !== lastObjective) {
@@ -546,6 +597,7 @@ function Frame(now) {
       input.itemPressed = false;
       input.callPressed = false;
       DispatchEvents(Rules.DrainEvents(state));
+      SyncCutscene();
       SyncHud();
     }
     render.Sync(state, dt);
@@ -605,6 +657,18 @@ function Boot() {
       // 跳过幕间卡，测试要直接进游戏
       const go = el("ChapterGoButton");
       if (!screens.chapter.hidden) go.click();
+    },
+    /** 测试/截图用：把当前过场直接结算掉。有界循环，卡住就退出而不是空转。 */
+    SkipCutscenes(maxRounds = 12) {
+      for (let i = 0; i < maxRounds && state.cutscene; i += 1) {
+        const before = state.cutscene.id;
+        if (typeof Rules.SkipCutscene === "function") Rules.SkipCutscene(state);
+        else if (typeof Rules.AdvanceCutscene === "function") Rules.AdvanceCutscene(state);
+        else break;
+        DispatchEvents(Rules.DrainEvents(state));
+        if (state.cutscene && state.cutscene.id === before) break; // 跳不动就别死循环
+      }
+      SyncCutscene();
     },
     SkipPanels() {
       panelQueue.length = 0;

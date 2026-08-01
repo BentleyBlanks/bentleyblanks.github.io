@@ -197,6 +197,9 @@ Level = {
   //   emit: { panels:[panelId], reveal:[hatchId|propId], arm:[hazardId],
   //           spawn:[enemyId], objective:"文本", checkpoint:true, win:false }
 
+  // —— 过场：脚本化的镜头 + 走位，玩家交出操作权 ——
+  cutscenes: { [id]: Cutscene },
+
   // —— 检查点：失败后从最近的检查点恢复 ——
   checkpoints: [ { id, x, y, label } ],
 
@@ -205,6 +208,42 @@ Level = {
   //   doneWhen: { trigger:id } | { propUsed:id } | { npcRescued:"all"|id } | { atExit:true }
 };
 ```
+
+### 3.1 过场（Cutscene）—— 仪式感的载体
+
+过场不是"弹一串气泡"。它是**镜头自己会动、角色按脚本走位、玩家交出操作权**的
+一段演出。用它给关键节拍仪式感：山田摸进村、高老忠上树敲钟、地道里传令、
+反击得手。**每幕至少一段开场过场 + 一段高潮过场。**
+
+```js
+Cutscene = {
+  id: "a1_cs_open",
+  letterbox: "wide" | "full",      // full = 上下黑边压到最大，最正式
+  skippable: true,                 // 允许跳过（长按/再按一次），但默认放完
+  steps: [
+    // 镜头：脱离玩家自己走。to 省略的字段保持不变
+    { kind:"camera", to:{ x, y, viewHeight }, sec: 2.4, ease:"inOut" },
+    // 角色走位：id 指向 enemies/npcs/player 里的任意一个，过场期间由脚本驱动
+    { kind:"actor", id:"a1_e_yamada", to:{ x: 18 }, sec: 3.0, anim:"walk", facing: 1 },
+    { kind:"panel", id:"a1_cs_p1" },   // 停下来等玩家翻页
+    { kind:"wait",  sec: 0.8 },
+    { kind:"sfx",   id:"boot" },
+    { kind:"bell",  rings: 3 },        // 钟：镜头会自动看向钟
+    { kind:"spawn", ids:["a1_e_search1"] },
+    { kind:"fade",  to: 1, sec: 0.6 }, // 1 = 全黑，0 = 亮回来
+    { kind:"reveal", ids:["a1_h_stove"] },
+  ],
+}
+```
+
+规则：
+- 过场期间 `state.phase === "cutscene"`，玩家输入被忽略（只有"翻页/跳过"有效）。
+- 过场里的 actor **不跑 AI**：不巡逻、不看见玩家、不涨警觉。结束后交还给 AI。
+- `camera` step 直接写 `state.camera`，**不受跟随逻辑影响**，但仍然受关卡 bounds 夹紧。
+- 过场结束后镜头**平滑交还**给玩家跟随，不许瞬移。
+- 必须是确定性的：不许用 `Math.random()`。
+- **过场不许吃掉玩法教学**：教操作的事归关卡布局，过场只负责叙事与仪式感。
+- 触发方式：`trigger.emit.cutscene = "id"`，或 `CHAPTERS[].openingCutscene`。
 
 **关卡设计红线：**
 
@@ -277,7 +316,14 @@ export const CODEX = [
 3. **汤丙会**（伪军队长）。之前完全没有这个角色。他是"内部的敌人"，
    带来搜村的情报与背叛的紧张感，也让敌我不只是"日军 vs 村民"。
    他要有可信的动机与语气，不是脸谱化的走狗。
-4. **钟声母题。** 钟贯穿全作、响三次，每次含义不同：
+4. **那句台词。** 「悄悄地进村，打枪的不要」必须做进去，位置是**第一幕开场过场**——
+   电影里它就是日军夜里摸进村时下的命令，而第一幕的开场恰恰是高老忠发现鬼子摸进村。
+   **处理纪律**：这句话在今天的流行文化里被玩成了梗，但在原片语境里它是一道
+   **冷的、要命的命令**——不许开枪，是为了不惊动全村，好把人堵在屋里。
+   所以要演成**危险**，不是滑稽：夜、压低的声音、队列无声散开。
+   不许配滑稽音效、不许让说话人显得蠢。这也是第 4 节"不给日军滑稽化处理"的延续。
+
+5. **钟声母题。** 钟贯穿全作、响三次，每次含义不同：
    示警（第 1 幕，高老忠用命换的）→ 集合（第 2 幕，地道里听见地面的钟）
    → 反击的信号（第 3 幕）。三次的音色/节奏在音效上也要能听出区别。
 
@@ -309,13 +355,17 @@ export function SerializeProgress(state);            // -> JSON string
 export function LoadProgress(raw);     // -> { levelIndex, checkpointId, codex:[] } | null
 export function CurrentPrompt(state);  // -> { key:"E"|"S"|"W", label:"开地道口" } | null
 export function ActiveObjective(state);// -> string
+export function StartCutscene(state, id);   // 进入过场
+export function AdvanceCutscene(state);     // 翻页（panel step 时有效）
+export function SkipCutscene(state);        // 跳过（skippable 时有效），要把副作用全部结算完
 ```
 
 ### 5.1 State 结构（渲染层只读这些字段）
 
 ```js
 state = {
-  levelIndex, level, phase,   // phase: "play" | "panel" | "won" | "lost" | "chapterEnd"
+  levelIndex, level, phase,   // "play" | "panel" | "cutscene" | "won" | "lost" | "chapterEnd"
+  cutscene: null | { id, stepIndex, t, letterbox, fade, skippable },
   time,                       // 累计秒
   player: {
     x, y, vx, vy,

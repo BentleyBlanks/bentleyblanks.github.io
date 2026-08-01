@@ -63,6 +63,33 @@ html, body {
 .letterbox i:first-child { top: 0; }
 .letterbox i:last-child { bottom: 0; }
 body[data-cinematic="1"] .letterbox i { height: 11vh; }
+/* 过场：黑边压到最大，界面全部让位 */
+body[data-cutscene="wide"] .letterbox i { height: 12vh; }
+body[data-cutscene="full"] .letterbox i { height: 17vh; }
+body[data-cutscene] .hudTop,
+body[data-cutscene] .hudPrompt,
+body[data-cutscene] .hudAlert { opacity: 0; transition: opacity .35s ease; }
+
+/* 过场的淡入淡出（由 Rules 的 fade step 驱动） */
+.cutFade {
+  position: absolute; inset: 0; z-index: 8;
+  background: #05080e; pointer-events: none;
+  opacity: 0;
+}
+
+/* 跳过提示：不抢戏，放在右下角，过一会儿自己淡掉 */
+.cutSkip {
+  position: absolute; right: clamp(1rem, 4vw, 2.6rem); bottom: 14vh;
+  z-index: 9; margin: 0;
+  color: #8d826d; font-size: .76rem; letter-spacing: .18em;
+  pointer-events: none;
+  animation: cutSkipIn .6s ease-out;
+}
+.cutSkip b {
+  color: var(--paper); font-family: ui-monospace, monospace;
+  border: 1px solid #6d5f4880; border-radius: 2px; padding: .1em .45em;
+}
+@keyframes cutSkipIn { from { opacity: 0; } to { opacity: 1; } }
 
 .vignette {
   position: absolute; inset: 0; pointer-events: none; z-index: 3;
