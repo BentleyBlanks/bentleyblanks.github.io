@@ -119,6 +119,34 @@ const act1 = {
     },
   ],
 
+  // —— 挖掘（契约 0.0.2）——
+  // 地道不是本来就有的，是一锨一锨挖出来的，而且是边打边挖、现挖现连。
+  // 第一幕只教两件事，一正一反：
+  //   a1_dig_yard12 —— 头道院的支道（30–48）和二道院的支道（52–78）之间隔着 4 米土。
+  //     刨开它，两个院子底下就连成一条，往后走这一段再不用上地面。
+  //     这是全作第一次让玩家明白：地道的形状是可以自己改的。
+  //   a1_dig_yard23 —— 紧接着的下一处（78–82）长得一模一样，却是三道院的砖基。
+  //     刨不动。「哪儿能挖」本身就是一种知识，不是随便哪面土墙都行。
+  //     所以 78→82 仍然只能从地面绕（水缸 79 / 驴槽 81 那条掩体链），难度不掉。
+  // 代价的第三层是土：挖出来的土堆在原地就是证据，得背到二道院的场院上摊掉。
+  // 本幕只给一个倒土点，从挖点爬上去、过 50.6 的院门、走到 56.5 —— 那段路就是这一课的另一半。
+  // 封锁段（x > 104）一处挖点都没有：钟响之后的合围是叙事必然，不许被绕过。
+  digSpots: [
+    {
+      id: "a1_dig_yard12", x: 48.0, y: -3.8, dir: "right",
+      toX: 52.3, toY: -3.8, sec: 3.2, spoil: 1, soft: true,
+      label: "往东掏 —— 那头就是二道院的支道",
+    },
+    {
+      id: "a1_dig_yard23", x: 77.6, y: -3.8, dir: "right",
+      toX: 82.3, toY: -3.8, sec: 5.0, spoil: 2, soft: false,
+      label: "三道院的砖基 —— 刨不动",
+    },
+  ],
+  spoilSinks: [
+    { id: "a1_sink_yard2", x: 56.5, y: 0.35, capacity: 4, label: "二道院的场院 —— 把新土摊开" },
+  ],
+
   props: [
     // —— 起点：无威胁直路，远景是钟 ——
     { id: "a1_pr_sign", x: 6, y: 0, z: PLAY, kind: "sign", facing: 1, interact: "read", data: { codexId: "codex_zhuanyi" }, label: "村口木牌" },
@@ -219,6 +247,17 @@ const act1 = {
     { id: "a1_pr_block_y2", x: 64, y: 0.35, z: PLAY, kind: "wall", facing: 1, interact: "block", data: { channel: "blockYard2", panels: [] }, label: "推倒这堵院墙" },
     { id: "a1_pr_block_y3", x: 100, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "block", data: { channel: "blockYard3", panels: [] }, label: "推倒这堵院墙" },
     { id: "a1_pr_millstone", x: 125, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hatch", data: { hatchId: "a1_h_exit" }, label: "碾盘下的地道口" },
+    // —— 挖：铁锨靠在土壁上（民兵挖地道的家伙，本来就该在地道里）。
+    //    没锨也能用手刨，慢一倍、更响 —— 这是取舍，不是关卡门槛。
+    { id: "a1_pr_shovel", x: 43, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "pickup", data: { item: "shovel" }, label: "靠在土壁上的铁锨" },
+    // 软土面（能刨开）用 chokepoint 的形，硬面（砖基/石头）用 wall 的形 ——
+    // 玩家必须一眼看得出哪面能动，这是"哪儿能挖"这条知识的载体。
+    { id: "a1_pr_dig_yard12", x: 48.0, y: -3.8, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
+      data: { digSpotId: "a1_dig_yard12", panels: [] }, label: "往东掏 —— 那头就是二道院的支道" },
+    { id: "a1_pr_dig_yard23", x: 77.6, y: -3.8, z: PLAY, kind: "wall", facing: 1, interact: "dig",
+      data: { digSpotId: "a1_dig_yard23", panels: [] }, label: "三道院的砖基 —— 刨不动" },
+    { id: "a1_pr_sink_yard2", x: 56.5, y: 0.35, z: PLAY, kind: "millstone", facing: 1, interact: "dumpSpoil",
+      data: { sinkId: "a1_sink_yard2", panels: [] }, label: "把土摊到场院上" },
   ],
 
   enemies: [
@@ -566,6 +605,50 @@ const act2 = {
     { id: "a2_h_well", x: 145, shaftId: "a2_sh_well", hidden: true, opened: false, revealBy: "a2_t_wellnear", label: "枯井口", propId: "a2_pr_well" },
   ],
 
+  // —— 挖掘（契约 0.0.2）——
+  // 本幕的上层是四条**互不相连**的支道（s1/s2/s3/s4），这是关卡的骨架，
+  // 不是缺陷：「高低相通」就是靠它逼出来的。所以这里的挖点大部分是**刨不动的**，
+  // 挖出来的那两条是真正拿命换的：
+  //   a2_dig_s2s1（软，6 米）—— 从 s2 往西掏通 s1。掏通之后 26–66 就是一条完整的上层长廊，
+  //     秋兰（35）和二嫂（58.5）不用再各自爬一趟竖井；从 s2 往西撤也不必再从 65 的土井下到干线。
+  //     只在 s2 这头布点：s2 得先自己走进去（翻口或 65 的土井），所以"顶开翻口"那一课跑不掉。
+  //   a2_dig_s2s3（软，18 米，全作最贵的一段）—— 从 s2 东头掏到西院支道 s3。
+  //     s2 东头正上方就是 a2_e_probe2（58–65，听觉 5.5，隔 3.8 米土）：这一锨下去一定被听见。
+  //     换来的是"街道相通"——上层从 46 一路通到 100，也顺手把倒土的路铺出来了（粮窖就在 94.5）。
+  //   a2_dig_s3e（硬）—— 老砖窑的窑壁。玩家一定会想"从上层跨过 96–112 的灌水段"，
+  //     这条路必须堵死，否则水道闸（94.5，要铁锨）这个中心谜题就没有了。
+  //   a2_dig_s4e（硬）—— 枯井的井壁，砖砌的。同理：不许从上层直接摸进枯井竖井，
+  //     那样既跳过粮袋堵渗水口，落点又是一口还没现形的井（死胡同）。
+  // 倒土只有两处，都在东边：粮窖（94.5，s3）和枯井底（142，干线）。
+  // 也就是说在 s2 挖的土得背着走一段真实的路 —— 或者先把 s2→s3 掏通，
+  // 让新挖的那条路同时成为倒土的路。
+  digSpots: [
+    {
+      id: "a2_dig_s2s1", x: 46.2, y: -3.8, dir: "left",
+      toX: 39.8, toY: -3.8, sec: 4.2, spoil: 2, soft: true,
+      label: "往西掏 —— 通秋兰那条支道",
+    },
+    {
+      id: "a2_dig_s2s3", x: 65.9, y: -3.8, dir: "right",
+      toX: 84.2, toY: -3.8, sec: 6.0, spoil: 3, soft: true,
+      label: "往东掏 —— 通西院支道（头顶就是刺刀）",
+    },
+    {
+      id: "a2_dig_s3e", x: 99.8, y: -3.8, dir: "right",
+      toX: 116.2, toY: -3.8, sec: 6.0, spoil: 3, soft: false,
+      label: "老砖窑的窑壁 —— 刨不动",
+    },
+    {
+      id: "a2_dig_s4e", x: 134.0, y: -3.8, dir: "right",
+      toX: 145, toY: -3.8, sec: 6.0, spoil: 3, soft: false,
+      label: "枯井的井壁 —— 砖砌的，刨不动",
+    },
+  ],
+  spoilSinks: [
+    { id: "a2_sink_grain", x: 94.5, y: -3.8, capacity: 6, label: "粮窖 —— 倒进空粮坑" },
+    { id: "a2_sink_well", x: 142, y: -8.0, capacity: 6, label: "枯井底 —— 土往井里倒，谁也看不出来" },
+  ],
+
   props: [
     // —— 干线 d1：开场。点着的马灯就是"看得见的目标" ——
     { id: "a2_pr_beam1", x: 7, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
@@ -654,6 +737,21 @@ const act2 = {
     { id: "a2_pr_house_t2", x: 124, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
     { id: "a2_pr_lamp_out", x: 146, y: 0, z: BACK, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_treeOut", x: 149, y: 0, z: BACK, kind: "tree", facing: 1, interact: "none", data: null, label: null },
+
+    // —— 挖 / 倒土（契约 0.0.2）。铁锨已经在 s3 的 a2_pr_shovel（x=93），
+    //    它同时是水道闸的钥匙 —— 想挖就得先把那趟竖井跑完，顺序天生就对。
+    { id: "a2_pr_dig_s2s1", x: 46.2, y: -3.8, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
+      data: { digSpotId: "a2_dig_s2s1", panels: [] }, label: "往西掏 —— 通秋兰那条支道" },
+    { id: "a2_pr_dig_s2s3", x: 65.9, y: -3.8, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
+      data: { digSpotId: "a2_dig_s2s3", panels: [] }, label: "往东掏 —— 通西院支道" },
+    { id: "a2_pr_dig_s3e", x: 99.8, y: -3.8, z: PLAY, kind: "wall", facing: 1, interact: "dig",
+      data: { digSpotId: "a2_dig_s3e", panels: [] }, label: "老砖窑的窑壁 —— 刨不动" },
+    { id: "a2_pr_dig_s4e", x: 134.0, y: -3.8, z: PLAY, kind: "wall", facing: 1, interact: "dig",
+      data: { digSpotId: "a2_dig_s4e", panels: [] }, label: "枯井的井壁 —— 刨不动" },
+    { id: "a2_pr_sink_grain", x: 94.5, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "dumpSpoil",
+      data: { sinkId: "a2_sink_grain", panels: [] }, label: "把土倒进空粮坑" },
+    { id: "a2_pr_sink_well", x: 142, y: -8.0, z: PLAY, kind: "well", facing: 1, interact: "dumpSpoil",
+      data: { sinkId: "a2_sink_well", panels: [] }, label: "把土倒进枯井" },
   ],
 
   enemies: [
@@ -930,6 +1028,62 @@ const act3 = {
     { id: "a3_h_kang", x: 116, shaftId: "a3_sh_kang", hidden: true, opened: false, revealBy: "a3_t_flood", label: "炕下的地道口", propId: "a3_pr_kang3" },
   ],
 
+  // —— 挖掘（契约 0.0.2）——
+  // 第三幕的挖是**应急**：土是湿的、时间是被烟和天光追着的，两处能挖的都在压力最大的地方。
+  //   a3_dig_millside（软，一米二，全作最便宜的一段）—— 从街底下短地道的西头掏进碾盘那口竖井的井壁。
+  //     掏通之后，干线 ⇄ 街底下短地道不用再上地面那一趟（x 63→64.5 正好在哨兵 a3_e_g1
+  //     视距 10 的边上）。挖点只布在短地道这头：要挖它必须先从碾盘下头钻出来过一次，
+  //     所以"天快亮了"那个地表节拍和 a3_t_surface 的检查点一定会发生 —— 这是回程/复线，不是跳票。
+  //   a3_dig_militia（软，10 米，本作最响的一锨）—— 把西头组的支道 s5（126–142）
+  //     和东头组的支道 s6（152–166）横向掏通。掏通之后跑腿传令不必再下到干线，
+  //     也就绕开了 a3_e_blockM（干线 151.2，视距 12）和头顶那两个捅刺刀的。
+  //     代价：正上方西边是汤丙会（134–140，听觉 6.0），东边是山田（149–166，听觉 7.5）。
+  //     这是"绕开一条巡逻线"的最高级形态，也是全幕唯一一条不靠地雷推进的路。
+  //   a3_dig_collapse（硬）—— 玩家一定会问"干线塌了，我刨开不就完了？"。
+  //     答案写在土里：塌方上头压着房梁，一动就是第二次塌。所以只能从碾盘下头上地表绕。
+  //   a3_dig_wellwall（硬）—— 街底下短地道的东头再往东是水井的井壁，青砖砌的。
+  //     这条堵死了两件事：不许跳过街上那段岗哨，也不许摸到一口还没现形的炕下竖井（死胡同）。
+  //   a3_dig_wind（硬，也是全作最想挖的一处）—— 从 s6 东头到黑风口的竖井只隔九米，
+  //     刨过去就能绕开堵在干线上的三个人。可那九米是整块青石。
+  //     合围的最后一下必须是全村的反击，不是一个人的铁锨 —— 这条红线用地质写死。
+  // 倒土两处，都不在挖点跟前：
+  //   a3_sink_yard（83.5，地表）—— 碾盘院东头的场院。从 85 那口炕洞钻出来就是，
+  //     但那是地面：a3_e_g1 的巡逻线（69–79，视距 10）刚好够得着，倒土得挑他背过身。
+  //   a3_sink_kang（129.5，s5 西头）—— 炕洞。从 142 挖完往西背十二米半，
+  //     一路都在汤丙会（134–140）脚底下。这段路本身就是代价。
+  // 铁锨也是两把（59.5 / 126.5），一把管西半场一把管东半场。
+  digSpots: [
+    {
+      id: "a3_dig_millside", x: 64.2, y: -4.5, dir: "left",
+      toX: 63, toY: -4.5, sec: 3.0, spoil: 1, soft: true,
+      label: "往西掏 —— 接上碾盘那口井的井壁",
+    },
+    {
+      id: "a3_dig_collapse", x: 69.6, y: -8.0, dir: "right",
+      toX: 110.2, toY: -8.0, sec: 6.0, spoil: 3, soft: false,
+      label: "塌方 —— 上头压着房梁，刨不动",
+    },
+    {
+      id: "a3_dig_wellwall", x: 103, y: -4.5, dir: "right",
+      toX: 116, toY: -4.5, sec: 6.0, spoil: 3, soft: false,
+      label: "再往东是水井的井壁 —— 青砖砌的",
+    },
+    {
+      id: "a3_dig_militia", x: 142, y: -3.8, dir: "right",
+      toX: 152.2, toY: -3.8, sec: 6.0, spoil: 3, soft: true,
+      label: "往东掏 —— 接东头组那条支道",
+    },
+    {
+      id: "a3_dig_wind", x: 166, y: -3.8, dir: "right",
+      toX: 175, toY: -3.8, sec: 6.0, spoil: 3, soft: false,
+      label: "黑风口这头是整块青石 —— 刨不动",
+    },
+  ],
+  spoilSinks: [
+    { id: "a3_sink_yard", x: 83.5, y: 0, capacity: 7, label: "碾盘院的场院 —— 把新土摊开" },
+    { id: "a3_sink_kang", x: 129.5, y: -3.8, capacity: 7, label: "炕洞 —— 把土垫到炕底下" },
+  ],
+
   props: [
     // —— 开场：亮着的马灯就在脚边，这是"看得见的目标" ——
     { id: "a3_pr_lantern", x: 6, y: -8.0, z: PLAY, kind: "lantern", facing: 1, interact: "pickup", data: { item: "lantern" }, label: "马灯" },
@@ -1085,6 +1239,29 @@ const act3 = {
     { id: "a3_pr_wall_t3", x: 164, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_treeOut3", x: 177, y: 0, z: BACK, kind: "tree", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_lampOut3", x: 174, y: 0, z: BACK, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
+
+    // —— 挖 / 倒土（契约 0.0.2）——
+    // 两把铁锨，一把在卡口东边的干线上（59.5，过了木塞那一关才够得着，
+    // 所以不会跟"拿木塞封卡口"抢手），一把在西头组的支道口（126.5）。
+    // 一次只能拿一件东西：想挖就得先把马灯放下 —— 摸黑刨土，这是取舍。
+    { id: "a3_pr_shovel", x: 59.5, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "pickup",
+      data: { item: "shovel" }, label: "撂在土墙根的铁锨" },
+    { id: "a3_pr_shovel2", x: 126.5, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "pickup",
+      data: { item: "shovel" }, label: "民兵撂下的铁锨" },
+    { id: "a3_pr_dig_millside", x: 64.2, y: -4.5, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
+      data: { digSpotId: "a3_dig_millside", panels: [] }, label: "往西掏 —— 接上碾盘那口井" },
+    { id: "a3_pr_dig_collapse", x: 69.6, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "dig",
+      data: { digSpotId: "a3_dig_collapse", panels: [] }, label: "塌方 —— 房梁压着，刨不动" },
+    { id: "a3_pr_dig_wellwall", x: 103, y: -4.5, z: PLAY, kind: "wall", facing: 1, interact: "dig",
+      data: { digSpotId: "a3_dig_wellwall", panels: [] }, label: "水井的井壁 —— 刨不动" },
+    { id: "a3_pr_dig_militia", x: 142, y: -3.8, z: PLAY, kind: "chokepoint", facing: 1, interact: "dig",
+      data: { digSpotId: "a3_dig_militia", panels: [] }, label: "往东掏 —— 接东头组那条支道" },
+    { id: "a3_pr_dig_wind", x: 166, y: -3.8, z: PLAY, kind: "wall", facing: 1, interact: "dig",
+      data: { digSpotId: "a3_dig_wind", panels: [] }, label: "整块青石 —— 刨不动" },
+    { id: "a3_pr_sink_yard", x: 83.5, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "dumpSpoil",
+      data: { sinkId: "a3_sink_yard", panels: [] }, label: "把土摊到场院上" },
+    { id: "a3_pr_sink_kang", x: 129.5, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "dumpSpoil",
+      data: { sinkId: "a3_sink_kang", panels: [] }, label: "把土垫到炕底下" },
   ],
 
   enemies: [

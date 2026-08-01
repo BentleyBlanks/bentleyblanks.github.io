@@ -156,9 +156,19 @@ const LURE_WIND_SEC = 0.5; // 弯腰摸一块土坷垃，抡出去
 const LURE_COOL_SEC = 2.4; // 冷却。连按无效是设计，不是限制
 const LURE_THROW_DIST = 9.5; // 落点离玩家多远（沿面朝方向；撞墙就落在墙根）
 const LURE_MIN_DIST = 2.6; // 比这还近就别扔了，等于把人叫到自己脸上
-const LURE_LOUD = 0.85; // 落点的响度（喂给敌人的 hearing 半径）
+// 落点的**听得见半径，单位是米**（跟关卡数据 lure.data.radius 同一套单位）。
+// 别拿它当"噪音强度"乘 hearing：那样算出来只有五米，比扔出去的距离还短，
+// 等于只能引到已经站在落点旁边的人——引这个动词当场就废了。
+// 11 米略大于 9.5 米的投掷距离，正好覆盖前方那一段路。
+const LURE_RADIUS = 11;
+const LURE_EAR_MIN = 0.7; // 耳朵好坏的折算范围（狗听得远）
+const LURE_EAR_MAX = 1.6;
 const LURE_SELF_NOISE = 0.18; // 起手那一下自己发出的动静：贴着人扔照样露馅
-const LURE_HOLD_SEC = 4.6; // 走到落点后蹲着查看多久 —— 这段就是玩家挣来的窗口
+// 走到落点后蹲着查看多久 —— 这段就是玩家挣来的窗口。
+// 5.5 秒不是随手定的：它要够玩家从十米外贴到他背后（背对着的人看不见你，
+// 所以那十米是站着跑的，3.3 m/s ≈ 3 秒），再加上 1.2 秒的制服前摇。
+// 短于 5 秒，「引开 → 绕到背后 → 敲晕」这条闭环在时间上就不成立。
+const LURE_HOLD_SEC = 5.5;
 const LURE_TRAVEL_MAX = 7.0; // 走过去的时间上限，免得他为一块石头追一辈子
 const LURE_RANGE_SLACK = 17; // 为了查这块石头，他愿意离开巡逻区间多远
 const LURE_FOCUS_VISION = 0.5; // 蹲着盯地上那块石头时，视距对折（这是窗口的来源）
@@ -389,6 +399,64 @@ function NormalizeLevel(raw, index) {
     label: typeof p.label === "string" ? p.label : "",
     hidden: !!p.hidden,
   }));
+
+  // —— 挖掘（AGENTS.md 0.0.2）——
+  // 授权挖点 + 倒土点。自由地形破坏会同时打穿寻路、敌人导航和土层剖面，白盒阶段不做。
+  level.digSpots = Arr(level.digSpots).map((s, i) => {
+    const x = Num(s.x, 0);
+    const y = Num(s.y, 0);
+    const dir = typeof s.dir === "string" ? s.dir : "right";
+    const fall = dir === "left" ? -6 : dir === "right" ? 6 : 0;
+    const rise = dir === "up" ? 4 : dir === "down" ? -4 : 0;
+    return {
+      id: typeof s.id === "string" ? s.id : "dig_" + i,
+      x,
+      y,
+      dir,
+      toX: Num(s.toX, x + fall),
+      toY: Num(s.toY, y + rise),
+      sec: Clamp(Num(s.sec, INTERACT.digSec * 2), 2.5, 6.0),
+      spoil: Clamp(Math.round(Num(s.spoil, 1)), 1, 3),
+      soft: s.soft === undefined ? true : !!s.soft,
+      label: typeof s.label === "string" ? s.label : "这段土",
+      kind: typeof s.kind === "string" ? s.kind : "prop_beam",
+      hidden: !!s.hidden,
+    };
+  });
+  level.spoilSinks = Arr(level.spoilSinks).map((s, i) => ({
+    id: typeof s.id === "string" ? s.id : "sink_" + i,
+    x: Num(s.x, 0),
+    y: Num(s.y, 0),
+    capacity: Math.max(1, Math.round(Num(s.capacity, 3))),
+    label: typeof s.label === "string" ? s.label : "枯井",
+    kind: typeof s.kind === "string" ? s.kind : "well",
+    hidden: !!s.hidden,
+  }));
+
+  // 挖点/倒土点直接长成互动道具，关卡不用再写一遍 prop。
+  // 关卡如果自己写了 interact:"dig"/"dumpSpoil" 的 prop（想换个 kind 或换个位置），
+  // 就以它为准，这里不再重复生成。
+  {
+    const claimed = {};
+    for (const p of level.props) {
+      const id = p.data && (p.data.digSpotId || p.data.sinkId);
+      if (typeof id === "string") claimed[id] = true;
+    }
+    for (const s of level.digSpots) {
+      if (claimed[s.id]) continue;
+      level.props.push({
+        id: "prop_" + s.id, x: s.x, y: s.y, z: 0, kind: s.kind, facing: s.dir === "left" ? -1 : 1,
+        interact: "dig", data: { digSpotId: s.id, panels: [] }, label: s.label, hidden: s.hidden,
+      });
+    }
+    for (const s of level.spoilSinks) {
+      if (claimed[s.id]) continue;
+      level.props.push({
+        id: "prop_" + s.id, x: s.x, y: s.y, z: 0, kind: s.kind, facing: 1,
+        interact: "dumpSpoil", data: { sinkId: s.id, panels: [] }, label: s.label, hidden: s.hidden,
+      });
+    }
+  }
 
   level.enemies = Arr(level.enemies).map((e, i) => {
     const patrol = e.patrol && typeof e.patrol === "object" ? e.patrol : null;
@@ -644,6 +712,8 @@ export function CreateState(levelIndex = 0) {
       lureCooldown: 0,
       lureAimX: 0,
       lureAimY: 0,
+      // 「挖」：背上背着多少土。跟 carrying 分开——土在背篓里，灯在手上。
+      spoil: 0,
     },
 
     // aspect = 视口宽/高，由集成层在 Resize 时写入，摄像机夹紧要用它
@@ -689,6 +759,8 @@ export function CreateState(levelIndex = 0) {
       callHint: null,
       lure: null, // { ready, cooldown, x, y, heat } —— UI 画准星/冷却圈用
       ammo: 0, // 子弹是有数的，玩家要一直看得见还剩几发
+      spoil: 0, // 背上背着多少土
+      spoilPiles: 0, // 地上还有几堆没处理的新土（= 几条露给敌人的线索）
       knockout: null, // { id, name } —— 站位成立时才有值
       stuckFollowers: [], // [{ id, name, reason:"crawl"|"climb" }] 谁没跟上、为什么
       villagersSafe: 0,
@@ -748,6 +820,11 @@ export function ResetLevel(state, levelIndex) {
   state.trail = [];
   state.winArmed = false;
   state.navNodes = null; // 换关卡了，机器人的导航图作废
+  // 一帧缓存按 state.time 记账，而 time 刚被清零——不作废会读到上一幕的旧答案
+  state.koCacheT = -1;
+  state.koCache = null;
+  state.aimCacheT = -1;
+  state.aimCache = null;
   state.checkpointId = null;
   state.stats.timeInLevel = 0;
   state.cutscene = null;
@@ -792,6 +869,12 @@ export function ResetLevel(state, levelIndex) {
   state.world.blocks = [];
   state.world.lureHeat = 0;
   state.world.lureCount = 0;
+  // 挖掘
+  state.world.dug = {};
+  state.world.digProgress = {};
+  state.world.spoilPiles = [];
+  state.world.sinks = {};
+  for (const s of level.spoilSinks) state.world.sinks[s.id] = { filled: 0, capacity: s.capacity };
   // 弹药：关卡没写就按"每个枪眼刚好一轮"给，绝不会因为没子弹而死锁。
   {
     let loopholes = 0;
@@ -942,6 +1025,8 @@ export function ResetLevel(state, levelIndex) {
   p.lureCooldown = 0;
   p.lureAimX = p.x;
   p.lureAimY = p.y;
+  p.spoil = 0;
+  p.knockoutId = null;
   p.anim.name = "idle";
   p.anim.t = 0;
   p.anim.speed = 0;
@@ -1140,6 +1225,7 @@ function SubStep(state, dt) {
     }
     UpdateTrail(state);
     UpdateHazards(state, dt);
+    UpdateSpoilPiles(state);
     UpdateEnemies(state, dt);
     UpdateNpcs(state, dt);
     if (state.phase === "play" && !state.player.dead) CheckWin(state, dt);
@@ -1685,6 +1771,8 @@ function MoveSpeedFor(p, input) {
   else if (p.posture === "crouch") speed = input.sneak ? PLAYER.crouchSpeed * 0.72 : PLAYER.crouchSpeed;
   else speed = input.sneak ? PLAYER.sneakSpeed : PLAYER.walkSpeed;
   if (p.carrying === "grain" || p.carrying === "shovel") speed *= 0.92;
+  // 背着一筐土走不快。倒土这一趟本来就该是有分量的
+  if (p.spoil > 0) speed *= 1 - 0.06 * Math.min(p.spoil, SPOIL_CARRY_MAX);
   return speed;
 }
 
@@ -2051,7 +2139,7 @@ function UpdatePlayerAnim(state, dt) {
 
   if (p.dead) name = p.deathReason === "spotted" || p.deathReason === "captured" ? "caught" : "dead";
   else if (p.hidden) name = "hide";
-  else if (p.action === "hatch") name = "dig";
+  else if (p.action === "hatch" || p.action === "dig") name = "dig";
   else if (p.action === "bell") name = "ring";
   else if (p.action === "push") name = "push";
   else if (p.action === "block") name = "push"; // 放倒院墙 = 推
@@ -2096,9 +2184,9 @@ function UpdateDeadPlayer(state, dt) {
  * 石头往面朝方向飞多远才落地。撞上过不去的东西就落在那儿——
  * 所以隔着一堵实墙引不到对面，但矮墙、院门这种是飞得过去的。
  */
-function LureLandingX(state) {
+function LureLandingX(state, dirOverride) {
   const p = state.player;
-  const dir = p.facing >= 0 ? 1 : -1;
+  const dir = dirOverride ? (dirOverride >= 0 ? 1 : -1) : p.facing >= 0 ? 1 : -1;
   const level = state.level;
   let x = p.x;
   for (let d = 0.5; d <= LURE_THROW_DIST + 0.001; d += 0.5) {
@@ -2116,8 +2204,16 @@ function LureLandingY(state, x) {
   return floor ? floor.y : state.player.y;
 }
 
-/** 现在能不能扔。返回 { ok, x, y, reason }。 */
+/** 现在能不能扔。返回 { ok, x, y, reason }。同一子步只算一遍（落点要走一遍地形）。 */
 function LureAim(state) {
+  if (state.aimCacheT === state.time) return state.aimCache;
+  const result = LureAimRaw(state);
+  state.aimCacheT = state.time;
+  state.aimCache = result;
+  return result;
+}
+
+function LureAimRaw(state) {
   const p = state.player;
   const x = LureLandingX(state);
   const y = LureLandingY(state, x);
@@ -2134,7 +2230,7 @@ function LureAim(state) {
  * 把"这里响了一下"广播出去。lureX/lureY 是**响的地方**，不是玩家的位置——
  * 这是整个动词成立的关键：敌人得到的线索指向别处。
  */
-function RaiseLure(state, x, y, loud, holdSec) {
+function RaiseLure(state, x, y, radiusM, holdSec) {
   const p = state.player;
   const heat = state.world.lureHeat;
   // 热度过线：他们不再上当。石头照样响，但他们开始朝**声音的来处**搜，
@@ -2144,7 +2240,9 @@ function RaiseLure(state, x, y, loud, holdSec) {
 
   for (const e of state.enemies) {
     if (e.dormant || e.defeated) continue;
-    const radius = (e.hearing || 6) * loud * SENSE.hearingScale;
+    // 半径是米；耳朵好的（狗）听得更远
+    const radius =
+      radiusM * Clamp((e.hearing || 6) / 6, LURE_EAR_MIN, LURE_EAR_MAX) * SENSE.hearingScale;
     const dx = x - e.x;
     const dy = (y - e.y) * (Math.abs(y - e.y) > 1.5 ? CROSSLAYER_MUFFLE : 1);
     if (dx * dx + dy * dy > radius * radius) continue;
@@ -2181,7 +2279,7 @@ function RaiseLure(state, x, y, loud, holdSec) {
 
   state.world.lureHeat += 1;
   state.world.lureCount++;
-  Emit(state, { kind: "lure", x, y, radius: loud, pulled, wised, heat: state.world.lureHeat });
+  Emit(state, { kind: "lure", x, y, radius: radiusM, pulled, wised, heat: state.world.lureHeat });
   Sfx(state, "pebble", x, y);
   return pulled;
 }
@@ -2211,7 +2309,7 @@ function FinishThrow(state) {
   const p = state.player;
   p.lureCooldown = LURE_COOL_SEC;
   // 落点要按**当下**的地形重算一次：起手那 0.5 秒里玩家没动，但敌人动了
-  RaiseLure(state, p.lureAimX, p.lureAimY, LURE_LOUD, LURE_HOLD_SEC);
+  RaiseLure(state, p.lureAimX, p.lureAimY, LURE_RADIUS, LURE_HOLD_SEC);
 }
 
 /** 附近有没有能招呼上的乡亲（F 是本作唯一的"带上人"手段，得让人看得见）。 */
@@ -2349,6 +2447,20 @@ function InteractAvailable(state, prop) {
       return !state.world.used[prop.id];
     case "block":
       return !state.world.blocked[prop.data.channel];
+    // —— 挖 / 倒土 ——
+    case "dig": {
+      const spot = DigSpotById(state, prop.data.digSpotId);
+      if (!spot) return false;
+      return !state.world.dug[spot.id]; // soft:false 也照样提示，只是按不动（"此路不通"要看得见）
+    }
+    case "dumpSpoil": {
+      const sink = SpoilSinkById(state, prop.data.sinkId);
+      if (!sink) return false;
+      const rec = state.world.sinks[sink.id];
+      return !!rec && rec.filled < rec.capacity;
+    }
+    case "spoil":
+      return true; // 地上的土堆：背起来
     // —— 反击三件套 ——
     // 提示照常出现（否则玩家不知道这儿有个枪眼），但条件不满足时 blocked=true，
     // 按下去只会得到一句"等他们就位"。跑腿本身就是玩法。
@@ -2382,6 +2494,12 @@ function CounterReady(state, prop) {
 
 /** 这个道具现在按下去会不会"按了个寂寞"（条件不满足）。 */
 function PropBlocked(state, prop) {
+  if (prop.interact === "dig") {
+    const spot = DigSpotById(state, prop.data.digSpotId);
+    return !spot || !spot.soft; // 石头/夯土挖不动：这是给玩家看的"此路不通"
+  }
+  if (prop.interact === "dumpSpoil") return state.player.spoil <= 0;
+  if (prop.interact === "spoil") return state.player.spoil >= SPOIL_CARRY_MAX;
   if (prop.interact !== "lever") return false;
   const need = prop.data && prop.data.needItem ? prop.data.needItem : null;
   return !!need && state.player.carrying !== need;
@@ -2471,6 +2589,35 @@ function PromptForProp(state, prop) {
       return { key: "E", label: prop.label ? "敲响" + prop.label : "弄出点动静", id: prop.id, kind: "lure" };
     case "block":
       return { key: "E", label: prop.label ? "放倒" + prop.label : "堵上这条路", id: prop.id, kind: "block" };
+    case "dig": {
+      const spot = DigSpotById(state, prop.data.digSpotId);
+      if (!spot) return null;
+      if (!spot.soft) return { key: "E", label: "挖不动 —— 是夯土", id: prop.id, kind: "dig", blocked: true };
+      const done = state.world.digProgress[spot.id] || 0;
+      const bare = p.carrying !== "shovel";
+      const label = done > 0.05 ? "接着挖" : bare ? "用手刨开" + spot.label : "挖开" + spot.label;
+      return { key: "E", label, id: prop.id, kind: "dig", progress: done / DigSeconds(state, spot) };
+    }
+    case "dumpSpoil": {
+      const has = p.spoil > 0;
+      return {
+        key: "E",
+        label: has ? "把土倒进" + (prop.label || "枯井") : "手上没有土",
+        id: prop.id,
+        kind: "dumpSpoil",
+        blocked: !has,
+      };
+    }
+    case "spoil": {
+      const full = p.spoil >= SPOIL_CARRY_MAX;
+      return {
+        key: "E",
+        label: full ? "背不动了" : "背起这堆新土",
+        id: prop.id,
+        kind: "spoil",
+        blocked: full,
+      };
+    }
     case "signal":
       return { key: "E", label: prop.label || "传口令", id: prop.id, kind: "signal" };
     case "mine": {
@@ -2554,11 +2701,33 @@ function BeginInteract(state, prop) {
     Sfx(state, "cloth", p.x, p.y);
     return;
   }
+  if (kind === "dig") {
+    const spot = DigSpotById(state, prop.data.digSpotId);
+    if (!spot || !spot.soft) {
+      Sfx(state, "cloth", p.x, p.y); // 夯土，刨两下就知道挖不动
+      return;
+    }
+  }
+  if (kind === "dumpSpoil" && p.spoil <= 0) {
+    Sfx(state, "cloth", p.x, p.y);
+    return;
+  }
+  if (kind === "spoil" && p.spoil >= SPOIL_CARRY_MAX) {
+    Sfx(state, "cloth", p.x, p.y);
+    return;
+  }
 
   let duration = 0.35;
   if (kind === "hatch") duration = INTERACT.hatchOpenSec;
   else if (kind === "lure") duration = LURE_WIND_SEC;
   else if (kind === "block") duration = BLOCK_SEC;
+  else if (kind === "dig") {
+    // 已经挖过一半的接着挖：被发现打断不许让玩家白挖
+    const spot = DigSpotById(state, prop.data.digSpotId);
+    const total = DigSeconds(state, spot);
+    duration = Math.max(0.2, total - (state.world.digProgress[spot.id] || 0));
+  } else if (kind === "dumpSpoil") duration = 0.8;
+  else if (kind === "spoil") duration = 0.6;
   else if (kind === "signal") duration = SIGNAL_SEC;
   else if (kind === "mine") duration = MINE_SEC;
   else if (kind === "loophole") duration = LOOPHOLE_SEC;
@@ -2582,6 +2751,10 @@ function BeginInteract(state, prop) {
   if (kind === "hatch") {
     Sfx(state, "dig", p.x, p.y);
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.dig);
+  } else if (kind === "dig") {
+    Sfx(state, "dig", p.x, p.y);
+    const bare = p.carrying !== "shovel";
+    p.noiseSpike = Math.max(p.noiseSpike, Math.min(1, NOISE.dig * (bare ? DIG_BARE_NOISE : 1)));
   } else if (kind === "push") {
     Sfx(state, "push", p.x, p.y);
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.push);
@@ -2623,6 +2796,22 @@ function UpdateAction(state, dt) {
 
   if (p.action === "hatch") {
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.dig * 0.8);
+  }
+
+  // 挖：一路上都在响，而且进度实时记账——半路被打断，已经挖掉的那部分留着
+  if (p.action === "dig" && prop) {
+    const spot = DigSpotById(state, prop.data.digSpotId);
+    if (spot) {
+      const bare = p.carrying !== "shovel";
+      p.noiseSpike = Math.max(p.noiseSpike, Math.min(1, NOISE.dig * (bare ? DIG_BARE_NOISE : 1)));
+      state.world.digProgress[spot.id] = (state.world.digProgress[spot.id] || 0) + dt;
+      p.stepTimer -= dt;
+      if (p.stepTimer <= 0) {
+        p.stepTimer = 0.55;
+        Sfx(state, "dig", p.x, p.y);
+        Dust(state, spot.x, spot.y + 0.4, 0.35);
+      }
+    }
   }
 
   p.actionTimer -= dt;
@@ -2757,13 +2946,58 @@ function CompleteInteract(state, kind, prop) {
       state.world.used[prop.id] = true;
       break;
     }
+    // —— 挖 / 倒土 ——
+    case "dig": {
+      const spot = DigSpotById(state, prop.data.digSpotId);
+      if (spot && !state.world.dug[spot.id]) {
+        CarveDig(state, spot);
+        // 挖出来的土就堆在洞口。不处理它，等于给搜村的人留一块路标。
+        DropSpoilPile(state, spot.x, spot.y, spot.spoil);
+        Sfx(state, "hatch_open", spot.x, spot.y);
+        Dust(state, spot.x, spot.y + 0.5, 0.8);
+        Shake(state, 0.2);
+        for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+        state.world.used[prop.id] = true;
+        // 挖完这个口就不再是互动点了，别让它一直挡着提示
+        const idx = state.level.props.indexOf(prop);
+        if (idx >= 0) state.level.props.splice(idx, 1);
+      }
+      break;
+    }
+    case "spoil": {
+      const pile = SpoilPileById(state, prop.data.pileId);
+      if (pile) {
+        const take = Math.min(pile.amount, SPOIL_CARRY_MAX - p.spoil);
+        p.spoil += take;
+        pile.amount -= take;
+        if (pile.amount <= 0) RemoveSpoilPile(state, pile.id);
+      }
+      Sfx(state, "pickup", p.x, p.y);
+      break;
+    }
+    case "dumpSpoil": {
+      const sink = SpoilSinkById(state, prop.data.sinkId);
+      const rec = sink ? state.world.sinks[sink.id] : null;
+      if (rec) {
+        const room = Math.max(0, rec.capacity - rec.filled);
+        const put = Math.min(room, p.spoil);
+        rec.filled += put;
+        p.spoil -= put;
+        Sfx(state, "dig", p.x, p.y);
+        Dust(state, PropX(state, prop), prop.y, 0.5);
+        Emit(state, { kind: "spoilDumped", sinkId: sink.id, amount: put, left: p.spoil });
+        for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      }
+      break;
+    }
     // —— 引 / 封 ——
     case "lure": {
       // 关卡布置的引点跟"扔"方向相反：响在**自己脚下**，把人叫过来。
       // 这是布陷阱用的（叫到死胡同、叫到雷上、叫到枪眼底下），不是用来溜过去的。
       const lx = PropX(state, prop);
-      const radius = Num(prop.data.radius, 1.0);
-      RaiseLure(state, lx, prop.y, Clamp(radius, 0.2, 2.0), LURE_PROP_HOLD);
+      // 关卡写的 radius 就是**米**（通气孔那种能把半条街叫过来的，写 11–12）
+      const radius = Clamp(Num(prop.data.radius, LURE_RADIUS), 1, 40);
+      RaiseLure(state, lx, prop.y, radius, LURE_PROP_HOLD);
       Sfx(state, "lure", lx, prop.y);
       p.noiseSpike = Math.max(p.noiseSpike, LURE_SELF_NOISE);
       for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
@@ -2873,6 +3107,163 @@ function CompleteInteract(state, kind, prop) {
     }
     default:
       break;
+  }
+}
+
+// ───────────────────────────── 挖（AGENTS.md 0.0.2）─────────────────────────────
+//
+// 这个游戏叫《地道战》，玩家当然得能自己挖。合理化不用编，史实本身就给了机制：
+// **挖地道真正的难处不是挖，是土往哪儿倒。** 地面上凭空多出一堆新土，
+// 等于告诉搜村的人"这儿底下有洞"（山田那句"这块地的土是新的"就是这么来的）。
+//
+// 所以代价是三层，缺一层它就是无脑捷径：
+//   1. 时间——一段 2.5–6 秒，期间人钉在原地；
+//   2. 声音——NOISE.dig 是全表第二响，挖之前得先把这一带的人解决掉（引开/敲晕）；
+//   3. 土——每段产出 spoil，堆在原地就是证据，得背到枯井/炕下/粮窖/场院倒掉。
+//
+// 有铁锨按原速，徒手慢一倍且更响：不给锨就完全挖不动会把关卡卡死，
+// 而"慢一倍 + 更响"已经足够让玩家自己想去找那把锨。
+const DIG_BARE_SCALE = 2.0; // 徒手挖的时长倍率
+const DIG_BARE_NOISE = 1.15; // 徒手挖的音量倍率（刨土比铲土响）
+const SPOIL_CARRY_MAX = 3; // 一趟背得动多少
+const SPOIL_ALERT = SENSE.searchAt + 0.06; // 敌人走到新土堆跟前：直接进搜索
+const SPOIL_NOTICE_X = 2.6; // 走到这么近算看见了
+const SPOIL_NOTICE_Y = 1.6;
+
+function DigSpotById(state, id) {
+  for (const s of state.level.digSpots) {
+    if (s.id === id) return s;
+  }
+  return null;
+}
+
+function SpoilSinkById(state, id) {
+  for (const s of state.level.spoilSinks) {
+    if (s.id === id) return s;
+  }
+  return null;
+}
+
+function DigSeconds(state, spot) {
+  const bare = state.player.carrying !== "shovel";
+  return spot.sec * (bare ? DIG_BARE_SCALE : 1);
+}
+
+/**
+ * 挖通之后**真的变成能走的地形**。这是最容易做半截的地方——
+ * 挖完看着通了却走不过去，等于白挖。
+ * 引擎限制（实测）：地板取"脚下最高的那块"，所以新地板必须跟起点同高，
+ * 不能靠垂直叠层做绕行；要换层就老老实实加一口竖井。
+ */
+function CarveDig(state, spot) {
+  const level = state.level;
+  const x0 = Math.min(spot.x, spot.toX);
+  const x1 = Math.max(spot.x, spot.toX);
+  const vertical = Math.abs(spot.toY - spot.y) >= 0.6;
+
+  if (vertical) {
+    const yTop = Math.max(spot.y, spot.toY);
+    const yBottom = Math.min(spot.y, spot.toY);
+    level.shafts.push({
+      id: "dugshaft_" + spot.id,
+      x: (spot.x + spot.toX) * 0.5,
+      yTop,
+      yBottom,
+      kind: "dirt",
+      requiresHatch: null,
+    });
+    // 井底得有块地板站，否则爬到底就掉出世界
+    if (!FloorUnder(level, spot.toX, yBottom + 0.2, 0.4)) {
+      level.floors.push({ id: "dugfloor_" + spot.id, x0: spot.toX - 1.2, x1: spot.toX + 1.2, y: yBottom, kind: "tunnel" });
+    }
+  } else {
+    level.floors.push({ id: "dugfloor_" + spot.id, x0: x0 - 0.4, x1: x1 + 0.4, y: spot.y, kind: "tunnel" });
+    // 新挖的洞是**矮**的：净空只够猫腰。这既是史实（一锨一锨掏出来的），
+    // 也让"挖出来的路"和现成的干线在手感上分得开。
+    level.ceils.push({ x0: x0 - 0.4, x1: x1 + 0.4, y: spot.y + 1.42 });
+  }
+
+  state.world.dug[spot.id] = true;
+  // 地形变了，机器人的导航图作废——不作废的话它永远不知道自己刚挖通一条路
+  state.navNodes = null;
+  Emit(state, {
+    kind: "dug", id: spot.id, x: spot.x, y: spot.y, toX: spot.toX, toY: spot.toY, vertical,
+  });
+}
+
+/** 挖出来的土堆在原地就是证据。堆本身也是可互动的（背起来才带得走）。 */
+function DropSpoilPile(state, x, y, amount) {
+  if (amount <= 0) return;
+  for (const pile of state.world.spoilPiles) {
+    if (Math.abs(pile.x - x) < 1.2 && Math.abs(pile.y - y) < 1.0) {
+      pile.amount += amount;
+      return;
+    }
+  }
+  const id = "spoil_" + state.world.spoilPiles.length;
+  state.world.spoilPiles.push({ id, x, y, amount, seen: false });
+  state.level.props.push({
+    id,
+    x,
+    y,
+    z: 0,
+    kind: "crock", // 一筐新土。渲染层认得这个 kind，不至于画不出来
+    facing: 1,
+    interact: "spoil",
+    data: { pileId: id },
+    label: "新土",
+    hidden: false,
+    spoilPile: true,
+  });
+}
+
+function SpoilPileById(state, id) {
+  for (const pile of state.world.spoilPiles) {
+    if (pile.id === id) return pile;
+  }
+  return null;
+}
+
+function RemoveSpoilPile(state, id) {
+  const piles = state.world.spoilPiles;
+  for (let i = 0; i < piles.length; i++) {
+    if (piles[i].id === id) {
+      piles.splice(i, 1);
+      break;
+    }
+  }
+  const props = state.level.props;
+  for (let i = 0; i < props.length; i++) {
+    if (props[i].id === id) {
+      props.splice(i, 1);
+      break;
+    }
+  }
+}
+
+/** 没处理的新土：敌人走到跟前会显著提高警觉并进入搜索。这是这套机制的牙齿。 */
+function UpdateSpoilPiles(state) {
+  const piles = state.world.spoilPiles;
+  if (piles.length === 0) return;
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated) continue;
+    for (const pile of piles) {
+      if (Math.abs(e.x - pile.x) > SPOIL_NOTICE_X) continue;
+      if (Math.abs(e.y - pile.y) > SPOIL_NOTICE_Y) continue;
+      if (e.alertness >= SPOIL_ALERT) continue;
+      e.alertness = Math.max(e.alertness, SPOIL_ALERT);
+      e.lastSeenX = pile.x;
+      e.lastSeenY = pile.y;
+      e.hasLead = true;
+      e.lured = false;
+      e.lureTimer = 0;
+      if (!pile.seen) {
+        pile.seen = true;
+        Sfx(state, "shout", e.x, e.y);
+        Emit(state, { kind: "spoilFound", x: pile.x, y: pile.y, enemyId: e.id });
+      }
+      break;
+    }
   }
 }
 
@@ -3684,30 +4075,61 @@ const KO_BEHIND_MIN = 0.25; // 太贴脸就不算"从背后"了，得在他身�
 const KO_ALERT_MAX = SENSE.suspiciousAt; // 已经起疑的人会回头，摸不到
 const KO_WITNESS_PAD = 1.0; // 第二双眼睛的宽容量：贴这么近就算看得见
 const KO_DISCOVER_X = 3.2; // 同伴走到这么近会发现躺着的人
-const KO_DISCOVER_ALERT = 0.86; // 发现之后直接进搜索（但够不到 1.0，不至于凭空被抓）
+// 发现之后直接进搜索。但**别贴着 1.0**：0.86 意味着他一眼扫到玩家就是当场被抓，
+// 契约给的 1.25 秒反应窗口等于被吃掉了。0.72 刚过 searchAt，行为一样凶，窗口还在。
+const KO_DISCOVER_ALERT = SENSE.searchAt + 0.1;
 
 /** 现在能不能从背后制服某个兵。返回该兵，或 null。 */
+/** 这个兵现在能不能被摸掉（不看距离，只看"该不该"）。 */
+function KnockoutEligible(state, e) {
+  if (e.dormant || e.defeated || e.down) return false;
+  // 狗听得见你走过来，摸不到它背后
+  if (e.kind === "dog") return false;
+  if (e.alertness >= KO_ALERT_MAX) return false;
+  if (e.hasLead && e.alertness >= SENSE.suspiciousAt * 0.5) return false;
+  if (e.state === "spotted" || e.state === "suspicious") return false;
+  if (e.seesPlayer) return false;
+  return true;
+}
+
+/** 敲晕这个动词此刻在这一幕里存不存在。 */
+function KnockoutAllowed(state) {
+  // 叙事必然不许被这个动词绕过（跟 0.0.2 里"封锁段不许有可挖点"是同一条纪律）：
+  // 钟一响全村被翻个底朝天，人人竖着耳朵——这时候摸不到任何人背后。
+  // 少了这一条，玩家可以等追兵的警觉自己退下去，逐个敲晕，然后大摇大摆走出村口，
+  // 第一幕的收场就没了。
+  if (state.world.bellRung && state.level.endKind === "captured") return false;
+  return true;
+}
+
+// 一帧之内 CurrentPrompt 和 UpdateHud 都要问"现在能不能摸他"，而这个问题要遍历
+// 敌人再做视线判定。按 state.time 记一次账，同一个子步只算一遍。
+// 键是 state.time，纯确定性，不引入任何跟真实时间有关的差异。
 function KnockoutTarget(state) {
+  if (state.koCacheT === state.time) return state.koCache;
+  const result = KnockoutTargetRaw(state);
+  state.koCacheT = state.time;
+  state.koCache = result;
+  return result;
+}
+
+function KnockoutTargetRaw(state) {
   const p = state.player;
   if (p.dead || p.hidden || p.action || p.onShaft) return null;
   if (state.phase !== "play") return null;
+  if (!KnockoutAllowed(state)) return null;
 
   let best = null;
   let bestD = Infinity;
   for (const e of state.enemies) {
-    if (e.dormant || e.defeated || e.down) continue;
+    if (!KnockoutEligible(state, e)) continue;
     if (Math.abs(e.y - p.y) > KO_REACH_Y) continue;
     const dx = p.x - e.x;
     if (Math.abs(dx) > KO_REACH_X) continue;
     // 1) 必须在他背后
     if (Math.sign(dx) === e.facing) continue;
     if (Math.abs(dx) < KO_BEHIND_MIN) continue;
-    // 2) 必须没察觉。被引开的人算没察觉——引开再绕后是这套动词的正解组合。
-    if (e.alertness >= KO_ALERT_MAX) continue;
-    if (e.hasLead && e.alertness >= SENSE.suspiciousAt * 0.5) continue;
-    if (e.state === "spotted" || e.state === "suspicious") continue;
-    if (e.seesPlayer) continue;
-    // 3) 旁边不许有第二双眼睛
+    // 2) 旁边不许有第二双眼睛
     if (KnockoutWitness(state, e)) continue;
     const d = Math.abs(dx);
     if (d < bestD) {
@@ -4077,9 +4499,20 @@ const NPC_REJOIN_X = 3.2; // 玩家回到这么近，停下的人重新入队
 const NPC_REJOIN_Y = 2.0;
 const NPC_GATE_SAMPLE = 0.28; // 沿面包屑抽样的步长
 
-/** 这个人过不过得去 (x,y) 这一点。返回 null / "crawl" / "climb"。 */
-function NpcGateAt(state, n, x, y) {
-  if (!n.canClimb && InShaft(state, x, y)) return "climb";
+// 干线上本来就压着一串支道竖井的井口（第三幕 e1@128 / e2@140 / e3@154 / e4@164
+// 全在 y=-8 的干线上）。**"站在井口"不等于"在爬梯子"**——按位置判会把不会爬的人
+// 钉死在他本来只是路过的地方（王大娘卡 167、栓柱卡 165，永远到不了 176 的出口）。
+// 所以只在这一段路**真的换了层**时才要求 canClimb。
+const NPC_CLIMB_WINDOW = 0.5; // 沿面包屑往前后各看这么远
+const NPC_CLIMB_DROP = 0.55; // 这个窗口里的高差超过它才算"在换层"
+
+/** 这个人过不过得去弧长 d 处（坐标 x,y）。返回 null / "crawl" / "climb"。 */
+function NpcGateAt(state, n, x, y, d) {
+  if (!n.canClimb && InShaft(state, x, y)) {
+    const a = TrailPointAtD(state, d - NPC_CLIMB_WINDOW);
+    const b = TrailPointAtD(state, d + NPC_CLIMB_WINDOW);
+    if (Math.abs(b.y - a.y) > NPC_CLIMB_DROP) return "climb";
+  }
   if (!n.canCrawl) {
     const col = Column(state.level, x, y + 0.15, FLOOR_SNAP + 0.2);
     if (col.clearance !== Infinity && col.clearance < HEADROOM.crouchNeeds) return "crawl";
@@ -4100,7 +4533,7 @@ function NpcAdvanceLimit(state, n, fromD, toD) {
   for (let i = 1; i <= steps; i++) {
     const d = fromD + (span * i) / steps;
     const pt = TrailPointAtD(state, d);
-    const gate = NpcGateAt(state, n, pt.x, pt.y);
+    const gate = NpcGateAt(state, n, pt.x, pt.y, d);
     if (gate) return { d: safe, reason: gate };
     safe = d;
   }
@@ -4483,6 +4916,11 @@ function UpdateHud(state) {
   };
   hud.ammo = state.world.ammo;
   hud.ammoMax = state.world.ammoMax;
+  // 挖出来的土：背上背了多少、地上还剩几堆没处理。后者是玩家最该盯着的东西——
+  // 一堆没倒掉的新土等于给搜村的人留了路标。
+  hud.spoil = p.spoil;
+  hud.spoilMax = SPOIL_CARRY_MAX;
+  hud.spoilPiles = state.world.spoilPiles.length;
   const ko = KnockoutTarget(state);
   hud.knockout = ko ? { id: ko.id, kind: ko.kind, x: ko.x, y: ko.y } : null;
 
@@ -5138,8 +5576,11 @@ function BotThreat(state) {
     if (Math.abs(e.y - p.y) > 2.5) continue; // 不同层：土层挡着，不算威胁
     const dist = Math.abs(e.x - p.x);
     const facingMe = dist < 1.5 || Math.sign(p.x - e.x) === e.facing;
-    const effStealth = e.visionRange * stealth + 1.4;
-    const effStand = e.visionRange + 1.4;
+    // 被引开、正蹲着盯地上那块石头的人看不了远处。不把这一层算进来，
+    // 机器人就永远不知道自己刚刚给自己开了一个窗口——"引"也就白引了。
+    const seeScale = EnemyVisionScale(e);
+    const effStealth = e.visionRange * seeScale * stealth + 1.4;
+    const effStand = e.visionRange * seeScale + 1.4;
     if (dist > effStand + 5) continue; // 站着都看不见，跟我没关系
     const info = {
       e,
@@ -5190,10 +5631,12 @@ function BotHopExposure(state, fromX, toX, stealth) {
   for (const e of state.enemies) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue;
-    const eff = e.visionRange * scale + 1.4;
-    const lo = e.patrol ? Math.min(e.patrol.x0, e.patrol.x1) : e.x;
-    const hi = e.patrol ? Math.max(e.patrol.x0, e.patrol.x1) : e.x;
-    const sp = e.patrol ? e.patrol.speed : 0;
+    const eff = e.visionRange * EnemyVisionScale(e) * scale + 1.4;
+    // 被引开的人不再按巡逻线推演：他正朝那块石头走／已经蹲在那儿了
+    const lured = e.lured && e.lureTimer > 0;
+    const lo = lured ? e.lureX : e.patrol ? Math.min(e.patrol.x0, e.patrol.x1) : e.x;
+    const hi = lured ? e.lureX : e.patrol ? Math.max(e.patrol.x0, e.patrol.x1) : e.x;
+    const sp = lured ? 0 : e.patrol ? e.patrol.speed : 0;
     let acc = e.alertness * SENSE.alertRiseSec; // 已经涨上去的警觉先算进去
     for (let i = 0; i <= steps; i++) {
       const t = i * step;
@@ -5234,8 +5677,9 @@ function BotHopSafe(state, fromX, toX, stealth) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue;
     if (e.alertness >= 0.3) return false; // 已经起疑了，别动
-    const eff = e.visionRange * scale + 1.4;
-    const eSpeed = e.patrol ? e.patrol.speed : 1.2;
+    const eff = e.visionRange * EnemyVisionScale(e) * scale + 1.4;
+    // 已经蹲在石头跟前的人不会朝我走过来——这一跳的窗口是真的
+    const eSpeed = e.lured && e.lureAt ? 0 : e.patrol ? e.patrol.speed : 1.2;
     // 这一跳里我离他最近能有多近（把他朝我走过来的可能也算上）
     const near = Math.min(Math.abs(e.x - fromX), Math.abs(e.x - toX)) - eSpeed * hopSec;
     if (near > eff) continue; // 全程都在他视距外，随便走
@@ -5349,18 +5793,132 @@ function BotWantsPrompt(state, bot, prompt, goal) {
   if (prompt.kind === "bell") return true;
   // 顺手就把口令传了：传令点散在地道支线里，等目标轮到它再回头跑要横穿半张图
   if (prompt.kind === "signal") return true;
+  // —— 主动策略专属 ——
+  // sneak 只躲：这几个动词一概不碰，那正是这条对照组的意义。
+  if (bot.active) {
+    // 从背后制服：站位是自己走出来的，遇上就不该放过
+    if (prompt.kind === "knockout") return true;
+    // 封路是纯赚：切断的是敌人的巡逻线，玩家自己不受影响
+    if (prompt.kind === "block") return true;
+    // 背上的土要倒掉，路上的土堆要背走——留着就是给搜村的人指路
+    if (prompt.kind === "dumpSpoil") return state.player.spoil > 0;
+    if (prompt.kind === "spoil") return true;
+  }
   if (goal && goal.prop && goal.prop.id === prompt.id) return true;
   if (prompt.kind === "talk") return true;
   return false;
 }
 
 /**
- * 目标驱动的机器人：朝当前目标走，遇到要互动的就互动，遇到敌人就猫腰躲。
- * 不追求玩得漂亮，只保证能通关。返回 { won, seconds, reason }。
+ * 主动策略的核心：**摸上去**。
+ * 挡路的那个兵背对着我、又没起疑、旁边也没人看着 → 走到他背后制服他。
+ * 这就是契约 0.0.1 的那条闭环（绕到背后的工具是地道），机器人也照这条走。
+ * 摸不成就退回老办法，不会赖着不放。
  */
-export function DebugAutoPlay(state, maxSeconds = 240) {
+// 能摸的人一定是**背对着我**的，也就是正走开的人。猫腰 1.75 m/s 追一个
+// 1.2–1.8 m/s 的背影是追不上的——所以对**还在走的人**，"摸"只在近在咫尺时成立。
+//
+// 但**站着不动的人可以从十米外摸到**：他背对着我，就完全看不见我，
+// 那十米是站着跑过去的。而让他站住不动的办法正是「引」——
+// 扔块土坷垃到他前面，他走过去蹲下来看，这几秒就是给我留的。
+// 「引开 → 从背后摸上去 → 敲晕」就是契约 0.0.1 那条闭环，机器人照这条走。
+const BOT_STALK_RANGE = 4.2; // 对还在走动的人：再远就是追，不是摸
+const BOT_STALK_STILL_RANGE = 8; // 对站住不动的人：可以从这么远摸过去（实测 8 米最划算）
+const BOT_STALK_MAX_SEC = 3.5;
+const BOT_STALK_STILL_SEC = 7.0;
+
+/** 这个兵此刻是不是站着不动（引过去蹲着看／巡逻线端点的停顿）。 */
+function EnemyStationary(e) {
+  if (e.lured && e.lureAt) return true;
+  if (e.state === "patrol" && e.pauseTimer > 0.4) return true;
+  return false;
+}
+
+function BotStalkTarget(state, bot, dirToGoal) {
+  if (!bot.active) return null;
+  const p = state.player;
+  if (p.hidden || p.action || p.onShaft) return null;
+  if (!KnockoutAllowed(state)) return null;
+
+  let best = null;
+  let bestD = Infinity;
+  for (const e of state.enemies) {
+    if (!KnockoutEligible(state, e)) continue;
+    if (Math.abs(e.y - p.y) > KO_REACH_Y) continue;
+    const dx = e.x - p.x;
+    const d = Math.abs(dx);
+    const still = EnemyStationary(e);
+    if (d > (still ? BOT_STALK_STILL_RANGE : BOT_STALK_RANGE)) continue;
+    // 只摸挡在路上的（身后那个不碍事，绕开就完了）
+    if (d > 2.5 && Math.sign(dx) !== dirToGoal) continue;
+    // 他得背对着我：正面走过去是送
+    if (Math.sign(p.x - e.x) === e.facing) continue;
+    if (KnockoutWitness(state, e)) continue;
+    // 中间还隔着别的兵就别摸了
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  if (best) best.stalkStill = EnemyStationary(best);
+  return best;
+}
+
+/**
+ * 主动策略的核心判断：现在该不该扔一块土坷垃。
+ * 要点是**落点必须在威胁的那一侧、而且越过他**——落在自己这边等于把人叫过来。
+ */
+function BotShouldThrow(state, bot, threat, dirToGoal) {
+  if (!bot.active || !threat) return false;
+  const p = state.player;
+  if (p.hidden || p.action || p.onShaft) return false;
+  if (p.lureCooldown > 0.01) return false;
+  if (bot.throwCooldown > 0) return false;
+  // 只在**为了摸他**的时候扔。实测下来这一条是成败的分界：
+  // 在走廊地形里单纯"把挡路的人调开"没有用——他被调去的地方还在我要走的路上，
+  // 我照样得从他眼皮底下过。真正值钱的是把他调成**站着不动、背对着我**，
+  // 那我就能贴上去把他放倒，这一段路从此站着走。
+  if (!KnockoutAllowed(state)) return false;
+  if (!KnockoutEligible(state, threat.e)) return false;
+  if (Math.abs(threat.e.y - p.y) > KO_REACH_Y) return false;
+  if (EnemyStationary(threat.e)) return false; // 已经站住了，直接摸过去就行
+  if (threat.dist > BOT_STALK_STILL_RANGE - 1.5) return false; // 太远，引来也摸不着
+  // 已经咬住我的人引不动（RaiseLure 里也会跳过），别浪费这半秒起手
+  if (threat.alert >= SENSE.searchAt) return false;
+  // 正被看着的时候不许扔：起手要站着不动半秒，那半秒足够他把警觉拉满
+  if (threat.exposed) return false;
+  // 太近了同理
+  if (threat.dist < 4.5) return false;
+  // 热度过线就先歇着，不然他们会朝我这边搜过来
+  if (state.world.lureHeat >= LURE_HEAT_WISE - 0.4) return false;
+  // 威胁得在我要去的方向上——身后那个不挡路，不用管
+  const toThreat = Math.sign(threat.e.x - p.x);
+  if (toThreat !== dirToGoal) return false;
+  // 落点必须越过他至少 1.5 米，否则是把人往我这边叫
+  const land = LureLandingX(state, dirToGoal);
+  if ((land - threat.e.x) * dirToGoal < 1.5) return false;
+  return true;
+}
+
+/**
+ * 目标驱动的机器人。返回 { won, seconds, reason, strategy, ... }。
+ *
+ * 两种策略，是"主动玩法立没立起来"的量尺（AGENTS.md 0.0 的判据）：
+ *   · "sneak"（默认）—— 只躲：猫腰、掩体接力、等空窗。绕地道照旧（那是导航图的事），
+ *     但**绝不主动出手**：不扔石头、不敲晕、不封路、不挖。
+ *   · "active" —— 优先用主动动词：引开（扔土坷垃）→ 绕到背后 → 敲晕 → 继续推进，
+ *     顺路封路、顺路挖开新洞。
+ *
+ * 两种都必须能通关三幕（证明"躲"仍然可行），而 active 应当明显更快
+ * （证明"躲"不是唯一解）。
+ */
+export function DebugAutoPlay(state, maxSeconds = 240, options = {}) {
   const dt = 1 / 60;
+  const opts = typeof options === "string" ? { strategy: options } : options || {};
+  const strategy = opts.strategy === "active" ? "active" : "sneak";
   const bot = {
+    strategy,
+    active: strategy === "active",
     pressCooldown: {},
     stuckTimer: 0,
     lastX: state.player.x,
@@ -5374,13 +5932,30 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
     lastBlockedBy: null,
     lastBlockedT: 0,
     lastGoal: "",
+    lures: 0,
+    knockouts: 0,
+    blocks: 0,
+    digs: 0,
+    throwCooldown: 0,
   };
   let t = 0;
   let guard = 0;
   const limit = Math.max(1, Num(maxSeconds, 240));
 
+  const Report = (won, reason) => ({
+    won,
+    seconds: t,
+    reason,
+    strategy,
+    lures: bot.lures,
+    knockouts: bot.knockouts,
+    blocks: bot.blocks,
+    digs: bot.digs,
+    deaths: state.stats.deaths,
+  });
+
   while (t < limit && guard++ < 200000) {
-    if (state.phase === "won") return { won: true, seconds: t, reason: "reached_exit" };
+    if (state.phase === "won") return Report(true, "reached_exit");
     // 机器人不看戏：挂号的过场直接开了再跳掉，
     // 这样"过场的副作用"照样结算（spawn/reveal/敲钟），关卡不会因为没人翻页而卡死。
     if (state.pendingCutscene && !state.cutscene) {
@@ -5398,15 +5973,13 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
     if (bot.giveUp) break;
   }
 
-  if (state.phase === "won") return { won: true, seconds: t, reason: "reached_exit" };
+  if (state.phase === "won") return Report(true, "reached_exit");
   // blockedBy 只报**当前这一帧**真的挡着路的人。
   // 以前它是"这一局里任何时候被挡过一次"就一直留着的陈旧值：
   // 冒烟报 blockedBy=某个兵，实际那人在 y=0、目标在 y=-3.8，隔着 3.8 米土——
   // 照着这个值查巡逻线只会白查一整轮。真因是目标压在没实现的动词上。
-  return {
-    won: false,
-    seconds: t,
-    reason:
+  return Report(
+    false,
       BotFailKind(bot) +
       " goal=" + (bot.lastGoal || "?") +
       " playerX=" + state.player.x.toFixed(1) +
@@ -5418,7 +5991,7 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
       (!bot.blockedBy && bot.lastBlockedBy
         ? " lastBlockedBy=" + bot.lastBlockedBy + "@" + bot.lastBlockedT.toFixed(0) + "s"
         : ""),
-  };
+  );
 }
 
 /** 失败原因分类，方便下次定位：卡在敌人 / 找不到路 / 目标不可达 / 几何卡死。 */
@@ -5594,6 +6167,80 @@ function BotThink(state, bot, dt) {
     }
   }
 
+  // ── 主动策略之一：站位成立就从背后制服 ──
+  // 这是"绕地道 → 从他背后冒出来"挣来的收益，遇上了不该放过。
+  // sneak 到这里什么也不做，只能继续等空窗——这正是这条对照组的意义。
+  bot.throwCooldown = Math.max(0, (bot.throwCooldown || 0) - dt);
+  if (bot.active && !p.hidden && !p.action) {
+    const ko = KnockoutTarget(state);
+    if (ko) {
+      input.interactPressed = true;
+      bot.knockouts++;
+      bot.stuckTimer = 0;
+      bot.stalkId = null;
+      bot.stalkTimer = 0;
+      return;
+    }
+    // 还没够着：挡在路上、背对着我、旁边没人看着 → 摸上去。
+    // 但**只在他确实碍事的时候**才绕这一趟：要么他已经逼得我一路猫腰
+    //（猫腰 1.75 m/s，站着走 3.3，把他放倒后面那一整段就能站着走），
+    // 要么他已经站住不动了（那就是白捡的）。满街追背影不是"主动"，是浪费。
+    const stalkCandidate = BotStalkTarget(state, bot, dirToGoal);
+    const stalkWorth =
+      stalkCandidate &&
+      (EnemyStationary(stalkCandidate) ||
+        (threat &&
+          threat.e === stalkCandidate &&
+          threat.dist < threat.effStand + 2 &&
+          Math.abs(stalkCandidate.x - p.x) < BOT_STALK_RANGE));
+    const stalk = stalkWorth ? stalkCandidate : null;
+    if (stalk) {
+      if (bot.stalkId !== stalk.id) {
+        bot.stalkId = stalk.id;
+        bot.stalkTimer = 0;
+      }
+      bot.stalkTimer += dt;
+      const still = !!stalk.stalkStill;
+      if (bot.stalkTimer < (still ? BOT_STALK_STILL_SEC : BOT_STALK_MAX_SEC)) {
+        const behindX = stalk.x - stalk.facing * 0.9;
+        const gap = Math.abs(behindX - p.x);
+        // 他背对着我就根本看不见我 —— 远的时候站着跑（3.3 m/s），
+        // 最后两米才低头。全程猫腰放轻只有 1.26 m/s，那这一趟永远走不完。
+        if (gap < 2.2 || !still) {
+          input.crouch = true;
+          if (gap < 1.4) input.sneak = true;
+        }
+        BotWalkTo(state, bot, behindX, input);
+        bot.stuckTimer = 0;
+        bot.dashTo = null;
+        bot.commitTimer = 0;
+        return;
+      }
+    } else {
+      bot.stalkId = null;
+      bot.stalkTimer = 0;
+    }
+    // 摸不上（他背对着我但在十米开外，追是追不上的）→ **引**。
+    // 关键是别等到"完全走不了"才引：只要前面这个人逼得我一路猫腰，
+    // 就该把他调开——猫腰 1.75 m/s，站着走 3.3，这一半的速度就是主动玩法的收益。
+    if (BotShouldThrow(state, bot, threat, dirToGoal)) {
+      if (p.facing !== dirToGoal) {
+        input.moveX = dirToGoal; // 石头往面朝方向飞：先把身子转过去
+        input.crouch = true;
+        input.sneak = true;
+        return;
+      }
+      input.itemPressed = true;
+      input.crouch = true;
+      input.sneak = true;
+      bot.throwCooldown = LURE_COOL_SEC + LURE_WIND_SEC;
+      bot.lures++;
+      bot.stuckTimer = 0;
+      bot.commitTimer = 0;
+      return;
+    }
+  }
+
   if (p.hidden) {
     bot.hideTimer = (bot.hideTimer || 0) + dt;
     const nextCover = BotCoverToward(state, dirToGoal, null);
@@ -5602,7 +6249,7 @@ function BotThink(state, bot, dt) {
     const clear =
       !threat || BotHopSafe(state, p.x, exitTarget, false) || BotHopSafe(state, p.x, exitTarget, true);
     // 实在等不到空窗就硬着头皮出去：宁可难看地通关，也不许无限等待
-    if (clear || bot.hideTimer > 20) {
+    if (clear || bot.hideTimer > (bot.active ? 5 : 20)) {
       input.interactPressed = true;
       if (!clear) {
         // 关键：出来就直接锁定下一个掩体开冲。
@@ -5649,7 +6296,9 @@ function BotThink(state, bot, dt) {
       const safeRun = BotHopSafe(state, p.x, hopTarget, false);
       const safeCreep = safeRun || BotHopSafe(state, p.x, hopTarget, true);
       const windowOpen = safeCreep;
-      const commit = bot.commitTimer > 16 || bot.desperate > 0;
+      // 主动策略的耐心短得多：它手上有牌（引 / 摸 / 封），不该跟只会躲的人一样
+      // 蹲在柴垛后面数十六秒。这跟"造窗口"是一体两面：sneak 等窗口，active 造窗口。
+      const commit = bot.commitTimer > (bot.active ? 5 : 16) || bot.desperate > 0;
 
       // 1) 已经在冲了：冲到底
       if (bot.dashTo != null) {
@@ -5686,7 +6335,34 @@ function BotThink(state, bot, dt) {
         return;
       }
 
-      // 3) 没窗口：钻眼前的掩体 → 退到后面的掩体 → 退出视距 → 低头继续挪
+      // 3) 没窗口。**主动策略在这里出手：窗口是造出来的，不是等来的。**
+      // sneak 没有这一整段，只能钻柴垛等他自己走开——两条策略的耗时差主要来自这里。
+
+      // 3a) 挡路那个人正背对着我 → 猫腰摸到他背后制服他。
+      // 只在"已经被挡住"时才绕这一趟：主动不等于满街追着人跑。
+      const stalk = BotStalkTarget(state, bot, dirToGoal);
+      if (stalk && Math.abs(stalk.x - p.x) <= BOT_STALK_RANGE) {
+        if (bot.stalkId !== stalk.id) {
+          bot.stalkId = stalk.id;
+          bot.stalkTimer = 0;
+        }
+        bot.stalkTimer += dt;
+        if (bot.stalkTimer < BOT_STALK_MAX_SEC) {
+          const behindX = stalk.x - stalk.facing * 0.9;
+          input.crouch = true;
+          input.sneak = true;
+          BotWalkTo(state, bot, behindX, input);
+          bot.stuckTimer = 0;
+          bot.dashTo = null;
+          return;
+        }
+      } else if (!stalk) {
+        bot.stalkId = null;
+        bot.stalkTimer = 0;
+      }
+
+      // 3b) 引不动也摸不上，就还是老办法：
+      //     钻眼前的掩体 → 退到后面的掩体 → 退出视距 → 低头继续挪
       const here = BotCoverAt(state, p.x);
       if (here) {
         bot.hiding = true;
