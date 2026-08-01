@@ -232,6 +232,85 @@ Section("姿态与净空");
   }
 }
 
+Section("镜头语言与过场");
+// 仪式感靠的是镜头会说话，但镜头一旦说错话就是事故：
+// 定镜头把玩家挤出画面、跳过过场导致卡关、放慢延续到玩家要操作的时候。
+{
+  let shotCount = 0;
+  let cutCount = 0;
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    const tag = `act${i + 1}`;
+    const shots = level.shots || [];
+    shotCount += shots.length;
+
+    for (const shot of shots) {
+      Assert(!!shot.reason, `${tag}: 机位 ${shot.id} 写了理由（没理由的机位切换就是晃）`);
+      Assert(shot.x1 > shot.x0, `${tag}: 机位 ${shot.id} 的区间有效`);
+      // 定镜头：玩家在整段区间里都必须留在画面内
+      if (typeof shot.anchorX === "number") {
+        const vh = shot.viewHeight || 11.5;
+        const halfW = vh * 0.5 * (16 / 9);
+        const worst = Math.max(Math.abs(shot.x0 - shot.anchorX), Math.abs(shot.x1 - shot.anchorX));
+        Assert(worst < halfW * 0.94,
+          `${tag}: 定镜头 ${shot.id} 全程把玩家留在画面内（最远 ${worst.toFixed(1)} / 半宽 ${halfW.toFixed(1)}）`);
+      }
+    }
+
+    const cuts = level.cutscenes || {};
+    for (const [id, cut] of Object.entries(cuts)) {
+      cutCount += 1;
+      Assert(Array.isArray(cut.steps) && cut.steps.length > 0, `${tag}: 过场 ${id} 有步骤`);
+      for (const step of cut.steps || []) {
+        if (step.kind === "panel") Assert(!!PANELS[step.id], `${tag}: 过场 ${id} 的气泡 ${step.id} 存在`);
+        if (step.kind === "actor") {
+          const known = [...(level.enemies || []), ...(level.npcs || [])].some((a) => a.id === step.id)
+            || step.id === "player";
+          Assert(known, `${tag}: 过场 ${id} 的角色 ${step.id} 存在`);
+        }
+      }
+    }
+  }
+  Assert(shotCount >= 12, `三幕合计至少 12 段机位区（实际 ${shotCount}）`);
+  Assert(cutCount >= 6, `三幕合计至少 6 段过场（实际 ${cutCount}）`);
+}
+
+Section("跳过过场不许卡关");
+// 跳过必须把剩余步骤的副作用全部结算完，否则玩家一按 Esc 就卡死。
+// 判据：跳过之后的世界状态要和放完一模一样。
+{
+  const fingerprint = (s) => JSON.stringify({
+    hatches: Object.keys(s.world.hatches || {}).filter((k) => s.world.hatches[k].opened).sort(),
+    revealed: Object.keys(s.world.revealed || {}).sort(),
+    squads: s.world.squads || {},
+    bell: !!s.world.bellRung,
+    enemies: s.enemies.filter((e) => !e.dormant).map((e) => e.id).sort(),
+    objective: s.hud.objective,
+    checkpoint: s.checkpointId,
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    for (const id of Object.keys(level.cutscenes || {})) {
+      const played = Rules.CreateState(i);
+      Rules.StartCutscene(played, id);
+      for (let f = 0; f < 3600 && played.cutscene; f += 1) {
+        Rules.StepPlay(played, 1 / 60);
+        Rules.AdvanceCutscene(played);
+      }
+      Assert(!played.cutscene, `act${i + 1}/${id}: 正常播放能放完`);
+
+      const skipped = Rules.CreateState(i);
+      Rules.StartCutscene(skipped, id);
+      Rules.SkipCutscene(skipped);
+      Rules.StepPlay(skipped, 1 / 60);
+      Assert(!skipped.cutscene, `act${i + 1}/${id}: 跳过之后真的结束了`);
+      Assert(fingerprint(skipped) === fingerprint(played),
+        `act${i + 1}/${id}: 跳过与放完的世界状态一致（不许跳过就卡关）`);
+    }
+  }
+}
+
 Section("姿态判别的隐式契约");
 // 契约的动画状态名里没有 crouchWalk：猫腰移动和匍匐爬行都发 `crawl`。
 // 动画层靠"归一化速度"把这两个姿态分开（猫腰封顶 crouchSpeed/walkSpeed，
