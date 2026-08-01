@@ -286,6 +286,11 @@ function ShowNextPanel() {
   activePanelId = id;
   document.body.dataset.cinematic = "1";
   el("PanelCard").dataset.mood = panel.mood || "talk";
+  // 无字的一拍：有说话人、有图标、没有台词（比如「孩子怕黑」那一下，
+  // 剧情层的原话是"不写形容词，只给图标"）。CSS 已经把空的 .panelText 收掉了，
+  // 但气泡本身还是撑满 62rem —— 一个几乎空着的大框，看着像文案漏了。
+  // 这里给它一个标记，让气泡缩到只包住图标：留白是演出，空框是 bug，两者得长得不一样。
+  el("PanelCard").dataset.wordless = panel.text ? "0" : "1";
   el("PanelSpeaker").textContent = panel.speaker || "";
   el("PanelText").textContent = panel.text || "";
 

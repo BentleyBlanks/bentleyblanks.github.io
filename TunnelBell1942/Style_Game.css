@@ -255,6 +255,16 @@ body[data-cutscene] .hudAlert { opacity: 0; transition: opacity .35s ease; }
 }
 .panelCard[data-mood="shout"] .panelText { font-size: clamp(1.2rem, 3.6vw, 1.65rem); letter-spacing: .06em; }
 .panelCard[data-mood="silent"] .panelBubble { background: #d8cbb0; }
+
+/* 无字的一拍：气泡缩到只包住图标，不再撑满整行。
+   判据是「有没有台词」而不是 mood —— 十三条 silent 里有五条是带台词的
+   （那是压着嗓子说话，不是不说话），撑满对它们才是对的。 */
+.panelCard[data-wordless="1"] .panelBubble {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: .8rem 1.05rem;
+}
+
 .panelCard[data-mood="narrate"] .panelBubble {
   background: transparent; box-shadow: none; color: var(--paper);
   border-left: 2px solid var(--warm);
