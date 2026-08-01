@@ -1464,6 +1464,18 @@ function EndCutscene(state) {
   state.timeScale = 1;
   state.timeScaleTimer = 0;
   Emit(state, { kind: "cutsceneEnd", id: cs.id });
+
+  // 触发器：和上面的检查点是同一个坑，必须在同一个地方收口。
+  //
+  // 过场可能把玩家放在某个触发框里。放完那条路径在这一子步就 return 了，
+  // 永远不会评估触发器；跳过那条路径紧接着的一次 StepPlay 会评估并武装它。
+  // 于是"跳过 vs 放完"的世界指纹分叉——而且分叉点取决于玩家最终站在哪，
+  // 关卡只能靠把触发框挪开来绕。
+  //
+  // 在这里跑一次触发器评估，两条路径就都在**同一时刻、同一位置**结算一次：
+  // 该触发的触发，triggersInside 同时置位，紧接着的 StepPlay 不会再触发第二遍。
+  // 语义上也对：过场把人送进了触发区，等同于他自己走进去。
+  UpdateTriggers(state);
 }
 
 /** 敲钟（过场版）。副作用必须和玩家亲手敲一模一样，否则跳过就卡关。 */
@@ -2780,7 +2792,7 @@ function UpdateHazards(state, dt) {
     // 不能靠某个 trigger 自己走完（armAt 也允许直接写成闸门 channel）。
     if (!h.armed) {
       if (h.armAt && Switched(state, h.armAt)) ArmHazard(state, h.id);
-      else if (h.kind === "water" && state.world.levers.waterDivert) ArmHazard(state, h.id);
+      else if (h.kind === "water" && Switched(state, "waterDivert")) ArmHazard(state, h.id);
     }
     // sealedBy / armAt 认两种开关：拉闸（world.levers）和地雷（world.mines）。
     // 原来只查 levers，于是"用地雷炸开塌方"这种设计会静默死锁——

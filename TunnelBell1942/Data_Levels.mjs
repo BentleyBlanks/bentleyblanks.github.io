@@ -1115,7 +1115,10 @@ const act3 = {
     { id: "a3_t_quiet", x0: 133, x1: 137, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_p13"], reveal: [], arm: [], spawn: [], objective: "人齐了 —— 往黑风口走", checkpoint: true, win: false } },
     // 反击从这儿开始：先把口令传到西头，把他们的退路封掉。
-    { id: "a3_t_counter", x0: 113, x1: 116.5, yMin: -9.5, yMax: -6.0, once: true,
+    // 区间原本被迫西移到 113–116.5，是为了避开「过场落点压在触发框里 →
+    // 跳过与放完的世界状态不一致」。那条已经在 EndCutscene 里从源头修好
+    // （过场交还控制权后统一跑一次 UpdateTriggers），所以放回钢轨跟前。
+    { id: "a3_t_counter", x0: 117, x1: 120, yMin: -9.5, yMax: -6.0, once: true,
       emit: { panels: ["a3_beat1", "a3_brief1"], reveal: [], arm: [], spawn: ["a3_e_probeM", "a3_e_probeM2", "a3_e_blockM"], objective: "敲钢轨 —— 三快一慢", checkpoint: true, win: false } },
     { id: "a3_t_squad_west", x0: 129, x1: 133, yMin: -5.0, yMax: -2.4, once: true,
       emit: { panels: [], reveal: [], arm: [], spawn: [], objective: "西头组：开枪眼，把他们往东赶", checkpoint: true, win: false } },
