@@ -9,6 +9,7 @@
 import * as Rules from "./Script_Rules.mjs";
 import { CHAPTERS, CODEX, PANELS } from "./Data_Story.mjs";
 import { CreateRenderer } from "./Script_Render.mjs";
+import { CreateAudio } from "./Script_Audio.mjs";
 
 const shell = document.getElementById("GameShell");
 const canvas = document.getElementById("GameCanvas");
@@ -170,105 +171,18 @@ screens.panel.addEventListener("pointerdown", () => AdvancePanel());
 
 const isTouch = matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-// ─────────────────────────────────────────── 音效（WebAudio 现场合成，无资源文件）
-let audioCtx = null;
-let masterGain = null;
+// ─────────────────────────────────────────── 音频
+// 三层现场合成（环境 / 紧张 / 钟的母题）都在 Script_Audio.mjs 里，
+// 这里只负责解锁、转发事件和每帧推进。模块自带降级：拿不到 AudioContext
+// 会返回一个空壳，所有方法可调用不抛错——绝不能因为没声音就让游戏起不来。
+let audio = null;
+
 function EnsureAudio() {
-  if (audioCtx || bootFailed) return;
-  try {
-    const Ctor = window.AudioContext || window.webkitAudioContext;
-    if (!Ctor) return;
-    audioCtx = new Ctor();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.36;
-    masterGain.connect(audioCtx.destination);
-  } catch {
-    audioCtx = null;
-  }
+  if (audio) audio.Unlock();
 }
 
-let noiseBuffer = null;
-function NoiseBuffer() {
-  if (noiseBuffer || !audioCtx) return noiseBuffer;
-  const len = audioCtx.sampleRate * 1.2;
-  noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  let seed = 12345;
-  for (let i = 0; i < len; i += 1) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    data[i] = (seed / 0x7fffffff) * 2 - 1;
-  }
-  return noiseBuffer;
-}
-
-function Tone(freq, dur, type, gain, sweepTo) {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  osc.type = type || "sine";
-  osc.frequency.setValueAtTime(freq, t);
-  if (sweepTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, sweepTo), t + dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(masterGain);
-  osc.start(t);
-  osc.stop(t + dur + 0.05);
-}
-
-function Noise(dur, gain, filterHz, q) {
-  if (!audioCtx) return;
-  const buf = NoiseBuffer();
-  if (!buf) return;
-  const t = audioCtx.currentTime;
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = filterHz;
-  filter.Q.value = q || 1;
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(gain, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(filter).connect(g).connect(masterGain);
-  src.start(t);
-  src.stop(t + dur);
-}
-
-const SFX = {
-  step_dirt: () => Noise(0.09, 0.16, 320, 1.1),
-  step_stone: () => Noise(0.07, 0.2, 900, 2.0),
-  cloth: () => Noise(0.13, 0.08, 1800, 0.8),
-  dig: () => { Noise(0.18, 0.3, 420, 0.9); Tone(90, 0.14, "triangle", 0.16, 55); },
-  bell_ring: () => {
-    // 铁钟：几个不谐和的分音叠一起才像"铁"，不像"乐器"
-    Tone(524, 2.6, "triangle", 0.34, 512);
-    Tone(786, 2.1, "sine", 0.2, 770);
-    Tone(1247, 1.5, "sine", 0.12, 1220);
-    Tone(262, 3.0, "sine", 0.16, 258);
-    Noise(0.14, 0.22, 2600, 1.4);
-  },
-  hatch_open: () => { Noise(0.42, 0.24, 260, 0.7); Tone(70, 0.3, "triangle", 0.18, 44); },
-  ladder: () => Noise(0.1, 0.13, 700, 1.6),
-  water: () => Noise(0.7, 0.16, 480, 0.5),
-  gas: () => Noise(1.0, 0.13, 260, 0.4),
-  alarm: () => { Tone(880, 0.16, "square", 0.2, 880); setTimeout(() => Tone(660, 0.22, "square", 0.2, 620), 150); },
-  shout: () => { Tone(300, 0.3, "sawtooth", 0.16, 160); Noise(0.24, 0.1, 1100, 0.8); },
-  dog: () => { Tone(240, 0.14, "sawtooth", 0.22, 120); setTimeout(() => Tone(220, 0.12, "sawtooth", 0.18, 110), 130); },
-  pickup: () => { Tone(660, 0.1, "sine", 0.16, 880); Tone(990, 0.14, "sine", 0.1, 1200); },
-  lever: () => { Noise(0.14, 0.24, 380, 1.4); Tone(140, 0.2, "square", 0.12, 90); },
-  push: () => Noise(0.55, 0.2, 190, 0.6),
-  land: () => { Noise(0.13, 0.26, 200, 0.8); Tone(64, 0.16, "sine", 0.2, 42); },
-  breath: () => Noise(0.34, 0.06, 640, 0.5),
-  heartbeat: () => { Tone(58, 0.14, "sine", 0.26, 42); setTimeout(() => Tone(52, 0.16, "sine", 0.18, 38), 190); },
-};
-
-function PlaySfx(id) {
-  EnsureAudio();
-  if (!audioCtx) return;
-  const fn = SFX[id];
-  if (fn) { try { fn(); } catch { /* 音效失败不影响玩法 */ } }
+function PlaySfx(id, at) {
+  if (audio) audio.Play(id, at);
 }
 
 // ─────────────────────────────────────────── 象形图标（气泡里的符号）
@@ -565,14 +479,15 @@ function DispatchEvents(events) {
   for (const event of events) {
     switch (event.kind) {
       case "panel": QueuePanels([event.id]); break;
-      case "sfx": PlaySfx(event.id); break;
+      // 事件对象本身带 { x, y }，直接透传给音频层做空间化
+      case "sfx": PlaySfx(event.id, event); break;
       case "codex": OpenCodex(event.id); break;
       // 新目标不弹居中大字：左上角那行已经写着同样的话，弹一次等于把同一句话说两遍。
       // 改成让角落那行闪一下，玩家的眼睛会跟过去。
       case "objective": FlashObjective(); break;
       case "checkpoint": Toast("安全点"); break;
-      case "spot": PlaySfx("alarm"); break;
-      case "lost": PlaySfx("heartbeat"); break;
+      case "spot": PlaySfx("alarm", event); break;
+      case "lost": PlaySfx("death", event); break;
       case "won": FinishLevel(); break;
       default: break;
     }
@@ -601,6 +516,8 @@ function Frame(now) {
       SyncHud();
     }
     render.Sync(state, dt);
+    // 音频每帧都推，不受 running 限制——标题画面和过场里环境层也该继续呼吸
+    if (audio) audio.Sync(state, dt);
   } catch (error) {
     running = false;
     ShowBootError("frame", error);
@@ -628,6 +545,8 @@ function Boot() {
     ShowBootError("CreateRenderer", error);
     return;
   }
+  // 音频自带降级，不用包 try——拿不到 AudioContext 会返回空壳
+  audio = CreateAudio({ volume: 0.85 });
   try {
     state = Rules.CreateState(0);
   } catch (error) {
@@ -699,7 +618,8 @@ function Boot() {
       render.Sync(state, 1 / 60);
     },
     Teleport(x, y) { Rules.DebugTeleport(state, x, y); render.Sync(state, 1 / 60); },
-    Muted(on) { if (masterGain) masterGain.gain.value = on ? 0 : 0.36; },
+    Muted(on) { if (audio) audio.SetMuted(!!on); },
+    get audio() { return audio; },
     get error() { return window.__tunnelBellError || null; },
     get ready() { return !bootFailed && !!state && !!render; },
   };
