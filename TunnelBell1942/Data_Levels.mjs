@@ -589,6 +589,8 @@ const act2 = {
     { id: "a2_pr_beam5", x: 46, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_fanko", x: 50, y: -8.0, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a2_h_fanko" }, label: "翻口" },
     { id: "a2_pr_crock3", x: 66, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a2_pr_stone", x: 70, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "push",
+      data: { toX: 73.5 }, label: "把这块石头推进卡口" },
     { id: "a2_pr_loophole1", x: 55, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: "枪眼" },
     { id: "a2_pr_beam6", x: 73, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
 
@@ -606,6 +608,8 @@ const act2 = {
     // —— 干线 d3 ——
     { id: "a2_pr_beam8", x: 80, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_sign2", x: 83, y: -8.0, z: PLAY, kind: "sign", facing: 1, interact: "read", data: { codexId: "codex_fanko" }, label: "支撑木上的刻痕" },
+    { id: "a2_pr_sluice", x: 94.5, y: -8.0, z: PLAY, kind: "waterpipe", facing: 1, interact: "lever",
+      data: { channel: "waterDivert", needItem: "shovel" }, label: "水道闸 —— 闸把子锈死了" },
     { id: "a2_pr_beam9", x: 95, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_waterpipe1", x: 102, y: -8.0, z: PLAY, kind: "waterpipe", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_crock5", x: 108, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
@@ -613,6 +617,8 @@ const act2 = {
     // —— 藏身洞 s3：粮窖 + 备用马灯（万一玩家把灯放下了）——
     { id: "a2_pr_lantern2", x: 86, y: -3.8, z: PLAY, kind: "lantern", facing: 1, interact: "pickup", data: { item: "lantern" }, label: "马灯" },
     { id: "a2_pr_vent6", x: 90, y: -2.60, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a2_pr_shovel", x: 93, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "pickup",
+      data: { item: "shovel" }, label: "铁锨" },
     { id: "a2_pr_crock6", x: 91, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     // 铺垫：把口令传给暗室里的人。对着通气孔说，不是喊。
     { id: "a2_pr_sig_hideout", x: 92, y: -3.8, z: PLAY, kind: "vent", facing: 1, interact: "signal",
@@ -625,6 +631,8 @@ const act2 = {
     { id: "a2_pr_beam11", x: 116, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_crock7", x: 135, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_chokepoint1", x: 137, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "none", data: null, label: "卡口" },
+    { id: "a2_pr_seep", x: 136.5, y: -8.0, z: PLAY, kind: "waterpipe", facing: 1, interact: "lever",
+      data: { channel: "gasSeal", needItem: "grain" }, label: "渗水口 —— 拿粮袋垫住" },
     { id: "a2_pr_beam12", x: 141, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_well", x: 145, y: -8.0, z: PLAY, kind: "well", facing: 1, interact: "hatch", data: { hatchId: "a2_h_well" }, label: "枯井口" },
 
@@ -635,6 +643,8 @@ const act2 = {
     { id: "a2_pr_kang4b", x: 124, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
     { id: "a2_pr_vent9", x: 126, y: -2.95, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
     { id: "a2_pr_vent10", x: 130, y: -2.60, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
+    { id: "a2_pr_grainbag", x: 131.5, y: -3.8, z: PLAY, kind: "crock", facing: 1, interact: "pickup",
+      data: { item: "grain" }, label: "粮袋" },
     { id: "a2_pr_kang4", x: 133, y: -3.8, z: PLAY, kind: "kang", facing: 1, interact: "hide", data: { capacity: 1 }, label: "被褥堆" },
 
     // —— 地表街面（构图 + 敌人站位）——
@@ -684,7 +694,10 @@ const act2 = {
     { id: "a2_n_laoshuan", x: 128, y: -3.8, name: "老栓", role: "villager", follow: false, rescued: false },
   ],
 
-  hazards: [],
+  hazards: [
+    { id: "a2_hz_water", kind: "water", x0: 96, x1: 112, y: -8.0, armAt: "a2_t_lantern", speed: 1.9, sealedBy: "waterDivert" },
+    { id: "a2_hz_seep", kind: "water", x0: 138, x1: 146, y: -8.0, armAt: "a2_t_street", speed: 1.6, sealedBy: "gasSeal" },
+  ],
 
   triggers: [
     { id: "a2_t_open", x0: 0, x1: 5, yMin: -9.5, yMax: -6.0, once: true,

@@ -275,8 +275,13 @@ Level = {
   //   kind: "search"(搜索兵) | "guard"(哨兵，站桩转头) | "dog"(军犬，听觉大) | "officer"(山田)
 
   // —— 需要带走的乡亲 ——
-  npcs: [ { id, x, y, name, role, follow, rescued } ],
+  npcs: [ { id, x, y, name, role, follow, rescued, canCrawl, canClimb } ],
   //   role: "villager" | "child" | "elder" | "militia"
+  //   canCrawl: 能不能钻矮口（净空 < HEADROOM.crouchNeeds 的段）。孩子能，老人不能。
+  //   canClimb: 能不能爬竖井。老人不能，孩子不能（够不着），壮年能。
+  //   两个字段是「按人分路线」这个谜题的地基：六个人不是一起走的，
+  //   玩家得按人规划——这也正是史实里「老人孩子先走」的做法。
+  //   缺省（不写）= true，老关卡不受影响。
   //   follow:false 时原地等待，玩家靠近并交互后变 true 跟随
 
   // —— 环境危害（地下为主）——

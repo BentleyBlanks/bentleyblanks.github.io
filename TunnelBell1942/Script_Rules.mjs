@@ -98,6 +98,13 @@ const MINE_REACH_UP = 9.0;
 const MINE_REACH_DOWN = 2.5;
 const LOOPHOLE_RANGE_X = 9.0; // 枪眼朝头顶的街面打，够着一段巡逻线
 const RIFLE_SHOTS = 3;
+// 子弹是有数的（AGENTS.md 0.0.1）。冀中民兵的弹药要省着用，一枪出去还打草惊蛇——
+// 所以枪不是常规解法，敲晕才是。默认额度 = 每个枪眼**刚好一轮**，一发都不许浪费；
+// 关卡可以用 level.ammo 压得更紧，让"先打哪个枪眼"变成真的取舍。
+const AMMO_PER_LOOPHOLE = RIFLE_SHOTS;
+const GUNSHOT_ALARM_X = 34; // 一枪响，这一片的人全都抬头
+const GUNSHOT_HUNT_X = 16; // 这么近的直接朝枪响处扑
+const BLAST_ALARM_X = 46; // 地雷更响
 
 // 招呼（F）：既是唯一的"带上乡亲"手段，也是把掉队的人拉回来的手段。
 const CALL_RECRUIT_RANGE_X = 7.0;
@@ -778,6 +785,17 @@ export function ResetLevel(state, levelIndex) {
   state.world.blocks = [];
   state.world.lureHeat = 0;
   state.world.lureCount = 0;
+  // 弹药：关卡没写就按"每个枪眼刚好一轮"给，绝不会因为没子弹而死锁。
+  {
+    let loopholes = 0;
+    for (const prop of level.props) {
+      if (prop.interact === "loophole") loopholes++;
+    }
+    const authored = Num(level.ammo, NaN);
+    state.world.ammo = Number.isFinite(authored) ? Math.max(0, Math.round(authored)) : loopholes * AMMO_PER_LOOPHOLE;
+    state.world.ammoMax = state.world.ammo;
+    state.world.shotsFired = 0;
+  }
   state.capturedEnding = false;
   // codex 跨幕保留，不清空
 
@@ -1699,9 +1717,17 @@ function UpdatePlayer(state, dt) {
     return;
   }
 
-  // 交互
+  // 交互。"用"键身兼二职：够得着道具就用道具，站位成立就从背后制服。
+  // 优先级跟 CurrentPrompt 保持一致，否则提示写着一件事、按下去做另一件。
   if (input.interactPressed) {
     const target = FindTarget(state);
+    const ko = KnockoutTarget(state);
+    if (ko && (!target || target.interact === "hide")) {
+      input.interactPressed = false;
+      BeginKnockout(state, ko);
+      FinishPlayerFrame(state, dt);
+      return;
+    }
     if (target) {
       input.interactPressed = false;
       BeginInteract(state, target);
@@ -2019,6 +2045,9 @@ function UpdatePlayerAnim(state, dt) {
   else if (p.action === "bell") name = "ring";
   else if (p.action === "push") name = "push";
   else if (p.action === "block") name = "push"; // 放倒院墙 = 推
+  // 敲晕先用现成的动画名（契约 5.2 那张表），等动画 Agent 补一个再换
+  else if (p.action === "knockout") name = "use";
+  else if (p.action === "lure") name = "use";
   else if (p.action === "call") name = "call";
   else if (p.action) name = "use";
   else if (p.onShaft) name = "climb";
@@ -2318,6 +2347,8 @@ function InteractAvailable(state, prop) {
     case "mine":
       return !state.world.mines[prop.data.channel];
     case "loophole":
+      // 没子弹了就不再提示"打开枪眼"——那只会让玩家以为自己按错了
+      if (state.world.ammo <= 0) return false;
       return SquadState(state, prop.data.squadId) !== "fired";
     default:
       return false;
@@ -2439,12 +2470,13 @@ function PromptForProp(state, prop) {
     }
     case "loophole": {
       const ok = CounterReady(state, prop);
+      const dry = state.world.ammo <= 0;
       return {
         key: "E",
-        label: ok ? "打开" + (prop.label || "枪眼") : "还没传到口令",
+        label: dry ? "没子弹了" : ok ? "打开" + (prop.label || "枪眼") : "还没传到口令",
         id: prop.id,
         kind: "loophole",
-        blocked: !ok,
+        blocked: !ok || dry,
       };
     }
     default:
@@ -2461,10 +2493,17 @@ export function CurrentPrompt(state) {
   if (p.action) return null;
 
   const prop = FindTarget(state);
+  // 敲晕只在站位成立的那几秒里存在，柴垛却遍地都是——所以它压过"躲进去"，
+  // 但不许压过敲钟/开地道口这类目标动作（那些是这一幕真正要做的事）。
+  const ko = KnockoutTarget(state);
+  if (ko && (!prop || prop.interact === "hide")) {
+    return { key: "E", label: "从背后制服", id: ko.id, kind: "knockout" };
+  }
   if (prop) {
     const prompt = PromptForProp(state, prop);
     if (prompt) return prompt;
   }
+  if (ko) return { key: "E", label: "从背后制服", id: ko.id, kind: "knockout" };
 
   if (p.onShaft) {
     return { key: "W", label: "攀爬", id: p.shaftId, kind: "shaft" };
@@ -2495,9 +2534,16 @@ function BeginInteract(state, prop) {
     Sfx(state, "cloth", p.x, p.y);
     return;
   }
+  // 子弹打光了就是打光了
+  if (kind === "loophole" && state.world.ammo <= 0) {
+    Sfx(state, "cloth", p.x, p.y);
+    return;
+  }
 
   let duration = 0.35;
   if (kind === "hatch") duration = INTERACT.hatchOpenSec;
+  else if (kind === "lure") duration = LURE_WIND_SEC;
+  else if (kind === "block") duration = BLOCK_SEC;
   else if (kind === "signal") duration = SIGNAL_SEC;
   else if (kind === "mine") duration = MINE_SEC;
   else if (kind === "loophole") duration = LOOPHOLE_SEC;
@@ -2526,6 +2572,10 @@ function BeginInteract(state, prop) {
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.push);
   } else if (kind === "lever") {
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.lever);
+  } else if (kind === "block") {
+    // 放倒一堵墙是响的：当着人的面封路等于送死
+    Sfx(state, "push", p.x, p.y);
+    p.noiseSpike = Math.max(p.noiseSpike, BLOCK_NOISE);
   } else if (kind === "signal") {
     // 敲钢轨传令是**响的**。跑腿的风险就在这一下上，不许做成静音按钮。
     Sfx(state, "signal", p.x, p.y);
@@ -2571,6 +2621,10 @@ function UpdateAction(state, dt) {
   // 徒手扔：不挂在任何道具上（这是它的重点——关卡没布置也能用）
   if (finished === "lure" && !finishedProp) {
     FinishThrow(state);
+    return;
+  }
+  if (finished === "knockout") {
+    FinishKnockout(state);
     return;
   }
   if (finished !== "call" && prop) CompleteInteract(state, finished, prop);
@@ -2688,6 +2742,49 @@ function CompleteInteract(state, kind, prop) {
       state.world.used[prop.id] = true;
       break;
     }
+    // —— 引 / 封 ——
+    case "lure": {
+      // 关卡布置的引点跟"扔"方向相反：响在**自己脚下**，把人叫过来。
+      // 这是布陷阱用的（叫到死胡同、叫到雷上、叫到枪眼底下），不是用来溜过去的。
+      const lx = PropX(state, prop);
+      const radius = Num(prop.data.radius, 1.0);
+      RaiseLure(state, lx, prop.y, Clamp(radius, 0.2, 2.0), LURE_PROP_HOLD);
+      Sfx(state, "lure", lx, prop.y);
+      p.noiseSpike = Math.max(p.noiseSpike, LURE_SELF_NOISE);
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      state.world.used[prop.id] = true;
+      break;
+    }
+    case "block": {
+      const channel = prop.data.channel;
+      const bx = PropX(state, prop);
+      if (channel) state.world.blocked[channel] = true;
+      // 几何只在这里长出来：敌人跨不过去，玩家的 CanWalkTo 永远不看它。
+      state.world.blocks.push({
+        channel: channel || prop.id,
+        x: bx,
+        y: prop.y,
+        halfWidth: Num(prop.data.halfWidth, BLOCK_HALF_WIDTH),
+      });
+      Sfx(state, "collapse", bx, prop.y);
+      Dust(state, bx, prop.y + 0.6, 0.9);
+      Shake(state, 0.3);
+      // 倒下的墙同时挡视线：这才是"封"值得跑一趟的理由
+      for (const e of state.enemies) {
+        if (e.dormant) continue;
+        if (Math.abs(e.y - prop.y) > BLOCK_REACH_Y) continue;
+        if (Math.abs(e.x - bx) > 12) continue;
+        // 塌下去的动静他们听得见，但看不到是谁弄的
+        e.alertness = Math.max(e.alertness, SENSE.suspiciousAt + 0.05);
+        e.lastSeenX = bx;
+        e.lastSeenY = prop.y;
+        e.hasLead = false;
+      }
+      Emit(state, { kind: "block", channel: channel || prop.id, x: bx, y: prop.y });
+      for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
+      state.world.used[prop.id] = true;
+      break;
+    }
     // —— 反击三件套 ——
     case "signal": {
       const squadId = prop.data.squadId;
@@ -2722,6 +2819,8 @@ function CompleteInteract(state, kind, prop) {
           e.y <= prop.y + MINE_REACH_UP,
         "mine",
       );
+      // 地雷比枪还响：合围的那一下，整条街都知道了
+      AlarmArea(state, mx, prop.y, BLAST_ALARM_X, GUNSHOT_HUNT_X * 1.5);
       Emit(state, { kind: "counter", verb: "mine", x: mx, y: prop.y, hit, channel: channel || null });
       SlowTime(state, TIME_SLOW.hazard, TIME_SLOW.hazardSec);
       for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
@@ -2735,7 +2834,11 @@ function CompleteInteract(state, kind, prop) {
         Emit(state, { kind: "squad", id: squadId, status: "fired" });
       }
       const lx = PropX(state, prop);
-      for (let i = 0; i < RIFLE_SHOTS; i++) Sfx(state, "rifle", lx, prop.y);
+      // 有几发打几发。子弹是有数的，这一轮很可能就是这一段的全部火力。
+      const shots = Math.max(1, Math.min(RIFLE_SHOTS, state.world.ammo));
+      state.world.ammo = Math.max(0, state.world.ammo - shots);
+      state.world.shotsFired += shots;
+      for (let i = 0; i < shots; i++) Sfx(state, "rifle", lx, prop.y);
       Shake(state, 0.28);
       // 枪眼朝**头顶的街面**打：守在后面的民兵放冷枪，玩家只是把枪眼推开。
       const hit = DefeatEnemies(
@@ -2743,13 +2846,43 @@ function CompleteInteract(state, kind, prop) {
         (e) => Math.abs(e.x - lx) <= LOOPHOLE_RANGE_X && e.y > prop.y + 1.0,
         "rifle",
       );
-      Emit(state, { kind: "counter", verb: "loophole", x: lx, y: prop.y, hit, squadId: squadId || null });
+      // 打草惊蛇：一枪出去，这一片的人全都知道了。枪不是常规解法，代价就在这儿。
+      AlarmArea(state, lx, prop.y, GUNSHOT_ALARM_X, GUNSHOT_HUNT_X);
+      Emit(state, {
+        kind: "counter", verb: "loophole", x: lx, y: prop.y, hit,
+        squadId: squadId || null, shots, ammo: state.world.ammo,
+      });
       for (const id of Arr(prop.data.panels)) QueuePanel(state, id);
       state.world.used[prop.id] = true;
       break;
     }
     default:
       break;
+  }
+}
+
+/**
+ * 打草惊蛇：一声枪响/一颗雷，把一片区域的警觉整体抬起来。
+ * 这是"枪弹稀缺且响"的落点（AGENTS.md 0.0.1）——用枪换掉的是整段路的安静。
+ */
+function AlarmArea(state, x, y, alarmX, huntX) {
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated) continue;
+    const dx = Math.abs(e.x - x);
+    if (dx > alarmX) continue;
+    // 这一声把被引开的人也叫回神了：石头算什么
+    e.lured = false;
+    e.lureTimer = 0;
+    e.lureAt = false;
+    if (dx <= huntX) {
+      e.alertness = Math.max(e.alertness, SENSE.searchAt + 0.08);
+      e.lastSeenX = x;
+      e.lastSeenY = y;
+      e.hasLead = true;
+      e.facing = x >= e.x ? 1 : -1;
+    } else {
+      e.alertness = Math.max(e.alertness, SENSE.suspiciousAt + 0.08);
+    }
   }
 }
 
@@ -3095,11 +3228,17 @@ function EarthBetween(level, ax, ay, bx, by) {
   return false;
 }
 
+/** 这个兵此刻的有效视距倍率（蹲在地上盯着一块石头的人看不了远处）。 */
+function EnemyVisionScale(e) {
+  if (e.lured && e.lureAt) return LURE_FOCUS_VISION;
+  return 1;
+}
+
 function CanSee(state, e) {
   const p = state.player;
   const vis = VisibilityScale(p);
   if (vis <= 0.001) return false;
-  const range = e.visionRange * vis;
+  const range = e.visionRange * vis * EnemyVisionScale(e);
   if (range <= 0.05) return false;
 
   const ax = e.x;
@@ -3116,6 +3255,28 @@ function CanSee(state, e) {
     if (ang > e.visionHalfAngleDeg) return false;
   }
   if (EarthBetween(state.level, ax, ay, bx, by)) return false;
+  // 放倒的院墙同时是一道视线屏障——"封"值得跑一趟的一半理由在这儿
+  if (BlockBetween(state, ax, ay, bx, by)) return false;
+  return true;
+}
+
+/** 这个兵能不能看见世界里的某个点（敲晕的"旁边有没有第二双眼睛"用它）。 */
+function CanSeePoint(state, e, x, y) {
+  if (e.dormant || e.defeated) return false;
+  const ax = e.x;
+  const ay = e.y + e.visionHeight;
+  const by = y + PLAYER.standHeight * 0.55;
+  const dx = x - ax;
+  const dy = by - ay;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > e.visionRange * EnemyVisionScale(e)) return false;
+  if (dist > 0.001) {
+    const cos = (dx * e.facing) / dist;
+    const ang = Math.acos(Clamp(cos, -1, 1)) * (180 / Math.PI);
+    if (ang > e.visionHalfAngleDeg) return false;
+  }
+  if (EarthBetween(state.level, ax, ay, x, by)) return false;
+  if (BlockBetween(state, ax, ay, x, by)) return false;
   return true;
 }
 
@@ -3125,11 +3286,49 @@ function CanHear(state, e) {
   const radius = (e.hearing || 6) * p.noise * SENSE.hearingScale;
   if (radius <= 0.1) return false;
   const dx = p.x - e.x;
-  // 声音跨层传得动，但打折；正对着通气孔就不打折——
-  // 通气孔本来就是地表和地道之间的声音通道，摸黑那段的紧张感全在这上面。
-  const vent = NearVent(state, p.x);
-  const dy = (p.y - e.y) * (vent ? 1.0 : 0.6);
+  // 隔着一层土，脚步声是闷的：竖直距离按 CROSSLAYER_MUFFLE 放大，等于几乎传不上去。
+  // 这条是"从地道绕过去"能不能成立的地基——绕后不该等于自报家门。
+  // 通气孔是唯一的例外：那本来就是打通的声音通道，摸黑那段的紧张感全在这上面。
+  const gap = Math.abs(p.y - e.y);
+  const vent = gap > 1.5 ? NearVent(state, p.x) : true;
+  const dy = (p.y - e.y) * (gap > 1.5 && !vent ? CROSSLAYER_MUFFLE : 1);
   return dx * dx + dy * dy <= radius * radius;
+}
+
+/** 这条水平线段上有没有被"封"住的口子（倒下的墙、堵死的街）。 */
+function BlockBetween(state, ax, ay, bx, by) {
+  const blocks = state.world.blocks;
+  if (!blocks || blocks.length === 0) return false;
+  const lo = Math.min(ax, bx);
+  const hi = Math.max(ax, bx);
+  for (const b of blocks) {
+    if (Math.abs(b.y - ay) > BLOCK_REACH_Y && Math.abs(b.y - by) > BLOCK_REACH_Y) continue;
+    if (b.x >= lo - b.halfWidth && b.x <= hi + b.halfWidth) return true;
+  }
+  return false;
+}
+
+/**
+ * 敌人能不能从 fromX 走到 nextX。
+ * **只有敌人走这条判定**——玩家的 CanWalkTo 永远不看 world.blocks。
+ * 封了街把自己也堵死是这个动词最容易出的 bug，这行注释就是那道锁。
+ */
+function BlockedForEnemy(state, e, fromX, nextX) {
+  const blocks = state.world.blocks;
+  if (!blocks || blocks.length === 0) return false;
+  for (const b of blocks) {
+    if (Math.abs(b.y - e.y) > BLOCK_REACH_Y) continue;
+    const lo = Math.min(fromX, nextX) - 0.001;
+    const hi = Math.max(fromX, nextX) + 0.001;
+    // 已经站在封口里的（比如墙就倒在他脚边）只准往外走，不许卡死
+    const inside = Math.abs(fromX - b.x) <= b.halfWidth;
+    if (inside) {
+      if (Math.abs(nextX - b.x) < Math.abs(fromX - b.x)) return true;
+      continue;
+    }
+    if (b.x - b.halfWidth <= hi && b.x + b.halfWidth >= lo) return true;
+  }
+  return false;
 }
 
 /** 玩家脚下附近有没有通气孔。 */
@@ -3190,6 +3389,13 @@ function EmitAlertStages(state, e, prevAlert, sensing) {
 
 function UpdateEnemy(state, e, dt) {
   if (e.dormant) {
+    // 被敲晕的人躺在原地，而且会被同伴发现——这是"敲晕换来一段时间，
+    // 不是永久少一个人"的落点（AGENTS.md 0.0.1）。
+    if (e.down) {
+      UpdateDownedEnemy(state, e, dt);
+      SetAnim(e, "caught", 0, dt);
+      return;
+    }
     SetAnim(e, "idle", 0, dt);
     return;
   }
@@ -3223,6 +3429,29 @@ function UpdateEnemy(state, e, dt) {
     if (e.alertness < SENSE.suspiciousAt * 0.5) e.hasLead = false;
   }
 
+  // 「引」的余额。一旦真看见/听见玩家，石头就不重要了——引不是脱身卡。
+  if (e.lured) {
+    if (seeing || (hearing && e.alertness >= SENSE.suspiciousAt)) {
+      e.lured = false;
+      e.lureTimer = 0;
+      e.lureAt = false;
+    } else {
+      e.lureTimer -= dt;
+      if (Math.abs(e.x - e.lureX) < 0.6) {
+        if (!e.lureAt) {
+          e.lureAt = true;
+          e.lureTimer = Math.min(e.lureTimer, e.lureHold);
+          Sfx(state, e.kind === "dog" ? "dog" : "breath", e.x, e.y);
+        }
+      }
+      if (e.lureTimer <= 0) {
+        e.lured = false;
+        e.lureAt = false;
+        e.hasLead = false;
+      }
+    }
+  }
+
   // 余温计时器：纯展示，不接进状态机（理由见文件头 HUNT_PERSIST_SEC 的注释）。
   if (e.alertness >= SENSE.searchAt) e.huntTimer = HUNT_PERSIST_SEC;
   else e.huntTimer = Math.max(0, (e.huntTimer || 0) - dt);
@@ -3236,6 +3465,9 @@ function UpdateEnemy(state, e, dt) {
   let next;
   if (e.alertness >= 1 && seeing) next = "spotted";
   else if (e.alertness >= SENSE.searchAt) next = "search";
+  // 被引开的人**真的走过去查看**：进 search，目标是那个点。
+  // 这一条是"引"能不能用的分水岭——原地转个头不算引。
+  else if (e.lured) next = "search";
   else if (e.alertness >= SENSE.suspiciousAt) next = "suspicious";
   else if (e.probeAt) next = "probe";
   else if (e.patrol) next = "patrol";
@@ -3244,7 +3476,7 @@ function UpdateEnemy(state, e, dt) {
 
   if (next !== prevState) {
     e.lookTimer = next === "search" ? SEARCH_LOOK_SEC : SUSPICIOUS_HOLD_SEC;
-    if (next === "search" && prevState !== "spotted") {
+    if (next === "search" && prevState !== "spotted" && !e.lured) {
       Sfx(state, e.kind === "dog" ? "dog" : "shout", e.x, e.y);
     } else if (next === "suspicious" && (prevState === "patrol" || prevState === "idle" || prevState === "probe")) {
       Sfx(state, e.kind === "dog" ? "dog" : "breath", e.x, e.y);
@@ -3288,6 +3520,8 @@ function MoveEnemy(state, e, targetX, speed, dt) {
   const nextX = e.x + dir * speed * dt;
   // 敌人按"猫腰"判定：能进矮通道，但爬行才过得去的洞不追
   if (!CanWalkTo(state, nextX, e.y, "crouch")) return false;
+  // 封住的口子：巡逻线到这儿就断了（玩家不受影响，见 BlockedForEnemy）
+  if (BlockedForEnemy(state, e, e.x, nextX)) return false;
   e.x = Clamp(nextX, state.level.bounds.x0 + 0.3, state.level.bounds.x1 - 0.3);
   e.facing = dir;
   e.stepTimer -= dt;
@@ -3337,8 +3571,11 @@ function EnemySuspicious(state, e, dt) {
 
 function EnemySearch(state, e, dt) {
   const speed = (e.patrol ? e.patrol.speed : 1.4) * SENSE.searchSpeedScale;
-  const targetX = e.hasLead ? e.lastSeenX : e.homeX;
-  const range = e.patrol ? 7 : 5;
+  // 被引开的人为了那块石头**愿意离开自己的巡逻区间**——这就是"调开"的意思。
+  // 只在自己那七米里转两圈的话，引跟没引一样。
+  const lured = e.lured && !e.hasLead;
+  const targetX = lured ? e.lureX : e.hasLead ? e.lastSeenX : e.homeX;
+  const range = lured ? LURE_RANGE_SLACK : e.patrol ? 7 : 5;
   const lo = (e.patrol ? Math.min(e.patrol.x0, e.patrol.x1) : e.homeX) - range;
   const hi = (e.patrol ? Math.max(e.patrol.x0, e.patrol.x1) : e.homeX) + range;
   const goal = Clamp(targetX, lo, hi);
@@ -3346,6 +3583,11 @@ function EnemySearch(state, e, dt) {
   if (Math.abs(goal - e.x) > 0.35) {
     MoveEnemy(state, e, goal, speed, dt);
     SetAnim(e, "walk", 1, dt);
+  } else if (lured) {
+    // 到了。蹲下来盯着地上那块石头看——脸朝着它，视距对折（见 EnemyVisionScale）。
+    // 玩家的窗口就是这几秒，而且是他自己挣来的，不是等来的。
+    e.facing = e.lureX >= e.x ? 1 : -1;
+    SetAnim(e, "idle", 0, dt);
   } else {
     e.lookTimer -= dt;
     if (e.lookTimer <= 0) {
@@ -3409,6 +3651,153 @@ function EnemyProbe(state, e, dt) {
       }
       break;
     }
+  }
+}
+
+// ───────────────────────────── 敲晕（AGENTS.md 0.0.1）─────────────────────────────
+//
+// 玩家仍然**没有攻击键**。敲晕走的是同一个"用"键，而且只在站位成立时才出现提示：
+// 在背后 + 对方没察觉 + 旁边没有第二双眼睛。三条缺一条，按下去什么也不发生。
+// 拿到这个站位的路子正是地道——从他脚底下过去，从他背后的院子冒出来。
+//
+// 它换来的是**一段时间**，不是"永久少一个人"：昏过去的人躺在街上，
+// 同伴走到跟前就会炸锅。想留得久一点，就得挑没人会路过的地方下手。
+const KO_WIND_SEC = 1.2; // 前摇。这段时间玩家站着，暴露
+const KO_REACH_X = 1.55; // 够得着的水平距离
+const KO_REACH_Y = 1.5; // 同层才谈得上背后
+const KO_BEHIND_MIN = 0.25; // 太贴脸就不算"从背后"了，得在他身后一点
+const KO_ALERT_MAX = SENSE.suspiciousAt; // 已经起疑的人会回头，摸不到
+const KO_WITNESS_PAD = 1.0; // 第二双眼睛的宽容量：贴这么近就算看得见
+const KO_DISCOVER_X = 3.2; // 同伴走到这么近会发现躺着的人
+const KO_DISCOVER_ALERT = 0.86; // 发现之后直接进搜索（但够不到 1.0，不至于凭空被抓）
+
+/** 现在能不能从背后制服某个兵。返回该兵，或 null。 */
+function KnockoutTarget(state) {
+  const p = state.player;
+  if (p.dead || p.hidden || p.action || p.onShaft) return null;
+  if (state.phase !== "play") return null;
+
+  let best = null;
+  let bestD = Infinity;
+  for (const e of state.enemies) {
+    if (e.dormant || e.defeated || e.down) continue;
+    if (Math.abs(e.y - p.y) > KO_REACH_Y) continue;
+    const dx = p.x - e.x;
+    if (Math.abs(dx) > KO_REACH_X) continue;
+    // 1) 必须在他背后
+    if (Math.sign(dx) === e.facing) continue;
+    if (Math.abs(dx) < KO_BEHIND_MIN) continue;
+    // 2) 必须没察觉。被引开的人算没察觉——引开再绕后是这套动词的正解组合。
+    if (e.alertness >= KO_ALERT_MAX) continue;
+    if (e.hasLead && e.alertness >= SENSE.suspiciousAt * 0.5) continue;
+    if (e.state === "spotted" || e.state === "suspicious") continue;
+    if (e.seesPlayer) continue;
+    // 3) 旁边不许有第二双眼睛
+    if (KnockoutWitness(state, e)) continue;
+    const d = Math.abs(dx);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** 这一下会不会被别人看见。 */
+function KnockoutWitness(state, target) {
+  const p = state.player;
+  for (const other of state.enemies) {
+    if (other === target) continue;
+    if (other.dormant || other.defeated || other.down) continue;
+    if (Math.abs(other.y - p.y) > 2.6) continue;
+    // 贴得太近的，就算此刻背对着，一转身也就看见了
+    if (Math.abs(other.x - p.x) <= KO_WITNESS_PAD) return true;
+    if (CanSeePoint(state, other, p.x, p.y)) return true;
+    if (CanSeePoint(state, other, target.x, target.y)) return true;
+  }
+  return false;
+}
+
+function BeginKnockout(state, target) {
+  const p = state.player;
+  p.action = "knockout";
+  p.actionTimer = KO_WIND_SEC;
+  p.actionTotal = KO_WIND_SEC;
+  p.actionPropId = null;
+  p.knockoutId = target.id;
+  p.vx = 0;
+  p.facing = target.x >= p.x ? 1 : -1;
+  Sfx(state, "cloth", p.x, p.y);
+}
+
+/** 前摇走完。这一秒二里目标可能已经转身或走开了——那就是空手一场。 */
+function FinishKnockout(state) {
+  const p = state.player;
+  const id = p.knockoutId;
+  p.knockoutId = null;
+  let target = null;
+  for (const e of state.enemies) {
+    if (e.id === id) target = e;
+  }
+  if (!target || target.dormant || target.down) return;
+
+  const dx = p.x - target.x;
+  const stillBehind =
+    Math.abs(dx) <= KO_REACH_X + 0.5 &&
+    Math.abs(target.y - p.y) <= KO_REACH_Y &&
+    Math.sign(dx) !== target.facing &&
+    target.alertness < KO_ALERT_MAX + 0.2;
+  if (!stillBehind) {
+    // 摸空了。响一下，人也警觉了——这才是"有风险的行动"该有的收场。
+    Sfx(state, "cloth", p.x, p.y);
+    target.alertness = Math.max(target.alertness, SENSE.suspiciousAt + 0.1);
+    target.lastSeenX = p.x;
+    target.lastSeenY = p.y;
+    target.hasLead = true;
+    Emit(state, { kind: "knockout", enemyId: target.id, x: target.x, y: target.y, ok: false });
+    return;
+  }
+
+  target.down = true;
+  target.downX = target.x;
+  target.downY = target.y;
+  target.downFound = false;
+  target.dormant = true; // 不再感知、不再移动。但没有 defeated：他还躺在那儿
+  target.lured = false;
+  target.lureTimer = 0;
+  target.alertness = 0;
+  target.seesPlayer = false;
+  target.hearsPlayer = false;
+  target.alertStage = "calm";
+  target.huntTimer = 0;
+  target.suspectTimer = 0;
+  target.linger = 0;
+  target.state = "idle";
+  SetAnim(target, "caught", 0, 0);
+  // 制服不是杀戮：一声闷响，一个人软下去，没有别的表现
+  Sfx(state, "thud", target.x, target.y);
+  p.noiseSpike = Math.max(p.noiseSpike, NOISE.crouch);
+  Shake(state, 0.12);
+  Emit(state, { kind: "knockout", enemyId: target.id, x: target.x, y: target.y, ok: true });
+}
+
+/** 躺着的人：等着被同伴发现。发现之后那一片就炸了。 */
+function UpdateDownedEnemy(state, e, dt) {
+  if (e.downFound) return;
+  for (const other of state.enemies) {
+    if (other === e || other.dormant || other.defeated) continue;
+    if (Math.abs(other.y - e.y) > KO_REACH_Y) continue;
+    if (Math.abs(other.x - e.x) > KO_DISCOVER_X) continue;
+    e.downFound = true;
+    other.alertness = Math.max(other.alertness, KO_DISCOVER_ALERT);
+    other.lastSeenX = e.x;
+    other.lastSeenY = e.y;
+    other.hasLead = true;
+    other.lured = false;
+    other.lureTimer = 0;
+    Sfx(state, "shout", other.x, other.y);
+    Emit(state, { kind: "bodyFound", enemyId: e.id, byId: other.id, x: e.x, y: e.y });
+    return;
   }
 }
 
