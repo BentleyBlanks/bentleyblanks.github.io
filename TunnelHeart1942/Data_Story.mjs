@@ -1,7 +1,7 @@
 /** Film beats — dig system is the spine of every underground act. */
 
 export const SAVE_KEY = "tunnelheart1942_v5";
-export const CACHE_BUST = "20260802a";
+export const CACHE_BUST = "20260802b";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -254,47 +254,44 @@ export const CHAPTERS = [
     title: "神出鬼没",
     timeLabel: "一九四三年 · 夏",
     cast: "高传宝",
-    objective: "听战前交代，从主巷上挖三处出击竖井，再轮流开火打散巡逻。",
+    objective: "挖穿三处出击竖井，悄悄出井杀光进村的鬼子——打一枪换一个地方。",
     goals: [
       "talk_ambush",
       "enter_spine",
       "dig_shaft_a",
       "dig_shaft_b",
       "dig_shaft_c",
-      "shot_a",
-      "shot_b",
-      "shot_c",
-      "break_patrol",
+      "kill_invaders",
     ],
     openPanels: [
       {
         id: "p4a",
         speaker: "旁白",
-        text: "山田进村。出击口不能是送的——要从主巷一锨锨往上挖穿。",
+        text: "山田把鬼子放进庄里。民兵不在街面上硬拼——要从主巷往上挖穿出击口，悄悄进村打枪。",
         mood: "wide",
       },
       {
         id: "p4b",
         speaker: "高传宝",
-        text: "先画竖井蓝图：井口、墙根、灶台——三口都挖穿，才能打一枪换一处。",
+        text: "井口、墙根、灶台——三口竖井都挖穿。出井就开枪，打完立刻钻回去换地方。",
         mood: "talk",
       },
       {
         id: "p4c",
         speaker: "林霞",
-        text: "别恋战，别跟巡逻硬撞。地道是腿，出击口是牙。",
+        text: "地面别站着挨打。蹲着挪、看准黄皮再扣扳机。地道是腿，出击口是牙。",
         mood: "talk",
       },
       {
         id: "p4d",
         speaker: "民兵",
-        text: "各小组注意：一口打完就换口。气焰压下去，人就敢动了。",
+        text: "杀光这拨进村的鬼子。一口打完就换口——神出鬼没，才叫地道战。",
         mood: "talk",
       },
       {
         id: "p4e",
         speaker: "提示",
-        text: "须手持铁锹。R 设计向上竖井蓝图，J 在设计中标记；退出后点 J 开挖计划格（非长按）。三口挖穿再轮流开火。",
+        text: "须铁锹挖穿三口竖井。井下按 E 悄悄出井，地面按 E 开枪并撤回；可投手榴弹。目标：消灭全部鬼子。",
         mood: "tip",
       },
     ],
@@ -302,7 +299,7 @@ export const CHAPTERS = [
       {
         id: "p4z1",
         speaker: "林霞",
-        text: "气焰压下去了。下一步：把地道往炮楼根下挖。",
+        text: "进村的鬼子清干净了。下一步：把地道往炮楼根下挖。",
         mood: "talk",
       },
       {
@@ -314,7 +311,7 @@ export const CHAPTERS = [
       {
         id: "p4z3",
         speaker: "旁白",
-        text: "神出鬼没这一仗，换来反攻前夜的最后一锨。",
+        text: "悄悄进村、打枪、钻回去。神出鬼没这一仗，换来反攻前夜的最后一锨。",
         mood: "wide",
       },
     ],

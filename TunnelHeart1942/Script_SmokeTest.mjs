@@ -7,6 +7,7 @@ import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   CreateCampaignState,
   DebugCarvePath,
+  DebugCompleteGoal,
   DebugHold,
   DebugPlanCell,
   GoalsRemaining,
@@ -213,6 +214,64 @@ function TestAct2MustDigBeforeShelter() {
   Assert(state.goalsDone.link_safe || EvalDigGoals(state.level).link_safe, "safe linked");
 }
 
+function TestAct4KillInvaders() {
+  const state = Play(3);
+  Assert(state.chapterId === "act4_ambush", "act4 chapter");
+  Assert(CHAPTERS[3].goals.includes("kill_invaders"), "kill_invaders goal");
+  Assert(!CHAPTERS[3].goals.includes("break_patrol"), "no abstract patrol checklist");
+  const enemies = state.level.entities.filter((e) => e.type === "enemy");
+  Assert(enemies.length >= 4, `spawned 鬼子 (${enemies.length})`);
+  const ports = state.level.entities.filter((e) => e.type === "shot_port");
+  Assert(ports.length === 3 && ports.every((p) => p.layer === "both"), "three dual-layer shot ports");
+
+  for (const g of ["talk_ambush", "enter_spine", "dig_shaft_a", "dig_shaft_b", "dig_shaft_c"]) {
+    DebugCompleteGoal(state, g);
+  }
+
+  const port = state.level.entities.find((e) => e.id === "port1");
+  for (const e of enemies) {
+    e.x = port.x + 36;
+    e.homeX = port.x + 36;
+    e.amp = 0;
+    e.alert = 0;
+    e.hp = 1;
+    e.maxHp = 1;
+    e.dead = false;
+  }
+
+  state.player.invuln = 99;
+  state.input.crouch = true;
+
+  for (let round = 0; round < 16 && !state.goalsDone.kill_invaders; round++) {
+    state.transition = 0;
+    state._hatchFlipped = false;
+    port.cool = 0;
+    state.player.inTunnel = true;
+    state.player.x = port.x;
+    state.player.y = port.tunnelY;
+    state.input.interactPressed = true;
+    StepPlay(state, 1 / 30);
+    for (let i = 0; i < 50; i++) StepPlay(state, 1 / 30);
+    Assert(!state.player.inTunnel, `round ${round}: sneak out`);
+
+    state.transition = 0;
+    state._hatchFlipped = false;
+    port.cool = 0;
+    state.player.inTunnel = false;
+    state.player.x = port.x;
+    state.player.y = 0;
+    state.player.invuln = 99;
+    state.input.interactPressed = true;
+    StepPlay(state, 1 / 30);
+    for (let i = 0; i < 50; i++) StepPlay(state, 1 / 30);
+    Assert(state.player.inTunnel, `round ${round}: retreat after shot`);
+  }
+
+  Assert(state.stats.kills >= enemies.length, `kills recorded (${state.stats.kills})`);
+  Assert(enemies.every((e) => e.dead), "all 鬼子 dead");
+  Assert(state.goalsDone.kill_invaders, "kill_invaders cleared");
+}
+
 function TestAct5PlantNeedsCharge() {
   const state = Play(4);
   Assert(state.player.inTunnel, "act5 starts underground");
@@ -280,6 +339,7 @@ function Main() {
   TestPickupShovelRequired();
   TestMultiTalk();
   TestAct2MustDigBeforeShelter();
+  TestAct4KillInvaders();
   TestAct5PlantNeedsCharge();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");
@@ -287,7 +347,7 @@ function Main() {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 plan-dig + story smoke OK");
+  console.log("\nTunnelHeart1942 ambush-kill smoke OK");
 }
 
 Main();

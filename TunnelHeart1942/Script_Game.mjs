@@ -675,8 +675,10 @@ function DrawEntity(ent) {
   if (ent.layer === "surface" && state.player.inTunnel && ent.type !== "spy") return;
 
   const s = Scale();
+  const worldY =
+    ent.type === "shot_port" && state.player.inTunnel && ent.tunnelY != null ? ent.tunnelY : ent.y;
   const x = WX(ent.x);
-  const y = WY(ent.y);
+  const y = WY(worldY);
   ctx.save();
   ctx.translate(x, y);
   ctx.lineWidth = 2.5 * s;
@@ -742,10 +744,63 @@ function DrawEntity(ent) {
       DrawPictogram("charge", -10 * s, -48 * s, 20 * s);
     }
   } else if (ent.type === "shot_port") {
-    if (!ent.used) glow();
-    ctx.fillStyle = "#2f5d4a";
+    const ready = !ent.requiresGoal || !!state.goalsDone[ent.requiresGoal];
+    if (ready) glow();
+    ctx.fillStyle = ready ? "#2f5d4a" : "#4a4538";
     ctx.fillRect(-17 * s, -26 * s, 34 * s, 26 * s);
     ctx.strokeRect(-17 * s, -26 * s, 34 * s, 26 * s);
+    if (ready && !state.player.inTunnel) {
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${11 * s}px IBM Plex Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("开枪", 0, -34 * s);
+    } else if (ready && state.player.inTunnel) {
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${11 * s}px IBM Plex Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("出井", 0, -34 * s);
+    }
+  } else if (ent.type === "enemy") {
+    if (ent.dead) ctx.globalAlpha = 0.28;
+    else if (ent.hurtFlash > 0) ctx.globalAlpha = 0.55 + Math.sin(ent.hurtFlash * 40) * 0.35;
+    // 鬼子 — helmet + puttee silhouette, distinct from militia
+    ctx.fillStyle = "#3a4630";
+    ctx.fillRect(-14 * s, -46 * s, 28 * s, 46 * s);
+    ctx.strokeRect(-14 * s, -46 * s, 28 * s, 46 * s);
+    ctx.fillStyle = "#2a3224";
+    ctx.fillRect(-16 * s, -62 * s, 32 * s, 12 * s);
+    ctx.strokeRect(-16 * s, -62 * s, 32 * s, 12 * s);
+    ctx.fillStyle = "#c9b89a";
+    ctx.beginPath();
+    ctx.arc(0, -54 * s, 8 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#8b1e1e";
+    ctx.fillRect(10 * s, -40 * s, 8 * s, 10 * s);
+    if (!ent.dead) {
+      ctx.fillStyle = "rgba(155,47,47,.28)";
+      ctx.beginPath();
+      ctx.moveTo(0, -18 * s);
+      ctx.lineTo(72 * s, -44 * s);
+      ctx.lineTo(72 * s, 8 * s);
+      ctx.closePath();
+      ctx.fill();
+      const maxHp = ent.maxHp || 2;
+      const hp = Math.max(0, ent.hp || 0);
+      ctx.fillStyle = "#1a1410";
+      ctx.fillRect(-16 * s, -72 * s, 32 * s, 5 * s);
+      ctx.fillStyle = "#a6452f";
+      ctx.fillRect(-16 * s, -72 * s, 32 * s * (hp / maxHp), 5 * s);
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("鬼子", 0, -78 * s);
+    } else {
+      ctx.fillStyle = "#7a7264";
+      ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("毙", 0, -70 * s);
+    }
   } else if (ent.type === "spy") {
     ctx.fillStyle = ent.trapped ? "#444" : "#5a4030";
     ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
@@ -1030,6 +1085,20 @@ function DrawProjectiles() {
     ctx.arc(WX(p.x), WY(p.y), 6 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
+  }
+  const m = state.muzzle;
+  if (m && m.timer > 0 && !state.player.inTunnel) {
+    ctx.save();
+    ctx.translate(WX(m.x), WY(m.y));
+    ctx.scale(m.facing || 1, 1);
+    ctx.fillStyle = `rgba(255,210,120,${Math.min(1, m.timer * 5)})`;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(28 * s, -10 * s);
+    ctx.lineTo(28 * s, 10 * s);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 }

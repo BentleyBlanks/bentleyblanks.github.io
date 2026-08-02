@@ -103,7 +103,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     pauseOpen: false,
     transition: 0,
     input: CreateInputState(),
-    stats: { digs: 0, interactions: 0, shots: 0, cellsCarved: 0, pickups: 0 },
+    stats: { digs: 0, interactions: 0, shots: 0, kills: 0, cellsCarved: 0, pickups: 0 },
+    muzzle: null,
   };
 }
 
@@ -200,7 +201,7 @@ function GoalIcon(goalId) {
   if (goalId.includes("hatch") || goalId.includes("enter") || goalId.includes("shaft")) return "hatch";
   if (goalId.includes("shelter")) return "people";
   if (goalId.includes("flip") || goalId.includes("trap") || goalId.includes("spy")) return "flip";
-  if (goalId.includes("shot") || goalId.includes("patrol")) return "shot";
+  if (goalId.includes("shot") || goalId.includes("patrol") || goalId.includes("kill")) return "shot";
   if (goalId.includes("charge") || goalId.includes("signal")) return "charge";
   if (goalId.includes("talk")) return "talk";
   return "check";
@@ -248,7 +249,7 @@ function GuessIcons(speaker, text) {
   if (/井|地道口|下到|回到地面/.test(t)) return ["hatch"];
   if (/翻口/.test(t)) return ["flip"];
   if (/特务|武工/.test(t)) return ["talk", "warn"];
-  if (/打一枪|出击/.test(t)) return ["shot"];
+  if (/打一枪|出击|鬼子|开枪|杀掉|干掉/.test(t)) return ["shot"];
   if (/药|炸药|总攻/.test(t)) return ["charge"];
   if (/乡亲|进洞|孩子/.test(t)) return ["people"];
   if (/发现|危险|蹲/.test(t)) return ["warn"];
@@ -433,6 +434,59 @@ function TryUseItem(state) {
   }
 }
 
+function HurtEnemy(state, ent, dmg) {
+  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  ent.hp -= dmg;
+  ent.hurtFlash = 0.28;
+  if (ent.hp <= 0) {
+    ent.hp = 0;
+    ent.dead = true;
+    state.stats.kills = (state.stats.kills || 0) + 1;
+    SyncKillGoals(state);
+    return true;
+  }
+  return false;
+}
+
+function SyncKillGoals(state) {
+  const foes = state.level.entities.filter((e) => e.type === "enemy");
+  if (!foes.length) return;
+  if (foes.every((e) => e.dead)) MarkGoal(state, "kill_invaders");
+}
+
+function FireFromPort(state, port) {
+  state.stats.shots += 1;
+  const facing = state.player.facing || 1;
+  state.muzzle = { x: port.x + facing * 18, y: SURFACE_Y - 38, timer: 0.2, facing };
+
+  const living = state.level.entities.filter((e) => e.type === "enemy" && !e.dead);
+  let best = null;
+  let bestD = 280;
+  for (const e of living) {
+    const d = Math.abs(e.x - port.x);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  for (const e of living) {
+    if (Math.abs(e.x - port.x) < 340) {
+      e.alert = 2.8;
+      e.alertX = port.x;
+    }
+  }
+  if (!best) {
+    SetSubtitle(state, "高传宝", "这口没鬼子。换口打！", 1.8);
+    return;
+  }
+  const killed = HurtEnemy(state, best, 1);
+  if (killed) {
+    SetSubtitle(state, "高传宝", "干掉一个！打一枪换一个地方！", 2.2);
+  } else {
+    SetSubtitle(state, "高传宝", "打中了！快钻回去换地方！", 2.0);
+  }
+}
+
 function UpdateProjectiles(state, dt) {
   const next = [];
   for (const p of state.projectiles || []) {
@@ -441,8 +495,15 @@ function UpdateProjectiles(state, dt) {
     p.y += p.vy * dt;
     p.life -= dt;
     if (p.life <= 0) {
-      // Soft impact: break a hostile patrol if close on surface
       for (const ent of state.level.entities) {
+        if (ent.type === "enemy" && !ent.dead) {
+          if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 78) {
+            const killed = HurtEnemy(state, ent, 2);
+            if (killed) SetSubtitle(state, "民兵", "手榴弹——好！", 1.8);
+            else SetSubtitle(state, "民兵", "炸伤了！再补一枪！", 1.6);
+          }
+          continue;
+        }
         if (ent.type !== "patrol" || ent.broken) continue;
         if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 70) {
           ent.hits = (ent.hits || 0) + 2;
@@ -457,6 +518,10 @@ function UpdateProjectiles(state, dt) {
     next.push(p);
   }
   state.projectiles = next;
+  if (state.muzzle) {
+    state.muzzle.timer -= dt;
+    if (state.muzzle.timer <= 0) state.muzzle = null;
+  }
 }
 
 function BeginHatchTransition(state, goingDown, ent) {
@@ -562,20 +627,20 @@ function TryInteract(state) {
     }
 
     if (ent.type === "shot_port") {
-      if (ent.used) return;
-      ent.used = true;
-      state.stats.shots += 1;
-      if (ent.goal) MarkGoal(state, ent.goal);
-      const patrol = level.entities.find((e) => e.type === "patrol" && !e.broken);
-      if (patrol) {
-        patrol.hits = (patrol.hits || 0) + 1;
-        if (patrol.hits >= 3) {
-          patrol.broken = true;
-          MarkGoal(state, "break_patrol");
-        }
+      // Underground: sneak up. Surface: fire, then auto-retreat into the shaft.
+      if (player.inTunnel) {
+        BeginHatchTransition(state, false, ent);
+        SetSubtitle(state, "高传宝", "悄悄出井……瞄准再打。", 2.0);
+        return;
       }
-      SetSubtitle(state, "高传宝", "打一枪，换一个地方！", 1.8);
-      if (ent.exitTo != null) player.x = ent.exitTo;
+      if ((ent.cool || 0) > 0) {
+        BeginHatchTransition(state, true, ent);
+        SetSubtitle(state, "林霞", "枪管还烫——先钻回去换口。", 1.8);
+        return;
+      }
+      FireFromPort(state, ent);
+      ent.cool = 1.6;
+      BeginHatchTransition(state, true, ent);
       return;
     }
 
@@ -604,10 +669,36 @@ function TryInteract(state) {
 function UpdateActors(state, dt) {
   const { level, player } = state;
   for (const ent of level.entities) {
+    if (ent.type === "shot_port" && (ent.cool || 0) > 0) {
+      ent.cool = Math.max(0, ent.cool - dt);
+    }
     if (ent.type === "spy" && ent.exposed && !ent.trapped) {
       const trap = level.entities.find((e) => e.type === "flip_trap");
       if (!trap) continue;
       ent.x += Math.sign(trap.x - ent.x) * 60 * dt;
+    }
+    if (ent.type === "enemy") {
+      if (ent.hurtFlash > 0) ent.hurtFlash = Math.max(0, ent.hurtFlash - dt);
+      if (ent.dead) continue;
+      ent.t = (ent.t || 0) + dt;
+      if (ent.alert > 0) {
+        ent.alert -= dt;
+        const dir = Math.sign((ent.alertX ?? ent.homeX) - ent.x) || 1;
+        ent.x += dir * 95 * dt;
+      } else {
+        ent.x = ent.homeX + Math.sin(ent.t * 0.7 + (ent.phase || 0)) * (ent.amp || 100);
+      }
+      if (!player.inTunnel && player.invuln <= 0) {
+        const detect = player.crouching ? 26 : 50;
+        if (Math.abs(player.x - ent.x) < detect && Math.abs(player.y - ent.y) < 42) {
+          player.hp -= 1;
+          player.invuln = 1.25;
+          player.vx = Math.sign(player.x - ent.x || 1) * 200;
+          SetSubtitle(state, "危险", "被鬼子发现了——蹲下或钻井！", 2.2);
+          if (player.hp <= 0) state.failed = true;
+        }
+      }
+      continue;
     }
     if (ent.type === "patrol" && !ent.broken && ent.hostile) {
       ent.t = (ent.t || 0) + dt;

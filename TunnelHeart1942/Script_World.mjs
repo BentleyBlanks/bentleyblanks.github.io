@@ -427,7 +427,48 @@ function BuildAct3() {
   return level;
 }
 
-/** Act4: dig three upward shafts to surface ports, then ambush. */
+function PlaceEnemy(id, x, opts = {}) {
+  const hp = opts.hp ?? 2;
+  return Ent({
+    id,
+    type: "enemy",
+    x,
+    y: SURFACE_Y,
+    layer: "surface",
+    homeX: x,
+    amp: opts.amp ?? 100,
+    phase: opts.phase ?? 0,
+    hp,
+    maxHp: hp,
+    dead: false,
+    alert: 0,
+    alertX: x,
+    hurtFlash: 0,
+    label: "鬼子",
+    hostile: true,
+    t: 0,
+  });
+}
+
+function PlaceShotPort(id, x, tunnelY, requiresGoal, hint) {
+  return Ent({
+    id,
+    type: "shot_port",
+    x,
+    y: SURFACE_Y,
+    layer: "both",
+    w: 36,
+    h: 20,
+    radius: 56,
+    hint,
+    requiresGoal,
+    tunnelX: x,
+    tunnelY,
+    cool: 0,
+  });
+}
+
+/** Act4: dig three shafts, sneak out ports, kill 鬼子, retreat into tunnels. */
 function BuildAct4() {
   const level = BaseLevel(2800);
   const originX = 40;
@@ -455,7 +496,7 @@ function BuildAct4() {
   level.digLinks = [
     {
       id: "link_a",
-      goal: null, // zones carry goals
+      goal: null,
       ax: s.x,
       ay: s.y,
       bx: CellCenter(soil, 14, 2).x,
@@ -463,11 +504,15 @@ function BuildAct4() {
     },
   ];
   const portX = (c) => CellCenter(soil, c, 1).x;
+  const tunnelAt = (c) => CellCenter(soil, c, 2).y + 10;
+  const pxA = portX(14);
+  const pxB = portX(28);
+  const pxC = portX(42);
   level.shafts = [
     { x: s.x, label: "主巷" },
-    { x: portX(14), label: "井口（上挖）" },
-    { x: portX(28), label: "墙根（上挖）" },
-    { x: portX(42), label: "灶台（上挖）" },
+    { x: pxA, label: "井口出击" },
+    { x: pxB, label: "墙根出击" },
+    { x: pxC, label: "灶台出击" },
   ];
   level.entities = [
     PlacePickup(s.x - 40, SURFACE_Y, ITEM_SHOVEL, "surface"),
@@ -480,8 +525,9 @@ function BuildAct4() {
       layer: "surface",
       speaker: "高传宝",
       script: [
-        { speaker: "高传宝", text: "山田进村了。出击口要从主巷往上挖穿——先画竖井蓝图。" },
-        { speaker: "林霞", text: "打一枪换一处。别恋战，别跟巡逻硬撞。" },
+        { speaker: "高传宝", text: "山田的鬼子进村了。竖井挖穿——悄悄出井，瞄着打，打完钻回去。" },
+        { speaker: "林霞", text: "打一枪换一个地方。别在地面恋战，杀光这拨再谈别的。" },
+        { speaker: "民兵", text: "井口、墙根、灶台三口轮着出。看见黄皮就开枪。" },
       ],
       hint: "战前交代",
       goal: "talk_ambush",
@@ -499,56 +545,23 @@ function BuildAct4() {
       tunnelY: s.y + 10,
       goal: "enter_spine",
     }),
-    Ent({
-      id: "port1",
-      type: "shot_port",
-      x: portX(14),
-      y: SURFACE_Y,
-      layer: "surface",
-      hint: "井口出击",
-      goal: "shot_a",
-      requiresGoal: "dig_shaft_a",
-      exitTo: portX(28),
-    }),
-    Ent({
-      id: "port2",
-      type: "shot_port",
-      x: portX(28),
-      y: SURFACE_Y,
-      layer: "surface",
-      hint: "墙根出击",
-      goal: "shot_b",
-      requiresGoal: "dig_shaft_b",
-      exitTo: portX(42),
-    }),
-    Ent({
-      id: "port3",
-      type: "shot_port",
-      x: portX(42),
-      y: SURFACE_Y,
-      layer: "surface",
-      hint: "灶台出击",
-      goal: "shot_c",
-      requiresGoal: "dig_shaft_c",
-      exitTo: portX(42) + 200,
-    }),
-    Ent({
-      id: "patrol2",
-      type: "patrol",
-      x: portX(28),
-      y: SURFACE_Y,
-      layer: "surface",
-      homeX: portX(28),
-      amp: 180,
-      hostile: true,
-      hits: 0,
-    }),
+    PlaceShotPort("port1", pxA, tunnelAt(14), "dig_shaft_a", "井口出击"),
+    PlaceShotPort("port2", pxB, tunnelAt(28), "dig_shaft_b", "墙根出击"),
+    PlaceShotPort("port3", pxC, tunnelAt(42), "dig_shaft_c", "灶台出击"),
+    // Village invaders — kill them all (神出鬼没)
+    PlaceEnemy("oni1", pxA + 70, { amp: 70, phase: 0.2, hp: 2 }),
+    PlaceEnemy("oni2", pxB - 40, { amp: 110, phase: 1.1, hp: 2 }),
+    PlaceEnemy("oni3", pxB + 90, { amp: 80, phase: 2.4, hp: 2 }),
+    PlaceEnemy("oni4", pxC - 30, { amp: 95, phase: 0.7, hp: 2 }),
+    PlaceEnemy("oni5", pxC + 120, { amp: 60, phase: 1.8, hp: 3 }),
   ];
   level.props = [
     { kind: "house", x: s.x, variant: 0 },
-    { kind: "well", x: portX(14) },
-    { kind: "house", x: portX(28), variant: 1 },
-    { kind: "house", x: portX(42), variant: 0 },
+    { kind: "well", x: pxA },
+    { kind: "house", x: pxB, variant: 1 },
+    { kind: "house", x: pxC, variant: 0 },
+    { kind: "tree", x: pxA - 90 },
+    { kind: "tree", x: pxC + 200 },
   ];
   return level;
 }
