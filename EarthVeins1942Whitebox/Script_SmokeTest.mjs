@@ -143,6 +143,18 @@ Assert(game.includes("function DrawFlipGateAssembly") && game.includes("floorY -
 Assert(game.includes("function DrawFloodGateAssembly") && game.includes("gateBottom = gateTop + gateHeight") && game.includes("DrawVerticalArrow"), "flood gate must visibly travel as one panel along its guide columns");
 Assert(game.includes("function DrawSmokeBaffleAssembly") && game.includes("const firstEndY = active") && game.includes("if (active)") && game.includes("activeBaffleSlot"), "smoke baffle must visibly switch between level flow and upward exhaust states");
 
+Assert(game.includes("function FindTakedownTarget") && game.includes("candidate.behind <= -.16") && game.includes("candidate.distance <= 1.08"), "nonlethal takedown must require a close rear approach");
+Assert(game.includes("state.takedownUsed = true") && game.includes("neutralizedEnemies") && game.includes("unconsciousEnemies"), "takedown must be limited and persist the neutralized enemy state");
+Assert(game.includes("function UpdateTakedown") && game.includes("function DrawTakedownTarget") && game.includes("function DrawTakedownCinematicOverlay"), "four-beat takedown state machine and cinematic rendering are missing");
+Assert(game.includes("function DrawProneEnemyBody") && game.includes("state.takedownGrace = 2.2") && game.includes("state.takedownGrace <= 0"), "takedown must end in a readable prone body and a short disengage window");
+Assert(game.includes("屏息") && game.includes("扣肩") && game.includes("击昏") && game.includes("收械") && game.includes("尚有呼吸"), "takedown ritual must communicate nonlethal intent and weapon security");
+Assert(game.includes('data-qa-hazard="takedown"') && game.includes('StartTakedown(target, true)'), "QA panel must expose the real takedown animation for visual review");
+Assert(game.includes('ui.touchControls.classList.toggle("locked", Boolean(state.caught || state.takedown))'), "mobile controls must lock during the takedown sequence");
+Assert(game.includes('ui.gameShell.classList.toggle("takedownCinematic", Boolean(state.takedown || state.takedownGrace > 0))') && css.includes("#gameShell.takedownCinematic #objectiveCard") && css.includes("#gameShell.takedownCinematic #metricsPanel"), "cinematic takedown must suppress objective and alert HUD clutter");
+Assert(game.includes('ui.touchControls.classList.toggle("cinematic", Boolean(state.takedown))') && css.includes("#touchControls.cinematic"), "mobile controls must disappear during the takedown cinematic");
+Assert(game.includes("function TakedownFigureScale(width)") && game.includes("Math.min(2.35") && game.includes("innerWidth <= 640 ? 1.42 : 1.18") && game.match(/\.038 \* TakedownFigureScale\(width\)/g)?.length >= 3, "mobile takedown figures must stay legible across actor, target, and prone poses");
+Assert(game.match(/const cinematicFocus = width <= 640/g)?.length >= 2 && game.includes('rgba(220,190,132,.72)') && game.includes('rgba(226,199,146,.68)'), "mobile prone target and disarmed weapon need a restrained high-contrast cinematic rim");
+
 const fluid = CreateTunnelFluidSimulation({ columns: 72, rows: 32 });
 Assert(fluid.Sample(0, 0).sdf > 0 && fluid.Sample(-11, 0).sdf < 0, "SDF 没有把地道内部与墙体边界分开");
 const solidBefore = fluid.solid.reduce((sum, value) => sum + value, 0);

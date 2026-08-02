@@ -78,6 +78,11 @@ function CreateState(levelIndex) {
     detection: 0,
     detected: false,
     caught: null,
+    takedown: null,
+    takedownUsed: false,
+    takedownGrace: 0,
+    neutralizedEnemies: new Set(),
+    unconsciousEnemies: [],
     lastSafeX: level.startX,
     alert: 18,
     morale: 100,
@@ -236,6 +241,11 @@ function MissingRequirement(action) {
 
 function PerformAction() {
   if (IsBlocked()) return;
+  const takedownTarget = FindTakedownTarget();
+  if (takedownTarget) {
+    StartTakedown(takedownTarget);
+    return;
+  }
   const action = FindNearestAction();
   if (!action) {
     const entrance = entrances.find((x) => Math.abs(x - state.player.x) < 1.05);
@@ -848,7 +858,7 @@ function EndCinematic() {
 }
 
 function IsBlocked() {
-  return state.mode !== "play" || state.cinematic || state.caught || !ui.dialoguePanel.hidden || !ui.buildPanel.hidden || !ui.levelPanel.hidden || !ui.guidePanel.hidden;
+  return state.mode !== "play" || state.cinematic || state.caught || state.takedown || !ui.dialoguePanel.hidden || !ui.buildPanel.hidden || !ui.levelPanel.hidden || !ui.guidePanel.hidden;
 }
 
 function Toast(message, tone = "neutral") {
@@ -867,15 +877,21 @@ function UpdateUi() {
   ui.objectiveHint.textContent = ContextHint();
   ui.phaseStrip.innerHTML = state.level.phases.map((item, index) => `<span class="${item.id === state.phaseId ? "active" : index < PhaseIndex() ? "done" : ""}"><i>${index + 1}</i>${item.label}</span>`).join("");
   ui.metricsPanel.innerHTML = MetricsMarkup();
+  const takedownTarget = FindTakedownTarget();
   const action = FindNearestAction();
-  Show(ui.interactionPrompt, Boolean(action) && !IsBlocked());
-  if (action) {
+  Show(ui.interactionPrompt, Boolean(takedownTarget || action) && !IsBlocked());
+  if (takedownTarget) {
+    ui.interactionVerb.textContent = "制服";
+    ui.interactionName.textContent = `${takedownTarget.unitType === "collaborator" ? "落单伪军" : "落单敌兵"} · 非致命`;
+  } else if (action) {
     ui.interactionVerb.textContent = action.verb;
     ui.interactionName.textContent = action.prop?.label || action.title;
   }
   ui.gameShell.dataset.layer = state.player.layer;
   ui.gameShell.dataset.level = state.level.id;
-  ui.touchControls.classList.toggle("locked", Boolean(state.caught));
+  ui.gameShell.classList.toggle("takedownCinematic", Boolean(state.takedown || state.takedownGrace > 0));
+  ui.touchControls.classList.toggle("locked", Boolean(state.caught || state.takedown));
+  ui.touchControls.classList.toggle("cinematic", Boolean(state.takedown));
   const depthButton = document.querySelector('[data-input="depth"] span');
   if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "↓ 下行" : "↑ 上行";
   RenderCivilianCommands();
@@ -889,7 +905,9 @@ function RenderQaPanel() {
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
-  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
+  const levelOneQa = '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelThreeQa = '<button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? levelOneQa : state.levelIndex === 2 ? levelThreeQa : "";
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
     EndCinematic();
@@ -976,6 +994,8 @@ function QaJumpToPhase(phaseId) {
 }
 
 function ContextHint() {
+  const takedownTarget = FindTakedownTarget();
+  if (takedownTarget) return `E · 从${takedownTarget.unitType === "collaborator" ? "伪军" : "敌兵"}背后制服｜非致命 · 本关一次`;
   const action = FindNearestAction();
   if (state.dog?.commandId) {
     const dogAction = state.level.actions.find((item) => item.id === state.dog.commandId);
@@ -1027,6 +1047,8 @@ function MetricsMarkup() {
 
 function Update(delta) {
   state.elapsed += delta;
+  state.unconsciousEnemies.forEach((enemy) => { enemy.age += delta; });
+  state.takedownGrace = Math.max(0, state.takedownGrace - delta);
   UpdateDogPartner(delta);
   state.player.rolePulse = Math.max(0, state.player.rolePulse - delta * .65);
   if (state.player.actionTime > 0) {
@@ -1036,6 +1058,11 @@ function Update(delta) {
   if (state.player.pickup) {
     state.player.pickup.time = Math.max(0, state.player.pickup.time - delta);
     if (state.player.pickup.time === 0) state.player.pickup = null;
+  }
+  if (state.takedown) {
+    UpdateTakedown(delta);
+    UpdateUi();
+    return;
   }
   if (state.caught) {
     UpdateCaught(delta);
@@ -1084,12 +1111,18 @@ function Update(delta) {
   UpdateCoverState();
   const targetX = Math.max(worldMin + 4, Math.min(worldMax - 4, state.player.x + state.player.facing * .7));
   state.camera.x = Lerp(state.camera.x, targetX, 1 - Math.pow(.002, delta));
-  state.camera.zoom = Lerp(state.camera.zoom, 1, 1 - Math.pow(.01, delta));
+  const followZoom = state.takedownGrace > 0 && innerWidth <= 640 ? 1.42 : 1;
+  state.camera.zoom = Lerp(state.camera.zoom, followZoom, 1 - Math.pow(.01, delta));
   UpdateDanger();
   UpdateUi();
 }
 
 function UpdateDanger() {
+  if (state.takedownGrace > 0) {
+    state.detection = 0;
+    state.visibility = GetActiveCover() ? 0 : 24;
+    return;
+  }
   state.detection = state.player.layer === "surface" ? GetDetectionStrength(state.player.x) : 0;
   const cover = GetActiveCover();
   state.visibility = state.player.layer === "tunnel" ? 0 : cover ? 0 : state.detection > 0 ? 100 : 46;
@@ -1126,6 +1159,82 @@ function UpdateCaught(delta) {
 
 function Lerp(a, b, amount) { return a + (b - a) * amount; }
 
+function SmoothStep(edgeA, edgeB, value) {
+  const progress = Math.max(0, Math.min(1, (value - edgeA) / Math.max(.0001, edgeB - edgeA)));
+  return progress * progress * (3 - 2 * progress);
+}
+
+function TakedownFigureScale(width) {
+  if (!state.takedown && state.takedownGrace <= 0) return 1;
+  return width <= 640 ? Math.min(2.35, 1 + (640 - Math.max(320, width)) / 190) : 1;
+}
+
+function FindTakedownTarget() {
+  if (state.levelIndex !== 2 || state.player.layer !== "surface" || state.selectedRole !== "scout") return null;
+  if (state.takedownUsed || state.takedown || state.caught || state.detected || state.detection > 0) return null;
+  return GetEnemyPatrols()
+    .map((enemy) => ({ enemy, distance: Math.abs(enemy.x - state.player.x), behind: (state.player.x - enemy.x) * enemy.facing }))
+    .filter((candidate) => candidate.distance >= .18 && candidate.distance <= 1.08 && candidate.behind <= -.16)
+    .sort((left, right) => left.distance - right.distance)[0]?.enemy || null;
+}
+
+function StartTakedown(enemy, qaPreview = false) {
+  if (!enemy || state.takedown || (!qaPreview && state.takedownUsed)) return;
+  inputKeys.left = false;
+  inputKeys.right = false;
+  state.takedownUsed = true;
+  state.neutralizedEnemies.add(enemy.id);
+  state.player.facing = enemy.facing;
+  state.player.moving = false;
+  state.player.motionBlend = 0;
+  state.player.actionKind = "takedown";
+  state.player.actionDuration = 2.65;
+  state.player.actionTime = 2.65;
+  state.takedown = {
+    time: 0,
+    duration: 2.65,
+    progress: 0,
+    startPlayerX: state.player.x,
+    target: { ...enemy, x: enemy.x, facing: enemy.facing },
+    impactTriggered: false,
+    qaPreview
+  };
+  Toast("屏息。贴近。只击昏，先收武器。", "success");
+}
+
+function UpdateTakedown(delta) {
+  const sequence = state.takedown;
+  if (!sequence) return;
+  sequence.time = Math.min(sequence.duration, sequence.time + delta);
+  sequence.progress = sequence.time / sequence.duration;
+  const target = sequence.target;
+  const closeProgress = SmoothStep(0, .54, sequence.time);
+  const behindX = target.x - target.facing * .4;
+  const recoverX = target.x - target.facing * .66;
+  state.player.x = Lerp(Lerp(sequence.startPlayerX, behindX, closeProgress), recoverX, SmoothStep(1.42, 2.25, sequence.time));
+  state.player.facing = target.facing;
+  state.player.moving = false;
+  state.player.motionBlend = 0;
+  const impactPulse = Math.max(0, 1 - Math.abs(sequence.time - .94) / .13);
+  const settle = SmoothStep(1.72, 2.65, sequence.time);
+  state.camera.x = target.x - target.facing * .04 + Math.sin(sequence.time * 96) * impactPulse * .028;
+  const cinematicZoom = innerWidth <= 640 ? 1.42 : 1.18;
+  state.camera.zoom = Lerp(cinematicZoom, innerWidth <= 640 ? 1.42 : 1.08, settle) + impactPulse * .055;
+  if (!sequence.impactTriggered && sequence.time >= .94) {
+    sequence.impactTriggered = true;
+    state.player.rolePulse = 1;
+  }
+  if (sequence.time < sequence.duration) return;
+  state.unconsciousEnemies.push({ ...target, x: target.x, facing: target.facing, disarmed: true, age: 0 });
+  state.takedown = null;
+  state.takedownGrace = 2.2;
+  state.player.actionKind = "inspect";
+  state.player.actionDuration = .48;
+  state.player.actionTime = .48;
+  state.alert = Math.min(100, state.alert + 4);
+  Toast("还有呼吸。枪已踢远，继续走。", "success");
+}
+
 function GetEnemyPatrols() {
   let bases = [];
   if (state.levelIndex === 0 && state.phaseId === "collect") bases = [-6.1, 2.2, 7.2];
@@ -1149,8 +1258,9 @@ function GetEnemyPatrols() {
     }
     const unitType = index % 3 === 1 ? "collaborator" : "soldier";
     const rank = index === 0 && state.phaseId === "defense" ? "sectionLeader" : "rifleman";
-    return { x, facing, viewDistance: state.levelIndex === 2 ? 4.4 : diversion ? 3.25 : 3.8, index, unitType, rank, investigating: Boolean(diversion) };
-  });
+    const id = `${state.levelIndex}:${state.phaseId}:${index}`;
+    return { id, x, facing, viewDistance: state.levelIndex === 2 ? 4.4 : diversion ? 3.25 : 3.8, index, unitType, rank, investigating: Boolean(diversion) };
+  }).filter((enemy) => !state.neutralizedEnemies.has(enemy.id));
 }
 
 function GetSurfaceCovers() {
@@ -1220,8 +1330,10 @@ function Draw() {
   DrawFluidSimulation(width, height, tunnelY);
   DrawDogCommandEnvironment(width, height, surfaceY, tunnelY);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
-  DrawActions(width, height, surfaceY, tunnelY);
+  if (!state.takedown) DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
+  DrawUnconsciousEnemies(width, surfaceY);
+  DrawTakedownTarget(width, surfaceY);
   DrawCivilians(width, height, tunnelY);
   DrawDogCompanion(width, height, surfaceY, tunnelY);
   DrawActor(width, height, surfaceY, tunnelY);
@@ -1237,6 +1349,7 @@ function Draw() {
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
   DrawDepthHint(width, height, surfaceY, tunnelY);
+  DrawTakedownCinematicOverlay(width, height);
   if (qaMode && !state.cleanCapture) DrawQa(width, height, surfaceY, tunnelY);
 }
 
@@ -1828,7 +1941,7 @@ function DrawSurfaceCovers(width, surfaceY, front) {
 }
 
 function DrawActorVisibilityHud(width, surfaceY) {
-  if (state.player.layer !== "surface" || (!GetEnemyPatrols().length && !state.caught)) return;
+  if (state.takedown || state.takedownGrace > 0 || state.player.layer !== "surface" || (!GetEnemyPatrols().length && !state.caught)) return;
   const profile = actorProfiles[state.selectedRole];
   const actorScale = Math.min(width, 1100) / 26 * .038;
   const actorHeight = profile.height * 39 * actorScale * (state.player.lowProfile ? .7 : 1);
@@ -2453,7 +2566,7 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
 }
 
 function QaInspectHazard(kind) {
-  if (!qaMode || state.levelIndex !== 0) return;
+  if (!qaMode) return;
   if (kind === "clean") {
     state.cleanCapture = true;
     Show(ui.qaPanel, false);
@@ -2462,6 +2575,25 @@ function QaInspectHazard(kind) {
     UpdateUi();
     return;
   }
+  if (kind === "takedown") {
+    if (state.levelIndex !== 2) return;
+    QaJumpToPhase("harass");
+    EndCinematic();
+    const previewPatrols = GetEnemyPatrols();
+    const target = { ...(previewPatrols[0] || {}), x: 1.2, facing: 1, unitType: "soldier", index: 0 };
+    state.player.layer = "surface";
+    state.player.x = target.x - target.facing * .86;
+    state.player.facing = target.facing;
+    state.lastSafeX = state.player.x;
+    state.camera.x = target.x;
+    state.camera.targetX = target.x;
+    state.camera.zoom = 1.18;
+    state.camera.targetZoom = 1.18;
+    StartTakedown(target, true);
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
+  if (state.levelIndex !== 0) return;
   if (kind === "buildPanel") {
     QaJumpToPhase("build");
     state.resources.wood = 6;
@@ -3294,6 +3426,7 @@ function DrawEntrances(width, height, surfaceY, tunnelY) {
 }
 
 function DrawDepthHint(width, height, surfaceY, tunnelY) {
+  if (state.takedown) return;
   const entrance = entrances.find((worldX) => Math.abs(worldX - state.player.x) <= 1.15);
   if (entrance === undefined || state.cinematic || state.caught) return;
   const x = WorldToScreen(entrance, width);
@@ -3309,12 +3442,17 @@ function DrawDepthHint(width, height, surfaceY, tunnelY) {
 function DrawEnemyUnit(enemy, height, x, baseY) {
   const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
   const isCollaborator = enemy.unitType === "collaborator";
+  const fall = Math.max(0, Math.min(1, enemy.takedownFall || 0));
   const phase = state.elapsed * (isCollaborator ? 4.35 : 3.85) + enemy.index * 1.7;
-  const stride = Math.sin(phase) * .34;
-  const investigateLift = enemy.investigating ? .32 + Math.sin(state.elapsed * 4 + enemy.index) * .08 : 0;
+  const stride = Math.sin(phase) * .34 * (1 - fall);
+  const investigateLift = enemy.investigating && !fall ? .32 + Math.sin(state.elapsed * 4 + enemy.index) * .08 : 0;
   const limbWidth = Math.max(3.2, height * profile.limb);
 
   context.save(); context.translate(x, baseY); context.scale(enemy.facing, 1);
+  if (fall > 0) {
+    context.translate(0, fall * height * .025);
+    context.rotate(-fall * 1.43);
+  }
   context.fillStyle = "rgba(0,0,0,.34)"; context.beginPath(); context.ellipse(0, 3, height * .18, 4.5, 0, 0, Math.PI * 2); context.fill();
 
   const rearFoot = DrawJointedLimb(-height * .055, -height * .34, height * .205, height * .185, stride, -stride * .38, profile.pants, limbWidth + .45);
@@ -3344,18 +3482,22 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
     context.fillStyle = "#53513d"; context.beginPath(); context.ellipse(-height * .155, -height * .47, height * .075, height * .12, -.1, 0, Math.PI * 2); context.fill();
   }
 
-  const rearArm = isCollaborator ? -.18 : .16;
-  DrawJointedLimb(-shoulder * .82, -height * .655, height * .17, height * .155, rearArm, isCollaborator ? -.35 : .58, profile.body, limbWidth);
+  const rearArm = fall ? Lerp(isCollaborator ? -.18 : .16, 1.34, fall) : isCollaborator ? -.18 : .16;
+  DrawJointedLimb(-shoulder * .82, -height * .655, height * .17, height * .155, rearArm, fall ? 2.42 : isCollaborator ? -.35 : .58, profile.body, limbWidth);
   if (isCollaborator) {
-    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .15, .92 + investigateLift, .45, profile.body, limbWidth);
-    context.strokeStyle = "#8a6a3f"; context.lineWidth = 3; context.beginPath(); context.moveTo(height * .19, -height * (.47 + investigateLift * .3)); context.lineTo(height * .38, -height * (.43 + investigateLift * .25)); context.stroke();
-    context.fillStyle = "#d0a75b"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .035, 0, Math.PI * 2); context.fill();
-    context.fillStyle = "rgba(244,181,74,.18)"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .16, 0, Math.PI * 2); context.fill();
+    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .15, fall ? 1.86 : .92 + investigateLift, fall ? 2.68 : .45, profile.body, limbWidth);
+    if (!enemy.disarmed) {
+      context.strokeStyle = "#8a6a3f"; context.lineWidth = 3; context.beginPath(); context.moveTo(height * .19, -height * (.47 + investigateLift * .3)); context.lineTo(height * .38, -height * (.43 + investigateLift * .25)); context.stroke();
+      context.fillStyle = "#d0a75b"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .035, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "rgba(244,181,74,.18)"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .16, 0, Math.PI * 2); context.fill();
+    }
   } else {
-    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .155, .72 + investigateLift, .18, profile.body, limbWidth);
-    context.strokeStyle = "#3b3027"; context.lineWidth = Math.max(4, height * .045); context.beginPath(); context.moveTo(-height * .33, -height * .54); context.lineTo(height * .37, -height * (.48 + investigateLift * .08)); context.stroke();
-    context.strokeStyle = "#a17a46"; context.lineWidth = 2.2; context.beginPath(); context.moveTo(-height * .29, -height * .545); context.lineTo(height * .24, -height * (.5 + investigateLift * .08)); context.stroke();
-    context.fillStyle = "#5e5d4b"; context.fillRect(-height * .37, -height * .565, height * .11, height * .035);
+    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .155, fall ? 1.76 : .72 + investigateLift, fall ? 2.56 : .18, profile.body, limbWidth);
+    if (!enemy.disarmed) {
+      context.strokeStyle = "#3b3027"; context.lineWidth = Math.max(4, height * .045); context.beginPath(); context.moveTo(-height * .33, -height * .54); context.lineTo(height * .37, -height * (.48 + investigateLift * .08)); context.stroke();
+      context.strokeStyle = "#a17a46"; context.lineWidth = 2.2; context.beginPath(); context.moveTo(-height * .29, -height * .545); context.lineTo(height * .24, -height * (.5 + investigateLift * .08)); context.stroke();
+      context.fillStyle = "#5e5d4b"; context.fillRect(-height * .37, -height * .565, height * .11, height * .035);
+    }
   }
 
   const headY = -height * (.86 + investigateLift * .06);
@@ -3372,7 +3514,7 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   }
   context.restore();
 
-  if (enemy.investigating) {
+  if (enemy.investigating && !fall) {
     context.fillStyle = "rgba(8,13,15,.9)"; context.beginPath(); context.arc(x, baseY - height - 13, 10, 0, Math.PI * 2); context.fill();
     context.strokeStyle = isCollaborator ? "#d7c490" : "#e2bc67"; context.lineWidth = 1.5; context.stroke();
     context.fillStyle = "#f3d78f"; context.font = "900 12px system-ui"; context.textAlign = "center"; context.fillText("?", x, baseY - height - 9);
@@ -3389,7 +3531,7 @@ function DrawEnemies(width, surfaceY) {
   patrols.forEach((enemy) => {
     const x = WorldToScreen(enemy.x, width);
     const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
-    const active = EnemyDetection(enemy) > 0;
+    const active = state.takedownGrace <= 0 && EnemyDetection(enemy) > 0;
     const gradient = context.createLinearGradient(x, 0, endX, 0);
     gradient.addColorStop(0, active ? "rgba(229,58,44,.48)" : "rgba(222,190,108,.13)");
     gradient.addColorStop(1, active ? "rgba(195,43,34,.06)" : "rgba(215,184,103,0)");
@@ -3399,6 +3541,178 @@ function DrawEnemies(width, surfaceY) {
     context.beginPath(); context.moveTo(x + enemy.facing * height * .11, baseY - height * .72); context.lineTo(endX, surfaceY + 3); context.stroke();
   });
   patrols.forEach((enemy) => DrawEnemyUnit(enemy, height, WorldToScreen(enemy.x, width), baseY));
+  DrawTakedownPrompt(width, surfaceY, height);
+}
+
+function DrawTakedownPrompt(width, surfaceY, enemyHeight) {
+  const target = FindTakedownTarget();
+  if (!target || state.takedown) return;
+  const x = WorldToScreen(target.x, width);
+  const y = surfaceY - enemyHeight - 31;
+  context.save(); context.textAlign = "center";
+  context.fillStyle = "rgba(20,18,15,.94)"; context.strokeStyle = "#bd3f35"; context.lineWidth = 1.8;
+  context.beginPath(); context.roundRect(x - 54, y - 17, 108, 26, 3); context.fill(); context.stroke();
+  context.fillStyle = "#eadbbc"; context.font = '800 11px "FangSong", serif'; context.fillText("E  背后制服", x, y);
+  context.strokeStyle = "rgba(189,63,53,.72)"; context.setLineDash([3, 3]); context.beginPath(); context.moveTo(x, y + 9); context.lineTo(x, surfaceY - enemyHeight * .73); context.stroke();
+  context.restore();
+}
+
+function DrawDroppedEnemyEquipment(enemy, width, baseY, enemyHeight, dropProgress = 1) {
+  const progress = Math.max(0, Math.min(1, dropProgress));
+  const cinematicFocus = width <= 640 && Boolean(state.takedown || state.takedownGrace > 0);
+  const targetWorldX = enemy.x + enemy.facing * .72;
+  const startX = WorldToScreen(enemy.x + enemy.facing * .12, width);
+  const endX = WorldToScreen(targetWorldX, width);
+  const x = Lerp(startX, endX, progress);
+  const y = baseY - (cinematicFocus ? 11 : 4) - Math.sin(progress * Math.PI) * enemyHeight * .22;
+  context.save(); context.translate(x, y); context.rotate(enemy.facing * Lerp(-.35, .08, progress)); context.globalAlpha = SmoothStep(0, .22, progress);
+  if (cinematicFocus) {
+    context.strokeStyle = "rgba(220,190,132,.72)"; context.lineCap = "round"; context.lineWidth = enemy.unitType === "collaborator" ? 9 : 12;
+    context.beginPath(); context.moveTo(enemy.unitType === "collaborator" ? -20 : -34, 0); context.lineTo(enemy.unitType === "collaborator" ? 20 : 34, 0); context.stroke();
+  }
+  if (enemy.unitType === "collaborator") {
+    context.strokeStyle = "rgba(24,22,19,.62)"; context.lineWidth = 6; context.beginPath(); context.moveTo(-18, 2); context.lineTo(18, 2); context.stroke();
+    context.strokeStyle = "#8a6a3f"; context.lineWidth = 3; context.beginPath(); context.moveTo(-18, 0); context.lineTo(17, 0); context.stroke();
+    context.fillStyle = "#d0a75b"; context.beginPath(); context.arc(19, 0, 3.5, 0, Math.PI * 2); context.fill();
+  } else {
+    context.strokeStyle = "rgba(24,22,19,.68)"; context.lineWidth = 8; context.beginPath(); context.moveTo(-31, 3); context.lineTo(31, 3); context.stroke();
+    context.strokeStyle = "#6d5035"; context.lineWidth = 4.5; context.beginPath(); context.moveTo(-31, 0); context.lineTo(31, 0); context.stroke();
+    context.strokeStyle = "#b08a52"; context.lineWidth = 2; context.beginPath(); context.moveTo(-23, -1); context.lineTo(22, -1); context.stroke();
+  }
+  if (cinematicFocus && progress > .58) {
+    context.strokeStyle = "rgba(184,63,53,.78)"; context.lineWidth = 2;
+    [-1, 0, 1].forEach((ray) => { context.beginPath(); context.moveTo(ray * 9, -9); context.lineTo(ray * 13, -15 - Math.abs(ray) * 2); context.stroke(); });
+  }
+  context.restore();
+}
+
+function DrawProneEnemyBody(enemy, width, baseY, height, alpha = 1) {
+  const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
+  const x = WorldToScreen(enemy.x, width);
+  const cinematicFocus = width <= 640 && Boolean(state.takedown || state.takedownGrace > 0);
+  context.save(); context.translate(x, baseY - 3); context.scale(enemy.facing, 1); context.globalAlpha = alpha;
+  if (cinematicFocus) {
+    context.fillStyle = "rgba(214,182,111,.18)"; context.strokeStyle = "rgba(226,199,146,.68)"; context.lineWidth = 2.4;
+    context.beginPath(); context.ellipse(0, -height * .09, height * .69, height * .24, -.04, 0, Math.PI * 2); context.fill(); context.stroke();
+  }
+  context.fillStyle = "rgba(0,0,0,.38)"; context.beginPath(); context.ellipse(2, 3, height * .55, 6, 0, 0, Math.PI * 2); context.fill();
+  context.strokeStyle = cinematicFocus ? "rgba(222,193,137,.72)" : "rgba(25,27,26,.5)"; context.lineWidth = Math.max(7, height * .075) + (cinematicFocus ? 3 : 0); context.lineCap = "round";
+  context.beginPath(); context.moveTo(-height * .08, -height * .08); context.lineTo(-height * .43, -height * .02); context.stroke();
+  context.strokeStyle = profile.pants; context.lineWidth = Math.max(4, height * .048); context.beginPath(); context.moveTo(-height * .08, -height * .1); context.lineTo(-height * .43, -height * .04); context.stroke();
+  context.fillStyle = "#302d27"; context.beginPath(); context.ellipse(-height * .48, -height * .025, height * .09, 4, -.08, 0, Math.PI * 2); context.fill();
+  context.fillStyle = profile.body; context.strokeStyle = cinematicFocus ? "rgba(229,204,157,.76)" : "rgba(32,29,24,.62)"; context.lineWidth = cinematicFocus ? 3.4 : 2;
+  context.beginPath(); context.roundRect(-height * .12, -height * .24, height * .48, height * .22, 5); context.fill(); context.stroke();
+  context.fillStyle = enemy.unitType === "collaborator" ? "#273234" : "#4a4938"; context.fillRect(-height * .11, -height * .1, height * .45, Math.max(3, height * .035));
+  context.strokeStyle = profile.body; context.lineWidth = Math.max(5, height * .055); context.beginPath(); context.moveTo(height * .02, -height * .17); context.lineTo(height * .26, -height * .29); context.stroke();
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(height * .43, -height * .15, height * profile.head, 0, Math.PI * 2); context.fill();
+  context.fillStyle = enemy.unitType === "collaborator" ? "#2c3738" : "#5b5c45"; context.beginPath(); context.arc(height * .43, -height * .18, height * profile.head * 1.02, Math.PI, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(57,38,29,.7)"; context.beginPath(); context.arc(height * .47, -height * .14, 1.8, 0, Math.PI * 2); context.fill();
+  context.restore();
+}
+
+function DrawImpactInkBurst(screenX, screenY, pulse) {
+  if (pulse <= 0) return;
+  context.save(); context.translate(screenX, screenY); context.globalAlpha = pulse;
+  context.strokeStyle = "#ead7ad"; context.fillStyle = "#b83f35"; context.lineCap = "round";
+  for (let ray = 0; ray < 11; ray += 1) {
+    const angle = ray / 11 * Math.PI * 2 + .17;
+    const inner = 16 + (ray % 3) * 3;
+    const outer = 32 + (ray % 4) * 8;
+    context.lineWidth = ray % 2 ? 1.6 : 3.1;
+    context.beginPath(); context.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner); context.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer); context.stroke();
+  }
+  context.beginPath(); context.arc(0, 0, 7 + pulse * 5, 0, Math.PI * 2); context.fill();
+  context.restore();
+}
+
+function DrawTakedownTarget(width, surfaceY) {
+  const sequence = state.takedown;
+  if (!sequence) return;
+  const target = sequence.target;
+  const profile = actorProfiles[target.unitType] || actorProfiles.soldier;
+  const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
+  const height = profile.height * 39 * scale;
+  const baseY = surfaceY - 5;
+  const fall = SmoothStep(.92, 1.54, sequence.time);
+  const disarmed = sequence.time >= .96;
+  const screenX = WorldToScreen(target.x, width);
+  const focus = 1 - SmoothStep(.72, 1.02, sequence.time);
+  if (focus > 0) {
+    context.save(); context.globalAlpha = focus; context.strokeStyle = "#d6b66f"; context.lineWidth = 1.7; context.setLineDash([4, 4]);
+    context.beginPath(); context.arc(screenX, baseY - height * .7, height * .34, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    context.restore();
+  }
+  const uprightAlpha = 1 - SmoothStep(.52, .86, fall);
+  const proneAlpha = SmoothStep(.44, .84, fall);
+  if (uprightAlpha > .01) {
+    context.save(); context.globalAlpha = uprightAlpha; context.shadowColor = "rgba(214,182,111,.42)"; context.shadowBlur = sequence.time < 1.08 ? 9 : 0;
+    DrawEnemyUnit({ ...target, takedownFall: fall, disarmed, investigating: false }, height, screenX, baseY);
+    context.restore();
+  }
+  if (proneAlpha > .01) DrawProneEnemyBody(target, width, baseY, height, proneAlpha);
+  if (disarmed) DrawDroppedEnemyEquipment(target, width, baseY, height, SmoothStep(.96, 1.56, sequence.time));
+  const impactPulse = Math.max(0, 1 - Math.abs(sequence.time - .96) / .16);
+  DrawImpactInkBurst(screenX + target.facing * height * .02, baseY - height * .83, impactPulse);
+}
+
+function DrawUnconsciousEnemies(width, surfaceY) {
+  if (!state.unconsciousEnemies.length) return;
+  const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
+  state.unconsciousEnemies.forEach((enemy) => {
+    const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
+    const height = profile.height * 39 * scale;
+    const baseY = surfaceY - 5;
+    DrawProneEnemyBody(enemy, width, baseY, height, 1);
+    DrawDroppedEnemyEquipment(enemy, width, baseY, height, 1);
+    const bodyX = WorldToScreen(enemy.x + enemy.facing * .04, width);
+    const equipmentX = WorldToScreen(enemy.x + enemy.facing * .72, width);
+    const breath = .5 + Math.sin(state.elapsed * 2.4) * .5;
+    context.save(); context.textAlign = "center";
+    context.strokeStyle = `rgba(214,198,154,${.28 + breath * .42})`; context.lineWidth = 1.6;
+    context.beginPath(); context.arc(bodyX, baseY - 21, 10 + breath * 4, Math.PI * 1.08, Math.PI * 1.92); context.stroke();
+    if (enemy.age < 4.5) {
+      const alpha = Math.min(1, (4.5 - enemy.age) * .65);
+      context.globalAlpha = alpha;
+      context.fillStyle = "rgba(20,18,15,.92)"; context.fillRect(bodyX - 61, baseY + 38, 122, 23);
+      context.strokeStyle = "rgba(143,151,118,.82)"; context.strokeRect(bodyX - 60.5, baseY + 38.5, 121, 22);
+      context.fillStyle = "#e6d8b7"; context.font = '800 10px "FangSong", serif'; context.fillText("已制服 · 尚有呼吸", bodyX, baseY + 54);
+      context.strokeStyle = "rgba(184,63,53,.7)"; context.lineWidth = 1.2; context.beginPath(); context.moveTo(equipmentX, baseY + 8); context.lineTo(equipmentX, baseY + 27); context.stroke();
+      context.fillStyle = "#b83f35"; context.beginPath(); context.arc(equipmentX, baseY + 30, 3, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#d5c397"; context.font = '700 8px "FangSong", serif'; context.fillText("武器已离手", equipmentX, baseY + 72);
+    }
+    context.restore();
+  });
+}
+
+function DrawTakedownCinematicOverlay(width, height) {
+  const sequence = state.takedown;
+  if (!sequence) return;
+  const time = sequence.time;
+  const open = SmoothStep(0, .22, time) * (1 - SmoothStep(2.42, 2.65, time));
+  const captions = time < .38 ? ["屏息", "先让脚步停下来"] : time < .86 ? ["贴近", "扣住持械一侧"] : time < 1.42 ? ["击昏", "一击即收，不恋战"] : ["收械", "确认呼吸，武器踢远"];
+  const activeBeat = time < .38 ? 0 : time < .86 ? 1 : time < 1.42 ? 2 : 3;
+  context.save();
+  const vignette = context.createRadialGradient(width * .5, height * .49, width * .12, width * .5, height * .49, width * .68);
+  vignette.addColorStop(0, "rgba(14,16,14,0)"); vignette.addColorStop(1, `rgba(10,9,8,${.5 * open})`);
+  context.fillStyle = vignette; context.fillRect(0, 0, width, height);
+  context.fillStyle = `rgba(13,12,10,${.9 * open})`; context.fillRect(0, 0, width, 42 * open); context.fillRect(0, height - 64 * open, width, 64 * open);
+  context.textAlign = "center"; context.font = '800 10px "FangSong", serif';
+  const beatLabels = ["屏息", "扣肩", "击昏", "收械"];
+  const startX = width * .5 - 116;
+  beatLabels.forEach((label, index) => {
+    const x = startX + index * 78;
+    context.fillStyle = index === activeBeat ? "#b83f35" : index < activeBeat ? "#7e8067" : "rgba(224,210,174,.28)";
+    context.beginPath(); context.rotate(0); context.rect(x - 4, 18, 8, 8); context.fill();
+    context.fillStyle = index === activeBeat ? "#f0dfbd" : "rgba(226,214,184,.55)"; context.fillText(label, x, 14);
+    if (index < beatLabels.length - 1) { context.strokeStyle = "rgba(222,205,167,.24)"; context.lineWidth = 1; context.beginPath(); context.moveTo(x + 10, 22); context.lineTo(x + 68, 22); context.stroke(); }
+  });
+  context.fillStyle = `rgba(18,16,13,${.92 * open})`; context.fillRect(width * .5 - 118, height - 51, 236, 34);
+  context.fillStyle = "#b83f35"; context.fillRect(width * .5 - 118, height - 51, 5, 34);
+  context.fillStyle = "#f1dfbb"; context.font = '900 16px "FangSong", serif'; context.fillText(captions[0], width * .5 - 63, height - 30);
+  context.fillStyle = "#bfb394"; context.font = '700 10px "FangSong", serif'; context.textAlign = "left"; context.fillText(captions[1], width * .5 - 25, height - 30);
+  const flash = Math.max(0, 1 - Math.abs(time - .96) / .1);
+  if (flash > 0) { context.fillStyle = `rgba(237,220,177,${flash * .2})`; context.fillRect(0, 0, width, height); }
+  context.restore();
 }
 
 function DrawJointedLimb(originX, originY, upperLength, lowerLength, upperAngle, lowerAngle, color, width) {
@@ -3440,6 +3754,21 @@ function DrawHeadwear(profile, roleId, height, headY, headRadius) {
 
 function DrawRoleProp(profile, roleId, height, actionLift) {
   context.strokeStyle = profile.accent; context.fillStyle = profile.accent; context.lineCap = "round";
+  if (roleId === "scout" && state.player.actionKind === "takedown" && state.takedown) {
+    const time = state.takedown.time;
+    const windup = SmoothStep(.35, .76, time);
+    const strike = SmoothStep(.76, 1.02, time);
+    const secure = SmoothStep(1.28, 1.82, time);
+    const angle = Lerp(-1.05, .78, windup) - strike * 1.38 + secure * .32;
+    context.save();
+    context.translate(height * .17, -height * .49);
+    context.rotate(angle);
+    context.strokeStyle = "rgba(24,22,19,.62)"; context.lineWidth = 7; context.beginPath(); context.moveTo(2, 2); context.lineTo(height * .42 + 2, 2); context.stroke();
+    context.strokeStyle = "#8a6748"; context.lineWidth = 4.2; context.beginPath(); context.moveTo(0, 0); context.lineTo(height * .42, 0); context.stroke();
+    context.strokeStyle = "#d2b47b"; context.lineWidth = 6.2; context.beginPath(); context.moveTo(height * .32, 0); context.lineTo(height * .43, 0); context.stroke();
+    context.restore();
+    return;
+  }
   if (profile.prop === "map") {
     context.strokeStyle = "#8d5d3f"; context.lineWidth = 2; context.beginPath(); context.moveTo(-height * .22, -height * .61); context.lineTo(height * .2, -height * .27); context.stroke();
     context.fillStyle = "#d6c69e"; context.fillRect(height * .12, -height * .34, height * .16, height * .12);
@@ -3475,16 +3804,20 @@ function DrawHumanActor(profile, roleId, height) {
   if ((roleId === "student" || roleId === "scout") && idleGesture > 0) actionLift = idleGesture;
   const idleBreath = Math.sin(state.elapsed * (1.25 + profile.gait * .22)) * 1.1;
   const bob = Math.abs(Math.sin(phase)) * -2.1 * moving + idleBreath * (1 - moving);
-  const profileScale = state.player.lowProfile || action === "crawl" ? .7 : 1;
+  const takedownTime = action === "takedown" && state.takedown ? state.takedown.time : 0;
+  const takedownKneel = action === "takedown" ? SmoothStep(1.42, 2.05, takedownTime) : 0;
+  const profileScale = state.player.lowProfile || action === "crawl" ? .7 : 1 - takedownKneel * .23;
   context.translate(0, bob);
   context.scale(1, profileScale);
   if (state.player.lowProfile || action === "crawl") context.rotate(-.055);
+  if (action === "takedown") context.rotate(-.075 * SmoothStep(.22, .72, takedownTime) + .045 * takedownKneel);
 
   context.fillStyle = "rgba(0,0,0,.32)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .24, 5, 0, 0, Math.PI * 2); context.fill();
 
   let rearLeg = Math.sin(phase) * .34 * moving;
   let frontLeg = -rearLeg;
   if (action === "climb") { rearLeg = Math.sin(actionProgress * Math.PI * 4) * .42; frontLeg = -rearLeg; }
+  if (action === "takedown") { rearLeg = .24 * takedownKneel; frontLeg = -.18 * takedownKneel; }
   const rearFoot = DrawJointedLimb(-height * .065, -height * .34, height * .2, height * .18, rearLeg, -rearLeg * .35, profile.pants, limbWidth + .55);
   const frontFoot = DrawJointedLimb(height * .065, -height * .34, height * .2, height * .18, frontLeg, -frontLeg * .35, profile.pants, limbWidth + .55);
   context.fillStyle = "#282a28"; [rearFoot, frontFoot].forEach((foot, index) => { context.beginPath(); context.ellipse(foot.x + (index ? 2 : -2), foot.y + 1, height * .055, Math.max(2.4, height * .025), index ? -.08 : .08, 0, Math.PI * 2); context.fill(); });
@@ -3500,6 +3833,20 @@ function DrawHumanActor(profile, roleId, height) {
   else if (action === "ready") { rearArm = -.7 * actionLift; frontArm = .72 * actionLift; rearForearm = -.2; frontForearm = .2; }
   else if (action === "climb") { rearArm = 2.45 - Math.sin(actionProgress * Math.PI * 4) * .35; frontArm = 2.45 + Math.sin(actionProgress * Math.PI * 4) * .35; rearForearm = 2.8; frontForearm = 2.8; }
   else if (action === "caught") { rearArm = 2.72; frontArm = 2.58; rearForearm = 3.05; frontForearm = 3.12; }
+  else if (action === "takedown") {
+    const reach = SmoothStep(.18, .56, takedownTime);
+    const strike = SmoothStep(.62, .94, takedownTime) * (1 - SmoothStep(.94, 1.18, takedownTime));
+    rearArm = Lerp(.05, 1.46, reach) - strike * 2.25;
+    frontArm = Lerp(.18, 1.72, reach) - strike * .48;
+    rearForearm = Lerp(-.1, 2.25, reach) - strike * 1.35;
+    frontForearm = Lerp(.15, 2.62, reach) - strike * .82;
+    if (takedownKneel > 0) {
+      rearArm = Lerp(rearArm, 1.18, takedownKneel);
+      frontArm = Lerp(frontArm, 1.62, takedownKneel);
+      rearForearm = Lerp(rearForearm, 2.28, takedownKneel);
+      frontForearm = Lerp(frontForearm, 2.72, takedownKneel);
+    }
+  }
   else if ((roleId === "student" || roleId === "scout") && idleGesture > 0) {
     frontArm = 1.35 + idleGesture * .48; frontForearm = 2.2 + idleGesture * .58;
     rearArm = .72 + idleGesture * .34; rearForearm = 1.55 + idleGesture * .66;
@@ -3666,13 +4013,13 @@ function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
   const role = roleDefinitions[roleId];
   const x = WorldToScreen(state.player.x, width);
   const baseY = state.player.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(state.player.x, viewportHeight, tunnelY);
-  const scale = Math.min(width, 1100) / 26 * .038;
+  const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
   if (profile.animal) DrawDogActor(profile, height, state.player);
   else DrawHumanActor(profile, roleId, height);
   context.restore();
-  DrawActorIdentity(profile, role, x, baseY, height);
+  if (!state.takedown) DrawActorIdentity(profile, role, x, baseY, height);
 }
 
 function DrawSurfaceVegetation(width, height, surfaceY) {

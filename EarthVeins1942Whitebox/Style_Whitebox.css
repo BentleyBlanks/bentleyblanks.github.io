@@ -524,6 +524,10 @@ h1 small { color: #bd553f; }
 #touchControls button.pressed { background: rgba(157,64,51,.82); border-color: #d5a66c; }
 #touchControls .touchPrimary { color: #f0dfbd; background: #a84637; border: 2px solid #d3ac72; }
 #touchControls .touchPrimary span { color: #f0dfbd; }
+#touchControls.cinematic { opacity: 0 !important; visibility: hidden; pointer-events: none; }
+#gameShell.takedownCinematic #objectiveCard,
+#gameShell.takedownCinematic #metricsPanel,
+#gameShell.takedownCinematic #interactionPrompt { opacity: 0; visibility: hidden; }
 #civilianCommandPanel, #dogCommandHud { color: #e7d6b3; background: rgba(43,34,27,.9); border-color: rgba(213,187,143,.34); border-radius: 2px; backdrop-filter: none; }
 .civilianGroupButtons button.active { color: #30281f; background: #d7c39a; border-color: #6d4c36; }
 .civilianShelterButtons button { color: #dfcfad; background: rgba(125,94,56,.18); border-color: rgba(188,142,79,.42); }
