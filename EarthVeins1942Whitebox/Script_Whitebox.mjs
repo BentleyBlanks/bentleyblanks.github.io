@@ -1,6 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803x";
-import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803x";
-import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803x";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803y";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803y";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803y";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -1187,16 +1187,56 @@ function SceneHash(seed) {
 
 function DrawMountainLayer(width, surfaceY, layer) {
   const offset = state.camera.x * width * layer.parallax * .018;
-  context.beginPath(); context.moveTo(-80, surfaceY + 2);
-  for (let x = -80; x <= width + 100; x += layer.step) {
+  const ridgePoints = [];
+  for (let x = -100; x <= width + 120; x += layer.step * .52) {
     const broad = Math.sin((x + offset) * layer.frequency + layer.seed) * layer.amplitude;
     const ridge = Math.sin((x + offset) * layer.frequency * 2.37 + layer.seed * 1.9) * layer.amplitude * .34;
-    const peak = Math.abs(Math.sin((x + offset) * layer.frequency * .61 + layer.seed * 2.4)) * layer.amplitude * .56;
-    context.lineTo(x, layer.baseY + broad + ridge - peak);
+    const peakWave = Math.abs(Math.sin((x + offset) * layer.frequency * .61 + layer.seed * 2.4));
+    const peak = Math.pow(peakWave, 1.8) * layer.amplitude * .72;
+    const crag = (SceneHash(Math.floor((x + offset) / layer.step) + layer.seed * 31) - .5) * layer.amplitude * .23;
+    ridgePoints.push({ x, y: layer.baseY + broad + ridge - peak + crag });
   }
+  context.beginPath(); context.moveTo(-100, surfaceY + 2);
+  ridgePoints.forEach((point) => context.lineTo(point.x, point.y));
   context.lineTo(width + 100, surfaceY + 2); context.closePath();
   context.fillStyle = layer.color; context.fill();
-  context.strokeStyle = layer.rim; context.lineWidth = layer.lineWidth; context.stroke();
+
+  context.save(); context.clip();
+  const detail = Math.max(.22, layer.parallax * 2.4);
+  context.strokeStyle = layer.hatch || `rgba(30,31,27,${.12 + detail * .16})`;
+  context.lineCap = "round";
+  for (let index = 1; index < ridgePoints.length - 1; index += 1) {
+    if (index % 2 === 0) continue;
+    const point = ridgePoints[index];
+    const previous = ridgePoints[index - 1];
+    const next = ridgePoints[index + 1];
+    const slope = Math.max(-.85, Math.min(.85, (next.y - previous.y) / Math.max(1, next.x - previous.x)));
+    const strokeCount = 1 + Math.floor(detail * 3);
+    for (let stroke = 0; stroke < strokeCount; stroke += 1) {
+      const inset = 7 + stroke * (8 + detail * 5) + SceneHash(index * 13 + stroke + layer.seed) * 8;
+      const startX = point.x + (stroke - strokeCount * .35) * layer.step * .18;
+      const startY = point.y + inset;
+      const length = 10 + detail * 25 + SceneHash(index * 7 + stroke) * 13;
+      context.lineWidth = .55 + detail * .75;
+      context.beginPath();
+      context.moveTo(startX, startY);
+      context.quadraticCurveTo(startX + length * .45, startY + slope * length * .2 + 3, startX + length, startY + slope * length + 7);
+      context.stroke();
+    }
+  }
+  context.strokeStyle = `rgba(225,205,165,${.025 + (1 - layer.parallax) * .035})`;
+  context.lineWidth = .7;
+  ridgePoints.forEach((point, index) => {
+    if (index % 5 !== 1) return;
+    context.beginPath();
+    context.moveTo(point.x, point.y + 6);
+    context.bezierCurveTo(point.x - layer.step * .3, point.y + 19, point.x + layer.step * .35, point.y + 29, point.x + layer.step * .18, point.y + 47);
+    context.stroke();
+  });
+  context.restore();
+
+  context.beginPath(); ridgePoints.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
+  context.strokeStyle = layer.rim; context.lineWidth = layer.lineWidth; context.lineJoin = "round"; context.stroke();
 }
 
 function DrawSky(width, height, surfaceY, daylight) {
@@ -1239,10 +1279,10 @@ function DrawSky(width, height, surfaceY, daylight) {
   });
 
   [
-    { parallax: .035, baseY: surfaceY * .53, amplitude: 23, step: 58, frequency: .008, seed: .7, color: isDay ? "#777c70" : "#293336", rim: "rgba(229,218,187,.08)", lineWidth: 1 },
-    { parallax: .075, baseY: surfaceY * .61, amplitude: 32, step: 52, frequency: .0092, seed: 2.1, color: isDay ? "#676f62" : "#303a39", rim: "rgba(220,204,169,.09)", lineWidth: 1.2 },
-    { parallax: .145, baseY: surfaceY * .69, amplitude: 42, step: 44, frequency: .0105, seed: 4.4, color: isDay ? "#565e50" : "#3a403b", rim: "rgba(211,188,145,.11)", lineWidth: 1.5 },
-    { parallax: .245, baseY: surfaceY * .78, amplitude: 34, step: 38, frequency: .013, seed: 6.6, color: isDay ? "#484e40" : "#3b3d34", rim: "rgba(218,180,126,.13)", lineWidth: 1.7 }
+    { parallax: .035, baseY: surfaceY * .53, amplitude: 23, step: 58, frequency: .008, seed: .7, color: isDay ? "#858779" : "#313d3f", rim: "rgba(229,218,187,.11)", hatch: "rgba(32,34,31,.08)", lineWidth: 1 },
+    { parallax: .075, baseY: surfaceY * .61, amplitude: 32, step: 52, frequency: .0092, seed: 2.1, color: isDay ? "#717667" : "#394342", rim: "rgba(220,204,169,.13)", hatch: "rgba(24,29,27,.12)", lineWidth: 1.25 },
+    { parallax: .145, baseY: surfaceY * .69, amplitude: 42, step: 44, frequency: .0105, seed: 4.4, color: isDay ? "#5f6655" : "#444940", rim: "rgba(211,188,145,.17)", hatch: "rgba(28,29,24,.18)", lineWidth: 1.55 },
+    { parallax: .245, baseY: surfaceY * .78, amplitude: 34, step: 38, frequency: .013, seed: 6.6, color: isDay ? "#4e5544" : "#4a493b", rim: "rgba(218,180,126,.2)", hatch: "rgba(28,24,19,.23)", lineWidth: 1.8 }
   ].forEach((layer) => DrawMountainLayer(width, surfaceY, layer));
 
   const treeBaseY = surfaceY - 31;
@@ -1255,27 +1295,49 @@ function DrawSky(width, height, surfaceY, daylight) {
 }
 
 function DrawFieldDepth(width, surfaceY) {
-  const horizonY = surfaceY - 57;
+  const horizonY = surfaceY - 72;
   const vanishX = width * .52 - state.camera.x * width * .006;
   const fieldGradient = context.createLinearGradient(0, horizonY, 0, surfaceY + 4);
-  fieldGradient.addColorStop(0, "#5a5941"); fieldGradient.addColorStop(1, "#4b4130");
+  fieldGradient.addColorStop(0, "#5b5940"); fieldGradient.addColorStop(.55, "#514832"); fieldGradient.addColorStop(1, "#3f3427");
   context.fillStyle = fieldGradient; context.fillRect(0, horizonY, width, surfaceY - horizonY + 6);
-  for (let lane = -9; lane <= 9; lane += 1) {
-    const nearX = width * .5 + lane * width * .09;
-    context.strokeStyle = lane % 2 ? "rgba(209,172,93,.22)" : "rgba(48,43,31,.42)";
-    context.lineWidth = Math.abs(lane) % 3 === 0 ? 4 : 2;
-    context.beginPath(); context.moveTo(vanishX + lane * 6, horizonY + 3); context.lineTo(nearX, surfaceY + 5); context.stroke();
+  const plots = [
+    { left: -.02, farLeft: -.1, farRight: -.02, right: .27, fill: "rgba(111,95,55,.38)" },
+    { left: .24, farLeft: -.015, farRight: .045, right: .49, fill: "rgba(66,68,45,.34)" },
+    { left: .46, farLeft: .035, farRight: .1, right: .73, fill: "rgba(111,84,49,.36)" },
+    { left: .7, farLeft: .09, farRight: .16, right: 1.03, fill: "rgba(62,64,43,.4)" }
+  ];
+  plots.forEach((plot, plotIndex) => {
+    context.fillStyle = plot.fill;
+    context.beginPath();
+    context.moveTo(vanishX + width * plot.farLeft, horizonY + 2 + plotIndex % 2 * 3);
+    context.lineTo(vanishX + width * plot.farRight, horizonY + 3);
+    context.lineTo(width * plot.right, surfaceY + 5);
+    context.lineTo(width * plot.left, surfaceY + 5);
+    context.closePath(); context.fill();
+  });
+
+  for (let lane = -12; lane <= 12; lane += 1) {
+    const nearX = width * .5 + lane * width * .071;
+    const bend = (SceneHash(lane + 402) - .5) * 24;
+    context.strokeStyle = lane % 3 ? "rgba(199,155,84,.2)" : "rgba(37,34,27,.5)";
+    context.lineWidth = lane % 4 === 0 ? 3.2 : 1.35;
+    context.beginPath();
+    context.moveTo(vanishX + lane * 4.2, horizonY + 3);
+    context.quadraticCurveTo(Lerp(vanishX, nearX, .57) + bend, Lerp(horizonY, surfaceY, .62), nearX, surfaceY + 6);
+    context.stroke();
   }
-  for (let row = 0; row < 5; row += 1) {
-    const progress = (row + 1) / 6;
-    const y = Lerp(horizonY, surfaceY, progress * progress);
-    context.strokeStyle = `rgba(223,189,119,${.08 + progress * .12})`; context.lineWidth = 1 + progress * 1.5;
-    context.beginPath(); context.moveTo(0, y); context.quadraticCurveTo(vanishX, y - 8 * (1 - progress), width, y + 2); context.stroke();
+  for (let row = 0; row < 7; row += 1) {
+    const progress = (row + 1) / 8;
+    const y = Lerp(horizonY, surfaceY, Math.pow(progress, 1.7));
+    const sag = (row % 2 ? -1 : 1) * (3 + row * .8);
+    context.strokeStyle = `rgba(216,175,105,${.055 + progress * .13})`; context.lineWidth = .8 + progress * 1.7;
+    context.beginPath(); context.moveTo(-20, y + Math.sin(row) * 2); context.bezierCurveTo(width * .25, y + sag, vanishX, y - sag * .7, width + 20, y + sag * .35); context.stroke();
   }
-  context.fillStyle = "rgba(61,52,38,.72)";
-  context.beginPath(); context.moveTo(vanishX - 17, horizonY); context.lineTo(vanishX + 23, horizonY); context.lineTo(width * .72, surfaceY + 6); context.lineTo(width * .51, surfaceY + 6); context.closePath(); context.fill();
-  context.strokeStyle = "rgba(203,164,99,.28)"; context.lineWidth = 3;
-  context.beginPath(); context.moveTo(vanishX - 5, horizonY); context.lineTo(width * .57, surfaceY + 6); context.moveTo(vanishX + 12, horizonY); context.lineTo(width * .67, surfaceY + 6); context.stroke();
+
+  context.fillStyle = "rgba(54,43,31,.72)";
+  context.beginPath(); context.moveTo(vanishX - 10, horizonY); context.lineTo(vanishX + 22, horizonY); context.lineTo(width * .69, surfaceY + 7); context.lineTo(width * .57, surfaceY + 7); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(201,151,86,.38)"; context.lineWidth = 2.6;
+  context.beginPath(); context.moveTo(vanishX + 1, horizonY + 1); context.quadraticCurveTo(width * .59, surfaceY - 31, width * .61, surfaceY + 6); context.moveTo(vanishX + 13, horizonY + 1); context.quadraticCurveTo(width * .65, surfaceY - 27, width * .68, surfaceY + 6); context.stroke();
 }
 
 function DrawPerspectiveHouse(worldX, width, baseY, size, parallax, variant, alpha) {
@@ -1321,89 +1383,251 @@ function DrawPerspectiveHouse(worldX, width, baseY, size, parallax, variant, alp
 function DrawVillageFenceSegment(worldX, width, baseY, span, parallax, variant, alpha = 1) {
   const x = LayerToScreen(worldX, width, parallax);
   const depthScale = .58 + parallax * .52;
+  const worldScale = Math.max(.64, Math.min(1.35, (width / (22 / state.camera.zoom)) / 48));
   const fenceWidth = span * width / 22 * depthScale;
-  const fenceHeight = (22 + variant % 3 * 5) * depthScale;
-  context.save(); context.globalAlpha = alpha;
-  context.fillStyle = "rgba(18,18,15,.2)"; context.beginPath(); context.ellipse(x, baseY + 3, fenceWidth * .52, 5 * depthScale, 0, 0, Math.PI * 2); context.fill();
+  const fenceHeight = (22 + variant % 3 * 5) * depthScale * worldScale;
+  const groundYAt = (progress) => baseY + Math.sin(progress * Math.PI * 1.7 + variant) * 2.6 * depthScale + (progress - .5) * (variant % 2 ? -3 : 2) * depthScale;
+  context.save(); context.globalAlpha = alpha; context.lineJoin = "round"; context.lineCap = "round";
+  context.fillStyle = "rgba(19,15,12,.34)"; context.beginPath(); context.ellipse(x + 7 * depthScale, baseY + 5, fenceWidth * .56, 6.5 * depthScale, -.015, 0, Math.PI * 2); context.fill();
   if (variant % 3 === 0) {
-    const postCount = Math.max(4, Math.round(span * 2.2));
-    context.strokeStyle = "#564631"; context.lineCap = "round";
+    const postCount = Math.max(5, Math.round(span * 2.6));
     for (let post = 0; post < postCount; post += 1) {
       const progress = post / Math.max(1, postCount - 1);
       const postX = x - fenceWidth / 2 + progress * fenceWidth;
-      const lean = (SceneHash(worldX * 7 + post) - .5) * 6;
-      const postHeight = fenceHeight * (.75 + SceneHash(worldX + post * 3) * .34);
-      context.lineWidth = 3.8 * depthScale; context.beginPath(); context.moveTo(postX, baseY + 3); context.lineTo(postX + lean, baseY - postHeight); context.stroke();
-      context.fillStyle = "#776046"; context.beginPath(); context.moveTo(postX + lean - 2, baseY - postHeight + 2); context.lineTo(postX + lean, baseY - postHeight - 5); context.lineTo(postX + lean + 2, baseY - postHeight + 2); context.closePath(); context.fill();
+      const postBaseY = groundYAt(progress);
+      const perspectiveScale = .82 + progress * .25;
+      const lean = (SceneHash(worldX * 7 + post) - .5) * 7 * depthScale;
+      const postHeight = fenceHeight * (.88 + SceneHash(worldX + post * 3) * .28) * perspectiveScale;
+      const postWidth = 3.2 * depthScale * perspectiveScale;
+      context.fillStyle = "#392b20";
+      context.beginPath(); context.moveTo(postX - postWidth, postBaseY + 3); context.lineTo(postX + lean - postWidth * .7, postBaseY - postHeight + 3); context.lineTo(postX + lean, postBaseY - postHeight - 5); context.lineTo(postX + lean + postWidth * .75, postBaseY - postHeight + 3); context.lineTo(postX + postWidth, postBaseY + 3); context.closePath(); context.fill();
+      context.strokeStyle = "#181511"; context.lineWidth = 1.15 * depthScale; context.stroke();
+      context.strokeStyle = "rgba(183,139,79,.46)"; context.lineWidth = .75 * depthScale; context.beginPath(); context.moveTo(postX + lean - postWidth * .15, postBaseY - postHeight + 6); context.lineTo(postX - postWidth * .2, postBaseY - 2); context.stroke();
     }
-    for (let rail = 0; rail < 4; rail += 1) {
-      context.strokeStyle = rail % 2 ? "#735b3c" : "#655039"; context.lineWidth = 2.5 * depthScale; context.beginPath();
-      for (let sample = 0; sample <= 12; sample += 1) {
-        const progress = sample / 12; const railX = x - fenceWidth / 2 + progress * fenceWidth; const railY = baseY - fenceHeight * (.18 + rail * .17) + Math.sin(progress * Math.PI * 6 + rail) * 2.2;
+    for (let rail = 0; rail < 5; rail += 1) {
+      context.strokeStyle = "rgba(24,18,14,.88)"; context.lineWidth = (4.5 - rail * .16) * depthScale; context.beginPath();
+      for (let sample = 0; sample <= 18; sample += 1) {
+        const progress = sample / 18; const railX = x - fenceWidth / 2 + progress * fenceWidth; const railY = groundYAt(progress) - fenceHeight * (.18 + rail * .145) + Math.sin(progress * Math.PI * 5.5 + rail) * 2.3;
         sample ? context.lineTo(railX, railY) : context.moveTo(railX, railY);
       }
       context.stroke();
+      context.strokeStyle = rail % 2 ? "#785b36" : "#685038"; context.lineWidth = 2.1 * depthScale; context.stroke();
+    }
+    for (let twig = 0; twig < postCount - 1; twig += 1) {
+      const progress = (twig + .55) / postCount;
+      const twigX = x - fenceWidth / 2 + progress * fenceWidth;
+      const twigBaseY = groundYAt(progress);
+      context.strokeStyle = "rgba(123,90,52,.75)"; context.lineWidth = 1.2 * depthScale;
+      context.beginPath(); context.moveTo(twigX - 2, twigBaseY - fenceHeight * .12); context.quadraticCurveTo(twigX + (twig % 2 ? 5 : -5), twigBaseY - fenceHeight * .48, twigX, twigBaseY - fenceHeight * .76); context.stroke();
     }
   } else if (variant % 3 === 1) {
-    const stoneRows = 3;
+    const stoneRows = 4;
     for (let row = 0; row < stoneRows; row += 1) {
-      const stones = 5 + row;
+      const stones = 6 + row;
       const stoneWidth = fenceWidth / stones;
       for (let stone = 0; stone < stones; stone += 1) {
-        const stagger = row % 2 ? stoneWidth * .34 : 0;
+        const stagger = row % 2 ? stoneWidth * .42 : -.05 * stoneWidth;
         const stoneX = x - fenceWidth / 2 + stone * stoneWidth + stagger;
-        const stoneY = baseY - row * fenceHeight / stoneRows;
-        context.fillStyle = row % 2 ? "#655c4f" : "#716556";
-        context.beginPath(); context.moveTo(stoneX - 1, stoneY); context.lineTo(stoneX + stoneWidth * .78, stoneY - 1); context.lineTo(stoneX + stoneWidth * .72, stoneY - fenceHeight / stoneRows + 2); context.lineTo(stoneX + 3, stoneY - fenceHeight / stoneRows); context.closePath(); context.fill();
-        context.strokeStyle = "rgba(191,169,129,.2)"; context.lineWidth = 1; context.stroke();
+        const progress = Math.max(0, Math.min(1, (stoneX - (x - fenceWidth / 2)) / fenceWidth));
+        const stoneY = groundYAt(progress) - row * fenceHeight / stoneRows;
+        const topJitter = (SceneHash(stone + row * 17 + worldX) - .5) * 4 * depthScale;
+        context.fillStyle = (stone + row) % 3 === 0 ? "#716452" : (stone + row) % 3 === 1 ? "#62594c" : "#7d6d56";
+        context.beginPath(); context.moveTo(stoneX - 2, stoneY + 1); context.lineTo(stoneX + stoneWidth * .82, stoneY - 1); context.lineTo(stoneX + stoneWidth * .72, stoneY - fenceHeight / stoneRows + 3 + topJitter); context.lineTo(stoneX + 3, stoneY - fenceHeight / stoneRows + topJitter); context.closePath(); context.fill();
+        context.strokeStyle = "rgba(28,23,18,.7)"; context.lineWidth = .9 * depthScale; context.stroke();
+        if ((stone + row) % 2 === 0) {
+          context.strokeStyle = "rgba(201,176,126,.2)"; context.lineWidth = .7;
+          context.beginPath(); context.moveTo(stoneX + stoneWidth * .18, stoneY - 4); context.lineTo(stoneX + stoneWidth * .58, stoneY - fenceHeight / stoneRows + 7 + topJitter); context.stroke();
+        }
       }
     }
-    context.strokeStyle = "#534b41"; context.lineWidth = 3 * depthScale; context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight); context.lineTo(x + fenceWidth * .52, baseY - fenceHeight + 2); context.stroke();
+    context.strokeStyle = "#2f2922"; context.lineWidth = 3.4 * depthScale; context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight + 2); context.quadraticCurveTo(x, baseY - fenceHeight - 4, x + fenceWidth * .52, baseY - fenceHeight + 4); context.stroke();
   } else {
     const posts = [-.5, -.16, .18, .5];
-    context.strokeStyle = "#5b432e"; context.lineCap = "square";
-    posts.forEach((progress, index) => { const postX = x + progress * fenceWidth; context.lineWidth = (index === 0 || index === posts.length - 1 ? 6 : 4) * depthScale; context.beginPath(); context.moveTo(postX, baseY + 2); context.lineTo(postX + (index % 2 ? 2 : -2), baseY - fenceHeight); context.stroke(); });
-    context.strokeStyle = "#765838"; context.lineWidth = 5 * depthScale;
-    [0.25, .7].forEach((heightProgress) => { context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight * heightProgress); context.lineTo(x + fenceWidth * .52, baseY - fenceHeight * heightProgress - 3); context.stroke(); });
-    context.strokeStyle = "#b18a57"; context.lineWidth = 1.5; posts.slice(1, 3).forEach((progress) => { const postX = x + progress * fenceWidth; context.beginPath(); context.arc(postX, baseY - fenceHeight * .69, 4 * depthScale, 0, Math.PI * 2); context.stroke(); });
+    context.strokeStyle = "#211812"; context.lineCap = "round";
+    posts.forEach((offset, index) => {
+      const progress = offset + .5; const postX = x + offset * fenceWidth; const postBaseY = groundYAt(progress);
+      context.lineWidth = (index === 0 || index === posts.length - 1 ? 8.2 : 6.2) * depthScale; context.beginPath(); context.moveTo(postX, postBaseY + 3); context.lineTo(postX + (index % 2 ? 2 : -2), postBaseY - fenceHeight); context.stroke();
+      context.strokeStyle = "#67472d"; context.lineWidth -= 3 * depthScale; context.stroke(); context.strokeStyle = "#211812";
+    });
+    [0.27, .72].forEach((heightProgress, railIndex) => {
+      context.strokeStyle = "#251a12"; context.lineWidth = 8 * depthScale; context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight * heightProgress); context.lineTo(x + fenceWidth * .52, baseY - fenceHeight * heightProgress - 4); context.stroke();
+      context.strokeStyle = railIndex ? "#765536" : "#65452c"; context.lineWidth = 4.5 * depthScale; context.stroke();
+    });
+    context.strokeStyle = "#3a2719"; context.lineWidth = 6 * depthScale; context.beginPath(); context.moveTo(x - fenceWidth * .45, baseY - fenceHeight * .12); context.lineTo(x + fenceWidth * .42, baseY - fenceHeight * .88); context.stroke();
+    context.strokeStyle = "#8a633c"; context.lineWidth = 3 * depthScale; context.stroke();
+    context.strokeStyle = "#b18a57"; context.lineWidth = 1.5; posts.forEach((offset) => { const postX = x + offset * fenceWidth; context.beginPath(); context.arc(postX, baseY - fenceHeight * .69, 4.5 * depthScale, 0, Math.PI * 2); context.stroke(); });
   }
   context.restore();
+}
+
+function DrawInkWheel(centerX, centerY, radius, squash = 1, spokes = 12, accent = "#9a7447") {
+  context.save(); context.translate(centerX, centerY); context.scale(1, squash);
+  context.strokeStyle = "#171411"; context.lineWidth = Math.max(4, radius * .2); context.beginPath(); context.arc(0, 0, radius, 0, Math.PI * 2); context.stroke();
+  context.strokeStyle = accent; context.lineWidth = Math.max(2, radius * .1); context.beginPath(); context.arc(0, 0, radius, 0, Math.PI * 2); context.stroke();
+  context.strokeStyle = "rgba(40,29,20,.95)"; context.lineWidth = Math.max(1.1, radius * .055);
+  for (let spoke = 0; spoke < spokes; spoke += 1) {
+    const angle = spoke / spokes * Math.PI * 2;
+    context.beginPath(); context.moveTo(Math.cos(angle) * radius * .16, Math.sin(angle) * radius * .16); context.lineTo(Math.cos(angle) * radius * .82, Math.sin(angle) * radius * .82); context.stroke();
+  }
+  context.fillStyle = "#2b2119"; context.beginPath(); context.arc(0, 0, radius * .2, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "#bd9560"; context.beginPath(); context.arc(-radius * .035, -radius * .04, radius * .075, 0, Math.PI * 2); context.fill();
+  context.restore();
+}
+
+function DrawDetailedHaystack(hayWidth, hayHeight, active = false, variant = 0) {
+  const fill = active ? "#9a7a43" : "#80663b";
+  context.fillStyle = "rgba(18,14,11,.34)"; context.beginPath(); context.ellipse(5, 4, hayWidth * .58, Math.max(5, hayHeight * .09), 0, 0, Math.PI * 2); context.fill();
+  context.fillStyle = fill; context.strokeStyle = "#241b13"; context.lineWidth = Math.max(2, hayWidth * .025); context.lineJoin = "round";
+  context.beginPath();
+  context.moveTo(-hayWidth * .53, 0);
+  context.quadraticCurveTo(-hayWidth * .55, -hayHeight * .32, -hayWidth * .33, -hayHeight * .67);
+  context.quadraticCurveTo(-hayWidth * .19, -hayHeight * .91, -hayWidth * .03, -hayHeight);
+  context.quadraticCurveTo(hayWidth * .2, -hayHeight * .91, hayWidth * .37, -hayHeight * .62);
+  context.quadraticCurveTo(hayWidth * .56, -hayHeight * .3, hayWidth * .51, 0);
+  context.quadraticCurveTo(0, hayHeight * .08, -hayWidth * .53, 0);
+  context.closePath(); context.fill(); context.stroke();
+
+  context.strokeStyle = "rgba(223,180,91,.72)"; context.lineWidth = Math.max(.85, hayWidth * .009); context.lineCap = "round";
+  const strawCount = Math.max(18, Math.round(hayWidth * .28));
+  for (let straw = 0; straw < strawCount; straw += 1) {
+    const progress = straw / Math.max(1, strawCount - 1);
+    const baseX = Lerp(-hayWidth * .48, hayWidth * .48, progress);
+    const centerPull = 1 - Math.abs(progress - .5) * 1.55;
+    const topY = -hayHeight * (.35 + Math.max(0, centerPull) * .58 + SceneHash(straw + variant * 29) * .12);
+    const lean = (progress - .5) * hayWidth * .2 + (SceneHash(straw + 91) - .5) * hayWidth * .1;
+    context.beginPath(); context.moveTo(baseX, -2 - SceneHash(straw + 18) * 5); context.quadraticCurveTo(baseX - lean * .25, topY * .55, baseX + lean, topY); context.stroke();
+  }
+  context.strokeStyle = "rgba(54,38,23,.62)"; context.lineWidth = Math.max(1, hayWidth * .013);
+  for (let layer = 0; layer < 4; layer += 1) {
+    const y = -hayHeight * (.18 + layer * .17);
+    context.beginPath(); context.moveTo(-hayWidth * (.48 - layer * .06), y); context.quadraticCurveTo(0, y + hayHeight * .06, hayWidth * (.47 - layer * .05), y - hayHeight * .02); context.stroke();
+  }
+  context.strokeStyle = "#a74536"; context.lineWidth = Math.max(2, hayWidth * .024);
+  context.beginPath(); context.moveTo(-hayWidth * .43, -hayHeight * .43); context.quadraticCurveTo(0, -hayHeight * .37, hayWidth * .43, -hayHeight * .44); context.stroke();
+  context.strokeStyle = "rgba(231,189,102,.7)"; context.lineWidth = 1;
+  [-.42, -.28, .34, .49].forEach((offset, index) => {
+    context.beginPath(); context.moveTo(hayWidth * offset, 1); context.lineTo(hayWidth * (offset + (index % 2 ? .12 : -.09)), 8 + index % 2 * 3); context.stroke();
+  });
+}
+
+function DrawDetailedCart(cartWidth, cartHeight, active = false, variant = 0) {
+  const wheelRadius = cartHeight * .27;
+  const bodyTop = -cartHeight * .82;
+  const bodyBottom = -cartHeight * .33;
+  context.fillStyle = "rgba(17,13,10,.4)"; context.beginPath(); context.ellipse(7, 5, cartWidth * .62, 8, -.02, 0, Math.PI * 2); context.fill();
+  context.strokeStyle = "#20160f"; context.lineWidth = Math.max(5, cartHeight * .065); context.lineCap = "round";
+  context.beginPath(); context.moveTo(cartWidth * .3, bodyBottom + 3); context.lineTo(cartWidth * .76, 4); context.moveTo(cartWidth * .3, bodyBottom - 5); context.lineTo(cartWidth * .82, -4); context.stroke();
+  context.strokeStyle = "#795232"; context.lineWidth = Math.max(2.5, cartHeight * .032); context.stroke();
+
+  DrawInkWheel(-cartWidth * .31 + 5, -wheelRadius * .08, wheelRadius * .9, .91, 12, "#7f5c37");
+  DrawInkWheel(cartWidth * .25, 0, wheelRadius, .95, 14, "#936b3f");
+  context.strokeStyle = "#241a12"; context.lineWidth = Math.max(4, cartHeight * .055); context.beginPath(); context.moveTo(-cartWidth * .36, -wheelRadius * .08); context.lineTo(cartWidth * .3, 0); context.stroke();
+  context.fillStyle = active ? "#715034" : "#60452f"; context.strokeStyle = "#201711"; context.lineWidth = Math.max(2, cartHeight * .034);
+  context.beginPath(); context.moveTo(-cartWidth * .52, bodyTop); context.lineTo(cartWidth * .39, bodyTop + cartHeight * .055); context.lineTo(cartWidth * .31, bodyBottom); context.lineTo(-cartWidth * .44, bodyBottom - cartHeight * .035); context.closePath(); context.fill(); context.stroke();
+  context.fillStyle = active ? "#876241" : "#765437";
+  context.beginPath(); context.moveTo(-cartWidth * .52, bodyTop); context.lineTo(cartWidth * .39, bodyTop + cartHeight * .055); context.lineTo(cartWidth * .47, bodyTop - cartHeight * .12); context.lineTo(-cartWidth * .42, bodyTop - cartHeight * .16); context.closePath(); context.fill(); context.stroke();
+  context.strokeStyle = "rgba(193,144,79,.5)"; context.lineWidth = Math.max(1, cartHeight * .014);
+  for (let plank = 0; plank < 5; plank += 1) {
+    const progress = (plank + 1) / 6;
+    const plankX = Lerp(-cartWidth * .44, cartWidth * .31, progress);
+    context.beginPath(); context.moveTo(plankX, bodyTop + 3); context.lineTo(plankX - cartWidth * .025, bodyBottom - 3); context.stroke();
+  }
+  context.strokeStyle = "rgba(41,29,20,.62)"; context.lineWidth = 1.1;
+  for (let grain = 0; grain < 6; grain += 1) {
+    const grainY = Lerp(bodyTop + 7, bodyBottom - 4, grain / 6);
+    context.beginPath(); context.moveTo(-cartWidth * .4, grainY); context.quadraticCurveTo(0, grainY + (grain % 2 ? 4 : -3), cartWidth * .28, grainY + 1); context.stroke();
+  }
 }
 
 function DrawVillageWorkProp(worldX, width, baseY, parallax, kind, variant = 0) {
   const x = LayerToScreen(worldX, width, parallax);
-  const scale = .62 + parallax * .52;
+  const scale = (.62 + parallax * .52) * Math.max(.7, Math.min(1.12, width / 1100)) * state.camera.zoom;
   context.save(); context.translate(x, baseY); context.scale(scale, scale);
-  context.fillStyle = "rgba(10,11,10,.25)"; context.beginPath(); context.ellipse(0, 4, kind === "dryingRack" ? 42 : 29, 6, 0, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(10,11,10,.32)"; context.beginPath(); context.ellipse(3, 4, kind === "dryingRack" ? 45 : kind === "strawStack" ? 37 : 31, 6.5, 0, 0, Math.PI * 2); context.fill();
   if (kind === "wheelbarrow") {
-    context.fillStyle = "#665039"; context.beginPath(); context.moveTo(-25, -25); context.lineTo(18, -22); context.lineTo(12, -3); context.lineTo(-17, -5); context.closePath(); context.fill();
-    context.fillStyle = "#806345"; context.beginPath(); context.moveTo(-25, -25); context.lineTo(18, -22); context.lineTo(25, -28); context.lineTo(-16, -32); context.closePath(); context.fill();
-    context.strokeStyle = "#a27a4c"; context.lineWidth = 3; context.stroke(); context.beginPath(); context.moveTo(-16, -5); context.lineTo(-29, 5); context.moveTo(12, -3); context.lineTo(31, 4); context.stroke();
-    context.strokeStyle = "#302922"; context.lineWidth = 5; context.beginPath(); context.arc(-20, 1, 10, 0, Math.PI * 2); context.stroke(); context.fillStyle = "#7d633e"; context.beginPath(); context.arc(-20, 1, 3, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#21170f"; context.lineWidth = 5; context.lineCap = "round";
+    context.beginPath(); context.moveTo(6, -12); context.lineTo(43, 4); context.moveTo(4, -17); context.lineTo(43, -1); context.stroke();
+    context.strokeStyle = "#825936"; context.lineWidth = 2.5; context.stroke();
+    context.strokeStyle = "#2c2017"; context.lineWidth = 4; context.beginPath(); context.moveTo(1, -7); context.lineTo(9, 4); context.moveTo(16, -9); context.lineTo(23, 3); context.stroke();
+    context.fillStyle = "#67482f"; context.strokeStyle = "#211711"; context.lineWidth = 2.2;
+    context.beginPath(); context.moveTo(-25, -31); context.lineTo(20, -28); context.lineTo(13, -8); context.lineTo(-18, -10); context.closePath(); context.fill(); context.stroke();
+    context.fillStyle = "#7f5c3a"; context.beginPath(); context.moveTo(-25, -31); context.lineTo(20, -28); context.lineTo(27, -35); context.lineTo(-15, -39); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = "rgba(201,153,87,.5)"; context.lineWidth = 1.2;
+    [-12, 0, 12].forEach((plankX) => { context.beginPath(); context.moveTo(plankX, -31); context.lineTo(plankX - 3, -11); context.stroke(); });
+    DrawInkWheel(-20, -1, 12, .96, 12, "#966c40");
+    context.strokeStyle = "#2b1e15"; context.lineWidth = 4; context.beginPath(); context.moveTo(-18, -10); context.lineTo(-20, -1); context.stroke();
   } else if (kind === "firewood") {
     for (let log = 0; log < 10; log += 1) {
-      const row = Math.floor(log / 4); const column = log % 4; const logX = (column - 1.5) * 12 + (row % 2) * 5; const logY = -5 - row * 9;
-      context.fillStyle = log % 2 ? "#7a5737" : "#8b6540"; context.fillRect(logX - 9, logY - 6, 22, 7); context.fillStyle = "#b78d58"; context.beginPath(); context.arc(logX + 12, logY - 2.5, 3.5, 0, Math.PI * 2); context.fill();
+      const row = Math.floor(log / 4); const column = log % 4; const logX = (column - 1.5) * 12 + (row % 2) * 5; const logY = -5 - row * 9; const logLength = 19 + SceneHash(log + variant * 9) * 8;
+      context.fillStyle = log % 2 ? "#705034" : "#845e39"; context.strokeStyle = "#2c2118"; context.lineWidth = 1.4;
+      context.beginPath(); context.roundRect(logX - logLength * .5, logY - 6, logLength, 7, 2); context.fill(); context.stroke();
+      context.fillStyle = "#b18754"; context.beginPath(); context.ellipse(logX + logLength * .5, logY - 2.5, 3.4, 3, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+      context.strokeStyle = "#5b4028"; context.lineWidth = .8; context.beginPath(); context.arc(logX + logLength * .5, logY - 2.5, 1.5, 0, Math.PI * 1.65); context.stroke();
     }
     context.strokeStyle = "#4b392a"; context.lineWidth = 3; context.beginPath(); context.moveTo(-24, 0); context.lineTo(-18, -30); context.moveTo(25, 0); context.lineTo(18, -30); context.stroke();
-    context.strokeStyle = "#9d784c"; context.lineWidth = 2; context.beginPath(); context.moveTo(-18, -15); context.lineTo(21, -11); context.stroke();
+    context.strokeStyle = "#a74536"; context.lineWidth = 2; context.beginPath(); context.moveTo(-18, -15); context.lineTo(21, -11); context.stroke();
   } else if (kind === "dryingRack") {
-    context.strokeStyle = "#725136"; context.lineWidth = 6; context.beginPath(); context.moveTo(-34, 2); context.lineTo(-28, -58); context.moveTo(34, 2); context.lineTo(28, -58); context.moveTo(-37, -54); context.lineTo(38, -54); context.stroke();
-    context.strokeStyle = "#b98d50"; context.lineWidth = 2; context.beginPath(); context.moveTo(-28, -49); context.quadraticCurveTo(0, -43, 28, -49); context.stroke();
+    context.strokeStyle = "#241a12"; context.lineWidth = 8; context.beginPath(); context.moveTo(-34, 2); context.lineTo(-28, -58); context.moveTo(34, 2); context.lineTo(28, -58); context.moveTo(-37, -54); context.lineTo(38, -54); context.stroke();
+    context.strokeStyle = "#755032"; context.lineWidth = 4.4; context.stroke();
+    context.strokeStyle = "#b98d50"; context.lineWidth = 2; context.beginPath(); context.moveTo(-28, -49); context.quadraticCurveTo(0, -40, 28, -49); context.stroke();
     for (let bundle = 0; bundle < 6; bundle += 1) {
       const bundleX = -23 + bundle * 9; const bundleY = -44 + Math.sin(bundle) * 3;
-      context.fillStyle = variant % 2 ? "#a56544" : "#a88745"; context.beginPath(); context.ellipse(bundleX, bundleY + 10, 4, 11, bundle % 2 ? .14 : -.12, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = "#5f7049"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(bundleX, bundleY); context.lineTo(bundleX - 5, bundleY - 7); context.moveTo(bundleX, bundleY); context.lineTo(bundleX + 5, bundleY - 7); context.stroke();
+      context.strokeStyle = variant % 2 ? "#a96a44" : "#c0964e"; context.lineWidth = 1.25;
+      for (let stem = 0; stem < 7; stem += 1) { const stemOffset = (stem - 3) * 1.2; context.beginPath(); context.moveTo(bundleX, bundleY); context.quadraticCurveTo(bundleX + stemOffset * .4, bundleY + 9, bundleX + stemOffset, bundleY + 22 + stem % 2 * 3); context.stroke(); }
+      context.strokeStyle = "#8d3e32"; context.lineWidth = 1.7; context.beginPath(); context.moveTo(bundleX - 4, bundleY + 5); context.lineTo(bundleX + 4, bundleY + 5); context.stroke();
     }
   } else if (kind === "plow") {
-    context.strokeStyle = "#765235"; context.lineWidth = 5; context.beginPath(); context.moveTo(-31, -3); context.lineTo(13, -22); context.lineTo(30, -51); context.moveTo(13, -22); context.lineTo(34, -7); context.stroke();
-    context.fillStyle = "#5c5b56"; context.beginPath(); context.moveTo(-33, -5); context.lineTo(-10, -14); context.lineTo(-3, -1); context.closePath(); context.fill(); context.strokeStyle = "#a6aaa1"; context.lineWidth = 1.5; context.stroke();
+    context.strokeStyle = "#21170f"; context.lineWidth = 7; context.lineCap = "round"; context.beginPath(); context.moveTo(-31, -3); context.lineTo(11, -22); context.lineTo(31, -53); context.moveTo(11, -22); context.lineTo(37, -9); context.stroke();
+    context.strokeStyle = "#775033"; context.lineWidth = 3.8; context.stroke();
+    context.fillStyle = "#5f615a"; context.strokeStyle = "#242722"; context.lineWidth = 2; context.beginPath(); context.moveTo(-35, -5); context.quadraticCurveTo(-19, -18, -5, -16); context.lineTo(-1, -1); context.lineTo(-19, -5); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = "#b4b5a7"; context.lineWidth = 1; context.beginPath(); context.moveTo(-30, -7); context.lineTo(-6, -13); context.stroke();
+  } else if (kind === "strawStack") {
+    DrawDetailedHaystack(70, 54, false, variant);
   }
   context.restore();
 }
 
+function DrawVillageGroundEdge(width, surfaceY) {
+  const edgePoints = [];
+  for (let x = -24; x <= width + 24; x += 18) {
+    const broadRise = Math.sin(x * .021 + .7) * 3.3;
+    const smallRise = Math.sin(x * .063 + 2.1) * 1.8;
+    const clodRise = (SceneHash(x + 761) - .5) * 8.5;
+    edgePoints.push({ x, y: surfaceY - 4 + broadRise + smallRise + clodRise });
+  }
+
+  context.fillStyle = "#493b2d";
+  context.beginPath(); context.moveTo(-24, surfaceY + 16);
+  edgePoints.forEach((point) => context.lineTo(point.x, point.y));
+  context.lineTo(width + 24, surfaceY + 16); context.closePath(); context.fill();
+
+  context.lineCap = "round"; context.lineJoin = "round";
+  for (let segment = 0; segment < edgePoints.length - 2; segment += 1) {
+    if (SceneHash(segment + 919) < .28) continue;
+    const point = edgePoints[segment];
+    const next = edgePoints[segment + 1];
+    context.strokeStyle = segment % 3 === 0 ? "rgba(229,181,106,.4)" : "rgba(183,132,76,.28)";
+    context.lineWidth = segment % 4 === 0 ? 2.4 : 1.35;
+    context.beginPath(); context.moveTo(point.x + 2, point.y); context.quadraticCurveTo((point.x + next.x) * .5, Math.min(point.y, next.y) - 1.5, next.x - 2, next.y); context.stroke();
+  }
+
+  for (let clod = 0; clod < Math.max(20, Math.round(width / 42)); clod += 1) {
+    const x = SceneHash(clod + 941) * width;
+    const y = surfaceY + 1 + SceneHash(clod + 967) * 9;
+    const radiusX = 4 + SceneHash(clod + 983) * 10;
+    const radiusY = 1.8 + SceneHash(clod + 997) * 3.4;
+    context.fillStyle = clod % 3 ? "rgba(42,29,21,.42)" : "rgba(110,76,46,.4)";
+    context.beginPath(); context.ellipse(x, y, radiusX, radiusY, (SceneHash(clod + 1013) - .5) * .35, 0, Math.PI * 2); context.fill();
+    if (clod % 2 === 0) {
+      context.strokeStyle = "rgba(210,156,91,.32)"; context.lineWidth = 1;
+      context.beginPath(); context.moveTo(x - radiusX * .58, y - 1); context.lineTo(x + radiusX * .42, y + radiusY * .18); context.stroke();
+    }
+  }
+}
+
 function DrawVillage(width, height, surfaceY) {
   DrawFieldDepth(width, surfaceY);
+  DrawVillageGroundEdge(width, surfaceY);
 
   const rearHouses = [-18, -14.4, -11, -7.6, -4.1, -.7, 2.8, 6.2, 9.7, 13.1, 16.7, 20.2];
   rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .42));
@@ -1433,12 +1657,9 @@ function DrawVillage(width, height, surfaceY) {
 
   [
     { x: -12.1, kind: "firewood", parallax: .82 }, { x: -7.2, kind: "wheelbarrow", parallax: .86 },
-    { x: -2.8, kind: "dryingRack", parallax: .79 }, { x: 2.2, kind: "plow", parallax: .85 },
-    { x: 6.9, kind: "firewood", parallax: .83 }, { x: 11.7, kind: "dryingRack", parallax: .8 }
+    { x: -4.8, kind: "strawStack", parallax: .78 }, { x: -2.3, kind: "dryingRack", parallax: .79 }, { x: 2.2, kind: "plow", parallax: .85 },
+    { x: 6.2, kind: "strawStack", parallax: .8 }, { x: 8.6, kind: "firewood", parallax: .83 }, { x: 12.1, kind: "dryingRack", parallax: .8 }
   ].forEach((prop, index) => DrawVillageWorkProp(prop.x, width, surfaceY - 3, prop.parallax, prop.kind, index));
-
-  context.fillStyle = "#4a4030"; context.fillRect(0, surfaceY - 5, width, 12);
-  context.strokeStyle = "rgba(220,174,102,.26)"; context.lineWidth = 2; context.beginPath(); context.moveTo(0, surfaceY - 4); context.lineTo(width, surfaceY - 4); context.stroke();
 }
 
 function DrawSurfaceDepthVeil(width, height, surfaceY, daylight) {
@@ -1460,14 +1681,24 @@ function DrawSurfaceDepthVeil(width, height, surfaceY, daylight) {
 function DrawSurfaceCovers(width, surfaceY, front) {
   const sceneScale = Math.min(width, 1100) / 1100;
   const unit = width / (22 / state.camera.zoom);
+  const verticalScale = Math.max(.52, Math.min(1.22, unit / 50));
   const activeId = state.player.layer === "surface" ? state.player.coverId : null;
   for (const cover of GetSurfaceCovers()) {
     const x = WorldToScreen(cover.x, width);
     const coverWidth = Math.max(44, cover.width * unit);
-    const baseHeight = ({ brush: 88, hay: 84, wall: 80, cart: 86, well: 76 })[cover.kind] * sceneScale;
+    const baseHeight = ({ brush: 82, hay: 84, wall: 78, cart: 88, well: 78 })[cover.kind] * verticalScale;
     const active = activeId === cover.id;
     context.save();
     context.translate(x, surfaceY - 3);
+
+    if (front) {
+      const shadowWidth = cover.kind === "cart" ? coverWidth * .67 : cover.kind === "hay" ? coverWidth * .6 : coverWidth * .55;
+      const shadowTilt = cover.kind === "cart" ? -.035 : (SceneHash(cover.x + 1103) - .5) * .08;
+      context.fillStyle = "rgba(15,10,8,.5)";
+      context.beginPath(); context.ellipse(4, 6, shadowWidth, Math.max(6, baseHeight * .085), shadowTilt, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "rgba(190,126,68,.3)"; context.lineWidth = Math.max(1, 1.35 * sceneScale);
+      context.beginPath(); context.ellipse(4, 5, shadowWidth * .94, Math.max(4, baseHeight * .055), shadowTilt, Math.PI * .06, Math.PI * .92); context.stroke();
+    }
 
     if (!front) {
       context.fillStyle = "rgba(8,12,12,.32)";
@@ -1478,11 +1709,11 @@ function DrawSurfaceCovers(width, surfaceY, front) {
           context.beginPath(); context.ellipse(coverWidth * offset, -baseHeight * (.38 + (index % 2) * .12), coverWidth * .3, baseHeight * .46, index % 2 ? .22 : -.18, 0, Math.PI * 2); context.fill();
         });
       } else if (cover.kind === "hay") {
-        context.fillStyle = "#806a3e";
-        context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.quadraticCurveTo(-coverWidth * .44, -baseHeight * .86, 0, -baseHeight); context.quadraticCurveTo(coverWidth * .46, -baseHeight * .84, coverWidth * .52, 0); context.closePath(); context.fill();
+        context.fillStyle = "rgba(88,70,40,.84)";
+        context.beginPath(); context.moveTo(-coverWidth * .53, 0); context.quadraticCurveTo(-coverWidth * .48, -baseHeight * .71, -coverWidth * .08, -baseHeight); context.quadraticCurveTo(coverWidth * .43, -baseHeight * .78, coverWidth * .53, 0); context.closePath(); context.fill();
       } else if (cover.kind === "cart") {
-        context.fillStyle = "#6f5a38"; context.fillRect(-coverWidth * .43, -baseHeight * .8, coverWidth * .86, baseHeight * .45);
-        context.fillStyle = "#3e3025"; context.fillRect(-coverWidth * .5, -baseHeight * .4, coverWidth, baseHeight * .38);
+        context.fillStyle = "#5c432d"; context.beginPath(); context.moveTo(-coverWidth * .48, -baseHeight * .8); context.lineTo(coverWidth * .38, -baseHeight * .76); context.lineTo(coverWidth * .31, -baseHeight * .31); context.lineTo(-coverWidth * .4, -baseHeight * .34); context.closePath(); context.fill();
+        context.strokeStyle = "#2c2118"; context.lineWidth = 5 * sceneScale; context.beginPath(); context.arc(-coverWidth * .26, -2, baseHeight * .24, 0, Math.PI * 2); context.arc(coverWidth * .26, 0, baseHeight * .26, 0, Math.PI * 2); context.stroke();
       } else if (cover.kind === "well") {
         context.strokeStyle = "#6b5236"; context.lineWidth = 7 * sceneScale;
         context.beginPath(); context.moveTo(-coverWidth * .34, -baseHeight * .98); context.lineTo(-coverWidth * .34, -baseHeight * .3); context.moveTo(coverWidth * .34, -baseHeight * .98); context.lineTo(coverWidth * .34, -baseHeight * .3); context.stroke();
@@ -1502,33 +1733,35 @@ function DrawSurfaceCovers(width, surfaceY, front) {
         context.beginPath(); context.moveTo(offset, 1); context.quadraticCurveTo(offset + (index % 2 ? 8 : -7) * sceneScale, -rise * .52, offset + (index % 3 - 1) * 8 * sceneScale, -rise); context.stroke();
       }
     } else if (cover.kind === "hay") {
-      context.fillStyle = active ? "#8a7443" : "#78643b";
-      context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.quadraticCurveTo(-coverWidth * .43, -baseHeight * .82, 0, -baseHeight); context.quadraticCurveTo(coverWidth * .43, -baseHeight * .82, coverWidth * .52, 0); context.closePath(); context.fill();
-      context.strokeStyle = "rgba(213,179,99,.63)"; context.lineWidth = Math.max(1, 1.6 * sceneScale);
-      for (let index = 0; index < 11; index += 1) {
-        const offset = (index / 10 - .5) * coverWidth * .88;
-        context.beginPath(); context.moveTo(offset, -4); context.lineTo(offset + (index % 3 - 1) * 11 * sceneScale, -baseHeight * (.48 + (index % 4) * .11)); context.stroke();
-      }
+      DrawDetailedHaystack(coverWidth, baseHeight, active, cover.id.length);
     } else if (cover.kind === "wall") {
       context.fillStyle = active ? "#66543f" : "#5a4938";
       context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.lineTo(-coverWidth * .52, -baseHeight * .68); context.lineTo(-coverWidth * .24, -baseHeight * .84); context.lineTo(0, -baseHeight * .7); context.lineTo(coverWidth * .23, -baseHeight * .92); context.lineTo(coverWidth * .52, -baseHeight * .72); context.lineTo(coverWidth * .52, 0); context.closePath(); context.fill();
-      context.strokeStyle = "rgba(187,148,96,.38)"; context.lineWidth = Math.max(1.5, 2 * sceneScale);
-      for (let row = 0; row < 3; row += 1) { context.beginPath(); context.moveTo(-coverWidth * .48, -baseHeight * (.18 + row * .19)); context.lineTo(coverWidth * .47, -baseHeight * (.14 + row * .2)); context.stroke(); }
+      context.strokeStyle = "#2b2119"; context.lineWidth = Math.max(1.8, 2.4 * sceneScale); context.stroke();
+      const brickRows = 4;
+      for (let row = 0; row < brickRows; row += 1) {
+        const rowY = -baseHeight * (.15 + row * .17);
+        context.strokeStyle = "rgba(192,150,96,.42)"; context.lineWidth = Math.max(1, 1.35 * sceneScale); context.beginPath(); context.moveTo(-coverWidth * .48, rowY); context.lineTo(coverWidth * .46, rowY - (row % 2 ? 3 : -1)); context.stroke();
+        for (let seam = 0; seam < 5; seam += 1) { const seamX = -coverWidth * .43 + (seam + (row % 2 ? .5 : 0)) * coverWidth * .2; context.beginPath(); context.moveTo(seamX, rowY); context.lineTo(seamX + (seam % 2 ? 2 : -2), rowY - baseHeight * .15); context.stroke(); }
+      }
+      context.strokeStyle = "rgba(39,28,20,.62)"; context.lineWidth = 1;
+      for (let hatch = 0; hatch < 10; hatch += 1) { const hx = Lerp(-coverWidth * .44, coverWidth * .42, hatch / 9); context.beginPath(); context.moveTo(hx, -baseHeight * .12); context.lineTo(hx + 12 * sceneScale, -baseHeight * (.27 + hatch % 3 * .13)); context.stroke(); }
     } else if (cover.kind === "cart") {
-      context.fillStyle = "#59422e"; context.fillRect(-coverWidth * .53, -baseHeight * .62, coverWidth * 1.06, baseHeight * .57);
-      context.strokeStyle = "#aa7b48"; context.lineWidth = Math.max(3, 5 * sceneScale); context.strokeRect(-coverWidth * .53, -baseHeight * .62, coverWidth * 1.06, baseHeight * .57);
-      context.strokeStyle = "#34271f"; context.lineWidth = Math.max(4, 6 * sceneScale);
-      context.beginPath(); context.arc(-coverWidth * .32, 0, baseHeight * .22, 0, Math.PI * 2); context.arc(coverWidth * .32, 0, baseHeight * .22, 0, Math.PI * 2); context.stroke();
-      context.fillStyle = "#75663f"; context.beginPath(); context.ellipse(0, -baseHeight * .72, coverWidth * .48, baseHeight * .26, 0, 0, Math.PI * 2); context.fill();
+      DrawDetailedCart(coverWidth, baseHeight, active, cover.id.length);
     } else if (cover.kind === "well") {
-      context.fillStyle = "#5d4b39"; context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .5, baseHeight * .22, 0, 0, Math.PI * 2); context.fill();
-      context.fillRect(-coverWidth * .5, -baseHeight * .58, coverWidth, baseHeight * .55);
-      context.fillStyle = "#201d1a"; context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .35, baseHeight * .11, 0, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = "#a47c4f"; context.lineWidth = Math.max(2, 4 * sceneScale); context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .5, baseHeight * .22, 0, 0, Math.PI * 2); context.stroke();
+      context.fillStyle = "#645545"; context.strokeStyle = "#28231d"; context.lineWidth = Math.max(2, 3 * sceneScale); context.beginPath(); context.ellipse(0, -baseHeight * .5, coverWidth * .51, baseHeight * .21, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+      context.fillRect(-coverWidth * .5, -baseHeight * .5, coverWidth, baseHeight * .47);
+      for (let row = 0; row < 3; row += 1) { const rowY = -baseHeight * (.1 + row * .14); context.strokeStyle = "rgba(185,153,109,.42)"; context.lineWidth = 1.2; context.beginPath(); context.moveTo(-coverWidth * .47, rowY); context.lineTo(coverWidth * .47, rowY - 2); context.stroke(); for (let seam = 0; seam < 4; seam += 1) { const seamX = -coverWidth * .4 + (seam + (row % 2 ? .5 : 0)) * coverWidth * .24; context.beginPath(); context.moveTo(seamX, rowY); context.lineTo(seamX, rowY - baseHeight * .13); context.stroke(); } }
+      context.fillStyle = "#181715"; context.beginPath(); context.ellipse(0, -baseHeight * .52, coverWidth * .36, baseHeight * .11, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#936c42"; context.lineWidth = Math.max(3, 4 * sceneScale); context.beginPath(); context.ellipse(0, -baseHeight * .52, coverWidth * .51, baseHeight * .21, 0, 0, Math.PI * 2); context.stroke();
+      context.strokeStyle = "#2a1d14"; context.lineWidth = Math.max(5, 6 * sceneScale); context.beginPath(); context.moveTo(-coverWidth * .37, -baseHeight * .56); context.lineTo(-coverWidth * .37, -baseHeight * 1.2); context.moveTo(coverWidth * .37, -baseHeight * .56); context.lineTo(coverWidth * .37, -baseHeight * 1.2); context.moveTo(-coverWidth * .45, -baseHeight * 1.16); context.lineTo(coverWidth * .45, -baseHeight * 1.16); context.stroke();
+      context.strokeStyle = "#7b5434"; context.lineWidth = Math.max(2.5, 3 * sceneScale); context.stroke();
+      context.strokeStyle = "#b48a55"; context.lineWidth = 2; context.beginPath(); context.moveTo(0, -baseHeight * 1.16); context.lineTo(0, -baseHeight * .56); context.stroke();
+      context.fillStyle = "#62422c"; context.beginPath(); context.ellipse(0, -baseHeight * 1.16, coverWidth * .11, baseHeight * .07, 0, 0, Math.PI * 2); context.fill();
     }
 
     if (active) {
-      context.strokeStyle = "rgba(112,222,214,.78)"; context.lineWidth = Math.max(1.5, 2 * sceneScale); context.setLineDash([5 * sceneScale, 5 * sceneScale]);
+      context.strokeStyle = "rgba(189,76,59,.92)"; context.lineWidth = Math.max(1.5, 2 * sceneScale); context.setLineDash([5 * sceneScale, 5 * sceneScale]);
       context.beginPath(); context.ellipse(0, 2, coverWidth * .55, 8 * sceneScale, 0, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
     }
     context.restore();
@@ -1569,13 +1802,103 @@ function DrawDetectionFlash(width, height, surfaceY) {
 
 function DrawEarth(width, height, surfaceY, tunnelY) {
   const gradient = context.createLinearGradient(0, surfaceY, 0, height);
-  gradient.addColorStop(0, "#6a4c35"); gradient.addColorStop(.45, "#3e3027"); gradient.addColorStop(1, "#171b1c");
+  gradient.addColorStop(0, "#765239"); gradient.addColorStop(.28, "#563d2e"); gradient.addColorStop(.58, "#392c25"); gradient.addColorStop(1, "#171b1c");
   context.fillStyle = gradient; context.fillRect(0, surfaceY + 4, width, height - surfaceY);
-  context.strokeStyle = "rgba(181,132,86,.18)"; context.lineWidth = 1;
-  for (let y = surfaceY + 30; y < height; y += 24) {
-    context.beginPath(); context.moveTo(0, y);
-    for (let x = 0; x <= width; x += 40) context.lineTo(x, y + Math.sin(x * .021 + y) * 4);
-    context.stroke();
+
+  const exposedSoilDepth = Math.max(88, tunnelY - surfaceY - 46);
+  const soilBands = 5;
+  for (let band = 0; band < soilBands; band += 1) {
+    const clodCount = Math.max(4, Math.round(width / (230 + band * 30)));
+    for (let clod = 0; clod < clodCount; clod += 1) {
+      const seed = band * 137 + clod * 19;
+      const cellWidth = width / clodCount;
+      const centerX = (clod + .5) * cellWidth + (SceneHash(seed + 1031) - .5) * cellWidth * .7;
+      const centerY = surfaceY + 17 + SceneHash(seed + 1049) * exposedSoilDepth;
+      const actualDepth = Math.max(0, Math.min(1, (centerY - surfaceY) / exposedSoilDepth));
+      const radiusX = cellWidth * (.16 + SceneHash(seed + 1063) * .2);
+      const radiusY = 6 + SceneHash(seed + 1087) * (7 + actualDepth * 5);
+      const tilt = (SceneHash(seed + 1097) - .5) * .32;
+      context.fillStyle = band % 2 ? "rgba(40,28,22,.12)" : "rgba(111,72,44,.11)";
+      context.beginPath();
+      context.moveTo(centerX - radiusX, centerY + radiusY * .1);
+      context.quadraticCurveTo(centerX - radiusX * .55, centerY - radiusY * 1.05, centerX + radiusX * .05, centerY - radiusY * .73);
+      context.quadraticCurveTo(centerX + radiusX * .68, centerY - radiusY * .55, centerX + radiusX, centerY + radiusY * .18);
+      context.quadraticCurveTo(centerX + radiusX * .36, centerY + radiusY * .72, centerX - radiusX, centerY + radiusY * .1);
+      context.closePath(); context.fill();
+
+      context.strokeStyle = `rgba(218,158,92,${.33 - actualDepth * .13})`;
+      context.lineWidth = 1.3 + (1 - actualDepth) * .8;
+      context.beginPath();
+      context.moveTo(centerX - radiusX * (.92 - SceneHash(seed + 1103) * .12), centerY + radiusY * .04);
+      context.quadraticCurveTo(centerX - radiusX * .54, centerY - radiusY * (.86 + SceneHash(seed + 1109) * .18), centerX + radiusX * (.18 + SceneHash(seed + 1111) * .38), centerY - radiusY * (.64 - SceneHash(seed + 1113) * .15));
+      context.stroke();
+      if ((clod + band) % 3 === 0) {
+        context.strokeStyle = `rgba(173,112,64,${.23 - actualDepth * .07})`; context.lineWidth = 1;
+        context.beginPath(); context.moveTo(centerX + radiusX * .25, centerY + radiusY * .42); context.quadraticCurveTo(centerX + radiusX * .52, centerY + radiusY * .5, centerX + radiusX * .76, centerY + radiusY * .16); context.stroke();
+      }
+
+      context.strokeStyle = `rgba(44,29,21,${.34 - actualDepth * .08})`; context.lineWidth = .8 + (1 - actualDepth) * .45;
+      for (let hatch = 0; hatch < 2; hatch += 1) {
+        const hatchX = centerX - radiusX * .46 + hatch * radiusX * .47;
+        const hatchY = centerY - radiusY * (.24 - hatch * .17);
+        const hatchLength = radiusX * (.34 + SceneHash(seed + hatch + 1117) * .18);
+        context.beginPath(); context.moveTo(hatchX - hatchLength * .45, hatchY - tilt * 6); context.lineTo(hatchX + hatchLength * .55, hatchY + radiusY * .38 + tilt * 6); context.stroke();
+      }
+    }
+  }
+
+  const soilMarkClusters = Math.max(12, Math.round(width / 102));
+  for (let cluster = 0; cluster < soilMarkClusters; cluster += 1) {
+    const seed = cluster * 43 + 1181;
+    const baseX = SceneHash(seed) * width;
+    const baseY = surfaceY + 14 + SceneHash(seed + 7) * exposedSoilDepth;
+    const actualDepth = Math.max(0, Math.min(1, (baseY - surfaceY) / exposedSoilDepth));
+    const strokes = 2 + cluster % 3;
+    const direction = (SceneHash(seed + 13) - .5) * .82;
+    for (let stroke = 0; stroke < strokes; stroke += 1) {
+      const length = 13 + SceneHash(seed + stroke * 5 + 19) * 29;
+      const startX = baseX + (stroke - (strokes - 1) * .5) * (8 + SceneHash(seed + stroke + 23) * 7);
+      const startY = baseY + (stroke - 1) * (4 + SceneHash(seed + stroke + 29) * 3);
+      context.strokeStyle = stroke % 2 ? `rgba(40,27,20,${.24 - actualDepth * .05})` : `rgba(200,139,80,${.25 - actualDepth * .08})`;
+      context.lineWidth = .8 + SceneHash(seed + stroke + 31) * .8;
+      context.beginPath(); context.moveTo(startX, startY); context.quadraticCurveTo(startX + length * .46, startY + direction * length * .34 - 2, startX + length, startY + direction * length + 2); context.stroke();
+    }
+  }
+
+  const stratumCount = 8;
+  for (let stratum = 0; stratum < stratumCount; stratum += 1) {
+    const progress = (stratum + 1) / (stratumCount + 1);
+    const centerY = Lerp(surfaceY + 16, height - 30, Math.pow(progress, 1.04));
+    const amplitude = 4 + progress * 9;
+    context.strokeStyle = `rgba(211,151,88,${.15 + (1 - progress) * .15})`; context.lineWidth = 1.05 + progress * .9;
+    const segmentWidth = Math.max(105, width / 7);
+    for (let segment = -1; segment <= Math.ceil(width / segmentWidth); segment += 1) {
+      if ((segment + stratum) % 5 === 2) continue;
+      const x0 = segment * segmentWidth + (SceneHash(stratum * 51 + segment) - .5) * 35;
+      const x1 = x0 + segmentWidth * (.68 + SceneHash(stratum * 71 + segment) * .26);
+      const y0 = centerY + Math.sin(x0 * .013 + stratum) * amplitude;
+      const y1 = centerY + Math.sin(x1 * .013 + stratum) * amplitude;
+      context.beginPath(); context.moveTo(x0, y0); context.bezierCurveTo(Lerp(x0, x1, .3), y0 - amplitude * .7, Lerp(x0, x1, .72), y1 + amplitude * .52, x1, y1); context.stroke();
+      if ((segment + stratum) % 3 === 0) {
+        context.strokeStyle = "rgba(34,24,18,.36)"; context.lineWidth = .85;
+        for (let hatch = 0; hatch < 3; hatch += 1) { const hx = Lerp(x0, x1, .28 + hatch * .17); const hy = Lerp(y0, y1, .28 + hatch * .17); context.beginPath(); context.moveTo(hx - 4, hy + 2); context.lineTo(hx + 7 + progress * 5, hy + 10 + progress * 4); context.stroke(); }
+      }
+    }
+  }
+  for (let pebble = 0; pebble < Math.max(34, Math.round(width / 24)); pebble += 1) {
+    const x = SceneHash(pebble + 701) * width;
+    const y = surfaceY + 18 + SceneHash(pebble + 739) * (height - surfaceY - 32);
+    const depth = (y - surfaceY) / Math.max(1, height - surfaceY);
+    const radiusX = 1.5 + SceneHash(pebble + 751) * (3.5 + depth * 2.5);
+    const radiusY = radiusX * (.38 + SceneHash(pebble + 779) * .32);
+    context.fillStyle = `rgba(30,23,19,${.13 + depth * .12})`; context.strokeStyle = `rgba(192,143,91,${.12 + (1 - depth) * .12})`; context.lineWidth = .65;
+    context.beginPath(); context.ellipse(x, y, radiusX, radiusY, SceneHash(pebble + 801) * .8 - .4, 0, Math.PI * 2); context.fill(); context.stroke();
+  }
+  context.strokeStyle = "rgba(68,43,26,.6)"; context.lineWidth = 1.5;
+  for (let root = 0; root < Math.max(11, Math.round(width / 110)); root += 1) {
+    const rootX = SceneHash(root + 829) * width;
+    const length = 14 + SceneHash(root + 847) * 42;
+    context.beginPath(); context.moveTo(rootX, surfaceY + 4); context.bezierCurveTo(rootX - 7, surfaceY + length * .32, rootX + 12, surfaceY + length * .58, rootX + (SceneHash(root + 863) - .5) * 24, surfaceY + length); context.stroke();
   }
   const halfHeight = TunnelHalfHeight(height);
   const samples = [];
@@ -2448,7 +2771,7 @@ function DrawLighting(width, height, surfaceY, tunnelY, daylight) {
   if (daylight < .3 || state.phaseId === "defense") {
     [-9, -.2, 8.3].forEach((worldX, index) => surfaceLights.push({
       x: LayerToScreen(worldX, width, .76), y: surfaceY - 43 - (index % 2) * 5,
-      radius: 112, intensity: .76, glow: .2, seed: index + .4, color: "238,170,76"
+      radius: 148, intensity: .82, glow: .24, seed: index + .4, color: "238,170,76"
     }));
     GetEnemyPatrols().forEach((enemy) => surfaceLights.push({
       x: WorldToScreen(enemy.x, width), y: surfaceY - 48, radius: 118, intensity: .72, glow: .17, seed: enemy.index + 5, color: "242,151,61"
@@ -2456,7 +2779,7 @@ function DrawLighting(width, height, surfaceY, tunnelY, daylight) {
   }
   if (surfaceLights.length || daylight < .4) {
     context.save(); context.beginPath(); context.rect(0, 0, width, surfaceY + 1); context.clip();
-    lightRenderer.Draw(context, width, height, surfaceLights, (x, y) => SurfaceLightSdf(x, y, width, surfaceY), daylight < .3 ? .72 : .28, state.elapsed);
+    lightRenderer.Draw(context, width, height, surfaceLights, (x, y) => SurfaceLightSdf(x, y, width, surfaceY), daylight < .3 ? .61 : .25, state.elapsed);
     context.restore();
   }
 
@@ -2466,7 +2789,7 @@ function DrawLighting(width, height, surfaceY, tunnelY, daylight) {
     radius: 205 + index * 8, intensity: .96, glow: .15, seed: index + 9, color: "240,169,72"
   }));
   context.save(); context.beginPath(); context.rect(0, surfaceY - 1, width, height - surfaceY + 1); context.clip();
-  lightRenderer.Draw(context, width, height, tunnelLights, (x, y) => TunnelLightSdf(x, y, width, height, surfaceY, tunnelY), .68, state.elapsed);
+  lightRenderer.Draw(context, width, height, tunnelLights, (x, y) => TunnelLightSdf(x, y, width, height, surfaceY, tunnelY), .62, state.elapsed);
   context.restore();
 }
 
