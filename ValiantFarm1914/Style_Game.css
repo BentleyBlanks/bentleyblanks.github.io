@@ -1,81 +1,130 @@
-@import url("https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=IBM+Plex+Sans:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Libre+Baskerville:wght@400;700&family=IBM+Plex+Sans:wght@500;700&display=swap");
 
 :root {
   --ink: #1c1710;
   --paper: #f0e2c4;
+  --paper2: #e4d0a8;
   --mud: #6a4a32;
   --leaf: #4a6a3a;
   --blood: #8b2e22;
-  --sky: #8fa8a0;
-  --ui: "IBM Plex Sans", sans-serif;
-  --display: "Libre Baskerville", Georgia, serif;
+  --gold: #c9a45a;
+  --ui: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+  --display: "Noto Serif SC", "Libre Baskerville", Georgia, serif;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: #12160f; color: var(--paper); font-family: var(--ui); }
 button { font: inherit; cursor: pointer; border: none; }
 
-.shell { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.shell { position: relative; width: 100%; height: 100%; overflow: hidden; background: #1a1814; }
 .canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .vignette {
-  pointer-events: none; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 40%, transparent 45%, rgba(10,12,8,.55) 100%);
+  pointer-events: none; position: absolute; inset: 0; z-index: 2;
+  background: radial-gradient(ellipse at 50% 40%, transparent 42%, rgba(10,12,8,.58) 100%);
+}
+.paperGrain {
+  pointer-events: none; position: absolute; inset: 0; z-index: 2; opacity: .08; mix-blend-mode: multiply;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(28,23,16,.35) 2px, rgba(28,23,16,.35) 3px),
+    repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(28,23,16,.2) 3px, rgba(28,23,16,.2) 4px);
 }
 
 .overlay {
   position: absolute; inset: 0; z-index: 4;
   display: flex; align-items: flex-end; justify-content: flex-start;
   padding: clamp(20px, 4vw, 48px);
-  background: linear-gradient(120deg, rgba(14,16,12,.88) 0%, rgba(14,16,12,.25) 55%, transparent 100%);
 }
 .overlay[hidden] { display: none !important; }
+
+.titleHero {
+  position: absolute; inset: 0; z-index: -1; overflow: hidden;
+}
+.titleHero img {
+  width: 100%; height: 100%; object-fit: cover; object-position: 55% 45%;
+  filter: saturate(.85) contrast(1.05);
+}
+.titleHero.dim img { filter: saturate(.7) brightness(.55) contrast(1.1); }
+.title::before,
+.win::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(105deg, rgba(14,16,12,.88) 0%, rgba(14,16,12,.45) 42%, rgba(14,16,12,.12) 100%);
+}
+.title .mark, .title .titleCard, .win .titleCard { position: relative; z-index: 1; }
+
 .overlay.win,
 .overlay.prologue {
-  align-items: center; justify-content: center; background: rgba(10,12,8,.78);
+  align-items: center; justify-content: center;
+  background: rgba(10,12,8,.55);
 }
 
 .prologueCard {
-  width: min(34rem, 92vw);
-  padding: clamp(28px, 5vw, 44px);
-  background: linear-gradient(165deg, #f0e2c4 0%, #e2cfa8 100%);
+  width: min(52rem, 94vw);
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: clamp(16px, 3vw, 28px);
+  padding: clamp(18px, 3vw, 28px);
+  background:
+    linear-gradient(165deg, #f3e6c8 0%, #e2cfa8 100%);
   color: var(--ink);
   border: 3px solid var(--ink);
-  box-shadow: 6px 6px 0 rgba(0,0,0,.4);
+  box-shadow: 7px 7px 0 rgba(0,0,0,.45);
 }
-.prologueCard .eyebrow { color: #8b2e22; }
+.prologueArt {
+  border: 3px solid var(--ink);
+  background: #d8c49a;
+  overflow: hidden;
+  min-height: 180px;
+  box-shadow: inset 0 0 0 1px rgba(240,226,196,.4);
+}
+.prologueArt img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  filter: contrast(1.05) saturate(.9);
+}
+.prologueCopy { display: flex; flex-direction: column; justify-content: center; }
+.prologueCard .eyebrow { color: #8b2e22; margin: 0 0 8px; }
 .prologueSpeaker {
-  margin: 0 0 10px; font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; opacity: .7;
+  margin: 0 0 10px; font-size: .8rem; letter-spacing: .18em; opacity: .7; font-weight: 700;
 }
 .prologueLine {
-  margin: 0 0 22px; font-family: var(--display); font-size: clamp(1.45rem, 4.2vw, 2rem);
-  line-height: 1.45; font-weight: 700;
+  margin: 0 0 22px; font-family: var(--display); font-size: clamp(1.35rem, 3.6vw, 1.85rem);
+  line-height: 1.5; font-weight: 700;
 }
 
 .mark {
   position: absolute; top: 20px; left: 20px; color: var(--paper); text-decoration: none;
-  letter-spacing: .08em;
+  letter-spacing: .08em; text-shadow: 2px 2px 0 #1c1710;
 }
-.mark b { display: block; font-family: var(--display); font-size: 1.15rem; }
-.mark span { display: block; font-size: .68rem; opacity: .6; margin-top: 2px; text-transform: uppercase; }
+.mark b { display: block; font-family: var(--display); font-size: 1.2rem; }
+.mark span { display: block; font-size: .68rem; opacity: .7; margin-top: 2px; }
 
 .titleCard { max-width: 26rem; }
+.inkCard {
+  background: rgba(240,226,196,.94); color: var(--ink); padding: 28px 26px;
+  border: 3px solid var(--ink); box-shadow: 6px 6px 0 rgba(0,0,0,.4);
+}
+.inkCard .eyebrow { color: var(--blood); }
+.inkCard h1 { color: var(--ink); text-shadow: none; }
+.inkCard h1 em { color: #8a5a20; }
+.inkCard .lead { color: #3a3028; }
+
 .eyebrow {
-  margin: 0 0 8px; color: #d2b56a; letter-spacing: .2em; text-transform: uppercase; font-size: .72rem;
+  margin: 0 0 8px; color: #d2b56a; letter-spacing: .2em; font-size: .72rem; font-weight: 700;
 }
 .titleCard h1 {
   margin: 0; font-family: var(--display); font-weight: 700;
   font-size: clamp(3rem, 9vw, 5.2rem); line-height: .92; color: #f6ead4;
-  text-shadow: 3px 3px 0 #1c1710;
+  text-shadow: 3px 3px 0 #1a1410;
 }
 .titleCard h1 em { font-style: normal; color: #e8c36a; }
-.lead { margin: 14px 0 18px; line-height: 1.5; color: #e5d3b0; max-width: 28ch; }
-.hintKeys { margin: 14px 0 0; font-size: .78rem; opacity: .7; }
+.lead { margin: 14px 0 18px; line-height: 1.55; color: #ead9be; max-width: 28ch; font-size: 1.05rem; }
+.hintKeys { margin: 14px 0 0; font-size: .78rem; opacity: .75; }
 
 .btn {
-  min-height: 48px; padding: 0 22px; border-radius: 2px;
+  min-height: 48px; padding: 0 22px; border-radius: 2px; align-self: flex-start;
   border: 2px solid var(--ink); box-shadow: 3px 3px 0 rgba(0,0,0,.35); font-weight: 700;
 }
 .btn.primary { background: var(--paper); color: var(--ink); }
+.btn.primary:hover { background: #fff1d4; }
 .btn.primary:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0,0,0,.35); }
 
 .hud {
@@ -88,19 +137,26 @@ button { font: inherit; cursor: pointer; border: none; }
   width: 18px; height: 16px; background: var(--blood);
   clip-path: path("M9 15 L1.5 8 A4.2 4.2 0 0 1 9 3.2 A4.2 4.2 0 0 1 16.5 8 Z");
   display: block;
+  filter: drop-shadow(1px 1px 0 #1c1710);
 }
 .hearts i.off { background: #3a3028; }
 .hand {
-  width: 44px; height: 44px; border: 2px solid var(--ink); background: rgba(240,226,196,.92);
+  width: 48px; height: 48px; border: 2px solid var(--ink); background: rgba(240,226,196,.94);
   color: var(--ink); display: grid; place-items: center; font-size: .72rem; font-weight: 700;
   box-shadow: 2px 2px 0 rgba(0,0,0,.3);
 }
 .barkBox {
-  margin: 0; max-width: 22rem; padding: 8px 12px; background: rgba(240,226,196,.94);
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 0; max-width: 24rem; padding: 8px 12px 8px 8px; background: rgba(240,226,196,.95);
   color: var(--ink); border: 2px solid var(--ink);
   box-shadow: 3px 3px 0 rgba(0,0,0,.3);
 }
 .barkBox[hidden] { display: none !important; }
+.barkPortrait {
+  width: 56px; height: 56px; object-fit: cover; border: 2px solid var(--ink); flex: none;
+  background: #d8c49a;
+}
+.barkPortrait[hidden] { display: none !important; }
 .barkSpeaker {
   margin: 0 0 4px; font-size: .72rem; letter-spacing: .12em; opacity: .65; font-weight: 700;
 }
@@ -115,13 +171,15 @@ button { font: inherit; cursor: pointer; border: none; }
 .touch[hidden] { display: none !important; }
 .touch button {
   width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink);
-  background: rgba(240,226,196,.88); color: var(--ink); font-weight: 700;
+  background: rgba(240,226,196,.9); color: var(--ink); font-weight: 700;
   box-shadow: 2px 2px 0 rgba(0,0,0,.3);
 }
 
 @media (max-width: 720px) {
   .touch { display: flex; }
   .hintKeys { display: none; }
+  .prologueCard { grid-template-columns: 1fr; }
+  .prologueArt { max-height: 200px; }
 }
 @media (min-width: 721px) {
   .touch { display: none !important; }

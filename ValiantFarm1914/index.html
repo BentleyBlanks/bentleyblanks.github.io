@@ -4,16 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1a2218">
-  <meta name="description" content="Valiant Farm 1914 — 勇敢的心式一关：扔罐头、使唤狗、救人。">
+  <meta name="description" content="Valiant Farm 1914 — 勇敢的心式一关：扔罐头、使唤狗、救人。六十年代连环画画风。">
   <title>瓦尔奈农场 · 1914</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260802c">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260802d">
 </head>
 <body>
   <main id="Shell" class="shell">
     <canvas id="GameCanvas" class="canvas" tabindex="0" aria-label="瓦尔奈农场"></canvas>
     <div class="vignette" aria-hidden="true"></div>
+    <div class="paperGrain" aria-hidden="true"></div>
 
     <section id="Title" class="overlay title">
+      <div class="titleHero" aria-hidden="true">
+        <img src="./Texture_FarmRuinWide.jpg?v=20260802d" alt="">
+      </div>
       <a class="mark" href="../"><b>瓦尔奈农场</b><span>向勇敢的心致敬</span></a>
       <div class="titleCard">
         <p class="eyebrow">一九一四年 · 法国乡下</p>
@@ -26,15 +30,23 @@
 
     <section id="Prologue" class="overlay prologue" hidden>
       <article class="prologueCard" aria-live="polite">
-        <p class="eyebrow">开场</p>
-        <p id="PrologueSpeaker" class="prologueSpeaker">埃米尔</p>
-        <blockquote id="PrologueLine" class="prologueLine">……</blockquote>
-        <button id="BtnPrologue" class="btn primary" type="button">往下说</button>
+        <div class="prologueArt">
+          <img id="ProloguePortrait" src="./Texture_PortraitEmile.png?v=20260802d" alt="">
+        </div>
+        <div class="prologueCopy">
+          <p class="eyebrow">开场</p>
+          <p id="PrologueSpeaker" class="prologueSpeaker">埃米尔</p>
+          <blockquote id="PrologueLine" class="prologueLine">……</blockquote>
+          <button id="BtnPrologue" class="btn primary" type="button">往下说</button>
+        </div>
       </article>
     </section>
 
     <section id="Win" class="overlay win" hidden>
-      <div class="titleCard">
+      <div class="titleHero dim" aria-hidden="true">
+        <img src="./Texture_FarmRuinWide.jpg?v=20260802d" alt="">
+      </div>
+      <div class="titleCard inkCard">
         <p class="eyebrow">撤出来了</p>
         <h1>人在车上</h1>
         <p class="lead">狗跟在脚边。今天先活下去——往后再说。</p>
@@ -46,8 +58,11 @@
       <div id="Hearts" class="hearts" aria-label="体力"></div>
       <div id="Hand" class="hand" aria-label="手里"></div>
       <div id="BarkBox" class="barkBox" hidden>
-        <p id="BarkSpeaker" class="barkSpeaker"></p>
-        <p id="Bark" class="bark"></p>
+        <img id="BarkPortrait" class="barkPortrait" alt="" hidden>
+        <div>
+          <p id="BarkSpeaker" class="barkSpeaker"></p>
+          <p id="Bark" class="bark"></p>
+        </div>
       </div>
     </section>
 
@@ -60,6 +75,6 @@
       <button type="button" data-k="throw">扔</button>
     </div>
   </main>
-  <script type="module" src="./Script_Game.mjs?v=20260802c"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260802d"></script>
 </body>
 </html>

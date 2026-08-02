@@ -4,7 +4,7 @@ export const W = 4200;
 export const H = 540;
 export const GROUND = 420;
 export const GRAVITY = 2100;
-export const CACHE_BUST = "20260802c";
+export const CACHE_BUST = "20260802d";
 
 /** Keep the line intact; fused into normal talk, not a slogan card. */
 export const PROLOGUE_LINE = "往后的形势只怕会更加艰难";
