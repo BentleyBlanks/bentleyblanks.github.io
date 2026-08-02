@@ -3531,14 +3531,18 @@ function DrawEnemies(width, surfaceY) {
   patrols.forEach((enemy) => {
     const x = WorldToScreen(enemy.x, width);
     const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
+    const originX = x + enemy.facing * height * .12;
+    const originY = baseY - height * .82;
+    const farTopY = Math.min(surfaceY - 10, originY + height * .12);
+    const farBottomY = surfaceY + 3;
     const active = state.takedownGrace <= 0 && EnemyDetection(enemy) > 0;
-    const gradient = context.createLinearGradient(x, 0, endX, 0);
+    const gradient = context.createLinearGradient(originX, 0, endX, 0);
     gradient.addColorStop(0, active ? "rgba(229,58,44,.48)" : "rgba(222,190,108,.13)");
     gradient.addColorStop(1, active ? "rgba(195,43,34,.06)" : "rgba(215,184,103,0)");
     context.fillStyle = gradient;
-    context.beginPath(); context.moveTo(x + enemy.facing * height * .11, baseY - height * .72); context.lineTo(endX, surfaceY + 3); context.lineTo(x + enemy.facing * height * .17, surfaceY + 3); context.closePath(); context.fill();
+    context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.lineTo(endX, farBottomY); context.closePath(); context.fill();
     context.strokeStyle = active ? "rgba(255,91,69,.92)" : "rgba(219,186,104,.18)"; context.lineWidth = active ? 2.5 : 1;
-    context.beginPath(); context.moveTo(x + enemy.facing * height * .11, baseY - height * .72); context.lineTo(endX, surfaceY + 3); context.stroke();
+    context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.moveTo(originX, originY); context.lineTo(endX, farBottomY); context.stroke();
   });
   patrols.forEach((enemy) => DrawEnemyUnit(enemy, height, WorldToScreen(enemy.x, width), baseY));
   DrawTakedownPrompt(width, surfaceY, height);

@@ -154,6 +154,7 @@ Assert(game.includes('ui.gameShell.classList.toggle("takedownCinematic", Boolean
 Assert(game.includes('ui.touchControls.classList.toggle("cinematic", Boolean(state.takedown))') && css.includes("#touchControls.cinematic"), "mobile controls must disappear during the takedown cinematic");
 Assert(game.includes("function TakedownFigureScale(width)") && game.includes("Math.min(2.35") && game.includes("innerWidth <= 640 ? 1.42 : 1.18") && game.match(/\.038 \* TakedownFigureScale\(width\)/g)?.length >= 3, "mobile takedown figures must stay legible across actor, target, and prone poses");
 Assert(game.match(/const cinematicFocus = width <= 640/g)?.length >= 2 && game.includes('rgba(220,190,132,.72)') && game.includes('rgba(226,199,146,.68)'), "mobile prone target and disarmed weapon need a restrained high-contrast cinematic rim");
+Assert(game.includes("const originY = baseY - height * .82") && game.includes("const farTopY = Math.min(surfaceY - 10, originY + height * .12)") && game.includes("context.lineTo(endX, farBottomY)"), "enemy alert cone must open forward and down from the face instead of pointing upward from the ground");
 
 const fluid = CreateTunnelFluidSimulation({ columns: 72, rows: 32 });
 Assert(fluid.Sample(0, 0).sdf > 0 && fluid.Sample(-11, 0).sdf < 0, "SDF 没有把地道内部与墙体边界分开");
