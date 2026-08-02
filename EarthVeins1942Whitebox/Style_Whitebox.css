@@ -137,11 +137,21 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #touchControls button { display: grid; width: 62px; height: 52px; place-items: center; background: rgba(11,17,19,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 4px; box-shadow: 0 8px 22px rgba(0,0,0,.25); }
 #touchControls button span { font-size: 11px; font-weight: 900; pointer-events: none; }
 #touchControls button.pressed { transform: translateY(2px); background: rgba(101,209,212,.22); border-color: var(--cyan); }
+#touchControls [data-input="crouch"][aria-pressed="true"] { color: #102024; background: var(--amber); border-color: #f0ce91; box-shadow: 0 0 0 2px rgba(216,170,97,.24), 0 8px 22px rgba(0,0,0,.35); }
+#touchControls [data-input="crouch"][aria-pressed="true"] span { color: #102024; text-shadow: none; }
 #touchControls .touchPrimary { width: 76px; color: #102024; background: rgba(101,209,212,.92); border-color: var(--cyan); }
 
 #toast { position: absolute; z-index: 50; top: 50%; left: 50%; width: min(520px, calc(100% - 40px)); padding: 13px 18px; transform: translate(-50%,-50%); text-align: center; font-size: 12px; font-weight: 800; background: rgba(13,20,22,.95); border: 1px solid rgba(101,209,212,.6); box-shadow: 0 18px 60px rgba(0,0,0,.55); pointer-events: none; }
 #toast[data-tone="warning"] { border-color: var(--red); }
 #toast[data-tone="success"] { border-color: var(--green); }
+
+#qaPanel { position: absolute; z-index: 60; top: 204px; left: 18px; width: 350px; padding: 9px 10px 10px; color: #dffbf5; background: rgba(5,12,14,.94); border: 1px solid rgba(101,209,212,.62); box-shadow: 0 14px 38px rgba(0,0,0,.48); font: 11px/1.35 ui-monospace, "Cascadia Mono", monospace; touch-action: manipulation; }
+#qaPanel summary { cursor: pointer; color: var(--cyan); font-weight: 900; letter-spacing: .08em; }
+#qaPanel > small { display: block; margin: 7px 0; color: #91a7a2; font-size: 9px; }
+.qaButtonRow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.qaButtonRow button { min-height: 28px; padding: 4px 7px; color: #dce9e4; font-size: 9px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+.qaButtonRow button.active { color: #102024; background: var(--cyan); border-color: var(--cyan); }
+#qaStateReadout { display: block; margin-top: 7px; overflow: hidden; color: #d8aa61; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
 
 #cinematicBars { position: absolute; inset: 0; z-index: 17; pointer-events: none; }
 #cinematicBars i { position: absolute; left: 0; right: 0; height: clamp(52px, 10vh, 92px); background: #050708; animation: barsIn .35s ease both; }
@@ -232,6 +242,9 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #cinematicCaption { left: 5%; bottom: 55px; }
   #skipCinematic { right: 4%; bottom: 55px; }
   #cinematicBars i { height: 42px; }
+  #qaPanel { top: 136px; left: 8px; width: 270px; padding: 6px 7px; }
+  #qaPanel > small, #qaStateReadout { display: none; }
+  .qaButtonRow button { min-height: 24px; padding: 3px 5px; font-size: 7px; }
 }
 
 @media (max-width: 520px) {

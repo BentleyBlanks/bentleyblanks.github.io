@@ -10,6 +10,7 @@ const ui = Object.fromEntries([
   "buildFeedback", "buildCancel", "levelComplete", "completeTitle", "completeSummary", "completeLedger", "replayButton",
   "nextLevelButton", "completeLevelsButton", "touchControls", "toast", "cinematicBars", "cinematicCaption",
   "cinematicLabel", "cinematicSpeaker", "cinematicText", "cinematicProgress", "skipCinematic"
+  , "qaPanel", "qaLevelButtons", "qaPhaseButtons", "qaStateReadout"
 ].map((id) => [id, document.querySelector(`#${id}`)]));
 
 const qaMode = new URLSearchParams(location.search).get("qa") === "1";
@@ -20,6 +21,7 @@ const entrances = [-1.1, 8.6];
 const requiredCollect = ["collectWood", "collectIron", "collectPowder", "collectSupplies"];
 const requiredRescues = ["wounded", "grain", "courier"];
 const inputKeys = { left: false, right: false, crouch: false };
+let touchCrouchLatched = false;
 let selectedLevel = startingLevel;
 let lastTime = performance.now();
 let toastTimer = 0;
@@ -88,6 +90,7 @@ function StartLevel(levelIndex) {
   selectedLevel = levelIndex;
   state = CreateState(levelIndex);
   state.mode = "play";
+  SetTouchCrouch(false);
   Show(ui.titleScreen, false);
   Show(ui.levelPanel, false);
   Show(ui.guidePanel, false);
@@ -99,6 +102,7 @@ function StartLevel(levelIndex) {
   ui.levelNumber.textContent = state.level.number;
   ui.levelName.textContent = state.level.title;
   RenderRoleDock();
+  RenderQaPanel();
   UpdateUi();
   const opener = state.levelIndex === 0
     ? ["第一轮 · 夜", "民兵队长", "先把能救命、能施工的东西带回地道。枪声不是今晚的办法。"]
@@ -173,7 +177,7 @@ function PerformAction() {
     Toast(`还缺前一步：${prerequisite?.title || missing}`, "warning");
     return;
   }
-  if (action.crouch && !(state.player.crouch || inputKeys.crouch)) {
+  if (action.crouch && !(state.player.crouch || inputKeys.crouch || touchCrouchLatched)) {
     Toast("这里暴露太高，先蹲伏再行动。", "warning");
     return;
   }
@@ -392,6 +396,91 @@ function UpdateUi() {
   ui.gameShell.dataset.level = state.level.id;
   const depthButton = document.querySelector('[data-input="depth"] span');
   if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "下行" : "上行";
+  UpdateQaReadout();
+}
+
+function RenderQaPanel() {
+  if (!qaMode) return;
+  Show(ui.qaPanel);
+  ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
+  ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
+  ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
+    StartLevel(Number(button.dataset.qaLevel));
+    EndCinematic();
+    ui.qaPanel.open = true;
+    RenderQaPanel();
+  }));
+  ui.qaPhaseButtons.querySelectorAll("[data-qa-phase]").forEach((button) => button.addEventListener("click", () => QaJumpToPhase(button.dataset.qaPhase)));
+  UpdateQaReadout();
+}
+
+function UpdateQaReadout() {
+  if (!qaMode || !ui.qaStateReadout) return;
+  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short}`;
+}
+
+function QaComplete(ids) {
+  ids.forEach((id) => state.completed.add(id));
+}
+
+function QaJumpToPhase(phaseId) {
+  if (!qaMode) return;
+  const phaseIndex = state.level.phases.findIndex((phase) => phase.id === phaseId);
+  if (phaseIndex < 0) return;
+  const levelIndex = state.levelIndex;
+  state = CreateState(levelIndex);
+  state.mode = "play";
+  state.phaseId = phaseId;
+  state.cinematic = null;
+  SetTouchCrouch(false);
+  if (levelIndex === 0) {
+    if (phaseIndex >= 1) {
+      QaComplete(requiredCollect);
+      Object.assign(state.resources, { wood: 6, iron: 4, powder: 2, medicine: 1, grain: 2 });
+      state.player.x = -7;
+    }
+    if (phaseIndex >= 2) {
+      state.buildSlots = ["flipGate", "smokeBaffle", "floodGate"];
+      state.resources.wood = 1; state.resources.iron = 1;
+      QaComplete(["buildSlotA", "buildSlotB", "buildSlotC", "startDefense"]);
+      RecalculateBuild();
+      state.player.x = -8.7;
+    }
+    if (phaseIndex >= 3) {
+      QaComplete(["placeDecoyCart", "closeSurfaceGate", "triggerSlotA", "triggerSlotB", "triggerSlotC"]);
+      state.defense.triggered = 3; state.defense.enemyUnits = 0;
+      state.player.x = 9.2;
+    }
+  } else if (levelIndex === 1) {
+    if (phaseIndex >= 1) { QaComplete(["sniffRoute", "markPatrol"]); state.selectedRole = "rescuer"; state.player.x = -3.4; }
+    if (phaseIndex >= 2) { QaComplete(["repairCamo", "liftHatch", "crawlGap", "unbarGate"]); state.selectedRole = "rescuer"; state.player.x = 5.2; }
+    if (phaseIndex >= 3) {
+      QaComplete(["moveWounded", "moveGrain", "freeCourier"]);
+      Object.assign(state.rescues, { wounded: true, grain: true, courier: true });
+      state.selectedRole = "child"; state.player.x = 10;
+    }
+  } else {
+    if (phaseIndex >= 1) {
+      QaComplete(["placeHelmet", "fireCracker", "routeHorn"]);
+      state.tricks = new Set(["placeHelmet", "fireCracker", "routeHorn"]);
+      state.alert = 59; state.morale = 52; state.player.x = -5.8;
+    }
+    if (phaseIndex >= 2) {
+      QaComplete(["misdirectSquad", "closeFalseGate", "finalSignal"]);
+      state.morale = 6; state.player.x = 8.8;
+    }
+  }
+  const phase = CurrentPhase();
+  state.player.layer = phase.layer;
+  state.camera.x = state.player.x; state.camera.targetX = state.player.x;
+  state.camera.zoom = 1; state.camera.targetZoom = 1;
+  Show(ui.titleScreen, false); Show(ui.levelPanel, false); Show(ui.levelComplete, false); Show(ui.dialoguePanel, false); Show(ui.buildPanel, false);
+  Show(ui.cinematicBars, false); Show(ui.cinematicCaption, false); Show(ui.skipCinematic, false);
+  Show(ui.gameHeader); Show(ui.objectiveCard); Show(ui.metricsPanel); Show(ui.roleDock, state.level.roleIds.length > 1);
+  ui.levelNumber.textContent = state.level.number; ui.levelName.textContent = state.level.title;
+  RenderRoleDock(); RenderQaPanel(); UpdateUi();
+  ui.qaPanel.open = true;
+  Toast(`DEBUG：已跳到 ${phase.label}，前置状态已补齐。`, "success");
 }
 
 function ContextHint() {
@@ -442,7 +531,7 @@ function Update(delta) {
     return;
   }
   if (state.mode !== "play" || IsBlocked()) return;
-  state.player.crouch = inputKeys.crouch;
+  state.player.crouch = inputKeys.crouch || touchCrouchLatched;
   const direction = Number(inputKeys.right) - Number(inputKeys.left);
   if (direction) {
     state.player.facing = direction;
@@ -512,7 +601,7 @@ function Draw() {
   DrawEntrances(width, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
   DrawActor(width, surfaceY, tunnelY);
-  DrawForeground(width, height, surfaceY);
+  DrawSurfaceVegetation(width, height, surfaceY);
   if (qaMode) DrawQa(width, height, surfaceY, tunnelY);
 }
 
@@ -654,12 +743,31 @@ function DrawActor(width, surfaceY, tunnelY) {
   context.fillStyle = "#edf1e9"; context.font = "600 11px system-ui"; context.textAlign = "center"; context.fillText(roleDefinitions[state.selectedRole].short, x, baseY + 20); context.textAlign = "left";
 }
 
-function DrawForeground(width, height, surfaceY) {
-  context.strokeStyle = "rgba(22,26,23,.72)"; context.lineWidth = 3;
-  for (let x = -20; x < width + 30; x += 31) {
-    const sway = Math.sin(state.elapsed * .7 + x) * 4;
-    context.beginPath(); context.moveTo(x, height); context.quadraticCurveTo(x + sway, surfaceY + 40, x + 9 + sway, surfaceY - 15); context.stroke();
+function DrawSurfaceVegetation(width, height, surfaceY) {
+  context.save();
+  const clumps = [-10.2, -7.6, -4.1, 2.8, 6.1, 9.5];
+  context.strokeStyle = "rgba(31,35,29,.72)";
+  context.fillStyle = "rgba(43,47,34,.72)";
+  context.lineCap = "round";
+  for (let clumpIndex = 0; clumpIndex < clumps.length; clumpIndex += 1) {
+    const baseX = WorldToScreen(clumps[clumpIndex], width);
+    for (let stemIndex = 0; stemIndex < 4; stemIndex += 1) {
+      const offset = (stemIndex - 1.5) * 5;
+      const stemHeight = 10 + ((clumpIndex * 7 + stemIndex * 5) % 15);
+      const sway = Math.sin(state.elapsed * .7 + clumpIndex + stemIndex * .8) * 2;
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.moveTo(baseX + offset, surfaceY - 2);
+      context.quadraticCurveTo(baseX + offset + sway, surfaceY - stemHeight * .55, baseX + offset + sway * 1.5, surfaceY - stemHeight);
+      context.stroke();
+      if (stemIndex % 2 === 0) {
+        context.beginPath();
+        context.ellipse(baseX + offset + sway + 2, surfaceY - stemHeight * .62, 4, 1.7, -.45, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
   }
+  context.restore();
   const vignette = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .2, width / 2, height / 2, Math.max(width, height) * .68);
   vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,0,.48)"); context.fillStyle = vignette; context.fillRect(0, 0, width, height);
 }
@@ -695,7 +803,24 @@ function BindHoldButton(button, input) {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
-document.querySelectorAll('[data-input="left"], [data-input="right"], [data-input="crouch"]').forEach((button) => BindHoldButton(button, button.dataset.input));
+function SetTouchCrouch(active) {
+  touchCrouchLatched = Boolean(active);
+  const button = document.querySelector('[data-input="crouch"]');
+  button.classList.toggle("pressed", touchCrouchLatched);
+  button.setAttribute("aria-pressed", String(touchCrouchLatched));
+  button.querySelector("span").textContent = touchCrouchLatched ? "起身" : "蹲伏";
+}
+
+function ToggleTouchCrouch() {
+  if (IsBlocked()) return;
+  SetTouchCrouch(!touchCrouchLatched);
+  state.player.crouch = inputKeys.crouch || touchCrouchLatched;
+  Toast(touchCrouchLatched ? "已保持蹲伏：现在可以移动或单独点“行动”。" : "已起身。", "neutral");
+  UpdateUi();
+}
+
+document.querySelectorAll('[data-input="left"], [data-input="right"]').forEach((button) => BindHoldButton(button, button.dataset.input));
+document.querySelector('[data-input="crouch"]').addEventListener("click", ToggleTouchCrouch);
 document.querySelector('[data-input="switch"]').addEventListener("click", CycleRole);
 document.querySelector('[data-input="depth"]').addEventListener("click", ToggleLayer);
 document.querySelector('[data-input="action"]').addEventListener("click", PerformAction);
@@ -736,6 +861,7 @@ document.addEventListener("selectstart", (event) => { if (event.target.closest("
 if (qaMode) {
   window.EarthVeinsWhiteboxQa = Object.freeze({
     startLevel: (index) => StartLevel(Math.max(0, Math.min(2, Number(index) || 0))),
+    jumpToPhase: (phaseId) => QaJumpToPhase(String(phaseId)),
     getState: () => ({
       level: state.level.id, phase: state.phaseId, x: state.player.x, layer: state.player.layer,
       role: state.selectedRole, completed: [...state.completed], resources: { ...state.resources }, buildSlots: [...state.buildSlots],
@@ -746,4 +872,5 @@ if (qaMode) {
 }
 
 RenderLevelSelectors();
+RenderQaPanel();
 requestAnimationFrame(Loop);
