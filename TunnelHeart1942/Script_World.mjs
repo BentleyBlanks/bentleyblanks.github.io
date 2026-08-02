@@ -120,15 +120,33 @@ function BuildAct1() {
     Ent({
       id: "npc_laozhong",
       type: "talk",
-      x: 220,
+      x: 200,
       y: SURFACE_Y,
       layer: "surface",
       speaker: "高老忠",
-      line: "铁锹在井边。捡起来再下洞——空手挖不动土。",
+      script: [
+        { speaker: "高老忠", text: "传宝，三家地窖互不相通，藏不住全村人。" },
+        { speaker: "高老忠", text: "铁锹在井边。你先捡上——空手挖不动土。" },
+        { speaker: "高老忠", text: "下洞后按 R 画蓝图，标出要挖的巷道，再点 J 一格格开挖。别学打洞乱刨！" },
+      ],
       hint: "与高老忠交谈",
       goal: "talk_laozhong",
     }),
-    PlacePickup(180, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    Ent({
+      id: "npc_linxia",
+      type: "talk",
+      x: 480,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "林霞",
+      script: [
+        { speaker: "林霞", text: "男的下洞，女的望风。蓝图画短了，人就喘不上气。" },
+        { speaker: "林霞", text: "软土能挖，硬砖绕开。通了三家，才算真正有地道。" },
+      ],
+      hint: "与林霞交谈",
+      goal: "talk_linxia",
+    }),
+    PlacePickup(100, SURFACE_Y, ITEM_SHOVEL, "surface"),
     Ent({
       id: "hatch1",
       type: "hatch",
@@ -195,6 +213,21 @@ function BuildAct2() {
   ];
   level.entities = [
     PlacePickup(w.x - 50, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    Ent({
+      id: "npc_night",
+      type: "talk",
+      x: w.x - 120,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "高老忠",
+      script: [
+        { speaker: "高老忠", text: "夜袭来了！东窖还没挖成，西口藏不下全村。" },
+        { speaker: "高传宝", text: "叔，我去挖东窖通气！" },
+        { speaker: "高老忠", text: "你挖蓝图、开东窖。钟——我去敲。进洞！" },
+      ],
+      hint: "夜袭前听交代",
+      goal: "talk_night",
+    }),
     Ent({
       id: "hatch2a",
       type: "hatch",
@@ -315,6 +348,21 @@ function BuildAct3() {
   level.entities = [
     PlacePickup(startPt.x - 36, startPt.y + 16, ITEM_SHOVEL, "tunnel"),
     Ent({
+      id: "npc_plan",
+      type: "talk",
+      x: startPt.x + 40,
+      y: startPt.y + 16,
+      layer: "tunnel",
+      speaker: "林霞",
+      script: [
+        { speaker: "林霞", text: "要能藏也能打。先设计翻口厢室蓝图，再改建机关。" },
+        { speaker: "高传宝", text: "我画蓝图挖厢室、通卡口。上面那两个武工队，回头盘问。" },
+      ],
+      hint: "听计议",
+      goal: "talk_plan",
+      tunnelAnchored: true,
+    }),
+    Ent({
       id: "flip_build",
       type: "flip_build",
       x: CellCenter(soil, 16, 3).x,
@@ -425,6 +473,20 @@ function BuildAct4() {
     PlacePickup(s.x - 40, SURFACE_Y, ITEM_SHOVEL, "surface"),
     PlacePickup(s.x + 70, SURFACE_Y, ITEM_GRENADE, "surface"),
     Ent({
+      id: "npc_ambush",
+      type: "talk",
+      x: s.x + 30,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "高传宝",
+      script: [
+        { speaker: "高传宝", text: "山田进村了。出击口要从主巷往上挖穿——先画竖井蓝图。" },
+        { speaker: "林霞", text: "打一枪换一处。别恋战，别跟巡逻硬撞。" },
+      ],
+      hint: "战前交代",
+      goal: "talk_ambush",
+    }),
+    Ent({
       id: "h4",
       type: "hatch",
       x: s.x,
@@ -528,6 +590,22 @@ function BuildAct5() {
   level.entities = [
     PlacePickup(s.x + 40, s.y + 16, ITEM_SHOVEL, "tunnel"),
     PlacePickup(s.x - 40, s.y + 16, ITEM_CHARGE, "tunnel"),
+    Ent({
+      id: "npc_assault",
+      type: "talk",
+      x: s.x + 80,
+      y: s.y + 16,
+      layer: "tunnel",
+      speaker: "赵平原",
+      script: [
+        { speaker: "赵平原", text: "炮楼夯土硬，软土里绕。先设计通往药室的蓝图。" },
+        { speaker: "赵平原", text: "挖通后放下铁锹、拿炸药包到药室按 F 安放，再上地面发信号。" },
+        { speaker: "高传宝", text: "叔的钟声还在。这一回，轮到炮楼听咱们的。" },
+      ],
+      hint: "进攻端听令",
+      goal: "talk_assault",
+      tunnelAnchored: true,
+    }),
     Ent({
       id: "plant_zone",
       type: "plant_zone",

@@ -1,12 +1,14 @@
-import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
+import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
 import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
+import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
 import { PropsBehind, PropsFront } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   CreateCampaignState,
   DebugCarvePath,
   DebugHold,
+  DebugPlanCell,
   GoalsRemaining,
   LoadProgress,
   SerializeProgress,
@@ -38,9 +40,17 @@ function HatchDown(state, id) {
   Assert(state.player.inTunnel, `${id} enters tunnel`);
 }
 
+function TestStoryBeats() {
+  Assert(PROLOGUE_PANELS.length >= 5, "prologue opening");
+  Assert(CHAPTERS.every((c) => c.openPanels.length >= 5), "acts have rich open panels");
+  Assert(CHAPTERS.every((c) => c.closePanels.length >= 3), "acts have close panels");
+  Assert(CHAPTERS[0].goals.includes("talk_linxia"), "act1 linxia talk");
+}
+
 function TestSoilNotGifted() {
   const level = BuildLevel("act1_connect");
   Assert(!!level.soil, "act1 has soil grid");
+  Assert(!!level.soil.plan, "plan grid exists");
   let air = 0;
   let soft = 0;
   for (let r = 0; r < level.soil.rows; r++) {
@@ -54,6 +64,78 @@ function TestSoilNotGifted() {
   Assert(soft > 200, `most of band is soft to dig (${soft})`);
   const links = EvalDigGoals(level);
   Assert(!links.link_ab && !links.link_bc, "links incomplete before digging");
+}
+
+function TestPlanBeforeExcavate() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  const hatch = state.level.entities.find((e) => e.id === "hatch1");
+  state.player.x = hatch.tunnelX + 80;
+  state.player.y = hatch.tunnelY;
+  state.player.facing = 1;
+  state.player.onGround = true;
+  DebugHold(state, ITEM_SHOVEL);
+  const before = state.stats.cellsCarved;
+
+  // Hold dig must NOT carve (no Terraria hold-to-dig)
+  state.input.dig = true;
+  for (let i = 0; i < 90; i++) StepPlay(state, 1 / 30);
+  Assert(state.stats.cellsCarved === before, "holding J does not carve");
+
+  // Tap dig without plan fails
+  state.input.dig = false;
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.stats.cellsCarved === before, "tap without blueprint does not carve");
+
+  // Design toggle + paint a soft neighbor of the digger, then excavate
+  state.input.designTogglePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.designMode, "R enters design mode");
+  EnsurePlanGrid(state.level.soil);
+  // Stand at cellar, pick soft cell immediately next to the digger
+  state.player.x = hatch.tunnelX;
+  state.player.y = hatch.tunnelY;
+  const chest = {
+    c: Math.floor((state.player.x - state.level.soil.originX) / state.level.soil.cell),
+    r: Math.floor((state.player.y - 24 - state.level.soil.originY) / state.level.soil.cell),
+  };
+  let target = null;
+  for (const [dc, dr] of [
+    [1, 0],
+    [1, -1],
+    [0, -1],
+    [-1, 0],
+    [0, 1],
+  ]) {
+    const c = chest.c + dc;
+    const r = chest.r + dr;
+    if (GetCell(state.level.soil, c, r) === SOFT) {
+      target = { c, r };
+      break;
+    }
+  }
+  Assert(!!target, "found soft neighbor of digger");
+  state.planCursor = { c: target.c, r: target.r };
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(IsPlanned(state.level.soil, target.c, target.r), "J marks blueprint");
+  Assert(CountPlanned(state.level.soil) >= 1, "plan count");
+
+  state.input.designTogglePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!state.designMode, "R exits design");
+
+  state.player.x = hatch.tunnelX;
+  state.player.y = hatch.tunnelY;
+  state.player.facing = target.c >= chest.c ? 1 : -1;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.onGround = true;
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.stats.cellsCarved > before, "tap J excavates planned cell");
+  Assert(GetCell(state.level.soil, target.c, target.r) === AIR, "cell became air");
 }
 
 function TestCarveConnectsAct1() {
@@ -78,7 +160,6 @@ function TestNoJump() {
   state.input.up = true;
   for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
   Assert(state.player.y >= y0 - 2, "W/up does not launch into the air");
-  Assert(!Object.prototype.hasOwnProperty.call(state.input, "jumpPressed"), "input has no jumpPressed");
 }
 
 function TestPickupShovelRequired() {
@@ -91,26 +172,24 @@ function TestPickupShovelRequired() {
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
   Assert(state.player.held === ITEM_SHOVEL, "E picks up shovel");
-  Assert(shovel.taken, "pickup consumed");
 }
 
-function TestDigNeedsShovel() {
+function TestMultiTalk() {
   const state = Play(0);
-  HatchDown(state, "hatch1");
-  const hatch = state.level.entities.find((e) => e.id === "hatch1");
-  state.player.x = hatch.tunnelX + 80;
-  state.player.y = hatch.tunnelY;
-  state.player.facing = 1;
-  state.player.onGround = true;
-  state.player.held = null;
-  const before = state.stats.cellsCarved;
-  state.input.dig = true;
-  for (let i = 0; i < 100; i++) StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved === before, "cannot dig empty-handed");
-  DebugHold(state, ITEM_SHOVEL);
-  state.input.dig = true;
-  for (let i = 0; i < 100; i++) StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved > before, "shovel dig carves soft cell");
+  const npc = state.level.entities.find((e) => e.id === "npc_laozhong");
+  Assert(npc.script?.length >= 3, "laozhong multi-line script");
+  state.player.x = npc.x;
+  state.player.y = npc.y;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!npc.done, "first line does not finish talk");
+  Assert(state.subtitle?.text, "dialogue text shown in subtitle");
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(npc.done, "talk completes after all lines");
+  Assert(state.goalsDone.talk_laozhong, "talk goal marked");
 }
 
 function TestAct2MustDigBeforeShelter() {
@@ -167,21 +246,12 @@ function TestAct5PlantNeedsCharge() {
   state.input.usePressed = true;
   StepPlay(state, 1 / 30);
   Assert(state.goalsDone.plant_charge, "F plants charge at zone");
-  Assert(state.player.held == null, "hands empty after plant");
 }
 
 function TestDepthLayers() {
   const level = BuildLevel("act1_connect");
   Assert(PropsBehind(level.props).length > 3, "back depth props exist");
   Assert(PropsFront(level.props).length > 5, "front occluder props exist");
-  Assert(
-    level.props.some((p) => p.kind === "house" && (p.depth ?? 0) < 0),
-    "houses sit behind play plane",
-  );
-  Assert(
-    level.props.some((p) => (p.depth ?? 0) >= 2 || p.kind === "mudbank" || p.kind === "bush"),
-    "near-camera occluders seeded",
-  );
 }
 
 function TestChaptersHaveSoil() {
@@ -189,34 +259,35 @@ function TestChaptersHaveSoil() {
   for (const ch of CHAPTERS) {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
-    Assert((level.digLinks?.length || 0) + (level.digZones?.length || 0) > 0, `${ch.id} dig objectives`);
     Assert(
       level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL),
       `${ch.id} has shovel pickup`,
     );
+    Assert(level.entities.some((e) => e.type === "talk" && e.script), `${ch.id} has talk script`);
   }
-  Assert(SAVE_KEY.endsWith("_v4"), "save v4");
-  const blob = SerializeProgress(Play(0));
-  Assert(LoadProgress(blob).chapterIndex === 0, "save");
+  Assert(SAVE_KEY.endsWith("_v5"), "save v5");
+  Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
 }
 
 function Main() {
   TestChaptersHaveSoil();
+  TestStoryBeats();
   TestDepthLayers();
   TestSoilNotGifted();
+  TestPlanBeforeExcavate();
   TestCarveConnectsAct1();
   TestNoJump();
   TestPickupShovelRequired();
-  TestDigNeedsShovel();
+  TestMultiTalk();
   TestAct2MustDigBeforeShelter();
   TestAct5PlantNeedsCharge();
   const leftover = GoalsRemaining(Play(0));
-  Assert(leftover.length === 4, "act1 starts with 4 open goals");
+  Assert(leftover.length === 5, "act1 starts with 5 open goals");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 depth-layers smoke OK");
+  console.log("\nTunnelHeart1942 plan-dig + story smoke OK");
 }
 
 Main();

@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260731f">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260802a">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -83,6 +83,7 @@
       <div id="HeldSlot" class="heldSlot" data-empty="1" aria-label="手持道具">
         <b></b><span>空手</span><em>走近地上的道具按 E 捡起</em>
       </div>
+      <div id="DesignBadge" class="designBadge" hidden>设计蓝图中</div>
 
       <div class="touchPad" aria-label="触屏操作">
         <div class="cluster">
@@ -90,9 +91,11 @@
           <button type="button" data-touch="right" aria-label="右移">▶</button>
         </div>
         <div class="cluster">
-          <button type="button" class="wide" data-touch="dig" aria-label="挖掘">⛏</button>
-          <button type="button" data-touch="crouch" aria-label="蹲/下挖">↓</button>
-          <button type="button" data-touch="up" aria-label="上挖">↑</button>
+          <button type="button" data-touch="design" aria-label="设计蓝图">R</button>
+          <button type="button" class="wide" data-touch="dig" aria-label="标记/开挖">J</button>
+          <button type="button" data-touch="chamber" aria-label="厢室蓝图">T</button>
+          <button type="button" data-touch="crouch" aria-label="蹲/下">↓</button>
+          <button type="button" data-touch="up" aria-label="上">↑</button>
           <button type="button" data-touch="interact" aria-label="捡/互动">E</button>
           <button type="button" data-touch="use" aria-label="使用道具">F</button>
         </div>
@@ -102,16 +105,16 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>A/D 走 · S 蹲/下挖 · W 上挖 · 按住 J 挖（须手持铁锹）· E/空格 捡物或互动 · F 使用手中道具 · Q 放下 · Esc 暂停</p>
-        <p>没有跳跃，也没有背包。地上一次只能捡一件拿在手里——左下角就是你手里那件。</p>
+        <p>A/D 走 · R 进入/退出地道设计 · 设计中：方向键移光标，J 标记/取消蓝图，T 厢室，C 巷道 · 退出后走到蓝图旁点 J 开挖（不是长按）· E 交谈/捡物 · F 用道具 · Q 放下 · Esc 暂停</p>
+        <p>先设计蓝图，再开挖。没有泰拉瑞亚式长按乱挖，也没有背包——一次只拿一件。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
       </article>
       <article id="HistoryModal" class="modalCard" hidden>
         <h2>说明</h2>
-        <p>剧情骨架取自电影《地道战》。形式对齐《勇敢的心：世界大战》：漫画页、气泡记号、单手持物、极简界面。</p>
-        <p>白盒零贴图。地道由土壤格网挖出；铁锹在地上，捡起来才能挖。</p>
+        <p>剧情取自电影《地道战》：开场白、钟声、翻口、神出鬼没、黑风口。形式对齐《勇敢的心》：漫画页、对话条、单手持物。</p>
+        <p>白盒零贴图。地道由你先画蓝图再挖通——设计权在玩家手里。</p>
         <div class="modalActions">
           <button id="CloseHistoryButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -135,6 +138,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260731f"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260802a"></script>
 </body>
 </html>

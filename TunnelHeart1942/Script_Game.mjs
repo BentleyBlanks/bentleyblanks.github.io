@@ -1,4 +1,4 @@
-import { CHAPTERS, CACHE_BUST } from "./Data_Story.mjs";
+import { CHAPTERS, CACHE_BUST, PROLOGUE_PANELS } from "./Data_Story.mjs";
 import {
   AdvancePanels,
   CreateCampaignState,
@@ -78,10 +78,15 @@ function SyncTitle() {
 
 function SyncPanels() {
   const chapter = CHAPTERS[state.chapterIndex];
-  const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
+  const isPrologue = state.phase === "prologue";
+  const list = isPrologue
+    ? PROLOGUE_PANELS
+    : state.phase === "panels"
+      ? chapter.openPanels
+      : chapter.closePanels;
   const beat = list[state.panelIndex];
-  $("PanelKicker").textContent = `第 ${chapter.act} 页`;
-  $("PanelTitle").textContent = chapter.title;
+  $("PanelKicker").textContent = isPrologue ? "开场" : `第 ${chapter.act} 页`;
+  $("PanelTitle").textContent = isPrologue ? "高家庄" : chapter.title;
   $("PanelSpeaker").textContent = beat.speaker;
   $("PanelBody").textContent = beat.text || beat.body || "";
   $("PanelProgress").innerHTML = list
@@ -99,29 +104,35 @@ function SyncHud() {
   const held = state.player.held;
   const meta = held ? ITEM_META[held] : null;
   slot.dataset.empty = held ? "0" : "1";
-  slot.innerHTML = meta
-    ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
-    : `<b></b><span>空手</span><em>走近地上的道具按 E 捡起（一次只拿一件）</em>`;
-  if (meta) slot.querySelector("b").dataset.item = held;
+  if (state.designMode) {
+    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>光标移格 · J 标记 · T 厢室 · C 巷道 · R 退出</em>`;
+  } else {
+    slot.innerHTML = meta
+      ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip} · R 设计地道</em>`
+      : `<b></b><span>空手</span><em>E 捡道具 · 洞里 R 设计蓝图再挖</em>`;
+    if (meta) slot.querySelector("b").dataset.item = held;
+  }
+  const badge = $("DesignBadge");
+  if (badge) badge.hidden = !state.designMode;
 }
 
 function SyncPhaseUi() {
   const phase = state.phase;
   Show($("TitleScreen"), phase === "title");
-  Show($("PanelScreen"), phase === "panels" || phase === "closePanels");
+  Show($("PanelScreen"), phase === "prologue" || phase === "panels" || phase === "closePanels");
   Show($("EndingScreen"), phase === "ending");
   Show($("GameHud"), phase === "play");
   const letter = document.querySelector(".comicLetterbox");
   if (letter) letter.style.visibility = phase === "play" ? "visible" : "hidden";
   if (phase === "title") SyncTitle();
-  if (phase === "panels" || phase === "closePanels") SyncPanels();
+  if (phase === "prologue" || phase === "panels" || phase === "closePanels") SyncPanels();
   if (phase === "play") SyncHud();
   if (state.failed) SetModal("fail");
 }
 
 function BeginFrom(chapterIndex) {
   state = CreateCampaignState(chapterIndex, LoadFromStorage());
-  state.phase = "panels";
+  state.phase = chapterIndex === 0 ? "prologue" : "panels";
   state.panelIndex = 0;
   SaveToStorage(state);
   SetModal(null);
@@ -498,6 +509,88 @@ function DrawShaft(shaft) {
   }
 }
 
+function DrawPlanOverlay(pal) {
+  const soil = state.level.soil;
+  if (!soil?.plan) return;
+  const s = Scale();
+  const cam0 = state.cameraX - 40;
+  const cam1 = state.cameraX + VIEW_W + 40;
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      if (!soil.plan[r][c]) continue;
+      const rect = CellWorldRect(soil, c, r);
+      if (rect.x + rect.w < cam0 || rect.x > cam1) continue;
+      const x = WX(rect.x);
+      const y = WY(rect.y);
+      const w = rect.w * s;
+      const h = rect.h * s;
+      ctx.fillStyle = "rgba(80,160,220,.28)";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "rgba(120,200,255,.85)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+      ctx.setLineDash([]);
+    }
+  }
+  if (state.designMode && state.planCursor) {
+    const rect = CellWorldRect(soil, state.planCursor.c, state.planCursor.r);
+    const x = WX(rect.x);
+    const y = WY(rect.y);
+    const w = rect.w * s;
+    const h = rect.h * s;
+    ctx.strokeStyle = "#f0c27a";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "rgba(240,194,122,.2)";
+    ctx.fillRect(x, y, w, h);
+  }
+}
+
+function DrawDialogueBanner() {
+  const sub = state.subtitle;
+  if (!sub || !sub.text) return;
+  const w = canvas.clientWidth || innerWidth;
+  const h = canvas.clientHeight || innerHeight;
+  const boxW = Math.min(720, w - 48);
+  const x = (w - boxW) / 2;
+  const y = h * 0.76;
+  ctx.save();
+  ctx.fillStyle = "rgba(15,12,10,.84)";
+  ctx.strokeStyle = "#efe2c8";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, boxW, 96, 6);
+  else ctx.rect(x, y, boxW, 96);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#c9a45a";
+  ctx.font = "700 15px IBM Plex Sans, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(sub.speaker || "旁白", x + 16, y + 12);
+  ctx.fillStyle = "#efe2c8";
+  ctx.font = "400 16px IBM Plex Sans, sans-serif";
+  let line = "";
+  let ly = y + 34;
+  const max = boxW - 32;
+  for (const ch of String(sub.text)) {
+    const test = line + ch;
+    if (ctx.measureText(test).width > max) {
+      ctx.fillText(line, x + 16, ly);
+      line = ch;
+      ly += 20;
+      if (ly > y + 72) break;
+    } else line = test;
+  }
+  if (line && ly <= y + 72) ctx.fillText(line, x + 16, ly);
+  ctx.fillStyle = "rgba(239,226,200,.55)";
+  ctx.font = "600 12px IBM Plex Sans, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(state.designMode ? "R 退出设计" : "E 继续", x + boxW - 14, y + 76);
+  ctx.restore();
+}
+
 function DrawSoilGrid(pal) {
   const soil = state.level.soil;
   if (!soil) return;
@@ -827,7 +920,17 @@ function DrawInteractPromptWorld() {
   const x = WX(state.player.x);
   const y = WY(state.player.y) - 8 * s;
   const key =
-    hint === "dig" ? "J" : hint === "plant_zone" && state.player.held === ITEM_CHARGE ? "F" : hint === "need_shovel" ? "E" : "E";
+    hint === "dig" || hint === "design" || hint === "need_plan"
+      ? hint === "design"
+        ? "J"
+        : hint === "need_plan"
+          ? "R"
+          : "J"
+      : hint === "plant_zone" && state.player.held === ITEM_CHARGE
+        ? "F"
+        : hint === "need_shovel"
+          ? "E"
+          : "E";
   const icon =
     hint === "dig" || hint === "need_shovel" || hint === "pickup"
       ? "shovel"
@@ -982,6 +1085,7 @@ function RenderTunnelStack(w, h, camX, pal) {
   ctx.globalAlpha = 0.85;
   DrawSoilGrid(pal);
   ctx.restore();
+  DrawPlanOverlay(pal);
   for (const shaft of state.level.shafts) DrawShaft(shaft);
   for (const ent of state.level.entities) DrawEntity(ent);
   DrawProjectiles();
@@ -1007,6 +1111,8 @@ function Render() {
     RenderSurfaceStack(w, h, camX, pal, { playable: state.phase === "play" });
   }
 
+  if (state.phase === "play") DrawDialogueBanner();
+
   if (state.transition > 0) {
     const a = state.transition < 0.5 ? state.transition * 2 : (1 - state.transition) * 2;
     ctx.fillStyle = `rgba(10,8,6,${Math.min(1, a)})`;
@@ -1021,13 +1127,31 @@ function BindInput() {
     if (["arrowleft", "a"].includes(k)) input.left = down;
     if (["arrowright", "d"].includes(k)) input.right = down;
     if (["arrowdown", "s"].includes(k)) input.crouch = down;
-    if (["j", "shift"].includes(k)) input.dig = down;
+    if (["j"].includes(k)) {
+      input.dig = down;
+      if (down) input.digPressed = true;
+    }
+    if (k === "r" && down) {
+      input.designTogglePressed = true;
+      e.preventDefault();
+    }
+    if (k === "t" && down) {
+      input.planChamberPressed = true;
+      e.preventDefault();
+    }
+    if (k === "c" && down && state.designMode) {
+      input.planCorridorPressed = true;
+      e.preventDefault();
+    }
+    if ((k === "x" || k === "backspace") && down) {
+      input.planErasePressed = true;
+    }
     if (["w", "arrowup"].includes(k)) {
       input.up = down;
       if (down) e.preventDefault();
     }
     if (down && (k === " " || k === "enter")) {
-      if (state.phase === "panels" || state.phase === "closePanels") {
+      if (state.phase === "prologue" || state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
         SaveToStorage(state);
         SyncPhaseUi();
@@ -1040,7 +1164,7 @@ function BindInput() {
       e.preventDefault();
     }
     if (down && k === "e") {
-      if (state.phase === "panels" || state.phase === "closePanels") {
+      if (state.phase === "prologue" || state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
         SaveToStorage(state);
         SyncPhaseUi();
@@ -1070,7 +1194,13 @@ function BindInput() {
       if (kind === "left") state.input.left = down;
       if (kind === "right") state.input.right = down;
       if (kind === "crouch") state.input.crouch = down;
-      if (kind === "dig") state.input.dig = down;
+      if (kind === "dig") {
+        state.input.dig = down;
+        if (down) state.input.digPressed = true;
+      }
+      if (kind === "design" && down) state.input.designTogglePressed = true;
+      if (kind === "chamber" && down) state.input.planChamberPressed = true;
+      if (kind === "corridor" && down) state.input.planCorridorPressed = true;
       if (kind === "up") state.input.up = down;
       if (kind === "interact" && down) state.input.interactPressed = true;
       if (kind === "use" && down) state.input.usePressed = true;

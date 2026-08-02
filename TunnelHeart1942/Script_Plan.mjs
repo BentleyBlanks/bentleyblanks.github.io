@@ -1,0 +1,200 @@
+/**
+ * Tunnel blueprint design — plan first, excavate second.
+ * Not Terraria hold-to-dig: soft soil only becomes diggable after you mark it.
+ */
+
+import {
+  AIR,
+  CellCenter,
+  CellWorldRect,
+  GetCell,
+  HARD,
+  InBounds,
+  SOFT,
+  WorldToCell,
+} from "./Script_Dig.mjs";
+
+export function EnsurePlanGrid(soil) {
+  if (!soil) return null;
+  if (soil.plan && soil.plan.length === soil.rows) return soil.plan;
+  soil.plan = [];
+  for (let r = 0; r < soil.rows; r++) {
+    soil.plan.push(new Array(soil.cols).fill(false));
+  }
+  return soil.plan;
+}
+
+export function IsPlanned(soil, c, r) {
+  if (!soil?.plan || !InBounds(soil, c, r)) return false;
+  return !!soil.plan[r][c];
+}
+
+export function ClearPlanCell(soil, c, r) {
+  EnsurePlanGrid(soil);
+  if (!InBounds(soil, c, r)) return false;
+  if (!soil.plan[r][c]) return false;
+  soil.plan[r][c] = false;
+  return true;
+}
+
+/** Plan must grow from AIR or another planned cell (connected tunnel design). */
+export function CanPlanCell(soil, c, r) {
+  if (!InBounds(soil, c, r)) return false;
+  if (GetCell(soil, c, r) !== SOFT) return false;
+  if (IsPlanned(soil, c, r)) return true;
+  const dirs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  for (const [dc, dr] of dirs) {
+    const nc = c + dc;
+    const nr = r + dr;
+    if (!InBounds(soil, nc, nr)) continue;
+    if (GetCell(soil, nc, nr) === AIR) return true;
+    if (IsPlanned(soil, nc, nr)) return true;
+  }
+  return false;
+}
+
+export function TogglePlanCell(soil, c, r) {
+  EnsurePlanGrid(soil);
+  if (!InBounds(soil, c, r)) return false;
+  if (GetCell(soil, c, r) !== SOFT) return false;
+  if (soil.plan[r][c]) {
+    soil.plan[r][c] = false;
+    return "erase";
+  }
+  if (!CanPlanCell(soil, c, r)) return false;
+  soil.plan[r][c] = true;
+  return "mark";
+}
+
+/** Stamp a chamber blueprint (soft cells only, must connect). */
+export function StampChamberPlan(soil, c0, r0, w = 2, h = 2) {
+  EnsurePlanGrid(soil);
+  let n = 0;
+  for (let r = r0; r < r0 + h; r++) {
+    for (let c = c0; c < c0 + w; c++) {
+      if (!InBounds(soil, c, r)) continue;
+      if (GetCell(soil, c, r) !== SOFT) continue;
+      if (soil.plan[r][c]) continue;
+      if (!CanPlanCell(soil, c, r) && n === 0) {
+        // allow first cell of stamp if any neighbor of stamp region touches air/plan
+        let ok = false;
+        for (let rr = r0; rr < r0 + h && !ok; rr++) {
+          for (let cc = c0; cc < c0 + w && !ok; cc++) {
+            if (CanPlanCell(soil, cc, rr) || IsPlanned(soil, cc, rr) || GetCell(soil, cc, rr) === AIR) ok = true;
+          }
+        }
+        if (!ok) continue;
+      }
+      if (CanPlanCell(soil, c, r) || n > 0) {
+        // after first mark, subsequent cells of stamp can attach to newly planned
+        if (!soil.plan[r][c] && (CanPlanCell(soil, c, r) || n > 0)) {
+          // force-connect: if adjacent to any cell we'll mark / marked
+          soil.plan[r][c] = true;
+          n += 1;
+        }
+      }
+    }
+  }
+  // Second pass — fill remaining soft in rect that now connects
+  for (let pass = 0; pass < 4; pass++) {
+    for (let r = r0; r < r0 + h; r++) {
+      for (let c = c0; c < c0 + w; c++) {
+        if (!InBounds(soil, c, r)) continue;
+        if (GetCell(soil, c, r) !== SOFT) continue;
+        if (soil.plan[r][c]) continue;
+        if (CanPlanCell(soil, c, r)) {
+          soil.plan[r][c] = true;
+          n += 1;
+        }
+      }
+    }
+  }
+  return n;
+}
+
+/** Extend a corridor plan in a facing direction from a seed cell. */
+export function StampCorridorPlan(soil, c0, r0, facing, length = 4) {
+  EnsurePlanGrid(soil);
+  let n = 0;
+  let c = c0;
+  let r = r0;
+  for (let i = 0; i < length; i++) {
+    c += facing;
+    if (!InBounds(soil, c, r)) break;
+    if (GetCell(soil, c, r) === HARD) break;
+    if (GetCell(soil, c, r) === AIR) continue;
+    if (GetCell(soil, c, r) !== SOFT) break;
+    if (!soil.plan[r][c] && CanPlanCell(soil, c, r)) {
+      soil.plan[r][c] = true;
+      n += 1;
+    } else if (soil.plan[r][c]) {
+      continue;
+    } else break;
+  }
+  return n;
+}
+
+export function CountPlanned(soil) {
+  EnsurePlanGrid(soil);
+  let n = 0;
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) if (soil.plan[r][c]) n += 1;
+  }
+  return n;
+}
+
+/** Planned soft cell next to the digger that can be excavated this tap. */
+export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digUp) {
+  EnsurePlanGrid(soil);
+  const pc = WorldToCell(soil, playerX, playerY - 24);
+  // Prefer facing / up / down, then any orthogonal neighbor with a plan mark.
+  const preferred = [];
+  if (digUp) preferred.push({ c: pc.c, r: pc.r - 1 }, { c: pc.c + facing, r: pc.r - 1 });
+  if (digDown) preferred.push({ c: pc.c, r: pc.r + 1 });
+  preferred.push(
+    { c: pc.c + facing, r: pc.r },
+    { c: pc.c + facing, r: pc.r - 1 },
+    { c: pc.c, r: pc.r - 1 },
+    { c: pc.c, r: pc.r + 1 },
+    { c: pc.c - facing, r: pc.r },
+    { c: pc.c, r: pc.r },
+  );
+  const seen = new Set();
+  for (const { c, r } of preferred) {
+    const k = `${c},${r}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (!InBounds(soil, c, r)) continue;
+    if (GetCell(soil, c, r) !== SOFT) continue;
+    if (!IsPlanned(soil, c, r)) continue;
+    const nearPlayer = Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 1;
+    if (!nearPlayer) continue;
+    return { c, r, rect: CellWorldRect(soil, c, r) };
+  }
+  return null;
+}
+
+export function InitPlanCursor(soil, playerX, playerY, facing) {
+  const pc = WorldToCell(soil, playerX + facing * 24, playerY - 24);
+  if (InBounds(soil, pc.c, pc.r)) return { c: pc.c, r: pc.r };
+  const fallback = WorldToCell(soil, playerX, playerY - 24);
+  return {
+    c: Math.max(1, Math.min(soil.cols - 2, fallback.c)),
+    r: Math.max(1, Math.min(soil.rows - 2, fallback.r)),
+  };
+}
+
+export function MovePlanCursor(soil, cursor, dc, dr) {
+  const nc = Math.max(0, Math.min(soil.cols - 1, cursor.c + dc));
+  const nr = Math.max(0, Math.min(soil.rows - 1, cursor.r + dr));
+  return { c: nc, r: nr };
+}
+
+export function PlanCursorWorld(soil, cursor) {
+  return CellCenter(soil, cursor.c, cursor.r);
+}

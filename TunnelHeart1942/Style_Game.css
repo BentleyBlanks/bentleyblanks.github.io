@@ -258,3 +258,10 @@ button { font: inherit; cursor: pointer; }
   .touchPad { display: flex; }
   .comicFrame { grid-template-columns: 80px 1fr; }
 }
+
+.designBadge {
+  position: absolute; top: 7%; left: 50%; transform: translateX(-50%);
+  background: #1a3a4a; color: #d8f0ff; border: 2.5px solid #1a1410;
+  padding: 6px 14px; font-weight: 700; letter-spacing: .08em;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.3); pointer-events: none;
+}

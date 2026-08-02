@@ -1,11 +1,21 @@
-import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
+import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import {
   CarveCell,
-  PickDigTarget,
   RebuildTunnelSolids,
   SetCell,
   AIR,
 } from "./Script_Dig.mjs";
+import {
+  ClearPlanCell,
+  CountPlanned,
+  EnsurePlanGrid,
+  InitPlanCursor,
+  MovePlanCursor,
+  PickExcavateTarget,
+  StampChamberPlan,
+  StampCorridorPlan,
+  TogglePlanCell,
+} from "./Script_Plan.mjs";
 import {
   CanDigWith,
   CanPlant,
@@ -22,7 +32,6 @@ export const PLAYER_W = 26;
 export const PLAYER_H = 48;
 export const GRAVITY = 1850;
 export const MOVE_SPEED = 220;
-export const DIG_RATE = 0.85;
 export const THROW_SPEED = 420;
 
 export function CreateInputState() {
@@ -31,6 +40,7 @@ export function CreateInputState() {
     right: false,
     up: false,
     dig: false,
+    digPressed: false,
     interact: false,
     interactPressed: false,
     use: false,
@@ -38,6 +48,11 @@ export function CreateInputState() {
     drop: false,
     dropPressed: false,
     crouch: false,
+    designTogglePressed: false,
+    planPaintPressed: false,
+    planErasePressed: false,
+    planChamberPressed: false,
+    planCorridorPressed: false,
   };
 }
 
@@ -45,6 +60,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
   const idx = Math.max(0, Math.min(CHAPTERS.length - 1, chapterIndex | 0));
   const chapter = CHAPTERS[idx];
   const level = BuildLevel(chapter.id);
+  if (level.soil) EnsurePlanGrid(level.soil);
   const tunnel = !!level.spawn.tunnel;
   return {
     phase: "title",
@@ -71,6 +87,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       inTunnel: tunnel,
     },
     projectiles: [],
+    designMode: false,
+    planCursor: level.soil ? InitPlanCursor(level.soil, level.spawn.x, level.spawn.y, 1) : null,
     cameraX: Math.max(0, level.spawn.x - VIEW_W * 0.35),
     cameraY: tunnel ? level.tunnelFloor - 300 : SURFACE_Y - 360,
     level,
@@ -190,14 +208,37 @@ function GoalIcon(goalId) {
 
 function SetBubble(state, icons, mutter = "", time = 2.8) {
   state.bubble = { icons: icons || [], mutter, timer: time };
-  state.subtitle = mutter ? { speaker: "", text: mutter } : null;
-  state.subtitleTimer = time;
+  if (mutter) {
+    const prev = state.subtitle;
+    state.subtitle = {
+      speaker: prev && prev.text === mutter && prev.speaker ? prev.speaker : prev?.speaker || "",
+      text: mutter,
+    };
+    state.subtitleTimer = time;
+  }
 }
 
-function SetSubtitle(state, speaker, text, time = 3.0) {
-  // Keep API for existing call sites — route into VH bubble (no quest-log tone)
+function SetSubtitle(state, speaker, text, time = 4.8) {
   const icons = GuessIcons(speaker, text);
-  SetBubble(state, icons, text, time);
+  state.subtitle = { speaker: speaker || "", text };
+  state.subtitleTimer = time;
+  state.bubble = { icons, mutter: text, timer: time };
+}
+
+function AdvanceTalk(state, ent) {
+  const script = ent.script || (ent.line ? [{ speaker: ent.speaker || "？", text: ent.line }] : []);
+  if (!script.length) {
+    ent.done = true;
+    return;
+  }
+  const idx = ent.scriptIndex | 0;
+  const beat = script[idx];
+  SetSubtitle(state, beat.speaker || ent.speaker || "", beat.text, 6.5);
+  ent.scriptIndex = idx + 1;
+  if (ent.scriptIndex >= script.length) {
+    ent.done = true;
+    if (ent.goal) MarkGoal(state, ent.goal);
+  }
 }
 
 function GuessIcons(speaker, text) {
@@ -229,52 +270,92 @@ function SyncDigGoals(state) {
   }
 }
 
-function TryDig(state, dt) {
+function TryDesign(state) {
   const { player, level, input } = state;
-  player.digging = false;
-  player.digTarget = null;
-  if (!input.dig || !player.inTunnel || !level.soil || state.transition > 0) {
-    player.digProgress = 0;
-    return;
-  }
-  if (!CanDigWith(player.held)) {
-    player.digProgress = 0;
-    state.interactHint = "need_shovel";
-    if (!state._digNeedWarned) {
-      state._digNeedWarned = true;
-      SetBubble(state, ["shovel", "warn"], "先捡起铁锹", 1.6);
+  if (!player.inTunnel || !level.soil || state.transition > 0) {
+    if (input.designTogglePressed && player.inTunnel === false) {
+      SetSubtitle(state, "设计", "下到地窖里才能设计地道蓝图。", 2.4);
     }
     return;
   }
-  state._digNeedWarned = false;
-
-  const digUp = !!input.up;
-  const digDown = !!input.crouch;
-  let dig = PickDigTarget(level.soil, player.x, player.y, player.facing, digDown, digUp);
-  if (!dig && digUp) {
-    dig = PickDigTarget(level.soil, player.x, player.y, player.facing, false, true);
+  if (input.designTogglePressed) {
+    state.designMode = !state.designMode;
+    if (state.designMode) {
+      EnsurePlanGrid(level.soil);
+      state.planCursor = InitPlanCursor(level.soil, player.x, player.y, player.facing);
+      SetSubtitle(state, "设计", "蓝图模式：方向键移光标，J 标记/取消，T 厢室，C 巷道。再按 R 退出，走到蓝图旁点 J 开挖。", 5.5);
+    } else {
+      const n = CountPlanned(level.soil);
+      SetSubtitle(state, "设计", n ? `蓝图 ${n} 格已定——走到标记旁点 J 开挖（不是长按）。` : "已退出设计。先画蓝图再挖。", 3.5);
+    }
   }
-  if (!dig) {
-    player.digProgress = 0;
-    state.interactHint = "";
+  if (!state.designMode || !state.planCursor) return;
+
+  let dc = 0;
+  let dr = 0;
+  if (input.left) dc -= 1;
+  if (input.right) dc += 1;
+  if (input.up) dr -= 1;
+  if (input.crouch) dr += 1;
+  state._planMoveCd = (state._planMoveCd || 0) - 1 / 30;
+  if ((dc || dr) && state._planMoveCd <= 0) {
+    state.planCursor = MovePlanCursor(level.soil, state.planCursor, dc, dr);
+    if (dc) player.facing = dc > 0 ? 1 : -1;
+    state._planMoveCd = 0.12;
+  }
+
+  const cur = state.planCursor;
+  if (input.planPaintPressed || input.digPressed) {
+    const res = TogglePlanCell(level.soil, cur.c, cur.r);
+    if (res === "mark") SetBubble(state, ["shovel"], "标记开挖", 0.8);
+    else if (res === "erase") SetBubble(state, ["warn"], "取消标记", 0.8);
+    else SetBubble(state, ["shovel", "warn"], "须从已有空洞或蓝图延伸", 1.4);
+  }
+  if (input.planErasePressed) {
+    if (ClearPlanCell(level.soil, cur.c, cur.r)) SetBubble(state, ["warn"], "擦除", 0.6);
+  }
+  if (input.planChamberPressed) {
+    const n = StampChamberPlan(level.soil, cur.c, cur.r, 2, 2);
+    SetSubtitle(state, "设计", n ? `厢室蓝图 +${n} 格` : "此处无法铺厢室——靠近已有洞或蓝图", 2.2);
+  }
+  if (input.planCorridorPressed) {
+    const face = player.facing >= 0 ? 1 : -1;
+    const n = StampCorridorPlan(level.soil, cur.c, cur.r, face, 5);
+    SetSubtitle(state, "设计", n ? `巷道蓝图 +${n} 格` : "巷道延伸失败——换方向或先连上气口", 2.2);
+  }
+}
+
+function TryExcavate(state) {
+  const { player, level, input } = state;
+  player.digging = false;
+  player.digTarget = null;
+  if (state.designMode) return;
+  if (!input.digPressed || !player.inTunnel || !level.soil || state.transition > 0) return;
+  if (!CanDigWith(player.held)) {
+    state.interactHint = "need_shovel";
+    SetBubble(state, ["shovel", "warn"], "先捡起铁锹", 1.6);
     return;
   }
-
-  player.digging = true;
+  EnsurePlanGrid(level.soil);
+  const digUp = !!input.up;
+  const digDown = !!input.crouch;
+  const dig = PickExcavateTarget(level.soil, player.x, player.y, player.facing, digDown, digUp);
+  if (!dig) {
+    SetSubtitle(state, "提示", "先按 R 进入设计，把要挖的格子标成蓝图，再点 J 开挖。不能长按乱挖。", 3.2);
+    state.interactHint = "need_plan";
+    return;
+  }
   player.digTarget = dig;
-  player.digProgress = Math.min(1, player.digProgress + DIG_RATE * dt);
   state.interactHint = "dig";
-  if (player.digProgress < 1) return;
-
   if (CarveCell(level.soil, dig.c, dig.r)) {
     state.stats.digs += 1;
     state.stats.cellsCarved += 1;
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
-    SetBubble(state, ["shovel"], "", 0.6);
+    SetBubble(state, ["shovel"], "开挖", 0.7);
   }
-  player.digProgress = 0;
 }
+
 
 function MakeDroppedPickup(player, itemId, side = 1) {
   const p = PickupEntity(player.x + player.facing * 28 * side, player.inTunnel ? player.y : SURFACE_Y, itemId);
@@ -407,12 +488,9 @@ function GoalReady(state, ent) {
 function TryInteract(state) {
   const { player, level, input } = state;
   if (!input.interactPressed || state.transition > 0) return;
-  if (TryPickupOrInteract(state)) {
-    state.stats.interactions += 1;
-    return;
-  }
   state.stats.interactions += 1;
 
+  // Story / hatches / world actions before pickups — never let a shovel steal a talk.
   for (const ent of level.entities) {
     if (ent.kind === "pickup") continue;
     if (ent.hidden || ent.done) continue;
@@ -425,9 +503,7 @@ function TryInteract(state) {
     }
 
     if (ent.type === "talk") {
-      ent.done = true;
-      SetSubtitle(state, ent.speaker, ent.line, 3.6);
-      if (ent.goal) MarkGoal(state, ent.goal);
+      AdvanceTalk(state, ent);
       return;
     }
 
@@ -520,6 +596,9 @@ function TryInteract(state) {
       return;
     }
   }
+
+  // Pickups last
+  TryPickupOrInteract(state);
 }
 
 function UpdateActors(state, dt) {
@@ -604,20 +683,16 @@ function RefreshHint(state) {
       return;
     }
   }
+  if (state.designMode) {
+    state.interactHint = "design";
+    return;
+  }
   if (state.player.inTunnel && state.level.soil) {
     if (!CanDigWith(state.player.held)) {
-      const softNear = PickDigTarget(
-        state.level.soil,
-        state.player.x,
-        state.player.y,
-        state.player.facing,
-        !!state.input.crouch,
-        !!state.input.up,
-      );
-      if (softNear) state.interactHint = "need_shovel";
+      state.interactHint = "need_shovel";
       return;
     }
-    const dig = PickDigTarget(
+    const dig = PickExcavateTarget(
       state.level.soil,
       state.player.x,
       state.player.y,
@@ -626,6 +701,7 @@ function RefreshHint(state) {
       !!state.input.up,
     );
     if (dig) state.interactHint = "dig";
+    else if (CountPlanned(state.level.soil) === 0) state.interactHint = "need_plan";
   }
 }
 
@@ -634,13 +710,15 @@ export function StepPlay(state, dt) {
   const clamped = Math.min(0.033, Math.max(0, dt));
 
   UpdateTransition(state, clamped);
+  TryDesign(state);
   // Use / pick / talk before physics — standing in a fresh chamber can get
   // X-shoved by unresolved soil solids for a frame.
   if (state.input.dropPressed) DropHeld(state);
   TryUseItem(state);
-  TryInteract(state);
-  ResolvePhysics(state, clamped);
-  TryDig(state, clamped);
+  if (!state.designMode) TryInteract(state);
+  // Excavate before physics — solids can shove the digger off the planned cell for a frame.
+  TryExcavate(state);
+  if (!state.designMode) ResolvePhysics(state, clamped);
   SyncDigGoals(state);
   RefreshHint(state);
   UpdateActors(state, clamped);
@@ -660,10 +738,25 @@ export function StepPlay(state, dt) {
   state.input.interactPressed = false;
   state.input.usePressed = false;
   state.input.dropPressed = false;
+  state.input.digPressed = false;
+  state.input.designTogglePressed = false;
+  state.input.planPaintPressed = false;
+  state.input.planErasePressed = false;
+  state.input.planChamberPressed = false;
+  state.input.planCorridorPressed = false;
   return state;
 }
 
 export function AdvancePanels(state) {
+  if (state.phase === "prologue") {
+    if (state.panelIndex < PROLOGUE_PANELS.length - 1) {
+      state.panelIndex += 1;
+      return state;
+    }
+    state.phase = "panels";
+    state.panelIndex = 0;
+    return state;
+  }
   const chapter = CHAPTERS[state.chapterIndex];
   const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
   if (state.panelIndex < list.length - 1) {
@@ -691,12 +784,18 @@ export function RestartChapter(state) {
 }
 
 export function SerializeProgress(state) {
-  return { v: 4, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+  return { v: 5, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
 }
 
 /** Test helper: put shovel in hand. */
 export function DebugHold(state, itemId = ITEM_SHOVEL) {
   state.player.held = itemId;
+  return state;
+}
+
+export function DebugPlanCell(state, c, r) {
+  EnsurePlanGrid(state.level.soil);
+  state.level.soil.plan[r][c] = true;
   return state;
 }
 

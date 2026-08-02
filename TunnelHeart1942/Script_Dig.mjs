@@ -16,12 +16,18 @@ export const HARD = 2;
 
 export function CreateSoilGrid({ cols, rows, originX, originY, fill = SOFT }) {
   const cells = [];
+  const plan = [];
   for (let r = 0; r < rows; r++) {
     const row = new Array(cols);
-    for (let c = 0; c < cols; c++) row[c] = fill;
+    const planRow = new Array(cols);
+    for (let c = 0; c < cols; c++) {
+      row[c] = fill;
+      planRow[c] = false;
+    }
     cells.push(row);
+    plan.push(planRow);
   }
-  return { cols, rows, originX, originY, cell: CELL, cells, carved: 0 };
+  return { cols, rows, originX, originY, cell: CELL, cells, plan, carved: 0 };
 }
 
 export function InBounds(grid, c, r) {
@@ -128,6 +134,7 @@ function TouchesAirOrPlayer(grid, c, r, playerX, playerY) {
 export function CarveCell(grid, c, r) {
   if (GetCell(grid, c, r) !== SOFT) return false;
   SetCell(grid, c, r, AIR);
+  if (grid.plan?.[r]) grid.plan[r][c] = false;
   return true;
 }
 
