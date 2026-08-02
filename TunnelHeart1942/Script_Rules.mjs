@@ -97,6 +97,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     bubble: null,
     subtitle: null,
     subtitleTimer: 0,
+    /** Film beats queued after key moments (e.g. 高老忠殉钟). */
+    subtitleQueue: [],
     winTimer: 0,
     failed: false,
     completed: false,
@@ -224,6 +226,19 @@ function SetSubtitle(state, speaker, text, time = 4.8) {
   state.subtitle = { speaker: speaker || "", text };
   state.subtitleTimer = time;
   state.bubble = { icons, mutter: text, timer: time };
+}
+
+function QueueSubtitles(state, beats) {
+  if (!Array.isArray(beats) || !beats.length) return;
+  state.subtitleQueue = (state.subtitleQueue || []).concat(beats);
+  if (!state.subtitle || state.subtitleTimer <= 0) DrainSubtitleQueue(state);
+}
+
+function DrainSubtitleQueue(state) {
+  const q = state.subtitleQueue;
+  if (!q || !q.length) return;
+  const next = q.shift();
+  SetSubtitle(state, next.speaker || "", next.text || "", next.time ?? 3.2);
 }
 
 function AdvanceTalk(state, ent) {
@@ -581,15 +596,30 @@ function TryInteract(state) {
     if (ent.type === "shelter") {
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
-      SetSubtitle(state, "乡亲", ent.line, 2.2);
+      SetSubtitle(state, ent.speaker || "乡亲", ent.line, 2.4);
       return;
     }
 
     if (ent.type === "bell") {
+      // Film beat: 高老忠敲钟殉难 — player witnesses at the bell, does not “play as” the ringer.
+      if (!state.goalsDone.shelter_a || !state.goalsDone.shelter_b || !state.goalsDone.shelter_c) {
+        SetSubtitle(state, "高老忠", "先把人藏进洞——钟，我来敲！", 2.8);
+        return;
+      }
+      if (ent.done) return;
       ent.done = true;
       ent.ringing = true;
       if (ent.goal) MarkGoal(state, ent.goal);
-      SetSubtitle(state, "高老忠", "快进洞——钟，我来敲！", 3.6);
+      // Hold the scene — patrols must not cut the martyrdom beat short.
+      player.invuln = Math.max(player.invuln, 22);
+      QueueSubtitles(state, [
+        { speaker: "高老忠", text: "乡亲们——快进洞！钟，我来敲！", time: 3.4 },
+        { speaker: "旁白", text: "钟声裂开夜色。鬼子朝钟楼扑过来。", time: 3.2 },
+        { speaker: "山田", text: "钟楼上有人——给我打！", time: 2.8 },
+        { speaker: "高老忠", text: "有种的——过来！", time: 2.6 },
+        { speaker: "旁白", text: "手榴弹的火光吞没钟架。高老忠用命，换全村进洞的时间。", time: 4.2 },
+        { speaker: "高传宝", text: "叔——！", time: 2.6 },
+      ]);
       return;
     }
 
@@ -703,6 +733,19 @@ function UpdateActors(state, dt) {
     if (ent.type === "patrol" && !ent.broken && ent.hostile) {
       ent.t = (ent.t || 0) + dt;
       ent.x = ent.homeX + Math.sin(ent.t * 0.65) * (ent.amp || 100);
+      if (
+        ent.barkYamada &&
+        !ent._barked &&
+        !player.inTunnel &&
+        Math.abs(player.x - ent.x) < 220 &&
+        !(state.subtitleQueue && state.subtitleQueue.length) &&
+        !level.entities.some((e) => e.type === "bell" && e.ringing)
+      ) {
+        ent._barked = true;
+        if (!state.subtitle || state.subtitleTimer < 0.4) {
+          SetSubtitle(state, "山田", ent.barkYamada, 3.0);
+        }
+      }
       if (!player.inTunnel && player.invuln <= 0 && !player.crouching) {
         if (Math.abs(player.x - ent.x) < 38 && Math.abs(player.y - ent.y) < 40) {
           player.hp -= 1;
@@ -719,7 +762,10 @@ function UpdateActors(state, dt) {
     if (state.subtitleTimer <= 0) {
       state.subtitle = null;
       state.bubble = null;
+      DrainSubtitleQueue(state);
     }
+  } else {
+    DrainSubtitleQueue(state);
   }
   if (state.bubble) {
     state.bubble.timer -= dt;
@@ -817,12 +863,17 @@ export function StepPlay(state, dt) {
   UpdateCamera(state, clamped);
 
   if (AllGoalsDone(state) && !state.completed) {
-    state.winTimer += clamped;
-    if (state.winTimer > 0.9) {
-      state.completed = true;
-      state.phase = "closePanels";
-      state.panelIndex = 0;
-      state.unlockedActs = Math.max(state.unlockedActs, state.chapterIndex + 2);
+    // Hold the win beat until film subtitle queues (殉钟等) finish playing.
+    const queueBusy =
+      (state.subtitleQueue && state.subtitleQueue.length > 0) || state.subtitleTimer > 0.05;
+    if (!queueBusy) {
+      state.winTimer += clamped;
+      if (state.winTimer > 0.9) {
+        state.completed = true;
+        state.phase = "closePanels";
+        state.panelIndex = 0;
+        state.unlockedActs = Math.max(state.unlockedActs, state.chapterIndex + 2);
+      }
     }
   } else state.winTimer = 0;
 

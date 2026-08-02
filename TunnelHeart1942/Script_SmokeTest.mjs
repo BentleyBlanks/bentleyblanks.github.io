@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
 import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
@@ -15,6 +18,8 @@ import {
   SerializeProgress,
   StepPlay,
 } from "./Script_Rules.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 let failed = 0;
 function Assert(cond, msg) {
@@ -42,10 +47,21 @@ function HatchDown(state, id) {
 }
 
 function TestStoryBeats() {
-  Assert(PROLOGUE_PANELS.length >= 5, "prologue opening");
-  Assert(CHAPTERS.every((c) => c.openPanels.length >= 5), "acts have rich open panels");
-  Assert(CHAPTERS.every((c) => c.closePanels.length >= 3), "acts have close panels");
+  Assert(PROLOGUE_PANELS.length >= 7, "prologue opening denser");
+  Assert(CHAPTERS.every((c) => c.openPanels.length >= 6), "acts have rich open panels");
+  Assert(CHAPTERS.every((c) => c.closePanels.length >= 4), "acts have denser close panels");
   Assert(CHAPTERS[0].goals.includes("talk_linxia"), "act1 linxia talk");
+  Assert(
+    CHAPTERS.some((c) => c.openPanels.some((p) => p.speaker === "山田")),
+    "Yamada appears in film beats",
+  );
+  Assert(
+    CHAPTERS[1].closePanels.some((p) => /高老忠/.test(p.text)),
+    "act2 close remembers 高老忠 martyrdom",
+  );
+  const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
+  Assert(rules.includes("QueueSubtitles"), "bell martyrdom subtitle queue");
+  Assert(rules.includes("手榴弹的火光吞没钟架"), "martyrdom line staged in play");
 }
 
 function TestSoilNotGifted() {
@@ -178,17 +194,17 @@ function TestPickupShovelRequired() {
 function TestMultiTalk() {
   const state = Play(0);
   const npc = state.level.entities.find((e) => e.id === "npc_laozhong");
-  Assert(npc.script?.length >= 3, "laozhong multi-line script");
+  Assert(npc.script?.length >= 4, "laozhong multi-line script");
   state.player.x = npc.x;
   state.player.y = npc.y;
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
   Assert(!npc.done, "first line does not finish talk");
   Assert(state.subtitle?.text, "dialogue text shown in subtitle");
-  state.input.interactPressed = true;
-  StepPlay(state, 1 / 30);
-  state.input.interactPressed = true;
-  StepPlay(state, 1 / 30);
+  for (let i = 1; i < npc.script.length; i++) {
+    state.input.interactPressed = true;
+    StepPlay(state, 1 / 30);
+  }
   Assert(npc.done, "talk completes after all lines");
   Assert(state.goalsDone.talk_laozhong, "talk goal marked");
 }
