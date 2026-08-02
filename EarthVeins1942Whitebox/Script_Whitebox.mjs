@@ -1,6 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803t";
-import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803t";
-import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803t";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803u";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803u";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803u";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -1147,6 +1147,7 @@ function Draw() {
   const daylight = state.levelIndex === 0 && state.phaseId === "collect" ? 0 : state.levelIndex === 2 ? .2 : .55;
   DrawSky(width, height, surfaceY, daylight);
   DrawVillage(width, height, surfaceY);
+  DrawSurfaceDepthVeil(width, height, surfaceY, daylight);
   DrawRaidDestruction(width, height, surfaceY);
   DrawSurfaceCovers(width, surfaceY, false);
   DrawEarth(width, height, surfaceY, tunnelY);
@@ -1166,6 +1167,7 @@ function Draw() {
   DrawSurfaceVegetation(width, height, surfaceY);
   DrawLighting(width, height, surfaceY, tunnelY, daylight);
   DrawSurfaceDiversions(width, height, surfaceY);
+  DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
   DrawDogCommandFocus(width, height, surfaceY, tunnelY);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
@@ -1173,63 +1175,191 @@ function Draw() {
   if (qaMode && !state.cleanCapture) DrawQa(width, height, surfaceY, tunnelY);
 }
 
+function SceneHash(seed) {
+  return Math.abs(Math.sin(seed * 91.733 + 17.19) * 43758.5453) % 1;
+}
+
+function DrawMountainLayer(width, surfaceY, layer) {
+  const offset = state.camera.x * width * layer.parallax * .018;
+  context.beginPath(); context.moveTo(-80, surfaceY + 2);
+  for (let x = -80; x <= width + 100; x += layer.step) {
+    const broad = Math.sin((x + offset) * layer.frequency + layer.seed) * layer.amplitude;
+    const ridge = Math.sin((x + offset) * layer.frequency * 2.37 + layer.seed * 1.9) * layer.amplitude * .34;
+    const peak = Math.abs(Math.sin((x + offset) * layer.frequency * .61 + layer.seed * 2.4)) * layer.amplitude * .56;
+    context.lineTo(x, layer.baseY + broad + ridge - peak);
+  }
+  context.lineTo(width + 100, surfaceY + 2); context.closePath();
+  context.fillStyle = layer.color; context.fill();
+  context.strokeStyle = layer.rim; context.lineWidth = layer.lineWidth; context.stroke();
+}
+
 function DrawSky(width, height, surfaceY, daylight) {
+  const isDay = daylight > .4;
   const gradient = context.createLinearGradient(0, 0, 0, surfaceY);
-  gradient.addColorStop(0, daylight > .4 ? "#96a4a0" : "#16242d");
-  gradient.addColorStop(1, daylight > .4 ? "#d0c5a4" : "#493f3e");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
-  context.fillStyle = daylight > .4 ? "rgba(237,214,154,.38)" : "rgba(202,218,207,.18)";
-  context.beginPath(); context.arc(width * .78, surfaceY * .25, 34, 0, Math.PI * 2); context.fill();
-  for (let layer = 0; layer < 3; layer += 1) {
-    context.beginPath();
-    context.moveTo(0, surfaceY);
-    for (let x = 0; x <= width + 80; x += 80) {
-      const offset = state.camera.x * width * (.012 + layer * .009);
-      const y = surfaceY * (.68 + layer * .07) + Math.sin((x + offset) * .012 + layer) * (15 + layer * 5);
-      context.lineTo(x, y);
+  gradient.addColorStop(0, isDay ? "#7f9696" : "#101c27");
+  gradient.addColorStop(.52, isDay ? "#a9aaa0" : "#28313a");
+  gradient.addColorStop(1, isDay ? "#d2bd94" : "#594640");
+  context.fillStyle = gradient; context.fillRect(0, 0, width, height);
+
+  const celestialX = LayerToScreen(7.6, width, .035);
+  const celestialY = surfaceY * .19;
+  const celestialGlow = context.createRadialGradient(celestialX, celestialY, 2, celestialX, celestialY, isDay ? 72 : 58);
+  celestialGlow.addColorStop(0, isDay ? "rgba(255,228,157,.72)" : "rgba(217,229,222,.38)");
+  celestialGlow.addColorStop(1, "rgba(255,236,185,0)");
+  context.fillStyle = celestialGlow; context.beginPath(); context.arc(celestialX, celestialY, isDay ? 72 : 58, 0, Math.PI * 2); context.fill();
+  context.fillStyle = isDay ? "rgba(238,208,137,.58)" : "rgba(210,222,216,.32)"; context.beginPath(); context.arc(celestialX, celestialY, isDay ? 29 : 22, 0, Math.PI * 2); context.fill();
+
+  if (!isDay) {
+    for (let star = 0; star < 34; star += 1) {
+      const starX = (SceneHash(star + 2) * width - state.camera.x * width * .0025 + width) % width;
+      const starY = 20 + SceneHash(star + 17) * surfaceY * .52;
+      const twinkle = .24 + SceneHash(star + 31) * .46 + Math.sin(state.elapsed * 1.1 + star) * .08;
+      context.fillStyle = `rgba(224,225,205,${twinkle})`; context.beginPath(); context.arc(starX, starY, .7 + SceneHash(star + 49) * 1.1, 0, Math.PI * 2); context.fill();
     }
-    context.lineTo(width, surfaceY); context.closePath();
-    context.fillStyle = ["rgba(35,50,50,.34)", "rgba(42,53,49,.52)", "rgba(55,57,48,.72)"][layer]; context.fill();
+  }
+
+  const cloudLayers = [
+    { y: .2, parallax: .035, scale: .55, alpha: isDay ? .12 : .055 },
+    { y: .34, parallax: .075, scale: .82, alpha: isDay ? .16 : .075 }
+  ];
+  cloudLayers.forEach((cloud, layerIndex) => {
+    const cloudOffset = state.camera.x * width * cloud.parallax * .02;
+    context.fillStyle = isDay ? `rgba(230,222,196,${cloud.alpha})` : `rgba(165,176,174,${cloud.alpha})`;
+    for (let cloudIndex = -1; cloudIndex < 7; cloudIndex += 1) {
+      const x = cloudIndex * width * .21 - cloudOffset + (layerIndex ? 70 : 0);
+      const y = surfaceY * cloud.y + Math.sin(cloudIndex * 2.2 + layerIndex) * 14;
+      context.beginPath(); context.ellipse(x, y, 62 * cloud.scale, 13 * cloud.scale, -.08, 0, Math.PI * 2); context.ellipse(x + 45 * cloud.scale, y - 7, 48 * cloud.scale, 16 * cloud.scale, .05, 0, Math.PI * 2); context.fill();
+    }
+  });
+
+  [
+    { parallax: .035, baseY: surfaceY * .53, amplitude: 23, step: 58, frequency: .008, seed: .7, color: isDay ? "#6e7c78" : "#26343a", rim: "rgba(229,224,197,.06)", lineWidth: 1 },
+    { parallax: .075, baseY: surfaceY * .61, amplitude: 32, step: 52, frequency: .0092, seed: 2.1, color: isDay ? "#596d68" : "#2d393b", rim: "rgba(225,210,177,.07)", lineWidth: 1.2 },
+    { parallax: .145, baseY: surfaceY * .69, amplitude: 42, step: 44, frequency: .0105, seed: 4.4, color: isDay ? "#4a5c54" : "#34403e", rim: "rgba(220,198,157,.08)", lineWidth: 1.5 },
+    { parallax: .245, baseY: surfaceY * .78, amplitude: 34, step: 38, frequency: .013, seed: 6.6, color: isDay ? "#3e4d42" : "#343c37", rim: "rgba(226,190,135,.1)", lineWidth: 1.7 }
+  ].forEach((layer) => DrawMountainLayer(width, surfaceY, layer));
+
+  const treeBaseY = surfaceY - 31;
+  for (let worldX = -20; worldX <= 20; worldX += .62) {
+    const x = LayerToScreen(worldX, width, .34);
+    const size = 10 + SceneHash(worldX + 100) * 18;
+    context.fillStyle = isDay ? "rgba(41,55,43,.78)" : "rgba(27,36,34,.86)";
+    context.beginPath(); context.ellipse(x, treeBaseY - size * .45, size * .55, size * .72, SceneHash(worldX) * .35 - .17, 0, Math.PI * 2); context.ellipse(x + size * .36, treeBaseY - size * .32, size * .44, size * .58, .15, 0, Math.PI * 2); context.fill();
   }
 }
 
+function DrawFieldDepth(width, surfaceY) {
+  const horizonY = surfaceY - 57;
+  const vanishX = width * .52 - state.camera.x * width * .006;
+  const fieldGradient = context.createLinearGradient(0, horizonY, 0, surfaceY + 4);
+  fieldGradient.addColorStop(0, "#5a5941"); fieldGradient.addColorStop(1, "#4b4130");
+  context.fillStyle = fieldGradient; context.fillRect(0, horizonY, width, surfaceY - horizonY + 6);
+  for (let lane = -9; lane <= 9; lane += 1) {
+    const nearX = width * .5 + lane * width * .09;
+    context.strokeStyle = lane % 2 ? "rgba(209,172,93,.22)" : "rgba(48,43,31,.42)";
+    context.lineWidth = Math.abs(lane) % 3 === 0 ? 4 : 2;
+    context.beginPath(); context.moveTo(vanishX + lane * 6, horizonY + 3); context.lineTo(nearX, surfaceY + 5); context.stroke();
+  }
+  for (let row = 0; row < 5; row += 1) {
+    const progress = (row + 1) / 6;
+    const y = Lerp(horizonY, surfaceY, progress * progress);
+    context.strokeStyle = `rgba(223,189,119,${.08 + progress * .12})`; context.lineWidth = 1 + progress * 1.5;
+    context.beginPath(); context.moveTo(0, y); context.quadraticCurveTo(vanishX, y - 8 * (1 - progress), width, y + 2); context.stroke();
+  }
+  context.fillStyle = "rgba(61,52,38,.72)";
+  context.beginPath(); context.moveTo(vanishX - 17, horizonY); context.lineTo(vanishX + 23, horizonY); context.lineTo(width * .72, surfaceY + 6); context.lineTo(width * .51, surfaceY + 6); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(203,164,99,.28)"; context.lineWidth = 3;
+  context.beginPath(); context.moveTo(vanishX - 5, horizonY); context.lineTo(width * .57, surfaceY + 6); context.moveTo(vanishX + 12, horizonY); context.lineTo(width * .67, surfaceY + 6); context.stroke();
+}
+
+function DrawPerspectiveHouse(worldX, width, baseY, size, parallax, variant, alpha) {
+  const x = LayerToScreen(worldX, width, parallax);
+  const side = variant % 2 ? 1 : -1;
+  const frontWidth = size * (.92 + SceneHash(variant + 4) * .18);
+  const wallHeight = size * (.52 + SceneHash(variant + 8) * .1);
+  const depthX = side * size * .35;
+  const depthY = -size * .11;
+  context.save(); context.globalAlpha = alpha;
+  context.fillStyle = "rgba(20,20,18,.26)"; context.beginPath(); context.ellipse(x + depthX * .2, baseY + 4, frontWidth * .72, size * .1, 0, 0, Math.PI * 2); context.fill();
+  context.fillStyle = variant % 3 === 0 ? "#756047" : variant % 3 === 1 ? "#675541" : "#80684d";
+  context.fillRect(x - frontWidth / 2, baseY - wallHeight, frontWidth, wallHeight);
+  context.fillStyle = variant % 2 ? "#4f4538" : "#554333";
+  context.beginPath(); context.moveTo(x + side * frontWidth / 2, baseY - wallHeight); context.lineTo(x + side * (frontWidth / 2 + Math.abs(depthX)), baseY - wallHeight + depthY); context.lineTo(x + side * (frontWidth / 2 + Math.abs(depthX)), baseY + depthY); context.lineTo(x + side * frontWidth / 2, baseY); context.closePath(); context.fill();
+  context.fillStyle = "#342f2b";
+  context.beginPath(); context.moveTo(x - frontWidth * .64, baseY - wallHeight); context.lineTo(x, baseY - wallHeight - size * .36); context.lineTo(x + frontWidth * .64, baseY - wallHeight); context.closePath(); context.fill();
+  context.fillStyle = "#292724";
+  context.beginPath(); context.moveTo(x, baseY - wallHeight - size * .36); context.lineTo(x + side * (frontWidth * .64 + Math.abs(depthX)), baseY - wallHeight + depthY); context.lineTo(x + side * frontWidth * .64, baseY - wallHeight); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(219,182,118,.28)"; context.lineWidth = Math.max(1, size * .018);
+  for (let beam = -1; beam <= 1; beam += 1) { context.beginPath(); context.moveTo(x + beam * frontWidth * .28, baseY - wallHeight + 3); context.lineTo(x + beam * frontWidth * .28, baseY); context.stroke(); }
+  context.fillStyle = "#211f1c"; context.fillRect(x - frontWidth * .13, baseY - wallHeight * .48, frontWidth * .26, wallHeight * .48);
+  if (variant % 2 === 0) {
+    context.fillStyle = "rgba(211,165,81,.34)"; context.fillRect(x - frontWidth * .38, baseY - wallHeight * .63, frontWidth * .16, wallHeight * .17);
+    context.strokeStyle = "rgba(236,202,132,.3)"; context.strokeRect(x - frontWidth * .38, baseY - wallHeight * .63, frontWidth * .16, wallHeight * .17);
+  }
+  context.strokeStyle = "rgba(231,198,139,.16)"; context.lineWidth = 1;
+  for (let mark = 0; mark < 4; mark += 1) { context.beginPath(); context.moveTo(x - frontWidth * .46, baseY - wallHeight * (.22 + mark * .15)); context.lineTo(x + frontWidth * .45, baseY - wallHeight * (.19 + mark * .15)); context.stroke(); }
+  if (variant % 3 === 1) {
+    const chimneyX = x - side * frontWidth * .27;
+    const chimneyY = baseY - wallHeight - size * .25;
+    context.fillStyle = "#3b3129"; context.fillRect(chimneyX - size * .055, chimneyY, size * .11, size * .26);
+    for (let puff = 0; puff < 4; puff += 1) {
+      const cycle = (state.elapsed * .055 + puff * .24 + variant * .17) % 1;
+      const drift = side * cycle * size * .42 + Math.sin(puff * 2.4 + state.elapsed * .3) * size * .06;
+      context.fillStyle = `rgba(141,139,126,${(1 - cycle) * .14})`;
+      context.beginPath(); context.ellipse(chimneyX + drift, chimneyY - cycle * size * .78, size * (.08 + cycle * .16), size * (.05 + cycle * .1), -.18 * side, 0, Math.PI * 2); context.fill();
+    }
+  }
+  context.restore();
+}
+
 function DrawVillage(width, height, surfaceY) {
-  const rearHouses = [-15, -10.8, -6.7, -2.4, 2.1, 6.5, 10.9, 15.2];
+  DrawFieldDepth(width, surfaceY);
+
+  const rearHouses = [-18, -14.4, -11, -7.6, -4.1, -.7, 2.8, 6.2, 9.7, 13.1, 16.7, 20.2];
+  rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .42));
+
   context.save();
-  context.globalAlpha = .44;
-  rearHouses.forEach((worldX, index) => {
-    const screenX = LayerToScreen(worldX, width, .42);
-    const size = 38 + (index % 3) * 5;
-    const baseY = surfaceY - 34 - (index % 2) * 5;
-    context.fillStyle = "#505248";
-    context.fillRect(screenX - size * .58, baseY - size * .52, size * 1.16, size * .52);
-    context.fillStyle = "#343d3a";
-    context.beginPath(); context.moveTo(screenX - size * .72, baseY - size * .52); context.lineTo(screenX, baseY - size * .82); context.lineTo(screenX + size * .72, baseY - size * .52); context.closePath(); context.fill();
-  });
-  context.strokeStyle = "rgba(53,56,47,.52)"; context.lineWidth = 3;
-  for (let row = 0; row < 2; row += 1) {
-    const y = surfaceY - 17 - row * 13;
-    context.beginPath(); context.moveTo(0, y);
-    for (let x = 0; x <= width; x += 55) context.lineTo(x, y + Math.sin(x * .025 + row) * 3);
-    context.stroke();
+  for (let worldX = -19; worldX <= 19; worldX += 1.05) {
+    const x = LayerToScreen(worldX, width, .58);
+    const baseY = surfaceY - 19 + Math.sin(worldX * .8) * 3;
+    const heightScale = 17 + SceneHash(worldX + 70) * 22;
+    context.fillStyle = "rgba(45,55,39,.72)"; context.beginPath(); context.ellipse(x, baseY - heightScale * .55, 8 + heightScale * .18, heightScale * .55, worldX % 2 ? .14 : -.14, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "rgba(72,61,42,.56)"; context.lineWidth = 2; context.beginPath(); context.moveTo(x, baseY); context.lineTo(x + Math.sin(worldX) * 3, baseY - heightScale); context.stroke();
   }
   context.restore();
 
-  const houses = [-9, -5.2, -.2, 4.4, 8.3];
-  houses.forEach((x, index) => {
-    const screenX = LayerToScreen(x, width, .76);
-    const size = 55 + (index % 2) * 12;
-    context.fillStyle = index % 2 ? "#6d5a48" : "#75604c";
-    context.fillRect(screenX - size * .55, surfaceY - size * .72, size * 1.1, size * .72);
-    context.fillStyle = "#3e3430";
-    context.beginPath(); context.moveTo(screenX - size * .72, surfaceY - size * .72); context.lineTo(screenX, surfaceY - size * 1.06); context.lineTo(screenX + size * .72, surfaceY - size * .72); context.closePath(); context.fill();
-    context.fillStyle = "#221f1d"; context.fillRect(screenX - 8, surfaceY - 27, 16, 27);
-    context.strokeStyle = "rgba(224,199,147,.16)"; context.lineWidth = 2;
-    context.beginPath(); context.moveTo(screenX - size * .45, surfaceY - size * .5); context.lineTo(screenX + size * .45, surfaceY - size * .45); context.stroke();
-  });
-  context.fillStyle = "#504936";
-  context.fillRect(0, surfaceY - 5, width, 12);
+  const middleHouses = [-12.6, -8.9, -5.2, -1.3, 2.5, 6.6, 10.7, 14.2];
+  middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .72));
+
+  context.strokeStyle = "rgba(62,52,36,.8)"; context.lineWidth = 4;
+  for (let row = 0; row < 2; row += 1) {
+    const fenceY = surfaceY - 10 - row * 15;
+    context.beginPath(); context.moveTo(0, fenceY);
+    for (let x = -20; x <= width + 30; x += 46) context.lineTo(x, fenceY + Math.sin((x + state.camera.x * 25) * .04 + row) * 4); context.stroke();
+    for (let x = -10; x <= width + 20; x += 72) { context.beginPath(); context.moveTo(x, fenceY + 7); context.lineTo(x + 3, fenceY - 18); context.stroke(); }
+  }
+
+  const mainHouses = [-9, -5.2, -.2, 4.4, 8.3];
+  mainHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 3, 66 + index % 2 * 12, .82, index + 40, .94));
+
+  context.fillStyle = "#4a4030"; context.fillRect(0, surfaceY - 5, width, 12);
+  context.strokeStyle = "rgba(220,174,102,.26)"; context.lineWidth = 2; context.beginPath(); context.moveTo(0, surfaceY - 4); context.lineTo(width, surfaceY - 4); context.stroke();
+}
+
+function DrawSurfaceDepthVeil(width, height, surfaceY, daylight) {
+  const haze = context.createLinearGradient(0, surfaceY * .42, 0, surfaceY + 12);
+  haze.addColorStop(0, "rgba(214,204,177,0)");
+  haze.addColorStop(.58, daylight > .4 ? "rgba(211,196,161,.08)" : "rgba(117,126,121,.035)");
+  haze.addColorStop(1, "rgba(31,34,29,.08)");
+  context.fillStyle = haze; context.fillRect(0, surfaceY * .38, width, surfaceY * .66);
+  const dustOffset = state.camera.x * width * .01;
+  for (let mote = 0; mote < 22; mote += 1) {
+    const x = (SceneHash(mote + 201) * width - dustOffset + width) % width;
+    const y = surfaceY * (.32 + SceneHash(mote + 230) * .61);
+    const drift = Math.sin(state.elapsed * (.18 + SceneHash(mote + 250) * .2) + mote) * 8;
+    context.fillStyle = `rgba(224,196,137,${.025 + SceneHash(mote + 280) * .055})`;
+    context.beginPath(); context.arc(x + drift, y, 1 + SceneHash(mote + 300) * 2.2, 0, Math.PI * 2); context.fill();
+  }
 }
 
 function DrawSurfaceCovers(width, surfaceY, front) {
@@ -1429,40 +1559,127 @@ function TunnelHalfHeightAt(worldX, height) {
 function TunnelFloorYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) + TunnelHalfHeightAt(worldX, height) - 6; }
 function TunnelCeilingYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) - TunnelHalfHeightAt(worldX, height) + 6; }
 
+function DrawTunnelRearNetwork(width, height, tunnelY) {
+  const rearTop = tunnelY - 52;
+  const rearBottom = tunnelY + 7;
+  const rearGradient = context.createLinearGradient(0, rearTop, 0, rearBottom);
+  rearGradient.addColorStop(0, "rgba(8,14,17,.96)"); rearGradient.addColorStop(.58, "rgba(21,33,34,.9)"); rearGradient.addColorStop(1, "rgba(13,22,24,.95)");
+  context.fillStyle = rearGradient;
+  context.beginPath(); context.moveTo(0, rearBottom);
+  for (let worldX = -15; worldX <= 15; worldX += .45) {
+    const x = LayerToScreen(worldX, width, .68);
+    const y = rearTop + Math.sin(worldX * .7) * 5 + Math.max(0, 1 - Math.abs(worldX) / 14) * -4;
+    context.lineTo(x, y);
+  }
+  context.lineTo(width, rearBottom); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(116,144,132,.16)"; context.lineWidth = 2;
+  context.beginPath();
+  for (let worldX = -15; worldX <= 15; worldX += .45) {
+    const x = LayerToScreen(worldX, width, .68);
+    const y = rearTop + Math.sin(worldX * .7) * 5;
+    worldX === -15 ? context.moveTo(x, y) : context.lineTo(x, y);
+  }
+  context.stroke();
+
+  for (let worldX = -14; worldX <= 14; worldX += 2.05) {
+    const x = LayerToScreen(worldX, width, .7);
+    const bayWidth = Math.max(25, width / 34);
+    const bayHeight = 38 + SceneHash(worldX + 410) * 10;
+    context.fillStyle = "rgba(3,8,10,.72)";
+    context.beginPath(); context.moveTo(x - bayWidth * .48, rearBottom); context.lineTo(x - bayWidth * .38, rearBottom - bayHeight * .65); context.quadraticCurveTo(x, rearBottom - bayHeight, x + bayWidth * .38, rearBottom - bayHeight * .65); context.lineTo(x + bayWidth * .48, rearBottom); context.closePath(); context.fill();
+    context.strokeStyle = "rgba(116,87,57,.28)"; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(x - bayWidth * .42, rearBottom); context.lineTo(x - bayWidth * .32, rearBottom - bayHeight * .58); context.quadraticCurveTo(x, rearBottom - bayHeight * .87, x + bayWidth * .32, rearBottom - bayHeight * .58); context.lineTo(x + bayWidth * .42, rearBottom); context.stroke();
+    if (Math.round(worldX * 10) % 4 === 0) {
+      context.fillStyle = "rgba(203,157,68,.15)"; context.beginPath(); context.arc(x, rearBottom - 13, 13, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "rgba(229,181,82,.52)"; context.beginPath(); context.arc(x, rearBottom - 13, 2.5, 0, Math.PI * 2); context.fill();
+    }
+  }
+
+  context.strokeStyle = "rgba(143,108,66,.26)"; context.lineWidth = 3;
+  for (let worldX = -13; worldX <= 13; worldX += 2.6) {
+    const x = LayerToScreen(worldX, width, .74);
+    context.beginPath(); context.moveTo(x, rearBottom); context.lineTo(x + 3, rearTop + 10); context.moveTo(x - 10, rearTop + 12); context.lineTo(x + 12, rearTop + 12); context.stroke();
+  }
+}
+
 function DrawTunnelDepth(width, height, tunnelY) {
+  DrawTunnelRearNetwork(width, height, tunnelY);
   const branches = [
-    { id: "west", x: -8.45, width: 1.25, height: 47 },
-    { id: "center", x: .15, width: 1.55, height: 55 },
-    { id: "east", x: 7.15, width: 1.3, height: 50 }
+    { id: "west", x: -8.45, width: 1.5, height: 59, skew: -1 },
+    { id: "center", x: .15, width: 1.82, height: 67, skew: 1 },
+    { id: "east", x: 7.15, width: 1.58, height: 61, skew: -1 }
   ];
   branches.forEach((branch, branchIndex) => {
-    const x = LayerToScreen(branch.x, width, .92);
+    const x = LayerToScreen(branch.x, width, .94);
     const floorY = TunnelFloorYAt(branch.x, height, tunnelY) - 5;
     const branchWidth = width / 22 * branch.width;
     const topY = floorY - branch.height;
     const isOpen = state.levelIndex !== 0 || state.excavated.has(branch.id);
     if (!isOpen) {
       context.fillStyle = "rgba(83,59,41,.94)";
-      context.beginPath(); context.ellipse(x, floorY - 17, branchWidth * .5, 31, 0, 0, Math.PI * 2); context.fill();
+      context.beginPath(); context.ellipse(x, floorY - 22, branchWidth * .5, 37, 0, 0, Math.PI * 2); context.fill();
       context.strokeStyle = "rgba(191,140,79,.42)"; context.lineWidth = 2;
-      for (let scar = 0; scar < 5; scar += 1) {
-        const scarX = x + (scar - 2) * branchWidth * .14;
-        context.beginPath(); context.moveTo(scarX - 5, floorY - 31 + (scar % 2) * 8); context.lineTo(scarX + 4, floorY - 18 + (scar % 3) * 5); context.stroke();
+      for (let scar = 0; scar < 7; scar += 1) {
+        const scarX = x + (scar - 3) * branchWidth * .11;
+        context.beginPath(); context.moveTo(scarX - 5, floorY - 39 + (scar % 2) * 8); context.lineTo(scarX + 4, floorY - 20 + (scar % 3) * 5); context.stroke();
       }
-      context.fillStyle = "rgba(222,184,112,.76)"; context.font = "800 8px system-ui"; context.textAlign = "center"; context.fillText("待挖", x, floorY - 12);
+      context.fillStyle = "rgba(222,184,112,.76)"; context.font = "800 8px system-ui"; context.textAlign = "center"; context.fillText("待挖", x, floorY - 14);
       return;
     }
-    const shade = context.createLinearGradient(x, floorY, x, topY);
-    shade.addColorStop(0, "rgba(35,48,47,.92)"); shade.addColorStop(1, "rgba(19,27,29,.96)");
+
+    const farX = x + branch.skew * branchWidth * .18;
+    const farTop = topY + 17;
+    const farFloor = floorY - 13;
+    const shade = context.createLinearGradient(x, floorY, farX, farTop);
+    shade.addColorStop(0, "rgba(45,58,53,.94)"); shade.addColorStop(.55, "rgba(20,32,33,.97)"); shade.addColorStop(1, "rgba(5,12,15,.99)");
     context.fillStyle = shade;
-    context.beginPath(); context.moveTo(x - branchWidth * .58, floorY); context.lineTo(x - branchWidth * .44, topY + 10); context.quadraticCurveTo(x, topY - 12, x + branchWidth * .44, topY + 10); context.lineTo(x + branchWidth * .58, floorY); context.closePath(); context.fill();
-    for (let frame = 0; frame < 3; frame += 1) {
-      const inset = frame * branchWidth * .12;
-      context.strokeStyle = `rgba(152,112,69,${.45 - frame * .1})`; context.lineWidth = Math.max(2, 5 - frame);
-      context.beginPath(); context.moveTo(x - branchWidth * .5 + inset, floorY - frame * 4); context.lineTo(x - branchWidth * .38 + inset, topY + 12 + frame * 5); context.quadraticCurveTo(x, topY - 7 + frame * 5, x + branchWidth * .38 - inset, topY + 12 + frame * 5); context.lineTo(x + branchWidth * .5 - inset, floorY - frame * 4); context.stroke();
+    context.beginPath(); context.moveTo(x - branchWidth * .62, floorY); context.lineTo(x - branchWidth * .48, topY + 10); context.quadraticCurveTo(x, topY - 15, x + branchWidth * .48, topY + 10); context.lineTo(x + branchWidth * .62, floorY); context.closePath(); context.fill();
+
+    context.fillStyle = "rgba(7,13,15,.96)";
+    context.beginPath(); context.moveTo(farX - branchWidth * .2, farFloor); context.lineTo(farX - branchWidth * .16, farTop + 8); context.quadraticCurveTo(farX, farTop - 3, farX + branchWidth * .16, farTop + 8); context.lineTo(farX + branchWidth * .2, farFloor); context.closePath(); context.fill();
+
+    context.fillStyle = "rgba(92,75,55,.36)";
+    context.beginPath(); context.moveTo(x - branchWidth * .62, floorY); context.lineTo(farX - branchWidth * .2, farFloor); context.lineTo(farX - branchWidth * .16, farTop + 8); context.lineTo(x - branchWidth * .48, topY + 10); context.closePath(); context.fill();
+    context.fillStyle = "rgba(30,41,39,.42)";
+    context.beginPath(); context.moveTo(x + branchWidth * .62, floorY); context.lineTo(farX + branchWidth * .2, farFloor); context.lineTo(farX + branchWidth * .16, farTop + 8); context.lineTo(x + branchWidth * .48, topY + 10); context.closePath(); context.fill();
+
+    context.fillStyle = branchIndex === 1 ? "rgba(211,165,74,.2)" : "rgba(91,166,153,.12)";
+    context.beginPath(); context.moveTo(x - branchWidth * .54, floorY); context.lineTo(x + branchWidth * .54, floorY); context.lineTo(farX + branchWidth * .19, farFloor); context.lineTo(farX - branchWidth * .19, farFloor); context.closePath(); context.fill();
+    for (let guide = 0; guide < 4; guide += 1) {
+      const progress = guide / 4;
+      const guideX = Lerp(x, farX, progress);
+      const guideHalfWidth = Lerp(branchWidth * .5, branchWidth * .17, progress);
+      const guideY = Lerp(floorY - 2, farFloor, progress);
+      context.strokeStyle = `rgba(205,161,92,${.24 - progress * .035})`; context.lineWidth = Math.max(1, 3.4 - guide * .55);
+      context.beginPath(); context.moveTo(guideX - guideHalfWidth, guideY); context.lineTo(guideX + guideHalfWidth, guideY); context.stroke();
     }
-    context.fillStyle = branchIndex === 1 ? "rgba(202,166,92,.23)" : "rgba(89,157,150,.12)";
-    context.beginPath(); context.ellipse(x, floorY - 8, branchWidth * .34, 7, 0, 0, Math.PI * 2); context.fill();
+
+    for (let frame = 0; frame < 4; frame += 1) {
+      const progress = frame / 4;
+      const frameX = Lerp(x, farX, progress);
+      const frameWidth = Lerp(branchWidth * .52, branchWidth * .18, progress);
+      const frameFloor = Lerp(floorY - frame * 1.4, farFloor, progress);
+      const frameTop = Lerp(topY, farTop, progress);
+      context.strokeStyle = `rgba(159,116,67,${.55 - frame * .09})`; context.lineWidth = Math.max(1.7, 5.2 - frame * .85);
+      context.beginPath(); context.moveTo(frameX - frameWidth, frameFloor); context.lineTo(frameX - frameWidth * .76, frameTop + 11); context.quadraticCurveTo(frameX, frameTop - 8, frameX + frameWidth * .76, frameTop + 11); context.lineTo(frameX + frameWidth, frameFloor); context.stroke();
+    }
+
+    context.fillStyle = branchIndex === 1 ? "rgba(228,180,81,.44)" : "rgba(98,183,169,.22)";
+    context.beginPath(); context.ellipse(farX, farFloor - 7, branchWidth * .12, 5, 0, 0, Math.PI * 2); context.fill();
+  });
+
+  const sideNiches = [
+    { x: -5.85, side: -1 }, { x: -3.2, side: 1 }, { x: 2.8, side: -1 }, { x: 5.1, side: 1 }, { x: 9.4, side: -1 }
+  ];
+  sideNiches.forEach((niche, index) => {
+    const x = LayerToScreen(niche.x, width, .9);
+    const floorY = TunnelFloorYAt(niche.x, height, tunnelY) - 6;
+    const nicheWidth = Math.max(28, width / 35);
+    const depth = niche.side * nicheWidth * .42;
+    context.fillStyle = "rgba(7,13,15,.72)"; context.beginPath(); context.moveTo(x - nicheWidth * .5, floorY); context.lineTo(x - nicheWidth * .36, floorY - 41); context.quadraticCurveTo(x, floorY - 57, x + nicheWidth * .36, floorY - 41); context.lineTo(x + nicheWidth * .5, floorY); context.closePath(); context.fill();
+    context.fillStyle = "rgba(88,69,50,.24)"; context.beginPath(); context.moveTo(x + niche.side * nicheWidth * .5, floorY); context.lineTo(x + niche.side * nicheWidth * .36, floorY - 41); context.lineTo(x + depth, floorY - 34); context.lineTo(x + depth, floorY - 6); context.closePath(); context.fill();
+    context.strokeStyle = "rgba(146,105,62,.4)"; context.lineWidth = 3; context.beginPath(); context.moveTo(x - nicheWidth * .46, floorY); context.lineTo(x - nicheWidth * .33, floorY - 39); context.quadraticCurveTo(x, floorY - 53, x + nicheWidth * .33, floorY - 39); context.lineTo(x + nicheWidth * .46, floorY); context.stroke();
+    if (index % 2 === 0) { context.fillStyle = "rgba(207,158,67,.28)"; context.beginPath(); context.arc(x + depth * .45, floorY - 17, 10, 0, Math.PI * 2); context.fill(); }
   });
 
   context.strokeStyle = "rgba(111,139,127,.14)"; context.lineWidth = 7;
@@ -1477,8 +1694,9 @@ function DrawTunnelDepth(width, height, tunnelY) {
 
 function DrawTunnelProps(width, height, tunnelY) {
   const props = [
-    { x: -9.25, kind: "basket" }, { x: -7.75, kind: "lamp" }, { x: -2.45, kind: "crate" },
-    { x: 3.8, kind: "lamp" }, { x: 6.45, kind: "jars" }, { x: 7.72, kind: "lamp" }
+    { x: -10.1, kind: "jars" }, { x: -9.25, kind: "basket" }, { x: -7.75, kind: "lamp" }, { x: -6.35, kind: "bench" },
+    { x: -4.7, kind: "sacks" }, { x: -2.45, kind: "crate" }, { x: -.9, kind: "rope" }, { x: 1.7, kind: "shelf" },
+    { x: 3.8, kind: "lamp" }, { x: 5.25, kind: "bench" }, { x: 6.45, kind: "jars" }, { x: 7.72, kind: "lamp" }, { x: 9.1, kind: "sacks" }
   ];
   props.forEach((prop) => {
     const x = WorldToScreen(prop.x, width);
@@ -1492,9 +1710,21 @@ function DrawTunnelProps(width, height, tunnelY) {
       context.fillStyle = "rgba(224,172,76,.18)"; context.beginPath(); context.arc(x, floorY - 23, 25, 0, Math.PI * 2); context.fill();
       context.fillStyle = "#d4a657"; context.beginPath(); context.arc(x, floorY - 20, 4, 0, Math.PI * 2); context.fill();
       context.strokeStyle = "#83613c"; context.lineWidth = 2; context.beginPath(); context.moveTo(x, floorY - 16); context.lineTo(x, floorY); context.stroke();
-    } else {
+    } else if (prop.kind === "jars") {
       context.fillStyle = "#70513c"; context.beginPath(); context.ellipse(x - 7, floorY - 8, 7, 9, 0, 0, Math.PI * 2); context.ellipse(x + 7, floorY - 6, 6, 7, 0, 0, Math.PI * 2); context.fill();
       context.strokeStyle = "#a77e54"; context.lineWidth = 2; context.beginPath(); context.moveTo(x - 12, floorY - 12); context.lineTo(x - 2, floorY - 12); context.moveTo(x + 2, floorY - 10); context.lineTo(x + 12, floorY - 10); context.stroke();
+    } else if (prop.kind === "bench") {
+      context.fillStyle = "#67482f"; context.fillRect(x - 19, floorY - 13, 38, 7); context.fillRect(x - 15, floorY - 7, 5, 9); context.fillRect(x + 10, floorY - 7, 5, 9);
+      context.strokeStyle = "rgba(190,139,77,.5)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x - 17, floorY - 11); context.lineTo(x + 17, floorY - 11); context.stroke();
+    } else if (prop.kind === "sacks") {
+      context.fillStyle = "#76664a"; context.beginPath(); context.ellipse(x - 8, floorY - 9, 10, 12, -.16, 0, Math.PI * 2); context.ellipse(x + 8, floorY - 7, 9, 10, .19, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "rgba(210,178,118,.45)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x - 15, floorY - 14); context.quadraticCurveTo(x - 8, floorY - 18, x - 1, floorY - 14); context.moveTo(x + 2, floorY - 12); context.quadraticCurveTo(x + 8, floorY - 15, x + 14, floorY - 11); context.stroke();
+    } else if (prop.kind === "rope") {
+      context.strokeStyle = "#9b7448"; context.lineWidth = 3; context.beginPath(); context.arc(x, floorY - 10, 11, 0, Math.PI * 2); context.arc(x, floorY - 10, 6, 0, Math.PI * 2); context.stroke();
+      context.strokeStyle = "rgba(220,180,106,.42)"; context.lineWidth = 1; context.beginPath(); context.arc(x, floorY - 10, 8.5, 0, Math.PI * 2); context.stroke();
+    } else if (prop.kind === "shelf") {
+      context.strokeStyle = "#745337"; context.lineWidth = 4; context.beginPath(); context.moveTo(x - 20, floorY); context.lineTo(x - 18, floorY - 35); context.moveTo(x + 20, floorY); context.lineTo(x + 18, floorY - 35); context.moveTo(x - 21, floorY - 27); context.lineTo(x + 21, floorY - 27); context.moveTo(x - 21, floorY - 12); context.lineTo(x + 21, floorY - 12); context.stroke();
+      context.fillStyle = "#78604a"; context.beginPath(); context.ellipse(x - 8, floorY - 32, 5, 6, 0, 0, Math.PI * 2); context.ellipse(x + 7, floorY - 31, 4, 5, 0, 0, Math.PI * 2); context.fill();
     }
   });
 }
@@ -2730,6 +2960,125 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
   context.restore();
   const vignette = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .2, width / 2, height / 2, Math.max(width, height) * .68);
   vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,0,.48)"); context.fillStyle = vignette; context.fillRect(0, 0, width, height);
+}
+
+function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
+  context.save();
+  const nearScale = Math.max(.72, Math.min(1.18, width / 1100));
+  const playerX = WorldToScreen(state.player.x, width);
+
+  const nearStructures = [-16.2, -7.1, 3.6, 13.9, 23.1];
+  nearStructures.forEach((worldX, index) => {
+    const x = LayerToScreen(worldX, width, 1.2);
+    if (x < -150 || x > width + 150 || (x > width * .23 && x < width * .77)) return;
+    const side = x < width / 2 ? 1 : -1;
+    const structureWidth = (112 + index % 2 * 26) * nearScale;
+    const wallHeight = (112 + index % 3 * 18) * nearScale;
+    context.fillStyle = daylight > .4 ? "rgba(43,36,29,.78)" : "rgba(16,19,20,.86)";
+    context.fillRect(x - structureWidth / 2, surfaceY - wallHeight, structureWidth, wallHeight + 9);
+    context.fillStyle = daylight > .4 ? "rgba(29,27,25,.94)" : "rgba(8,12,14,.97)";
+    context.beginPath(); context.moveTo(x - structureWidth * .76, surfaceY - wallHeight); context.lineTo(x + side * structureWidth * .08, surfaceY - wallHeight - 52 * nearScale); context.lineTo(x + structureWidth * .76, surfaceY - wallHeight); context.closePath(); context.fill();
+    context.fillStyle = "rgba(81,61,42,.72)";
+    context.beginPath(); context.moveTo(x + side * structureWidth * .5, surfaceY - wallHeight); context.lineTo(x + side * structureWidth * .82, surfaceY - wallHeight - 17 * nearScale); context.lineTo(x + side * structureWidth * .82, surfaceY); context.lineTo(x + side * structureWidth * .5, surfaceY); context.closePath(); context.fill();
+    context.strokeStyle = "rgba(172,124,70,.6)"; context.lineWidth = 7 * nearScale;
+    context.beginPath(); context.moveTo(x - structureWidth * .43, surfaceY); context.lineTo(x - structureWidth * .43, surfaceY - wallHeight + 8); context.moveTo(x + structureWidth * .43, surfaceY); context.lineTo(x + structureWidth * .43, surfaceY - wallHeight + 8); context.moveTo(x - structureWidth * .58, surfaceY - wallHeight + 9); context.lineTo(x + structureWidth * .58, surfaceY - wallHeight + 9); context.stroke();
+    context.strokeStyle = "rgba(218,169,101,.18)"; context.lineWidth = 2;
+    for (let beam = 0; beam < 3; beam += 1) { const beamY = surfaceY - wallHeight * (.22 + beam * .23); context.beginPath(); context.moveTo(x - structureWidth * .48, beamY); context.lineTo(x + structureWidth * .48, beamY - 3); context.stroke(); }
+  });
+
+  const nearCropXs = [-18.4, -15.7, -12.2, -8.7, -4.9, -1.6, 1.8, 5.3, 9.1, 12.8, 16.2, 19.7];
+  nearCropXs.forEach((worldX, clumpIndex) => {
+    const baseX = LayerToScreen(worldX, width, 1.29);
+    if (baseX < -90 || baseX > width + 90 || Math.abs(baseX - playerX) < 52) return;
+    const clumpHeight = (56 + SceneHash(worldX + 510) * 82) * nearScale;
+    const stalkCount = 3 + Math.floor(SceneHash(worldX + 521) * 5);
+    for (let stalk = 0; stalk < stalkCount; stalk += 1) {
+      const spread = (stalk / Math.max(1, stalkCount - 1) - .5) * (34 + SceneHash(worldX + 533) * 32) * nearScale;
+      const sway = Math.sin(state.elapsed * .42 + stalk + worldX) * 5 * nearScale;
+      const stalkHeight = clumpHeight * (.62 + SceneHash(stalk + worldX * 3) * .4);
+      const stalkLean = (SceneHash(stalk + worldX * 11) - .5) * 13 * nearScale;
+      context.strokeStyle = daylight > .4 ? "rgba(28,35,23,.82)" : "rgba(11,19,18,.88)"; context.lineWidth = (2.2 + SceneHash(stalk + 607) * 2.1) * nearScale; context.lineCap = "round";
+      context.beginPath(); context.moveTo(baseX + spread, surfaceY + 8); context.quadraticCurveTo(baseX + spread + sway * .35, surfaceY - stalkHeight * .55, baseX + spread + sway, surfaceY - stalkHeight); context.stroke();
+      context.fillStyle = daylight > .4 ? "rgba(42,48,29,.88)" : "rgba(17,25,21,.92)";
+      context.beginPath();
+      context.ellipse(baseX + spread + sway + 7 + stalkLean * .25, surfaceY - stalkHeight * .73, 12 * nearScale, 3.8 * nearScale, -.62, 0, Math.PI * 2);
+      if ((stalk + clumpIndex) % 3 !== 1) context.ellipse(baseX + spread + sway - 5, surfaceY - stalkHeight * .48, 10 * nearScale, 3.5 * nearScale, .58, 0, Math.PI * 2);
+      context.fill();
+      if ((stalk + clumpIndex) % 3 === 0) { context.fillStyle = "rgba(105,83,43,.86)"; context.beginPath(); context.ellipse(baseX + spread + sway + stalkLean * .1, surfaceY - stalkHeight - 4, 3.8 * nearScale, 10 * nearScale, -.16, 0, Math.PI * 2); context.fill(); }
+    }
+  });
+
+  const branchDrift = state.camera.x * 8.5;
+  context.strokeStyle = daylight > .4 ? "rgba(24,27,23,.88)" : "rgba(7,12,14,.94)"; context.lineCap = "round";
+  const crownSides = [
+    { mirror: 1, rootX: -30, rootY: 16, reachX: width * .23 - branchDrift, reachY: 116 },
+    { mirror: -1, rootX: width + 30, rootY: -4, reachX: width * .79 - branchDrift, reachY: 132 }
+  ];
+  crownSides.forEach((crown, sideIndex) => {
+    context.lineWidth = (15 + sideIndex * 3) * nearScale;
+    context.beginPath(); context.moveTo(crown.rootX, crown.rootY); context.bezierCurveTo(crown.rootX + crown.mirror * width * .08, 25, crown.reachX - crown.mirror * 60, crown.reachY - 30, crown.reachX, crown.reachY); context.stroke();
+    for (let twig = 0; twig < 7; twig += 1) {
+      const progress = .18 + twig * .105;
+      const anchorX = Lerp(crown.rootX, crown.reachX, progress) + Math.sin(twig * 2.2 + sideIndex) * 11;
+      const anchorY = Lerp(crown.rootY, crown.reachY, progress) + Math.cos(twig * 1.7) * 9;
+      const upper = twig % 3 !== 1;
+      const angleX = crown.mirror * (18 + SceneHash(twig + sideIndex * 40) * 27);
+      const angleY = (upper ? -1 : 1) * (20 + SceneHash(twig + 87) * 28);
+      const tipX = anchorX + angleX;
+      const tipY = anchorY + angleY;
+      context.lineWidth = (2.6 + SceneHash(twig + 101) * 3.2) * nearScale;
+      context.beginPath(); context.moveTo(anchorX, anchorY); context.quadraticCurveTo(anchorX + angleX * .38 - crown.mirror * 5, anchorY + angleY * .42, tipX, tipY); context.stroke();
+      if (twig % 2 === 0) {
+        const forkX = tipX - crown.mirror * (8 + twig);
+        const forkY = tipY + (upper ? 12 : -12);
+        context.lineWidth = 2 * nearScale; context.beginPath(); context.moveTo(tipX - angleX * .28, tipY - angleY * .28); context.lineTo(forkX, forkY); context.stroke();
+      }
+      context.fillStyle = daylight > .4 ? "rgba(31,40,30,.9)" : "rgba(10,20,18,.94)";
+      const leafCount = 2 + (twig % 3);
+      for (let leaf = 0; leaf < leafCount; leaf += 1) {
+        const leafX = tipX - crown.mirror * leaf * 7 + Math.sin(leaf + twig) * 4;
+        const leafY = tipY + (leaf - 1) * 7;
+        context.beginPath(); context.ellipse(leafX, leafY, (9 + SceneHash(leaf + twig * 6) * 6) * nearScale, (3.5 + SceneHash(leaf + twig * 9) * 2.5) * nearScale, crown.mirror * (-.45 + leaf * .2), 0, Math.PI * 2); context.fill();
+      }
+    }
+  });
+
+  const foregroundSupports = [-11.8, -7.4, -3.1, 1.5, 5.9, 10.2, 14.6];
+  foregroundSupports.forEach((worldX, index) => {
+    const x = LayerToScreen(worldX, width, 1.13);
+    if (x < -50 || x > width + 50 || (state.player.layer === "tunnel" && Math.abs(x - playerX) < 46)) return;
+    const centerY = TunnelCenterYAt(worldX, tunnelY);
+    const localHalfHeight = TunnelHalfHeightAt(worldX, height);
+    const ceilingY = centerY - localHalfHeight + 2;
+    const floorY = centerY + localHalfHeight + 7;
+    context.strokeStyle = "rgba(24,17,13,.78)"; context.lineWidth = 13 * nearScale;
+    context.beginPath(); context.moveTo(x, floorY + 18); context.lineTo(x + (index % 2 ? -5 : 5), ceilingY + 7); context.moveTo(x - 25 * nearScale, ceilingY + 6); context.lineTo(x + 26 * nearScale, ceilingY + 6); context.stroke();
+    context.strokeStyle = "rgba(105,75,43,.88)"; context.lineWidth = 7 * nearScale;
+    context.beginPath(); context.moveTo(x, floorY + 16); context.lineTo(x + (index % 2 ? -5 : 5), ceilingY + 8); context.moveTo(x - 24 * nearScale, ceilingY + 8); context.lineTo(x + 25 * nearScale, ceilingY + 8); context.stroke();
+    context.strokeStyle = "rgba(192,139,75,.22)"; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(x + 4, floorY + 10); context.lineTo(x + (index % 2 ? -1 : 9), ceilingY + 12); context.stroke();
+  });
+
+  const rootXs = [-9.8, -6.1, -2.6, .8, 4.1, 7.8, 10.6];
+  rootXs.forEach((worldX, index) => {
+    const x = LayerToScreen(worldX, width, 1.09);
+    const rootLength = 18 + index % 3 * 12;
+    context.strokeStyle = "rgba(78,54,35,.72)"; context.lineWidth = 2.5;
+    context.beginPath(); context.moveTo(x, surfaceY + 2); context.quadraticCurveTo(x + (index % 2 ? -8 : 7), surfaceY + rootLength * .55, x + (index % 3 - 1) * 11, surfaceY + rootLength); context.stroke();
+  });
+
+  const floorSamples = [];
+  for (let worldX = worldMin - 4; worldX <= worldMax + 4; worldX += .42) {
+    floorSamples.push({ x: LayerToScreen(worldX, width, 1.085), y: TunnelFloorYAt(worldX, height, tunnelY) + 14 + Math.sin(worldX * 2.8) * 5 });
+  }
+  const lipGradient = context.createLinearGradient(0, tunnelY, 0, height);
+  lipGradient.addColorStop(0, "rgba(28,22,18,.18)"); lipGradient.addColorStop(1, "rgba(5,9,11,.86)");
+  context.fillStyle = lipGradient; context.beginPath(); context.moveTo(-30, height); floorSamples.forEach((point) => context.lineTo(point.x, point.y)); context.lineTo(width + 30, height); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(123,88,49,.5)"; context.lineWidth = 4; context.beginPath(); floorSamples.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)); context.stroke();
+
+  const nearVignette = context.createRadialGradient(width / 2, height * .54, Math.min(width, height) * .28, width / 2, height * .54, Math.max(width, height) * .76);
+  nearVignette.addColorStop(0, "rgba(0,0,0,0)"); nearVignette.addColorStop(.68, "rgba(0,0,0,.04)"); nearVignette.addColorStop(1, "rgba(0,0,0,.3)"); context.fillStyle = nearVignette; context.fillRect(0, 0, width, height);
+  context.restore();
 }
 
 function DrawQa(width, height, surfaceY, tunnelY) {
