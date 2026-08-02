@@ -18,6 +18,7 @@ import {
   SerializeProgress,
   StepPlay,
 } from "./Script_Rules.mjs";
+import { BONE_DEFS, CLIPS, SampleClip, SolveBones, PickClip } from "./Script_Puppet.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -344,9 +345,25 @@ function TestChaptersHaveSoil() {
   Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
 }
 
+
+function TestPuppetAnim() {
+  Assert(Object.keys(BONE_DEFS).length >= 12, "puppet has bone parts");
+  Assert(CLIPS.walk && CLIPS.idle && CLIPS.dig && CLIPS.crouch, "walk/idle/dig/crouch clips");
+  const bones = SolveBones(SampleClip("walk", 0.2));
+  Assert(bones.hip && bones.head && bones.footL && bones.handR, "solved hierarchy");
+  Assert(Math.abs(bones.footL.y) < 12, "feet near ground in rest/walk");
+  Assert(PickClip({ digging: true }) === "dig", "dig clip pick");
+  Assert(PickClip({ crouching: true }) === "crouch", "crouch clip pick");
+  Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("DrawPuppet"), "game draws puppet");
+  Assert(game.includes("Script_Puppet.mjs"), "game imports puppet");
+}
+
 function Main() {
   TestChaptersHaveSoil();
   TestStoryBeats();
+  TestPuppetAnim();
   TestDepthLayers();
   TestSoilNotGifted();
   TestPlanBeforeExcavate();

@@ -20,6 +20,7 @@ import {
   YLiftOf,
 } from "./Script_Depth.mjs";
 import { ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_SHOVEL } from "./Script_Items.mjs";
+import { DrawPuppet, PaletteForSpeaker, PickClip } from "./Script_Puppet.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -708,15 +709,21 @@ function DrawEntity(ent) {
 
   if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
     if (!ent.done) glow();
-    ctx.fillStyle = ent.type === "spy_talk" ? "#6b7058" : ent.type === "shelter" ? "#c4a27a" : "#4a5d4a";
-    if (ent.done && ent.type === "shelter") ctx.globalAlpha = 0.35;
-    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.fillStyle = "#e7d0b0";
-    ctx.beginPath();
-    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    const pal =
+      ent.type === "spy_talk"
+        ? "spy"
+        : PaletteForSpeaker(ent.speaker || (ent.type === "shelter" ? "乡亲" : "民兵"));
+    const alpha = ent.done && ent.type === "shelter" ? 0.35 : 1;
+    DrawPuppet(ctx, {
+      x: 0,
+      y: 0,
+      facing: ent.facing || 1,
+      scale: s,
+      palette: pal,
+      clip: "idle",
+      time: ((performance.now() || 0) / 1000) + (ent.x || 0) * 0.01,
+      alpha,
+    });
   } else if (ent.type === "hatch") {
     glow();
     ctx.fillStyle = "#2a1c12";
@@ -761,28 +768,28 @@ function DrawEntity(ent) {
       ctx.fillText("出井", 0, -34 * s);
     }
   } else if (ent.type === "enemy") {
-    if (ent.dead) ctx.globalAlpha = 0.28;
-    else if (ent.hurtFlash > 0) ctx.globalAlpha = 0.55 + Math.sin(ent.hurtFlash * 40) * 0.35;
-    // 鬼子 — helmet + puttee silhouette, distinct from militia
-    ctx.fillStyle = "#3a4630";
-    ctx.fillRect(-14 * s, -46 * s, 28 * s, 46 * s);
-    ctx.strokeRect(-14 * s, -46 * s, 28 * s, 46 * s);
-    ctx.fillStyle = "#2a3224";
-    ctx.fillRect(-16 * s, -62 * s, 32 * s, 12 * s);
-    ctx.strokeRect(-16 * s, -62 * s, 32 * s, 12 * s);
-    ctx.fillStyle = "#c9b89a";
-    ctx.beginPath();
-    ctx.arc(0, -54 * s, 8 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#8b1e1e";
-    ctx.fillRect(10 * s, -40 * s, 8 * s, 10 * s);
+    let alpha = 1;
+    if (ent.dead) alpha = 0.28;
+    else if (ent.hurtFlash > 0) alpha = 0.55 + Math.sin(ent.hurtFlash * 40) * 0.35;
+    const facing = ent.alert > 0 ? Math.sign((ent.alertX ?? ent.x) - ent.x) || 1 : Math.sin((ent.t || 0) * 0.7) >= 0 ? 1 : -1;
+    DrawPuppet(ctx, {
+      x: 0,
+      y: 0,
+      facing,
+      scale: s,
+      palette: "enemy",
+      clip: ent.dead ? "idle" : ent.alert > 0 ? "alert" : "walk",
+      time: ent.t || 0,
+      moving: !ent.dead,
+      alert: (ent.alert || 0) > 0,
+      alpha,
+    });
     if (!ent.dead) {
       ctx.fillStyle = "rgba(155,47,47,.28)";
       ctx.beginPath();
       ctx.moveTo(0, -18 * s);
-      ctx.lineTo(72 * s, -44 * s);
-      ctx.lineTo(72 * s, 8 * s);
+      ctx.lineTo(facing * 72 * s, -44 * s);
+      ctx.lineTo(facing * 72 * s, 8 * s);
       ctx.closePath();
       ctx.fill();
       const maxHp = ent.maxHp || 2;
@@ -802,36 +809,43 @@ function DrawEntity(ent) {
       ctx.fillText("毙", 0, -70 * s);
     }
   } else if (ent.type === "spy") {
-    ctx.fillStyle = ent.trapped ? "#444" : "#5a4030";
-    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.fillStyle = "#e7d0b0";
-    ctx.beginPath();
-    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    DrawPuppet(ctx, {
+      x: 0,
+      y: 0,
+      facing: 1,
+      scale: s,
+      palette: "spy",
+      clip: ent.trapped ? "crouch" : ent.exposed ? "walk" : "idle",
+      time: ((performance.now() || 0) / 1000),
+      moving: !!(ent.exposed && !ent.trapped),
+      alpha: ent.trapped ? 0.55 : 1,
+    });
     if (ent.exposed && !ent.trapped) {
       ctx.fillStyle = "#a6452f";
       ctx.font = `bold ${16 * s}px sans-serif`;
       ctx.fillText("!", -4 * s, -70 * s);
     }
   } else if (ent.type === "patrol") {
-    if (ent.broken) ctx.globalAlpha = 0.3;
-    ctx.fillStyle = "#3e4638";
-    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
-    ctx.fillStyle = "#c9b89a";
-    ctx.beginPath();
-    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "rgba(155,47,47,.22)";
-    ctx.beginPath();
-    ctx.moveTo(0, -20 * s);
-    ctx.lineTo(80 * s, -50 * s);
-    ctx.lineTo(80 * s, 10 * s);
-    ctx.closePath();
-    ctx.fill();
+    DrawPuppet(ctx, {
+      x: 0,
+      y: 0,
+      facing: Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1,
+      scale: s,
+      palette: "enemy",
+      clip: ent.broken ? "idle" : "walk",
+      time: ent.t || 0,
+      moving: !ent.broken,
+      alpha: ent.broken ? 0.3 : 1,
+    });
+    if (!ent.broken) {
+      ctx.fillStyle = "rgba(155,47,47,.22)";
+      ctx.beginPath();
+      ctx.moveTo(0, -20 * s);
+      ctx.lineTo(80 * s, -50 * s);
+      ctx.lineTo(80 * s, 10 * s);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -1035,43 +1049,38 @@ function DrawPlayer() {
   const s = Scale();
   const x = WX(p.x);
   const y = WY(p.y);
-  const h = (p.crouching ? PLAYER_H * 0.7 : PLAYER_H) * s;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(p.facing, 1);
-  if (p.invuln > 0 && Math.floor(p.invuln * 18) % 2 === 0) ctx.globalAlpha = 0.4;
-  ctx.lineWidth = 2.5 * s;
-  ctx.strokeStyle = "#1a1410";
-  ctx.fillStyle = "#4d6b57";
-  ctx.fillRect(-13 * s, -h, 26 * s, h);
-  ctx.strokeRect(-13 * s, -h, 26 * s, h);
-  ctx.fillStyle = "#e7d0b0";
-  ctx.beginPath();
-  ctx.arc(0, -h - 9 * s, 9 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  // Always show carried tool in hand (VH one-item carry)
-  if (p.held === ITEM_SHOVEL || p.digging) {
-    ctx.strokeStyle = "#8b6a45";
-    ctx.lineWidth = 3 * s;
-    ctx.beginPath();
-    ctx.moveTo(10 * s, -22 * s);
-    ctx.lineTo(p.digging ? 32 * s : 26 * s, p.digging ? -4 * s : -10 * s);
-    ctx.stroke();
-    ctx.fillStyle = "#6e5a3a";
-    ctx.fillRect((p.digging ? 28 : 22) * s, (p.digging ? -8 : -14) * s, 12 * s, 10 * s);
-  } else if (p.held === ITEM_CHARGE) {
-    ctx.fillStyle = "#4a3a2a";
-    ctx.fillRect(10 * s, -28 * s, 16 * s, 14 * s);
-    ctx.strokeRect(10 * s, -28 * s, 16 * s, 14 * s);
-  } else if (p.held === ITEM_GRENADE) {
-    ctx.fillStyle = "#5a6a3a";
-    ctx.beginPath();
-    ctx.arc(16 * s, -22 * s, 7 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-  ctx.restore();
+  const blink = p.invuln > 0 && Math.floor(p.invuln * 18) % 2 === 0;
+  const hold =
+    p.held === ITEM_SHOVEL || p.digging
+      ? "shovel"
+      : p.held === ITEM_CHARGE
+        ? "charge"
+        : p.held === ITEM_GRENADE
+          ? "grenade"
+          : null;
+  // Spine-style modular puppet — walk / crouch / dig clips on bone parts
+  if (!p._animT) p._animT = 0;
+  const moving = Math.abs(p.vx || 0) > 18;
+  DrawPuppet(ctx, {
+    x,
+    y,
+    facing: p.facing,
+    scale: s,
+    palette: "militia",
+    clip: PickClip({
+      digging: !!p.digging,
+      crouching: !!p.crouching,
+      vx: p.vx,
+      moving,
+    }),
+    time: (performance.now() || 0) / 1000,
+    hold,
+    digging: !!p.digging,
+    crouching: !!p.crouching,
+    vx: p.vx,
+    moving,
+    alpha: blink ? 0.4 : 1,
+  });
 }
 
 function DrawProjectiles() {
