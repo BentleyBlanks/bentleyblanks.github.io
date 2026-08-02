@@ -1,6 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803u";
-import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803u";
-import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803u";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803w";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803w";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803w";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -837,7 +837,7 @@ function RenderQaPanel() {
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
-  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
+  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
     EndCinematic();
@@ -1085,7 +1085,9 @@ function GetEnemyPatrols() {
       x = Lerp(x, formationX, pull);
       facing = Math.sign(formationX - x) || facing;
     }
-    return { x, facing, viewDistance: state.levelIndex === 2 ? 4.4 : diversion ? 3.25 : 3.8, index, investigating: Boolean(diversion) };
+    const unitType = index % 3 === 1 ? "collaborator" : "soldier";
+    const rank = index === 0 && state.phaseId === "defense" ? "sectionLeader" : "rifleman";
+    return { x, facing, viewDistance: state.levelIndex === 2 ? 4.4 : diversion ? 3.25 : 3.8, index, unitType, rank, investigating: Boolean(diversion) };
   });
 }
 
@@ -1312,6 +1314,90 @@ function DrawPerspectiveHouse(worldX, width, baseY, size, parallax, variant, alp
   context.restore();
 }
 
+function DrawVillageFenceSegment(worldX, width, baseY, span, parallax, variant, alpha = 1) {
+  const x = LayerToScreen(worldX, width, parallax);
+  const depthScale = .58 + parallax * .52;
+  const fenceWidth = span * width / 22 * depthScale;
+  const fenceHeight = (22 + variant % 3 * 5) * depthScale;
+  context.save(); context.globalAlpha = alpha;
+  context.fillStyle = "rgba(18,18,15,.2)"; context.beginPath(); context.ellipse(x, baseY + 3, fenceWidth * .52, 5 * depthScale, 0, 0, Math.PI * 2); context.fill();
+  if (variant % 3 === 0) {
+    const postCount = Math.max(4, Math.round(span * 2.2));
+    context.strokeStyle = "#564631"; context.lineCap = "round";
+    for (let post = 0; post < postCount; post += 1) {
+      const progress = post / Math.max(1, postCount - 1);
+      const postX = x - fenceWidth / 2 + progress * fenceWidth;
+      const lean = (SceneHash(worldX * 7 + post) - .5) * 6;
+      const postHeight = fenceHeight * (.75 + SceneHash(worldX + post * 3) * .34);
+      context.lineWidth = 3.8 * depthScale; context.beginPath(); context.moveTo(postX, baseY + 3); context.lineTo(postX + lean, baseY - postHeight); context.stroke();
+      context.fillStyle = "#776046"; context.beginPath(); context.moveTo(postX + lean - 2, baseY - postHeight + 2); context.lineTo(postX + lean, baseY - postHeight - 5); context.lineTo(postX + lean + 2, baseY - postHeight + 2); context.closePath(); context.fill();
+    }
+    for (let rail = 0; rail < 4; rail += 1) {
+      context.strokeStyle = rail % 2 ? "#735b3c" : "#655039"; context.lineWidth = 2.5 * depthScale; context.beginPath();
+      for (let sample = 0; sample <= 12; sample += 1) {
+        const progress = sample / 12; const railX = x - fenceWidth / 2 + progress * fenceWidth; const railY = baseY - fenceHeight * (.18 + rail * .17) + Math.sin(progress * Math.PI * 6 + rail) * 2.2;
+        sample ? context.lineTo(railX, railY) : context.moveTo(railX, railY);
+      }
+      context.stroke();
+    }
+  } else if (variant % 3 === 1) {
+    const stoneRows = 3;
+    for (let row = 0; row < stoneRows; row += 1) {
+      const stones = 5 + row;
+      const stoneWidth = fenceWidth / stones;
+      for (let stone = 0; stone < stones; stone += 1) {
+        const stagger = row % 2 ? stoneWidth * .34 : 0;
+        const stoneX = x - fenceWidth / 2 + stone * stoneWidth + stagger;
+        const stoneY = baseY - row * fenceHeight / stoneRows;
+        context.fillStyle = row % 2 ? "#655c4f" : "#716556";
+        context.beginPath(); context.moveTo(stoneX - 1, stoneY); context.lineTo(stoneX + stoneWidth * .78, stoneY - 1); context.lineTo(stoneX + stoneWidth * .72, stoneY - fenceHeight / stoneRows + 2); context.lineTo(stoneX + 3, stoneY - fenceHeight / stoneRows); context.closePath(); context.fill();
+        context.strokeStyle = "rgba(191,169,129,.2)"; context.lineWidth = 1; context.stroke();
+      }
+    }
+    context.strokeStyle = "#534b41"; context.lineWidth = 3 * depthScale; context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight); context.lineTo(x + fenceWidth * .52, baseY - fenceHeight + 2); context.stroke();
+  } else {
+    const posts = [-.5, -.16, .18, .5];
+    context.strokeStyle = "#5b432e"; context.lineCap = "square";
+    posts.forEach((progress, index) => { const postX = x + progress * fenceWidth; context.lineWidth = (index === 0 || index === posts.length - 1 ? 6 : 4) * depthScale; context.beginPath(); context.moveTo(postX, baseY + 2); context.lineTo(postX + (index % 2 ? 2 : -2), baseY - fenceHeight); context.stroke(); });
+    context.strokeStyle = "#765838"; context.lineWidth = 5 * depthScale;
+    [0.25, .7].forEach((heightProgress) => { context.beginPath(); context.moveTo(x - fenceWidth * .52, baseY - fenceHeight * heightProgress); context.lineTo(x + fenceWidth * .52, baseY - fenceHeight * heightProgress - 3); context.stroke(); });
+    context.strokeStyle = "#b18a57"; context.lineWidth = 1.5; posts.slice(1, 3).forEach((progress) => { const postX = x + progress * fenceWidth; context.beginPath(); context.arc(postX, baseY - fenceHeight * .69, 4 * depthScale, 0, Math.PI * 2); context.stroke(); });
+  }
+  context.restore();
+}
+
+function DrawVillageWorkProp(worldX, width, baseY, parallax, kind, variant = 0) {
+  const x = LayerToScreen(worldX, width, parallax);
+  const scale = .62 + parallax * .52;
+  context.save(); context.translate(x, baseY); context.scale(scale, scale);
+  context.fillStyle = "rgba(10,11,10,.25)"; context.beginPath(); context.ellipse(0, 4, kind === "dryingRack" ? 42 : 29, 6, 0, 0, Math.PI * 2); context.fill();
+  if (kind === "wheelbarrow") {
+    context.fillStyle = "#665039"; context.beginPath(); context.moveTo(-25, -25); context.lineTo(18, -22); context.lineTo(12, -3); context.lineTo(-17, -5); context.closePath(); context.fill();
+    context.fillStyle = "#806345"; context.beginPath(); context.moveTo(-25, -25); context.lineTo(18, -22); context.lineTo(25, -28); context.lineTo(-16, -32); context.closePath(); context.fill();
+    context.strokeStyle = "#a27a4c"; context.lineWidth = 3; context.stroke(); context.beginPath(); context.moveTo(-16, -5); context.lineTo(-29, 5); context.moveTo(12, -3); context.lineTo(31, 4); context.stroke();
+    context.strokeStyle = "#302922"; context.lineWidth = 5; context.beginPath(); context.arc(-20, 1, 10, 0, Math.PI * 2); context.stroke(); context.fillStyle = "#7d633e"; context.beginPath(); context.arc(-20, 1, 3, 0, Math.PI * 2); context.fill();
+  } else if (kind === "firewood") {
+    for (let log = 0; log < 10; log += 1) {
+      const row = Math.floor(log / 4); const column = log % 4; const logX = (column - 1.5) * 12 + (row % 2) * 5; const logY = -5 - row * 9;
+      context.fillStyle = log % 2 ? "#7a5737" : "#8b6540"; context.fillRect(logX - 9, logY - 6, 22, 7); context.fillStyle = "#b78d58"; context.beginPath(); context.arc(logX + 12, logY - 2.5, 3.5, 0, Math.PI * 2); context.fill();
+    }
+    context.strokeStyle = "#4b392a"; context.lineWidth = 3; context.beginPath(); context.moveTo(-24, 0); context.lineTo(-18, -30); context.moveTo(25, 0); context.lineTo(18, -30); context.stroke();
+    context.strokeStyle = "#9d784c"; context.lineWidth = 2; context.beginPath(); context.moveTo(-18, -15); context.lineTo(21, -11); context.stroke();
+  } else if (kind === "dryingRack") {
+    context.strokeStyle = "#725136"; context.lineWidth = 6; context.beginPath(); context.moveTo(-34, 2); context.lineTo(-28, -58); context.moveTo(34, 2); context.lineTo(28, -58); context.moveTo(-37, -54); context.lineTo(38, -54); context.stroke();
+    context.strokeStyle = "#b98d50"; context.lineWidth = 2; context.beginPath(); context.moveTo(-28, -49); context.quadraticCurveTo(0, -43, 28, -49); context.stroke();
+    for (let bundle = 0; bundle < 6; bundle += 1) {
+      const bundleX = -23 + bundle * 9; const bundleY = -44 + Math.sin(bundle) * 3;
+      context.fillStyle = variant % 2 ? "#a56544" : "#a88745"; context.beginPath(); context.ellipse(bundleX, bundleY + 10, 4, 11, bundle % 2 ? .14 : -.12, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#5f7049"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(bundleX, bundleY); context.lineTo(bundleX - 5, bundleY - 7); context.moveTo(bundleX, bundleY); context.lineTo(bundleX + 5, bundleY - 7); context.stroke();
+    }
+  } else if (kind === "plow") {
+    context.strokeStyle = "#765235"; context.lineWidth = 5; context.beginPath(); context.moveTo(-31, -3); context.lineTo(13, -22); context.lineTo(30, -51); context.moveTo(13, -22); context.lineTo(34, -7); context.stroke();
+    context.fillStyle = "#5c5b56"; context.beginPath(); context.moveTo(-33, -5); context.lineTo(-10, -14); context.lineTo(-3, -1); context.closePath(); context.fill(); context.strokeStyle = "#a6aaa1"; context.lineWidth = 1.5; context.stroke();
+  }
+  context.restore();
+}
+
 function DrawVillage(width, height, surfaceY) {
   DrawFieldDepth(width, surfaceY);
 
@@ -1331,16 +1417,21 @@ function DrawVillage(width, height, surfaceY) {
   const middleHouses = [-12.6, -8.9, -5.2, -1.3, 2.5, 6.6, 10.7, 14.2];
   middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .72));
 
-  context.strokeStyle = "rgba(62,52,36,.8)"; context.lineWidth = 4;
-  for (let row = 0; row < 2; row += 1) {
-    const fenceY = surfaceY - 10 - row * 15;
-    context.beginPath(); context.moveTo(0, fenceY);
-    for (let x = -20; x <= width + 30; x += 46) context.lineTo(x, fenceY + Math.sin((x + state.camera.x * 25) * .04 + row) * 4); context.stroke();
-    for (let x = -10; x <= width + 20; x += 72) { context.beginPath(); context.moveTo(x, fenceY + 7); context.lineTo(x + 3, fenceY - 18); context.stroke(); }
-  }
+  [
+    { x: -14.8, span: 3.2, parallax: .65, variant: 0 }, { x: -9.8, span: 2.4, parallax: .7, variant: 2 },
+    { x: -4.8, span: 3, parallax: .67, variant: 1 }, { x: .5, span: 2.7, parallax: .72, variant: 0 },
+    { x: 5.7, span: 2.5, parallax: .69, variant: 2 }, { x: 10.7, span: 3.1, parallax: .66, variant: 1 },
+    { x: 15.2, span: 2.8, parallax: .71, variant: 0 }
+  ].forEach((fence, index) => DrawVillageFenceSegment(fence.x, width, surfaceY - 8 - index % 2 * 4, fence.span, fence.parallax, fence.variant, .82));
 
   const mainHouses = [-9, -5.2, -.2, 4.4, 8.3];
   mainHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 3, 66 + index % 2 * 12, .82, index + 40, .94));
+
+  [
+    { x: -12.1, kind: "firewood", parallax: .82 }, { x: -7.2, kind: "wheelbarrow", parallax: .86 },
+    { x: -2.8, kind: "dryingRack", parallax: .79 }, { x: 2.2, kind: "plow", parallax: .85 },
+    { x: 6.9, kind: "firewood", parallax: .83 }, { x: 11.7, kind: "dryingRack", parallax: .8 }
+  ].forEach((prop, index) => DrawVillageWorkProp(prop.x, width, surfaceY - 3, prop.parallax, prop.kind, index));
 
   context.fillStyle = "#4a4030"; context.fillRect(0, surfaceY - 5, width, 12);
   context.strokeStyle = "rgba(220,174,102,.26)"; context.lineWidth = 2; context.beginPath(); context.moveTo(0, surfaceY - 4); context.lineTo(width, surfaceY - 4); context.stroke();
@@ -1695,8 +1786,8 @@ function DrawTunnelDepth(width, height, tunnelY) {
 function DrawTunnelProps(width, height, tunnelY) {
   const props = [
     { x: -10.1, kind: "jars" }, { x: -9.25, kind: "basket" }, { x: -7.75, kind: "lamp" }, { x: -6.35, kind: "bench" },
-    { x: -4.7, kind: "sacks" }, { x: -2.45, kind: "crate" }, { x: -.9, kind: "rope" }, { x: 1.7, kind: "shelf" },
-    { x: 3.8, kind: "lamp" }, { x: 5.25, kind: "bench" }, { x: 6.45, kind: "jars" }, { x: 7.72, kind: "lamp" }, { x: 9.1, kind: "sacks" }
+    { x: -4.7, kind: "sacks" }, { x: -3.55, kind: "toolRack" }, { x: -2.45, kind: "crate" }, { x: -.9, kind: "rope" }, { x: 1.7, kind: "shelf" },
+    { x: 2.75, kind: "stove" }, { x: 3.8, kind: "lamp" }, { x: 5.25, kind: "bench" }, { x: 6.45, kind: "jars" }, { x: 7.72, kind: "lamp" }, { x: 9.1, kind: "sacks" }
   ];
   props.forEach((prop) => {
     const x = WorldToScreen(prop.x, width);
@@ -1725,6 +1816,19 @@ function DrawTunnelProps(width, height, tunnelY) {
     } else if (prop.kind === "shelf") {
       context.strokeStyle = "#745337"; context.lineWidth = 4; context.beginPath(); context.moveTo(x - 20, floorY); context.lineTo(x - 18, floorY - 35); context.moveTo(x + 20, floorY); context.lineTo(x + 18, floorY - 35); context.moveTo(x - 21, floorY - 27); context.lineTo(x + 21, floorY - 27); context.moveTo(x - 21, floorY - 12); context.lineTo(x + 21, floorY - 12); context.stroke();
       context.fillStyle = "#78604a"; context.beginPath(); context.ellipse(x - 8, floorY - 32, 5, 6, 0, 0, Math.PI * 2); context.ellipse(x + 7, floorY - 31, 4, 5, 0, 0, Math.PI * 2); context.fill();
+    } else if (prop.kind === "toolRack") {
+      context.fillStyle = "#6f5035"; context.fillRect(x - 20, floorY - 36, 40, 6);
+      context.strokeStyle = "#a27949"; context.lineWidth = 2; context.beginPath(); context.moveTo(x - 17, floorY - 33); context.lineTo(x - 17, floorY - 27); context.moveTo(x, floorY - 33); context.lineTo(x, floorY - 26); context.moveTo(x + 17, floorY - 33); context.lineTo(x + 17, floorY - 27); context.stroke();
+      context.strokeStyle = "#825f3c"; context.lineWidth = 3; context.beginPath(); context.moveTo(x - 14, floorY - 29); context.lineTo(x - 9, floorY - 3); context.moveTo(x + 5, floorY - 29); context.lineTo(x + 7, floorY - 2); context.stroke();
+      context.fillStyle = "#6f7470"; context.beginPath(); context.moveTo(x - 14, floorY - 29); context.lineTo(x - 21, floorY - 37); context.lineTo(x - 7, floorY - 37); context.closePath(); context.fill();
+      context.strokeStyle = "#8f9490"; context.lineWidth = 3; context.beginPath(); context.moveTo(x - 2, floorY - 28); context.lineTo(x + 14, floorY - 35); context.stroke();
+    } else if (prop.kind === "stove") {
+      context.fillStyle = "#5c4b3d"; context.beginPath(); context.moveTo(x - 18, floorY); context.lineTo(x - 15, floorY - 24); context.quadraticCurveTo(x, floorY - 34, x + 16, floorY - 24); context.lineTo(x + 19, floorY); context.closePath(); context.fill();
+      context.strokeStyle = "#967151"; context.lineWidth = 2; context.stroke();
+      context.fillStyle = "#1e2220"; context.beginPath(); context.ellipse(x, floorY - 7, 8, 5, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#353532"; context.beginPath(); context.ellipse(x, floorY - 28, 14, 5, 0, 0, Math.PI * 2); context.fill(); context.fillRect(x - 9, floorY - 35, 18, 8);
+      context.strokeStyle = "#77614a"; context.lineWidth = 4; context.beginPath(); context.moveTo(x + 11, floorY - 29); context.lineTo(x + 22, floorY - 43); context.stroke();
+      for (let puff = 0; puff < 3; puff += 1) { const puffY = floorY - 45 - puff * 8 - Math.sin(state.elapsed * .8 + puff) * 2; context.fillStyle = `rgba(177,174,155,${.1 - puff * .02})`; context.beginPath(); context.ellipse(x + 23 + puff * 3, puffY, 5 + puff * 2, 3 + puff, -.2, 0, Math.PI * 2); context.fill(); }
     }
   });
 }
@@ -1811,8 +1915,19 @@ function QaInspectHazard(kind) {
     UpdateUi();
     return;
   }
-  if (["dog", "bell", "crackers"].includes(kind) || state.phaseId !== "defense" || state.mode !== "play") QaJumpToPhase("defense");
+  if (["dog", "bell", "crackers", "enemies"].includes(kind) || state.phaseId !== "defense" || state.mode !== "play") QaJumpToPhase("defense");
   EndCinematic();
+  if (kind === "enemies") {
+    state.selectedRole = "blacksmith";
+    state.player.layer = "tunnel";
+    state.player.x = .8;
+    state.camera.x = .8;
+    state.camera.targetX = .8;
+    state.camera.zoom = 1.34;
+    state.camera.targetZoom = 1.34;
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
   if (["dog", "bell", "crackers"].includes(kind)) {
     state.selectedRole = "leader";
     if (kind === "dog") {
@@ -1988,7 +2103,11 @@ function DrawFluidSimulation(width, height, tunnelY) {
 
 function DrawCivilians(width, height, tunnelY) {
   if (state.levelIndex !== 0 || !state.civilians.length) return;
-  const colors = { elders: "#958a70", stretcher: "#78998a", children: "#bd9152" };
+  const civilianLooks = {
+    elders: { coat: "#817b69", pants: "#444a43", scarf: "#a69a7d" },
+    stretcher: { coat: "#66847a", pants: "#384942", scarf: "#b5a47a" },
+    children: { coat: "#aa8248", pants: "#464b40", scarf: "#9b493f" }
+  };
   for (const civilian of state.civilians) {
     const x = WorldToScreen(civilian.x, width);
     const floorY = TunnelFloorYAt(civilian.x, height, tunnelY) - 1;
@@ -2000,19 +2119,26 @@ function DrawCivilians(width, height, tunnelY) {
     context.globalAlpha = .93;
     if (civilian.group === "stretcher" && civilian.id === "wounded") {
       context.strokeStyle = "#8b6640"; context.lineWidth = 3;
-      context.beginPath(); context.moveTo(-18, -5); context.lineTo(20, -5); context.stroke();
-      context.fillStyle = "#6d8078"; context.beginPath(); context.ellipse(0, -11, 16, 7, -.08, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#d09a73"; context.beginPath(); context.arc(13, -14, 4, 0, Math.PI * 2); context.fill();
+      context.beginPath(); context.moveTo(-21, -4); context.lineTo(22, -4); context.moveTo(-18, -18); context.lineTo(19, -18); context.stroke();
+      context.fillStyle = "#65776f"; context.beginPath(); context.moveTo(-15, -6); context.lineTo(-11, -20); context.lineTo(14, -20); context.lineTo(18, -6); context.closePath(); context.fill();
+      context.fillStyle = "#c98e6b"; context.beginPath(); context.arc(14, -23, 4.2, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#d6c9aa"; context.fillRect(-7, -20, 12, 12);
     } else {
-      const bodyHeight = civilian.group === "children" ? 24 : 30;
-      context.strokeStyle = "rgba(8,12,13,.48)"; context.lineWidth = 4;
-      context.beginPath(); context.moveTo(-4, -3); context.lineTo(-3 + gait * 2, bodyHeight * -.42); context.moveTo(4, -3); context.lineTo(3 - gait * 2, bodyHeight * -.42); context.stroke();
-      context.fillStyle = colors[civilian.group];
-      context.beginPath(); context.moveTo(-8, -bodyHeight * .35); context.quadraticCurveTo(-9, -bodyHeight * .8, -4, -bodyHeight); context.lineTo(5, -bodyHeight); context.quadraticCurveTo(10, -bodyHeight * .78, 8, -bodyHeight * .35); context.closePath(); context.fill();
-      context.strokeStyle = "rgba(244,207,135,.6)"; context.lineWidth = 1.2; context.stroke();
-      context.fillStyle = "#d4a17d"; context.beginPath(); context.arc(0, -bodyHeight - 5, civilian.group === "children" ? 4.5 : 5.2, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = "rgba(255,222,167,.58)"; context.lineWidth = 1; context.stroke();
-      context.fillStyle = civilian.group === "elders" ? "#b7b0a0" : "#302821"; context.beginPath(); context.arc(-1, -bodyHeight - 7, 4.7, Math.PI, Math.PI * 2); context.fill();
+      const look = civilianLooks[civilian.group];
+      const bodyHeight = civilian.group === "children" ? 24 : civilian.id === "signalman" ? 32 : 30;
+      const shoulder = civilian.group === "children" ? 5.1 : 6.1;
+      const waist = civilian.group === "children" ? 3.2 : 3.8;
+      context.strokeStyle = look.pants; context.lineWidth = 2.6; context.lineCap = "round";
+      context.beginPath(); context.moveTo(-2.6, -bodyHeight * .35); context.lineTo(-3.2 + gait * 2, -2); context.moveTo(2.6, -bodyHeight * .35); context.lineTo(3.2 - gait * 2, -2); context.stroke();
+      context.fillStyle = look.coat;
+      context.beginPath(); context.moveTo(-shoulder, -bodyHeight * .78); context.quadraticCurveTo(0, -bodyHeight * 1.02, shoulder, -bodyHeight * .78); context.lineTo(waist, -bodyHeight * .35); context.lineTo(-waist, -bodyHeight * .35); context.closePath(); context.fill();
+      context.strokeStyle = "rgba(232,205,150,.42)"; context.lineWidth = 1; context.stroke();
+      context.strokeStyle = look.coat; context.lineWidth = 2.3; context.beginPath(); context.moveTo(-shoulder * .8, -bodyHeight * .73); context.lineTo(-shoulder - 2, -bodyHeight * .42); context.moveTo(shoulder * .8, -bodyHeight * .73); context.lineTo(shoulder + 2, -bodyHeight * .45); context.stroke();
+      context.fillStyle = look.scarf; context.fillRect(-waist * 1.2, -bodyHeight * .42, waist * 2.4, 2.5);
+      context.fillStyle = "#c99370"; context.beginPath(); context.arc(0, -bodyHeight - 4.5, civilian.group === "children" ? 4.2 : 4.7, 0, Math.PI * 2); context.fill();
+      context.fillStyle = civilian.group === "elders" ? "#aaa697" : "#302821"; context.beginPath(); context.arc(-.5, -bodyHeight - 6.2, civilian.group === "children" ? 4 : 4.5, Math.PI, Math.PI * 2); context.fill();
+      if (civilian.id === "signalman") { context.strokeStyle = "#ad8550"; context.lineWidth = 2; context.beginPath(); context.moveTo(shoulder + 2, -bodyHeight * .45); context.lineTo(11, -2); context.stroke(); }
+      if (civilian.id === "medic") { context.fillStyle = "#d8d1b7"; context.fillRect(-3, -bodyHeight * .67, 6, 6); context.fillStyle = "#688c82"; context.fillRect(-1, -bodyHeight * .66, 2, 4); context.fillRect(-2, -bodyHeight * .65, 4, 2); }
     }
     context.fillStyle = dose > 65 ? "#e46150" : "rgba(235,231,210,.9)";
     context.beginPath(); context.arc(0, -43, 8, 0, Math.PI * 2); context.fill();
@@ -2600,6 +2726,79 @@ function DrawDepthHint(width, height, surfaceY, tunnelY) {
   context.fillStyle = "#edf7ef"; context.fillText(hint, x, hintY - 1); context.restore();
 }
 
+function DrawEnemyUnit(enemy, height, x, baseY) {
+  const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
+  const isCollaborator = enemy.unitType === "collaborator";
+  const phase = state.elapsed * (isCollaborator ? 4.35 : 3.85) + enemy.index * 1.7;
+  const stride = Math.sin(phase) * .34;
+  const investigateLift = enemy.investigating ? .32 + Math.sin(state.elapsed * 4 + enemy.index) * .08 : 0;
+  const limbWidth = Math.max(3.2, height * profile.limb);
+
+  context.save(); context.translate(x, baseY); context.scale(enemy.facing, 1);
+  context.fillStyle = "rgba(0,0,0,.34)"; context.beginPath(); context.ellipse(0, 3, height * .18, 4.5, 0, 0, Math.PI * 2); context.fill();
+
+  const rearFoot = DrawJointedLimb(-height * .055, -height * .34, height * .205, height * .185, stride, -stride * .38, profile.pants, limbWidth + .45);
+  const frontFoot = DrawJointedLimb(height * .055, -height * .34, height * .205, height * .185, -stride, stride * .38, profile.pants, limbWidth + .45);
+  context.fillStyle = isCollaborator ? "#202729" : "#3f4033"; [rearFoot, frontFoot].forEach((foot, index) => { context.beginPath(); context.ellipse(foot.x + (index ? 2 : -2), foot.y + 1, height * .058, Math.max(2.5, height * .026), index ? -.08 : .08, 0, Math.PI * 2); context.fill(); });
+  context.strokeStyle = isCollaborator ? "#292f30" : "#56543f"; context.lineWidth = Math.max(3, height * .034);
+  [-1, 1].forEach((side) => {
+    context.beginPath(); context.moveTo(side * height * .075, -height * .17); context.lineTo(side * height * .09, -height * .035); context.stroke();
+    for (let wrap = 0; wrap < 4; wrap += 1) { const wrapY = -height * (.15 - wrap * .033); context.strokeStyle = isCollaborator ? "rgba(170,177,165,.28)" : "rgba(201,191,151,.38)"; context.lineWidth = 1.2; context.beginPath(); context.moveTo(side * height * .115, wrapY); context.lineTo(side * height * .052, wrapY + 2); context.stroke(); }
+  });
+
+  const shoulder = height * profile.shoulder * .52;
+  const waist = height * profile.waist;
+  context.fillStyle = profile.body;
+  context.beginPath(); context.moveTo(-shoulder, -height * .72); context.quadraticCurveTo(0, -height * .755, shoulder, -height * .72); context.lineTo(waist, -height * .31); context.lineTo(-waist, -height * .31); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(231,219,177,.18)"; context.lineWidth = 1.4; context.beginPath(); context.moveTo(-shoulder * .75, -height * .69); context.lineTo(-waist * .72, -height * .34); context.stroke();
+  context.fillStyle = isCollaborator ? "#252f31" : "#4a4938"; context.fillRect(-waist * 1.15, -height * .38, waist * 2.3, Math.max(3, height * .032));
+
+  if (isCollaborator) {
+    context.fillStyle = "#ddd5bd"; context.fillRect(height * .115, -height * .615, height * .06, height * .115);
+    context.strokeStyle = "#8c2f2c"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(height * .118, -height * .565); context.lineTo(height * .172, -height * .55); context.stroke();
+    context.fillStyle = "#313b3c"; context.fillRect(-height * .09, -height * .385, height * .075, height * .075); context.fillRect(height * .025, -height * .385, height * .075, height * .075);
+  } else {
+    context.fillStyle = "#4a4938"; context.fillRect(-height * .105, -height * .405, height * .075, height * .09); context.fillRect(height * .03, -height * .405, height * .075, height * .09);
+    context.fillStyle = profile.accent; context.fillRect(-height * .095, -height * .69, height * .055, height * .035); context.fillRect(height * .04, -height * .69, height * .055, height * .035);
+    context.strokeStyle = "#777151"; context.lineWidth = 3; context.beginPath(); context.moveTo(-shoulder * .82, -height * .66); context.lineTo(height * .1, -height * .35); context.stroke();
+    context.fillStyle = "#53513d"; context.beginPath(); context.ellipse(-height * .155, -height * .47, height * .075, height * .12, -.1, 0, Math.PI * 2); context.fill();
+  }
+
+  const rearArm = isCollaborator ? -.18 : .16;
+  DrawJointedLimb(-shoulder * .82, -height * .655, height * .17, height * .155, rearArm, isCollaborator ? -.35 : .58, profile.body, limbWidth);
+  if (isCollaborator) {
+    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .15, .92 + investigateLift, .45, profile.body, limbWidth);
+    context.strokeStyle = "#8a6a3f"; context.lineWidth = 3; context.beginPath(); context.moveTo(height * .19, -height * (.47 + investigateLift * .3)); context.lineTo(height * .38, -height * (.43 + investigateLift * .25)); context.stroke();
+    context.fillStyle = "#d0a75b"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .035, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "rgba(244,181,74,.18)"; context.beginPath(); context.arc(height * .4, -height * (.425 + investigateLift * .24), height * .16, 0, Math.PI * 2); context.fill();
+  } else {
+    DrawJointedLimb(shoulder * .82, -height * .655, height * .17, height * .155, .72 + investigateLift, .18, profile.body, limbWidth);
+    context.strokeStyle = "#3b3027"; context.lineWidth = Math.max(4, height * .045); context.beginPath(); context.moveTo(-height * .33, -height * .54); context.lineTo(height * .37, -height * (.48 + investigateLift * .08)); context.stroke();
+    context.strokeStyle = "#a17a46"; context.lineWidth = 2.2; context.beginPath(); context.moveTo(-height * .29, -height * .545); context.lineTo(height * .24, -height * (.5 + investigateLift * .08)); context.stroke();
+    context.fillStyle = "#5e5d4b"; context.fillRect(-height * .37, -height * .565, height * .11, height * .035);
+  }
+
+  const headY = -height * (.86 + investigateLift * .06);
+  const headRadius = height * profile.head;
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(0, headY, headRadius, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(63,39,30,.68)"; context.beginPath(); context.arc(headRadius * .48, headY + headRadius * .1, Math.max(1.2, headRadius * .12), 0, Math.PI * 2); context.fill();
+  if (isCollaborator) {
+    context.fillStyle = "#2c3738"; context.beginPath(); context.moveTo(-headRadius * 1.05, headY - headRadius * .35); context.quadraticCurveTo(-headRadius * .2, headY - headRadius * 1.2, headRadius * .82, headY - headRadius * .52); context.lineTo(headRadius * 1.18, headY - headRadius * .28); context.lineTo(-headRadius * .78, headY - headRadius * .18); context.closePath(); context.fill();
+  } else {
+    context.fillStyle = "#5b5c45"; context.beginPath(); context.arc(0, headY - headRadius * .28, headRadius * 1.04, Math.PI, Math.PI * 2); context.fill();
+    context.fillRect(-headRadius * .7, headY - headRadius * .42, headRadius * 1.75, Math.max(2, height * .024));
+    context.fillStyle = "#4f503d"; context.beginPath(); context.moveTo(-headRadius * .92, headY - headRadius * .22); context.lineTo(-headRadius * .72, headY + headRadius * .95); context.lineTo(-headRadius * .28, headY + headRadius * .62); context.closePath(); context.fill();
+    if (enemy.rank === "sectionLeader") { context.fillStyle = "#b89a5e"; context.beginPath(); context.arc(0, headY - headRadius * .58, 2, 0, Math.PI * 2); context.fill(); }
+  }
+  context.restore();
+
+  if (enemy.investigating) {
+    context.fillStyle = "rgba(8,13,15,.9)"; context.beginPath(); context.arc(x, baseY - height - 13, 10, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = isCollaborator ? "#d7c490" : "#e2bc67"; context.lineWidth = 1.5; context.stroke();
+    context.fillStyle = "#f3d78f"; context.font = "900 12px system-ui"; context.textAlign = "center"; context.fillText("?", x, baseY - height - 9);
+  }
+}
+
 function DrawEnemies(width, surfaceY) {
   const patrols = GetEnemyPatrols();
   if (!patrols.length) return;
@@ -2612,31 +2811,14 @@ function DrawEnemies(width, surfaceY) {
     const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
     const active = EnemyDetection(enemy) > 0;
     const gradient = context.createLinearGradient(x, 0, endX, 0);
-    gradient.addColorStop(0, active ? "rgba(229,58,44,.5)" : "rgba(215,184,103,.15)");
-    gradient.addColorStop(1, active ? "rgba(195,43,34,.08)" : "rgba(215,184,103,0)");
+    gradient.addColorStop(0, active ? "rgba(229,58,44,.48)" : "rgba(222,190,108,.13)");
+    gradient.addColorStop(1, active ? "rgba(195,43,34,.06)" : "rgba(215,184,103,0)");
     context.fillStyle = gradient;
-    context.beginPath(); context.moveTo(x + enemy.facing * height * .12, baseY - height * .69); context.lineTo(endX, surfaceY + 3); context.lineTo(x + enemy.facing * height * .18, surfaceY + 3); context.closePath(); context.fill();
-    context.strokeStyle = active ? "rgba(255,91,69,.95)" : "rgba(219,186,104,.22)"; context.lineWidth = active ? 3 : 1;
-    context.beginPath(); context.moveTo(x + enemy.facing * height * .12, baseY - height * .69); context.lineTo(endX, surfaceY + 3); context.stroke();
+    context.beginPath(); context.moveTo(x + enemy.facing * height * .11, baseY - height * .72); context.lineTo(endX, surfaceY + 3); context.lineTo(x + enemy.facing * height * .17, surfaceY + 3); context.closePath(); context.fill();
+    context.strokeStyle = active ? "rgba(255,91,69,.92)" : "rgba(219,186,104,.18)"; context.lineWidth = active ? 2.5 : 1;
+    context.beginPath(); context.moveTo(x + enemy.facing * height * .11, baseY - height * .72); context.lineTo(endX, surfaceY + 3); context.stroke();
   });
-  patrols.forEach((enemy) => {
-      const i = enemy.index;
-      const x = WorldToScreen(enemy.x, width);
-      const baseY = surfaceY - 5;
-      const stride = Math.sin(state.elapsed * 4 + i) * height * .06;
-      context.fillStyle = "rgba(0,0,0,.28)"; context.beginPath(); context.ellipse(x, baseY + 2, height * .2, 5, 0, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = "#6e3e38"; context.lineCap = "round"; context.lineWidth = Math.max(6, height * .08);
-      context.beginPath(); context.moveTo(x - height * .05, baseY - height * .34); context.lineTo(x - height * .08 + stride, baseY); context.moveTo(x + height * .05, baseY - height * .34); context.lineTo(x + height * .08 - stride, baseY); context.stroke();
-      context.fillStyle = "#78443d"; context.beginPath(); context.moveTo(x - height * .18, baseY - height * .72); context.lineTo(x + height * .18, baseY - height * .72); context.lineTo(x + height * .15, baseY - height * .3); context.lineTo(x - height * .15, baseY - height * .3); context.closePath(); context.fill();
-      context.fillStyle = "#b56c5d"; context.beginPath(); context.arc(x, baseY - height * .86, height * profile.head, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#4d302d"; context.fillRect(x - height * .12, baseY - height * .94, height * .24, height * .045);
-      context.strokeStyle = "#78443d"; context.lineWidth = Math.max(5, height * .055); context.beginPath(); context.moveTo(x - height * .13, baseY - height * .64); context.lineTo(x - height * .26, baseY - height * .4); context.moveTo(x + height * .13, baseY - height * .64); context.lineTo(x + height * .26, baseY - height * .42); context.stroke();
-      context.fillStyle = "#d3aa63"; context.beginPath(); context.arc(x + enemy.facing * height * .16, baseY - height * .69, 3, 0, Math.PI * 2); context.fill();
-      if (enemy.investigating) {
-        context.fillStyle = "rgba(8,13,15,.84)"; context.beginPath(); context.arc(x, baseY - height - 13, 10, 0, Math.PI * 2); context.fill();
-        context.fillStyle = "#e2bc67"; context.font = "900 12px system-ui"; context.textAlign = "center"; context.fillText("?", x, baseY - height - 9);
-      }
-  });
+  patrols.forEach((enemy) => DrawEnemyUnit(enemy, height, WorldToScreen(enemy.x, width), baseY));
 }
 
 function DrawJointedLimb(originX, originY, upperLength, lowerLength, upperAngle, lowerAngle, color, width) {
@@ -2707,6 +2889,8 @@ function DrawHumanActor(profile, roleId, height) {
   const actionProgress = state.player.actionDuration ? 1 - state.player.actionTime / state.player.actionDuration : 0;
   let actionLift = state.player.actionTime > 0 ? Math.sin(actionProgress * Math.PI) : 0;
   const action = state.player.actionKind;
+  const limbWidth = Math.max(3.2, height * (profile.limb || .038));
+  const waist = height * (profile.waist || .105);
   const idleGesture = !moving && !action ? Math.max(0, (Math.sin(state.elapsed * .92 + profile.gait * 3) - .25) / .75) : 0;
   if ((roleId === "student" || roleId === "scout") && idleGesture > 0) actionLift = idleGesture;
   const idleBreath = Math.sin(state.elapsed * (1.25 + profile.gait * .22)) * 1.1;
@@ -2721,8 +2905,9 @@ function DrawHumanActor(profile, roleId, height) {
   let rearLeg = Math.sin(phase) * .34 * moving;
   let frontLeg = -rearLeg;
   if (action === "climb") { rearLeg = Math.sin(actionProgress * Math.PI * 4) * .42; frontLeg = -rearLeg; }
-  DrawJointedLimb(-height * .085, -height * .34, height * .2, height * .18, rearLeg, -rearLeg * .35, profile.pants, Math.max(6, height * .07));
-  DrawJointedLimb(height * .085, -height * .34, height * .2, height * .18, frontLeg, -frontLeg * .35, profile.pants, Math.max(6, height * .07));
+  const rearFoot = DrawJointedLimb(-height * .065, -height * .34, height * .2, height * .18, rearLeg, -rearLeg * .35, profile.pants, limbWidth + .55);
+  const frontFoot = DrawJointedLimb(height * .065, -height * .34, height * .2, height * .18, frontLeg, -frontLeg * .35, profile.pants, limbWidth + .55);
+  context.fillStyle = "#282a28"; [rearFoot, frontFoot].forEach((foot, index) => { context.beginPath(); context.ellipse(foot.x + (index ? 2 : -2), foot.y + 1, height * .055, Math.max(2.4, height * .025), index ? -.08 : .08, 0, Math.PI * 2); context.fill(); });
 
   let rearArm = -.12 - Math.sin(phase) * .28 * moving;
   let frontArm = .12 + Math.sin(phase) * .28 * moving;
@@ -2748,13 +2933,16 @@ function DrawHumanActor(profile, roleId, height) {
     frontArm += idleGesture * .32; frontForearm += idleGesture * .52;
   }
 
-  DrawJointedLimb(-height * profile.shoulder * .48, -height * .65, height * .2, height * .17, rearArm, rearForearm, profile.body, Math.max(5, height * .055));
+  const rearHand = DrawJointedLimb(-height * profile.shoulder * .5, -height * .65, height * .2, height * .17, rearArm, rearForearm, profile.body, limbWidth);
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(rearHand.x, rearHand.y, Math.max(2.2, height * .03), 0, Math.PI * 2); context.fill();
 
   context.fillStyle = profile.body;
-  context.beginPath(); context.moveTo(-height * profile.shoulder * .56, -height * .72); context.quadraticCurveTo(0, -height * .77, height * profile.shoulder * .56, -height * .72); context.lineTo(height * .2, -height * .32); context.lineTo(-height * .2, -height * .32); context.closePath(); context.fill();
-  context.fillStyle = "rgba(255,255,255,.12)"; context.beginPath(); context.moveTo(-height * profile.shoulder * .42, -height * .69); context.lineTo(-height * .03, -height * .71); context.lineTo(-height * .03, -height * .35); context.lineTo(-height * .17, -height * .34); context.closePath(); context.fill();
-  context.fillStyle = profile.accent; context.fillRect(-height * .21, -height * .39, height * .42, Math.max(3, height * .035));
-  if (roleId === "blacksmith") { context.fillStyle = profile.accent; context.beginPath(); context.moveTo(-height * .18, -height * .62); context.lineTo(height * .18, -height * .62); context.lineTo(height * .24, -height * .3); context.lineTo(-height * .24, -height * .3); context.closePath(); context.fill(); }
+  const shoulder = height * profile.shoulder * .53;
+  context.beginPath(); context.moveTo(-shoulder, -height * .72); context.quadraticCurveTo(0, -height * .765, shoulder, -height * .72); context.lineTo(waist, -height * .32); context.lineTo(-waist, -height * .32); context.closePath(); context.fill();
+  context.fillStyle = "rgba(255,255,255,.11)"; context.beginPath(); context.moveTo(-shoulder * .74, -height * .69); context.lineTo(-height * .018, -height * .715); context.lineTo(-height * .018, -height * .35); context.lineTo(-waist * .72, -height * .34); context.closePath(); context.fill();
+  context.strokeStyle = "rgba(49,45,38,.36)"; context.lineWidth = 1.4; context.beginPath(); context.moveTo(-height * .04, -height * .69); context.lineTo(0, -height * .61); context.lineTo(height * .04, -height * .69); context.moveTo(0, -height * .61); context.lineTo(0, -height * .36); context.stroke();
+  context.fillStyle = profile.accent; context.fillRect(-waist * 1.16, -height * .39, waist * 2.32, Math.max(3, height * .032));
+  if (roleId === "blacksmith") { context.fillStyle = profile.accent; context.beginPath(); context.moveTo(-height * .115, -height * .61); context.lineTo(height * .115, -height * .61); context.lineTo(height * .145, -height * .31); context.lineTo(-height * .145, -height * .31); context.closePath(); context.fill(); context.strokeStyle = "rgba(205,163,110,.3)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(-height * .095, -height * .58); context.lineTo(height * .1, -height * .34); context.stroke(); }
   if (roleId === "rescuer") { context.strokeStyle = profile.accent; context.lineWidth = 3; context.beginPath(); context.moveTo(-height * .16, -height * .54); context.lineTo(height * .16, -height * .54); context.stroke(); }
   if (roleId === "scout") {
     context.strokeStyle = "rgba(218,226,209,.68)"; context.lineWidth = 2;
@@ -2764,7 +2952,8 @@ function DrawHumanActor(profile, roleId, height) {
   }
 
   DrawRoleProp(profile, roleId, height, actionLift);
-  DrawJointedLimb(height * profile.shoulder * .48, -height * .65, height * .2, height * .17, frontArm, frontForearm, profile.body, Math.max(5, height * .055));
+  const frontHand = DrawJointedLimb(height * profile.shoulder * .5, -height * .65, height * .2, height * .17, frontArm, frontForearm, profile.body, limbWidth);
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(frontHand.x, frontHand.y, Math.max(2.2, height * .03), 0, Math.PI * 2); context.fill();
 
   const headY = -height * .86;
   const headRadius = height * profile.head;

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { levelDefinitions, roleDefinitions, buildOptions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs";
+import { actorProfiles, levelDefinitions, roleDefinitions, buildOptions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs";
 import { TraceSdfRay } from "./Script_LightSimulation.mjs";
 
@@ -108,6 +108,11 @@ Assert(game.includes("TunnelCenterYAt") && game.includes("TunnelFloorYAt") && ga
 Assert(game.includes("function LayerToScreen") && game.includes("DrawMountainLayer") && game.includes("DrawFieldDepth") && game.includes("DrawPerspectiveHouse") && game.includes("DrawSurfaceDepthVeil") && game.includes("DrawForegroundDepthFrame") && game.includes("nearStructures") && game.includes("nearCropXs") && game.includes("parallax: .035") && game.includes("parallax: .245") && game.includes("LayerToScreen(worldX, width, 1.29)"), "远山、田野、村庄、玩法层与前景没有形成至少五级视差、透视缩放和近景遮挡");
 Assert(game.includes("TunnelHalfHeightAt") && game.includes("DrawTunnelRearNetwork") && game.includes("DrawTunnelDepth") && game.includes("sideNiches") && game.includes("farX") && game.includes("foregroundSupports") && game.includes("DrawTunnelProps") && game.includes('kind: "basket"') && game.includes('kind: "lamp"'), "地道仍是单根走廊，缺少后层平行通道、侧洞、收束透视、近景支护与生活道具");
 Assert(game.includes("DrawHumanActor") && game.includes("DrawDogActor") && game.includes("DrawHeadwear") && game.includes("DrawRoleProp") && game.includes("DrawJointedLimb"), "角色仍是统一几何人形，缺少独立轮廓、服装、道具或关节动画");
+Assert(["leader", "student", "rescuer", "blacksmith", "child", "scout"].every((roleId) => actorProfiles[roleId].shoulder <= .35 && actorProfiles[roleId].waist <= .125 && actorProfiles[roleId].limb <= .044), "村民体态重新膨胀，必须保持战时劳动者的清瘦或精干轮廓");
+Assert(actorProfiles.soldier.prop === "rifle" && actorProfiles.collaborator?.prop === "torch" && actorProfiles.soldier.body !== actorProfiles.collaborator.body, "日军与伪军没有独立服装、装备和色彩身份");
+Assert(game.includes("function DrawEnemyUnit") && game.includes('unitType = index % 3 === 1 ? "collaborator" : "soldier"') && game.includes('enemy.rank === "sectionLeader"'), "日伪军仍是同一种几何木偶，缺少阵营与军衔轮廓");
+Assert(game.includes("function DrawVillageFenceSegment") && game.includes("function DrawVillageWorkProp") && game.includes('kind: "wheelbarrow"') && game.includes('kind: "dryingRack"') && game.includes('kind: "firewood"') && game.includes('kind: "plow"'), "村庄栅栏与生产道具没有按结构和用途重做");
+Assert(game.includes('kind: "toolRack"') && game.includes('kind: "stove"') && game.includes('prop.kind === "toolRack"') && game.includes('prop.kind === "stove"'), "地道生活区缺少工具架或炉灶等有用途的生活设施");
 Assert(game.includes("ActorActionKind") && game.includes("BeginActorAction") && game.includes("motionBlend") && game.includes("rolePulse"), "角色缺少移动、行动或切换聚焦动画状态");
 Assert(game.includes("function IssueDogCommand") && game.includes("function UpdateDogPartner") && game.includes("function CompleteDogCommand") && game.includes('dog.commandMode = "work"'), "阿土哨令仍是瞬时按钮，没有跑动、钻洞、停留工作与完成回报");
 Assert(game.includes("DrawDogCompanion") && game.includes("DrawDogCommandEnvironment") && game.includes("DrawDogCommandFocus") && game.includes("DrawPawMark") && game.includes("犬 · 阿土执行中") && html.includes('id="dogCommandHud"') && css.includes("#dogCommandHud.commanding"), "阿土实体、高对比四足聚焦、连续爪印、窄洞路径或哨令 HUD 缺少可视反馈");

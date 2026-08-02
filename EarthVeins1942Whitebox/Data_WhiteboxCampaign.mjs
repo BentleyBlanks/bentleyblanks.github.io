@@ -1,12 +1,13 @@
 export const actorProfiles = Object.freeze({
-  leader: Object.freeze({ height: 1.72, shoulder: .37, head: .105, color: "#ded5bc", body: "#c8bea5", pants: "#48564e", accent: "#b64b3e", skin: "#d49a72", hair: "#302923", mark: "领", gait: .96, headwear: "cap", prop: "map" }),
+  leader: Object.freeze({ height: 1.72, shoulder: .30, waist: .105, limb: .038, head: .092, color: "#ded5bc", body: "#b9b39f", pants: "#48564e", accent: "#a64237", skin: "#c88d68", hair: "#302923", mark: "领", gait: .96, headwear: "cap", prop: "map" }),
   dog: Object.freeze({ height: .72, shoulder: .26, head: .15, color: "#a97750", body: "#a97750", pants: "#553b2d", accent: "#4f8791", skin: "#b9865e", hair: "#453028", mark: "犬", gait: 1.28, animal: true, prop: "bandana" }),
-  student: Object.freeze({ height: 1.66, shoulder: .31, head: .107, color: "#6f9fbd", body: "#6f9fbd", pants: "#374a59", accent: "#d4b66d", skin: "#dda17b", hair: "#29282a", mark: "镜", gait: 1.06, headwear: "hair", prop: "telescope" }),
-  rescuer: Object.freeze({ height: 1.64, shoulder: .34, head: .106, color: "#6ca88b", body: "#6ca88b", pants: "#3f5149", accent: "#b95649", skin: "#dca07b", hair: "#302821", mark: "针", gait: .93, headwear: "scarf", prop: "clothRoll" }),
-  blacksmith: Object.freeze({ height: 1.79, shoulder: .43, head: .101, color: "#c67552", body: "#b96749", pants: "#443b37", accent: "#4b4039", skin: "#c98c68", hair: "#30251f", mark: "锤", gait: .84, headwear: "headwrap", prop: "hammer" }),
-  child: Object.freeze({ height: 1.38, shoulder: .27, head: .119, color: "#d4aa47", body: "#d4aa47", pants: "#4f5344", accent: "#ad5041", skin: "#dfa17a", hair: "#312820", mark: "信", gait: 1.22, headwear: "smallCap", prop: "satchel" }),
-  scout: Object.freeze({ height: 1.70, shoulder: .35, head: .105, color: "#aeb4a2", body: "#8f9b88", pants: "#3f4b46", accent: "#536e76", skin: "#d19871", hair: "#2c2722", mark: "哨", gait: 1.04, headwear: "sideCap", prop: "binoculars" }),
-  soldier: Object.freeze({ height: 1.76, shoulder: .38, head: .103, color: "#9a5349", body: "#915047", pants: "#49383a", accent: "#c49a5d", skin: "#bd8068", hair: "#3c2c2d", mark: "敌", gait: .98, headwear: "fieldCap", prop: "torch" })
+  student: Object.freeze({ height: 1.66, shoulder: .27, waist: .095, limb: .034, head: .095, color: "#6f9fbd", body: "#668fa8", pants: "#374a59", accent: "#d4b66d", skin: "#d39770", hair: "#29282a", mark: "镜", gait: 1.06, headwear: "hair", prop: "telescope" }),
+  rescuer: Object.freeze({ height: 1.64, shoulder: .29, waist: .105, limb: .035, head: .094, color: "#6ca88b", body: "#65957e", pants: "#3f5149", accent: "#a94d43", skin: "#d09570", hair: "#302821", mark: "针", gait: .93, headwear: "scarf", prop: "clothRoll" }),
+  blacksmith: Object.freeze({ height: 1.79, shoulder: .35, waist: .125, limb: .044, head: .09, color: "#c67552", body: "#a95f46", pants: "#443b37", accent: "#433b37", skin: "#bd7f5d", hair: "#30251f", mark: "锤", gait: .84, headwear: "headwrap", prop: "hammer" }),
+  child: Object.freeze({ height: 1.38, shoulder: .24, waist: .085, limb: .032, head: .105, color: "#d4aa47", body: "#c69c44", pants: "#4f5344", accent: "#a7493d", skin: "#d79a73", hair: "#312820", mark: "信", gait: 1.22, headwear: "smallCap", prop: "satchel" }),
+  scout: Object.freeze({ height: 1.70, shoulder: .29, waist: .105, limb: .036, head: .093, color: "#aeb4a2", body: "#849080", pants: "#3f4b46", accent: "#536e76", skin: "#c78d68", hair: "#2c2722", mark: "哨", gait: 1.04, headwear: "sideCap", prop: "binoculars" }),
+  soldier: Object.freeze({ height: 1.76, shoulder: .31, waist: .112, limb: .039, head: .091, color: "#7b7755", body: "#66684f", pants: "#4d503d", accent: "#b39a61", skin: "#b77b5f", hair: "#352e25", mark: "日", gait: .98, headwear: "fieldCap", prop: "rifle" }),
+  collaborator: Object.freeze({ height: 1.72, shoulder: .29, waist: .108, limb: .036, head: .094, color: "#59645f", body: "#4d5a58", pants: "#343e3f", accent: "#c4b489", skin: "#bd8264", hair: "#302d29", mark: "伪", gait: 1.04, headwear: "softCap", prop: "torch" })
 });
 
 export const roleDefinitions = Object.freeze({
