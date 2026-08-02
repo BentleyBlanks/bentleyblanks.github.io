@@ -1,22 +1,22 @@
 export const actorProfiles = Object.freeze({
-  leader: Object.freeze({ height: 1.72, shoulder: .35, head: .105, color: "#e5e7df" }),
-  dog: Object.freeze({ height: .72, shoulder: .26, head: .15, color: "#b79068", animal: true }),
-  student: Object.freeze({ height: 1.66, shoulder: .32, head: .107, color: "#78a7c5" }),
-  rescuer: Object.freeze({ height: 1.64, shoulder: .32, head: .106, color: "#7db89d" }),
-  blacksmith: Object.freeze({ height: 1.76, shoulder: .38, head: .102, color: "#d08b67" }),
-  child: Object.freeze({ height: 1.42, shoulder: .28, head: .115, color: "#d8b75f" }),
-  scout: Object.freeze({ height: 1.70, shoulder: .34, head: .105, color: "#dedfd9" }),
-  soldier: Object.freeze({ height: 1.76, shoulder: .37, head: .103, color: "#d66f61" })
+  leader: Object.freeze({ height: 1.72, shoulder: .37, head: .105, color: "#ded5bc", body: "#c8bea5", pants: "#48564e", accent: "#b64b3e", skin: "#d49a72", hair: "#302923", mark: "领", gait: .96, headwear: "cap", prop: "map" }),
+  dog: Object.freeze({ height: .72, shoulder: .26, head: .15, color: "#a97750", body: "#a97750", pants: "#553b2d", accent: "#4f8791", skin: "#b9865e", hair: "#453028", mark: "犬", gait: 1.28, animal: true, prop: "bandana" }),
+  student: Object.freeze({ height: 1.66, shoulder: .31, head: .107, color: "#6f9fbd", body: "#6f9fbd", pants: "#374a59", accent: "#d4b66d", skin: "#dda17b", hair: "#29282a", mark: "镜", gait: 1.06, headwear: "hair", prop: "telescope" }),
+  rescuer: Object.freeze({ height: 1.64, shoulder: .34, head: .106, color: "#6ca88b", body: "#6ca88b", pants: "#3f5149", accent: "#b95649", skin: "#dca07b", hair: "#302821", mark: "针", gait: .93, headwear: "scarf", prop: "clothRoll" }),
+  blacksmith: Object.freeze({ height: 1.79, shoulder: .43, head: .101, color: "#c67552", body: "#b96749", pants: "#443b37", accent: "#4b4039", skin: "#c98c68", hair: "#30251f", mark: "锤", gait: .84, headwear: "headwrap", prop: "hammer" }),
+  child: Object.freeze({ height: 1.38, shoulder: .27, head: .119, color: "#d4aa47", body: "#d4aa47", pants: "#4f5344", accent: "#ad5041", skin: "#dfa17a", hair: "#312820", mark: "信", gait: 1.22, headwear: "smallCap", prop: "satchel" }),
+  scout: Object.freeze({ height: 1.70, shoulder: .35, head: .105, color: "#aeb4a2", body: "#8f9b88", pants: "#3f4b46", accent: "#536e76", skin: "#d19871", hair: "#2c2722", mark: "哨", gait: 1.04, headwear: "sideCap", prop: "binoculars" }),
+  soldier: Object.freeze({ height: 1.76, shoulder: .38, head: .103, color: "#9a5349", body: "#915047", pants: "#49383a", accent: "#c49a5d", skin: "#bd8068", hair: "#3c2c2d", mark: "敌", gait: .98, headwear: "fieldCap", prop: "torch" })
 });
 
 export const roleDefinitions = Object.freeze({
   leader: Object.freeze({ id: "leader", name: "民兵队长", skill: "组织 / 施工 / 闸门", short: "队长" }),
-  dog: Object.freeze({ id: "dog", name: "流浪狗 · 阿土", skill: "嗅出暗路与危险气味", short: "阿土" }),
-  student: Object.freeze({ id: "student", name: "学生 · 叶星", skill: "望远镜标记巡逻规律", short: "学生" }),
-  rescuer: Object.freeze({ id: "rescuer", name: "妇救会 · 赵禾", skill: "缝补伪装与照护伤员", short: "妇救会" }),
-  blacksmith: Object.freeze({ id: "blacksmith", name: "铁匠 · 魏根生", skill: "拉动重门与搬运粮袋", short: "铁匠" }),
-  child: Object.freeze({ id: "child", name: "小交通员 · 石头", skill: "穿过狭口打开内闩", short: "石头" }),
-  scout: Object.freeze({ id: "scout", name: "武工队员 · 林青禾", skill: "布置假象与地道声路", short: "武工队" })
+  dog: Object.freeze({ id: "dog", name: "阿土 · 流浪狗", skill: "嗅出暗路与危险气味", short: "阿土" }),
+  student: Object.freeze({ id: "student", name: "叶星 · 学生", skill: "望远镜标记巡逻规律", short: "叶星" }),
+  rescuer: Object.freeze({ id: "rescuer", name: "赵禾 · 妇救会", skill: "缝补伪装与照护伤员", short: "赵禾" }),
+  blacksmith: Object.freeze({ id: "blacksmith", name: "魏根生 · 铁匠", skill: "拉动重门与搬运粮袋", short: "根生" }),
+  child: Object.freeze({ id: "child", name: "石头 · 小交通员", skill: "穿过狭口打开内闩", short: "石头" }),
+  scout: Object.freeze({ id: "scout", name: "林青禾 · 武工队员", skill: "布置假象与地道声路", short: "青禾" })
 });
 
 export const buildOptions = Object.freeze([

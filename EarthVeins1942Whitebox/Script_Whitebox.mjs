@@ -34,7 +34,7 @@ function CreateState(levelIndex) {
     levelIndex,
     level,
     phaseId: level.phases[0].id,
-    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, crouch: false, step: 0 },
+    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, crouch: false, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0 },
     selectedRole: level.startRole,
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
@@ -121,8 +121,9 @@ function OpenLevelPanel() {
 function RenderRoleDock() {
   ui.roleButtons.innerHTML = state.level.roleIds.map((roleId) => {
     const role = roleDefinitions[roleId];
+    const profile = actorProfiles[roleId];
     return `<button type="button" data-role="${roleId}" class="${state.selectedRole === roleId ? "active" : ""}">
-      <span class="roleDot" style="--role:${actorProfiles[roleId].color}"></span><b>${role.short}</b><small>${role.skill}</small>
+      <span class="rolePortrait" style="--role:${profile.body};--accent:${profile.accent}"><i>${profile.mark}</i></span><span class="roleCopy"><b>${role.short}</b><small>${role.skill}</small></span>
     </button>`;
   }).join("");
   ui.roleButtons.querySelectorAll("[data-role]").forEach((button) => button.addEventListener("click", () => SelectRole(button.dataset.role)));
@@ -130,9 +131,30 @@ function RenderRoleDock() {
 
 function SelectRole(roleId) {
   if (!state.level.roleIds.includes(roleId) || IsBlocked()) return;
+  if (state.selectedRole === roleId) return;
   state.selectedRole = roleId;
+  state.player.rolePulse = 1;
+  state.player.actionKind = "ready";
+  state.player.actionTime = .62;
+  state.player.actionDuration = .62;
   RenderRoleDock();
   UpdateUi();
+}
+
+function ActorActionKind(action) {
+  if (["liftHatch", "unbarGate", "moveGrain", "closeSurfaceGate"].includes(action.id)) return "lift";
+  if (["collectWood", "collectIron", "repairCamo", "triggerSlotA", "triggerSlotB", "triggerSlotC"].includes(action.id)) return "work";
+  if (["markPatrol", "freeCourier", "routeHorn", "captureIntel"].includes(action.id)) return "inspect";
+  if (["moveWounded", "collectSupplies"].includes(action.id)) return "carry";
+  if (["crawlGap", "sniffRoute"].includes(action.id)) return "crawl";
+  if (["placeHelmet", "fireCracker", "misdirectSquad", "finalSignal"].includes(action.id)) return "signal";
+  return "interact";
+}
+
+function BeginActorAction(action, duration = .78) {
+  state.player.actionKind = ActorActionKind(action);
+  state.player.actionTime = Math.max(1.02, duration);
+  state.player.actionDuration = Math.max(1.02, duration);
 }
 
 function CycleRole() {
@@ -191,6 +213,7 @@ function PerformAction() {
     if (state.defense.ventilation < 3) return Toast("通风不足 3：烟会先伤到地道里的乡亲。请重建一处机关。", "warning");
     if (state.defense.strength < 4) return Toast("防御不足 4：还无法安全分割六人小队。", "warning");
     state.completed.add(action.id);
+    BeginActorAction({ id: "closeSurfaceGate" });
     SetPhase("defense", "第二轮 · 扫荡入村", "他们进村了。照说好的，把人往空院领。", "队长");
     return;
   }
@@ -198,6 +221,7 @@ function PerformAction() {
 }
 
 function ApplyAction(action) {
+  BeginActorAction(action);
   state.completed.add(action.id);
   if (action.resource) {
     for (const [key, amount] of Object.entries(action.resource)) state.resources[key] += amount;
@@ -291,6 +315,7 @@ function ChooseBuild(optionId) {
   state.resources.iron -= option.cost.iron;
   state.buildSlots[state.currentBuildSlot] = option.id;
   state.completed.add(["buildSlotA", "buildSlotB", "buildSlotC"][state.currentBuildSlot]);
+  BeginActorAction({ id: "collectWood" }, .9);
   RecalculateBuild();
   Show(ui.buildPanel, false);
   Toast(`${option.name}完工 · 通风 ${state.defense.ventilation} / 防御 ${state.defense.strength}`, state.defense.ventilation >= 3 && state.defense.strength >= 4 ? "success" : "neutral");
@@ -313,6 +338,9 @@ function ToggleLayer() {
   if (entrance === undefined) return Toast("需要靠近蓝色地道入口。", "neutral");
   state.player.x = entrance;
   state.player.layer = state.player.layer === "surface" ? "tunnel" : "surface";
+  state.player.actionKind = "climb";
+  state.player.actionTime = .68;
+  state.player.actionDuration = .68;
   if (state.player.layer === "tunnel") state.alert = Math.max(0, state.alert - 8);
   Toast(state.player.layer === "tunnel" ? "进入地道：地表警觉开始回落。" : "回到地表：注意巡逻与暴露。", "neutral");
   UpdateUi();
@@ -520,6 +548,11 @@ function MetricsMarkup() {
 
 function Update(delta) {
   state.elapsed += delta;
+  state.player.rolePulse = Math.max(0, state.player.rolePulse - delta * .65);
+  if (state.player.actionTime > 0) {
+    state.player.actionTime = Math.max(0, state.player.actionTime - delta);
+    if (state.player.actionTime === 0) state.player.actionKind = null;
+  }
   if (state.cinematic) {
     state.cinematic.time += delta;
     const progress = Math.min(1, state.cinematic.time / state.cinematic.duration);
@@ -530,13 +563,22 @@ function Update(delta) {
     if (progress >= 1) EndCinematic();
     return;
   }
-  if (state.mode !== "play" || IsBlocked()) return;
+  if (state.mode !== "play" || IsBlocked()) {
+    state.player.moving = false;
+    state.player.motionBlend = Lerp(state.player.motionBlend, 0, 1 - Math.pow(.004, delta));
+    state.player.step += delta * .72;
+    return;
+  }
   state.player.crouch = inputKeys.crouch || touchCrouchLatched;
   const direction = Number(inputKeys.right) - Number(inputKeys.left);
+  state.player.moving = Boolean(direction);
+  state.player.motionBlend = Lerp(state.player.motionBlend, direction ? 1 : 0, 1 - Math.pow(.0008, delta));
   if (direction) {
     state.player.facing = direction;
     state.player.x = Math.max(worldMin, Math.min(worldMax, state.player.x + direction * delta * (state.player.crouch ? 2.25 : 3.55)));
     state.player.step += delta * (state.player.crouch ? 6 : 9);
+  } else {
+    state.player.step += delta * .72;
   }
   const targetX = Math.max(worldMin + 4, Math.min(worldMax - 4, state.player.x + state.player.facing * .7));
   state.camera.x = Lerp(state.camera.x, targetX, 1 - Math.pow(.002, delta));
@@ -1036,32 +1078,194 @@ function DrawEnemies(width, surfaceY) {
   });
 }
 
+function DrawJointedLimb(originX, originY, upperLength, lowerLength, upperAngle, lowerAngle, color, width) {
+  const kneeX = originX + Math.sin(upperAngle) * upperLength;
+  const kneeY = originY + Math.cos(upperAngle) * upperLength;
+  const endX = kneeX + Math.sin(lowerAngle) * lowerLength;
+  const endY = kneeY + Math.cos(lowerAngle) * lowerLength;
+  context.strokeStyle = "rgba(25,27,26,.38)"; context.lineWidth = width + 3; context.lineCap = "round"; context.lineJoin = "round";
+  context.beginPath(); context.moveTo(originX + 1, originY + 2); context.lineTo(kneeX + 1, kneeY + 2); context.lineTo(endX + 1, endY + 2); context.stroke();
+  context.strokeStyle = color; context.lineWidth = width;
+  context.beginPath(); context.moveTo(originX, originY); context.lineTo(kneeX, kneeY); context.lineTo(endX, endY); context.stroke();
+  return { x: endX, y: endY };
+}
+
+function DrawHeadwear(profile, roleId, height, headY, headRadius) {
+  context.fillStyle = profile.hair;
+  if (profile.headwear === "scarf") {
+    context.fillStyle = profile.accent; context.beginPath(); context.moveTo(-headRadius * 1.18, headY); context.lineTo(-headRadius * 1.42, headY + headRadius * 2.2); context.lineTo(headRadius * .25, headY + headRadius * 1.25); context.closePath(); context.fill();
+    context.beginPath(); context.arc(0, headY - headRadius * .18, headRadius * 1.06, Math.PI, Math.PI * 2); context.fill();
+  } else if (["cap", "smallCap", "sideCap", "fieldCap"].includes(profile.headwear)) {
+    if (profile.headwear === "sideCap") context.fillStyle = profile.accent;
+    context.beginPath(); context.arc(0, headY - headRadius * .34, headRadius * 1.04, Math.PI, Math.PI * 2); context.fill();
+    context.fillRect(profile.headwear === "sideCap" ? -headRadius * .35 : 0, headY - headRadius * .5, headRadius * 1.25, Math.max(2, height * .026));
+    if (profile.headwear === "sideCap") {
+      context.strokeStyle = "rgba(235,239,224,.55)"; context.lineWidth = 1.5;
+      context.beginPath(); context.moveTo(-headRadius * .68, headY - headRadius * .49); context.lineTo(headRadius * .67, headY - headRadius * .62); context.stroke();
+    }
+  } else if (profile.headwear === "headwrap") {
+    context.fillStyle = "#756457"; context.fillRect(-headRadius * 1.08, headY - headRadius * .58, headRadius * 2.16, headRadius * .54);
+    context.strokeStyle = "rgba(235,211,170,.42)"; context.lineWidth = 2; context.beginPath(); context.moveTo(-headRadius, headY - headRadius * .33); context.lineTo(headRadius, headY - headRadius * .12); context.stroke();
+  } else {
+    context.beginPath(); context.arc(-headRadius * .14, headY - headRadius * .28, headRadius * 1.04, Math.PI, Math.PI * 2); context.fill();
+  }
+  if (roleId === "student") {
+    context.strokeStyle = "#273b45"; context.lineWidth = 1.5;
+    context.beginPath(); context.arc(-headRadius * .4, headY + 1, headRadius * .29, 0, Math.PI * 2); context.arc(headRadius * .34, headY + 1, headRadius * .29, 0, Math.PI * 2); context.moveTo(-headRadius * .1, headY + 1); context.lineTo(headRadius * .05, headY + 1); context.stroke();
+  }
+}
+
+function DrawRoleProp(profile, roleId, height, actionLift) {
+  context.strokeStyle = profile.accent; context.fillStyle = profile.accent; context.lineCap = "round";
+  if (profile.prop === "map") {
+    context.strokeStyle = "#8d5d3f"; context.lineWidth = 2; context.beginPath(); context.moveTo(-height * .22, -height * .61); context.lineTo(height * .2, -height * .27); context.stroke();
+    context.fillStyle = "#d6c69e"; context.fillRect(height * .12, -height * .34, height * .16, height * .12);
+  } else if (profile.prop === "telescope") {
+    context.strokeStyle = profile.accent; context.lineWidth = Math.max(3, height * .035); context.beginPath(); context.moveTo(-height * .22, -height * .62); context.lineTo(height * .22, -height * .31); context.stroke();
+    context.fillStyle = "#435d68"; context.fillRect(height * .14, -height * (.36 + actionLift * .22), height * .23, height * .055);
+  } else if (profile.prop === "clothRoll") {
+    context.strokeStyle = profile.accent; context.lineWidth = 2; context.beginPath(); context.moveTo(-height * .22, -height * .64); context.lineTo(height * .19, -height * .3); context.stroke();
+    context.fillStyle = "#d7c5a0"; context.beginPath(); context.arc(height * .2, -height * .3, height * .09, 0, Math.PI * 2); context.fill(); context.strokeStyle = "#8c7c63"; context.beginPath(); context.arc(height * .2, -height * .3, height * .045, 0, Math.PI * 2); context.stroke();
+  } else if (profile.prop === "hammer") {
+    context.strokeStyle = "#8a6748"; context.lineWidth = 3; context.beginPath(); context.moveTo(height * .22, -height * .38); context.lineTo(height * .35, -height * .12); context.stroke();
+    context.fillStyle = "#474441"; context.fillRect(height * .27, -height * .43, height * .22, height * .08);
+  } else if (profile.prop === "satchel") {
+    context.strokeStyle = profile.accent; context.lineWidth = 2; context.beginPath(); context.moveTo(-height * .18, -height * .63); context.lineTo(height * .21, -height * .29); context.stroke();
+    context.fillStyle = "#8e563c"; context.fillRect(height * .14, -height * .33, height * .22, height * .17);
+  } else if (profile.prop === "binoculars") {
+    context.strokeStyle = profile.accent; context.lineWidth = 2; context.beginPath(); context.moveTo(-height * .18, -height * .63); context.lineTo(height * .16, -height * .34); context.stroke();
+    const glassY = -height * (.42 + actionLift * .28);
+    context.fillStyle = "#263d42"; context.beginPath(); context.arc(height * .13, glassY, height * .078, 0, Math.PI * 2); context.arc(height * .3, glassY, height * .078, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#9fb7b3"; context.lineWidth = 1.5; context.beginPath(); context.arc(height * .13, glassY, height * .052, 0, Math.PI * 2); context.arc(height * .3, glassY, height * .052, 0, Math.PI * 2); context.stroke();
+  }
+}
+
+function DrawHumanActor(profile, roleId, height) {
+  const phase = state.player.step * profile.gait;
+  const moving = state.player.motionBlend;
+  const actionProgress = state.player.actionDuration ? 1 - state.player.actionTime / state.player.actionDuration : 0;
+  let actionLift = state.player.actionTime > 0 ? Math.sin(actionProgress * Math.PI) : 0;
+  const action = state.player.actionKind;
+  const idleGesture = !moving && !action ? Math.max(0, (Math.sin(state.elapsed * .92 + profile.gait * 3) - .25) / .75) : 0;
+  if ((roleId === "student" || roleId === "scout") && idleGesture > 0) actionLift = idleGesture;
+  const idleBreath = Math.sin(state.elapsed * (1.25 + profile.gait * .22)) * 1.1;
+  const bob = Math.abs(Math.sin(phase)) * -2.1 * moving + idleBreath * (1 - moving);
+  const crouchScale = state.player.crouch || action === "crawl" ? .7 : 1;
+  context.translate(0, bob);
+  context.scale(1, crouchScale);
+  if (state.player.crouch || action === "crawl") context.rotate(-.055);
+
+  context.fillStyle = "rgba(0,0,0,.32)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .24, 5, 0, 0, Math.PI * 2); context.fill();
+
+  let rearLeg = Math.sin(phase) * .34 * moving;
+  let frontLeg = -rearLeg;
+  if (action === "climb") { rearLeg = Math.sin(actionProgress * Math.PI * 4) * .42; frontLeg = -rearLeg; }
+  DrawJointedLimb(-height * .085, -height * .34, height * .2, height * .18, rearLeg, -rearLeg * .35, profile.pants, Math.max(6, height * .07));
+  DrawJointedLimb(height * .085, -height * .34, height * .2, height * .18, frontLeg, -frontLeg * .35, profile.pants, Math.max(6, height * .07));
+
+  let rearArm = -.12 - Math.sin(phase) * .28 * moving;
+  let frontArm = .12 + Math.sin(phase) * .28 * moving;
+  let rearForearm = rearArm * .65;
+  let frontForearm = frontArm * .65;
+  if (action === "lift" || action === "carry") { rearArm = .92 + actionLift * .5; frontArm = 1.12 + actionLift * .35; rearForearm = .3; frontForearm = .2; }
+  else if (action === "work") { rearArm = .62 + actionLift * .75; frontArm = 1.05 - actionLift * .5; rearForearm = 1.28; frontForearm = .8; }
+  else if (action === "inspect") { frontArm = 1.8; frontForearm = 2.8; rearArm = .5; rearForearm = .2; }
+  else if (action === "signal") { frontArm = 2.65; frontForearm = 3.05; rearArm = .45; rearForearm = .2; }
+  else if (action === "ready") { rearArm = -.7 * actionLift; frontArm = .72 * actionLift; rearForearm = -.2; frontForearm = .2; }
+  else if (action === "climb") { rearArm = 2.45 - Math.sin(actionProgress * Math.PI * 4) * .35; frontArm = 2.45 + Math.sin(actionProgress * Math.PI * 4) * .35; rearForearm = 2.8; frontForearm = 2.8; }
+  else if ((roleId === "student" || roleId === "scout") && idleGesture > 0) {
+    frontArm = 1.35 + idleGesture * .48; frontForearm = 2.2 + idleGesture * .58;
+    rearArm = .72 + idleGesture * .34; rearForearm = 1.55 + idleGesture * .66;
+  } else if (roleId === "leader") {
+    frontArm = .42 + idleGesture * .24; frontForearm = 1.28; rearArm = -.38; rearForearm = -.82;
+  } else if (roleId === "rescuer") {
+    frontArm = .52 + idleGesture * .24; frontForearm = 1.48; rearArm = -.22; rearForearm = -.68;
+  } else if (roleId === "blacksmith") {
+    frontArm = .2 + idleGesture * .34; frontForearm = .62; rearArm = -.28; rearForearm = -.48;
+  } else if (roleId === "child") {
+    frontArm += idleGesture * .32; frontForearm += idleGesture * .52;
+  }
+
+  DrawJointedLimb(-height * profile.shoulder * .48, -height * .65, height * .2, height * .17, rearArm, rearForearm, profile.body, Math.max(5, height * .055));
+
+  context.fillStyle = profile.body;
+  context.beginPath(); context.moveTo(-height * profile.shoulder * .56, -height * .72); context.quadraticCurveTo(0, -height * .77, height * profile.shoulder * .56, -height * .72); context.lineTo(height * .2, -height * .32); context.lineTo(-height * .2, -height * .32); context.closePath(); context.fill();
+  context.fillStyle = "rgba(255,255,255,.12)"; context.beginPath(); context.moveTo(-height * profile.shoulder * .42, -height * .69); context.lineTo(-height * .03, -height * .71); context.lineTo(-height * .03, -height * .35); context.lineTo(-height * .17, -height * .34); context.closePath(); context.fill();
+  context.fillStyle = profile.accent; context.fillRect(-height * .21, -height * .39, height * .42, Math.max(3, height * .035));
+  if (roleId === "blacksmith") { context.fillStyle = profile.accent; context.beginPath(); context.moveTo(-height * .18, -height * .62); context.lineTo(height * .18, -height * .62); context.lineTo(height * .24, -height * .3); context.lineTo(-height * .24, -height * .3); context.closePath(); context.fill(); }
+  if (roleId === "rescuer") { context.strokeStyle = profile.accent; context.lineWidth = 3; context.beginPath(); context.moveTo(-height * .16, -height * .54); context.lineTo(height * .16, -height * .54); context.stroke(); }
+  if (roleId === "scout") {
+    context.strokeStyle = "rgba(218,226,209,.68)"; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(-height * .16, -height * .66); context.lineTo(height * .15, -height * .37); context.stroke();
+    context.fillStyle = "#4b5f59"; context.fillRect(-height * .29, -height * .42, height * .19, height * .2);
+    context.strokeStyle = "#9aa894"; context.strokeRect(-height * .29, -height * .42, height * .19, height * .2);
+  }
+
+  DrawRoleProp(profile, roleId, height, actionLift);
+  DrawJointedLimb(height * profile.shoulder * .48, -height * .65, height * .2, height * .17, frontArm, frontForearm, profile.body, Math.max(5, height * .055));
+
+  const headY = -height * .86;
+  const headRadius = height * profile.head;
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(0, headY, headRadius, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(87,49,36,.68)"; context.beginPath(); context.arc(headRadius * .4, headY + headRadius * .12, Math.max(1.5, headRadius * .12), 0, Math.PI * 2); context.fill();
+  DrawHeadwear(profile, roleId, height, headY, headRadius);
+}
+
+function DrawDogActor(profile, height) {
+  const phase = state.player.step * profile.gait;
+  const moving = state.player.motionBlend;
+  const sniff = state.player.actionKind === "crawl" || !moving ? (.5 + Math.sin(state.elapsed * 2.8) * .5) : 0;
+  const bob = Math.abs(Math.sin(phase)) * -2 * moving;
+  context.translate(0, bob);
+  context.fillStyle = "rgba(0,0,0,.3)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .48, 5, 0, 0, Math.PI * 2); context.fill();
+  const legSwing = Math.sin(phase) * height * .08 * moving;
+  context.strokeStyle = profile.pants; context.lineWidth = Math.max(3, height * .065); context.lineCap = "round";
+  [-.27, -.08, .13, .31].forEach((offset, index) => { context.beginPath(); context.moveTo(height * offset, -height * .22); context.lineTo(height * offset + (index % 2 ? -legSwing : legSwing), 0); context.stroke(); });
+  context.fillStyle = profile.body; context.beginPath(); context.ellipse(-height * .04, -height * .42, height * .48, height * .24, -.05, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(225,190,145,.48)"; context.beginPath(); context.ellipse(height * .08, -height * .37, height * .24, height * .12, 0, 0, Math.PI * 2); context.fill();
+  const headY = -height * (.54 - sniff * .12);
+  context.fillStyle = profile.skin; context.beginPath(); context.arc(height * .43, headY, height * .19, 0, Math.PI * 2); context.fill();
+  context.fillStyle = profile.hair; context.beginPath(); context.moveTo(height * .32, headY - height * .15); context.lineTo(height * .27, headY - height * .35); context.lineTo(height * .43, headY - height * .18); context.moveTo(height * .49, headY - height * .16); context.lineTo(height * .62, headY - height * .31); context.lineTo(height * .59, headY - height * .08); context.fill();
+  context.fillStyle = "#1e2422"; context.beginPath(); context.arc(height * .56, headY + 1, 2.3, 0, Math.PI * 2); context.arc(height * .44, headY - height * .04, 1.8, 0, Math.PI * 2); context.fill();
+  context.fillStyle = profile.accent; context.beginPath(); context.moveTo(height * .25, -height * .53); context.lineTo(height * .48, -height * .47); context.lineTo(height * .28, -height * .33); context.closePath(); context.fill();
+  const tailWave = Math.sin(state.elapsed * (moving ? 8 : 3.5)) * .35;
+  context.strokeStyle = profile.body; context.lineWidth = Math.max(4, height * .075); context.beginPath(); context.moveTo(-height * .46, -height * .47); context.quadraticCurveTo(-height * .72, -height * (.72 + tailWave), -height * .62, -height * (.88 + tailWave)); context.stroke();
+}
+
+function DrawActorIdentity(profile, role, x, baseY, height) {
+  context.save();
+  context.font = "700 11px system-ui, sans-serif";
+  const label = role.name;
+  const labelWidth = Math.ceil(context.measureText(label).width) + 28;
+  const left = x - labelWidth / 2;
+  context.fillStyle = "rgba(8,13,15,.9)"; context.fillRect(left, baseY + 7, labelWidth, 21);
+  context.fillStyle = profile.accent; context.fillRect(left, baseY + 7, 5, 21);
+  context.strokeStyle = "rgba(240,236,217,.2)"; context.lineWidth = 1; context.strokeRect(left + .5, baseY + 7.5, labelWidth - 1, 20);
+  context.fillStyle = "#f1eee2"; context.textAlign = "center"; context.fillText(label, x + 2, baseY + 22);
+  if (state.player.rolePulse > 0) {
+    const alpha = Math.min(1, state.player.rolePulse * 1.7);
+    context.globalAlpha = alpha;
+    context.strokeStyle = profile.accent; context.lineWidth = 3;
+    context.beginPath(); context.arc(x, baseY - height * .53, height * (.4 + (1 - state.player.rolePulse) * .13), 0, Math.PI * 2); context.stroke();
+    context.fillStyle = "rgba(8,13,15,.88)"; context.fillRect(x - 58, baseY - height - 34, 116, 24);
+    context.fillStyle = "#f3efe1"; context.font = "700 12px system-ui, sans-serif"; context.fillText(`现在是 ${role.short}`, x, baseY - height - 17);
+  }
+  context.restore();
+}
+
 function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
-  const profile = actorProfiles[state.selectedRole];
+  const roleId = state.selectedRole;
+  const profile = actorProfiles[roleId];
+  const role = roleDefinitions[roleId];
   const x = WorldToScreen(state.player.x, width);
   const baseY = state.player.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(state.player.x, viewportHeight, tunnelY);
   const scale = Math.min(width, 1100) / 26 * .038;
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
-  if (profile.animal) {
-    context.fillStyle = profile.color; context.beginPath(); context.ellipse(0, -height * .34, height * .42, height * .2, 0, 0, Math.PI * 2); context.fill();
-    context.beginPath(); context.arc(height * .4, -height * .48, height * .16, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = profile.color; context.lineWidth = 4; context.beginPath(); context.moveTo(-height * .36, -height * .42); context.quadraticCurveTo(-height * .62, -height * .7, -height * .52, -height * .82); context.stroke();
-    context.strokeStyle = "#2b2823"; context.lineWidth = 3; [-.2, .2].forEach((offset) => { context.beginPath(); context.moveTo(height * offset, -height * .22); context.lineTo(height * offset - 2, 0); context.stroke(); });
-  } else {
-    const crouch = state.player.crouch ? .66 : 1;
-    context.scale(1, crouch);
-    context.fillStyle = "rgba(0,0,0,.28)"; context.beginPath(); context.ellipse(0, 0, 19, 5, 0, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = profile.color; context.lineCap = "round"; context.lineWidth = Math.max(6, height * profile.shoulder * .22);
-    const swing = Math.sin(state.player.step) * 8;
-    context.beginPath(); context.moveTo(-5, -height * .35); context.lineTo(-7 + swing, -2); context.moveTo(5, -height * .35); context.lineTo(7 - swing, -2); context.stroke();
-    context.fillStyle = profile.color; context.beginPath(); context.moveTo(-height * profile.shoulder * .55, -height * .72); context.lineTo(height * profile.shoulder * .55, -height * .72); context.lineTo(height * .2, -height * .28); context.lineTo(-height * .2, -height * .28); context.closePath(); context.fill();
-    context.beginPath(); context.arc(0, -height * .86, height * profile.head, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = profile.color; context.lineWidth = 5; context.beginPath(); context.moveTo(-height * .14, -height * .64); context.lineTo(-height * .31, -height * .39 + swing * .5); context.moveTo(height * .14, -height * .64); context.lineTo(height * .31, -height * .39 - swing * .5); context.stroke();
-  }
+  if (profile.animal) DrawDogActor(profile, height);
+  else DrawHumanActor(profile, roleId, height);
   context.restore();
-  context.fillStyle = "rgba(9,13,14,.82)"; context.fillRect(x - 31, baseY + 8, 62, 17);
-  context.fillStyle = "#edf1e9"; context.font = "600 11px system-ui"; context.textAlign = "center"; context.fillText(roleDefinitions[state.selectedRole].short, x, baseY + 20); context.textAlign = "left";
+  DrawActorIdentity(profile, role, x, baseY, height);
 }
 
 function DrawSurfaceVegetation(width, height, surfaceY) {

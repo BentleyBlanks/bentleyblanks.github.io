@@ -285,11 +285,15 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #roleDock { left: 24px; bottom: 76px; width: auto; max-width: calc(100% - 48px); padding: 0; background: transparent; border: 0; filter: drop-shadow(0 4px 12px rgba(0,0,0,.62)); }
 #roleDock > small { display: none; }
 #roleButtons { display: flex; gap: 6px; }
-#roleButtons button { width: auto; min-width: 48px; min-height: 34px; padding: 5px 9px 5px 19px; overflow: hidden; text-align: center; background: rgba(8,13,15,.58); border: 1px solid rgba(236,239,226,.15); border-radius: 19px; backdrop-filter: blur(4px); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+#roleButtons button { position: relative; display: flex; width: auto; min-width: 72px; min-height: 42px; align-items: center; padding: 5px 10px 5px 37px; overflow: hidden; text-align: left; background: rgba(8,13,15,.68); border: 1px solid rgba(236,239,226,.17); border-radius: 22px; backdrop-filter: blur(4px); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
 #roleButtons button.active { color: #172326; background: rgba(236,232,214,.94); border-color: #fffbed; transform: translateY(-2px); }
-.roleDot { top: 50%; left: 8px; width: 7px; height: 7px; transform: translateY(-50%); border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.13); }
-#roleButtons b { display: block; font-size: 9px; white-space: nowrap; }
-#roleButtons small { display: none; }
+.rolePortrait { position: absolute; top: 50%; left: 7px; display: grid; width: 25px; height: 29px; place-items: end center; overflow: hidden; background: linear-gradient(155deg, color-mix(in srgb, var(--role) 78%, white), var(--role)); border: 1px solid rgba(255,255,255,.34); border-radius: 12px 12px 8px 8px; box-shadow: inset 0 -8px 0 color-mix(in srgb, var(--accent) 76%, transparent), 0 2px 6px rgba(0,0,0,.38); transform: translateY(-50%); }
+.rolePortrait::before { content: ""; position: absolute; top: 4px; width: 9px; height: 9px; background: rgba(236,208,176,.92); border-radius: 50%; box-shadow: 0 8px 0 4px var(--role); }
+.rolePortrait i { position: relative; z-index: 1; margin-bottom: 1px; color: #fff8e8; font: 900 7px/1 system-ui; font-style: normal; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+.roleCopy { display: block; min-width: 0; }
+#roleButtons b { display: block; font-size: 10px; white-space: nowrap; }
+#roleButtons small { display: block; max-width: 94px; margin-top: 2px; overflow: hidden; color: rgba(225,229,218,.56); font-size: 6px; white-space: nowrap; text-overflow: ellipsis; }
+#roleButtons button.active small { color: rgba(29,42,42,.62); }
 
 #interactionPrompt { bottom: 78px; min-width: 0; padding: 0; gap: 7px; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 4px 9px rgba(0,0,0,.72)); }
 #roleDock:not([hidden]) + #interactionPrompt { bottom: 124px; }
@@ -353,9 +357,10 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   .metricBar { left: 29px; right: 6px; }
   #roleDock { left: 10px; bottom: 61px; width: auto; max-width: 470px; padding: 0; }
   #roleButtons { display: flex; gap: 4px; }
-  #roleButtons button { min-width: 46px; min-height: 28px; padding: 3px 7px 3px 15px; }
-  .roleDot { left: 6px; top: 50%; width: 6px; height: 6px; }
-  #roleButtons b { font-size: 7px; }
+  #roleButtons button { min-width: 58px; min-height: 40px; padding: 4px 7px 4px 32px; }
+  .rolePortrait { left: 5px; width: 24px; height: 29px; }
+  #roleButtons b { font-size: 8px; }
+  #roleButtons small { display: none; }
   #interactionPrompt { bottom: 64px; min-width: 0; padding: 0; }
   #roleDock:not([hidden]) + #interactionPrompt { bottom: 96px; }
   #interactionPrompt kbd { width: 27px; height: 27px; font-size: 8px; }
