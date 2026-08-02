@@ -620,6 +620,11 @@ function WorldToScreen(x, width) {
   return width / 2 + (x - state.camera.x) * scale;
 }
 
+function LayerToScreen(x, width, parallax) {
+  const scale = width / (22 / state.camera.zoom);
+  return width / 2 + (x - state.camera.x * parallax) * scale;
+}
+
 function Draw() {
   const { width, height } = ResizeCanvas();
   const surfaceY = height * .48;
@@ -649,7 +654,7 @@ function DrawSky(width, height, surfaceY, daylight) {
     context.beginPath();
     context.moveTo(0, surfaceY);
     for (let x = 0; x <= width + 80; x += 80) {
-      const offset = state.camera.x * (4 + layer * 3);
+      const offset = state.camera.x * width * (.012 + layer * .009);
       const y = surfaceY * (.68 + layer * .07) + Math.sin((x + offset) * .012 + layer) * (15 + layer * 5);
       context.lineTo(x, y);
     }
@@ -659,9 +664,30 @@ function DrawSky(width, height, surfaceY, daylight) {
 }
 
 function DrawVillage(width, height, surfaceY) {
+  const rearHouses = [-15, -10.8, -6.7, -2.4, 2.1, 6.5, 10.9, 15.2];
+  context.save();
+  context.globalAlpha = .44;
+  rearHouses.forEach((worldX, index) => {
+    const screenX = LayerToScreen(worldX, width, .42);
+    const size = 38 + (index % 3) * 5;
+    const baseY = surfaceY - 34 - (index % 2) * 5;
+    context.fillStyle = "#505248";
+    context.fillRect(screenX - size * .58, baseY - size * .52, size * 1.16, size * .52);
+    context.fillStyle = "#343d3a";
+    context.beginPath(); context.moveTo(screenX - size * .72, baseY - size * .52); context.lineTo(screenX, baseY - size * .82); context.lineTo(screenX + size * .72, baseY - size * .52); context.closePath(); context.fill();
+  });
+  context.strokeStyle = "rgba(53,56,47,.52)"; context.lineWidth = 3;
+  for (let row = 0; row < 2; row += 1) {
+    const y = surfaceY - 17 - row * 13;
+    context.beginPath(); context.moveTo(0, y);
+    for (let x = 0; x <= width; x += 55) context.lineTo(x, y + Math.sin(x * .025 + row) * 3);
+    context.stroke();
+  }
+  context.restore();
+
   const houses = [-9, -5.2, -.2, 4.4, 8.3];
   houses.forEach((x, index) => {
-    const screenX = WorldToScreen(x, width);
+    const screenX = LayerToScreen(x, width, .76);
     const size = 55 + (index % 2) * 12;
     context.fillStyle = index % 2 ? "#6d5a48" : "#75604c";
     context.fillRect(screenX - size * .55, surfaceY - size * .72, size * 1.1, size * .72);
@@ -687,41 +713,118 @@ function DrawEarth(width, height, surfaceY, tunnelY) {
   }
   const halfHeight = TunnelHalfHeight(height);
   const samples = [];
-  for (let worldX = worldMin - 3; worldX <= worldMax + 3; worldX += .35) samples.push({ worldX, screenX: WorldToScreen(worldX, width), centerY: TunnelCenterYAt(worldX, tunnelY) });
+  for (let worldX = worldMin - 3; worldX <= worldMax + 3; worldX += .28) {
+    samples.push({ worldX, screenX: WorldToScreen(worldX, width), centerY: TunnelCenterYAt(worldX, tunnelY), halfHeight: TunnelHalfHeightAt(worldX, height) });
+  }
   context.beginPath();
-  samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY - halfHeight) : context.moveTo(point.screenX, point.centerY - halfHeight));
-  [...samples].reverse().forEach((point) => context.lineTo(point.screenX, point.centerY + halfHeight));
+  samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY - point.halfHeight) : context.moveTo(point.screenX, point.centerY - point.halfHeight));
+  [...samples].reverse().forEach((point) => context.lineTo(point.screenX, point.centerY + point.halfHeight));
   context.closePath();
   context.fillStyle = "#111819"; context.fill();
   context.strokeStyle = "rgba(204,158,94,.42)"; context.lineWidth = 3; context.lineJoin = "round"; context.stroke();
 
+  DrawTunnelDepth(width, height, tunnelY);
+
   context.strokeStyle = "rgba(225,190,126,.25)"; context.lineWidth = 2;
-  context.beginPath(); samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY + halfHeight - 5) : context.moveTo(point.screenX, point.centerY + halfHeight - 5)); context.stroke();
+  context.beginPath(); samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY + point.halfHeight - 5) : context.moveTo(point.screenX, point.centerY + point.halfHeight - 5)); context.stroke();
 
   context.strokeStyle = "#795a37"; context.lineWidth = Math.max(4, height * .006); context.lineCap = "round";
-  for (let worldX = -10; worldX <= 10; worldX += 2) {
+  for (let worldX = -10; worldX <= 10; worldX += 1.8) {
     const screenX = WorldToScreen(worldX, width);
     if (screenX < -30 || screenX > width + 30 || entrances.some((entrance) => Math.abs(entrance - worldX) < .75)) continue;
     const centerY = TunnelCenterYAt(worldX, tunnelY);
-    const top = centerY - halfHeight + 7;
-    const floor = centerY + halfHeight - 6;
+    const localHalfHeight = TunnelHalfHeightAt(worldX, height);
+    const top = centerY - localHalfHeight + 7;
+    const floor = centerY + localHalfHeight - 6;
     context.beginPath(); context.moveTo(screenX, floor); context.lineTo(screenX, top + 7); context.moveTo(screenX - 15, top + 6); context.lineTo(screenX + 15, top + 6); context.stroke();
     context.strokeStyle = "rgba(183,132,76,.5)"; context.lineWidth = 2; context.beginPath(); context.moveTo(screenX + 5, floor); context.lineTo(screenX + 5, top + 8); context.stroke();
     context.strokeStyle = "#795a37"; context.lineWidth = Math.max(4, height * .006);
   }
+
+  DrawTunnelProps(width, height, tunnelY);
 }
 
 function TunnelOffsetAt(worldX) {
-  if (worldX <= -6) return 2;
-  if (worldX < -4) return Lerp(2, -18, (worldX + 6) / 2);
-  if (worldX <= 2) return -18;
-  if (worldX < 4) return Lerp(-18, 10, (worldX - 2) / 2);
-  return 10;
+  if (worldX <= -8.2) return 10;
+  if (worldX < -6.2) return Lerp(10, -5, (worldX + 8.2) / 2);
+  if (worldX < -4.7) return Lerp(-5, -24, (worldX + 6.2) / 1.5);
+  if (worldX <= -1.2) return -24;
+  if (worldX < .8) return Lerp(-24, -8, (worldX + 1.2) / 2);
+  if (worldX < 2.8) return Lerp(-8, 14, (worldX - .8) / 2);
+  if (worldX <= 5.8) return 14;
+  if (worldX < 7.6) return Lerp(14, 4, (worldX - 5.8) / 1.8);
+  return 4;
 }
 
 function TunnelCenterYAt(worldX, tunnelY) { return tunnelY + TunnelOffsetAt(worldX); }
 function TunnelHalfHeight(height) { return Math.max(42, Math.min(64, height * .085)); }
-function TunnelFloorYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) + TunnelHalfHeight(height) - 6; }
+function TunnelHalfHeightAt(worldX, height) {
+  const base = TunnelHalfHeight(height);
+  const westernChamber = Math.max(0, 1 - Math.abs(worldX + 8.4) / 1.5) * 15;
+  const meetingChamber = Math.max(0, 1 - Math.abs(worldX - .1) / 1.8) * 18;
+  const refugeChamber = Math.max(0, 1 - Math.abs(worldX - 7.1) / 1.45) * 14;
+  const shortBend = Math.max(0, 1 - Math.abs(worldX + 5.15) / .72) * 11;
+  return base + westernChamber + meetingChamber + refugeChamber - shortBend;
+}
+function TunnelFloorYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) + TunnelHalfHeightAt(worldX, height) - 6; }
+function TunnelCeilingYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) - TunnelHalfHeightAt(worldX, height) + 6; }
+
+function DrawTunnelDepth(width, height, tunnelY) {
+  const branches = [
+    { x: -8.45, width: 1.25, height: 47 },
+    { x: .15, width: 1.55, height: 55 },
+    { x: 7.15, width: 1.3, height: 50 }
+  ];
+  branches.forEach((branch, branchIndex) => {
+    const x = LayerToScreen(branch.x, width, .92);
+    const floorY = TunnelFloorYAt(branch.x, height, tunnelY) - 5;
+    const branchWidth = width / 22 * branch.width;
+    const topY = floorY - branch.height;
+    const shade = context.createLinearGradient(x, floorY, x, topY);
+    shade.addColorStop(0, "rgba(35,48,47,.92)"); shade.addColorStop(1, "rgba(19,27,29,.96)");
+    context.fillStyle = shade;
+    context.beginPath(); context.moveTo(x - branchWidth * .58, floorY); context.lineTo(x - branchWidth * .44, topY + 10); context.quadraticCurveTo(x, topY - 12, x + branchWidth * .44, topY + 10); context.lineTo(x + branchWidth * .58, floorY); context.closePath(); context.fill();
+    for (let frame = 0; frame < 3; frame += 1) {
+      const inset = frame * branchWidth * .12;
+      context.strokeStyle = `rgba(152,112,69,${.45 - frame * .1})`; context.lineWidth = Math.max(2, 5 - frame);
+      context.beginPath(); context.moveTo(x - branchWidth * .5 + inset, floorY - frame * 4); context.lineTo(x - branchWidth * .38 + inset, topY + 12 + frame * 5); context.quadraticCurveTo(x, topY - 7 + frame * 5, x + branchWidth * .38 - inset, topY + 12 + frame * 5); context.lineTo(x + branchWidth * .5 - inset, floorY - frame * 4); context.stroke();
+    }
+    context.fillStyle = branchIndex === 1 ? "rgba(202,166,92,.23)" : "rgba(89,157,150,.12)";
+    context.beginPath(); context.ellipse(x, floorY - 8, branchWidth * .34, 7, 0, 0, Math.PI * 2); context.fill();
+  });
+
+  context.strokeStyle = "rgba(111,139,127,.14)"; context.lineWidth = 7;
+  context.beginPath();
+  for (let worldX = -11; worldX <= 11; worldX += .4) {
+    const x = LayerToScreen(worldX, width, .96);
+    const y = TunnelCeilingYAt(worldX, height, tunnelY) + 13;
+    worldX === -11 ? context.moveTo(x, y) : context.lineTo(x, y);
+  }
+  context.stroke();
+}
+
+function DrawTunnelProps(width, height, tunnelY) {
+  const props = [
+    { x: -9.25, kind: "basket" }, { x: -2.45, kind: "crate" }, { x: 1.15, kind: "lamp" }, { x: 6.45, kind: "jars" }
+  ];
+  props.forEach((prop) => {
+    const x = WorldToScreen(prop.x, width);
+    const floorY = TunnelFloorYAt(prop.x, height, tunnelY) - 5;
+    if (prop.kind === "basket") {
+      context.fillStyle = "#725439"; context.beginPath(); context.ellipse(x, floorY - 7, 12, 7, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#a47a4b"; context.lineWidth = 2; context.beginPath(); context.arc(x, floorY - 8, 9, Math.PI, Math.PI * 2); context.stroke();
+    } else if (prop.kind === "crate") {
+      context.fillStyle = "#60452f"; context.fillRect(x - 12, floorY - 18, 24, 18); context.strokeStyle = "#9b7144"; context.lineWidth = 2; context.strokeRect(x - 12, floorY - 18, 24, 18); context.beginPath(); context.moveTo(x - 10, floorY - 16); context.lineTo(x + 10, floorY - 2); context.stroke();
+    } else if (prop.kind === "lamp") {
+      context.fillStyle = "rgba(224,172,76,.18)"; context.beginPath(); context.arc(x, floorY - 23, 25, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#d4a657"; context.beginPath(); context.arc(x, floorY - 20, 4, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#83613c"; context.lineWidth = 2; context.beginPath(); context.moveTo(x, floorY - 16); context.lineTo(x, floorY); context.stroke();
+    } else {
+      context.fillStyle = "#70513c"; context.beginPath(); context.ellipse(x - 7, floorY - 8, 7, 9, 0, 0, Math.PI * 2); context.ellipse(x + 7, floorY - 6, 6, 7, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#a77e54"; context.lineWidth = 2; context.beginPath(); context.moveTo(x - 12, floorY - 12); context.lineTo(x - 2, floorY - 12); context.moveTo(x + 2, floorY - 10); context.lineTo(x + 12, floorY - 10); context.stroke();
+    }
+  });
+}
 
 function DrawFlowArrow(screenX, screenY, direction, color, alpha = 1) {
   context.save(); context.translate(screenX, screenY); context.scale(direction, 1); context.globalAlpha = alpha;
@@ -732,12 +835,11 @@ function DrawFlowArrow(screenX, screenY, direction, color, alpha = 1) {
 
 function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
   if (state.levelIndex !== 0) return;
-  const halfHeight = TunnelHalfHeight(height);
   const intakeX = -5.6;
   const exhaustX = 4.6;
   for (const [worldX, kind] of [[intakeX, "intake"], [exhaustX, "exhaust"]]) {
     const screenX = WorldToScreen(worldX, width);
-    const ceilingY = TunnelCenterYAt(worldX, tunnelY) - halfHeight;
+    const ceilingY = TunnelCeilingYAt(worldX, height, tunnelY) - 6;
     context.fillStyle = "#172224"; context.fillRect(screenX - 8, surfaceY - 2, 16, ceilingY - surfaceY + 10);
     context.strokeStyle = "#765a3d"; context.lineWidth = 3;
     context.beginPath(); context.moveTo(screenX - 9, surfaceY); context.lineTo(screenX - 9, ceilingY + 10); context.moveTo(screenX + 9, surfaceY); context.lineTo(screenX + 9, ceilingY + 10); context.stroke();
@@ -768,12 +870,13 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
     const worldX = slotWorldXs[slotIndex];
     const screenX = WorldToScreen(worldX, width);
     const centerY = TunnelCenterYAt(worldX, tunnelY);
+    const localHalfHeight = TunnelHalfHeightAt(worldX, height);
     const floorY = TunnelFloorYAt(worldX, height, tunnelY);
     if (slotId === "flipGate") {
       context.strokeStyle = "#b3834e"; context.lineWidth = 5; context.beginPath(); context.moveTo(screenX - 18, floorY - 4); context.lineTo(screenX + 18, floorY - 4); context.stroke();
       context.fillStyle = "#d8aa61"; context.beginPath(); context.arc(screenX - 16, floorY - 4, 4, 0, Math.PI * 2); context.fill();
     } else if (slotId === "smokeBaffle") {
-      context.fillStyle = "#8f7049"; context.beginPath(); context.moveTo(screenX - 4, centerY - halfHeight + 10); context.lineTo(screenX + 17, centerY - 8); context.lineTo(screenX + 8, centerY - 4); context.lineTo(screenX - 10, centerY - halfHeight + 16); context.closePath(); context.fill();
+      context.fillStyle = "#8f7049"; context.beginPath(); context.moveTo(screenX - 4, centerY - localHalfHeight + 10); context.lineTo(screenX + 17, centerY - 8); context.lineTo(screenX + 8, centerY - 4); context.lineTo(screenX - 10, centerY - localHalfHeight + 16); context.closePath(); context.fill();
       DrawFlowArrow(screenX + 10, centerY - 24, 1, "#75d7d7", .9);
     } else if (slotId === "floodGate") {
       context.fillStyle = "#775b3c"; context.fillRect(screenX - 6, centerY - 25, 12, floorY - centerY + 21);
@@ -806,7 +909,7 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
       if (hasBaffle && progress > .66) {
         const rise = (progress - .66) / .34;
         worldX = exhaustX + Math.sin(index * 2.3 + state.elapsed * 1.7) * .08;
-        const tunnelMouthY = TunnelCenterYAt(exhaustX, tunnelY) - halfHeight + 8;
+        const tunnelMouthY = TunnelCeilingYAt(exhaustX, height, tunnelY) + 2;
         y = Lerp(tunnelMouthY, surfaceY - 52, rise);
       } else {
         const run = hasBaffle ? progress / .66 : progress;
@@ -850,26 +953,47 @@ function DrawActions(width, height, surfaceY, tunnelY) {
 }
 
 function DrawEntrances(width, height, surfaceY, tunnelY) {
-  const halfHeight = TunnelHalfHeight(height);
   entrances.forEach((entrance, index) => {
     const x = WorldToScreen(entrance, width);
-    const shaftBottom = TunnelCenterYAt(entrance, tunnelY) - halfHeight + 16;
+    const shaftBottom = TunnelCeilingYAt(entrance, height, tunnelY) + 16;
     const shaftHalf = index === 0 ? 16 : 20;
     const nearby = Math.abs(state.player.x - entrance) < 1.15;
-    context.fillStyle = "#101819";
+    const shaftShade = context.createLinearGradient(x - shaftHalf, 0, x + shaftHalf, 0);
+    shaftShade.addColorStop(0, "#0b1112"); shaftShade.addColorStop(.5, "#1b2726"); shaftShade.addColorStop(1, "#080d0f");
+    context.fillStyle = shaftShade;
     context.beginPath(); context.moveTo(x - shaftHalf, surfaceY - 1); context.lineTo(x + shaftHalf, surfaceY - 1); context.lineTo(x + shaftHalf + 5, shaftBottom); context.lineTo(x - shaftHalf - 5, shaftBottom); context.closePath(); context.fill();
+    context.fillStyle = "rgba(151,105,62,.24)";
+    context.beginPath(); context.moveTo(x - shaftHalf - 7, surfaceY + 3); context.lineTo(x - shaftHalf - 2, surfaceY + 3); context.lineTo(x - shaftHalf - 7, shaftBottom); context.lineTo(x - shaftHalf - 13, shaftBottom); context.closePath(); context.fill();
+    context.beginPath(); context.moveTo(x + shaftHalf + 2, surfaceY + 3); context.lineTo(x + shaftHalf + 7, surfaceY + 3); context.lineTo(x + shaftHalf + 13, shaftBottom); context.lineTo(x + shaftHalf + 7, shaftBottom); context.closePath(); context.fill();
     context.strokeStyle = nearby ? "rgba(98,207,213,.78)" : "rgba(177,132,78,.58)"; context.lineWidth = nearby ? 3 : 2;
     context.beginPath(); context.moveTo(x - shaftHalf, surfaceY); context.lineTo(x - shaftHalf - 5, shaftBottom); context.moveTo(x + shaftHalf, surfaceY); context.lineTo(x + shaftHalf + 5, shaftBottom); context.stroke();
-    context.strokeStyle = "#9b7548"; context.lineWidth = 3;
-    context.beginPath(); context.moveTo(x - 8, surfaceY + 10); context.lineTo(x - 8, shaftBottom - 5); context.moveTo(x + 8, surfaceY + 10); context.lineTo(x + 8, shaftBottom - 5); context.stroke();
-    context.lineWidth = 2;
-    for (let y = surfaceY + 16; y < shaftBottom - 4; y += 12) { context.beginPath(); context.moveTo(x - 8, y); context.lineTo(x + 8, y); context.stroke(); }
+    context.strokeStyle = "rgba(38,26,19,.72)"; context.lineWidth = 6;
+    context.beginPath(); context.moveTo(x - 7, surfaceY + 10); context.lineTo(x - 9, shaftBottom - 5); context.moveTo(x + 9, surfaceY + 10); context.lineTo(x + 7, shaftBottom - 5); context.stroke();
+    context.strokeStyle = "#9b7548"; context.lineWidth = 4;
+    context.beginPath(); context.moveTo(x - 8, surfaceY + 10); context.lineTo(x - 10, shaftBottom - 5); context.moveTo(x + 8, surfaceY + 10); context.lineTo(x + 6, shaftBottom - 5); context.stroke();
+    context.strokeStyle = "rgba(226,177,105,.42)"; context.lineWidth = 1;
+    context.beginPath(); context.moveTo(x - 7, surfaceY + 11); context.lineTo(x - 9, shaftBottom - 6); context.moveTo(x + 9, surfaceY + 11); context.lineTo(x + 7, shaftBottom - 6); context.stroke();
+    for (let y = surfaceY + 16; y < shaftBottom - 4; y += 12) {
+      context.strokeStyle = "rgba(44,28,18,.78)"; context.lineWidth = 5; context.beginPath(); context.moveTo(x - 9, y + 2); context.lineTo(x + 9, y + 2); context.stroke();
+      context.strokeStyle = "#a67b48"; context.lineWidth = 3; context.beginPath(); context.moveTo(x - 9, y); context.lineTo(x + 9, y); context.stroke();
+    }
+    context.strokeStyle = "#755436"; context.lineWidth = 5;
+    context.beginPath(); context.moveTo(x - shaftHalf - 8, shaftBottom); context.lineTo(x + shaftHalf + 8, shaftBottom); context.stroke();
+    context.strokeStyle = "rgba(190,139,78,.46)"; context.lineWidth = 2;
+    for (let y = surfaceY + 30; y < shaftBottom - 18; y += 34) {
+      context.beginPath(); context.moveTo(x - shaftHalf - 7, y); context.lineTo(x - shaftHalf + 1, y + 10); context.moveTo(x + shaftHalf + 7, y); context.lineTo(x + shaftHalf - 1, y + 10); context.stroke();
+    }
     if (index === 0) {
       context.fillStyle = "#6f5135"; context.fillRect(x - 23, surfaceY - 7, 46, 8);
       context.strokeStyle = "rgba(218,174,105,.56)"; context.lineWidth = 2; context.strokeRect(x - 23, surfaceY - 7, 46, 8);
+      context.strokeStyle = "rgba(42,27,18,.7)"; context.lineWidth = 1;
+      [-12, 0, 12].forEach((plankX) => { context.beginPath(); context.moveTo(x + plankX, surfaceY - 6); context.lineTo(x + plankX, surfaceY); context.stroke(); });
+      context.strokeStyle = "#b58a52"; context.lineWidth = 2; context.beginPath(); context.arc(x + 14, surfaceY - 4, 3, 0, Math.PI * 2); context.stroke();
     } else {
       context.fillStyle = "#2d3028"; context.beginPath(); context.ellipse(x, surfaceY - 1, 27, 9, 0, 0, Math.PI * 2); context.fill();
       context.strokeStyle = "#8c6a45"; context.lineWidth = 6; context.beginPath(); context.ellipse(x, surfaceY - 3, 27, 9, 0, 0, Math.PI * 2); context.stroke();
+      context.strokeStyle = "rgba(205,162,96,.52)"; context.lineWidth = 2;
+      for (let segment = 0; segment < 6; segment += 1) { context.beginPath(); context.ellipse(x, surfaceY - 3, 27, 9, 0, segment * Math.PI / 3 + .08, segment * Math.PI / 3 + .82); context.stroke(); }
     }
     context.strokeStyle = nearby ? "rgba(111,225,226,.95)" : "rgba(92,188,196,.48)"; context.lineWidth = 2;
     context.beginPath(); context.arc(x, surfaceY - 18, nearby ? 10 : 7, 0, Math.PI * 2); context.stroke();
@@ -947,7 +1071,7 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
   context.fillStyle = "rgba(43,47,34,.72)";
   context.lineCap = "round";
   for (let clumpIndex = 0; clumpIndex < clumps.length; clumpIndex += 1) {
-    const baseX = WorldToScreen(clumps[clumpIndex], width);
+    const baseX = LayerToScreen(clumps[clumpIndex], width, .9);
     for (let stemIndex = 0; stemIndex < 4; stemIndex += 1) {
       const offset = (stemIndex - 1.5) * 5;
       const stemHeight = 10 + ((clumpIndex * 7 + stemIndex * 5) % 15);
@@ -963,6 +1087,33 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
         context.fill();
       }
     }
+  }
+  context.restore();
+
+  context.save();
+  context.strokeStyle = "rgba(18,24,21,.78)"; context.fillStyle = "rgba(23,29,24,.76)"; context.lineCap = "round";
+  const foregroundClumps = [-13, -9.3, -5.4, -1.2, 3.4, 7.7, 12.1];
+  foregroundClumps.forEach((worldX, clumpIndex) => {
+    const baseX = LayerToScreen(worldX, width, 1.16);
+    for (let stemIndex = 0; stemIndex < 5; stemIndex += 1) {
+      const offset = (stemIndex - 2) * 8;
+      const stemHeight = 24 + ((clumpIndex * 9 + stemIndex * 7) % 30);
+      const sway = Math.sin(state.elapsed * .55 + clumpIndex + stemIndex) * 3;
+      context.lineWidth = 2.5;
+      context.beginPath(); context.moveTo(baseX + offset, surfaceY + 5); context.quadraticCurveTo(baseX + offset + sway, surfaceY - stemHeight * .55, baseX + offset + sway * 1.4, surfaceY - stemHeight); context.stroke();
+      if (stemIndex % 2 === 0) { context.beginPath(); context.ellipse(baseX + offset + sway + 3, surfaceY - stemHeight * .66, 7, 2.5, -.5, 0, Math.PI * 2); context.fill(); }
+    }
+  });
+
+  if (state.player.layer === "tunnel") {
+    const floorSamples = [];
+    for (let worldX = worldMin - 3; worldX <= worldMax + 3; worldX += .45) {
+      floorSamples.push({ x: LayerToScreen(worldX, width, 1.07), y: TunnelFloorYAt(worldX, height, height * .76) + 9 + Math.sin(worldX * 2.1) * 3 });
+    }
+    context.fillStyle = "rgba(10,14,15,.42)";
+    context.beginPath(); context.moveTo(0, height);
+    floorSamples.forEach((point) => context.lineTo(point.x, point.y));
+    context.lineTo(width, height); context.closePath(); context.fill();
   }
   context.restore();
   const vignette = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .2, width / 2, height / 2, Math.max(width, height) * .68);

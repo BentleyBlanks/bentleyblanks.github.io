@@ -65,6 +65,8 @@ Assert(!game.includes(`document.querySelectorAll('[data-input="left"], [data-inp
 Assert(html.includes('data-input="crouch" type="button" aria-pressed="false"') && css.includes('[data-input="crouch"][aria-pressed="true"]'), "蹲伏开关缺少可访问状态或视觉反馈");
 Assert(game.includes("function DrawSurfaceVegetation") && !game.includes("context.moveTo(x, height)"), "仍存在贯穿整个土层的前景竖线");
 Assert(game.includes("TunnelCenterYAt") && game.includes("TunnelFloorYAt") && game.includes("DrawEntrances(width, height") && game.includes("DrawTunnelSystems"), "地道剖面、人物落地或实体竖井系统缺失");
+Assert(game.includes("function LayerToScreen") && game.includes("LayerToScreen(x, width, .76)") && game.includes("LayerToScreen(worldX, width, 1.16)"), "远山、村庄、玩法层与前景没有建立不同视差");
+Assert(game.includes("TunnelHalfHeightAt") && game.includes("DrawTunnelDepth") && game.includes("DrawTunnelProps") && game.includes('kind: "basket"') && game.includes('kind: "lamp"'), "地道仍是单根走廊，缺少高低差、支洞纵深与生活道具");
 Assert(game.includes('state.buildSlots.includes("floodGate")') && game.includes('state.buildSlots.includes("smokeBaffle")') && game.includes("DrawFlowArrow"), "水流、烟流或气流可视化缺失");
 Assert(game.includes("GetEnemyPatrols") && game.includes("GetDetectionStrength") && game.includes("EnemyDetection(enemy) > 0") && game.includes("state.detection"), "敌兵警戒绘制与实际侦测规则没有共用数据");
 Assert(data.includes("这根是干的。轻点") && data.includes("跟紧我") && data.includes("等他们跑到空坡") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
