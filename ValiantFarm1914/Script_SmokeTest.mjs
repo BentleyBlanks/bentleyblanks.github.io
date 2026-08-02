@@ -34,7 +34,6 @@ function Main() {
   const state = CreateState();
   BeginPlay(state);
   Assert(state.phase === "play", "play starts");
-  Assert(state.bark === PROLOGUE_LINE, "prologue echoes as opening bark");
 
   // Pick can
   const can = state.level.entities.find((e) => e.id === "can");

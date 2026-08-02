@@ -736,7 +736,7 @@ export function BeginPlay(state) {
   const next = CreateState();
   next.phase = "play";
   next.cameraX = 0;
-  SetBark(next, PROLOGUE_LINE, 3.6);
+  SetBark(next, "Tin can on the crate. Walt waits by the barn.", 3.2);
   Object.assign(state, next);
   return state;
 }
