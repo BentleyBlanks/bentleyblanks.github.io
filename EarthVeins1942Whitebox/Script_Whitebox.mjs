@@ -1,4 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803c";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803n";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803n";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803n";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -10,7 +12,9 @@ const ui = Object.fromEntries([
   "buildFeedback", "buildCancel", "levelComplete", "completeTitle", "completeSummary", "completeLedger", "replayButton",
   "nextLevelButton", "completeLevelsButton", "touchControls", "toast", "cinematicBars", "cinematicCaption",
   "cinematicLabel", "cinematicSpeaker", "cinematicText", "cinematicProgress", "skipCinematic"
-  , "qaPanel", "qaLevelButtons", "qaPhaseButtons", "qaStateReadout"
+  , "civilianCommandPanel", "civilianGroupButtons", "civilianShelterButtons", "civilianStatus"
+  , "missionFailure", "failureTitle", "failureSummary", "failureLedger", "failureReplayButton", "failureQaButton"
+  , "qaPanel", "qaLevelButtons", "qaPhaseButtons", "qaHazardButtons", "qaStateReadout"
 ].map((id) => [id, document.querySelector(`#${id}`)]));
 
 const qaMode = new URLSearchParams(location.search).get("qa") === "1";
@@ -21,10 +25,26 @@ const entrances = [-1.1, 8.6];
 const requiredCollect = ["collectWood", "collectIron", "collectPowder", "collectSupplies"];
 const requiredRescues = ["wounded", "grain", "courier"];
 const inputKeys = { left: false, right: false };
+const fluidCanvas = document.createElement("canvas");
+const fluidContext = fluidCanvas.getContext("2d");
+const lightRenderer = CreateSdfLightRenderer({ resolutionScale: .52, rayCount: 184 });
 let selectedLevel = startingLevel;
 let lastTime = performance.now();
 let toastTimer = 0;
 let state = CreateState(startingLevel);
+
+function CreateCivilians() {
+  return [
+    { id: "elderYu", name: "于大娘", group: "elders", x: -1.1, targetX: -1.1, smokeDose: 0, waterDose: 0, pace: 1.05, mark: "老" },
+    { id: "elderGao", name: "高叔", group: "elders", x: -.7, targetX: -.7, smokeDose: 0, waterDose: 0, pace: .96, mark: "老" },
+    { id: "wounded", name: "伤员小周", group: "stretcher", x: .05, targetX: .05, smokeDose: 0, waterDose: 0, pace: .72, mark: "伤" },
+    { id: "medic", name: "赵禾", group: "stretcher", x: .5, targetX: .5, smokeDose: 0, waterDose: 0, pace: .82, mark: "护" },
+    { id: "childAn", name: "小安", group: "children", x: 1.1, targetX: 1.1, smokeDose: 0, waterDose: 0, pace: 1.35, mark: "童" },
+    { id: "childShi", name: "石头", group: "children", x: 1.45, targetX: 1.45, smokeDose: 0, waterDose: 0, pace: 1.42, mark: "童" },
+    { id: "mother", name: "石头娘", group: "children", x: 1.8, targetX: 1.8, smokeDose: 0, waterDose: 0, pace: 1.08, mark: "母" },
+    { id: "signalman", name: "钟有田", group: "elders", x: -1.5, targetX: -1.5, smokeDose: 0, waterDose: 0, pace: 1.02, mark: "钟" }
+  ];
+}
 
 function CreateState(levelIndex) {
   const level = levelDefinitions[levelIndex];
@@ -38,7 +58,16 @@ function CreateState(levelIndex) {
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
     buildSlots: [null, null, null],
-    defense: { ventilation: 0, strength: 0, enemyUnits: 6, triggered: 0 },
+    excavated: new Set(),
+    defense: { ventilation: 0, strength: 0, enemyUnits: 8, triggered: 0, activeSlots: new Set() },
+    prepRemaining: levelIndex === 0 ? 92 : null,
+    raid: { active: false, elapsed: 0, duration: 72, stage: "准备", announcedStage: null, smokeKnown: false, waterKnown: false },
+    civilians: levelIndex === 0 ? CreateCivilians() : [],
+    selectedCivilianGroup: "elders",
+    missionFailure: null,
+    cleanCapture: false,
+    fluid: levelIndex === 0 ? CreateTunnelFluidSimulation({ columns: 152, rows: 58 }) : null,
+    fluidAccumulator: 0,
     rescues: { wounded: false, grain: false, courier: false },
     memories: [],
     visibility: 0,
@@ -97,10 +126,12 @@ function StartLevel(levelIndex) {
   Show(ui.levelPanel, false);
   Show(ui.guidePanel, false);
   Show(ui.levelComplete, false);
+  Show(ui.missionFailure, false);
   Show(ui.gameHeader);
   Show(ui.objectiveCard);
   Show(ui.metricsPanel);
   Show(ui.roleDock, state.level.roleIds.length > 1);
+  Show(ui.civilianCommandPanel, false);
   ui.levelNumber.textContent = state.level.number;
   ui.levelName.textContent = state.level.title;
   RenderRoleDock();
@@ -143,6 +174,7 @@ function SelectRole(roleId) {
 }
 
 function ActorActionKind(action) {
+  if (action.excavate) return "work";
   if (["liftHatch", "unbarGate", "moveGrain", "closeSurfaceGate"].includes(action.id)) return "lift";
   if (["collectWood", "collectIron", "repairCamo", "triggerSlotA", "triggerSlotB", "triggerSlotC"].includes(action.id)) return "work";
   if (["markPatrol", "freeCourier", "routeHorn", "findLetter", "findThimble", "inventoryCapture"].includes(action.id)) return "inspect";
@@ -213,10 +245,10 @@ function PerformAction() {
   if (action.phaseGate) {
     if (state.buildSlots.some((slot) => !slot)) return Toast("三处机关位还没有全部完工。", "warning");
     if (state.defense.ventilation < 3) return Toast("通风不足 3：烟会先伤到地道里的乡亲。请重建一处机关。", "warning");
-    if (state.defense.strength < 4) return Toast("防御不足 4：还无法安全分割六人小队。", "warning");
+    if (state.defense.strength < 4) return Toast("防御不足 4：还无法安全分割八人扫荡队。", "warning");
     state.completed.add(action.id);
     BeginActorAction({ id: "closeSurfaceGate" });
-    SetPhase("defense", "第二轮 · 扫荡入村", "他们进村了。照说好的，把人往空院领。", "队长");
+    StartRaid(false);
     return;
   }
   ApplyAction(action);
@@ -241,6 +273,7 @@ function ApplyAction(action) {
   if (action.effect === "enterTunnel") state.player.layer = "tunnel";
   if (action.rescue) state.rescues[action.rescue] = true;
   if (action.memory && !state.memories.includes(action.memory)) state.memories.push(action.memory);
+  if (action.excavate) state.excavated.add(action.excavate);
   if (action.trick) {
     state.tricks.add(action.id);
     state.alert = Math.min(100, state.alert + action.alert);
@@ -249,9 +282,13 @@ function ApplyAction(action) {
   if (action.panicStep) state.morale = Math.max(0, state.morale + action.morale);
   if (action.triggerSlot !== undefined) {
     state.defense.triggered += 1;
+    state.defense.activeSlots.add(action.triggerSlot);
     const built = buildOptions.find((option) => option.id === state.buildSlots[action.triggerSlot]);
     state.defense.enemyUnits = Math.max(0, state.defense.enemyUnits - Math.max(1, built?.defense || 1));
+    SyncFluidStructures();
   }
+  if (action.hazardScout === "smoke") state.raid.smokeKnown = true;
+  if (action.hazardScout === "water") state.raid.waterKnown = true;
   if (action.id === "captureIntel") state.nextRaid = "东堤 · 拂晓 · 两路合围";
   if (action.dialogue) OpenDialogue(action.dialogue, action.role ? roleDefinitions[action.role].name : roleDefinitions[state.selectedRole].name);
   EvaluateProgress(action);
@@ -262,8 +299,6 @@ function EvaluateProgress(action) {
   if (state.levelIndex === 0) {
     if (state.phaseId === "collect" && requiredCollect.every((id) => state.completed.has(id))) {
       SetPhase("build", "第一轮 · 天明", "东西齐了。先把风道通开，再安闸。人在下头，得先喘得上气。", "队长");
-    } else if (state.phaseId === "defense" && action.id === "triggerSlotC") {
-      SetPhase("outcome", "扫荡队撤离", "别追了。先挨个问一声，人都在不在。", "队长");
     }
   } else if (state.levelIndex === 1) {
     if (state.phaseId === "survey" && state.completed.has("markPatrol")) {
@@ -342,6 +377,169 @@ function RecalculateBuild() {
     state.defense.ventilation += option?.ventilation || 0;
     state.defense.strength += option?.defense || 0;
   }
+  SyncFluidStructures();
+}
+
+function SyncFluidStructures() {
+  if (!state.fluid) return;
+  const activeStructures = [0, 1, 2].map((slotIndex) => state.defense.activeSlots.has(slotIndex));
+  state.fluid.SetStructures(state.buildSlots, activeStructures, state.defense.ventilation);
+}
+
+function StartRaid(automatic) {
+  if (state.levelIndex !== 0 || state.raid.active || state.phaseId === "outcome") return;
+  state.prepRemaining = 0;
+  state.raid.active = true;
+  state.raid.elapsed = 0;
+  state.raid.stage = "敌兵入村";
+  state.raid.announcedStage = "敌兵入村";
+  state.player.x = Math.min(9.2, Math.max(-9.5, state.player.x));
+  SyncFluidStructures();
+  SetPhase("defense", automatic ? "准备时间到 · 扫荡入村" : "提前迎敌 · 扫荡入村",
+    automatic
+      ? "火把已经进村。没做完的来不及了，先把乡亲从烟水来路上调开。"
+      : "火把进村了。传宝盯地表，根生守机关，阿土听烟水。乡亲一个也不能少。",
+    "高传宝");
+}
+
+function RaidStageAt(elapsed) {
+  if (elapsed < 8) return "敌兵入村";
+  if (elapsed < 28) return "东口灌烟";
+  if (elapsed < 50) return "西井灌水";
+  if (elapsed < 66) return "两头掘口";
+  return "扫荡撤退";
+}
+
+function UpdateLevelOneSystems(delta) {
+  if (state.levelIndex !== 0 || !state.fluid || state.mode !== "play") return;
+  SyncFluidStructures();
+  if (["collect", "build"].includes(state.phaseId)) {
+    state.prepRemaining = Math.max(0, state.prepRemaining - delta);
+    if (state.phaseId === "build" && state.defense.ventilation > 0) {
+      state.fluid.Inject("tracer", -5.55, -.18, delta * .82, .24, 2.2, -.12);
+    }
+    if (state.prepRemaining <= 0) StartRaid(true);
+  }
+
+  if (state.raid.active && state.phaseId === "defense") {
+    state.raid.elapsed += delta;
+    const nextStage = RaidStageAt(state.raid.elapsed);
+    state.raid.stage = nextStage;
+    if (nextStage !== state.raid.announcedStage) {
+      state.raid.announcedStage = nextStage;
+      const warning = {
+        "东口灌烟": "东翻口开始灌烟——看烟流，不要把人留在东支洞。",
+        "西井灌水": "西井传来水声——把低处的人调开，根生去守水闸。",
+        "两头掘口": "两头都在掘口——机关要逐个闭合，群众继续向安全支洞移动。",
+        "扫荡撤退": "外头的脚步散了。再撑住几秒，先别开口。"
+      }[nextStage];
+      if (warning) Toast(warning, nextStage === "扫荡撤退" ? "success" : "warning");
+    }
+
+    const elapsed = state.raid.elapsed;
+    const hasEastBaffle = state.buildSlots[2] === "smokeBaffle" || state.buildSlots.includes("smokeBaffle");
+    const hasWestFloodGate = state.buildSlots[0] === "floodGate" || state.buildSlots.includes("floodGate");
+    if (elapsed >= 8 && elapsed < 58) {
+      const sourceStrength = hasEastBaffle && state.defense.activeSlots.has(2) ? .54 : 1;
+      state.fluid.Inject("smoke", 9.35, -.05, delta * 1.92 * sourceStrength, .42, -4.9, -.75);
+    }
+    if (elapsed >= 25 && elapsed < 66) {
+      const sourceStrength = hasWestFloodGate && state.defense.activeSlots.has(0) ? .5 : 1;
+      state.fluid.Inject("water", -9.45, .52, delta * 1.7 * sourceStrength, .36, 4.2, 2.1);
+    }
+    if (elapsed >= 45 && elapsed < 64) {
+      state.fluid.Inject("smoke", -9.4, .02, delta * .72, .34, 3.4, -.42);
+    }
+  }
+
+  state.fluidAccumulator = Math.min(.08, state.fluidAccumulator + delta);
+  let fluidSteps = 0;
+  while (state.fluidAccumulator >= 1 / 60 && fluidSteps < 4) {
+    state.fluid.Step(1 / 60);
+    state.fluidAccumulator -= 1 / 60;
+    fluidSteps += 1;
+  }
+  UpdateCivilians(delta);
+
+  if (state.raid.active && state.phaseId === "defense" && state.raid.elapsed >= state.raid.duration && !state.missionFailure) {
+    state.raid.active = false;
+    Show(ui.civilianCommandPanel, false);
+    SetPhase("outcome", "扫荡队撤离", "先别开口。挨个点名，听见自己名字就应一声。", "高传宝");
+  }
+}
+
+function UpdateCivilians(delta) {
+  for (const civilian of state.civilians) {
+    const difference = civilian.targetX - civilian.x;
+    if (Math.abs(difference) > .02) civilian.x += Math.sign(difference) * Math.min(Math.abs(difference), civilian.pace * delta);
+    if (state.phaseId !== "defense") continue;
+    const headSample = state.fluid.Sample(civilian.x, -.17);
+    const bodySample = state.fluid.Sample(civilian.x, .57);
+    const smokeExposure = Math.max(headSample.smoke, bodySample.smoke * .72);
+    const waterExposure = Math.max(bodySample.water, state.fluid.Sample(civilian.x, .78).water);
+    civilian.smokeDose = Math.max(0, civilian.smokeDose + Math.max(0, smokeExposure - .055) * delta * 12 - delta * .18);
+    civilian.waterDose = Math.max(0, civilian.waterDose + Math.max(0, waterExposure - .12) * delta * 8 - delta * .08);
+    if (civilian.smokeDose >= 100) return FailMission("烟雾吸入超过安全阈值", civilian);
+    if (civilian.waterDose >= 100) return FailMission("积水浸泡与失温超过安全阈值", civilian);
+  }
+}
+
+function CivilianGroupDefinition(groupId) {
+  return {
+    elders: { label: "老人组", offset: -.28 },
+    stretcher: { label: "担架组", offset: 0 },
+    children: { label: "孩子组", offset: .28 }
+  }[groupId];
+}
+
+function CommandCivilianGroup(shelterId) {
+  if (state.levelIndex !== 0 || state.phaseId !== "defense" || state.mode !== "play") return;
+  if (state.selectedRole !== "leader") return Toast("调动乡亲要由传宝下令。按 Q 切回传宝。", "warning");
+  const shelter = {
+    west: { x: -8.35, label: "西支洞", excavation: "west" },
+    center: { x: .05, label: "中央避难湾", excavation: "center" },
+    east: { x: 7.1, label: "东翻口", excavation: "east" }
+  }[shelterId];
+  if (!shelter) return;
+  if (!state.excavated.has(shelter.excavation)) return Toast(`${shelter.label}还没挖通，乡亲过不去。`, "warning");
+  const group = CivilianGroupDefinition(state.selectedCivilianGroup);
+  const members = state.civilians.filter((civilian) => civilian.group === state.selectedCivilianGroup);
+  members.forEach((civilian, index) => {
+    civilian.targetX = shelter.x + (index - (members.length - 1) / 2) * .38 + group.offset;
+  });
+  Toast(`${group.label}转移到${shelter.label}。他们会真实穿过地道，不会瞬移。`, "success");
+  RenderCivilianCommands();
+}
+
+function RenderCivilianCommands() {
+  if (!ui.civilianCommandPanel || state.levelIndex !== 0) return;
+  const visible = state.phaseId === "defense" && state.mode === "play";
+  Show(ui.civilianCommandPanel, visible);
+  if (!visible) return;
+  ui.civilianGroupButtons.querySelectorAll("[data-civilian-group]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.civilianGroup === state.selectedCivilianGroup);
+  });
+  ui.civilianCommandPanel.classList.toggle("commandLocked", state.selectedRole !== "leader");
+  const highestSmoke = Math.max(0, ...state.civilians.map((civilian) => civilian.smokeDose));
+  const highestWater = Math.max(0, ...state.civilians.map((civilian) => civilian.waterDose));
+  ui.civilianStatus.textContent = `${state.civilians.length} 人在地道 · 烟剂量 ${Math.round(highestSmoke)}% · 水剂量 ${Math.round(highestWater)}%`;
+}
+
+function FailMission(reason, civilian) {
+  if (state.missionFailure) return;
+  state.missionFailure = { reason, civilian: civilian.name, smokeDose: civilian.smokeDose, waterDose: civilian.waterDose };
+  state.mode = "failed";
+  inputKeys.left = false; inputKeys.right = false;
+  ui.failureTitle.textContent = "乡亲没能全部撤离";
+  ui.failureSummary.textContent = `${civilian.name}：${reason}。烟水模拟继续由实际地道结构与机关状态决定，请重排风路和躲避方向。`;
+  ui.failureLedger.innerHTML = [
+    ["烟雾剂量", `${Math.round(civilian.smokeDose)}%`],
+    ["积水剂量", `${Math.round(civilian.waterDose)}%`],
+    ["扫荡进度", `${Math.round(state.raid.elapsed)} / ${state.raid.duration} 秒`],
+    ["已触发机关", `${state.defense.triggered} / 3`]
+  ].map(([label, value]) => `<div><small>${label}</small><b>${value}</b></div>`).join("");
+  Show(ui.civilianCommandPanel, false);
+  Show(ui.missionFailure);
 }
 
 function ChangeLayer(targetLayer) {
@@ -387,7 +585,7 @@ function CompleteLevel() {
   ui.completeTitle.textContent = `${state.level.title} · 循环闭合`;
   ui.completeSummary.textContent = title;
   const ledgers = state.levelIndex === 0
-    ? [["通风", state.defense.ventilation], ["防御", state.defense.strength], ["剩余敌队", `${state.defense.enemyUnits}（撤离/受困）`], ["下一轮", "缴获物资用于加深支洞"]]
+    ? [["通风", state.defense.ventilation], ["已触发机关", `${state.defense.triggered}/3`], ["最高烟剂量", `${Math.round(Math.max(0, ...state.civilians.map((civilian) => civilian.smokeDose)))}%`], ["最高水剂量", `${Math.round(Math.max(0, ...state.civilians.map((civilian) => civilian.waterDose)))}%`]]
     : state.levelIndex === 1
       ? [["转移", "伤员 / 粮食 / 联络员"], ["记忆", state.memories.length ? state.memories.join("、") : "未停留搜寻"], ["原则", "遗物可选，生命优先"], ["新节点", "东翻口"]]
       : [["使用诡计", `${state.tricks.size} 种`], ["敌方士气", state.morale], ["群众伤亡", 0], ["下次扫荡", state.nextRaid || "待译码"]];
@@ -448,6 +646,7 @@ function UpdateUi() {
   ui.touchControls.classList.toggle("locked", Boolean(state.caught));
   const depthButton = document.querySelector('[data-input="depth"] span');
   if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "↓ 下行" : "↑ 上行";
+  RenderCivilianCommands();
   UpdateQaReadout();
 }
 
@@ -456,6 +655,7 @@ function RenderQaPanel() {
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
+  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
     EndCinematic();
@@ -463,12 +663,14 @@ function RenderQaPanel() {
     RenderQaPanel();
   }));
   ui.qaPhaseButtons.querySelectorAll("[data-qa-phase]").forEach((button) => button.addEventListener("click", () => QaJumpToPhase(button.dataset.qaPhase)));
+  ui.qaHazardButtons.querySelectorAll("[data-qa-hazard]").forEach((button) => button.addEventListener("click", () => QaInspectHazard(button.dataset.qaHazard)));
   UpdateQaReadout();
 }
 
 function UpdateQaReadout() {
   if (!qaMode || !ui.qaStateReadout) return;
-  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short}`;
+  const fluid = state.fluid?.GetStatistics();
+  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short}${fluid ? ` · 烟${Math.round(fluid.smokeMass)} 水${Math.round(fluid.waterMass)}` : ""}`;
 }
 
 function QaComplete(ids) {
@@ -491,15 +693,20 @@ function QaJumpToPhase(phaseId) {
       state.player.x = -7;
     }
     if (phaseIndex >= 2) {
-      state.buildSlots = ["flipGate", "smokeBaffle", "floodGate"];
+      state.buildSlots = ["floodGate", "flipGate", "smokeBaffle"];
+      state.excavated = new Set(["west", "center", "east"]);
       state.resources.wood = 1; state.resources.iron = 1;
-      QaComplete(["buildSlotA", "buildSlotB", "buildSlotC", "startDefense"]);
+      QaComplete(["sniffDraft", "briefCivilians", "digWestRefuge", "digCenterBypass", "digEastPocket", "buildSlotA", "buildSlotB", "buildSlotC", "startDefense"]);
       RecalculateBuild();
+      state.prepRemaining = 0; state.raid.active = true; state.raid.elapsed = 10; state.raid.stage = "东口灌烟"; state.raid.announcedStage = "东口灌烟";
+      state.selectedRole = "leader";
       state.player.x = -8.7;
     }
     if (phaseIndex >= 3) {
       QaComplete(["placeDecoyCart", "closeSurfaceGate", "triggerSlotA", "triggerSlotB", "triggerSlotC"]);
-      state.defense.triggered = 3; state.defense.enemyUnits = 0;
+      state.defense.triggered = 3; state.defense.enemyUnits = 0; state.defense.activeSlots = new Set([0, 1, 2]);
+      state.raid.active = false; state.raid.elapsed = state.raid.duration;
+      SyncFluidStructures();
       state.player.x = 9.2;
     }
   } else if (levelIndex === 1) {
@@ -525,7 +732,7 @@ function QaJumpToPhase(phaseId) {
   state.player.layer = phase.layer;
   state.camera.x = state.player.x; state.camera.targetX = state.player.x;
   state.camera.zoom = 1; state.camera.targetZoom = 1;
-  Show(ui.titleScreen, false); Show(ui.levelPanel, false); Show(ui.levelComplete, false); Show(ui.dialoguePanel, false); Show(ui.buildPanel, false);
+  Show(ui.titleScreen, false); Show(ui.levelPanel, false); Show(ui.levelComplete, false); Show(ui.missionFailure, false); Show(ui.dialoguePanel, false); Show(ui.buildPanel, false);
   Show(ui.cinematicBars, false); Show(ui.cinematicCaption, false); Show(ui.skipCinematic, false);
   Show(ui.gameHeader); Show(ui.objectiveCard); Show(ui.metricsPanel); Show(ui.roleDock, state.level.roleIds.length > 1);
   ui.levelNumber.textContent = state.level.number; ui.levelName.textContent = state.level.title;
@@ -541,7 +748,8 @@ function ContextHint() {
     const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
     return `先藏到${cover?.label || "场景遮挡"}后`;
   }
-  if (state.levelIndex === 0 && state.phaseId === "build") return `通风 ${state.defense.ventilation}/3 · 防御 ${state.defense.strength}/4`;
+  if (state.levelIndex === 0 && ["collect", "build"].includes(state.phaseId)) return `距扫荡 ${Math.ceil(state.prepRemaining)} 秒 · 通风 ${state.defense.ventilation}/3 · 防御 ${state.defense.strength}/4`;
+  if (state.levelIndex === 0 && state.phaseId === "defense") return `${state.raid.stage} · 传宝可在右侧指挥三组乡亲`;
   if (state.levelIndex === 2 && state.phaseId === "harass") return `至少 3 种诡计且士气 ≤ 55；已用 ${state.tricks.size} 种`;
   return `${roleDefinitions[state.selectedRole].name} · ${state.player.layer === "surface" ? "地表" : "地道"}`;
 }
@@ -554,12 +762,15 @@ function Metric(label, value, detail = "", meter = null, inverse = false, icon =
 function MetricsMarkup() {
   if (state.levelIndex === 0) {
     const resources = Metric("材料", `木${state.resources.wood} 铁${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`, null, false, "材");
+    const timer = Metric("扫荡倒计时", `${Math.max(0, Math.ceil(state.prepRemaining))}秒`, "归零后敌军自动入村，未完工机关不会补齐", state.prepRemaining / 92 * 100, false, "时");
     if (state.phaseId === "collect") {
       const carried = state.level.actions.filter((action) => action.phase === "collect" && action.prop?.mode === "take" && state.completed.has(action.id)).map((action) => action.prop.label);
-      return [resources, Metric("已携带", `${carried.length}/4`, carried.join(" · ") || "靠近场景中的实物后拿取", carried.length / 4 * 100, false, "包")].join("");
+      return [timer, resources, Metric("已携带", `${carried.length}/4`, carried.join(" · ") || "靠近场景中的实物后拿取", carried.length / 4 * 100, false, "包")].join("");
     }
-    if (state.phaseId === "build") return [resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
-    return [Metric("敌队", state.defense.enemyUnits, "受困或撤离后的剩余人数", state.defense.enemyUnits / 6 * 100, true, "敌"), Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
+    if (state.phaseId === "build") return [timer, resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
+    const highestSmoke = Math.max(0, ...state.civilians.map((civilian) => civilian.smokeDose));
+    const highestWater = Math.max(0, ...state.civilians.map((civilian) => civilian.waterDose));
+    return [Metric("扫荡", `${Math.ceil(state.raid.elapsed)}/${state.raid.duration}秒`, state.raid.stage, state.raid.elapsed / state.raid.duration * 100, false, "袭"), Metric("烟剂量", `${Math.round(highestSmoke)}%`, "任一乡亲达到 100% 即失败", highestSmoke, true, "烟"), Metric("水剂量", `${Math.round(highestWater)}%`, "任一乡亲达到 100% 即失败", highestWater, true, "水")].join("");
   }
   if (state.levelIndex === 1) return [
     Metric("转移", requiredRescues.filter((key) => state.rescues[key]).length + "/3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100, false, "转"),
@@ -597,6 +808,9 @@ function Update(delta) {
     ui.cinematicProgress.style.transform = `scaleX(${progress})`;
     if (progress >= 1) EndCinematic();
     return;
+  }
+  if (state.mode === "play" && ui.levelPanel.hidden && ui.guidePanel.hidden && ui.dialoguePanel.hidden) {
+    UpdateLevelOneSystems(delta);
   }
   if (state.mode !== "play" || IsBlocked()) {
     state.player.moving = false;
@@ -662,6 +876,10 @@ function Lerp(a, b, amount) { return a + (b - a) * amount; }
 function GetEnemyPatrols() {
   let bases = [];
   if (state.levelIndex === 0 && state.phaseId === "collect") bases = [-6.1, 2.2, 7.2];
+  else if (state.levelIndex === 0 && state.phaseId === "defense") {
+    const count = Math.max(2, Math.min(5, Math.ceil(state.defense.enemyUnits / 2)));
+    bases = [-8.8, -4.5, .8, 5.2, 8.7].slice(0, count);
+  }
   else if (state.levelIndex === 1 && state.player.layer === "surface") bases = [2.4, 5.6, 8.8];
   else if (state.levelIndex === 2) bases = [-2.2, 2.1, 6.2, 9.2].slice(0, Math.max(2, Math.ceil(state.morale / 25)));
   return bases.map((base, index) => {
@@ -729,22 +947,26 @@ function Draw() {
   const daylight = state.levelIndex === 0 && state.phaseId === "collect" ? 0 : state.levelIndex === 2 ? .2 : .55;
   DrawSky(width, height, surfaceY, daylight);
   DrawVillage(width, height, surfaceY);
+  DrawRaidDestruction(width, height, surfaceY);
   DrawSurfaceCovers(width, surfaceY, false);
   DrawEarth(width, height, surfaceY, tunnelY);
   DrawEntrances(width, height, surfaceY, tunnelY);
   DrawTunnelSystems(width, height, surfaceY, tunnelY);
+  DrawFluidSimulation(width, height, tunnelY);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
   DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
+  DrawCivilians(width, height, tunnelY);
   DrawActor(width, height, surfaceY, tunnelY);
   DrawSurfaceCovers(width, surfaceY, true);
   DrawActionProps(width, height, surfaceY, tunnelY, true);
   DrawPickupTransfer(width, height, surfaceY, tunnelY);
   DrawSurfaceVegetation(width, height, surfaceY);
+  DrawLighting(width, height, surfaceY, tunnelY, daylight);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
   DrawDepthHint(width, height, surfaceY, tunnelY);
-  if (qaMode) DrawQa(width, height, surfaceY, tunnelY);
+  if (qaMode && !state.cleanCapture) DrawQa(width, height, surfaceY, tunnelY);
 }
 
 function DrawSky(width, height, surfaceY, daylight) {
@@ -935,7 +1157,26 @@ function DrawEarth(width, height, surfaceY, tunnelY) {
   samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY - point.halfHeight) : context.moveTo(point.screenX, point.centerY - point.halfHeight));
   [...samples].reverse().forEach((point) => context.lineTo(point.screenX, point.centerY + point.halfHeight));
   context.closePath();
-  context.fillStyle = "#111819"; context.fill();
+  const tunnelShade = context.createLinearGradient(0, tunnelY - halfHeight, 0, tunnelY + halfHeight);
+  tunnelShade.addColorStop(0, "#2d3a38");
+  tunnelShade.addColorStop(.44, "#202e2e");
+  tunnelShade.addColorStop(1, "#111c1f");
+  context.fillStyle = tunnelShade; context.fill();
+  context.save(); context.clip();
+  context.strokeStyle = "rgba(130,154,139,.13)"; context.lineWidth = 2;
+  for (let band = -2; band <= 2; band += 1) {
+    context.beginPath();
+    samples.forEach((point, index) => {
+      const y = point.centerY + band * 17 + Math.sin(point.worldX * 1.25 + band) * 4;
+      index ? context.lineTo(point.screenX, y) : context.moveTo(point.screenX, y);
+    });
+    context.stroke();
+  }
+  context.restore();
+  context.beginPath();
+  samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY - point.halfHeight) : context.moveTo(point.screenX, point.centerY - point.halfHeight));
+  [...samples].reverse().forEach((point) => context.lineTo(point.screenX, point.centerY + point.halfHeight));
+  context.closePath();
   context.strokeStyle = "rgba(204,158,94,.42)"; context.lineWidth = 3; context.lineJoin = "round"; context.stroke();
 
   DrawTunnelDepth(width, height, tunnelY);
@@ -986,15 +1227,27 @@ function TunnelCeilingYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worl
 
 function DrawTunnelDepth(width, height, tunnelY) {
   const branches = [
-    { x: -8.45, width: 1.25, height: 47 },
-    { x: .15, width: 1.55, height: 55 },
-    { x: 7.15, width: 1.3, height: 50 }
+    { id: "west", x: -8.45, width: 1.25, height: 47 },
+    { id: "center", x: .15, width: 1.55, height: 55 },
+    { id: "east", x: 7.15, width: 1.3, height: 50 }
   ];
   branches.forEach((branch, branchIndex) => {
     const x = LayerToScreen(branch.x, width, .92);
     const floorY = TunnelFloorYAt(branch.x, height, tunnelY) - 5;
     const branchWidth = width / 22 * branch.width;
     const topY = floorY - branch.height;
+    const isOpen = state.levelIndex !== 0 || state.excavated.has(branch.id);
+    if (!isOpen) {
+      context.fillStyle = "rgba(83,59,41,.94)";
+      context.beginPath(); context.ellipse(x, floorY - 17, branchWidth * .5, 31, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "rgba(191,140,79,.42)"; context.lineWidth = 2;
+      for (let scar = 0; scar < 5; scar += 1) {
+        const scarX = x + (scar - 2) * branchWidth * .14;
+        context.beginPath(); context.moveTo(scarX - 5, floorY - 31 + (scar % 2) * 8); context.lineTo(scarX + 4, floorY - 18 + (scar % 3) * 5); context.stroke();
+      }
+      context.fillStyle = "rgba(222,184,112,.76)"; context.font = "800 8px system-ui"; context.textAlign = "center"; context.fillText("待挖", x, floorY - 12);
+      return;
+    }
     const shade = context.createLinearGradient(x, floorY, x, topY);
     shade.addColorStop(0, "rgba(35,48,47,.92)"); shade.addColorStop(1, "rgba(19,27,29,.96)");
     context.fillStyle = shade;
@@ -1020,7 +1273,8 @@ function DrawTunnelDepth(width, height, tunnelY) {
 
 function DrawTunnelProps(width, height, tunnelY) {
   const props = [
-    { x: -9.25, kind: "basket" }, { x: -2.45, kind: "crate" }, { x: 1.15, kind: "lamp" }, { x: 6.45, kind: "jars" }
+    { x: -9.25, kind: "basket" }, { x: -7.75, kind: "lamp" }, { x: -2.45, kind: "crate" },
+    { x: 3.8, kind: "lamp" }, { x: 6.45, kind: "jars" }, { x: 7.72, kind: "lamp" }
   ];
   props.forEach((prop) => {
     const x = WorldToScreen(prop.x, width);
@@ -1100,44 +1354,8 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
     }
   });
 
-  if (state.buildSlots.includes("floodGate")) {
-    context.strokeStyle = "rgba(78,169,190,.72)"; context.lineWidth = 5; context.lineCap = "round";
-    context.beginPath();
-    for (let worldX = -9; worldX <= 9; worldX += .4) {
-      const screenX = WorldToScreen(worldX, width); const y = TunnelFloorYAt(worldX, height, tunnelY) - 7;
-      worldX === -9 ? context.moveTo(screenX, y) : context.lineTo(screenX, y);
-    }
-    context.stroke();
-    for (let index = 0; index < 9; index += 1) {
-      const progress = (state.elapsed * .16 + index / 9) % 1; const worldX = Lerp(8.5, -8.5, progress);
-      context.fillStyle = "rgba(158,230,235,.85)"; context.beginPath(); context.arc(WorldToScreen(worldX, width), TunnelFloorYAt(worldX, height, tunnelY) - 7, 2.5, 0, Math.PI * 2); context.fill();
-    }
-  }
-
   if (["defense", "outcome"].includes(state.phaseId)) {
     const hasBaffle = state.buildSlots.includes("smokeBaffle");
-    const smokeCount = hasBaffle ? 14 : 11;
-    for (let index = 0; index < smokeCount; index += 1) {
-      const progress = (state.elapsed * .09 + index / smokeCount) % 1;
-      let worldX;
-      let y;
-      if (hasBaffle && progress > .66) {
-        const rise = (progress - .66) / .34;
-        worldX = exhaustX + Math.sin(index * 2.3 + state.elapsed * 1.7) * .08;
-        const tunnelMouthY = TunnelCeilingYAt(exhaustX, height, tunnelY) + 2;
-        y = Lerp(tunnelMouthY, surfaceY - 52, rise);
-      } else {
-        const run = hasBaffle ? progress / .66 : progress;
-        worldX = Lerp(8.7, hasBaffle ? exhaustX : -7.5, run);
-        y = TunnelCenterYAt(worldX, tunnelY) - 19 + Math.sin(index * 1.8 + state.elapsed * 1.6) * 7;
-      }
-      const size = 8 + (index % 4) * 2.2;
-      context.fillStyle = hasBaffle ? "rgba(165,174,166,.52)" : "rgba(129,116,103,.62)";
-      context.beginPath(); context.arc(WorldToScreen(worldX, width), y, size, 0, Math.PI * 2); context.fill();
-      context.fillStyle = hasBaffle ? "rgba(200,207,199,.18)" : "rgba(174,155,137,.18)";
-      context.beginPath(); context.arc(WorldToScreen(worldX, width) - size * .38, y - size * .24, size * .64, 0, Math.PI * 2); context.fill();
-    }
-
     context.save();
     context.font = "600 11px system-ui, sans-serif";
     context.textAlign = "center";
@@ -1147,6 +1365,314 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
     context.fillText(hasBaffle ? "排烟" : "烟倒灌", WorldToScreen(hasBaffle ? exhaustX : -7.5, width), surfaceY - 16);
     context.restore();
   }
+}
+
+function QaInspectHazard(kind) {
+  if (!qaMode || state.levelIndex !== 0) return;
+  if (kind === "clean") {
+    state.cleanCapture = true;
+    Show(ui.qaPanel, false);
+    clearTimeout(toastTimer);
+    Show(ui.toast, false);
+    UpdateUi();
+    return;
+  }
+  if (state.phaseId !== "defense" || state.mode !== "play") QaJumpToPhase("defense");
+  EndCinematic();
+  if (kind === "safe") {
+    state.defense.activeSlots = new Set([0, 1, 2]);
+    state.defense.triggered = 3;
+    state.defense.enemyUnits = 0;
+    QaComplete(["placeDecoyCart", "closeSurfaceGate", "triggerSlotA", "triggerSlotB", "triggerSlotC"]);
+    SyncFluidStructures();
+    state.raid.elapsed = 52;
+    state.raid.stage = "两头掘口";
+    state.selectedRole = "leader";
+    ["elders", "stretcher", "children"].forEach((groupId) => {
+      state.selectedCivilianGroup = groupId;
+      CommandCivilianGroup("center");
+    });
+    state.selectedCivilianGroup = "elders";
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
+  state.player.layer = "tunnel";
+  state.player.x = kind === "smoke" ? 8.45 : -8.55;
+  state.camera.x = state.player.x;
+  state.camera.targetX = state.player.x;
+  state.raid.elapsed = kind === "smoke" ? 18 : 31;
+  state.raid.stage = kind === "smoke" ? "东口灌烟" : "西井灌水";
+  for (let pulse = 0; pulse < 64; pulse += 1) {
+    if (kind === "smoke") state.fluid.Inject("smoke", 9.25, -.05, .16, .5, -5.2, -.82);
+    else state.fluid.Inject("water", -9.35, .4, .17, .48, 4.6, 2.05);
+    state.fluid.Step(1 / 30);
+  }
+  RenderQaPanel();
+  UpdateUi();
+  ui.qaPanel.open = true;
+}
+
+function DrawFluidSimulation(width, height, tunnelY) {
+  if (state.levelIndex !== 0 || !state.fluid) return;
+  const simulation = state.fluid;
+  if (fluidCanvas.width !== simulation.columns || fluidCanvas.height !== simulation.rows) {
+    fluidCanvas.width = simulation.columns;
+    fluidCanvas.height = simulation.rows;
+  }
+  const image = fluidContext.createImageData(simulation.columns, simulation.rows);
+  image.data.set(simulation.Rasterize());
+  fluidContext.putImageData(image, 0, 0);
+  context.save();
+  context.imageSmoothingEnabled = true;
+  context.globalCompositeOperation = "source-over";
+  const worldSpan = state.fluid.worldMaximum - state.fluid.worldMinimum;
+  const worldStep = worldSpan / simulation.columns;
+  for (let column = 0; column < simulation.columns; column += 1) {
+    const worldX = simulation.worldMinimum + (column + .5) / simulation.columns * worldSpan;
+    const nextWorldX = worldX + worldStep;
+    const screenX = WorldToScreen(worldX, width);
+    const nextScreenX = WorldToScreen(nextWorldX, width);
+    const halfHeight = TunnelHalfHeightAt(worldX, height) - 5;
+    const destinationY = TunnelCenterYAt(worldX, tunnelY) - halfHeight;
+    context.drawImage(fluidCanvas, column, 0, 1, simulation.rows, screenX - 1, destinationY, Math.max(2, nextScreenX - screenX + 2), halfHeight * 2);
+  }
+
+  context.filter = "blur(2.4px)";
+  for (let row = 2; row < simulation.rows - 2; row += 3) {
+    for (let column = 2; column < simulation.columns - 2; column += 4) {
+      const index = simulation.Index(column, row);
+      const smoke = simulation.smoke[index];
+      if (smoke < .055 || simulation.solid[index]) continue;
+      const worldX = simulation.ColumnToWorld(column);
+      const normalizedY = simulation.RowToNormalized(row);
+      const halfHeight = TunnelHalfHeightAt(worldX, height) - 5;
+      const x = WorldToScreen(worldX, width);
+      const y = TunnelCenterYAt(worldX, tunnelY) + normalizedY * halfHeight;
+      const velocityX = simulation.velocityX[index];
+      const velocityY = simulation.velocityY[index];
+      const angle = Math.atan2(velocityY, velocityX);
+      const radius = 4 + smoke * 13;
+      context.save(); context.translate(x, y); context.rotate(angle * .28);
+      context.fillStyle = `rgba(171,164,150,${.1 + smoke * .48})`;
+      context.beginPath(); context.ellipse(0, 0, radius * 1.35, radius * .82, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = `rgba(214,207,191,${smoke * .15})`;
+      context.beginPath(); context.ellipse(-radius * .24, -radius * .18, radius * .7, radius * .46, 0, 0, Math.PI * 2); context.fill();
+      context.restore();
+    }
+  }
+  context.filter = "none";
+
+  const waterSegments = [];
+  let currentWaterSegment = [];
+  for (let column = 2; column < simulation.columns - 2; column += 2) {
+    let surfaceRow = -1;
+    let density = 0;
+    for (let row = 2; row < simulation.rows - 2; row += 1) {
+      const value = simulation.water[simulation.Index(column, row)];
+      density = Math.max(density, value);
+      if (surfaceRow < 0 && value > .025) surfaceRow = row;
+    }
+    if (surfaceRow < 0) {
+      if (currentWaterSegment.length) waterSegments.push(currentWaterSegment);
+      currentWaterSegment = [];
+      continue;
+    }
+    const worldX = simulation.ColumnToWorld(column);
+    const halfHeight = TunnelHalfHeightAt(worldX, height) - 5;
+    const x = WorldToScreen(worldX, width);
+    const y = TunnelCenterYAt(worldX, tunnelY) + simulation.RowToNormalized(surfaceRow) * halfHeight;
+    currentWaterSegment.push({ x, y, floorY: TunnelFloorYAt(worldX, height, tunnelY) - 3, density });
+  }
+  if (currentWaterSegment.length) waterSegments.push(currentWaterSegment);
+  waterSegments.filter((segment) => segment.length > 1).forEach((segment) => {
+    const topY = Math.min(...segment.map((point) => point.y));
+    const bottomY = Math.max(...segment.map((point) => point.floorY));
+    const density = segment.reduce((total, point) => total + point.density, 0) / segment.length;
+    const gradient = context.createLinearGradient(0, topY, 0, bottomY);
+    gradient.addColorStop(0, `rgba(96,207,224,${.34 + density * .35})`);
+    gradient.addColorStop(.18, `rgba(44,143,181,${.42 + density * .3})`);
+    gradient.addColorStop(1, `rgba(20,72,111,${.55 + density * .25})`);
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.moveTo(segment[0].x, segment[0].y);
+    for (let index = 1; index < segment.length; index += 1) {
+      const previous = segment[index - 1];
+      const point = segment[index];
+      context.quadraticCurveTo(previous.x, previous.y, (previous.x + point.x) * .5, (previous.y + point.y) * .5);
+    }
+    const last = segment[segment.length - 1];
+    context.lineTo(last.x, last.y);
+    for (let index = segment.length - 1; index >= 0; index -= 1) context.lineTo(segment[index].x, segment[index].floorY);
+    context.closePath(); context.fill();
+    context.strokeStyle = "rgba(156,236,239,.9)"; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(segment[0].x, segment[0].y);
+    for (let index = 1; index < segment.length; index += 1) {
+      const previous = segment[index - 1]; const point = segment[index];
+      context.quadraticCurveTo(previous.x, previous.y, (previous.x + point.x) * .5, (previous.y + point.y) * .5);
+    }
+    context.stroke();
+  });
+  context.restore();
+
+  if (state.phaseId === "defense" && qaMode && !state.cleanCapture) {
+    const statistics = simulation.GetStatistics();
+    context.save();
+    context.font = "700 9px ui-monospace, monospace";
+    context.textAlign = "left";
+    context.fillStyle = "rgba(224,240,234,.74)";
+    context.fillText(`实时流体格 ${simulation.columns}×${simulation.rows} · 烟 ${Math.round(statistics.smokeMass)} · 水 ${Math.round(statistics.waterMass)}`, 18, height - 18);
+    context.restore();
+  }
+}
+
+function DrawCivilians(width, height, tunnelY) {
+  if (state.levelIndex !== 0 || !state.civilians.length) return;
+  const colors = { elders: "#958a70", stretcher: "#78998a", children: "#bd9152" };
+  for (const civilian of state.civilians) {
+    const x = WorldToScreen(civilian.x, width);
+    const floorY = TunnelFloorYAt(civilian.x, height, tunnelY) - 1;
+    const moving = Math.abs(civilian.targetX - civilian.x) > .04;
+    const gait = moving ? Math.sin(state.elapsed * 8 + civilian.x * 1.7) : 0;
+    const dose = Math.max(civilian.smokeDose, civilian.waterDose);
+    context.save();
+    context.translate(x, floorY);
+    context.globalAlpha = .93;
+    if (civilian.group === "stretcher" && civilian.id === "wounded") {
+      context.strokeStyle = "#8b6640"; context.lineWidth = 3;
+      context.beginPath(); context.moveTo(-18, -5); context.lineTo(20, -5); context.stroke();
+      context.fillStyle = "#6d8078"; context.beginPath(); context.ellipse(0, -11, 16, 7, -.08, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#d09a73"; context.beginPath(); context.arc(13, -14, 4, 0, Math.PI * 2); context.fill();
+    } else {
+      const bodyHeight = civilian.group === "children" ? 24 : 30;
+      context.strokeStyle = "rgba(8,12,13,.48)"; context.lineWidth = 4;
+      context.beginPath(); context.moveTo(-4, -3); context.lineTo(-3 + gait * 2, bodyHeight * -.42); context.moveTo(4, -3); context.lineTo(3 - gait * 2, bodyHeight * -.42); context.stroke();
+      context.fillStyle = colors[civilian.group];
+      context.beginPath(); context.moveTo(-8, -bodyHeight * .35); context.quadraticCurveTo(-9, -bodyHeight * .8, -4, -bodyHeight); context.lineTo(5, -bodyHeight); context.quadraticCurveTo(10, -bodyHeight * .78, 8, -bodyHeight * .35); context.closePath(); context.fill();
+      context.strokeStyle = "rgba(244,207,135,.6)"; context.lineWidth = 1.2; context.stroke();
+      context.fillStyle = "#d4a17d"; context.beginPath(); context.arc(0, -bodyHeight - 5, civilian.group === "children" ? 4.5 : 5.2, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "rgba(255,222,167,.58)"; context.lineWidth = 1; context.stroke();
+      context.fillStyle = civilian.group === "elders" ? "#b7b0a0" : "#302821"; context.beginPath(); context.arc(-1, -bodyHeight - 7, 4.7, Math.PI, Math.PI * 2); context.fill();
+    }
+    context.fillStyle = dose > 65 ? "#e46150" : "rgba(235,231,210,.9)";
+    context.beginPath(); context.arc(0, -43, 8, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#172123"; context.font = "900 7px system-ui"; context.textAlign = "center"; context.fillText(civilian.mark, 0, -40.5);
+    if (dose > 4) {
+      context.strokeStyle = dose > 65 ? "#ef6657" : "#d2ad67"; context.lineWidth = 2;
+      context.beginPath(); context.arc(0, -43, 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, dose / 100)); context.stroke();
+    }
+    context.restore();
+  }
+}
+
+function DrawRaidDestruction(width, height, surfaceY) {
+  if (state.levelIndex !== 0 || state.phaseId !== "defense") return;
+  const intensity = Math.min(1, state.raid.elapsed / 42);
+  const damagedHouses = [-5.2, 4.4, 8.3];
+  context.save();
+  for (let index = 0; index < damagedHouses.length; index += 1) {
+    if (state.raid.elapsed < 12 + index * 8) continue;
+    const x = LayerToScreen(damagedHouses[index], width, .76);
+    const baseY = surfaceY - 52 - (index % 2) * 8;
+    context.strokeStyle = `rgba(35,27,24,${.36 + intensity * .35})`; context.lineWidth = 5;
+    context.beginPath(); context.moveTo(x - 23, baseY - 18); context.lineTo(x - 5, baseY - 3); context.lineTo(x - 13, baseY + 16); context.moveTo(x + 18, baseY - 22); context.lineTo(x + 4, baseY + 8); context.stroke();
+    for (let particle = 0; particle < 7; particle += 1) {
+      const cycle = (state.elapsed * (.18 + particle * .009) + particle * .17 + index * .23) % 1;
+      const driftX = Math.sin(particle * 2.9 + state.elapsed) * 14 * cycle;
+      context.fillStyle = `rgba(104,91,77,${(1 - cycle) * .28})`;
+      context.beginPath(); context.arc(x + driftX, baseY - cycle * 72, 5 + particle % 3 * 2, 0, Math.PI * 2); context.fill();
+    }
+  }
+  if (state.raid.elapsed > 8) {
+    const fireX = WorldToScreen(9.55, width);
+    const flame = 16 + Math.sin(state.elapsed * 9) * 4;
+    context.fillStyle = "rgba(223,117,49,.72)"; context.beginPath(); context.moveTo(fireX - 8, surfaceY); context.quadraticCurveTo(fireX - 5, surfaceY - flame, fireX, surfaceY - flame - 13); context.quadraticCurveTo(fireX + 10, surfaceY - flame * .6, fireX + 7, surfaceY); context.fill();
+    context.fillStyle = "rgba(245,198,91,.82)"; context.beginPath(); context.moveTo(fireX - 3, surfaceY); context.quadraticCurveTo(fireX, surfaceY - flame * .7, fireX + 2, surfaceY - flame); context.quadraticCurveTo(fireX + 5, surfaceY - 5, fireX + 4, surfaceY); context.fill();
+  }
+  context.restore();
+}
+
+function SignedDistanceToRectangle(x, y, centerX, centerY, halfWidth, halfHeight) {
+  const distanceX = Math.abs(x - centerX) - halfWidth;
+  const distanceY = Math.abs(y - centerY) - halfHeight;
+  const outside = Math.hypot(Math.max(distanceX, 0), Math.max(distanceY, 0));
+  return outside + Math.min(Math.max(distanceX, distanceY), 0);
+}
+
+function ScreenToWorld(screenX, width) {
+  const scale = width / (22 / state.camera.zoom);
+  return state.camera.x + (screenX - width / 2) / scale;
+}
+
+function SurfaceLightSdf(screenX, screenY, width, surfaceY) {
+  let distance = surfaceY - screenY;
+  const houses = [-9, -5.2, -.2, 4.4, 8.3];
+  houses.forEach((worldX, index) => {
+    const houseX = LayerToScreen(worldX, width, .76);
+    const size = 55 + (index % 2) * 12;
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, houseX, surfaceY - size * .36, size * .55, size * .36));
+  });
+  for (const cover of GetSurfaceCovers()) {
+    const coverX = WorldToScreen(cover.x, width);
+    const coverWidth = Math.max(44, cover.width * width / (22 / state.camera.zoom));
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, coverX, surfaceY - 32, coverWidth * .48, 34));
+  }
+  return distance;
+}
+
+function TunnelLightSdf(screenX, screenY, width, height, surfaceY, tunnelY) {
+  if (screenY < surfaceY) return -1;
+  const worldX = ScreenToWorld(screenX, width);
+  const ceilingY = TunnelCeilingYAt(worldX, height, tunnelY);
+  const floorY = TunnelFloorYAt(worldX, height, tunnelY);
+  let distance = Math.min(screenY - ceilingY, floorY - screenY);
+  for (let supportX = -10; supportX <= 10; supportX += 1.8) {
+    if (entrances.some((entrance) => Math.abs(entrance - supportX) < .75)) continue;
+    const x = WorldToScreen(supportX, width);
+    const centerY = TunnelCenterYAt(supportX, tunnelY);
+    const halfHeight = TunnelHalfHeightAt(supportX, height);
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, x + 4, centerY, 3.4, halfHeight - 9));
+  }
+  for (const civilian of state.civilians) {
+    const x = WorldToScreen(civilian.x, width);
+    const floorY = TunnelFloorYAt(civilian.x, height, tunnelY);
+    const bodyHeight = civilian.group === "children" ? 24 : civilian.id === "wounded" ? 17 : 31;
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, x, floorY - bodyHeight * .5, civilian.id === "wounded" ? 17 : 6, bodyHeight * .5));
+  }
+  if (state.player.layer === "tunnel") {
+    const profile = actorProfiles[state.selectedRole];
+    const x = WorldToScreen(state.player.x, width);
+    const floorY = TunnelFloorYAt(state.player.x, height, tunnelY);
+    const bodyHeight = profile.animal ? 24 : 48;
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, x, floorY - bodyHeight * .5, profile.animal ? 15 : 8, bodyHeight * .5));
+  }
+  return distance;
+}
+
+function DrawLighting(width, height, surfaceY, tunnelY, daylight) {
+  const surfaceLights = [];
+  if (daylight < .3 || state.phaseId === "defense") {
+    [-9, -.2, 8.3].forEach((worldX, index) => surfaceLights.push({
+      x: LayerToScreen(worldX, width, .76), y: surfaceY - 43 - (index % 2) * 5,
+      radius: 112, intensity: .76, glow: .2, seed: index + .4, color: "238,170,76"
+    }));
+    GetEnemyPatrols().forEach((enemy) => surfaceLights.push({
+      x: WorldToScreen(enemy.x, width), y: surfaceY - 48, radius: 118, intensity: .72, glow: .17, seed: enemy.index + 5, color: "242,151,61"
+    }));
+  }
+  if (surfaceLights.length || daylight < .4) {
+    context.save(); context.beginPath(); context.rect(0, 0, width, surfaceY + 1); context.clip();
+    lightRenderer.Draw(context, width, height, surfaceLights, (x, y) => SurfaceLightSdf(x, y, width, surfaceY), daylight < .3 ? .72 : .28, state.elapsed);
+    context.restore();
+  }
+
+  const tunnelLights = [-7.75, 3.8, 7.72].map((worldX, index) => ({
+    x: WorldToScreen(worldX, width),
+    y: TunnelFloorYAt(worldX, height, tunnelY) - 25,
+    radius: 205 + index * 8, intensity: .96, glow: .15, seed: index + 9, color: "240,169,72"
+  }));
+  context.save(); context.beginPath(); context.rect(0, surfaceY - 1, width, height - surfaceY + 1); context.clip();
+  lightRenderer.Draw(context, width, height, tunnelLights, (x, y) => TunnelLightSdf(x, y, width, height, surfaceY, tunnelY), .68, state.elapsed);
+  context.restore();
 }
 
 function PropSupportLift(support) {
@@ -1341,7 +1867,7 @@ function DrawActions(width, height, surfaceY, tunnelY) {
     context.beginPath(); context.arc(0, 0, 8, 0, Math.PI * 2); context.fill();
     context.strokeStyle = locked ? "rgba(229,196,133,.66)" : "rgba(193,250,242,.9)"; context.lineWidth = 2;
     context.beginPath(); context.arc(0, 0, 14, 0, Math.PI * 2); context.stroke(); context.restore();
-    if (qaMode) {
+    if (qaMode && !state.cleanCapture) {
       context.fillStyle = "#fff"; context.font = "11px monospace"; context.fillText(action.id, x - 24, y - 44);
     }
   }
@@ -1726,6 +2252,11 @@ document.querySelectorAll('[data-input="left"], [data-input="right"]').forEach((
 document.querySelector('[data-input="switch"]').addEventListener("click", CycleRole);
 document.querySelector('[data-input="depth"]').addEventListener("click", UseContextDepth);
 document.querySelector('[data-input="action"]').addEventListener("click", PerformAction);
+ui.civilianGroupButtons.querySelectorAll("[data-civilian-group]").forEach((button) => button.addEventListener("click", () => {
+  state.selectedCivilianGroup = button.dataset.civilianGroup;
+  RenderCivilianCommands();
+}));
+ui.civilianShelterButtons.querySelectorAll("[data-shelter]").forEach((button) => button.addEventListener("click", () => CommandCivilianGroup(button.dataset.shelter)));
 ui.startButton.addEventListener("click", () => StartLevel(selectedLevel));
 ui.guideButton.addEventListener("click", () => Show(ui.guidePanel));
 ui.menuButton.addEventListener("click", OpenLevelPanel);
@@ -1735,6 +2266,9 @@ ui.skipCinematic.addEventListener("click", EndCinematic);
 ui.replayButton.addEventListener("click", () => StartLevel(state.levelIndex));
 ui.nextLevelButton.addEventListener("click", () => StartLevel((state.levelIndex + 1) % levelDefinitions.length));
 ui.completeLevelsButton.addEventListener("click", () => { Show(ui.levelComplete, false); OpenLevelPanel(); });
+ui.failureReplayButton.addEventListener("click", () => StartLevel(0));
+ui.failureQaButton.addEventListener("click", () => { Show(ui.missionFailure, false); QaJumpToPhase("defense"); });
+Show(ui.failureQaButton, qaMode);
 document.querySelectorAll("[data-close-panel]").forEach((button) => button.addEventListener("click", () => Show(button.closest(".panelScreen"), false)));
 
 window.addEventListener("keydown", (event) => {
@@ -1763,12 +2297,16 @@ if (qaMode) {
   window.EarthVeinsWhiteboxQa = Object.freeze({
     startLevel: (index) => StartLevel(Math.max(0, Math.min(2, Number(index) || 0))),
     jumpToPhase: (phaseId) => QaJumpToPhase(String(phaseId)),
+    inspectHazard: (kind) => QaInspectHazard(String(kind)),
     getState: () => ({
       level: state.level.id, phase: state.phaseId, x: state.player.x, layer: state.player.layer,
       role: state.selectedRole, completed: [...state.completed], resources: { ...state.resources }, buildSlots: [...state.buildSlots],
       ventilation: state.defense.ventilation, defense: state.defense.strength, rescues: { ...state.rescues }, memories: [...state.memories],
       visibility: state.visibility, detection: state.detection, detected: state.detected, cover: state.player.coverId,
       alert: state.alert, morale: state.morale, tricks: [...state.tricks]
+      , prepRemaining: state.prepRemaining, raid: { ...state.raid }, excavated: [...state.excavated]
+      , civilians: state.civilians.map((civilian) => ({ name: civilian.name, group: civilian.group, x: civilian.x, targetX: civilian.targetX, smokeDose: civilian.smokeDose, waterDose: civilian.waterDose }))
+      , fluid: state.fluid?.GetStatistics() || null, failure: state.missionFailure
     })
   });
 }

@@ -318,6 +318,32 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #toast { width: auto; max-width: min(520px, calc(100% - 40px)); padding: 8px 14px; font-size: 10px; font-weight: 700; background: rgba(8,13,15,.82); border: 0; border-radius: 18px; backdrop-filter: blur(5px); }
 #qaPanel { top: 126px; }
 
+#civilianCommandPanel { position: absolute; z-index: 15; right: 24px; bottom: 72px; width: 250px; padding: 10px; color: #eee9da; background: rgba(7,13,15,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 6px; box-shadow: 0 12px 34px rgba(0,0,0,.42); backdrop-filter: blur(7px); }
+#civilianCommandPanel > small { display: block; margin: 0 0 7px; color: #d8b16b; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.civilianGroupButtons { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; }
+.civilianGroupButtons button { min-height: 25px; color: rgba(237,235,221,.64); font-size: 8px; background: rgba(255,255,255,.05); border: 1px solid transparent; border-radius: 13px; }
+.civilianGroupButtons button.active { color: #182225; background: rgba(235,230,210,.94); border-color: #fffbe8; }
+.civilianShelterButtons { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 7px; }
+.civilianShelterButtons button { min-height: 47px; padding: 4px; color: #e8ece4; background: rgba(74,130,125,.16); border: 1px solid rgba(101,209,212,.36); border-radius: 3px; }
+.civilianShelterButtons b, .civilianShelterButtons span { display: block; }
+.civilianShelterButtons b { color: #76dcdd; font-size: 14px; }
+.civilianShelterButtons span { margin-top: 2px; font-size: 7px; }
+#civilianStatus { margin: 7px 2px 0; color: rgba(231,234,224,.7); font: 8px/1.35 ui-monospace, "Cascadia Mono", monospace; }
+#civilianCommandPanel.commandLocked .civilianShelterButtons { opacity: .42; }
+#civilianCommandPanel.commandLocked::after { content: "切换到传宝才能下令"; position: absolute; right: 11px; top: 8px; color: #e36c59; font-size: 7px; }
+.failurePaper { border-top: 3px solid #b94439; }
+.failurePaper .completeLedger div { border-left-color: #bd4a3f; }
+
+@media (max-width: 760px), (max-height: 520px) {
+  #civilianCommandPanel { right: 8px; bottom: 61px; width: 214px; padding: 7px; }
+  #civilianCommandPanel > small { margin-bottom: 4px; font-size: 6px; }
+  .civilianGroupButtons button { min-height: 21px; font-size: 6px; }
+  .civilianShelterButtons { gap: 3px; margin-top: 4px; }
+  .civilianShelterButtons button { min-height: 35px; }
+  .civilianShelterButtons b { font-size: 11px; }
+  .civilianShelterButtons span, #civilianStatus { font-size: 6px; }
+}
+
 .levelCard { background: rgba(20,28,29,.58); border: 0; border-top: 1px solid rgba(230,233,219,.18); box-shadow: none; }
 .levelCard:hover, .levelCard.selected { background: rgba(33,45,44,.72); border-color: var(--cyan); }
 .buildPaper { color: #202827; background: rgba(237,232,214,.98); border: 0; }

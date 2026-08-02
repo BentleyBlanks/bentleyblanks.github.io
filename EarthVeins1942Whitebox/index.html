@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#11171b">
   <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法白盒">
   <title>地脉：三个循环 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803d">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803n">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -80,6 +80,21 @@
       <div id="roleButtons"></div>
     </aside>
 
+    <aside id="civilianCommandPanel" aria-label="群众转移指挥" hidden>
+      <small>群众调度 · 仅传宝可下令</small>
+      <div id="civilianGroupButtons" class="civilianGroupButtons">
+        <button type="button" data-civilian-group="elders" class="active">老人组</button>
+        <button type="button" data-civilian-group="stretcher">担架组</button>
+        <button type="button" data-civilian-group="children">孩子组</button>
+      </div>
+      <div id="civilianShelterButtons" class="civilianShelterButtons">
+        <button type="button" data-shelter="west"><b>←</b><span>西支洞</span></button>
+        <button type="button" data-shelter="center"><b>●</b><span>中央湾</span></button>
+        <button type="button" data-shelter="east"><b>→</b><span>东翻口</span></button>
+      </div>
+      <p id="civilianStatus"></p>
+    </aside>
+
     <div id="interactionPrompt" hidden>
       <kbd>E</kbd>
       <p><b id="interactionVerb"></b><span id="interactionName"></span></p>
@@ -114,6 +129,17 @@
       </div>
     </section>
 
+    <section id="missionFailure" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="failureTitle" hidden>
+      <div class="panelPaper completePaper failurePaper">
+        <p class="eyebrow">MISSION FAILED · PHYSICAL EXPOSURE</p>
+        <h2 id="failureTitle"></h2>
+        <p id="failureSummary"></p>
+        <div id="failureLedger" class="completeLedger"></div>
+        <button id="failureReplayButton" class="primaryButton" type="button">重新准备</button>
+        <button id="failureQaButton" class="quietButton" type="button">DEBUG 跳到扫荡</button>
+      </div>
+    </section>
+
     <div id="touchControls" aria-label="移动端操作">
       <div class="touchMove">
         <button data-input="left" type="button" aria-label="持续向左移动"><span>◀</span></button>
@@ -133,9 +159,10 @@
       <small>只在 ?qa=1 显示 · 自动补齐前置状态</small>
       <div id="qaLevelButtons" class="qaButtonRow"></div>
       <div id="qaPhaseButtons" class="qaButtonRow"></div>
+      <div id="qaHazardButtons" class="qaButtonRow"></div>
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803d"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803n"></script>
 </body>
 </html>
