@@ -4,7 +4,7 @@ export const W = 4200;
 export const H = 540;
 export const GROUND = 420;
 export const GRAVITY = 2100;
-export const CACHE_BUST = "20260802h";
+export const CACHE_BUST = "20260802i";
 
 /** Every in-world drawable must have a generated Texture_* plate (100% art coverage). */
 export const WORLD_ART_FILES = [

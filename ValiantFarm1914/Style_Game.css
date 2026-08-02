@@ -16,12 +16,21 @@
 html, body {
   margin: 0; height: 100%; background: #12160f; color: var(--paper); font-family: var(--ui);
   overscroll-behavior: none;
+  /* iOS Safari: kill double-tap zoom on the page chrome */
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
 }
-button { font: inherit; cursor: pointer; border: none; }
+button {
+  font: inherit; cursor: pointer; border: none;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
 
 .shell {
   position: relative; width: 100%; height: 100%; overflow: hidden; background: #1a1814;
   height: 100dvh; min-height: 100%;
+  touch-action: manipulation;
 }
 .canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .vignette {

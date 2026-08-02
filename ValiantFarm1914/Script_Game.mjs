@@ -116,7 +116,36 @@ function SyncInput() {
   i.crouch = keys.has("s") || keys.has("arrowdown");
 }
 
+/** iOS Safari double-tap zooms the page — block it for the game shell. */
+function GuardSafariZoom() {
+  let lastTouchEnd = 0;
+  document.addEventListener(
+    "touchend",
+    (e) => {
+      const now = performance.now();
+      if (now - lastTouchEnd < 320) e.preventDefault();
+      lastTouchEnd = now;
+    },
+    { passive: false },
+  );
+  document.addEventListener(
+    "gesturestart",
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+  document.addEventListener(
+    "dblclick",
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+}
+
 function Bind() {
+  GuardSafariZoom();
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
     keys.add(k);
