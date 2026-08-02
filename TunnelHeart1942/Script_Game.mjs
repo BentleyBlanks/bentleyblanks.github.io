@@ -13,6 +13,7 @@ import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
 import {
   ParallaxOf,
   PropsBehind,
+  PropsBehindBands,
   PropsFront,
   PropsPlay,
   ScaleOf,
@@ -220,67 +221,124 @@ function DrawRidge(w, h, camX, factor, yFrac, amp, color, alpha = 1) {
 
 /** Far → near atmospheric bands (no gameplay props). */
 function DrawDepthBackdrop(w, h, camX, pal) {
-  DrawRidge(w, h, camX, 0.08, 0.48, 22, pal.haze, 0.95);
-  DrawRidge(w, h, camX, 0.18, 0.54, 16, pal.night ? "#2a342c" : "#6a7d58", 0.9);
-  // Distant village tooth-row on the second ridge
-  const baseY = h * 0.54;
-  const scroll = camX * 0.22 * Scale();
+  // Stacked ridges — each closer band sits lower + scrolls faster
+  DrawRidge(w, h, camX, 0.05, 0.42, 26, pal.haze, 0.85);
+  DrawRidge(w, h, camX, 0.12, 0.5, 20, pal.night ? "#243028" : "#7a9070", 0.88);
+  DrawRidge(w, h, camX, 0.22, 0.56, 16, pal.night ? "#2a342c" : "#6a7d58", 0.92);
+
+  // Distant village tooth-row on the haze ridge
+  const baseY = h * 0.52;
+  const scroll = camX * 0.16 * Scale();
   ctx.fillStyle = pal.night ? "#1c241e" : "#4a5a42";
-  for (let i = -3; i < 22; i++) {
-    const x = ((i * 110 - scroll) % (w + 180)) - 40;
-    const bw = 18 + ((i * 11) % 16);
-    const bh = 24 + ((i * 9) % 28);
-    ctx.globalAlpha = 0.65;
+  for (let i = -3; i < 26; i++) {
+    const x = ((i * 96 - scroll) % (w + 180)) - 40;
+    const bw = 14 + ((i * 11) % 14);
+    const bh = 18 + ((i * 9) % 22);
+    ctx.globalAlpha = 0.55;
     ctx.fillRect(x, baseY - bh, bw, bh);
     ctx.beginPath();
-    ctx.moveTo(x - 3, baseY - bh);
-    ctx.lineTo(x + bw * 0.5, baseY - bh - 12);
-    ctx.lineTo(x + bw + 3, baseY - bh);
+    ctx.moveTo(x - 2, baseY - bh);
+    ctx.lineTo(x + bw * 0.5, baseY - bh - 10);
+    ctx.lineTo(x + bw + 2, baseY - bh);
     ctx.closePath();
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  DrawRidge(w, h, camX, 0.4, 0.62, 12, pal.field, 1);
-  DrawRidge(w, h, camX, 0.62, 0.7, 8, pal.earth, 1);
+
+  // Mid field plate + furrow stripes (parallax 0.35)
+  DrawRidge(w, h, camX, 0.35, 0.64, 12, pal.field, 1);
+  const furrowY = h * 0.64;
+  const furrowScroll = camX * 0.35 * Scale();
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.22)" : "rgba(40,50,28,.28)";
+  ctx.lineWidth = 1.2;
+  for (let i = -4; i < 28; i++) {
+    const x = ((i * 48 - furrowScroll) % (w + 80)) - 20;
+    ctx.beginPath();
+    ctx.moveTo(x, furrowY - 8);
+    ctx.lineTo(x + (x - w * 0.5) * 0.08, furrowY + 28);
+    ctx.stroke();
+  }
+
+  DrawRidge(w, h, camX, 0.55, 0.72, 9, pal.earth, 1);
+  // Soft atmospheric veil over far bands so they read as distance
+  const veil = ctx.createLinearGradient(0, h * 0.38, 0, h * 0.7);
+  veil.addColorStop(0, pal.night ? "rgba(20,28,36,.35)" : "rgba(180,200,190,.22)");
+  veil.addColorStop(0.55, pal.night ? "rgba(20,28,36,.12)" : "rgba(180,200,190,.08)");
+  veil.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = veil;
+  ctx.fillRect(0, h * 0.38, w, h * 0.34);
+}
+
+/** Haze strip between depth bands — sells air between planes. */
+function DrawDepthVeil(w, h, y0, y1, rgba) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(0.45, rgba);
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y0, w, Math.max(4, y1 - y0));
 }
 
 /** Perspective stage floor — VH walk plane with foreshortening stripes. */
 function DrawStageFloor(w, h, pal) {
   const s = Scale();
   const y = WY(SURFACE_Y);
-  // Receding dirt plate behind the walk line
-  const back = ctx.createLinearGradient(0, y - 70 * s, 0, y);
+  // Receding dirt plate behind the walk line (field → earth)
+  const back = ctx.createLinearGradient(0, y - 90 * s, 0, y);
   back.addColorStop(0, pal.night ? "rgba(42,50,40,.0)" : "rgba(120,140,90,.0)");
-  back.addColorStop(0.55, pal.night ? "#2e382c" : "#7a8f5c");
-  back.addColorStop(1, pal.night ? "#3a3228" : "#8b6a45");
+  back.addColorStop(0.4, pal.night ? "#2e382c" : "#7a8f5c");
+  back.addColorStop(0.78, pal.night ? "#3a3228" : "#8b6a45");
+  back.addColorStop(1, pal.night ? "#32281e" : "#7a5a38");
   ctx.fillStyle = back;
-  ctx.fillRect(0, y - 70 * s, w, 70 * s);
+  ctx.fillRect(0, y - 90 * s, w, 90 * s);
 
   // Walk strip toward camera (darker = nearer)
   const near = ctx.createLinearGradient(0, y, 0, h);
   near.addColorStop(0, pal.night ? "#3a3228" : "#8b6a45");
-  near.addColorStop(0.35, pal.night ? "#2a241c" : "#6a4e34");
-  near.addColorStop(1, pal.night ? "#12100e" : "#3a2818");
+  near.addColorStop(0.28, pal.night ? "#2a241c" : "#6a4e34");
+  near.addColorStop(0.65, pal.night ? "#1a1612" : "#4a3420");
+  near.addColorStop(1, pal.night ? "#0c0a08" : "#2a1c12");
   ctx.fillStyle = near;
   ctx.fillRect(0, y, w, h - y + 4);
 
-  // Perspective hatch lines — sell the 2.5D ground plane
-  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.28)" : "rgba(40,28,16,.22)";
-  ctx.lineWidth = 1;
-  for (let i = -6; i < 18; i++) {
-    const x0 = WX(state.cameraX + i * 70);
+  // Perspective hatch lines — vanishing toward mid-horizon
+  const vpX = w * 0.5;
+  const vpY = y - 40 * s;
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.32)" : "rgba(40,28,16,.26)";
+  ctx.lineWidth = 1.15;
+  for (let i = -10; i < 22; i++) {
+    const x0 = WX(state.cameraX + i * 58);
     ctx.beginPath();
     ctx.moveTo(x0, y);
-    ctx.lineTo(w * 0.5 + (x0 - w * 0.5) * 1.45, h);
+    ctx.lineTo(vpX + (x0 - vpX) * 1.65, h + 8);
     ctx.stroke();
   }
-  // Horizon seam
-  ctx.strokeStyle = "rgba(20,14,10,.55)";
-  ctx.lineWidth = 2.5;
+  // Cross boards (nearer = thicker / wider spacing)
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.2)" : "rgba(30,20,12,.18)";
+  for (let t = 0.15; t < 0.95; t += 0.12) {
+    const yy = y + (h - y) * t;
+    ctx.lineWidth = 1 + t * 2.5;
+    ctx.globalAlpha = 0.35 + t * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(0, yy);
+    ctx.lineTo(w, yy);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Horizon seam (walk line)
+  ctx.strokeStyle = "rgba(20,14,10,.65)";
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(0, y);
   ctx.lineTo(w, y);
   ctx.stroke();
+  // Soft light rim just above the walk line
+  const rim = ctx.createLinearGradient(0, y - 10 * s, 0, y + 6 * s);
+  rim.addColorStop(0, "rgba(255,230,180,.0)");
+  rim.addColorStop(0.55, pal.night ? "rgba(200,180,120,.08)" : "rgba(255,230,180,.16)");
+  rim.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = rim;
+  ctx.fillRect(0, y - 10 * s, w, 16 * s);
 }
 
 function DrawSoilCutaway(w, h, camX, pal) {
@@ -302,8 +360,8 @@ function DrawSoilCutaway(w, h, camX, pal) {
   ctx.rect(0, 0, w, Math.max(0, cutY));
   ctx.clip();
   DrawDepthBackdrop(w, h, camX, pal);
-  for (const prop of PropsBehind(state.level.props)) {
-    DrawProp(prop, pal, 0.55);
+  for (const [, band] of PropsBehindBands(state.level.props)) {
+    for (const prop of band) DrawProp(prop, pal, 0.55);
   }
   ctx.restore();
 
@@ -339,6 +397,15 @@ function DrawProp(prop, pal, alphaMul = 1) {
   ctx.globalAlpha = TintAlpha(depth) * alphaMul;
   ctx.lineWidth = Math.max(1.5, 2.4 * s);
   ctx.strokeStyle = depth >= 1 ? "#0e0a08" : "#1c1712";
+
+  // Contact shadow — stronger / wider toward camera
+  const shadowW = (depth >= 2 ? 46 : depth >= 1 ? 34 : depth < 0 ? 18 : 26) * s;
+  const shadowA = depth >= 1 ? 0.35 : depth < 0 ? 0.12 : 0.22;
+  ctx.fillStyle = `rgba(10,6,4,${shadowA})`;
+  ctx.beginPath();
+  if (typeof ctx.ellipse === "function") ctx.ellipse(0, 4 * s, shadowW, 5 * s, 0, 0, Math.PI * 2);
+  else ctx.arc(0, 4 * s, shadowW * 0.45, 0, Math.PI * 2);
+  ctx.fill();
 
   const cool = depth < 0;
   const ink = cool ? (pal.night ? "#1a221c" : "#3a4a38") : "#1c1712";
@@ -1114,15 +1181,34 @@ function DrawProjectiles() {
 
 function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   const playable = !!opts.playable;
+  const s = Scale();
+  const walkY = WY(SURFACE_Y);
   // 1 far sky + ridge bands
   DrawSky(w, h, pal);
   DrawDepthBackdrop(w, h, camX, pal);
   // 2 stage floor (perspective plate)
   DrawStageFloor(w, h, pal);
-  // 3 BACK props (houses behind walk plane)
-  for (const prop of PropsBehind(state.level.props)) DrawProp(prop, pal);
+
+  // 3 BACK props by depth band — haze between FAR / MID / BACK
+  const hazeFar = pal.night ? "rgba(18,24,32,.28)" : "rgba(170,190,180,.2)";
+  const hazeMid = pal.night ? "rgba(16,20,24,.18)" : "rgba(140,150,120,.14)";
+  for (const [depth, band] of PropsBehindBands(state.level.props)) {
+    for (const prop of band) DrawProp(prop, pal);
+    if (depth <= -3) DrawDepthVeil(w, h, walkY - 140 * s, walkY - 40 * s, hazeFar);
+    else if (depth === -2) DrawDepthVeil(w, h, walkY - 90 * s, walkY - 10 * s, hazeMid);
+  }
   if (playable) DrawSurfaceExtras();
-  // 4 play-plane props
+
+  // Soft cool wash so play plane pops warmer against the back
+  DrawDepthVeil(
+    w,
+    h,
+    walkY - 50 * s,
+    walkY + 20 * s,
+    pal.night ? "rgba(10,12,16,.16)" : "rgba(90,110,90,.1)",
+  );
+
+  // 4 play-plane props + actors
   for (const prop of PropsPlay(state.level.props)) DrawProp(prop, pal);
   if (playable) {
     for (const shaft of state.level.shafts) DrawShaft(shaft);
@@ -1132,28 +1218,48 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     DrawSpeechBubble();
     DrawInteractPromptWorld();
   }
+
   // 5 FRONT occluders — paint AFTER player (real 2.5D cover)
-  for (const prop of PropsFront(state.level.props)) DrawProp(prop, pal);
+  const front = PropsFront(state.level.props);
+  for (const prop of front.filter((p) => (p.depth ?? 0) === 1)) DrawProp(prop, pal);
+  // Darken a bit before NEAR so the closest plane punches harder
+  DrawDepthVeil(
+    w,
+    h,
+    walkY + 10 * s,
+    h * 0.92,
+    pal.night ? "rgba(0,0,0,.16)" : "rgba(20,12,8,.12)",
+  );
+  for (const prop of front.filter((p) => (p.depth ?? 0) >= 2)) DrawProp(prop, pal);
+
   // Near camera dirt skirt — solid bottom plane like VH stage edge
   ctx.fillStyle = pal.night ? "#0e0c0a" : "#2a1c12";
   ctx.beginPath();
   ctx.moveTo(0, h);
-  ctx.lineTo(0, h * 0.9);
-  for (let i = 0; i <= w; i += 40) {
-    const wave = Math.sin((i + camX * 1.5) * 0.02) * 10;
-    ctx.lineTo(i, h * 0.88 + wave);
+  ctx.lineTo(0, h * 0.86);
+  for (let i = 0; i <= w; i += 28) {
+    const wave = Math.sin((i + camX * 1.7) * 0.025) * 14 + Math.sin((i + camX) * 0.01) * 6;
+    ctx.lineTo(i, h * 0.84 + wave);
   }
   ctx.lineTo(w, h);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#0a0806";
-  ctx.lineWidth = 2;
+  // Skirt lip highlight
+  ctx.strokeStyle = pal.night ? "#1a1410" : "#3a2818";
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(0, h * 0.88);
-  for (let i = 0; i <= w; i += 40) {
-    ctx.lineTo(i, h * 0.88 + Math.sin((i + camX * 1.5) * 0.02) * 10);
+  ctx.moveTo(0, h * 0.84);
+  for (let i = 0; i <= w; i += 28) {
+    ctx.lineTo(i, h * 0.84 + Math.sin((i + camX * 1.7) * 0.025) * 14);
   }
   ctx.stroke();
+  // Tiny near grass nubs along the skirt
+  ctx.fillStyle = pal.night ? "#152016" : "#2a3820";
+  for (let i = 0; i < 18; i++) {
+    const x = ((i * 70 - camX * 1.6) % (w + 60)) - 20;
+    const y0 = h * 0.84 + Math.sin((x + camX * 1.7) * 0.025) * 14;
+    ctx.fillRect(x, y0 - 18, 5, 18);
+  }
 }
 
 function RenderTunnelStack(w, h, camX, pal) {

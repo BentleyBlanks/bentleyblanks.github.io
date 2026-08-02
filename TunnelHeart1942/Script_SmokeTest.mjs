@@ -5,7 +5,7 @@ import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
 import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
-import { PropsBehind, PropsFront } from "./Script_Depth.mjs";
+import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   CreateCampaignState,
@@ -326,8 +326,15 @@ function TestAct5PlantNeedsCharge() {
 
 function TestDepthLayers() {
   const level = BuildLevel("act1_connect");
-  Assert(PropsBehind(level.props).length > 3, "back depth props exist");
-  Assert(PropsFront(level.props).length > 5, "front occluder props exist");
+  Assert(PropsBehind(level.props).length > 8, "back depth props exist");
+  Assert(PropsFront(level.props).length > 8, "front occluder props exist");
+  Assert(level.props.some((p) => p.depth === DEPTH_MID), "mid depth crop/orchard band");
+  Assert(PropsBehindBands(level.props).length >= 2, "multiple behind depth bands");
+  Assert(ScaleOf(-3) < ScaleOf(-1) && ScaleOf(-1) < ScaleOf(0) && ScaleOf(0) < ScaleOf(2), "depth scale stack");
+  Assert(YLiftOf(-3, 1) < YLiftOf(0, 1) && YLiftOf(0, 1) < YLiftOf(2, 1), "depth Y-lift stack");
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("DrawDepthVeil"), "atmospheric depth veils");
+  Assert(game.includes("PropsBehindBands"), "banded behind draw");
 }
 
 function TestChaptersHaveSoil() {

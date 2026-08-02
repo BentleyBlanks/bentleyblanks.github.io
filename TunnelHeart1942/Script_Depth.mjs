@@ -1,51 +1,53 @@
 /**
- * Valiant Hearts–style 2.5D depth planes.
- * Gameplay stays flat 2D; paint order + parallax + scale fake a diorama stage
- * with real front occlusion (props drawn after the player).
+ * Valiant Hearts–style 2.5D depth planes (punched up).
+ * Gameplay stays flat 2D; paint order + parallax + scale + Y-lift + haze
+ * sell a diorama stage with real front occlusion.
  *
  * depth < 0  behind play plane (smaller, higher, cooler, slower scroll)
- * depth = 0  play plane (player, interactables, main houses)
+ * depth = 0  play plane (player, interactables)
  * depth > 0  foreground occluders (larger, lower, darker, faster scroll)
  */
 
 export const DEPTH_FAR = -3;
+export const DEPTH_MID = -2;
 export const DEPTH_BACK = -1;
 export const DEPTH_PLAY = 0;
 export const DEPTH_FRONT = 1;
 export const DEPTH_NEAR = 2;
 
 export function ParallaxOf(depth) {
-  if (depth <= -3) return 0.08;
-  if (depth === -2) return 0.22;
-  if (depth === -1) return 0.55;
+  if (depth <= -3) return 0.06;
+  if (depth === -2) return 0.28;
+  if (depth === -1) return 0.58;
   if (depth === 0) return 1;
-  if (depth === 1) return 1.25;
-  return 1.55;
+  if (depth === 1) return 1.35;
+  return 1.7;
 }
 
 export function ScaleOf(depth) {
-  if (depth <= -3) return 0.48;
-  if (depth === -2) return 0.62;
-  if (depth === -1) return 0.82;
+  if (depth <= -3) return 0.38;
+  if (depth === -2) return 0.58;
+  if (depth === -1) return 0.78;
   if (depth === 0) return 1;
-  if (depth === 1) return 1.28;
-  return 1.55;
+  if (depth === 1) return 1.38;
+  return 1.72;
 }
 
-/** Screen Y lift: far sits higher on the stage ridge; near drops toward camera. */
+/** Screen Y lift: far sits on the ridge; near drops into the camera skirt. */
 export function YLiftOf(depth, scale) {
-  if (depth <= -3) return -96 * scale;
-  if (depth === -2) return -58 * scale;
-  if (depth === -1) return -34 * scale;
+  if (depth <= -3) return -118 * scale;
+  if (depth === -2) return -72 * scale;
+  if (depth === -1) return -42 * scale;
   if (depth === 0) return 0;
-  if (depth === 1) return 28 * scale;
-  return 56 * scale;
+  if (depth === 1) return 36 * scale;
+  return 72 * scale;
 }
 
 export function TintAlpha(depth) {
-  if (depth <= -2) return 0.5;
-  if (depth === -1) return 0.78;
-  // Front plane must read solid — not a translucent smear
+  if (depth <= -3) return 0.42;
+  if (depth === -2) return 0.62;
+  if (depth === -1) return 0.86;
+  if (depth >= 2) return 1;
   if (depth >= 1) return 1;
   return 1;
 }
@@ -56,49 +58,74 @@ export function SeedDepthDecor(level) {
   const width = level.width || 2400;
   const night = !!level.palette?.night;
 
-  // Far silhouette ridge markers (drawn as tiny houses in back band)
-  for (let x = 80; x < width; x += 210 + (x % 70)) {
-    props.push({ kind: "farHouse", x, depth: DEPTH_FAR, variant: (x / 70) | 0 });
+  // FAR — tiny silhouette village on the horizon ridge
+  for (let x = 60; x < width; x += 180 + (x % 60)) {
+    props.push({ kind: "farHouse", x, depth: DEPTH_FAR, variant: (x / 60) | 0 });
+  }
+  for (let x = 120; x < width; x += 260) {
+    props.push({ kind: "tree", x, depth: DEPTH_FAR, occlude: false });
   }
 
-  // Mid-back orchard / sheds behind the walk plane
-  for (let x = 160; x < width; x += 320 + (x % 90)) {
+  // MID — orchard / crop band between horizon and village street
+  for (let x = 100; x < width; x += 90 + (x % 40)) {
+    props.push({ kind: "wheat", x, depth: DEPTH_MID });
+  }
+  for (let x = 200; x < width; x += 280 + (x % 70)) {
+    props.push({ kind: "tree", x, depth: DEPTH_MID, occlude: false });
+  }
+  for (let x = 160; x < width; x += 340 + (x % 90)) {
+    if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 120)) continue;
+    props.push({ kind: "shed", x, depth: DEPTH_MID });
+  }
+
+  // BACK — street buildings sit behind the walk plane (player walks in front)
+  for (let x = 180; x < width; x += 300 + (x % 80)) {
     if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 100)) continue;
     props.push({ kind: "shed", x, depth: DEPTH_BACK });
   }
+  for (let x = 90; x < width; x += 200) {
+    props.push({ kind: "post", x, depth: DEPTH_BACK });
+  }
 
-  // Play-plane roadside props (same depth as player — no occlusion)
-  for (let x = 240; x < width; x += 380) {
-    if (props.some((p) => Math.abs(p.x - x) < 60)) continue;
+  // PLAY — roadside clutter on the walk line
+  for (let x = 240; x < width; x += 360) {
+    if (props.some((p) => Math.abs(p.x - x) < 60 && (p.depth ?? 0) === 0)) continue;
     props.push({ kind: "stack", x, depth: DEPTH_PLAY });
   }
 
-  // FRONT occluders — paint AFTER the player; dense enough to read as 2.5D cover
-  for (let x = 70; x < width; x += 130 + (x % 40)) {
-    const roll = (x * 13) % 5;
-    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
+  // FRONT — mid occluders (wheat / bush / post) between player and camera
+  for (let x = 50; x < width; x += 110 + (x % 35)) {
+    const roll = (x * 17) % 6;
+    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
     else if (roll === 1) props.push({ kind: "wheat", x, depth: DEPTH_FRONT });
     else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_FRONT });
-    else if (roll === 3) props.push({ kind: "mudbank", x, depth: DEPTH_NEAR, w: 90 + (x % 50) });
-    else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
+    else if (roll === 3) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
+    else if (roll === 4) props.push({ kind: "stack", x, depth: DEPTH_FRONT });
+    else props.push({ kind: "wheat", x: x + 20, depth: DEPTH_FRONT });
   }
 
-  // Big near trees that clip the player silhouette hard
-  for (let x = 280; x < width; x += 380) {
+  // NEAR — hard occluders + mudbanks that clip the silhouette
+  for (let x = 40; x < width; x += 150 + (x % 45)) {
+    const roll = (x * 13) % 4;
+    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
+    else if (roll === 1) props.push({ kind: "mudbank", x, depth: DEPTH_NEAR, w: 100 + (x % 60) });
+    else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_NEAR });
+    else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
+  }
+  for (let x = 260; x < width; x += 360) {
     props.push({ kind: "tree", x: x + 40, depth: DEPTH_NEAR, occlude: true });
   }
-  // Extra near mud banks at walk height — undeniable front plane
-  for (let x = 150; x < width; x += 260) {
-    props.push({ kind: "mudbank", x: x + 30, depth: DEPTH_NEAR, w: 110 });
+  for (let x = 120; x < width; x += 220) {
+    props.push({ kind: "mudbank", x: x + 30, depth: DEPTH_NEAR, w: 120 });
   }
 
   if (night) {
-    for (let x = 300; x < width; x += 440) {
+    for (let x = 280; x < width; x += 400) {
       props.push({ kind: "lantern", x, depth: DEPTH_BACK });
     }
   }
 
-  // Ensure authored houses sit on a depth band
+  // Ensure authored props sit on a depth band
   for (const p of props) {
     if (p.depth == null) {
       if (p.kind === "house" || p.kind === "blockhouse" || p.kind === "well" || p.kind === "bell") {
@@ -122,4 +149,16 @@ export function PropsPlay(props) {
 
 export function PropsFront(props) {
   return (props || []).filter((p) => (p.depth ?? 0) > 0).sort((a, b) => a.depth - b.depth);
+}
+
+/** Group behind props by depth band for layered haze between bands. */
+export function PropsBehindBands(props) {
+  const behind = PropsBehind(props);
+  const bands = new Map();
+  for (const p of behind) {
+    const d = p.depth ?? -1;
+    if (!bands.has(d)) bands.set(d, []);
+    bands.get(d).push(p);
+  }
+  return [...bands.entries()].sort((a, b) => a[0] - b[0]);
 }
