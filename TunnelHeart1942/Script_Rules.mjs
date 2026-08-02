@@ -1,15 +1,18 @@
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import {
+  AIR,
   CarveCell,
+  GetCell,
   RebuildTunnelSolids,
   SetCell,
-  AIR,
+  SOFT,
 } from "./Script_Dig.mjs";
 import {
   ClearPlanCell,
   CountPlanned,
   EnsurePlanGrid,
   InitPlanCursor,
+  IsPlanned,
   MovePlanCursor,
   PickExcavateTarget,
   StampChamberPlan,
@@ -357,8 +360,14 @@ function TryExcavate(state) {
   const digDown = !!input.crouch;
   const dig = PickExcavateTarget(level.soil, player.x, player.y, player.facing, digDown, digUp);
   if (!dig) {
-    SetSubtitle(state, "提示", "先按 R 进入设计，把要挖的格子标成蓝图，再点 J 开挖。不能长按乱挖。", 3.2);
-    state.interactHint = "need_plan";
+    const planned = CountPlanned(level.soil);
+    if (planned > 0) {
+      SetSubtitle(state, "提示", "蓝图已画好——走到蓝色格子旁边，再点 J 开挖。", 2.8);
+      state.interactHint = "follow_plan";
+    } else {
+      SetSubtitle(state, "提示", "先按 R 进入设计，把要挖的格子标成蓝图，再点 J 开挖。不能长按乱挖。", 3.2);
+      state.interactHint = "need_plan";
+    }
     return;
   }
   player.digTarget = dig;
@@ -366,6 +375,15 @@ function TryExcavate(state) {
   if (CarveCell(level.soil, dig.c, dig.r)) {
     state.stats.digs += 1;
     state.stats.cellsCarved += 1;
+    // One tap also clears planned headroom — player is ~2 cells tall.
+    const headR = dig.r - 1;
+    if (IsPlanned(level.soil, dig.c, headR) && GetCell(level.soil, dig.c, headR) === SOFT) {
+      if (CarveCell(level.soil, dig.c, headR)) state.stats.cellsCarved += 1;
+    }
+    const footR = dig.r + 1;
+    if (IsPlanned(level.soil, dig.c, footR) && GetCell(level.soil, dig.c, footR) === SOFT) {
+      if (CarveCell(level.soil, dig.c, footR)) state.stats.cellsCarved += 1;
+    }
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
     SetBubble(state, ["shovel"], "开挖", 0.7);
@@ -588,6 +606,13 @@ function TryInteract(state) {
     }
 
     if (ent.type === "hatch") {
+      // Going down into a tutorial hatch requires the shovel in hand.
+      if (!player.inTunnel && ent.needsShovel && player.held !== ITEM_SHOVEL) {
+        state.interactHint = "need_shovel";
+        SetBubble(state, ["shovel", "warn"], "先捡铁锹", 1.6);
+        SetSubtitle(state, "提示", "铁锹在井边。先捡上，再下洞挖。", 2.8);
+        return;
+      }
       BeginHatchTransition(state, !player.inTunnel, ent);
       if (ent.goal) MarkGoal(state, ent.goal);
       return;
@@ -816,7 +841,16 @@ function RefreshHint(state) {
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(state.player, ent)) continue;
     if (Near(state.player, ent, ent.radius || 52)) {
-      state.interactHint = ent.type;
+      if (
+        ent.type === "hatch" &&
+        ent.needsShovel &&
+        !state.player.inTunnel &&
+        state.player.held !== ITEM_SHOVEL
+      ) {
+        state.interactHint = "need_shovel";
+      } else {
+        state.interactHint = ent.type;
+      }
       return;
     }
   }
@@ -839,6 +873,7 @@ function RefreshHint(state) {
     );
     if (dig) state.interactHint = "dig";
     else if (CountPlanned(state.level.soil) === 0) state.interactHint = "need_plan";
+    else state.interactHint = "follow_plan";
   }
 }
 
@@ -978,6 +1013,24 @@ export function GoalsRemaining(state) {
   return Object.entries(state.goalsDone)
     .filter(([, d]) => !d)
     .map(([id]) => id);
+}
+
+/** Always-on next-step copy for the play HUD — Act1 is hard-gated by tutorials. */
+export function NextStepText(state) {
+  const g = state.goalsDone;
+  if (state.chapterId === "act1_connect") {
+    if (!g.talk_laozhong) return "找高老忠交谈（E）";
+    if (!g.talk_linxia) return "找林霞交谈（E）";
+    if (state.player.held !== ITEM_SHOVEL) return "去井边捡铁锹（E）";
+    if (!g.enter_hatch) return "带着铁锹到地窖口按 E 下洞";
+    if (!g.link_ab) return "顺着蓝线走到格旁，点 J 挖通甲—乙";
+    if (!g.link_bc) return "继续沿蓝线点 J，挖通乙—丙";
+    return "三家已通";
+  }
+  const chapter = CHAPTERS[state.chapterIndex];
+  const open = GoalsRemaining(state);
+  if (!open.length) return "本幕目标已完成";
+  return chapter?.objective || open[0];
 }
 
 /** Test helper: BFS-carve through SOFT (skips HARD) between two cells. */

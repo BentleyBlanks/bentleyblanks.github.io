@@ -12,6 +12,7 @@ import {
   RebuildTunnelSolids,
 } from "./Script_Dig.mjs";
 import { SeedDepthDecor } from "./Script_Depth.mjs";
+import { EnsurePlanGrid, PlanCorridorHeadroom, PlanSoftPath } from "./Script_Plan.mjs";
 import { ITEM_CHARGE, ITEM_GRENADE, ITEM_SHOVEL, PickupEntity } from "./Script_Items.mjs";
 
 function PlacePickup(x, y, itemId, layer = "both") {
@@ -99,10 +100,8 @@ function BuildAct1() {
     originY: DIG_ORIGIN_Y,
     cols,
     rows: DIG_ROWS,
-    hardBlobs: [
-      { c: 14, r: 1, w: 2, h: 3 }, // rock forcing dig around
-      { c: 32, r: 4, w: 3, h: 2 },
-    ],
+    // One soft rock bump later — Act1 tutorial path stays a straight soft corridor.
+    hardBlobs: [{ c: 33, r: 5, w: 2, h: 1 }],
     cellars: [cellarA, cellarB, cellarC],
   });
   AttachSoil(level, soil);
@@ -115,6 +114,17 @@ function BuildAct1() {
     { id: "link_bc", goal: "link_bc", ax: b.x, ay: b.y, bx: c.x, by: c.y },
   ];
 
+  // Pre-draw the tutorial corridors — player walks the blue path and taps J.
+  EnsurePlanGrid(soil);
+  const ac = { c: cellarA.c + 1, r: cellarA.r + 1 };
+  const bc = { c: cellarB.c + 1, r: cellarB.r + 1 };
+  const cc = { c: cellarC.c + 1, r: cellarC.r + 1 };
+  PlanSoftPath(soil, ac.c, ac.r, bc.c, bc.r);
+  PlanSoftPath(soil, bc.c, bc.r, cc.c, cc.r);
+  PlanCorridorHeadroom(soil);
+  level.tutorialPlan = true;
+
+  const wellX = (a.x + b.x) / 2;
   level.shafts = [{ x: a.x, label: "高家地窖", col: cellarA.c + 1, row: cellarA.r }];
   level.entities = [
     Ent({
@@ -128,7 +138,7 @@ function BuildAct1() {
         { speaker: "高老忠", text: "传宝，三家地窖互不相通，藏不住全村人。" },
         { speaker: "高老忠", text: "鬼子一进庄，各顾各的地窖——等于把人往网里送。" },
         { speaker: "高老忠", text: "铁锹在井边。你先捡上——空手挖不动土。" },
-        { speaker: "高老忠", text: "下洞后按 R 画蓝图，标出要挖的巷道，再点 J 一格格开挖。别学打洞乱刨！" },
+        { speaker: "高老忠", text: "下洞后蓝图已经画好了。走到蓝色格子旁，点 J 一格格挖通。按 R 能改蓝图。" },
       ],
       hint: "与高老忠交谈",
       goal: "talk_laozhong",
@@ -141,9 +151,9 @@ function BuildAct1() {
       layer: "surface",
       speaker: "林霞",
       script: [
-        { speaker: "林霞", text: "男的下洞，女的望风。蓝图画短了，人就喘不上气。" },
+        { speaker: "林霞", text: "男的下洞，女的望风。顺着蓝图挖，别乱跑。" },
         { speaker: "林霞", text: "软土能挖，硬砖绕开。通了三家，才算真正有地道。" },
-        { speaker: "林霞", text: "我在街上盯着——有狗腿子过来，你就别出声。" },
+        { speaker: "林霞", text: "井边那把铁锹——先捡上再下洞。" },
       ],
       hint: "与林霞交谈",
       goal: "talk_linxia",
@@ -151,7 +161,7 @@ function BuildAct1() {
     Ent({
       id: "npc_militia1",
       type: "talk",
-      x: 720,
+      x: 980,
       y: SURFACE_Y,
       layer: "surface",
       speaker: "民兵",
@@ -161,7 +171,8 @@ function BuildAct1() {
       ],
       hint: "与民兵交谈",
     }),
-    PlacePickup(100, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    // Shovel left of the well — clear of militia talk radius ("铁锹在井边")
+    PlacePickup(wellX - 40, SURFACE_Y, ITEM_SHOVEL, "surface"),
     Ent({
       id: "hatch1",
       type: "hatch",
@@ -174,6 +185,7 @@ function BuildAct1() {
       goal: "enter_hatch",
       tunnelX: a.x,
       tunnelY: a.y + 10,
+      needsShovel: true,
     }),
   ];
   level.props = [
@@ -181,7 +193,7 @@ function BuildAct1() {
     { kind: "house", x: b.x, variant: 1 },
     { kind: "house", x: c.x, variant: 0 },
     { kind: "tree", x: 2100 },
-    { kind: "well", x: (a.x + b.x) / 2 },
+    { kind: "well", x: wellX },
   ];
   return level;
 }

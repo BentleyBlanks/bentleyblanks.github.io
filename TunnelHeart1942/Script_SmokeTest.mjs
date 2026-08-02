@@ -15,10 +15,12 @@ import {
   DebugPlanCell,
   GoalsRemaining,
   LoadProgress,
+  NextStepText,
   SerializeProgress,
   StepPlay,
 } from "./Script_Rules.mjs";
 import { BONE_DEFS, CLIPS, SampleClip, SolveBones, PickClip } from "./Script_Puppet.mjs";
+import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +40,7 @@ function Play(i = 0) {
 
 function HatchDown(state, id) {
   const ent = state.level.entities.find((e) => e.id === id);
+  DebugHold(state, ITEM_SHOVEL);
   state.player.x = ent.x;
   state.player.y = 0;
   state.player.inTunnel = false;
@@ -93,6 +96,11 @@ function TestPlanBeforeExcavate() {
   state.player.facing = 1;
   state.player.onGround = true;
   DebugHold(state, ITEM_SHOVEL);
+  // Wipe tutorial blueprint so this test proves plan-gate still exists.
+  EnsurePlanGrid(state.level.soil);
+  for (let r = 0; r < state.level.soil.rows; r++) {
+    for (let c = 0; c < state.level.soil.cols; c++) state.level.soil.plan[r][c] = false;
+  }
   const before = state.stats.cellsCarved;
 
   // Hold dig must NOT carve (no Terraria hold-to-dig)
@@ -154,6 +162,61 @@ function TestPlanBeforeExcavate() {
   StepPlay(state, 1 / 30);
   Assert(state.stats.cellsCarved > before, "tap J excavates planned cell");
   Assert(GetCell(state.level.soil, target.c, target.r) === AIR, "cell became air");
+}
+
+function TestAct1TutorialPlayable() {
+  const level = BuildLevel("act1_connect");
+  const well = level.props.find((p) => p.kind === "well");
+  const shovel = level.entities.find((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL);
+  const hatch = level.entities.find((e) => e.id === "hatch1");
+  Assert(!!well && !!shovel, "well + shovel");
+  Assert(Math.abs(shovel.x - well.x) < 50, "shovel spawns at well");
+  Assert(hatch.needsShovel === true, "hatch requires shovel");
+  Assert(!!level.tutorialPlan, "act1 tutorial plan");
+  Assert(CountPlanned(level.soil) >= 40, "A→B→C pre-planned with headroom");
+
+  const state = Play(0);
+  Assert(/高老忠/.test(NextStepText(state)), "next-step hints talk first");
+  state.player.x = hatch.x;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.player.held = null;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  for (let i = 0; i < 60; i++) StepPlay(state, 1 / 30);
+  Assert(!state.player.inTunnel, "cannot hatch without shovel");
+
+  DebugHold(state, ITEM_SHOVEL);
+  state.player.x = hatch.x;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  for (let i = 0; i < 60; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.inTunnel, "hatch opens with shovel");
+
+  // Pre-drawn neighbor should excavate on first J without entering design.
+  const before = state.stats.cellsCarved;
+  state.player.x = hatch.tunnelX;
+  state.player.y = hatch.tunnelY;
+  state.player.facing = 1;
+  state.player.onGround = true;
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.stats.cellsCarved > before, "tutorial blueprint digs without R");
+
+  const html = readFileSync(join(here, "index.html"), "utf8");
+  Assert(html.includes('data-touch="corridor"'), "mobile corridor C button");
+  Assert(html.includes('id="StepHint"'), "always-on step hint");
+}
+
+function TestNaiveAct1Bot() {
+  const bot = spawnSync(process.execPath, [join(here, "Script_NaiveAct1Bot.mjs")], {
+    encoding: "utf8",
+  });
+  if (bot.stdout) process.stdout.write(bot.stdout);
+  if (bot.stderr) process.stderr.write(bot.stderr);
+  Assert(bot.status === 0, "naive Act1 bot finishes all goals");
 }
 
 function TestCarveConnectsAct1() {
@@ -373,6 +436,7 @@ function Main() {
   TestPuppetAnim();
   TestDepthLayers();
   TestSoilNotGifted();
+  TestAct1TutorialPlayable();
   TestPlanBeforeExcavate();
   TestCarveConnectsAct1();
   TestNoJump();
@@ -381,13 +445,14 @@ function Main() {
   TestAct2MustDigBeforeShelter();
   TestAct4KillInvaders();
   TestAct5PlantNeedsCharge();
+  TestNaiveAct1Bot();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 ambush-kill smoke OK");
+  console.log("\nTunnelHeart1942 play-fix smoke OK");
 }
 
 Main();

@@ -117,7 +117,7 @@ export function StampChamberPlan(soil, c0, r0, w = 2, h = 2) {
   return n;
 }
 
-/** Extend a corridor plan in a facing direction from a seed cell. */
+/** Extend a corridor plan in a facing direction from a seed cell (2 cells tall). */
 export function StampCorridorPlan(soil, c0, r0, facing, length = 4) {
   EnsurePlanGrid(soil);
   let n = 0;
@@ -127,14 +127,23 @@ export function StampCorridorPlan(soil, c0, r0, facing, length = 4) {
     c += facing;
     if (!InBounds(soil, c, r)) break;
     if (GetCell(soil, c, r) === HARD) break;
-    if (GetCell(soil, c, r) === AIR) continue;
+    if (GetCell(soil, c, r) === AIR) {
+      // still try headroom mark on soft above/below nothing — keep extending
+      continue;
+    }
     if (GetCell(soil, c, r) !== SOFT) break;
     if (!soil.plan[r][c] && CanPlanCell(soil, c, r)) {
       soil.plan[r][c] = true;
       n += 1;
-    } else if (soil.plan[r][c]) {
-      continue;
-    } else break;
+    } else if (!soil.plan[r][c]) break;
+    // Headroom cell above the floor mark
+    const above = r - 1;
+    if (InBounds(soil, c, above) && GetCell(soil, c, above) === SOFT && !soil.plan[above][c]) {
+      if (CanPlanCell(soil, c, above) || soil.plan[r][c]) {
+        soil.plan[above][c] = true;
+        n += 1;
+      }
+    }
   }
   return n;
 }
@@ -159,6 +168,8 @@ export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digU
   preferred.push(
     { c: pc.c + facing, r: pc.r },
     { c: pc.c + facing, r: pc.r - 1 },
+    { c: pc.c + facing * 2, r: pc.r },
+    { c: pc.c + facing * 2, r: pc.r - 1 },
     { c: pc.c, r: pc.r - 1 },
     { c: pc.c, r: pc.r + 1 },
     { c: pc.c - facing, r: pc.r },
@@ -172,7 +183,8 @@ export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digU
     if (!InBounds(soil, c, r)) continue;
     if (GetCell(soil, c, r) !== SOFT) continue;
     if (!IsPlanned(soil, c, r)) continue;
-    const nearPlayer = Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 1;
+    // Manhattan ≤2 so cellar-center still reaches the east lip plan cell.
+    const nearPlayer = Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 2;
     if (!nearPlayer) continue;
     return { c, r, rect: CellWorldRect(soil, c, r) };
   }
@@ -180,13 +192,103 @@ export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digU
 }
 
 export function InitPlanCursor(soil, playerX, playerY, facing) {
-  const pc = WorldToCell(soil, playerX + facing * 24, playerY - 24);
-  if (InBounds(soil, pc.c, pc.r)) return { c: pc.c, r: pc.r };
-  const fallback = WorldToCell(soil, playerX, playerY - 24);
+  EnsurePlanGrid(soil);
+  const pc = WorldToCell(soil, playerX, playerY - 24);
+  // Prefer a SOFT (ideally already planned) neighbor — never start the cursor on AIR.
+  const candidates = [
+    { c: pc.c + facing, r: pc.r },
+    { c: pc.c + facing, r: pc.r - 1 },
+    { c: pc.c, r: pc.r - 1 },
+    { c: pc.c, r: pc.r + 1 },
+    { c: pc.c - facing, r: pc.r },
+    { c: pc.c + facing, r: pc.r + 1 },
+  ];
+  for (const cell of candidates) {
+    if (!InBounds(soil, cell.c, cell.r)) continue;
+    if (GetCell(soil, cell.c, cell.r) !== SOFT) continue;
+    if (IsPlanned(soil, cell.c, cell.r) || CanPlanCell(soil, cell.c, cell.r)) return cell;
+  }
+  for (const cell of candidates) {
+    if (InBounds(soil, cell.c, cell.r) && GetCell(soil, cell.c, cell.r) === SOFT) return cell;
+  }
+  const probe = WorldToCell(soil, playerX + facing * 24, playerY - 24);
   return {
-    c: Math.max(1, Math.min(soil.cols - 2, fallback.c)),
-    r: Math.max(1, Math.min(soil.rows - 2, fallback.r)),
+    c: Math.max(1, Math.min(soil.cols - 2, probe.c)),
+    r: Math.max(1, Math.min(soil.rows - 2, probe.r)),
   };
+}
+
+/**
+ * BFS soft path between two cells (around HARD), then mark every soft step as planned.
+ * Used to pre-draw tutorial corridors so Act1 is playable without inventing the UX.
+ */
+export function PlanSoftPath(soil, c0, r0, c1, r1) {
+  EnsurePlanGrid(soil);
+  if (!InBounds(soil, c0, r0) || !InBounds(soil, c1, r1)) return 0;
+  const key = (c, r) => `${c},${r}`;
+  const walkable = (c, r) => {
+    if (!InBounds(soil, c, r)) return false;
+    const v = GetCell(soil, c, r);
+    return v === SOFT || v === AIR;
+  };
+  const q = [[c0, r0]];
+  const prev = new Map([[key(c0, r0), null]]);
+  const dirs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  let found = false;
+  while (q.length) {
+    const [c, r] = q.shift();
+    if (c === c1 && r === r1) {
+      found = true;
+      break;
+    }
+    for (const [dc, dr] of dirs) {
+      const nc = c + dc;
+      const nr = r + dr;
+      const k = key(nc, nr);
+      if (prev.has(k)) continue;
+      if (!walkable(nc, nr)) continue;
+      prev.set(k, [c, r]);
+      q.push([nc, nr]);
+    }
+  }
+  if (!found) return 0;
+  let n = 0;
+  let cur = [c1, r1];
+  while (cur) {
+    const [c, r] = cur;
+    if (GetCell(soil, c, r) === SOFT && !soil.plan[r][c]) {
+      soil.plan[r][c] = true;
+      n += 1;
+    }
+    cur = prev.get(key(c, r));
+  }
+  return n;
+}
+
+/**
+ * Player is ~2 cells tall — any planned floor cell also needs the soft cell above
+ * marked, or digging a 1-high crawlway traps you against the ceiling solid.
+ */
+export function PlanCorridorHeadroom(soil) {
+  EnsurePlanGrid(soil);
+  let n = 0;
+  for (let r = 1; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      if (!soil.plan[r][c]) continue;
+      if (GetCell(soil, c, r) !== SOFT) continue;
+      const above = r - 1;
+      if (GetCell(soil, c, above) !== SOFT) continue;
+      if (soil.plan[above][c]) continue;
+      soil.plan[above][c] = true;
+      n += 1;
+    }
+  }
+  return n;
 }
 
 export function MovePlanCursor(soil, cursor, dc, dr) {

@@ -4,6 +4,7 @@ import {
   CreateCampaignState,
   CreateInputState,
   LoadFromStorage,
+  NextStepText,
   PLAYER_H,
   RestartChapter,
   SaveToStorage,
@@ -106,16 +107,25 @@ function SyncHud() {
   const held = state.player.held;
   const meta = held ? ITEM_META[held] : null;
   slot.dataset.empty = held ? "0" : "1";
+  const tutorialDig =
+    !!state.level?.tutorialPlan && state.player.inTunnel && held === ITEM_SHOVEL && !state.designMode;
   if (state.designMode) {
     slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>光标移格 · J 标记 · T 厢室 · C 巷道 · R 退出</em>`;
   } else {
     slot.innerHTML = meta
-      ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip} · R 设计地道</em>`
+      ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${
+          tutorialDig ? "顺着蓝线走到格旁，点 J 开挖" : `${meta.tip} · R 设计地道`
+        }</em>`
       : `<b></b><span>空手</span><em>E 捡道具 · 洞里 R 设计蓝图再挖</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }
   const badge = $("DesignBadge");
   if (badge) badge.hidden = !state.designMode;
+  const step = $("StepHint");
+  if (step) {
+    step.textContent = NextStepText(state);
+    step.hidden = false;
+  }
 }
 
 function SyncPhaseUi() {
@@ -1056,19 +1066,21 @@ function DrawInteractPromptWorld() {
   const x = WX(state.player.x);
   const y = WY(state.player.y) - 8 * s;
   const key =
-    hint === "dig" || hint === "design" || hint === "need_plan"
+    hint === "dig" || hint === "design" || hint === "need_plan" || hint === "follow_plan"
       ? hint === "design"
         ? "J"
         : hint === "need_plan"
           ? "R"
-          : "J"
+          : hint === "follow_plan"
+            ? "→"
+            : "J"
       : hint === "plant_zone" && state.player.held === ITEM_CHARGE
         ? "F"
         : hint === "need_shovel"
           ? "E"
           : "E";
   const icon =
-    hint === "dig" || hint === "need_shovel" || hint === "pickup"
+    hint === "dig" || hint === "need_shovel" || hint === "pickup" || hint === "follow_plan"
       ? "shovel"
       : hint === "hatch"
         ? "hatch"

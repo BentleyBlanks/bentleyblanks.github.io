@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v5";
-export const CACHE_BUST = "20260802l";
+export const CACHE_BUST = "20260802m";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -73,7 +73,7 @@ export const CHAPTERS = [
     title: "土洞相连",
     timeLabel: "一九四二年 · 春",
     cast: "高传宝",
-    objective: "先听高老忠与林霞交代，再下地窖，把三家土洞挖通。",
+    objective: "听交代 → 井边捡铁锹 → 下洞 → 沿蓝线点 J 挖通三家。",
     goals: ["talk_laozhong", "talk_linxia", "enter_hatch", "link_ab", "link_bc"],
     openPanels: [
       {
@@ -115,7 +115,7 @@ export const CHAPTERS = [
       {
         id: "p1g",
         speaker: "提示",
-        text: "E 捡铁锹（一次只拿一件）。下洞后按 R 进入设计蓝图，方向键移光标，J 标记要挖的格；退出设计后走到标记旁再点 J 开挖——不是泰拉瑞亚式长按乱刨。",
+        text: "E 捡井边铁锹（一次一件）→ 地窖口 E 下洞。蓝图已画好：走到蓝色格子旁点 J 开挖。要改线再按 R。不是长按乱刨。",
         mood: "tip",
       },
     ],

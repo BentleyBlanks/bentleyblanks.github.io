@@ -285,3 +285,18 @@ button {
   padding: 6px 14px; font-weight: 700; letter-spacing: .08em;
   box-shadow: 3px 3px 0 rgba(0,0,0,.3); pointer-events: none;
 }
+
+.stepHint {
+  position: absolute; top: calc(7% + 52px); left: 14px;
+  max-width: min(340px, 62vw);
+  margin: 0;
+  padding: 6px 10px;
+  background: rgba(26, 20, 16, .82);
+  color: #efe2c8;
+  border: 2px solid #1a1410;
+  font-size: .78rem;
+  line-height: 1.35;
+  font-weight: 600;
+  pointer-events: none;
+  box-shadow: 2px 2px 0 rgba(0,0,0,.28);
+}
