@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#11171b">
   <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法白盒">
   <title>地脉：三个循环 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803c">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803d">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -52,7 +52,7 @@
         <dl class="controlList">
           <div><dt>A / D</dt><dd>左右移动；移动端长按方向按钮。</dd></div>
           <div><dt>遮挡</dt><dd>潜行只认场景里的草垛、断墙、灌木、车架和井台；人物进入遮挡会自动压低身形，空地上没有任何蹲伏隐身判定。</dd></div>
-          <div><dt>S</dt><dd>靠近蓝色入口时切换地上与地下。</dd></div>
+          <div><dt>W / S</dt><dd>靠近蓝色竖井时，W 向上攀爬，S 向下进入。</dd></div>
           <div><dt>Q</dt><dd>第二关切换角色；也可直接点击角色卡。</dd></div>
           <div><dt>E</dt><dd>执行当前角色的现场动作，或打开机关建造选择。</dd></div>
         </dl>
@@ -121,7 +121,7 @@
       </div>
       <div class="touchActions">
         <button data-input="switch" type="button"><span>换人</span></button>
-        <button data-input="depth" type="button"><span>下行</span></button>
+        <button data-input="depth" type="button"><span>↓ 下行</span></button>
         <button data-input="action" class="touchPrimary" type="button"><span>行动</span></button>
       </div>
     </div>
@@ -136,6 +136,6 @@
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803c"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803d"></script>
 </body>
 </html>

@@ -188,7 +188,7 @@ function PerformAction() {
   const action = FindNearestAction();
   if (!action) {
     const entrance = entrances.find((x) => Math.abs(x - state.player.x) < 1.05);
-    Toast(entrance !== undefined ? "这里可用“地层切换”，不是行动键。" : "靠近发光的现场标记后再行动。", "neutral");
+    Toast(entrance !== undefined ? (state.player.layer === "surface" ? "这里按 S 向下进入地道，不是行动键。" : "这里按 W 向上回到地表，不是行动键。") : "靠近发光的现场标记后再行动。", "neutral");
     return;
   }
   if (action.role && action.role !== state.selectedRole) {
@@ -344,18 +344,27 @@ function RecalculateBuild() {
   }
 }
 
-function ToggleLayer() {
+function ChangeLayer(targetLayer) {
   if (IsBlocked()) return;
+  if (!['surface', 'tunnel'].includes(targetLayer)) return;
+  if (state.player.layer === targetLayer) {
+    Toast(targetLayer === "surface" ? "已经在地表；向下进入地道请按 S。" : "已经在地道；向上回到地表请按 W。", "neutral");
+    return;
+  }
   const entrance = entrances.find((x) => Math.abs(x - state.player.x) <= 1.15);
-  if (entrance === undefined) return Toast("需要靠近蓝色地道入口。", "neutral");
+  if (entrance === undefined) return Toast(targetLayer === "surface" ? "靠近蓝色竖井后按 W 向上攀爬。" : "靠近蓝色入口后按 S 向下进入。", "neutral");
   state.player.x = entrance;
-  state.player.layer = state.player.layer === "surface" ? "tunnel" : "surface";
+  state.player.layer = targetLayer;
   state.player.actionKind = "climb";
   state.player.actionTime = .68;
   state.player.actionDuration = .68;
   if (state.player.layer === "tunnel") state.alert = Math.max(0, state.alert - 8);
   Toast(state.player.layer === "tunnel" ? "进入地道：敌兵视线被土层完全隔断。" : "回到地表：先找草垛、断墙或灌木，再等巡逻转身。", "neutral");
   UpdateUi();
+}
+
+function UseContextDepth() {
+  ChangeLayer(state.player.layer === "surface" ? "tunnel" : "surface");
 }
 
 function OpenDialogue(text, speaker) {
@@ -438,7 +447,7 @@ function UpdateUi() {
   ui.gameShell.dataset.level = state.level.id;
   ui.touchControls.classList.toggle("locked", Boolean(state.caught));
   const depthButton = document.querySelector('[data-input="depth"] span');
-  if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "下行" : "上行";
+  if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "↓ 下行" : "↑ 上行";
   UpdateQaReadout();
 }
 
@@ -734,6 +743,7 @@ function Draw() {
   DrawSurfaceVegetation(width, height, surfaceY);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
+  DrawDepthHint(width, height, surfaceY, tunnelY);
   if (qaMode) DrawQa(width, height, surfaceY, tunnelY);
 }
 
@@ -1386,6 +1396,19 @@ function DrawEntrances(width, height, surfaceY, tunnelY) {
   });
 }
 
+function DrawDepthHint(width, height, surfaceY, tunnelY) {
+  const entrance = entrances.find((worldX) => Math.abs(worldX - state.player.x) <= 1.15);
+  if (entrance === undefined || state.cinematic || state.caught) return;
+  const x = WorldToScreen(entrance, width);
+  const hint = state.player.layer === "surface" ? "S  ↓  下行" : "W  ↑  上行";
+  const hintY = state.player.layer === "surface" ? surfaceY - 74 : TunnelCeilingYAt(entrance, height, tunnelY) + 28;
+  context.save(); context.font = "800 11px system-ui, sans-serif"; context.textAlign = "center";
+  const hintWidth = Math.ceil(context.measureText(hint).width) + 22;
+  context.fillStyle = "rgba(8,14,16,.94)"; context.fillRect(x - hintWidth / 2, hintY - 17, hintWidth, 23);
+  context.strokeStyle = "rgba(104,225,225,.85)"; context.lineWidth = 1.5; context.strokeRect(x - hintWidth / 2 + .75, hintY - 16.25, hintWidth - 1.5, 21.5);
+  context.fillStyle = "#edf7ef"; context.fillText(hint, x, hintY - 1); context.restore();
+}
+
 function DrawEnemies(width, surfaceY) {
   const patrols = GetEnemyPatrols();
   if (!patrols.length) return;
@@ -1701,7 +1724,7 @@ function BindHoldButton(button, input) {
 
 document.querySelectorAll('[data-input="left"], [data-input="right"]').forEach((button) => BindHoldButton(button, button.dataset.input));
 document.querySelector('[data-input="switch"]').addEventListener("click", CycleRole);
-document.querySelector('[data-input="depth"]').addEventListener("click", ToggleLayer);
+document.querySelector('[data-input="depth"]').addEventListener("click", UseContextDepth);
 document.querySelector('[data-input="action"]').addEventListener("click", PerformAction);
 ui.startButton.addEventListener("click", () => StartLevel(selectedLevel));
 ui.guideButton.addEventListener("click", () => Show(ui.guidePanel));
@@ -1717,10 +1740,11 @@ document.querySelectorAll("[data-close-panel]").forEach((button) => button.addEv
 window.addEventListener("keydown", (event) => {
   if (["KeyA", "ArrowLeft"].includes(event.code)) inputKeys.left = true;
   if (["KeyD", "ArrowRight"].includes(event.code)) inputKeys.right = true;
-  if (event.repeat && ["KeyE", "KeyQ", "KeyS"].includes(event.code)) return;
+  if (event.repeat && ["KeyE", "KeyQ", "KeyW", "KeyS"].includes(event.code)) return;
   if (event.code === "KeyE") PerformAction();
   if (event.code === "KeyQ") CycleRole();
-  if (event.code === "KeyS") ToggleLayer();
+  if (event.code === "KeyW") ChangeLayer("surface");
+  if (event.code === "KeyS") ChangeLayer("tunnel");
   if (event.code === "Escape") {
     if (!ui.dialoguePanel.hidden) CloseDialogue();
     else if (!ui.buildPanel.hidden) Show(ui.buildPanel, false);

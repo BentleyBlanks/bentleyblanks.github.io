@@ -67,6 +67,9 @@ Assert(game.includes('ui.touchControls.classList.toggle("locked"') && css.includ
 Assert(!html.includes('id="observeButton"') && !html.includes('data-input="observe"'), "正式玩家操作仍存在观察按钮");
 Assert(html.includes('data-input="left"') && html.includes('data-input="right"') && html.includes('data-input="switch"') && html.includes('data-input="depth"') && html.includes('data-input="action"'), "移动端五个核心操作不完整");
 Assert(!html.includes('data-input="crouch"') && !game.includes("touchCrouchLatched") && !game.includes("inputKeys.crouch"), "仍保留空地蹲伏即可隐身的错误操作");
+Assert(game.includes("function ChangeLayer(targetLayer)") && game.includes('if (event.code === "KeyW") ChangeLayer("surface")') && game.includes('if (event.code === "KeyS") ChangeLayer("tunnel")'), "键盘上下行没有拆成 W 向上、S 向下");
+Assert(game.includes("function UseContextDepth()") && game.includes('addEventListener("click", UseContextDepth)') && !game.includes("ToggleLayer"), "移动端仍在调用含混的双向切层函数");
+Assert(html.includes("W 向上攀爬，S 向下进入") && game.includes('"S  ↓  下行"') && game.includes('"W  ↑  上行"') && game.includes("function DrawDepthHint"), "操作说明或入口现场提示没有明确上下行方向");
 Assert(css.includes("user-select: none") && css.includes("-webkit-touch-callout: none") && css.includes("touch-action: none"), "移动端长按防文本选择保护不完整");
 Assert(game.includes("setPointerCapture") && game.includes("pointercancel") && game.includes("lostpointercapture"), "移动端长按移动缺少 Pointer Capture 清理");
 Assert(!game.includes("state.exposure") && !game.includes('Metric("暴露"') && !game.includes('Metric("警戒", Math.round(state.exposure)'), "累积暴露条仍在参与潜行规则");
