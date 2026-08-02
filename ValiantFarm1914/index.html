@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a2218">
+  <meta name="description" content="Valiant Farm 1914 — 勇敢的心式一关白盒：扔、潜、狗、挖、救。">
+  <title>Valiant Farm 1914</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260802a">
+</head>
+<body>
+  <main id="Shell" class="shell">
+    <canvas id="GameCanvas" class="canvas" tabindex="0" aria-label="Valiant Farm level"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <section id="Title" class="overlay title">
+      <a class="mark" href="../"><b>Valiant Farm</b><span>after Valiant Hearts</span></a>
+      <div class="titleCard">
+        <p class="eyebrow">1914 · Varnay</p>
+        <h1>Farm<br><em>Rescue</em></h1>
+        <p class="lead">One ruined farm. One dog. Get the medic out.</p>
+        <button id="BtnPlay" class="btn primary" type="button">Play</button>
+        <p class="hintKeys">A/D move · S cover · Space hop · E act / dog · F throw</p>
+      </div>
+    </section>
+
+    <section id="Win" class="overlay win" hidden>
+      <div class="titleCard">
+        <p class="eyebrow">Clear</p>
+        <h1>Out</h1>
+        <p class="lead">Walt stays at your heel. The cart rolls. The farm is behind you.</p>
+        <button id="BtnReplay" class="btn primary" type="button">Again</button>
+      </div>
+    </section>
+
+    <section id="Hud" class="hud" hidden>
+      <div id="Hearts" class="hearts" aria-label="HP"></div>
+      <div id="Hand" class="hand" aria-label="Held"></div>
+      <p id="Bark" class="bark" hidden></p>
+    </section>
+
+    <div id="Touch" class="touch" hidden>
+      <button type="button" data-k="left">◀</button>
+      <button type="button" data-k="right">▶</button>
+      <button type="button" data-k="crouch">S</button>
+      <button type="button" data-k="jump">⤒</button>
+      <button type="button" data-k="act">E</button>
+      <button type="button" data-k="throw">F</button>
+    </div>
+  </main>
+  <script type="module" src="./Script_Game.mjs?v=20260802a"></script>
+</body>
+</html>
