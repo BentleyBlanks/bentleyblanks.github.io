@@ -99,7 +99,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 
 #interactionPrompt { position: absolute; z-index: 13; left: 50%; bottom: 102px; display: flex; align-items: center; gap: 9px; min-width: 230px; padding: 8px 12px; transform: translateX(-50%); background: rgba(10,16,18,.9); border: 1px solid rgba(101,209,212,.5); box-shadow: 0 12px 40px rgba(0,0,0,.42); }
 #interactionPrompt { pointer-events: none; }
-#roleDock:not([hidden]) + #interactionPrompt { bottom: 158px; }
+#roleDock:not([hidden]) ~ #interactionPrompt { bottom: 158px; }
 #interactionPrompt kbd { display: grid; width: 29px; height: 29px; place-items: center; color: #102024; font: 900 13px system-ui; background: var(--cyan); }
 #interactionPrompt p { display: flex; flex-direction: column; margin: 0; }
 #interactionVerb { color: var(--cyan); font-size: 10px; }
@@ -213,7 +213,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #roleButtons b { font-size: 8px; }
   #roleButtons small { font-size: 5px; }
   #interactionPrompt { bottom: 69px; min-width: 185px; padding: 5px 7px; }
-  #roleDock:not([hidden]) + #interactionPrompt { bottom: 112px; }
+  #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 112px; }
   #interactionPrompt kbd { width: 24px; height: 24px; font-size: 10px; }
   #interactionVerb { font-size: 7px; }
   #interactionName { max-width: 220px; font-size: 8px; }
@@ -296,7 +296,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #roleButtons button.active small { color: rgba(29,42,42,.62); }
 
 #interactionPrompt { bottom: 78px; min-width: 0; padding: 0; gap: 7px; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 4px 9px rgba(0,0,0,.72)); }
-#roleDock:not([hidden]) + #interactionPrompt { bottom: 124px; }
+#roleDock:not([hidden]) ~ #interactionPrompt { bottom: 124px; }
 #interactionPrompt kbd { width: 34px; height: 34px; color: #182326; font-size: 11px; background: rgba(236,232,214,.96); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; }
 #interactionPrompt p { max-width: 260px; padding: 5px 11px 6px; background: rgba(8,13,15,.68); border-radius: 16px; backdrop-filter: blur(4px); }
 #interactionVerb { color: var(--cyan); font-size: 8px; }
@@ -331,12 +331,29 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #civilianStatus { margin: 7px 2px 0; color: rgba(231,234,224,.7); font: 8px/1.35 ui-monospace, "Cascadia Mono", monospace; }
 #civilianCommandPanel.commandLocked .civilianShelterButtons { opacity: .42; }
 #civilianCommandPanel.commandLocked::after { content: "切换到传宝才能下令"; position: absolute; right: 11px; top: 8px; color: #e36c59; font-size: 7px; }
+
+#dogCommandHud { position: absolute; z-index: 14; left: 24px; bottom: 139px; display: flex; align-items: center; gap: 8px; min-width: 205px; padding: 7px 10px 8px; color: #eee9da; background: rgba(7,13,15,.76); border: 1px solid rgba(104,220,218,.24); border-radius: 24px; box-shadow: 0 8px 24px rgba(0,0,0,.34); backdrop-filter: blur(6px); }
+#dogCommandHud[hidden] { display: none; }
+.dogCommandPortrait { display: grid; width: 31px; height: 31px; place-items: center; flex: 0 0 auto; color: #e9dfc7; font: 900 11px system-ui; background: #8e6347; border: 2px solid #61c8ca; border-radius: 50%; }
+#dogCommandHud p { display: flex; min-width: 126px; flex: 1; flex-direction: column; margin: 0; }
+#dogCommandHud small { color: rgba(224,229,219,.64); font-size: 7px; font-weight: 800; letter-spacing: .06em; }
+#dogCommandHud b { margin-top: 2px; font-size: 10px; font-weight: 800; }
+#dogCommandProgress { position: absolute; right: 13px; bottom: 5px; left: 49px; height: 2px; overflow: hidden; background: rgba(255,255,255,.1); }
+#dogCommandProgress u { display: block; width: 0; height: 100%; background: #6ddbdd; transition: width .16s linear; }
+#dogCommandHud.commanding .dogCommandPortrait { animation: dogCommandPulse .72s ease-in-out infinite alternate; }
+@keyframes dogCommandPulse { to { box-shadow: 0 0 0 5px rgba(101,220,219,.12), 0 0 18px rgba(101,220,219,.32); } }
 .failurePaper { border-top: 3px solid #b94439; }
 .failurePaper .completeLedger div { border-left-color: #bd4a3f; }
 
 @media (max-width: 760px), (max-height: 520px) {
   #civilianCommandPanel { right: 8px; bottom: 61px; width: 214px; padding: 7px; }
   #civilianCommandPanel > small { margin-bottom: 4px; font-size: 6px; }
+  #dogCommandHud { left: 10px; bottom: 106px; min-width: 166px; padding: 5px 8px 6px; }
+  .dogCommandPortrait { width: 25px; height: 25px; font-size: 8px; }
+  #dogCommandHud p { min-width: 105px; }
+  #dogCommandHud small { font-size: 6px; }
+  #dogCommandHud b { font-size: 8px; }
+  #dogCommandProgress { left: 41px; }
   .civilianGroupButtons button { min-height: 21px; font-size: 6px; }
   .civilianShelterButtons { gap: 3px; margin-top: 4px; }
   .civilianShelterButtons button { min-height: 35px; }
@@ -388,7 +405,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #roleButtons b { font-size: 8px; }
   #roleButtons small { display: none; }
   #interactionPrompt { bottom: 64px; min-width: 0; padding: 0; }
-  #roleDock:not([hidden]) + #interactionPrompt { bottom: 96px; }
+  #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 96px; }
   #interactionPrompt kbd { width: 27px; height: 27px; font-size: 8px; }
   #interactionPrompt p { padding: 4px 8px; }
   #interactionVerb { font-size: 6px; }

@@ -46,7 +46,14 @@ Assert(wall.actions.some((action) => action.phaseGate) && wall.actions.filter((a
 const excavationActions = wall.actions.filter((action) => action.excavate);
 Assert(excavationActions.length === 3 && new Set(excavationActions.map((action) => action.excavate)).size === 3, "第一关必须实际挖开西、中、东三处避难支洞");
 Assert(excavationActions.every((action) => action.role === "blacksmith") && buildActions.every((action) => action.requires?.some((id) => id.startsWith("dig"))), "挖掘没有绑定铁匠能力，或机关能在未挖通的位置凭空建造");
-Assert(wall.actions.some((action) => action.role === "dog" && action.hazardScout === "smoke") && wall.actions.some((action) => action.role === "dog" && action.hazardScout === "water"), "阿土缺少烟水来源预警能力");
+const dogCommands = wall.actions.filter((action) => action.dogCommand);
+Assert(dogCommands.length >= 2 && dogCommands.every((action) => action.role === "leader" && Number.isFinite(action.dogCommand.targetX) && action.dogCommand.workTime > 0), "吹哨控制阿土的异步窄洞解谜不足两处，或没有绑定实体目标与工作时间");
+Assert(wall.actions.some((action) => action.dogCommand && action.hazardScout === "smoke") && wall.actions.some((action) => action.role === "dog" && action.hazardScout === "water"), "阿土缺少烟水来源预警能力");
+Assert(wall.actions.find((action) => action.id === "startDefense")?.requires?.includes("whistleDraftGap"), "迎敌前没有要求阿土先钻低风孔确认风向");
+Assert(wall.actions.find((action) => action.id === "triggerSlotC")?.requires?.includes("whistleSmokeLatch"), "东翻口机关没有等待阿土穿烟道侧孔拉绳");
+const diversions = wall.actions.filter((action) => action.diversion);
+Assert(diversions.map((action) => action.diversion.kind).sort().join(",") === "bell,crackers" && diversions.every((action) => action.layer === "surface" && action.cover), "地表警钟/炮仗诱敌没有落到实体遮挡与声源位置");
+Assert(wall.actions.find((action) => action.id === "throwFirecrackers")?.consume?.powder === 1, "炮仗没有消耗夜间收集的火药材料");
 const materialPickups = wall.actions.filter((action) => action.phase === "collect" && action.resource);
 Assert(materialPickups.length === 4 && materialPickups.every((action) => action.prop?.mode === "take" && action.prop.kind && action.prop.label && action.prop.support), "四个夜间收集点必须各自绑定可见实物、名称与承托位置");
 Assert(new Set(materialPickups.map((action) => action.prop.kind)).size === 4 && new Set(materialPickups.map((action) => action.prop.label)).size === 4, "夜间收集物不能继续复用同一个抽象交互标记");
@@ -102,6 +109,10 @@ Assert(game.includes("function LayerToScreen") && game.includes("LayerToScreen(x
 Assert(game.includes("TunnelHalfHeightAt") && game.includes("DrawTunnelDepth") && game.includes("DrawTunnelProps") && game.includes('kind: "basket"') && game.includes('kind: "lamp"'), "地道仍是单根走廊，缺少高低差、支洞纵深与生活道具");
 Assert(game.includes("DrawHumanActor") && game.includes("DrawDogActor") && game.includes("DrawHeadwear") && game.includes("DrawRoleProp") && game.includes("DrawJointedLimb"), "角色仍是统一几何人形，缺少独立轮廓、服装、道具或关节动画");
 Assert(game.includes("ActorActionKind") && game.includes("BeginActorAction") && game.includes("motionBlend") && game.includes("rolePulse"), "角色缺少移动、行动或切换聚焦动画状态");
+Assert(game.includes("function IssueDogCommand") && game.includes("function UpdateDogPartner") && game.includes("function CompleteDogCommand") && game.includes('dog.commandMode = "work"'), "阿土哨令仍是瞬时按钮，没有跑动、钻洞、停留工作与完成回报");
+Assert(game.includes("DrawDogCompanion") && game.includes("DrawDogCommandEnvironment") && game.includes("DrawDogCommandFocus") && game.includes("DrawPawMark") && game.includes("犬 · 阿土执行中") && html.includes('id="dogCommandHud"') && css.includes("#dogCommandHud.commanding"), "阿土实体、高对比四足聚焦、连续爪印、窄洞路径或哨令 HUD 缺少可视反馈");
+Assert(game.includes("function StartDiversion") && game.includes("ActiveDiversion(\"bell\")") && game.includes("ActiveDiversion(\"crackers\")") && game.includes("formationX"), "警钟/炮仗没有接入敌军调查状态与烟水源削弱因果");
+Assert(game.includes("DrawSurfaceDiversions") && game.includes("DrawSoundRings") && game.includes("trajectoryPoint") && game.includes("trailProgresses") && game.includes("investigatingEnemies") && game.includes("enemy.investigating"), "警钟、炮仗抛物线残影、落点声波或连接敌军的调查反馈没有进入实际画面");
 Assert(css.includes(".rolePortrait") && css.includes(".roleCopy") && data.includes('short: "叶星"') && data.includes('short: "赵禾"') && data.includes('short: "根生"'), "角色切换条仍无法直接识别人物姓名与肖像色块");
 Assert(game.includes("DrawFluidSimulation") && game.includes("UpdateLevelOneSystems") && game.includes("state.fluid.Inject(\"smoke\"") && game.includes("state.fluid.Inject(\"water\""), "烟水没有进入实时模拟、关卡脚本或画面绘制");
 Assert(fluidCode.includes("ProjectVelocity") && fluidCode.includes("Advect") && fluidCode.includes("AddVorticity") && fluidCode.includes("BuildSignedDistanceField") && fluidCode.includes("SettleWater"), "流体模块缺少压力投影、半拉格朗日平流、涡量、SDF 或水体重力沉降");

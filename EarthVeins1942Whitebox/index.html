@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#11171b">
   <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法白盒">
   <title>地脉：三个循环 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803n">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803t">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -54,7 +54,7 @@
           <div><dt>遮挡</dt><dd>潜行只认场景里的草垛、断墙、灌木、车架和井台；人物进入遮挡会自动压低身形，空地上没有任何蹲伏隐身判定。</dd></div>
           <div><dt>W / S</dt><dd>靠近蓝色竖井时，W 向上攀爬，S 向下进入。</dd></div>
           <div><dt>Q</dt><dd>第二关切换角色；也可直接点击角色卡。</dd></div>
-          <div><dt>E</dt><dd>执行当前角色的现场动作，或打开机关建造选择。</dd></div>
+          <div><dt>E</dt><dd>执行现场动作；传宝靠近犬用暗号点时会吹哨，阿土将自己跑进人无法通过的窄洞。</dd></div>
         </dl>
         <p class="guideNote">“观察”已从正式操作中移除。标尺、依赖线和测试状态只在带 <code>?qa=1</code> 的检查模式出现。</p>
         <button class="backButton" data-close-panel type="button">返回</button>
@@ -78,6 +78,12 @@
     <aside id="roleDock" hidden>
       <small>切换角色 · Q</small>
       <div id="roleButtons"></div>
+    </aside>
+
+    <aside id="dogCommandHud" aria-label="阿土行动状态" hidden>
+      <span class="dogCommandPortrait">犬</span>
+      <p><small>阿土 · 听哨行动</small><b id="dogCommandStatus">跟随传宝</b></p>
+      <i id="dogCommandProgress"><u></u></i>
     </aside>
 
     <aside id="civilianCommandPanel" aria-label="群众转移指挥" hidden>
@@ -163,6 +169,6 @@
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803n"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803t"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ export const actorProfiles = Object.freeze({
 
 export const roleDefinitions = Object.freeze({
   leader: Object.freeze({ id: "leader", name: "高传宝 · 民兵队长", skill: "调度群众 / 诱敌封闸", short: "传宝" }),
-  dog: Object.freeze({ id: "dog", name: "阿土 · 流浪狗", skill: "嗅烟探水 / 提前预警", short: "阿土" }),
+  dog: Object.freeze({ id: "dog", name: "阿土 · 流浪狗", skill: "听哨穿窄洞 / 嗅烟探水", short: "阿土" }),
   student: Object.freeze({ id: "student", name: "叶星 · 学生", skill: "望远镜标记巡逻规律", short: "叶星" }),
   rescuer: Object.freeze({ id: "rescuer", name: "赵禾 · 妇救会", skill: "缝补伪装与照护伤员", short: "赵禾" }),
   blacksmith: Object.freeze({ id: "blacksmith", name: "魏根生 · 铁匠", skill: "挖掘支护 / 布设机关", short: "根生" }),
@@ -25,6 +25,8 @@ export const coverDefinitions = Object.freeze({
   undergroundWall: Object.freeze([
     Cover("westStable", -9.35, 1.8, "brush", "倒棚与荆条"),
     Cover("brokenCart", -4.85, 1.55, "cart", "废车草帘"),
+    Cover("gateWall", -3.15, 1.45, "wall", "假门残墙"),
+    Cover("bellWall", 1.3, 2.6, "wall", "钟架土墙"),
     Cover("ashStack", .35, 1.5, "hay", "柴垛"),
     Cover("fieldWall", 3.75, 1.45, "wall", "断墙"),
     Cover("supplyStack", 6.85, 1.7, "hay", "口粮草垛"),
@@ -70,8 +72,8 @@ export const levelDefinitions = Object.freeze([
     startX: -10,
     phases: Object.freeze([
       Object.freeze({ id: "collect", label: "夜间准备", objective: "三人分工带回材料；地道里的乡亲正在等", layer: "surface" }),
-      Object.freeze({ id: "build", label: "限时挖建", objective: "测风、安置乡亲并在倒计时内完成三处机关", layer: "tunnel" }),
-      Object.freeze({ id: "defense", label: "扫荡生存", objective: "操作机关，同时指挥三组乡亲避开烟水", layer: "surface" }),
+      Object.freeze({ id: "build", label: "限时挖建", objective: "吹哨让阿土钻风孔，安置乡亲并完成三处机关", layer: "tunnel" }),
+      Object.freeze({ id: "defense", label: "扫荡生存", objective: "地表敲钟、扔炮仗调敌；地下封闸并转移群众", layer: "surface" }),
       Object.freeze({ id: "outcome", label: "缴获与扩展", objective: "清点缴获，决定下一轮扩建方向", layer: "tunnel" })
     ]),
     actions: Object.freeze([
@@ -79,7 +81,7 @@ export const levelDefinitions = Object.freeze([
       Action("collectIron", -4.8, "surface", "废车脚边木盘里放着铁箍和四枚销钉", "收起", { phase: "collect", role: "blacksmith", cover: "brokenCart", prop: Prop("ironFittings", "铁箍与四枚销钉", "tray", "take", { offsetX: .42, front: true }), resource: { iron: 4 }, dialogue: "四枚销子都在。闸门能锁牢。" }),
       Action("collectPowder", .4, "surface", "柴垛边矮箱上放着封口硝灰罐", "嗅查", { phase: "collect", role: "dog", cover: "ashStack", prop: Prop("powderJar", "封口硝灰罐", "lowCrate", "take", { offsetX: .42, front: true }), resource: { powder: 2 }, dialogue: "阿土没叫，罐子也没漏。传宝把它抱走。" }),
       Action("collectSupplies", 6.8, "surface", "草垛前木案上摆着药布包和两袋口粮", "搬走", { phase: "collect", role: "leader", cover: "supplyStack", prop: Prop("reliefBundle", "药布包与两袋口粮", "plankTable", "take", { offsetX: .45, front: true }), resource: { medicine: 1, grain: 2 }, dialogue: "药布给担架边。粮靠干墙放，别堵住孩子们的路。" }),
-      Action("sniffDraft", -5.6, "tunnel", "让阿土辨清进风井与烟味来向", "辨风", { phase: "build", role: "dog", dialogue: "阿土一直朝东翻口呜。要灌烟，多半从那边下手。" }),
+      Action("whistleDraftGap", -3.4, "tunnel", "吹两短一长，让阿土钻进人过不去的低风孔", "吹哨", { phase: "build", role: "leader", dogCommand: Object.freeze({ targetX: -5.85, targetLayer: "tunnel", label: "西侧低风孔", task: "叼回风向布条", workTime: 1.2 }), dialogue: "布条往东飘。阿土没走明洞，是从低风孔绕过去的。" }),
       Action("digWestRefuge", -7.7, "tunnel", "向西挖出可容老人侧卧的高位支洞", "挖掘", { phase: "build", role: "blacksmith", excavate: "west", dialogue: "这层土干，顶上再留一掌厚。木撑跟着我往前走。" }),
       Action("buildSlotA", -7, "tunnel", "西支洞机关位", "施工", { phase: "build", role: "blacksmith", requires: ["digWestRefuge"], buildSlot: 0 }),
       Action("digCenterBypass", -.7, "tunnel", "掘开中央避难湾与回身短道", "挖掘", { phase: "build", role: "blacksmith", excavate: "center", dialogue: "担架要在这里回身。再削半尺，别让梁压着人。" }),
@@ -87,14 +89,16 @@ export const levelDefinitions = Object.freeze([
       Action("briefCivilians", 3.2, "tunnel", "把三组乡亲的避险方向说清楚", "分组", { phase: "build", role: "leader", dialogue: "老人跟担架走中湾，孩子听钟走东口。谁也别自己乱跑。" }),
       Action("digEastPocket", 7.7, "tunnel", "在东翻口后挖出错层藏身窝", "挖掘", { phase: "build", role: "blacksmith", excavate: "east", dialogue: "东口容易进烟，藏身窝得比主道高，底下还要留返水沟。" }),
       Action("buildSlotC", 7, "tunnel", "东翻口机关位", "施工", { phase: "build", role: "blacksmith", requires: ["digEastPocket"], buildSlot: 2 }),
-      Action("startDefense", 9.2, "tunnel", "确认风路、机关和群众去向后提前迎敌", "迎敌", { phase: "build", role: "leader", requires: ["sniffDraft", "briefCivilians"], phaseGate: true }),
-      Action("placeDecoyCart", -8.7, "surface", "在空院留下向西的重车辙", "诱导", { phase: "defense", role: "leader", defenseStep: "lure", dialogue: "车印往西压。让他们离真入口越远越好。" }),
-      Action("closeSurfaceGate", -3.2, "surface", "等敌队过半后关闭地表假门", "分割", { phase: "defense", role: "leader", requires: ["placeDecoyCart"], defenseStep: "split", dialogue: "后半队还没进来……再等。好，关！" }),
+      Action("startDefense", 9.2, "tunnel", "确认风路、机关和群众去向后提前迎敌", "迎敌", { phase: "build", role: "leader", requires: ["whistleDraftGap", "briefCivilians"], phaseGate: true }),
+      Action("placeDecoyCart", -8.7, "surface", "躲在倒棚后，把重车辙压向西边空院", "诱导", { phase: "defense", role: "leader", cover: "westStable", defenseStep: "lure", dialogue: "车印往西压。让他们离真入口越远越好。" }),
+      Action("ringAlarmBell", 1.85, "surface", "贴着钟架土墙拉动长绳敲响警钟，把东口敌兵引向钟楼", "敲钟", { phase: "defense", role: "leader", cover: "bellWall", requires: ["placeDecoyCart"], diversion: Object.freeze({ kind: "bell", targetX: .75, duration: 14, label: "警钟回声", weakens: "smoke" }), dialogue: "当——当——！他们离开东翻口了。趁现在关导烟板。" }),
+      Action("closeSurfaceGate", -3.15, "surface", "等敌队过半后，在假门残墙后关闭地表假门", "分割", { phase: "defense", role: "leader", cover: "gateWall", requires: ["placeDecoyCart"], defenseStep: "split", dialogue: "后半队还没进来……再等。好，关！" }),
+      Action("throwFirecrackers", 9.35, "surface", "从东沟灌木后把一串炮仗扔进远沟，引走西井灌水队", "扔炮仗", { phase: "defense", role: "leader", cover: "eastBrush", requires: ["ringAlarmBell"], consume: Object.freeze({ powder: 1 }), diversion: Object.freeze({ kind: "crackers", targetX: 10.65, duration: 14, label: "东沟炮仗", weakens: "water" }), dialogue: "响在东沟，人会往东追。西井那边一下少了三个。" }),
       Action("warnWater", -8.3, "tunnel", "让阿土确认西井渗水声", "听水", { phase: "defense", role: "dog", hazardScout: "water", dialogue: "西边土里响了。不是雨，是他们往井里灌水。" }),
       Action("triggerSlotA", -7, "tunnel", "触发西支洞机关", "扳闸", { phase: "defense", role: "blacksmith", requires: ["closeSurfaceGate"], triggerSlot: 0 }),
       Action("triggerSlotB", 0, "tunnel", "触发中央短湾机关", "扳闸", { phase: "defense", role: "blacksmith", requires: ["triggerSlotA"], triggerSlot: 1 }),
-      Action("warnSmoke", 6.2, "tunnel", "让阿土确认东翻口的烟味", "嗅烟", { phase: "defense", role: "dog", hazardScout: "smoke", dialogue: "东口呛鼻子。烟已经进来了，别把孩子往东带。" }),
-      Action("triggerSlotC", 7, "tunnel", "触发东翻口机关", "扳闸", { phase: "defense", role: "blacksmith", requires: ["triggerSlotB"], triggerSlot: 2 }),
+      Action("whistleSmokeLatch", 4.85, "tunnel", "隔着低梁吹哨，让阿土穿过烟道侧孔拉下导烟绳", "吹哨", { phase: "defense", role: "leader", requires: ["closeSurfaceGate"], dogCommand: Object.freeze({ targetX: 8.95, targetLayer: "tunnel", label: "东翻口烟道侧孔", task: "咬住麻绳拉开侧闸", workTime: 1.45 }), hazardScout: "smoke", dogRelief: "smoke", dialogue: "绳落了！侧闸已经开了，烟会先走空支洞。" }),
+      Action("triggerSlotC", 7, "tunnel", "等阿土拉开烟道侧闸后，触发东翻口机关", "扳闸", { phase: "defense", role: "blacksmith", requires: ["triggerSlotB", "whistleSmokeLatch"], triggerSlot: 2 }),
       Action("inventoryCapture", 9.2, "tunnel", "支洞口散着敌人弃下的地图、口粮箱和工具", "清点", { phase: "outcome", prop: Prop("capturePile", "遗留地图、口粮箱与工具", "ground"), outcome: true, dialogue: "先看有没有药。粮也收好，枪最后再算。" })
     ])
   }),
