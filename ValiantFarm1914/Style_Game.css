@@ -13,10 +13,16 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: #12160f; color: var(--paper); font-family: var(--ui); }
+html, body {
+  margin: 0; height: 100%; background: #12160f; color: var(--paper); font-family: var(--ui);
+  overscroll-behavior: none;
+}
 button { font: inherit; cursor: pointer; border: none; }
 
-.shell { position: relative; width: 100%; height: 100%; overflow: hidden; background: #1a1814; }
+.shell {
+  position: relative; width: 100%; height: 100%; overflow: hidden; background: #1a1814;
+  height: 100dvh; min-height: 100%;
+}
 .canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .vignette {
   pointer-events: none; position: absolute; inset: 0; z-index: 2;
@@ -77,10 +83,12 @@ button { font: inherit; cursor: pointer; border: none; }
   box-shadow: inset 0 0 0 1px rgba(240,226,196,.4);
 }
 .prologueArt img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
+  width: 100%; height: 100%; object-fit: contain; object-position: bottom center; display: block;
+  background: #d8c49a;
   filter: contrast(1.04) saturate(.75) sepia(.12);
 }
 .barkPortrait {
+  object-fit: contain; object-position: bottom center;
   filter: saturate(.75) sepia(.1);
 }
 .prologueCopy { display: flex; flex-direction: column; justify-content: center; }
@@ -131,8 +139,12 @@ button { font: inherit; cursor: pointer; border: none; }
 .btn.primary:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0,0,0,.35); }
 
 .hud {
-  position: absolute; left: 16px; top: 16px; z-index: 3;
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  top: max(12px, env(safe-area-inset-top));
+  z-index: 3;
   display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  max-width: min(28rem, calc(100% - 24px));
 }
 .hud[hidden] { display: none !important; }
 .hearts { display: flex; gap: 6px; }
@@ -168,12 +180,24 @@ button { font: inherit; cursor: pointer; border: none; }
 }
 
 .touch {
-  position: absolute; left: 0; right: 0; bottom: 10px; z-index: 5;
-  display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 10px;
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: none; justify-content: space-between; align-items: flex-end;
+  gap: 12px; pointer-events: none;
+  padding:
+    0
+    max(12px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
 .touch[hidden] { display: none !important; }
+.touchCluster {
+  display: flex; gap: 8px; flex-wrap: wrap; pointer-events: auto;
+  max-width: 48%;
+}
+.touchLeft { justify-content: flex-start; }
+.touchRight { justify-content: flex-end; margin-left: auto; }
 .touch button {
   width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink);
   background: rgba(240,226,196,.9); color: var(--ink); font-weight: 700;
@@ -184,12 +208,50 @@ button { font: inherit; cursor: pointer; border: none; }
   touch-action: manipulation;
 }
 
-@media (max-width: 720px) {
-  .touch { display: flex; }
+/* Phones + tablets in either orientation (landscape width often >720). */
+@media (pointer: coarse), (max-width: 920px), (max-height: 520px) {
+  .touch:not([hidden]) { display: flex; }
   .hintKeys { display: none; }
-  .prologueCard { grid-template-columns: 1fr; }
-  .prologueArt { max-height: 200px; }
 }
-@media (min-width: 721px) {
+@media (hover: hover) and (pointer: fine) and (min-width: 921px) and (min-height: 521px) {
   .touch { display: none !important; }
+}
+
+@media (max-width: 720px) and (orientation: portrait) {
+  .prologueCard { grid-template-columns: 1fr; }
+  .prologueArt { max-height: 180px; }
+  .titleCard h1 { font-size: clamp(2.6rem, 14vw, 4.2rem); }
+  .overlay { padding: 16px; }
+}
+
+/* Landscape mobile: keep stage tall enough, split pads, compact overlays. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .overlay {
+    align-items: center;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+  .mark { top: 8px; left: max(12px, env(safe-area-inset-left)); }
+  .mark b { font-size: 1rem; }
+  .titleCard h1 { font-size: clamp(2rem, 12vh, 3.2rem); }
+  .lead { margin: 8px 0 12px; font-size: .95rem; }
+  .prologueCard {
+    grid-template-columns: minmax(110px, 160px) 1fr;
+    width: min(40rem, 92vw);
+    max-height: calc(100dvh - 20px);
+    padding: 12px 14px;
+    gap: 14px;
+  }
+  .prologueArt { min-height: 0; max-height: 42vh; }
+  .prologueLine { font-size: clamp(1.05rem, 3.8vh, 1.35rem); margin-bottom: 12px; }
+  .btn { min-height: 40px; }
+  .hud { gap: 6px; }
+  .barkBox { max-width: min(22rem, 55vw); padding: 6px 10px 6px 6px; }
+  .barkPortrait { width: 44px; height: 44px; }
+  .bark { font-size: .85rem; }
+  .touch button { width: 46px; height: 46px; font-size: .9rem; }
+  .touchCluster { gap: 6px; }
 }

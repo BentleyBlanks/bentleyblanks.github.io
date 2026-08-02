@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1a2218">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="description" content="Valiant Farm 1914 — 勇敢的心式一关：扔罐头、使唤狗、救人。六十年代连环画画风。">
   <title>瓦尔奈农场 · 1914</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260802f">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260802g">
 </head>
 <body>
   <main id="Shell" class="shell">
@@ -16,7 +17,7 @@
 
     <section id="Title" class="overlay title">
       <div class="titleHero" aria-hidden="true">
-        <img src="./Texture_FarmRuinWide.jpg?v=20260802e" alt="">
+        <img src="./Texture_FarmRuinWide.jpg?v=20260802g" alt="">
       </div>
       <a class="mark" href="../"><b>瓦尔奈农场</b><span>向勇敢的心致敬</span></a>
       <div class="titleCard">
@@ -31,7 +32,7 @@
     <section id="Prologue" class="overlay prologue" hidden>
       <article class="prologueCard" aria-live="polite">
         <div class="prologueArt">
-          <img id="ProloguePortrait" src="./Texture_PortraitEmile.png?v=20260802e" alt="">
+          <img id="ProloguePortrait" src="./Texture_PortraitEmile.png?v=20260802g" alt="">
         </div>
         <div class="prologueCopy">
           <p class="eyebrow">开场</p>
@@ -44,7 +45,7 @@
 
     <section id="Win" class="overlay win" hidden>
       <div class="titleHero dim" aria-hidden="true">
-        <img src="./Texture_FarmRuinWide.jpg?v=20260802e" alt="">
+        <img src="./Texture_FarmRuinWide.jpg?v=20260802g" alt="">
       </div>
       <div class="titleCard inkCard">
         <p class="eyebrow">撤出来了</p>
@@ -66,15 +67,19 @@
       </div>
     </section>
 
-    <div id="Touch" class="touch" hidden>
-      <button type="button" data-k="left">◀</button>
-      <button type="button" data-k="right">▶</button>
-      <button type="button" data-k="crouch">蹲</button>
-      <button type="button" data-k="jump">跳</button>
-      <button type="button" data-k="act">E</button>
-      <button type="button" data-k="throw">扔</button>
+    <div id="Touch" class="touch" hidden aria-label="触屏操作">
+      <div class="touchCluster touchLeft">
+        <button type="button" data-k="left" aria-label="左移">◀</button>
+        <button type="button" data-k="right" aria-label="右移">▶</button>
+        <button type="button" data-k="crouch" aria-label="蹲下">蹲</button>
+      </div>
+      <div class="touchCluster touchRight">
+        <button type="button" data-k="jump" aria-label="跳">跳</button>
+        <button type="button" data-k="act" aria-label="互动">E</button>
+        <button type="button" data-k="throw" aria-label="扔">扔</button>
+      </div>
     </div>
   </main>
-  <script type="module" src="./Script_Game.mjs?v=20260802f"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260802g"></script>
 </body>
 </html>

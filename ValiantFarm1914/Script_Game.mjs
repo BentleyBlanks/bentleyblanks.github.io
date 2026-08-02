@@ -24,10 +24,11 @@ const ART = {
   emile: `./Texture_PortraitEmile.png?v=${CACHE_BUST}`,
   karl: `./Texture_PortraitKarl.png?v=${CACHE_BUST}`,
   medic: `./Texture_PortraitMedic.png?v=${CACHE_BUST}`,
+  medicSprite: `./Texture_SpriteMedic.png?v=${CACHE_BUST}`,
   dog: `./Texture_DogWalt.png?v=${CACHE_BUST}`,
   sentry: `./Texture_EnemySentry.png?v=${CACHE_BUST}`,
-  cart: `./Texture_PropCart.jpg?v=${CACHE_BUST}`,
-  wireBag: `./Texture_PropWireBag.jpg?v=${CACHE_BUST}`,
+  cart: `./Texture_PropCart.png?v=${CACHE_BUST}`,
+  wireBag: `./Texture_PropWireBag.png?v=${CACHE_BUST}`,
 };
 const imgs = {};
 
@@ -54,8 +55,21 @@ function PortraitKey(speaker) {
   return "emile";
 }
 
-function DrawSprite(img, x, y, drawW, drawH, opts = {}) {
+/** Fit sprite into a box without stretching (native aspect). */
+function FitSpriteSize(img, maxW, maxH, mode = "contain") {
+  const iw = img.naturalWidth || img.width || 1;
+  const ih = img.naturalHeight || img.height || 1;
+  const ar = iw / ih;
+  if (mode === "width") return { w: maxW, h: maxW / ar };
+  if (mode === "height") return { w: maxH * ar, h: maxH };
+  if (maxW / maxH > ar) return { w: maxH * ar, h: maxH };
+  return { w: maxW, h: maxW / ar };
+}
+
+function DrawSprite(img, x, y, maxW, maxH, opts = {}) {
   if (!img) return false;
+  const mode = opts.fit || "contain";
+  const { w: drawW, h: drawH } = FitSpriteSize(img, maxW, maxH, mode);
   ctx.save();
   if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
   if (opts.flip) {
@@ -137,7 +151,14 @@ function Bind() {
     else keys.delete("s");
   }, 16);
 
-  if (matchMedia("(max-width: 720px)").matches) touch.hidden = false;
+  // Portrait phones, landscape phones (width often >720), and coarse pointers.
+  const touchMq = matchMedia("(pointer: coarse), (max-width: 920px), (max-height: 520px)");
+  const syncTouch = () => {
+    touch.hidden = !touchMq.matches;
+  };
+  syncTouch();
+  if (touchMq.addEventListener) touchMq.addEventListener("change", syncTouch);
+  else if (touchMq.addListener) touchMq.addListener(syncTouch);
 }
 
 function showPrologueBeat() {
@@ -297,7 +318,8 @@ function DrawEntity(e) {
       ctx.closePath();
       ctx.fill();
     }
-    const drawn = DrawSprite(imgs.sentry, x, y, 52 * s, 78 * s, {
+    const drawn = DrawSprite(imgs.sentry, x, y, 48 * s, 96 * s, {
+      fit: "height",
       flip: e.facing < 0,
       alpha: e.stun > 0 ? 0.5 : 1,
     });
@@ -319,7 +341,7 @@ function DrawEntity(e) {
   }
 
   if (e.type === "dog") {
-    const drawn = DrawSprite(imgs.dog, x, y, 56 * s, 56 * s);
+    const drawn = DrawSprite(imgs.dog, x, y, 72 * s, 44 * s, { fit: "height" });
     if (!drawn) {
       ctx.fillStyle = "#5a4030";
       ctx.fillRect(x - 16 * s, y - 22 * s, 28 * s, 18 * s);
@@ -329,13 +351,13 @@ function DrawEntity(e) {
     ctx.lineWidth = 2;
     ctx.font = `700 ${10 * s}px Noto Serif SC, sans-serif`;
     ctx.textAlign = "center";
-    ctx.strokeText("沃尔特", x, y - 58 * s);
-    ctx.fillText("沃尔特", x, y - 58 * s);
+    ctx.strokeText("沃尔特", x, y - 52 * s);
+    ctx.fillText("沃尔特", x, y - 52 * s);
     return;
   }
 
   if (e.type === "cart") {
-    const drawn = DrawSprite(imgs.cart, x, y, 130 * s, 70 * s);
+    const drawn = DrawSprite(imgs.cart, x, y, 150 * s, 70 * s, { fit: "width" });
     if (!drawn) {
       ctx.fillStyle = "#5a4030";
       ctx.fillRect(x - 45 * s, y - 40 * s, 90 * s, 40 * s);
@@ -343,21 +365,24 @@ function DrawEntity(e) {
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${11 * s}px Noto Serif SC, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("马车", x, y - 76 * s);
+    ctx.fillText("马车", x, y - 82 * s);
     return;
   }
 
   if (e.type === "wire" && !e.cut && imgs.wireBag) {
-    DrawSprite(imgs.wireBag, x, y, Math.max(e.w, 120) * s, 70 * s, { alpha: 0.9 });
+    DrawSprite(imgs.wireBag, x, y, Math.max(e.w, 160) * s, 90 * s, {
+      fit: "width",
+      alpha: 0.95,
+    });
     return;
   }
 
-  if (e.type === "medic" && !e.rescued && !e.carried && imgs.medic) {
-    DrawSprite(imgs.medic, x, y, 64 * s, 64 * s);
+  if (e.type === "medic" && !e.rescued && !e.carried && (imgs.medicSprite || imgs.medic)) {
+    DrawSprite(imgs.medicSprite || imgs.medic, x, y, 70 * s, 58 * s, { fit: "height" });
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${10 * s}px Noto Serif SC, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("卫生员", x, y - 72 * s);
+    ctx.fillText("卫生员", x, y - 68 * s);
     return;
   }
 

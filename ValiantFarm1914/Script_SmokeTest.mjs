@@ -40,12 +40,35 @@ function Main() {
     "Texture_PortraitKarl.png",
     "Texture_DogWalt.png",
     "Texture_EnemySentry.png",
-    "Texture_PropCart.jpg",
-    "Texture_PropWireBag.jpg",
+    "Texture_PropCart.png",
+    "Texture_PropWireBag.png",
     "Texture_PortraitMedic.png",
+    "Texture_SpriteMedic.png",
   ]) {
     Assert(existsSync(join(here, name)), `art ${name}`);
   }
+  // In-game sprites must be cut out (real alpha), not opaque paper plates.
+  for (const name of [
+    "Texture_DogWalt.png",
+    "Texture_EnemySentry.png",
+    "Texture_PropCart.png",
+    "Texture_PropWireBag.png",
+    "Texture_SpriteMedic.png",
+  ]) {
+    const buf = readFileSync(join(here, name));
+    Assert(buf[0] === 0x89 && buf[1] === 0x50, `${name} is png`);
+    // tRNS or truecolor+alpha (color type 4/6) — IHDR byte 25 = color type
+    const colorType = buf[25];
+    Assert(colorType === 4 || colorType === 6, `${name} has alpha channel`);
+  }
+  Assert(
+    readFileSync(join(here, "Style_Game.css"), "utf8").includes("orientation: landscape"),
+    "landscape mobile CSS",
+  );
+  Assert(
+    readFileSync(join(here, "index.html"), "utf8").includes("touchCluster"),
+    "split touch pad for landscape",
+  );
   Assert(readFileSync(join(here, "index.html"), "utf8").includes("Texture_FarmRuinWide"), "title uses farm plate");
   const level = BuildLevel();
   Assert(level.entities.some((e) => e.type === "dog"), "Walt present");
