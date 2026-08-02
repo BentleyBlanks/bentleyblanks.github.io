@@ -18,18 +18,35 @@ let state = CreateState();
 let last = 0;
 const keys = new Set();
 
-/** 1960s lianhuanhua plates — fall back to ink shapes if a file misses. */
+/** 1960s lianhuanhua plates — 100% generated; ink only if a file fails to load. */
 const ART = {
   farm: `./Texture_FarmRuinWide.jpg?v=${CACHE_BUST}`,
   emile: `./Texture_PortraitEmile.png?v=${CACHE_BUST}`,
   karl: `./Texture_PortraitKarl.png?v=${CACHE_BUST}`,
   medic: `./Texture_PortraitMedic.png?v=${CACHE_BUST}`,
+  emileSprite: `./Texture_SpriteEmile.png?v=${CACHE_BUST}`,
   medicSprite: `./Texture_SpriteMedic.png?v=${CACHE_BUST}`,
   dog: `./Texture_DogWalt.png?v=${CACHE_BUST}`,
   sentry: `./Texture_EnemySentry.png?v=${CACHE_BUST}`,
   cart: `./Texture_PropCart.png?v=${CACHE_BUST}`,
   wireBag: `./Texture_PropWireBag.png?v=${CACHE_BUST}`,
+  tinCan: `./Texture_PropTinCan.png?v=${CACHE_BUST}`,
+  grenade: `./Texture_PropGrenade.png?v=${CACHE_BUST}`,
+  cutters: `./Texture_PropCutters.png?v=${CACHE_BUST}`,
+  mgNest: `./Texture_PropMgNest.png?v=${CACHE_BUST}`,
+  crate: `./Texture_PropCrate.png?v=${CACHE_BUST}`,
+  sandbag: `./Texture_PropSandbag.png?v=${CACHE_BUST}`,
+  dogGap: `./Texture_PropDogGap.png?v=${CACHE_BUST}`,
+  dirtMound: `./Texture_PropDirtMound.png?v=${CACHE_BUST}`,
+  barn: `./Texture_PropBarn.png?v=${CACHE_BUST}`,
 };
+
+function PickupArtKey(item) {
+  if (item === "can") return "tinCan";
+  if (item === "grenade") return "grenade";
+  if (item === "cutters") return "cutters";
+  return null;
+}
 const imgs = {};
 
 function LoadImage(src) {
@@ -263,7 +280,7 @@ function DrawBarn() {
   const s = S();
   const x = WX(1050);
   const y = WY(GROUND);
-  // Crop a ruin slice from the farm plate behind the barn landmark
+  if (DrawSprite(imgs.barn, x, y, 300 * s, 220 * s, { fit: "width" })) return;
   if (imgs.farm) {
     const src = imgs.farm;
     const sw = src.width * 0.28;
@@ -273,21 +290,8 @@ function DrawBarn() {
     ctx.save();
     ctx.globalAlpha = 0.92;
     ctx.drawImage(src, sx, sy, sw, sh, x - 150 * s, y - 210 * s, 300 * s, 210 * s);
-    ctx.strokeStyle = "#1c1710";
-    ctx.lineWidth = 3 * s;
-    ctx.strokeRect(x - 150 * s, y - 210 * s, 300 * s, 210 * s);
     ctx.restore();
-    return;
   }
-  ctx.fillStyle = "#6a3d2a";
-  ctx.fillRect(x - 120 * s, y - 160 * s, 240 * s, 160 * s);
-  ctx.fillStyle = "#3d281c";
-  ctx.beginPath();
-  ctx.moveTo(x - 130 * s, y - 158 * s);
-  ctx.lineTo(x, y - 220 * s);
-  ctx.lineTo(x + 130 * s, y - 158 * s);
-  ctx.closePath();
-  ctx.fill();
 }
 
 function DrawSolid(sld) {
@@ -295,6 +299,8 @@ function DrawSolid(sld) {
   const s = S();
   const x = WX(sld.x);
   const y = WY(sld.y);
+  const img = sld.kind === "sandbag" ? imgs.sandbag : imgs.crate;
+  if (DrawSprite(img, x, y, sld.w * s, sld.h * s, { fit: "contain" })) return;
   ctx.fillStyle = sld.kind === "sandbag" ? "#7a6a48" : "#8a6238";
   ctx.strokeStyle = "#1c1710";
   ctx.lineWidth = 2;
@@ -386,16 +392,71 @@ function DrawEntity(e) {
     return;
   }
 
+  if (e.type === "pickup") {
+    const key = PickupArtKey(e.item);
+    const img = key ? imgs[key] : null;
+    if (e.behindGap) {
+      if (img) DrawSprite(img, x, y, 36 * s, 28 * s, { fit: "contain", alpha: 0.45 });
+      return;
+    }
+    if (DrawSprite(img, x, y, 40 * s, 36 * s, { fit: "contain" })) {
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${10 * s}px Noto Serif SC, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(e.label || "", x, y - 42 * s);
+      return;
+    }
+  }
+
+  if (e.type === "gap") {
+    if (DrawSprite(imgs.dogGap, x, y, 90 * s, 48 * s, { fit: "width" })) {
+      ctx.fillStyle = "#c9a45a";
+      ctx.font = `700 ${9 * s}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("狗洞", x, y - 52 * s);
+      return;
+    }
+  }
+
+  if (e.type === "dirt") {
+    if (e.dug) return;
+    if (DrawSprite(imgs.dirtMound, x, y, Math.max(e.w, 100) * s, 70 * s, { fit: "width" })) {
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${10 * s}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(`再挖${e.hp}`, x, y - 78 * s);
+      return;
+    }
+  }
+
+  if (e.type === "mg") {
+    if (DrawSprite(imgs.mgNest, x, y, 120 * s, 70 * s, {
+      fit: "width",
+      alpha: e.alive ? 1 : 0.35,
+    })) {
+      if (e.alive) {
+        ctx.fillStyle = "#a6452f";
+        ctx.font = `700 ${11 * s}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("机枪", x, y - 78 * s);
+      }
+      return;
+    }
+  }
+
+  if (e.type === "wire") {
+    if (e.cut) return;
+    // Fallback ink wire if plate missing
+  } else if (e.type === "medic") {
+    if (e.rescued || e.carried) return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#1c1710";
 
   if (e.type === "pickup") {
-    if (e.behindGap) {
-      ctx.restore();
-      return;
-    }
     ctx.fillStyle = "#efe2c8";
     ctx.fillRect(-14 * s, -28 * s, 28 * s, 28 * s);
     ctx.strokeRect(-14 * s, -28 * s, 28 * s, 28 * s);
@@ -407,15 +468,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#2a2118";
     ctx.fillRect(-20 * s, -22 * s, 40 * s, 22 * s);
     ctx.strokeRect(-20 * s, -22 * s, 40 * s, 22 * s);
-    ctx.fillStyle = "#c9a45a";
-    ctx.font = `700 ${9 * s}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText("狗洞", 0, -28 * s);
   } else if (e.type === "wire") {
-    if (e.cut) {
-      ctx.restore();
-      return;
-    }
     ctx.strokeStyle = "#b0b0b0";
     ctx.lineWidth = 2.5 * s;
     for (let i = 0; i < 4; i++) {
@@ -425,42 +478,18 @@ function DrawEntity(e) {
       ctx.stroke();
     }
   } else if (e.type === "dirt") {
-    if (e.dug) {
-      ctx.restore();
-      return;
-    }
     ctx.fillStyle = "#8a6238";
     ctx.fillRect((-e.w / 2) * s, -e.h * s, e.w * s, e.h * s);
     ctx.strokeRect((-e.w / 2) * s, -e.h * s, e.w * s, e.h * s);
-    ctx.fillStyle = "#efe2c8";
-    ctx.font = `700 ${10 * s}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText(`再挖${e.hp}`, 0, -e.h * s - 8 * s);
   } else if (e.type === "mg") {
     if (!e.alive) ctx.globalAlpha = 0.35;
     ctx.fillStyle = "#3a3530";
     ctx.fillRect(-30 * s, -56 * s, 60 * s, 56 * s);
     ctx.strokeRect(-30 * s, -56 * s, 60 * s, 56 * s);
-    ctx.fillStyle = "#2a2824";
-    ctx.fillRect(-50 * s, -40 * s, 40 * s, 8 * s);
-    if (e.alive) {
-      ctx.fillStyle = "#a6452f";
-      ctx.font = `700 ${11 * s}px sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("机枪", 0, -64 * s);
-    }
   } else if (e.type === "medic") {
-    if (e.rescued) {
-      ctx.restore();
-      return;
-    }
     ctx.fillStyle = "#c4a27a";
     ctx.fillRect(-12 * s, -36 * s, 24 * s, 24 * s);
     ctx.strokeRect(-12 * s, -36 * s, 24 * s, 24 * s);
-    ctx.fillStyle = "#efe2c8";
-    ctx.font = `700 ${10 * s}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText(e.carried ? "" : "卫生员", 0, -56 * s);
   }
   ctx.restore();
 }
@@ -470,36 +499,40 @@ function DrawPlayer() {
   const s = S();
   const x = WX(p.x);
   const y = WY(p.y);
-  const h = (p.crouching ? 34 : 50) * s;
+  const h = (p.crouching ? 38 : 56) * s;
+  const blink = p.invuln > 0 && Math.floor(p.invuln * 20) % 2 === 0;
+  if (imgs.emileSprite) {
+    DrawSprite(imgs.emileSprite, x, y, 44 * s, h, {
+      fit: "height",
+      flip: p.facing < 0,
+      alpha: blink ? 0.4 : 1,
+    });
+    if (p.carryingMedic && (imgs.medicSprite || imgs.medic)) {
+      DrawSprite(imgs.medicSprite || imgs.medic, x + p.facing * 16 * s, y - h * 0.2, 40 * s, 36 * s, {
+        fit: "height",
+        alpha: 0.95,
+      });
+    }
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(p.facing, 1);
-  if (p.invuln > 0 && Math.floor(p.invuln * 20) % 2 === 0) ctx.globalAlpha = 0.4;
-  // Ink-wash soldier — portraits stay in dialogue UI so the run cycle stays readable
+  if (blink) ctx.globalAlpha = 0.4;
   ctx.fillStyle = "#3a4534";
   ctx.strokeStyle = "#1c1710";
   ctx.lineWidth = 2.5 * s;
   ctx.fillRect(-14 * s, -h, 28 * s, h);
   ctx.strokeRect(-14 * s, -h, 28 * s, h);
-  ctx.fillStyle = "#2a3228";
-  ctx.fillRect(-16 * s, -h - 4 * s, 32 * s, 10 * s);
-  ctx.strokeRect(-16 * s, -h - 4 * s, 32 * s, 10 * s);
-  ctx.fillStyle = "#e7d0b0";
-  ctx.beginPath();
-  ctx.arc(0, -h - 10 * s, 8 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  if (p.carryingMedic) {
-    ctx.fillStyle = "#c4a27a";
-    ctx.fillRect(8 * s, -h + 6 * s, 20 * s, 22 * s);
-    ctx.strokeRect(8 * s, -h + 6 * s, 20 * s, 22 * s);
-  }
   ctx.restore();
 }
 
 function DrawProjectiles() {
   const s = S();
   for (const p of state.projectiles) {
+    const key = PickupArtKey(p.kind);
+    const img = key ? imgs[key] : null;
+    if (DrawSprite(img, WX(p.x), WY(p.y) + 8 * s, 28 * s, 28 * s, { fit: "contain" })) continue;
     ctx.save();
     ctx.fillStyle = p.kind === "grenade" ? "#3a4630" : "#b0a090";
     ctx.strokeStyle = "#1c1710";
@@ -556,7 +589,10 @@ function DrawHud() {
     hearts.appendChild(el);
   }
   const hand = $("Hand");
-  hand.textContent = state.player.carryingMedic
+  const heldKey = state.player.carryingMedic
+    ? "medicSprite"
+    : PickupArtKey(state.player.held);
+  const heldLabel = state.player.carryingMedic
     ? "伤员"
     : state.player.held === "can"
       ? "罐头"
@@ -565,6 +601,15 @@ function DrawHud() {
         : state.player.held === "grenade"
           ? "手雷"
           : "空";
+  if (heldKey && ART[heldKey]) {
+    hand.innerHTML = "";
+    const im = document.createElement("img");
+    im.src = ART[heldKey];
+    im.alt = heldLabel;
+    hand.appendChild(im);
+  } else {
+    hand.textContent = heldLabel;
+  }
   const box = $("BarkBox");
   if (state.bark) {
     box.hidden = false;

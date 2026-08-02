@@ -4,7 +4,30 @@ export const W = 4200;
 export const H = 540;
 export const GROUND = 420;
 export const GRAVITY = 2100;
-export const CACHE_BUST = "20260802g";
+export const CACHE_BUST = "20260802h";
+
+/** Every in-world drawable must have a generated Texture_* plate (100% art coverage). */
+export const WORLD_ART_FILES = [
+  "Texture_FarmRuinWide.jpg",
+  "Texture_SpriteEmile.png",
+  "Texture_SpriteMedic.png",
+  "Texture_DogWalt.png",
+  "Texture_EnemySentry.png",
+  "Texture_PropCart.png",
+  "Texture_PropWireBag.png",
+  "Texture_PropTinCan.png",
+  "Texture_PropGrenade.png",
+  "Texture_PropCutters.png",
+  "Texture_PropMgNest.png",
+  "Texture_PropCrate.png",
+  "Texture_PropSandbag.png",
+  "Texture_PropDogGap.png",
+  "Texture_PropDirtMound.png",
+  "Texture_PropBarn.png",
+  "Texture_PortraitEmile.png",
+  "Texture_PortraitKarl.png",
+  "Texture_PortraitMedic.png",
+];
 
 /** Keep the line intact; fused into normal talk, not a slogan card. */
 export const PROLOGUE_LINE = "往后的形势只怕会更加艰难";

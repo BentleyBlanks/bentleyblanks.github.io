@@ -11,6 +11,7 @@ import {
   PROLOGUE_BEATS,
   PROLOGUE_LINE,
   Step,
+  WORLD_ART_FILES,
 } from "./Script_Sim.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -34,30 +35,21 @@ function Main() {
   Assert(PROLOGUE_LINE === "往后的形势只怕会更加艰难", "prologue line");
   Assert(PROLOGUE_BEATS.some((b) => b.text === PROLOGUE_LINE), "line fused into talk");
   Assert(PROLOGUE_BEATS.every((b) => b.speaker && b.text), "prologue is spoken dialogue");
-  for (const name of [
-    "Texture_FarmRuinWide.jpg",
-    "Texture_PortraitEmile.png",
-    "Texture_PortraitKarl.png",
-    "Texture_DogWalt.png",
-    "Texture_EnemySentry.png",
-    "Texture_PropCart.png",
-    "Texture_PropWireBag.png",
-    "Texture_PortraitMedic.png",
-    "Texture_SpriteMedic.png",
-  ]) {
+  Assert(WORLD_ART_FILES.length >= 19, "100% art manifest");
+  const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  for (const name of WORLD_ART_FILES) {
     Assert(existsSync(join(here, name)), `art ${name}`);
+    Assert(gameSrc.includes(`./${name}`), `wired ${name}`);
   }
+  Assert(gameSrc.includes("emileSprite"), "player uses generated Emile sprite");
+  Assert(gameSrc.includes("mgNest"), "MG uses generated nest");
+  Assert(gameSrc.includes("tinCan"), "can uses generated plate");
+  Assert(gameSrc.includes("dirtMound"), "dirt uses generated mound");
+  Assert(gameSrc.includes("dogGap"), "gap uses generated plate");
   // In-game sprites must be cut out (real alpha), not opaque paper plates.
-  for (const name of [
-    "Texture_DogWalt.png",
-    "Texture_EnemySentry.png",
-    "Texture_PropCart.png",
-    "Texture_PropWireBag.png",
-    "Texture_SpriteMedic.png",
-  ]) {
+  for (const name of WORLD_ART_FILES.filter((n) => n.endsWith(".png"))) {
     const buf = readFileSync(join(here, name));
     Assert(buf[0] === 0x89 && buf[1] === 0x50, `${name} is png`);
-    // tRNS or truecolor+alpha (color type 4/6) — IHDR byte 25 = color type
     const colorType = buf[25];
     Assert(colorType === 4 || colorType === 6, `${name} has alpha channel`);
   }

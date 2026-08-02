@@ -158,7 +158,11 @@ button { font: inherit; cursor: pointer; border: none; }
 .hand {
   width: 48px; height: 48px; border: 2px solid var(--ink); background: rgba(240,226,196,.94);
   color: var(--ink); display: grid; place-items: center; font-size: .72rem; font-weight: 700;
-  box-shadow: 2px 2px 0 rgba(0,0,0,.3);
+  box-shadow: 2px 2px 0 rgba(0,0,0,.3); overflow: hidden;
+}
+.hand img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  pointer-events: none; -webkit-user-select: none; user-select: none;
 }
 .barkBox {
   display: flex; gap: 10px; align-items: flex-start;
