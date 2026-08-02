@@ -9,6 +9,56 @@ export const actorProfiles = Object.freeze({
 
 const Puzzle = (title, brief, correct, options) => ({ title, brief, correct, options });
 
+export const cinematicSequences = Object.freeze({
+  prologueOpening: Object.freeze([
+    { duration: 2.8, targetX: -6.2, targetY: 3.45, zoom: 1.02, label: "一九四二年五月 · 深夜", speaker: "黑风口外", caption: "远处的枪声没有按约定停下。原本用来掩护撤回的信号，也迟迟没有出现。", effect: "raidFlash", shake: .08 },
+    { duration: 3.1, targetX: -9.7, targetY: 3.35, zoom: 1.25, label: "村外堤沟", speaker: "夜袭归队员", caption: "队形还没展开，路口的车灯先亮了。伤员在后面，追兵正沿我们的退路往村里压。", effect: "retreat", shake: .16 },
+    { duration: 2.9, targetX: -6.8, targetY: 3.15, zoom: 1.38, label: "高家庄西口", speaker: "高老忠", caption: "先把消息送进村。钟一响，各院照平日排好的次序走，谁也不许乱。", effect: "bellStill" },
+    { duration: 2.5, targetX: -3.1, targetY: 3.65, zoom: 1.06, label: "追兵逼近", speaker: "林青禾", caption: "先确认夜袭队留下的信号，再决定村里还有多少时间。", effect: "searchLight" }
+  ]),
+  raidLost: Object.freeze([
+    { duration: 2.4, targetX: -10.2, targetY: 3.35, zoom: 1.42, label: "断开的联络", speaker: "林青禾", caption: "土坡上只有凌乱弹痕，没有约定的回号。夜袭已经失去突然性。", effect: "raidFlash", shake: .11 },
+    { duration: 2.4, targetX: -8.9, targetY: 3.4, zoom: 1.24, label: "退路", speaker: "林青禾", caption: "先接住回来的人。只有问清追兵方向，警报才不是让全村盲目奔跑。", effect: "retreat" }
+  ]),
+  runnerWarning: Object.freeze([
+    { duration: 2.6, targetX: -8.8, targetY: 3.28, zoom: 1.48, label: "伤员带回的消息", speaker: "夜袭归队员", caption: "敌人从路口追来，后队还在轮换抬伤员。村里只剩一小段准备时间。", effect: "breath", shake: .07 },
+    { duration: 2.6, targetX: -6.8, targetY: 3.2, zoom: 1.28, label: "钟楼", speaker: "高老忠", caption: "让钟声先越过屋脊。每个院子都必须听懂同一个次序。", effect: "bellStill" }
+  ]),
+  bellAcrossVillage: Object.freeze([
+    { duration: 2.1, targetX: -6.8, targetY: 3.05, zoom: 1.55, label: "第一声", speaker: "高老忠", caption: "不是催促，是唤醒。", effect: "bellRing", shake: .13 },
+    { duration: 2.5, targetX: -3.5, targetY: 3.45, zoom: 1.18, label: "第二声", speaker: "村中", caption: "门闩一扇接一扇打开，灯罩被压低，担架先从窄院里转出来。", effect: "doors" },
+    { duration: 2.7, targetX: 1.2, targetY: 3.55, zoom: 1.05, label: "三声一停", speaker: "赵婶", caption: "西院先答，伤员居中，断后的人最后应声。钟停以后，只剩脚步。", effect: "searchLight" }
+  ]),
+  doorsAndFootsteps: Object.freeze([
+    { duration: 2.4, targetX: -2.8, targetY: 3.38, zoom: 1.36, label: "逐户回应", speaker: "赵婶", caption: "不是数影子。每户都要有人亲口答应，才知道老人和孩子没有落下。", effect: "doors" },
+    { duration: 2.6, targetX: .2, targetY: 3.55, zoom: 1.15, label: "村口已有车灯", speaker: "林青禾", caption: "队伍必须绕开开阔村道，同时让担架和老人不断队。", effect: "searchLight", shake: .08 }
+  ]),
+  evacuationDescent: Object.freeze([
+    { duration: 2.3, targetX: .2, targetY: 3.5, zoom: 1.24, label: "灌渠背坡", speaker: "林青禾", caption: "背坡挡住车灯，缓坡让担架能连续转弯。队伍开始向入口收拢。", effect: "evacuation" },
+    { duration: 2.6, targetX: 2.8, targetY: 5.4, zoom: 1.08, label: "地表与土层之间", speaker: "赵婶", caption: "老人先踩稳梯脚，伤员一端一端换肩。上面的人没有催，下面的人没有挤。", effect: "descent" },
+    { duration: 2.8, targetX: 4.2, targetY: 7.75, zoom: 1.16, label: "旧藏身洞", speaker: "高传宝", caption: "所有人都在往同一个洞口聚。只要入口被堵，里面就没有第二条路。", effect: "tunnelCrowd" }
+  ]),
+  hatchClosing: Object.freeze([
+    { duration: 2.5, targetX: 3.8, targetY: 3.45, zoom: 1.42, label: "最后一户", speaker: "林青禾", caption: "回应传到门边以后，断后的人才落下门板。", effect: "hatch" },
+    { duration: 2.6, targetX: 4.2, targetY: 7.7, zoom: 1.2, label: "门板之下", speaker: "洞内", caption: "光线只剩一道细缝。头顶的脚步已经压进院子。", effect: "searchAbove", shake: .12 }
+  ]),
+  searchAboveSoil: Object.freeze([
+    { duration: 2.6, targetX: 4.6, targetY: 7.75, zoom: 1.5, label: "搜查开始", speaker: "赵婶", caption: "孩子贴着衣襟慢慢喘，担架布被攥住，没有人敢让木架碰墙。", effect: "breath", shake: .08 },
+    { duration: 2.5, targetX: 3.8, targetY: 5.2, zoom: 1.16, label: "一层土之隔", speaker: "地面", caption: "刺刀先敲门板，再沿着墙根找空响。尘土从梁缝一粒粒落下。", effect: "bayonet", shake: .21 },
+    { duration: 2.7, targetX: 6.4, targetY: 7.85, zoom: 1.25, label: "单口洞深处", speaker: "高传宝", caption: "人群只能继续向死角退。前面没有出口，后面仍有人往里进。", effect: "tunnelCrowd" }
+  ]),
+  singleExitCrisis: Object.freeze([
+    { duration: 2.4, targetX: 7.2, targetY: 7.95, zoom: 1.5, label: "浮土下落", speaker: "高传宝", caption: "旧撑木开始吃力。门板只能暂时托住塌土，换不来一条退路。", effect: "collapse", shake: .28 },
+    { duration: 2.7, targetX: 5.4, targetY: 7.75, zoom: 1.16, label: "空气越来越薄", speaker: "洞内", caption: "伤员、老人和孩子都挤在同一条线上。藏住了人，却让所有人的安危系在一个洞口上。", effect: "breath" },
+    { duration: 2.7, targetX: 9.2, targetY: 7.7, zoom: 1.3, label: "这一夜的代价", speaker: "高传宝", caption: "等脚步走远，必须把教训说清楚。", effect: "stillness" }
+  ]),
+  prologueResolve: Object.freeze([
+    { duration: 2.8, targetX: 9.2, targetY: 7.7, zoom: 1.5, label: "脚步远去", speaker: "高传宝", caption: "往后的形势只会更加困难。", effect: "stillness" },
+    { duration: 3.1, targetX: 3.7, targetY: 6.5, zoom: .98, label: "从藏身洞开始改", speaker: "高传宝", caption: "地道要有支路、风路和第二出口；既能转移群众，也能让守庄的人换位。", effect: "networkDraft" },
+    { duration: 3.2, targetX: 0, targetY: 5.3, zoom: .94, label: "序章 · 钟声与教训", speaker: "高家庄", caption: "钟声救下了这一夜。下一次，村子要靠一张连起来的地下路网活下来。", effect: "networkDraft" }
+  ])
+});
+
 export const campaignData = Object.freeze([
   {
     id: "prologue",
@@ -17,24 +67,32 @@ export const campaignData = Object.freeze([
     title: "高老忠的钟声",
     date: "一九四二年五月 · 深夜",
     location: "黑风口外 · 高家庄",
-    thesis: "一次受挫的夜袭，把全村推到只能藏、不能转身的旧洞里。",
+    thesis: "夜袭失去突然性、群众被迫转入旧洞；那一夜证明，只能藏人的洞救不了下一次。",
     startX: -10,
     threat: true,
+    introCinematic: "prologueOpening",
     actors: [
-      { label: "高老忠", profile: "elder", color: "#d59b55", x: -8.4, layer: "surface" },
+      { label: "夜袭归队员", profile: "youth", color: "#73a5c6", x: -10.3, layer: "surface", injured: true },
+      { label: "高老忠", profile: "elder", color: "#d59b55", x: -6.8, layer: "surface" },
       { label: "赵婶", profile: "woman", color: "#7db8a4", x: -2.8, layer: "surface" },
-      { label: "高传宝", profile: "man", color: "#c77a65", x: 7.8, layer: "tunnel" }
+      { label: "伤员", profile: "youth", color: "#7ea6c5", x: 4.5, layer: "tunnel", injured: true },
+      { label: "高传宝", profile: "man", color: "#c77a65", x: 9.2, layer: "tunnel" }
     ],
     actions: [
-      { id: "ringAlarm", x: -8.2, layer: "surface", kind: "bell", verb: "敲钟", title: "让第一声越过屋脊", dialogue: "高老忠：钟声不是叫人往外跑，是让每户按次序进洞。" },
-      { id: "gatherFamilies", x: -3.1, layer: "surface", kind: "group", verb: "点户", title: "按院落次序聚拢群众", requires: ["ringAlarm"], dialogue: "赵婶：西院先走，伤员居中，最后一户要有人亲口回应。" },
-      { id: "chooseEvacuation", x: 1.2, layer: "surface", kind: "choice", verb: "定路线", title: "避开暴露的村口", requires: ["gatherFamilies"], dialogue: "林青禾：不是哪条路最近，而是哪条路还能让伤员和老人通过。", puzzle: Puzzle("撤离路线", "敌兵正从村口推进；群众中有伤员和老人。", "ditch", [
+      { id: "readBrokenSignal", x: -10.4, layer: "surface", kind: "signal", verb: "辨信号", title: "确认夜袭队伍已经失去联络", dialogue: "林青禾：约定的两短一长没有回来。枪声正往村子的方向压。", cinematicAfter: "raidLost" },
+      { id: "receiveRunner", x: -8.8, layer: "surface", kind: "stretcher", verb: "接伤员", title: "问清敌人追来的方向", requires: ["readBrokenSignal"], dialogue: "夜袭归队员：路口先亮了车灯，我们刚展开就被火力压住。后队正带伤员撤，敌人跟过来了。", cinematicAfter: "runnerWarning" },
+      { id: "ringAlarm", x: -6.8, layer: "surface", kind: "bell", verb: "敲钟", title: "让警报越过每一排屋脊", requires: ["receiveRunner"], dialogue: "高老忠：钟不是催大家乱跑。三声一停，各院按平日排好的次序走。", cinematicAfter: "bellAcrossVillage" },
+      { id: "cutLanterns", x: -4.8, layer: "surface", kind: "lamp", verb: "压灯罩", title: "熄掉会暴露入口的院灯", requires: ["ringAlarm"], dialogue: "林青禾：留灶膛余火，院灯全灭。让远处看见的还是一座睡着的村子。" },
+      { id: "gatherFamilies", x: -2.8, layer: "surface", kind: "group", verb: "逐户回应", title: "按院落次序聚拢群众", requires: ["cutLanterns"], dialogue: "赵婶：西院先走，伤员居中，最后一户必须由本人答应，不能只数影子。", cinematicAfter: "doorsAndFootsteps" },
+      { id: "chooseEvacuation", x: .2, layer: "surface", kind: "choice", verb: "定路线", title: "让老人和担架避开村口灯火", requires: ["gatherFamilies"], dialogue: "林青禾：不是哪条路最近，而是哪条路还能让整队人不散。", puzzle: Puzzle("撤离路线", "追兵的车灯已压到村口；队伍里有老人、孩子和担架。", "ditch", [
         { id: "road", label: "走开阔村道", note: "路平，但会直接进入灯火和视线。" },
         { id: "ditch", label: "沿灌渠背坡", note: "坡缓、有遮挡，也能让担架转弯。" },
         { id: "wall", label: "翻越高墙", note: "年轻人能过，伤员和老人无法连续通过。" }
-      ]) },
-      { id: "sealLastHatch", x: 4.8, layer: "surface", kind: "hatch", verb: "合门", title: "等最后一户下去再封口", requires: ["chooseEvacuation"], dialogue: "林青禾：少一个回应，门板就不能落。" },
-      { id: "endureSearch", x: 7.6, layer: "tunnel", kind: "listen", verb: "压住声息", title: "在单口洞里听完搜查", requires: ["sealLastHatch"], crouch: true, dialogue: "高传宝：往后的形势只会更加困难。藏身洞得改成能转、能救、也能打的地道。" }
+      ]), cinematicAfter: "evacuationDescent" },
+      { id: "sealLastHatch", x: 3.8, layer: "surface", kind: "hatch", verb: "等人齐再合门", title: "让断后的最后一户进入旧洞", requires: ["chooseEvacuation"], dialogue: "林青禾：少一个回应，门板就不能落。", cinematicAfter: "hatchClosing" },
+      { id: "endureSearch", x: 4.5, layer: "tunnel", kind: "listen", verb: "压住声息", title: "在脚步和刺刀声下护住伤员", requires: ["sealLastHatch"], crouch: true, dialogue: "赵婶：孩子的嘴别捂死，让他贴着衣襟慢慢喘。上面的脚步还没过完。", cinematicAfter: "searchAboveSoil" },
+      { id: "clearDeadEnd", x: 7.2, layer: "tunnel", kind: "timber", verb: "托住塌土", title: "给拥堵的单口洞留出一线空气", requires: ["endureSearch"], crouch: true, dialogue: "高传宝：后面没有第二条路。先用门板托住浮土，别让人群再往死角挤。", cinematicAfter: "singleExitCrisis" },
+      { id: "nameTheLesson", x: 9.2, layer: "tunnel", kind: "proof", verb: "定下改造", title: "把这一夜的教训变成下一步", requires: ["clearDeadEnd"], dialogue: "高传宝：往后的形势只会更加困难。藏身洞得改成能转、能救、也能打的地道。", cinematicAfter: "prologueResolve" }
     ]
   },
   {

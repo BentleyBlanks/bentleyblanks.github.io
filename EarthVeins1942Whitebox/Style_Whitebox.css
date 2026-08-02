@@ -98,10 +98,95 @@ button:focus-visible {
   width: 100%;
   height: clamp(10px, 2.2vh, 24px);
   background: #070a0c;
+  transition: height .65s cubic-bezier(.2,.75,.2,1);
 }
 
 #cinematicBars i:first-child { top: 0; }
 #cinematicBars i:last-child { bottom: 0; }
+
+#gameShell.isCinematic #cinematicBars i {
+  height: clamp(38px, 8.2vh, 76px);
+}
+
+#cinematicPulse {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: var(--pulse-opacity, 0);
+  background:
+    radial-gradient(circle at var(--pulse-x, 50%) var(--pulse-y, 48%), rgba(226, 156, 84, .2), transparent 26%),
+    linear-gradient(90deg, rgba(115, 37, 30, .18), transparent 38%);
+  mix-blend-mode: screen;
+}
+
+#cinematicCaption {
+  position: absolute;
+  z-index: 28;
+  left: clamp(30px, 8vw, 130px);
+  bottom: clamp(54px, 11vh, 112px);
+  width: min(660px, 72vw);
+  padding: 0 0 13px 18px;
+  border-left: 2px solid var(--amber);
+  text-shadow: 0 2px 8px rgba(0,0,0,.9);
+  pointer-events: none;
+}
+
+#cinematicCaption small {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+#cinematicCaption b {
+  display: block;
+  color: #f0eadc;
+  font-size: clamp(13px, 1.45vw, 19px);
+  font-weight: 500;
+}
+
+#cinematicCaption p {
+  margin: 5px 0 0;
+  color: #e0e3e2;
+  font-size: clamp(14px, 1.65vw, 22px);
+  line-height: 1.65;
+}
+
+#cinematicProgress {
+  position: absolute;
+  left: 18px;
+  bottom: 0;
+  width: var(--shot-progress, 0%);
+  height: 2px;
+  background: linear-gradient(90deg, var(--amber), rgba(231,169,94,.12));
+}
+
+#skipCinematic {
+  position: absolute;
+  z-index: 31;
+  right: clamp(26px, 4vw, 62px);
+  bottom: clamp(56px, 10vh, 104px);
+  min-height: 36px;
+  padding: 8px 13px;
+  color: #b9c0c3;
+  border: 1px solid rgba(233,226,210,.2);
+  background: rgba(11,15,18,.72);
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+
+#gameShell.isCinematic #gameHeader,
+#gameShell.isCinematic #objectiveCard,
+#gameShell.isCinematic #suspicionHud,
+#gameShell.isCinematic #interactionPrompt,
+#gameShell.isCinematic #touchControls {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .28s ease;
+}
 
 .fullScreen,
 .panelScreen {
@@ -688,10 +773,32 @@ button:focus-visible {
   .touchMove, .touchActions { gap: 5px; }
   #touchControls button { width: 52px; height: 52px; }
   .touchActions button { width: 46px; height: 46px; font-size: 9px; }
+
+  #cinematicCaption {
+    left: 22px;
+    bottom: 70px;
+    width: calc(100vw - 118px);
+    padding-left: 12px;
+  }
+  #cinematicCaption p { font-size: 13px; line-height: 1.5; }
+  #cinematicProgress { left: 12px; }
+  #skipCinematic { right: 18px; bottom: 70px; }
 }
 
 @media (max-height: 460px) {
   #cinematicBars i { height: 10px; }
+  #gameShell.isCinematic #cinematicBars i { height: 28px; }
+  #cinematicCaption {
+    left: 22px;
+    bottom: 38px;
+    width: min(570px, 67vw);
+    padding: 0 0 8px 12px;
+  }
+  #cinematicCaption small { margin-bottom: 3px; font-size: 8px; }
+  #cinematicCaption b { font-size: 11px; }
+  #cinematicCaption p { margin-top: 2px; font-size: 12px; line-height: 1.35; }
+  #cinematicProgress { left: 12px; }
+  #skipCinematic { right: 18px; bottom: 38px; min-height: 30px; padding: 6px 9px; font-size: 8px; }
   #gameHeader { top: 12px; }
   #objectiveCard {
     top: 48px;

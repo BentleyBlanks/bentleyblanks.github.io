@@ -1,8 +1,9 @@
-import { actorProfiles, campaignData, actorHeightRange } from "./Data_WhiteboxCampaign.mjs";
+import { actorProfiles, campaignData, actorHeightRange, cinematicSequences } from "./Data_WhiteboxCampaign.mjs";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
 const ui = {
+  gameShell: document.querySelector("#gameShell"),
   titleScreen: document.querySelector("#titleScreen"),
   startButton: document.querySelector("#startButton"),
   chapterButton: document.querySelector("#chapterButton"),
@@ -45,6 +46,13 @@ const ui = {
   endingChaptersButton: document.querySelector("#endingChaptersButton"),
   touchControls: document.querySelector("#touchControls"),
   touchDepthLabel: document.querySelector('[data-input="depth"] span'),
+  cinematicCaption: document.querySelector("#cinematicCaption"),
+  cinematicLabel: document.querySelector("#cinematicLabel"),
+  cinematicSpeaker: document.querySelector("#cinematicSpeaker"),
+  cinematicText: document.querySelector("#cinematicText"),
+  cinematicProgress: document.querySelector("#cinematicProgress"),
+  skipCinematic: document.querySelector("#skipCinematic"),
+  cinematicPulse: document.querySelector("#cinematicPulse"),
   toast: document.querySelector("#toast")
 };
 
@@ -70,9 +78,14 @@ const state = {
   cameraX: 0,
   cameraY: 4.35,
   cameraTargetY: 4.35,
+  cameraZoom: 1,
+  cameraShakeX: 0,
+  cameraShakeY: 0,
+  cinematic: null,
   transition: null,
   nearestAction: null,
   suspicion: 0,
+  exposureGrace: 0,
   patrolX: -8.5,
   patrolDirection: 1,
   patrolPause: 0,
@@ -104,6 +117,10 @@ function GetLayerY(layer) {
   return layer === "surface" ? world.surfaceY : world.tunnelY;
 }
 
+function GetRenderScale() {
+  return state.viewport.scale * state.cameraZoom;
+}
+
 function GetPlayerWorldY() {
   if (!state.transition) return GetLayerY(state.player.layer);
   const progress = SmoothStep(state.transition.progress);
@@ -112,11 +129,11 @@ function GetPlayerWorldY() {
 
 function WorldToScreenX(worldX, parallax = 1) {
   const cameraContribution = state.cameraX * parallax;
-  return (worldX - cameraContribution) * state.viewport.scale + state.viewport.width * .5;
+  return (worldX - cameraContribution) * GetRenderScale() + state.viewport.width * .5 + state.cameraShakeX;
 }
 
 function WorldToScreenY(worldY) {
-  return (worldY - state.cameraY) * state.viewport.scale + state.viewport.height * .5;
+  return (worldY - state.cameraY) * GetRenderScale() + state.viewport.height * .5 + state.cameraShakeY;
 }
 
 function ResizeCanvas() {
@@ -199,6 +216,123 @@ function CloseNavigationPanel() {
   ui.dialoguePanel.hidden = state.mode !== "dialogue";
 }
 
+function ApplyCinematicBeat(beat) {
+  ui.cinematicLabel.textContent = beat.label || "镜头段落";
+  ui.cinematicSpeaker.textContent = beat.speaker || "";
+  ui.cinematicText.textContent = beat.caption || "";
+  ui.cinematicProgress.style.setProperty("--shot-progress", "0%");
+  ui.cinematicPulse.style.setProperty("--pulse-opacity", "0");
+}
+
+function PlayCinematic(sequenceId, callback = null) {
+  const beats = cinematicSequences[sequenceId];
+  if (!beats?.length) {
+    callback?.();
+    return;
+  }
+  ResetHeldInputs();
+  state.mode = "cinematic";
+  state.cinematic = {
+    sequenceId,
+    beats,
+    index: 0,
+    elapsed: 0,
+    fromX: state.cameraX,
+    fromY: state.cameraY,
+    fromZoom: state.cameraZoom,
+    callback
+  };
+  ui.gameShell.classList.add("isCinematic");
+  ui.cinematicCaption.hidden = false;
+  ui.skipCinematic.hidden = false;
+  ui.toast.hidden = true;
+  ApplyCinematicBeat(beats[0]);
+}
+
+function FinishCinematic() {
+  const callback = state.cinematic?.callback || null;
+  state.cinematic = null;
+  state.cameraShakeX = 0;
+  state.cameraShakeY = 0;
+  state.mode = "playing";
+  state.exposureGrace = Math.max(state.exposureGrace, 2.4);
+  ui.gameShell.classList.remove("isCinematic");
+  ui.cinematicCaption.hidden = true;
+  ui.skipCinematic.hidden = true;
+  ui.cinematicPulse.style.setProperty("--pulse-opacity", "0");
+  callback?.();
+  UpdateInterface();
+}
+
+function SkipCinematic() {
+  if (state.mode !== "cinematic") return;
+  const finalBeat = state.cinematic.beats[state.cinematic.beats.length - 1];
+  state.cameraX = finalBeat.targetX ?? state.cameraX;
+  state.cameraY = finalBeat.targetY ?? state.cameraY;
+  state.cameraZoom = finalBeat.zoom ?? state.cameraZoom;
+  FinishCinematic();
+}
+
+function HoldCinematicBeatForQa(beatIndex) {
+  if (!state.cinematic) return;
+  const safeIndex = Clamp(Number(beatIndex) || 0, 0, state.cinematic.beats.length - 1);
+  const beat = state.cinematic.beats[safeIndex];
+  state.cinematic.index = safeIndex;
+  state.cinematic.elapsed = 0;
+  state.cinematic.hold = true;
+  state.cinematic.fromX = beat.targetX ?? state.cameraX;
+  state.cinematic.fromY = beat.targetY ?? state.cameraY;
+  state.cinematic.fromZoom = beat.zoom ?? state.cameraZoom;
+  state.cameraX = state.cinematic.fromX;
+  state.cameraY = state.cinematic.fromY;
+  state.cameraZoom = state.cinematic.fromZoom;
+  ApplyCinematicBeat(beat);
+  ui.cinematicProgress.style.setProperty("--shot-progress", "50%");
+}
+
+function UpdateCinematic(delta) {
+  const cinematic = state.cinematic;
+  if (!cinematic) return;
+  const beat = cinematic.beats[cinematic.index];
+  if (cinematic.hold) {
+    state.cameraX = beat.targetX ?? state.cameraX;
+    state.cameraY = beat.targetY ?? state.cameraY;
+    state.cameraZoom = beat.zoom ?? state.cameraZoom;
+    state.cameraShakeX = 0;
+    state.cameraShakeY = 0;
+    return;
+  }
+  cinematic.elapsed += delta;
+  const progress = Clamp(cinematic.elapsed / Math.max(.05, beat.duration || 1), 0, 1);
+  const eased = SmoothStep(progress);
+  const targetX = beat.targetX ?? cinematic.fromX;
+  const targetY = beat.targetY ?? cinematic.fromY;
+  const targetZoom = beat.zoom ?? cinematic.fromZoom;
+  state.cameraX = cinematic.fromX + (targetX - cinematic.fromX) * eased;
+  state.cameraY = cinematic.fromY + (targetY - cinematic.fromY) * eased;
+  state.cameraZoom = cinematic.fromZoom + (targetZoom - cinematic.fromZoom) * eased;
+  const shakeEnvelope = Math.sin(progress * Math.PI);
+  const shake = (beat.shake || 0) * shakeEnvelope * 18;
+  state.cameraShakeX = Math.sin(state.elapsed * 73 + cinematic.index * 2.1) * shake;
+  state.cameraShakeY = Math.cos(state.elapsed * 91 + cinematic.index) * shake * .55;
+  ui.cinematicProgress.style.setProperty("--shot-progress", `${Math.round(progress * 100)}%`);
+  const pulseEffects = ["raidFlash", "bellRing", "collapse", "searchAbove", "bayonet"];
+  const pulse = pulseEffects.includes(beat.effect) ? Math.sin(progress * Math.PI * (beat.effect === "raidFlash" ? 4 : 1)) ** 2 * .68 : 0;
+  ui.cinematicPulse.style.setProperty("--pulse-opacity", pulse.toFixed(3));
+
+  if (progress < 1) return;
+  cinematic.index += 1;
+  if (cinematic.index >= cinematic.beats.length) {
+    FinishCinematic();
+    return;
+  }
+  cinematic.elapsed = 0;
+  cinematic.fromX = state.cameraX;
+  cinematic.fromY = state.cameraY;
+  cinematic.fromZoom = state.cameraZoom;
+  ApplyCinematicBeat(cinematic.beats[cinematic.index]);
+}
+
 function StartSequence(index) {
   const safeIndex = Clamp(Number(index) || 0, 0, campaignData.length - 1);
   ClosePanels();
@@ -216,8 +350,16 @@ function StartSequence(index) {
   state.cameraX = Clamp(state.player.x + 2.1, world.minimumX + 3, world.maximumX - 3);
   state.cameraY = 4.35;
   state.cameraTargetY = 4.35;
+  state.cameraZoom = 1;
+  state.cameraShakeX = 0;
+  state.cameraShakeY = 0;
+  state.cinematic = null;
+  ui.gameShell.classList.remove("isCinematic");
+  ui.cinematicCaption.hidden = true;
+  ui.skipCinematic.hidden = true;
   state.transition = null;
   state.suspicion = 0;
+  state.exposureGrace = 1.2;
   state.patrolX = -8.5;
   state.patrolDirection = 1;
   state.patrolPause = 0;
@@ -232,6 +374,13 @@ function StartSequence(index) {
   ui.scaleStatus.textContent = `角色标尺 ${actorHeightRange.minimum.toFixed(2)}–${actorHeightRange.maximum.toFixed(2)}m`;
   UpdateInterface();
   ShowToast(`${state.chapter.number} · ${state.chapter.title}`, 1250);
+  const query = new URLSearchParams(location.search);
+  const requestedCinematic = query.get("qaCinematic");
+  const cinematicId = requestedCinematic || state.chapter.introCinematic;
+  if (cinematicId && query.get("skipCinematic") !== "1") {
+    PlayCinematic(cinematicId);
+    if (requestedCinematic && query.get("qaHold") === "1") HoldCinematicBeatForQa(query.get("qaBeat"));
+  }
 }
 
 function GetNextAction() {
@@ -388,8 +537,12 @@ function CompleteAction(action) {
   state.suspicion = Math.max(0, state.suspicion - .32);
   UpdateInterface();
   ShowDialogue(action.dialogue, () => {
-    if (state.completed.size >= state.chapter.actions.length) FinishSequence();
-    else state.mode = "playing";
+    const ContinueAfterAction = () => {
+      if (state.completed.size >= state.chapter.actions.length) FinishSequence();
+      else state.mode = "playing";
+    };
+    if (action.cinematicAfter) PlayCinematic(action.cinematicAfter, ContinueAfterAction);
+    else ContinueAfterAction();
   });
 }
 
@@ -458,6 +611,11 @@ function IsInsideCover(x) {
 }
 
 function UpdatePatrol(delta) {
+  if (state.exposureGrace > 0) {
+    state.exposureGrace = Math.max(0, state.exposureGrace - delta);
+    state.suspicion = Math.max(0, state.suspicion - delta * .8);
+    return;
+  }
   if (!state.chapter.threat) {
     state.suspicion = Math.max(0, state.suspicion - delta * .55);
     return;
@@ -512,6 +670,11 @@ function UpdateToast(now) {
 }
 
 function Update(delta) {
+  if (state.mode === "cinematic") {
+    state.elapsed += delta;
+    UpdateCinematic(delta);
+    return;
+  }
   if (state.mode !== "playing") return;
   state.elapsed += delta;
   if (state.transition) {
@@ -541,11 +704,15 @@ function Update(delta) {
   const followY = 1 - Math.exp(-delta / (state.transition ? .08 : .32));
   state.cameraX += (cameraTargetX - state.cameraX) * followX;
   state.cameraY += (state.cameraTargetY - state.cameraY) * followY;
+  state.cameraZoom += (1 - state.cameraZoom) * (1 - Math.exp(-delta / .32));
+  state.cameraShakeX = 0;
+  state.cameraShakeY = 0;
   UpdateInterface();
 }
 
 function DrawBackground() {
-  const { width, height, scale } = state.viewport;
+  const { width, height } = state.viewport;
+  const scale = GetRenderScale();
   const surfaceScreenY = WorldToScreenY(world.surfaceY);
   const tunnelTopScreenY = WorldToScreenY(world.tunnelY - 2.05);
   const tunnelFloorScreenY = WorldToScreenY(world.tunnelY);
@@ -609,7 +776,7 @@ function DrawBackground() {
 }
 
 function DrawVillage(surfaceScreenY) {
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   const housePositions = [-11, -6.6, -1.4, 4.1, 9.2, 13.4];
   housePositions.forEach((houseX, index) => {
     const x = WorldToScreenX(houseX, .83);
@@ -643,7 +810,7 @@ function DrawVillage(surfaceScreenY) {
 
 function DrawTunnelSupport(worldX, topY, floorY) {
   const x = WorldToScreenX(worldX);
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   context.strokeStyle = "#7d654b";
   context.lineWidth = Math.max(2, scale * .07);
   context.beginPath();
@@ -656,7 +823,7 @@ function DrawTunnelSupport(worldX, topY, floorY) {
 
 function DrawEntrance(worldX, surfaceY, tunnelTopY, tunnelFloorY) {
   const x = WorldToScreenX(worldX);
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   const isNear = Math.abs(state.player.x - worldX) <= 1.1;
   context.fillStyle = isNear ? "rgba(83, 169, 200, .28)" : "rgba(20, 29, 34, .7)";
   context.fillRect(x - scale * .48, surfaceY, scale * .96, tunnelTopY - surfaceY);
@@ -674,7 +841,7 @@ function DrawEntrance(worldX, surfaceY, tunnelTopY, tunnelFloorY) {
 }
 
 function DrawSmoke(topY, floorY) {
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   context.save();
   context.globalAlpha = .22 + state.suspicion * .18;
   for (let index = 0; index < 12; index += 1) {
@@ -712,8 +879,168 @@ function DrawNetworkLines(topY, floorY) {
   });
 }
 
+function DrawCinematicEffects() {
+  const cinematic = state.cinematic;
+  if (!cinematic) return;
+  const beat = cinematic.beats[cinematic.index];
+  const effect = beat?.effect || "";
+  const scale = GetRenderScale();
+  const surfaceY = WorldToScreenY(world.surfaceY);
+  const tunnelY = WorldToScreenY(world.tunnelY);
+  const pulse = .5 + Math.sin(state.elapsed * 5.2) * .5;
+  context.save();
+
+  if (["raidFlash", "retreat"].includes(effect)) {
+    for (let index = 0; index < 4; index += 1) {
+      const x = WorldToScreenX(-11.2 + index * 1.15);
+      const y = surfaceY - scale * (1.15 + (index % 2) * .24);
+      context.fillStyle = `rgba(224,116,76,${.08 + pulse * .18})`;
+      context.beginPath();
+      context.arc(x, y, scale * (.11 + pulse * .08), 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = "rgba(235,188,120,.42)";
+      context.lineWidth = Math.max(1, scale * .025);
+      context.beginPath();
+      context.moveTo(x - scale * .34, y + scale * .5);
+      context.lineTo(x + scale * .28, y + scale * .08);
+      context.stroke();
+    }
+  }
+
+  if (["searchLight", "searchAbove", "bayonet"].includes(effect)) {
+    const sourceX = WorldToScreenX(8.8, .92);
+    const sourceY = surfaceY - scale * 1.45;
+    const targetX = WorldToScreenX(effect === "searchLight" ? 1.2 : 4.1);
+    context.fillStyle = effect === "searchLight" ? "rgba(225,192,126,.12)" : "rgba(214,111,97,.1)";
+    context.beginPath();
+    context.moveTo(sourceX, sourceY);
+    context.lineTo(targetX - scale * 1.2, surfaceY);
+    context.lineTo(targetX + scale * 1.4, surfaceY);
+    context.closePath();
+    context.fill();
+    if (effect !== "searchLight") {
+      context.strokeStyle = "rgba(225,226,215,.42)";
+      context.lineWidth = Math.max(1.5, scale * .03);
+      for (let index = 0; index < 5; index += 1) {
+        const x = WorldToScreenX(2.8 + index * .7);
+        context.beginPath();
+        context.moveTo(x, surfaceY - scale * .12);
+        context.lineTo(x + Math.sin(state.elapsed * 7 + index) * scale * .08, surfaceY + scale * .42);
+        context.stroke();
+      }
+    }
+  }
+
+  if (["bellStill", "bellRing"].includes(effect)) {
+    const bellX = WorldToScreenX(-6.8);
+    const bellY = surfaceY - scale * 1.9;
+    context.strokeStyle = `rgba(231,169,94,${effect === "bellRing" ? .72 : .32})`;
+    context.lineWidth = Math.max(2, scale * .04);
+    const rings = effect === "bellRing" ? 3 : 1;
+    for (let index = 0; index < rings; index += 1) {
+      context.beginPath();
+      context.arc(bellX, bellY, scale * (.4 + index * .34 + pulse * .16), -.9, .9);
+      context.stroke();
+    }
+  }
+
+  if (["doors", "evacuation"].includes(effect)) {
+    context.strokeStyle = "rgba(231,169,94,.62)";
+    context.lineWidth = Math.max(2, scale * .035);
+    [-5.7, -2.1, 1.5].forEach((worldX, index) => {
+      const x = WorldToScreenX(worldX);
+      context.strokeRect(x - scale * .28, surfaceY - scale * (.82 + index * .04), scale * .56, scale * (.82 + index * .04));
+      context.beginPath();
+      context.moveTo(x, surfaceY - scale * .4);
+      context.lineTo(x + scale * (.22 + pulse * .08), surfaceY - scale * .34);
+      context.stroke();
+    });
+  }
+
+  if (["descent", "hatch"].includes(effect)) {
+    const entranceX = WorldToScreenX(effect === "hatch" ? 3.8 : 0);
+    const targetY = WorldToScreenY(world.tunnelY - 1.05);
+    context.strokeStyle = "rgba(116,185,211,.72)";
+    context.lineWidth = Math.max(2, scale * .04);
+    context.setLineDash([8, 7]);
+    context.beginPath();
+    context.moveTo(entranceX, surfaceY - scale * .25);
+    context.lineTo(entranceX, targetY);
+    context.stroke();
+    context.setLineDash([]);
+    if (effect === "hatch") {
+      context.fillStyle = "rgba(10,14,16,.82)";
+      context.fillRect(entranceX - scale * .62, surfaceY - scale * (.12 + pulse * .08), scale * 1.24, scale * .2);
+    }
+  }
+
+  if (["tunnelCrowd", "breath"].includes(effect)) {
+    for (let index = 0; index < 7; index += 1) {
+      const x = WorldToScreenX(3.1 + index * .62);
+      const y = tunnelY - scale * (.22 + (index % 2) * .06);
+      context.fillStyle = `rgba(220,220,205,${.12 + (index % 3) * .045})`;
+      context.beginPath();
+      context.arc(x, y - scale * .36, scale * .11, 0, Math.PI * 2);
+      context.fill();
+      context.fillRect(x - scale * .08, y - scale * .3, scale * .16, scale * .3);
+    }
+  }
+
+  if (effect === "collapse") {
+    context.fillStyle = "rgba(166,132,92,.72)";
+    for (let index = 0; index < 18; index += 1) {
+      const x = WorldToScreenX(7.2) + Math.sin(index * 2.4) * scale * .7;
+      const fall = (state.elapsed * (.8 + index * .03) + index * .17) % 1;
+      const y = WorldToScreenY(world.tunnelY - 2) + fall * scale * 1.8;
+      context.fillRect(x, y, Math.max(2, scale * .04), Math.max(2, scale * .04));
+    }
+  }
+
+  if (effect === "networkDraft") {
+    const lineY = WorldToScreenY(world.tunnelY - 1.05);
+    context.strokeStyle = "rgba(116,185,211,.68)";
+    context.lineWidth = Math.max(2, scale * .035);
+    context.setLineDash([10, 7]);
+    context.beginPath();
+    context.moveTo(WorldToScreenX(-10), lineY);
+    context.lineTo(WorldToScreenX(10), lineY);
+    context.stroke();
+    [-6, 0, 6].forEach((worldX) => {
+      context.beginPath();
+      context.moveTo(WorldToScreenX(worldX), lineY);
+      context.lineTo(WorldToScreenX(worldX), surfaceY);
+      context.stroke();
+    });
+    context.setLineDash([]);
+  }
+  context.restore();
+}
+
+function DrawCinematicForeground() {
+  if (!state.cinematic) return;
+  const scale = GetRenderScale();
+  const width = state.viewport.width;
+  const height = state.viewport.height;
+  const nearShift = state.cameraX * scale * .18;
+  context.save();
+  context.fillStyle = "rgba(8,12,14,.5)";
+  context.fillRect(-80 - nearShift % 170, 0, Math.max(55, scale * .9), height);
+  context.fillRect(width - Math.max(48, scale * .72) - nearShift % 90, 0, Math.max(70, scale * 1.1), height);
+  context.strokeStyle = "rgba(8,12,14,.72)";
+  context.lineWidth = Math.max(2, scale * .028);
+  for (let index = 0; index < 18; index += 1) {
+    const x = ((index * 79 - nearShift) % (width + 160)) - 80;
+    context.beginPath();
+    context.moveTo(x, height);
+    context.lineTo(x + Math.sin(index) * scale * .16, height - scale * (.42 + index % 3 * .16));
+    context.stroke();
+  }
+  context.restore();
+}
+
 function DrawMeterGrid() {
-  const { width, height, scale } = state.viewport;
+  const { width, height } = state.viewport;
+  const scale = GetRenderScale();
   context.save();
   context.strokeStyle = "rgba(116, 185, 211, .13)";
   context.lineWidth = 1;
@@ -745,9 +1072,9 @@ function DrawActionMarkers() {
     const available = !completed && RequirementsMet(action);
     const layerY = GetLayerY(action.layer);
     const x = WorldToScreenX(action.x);
-    const y = WorldToScreenY(layerY) - state.viewport.scale * 2.02;
+    const y = WorldToScreenY(layerY) - GetRenderScale() * 2.02;
     if (x < -80 || x > state.viewport.width + 80) return;
-    const radius = Math.max(15, state.viewport.scale * .24);
+    const radius = Math.max(15, GetRenderScale() * .24);
     context.save();
     context.globalAlpha = completed ? .55 : action.layer === state.player.layer ? 1 : .28;
     context.fillStyle = completed ? "#547866" : available ? "#d79b52" : "#555d61";
@@ -772,7 +1099,7 @@ function DrawActionMarkers() {
           context.strokeStyle = available || completed ? "rgba(116,185,211,.55)" : "rgba(130,130,130,.32)";
           context.setLineDash([5, 5]);
           context.beginPath();
-          context.moveTo(WorldToScreenX(parent.x), WorldToScreenY(GetLayerY(parent.layer)) - state.viewport.scale * 1.5);
+          context.moveTo(WorldToScreenX(parent.x), WorldToScreenY(GetLayerY(parent.layer)) - GetRenderScale() * 1.5);
           context.lineTo(x, y + radius);
           context.stroke();
           context.setLineDash([]);
@@ -785,7 +1112,7 @@ function DrawActionMarkers() {
 
 function DrawActor(actor, isPlayer = false) {
   const profile = actorProfiles[actor.profile || "player"] || actorProfiles.player;
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   const x = WorldToScreenX(actor.x);
   const baselineY = WorldToScreenY(actor.worldY ?? GetLayerY(actor.layer || state.player.layer));
   const canonicalHeight = profile.height * scale;
@@ -926,7 +1253,7 @@ function DrawActors() {
 }
 
 function DrawPatrol() {
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   const patrolY = world.surfaceY;
   const facing = state.patrolDirection;
   const patrolScreenX = WorldToScreenX(state.patrolX);
@@ -956,7 +1283,7 @@ function DrawPatrol() {
 }
 
 function DrawSceneLabels() {
-  const scale = state.viewport.scale;
+  const scale = GetRenderScale();
   context.save();
   context.textAlign = "left";
   context.fillStyle = "rgba(231,226,210,.78)";
@@ -972,9 +1299,15 @@ function Draw() {
   context.clearRect(0, 0, state.viewport.width, state.viewport.height);
   DrawBackground();
   if (state.mode !== "title" || ui.titleScreen.hidden) {
-    DrawActionMarkers();
-    DrawActors();
-    DrawSceneLabels();
+    if (state.mode === "cinematic") {
+      DrawActors();
+      DrawCinematicEffects();
+      DrawCinematicForeground();
+    } else {
+      DrawActionMarkers();
+      DrawActors();
+      DrawSceneLabels();
+    }
   } else {
     DrawActor({ label: "统一角色", profile: "player", color: "#e4e9e8", x: -1.2, worldY: world.surfaceY, layer: "surface" });
     DrawActor({ label: "成年民兵", profile: "man", color: "#c77a65", x: 1, worldY: world.surfaceY, layer: "surface" });
@@ -1060,7 +1393,8 @@ function BindInput() {
     if (key === "s") ToggleDepth();
     if (key === "f") ToggleObserve();
     if (key === "escape") {
-      if (state.mode === "puzzle") CancelPuzzle();
+      if (state.mode === "cinematic") SkipCinematic();
+      else if (state.mode === "puzzle") CancelPuzzle();
       else ShowChapterPanel();
     }
   });
@@ -1082,6 +1416,7 @@ function BindUi() {
   document.querySelectorAll("[data-close-panel]").forEach((button) => button.addEventListener("click", CloseNavigationPanel));
   ui.menuButton.addEventListener("click", ShowChapterPanel);
   ui.dialogueNext.addEventListener("click", ContinueDialogue);
+  ui.skipCinematic.addEventListener("click", SkipCinematic);
   ui.puzzleCancel.addEventListener("click", CancelPuzzle);
   ui.nextChapterButton.addEventListener("click", GoToNextSequence);
   ui.completeChaptersButton.addEventListener("click", () => {
@@ -1118,12 +1453,20 @@ window.EarthVeinsWhiteboxQa = Object.freeze({
     completed: [...state.completed],
     suspicion: state.suspicion,
     observe: state.observe,
-    nearestAction: state.nearestAction?.id || null
+    nearestAction: state.nearestAction?.id || null,
+    cinematic: state.cinematic ? {
+      sequenceId: state.cinematic.sequenceId,
+      beatIndex: state.cinematic.index,
+      effect: state.cinematic.beats[state.cinematic.index]?.effect || null
+    } : null
   }),
   StartSequence,
   MoveTo: (x) => { state.player.x = Clamp(Number(x) || 0, world.minimumX, world.maximumX); UpdateInterface(); },
   SetLayer: (layer) => { if (["surface", "tunnel"].includes(layer)) state.player.layer = layer; UpdateInterface(); },
   SetCrouch: (value) => { state.input.crouch = Boolean(value); state.player.crouch = Boolean(value); },
+  PlayCinematic,
+  HoldCinematicBeatForQa,
+  SkipCinematic,
   ToggleDepth,
   HandleAction
 });

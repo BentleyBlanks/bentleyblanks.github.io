@@ -6,13 +6,22 @@
   <meta name="theme-color" content="#171b20">
   <meta name="description" content="《地脉：灯火相连》纯 Canvas 2D 玩法白盒。">
   <title>地脉：灯火相连 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260802b">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260802c">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：灯火相连 纯2D白盒">
     <canvas id="gameCanvas" aria-label="程序化绘制的横版玩法区域"></canvas>
     <div id="filmGrain" aria-hidden="true"></div>
     <div id="cinematicBars" aria-hidden="true"><i></i><i></i></div>
+    <div id="cinematicPulse" aria-hidden="true"></div>
+
+    <section id="cinematicCaption" aria-live="polite" hidden>
+      <small id="cinematicLabel">镜头段落</small>
+      <b id="cinematicSpeaker"></b>
+      <p id="cinematicText"></p>
+      <i id="cinematicProgress" aria-hidden="true"></i>
+    </section>
+    <button id="skipCinematic" type="button" hidden>跳过镜头</button>
 
     <section id="titleScreen" class="fullScreen isVisible" aria-labelledby="gameTitle">
       <div class="titleGrid" aria-hidden="true"></div>
@@ -137,6 +146,6 @@
 
     <div id="toast" role="status" aria-live="polite" hidden></div>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260802b"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260802c"></script>
 </body>
 </html>
