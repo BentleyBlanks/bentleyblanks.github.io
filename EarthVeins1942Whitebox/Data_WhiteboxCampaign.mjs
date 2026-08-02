@@ -56,6 +56,7 @@ export const buildOptions = Object.freeze([
 ]);
 
 const Action = (id, x, layer, title, verb, options = {}) => Object.freeze({ id, x, layer, title, verb, ...options });
+const Prop = (kind, label, support, mode = "take", options = {}) => Object.freeze({ kind, label, support, mode, ...options });
 
 export const levelDefinitions = Object.freeze([
   Object.freeze({
@@ -74,10 +75,10 @@ export const levelDefinitions = Object.freeze([
       Object.freeze({ id: "outcome", label: "缴获与扩展", objective: "清点缴获，决定下一轮扩建方向", layer: "tunnel" })
     ]),
     actions: Object.freeze([
-      Action("collectWood", -9.2, "surface", "躲在倒棚与荆条后拆下整根木料", "拆木", { phase: "collect", cover: "westStable", resource: { wood: 6 }, dialogue: "这根是干的。轻点，别把棚顶弄响。" }),
-      Action("collectIron", -4.8, "surface", "借废车草帘遮住身形，取下铁箍和销钉", "取铁", { phase: "collect", cover: "brokenCart", resource: { iron: 4 }, dialogue: "销子别丢，闸门就靠它卡住。" }),
-      Action("collectPowder", .4, "surface", "藏在柴垛后收回鞭炮作坊留下的硝灰罐", "收罐", { phase: "collect", cover: "ashStack", resource: { powder: 2 }, dialogue: "盖紧。撒一路味儿，巡逻队鼻子再笨也能闻见。" }),
-      Action("collectSupplies", 6.8, "surface", "借口粮草垛遮挡，把药布和两袋口粮送进备用口", "转运", { phase: "collect", cover: "supplyStack", resource: { medicine: 1, grain: 2 }, dialogue: "药包给我。粮食贴墙放，给担架留条路。" }),
+      Action("collectWood", -9.2, "surface", "倒棚边码着三根可用的干木梁", "拆取", { phase: "collect", cover: "westStable", prop: Prop("timberStack", "三根干木梁", "ground", "take", { offsetX: .5, front: true }), resource: { wood: 6 }, dialogue: "这三根是干的。轻点，别把棚顶弄响。" }),
+      Action("collectIron", -4.8, "surface", "废车脚边木盘里放着铁箍和四枚销钉", "收起", { phase: "collect", cover: "brokenCart", prop: Prop("ironFittings", "铁箍与四枚销钉", "tray", "take", { offsetX: .42, front: true }), resource: { iron: 4 }, dialogue: "销子数清了，四枚。闸门就靠它们卡住。" }),
+      Action("collectPowder", .4, "surface", "柴垛边矮箱上放着封口硝灰罐", "抱走", { phase: "collect", cover: "ashStack", prop: Prop("powderJar", "封口硝灰罐", "lowCrate", "take", { offsetX: .42, front: true }), resource: { powder: 2 }, dialogue: "罐盖封紧了。抱稳，别撒下一路味儿。" }),
+      Action("collectSupplies", 6.8, "surface", "草垛前木案上摆着药布包和两袋口粮", "搬走", { phase: "collect", cover: "supplyStack", prop: Prop("reliefBundle", "药布包与两袋口粮", "plankTable", "take", { offsetX: .45, front: true }), resource: { medicine: 1, grain: 2 }, dialogue: "药布包给我。两袋粮贴墙放，给担架留条路。" }),
       Action("buildSlotA", -7, "tunnel", "西支洞机关位", "施工", { phase: "build", buildSlot: 0 }),
       Action("buildSlotB", 0, "tunnel", "中央短湾机关位", "施工", { phase: "build", buildSlot: 1 }),
       Action("buildSlotC", 7, "tunnel", "东翻口机关位", "施工", { phase: "build", buildSlot: 2 }),
@@ -87,7 +88,7 @@ export const levelDefinitions = Object.freeze([
       Action("triggerSlotA", -7, "tunnel", "触发西支洞机关", "扳闸", { phase: "defense", requires: ["closeSurfaceGate"], triggerSlot: 0 }),
       Action("triggerSlotB", 0, "tunnel", "触发中央短湾机关", "扳闸", { phase: "defense", requires: ["triggerSlotA"], triggerSlot: 1 }),
       Action("triggerSlotC", 7, "tunnel", "触发东翻口机关", "扳闸", { phase: "defense", requires: ["triggerSlotB"], triggerSlot: 2 }),
-      Action("inventoryCapture", 9.2, "tunnel", "清点弃下的地图、口粮和工具", "清点", { phase: "outcome", outcome: true, dialogue: "先看有没有药。粮也收好，枪最后再算。" })
+      Action("inventoryCapture", 9.2, "tunnel", "支洞口散着敌人弃下的地图、口粮箱和工具", "清点", { phase: "outcome", prop: Prop("capturePile", "遗留地图、口粮箱与工具", "ground"), outcome: true, dialogue: "先看有没有药。粮也收好，枪最后再算。" })
     ])
   }),
   Object.freeze({
@@ -112,12 +113,12 @@ export const levelDefinitions = Object.freeze([
       Action("liftHatch", -.6, "surface", "借磨盘车架遮住动作，拉开压着石磨的重暗门", "抬门", { phase: "cooperate", role: "blacksmith", cover: "hatchCart", requires: ["repairCamo"], dialogue: "扶住磨盘。门一响，咱们谁都走不了。" }),
       Action("crawlGap", .2, "surface", "从磨盘车架下方的狭口钻入地道", "钻入", { phase: "cooperate", role: "child", cover: "hatchCart", requires: ["liftHatch"], effect: "enterTunnel", dialogue: "绳子给我。我瘦，能过去。" }),
       Action("unbarGate", 3.1, "tunnel", "从内侧抽出双木门闩", "开闩", { phase: "cooperate", role: "child", requires: ["crawlGap"], dialogue: "第一根出来了……你们托住门，我拔第二根。" }),
-      Action("findLetter", 4.7, "tunnel", "找回交通员藏在瓦罐后的家书", "收信", { phase: "transfer", role: "dog", requires: ["unbarGate"], memory: "一封没有寄出的家书", optional: true, dialogue: "瓦罐后头有封信。是老周的字……先收好，出去再看。" }),
-      Action("findThimble", 6.2, "tunnel", "拾起牺牲缝纫员留下的铜顶针", "拾取", { phase: "transfer", role: "rescuer", requires: ["unbarGate"], memory: "磨亮的铜顶针", optional: true, dialogue: "是小安的顶针。带上吧，别让它留这儿。" }),
-      Action("moveWounded", 5.2, "tunnel", "给伤员重新固定夹板并通过窄弯", "转移", { phase: "transfer", role: "rescuer", requires: ["unbarGate"], rescue: "wounded", dialogue: "叔，疼就抓我胳膊。前头那个弯，慢一点就能过。" }),
-      Action("moveGrain", 7.4, "tunnel", "把粮袋分成能通过低梁的小包", "搬粮", { phase: "transfer", role: "blacksmith", requires: ["moveWounded"], rescue: "grain", dialogue: "大袋过不去，拆成小包。我多跑两趟。" }),
-      Action("freeCourier", 8.5, "tunnel", "辨认联络员留下的敲击暗号", "回应", { phase: "transfer", role: "student", requires: ["moveGrain"], rescue: "courier", dialogue: "听，三长一短。是咱们的人，他还醒着！" }),
-      Action("escortExit", 10, "tunnel", "让五名伙伴与转移队逐名通过东翻口", "离开", { phase: "outcome", role: "child", requires: ["moveWounded", "moveGrain", "freeCourier"], outcome: true, dialogue: "赵姨，老周出来了。阿土也在。人齐了，我关门。" })
+      Action("findLetter", 3.8, "tunnel", "家书压在壁龛矮箱的瓦罐旁", "收信", { phase: "transfer", role: "dog", requires: ["unbarGate"], prop: Prop("hiddenLetter", "瓦罐旁的折角家书", "lowCrate"), memory: "一封没有寄出的家书", optional: true, dialogue: "瓦罐旁边有封信。是老周的字……先收好，出去再看。" }),
+      Action("findThimble", 6.6, "tunnel", "铜顶针立在缝纫员留下的蓝布木案上", "拾取", { phase: "transfer", role: "rescuer", requires: ["unbarGate"], prop: Prop("thimble", "蓝布木案上的铜顶针", "plankTable"), memory: "磨亮的铜顶针", optional: true, dialogue: "是小安的顶针。带上吧，别让它留这儿。" }),
+      Action("moveWounded", 5.2, "tunnel", "伤员躺在窄弯前的木担架上", "抬担架", { phase: "transfer", role: "rescuer", requires: ["unbarGate"], prop: Prop("woundedStretcher", "担架上的伤员", "ground", "take", { offsetX: .15 }), rescue: "wounded", dialogue: "叔，疼就抓我胳膊。前头那个弯，慢一点就能过。" }),
+      Action("moveGrain", 8, "tunnel", "低梁前堆着两只过不去的大粮袋", "拆包搬运", { phase: "transfer", role: "blacksmith", requires: ["moveWounded"], prop: Prop("grainSacks", "两只大粮袋", "pallet"), rescue: "grain", dialogue: "大袋过不去，拆成小包。我多跑两趟。" }),
+      Action("freeCourier", 9.25, "tunnel", "辨认联络员留下的敲击暗号", "回应", { phase: "transfer", role: "student", requires: ["moveGrain"], rescue: "courier", dialogue: "听，三长一短。是咱们的人，他还醒着！" }),
+      Action("escortExit", 10.4, "tunnel", "让五名伙伴与转移队逐名通过东翻口", "离开", { phase: "outcome", role: "child", requires: ["moveWounded", "moveGrain", "freeCourier"], outcome: true, dialogue: "赵姨，老周出来了。阿土也在。人齐了，我关门。" })
     ])
   }),
   Object.freeze({
@@ -138,12 +139,12 @@ export const levelDefinitions = Object.freeze([
       Action("placeHelmet", -9, "surface", "藏在空院蒿草后，把旧军帽挑上墙头", "布疑", { phase: "harass", cover: "helmetBrush", trick: true, alert: 12, morale: -10, dialogue: "风一吹它就动。够他们盯半天了。" }),
       Action("fireCracker", -4.8, "surface", "在铁桶车架后，把鞭炮声压向西坡", "引声", { phase: "harass", cover: "crackerCart", trick: true, alert: 24, morale: -18, dialogue: "隔一会儿再响第二串。别让他们听出是鞭炮。" }),
       Action("routeHorn", -.5, "tunnel", "把铁皮喇叭接入通往敌后的声孔", "传声", { phase: "harass", trick: true, alert: 10, morale: -20, dialogue: "喇叭口对准后墙。喊一声就走，别等他们回头。" }),
-      Action("hideWellRope", 4.2, "surface", "借井台矮墙遮住身形，趁取水队离开时收走井绳", "撤绳", { phase: "harass", cover: "wellCurb", trick: true, alert: 16, morale: -12, dialogue: "绳子收走。看他们拿什么打水。" }),
-      Action("leaveShoe", 8.1, "tunnel", "把落单哨兵困在安全支洞，只留下军鞋", "消失", { phase: "harass", trick: true, alert: 20, morale: -22, dialogue: "人锁在空洞里了。把鞋搁井边，咱们撤。" }),
+      Action("hideWellRope", 4.2, "surface", "井台木桩上盘着正在使用的井绳", "收绳", { phase: "harass", cover: "wellCurb", prop: Prop("ropeCoil", "井台上的整盘井绳", "wellPeg", "take", { offsetX: .38, front: true }), trick: true, alert: 16, morale: -12, dialogue: "整盘绳子收走。看他们拿什么打水。" }),
+      Action("leaveShoe", 8.1, "tunnel", "把落单哨兵困在安全支洞，只在洞口留下军鞋", "留鞋", { phase: "harass", prop: Prop("soldierBoot", "洞口的一只军鞋", "ground", "place"), trick: true, alert: 20, morale: -22, dialogue: "人锁在空洞里了。把鞋搁井边，咱们撤。" }),
       Action("misdirectSquad", -5.8, "surface", "从铁桶车架后，让两组灯影同时出现在相反院墙", "错判", { phase: "panic", cover: "crackerCart", panicStep: true, morale: -12, dialogue: "西墙一盏，东墙一盏。让他们自己猜。" }),
       Action("closeFalseGate", 1, "tunnel", "关闭假入口后方的空闸门", "断路", { phase: "panic", requires: ["misdirectSquad"], panicStep: true, morale: -14, dialogue: "他们进来了。关空闸，让前后都听见。" }),
       Action("finalSignal", 7.2, "surface", "藏在井边草垛后，在远离群众的空坡打出最后一声土枪", "送客", { phase: "panic", cover: "shoeHay", requires: ["closeFalseGate"], panicStep: true, morale: -20, dialogue: "等他们跑到空坡……现在，放一枪。" }),
-      Action("captureIntel", 8.8, "tunnel", "收取撤退时遗下的地图和电台", "收报", { phase: "outcome", requires: ["finalSignal"], outcome: true, dialogue: "地图在这儿。电台别碰旋钮，回去让叶星听。" })
+      Action("captureIntel", 8.8, "tunnel", "木箱上分开放着撤退时遗下的地图和电台", "收取", { phase: "outcome", requires: ["finalSignal"], prop: Prop("fieldRadioMap", "分开放置的地图与电台", "crate", "take", { offsetX: 1.05 }), outcome: true, dialogue: "地图在这儿。电台别碰旋钮，回去让叶星听。" })
     ])
   })
 ]);

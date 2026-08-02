@@ -1,4 +1,4 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803c";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -33,7 +33,7 @@ function CreateState(levelIndex) {
     levelIndex,
     level,
     phaseId: level.phases[0].id,
-    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0 },
+    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
     selectedRole: level.startRole,
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
@@ -145,8 +145,8 @@ function SelectRole(roleId) {
 function ActorActionKind(action) {
   if (["liftHatch", "unbarGate", "moveGrain", "closeSurfaceGate"].includes(action.id)) return "lift";
   if (["collectWood", "collectIron", "repairCamo", "triggerSlotA", "triggerSlotB", "triggerSlotC"].includes(action.id)) return "work";
-  if (["markPatrol", "freeCourier", "routeHorn", "captureIntel"].includes(action.id)) return "inspect";
-  if (["moveWounded", "collectSupplies"].includes(action.id)) return "carry";
+  if (["markPatrol", "freeCourier", "routeHorn", "findLetter", "findThimble", "inventoryCapture"].includes(action.id)) return "inspect";
+  if (["moveWounded", "collectSupplies", "collectPowder", "hideWellRope", "captureIntel"].includes(action.id)) return "carry";
   if (["crawlGap", "sniffRoute"].includes(action.id)) return "crawl";
   if (["placeHelmet", "fireCracker", "misdirectSquad", "finalSignal"].includes(action.id)) return "signal";
   return "interact";
@@ -224,6 +224,16 @@ function PerformAction() {
 
 function ApplyAction(action) {
   BeginActorAction(action);
+  if (action.prop?.mode === "take") {
+    state.player.pickup = {
+      kind: action.prop.kind,
+      label: action.prop.label,
+      x: action.x + (action.prop.offsetX || 0),
+      layer: action.layer,
+      time: 1.02,
+      duration: 1.02
+    };
+  }
   state.completed.add(action.id);
   if (action.resource) {
     for (const [key, amount] of Object.entries(action.resource)) state.resources[key] += amount;
@@ -422,7 +432,7 @@ function UpdateUi() {
   Show(ui.interactionPrompt, Boolean(action) && !IsBlocked());
   if (action) {
     ui.interactionVerb.textContent = action.verb;
-    ui.interactionName.textContent = action.title;
+    ui.interactionName.textContent = action.prop?.label || action.title;
   }
   ui.gameShell.dataset.layer = state.player.layer;
   ui.gameShell.dataset.level = state.level.id;
@@ -535,7 +545,10 @@ function Metric(label, value, detail = "", meter = null, inverse = false, icon =
 function MetricsMarkup() {
   if (state.levelIndex === 0) {
     const resources = Metric("材料", `木${state.resources.wood} 铁${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`, null, false, "材");
-    if (state.phaseId === "collect") return resources;
+    if (state.phaseId === "collect") {
+      const carried = state.level.actions.filter((action) => action.phase === "collect" && action.prop?.mode === "take" && state.completed.has(action.id)).map((action) => action.prop.label);
+      return [resources, Metric("已携带", `${carried.length}/4`, carried.join(" · ") || "靠近场景中的实物后拿取", carried.length / 4 * 100, false, "包")].join("");
+    }
     if (state.phaseId === "build") return [resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
     return [Metric("敌队", state.defense.enemyUnits, "受困或撤离后的剩余人数", state.defense.enemyUnits / 6 * 100, true, "敌"), Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
   }
@@ -556,6 +569,10 @@ function Update(delta) {
   if (state.player.actionTime > 0) {
     state.player.actionTime = Math.max(0, state.player.actionTime - delta);
     if (state.player.actionTime === 0) state.player.actionKind = null;
+  }
+  if (state.player.pickup) {
+    state.player.pickup.time = Math.max(0, state.player.pickup.time - delta);
+    if (state.player.pickup.time === 0) state.player.pickup = null;
   }
   if (state.caught) {
     UpdateCaught(delta);
@@ -707,10 +724,13 @@ function Draw() {
   DrawEarth(width, height, surfaceY, tunnelY);
   DrawEntrances(width, height, surfaceY, tunnelY);
   DrawTunnelSystems(width, height, surfaceY, tunnelY);
+  DrawActionProps(width, height, surfaceY, tunnelY, false);
   DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
   DrawActor(width, height, surfaceY, tunnelY);
   DrawSurfaceCovers(width, surfaceY, true);
+  DrawActionProps(width, height, surfaceY, tunnelY, true);
+  DrawPickupTransfer(width, height, surfaceY, tunnelY);
   DrawSurfaceVegetation(width, height, surfaceY);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
@@ -1119,9 +1139,189 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
   }
 }
 
+function PropSupportLift(support) {
+  return ({ ground: 0, tray: -7, lowCrate: -21, plankTable: -27, jarShelf: -16, cloth: -3, pallet: -6, wellPeg: -9, crate: -27 })[support] ?? 0;
+}
+
+function PropVisualHeight(kind) {
+  return ({ timberStack: 22, ironFittings: 26, powderJar: 34, reliefBundle: 35, capturePile: 32, hiddenLetter: 27, thimble: 29, woundedStretcher: 31, grainSacks: 34, ropeCoil: 31, soldierBoot: 28, fieldRadioMap: 48 })[kind] ?? 28;
+}
+
+function DrawPropSupport(support, scale, empty) {
+  context.save(); context.scale(scale, scale);
+  context.fillStyle = "rgba(4,8,9,.36)";
+  context.beginPath(); context.ellipse(0, 3, support === "plankTable" ? 35 : 27, 6, 0, 0, Math.PI * 2); context.fill();
+  if (support === "tray") {
+    context.fillStyle = "#62452d"; context.fillRect(-23, -7, 46, 8);
+    context.strokeStyle = "#a37848"; context.lineWidth = 2; context.strokeRect(-23, -7, 46, 8);
+  } else if (support === "lowCrate" || support === "crate") {
+    const crateWidth = support === "crate" ? 43 : 36;
+    const crateHeight = support === "crate" ? 27 : 21;
+    context.fillStyle = "#60432b"; context.fillRect(-crateWidth / 2, -crateHeight, crateWidth, crateHeight);
+    context.strokeStyle = "#9c7143"; context.lineWidth = 2; context.strokeRect(-crateWidth / 2, -crateHeight, crateWidth, crateHeight);
+    context.beginPath(); context.moveTo(-crateWidth * .4, -crateHeight + 3); context.lineTo(crateWidth * .4, -3); context.moveTo(crateWidth * .4, -crateHeight + 3); context.lineTo(-crateWidth * .4, -3); context.stroke();
+  } else if (support === "plankTable") {
+    context.strokeStyle = "#65472e"; context.lineWidth = 5;
+    context.beginPath(); context.moveTo(-29, -24); context.lineTo(-25, 0); context.moveTo(29, -24); context.lineTo(25, 0); context.stroke();
+    context.fillStyle = "#876039"; context.fillRect(-36, -29, 72, 8);
+    context.strokeStyle = "rgba(223,175,101,.42)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(-32, -26); context.lineTo(31, -26); context.stroke();
+  } else if (support === "jarShelf") {
+    context.fillStyle = "#735138"; context.fillRect(-27, -18, 54, 6);
+    context.strokeStyle = "#9d7249"; context.lineWidth = 2; context.beginPath(); context.moveTo(-24, -13); context.lineTo(-20, 0); context.moveTo(24, -13); context.lineTo(20, 0); context.stroke();
+    context.fillStyle = "#72513c"; context.beginPath(); context.ellipse(-12, -29, 10, 13, 0, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#a77e54"; context.beginPath(); context.moveTo(-19, -39); context.lineTo(-5, -39); context.stroke();
+  } else if (support === "cloth") {
+    context.fillStyle = "#436278"; context.beginPath(); context.moveTo(-23, -2); context.lineTo(-17, -13); context.lineTo(24, -9); context.lineTo(19, 0); context.closePath(); context.fill();
+    context.strokeStyle = "rgba(171,205,216,.45)"; context.lineWidth = 1.5; context.stroke();
+  } else if (support === "pallet") {
+    context.strokeStyle = "#84603d"; context.lineWidth = 5;
+    [-21, -7, 7, 21].forEach((x) => { context.beginPath(); context.moveTo(x - 7, -5); context.lineTo(x + 7, -5); context.stroke(); });
+  } else if (support === "wellPeg") {
+    context.strokeStyle = "#755033"; context.lineWidth = 6; context.beginPath(); context.moveTo(-18, 0); context.lineTo(-18, -43); context.stroke();
+    context.strokeStyle = "#b1814c"; context.lineWidth = 2; context.beginPath(); context.arc(-13, -30, 6, -.7, 1.25); context.stroke();
+  } else if (empty) {
+    context.strokeStyle = "rgba(187,145,84,.35)"; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(-18, -1); context.lineTo(-7, -5); context.moveTo(3, -2); context.lineTo(17, -5); context.stroke();
+  }
+  context.restore();
+}
+
+function DrawPropObject(kind, scale = 1, ghost = false) {
+  context.save(); context.scale(scale, scale); context.globalAlpha = ghost ? .24 : 1;
+  if (ghost) context.setLineDash([4, 3]);
+  if (kind === "timberStack") {
+    for (let index = 0; index < 3; index += 1) {
+      const y = -5 - index * 7;
+      context.fillStyle = index === 1 ? "#9a7040" : "#ad7e46"; context.fillRect(-31 + index * 2, y - 6, 62, 7);
+      context.strokeStyle = "#d2a263"; context.lineWidth = 1.4; context.strokeRect(-31 + index * 2, y - 6, 62, 7);
+      context.fillStyle = "#6e4a2e"; context.beginPath(); context.arc(-19 + index * 14, y - 3, 2, 0, Math.PI * 2); context.fill();
+    }
+    context.strokeStyle = "#66513a"; context.lineWidth = 3; [-11, 13].forEach((x) => { context.beginPath(); context.moveTo(x, -25); context.lineTo(x + 2, 0); context.stroke(); });
+  } else if (kind === "ironFittings") {
+    context.strokeStyle = "#aeb1aa"; context.lineWidth = 4; context.beginPath(); context.ellipse(-4, -12, 17, 10, -.16, .15, Math.PI * 1.85); context.stroke();
+    context.strokeStyle = "#d0d2c9"; context.lineWidth = 2.5;
+    [-13, -5, 4, 13].forEach((x, index) => { context.beginPath(); context.moveTo(x, -6); context.lineTo(x + (index % 2 ? 4 : -3), -23); context.stroke(); });
+    context.fillStyle = "#5b5d58"; context.beginPath(); context.arc(-4, -12, 4, 0, Math.PI * 2); context.fill();
+  } else if (kind === "powderJar") {
+    context.fillStyle = "#8f6848"; context.beginPath(); context.moveTo(-13, -4); context.quadraticCurveTo(-18, -18, -10, -27); context.lineTo(-7, -32); context.lineTo(7, -32); context.lineTo(10, -27); context.quadraticCurveTo(18, -18, 13, -4); context.closePath(); context.fill();
+    context.strokeStyle = "#d0a06b"; context.lineWidth = 2; context.stroke(); context.fillStyle = "#483a2e"; context.fillRect(-9, -36, 18, 5);
+    context.fillStyle = "#d5c08d"; context.fillRect(-7, -22, 14, 10); context.fillStyle = "#5f4a35"; context.font = "700 8px serif"; context.textAlign = "center"; context.fillText("硝", 0, -14);
+  } else if (kind === "reliefBundle") {
+    context.fillStyle = "#927145";
+    [-13, 13].forEach((x, index) => { context.beginPath(); context.moveTo(x - 11, 0); context.quadraticCurveTo(x - 15, -18, x - 6, -29); context.quadraticCurveTo(x, -35, x + 6, -29); context.quadraticCurveTo(x + 15, -18, x + 11, 0); context.closePath(); context.fill(); context.strokeStyle = "#c3a06a"; context.lineWidth = 1.5; context.stroke(); context.beginPath(); context.moveTo(x - 5, -27); context.lineTo(x + 5, -27); context.stroke(); });
+    context.fillStyle = "#d3cfba"; context.fillRect(-18, -17, 36, 13); context.strokeStyle = "#698a82"; context.lineWidth = 3; context.beginPath(); context.moveTo(0, -17); context.lineTo(0, -4); context.moveTo(-8, -10); context.lineTo(8, -10); context.stroke();
+  } else if (kind === "capturePile") {
+    context.fillStyle = "#7f6040"; context.fillRect(-27, -20, 29, 20); context.strokeStyle = "#bc8d52"; context.strokeRect(-27, -20, 29, 20);
+    context.fillStyle = "#d2c39b"; context.beginPath(); context.moveTo(-2, -24); context.lineTo(26, -20); context.lineTo(20, -4); context.lineTo(-4, -8); context.closePath(); context.fill();
+    context.strokeStyle = "#89694a"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(2, -20); context.lineTo(18, -8); context.moveTo(8, -21); context.lineTo(2, -9); context.stroke();
+    context.strokeStyle = "#555653"; context.lineWidth = 5; context.beginPath(); context.moveTo(10, -28); context.lineTo(29, -4); context.stroke();
+  } else if (kind === "hiddenLetter") {
+    context.fillStyle = "rgba(225,190,105,.18)"; context.beginPath(); context.ellipse(0, -10, 27, 18, 0, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#e4d5aa"; context.beginPath(); context.moveTo(-21, -20); context.lineTo(19, -23); context.lineTo(22, 0); context.lineTo(-19, -2); context.closePath(); context.fill();
+    context.strokeStyle = "#987653"; context.lineWidth = 2; context.stroke();
+    context.beginPath(); context.moveTo(-18, -17); context.lineTo(1, -7); context.lineTo(17, -20); context.moveTo(12, -22); context.lineTo(20, -14); context.lineTo(13, -13); context.closePath(); context.stroke();
+    context.strokeStyle = "rgba(104,74,48,.58)"; context.lineWidth = 1.2; context.beginPath(); context.moveTo(-12, -11); context.lineTo(8, -12); context.moveTo(-12, -7); context.lineTo(4, -8); context.stroke();
+  } else if (kind === "thimble") {
+    context.fillStyle = "rgba(241,205,101,.2)"; context.beginPath(); context.arc(0, -13, 23, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#c59b56"; context.beginPath(); context.moveTo(-11, 0); context.lineTo(-8, -20); context.quadraticCurveTo(0, -30, 8, -20); context.lineTo(11, 0); context.closePath(); context.fill();
+    context.strokeStyle = "#ffe0a0"; context.lineWidth = 2.4; context.stroke();
+    context.strokeStyle = "#765a35"; context.lineWidth = 2; context.beginPath(); context.ellipse(0, -20, 8, 5, 0, 0, Math.PI * 2); context.ellipse(0, 0, 11, 4, 0, 0, Math.PI * 2); context.stroke();
+    context.fillStyle = "#7c623d"; [-5, 0, 5].forEach((x, index) => { context.beginPath(); context.arc(x, -10 - index * 3, 1.4, 0, Math.PI * 2); context.fill(); });
+  } else if (kind === "woundedStretcher") {
+    context.strokeStyle = "#a87642"; context.lineWidth = 5; context.beginPath(); context.moveTo(-39, 0); context.lineTo(39, 0); context.moveTo(-35, -20); context.lineTo(35, -20); context.stroke();
+    context.fillStyle = "#8f9d89"; context.beginPath(); context.moveTo(-29, -4); context.lineTo(-24, -23); context.lineTo(19, -23); context.lineTo(28, -4); context.closePath(); context.fill();
+    context.fillStyle = "#d09a75"; context.beginPath(); context.arc(-24, -25, 7, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#e1d4b7"; context.beginPath(); context.moveTo(-10, -22); context.lineTo(3, -22); context.lineTo(9, -5); context.lineTo(-17, -5); context.closePath(); context.fill();
+  } else if (kind === "grainSacks") {
+    context.fillStyle = "#9d7949";
+    [-12, 12].forEach((x, index) => { context.beginPath(); context.moveTo(x - 12, 0); context.quadraticCurveTo(x - 17, -21, x - 6, -31); context.lineTo(x + 6, -31); context.quadraticCurveTo(x + 17, -20, x + 12, 0); context.closePath(); context.fill(); context.strokeStyle = "#d0a769"; context.lineWidth = 2; context.stroke(); context.beginPath(); context.moveTo(x - 6, -28); context.lineTo(x + 6, -28); context.stroke(); });
+  } else if (kind === "ropeCoil") {
+    context.strokeStyle = "#ba8a50"; context.lineWidth = 4;
+    [14, 10, 6].forEach((radius) => { context.beginPath(); context.arc(0, -15, radius, 0, Math.PI * 2); context.stroke(); });
+    context.beginPath(); context.moveTo(11, -7); context.quadraticCurveTo(24, -2, 20, 6); context.stroke();
+  } else if (kind === "soldierBoot") {
+    context.fillStyle = ghost ? "#6e4e43" : "#392e2c"; context.beginPath(); context.moveTo(-9, -27); context.lineTo(7, -27); context.lineTo(8, -9); context.quadraticCurveTo(21, -5, 22, 2); context.lineTo(-11, 2); context.closePath(); context.fill();
+    context.strokeStyle = "#85645a"; context.lineWidth = 2; context.stroke();
+  } else if (kind === "fieldRadioMap") {
+    context.fillStyle = "#3f5149"; context.fillRect(-34, -34, 31, 31); context.strokeStyle = "#a5b29e"; context.lineWidth = 2; context.strokeRect(-34, -34, 31, 31);
+    context.fillStyle = "#151e1d"; context.fillRect(-29, -28, 19, 11); context.strokeStyle = "#657b70"; context.strokeRect(-29, -28, 19, 11);
+    context.fillStyle = "#d3b36c"; context.beginPath(); context.arc(-27, -9, 3.5, 0, Math.PI * 2); context.arc(-15, -9, 3.5, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#c4c8b8"; context.lineWidth = 2; context.beginPath(); context.moveTo(-5, -34); context.lineTo(7, -56); context.stroke();
+    context.fillStyle = "#ded0a5"; context.beginPath(); context.moveTo(7, -29); context.lineTo(42, -34); context.lineTo(40, -4); context.lineTo(9, -2); context.closePath(); context.fill();
+    context.strokeStyle = "#8d6b48"; context.lineWidth = 1.5; context.stroke(); context.beginPath(); context.moveTo(12, -25); context.lineTo(35, -9); context.moveTo(27, -30); context.lineTo(15, -7); context.moveTo(22, -31); context.lineTo(23, -4); context.stroke();
+    context.fillStyle = "#a3453e"; context.beginPath(); context.arc(30, -18, 3, 0, Math.PI * 2); context.fill();
+  }
+  context.restore();
+}
+
+function DrawPropLabel(x, y, textValue, tone = "active") {
+  context.save(); context.font = "700 11px system-ui, sans-serif"; context.textAlign = "center";
+  const labelWidth = Math.ceil(context.measureText(textValue).width) + 20;
+  context.fillStyle = tone === "empty" ? "rgba(24,28,27,.78)" : "rgba(8,14,16,.9)"; context.fillRect(x - labelWidth / 2, y - 17, labelWidth, 21);
+  context.fillStyle = tone === "empty" ? "#b9aa90" : "#f2ead7"; context.fillText(textValue, x, y - 3);
+  context.strokeStyle = tone === "empty" ? "rgba(190,160,107,.35)" : "rgba(103,221,221,.62)"; context.lineWidth = 1; context.strokeRect(x - labelWidth / 2 + .5, y - 16.5, labelWidth - 1, 20);
+  context.restore();
+}
+
+function DrawActionProps(width, height, surfaceY, tunnelY, front) {
+  const sceneScale = Math.max(.72, Math.min(1.05, width / 980));
+  const focusedProp = state.level.actions
+    .filter((action) => action.phase === state.phaseId && action.layer === state.player.layer && action.prop && Math.abs(action.x - state.player.x) <= 1.9)
+    .sort((a, b) => Math.abs(a.x - state.player.x) - Math.abs(b.x - state.player.x))[0] || null;
+  for (const action of state.level.actions) {
+    if (action.phase !== state.phaseId || !action.prop || Boolean(action.prop.front) !== front) continue;
+    const completed = state.completed.has(action.id);
+    const propWorldX = action.x + (action.prop.offsetX || 0);
+    const x = WorldToScreen(propWorldX, width);
+    const baseY = action.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(propWorldX, height, tunnelY) - 5;
+    const supportLift = PropSupportLift(action.prop.support) * sceneScale;
+    const present = action.prop.mode === "place" ? completed : !completed;
+    const empty = action.prop.mode !== "place" && completed;
+    context.save(); context.translate(x, baseY);
+    DrawPropSupport(action.prop.support, sceneScale, empty);
+    context.translate(0, supportLift);
+    if (present) DrawPropObject(action.prop.kind, sceneScale);
+    else if (action.prop.mode === "place" && !completed) DrawPropObject(action.prop.kind, sceneScale, true);
+    context.restore();
+
+    const sameLayer = action.layer === state.player.layer;
+    const focused = focusedProp?.id === action.id;
+    const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
+    const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * sceneScale * .58;
+    if (!completed && sameLayer) {
+      const pulse = 1 + Math.sin(state.elapsed * 4.2 + action.x) * .1;
+      context.save(); context.translate(x, markerY); context.scale(pulse, pulse);
+      context.strokeStyle = locked ? "rgba(222,183,112,.7)" : "rgba(104,225,225,.88)"; context.lineWidth = 2;
+      context.beginPath(); context.ellipse(0, 0, 17 * sceneScale, 12 * sceneScale, 0, 0, Math.PI * 2); context.stroke();
+      context.fillStyle = locked ? "rgba(178,132,74,.2)" : "rgba(92,214,216,.16)"; context.fill(); context.restore();
+    }
+    if (focused) {
+      const label = completed ? (action.prop.mode === "place" ? `已布置 · ${action.prop.label}` : `已取走 · ${action.prop.label}`) : action.prop.label;
+      DrawPropLabel(x, markerY - 22 * sceneScale, label, completed ? "empty" : "active");
+    }
+  }
+}
+
+function DrawPickupTransfer(width, height, surfaceY, tunnelY) {
+  const pickup = state.player.pickup;
+  if (!pickup) return;
+  const progress = 1 - pickup.time / pickup.duration;
+  const eased = 1 - Math.pow(1 - progress, 3);
+  const sourceX = WorldToScreen(pickup.x, width);
+  const sourceBaseY = pickup.layer === "surface" ? surfaceY - 8 : TunnelFloorYAt(pickup.x, height, tunnelY) - 8;
+  const actorX = WorldToScreen(state.player.x, width) + state.player.facing * 16;
+  const actorBaseY = state.player.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(state.player.x, height, tunnelY);
+  const targetY = actorBaseY - 48;
+  const x = Lerp(sourceX, actorX, eased);
+  const y = Lerp(sourceBaseY - PropVisualHeight(pickup.kind) * .45, targetY, eased) - Math.sin(progress * Math.PI) * 24;
+  context.save(); context.translate(x, y); DrawPropObject(pickup.kind, Lerp(.82, .42, eased)); context.restore();
+  context.strokeStyle = `rgba(112,229,225,${.55 * (1 - progress)})`; context.lineWidth = 2; context.beginPath(); context.moveTo(sourceX, sourceBaseY - 10); context.quadraticCurveTo((sourceX + actorX) / 2, y - 28, actorX, targetY); context.stroke();
+}
+
 function DrawActions(width, height, surfaceY, tunnelY) {
   for (const action of state.level.actions) {
     if (action.phase !== state.phaseId || (state.completed.has(action.id) && action.buildSlot === undefined)) continue;
+    if (action.prop) continue;
     const x = WorldToScreen(action.x, width);
     const y = action.layer === "surface" ? surfaceY - 10 : TunnelCenterYAt(action.x, tunnelY) - 4;
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);

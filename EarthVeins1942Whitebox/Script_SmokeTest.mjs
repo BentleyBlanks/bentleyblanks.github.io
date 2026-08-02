@@ -37,6 +37,10 @@ for (const a of buildOptions) for (const b of buildOptions) for (const c of buil
 }
 Assert(feasible.length >= 2, "第一关采集量必须支持至少两种合格建造组合");
 Assert(wall.actions.some((action) => action.phaseGate) && wall.actions.filter((action) => action.triggerSlot !== undefined).length === 3, "第一关缺少迎敌门槛或三机关结算");
+const materialPickups = wall.actions.filter((action) => action.phase === "collect" && action.resource);
+Assert(materialPickups.length === 4 && materialPickups.every((action) => action.prop?.mode === "take" && action.prop.kind && action.prop.label && action.prop.support), "四个夜间收集点必须各自绑定可见实物、名称与承托位置");
+Assert(new Set(materialPickups.map((action) => action.prop.kind)).size === 4 && new Set(materialPickups.map((action) => action.prop.label)).size === 4, "夜间收集物不能继续复用同一个抽象交互标记");
+Assert(data.includes('Prop("timberStack", "三根干木梁", "ground"') && data.includes('Prop("ironFittings", "铁箍与四枚销钉", "tray"') && data.includes('Prop("powderJar", "封口硝灰罐", "lowCrate"') && data.includes('Prop("reliefBundle", "药布包与两袋口粮", "plankTable"'), "木料、铁件、硝灰与救护口粮没有落到明确场景位置");
 
 const ensemble = levelDefinitions[1];
 Assert(ensemble.roleIds.length === 5, "第二关必须有五个可切换角色");
@@ -46,6 +50,8 @@ for (const roleId of ensemble.roleIds) {
 }
 Assert(ensemble.actions.filter((action) => action.rescue).length === 3, "第二关必须转移伤员、粮食、联络员三项");
 Assert(ensemble.actions.filter((action) => action.memory && action.optional).length === 2, "第二关必须有两件不阻塞流程的记忆物");
+Assert(ensemble.actions.filter((action) => action.memory || action.rescue === "wounded" || action.rescue === "grain").every((action) => action.prop?.kind && action.prop?.label), "记忆物、伤员或粮袋仍只有抽象交互点");
+Assert(ensemble.actions.find((action) => action.id === "findLetter")?.prop?.support === "lowCrate" && ensemble.actions.find((action) => action.id === "findThimble")?.prop?.support === "plankTable", "家书或铜顶针没有独立承托面，容易退化成地面贴片");
 Assert(game.includes("CycleRole") && game.includes("需要${roleDefinitions[action.role].name}"), "第二关缺少角色切换或错角色反馈");
 
 const mindGame = levelDefinitions[2];
@@ -53,6 +59,7 @@ const tricks = mindGame.actions.filter((action) => action.trick);
 Assert(tricks.length >= 5, "第三关至少需要五种诡计");
 Assert(tricks.every((action) => Number.isFinite(action.alert) && action.alert > 0 && Number.isFinite(action.morale) && action.morale < 0), "每种诡计都必须有警觉与士气因果");
 Assert(mindGame.actions.filter((action) => action.panicStep).length === 3, "第三关必须有三步恐慌连锁");
+Assert(mindGame.actions.find((action) => action.id === "captureIntel")?.prop?.offsetX >= 1, "地图电台没有与角色站位错开，实机中会被人物遮住");
 Assert(game.includes("state.tricks.size >= 3") && game.includes("state.morale <= 55"), "恐慌断点没有按诡计种类和士气双条件实现");
 Assert(game.includes("function TriggerDetection") && game.includes("function UpdateCaught") && game.includes("state.caught = { time: 0, duration: .9 }"), "被发现后锁定操作并退回遮挡的二元失败规则缺失");
 Assert(game.includes('ui.touchControls.classList.toggle("locked"') && css.includes("#touchControls.locked"), "被发现期间移动端操作没有明确锁定反馈");
@@ -74,6 +81,8 @@ Assert(ensemble.actions.filter((action) => action.layer === "surface").every((ac
 Assert(mindGame.actions.filter((action) => action.layer === "surface").every((action) => action.cover), "心理战地表行动仍有行动不依赖实体遮挡");
 Assert(game.includes("GetSurfaceCovers") && game.includes("GetActiveCover") && game.includes("UpdateCoverState") && game.includes("if (GetActiveCover(playerX)) return 0"), "敌兵视线没有与实体遮挡共用判定");
 Assert(game.includes("DrawSurfaceCovers(width, surfaceY, false)") && game.includes("DrawSurfaceCovers(width, surfaceY, true)") && game.includes("DrawActorVisibilityHud") && game.includes("DrawDetectionFlash"), "遮挡前后层、随身可见度或发现反馈缺失");
+Assert(game.includes("function DrawActionProps") && game.includes("function DrawPropSupport") && game.includes("function DrawPropObject") && game.includes("function DrawPickupTransfer"), "实体物件、承托面或拿取过程没有进入画面绘制");
+Assert(game.includes("action.prop?.label || action.title") && game.includes('Metric("已携带"') && game.includes("已取走 · ${action.prop.label}"), "交互提示、随身携带栏或拿走后的空位反馈缺失");
 Assert(game.includes("function DrawSurfaceVegetation") && !game.includes("context.moveTo(x, height)"), "仍存在贯穿整个土层的前景竖线");
 Assert(game.includes("TunnelCenterYAt") && game.includes("TunnelFloorYAt") && game.includes("DrawEntrances(width, height") && game.includes("DrawTunnelSystems"), "地道剖面、人物落地或实体竖井系统缺失");
 Assert(game.includes("function LayerToScreen") && game.includes("LayerToScreen(x, width, .76)") && game.includes("LayerToScreen(worldX, width, 1.16)"), "远山、村庄、玩法层与前景没有建立不同视差");
@@ -83,7 +92,7 @@ Assert(game.includes("ActorActionKind") && game.includes("BeginActorAction") && 
 Assert(css.includes(".rolePortrait") && css.includes(".roleCopy") && data.includes('short: "叶星"') && data.includes('short: "赵禾"') && data.includes('short: "根生"'), "角色切换条仍无法直接识别人物姓名与肖像色块");
 Assert(game.includes('state.buildSlots.includes("floodGate")') && game.includes('state.buildSlots.includes("smokeBaffle")') && game.includes("DrawFlowArrow"), "水流、烟流或气流可视化缺失");
 Assert(game.includes("GetEnemyPatrols") && game.includes("GetDetectionStrength") && game.includes("EnemyDetection(enemy) > 0") && game.includes("state.detection"), "敌兵警戒绘制与实际侦测规则没有共用数据");
-Assert(data.includes("这根是干的。轻点") && data.includes("跟紧我") && data.includes("等他们跑到空坡") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
+Assert(data.includes("这三根是干的。轻点") && data.includes("跟紧我") && data.includes("等他们跑到空坡") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
 Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
 Assert(css.includes("Minimal narrative HUD") && css.includes("#touchControls { display: none; }") && css.includes(".metricIcon"), "极简叙事 HUD 或桌面端触控隐藏规则缺失");
 Assert(html.includes('id="qaPanel"') && html.includes('id="qaPhaseButtons"') && game.includes("QaJumpToPhase") && game.includes("jumpToPhase"), "DEBUG 跳关面板或阶段跳转 API 缺失");
