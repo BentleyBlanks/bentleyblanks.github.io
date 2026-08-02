@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v5";
-export const CACHE_BUST = "20260802j";
+export const CACHE_BUST = "20260802k";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",

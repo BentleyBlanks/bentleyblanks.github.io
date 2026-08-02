@@ -1198,7 +1198,36 @@ function Render() {
   }
 }
 
+/** iOS Safari double-tap zooms the page — block it for the game shell. */
+function GuardSafariZoom() {
+  let lastTouchEnd = 0;
+  document.addEventListener(
+    "touchend",
+    (e) => {
+      const now = performance.now();
+      if (now - lastTouchEnd < 320) e.preventDefault();
+      lastTouchEnd = now;
+    },
+    { passive: false },
+  );
+  document.addEventListener(
+    "gesturestart",
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+  document.addEventListener(
+    "dblclick",
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+}
+
 function BindInput() {
+  GuardSafariZoom();
   const setKey = (e, down) => {
     const input = state.input;
     const k = e.key.toLowerCase();
