@@ -4,7 +4,10 @@ export const W = 4200;
 export const H = 540;
 export const GROUND = 420;
 export const GRAVITY = 2100;
-export const CACHE_BUST = "20260802a";
+export const CACHE_BUST = "20260802b";
+
+/** Opening comic beat — Valiant Hearts–style prologue line. */
+export const PROLOGUE_LINE = "往后的形势只怕会更加艰难";
 
 export function CreateInput() {
   return {
@@ -733,7 +736,7 @@ export function BeginPlay(state) {
   const next = CreateState();
   next.phase = "play";
   next.cameraX = 0;
-  SetBark(next, "Tin can on the crate. Walt waits by the barn.", 3.2);
+  SetBark(next, PROLOGUE_LINE, 3.6);
   Object.assign(state, next);
   return state;
 }

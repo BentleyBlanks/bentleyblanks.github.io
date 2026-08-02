@@ -29,7 +29,27 @@ button { font: inherit; cursor: pointer; border: none; }
   background: linear-gradient(120deg, rgba(14,16,12,.88) 0%, rgba(14,16,12,.25) 55%, transparent 100%);
 }
 .overlay[hidden] { display: none !important; }
-.overlay.win { align-items: center; justify-content: center; background: rgba(10,12,8,.72); }
+.overlay.win,
+.overlay.prologue {
+  align-items: center; justify-content: center; background: rgba(10,12,8,.78);
+}
+
+.prologueCard {
+  width: min(34rem, 92vw);
+  padding: clamp(28px, 5vw, 44px);
+  background: linear-gradient(165deg, #f0e2c4 0%, #e2cfa8 100%);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  box-shadow: 6px 6px 0 rgba(0,0,0,.4);
+}
+.prologueCard .eyebrow { color: #8b2e22; }
+.prologueSpeaker {
+  margin: 0 0 10px; font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; opacity: .7;
+}
+.prologueLine {
+  margin: 0 0 22px; font-family: var(--display); font-size: clamp(1.45rem, 4.2vw, 2rem);
+  line-height: 1.45; font-weight: 700;
+}
 
 .mark {
   position: absolute; top: 20px; left: 20px; color: var(--paper); text-decoration: none;

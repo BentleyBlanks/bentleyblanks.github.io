@@ -5,6 +5,7 @@ import {
   DebugCutAll,
   DebugHold,
   DebugKillMg,
+  PROLOGUE_LINE,
   Step,
 } from "./Script_Sim.mjs";
 
@@ -24,6 +25,7 @@ function Tap(state, key) {
 }
 
 function Main() {
+  Assert(PROLOGUE_LINE === "往后的形势只怕会更加艰难", "prologue line");
   const level = BuildLevel();
   Assert(level.entities.some((e) => e.type === "dog"), "Walt present");
   Assert(level.entities.some((e) => e.type === "mg"), "MG nest present");
@@ -32,6 +34,7 @@ function Main() {
   const state = CreateState();
   BeginPlay(state);
   Assert(state.phase === "play", "play starts");
+  Assert(state.bark === PROLOGUE_LINE, "prologue echoes as opening bark");
 
   // Pick can
   const can = state.level.entities.find((e) => e.id === "can");

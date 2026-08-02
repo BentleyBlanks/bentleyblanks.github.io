@@ -3,6 +3,7 @@ import {
   CACHE_BUST,
   CreateState,
   GROUND,
+  PROLOGUE_LINE,
   Step,
   W,
 } from "./Script_Sim.mjs";
@@ -40,13 +41,15 @@ function Bind() {
     if (k === " " || k === "w" || k === "arrowup") state.input.jumpPressed = true;
     if (k === "e") state.input.actPressed = true;
     if (k === "f" || k === "j") state.input.throwPressed = true;
-    if (state.phase === "title" && (k === "enter" || k === " ")) start();
-    if (state.phase === "win" && k === "enter") start();
+    if (state.phase === "title" && (k === "enter" || k === " ")) openPrologue();
+    if (state.phase === "prologue" && (k === "enter" || k === " " || k === "e")) start();
+    if (state.phase === "win" && k === "enter") openPrologue();
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
-  $("BtnPlay").onclick = start;
-  $("BtnReplay").onclick = start;
+  $("BtnPlay").onclick = openPrologue;
+  $("BtnPrologue").onclick = start;
+  $("BtnReplay").onclick = openPrologue;
 
   const touch = $("Touch");
   const hold = { left: false, right: false, crouch: false };
@@ -83,9 +86,20 @@ function Bind() {
   if (matchMedia("(max-width: 720px)").matches) touch.hidden = false;
 }
 
+function openPrologue() {
+  state.phase = "prologue";
+  $("Title").hidden = true;
+  $("Win").hidden = true;
+  $("Hud").hidden = true;
+  $("Prologue").hidden = false;
+  const line = $("Prologue").querySelector(".prologueLine");
+  if (line) line.textContent = PROLOGUE_LINE;
+}
+
 function start() {
   BeginPlay(state);
   $("Title").hidden = true;
+  $("Prologue").hidden = true;
   $("Win").hidden = true;
   $("Hud").hidden = false;
   canvas.focus();
