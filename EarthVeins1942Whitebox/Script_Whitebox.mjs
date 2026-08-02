@@ -1,6 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803w";
-import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803w";
-import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803w";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803x";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803x";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803x";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -29,6 +29,8 @@ const inputKeys = { left: false, right: false };
 const fluidCanvas = document.createElement("canvas");
 const fluidContext = fluidCanvas.getContext("2d");
 const lightRenderer = CreateSdfLightRenderer({ resolutionScale: .52, rayCount: 184 });
+let lianhuanhuaTexture = null;
+let lianhuanhuaPattern = null;
 let selectedLevel = startingLevel;
 let lastTime = performance.now();
 let toastTimer = 0;
@@ -834,6 +836,7 @@ function UpdateUi() {
 
 function RenderQaPanel() {
   if (!qaMode) return;
+  if (state.mode === "title") { Show(ui.qaPanel, false); return; }
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
@@ -1170,6 +1173,7 @@ function Draw() {
   DrawLighting(width, height, surfaceY, tunnelY, daylight);
   DrawSurfaceDiversions(width, height, surfaceY);
   DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
+  DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
   DrawDogCommandFocus(width, height, surfaceY, tunnelY);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
@@ -1198,9 +1202,9 @@ function DrawMountainLayer(width, surfaceY, layer) {
 function DrawSky(width, height, surfaceY, daylight) {
   const isDay = daylight > .4;
   const gradient = context.createLinearGradient(0, 0, 0, surfaceY);
-  gradient.addColorStop(0, isDay ? "#7f9696" : "#101c27");
-  gradient.addColorStop(.52, isDay ? "#a9aaa0" : "#28313a");
-  gradient.addColorStop(1, isDay ? "#d2bd94" : "#594640");
+  gradient.addColorStop(0, isDay ? "#96978b" : "#172126");
+  gradient.addColorStop(.52, isDay ? "#b4ac96" : "#343a38");
+  gradient.addColorStop(1, isDay ? "#cfb98e" : "#6a5140");
   context.fillStyle = gradient; context.fillRect(0, 0, width, height);
 
   const celestialX = LayerToScreen(7.6, width, .035);
@@ -1235,10 +1239,10 @@ function DrawSky(width, height, surfaceY, daylight) {
   });
 
   [
-    { parallax: .035, baseY: surfaceY * .53, amplitude: 23, step: 58, frequency: .008, seed: .7, color: isDay ? "#6e7c78" : "#26343a", rim: "rgba(229,224,197,.06)", lineWidth: 1 },
-    { parallax: .075, baseY: surfaceY * .61, amplitude: 32, step: 52, frequency: .0092, seed: 2.1, color: isDay ? "#596d68" : "#2d393b", rim: "rgba(225,210,177,.07)", lineWidth: 1.2 },
-    { parallax: .145, baseY: surfaceY * .69, amplitude: 42, step: 44, frequency: .0105, seed: 4.4, color: isDay ? "#4a5c54" : "#34403e", rim: "rgba(220,198,157,.08)", lineWidth: 1.5 },
-    { parallax: .245, baseY: surfaceY * .78, amplitude: 34, step: 38, frequency: .013, seed: 6.6, color: isDay ? "#3e4d42" : "#343c37", rim: "rgba(226,190,135,.1)", lineWidth: 1.7 }
+    { parallax: .035, baseY: surfaceY * .53, amplitude: 23, step: 58, frequency: .008, seed: .7, color: isDay ? "#777c70" : "#293336", rim: "rgba(229,218,187,.08)", lineWidth: 1 },
+    { parallax: .075, baseY: surfaceY * .61, amplitude: 32, step: 52, frequency: .0092, seed: 2.1, color: isDay ? "#676f62" : "#303a39", rim: "rgba(220,204,169,.09)", lineWidth: 1.2 },
+    { parallax: .145, baseY: surfaceY * .69, amplitude: 42, step: 44, frequency: .0105, seed: 4.4, color: isDay ? "#565e50" : "#3a403b", rim: "rgba(211,188,145,.11)", lineWidth: 1.5 },
+    { parallax: .245, baseY: surfaceY * .78, amplitude: 34, step: 38, frequency: .013, seed: 6.6, color: isDay ? "#484e40" : "#3b3d34", rim: "rgba(218,180,126,.13)", lineWidth: 1.7 }
   ].forEach((layer) => DrawMountainLayer(width, surfaceY, layer));
 
   const treeBaseY = surfaceY - 31;
@@ -3267,6 +3271,84 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
 
   const nearVignette = context.createRadialGradient(width / 2, height * .54, Math.min(width, height) * .28, width / 2, height * .54, Math.max(width, height) * .76);
   nearVignette.addColorStop(0, "rgba(0,0,0,0)"); nearVignette.addColorStop(.68, "rgba(0,0,0,.04)"); nearVignette.addColorStop(1, "rgba(0,0,0,.3)"); context.fillStyle = nearVignette; context.fillRect(0, 0, width, height);
+  context.restore();
+}
+
+function BuildLianhuanhuaTexture() {
+  const texture = document.createElement("canvas");
+  texture.width = 192; texture.height = 192;
+  const ink = texture.getContext("2d");
+  let seed = 1942;
+  const NextPrintNoise = () => {
+    seed = seed * 1664525 + 1013904223 | 0;
+    return (seed >>> 0) / 4294967296;
+  };
+  ink.clearRect(0, 0, texture.width, texture.height);
+  ink.lineCap = "round";
+  for (let fiber = 0; fiber < 520; fiber += 1) {
+    const x = NextPrintNoise() * texture.width;
+    const y = NextPrintNoise() * texture.height;
+    const length = 2 + NextPrintNoise() * 13;
+    const angle = (NextPrintNoise() - .5) * .34;
+    ink.strokeStyle = `rgba(41,31,22,${.018 + NextPrintNoise() * .04})`;
+    ink.lineWidth = .35 + NextPrintNoise() * .6;
+    ink.beginPath(); ink.moveTo(x, y); ink.lineTo(x + Math.cos(angle) * length, y + Math.sin(angle) * length); ink.stroke();
+  }
+  for (let speck = 0; speck < 210; speck += 1) {
+    ink.fillStyle = `rgba(31,23,17,${.025 + NextPrintNoise() * .06})`;
+    ink.beginPath(); ink.arc(NextPrintNoise() * texture.width, NextPrintNoise() * texture.height, .25 + NextPrintNoise() * .75, 0, Math.PI * 2); ink.fill();
+  }
+  return texture;
+}
+
+function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) {
+  if (!lianhuanhuaTexture) lianhuanhuaTexture = BuildLianhuanhuaTexture();
+  if (!lianhuanhuaPattern) lianhuanhuaPattern = context.createPattern(lianhuanhuaTexture, "repeat");
+  context.save();
+
+  context.globalCompositeOperation = "multiply";
+  context.fillStyle = daylight > .4 ? "rgba(103,72,37,.1)" : "rgba(91,56,35,.15)";
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.beginPath(); context.rect(0, surfaceY + 3, width, height - surfaceY - 3); context.clip();
+  context.strokeStyle = "rgba(31,24,19,.12)"; context.lineWidth = .8;
+  const hatchSpacing = Math.max(11, Math.min(17, width / 82));
+  for (let offset = -height; offset < width + height; offset += hatchSpacing) {
+    context.beginPath(); context.moveTo(offset, surfaceY - 12); context.lineTo(offset - height * .48, height + 12); context.stroke();
+  }
+  context.strokeStyle = "rgba(227,206,163,.045)";
+  for (let offset = -height; offset < width + height; offset += hatchSpacing * 2.4) {
+    context.beginPath(); context.moveTo(offset, height + 6); context.lineTo(offset - height * .34, surfaceY + 4); context.stroke();
+  }
+  context.restore();
+
+  context.strokeStyle = daylight > .4 ? "rgba(53,45,33,.055)" : "rgba(232,216,177,.025)";
+  context.lineWidth = .7;
+  for (let line = 0; line < 22; line += 1) {
+    const y = 17 + line * surfaceY / 23;
+    const start = SceneHash(line + 804) * width * .62;
+    const length = width * (.08 + SceneHash(line + 826) * .29);
+    context.beginPath(); context.moveTo(start, y); context.quadraticCurveTo(start + length * .5, y + Math.sin(line) * 2, start + length, y + (line % 3 - 1)); context.stroke();
+  }
+
+  context.globalAlpha = daylight > .4 ? .92 : .7;
+  context.fillStyle = lianhuanhuaPattern;
+  context.fillRect(0, 0, width, height);
+
+  context.globalCompositeOperation = "source-over";
+  const paperGlow = context.createRadialGradient(width * .48, height * .45, 20, width * .48, height * .45, Math.max(width, height) * .72);
+  paperGlow.addColorStop(0, "rgba(239,224,186,.025)");
+  paperGlow.addColorStop(.7, "rgba(63,43,29,.02)");
+  paperGlow.addColorStop(1, "rgba(22,18,15,.25)");
+  context.fillStyle = paperGlow; context.fillRect(0, 0, width, height);
+
+  context.strokeStyle = "rgba(24,19,15,.62)"; context.lineWidth = Math.max(2, Math.min(5, width * .003));
+  context.beginPath();
+  context.moveTo(3, 8); context.quadraticCurveTo(width * .31, 2, width - 7, 6);
+  context.quadraticCurveTo(width - 2, height * .48, width - 6, height - 7);
+  context.quadraticCurveTo(width * .64, height - 2, 6, height - 6);
+  context.quadraticCurveTo(2, height * .57, 3, 8); context.stroke();
   context.restore();
 }
 

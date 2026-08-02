@@ -1,21 +1,21 @@
 :root {
   color-scheme: dark;
-  font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
-  --ink: #ecede5;
-  --muted: #aeb5ad;
-  --paper: rgba(20, 27, 29, .94);
-  --paperSolid: #151d1f;
-  --line: rgba(219, 226, 211, .18);
-  --cyan: #65d1d4;
-  --amber: #d8aa61;
-  --red: #d26a5d;
-  --green: #87c7a0;
+  font-family: "FangSong", "STFangsong", "Noto Serif SC", "SimSun", serif;
+  --ink: #eee1c1;
+  --muted: #b7aa91;
+  --paper: rgba(45, 38, 30, .94);
+  --paperSolid: #2b251e;
+  --line: rgba(226, 205, 165, .25);
+  --cyan: #b44d3e;
+  --amber: #c4964f;
+  --red: #a43d32;
+  --green: #899471;
 }
 
 * { box-sizing: border-box; }
 
 html, body {
-  width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0b1012; color: var(--ink);
+  width: 100%; height: 100%; margin: 0; overflow: hidden; background: #1a1713; color: var(--ink);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
 }
 
@@ -24,10 +24,10 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action
 button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 [hidden] { display: none !important; }
 
-#gameShell { position: relative; width: 100%; height: 100%; min-height: 390px; overflow: hidden; background: #111719; isolation: isolate; }
-#gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#filmGrain { position: absolute; inset: 0; pointer-events: none; opacity: .13; z-index: 2; background-image: repeating-radial-gradient(circle at 27% 39%, transparent 0 1px, rgba(255,255,255,.13) 1px 2px, transparent 2px 5px); background-size: 7px 7px; mix-blend-mode: overlay; animation: grain .38s steps(2) infinite; }
-@keyframes grain { 50% { transform: translate3d(1px,-1px,0); } }
+#gameShell { position: relative; width: 100%; height: 100%; min-height: 390px; overflow: hidden; background: #211d18; isolation: isolate; }
+#gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; filter: sepia(.16) saturate(.72) contrast(1.08) brightness(.97); }
+#filmGrain { position: absolute; inset: 0; pointer-events: none; opacity: .24; z-index: 2; background-image: repeating-linear-gradient(4deg, transparent 0 3px, rgba(43,31,21,.08) 3px 4px, transparent 4px 9px), repeating-radial-gradient(circle at 27% 39%, transparent 0 1px, rgba(245,225,184,.1) 1px 2px, transparent 2px 6px); background-size: 37px 31px, 9px 9px; mix-blend-mode: soft-light; animation: grain .7s steps(2) infinite; }
+@keyframes grain { 50% { transform: translate3d(.5px,-.5px,0); } }
 
 .fullScreen, .panelScreen { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; }
 .fullScreen { background: linear-gradient(105deg, rgba(11,16,18,.98) 0 42%, rgba(11,16,18,.82) 66%, rgba(11,16,18,.28)); overflow: auto; touch-action: pan-y; }
@@ -419,4 +419,99 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #dialoguePanel p { font-size: 9px; }
   #dialoguePanel button { height: 27px; font-size: 7px; }
   #qaPanel { top: 102px; }
+}
+
+/* 1960s Chinese lianhuanhua art direction: ink, aged paper and restrained spot color. */
+#gameShell::after { content: ""; position: absolute; z-index: 3; inset: 3px; pointer-events: none; border: 2px solid rgba(30,23,17,.58); box-shadow: inset 0 0 42px rgba(29,20,14,.27), inset 0 0 0 1px rgba(235,214,169,.08); }
+.fullScreen { background: linear-gradient(104deg, rgba(28,24,19,.98) 0 43%, rgba(39,33,26,.93) 68%, rgba(54,44,33,.62)); }
+.titleGrid { opacity: .34; background: repeating-linear-gradient(9deg, transparent 0 13px, rgba(235,214,173,.055) 13px 14px), repeating-linear-gradient(168deg, transparent 0 19px, rgba(20,16,12,.18) 19px 20px); background-size: auto; transform: none; }
+.titleCopy::before { content: "连环画式玩法白盒"; position: absolute; top: 34px; right: 8px; width: 54px; padding: 8px 3px; color: #c75a48; font: 800 11px/1.35 "FangSong", "STFangsong", serif; letter-spacing: .08em; text-align: center; border: 2px solid rgba(183,67,53,.76); transform: rotate(-3deg); }
+.eyebrow { color: var(--amber); }
+h1 { color: #eee1c1; text-shadow: 2px 2px 0 #30251b, -1px 0 0 rgba(239,219,179,.18); }
+h1 small { color: #bd553f; }
+.titleThesis { color: #c9b99c; font-family: "FangSong", "STFangsong", serif; }
+.levelCard { color: #eadcba; background: rgba(45,38,29,.72); border: 1px solid rgba(218,194,151,.22); border-radius: 0; box-shadow: inset 0 0 0 1px rgba(25,19,14,.45); }
+.levelCard::before { content: ""; position: absolute; inset: 7px; pointer-events: none; border-top: 1px solid rgba(220,199,158,.08); border-bottom: 1px solid rgba(22,17,13,.42); }
+.levelCard::after { height: 4px; background: #a74536; }
+.levelCard:hover, .levelCard.selected { transform: translateY(-2px) rotate(-.15deg); color: #f3e7c9; background: rgba(65,52,38,.84); border-color: rgba(202,151,91,.58); }
+.levelCard small { color: #c9a465; }
+.levelCard span { color: #bcae93; font-family: "FangSong", "STFangsong", serif; }
+.levelCard i { color: #c9654e; }
+.primaryButton { color: #f0dfbd; background: #a54738; border: 1px solid #d8b277; box-shadow: inset 0 0 0 1px rgba(45,24,18,.45); }
+.quietButton, .backButton, .headerButton { color: #dfd0b1; background: rgba(38,31,24,.74); border-color: rgba(216,192,151,.3); }
+
+.panelScreen { background: rgba(24,19,15,.76); backdrop-filter: blur(3px) sepia(.35); }
+.panelPaper { position: relative; color: #2f2921; background: #d8c8a7; border: 2px solid #45372a; box-shadow: 9px 11px 0 rgba(23,18,14,.42), inset 0 0 34px rgba(101,72,39,.12); }
+.panelPaper::before { content: ""; position: absolute; inset: 7px; pointer-events: none; border: 1px solid rgba(84,62,42,.2); }
+.controlList div { border-color: rgba(61,48,36,.22); }
+.controlList dt, .panelPaper .eyebrow { color: #9d4033; }
+.controlList dd, .guideNote, .completePaper > p:not(.eyebrow) { color: #554b3d; }
+.guideNote { background: rgba(94,68,39,.09); border-left-color: #a44836; }
+
+.levelStamp { filter: drop-shadow(1px 2px 0 rgba(20,15,11,.72)); }
+.levelStamp small { color: #c99b53; }
+.levelStamp span { color: #f0dfbb; font-family: "FangSong", "STFangsong", serif; text-shadow: 1px 2px 0 #2e231a; }
+.phaseStrip span i { background: rgba(222,204,167,.14); border-color: rgba(232,215,178,.5); border-radius: 1px; transform: rotate(45deg); }
+.phaseStrip span.done i { background: #b8904f; border-color: #ddc28d; }
+.phaseStrip span.active { color: #f0dfbd; }
+.phaseStrip span.active i { background: #a84637; border-color: #d29d72; box-shadow: 0 0 0 3px rgba(165,65,51,.16); }
+
+#objectiveCard { color: #2b261f; padding: 8px 14px 9px 16px; background: linear-gradient(90deg, rgba(224,207,170,.94), rgba(224,207,170,.68) 78%, rgba(224,207,170,0)); border-left: 3px double #963b30; filter: drop-shadow(2px 3px 0 rgba(31,23,17,.48)); }
+#objectiveCard small { color: #963b30; }
+#objectiveCard p { color: #2b261f; text-shadow: none; }
+#objectiveCard span { color: rgba(55,48,38,.75); }
+.metric { color: #e6d7b6; background: rgba(39,32,25,.84); border: 1px solid rgba(221,199,159,.25); border-radius: 2px; box-shadow: 2px 3px 0 rgba(24,18,14,.28); backdrop-filter: none; }
+.metricIcon { color: #322820; background: #d5c197; border: 1px solid rgba(46,34,25,.55); border-radius: 50%; }
+.metricCopy small { color: rgba(221,205,173,.66); }
+.metricCopy b { color: #f0dfbd; }
+.metricBar u { background: #9a8f66; }
+.metricBar u.inverse { background: #a74536; }
+
+#roleButtons button { color: #d9c8a6; background: rgba(42,34,27,.88); border: 1px solid rgba(216,192,151,.3); border-radius: 2px; backdrop-filter: none; }
+#roleButtons button.active { color: #2f2921; background: #d8c49b; border: 2px solid #704633; transform: translateY(-2px) rotate(-.35deg); box-shadow: 3px 3px 0 rgba(28,21,16,.38); }
+.rolePortrait { background: var(--role); border: 1px solid rgba(235,216,178,.48); border-radius: 50% 50% 8px 8px; filter: sepia(.22) contrast(1.08); }
+.rolePortrait i { color: #f2e4c6; }
+#roleButtons small { color: rgba(219,204,172,.62); }
+#roleButtons button.active small { color: rgba(48,40,31,.66); }
+
+#interactionPrompt { filter: drop-shadow(2px 3px 0 rgba(24,18,14,.62)); }
+#interactionPrompt kbd { color: #f1dfbd; background: #a84738; border: 2px solid #d2ad73; border-radius: 2px; }
+#interactionPrompt p { color: #eadcba; background: rgba(43,34,26,.9); border: 1px solid rgba(218,194,151,.3); border-radius: 2px; backdrop-filter: none; }
+#interactionVerb { color: #c35b46; }
+
+#dialoguePanel { color: #2e2820; background: #ddcba5; border: 2px solid #49392b; border-radius: 1px; box-shadow: 7px 8px 0 rgba(24,18,14,.44), inset 0 0 22px rgba(100,73,42,.1); }
+#dialoguePanel::after { border-top-color: #49392b; }
+#dialoguePanel small { color: #983e31; }
+#dialoguePanel p { color: #2e2820; }
+#dialoguePanel button { color: #ead9b6; background: #47372a; border-radius: 1px; }
+
+#touchControls button { color: #ead9b6; background: rgba(43,34,27,.82); border: 1px solid rgba(226,205,165,.45); border-radius: 50%; box-shadow: 2px 3px 0 rgba(24,18,14,.38); backdrop-filter: none; }
+#touchControls button.pressed { background: rgba(157,64,51,.82); border-color: #d5a66c; }
+#touchControls .touchPrimary { color: #f0dfbd; background: #a84637; border: 2px solid #d3ac72; }
+#touchControls .touchPrimary span { color: #f0dfbd; }
+#civilianCommandPanel, #dogCommandHud { color: #e7d6b3; background: rgba(43,34,27,.9); border-color: rgba(213,187,143,.34); border-radius: 2px; backdrop-filter: none; }
+.civilianGroupButtons button.active { color: #30281f; background: #d7c39a; border-color: #6d4c36; }
+.civilianShelterButtons button { color: #dfcfad; background: rgba(125,94,56,.18); border-color: rgba(188,142,79,.42); }
+.civilianShelterButtons b { color: #bd6249; }
+.dogCommandPortrait { color: #ead9b8; background: #77543d; border-color: #b84d3e; }
+#dogCommandProgress u { background: #b94f3f; }
+
+#cinematicBars i { background: #15110e; }
+#cinematicCaption { padding: 9px 14px 11px 17px; color: #eddfc1; background: linear-gradient(90deg, rgba(33,27,21,.82), rgba(33,27,21,0)); border-left: 3px double #b24c3b; text-shadow: 1px 2px 0 #211811; }
+#cinematicCaption small { color: #cf9f58; }
+#cinematicProgress { background: #af4939; }
+#skipCinematic { color: #d3c4a6; background: rgba(38,30,23,.72); border-color: rgba(218,196,157,.25); }
+
+.buildPaper { color: #302a22; background: #d9c9a8; border: 2px solid #4b3a2b; }
+.buildPaper .eyebrow, .buildFeedback { color: #984033; }
+.buildBrief, .buildOption p { color: #5c5142; }
+.buildOption { color: #302a22; background: rgba(242,226,191,.48); border: 1px solid rgba(68,51,36,.28); }
+.buildOption:hover, .buildOption.current { background: rgba(169,106,61,.17); border-color: #8f3d32; }
+.buildOption i { color: #a44837; }
+
+@media (max-width: 760px), (max-height: 520px) {
+  .titleCopy::before { top: 15px; right: 0; width: 40px; padding: 5px 2px; font-size: 8px; }
+  #objectiveCard { padding: 5px 0 6px 10px; background: linear-gradient(90deg, rgba(224,207,170,.92), rgba(224,207,170,.53) 80%, transparent); }
+  #roleButtons button { border-radius: 2px; }
+  #gameShell::after { inset: 2px; border-width: 1px; }
 }

@@ -113,6 +113,8 @@ Assert(actorProfiles.soldier.prop === "rifle" && actorProfiles.collaborator?.pro
 Assert(game.includes("function DrawEnemyUnit") && game.includes('unitType = index % 3 === 1 ? "collaborator" : "soldier"') && game.includes('enemy.rank === "sectionLeader"'), "日伪军仍是同一种几何木偶，缺少阵营与军衔轮廓");
 Assert(game.includes("function DrawVillageFenceSegment") && game.includes("function DrawVillageWorkProp") && game.includes('kind: "wheelbarrow"') && game.includes('kind: "dryingRack"') && game.includes('kind: "firewood"') && game.includes('kind: "plow"'), "村庄栅栏与生产道具没有按结构和用途重做");
 Assert(game.includes('kind: "toolRack"') && game.includes('kind: "stove"') && game.includes('prop.kind === "toolRack"') && game.includes('prop.kind === "stove"'), "地道生活区缺少工具架或炉灶等有用途的生活设施");
+Assert(game.includes("function BuildLianhuanhuaTexture") && game.includes("function DrawLianhuanhuaPostProcess") && game.includes('globalCompositeOperation = "multiply"') && game.includes("hatchSpacing") && game.includes("NextPrintNoise"), "60年代连环画的纸纹、排线、墨色叠印或确定性印刷颗粒后处理缺失");
+Assert(css.includes("1960s Chinese lianhuanhua art direction") && css.includes('font-family: "FangSong"') && css.includes("sepia(.16)") && css.includes("repeating-linear-gradient") && css.includes("#gameShell::after"), "界面没有统一为60年代连环画的仿宋题签、有限套色、纸纹和墨框语言");
 Assert(game.includes("ActorActionKind") && game.includes("BeginActorAction") && game.includes("motionBlend") && game.includes("rolePulse"), "角色缺少移动、行动或切换聚焦动画状态");
 Assert(game.includes("function IssueDogCommand") && game.includes("function UpdateDogPartner") && game.includes("function CompleteDogCommand") && game.includes('dog.commandMode = "work"'), "阿土哨令仍是瞬时按钮，没有跑动、钻洞、停留工作与完成回报");
 Assert(game.includes("DrawDogCompanion") && game.includes("DrawDogCommandEnvironment") && game.includes("DrawDogCommandFocus") && game.includes("DrawPawMark") && game.includes("犬 · 阿土执行中") && html.includes('id="dogCommandHud"') && css.includes("#dogCommandHud.commanding"), "阿土实体、高对比四足聚焦、连续爪印、窄洞路径或哨令 HUD 缺少可视反馈");
@@ -130,6 +132,7 @@ Assert(data.includes("这三根没受潮。你扶棚") && data.includes("跟紧�
 Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
 Assert(css.includes("Minimal narrative HUD") && css.includes("#touchControls { display: none; }") && css.includes(".metricIcon"), "极简叙事 HUD 或桌面端触控隐藏规则缺失");
 Assert(html.includes('id="qaPanel"') && html.includes('id="qaPhaseButtons"') && game.includes("QaJumpToPhase") && game.includes("jumpToPhase"), "DEBUG 跳关面板或阶段跳转 API 缺失");
+Assert(game.includes('if (state.mode === "title") { Show(ui.qaPanel, false); return; }'), "标题页仍显示青灰 DEBUG 面板，破坏连环画玩家向版式");
 Assert(game.includes('Object.assign(state.resources, { wood: 6, iron: 4, powder: 2, medicine: 1, grain: 2 })') && game.includes('state.buildSlots = ["floodGate", "flipGate", "smokeBaffle"]') && game.includes('state.excavated = new Set(["west", "center", "east"])'), "DEBUG 跳关没有补齐夜间收集、挖掘或建造前置状态");
 Assert(game.includes("const profile = actorProfiles.soldier") && game.match(/const scale = Math\.min\(width, 1100\) \/ 26 \* \.038/g)?.length >= 2, "敌兵与主角未共用人物尺度换算");
 Assert(css.includes("#touchControls { left: 8px; right: 8px; bottom: 7px; opacity: 1; }") && css.includes("rgba(10,17,19,.94)"), "低高度移动端触控键未强制高对比显示");
