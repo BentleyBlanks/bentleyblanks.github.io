@@ -227,12 +227,18 @@ button { font: inherit; cursor: pointer; }
 .touchPad {
   position: absolute; left: 12px; right: 12px; bottom: 7%;
   display: none; justify-content: space-between; gap: 12px; pointer-events: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
 }
 .touchPad .cluster { display: flex; gap: 8px; pointer-events: auto; }
 .touchPad button {
   width: 56px; height: 56px; border: 2.5px solid var(--ink); border-radius: 50%;
   background: rgba(239,226,200,.88); color: var(--ink); font-weight: 700;
-  box-shadow: 2px 2px 0 rgba(0,0,0,.25); user-select: none;
+  box-shadow: 2px 2px 0 rgba(0,0,0,.25);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .touchPad button.wide { width: 68px; border-radius: 16px; }
 

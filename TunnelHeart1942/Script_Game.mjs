@@ -1274,6 +1274,8 @@ function BindInput() {
       if (kind === "interact" && down) state.input.interactPressed = true;
       if (kind === "use" && down) state.input.usePressed = true;
     };
+    btn.addEventListener("contextmenu", (e) => e.preventDefault());
+    btn.addEventListener("selectstart", (e) => e.preventDefault());
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       btn.setPointerCapture(e.pointerId);
