@@ -5,6 +5,7 @@ import {
   DebugCutAll,
   DebugHold,
   DebugKillMg,
+  PROLOGUE_BEATS,
   PROLOGUE_LINE,
   Step,
 } from "./Script_Sim.mjs";
@@ -26,6 +27,8 @@ function Tap(state, key) {
 
 function Main() {
   Assert(PROLOGUE_LINE === "往后的形势只怕会更加艰难", "prologue line");
+  Assert(PROLOGUE_BEATS.some((b) => b.text === PROLOGUE_LINE), "line fused into talk");
+  Assert(PROLOGUE_BEATS.every((b) => b.speaker && b.text), "prologue is spoken dialogue");
   const level = BuildLevel();
   Assert(level.entities.some((e) => e.type === "dog"), "Walt present");
   Assert(level.entities.some((e) => e.type === "mg"), "MG nest present");

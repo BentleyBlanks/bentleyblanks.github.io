@@ -3,10 +3,12 @@ import {
   CACHE_BUST,
   CreateState,
   GROUND,
-  PROLOGUE_LINE,
+  PROLOGUE_BEATS,
   Step,
   W,
 } from "./Script_Sim.mjs";
+
+let prologueIndex = 0;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("GameCanvas");
@@ -42,13 +44,13 @@ function Bind() {
     if (k === "e") state.input.actPressed = true;
     if (k === "f" || k === "j") state.input.throwPressed = true;
     if (state.phase === "title" && (k === "enter" || k === " ")) openPrologue();
-    if (state.phase === "prologue" && (k === "enter" || k === " " || k === "e")) start();
+    if (state.phase === "prologue" && (k === "enter" || k === " " || k === "e")) advancePrologue();
     if (state.phase === "win" && k === "enter") openPrologue();
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
   $("BtnPlay").onclick = openPrologue;
-  $("BtnPrologue").onclick = start;
+  $("BtnPrologue").onclick = advancePrologue;
   $("BtnReplay").onclick = openPrologue;
 
   const touch = $("Touch");
@@ -86,14 +88,31 @@ function Bind() {
   if (matchMedia("(max-width: 720px)").matches) touch.hidden = false;
 }
 
+function showPrologueBeat() {
+  const beat = PROLOGUE_BEATS[prologueIndex];
+  if (!beat) return;
+  $("PrologueSpeaker").textContent = beat.speaker;
+  $("PrologueLine").textContent = beat.text;
+  $("BtnPrologue").textContent = prologueIndex >= PROLOGUE_BEATS.length - 1 ? "开干" : "往下说";
+}
+
 function openPrologue() {
   state.phase = "prologue";
+  prologueIndex = 0;
   $("Title").hidden = true;
   $("Win").hidden = true;
   $("Hud").hidden = true;
   $("Prologue").hidden = false;
-  const line = $("Prologue").querySelector(".prologueLine");
-  if (line) line.textContent = PROLOGUE_LINE;
+  showPrologueBeat();
+}
+
+function advancePrologue() {
+  if (prologueIndex < PROLOGUE_BEATS.length - 1) {
+    prologueIndex += 1;
+    showPrologueBeat();
+    return;
+  }
+  start();
 }
 
 function start() {
@@ -240,7 +259,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${10 * s}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("Walt", 0, -34 * s);
+    ctx.fillText("沃尔特", 0, -34 * s);
   } else if (e.type === "gap") {
     ctx.fillStyle = "#2a2118";
     ctx.fillRect(-20 * s, -22 * s, 40 * s, 22 * s);
@@ -248,7 +267,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#c9a45a";
     ctx.font = `700 ${9 * s}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("gap", 0, -28 * s);
+    ctx.fillText("狗洞", 0, -28 * s);
   } else if (e.type === "wire") {
     if (e.cut) {
       ctx.restore();
@@ -273,7 +292,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${10 * s}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(`dig ${e.hp}`, 0, -e.h * s - 8 * s);
+    ctx.fillText(`再挖${e.hp}`, 0, -e.h * s - 8 * s);
   } else if (e.type === "mg") {
     if (!e.alive) ctx.globalAlpha = 0.35;
     ctx.fillStyle = "#3a3530";
@@ -285,7 +304,7 @@ function DrawEntity(e) {
       ctx.fillStyle = "#a6452f";
       ctx.font = `700 ${11 * s}px sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("MG", 0, -64 * s);
+      ctx.fillText("机枪", 0, -64 * s);
     }
   } else if (e.type === "medic") {
     if (e.rescued) {
@@ -303,7 +322,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${10 * s}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(e.carried ? "" : "medic", 0, -56 * s);
+    ctx.fillText(e.carried ? "" : "卫生员", 0, -56 * s);
   } else if (e.type === "cart") {
     ctx.fillStyle = "#5a4030";
     ctx.fillRect(-45 * s, -40 * s, 90 * s, 40 * s);
@@ -316,7 +335,7 @@ function DrawEntity(e) {
     ctx.fillStyle = "#efe2c8";
     ctx.font = `700 ${11 * s}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("CART", 0, -48 * s);
+    ctx.fillText("马车", 0, -48 * s);
   }
   ctx.restore();
 }
@@ -372,17 +391,17 @@ function DrawPrompt() {
   const dog = state.level.entities.find((e) => e.type === "dog");
   const cutters = state.level.entities.find((e) => e.id === "cutters");
   if (dog && Math.abs(p.x - dog.x) < 75) {
-    if (cutters && !cutters.taken && cutters.behindGap) label = "E  Walt fetch";
-    else if (state.level.entities.find((e) => e.type === "mg")?.alive && p.x > 2000) label = "E  distract";
+    if (cutters && !cutters.taken && cutters.behindGap) label = "E  让狗去叼";
+    else if (state.level.entities.find((e) => e.type === "mg")?.alive && p.x > 2000) label = "E  让狗引开";
   }
   for (const e of state.level.entities) {
-    if (e.type === "pickup" && !e.taken && !e.hidden && !e.behindGap && Math.abs(p.x - e.x) < 42) label = "E / F  pick";
-    if (e.type === "wire" && !e.cut && e.needs === "cutters" && Math.abs(p.x - e.x) < 55) label = "E  cut";
-    if (e.type === "dirt" && !e.dug && Math.abs(p.x - e.x) < 60) label = "E  dig";
-    if (e.type === "medic" && !e.rescued && Math.abs(p.x - e.x) < 50) label = p.carryingMedic ? "E  drop" : "E  carry";
-    if (e.type === "cart" && p.carryingMedic && Math.abs(p.x - e.x) < 70) label = "E  load cart";
+    if (e.type === "pickup" && !e.taken && !e.hidden && !e.behindGap && Math.abs(p.x - e.x) < 42) label = "E  捡起来";
+    if (e.type === "wire" && !e.cut && e.needs === "cutters" && Math.abs(p.x - e.x) < 55) label = "E  剪开";
+    if (e.type === "dirt" && !e.dug && Math.abs(p.x - e.x) < 60) label = "E  往下挖";
+    if (e.type === "medic" && !e.rescued && Math.abs(p.x - e.x) < 50) label = p.carryingMedic ? "E  放下" : "E  背起来";
+    if (e.type === "cart" && p.carryingMedic && Math.abs(p.x - e.x) < 70) label = "E  弄上车";
   }
-  if (p.held) label = (label ? label + " · " : "") + "F  throw";
+  if (p.held) label = (label ? label + " · " : "") + "F  扔出去";
   if (!label) return;
   ctx.fillStyle = "rgba(240,226,196,.92)";
   ctx.strokeStyle = "#1c1710";
@@ -408,12 +427,21 @@ function DrawHud() {
     hearts.appendChild(el);
   }
   const hand = $("Hand");
-  hand.textContent = state.player.carryingMedic ? "MED" : state.player.held ? state.player.held.slice(0, 4).toUpperCase() : "—";
-  const bark = $("Bark");
+  hand.textContent = state.player.carryingMedic
+    ? "伤员"
+    : state.player.held === "can"
+      ? "罐头"
+      : state.player.held === "cutters"
+        ? "钳子"
+        : state.player.held === "grenade"
+          ? "手雷"
+          : "空";
+  const box = $("BarkBox");
   if (state.bark) {
-    bark.hidden = false;
-    bark.textContent = state.bark;
-  } else bark.hidden = true;
+    box.hidden = false;
+    $("BarkSpeaker").textContent = state.barkSpeaker || "埃米尔";
+    $("Bark").textContent = state.bark;
+  } else box.hidden = true;
 }
 
 function Render() {
@@ -463,6 +491,6 @@ function Frame(ts) {
 Resize();
 Bind();
 window.addEventListener("resize", Resize);
-document.title = `Valiant Farm 1914`;
+document.title = "瓦尔奈农场 · 1914";
 requestAnimationFrame(Frame);
 console.info("ValiantFarm1914", CACHE_BUST);

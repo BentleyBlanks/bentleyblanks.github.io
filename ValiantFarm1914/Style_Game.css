@@ -95,10 +95,17 @@ button { font: inherit; cursor: pointer; border: none; }
   color: var(--ink); display: grid; place-items: center; font-size: .72rem; font-weight: 700;
   box-shadow: 2px 2px 0 rgba(0,0,0,.3);
 }
-.bark {
+.barkBox {
   margin: 0; max-width: 22rem; padding: 8px 12px; background: rgba(240,226,196,.94);
-  color: var(--ink); border: 2px solid var(--ink); font-size: .9rem; line-height: 1.35;
+  color: var(--ink); border: 2px solid var(--ink);
   box-shadow: 3px 3px 0 rgba(0,0,0,.3);
+}
+.barkBox[hidden] { display: none !important; }
+.barkSpeaker {
+  margin: 0 0 4px; font-size: .72rem; letter-spacing: .12em; opacity: .65; font-weight: 700;
+}
+.bark {
+  margin: 0; font-size: .95rem; line-height: 1.4; font-family: var(--display);
 }
 
 .touch {

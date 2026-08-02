@@ -4,10 +4,16 @@ export const W = 4200;
 export const H = 540;
 export const GROUND = 420;
 export const GRAVITY = 2100;
-export const CACHE_BUST = "20260802b";
+export const CACHE_BUST = "20260802c";
 
-/** Opening comic beat — Valiant Hearts–style prologue line. */
+/** Keep the line intact; fused into normal talk, not a slogan card. */
 export const PROLOGUE_LINE = "往后的形势只怕会更加艰难";
+
+export const PROLOGUE_BEATS = [
+  { speaker: "埃米尔", text: "这农场完了。卫生员还困在后面。" },
+  { speaker: "卡尔", text: PROLOGUE_LINE },
+  { speaker: "埃米尔", text: "先把人救出来。沃尔特，跟上。" },
+];
 
 export function CreateInput() {
   return {
@@ -47,7 +53,7 @@ export function BuildLevel() {
       item: "can",
       x: 260,
       y: GROUND,
-      label: "TIN",
+      label: "罐头",
     }),
     Ent({
       id: "grenade",
@@ -55,7 +61,7 @@ export function BuildLevel() {
       item: "grenade",
       x: 2150,
       y: GROUND,
-      label: "NADE",
+      label: "手雷",
       hidden: true,
     }),
     Ent({
@@ -98,7 +104,7 @@ export function BuildLevel() {
       item: "cutters",
       x: 1280,
       y: GROUND,
-      label: "CUT",
+      label: "钳子",
       behindGap: true,
       hidden: false,
     }),
@@ -202,6 +208,7 @@ export function CreateState() {
     shake: 0,
     projectiles: [],
     bark: null,
+    barkSpeaker: "",
     barkTimer: 0,
     won: false,
     failTimer: 0,
@@ -223,8 +230,9 @@ function NearX(ax, bx, r) {
   return Math.abs(ax - bx) < r;
 }
 
-function SetBark(state, text, time = 2.4) {
+function SetBark(state, text, time = 2.4, speaker = "埃米尔") {
   state.bark = text;
+  state.barkSpeaker = speaker;
   state.barkTimer = time;
 }
 
@@ -320,7 +328,7 @@ function HurtPlayer(state, amount = 1) {
   p.invuln = 1.1;
   p.vx = -p.facing * 160;
   state.shake = 0.35;
-  SetBark(state, "Hit — cover!", 1.6);
+  SetBark(state, "疼……快蹲下！", 1.6);
   if (p.hp <= 0) {
     p.hp = 0;
     state.failTimer = 1.2;
@@ -358,7 +366,7 @@ function PickupNear(state) {
         item: p.held,
         x: p.x - p.facing * 30,
         y: GROUND,
-        label: p.held === "can" ? "TIN" : p.held === "cutters" ? "CUT" : "NADE",
+        label: p.held === "can" ? "罐头" : p.held === "cutters" ? "钳子" : "手雷",
         taken: false,
         hidden: false,
       };
@@ -367,7 +375,11 @@ function PickupNear(state) {
     p.held = e.item;
     e.taken = true;
     e.hidden = true;
-    SetBark(state, e.item === "can" ? "Tin can." : e.item === "cutters" ? "Wire cutters." : "Grenade.", 1.5);
+    SetBark(
+      state,
+      e.item === "can" ? "罐头。砸人头够用。" : e.item === "cutters" ? "钳子到手了。" : "手雷，沉甸甸的。",
+      1.5,
+    );
     return true;
   }
   return false;
@@ -389,7 +401,7 @@ function TryAct(state) {
     medic.y = cart.y;
     state.won = true;
     state.phase = "win";
-    SetBark(state, "Go — go — go!", 3);
+    SetBark(state, "上车！快走！", 3);
     state.shake = 0.2;
     return;
   }
@@ -398,19 +410,19 @@ function TryAct(state) {
   if (medic && !medic.rescued && NearX(p.x, medic.x, 50)) {
     if (!p.carryingMedic) {
       if (p.held) {
-        SetBark(state, "Hands free — drop item (F empty throw first).", 2);
+        SetBark(state, "手里占着——先把东西扔了。", 2);
         return;
       }
       p.carryingMedic = true;
       medic.carried = true;
-      SetBark(state, "I've got you.", 1.8);
+      SetBark(state, "撑住，我背你。", 1.8);
       return;
     }
     p.carryingMedic = false;
     medic.carried = false;
     medic.x = p.x;
     medic.y = GROUND;
-    SetBark(state, "Stay low.", 1.4);
+    SetBark(state, "趴好，别乱动。", 1.4);
     return;
   }
 
@@ -419,12 +431,12 @@ function TryAct(state) {
     if (e.type !== "wire" || e.cut || e.needs !== "cutters") continue;
     if (!NearX(p.x, e.x, 55)) continue;
     if (p.held !== "cutters") {
-      SetBark(state, "Need cutters.", 1.6);
+      SetBark(state, "剪不动，得找把钳子。", 1.6);
       return;
     }
     e.cut = true;
     p.held = null;
-    SetBark(state, "Wire down.", 1.6);
+    SetBark(state, "铁丝断了。", 1.6);
     state.shake = 0.15;
     return;
   }
@@ -440,9 +452,9 @@ function TryAct(state) {
       e.dug = true;
       const w2 = level.entities.find((w) => w.type === "wire" && w.needs === "dig");
       if (w2) w2.cut = true;
-      SetBark(state, "Tunnel under!", 1.8);
+      SetBark(state, "钻过去了！", 1.8);
     } else {
-      SetBark(state, "Dig…", 0.8);
+      SetBark(state, "再刨两下……", 0.9);
     }
     return;
   }
@@ -457,13 +469,13 @@ function TryAct(state) {
       dog.state = "fetch";
       dog.fetchTarget = cutters;
       dog.crawlTo = gap.x;
-      SetBark(state, "Walt — fetch!", 1.8);
+      SetBark(state, "沃尔特，去把钳子叼来！", 1.8);
       return;
     }
     if (mg?.alive && p.x > 2000) {
       dog.state = "distract";
       dog.distractT = 4.5;
-      SetBark(state, "Walt — draw their fire!", 2);
+      SetBark(state, "沃尔特，引开他们！", 2);
       return;
     }
   }
@@ -473,7 +485,7 @@ function TryAct(state) {
   const w2 = level.entities.find((e) => e.type === "wire" && e.needs === "dig");
   if (g && g.hidden && w2?.cut && NearX(p.x, g.x, 50)) {
     g.hidden = false;
-    SetBark(state, "Grenades in the bag.", 1.8);
+    SetBark(state, "沙袋里还有雷。", 1.8);
     return;
   }
 
@@ -482,7 +494,7 @@ function TryAct(state) {
   // Whistle dog follow
   if (dog && NearX(p.x, dog.x, 80)) {
     dog.state = "follow";
-    SetBark(state, "Heel.", 1.2);
+    SetBark(state, "过来，跟紧。", 1.2);
   }
 }
 
@@ -501,7 +513,7 @@ function UpdateDog(state, dt) {
       dog.carrying = "cutters";
       dog.state = "return";
       state.stats.dogFetches += 1;
-      SetBark(state, "Good boy!", 1.5);
+      SetBark(state, "好狗！", 1.5);
     }
     return;
   }
@@ -609,7 +621,7 @@ function UpdateMg(state, dt) {
 
 function Boom(state, x, y) {
   state.shake = 0.55;
-  SetBark(state, "Boom!", 1.2);
+  SetBark(state, "炸了！", 1.2);
   for (const e of state.level.entities) {
     if (e.type === "patrol" && Math.abs(e.x - x) < 110) {
       e.stun = 4;
@@ -617,7 +629,7 @@ function Boom(state, x, y) {
     }
     if (e.type === "mg" && e.alive && Math.abs(e.x - x) < 130) {
       e.alive = false;
-      SetBark(state, "Nest silent!", 2);
+      SetBark(state, "机枪哑火了！", 2);
     }
   }
   // soft dig assist
@@ -650,7 +662,7 @@ function UpdateProjectiles(state, dt) {
         if (e.type === "patrol" && e.stun <= 0 && Math.abs(e.x - p.x) < 55) {
           e.stun = 3.2;
           state.stats.stuns += 1;
-          SetBark(state, "Helmet rings!", 1.5);
+          SetBark(state, "晕了！快走！", 1.5);
         }
       }
       continue;
@@ -659,7 +671,7 @@ function UpdateProjectiles(state, dt) {
         if (e.type === "patrol" && e.stun <= 0 && Math.hypot(e.x - p.x, e.y - 40 - p.y) < 40) {
           e.stun = 3.2;
           state.stats.stuns += 1;
-          SetBark(state, "Helmet rings!", 1.5);
+          SetBark(state, "晕了！快走！", 1.5);
           p.life = 0;
         }
       }
@@ -736,7 +748,7 @@ export function BeginPlay(state) {
   const next = CreateState();
   next.phase = "play";
   next.cameraX = 0;
-  SetBark(next, "Tin can on the crate. Walt waits by the barn.", 3.2);
+  SetBark(next, "箱子上有个罐头。狗在谷仓边等着。", 3.2);
   Object.assign(state, next);
   return state;
 }
