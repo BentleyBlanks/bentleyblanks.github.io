@@ -64,6 +64,10 @@ Assert(game.includes("touchCrouchLatched") && game.includes("ToggleTouchCrouch")
 Assert(!game.includes(`document.querySelectorAll('[data-input="left"], [data-input="right"], [data-input="crouch"]')`), "移动端蹲伏仍错误绑定为按住态");
 Assert(html.includes('data-input="crouch" type="button" aria-pressed="false"') && css.includes('[data-input="crouch"][aria-pressed="true"]'), "蹲伏开关缺少可访问状态或视觉反馈");
 Assert(game.includes("function DrawSurfaceVegetation") && !game.includes("context.moveTo(x, height)"), "仍存在贯穿整个土层的前景竖线");
+Assert(game.includes("TunnelCenterYAt") && game.includes("TunnelFloorYAt") && game.includes("DrawEntrances(width, height") && game.includes("DrawTunnelSystems"), "地道剖面、人物落地或实体竖井系统缺失");
+Assert(game.includes('state.buildSlots.includes("floodGate")') && game.includes('state.buildSlots.includes("smokeBaffle")') && game.includes("DrawFlowArrow"), "水流、烟流或气流可视化缺失");
+Assert(game.includes("GetEnemyPatrols") && game.includes("GetDetectionStrength") && game.includes("EnemyDetection(enemy) > 0") && game.includes("state.detection"), "敌兵警戒绘制与实际侦测规则没有共用数据");
+Assert(data.includes("这根是干的。轻点") && data.includes("跟紧我") && data.includes("等他们跑到空坡") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
 Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
 Assert(css.includes("Minimal narrative HUD") && css.includes("#touchControls { display: none; }") && css.includes(".metricIcon"), "极简叙事 HUD 或桌面端触控隐藏规则缺失");
 Assert(html.includes('id="qaPanel"') && html.includes('id="qaPhaseButtons"') && game.includes("QaJumpToPhase") && game.includes("jumpToPhase"), "DEBUG 跳关面板或阶段跳转 API 缺失");

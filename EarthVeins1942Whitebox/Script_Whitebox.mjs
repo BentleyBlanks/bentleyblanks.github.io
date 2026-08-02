@@ -43,6 +43,7 @@ function CreateState(levelIndex) {
     rescues: { wounded: false, grain: false, courier: false },
     memories: [],
     exposure: 0,
+    detection: 0,
     alert: 18,
     morale: 100,
     tricks: new Set(),
@@ -105,10 +106,10 @@ function StartLevel(levelIndex) {
   RenderQaPanel();
   UpdateUi();
   const opener = state.levelIndex === 0
-    ? ["第一轮 · 夜", "民兵队长", "先把能救命、能施工的东西带回地道。枪声不是今晚的办法。"]
+    ? ["第一轮 · 夜", "民兵队长", "天亮前得把木料和铁件带回来。都别逞强，见灯就趴下。"]
     : state.levelIndex === 1
-      ? ["封锁线外", "五个同行者", "每个人只会一件事。少了任何一个，伤员都过不了村口。"]
-      : ["扫荡第三日", "武工队员", "让他们追声音、追影子、追自己的恐惧；我们不在任何一次响动后停留。"];
+      ? ["封锁线外", "赵禾", "伤员走不了明路。咱们几个，一个接一个把门打开。"]
+      : ["扫荡第三日", "林青禾", "别跟他们碰。弄出点动静就走，让他们自己乱起来。"];
   PlayCinematic(...opener, 2.8, state.player.x + 2.2, 1.16);
 }
 
@@ -190,7 +191,7 @@ function PerformAction() {
     if (state.defense.ventilation < 3) return Toast("通风不足 3：烟会先伤到地道里的乡亲。请重建一处机关。", "warning");
     if (state.defense.strength < 4) return Toast("防御不足 4：还无法安全分割六人小队。", "warning");
     state.completed.add(action.id);
-    SetPhase("defense", "第二轮 · 扫荡入村", "机关不是终点。现在要把敌队引到没有群众的空院，再逐段关闸。", "队长");
+    SetPhase("defense", "第二轮 · 扫荡入村", "他们进村了。照说好的，把人往空院领。", "队长");
     return;
   }
   ApplyAction(action);
@@ -224,23 +225,23 @@ function ApplyAction(action) {
 function EvaluateProgress(action) {
   if (state.levelIndex === 0) {
     if (state.phaseId === "collect" && requiredCollect.every((id) => state.completed.has(id))) {
-      SetPhase("build", "第一轮 · 天明", "物资到齐。三处机关必须同时兼顾风路和分割能力。", "施工组");
+      SetPhase("build", "第一轮 · 天明", "东西齐了。先把风道通开，再安闸。人在下头，得先喘得上气。", "队长");
     } else if (state.phaseId === "defense" && action.id === "triggerSlotC") {
-      SetPhase("outcome", "扫荡队撤离", "没有追击。先确认群众安全，再清点空院里遗下的物资。", "队长");
+      SetPhase("outcome", "扫荡队撤离", "别追了。先挨个问一声，人都在不在。", "队长");
     }
   } else if (state.levelIndex === 1) {
     if (state.phaseId === "survey" && state.completed.has("markPatrol")) {
-      SetPhase("cooperate", "十一秒暗区", "路已经看清，但门不会自己打开。让每个人接住上一人的工作。", "叶星");
+      SetPhase("cooperate", "十一秒暗区", "灯转一圈是十一下。赵禾，你先补网；根生跟我抬门。", "叶星");
     } else if (state.phaseId === "cooperate" && state.completed.has("unbarGate")) {
-      SetPhase("transfer", "门后不是终点", "伤员、粮食和联络员都要过去。遗物可以找，生命不能等。", "赵禾");
+      SetPhase("transfer", "门开了", "先抬伤员。粮袋能带多少带多少。", "赵禾");
     } else if (state.phaseId === "transfer" && requiredRescues.every((key) => state.rescues[key])) {
-      SetPhase("outcome", "东翻口已接通", "逐名清点。最后一个人离开时，要把门闩恢复成没人来过的样子。", "石头");
+      SetPhase("outcome", "东翻口已接通", "伤员、粮、人……都齐了。石头，关门。", "赵禾");
     }
   } else if (state.levelIndex === 2) {
     if (state.phaseId === "harass" && state.tricks.size >= 3 && state.morale <= 55) {
-      SetPhase("panic", "士气断点", "他们开始拒绝进屋、互相照射。把错误判断连成一条退路。", "林青禾");
+      SetPhase("panic", "他们乱了", "他们不敢进屋了。再引一次，往空坡赶。", "林青禾");
     } else if (state.phaseId === "panic" && action.id === "finalSignal") {
-      SetPhase("outcome", "队形自行瓦解", "不追。等脚步远离村口，再从地道收取他们丢下的情报。", "林青禾");
+      SetPhase("outcome", "扫荡队撤了", "别追。等他们走远，咱们再出去捡电台。", "林青禾");
     }
   }
   if (action.outcome) state.pendingComplete = true;
@@ -310,6 +311,7 @@ function ToggleLayer() {
   if (IsBlocked()) return;
   const entrance = entrances.find((x) => Math.abs(x - state.player.x) <= 1.15);
   if (entrance === undefined) return Toast("需要靠近蓝色地道入口。", "neutral");
+  state.player.x = entrance;
   state.player.layer = state.player.layer === "surface" ? "tunnel" : "surface";
   if (state.player.layer === "tunnel") state.alert = Math.max(0, state.alert - 8);
   Toast(state.player.layer === "tunnel" ? "进入地道：地表警觉开始回落。" : "回到地表：注意巡逻与暴露。", "neutral");
@@ -506,7 +508,8 @@ function MetricsMarkup() {
   }
   if (state.levelIndex === 1) return [
     Metric("转移", requiredRescues.filter((key) => state.rescues[key]).length + "/3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100, false, "转"),
-    Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆")
+    Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆"),
+    ...(state.player.layer === "surface" ? [Metric("警戒", Math.round(state.exposure), "进入敌兵实际视野会增加", state.exposure, true, "警")] : [])
   ].join("");
   return [
     Metric("警觉", Math.round(state.alert), state.player.layer === "tunnel" ? "正在回落" : state.player.crouch ? "增长减缓" : "地表暴露", state.alert, true, "警"),
@@ -543,18 +546,20 @@ function Update(delta) {
 }
 
 function UpdateDanger(delta, direction) {
-  if (state.player.layer === "surface" && state.levelIndex === 0 && state.phaseId === "collect") {
-    const inPatrol = Math.abs(state.player.x - 2.7) < 3.2 || Math.abs(state.player.x + 6) < 1.7;
-    const rate = inPatrol ? (state.player.crouch ? 4 : direction ? 15 : 9) : -8;
+  const surfaceStealth = state.player.layer === "surface" && ((state.levelIndex === 0 && state.phaseId === "collect") || state.levelIndex === 1);
+  state.detection = state.player.layer === "surface" ? GetDetectionStrength(state.player.x) : 0;
+  if (surfaceStealth) {
+    const detectedRate = (18 + state.detection * 44) * (state.player.crouch ? .48 : 1);
+    const rate = state.detection > 0 ? detectedRate : -12;
     state.exposure = Math.max(0, Math.min(100, state.exposure + rate * delta));
     if (state.exposure >= 100) {
       state.exposure = 35;
       state.player.x = -10;
-      Toast("巡逻灯扫到动静：撤回西侧阴影。已收集物资不会丢失。", "warning");
+      Toast(state.levelIndex === 0 ? "被看见了，先退回西边。已经拿到的东西还在。" : "巡逻队逼近，众人退回草垛后重新等空当。", "warning");
     }
   }
   if (state.levelIndex === 2) {
-    let rate = state.player.layer === "tunnel" ? -10 : state.player.crouch ? -3 : direction ? 3 : .5;
+    let rate = state.player.layer === "tunnel" ? -10 : state.detection > 0 ? 10 + state.detection * 34 : state.player.crouch ? -4 : direction ? 1.2 : -1;
     if (state.phaseId === "panic") rate *= .5;
     state.alert = Math.max(0, Math.min(100, state.alert + rate * delta));
     if (state.alert >= 100) {
@@ -567,6 +572,35 @@ function UpdateDanger(delta, direction) {
 }
 
 function Lerp(a, b, amount) { return a + (b - a) * amount; }
+
+function GetEnemyPatrols() {
+  let bases = [];
+  if (state.levelIndex === 0 && state.phaseId === "collect") bases = [-6.1, 2.2, 7.2];
+  else if (state.levelIndex === 1 && state.player.layer === "surface") bases = [2.4, 5.6, 8.8];
+  else if (state.levelIndex === 2) bases = [-2.2, 2.1, 6.2, 9.2].slice(0, Math.max(2, Math.ceil(state.morale / 25)));
+  return bases.map((base, index) => {
+    const time = state.elapsed * (.42 + index * .035) + index * 1.7;
+    const travel = Math.sin(time) * (index % 2 ? 1.05 : 1.25);
+    return { x: base + travel, facing: Math.cos(time) >= 0 ? 1 : -1, viewDistance: state.levelIndex === 2 ? 4.4 : 3.8, index };
+  });
+}
+
+function IsCrouchCover(worldX) {
+  return [-9, -5.2, -.2, 4.4, 8.3].some((houseX) => Math.abs(worldX - houseX) < .58);
+}
+
+function EnemyDetection(enemy, playerX = state.player.x) {
+  if (state.player.layer !== "surface") return 0;
+  const forward = (playerX - enemy.x) * enemy.facing;
+  const effectiveDistance = state.player.crouch ? enemy.viewDistance * .64 : enemy.viewDistance;
+  if (forward < .18 || forward > effectiveDistance) return 0;
+  if (state.player.crouch && IsCrouchCover(playerX)) return 0;
+  return Math.max(.08, 1 - forward / effectiveDistance);
+}
+
+function GetDetectionStrength(playerX) {
+  return GetEnemyPatrols().reduce((highest, enemy) => Math.max(highest, EnemyDetection(enemy, playerX)), 0);
+}
 
 function ResizeCanvas() {
   const ratio = Math.min(2, devicePixelRatio || 1);
@@ -594,10 +628,11 @@ function Draw() {
   DrawSky(width, height, surfaceY, daylight);
   DrawVillage(width, height, surfaceY);
   DrawEarth(width, height, surfaceY, tunnelY);
+  DrawEntrances(width, height, surfaceY, tunnelY);
+  DrawTunnelSystems(width, height, surfaceY, tunnelY);
   DrawActions(width, height, surfaceY, tunnelY);
-  DrawEntrances(width, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
-  DrawActor(width, surfaceY, tunnelY);
+  DrawActor(width, height, surfaceY, tunnelY);
   DrawSurfaceVegetation(width, height, surfaceY);
   if (qaMode) DrawQa(width, height, surfaceY, tunnelY);
 }
@@ -650,15 +685,149 @@ function DrawEarth(width, height, surfaceY, tunnelY) {
     for (let x = 0; x <= width; x += 40) context.lineTo(x, y + Math.sin(x * .021 + y) * 4);
     context.stroke();
   }
-  context.lineWidth = Math.max(34, height * .095); context.lineCap = "round"; context.lineJoin = "round";
-  context.strokeStyle = "#171c1c";
-  context.beginPath(); context.moveTo(0, tunnelY); context.lineTo(width * .28, tunnelY); context.lineTo(width * .34, tunnelY - 22); context.lineTo(width * .58, tunnelY - 22); context.lineTo(width * .65, tunnelY + 8); context.lineTo(width, tunnelY + 8); context.stroke();
-  context.lineWidth = 3; context.strokeStyle = "rgba(203,157,96,.35)"; context.stroke();
-  const supportCount = Math.ceil(width / 105);
-  context.strokeStyle = "#725637"; context.lineWidth = 5;
-  for (let i = 0; i < supportCount; i += 1) {
-    const x = i * 105 - ((state.camera.x * 8) % 105);
-    context.beginPath(); context.moveTo(x, tunnelY - 35); context.lineTo(x, tunnelY + 35); context.moveTo(x - 14, tunnelY - 34); context.lineTo(x + 14, tunnelY - 34); context.stroke();
+  const halfHeight = TunnelHalfHeight(height);
+  const samples = [];
+  for (let worldX = worldMin - 3; worldX <= worldMax + 3; worldX += .35) samples.push({ worldX, screenX: WorldToScreen(worldX, width), centerY: TunnelCenterYAt(worldX, tunnelY) });
+  context.beginPath();
+  samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY - halfHeight) : context.moveTo(point.screenX, point.centerY - halfHeight));
+  [...samples].reverse().forEach((point) => context.lineTo(point.screenX, point.centerY + halfHeight));
+  context.closePath();
+  context.fillStyle = "#111819"; context.fill();
+  context.strokeStyle = "rgba(204,158,94,.42)"; context.lineWidth = 3; context.lineJoin = "round"; context.stroke();
+
+  context.strokeStyle = "rgba(225,190,126,.25)"; context.lineWidth = 2;
+  context.beginPath(); samples.forEach((point, index) => index ? context.lineTo(point.screenX, point.centerY + halfHeight - 5) : context.moveTo(point.screenX, point.centerY + halfHeight - 5)); context.stroke();
+
+  context.strokeStyle = "#795a37"; context.lineWidth = Math.max(4, height * .006); context.lineCap = "round";
+  for (let worldX = -10; worldX <= 10; worldX += 2) {
+    const screenX = WorldToScreen(worldX, width);
+    if (screenX < -30 || screenX > width + 30 || entrances.some((entrance) => Math.abs(entrance - worldX) < .75)) continue;
+    const centerY = TunnelCenterYAt(worldX, tunnelY);
+    const top = centerY - halfHeight + 7;
+    const floor = centerY + halfHeight - 6;
+    context.beginPath(); context.moveTo(screenX, floor); context.lineTo(screenX, top + 7); context.moveTo(screenX - 15, top + 6); context.lineTo(screenX + 15, top + 6); context.stroke();
+    context.strokeStyle = "rgba(183,132,76,.5)"; context.lineWidth = 2; context.beginPath(); context.moveTo(screenX + 5, floor); context.lineTo(screenX + 5, top + 8); context.stroke();
+    context.strokeStyle = "#795a37"; context.lineWidth = Math.max(4, height * .006);
+  }
+}
+
+function TunnelOffsetAt(worldX) {
+  if (worldX <= -6) return 2;
+  if (worldX < -4) return Lerp(2, -18, (worldX + 6) / 2);
+  if (worldX <= 2) return -18;
+  if (worldX < 4) return Lerp(-18, 10, (worldX - 2) / 2);
+  return 10;
+}
+
+function TunnelCenterYAt(worldX, tunnelY) { return tunnelY + TunnelOffsetAt(worldX); }
+function TunnelHalfHeight(height) { return Math.max(42, Math.min(64, height * .085)); }
+function TunnelFloorYAt(worldX, height, tunnelY) { return TunnelCenterYAt(worldX, tunnelY) + TunnelHalfHeight(height) - 6; }
+
+function DrawFlowArrow(screenX, screenY, direction, color, alpha = 1) {
+  context.save(); context.translate(screenX, screenY); context.scale(direction, 1); context.globalAlpha = alpha;
+  context.strokeStyle = color; context.fillStyle = color; context.lineWidth = 2;
+  context.beginPath(); context.moveTo(-7, 0); context.lineTo(6, 0); context.stroke();
+  context.beginPath(); context.moveTo(6, 0); context.lineTo(1, -4); context.lineTo(1, 4); context.closePath(); context.fill(); context.restore();
+}
+
+function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
+  if (state.levelIndex !== 0) return;
+  const halfHeight = TunnelHalfHeight(height);
+  const intakeX = -5.6;
+  const exhaustX = 4.6;
+  for (const [worldX, kind] of [[intakeX, "intake"], [exhaustX, "exhaust"]]) {
+    const screenX = WorldToScreen(worldX, width);
+    const ceilingY = TunnelCenterYAt(worldX, tunnelY) - halfHeight;
+    context.fillStyle = "#172224"; context.fillRect(screenX - 8, surfaceY - 2, 16, ceilingY - surfaceY + 10);
+    context.strokeStyle = "#765a3d"; context.lineWidth = 3;
+    context.beginPath(); context.moveTo(screenX - 9, surfaceY); context.lineTo(screenX - 9, ceilingY + 10); context.moveTo(screenX + 9, surfaceY); context.lineTo(screenX + 9, ceilingY + 10); context.stroke();
+    context.strokeStyle = "rgba(222,192,137,.55)"; context.lineWidth = 2;
+    for (let y = surfaceY + 7; y < ceilingY; y += 8) { context.beginPath(); context.moveTo(screenX - 7, y); context.lineTo(screenX + 7, y); context.stroke(); }
+    context.fillStyle = "#2a3735"; context.fillRect(screenX - 13, surfaceY - 5, 26, 7);
+    const flow = (state.elapsed * 28) % Math.max(16, ceilingY - surfaceY);
+    const arrowY = kind === "intake" ? surfaceY + 12 + flow : ceilingY - 8 - flow;
+    context.fillStyle = kind === "intake" ? "rgba(94,212,218,.85)" : "rgba(183,198,185,.78)";
+    context.beginPath(); context.moveTo(screenX, arrowY + (kind === "intake" ? 5 : -5)); context.lineTo(screenX - 4, arrowY); context.lineTo(screenX + 4, arrowY); context.closePath(); context.fill();
+  }
+
+  const ventilation = state.defense.ventilation;
+  if (ventilation > 0) {
+    const particleCount = 5 + ventilation * 2;
+    for (let index = 0; index < particleCount; index += 1) {
+      const progress = (state.elapsed * (.08 + ventilation * .012) + index / particleCount) % 1;
+      const worldX = Lerp(intakeX, exhaustX, progress);
+      const screenX = WorldToScreen(worldX, width);
+      const y = TunnelCenterYAt(worldX, tunnelY) - 18 + Math.sin(index * 2.1 + state.elapsed * 2) * 8;
+      DrawFlowArrow(screenX, y, 1, "#69d4d7", .35 + ventilation * .15);
+    }
+  }
+
+  const slotWorldXs = [-7, 0, 7];
+  state.buildSlots.forEach((slotId, slotIndex) => {
+    if (!slotId) return;
+    const worldX = slotWorldXs[slotIndex];
+    const screenX = WorldToScreen(worldX, width);
+    const centerY = TunnelCenterYAt(worldX, tunnelY);
+    const floorY = TunnelFloorYAt(worldX, height, tunnelY);
+    if (slotId === "flipGate") {
+      context.strokeStyle = "#b3834e"; context.lineWidth = 5; context.beginPath(); context.moveTo(screenX - 18, floorY - 4); context.lineTo(screenX + 18, floorY - 4); context.stroke();
+      context.fillStyle = "#d8aa61"; context.beginPath(); context.arc(screenX - 16, floorY - 4, 4, 0, Math.PI * 2); context.fill();
+    } else if (slotId === "smokeBaffle") {
+      context.fillStyle = "#8f7049"; context.beginPath(); context.moveTo(screenX - 4, centerY - halfHeight + 10); context.lineTo(screenX + 17, centerY - 8); context.lineTo(screenX + 8, centerY - 4); context.lineTo(screenX - 10, centerY - halfHeight + 16); context.closePath(); context.fill();
+      DrawFlowArrow(screenX + 10, centerY - 24, 1, "#75d7d7", .9);
+    } else if (slotId === "floodGate") {
+      context.fillStyle = "#775b3c"; context.fillRect(screenX - 6, centerY - 25, 12, floorY - centerY + 21);
+      context.fillStyle = "#5cb4c1"; context.fillRect(screenX - 3, centerY - 17, 6, 23);
+      context.strokeStyle = "#72c9d2"; context.lineWidth = 3; context.beginPath(); context.moveTo(screenX - 22, floorY - 7); context.lineTo(screenX + 25, floorY - 7); context.stroke();
+    }
+  });
+
+  if (state.buildSlots.includes("floodGate")) {
+    context.strokeStyle = "rgba(78,169,190,.72)"; context.lineWidth = 5; context.lineCap = "round";
+    context.beginPath();
+    for (let worldX = -9; worldX <= 9; worldX += .4) {
+      const screenX = WorldToScreen(worldX, width); const y = TunnelFloorYAt(worldX, height, tunnelY) - 7;
+      worldX === -9 ? context.moveTo(screenX, y) : context.lineTo(screenX, y);
+    }
+    context.stroke();
+    for (let index = 0; index < 9; index += 1) {
+      const progress = (state.elapsed * .16 + index / 9) % 1; const worldX = Lerp(8.5, -8.5, progress);
+      context.fillStyle = "rgba(158,230,235,.85)"; context.beginPath(); context.arc(WorldToScreen(worldX, width), TunnelFloorYAt(worldX, height, tunnelY) - 7, 2.5, 0, Math.PI * 2); context.fill();
+    }
+  }
+
+  if (["defense", "outcome"].includes(state.phaseId)) {
+    const hasBaffle = state.buildSlots.includes("smokeBaffle");
+    const smokeCount = hasBaffle ? 14 : 11;
+    for (let index = 0; index < smokeCount; index += 1) {
+      const progress = (state.elapsed * .09 + index / smokeCount) % 1;
+      let worldX;
+      let y;
+      if (hasBaffle && progress > .66) {
+        const rise = (progress - .66) / .34;
+        worldX = exhaustX + Math.sin(index * 2.3 + state.elapsed * 1.7) * .08;
+        const tunnelMouthY = TunnelCenterYAt(exhaustX, tunnelY) - halfHeight + 8;
+        y = Lerp(tunnelMouthY, surfaceY - 52, rise);
+      } else {
+        const run = hasBaffle ? progress / .66 : progress;
+        worldX = Lerp(8.7, hasBaffle ? exhaustX : -7.5, run);
+        y = TunnelCenterYAt(worldX, tunnelY) - 19 + Math.sin(index * 1.8 + state.elapsed * 1.6) * 7;
+      }
+      const size = 8 + (index % 4) * 2.2;
+      context.fillStyle = hasBaffle ? "rgba(165,174,166,.52)" : "rgba(129,116,103,.62)";
+      context.beginPath(); context.arc(WorldToScreen(worldX, width), y, size, 0, Math.PI * 2); context.fill();
+      context.fillStyle = hasBaffle ? "rgba(200,207,199,.18)" : "rgba(174,155,137,.18)";
+      context.beginPath(); context.arc(WorldToScreen(worldX, width) - size * .38, y - size * .24, size * .64, 0, Math.PI * 2); context.fill();
+    }
+
+    context.save();
+    context.font = "600 11px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.fillStyle = "rgba(107,222,224,.88)";
+    context.fillText("进风", WorldToScreen(intakeX, width), surfaceY - 16);
+    context.fillStyle = "rgba(205,214,205,.88)";
+    context.fillText(hasBaffle ? "排烟" : "烟倒灌", WorldToScreen(hasBaffle ? exhaustX : -7.5, width), surfaceY - 16);
+    context.restore();
   }
 }
 
@@ -666,7 +835,7 @@ function DrawActions(width, height, surfaceY, tunnelY) {
   for (const action of state.level.actions) {
     if (action.phase !== state.phaseId || (state.completed.has(action.id) && action.buildSlot === undefined)) continue;
     const x = WorldToScreen(action.x, width);
-    const y = action.layer === "surface" ? surfaceY - 10 : tunnelY - 8;
+    const y = action.layer === "surface" ? surfaceY - 10 : TunnelCenterYAt(action.x, tunnelY) - 4;
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const pulse = 1 + Math.sin(state.elapsed * 4 + action.x) * .12;
     context.save(); context.translate(x, y - 24); context.scale(pulse, pulse);
@@ -680,24 +849,56 @@ function DrawActions(width, height, surfaceY, tunnelY) {
   }
 }
 
-function DrawEntrances(width, surfaceY, tunnelY) {
-  for (const entrance of entrances) {
+function DrawEntrances(width, height, surfaceY, tunnelY) {
+  const halfHeight = TunnelHalfHeight(height);
+  entrances.forEach((entrance, index) => {
     const x = WorldToScreen(entrance, width);
-    context.strokeStyle = "rgba(98,196,212,.66)"; context.lineWidth = 4; context.setLineDash([5, 6]);
-    context.beginPath(); context.moveTo(x, surfaceY - 3); context.bezierCurveTo(x - 18, surfaceY + 45, x + 18, tunnelY - 46, x, tunnelY); context.stroke(); context.setLineDash([]);
-    context.fillStyle = "#5fc6d5"; context.beginPath(); context.arc(x, state.player.layer === "surface" ? surfaceY - 4 : tunnelY, 5, 0, Math.PI * 2); context.fill();
-  }
+    const shaftBottom = TunnelCenterYAt(entrance, tunnelY) - halfHeight + 16;
+    const shaftHalf = index === 0 ? 16 : 20;
+    const nearby = Math.abs(state.player.x - entrance) < 1.15;
+    context.fillStyle = "#101819";
+    context.beginPath(); context.moveTo(x - shaftHalf, surfaceY - 1); context.lineTo(x + shaftHalf, surfaceY - 1); context.lineTo(x + shaftHalf + 5, shaftBottom); context.lineTo(x - shaftHalf - 5, shaftBottom); context.closePath(); context.fill();
+    context.strokeStyle = nearby ? "rgba(98,207,213,.78)" : "rgba(177,132,78,.58)"; context.lineWidth = nearby ? 3 : 2;
+    context.beginPath(); context.moveTo(x - shaftHalf, surfaceY); context.lineTo(x - shaftHalf - 5, shaftBottom); context.moveTo(x + shaftHalf, surfaceY); context.lineTo(x + shaftHalf + 5, shaftBottom); context.stroke();
+    context.strokeStyle = "#9b7548"; context.lineWidth = 3;
+    context.beginPath(); context.moveTo(x - 8, surfaceY + 10); context.lineTo(x - 8, shaftBottom - 5); context.moveTo(x + 8, surfaceY + 10); context.lineTo(x + 8, shaftBottom - 5); context.stroke();
+    context.lineWidth = 2;
+    for (let y = surfaceY + 16; y < shaftBottom - 4; y += 12) { context.beginPath(); context.moveTo(x - 8, y); context.lineTo(x + 8, y); context.stroke(); }
+    if (index === 0) {
+      context.fillStyle = "#6f5135"; context.fillRect(x - 23, surfaceY - 7, 46, 8);
+      context.strokeStyle = "rgba(218,174,105,.56)"; context.lineWidth = 2; context.strokeRect(x - 23, surfaceY - 7, 46, 8);
+    } else {
+      context.fillStyle = "#2d3028"; context.beginPath(); context.ellipse(x, surfaceY - 1, 27, 9, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#8c6a45"; context.lineWidth = 6; context.beginPath(); context.ellipse(x, surfaceY - 3, 27, 9, 0, 0, Math.PI * 2); context.stroke();
+    }
+    context.strokeStyle = nearby ? "rgba(111,225,226,.95)" : "rgba(92,188,196,.48)"; context.lineWidth = 2;
+    context.beginPath(); context.arc(x, surfaceY - 18, nearby ? 10 : 7, 0, Math.PI * 2); context.stroke();
+    context.fillStyle = nearby ? "#83e4e2" : "#5fc6d5"; context.beginPath(); context.moveTo(x - 4, surfaceY - 20); context.lineTo(x + 4, surfaceY - 20); context.lineTo(x, surfaceY - 14); context.closePath(); context.fill();
+  });
 }
 
 function DrawEnemies(width, surfaceY) {
-  if (state.levelIndex === 1 || (state.levelIndex === 0 && state.phaseId === "collect") || state.levelIndex === 2) {
-    const count = state.levelIndex === 2 ? Math.max(2, Math.ceil(state.morale / 24)) : 3;
-    const profile = actorProfiles.soldier;
-    const scale = Math.min(width, 1100) / 26 * .038;
-    const height = profile.height * 39 * scale;
-    for (let i = 0; i < count; i += 1) {
-      const patrolX = state.levelIndex === 1 ? 2.2 + i * 2 : state.levelIndex === 2 ? -2 + i * 2.5 : 1 + i * 2.1;
-      const x = WorldToScreen(patrolX + Math.sin(state.elapsed * (.45 + i * .08) + i) * 1.3, width);
+  const patrols = GetEnemyPatrols();
+  if (!patrols.length) return;
+  const profile = actorProfiles.soldier;
+  const scale = Math.min(width, 1100) / 26 * .038;
+  const height = profile.height * 39 * scale;
+  const baseY = surfaceY - 5;
+  patrols.forEach((enemy) => {
+    const x = WorldToScreen(enemy.x, width);
+    const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
+    const active = EnemyDetection(enemy) > 0;
+    const gradient = context.createLinearGradient(x, 0, endX, 0);
+    gradient.addColorStop(0, active ? "rgba(229,58,44,.5)" : "rgba(215,184,103,.15)");
+    gradient.addColorStop(1, active ? "rgba(195,43,34,.08)" : "rgba(215,184,103,0)");
+    context.fillStyle = gradient;
+    context.beginPath(); context.moveTo(x + enemy.facing * height * .12, baseY - height * .69); context.lineTo(endX, surfaceY + 3); context.lineTo(x + enemy.facing * height * .18, surfaceY + 3); context.closePath(); context.fill();
+    context.strokeStyle = active ? "rgba(255,91,69,.95)" : "rgba(219,186,104,.22)"; context.lineWidth = active ? 3 : 1;
+    context.beginPath(); context.moveTo(x + enemy.facing * height * .12, baseY - height * .69); context.lineTo(endX, surfaceY + 3); context.stroke();
+  });
+  patrols.forEach((enemy) => {
+      const i = enemy.index;
+      const x = WorldToScreen(enemy.x, width);
       const baseY = surfaceY - 5;
       const stride = Math.sin(state.elapsed * 4 + i) * height * .06;
       context.fillStyle = "rgba(0,0,0,.28)"; context.beginPath(); context.ellipse(x, baseY + 2, height * .2, 5, 0, 0, Math.PI * 2); context.fill();
@@ -707,15 +908,14 @@ function DrawEnemies(width, surfaceY) {
       context.fillStyle = "#b56c5d"; context.beginPath(); context.arc(x, baseY - height * .86, height * profile.head, 0, Math.PI * 2); context.fill();
       context.fillStyle = "#4d302d"; context.fillRect(x - height * .12, baseY - height * .94, height * .24, height * .045);
       context.strokeStyle = "#78443d"; context.lineWidth = Math.max(5, height * .055); context.beginPath(); context.moveTo(x - height * .13, baseY - height * .64); context.lineTo(x - height * .26, baseY - height * .4); context.moveTo(x + height * .13, baseY - height * .64); context.lineTo(x + height * .26, baseY - height * .42); context.stroke();
-      context.fillStyle = "rgba(225,196,128,.09)"; context.beginPath(); context.moveTo(x + height * .15, baseY - height * .7); context.lineTo(x + 150, baseY + 10); context.lineTo(x + height * .22, baseY + 10); context.closePath(); context.fill();
-    }
-  }
+      context.fillStyle = "#d3aa63"; context.beginPath(); context.arc(x + enemy.facing * height * .16, baseY - height * .69, 3, 0, Math.PI * 2); context.fill();
+  });
 }
 
-function DrawActor(width, surfaceY, tunnelY) {
+function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
   const profile = actorProfiles[state.selectedRole];
   const x = WorldToScreen(state.player.x, width);
-  const baseY = state.player.layer === "surface" ? surfaceY - 5 : tunnelY + 10;
+  const baseY = state.player.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(state.player.x, viewportHeight, tunnelY);
   const scale = Math.min(width, 1100) / 26 * .038;
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
@@ -863,7 +1063,7 @@ if (qaMode) {
       level: state.level.id, phase: state.phaseId, x: state.player.x, layer: state.player.layer,
       role: state.selectedRole, completed: [...state.completed], resources: { ...state.resources }, buildSlots: [...state.buildSlots],
       ventilation: state.defense.ventilation, defense: state.defense.strength, rescues: { ...state.rescues }, memories: [...state.memories],
-      alert: state.alert, morale: state.morale, tricks: [...state.tricks]
+      exposure: state.exposure, detection: state.detection, alert: state.alert, morale: state.morale, tricks: [...state.tricks]
     })
   });
 }
