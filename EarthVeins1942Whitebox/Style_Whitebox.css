@@ -137,8 +137,8 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #touchControls button { display: grid; width: 62px; height: 52px; place-items: center; background: rgba(11,17,19,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 4px; box-shadow: 0 8px 22px rgba(0,0,0,.25); }
 #touchControls button span { font-size: 11px; font-weight: 900; pointer-events: none; }
 #touchControls button.pressed { transform: translateY(2px); background: rgba(101,209,212,.22); border-color: var(--cyan); }
-#touchControls [data-input="crouch"][aria-pressed="true"] { color: #102024; background: var(--amber); border-color: #f0ce91; box-shadow: 0 0 0 2px rgba(216,170,97,.24), 0 8px 22px rgba(0,0,0,.35); }
-#touchControls [data-input="crouch"][aria-pressed="true"] span { color: #102024; text-shadow: none; }
+#touchControls.locked .touchMove, #touchControls.locked .touchActions { pointer-events: none; }
+#touchControls.locked button { opacity: .3; filter: grayscale(1); transform: none; }
 #touchControls .touchPrimary { width: 76px; color: #102024; background: rgba(101,209,212,.92); border-color: var(--cyan); }
 
 #toast { position: absolute; z-index: 50; top: 50%; left: 50%; width: min(520px, calc(100% - 40px)); padding: 13px 18px; transform: translate(-50%,-50%); text-align: center; font-size: 12px; font-weight: 800; background: rgba(13,20,22,.95); border: 1px solid rgba(101,209,212,.6); box-shadow: 0 18px 60px rgba(0,0,0,.55); pointer-events: none; }

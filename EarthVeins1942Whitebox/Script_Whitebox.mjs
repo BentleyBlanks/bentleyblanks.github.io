@@ -1,4 +1,4 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions } from "./Data_WhiteboxCampaign.mjs";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -20,8 +20,7 @@ const worldMax = 11;
 const entrances = [-1.1, 8.6];
 const requiredCollect = ["collectWood", "collectIron", "collectPowder", "collectSupplies"];
 const requiredRescues = ["wounded", "grain", "courier"];
-const inputKeys = { left: false, right: false, crouch: false };
-let touchCrouchLatched = false;
+const inputKeys = { left: false, right: false };
 let selectedLevel = startingLevel;
 let lastTime = performance.now();
 let toastTimer = 0;
@@ -34,7 +33,7 @@ function CreateState(levelIndex) {
     levelIndex,
     level,
     phaseId: level.phases[0].id,
-    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, crouch: false, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0 },
+    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0 },
     selectedRole: level.startRole,
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
@@ -42,8 +41,11 @@ function CreateState(levelIndex) {
     defense: { ventilation: 0, strength: 0, enemyUnits: 6, triggered: 0 },
     rescues: { wounded: false, grain: false, courier: false },
     memories: [],
-    exposure: 0,
+    visibility: 0,
     detection: 0,
+    detected: false,
+    caught: null,
+    lastSafeX: level.startX,
     alert: 18,
     morale: 100,
     tricks: new Set(),
@@ -91,7 +93,6 @@ function StartLevel(levelIndex) {
   selectedLevel = levelIndex;
   state = CreateState(levelIndex);
   state.mode = "play";
-  SetTouchCrouch(false);
   Show(ui.titleScreen, false);
   Show(ui.levelPanel, false);
   Show(ui.guidePanel, false);
@@ -106,7 +107,7 @@ function StartLevel(levelIndex) {
   RenderQaPanel();
   UpdateUi();
   const opener = state.levelIndex === 0
-    ? ["第一轮 · 夜", "民兵队长", "天亮前得把木料和铁件带回来。都别逞强，见灯就趴下。"]
+    ? ["第一轮 · 夜", "民兵队长", "天亮前得把木料和铁件带回来。别在空地停，等巡逻背过身，再从草垛和断墙后走。"]
     : state.levelIndex === 1
       ? ["封锁线外", "赵禾", "伤员走不了明路。咱们几个，一个接一个把门打开。"]
       : ["扫荡第三日", "林青禾", "别跟他们碰。弄出点动静就走，让他们自己乱起来。"];
@@ -200,8 +201,9 @@ function PerformAction() {
     Toast(`还缺前一步：${prerequisite?.title || missing}`, "warning");
     return;
   }
-  if (action.crouch && !(state.player.crouch || inputKeys.crouch || touchCrouchLatched)) {
-    Toast("这里暴露太高，先蹲伏再行动。", "warning");
+  if (action.cover && GetActiveCover()?.id !== action.cover) {
+    const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
+    Toast(`先进入${cover?.label || "场景遮挡"}后再行动；空地上压低身子不会隐身。`, "warning");
     return;
   }
   if (action.buildSlot !== undefined) {
@@ -342,7 +344,7 @@ function ToggleLayer() {
   state.player.actionTime = .68;
   state.player.actionDuration = .68;
   if (state.player.layer === "tunnel") state.alert = Math.max(0, state.alert - 8);
-  Toast(state.player.layer === "tunnel" ? "进入地道：地表警觉开始回落。" : "回到地表：注意巡逻与暴露。", "neutral");
+  Toast(state.player.layer === "tunnel" ? "进入地道：敌兵视线被土层完全隔断。" : "回到地表：先找草垛、断墙或灌木，再等巡逻转身。", "neutral");
   UpdateUi();
 }
 
@@ -397,7 +399,7 @@ function EndCinematic() {
 }
 
 function IsBlocked() {
-  return state.mode !== "play" || state.cinematic || !ui.dialoguePanel.hidden || !ui.buildPanel.hidden || !ui.levelPanel.hidden || !ui.guidePanel.hidden;
+  return state.mode !== "play" || state.cinematic || state.caught || !ui.dialoguePanel.hidden || !ui.buildPanel.hidden || !ui.levelPanel.hidden || !ui.guidePanel.hidden;
 }
 
 function Toast(message, tone = "neutral") {
@@ -424,6 +426,7 @@ function UpdateUi() {
   }
   ui.gameShell.dataset.layer = state.player.layer;
   ui.gameShell.dataset.level = state.level.id;
+  ui.touchControls.classList.toggle("locked", Boolean(state.caught));
   const depthButton = document.querySelector('[data-input="depth"] span');
   if (depthButton) depthButton.textContent = state.player.layer === "surface" ? "下行" : "上行";
   UpdateQaReadout();
@@ -462,7 +465,6 @@ function QaJumpToPhase(phaseId) {
   state.mode = "play";
   state.phaseId = phaseId;
   state.cinematic = null;
-  SetTouchCrouch(false);
   if (levelIndex === 0) {
     if (phaseIndex >= 1) {
       QaComplete(requiredCollect);
@@ -516,7 +518,10 @@ function QaJumpToPhase(phaseId) {
 function ContextHint() {
   const action = FindNearestAction();
   if (action?.role && action.role !== state.selectedRole) return `需要：${roleDefinitions[action.role].name}`;
-  if (action?.crouch && !state.player.crouch) return "此处需先蹲伏";
+  if (action?.cover && GetActiveCover()?.id !== action.cover) {
+    const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
+    return `先藏到${cover?.label || "场景遮挡"}后`;
+  }
   if (state.levelIndex === 0 && state.phaseId === "build") return `通风 ${state.defense.ventilation}/3 · 防御 ${state.defense.strength}/4`;
   if (state.levelIndex === 2 && state.phaseId === "harass") return `至少 3 种诡计且士气 ≤ 55；已用 ${state.tricks.size} 种`;
   return `${roleDefinitions[state.selectedRole].name} · ${state.player.layer === "surface" ? "地表" : "地道"}`;
@@ -530,17 +535,16 @@ function Metric(label, value, detail = "", meter = null, inverse = false, icon =
 function MetricsMarkup() {
   if (state.levelIndex === 0) {
     const resources = Metric("材料", `木${state.resources.wood} 铁${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`, null, false, "材");
-    if (state.phaseId === "collect") return [resources, Metric("暴露", Math.round(state.exposure), state.player.crouch ? "蹲伏中" : "站立移动", state.exposure, true, "隐")].join("");
+    if (state.phaseId === "collect") return resources;
     if (state.phaseId === "build") return [resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
     return [Metric("敌队", state.defense.enemyUnits, "受困或撤离后的剩余人数", state.defense.enemyUnits / 6 * 100, true, "敌"), Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
   }
   if (state.levelIndex === 1) return [
     Metric("转移", requiredRescues.filter((key) => state.rescues[key]).length + "/3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100, false, "转"),
-    Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆"),
-    ...(state.player.layer === "surface" ? [Metric("警戒", Math.round(state.exposure), "进入敌兵实际视野会增加", state.exposure, true, "警")] : [])
+    Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆")
   ].join("");
   return [
-    Metric("警觉", Math.round(state.alert), state.player.layer === "tunnel" ? "正在回落" : state.player.crouch ? "增长减缓" : "地表暴露", state.alert, true, "警"),
+    Metric("敌军警觉", Math.round(state.alert), "只由诡计和被发现改变", state.alert, true, "警"),
     Metric("士气", Math.round(state.morale), state.morale <= 55 ? "已到恐慌断点" : "继续制造矛盾信息", state.morale, false, "志"),
     Metric("诡计", `${state.tricks.size}/3`, "三种不同异常可触发恐慌", state.tricks.size / 3 * 100, false, "计")
   ].join("");
@@ -552,6 +556,11 @@ function Update(delta) {
   if (state.player.actionTime > 0) {
     state.player.actionTime = Math.max(0, state.player.actionTime - delta);
     if (state.player.actionTime === 0) state.player.actionKind = null;
+  }
+  if (state.caught) {
+    UpdateCaught(delta);
+    UpdateUi();
+    return;
   }
   if (state.cinematic) {
     state.cinematic.time += delta;
@@ -569,48 +578,57 @@ function Update(delta) {
     state.player.step += delta * .72;
     return;
   }
-  state.player.crouch = inputKeys.crouch || touchCrouchLatched;
   const direction = Number(inputKeys.right) - Number(inputKeys.left);
   state.player.moving = Boolean(direction);
   state.player.motionBlend = Lerp(state.player.motionBlend, direction ? 1 : 0, 1 - Math.pow(.0008, delta));
   if (direction) {
     state.player.facing = direction;
-    state.player.x = Math.max(worldMin, Math.min(worldMax, state.player.x + direction * delta * (state.player.crouch ? 2.25 : 3.55)));
-    state.player.step += delta * (state.player.crouch ? 6 : 9);
+    state.player.x = Math.max(worldMin, Math.min(worldMax, state.player.x + direction * delta * (state.player.lowProfile ? 2.45 : 3.55)));
+    state.player.step += delta * (state.player.lowProfile ? 6.4 : 9);
   } else {
     state.player.step += delta * .72;
   }
+  UpdateCoverState();
   const targetX = Math.max(worldMin + 4, Math.min(worldMax - 4, state.player.x + state.player.facing * .7));
   state.camera.x = Lerp(state.camera.x, targetX, 1 - Math.pow(.002, delta));
   state.camera.zoom = Lerp(state.camera.zoom, 1, 1 - Math.pow(.01, delta));
-  UpdateDanger(delta, direction);
+  UpdateDanger();
   UpdateUi();
 }
 
-function UpdateDanger(delta, direction) {
-  const surfaceStealth = state.player.layer === "surface" && ((state.levelIndex === 0 && state.phaseId === "collect") || state.levelIndex === 1);
+function UpdateDanger() {
   state.detection = state.player.layer === "surface" ? GetDetectionStrength(state.player.x) : 0;
-  if (surfaceStealth) {
-    const detectedRate = (18 + state.detection * 44) * (state.player.crouch ? .48 : 1);
-    const rate = state.detection > 0 ? detectedRate : -12;
-    state.exposure = Math.max(0, Math.min(100, state.exposure + rate * delta));
-    if (state.exposure >= 100) {
-      state.exposure = 35;
-      state.player.x = -10;
-      Toast(state.levelIndex === 0 ? "被看见了，先退回西边。已经拿到的东西还在。" : "巡逻队逼近，众人退回草垛后重新等空当。", "warning");
-    }
-  }
-  if (state.levelIndex === 2) {
-    let rate = state.player.layer === "tunnel" ? -10 : state.detection > 0 ? 10 + state.detection * 34 : state.player.crouch ? -4 : direction ? 1.2 : -1;
-    if (state.phaseId === "panic") rate *= .5;
-    state.alert = Math.max(0, Math.min(100, state.alert + rate * delta));
-    if (state.alert >= 100) {
-      state.alert = 45;
-      state.player.x = -1.1;
-      state.player.layer = "tunnel";
-      Toast("警觉拉满：撤回安全支洞。已完成的诡计仍保留。", "warning");
-    }
-  }
+  const cover = GetActiveCover();
+  state.visibility = state.player.layer === "tunnel" ? 0 : cover ? 0 : state.detection > 0 ? 100 : 46;
+  if (state.detection > 0 && !state.detected) TriggerDetection();
+}
+
+function TriggerDetection() {
+  state.detected = true;
+  state.visibility = 100;
+  inputKeys.left = false;
+  inputKeys.right = false;
+  state.player.moving = false;
+  state.player.actionKind = "caught";
+  state.player.actionTime = .9;
+  state.player.actionDuration = .9;
+  state.caught = { time: 0, duration: .9 };
+  if (state.levelIndex === 2) state.alert = Math.min(100, state.alert + 10);
+}
+
+function UpdateCaught(delta) {
+  state.caught.time += delta;
+  state.player.motionBlend = Lerp(state.player.motionBlend, 0, 1 - Math.pow(.001, delta));
+  if (state.caught.time < state.caught.duration) return;
+  state.player.x = state.lastSafeX;
+  state.detected = false;
+  state.caught = null;
+  state.detection = 0;
+  state.visibility = 0;
+  state.player.actionKind = null;
+  state.player.actionTime = 0;
+  UpdateCoverState();
+  Toast(state.levelIndex === 0 ? "被巡逻看见，已退回最近的实体遮挡；拿到的材料仍保留。" : "被巡逻看见，队伍已退回最近的实体遮挡；已完成步骤仍保留。", "warning");
 }
 
 function Lerp(a, b, amount) { return a + (b - a) * amount; }
@@ -627,17 +645,28 @@ function GetEnemyPatrols() {
   });
 }
 
-function IsCrouchCover(worldX) {
-  return [-9, -5.2, -.2, 4.4, 8.3].some((houseX) => Math.abs(worldX - houseX) < .58);
+function GetSurfaceCovers() {
+  return coverDefinitions[state.level.id] || [];
+}
+
+function GetActiveCover(worldX = state.player.x) {
+  if (state.player.layer !== "surface") return null;
+  return GetSurfaceCovers().find((cover) => Math.abs(worldX - cover.x) <= cover.width * .5) || null;
+}
+
+function UpdateCoverState() {
+  const cover = GetActiveCover();
+  state.player.coverId = cover?.id || null;
+  state.player.lowProfile = Boolean(cover && cover.pose === "low");
+  if (cover && !state.detected) state.lastSafeX = cover.x;
 }
 
 function EnemyDetection(enemy, playerX = state.player.x) {
   if (state.player.layer !== "surface") return 0;
+  if (GetActiveCover(playerX)) return 0;
   const forward = (playerX - enemy.x) * enemy.facing;
-  const effectiveDistance = state.player.crouch ? enemy.viewDistance * .64 : enemy.viewDistance;
-  if (forward < .18 || forward > effectiveDistance) return 0;
-  if (state.player.crouch && IsCrouchCover(playerX)) return 0;
-  return Math.max(.08, 1 - forward / effectiveDistance);
+  if (forward < .18 || forward > enemy.viewDistance) return 0;
+  return Math.max(.08, 1 - forward / enemy.viewDistance);
 }
 
 function GetDetectionStrength(playerX) {
@@ -674,13 +703,17 @@ function Draw() {
   const daylight = state.levelIndex === 0 && state.phaseId === "collect" ? 0 : state.levelIndex === 2 ? .2 : .55;
   DrawSky(width, height, surfaceY, daylight);
   DrawVillage(width, height, surfaceY);
+  DrawSurfaceCovers(width, surfaceY, false);
   DrawEarth(width, height, surfaceY, tunnelY);
   DrawEntrances(width, height, surfaceY, tunnelY);
   DrawTunnelSystems(width, height, surfaceY, tunnelY);
   DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
   DrawActor(width, height, surfaceY, tunnelY);
+  DrawSurfaceCovers(width, surfaceY, true);
   DrawSurfaceVegetation(width, height, surfaceY);
+  DrawActorVisibilityHud(width, surfaceY);
+  DrawDetectionFlash(width, height, surfaceY);
   if (qaMode) DrawQa(width, height, surfaceY, tunnelY);
 }
 
@@ -741,6 +774,116 @@ function DrawVillage(width, height, surfaceY) {
   });
   context.fillStyle = "#504936";
   context.fillRect(0, surfaceY - 5, width, 12);
+}
+
+function DrawSurfaceCovers(width, surfaceY, front) {
+  const sceneScale = Math.min(width, 1100) / 1100;
+  const unit = width / (22 / state.camera.zoom);
+  const activeId = state.player.layer === "surface" ? state.player.coverId : null;
+  for (const cover of GetSurfaceCovers()) {
+    const x = WorldToScreen(cover.x, width);
+    const coverWidth = Math.max(44, cover.width * unit);
+    const baseHeight = ({ brush: 88, hay: 84, wall: 80, cart: 86, well: 76 })[cover.kind] * sceneScale;
+    const active = activeId === cover.id;
+    context.save();
+    context.translate(x, surfaceY - 3);
+
+    if (!front) {
+      context.fillStyle = "rgba(8,12,12,.32)";
+      context.beginPath(); context.ellipse(0, 5, coverWidth * .56, 7 * sceneScale, 0, 0, Math.PI * 2); context.fill();
+      if (cover.kind === "brush") {
+        context.fillStyle = "#394333";
+        [-.34, -.12, .12, .34].forEach((offset, index) => {
+          context.beginPath(); context.ellipse(coverWidth * offset, -baseHeight * (.38 + (index % 2) * .12), coverWidth * .3, baseHeight * .46, index % 2 ? .22 : -.18, 0, Math.PI * 2); context.fill();
+        });
+      } else if (cover.kind === "hay") {
+        context.fillStyle = "#806a3e";
+        context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.quadraticCurveTo(-coverWidth * .44, -baseHeight * .86, 0, -baseHeight); context.quadraticCurveTo(coverWidth * .46, -baseHeight * .84, coverWidth * .52, 0); context.closePath(); context.fill();
+      } else if (cover.kind === "cart") {
+        context.fillStyle = "#6f5a38"; context.fillRect(-coverWidth * .43, -baseHeight * .8, coverWidth * .86, baseHeight * .45);
+        context.fillStyle = "#3e3025"; context.fillRect(-coverWidth * .5, -baseHeight * .4, coverWidth, baseHeight * .38);
+      } else if (cover.kind === "well") {
+        context.strokeStyle = "#6b5236"; context.lineWidth = 7 * sceneScale;
+        context.beginPath(); context.moveTo(-coverWidth * .34, -baseHeight * .98); context.lineTo(-coverWidth * .34, -baseHeight * .3); context.moveTo(coverWidth * .34, -baseHeight * .98); context.lineTo(coverWidth * .34, -baseHeight * .3); context.stroke();
+        context.strokeStyle = "#927049"; context.lineWidth = 5 * sceneScale; context.beginPath(); context.moveTo(-coverWidth * .4, -baseHeight * .96); context.lineTo(coverWidth * .4, -baseHeight * .96); context.stroke();
+      }
+      context.restore();
+      continue;
+    }
+
+    if (cover.kind === "brush") {
+      context.fillStyle = active ? "#27362e" : "#303b30";
+      for (let index = 0; index < 9; index += 1) {
+        const offset = (index / 8 - .5) * coverWidth * .9;
+        const rise = baseHeight * (.62 + (index * 17 % 31) / 100);
+        context.beginPath(); context.ellipse(offset, -rise * .48, coverWidth * .18, rise * .52, index % 2 ? .22 : -.22, 0, Math.PI * 2); context.fill();
+        context.strokeStyle = "#52604a"; context.lineWidth = Math.max(1.5, 2.2 * sceneScale);
+        context.beginPath(); context.moveTo(offset, 1); context.quadraticCurveTo(offset + (index % 2 ? 8 : -7) * sceneScale, -rise * .52, offset + (index % 3 - 1) * 8 * sceneScale, -rise); context.stroke();
+      }
+    } else if (cover.kind === "hay") {
+      context.fillStyle = active ? "#8a7443" : "#78643b";
+      context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.quadraticCurveTo(-coverWidth * .43, -baseHeight * .82, 0, -baseHeight); context.quadraticCurveTo(coverWidth * .43, -baseHeight * .82, coverWidth * .52, 0); context.closePath(); context.fill();
+      context.strokeStyle = "rgba(213,179,99,.63)"; context.lineWidth = Math.max(1, 1.6 * sceneScale);
+      for (let index = 0; index < 11; index += 1) {
+        const offset = (index / 10 - .5) * coverWidth * .88;
+        context.beginPath(); context.moveTo(offset, -4); context.lineTo(offset + (index % 3 - 1) * 11 * sceneScale, -baseHeight * (.48 + (index % 4) * .11)); context.stroke();
+      }
+    } else if (cover.kind === "wall") {
+      context.fillStyle = active ? "#66543f" : "#5a4938";
+      context.beginPath(); context.moveTo(-coverWidth * .52, 0); context.lineTo(-coverWidth * .52, -baseHeight * .68); context.lineTo(-coverWidth * .24, -baseHeight * .84); context.lineTo(0, -baseHeight * .7); context.lineTo(coverWidth * .23, -baseHeight * .92); context.lineTo(coverWidth * .52, -baseHeight * .72); context.lineTo(coverWidth * .52, 0); context.closePath(); context.fill();
+      context.strokeStyle = "rgba(187,148,96,.38)"; context.lineWidth = Math.max(1.5, 2 * sceneScale);
+      for (let row = 0; row < 3; row += 1) { context.beginPath(); context.moveTo(-coverWidth * .48, -baseHeight * (.18 + row * .19)); context.lineTo(coverWidth * .47, -baseHeight * (.14 + row * .2)); context.stroke(); }
+    } else if (cover.kind === "cart") {
+      context.fillStyle = "#59422e"; context.fillRect(-coverWidth * .53, -baseHeight * .62, coverWidth * 1.06, baseHeight * .57);
+      context.strokeStyle = "#aa7b48"; context.lineWidth = Math.max(3, 5 * sceneScale); context.strokeRect(-coverWidth * .53, -baseHeight * .62, coverWidth * 1.06, baseHeight * .57);
+      context.strokeStyle = "#34271f"; context.lineWidth = Math.max(4, 6 * sceneScale);
+      context.beginPath(); context.arc(-coverWidth * .32, 0, baseHeight * .22, 0, Math.PI * 2); context.arc(coverWidth * .32, 0, baseHeight * .22, 0, Math.PI * 2); context.stroke();
+      context.fillStyle = "#75663f"; context.beginPath(); context.ellipse(0, -baseHeight * .72, coverWidth * .48, baseHeight * .26, 0, 0, Math.PI * 2); context.fill();
+    } else if (cover.kind === "well") {
+      context.fillStyle = "#5d4b39"; context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .5, baseHeight * .22, 0, 0, Math.PI * 2); context.fill();
+      context.fillRect(-coverWidth * .5, -baseHeight * .58, coverWidth, baseHeight * .55);
+      context.fillStyle = "#201d1a"; context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .35, baseHeight * .11, 0, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#a47c4f"; context.lineWidth = Math.max(2, 4 * sceneScale); context.beginPath(); context.ellipse(0, -baseHeight * .58, coverWidth * .5, baseHeight * .22, 0, 0, Math.PI * 2); context.stroke();
+    }
+
+    if (active) {
+      context.strokeStyle = "rgba(112,222,214,.78)"; context.lineWidth = Math.max(1.5, 2 * sceneScale); context.setLineDash([5 * sceneScale, 5 * sceneScale]);
+      context.beginPath(); context.ellipse(0, 2, coverWidth * .55, 8 * sceneScale, 0, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    }
+    context.restore();
+  }
+}
+
+function DrawActorVisibilityHud(width, surfaceY) {
+  if (state.player.layer !== "surface" || (!GetEnemyPatrols().length && !state.caught)) return;
+  const profile = actorProfiles[state.selectedRole];
+  const actorScale = Math.min(width, 1100) / 26 * .038;
+  const actorHeight = profile.height * 39 * actorScale * (state.player.lowProfile ? .7 : 1);
+  const cover = GetActiveCover();
+  const label = state.detected ? "被发现" : cover ? `遮蔽 · ${cover.label}` : "无遮掩";
+  const tone = state.detected ? "#ef6657" : cover ? "#6ed7d3" : "#d9ae65";
+  const x = WorldToScreen(state.player.x, width);
+  const y = surfaceY - actorHeight - 42;
+  const panelWidth = Math.max(88, Math.min(146, 52 + label.length * 11));
+  context.save(); context.translate(x, y);
+  context.fillStyle = "rgba(8,13,15,.9)"; context.beginPath(); context.roundRect(-panelWidth / 2, -12, panelWidth, 28, 14); context.fill();
+  context.strokeStyle = tone; context.lineWidth = 1.5; context.stroke();
+  context.fillStyle = tone; context.font = "800 10px system-ui, sans-serif"; context.textAlign = "center"; context.fillText(label, 0, -1);
+  context.fillStyle = "rgba(255,255,255,.12)"; context.fillRect(-panelWidth * .32, 5, panelWidth * .64, 3);
+  context.fillStyle = tone; context.fillRect(-panelWidth * .32, 5, panelWidth * .64 * state.visibility / 100, 3);
+  context.restore();
+}
+
+function DrawDetectionFlash(width, height, surfaceY) {
+  if (!state.caught) return;
+  const progress = state.caught.time / state.caught.duration;
+  const pulse = .13 + Math.sin(progress * Math.PI * 5) * .04;
+  context.fillStyle = `rgba(170,24,22,${pulse})`; context.fillRect(0, 0, width, height);
+  const x = WorldToScreen(state.player.x, width);
+  context.save(); context.translate(x, surfaceY - 150);
+  context.fillStyle = "#f16759"; context.beginPath(); context.arc(0, 0, 17, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "#fff5e8"; context.font = "900 22px system-ui, sans-serif"; context.textAlign = "center"; context.fillText("!", 0, 8);
+  context.restore();
 }
 
 function DrawEarth(width, height, surfaceY, tunnelY) {
@@ -1150,10 +1293,10 @@ function DrawHumanActor(profile, roleId, height) {
   if ((roleId === "student" || roleId === "scout") && idleGesture > 0) actionLift = idleGesture;
   const idleBreath = Math.sin(state.elapsed * (1.25 + profile.gait * .22)) * 1.1;
   const bob = Math.abs(Math.sin(phase)) * -2.1 * moving + idleBreath * (1 - moving);
-  const crouchScale = state.player.crouch || action === "crawl" ? .7 : 1;
+  const profileScale = state.player.lowProfile || action === "crawl" ? .7 : 1;
   context.translate(0, bob);
-  context.scale(1, crouchScale);
-  if (state.player.crouch || action === "crawl") context.rotate(-.055);
+  context.scale(1, profileScale);
+  if (state.player.lowProfile || action === "crawl") context.rotate(-.055);
 
   context.fillStyle = "rgba(0,0,0,.32)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .24, 5, 0, 0, Math.PI * 2); context.fill();
 
@@ -1173,6 +1316,7 @@ function DrawHumanActor(profile, roleId, height) {
   else if (action === "signal") { frontArm = 2.65; frontForearm = 3.05; rearArm = .45; rearForearm = .2; }
   else if (action === "ready") { rearArm = -.7 * actionLift; frontArm = .72 * actionLift; rearForearm = -.2; frontForearm = .2; }
   else if (action === "climb") { rearArm = 2.45 - Math.sin(actionProgress * Math.PI * 4) * .35; frontArm = 2.45 + Math.sin(actionProgress * Math.PI * 4) * .35; rearForearm = 2.8; frontForearm = 2.8; }
+  else if (action === "caught") { rearArm = 2.72; frontArm = 2.58; rearForearm = 3.05; frontForearm = 3.12; }
   else if ((roleId === "student" || roleId === "scout") && idleGesture > 0) {
     frontArm = 1.35 + idleGesture * .48; frontForearm = 2.2 + idleGesture * .58;
     rearArm = .72 + idleGesture * .34; rearForearm = 1.55 + idleGesture * .66;
@@ -1346,7 +1490,7 @@ function Loop(now) {
 }
 
 function BindHoldButton(button, input) {
-  const down = (event) => { event.preventDefault(); button.setPointerCapture?.(event.pointerId); inputKeys[input] = true; button.classList.add("pressed"); };
+  const down = (event) => { event.preventDefault(); if (IsBlocked()) return; button.setPointerCapture?.(event.pointerId); inputKeys[input] = true; button.classList.add("pressed"); };
   const up = (event) => { event.preventDefault(); inputKeys[input] = false; button.classList.remove("pressed"); if (button.hasPointerCapture?.(event.pointerId)) button.releasePointerCapture(event.pointerId); };
   button.addEventListener("pointerdown", down);
   button.addEventListener("pointerup", up);
@@ -1355,24 +1499,7 @@ function BindHoldButton(button, input) {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
-function SetTouchCrouch(active) {
-  touchCrouchLatched = Boolean(active);
-  const button = document.querySelector('[data-input="crouch"]');
-  button.classList.toggle("pressed", touchCrouchLatched);
-  button.setAttribute("aria-pressed", String(touchCrouchLatched));
-  button.querySelector("span").textContent = touchCrouchLatched ? "起身" : "蹲伏";
-}
-
-function ToggleTouchCrouch() {
-  if (IsBlocked()) return;
-  SetTouchCrouch(!touchCrouchLatched);
-  state.player.crouch = inputKeys.crouch || touchCrouchLatched;
-  Toast(touchCrouchLatched ? "已保持蹲伏：现在可以移动或单独点“行动”。" : "已起身。", "neutral");
-  UpdateUi();
-}
-
 document.querySelectorAll('[data-input="left"], [data-input="right"]').forEach((button) => BindHoldButton(button, button.dataset.input));
-document.querySelector('[data-input="crouch"]').addEventListener("click", ToggleTouchCrouch);
 document.querySelector('[data-input="switch"]').addEventListener("click", CycleRole);
 document.querySelector('[data-input="depth"]').addEventListener("click", ToggleLayer);
 document.querySelector('[data-input="action"]').addEventListener("click", PerformAction);
@@ -1390,7 +1517,6 @@ document.querySelectorAll("[data-close-panel]").forEach((button) => button.addEv
 window.addEventListener("keydown", (event) => {
   if (["KeyA", "ArrowLeft"].includes(event.code)) inputKeys.left = true;
   if (["KeyD", "ArrowRight"].includes(event.code)) inputKeys.right = true;
-  if (["ShiftLeft", "ShiftRight"].includes(event.code)) inputKeys.crouch = true;
   if (event.repeat && ["KeyE", "KeyQ", "KeyS"].includes(event.code)) return;
   if (event.code === "KeyE") PerformAction();
   if (event.code === "KeyQ") CycleRole();
@@ -1405,7 +1531,6 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => {
   if (["KeyA", "ArrowLeft"].includes(event.code)) inputKeys.left = false;
   if (["KeyD", "ArrowRight"].includes(event.code)) inputKeys.right = false;
-  if (["ShiftLeft", "ShiftRight"].includes(event.code)) inputKeys.crouch = false;
 });
 window.addEventListener("blur", () => Object.keys(inputKeys).forEach((key) => inputKeys[key] = false));
 document.addEventListener("selectstart", (event) => { if (event.target.closest("#gameShell")) event.preventDefault(); });
@@ -1418,7 +1543,8 @@ if (qaMode) {
       level: state.level.id, phase: state.phaseId, x: state.player.x, layer: state.player.layer,
       role: state.selectedRole, completed: [...state.completed], resources: { ...state.resources }, buildSlots: [...state.buildSlots],
       ventilation: state.defense.ventilation, defense: state.defense.strength, rescues: { ...state.rescues }, memories: [...state.memories],
-      exposure: state.exposure, detection: state.detection, alert: state.alert, morale: state.morale, tricks: [...state.tricks]
+      visibility: state.visibility, detection: state.detection, detected: state.detected, cover: state.player.coverId,
+      alert: state.alert, morale: state.morale, tricks: [...state.tricks]
     })
   });
 }

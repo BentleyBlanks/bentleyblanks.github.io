@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { levelDefinitions, roleDefinitions, buildOptions } from "./Data_WhiteboxCampaign.mjs";
+import { levelDefinitions, roleDefinitions, buildOptions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const Read = (name) => fs.readFileSync(path.join(root, name), "utf8");
@@ -54,15 +54,26 @@ Assert(tricks.length >= 5, "第三关至少需要五种诡计");
 Assert(tricks.every((action) => Number.isFinite(action.alert) && action.alert > 0 && Number.isFinite(action.morale) && action.morale < 0), "每种诡计都必须有警觉与士气因果");
 Assert(mindGame.actions.filter((action) => action.panicStep).length === 3, "第三关必须有三步恐慌连锁");
 Assert(game.includes("state.tricks.size >= 3") && game.includes("state.morale <= 55"), "恐慌断点没有按诡计种类和士气双条件实现");
-Assert(game.includes("撤回安全支洞") && game.includes("已完成的诡计仍保留"), "警觉满后的非惩罚性撤退规则缺失");
+Assert(game.includes("function TriggerDetection") && game.includes("function UpdateCaught") && game.includes("state.caught = { time: 0, duration: .9 }"), "被发现后锁定操作并退回遮挡的二元失败规则缺失");
+Assert(game.includes('ui.touchControls.classList.toggle("locked"') && css.includes("#touchControls.locked"), "被发现期间移动端操作没有明确锁定反馈");
 
 Assert(!html.includes('id="observeButton"') && !html.includes('data-input="observe"'), "正式玩家操作仍存在观察按钮");
-Assert(html.includes('data-input="left"') && html.includes('data-input="right"') && html.includes('data-input="switch"') && html.includes('data-input="crouch"') && html.includes('data-input="depth"') && html.includes('data-input="action"'), "移动端六个操作不完整");
+Assert(html.includes('data-input="left"') && html.includes('data-input="right"') && html.includes('data-input="switch"') && html.includes('data-input="depth"') && html.includes('data-input="action"'), "移动端五个核心操作不完整");
+Assert(!html.includes('data-input="crouch"') && !game.includes("touchCrouchLatched") && !game.includes("inputKeys.crouch"), "仍保留空地蹲伏即可隐身的错误操作");
 Assert(css.includes("user-select: none") && css.includes("-webkit-touch-callout: none") && css.includes("touch-action: none"), "移动端长按防文本选择保护不完整");
 Assert(game.includes("setPointerCapture") && game.includes("pointercancel") && game.includes("lostpointercapture"), "移动端长按移动缺少 Pointer Capture 清理");
-Assert(game.includes("touchCrouchLatched") && game.includes("ToggleTouchCrouch") && game.includes("SetTouchCrouch"), "移动端蹲伏没有实现可保持开关");
-Assert(!game.includes(`document.querySelectorAll('[data-input="left"], [data-input="right"], [data-input="crouch"]')`), "移动端蹲伏仍错误绑定为按住态");
-Assert(html.includes('data-input="crouch" type="button" aria-pressed="false"') && css.includes('[data-input="crouch"][aria-pressed="true"]'), "蹲伏开关缺少可访问状态或视觉反馈");
+Assert(!game.includes("state.exposure") && !game.includes('Metric("暴露"') && !game.includes('Metric("警戒", Math.round(state.exposure)'), "累积暴露条仍在参与潜行规则");
+Assert(Object.values(coverDefinitions).every((covers) => covers.length >= 6), "三个关卡都必须提供连续的实体遮挡点");
+Assert(Object.values(coverDefinitions).flat().every((cover) => cover.id && cover.label && cover.width >= 1.4), "实体遮挡缺少可读名称或有效宽度");
+for (const level of levelDefinitions) {
+  const coverIds = new Set(coverDefinitions[level.id].map((cover) => cover.id));
+  Assert(level.actions.filter((action) => action.cover).every((action) => coverIds.has(action.cover)), `${level.id} 有行动引用了不存在的实体遮挡`);
+}
+Assert(wall.actions.filter((action) => action.phase === "collect" && action.resource).every((action) => action.cover), "夜间收集仍有行动不依赖实体遮挡");
+Assert(ensemble.actions.filter((action) => action.layer === "surface").every((action) => action.cover), "地表多人解谜仍有行动不依赖实体遮挡");
+Assert(mindGame.actions.filter((action) => action.layer === "surface").every((action) => action.cover), "心理战地表行动仍有行动不依赖实体遮挡");
+Assert(game.includes("GetSurfaceCovers") && game.includes("GetActiveCover") && game.includes("UpdateCoverState") && game.includes("if (GetActiveCover(playerX)) return 0"), "敌兵视线没有与实体遮挡共用判定");
+Assert(game.includes("DrawSurfaceCovers(width, surfaceY, false)") && game.includes("DrawSurfaceCovers(width, surfaceY, true)") && game.includes("DrawActorVisibilityHud") && game.includes("DrawDetectionFlash"), "遮挡前后层、随身可见度或发现反馈缺失");
 Assert(game.includes("function DrawSurfaceVegetation") && !game.includes("context.moveTo(x, height)"), "仍存在贯穿整个土层的前景竖线");
 Assert(game.includes("TunnelCenterYAt") && game.includes("TunnelFloorYAt") && game.includes("DrawEntrances(width, height") && game.includes("DrawTunnelSystems"), "地道剖面、人物落地或实体竖井系统缺失");
 Assert(game.includes("function LayerToScreen") && game.includes("LayerToScreen(x, width, .76)") && game.includes("LayerToScreen(worldX, width, 1.16)"), "远山、村庄、玩法层与前景没有建立不同视差");
@@ -97,6 +108,6 @@ console.log(JSON.stringify({
   ok: true,
   levels: levelDefinitions.map((level) => ({ id: level.id, phases: level.phases.length, actions: level.actions.length })),
   feasibleBuilds: feasible,
-  mobileInputs: 6,
+  mobileInputs: 5,
   cacheVersion: cssVersion
 }, null, 2));

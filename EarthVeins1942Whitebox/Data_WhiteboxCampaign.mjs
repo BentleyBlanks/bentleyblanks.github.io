@@ -19,6 +19,36 @@ export const roleDefinitions = Object.freeze({
   scout: Object.freeze({ id: "scout", name: "林青禾 · 武工队员", skill: "布置假象与地道声路", short: "青禾" })
 });
 
+const Cover = (id, x, width, kind, label, pose = "low") => Object.freeze({ id, x, width, kind, label, pose });
+
+export const coverDefinitions = Object.freeze({
+  undergroundWall: Object.freeze([
+    Cover("westStable", -9.35, 1.8, "brush", "倒棚与荆条"),
+    Cover("brokenCart", -4.85, 1.55, "cart", "废车草帘"),
+    Cover("ashStack", .35, 1.5, "hay", "柴垛"),
+    Cover("fieldWall", 3.75, 1.45, "wall", "断墙"),
+    Cover("supplyStack", 6.85, 1.7, "hay", "口粮草垛"),
+    Cover("eastBrush", 9.55, 1.5, "brush", "东沟灌木")
+  ]),
+  ensemble: Object.freeze([
+    Cover("westReeds", -9.9, 1.65, "brush", "沟边芦苇"),
+    Cover("surveyHay", -6.7, 1.55, "hay", "晒场草垛"),
+    Cover("camoWall", -3.35, 1.5, "wall", "破院墙"),
+    Cover("hatchCart", -.45, 1.55, "cart", "磨盘车架"),
+    Cover("courtyardBrush", 3.1, 1.5, "brush", "院角荆条"),
+    Cover("transferHay", 6.15, 1.65, "hay", "转移草垛"),
+    Cover("eastWall", 9.45, 1.55, "wall", "东翻口矮墙")
+  ]),
+  mindGame: Object.freeze([
+    Cover("helmetBrush", -9.25, 1.8, "brush", "空院蒿草"),
+    Cover("crackerCart", -5.1, 2.2, "cart", "铁桶车架"),
+    Cover("falseWall", -1.15, 1.4, "wall", "假入口断墙"),
+    Cover("wellCurb", 4.2, 1.5, "well", "井台矮墙"),
+    Cover("shoeHay", 7.95, 1.65, "hay", "井边草垛"),
+    Cover("eastReeds", 10.1, 1.45, "brush", "东坡芦苇")
+  ])
+});
+
 export const buildOptions = Object.freeze([
   Object.freeze({ id: "flipGate", name: "翻板分割闸", cost: Object.freeze({ wood: 2, iron: 1 }), defense: 2, ventilation: 0, note: "分割敌队最强，但会截断一段风路。" }),
   Object.freeze({ id: "floodGate", name: "引水回流闸", cost: Object.freeze({ wood: 1, iron: 2 }), defense: 1, ventilation: 1, note: "能迟滞推进，同时保留一条窄风路。" }),
@@ -44,10 +74,10 @@ export const levelDefinitions = Object.freeze([
       Object.freeze({ id: "outcome", label: "缴获与扩展", objective: "清点缴获，决定下一轮扩建方向", layer: "tunnel" })
     ]),
     actions: Object.freeze([
-      Action("collectWood", -9.2, "surface", "从倒塌牲口棚拆下整根木料", "拆木", { phase: "collect", crouch: true, resource: { wood: 6 }, dialogue: "这根是干的。轻点，别把棚顶弄响。" }),
-      Action("collectIron", -4.8, "surface", "从废车轴上取下铁箍和销钉", "取铁", { phase: "collect", crouch: true, resource: { iron: 4 }, dialogue: "销子别丢，闸门就靠它卡住。" }),
-      Action("collectPowder", .4, "surface", "收回鞭炮作坊留下的硝灰罐", "收罐", { phase: "collect", resource: { powder: 2 }, dialogue: "盖紧。撒一路味儿，巡逻队鼻子再笨也能闻见。" }),
-      Action("collectSupplies", 6.8, "surface", "把药布和两袋口粮送进备用口", "转运", { phase: "collect", resource: { medicine: 1, grain: 2 }, dialogue: "药包给我。粮食贴墙放，给担架留条路。" }),
+      Action("collectWood", -9.2, "surface", "躲在倒棚与荆条后拆下整根木料", "拆木", { phase: "collect", cover: "westStable", resource: { wood: 6 }, dialogue: "这根是干的。轻点，别把棚顶弄响。" }),
+      Action("collectIron", -4.8, "surface", "借废车草帘遮住身形，取下铁箍和销钉", "取铁", { phase: "collect", cover: "brokenCart", resource: { iron: 4 }, dialogue: "销子别丢，闸门就靠它卡住。" }),
+      Action("collectPowder", .4, "surface", "藏在柴垛后收回鞭炮作坊留下的硝灰罐", "收罐", { phase: "collect", cover: "ashStack", resource: { powder: 2 }, dialogue: "盖紧。撒一路味儿，巡逻队鼻子再笨也能闻见。" }),
+      Action("collectSupplies", 6.8, "surface", "借口粮草垛遮挡，把药布和两袋口粮送进备用口", "转运", { phase: "collect", cover: "supplyStack", resource: { medicine: 1, grain: 2 }, dialogue: "药包给我。粮食贴墙放，给担架留条路。" }),
       Action("buildSlotA", -7, "tunnel", "西支洞机关位", "施工", { phase: "build", buildSlot: 0 }),
       Action("buildSlotB", 0, "tunnel", "中央短湾机关位", "施工", { phase: "build", buildSlot: 1 }),
       Action("buildSlotC", 7, "tunnel", "东翻口机关位", "施工", { phase: "build", buildSlot: 2 }),
@@ -76,11 +106,11 @@ export const levelDefinitions = Object.freeze([
       Object.freeze({ id: "outcome", label: "新区域联通", objective: "让全员从东翻口离开", layer: "tunnel" })
     ]),
     actions: Object.freeze([
-      Action("sniffRoute", -9, "surface", "嗅出草垛后没有机油味的窄路", "嗅闻", { phase: "survey", role: "dog", dialogue: "呜……（阿土停在草垛后，回头等人。）" }),
-      Action("markPatrol", -6.2, "surface", "记录探照灯每次转回的间隔", "标记", { phase: "survey", role: "student", requires: ["sniffRoute"], dialogue: "我数过了，灯一过去，够咱们跑到东墙。跟紧我。" }),
-      Action("repairCamo", -3.4, "surface", "补好被风撕开的秸秆伪装网", "缝补", { phase: "cooperate", role: "rescuer", requires: ["markPatrol"], dialogue: "别拉太紧，风一吹就不像真的了。这样，刚好。" }),
-      Action("liftHatch", -.6, "surface", "拉开压着石磨的重暗门", "抬门", { phase: "cooperate", role: "blacksmith", requires: ["repairCamo"], dialogue: "扶住磨盘。门一响，咱们谁都走不了。" }),
-      Action("crawlGap", .2, "surface", "从磨盘侧面的狭口钻入地道", "钻入", { phase: "cooperate", role: "child", requires: ["liftHatch"], effect: "enterTunnel", dialogue: "绳子给我。我瘦，能过去。" }),
+      Action("sniffRoute", -9, "surface", "藏在沟边芦苇里，嗅出草垛后没有机油味的窄路", "嗅闻", { phase: "survey", role: "dog", cover: "westReeds", dialogue: "呜……（阿土停在草垛后，回头等人。）" }),
+      Action("markPatrol", -6.2, "surface", "借晒场草垛遮挡，记录探照灯每次转回的间隔", "标记", { phase: "survey", role: "student", cover: "surveyHay", requires: ["sniffRoute"], dialogue: "我数过了，灯一过去，够咱们跑到东墙。跟紧我。" }),
+      Action("repairCamo", -3.4, "surface", "躲在破院墙后，补好被风撕开的秸秆伪装网", "缝补", { phase: "cooperate", role: "rescuer", cover: "camoWall", requires: ["markPatrol"], dialogue: "别拉太紧，风一吹就不像真的了。这样，刚好。" }),
+      Action("liftHatch", -.6, "surface", "借磨盘车架遮住动作，拉开压着石磨的重暗门", "抬门", { phase: "cooperate", role: "blacksmith", cover: "hatchCart", requires: ["repairCamo"], dialogue: "扶住磨盘。门一响，咱们谁都走不了。" }),
+      Action("crawlGap", .2, "surface", "从磨盘车架下方的狭口钻入地道", "钻入", { phase: "cooperate", role: "child", cover: "hatchCart", requires: ["liftHatch"], effect: "enterTunnel", dialogue: "绳子给我。我瘦，能过去。" }),
       Action("unbarGate", 3.1, "tunnel", "从内侧抽出双木门闩", "开闩", { phase: "cooperate", role: "child", requires: ["crawlGap"], dialogue: "第一根出来了……你们托住门，我拔第二根。" }),
       Action("findLetter", 4.7, "tunnel", "找回交通员藏在瓦罐后的家书", "收信", { phase: "transfer", role: "dog", requires: ["unbarGate"], memory: "一封没有寄出的家书", optional: true, dialogue: "瓦罐后头有封信。是老周的字……先收好，出去再看。" }),
       Action("findThimble", 6.2, "tunnel", "拾起牺牲缝纫员留下的铜顶针", "拾取", { phase: "transfer", role: "rescuer", requires: ["unbarGate"], memory: "磨亮的铜顶针", optional: true, dialogue: "是小安的顶针。带上吧，别让它留这儿。" }),
@@ -105,14 +135,14 @@ export const levelDefinitions = Object.freeze([
       Object.freeze({ id: "outcome", label: "战果转化", objective: "收取地图与电台，预判下一轮扫荡", layer: "tunnel" })
     ]),
     actions: Object.freeze([
-      Action("placeHelmet", -9, "surface", "在空院墙头留下会晃动的旧军帽", "布疑", { phase: "harass", trick: true, alert: 12, morale: -10, dialogue: "风一吹它就动。够他们盯半天了。" }),
-      Action("fireCracker", -4.8, "surface", "把鞭炮声通过铁桶压向西坡", "引声", { phase: "harass", trick: true, alert: 24, morale: -18, dialogue: "隔一会儿再响第二串。别让他们听出是鞭炮。" }),
+      Action("placeHelmet", -9, "surface", "藏在空院蒿草后，把旧军帽挑上墙头", "布疑", { phase: "harass", cover: "helmetBrush", trick: true, alert: 12, morale: -10, dialogue: "风一吹它就动。够他们盯半天了。" }),
+      Action("fireCracker", -4.8, "surface", "在铁桶车架后，把鞭炮声压向西坡", "引声", { phase: "harass", cover: "crackerCart", trick: true, alert: 24, morale: -18, dialogue: "隔一会儿再响第二串。别让他们听出是鞭炮。" }),
       Action("routeHorn", -.5, "tunnel", "把铁皮喇叭接入通往敌后的声孔", "传声", { phase: "harass", trick: true, alert: 10, morale: -20, dialogue: "喇叭口对准后墙。喊一声就走，别等他们回头。" }),
-      Action("hideWellRope", 4.2, "surface", "趁取水队离开时收走井绳", "撤绳", { phase: "harass", trick: true, alert: 16, morale: -12, crouch: true, dialogue: "绳子收走。看他们拿什么打水。" }),
-      Action("leaveShoe", 8.1, "tunnel", "把落单哨兵困在安全支洞，只留下军鞋", "消失", { phase: "harass", trick: true, alert: 20, morale: -22, crouch: true, dialogue: "人锁在空洞里了。把鞋搁井边，咱们撤。" }),
-      Action("misdirectSquad", -5.8, "surface", "让两组灯影同时出现在相反院墙", "错判", { phase: "panic", panicStep: true, morale: -12, dialogue: "西墙一盏，东墙一盏。让他们自己猜。" }),
+      Action("hideWellRope", 4.2, "surface", "借井台矮墙遮住身形，趁取水队离开时收走井绳", "撤绳", { phase: "harass", cover: "wellCurb", trick: true, alert: 16, morale: -12, dialogue: "绳子收走。看他们拿什么打水。" }),
+      Action("leaveShoe", 8.1, "tunnel", "把落单哨兵困在安全支洞，只留下军鞋", "消失", { phase: "harass", trick: true, alert: 20, morale: -22, dialogue: "人锁在空洞里了。把鞋搁井边，咱们撤。" }),
+      Action("misdirectSquad", -5.8, "surface", "从铁桶车架后，让两组灯影同时出现在相反院墙", "错判", { phase: "panic", cover: "crackerCart", panicStep: true, morale: -12, dialogue: "西墙一盏，东墙一盏。让他们自己猜。" }),
       Action("closeFalseGate", 1, "tunnel", "关闭假入口后方的空闸门", "断路", { phase: "panic", requires: ["misdirectSquad"], panicStep: true, morale: -14, dialogue: "他们进来了。关空闸，让前后都听见。" }),
-      Action("finalSignal", 7.2, "surface", "在远离群众的空坡打出最后一声土枪", "送客", { phase: "panic", requires: ["closeFalseGate"], panicStep: true, morale: -20, dialogue: "等他们跑到空坡……现在，放一枪。" }),
+      Action("finalSignal", 7.2, "surface", "藏在井边草垛后，在远离群众的空坡打出最后一声土枪", "送客", { phase: "panic", cover: "shoeHay", requires: ["closeFalseGate"], panicStep: true, morale: -20, dialogue: "等他们跑到空坡……现在，放一枪。" }),
       Action("captureIntel", 8.8, "tunnel", "收取撤退时遗下的地图和电台", "收报", { phase: "outcome", requires: ["finalSignal"], outcome: true, dialogue: "地图在这儿。电台别碰旋钮，回去让叶星听。" })
     ])
   })
