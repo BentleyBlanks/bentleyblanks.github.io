@@ -580,6 +580,15 @@ function Render() {
     const gy = WY(GROUND);
     ctx.fillRect(x, gy - 10, 3, 12);
   }
+  // Unify plates + ink shapes under one newsprint wash
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "rgba(232,217,184,.22)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(28,23,16,.04)";
+  for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+  ctx.restore();
 }
 
 function Frame(ts) {
