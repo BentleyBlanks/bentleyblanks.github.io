@@ -53,9 +53,9 @@ export const coverDefinitions = Object.freeze({
 });
 
 export const buildOptions = Object.freeze([
-  Object.freeze({ id: "flipGate", name: "翻板分割闸", cost: Object.freeze({ wood: 2, iron: 1 }), defense: 2, ventilation: 0, note: "分割敌队最强，但会截断一段风路。" }),
-  Object.freeze({ id: "floodGate", name: "引水回流闸", cost: Object.freeze({ wood: 1, iron: 2 }), defense: 1, ventilation: 1, note: "能迟滞推进，同时保留一条窄风路。" }),
-  Object.freeze({ id: "smokeBaffle", name: "防烟导流板", cost: Object.freeze({ wood: 2, iron: 0 }), defense: 1, ventilation: 2, note: "把烟导回空支洞，保护群众呼吸。" })
+  Object.freeze({ id: "flipGate", name: "翻板分割闸", cost: Object.freeze({ wood: 2, iron: 1 }), defense: 2, ventilation: 0, mechanism: "地板闸面绕铁轴翻起，立成一堵分隔墙。", motion: "平放通行 → 翻立封路", bestUse: "直道截队", note: "分割敌队最强，但会截断一段风路。" }),
+  Object.freeze({ id: "floodGate", name: "引水回流闸", cost: Object.freeze({ wood: 1, iron: 2 }), defense: 1, ventilation: 1, mechanism: "木闸沿双柱槽升降，底部接入低位返水沟。", motion: "抬闸通水 → 落闸回流", bestUse: "低洼水路", note: "能迟滞推进，同时保留一条窄风路。" }),
+  Object.freeze({ id: "smokeBaffle", name: "防烟导流板", cost: Object.freeze({ wood: 2, iron: 0 }), defense: 1, ventilation: 2, mechanism: "顶棚双片导流叶由侧绳改变夹角，把烟抬进空支洞。", motion: "平送主道 → 斜导排烟", bestUse: "风口与烟道", note: "把烟导回空支洞，保护群众呼吸。" })
 ]);
 
 const Action = (id, x, layer, title, verb, options = {}) => Object.freeze({ id, x, layer, title, verb, ...options });

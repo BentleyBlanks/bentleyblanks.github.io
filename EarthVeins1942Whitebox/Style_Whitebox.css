@@ -110,15 +110,42 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #dialoguePanel p { margin: 0; color: #e3e6df; font-size: 13px; line-height: 1.65; }
 #dialoguePanel button { height: 38px; color: #122023; font-size: 11px; font-weight: 900; background: var(--cyan); }
 
-.buildPaper { max-width: 900px; }
-.buildBrief { color: var(--muted); }
+.buildPaper { width: min(1120px, calc(100% - 32px)); max-width: 1120px; max-height: calc(100% - 32px); overflow: auto; }
+.buildBrief { margin-bottom: 13px; color: #d2c5a9; line-height: 1.55; }
 .buildOptions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.buildOption { min-height: 210px; padding: 16px; text-align: left; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.buildOption { min-height: 405px; padding: 14px; overflow: hidden; text-align: left; background: linear-gradient(155deg, rgba(78,62,43,.24), rgba(21,19,16,.78)); border: 1px solid var(--line); }
 .buildOption:hover, .buildOption.current { border-color: var(--cyan); background: rgba(101,209,212,.08); }
-.buildOption > span { display: flex; justify-content: space-between; gap: 8px; }
+.buildOptionHeading { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .buildOption b { font-size: 16px; }
 .buildOption i { color: var(--cyan); font-size: 9px; font-style: normal; }
-.buildOption p { min-height: 58px; color: #aeb6af; font-size: 11px; line-height: 1.55; }
+.buildDiagram { margin: 11px 0 10px; padding: 7px 8px 6px; background: rgba(12,14,13,.56); border: 1px solid rgba(201,166,106,.2); }
+.buildDiagram svg { display: block; width: 100%; height: 112px; }
+.diagramTunnel { fill: none; stroke: rgba(190,157,104,.38); stroke-width: 4; stroke-linecap: round; }
+.diagramWood { fill: #795a38; stroke: #d0a466; stroke-width: 2; }
+.diagramPlank { fill: none; stroke: rgba(36,25,18,.74); stroke-width: 1.4; }
+.diagramGhost { fill: none; stroke: rgba(202,161,91,.45); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.diagramPivot { fill: #a84839; stroke: #e0b671; stroke-width: 2; }
+.diagramBolt, .diagramKnot { fill: #231b15; }
+.diagramPit { fill: rgba(12,13,12,.78); stroke: #5a4530; stroke-width: 2; }
+.diagramMotion { fill: none; stroke: #b34f3f; stroke-width: 2; stroke-dasharray: 4 3; }
+.diagramArrow { fill: #b34f3f; }
+.diagramPost, .diagramBeam { fill: #6c5035; stroke: #c49a61; stroke-width: 1.8; }
+.diagramGate { fill: #78583a; stroke: #d0a466; stroke-width: 2; }
+.diagramWheel { fill: #2c251e; stroke: #c49a61; stroke-width: 2; }
+.diagramWheelSpoke { fill: none; stroke: #c49a61; stroke-width: 1.4; }
+.diagramWater { fill: none; stroke: #6f9da5; stroke-width: 4; stroke-linecap: round; }
+.diagramChannel { fill: none; stroke: #8f724c; stroke-width: 5; stroke-linecap: round; }
+.diagramDuct { fill: none; stroke: #947248; stroke-width: 6; stroke-linejoin: round; }
+.diagramRope { fill: none; stroke: #c79a59; stroke-width: 2; }
+.diagramAir { fill: none; stroke: #7fa5a2; stroke-width: 4; stroke-linecap: round; }
+.diagramAir.faint { opacity: .48; stroke-width: 2.4; }
+.diagramArrowAir { fill: #7fa5a2; }
+.diagramAxis { display: flex; justify-content: space-between; gap: 8px; margin-top: -2px; color: #d8c8a7; font-size: 8px; font-weight: 800; }
+.diagramAxis span:last-child { color: #9ba78c; text-align: right; }
+.buildMechanism { min-height: 45px; margin: 0; color: #d4cbbb; font-size: 10px; line-height: 1.55; }
+.buildMotion { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.buildMotion span { padding: 4px 6px; color: #d7b97c; font-size: 8px; font-weight: 800; background: rgba(196,150,79,.1); border-left: 2px solid rgba(196,150,79,.55); }
+.buildTradeoff { min-height: 38px; margin: 7px 0; color: #9fa89f; font-size: 9px; line-height: 1.5; }
 .buildOption dl { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin: 18px 0 0; }
 .buildOption dl div { padding: 7px 4px; text-align: center; background: rgba(0,0,0,.23); }
 .buildOption dt { color: var(--muted); font-size: 9px; }
@@ -230,11 +257,17 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #dialoguePanel button { height: 30px; font-size: 8px; }
   .buildPaper { width: calc(100% - 16px); padding: 12px; }
   .buildBrief, .buildFeedback { margin: 5px 0; font-size: 8px; }
-  .buildOptions { gap: 5px; }
-  .buildOption { min-height: 145px; padding: 9px; }
+  .buildOptions { grid-template-columns: repeat(3, minmax(250px, 1fr)); gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; }
+  .buildOption { min-height: 320px; padding: 9px; scroll-snap-align: start; }
   .buildOption b { font-size: 11px; }
   .buildOption i { font-size: 6px; }
-  .buildOption p { min-height: 43px; margin: 7px 0; font-size: 7px; }
+  .buildDiagram { margin: 6px 0; padding: 4px; }
+  .buildDiagram svg { height: 78px; }
+  .diagramAxis { font-size: 6px; }
+  .buildMechanism { min-height: 32px; font-size: 7px; }
+  .buildMotion { margin: 5px 0; }
+  .buildMotion span { padding: 2px 4px; font-size: 6px; }
+  .buildTradeoff { min-height: 27px; margin: 4px 0; font-size: 6px; }
   .buildOption dl { margin-top: 7px; }
   .buildOption dl div { padding: 4px 1px; }
   .buildOption dt { font-size: 6px; }
@@ -252,6 +285,8 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   .metric { min-height: 36px; }
   #objectiveCard { width: 210px; }
   #roleDock { width: calc(100% - 16px); }
+  .buildOptions { grid-template-columns: 1fr; overflow-x: visible; scroll-snap-type: none; }
+  .buildOption { min-height: 310px; }
 }
 
 /* Minimal narrative HUD: screen space belongs to the scene, not a dashboard. */

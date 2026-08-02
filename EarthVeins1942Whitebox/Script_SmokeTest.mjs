@@ -137,6 +137,12 @@ Assert(game.includes('Object.assign(state.resources, { wood: 6, iron: 4, powder:
 Assert(game.includes("const profile = actorProfiles.soldier") && game.match(/const scale = Math\.min\(width, 1100\) \/ 26 \* \.038/g)?.length >= 2, "敌兵与主角未共用人物尺度换算");
 Assert(css.includes("#touchControls { left: 8px; right: 8px; bottom: 7px; opacity: 1; }") && css.includes("rgba(10,17,19,.94)"), "低高度移动端触控键未强制高对比显示");
 
+Assert(game.includes('data-qa-hazard="structuresIdle"') && game.includes('const showWorkingState = kind === "structures"'), "DEBUG must expose idle and working mechanism comparison views");
+Assert(game.includes("state.qaCameraFocus = { x: 0, zoom: .88 }") && game.includes("if (qaMode && state.qaCameraFocus)"), "mechanism comparison camera must stay centered while the game loop runs");
+Assert(game.includes("function DrawFlipGateAssembly") && game.includes("floorY - ceilingY - gateClearance * 2") && game.includes("activeEndY = ceilingY + gateClearance"), "raised flip gate must close the full tunnel cross-section");
+Assert(game.includes("function DrawFloodGateAssembly") && game.includes("gateBottom = gateTop + gateHeight") && game.includes("DrawVerticalArrow"), "flood gate must visibly travel as one panel along its guide columns");
+Assert(game.includes("function DrawSmokeBaffleAssembly") && game.includes("const firstEndY = active") && game.includes("if (active)") && game.includes("activeBaffleSlot"), "smoke baffle must visibly switch between level flow and upward exhaust states");
+
 const fluid = CreateTunnelFluidSimulation({ columns: 72, rows: 32 });
 Assert(fluid.Sample(0, 0).sdf > 0 && fluid.Sample(-11, 0).sdf < 0, "SDF 没有把地道内部与墙体边界分开");
 const solidBefore = fluid.solid.reduce((sum, value) => sum + value, 0);

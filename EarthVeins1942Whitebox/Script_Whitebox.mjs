@@ -1,6 +1,6 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803y";
-import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803y";
-import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803y";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803z";
+import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803z";
+import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803z";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -479,16 +479,65 @@ function SetPhase(phaseId, label, text, speaker) {
   UpdateUi();
 }
 
+const buildSiteProfiles = Object.freeze([
+  Object.freeze({ name: "西支洞", incoming: "西井灌水", protectedSide: "右侧高位支洞", flowDirection: 1 }),
+  Object.freeze({ name: "中央短湾", incoming: "西口来敌", protectedSide: "右侧回身湾", flowDirection: 1 }),
+  Object.freeze({ name: "东翻口", incoming: "东口烟气", protectedSide: "左上方空支洞", flowDirection: -1 })
+]);
+
+function BuildMechanismDiagram(optionId, slotIndex) {
+  const site = buildSiteProfiles[slotIndex];
+  const mirrored = site.flowDirection < 0 ? ' transform="translate(240 0) scale(-1 1)"' : "";
+  const directionText = site.flowDirection > 0 ? "左 → 右" : "右 → 左";
+  let assembly = "";
+  if (optionId === "flipGate") {
+    assembly = `<g${mirrored}>
+      <path class="diagramPit" d="M91 66 L91 81 L153 81 L153 66"/>
+      <rect class="diagramGhost" x="93" y="57" width="58" height="8" rx="2"/>
+      <g transform="rotate(-57 95 63)"><rect class="diagramWood" x="95" y="57" width="58" height="12" rx="2"/><path class="diagramPlank" d="M108 58V68M122 58V68M136 58V68"/></g>
+      <circle class="diagramPivot" cx="95" cy="63" r="6"/><circle class="diagramBolt" cx="95" cy="63" r="2"/>
+      <path class="diagramMotion" d="M111 61 Q127 36 151 28"/><path class="diagramArrow" d="M151 28 L143 27 L148 35 Z"/>
+    </g>`;
+  } else if (optionId === "floodGate") {
+    assembly = `<g${mirrored}>
+      <path class="diagramWater" d="M17 62 Q38 55 61 62 T103 62"/><path class="diagramWater" d="M139 70 Q166 63 190 69 T228 68"/>
+      <rect class="diagramPost" x="101" y="22" width="8" height="51"/><rect class="diagramPost" x="136" y="22" width="8" height="51"/><rect class="diagramBeam" x="94" y="20" width="57" height="8"/>
+      <rect class="diagramGate" x="109" y="31" width="27" height="37"/><path class="diagramPlank" d="M109 42H136M109 53H136"/>
+      <circle class="diagramWheel" cx="122.5" cy="21" r="9"/><path class="diagramWheelSpoke" d="M114 21H131M122.5 12V30M116 15L129 27M129 15L116 27"/>
+      <path class="diagramChannel" d="M92 69 Q122 83 154 69"/><path class="diagramMotion" d="M154 55 Q170 65 186 69"/><path class="diagramArrow" d="M187 69 L179 64 L180 73 Z"/>
+    </g>`;
+  } else {
+    assembly = `<g${mirrored}>
+      <path class="diagramDuct" d="M21 30H96L111 18H157L171 30H222"/>
+      <path class="diagramWood" d="M92 34 L118 56 L111 62 L83 40 Z"/><path class="diagramWood" d="M151 34 L125 56 L132 62 L160 40 Z"/>
+      <circle class="diagramPivot" cx="91" cy="36" r="4"/><circle class="diagramPivot" cx="153" cy="36" r="4"/>
+      <path class="diagramRope" d="M160 38 Q177 49 181 70"/><circle class="diagramKnot" cx="181" cy="70" r="3"/>
+      <path class="diagramAir" d="M18 59 C58 59 73 58 98 53 C117 49 121 34 122 19"/><path class="diagramArrowAir" d="M122 18 L116 27 L128 26 Z"/>
+      <path class="diagramAir faint" d="M26 70 C64 70 83 67 109 57"/>
+    </g>`;
+  }
+  return `<div class="buildDiagram buildDiagram_${optionId}" aria-hidden="true">
+    <svg viewBox="0 0 240 90" focusable="false"><path class="diagramTunnel" d="M8 79V29Q8 11 27 11H213Q232 11 232 29V79"/>${assembly}</svg>
+    <div class="diagramAxis"><span>来向 ${directionText} · ${site.incoming}</span><span>保护 ${site.protectedSide}</span></div>
+  </div>`;
+}
+
 function OpenBuildPanel(slotIndex) {
   state.currentBuildSlot = slotIndex;
   const existing = state.buildSlots[slotIndex];
-  ui.buildBrief.textContent = `机关位 ${slotIndex + 1} · ${existing ? `当前为${buildOptions.find((item) => item.id === existing).name}，重建会退回原料` : "尚未施工"}`;
-  ui.buildFeedback.textContent = "目标：三处合计通风 ≥ 3、防御 ≥ 4。不同位置允许使用同一种结构。";
+  const site = buildSiteProfiles[slotIndex];
+  const siteDirection = site.flowDirection > 0 ? "左→右" : "右→左";
+  const currentDescription = existing ? `当前为${buildOptions.find((item) => item.id === existing).name}，重建会退回原料` : "尚未施工";
+  ui.buildBrief.textContent = `机关位 ${slotIndex + 1} · ${site.name}｜来向：${site.incoming}（${siteDirection}）｜保护：${site.protectedSide}｜${currentDescription}`;
+  ui.buildFeedback.textContent = "先看转轴、上游与导流出口，再确认组合。目标：三处合计通风 ≥ 3、防御 ≥ 4。";
   ui.buildOptions.innerHTML = buildOptions.map((option) => {
     const isCurrent = option.id === existing;
     return `<button type="button" data-build="${option.id}" class="buildOption ${isCurrent ? "current" : ""}">
-      <span><b>${option.name}</b><i>${isCurrent ? "当前结构" : "选择此结构"}</i></span>
-      <p>${option.note}</p>
+      <span class="buildOptionHeading"><b>${option.name}</b><i>${isCurrent ? "当前结构" : option.bestUse}</i></span>
+      ${BuildMechanismDiagram(option.id, slotIndex)}
+      <p class="buildMechanism">${option.mechanism}</p>
+      <div class="buildMotion"><span>${option.motion}</span><span>适合：${option.bestUse}</span></div>
+      <p class="buildTradeoff">取舍：${option.note}</p>
       <dl><div><dt>木</dt><dd>${option.cost.wood}</dd></div><div><dt>铁</dt><dd>${option.cost.iron}</dd></div><div><dt>通风</dt><dd>+${option.ventilation}</dd></div><div><dt>防御</dt><dd>+${option.defense}</dd></div></dl>
     </button>`;
   }).join("");
@@ -840,7 +889,7 @@ function RenderQaPanel() {
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
-  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
+  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>' : "";
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
     EndCinematic();
@@ -1010,6 +1059,16 @@ function Update(delta) {
     state.player.moving = false;
     state.player.motionBlend = Lerp(state.player.motionBlend, 0, 1 - Math.pow(.004, delta));
     state.player.step += delta * .72;
+    return;
+  }
+  if (qaMode && state.qaCameraFocus) {
+    state.player.moving = false;
+    state.player.motionBlend = Lerp(state.player.motionBlend, 0, 1 - Math.pow(.004, delta));
+    state.player.step += delta * .72;
+    state.camera.x = Lerp(state.camera.x, state.qaCameraFocus.x, 1 - Math.pow(.0002, delta));
+    state.camera.zoom = Lerp(state.camera.zoom, state.qaCameraFocus.zoom, 1 - Math.pow(.0002, delta));
+    UpdateDanger();
+    UpdateUi();
     return;
   }
   const direction = Number(inputKeys.right) - Number(inputKeys.left);
@@ -2167,6 +2226,164 @@ function DrawFlowArrow(screenX, screenY, direction, color, alpha = 1) {
   context.beginPath(); context.moveTo(6, 0); context.lineTo(1, -4); context.lineTo(1, 4); context.closePath(); context.fill(); context.restore();
 }
 
+function DrawVerticalArrow(screenX, screenY, direction, color, alpha = 1) {
+  context.save(); context.translate(screenX, screenY); context.scale(1, direction); context.globalAlpha = alpha;
+  context.strokeStyle = color; context.fillStyle = color; context.lineWidth = 2;
+  context.beginPath(); context.moveTo(0, -7); context.lineTo(0, 6); context.stroke();
+  context.beginPath(); context.moveTo(0, 6); context.lineTo(-4, 1); context.lineTo(4, 1); context.closePath(); context.fill(); context.restore();
+}
+
+function DrawStructureTag(screenX, ceilingY, scale, title, cue, status, tone) {
+  const panelWidth = Math.max(86, Math.min(132, 112 * scale));
+  const panelHeight = Math.max(28, 34 * scale);
+  const panelY = ceilingY - panelHeight - 10;
+  context.save();
+  context.strokeStyle = tone; context.lineWidth = 1.2; context.setLineDash([3, 3]);
+  context.beginPath(); context.moveTo(screenX, panelY + panelHeight); context.lineTo(screenX, ceilingY + 5); context.stroke(); context.setLineDash([]);
+  context.fillStyle = tone; context.beginPath(); context.arc(screenX, ceilingY + 5, 2.5, 0, Math.PI * 2); context.fill();
+  context.restore();
+  context.save(); context.translate(screenX, panelY);
+  context.fillStyle = "rgba(20,18,15,.92)";
+  context.strokeStyle = tone; context.lineWidth = 1.4;
+  context.beginPath(); context.roundRect(-panelWidth / 2, 0, panelWidth, panelHeight, 3); context.fill(); context.stroke();
+  context.fillStyle = tone; context.fillRect(-panelWidth / 2, 0, 4, panelHeight);
+  context.fillStyle = "#eadcbc"; context.font = `800 ${Math.max(8, 9.5 * scale)}px "FangSong", serif`; context.textAlign = "left";
+  context.fillText(title, -panelWidth / 2 + 10, Math.max(11, 12 * scale));
+  context.fillStyle = "#b9ad94"; context.font = `700 ${Math.max(6.5, 7.2 * scale)}px system-ui, sans-serif`;
+  context.fillText(cue, -panelWidth / 2 + 10, Math.max(22, 25 * scale));
+  context.fillStyle = status === "工作中" ? "#a84a3b" : "#827b67";
+  context.fillRect(panelWidth / 2 - 31, 5, 26, 11);
+  context.fillStyle = "#f0dfbd"; context.font = `800 ${Math.max(5.5, 6 * scale)}px system-ui, sans-serif`; context.textAlign = "center";
+  context.fillText(status, panelWidth / 2 - 18, 13);
+  context.restore();
+}
+
+function DrawEmptyStructureSite(screenX, centerY, ceilingY, floorY, scale, slotIndex) {
+  const site = buildSiteProfiles[slotIndex];
+  const direction = site.flowDirection;
+  const frameWidth = 58 * scale;
+  context.save();
+  context.strokeStyle = "rgba(198,154,85,.42)"; context.lineWidth = 1.5; context.setLineDash([5, 5]);
+  context.strokeRect(screenX - frameWidth / 2, centerY - 23 * scale, frameWidth, 48 * scale);
+  context.setLineDash([]);
+  context.fillStyle = "rgba(28,22,17,.7)";
+  [-1, 1].forEach((side) => { context.beginPath(); context.arc(screenX + side * frameWidth * .38, floorY - 5, 4 * scale, 0, Math.PI * 2); context.fill(); });
+  DrawFlowArrow(screenX - direction * frameWidth * .78, centerY + 4, direction, "#bb8d4c", .72);
+  context.restore();
+  DrawStructureTag(screenX, ceilingY, scale, `机关位 ${slotIndex + 1} · ${site.name}`, `来向 ${direction > 0 ? "左→右" : "右→左"}`, "待施工", "#9a7447");
+}
+
+function DrawFlipGateAssembly(screenX, centerY, ceilingY, floorY, scale, slotIndex, active) {
+  const direction = buildSiteProfiles[slotIndex].flowDirection;
+  const gateClearance = Math.max(5, 6 * scale);
+  const gateLength = Math.max(58 * scale, floorY - ceilingY - gateClearance * 2);
+  const gateThickness = Math.max(8, (active ? 20 : 10) * scale);
+  const pivotX = screenX - direction * gateLength * .46;
+  const pivotY = floorY - gateClearance;
+  const flatEndX = pivotX + direction * gateLength;
+  const activeEndX = pivotX + direction * 16 * scale;
+  const activeEndY = ceilingY + gateClearance;
+
+  context.save(); context.lineCap = "round"; context.lineJoin = "round";
+  context.fillStyle = "rgba(11,12,11,.78)"; context.strokeStyle = "#5f4630"; context.lineWidth = 2;
+  context.beginPath(); context.moveTo(pivotX - direction * 5, floorY - 3); context.lineTo(flatEndX + direction * 6, floorY - 3); context.lineTo(flatEndX + direction * 2, floorY + 9); context.lineTo(pivotX, floorY + 9); context.closePath(); context.fill(); context.stroke();
+
+  context.strokeStyle = "rgba(205,159,89,.38)"; context.lineWidth = 1.4; context.setLineDash([4, 4]);
+  context.beginPath(); context.moveTo(pivotX, pivotY); context.lineTo(active ? flatEndX : pivotX, active ? pivotY : activeEndY); context.stroke();
+  context.beginPath();
+  if (direction > 0) context.arc(pivotX, pivotY, gateLength * .73, active ? -Math.PI / 2 : 0, active ? 0 : -Math.PI / 2, active);
+  else context.arc(pivotX, pivotY, gateLength * .73, active ? -Math.PI / 2 : Math.PI, active ? Math.PI : -Math.PI / 2, !active);
+  context.stroke(); context.setLineDash([]);
+
+  const endX = active ? activeEndX : flatEndX;
+  const endY = active ? activeEndY : pivotY;
+  const vectorX = endX - pivotX; const vectorY = endY - pivotY;
+  const length = Math.max(1, Math.hypot(vectorX, vectorY));
+  const normalX = -vectorY / length * gateThickness / 2; const normalY = vectorX / length * gateThickness / 2;
+  context.fillStyle = active ? "#7e5837" : "#6e4e34"; context.strokeStyle = "#d0a367"; context.lineWidth = 2.2;
+  context.beginPath(); context.moveTo(pivotX + normalX, pivotY + normalY); context.lineTo(endX + normalX, endY + normalY); context.lineTo(endX - normalX, endY - normalY); context.lineTo(pivotX - normalX, pivotY - normalY); context.closePath(); context.fill(); context.stroke();
+  context.strokeStyle = "rgba(44,29,19,.75)"; context.lineWidth = 1.2;
+  for (let plank = 1; plank < 5; plank += 1) { const progress = plank / 5; const plankX = Lerp(pivotX, endX, progress); const plankY = Lerp(pivotY, endY, progress); context.beginPath(); context.moveTo(plankX + normalX * .88, plankY + normalY * .88); context.lineTo(plankX - normalX * .88, plankY - normalY * .88); context.stroke(); }
+  if (active) {
+    context.strokeStyle = "rgba(225,184,116,.72)"; context.lineWidth = 2.2;
+    context.beginPath();
+    context.moveTo(Lerp(pivotX, endX, .16) + normalX * .64, Lerp(pivotY, endY, .16) + normalY * .64);
+    context.lineTo(Lerp(pivotX, endX, .84) - normalX * .64, Lerp(pivotY, endY, .84) - normalY * .64);
+    context.stroke();
+  }
+  context.fillStyle = "#a54537"; context.strokeStyle = "#e1b874"; context.lineWidth = 2; context.beginPath(); context.arc(pivotX, pivotY, 6 * scale, 0, Math.PI * 2); context.fill(); context.stroke();
+  context.fillStyle = "#262019"; context.beginPath(); context.arc(pivotX, pivotY, 2.3 * scale, 0, Math.PI * 2); context.fill();
+  context.strokeStyle = "#c1965d"; context.lineWidth = 3; context.beginPath();
+  context.moveTo(activeEndX - 11 * scale, ceilingY + gateClearance); context.lineTo(activeEndX + 11 * scale, ceilingY + gateClearance);
+  context.moveTo(activeEndX - 8 * scale, ceilingY + gateClearance); context.lineTo(activeEndX - 8 * scale, ceilingY + 16 * scale);
+  context.moveTo(activeEndX + 8 * scale, ceilingY + gateClearance); context.lineTo(activeEndX + 8 * scale, ceilingY + 16 * scale);
+  context.stroke();
+  if (active) {
+    context.fillStyle = "#a54537"; context.strokeStyle = "#e1b874"; context.lineWidth = 1.5;
+    context.beginPath(); context.roundRect(activeEndX - 10 * scale, activeEndY - 4 * scale, 20 * scale, 9 * scale, 2); context.fill(); context.stroke();
+  }
+  DrawFlowArrow(screenX - direction * gateLength * .82, centerY + 14, direction, "#b34f3f", .86);
+  context.restore();
+  DrawStructureTag(screenX, ceilingY, scale, "翻板分割闸", `轴在${direction > 0 ? "左" : "右"} · 闸面↑`, active ? "工作中" : "平放", "#b34f3f");
+}
+
+function DrawFloodGateAssembly(screenX, centerY, ceilingY, floorY, scale, slotIndex, active) {
+  const direction = buildSiteProfiles[slotIndex].flowDirection;
+  const frameTop = ceilingY + 25 * scale;
+  const frameHalfWidth = 24 * scale;
+  const gateHeight = Math.min(48 * scale, floorY - frameTop - 24 * scale);
+  const gateTop = active ? floorY - 7 - gateHeight : frameTop + 7 * scale;
+  const gateBottom = gateTop + gateHeight;
+  context.save(); context.lineCap = "round"; context.lineJoin = "round";
+  context.fillStyle = "rgba(61,45,31,.66)"; context.strokeStyle = "#c1965d"; context.lineWidth = 2;
+  [-1, 1].forEach((side) => { context.beginPath(); context.roundRect(screenX + side * frameHalfWidth - 5 * scale, frameTop, 10 * scale, floorY - frameTop, 2); context.fill(); context.stroke(); });
+  context.fillStyle = "#6e5135"; context.fillRect(screenX - frameHalfWidth - 6 * scale, frameTop - 5 * scale, frameHalfWidth * 2 + 12 * scale, 9 * scale); context.strokeRect(screenX - frameHalfWidth - 6 * scale, frameTop - 5 * scale, frameHalfWidth * 2 + 12 * scale, 9 * scale);
+  context.fillStyle = "#765537"; context.strokeStyle = "#d0a367"; context.beginPath(); context.rect(screenX - frameHalfWidth + 5 * scale, gateTop, frameHalfWidth * 2 - 10 * scale, gateBottom - gateTop); context.fill(); context.stroke();
+  context.strokeStyle = "rgba(45,31,21,.72)"; context.lineWidth = 1.2;
+  for (let boardY = gateTop + 9 * scale; boardY < gateBottom; boardY += 10 * scale) { context.beginPath(); context.moveTo(screenX - frameHalfWidth + 7 * scale, boardY); context.lineTo(screenX + frameHalfWidth - 7 * scale, boardY); context.stroke(); }
+  context.strokeStyle = "#b98d54"; context.lineWidth = 2; context.beginPath(); context.moveTo(screenX, frameTop - 8 * scale); context.lineTo(screenX, gateTop); context.stroke();
+  context.fillStyle = "#28221c"; context.strokeStyle = "#c1965d"; context.lineWidth = 2; context.beginPath(); context.arc(screenX, frameTop - 11 * scale, 10 * scale, 0, Math.PI * 2); context.fill(); context.stroke();
+  context.strokeStyle = "#c1965d"; context.lineWidth = 1.4;
+  for (let spoke = 0; spoke < 8; spoke += 1) { const angle = spoke / 8 * Math.PI * 2; context.beginPath(); context.moveTo(screenX + Math.cos(angle) * 2, frameTop - 11 * scale + Math.sin(angle) * 2); context.lineTo(screenX + Math.cos(angle) * 9 * scale, frameTop - 11 * scale + Math.sin(angle) * 9 * scale); context.stroke(); }
+  const upstreamX = screenX - direction * frameHalfWidth;
+  context.strokeStyle = "#6d9aa3"; context.lineWidth = 4; for (let wave = 0; wave < 2; wave += 1) { const waveY = floorY - 13 - wave * 8; context.beginPath(); context.moveTo(upstreamX - direction * 36 * scale, waveY); context.quadraticCurveTo(upstreamX - direction * 24 * scale, waveY - 4, upstreamX - direction * 12 * scale, waveY); context.stroke(); }
+  context.strokeStyle = "#8e7049"; context.lineWidth = 5; context.beginPath(); context.moveTo(screenX - frameHalfWidth * .55, floorY - 3); context.quadraticCurveTo(screenX, floorY + 11, screenX + frameHalfWidth * .72, floorY - 3); context.stroke();
+  DrawFlowArrow(upstreamX - direction * 27 * scale, floorY - 17, direction, "#6f9da5", .92);
+  DrawFlowArrow(screenX + direction * frameHalfWidth * .75, floorY + 1, direction, "#6f9da5", .72);
+  DrawVerticalArrow(screenX + frameHalfWidth + 11 * scale, active ? gateTop - 7 * scale : gateBottom + 7 * scale, active ? 1 : -1, "#c1965d", .72);
+  context.restore();
+  DrawStructureTag(screenX, ceilingY, scale, "引水回流闸", `上游在${direction > 0 ? "左" : "右"} · 水↘沟`, active ? "工作中" : "抬闸", "#6f9da5");
+}
+
+function DrawSmokeBaffleAssembly(screenX, centerY, ceilingY, floorY, scale, slotIndex, active) {
+  const direction = buildSiteProfiles[slotIndex].flowDirection;
+  const ductY = ceilingY + 39 * scale;
+  const plateSpan = active ? 34 * scale : 25 * scale;
+  context.save(); context.lineCap = "round"; context.lineJoin = "round";
+  context.strokeStyle = "#927049"; context.lineWidth = 7 * scale;
+  context.beginPath(); context.moveTo(screenX - 48 * scale, ductY); context.lineTo(screenX - 18 * scale, ductY); context.lineTo(screenX - 8 * scale, ceilingY + 23 * scale); context.lineTo(screenX + 25 * scale, ceilingY + 23 * scale); context.lineTo(screenX + 38 * scale, ductY); context.lineTo(screenX + 49 * scale, ductY); context.stroke();
+  context.fillStyle = "#76583a"; context.strokeStyle = "#d0a367"; context.lineWidth = 2;
+  const firstEndY = active ? centerY + 3 * scale : ductY + 5 * scale;
+  const secondEndY = active ? centerY - 2 * scale : ductY + 5 * scale;
+  context.beginPath(); context.moveTo(screenX - 22 * scale, ductY + 1); context.lineTo(screenX - 22 * scale + direction * plateSpan, firstEndY); context.lineTo(screenX - 15 * scale + direction * plateSpan, firstEndY + 6 * scale); context.lineTo(screenX - 14 * scale, ductY + 5 * scale); context.closePath(); context.fill(); context.stroke();
+  context.beginPath(); context.moveTo(screenX + 20 * scale, ductY + 1); context.lineTo(screenX + 20 * scale - direction * plateSpan * .76, secondEndY); context.lineTo(screenX + 26 * scale - direction * plateSpan * .76, secondEndY + 6 * scale); context.lineTo(screenX + 27 * scale, ductY + 5 * scale); context.closePath(); context.fill(); context.stroke();
+  context.fillStyle = "#a54537"; [-20, 22].forEach((offset) => { context.beginPath(); context.arc(screenX + offset * scale, ductY + 2, 4 * scale, 0, Math.PI * 2); context.fill(); });
+  const ropeX = screenX + direction * 37 * scale;
+  context.strokeStyle = "#c79a59"; context.lineWidth = 2; context.beginPath(); context.moveTo(screenX + direction * 21 * scale, ductY + 6); context.quadraticCurveTo(ropeX, centerY + 12, ropeX, floorY - 15); context.stroke();
+  context.fillStyle = "#3e3022"; context.beginPath(); context.arc(ropeX, floorY - 14, 4 * scale, 0, Math.PI * 2); context.fill();
+  const incomingX = screenX - direction * 52 * scale;
+  DrawFlowArrow(incomingX, centerY + 4, direction, "#7fa5a2", .95);
+  DrawFlowArrow(screenX - direction * 18 * scale, centerY - 7, direction, "#7fa5a2", .82);
+  if (active) {
+    context.strokeStyle = "rgba(127,165,162,.72)"; context.lineWidth = 2.4; context.beginPath(); context.moveTo(screenX, centerY - 2); context.quadraticCurveTo(screenX + direction * 14 * scale, centerY - 24 * scale, screenX + direction * 12 * scale, ceilingY + 18 * scale); context.stroke();
+    context.fillStyle = "#7fa5a2"; context.beginPath(); context.moveTo(screenX + direction * 12 * scale, ceilingY + 14 * scale); context.lineTo(screenX + direction * 5 * scale, ceilingY + 24 * scale); context.lineTo(screenX + direction * 19 * scale, ceilingY + 24 * scale); context.closePath(); context.fill();
+  } else {
+    DrawFlowArrow(screenX + direction * 31 * scale, ductY + 14 * scale, direction, "#7fa5a2", .68);
+  }
+  context.restore();
+  DrawStructureTag(screenX, ceilingY, scale, "防烟导流板", `烟${direction > 0 ? "→" : "←"} · ↑空支洞`, active ? "工作中" : "平送", "#899471");
+}
+
 function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
   if (state.levelIndex !== 0) return;
   const intakeX = -5.6;
@@ -2200,34 +2417,37 @@ function DrawTunnelSystems(width, height, surfaceY, tunnelY) {
 
   const slotWorldXs = [-7, 0, 7];
   state.buildSlots.forEach((slotId, slotIndex) => {
-    if (!slotId) return;
     const worldX = slotWorldXs[slotIndex];
     const screenX = WorldToScreen(worldX, width);
     const centerY = TunnelCenterYAt(worldX, tunnelY);
     const localHalfHeight = TunnelHalfHeightAt(worldX, height);
+    const ceilingY = centerY - localHalfHeight;
     const floorY = TunnelFloorYAt(worldX, height, tunnelY);
+    const structureScale = Math.max(.7, Math.min(1.25, width / (22 / state.camera.zoom) / 52));
+    const active = state.defense.activeSlots.has(slotIndex);
+    if (!slotId) {
+      if (state.phaseId === "build") DrawEmptyStructureSite(screenX, centerY, ceilingY, floorY, structureScale, slotIndex);
+      return;
+    }
     if (slotId === "flipGate") {
-      context.strokeStyle = "#b3834e"; context.lineWidth = 5; context.beginPath(); context.moveTo(screenX - 18, floorY - 4); context.lineTo(screenX + 18, floorY - 4); context.stroke();
-      context.fillStyle = "#d8aa61"; context.beginPath(); context.arc(screenX - 16, floorY - 4, 4, 0, Math.PI * 2); context.fill();
+      DrawFlipGateAssembly(screenX, centerY, ceilingY, floorY, structureScale, slotIndex, active);
     } else if (slotId === "smokeBaffle") {
-      context.fillStyle = "#8f7049"; context.beginPath(); context.moveTo(screenX - 4, centerY - localHalfHeight + 10); context.lineTo(screenX + 17, centerY - 8); context.lineTo(screenX + 8, centerY - 4); context.lineTo(screenX - 10, centerY - localHalfHeight + 16); context.closePath(); context.fill();
-      DrawFlowArrow(screenX + 10, centerY - 24, 1, "#75d7d7", .9);
+      DrawSmokeBaffleAssembly(screenX, centerY, ceilingY, floorY, structureScale, slotIndex, active);
     } else if (slotId === "floodGate") {
-      context.fillStyle = "#775b3c"; context.fillRect(screenX - 6, centerY - 25, 12, floorY - centerY + 21);
-      context.fillStyle = "#5cb4c1"; context.fillRect(screenX - 3, centerY - 17, 6, 23);
-      context.strokeStyle = "#72c9d2"; context.lineWidth = 3; context.beginPath(); context.moveTo(screenX - 22, floorY - 7); context.lineTo(screenX + 25, floorY - 7); context.stroke();
+      DrawFloodGateAssembly(screenX, centerY, ceilingY, floorY, structureScale, slotIndex, active);
     }
   });
 
   if (["defense", "outcome"].includes(state.phaseId)) {
-    const hasBaffle = state.buildSlots.includes("smokeBaffle");
+    const activeBaffleSlot = state.buildSlots.findIndex((slotId, slotIndex) => slotId === "smokeBaffle" && state.defense.activeSlots.has(slotIndex));
+    const baffleActive = activeBaffleSlot >= 0;
     context.save();
     context.font = "600 11px system-ui, sans-serif";
     context.textAlign = "center";
     context.fillStyle = "rgba(107,222,224,.88)";
     context.fillText("进风", WorldToScreen(intakeX, width), surfaceY - 16);
     context.fillStyle = "rgba(205,214,205,.88)";
-    context.fillText(hasBaffle ? "排烟" : "烟倒灌", WorldToScreen(hasBaffle ? exhaustX : -7.5, width), surfaceY - 16);
+    context.fillText(baffleActive ? "排烟" : "烟倒灌", WorldToScreen(baffleActive ? exhaustX : -7.5, width), surfaceY - 16);
     context.restore();
   }
 }
@@ -2242,8 +2462,41 @@ function QaInspectHazard(kind) {
     UpdateUi();
     return;
   }
-  if (["dog", "bell", "crackers", "enemies"].includes(kind) || state.phaseId !== "defense" || state.mode !== "play") QaJumpToPhase("defense");
+  if (kind === "buildPanel") {
+    QaJumpToPhase("build");
+    state.resources.wood = 6;
+    state.resources.iron = 4;
+    state.excavated = new Set(["west", "center", "east"]);
+    state.selectedRole = "blacksmith";
+    OpenBuildPanel(2);
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
+  if (["dog", "bell", "crackers", "enemies", "structures", "structuresIdle"].includes(kind) || state.phaseId !== "defense" || state.mode !== "play") QaJumpToPhase("defense");
   EndCinematic();
+  if (["structures", "structuresIdle"].includes(kind)) {
+    const showWorkingState = kind === "structures";
+    state.defense.activeSlots = new Set(showWorkingState ? [0, 1, 2] : []);
+    state.defense.triggered = showWorkingState ? 3 : 0;
+    if (showWorkingState) QaComplete(["triggerSlotA", "triggerSlotB", "triggerSlotC"]);
+    SyncFluidStructures();
+    state.selectedRole = "blacksmith";
+    state.player.layer = "tunnel";
+    state.player.x = 3.45;
+    state.dog.layer = "tunnel";
+    state.dog.x = 3.8;
+    state.civilians.forEach((civilian, index) => {
+      civilian.x = 2.25 + index * .18;
+      civilian.targetX = civilian.x;
+    });
+    state.camera.x = 0;
+    state.camera.targetX = 0;
+    state.camera.zoom = .88;
+    state.camera.targetZoom = .88;
+    state.qaCameraFocus = { x: 0, zoom: .88 };
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
   if (kind === "enemies") {
     state.selectedRole = "blacksmith";
     state.player.layer = "tunnel";
