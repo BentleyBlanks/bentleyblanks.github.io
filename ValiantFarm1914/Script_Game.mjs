@@ -122,6 +122,8 @@ function Bind() {
       if (k === "right") hold.right = false;
       if (k === "crouch") hold.crouch = false;
     };
+    btn.addEventListener("contextmenu", (e) => e.preventDefault());
+    btn.addEventListener("selectstart", (e) => e.preventDefault());
     btn.addEventListener("pointerdown", down);
     btn.addEventListener("pointerup", up);
     btn.addEventListener("pointercancel", up);

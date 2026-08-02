@@ -170,12 +170,18 @@ button { font: inherit; cursor: pointer; border: none; }
 .touch {
   position: absolute; left: 0; right: 0; bottom: 10px; z-index: 5;
   display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 10px;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
 }
 .touch[hidden] { display: none !important; }
 .touch button {
   width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink);
   background: rgba(240,226,196,.9); color: var(--ink); font-weight: 700;
   box-shadow: 2px 2px 0 rgba(0,0,0,.3);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 @media (max-width: 720px) {
