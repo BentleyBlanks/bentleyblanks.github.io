@@ -1,72 +1,86 @@
-import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { actorProfiles, campaignData, actorHeightRange, cinematicSequences } from "./Data_WhiteboxCampaign.mjs";
+import { spawnSync } from "node:child_process";
+import { levelDefinitions, roleDefinitions, buildOptions } from "./Data_WhiteboxCampaign.mjs";
 
-const rootDirectory = dirname(fileURLToPath(import.meta.url));
-const [html, css, script] = await Promise.all([
-  readFile(join(rootDirectory, "index.html"), "utf8"),
-  readFile(join(rootDirectory, "Style_Whitebox.css"), "utf8"),
-  readFile(join(rootDirectory, "Script_Whitebox.mjs"), "utf8")
-]);
+const root = path.dirname(fileURLToPath(import.meta.url));
+const Read = (name) => fs.readFileSync(path.join(root, name), "utf8");
+const Assert = (condition, message) => { if (!condition) throw new Error(message); };
+const html = Read("index.html");
+const css = Read("Style_Whitebox.css");
+const game = Read("Script_Whitebox.mjs");
+const data = Read("Data_WhiteboxCampaign.mjs");
 
-assert.equal(campaignData.length, 7, "序章加六章应为七段流程");
-assert.equal(campaignData.filter((chapter) => chapter.number !== "序章").length, 6, "正式章节应为六章");
+Assert(levelDefinitions.length === 3, "必须正好包含三个关卡");
+Assert(levelDefinitions.map((level) => level.id).join(",") === "undergroundWall,ensemble,mindGame", "三个关卡 ID 或顺序错误");
+Assert(levelDefinitions.map((level) => level.phases.length).join(",") === "4,4,3", "三个循环阶段数应为 4/4/3");
+Assert(!data.includes("campaignData") && !data.includes("cinematicSequences"), "旧七章线性战役导出仍存在");
+Assert(!game.includes("campaignData") && !game.includes("chapterIndex"), "运行脚本仍引用旧线性战役");
 
-const actions = campaignData.flatMap((chapter) => chapter.actions);
-assert.equal(actions.length, 40, "扩写序章后总计应为四十个互动");
-assert.equal(campaignData[0].actions.length, 10, "序章应包含十个完整叙事与玩法节点");
-assert.equal(actions.filter((action) => action.puzzle).length, 7, "序章与六个正式章节应各有一个选择谜题");
-assert.ok(campaignData[0].actions.some((action) => action.dialogue.includes("往后的形势只会更加困难")), "序章应保留获准使用的核心台词");
+const wall = levelDefinitions[0];
+const buildActions = wall.actions.filter((action) => action.buildSlot !== undefined);
+Assert(buildActions.length === 3 && new Set(buildActions.map((action) => action.buildSlot)).size === 3, "第一关必须有三个独立建造槽");
+Assert(buildOptions.length === 3, "第一关必须有三种机关方案");
+const collected = wall.actions.reduce((total, action) => {
+  for (const [key, value] of Object.entries(action.resource || {})) total[key] = (total[key] || 0) + value;
+  return total;
+}, {});
+const feasible = [];
+for (const a of buildOptions) for (const b of buildOptions) for (const c of buildOptions) {
+  const options = [a, b, c];
+  const wood = options.reduce((sum, option) => sum + option.cost.wood, 0);
+  const iron = options.reduce((sum, option) => sum + option.cost.iron, 0);
+  const ventilation = options.reduce((sum, option) => sum + option.ventilation, 0);
+  const defense = options.reduce((sum, option) => sum + option.defense, 0);
+  if (wood <= collected.wood && iron <= collected.iron && ventilation >= 3 && defense >= 4) feasible.push(options.map((option) => option.id).join("+"));
+}
+Assert(feasible.length >= 2, "第一关采集量必须支持至少两种合格建造组合");
+Assert(wall.actions.some((action) => action.phaseGate) && wall.actions.filter((action) => action.triggerSlot !== undefined).length === 3, "第一关缺少迎敌门槛或三机关结算");
 
-const cinematicEntries = Object.entries(cinematicSequences);
-const cinematicBeats = cinematicEntries.flatMap(([, beats]) => beats);
-const cinematicDuration = cinematicBeats.reduce((sum, beat) => sum + beat.duration, 0);
-assert.equal(cinematicEntries.length, 10, "序章应包含十段镜头调度");
-assert.equal(cinematicBeats.length, 27, "序章镜头段应包含二十七个节拍");
-assert.ok(cinematicDuration >= 60, "镜头总时长应足以承载完整序章节奏");
-assert.ok(cinematicSequences[campaignData[0].introCinematic], "序章开场镜头必须存在");
-campaignData[0].actions.filter((action) => action.cinematicAfter).forEach((action) => {
-  assert.ok(cinematicSequences[action.cinematicAfter], `互动 ${action.id} 引用的镜头段必须存在`);
-});
+const ensemble = levelDefinitions[1];
+Assert(ensemble.roleIds.length === 5, "第二关必须有五个可切换角色");
+for (const roleId of ensemble.roleIds) {
+  Assert(roleDefinitions[roleId], `角色 ${roleId} 未定义`);
+  Assert(ensemble.actions.some((action) => action.role === roleId), `角色 ${roleId} 没有专属动作`);
+}
+Assert(ensemble.actions.filter((action) => action.rescue).length === 3, "第二关必须转移伤员、粮食、联络员三项");
+Assert(ensemble.actions.filter((action) => action.memory && action.optional).length === 2, "第二关必须有两件不阻塞流程的记忆物");
+Assert(game.includes("CycleRole") && game.includes("需要${roleDefinitions[action.role].name}"), "第二关缺少角色切换或错角色反馈");
 
-const actorHeights = Object.values(actorProfiles).map((profile) => profile.height);
-const minimumHeight = Math.min(...actorHeights);
-const maximumHeight = Math.max(...actorHeights);
-assert.equal(actorHeightRange.minimum, minimumHeight, "导出最小身高应与角色配置一致");
-assert.equal(actorHeightRange.maximum, maximumHeight, "导出最大身高应与角色配置一致");
-assert.ok(maximumHeight / minimumHeight <= 1.1, "角色最大与最小身高比不得超过 1.10");
+const mindGame = levelDefinitions[2];
+const tricks = mindGame.actions.filter((action) => action.trick);
+Assert(tricks.length >= 5, "第三关至少需要五种诡计");
+Assert(tricks.every((action) => Number.isFinite(action.alert) && action.alert > 0 && Number.isFinite(action.morale) && action.morale < 0), "每种诡计都必须有警觉与士气因果");
+Assert(mindGame.actions.filter((action) => action.panicStep).length === 3, "第三关必须有三步恐慌连锁");
+Assert(game.includes("state.tricks.size >= 3") && game.includes("state.morale <= 55"), "恐慌断点没有按诡计种类和士气双条件实现");
+Assert(game.includes("撤回安全支洞") && game.includes("已完成的诡计仍保留"), "警觉满后的非惩罚性撤退规则缺失");
 
-const combinedSource = `${html}\n${css}\n${script}`;
-assert.doesNotMatch(combinedSource, /three(?:\.min)?\.js|THREE\./i, "纯 2D 白盒不得引入 Three.js");
-assert.doesNotMatch(html, /<(?:img|audio|video|source)\b/i, "页面不得加载图片、音频或视频素材");
-assert.doesNotMatch(combinedSource, /https?:\/\//i, "白盒不得加载外部 URL");
-assert.doesNotMatch(combinedSource, /\.(?:png|jpe?g|webp|gif|svg|mp3|wav|ogg|mp4|webm)(?:[?"'`)]|$)/i, "白盒不得引用媒体资产");
+Assert(!html.includes('id="observeButton"') && !html.includes('data-input="observe"'), "正式玩家操作仍存在观察按钮");
+Assert(html.includes('data-input="left"') && html.includes('data-input="right"') && html.includes('data-input="switch"') && html.includes('data-input="crouch"') && html.includes('data-input="depth"') && html.includes('data-input="action"'), "移动端六个操作不完整");
+Assert(css.includes("user-select: none") && css.includes("-webkit-touch-callout: none") && css.includes("touch-action: none"), "移动端长按防文本选择保护不完整");
+Assert(game.includes("setPointerCapture") && game.includes("pointercancel") && game.includes("lostpointercapture"), "移动端长按移动缺少 Pointer Capture 清理");
+Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
+Assert(game.includes("const profile = actorProfiles.soldier") && game.match(/const scale = Math\.min\(width, 1100\) \/ 26 \* \.038/g)?.length >= 2, "敌兵与主角未共用人物尺度换算");
+Assert(css.includes("#touchControls { left: 8px; right: 8px; bottom: 7px; opacity: 1; }") && css.includes("rgba(10,17,19,.94)"), "低高度移动端触控键未强制高对比显示");
 
-assert.match(css, /user-select:\s*none/i, "移动控件必须禁止文本选择");
-assert.match(css, /touch-action:\s*none/i, "移动控件必须接管触摸手势");
-assert.match(css, /-webkit-touch-callout:\s*none/i, "移动控件必须禁止系统长按菜单");
-assert.match(script, /setPointerCapture/, "长按移动必须捕获指针");
-assert.match(script, /preventDefault/, "触摸事件必须阻止浏览器默认行为");
-for (const eventName of ["pointercancel", "lostpointercapture", "selectstart", "contextmenu"]) {
-  assert.ok(script.includes(eventName), `缺少 ${eventName} 输入守卫`);
+const forbiddenRuntime = [/three(?:\.min)?\.js/i, /<img\b/i, /new\s+Image\s*\(/, /AudioContext/i, /https?:\/\//i];
+for (const pattern of forbiddenRuntime) {
+  Assert(!pattern.test(html + "\n" + game + "\n" + data), `白盒出现禁止的外部运行时/素材：${pattern}`);
+}
+const cssVersion = html.match(/Style_Whitebox\.css\?v=([^"']+)/)?.[1];
+const scriptVersion = html.match(/Script_Whitebox\.mjs\?v=([^"']+)/)?.[1];
+Assert(cssVersion && cssVersion === scriptVersion, "HTML 的 CSS/JS cache-bust 不一致");
+
+for (const name of ["Data_WhiteboxCampaign.mjs", "Script_Whitebox.mjs", "Script_SmokeTest.mjs"]) {
+  const result = spawnSync(process.execPath, ["--check", path.join(root, name)], { encoding: "utf8" });
+  Assert(result.status === 0, `${name} 语法错误：${result.stderr}`);
 }
 
-const styleVersion = html.match(/Style_Whitebox\.css\?v=([A-Za-z0-9]+)/)?.[1];
-const scriptVersion = html.match(/Script_Whitebox\.mjs\?v=([A-Za-z0-9]+)/)?.[1];
-assert.ok(styleVersion, "样式表应带缓存版本");
-assert.equal(scriptVersion, styleVersion, "样式与脚本缓存版本必须一致");
-assert.match(script, /state\.mode = "panel"/, "章节菜单必须暂停游戏状态");
-assert.match(script, /CloseNavigationPanel/, "章节菜单必须能恢复来源状态");
-assert.match(html, /id="cinematicCaption"/, "页面必须提供电影字幕层");
-assert.match(html, /id="skipCinematic"/, "镜头段必须允许跳过");
-assert.match(script, /function UpdateCinematic/, "必须实现逐帧镜头调度");
-assert.match(script, /cameraZoom/, "镜头系统必须支持变焦");
-assert.match(script, /cameraShakeX/, "镜头系统必须支持震动反馈");
-assert.match(script, /DrawCinematicForeground/, "镜头系统必须包含前景视差层");
-assert.match(script, /DrawCinematicEffects/, "镜头系统必须包含场景化镜头效果");
-assert.match(script, /HoldCinematicBeatForQa/, "视觉审查必须能锁定指定镜头节拍");
-assert.match(script, /exposureGrace/, "镜头结束后必须提供短暂的暴露保护时间");
-
-console.log(`EarthVeins1942Whitebox smoke test passed: ${campaignData.length} sequences, ${actions.length} actions, ${cinematicBeats.length} cinematic beats (${cinematicDuration.toFixed(1)}s), actor ratio ${(maximumHeight / minimumHeight).toFixed(3)}.`);
+console.log(JSON.stringify({
+  ok: true,
+  levels: levelDefinitions.map((level) => ({ id: level.id, phases: level.phases.length, actions: level.actions.length })),
+  feasibleBuilds: feasible,
+  mobileInputs: 6,
+  cacheVersion: cssVersion
+}, null, 2));

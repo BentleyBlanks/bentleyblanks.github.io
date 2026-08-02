@@ -1,840 +1,242 @@
 :root {
   color-scheme: dark;
-  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-  --ink: #e9e2d2;
-  --muted: #a7afb5;
-  --paper: #e7dfca;
-  --paperInk: #26282a;
-  --amber: #e7a95e;
-  --blue: #74b9d3;
-  --red: #d66f61;
-  --panel: rgba(20, 25, 30, .94);
-  --line: rgba(233, 226, 210, .2);
-}
-
-* {
-  box-sizing: border-box;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
-html,
-body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  background: #11161b;
-  overscroll-behavior: none;
-}
-
-body,
-button,
-canvas,
-#gameShell,
-#touchControls,
-#touchControls * {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-}
-
-button {
-  border: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
-}
-
-[hidden] {
-  display: none !important;
-}
-
-#gameShell {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  background: #151b20;
-  touch-action: none;
-  isolation: isolate;
-}
-
-#gameCanvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
-}
-
-#filmGrain {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  opacity: .2;
-  background-image:
-    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.025) 3px 4px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);
-  mix-blend-mode: soft-light;
-}
-
-#cinematicBars {
-  position: absolute;
-  inset: 0;
-  z-index: 7;
-  pointer-events: none;
-}
-
-#cinematicBars i {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: clamp(10px, 2.2vh, 24px);
-  background: #070a0c;
-  transition: height .65s cubic-bezier(.2,.75,.2,1);
-}
-
-#cinematicBars i:first-child { top: 0; }
-#cinematicBars i:last-child { bottom: 0; }
-
-#gameShell.isCinematic #cinematicBars i {
-  height: clamp(38px, 8.2vh, 76px);
-}
-
-#cinematicPulse {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  pointer-events: none;
-  opacity: var(--pulse-opacity, 0);
-  background:
-    radial-gradient(circle at var(--pulse-x, 50%) var(--pulse-y, 48%), rgba(226, 156, 84, .2), transparent 26%),
-    linear-gradient(90deg, rgba(115, 37, 30, .18), transparent 38%);
-  mix-blend-mode: screen;
-}
-
-#cinematicCaption {
-  position: absolute;
-  z-index: 28;
-  left: clamp(30px, 8vw, 130px);
-  bottom: clamp(54px, 11vh, 112px);
-  width: min(660px, 72vw);
-  padding: 0 0 13px 18px;
-  border-left: 2px solid var(--amber);
-  text-shadow: 0 2px 8px rgba(0,0,0,.9);
-  pointer-events: none;
-}
-
-#cinematicCaption small {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--amber);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .16em;
-}
-
-#cinematicCaption b {
-  display: block;
-  color: #f0eadc;
-  font-size: clamp(13px, 1.45vw, 19px);
-  font-weight: 500;
-}
-
-#cinematicCaption p {
-  margin: 5px 0 0;
-  color: #e0e3e2;
-  font-size: clamp(14px, 1.65vw, 22px);
-  line-height: 1.65;
-}
-
-#cinematicProgress {
-  position: absolute;
-  left: 18px;
-  bottom: 0;
-  width: var(--shot-progress, 0%);
-  height: 2px;
-  background: linear-gradient(90deg, var(--amber), rgba(231,169,94,.12));
-}
-
-#skipCinematic {
-  position: absolute;
-  z-index: 31;
-  right: clamp(26px, 4vw, 62px);
-  bottom: clamp(56px, 10vh, 104px);
-  min-height: 36px;
-  padding: 8px 13px;
-  color: #b9c0c3;
-  border: 1px solid rgba(233,226,210,.2);
-  background: rgba(11,15,18,.72);
-  font-size: 10px;
-  letter-spacing: .08em;
-}
-
-#gameShell.isCinematic #gameHeader,
-#gameShell.isCinematic #objectiveCard,
-#gameShell.isCinematic #suspicionHud,
-#gameShell.isCinematic #interactionPrompt,
-#gameShell.isCinematic #touchControls {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .28s ease;
-}
-
-.fullScreen,
-.panelScreen {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-}
-
-.fullScreen {
-  background: radial-gradient(circle at 35% 40%, rgba(80, 115, 126, .18), transparent 42%), rgba(13, 17, 21, .91);
-}
-
-#titleScreen {
-  justify-items: start;
-  padding: clamp(32px, 8vw, 130px);
-}
-
-.titleGrid {
-  position: absolute;
-  inset: 0;
-  opacity: .22;
-  background-image:
-    linear-gradient(rgba(116,185,211,.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(116,185,211,.14) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(90deg, black, transparent 74%);
-}
-
-.titleCopy {
-  position: relative;
-  z-index: 1;
-  width: min(680px, 86vw);
-}
-
-.eyebrow {
-  margin: 0 0 14px;
-  color: var(--amber);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .2em;
-}
-
-.titleCopy h1 {
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-  margin: 0;
-  line-height: .92;
-  font-weight: 300;
-}
-
-.titleCopy h1 span {
-  font-size: clamp(76px, 11vw, 162px);
-  letter-spacing: .12em;
-}
-
-.titleCopy h1 small {
-  color: var(--amber);
-  font-size: clamp(24px, 4vw, 54px);
-  font-weight: 400;
-  letter-spacing: .1em;
-}
-
-.titleThesis {
-  margin: 30px 0;
-  color: #c9cdd0;
-  font-size: clamp(14px, 1.45vw, 20px);
-  line-height: 1.9;
-}
-
-.titleActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.primaryButton,
-.quietButton,
-.backButton,
-.headerButton {
-  min-height: 44px;
-  padding: 11px 20px;
-  border: 1px solid var(--line);
-  background: rgba(24, 30, 35, .84);
-  transition: background .16s ease, border-color .16s ease, transform .16s ease;
-}
-
-.primaryButton {
-  color: #181b1d;
-  border-color: var(--amber);
-  background: var(--amber);
-  font-weight: 700;
-}
-
-.quietButton:hover,
-.backButton:hover,
-.headerButton:hover {
-  border-color: rgba(231, 169, 94, .7);
-  background: rgba(62, 55, 45, .9);
-}
-
-.primaryButton:active,
-.quietButton:active,
-.backButton:active,
-.headerButton:active {
-  transform: translateY(1px);
-}
-
-.buildNotice {
-  position: absolute;
-  right: clamp(26px, 5vw, 78px);
-  bottom: clamp(28px, 6vh, 72px);
-  display: grid;
-  gap: 6px;
-  width: min(370px, 36vw);
-  padding: 18px;
-  border-left: 2px solid var(--blue);
-  background: rgba(18, 24, 29, .74);
-  color: #aeb8be;
-  font-size: 12px;
-}
-
-.buildNotice b {
-  margin-bottom: 4px;
-  color: var(--blue);
-  letter-spacing: .12em;
-}
-
-.panelScreen {
-  padding: clamp(18px, 4vw, 56px);
-  background: rgba(7, 10, 12, .78);
-  backdrop-filter: blur(8px);
-}
-
-.panelPaper {
-  width: min(960px, 94vw);
-  max-height: min(860px, 91vh);
-  overflow: auto;
-  padding: clamp(24px, 4vw, 54px);
-  color: var(--paperInk);
-  background:
-    repeating-linear-gradient(0deg, transparent 0 31px, rgba(25,28,30,.045) 31px 32px),
-    var(--paper);
-  box-shadow: 0 24px 90px rgba(0, 0, 0, .48);
-}
-
-.compactPaper { width: min(670px, 94vw); }
-
-.panelPaper h2 {
-  margin: 0 0 24px;
-  font-size: clamp(34px, 5vw, 64px);
-  font-weight: 300;
-}
-
-.panelPaper .eyebrow { color: #9c4f43; }
-
-.chapterList {
-  display: grid;
-  gap: 2px;
-  margin-bottom: 24px;
-}
-
-.chapterEntry {
-  display: grid;
-  grid-template-columns: 76px 1fr auto;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  min-height: 68px;
-  padding: 12px 16px;
-  text-align: left;
-  color: #2c3032;
-  border-bottom: 1px solid rgba(38, 40, 42, .2);
-  background: rgba(255, 255, 255, .05);
-}
-
-.chapterEntry:hover { background: rgba(156, 79, 67, .08); }
-
-.chapterEntry > b {
-  color: #9c4f43;
-  font-size: 14px;
-  letter-spacing: .08em;
-}
-
-.chapterEntry span {
-  display: grid;
-  gap: 4px;
-}
-
-.chapterEntry strong { font-size: 19px; font-weight: 500; }
-.chapterEntry small { color: #6a6b68; font-size: 11px; }
-.chapterEntry i { font-style: normal; font-size: 22px; }
-
-.backButton {
-  color: #2d3032;
-  border-color: rgba(45,48,50,.3);
-  background: transparent;
-}
-
-.controlList {
-  display: grid;
-  gap: 1px;
-  margin: 0 0 22px;
-}
-
-.controlList div {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 14px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(35, 38, 40, .18);
-}
-
-.controlList dt { color: #9c4f43; font-weight: 700; }
-.controlList dd { margin: 0; line-height: 1.55; }
-.guideNote { color: #5d615f; line-height: 1.7; }
-
-#gameHeader {
-  position: absolute;
-  top: clamp(18px, 3.2vh, 34px);
-  left: clamp(18px, 2.5vw, 38px);
-  right: clamp(18px, 2.5vw, 38px);
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  pointer-events: none;
-}
-
-.chapterStamp,
-.statusStrip,
-.headerButton {
-  pointer-events: auto;
-}
-
-.chapterStamp {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 8px 12px;
-  border-left: 2px solid var(--amber);
-  background: rgba(13, 17, 21, .76);
-}
-
-.chapterStamp small { color: var(--amber); font-size: 10px; letter-spacing: .14em; }
-.chapterStamp span { font-size: 15px; }
-
-.statusStrip {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  margin-left: auto;
-}
-
-.statusStrip span {
-  min-height: 34px;
-  padding: 9px 12px;
-  color: #bdc6ca;
-  background: rgba(13, 17, 21, .78);
-  font-size: 11px;
-  letter-spacing: .05em;
-}
-
-.headerButton {
-  min-height: 36px;
-  padding: 8px 14px;
-  color: var(--ink);
-}
-
-#objectiveCard {
-  position: absolute;
-  z-index: 13;
-  top: clamp(72px, 11vh, 116px);
-  left: clamp(18px, 2.5vw, 38px);
-  width: min(340px, 40vw);
-  padding: 15px 17px;
-  border: 1px solid rgba(231, 169, 94, .32);
-  background: rgba(17, 22, 27, .9);
-  box-shadow: 0 10px 28px rgba(0,0,0,.24);
-}
-
-#objectiveCard small {
-  color: var(--amber);
-  font-size: 10px;
-  letter-spacing: .14em;
-}
-
-#objectiveCard p {
-  margin: 6px 0 5px;
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-#objectiveCard span {
-  color: #99a6ad;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-#suspicionHud {
-  position: absolute;
-  z-index: 13;
-  top: clamp(76px, 11.5vh, 120px);
-  right: clamp(18px, 2.5vw, 38px);
-  width: 190px;
-  padding: 10px 12px;
-  background: rgba(17, 22, 27, .86);
-}
-
-#suspicionHud span {
-  display: block;
-  margin-bottom: 6px;
-  color: #c8ced1;
-  font-size: 10px;
-  letter-spacing: .12em;
-}
-
-#suspicionHud i {
-  display: block;
-  height: 5px;
-  overflow: hidden;
-  background: rgba(255,255,255,.12);
-}
-
-#suspicionFill {
-  display: block;
-  width: 0;
-  height: 100%;
-  background: linear-gradient(90deg, var(--amber), var(--red));
-  transition: width .1s linear;
-}
-
-#interactionPrompt {
-  position: absolute;
-  z-index: 14;
-  left: 50%;
-  bottom: clamp(86px, 13vh, 128px);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transform: translateX(-50%);
-  padding: 9px 12px;
-  background: rgba(12, 16, 19, .9);
-  border: 1px solid rgba(116,185,211,.45);
-}
-
-#interactionPrompt kbd {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  color: #132027;
-  border-radius: 50%;
-  background: var(--blue);
-  font-weight: 800;
-}
-
-#interactionPrompt p { display: grid; gap: 2px; margin: 0; }
-#interactionPrompt b { font-size: 13px; }
-#interactionPrompt span { color: #9eabb2; font-size: 10px; }
-
-#dialoguePanel {
-  position: absolute;
-  z-index: 25;
-  left: 50%;
-  bottom: clamp(44px, 7vh, 74px);
-  width: min(720px, 88vw);
-  min-height: 104px;
-  padding: 16px 150px 16px 20px;
-  transform: translateX(-50%);
-  border-left: 3px solid var(--amber);
-  background: rgba(13, 17, 21, .96);
-  box-shadow: 0 18px 48px rgba(0,0,0,.36);
-}
-
-#dialoguePanel small { color: var(--amber); font-size: 10px; letter-spacing: .13em; }
-#dialoguePanel p { margin: 8px 0 0; line-height: 1.65; }
-#dialoguePanel button {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  padding: 9px 18px;
-  color: #171b1e;
-  background: var(--amber);
-  font-weight: 700;
-}
-
-.puzzlePaper { width: min(760px, 94vw); }
-.puzzleBrief { margin: -8px 0 22px; color: #555d60; line-height: 1.65; }
-.puzzleOptions { display: grid; gap: 10px; }
-
-.puzzleOption {
-  display: grid;
-  gap: 5px;
-  width: 100%;
-  padding: 15px 16px;
-  color: #2a2d2f;
-  text-align: left;
-  border: 1px solid rgba(42,45,47,.22);
-  background: rgba(255,255,255,.12);
-}
-
-.puzzleOption:hover { border-color: #9c4f43; background: rgba(156,79,67,.08); }
-.puzzleOption b { font-size: 16px; }
-.puzzleOption span { color: #646968; font-size: 12px; line-height: 1.45; }
-.puzzleFeedback { min-height: 24px; color: #9c4f43; font-weight: 600; }
-.puzzleFeedback.isSuccess { color: #3e735f; }
-
-.completePaper { text-align: center; }
-.completePaper blockquote { margin: 0 0 26px; color: #565d5d; line-height: 1.8; }
-.completePaper .primaryButton,
-.completePaper .quietButton { margin: 4px; }
-
-#endingPanel { z-index: 44; }
-.endingCopy { width: min(680px, 88vw); text-align: center; }
-.endingCopy h2 { margin: 0 0 18px; font-size: clamp(42px, 7vw, 86px); font-weight: 300; }
-.endingCopy p:not(.eyebrow) { color: #b7c0c5; line-height: 1.8; }
-.endingCopy button { margin: 5px; }
-
-#touchControls {
-  position: absolute;
-  z-index: 30;
-  left: max(14px, env(safe-area-inset-left));
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px));
-  display: none;
-  align-items: flex-end;
-  justify-content: space-between;
-  pointer-events: none;
-  touch-action: none;
-}
-
-.touchMove,
-.touchActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-#touchControls button {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  padding: 0;
-  color: #dce2e4;
-  border: 1px solid rgba(220,226,228,.3);
-  border-radius: 50%;
-  background: rgba(19, 25, 30, .88);
-  box-shadow: 0 5px 18px rgba(0,0,0,.24);
-  touch-action: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-tap-highlight-color: transparent;
-  cursor: default;
-}
-
-#touchControls button span {
-  pointer-events: none;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-#touchControls button.isHeld {
-  color: #172027;
-  border-color: var(--blue);
-  background: var(--blue);
-  transform: scale(.96);
-}
-
-#touchControls .touchPrimary {
-  color: #1d2225;
-  border-color: var(--amber);
-  background: var(--amber);
-  font-weight: 800;
-}
-
-.touchActions button { width: 54px; height: 54px; font-size: 11px; }
-
-#toast {
-  position: absolute;
-  z-index: 32;
-  left: 50%;
-  top: 52%;
-  transform: translate(-50%, -50%);
-  max-width: min(520px, 80vw);
-  padding: 12px 16px;
-  border: 1px solid rgba(231,169,94,.42);
-  background: rgba(13,17,21,.94);
-  color: #e7dfcf;
-  text-align: center;
-  line-height: 1.5;
-}
-
-@media (max-width: 900px), (pointer: coarse) {
-  #touchControls { display: flex; }
-  #interactionPrompt { bottom: 92px; }
-  #dialoguePanel { bottom: 92px; }
-  .buildNotice { display: none; }
-}
-
-@media (max-width: 700px) {
-  #titleScreen {
-    align-items: start;
-    padding: max(36px, env(safe-area-inset-top)) 24px 90px;
-    overflow: auto;
-  }
-
-  .titleCopy { width: 100%; }
-  .titleCopy h1 { gap: 10px; }
-  .titleCopy h1 span { font-size: clamp(60px, 17vw, 96px); }
-  .titleCopy h1 small { font-size: clamp(21px, 7vw, 38px); }
-  .titleThesis { margin: 20px 0; font-size: 13px; }
-  .titleActions { display: grid; grid-template-columns: 1fr 1fr; }
-  .titleActions .primaryButton { grid-column: 1 / -1; }
-
-  .panelScreen { padding: 10px; }
-  .panelPaper { width: 100%; max-height: 96vh; padding: 22px 18px; }
-  .panelPaper h2 { margin-bottom: 16px; font-size: 36px; }
-  .chapterEntry { grid-template-columns: 58px 1fr 18px; gap: 8px; min-height: 60px; padding: 9px 8px; }
-  .chapterEntry strong { font-size: 16px; }
-  .chapterEntry small { font-size: 9px; }
-
-  #gameHeader {
-    top: 14px;
-    left: 14px;
-    right: 14px;
-    gap: 6px;
-  }
-
-  .chapterStamp { padding: 6px 8px; }
-  .chapterStamp small { display: none; }
-  .chapterStamp span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .statusStrip { gap: 0; }
-  .statusStrip span { min-height: 30px; padding: 7px 8px; font-size: 9px; }
-  #scaleStatus { display: none; }
-  .headerButton { min-height: 31px; padding: 6px 9px; font-size: 10px; }
-
-  #objectiveCard {
-    top: 52px;
-    left: 14px;
-    width: min(280px, 64vw);
-    padding: 10px 12px;
-  }
-
-  #objectiveCard p { margin: 4px 0 2px; font-size: 12px; }
-  #objectiveCard span { display: block; max-height: 30px; overflow: hidden; font-size: 9px; }
-
-  #suspicionHud {
-    top: 54px;
-    right: 14px;
-    width: 118px;
-    padding: 7px 8px;
-  }
-
-  #suspicionHud span { margin-bottom: 3px; font-size: 8px; }
-
-  #dialoguePanel {
-    width: calc(100vw - 26px);
-    min-height: 80px;
-    padding: 11px 92px 11px 13px;
-  }
-
-  #dialoguePanel p { margin-top: 4px; font-size: 11px; line-height: 1.5; }
-  #dialoguePanel button { right: 10px; bottom: 12px; padding: 7px 12px; font-size: 11px; }
-
-  #interactionPrompt {
-    bottom: 82px;
-    padding: 6px 8px;
-  }
-
-  #interactionPrompt kbd { width: 25px; height: 25px; font-size: 10px; }
-  #interactionPrompt b { font-size: 10px; }
-  #interactionPrompt span { font-size: 8px; }
-
-  #touchControls { left: 10px; right: 10px; bottom: 10px; }
+  font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --ink: #ecede5;
+  --muted: #aeb5ad;
+  --paper: rgba(20, 27, 29, .94);
+  --paperSolid: #151d1f;
+  --line: rgba(219, 226, 211, .18);
+  --cyan: #65d1d4;
+  --amber: #d8aa61;
+  --red: #d26a5d;
+  --green: #87c7a0;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0b1012; color: var(--ink);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
+}
+
+button, canvas, #gameShell { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action: none; }
+button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+[hidden] { display: none !important; }
+
+#gameShell { position: relative; width: 100%; height: 100%; min-height: 390px; overflow: hidden; background: #111719; isolation: isolate; }
+#gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#filmGrain { position: absolute; inset: 0; pointer-events: none; opacity: .13; z-index: 2; background-image: repeating-radial-gradient(circle at 27% 39%, transparent 0 1px, rgba(255,255,255,.13) 1px 2px, transparent 2px 5px); background-size: 7px 7px; mix-blend-mode: overlay; animation: grain .38s steps(2) infinite; }
+@keyframes grain { 50% { transform: translate3d(1px,-1px,0); } }
+
+.fullScreen, .panelScreen { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; }
+.fullScreen { background: linear-gradient(105deg, rgba(11,16,18,.98) 0 42%, rgba(11,16,18,.82) 66%, rgba(11,16,18,.28)); overflow: auto; touch-action: pan-y; }
+.titleGrid { position: absolute; inset: 0; opacity: .23; background: linear-gradient(90deg, transparent 74%, rgba(101,209,212,.08) 74%), linear-gradient(0deg, transparent 74%, rgba(101,209,212,.06) 74%); background-size: 92px 92px; transform: perspective(600px) rotateY(-15deg) scale(1.15); transform-origin: left; }
+.titleCopy { position: relative; width: min(1120px, calc(100% - 56px)); padding: 30px 0 36px; }
+.eyebrow { margin: 0 0 10px; color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+h1 { display: flex; align-items: baseline; gap: 18px; margin: 0; font-family: "STKaiti", "KaiTi", serif; font-size: clamp(56px, 8vw, 110px); font-weight: 800; line-height: .92; letter-spacing: -.05em; text-shadow: 0 8px 36px rgba(0,0,0,.7); }
+h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-spacing: .08em; }
+.titleThesis { max-width: 720px; margin: 20px 0 24px; color: #cdd1ca; font-size: 15px; line-height: 1.7; }
+.levelCards, .levelList { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
+.levelCard { position: relative; min-height: 180px; padding: 20px; overflow: hidden; text-align: left; background: linear-gradient(145deg, rgba(35,44,43,.94), rgba(19,25,27,.94)); border: 1px solid var(--line); transition: .18s ease; }
+.levelCard::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; transform: scaleX(0); transform-origin: left; background: var(--cyan); transition: transform .18s ease; }
+.levelCard:hover, .levelCard.selected { transform: translateY(-3px); border-color: rgba(101,209,212,.62); background: linear-gradient(145deg, rgba(40,54,52,.96), rgba(20,29,31,.96)); }
+.levelCard.selected::after { transform: scaleX(1); }
+.levelCard small { display: block; color: var(--amber); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.levelCard b { display: block; margin: 12px 0 8px; font-family: "STKaiti", "KaiTi", serif; font-size: 29px; letter-spacing: .06em; }
+.levelCard span { display: block; min-height: 48px; color: #b9c0ba; font-size: 12px; line-height: 1.55; }
+.levelCard i { display: block; margin-top: 14px; color: var(--cyan); font-size: 11px; font-style: normal; font-weight: 700; }
+.titleActions { display: flex; gap: 10px; margin-top: 18px; }
+.primaryButton, .quietButton, .backButton, .headerButton { min-height: 46px; padding: 0 22px; font-weight: 800; letter-spacing: .04em; }
+.primaryButton { background: var(--cyan); color: #102024; }
+.quietButton, .backButton, .headerButton { background: rgba(234,238,227,.08); border: 1px solid var(--line); }
+
+.panelScreen { background: rgba(4,8,10,.76); backdrop-filter: blur(9px); }
+.panelPaper { width: min(1040px, calc(100% - 48px)); max-height: calc(100% - 48px); padding: 30px; overflow: auto; background: linear-gradient(150deg, rgba(31,41,42,.98), rgba(16,23,25,.99)); border: 1px solid rgba(219,226,211,.22); box-shadow: 0 28px 90px rgba(0,0,0,.55); touch-action: pan-y; }
+.panelPaper h2 { margin: 0 0 22px; font-family: "STKaiti", "KaiTi", serif; font-size: 40px; letter-spacing: .06em; }
+.compactPaper { max-width: 720px; }
+.controlList { display: grid; gap: 8px; margin: 0 0 20px; }
+.controlList div { display: grid; grid-template-columns: 112px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.controlList dt { color: var(--cyan); font-weight: 900; }
+.controlList dd { margin: 0; color: #c3c9c2; line-height: 1.5; }
+.guideNote { padding: 12px 14px; color: #aab4ae; background: rgba(0,0,0,.2); border-left: 3px solid var(--amber); line-height: 1.55; }
+.guideNote code { color: var(--amber); user-select: text; -webkit-user-select: text; }
+
+#gameHeader { position: absolute; z-index: 10; top: max(12px, env(safe-area-inset-top)); left: 18px; right: 18px; display: grid; grid-template-columns: 170px 1fr 74px; align-items: center; gap: 14px; pointer-events: none; }
+.levelStamp { display: flex; flex-direction: column; padding: 9px 13px; background: rgba(12,18,20,.78); border-left: 3px solid var(--amber); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+.levelStamp small { color: var(--amber); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.levelStamp span { font-family: "STKaiti", "KaiTi", serif; font-size: 21px; font-weight: 800; letter-spacing: .08em; }
+.phaseStrip { display: flex; justify-content: center; gap: 2px; }
+.phaseStrip span { display: flex; align-items: center; gap: 6px; min-width: 108px; padding: 8px 11px; color: rgba(231,234,225,.48); font-size: 10px; font-weight: 700; background: rgba(12,18,20,.66); border-bottom: 2px solid transparent; }
+.phaseStrip span i { display: grid; width: 18px; height: 18px; place-items: center; font-size: 9px; font-style: normal; border: 1px solid currentColor; border-radius: 50%; }
+.phaseStrip span.active { color: #eef3e9; border-color: var(--cyan); background: rgba(20,35,36,.88); }
+.phaseStrip span.done { color: var(--green); }
+.headerButton { min-height: 38px; padding: 0 12px; pointer-events: auto; background: rgba(12,18,20,.82); }
+
+#objectiveCard { position: absolute; z-index: 9; top: 86px; left: 18px; width: min(350px, calc(100% - 36px)); padding: 14px 16px 13px; background: rgba(13,19,21,.83); border: 1px solid var(--line); border-left: 3px solid var(--cyan); box-shadow: 0 14px 38px rgba(0,0,0,.25); }
+#objectiveCard small { color: var(--cyan); font-size: 9px; font-weight: 900; letter-spacing: .16em; }
+#objectiveCard p { margin: 6px 0 5px; font-size: 14px; font-weight: 800; line-height: 1.45; }
+#objectiveCard span { color: var(--muted); font-size: 11px; }
+
+#metricsPanel { position: absolute; z-index: 9; top: 86px; right: 18px; display: grid; grid-template-columns: repeat(2, minmax(130px, 180px)); gap: 7px; width: min(370px, calc(100% - 36px)); }
+.metric { position: relative; min-height: 66px; padding: 10px 12px; overflow: hidden; background: rgba(13,19,21,.82); border: 1px solid var(--line); }
+.metric small, .metric b, .metric span { position: relative; z-index: 1; display: block; }
+.metric small { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+.metric b { margin-top: 4px; font-size: 14px; }
+.metric span { margin-top: 3px; overflow: hidden; color: #aab1ab; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+.metricBar { position: absolute; inset: auto 0 0; height: 3px; background: rgba(255,255,255,.08); }
+.metricBar u { display: block; height: 100%; background: var(--green); transition: width .25s ease; }
+.metricBar u.inverse { background: var(--red); }
+
+#roleDock { position: absolute; z-index: 12; left: 18px; bottom: 86px; width: min(590px, calc(100% - 36px)); padding: 9px; background: rgba(12,18,20,.86); border: 1px solid var(--line); }
+#roleDock > small { display: block; margin: 0 0 7px 4px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .13em; }
+#roleButtons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+#roleButtons button { position: relative; min-height: 48px; padding: 7px 7px 6px 17px; text-align: left; background: rgba(255,255,255,.045); border: 1px solid transparent; }
+#roleButtons button.active { background: rgba(101,209,212,.11); border-color: rgba(101,209,212,.58); }
+.roleDot { position: absolute; left: 6px; top: 10px; width: 6px; height: 25px; background: var(--role); }
+#roleButtons b { display: block; font-size: 10px; }
+#roleButtons small { display: block; margin-top: 3px; overflow: hidden; color: #9da6a0; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
+
+#interactionPrompt { position: absolute; z-index: 13; left: 50%; bottom: 102px; display: flex; align-items: center; gap: 9px; min-width: 230px; padding: 8px 12px; transform: translateX(-50%); background: rgba(10,16,18,.9); border: 1px solid rgba(101,209,212,.5); box-shadow: 0 12px 40px rgba(0,0,0,.42); }
+#interactionPrompt { pointer-events: none; }
+#roleDock:not([hidden]) + #interactionPrompt { bottom: 158px; }
+#interactionPrompt kbd { display: grid; width: 29px; height: 29px; place-items: center; color: #102024; font: 900 13px system-ui; background: var(--cyan); }
+#interactionPrompt p { display: flex; flex-direction: column; margin: 0; }
+#interactionVerb { color: var(--cyan); font-size: 10px; }
+#interactionName { max-width: 310px; margin-top: 2px; overflow: hidden; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+
+#dialoguePanel { position: absolute; z-index: 20; left: 50%; bottom: 24px; display: grid; grid-template-columns: 120px minmax(260px, 610px) 76px; align-items: center; gap: 16px; width: min(860px, calc(100% - 36px)); min-height: 88px; padding: 14px 16px; transform: translateX(-50%); background: rgba(12,18,20,.96); border-top: 2px solid var(--amber); box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+#dialoguePanel small { color: var(--amber); font-size: 11px; font-weight: 900; }
+#dialoguePanel p { margin: 0; color: #e3e6df; font-size: 13px; line-height: 1.65; }
+#dialoguePanel button { height: 38px; color: #122023; font-size: 11px; font-weight: 900; background: var(--cyan); }
+
+.buildPaper { max-width: 900px; }
+.buildBrief { color: var(--muted); }
+.buildOptions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.buildOption { min-height: 210px; padding: 16px; text-align: left; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.buildOption:hover, .buildOption.current { border-color: var(--cyan); background: rgba(101,209,212,.08); }
+.buildOption > span { display: flex; justify-content: space-between; gap: 8px; }
+.buildOption b { font-size: 16px; }
+.buildOption i { color: var(--cyan); font-size: 9px; font-style: normal; }
+.buildOption p { min-height: 58px; color: #aeb6af; font-size: 11px; line-height: 1.55; }
+.buildOption dl { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin: 18px 0 0; }
+.buildOption dl div { padding: 7px 4px; text-align: center; background: rgba(0,0,0,.23); }
+.buildOption dt { color: var(--muted); font-size: 9px; }
+.buildOption dd { margin: 3px 0 0; color: var(--amber); font-size: 14px; font-weight: 900; }
+.buildFeedback { min-height: 24px; color: var(--amber); font-size: 12px; }
+.completePaper { max-width: 720px; }
+.completePaper > p:not(.eyebrow) { color: #c3cac3; line-height: 1.6; }
+.completeLedger { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin: 20px 0; }
+.completeLedger div { min-height: 72px; padding: 12px; background: rgba(255,255,255,.045); border-left: 2px solid var(--green); }
+.completeLedger small { display: block; color: var(--muted); font-size: 9px; }
+.completeLedger b { display: block; margin-top: 7px; font-size: 14px; }
+.completePaper button { margin: 0 6px 6px 0; }
+
+#touchControls { position: absolute; z-index: 14; inset: auto 18px max(14px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; pointer-events: none; }
+.touchMove, .touchActions { display: flex; gap: 8px; pointer-events: auto; }
+#touchControls button { display: grid; width: 62px; height: 52px; place-items: center; background: rgba(11,17,19,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 4px; box-shadow: 0 8px 22px rgba(0,0,0,.25); }
+#touchControls button span { font-size: 11px; font-weight: 900; pointer-events: none; }
+#touchControls button.pressed { transform: translateY(2px); background: rgba(101,209,212,.22); border-color: var(--cyan); }
+#touchControls .touchPrimary { width: 76px; color: #102024; background: rgba(101,209,212,.92); border-color: var(--cyan); }
+
+#toast { position: absolute; z-index: 50; top: 50%; left: 50%; width: min(520px, calc(100% - 40px)); padding: 13px 18px; transform: translate(-50%,-50%); text-align: center; font-size: 12px; font-weight: 800; background: rgba(13,20,22,.95); border: 1px solid rgba(101,209,212,.6); box-shadow: 0 18px 60px rgba(0,0,0,.55); pointer-events: none; }
+#toast[data-tone="warning"] { border-color: var(--red); }
+#toast[data-tone="success"] { border-color: var(--green); }
+
+#cinematicBars { position: absolute; inset: 0; z-index: 17; pointer-events: none; }
+#cinematicBars i { position: absolute; left: 0; right: 0; height: clamp(52px, 10vh, 92px); background: #050708; animation: barsIn .35s ease both; }
+#cinematicBars i:first-child { top: 0; transform-origin: top; }
+#cinematicBars i:last-child { bottom: 0; transform-origin: bottom; }
+@keyframes barsIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+#cinematicCaption { position: absolute; z-index: 18; left: 8%; bottom: clamp(72px, 13vh, 122px); width: min(620px, 76%); padding-left: 18px; border-left: 3px solid var(--amber); text-shadow: 0 2px 10px #000; }
+#cinematicCaption small { display: block; color: var(--amber); font-size: 9px; font-weight: 900; letter-spacing: .18em; }
+#cinematicCaption b { display: block; margin-top: 5px; font-size: 13px; }
+#cinematicCaption p { margin: 6px 0 8px; font-family: "STKaiti", "KaiTi", serif; font-size: clamp(16px, 2.1vw, 25px); line-height: 1.45; }
+#cinematicProgress { display: block; width: 100%; height: 2px; transform-origin: left; background: var(--cyan); }
+#skipCinematic { position: absolute; z-index: 19; right: 6%; bottom: clamp(72px, 13vh, 122px); padding: 7px 10px; color: #aeb5ae; font-size: 10px; background: rgba(0,0,0,.38); border: 1px solid rgba(255,255,255,.16); }
+
+@media (hover: hover) and (pointer: fine) {
+  #touchControls { opacity: .3; }
+  #touchControls:hover { opacity: 1; }
+}
+
+@media (max-width: 760px), (max-height: 520px) {
+  #gameShell { min-height: 320px; }
+  .titleCopy { width: calc(100% - 28px); padding: 14px 0; }
+  .eyebrow { margin-bottom: 5px; font-size: 8px; }
+  h1 { gap: 10px; font-size: clamp(42px, 13vw, 66px); }
+  .titleThesis { margin: 10px 0 12px; font-size: 11px; line-height: 1.45; }
+  .levelCards, .levelList { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .levelCard { min-height: 118px; padding: 11px; }
+  .levelCard small { font-size: 7px; letter-spacing: .03em; }
+  .levelCard b { margin: 6px 0 4px; font-size: 20px; }
+  .levelCard span { min-height: 33px; font-size: 8px; line-height: 1.35; }
+  .levelCard i { margin-top: 5px; font-size: 7px; }
+  .titleActions { margin-top: 9px; }
+  .primaryButton, .quietButton, .backButton { min-height: 36px; padding: 0 14px; font-size: 10px; }
+  .panelPaper { width: calc(100% - 22px); max-height: calc(100% - 22px); padding: 16px; }
+  .panelPaper h2 { margin-bottom: 10px; font-size: 28px; }
+  .controlList { gap: 0; }
+  .controlList div { grid-template-columns: 72px 1fr; padding: 7px 0; font-size: 10px; }
+  .guideNote { margin: 8px 0; padding: 8px 10px; font-size: 9px; }
+  #gameHeader { top: 6px; left: 8px; right: 8px; grid-template-columns: 106px 1fr 48px; gap: 5px; }
+  .levelStamp { padding: 5px 8px; }
+  .levelStamp small { font-size: 6px; }
+  .levelStamp span { font-size: 14px; }
+  .phaseStrip span { min-width: 0; flex: 1; justify-content: center; padding: 5px 2px; font-size: 7px; }
+  .phaseStrip span i { display: none; }
+  .headerButton { min-height: 30px; padding: 0 5px; font-size: 8px; }
+  #objectiveCard { top: 49px; left: 8px; width: 242px; padding: 8px 10px; }
+  #objectiveCard small { font-size: 6px; }
+  #objectiveCard p { margin: 3px 0; font-size: 10px; line-height: 1.25; }
+  #objectiveCard span { font-size: 7px; }
+  #metricsPanel { top: 49px; right: 8px; grid-template-columns: repeat(2, minmax(82px, 1fr)); gap: 4px; width: 218px; }
+  .metric { min-height: 42px; padding: 5px 7px; }
+  .metric small { font-size: 6px; }
+  .metric b { margin-top: 2px; font-size: 9px; }
+  .metric span { margin-top: 1px; font-size: 6px; }
+  #roleDock { left: 8px; bottom: 68px; width: 420px; padding: 5px; }
+  #roleDock > small { display: none; }
+  #roleButtons { gap: 3px; }
+  #roleButtons button { min-height: 34px; padding: 4px 3px 3px 11px; }
+  .roleDot { left: 4px; top: 5px; width: 4px; height: 22px; }
+  #roleButtons b { font-size: 8px; }
+  #roleButtons small { font-size: 5px; }
+  #interactionPrompt { bottom: 69px; min-width: 185px; padding: 5px 7px; }
+  #roleDock:not([hidden]) + #interactionPrompt { bottom: 112px; }
+  #interactionPrompt kbd { width: 24px; height: 24px; font-size: 10px; }
+  #interactionVerb { font-size: 7px; }
+  #interactionName { max-width: 220px; font-size: 8px; }
+  #touchControls { left: 8px; right: 8px; bottom: 7px; opacity: 1; }
   .touchMove, .touchActions { gap: 5px; }
-  #touchControls button { width: 52px; height: 52px; }
-  .touchActions button { width: 46px; height: 46px; font-size: 9px; }
-
-  #cinematicCaption {
-    left: 22px;
-    bottom: 70px;
-    width: calc(100vw - 118px);
-    padding-left: 12px;
-  }
-  #cinematicCaption p { font-size: 13px; line-height: 1.5; }
-  #cinematicProgress { left: 12px; }
-  #skipCinematic { right: 18px; bottom: 70px; }
+  #touchControls button { width: 49px; height: 43px; color: #eef3e9; background: rgba(10,17,19,.94); border-color: rgba(226,232,218,.46); box-shadow: 0 4px 16px rgba(0,0,0,.56); }
+  #touchControls .touchPrimary { width: 60px; }
+  #touchControls button span { font-size: 9px; color: #eef3e9; text-shadow: 0 1px 4px #000; }
+  #touchControls .touchPrimary { color: #102024; background: #65d1d4; border-color: #9decef; }
+  #touchControls .touchPrimary span { color: #102024; text-shadow: none; }
+  #dialoguePanel { bottom: 7px; grid-template-columns: 80px 1fr 58px; gap: 8px; min-height: 65px; width: calc(100% - 16px); padding: 8px 10px; }
+  #dialoguePanel small { font-size: 8px; }
+  #dialoguePanel p { font-size: 9px; line-height: 1.45; }
+  #dialoguePanel button { height: 30px; font-size: 8px; }
+  .buildPaper { width: calc(100% - 16px); padding: 12px; }
+  .buildBrief, .buildFeedback { margin: 5px 0; font-size: 8px; }
+  .buildOptions { gap: 5px; }
+  .buildOption { min-height: 145px; padding: 9px; }
+  .buildOption b { font-size: 11px; }
+  .buildOption i { font-size: 6px; }
+  .buildOption p { min-height: 43px; margin: 7px 0; font-size: 7px; }
+  .buildOption dl { margin-top: 7px; }
+  .buildOption dl div { padding: 4px 1px; }
+  .buildOption dt { font-size: 6px; }
+  .buildOption dd { font-size: 9px; }
+  #cinematicCaption { left: 5%; bottom: 55px; }
+  #skipCinematic { right: 4%; bottom: 55px; }
+  #cinematicBars i { height: 42px; }
 }
 
-@media (max-height: 460px) {
-  #cinematicBars i { height: 10px; }
-  #gameShell.isCinematic #cinematicBars i { height: 28px; }
-  #cinematicCaption {
-    left: 22px;
-    bottom: 38px;
-    width: min(570px, 67vw);
-    padding: 0 0 8px 12px;
-  }
-  #cinematicCaption small { margin-bottom: 3px; font-size: 8px; }
-  #cinematicCaption b { font-size: 11px; }
-  #cinematicCaption p { margin-top: 2px; font-size: 12px; line-height: 1.35; }
-  #cinematicProgress { left: 12px; }
-  #skipCinematic { right: 18px; bottom: 38px; min-height: 30px; padding: 6px 9px; font-size: 8px; }
-  #gameHeader { top: 12px; }
-  #objectiveCard {
-    top: 48px;
-    width: min(260px, 31vw);
-    padding: 8px 10px;
-  }
-  #objectiveCard p {
-    margin: 3px 0 1px;
-    font-size: 12px;
-    line-height: 1.35;
-  }
-  #objectiveCard span {
-    display: block;
-    overflow: hidden;
-    font-size: 9px;
-    line-height: 1.3;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  #suspicionHud { top: 48px; }
-  #touchControls { bottom: 10px; }
-  #touchControls button { width: 48px; height: 48px; }
-  .touchActions button { width: 44px; height: 44px; }
-  #dialoguePanel { bottom: 68px; }
-  #interactionPrompt { bottom: 68px; }
-}
-
-@media (max-width: 560px) and (orientation: portrait) {
-  .touchActions { display: grid; grid-template-columns: repeat(2, 46px); }
-  #touchControls { align-items: end; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    scroll-behavior: auto !important;
-    transition-duration: .01ms !important;
-    animation-duration: .01ms !important;
-  }
+@media (max-width: 520px) {
+  #metricsPanel { grid-template-columns: 1fr; width: 112px; }
+  .metric { min-height: 36px; }
+  #objectiveCard { width: 210px; }
+  #roleDock { width: calc(100% - 16px); }
 }
