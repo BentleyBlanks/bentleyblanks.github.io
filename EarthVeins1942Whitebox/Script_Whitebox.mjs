@@ -37,7 +37,7 @@ let toastTimer = 0;
 let state = CreateState(startingLevel);
 
 function CreateCivilians() {
-  return [
+  const civilians = [
     { id: "elderYu", name: "于大娘", group: "elders", x: -1.1, targetX: -1.1, smokeDose: 0, waterDose: 0, pace: 1.05, mark: "老" },
     { id: "elderGao", name: "高叔", group: "elders", x: -.7, targetX: -.7, smokeDose: 0, waterDose: 0, pace: .96, mark: "老" },
     { id: "wounded", name: "伤员小周", group: "stretcher", x: .05, targetX: .05, smokeDose: 0, waterDose: 0, pace: .72, mark: "伤" },
@@ -47,6 +47,8 @@ function CreateCivilians() {
     { id: "mother", name: "石头娘", group: "children", x: 1.8, targetX: 1.8, smokeDose: 0, waterDose: 0, pace: 1.08, mark: "母" },
     { id: "signalman", name: "钟有田", group: "elders", x: -1.5, targetX: -1.5, smokeDose: 0, waterDose: 0, pace: 1.02, mark: "钟" }
   ];
+  const visualX = { signalman: -3.1, elderYu: -2.35, elderGao: -1.6, wounded: -.55, medic: .25, childAn: 1.2, childShi: 1.85, mother: 2.55 };
+  return civilians.map((civilian) => ({ ...civilian, x: visualX[civilian.id], targetX: visualX[civilian.id] }));
 }
 
 function CreateState(levelIndex) {
@@ -728,7 +730,7 @@ function CommandCivilianGroup(shelterId) {
   const group = CivilianGroupDefinition(state.selectedCivilianGroup);
   const members = state.civilians.filter((civilian) => civilian.group === state.selectedCivilianGroup);
   members.forEach((civilian, index) => {
-    civilian.targetX = shelter.x + (index - (members.length - 1) / 2) * .38 + group.offset;
+    civilian.targetX = shelter.x + (index - (members.length - 1) / 2) * .72 + group.offset;
   });
   Toast(`${group.label}转移到${shelter.label}。他们会真实穿过地道，不会瞬移。`, "success");
   RenderCivilianCommands();
@@ -1329,6 +1331,8 @@ function Draw() {
   DrawTunnelSystems(width, height, surfaceY, tunnelY);
   DrawFluidSimulation(width, height, tunnelY);
   DrawDogCommandEnvironment(width, height, surfaceY, tunnelY);
+  DrawSurfaceVegetation(width, height, surfaceY);
+  DrawLighting(width, height, surfaceY, tunnelY, daylight);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
   if (!state.takedown) DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
@@ -1340,8 +1344,6 @@ function Draw() {
   DrawSurfaceCovers(width, surfaceY, true);
   DrawActionProps(width, height, surfaceY, tunnelY, true);
   DrawPickupTransfer(width, height, surfaceY, tunnelY);
-  DrawSurfaceVegetation(width, height, surfaceY);
-  DrawLighting(width, height, surfaceY, tunnelY, daylight);
   DrawSurfaceDiversions(width, height, surfaceY);
   DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
   DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
@@ -1801,36 +1803,35 @@ function DrawVillage(width, height, surfaceY) {
   DrawFieldDepth(width, surfaceY);
   DrawVillageGroundEdge(width, surfaceY);
 
-  const rearHouses = [-18, -14.4, -11, -7.6, -4.1, -.7, 2.8, 6.2, 9.7, 13.1, 16.7, 20.2];
-  rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .42));
+  const rearHouses = [-18, -12.8, -7.6, -2.4, 2.8, 8.1, 13.4, 18.7];
+  rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .3));
 
   context.save();
-  for (let worldX = -19; worldX <= 19; worldX += 1.05) {
+  for (let worldX = -19; worldX <= 19; worldX += 1.65) {
     const x = LayerToScreen(worldX, width, .58);
     const baseY = surfaceY - 19 + Math.sin(worldX * .8) * 3;
     const heightScale = 17 + SceneHash(worldX + 70) * 22;
-    context.fillStyle = "rgba(45,55,39,.72)"; context.beginPath(); context.ellipse(x, baseY - heightScale * .55, 8 + heightScale * .18, heightScale * .55, worldX % 2 ? .14 : -.14, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = "rgba(72,61,42,.56)"; context.lineWidth = 2; context.beginPath(); context.moveTo(x, baseY); context.lineTo(x + Math.sin(worldX) * 3, baseY - heightScale); context.stroke();
+    context.fillStyle = "rgba(45,55,39,.46)"; context.beginPath(); context.ellipse(x, baseY - heightScale * .55, 8 + heightScale * .18, heightScale * .55, worldX % 2 ? .14 : -.14, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "rgba(72,61,42,.38)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x, baseY); context.lineTo(x + Math.sin(worldX) * 3, baseY - heightScale); context.stroke();
   }
   context.restore();
 
-  const middleHouses = [-12.6, -8.9, -5.2, -1.3, 2.5, 6.6, 10.7, 14.2];
-  middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .72));
+  const middleHouses = [-12.6, -7.7, -2.4, 2.9, 8.1, 13.4];
+  middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .56));
 
   [
-    { x: -14.8, span: 3.2, parallax: .65, variant: 0 }, { x: -9.8, span: 2.4, parallax: .7, variant: 2 },
-    { x: -4.8, span: 3, parallax: .67, variant: 1 }, { x: .5, span: 2.7, parallax: .72, variant: 0 },
-    { x: 5.7, span: 2.5, parallax: .69, variant: 2 }, { x: 10.7, span: 3.1, parallax: .66, variant: 1 },
-    { x: 15.2, span: 2.8, parallax: .71, variant: 0 }
-  ].forEach((fence, index) => DrawVillageFenceSegment(fence.x, width, surfaceY - 8 - index % 2 * 4, fence.span, fence.parallax, fence.variant, .82));
+    { x: -14.8, span: 3.2, parallax: .65, variant: 0 }, { x: -7.8, span: 2.4, parallax: .7, variant: 2 },
+    { x: -.8, span: 3, parallax: .67, variant: 1 }, { x: 6.2, span: 2.7, parallax: .72, variant: 0 },
+    { x: 13.2, span: 3.1, parallax: .66, variant: 1 }
+  ].forEach((fence, index) => DrawVillageFenceSegment(fence.x, width, surfaceY - 8 - index % 2 * 4, fence.span, fence.parallax, fence.variant, .58));
 
   const mainHouses = [-9, -5.2, -.2, 4.4, 8.3];
   mainHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 3, 66 + index % 2 * 12, .82, index + 40, .94));
 
   [
     { x: -12.1, kind: "firewood", parallax: .82 }, { x: -7.2, kind: "wheelbarrow", parallax: .86 },
-    { x: -4.8, kind: "strawStack", parallax: .78 }, { x: -2.3, kind: "dryingRack", parallax: .79 }, { x: 2.2, kind: "plow", parallax: .85 },
-    { x: 6.2, kind: "strawStack", parallax: .8 }, { x: 8.6, kind: "firewood", parallax: .83 }, { x: 12.1, kind: "dryingRack", parallax: .8 }
+    { x: -2.3, kind: "dryingRack", parallax: .79 }, { x: 3.2, kind: "plow", parallax: .85 },
+    { x: 9.2, kind: "strawStack", parallax: .8 }
   ].forEach((prop, index) => DrawVillageWorkProp(prop.x, width, surfaceY - 3, prop.parallax, prop.kind, index));
 }
 
@@ -2813,6 +2814,35 @@ function DrawFluidSimulation(width, height, tunnelY) {
   }
 }
 
+function CivilianVisualMetrics(width, civilian) {
+  const actorReferenceHeight = actorProfiles.leader.height * 39 * (Math.min(width, 1100) / 26 * .038);
+  const lineScale = Math.max(.68, Math.min(1.18, actorReferenceHeight / 108));
+  if (civilian.id === "wounded") {
+    return {
+      bodyHeight: actorReferenceHeight * .42,
+      bodyWidth: actorReferenceHeight * .88,
+      headRadius: actorReferenceHeight * .06,
+      visualHeight: actorReferenceHeight * .54,
+      shoulder: actorReferenceHeight * .12,
+      waist: actorReferenceHeight * .07,
+      lineScale
+    };
+  }
+  const child = civilian.id === "childAn" || civilian.id === "childShi";
+  const signalman = civilian.id === "signalman";
+  const bodyHeight = actorReferenceHeight * (child ? .47 : signalman ? .73 : .7);
+  const headRadius = actorReferenceHeight * (child ? .062 : .064);
+  return {
+    bodyHeight,
+    bodyWidth: actorReferenceHeight * (child ? .2 : .27),
+    headRadius,
+    visualHeight: bodyHeight + headRadius * 2.15,
+    shoulder: actorReferenceHeight * (child ? .072 : .094),
+    waist: actorReferenceHeight * (child ? .045 : .058),
+    lineScale
+  };
+}
+
 function DrawCivilians(width, height, tunnelY) {
   if (state.levelIndex !== 0 || !state.civilians.length) return;
   const civilianLooks = {
@@ -2826,38 +2856,53 @@ function DrawCivilians(width, height, tunnelY) {
     const moving = Math.abs(civilian.targetX - civilian.x) > .04;
     const gait = moving ? Math.sin(state.elapsed * 8 + civilian.x * 1.7) : 0;
     const dose = Math.max(civilian.smokeDose, civilian.waterDose);
+    const metrics = CivilianVisualMetrics(width, civilian);
+    const { bodyHeight, headRadius, visualHeight, shoulder, waist, lineScale } = metrics;
     context.save();
     context.translate(x, floorY);
-    context.globalAlpha = .93;
+    context.globalAlpha = .97;
+    context.fillStyle = dose > 65 ? "rgba(153,56,44,.2)" : "rgba(232,213,169,.14)";
+    context.strokeStyle = dose > 65 ? "rgba(239,102,87,.52)" : "rgba(235,216,176,.38)";
+    context.lineWidth = 1.5 * lineScale;
+    context.beginPath();
+    context.ellipse(0, -visualHeight * .46, civilian.id === "wounded" ? metrics.bodyWidth * .57 : shoulder * 1.65, visualHeight * .55, 0, 0, Math.PI * 2);
+    context.fill(); context.stroke();
+    context.fillStyle = "rgba(5,8,8,.46)"; context.beginPath(); context.ellipse(0, 2, civilian.id === "wounded" ? metrics.bodyWidth * .55 : shoulder * 1.25, 4.5 * lineScale, 0, 0, Math.PI * 2); context.fill();
     if (civilian.group === "stretcher" && civilian.id === "wounded") {
-      context.strokeStyle = "#8b6640"; context.lineWidth = 3;
-      context.beginPath(); context.moveTo(-21, -4); context.lineTo(22, -4); context.moveTo(-18, -18); context.lineTo(19, -18); context.stroke();
-      context.fillStyle = "#65776f"; context.beginPath(); context.moveTo(-15, -6); context.lineTo(-11, -20); context.lineTo(14, -20); context.lineTo(18, -6); context.closePath(); context.fill();
-      context.fillStyle = "#c98e6b"; context.beginPath(); context.arc(14, -23, 4.2, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#d6c9aa"; context.fillRect(-7, -20, 12, 12);
+      const halfWidth = metrics.bodyWidth * .5;
+      context.strokeStyle = "#2c241b"; context.lineWidth = 5 * lineScale;
+      context.beginPath(); context.moveTo(-halfWidth, -4); context.lineTo(halfWidth, -4); context.moveTo(-halfWidth * .86, -bodyHeight * .72); context.lineTo(halfWidth * .86, -bodyHeight * .72); context.stroke();
+      context.strokeStyle = "#a87a46"; context.lineWidth = 2.8 * lineScale; context.stroke();
+      context.fillStyle = "#65776f"; context.strokeStyle = "rgba(226,209,167,.62)"; context.lineWidth = 1.4 * lineScale;
+      context.beginPath(); context.moveTo(-halfWidth * .78, -6); context.lineTo(-halfWidth * .61, -bodyHeight * .78); context.lineTo(halfWidth * .62, -bodyHeight * .78); context.lineTo(halfWidth * .8, -6); context.closePath(); context.fill(); context.stroke();
+      context.fillStyle = "#c98e6b"; context.beginPath(); context.arc(halfWidth * .61, -bodyHeight * .9, headRadius, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#d6c9aa"; context.fillRect(-halfWidth * .31, -bodyHeight * .73, halfWidth * .55, bodyHeight * .48);
     } else {
       const look = civilianLooks[civilian.group];
-      const bodyHeight = civilian.group === "children" ? 24 : civilian.id === "signalman" ? 32 : 30;
-      const shoulder = civilian.group === "children" ? 5.1 : 6.1;
-      const waist = civilian.group === "children" ? 3.2 : 3.8;
-      context.strokeStyle = look.pants; context.lineWidth = 2.6; context.lineCap = "round";
-      context.beginPath(); context.moveTo(-2.6, -bodyHeight * .35); context.lineTo(-3.2 + gait * 2, -2); context.moveTo(2.6, -bodyHeight * .35); context.lineTo(3.2 - gait * 2, -2); context.stroke();
+      context.strokeStyle = "rgba(24,22,18,.92)"; context.lineWidth = 5.2 * lineScale; context.lineCap = "round";
+      context.beginPath(); context.moveTo(-waist * .62, -bodyHeight * .35); context.lineTo(-waist * .75 + gait * 3 * lineScale, -2); context.moveTo(waist * .62, -bodyHeight * .35); context.lineTo(waist * .75 - gait * 3 * lineScale, -2); context.stroke();
+      context.strokeStyle = look.pants; context.lineWidth = 2.8 * lineScale; context.stroke();
       context.fillStyle = look.coat;
       context.beginPath(); context.moveTo(-shoulder, -bodyHeight * .78); context.quadraticCurveTo(0, -bodyHeight * 1.02, shoulder, -bodyHeight * .78); context.lineTo(waist, -bodyHeight * .35); context.lineTo(-waist, -bodyHeight * .35); context.closePath(); context.fill();
-      context.strokeStyle = "rgba(232,205,150,.42)"; context.lineWidth = 1; context.stroke();
-      context.strokeStyle = look.coat; context.lineWidth = 2.3; context.beginPath(); context.moveTo(-shoulder * .8, -bodyHeight * .73); context.lineTo(-shoulder - 2, -bodyHeight * .42); context.moveTo(shoulder * .8, -bodyHeight * .73); context.lineTo(shoulder + 2, -bodyHeight * .45); context.stroke();
-      context.fillStyle = look.scarf; context.fillRect(-waist * 1.2, -bodyHeight * .42, waist * 2.4, 2.5);
-      context.fillStyle = "#c99370"; context.beginPath(); context.arc(0, -bodyHeight - 4.5, civilian.group === "children" ? 4.2 : 4.7, 0, Math.PI * 2); context.fill();
-      context.fillStyle = civilian.group === "elders" ? "#aaa697" : "#302821"; context.beginPath(); context.arc(-.5, -bodyHeight - 6.2, civilian.group === "children" ? 4 : 4.5, Math.PI, Math.PI * 2); context.fill();
-      if (civilian.id === "signalman") { context.strokeStyle = "#ad8550"; context.lineWidth = 2; context.beginPath(); context.moveTo(shoulder + 2, -bodyHeight * .45); context.lineTo(11, -2); context.stroke(); }
-      if (civilian.id === "medic") { context.fillStyle = "#d8d1b7"; context.fillRect(-3, -bodyHeight * .67, 6, 6); context.fillStyle = "#688c82"; context.fillRect(-1, -bodyHeight * .66, 2, 4); context.fillRect(-2, -bodyHeight * .65, 4, 2); }
+      context.strokeStyle = "rgba(30,25,20,.9)"; context.lineWidth = 3.3 * lineScale; context.stroke();
+      context.strokeStyle = "rgba(238,216,171,.66)"; context.lineWidth = 1.25 * lineScale; context.stroke();
+      context.strokeStyle = look.coat; context.lineWidth = 3.1 * lineScale; context.beginPath(); context.moveTo(-shoulder * .8, -bodyHeight * .73); context.lineTo(-shoulder - 3 * lineScale, -bodyHeight * .42); context.moveTo(shoulder * .8, -bodyHeight * .73); context.lineTo(shoulder + 3 * lineScale, -bodyHeight * .45); context.stroke();
+      context.fillStyle = look.scarf; context.fillRect(-waist * 1.2, -bodyHeight * .42, waist * 2.4, 3 * lineScale);
+      const headY = -bodyHeight - headRadius * .92;
+      context.fillStyle = "rgba(28,23,19,.92)"; context.beginPath(); context.arc(0, headY, headRadius + 2 * lineScale, 0, Math.PI * 2); context.fill();
+      context.fillStyle = "#c99370"; context.beginPath(); context.arc(0, headY, headRadius, 0, Math.PI * 2); context.fill();
+      context.fillStyle = civilian.group === "elders" ? "#aaa697" : "#302821"; context.beginPath(); context.arc(-.5 * lineScale, headY - headRadius * .32, headRadius * .96, Math.PI, Math.PI * 2); context.fill();
+      if (civilian.id === "signalman") { context.strokeStyle = "#ad8550"; context.lineWidth = 2.5 * lineScale; context.beginPath(); context.moveTo(shoulder + 2, -bodyHeight * .45); context.lineTo(shoulder * 1.75, -2); context.stroke(); }
+      if (civilian.id === "medic") { const patch = Math.max(5, bodyHeight * .12); context.fillStyle = "#d8d1b7"; context.fillRect(-patch / 2, -bodyHeight * .67, patch, patch); context.fillStyle = "#688c82"; context.fillRect(-lineScale, -bodyHeight * .66, 2 * lineScale, patch * .72); context.fillRect(-patch * .36, -bodyHeight * .65 + patch * .25, patch * .72, 2 * lineScale); }
     }
+    const badgeY = -visualHeight - 15 * lineScale;
+    const badgeRadius = Math.max(7, 8 * lineScale);
     context.fillStyle = dose > 65 ? "#e46150" : "rgba(235,231,210,.9)";
-    context.beginPath(); context.arc(0, -43, 8, 0, Math.PI * 2); context.fill();
-    context.fillStyle = "#172123"; context.font = "900 7px system-ui"; context.textAlign = "center"; context.fillText(civilian.mark, 0, -40.5);
+    context.beginPath(); context.arc(0, badgeY, badgeRadius, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#172123"; context.font = `900 ${Math.max(7, 7 * lineScale)}px system-ui`; context.textAlign = "center"; context.fillText(civilian.mark, 0, badgeY + 2.5 * lineScale);
     if (dose > 4) {
-      context.strokeStyle = dose > 65 ? "#ef6657" : "#d2ad67"; context.lineWidth = 2;
-      context.beginPath(); context.arc(0, -43, 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, dose / 100)); context.stroke();
+      context.strokeStyle = dose > 65 ? "#ef6657" : "#d2ad67"; context.lineWidth = 2 * lineScale;
+      context.beginPath(); context.arc(0, badgeY, badgeRadius + 3 * lineScale, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, dose / 100)); context.stroke();
     }
     context.restore();
   }
@@ -3133,8 +3178,8 @@ function TunnelLightSdf(screenX, screenY, width, height, surfaceY, tunnelY) {
   for (const civilian of state.civilians) {
     const x = WorldToScreen(civilian.x, width);
     const floorY = TunnelFloorYAt(civilian.x, height, tunnelY);
-    const bodyHeight = civilian.group === "children" ? 24 : civilian.id === "wounded" ? 17 : 31;
-    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, x, floorY - bodyHeight * .5, civilian.id === "wounded" ? 17 : 6, bodyHeight * .5));
+    const metrics = CivilianVisualMetrics(width, civilian);
+    distance = Math.min(distance, SignedDistanceToRectangle(screenX, screenY, x, floorY - metrics.visualHeight * .5, civilian.id === "wounded" ? metrics.bodyWidth * .52 : metrics.shoulder * 1.08, metrics.visualHeight * .5));
   }
   if (state.player.layer === "tunnel") {
     const profile = actorProfiles[state.selectedRole];
@@ -3316,23 +3361,30 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const supportLift = PropSupportLift(action.prop.support) * sceneScale;
     const present = action.prop.mode === "place" ? completed : !completed;
     const empty = action.prop.mode !== "place" && completed;
-    context.save(); context.translate(x, baseY);
-    DrawPropSupport(action.prop.support, sceneScale, empty);
-    context.translate(0, supportLift);
-    if (present) DrawPropObject(action.prop.kind, sceneScale);
-    else if (action.prop.mode === "place" && !completed) DrawPropObject(action.prop.kind, sceneScale, true);
-    context.restore();
-
     const sameLayer = action.layer === state.player.layer;
     const focused = focusedProp?.id === action.id;
+    const entityScale = sceneScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
+    context.save(); context.translate(x, baseY);
+    if (!completed && sameLayer) {
+      context.fillStyle = focused ? "rgba(239,195,103,.2)" : "rgba(231,205,150,.11)";
+      context.strokeStyle = focused ? "rgba(246,210,129,.62)" : "rgba(229,211,172,.3)";
+      context.lineWidth = focused ? 2.3 : 1.3;
+      context.beginPath(); context.ellipse(0, supportLift - PropVisualHeight(action.prop.kind) * entityScale * .43, 31 * entityScale, 27 * entityScale, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    }
+    DrawPropSupport(action.prop.support, sceneScale, empty);
+    context.translate(0, supportLift);
+    if (present) DrawPropObject(action.prop.kind, entityScale);
+    else if (action.prop.mode === "place" && !completed) DrawPropObject(action.prop.kind, entityScale, true);
+    context.restore();
+
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
-    const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * sceneScale * .58;
+    const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * entityScale * .58;
     if (!completed && sameLayer) {
       const pulse = 1 + Math.sin(state.elapsed * 4.2 + action.x) * .1;
       context.save(); context.translate(x, markerY); context.scale(pulse, pulse);
-      context.strokeStyle = locked ? "rgba(222,183,112,.7)" : "rgba(104,225,225,.88)"; context.lineWidth = 2;
-      context.beginPath(); context.ellipse(0, 0, 17 * sceneScale, 12 * sceneScale, 0, 0, Math.PI * 2); context.stroke();
-      context.fillStyle = locked ? "rgba(178,132,74,.2)" : "rgba(92,214,216,.16)"; context.fill(); context.restore();
+      context.strokeStyle = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.9)"; context.lineWidth = focused ? 3 : 2.3;
+      context.beginPath(); context.ellipse(0, 0, (focused ? 22 : 18) * entityScale, (focused ? 15 : 12) * entityScale, 0, 0, Math.PI * 2); context.stroke();
+      context.fillStyle = locked ? "rgba(178,132,74,.2)" : focused ? "rgba(238,186,82,.2)" : "rgba(92,214,216,.14)"; context.fill(); context.restore();
     }
     if (focused) {
       const label = completed ? (action.prop.mode === "place" ? `已布置 · ${action.prop.label}` : `已取走 · ${action.prop.label}`) : action.prop.label;
@@ -3453,6 +3505,10 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
     context.translate(0, fall * height * .025);
     context.rotate(-fall * 1.43);
   }
+  context.fillStyle = isCollaborator ? "rgba(191,174,143,.1)" : "rgba(190,171,105,.11)";
+  context.strokeStyle = enemy.detecting ? "rgba(233,91,67,.58)" : "rgba(221,205,158,.28)";
+  context.lineWidth = 1.5;
+  context.beginPath(); context.ellipse(0, -height * .45, height * .21, height * .55, 0, 0, Math.PI * 2); context.fill(); context.stroke();
   context.fillStyle = "rgba(0,0,0,.34)"; context.beginPath(); context.ellipse(0, 3, height * .18, 4.5, 0, 0, Math.PI * 2); context.fill();
 
   const rearFoot = DrawJointedLimb(-height * .055, -height * .34, height * .205, height * .185, stride, -stride * .38, profile.pants, limbWidth + .45);
@@ -4020,6 +4076,10 @@ function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
   const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
+  context.fillStyle = profile.animal ? "rgba(240,196,112,.13)" : "rgba(203,231,219,.14)";
+  context.strokeStyle = profile.animal ? "rgba(246,213,150,.46)" : "rgba(214,241,227,.5)";
+  context.lineWidth = 1.7;
+  context.beginPath(); context.ellipse(0, -height * .46, profile.animal ? height * .67 : height * .21, height * .56, 0, 0, Math.PI * 2); context.fill(); context.stroke();
   if (profile.animal) DrawDogActor(profile, height, state.player);
   else DrawHumanActor(profile, roleId, height);
   context.restore();
@@ -4028,6 +4088,7 @@ function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
 
 function DrawSurfaceVegetation(width, height, surfaceY) {
   context.save();
+  context.globalAlpha = .58;
   const clumps = [-10.2, -7.6, -4.1, 2.8, 6.1, 9.5];
   context.strokeStyle = "rgba(31,35,29,.72)";
   context.fillStyle = "rgba(43,47,34,.72)";
@@ -4053,10 +4114,13 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
   context.restore();
 
   context.save();
+  context.globalAlpha = .62;
   context.strokeStyle = "rgba(18,24,21,.78)"; context.fillStyle = "rgba(23,29,24,.76)"; context.lineCap = "round";
+  const playerX = WorldToScreen(state.player.x, width);
   const foregroundClumps = [-13, -9.3, -5.4, -1.2, 3.4, 7.7, 12.1];
   foregroundClumps.forEach((worldX, clumpIndex) => {
     const baseX = LayerToScreen(worldX, width, 1.16);
+    if (Math.abs(baseX - playerX) < 76) return;
     for (let stemIndex = 0; stemIndex < 5; stemIndex += 1) {
       const offset = (stemIndex - 2) * 8;
       const stemHeight = 24 + ((clumpIndex * 9 + stemIndex * 7) % 30);
@@ -4079,11 +4143,12 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
   }
   context.restore();
   const vignette = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .2, width / 2, height / 2, Math.max(width, height) * .68);
-  vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,0,.48)"); context.fillStyle = vignette; context.fillRect(0, 0, width, height);
+  vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,0,.28)"); context.fillStyle = vignette; context.fillRect(0, 0, width, height);
 }
 
 function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
   context.save();
+  context.globalAlpha = .62;
   const nearScale = Math.max(.72, Math.min(1.18, width / 1100));
   const playerX = WorldToScreen(state.player.x, width);
 
@@ -4106,7 +4171,7 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
     for (let beam = 0; beam < 3; beam += 1) { const beamY = surfaceY - wallHeight * (.22 + beam * .23); context.beginPath(); context.moveTo(x - structureWidth * .48, beamY); context.lineTo(x + structureWidth * .48, beamY - 3); context.stroke(); }
   });
 
-  const nearCropXs = [-18.4, -15.7, -12.2, -8.7, -4.9, -1.6, 1.8, 5.3, 9.1, 12.8, 16.2, 19.7];
+  const nearCropXs = [-18.4, -13.6, -8.7, -3.9, 1.8, 6.7, 11.6, 16.4];
   nearCropXs.forEach((worldX, clumpIndex) => {
     const baseX = LayerToScreen(worldX, width, 1.29);
     if (baseX < -90 || baseX > width + 90 || Math.abs(baseX - playerX) < 52) return;
@@ -4163,10 +4228,11 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
     }
   });
 
-  const foregroundSupports = [-11.8, -7.4, -3.1, 1.5, 5.9, 10.2, 14.6];
+  const foregroundSupports = [-11.8, -6.2, -.7, 4.9, 10.5];
   foregroundSupports.forEach((worldX, index) => {
     const x = LayerToScreen(worldX, width, 1.13);
-    if (x < -50 || x > width + 50 || (state.player.layer === "tunnel" && Math.abs(x - playerX) < 46)) return;
+    const nearCivilian = state.civilians.some((civilian) => Math.abs(x - WorldToScreen(civilian.x, width)) < 46);
+    if (x < -50 || x > width + 50 || nearCivilian || (state.player.layer === "tunnel" && Math.abs(x - playerX) < 46)) return;
     const centerY = TunnelCenterYAt(worldX, tunnelY);
     const localHalfHeight = TunnelHalfHeightAt(worldX, height);
     const ceilingY = centerY - localHalfHeight + 2;
@@ -4179,7 +4245,7 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
     context.beginPath(); context.moveTo(x + 4, floorY + 10); context.lineTo(x + (index % 2 ? -1 : 9), ceilingY + 12); context.stroke();
   });
 
-  const rootXs = [-9.8, -6.1, -2.6, .8, 4.1, 7.8, 10.6];
+  const rootXs = [-9.8, -4.8, .2, 5.2, 10.2];
   rootXs.forEach((worldX, index) => {
     const x = LayerToScreen(worldX, width, 1.09);
     const rootLength = 18 + index % 3 * 12;
@@ -4197,7 +4263,7 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
   context.strokeStyle = "rgba(123,88,49,.5)"; context.lineWidth = 4; context.beginPath(); floorSamples.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)); context.stroke();
 
   const nearVignette = context.createRadialGradient(width / 2, height * .54, Math.min(width, height) * .28, width / 2, height * .54, Math.max(width, height) * .76);
-  nearVignette.addColorStop(0, "rgba(0,0,0,0)"); nearVignette.addColorStop(.68, "rgba(0,0,0,.04)"); nearVignette.addColorStop(1, "rgba(0,0,0,.3)"); context.fillStyle = nearVignette; context.fillRect(0, 0, width, height);
+  nearVignette.addColorStop(0, "rgba(0,0,0,0)"); nearVignette.addColorStop(.68, "rgba(0,0,0,.025)"); nearVignette.addColorStop(1, "rgba(0,0,0,.18)"); context.fillStyle = nearVignette; context.fillRect(0, 0, width, height);
   context.restore();
 }
 
@@ -4234,7 +4300,7 @@ function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) 
   context.save();
 
   context.globalCompositeOperation = "multiply";
-  context.fillStyle = daylight > .4 ? "rgba(103,72,37,.1)" : "rgba(91,56,35,.15)";
+  context.fillStyle = daylight > .4 ? "rgba(103,72,37,.06)" : "rgba(91,56,35,.1)";
   context.fillRect(0, 0, width, height);
 
   context.save();
@@ -4259,7 +4325,7 @@ function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) 
     context.beginPath(); context.moveTo(start, y); context.quadraticCurveTo(start + length * .5, y + Math.sin(line) * 2, start + length, y + (line % 3 - 1)); context.stroke();
   }
 
-  context.globalAlpha = daylight > .4 ? .92 : .7;
+  context.globalAlpha = daylight > .4 ? .62 : .5;
   context.fillStyle = lianhuanhuaPattern;
   context.fillRect(0, 0, width, height);
 
@@ -4267,7 +4333,7 @@ function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) 
   const paperGlow = context.createRadialGradient(width * .48, height * .45, 20, width * .48, height * .45, Math.max(width, height) * .72);
   paperGlow.addColorStop(0, "rgba(239,224,186,.025)");
   paperGlow.addColorStop(.7, "rgba(63,43,29,.02)");
-  paperGlow.addColorStop(1, "rgba(22,18,15,.25)");
+  paperGlow.addColorStop(1, "rgba(22,18,15,.18)");
   context.fillStyle = paperGlow; context.fillRect(0, 0, width, height);
 
   context.strokeStyle = "rgba(24,19,15,.62)"; context.lineWidth = Math.max(2, Math.min(5, width * .003));

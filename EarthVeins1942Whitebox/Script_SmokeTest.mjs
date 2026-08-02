@@ -179,6 +179,16 @@ Assert(WaterCentroid() > waterStart + .5, "水体没有在重力与自由表面�
 const rayDistance = TraceSdfRay(0, 0, 0, 30, (x, y) => 10 - Math.hypot(x, y));
 Assert(rayDistance >= 8 && rayDistance <= 11, "SDF 光线没有在遮挡墙面前终止");
 
+Assert(game.includes("function CivilianVisualMetrics") && game.match(/CivilianVisualMetrics\(width, civilian\)/g)?.length >= 3, "civilian drawing and tunnel-light occlusion must share one responsive size model");
+Assert(game.includes("actorReferenceHeight * (child ? .47 : signalman ? .73 : .7)") && !game.includes('children\" ? 24'), "adult and child civilians must scale from the same on-screen actor reference instead of fixed tiny pixels");
+Assert(game.includes("const visualX = { signalman: -3.1") && game.includes("* .72 + group.offset") && game.includes('civilian.id === "childAn" || civilian.id === "childShi"'), "civilian groups must keep readable spacing and must not render the children\'s mother at child scale");
+Assert(game.includes("const entityScale = sceneScale * (focused && !completed ? 1.2") && game.includes("rgba(239,195,103,.2)"), "focused key props must receive a restrained warm isolation field and visible scale lift");
+Assert(game.includes("context.globalAlpha = .62") && game.includes("Math.abs(baseX - playerX) < 76") && game.includes('rgba(0,0,0,.28)'), "foreground depth must preserve parallax without covering the controlled character");
+Assert(game.indexOf("DrawLighting(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawCivilians(width, height, tunnelY)") && game.includes("const nearCivilian = state.civilians.some"), "lighting and foreground supports must preserve readable character silhouettes");
+Assert(game.includes('daylight > .4 ? \"rgba(103,72,37,.06)\" : \"rgba(91,56,35,.1)\"') && game.includes("daylight > .4 ? .62 : .5"), "lianhuanhua print treatment must stay visible without muddying gameplay silhouettes");
+Assert(css.includes("Portrait phones keep identity and interaction UI in the sky band") && css.includes("#roleDock { top: 128px; bottom: auto") && css.includes("#civilianCommandPanel { top: 184px"), "portrait-phone HUD must stay above the tunnel playfield instead of covering villagers and props");
+Assert(css.includes("#interactionPrompt { top: 170px; bottom: auto") && css.includes("#roleDock:not([hidden]) ~ #interactionPrompt { top: 170px; bottom: auto"), "desktop interaction prompt must stay in the upper safe band instead of covering actors and props");
+
 const forbiddenRuntime = [/three(?:\.min)?\.js/i, /<img\b/i, /new\s+Image\s*\(/, /AudioContext/i, /https?:\/\//i];
 for (const pattern of forbiddenRuntime) {
   Assert(!pattern.test(html + "\n" + game + "\n" + data + "\n" + fluidCode + "\n" + lightCode), `白盒出现禁止的外部运行时/素材：${pattern}`);

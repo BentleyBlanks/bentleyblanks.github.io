@@ -330,8 +330,8 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #roleButtons small { display: block; max-width: 94px; margin-top: 2px; overflow: hidden; color: rgba(225,229,218,.56); font-size: 6px; white-space: nowrap; text-overflow: ellipsis; }
 #roleButtons button.active small { color: rgba(29,42,42,.62); }
 
-#interactionPrompt { bottom: 78px; min-width: 0; padding: 0; gap: 7px; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 4px 9px rgba(0,0,0,.72)); }
-#roleDock:not([hidden]) ~ #interactionPrompt { bottom: 124px; }
+#interactionPrompt { top: 170px; bottom: auto; min-width: 0; padding: 0; gap: 7px; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 4px 9px rgba(0,0,0,.72)); }
+#roleDock:not([hidden]) ~ #interactionPrompt { top: 170px; bottom: auto; }
 #interactionPrompt kbd { width: 34px; height: 34px; color: #182326; font-size: 11px; background: rgba(236,232,214,.96); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; }
 #interactionPrompt p { max-width: 260px; padding: 5px 11px 6px; background: rgba(8,13,15,.68); border-radius: 16px; backdrop-filter: blur(4px); }
 #interactionVerb { color: var(--cyan); font-size: 8px; }
@@ -439,8 +439,8 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   .rolePortrait { left: 5px; width: 24px; height: 29px; }
   #roleButtons b { font-size: 8px; }
   #roleButtons small { display: none; }
-  #interactionPrompt { bottom: 64px; min-width: 0; padding: 0; }
-  #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 96px; }
+  #interactionPrompt { top: auto; bottom: 64px; min-width: 0; padding: 0; }
+  #roleDock:not([hidden]) ~ #interactionPrompt { top: auto; bottom: 96px; }
   #interactionPrompt kbd { width: 27px; height: 27px; font-size: 8px; }
   #interactionPrompt p { padding: 4px 8px; }
   #interactionVerb { font-size: 6px; }
@@ -553,4 +553,12 @@ h1 small { color: #bd553f; }
   #objectiveCard { padding: 5px 0 6px 10px; background: linear-gradient(90deg, rgba(224,207,170,.92), rgba(224,207,170,.53) 80%, transparent); }
   #roleButtons button { border-radius: 2px; }
   #gameShell::after { inset: 2px; border-width: 1px; }
+}
+
+/* Portrait phones keep identity and interaction UI in the sky band, leaving the tunnel stage unobstructed. */
+@media (max-width: 520px) and (min-height: 650px) {
+  #roleDock { top: 128px; bottom: auto; left: 10px; }
+  #interactionPrompt, #roleDock:not([hidden]) ~ #interactionPrompt { top: 174px; bottom: auto; left: 10px; right: auto; transform: none; }
+  #dogCommandHud { top: 210px; bottom: auto; left: 10px; }
+  #civilianCommandPanel { top: 184px; right: 8px; bottom: auto; }
 }
