@@ -253,3 +253,122 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
   #objectiveCard { width: 210px; }
   #roleDock { width: calc(100% - 16px); }
 }
+
+/* Minimal narrative HUD: screen space belongs to the scene, not a dashboard. */
+#gameHeader { top: max(16px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.levelStamp { min-width: 0; padding: 0; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 2px 7px rgba(0,0,0,.85)); }
+.levelStamp small { color: var(--amber); font-size: 8px; letter-spacing: .16em; }
+.levelStamp span { margin-top: 2px; font-size: 19px; text-shadow: 0 2px 7px #000; }
+.phaseStrip { position: absolute; top: 2px; left: 50%; display: flex; align-items: center; gap: 8px; transform: translateX(-50%); }
+.phaseStrip span { display: flex; align-items: center; gap: 6px; width: 9px; min-width: 0; padding: 0; color: rgba(238,241,232,.56); font-size: 0; background: none; border: 0; transition: width .2s ease, color .2s ease; }
+.phaseStrip span i { display: block; flex: 0 0 auto; width: 7px; height: 7px; overflow: hidden; color: transparent; font-size: 0; background: rgba(238,241,232,.12); border: 1px solid rgba(238,241,232,.48); border-radius: 50%; }
+.phaseStrip span.done i { background: var(--amber); border-color: var(--amber); }
+.phaseStrip span.active { width: auto; color: #f3f0e5; font-size: 9px; text-shadow: 0 2px 5px #000; }
+.phaseStrip span.active i { width: 9px; height: 9px; background: var(--cyan); border-color: #d8ffff; box-shadow: 0 0 0 3px rgba(101,209,212,.14); }
+.headerButton { min-width: 42px; min-height: 28px; padding: 0 8px; color: rgba(242,242,232,.78); font-size: 9px; background: rgba(8,13,15,.32); border: 0; border-radius: 16px; box-shadow: none; backdrop-filter: blur(4px); }
+
+#objectiveCard { top: 56px; left: 24px; width: min(330px, calc(100% - 48px)); padding: 5px 0 7px 13px; background: linear-gradient(90deg, rgba(7,12,14,.7), rgba(7,12,14,0)); border: 0; border-left: 2px solid var(--cyan); box-shadow: none; filter: drop-shadow(0 3px 7px rgba(0,0,0,.65)); }
+#objectiveCard small { font-size: 8px; letter-spacing: .13em; }
+#objectiveCard p { margin: 3px 0 2px; font-family: "STKaiti", "KaiTi", serif; font-size: 15px; line-height: 1.32; text-shadow: 0 2px 5px #000; }
+#objectiveCard span { display: block; max-width: 290px; color: rgba(224,229,219,.7); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+#metricsPanel { top: 58px; right: 24px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: auto; max-width: 200px; }
+.metric { position: relative; display: grid; grid-template-columns: 25px auto; align-items: center; gap: 7px; min-height: 0; min-width: 96px; padding: 5px 10px 6px 6px; overflow: hidden; background: rgba(8,13,15,.58); border: 0; border-radius: 22px; box-shadow: 0 3px 12px rgba(0,0,0,.28); backdrop-filter: blur(4px); }
+.metricIcon { display: grid; width: 24px; height: 24px; place-items: center; color: #192427; font: 900 10px/1 system-ui; font-style: normal; background: rgba(226,224,205,.88); border-radius: 50%; }
+.metricCopy { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.metricCopy small { color: rgba(228,232,222,.62); font-size: 7px; letter-spacing: .08em; }
+.metricCopy b { margin: 0; color: #f3f0e5; font-size: 11px; white-space: nowrap; }
+.metric > span:not(.metricCopy) { display: none; }
+.metricBar { right: 8px; bottom: 2px; left: 38px; height: 2px; border-radius: 2px; }
+.metricBar u { border-radius: 2px; }
+
+#roleDock { left: 24px; bottom: 76px; width: auto; max-width: calc(100% - 48px); padding: 0; background: transparent; border: 0; filter: drop-shadow(0 4px 12px rgba(0,0,0,.62)); }
+#roleDock > small { display: none; }
+#roleButtons { display: flex; gap: 6px; }
+#roleButtons button { width: auto; min-width: 48px; min-height: 34px; padding: 5px 9px 5px 19px; overflow: hidden; text-align: center; background: rgba(8,13,15,.58); border: 1px solid rgba(236,239,226,.15); border-radius: 19px; backdrop-filter: blur(4px); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+#roleButtons button.active { color: #172326; background: rgba(236,232,214,.94); border-color: #fffbed; transform: translateY(-2px); }
+.roleDot { top: 50%; left: 8px; width: 7px; height: 7px; transform: translateY(-50%); border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.13); }
+#roleButtons b { display: block; font-size: 9px; white-space: nowrap; }
+#roleButtons small { display: none; }
+
+#interactionPrompt { bottom: 78px; min-width: 0; padding: 0; gap: 7px; background: transparent; border: 0; box-shadow: none; filter: drop-shadow(0 4px 9px rgba(0,0,0,.72)); }
+#roleDock:not([hidden]) + #interactionPrompt { bottom: 124px; }
+#interactionPrompt kbd { width: 34px; height: 34px; color: #182326; font-size: 11px; background: rgba(236,232,214,.96); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; }
+#interactionPrompt p { max-width: 260px; padding: 5px 11px 6px; background: rgba(8,13,15,.68); border-radius: 16px; backdrop-filter: blur(4px); }
+#interactionVerb { color: var(--cyan); font-size: 8px; }
+#interactionName { margin-top: 0; font-size: 9px; }
+
+#dialoguePanel { bottom: 24px; grid-template-columns: 92px minmax(240px, 560px) 62px; gap: 12px; width: min(760px, calc(100% - 48px)); min-height: 72px; padding: 11px 13px; color: #1a2222; background: rgba(237,232,214,.97); border: 0; border-radius: 4px; box-shadow: 0 16px 50px rgba(0,0,0,.45); }
+#dialoguePanel::after { content: ""; position: absolute; left: 19%; bottom: -12px; border: 7px solid transparent; border-top-color: rgba(237,232,214,.97); }
+#dialoguePanel small { color: #77603c; font-size: 9px; }
+#dialoguePanel p { color: #202828; font-family: "STKaiti", "KaiTi", serif; font-size: 13px; line-height: 1.5; }
+#dialoguePanel button { height: 30px; color: #eee9d7; font-size: 9px; background: #273538; border-radius: 16px; }
+
+#touchControls { left: 20px; right: 20px; bottom: max(14px, env(safe-area-inset-bottom)); }
+.touchMove, .touchActions { gap: 8px; }
+#touchControls button { width: 46px; height: 46px; color: #eeeadd; background: rgba(8,13,15,.52); border: 1px solid rgba(238,239,225,.34); border-radius: 50%; box-shadow: 0 5px 18px rgba(0,0,0,.34); backdrop-filter: blur(5px); }
+#touchControls button span { font-size: 9px; }
+#touchControls .touchPrimary { width: 56px; height: 56px; margin-top: -5px; color: #172326; background: rgba(236,232,214,.96); border: 2px solid rgba(255,255,255,.78); }
+#touchControls .touchPrimary span { color: #172326; }
+
+#toast { width: auto; max-width: min(520px, calc(100% - 40px)); padding: 8px 14px; font-size: 10px; font-weight: 700; background: rgba(8,13,15,.82); border: 0; border-radius: 18px; backdrop-filter: blur(5px); }
+#qaPanel { top: 126px; }
+
+.levelCard { background: rgba(20,28,29,.58); border: 0; border-top: 1px solid rgba(230,233,219,.18); box-shadow: none; }
+.levelCard:hover, .levelCard.selected { background: rgba(33,45,44,.72); border-color: var(--cyan); }
+.buildPaper { color: #202827; background: rgba(237,232,214,.98); border: 0; }
+.buildPaper .eyebrow, .buildFeedback { color: #426e70; }
+.buildBrief, .buildOption p { color: #53605c; }
+.buildOption { color: #202827; background: rgba(255,255,255,.35); border: 1px solid rgba(37,49,48,.17); }
+.buildOption:hover, .buildOption.current { background: rgba(101,209,212,.12); border-color: #426e70; }
+.buildOption dl div { background: rgba(32,40,39,.08); }
+.buildOption dt { color: #65706c; }
+.buildOption dd { color: #8e6227; }
+.buildPaper .backButton { color: #eee9d7; background: #273538; }
+
+@media (hover: hover) and (pointer: fine) {
+  #touchControls { display: none; }
+}
+
+@media (max-width: 760px), (max-height: 520px) {
+  #gameHeader { top: 8px; left: 10px; right: 10px; display: flex; }
+  .levelStamp { padding: 0; }
+  .levelStamp small { display: none; }
+  .levelStamp span { font-size: 14px; }
+  .phaseStrip { top: 1px; gap: 6px; }
+  .phaseStrip span { flex: 0 0 auto; width: 7px; padding: 0; font-size: 0; }
+  .phaseStrip span.active { width: auto; font-size: 7px; }
+  .phaseStrip span i { display: block; width: 6px; height: 6px; }
+  .headerButton { min-height: 24px; padding: 0 7px; font-size: 7px; }
+  #objectiveCard { top: 36px; left: 10px; width: 235px; padding: 4px 0 5px 9px; }
+  #objectiveCard small { font-size: 6px; }
+  #objectiveCard p { margin: 2px 0; font-size: 11px; }
+  #objectiveCard span { max-width: 220px; font-size: 7px; }
+  #metricsPanel { top: 37px; right: 10px; display: flex; grid-template-columns: none; gap: 4px; width: auto; max-width: 150px; }
+  .metric { min-width: 78px; min-height: 0; grid-template-columns: 20px auto; gap: 5px; padding: 3px 7px 4px 4px; }
+  .metricIcon { width: 19px; height: 19px; font-size: 7px; }
+  .metricCopy { gap: 4px; }
+  .metricCopy small { font-size: 5px; }
+  .metricCopy b { font-size: 8px; }
+  .metricBar { left: 29px; right: 6px; }
+  #roleDock { left: 10px; bottom: 61px; width: auto; max-width: 470px; padding: 0; }
+  #roleButtons { display: flex; gap: 4px; }
+  #roleButtons button { min-width: 46px; min-height: 28px; padding: 3px 7px 3px 15px; }
+  .roleDot { left: 6px; top: 50%; width: 6px; height: 6px; }
+  #roleButtons b { font-size: 7px; }
+  #interactionPrompt { bottom: 64px; min-width: 0; padding: 0; }
+  #roleDock:not([hidden]) + #interactionPrompt { bottom: 96px; }
+  #interactionPrompt kbd { width: 27px; height: 27px; font-size: 8px; }
+  #interactionPrompt p { padding: 4px 8px; }
+  #interactionVerb { font-size: 6px; }
+  #interactionName { max-width: 180px; font-size: 7px; }
+  #touchControls { display: flex; left: 8px; right: 8px; bottom: 7px; opacity: 1; }
+  .touchMove, .touchActions { gap: 5px; }
+  #touchControls button { width: 42px; height: 42px; border-radius: 50%; }
+  #touchControls .touchPrimary { width: 50px; height: 50px; margin-top: -4px; }
+  #dialoguePanel { bottom: 9px; grid-template-columns: 68px 1fr 50px; gap: 7px; min-height: 56px; width: min(700px, calc(100% - 18px)); padding: 7px 9px; }
+  #dialoguePanel small { font-size: 7px; }
+  #dialoguePanel p { font-size: 9px; }
+  #dialoguePanel button { height: 27px; font-size: 7px; }
+  #qaPanel { top: 102px; }
+}

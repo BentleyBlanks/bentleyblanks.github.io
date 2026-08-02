@@ -492,29 +492,26 @@ function ContextHint() {
   return `${roleDefinitions[state.selectedRole].name} · ${state.player.layer === "surface" ? "地表" : "地道"}`;
 }
 
-function Metric(label, value, detail = "", meter = null, inverse = false) {
+function Metric(label, value, detail = "", meter = null, inverse = false, icon = "·") {
   const fill = meter === null ? "" : `<i class="metricBar"><u style="width:${Math.max(0, Math.min(100, meter))}%" class="${inverse ? "inverse" : ""}"></u></i>`;
-  return `<div class="metric"><small>${label}</small><b>${value}</b>${detail ? `<span>${detail}</span>` : ""}${fill}</div>`;
+  return `<div class="metric" title="${detail}"><em class="metricIcon">${icon}</em><span class="metricCopy"><small>${label}</small><b>${value}</b></span>${fill}</div>`;
 }
 
 function MetricsMarkup() {
-  if (state.levelIndex === 0) return [
-    Metric("施工物资", `木 ${state.resources.wood} · 铁 ${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`),
-    Metric("地道通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100),
-    Metric("分割防御", state.defense.strength, `剩余敌队 ${state.defense.enemyUnits}`, state.defense.strength / 6 * 100),
-    Metric("夜间暴露", Math.round(state.exposure), state.player.crouch ? "蹲伏中" : "站立移动", state.exposure, true)
-  ].join("");
+  if (state.levelIndex === 0) {
+    const resources = Metric("材料", `木${state.resources.wood} 铁${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`, null, false, "材");
+    if (state.phaseId === "collect") return [resources, Metric("暴露", Math.round(state.exposure), state.player.crouch ? "蹲伏中" : "站立移动", state.exposure, true, "隐")].join("");
+    if (state.phaseId === "build") return [resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
+    return [Metric("敌队", state.defense.enemyUnits, "受困或撤离后的剩余人数", state.defense.enemyUnits / 6 * 100, true, "敌"), Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
+  }
   if (state.levelIndex === 1) return [
-    Metric("当前角色", roleDefinitions[state.selectedRole].short, roleDefinitions[state.selectedRole].skill),
-    Metric("安全转移", requiredRescues.filter((key) => state.rescues[key]).length + " / 3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100),
-    Metric("记忆物", `${state.memories.length} / 2`, state.memories.join(" · ") || "可选，不阻塞转移"),
-    Metric("协作链", `${state.completed.size}`, "每一步需要特定人物")
+    Metric("转移", requiredRescues.filter((key) => state.rescues[key]).length + "/3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100, false, "转"),
+    Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆")
   ].join("");
   return [
-    Metric("敌方警觉", Math.round(state.alert), state.player.layer === "tunnel" ? "正在回落" : state.player.crouch ? "增长减缓" : "地表暴露", state.alert, true),
-    Metric("敌方士气", Math.round(state.morale), state.morale <= 55 ? "已到恐慌断点" : "继续制造矛盾信息", state.morale),
-    Metric("不同诡计", `${state.tricks.size} / 3`, "重复同一种异常不会加速循环", state.tricks.size / 3 * 100),
-    Metric("AI 状态", state.phaseId === "harass" ? "搜索" : state.phaseId === "panic" ? "恐慌连锁" : "撤离", state.nextRaid || "拒绝入屋值随士气下降")
+    Metric("警觉", Math.round(state.alert), state.player.layer === "tunnel" ? "正在回落" : state.player.crouch ? "增长减缓" : "地表暴露", state.alert, true, "警"),
+    Metric("士气", Math.round(state.morale), state.morale <= 55 ? "已到恐慌断点" : "继续制造矛盾信息", state.morale, false, "志"),
+    Metric("诡计", `${state.tricks.size}/3`, "三种不同异常可触发恐慌", state.tricks.size / 3 * 100, false, "计")
   ].join("");
 }
 
