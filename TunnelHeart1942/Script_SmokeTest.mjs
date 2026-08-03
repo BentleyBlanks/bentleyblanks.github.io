@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT, WorldToCell } from "./Script_Dig.mjs";
-import { FluidFillAtWorld, IsSealed, SetSealed } from "./Script_Fluid.mjs";
+import { FluidFillAtWorld, IsSealed, SetFlueVent, SetSealed, SmokeFillAtWorld } from "./Script_Fluid.mjs";
 import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, PickExcavateTarget, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
@@ -1216,8 +1216,11 @@ function TestFloodRaidFluidAndLoadout() {
   Assert(state.chapterId === "act9_flood_raid", "act9 flood chapter");
   Assert(state.player.inTunnel, "flood raid starts underground");
   Assert(!!state.fluid, "fluid field created");
+  Assert(!!state.smoke, "smoke field created");
   Assert(state.level.soil.rows >= 12, "multi-layer dig band");
   Assert(state.level.entities.some((e) => e.type === "seal_mouth"), "seal mouths authored");
+  Assert(state.level.entities.some((e) => e.type === "seal_mouth" && e.kindSeal === "smoke"), "smoke flue seal authored");
+  Assert(state.level.entities.filter((e) => e.type === "flue_flip").length >= 2, "flue flip lids authored");
   Assert(state.level.entities.some((e) => e.type === "cistern"), "drink cistern authored");
   Assert(state.level.entities.filter((e) => e.type === "refugee").length >= 3, "refugees to herd");
   Assert(state.level.entities.filter((e) => e.tunnelRaid).length >= 2, "tunnel raiders staged");
@@ -1238,6 +1241,25 @@ function TestFloodRaidFluidAndLoadout() {
   const before = state.fluid.totalInjected;
   for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
   Assert(state.fluid.totalInjected >= before, "fluid keeps simulating after seal");
+
+  // Smoke flue: after smokeDelay, unsealed smoke shaft injects buoyant gas.
+  state.level.flood.smokeDelay = 0;
+  state.level.flood.smokeTimer = 0;
+  state.level.flood.smokeActive = false;
+  for (let i = 0; i < 40; i++) StepPlay(state, 1 / 30);
+  Assert(state.level.flood.smokeActive, "smoke activates after delay");
+  const smokeCol = state.level.entities.find((e) => e.id === "seal_smoke");
+  Assert(!!smokeCol, "smoke seal ent");
+  const sm = SmokeFillAtWorld(state.smoke, soil, smokeCol.x, soil.originY + soil.cell * 2.2);
+  Assert(sm > 0.04 || state.smoke.totalInjected > 0.1, `smoke injects (fill=${sm.toFixed(2)} inj=${state.smoke.totalInjected.toFixed(2)})`);
+  // Flip vents divert — goal sync when both open.
+  for (const flip of state.level.entities.filter((e) => e.type === "flue_flip")) {
+    SetFlueVent(soil, flip.c, flip.r, true);
+    flip.mode = "vent";
+  }
+  state.input.interactPressed = false;
+  for (let i = 0; i < 5; i++) StepPlay(state, 1 / 30);
+  Assert(state.goalsDone.flip_vents, "open flips complete flip_vents goal");
 
   // Loadout carries act9 → act10.
   state.player.held = ITEM_RIFLE;

@@ -52,7 +52,13 @@ import {
   PickClip,
 } from "./Script_Puppet.mjs";
 import { InteractPadIcon, PAD_ICON, HUD_ICON_FILES } from "./Script_PadIcons.mjs";
-import { DrawFluidField, DrawSealPlugs, IsSealed } from "./Script_Fluid.mjs";
+import {
+  DrawFluidField,
+  DrawFlueHardware,
+  DrawSealPlugs,
+  DrawSmokeField,
+  IsSealed,
+} from "./Script_Fluid.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -1652,6 +1658,27 @@ function DrawEntity(ent) {
     ctx.fillRect(-16 * s, -22 * s, 32 * s, 22 * s);
     ctx.strokeRect(-16 * s, -22 * s, 32 * s, 22 * s);
     DrawNameplate(sealed ? `${ent.mouthLabel || "井口"}·封` : `${ent.mouthLabel || "井口"}·封口`, "hatch", -48 * s, s);
+  } else if (ent.type === "flue_flip") {
+    if (Math.abs(state.player.x - ent.x) < 80) glow();
+    const vent = ent.mode === "vent";
+    ctx.fillStyle = vent ? "#8a6a38" : "#3a2a18";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = Math.max(1.5, 2 * s);
+    if (vent) {
+      // Open lid propped up.
+      ctx.beginPath();
+      ctx.moveTo(-16 * s, -4 * s);
+      ctx.lineTo(16 * s, -4 * s);
+      ctx.lineTo(12 * s, -28 * s);
+      ctx.lineTo(-12 * s, -22 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(-18 * s, -14 * s, 36 * s, 10 * s);
+      ctx.strokeRect(-18 * s, -14 * s, 36 * s, 10 * s);
+    }
+    DrawNameplate(vent ? "翻口·抽" : "翻口·盖", "up", -44 * s, s);
   } else if (ent.type === "cistern") {
     if (Math.abs(state.player.x - ent.x) < 80) glow();
     ctx.fillStyle = "#3a5a68";
@@ -2378,22 +2405,36 @@ function DrawGrenadeAimArc() {
 /** Breath / drown meter while submerged in flood water. */
 function DrawDrownMeter() {
   const d = state.player?.drown || 0;
-  if (d < 0.08 || !state.player.inTunnel) return;
+  const c = state.player?.choke || 0;
+  if ((d < 0.08 && c < 0.08) || !state.player.inTunnel) return;
   const w = canvas.clientWidth || innerWidth;
   const h = canvas.clientHeight || innerHeight;
   const bw = Math.min(180, w * 0.28);
   const bh = 8;
   const x = (w - bw) / 2;
-  const y = h * 0.16;
+  let y = h * 0.16;
   ctx.save();
-  ctx.fillStyle = "rgba(10,16,22,.55)";
-  ctx.fillRect(x - 2, y - 2, bw + 4, bh + 4);
-  ctx.fillStyle = d > 0.7 ? "#a6452f" : "#3a8aaa";
-  ctx.fillRect(x, y, bw * Math.min(1, d), bh);
-  ctx.fillStyle = "#efe2c8";
-  ctx.font = '700 11px "Noto Sans SC","PingFang SC",sans-serif';
-  ctx.textAlign = "center";
-  ctx.fillText(d > 0.7 ? "呛水！" : "屏息", w / 2, y - 6);
+  if (d >= 0.08) {
+    ctx.fillStyle = "rgba(10,16,22,.55)";
+    ctx.fillRect(x - 2, y - 2, bw + 4, bh + 4);
+    ctx.fillStyle = d > 0.7 ? "#a6452f" : "#3a8aaa";
+    ctx.fillRect(x, y, bw * Math.min(1, d), bh);
+    ctx.fillStyle = "#efe2c8";
+    ctx.font = '700 11px "Noto Sans SC","PingFang SC",sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText(d > 0.7 ? "呛水！" : "屏息", w / 2, y - 6);
+    y += 22;
+  }
+  if (c >= 0.08) {
+    ctx.fillStyle = "rgba(18,12,8,.55)";
+    ctx.fillRect(x - 2, y - 2, bw + 4, bh + 4);
+    ctx.fillStyle = c > 0.7 ? "#a6452f" : "#6a5a40";
+    ctx.fillRect(x, y, bw * Math.min(1, c), bh);
+    ctx.fillStyle = "#efe2c8";
+    ctx.font = '700 11px "Noto Sans SC","PingFang SC",sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText(c > 0.7 ? "呛烟！" : "烟尘", w / 2, y - 6);
+  }
   ctx.restore();
 }
 
@@ -2405,8 +2446,9 @@ function DrawFloodRaidBanner() {
   ctx.font = '700 12px "Noto Sans SC","PingFang SC",sans-serif';
   ctx.textAlign = "left";
   let text = "";
-  if (flood.phase === "prep") text = `灌水倒计时 ${Math.ceil(flood.prepTimer || 0)}s · 封口 / 上高台`;
-  else if (flood.phase === "flood") text = "灌水中 · 封不住的口子在进水";
+  if (flood.phase === "prep") text = `灌水倒计时 ${Math.ceil(flood.prepTimer || 0)}s · 封水口/烟道 · 翻口`;
+  else if (flood.phase === "flood" && !flood.smokeActive) text = "灌水中 · 烟道将至，先封烟口、翻开抽烟";
+  else if (flood.smokeActive) text = "毒烟+灌水 · 封口翻口，上高台避烟";
   else if (flood.phase === "raid") text = "日军进洞 · 击晕抢枪 · 东口突围";
   if (!text) {
     ctx.restore();
@@ -2415,7 +2457,7 @@ function DrawFloodRaidBanner() {
   ctx.fillStyle = "rgba(18,10,6,.72)";
   const tw = ctx.measureText(text).width;
   ctx.fillRect(12, 48, tw + 20, 22);
-  ctx.fillStyle = flood.phase === "prep" ? "#efe2c8" : "#f0c27a";
+  ctx.fillStyle = flood.smokeActive ? "#c9a45a" : flood.phase === "prep" ? "#efe2c8" : "#f0c27a";
   ctx.fillText(text, 22, 64);
   ctx.restore();
 }
@@ -2655,6 +2697,10 @@ function RenderPlayCutaway(w, h, camX, pal) {
   if (state.fluid && state.level.soil) {
     DrawFluidField(ctx, state.fluid, state.level.soil, fluidView);
     DrawSealPlugs(ctx, state.level.soil, fluidView);
+  }
+  if (state.smoke && state.level.soil) {
+    DrawSmokeField(ctx, state.smoke, state.level.soil, fluidView);
+    DrawFlueHardware(ctx, state.level.soil, fluidView);
   }
 
   // Surface ridge props (already partly in DrawSoilCutaway); play-plane props on the lip.

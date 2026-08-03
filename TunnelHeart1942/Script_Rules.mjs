@@ -11,11 +11,17 @@ import {
 } from "./Script_Dig.mjs";
 import {
   CreateFluidField,
+  CreateSmokeField,
+  EnsureFlueGrid,
   EnsureSealGrid,
   FluidFillAtWorld,
   IsSealed,
+  SetFlueClosed,
+  SetFlueVent,
   SetSealed,
+  SmokeFillAtWorld,
   StepFluid,
+  StepSmoke,
 } from "./Script_Fluid.mjs";
 import {
   CanPlanCell,
@@ -100,6 +106,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
   if (level.soil) {
     EnsurePlanGrid(level.soil);
     EnsureSealGrid(level.soil);
+    EnsureFlueGrid(level.soil);
   }
   const tunnel = !!level.spawn.tunnel;
   // Campaign loadout (looted guns) overrides the chapter's default spawn kit.
@@ -148,6 +155,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       climbing: false,
       /** Flood raid: 0..1 submerged breath meter. */
       drown: 0,
+      /** Flood raid: 0..1 smoke choke meter. */
+      choke: 0,
     },
     meleeFx: null,
     /** Dirt chips + cell flash from a shovel bite. */
@@ -193,7 +202,16 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     stats: { digs: 0, interactions: 0, shots: 0, kills: 0, cellsCarved: 0, pickups: 0 },
     muzzle: null,
     fluid: level.soil && level.flood?.enabled ? CreateFluidField(level.soil) : null,
+    smoke: level.soil && level.flood?.enabled ? CreateSmokeField(level.soil) : null,
   };
+  // Default flip lids start closed (block high refuge from rising smoke).
+  if (state.smoke && level.soil) {
+    for (const e of level.entities || []) {
+      if (e.type !== "flue_flip") continue;
+      SetFlueClosed(level.soil, e.c, e.r, true);
+      e.mode = "closed";
+    }
+  }
   return state;
 }
 
@@ -2111,19 +2129,46 @@ function TryInteract(state) {
       }
       if (player.held !== ITEM_SHOVEL && !CanDigWith(player.held)) {
         SetBubble(state, ["shovel", "warn"], "要铁锹", 1.4);
-        SetSubtitle(state, "提示", "用铁锹堵土封口——堵住灌水道。", 2.6);
+        SetSubtitle(state, "提示", "用铁锹堵土封口——堵住灌水/烟道。", 2.6);
         return true;
       }
       const on = !IsSealed(level.soil, ent.c, ent.r);
       SetSealed(level.soil, ent.c, ent.r, on);
       ent.sealed = on;
+      const smokeKind = ent.kindSeal === "smoke";
       SetBubble(state, on ? ["shovel", "check"] : ["shovel", "warn"], on ? "封口" : "启封", 1.3);
       SetSubtitle(
         state,
         "高传宝",
-        on ? `${ent.mouthLabel || "井口"}封上了——水灌不进来。` : `${ent.mouthLabel || "井口"}打开了。`,
+        on
+          ? smokeKind
+            ? `${ent.mouthLabel || "烟道"}封上了——毒烟灌不进来。`
+            : `${ent.mouthLabel || "井口"}封上了——水灌不进来。`
+          : `${ent.mouthLabel || "井口"}打开了。`,
         2.4,
       );
+      SyncFloodRaidGoals(state);
+      return true;
+    }
+
+    if (ent.type === "flue_flip") {
+      if (!player.inTunnel) {
+        SetSubtitle(state, "提示", "下洞才能扳翻口。", 2.0);
+        return true;
+      }
+      EnsureFlueGrid(level.soil);
+      // Toggle: closed (lid) ↔ vent (open exhaust).
+      if (ent.mode === "vent") {
+        SetFlueClosed(level.soil, ent.c, ent.r, true);
+        ent.mode = "closed";
+        SetBubble(state, ["warn"], "盖死", 1.2);
+        SetSubtitle(state, "高传宝", "翻口盖上了——挡烟进高台，但抽不走烟。", 2.6);
+      } else {
+        SetFlueVent(level.soil, ent.c, ent.r, true);
+        ent.mode = "vent";
+        SetBubble(state, ["check"], "翻开", 1.2);
+        SetSubtitle(state, "高传宝", "翻口翻开——残烟往上抽！", 2.4);
+      }
       SyncFloodRaidGoals(state);
       return true;
     }
@@ -2131,6 +2176,7 @@ function TryInteract(state) {
     if (ent.type === "cistern") {
       if (!player.inTunnel) return true;
       player.drown = 0;
+      player.choke = Math.max(0, (player.choke || 0) - 0.35);
       if (player.hp < 3) player.hp = Math.min(3, player.hp + 1);
       if (ent.goal) MarkGoal(state, ent.goal);
       ent.drunk = true;
@@ -2542,9 +2588,21 @@ function CycleRefugeeOrder(state, ent) {
 function SyncFloodRaidGoals(state) {
   const { level, player, chapterId } = state;
   if (chapterId === "act9_flood_raid") {
-    const seals = (level.entities || []).filter((e) => e.type === "seal_mouth");
-    if (seals.length && seals.every((e) => IsSealed(level.soil, e.c, e.r))) {
+    const waterSeals = (level.entities || []).filter(
+      (e) => e.type === "seal_mouth" && e.kindSeal !== "smoke",
+    );
+    if (waterSeals.length && waterSeals.every((e) => IsSealed(level.soil, e.c, e.r))) {
       MarkGoal(state, "seal_mouths");
+    }
+    const flueSeals = (level.entities || []).filter(
+      (e) => e.type === "seal_mouth" && e.kindSeal === "smoke",
+    );
+    if (flueSeals.length && flueSeals.every((e) => IsSealed(level.soil, e.c, e.r))) {
+      MarkGoal(state, "seal_flues");
+    }
+    const flips = (level.entities || []).filter((e) => e.type === "flue_flip");
+    if (flips.length && flips.every((e) => e.mode === "vent")) {
+      MarkGoal(state, "flip_vents");
     }
     const refugees = (level.entities || []).filter((e) => e.type === "refugee" && !e.done);
     if (
@@ -2644,23 +2702,33 @@ function UpdateFloodRaid(state, dt) {
   const flood = state.level?.flood;
   if (!flood?.enabled || !state.level.soil) return;
   if (!state.fluid) state.fluid = CreateFluidField(state.level.soil);
+  if (!state.smoke) state.smoke = CreateSmokeField(state.level.soil);
 
   if (flood.phase === "prep") {
     flood.prepTimer = Math.max(0, (flood.prepTimer ?? 55) - dt);
     if (flood.prepTimer <= 0) {
       flood.phase = "flood";
+      flood.smokeTimer = 0;
       SetSubtitle(state, "危险", "灌水了！封不住的口子会往下灌——上高台！", 3.2);
       SetBubble(state, ["warn"], "灌水", 1.6);
     }
-  } else if (flood.phase === "flood") {
-    flood.raidTimer = (flood.raidTimer || 0) + dt;
-    if (flood.raidTimer >= (flood.raidDelay || 12)) {
-      flood.phase = "raid";
-      for (const e of state.level.entities || []) {
-        if (e.tunnelRaid) e.hidden = false;
+  } else if (flood.phase === "flood" || flood.phase === "raid") {
+    if (flood.phase === "flood") {
+      flood.raidTimer = (flood.raidTimer || 0) + dt;
+      if (flood.raidTimer >= (flood.raidDelay || 12)) {
+        flood.phase = "raid";
+        for (const e of state.level.entities || []) {
+          if (e.tunnelRaid) e.hidden = false;
+        }
+        SetSubtitle(state, "危险", "日军顺着井口下来了——辗转击晕，抢他们的枪！", 3.2);
+        SetBubble(state, ["warn"], "扫荡", 1.5);
       }
-      SetSubtitle(state, "危险", "日军顺着井口下来了——辗转击晕，抢他们的枪！", 3.2);
-      SetBubble(state, ["warn"], "扫荡", 1.5);
+    }
+    flood.smokeTimer = (flood.smokeTimer || 0) + dt;
+    if (!flood.smokeActive && flood.smokeTimer >= (flood.smokeDelay ?? 8)) {
+      flood.smokeActive = true;
+      SetSubtitle(state, "危险", "毒烟灌进来了！封烟道、翻开抽烟口——别站在烟里！", 3.2);
+      SetBubble(state, ["warn"], "烟道", 1.5);
     }
   }
 
@@ -2675,6 +2743,22 @@ function UpdateFloodRaid(state, dt) {
     }
   }
   StepFluid(state.fluid, state.level.soil, dt, inlets);
+
+  const smokeInlets = [];
+  if (flood.smokeActive) {
+    for (const sh of state.level.shafts || []) {
+      if (!sh.smokeInlet) continue;
+      const c = sh.col ?? WorldToCell(state.level.soil, sh.x, state.level.soil.originY + 20).c;
+      if (IsSealed(state.level.soil, c, 1)) continue;
+      if (GetCell(state.level.soil, c, 1) !== AIR) continue;
+      smokeInlets.push({ c, r: 1, rate: flood.smokeRate || 0.5 });
+      // Also inject a bit lower so smoke rolls into mid spine.
+      if (GetCell(state.level.soil, c, 5) === AIR) {
+        smokeInlets.push({ c, r: 5, rate: (flood.smokeRate || 0.5) * 0.45 });
+      }
+    }
+  }
+  StepSmoke(state.smoke, state.level.soil, dt, smokeInlets);
 
   // Drown / swim resistance when submerged in tunnel.
   const { player } = state;
@@ -2700,8 +2784,29 @@ function UpdateFloodRaid(state, dt) {
     } else {
       player.drown = Math.max(0, (player.drown || 0) - dt * 0.4);
     }
+
+    const smokeHead = SmokeFillAtWorld(state.smoke, state.level.soil, player.x, player.y - 40);
+    const smokeChest = SmokeFillAtWorld(state.smoke, state.level.soil, player.x, player.y - 24);
+    const smoke = Math.max(smokeHead, smokeChest * 0.85);
+    if (smoke > 0.28) {
+      player.choke = Math.min(1, (player.choke || 0) + dt * (0.22 + smoke * 0.35));
+      player.vx *= 0.92;
+      if (player.choke >= 1 && (player.invuln || 0) <= 0) {
+        HurtPlayer(state, {
+          damage: 1,
+          invuln: 1.35,
+          speaker: "危险",
+          line: "毒烟呛人——封烟道、翻开抽烟口，或撤到无烟处！",
+          lineTime: 2.6,
+        });
+        player.choke = 0.4;
+      }
+    } else {
+      player.choke = Math.max(0, (player.choke || 0) - dt * 0.35);
+    }
   } else {
     player.drown = Math.max(0, (player.drown || 0) - dt);
+    player.choke = Math.max(0, (player.choke || 0) - dt);
   }
 
   UpdateRefugees(state, dt);
@@ -3061,11 +3166,15 @@ export function NextStepText(state) {
     const flood = state.level.flood;
     if (!g.talk_raid) return "找林霞听灌水扫荡交代";
     if (!g.seal_mouths) return "带铁锹到西口/东口封土——堵住灌水道";
-    if (!g.drink_cistern) return "下到饮水窖喝一口，备着呛水";
+    if (!g.seal_flues) return "封住毒烟道口（带铁锹点烟道封口）";
+    if (!g.flip_vents) return "扳开高台两侧翻口——把残烟往上抽走";
+    if (!g.drink_cistern) return "下到饮水窖喝一口，备着呛水/呛烟";
     if (!g.herd_high) return "点乡亲：跟上→上高台——把他们哄到上层";
     if (flood?.phase === "prep") {
-      return `封口就绪——约 ${Math.ceil(flood.prepTimer || 0)} 秒后灌水，上高台待命`;
+      return `封口/翻口就绪——约 ${Math.ceil(flood.prepTimer || 0)} 秒后灌水灌烟`;
     }
+    if (flood?.smokeActive && !g.seal_flues) return "烟来了！先封烟道口";
+    if (flood?.smokeActive && !g.flip_vents) return "翻开抽烟口，别站在浓烟里";
     if (!g.silence_raiders) return "日军进洞了：绕高台辗转击晕，抢枪/弹药";
     if (!g.grab_arms) return "捡起日军掉落的步枪或弹药";
     if (!g.escape_breakout) return "带乡亲到东突口出井（武器会带进下一幕）";

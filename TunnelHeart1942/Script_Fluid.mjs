@@ -69,11 +69,11 @@ function Sample(grid, c, r, rows, cols) {
   return grid[r][c];
 }
 
-function AdvectScalar(src, out, vx, vy, soil, dt) {
+function AdvectScalar(src, out, vx, vy, soil, dt, blocked = FluidBlocked) {
   const { rows, cols, cell, originX, originY } = soil;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (FluidBlocked(soil, c, r)) {
+      if (blocked(soil, c, r)) {
         out[r][c] = 0;
         continue;
       }
@@ -89,11 +89,10 @@ function AdvectScalar(src, out, vx, vy, soil, dt) {
       const b = Sample(src, c0 + 1, r0, rows, cols);
       const d = Sample(src, c0, r0 + 1, rows, cols);
       const e = Sample(src, c0 + 1, r0 + 1, rows, cols);
-      // Discard samples from solid cells (keep mass in open tunnels).
-      const wa = FluidBlocked(soil, c0, r0) ? 0 : 1;
-      const wb = FluidBlocked(soil, c0 + 1, r0) ? 0 : 1;
-      const wd = FluidBlocked(soil, c0, r0 + 1) ? 0 : 1;
-      const we = FluidBlocked(soil, c0 + 1, r0 + 1) ? 0 : 1;
+      const wa = blocked(soil, c0, r0) ? 0 : 1;
+      const wb = blocked(soil, c0 + 1, r0) ? 0 : 1;
+      const wd = blocked(soil, c0, r0 + 1) ? 0 : 1;
+      const we = blocked(soil, c0 + 1, r0 + 1) ? 0 : 1;
       const wsum = wa * (1 - tx) * (1 - ty) + wb * tx * (1 - ty) + wd * (1 - tx) * ty + we * tx * ty;
       out[r][c] = wsum > 1e-6
         ? (a * wa * (1 - tx) * (1 - ty) + b * wb * tx * (1 - ty) + d * wd * (1 - tx) * ty + e * we * tx * ty) / wsum
@@ -102,19 +101,19 @@ function AdvectScalar(src, out, vx, vy, soil, dt) {
   }
 }
 
-function Project(field, soil) {
+function Project(field, soil, blocked = FluidBlocked) {
   const { dens, vx, vy, div, p, rows, cols } = field;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (FluidBlocked(soil, c, r) || dens[r][c] < 0.02) {
+      if (blocked(soil, c, r) || dens[r][c] < 0.02) {
         div[r][c] = 0;
         p[r][c] = 0;
         continue;
       }
-      const vl = FluidBlocked(soil, c - 1, r) ? vx[r][c] : vx[r][c - 1];
-      const vr = FluidBlocked(soil, c + 1, r) ? vx[r][c] : vx[r][c + 1];
-      const vt = FluidBlocked(soil, c, r - 1) ? vy[r][c] : vy[r - 1][c];
-      const vb = FluidBlocked(soil, c, r + 1) ? vy[r][c] : vy[r + 1][c];
+      const vl = blocked(soil, c - 1, r) ? vx[r][c] : vx[r][c - 1];
+      const vr = blocked(soil, c + 1, r) ? vx[r][c] : vx[r][c + 1];
+      const vt = blocked(soil, c, r - 1) ? vy[r][c] : vy[r - 1][c];
+      const vb = blocked(soil, c, r + 1) ? vy[r][c] : vy[r + 1][c];
       div[r][c] = -0.5 * (vr - vl + vb - vt);
       p[r][c] = 0;
     }
@@ -122,30 +121,30 @@ function Project(field, soil) {
   for (let k = 0; k < ITER; k++) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        if (FluidBlocked(soil, c, r) || dens[r][c] < 0.02) {
+        if (blocked(soil, c, r) || dens[r][c] < 0.02) {
           p[r][c] = 0;
           continue;
         }
-        const pl = FluidBlocked(soil, c - 1, r) ? p[r][c] : p[r][c - 1];
-        const pr = FluidBlocked(soil, c + 1, r) ? p[r][c] : p[r][c + 1];
-        const pt = FluidBlocked(soil, c, r - 1) ? p[r][c] : p[r - 1][c];
-        const pb = FluidBlocked(soil, c, r + 1) ? p[r][c] : p[r + 1][c];
+        const pl = blocked(soil, c - 1, r) ? p[r][c] : p[r][c - 1];
+        const pr = blocked(soil, c + 1, r) ? p[r][c] : p[r][c + 1];
+        const pt = blocked(soil, c, r - 1) ? p[r][c] : p[r - 1][c];
+        const pb = blocked(soil, c, r + 1) ? p[r][c] : p[r + 1][c];
         p[r][c] = (div[r][c] + pl + pr + pt + pb) * 0.25;
       }
     }
   }
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (FluidBlocked(soil, c, r)) {
+      if (blocked(soil, c, r)) {
         vx[r][c] = 0;
         vy[r][c] = 0;
         continue;
       }
       if (dens[r][c] < 0.02) continue;
-      const pl = FluidBlocked(soil, c - 1, r) ? p[r][c] : p[r][c - 1];
-      const pr = FluidBlocked(soil, c + 1, r) ? p[r][c] : p[r][c + 1];
-      const pt = FluidBlocked(soil, c, r - 1) ? p[r][c] : p[r - 1][c];
-      const pb = FluidBlocked(soil, c, r + 1) ? p[r][c] : p[r + 1][c];
+      const pl = blocked(soil, c - 1, r) ? p[r][c] : p[r][c - 1];
+      const pr = blocked(soil, c + 1, r) ? p[r][c] : p[r][c + 1];
+      const pt = blocked(soil, c, r - 1) ? p[r][c] : p[r - 1][c];
+      const pb = blocked(soil, c, r + 1) ? p[r][c] : p[r + 1][c];
       vx[r][c] -= 0.5 * (pr - pl);
       vy[r][c] -= 0.5 * (pb - pt);
     }
@@ -426,6 +425,284 @@ export function DrawSealPlugs(ctx, soil, view) {
       ctx.moveTo(x + 3, y + h * 0.65);
       ctx.lineTo(x + w - 3, y + h * 0.65);
       ctx.stroke();
+    }
+  }
+}
+
+// ─── Smoke / flue gas (buoyant Eulerian field) ───────────────────
+
+const SMOKE_BUOYANCY = 380;
+const SMOKE_DECAY = 0.12;
+const MAX_SMOKE_PUFFS = 700;
+
+export function EnsureFlueGrid(soil) {
+  if (!soil) return null;
+  if (!soil.flueClosed || soil.flueClosed.length !== soil.rows) {
+    soil.flueClosed = Array.from({ length: soil.rows }, () => new Array(soil.cols).fill(false));
+  }
+  if (!soil.flueVent || soil.flueVent.length !== soil.rows) {
+    soil.flueVent = Array.from({ length: soil.rows }, () => new Array(soil.cols).fill(false));
+  }
+  return soil;
+}
+
+export function IsFlueClosed(soil, c, r) {
+  if (!soil?.flueClosed || !InBounds(soil, c, r)) return false;
+  return !!soil.flueClosed[r][c];
+}
+
+export function IsFlueVent(soil, c, r) {
+  if (!soil?.flueVent || !InBounds(soil, c, r)) return false;
+  return !!soil.flueVent[r][c];
+}
+
+/** Closed flip lid — blocks smoke into a refuge passage. */
+export function SetFlueClosed(soil, c, r, on = true) {
+  EnsureFlueGrid(soil);
+  if (!InBounds(soil, c, r) || GetCell(soil, c, r) !== AIR) return false;
+  soil.flueClosed[r][c] = !!on;
+  if (on) soil.flueVent[r][c] = false;
+  return true;
+}
+
+/** Open flip vent — pulls smoke upward and vents it out of the dig band. */
+export function SetFlueVent(soil, c, r, on = true) {
+  EnsureFlueGrid(soil);
+  if (!InBounds(soil, c, r) || GetCell(soil, c, r) !== AIR) return false;
+  soil.flueVent[r][c] = !!on;
+  if (on) soil.flueClosed[r][c] = false;
+  return true;
+}
+
+/** Smoke cannot cross dirt, water-seals, or closed flue lids. */
+export function SmokeBlocked(soil, c, r) {
+  if (!InBounds(soil, c, r)) return true;
+  if (GetCell(soil, c, r) !== AIR) return true;
+  if (IsSealed(soil, c, r)) return true;
+  return IsFlueClosed(soil, c, r);
+}
+
+export function CreateSmokeField(soil) {
+  EnsureSealGrid(soil);
+  EnsureFlueGrid(soil);
+  const { cols, rows } = soil;
+  return {
+    kind: "smoke",
+    cols,
+    rows,
+    dens: Array.from({ length: rows }, () => new Float32Array(cols)),
+    vx: Array.from({ length: rows }, () => new Float32Array(cols)),
+    vy: Array.from({ length: rows }, () => new Float32Array(cols)),
+    div: Array.from({ length: rows }, () => new Float32Array(cols)),
+    p: Array.from({ length: rows }, () => new Float32Array(cols)),
+    particles: [],
+    time: 0,
+    totalInjected: 0,
+  };
+}
+
+function SpawnSmokePuff(field, soil, c, r, n = 2) {
+  if (field.particles.length >= MAX_SMOKE_PUFFS) return;
+  const cell = soil.cell;
+  const x0 = soil.originX + c * cell;
+  const y0 = soil.originY + r * cell;
+  for (let i = 0; i < n && field.particles.length < MAX_SMOKE_PUFFS; i++) {
+    field.particles.push({
+      x: x0 + Math.random() * cell,
+      y: y0 + Math.random() * cell,
+      vx: (Math.random() - 0.5) * 40 + field.vx[r][c] * 0.25,
+      vy: -30 - Math.random() * 70 + field.vy[r][c] * 0.2,
+      life: 0.5 + Math.random() * 0.9,
+      r: 2 + Math.random() * 4,
+    });
+  }
+}
+
+/**
+ * Buoyant smoke step — rises, drifts, vents at open flips, blocked by seals/closed lids.
+ * @param {{ c:number, r:number, rate:number }[]} inlets
+ */
+export function StepSmoke(field, soil, dt, inlets = []) {
+  if (!field || !soil) return;
+  EnsureFlueGrid(soil);
+  const step = Math.min(0.033, Math.max(0, dt));
+  field.time += step;
+  const { dens, vx, vy, rows, cols } = field;
+  const blocked = SmokeBlocked;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (blocked(soil, c, r)) {
+        dens[r][c] = 0;
+        vx[r][c] = 0;
+        vy[r][c] = 0;
+        continue;
+      }
+      // Open vent: suck smoke out (density sink + strong updraft).
+      if (IsFlueVent(soil, c, r)) {
+        dens[r][c] = Clamp01(dens[r][c] * (1 - step * 2.8) - step * 0.15);
+        vy[r][c] -= 220 * step;
+        if (dens[r][c] > 0.08 && Math.random() < 0.35) SpawnSmokePuff(field, soil, c, r, 2);
+        continue;
+      }
+      if (dens[r][c] < 0.01) {
+        vx[r][c] *= 0.6;
+        vy[r][c] *= 0.6;
+        continue;
+      }
+      // Buoyancy (world +y down → negative vy rises).
+      vy[r][c] -= SMOKE_BUOYANCY * step * (0.4 + dens[r][c] * 0.6);
+      dens[r][c] = Clamp01(dens[r][c] - SMOKE_DECAY * step * dens[r][c]);
+      vx[r][c] *= 0.98;
+      vy[r][c] *= 0.985;
+    }
+  }
+
+  for (const inn of inlets) {
+    if (!inn || blocked(soil, inn.c, inn.r)) continue;
+    const add = (inn.rate || 0.45) * step;
+    dens[inn.r][inn.c] = Clamp01(dens[inn.r][inn.c] + add);
+    vy[inn.r][inn.c] -= 70 * step;
+    field.totalInjected += add;
+    if (Math.random() < 0.5) SpawnSmokePuff(field, soil, inn.c, inn.r, 3);
+  }
+
+  const tmpD = Array.from({ length: rows }, () => new Float32Array(cols));
+  const tmpVx = Array.from({ length: rows }, () => new Float32Array(cols));
+  const tmpVy = Array.from({ length: rows }, () => new Float32Array(cols));
+  AdvectScalar(dens, tmpD, vx, vy, soil, step, blocked);
+  AdvectScalar(vx, tmpVx, vx, vy, soil, step, blocked);
+  AdvectScalar(vy, tmpVy, vx, vy, soil, step, blocked);
+  for (let r = 0; r < rows; r++) {
+    dens[r].set(tmpD[r]);
+    vx[r].set(tmpVx[r]);
+    vy[r].set(tmpVy[r]);
+  }
+  Project(field, soil, blocked);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (blocked(soil, c, r)) {
+        dens[r][c] = 0;
+        vx[r][c] = 0;
+        vy[r][c] = 0;
+        continue;
+      }
+      dens[r][c] = Clamp01(dens[r][c]);
+      // Prefer rising into emptier cells above.
+      if (dens[r][c] > 0.12 && r > 0 && !blocked(soil, c, r - 1) && dens[r - 1][c] < dens[r][c]) {
+        const move = Math.min(0.07, dens[r][c] - dens[r - 1][c]) * 0.4;
+        dens[r][c] -= move;
+        dens[r - 1][c] = Clamp01(dens[r - 1][c] + move);
+        vy[r][c] -= 35;
+      }
+      const spd = Math.hypot(vx[r][c], vy[r][c]);
+      if (spd > 260) {
+        vx[r][c] *= 260 / spd;
+        vy[r][c] *= 260 / spd;
+      }
+    }
+  }
+
+  const next = [];
+  for (const p of field.particles) {
+    p.life -= step;
+    if (p.life <= 0) continue;
+    p.vy -= SMOKE_BUOYANCY * 0.35 * step;
+    p.x += p.vx * step;
+    p.y += p.vy * step;
+    const cell = WorldToCell(soil, p.x, p.y);
+    if (SmokeBlocked(soil, cell.c, cell.r)) {
+      p.vy *= -0.2;
+      p.life *= 0.5;
+    }
+    if (IsFlueVent(soil, cell.c, cell.r)) p.life *= 0.7;
+    next.push(p);
+  }
+  field.particles = next;
+}
+
+export function SmokeFillAtWorld(field, soil, x, y) {
+  if (!field || !soil) return 0;
+  const { c, r } = WorldToCell(soil, x, y);
+  if (!InBounds(soil, c, r)) return 0;
+  return field.dens[r][c] || 0;
+}
+
+export function DrawSmokeField(ctx, field, soil, view) {
+  if (!field || !soil) return;
+  const { WX, WY, scale: s, cam0, cam1 } = view;
+  const cell = soil.cell;
+  const t = field.time;
+  ctx.save();
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      const d = field.dens[r][c];
+      if (d < 0.06 || SmokeBlocked(soil, c, r)) continue;
+      const x0 = soil.originX + c * cell;
+      if (x0 + cell < cam0 || x0 > cam1) continue;
+      const wobble = Math.sin(t * 2.4 + c * 0.7 + r * 0.4) * 3 * s;
+      const sx = WX(x0) + wobble * 0.3;
+      const sy = WY(soil.originY + r * cell) + wobble;
+      const sw = cell * s;
+      const sh = cell * s;
+      const a = Math.min(0.72, 0.18 + d * 0.7);
+      const g = ctx.createRadialGradient(sx + sw * 0.5, sy + sh * 0.55, 2, sx + sw * 0.5, sy + sh * 0.4, sw * 0.7);
+      g.addColorStop(0, `rgba(70,62,48,${a})`);
+      g.addColorStop(0.55, `rgba(40,36,30,${a * 0.75})`);
+      g.addColorStop(1, `rgba(20,18,14,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(sx + sw * 0.5, sy + sh * 0.45, sw * (0.45 + d * 0.25), sh * (0.4 + d * 0.2), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  for (const p of field.particles) {
+    const px = WX(p.x);
+    const py = WY(p.y);
+    ctx.globalAlpha = Math.max(0, Math.min(0.55, p.life * 0.7));
+    ctx.fillStyle = "rgba(55,48,38,.9)";
+    ctx.beginPath();
+    ctx.arc(px, py, p.r * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** Draw closed flue lids + open vent arrows. */
+export function DrawFlueHardware(ctx, soil, view) {
+  if (!soil?.flueClosed && !soil?.flueVent) return;
+  EnsureFlueGrid(soil);
+  const { WX, WY, scale: s, cam0, cam1 } = view;
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) {
+      const closed = soil.flueClosed[r][c];
+      const vent = soil.flueVent[r][c];
+      if (!closed && !vent) continue;
+      const x0 = soil.originX + c * soil.cell;
+      if (x0 + soil.cell < cam0 || x0 > cam1) continue;
+      const x = WX(x0 + 6);
+      const y = WY(soil.originY + r * soil.cell + 8);
+      const w = (soil.cell - 12) * s;
+      const h = (soil.cell - 16) * s;
+      if (closed) {
+        ctx.fillStyle = "#4a3a28";
+        ctx.strokeStyle = "#1a1410";
+        ctx.lineWidth = Math.max(1.5, 2 * s);
+        ctx.fillRect(x, y, w, h * 0.45);
+        ctx.strokeRect(x, y, w, h * 0.45);
+      } else if (vent) {
+        ctx.strokeStyle = "#c9a45a";
+        ctx.lineWidth = Math.max(1.5, 2 * s);
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.5, y + h * 0.75);
+        ctx.lineTo(x + w * 0.5, y + h * 0.15);
+        ctx.moveTo(x + w * 0.28, y + h * 0.35);
+        ctx.lineTo(x + w * 0.5, y + h * 0.12);
+        ctx.lineTo(x + w * 0.72, y + h * 0.35);
+        ctx.stroke();
+      }
     }
   }
 }

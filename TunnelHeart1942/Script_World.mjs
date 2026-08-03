@@ -579,6 +579,8 @@ function BuildAct9FloodRaid() {
   CarveRect(soil, 20, 3, 2, 3);
   CarveRect(soil, 28, 6, 2, 3);
   CarveRect(soil, 44, 3, 2, 3);
+  // Smoke flue shaft (mid-west) — 日军灌毒烟道，与灌水口分开。
+  CarveRect(soil, 22, 1, 1, 8);
 
   AttachSoil(level, soil);
   level.tunnelFloor = DIG_ORIGIN_Y + (rows - 3) * CELL;
@@ -588,15 +590,19 @@ function BuildAct9FloodRaid() {
   const westMouth = CellCenter(soil, 10, 1);
   const midMouth = CellCenter(soil, 32, 1);
   const eastMouth = CellCenter(soil, 50, 1);
+  const smokeMouth = CellCenter(soil, 22, 1);
   const highWest = CellCenter(soil, 12, 2);
   const highEast = CellCenter(soil, 46, 2);
   const cistern = CellCenter(soil, 16, 9);
   const exitHatch = CellCenter(soil, 50, 5);
+  const flipWest = CellCenter(soil, 20, 3);
+  const flipEast = CellCenter(soil, 44, 3);
 
   level.shafts = [
     { x: westMouth.x, label: "西灌水口", col: 10, floodInlet: true },
     { x: midMouth.x, label: "中井", col: 32, floodInlet: false },
     { x: eastMouth.x, label: "东突口", col: 50, floodInlet: true },
+    { x: smokeMouth.x, label: "毒烟道", col: 22, smokeInlet: true },
   ];
 
   level.flood = {
@@ -607,6 +613,11 @@ function BuildAct9FloodRaid() {
     raidDelay: 12,
     raidTimer: 0,
     inletRate: 0.55,
+    /** Smoke starts shortly after water — seal flues + flip vents to survive. */
+    smokeDelay: 8,
+    smokeTimer: 0,
+    smokeActive: false,
+    smokeRate: 0.5,
   };
   level.refugeHigh = { x: highWest.x, y: highWest.y + 10 };
   level.refugeExit = { x: eastMouth.x, y: exitHatch.y + 10 };
@@ -627,11 +638,11 @@ function BuildAct9FloodRaid() {
           mood: "talk",
         },
         {
-          text: "下层有积水窖，渴了就喝一口。乡亲先哄到上层台，别站在灌水道上。",
+          text: "还要灌毒烟。烟道口也要封；高台两侧的翻口翻开，把残烟往上抽走。",
           mood: "tip",
         },
         {
-          text: "水一起来，日军会顺着井口摸进来。辗转击晕，抢枪——突围时用得着。",
+          text: "下层有积水窖。乡亲先哄到上层台。日军摸进来就击晕抢枪，东口突围。",
           mood: "tip",
         },
       ],
@@ -648,6 +659,7 @@ function BuildAct9FloodRaid() {
       c: 10,
       r: 1,
       mouthLabel: "西口",
+      kindSeal: "water",
       hint: "封西灌水口",
       radius: 48,
     }),
@@ -661,7 +673,48 @@ function BuildAct9FloodRaid() {
       c: 50,
       r: 1,
       mouthLabel: "东口",
+      kindSeal: "water",
       hint: "封东灌水口",
+      radius: 48,
+    }),
+    Ent({
+      id: "seal_smoke",
+      type: "seal_mouth",
+      x: smokeMouth.x,
+      y: smokeMouth.y + 12,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      c: 22,
+      r: 1,
+      mouthLabel: "烟道",
+      kindSeal: "smoke",
+      hint: "封毒烟道口",
+      radius: 48,
+    }),
+    Ent({
+      id: "flue_flip_w",
+      type: "flue_flip",
+      x: flipWest.x,
+      y: flipWest.y + 14,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      c: 20,
+      r: 3,
+      mode: "closed", // closed = lid blocks into high; vent = flip open exhaust
+      hint: "西翻口——翻开抽烟",
+      radius: 48,
+    }),
+    Ent({
+      id: "flue_flip_e",
+      type: "flue_flip",
+      x: flipEast.x,
+      y: flipEast.y + 14,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      c: 44,
+      r: 3,
+      mode: "closed",
+      hint: "东翻口——翻开抽烟",
       radius: 48,
     }),
     Ent({

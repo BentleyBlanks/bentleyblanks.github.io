@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v9";
-export const CACHE_BUST = "20260803bb";
+export const CACHE_BUST = "20260803bc";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -359,10 +359,12 @@ export const CHAPTERS = [
     startTunnel: true,
     night: true,
     objective:
-      "封死灌水口，喝窖水，指挥乡亲上高台；日军摸进地道后辗转击晕抢枪，再从东口突围。",
+      "封死灌水口与毒烟道，翻开抽烟口，喝窖水，指挥乡亲上高台；击晕抢枪后东口突围。",
     goals: [
       "talk_raid",
       "seal_mouths",
+      "seal_flues",
+      "flip_vents",
       "drink_cistern",
       "herd_high",
       "silence_raiders",
@@ -373,19 +375,19 @@ export const CHAPTERS = [
       {
         id: "p9a",
         speaker: "背景",
-        text: "扫荡队架起水车。水会从西口、东口灌进多层地道——封不住就淹。",
+        text: "扫荡队架起水车，还要灌毒烟。水从西东口进，烟从烟道灌——封不住就淹、就呛。",
         mood: "wide",
       },
       {
         id: "p9b",
         speaker: "困难",
-        text: "乡亲要先上高台。水一起来，日军顺着井口摸进来。下层有饮水窖。",
+        text: "封口堵水烟；高台两侧翻口要翻开抽残烟。乡亲上高台。日军随后摸进来。",
         mood: "talk",
       },
       {
         id: "p9c",
         speaker: "目标",
-        text: "封口 → 饮水 → 乡亲上高 → 击晕抢枪 → 东口突围（武器带进下一幕）。",
+        text: "封水口 → 封烟道 → 翻口抽烟 → 饮水/上高 → 击晕抢枪 → 东口突围。",
         mood: "tip",
       },
     ],
