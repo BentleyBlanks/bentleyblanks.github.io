@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803u">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803v">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -25,7 +25,7 @@
         <article class="titleCopy">
           <p class="eyebrow" id="TitleEyebrow"><i></i> 一九四二年 · 冀中</p>
           <h1>地道战<br><em>高家庄</em></h1>
-          <p class="titleLead">地窖只是起点。贴着土壁一锨锨挖——要开长巷再画线。连通、翻口、竖井，直到黑风口。</p>
+          <p class="titleLead">地窖只是起点。拿铁锹贴着土壁挖通三家——连通、翻口、竖井，直到黑风口。</p>
           <div class="titleActions">
             <button id="BeginButton" class="primaryButton" type="button"><span>开始</span></button>
             <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续</button>
@@ -83,7 +83,7 @@
       <div id="HeldSlot" class="heldSlot" data-empty="1" aria-label="手持道具">
         <b></b><span>空手</span><em>走近地上的道具捡起</em>
       </div>
-      <div id="DesignBadge" class="designBadge" hidden>设计蓝图中</div>
+      <div id="DesignBadge" class="designBadge" hidden>点铁锹大键退出并挖</div>
       <div id="AdsBadge" class="adsBadge" hidden>开镜</div>
       <p id="AmmoHud" class="ammoHud" hidden>弹药 0</p>
       <p id="StepHint" class="stepHint" aria-live="polite">下一步</p>
@@ -110,11 +110,11 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>手机：左右走，上下蹲/抬头，右侧大键按情境变（交谈/捡物/敲晕；地道里铁锹开挖；开镜后开火）。有手雷时出现扔雷键。</p>
-        <p>挖地道：贴着空洞边的软土，直接点铁锹大键挖。画线按钮是可选的——要开长直巷再画。</p>
-        <p>近战：伪军靠近就能敲晕；鬼子要摸背后——正面硬抢会被反抓。</p>
-        <p>手雷：口袋可叠。沙袋后吃枪子不疼，炸开掩体才管用。</p>
-        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 画线 R · 放下 Q。</p>
+        <p>怎么联通：下地窖，拿铁锹，贴着土壁（或蓝格）反复点大键往前挖，挖通甲乙丙三家地窖就行。</p>
+        <p>手机：左右走，上下蹲/抬头，右侧大键=交谈/捡物/挖土/开火。有手雷时多一个扔雷键。</p>
+        <p>若顶上出现「点铁锹大键退出并挖」：你误进了画线，直接点大键即可退出并开挖。</p>
+        <p>近战：伪军靠近敲晕；鬼子摸背后。手雷可叠，沙袋后要炸。</p>
+        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 放下 Q。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -122,7 +122,7 @@
       <article id="HistoryModal" class="modalCard" hidden>
         <h2>说明</h2>
         <p>剧情照着电影《地道战》的劲儿写：高家庄连通地窖、夜袭钟声、高老忠殉钟、翻口捉特务、神出鬼没、黑风口炸炮楼。镜头没法一比一，场面要尽量贴着片子走。</p>
-        <p>形式对齐《勇敢的心》：漫画页、对话条、单手持物。地道贴壁开挖，长巷可选用画线。</p>
+        <p>形式对齐《勇敢的心》：漫画页、对话条、单手持物。地道贴壁开挖联通地窖。</p>
         <div class="modalActions">
           <button id="CloseHistoryButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -164,6 +164,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803u"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803v"></script>
 </body>
 </html>

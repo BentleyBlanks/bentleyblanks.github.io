@@ -468,9 +468,11 @@ function SyncDigGoals(state) {
 
 function TryDesign(state) {
   const { player, level, input } = state;
+  // Leaving the tunnel always drops design — it must never trap surface play.
+  if (!player.inTunnel && state.designMode) state.designMode = false;
   if (!player.inTunnel || !level.soil || state.transition > 0) {
     if (input.designTogglePressed && player.inTunnel === false) {
-      SetSubtitle(state, "设计", "下到地窖里才能设计地道蓝图。", 2.4);
+      SetSubtitle(state, "提示", "下到地窖里，贴土壁用铁锹挖就能联通。", 2.4);
     }
     return;
   }
@@ -481,18 +483,12 @@ function TryDesign(state) {
       state.planCursor = InitPlanCursor(level.soil, player.x, player.y, player.facing);
       SetSubtitle(
         state,
-        "设计",
-        "画线（可选）：挪格标记长巷；巷道键可连铺。再点一次退出——贴着土壁也能直接挖，不必先画线。",
-        5.2,
+        "提示",
+        "这是可选画线。联通地窖不靠它——点铁锹大键会退出并直接挖土。",
+        4.0,
       );
     } else {
-      const n = CountPlanned(level.soil);
-      SetSubtitle(
-        state,
-        "设计",
-        n ? `蓝线 ${n} 格——走到边上挖；贴土壁也可直接挖。` : "已退出画线。贴着空洞边的软土，直接点铁锹挖。",
-        3.2,
-      );
+      SetSubtitle(state, "提示", "已退出画线。贴着土壁点铁锹挖，挖通甲乙丙三家。", 2.8);
     }
   }
   if (!state.designMode || !state.planCursor) return;
@@ -511,23 +507,24 @@ function TryDesign(state) {
   }
 
   const cur = state.planCursor;
-  if (input.planPaintPressed || input.digPressed) {
+  // digPressed is ALWAYS excavate — never steal it for marking (that trapped mobile).
+  if (input.planPaintPressed) {
     const res = TogglePlanCell(level.soil, cur.c, cur.r);
-    if (res === "mark") SetBubble(state, ["shovel"], "标记开挖", 0.8);
-    else if (res === "erase") SetBubble(state, ["warn"], "取消标记", 0.8);
-    else SetBubble(state, ["shovel", "warn"], "须从已有空洞或蓝图延伸", 1.4);
+    if (res === "mark") SetBubble(state, ["shovel"], "标记", 0.8);
+    else if (res === "erase") SetBubble(state, ["warn"], "取消", 0.8);
+    else SetBubble(state, ["shovel", "warn"], "须从空洞延伸", 1.4);
   }
   if (input.planErasePressed) {
     if (ClearPlanCell(level.soil, cur.c, cur.r)) SetBubble(state, ["warn"], "擦除", 0.6);
   }
   if (input.planChamberPressed) {
     const n = StampChamberPlan(level.soil, cur.c, cur.r, 2, 2);
-    SetSubtitle(state, "设计", n ? `厢室蓝图 +${n} 格` : "此处无法铺厢室——靠近已有洞或蓝图", 2.2);
+    SetSubtitle(state, "提示", n ? `厢室标记 +${n}` : "此处无法铺厢室", 2.0);
   }
   if (input.planCorridorPressed) {
     const face = player.facing >= 0 ? 1 : -1;
     const n = StampCorridorPlan(level.soil, cur.c, cur.r, face, 5);
-    SetSubtitle(state, "设计", n ? `巷道蓝图 +${n} 格` : "巷道延伸失败——换方向或先连上气口", 2.2);
+    SetSubtitle(state, "提示", n ? `巷道标记 +${n}` : "巷道延伸失败", 2.0);
   }
 }
 
@@ -535,7 +532,12 @@ function TryExcavate(state) {
   const { player, level, input } = state;
   player.digging = false;
   player.digTarget = null;
-  if (state.designMode) return;
+  // Design mode used to block dig entirely — that stranded mobile players.
+  // Any dig tap exits design and carves.
+  if (state.designMode && input.digPressed) {
+    state.designMode = false;
+    SetBubble(state, ["shovel"], "退出画线·开挖", 0.9);
+  }
   if (!input.digPressed || !player.inTunnel || !level.soil || state.transition > 0) return;
   if (!CanDigWith(player.held)) {
     state.interactHint = "need_shovel";
@@ -549,10 +551,10 @@ function TryExcavate(state) {
   if (!dig) {
     const planned = CountPlanned(level.soil);
     if (planned > 0) {
-      SetSubtitle(state, "提示", "蓝线在别处——走到蓝色格子旁边，或贴着土壁挖。", 2.6);
+      SetSubtitle(state, "提示", "走到蓝色格子旁边，或贴着土壁再挖。", 2.6);
       state.interactHint = "follow_plan";
     } else {
-      SetSubtitle(state, "提示", "贴着空洞边的软土再挖。站太远挖不着；要开长巷可点画线。", 2.8);
+      SetSubtitle(state, "提示", "贴着空洞边的软土再挖。站太远挖不着。", 2.6);
       state.interactHint = "need_plan";
     }
     return;
@@ -1664,10 +1666,11 @@ export function StepPlay(state, dt) {
   // X-shoved by unresolved soil solids for a frame.
   if (state.input.dropPressed) DropHeld(state);
   TryUseItem(state);
-  if (!state.designMode) TryInteract(state);
+  TryInteract(state);
   // Excavate before physics — solids can shove the digger off the planned cell for a frame.
+  // Dig always wins over design mode (auto-exits).
   TryExcavate(state);
-  if (!state.designMode) ResolvePhysics(state, clamped);
+  ResolvePhysics(state, clamped);
   SyncDigGoals(state);
   SyncMgNestGoals(state);
   RefreshHint(state);
@@ -1807,15 +1810,15 @@ export function NextStepText(state) {
   // Act7 has its own step ladder (includes surface MG phase) — skip generic tunnel tip.
   if (p.inTunnel && state.chapterId !== "act7_mg_nest") {
     if (state.designMode) {
-      return "画线中（可选）：方向挪格 · 大键标记 · 巷道键铺直道 · 再点画线退出后去挖";
+      return "误进画线了：直接点铁锹大键——退出并挖土";
     }
     if (state.chapterId === "act1_connect") {
-      if (!g.link_ab) return "地道里：贴着土壁/蓝线，点铁锹大键开挖（甲—乙）";
-      if (!g.link_bc) return "继续沿土壁/蓝线挖通（乙—丙）";
-      return "三家已通 · 可回井口上地面";
+      if (!g.link_ab) return "联通甲—乙：贴着土壁/蓝格，反复点铁锹大键往前挖";
+      if (!g.link_bc) return "联通乙—丙：继续贴壁点铁锹挖";
+      return "三家已通 · 回井口上地面";
     }
     if (CanDigWith(p.held)) {
-      return "贴着空洞边的软土，点铁锹大键挖；要开长巷可点画线（可选）";
+      return "贴着土壁，反复点铁锹大键挖通";
     }
     return "地道里需要铁锹才能挖；靠近井口可上地面";
   }

@@ -219,8 +219,9 @@ function PadInteractVerb(st) {
   const hint = st.interactHint || "";
   // Mounted MG: big key is the trigger.
   if (p.manningMg) return "shot";
-  // Design mode: big key paints blueprint cells (hold down + tap = chamber).
-  if (st.designMode) return st.input.crouch ? "chamber" : "plan";
+  // Design mode must NOT trap the big key on "plan" — dig exits design and carves.
+  if (st.designMode && p.inTunnel && CanDigWith(p.held)) return "dig";
+  if (st.designMode) return "dig";
   if (IsDialogueBlockingPad(st)) return "talk";
   if (hint === "mg_nest") return "shot";
   // Underground with shovel: dig is the default — hatch only when no diggable wall.
@@ -264,31 +265,32 @@ function SyncTouchPadActions() {
 
   const touchDesign = $("TouchDesign");
   if (touchDesign) {
-    // Optional route sketch — free dig works without it; don't pulse as mandatory.
-    const showDesign = inTunnel;
+    // Hidden from the normal pad — it stranded players in "设计蓝图中".
+    // Desktop still has R; debug panel can toggle. If somehow stuck in design,
+    // show a single bright EXIT control.
+    const showDesign = !!design;
     touchDesign.hidden = !showDesign;
-    touchDesign.classList.toggle("isNeeded", false);
-    touchDesign.classList.toggle("isActive", design);
-    if (showDesign && touchDesign.dataset.padMode !== (design ? "designOn" : "design")) {
-      touchDesign.innerHTML = PAD_ICON.design;
-      touchDesign.dataset.padMode = design ? "designOn" : "design";
-      touchDesign.setAttribute("aria-label", design ? "退出画线去挖" : "画线（可选）");
-      touchDesign.title = design ? "退出画线去挖" : "画线（可选）· 开长巷用";
+    touchDesign.classList.toggle("isNeeded", showDesign);
+    touchDesign.classList.toggle("isActive", showDesign);
+    if (showDesign && touchDesign.dataset.padMode !== "designExit") {
+      touchDesign.innerHTML = PAD_ICON.shovel;
+      touchDesign.dataset.padMode = "designExit";
+      touchDesign.setAttribute("aria-label", "退出画线");
+      touchDesign.title = "退出画线 · 然后用大键挖";
     }
   }
 
   const touchUse = $("TouchUse");
   if (touchUse) {
-    // Design: corridor stamp. Surface: dedicated throw when pocket has grenades.
+    // Grenades only — corridor stamp removed from mobile pad (was design-trap bait).
     const canNade = !design && CanThrowGrenade(state.player);
-    const showUse = design || canNade;
+    const showUse = canNade;
     touchUse.hidden = !showUse;
-    const useMode = design ? "corridor" : "grenade";
-    if (showUse && touchUse.dataset.padMode !== useMode) {
-      touchUse.innerHTML = design ? PAD_ICON.corridor : PAD_ICON.grenade;
-      touchUse.dataset.padMode = useMode;
-      touchUse.setAttribute("aria-label", design ? "铺巷道" : "扔手雷");
-      touchUse.title = design ? "铺巷道" : "扔手雷 · 抬头高抛 · 蹲下近抛";
+    if (showUse && touchUse.dataset.padMode !== "grenade") {
+      touchUse.innerHTML = PAD_ICON.grenade;
+      touchUse.dataset.padMode = "grenade";
+      touchUse.setAttribute("aria-label", "扔手雷");
+      touchUse.title = "扔手雷 · 抬头高抛 · 蹲下近抛";
     }
   }
 
@@ -340,7 +342,7 @@ function SyncHud() {
   slot.dataset.empty = held ? "0" : "1";
   const inTunnel = !!state.player.inTunnel;
   if (state.designMode) {
-    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出</em>`;
+    slot.innerHTML = `<b data-item="shovel" style="--item:#8a7355"></b><span>铁锹 · 点大键挖</span><em>误进画线了——直接点下方大键退出并挖土</em>`;
   } else if (held === ITEM_RIFLE) {
     const nade = GrenadeCount(state.player);
     const ads = state.player.aiming
@@ -356,10 +358,7 @@ function SyncHud() {
   } else if (state.player.manningMg) {
     slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
-    const tip = state.designMode
-      ? "画线中 · 再点画线退出后挖"
-      : "贴土壁点大键挖 · 画线可选";
-    slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹</span><em>${tip}</em>`;
+    slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹</span><em>贴土壁反复点大键往前挖，挖通就联通了</em>`;
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
@@ -2072,10 +2071,12 @@ function BindInput() {
       if (kind === "up") state.input.up = down;
       if (kind === "crouch") state.input.crouch = down;
       if (kind === "aim") state.input.aim = down;
-      if (kind === "design" && down) state.input.designTogglePressed = true;
+      if (kind === "design" && down) {
+        // Only visible while stuck in design — tap exits (same as toggle off).
+        state.input.designTogglePressed = true;
+      }
       if (kind === "use" && down) {
-        if (state.designMode) state.input.planCorridorPressed = true;
-        else state.input.usePressed = true; // throw grenade (or fire if MG/rifle path)
+        state.input.usePressed = true; // throw grenade / fire
       }
       if (kind === "interact" && down) {
         // One action key: talk / dig / fire / throw / plan — verb from current context

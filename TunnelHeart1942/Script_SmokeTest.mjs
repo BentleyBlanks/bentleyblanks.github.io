@@ -148,7 +148,7 @@ function TestPlanBeforeExcavate() {
   StepPlay(state, 1 / 30);
   Assert(state.stats.cellsCarved > before, "free dig carves soft lip without blueprint");
 
-  // Optional design mode still marks cells.
+  // Optional design paint still works via planPaintPressed (not dig — dig must excavate).
   const afterFree = state.stats.cellsCarved;
   state.input.designTogglePressed = true;
   StepPlay(state, 1 / 30);
@@ -175,24 +175,23 @@ function TestPlanBeforeExcavate() {
   }
   Assert(!!target, "found soft neighbor of digger");
   state.planCursor = { c: target.c, r: target.r };
-  state.input.digPressed = true;
+  state.input.planPaintPressed = true;
   StepPlay(state, 1 / 30);
-  Assert(IsPlanned(state.level.soil, target.c, target.r), "J marks blueprint");
+  Assert(IsPlanned(state.level.soil, target.c, target.r), "planPaint marks cell");
   Assert(CountPlanned(state.level.soil) >= 1, "plan count");
 
-  state.input.designTogglePressed = true;
-  StepPlay(state, 1 / 30);
-  Assert(!state.designMode, "R exits design");
-
+  // Dig while in design mode must EXIT and carve — never trap mobile.
   state.player.x = hatch.tunnelX;
   state.player.y = hatch.tunnelY;
   state.player.facing = target.c >= chest.c ? 1 : -1;
   state.player.vx = 0;
   state.player.vy = 0;
   state.player.onGround = true;
+  state.designMode = true;
   state.input.digPressed = true;
   StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved > afterFree, "tap J excavates planned cell");
+  Assert(!state.designMode, "dig exits design mode");
+  Assert(state.stats.cellsCarved > afterFree, "dig while designing still carves");
   Assert(GetCell(state.level.soil, target.c, target.r) === AIR, "cell became air");
 }
 
@@ -243,11 +242,12 @@ function TestAct1TutorialPlayable() {
   Assert(html.includes('data-touch="up"'), "mobile up button");
   Assert(html.includes('data-touch="crouch"'), "mobile down/crouch button");
   Assert(html.includes('id="TouchAim"'), "mobile aim key (contextual)");
-  Assert(html.includes('id="TouchDesign"'), "mobile design key (contextual)");
+  Assert(html.includes('id="TouchDesign"'), "design exit key exists (hidden unless stuck)");
   Assert(html.includes('hidden'), "contextual pad keys start hidden");
   Assert(!html.includes('data-touch="dig"'), "dig merged into contextual interact");
-  Assert(!html.includes('data-touch="corridor"'), "corridor is on-demand use in design");
-  Assert(!html.includes('data-touch="chamber"'), "chamber merged into crouch+interact in design");
+  Assert(!html.includes('data-touch="corridor"'), "no dedicated corridor pad key");
+  Assert(!html.includes('data-touch="chamber"'), "no dedicated chamber pad key");
+  Assert(html.includes("点铁锹大键退出并挖"), "design badge tells player to dig-exit");
   Assert(html.includes('id="StepHint"'), "step hint");
   const padHtml = html.slice(html.indexOf('class="touchPad"'), html.indexOf("ModalLayer"));
   Assert(!/>互动</.test(padHtml) && !/>开火</.test(padHtml) && !/>挖</.test(padHtml), "pad buttons are not Chinese text labels");
@@ -274,6 +274,7 @@ function TestAct1TutorialPlayable() {
   Assert(game.includes("IsDialogueBlockingPad"), "tips must not steal dig verb");
   Assert(game.includes("forceTouchPad") || css.includes("forceTouchPad"), "touch pad forced on touch devices");
   Assert(html.includes('id="DebugModal"'), "hidden debug panel exists");
+  Assert(game.includes("designExit") || game.includes("误进画线"), "design trap has dig-exit path");
 }
 
 function TestNaiveAct1Bot() {
@@ -1002,7 +1003,7 @@ function Main() {
   Assert(html.includes('data-touch="aim"'), "mobile ADS aim button");
   Assert(html.includes('class="cluster actions"'), "consolidated action cluster");
   Assert(html.includes('id="TouchAim" hidden') || /id="TouchAim"[^>]*hidden/.test(html), "aim hidden until rifle");
-  Assert(/id="TouchDesign"[^>]*hidden/.test(html), "design hidden until tunnel");
+  Assert(/id="TouchDesign"[^>]*hidden/.test(html), "design key starts hidden");
   Assert(!html.includes('data-touch="dig"'), "no always-on dig key");
   Assert(html.includes('data-touch="up"') && html.includes('data-touch="crouch"'), "up/down always on pad");
   // Underground HUD must teach dig / blueprint — not leave a silent talk key.

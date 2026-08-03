@@ -1,12 +1,12 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v8";
-export const CACHE_BUST = "20260803u";
+export const CACHE_BUST = "20260803v";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
-  subtitle: "白盒 · 贴壁开挖（画线可选）",
-  tagline: "地窖只是起点。软土贴着挖——要开长巷再画线。",
+  subtitle: "白盒 · 贴壁开挖联通地窖",
+  tagline: "地窖只是起点。拿铁锹贴着土壁挖，挖通就联通了。",
   yearLabel: "一九四二年 · 冀中高家庄",
 };
 
