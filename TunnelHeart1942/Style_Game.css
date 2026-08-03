@@ -264,15 +264,23 @@ button {
   justify-content: end;
 }
 .touchPad button {
-  width: 74px; height: 74px; border: 3px solid var(--ink); border-radius: 50%;
-  background: rgba(239,226,200,.92); color: var(--ink);
+  width: 74px; height: 74px; border: 2.5px solid rgba(26,20,16,.45); border-radius: 50%;
+  background: rgba(239,226,200,.38); color: var(--ink);
   display: grid; place-items: center;
   padding: 0;
-  box-shadow: 3px 3px 0 rgba(0,0,0,.28);
+  box-shadow: 2px 2px 0 rgba(0,0,0,.12);
+  opacity: 0.72;
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  transition: opacity .12s ease, background .12s ease, border-color .12s ease;
+}
+.touchPad button:active,
+.touchPad button:focus-visible {
+  opacity: 1;
+  background: rgba(239,226,200,.78);
+  border-color: rgba(26,20,16,.75);
 }
 .touchPad button.wide {
   width: 92px; border-radius: 22px;
@@ -281,6 +289,7 @@ button {
   width: 58%; height: 58%;
   display: block;
   pointer-events: none;
+  opacity: 0.9;
 }
 .touchPad button.wide .padIcon { width: 52%; height: 52%; }
 .touchPad button[hidden] { display: none !important; }
