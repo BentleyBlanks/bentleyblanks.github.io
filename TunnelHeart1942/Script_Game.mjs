@@ -1029,17 +1029,7 @@ function DrawTunnelFrontLips(pal) {
       if (airRight) ctx.fillRect(x + rw - lipW, y, lipW, rh);
     }
   }
-  // Near-camera dirt clumps along the bottom of the view (depth skirt only).
-  const scroll = state.cameraX * 1.4;
-  ctx.fillStyle = "rgba(18,12,8,.75)";
-  for (let i = 0; i < 10; i++) {
-    const x = ((i * 130 - scroll) % (VIEW_W * Scale() + 100)) - 40;
-    const y = (canvas.clientHeight || innerHeight) * 0.88;
-    ctx.beginPath();
-    if (typeof ctx.ellipse === "function") ctx.ellipse(x, y, 40, 18, 0, 0, Math.PI * 2);
-    else ctx.arc(x, y, 28, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // No bottom-of-screen dirt ellipses — they read as mystery eggs under the dig band.
 }
 
 function DrawShaft(shaft) {
