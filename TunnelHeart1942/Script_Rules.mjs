@@ -138,12 +138,39 @@ function SolidsFor(state) {
   return state.player.inTunnel ? state.level.tunnelSolids : state.level.surfaceSolids;
 }
 
+/** Floor strip under feet — never shove X against these. */
+function IsFloorSolid(player, s) {
+  return s.y >= player.y - 8 && s.y <= player.y + 10;
+}
+
+/** Ceiling / crawlway roof above the body — X-shove against merged ceiling teleports to map edge. */
+function IsCeilingSolid(player, s) {
+  return s.y + s.h <= player.y - 10;
+}
+
+/** True if standing (full height) would overlap a wall or ceiling solid. */
+export function StandingWouldClip(player, solids) {
+  const stand = { x: player.x - PLAYER_W / 2, y: player.y - PLAYER_H, w: PLAYER_W, h: PLAYER_H };
+  for (const s of solids || []) {
+    if (!RectsOverlap(stand, s)) continue;
+    if (IsFloorSolid(player, s)) continue;
+    return true;
+  }
+  return false;
+}
+
 function ResolvePhysics(state, dt) {
   const { player, input, level } = state;
   if (state.transition > 0) return;
 
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  player.crouching = !!input.crouch && player.onGround && !input.dig;
+  const solids = SolidsFor(state);
+  // Dig must NOT force-stand — that clips the head into a 1-high crawlway roof.
+  let crouch = !!input.crouch && player.onGround;
+  if (!crouch && player.inTunnel && player.onGround && StandingWouldClip(player, solids)) {
+    crouch = true; // low ceiling — stay crouched until there's headroom
+  }
+  player.crouching = crouch;
   player.aiming = !!input.aim && CanShoot(player.held) && !state.designMode && !player.inTunnel;
   let speed = MOVE_SPEED;
   if (player.crouching) speed *= 0.55;
@@ -158,8 +185,10 @@ function ResolvePhysics(state, dt) {
   player.x += player.vx * dt;
   player.x = Math.max(20, Math.min(level.width - 20, player.x));
   let aabb = PlayerAabb(player);
-  for (const s of SolidsFor(state)) {
+  for (const s of solids) {
     if (!RectsOverlap(aabb, s)) continue;
+    // Only real walls shove on X — floor/ceiling strips are Y-resolved.
+    if (IsFloorSolid(player, s) || IsCeilingSolid(player, s)) continue;
     if (player.vx > 0) player.x = s.x - PLAYER_W / 2;
     else if (player.vx < 0) player.x = s.x + s.w + PLAYER_W / 2;
     else {
@@ -173,7 +202,7 @@ function ResolvePhysics(state, dt) {
   player.y += player.vy * dt;
   aabb = PlayerAabb(player);
   player.onGround = false;
-  for (const s of SolidsFor(state)) {
+  for (const s of solids) {
     if (!RectsOverlap(aabb, s)) continue;
     if (player.vy >= 0 && prevY <= s.y + 6) {
       player.y = s.y;
@@ -474,9 +503,9 @@ function TryExcavate(state) {
   if (CarveCell(level.soil, dig.c, dig.r)) {
     state.stats.digs += 1;
     state.stats.cellsCarved += 1;
-    // One tap also clears planned headroom — player is ~2 cells tall.
+    // Always clear soft headroom above the dig — 1-high crawlways trap a standing digger.
     const headR = dig.r - 1;
-    if (IsPlanned(level.soil, dig.c, headR) && GetCell(level.soil, dig.c, headR) === SOFT) {
+    if (GetCell(level.soil, dig.c, headR) === SOFT) {
       if (CarveCell(level.soil, dig.c, headR)) state.stats.cellsCarved += 1;
     }
     const footR = dig.r + 1;

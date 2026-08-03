@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
-import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
+import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT } from "./Script_Dig.mjs";
 import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
@@ -18,6 +18,7 @@ import {
   LoadProgress,
   NextStepText,
   SerializeProgress,
+  StandingWouldClip,
   StepPlay,
 } from "./Script_Rules.mjs";
 import { BONE_DEFS, CLIPS, SampleClip, SolveBones, PickClip } from "./Script_Puppet.mjs";
@@ -280,6 +281,47 @@ function TestNoJump() {
   state.input.up = true;
   for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
   Assert(state.player.y >= y0 - 2, "W/up does not launch into the air");
+}
+
+/** Crouch into a 1-high crawlway — must not X-shove to the map/soil edge. */
+function TestCrouchCrawlNoEdgeTeleport() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  DebugHold(state, ITEM_SHOVEL);
+  const soil = state.level.soil;
+  const pc = Math.floor((state.player.x - soil.originX) / soil.cell);
+  const pr = Math.floor((state.player.y - 24 - soil.originY) / soil.cell);
+  for (let c = pc + 1; c < pc + 10; c++) {
+    SetCell(soil, c, pr, AIR);
+    if (GetCell(soil, c, pr - 1) === AIR) SetCell(soil, c, pr - 1, SOFT);
+  }
+  RebuildTunnelSolids(state.level);
+
+  state.input.crouch = true;
+  state.input.right = true;
+  for (let i = 0; i < 50; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.crouching, "crouch-walks inside 1-high crawlway");
+  Assert(state.player.x > soil.originX + (pc + 2) * soil.cell, "reached crawlway interior");
+  Assert(
+    StandingWouldClip({ ...state.player, crouching: false }, state.level.tunnelSolids),
+    "standing would clip crawlway ceiling",
+  );
+  const xCrawl = state.player.x;
+
+  state.input.crouch = false;
+  state.input.right = true;
+  for (let i = 0; i < 12; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.crouching, "low ceiling keeps player crouched");
+  Assert(Math.abs(state.player.x - xCrawl) < 100, "uncrouch does not teleport on X");
+  Assert(state.player.x > 100, "not pinned at left map edge");
+
+  const xDig = state.player.x;
+  state.input.crouch = true;
+  state.input.right = true;
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(Math.abs(state.player.x - xDig) < 60, "dig-while-crouch does not edge-shove");
+  Assert(state.player.crouching, "dig does not force-stand in crawlway");
 }
 
 function TestPickupShovelRequired() {
@@ -624,6 +666,7 @@ function Main() {
   TestPlanBeforeExcavate();
   TestCarveConnectsAct1();
   TestNoJump();
+  TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();
   TestMultiTalk();
   TestAct2MustDigBeforeShelter();
