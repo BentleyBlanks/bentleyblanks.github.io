@@ -228,6 +228,9 @@ function TestAct1TutorialPlayable() {
   const html = readFileSync(join(here, "index.html"), "utf8");
   Assert(html.includes('data-touch="corridor"'), "mobile corridor C button");
   Assert(html.includes('id="StepHint"'), "always-on step hint");
+  const css = readFileSync(join(here, "Style_Game.css"), "utf8");
+  Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
+  Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
 }
 
 function TestNaiveAct1Bot() {

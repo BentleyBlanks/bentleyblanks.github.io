@@ -240,11 +240,19 @@ button {
 
 .touchPad {
   position: absolute; left: 12px; right: 12px; bottom: 7%;
-  display: none; justify-content: space-between; gap: 12px; pointer-events: none;
+  z-index: 4;
+  display: none; justify-content: space-between; align-items: flex-end; gap: 12px;
+  pointer-events: none;
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
-.touchPad .cluster { display: flex; gap: 8px; pointer-events: auto; }
+.touchPad .cluster {
+  display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto;
+  max-width: min(58vw, 420px); justify-content: flex-end;
+}
+.touchPad .cluster:first-child {
+  max-width: none; justify-content: flex-start; flex-wrap: nowrap;
+}
 .touchPad button {
   width: 56px; height: 56px; border: 2.5px solid var(--ink); border-radius: 50%;
   background: rgba(239,226,200,.88); color: var(--ink); font-weight: 700;
@@ -272,11 +280,40 @@ button {
 .modalCard p { line-height: 1.65; margin: 0 0 12px; }
 .modalCard .modalActions { padding: 0; }
 
-@media (max-width: 820px) {
+/* Phones/tablets: landscape width often >820 — keep pads visible. */
+@media (pointer: coarse), (max-width: 920px), (max-height: 520px) {
   .titleLayout { grid-template-columns: 1fr; }
   .comicCover { display: none; }
   .touchPad { display: flex; }
   .comicFrame { grid-template-columns: 80px 1fr; }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 921px) and (min-height: 521px) {
+  .touchPad { display: none !important; }
+}
+
+/* Landscape mobile: compact pads that stay on-screen above the letterbox. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .comicLetterbox i { height: 3%; }
+  .touchPad {
+    display: flex;
+    bottom: max(4px, env(safe-area-inset-bottom, 0px));
+    left: max(8px, env(safe-area-inset-left, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    gap: 8px;
+  }
+  .touchPad button { width: 44px; height: 44px; font-size: .85rem; }
+  .touchPad button.wide { width: 54px; }
+  .touchPad .cluster { gap: 6px; max-width: min(62vw, 380px); }
+  .heldSlot { max-width: min(220px, 38vw); top: max(4%, env(safe-area-inset-top, 0px)); }
+  .heldSlot em { display: none; }
+  .stepHint {
+    top: max(12%, calc(env(safe-area-inset-top, 0px) + 48px));
+    max-width: min(260px, 46vw);
+    font-size: .68rem;
+    padding: 4px 8px;
+  }
+  .vhChrome { top: max(4%, env(safe-area-inset-top, 0px)); }
+  .designBadge { top: max(4%, env(safe-area-inset-top, 0px)); padding: 4px 10px; font-size: .8rem; }
 }
 
 .designBadge {
