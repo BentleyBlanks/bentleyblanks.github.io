@@ -134,9 +134,12 @@ function PaintTouchPadIcons() {
 function PadInteractVerb(st) {
   const p = st.player;
   const hint = st.interactHint || "";
+  // Mounted MG: big key is the trigger.
+  if (p.manningMg) return "shot";
   // Design mode: big key paints blueprint cells (hold down + tap = chamber).
   if (st.designMode) return st.input.crouch ? "chamber" : "plan";
   if (st.activeTalkId || st.subtitle?.comic) return "talk";
+  if (hint === "mg_nest") return "shot";
   // Concrete world verbs beat the underground dig default.
   if (hint === "hatch") return "hatch";
   if (hint === "stealth_ko") return "warn";
@@ -248,6 +251,8 @@ function SyncHud() {
   } else if (held === ITEM_RIFLE) {
     const ads = state.player.aiming ? "开镜中 · 大键开火" : "按住开镜，再点大键打";
     slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>${ads}</em>`;
+  } else if (state.player.manningMg) {
+    slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
     const tip = state.level?.tutorialPlan
       ? "走到蓝色格子旁，点铁锹大键挖"
@@ -1190,6 +1195,34 @@ function DrawEntity(ent) {
       ctx.textAlign = "center";
       ctx.fillText(state.player.inTunnel ? "出井" : "开枪", 0, -34 * s);
     }
+  } else if (ent.type === "mg_nest") {
+    const gunner = state.level.entities.find((e) => e.id === "mg_gunner");
+    const ready = !gunner || gunner.dead;
+    const nearNest = Math.abs(state.player.x - ent.x) < 80;
+    if (ready && nearNest && !state.player.manningMg) glow();
+    const face = ent.facing || 1;
+    // Sandbags
+    ctx.fillStyle = "#6a5a3a";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-28 * s, 0);
+    ctx.lineTo(-22 * s, -22 * s);
+    ctx.lineTo(22 * s, -22 * s);
+    ctx.lineTo(28 * s, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Barrel
+    ctx.fillStyle = state.player.manningMg ? "#2a241c" : "#3a3228";
+    ctx.fillRect(face > 0 ? 4 * s : -30 * s, -30 * s, 26 * s, 6 * s);
+    ctx.strokeRect(face > 0 ? 4 * s : -30 * s, -30 * s, 26 * s, 6 * s);
+    if (nearNest || state.player.manningMg) {
+      ctx.fillStyle = "#efe2c8";
+      ctx.font = `700 ${11 * s}px IBM Plex Sans, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(state.player.manningMg ? "扫射中" : ready ? "抢机枪" : "先制枪手", 0, -40 * s);
+    }
   } else if (ent.type === "enemy") {
     let alpha = 1;
     if (ent.dead) alpha = ent.ko ? 0.4 : 0.28;
@@ -1445,7 +1478,11 @@ function DrawInteractPromptWorld() {
           ? "bell"
           : hint === "shelter"
             ? "people"
-            : hint === "shot_port" || hint === "shoot" || hint === "ads" || hint === "need_ammo"
+            : hint === "shot_port" ||
+                hint === "shoot" ||
+                hint === "ads" ||
+                hint === "need_ammo" ||
+                hint === "mg_nest"
               ? "shot"
               : hint === "stealth_ko"
                 ? "warn"

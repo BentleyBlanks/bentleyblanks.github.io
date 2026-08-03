@@ -837,6 +837,188 @@ function BuildAct6Heifengkou() {
   return level;
 }
 
+/**
+ * Act7: dig through hard soil + crawlway to enemy camp, surface behind the
+ * gunner, seize the MG nest, hold waves of 日伪军.
+ */
+function BuildAct7MgNest() {
+  const level = BaseLevel(3400, { startTunnel: true });
+  const originX = 40;
+  const cols = 72;
+  const start = { c: 3, r: 3, w: 4, h: 2 };
+  // 1-high crawl forces crouch mid-route (hardship).
+  const crawl = { c: 18, r: 4, w: 10, h: 1 };
+  const camp = { c: 54, r: 3, w: 4, h: 2 }; // not pre-carved — must dig
+  const soil = BuildDigBand({
+    originX,
+    originY: DIG_ORIGIN_Y,
+    cols,
+    rows: DIG_ROWS,
+    hardBlobs: [
+      { c: 12, r: 2, w: 3, h: 3 }, // blocks straight dig — go under via crawl
+      { c: 30, r: 1, w: 2, h: 5 },
+      { c: 38, r: 3, w: 4, h: 2 },
+      { c: 46, r: 2, w: 3, h: 3 }, // camp footing — skirt soft earth
+    ],
+    cellars: [start, crawl],
+  });
+  AttachSoil(level, soil);
+  SpawnInCellar(level, start.c + 1, start.r);
+  const s = CellCenter(soil, start.c + 1, start.r + 1);
+  const campPt = CellCenter(soil, camp.c + 1, camp.r + 1);
+  const crawlPt = CellCenter(soil, crawl.c + 5, crawl.r);
+  level.digZones = [
+    { id: "camp_room", goal: null, c: camp.c, r: camp.r, w: camp.w, h: camp.h, need: 5 },
+  ];
+  level.digLinks = [
+    { id: "link_camp", goal: "link_camp", ax: s.x, ay: s.y, bx: campPt.x, by: campPt.y },
+  ];
+  level.shafts = [
+    { x: s.x, label: "出击端" },
+    { x: crawlPt.x, label: "低洞" },
+    { x: campPt.x, label: "敌营下（待挖）" },
+  ];
+  const nestX = campPt.x + 36;
+  level.mgWaves = [
+    {
+      gap: 0.8,
+      bark: "前哨扑上来了——打！",
+      foes: [
+        { x: nestX + 220, label: "伪军", hp: 2, amp: 30, phase: 0.2 },
+        { x: nestX + 300, label: "鬼子", hp: 2, amp: 40, phase: 1.1 },
+      ],
+    },
+    {
+      gap: 1.1,
+      bark: "又一阵！压住！",
+      foes: [
+        { x: nestX + 260, label: "伪军", hp: 2, amp: 50, phase: 0.4 },
+        { x: nestX + 340, label: "鬼子", hp: 3, amp: 35, phase: 2.0 },
+        { x: nestX + 420, label: "伪军", hp: 2, amp: 45, phase: 1.4 },
+      ],
+    },
+    {
+      gap: 1.3,
+      bark: "最后一波——打光他们！",
+      foes: [
+        { x: nestX + 240, label: "鬼子", hp: 3, amp: 55, phase: 0.6 },
+        { x: nestX + 320, label: "伪军", hp: 2, amp: 40, phase: 1.8 },
+        { x: nestX + 400, label: "鬼子", hp: 3, amp: 50, phase: 0.9 },
+        { x: nestX + 480, label: "伪军", hp: 2, amp: 35, phase: 2.4 },
+      ],
+    },
+  ];
+  level.mgArmed = false;
+  level.mgWaveIndex = 0;
+  level.mgWaveTimer = 0;
+  level.entities = [
+    PlacePickup(s.x + 36, s.y + 16, ITEM_SHOVEL, "tunnel"),
+    PlacePickup(crawlPt.x, crawlPt.y + 8, ITEM_GRENADE, "tunnel"),
+    Ent({
+      id: "npc_mg",
+      type: "talk",
+      x: s.x + 70,
+      y: s.y + 16,
+      layer: "tunnel",
+      speaker: "林霞",
+      script: [
+        {
+          speaker: "林霞",
+          text: "直挖会撞夯土。从低洞绕过去，挖到营盘底下再翻上去。",
+        },
+        {
+          speaker: "林霞",
+          text: "机枪手盯着正面——你从他背后出来，制住他，枪就是咱们的。",
+        },
+        {
+          speaker: "高传宝",
+          text: "抢过机枪，来多少日伪军，我扫多少。",
+        },
+      ],
+      hint: "听林霞交代营盘",
+      goal: "talk_mg",
+      tunnelAnchored: true,
+    }),
+    // Mid-route peek — optional hardship / ammo sink, not a required goal.
+    PlaceShotPort(
+      "peek_mid",
+      CellCenter(soil, 32, 1).x,
+      CellCenter(soil, 32, 2).y + 10,
+      null,
+      "墙根窥口（可打可退）",
+    ),
+    Ent({
+      id: "patrol_mid",
+      type: "patrol",
+      x: CellCenter(soil, 32, 1).x + 40,
+      y: SURFACE_Y,
+      layer: "surface",
+      homeX: CellCenter(soil, 32, 1).x + 40,
+      amp: 70,
+      hostile: true,
+    }),
+    Ent({
+      id: "hatch_camp",
+      type: "hatch",
+      x: nestX - 100,
+      y: SURFACE_Y,
+      layer: "both",
+      w: 40,
+      h: 18,
+      radius: 52,
+      hint: "敌营翻口",
+      goal: "surface_camp",
+      requiresGoal: "link_camp",
+      // Keep tunnel mouth under the hatch X so Near() lines up underground.
+      tunnelX: nestX - 100,
+      tunnelY: campPt.y + 10,
+      needsShovel: false,
+    }),
+    // Facing +1 (east) — surface west of him, walk up, rear KO, then take nest.
+    PlaceEnemy("mg_gunner", nestX + 80, {
+      amp: 0,
+      phase: 0,
+      hp: 2,
+      facing: 1,
+      label: "机枪手",
+    }),
+    Ent({
+      id: "mg_nest",
+      type: "mg_nest",
+      x: nestX,
+      y: SURFACE_Y,
+      layer: "surface",
+      w: 56,
+      h: 36,
+      radius: 70,
+      facing: 1,
+      hint: "机枪巢",
+      goal: "man_mg",
+      requiresGoal: "silence_gunner",
+    }),
+    // Start hatch back to village end
+    Ent({
+      id: "hatch_start",
+      type: "hatch",
+      x: s.x,
+      y: SURFACE_Y,
+      layer: "both",
+      w: 40,
+      h: 18,
+      hint: "回出击端",
+      tunnelX: s.x,
+      tunnelY: s.y + 10,
+    }),
+  ];
+  level.props = [
+    { kind: "house", x: s.x - 40, variant: 0 },
+    { kind: "blockhouse", x: nestX + 160 },
+    { kind: "shed", x: nestX - 120 },
+    { kind: "post", x: nestX + 80 },
+  ];
+  return level;
+}
+
 const BUILDERS = {
   act1_connect: BuildAct1,
   act2_bell: BuildAct2,
@@ -844,6 +1026,7 @@ const BUILDERS = {
   act4_ambush: BuildAct4,
   act5_street_hunt: BuildAct5StreetHunt,
   act6_heifengkou: BuildAct6Heifengkou,
+  act7_mg_nest: BuildAct7MgNest,
 };
 
 export function BuildLevel(chapterId) {

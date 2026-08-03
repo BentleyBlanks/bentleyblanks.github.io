@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
-export const SAVE_KEY = "tunnelheart1942_v6";
-export const CACHE_BUST = "20260803q";
+export const SAVE_KEY = "tunnelheart1942_v7";
+export const CACHE_BUST = "20260803r";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -261,7 +261,53 @@ export const CHAPTERS = [
       {
         id: "p6z1",
         speaker: "旁白",
-        text: "黑风口塌了。地道是挖出来的——人也是。",
+        text: "黑风口塌了。可村东营盘还有一挺机枪压着路口——不拔掉，乡亲们仍出不去。",
+        mood: "wide",
+      },
+    ],
+  },
+  {
+    id: "act7_mg_nest",
+    act: 7,
+    title: "机枪巢",
+    timeLabel: "反攻清晨",
+    cast: "高传宝",
+    startTunnel: true,
+    night: false,
+    objective: "绕硬土与低洞挖到敌营下，翻上去制住机枪手，抢过机枪扫光来犯日伪军。",
+    goals: [
+      "talk_mg",
+      "link_camp",
+      "surface_camp",
+      "silence_gunner",
+      "man_mg",
+      "hold_waves",
+    ],
+    openPanels: [
+      {
+        id: "p7a",
+        speaker: "背景",
+        text: "村东敌营路口架着机枪。炮楼塌了，这挺枪还在咬人。",
+        mood: "wide",
+      },
+      {
+        id: "p7b",
+        speaker: "困难",
+        text: "直挖会撞硬夯土；中段还有低洞要爬。营盘上机枪手盯着正面——得从地道翻到他背后。",
+        mood: "talk",
+      },
+      {
+        id: "p7c",
+        speaker: "目标",
+        text: "挖通到营下 → 出井制住机枪手 → 抢机枪 → 打光扑上来的日伪军。",
+        mood: "tip",
+      },
+    ],
+    closePanels: [
+      {
+        id: "p7z1",
+        speaker: "旁白",
+        text: "机枪哑了。地道通到敌营根上——枪，也成了咱们的。",
         mood: "wide",
       },
     ],

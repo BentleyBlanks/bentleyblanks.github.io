@@ -658,9 +658,10 @@ function TestDepthLayers() {
 }
 
 function TestChaptersHaveSoil() {
-  Assert(CHAPTERS.length === 6, "six acts");
+  Assert(CHAPTERS.length === 7, "seven acts");
   Assert(CHAPTERS[4].id === "act5_street_hunt", "street hunt slotted as act5");
   Assert(CHAPTERS[5].id === "act6_heifengkou", "heifengkou is act6");
+  Assert(CHAPTERS[6].id === "act7_mg_nest", "mg nest slotted as act7");
   for (const ch of CHAPTERS) {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
@@ -670,8 +671,77 @@ function TestChaptersHaveSoil() {
     );
     Assert(level.entities.some((e) => e.type === "talk" && e.script), `${ch.id} has talk script`);
   }
-  Assert(SAVE_KEY.endsWith("_v6"), "save v6");
+  Assert(SAVE_KEY.endsWith("_v7"), "save v7");
   Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
+}
+
+function TestAct7MgNest() {
+  const state = Play(6);
+  Assert(state.chapterId === "act7_mg_nest", "mg nest chapter");
+  Assert(state.player.inTunnel, "act7 starts underground");
+  Assert(state.level.entities.some((e) => e.type === "mg_nest"), "mg nest entity");
+  Assert(state.level.entities.some((e) => e.id === "mg_gunner"), "machine gunner");
+  Assert(state.level.mgWaves?.length >= 3, "three assault waves authored");
+  Assert(state.level.entities.some((e) => e.type === "patrol"), "mid-route patrol hardship");
+  const crawlAir = state.level.soil.cells[4]?.slice(18, 28).filter((c) => c === AIR).length;
+  Assert(crawlAir >= 8, "pre-carved crawlway hardship");
+
+  DebugCompleteGoal(state, "talk_mg");
+  // Dig start → camp under hard blobs (BFS skips HARD).
+  DebugCarvePath(state, 4, 4, 55, 4);
+  for (let r = 3; r < 5; r++) {
+    for (let c = 54; c < 58; c++) state.level.soil.cells[r][c] = AIR;
+  }
+  RebuildTunnelSolids(state.level);
+  for (let i = 0; i < 3; i++) StepPlay(state, 1 / 30);
+  Assert(state.goalsDone.link_camp || EvalDigGoals(state.level).link_camp, "link_camp after carve");
+
+  const hatch = state.level.entities.find((e) => e.id === "hatch_camp");
+  Assert(!!hatch, "camp hatch");
+  state.player.x = hatch.tunnelX;
+  state.player.y = hatch.tunnelY;
+  state.player.inTunnel = true;
+  state.player.onGround = true;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  for (let i = 0; i < 50; i++) StepPlay(state, 1 / 30);
+  Assert(!state.player.inTunnel, "surfaced at camp");
+  Assert(state.goalsDone.surface_camp, "surface_camp goal");
+
+  const nest = state.level.entities.find((e) => e.type === "mg_nest");
+  const gunner = state.level.entities.find((e) => e.id === "mg_gunner");
+  gunner.amp = 0;
+  gunner.facing = 1;
+  gunner.x = nest.x + 80;
+  gunner.homeX = gunner.x;
+  state.player.x = gunner.x - 28;
+  state.player.y = 0;
+  state.player.facing = 1;
+  state.subtitle = null;
+  state.subtitleTimer = 0;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(gunner.dead && gunner.ko, "rear KO silences gunner");
+  Assert(state.goalsDone.silence_gunner, "silence_gunner goal");
+
+  state.subtitle = null;
+  state.subtitleTimer = 0;
+  state.player.x = nest.x;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.manningMg, "player mans the MG");
+  Assert(state.goalsDone.man_mg, "man_mg goal");
+  Assert(state.level.mgArmed, "waves armed");
+
+  // Spray until all authored waves are spawned and cleared.
+  for (let i = 0; i < 1200 && !state.goalsDone.hold_waves; i++) {
+    state.input.usePressed = true;
+    state.player.shotCool = 0;
+    StepPlay(state, 1 / 30);
+  }
+  Assert(state.level.mgWaveIndex >= state.level.mgWaves.length, "all waves deployed");
+  Assert(state.goalsDone.hold_waves, "hold_waves after MG defense");
+  Assert(/机枪|扫射|日伪/.test(NextStepText(state)) || state.goalsDone.hold_waves, "mg tip or done");
 }
 
 
@@ -711,6 +781,7 @@ function Main() {
   TestAct4KillInvaders();
   TestAct5StreetHunt();
   TestAct6PlantNeedsCharge();
+  TestAct7MgNest();
   TestNaiveAct1Bot();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");

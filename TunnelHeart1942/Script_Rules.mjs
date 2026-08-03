@@ -95,6 +95,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       /** Pocket ammo — separate from held slot (rifle consumes this). */
       ammo: loadout.ammo ?? 0,
       shotCool: 0,
+      /** Act7: locked to mg_nest, rapid fire, no ammo. */
+      manningMg: false,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
@@ -162,6 +164,24 @@ export function StandingWouldClip(player, solids) {
 function ResolvePhysics(state, dt) {
   const { player, input, level } = state;
   if (state.transition > 0) return;
+
+  // Seized MG: pinned to the nest, always "ADS", spray with use/interact.
+  if (player.manningMg) {
+    const nest = level.entities.find((e) => e.type === "mg_nest");
+    if (nest) {
+      player.x = nest.x;
+      player.facing = nest.facing || 1;
+    }
+    player.y = SURFACE_Y;
+    player.vx = 0;
+    player.vy = 0;
+    player.onGround = true;
+    player.inTunnel = false;
+    player.crouching = false;
+    player.aiming = true;
+    if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
+    return;
+  }
 
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const solids = SolidsFor(state);
@@ -586,8 +606,47 @@ function AlertEnemiesNear(state, x, radius, alertTime = 4.2) {
   }
 }
 
+/** Act7 mounted MG — belt-fed, long range, keeps the nest pinned down. */
+function FireMg(state) {
+  const { player } = state;
+  if ((player.shotCool || 0) > 0) return;
+  if (!player.manningMg) return;
+  player.shotCool = 0.11;
+  state.stats.shots += 1;
+  state.stats.mgShots = (state.stats.mgShots || 0) + 1;
+  const facing = player.facing || 1;
+  const range = 560;
+  state.muzzle = {
+    x: player.x + facing * 34,
+    y: SURFACE_Y - 32,
+    timer: 0.1,
+    facing,
+  };
+  const living = state.level.entities.filter((e) => e.type === "enemy" && !e.dead && !e.inTunnel);
+  let best = null;
+  let bestD = range;
+  for (const e of living) {
+    if (e.id === "mg_gunner") continue; // already silenced
+    const dx = e.x - player.x;
+    if (facing > 0 && dx < 12) continue;
+    if (facing < 0 && dx > -12) continue;
+    const d = Math.abs(dx);
+    if (d < bestD && Math.abs((e.y || 0) - SURFACE_Y) < 64) {
+      bestD = d;
+      best = e;
+    }
+  }
+  AlertEnemiesNear(state, player.x, 420, 4.0);
+  if (!best) return;
+  HurtEnemy(state, best, 2);
+}
+
 function FireRifle(state) {
   const { player } = state;
+  if (player.manningMg) {
+    FireMg(state);
+    return;
+  }
   if ((player.shotCool || 0) > 0) return;
   if (!CanShoot(player.held)) return;
   if ((player.ammo || 0) <= 0) {
@@ -636,6 +695,11 @@ function FireRifle(state) {
 function TryUseItem(state) {
   const { player, level, input } = state;
   if (!input.usePressed || state.transition > 0) return;
+
+  if (player.manningMg) {
+    FireMg(state);
+    return;
+  }
 
   if (CanShoot(player.held)) {
     FireRifle(state);
@@ -788,6 +852,76 @@ function SyncKillGoals(state) {
     MarkGoal(state, "kill_invaders");
     MarkGoal(state, "clear_street");
   }
+  SyncMgNestGoals(state);
+}
+
+function SyncMgNestGoals(state) {
+  if (state.chapterId !== "act7_mg_nest") return;
+  const gunner = state.level.entities.find((e) => e.id === "mg_gunner");
+  if (gunner?.dead) MarkGoal(state, "silence_gunner");
+  if (!state.goalsDone.man_mg) return;
+  const waves = state.level.mgWaves || [];
+  if ((state.level.mgWaveIndex || 0) < waves.length) return;
+  const waveFoes = state.level.entities.filter((e) => e.waveSpawn);
+  if (waveFoes.length && waveFoes.every((e) => e.dead)) MarkGoal(state, "hold_waves");
+}
+
+function SpawnMgWaveEnemy(state, spec, waveIdx) {
+  const hp = spec.hp ?? 2;
+  state.level.entities.push({
+    id: `wave_${waveIdx}_${Math.round(spec.x)}`,
+    type: "enemy",
+    x: spec.x,
+    y: SURFACE_Y,
+    layer: "surface",
+    homeX: spec.x,
+    amp: spec.amp ?? 40,
+    phase: spec.phase ?? 0,
+    hp,
+    maxHp: hp,
+    dead: false,
+    ko: false,
+    corpse: false,
+    discovered: false,
+    highAlert: true,
+    facing: -1,
+    alert: 5,
+    alertX: state.player.x,
+    hurtFlash: 0,
+    label: spec.label || "鬼子",
+    hostile: true,
+    t: 0,
+    waveSpawn: true,
+    dropAmmo: 0,
+    dropRifle: false,
+    dropGrenade: false,
+  });
+}
+
+function UpdateMgWaves(state, dt) {
+  const level = state.level;
+  if (state.chapterId !== "act7_mg_nest" || !level.mgArmed) return;
+  const waves = level.mgWaves || [];
+  const living = level.entities.filter((e) => e.waveSpawn && !e.dead);
+  for (const e of living) {
+    e.alert = Math.max(e.alert || 0, 2.5);
+    e.alertX = state.player.x;
+    e.highAlert = true;
+  }
+  if (living.length) return;
+  if ((level.mgWaveIndex || 0) >= waves.length) {
+    SyncMgNestGoals(state);
+    return;
+  }
+  level.mgWaveTimer = (level.mgWaveTimer || 0) - dt;
+  if (level.mgWaveTimer > 0) return;
+  const wave = waves[level.mgWaveIndex];
+  const idx = level.mgWaveIndex;
+  level.mgWaveIndex += 1;
+  level.mgWaveTimer = wave.gap ?? 1.2;
+  for (const f of wave.foes || []) SpawnMgWaveEnemy(state, f, idx);
+  SetSubtitle(state, "高传宝", wave.bark || "开火！", 1.8);
+  SetBubble(state, ["shot"], "机枪", 0.8);
 }
 
 function FireFromPort(state, port) {
@@ -898,26 +1032,20 @@ function TryInteract(state) {
 
   state.stats.interactions += 1;
 
-  // Stealth rear KO — any stance / any held item, but never steal hatch/port/talk E.
-  let nearWorldAction = false;
+  // Stealth rear KO first when the geometry is clean — nest/hatch must not eat the takedown
+  // (Act7 gunner stands next to the MG nest on purpose).
   for (const ent of level.entities) {
-    if (ent.kind === "pickup" || ent.type === "enemy") continue;
-    if (ent.hidden || ent.done) continue;
-    if (!LayerOk(player, ent)) continue;
-    if (Near(player, ent, ent.radius || 52)) {
-      nearWorldAction = true;
-      break;
-    }
-  }
-  if (!nearWorldAction) {
-    for (const ent of level.entities) {
-      if (ent.type !== "enemy" || ent.dead) continue;
-      if (!CanStealthKO(player, ent)) continue;
-      KnockOutEnemy(state, ent);
-      SetBubble(state, ["warn"], "击晕", 0.9);
-      SetSubtitle(state, "高传宝", "从背后制住。别让他们看见尸体。", 2.4);
-      return;
-    }
+    if (ent.type !== "enemy" || ent.dead) continue;
+    if (!CanStealthKO(player, ent)) continue;
+    KnockOutEnemy(state, ent);
+    SetBubble(state, ["warn"], "击晕", 0.9);
+    SetSubtitle(
+      state,
+      "高传宝",
+      ent.id === "mg_gunner" ? "机枪手制住了——枪是咱们的！" : "从背后制住。别让他们看见尸体。",
+      2.4,
+    );
+    return;
   }
 
   // Story / hatches / world actions before pickups — never let a shovel steal a talk.
@@ -937,6 +1065,31 @@ function TryInteract(state) {
       return;
     }
 
+    if (ent.type === "mg_nest") {
+      if (player.inTunnel) {
+        SetSubtitle(state, "提示", "先出井，再抢机枪。", 2.0);
+        return;
+      }
+      const gunner = level.entities.find((e) => e.id === "mg_gunner");
+      if (gunner && !gunner.dead) {
+        SetSubtitle(state, "提示", "先制住机枪手——绕到他背后。", 2.4);
+        return;
+      }
+      if (player.manningMg) return;
+      MarkGoal(state, "silence_gunner");
+      player.manningMg = true;
+      player.inTunnel = false;
+      player.x = ent.x;
+      player.facing = ent.facing || 1;
+      if (ent.goal) MarkGoal(state, ent.goal);
+      level.mgArmed = true;
+      level.mgWaveIndex = 0;
+      level.mgWaveTimer = 0.55;
+      SetSubtitle(state, "高传宝", "机枪到手！来多少日伪军，扫多少！", 3.0);
+      SetBubble(state, ["shot"], "机枪", 1.2);
+      return;
+    }
+
     if (ent.type === "hatch") {
       // Going down into a tutorial hatch requires the shovel in hand.
       if (!player.inTunnel && ent.needsShovel && player.held !== ITEM_SHOVEL) {
@@ -944,6 +1097,20 @@ function TryInteract(state) {
         SetBubble(state, ["shovel", "warn"], "先捡铁锹", 1.6);
         SetSubtitle(state, "提示", "铁锹在井边。先捡上，再下洞挖。", 2.8);
         return;
+      }
+      if (ent.requiresGoal && !GoalReady(state, ent)) {
+        SetBubble(state, ["shovel", "warn"], "地道还没挖通", 1.6);
+        SetSubtitle(state, "提示", "先挖通到营盘底下，再翻这口井。", 2.6);
+        return;
+      }
+      // Don't dive back down while standing on the nest after silencing the gunner.
+      if (
+        !player.inTunnel &&
+        state.goalsDone.silence_gunner &&
+        !state.goalsDone.man_mg &&
+        level.entities.some((e) => e.type === "mg_nest" && Near(player, e, e.radius || 64))
+      ) {
+        continue;
       }
       BeginHatchTransition(state, !player.inTunnel, ent);
       if (ent.goal) MarkGoal(state, ent.goal);
@@ -1252,8 +1419,10 @@ export function StepPlay(state, dt) {
   TryExcavate(state);
   if (!state.designMode) ResolvePhysics(state, clamped);
   SyncDigGoals(state);
+  SyncMgNestGoals(state);
   RefreshHint(state);
   UpdateActors(state, clamped);
+  UpdateMgWaves(state, clamped);
   UpdateProjectiles(state, clamped);
   UpdateCamera(state, clamped);
 
@@ -1326,7 +1495,7 @@ export function RestartChapter(state) {
 }
 
 export function SerializeProgress(state) {
-  return { v: 6, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+  return { v: 7, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
 }
 
 /** Test helper: put shovel in hand. */
@@ -1385,7 +1554,8 @@ export function NextStepText(state) {
   const g = state.goalsDone;
   const p = state.player;
   // Underground controls must read on the HUD — pad merge made this easy to miss.
-  if (p.inTunnel) {
+  // Act7 has its own step ladder (includes surface MG phase) — skip generic tunnel tip.
+  if (p.inTunnel && state.chapterId !== "act7_mg_nest") {
     if (state.designMode) {
       return "设计中：方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出后去挖";
     }
@@ -1420,6 +1590,21 @@ export function NextStepText(state) {
       return "清街：开镜开枪 / 扔手雷 / 背后击晕（别让人看见尸体）";
     }
     return "街道已清";
+  }
+  if (state.chapterId === "act7_mg_nest") {
+    if (p.manningMg || g.man_mg) {
+      if (!g.hold_waves) return "按住开火键扫射！打光扑上来的日伪军";
+      return "机枪巢守住了";
+    }
+    if (!g.talk_mg) return "听林霞交代敌营机枪巢";
+    if (!g.link_camp) {
+      if (p.inTunnel) return "绕硬土、爬低洞，挖通到敌营底下";
+      return "下洞：绕硬土爬低洞，挖到敌营下";
+    }
+    if (!g.surface_camp) return "从敌营翻口出井（在机枪手背后）";
+    if (!g.silence_gunner) return "绕到机枪手背后制住他";
+    if (!g.man_mg) return "点机枪巢，抢过机枪";
+    return "扫光来犯日伪军";
   }
   const chapter = CHAPTERS[state.chapterIndex];
   const open = GoalsRemaining(state);
