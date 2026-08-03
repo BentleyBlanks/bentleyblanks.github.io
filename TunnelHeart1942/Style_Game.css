@@ -260,11 +260,25 @@ button {
   align-items: flex-end;
 }
 .touchPad .cluster.move {
-  max-width: none; justify-content: flex-start; flex-wrap: nowrap; gap: 12px;
+  max-width: none; justify-content: flex-start; flex-wrap: nowrap; gap: 0;
   align-items: flex-end;
 }
-.touchPad .cluster.move .vert {
-  display: flex; flex-direction: column; gap: 8px;
+/* Classic direction-key cross: ↑ on top, ← ↓ → on the bottom row. */
+.touchPad .cluster.move.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 64px);
+  gap: 8px;
+  align-items: center;
+  justify-items: center;
+}
+.touchPad .dpadUp { grid-column: 2; grid-row: 1; }
+.touchPad .dpadLeft { grid-column: 1; grid-row: 2; }
+.touchPad .dpadDown { grid-column: 2; grid-row: 2; }
+.touchPad .dpadRight { grid-column: 3; grid-row: 2; }
+.touchPad .cluster.move.dpad button {
+  width: 64px; height: 64px;
+  border-radius: 14px; /* key-cap, not random circles */
 }
 .touchPad .cluster.actions {
   display: flex;
@@ -448,6 +462,12 @@ html.forceTouchPad .touchPad { display: flex !important; }
   .touchPad button.wide { width: 78px; }
   .touchPad .cluster { gap: 8px; max-width: min(58vw, 320px); }
   .touchPad .cluster.actions { gap: 8px; }
+  .touchPad .cluster.move.dpad {
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(2, 56px);
+    gap: 6px;
+  }
+  .touchPad .cluster.move.dpad button { width: 56px; height: 56px; }
   .heldSlot { max-width: min(220px, 38vw); top: max(4%, env(safe-area-inset-top, 0px)); }
   .heldSlot em { display: none; }
   .stepHint {

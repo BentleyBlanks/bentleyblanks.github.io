@@ -339,7 +339,10 @@ function TestAct1TutorialPlayable() {
   Assert(/width:\s*74px/.test(css), "touch keys are large");
   Assert(css.includes("width: 78%") || css.includes("width:78%"), "pad icons fill most of the key");
   Assert(css.includes("Icon_Charge.png") && css.includes("Icon_Grenade.png") && css.includes("Icon_Rifle.png"), "held slot uses generated item plates");
-  Assert(css.includes(".cluster.move .vert"), "up/down stacked beside strafe");
+  Assert(css.includes(".cluster.move.dpad") && css.includes(".dpadUp"), "move pad is a direction-key cross");
+  Assert(html.includes('class="cluster move dpad"') || html.includes("cluster move dpad"), "HTML uses dpad cluster");
+  Assert(html.includes("dpadLeft") && html.includes("dpadRight") && html.includes("dpadDown"), "dpad has four direction keys");
+  Assert(css.includes(".cluster.actions"), "action cluster present");
   Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
   Assert(css.includes(".isPressed"), "touch pad has pressed visual class");
   Assert(css.includes("scale(0.92)"), "pressed keys sink/scale");

@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803aj">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803ak">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -89,13 +89,11 @@
       <p id="StepHint" class="stepHint" aria-live="polite">下一步</p>
 
       <div class="touchPad" aria-label="触屏操作">
-        <div class="cluster move">
-          <button type="button" data-touch="left" aria-label="左移" title="左移"></button>
-          <button type="button" data-touch="right" aria-label="右移" title="右移"></button>
-          <div class="vert">
-            <button type="button" id="TouchUp" data-touch="up" aria-label="上" title="上"></button>
-            <button type="button" id="TouchDown" data-touch="crouch" aria-label="下 / 蹲" title="下 / 蹲"></button>
-          </div>
+        <div class="cluster move dpad" aria-label="方向键">
+          <button type="button" class="dpadUp" id="TouchUp" data-touch="up" aria-label="上" title="上"></button>
+          <button type="button" class="dpadLeft" data-touch="left" aria-label="左移" title="左移"></button>
+          <button type="button" class="dpadRight" data-touch="right" aria-label="右移" title="右移"></button>
+          <button type="button" class="dpadDown" id="TouchDown" data-touch="crouch" aria-label="下 / 蹲" title="下 / 蹲"></button>
         </div>
         <div class="cluster actions">
           <!-- Aim / design / corridor appear only when that verb is available -->
