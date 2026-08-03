@@ -1651,8 +1651,13 @@ function BindInput() {
 
   for (const btn of document.querySelectorAll("[data-touch]")) {
     const kind = btn.getAttribute("data-touch");
+    const setPressed = (down) => {
+      btn.classList.toggle("isPressed", !!down);
+      btn.setAttribute("aria-pressed", down ? "true" : "false");
+    };
     const on = (down) => {
       EnsureAudio();
+      setPressed(down);
       if (kind === "left") state.input.left = down;
       if (kind === "right") state.input.right = down;
       if (kind === "crouch") state.input.crouch = down;
@@ -1684,7 +1689,7 @@ function BindInput() {
     });
     btn.addEventListener("pointerup", () => on(false));
     btn.addEventListener("pointercancel", () => on(false));
-    btn.addEventListener("pointerleave", () => on(false));
+    btn.addEventListener("lostpointercapture", () => on(false));
   }
 }
 

@@ -243,6 +243,10 @@ function TestAct1TutorialPlayable() {
   Assert(/width:\s*74px/.test(css), "touch keys are large");
   Assert(css.includes(".padIcon"), "pad icon sizing");
   Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
+  Assert(css.includes(".isPressed"), "touch pad has pressed visual class");
+  Assert(css.includes("scale(0.92)"), "pressed keys sink/scale");
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes('classList.toggle("isPressed"'), "pointer handlers toggle isPressed");
 }
 
 function TestNaiveAct1Bot() {

@@ -270,17 +270,32 @@ button {
   padding: 0;
   box-shadow: 2px 2px 0 rgba(0,0,0,.12);
   opacity: 0.72;
+  transform: translateY(0) scale(1);
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: opacity .12s ease, background .12s ease, border-color .12s ease;
+  transition:
+    opacity .08s ease,
+    background .08s ease,
+    border-color .08s ease,
+    box-shadow .08s ease,
+    transform .08s ease;
 }
-.touchPad button:active,
-.touchPad button:focus-visible {
+/* Class-driven press — :active alone is flaky under pointer capture / preventDefault */
+.touchPad button.isPressed,
+.touchPad button:active {
   opacity: 1;
-  background: rgba(239,226,200,.78);
-  border-color: rgba(26,20,16,.75);
+  background: rgba(201,164,90,.92);
+  border-color: #1a1410;
+  border-width: 3px;
+  box-shadow: inset 0 3px 0 rgba(0,0,0,.28), 0 0 0 2px rgba(239,226,200,.35);
+  transform: translateY(3px) scale(0.92);
+}
+.touchPad button.isPressed .padIcon,
+.touchPad button:active .padIcon {
+  opacity: 1;
+  transform: scale(0.94);
 }
 .touchPad button.wide {
   width: 92px; border-radius: 22px;
@@ -290,6 +305,7 @@ button {
   display: block;
   pointer-events: none;
   opacity: 0.9;
+  transition: transform .08s ease, opacity .08s ease;
 }
 .touchPad button.wide .padIcon { width: 52%; height: 52%; }
 .touchPad button[hidden] { display: none !important; }
