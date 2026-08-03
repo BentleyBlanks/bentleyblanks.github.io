@@ -613,12 +613,19 @@ function TestMultiTalk() {
 function TestAct2MustDigBeforeShelter() {
   const state = Play(1);
   const v1 = state.level.entities.find((e) => e.id === "v1");
+  const hatch = state.level.entities.find((e) => e.type === "hatch");
+  Assert(!!v1 && !!hatch, "act2 has shelter villagers + hatch");
+  Assert(/跟上|井口|进洞/.test(NextStepText(state)) || /夜袭|东窖/.test(NextStepText(state)), "act2 tip names dig/escort");
+
   state.player.x = v1.x;
   state.player.y = 0;
   state.player.inTunnel = false;
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
   Assert(!state.goalsDone.shelter_a, "cannot shelter before dig link");
+  Assert(!v1.following, "cannot start escort before dig link");
+  Assert(/挖通|东窖/.test(state.subtitle?.text || ""), "blocked shelter explains dig-first");
+
   DebugCarvePath(state, 6, 3, 29, 3);
   for (let r = 2; r < 5; r++) {
     for (let c = 28; c < 32; c++) {
@@ -629,6 +636,41 @@ function TestAct2MustDigBeforeShelter() {
   StepPlay(state, 1 / 30);
   Assert(state.goalsDone.dig_safe_room || EvalDigGoals(state.level).dig_safe_room, "safe room carved");
   Assert(state.goalsDone.link_safe || EvalDigGoals(state.level).link_safe, "safe linked");
+  DebugCompleteGoal(state, "talk_night");
+  Assert(/乡亲|跟上|井口/.test(NextStepText(state)), "after dig, tip says escort to well");
+
+  // Escort: tap villager → follow → walk to hatch → enter.
+  state.player.x = v1.x;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(v1.following && !v1.done, "tap villager starts follow escort");
+  Assert(!state.goalsDone.shelter_a, "follow alone does not complete shelter");
+  Assert(/跟上|井口/.test(NextStepText(state)), "HUD says lead follower to well");
+
+  // Walk player + follower to the hatch mouth.
+  state.player.x = hatch.x;
+  state.player.facing = 1;
+  for (let i = 0; i < 90 && !v1.done; i++) {
+    // Keep player at mouth while follower catches up.
+    state.player.x = hatch.x;
+    StepPlay(state, 1 / 30);
+  }
+  Assert(v1.done && v1.hidden, "villager enters at hatch mouth");
+  Assert(state.goalsDone.shelter_a, "shelter_a after drop-off at well");
+
+  // Remaining villagers: follow + explicit hatch interact drop-off.
+  const v2 = state.level.entities.find((e) => e.id === "v2");
+  state.player.x = v2.x;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(v2.following, "second villager follows");
+  v2.x = hatch.x;
+  state.player.x = hatch.x;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(v2.done && state.goalsDone.shelter_b, "hatch interact drops follower into tunnel");
 }
 
 function TestAct4KillInvaders() {

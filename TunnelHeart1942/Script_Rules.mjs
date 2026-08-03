@@ -421,6 +421,9 @@ function TryDescendOpenShaft(state) {
       break;
     }
   }
+  const mouthX = hatchNear?.x ?? player.x;
+  // Escort first — ↓ at the mouth with followers sends them in (you stay up to fetch more).
+  if (DropOffShelterFollowers(state, mouthX)) return true;
   const pose = hatchNear
     ? {
         x: hatchNear.tunnelX ?? player.x,
@@ -1774,6 +1777,126 @@ function GoalReady(state, ent) {
   return !!state.goalsDone[ent.requiresGoal];
 }
 
+/** Surface mouth a villager can enter — hatch entity or carved open shaft. */
+function FindShelterMouth(state, nearX) {
+  let best = null;
+  let bestD = 1e9;
+  for (const e of state.level.entities || []) {
+    if (e.type !== "hatch" || e.hidden || e.done) continue;
+    const d = Math.abs((e.x || 0) - nearX);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: e.x, kind: "hatch" };
+    }
+  }
+  for (const sh of state.level.shafts || []) {
+    if (!IsShaftOpenAt(state, sh.x)) continue;
+    const d = Math.abs((sh.x || 0) - nearX);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: sh.x, kind: "shaft" };
+    }
+  }
+  return best;
+}
+
+function CompleteShelterEnter(state, ent, mouthX) {
+  if (!ent || ent.done) return false;
+  ent.done = true;
+  ent.following = false;
+  ent.hidden = true;
+  ent.x = mouthX != null ? mouthX : ent.x;
+  if (ent.goal) MarkGoal(state, ent.goal);
+  SetBubble(state, ["people", "hatch", "check"], "进洞", 1.5);
+  SetSubtitle(
+    state,
+    ent.speaker || "乡亲",
+    ent.enterLine || "进洞了！谢传宝——",
+    2.4,
+  );
+  return true;
+}
+
+/** Point 乡亲 → they stick to you until a well / hatch mouth. */
+function BeginShelterFollow(state, ent) {
+  if (!ent || ent.done) return false;
+  if (ent.following) {
+    SetBubble(state, ["people", "hatch"], "去井口", 1.4);
+    SetSubtitle(
+      state,
+      ent.speaker || "乡亲",
+      "我跟着你——带到井口（地窖口），我就钻进去。",
+      2.8,
+    );
+    return true;
+  }
+  ent.following = true;
+  ent.followT = 0;
+  ent.facing = Math.sign(state.player.x - ent.x) || 1;
+  SetBubble(state, ["people"], "跟上", 1.3);
+  SetSubtitle(
+    state,
+    ent.speaker || "乡亲",
+    ent.line || "好，跟着你——去井口进洞！",
+    2.8,
+  );
+  return true;
+}
+
+/** Send every follower standing at this mouth into the tunnel. */
+function DropOffShelterFollowers(state, mouthX) {
+  const player = state.player;
+  if (player.inTunnel) return false;
+  let n = 0;
+  for (const ent of state.level.entities || []) {
+    if (ent.type !== "shelter" || ent.done || !ent.following) continue;
+    if (Math.abs(ent.x - mouthX) > 64) continue;
+    if (CompleteShelterEnter(state, ent, mouthX)) n += 1;
+  }
+  if (n <= 0) return false;
+  const left = (state.level.entities || []).filter(
+    (e) => e.type === "shelter" && !e.done,
+  ).length;
+  SetSubtitle(
+    state,
+    "高传宝",
+    left > 0
+      ? `进洞${n}人——再去点下一位乡亲，带到井口。`
+      : "乡亲都进洞了——东头钟下，高老忠等着。",
+    2.8,
+  );
+  return true;
+}
+
+function UpdateShelterFollowers(state, dt) {
+  const { player, level } = state;
+  if (player.inTunnel) return;
+  for (const ent of level.entities || []) {
+    if (ent.type !== "shelter" || ent.done || !ent.following) continue;
+    ent.followT = (ent.followT || 0) + dt;
+    const slot = 28 + (Math.abs((ent.id || "").length % 17));
+    const targetX = player.x - (player.facing || 1) * slot;
+    const dx = targetX - ent.x;
+    if (Math.abs(dx) > 3) {
+      const step = Math.min(Math.abs(dx), 155 * dt);
+      ent.x += Math.sign(dx) * step;
+      ent.facing = Math.sign(dx) || ent.facing || 1;
+      ent.moving = true;
+    } else {
+      ent.moving = false;
+      ent.facing = player.facing || ent.facing || 1;
+    }
+    ent.y = SURFACE_Y;
+    // Auto-enter only after a short escort beat — both of you on the mouth.
+    if ((ent.followT || 0) < 0.4) continue;
+    const mouth = FindShelterMouth(state, ent.x);
+    if (!mouth) continue;
+    if (Math.abs(ent.x - mouth.x) > 40) continue;
+    if (Math.abs(player.x - mouth.x) > 56) continue;
+    CompleteShelterEnter(state, ent, mouth.x);
+  }
+}
+
 function TryInteract(state) {
   const { player, level, input } = state;
   if (!input.interactPressed || state.transition > 0) return false;
@@ -1811,6 +1934,16 @@ function TryInteract(state) {
     if (!Near(player, ent, ent.radius || 52)) continue;
 
     if (!GoalReady(state, ent) && ent.type !== "hatch" && ent.type !== "talk") {
+      if (ent.type === "shelter") {
+        SetBubble(state, ["shovel", "people", "warn"], "先挖通", 2.0);
+        SetSubtitle(
+          state,
+          "提示",
+          "东窖还没挖通——先下洞挖通东窖，再回来点乡亲，带他们去井口进洞。",
+          3.2,
+        );
+        return true;
+      }
       SetBubble(state, ["shovel", "warn"], "", 1.8);
       return true;
     }
@@ -1846,6 +1979,10 @@ function TryInteract(state) {
     }
 
     if (ent.type === "hatch") {
+      // Escort drop-off: followers at the mouth go in before you dive.
+      if (!player.inTunnel && DropOffShelterFollowers(state, ent.x)) {
+        return true;
+      }
       // Going down into a tutorial hatch requires the shovel in hand.
       if (!player.inTunnel && ent.needsShovel && player.held !== ITEM_SHOVEL) {
         state.interactHint = "need_shovel";
@@ -1873,9 +2010,7 @@ function TryInteract(state) {
     }
 
     if (ent.type === "shelter") {
-      ent.done = true;
-      if (ent.goal) MarkGoal(state, ent.goal);
-      SetSubtitle(state, ent.speaker || "乡亲", ent.line, 2.4);
+      BeginShelterFollow(state, ent);
       return true;
     }
 
@@ -1982,6 +2117,7 @@ function TryInteract(state) {
 
 function UpdateActors(state, dt) {
   const { level, player } = state;
+  UpdateShelterFollowers(state, dt);
   for (const ent of level.entities) {
     if (ent.type === "shot_port" && (ent.cool || 0) > 0) {
       ent.cool = Math.max(0, ent.cool - dt);
@@ -2198,9 +2334,17 @@ function RefreshHint(state) {
     return;
   }
   // Surface mouth — ↓ / 互动 re-enters (no hatch entity required).
+  // Prefer "send followers in" if any are trailing at this mouth.
   if (!state.player.inTunnel && IsShaftOpenAt(state, state.player.x)) {
-    state.interactHint = "hatch";
     state.openShaftX = state.player.x;
+    const drop = (state.level.entities || []).some(
+      (e) =>
+        e.type === "shelter" &&
+        e.following &&
+        !e.done &&
+        Math.abs(e.x - state.player.x) < 64,
+    );
+    state.interactHint = drop ? "shelter" : "hatch";
   }
 }
 
@@ -2458,12 +2602,22 @@ export function NextStepText(state) {
       if (!g.link_bc) return "联通乙—丙：继续贴壁点铁锹挖";
       return "三家已通 · ↑爬竖井出地面，↓再钻回去";
     }
+    if (state.chapterId === "act2_bell") {
+      if (!g.dig_safe_room || !g.link_safe) return "贴壁挖通东窖（蓝区），连通西口后再出井喊人";
+      return "东窖已通 · ↑出井，点乡亲让他们跟上，带到井口进洞";
+    }
     if (CanDigWith(p.held)) {
       return "贴壁挖通；往上挖竖井后按住↑出地面，地面按↓钻回";
     }
     return "地道里需要铁锹才能挖；↑出井 / ↓回井，井口也能上下";
   }
   if (!p.inTunnel && IsShaftOpenAt(state, p.x)) {
+    const atMouth = (state.level.entities || []).find(
+      (e) => e.type === "shelter" && e.following && !e.done && Math.abs(e.x - p.x) < 64,
+    );
+    if (atMouth) {
+      return `带着${atMouth.speaker || "乡亲"}在井口——点大键或↓送进洞`;
+    }
     return "竖井口：按↓或点大键钻回地道";
   }
   if (state.chapterId === "act1_connect") {
@@ -2474,6 +2628,24 @@ export function NextStepText(state) {
     if (!g.link_ab) return "下洞后走到蓝格旁，点铁锹开挖";
     if (!g.link_bc) return "继续沿蓝线挖通乙—丙";
     return "三家已通";
+  }
+  if (state.chapterId === "act2_bell") {
+    if (!g.talk_night) return "找高老忠听夜袭交代";
+    if (!g.dig_safe_room || !g.link_safe) {
+      if (p.inTunnel) return "贴壁挖通东窖（蓝区），连通西口";
+      return "带铁锹下西口，挖通东窖再上来喊人";
+    }
+    const follower = (state.level.entities || []).find(
+      (e) => e.type === "shelter" && e.following && !e.done,
+    );
+    if (follower) {
+      return `带着${follower.speaker || "乡亲"}去井口（地窖口）——靠近就进洞`;
+    }
+    if (!g.shelter_a || !g.shelter_b || !g.shelter_c) {
+      return "点街面上的乡亲让他们跟上，再带到井口进洞";
+    }
+    if (!g.reach_bell) return "乡亲已进洞——往东到钟下，见证高老忠敲钟";
+    return "本幕目标已完成";
   }
   if (state.chapterId === "act5_street_hunt") {
     if (!g.talk_street) return "听林霞交代";

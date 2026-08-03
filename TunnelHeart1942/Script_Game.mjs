@@ -1487,6 +1487,7 @@ function DrawEntity(ent) {
     if (!ent.done && nearTalk) glow();
     const name = ent.speaker || (ent.type === "shelter" ? "乡亲" : "民兵");
     const pal = ent.type === "spy_talk" ? "spy" : PaletteForSpeaker(name);
+    const following = ent.type === "shelter" && ent.following && !ent.done;
     const alpha = ent.done && ent.type === "shelter" ? 0.35 : 1;
     DrawPuppet(ctx, {
       x: 0,
@@ -1494,12 +1495,18 @@ function DrawEntity(ent) {
       facing: ent.facing || 1,
       scale: s,
       palette: pal,
-      clip: "idle",
+      clip: following && ent.moving ? "walk" : "idle",
       time: ((performance.now() || 0) / 1000) + (ent.x || 0) * 0.01,
+      moving: !!(following && ent.moving),
       alpha,
     });
     // Always-on who-is-who plate — puppets alone are not readable.
-    DrawNameplate(name, RoleIconForSpeaker(name), -78 * s, s);
+    DrawNameplate(
+      following ? `${name}·跟上` : name,
+      RoleIconForSpeaker(name),
+      following ? -88 * s : -78 * s,
+      s,
+    );
   } else if (ent.type === "hatch") {
     if (Math.abs(state.player.x - ent.x) < 80) glow();
     ctx.fillStyle = "#2a1c12";

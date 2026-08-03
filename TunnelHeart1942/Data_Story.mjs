@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v8";
-export const CACHE_BUST = "20260803as";
+export const CACHE_BUST = "20260803at";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -69,7 +69,7 @@ export const CHAPTERS = [
     timeLabel: "一九四二年 · 夜袭",
     cast: "高传宝",
     night: true,
-    objective: "听夜袭交代，挖出东侧避难窖并连通，送乡亲入洞——再到钟下，见证高老忠敲响报警钟。",
+    objective: "听夜袭交代，挖通东窖；点乡亲让他们跟上，带到井口进洞——再到钟下，见证高老忠敲钟。",
     goals: [
       "talk_night",
       "dig_safe_room",
@@ -95,7 +95,7 @@ export const CHAPTERS = [
       {
         id: "p2c",
         speaker: "目标",
-        text: "铁锹在手，挖通东窖，送乡亲入洞，再到钟下。",
+        text: "挖通东窖后出井：点乡亲让他们跟上，带到西口井边进洞，再到钟下。",
         mood: "tip",
       },
     ],
