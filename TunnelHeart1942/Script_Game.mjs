@@ -90,9 +90,8 @@ function SetModal(which) {
   Show($("PauseModal"), which === "pause");
   Show($("FailModal"), which === "fail");
   Show($("DebugModal"), which === "debug");
-  // Help/history/pause/debug/fail all freeze play input via pauseOpen.
-  state.pauseOpen = !!which && which !== "fail" ? true : which === "fail";
-  if (which === "fail") state.pauseOpen = true;
+  // Any open modal freezes play stepping.
+  state.pauseOpen = !!which;
   if (which === "debug") SyncDebugPanel();
 }
 
