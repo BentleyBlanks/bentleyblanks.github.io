@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803ah">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803ai">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -141,10 +141,12 @@
         </div>
       </article>
       <article id="FailModal" class="modalCard" hidden>
-        <h2>……</h2>
-        <p>蹲下，或回到井口。</p>
+        <h2>倒下了</h2>
+        <p>体力耗尽。可以在井口站起来继续（保留已挖进度），或整幕重来。</p>
         <div class="modalActions">
-          <button id="FailRetryButton" class="primaryButton" type="button"><span>再试</span></button>
+          <button id="FailRespawnButton" class="primaryButton" type="button"><span>站起来</span></button>
+          <button id="FailRetryButton" class="secondaryButton" type="button">重来本幕</button>
+          <button id="FailTitleButton" class="secondaryButton" type="button">标题</button>
         </div>
       </article>
       <article id="DebugModal" class="modalCard debugModal" hidden>
@@ -168,6 +170,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803ah"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803ai"></script>
 </body>
 </html>

@@ -24,6 +24,8 @@ import {
   MELEE_DURATION,
   MELEE_IMPACT_AT,
   NextStepText,
+  RespawnPlayer,
+  RestartChapterToPlay,
   SampleGrenadeArc,
   SerializeProgress,
   StandingWouldClip,
@@ -1165,6 +1167,49 @@ function TestAct8GrenadeYard() {
   Assert(/沙袋|已清/.test(NextStepText(state)) || state.goalsDone.clear_grenade_yard, "yard tip or done");
 }
 
+/** 0 HP must not freeze the run — soft respawn + hard chapter retry. */
+function TestDeathRespawn() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  DebugHold(state, ITEM_SHOVEL);
+  const soil = state.level.soil;
+  const pc = WorldToCell(soil, state.player.x, state.player.y - 24);
+  SetCell(soil, pc.c, pc.r, AIR);
+  const carvedBefore = soil.carved | 0;
+  state.goalsDone.enter_hatch = true;
+
+  state.player.hp = 0;
+  state.failed = true;
+  RespawnPlayer(state);
+  Assert(!state.failed, "soft respawn clears fail lock");
+  Assert(state.player.hp === 3, "soft respawn refills hearts");
+  Assert(state.player.invuln > 1, "soft respawn grants brief invuln");
+  Assert(soil.carved === carvedBefore, "soft respawn keeps dig progress");
+  Assert(state.goalsDone.enter_hatch, "soft respawn keeps goals");
+  Assert(!state.player.inTunnel, "soft respawn drops at surface hatch mouth");
+  state.input.left = true;
+  const x0 = state.player.x;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.x !== x0 || state.player.vx !== 0, "after respawn, play steps again");
+
+  state.player.hp = 0;
+  state.failed = true;
+  const hard = RestartChapterToPlay(state);
+  Assert(hard.phase === "play", "hard retry jumps straight into play");
+  Assert(!hard.failed && hard.player.hp === 3, "hard retry resets fail + hearts");
+  Assert(hard.chapterIndex === state.chapterIndex, "hard retry stays on same act");
+
+  const html = readFileSync(join(here, "index.html"), "utf8");
+  Assert(html.includes("FailRespawnButton") && html.includes("站起来"), "fail modal has respawn");
+  Assert(html.includes("FailRetryButton") && html.includes("重来本幕"), "fail modal has chapter retry");
+  Assert(html.includes("FailTitleButton"), "fail modal has title exit");
+  const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
+  Assert(rules.includes("export function RespawnPlayer"), "respawn helper exported");
+  Assert(rules.includes("RestartChapterToPlay"), "play-skip restart helper");
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("state.failed") && game.includes('SetModal("fail")'), "death opens fail modal");
+  Assert(game.includes("Death lock") || game.includes("never leave the player frozen"), "fail modal cannot soft-dismiss");
+}
 
 function TestPuppetAnim() {
   Assert(Object.keys(BONE_DEFS).length >= 12, "puppet has bone parts");
@@ -1210,6 +1255,7 @@ function Main() {
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
   TestAct8GrenadeYard();
+  TestDeathRespawn();
   TestNaiveAct1Bot();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");

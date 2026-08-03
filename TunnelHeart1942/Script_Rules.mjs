@@ -2104,6 +2104,75 @@ export function RestartChapter(state) {
   return next;
 }
 
+/** Death retry — skip open panels and drop straight back into play. */
+export function RestartChapterToPlay(state) {
+  const next = CreateCampaignState(state.chapterIndex, { unlockedActs: state.unlockedActs });
+  next.phase = "play";
+  next.panelIndex = 0;
+  return next;
+}
+
+/**
+ * Soft respawn after HP hits 0 — keep dig progress / goals, refill hearts,
+ * return to a safe mouth (spawn / hatch / last open shaft).
+ */
+export function RespawnPlayer(state) {
+  const { player, level } = state;
+  if (!player || !level) return state;
+
+  player.hp = 3;
+  player.invuln = 2.4;
+  player.vx = 0;
+  player.vy = 0;
+  player.manningMg = false;
+  player.meleeT = 0;
+  player.throwT = 0;
+  player.climbing = false;
+  player.crouching = false;
+  player.aiming = false;
+  player.digging = false;
+  player.digProgress = 0;
+  player.digTarget = null;
+  player.onGround = true;
+
+  state.failed = false;
+  state.pauseOpen = false;
+  state.pendingMelee = null;
+  state.meleeFx = null;
+  state.nadeAiming = false;
+  state.hitStop = 0;
+  state.shake = Math.max(state.shake || 0, 0.2);
+  state.activeTalkId = null;
+
+  // Prefer last open shaft mouth, then authored hatch, else chapter spawn.
+  let x = level.spawn.x;
+  let y = level.spawn.y;
+  let tunnel = !!level.spawn.tunnel;
+  const shaftX = state.openShaftX;
+  if (shaftX != null && IsShaftOpenAt(state, shaftX)) {
+    x = shaftX;
+    y = SURFACE_Y;
+    tunnel = false;
+  } else {
+    const hatch = (level.entities || []).find((e) => e.type === "hatch" && !e.hidden && !e.done);
+    if (hatch) {
+      // Respawn on the surface mouth so the player can choose to re-enter.
+      x = hatch.x;
+      y = SURFACE_Y;
+      tunnel = false;
+    }
+  }
+  player.x = x;
+  player.y = y;
+  player.inTunnel = tunnel;
+  state.cameraX = Math.max(0, Math.min((level.width || 2400) - VIEW_W, player.x - VIEW_W * 0.35));
+  state.cameraY = tunnel ? (level.tunnelFloor || 0) - 300 : SURFACE_Y - 220;
+
+  SetBubble(state, ["check", "hatch"], "再起", 1.6);
+  SetSubtitle(state, "高传宝", "还没完——站起来，从井口再来。", 2.6);
+  return state;
+}
+
 export function SerializeProgress(state) {
   return { v: 7, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
 }

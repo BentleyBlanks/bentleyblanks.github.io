@@ -13,6 +13,8 @@ import {
   NextStepText,
   PLAYER_H,
   RestartChapter,
+  RestartChapterToPlay,
+  RespawnPlayer,
   SaveToStorage,
   StepPlay,
 } from "./Script_Rules.mjs";
@@ -127,6 +129,8 @@ function Show(el, on) {
 }
 
 function SetModal(which) {
+  // Death lock: never leave the player frozen with failed=true and no UI.
+  if (!which && state?.failed) which = "fail";
   Show($("ModalLayer"), !!which);
   Show($("HelpModal"), which === "help");
   Show($("HistoryModal"), which === "history");
@@ -134,7 +138,7 @@ function SetModal(which) {
   Show($("FailModal"), which === "fail");
   Show($("DebugModal"), which === "debug");
   // Any open modal freezes play stepping.
-  state.pauseOpen = !!which;
+  if (state) state.pauseOpen = !!which;
   if (which === "debug") SyncDebugPanel();
 }
 
@@ -2407,6 +2411,11 @@ function BindInput() {
       input.dropPressed = true;
     }
     if (down && k === "escape") {
+      if (state.failed) {
+        SetModal("fail");
+        e.preventDefault();
+        return;
+      }
       if (AnyModalOpen()) {
         SetModal(null);
         e.preventDefault();
@@ -2503,9 +2512,19 @@ function BindUi() {
   $("PauseButton").addEventListener("click", () => {
     // Triple-tap opens debug (capture listener); single tap still pauses.
     if ($("DebugModal") && !$("DebugModal").hidden) return;
+    if (state.failed) {
+      SetModal("fail");
+      return;
+    }
     SetModal("pause");
   });
-  $("ResumeButton").addEventListener("click", () => SetModal(null));
+  $("ResumeButton").addEventListener("click", () => {
+    if (state.failed) {
+      SetModal("fail");
+      return;
+    }
+    SetModal(null);
+  });
   const openDebugBtn = $("OpenDebugButton");
   if (openDebugBtn) {
     openDebugBtn.addEventListener("click", () => {
@@ -2522,12 +2541,30 @@ function BindUi() {
   $("ExitTitleButton").addEventListener("click", () => {
     SaveToStorage(state);
     state.phase = "title";
+    state.failed = false;
     state.input = CreateInputState();
     SetModal(null);
     SyncPhaseUi();
   });
+  $("FailRespawnButton").addEventListener("click", () => {
+    RespawnPlayer(state);
+    SetModal(null);
+    SyncHud();
+    SyncPhaseUi();
+    Beep(520, 0.08, "triangle", 0.04);
+  });
   $("FailRetryButton").addEventListener("click", () => {
-    state = RestartChapter(state);
+    state = RestartChapterToPlay(state);
+    SetModal(null);
+    SyncPhaseUi();
+    Beep(480, 0.07, "triangle", 0.04);
+  });
+  $("FailTitleButton").addEventListener("click", () => {
+    SaveToStorage(state);
+    state.phase = "title";
+    state.failed = false;
+    state.pauseOpen = false;
+    state.input = CreateInputState();
     SetModal(null);
     SyncPhaseUi();
   });
@@ -2614,6 +2651,11 @@ function BindUi() {
 function Frame(ts) {
   const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
   lastTs = ts;
+
+  if (state.phase === "play" && state.failed) {
+    // Keep the death UI up — Esc / accidental dismiss used to freeze the run.
+    if (!AnyModalOpen() || $("FailModal")?.hidden) SetModal("fail");
+  }
 
   if (state.phase === "play" && !state.pauseOpen && !state.failed) {
     StepPlay(state, dt);
