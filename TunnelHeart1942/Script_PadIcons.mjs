@@ -1,5 +1,5 @@
 /**
- * Touch-pad icons — generated Icon_*.png plates (cream + ink).
+ * Touch-pad icons — transparent Icon_*.png cutouts (ink only, no baked plate).
  * Keep filenames English PascalCase with Icon_ category prefix.
  */
 

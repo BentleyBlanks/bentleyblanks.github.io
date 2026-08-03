@@ -1569,9 +1569,15 @@ function DrawEntity(ent) {
 function DrawPictogram(kind, x, y, size) {
   ctx.save();
   const plate = PICTO_IMG[kind] || null;
-  // Generated plates already include cream + ink border — draw full tile.
+  // Transparent cutout glyphs — cream plate is drawn by us, ink by the PNG.
   if (plate && plate.complete && plate.naturalWidth > 0) {
-    ctx.drawImage(plate, x, y, size, size);
+    ctx.fillStyle = "#efe2c8";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = Math.max(1.5, size * 0.08);
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeRect(x, y, size, size);
+    const m = size * 0.1;
+    ctx.drawImage(plate, x + m, y + m, size - m * 2, size - m * 2);
     ctx.restore();
     return;
   }

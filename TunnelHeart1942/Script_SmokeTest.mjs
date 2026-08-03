@@ -303,6 +303,32 @@ function TestAct1TutorialPlayable() {
   ]) {
     Assert(FileExists(join(here, file)), `${file} plate present`);
   }
+  // True 抠图: corners transparent, no baked cream/black plate.
+  {
+    const cutCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        [
+          "from PIL import Image",
+          "import glob, os, sys",
+          f"here = {JSON.stringify(here)}",
+          "bad = []",
+          "for p in glob.glob(os.path.join(here, 'Icon_*.png')):",
+          "  im = Image.open(p).convert('RGBA')",
+          "  w, h = im.size",
+          "  for xy in [(0,0),(w-1,0),(0,h-1),(w-1,h-1)]:",
+          "    if im.getpixel(xy)[3] != 0: bad.append(os.path.basename(p)+':corner')",
+          "  cream = sum(1 for px in im.getdata() if px[3] > 20 and px[0] > 200 and px[1] > 180)",
+          "  if cream > 40: bad.append(os.path.basename(p)+':cream')",
+          "print('OK' if not bad else 'BAD '+','.join(bad))",
+          "sys.exit(1 if bad else 0)",
+        ].join("\n"),
+      ],
+      { encoding: "utf8" },
+    );
+    Assert(cutCheck.status === 0, `icon cutouts transparent (${(cutCheck.stdout || cutCheck.stderr || "").trim()})`);
+  }
   Assert(padIcons.includes("Icon_Plan.png") && padIcons.includes("ICON_PLAN"), "design icon is blueprint plate");
   Assert(padIcons.includes("ICON_DOWN") && padIcons.includes("ICON_UP"), "up/down chevron pad icons");
   Assert(padIcons.includes("ICON_CROUCH"), "crouch icon retained for pictogram parity");
