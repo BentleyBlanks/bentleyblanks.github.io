@@ -226,11 +226,16 @@ function TestAct1TutorialPlayable() {
   Assert(state.stats.cellsCarved > before, "tutorial blueprint digs without R");
 
   const html = readFileSync(join(here, "index.html"), "utf8");
-  Assert(html.includes('data-touch="corridor"'), "mobile corridor C button");
-  Assert(html.includes('id="StepHint"'), "always-on step hint");
+  Assert(html.includes('data-touch="interact"'), "mobile interact button");
+  Assert(html.includes('data-touch="use"'), "mobile use/fire button");
+  Assert(html.includes('id="TouchAim"'), "mobile aim key (contextual)");
+  Assert(!html.includes('data-touch="corridor"'), "corridor merged into 开火 in design");
+  Assert(!html.includes('data-touch="chamber"'), "chamber merged into 蹲+挖 in design");
+  Assert(html.includes('id="StepHint"'), "step hint");
   const css = readFileSync(join(here, "Style_Game.css"), "utf8");
   Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
+  Assert(/width:\s*74px/.test(css), "touch keys are large");
 }
 
 function TestNaiveAct1Bot() {
@@ -596,6 +601,9 @@ function Main() {
   Assert(leftover.length === 5, "act1 starts with 5 open goals");
   const html = readFileSync(join(here, "index.html"), "utf8");
   Assert(html.includes('data-touch="aim"'), "mobile ADS aim button");
+  Assert(html.includes('class="cluster actions"'), "consolidated action cluster");
+  const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);

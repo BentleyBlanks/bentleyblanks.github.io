@@ -141,9 +141,17 @@ function SyncHud() {
   }
   const ammoHud = $("AmmoHud");
   if (ammoHud) {
-    const showAmmo = held === ITEM_RIFLE || (state.player.ammo || 0) > 0 || !!state.level?.combatStreet;
-    ammoHud.hidden = !showAmmo || state.phase !== "play";
-    ammoHud.textContent = `弹药 ${state.player.ammo | 0}`;
+    // Pocket ammo only when rifle is actually in hand — not a permanent walking placard.
+    const showAmmo = held === ITEM_RIFLE && state.phase === "play";
+    ammoHud.hidden = !showAmmo;
+    ammoHud.textContent = `${state.player.ammo | 0}发`;
+  }
+  const touchAim = $("TouchAim");
+  if (touchAim) {
+    const showAim = state.phase === "play" && (held === ITEM_RIFLE || state.designMode);
+    touchAim.hidden = !showAim;
+    touchAim.textContent = state.designMode ? "↑" : "瞄";
+    touchAim.setAttribute("aria-label", state.designMode ? "上移光标" : "开镜");
   }
 }
 
@@ -793,7 +801,7 @@ function DrawEntity(ent) {
       ctx.restore();
       return;
     }
-    glow();
+    if (Math.abs(state.player.x - ent.x) < 100) glow();
     const bob = Math.sin((performance.now() || 0) * 0.006) * 3 * s;
     ctx.translate(0, -18 * s + bob);
     const icon =
@@ -812,7 +820,8 @@ function DrawEntity(ent) {
   }
 
   if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
-    if (!ent.done) glow();
+    const nearTalk = Math.abs(state.player.x - ent.x) < 90;
+    if (!ent.done && nearTalk) glow();
     const pal =
       ent.type === "spy_talk"
         ? "spy"
@@ -829,13 +838,13 @@ function DrawEntity(ent) {
       alpha,
     });
   } else if (ent.type === "hatch") {
-    glow();
+    if (Math.abs(state.player.x - ent.x) < 80) glow();
     ctx.fillStyle = "#2a1c12";
     ctx.fillRect(-20 * s, -8 * s, 40 * s, 10 * s);
     ctx.strokeStyle = "#c9a45a";
     ctx.strokeRect(-20 * s, -8 * s, 40 * s, 10 * s);
   } else if (ent.type === "bell") {
-    glow();
+    if (Math.abs(state.player.x - ent.x) < 100) glow();
     ctx.fillStyle = ent.ringing ? "#f0c27a" : "#c9a45a";
     ctx.beginPath();
     ctx.moveTo(-14 * s, -96 * s);
@@ -856,20 +865,17 @@ function DrawEntity(ent) {
     }
   } else if (ent.type === "shot_port") {
     const ready = !ent.requiresGoal || !!state.goalsDone[ent.requiresGoal];
-    if (ready) glow();
+    const nearPort = Math.abs(state.player.x - ent.x) < 70;
+    if (ready && nearPort) glow();
     ctx.fillStyle = ready ? "#2f5d4a" : "#4a4538";
     ctx.fillRect(-17 * s, -26 * s, 34 * s, 26 * s);
     ctx.strokeRect(-17 * s, -26 * s, 34 * s, 26 * s);
-    if (ready && !state.player.inTunnel) {
+    // Label only when the player is close enough to use it.
+    if (ready && nearPort) {
       ctx.fillStyle = "#efe2c8";
       ctx.font = `700 ${11 * s}px IBM Plex Sans, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("开枪", 0, -34 * s);
-    } else if (ready && state.player.inTunnel) {
-      ctx.fillStyle = "#efe2c8";
-      ctx.font = `700 ${11 * s}px IBM Plex Sans, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("出井", 0, -34 * s);
+      ctx.fillText(state.player.inTunnel ? "出井" : "开枪", 0, -34 * s);
     }
   } else if (ent.type === "enemy") {
     let alpha = 1;
@@ -890,29 +896,40 @@ function DrawEntity(ent) {
       alert: (ent.alert || 0) > 0 || !!ent.highAlert,
       alpha,
     });
+    const near = Math.abs(state.player.x - ent.x) < 150;
+    const engaged = (ent.alert || 0) > 0 || !!ent.highAlert || (ent.hurtFlash || 0) > 0;
     if (!ent.dead) {
-      ctx.fillStyle = ent.highAlert ? "rgba(180,40,30,.4)" : "rgba(155,47,47,.28)";
-      ctx.beginPath();
-      ctx.moveTo(0, -18 * s);
-      ctx.lineTo(facing * 72 * s, -44 * s);
-      ctx.lineTo(facing * 72 * s, 8 * s);
-      ctx.closePath();
-      ctx.fill();
+      // Idle patrol: bare puppet only. Cones / bars / labels on demand.
+      if (engaged) {
+        ctx.fillStyle = ent.highAlert ? "rgba(180,40,30,.4)" : "rgba(155,47,47,.28)";
+        ctx.beginPath();
+        ctx.moveTo(0, -18 * s);
+        ctx.lineTo(facing * 72 * s, -44 * s);
+        ctx.lineTo(facing * 72 * s, 8 * s);
+        ctx.closePath();
+        ctx.fill();
+      }
       const maxHp = ent.maxHp || 2;
       const hp = Math.max(0, ent.hp || 0);
-      ctx.fillStyle = "#1a1410";
-      ctx.fillRect(-16 * s, -72 * s, 32 * s, 5 * s);
-      ctx.fillStyle = "#a6452f";
-      ctx.fillRect(-16 * s, -72 * s, 32 * s * (hp / maxHp), 5 * s);
-      ctx.fillStyle = "#efe2c8";
-      ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(ent.label || "鬼子", 0, -78 * s);
-      if (ent.highAlert) {
+      if (engaged || (near && hp < maxHp)) {
+        ctx.fillStyle = "#1a1410";
+        ctx.fillRect(-16 * s, -72 * s, 32 * s, 5 * s);
+        ctx.fillStyle = "#a6452f";
+        ctx.fillRect(-16 * s, -72 * s, 32 * s * (hp / maxHp), 5 * s);
+      }
+      if (engaged || near) {
+        ctx.fillStyle = "#efe2c8";
+        ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(ent.label || "鬼子", 0, -78 * s);
+      }
+      if (ent.highAlert && (engaged || near)) {
         ctx.fillStyle = "#ffb0a0";
+        ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
+        ctx.textAlign = "center";
         ctx.fillText("警戒!", 0, -90 * s);
       }
-    } else {
+    } else if (near) {
       ctx.fillStyle = ent.discovered ? "#a6452f" : "#7a7264";
       ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
       ctx.textAlign = "center";
@@ -936,10 +953,11 @@ function DrawEntity(ent) {
       ctx.fillText("!", -4 * s, -70 * s);
     }
   } else if (ent.type === "patrol") {
+    const facing = Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1;
     DrawPuppet(ctx, {
       x: 0,
       y: 0,
-      facing: Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1,
+      facing,
       scale: s,
       palette: "enemy",
       clip: ent.broken ? "idle" : "walk",
@@ -947,12 +965,13 @@ function DrawEntity(ent) {
       moving: !ent.broken,
       alpha: ent.broken ? 0.3 : 1,
     });
-    if (!ent.broken) {
+    // Cone only when the player is close — not a permanent walking HUD.
+    if (!ent.broken && Math.abs(state.player.x - ent.x) < 160) {
       ctx.fillStyle = "rgba(155,47,47,.22)";
       ctx.beginPath();
       ctx.moveTo(0, -20 * s);
-      ctx.lineTo(80 * s, -50 * s);
-      ctx.lineTo(80 * s, 10 * s);
+      ctx.lineTo(facing * 80 * s, -50 * s);
+      ctx.lineTo(facing * 80 * s, 10 * s);
       ctx.closePath();
       ctx.fill();
     }
@@ -1494,17 +1513,24 @@ function BindInput() {
       if (kind === "left") state.input.left = down;
       if (kind === "right") state.input.right = down;
       if (kind === "crouch") state.input.crouch = down;
-      if (kind === "aim") state.input.aim = down;
+      // Aim doubles as ↑ cursor when designing — keeps the pad to six fat keys.
+      if (kind === "aim") {
+        if (state.designMode) state.input.up = down;
+        else state.input.aim = down;
+      }
       if (kind === "dig") {
         state.input.dig = down;
-        if (down) state.input.digPressed = true;
+        if (down) {
+          if (state.designMode && state.input.crouch) state.input.planChamberPressed = true;
+          else state.input.digPressed = true;
+        }
       }
       if (kind === "design" && down) state.input.designTogglePressed = true;
-      if (kind === "chamber" && down) state.input.planChamberPressed = true;
-      if (kind === "corridor" && down) state.input.planCorridorPressed = true;
-      if (kind === "up") state.input.up = down;
       if (kind === "interact" && down) state.input.interactPressed = true;
-      if (kind === "use" && down) state.input.usePressed = true;
+      if (kind === "use" && down) {
+        if (state.designMode) state.input.planCorridorPressed = true;
+        else state.input.usePressed = true;
+      }
     };
     btn.addEventListener("contextmenu", (e) => e.preventDefault());
     btn.addEventListener("selectstart", (e) => e.preventDefault());

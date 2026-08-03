@@ -1094,19 +1094,9 @@ function RefreshHint(state) {
       return;
     }
   }
-  if (CanShoot(state.player.held) && !state.player.inTunnel) {
-    state.interactHint = state.player.ammo > 0 ? (state.player.aiming ? "ads" : "shoot") : "need_ammo";
-    return;
-  }
-  if (state.designMode) {
-    state.interactHint = "design";
-    return;
-  }
-  if (state.player.inTunnel && state.level.soil) {
-    if (!CanDigWith(state.player.held)) {
-      state.interactHint = "need_shovel";
-      return;
-    }
+  // No persistent “walking with rifle / in tunnel” head prompts — only near targets above.
+  // Dig hint only when a planned cell is actually in reach.
+  if (state.player.inTunnel && state.level.soil && CanDigWith(state.player.held) && !state.designMode) {
     const dig = PickExcavateTarget(
       state.level.soil,
       state.player.x,
@@ -1116,8 +1106,6 @@ function RefreshHint(state) {
       !!state.input.up,
     );
     if (dig) state.interactHint = "dig";
-    else if (CountPlanned(state.level.soil) === 0) state.interactHint = "need_plan";
-    else state.interactHint = "follow_plan";
   }
 }
 
