@@ -609,6 +609,8 @@ function TestMultiTalk() {
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("DrawComicSpeechBubble"), "comic speech bubble draw");
   Assert(game.includes("topSafe") && game.includes("flip below"), "comic bubble clamps / flips inside window");
+  Assert(game.includes("function DrawGroundPickup") && game.includes("DrawGroundPickupProp"), "ground pickups draw world props");
+  Assert(game.includes("ITEM_META[ent.itemId]") || game.includes("meta?.label"), "ground pickups show item nameplate");
 }
 
 function TestAct2MustDigBeforeShelter() {

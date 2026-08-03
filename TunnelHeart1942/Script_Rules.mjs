@@ -853,7 +853,15 @@ function TryExcavate(state) {
 
 
 function MakeDroppedPickup(player, itemId, side = 1) {
-  const p = PickupEntity(player.x + player.facing * 28 * side, player.inTunnel ? player.y : SURFACE_Y, itemId);
+  const extras = {};
+  if (itemId === ITEM_GRENADE) extras.grenadeAmount = 1;
+  if (itemId === ITEM_AMMO) extras.ammoAmount = 1;
+  const p = PickupEntity(
+    player.x + player.facing * 28 * side,
+    player.inTunnel ? player.y : SURFACE_Y,
+    itemId,
+    extras,
+  );
   p.layer = player.inTunnel ? "tunnel" : "surface";
   return p;
 }

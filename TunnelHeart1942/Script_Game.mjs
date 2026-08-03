@@ -852,6 +852,117 @@ function EnemyHudPlate(ent) {
   };
 }
 
+function PickupIconKind(itemId) {
+  if (itemId === ITEM_SHOVEL) return "shovel";
+  if (itemId === ITEM_CHARGE) return "charge";
+  if (itemId === ITEM_GRENADE) return "grenade";
+  if (itemId === ITEM_RIFLE) return "rifle";
+  if (itemId === ITEM_AMMO) return "ammo";
+  return "talk";
+}
+
+/**
+ * World prop for a dropped / authored pickup — real silhouette on the ground,
+ * not a floating HUD tile (players must read what lies at their feet).
+ * Expects ctx translated to the pickup's feet.
+ */
+function DrawGroundPickupProp(itemId, s) {
+  ctx.lineWidth = Math.max(1.5, 2 * s);
+  ctx.strokeStyle = "#1a1410";
+  if (itemId === ITEM_SHOVEL) {
+    ctx.save();
+    ctx.rotate(-0.62);
+    ctx.strokeStyle = "#5a4030";
+    ctx.lineWidth = Math.max(2.4, 3.2 * s);
+    ctx.beginPath();
+    ctx.moveTo(-20 * s, 0);
+    ctx.lineTo(12 * s, 0);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(2, 2.6 * s);
+    ctx.beginPath();
+    ctx.moveTo(-20 * s, -7 * s);
+    ctx.lineTo(-20 * s, 7 * s);
+    ctx.stroke();
+    ctx.fillStyle = "#8a7355";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = Math.max(1.4, 1.9 * s);
+    ctx.beginPath();
+    ctx.moveTo(10 * s, -8 * s);
+    ctx.lineTo(24 * s, -2 * s);
+    ctx.lineTo(24 * s, 2 * s);
+    ctx.lineTo(10 * s, 8 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (itemId === ITEM_RIFLE) {
+    ctx.fillStyle = "#3a3228";
+    ctx.fillRect(-22 * s, -3.5 * s, 40 * s, 5.5 * s);
+    ctx.strokeRect(-22 * s, -3.5 * s, 40 * s, 5.5 * s);
+    ctx.fillStyle = "#2a241c";
+    ctx.fillRect(12 * s, -5.5 * s, 14 * s, 3 * s);
+    ctx.strokeRect(12 * s, -5.5 * s, 14 * s, 3 * s);
+    ctx.fillRect(-18 * s, 1 * s, 10 * s, 6 * s);
+    ctx.strokeRect(-18 * s, 1 * s, 10 * s, 6 * s);
+    return;
+  }
+  if (itemId === ITEM_GRENADE) {
+    // Stick grenade lying on its side.
+    ctx.fillStyle = "#5a6a3a";
+    ctx.beginPath();
+    ctx.ellipse(8 * s, 0, 7 * s, 5.5 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#6a4a28";
+    ctx.fillRect(-16 * s, -2.2 * s, 18 * s, 4.4 * s);
+    ctx.strokeRect(-16 * s, -2.2 * s, 18 * s, 4.4 * s);
+    return;
+  }
+  if (itemId === ITEM_CHARGE) {
+    ctx.fillStyle = "#4a3a2a";
+    ctx.fillRect(-12 * s, -10 * s, 24 * s, 16 * s);
+    ctx.strokeRect(-12 * s, -10 * s, 24 * s, 16 * s);
+    ctx.strokeStyle = "#c9a45a";
+    ctx.lineWidth = Math.max(1.2, 1.6 * s);
+    ctx.beginPath();
+    ctx.moveTo(-4 * s, -10 * s);
+    ctx.lineTo(-4 * s, -16 * s);
+    ctx.stroke();
+    ctx.strokeStyle = "#1a1410";
+    return;
+  }
+  if (itemId === ITEM_AMMO) {
+    ctx.fillStyle = "#6a5a30";
+    ctx.fillRect(-11 * s, -8 * s, 22 * s, 12 * s);
+    ctx.strokeRect(-11 * s, -8 * s, 22 * s, 12 * s);
+    ctx.fillStyle = "#c9a45a";
+    ctx.fillRect(-7 * s, -5 * s, 14 * s, 3 * s);
+    return;
+  }
+  // Fallback plate if an unknown id appears.
+  DrawPictogram(PickupIconKind(itemId), -12 * s, -20 * s, 24 * s);
+}
+
+function DrawGroundPickup(ent, s, glow) {
+  if (Math.abs(state.player.x - ent.x) < 110) glow();
+  // Ground contact shadow so the prop reads as lying on dirt, not a HUD chip.
+  ctx.fillStyle = "rgba(12,8,4,.28)";
+  ctx.beginPath();
+  if (typeof ctx.ellipse === "function") ctx.ellipse(0, 2 * s, 18 * s, 5 * s, 0, 0, Math.PI * 2);
+  else ctx.arc(0, 2 * s, 12 * s, 0, Math.PI * 2);
+  ctx.fill();
+  const bob = Math.sin(((performance.now() || 0) / 1000) * 2.2 + (ent.x || 0) * 0.02) * 1.2 * s;
+  ctx.save();
+  ctx.translate(0, -6 * s + bob);
+  DrawGroundPickupProp(ent.itemId, s);
+  ctx.restore();
+  const meta = ITEM_META[ent.itemId];
+  const label = meta?.label || "道具";
+  DrawNameplate(label, PickupIconKind(ent.itemId), -34 * s, s);
+}
+
 /**
  * Always-on head / landmark plate: cutout role glyph + readable Chinese name.
  * Expects ctx already translated to the actor's / prop's feet.
@@ -1492,20 +1603,7 @@ function DrawEntity(ent) {
       ctx.restore();
       return;
     }
-    if (Math.abs(state.player.x - ent.x) < 100) glow();
-    const bob = Math.sin((performance.now() || 0) * 0.006) * 3 * s;
-    ctx.translate(0, -18 * s + bob);
-    const icon =
-      ent.itemId === ITEM_SHOVEL
-        ? "shovel"
-        : ent.itemId === ITEM_CHARGE
-          ? "charge"
-          : ent.itemId === ITEM_GRENADE
-            ? "grenade"
-            : ent.itemId === ITEM_RIFLE || ent.itemId === ITEM_AMMO
-              ? "shot"
-              : "talk";
-    DrawPictogram(icon, -12 * s, -12 * s, 24 * s);
+    DrawGroundPickup(ent, s, glow);
     ctx.restore();
     return;
   }
