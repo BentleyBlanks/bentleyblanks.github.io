@@ -312,7 +312,7 @@ function TestAct1TutorialPlayable() {
         [
           "from PIL import Image",
           "import glob, os, sys",
-          f"here = {JSON.stringify(here)}",
+          `here = ${JSON.stringify(here)}`,
           "bad = []",
           "for p in glob.glob(os.path.join(here, 'Icon_*.png')):",
           "  im = Image.open(p).convert('RGBA')",
