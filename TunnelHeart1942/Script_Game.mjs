@@ -53,6 +53,14 @@ const $ = (id) => document.getElementById(id);
 const canvas = $("GameCanvas");
 const ctx = canvas.getContext("2d");
 
+/** Preload shovel / hatch plates so HUD prompts match the pad icons. */
+const PICTO_IMG = {
+  shovel: new Image(),
+  hatch: new Image(),
+};
+PICTO_IMG.shovel.src = `./Icon_Shovel.png?v=${CACHE_BUST}`;
+PICTO_IMG.hatch.src = `./Icon_TunnelHatch.png?v=${CACHE_BUST}`;
+
 let state = CreateCampaignState(0);
 let lastTs = 0;
 let audioCtx = null;
@@ -1487,24 +1495,57 @@ function DrawPictogram(kind, x, y, size) {
   ctx.strokeRect(0, 0, size, size);
   ctx.strokeStyle = "#1a1410";
   ctx.fillStyle = "#1a1410";
-  const m = size * 0.2;
+  const m = size * 0.12;
   const d = size - m * 2;
+  const plate = kind === "shovel" || kind === "hatch" ? PICTO_IMG[kind] : null;
+  if (plate && plate.complete && plate.naturalWidth > 0) {
+    ctx.drawImage(plate, m, m, d, d);
+    ctx.restore();
+    return;
+  }
   if (kind === "shovel") {
-    ctx.fillRect(m + d * 0.4, m, d * 0.2, d * 0.7);
+    // Fallback: T-grip + pointed spade (readable without the PNG).
     ctx.beginPath();
-    ctx.moveTo(m + d * 0.15, m + d * 0.65);
-    ctx.lineTo(m + d * 0.85, m + d * 0.65);
-    ctx.lineTo(m + d * 0.5, m + d);
+    ctx.moveTo(m + d * 0.28, m + d * 0.08);
+    ctx.lineTo(m + d * 0.72, m + d * 0.08);
+    ctx.lineTo(m + d * 0.72, m + d * 0.22);
+    ctx.lineTo(m + d * 0.58, m + d * 0.22);
+    ctx.lineTo(m + d * 0.58, m + d * 0.58);
+    ctx.lineTo(m + d * 0.78, m + d * 0.58);
+    ctx.lineTo(m + d * 0.5, m + d * 0.98);
+    ctx.lineTo(m + d * 0.22, m + d * 0.58);
+    ctx.lineTo(m + d * 0.42, m + d * 0.58);
+    ctx.lineTo(m + d * 0.42, m + d * 0.22);
+    ctx.lineTo(m + d * 0.28, m + d * 0.22);
     ctx.closePath();
     ctx.fill();
   } else if (kind === "hatch") {
-    ctx.strokeRect(m + d * 0.25, m, d * 0.5, d);
+    // Fallback: dirt mound + arched tunnel mouth + ladder.
     ctx.beginPath();
-    ctx.moveTo(m + d * 0.35, m + d * 0.2);
-    ctx.lineTo(m + d * 0.65, m + d * 0.35);
-    ctx.lineTo(m + d * 0.35, m + d * 0.5);
-    ctx.lineTo(m + d * 0.65, m + d * 0.65);
-    ctx.lineTo(m + d * 0.35, m + d * 0.8);
+    ctx.moveTo(m + d * 0.05, m + d * 0.95);
+    ctx.quadraticCurveTo(m + d * 0.15, m + d * 0.35, m + d * 0.5, m + d * 0.28);
+    ctx.quadraticCurveTo(m + d * 0.85, m + d * 0.35, m + d * 0.95, m + d * 0.95);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#efe2c8";
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.32, m + d * 0.55);
+    ctx.quadraticCurveTo(m + d * 0.5, m + d * 0.38, m + d * 0.68, m + d * 0.55);
+    ctx.lineTo(m + d * 0.68, m + d * 0.92);
+    ctx.lineTo(m + d * 0.32, m + d * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = Math.max(1.2, size * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.4, m + d * 0.58);
+    ctx.lineTo(m + d * 0.4, m + d * 0.88);
+    ctx.moveTo(m + d * 0.6, m + d * 0.58);
+    ctx.lineTo(m + d * 0.6, m + d * 0.88);
+    ctx.moveTo(m + d * 0.4, m + d * 0.68);
+    ctx.lineTo(m + d * 0.6, m + d * 0.68);
+    ctx.moveTo(m + d * 0.4, m + d * 0.8);
+    ctx.lineTo(m + d * 0.6, m + d * 0.8);
     ctx.stroke();
   } else if (kind === "bell") {
     ctx.beginPath();

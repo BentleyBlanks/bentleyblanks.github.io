@@ -1,12 +1,18 @@
 /**
- * Touch-pad SVG icons — same ink-on-paper language as DrawPictogram in Script_Game.
- * Kept as markup so DOM buttons match the canvas HUD without letter labels.
+ * Touch-pad icons — ink pictograms for DOM buttons.
+ * Shovel / hatch use generated Icon_*.png assets; others stay inline SVG.
  */
+
+import { CACHE_BUST } from "./Data_Story.mjs";
 
 const ink = "#1a1410";
 
 function Svg(inner) {
   return `<svg class="padIcon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">${inner}</svg>`;
+}
+
+function ImgIcon(file, label) {
+  return `<img class="padIcon" src="./${file}?v=${CACHE_BUST}" alt="" width="32" height="32" draggable="false" aria-hidden="true" data-icon="${label}">`;
 }
 
 /** Speech bubble — matches DrawPictogram("talk") */
@@ -22,11 +28,8 @@ export const ICON_SHOT = Svg(
    <rect x="22" y="15" width="7" height="3" fill="${ink}"/>`,
 );
 
-/** Shovel — matches DrawPictogram("shovel") */
-export const ICON_SHOVEL = Svg(
-  `<rect x="14" y="2" width="4" height="17" fill="${ink}"/>
-   <path d="M7 20 L25 20 L16 30 Z" fill="${ink}"/>`,
-);
+/** Real shovel plate (T-grip + pointed spade). */
+export const ICON_SHOVEL = ImgIcon("Icon_Shovel.png", "shovel");
 
 /**
  * Blueprint / design — grid map + pencil.
@@ -62,12 +65,8 @@ export const ICON_CROUCH = Svg(
    <path d="M4 30 L16 24 L28 30" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>`,
 );
 
-/** Hatch / well lip */
-export const ICON_HATCH = Svg(
-  `<rect x="4" y="18" width="24" height="6" fill="${ink}"/>
-   <path d="M8 18 V10 H24 V18" fill="none" stroke="${ink}" stroke-width="2.4"/>
-   <path d="M12 10 V6 H20 V10" fill="none" stroke="${ink}" stroke-width="2"/>`,
-);
+/** Tunnel mouth / cellar hatch with ladder (地道口). */
+export const ICON_HATCH = ImgIcon("Icon_TunnelHatch.png", "hatch");
 
 /** Corridor stamp (design mode) */
 export const ICON_CORRIDOR = Svg(
@@ -114,7 +113,7 @@ export const PAD_ICON = {
   grenade: ICON_GRENADE,
 };
 
-/** Pick pad SVG for the single contextual interact button. */
+/** Pick pad SVG/img for the single contextual interact button. */
 export function InteractPadIcon(mode) {
   return PAD_ICON[mode] || ICON_TALK;
 }

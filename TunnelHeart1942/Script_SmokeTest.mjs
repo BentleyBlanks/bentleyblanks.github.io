@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync as FileExists } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
@@ -272,6 +272,8 @@ function TestAct1TutorialPlayable() {
   Assert(!/>蹲</.test(padHtml) && !/>瞄</.test(padHtml) && !/>设计</.test(padHtml), "pad buttons have no text glyphs");
   const padIcons = readFileSync(join(here, "Script_PadIcons.mjs"), "utf8");
   Assert(padIcons.includes("ICON_TALK") && padIcons.includes("ICON_SHOT") && padIcons.includes("ICON_SHOVEL"), "pad icons match game pictograms");
+  Assert(padIcons.includes("Icon_Shovel.png") && padIcons.includes("Icon_TunnelHatch.png"), "shovel/hatch use generated icon plates");
+  Assert(FileExists(join(here, "Icon_Shovel.png")) && FileExists(join(here, "Icon_TunnelHatch.png")), "icon plate files present");
   Assert(padIcons.includes("M3 10 H23") && padIcons.includes("ICON_PLAN"), "design icon is blueprint grid + pencil");
   Assert(padIcons.includes("ICON_DOWN") && padIcons.includes("ICON_UP"), "up/down chevron pad icons");
   Assert(padIcons.includes("ICON_CROUCH"), "crouch icon retained for pictogram parity");
