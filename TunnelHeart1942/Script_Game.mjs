@@ -909,6 +909,11 @@ function DrawProp(prop, pal, alphaMul = 1) {
 }
 
 /** Front soil lips that paint OVER the digger — tunnel 2.5D occlusion. */
+/**
+ * Soft front occlusion for the dig corridor.
+ * Only shade the inward face of walls that touch AIR — never paint floor /
+ * ceiling cells under the digger (those used to read as two mystery bars).
+ */
 function DrawTunnelFrontLips(pal) {
   const soil = state.level.soil;
   if (!soil) return;
@@ -917,25 +922,31 @@ function DrawTunnelFrontLips(pal) {
   const cam1 = state.cameraX + VIEW_W + 40;
   const px = state.player.x;
   const py = state.player.y;
+  const lipW = Math.max(3, 5 * s);
   for (let r = 0; r < soil.rows; r++) {
     for (let c = 0; c < soil.cols; c++) {
       if (soil.cells[r][c] === AIR) continue;
       const rect = CellWorldRect(soil, c, r);
       if (rect.x + rect.w < cam0 || rect.x > cam1) continue;
-      // Only lips near the player column — frame the corridor
-      if (Math.abs(rect.x + rect.w / 2 - px) > 140) continue;
-      if (rect.y > py + 20 || rect.y + rect.h < py - 70) continue;
+      if (Math.abs(rect.x + rect.w / 2 - px) > 160) continue;
+      if (rect.y > py + 30 || rect.y + rect.h < py - 90) continue;
+
+      const airLeft = c > 0 && soil.cells[r][c - 1] === AIR;
+      const airRight = c < soil.cols - 1 && soil.cells[r][c + 1] === AIR;
+      // Floor (AIR above) / ceiling (AIR below) are walk planes — skip the old
+      // top+bottom bars that looked like unexplained stripes under the feet.
+      if (!airLeft && !airRight) continue;
+
       const x = WX(rect.x);
       const y = WY(rect.y);
       const rw = rect.w * s;
       const rh = rect.h * s;
-      ctx.fillStyle = "rgba(20,12,8,.42)";
-      ctx.fillRect(x, y, rw, Math.min(10 * s, rh * 0.35));
-      ctx.fillStyle = "rgba(10,6,4,.35)";
-      ctx.fillRect(x, y + rh - 8 * s, rw, 8 * s);
+      ctx.fillStyle = "rgba(14,8,5,.5)";
+      if (airLeft) ctx.fillRect(x, y, lipW, rh);
+      if (airRight) ctx.fillRect(x + rw - lipW, y, lipW, rh);
     }
   }
-  // Near camera dirt clumps along bottom of view
+  // Near-camera dirt clumps along the bottom of the view (depth skirt only).
   const scroll = state.cameraX * 1.4;
   ctx.fillStyle = "rgba(18,12,8,.75)";
   for (let i = 0; i < 10; i++) {
@@ -943,9 +954,7 @@ function DrawTunnelFrontLips(pal) {
     const y = (canvas.clientHeight || innerHeight) * 0.88;
     ctx.beginPath();
     if (typeof ctx.ellipse === "function") ctx.ellipse(x, y, 40, 18, 0, 0, Math.PI * 2);
-    else {
-      ctx.arc(x, y, 28, 0, Math.PI * 2);
-    }
+    else ctx.arc(x, y, 28, 0, Math.PI * 2);
     ctx.fill();
   }
 }

@@ -869,6 +869,9 @@ function TestDepthLayers() {
   Assert(!wide.props.some((p) => p.kind === "mudbank"), "wide map also has continuous ground only");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("DrawDepthVeil"), "atmospheric depth veils");
+  Assert(game.includes("DrawTunnelFrontLips"), "tunnel front lips draw");
+  Assert(game.includes("airLeft") && game.includes("airRight"), "front lips only on walls beside air");
+  Assert(!/fillRect\(x, y, rw, Math\.min\(10/.test(game), "no floor-stripe lip bars under digger");
   Assert(game.includes("PropsBehindBands"), "banded behind draw");
   Assert(game.includes("DrawContinuousNearGround"), "continuous near ground ribbon");
   Assert(!game.includes("vanishing toward mid-horizon"), "no radial floor trapezoid hatch");
