@@ -1330,12 +1330,26 @@ function TestDeathRespawn() {
 function TestPuppetAnim() {
   Assert(Object.keys(BONE_DEFS).length >= 12, "puppet has bone parts");
   Assert(CLIPS.walk && CLIPS.idle && CLIPS.dig && CLIPS.crouch, "walk/idle/dig/crouch clips");
+  Assert(CLIPS.crouchWalk && CLIPS.crouchWalk.keys.length >= 4, "crouchWalk duck-stride clip");
   const bones = SolveBones(SampleClip("walk", 0.2));
   Assert(bones.hip && bones.head && bones.footL && bones.handR, "solved hierarchy");
   Assert(Math.abs(bones.footL.y) < 12, "feet near ground in rest/walk");
   Assert(PickClip({ digging: true }) === "dig", "dig clip pick");
   Assert(PickClip({ crouching: true }) === "crouch", "crouch clip pick");
+  Assert(PickClip({ crouching: true, moving: true }) === "crouchWalk", "crouch+move picks crouchWalk");
+  Assert(PickClip({ crouching: true, vx: 40 }) === "crouchWalk", "crouch+vx picks crouchWalk");
   Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
+  // Deep crouch must clearly drop head/hip vs idle — not a tiny tip.
+  {
+    const idlePose = SolveBones(SampleClip("idle", 0));
+    const crouchPose = SolveBones(SampleClip("crouch", 0));
+    const headDrop = crouchPose.head.y - idlePose.head.y;
+    const hipDrop = crouchPose.hip.y - idlePose.hip.y;
+    Assert(headDrop > 14, `crouch head drops hard (Δ=${headDrop.toFixed(1)})`);
+    Assert(hipDrop > 12, `crouch hip drops hard (Δ=${hipDrop.toFixed(1)})`);
+    Assert(SampleClip("crouch", 0).torso < 0, "crouch leans forward into facing");
+    Assert(SampleClip("crouch", 0).thighL > 1.2, "crouch thighs near horizontal");
+  }
   Assert(CLIPS.dig.keys.length >= 4, "dig clip has coil→bite→settle keys");
   Assert(Math.abs(CLIPS.dig.duration - 0.42) < 0.01, "dig clip duration matches swing");
   // Dig chop must strike FORWARD (local +X = facing), not swing behind the back.

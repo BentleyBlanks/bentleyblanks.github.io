@@ -1987,7 +1987,10 @@ function DrawPlayer() {
     // Drive shovel chop from remaining digSwingT (coil → bite → settle).
     p._animT = Math.max(0, DIG_SWING_DURATION - p.digSwingT);
   } else {
-    p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
+    p._animT = AdvanceClipTime(clip, p._animT, animDt, {
+      vx: p.vx,
+      refSpeed: clip === "crouchWalk" ? 120 : 220,
+    });
   }
   DrawPuppet(ctx, {
     x,

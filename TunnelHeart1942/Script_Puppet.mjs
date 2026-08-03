@@ -233,44 +233,147 @@ export const CLIPS = {
       },
     ],
   },
+  /**
+   * Deep sneak crouch — hip drops hard, thighs near horizontal, shins tucked,
+   * torso tips forward over the knees (negative torso = lean into facing).
+   * Soft breath bob only; travel uses crouchWalk.
+   */
   crouch: {
-    duration: 1.2,
+    duration: 1.35,
     keys: [
       {
         t: 0,
-        hip: 0,
-        torso: 0.35,
-        thighL: 1.05,
-        shinL: -1.35,
-        thighR: 0.95,
-        shinR: -1.25,
-        armL: 0.4,
-        armR: -0.35,
-        neck: 0.15,
+        torso: -0.28,
+        neck: -0.08,
+        thighL: 1.42,
+        shinL: -2.48,
+        footL: 0.98,
+        thighR: 1.34,
+        shinR: -2.38,
+        footR: 0.92,
+        armL: 0.78,
+        foreL: 0.42,
+        armR: 0.92,
+        foreR: 0.48,
+        _hipY: 0,
       },
       {
         t: 0.5,
-        hip: 0,
-        torso: 0.38,
-        thighL: 1.0,
-        shinL: -1.3,
-        thighR: 1.0,
-        shinR: -1.3,
-        armL: 0.35,
-        armR: -0.3,
-        neck: 0.18,
+        torso: -0.3,
+        neck: -0.1,
+        thighL: 1.4,
+        shinL: -2.5,
+        footL: 1.02,
+        thighR: 1.36,
+        shinR: -2.4,
+        footR: 0.95,
+        armL: 0.82,
+        foreL: 0.45,
+        armR: 0.88,
+        foreR: 0.5,
+        _hipY: 0.8,
       },
       {
         t: 1,
-        hip: 0,
-        torso: 0.35,
-        thighL: 1.05,
-        shinL: -1.35,
-        thighR: 0.95,
-        shinR: -1.25,
-        armL: 0.4,
-        armR: -0.35,
-        neck: 0.15,
+        torso: -0.28,
+        neck: -0.08,
+        thighL: 1.42,
+        shinL: -2.48,
+        footL: 0.98,
+        thighR: 1.34,
+        shinR: -2.38,
+        footR: 0.92,
+        armL: 0.78,
+        foreL: 0.42,
+        armR: 0.92,
+        foreR: 0.48,
+        _hipY: 0,
+      },
+    ],
+  },
+  /** Duck-walk while holding crouch — weight shifts, knees stay bent. */
+  crouchWalk: {
+    duration: 0.62,
+    keys: [
+      {
+        t: 0,
+        torso: -0.26,
+        neck: -0.08,
+        thighL: 1.55,
+        shinL: -2.35,
+        footL: 0.78,
+        thighR: 1.22,
+        shinR: -2.5,
+        footR: 1.05,
+        armL: 0.7,
+        foreL: 0.35,
+        armR: 1.0,
+        foreR: 0.5,
+        _hipY: 0.6,
+      },
+      {
+        t: 0.25,
+        torso: -0.3,
+        neck: -0.1,
+        thighL: 1.38,
+        shinL: -2.45,
+        footL: 0.95,
+        thighR: 1.38,
+        shinR: -2.4,
+        footR: 0.9,
+        armL: 0.85,
+        foreL: 0.42,
+        armR: 0.85,
+        foreR: 0.42,
+        _hipY: -0.4,
+      },
+      {
+        t: 0.5,
+        torso: -0.26,
+        neck: -0.08,
+        thighL: 1.22,
+        shinL: -2.5,
+        footL: 1.05,
+        thighR: 1.55,
+        shinR: -2.35,
+        footR: 0.78,
+        armL: 1.0,
+        foreL: 0.5,
+        armR: 0.7,
+        foreR: 0.35,
+        _hipY: 0.6,
+      },
+      {
+        t: 0.75,
+        torso: -0.3,
+        neck: -0.1,
+        thighL: 1.38,
+        shinL: -2.4,
+        footL: 0.9,
+        thighR: 1.38,
+        shinR: -2.45,
+        footR: 0.95,
+        armL: 0.85,
+        foreL: 0.42,
+        armR: 0.85,
+        foreR: 0.42,
+        _hipY: -0.4,
+      },
+      {
+        t: 1,
+        torso: -0.26,
+        neck: -0.08,
+        thighL: 1.55,
+        shinL: -2.35,
+        footL: 0.78,
+        thighR: 1.22,
+        shinR: -2.5,
+        footR: 1.05,
+        armL: 0.7,
+        foreL: 0.35,
+        armR: 1.0,
+        foreR: 0.5,
+        _hipY: 0.6,
       },
     ],
   },
@@ -465,7 +568,10 @@ export function SampleClip(clipName, timeSec) {
 export function PickClip(opts) {
   if (opts.melee) return "melee";
   if (opts.digging) return "dig";
-  if (opts.crouching) return "crouch";
+  if (opts.crouching) {
+    if (Math.abs(opts.vx || 0) > 12 || opts.moving) return "crouchWalk";
+    return "crouch";
+  }
   if (opts.alert) return "alert";
   if (Math.abs(opts.vx || 0) > 12 || opts.moving) return "walk";
   return "idle";
@@ -483,8 +589,8 @@ export function AdvanceClipTime(clipName, timeSec, dt, opts = {}) {
   const clip = CLIPS[clipName] || CLIPS.idle;
   const dur = clip.duration || 1;
   let rate = 1;
-  if (clipName === "walk") {
-    const ref = opts.refSpeed || 220;
+  if (clipName === "walk" || clipName === "crouchWalk") {
+    const ref = opts.refSpeed || (clipName === "crouchWalk" ? 120 : 220);
     const speed = Math.abs(opts.vx || 0);
     rate = Math.max(0.38, Math.min(1.35, speed / ref));
   }
@@ -743,10 +849,10 @@ export function DrawPuppet(ctx, opts) {
   const pal = typeof opts.palette === "string" ? PALETTES[opts.palette] || PALETTES.militia : opts.palette || PALETTES.militia;
   const clip = opts.clip || PickClip(opts);
   const angleOff = SampleClip(clip, opts.time || 0);
-  if (opts.crouching) angleOff._hipY = (angleOff._hipY || 0) + 10;
-  // Plant feet for upright clips; crouch/dig keep authored hip drop.
+  // Dig keeps authored hip drop (chop bite). Crouch / crouchWalk plant so
+  // folded knees drop the hip onto planted feet — no fake +hipY hack.
   const bones = SolveBones(angleOff, {
-    plantFeet: clip !== "crouch" && clip !== "dig",
+    plantFeet: clip !== "dig",
   });
 
   ctx.save();
