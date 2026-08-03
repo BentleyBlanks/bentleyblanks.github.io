@@ -275,6 +275,9 @@ function TestAct1TutorialPlayable() {
   Assert(game.includes("forceTouchPad") || css.includes("forceTouchPad"), "touch pad forced on touch devices");
   Assert(html.includes('id="DebugModal"'), "hidden debug panel exists");
   Assert(html.includes('id="OpenDebugButton"'), "pause modal has debug button");
+  Assert(html.includes('id="DismissHelpButton"'), "help modal has corner dismiss");
+  Assert(css.includes("max-height: min(88dvh") || css.includes("88dvh"), "modals scroll on short screens");
+  Assert(css.includes("position: sticky") && css.includes(".modalDismiss"), "sticky close affordances");
   Assert(game.includes("designExit") || game.includes("误进画线"), "design trap has dig-exit path");
 }
 

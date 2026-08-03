@@ -90,9 +90,15 @@ function SetModal(which) {
   Show($("PauseModal"), which === "pause");
   Show($("FailModal"), which === "fail");
   Show($("DebugModal"), which === "debug");
-  // Debug also freezes play — same as pause.
-  state.pauseOpen = which === "pause" || which === "debug";
+  // Help/history/pause/debug/fail all freeze play input via pauseOpen.
+  state.pauseOpen = !!which && which !== "fail" ? true : which === "fail";
+  if (which === "fail") state.pauseOpen = true;
   if (which === "debug") SyncDebugPanel();
+}
+
+function AnyModalOpen() {
+  const layer = $("ModalLayer");
+  return !!(layer && !layer.hidden);
 }
 
 function SyncDebugPanel() {
@@ -2040,8 +2046,13 @@ function BindInput() {
     if (down && k === "q") {
       input.dropPressed = true;
     }
-    if (down && k === "escape" && state.phase === "play") {
-      SetModal(state.pauseOpen ? null : "pause");
+    if (down && k === "escape") {
+      if (AnyModalOpen()) {
+        SetModal(null);
+        e.preventDefault();
+        return;
+      }
+      if (state.phase === "play") SetModal("pause");
     }
   };
   window.addEventListener("keydown", (e) => setKey(e, true));
@@ -2110,10 +2121,25 @@ function BindUi() {
     const progress = LoadFromStorage();
     BeginFrom(Math.max(0, Math.min(CHAPTERS.length - 1, (progress?.unlockedActs || 1) - 1)));
   });
+  const closeModal = () => SetModal(null);
   $("OpenHelpButton").addEventListener("click", () => SetModal("help"));
-  $("CloseHelpButton").addEventListener("click", () => SetModal(null));
+  $("CloseHelpButton").addEventListener("click", closeModal);
+  const dismissHelp = $("DismissHelpButton");
+  if (dismissHelp) dismissHelp.addEventListener("click", closeModal);
   $("OpenHistoryButton").addEventListener("click", () => SetModal("history"));
-  $("CloseHistoryButton").addEventListener("click", () => SetModal(null));
+  $("CloseHistoryButton").addEventListener("click", closeModal);
+  const dismissHistory = $("DismissHistoryButton");
+  if (dismissHistory) dismissHistory.addEventListener("click", closeModal);
+  // Tap dimmed backdrop (not the card) to dismiss — mobile escape hatch.
+  const modalLayer = $("ModalLayer");
+  if (modalLayer) {
+    modalLayer.addEventListener("pointerdown", (e) => {
+      if (e.target === modalLayer) {
+        e.preventDefault();
+        SetModal(null);
+      }
+    });
+  }
   $("PauseButton").addEventListener("click", () => {
     // Triple-tap opens debug (capture listener); single tap still pauses.
     if ($("DebugModal") && !$("DebugModal").hidden) return;
