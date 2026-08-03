@@ -1,0 +1,81 @@
+<!doctype html>
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0908">
+  <meta name="description" content="《地道里的光》——1942-1943 华北敌后，一个木匠儿子在地道里学会保护更多人的白盒原型">
+  <title>地道里的光 · 白盒原型</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=010">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+<main id="gameShell">
+  <canvas id="gameCanvas" aria-label="地道里的光 三维白盒场景"></canvas>
+
+  <div id="hud" aria-hidden="false">
+    <section id="objectivePanel">
+      <b id="objectiveText"></b>
+      <span id="hintText"></span>
+    </section>
+    <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
+    <div id="toast"></div>
+    <div id="prompt" hidden></div>
+    <div id="detectionVignette" aria-hidden="true"></div>
+    <div id="cineBars" aria-hidden="true"><i class="barTop"></i><i class="barBottom"></i></div>
+    <section id="caption" hidden>
+      <b id="capSpeaker" hidden></b>
+      <p id="capText"></p>
+    </section>
+    <div id="fadeOverlay" aria-hidden="true"></div>
+
+    <section id="chapterCard" hidden>
+      <small id="cardNum"></small>
+      <h2 id="cardTitle"></h2>
+      <p id="cardYear"></p>
+      <span id="cardContinue">按 E 继续</span>
+    </section>
+
+    <section id="choiceOverlay" hidden>
+      <h3 id="choicePrompt"></h3>
+      <div id="choiceList"></div>
+    </section>
+
+    <section id="endScreen" hidden>
+      <small>《地道里的光》</small>
+      <h2>门框上的两道刻痕，留在了身后</h2>
+      <p>地道还在。人还在。日子还要往下过。</p>
+      <button id="endRestart" type="button">回到标题</button>
+    </section>
+  </div>
+
+  <section id="titleScreen">
+    <div class="titleInner">
+      <p class="eyebrow">WHITEBOX PROTOTYPE · 1942–1943 华北敌后</p>
+      <h1><span>地道里的光</span></h1>
+      <p class="thesis">一个只想保护母亲和妹妹的普通青年，在一次次失去之后，被迫学会保护更多人。</p>
+      <div class="titleActions">
+        <button id="startButton" type="button">从第一章开始</button>
+      </div>
+      <div id="chapterList" aria-label="章节选择"></div>
+      <dl id="controlsNote">
+        <div><dt>W A S D</dt><dd>移动</dd></div>
+        <div><dt>E</dt><dd>互动 / 按住施工 / 推进字幕</dd></div>
+        <div><dt>C</dt><dd>蹲低（贴着草垛可以躲开视线）</dd></div>
+        <div><dt>1 / 2</dt><dd>做出抉择</dd></div>
+      </dl>
+      <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
+    </div>
+  </section>
+</main>
+<script type="module" src="./Script_Main.js?v=010"></script>
+</body>
+</html>

@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942",
+    "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942 && npm run test:tunnelLight1943",
+    "test:tunnelLight1943": "node TunnelLight1943/Script_SmokeTest.mjs",
+    "test:tunnelLight1943:browser": "node TunnelLight1943/Script_RenderHealthTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",
     "test:tunnelBell1942:browser": "node TunnelBell1942/Script_RenderHealthTest.mjs",
     "shots:tunnelBell1942": "node TunnelBell1942/Script_Screenshot.mjs",

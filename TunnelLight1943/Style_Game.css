@@ -1,0 +1,200 @@
+/* 《地道里的光》白盒 UI —— 昏黄油灯色 + 黑边电影字幕 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+:root {
+  --lamp: #e8c15a;
+  --paper: #d8cbb0;
+  --ink: #171310;
+  --dim: #9a8f7a;
+}
+
+html, body { height: 100%; }
+body {
+  background: #0a0908;
+  color: var(--paper);
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  overflow: hidden;
+}
+
+#gameShell { position: fixed; inset: 0; }
+#gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#hud button { pointer-events: auto; }
+
+/* 目标 */
+#objectivePanel {
+  position: absolute; top: 22px; left: 26px; max-width: 380px;
+  padding: 10px 16px;
+  background: rgba(10, 9, 8, 0.62);
+  border-left: 3px solid var(--lamp);
+  transition: opacity 0.4s;
+}
+#objectivePanel b { display: block; font-size: 16px; letter-spacing: 0.06em; }
+#objectivePanel span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+
+#crouchTag {
+  position: absolute; top: 22px; right: 26px;
+  padding: 6px 12px; font-size: 12.5px; letter-spacing: 0.08em;
+  color: #b8c4d8; background: rgba(14, 18, 28, 0.66);
+  border: 1px solid rgba(150, 170, 200, 0.35);
+}
+
+/* 交互提示 */
+#prompt {
+  position: absolute; left: 50%; bottom: 17%;
+  transform: translateX(-50%);
+  padding: 8px 18px; font-size: 15px; letter-spacing: 0.1em;
+  color: var(--lamp); background: rgba(10, 9, 8, 0.7);
+  border: 1px solid rgba(232, 193, 90, 0.4);
+  white-space: nowrap;
+}
+
+/* 短提示 */
+#toast {
+  position: absolute; left: 50%; top: 15%;
+  transform: translateX(-50%) translateY(-8px);
+  max-width: 560px; padding: 10px 20px; text-align: center;
+  font-size: 14.5px; line-height: 1.7; color: var(--paper);
+  background: rgba(16, 13, 10, 0.82);
+  border-top: 1px solid rgba(232, 193, 90, 0.5);
+  border-bottom: 1px solid rgba(232, 193, 90, 0.2);
+  opacity: 0; transition: opacity 0.45s, transform 0.45s;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 被发现红晕 */
+#detectionVignette {
+  position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 46%, rgba(150, 30, 18, 0.55) 100%);
+  transition: opacity 0.2s;
+}
+
+/* 电影黑边 */
+#cineBars .barTop, #cineBars .barBottom {
+  position: absolute; left: 0; right: 0; height: 0; background: #000;
+  transition: height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#cineBars .barTop { top: 0; }
+#cineBars .barBottom { bottom: 0; }
+#cineBars.active .barTop, #cineBars.active .barBottom { height: 11.5vh; }
+
+/* 字幕 */
+#caption {
+  position: absolute; left: 50%; bottom: 13.5vh;
+  transform: translateX(-50%);
+  width: min(720px, 86vw); text-align: center;
+}
+#capSpeaker {
+  display: inline-block; margin-bottom: 6px;
+  font-size: 14px; letter-spacing: 0.3em; color: var(--lamp);
+}
+#capText { font-size: 17.5px; line-height: 1.9; text-shadow: 0 1px 6px #000; }
+#capText.stage { color: #cfc4ad; font-size: 15.5px; }
+
+#fadeOverlay {
+  position: absolute; inset: 0; background: #030202;
+  opacity: 1; pointer-events: none;
+}
+
+/* 章节卡 */
+#chapterCard {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: #050403; text-align: center;
+}
+#chapterCard small { font-size: 14px; letter-spacing: 0.5em; color: var(--dim); }
+#chapterCard h2 { font-size: 40px; letter-spacing: 0.24em; color: var(--paper); font-weight: 600; }
+#chapterCard p { font-size: 14px; letter-spacing: 0.2em; color: #8f8371; }
+#chapterCard span { margin-top: 34px; font-size: 13px; letter-spacing: 0.3em; color: var(--lamp); animation: blink 1.8s infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+
+/* 抉择 */
+#choiceOverlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  background: rgba(5, 4, 3, 0.86); padding: 20px;
+}
+#choicePrompt { font-size: 21px; letter-spacing: 0.12em; }
+#choiceList { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+#choiceList button {
+  width: min(330px, 84vw); padding: 18px 20px; text-align: left; cursor: pointer;
+  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  border: 1px solid rgba(232, 193, 90, 0.35);
+  font-family: inherit; transition: border-color 0.2s, background 0.2s;
+}
+#choiceList button:hover { border-color: var(--lamp); background: rgba(38, 31, 21, 0.95); }
+#choiceList button b { display: block; font-size: 17px; margin-bottom: 8px; color: var(--lamp); }
+#choiceList button span { font-size: 13.5px; line-height: 1.7; color: var(--dim); }
+
+/* 结局 */
+#endScreen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #050403; text-align: center; padding: 20px;
+}
+#endScreen small { letter-spacing: 0.4em; color: var(--dim); }
+#endScreen h2 { font-size: 27px; letter-spacing: 0.14em; font-weight: 600; }
+#endScreen p { color: var(--dim); font-size: 14.5px; }
+#endScreen button {
+  margin-top: 26px; padding: 12px 34px; cursor: pointer;
+  background: none; color: var(--lamp); border: 1px solid rgba(232, 193, 90, 0.5);
+  font-family: inherit; font-size: 15px; letter-spacing: 0.2em;
+}
+#endScreen button:hover { background: rgba(232, 193, 90, 0.12); }
+
+/* 标题 */
+#titleScreen {
+  position: absolute; inset: 0; overflow-y: auto;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),
+    #070605;
+}
+.titleInner { width: min(760px, 92vw); padding: 48px 0; text-align: center; }
+.eyebrow { font-size: 12px; letter-spacing: 0.4em; color: var(--dim); }
+#titleScreen h1 { margin: 18px 0 14px; }
+#titleScreen h1 span {
+  font-size: clamp(44px, 8vw, 68px); letter-spacing: 0.22em; font-weight: 700;
+  color: var(--paper);
+  text-shadow: 0 0 34px rgba(232, 193, 90, 0.35);
+}
+.thesis { max-width: 520px; margin: 0 auto; font-size: 15px; line-height: 2; color: #b3a78e; }
+.titleActions { margin: 30px 0 26px; }
+#startButton {
+  padding: 14px 44px; cursor: pointer; font-family: inherit;
+  font-size: 17px; letter-spacing: 0.24em;
+  color: var(--ink); background: var(--lamp); border: none;
+}
+#startButton:hover { background: #f4d47c; }
+#chapterList {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  max-width: 640px; margin: 0 auto 30px;
+}
+#chapterList button {
+  padding: 12px 6px; cursor: pointer; font-family: inherit;
+  background: rgba(24, 20, 15, 0.8); color: var(--paper);
+  border: 1px solid rgba(154, 143, 122, 0.3);
+  transition: border-color 0.2s;
+}
+#chapterList button:hover:not(:disabled) { border-color: var(--lamp); }
+#chapterList button:disabled { opacity: 0.38; cursor: default; }
+#chapterList button small { display: block; font-size: 10.5px; letter-spacing: 0.2em; color: var(--dim); margin-bottom: 5px; }
+#chapterList button b { font-size: 13.5px; font-weight: 600; }
+#controlsNote {
+  display: flex; gap: 26px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+#controlsNote div { display: flex; gap: 8px; align-items: baseline; }
+#controlsNote dt {
+  font-size: 12px; padding: 3px 8px; letter-spacing: 0.1em;
+  border: 1px solid rgba(154, 143, 122, 0.45); color: var(--lamp);
+}
+#controlsNote dd { font-size: 12.5px; color: var(--dim); }
+.titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
+
+@media (max-width: 700px) {
+  #chapterList { grid-template-columns: repeat(2, 1fr); }
+  #objectivePanel { max-width: 62vw; }
+}
