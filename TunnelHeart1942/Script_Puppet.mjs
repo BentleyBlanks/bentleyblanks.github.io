@@ -16,26 +16,28 @@ export const BONE_DEFS = {
   hip: { parent: "root", len: 0, angle: 0 },
   // torso grows upward from hip
   torso: { parent: "hip", len: 22, angle: Math.PI },
-  neck: { parent: "torso", len: 5, angle: 0 },
-  head: { parent: "neck", len: 9, angle: 0 },
-  // legs grow downward
-  thighL: { parent: "hip", len: 15, angle: 0.14 },
-  shinL: { parent: "thighL", len: 14, angle: -0.06 },
-  footL: { parent: "shinL", len: 4, angle: Math.PI / 2 - 0.14 },
-  thighR: { parent: "hip", len: 15, angle: -0.14 },
-  shinR: { parent: "thighR", len: 14, angle: 0.06 },
-  footR: { parent: "shinR", len: 4, angle: -(Math.PI / 2 - 0.14) },
+  neck: { parent: "torso", len: 3.2, angle: 0 },
+  head: { parent: "neck", len: 7.5, angle: 0 },
+  // legs grow downward — narrow stance (not a duck A-frame)
+  thighL: { parent: "hip", len: 15, angle: 0.07 },
+  shinL: { parent: "thighL", len: 14, angle: -0.04 },
+  // Side-view: BOTH feet point forward (+X / facing), never mirrored backward.
+  footL: { parent: "shinL", len: 5.2, angle: Math.PI / 2 - 0.06 },
+  thighR: { parent: "hip", len: 15, angle: -0.07 },
+  shinR: { parent: "thighR", len: 14, angle: 0.04 },
+  footR: { parent: "shinR", len: 5.2, angle: Math.PI / 2 - 0.1 },
   // arms hang roughly down from upper torso
-  armL: { parent: "torso", len: 11, angle: Math.PI + 0.55 },
-  foreL: { parent: "armL", len: 10, angle: 0.15 },
+  armL: { parent: "torso", len: 11, angle: Math.PI + 0.48 },
+  foreL: { parent: "armL", len: 10, angle: 0.12 },
   handL: { parent: "foreL", len: 3, angle: 0 },
-  armR: { parent: "torso", len: 11, angle: Math.PI - 0.55 },
-  foreR: { parent: "armR", len: 10, angle: -0.15 },
+  armR: { parent: "torso", len: 11, angle: Math.PI - 0.48 },
+  foreR: { parent: "armR", len: 10, angle: -0.12 },
   handR: { parent: "foreR", len: 3, angle: 0 },
 };
 
 const PART_ON = {
   torso: { fill: "tunic", w: 18, h: 24, kind: "capsule" },
+  neck: { fill: "skin", w: 5.5, h: 5, kind: "capsule" },
   head: { fill: "skin", w: 16, h: 16, kind: "head" },
   thighL: { fill: "tunic", w: 8, h: 16, kind: "capsule" },
   shinL: { fill: "puttee", w: 7, h: 15, kind: "capsule" },
@@ -55,6 +57,7 @@ export const PALETTES = {
     puttee: "#3a4a38",
     boot: "#2a2118",
     skin: "#e7d0b0",
+    hair: "#2a241c",
     accent: "#c9a45a",
     ink: "#1a1410",
     helmet: null,
@@ -64,6 +67,7 @@ export const PALETTES = {
     puttee: "#2e3830",
     boot: "#241c14",
     skin: "#d8c09a",
+    hair: "#5a5048",
     accent: "#a6452f",
     ink: "#1a1410",
     helmet: null,
@@ -73,6 +77,7 @@ export const PALETTES = {
     puttee: "#5a3a2a",
     boot: "#2a2118",
     skin: "#edd4b8",
+    hair: "#3a2820",
     accent: "#8b2e22",
     ink: "#1a1410",
     helmet: null,
@@ -82,6 +87,7 @@ export const PALETTES = {
     puttee: "#6a4a28",
     boot: "#2a2118",
     skin: "#e7d0b0",
+    hair: "#2c2418",
     accent: "#c9a45a",
     ink: "#1a1410",
     helmet: null,
@@ -124,6 +130,7 @@ export const PALETTES = {
     puttee: "#3a3028",
     boot: "#1a1410",
     skin: "#e7d0b0",
+    hair: "#1a1410",
     accent: "#a6452f",
     ink: "#1a1410",
     helmet: null,
@@ -138,9 +145,48 @@ export const CLIPS = {
   idle: {
     duration: 1.8,
     keys: [
-      { t: 0, torso: 0, neck: 0, armL: 0.04, armR: -0.04, thighL: 0.02, thighR: -0.02, _hipY: 0 },
-      { t: 0.5, torso: 0.02, neck: 0.015, armL: -0.03, armR: 0.03, thighL: -0.015, thighR: 0.015, _hipY: 0.6 },
-      { t: 1, torso: 0, neck: 0, armL: 0.04, armR: -0.04, thighL: 0.02, thighR: -0.02, _hipY: 0 },
+      {
+        t: 0,
+        torso: 0.02,
+        neck: -0.02,
+        armL: 0.05,
+        armR: -0.05,
+        thighL: 0.02,
+        shinL: -0.03,
+        footL: 0.04,
+        thighR: -0.02,
+        shinR: 0.02,
+        footR: 0.02,
+        _hipY: 0,
+      },
+      {
+        t: 0.5,
+        torso: 0.035,
+        neck: -0.01,
+        armL: -0.02,
+        armR: 0.02,
+        thighL: -0.01,
+        shinL: -0.02,
+        footL: 0.03,
+        thighR: 0.01,
+        shinR: 0.01,
+        footR: 0.03,
+        _hipY: 0.45,
+      },
+      {
+        t: 1,
+        torso: 0.02,
+        neck: -0.02,
+        armL: 0.05,
+        armR: -0.05,
+        thighL: 0.02,
+        shinL: -0.03,
+        footL: 0.04,
+        thighR: -0.02,
+        shinR: 0.02,
+        footR: 0.02,
+        _hipY: 0,
+      },
     ],
   },
   // Contact → pass → contact → pass. Soft VH-style stride + hip bob (_hipY).
@@ -697,57 +743,84 @@ function DrawCapsule(ctx, x, y, angle, len, width, fill, ink, scale) {
 function DrawHead(ctx, x, y, angle, pal, scale, helmet) {
   ctx.save();
   ctx.translate(x * scale, y * scale);
-  // head bone points up (≈π); draw face upright
+  // head bone points up (≈π); draw face upright. Local -Y = screen up.
   ctx.rotate(-angle + Math.PI);
-  const r = 8 * scale;
+  const r = 7.4 * scale;
+  const cy = -r * 0.55;
   ctx.fillStyle = pal.skin;
   ctx.strokeStyle = pal.ink;
   ctx.lineWidth = Math.max(1.2, 1.8 * scale);
+  // Soft jaw (not a perfect billiard ball).
   ctx.beginPath();
-  ctx.arc(0, -r * 0.15, r, 0, Math.PI * 2);
+  ctx.ellipse(0, cy, r * 0.92, r * 1.02, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  // Ear (back of head in side view).
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.72, cy + r * 0.05, r * 0.22, r * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Eye looking toward facing (+X).
+  ctx.fillStyle = pal.ink;
+  ctx.beginPath();
+  ctx.ellipse(r * 0.28, cy - r * 0.05, r * 0.16, r * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f4ebe0";
+  ctx.beginPath();
+  ctx.arc(r * 0.34, cy - r * 0.08, r * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+  // Nose tick.
+  ctx.strokeStyle = pal.ink;
+  ctx.lineWidth = Math.max(1, 1.35 * scale);
+  ctx.beginPath();
+  ctx.moveTo(r * 0.55, cy + r * 0.05);
+  ctx.lineTo(r * 0.78, cy + r * 0.22);
+  ctx.stroke();
+
   if (helmet || pal.helmet) {
     const cap = helmet || pal.helmet;
     ctx.fillStyle = cap;
+    ctx.strokeStyle = pal.ink;
+    ctx.lineWidth = Math.max(1.2, 1.7 * scale);
     if (pal.helmetKind === "peaked") {
-      // 伪军大盖帽 — flat crown + long visor (reads apart from IJA steel pot).
+      // 伪军大盖帽 — flat crown + long visor.
       ctx.beginPath();
-      ctx.moveTo(-r * 1.05, -r * 0.95);
-      ctx.lineTo(r * 1.05, -r * 0.95);
-      ctx.lineTo(r * 1.05, -r * 0.35);
-      ctx.lineTo(-r * 1.05, -r * 0.35);
+      ctx.moveTo(-r * 1.0, cy - r * 0.85);
+      ctx.lineTo(r * 1.0, cy - r * 0.85);
+      ctx.lineTo(r * 1.0, cy - r * 0.2);
+      ctx.lineTo(-r * 1.0, cy - r * 0.2);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(-r * 1.25, -r * 0.35);
-      ctx.lineTo(r * 1.3, -r * 0.32);
-      ctx.lineTo(r * 1.15, -r * 0.05);
-      ctx.lineTo(-r * 1.15, -r * 0.08);
+      ctx.moveTo(-r * 1.15, cy - r * 0.2);
+      ctx.lineTo(r * 1.25, cy - r * 0.18);
+      ctx.lineTo(r * 1.1, cy + r * 0.08);
+      ctx.lineTo(-r * 1.05, cy + r * 0.05);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else {
       // 日军钢盔 — dome + brim + front star.
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.5, r * 1.2, r * 0.7, 0, Math.PI, 0);
+      ctx.ellipse(0, cy - r * 0.35, r * 1.15, r * 0.68, 0, Math.PI, 0);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.28, r * 1.35, r * 0.28, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, cy - r * 0.12, r * 1.3, r * 0.26, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = "#c9a45a";
       ctx.beginPath();
-      const sr = r * 0.28;
+      const sr = r * 0.26;
+      const sy = cy - r * 0.4;
       for (let i = 0; i < 5; i++) {
         const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
         const b = a + Math.PI / 5;
         const x1 = Math.cos(a) * sr;
-        const y1 = -r * 0.55 + Math.sin(a) * sr;
+        const y1 = sy + Math.sin(a) * sr;
         const x2 = Math.cos(b) * sr * 0.4;
-        const y2 = -r * 0.55 + Math.sin(b) * sr * 0.4;
+        const y2 = sy + Math.sin(b) * sr * 0.4;
         if (i === 0) ctx.moveTo(x1, y1);
         else ctx.lineTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -757,20 +830,53 @@ function DrawHead(ctx, x, y, angle, pal, scale, helmet) {
       ctx.strokeStyle = pal.ink;
       ctx.stroke();
     }
+  } else {
+    // Bare head: short side-view hair / cloth wrap — kill the bald egg look.
+    const hair = pal.hair || "#2a241c";
+    ctx.fillStyle = hair;
+    ctx.strokeStyle = pal.ink;
+    ctx.lineWidth = Math.max(1.1, 1.5 * scale);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.95, cy - r * 0.1);
+    ctx.quadraticCurveTo(-r * 1.05, cy - r * 1.15, 0, cy - r * 1.2);
+    ctx.quadraticCurveTo(r * 0.95, cy - r * 1.1, r * 0.85, cy - r * 0.25);
+    ctx.quadraticCurveTo(r * 0.2, cy - r * 0.55, -r * 0.35, cy - r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }
 
+/**
+ * Side-view boot. After rotate(-angle): local +Y = toward toe along sole,
+ * local +X = into the ground (when foot is flat / angle ≈ π/2).
+ */
 function DrawBoot(ctx, x, y, angle, pal, scale) {
   ctx.save();
   ctx.translate(x * scale, y * scale);
   ctx.rotate(-angle);
+  const s = scale;
   ctx.fillStyle = pal.boot;
   ctx.strokeStyle = pal.ink;
-  ctx.lineWidth = Math.max(1.2, 1.6 * scale);
+  ctx.lineWidth = Math.max(1.2, 1.65 * s);
   ctx.beginPath();
-  ctx.ellipse(5 * scale, 1 * scale, 7 * scale, 3.2 * scale, 0, 0, Math.PI * 2);
+  // Ankle cuff → heel → sole → toe → vamp
+  ctx.moveTo(-2.6 * s, -2.1 * s);
+  ctx.lineTo(-1.1 * s, -2.4 * s);
+  ctx.lineTo(1.2 * s, -2.0 * s);
+  ctx.lineTo(1.7 * s, 0.4 * s);
+  ctx.lineTo(1.55 * s, 4.6 * s);
+  ctx.quadraticCurveTo(1.2 * s, 6.3 * s, -0.1 * s, 6.5 * s);
+  ctx.quadraticCurveTo(-1.5 * s, 6.1 * s, -2.0 * s, 4.4 * s);
+  ctx.lineTo(-2.8 * s, 0.6 * s);
+  ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+  // Sole edge
+  ctx.beginPath();
+  ctx.moveTo(1.5 * s, 0.8 * s);
+  ctx.lineTo(1.4 * s, 4.8 * s);
   ctx.stroke();
   ctx.restore();
 }
@@ -860,7 +966,7 @@ export function DrawPuppet(ctx, opts) {
   ctx.scale(facing, 1);
   if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
 
-  // Draw order: far limbs first (L), then torso, then R, then head, then held
+  // Draw order: far limbs first (L), then torso/neck, then R, then head, then held
   const order = [
     "thighL",
     "shinL",
@@ -871,6 +977,7 @@ export function DrawPuppet(ctx, opts) {
     "shinR",
     "footR",
     "torso",
+    "neck",
     "armR",
     "foreR",
     "head",

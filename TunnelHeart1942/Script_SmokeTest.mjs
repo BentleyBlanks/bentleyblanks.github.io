@@ -1381,6 +1381,22 @@ function TestPuppetAnim() {
   Assert(PickClip({ crouching: true, moving: true }) === "crouchWalk", "crouch+move picks crouchWalk");
   Assert(PickClip({ crouching: true, vx: 40 }) === "crouchWalk", "crouch+vx picks crouchWalk");
   Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
+  // Standing silhouette: both feet point forward (side-view), not duck-mirrored.
+  {
+    const idlePose = SolveBones(SampleClip("idle", 0));
+    const tipX = (name) => {
+      const b = idlePose[name];
+      const def = BONE_DEFS[name];
+      return b.x + Math.sin(b.angle) * def.len;
+    };
+    Assert(tipX("footL") > idlePose.footL.x + 2, "stand left foot tip points forward");
+    Assert(tipX("footR") > idlePose.footR.x + 2, "stand right foot tip points forward");
+    Assert(Math.abs(idlePose.footL.angle - idlePose.footR.angle) < 0.45, "stand feet not mirrored backward");
+    Assert(BONE_DEFS.footR.angle > 1.0, "footR rest faces forward like footL");
+    const puppetSrc = readFileSync(join(here, "Script_Puppet.mjs"), "utf8");
+    Assert(puppetSrc.includes('neck: { fill: "skin"'), "neck part drawn under head");
+    Assert(puppetSrc.includes("Bare head: short side-view hair") && puppetSrc.includes("Side-view boot"), "head/boot draw rewrite");
+  }
   // Deep crouch must clearly drop head/hip vs idle — not a tiny tip.
   {
     const idlePose = SolveBones(SampleClip("idle", 0));
