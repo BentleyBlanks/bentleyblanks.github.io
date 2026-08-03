@@ -1,8 +1,10 @@
 import { CHAPTERS, CACHE_BUST, PROLOGUE_PANELS } from "./Data_Story.mjs";
 import {
   AdvancePanels,
+  CanThrowGrenade,
   CreateCampaignState,
   CreateInputState,
+  GrenadeCount,
   LoadFromStorage,
   NextStepText,
   PLAYER_H,
@@ -152,7 +154,9 @@ function PadInteractVerb(st) {
   if (p.inTunnel && CanDigWith(p.held)) return "dig";
   if (hint === "dig" || hint === "follow_plan" || hint === "need_plan") return "dig";
   if (CanShoot(p.held) && p.aiming && !p.inTunnel) return "shot";
-  if (CanThrow(p.held)) return "shot";
+  // Pocket / held grenades: big key throws when rifle isn't ADS.
+  if (CanThrowGrenade(p) && !(CanShoot(p.held) && !p.inTunnel)) return "grenade";
+  if (CanThrow(p.held) || (CanThrowGrenade(p) && p.held === ITEM_GRENADE)) return "grenade";
   if (hint) return "talk";
   return "talk";
 }
@@ -192,14 +196,16 @@ function SyncTouchPadActions() {
 
   const touchUse = $("TouchUse");
   if (touchUse) {
-    // Corridor stamp only while designing — fire/dig ride the main interact key.
-    const showUse = design;
+    // Design: corridor stamp. Surface: dedicated throw when pocket has grenades.
+    const canNade = !design && CanThrowGrenade(state.player);
+    const showUse = design || canNade;
     touchUse.hidden = !showUse;
-    if (showUse && touchUse.dataset.padMode !== "corridor") {
-      touchUse.innerHTML = PAD_ICON.corridor;
-      touchUse.dataset.padMode = "corridor";
-      touchUse.setAttribute("aria-label", "铺巷道");
-      touchUse.title = "铺巷道";
+    const useMode = design ? "corridor" : "grenade";
+    if (showUse && touchUse.dataset.padMode !== useMode) {
+      touchUse.innerHTML = design ? PAD_ICON.corridor : PAD_ICON.grenade;
+      touchUse.dataset.padMode = useMode;
+      touchUse.setAttribute("aria-label", design ? "铺巷道" : "扔手雷");
+      touchUse.title = design ? "铺巷道" : "扔手雷 · 抬头高抛 · 蹲下近抛";
     }
   }
 
@@ -211,7 +217,9 @@ function SyncTouchPadActions() {
         ? "plan"
         : verb === "use"
           ? "shovel"
-          : verb;
+          : verb === "grenade"
+            ? "grenade"
+            : verb;
     if (touchInteract.dataset.padMode !== mode) {
       touchInteract.innerHTML = InteractPadIcon(mode);
       touchInteract.dataset.padMode = mode;
@@ -223,13 +231,15 @@ function SyncTouchPadActions() {
           ? "捡起"
           : mode === "shot"
             ? "开火"
-            : mode === "hatch"
-              ? "进出井口"
-              : mode === "plan"
-                ? "标记蓝图格"
-                : mode === "warn"
-                  ? "制住"
-                  : "互动";
+            : mode === "grenade"
+              ? "扔手雷"
+              : mode === "hatch"
+                ? "进出井口"
+                : mode === "plan"
+                  ? "标记蓝图格"
+                  : mode === "warn"
+                    ? "制住"
+                    : "互动";
     touchInteract.setAttribute("aria-label", label);
     touchInteract.title = label;
     touchInteract.classList.toggle("isDig", mode === "dig" || mode === "plan");
@@ -249,8 +259,17 @@ function SyncHud() {
   if (state.designMode) {
     slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出</em>`;
   } else if (held === ITEM_RIFLE) {
-    const ads = state.player.aiming ? "开镜中 · 大键开火" : "按住开镜，再点大键打";
+    const nade = GrenadeCount(state.player);
+    const ads = state.player.aiming
+      ? "开镜中 · 大键开火"
+      : nade > 0
+        ? `按住开镜再打 · 手雷键扔（×${nade}）`
+        : "按住开镜，再点大键打";
     slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>${ads}</em>`;
+  } else if (held === ITEM_GRENADE || GrenadeCount(state.player) > 0) {
+    const n = GrenadeCount(state.player) || (held === ITEM_GRENADE ? 1 : 0);
+    const tip = ITEM_META[ITEM_GRENADE]?.tip || "朝面朝方向扔";
+    slot.innerHTML = `<b data-item="grenade" style="--item:${ITEM_META[ITEM_GRENADE].color}"></b><span>土制手雷 · ×${n}</span><em>${tip}</em>`;
   } else if (state.player.manningMg) {
     slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
@@ -275,10 +294,14 @@ function SyncHud() {
   }
   const ammoHud = $("AmmoHud");
   if (ammoHud) {
-    // Pocket ammo only when rifle is actually in hand — not a permanent walking placard.
+    // Pocket ammo / grenades — only when that stock matters this beat.
+    const nades = GrenadeCount(state.player);
     const showAmmo = held === ITEM_RIFLE && state.phase === "play";
-    ammoHud.hidden = !showAmmo;
-    ammoHud.textContent = `${state.player.ammo | 0}发`;
+    const showNade = nades > 0 && state.phase === "play" && !showAmmo;
+    ammoHud.hidden = !(showAmmo || showNade);
+    if (showAmmo && nades > 0) ammoHud.textContent = `${state.player.ammo | 0}发 · 雷×${nades}`;
+    else if (showAmmo) ammoHud.textContent = `${state.player.ammo | 0}发`;
+    else if (showNade) ammoHud.textContent = `雷×${nades}`;
   }
   SyncTouchPadActions();
 }
@@ -1128,7 +1151,7 @@ function DrawEntity(ent) {
         : ent.itemId === ITEM_CHARGE
           ? "charge"
           : ent.itemId === ITEM_GRENADE
-            ? "warn"
+            ? "grenade"
             : ent.itemId === ITEM_RIFLE || ent.itemId === ITEM_AMMO
               ? "shot"
               : "talk";
@@ -1223,6 +1246,29 @@ function DrawEntity(ent) {
       ctx.textAlign = "center";
       ctx.fillText(state.player.manningMg ? "扫射中" : ready ? "抢机枪" : "先制枪手", 0, -40 * s);
     }
+  } else if (ent.type === "sandbag") {
+    if (ent.broken) {
+      ctx.restore();
+      return;
+    }
+    const w = (ent.w || 54) * s;
+    ctx.fillStyle = "#6a5a3a";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 2.2 * s;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, 0);
+    ctx.lineTo(-w * 0.42, -26 * s);
+    ctx.lineTo(w * 0.42, -26 * s);
+    ctx.lineTo(w * 0.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Stacked bag seams
+    ctx.strokeStyle = "rgba(26,20,16,.55)";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.35, -12 * s);
+    ctx.lineTo(w * 0.35, -12 * s);
+    ctx.stroke();
   } else if (ent.type === "enemy") {
     let alpha = 1;
     if (ent.dead) alpha = ent.ko ? 0.4 : 0.28;
@@ -1267,7 +1313,7 @@ function DrawEntity(ent) {
         ctx.fillStyle = "#efe2c8";
         ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText(ent.label || "鬼子", 0, -78 * s);
+        ctx.fillText(ent.cover ? `${ent.label || "鬼子"}·掩` : ent.label || "鬼子", 0, -78 * s);
       }
       if (ent.highAlert && (engaged || near)) {
         ctx.fillStyle = "#ffb0a0";
@@ -1406,6 +1452,11 @@ function DrawPictogram(kind, x, y, size) {
     ctx.fillStyle = "#1a1410";
     ctx.fillRect(m + d * 0.45, m + d * 0.3, d * 0.1, d * 0.35);
     ctx.fillRect(m + d * 0.45, m + d * 0.75, d * 0.1, d * 0.1);
+  } else if (kind === "grenade") {
+    ctx.fillRect(m + d * 0.42, m + d * 0.05, d * 0.16, d * 0.45);
+    ctx.beginPath();
+    ctx.ellipse(m + d * 0.5, m + d * 0.72, d * 0.28, d * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
   } else if (kind === "check") {
     ctx.beginPath();
     ctx.moveTo(m + d * 0.15, m + d * 0.5);
@@ -1648,12 +1699,44 @@ function DrawProjectiles() {
   const s = Scale();
   for (const p of state.projectiles || []) {
     ctx.save();
-    ctx.fillStyle = "#5a6a3a";
-    ctx.strokeStyle = "#1a1410";
-    ctx.lineWidth = 2;
+    if (p.kind === "grenade") {
+      const ang = Math.atan2(p.vy || 0, p.vx || 1);
+      ctx.translate(WX(p.x), WY(p.y));
+      ctx.rotate(ang);
+      ctx.fillStyle = "#5a6a3a";
+      ctx.strokeStyle = "#1a1410";
+      ctx.lineWidth = 2;
+      ctx.fillRect(-10 * s, -3 * s, 14 * s, 6 * s);
+      ctx.beginPath();
+      ctx.ellipse(6 * s, 0, 7 * s, 5.5 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#5a6a3a";
+      ctx.strokeStyle = "#1a1410";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(WX(p.x), WY(p.y), 6 * s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  for (const b of state.blasts || []) {
+    const t = Math.max(0, Math.min(1, b.timer / 0.5));
+    const r = (b.r || 92) * (1.15 - t * 0.35) * s;
+    ctx.save();
+    ctx.translate(WX(b.x), WY(b.y));
+    ctx.strokeStyle = `rgba(255,180,90,${0.85 * t})`;
+    ctx.fillStyle = `rgba(180,60,30,${0.28 * t})`;
+    ctx.lineWidth = 3 * s;
     ctx.beginPath();
-    ctx.arc(WX(p.x), WY(p.y), 6 * s, 0, Math.PI * 2);
+    ctx.arc(0, -8 * s, r, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,230,160,${0.55 * t})`;
+    ctx.beginPath();
+    ctx.arc(0, -8 * s, r * 0.55, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -1908,15 +1991,15 @@ function BindInput() {
       if (kind === "aim") state.input.aim = down;
       if (kind === "design" && down) state.input.designTogglePressed = true;
       if (kind === "use" && down) {
-        // Only visible in design mode → corridor stamp
-        state.input.planCorridorPressed = true;
+        if (state.designMode) state.input.planCorridorPressed = true;
+        else state.input.usePressed = true; // throw grenade (or fire if MG/rifle path)
       }
       if (kind === "interact" && down) {
-        // One action key: talk / dig / fire / plan — verb from current context
+        // One action key: talk / dig / fire / throw / plan — verb from current context
         const verb = PadInteractVerb(state);
         if (verb === "chamber") state.input.planChamberPressed = true;
         else if (verb === "plan" || verb === "dig") state.input.digPressed = true;
-        else if (verb === "shot" || verb === "use") state.input.usePressed = true;
+        else if (verb === "shot" || verb === "use" || verb === "grenade") state.input.usePressed = true;
         else state.input.interactPressed = true;
       }
     };

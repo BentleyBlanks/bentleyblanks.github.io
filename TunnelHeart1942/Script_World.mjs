@@ -520,10 +520,27 @@ function PlaceEnemy(id, x, opts = {}) {
     label,
     faction,
     hostile: true,
+    /** Behind sandbags — bullets deal half, blast ignores. */
+    cover: !!opts.cover,
     t: 0,
     dropAmmo: opts.dropAmmo || 0,
     dropRifle: !!opts.dropRifle,
     dropGrenade: !!opts.dropGrenade,
+  });
+}
+
+/** Destructible sandbag pile — blast clears it; visual cover only (no walk collision). */
+function PlaceSandbag(id, x, opts = {}) {
+  return Ent({
+    id,
+    type: "sandbag",
+    x,
+    y: SURFACE_Y,
+    layer: "surface",
+    w: opts.w || 54,
+    h: opts.h || 28,
+    broken: false,
+    hidden: false,
   });
 }
 
@@ -1025,6 +1042,167 @@ function BuildAct7MgNest() {
   return level;
 }
 
+/**
+ * Act8 grenade yard — teach pocket grenades + lob arcs over sandbags.
+ * Cover foes shrug off rifle fire; blast clears bags and splash.
+ */
+function BuildAct8GrenadeYard() {
+  const level = BaseLevel(2800, { night: true });
+  const cellar = { c: 2, r: 2, w: 3, h: 2 };
+  const soil = BuildDigBand({
+    originX: 40,
+    originY: DIG_ORIGIN_Y,
+    cols: 16,
+    rows: DIG_ROWS,
+    hardBlobs: [],
+    cellars: [cellar],
+  });
+  AttachSoil(level, soil);
+  const hatch = CellCenter(soil, cellar.c + 1, cellar.r + 1);
+  level.spawn = { x: 180, y: SURFACE_Y, tunnel: false };
+  level.spawnLoadout = { held: null, ammo: 0, grenades: 0 };
+  level.grenadeYard = true;
+  level.shafts = [{ x: hatch.x, label: "退路地窖" }];
+  level.entities = [
+    Ent({
+      id: "npc_nade",
+      type: "talk",
+      x: 240,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "林霞",
+      script: [
+        {
+          speaker: "林霞",
+          text: "村西晒谷场，日伪军趴在沙袋后。步枪打不穿——得用手雷。",
+        },
+        {
+          speaker: "林霞",
+          text: "雷箱里有土制手雷。抬头高抛过沙袋，蹲下近抛贴着门口。一窝端。",
+        },
+        {
+          speaker: "高传宝",
+          text: "捡雷，朝面朝方向扔。沙袋炸开，人就完了。",
+        },
+      ],
+      hint: "听交代",
+      goal: "talk_nade",
+    }),
+    PlacePickup(360, SURFACE_Y, ITEM_GRENADE, "surface", {
+      grenadeAmount: 3,
+      goal: "stock_nades",
+    }),
+    PlacePickup(980, SURFACE_Y, ITEM_GRENADE, "surface", { grenadeAmount: 2 }),
+    PlacePickup(1680, SURFACE_Y, ITEM_GRENADE, "surface", { grenadeAmount: 3 }),
+    PlacePickup(520, SURFACE_Y, ITEM_AMMO, "surface", { ammoAmount: 2 }),
+    PlacePickup(600, SURFACE_Y, ITEM_RIFLE, "surface"),
+    PlacePickup(hatch.x - 28, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    Ent({
+      id: "h8yard",
+      type: "hatch",
+      x: hatch.x,
+      y: SURFACE_Y,
+      layer: "both",
+      w: 40,
+      h: 18,
+      hint: "钻地窖躲一阵",
+      tunnelX: hatch.x,
+      tunnelY: hatch.y + 10,
+    }),
+    // Nest A — two behind bags, short lob / high lob teach
+    PlaceSandbag("bag_a1", 780),
+    PlaceSandbag("bag_a2", 820),
+    PlaceEnemy("yard_pup1", 800, {
+      amp: 18,
+      phase: 0.4,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      cover: true,
+      dropGrenade: true,
+    }),
+    PlaceEnemy("yard_jp1", 860, {
+      amp: 22,
+      phase: 1.2,
+      hp: 3,
+      label: "鬼子",
+      facing: -1,
+      cover: true,
+    }),
+    // Nest B — cluster for splash
+    PlaceSandbag("bag_b1", 1280),
+    PlaceSandbag("bag_b2", 1330),
+    PlaceSandbag("bag_b3", 1380),
+    PlaceEnemy("yard_pup2", 1310, {
+      amp: 15,
+      phase: 0.8,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      cover: true,
+      dropAmmo: 2,
+    }),
+    PlaceEnemy("yard_jp2", 1360, {
+      amp: 20,
+      phase: 2.0,
+      hp: 3,
+      label: "鬼子",
+      facing: -1,
+      cover: true,
+      dropGrenade: true,
+    }),
+    PlaceEnemy("yard_pup3", 1420, {
+      amp: 16,
+      phase: 1.5,
+      hp: 2,
+      label: "伪军",
+      facing: 1,
+      cover: true,
+    }),
+    // Nest C — doorway short-toss
+    PlaceSandbag("bag_c1", 1900),
+    PlaceSandbag("bag_c2", 1960),
+    PlaceEnemy("yard_jp3", 1930, {
+      amp: 12,
+      phase: 0.6,
+      hp: 3,
+      label: "鬼子",
+      facing: -1,
+      cover: true,
+      dropRifle: true,
+      dropAmmo: 2,
+    }),
+    PlaceEnemy("yard_jp4", 2020, {
+      amp: 28,
+      phase: 2.4,
+      hp: 3,
+      label: "鬼子",
+      facing: -1,
+      cover: true,
+    }),
+    // Open flank — melee / rifle finish so the yard is not pure spam
+    PlaceEnemy("yard_pup_open", 2320, {
+      amp: 55,
+      phase: 0.3,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      dropAmmo: 2,
+    }),
+  ];
+  level.props = [
+    { kind: "shed", x: 320 },
+    { kind: "house", x: 700, variant: 0 },
+    { kind: "tree", x: 1050 },
+    { kind: "house", x: 1250, variant: 1 },
+    { kind: "well", x: 1600 },
+    { kind: "house", x: 1880, variant: 0 },
+    { kind: "tree", x: 2200 },
+    { kind: "shed", x: 2500 },
+  ];
+  return level;
+}
+
 const BUILDERS = {
   act1_connect: BuildAct1,
   act2_bell: BuildAct2,
@@ -1033,6 +1211,7 @@ const BUILDERS = {
   act5_street_hunt: BuildAct5StreetHunt,
   act6_heifengkou: BuildAct6Heifengkou,
   act7_mg_nest: BuildAct7MgNest,
+  act8_grenade_yard: BuildAct8GrenadeYard,
 };
 
 export function BuildLevel(chapterId) {

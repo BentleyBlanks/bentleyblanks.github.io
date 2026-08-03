@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
-export const SAVE_KEY = "tunnelheart1942_v7";
-export const CACHE_BUST = "20260803s";
+export const SAVE_KEY = "tunnelheart1942_v8";
+export const CACHE_BUST = "20260803t";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -307,7 +307,45 @@ export const CHAPTERS = [
       {
         id: "p7z1",
         speaker: "旁白",
-        text: "机枪哑了。地道通到敌营根上——枪，也成了咱们的。",
+        text: "机枪哑了。可村西晒谷场还有日伪军趴在沙袋后——步枪打不穿，得用手雷。",
+        mood: "wide",
+      },
+    ],
+  },
+  {
+    id: "act8_grenade_yard",
+    act: 8,
+    title: "沙袋场",
+    timeLabel: "反攻午前",
+    cast: "高传宝",
+    night: true,
+    objective: "捡手雷，抬头高抛过沙袋，蹲下近抛。炸开掩体，清光晒谷场日伪军。",
+    goals: ["talk_nade", "stock_nades", "clear_grenade_yard"],
+    openPanels: [
+      {
+        id: "p8a",
+        speaker: "背景",
+        text: "村西晒谷场。日伪军用沙袋堵着路口，步枪压不住。",
+        mood: "wide",
+      },
+      {
+        id: "p8b",
+        speaker: "困难",
+        text: "沙袋后的人吃枪子不疼。土制手雷才管用——要会抛弧，别砸自己脚边。",
+        mood: "talk",
+      },
+      {
+        id: "p8c",
+        speaker: "目标",
+        text: "听交代 → 雷箱装雷 → 高抛/近抛清场。口袋可叠手雷。",
+        mood: "tip",
+      },
+    ],
+    closePanels: [
+      {
+        id: "p8z1",
+        speaker: "旁白",
+        text: "沙袋后也清了。手雷、地道、枪——高家庄又多了一招。",
         mood: "wide",
       },
     ],

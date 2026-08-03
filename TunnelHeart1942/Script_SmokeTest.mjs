@@ -753,10 +753,11 @@ function TestDepthLayers() {
 }
 
 function TestChaptersHaveSoil() {
-  Assert(CHAPTERS.length === 7, "seven acts");
+  Assert(CHAPTERS.length === 8, "eight acts");
   Assert(CHAPTERS[4].id === "act5_street_hunt", "street hunt slotted as act5");
   Assert(CHAPTERS[5].id === "act6_heifengkou", "heifengkou is act6");
   Assert(CHAPTERS[6].id === "act7_mg_nest", "mg nest slotted as act7");
+  Assert(CHAPTERS[7].id === "act8_grenade_yard", "grenade yard slotted as act8");
   for (const ch of CHAPTERS) {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
@@ -766,7 +767,7 @@ function TestChaptersHaveSoil() {
     );
     Assert(level.entities.some((e) => e.type === "talk" && e.script), `${ch.id} has talk script`);
   }
-  Assert(SAVE_KEY.endsWith("_v7"), "save v7");
+  Assert(SAVE_KEY.endsWith("_v8"), "save v8");
   Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
 }
 
@@ -839,6 +840,117 @@ function TestAct7MgNest() {
   Assert(/机枪|扫射|日伪/.test(NextStepText(state)) || state.goalsDone.hold_waves, "mg tip or done");
 }
 
+function TestAct8GrenadeYard() {
+  const state = Play(7);
+  Assert(state.chapterId === "act8_grenade_yard", "grenade yard chapter");
+  Assert(CHAPTERS[7].goals.includes("clear_grenade_yard"), "clear_grenade_yard goal");
+  Assert(state.level.night !== false && state.level.palette?.night, "night yard palette");
+  const bags = state.level.entities.filter((e) => e.type === "sandbag");
+  const foes = state.level.entities.filter((e) => e.type === "enemy");
+  const coverFoes = foes.filter((e) => e.cover);
+  Assert(bags.length >= 5, `sandbags authored (${bags.length})`);
+  Assert(coverFoes.length >= 5, `cover foes (${coverFoes.length})`);
+  Assert(
+    state.level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_GRENADE && e.grenadeAmount >= 2),
+    "grenade crates stack amount",
+  );
+  Assert(/手雷|沙袋/.test(NextStepText(state)) || !state.goalsDone.talk_nade, "nade tip mentions hand grenade/sandbags");
+
+  DebugCompleteGoal(state, "talk_nade");
+  const crate = state.level.entities.find(
+    (e) => e.kind === "pickup" && e.itemId === ITEM_GRENADE && e.goal === "stock_nades",
+  );
+  Assert(!!crate, "stock crate with goal");
+  state.player.x = crate.x;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.goalsDone.stock_nades, "stock_nades on crate pickup");
+  Assert(state.player.grenades >= 3, `pocket stack (${state.player.grenades})`);
+  Assert(state.player.held === ITEM_GRENADE, "empty hands equip grenade");
+
+  // Cover halves ADS damage (2 → 1) — freeze the foe so the shot is unambiguous.
+  const target = coverFoes[0];
+  const nestX = 800;
+  target.amp = 0;
+  target.x = nestX;
+  target.homeX = nestX;
+  target.facing = -1;
+  target.hp = 3;
+  target.maxHp = 3;
+  target.dead = false;
+  target.alert = 0;
+  target.highAlert = false;
+  const hpBefore = target.hp;
+  state.player.x = nestX - 90;
+  state.player.held = ITEM_RIFLE;
+  state.player.ammo = 4;
+  state.player.facing = 1;
+  state.player.shotCool = 0;
+  state.input.aim = true;
+  StepPlay(state, 1 / 30);
+  // Pin again after ADS step (gunshot alert would otherwise make him chase).
+  target.x = nestX;
+  target.homeX = nestX;
+  target.amp = 0;
+  target.alert = 0;
+  target.highAlert = false;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(target.hp === hpBefore - 1, `cover halves ADS (hp ${target.hp})`);
+
+  // High lob over bags: freeze AI so fuse lands in the nest, not a chase.
+  for (const e of foes) {
+    if (e !== target) {
+      e.dead = true;
+      e.hp = 0;
+      e.corpse = true;
+    }
+  }
+  target.dead = false;
+  target.hp = 3;
+  target.cover = true;
+  target.amp = 0;
+  target.alert = 0;
+  target.highAlert = false;
+  target.x = nestX;
+  target.homeX = nestX;
+  const bag = bags.find((b) => Math.abs(b.x - nestX) < 50);
+  Assert(!!bag, "sandbag at nest A");
+  bag.broken = false;
+  bag.hidden = false;
+  state.player.x = nestX - 140;
+  state.player.facing = 1;
+  state.player.held = ITEM_GRENADE;
+  state.player.grenades = 2;
+  state.player.throwCool = 0;
+  state.input.aim = false;
+  state.input.up = true;
+  state.input.crouch = false;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(
+    (state.projectiles || []).some((p) => p.kind === "grenade"),
+    "grenade projectile spawned",
+  );
+  Assert(state.player.grenades === 1, "throw consumes pocket stack");
+  for (let i = 0; i < 90 && !target.dead; i++) {
+    // Keep the teaching-nest foe planted while the stick is in the air.
+    target.x = nestX;
+    target.homeX = nestX;
+    target.amp = 0;
+    target.alert = 0;
+    target.vx = 0;
+    StepPlay(state, 1 / 30);
+  }
+  Assert(target.dead, "blast kills cover foe");
+  Assert(bag.broken || state.stats.coversBroken > 0, "blast breaks sandbag");
+  Assert(state.stats.grenadesThrown >= 1, "grenadesThrown stat");
+  Assert(state.goalsDone.clear_grenade_yard, "clear_grenade_yard after last kill");
+  Assert(/沙袋|已清/.test(NextStepText(state)) || state.goalsDone.clear_grenade_yard, "yard tip or done");
+}
+
 
 function TestPuppetAnim() {
   Assert(Object.keys(BONE_DEFS).length >= 12, "puppet has bone parts");
@@ -878,6 +990,7 @@ function Main() {
   TestMeleeKoFactions();
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
+  TestAct8GrenadeYard();
   TestNaiveAct1Bot();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");

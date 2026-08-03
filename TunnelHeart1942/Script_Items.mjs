@@ -19,7 +19,7 @@ export const ITEM_META = {
     id: ITEM_GRENADE,
     label: "土制手雷",
     color: "#5a6a3a",
-    tip: "朝面朝方向扔出",
+    tip: "朝面朝方向扔出 · 上抛高弧 · 蹲着近抛",
   },
   [ITEM_CHARGE]: {
     id: ITEM_CHARGE,

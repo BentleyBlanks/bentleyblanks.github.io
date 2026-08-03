@@ -82,6 +82,13 @@ export const ICON_WARN = Svg(
    <rect x="14.5" y="21" width="3" height="3" fill="${ink}"/>`,
 );
 
+/** Stick grenade */
+export const ICON_GRENADE = Svg(
+  `<rect x="14" y="4" width="4" height="14" fill="${ink}"/>
+   <ellipse cx="16" cy="24" rx="7" ry="6" fill="${ink}"/>
+   <path d="M12 8 H20" stroke="#efe2c8" stroke-width="1.6"/>`,
+);
+
 /** Move chevrons */
 export const ICON_LEFT = Svg(`<path d="M22 5 L9 16 L22 27 Z" fill="${ink}"/>`);
 export const ICON_RIGHT = Svg(`<path d="M10 5 L23 16 L10 27 Z" fill="${ink}"/>`);
@@ -104,6 +111,7 @@ export const PAD_ICON = {
   hatch: ICON_HATCH,
   corridor: ICON_CORRIDOR,
   warn: ICON_WARN,
+  grenade: ICON_GRENADE,
 };
 
 /** Pick pad SVG for the single contextual interact button. */

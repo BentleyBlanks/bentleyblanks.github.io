@@ -94,16 +94,23 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       held: loadout.held ?? ITEM_NONE,
       /** Pocket ammo — separate from held slot (rifle consumes this). */
       ammo: loadout.ammo ?? 0,
+      /** Pocket grenades — stack; throw consumes one. */
+      grenades:
+        loadout.grenades ??
+        (loadout.held === ITEM_GRENADE ? 1 : 0),
       shotCool: 0,
+      throwCool: 0,
       /** Act7: locked to mg_nest, rapid fire, no ammo. */
       manningMg: false,
       meleeT: 0,
       meleeFacing: 1,
+      throwT: 0,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
     },
     meleeFx: null,
+    blasts: [],
     projectiles: [],
     designMode: false,
     planCursor: level.soil ? InitPlanCursor(level.soil, level.spawn.x, level.spawn.y, 1) : null,
@@ -215,6 +222,8 @@ function ResolvePhysics(state, dt) {
     if (move && !player.aiming) player.facing = move;
   }
   if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
+  if (player.throwCool > 0) player.throwCool = Math.max(0, player.throwCool - dt);
+  if (player.throwT > 0) player.throwT = Math.max(0, player.throwT - dt);
   // No Mario jump — Valiant Hearts traversal is walk / crawl / dig / hatch.
 
   player.vy += GRAVITY * dt;
@@ -591,6 +600,19 @@ function TryPickupOrInteract(state) {
       SetSubtitle(state, "提示", `装上 ${add} 发子弹（现有 ${player.ammo}）。`, 2.0);
       return true;
     }
+    // Grenades stack in a pocket (like ammo) and show in hand when empty-handed.
+    if (ent.itemId === ITEM_GRENADE) {
+      const add = ent.grenadeAmount || 1;
+      player.grenades = (player.grenades || 0) + add;
+      if (!player.held || player.held === ITEM_GRENADE) player.held = ITEM_GRENADE;
+      ent.taken = true;
+      ent.hidden = true;
+      state.stats.pickups += 1;
+      if (ent.goal) MarkGoal(state, ent.goal);
+      SetBubble(state, ["warn"], `+${add}雷`, 1.2);
+      SetSubtitle(state, "提示", `手雷 ×${player.grenades}。朝面朝方向扔；抬头高抛，蹲下近抛。`, 2.4);
+      return true;
+    }
     const previous = player.held;
     player.held = ent.itemId;
     ent.taken = true;
@@ -723,18 +745,8 @@ function TryUseItem(state) {
     return;
   }
 
-  if (CanThrow(player.held)) {
-    state.projectiles.push({
-      kind: "grenade",
-      x: player.x + player.facing * 20,
-      y: player.y - 28,
-      vx: player.facing * THROW_SPEED,
-      vy: -220,
-      life: 1.4,
-    });
-    player.held = ITEM_NONE;
-    SetBubble(state, ["warn"], "", 0.8);
-    AlertEnemiesNear(state, player.x, 260, 3.5);
+  if (CanThrowGrenade(player)) {
+    ThrowGrenade(state);
     return;
   }
 
@@ -778,20 +790,127 @@ function DropEnemyLoot(state, ent) {
   }
 }
 
-function HurtEnemy(state, ent, dmg) {
+function HurtEnemy(state, ent, dmg, opts = {}) {
   if (!ent || ent.type !== "enemy" || ent.dead) return false;
-  ent.hp -= dmg;
-  ent.hurtFlash = 0.28;
+  // Sandbag cover cuts bullet damage; blast ignores cover.
+  let dealt = dmg;
+  if (ent.cover && !opts.blast) dealt = Math.max(1, Math.floor(dmg * 0.5));
+  ent.hp -= dealt;
+  ent.hurtFlash = opts.blast ? 0.4 : 0.28;
   if (ent.hp <= 0) {
     ent.hp = 0;
     ent.dead = true;
     ent.corpse = true;
     state.stats.kills = (state.stats.kills || 0) + 1;
+    if (opts.blast) state.stats.grenadeKills = (state.stats.grenadeKills || 0) + 1;
     DropEnemyLoot(state, ent);
     SyncKillGoals(state);
     return true;
   }
   return false;
+}
+
+export function GrenadeCount(player) {
+  return Math.max(0, player.grenades | 0);
+}
+
+export function CanThrowGrenade(player) {
+  if (!player || player.inTunnel || player.manningMg) return false;
+  return GrenadeCount(player) > 0 || player.held === ITEM_GRENADE;
+}
+
+function ConsumeGrenade(player) {
+  if ((player.grenades || 0) > 0) {
+    player.grenades -= 1;
+    if (player.grenades <= 0 && player.held === ITEM_GRENADE) player.held = ITEM_NONE;
+    return true;
+  }
+  if (player.held === ITEM_GRENADE) {
+    player.held = ITEM_NONE;
+    return true;
+  }
+  return false;
+}
+
+/** Lob a stick grenade — up = high arc, crouch = short toss. */
+function ThrowGrenade(state) {
+  const { player, input } = state;
+  if ((player.throwCool || 0) > 0) return false;
+  if (!CanThrowGrenade(player)) return false;
+  if (!ConsumeGrenade(player)) return false;
+
+  // Ranges tuned so lobs land ~80–170px ahead (inside blast), not across the map.
+  let speed = 300;
+  let loft = -280;
+  if (input.up) {
+    speed = 240;
+    loft = -360; // high lob over sandbags
+  } else if (input.crouch) {
+    speed = 190;
+    loft = -120; // short dump into a doorway
+  }
+  const facing = player.facing || 1;
+  state.projectiles.push({
+    kind: "grenade",
+    x: player.x + facing * 22,
+    y: (player.y || SURFACE_Y) - (player.crouching ? 22 : 32),
+    vx: facing * speed,
+    vy: loft,
+    life: 1.35,
+    bounced: false,
+  });
+  player.throwCool = 0.55;
+  player.throwT = 0.36;
+  player.facing = facing;
+  state.stats.grenadesThrown = (state.stats.grenadesThrown || 0) + 1;
+  SetBubble(state, ["warn"], "手雷", 0.7);
+  AlertEnemiesNear(state, player.x, 160, 2.2);
+  return true;
+}
+
+function DetonateGrenade(state, p) {
+  const blastR = 92;
+  state.blasts = state.blasts || [];
+  state.blasts.push({ x: p.x, y: p.y, timer: 0.5, r: blastR });
+  AlertEnemiesNear(state, p.x, 340, 5.5);
+  let hits = 0;
+  for (const ent of state.level.entities) {
+    if (ent.type === "sandbag" && !ent.broken) {
+      if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < blastR) {
+        ent.broken = true;
+        ent.hidden = true;
+        state.stats.coversBroken = (state.stats.coversBroken || 0) + 1;
+      }
+      continue;
+    }
+    if (ent.type === "enemy" && !ent.dead) {
+      if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < blastR) {
+        const killed = HurtEnemy(state, ent, 3, { blast: true });
+        hits += 1;
+        if (killed) SetSubtitle(state, "高传宝", "手榴弹——一窝端！", 1.8);
+      }
+      continue;
+    }
+    if (ent.type === "patrol" && !ent.broken) {
+      if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 70) {
+        ent.hits = (ent.hits || 0) + 3;
+        if (ent.hits >= 3) {
+          ent.broken = true;
+          MarkGoal(state, "break_patrol");
+        }
+      }
+    }
+  }
+  // Cover melts with the bags — leftover foes can be finished with rifle/melee.
+  for (const foe of state.level.entities) {
+    if (foe.type !== "enemy" || foe.dead || !foe.cover) continue;
+    const shield = state.level.entities.some(
+      (b) => b.type === "sandbag" && !b.broken && Math.abs(b.x - foe.x) < 90,
+    );
+    if (!shield) foe.cover = false;
+  }
+  if (hits > 0 && hits < 2) SetSubtitle(state, "高传宝", "炸中了！再补一颗！", 1.6);
+  else if (hits === 0) SetSubtitle(state, "高传宝", "炸偏了——贴着沙袋再丢。", 1.5);
 }
 
 /** Silent / melee KO finish. */
@@ -957,6 +1076,7 @@ function SyncKillGoals(state) {
   if (foes.every((e) => e.dead)) {
     MarkGoal(state, "kill_invaders");
     MarkGoal(state, "clear_street");
+    MarkGoal(state, "clear_grenade_yard");
   }
   SyncMgNestGoals(state);
 }
@@ -1067,29 +1187,27 @@ function FireFromPort(state, port) {
 function UpdateProjectiles(state, dt) {
   const next = [];
   for (const p of state.projectiles || []) {
-    p.vy += GRAVITY * 0.55 * dt;
+    p.vy += GRAVITY * 0.62 * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.life -= dt;
-    if (p.life <= 0) {
-      for (const ent of state.level.entities) {
-        if (ent.type === "enemy" && !ent.dead) {
-          if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 78) {
-            const killed = HurtEnemy(state, ent, 2);
-            if (killed) SetSubtitle(state, "民兵", "手榴弹——好！", 1.8);
-            else SetSubtitle(state, "民兵", "炸伤了！再补一枪！", 1.6);
-          }
-          continue;
-        }
-        if (ent.type !== "patrol" || ent.broken) continue;
-        if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 70) {
-          ent.hits = (ent.hits || 0) + 2;
-          if (ent.hits >= 3) {
-            ent.broken = true;
-            MarkGoal(state, "break_patrol");
-          }
-        }
+    // Soft bounce on the walk plane so lobs settle into cover before boom.
+    if (p.kind === "grenade" && p.y >= SURFACE_Y - 2 && p.vy > 0) {
+      p.y = SURFACE_Y - 2;
+      if (!p.bounced) {
+        p.bounced = true;
+        p.vy *= -0.28;
+        p.vx *= 0.45;
+      } else {
+        p.vy = 0;
+        p.vx *= 0.7;
       }
+    }
+    p.life -= dt;
+    // Fuse out, or cook off once the stick has settled on the dirt.
+    const settled =
+      p.kind === "grenade" && p.bounced && Math.abs(p.vy) < 8 && Math.abs(p.vx) < 40 && p.life < 1.0;
+    if (p.life <= 0 || settled) {
+      if (p.kind === "grenade") DetonateGrenade(state, p);
       continue;
     }
     next.push(p);
@@ -1098,6 +1216,12 @@ function UpdateProjectiles(state, dt) {
   if (state.muzzle) {
     state.muzzle.timer -= dt;
     if (state.muzzle.timer <= 0) state.muzzle = null;
+  }
+  if (state.blasts) {
+    state.blasts = state.blasts.filter((b) => {
+      b.timer -= dt;
+      return b.timer > 0;
+    });
   }
 }
 
@@ -1703,7 +1827,7 @@ export function NextStepText(state) {
   }
   if (state.chapterId === "act7_mg_nest") {
     if (p.manningMg || g.man_mg) {
-      if (!g.hold_waves) return "按住开火键扫射！打光扑上来的日伪军";
+      if (!g.hold_waves) return "按住开火扫射！打光扑上来的日伪军";
       return "机枪巢守住了";
     }
     if (!g.talk_mg) return "听林霞交代敌营机枪巢";
@@ -1715,6 +1839,15 @@ export function NextStepText(state) {
     if (!g.silence_gunner) return "绕到机枪手背后制住他";
     if (!g.man_mg) return "点机枪巢，抢过机枪";
     return "扫光来犯日伪军";
+  }
+  if (state.chapterId === "act8_grenade_yard") {
+    if (!g.talk_nade) return "听林霞交代沙袋场";
+    if (!g.stock_nades) return "去雷箱捡手雷（口袋可叠）";
+    if (!g.clear_grenade_yard) {
+      if (GrenadeCount(p) <= 0) return "雷用完了——再去雷箱补，或捡地上掉的";
+      return "抬头高抛过沙袋，蹲下近抛；炸开沙袋后的日伪军";
+    }
+    return "沙袋场已清";
   }
   const chapter = CHAPTERS[state.chapterIndex];
   const open = GoalsRemaining(state);
