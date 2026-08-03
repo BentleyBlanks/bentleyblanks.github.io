@@ -12,6 +12,7 @@ import {
 } from "./Script_Rules.mjs";
 import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
 import {
+  DEPTH_NEAR,
   ParallaxOf,
   PropsBehind,
   PropsBehindBands,
@@ -316,7 +317,7 @@ function DrawDepthVeil(w, h, y0, y1, rgba) {
   ctx.fillRect(0, y0, w, Math.max(4, y1 - y0));
 }
 
-/** Perspective stage floor — VH walk plane with foreshortening stripes. */
+/** Continuous stage floor — one solid walk plane, full viewport width. */
 function DrawStageFloor(w, h, pal) {
   const s = Scale();
   const y = WY(SURFACE_Y);
@@ -329,7 +330,7 @@ function DrawStageFloor(w, h, pal) {
   ctx.fillStyle = back;
   ctx.fillRect(0, y - 90 * s, w, 90 * s);
 
-  // Walk strip toward camera (darker = nearer)
+  // Walk strip toward camera (darker = nearer) — solid, no vanishing wedges
   const near = ctx.createLinearGradient(0, y, 0, h);
   near.addColorStop(0, pal.night ? "#3a3228" : "#8b6a45");
   near.addColorStop(0.28, pal.night ? "#2a241c" : "#6a4e34");
@@ -338,31 +339,19 @@ function DrawStageFloor(w, h, pal) {
   ctx.fillStyle = near;
   ctx.fillRect(0, y, w, h - y + 4);
 
-  // Perspective hatch lines — vanishing toward mid-horizon
-  const vpX = w * 0.5;
-  const vpY = y - 40 * s;
-  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.32)" : "rgba(40,28,16,.26)";
-  ctx.lineWidth = 1.15;
-  for (let i = -10; i < 22; i++) {
-    const x0 = WX(state.cameraX + i * 58);
-    ctx.beginPath();
-    ctx.moveTo(x0, y);
-    ctx.lineTo(vpX + (x0 - vpX) * 1.65, h + 8);
-    ctx.stroke();
-  }
-  // Cross boards (nearer = thicker / wider spacing)
-  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.2)" : "rgba(30,20,12,.18)";
-  for (let t = 0.15; t < 0.95; t += 0.12) {
+  // Soft soil grain — horizontal only, never radial trapezoid plates
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.18)" : "rgba(30,20,12,.14)";
+  for (let t = 0.08; t < 0.92; t += 0.1) {
     const yy = y + (h - y) * t;
-    ctx.lineWidth = 1 + t * 2.5;
-    ctx.globalAlpha = 0.35 + t * 0.45;
+    ctx.lineWidth = 1 + t * 1.8;
+    ctx.globalAlpha = 0.22 + t * 0.35;
     ctx.beginPath();
     ctx.moveTo(0, yy);
     ctx.lineTo(w, yy);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  // Horizon seam (walk line)
+  // Horizon seam (walk line) — continuous edge to edge
   ctx.strokeStyle = "rgba(20,14,10,.65)";
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -376,6 +365,72 @@ function DrawStageFloor(w, h, pal) {
   rim.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = rim;
   ctx.fillRect(0, y - 10 * s, w, 16 * s);
+}
+
+/**
+ * Continuous near-camera ground bank — one connected ribbon across the full
+ * level width (and always full screen), replacing scattered mudbank trapezoids.
+ */
+function DrawContinuousNearGround(w, h, camX, pal) {
+  const s = Scale();
+  const lipY = h * 0.82;
+  const dirt = pal.night ? "#14100c" : "#2a1c12";
+  const lip = pal.night ? "#221810" : "#3a2818";
+  const mid = pal.night ? "#1a1410" : "#322214";
+
+  // Solid skirt fills entire bottom — no gaps at left/right camera edges
+  const skirt = ctx.createLinearGradient(0, lipY - 20 * s, 0, h);
+  skirt.addColorStop(0, mid);
+  skirt.addColorStop(0.35, dirt);
+  skirt.addColorStop(1, pal.night ? "#0a0806" : "#1a100c");
+  ctx.fillStyle = skirt;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, lipY);
+  // Gentle continuous lip (small wave — never breaks into separate plates)
+  const step = 16;
+  for (let i = 0; i <= w + step; i += step) {
+    const wave = Math.sin((i + camX * 1.4) * 0.018) * 5 + Math.sin((i + camX) * 0.007) * 2.5;
+    ctx.lineTo(i, lipY + wave);
+  }
+  ctx.lineTo(w + step, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Lit continuous lip stroke
+  ctx.strokeStyle = lip;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  for (let i = 0; i <= w + step; i += step) {
+    const wave = Math.sin((i + camX * 1.4) * 0.018) * 5 + Math.sin((i + camX) * 0.007) * 2.5;
+    if (i === 0) ctx.moveTo(i, lipY + wave);
+    else ctx.lineTo(i, lipY + wave);
+  }
+  ctx.stroke();
+
+  // World-width dirt band under the walk plane so the rightmost map still reads solid
+  const levelW = state.level?.width || 2400;
+  const yBand = DepthWY(DEPTH_NEAR) + 8 * s;
+  const x0 = DepthWX(-120, DEPTH_NEAR);
+  const x1 = DepthWX(levelW + 160, DEPTH_NEAR);
+  const bandTop = Math.min(yBand, lipY - 8);
+  const bandBot = Math.min(h, yBand + 54 * s);
+  if (x1 > 0 && x0 < w && bandBot > bandTop) {
+    const g = ctx.createLinearGradient(0, bandTop, 0, bandBot);
+    g.addColorStop(0, pal.night ? "rgba(26,20,14,.0)" : "rgba(58,40,24,.0)");
+    g.addColorStop(0.2, pal.night ? "#1a1410" : "#3a2818");
+    g.addColorStop(1, dirt);
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.max(0, x0), bandTop, Math.min(w, x1) - Math.max(0, x0) + 2, bandBot - bandTop);
+  }
+
+  // Dense overlapping soil nubs — texture only, never sparse floating trapezoids
+  ctx.fillStyle = pal.night ? "#152016" : "#2a3820";
+  for (let i = 0; i < 28; i++) {
+    const x = ((i * 48 - camX * 1.55) % (w + 40)) - 16;
+    const y0 = lipY + Math.sin((x + camX * 1.4) * 0.018) * 5;
+    ctx.fillRect(x, y0 - 14, 4, 14);
+  }
 }
 
 function DrawSoilCutaway(w, h, camX, pal) {
@@ -513,19 +568,7 @@ function DrawProp(prop, pal, alphaMul = 1) {
     ctx.fillRect(-4 * s, -62 * s, 8 * s, 62 * s);
     ctx.fillRect(-22 * s, -58 * s, 44 * s, 5 * s);
   } else if (prop.kind === "mudbank") {
-    const mw = (prop.w || 80) * s;
-    ctx.fillStyle = depth >= 2 ? "#1a120c" : "#2a1c12";
-    ctx.beginPath();
-    ctx.moveTo(-mw / 2, 14 * s);
-    ctx.lineTo(-mw / 2 + 8 * s, -44 * s);
-    ctx.lineTo(mw / 2 - 10 * s, -38 * s);
-    ctx.lineTo(mw / 2 + 10 * s, 16 * s);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // Lit lip so it reads as volume toward camera
-    ctx.fillStyle = "#3a2a18";
-    ctx.fillRect(-mw * 0.35, -18 * s, mw * 0.5, 8 * s);
+    // Legacy: continuous ground is DrawContinuousNearGround — skip floating traps
   } else if (prop.kind === "lantern") {
     ctx.fillStyle = "#c9a45a";
     ctx.globalAlpha *= 0.7;
@@ -1334,34 +1377,8 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   );
   for (const prop of front.filter((p) => (p.depth ?? 0) >= 2)) DrawProp(prop, pal);
 
-  // Near camera dirt skirt — solid bottom plane like VH stage edge
-  ctx.fillStyle = pal.night ? "#0e0c0a" : "#2a1c12";
-  ctx.beginPath();
-  ctx.moveTo(0, h);
-  ctx.lineTo(0, h * 0.86);
-  for (let i = 0; i <= w; i += 28) {
-    const wave = Math.sin((i + camX * 1.7) * 0.025) * 14 + Math.sin((i + camX) * 0.01) * 6;
-    ctx.lineTo(i, h * 0.84 + wave);
-  }
-  ctx.lineTo(w, h);
-  ctx.closePath();
-  ctx.fill();
-  // Skirt lip highlight
-  ctx.strokeStyle = pal.night ? "#1a1410" : "#3a2818";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, h * 0.84);
-  for (let i = 0; i <= w; i += 28) {
-    ctx.lineTo(i, h * 0.84 + Math.sin((i + camX * 1.7) * 0.025) * 14);
-  }
-  ctx.stroke();
-  // Tiny near grass nubs along the skirt
-  ctx.fillStyle = pal.night ? "#152016" : "#2a3820";
-  for (let i = 0; i < 18; i++) {
-    const x = ((i * 70 - camX * 1.6) % (w + 60)) - 20;
-    const y0 = h * 0.84 + Math.sin((x + camX * 1.7) * 0.025) * 14;
-    ctx.fillRect(x, y0 - 18, 5, 18);
-  }
+  // Continuous near ground — full width, connected, covers rightmost map edge
+  DrawContinuousNearGround(w, h, camX, pal);
 }
 
 function RenderTunnelStack(w, h, camX, pal) {

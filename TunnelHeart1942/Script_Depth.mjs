@@ -104,19 +104,16 @@ export function SeedDepthDecor(level) {
     else props.push({ kind: "wheat", x: x + 20, depth: DEPTH_FRONT });
   }
 
-  // NEAR — hard occluders + mudbanks that clip the silhouette
+  // NEAR — hard occluders only. Continuous ground is painted in Script_Game
+  // (no scattered mudbank trapezoids — those read as disconnected floor plates).
   for (let x = 40; x < width; x += 150 + (x % 45)) {
     const roll = (x * 13) % 4;
-    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
-    else if (roll === 1) props.push({ kind: "mudbank", x, depth: DEPTH_NEAR, w: 100 + (x % 60) });
+    if (roll === 0 || roll === 1) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
     else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_NEAR });
     else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
   }
   for (let x = 260; x < width; x += 360) {
     props.push({ kind: "tree", x: x + 40, depth: DEPTH_NEAR, occlude: true });
-  }
-  for (let x = 120; x < width; x += 220) {
-    props.push({ kind: "mudbank", x: x + 30, depth: DEPTH_NEAR, w: 120 });
   }
 
   if (night) {

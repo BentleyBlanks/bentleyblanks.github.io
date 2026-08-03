@@ -543,9 +543,15 @@ function TestDepthLayers() {
   Assert(PropsBehindBands(level.props).length >= 2, "multiple behind depth bands");
   Assert(ScaleOf(-3) < ScaleOf(-1) && ScaleOf(-1) < ScaleOf(0) && ScaleOf(0) < ScaleOf(2), "depth scale stack");
   Assert(YLiftOf(-3, 1) < YLiftOf(0, 1) && YLiftOf(0, 1) < YLiftOf(2, 1), "depth Y-lift stack");
+  Assert(!level.props.some((p) => p.kind === "mudbank"), "no scattered mudbank trapezoids");
+  const wide = BuildLevel("act5_street_hunt");
+  Assert(wide.width >= 3000, "street hunt is a wide map");
+  Assert(!wide.props.some((p) => p.kind === "mudbank"), "wide map also has continuous ground only");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("DrawDepthVeil"), "atmospheric depth veils");
   Assert(game.includes("PropsBehindBands"), "banded behind draw");
+  Assert(game.includes("DrawContinuousNearGround"), "continuous near ground ribbon");
+  Assert(!game.includes("vanishing toward mid-horizon"), "no radial floor trapezoid hatch");
 }
 
 function TestChaptersHaveSoil() {
