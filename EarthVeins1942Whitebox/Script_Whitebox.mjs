@@ -1,7 +1,7 @@
 import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
-import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zaa";
+import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zag";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -98,7 +98,7 @@ function CreateState(levelIndex) {
     levelIndex,
     level,
     phaseId: level.phases[0].id,
-    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, coverBlend: 0, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
+    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, crouchBlend: 0, coverId: null, coverBlend: 0, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
     selectedRole: level.startRole,
     rolePositions,
     completed: new Set(),
@@ -1644,6 +1644,8 @@ function Update(delta) {
   audioDirector.Update(delta, state);
   const coverTarget = state.player.coverId ? 1 : 0;
   state.player.coverBlend = Lerp(state.player.coverBlend || 0, coverTarget, 1 - Math.pow(.00008, delta));
+  const crouchTarget = state.player.lowProfile ? 1 : 0;
+  state.player.crouchBlend = Lerp(state.player.crouchBlend || 0, crouchTarget, 1 - Math.pow(.000025, delta));
   state.unconsciousEnemies.forEach((enemy) => { enemy.age += delta; });
   state.takedownGrace = Math.max(0, state.takedownGrace - delta);
   UpdateCombat(delta);
@@ -2863,7 +2865,7 @@ function DrawCombatCovers(width, height, surfaceY, tunnelY, front) {
     const blasted = state.combat.blastScars.some((scar) => scar.layer === cover.layer && Math.abs(scar.x - cover.x) <= .9);
     const mobileFront = width <= 640 && front;
     context.save(); context.translate(x, baseY);
-    if (front && active) context.globalAlpha = 1 - .78 * state.player.coverBlend;
+    if (front && active) context.globalAlpha = 1 - .94 * state.player.coverBlend;
     context.shadowColor = "rgba(14,10,8,.42)"; context.shadowBlur = active ? 9 : 3;
     if (cover.kind === "chimney") {
       context.fillStyle = active ? "#8c5d3f" : "#6d4935"; context.strokeStyle = "#291f19"; context.lineWidth = 3;
@@ -2964,7 +2966,7 @@ function DrawSurfaceCovers(width, surfaceY, front) {
     const active = activeId === cover.id;
     context.save();
     context.translate(x, surfaceY - 3);
-    if (front && active) context.globalAlpha = 1 - .78 * state.player.coverBlend;
+    if (front && active) context.globalAlpha = 1 - .94 * state.player.coverBlend;
 
     if (front) {
       const shadowWidth = cover.kind === "cart" ? coverWidth * .67 : cover.kind === "hay" ? coverWidth * .6 : coverWidth * .55;
@@ -4752,9 +4754,13 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const choiceDimmed = Boolean(action.puzzleChoice && chosenValue !== null && !choiceSelected && !focused);
     const choiceScale = action.puzzleChoice ? .82 : 1;
     const entityScale = sceneScale * choiceScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
+    const playerDistance = sameLayer ? Math.abs(propWorldX - state.player.x) : Infinity;
+    const playerOverlap = 1 - SmoothStep(1.15, 2.15, playerDistance);
+    const playerRevealAlpha = 1 - playerOverlap * .96;
     context.save(); context.translate(x, baseY);
     if (suppressMarkers) context.globalAlpha = .34;
     else if (choiceDimmed) context.globalAlpha = .22;
+    context.globalAlpha *= playerRevealAlpha;
     DrawPropSupport(action.prop.support, sceneScale, empty);
     context.translate(0, supportLift);
     if (present) DrawPropObject(action.prop.kind, entityScale);
@@ -4773,7 +4779,10 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     }
     if (focused && !suppressMarkers) {
       const label = completed ? (action.prop.mode === "place" ? `已布置 · ${action.prop.label}` : `已取走 · ${action.prop.label}`) : action.prop.label;
+      context.save();
+      context.globalAlpha = playerRevealAlpha;
       DrawPropLabel(x, markerY - 22 * sceneScale, label, completed ? "empty" : "active");
+      context.restore();
     }
   }
 }
@@ -5381,21 +5390,31 @@ function DrawHumanActor(profile, roleId, height) {
   const bob = Math.abs(Math.sin(phase)) * -2.1 * moving + idleBreath * (1 - moving);
   const takedownTime = action === "takedown" && state.takedown ? state.takedown.time : 0;
   const takedownKneel = action === "takedown" ? SmoothStep(1.42, 2.05, takedownTime) : 0;
-  const profileScale = state.player.lowProfile || action === "crawl" ? .7 : 1 - takedownKneel * .23;
+  const crouchBlend = Math.max(state.player.crouchBlend || 0, action === "crawl" ? 1 : 0);
+  const crouchStep = Math.sin(phase) * moving;
+  const pelvisY = Lerp(-height * .34, -height * .19, crouchBlend);
+  const torsoDrop = height * .15 * crouchBlend;
+  const torsoLean = height * (.075 + crouchStep * .008) * crouchBlend;
   context.translate(0, bob);
-  context.scale(1, profileScale);
-  if (state.player.lowProfile || action === "crawl") context.rotate(-.055);
+  if (takedownKneel > 0) context.scale(1, 1 - takedownKneel * .23);
   if (action === "takedown") context.rotate(-.075 * SmoothStep(.22, .72, takedownTime) + .045 * takedownKneel);
 
-  context.fillStyle = "rgba(0,0,0,.32)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .24, 5, 0, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "rgba(0,0,0,.32)"; context.beginPath(); context.ellipse(height * .025 * crouchBlend, 1 - bob, height * Lerp(.24, .34, crouchBlend), Lerp(5, 4, crouchBlend), 0, 0, Math.PI * 2); context.fill();
 
   let rearLeg = Math.sin(phase) * .34 * moving;
   let frontLeg = -rearLeg;
   if (action === "climb") { rearLeg = Math.sin(actionProgress * Math.PI * 4) * .42; frontLeg = -rearLeg; }
   if (action === "takedown") { rearLeg = .24 * takedownKneel; frontLeg = -.18 * takedownKneel; }
-  const rearFoot = DrawJointedLimb(-height * .065, -height * .34, height * .2, height * .18, rearLeg, -rearLeg * .35, profile.pants, limbWidth + .55);
-  const frontFoot = DrawJointedLimb(height * .065, -height * .34, height * .2, height * .18, frontLeg, -frontLeg * .35, profile.pants, limbWidth + .55);
-  context.fillStyle = "#282a28"; [rearFoot, frontFoot].forEach((foot, index) => { context.beginPath(); context.ellipse(foot.x + (index ? 2 : -2), foot.y + 1, height * .055, Math.max(2.4, height * .025), index ? -.08 : .08, 0, Math.PI * 2); context.fill(); });
+  let rearLowerLeg = -rearLeg * .35;
+  let frontLowerLeg = -frontLeg * .35;
+  rearLeg = Lerp(rearLeg, -1.08 + crouchStep * .15, crouchBlend);
+  rearLowerLeg = Lerp(rearLowerLeg, .92 - crouchStep * .1, crouchBlend);
+  frontLeg = Lerp(frontLeg, 1.14 - crouchStep * .17, crouchBlend);
+  frontLowerLeg = Lerp(frontLowerLeg, -.94 + crouchStep * .12, crouchBlend);
+  const hipSpread = height * Lerp(.065, .105, crouchBlend);
+  const rearFoot = DrawJointedLimb(-hipSpread, pelvisY, height * .2, height * .18, rearLeg, rearLowerLeg, profile.pants, limbWidth + .55);
+  const frontFoot = DrawJointedLimb(hipSpread, pelvisY, height * .2, height * .18, frontLeg, frontLowerLeg, profile.pants, limbWidth + .55);
+  context.fillStyle = "#282a28"; [rearFoot, frontFoot].forEach((foot, index) => { context.beginPath(); context.ellipse(foot.x + height * (index ? .035 : -.035), Math.min(foot.y, 0) + 1, height * Lerp(.055, .07, crouchBlend), Math.max(2.4, height * .025), index ? -.08 : .08, 0, Math.PI * 2); context.fill(); });
 
   let rearArm = -.12 - Math.sin(phase) * .28 * moving;
   let frontArm = .12 + Math.sin(phase) * .28 * moving;
@@ -5434,10 +5453,19 @@ function DrawHumanActor(profile, roleId, height) {
   } else if (roleId === "child") {
     frontArm += idleGesture * .32; frontForearm += idleGesture * .52;
   }
+  if (crouchBlend > 0 && !action) {
+    rearArm = Lerp(rearArm, .68 + crouchStep * .09, crouchBlend);
+    rearForearm = Lerp(rearForearm, .18 - crouchStep * .08, crouchBlend);
+    frontArm = Lerp(frontArm, 1.08 - crouchStep * .08, crouchBlend);
+    frontForearm = Lerp(frontForearm, 1.42 + crouchStep * .1, crouchBlend);
+  }
 
-  const rearHand = DrawJointedLimb(-height * profile.shoulder * .5, -height * .65, height * .2, height * .17, rearArm, rearForearm, profile.body, limbWidth);
+  const shoulderY = -height * .65 + torsoDrop;
+  const rearHand = DrawJointedLimb(torsoLean - height * profile.shoulder * .5, shoulderY, height * .2, height * .17, rearArm, rearForearm, profile.body, limbWidth);
   context.fillStyle = profile.skin; context.beginPath(); context.arc(rearHand.x, rearHand.y, Math.max(2.2, height * .03), 0, Math.PI * 2); context.fill();
 
+  context.save();
+  context.translate(torsoLean, torsoDrop);
   context.fillStyle = profile.body;
   const shoulder = height * profile.shoulder * .53;
   context.beginPath(); context.moveTo(-shoulder, -height * .72); context.quadraticCurveTo(0, -height * .765, shoulder, -height * .72); context.lineTo(waist, -height * .32); context.lineTo(-waist, -height * .32); context.closePath(); context.fill();
@@ -5454,15 +5482,19 @@ function DrawHumanActor(profile, roleId, height) {
   }
 
   DrawRoleProp(profile, roleId, height, actionLift);
-  const frontHand = DrawJointedLimb(height * profile.shoulder * .5, -height * .65, height * .2, height * .17, frontArm, frontForearm, profile.body, limbWidth);
+  context.restore();
+  const frontHand = DrawJointedLimb(torsoLean + height * profile.shoulder * .5, shoulderY, height * .2, height * .17, frontArm, frontForearm, profile.body, limbWidth);
   context.fillStyle = profile.skin; context.beginPath(); context.arc(frontHand.x, frontHand.y, Math.max(2.2, height * .03), 0, Math.PI * 2); context.fill();
   if (action === "takedown" && state.takedown) DrawTakedownBaton(height, rearHand, takedownTime);
 
+  context.save();
+  context.translate(torsoLean, torsoDrop);
   const headY = -height * .86;
   const headRadius = height * profile.head;
   context.fillStyle = profile.skin; context.beginPath(); context.arc(0, headY, headRadius, 0, Math.PI * 2); context.fill();
   context.fillStyle = "rgba(87,49,36,.68)"; context.beginPath(); context.arc(headRadius * .4, headY + headRadius * .12, Math.max(1.5, headRadius * .12), 0, Math.PI * 2); context.fill();
   DrawHeadwear(profile, roleId, height, headY, headRadius);
+  context.restore();
 }
 
 function DrawDogActor(profile, height, actor = state.player) {
