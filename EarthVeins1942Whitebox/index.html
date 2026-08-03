@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#11171b">
   <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法与屋脊战斗白盒">
   <title>地脉：三个循环 + 屋脊战 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zz">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zaa">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -65,7 +65,10 @@
     <header id="gameHeader" hidden>
       <div class="levelStamp"><small id="levelNumber"></small><span id="levelName"></span></div>
       <div id="phaseStrip" class="phaseStrip" aria-label="循环阶段"></div>
-      <button id="menuButton" class="headerButton" type="button" aria-label="打开关卡菜单" title="关卡菜单">关</button>
+      <div class="headerActions">
+        <button id="audioButton" class="headerButton audioButton" type="button" aria-label="静音" title="静音">声</button>
+        <button id="menuButton" class="headerButton" type="button" aria-label="打开关卡菜单" title="关卡菜单">关</button>
+      </div>
     </header>
 
     <aside id="objectiveCard" aria-label="角色与当前任务" aria-live="polite" hidden>
@@ -182,6 +185,6 @@
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803zz"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803zaa"></script>
 </body>
 </html>

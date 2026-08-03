@@ -533,7 +533,8 @@ h1 small { color: #bd553f; }
 #touchControls.cinematic { opacity: 0 !important; visibility: hidden; pointer-events: none; }
 #gameShell.takedownCinematic #objectiveCard,
 #gameShell.takedownCinematic #metricsPanel,
-#gameShell.takedownCinematic #interactionPrompt { opacity: 0; visibility: hidden; }
+#gameShell.takedownCinematic #interactionPrompt,
+#gameShell.takedownCinematic #gameHeader { opacity: 0; visibility: hidden; }
 #civilianCommandPanel, #dogCommandHud { color: #e7d6b3; background: rgba(43,34,27,.9); border-color: rgba(213,187,143,.34); border-radius: 2px; backdrop-filter: none; }
 .civilianGroupButtons button.active { color: #30281f; background: #d7c39a; border-color: #6d4c36; }
 .civilianShelterButtons button { color: #dfcfad; background: rgba(125,94,56,.18); border-color: rgba(188,142,79,.42); }
@@ -783,6 +784,9 @@ h1 small { color: #bd553f; }
   box-shadow: 3px 3px 0 rgba(21,16,12,.3);
   backdrop-filter: none;
 }
+.headerActions { display: flex; align-items: center; gap: 7px; pointer-events: auto; }
+.audioButton { color: #812f28; }
+.audioButton.muted { color: #655747; background: #c9b892; }
 
 #roleDock,
 #roleDock.defenseDock {
@@ -866,13 +870,14 @@ h1 small { color: #bd553f; }
   .hudTaskStrip { width: calc(100% - 12px); padding: 5px 8px 6px; border-width: 1.5px; }
   #objectiveCard .hudTaskStrip p { margin: 2px 0; font-size: 10px; }
   #objectiveCard .hudTaskStrip > span { display: -webkit-box; overflow: hidden; font-size: 8.5px; line-height: 1.3; white-space: normal; text-overflow: clip; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  #metricsPanel { top: 40px; right: 52px; display: grid; grid-template-columns: repeat(2, minmax(70px, 1fr)); max-width: min(48vw, 292px); }
+  #metricsPanel { top: 40px; right: 90px; display: grid; grid-template-columns: repeat(2, minmax(70px, 1fr)); max-width: min(44vw, 270px); }
   .metric { grid-template-columns: 22px minmax(0,1fr); gap: 4px; min-width: 70px; min-height: 34px; padding: 4px 5px 6px 4px; }
   .metricIcon { width: 21px; height: 21px; font-size: 7px; border-width: 1px; }
   .metricCopy small { font-size: 5px; }
   .metricCopy b { max-width: 82px; font-size: 8px; }
   .metricBar { left: 30px; right: 4px; bottom: 2px; height: 2px; }
   .headerButton { width: 34px; min-width: 34px; height: 34px; min-height: 34px; font-size: 10px; }
+  .headerActions { gap: 4px; }
   #roleDock, #roleDock.defenseDock { top: 164px; left: 8px; max-width: calc(100% - 16px); }
   #roleButtons button, #roleButtons button:not(.active) { min-width: 50px; min-height: 32px; padding: 3px 5px 3px 27px; }
   .rolePortrait { left: 3px; width: 21px; height: 25px; }

@@ -1,12 +1,13 @@
 import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
+import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zaa";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
 const ui = Object.fromEntries([
   "gameShell", "titleScreen", "levelCards", "startButton", "guideButton", "levelPanel", "levelList", "guidePanel",
-  "gameHeader", "levelNumber", "levelName", "phaseStrip", "menuButton", "objectiveCard", "phaseLabel", "objectiveText",
+  "gameHeader", "levelNumber", "levelName", "phaseStrip", "audioButton", "menuButton", "objectiveCard", "phaseLabel", "objectiveText",
   "objectiveHint", "hudRoleGlyph", "hudRoleName", "hudRoleSkill", "metricsPanel", "roleDock", "roleButtons", "interactionPrompt", "interactionVerb", "interactionName",
   "dialoguePanel", "dialogueSpeaker", "dialogueText", "dialogueNext", "buildPanel", "buildBrief", "buildOptions",
   "buildFeedback", "buildCancel", "levelComplete", "completeTitle", "completeSummary", "completeLedger", "replayButton",
@@ -66,6 +67,8 @@ let selectedLevel = startingLevel;
 let lastTime = performance.now();
 let toastTimer = 0;
 let state = CreateState(startingLevel);
+const audioDirector = CreateEarthVeinsAudioDirector();
+audioDirector.BindButton(ui.audioButton);
 
 function CreateCivilians() {
   const civilians = [
@@ -534,6 +537,8 @@ function ApplyAction(action) {
   if (action.hazardScout === "smoke") state.raid.smokeKnown = true;
   if (action.hazardScout === "water") state.raid.waterKnown = true;
   if (action.diversion) StartDiversion(action);
+  else if (action.triggerSlot !== undefined || ["closeSurfaceGate", "unbarGate", "liftHatch", "openRoofHatch"].includes(action.id)) audioDirector.PlayCue("mechanism");
+  else if (action.prop?.mode === "take" || action.combatPickup) audioDirector.PlayCue("pickup");
   if (action.id === "captureIntel") state.nextRaid = "东堤 · 拂晓 · 两路合围";
   if (action.dialogue) OpenDialogue(action.dialogue, action.role ? roleDefinitions[action.role].name : roleDefinitions[state.selectedRole].name);
   SyncSelectedRolePosition();
@@ -561,6 +566,7 @@ function IssueDogCommand(action) {
     resultTime: 0,
     lastResult: ""
   });
+  audioDirector.PlayCue("whistle");
   Toast(`嘘——两短一长。阿土正去${command.label}。`, "success");
   UpdateUi();
 }
@@ -656,6 +662,7 @@ function StartDiversion(action) {
     age: 0,
     weakens: diversion.weakens
   };
+  audioDirector.PlayCue(diversion.kind === "bell" ? "bell" : "firecracker");
   Toast(`${diversion.label}响起，敌军开始改变搜索方向。`, "success");
 }
 
@@ -695,6 +702,7 @@ function StartDogBarkLure(qaPreview = false) {
   state.player.actionDuration = .9;
   state.player.moving = false;
   state.dog.whistlePulse = 1;
+  audioDirector.PlayCue("dogBark");
   Toast("汪！敌兵会追向这声吠叫。阿土立刻反向跑，通路就在他们身后。", "success");
   UpdateUi();
   return true;
@@ -727,6 +735,7 @@ function CollectCombatDrop(enemy) {
   state.combat.recoveredAmmo += enemy.ammoDrop;
   BeginActorAction({ id: "takeAmmo" }, .62);
   state.player.pickup = { kind: "ammoBox", label: `${enemy.ammoDrop} 发散弹`, x: enemy.x, layer: enemy.layer, time: .82, duration: .82 };
+  audioDirector.PlayCue("pickup");
   Toast(`从枪套旁摸到 ${enemy.ammoDrop} 发散弹。现在共有 ${state.combat.ammo} 发。`, "success");
   UpdateUi();
 }
@@ -766,6 +775,7 @@ function FireRifle() {
     duration: .22,
     resolved: false
   });
+  audioDirector.PlayCue("rifle");
   TriggerCombatAlarm("rifle");
   UpdateUi();
 }
@@ -786,6 +796,7 @@ function ThrowGrenade() {
     duration: .86,
     facing: state.player.facing
   });
+  audioDirector.PlayCue("mechanism");
   TriggerCombatAlarm("grenade");
   UpdateUi();
 }
@@ -851,6 +862,7 @@ function UpdateCombat(delta) {
     grenade.age += delta;
     if (grenade.age < grenade.duration) return;
     combat.blasts.push({ x: grenade.targetX, layer: grenade.layer, age: 0, duration: 1.35 });
+    audioDirector.PlayCue("grenade");
     if (!combat.blastScars.some((scar) => Math.abs(scar.x - grenade.targetX) < .45)) {
       combat.blastScars.push({ x: grenade.targetX, layer: grenade.layer });
     }
@@ -869,6 +881,7 @@ function UpdateCombat(delta) {
         state.player.actionKind = "hit";
         state.player.actionTime = .4;
         state.player.actionDuration = .4;
+        audioDirector.PlayCue("bodyHit");
         Toast(`中弹负伤。还能承受 ${combat.health} 次命中；马上进掩体。`, "warning");
         if (combat.health <= 0) FailCombat();
       }
@@ -881,6 +894,7 @@ function UpdateCombat(delta) {
       const shooter = GetEnemyPatrols().sort((left, right) => Math.abs(left.x - state.player.x) - Math.abs(right.x - state.player.x))[0];
       if (shooter && !GetActiveCover() && Math.abs(shooter.x - state.player.x) <= shooter.viewDistance + 2.2) {
         combat.enemyShots.push({ fromX: shooter.x, toX: state.player.x, layer: shooter.layer, age: 0, duration: .28, resolved: false });
+        audioDirector.PlayCue("rifle");
         combat.enemyFireCooldown = 1.55;
       } else combat.enemyFireCooldown = .48;
     }
@@ -1627,6 +1641,7 @@ function MetricsMarkup() {
 
 function Update(delta) {
   state.elapsed += delta;
+  audioDirector.Update(delta, state);
   const coverTarget = state.player.coverId ? 1 : 0;
   state.player.coverBlend = Lerp(state.player.coverBlend || 0, coverTarget, 1 - Math.pow(.00008, delta));
   state.unconsciousEnemies.forEach((enemy) => { enemy.age += delta; });
@@ -1776,6 +1791,7 @@ function ForegroundFocusAlpha(screenX, width, nearRadius = 52, farRadius = 138, 
 
 function TakedownFigureScale(width) {
   if (!state.takedown && state.takedownGrace <= 0) return 1;
+  if (state.player.layer === "roof" && innerHeight <= 480) return .72;
   return width <= 640 ? Math.min(2.35, 1 + (640 - Math.max(320, width)) / 190) : 1;
 }
 
@@ -1860,7 +1876,9 @@ function StartTakedown(enemy, qaPreview = false) {
     progress: 0,
     startPlayerX: state.player.x,
     target: { ...enemy, x: enemy.x, facing: enemy.facing },
+    swingTriggered: false,
     impactTriggered: false,
+    hitStopRemaining: 0,
     qaPreview
   };
   Toast("屏息。贴近。只击昏，先收武器。", "success");
@@ -1869,6 +1887,12 @@ function StartTakedown(enemy, qaPreview = false) {
 function UpdateTakedown(delta) {
   const sequence = state.takedown;
   if (!sequence) return;
+  if (sequence.hitStopRemaining > 0) {
+    sequence.hitStopRemaining = Math.max(0, sequence.hitStopRemaining - delta);
+    state.camera.x = sequence.target.x - sequence.target.facing * .04 + Math.sin(state.elapsed * 132) * .035;
+    state.camera.zoom += Math.sin(state.elapsed * 88) * .006;
+    return;
+  }
   sequence.time = Math.min(sequence.duration, sequence.time + delta);
   sequence.progress = sequence.time / sequence.duration;
   const target = sequence.target;
@@ -1884,9 +1908,15 @@ function UpdateTakedown(delta) {
   state.camera.x = target.x - target.facing * .04 + Math.sin(sequence.time * 96) * impactPulse * .028;
   const cinematicZoom = innerWidth <= 640 ? 1.42 : 1.18;
   state.camera.zoom = Lerp(cinematicZoom, innerWidth <= 640 ? 1.42 : 1.08, settle) + impactPulse * .055;
+  if (!sequence.swingTriggered && sequence.time >= .7) {
+    sequence.swingTriggered = true;
+    audioDirector.PlayCue("batonSwing");
+  }
   if (!sequence.impactTriggered && sequence.time >= .94) {
     sequence.impactTriggered = true;
+    sequence.hitStopRemaining = .075;
     state.player.rolePulse = 1;
+    audioDirector.PlayCue("batonImpact");
   }
   if (sequence.time < sequence.duration) return;
   state.unconsciousEnemies.push({ ...target, layer: target.layer || "surface", x: target.x, facing: target.facing, disarmed: true, age: 0, ammoDrop: state.levelIndex === 3 && target.index === 1 ? 1 : 0, lootTaken: false });
@@ -2043,13 +2073,14 @@ function LayerToScreen(x, width, parallax) {
 }
 
 function RoofFloorYAt(worldX, surfaceY) {
+  const shortViewportScale = Math.max(.35, Math.min(1, (surfaceY - 105) / 235));
   if (worldX <= 1.85) {
     const distance = Math.min(1, Math.abs(worldX + 3.75) / 5.55);
-    return surfaceY - 128 - (1 - distance) * 54;
+    return surfaceY - (128 + (1 - distance) * 54) * shortViewportScale;
   }
-  if (worldX < 2.55) return surfaceY - 126;
+  if (worldX < 2.55) return surfaceY - 126 * shortViewportScale;
   const distance = Math.min(1, Math.abs(worldX - 6.15) / 3.75);
-  return surfaceY - 118 - (1 - distance) * 45;
+  return surfaceY - (118 + (1 - distance) * 45) * shortViewportScale;
 }
 
 function LayerBaseY(layer, worldX, height, surfaceY, tunnelY) {
@@ -4893,6 +4924,7 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
   const isCollaborator = enemy.unitType === "collaborator";
   const fall = Math.max(0, Math.min(1, enemy.takedownFall || 0));
+  const recoil = Math.max(0, Math.min(1, enemy.takedownRecoil || 0));
   const phase = state.elapsed * (isCollaborator ? 4.35 : 3.85) + enemy.index * 1.7;
   const stride = Math.sin(phase) * .34 * (1 - fall);
   const investigateLift = enemy.investigating && !fall ? .32 + Math.sin(state.elapsed * 4 + enemy.index) * .08 : 0;
@@ -4903,8 +4935,8 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   if (emphasized) { context.shadowColor = "rgba(238,216,165,.42)"; context.shadowBlur = 5; }
   if (enemy.focused === false) context.globalAlpha = emphasized ? .96 : .72;
   if (fall > 0) {
-    context.translate(0, fall * height * .025);
-    context.rotate(-fall * 1.43);
+    context.translate(recoil * height * .075, fall * height * .025 - recoil * height * .035);
+    context.rotate(-fall * 1.43 + recoil * .12);
   }
   context.fillStyle = "rgba(0,0,0,.34)"; context.beginPath(); context.ellipse(0, 3, height * .18, 4.5, 0, 0, Math.PI * 2); context.fill();
 
@@ -5091,9 +5123,9 @@ function DrawDroppedEnemyEquipment(enemy, width, baseY, enemyHeight, dropProgres
   context.restore();
 }
 
-function DrawProneEnemyBody(enemy, width, baseY, height, alpha = 1) {
+function DrawProneEnemyBody(enemy, width, baseY, height, alpha = 1, screenOffset = 0) {
   const profile = actorProfiles[enemy.unitType] || actorProfiles.soldier;
-  const x = WorldToScreen(enemy.x, width);
+  const x = WorldToScreen(enemy.x, width) + screenOffset;
   const cinematicFocus = width <= 640 && Boolean(state.takedown || state.takedownGrace > 0);
   context.save(); context.translate(x, baseY - 3); context.scale(enemy.facing, 1); context.globalAlpha = alpha;
   if (cinematicFocus) {
@@ -5149,15 +5181,19 @@ function DrawTakedownTarget(width, viewportHeight, surfaceY, tunnelY) {
   }
   const uprightAlpha = 1 - SmoothStep(.52, .86, fall);
   const proneAlpha = SmoothStep(.44, .84, fall);
+  const recoil = Math.max(0, 1 - Math.abs(sequence.time - .96) / .22);
+  const separation = Math.max(recoil, SmoothStep(.9, 1.08, sequence.time) * (1 - SmoothStep(2.18, 2.55, sequence.time)));
+  const impactDrawX = screenX + target.facing * separation * height * .38;
   if (uprightAlpha > .01) {
-    context.save(); context.globalAlpha = uprightAlpha; context.shadowColor = "rgba(214,182,111,.42)"; context.shadowBlur = sequence.time < 1.08 ? 9 : 0;
-    DrawEnemyUnit({ ...target, takedownFall: fall, disarmed, investigating: false }, height, screenX, baseY);
+    context.save(); context.globalAlpha = uprightAlpha; context.shadowColor = "rgba(234,215,173,.76)"; context.shadowBlur = sequence.time < 1.65 ? 15 : 0;
+    DrawEnemyUnit({ ...target, takedownFall: fall, takedownRecoil: recoil, disarmed, investigating: false }, height, impactDrawX, baseY);
     context.restore();
   }
-  if (proneAlpha > .01) DrawProneEnemyBody(target, width, baseY, height, proneAlpha);
+  const proneOffset = target.facing * SmoothStep(.22, .82, fall) * height * .38;
+  if (proneAlpha > .01) DrawProneEnemyBody(target, width, baseY, height, proneAlpha, proneOffset);
   if (disarmed) DrawDroppedEnemyEquipment(target, width, baseY, height, SmoothStep(.96, 1.56, sequence.time));
   const impactPulse = Math.max(0, 1 - Math.abs(sequence.time - .96) / .16);
-  DrawImpactInkBurst(screenX + target.facing * height * .02, baseY - height * .83, impactPulse);
+  DrawImpactInkBurst(impactDrawX + target.facing * height * .02, baseY - height * .83, impactPulse);
 }
 
 function DrawUnconsciousEnemies(width, viewportHeight, surfaceY, tunnelY) {
@@ -5257,8 +5293,47 @@ function DrawHeadwear(profile, roleId, height, headY, headRadius) {
   }
 }
 
+function DrawTakedownBaton(height, hand, time) {
+  const lift = SmoothStep(.18, .62, time);
+  const snap = SmoothStep(.62, .94, time);
+  const recover = SmoothStep(1.08, 1.72, time);
+  const angle = Lerp(-.28, -1.82, lift) + snap * 2.02 - recover * .38;
+  const strikePulse = SmoothStep(.66, .84, time) * (1 - SmoothStep(.96, 1.08, time));
+  const length = height * .58;
+
+  context.save();
+  context.translate(hand.x, hand.y);
+  if (strikePulse > 0) {
+    context.globalAlpha = strikePulse * .46;
+    context.strokeStyle = "#e2c27e";
+    context.lineCap = "round";
+    [0, .1, .19].forEach((lag, index) => {
+      const trailAngle = angle - lag * 5.2;
+      context.lineWidth = Math.max(2, 6 - index * 1.5);
+      context.beginPath();
+      context.arc(0, 0, length * (.7 + index * .08), trailAngle - .62, trailAngle - .08);
+      context.stroke();
+    });
+  }
+  context.globalAlpha = 1;
+  context.rotate(angle);
+  context.strokeStyle = "rgba(24,20,16,.72)";
+  context.lineWidth = Math.max(8, height * .078);
+  context.beginPath(); context.moveTo(-height * .05, 3); context.lineTo(length + 3, 3); context.stroke();
+  context.strokeStyle = "#8a6748";
+  context.lineWidth = Math.max(5, height * .048);
+  context.beginPath(); context.moveTo(-height * .05, 0); context.lineTo(length, 0); context.stroke();
+  context.strokeStyle = "#d4b774";
+  context.lineWidth = Math.max(7, height * .064);
+  context.beginPath(); context.moveTo(length * .77, 0); context.lineTo(length, 0); context.stroke();
+  context.fillStyle = "#34271d";
+  context.beginPath(); context.arc(-height * .035, 0, Math.max(3, height * .036), 0, Math.PI * 2); context.fill();
+  context.restore();
+}
+
 function DrawRoleProp(profile, roleId, height, actionLift) {
   context.strokeStyle = profile.accent; context.fillStyle = profile.accent; context.lineCap = "round";
+  if (state.player.actionKind === "takedown" && state.takedown) return;
   if (state.levelIndex === 3 && roleId === "leader" && state.combat.rifle) {
     const firing = state.player.actionKind === "shoot";
     context.save(); context.translate(height * .03, -height * (.55 + actionLift * .08)); context.rotate(firing ? -.08 : -.54);
@@ -5266,21 +5341,6 @@ function DrawRoleProp(profile, roleId, height, actionLift) {
     context.strokeStyle = "#855d39"; context.lineWidth = 4.5; context.beginPath(); context.moveTo(-height * .2, 0); context.lineTo(height * .22, 0); context.stroke();
     context.strokeStyle = "#b8bab0"; context.lineWidth = 3.2; context.beginPath(); context.moveTo(height * .14, 0); context.lineTo(height * .6, 0); context.stroke();
     context.fillStyle = "#493328"; context.beginPath(); context.moveTo(-height * .22, -5); context.lineTo(-height * .11, -10); context.lineTo(-height * .05, 2); context.lineTo(-height * .2, 7); context.closePath(); context.fill();
-    context.restore();
-    return;
-  }
-  if (roleId === "scout" && state.player.actionKind === "takedown" && state.takedown) {
-    const time = state.takedown.time;
-    const windup = SmoothStep(.35, .76, time);
-    const strike = SmoothStep(.76, 1.02, time);
-    const secure = SmoothStep(1.28, 1.82, time);
-    const angle = Lerp(-1.05, .78, windup) - strike * 1.38 + secure * .32;
-    context.save();
-    context.translate(height * .17, -height * .49);
-    context.rotate(angle);
-    context.strokeStyle = "rgba(24,22,19,.62)"; context.lineWidth = 7; context.beginPath(); context.moveTo(2, 2); context.lineTo(height * .42 + 2, 2); context.stroke();
-    context.strokeStyle = "#8a6748"; context.lineWidth = 4.2; context.beginPath(); context.moveTo(0, 0); context.lineTo(height * .42, 0); context.stroke();
-    context.strokeStyle = "#d2b47b"; context.lineWidth = 6.2; context.beginPath(); context.moveTo(height * .32, 0); context.lineTo(height * .43, 0); context.stroke();
     context.restore();
     return;
   }
@@ -5396,6 +5456,7 @@ function DrawHumanActor(profile, roleId, height) {
   DrawRoleProp(profile, roleId, height, actionLift);
   const frontHand = DrawJointedLimb(height * profile.shoulder * .5, -height * .65, height * .2, height * .17, frontArm, frontForearm, profile.body, limbWidth);
   context.fillStyle = profile.skin; context.beginPath(); context.arc(frontHand.x, frontHand.y, Math.max(2.2, height * .03), 0, Math.PI * 2); context.fill();
+  if (action === "takedown" && state.takedown) DrawTakedownBaton(height, rearHand, takedownTime);
 
   const headY = -height * .86;
   const headRadius = height * profile.head;
@@ -5976,6 +6037,8 @@ function BindHoldButton(button, input) {
 }
 
 document.querySelectorAll('[data-input="left"], [data-input="right"]').forEach((button) => BindHoldButton(button, button.dataset.input));
+window.addEventListener("pointerdown", () => audioDirector.Unlock(), { capture: true, once: true });
+window.addEventListener("pointerup", () => audioDirector.Unlock(), { capture: true, once: true });
 document.querySelector('[data-input="switch"]').addEventListener("click", CycleRole);
 document.querySelector('[data-input="depth"]').addEventListener("click", UseContextDepth);
 document.querySelector('[data-input="shoot"]').addEventListener("click", FireRifle);
@@ -6001,6 +6064,7 @@ Show(ui.failureQaButton, qaMode);
 document.querySelectorAll("[data-close-panel]").forEach((button) => button.addEventListener("click", () => Show(button.closest(".panelScreen"), false)));
 
 window.addEventListener("keydown", (event) => {
+  audioDirector.Unlock();
   if (["KeyA", "ArrowLeft"].includes(event.code)) inputKeys.left = true;
   if (["KeyD", "ArrowRight"].includes(event.code)) inputKeys.right = true;
   if (event.repeat && ["KeyE", "KeyQ", "KeyW", "KeyS", "KeyF", "KeyG"].includes(event.code)) return;
@@ -6043,6 +6107,7 @@ if (qaMode) {
       , dog: state.dog ? { x: state.dog.x, layer: state.dog.layer, commandId: state.dog.commandId, commandMode: state.dog.commandMode, progress: state.dog.progress } : null
       , distraction: state.raid.distraction ? { ...state.raid.distraction } : null
       , takedownCount: state.takedownCount, neutralizedEnemies: [...state.neutralizedEnemies], unconsciousCount: state.unconsciousEnemies.length
+      , audio: audioDirector.DebugState()
       , combat: state.combat ? { rifle: state.combat.rifle, ammo: state.combat.ammo, grenades: state.combat.grenades, health: state.combat.health, alarm: state.combat.alarm, neutralized: state.combat.neutralized, shots: state.combat.shots.length, grenadesInFlight: state.combat.grenadesInFlight.length } : null
       , enemies: GetEnemyPatrols().map((enemy) => ({ id: enemy.id, x: enemy.x, facing: enemy.facing, unitType: enemy.unitType, investigating: enemy.investigating, lureKind: enemy.lureKind, routeMin: enemy.routeMin, routeMax: enemy.routeMax }))
       , fluid: state.fluid?.GetStatistics() || null, failure: state.missionFailure

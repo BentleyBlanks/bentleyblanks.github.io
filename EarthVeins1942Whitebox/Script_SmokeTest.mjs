@@ -12,6 +12,7 @@ const Assert = (condition, message) => { if (!condition) throw new Error(message
 const html = Read("index.html");
 const css = Read("Style_Whitebox.css");
 const game = Read("Script_Whitebox.mjs");
+const audioCode = Read("Script_Audio.mjs");
 const data = Read("Data_WhiteboxCampaign.mjs");
 const fluidCode = Read("Script_FluidSimulation.mjs");
 const lightCode = Read("Script_LightSimulation.mjs");
@@ -192,6 +193,10 @@ Assert(game.includes("nearbyEnemy && takedownRoles.has(state.selectedRole) && !a
 Assert(game.includes("function FindTakedownOpportunity") && game.includes("if (FindTakedownOpportunity())") && game.includes("candidate.distance <= 1.35 && candidate.behind <= .22"), "a valid side/rear takedown opportunity must not be spoiled by overlapping patrol cones");
 Assert(game.includes("if (!focused) return") && game.includes("EnemyDetection(enemy) > 0") && game.includes('context.globalAlpha = focusedEnemy?.id === enemy.id ? 1 : .72') && !game.includes("function DrawTakedownPrompt"), "only the focused enemy may own a low-weight view cone while secondary threats stay subordinate");
 Assert(game.includes("function UpdateTakedown") && game.includes("function DrawTakedownTarget") && game.includes("function DrawTakedownCinematicOverlay"), "four-beat takedown state machine and cinematic rendering are missing");
+Assert(game.includes("function DrawTakedownBaton") && game.includes('if (action === "takedown" && state.takedown) DrawTakedownBaton') && game.includes("sequence.hitStopRemaining = .075") && game.includes('audioDirector.PlayCue("batonSwing")') && game.includes('audioDirector.PlayCue("batonImpact")'), "制服必须让三名受训角色共用可见棍棒轨迹、命中停顿与同步声效");
+Assert(game.includes("takedownRecoil") && game.includes("DrawImpactInkBurst") && game.includes("strikePulse"), "敌兵受击甩身、墨爆或棍棒运动残影缺失");
+Assert(game.includes("const separation = Math.max(recoil") && game.includes("target.facing * separation * height * .38") && game.includes("const proneOffset = target.facing * SmoothStep"), "命中目标必须沿受力方向与主角持续分离，并保留可读倒地剪影");
+Assert(game.includes('state.player.layer === "roof" && innerHeight <= 480') && game.includes("const shortViewportScale = Math.max(.35, Math.min(1, (surfaceY - 105) / 235))"), "矮屏屋脊必须下移并缩放制服双方，确保人物完整进入画面");
 Assert(game.includes("function DrawProneEnemyBody") && game.includes("state.takedownGrace = 2.2") && game.includes("state.takedownGrace <= 0"), "takedown must end in a readable prone body and a short disengage window");
 Assert(game.includes("屏息") && game.includes("扣肩") && game.includes("击昏") && game.includes("收械") && game.includes("尚有呼吸"), "takedown ritual must communicate nonlethal intent and weapon security");
 Assert(game.includes('data-qa-hazard="takedown"') && game.includes('StartTakedown(target, true)'), "QA panel must expose the real takedown animation for visual review");
@@ -240,15 +245,32 @@ Assert(css.includes("Playable HUD: one identity plate") && css.includes("backgro
 Assert(css.includes("#roleDock, #roleDock.defenseDock { top: 226px") && css.includes("#civilianCommandPanel { top: 272px"), "portrait-phone HUD must stay above the tunnel playfield instead of covering villagers and props");
 Assert(css.includes("#roleDock:not([hidden]) ~ #interactionPrompt") && css.includes("bottom: 76px") && css.includes("width: 46px"), "desktop interaction prompt must be a readable bottom-center control plate instead of a tiny floating label");
 
-const forbiddenRuntime = [/three(?:\.min)?\.js/i, /<img\b/i, /new\s+Image\s*\(/, /AudioContext/i, /https?:\/\//i];
+const audioAssets = [
+  "Audio/AudioBgm_VillageRuins.ogg",
+  "Audio/AudioBgm_CovertOperations.mp3",
+  "Audio/AudioSfx_BambooSwing01.flac",
+  "Audio/AudioSfx_BambooSwing02.flac",
+  "Audio/AudioSfx_BatonImpact01.flac",
+  "Audio/AudioSfx_BatonImpact02.flac"
+];
+Assert(audioAssets.every((name) => fs.existsSync(path.join(root, name)) && fs.statSync(path.join(root, name)).size > 30000), "BGM 或棍棒音效文件缺失/为空");
+Assert(game.includes("CreateEarthVeinsAudioDirector") && game.includes("audioDirector.Update(delta, state)") && html.includes('id="audioButton"'), "音频导演、持续混音或静音按钮没有接入游戏");
+Assert(audioCode.includes('earthveins1942_audio_v1') && audioCode.includes('TrackFor(gameState)') && audioCode.includes('gameState?.takedown') && audioCode.includes('gameState?.combat?.alarm'), "音乐没有按关卡/扫荡/制服/交火进行切换与压低");
+Assert(audioCode.includes("function DebugState") && game.includes("audio: audioDirector.DebugState()"), "QA 状态必须暴露真实音频播放诊断");
+Assert(game.includes('window.addEventListener("pointerdown", () => audioDirector.Unlock()') && game.includes('window.addEventListener("pointerup", () => audioDirector.Unlock()'), "移动端首触必须在按下与抬起阶段兼容解锁音频");
+Assert(["bell", "whistle", "dogBark", "firecracker", "rifle", "grenade", "mechanism", "pickup"].every((cue) => audioCode.includes(`name === "${cue}"`)), "关键场景音效配置不完整");
+Assert(audioCode.includes("./Audio/AudioBgm_VillageRuins.ogg") && audioCode.includes("./Audio/AudioSfx_BambooSwing01.flac") && !/https?:\/\//i.test(audioCode), "运行时音频必须全部由本站本地资源提供");
+
+const forbiddenRuntime = [/three(?:\.min)?\.js/i, /<img\b/i, /new\s+Image\s*\(/, /https?:\/\//i];
 for (const pattern of forbiddenRuntime) {
-  Assert(!pattern.test(html + "\n" + game + "\n" + data + "\n" + fluidCode + "\n" + lightCode), `白盒出现禁止的外部运行时/素材：${pattern}`);
+  Assert(!pattern.test(html + "\n" + game + "\n" + audioCode + "\n" + data + "\n" + fluidCode + "\n" + lightCode), `白盒出现禁止的外部运行时/素材：${pattern}`);
 }
 const cssVersion = html.match(/Style_Whitebox\.css\?v=([^"']+)/)?.[1];
 const scriptVersion = html.match(/Script_Whitebox\.mjs\?v=([^"']+)/)?.[1];
 Assert(cssVersion && cssVersion === scriptVersion, "HTML 的 CSS/JS cache-bust 不一致");
+Assert(game.includes(`Script_Audio.mjs?v=${scriptVersion}`) && audioCode.includes(`const AudioVersion = "${scriptVersion}"`), "音频模块或音频资源 cache-bust 未与主页面同步");
 
-for (const name of ["Data_WhiteboxCampaign.mjs", "Script_FluidSimulation.mjs", "Script_LightSimulation.mjs", "Script_Whitebox.mjs", "Script_SmokeTest.mjs"]) {
+for (const name of ["Data_WhiteboxCampaign.mjs", "Script_FluidSimulation.mjs", "Script_LightSimulation.mjs", "Script_Audio.mjs", "Script_Whitebox.mjs", "Script_SmokeTest.mjs"]) {
   const result = spawnSync(process.execPath, ["--check", path.join(root, name)], { encoding: "utf8" });
   Assert(result.status === 0, `${name} 语法错误：${result.stderr}`);
 }
@@ -260,5 +282,6 @@ console.log(JSON.stringify({
   fluidGrid: `${fluid.columns}x${fluid.rows}`,
   sdfLightRay: Number(rayDistance.toFixed(2)),
   mobileInputs: 7,
+  audioAssets: audioAssets.length,
   cacheVersion: cssVersion
 }, null, 2));
