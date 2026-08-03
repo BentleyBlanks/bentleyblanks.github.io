@@ -23,6 +23,9 @@ import {
   YLiftOf,
 } from "./Script_Depth.mjs";
 import {
+  CanPlant,
+  CanShoot,
+  CanThrow,
   ITEM_AMMO,
   ITEM_CHARGE,
   ITEM_GRENADE,
@@ -36,7 +39,7 @@ import {
   PaletteForSpeaker,
   PickClip,
 } from "./Script_Puppet.mjs";
-import { PAD_ICON } from "./Script_PadIcons.mjs";
+import { InteractPadIcon, PAD_ICON } from "./Script_PadIcons.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -116,12 +119,106 @@ function SyncPanels() {
 function PaintTouchPadIcons() {
   for (const btn of document.querySelectorAll(".touchPad [data-touch]")) {
     const kind = btn.getAttribute("data-touch");
-    if (kind === "aim") continue; // SyncHud swaps aim / up
+    // Interact / aim / use icons are contextual — SyncTouchPadActions owns them.
+    if (kind === "interact" || kind === "aim" || kind === "use") continue;
     const svg = PAD_ICON[kind];
     if (svg && !btn.dataset.iconReady) {
       btn.innerHTML = svg;
       btn.dataset.iconReady = "1";
     }
+  }
+}
+
+/** What the single interact key should fire this frame. */
+function PadInteractVerb(st) {
+  const p = st.player;
+  const hint = st.interactHint || "";
+  if (st.designMode) return st.input.crouch ? "chamber" : "plan";
+  if (st.activeTalkId || st.subtitle?.comic) return "talk";
+  if (hint === "dig" || hint === "follow_plan") return "dig";
+  if (CanShoot(p.held) && p.aiming && !p.inTunnel) return "shot";
+  if (CanThrow(p.held)) return "shot";
+  if (CanPlant(p.held) && (hint === "plant_zone" || hint === "signal")) return "use";
+  if (hint === "hatch") return "hatch";
+  if (hint === "stealth_ko") return "warn";
+  if (hint === "pickup" || hint === "need_shovel") return "shovel";
+  if (hint === "talk" || hint === "spy_talk" || hint === "shelter") return "talk";
+  if (hint === "bell") return "talk";
+  if (hint === "shot_port" || hint === "shoot") return "shot";
+  if (hint) return "talk";
+  return "talk";
+}
+
+function SyncTouchPadActions() {
+  if (state.phase !== "play") return;
+  const held = state.player.held;
+  const inTunnel = !!state.player.inTunnel;
+  const design = !!state.designMode;
+
+  const touchAim = $("TouchAim");
+  if (touchAim) {
+    const showAim = held === ITEM_RIFLE && !inTunnel && !design;
+    touchAim.hidden = !showAim;
+    if (showAim && touchAim.dataset.padMode !== "aim") {
+      touchAim.innerHTML = PAD_ICON.aim;
+      touchAim.dataset.padMode = "aim";
+      touchAim.setAttribute("aria-label", "开镜");
+      touchAim.title = "开镜";
+    }
+  }
+
+  const touchDesign = $("TouchDesign");
+  if (touchDesign) {
+    const showDesign = inTunnel;
+    touchDesign.hidden = !showDesign;
+    if (showDesign && touchDesign.dataset.padMode !== (design ? "designOn" : "design")) {
+      touchDesign.innerHTML = PAD_ICON.design;
+      touchDesign.dataset.padMode = design ? "designOn" : "design";
+      touchDesign.setAttribute("aria-label", design ? "退出设计" : "画蓝图");
+      touchDesign.title = design ? "退出设计" : "画蓝图";
+    }
+  }
+
+  const touchUse = $("TouchUse");
+  if (touchUse) {
+    // Corridor stamp only while designing — fire/dig ride the main interact key.
+    const showUse = design;
+    touchUse.hidden = !showUse;
+    if (showUse && touchUse.dataset.padMode !== "corridor") {
+      touchUse.innerHTML = PAD_ICON.corridor;
+      touchUse.dataset.padMode = "corridor";
+      touchUse.setAttribute("aria-label", "铺巷道");
+      touchUse.title = "铺巷道";
+    }
+  }
+
+  const touchInteract = $("TouchInteract");
+  if (touchInteract) {
+    const verb = PadInteractVerb(state);
+    const mode =
+      verb === "chamber" || verb === "plan"
+        ? "plan"
+        : verb === "use"
+          ? "shovel"
+          : verb;
+    if (touchInteract.dataset.padMode !== mode) {
+      touchInteract.innerHTML = InteractPadIcon(mode);
+      touchInteract.dataset.padMode = mode;
+    }
+    const label =
+      mode === "dig" || mode === "shovel"
+        ? "挖掘 / 捡起"
+        : mode === "shot"
+          ? "开火"
+          : mode === "hatch"
+            ? "进出井口"
+            : mode === "plan"
+              ? "标记蓝图"
+              : mode === "warn"
+                ? "制住"
+                : "互动";
+    touchInteract.setAttribute("aria-label", label);
+    touchInteract.title = label;
   }
 }
 
@@ -165,18 +262,7 @@ function SyncHud() {
     ammoHud.hidden = !showAmmo;
     ammoHud.textContent = `${state.player.ammo | 0}发`;
   }
-  const touchAim = $("TouchAim");
-  if (touchAim) {
-    const showAim = state.phase === "play" && (held === ITEM_RIFLE || state.designMode);
-    touchAim.hidden = !showAim;
-    const aimIcon = state.designMode ? PAD_ICON.up : PAD_ICON.aim;
-    if (touchAim.dataset.aimMode !== (state.designMode ? "up" : "aim")) {
-      touchAim.innerHTML = aimIcon;
-      touchAim.dataset.aimMode = state.designMode ? "up" : "aim";
-    }
-    touchAim.setAttribute("aria-label", state.designMode ? "上移光标" : "开镜");
-    touchAim.title = state.designMode ? "上移光标" : "开镜";
-  }
+  SyncTouchPadActions();
 }
 
 function SyncPhaseUi() {
@@ -1724,24 +1810,21 @@ function BindInput() {
       setPressed(down);
       if (kind === "left") state.input.left = down;
       if (kind === "right") state.input.right = down;
+      if (kind === "up") state.input.up = down;
       if (kind === "crouch") state.input.crouch = down;
-      // Aim doubles as ↑ cursor when designing — keeps the pad to six fat keys.
-      if (kind === "aim") {
-        if (state.designMode) state.input.up = down;
-        else state.input.aim = down;
-      }
-      if (kind === "dig") {
-        state.input.dig = down;
-        if (down) {
-          if (state.designMode && state.input.crouch) state.input.planChamberPressed = true;
-          else state.input.digPressed = true;
-        }
-      }
+      if (kind === "aim") state.input.aim = down;
       if (kind === "design" && down) state.input.designTogglePressed = true;
-      if (kind === "interact" && down) state.input.interactPressed = true;
       if (kind === "use" && down) {
-        if (state.designMode) state.input.planCorridorPressed = true;
-        else state.input.usePressed = true;
+        // Only visible in design mode → corridor stamp
+        state.input.planCorridorPressed = true;
+      }
+      if (kind === "interact" && down) {
+        // One action key: talk / dig / fire / plan — verb from current context
+        const verb = PadInteractVerb(state);
+        if (verb === "chamber") state.input.planChamberPressed = true;
+        else if (verb === "plan" || verb === "dig") state.input.digPressed = true;
+        else if (verb === "shot" || verb === "use") state.input.usePressed = true;
+        else state.input.interactPressed = true;
       }
     };
     btn.addEventListener("contextmenu", (e) => e.preventDefault());

@@ -235,10 +235,15 @@ function TestAct1TutorialPlayable() {
 
   const html = readFileSync(join(here, "index.html"), "utf8");
   Assert(html.includes('data-touch="interact"'), "mobile interact button");
-  Assert(html.includes('data-touch="use"'), "mobile use/fire button");
+  Assert(html.includes('id="TouchInteract"'), "single contextual interact key");
+  Assert(html.includes('data-touch="up"'), "mobile up button");
+  Assert(html.includes('data-touch="crouch"'), "mobile down/crouch button");
   Assert(html.includes('id="TouchAim"'), "mobile aim key (contextual)");
-  Assert(!html.includes('data-touch="corridor"'), "corridor merged into use/fire in design");
-  Assert(!html.includes('data-touch="chamber"'), "chamber merged into crouch+dig in design");
+  Assert(html.includes('id="TouchDesign"'), "mobile design key (contextual)");
+  Assert(html.includes('hidden'), "contextual pad keys start hidden");
+  Assert(!html.includes('data-touch="dig"'), "dig merged into contextual interact");
+  Assert(!html.includes('data-touch="corridor"'), "corridor is on-demand use in design");
+  Assert(!html.includes('data-touch="chamber"'), "chamber merged into crouch+interact in design");
   Assert(html.includes('id="StepHint"'), "step hint");
   const padHtml = html.slice(html.indexOf('class="touchPad"'), html.indexOf("ModalLayer"));
   Assert(!/>互动</.test(padHtml) && !/>开火</.test(padHtml) && !/>挖</.test(padHtml), "pad buttons are not Chinese text labels");
@@ -246,17 +251,21 @@ function TestAct1TutorialPlayable() {
   const padIcons = readFileSync(join(here, "Script_PadIcons.mjs"), "utf8");
   Assert(padIcons.includes("ICON_TALK") && padIcons.includes("ICON_SHOT") && padIcons.includes("ICON_SHOVEL"), "pad icons match game pictograms");
   Assert(padIcons.includes("M3 10 H23") && padIcons.includes("ICON_PLAN"), "design icon is blueprint grid + pencil");
-  Assert(padIcons.includes("L16 24 L28 30") && padIcons.includes("ICON_CROUCH"), "crouch icon is crouched figure + down chevron");
+  Assert(padIcons.includes("ICON_DOWN") && padIcons.includes("ICON_UP"), "up/down chevron pad icons");
+  Assert(padIcons.includes("ICON_CROUCH"), "crouch icon retained for pictogram parity");
+  Assert(padIcons.includes("InteractPadIcon"), "contextual interact icon helper");
   const css = readFileSync(join(here, "Style_Game.css"), "utf8");
   Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
   Assert(/width:\s*74px/.test(css), "touch keys are large");
   Assert(css.includes(".padIcon"), "pad icon sizing");
+  Assert(css.includes(".cluster.move .vert"), "up/down stacked beside strafe");
   Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
   Assert(css.includes(".isPressed"), "touch pad has pressed visual class");
   Assert(css.includes("scale(0.92)"), "pressed keys sink/scale");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes('classList.toggle("isPressed"'), "pointer handlers toggle isPressed");
+  Assert(game.includes("PadInteractVerb") && game.includes("SyncTouchPadActions"), "contextual pad action router");
 }
 
 function TestNaiveAct1Bot() {
@@ -706,6 +715,10 @@ function Main() {
   const html = readFileSync(join(here, "index.html"), "utf8");
   Assert(html.includes('data-touch="aim"'), "mobile ADS aim button");
   Assert(html.includes('class="cluster actions"'), "consolidated action cluster");
+  Assert(html.includes('id="TouchAim" hidden') || /id="TouchAim"[^>]*hidden/.test(html), "aim hidden until rifle");
+  Assert(/id="TouchDesign"[^>]*hidden/.test(html), "design hidden until tunnel");
+  Assert(!html.includes('data-touch="dig"'), "no always-on dig key");
+  Assert(html.includes('data-touch="up"') && html.includes('data-touch="crouch"'), "up/down always on pad");
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with SVG icons");

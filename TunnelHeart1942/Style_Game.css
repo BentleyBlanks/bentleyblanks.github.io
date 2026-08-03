@@ -253,15 +253,22 @@ button {
 .touchPad .cluster {
   display: flex; flex-wrap: wrap; gap: 10px; pointer-events: auto;
   max-width: min(56vw, 340px); justify-content: flex-end;
+  align-items: flex-end;
 }
 .touchPad .cluster.move {
   max-width: none; justify-content: flex-start; flex-wrap: nowrap; gap: 12px;
+  align-items: flex-end;
+}
+.touchPad .cluster.move .vert {
+  display: flex; flex-direction: column; gap: 8px;
 }
 .touchPad .cluster.actions {
-  display: grid;
-  grid-template-columns: repeat(3, auto);
+  display: flex;
+  flex-direction: column-reverse;
+  flex-wrap: nowrap;
   gap: 10px;
-  justify-content: end;
+  align-items: flex-end;
+  max-width: none;
 }
 .touchPad button {
   width: 74px; height: 74px; border: 2.5px solid rgba(26,20,16,.45); border-radius: 50%;

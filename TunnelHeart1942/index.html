@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803o">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803p">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -92,14 +92,17 @@
         <div class="cluster move">
           <button type="button" data-touch="left" aria-label="左移" title="左移"></button>
           <button type="button" data-touch="right" aria-label="右移" title="右移"></button>
+          <div class="vert">
+            <button type="button" id="TouchUp" data-touch="up" aria-label="上" title="上"></button>
+            <button type="button" id="TouchDown" data-touch="crouch" aria-label="下 / 蹲" title="下 / 蹲"></button>
+          </div>
         </div>
         <div class="cluster actions">
-          <button type="button" data-touch="crouch" aria-label="蹲下" title="蹲下"></button>
+          <!-- Aim / design / corridor appear only when that verb is available -->
           <button type="button" id="TouchAim" data-touch="aim" aria-label="开镜" title="开镜" hidden></button>
-          <button type="button" class="wide" data-touch="interact" aria-label="交谈 / 互动" title="交谈 / 互动"></button>
-          <button type="button" class="wide" data-touch="use" aria-label="开火" title="开火"></button>
-          <button type="button" class="wide" data-touch="dig" aria-label="挖掘" title="挖掘"></button>
-          <button type="button" data-touch="design" aria-label="画蓝图" title="画蓝图"></button>
+          <button type="button" id="TouchDesign" data-touch="design" aria-label="画蓝图" title="画蓝图" hidden></button>
+          <button type="button" id="TouchUse" data-touch="use" aria-label="铺巷道" title="铺巷道" hidden></button>
+          <button type="button" class="wide" id="TouchInteract" data-touch="interact" aria-label="互动" title="互动"></button>
         </div>
       </div>
     </section>
@@ -107,8 +110,8 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>手机点右侧图标：走、蹲、瞄、交谈、开火、挖、设计。</p>
-        <p>电脑键位（仅此处）：走 A/D · 交谈 E · 开火 F · 开镜 Shift · 挖 J · 设计 R · 放下 Q。弹药另算；看见尸体会喊人。</p>
+        <p>手机：左右走，上下蹲/抬头，中间一个互动键（交谈·捡物·挖·开火按情境变）。开镜与画蓝图只在用得着时出现。</p>
+        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 设计 R · 放下 Q。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -140,6 +143,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803o"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803p"></script>
 </body>
 </html>
