@@ -6,8 +6,10 @@ import {
   CreateInputState,
   DebugCompleteGoal,
   DebugHold,
+  GrenadeAimWorldArc,
   GrenadeCount,
   LoadFromStorage,
+  MELEE_DURATION,
   NextStepText,
   PLAYER_H,
   RestartChapter,
@@ -258,14 +260,18 @@ function SyncTouchPadActions() {
 
   const touchAim = $("TouchAim");
   if (touchAim) {
-    const showAim = held === ITEM_RIFLE && !inTunnel && !design;
+    const rifleAim = held === ITEM_RIFLE && !inTunnel && !design;
+    const nadeAim = !rifleAim && CanThrowGrenade(state.player) && !design;
+    const showAim = rifleAim || nadeAim;
     touchAim.hidden = !showAim;
-    if (showAim && touchAim.dataset.padMode !== "aim") {
+    const mode = rifleAim ? "aim" : state.nadeAiming ? "nadeAimOn" : "nadeAim";
+    if (showAim && touchAim.dataset.padMode !== mode) {
       touchAim.innerHTML = PAD_ICON.aim;
-      touchAim.dataset.padMode = "aim";
-      touchAim.setAttribute("aria-label", "开镜");
-      touchAim.title = "开镜";
+      touchAim.dataset.padMode = mode;
+      touchAim.setAttribute("aria-label", rifleAim ? "开镜" : "调抛射角");
+      touchAim.title = rifleAim ? "开镜" : "按住 · 配合↑↓调手雷角度";
     }
+    touchAim.classList.toggle("isActive", !!state.nadeAiming && nadeAim);
   }
 
   const touchDesign = $("TouchDesign");
@@ -291,12 +297,14 @@ function SyncTouchPadActions() {
     const canNade = !design && CanThrowGrenade(state.player);
     const showUse = canNade;
     touchUse.hidden = !showUse;
-    if (showUse && touchUse.dataset.padMode !== "grenade") {
+    const nadeMode = state.nadeAiming ? "grenadeThrow" : "grenade";
+    if (showUse && touchUse.dataset.padMode !== nadeMode) {
       touchUse.innerHTML = PAD_ICON.grenade;
-      touchUse.dataset.padMode = "grenade";
-      touchUse.setAttribute("aria-label", "扔手雷");
-      touchUse.title = "扔手雷 · 抬头高抛 · 蹲下近抛";
+      touchUse.dataset.padMode = nadeMode;
+      touchUse.setAttribute("aria-label", state.nadeAiming ? "确认投掷" : "瞄准手雷");
+      touchUse.title = state.nadeAiming ? "确认投掷" : "瞄准手雷 · 再点扔出";
     }
+    touchUse.classList.toggle("isActive", !!state.nadeAiming && showUse);
   }
 
   const touchInteract = $("TouchInteract");
@@ -325,7 +333,9 @@ function SyncTouchPadActions() {
           : mode === "shot"
             ? "开火"
             : mode === "grenade"
-              ? "扔手雷"
+              ? state.nadeAiming
+                ? "确认投掷"
+                : "瞄准手雷"
               : mode === "hatch"
                 ? "进出井口"
                 : mode === "plan"
@@ -361,8 +371,10 @@ function SyncHud() {
     slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>${ads}</em>`;
   } else if (held === ITEM_GRENADE || GrenadeCount(state.player) > 0) {
     const n = GrenadeCount(state.player) || (held === ITEM_GRENADE ? 1 : 0);
-    const tip = ITEM_META[ITEM_GRENADE]?.tip || "朝面朝方向扔";
-    slot.innerHTML = `<b data-item="grenade" style="--item:${ITEM_META[ITEM_GRENADE].color}"></b><span>土制手雷 · ×${n}</span><em>${tip}</em>`;
+    const tip = state.nadeAiming
+      ? `瞄准中 · 角度 ${Math.round((state.nadeAim ?? 0.55) * 100)}% · ↑高 ↓近 · 再点扔`
+      : ITEM_META[ITEM_GRENADE]?.tip || "点手雷键瞄准";
+    slot.innerHTML = `<b data-item="grenade" style="--item:${ITEM_META[ITEM_GRENADE].color}"></b><span>土制手雷 · ×${n}${state.nadeAiming ? " · 瞄准" : ""}</span><em>${tip}</em>`;
   } else if (state.player.manningMg) {
     slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
@@ -1705,8 +1717,7 @@ function DrawPlayer() {
   }
   if (melee) {
     // Drive strike from remaining meleeT so the chop lands mid-window.
-    const dur = 0.42;
-    p._animT = Math.max(0, dur - p.meleeT);
+    p._animT = Math.max(0, MELEE_DURATION - p.meleeT);
   } else {
     p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
   }
@@ -1734,29 +1745,79 @@ function DrawMeleeFx() {
   const s = Scale();
   const x = WX(fx.x);
   const y = WY(fx.y);
-  const u = Math.max(0, Math.min(1, fx.timer / 0.28));
+  const maxT = fx.windup ? 0.35 : fx.ok ? 0.52 : 0.4;
+  const u = Math.max(0, Math.min(1, fx.timer / maxT));
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = 0.35 + u * 0.65;
-  ctx.strokeStyle = fx.ok ? "#a6452f" : "#efe2c8";
-  ctx.fillStyle = fx.ok ? "rgba(166,69,47,.55)" : "rgba(239,226,200,.4)";
-  ctx.lineWidth = 3 * s;
-  const reach = (18 + (1 - u) * 16) * s;
+  if (fx.windup) {
+    // Coil telegraph — thin rising wedge before the chop lands.
+    ctx.globalAlpha = 0.25 + (1 - u) * 0.35;
+    ctx.strokeStyle = "rgba(239,226,200,.75)";
+    ctx.lineWidth = 2 * s;
+    const r = (10 + (1 - u) * 14) * s;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -2.2, -0.6);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  ctx.globalAlpha = 0.4 + u * 0.6;
+  ctx.strokeStyle = fx.ok ? "#c44a2e" : "#efe2c8";
+  ctx.fillStyle = fx.ok ? "rgba(196,74,46,.62)" : "rgba(239,226,200,.45)";
+  ctx.lineWidth = 3.5 * s;
+  const reach = (22 + (1 - u) * 22) * s;
   ctx.beginPath();
-  ctx.moveTo(-reach * 0.2, -reach * 0.15);
-  ctx.lineTo(reach, reach * 0.35);
-  ctx.lineTo(reach * 0.55, -reach * 0.55);
+  ctx.moveTo(-reach * 0.25, -reach * 0.2);
+  ctx.lineTo(reach, reach * 0.4);
+  ctx.lineTo(reach * 0.5, -reach * 0.65);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  if (!fx.ok) {
+  // Shock rings on a clean KO.
+  const rings = fx.rings | 0;
+  for (let i = 0; i < rings; i++) {
+    const rr = (12 + (1 - u) * (18 + i * 10)) * s;
+    ctx.globalAlpha = 0.15 + u * 0.35 * (1 - i * 0.25);
     ctx.beginPath();
-    ctx.moveTo(-10 * s, -10 * s);
-    ctx.lineTo(10 * s, 10 * s);
-    ctx.moveTo(10 * s, -10 * s);
-    ctx.lineTo(-10 * s, 10 * s);
+    ctx.arc(reach * 0.35, 0, rr, 0, Math.PI * 2);
     ctx.stroke();
   }
+  if (!fx.ok) {
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-12 * s, -12 * s);
+    ctx.lineTo(12 * s, 12 * s);
+    ctx.moveTo(12 * s, -12 * s);
+    ctx.lineTo(-12 * s, 12 * s);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Valiant Hearts–style lob dots while grenade aiming. */
+function DrawGrenadeAimArc() {
+  if (!state.nadeAiming || state.player.inTunnel) return;
+  const pts = GrenadeAimWorldArc(state);
+  if (!pts.length) return;
+  const s = Scale();
+  ctx.save();
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const u = i / Math.max(1, pts.length - 1);
+    ctx.globalAlpha = 0.35 + (1 - u) * 0.5;
+    ctx.fillStyle = i === pts.length - 1 ? "#c44a2e" : "#efe2c8";
+    ctx.beginPath();
+    ctx.arc(WX(p.x), WY(p.y), (i === pts.length - 1 ? 5.5 : 3.2) * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Landing ring
+  const land = pts[pts.length - 1];
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = "rgba(196,74,46,.85)";
+  ctx.lineWidth = 2 * s;
+  ctx.beginPath();
+  ctx.ellipse(WX(land.x), WY(SURFACE_Y), 22 * s, 7 * s, 0, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1887,6 +1948,7 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     for (const shaft of state.level.shafts) DrawShaft(shaft);
     for (const ent of state.level.entities) DrawEntity(ent);
     DrawProjectiles();
+    DrawGrenadeAimArc();
     DrawPlayer();
     DrawMeleeFx();
     DrawAdsOverlay();
@@ -1941,6 +2003,12 @@ function Render() {
   const pal = state.level.palette;
   const camX = state.cameraX;
 
+  ctx.save();
+  if ((state.shake || 0) > 0.01) {
+    const mag = Math.min(12, state.shake * 28);
+    ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag * 0.7);
+  }
+
   if (state.phase === "title" || state.phase === "ending") {
     RenderSurfaceStack(w, h, camX * 0.35, pal, { playable: false });
   } else if (state.player.inTunnel && state.phase === "play") {
@@ -1957,6 +2025,7 @@ function Render() {
     ctx.fillStyle = `rgba(10,8,6,${Math.min(1, a)})`;
     ctx.fillRect(0, 0, w, h);
   }
+  ctx.restore();
 }
 
 /** iOS Safari double-tap zooms the page — block it for the game shell. */

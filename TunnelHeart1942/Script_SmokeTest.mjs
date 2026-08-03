@@ -17,8 +17,13 @@ import {
   DebugPlanCell,
   EnemyFaction,
   GoalsRemaining,
+  GrenadeAimWorldArc,
+  GrenadeLobParams,
   LoadProgress,
+  MELEE_DURATION,
+  MELEE_IMPACT_AT,
   NextStepText,
+  SampleGrenadeArc,
   SerializeProgress,
   StandingWouldClip,
   StepPlay,
@@ -34,6 +39,19 @@ import {
 import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+function StepFrames(state, n) {
+  for (let i = 0; i < n; i++) StepPlay(state, 1 / 30);
+}
+
+/** Interact then wait out KO windup so the chop actually lands. */
+function MeleeUntilResolved(state, max = 36) {
+  if (!state.pendingMelee) {
+    state.input.interactPressed = true;
+    StepPlay(state, 1 / 30);
+  }
+  for (let i = 0; i < max && state.pendingMelee; i++) StepPlay(state, 1 / 30);
+}
 
 let failed = 0;
 function Assert(cond, msg) {
@@ -607,11 +625,10 @@ function TestAct5StreetHunt() {
   }
   state.input.aim = false;
   state.input.crouch = false;
-  state.input.interactPressed = true;
-  StepPlay(state, 1 / 30);
+  MeleeUntilResolved(state);
   Assert(koTarget.dead && koTarget.ko, "rear KO while standing with rifle");
   Assert(!koTarget.discovered, "KO corpse not auto-discovered");
-  Assert(state.player.meleeT > 0 || state.meleeFx, "melee strike anim/fx fired");
+  Assert(state.player.meleeT > 0 || state.meleeFx || state.shake > 0, "melee strike anim/fx fired");
 
   const witness = foes.find((e) => !e.dead);
   Assert(!!witness, "living witness remains");
@@ -662,7 +679,8 @@ function TestAct5StreetHunt() {
 }
 
 function TestMeleeKoFactions() {
-  Assert(CLIPS.melee && CLIPS.melee.duration > 0.3, "hungry melee clip exists");
+  Assert(CLIPS.melee && CLIPS.melee.duration >= MELEE_DURATION - 0.01, "hungry melee clip exists");
+  Assert(MELEE_IMPACT_AT > 0.15 && MELEE_IMPACT_AT < MELEE_DURATION, "melee impact after windup");
   Assert(PickClip({ melee: true }) === "melee", "melee clip pick");
 
   const state = Play(4);
@@ -698,7 +716,10 @@ function TestMeleeKoFactions() {
   state.player.meleeT = 0;
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
+  Assert(!!state.pendingMelee && !pup.dead, "伪军 KO waits for chop windup");
+  MeleeUntilResolved(state);
   Assert(pup.dead && pup.ko, "伪军 front proximity KO");
+  Assert((state.shake || 0) > 0 || (state.meleeFx && !state.meleeFx.windup), "KO lands with impact shake/fx");
   Assert(
     CanMeleeReach(
       { x: 100, y: 0, inTunnel: false, manningMg: false, meleeT: 0 },
@@ -733,8 +754,7 @@ function TestMeleeKoFactions() {
   st2.player.facing = 1;
   st2.player.hp = 3;
   st2.player.meleeT = 0;
-  st2.input.interactPressed = true;
-  StepPlay(st2, 1 / 30);
+  MeleeUntilResolved(st2);
   Assert(!jp.dead, "鬼子 front KO fails");
   Assert(st2.player.hp < 3, "鬼子 front counters and hurts player");
   Assert(jp.highAlert || jp.alert > 0, "鬼子 counters into alert");
@@ -748,9 +768,42 @@ function TestMeleeKoFactions() {
   st2.player.facing = 1;
   st2.player.meleeT = 0;
   st2.player.invuln = 0;
-  st2.input.interactPressed = true;
-  StepPlay(st2, 1 / 30);
+  st2.pendingMelee = null;
+  MeleeUntilResolved(st2);
   Assert(jp.dead && jp.ko, "鬼子 rear KO still works");
+}
+
+function TestGrenadeAimArc() {
+  const low = GrenadeLobParams(0);
+  const mid = GrenadeLobParams(0.5);
+  const high = GrenadeLobParams(1);
+  Assert(high.loft < mid.loft && mid.loft < low.loft, "higher aim = loftier lob");
+  const arc = SampleGrenadeArc(100, -32, mid.speed, mid.loft, 16);
+  Assert(arc.length >= 4, "arc samples several points");
+  Assert(arc[arc.length - 1].y >= arc[0].y, "lob falls toward ground");
+
+  const state = Play(7);
+  DebugCompleteGoal(state, "talk_nade");
+  DebugCompleteGoal(state, "stock_nades");
+  state.player.held = ITEM_GRENADE;
+  state.player.grenades = 2;
+  state.player.throwCool = 0;
+  state.player.inTunnel = false;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.nadeAiming, "first throw tap enters aim mode");
+  Assert(!(state.projectiles || []).some((p) => p.kind === "grenade"), "aim does not throw yet");
+  Assert(GrenadeAimWorldArc(state).length >= 3, "aim draws world arc");
+  state.input.up = true;
+  StepFrames(state, 20);
+  Assert(state.nadeAim > 0.7, "hold ↑ raises lob aim");
+  const before = state.player.grenades;
+  state.input.up = false;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!state.nadeAiming, "confirm throw exits aim");
+  Assert(state.player.grenades === before - 1, "confirm throw spends a grenade");
+  Assert((state.projectiles || []).some((p) => p.kind === "grenade"), "confirm spawns projectile");
 }
 
 function TestAct6PlantNeedsCharge() {
@@ -884,8 +937,7 @@ function TestAct7MgNest() {
   state.player.facing = 1;
   state.subtitle = null;
   state.subtitleTimer = 0;
-  state.input.interactPressed = true;
-  StepPlay(state, 1 / 30);
+  MeleeUntilResolved(state);
   Assert(gunner.dead && gunner.ko, "rear KO silences gunner");
   Assert(state.goalsDone.silence_gunner, "silence_gunner goal");
 
@@ -997,6 +1049,10 @@ function TestAct8GrenadeYard() {
   state.input.aim = false;
   state.input.up = true;
   state.input.crouch = false;
+  // Aim → confirm (Valiant Hearts lob), seeded high by ↑.
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.nadeAiming, "yard throw opens aim first");
   state.input.usePressed = true;
   StepPlay(state, 1 / 30);
   Assert(
@@ -1059,6 +1115,7 @@ function Main() {
   TestAct4KillInvaders();
   TestAct5StreetHunt();
   TestMeleeKoFactions();
+  TestGrenadeAimArc();
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
   TestAct8GrenadeYard();

@@ -44,6 +44,11 @@ export const MOVE_SPEED = 220;
 export const THROW_SPEED = 420;
 /** Ladder-style climb in carved air columns — not a Mario jump. */
 export const CLIMB_SPEED = 175;
+/** Hungry KO windup → impact → follow-through (matches Script_Puppet melee clip). */
+export const MELEE_DURATION = 0.68;
+export const MELEE_IMPACT_AT = 0.28;
+/** Projectile gravity scale used by stick grenades (matches UpdateProjectiles). */
+export const GRENADE_GRAVITY = GRAVITY * 0.62;
 
 export function CreateInputState() {
   return {
@@ -117,8 +122,15 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       climbing: false,
     },
     meleeFx: null,
+    /** Queued KO / counter — lands on the chop frame for ritual impact. */
+    pendingMelee: null,
+    shake: 0,
+    hitStop: 0,
     blasts: [],
     projectiles: [],
+    /** Valiant Hearts lob: enter aim, ↑↓ tune arc, confirm throw. */
+    nadeAiming: false,
+    nadeAim: 0.55,
     /** Mobile: tap ↑ then dig — keep dig-up intent briefly without two-finger hold. */
     digAimUp: 0,
     digAimDown: 0,
@@ -219,17 +231,18 @@ function ResolvePhysics(state, dt) {
   if (!crouch && player.inTunnel && player.onGround && StandingWouldClip(player, solids)) {
     crouch = true; // low ceiling — stay crouched until there's headroom
   }
-  player.crouching = crouch;
+  player.crouching = crouch && !state.nadeAiming;
   player.aiming = !!input.aim && CanShoot(player.held) && !state.designMode && !player.inTunnel;
   let speed = MOVE_SPEED;
   if (player.crouching) speed *= 0.55;
-  if (player.aiming) speed *= 0.32;
+  if (player.aiming || state.nadeAiming) speed *= 0.32;
   // Melee lunge: plant feet mid-strike so the chop reads.
   if (player.meleeT > 0.08) {
-    player.vx = (player.meleeFacing || player.facing || 1) * 40;
+    const wind = player.meleeT > MELEE_DURATION - MELEE_IMPACT_AT;
+    player.vx = (player.meleeFacing || player.facing || 1) * (wind ? 18 : 55);
   } else {
     player.vx = move * speed;
-    if (move && !player.aiming) player.facing = move;
+    if (move && !player.aiming && !state.nadeAiming) player.facing = move;
   }
   if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
   if (player.throwCool > 0) player.throwCool = Math.max(0, player.throwCool - dt);
@@ -684,6 +697,10 @@ function MakeDroppedPickup(player, itemId, side = 1) {
 
 function DropHeld(state) {
   const { player, level } = state;
+  if (state.nadeAiming) {
+    CancelGrenadeAim(state);
+    return;
+  }
   if (!player.held) return;
   const itemId = player.held;
   player.held = ITEM_NONE;
@@ -721,7 +738,7 @@ function TryPickupOrInteract(state) {
       state.stats.pickups += 1;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetBubble(state, ["warn"], `+${add}雷`, 1.2);
-      SetSubtitle(state, "提示", `手雷 ×${player.grenades}。朝面朝方向扔；抬头高抛，蹲下近抛。`, 2.4);
+      SetSubtitle(state, "提示", `手雷 ×${player.grenades}。先点手雷键瞄准，↑↓调角度再扔。`, 2.6);
       return true;
     }
     const previous = player.held;
@@ -857,6 +874,10 @@ function TryUseItem(state) {
   }
 
   if (CanThrowGrenade(player)) {
+    if (!state.nadeAiming) {
+      BeginGrenadeAim(state);
+      return;
+    }
     ThrowGrenade(state);
     return;
   }
@@ -930,6 +951,81 @@ export function CanThrowGrenade(player) {
   return GrenadeCount(player) > 0 || player.held === ITEM_GRENADE;
 }
 
+/**
+ * Map aim 0..1 → lob speed/loft (Valiant Hearts style continuous arc).
+ * 0 = short dump, ~0.5 = mid lob, 1 = high over sandbags.
+ */
+export function GrenadeLobParams(aim01) {
+  const t = Math.max(0, Math.min(1, aim01));
+  const short = { speed: 185, loft: -110 };
+  const mid = { speed: 295, loft: -275 };
+  const high = { speed: 235, loft: -385 };
+  if (t <= 0.5) {
+    const u = t / 0.5;
+    return {
+      speed: short.speed + (mid.speed - short.speed) * u,
+      loft: short.loft + (mid.loft - short.loft) * u,
+    };
+  }
+  const u = (t - 0.5) / 0.5;
+  return {
+    speed: mid.speed + (high.speed - mid.speed) * u,
+    loft: mid.loft + (high.loft - mid.loft) * u,
+  };
+}
+
+/** Dotted preview of a stick-grenade lob (world points). */
+export function SampleGrenadeArc(x0, y0, vx, vy, steps = 14) {
+  const pts = [];
+  let x = x0;
+  let y = y0;
+  let pvx = vx;
+  let pvy = vy;
+  const dt = 1 / 28;
+  for (let i = 0; i < steps; i++) {
+    pts.push({ x, y });
+    pvy += GRENADE_GRAVITY * dt;
+    x += pvx * dt;
+    y += pvy * dt;
+    if (y >= SURFACE_Y - 2 && pvy > 0) {
+      pts.push({ x, y: SURFACE_Y - 2 });
+      break;
+    }
+  }
+  return pts;
+}
+
+export function GrenadeAimWorldArc(state) {
+  const player = state.player;
+  const facing = player.facing || 1;
+  const { speed, loft } = GrenadeLobParams(state.nadeAim ?? 0.55);
+  const x0 = player.x + facing * 22;
+  const y0 = (player.y || SURFACE_Y) - 32;
+  return SampleGrenadeArc(x0, y0, facing * speed, loft);
+}
+
+function BeginGrenadeAim(state) {
+  const player = state.player;
+  if (!CanThrowGrenade(player)) return false;
+  if (player.held !== ITEM_GRENADE && GrenadeCount(player) > 0) {
+    player.held = ITEM_GRENADE;
+  }
+  state.nadeAiming = true;
+  // Seed from current pad pose so ↑/蹲 already held snaps the arc.
+  if (state.input.up) state.nadeAim = 0.92;
+  else if (state.input.crouch) state.nadeAim = 0.12;
+  else if (state.nadeAim == null) state.nadeAim = 0.55;
+  SetBubble(state, ["warn"], "瞄准", 0.9);
+  SetSubtitle(state, "提示", "↑↓调抛射角，再点手雷键扔出。", 2.4);
+  return true;
+}
+
+function CancelGrenadeAim(state) {
+  if (!state.nadeAiming) return;
+  state.nadeAiming = false;
+  SetBubble(state, ["warn"], "收雷", 0.7);
+}
+
 function ConsumeGrenade(player) {
   if ((player.grenades || 0) > 0) {
     player.grenades -= 1;
@@ -943,33 +1039,25 @@ function ConsumeGrenade(player) {
   return false;
 }
 
-/** Lob a stick grenade — up = high arc, crouch = short toss. */
+/** Confirm lob from current nadeAim arc (must already be in aim mode, or seeded). */
 function ThrowGrenade(state) {
-  const { player, input } = state;
+  const { player } = state;
   if ((player.throwCool || 0) > 0) return false;
   if (!CanThrowGrenade(player)) return false;
   if (!ConsumeGrenade(player)) return false;
 
-  // Ranges tuned so lobs land ~80–170px ahead (inside blast), not across the map.
-  let speed = 300;
-  let loft = -280;
-  if (input.up) {
-    speed = 240;
-    loft = -360; // high lob over sandbags
-  } else if (input.crouch) {
-    speed = 190;
-    loft = -120; // short dump into a doorway
-  }
   const facing = player.facing || 1;
+  const { speed, loft } = GrenadeLobParams(state.nadeAim ?? 0.55);
   state.projectiles.push({
     kind: "grenade",
     x: player.x + facing * 22,
-    y: (player.y || SURFACE_Y) - (player.crouching ? 22 : 32),
+    y: (player.y || SURFACE_Y) - 32,
     vx: facing * speed,
     vy: loft,
     life: 1.35,
     bounced: false,
   });
+  state.nadeAiming = false;
   player.throwCool = 0.55;
   player.throwT = 0.36;
   player.facing = facing;
@@ -1076,11 +1164,23 @@ function CanStealthKO(player, ent) {
 
 function BeginMeleeStrike(state, dir) {
   const player = state.player;
-  player.meleeT = 0.42;
+  player.meleeT = MELEE_DURATION;
   player.meleeFacing = dir || player.facing || 1;
   player.facing = player.meleeFacing;
   player._animT = 0;
   player._animClip = "melee";
+}
+
+function SpawnMeleeImpactFx(state, x, y, ok) {
+  state.meleeFx = {
+    x,
+    y,
+    timer: ok ? 0.52 : 0.4,
+    ok,
+    rings: ok ? 3 : 1,
+  };
+  state.shake = Math.max(state.shake || 0, ok ? 0.32 : 0.22);
+  state.hitStop = Math.max(state.hitStop || 0, ok ? 0.1 : 0.06);
 }
 
 function MeleeCounter(state, ent) {
@@ -1088,14 +1188,15 @@ function MeleeCounter(state, ent) {
   const dir = Math.sign(ent.x - player.x) || player.facing || 1;
   player.hp -= 1;
   player.invuln = 1.15;
-  player.vx = -dir * 180;
+  player.vx = -dir * 200;
   ent.alert = Math.max(ent.alert || 0, 5.5);
   ent.alertX = player.x;
   ent.highAlert = true;
-  ent.hurtFlash = 0.15;
+  ent.hurtFlash = 0.35;
+  ent.stunLock = 0;
   AlertEnemiesNear(state, player.x, 220, 4.5);
-  state.meleeFx = { x: (player.x + ent.x) / 2, y: SURFACE_Y - 36, timer: 0.28, ok: false };
-  SetBubble(state, ["warn"], "反抓", 1.0);
+  SpawnMeleeImpactFx(state, (player.x + ent.x) / 2, SURFACE_Y - 36, false);
+  SetBubble(state, ["warn"], "反抓", 1.1);
   SetSubtitle(
     state,
     ent.label === "伪军" ? "伪军" : "鬼子",
@@ -1108,42 +1209,80 @@ function MeleeCounter(state, ent) {
   return false;
 }
 
+function ResolvePendingMelee(state) {
+  const pend = state.pendingMelee;
+  if (!pend) return;
+  state.pendingMelee = null;
+  const ent = pend.ent;
+  if (!ent || ent.dead) return;
+  const player = state.player;
+  const midX = (player.x + ent.x) / 2;
+  if (pend.ok) {
+    KnockOutEnemy(state, ent);
+    ent.hurtFlash = 0.55;
+    SpawnMeleeImpactFx(state, midX, SURFACE_Y - 34, true);
+    SetBubble(state, ["warn"], "击晕", 1.15);
+    SetSubtitle(state, "高传宝", pend.line || "制住了！", 2.2);
+  } else {
+    MeleeCounter(state, ent);
+  }
+}
+
+function UpdatePendingMelee(state, dt) {
+  const pend = state.pendingMelee;
+  if (!pend) return;
+  pend.landIn -= dt;
+  if (pend.ent && !pend.ent.dead) {
+    pend.ent.stunLock = Math.max(pend.ent.stunLock || 0, pend.landIn + 0.05);
+  }
+  if (pend.landIn > 0) return;
+  ResolvePendingMelee(state);
+}
+
 /**
  * Proximity KO: 伪军 — close = down. 鬼子 — only clean rear (crouch if alerted);
- * front / side = counter grab.
+ * front / side = counter grab. Impact lands after windup (ritual chop).
  */
 function TryMeleeKO(state, ent) {
   const player = state.player;
   if (!CanMeleeReach(player, ent)) return false;
+  if (state.pendingMelee) return false;
   const dir = Math.sign(ent.x - player.x) || player.facing || 1;
   BeginMeleeStrike(state, dir);
-  state.meleeFx = { x: (player.x + ent.x) / 2, y: SURFACE_Y - 34, timer: 0.22, ok: true };
+  // Windup telegraph — full impact FX fires on the chop frame.
+  state.meleeFx = {
+    x: (player.x + ent.x) / 2,
+    y: SURFACE_Y - 40,
+    timer: MELEE_IMPACT_AT + 0.05,
+    ok: true,
+    windup: true,
+    rings: 0,
+  };
 
   const faction = EnemyFaction(ent);
   const behind = IsBehindEnemy(player, ent);
+  let ok = false;
+  let line = "伪军好对付——靠近就给他一下。";
 
   if (faction === "puppet") {
-    KnockOutEnemy(state, ent);
-    SetBubble(state, ["warn"], "击晕", 0.9);
-    SetSubtitle(state, "高传宝", "伪军好对付——靠近就给他一下。", 2.0);
-    return true;
+    ok = true;
+  } else {
+    const alerted = !!ent.highAlert || (ent.alert || 0) > 1.2;
+    if (behind && (!alerted || player.crouching)) {
+      ok = true;
+      line =
+        ent.id === "mg_gunner" ? "机枪手制住了——枪是咱们的！" : "鬼子得摸背后——正面会反抓你。";
+    }
   }
 
-  // IJA / gunner: rear only; high alert needs crouch from behind.
-  const alerted = !!ent.highAlert || (ent.alert || 0) > 1.2;
-  if (behind && (!alerted || player.crouching)) {
-    KnockOutEnemy(state, ent);
-    SetBubble(state, ["warn"], "击晕", 0.9);
-    SetSubtitle(
-      state,
-      "高传宝",
-      ent.id === "mg_gunner" ? "机枪手制住了——枪是咱们的！" : "鬼子得摸背后——正面会反抓你。",
-      2.4,
-    );
-    return true;
-  }
-  state.meleeFx.ok = false;
-  return MeleeCounter(state, ent);
+  ent.stunLock = MELEE_IMPACT_AT + 0.12;
+  state.pendingMelee = {
+    ent,
+    landIn: MELEE_IMPACT_AT,
+    ok,
+    line,
+  };
+  return true;
 }
 
 function RaiseCorpseAlarm(state, witness, body) {
@@ -1337,6 +1476,7 @@ function UpdateProjectiles(state, dt) {
 }
 
 function BeginHatchTransition(state, goingDown, ent) {
+  if (state.nadeAiming) CancelGrenadeAim(state);
   state.transition = 0.01;
   state._hatchDir = goingDown ? "down" : "up";
   state._hatchEnt = ent;
@@ -1579,7 +1719,10 @@ function UpdateActors(state, dt) {
     }
     if (ent.type === "enemy") {
       if (ent.hurtFlash > 0) ent.hurtFlash = Math.max(0, ent.hurtFlash - dt);
+      if (ent.stunLock > 0) ent.stunLock = Math.max(0, ent.stunLock - dt);
       if (ent.dead) continue;
+      // Locked during player KO windup — don't walk out of the chop.
+      if ((ent.stunLock || 0) > 0) continue;
       const prevX = ent.x;
       ent.t = (ent.t || 0) + dt;
       const high = !!ent.highAlert || !!level.alarm;
@@ -1757,6 +1900,13 @@ function RefreshHint(state) {
 export function StepPlay(state, dt) {
   if (state.phase !== "play" || state.pauseOpen || state.failed || state.completed) return state;
   const clamped = Math.min(0.033, Math.max(0, dt));
+  // Brief impact freeze — windup chop lands harder.
+  let simDt = clamped;
+  if ((state.hitStop || 0) > 0) {
+    state.hitStop = Math.max(0, state.hitStop - clamped);
+    simDt = clamped * 0.18;
+  }
+  if ((state.shake || 0) > 0) state.shake = Math.max(0, state.shake - clamped * 1.8);
 
   // Sticky dig aim: mobile can tap ↑ then iron-shovel without holding both.
   if (state.input.up) state.digAimUp = 0.55;
@@ -1764,7 +1914,26 @@ export function StepPlay(state, dt) {
   if (state.input.crouch) state.digAimDown = 0.55;
   else state.digAimDown = Math.max(0, (state.digAimDown || 0) - clamped);
 
-  UpdateTransition(state, clamped);
+  // Grenade lob aim: ↑ high / ↓ short while the arc is up (crouch retunes, doesn't dump).
+  // Aim pad (no rifle) also opens the lob reticle — Valiant Hearts hold-to-aim feel.
+  if (
+    !state.nadeAiming &&
+    state.input.aim &&
+    CanThrowGrenade(state.player) &&
+    !CanShoot(state.player.held)
+  ) {
+    BeginGrenadeAim(state);
+  }
+  if (state.nadeAiming) {
+    if (state.player.inTunnel || !CanThrowGrenade(state.player)) {
+      CancelGrenadeAim(state);
+    } else {
+      if (state.input.up) state.nadeAim = Math.min(1, (state.nadeAim ?? 0.55) + simDt * 1.35);
+      if (state.input.crouch) state.nadeAim = Math.max(0, (state.nadeAim ?? 0.55) - simDt * 1.35);
+    }
+  }
+
+  UpdateTransition(state, simDt);
   TryDesign(state);
   // Use / pick / talk before physics — standing in a fresh chamber can get
   // X-shoved by unresolved soil solids for a frame.
@@ -1774,14 +1943,15 @@ export function StepPlay(state, dt) {
   // Excavate before physics — solids can shove the digger off the planned cell for a frame.
   // Dig always wins over design mode (auto-exits).
   TryExcavate(state);
-  ResolvePhysics(state, clamped);
+  ResolvePhysics(state, simDt);
+  UpdatePendingMelee(state, simDt);
   SyncDigGoals(state);
   SyncMgNestGoals(state);
   RefreshHint(state);
-  UpdateActors(state, clamped);
-  UpdateMgWaves(state, clamped);
-  UpdateProjectiles(state, clamped);
-  UpdateCamera(state, clamped);
+  UpdateActors(state, simDt);
+  UpdateMgWaves(state, simDt);
+  UpdateProjectiles(state, simDt);
+  UpdateCamera(state, simDt);
 
   if (AllGoalsDone(state) && !state.completed) {
     // Hold the win beat until film subtitle queues (殉钟等) finish playing.
@@ -1966,7 +2136,8 @@ export function NextStepText(state) {
     if (!g.stock_nades) return "去雷箱捡手雷（口袋可叠）";
     if (!g.clear_grenade_yard) {
       if (GrenadeCount(p) <= 0) return "雷用完了——再去雷箱补，或捡地上掉的";
-      return "抬头高抛过沙袋，蹲下近抛；炸开沙袋后的日伪军";
+      if (state.nadeAiming) return "↑高抛 / ↓近抛 · 再点手雷键扔出";
+      return "点手雷键出瞄准弧，↑↓调角度再扔——炸开沙袋后的日伪军";
     }
     return "沙袋场已清";
   }
