@@ -197,9 +197,12 @@ button {
   box-shadow: 3px 3px 0 rgba(0,0,0,.3); font-weight: 700;
 }
 
-/* Valiant Hearts one-item carry — single slot, not inventory */
+/* Valiant Hearts one-item carry — sit above the pad, never cover head nameplates. */
 .heldSlot {
-  position: absolute; left: 14px; top: 7%;
+  position: absolute;
+  left: 14px;
+  top: auto;
+  bottom: max(22%, calc(env(safe-area-inset-bottom, 0px) + 118px));
   display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto;
   column-gap: 10px; align-items: center;
   max-width: min(280px, 46vw);
@@ -208,6 +211,7 @@ button {
   border: 2.5px solid var(--ink);
   box-shadow: 3px 3px 0 rgba(0,0,0,.28);
   padding: 8px 10px;
+  z-index: 5;
 }
 .heldSlot b {
   grid-row: 1 / span 2;
@@ -218,7 +222,12 @@ button {
     var(--item, #c9b89a);
   position: relative;
 }
-.heldSlot[data-empty="1"] b { background: repeating-linear-gradient(45deg, #d8c9a8, #d8c9a8 4px, #cbb996 4px, #cbb996 8px); }
+.heldSlot[data-empty="1"] b { background: #efe2c8; }
+.heldSlot b[data-item="empty"]::after {
+  content: ""; position: absolute; inset: 2px;
+  background: center / contain no-repeat url("./Icon_HandEmpty.png");
+  box-shadow: none;
+}
 .heldSlot b[data-item="shovel"]::after {
   content: ""; position: absolute; inset: 2px;
   background: center / contain no-repeat url("./Icon_Shovel.png");
@@ -468,11 +477,16 @@ html.forceTouchPad .touchPad { display: flex !important; }
     gap: 6px;
   }
   .touchPad .cluster.move.dpad button { width: 56px; height: 56px; }
-  .heldSlot { max-width: min(220px, 38vw); top: max(4%, env(safe-area-inset-top, 0px)); }
+  .heldSlot {
+    max-width: min(220px, 42vw);
+    top: auto;
+    bottom: max(20%, calc(env(safe-area-inset-bottom, 0px) + 108px));
+  }
   .heldSlot em { display: none; }
   .stepHint {
-    top: max(12%, calc(env(safe-area-inset-top, 0px) + 48px));
-    max-width: min(260px, 46vw);
+    top: auto;
+    bottom: max(16%, calc(env(safe-area-inset-bottom, 0px) + 72px));
+    max-width: min(320px, 70vw);
     font-size: .68rem;
     padding: 4px 8px;
   }
@@ -501,16 +515,22 @@ html.forceTouchPad .touchPad { display: flex !important; }
 }
 
 .stepHint {
-  position: absolute; top: calc(7% + 52px); left: 14px;
-  max-width: min(340px, 62vw);
+  position: absolute;
+  left: 50%;
+  top: auto;
+  bottom: max(18%, calc(env(safe-area-inset-bottom, 0px) + 96px));
+  transform: translateX(-50%);
+  max-width: min(420px, 72vw);
   margin: 0;
-  padding: 6px 10px;
+  padding: 6px 12px;
   background: rgba(26, 20, 16, .82);
   color: #efe2c8;
   border: 2px solid #1a1410;
   font-size: .78rem;
   line-height: 1.35;
   font-weight: 600;
+  text-align: center;
   pointer-events: none;
   box-shadow: 2px 2px 0 rgba(0,0,0,.28);
+  z-index: 5;
 }

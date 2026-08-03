@@ -64,9 +64,12 @@ export const ICON_ROLE_ELDER = ImgIcon("Icon_RoleElder.png", "roleElder");
 export const ICON_ROLE_WOMAN = ImgIcon("Icon_RoleWoman.png", "roleWoman");
 export const ICON_ROLE_MILITIA = ImgIcon("Icon_RoleMilitia.png", "roleMilitia");
 export const ICON_ROLE_ENEMY = ImgIcon("Icon_RoleEnemy.png", "roleEnemy");
+export const ICON_ROLE_IJP = ImgIcon("Icon_RoleIjp.png", "roleIjp");
+export const ICON_ROLE_PUPPET = ImgIcon("Icon_RolePuppet.png", "rolePuppet");
 export const ICON_ROLE_SPY = ImgIcon("Icon_RoleSpy.png", "roleSpy");
 export const ICON_WELL = ImgIcon("Icon_Well.png", "well");
 export const ICON_BUSH = ImgIcon("Icon_Bush.png", "bush");
+export const ICON_HAND_EMPTY = ImgIcon("Icon_HandEmpty.png", "empty");
 
 export const PAD_ICON = {
   left: ICON_LEFT,
@@ -100,9 +103,13 @@ export const PAD_ICON = {
   roleWoman: ICON_ROLE_WOMAN,
   roleMilitia: ICON_ROLE_MILITIA,
   roleEnemy: ICON_ROLE_ENEMY,
+  roleIjp: ICON_ROLE_IJP,
+  rolePuppet: ICON_ROLE_PUPPET,
   roleSpy: ICON_ROLE_SPY,
   well: ICON_WELL,
   bush: ICON_BUSH,
+  empty: ICON_HAND_EMPTY,
+  handEmpty: ICON_HAND_EMPTY,
 };
 
 /** All generated plate filenames — smoke / preload. */
@@ -133,9 +140,12 @@ export const HUD_ICON_FILES = [
   "Icon_RoleWoman.png",
   "Icon_RoleMilitia.png",
   "Icon_RoleEnemy.png",
+  "Icon_RoleIjp.png",
+  "Icon_RolePuppet.png",
   "Icon_RoleSpy.png",
   "Icon_Well.png",
   "Icon_Bush.png",
+  "Icon_HandEmpty.png",
 ];
 
 /** Pick pad img for the single contextual interact button. */

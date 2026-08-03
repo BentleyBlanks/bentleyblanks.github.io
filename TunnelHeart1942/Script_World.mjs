@@ -345,6 +345,8 @@ function BuildAct2() {
       homeX: 1600,
       amp: 140,
       hostile: true,
+      label: "日军",
+      faction: "ijp",
       barkYamada: "高家庄的人呢？搜！地窖里也给我翻！",
     }),
     Ent({
@@ -356,6 +358,8 @@ function BuildAct2() {
       homeX: 2050,
       amp: 90,
       hostile: true,
+      label: "日军",
+      faction: "ijp",
       barkYamada: "钟楼方向有动静——跟上！",
     }),
   ];
@@ -492,8 +496,8 @@ function BuildAct3() {
 
 function PlaceEnemy(id, x, opts = {}) {
   const hp = opts.hp ?? 2;
-  const label = opts.label || "鬼子";
-  // 伪军 = easy proximity KO; 鬼子/机枪手 = hard IJA (front = counter).
+  const label = opts.label || "日军";
+  // 伪军 = easy proximity KO; 日军/机枪手 = hard IJA (front = counter).
   const faction =
     opts.faction ||
     (label === "伪军" ? "puppet" : "ijp");
@@ -723,7 +727,7 @@ function BuildAct5StreetHunt() {
       tunnelX: hatch.x,
       tunnelY: hatch.y + 10,
     }),
-    PlaceEnemy("jp1", 640, { amp: 55, phase: 0.3, hp: 2, label: "鬼子", dropAmmo: 2 }),
+    PlaceEnemy("jp1", 640, { amp: 55, phase: 0.3, hp: 2, label: "日军", dropAmmo: 2 }),
     PlaceEnemy("pup1", 860, {
       amp: 40,
       phase: 1.4,
@@ -732,11 +736,11 @@ function BuildAct5StreetHunt() {
       facing: -1,
       dropAmmo: 2,
     }),
-    PlaceEnemy("jp2", 1180, { amp: 70, phase: 2.1, hp: 2, label: "鬼子", dropGrenade: true }),
+    PlaceEnemy("jp2", 1180, { amp: 70, phase: 2.1, hp: 2, label: "日军", dropGrenade: true }),
     PlaceEnemy("pup2", 1520, { amp: 50, phase: 0.8, hp: 2, label: "伪军", dropAmmo: 3 }),
-    PlaceEnemy("jp3", 1880, { amp: 90, phase: 1.6, hp: 3, label: "鬼子", dropRifle: true, dropAmmo: 2 }),
+    PlaceEnemy("jp3", 1880, { amp: 90, phase: 1.6, hp: 3, label: "日军", dropRifle: true, dropAmmo: 2 }),
     PlaceEnemy("pup3", 2280, { amp: 45, phase: 2.8, hp: 2, label: "伪军", dropAmmo: 2 }),
-    PlaceEnemy("jp4", 2680, { amp: 60, phase: 0.5, hp: 3, label: "鬼子", dropAmmo: 4 }),
+    PlaceEnemy("jp4", 2680, { amp: 60, phase: 0.5, hp: 3, label: "日军", dropAmmo: 4 }),
   ];
   level.props = [
     { kind: "house", x: 400, variant: 0 },
@@ -851,6 +855,8 @@ function BuildAct6Heifengkou() {
       homeX: chargePt.x + 120,
       amp: 70,
       hostile: true,
+      label: "日军",
+      faction: "ijp",
     }),
   ];
   level.props = [
@@ -908,7 +914,7 @@ function BuildAct7MgNest() {
       bark: "前哨扑上来了——打！",
       foes: [
         { x: nestX + 220, label: "伪军", hp: 2, amp: 30, phase: 0.2 },
-        { x: nestX + 300, label: "鬼子", hp: 2, amp: 40, phase: 1.1 },
+        { x: nestX + 300, label: "日军", hp: 2, amp: 40, phase: 1.1 },
       ],
     },
     {
@@ -916,7 +922,7 @@ function BuildAct7MgNest() {
       bark: "又一阵！压住！",
       foes: [
         { x: nestX + 260, label: "伪军", hp: 2, amp: 50, phase: 0.4 },
-        { x: nestX + 340, label: "鬼子", hp: 3, amp: 35, phase: 2.0 },
+        { x: nestX + 340, label: "日军", hp: 3, amp: 35, phase: 2.0 },
         { x: nestX + 420, label: "伪军", hp: 2, amp: 45, phase: 1.4 },
       ],
     },
@@ -924,9 +930,9 @@ function BuildAct7MgNest() {
       gap: 1.3,
       bark: "最后一波——打光他们！",
       foes: [
-        { x: nestX + 240, label: "鬼子", hp: 3, amp: 55, phase: 0.6 },
+        { x: nestX + 240, label: "日军", hp: 3, amp: 55, phase: 0.6 },
         { x: nestX + 320, label: "伪军", hp: 2, amp: 40, phase: 1.8 },
-        { x: nestX + 400, label: "鬼子", hp: 3, amp: 50, phase: 0.9 },
+        { x: nestX + 400, label: "日军", hp: 3, amp: 50, phase: 0.9 },
         { x: nestX + 480, label: "伪军", hp: 2, amp: 35, phase: 2.4 },
       ],
     },
@@ -979,6 +985,8 @@ function BuildAct7MgNest() {
       homeX: CellCenter(soil, 32, 1).x + 40,
       amp: 70,
       hostile: true,
+      label: "日军",
+      faction: "ijp",
     }),
     Ent({
       id: "hatch_camp",
@@ -1125,7 +1133,7 @@ function BuildAct8GrenadeYard() {
       amp: 22,
       phase: 1.2,
       hp: 3,
-      label: "鬼子",
+      label: "日军",
       facing: -1,
       cover: true,
     }),
@@ -1146,7 +1154,7 @@ function BuildAct8GrenadeYard() {
       amp: 20,
       phase: 2.0,
       hp: 3,
-      label: "鬼子",
+      label: "日军",
       facing: -1,
       cover: true,
       dropGrenade: true,
@@ -1166,7 +1174,7 @@ function BuildAct8GrenadeYard() {
       amp: 12,
       phase: 0.6,
       hp: 3,
-      label: "鬼子",
+      label: "日军",
       facing: -1,
       cover: true,
       dropRifle: true,
@@ -1176,7 +1184,7 @@ function BuildAct8GrenadeYard() {
       amp: 28,
       phase: 2.4,
       hp: 3,
-      label: "鬼子",
+      label: "日军",
       facing: -1,
       cover: true,
     }),

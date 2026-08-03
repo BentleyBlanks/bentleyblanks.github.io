@@ -311,9 +311,12 @@ function TestAct1TutorialPlayable() {
     "Icon_RoleWoman.png",
     "Icon_RoleMilitia.png",
     "Icon_RoleEnemy.png",
+    "Icon_RoleIjp.png",
+    "Icon_RolePuppet.png",
     "Icon_RoleSpy.png",
     "Icon_Well.png",
     "Icon_Bush.png",
+    "Icon_HandEmpty.png",
   ]) {
     Assert(FileExists(join(here, file)), `${file} plate present`);
   }
@@ -813,7 +816,7 @@ function TestMeleeKoFactions() {
   const state = Play(4);
   DebugCompleteGoal(state, "talk_street");
   const pup = state.level.entities.find((e) => e.type === "enemy" && e.label === "伪军");
-  const ijp = state.level.entities.find((e) => e.type === "enemy" && e.label === "鬼子");
+  const ijp = state.level.entities.find((e) => e.type === "enemy" && e.label === "日军");
   Assert(!!pup && !!ijp, "street has 伪军 and 鬼子");
   Assert(EnemyFaction(pup) === "puppet", "伪军 faction");
   Assert(EnemyFaction(ijp) === "ijp", "鬼子 faction");
@@ -858,7 +861,7 @@ function TestMeleeKoFactions() {
   // 鬼子: front attempt = counter
   const st2 = Play(4);
   DebugCompleteGoal(st2, "talk_street");
-  const jp = st2.level.entities.find((e) => e.type === "enemy" && e.label === "鬼子");
+  const jp = st2.level.entities.find((e) => e.type === "enemy" && e.label === "日军");
   for (const e of st2.level.entities) {
     if (e.type === "enemy" && e !== jp) {
       e.dead = true;
@@ -1341,12 +1344,28 @@ function Main() {
   Assert(gameSrc.includes("RoleIconForSpeaker") && gameSrc.includes("Icon_RoleHero.png"), "role cutout icons wired");
   Assert(gameSrc.includes("Foot ring under interactables"), "interact cue is foot ring not floating ball");
   Assert(gameSrc.includes("DrawNameplate(\"水井\""), "well landmark labeled");
+  Assert(gameSrc.includes("EnemyHudPlate") && gameSrc.includes("roleIjp") && gameSrc.includes("rolePuppet"), "faction head plates 日军/伪军");
+  Assert(!gameSrc.includes('DrawNameplate(ent.broken ? "巡逻'), "no vague 巡逻 nameplate");
   {
     const act1 = BuildLevel("act1_connect");
     const nearSpawnBush = (act1.props || []).filter(
       (p) => p.kind === "bush" && (p.depth || 0) > 0 && p.x < 300,
     );
     Assert(nearSpawnBush.length === 0, "no near-camera bush egg in spawn skirt");
+  }
+  {
+    const css = readFileSync(join(here, "Style_Game.css"), "utf8");
+    Assert(css.includes("Icon_HandEmpty.png"), "empty-hand held icon");
+    Assert(/\.heldSlot\s*\{[^}]*bottom\s*:/s.test(css), "held slot moved off top-left");
+    Assert(/\.stepHint\s*\{[^}]*bottom\s*:/s.test(css), "step hint moved off top-left");
+    const puppet = readFileSync(join(here, "Script_Puppet.mjs"), "utf8");
+    Assert(puppet.includes('helmetKind: "ija"') && puppet.includes('helmetKind: "peaked"'), "日军/伪军 distinct headgear");
+  }
+  {
+    const night = BuildLevel("act2_bell");
+    const patrols = (night.entities || []).filter((e) => e.type === "patrol");
+    Assert(patrols.length >= 1, "act2 has surface hostiles");
+    Assert(patrols.every((e) => e.label === "日军" || e.label === "伪军"), "patrol entities labeled 日军/伪军");
   }
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with icon plates");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");

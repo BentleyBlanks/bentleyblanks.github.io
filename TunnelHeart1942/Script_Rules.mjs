@@ -1290,7 +1290,7 @@ function EnemyFacing(ent) {
   return 1;
 }
 
-/** puppet = 伪军 (easy); ijp = 鬼子/机枪手 (hard, counters front). */
+/** puppet = 伪军 (easy); ijp = 日军/机枪手 (hard, counters front). */
 export function EnemyFaction(ent) {
   if (!ent) return "ijp";
   if (ent.faction === "puppet" || ent.faction === "ijp") return ent.faction;
@@ -1357,7 +1357,7 @@ function MeleeCounter(state, ent) {
   SetBubble(state, ["warn"], "反抓", 1.1);
   SetSubtitle(
     state,
-    ent.label === "伪军" ? "伪军" : "鬼子",
+    ent.label === "伪军" ? "伪军" : "日军",
     EnemyFaction(ent) === "ijp"
       ? "日军有防备——被反手抓住了！别正面硬抢！"
       : "被挡住了！",
@@ -1522,7 +1522,7 @@ function SpawnMgWaveEnemy(state, spec, waveIdx) {
     alert: 5,
     alertX: state.player.x,
     hurtFlash: 0,
-    label: spec.label || "鬼子",
+    label: spec.label || "日军",
     faction: spec.label === "伪军" ? "puppet" : "ijp",
     hostile: true,
     t: 0,

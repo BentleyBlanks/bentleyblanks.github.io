@@ -86,14 +86,38 @@ export const PALETTES = {
     ink: "#1a1410",
     helmet: null,
   },
-  enemy: {
-    tunic: "#3a4630",
-    puttee: "#2a3224",
+  /** 日军 — khaki + steel helmet with front star. */
+  ijp: {
+    tunic: "#6a6848",
+    puttee: "#4a4830",
     boot: "#1a1810",
-    skin: "#c9b89a",
+    skin: "#c9b089",
     accent: "#8b1e1e",
     ink: "#1a1410",
-    helmet: "#2a3224",
+    helmet: "#3a3c28",
+    helmetKind: "ija",
+  },
+  /** 伪军 — grey-blue tunic + peaked cap (no IJA helmet). */
+  puppet: {
+    tunic: "#3a4a58",
+    puttee: "#2a343c",
+    boot: "#1a1410",
+    skin: "#d8c0a0",
+    accent: "#5a6a40",
+    ink: "#1a1410",
+    helmet: "#2a3038",
+    helmetKind: "peaked",
+  },
+  /** Legacy alias → 日军. */
+  enemy: {
+    tunic: "#6a6848",
+    puttee: "#4a4830",
+    boot: "#1a1810",
+    skin: "#c9b089",
+    accent: "#8b1e1e",
+    ink: "#1a1410",
+    helmet: "#3a3c28",
+    helmetKind: "ija",
   },
   spy: {
     tunic: "#5a4030",
@@ -578,18 +602,55 @@ function DrawHead(ctx, x, y, angle, pal, scale, helmet) {
   ctx.fill();
   ctx.stroke();
   if (helmet || pal.helmet) {
-    ctx.fillStyle = helmet || pal.helmet;
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.5, r * 1.15, r * 0.65, 0, Math.PI, 0);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 1.3);
-    ctx.lineTo(-2.2 * scale, -r * 0.85);
-    ctx.lineTo(2.2 * scale, -r * 0.85);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    const cap = helmet || pal.helmet;
+    ctx.fillStyle = cap;
+    if (pal.helmetKind === "peaked") {
+      // 伪军大盖帽 — flat crown + long visor (reads apart from IJA steel pot).
+      ctx.beginPath();
+      ctx.moveTo(-r * 1.05, -r * 0.95);
+      ctx.lineTo(r * 1.05, -r * 0.95);
+      ctx.lineTo(r * 1.05, -r * 0.35);
+      ctx.lineTo(-r * 1.05, -r * 0.35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 1.25, -r * 0.35);
+      ctx.lineTo(r * 1.3, -r * 0.32);
+      ctx.lineTo(r * 1.15, -r * 0.05);
+      ctx.lineTo(-r * 1.15, -r * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // 日军钢盔 — dome + brim + front star.
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.5, r * 1.2, r * 0.7, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.28, r * 1.35, r * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#c9a45a";
+      ctx.beginPath();
+      const sr = r * 0.28;
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+        const b = a + Math.PI / 5;
+        const x1 = Math.cos(a) * sr;
+        const y1 = -r * 0.55 + Math.sin(a) * sr;
+        const x2 = Math.cos(b) * sr * 0.4;
+        const y2 = -r * 0.55 + Math.sin(b) * sr * 0.4;
+        if (i === 0) ctx.moveTo(x1, y1);
+        else ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = pal.ink;
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -744,6 +805,7 @@ export function PaletteForSpeaker(speaker) {
   if (/林霞|大娘/.test(speaker)) return "woman";
   if (/乡亲|小伙/.test(speaker)) return "villager";
   if (/特务|武工/.test(speaker)) return "spy";
-  if (/鬼子|山田|巡逻/.test(speaker)) return "enemy";
+  if (/伪军/.test(speaker)) return "puppet";
+  if (/鬼子|日军|山田|机枪手/.test(speaker)) return "ijp";
   return "militia";
 }

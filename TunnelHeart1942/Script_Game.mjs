@@ -10,6 +10,7 @@ import {
   GrenadeCount,
   LoadFromStorage,
   DIG_SWING_DURATION,
+  EnemyFaction,
   MELEE_DURATION,
   NextStepText,
   PLAYER_H,
@@ -88,9 +89,13 @@ const PICTO_FILE = {
   roleWoman: "Icon_RoleWoman.png",
   roleMilitia: "Icon_RoleMilitia.png",
   roleEnemy: "Icon_RoleEnemy.png",
+  roleIjp: "Icon_RoleIjp.png",
+  rolePuppet: "Icon_RolePuppet.png",
   roleSpy: "Icon_RoleSpy.png",
   well: "Icon_Well.png",
   bush: "Icon_Bush.png",
+  empty: "Icon_HandEmpty.png",
+  handEmpty: "Icon_HandEmpty.png",
 };
 for (const [kind, file] of Object.entries(PICTO_FILE)) {
   const img = new Image();
@@ -440,7 +445,7 @@ function SyncHud() {
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
-      : `<b></b><span>空手</span><em>走近捡道具 · 绕到背后可制住敌人</em>`;
+      : `<b data-item="empty"></b><span>空手</span><em>走近捡道具 · 绕到背后可制住敌人</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }
   const badge = $("DesignBadge");
@@ -827,9 +832,24 @@ function RoleIconForSpeaker(speaker) {
   if (/林霞|大娘/.test(name)) return "roleWoman";
   if (/乡亲|小伙/.test(name)) return "people";
   if (/特务|武工/.test(name)) return "roleSpy";
-  if (/鬼子|山田|巡逻/.test(name)) return "roleEnemy";
+  if (/伪军/.test(name)) return "rolePuppet";
+  if (/鬼子|日军|山田|机枪手/.test(name)) return "roleIjp";
   if (/民兵/.test(name)) return "roleMilitia";
   return "roleMilitia";
+}
+
+/** Player-facing faction plate for enemies / surface hostiles. */
+function EnemyHudPlate(ent) {
+  const faction = EnemyFaction(ent);
+  let name = ent.label || (faction === "puppet" ? "伪军" : "日军");
+  if (name === "鬼子" || name === "巡逻") name = "日军";
+  if (ent.cover) name = `${name}·掩`;
+  if (ent.broken) name = `${name}·退`;
+  return {
+    name,
+    icon: faction === "puppet" ? "rolePuppet" : "roleIjp",
+    palette: faction === "puppet" ? "puppet" : "ijp",
+  };
 }
 
 /**
@@ -1580,16 +1600,18 @@ function DrawEntity(ent) {
     const facing =
       ent.facing ||
       (ent.alert > 0 ? Math.sign((ent.alertX ?? ent.x) - ent.x) || 1 : Math.sin((ent.t || 0) * 0.7) >= 0 ? 1 : -1);
+    const plate = EnemyHudPlate(ent);
     DrawPuppet(ctx, {
       x: 0,
       y: ent.dead ? 10 * s : 0,
       facing,
       scale: s,
-      palette: "enemy",
+      palette: plate.palette,
       clip: ent.dead ? "crouch" : ent.alert > 0 || ent.highAlert ? "alert" : "walk",
       time: ent.t || 0,
       moving: !ent.dead,
       alert: (ent.alert || 0) > 0 || !!ent.highAlert,
+      hold: !ent.dead && plate.palette === "ijp" ? "rifle" : null,
       alpha,
     });
     const near = Math.abs(state.player.x - ent.x) < 150;
@@ -1607,7 +1629,7 @@ function DrawEntity(ent) {
       }
       const maxHp = ent.maxHp || 2;
       const hp = Math.max(0, ent.hp || 0);
-      DrawNameplate(ent.cover ? `${ent.label || "鬼子"}·掩` : ent.label || "鬼子", "roleEnemy", -78 * s, s);
+      DrawNameplate(plate.name, plate.icon, -78 * s, s);
       if (engaged || (near && hp < maxHp)) {
         ctx.fillStyle = "#1a1410";
         ctx.fillRect(-16 * s, -96 * s, 32 * s, 5 * s);
@@ -1623,7 +1645,7 @@ function DrawEntity(ent) {
     } else {
       DrawNameplate(
         ent.ko ? (ent.discovered ? "晕·被发现" : "晕倒") : ent.discovered ? "毙·被发现" : "毙命",
-        "roleEnemy",
+        plate.icon,
         -70 * s,
         s,
       );
@@ -1643,18 +1665,23 @@ function DrawEntity(ent) {
     DrawNameplate(ent.trapped ? "特务·陷" : ent.exposed ? "特务" : "行商?", "roleSpy", -78 * s, s);
   } else if (ent.type === "patrol") {
     const facing = Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1;
+    // Surface hostiles are 日军 / 伪军 — never a vague "巡逻" plate.
+    if (!ent.label) ent.label = "日军";
+    if (!ent.faction) ent.faction = "ijp";
+    const plate = EnemyHudPlate(ent);
     DrawPuppet(ctx, {
       x: 0,
       y: 0,
       facing,
       scale: s,
-      palette: "enemy",
+      palette: plate.palette,
       clip: ent.broken ? "idle" : "walk",
       time: ent.t || 0,
       moving: !ent.broken,
+      hold: !ent.broken && plate.palette === "ijp" ? "rifle" : null,
       alpha: ent.broken ? 0.3 : 1,
     });
-    DrawNameplate(ent.broken ? "巡逻·退" : "巡逻", "roleEnemy", -78 * s, s);
+    DrawNameplate(plate.name, plate.icon, -78 * s, s);
     // Cone only when the player is close — not a permanent walking HUD.
     if (!ent.broken && Math.abs(state.player.x - ent.x) < 160) {
       ctx.fillStyle = "rgba(155,47,47,.22)";
