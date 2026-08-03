@@ -494,6 +494,26 @@ function Resize() {
 function Scale() {
   return (canvas.clientHeight || innerHeight) / VIEW_H;
 }
+
+/** Actual world units visible horizontally — canvas aspect often wider than VIEW_W. */
+function VisibleWorldWidth() {
+  const s = Scale();
+  const screenW = canvas?.clientWidth || globalThis.innerWidth || VIEW_W;
+  if (!s || s <= 0) return VIEW_W;
+  // Never narrower than design VIEW_W; widen with real aspect so soil isn't "streamed in".
+  return Math.max(VIEW_W, screenW / s);
+}
+
+/** Horizontal draw cull in world space — pad past the real visible span. */
+function CameraCullX(pad = 160) {
+  const viewW = state.viewW || VisibleWorldWidth();
+  return {
+    cam0: state.cameraX - pad,
+    cam1: state.cameraX + viewW + pad,
+    viewW,
+  };
+}
+
 function WX(x) {
   return (x - state.cameraX) * Scale();
 }
@@ -982,8 +1002,7 @@ function DrawTunnelFrontLips(pal) {
   const soil = state.level.soil;
   if (!soil) return;
   const s = Scale();
-  const cam0 = state.cameraX - 40;
-  const cam1 = state.cameraX + VIEW_W + 40;
+  const { cam0, cam1 } = CameraCullX(160);
   const px = state.player.x;
   const py = state.player.y;
   const lipW = Math.max(3, 5 * s);
@@ -1041,8 +1060,7 @@ function DrawPlanOverlay(pal) {
   const soil = state.level.soil;
   if (!soil?.plan) return;
   const s = Scale();
-  const cam0 = state.cameraX - 40;
-  const cam1 = state.cameraX + VIEW_W + 40;
+  const { cam0, cam1 } = CameraCullX(160);
   for (let r = 0; r < soil.rows; r++) {
     for (let c = 0; c < soil.cols; c++) {
       if (!soil.plan[r][c]) continue;
@@ -1228,8 +1246,7 @@ function DrawSoilGrid(pal) {
   const soil = state.level.soil;
   if (!soil) return;
   const s = Scale();
-  const cam0 = state.cameraX - 40;
-  const cam1 = state.cameraX + VIEW_W + 40;
+  const { cam0, cam1 } = CameraCullX(160);
   for (let r = 0; r < soil.rows; r++) {
     for (let c = 0; c < soil.cols; c++) {
       const rect = CellWorldRect(soil, c, r);
@@ -2048,8 +2065,7 @@ function DrawOpenShaftMarkers() {
   const soil = state.level.soil;
   if (!soil) return;
   const s = Scale();
-  const cam0 = state.cameraX - 40;
-  const cam1 = state.cameraX + VIEW_W + 40;
+  const { cam0, cam1 } = CameraCullX(160);
   const inTunnel = !!state.player.inTunnel;
   const pulse = 0.55 + 0.45 * Math.sin(((performance.now() || 0) / 1000) * 3.1);
 
@@ -2657,6 +2673,9 @@ function BindUi() {
 function Frame(ts) {
   const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
   lastTs = ts;
+
+  // Keep camera / soil cull on the real canvas span (wide phones > VIEW_W).
+  if (state) state.viewW = VisibleWorldWidth();
 
   if (state.phase === "play" && state.failed) {
     // Keep the death UI up — Esc / accidental dismiss used to freeze the run.

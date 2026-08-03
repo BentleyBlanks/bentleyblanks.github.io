@@ -140,6 +140,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     planCursor: level.soil ? InitPlanCursor(level.soil, level.spawn.x, level.spawn.y, 1) : null,
     cameraX: Math.max(0, level.spawn.x - VIEW_W * 0.35),
     cameraY: tunnel ? level.tunnelFloor - 300 : SURFACE_Y - 360,
+    /** Filled each frame by Game from canvas aspect — widens cull/camera past VIEW_W. */
+    viewW: VIEW_W,
     level,
     interactHint: "",
     /** Valiant Hearts-style bubble: { icons: string[], mutter?: string, timer } */
@@ -1877,8 +1879,10 @@ function UpdateActors(state, dt) {
 
 function UpdateCamera(state, dt) {
   const { player, level } = state;
-  const targetX = player.x - VIEW_W * 0.38;
-  state.cameraX += (Math.max(0, Math.min(level.width - VIEW_W, targetX)) - state.cameraX) * Math.min(1, dt * 6);
+  // Prefer real canvas span (state.viewW from Game) so wide phones don't stream soil in.
+  const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
+  const targetX = player.x - viewW * 0.38;
+  state.cameraX += (Math.max(0, Math.min(level.width - viewW, targetX)) - state.cameraX) * Math.min(1, dt * 6);
   // Cutaway play shows dig under the lip — keep more of the soil band on screen.
   const targetY = player.inTunnel
     ? player.y - 280
@@ -2165,7 +2169,10 @@ export function RespawnPlayer(state) {
   player.x = x;
   player.y = y;
   player.inTunnel = tunnel;
-  state.cameraX = Math.max(0, Math.min((level.width || 2400) - VIEW_W, player.x - VIEW_W * 0.35));
+  {
+    const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
+    state.cameraX = Math.max(0, Math.min((level.width || 2400) - viewW, player.x - viewW * 0.35));
+  }
   state.cameraY = tunnel ? (level.tunnelFloor || 0) - 300 : SURFACE_Y - 220;
 
   SetBubble(state, ["check", "hatch"], "再起", 1.6);
