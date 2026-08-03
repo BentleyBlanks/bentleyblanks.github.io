@@ -58,6 +58,16 @@ export const ICON_CHECK = ImgIcon("Icon_Check.png", "check");
 export const ICON_AMMO = ImgIcon("Icon_Ammo.png", "ammo");
 export const ICON_RIFLE = ImgIcon("Icon_Rifle.png", "rifle");
 
+/** Head-HUD role glyphs + landmark plates (transparent cutouts). */
+export const ICON_ROLE_HERO = ImgIcon("Icon_RoleHero.png", "roleHero");
+export const ICON_ROLE_ELDER = ImgIcon("Icon_RoleElder.png", "roleElder");
+export const ICON_ROLE_WOMAN = ImgIcon("Icon_RoleWoman.png", "roleWoman");
+export const ICON_ROLE_MILITIA = ImgIcon("Icon_RoleMilitia.png", "roleMilitia");
+export const ICON_ROLE_ENEMY = ImgIcon("Icon_RoleEnemy.png", "roleEnemy");
+export const ICON_ROLE_SPY = ImgIcon("Icon_RoleSpy.png", "roleSpy");
+export const ICON_WELL = ImgIcon("Icon_Well.png", "well");
+export const ICON_BUSH = ImgIcon("Icon_Bush.png", "bush");
+
 export const PAD_ICON = {
   left: ICON_LEFT,
   right: ICON_RIGHT,
@@ -85,6 +95,14 @@ export const PAD_ICON = {
   check: ICON_CHECK,
   ammo: ICON_AMMO,
   rifle: ICON_RIFLE,
+  roleHero: ICON_ROLE_HERO,
+  roleElder: ICON_ROLE_ELDER,
+  roleWoman: ICON_ROLE_WOMAN,
+  roleMilitia: ICON_ROLE_MILITIA,
+  roleEnemy: ICON_ROLE_ENEMY,
+  roleSpy: ICON_ROLE_SPY,
+  well: ICON_WELL,
+  bush: ICON_BUSH,
 };
 
 /** All generated plate filenames — smoke / preload. */
@@ -110,6 +128,14 @@ export const HUD_ICON_FILES = [
   "Icon_Corridor.png",
   "Icon_Crouch.png",
   "Icon_Ammo.png",
+  "Icon_RoleHero.png",
+  "Icon_RoleElder.png",
+  "Icon_RoleWoman.png",
+  "Icon_RoleMilitia.png",
+  "Icon_RoleEnemy.png",
+  "Icon_RoleSpy.png",
+  "Icon_Well.png",
+  "Icon_Bush.png",
 ];
 
 /** Pick pad img for the single contextual interact button. */

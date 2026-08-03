@@ -119,8 +119,10 @@ export function SeedDepthDecor(level) {
     props.push({ kind: "stack", x, depth: DEPTH_PLAY });
   }
 
-  // FRONT — mid-fg skirt: bushes + crop fringe (not a hedge wall)
+  // FRONT — mid-fg skirt: bushes + crop fringe (not a hedge wall).
+  // Skip the spawn skirt — a giant near-camera ellipse there reads as a mystery ball.
   for (let x = 100; x < width; x += 220 + (x % 70)) {
+    if (x < 300) continue;
     const roll = (x * 17) % 5;
     if (roll <= 1) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
     else if (roll === 2 || roll === 3) {
@@ -131,6 +133,7 @@ export function SeedDepthDecor(level) {
   // NEAR — closest camera plane: fewer, bigger punches. Keep distinct from FRONT
   // so two occluder bands still read after thinning. Ground ribbon is Script_Game.
   for (let x = 90; x < width; x += 380 + (x % 90)) {
+    if (x < 320) continue;
     const roll = (x * 13) % 3;
     if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
     else if (roll === 1) props.push({ kind: "post", x, depth: DEPTH_NEAR });

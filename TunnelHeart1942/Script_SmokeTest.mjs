@@ -300,6 +300,14 @@ function TestAct1TutorialPlayable() {
     "Icon_Corridor.png",
     "Icon_Crouch.png",
     "Icon_Ammo.png",
+    "Icon_RoleHero.png",
+    "Icon_RoleElder.png",
+    "Icon_RoleWoman.png",
+    "Icon_RoleMilitia.png",
+    "Icon_RoleEnemy.png",
+    "Icon_RoleSpy.png",
+    "Icon_Well.png",
+    "Icon_Bush.png",
   ]) {
     Assert(FileExists(join(here, file)), `${file} plate present`);
   }
@@ -1310,7 +1318,17 @@ function Main() {
   }
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(gameSrc.includes("p.inTunnel && CanDigWith"), "pad verb digs by default underground");
-  Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
+  Assert(gameSrc.includes("function DrawNameplate") && gameSrc.includes("Always-on who-is-who plate"), "actor head nameplates always on");
+  Assert(gameSrc.includes("RoleIconForSpeaker") && gameSrc.includes("Icon_RoleHero.png"), "role cutout icons wired");
+  Assert(gameSrc.includes("Foot ring under interactables"), "interact cue is foot ring not floating ball");
+  Assert(gameSrc.includes("DrawNameplate(\"水井\""), "well landmark labeled");
+  {
+    const act1 = BuildLevel("act1_connect");
+    const nearSpawnBush = (act1.props || []).filter(
+      (p) => p.kind === "bush" && (p.depth || 0) > 0 && p.x < 300,
+    );
+    Assert(nearSpawnBush.length === 0, "no near-camera bush egg in spawn skirt");
+  }
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with icon plates");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
   const surfaceStack = gameSrc.slice(gameSrc.indexOf("function RenderSurfaceStack"), gameSrc.indexOf("function RenderTunnelStack"));

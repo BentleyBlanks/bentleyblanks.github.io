@@ -82,6 +82,14 @@ const PICTO_FILE = {
   corridor: "Icon_Corridor.png",
   ammo: "Icon_Ammo.png",
   dig: "Icon_Shovel.png",
+  roleHero: "Icon_RoleHero.png",
+  roleElder: "Icon_RoleElder.png",
+  roleWoman: "Icon_RoleWoman.png",
+  roleMilitia: "Icon_RoleMilitia.png",
+  roleEnemy: "Icon_RoleEnemy.png",
+  roleSpy: "Icon_RoleSpy.png",
+  well: "Icon_Well.png",
+  bush: "Icon_Bush.png",
 };
 for (const [kind, file] of Object.entries(PICTO_FILE)) {
   const img = new Image();
@@ -810,6 +818,57 @@ function DrawSoilCutaway(w, h, camX, pal) {
   }
 }
 
+/** Role glyph for a speaker / faction name. */
+function RoleIconForSpeaker(speaker) {
+  const name = String(speaker || "");
+  if (/高传宝|^传宝$/.test(name)) return "roleHero";
+  if (/高老忠|赵平原/.test(name)) return "roleElder";
+  if (/林霞|大娘/.test(name)) return "roleWoman";
+  if (/乡亲|小伙/.test(name)) return "people";
+  if (/特务|武工/.test(name)) return "roleSpy";
+  if (/鬼子|山田|巡逻/.test(name)) return "roleEnemy";
+  if (/民兵/.test(name)) return "roleMilitia";
+  return "roleMilitia";
+}
+
+/**
+ * Always-on head / landmark plate: cutout role glyph + readable Chinese name.
+ * Expects ctx already translated to the actor's / prop's feet.
+ */
+function DrawNameplate(label, iconKind, headY, s) {
+  const text = String(label || "").trim();
+  if (!text) return;
+  const icon = 13 * s;
+  const padX = 4 * s;
+  const padY = 3 * s;
+  const gap = 3 * s;
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.font = `700 ${11 * s}px "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const tw = ctx.measureText(text).width;
+  const w = padX * 2 + icon + gap + tw;
+  const h = Math.max(icon + padY * 2, 16 * s);
+  const x0 = -w / 2;
+  const y0 = headY - h;
+  ctx.fillStyle = "rgba(239,226,200,.94)";
+  ctx.strokeStyle = "#1a1410";
+  ctx.lineWidth = Math.max(1.5, 1.8 * s);
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(x0, y0, w, h, 3 * s);
+  else ctx.rect(x0, y0, w, h);
+  ctx.fill();
+  ctx.stroke();
+  DrawPictogram(iconKind, x0 + padX, y0 + (h - icon) / 2, icon);
+  ctx.fillStyle = "#1a1410";
+  ctx.font = `700 ${11 * s}px "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x0 + padX + icon + gap, y0 + h / 2);
+  ctx.restore();
+}
+
 function DrawProp(prop, pal, alphaMul = 1) {
   const depth = prop.depth ?? 0;
   const s = Scale() * ScaleOf(depth);
@@ -874,18 +933,28 @@ function DrawProp(prop, pal, alphaMul = 1) {
     ctx.fill();
     ctx.stroke();
   } else if (prop.kind === "bush") {
+    // Trunk + multi-lobe foliage — must read as 灌木, not a floating egg.
     const bh = (prop.tall ? 56 : 34) * s;
+    ctx.fillStyle = depth >= 2 ? "#1a120c" : "#3a2a1c";
+    ctx.fillRect(-5 * s, -bh * 0.4, 10 * s, bh * 0.5);
     ctx.fillStyle = depth >= 2 ? "#152016" : "#2a3824";
     ctx.beginPath();
-    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -bh * 0.35, 40 * s, bh * 0.6, 0, 0, Math.PI * 2);
-    else ctx.arc(0, -bh * 0.35, 32 * s, 0, Math.PI * 2);
+    if (typeof ctx.ellipse === "function") ctx.ellipse(-10 * s, -bh * 0.45, 28 * s, bh * 0.42, 0, 0, Math.PI * 2);
+    else ctx.arc(-10 * s, -bh * 0.45, 22 * s, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
-    // Second lobe — denser silhouette
     ctx.beginPath();
-    if (typeof ctx.ellipse === "function") ctx.ellipse(16 * s, -bh * 0.25, 26 * s, bh * 0.45, 0, 0, Math.PI * 2);
-    else ctx.arc(16 * s, -bh * 0.25, 20 * s, 0, Math.PI * 2);
+    if (typeof ctx.ellipse === "function") ctx.ellipse(14 * s, -bh * 0.4, 30 * s, bh * 0.48, 0, 0, Math.PI * 2);
+    else ctx.arc(14 * s, -bh * 0.4, 24 * s, 0, Math.PI * 2);
     ctx.fill();
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -bh * 0.7, 24 * s, bh * 0.38, 0, 0, Math.PI * 2);
+    else ctx.arc(0, -bh * 0.7, 18 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = ink;
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -bh * 0.5, 36 * s, bh * 0.55, 0, 0, Math.PI * 2);
+    else ctx.arc(0, -bh * 0.5, 28 * s, 0, Math.PI * 2);
+    ctx.stroke();
   } else if (prop.kind === "wheat") {
     // Golden stalk clump / grain heads — multi-row field patch; mid/far read as continuous 麦田.
     const coolFar = depth <= -2;
@@ -967,9 +1036,36 @@ function DrawProp(prop, pal, alphaMul = 1) {
     ctx.arc(0, -40 * s, 5 * s, 0, Math.PI * 2);
     ctx.fill();
   } else if (prop.kind === "well") {
+    // Village well: posts + beam + crank + bucket + stone curb — labeled below.
+    ctx.fillStyle = "#5a4a38";
+    ctx.fillRect(-18 * s, -54 * s, 7 * s, 42 * s);
+    ctx.fillRect(11 * s, -54 * s, 7 * s, 42 * s);
+    ctx.fillStyle = "#6a5a40";
+    ctx.fillRect(-22 * s, -58 * s, 44 * s, 8 * s);
+    ctx.fillRect(20 * s, -56 * s, 12 * s, 5 * s);
+    ctx.fillRect(28 * s, -66 * s, 5 * s, 14 * s);
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = Math.max(1.2, 1.8 * s);
+    ctx.beginPath();
+    ctx.moveTo(0, -50 * s);
+    ctx.lineTo(0, -28 * s);
+    ctx.stroke();
+    ctx.fillStyle = "#8a6a40";
+    ctx.fillRect(-7 * s, -30 * s, 14 * s, 11 * s);
+    ctx.strokeRect(-7 * s, -30 * s, 14 * s, 11 * s);
     ctx.fillStyle = "#7a7264";
-    ctx.fillRect(-16 * s, -18 * s, 32 * s, 18 * s);
-    ctx.strokeRect(-16 * s, -18 * s, 32 * s, 18 * s);
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -8 * s, 22 * s, 11 * s, 0, 0, Math.PI * 2);
+    else ctx.arc(0, -8 * s, 18 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.fillStyle = "#2a241c";
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, -8 * s, 11 * s, 5 * s, 0, 0, Math.PI * 2);
+    else ctx.arc(0, -8 * s, 8 * s, 0, Math.PI * 2);
+    ctx.fill();
+    DrawNameplate("水井", "well", -72 * s, s);
   } else if (prop.kind === "bell") {
     ctx.fillStyle = "#c9a45a";
     ctx.beginPath();
@@ -1333,10 +1429,13 @@ function DrawEntity(ent) {
   ctx.strokeStyle = "#1c1712";
 
   const glow = () => {
-    ctx.fillStyle = "rgba(201,164,90,.35)";
+    // Foot ring under interactables — never a floating mystery ball behind the puppet.
+    ctx.strokeStyle = "rgba(201,164,90,.9)";
+    ctx.lineWidth = Math.max(1.5, 2.2 * s);
     ctx.beginPath();
-    ctx.arc(0, -24 * s, 20 * s, 0, Math.PI * 2);
-    ctx.fill();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(0, 2 * s, 18 * s, 5 * s, 0, 0, Math.PI * 2);
+    else ctx.arc(0, 2 * s, 14 * s, 0, Math.PI * 2);
+    ctx.stroke();
   };
 
   if (ent.kind === "pickup") {
@@ -1365,10 +1464,8 @@ function DrawEntity(ent) {
   if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
     const nearTalk = Math.abs(state.player.x - ent.x) < 90;
     if (!ent.done && nearTalk) glow();
-    const pal =
-      ent.type === "spy_talk"
-        ? "spy"
-        : PaletteForSpeaker(ent.speaker || (ent.type === "shelter" ? "乡亲" : "民兵"));
+    const name = ent.speaker || (ent.type === "shelter" ? "乡亲" : "民兵");
+    const pal = ent.type === "spy_talk" ? "spy" : PaletteForSpeaker(name);
     const alpha = ent.done && ent.type === "shelter" ? 0.35 : 1;
     DrawPuppet(ctx, {
       x: 0,
@@ -1380,12 +1477,15 @@ function DrawEntity(ent) {
       time: ((performance.now() || 0) / 1000) + (ent.x || 0) * 0.01,
       alpha,
     });
+    // Always-on who-is-who plate — puppets alone are not readable.
+    DrawNameplate(name, RoleIconForSpeaker(name), -78 * s, s);
   } else if (ent.type === "hatch") {
     if (Math.abs(state.player.x - ent.x) < 80) glow();
     ctx.fillStyle = "#2a1c12";
     ctx.fillRect(-20 * s, -8 * s, 40 * s, 10 * s);
     ctx.strokeStyle = "#c9a45a";
     ctx.strokeRect(-20 * s, -8 * s, 40 * s, 10 * s);
+    DrawNameplate("地窖口", "hatch", -40 * s, s);
   } else if (ent.type === "bell") {
     if (Math.abs(state.player.x - ent.x) < 100) glow();
     ctx.fillStyle = ent.ringing ? "#f0c27a" : "#c9a45a";
@@ -1398,6 +1498,7 @@ function DrawEntity(ent) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    DrawNameplate("警钟", "bell", -110 * s, s);
   } else if (ent.type === "flip_build" || ent.type === "flip_trap" || ent.type === "plant_zone" || ent.type === "signal") {
     if (!ent.done) glow();
     ctx.fillStyle = ent.done ? "#7a7264" : ent.type === "plant_zone" ? "#5a3a28" : "#a6452f";
@@ -1493,7 +1594,7 @@ function DrawEntity(ent) {
     const near = Math.abs(state.player.x - ent.x) < 150;
     const engaged = (ent.alert || 0) > 0 || !!ent.highAlert || (ent.hurtFlash || 0) > 0;
     if (!ent.dead) {
-      // Idle patrol: bare puppet only. Cones / bars / labels on demand.
+      // Always-on nameplate; cones / HP bars still on demand.
       if (engaged) {
         ctx.fillStyle = ent.highAlert ? "rgba(180,40,30,.4)" : "rgba(155,47,47,.28)";
         ctx.beginPath();
@@ -1505,29 +1606,26 @@ function DrawEntity(ent) {
       }
       const maxHp = ent.maxHp || 2;
       const hp = Math.max(0, ent.hp || 0);
+      DrawNameplate(ent.cover ? `${ent.label || "鬼子"}·掩` : ent.label || "鬼子", "roleEnemy", -78 * s, s);
       if (engaged || (near && hp < maxHp)) {
         ctx.fillStyle = "#1a1410";
-        ctx.fillRect(-16 * s, -72 * s, 32 * s, 5 * s);
+        ctx.fillRect(-16 * s, -96 * s, 32 * s, 5 * s);
         ctx.fillStyle = "#a6452f";
-        ctx.fillRect(-16 * s, -72 * s, 32 * s * (hp / maxHp), 5 * s);
-      }
-      if (engaged || near) {
-        ctx.fillStyle = "#efe2c8";
-        ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillText(ent.cover ? `${ent.label || "鬼子"}·掩` : ent.label || "鬼子", 0, -78 * s);
+        ctx.fillRect(-16 * s, -96 * s, 32 * s * (hp / maxHp), 5 * s);
       }
       if (ent.highAlert && (engaged || near)) {
-        ctx.fillStyle = "#ffb0a0";
-        ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
+        ctx.fillStyle = "#a6452f";
+        ctx.font = `700 ${10 * s}px "Noto Sans SC","PingFang SC",sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText("警戒!", 0, -90 * s);
+        ctx.fillText("警戒!", 0, -104 * s);
       }
-    } else if (near) {
-      ctx.fillStyle = ent.discovered ? "#a6452f" : "#7a7264";
-      ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(ent.ko ? (ent.discovered ? "尸·被发现" : "晕") : ent.discovered ? "尸·被发现" : "毙", 0, -70 * s);
+    } else {
+      DrawNameplate(
+        ent.ko ? (ent.discovered ? "晕·被发现" : "晕倒") : ent.discovered ? "毙·被发现" : "毙命",
+        "roleEnemy",
+        -70 * s,
+        s,
+      );
     }
   } else if (ent.type === "spy") {
     DrawPuppet(ctx, {
@@ -1541,11 +1639,7 @@ function DrawEntity(ent) {
       moving: !!(ent.exposed && !ent.trapped),
       alpha: ent.trapped ? 0.55 : 1,
     });
-    if (ent.exposed && !ent.trapped) {
-      ctx.fillStyle = "#a6452f";
-      ctx.font = `bold ${16 * s}px sans-serif`;
-      ctx.fillText("!", -4 * s, -70 * s);
-    }
+    DrawNameplate(ent.trapped ? "特务·陷" : ent.exposed ? "特务" : "行商?", "roleSpy", -78 * s, s);
   } else if (ent.type === "patrol") {
     const facing = Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1;
     DrawPuppet(ctx, {
@@ -1559,6 +1653,7 @@ function DrawEntity(ent) {
       moving: !ent.broken,
       alpha: ent.broken ? 0.3 : 1,
     });
+    DrawNameplate(ent.broken ? "巡逻·退" : "巡逻", "roleEnemy", -78 * s, s);
     // Cone only when the player is close — not a permanent walking HUD.
     if (!ent.broken && Math.abs(state.player.x - ent.x) < 160) {
       ctx.fillStyle = "rgba(155,47,47,.22)";
@@ -1872,6 +1967,10 @@ function DrawPlayer() {
     moving,
     alpha: blink ? 0.4 : 1,
   });
+  ctx.save();
+  ctx.translate(x, y);
+  DrawNameplate("高传宝", "roleHero", p.crouching ? -58 * s : -78 * s, s);
+  ctx.restore();
 }
 
 /** Impact slash / fail burst for melee KO. */
