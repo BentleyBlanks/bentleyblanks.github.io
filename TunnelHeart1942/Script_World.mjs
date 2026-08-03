@@ -492,6 +492,11 @@ function BuildAct3() {
 
 function PlaceEnemy(id, x, opts = {}) {
   const hp = opts.hp ?? 2;
+  const label = opts.label || "鬼子";
+  // 伪军 = easy proximity KO; 鬼子/机枪手 = hard IJA (front = counter).
+  const faction =
+    opts.faction ||
+    (label === "伪军" ? "puppet" : "ijp");
   return Ent({
     id,
     type: "enemy",
@@ -512,7 +517,8 @@ function PlaceEnemy(id, x, opts = {}) {
     alert: 0,
     alertX: x,
     hurtFlash: 0,
-    label: opts.label || "鬼子",
+    label,
+    faction,
     hostile: true,
     t: 0,
     dropAmmo: opts.dropAmmo || 0,

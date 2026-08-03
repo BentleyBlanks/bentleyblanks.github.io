@@ -9,11 +9,13 @@ import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf 
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   AdvancePanels,
+  CanMeleeReach,
   CreateCampaignState,
   DebugCarvePath,
   DebugCompleteGoal,
   DebugHold,
   DebugPlanCell,
+  EnemyFaction,
   GoalsRemaining,
   LoadProgress,
   NextStepText,
@@ -540,6 +542,7 @@ function TestAct5StreetHunt() {
   StepPlay(state, 1 / 30);
   Assert(koTarget.dead && koTarget.ko, "rear KO while standing with rifle");
   Assert(!koTarget.discovered, "KO corpse not auto-discovered");
+  Assert(state.player.meleeT > 0 || state.meleeFx, "melee strike anim/fx fired");
 
   const witness = foes.find((e) => !e.dead);
   Assert(!!witness, "living witness remains");
@@ -587,6 +590,98 @@ function TestAct5StreetHunt() {
   StepPlay(state, 1 / 30);
   Assert(witness.dead, "final foe down");
   Assert(state.goalsDone.clear_street, "clear_street when all foes down");
+}
+
+function TestMeleeKoFactions() {
+  Assert(CLIPS.melee && CLIPS.melee.duration > 0.3, "hungry melee clip exists");
+  Assert(PickClip({ melee: true }) === "melee", "melee clip pick");
+
+  const state = Play(4);
+  DebugCompleteGoal(state, "talk_street");
+  const pup = state.level.entities.find((e) => e.type === "enemy" && e.label === "伪军");
+  const ijp = state.level.entities.find((e) => e.type === "enemy" && e.label === "鬼子");
+  Assert(!!pup && !!ijp, "street has 伪军 and 鬼子");
+  Assert(EnemyFaction(pup) === "puppet", "伪军 faction");
+  Assert(EnemyFaction(ijp) === "ijp", "鬼子 faction");
+
+  // 伪军: front proximity KO
+  for (const e of state.level.entities) {
+    if (e.type === "enemy" && e !== pup) {
+      e.dead = true;
+      e.hidden = true;
+      e.corpse = false;
+    }
+  }
+  pup.dead = false;
+  pup.hp = 2;
+  pup.ko = false;
+  pup.amp = 0;
+  pup.facing = 1;
+  pup.x = 900;
+  pup.homeX = 900;
+  pup.alert = 0;
+  pup.highAlert = false;
+  state.player.x = pup.x + 30; // in front
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.player.facing = -1;
+  state.player.hp = 3;
+  state.player.meleeT = 0;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(pup.dead && pup.ko, "伪军 front proximity KO");
+  Assert(
+    CanMeleeReach(
+      { x: 100, y: 0, inTunnel: false, manningMg: false, meleeT: 0 },
+      { type: "enemy", dead: false, x: 130, y: 0, layer: "surface" },
+    ),
+    "melee reach helper",
+  );
+
+  // 鬼子: front attempt = counter
+  const st2 = Play(4);
+  DebugCompleteGoal(st2, "talk_street");
+  const jp = st2.level.entities.find((e) => e.type === "enemy" && e.label === "鬼子");
+  for (const e of st2.level.entities) {
+    if (e.type === "enemy" && e !== jp) {
+      e.dead = true;
+      e.hidden = true;
+      e.corpse = false;
+    }
+  }
+  jp.dead = false;
+  jp.hp = 2;
+  jp.ko = false;
+  jp.amp = 0;
+  jp.facing = -1; // facing left; player in front (left of him) is not behind
+  jp.x = 1000;
+  jp.homeX = 1000;
+  jp.alert = 0;
+  jp.highAlert = false;
+  st2.player.x = jp.x - 30; // in front of facing -1
+  st2.player.y = 0;
+  st2.player.inTunnel = false;
+  st2.player.facing = 1;
+  st2.player.hp = 3;
+  st2.player.meleeT = 0;
+  st2.input.interactPressed = true;
+  StepPlay(st2, 1 / 30);
+  Assert(!jp.dead, "鬼子 front KO fails");
+  Assert(st2.player.hp < 3, "鬼子 front counters and hurts player");
+  Assert(jp.highAlert || jp.alert > 0, "鬼子 counters into alert");
+
+  // 鬼子: rear still works
+  jp.alert = 0;
+  jp.highAlert = false;
+  jp.facing = 1;
+  st2.player.hp = 3;
+  st2.player.x = jp.x - 28;
+  st2.player.facing = 1;
+  st2.player.meleeT = 0;
+  st2.player.invuln = 0;
+  st2.input.interactPressed = true;
+  StepPlay(st2, 1 / 30);
+  Assert(jp.dead && jp.ko, "鬼子 rear KO still works");
 }
 
 function TestAct6PlantNeedsCharge() {
@@ -780,6 +875,7 @@ function Main() {
   TestAct2MustDigBeforeShelter();
   TestAct4KillInvaders();
   TestAct5StreetHunt();
+  TestMeleeKoFactions();
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
   TestNaiveAct1Bot();

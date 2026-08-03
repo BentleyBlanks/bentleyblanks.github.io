@@ -142,7 +142,7 @@ function PadInteractVerb(st) {
   if (hint === "mg_nest") return "shot";
   // Concrete world verbs beat the underground dig default.
   if (hint === "hatch") return "hatch";
-  if (hint === "stealth_ko") return "warn";
+  if (hint === "stealth_ko" || hint === "melee_risky") return "warn";
   if (hint === "pickup" || hint === "need_shovel") return "shovel";
   if (hint === "talk" || hint === "spy_talk" || hint === "shelter" || hint === "bell") return "talk";
   if (hint === "shot_port" || hint === "shoot") return "shot";
@@ -1484,7 +1484,7 @@ function DrawInteractPromptWorld() {
                 hint === "need_ammo" ||
                 hint === "mg_nest"
               ? "shot"
-              : hint === "stealth_ko"
+              : hint === "stealth_ko" || hint === "melee_risky"
                 ? "warn"
                 : hint === "flip_build" || hint === "flip_trap"
                   ? "flip"
@@ -1505,7 +1505,7 @@ function DrawInteractPromptWorld() {
   ctx.fill();
   ctx.stroke();
   DrawPictogram(icon, ix, iy, size);
-  if (hint === "need_shovel" || hint === "need_ammo" || hint === "stealth_ko") {
+  if (hint === "need_shovel" || hint === "need_ammo" || hint === "stealth_ko" || hint === "melee_risky") {
     DrawPictogram("warn", ix + size + 4 * s, iy + 2 * s, 14 * s);
   }
   if (hint === "dig" && state.player.digging) {
@@ -1540,38 +1540,79 @@ function DrawPlayer() {
           : p.held === ITEM_RIFLE
             ? "rifle"
             : null;
-  // Spine-style modular puppet — walk / crouch / dig clips on bone parts
+  // Spine-style modular puppet — walk / crouch / dig / hungry melee clips
   if (p._animT == null) p._animT = 0;
   const now = (performance.now() || 0) / 1000;
   const animDt = p._animLastTs != null ? Math.min(0.05, Math.max(0, now - p._animLastTs)) : 0.016;
   p._animLastTs = now;
   const moving = Math.abs(p.vx || 0) > 18;
+  const melee = (p.meleeT || 0) > 0;
   const clip = PickClip({
+    melee,
     digging: !!p.digging,
-    crouching: !!p.crouching,
+    crouching: !!p.crouching && !melee,
     vx: p.vx,
-    moving,
+    moving: moving && !melee,
   });
   if (p._animClip !== clip) {
     p._animT = 0;
     p._animClip = clip;
   }
-  p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
+  if (melee) {
+    // Drive strike from remaining meleeT so the chop lands mid-window.
+    const dur = 0.42;
+    p._animT = Math.max(0, dur - p.meleeT);
+  } else {
+    p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
+  }
   DrawPuppet(ctx, {
     x,
     y,
-    facing: p.facing,
+    facing: melee && p.meleeFacing ? p.meleeFacing : p.facing,
     scale: s,
     palette: "militia",
     clip,
     time: p._animT,
-    hold,
+    hold: melee ? null : hold,
     digging: !!p.digging,
-    crouching: !!p.crouching,
+    crouching: !!p.crouching && !melee,
     vx: p.vx,
     moving,
     alpha: blink ? 0.4 : 1,
   });
+}
+
+/** Impact slash / fail burst for melee KO. */
+function DrawMeleeFx() {
+  const fx = state.meleeFx;
+  if (!fx || fx.timer <= 0) return;
+  const s = Scale();
+  const x = WX(fx.x);
+  const y = WY(fx.y);
+  const u = Math.max(0, Math.min(1, fx.timer / 0.28));
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = 0.35 + u * 0.65;
+  ctx.strokeStyle = fx.ok ? "#a6452f" : "#efe2c8";
+  ctx.fillStyle = fx.ok ? "rgba(166,69,47,.55)" : "rgba(239,226,200,.4)";
+  ctx.lineWidth = 3 * s;
+  const reach = (18 + (1 - u) * 16) * s;
+  ctx.beginPath();
+  ctx.moveTo(-reach * 0.2, -reach * 0.15);
+  ctx.lineTo(reach, reach * 0.35);
+  ctx.lineTo(reach * 0.55, -reach * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (!fx.ok) {
+    ctx.beginPath();
+    ctx.moveTo(-10 * s, -10 * s);
+    ctx.lineTo(10 * s, 10 * s);
+    ctx.moveTo(10 * s, -10 * s);
+    ctx.lineTo(-10 * s, 10 * s);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function DrawAdsOverlay() {
@@ -1670,6 +1711,7 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     for (const ent of state.level.entities) DrawEntity(ent);
     DrawProjectiles();
     DrawPlayer();
+    DrawMeleeFx();
     DrawAdsOverlay();
   }
 
@@ -1708,6 +1750,7 @@ function RenderTunnelStack(w, h, camX, pal) {
   for (const ent of state.level.entities) DrawEntity(ent);
   DrawProjectiles();
   DrawPlayer();
+  DrawMeleeFx();
   // Front lips / dirt clumps occlude the digger
   DrawTunnelFrontLips(pal);
   // Dialogue / prompts above tunnel lips

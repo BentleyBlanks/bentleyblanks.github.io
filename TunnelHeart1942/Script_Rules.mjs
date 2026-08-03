@@ -97,10 +97,13 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       shotCool: 0,
       /** Act7: locked to mg_nest, rapid fire, no ammo. */
       manningMg: false,
+      meleeT: 0,
+      meleeFacing: 1,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
     },
+    meleeFx: null,
     projectiles: [],
     designMode: false,
     planCursor: level.soil ? InitPlanCursor(level.soil, level.spawn.x, level.spawn.y, 1) : null,
@@ -165,6 +168,15 @@ function ResolvePhysics(state, dt) {
   const { player, input, level } = state;
   if (state.transition > 0) return;
 
+  if (player.meleeT > 0) {
+    player.meleeT = Math.max(0, player.meleeT - dt);
+    if (player.meleeFacing) player.facing = player.meleeFacing;
+  }
+  if (state.meleeFx) {
+    state.meleeFx.timer -= dt;
+    if (state.meleeFx.timer <= 0) state.meleeFx = null;
+  }
+
   // Seized MG: pinned to the nest, always "ADS", spray with use/interact.
   if (player.manningMg) {
     const nest = level.entities.find((e) => e.type === "mg_nest");
@@ -195,8 +207,13 @@ function ResolvePhysics(state, dt) {
   let speed = MOVE_SPEED;
   if (player.crouching) speed *= 0.55;
   if (player.aiming) speed *= 0.32;
-  player.vx = move * speed;
-  if (move && !player.aiming) player.facing = move;
+  // Melee lunge: plant feet mid-strike so the chop reads.
+  if (player.meleeT > 0.08) {
+    player.vx = (player.meleeFacing || player.facing || 1) * 40;
+  } else {
+    player.vx = move * speed;
+    if (move && !player.aiming) player.facing = move;
+  }
   if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
   // No Mario jump — Valiant Hearts traversal is walk / crawl / dig / hatch.
 
@@ -777,14 +794,14 @@ function HurtEnemy(state, ent, dmg) {
   return false;
 }
 
-/** Silent rear KO — works standing / crouching / aiming / any held item. */
+/** Silent / melee KO finish. */
 function KnockOutEnemy(state, ent) {
   if (!ent || ent.type !== "enemy" || ent.dead) return false;
   ent.hp = 0;
   ent.dead = true;
   ent.ko = true;
   ent.corpse = true;
-  ent.hurtFlash = 0.2;
+  ent.hurtFlash = 0.35;
   state.stats.kills = (state.stats.kills || 0) + 1;
   state.stats.stealthKos = (state.stats.stealthKos || 0) + 1;
   DropEnemyLoot(state, ent);
@@ -797,17 +814,106 @@ function EnemyFacing(ent) {
   return 1;
 }
 
-/** Player is close behind an enemy (facing away from player). */
-function CanStealthKO(player, ent) {
-  if (!ent || ent.type !== "enemy" || ent.dead) return false;
-  if (!LayerOk(player, ent)) return false;
+/** puppet = 伪军 (easy); ijp = 鬼子/机枪手 (hard, counters front). */
+export function EnemyFaction(ent) {
+  if (!ent) return "ijp";
+  if (ent.faction === "puppet" || ent.faction === "ijp") return ent.faction;
+  if (ent.label === "伪军") return "puppet";
+  return "ijp";
+}
+
+function IsBehindEnemy(player, ent) {
   const dx = player.x - ent.x;
   const face = EnemyFacing(ent);
-  const behind = face > 0 ? dx < -10 : dx > 10;
-  if (!behind) return false;
-  if (Math.abs(dx) > 44) return false;
+  return face > 0 ? dx < -8 : dx > 8;
+}
+
+/** Close enough to throw a fist — any angle. */
+export function CanMeleeReach(player, ent) {
+  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  if (!LayerOk(player, ent)) return false;
+  if (player.inTunnel || player.manningMg) return false;
+  if ((player.meleeT || 0) > 0.12) return false;
+  if (Math.abs(player.x - ent.x) > 52) return false;
   if (Math.abs((player.y || 0) - (ent.y || 0)) > 48) return false;
   return true;
+}
+
+/** @deprecated name kept for smoke/string refs — now means melee reach. */
+function CanStealthKO(player, ent) {
+  return CanMeleeReach(player, ent);
+}
+
+function BeginMeleeStrike(state, dir) {
+  const player = state.player;
+  player.meleeT = 0.42;
+  player.meleeFacing = dir || player.facing || 1;
+  player.facing = player.meleeFacing;
+  player._animT = 0;
+  player._animClip = "melee";
+}
+
+function MeleeCounter(state, ent) {
+  const player = state.player;
+  const dir = Math.sign(ent.x - player.x) || player.facing || 1;
+  player.hp -= 1;
+  player.invuln = 1.15;
+  player.vx = -dir * 180;
+  ent.alert = Math.max(ent.alert || 0, 5.5);
+  ent.alertX = player.x;
+  ent.highAlert = true;
+  ent.hurtFlash = 0.15;
+  AlertEnemiesNear(state, player.x, 220, 4.5);
+  state.meleeFx = { x: (player.x + ent.x) / 2, y: SURFACE_Y - 36, timer: 0.28, ok: false };
+  SetBubble(state, ["warn"], "反抓", 1.0);
+  SetSubtitle(
+    state,
+    ent.label === "伪军" ? "伪军" : "鬼子",
+    EnemyFaction(ent) === "ijp"
+      ? "日军有防备——被反手抓住了！别正面硬抢！"
+      : "被挡住了！",
+    2.4,
+  );
+  if (player.hp <= 0) state.failed = true;
+  return false;
+}
+
+/**
+ * Proximity KO: 伪军 — close = down. 鬼子 — only clean rear (crouch if alerted);
+ * front / side = counter grab.
+ */
+function TryMeleeKO(state, ent) {
+  const player = state.player;
+  if (!CanMeleeReach(player, ent)) return false;
+  const dir = Math.sign(ent.x - player.x) || player.facing || 1;
+  BeginMeleeStrike(state, dir);
+  state.meleeFx = { x: (player.x + ent.x) / 2, y: SURFACE_Y - 34, timer: 0.22, ok: true };
+
+  const faction = EnemyFaction(ent);
+  const behind = IsBehindEnemy(player, ent);
+
+  if (faction === "puppet") {
+    KnockOutEnemy(state, ent);
+    SetBubble(state, ["warn"], "击晕", 0.9);
+    SetSubtitle(state, "高传宝", "伪军好对付——靠近就给他一下。", 2.0);
+    return true;
+  }
+
+  // IJA / gunner: rear only; high alert needs crouch from behind.
+  const alerted = !!ent.highAlert || (ent.alert || 0) > 1.2;
+  if (behind && (!alerted || player.crouching)) {
+    KnockOutEnemy(state, ent);
+    SetBubble(state, ["warn"], "击晕", 0.9);
+    SetSubtitle(
+      state,
+      "高传宝",
+      ent.id === "mg_gunner" ? "机枪手制住了——枪是咱们的！" : "鬼子得摸背后——正面会反抓你。",
+      2.4,
+    );
+    return true;
+  }
+  state.meleeFx.ok = false;
+  return MeleeCounter(state, ent);
 }
 
 function RaiseCorpseAlarm(state, witness, body) {
@@ -889,6 +995,7 @@ function SpawnMgWaveEnemy(state, spec, waveIdx) {
     alertX: state.player.x,
     hurtFlash: 0,
     label: spec.label || "鬼子",
+    faction: spec.label === "伪军" ? "puppet" : "ijp",
     hostile: true,
     t: 0,
     waveSpawn: true,
@@ -1032,19 +1139,20 @@ function TryInteract(state) {
 
   state.stats.interactions += 1;
 
-  // Stealth rear KO first when the geometry is clean — nest/hatch must not eat the takedown
-  // (Act7 gunner stands next to the MG nest on purpose).
+  // Melee KO before world props — nest/hatch must not eat a lined-up takedown.
+  let bestFoe = null;
+  let bestD = 9999;
   for (const ent of level.entities) {
     if (ent.type !== "enemy" || ent.dead) continue;
-    if (!CanStealthKO(player, ent)) continue;
-    KnockOutEnemy(state, ent);
-    SetBubble(state, ["warn"], "击晕", 0.9);
-    SetSubtitle(
-      state,
-      "高传宝",
-      ent.id === "mg_gunner" ? "机枪手制住了——枪是咱们的！" : "从背后制住。别让他们看见尸体。",
-      2.4,
-    );
+    if (!CanMeleeReach(player, ent)) continue;
+    const d = Math.abs(player.x - ent.x);
+    if (d < bestD) {
+      bestD = d;
+      bestFoe = ent;
+    }
+  }
+  if (bestFoe) {
+    TryMeleeKO(state, bestFoe);
     return;
   }
 
@@ -1366,8 +1474,10 @@ function RefreshHint(state) {
     }
   }
   for (const ent of state.level.entities) {
-    if (ent.type === "enemy" && !ent.dead && CanStealthKO(state.player, ent)) {
-      state.interactHint = "stealth_ko";
+    if (ent.type === "enemy" && !ent.dead && CanMeleeReach(state.player, ent)) {
+      const behind = IsBehindEnemy(state.player, ent);
+      const hard = EnemyFaction(ent) === "ijp";
+      state.interactHint = hard && !behind ? "melee_risky" : "stealth_ko";
       return;
     }
   }
@@ -1586,8 +1696,8 @@ export function NextStepText(state) {
       if ((state.player.ammo || 0) <= 0 && state.player.held !== ITEM_RIFLE) {
         return "捡枪/弹药，或绕到敌人背后击晕";
       }
-      if ((state.player.ammo || 0) <= 0) return "没子弹了：捡弹药，或背后击晕";
-      return "清街：开镜开枪 / 扔手雷 / 背后击晕（别让人看见尸体）";
+      if ((state.player.ammo || 0) <= 0) return "没子弹了：捡弹药，或靠近敲晕";
+      return "清街：伪军靠近就敲；鬼子摸背后——正面会反抓。别让人看见尸体";
     }
     return "街道已清";
   }

@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v7";
-export const CACHE_BUST = "20260803r";
+export const CACHE_BUST = "20260803s";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -197,7 +197,7 @@ export const CHAPTERS = [
     timeLabel: "一九四三年 · 夏夜",
     cast: "高传宝",
     night: true,
-    objective: "弹药极少。开镜开枪、扔手雷，或绕到背后制住——别让敌人看见尸体。",
+    objective: "弹药极少。开镜/手雷，或靠近敲晕——伪军好敲，鬼子摸背后，正面会反抓。别让人看见尸体。",
     goals: ["talk_street", "clear_street"],
     openPanels: [
       {
@@ -209,13 +209,13 @@ export const CHAPTERS = [
       {
         id: "p5b",
         speaker: "困难",
-        text: "子弹很少。枪声会招人；尸体被看见，他们会喊同伴高度警戒。",
+        text: "子弹很少。伪军靠近就能敲晕；鬼子有防备，正面硬抢会被反抓。尸体被看见会喊人。",
         mood: "talk",
       },
       {
         id: "p5c",
         speaker: "目标",
-        text: "开镜开枪 · 扔手雷 · 绕到背后击晕。清光街道。子弹很紧，别浪。",
+        text: "开镜开枪 · 扔手雷 · 靠近敲晕（鬼子摸背后）。清光街道。子弹很紧，别浪。",
         mood: "tip",
       },
     ],

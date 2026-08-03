@@ -290,6 +290,66 @@ export const CLIPS = {
       { t: 1, torso: 0.1, armR: -1.2, foreR: 0.3, armL: 0.5, thighL: 0.15, thighR: -0.1 },
     ],
   },
+  // Hungry close-range KO — coil then lunge chop (not a polite tap).
+  melee: {
+    duration: 0.42,
+    keys: [
+      {
+        t: 0,
+        torso: -0.18,
+        neck: -0.12,
+        armR: 1.15,
+        foreR: -0.55,
+        armL: 0.55,
+        foreL: 0.2,
+        thighL: 0.28,
+        shinL: -0.2,
+        thighR: -0.22,
+        shinR: 0.12,
+        footR: -0.08,
+        _hipY: 1.2,
+      },
+      {
+        t: 0.28,
+        torso: 0.42,
+        neck: 0.22,
+        armR: -1.85,
+        foreR: 0.35,
+        armL: -0.55,
+        foreL: 0.15,
+        thighL: 0.45,
+        shinL: -0.35,
+        thighR: -0.35,
+        shinR: 0.2,
+        footL: 0.1,
+        _hipY: 3.2,
+      },
+      {
+        t: 0.55,
+        torso: 0.28,
+        neck: 0.1,
+        armR: -1.25,
+        foreR: 0.55,
+        armL: -0.25,
+        foreL: 0.1,
+        thighL: 0.3,
+        shinL: -0.18,
+        thighR: -0.18,
+        _hipY: 2.2,
+      },
+      {
+        t: 1,
+        torso: 0.06,
+        neck: 0.02,
+        armR: -0.35,
+        foreR: 0.12,
+        armL: 0.1,
+        thighL: 0.08,
+        thighR: -0.06,
+        _hipY: 0.4,
+      },
+    ],
+  },
 };
 
 function Lerp(a, b, u) {
@@ -324,6 +384,7 @@ export function SampleClip(clipName, timeSec) {
 }
 
 export function PickClip(opts) {
+  if (opts.melee) return "melee";
   if (opts.digging) return "dig";
   if (opts.crouching) return "crouch";
   if (opts.alert) return "alert";
