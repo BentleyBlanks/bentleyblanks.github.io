@@ -1,4 +1,4 @@
-const AudioVersion = "20260803zah";
+const AudioVersion = "20260804zaa";
 
 const AudioAssets = Object.freeze({
   village: new URL(`./Audio/AudioBgm_VillageRuins.ogg?v=${AudioVersion}`, import.meta.url).href,

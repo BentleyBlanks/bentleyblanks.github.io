@@ -1,7 +1,7 @@
 import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
-import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zah";
+import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260804zaa";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -5088,7 +5088,7 @@ function DrawEnemyFocusHud(width, viewportHeight, surfaceY, tunnelY, enemyHeight
     context.save(); context.translate(symbolX, symbolY); context.rotate(Math.PI / 4); context.fillRect(-6, -6, 12, 12); context.restore();
   } else context.fillRect(symbolX - 6, symbolY - 6, 12, 12);
   context.fillStyle = "#f4ead4"; context.font = `900 ${titleSize}px system-ui, sans-serif`; context.textAlign = "left";
-  context.fillText(mobileCombat ? `${identity.faction} · ${identity.role}` : `敌军 · ${identity.faction}`, cardX + (mobileCombat ? 22 : 31), cardY + (mobileCombat ? 17 : mobile ? 18 : 22));
+  context.fillText(mobileCombat ? `${identity.faction} · ${identity.role}` : identity.faction, cardX + (mobileCombat ? 22 : 31), cardY + (mobileCombat ? 17 : mobile ? 18 : 22));
   context.fillStyle = statusTone; context.font = `700 ${bodySize}px system-ui, sans-serif`;
   if (!mobileCombat) context.fillText(`${identity.role} · ${interaction.status}`, cardX + 12, cardY + (mobile ? 36 : 42));
   if (interaction.ready) {
