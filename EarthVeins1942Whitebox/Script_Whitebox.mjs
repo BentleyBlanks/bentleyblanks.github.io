@@ -26,6 +26,26 @@ const entrances = [-1.1, 8.6];
 const requiredCollect = ["collectWood", "collectIron", "collectPowder", "collectSupplies"];
 const requiredRescues = ["wounded", "grain", "courier"];
 const takedownRoles = new Set(["leader", "blacksmith", "scout"]);
+const patrolRouteSets = Object.freeze({
+  collect: Object.freeze([
+    Object.freeze({ anchor: -2.8, span: 3.15, speed: .3, phase: 1.1, viewDistance: 3.15 }),
+    Object.freeze({ anchor: 7.55, span: 2.05, speed: .24, phase: 4.05, viewDistance: 3.05 })
+  ]),
+  defense: Object.freeze([
+    Object.freeze({ anchor: -7.55, span: 1.75, speed: .28, phase: .45, viewDistance: 3.1 }),
+    Object.freeze({ anchor: .45, span: 2.35, speed: .24, phase: 3.3, viewDistance: 3.15 }),
+    Object.freeze({ anchor: 8.0, span: 1.65, speed: .31, phase: 5.15, viewDistance: 3.0 })
+  ]),
+  ensemble: Object.freeze([
+    Object.freeze({ anchor: -2.55, span: 3.05, speed: .27, phase: .7, viewDistance: 3.15 }),
+    Object.freeze({ anchor: 7.45, span: 2.15, speed: .23, phase: 4.2, viewDistance: 3.05 })
+  ]),
+  mindGame: Object.freeze([
+    Object.freeze({ anchor: -6.95, span: 2.0, speed: .29, phase: .4, viewDistance: 3.35 }),
+    Object.freeze({ anchor: .65, span: 2.45, speed: .22, phase: 3.25, viewDistance: 3.4 }),
+    Object.freeze({ anchor: 8.05, span: 1.8, speed: .31, phase: 5.0, viewDistance: 3.2 })
+  ])
+});
 const inputKeys = { left: false, right: false };
 const fluidCanvas = document.createElement("canvas");
 const fluidContext = fluidCanvas.getContext("2d");
@@ -68,6 +88,8 @@ function CreateState(levelIndex) {
     defense: { ventilation: 0, strength: 0, enemyUnits: 8, triggered: 0, activeSlots: new Set() },
     prepRemaining: levelIndex === 0 ? 92 : null,
     raid: { active: false, elapsed: 0, duration: 72, stage: "准备", announcedStage: null, smokeKnown: false, waterKnown: false, distraction: null, dogSmokeRelief: 0 },
+    patrolLure: null,
+    dogBarkCooldown: 0,
     dog: { x: level.startX + .55, layer: level.phases[0].layer, facing: 1, step: 0, motionBlend: 0, actionKind: null, commandId: null, commandMode: "follow", targetX: level.startX + .55, targetLayer: level.phases[0].layer, workRemaining: 0, workDuration: 0, progress: 0, whistlePulse: 0, resultTime: 0, lastResult: "" },
     civilians: levelIndex === 0 ? CreateCivilians() : [],
     selectedCivilianGroup: "elders",
@@ -77,6 +99,7 @@ function CreateState(levelIndex) {
     qaFreezePatrols: false,
     qaPatrolTime: 0,
     qaSafePreview: false,
+    qaPatrolReview: false,
     fluid: levelIndex === 0 ? CreateTunnelFluidSimulation({ columns: 152, rows: 58 }) : null,
     fluidAccumulator: 0,
     rescues: { wounded: false, grain: false, courier: false },
@@ -248,9 +271,14 @@ function MissingRequirement(action) {
 
 function PerformAction() {
   if (IsBlocked()) return;
+  const action = FindNearestAction();
   const takedownTarget = FindTakedownTarget();
   if (takedownTarget) {
     StartTakedown(takedownTarget);
+    return;
+  }
+  if (state.selectedRole === "dog" && state.player.layer === "surface" && action?.role !== "dog") {
+    StartDogBarkLure();
     return;
   }
   const nearbyEnemy = FindFocusedEnemy(1.45);
@@ -259,7 +287,6 @@ function PerformAction() {
     Toast(interaction.instruction, interaction.ready ? "success" : "warning");
     return;
   }
-  const action = FindNearestAction();
   if (!action) {
     const entrance = entrances.find((x) => Math.abs(x - state.player.x) < 1.05);
     Toast(entrance !== undefined ? (state.player.layer === "surface" ? "这里按 S 向下进入地道，不是行动键。" : "这里按 W 向上回到地表，不是行动键。") : "靠近发光的现场标记后再行动。", "neutral");
@@ -468,6 +495,54 @@ function StartDiversion(action) {
 function ActiveDiversion(kind = null) {
   const diversion = state.raid.distraction;
   return Boolean(diversion && diversion.remaining > 0 && (!kind || diversion.kind === kind));
+}
+
+function ActivePatrolLure(kind = null) {
+  const lure = state.patrolLure;
+  return lure && lure.remaining > 0 && (!kind || lure.kind === kind) ? lure : null;
+}
+
+function StartDogBarkLure(qaPreview = false) {
+  if (state.selectedRole !== "dog" || state.player.layer !== "surface") return false;
+  if (!GetEnemyPatrols().length) {
+    Toast("附近没有巡逻。阿土竖着耳朵，没有乱叫。", "neutral");
+    return false;
+  }
+  if (!qaPreview && state.dogBarkCooldown > 0) {
+    Toast(`阿土还在喘，${Math.ceil(state.dogBarkCooldown)} 秒后才能再次大声诱敌。`, "warning");
+    return false;
+  }
+  const duration = 6.8;
+  state.patrolLure = {
+    kind: "dogBark",
+    label: "阿土吠声",
+    sourceX: state.player.x,
+    targetX: Math.max(worldMin + 1, Math.min(worldMax - 1, state.player.x + state.player.facing * 1.75)),
+    duration,
+    remaining: duration,
+    age: 0
+  };
+  state.dogBarkCooldown = qaPreview ? 0 : 9;
+  state.player.actionKind = "signal";
+  state.player.actionTime = .9;
+  state.player.actionDuration = .9;
+  state.player.moving = false;
+  state.dog.whistlePulse = 1;
+  Toast("汪！敌兵会追向这声吠叫。阿土立刻反向跑，通路就在他们身后。", "success");
+  UpdateUi();
+  return true;
+}
+
+function UpdatePatrolLure(delta) {
+  state.dogBarkCooldown = Math.max(0, state.dogBarkCooldown - delta);
+  const lure = ActivePatrolLure();
+  if (!lure) return;
+  lure.age += delta;
+  lure.remaining = Math.max(0, lure.remaining - delta);
+  if (lure.remaining > 0) return;
+  state.patrolLure = null;
+  Toast("吠声散了，敌兵重新回到各自巡逻线。", "neutral");
+  UpdateUi();
 }
 
 function EvaluateProgress(action) {
@@ -763,19 +838,26 @@ function RenderCivilianCommands() {
 
 function RenderDogCommandHud() {
   if (!ui.dogCommandHud) return;
-  const visible = state.levelIndex === 0 && state.mode === "play";
+  const lure = ActivePatrolLure("dogBark");
+  const visible = state.level.roleIds.includes("dog") && state.mode === "play" && !lure;
   Show(ui.dogCommandHud, visible);
   if (!visible) return;
   const action = state.dog.commandId ? state.level.actions.find((item) => item.id === state.dog.commandId) : null;
   let status = "跟随传宝，等待哨令";
-  if (state.selectedRole === "dog") status = "玩家正在直接控制阿土";
+  if (lure) status = `吠声诱敌 · ${GetEnemyPatrols().length} 名敌兵追向原地 · 剩 ${Math.ceil(lure.remaining)} 秒`;
+  else if (state.selectedRole === "dog" && state.player.layer === "surface" && state.dogBarkCooldown > 0) status = `吠叫冷却 ${Math.ceil(state.dogBarkCooldown)} 秒 · 利用刚拉开的空档`;
+  else if (state.selectedRole === "dog" && state.player.layer === "surface") status = "行动键：原地吠叫诱敌，然后立刻反向穿越";
+  else if (state.selectedRole === "dog") status = "玩家正在直接控制阿土";
   else if (action && state.dog.commandMode === "travel") status = `奔向${action.dogCommand.label}`;
   else if (action) status = `正在${action.dogCommand.task}`;
   else if (state.dog.resultTime > 0) status = `已完成：${state.dog.lastResult}`;
   ui.dogCommandStatus.textContent = status;
-  ui.dogCommandHud.classList.toggle("commanding", Boolean(action));
+  ui.dogCommandHud.classList.toggle("commanding", Boolean(action || lure));
   const progressFill = ui.dogCommandProgress?.querySelector("u");
-  if (progressFill) progressFill.style.width = `${Math.round(Math.max(0, Math.min(1, state.dog.progress)) * 100)}%`;
+  if (progressFill) {
+    const progress = lure ? lure.remaining / lure.duration : action ? state.dog.progress : state.dogBarkCooldown > 0 ? 1 - state.dogBarkCooldown / 9 : 0;
+    progressFill.style.width = `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
+  }
 }
 
 function FailMission(reason, civilian) {
@@ -893,7 +975,7 @@ function UpdateUi() {
   const takedownTarget = FindTakedownTarget();
   const focusedEnemy = FindFocusedEnemy();
   const action = FindNearestAction();
-  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !focusedEnemy && !IsBlocked());
+  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !focusedEnemy && !state.qaPatrolReview && !ActivePatrolLure("dogBark") && !IsBlocked());
   if (action) {
     ui.interactionVerb.textContent = action.verb;
     ui.interactionName.textContent = action.prop?.label || action.title;
@@ -916,9 +998,10 @@ function RenderQaPanel() {
   Show(ui.qaPanel);
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
-  const levelOneQa = '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
-  const levelThreeQa = '<button type="button" data-qa-hazard="enemyHud">HUD：伪军身份</button><button type="button" data-qa-hazard="enemyHudJapanese">HUD：日军身份</button><button type="button" data-qa-hazard="takedownReady">交互：靠近日军可制服</button><button type="button" data-qa-hazard="takedownReadyCollaborator">交互：靠近伪军可制服</button><button type="button" data-qa-hazard="takedownNext">交互：下一个敌人</button><button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
-  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? levelOneQa : state.levelIndex === 2 ? levelThreeQa : "";
+  const levelOneQa = '<button type="button" data-qa-hazard="dogBark">诱敌：阿土吠叫</button><button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelTwoQa = '<button type="button" data-qa-hazard="dogBark">诱敌：阿土吠叫</button><button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelThreeQa = '<button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="enemyHud">HUD：伪军身份</button><button type="button" data-qa-hazard="enemyHudJapanese">HUD：日军身份</button><button type="button" data-qa-hazard="takedownReady">交互：靠近日军可制服</button><button type="button" data-qa-hazard="takedownReadyCollaborator">交互：靠近伪军可制服</button><button type="button" data-qa-hazard="takedownNext">交互：下一个敌人</button><button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? levelOneQa : state.levelIndex === 1 ? levelTwoQa : levelThreeQa;
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
     EndCinematic();
@@ -933,7 +1016,8 @@ function RenderQaPanel() {
 function UpdateQaReadout() {
   if (!qaMode || !ui.qaStateReadout) return;
   const fluid = state.fluid?.GetStatistics();
-  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short} · 制服${state.takedownCount} · 犬${state.dog?.commandMode || "—"}${fluid ? ` · 烟${Math.round(fluid.smokeMass)} 水${Math.round(fluid.waterMass)}` : ""}`;
+  const lure = ActivePatrolLure("dogBark");
+  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short} · 敌${GetEnemyPatrols().length} · ${lure ? `追声${lure.remaining.toFixed(1)}秒` : `吠叫冷却${state.dogBarkCooldown.toFixed(1)}`} · 制服${state.takedownCount} · 犬${state.dog?.commandMode || "—"}${fluid ? ` · 烟${Math.round(fluid.smokeMass)} 水${Math.round(fluid.waterMass)}` : ""}`;
 }
 
 function QaComplete(ids) {
@@ -1010,13 +1094,18 @@ function ContextHint() {
     const identity = EnemyIdentity(takedownTarget);
     return `E · 制服${identity.faction}${identity.role}｜非致命`;
   }
+  const action = FindNearestAction();
+  const patrolLure = ActivePatrolLure("dogBark");
+  if (patrolLure) return `犬吠诱敌 · ${GetEnemyPatrols().length} 名追声中 · ${Math.ceil(patrolLure.remaining)} 秒｜立刻反向穿过`;
+  if (state.selectedRole === "dog" && state.player.layer === "surface" && action?.role !== "dog") {
+    return state.dogBarkCooldown > 0 ? `吠叫冷却 ${Math.ceil(state.dogBarkCooldown)} 秒｜先利用现有空档` : "E · 原地吠叫诱敌｜敌兵追声后立刻反向跑";
+  }
   const focusedEnemy = FindFocusedEnemy();
   if (focusedEnemy) {
     const identity = EnemyIdentity(focusedEnemy);
     const interaction = EnemyInteractionState(focusedEnemy);
     return `${identity.faction}${identity.role} · ${interaction.status}｜${interaction.instruction}`;
   }
-  const action = FindNearestAction();
   if (state.dog?.commandId) {
     const dogAction = state.level.actions.find((item) => item.id === state.dog.commandId);
     return `阿土：${state.dog.commandMode === "travel" ? `正去${dogAction?.dogCommand?.label}` : dogAction?.dogCommand?.task}`;
@@ -1070,6 +1159,7 @@ function Update(delta) {
   state.unconsciousEnemies.forEach((enemy) => { enemy.age += delta; });
   state.takedownGrace = Math.max(0, state.takedownGrace - delta);
   UpdateDogPartner(delta);
+  if (state.mode === "play") UpdatePatrolLure(delta);
   state.player.rolePulse = Math.max(0, state.player.rolePulse - delta * .65);
   if (state.player.actionTime > 0) {
     state.player.actionTime = Math.max(0, state.player.actionTime - delta);
@@ -1210,6 +1300,7 @@ function EnemyIdentity(enemy) {
 
 function FindFocusedEnemy(maxDistance = 4.2) {
   if (state.player.layer !== "surface" || state.takedown) return null;
+  if (state.qaPatrolReview || ActivePatrolLure("dogBark")) return null;
   const patrols = GetEnemyPatrols();
   const qaFocus = qaMode && state.qaEnemyFocusId ? patrols.find((enemy) => enemy.id === state.qaEnemyFocusId) : null;
   if (qaFocus && Math.abs(qaFocus.x - state.player.x) <= maxDistance) return qaFocus;
@@ -1236,7 +1327,11 @@ function EnemyInteractionState(enemy) {
   const ready = roleAllowed && unseen && rearPosition && distance <= 1.35 && state.takedownGrace <= 0;
   let status = enemy.investigating ? "正在搜查" : "巡逻中";
   let instruction = roleAllowed ? "贴近侧后方，等他背向你时按行动键。" : "当前角色不执行制服；切换传宝、根生或青禾。";
-  if (state.detected || state.detection > 0) { status = "已经发现你"; instruction = "已经暴露，先脱离视线。"; }
+  if (enemy.lureKind === "dogBark") {
+    status = "追声中";
+    instruction = state.selectedRole === "dog" ? "敌兵正追向吠声原点，立刻反向穿过。" : "敌兵正背向通路追声，趁空档移动。";
+  }
+  else if (state.detected || state.detection > 0) { status = "已经发现你"; instruction = "已经暴露，先脱离视线。"; }
   else if (!rearPosition && distance <= 1.35) { status = "正面警戒"; instruction = "敌人正看着这里，绕到侧后方。"; }
   else if (ready) { status = "可非致命制服"; instruction = "按行动键制服；目标会昏迷但仍有呼吸。"; }
   else if (distance <= 2.5 && roleAllowed) status = "接近中";
@@ -1310,32 +1405,89 @@ function UpdateTakedown(delta) {
 }
 
 function GetEnemyPatrols() {
-  let bases = [];
-  if (state.levelIndex === 0 && state.phaseId === "collect") bases = [-6.1, 2.2, 7.2];
+  let routes = [];
+  if (state.levelIndex === 0 && state.phaseId === "collect") routes = patrolRouteSets.collect;
   else if (state.levelIndex === 0 && state.phaseId === "defense") {
-    const count = Math.max(2, Math.min(5, Math.ceil(state.defense.enemyUnits / 2)));
-    bases = [-8.8, -4.5, .8, 5.2, 8.7].slice(0, count);
+    const count = Math.min(3, Math.ceil(state.defense.enemyUnits / 3));
+    routes = patrolRouteSets.defense.slice(0, count);
   }
-  else if (state.levelIndex === 1 && state.player.layer === "surface") bases = [2.4, 5.6, 8.8];
-  else if (state.levelIndex === 2) bases = [-2.2, 2.1, 6.2, 9.2].slice(0, Math.max(2, Math.ceil(state.morale / 25)));
-  const diversion = state.levelIndex === 0 && state.phaseId === "defense" && ActiveDiversion() ? state.raid.distraction : null;
-  return bases.map((base, index) => {
+  else if (state.levelIndex === 1 && state.player.layer === "surface") routes = patrolRouteSets.ensemble;
+  else if (state.levelIndex === 2) {
+    const count = state.morale > 70 ? 3 : 2;
+    routes = patrolRouteSets.mindGame.slice(0, count);
+  }
+  const patrolLure = ActivePatrolLure();
+  const scriptedDiversion = state.levelIndex === 0 && state.phaseId === "defense" && ActiveDiversion() ? state.raid.distraction : null;
+  const diversion = patrolLure || scriptedDiversion;
+  return routes.map((route, index) => {
     const patrolClock = state.qaFreezePatrols ? state.qaPatrolTime : state.elapsed;
-    const time = patrolClock * (.42 + index * .035) + index * 1.7;
-    const travel = Math.sin(time) * (index % 2 ? 1.05 : 1.25);
-    let x = base + travel;
+    const time = patrolClock * route.speed + route.phase;
+    const travel = Math.sin(time) * route.span;
+    let x = route.anchor + travel;
     let facing = Math.cos(time) >= 0 ? 1 : -1;
     if (diversion) {
-      const formationX = diversion.targetX + (index - (bases.length - 1) / 2) * .42;
-      const pull = Math.min(.92, .22 + diversion.age * .27);
+      const spacing = diversion.kind === "dogBark" ? 1.28 : .42;
+      const formationX = diversion.targetX + (index - (routes.length - 1) / 2) * spacing;
+      const pull = diversion.kind === "dogBark" ? Math.min(.96, .18 + diversion.age * .34) : Math.min(.92, .22 + diversion.age * .27);
       x = Lerp(x, formationX, pull);
       facing = Math.sign(formationX - x) || facing;
     }
     const unitType = index % 3 === 1 ? "collaborator" : "soldier";
     const rank = index === 0 && state.phaseId === "defense" ? "sectionLeader" : "rifleman";
     const id = `${state.levelIndex}:${state.phaseId}:${index}`;
-    return { id, x, facing, viewDistance: state.levelIndex === 2 ? 4.4 : diversion ? 3.25 : 3.8, index, unitType, rank, investigating: Boolean(diversion) };
+    return {
+      id, x, facing,
+      viewDistance: diversion ? Math.min(route.viewDistance, diversion.kind === "dogBark" ? 2.65 : 3.05) : route.viewDistance,
+      index, unitType, rank,
+      investigating: Boolean(diversion),
+      lureKind: diversion?.kind || null,
+      routeMin: route.anchor - route.span,
+      routeMax: route.anchor + route.span
+    };
   }).filter((enemy) => !state.neutralizedEnemies.has(enemy.id));
+}
+
+function DrawPatrolRoutes(width, surfaceY) {
+  if (state.player.layer !== "surface" || ActivePatrolLure("dogBark")) return;
+  const patrols = GetEnemyPatrols().slice().sort((left, right) => left.routeMin - right.routeMin);
+  if (!patrols.length) return;
+  const review = Boolean(state.qaPatrolReview);
+  const lineY = surfaceY + 10;
+  context.save();
+  context.textAlign = "center";
+  patrols.forEach((enemy, index) => {
+    const startX = WorldToScreen(enemy.routeMin, width);
+    const endX = WorldToScreen(enemy.routeMax, width);
+    const left = Math.max(4, Math.min(startX, endX));
+    const right = Math.min(width - 4, Math.max(startX, endX));
+    if (right <= left) return;
+    context.fillStyle = review ? "rgba(160,70,55,.28)" : "rgba(141,74,56,.13)";
+    context.fillRect(left, lineY - 4, right - left, 8);
+    context.strokeStyle = review ? "rgba(211,127,91,.9)" : "rgba(178,113,79,.38)";
+    context.lineWidth = review ? 2.2 : 1.2;
+    context.beginPath(); context.moveTo(left, lineY); context.lineTo(right, lineY); context.moveTo(left, lineY - 7); context.lineTo(left, lineY + 7); context.moveTo(right, lineY - 7); context.lineTo(right, lineY + 7); context.stroke();
+    if (review) {
+      const centerX = (left + right) / 2;
+      context.fillStyle = "rgba(18,17,15,.9)"; context.fillRect(centerX - 34, lineY + 10, 68, 17);
+      context.fillStyle = "#e0b18a"; context.font = '800 9px "FangSong", serif'; context.fillText(`巡逻段 ${index + 1}`, centerX, lineY + 22);
+    }
+  });
+  if (review) {
+    for (let index = 0; index < patrols.length - 1; index += 1) {
+      const gapStart = WorldToScreen(patrols[index].routeMax, width);
+      const gapEnd = WorldToScreen(patrols[index + 1].routeMin, width);
+      const left = Math.max(4, Math.min(gapStart, gapEnd));
+      const right = Math.min(width - 4, Math.max(gapStart, gapEnd));
+      if (right - left < 48) continue;
+      const centerX = (left + right) / 2;
+      context.fillStyle = "rgba(77,171,164,.18)"; context.fillRect(left, lineY - 5, right - left, 10);
+      context.strokeStyle = "rgba(111,224,214,.92)"; context.lineWidth = 2.4;
+      context.beginPath(); context.moveTo(left, lineY - 6); context.lineTo(left, lineY + 7); context.lineTo(right, lineY + 7); context.lineTo(right, lineY - 6); context.stroke();
+      context.fillStyle = "rgba(8,18,18,.94)"; context.fillRect(centerX - 39, lineY + 10, 78, 17);
+      context.fillStyle = "#bdf3ed"; context.font = '900 9px "FangSong", serif'; context.fillText("穿越空档", centerX, lineY + 22);
+    }
+  }
+  context.restore();
 }
 
 function GetSurfaceCovers() {
@@ -1356,6 +1508,7 @@ function UpdateCoverState() {
 
 function EnemyDetection(enemy, playerX = state.player.x) {
   if (state.player.layer !== "surface") return 0;
+  if (state.selectedRole === "dog" && ActivePatrolLure("dogBark")) return 0;
   if (GetActiveCover(playerX)) return 0;
   const forward = (playerX - enemy.x) * enemy.facing;
   if (forward < .18 || forward > enemy.viewDistance) return 0;
@@ -1410,19 +1563,22 @@ function Draw() {
   DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
   DrawSceneHierarchyVeil(width, height, surfaceY, tunnelY);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
-  if (!state.takedown) DrawActions(width, height, surfaceY, tunnelY);
+  if (!state.takedown && !state.qaPatrolReview && !ActivePatrolLure("dogBark")) DrawActions(width, height, surfaceY, tunnelY);
+  DrawPatrolRoutes(width, surfaceY);
   DrawEnemies(width, surfaceY);
   DrawUnconsciousEnemies(width, surfaceY);
   DrawTakedownTarget(width, surfaceY);
   DrawCivilians(width, height, tunnelY);
   DrawDogCompanion(width, height, surfaceY, tunnelY);
-  DrawActor(width, height, surfaceY, tunnelY);
+  if (!ActivePatrolLure("dogBark")) DrawActor(width, height, surfaceY, tunnelY);
   DrawSurfaceCovers(width, surfaceY, true);
+  if (ActivePatrolLure("dogBark")) DrawActor(width, height, surfaceY, tunnelY);
   DrawActionProps(width, height, surfaceY, tunnelY, true);
   DrawPickupTransfer(width, height, surfaceY, tunnelY);
   DrawSurfaceDiversions(width, height, surfaceY);
+  DrawDogBarkLure(width, surfaceY);
   DrawDogCommandFocus(width, height, surfaceY, tunnelY);
-  DrawActorVisibilityHud(width, surfaceY);
+  if (!ActivePatrolLure("dogBark")) DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
   DrawDepthHint(width, height, surfaceY, tunnelY);
   DrawTakedownCinematicOverlay(width, height);
@@ -2667,6 +2823,49 @@ function QaInspectHazard(kind) {
     UpdateUi();
     return;
   }
+  if (kind === "dogBark") {
+    if (!state.level.roleIds.includes("dog")) return;
+    QaJumpToPhase(state.levelIndex === 0 ? "collect" : "survey");
+    EndCinematic();
+    state.selectedRole = "dog";
+    state.player.layer = "surface";
+    state.player.x = -8.7;
+    state.player.facing = 1;
+    state.dog.layer = "surface";
+    state.dog.x = state.player.x;
+    state.dog.facing = state.player.facing;
+    state.qaFreezePatrols = true;
+    state.qaPatrolTime = 0;
+    state.qaSafePreview = true;
+    state.camera.x = -2.4;
+    state.camera.targetX = -2.4;
+    state.camera.zoom = .92;
+    state.camera.targetZoom = .92;
+    StartDogBarkLure(true);
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    return;
+  }
+  if (kind === "patrolWindow") {
+    const phaseId = state.levelIndex === 0 ? "collect" : state.levelIndex === 1 ? "survey" : "harass";
+    QaJumpToPhase(phaseId);
+    EndCinematic();
+    state.player.layer = "surface";
+    state.player.x = -10.1;
+    state.player.facing = 1;
+    state.qaFreezePatrols = true;
+    state.qaPatrolTime = state.levelIndex === 1 ? 8.4 : 0;
+    state.qaSafePreview = true;
+    state.qaPatrolReview = true;
+    state.qaEnemyFocusId = null;
+    state.camera.x = 0;
+    state.camera.targetX = 0;
+    state.camera.zoom = .84;
+    state.camera.targetZoom = .84;
+    state.qaCameraFocus = { x: 0, zoom: .84 };
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    Toast(`巡逻已错峰：${GetEnemyPatrols().length} 名敌兵分区巡逻，中间留有可穿越空档。`, "success");
+    return;
+  }
   if (["enemyHud", "enemyHudJapanese", "takedownReady", "takedownReadyCollaborator", "takedownNext"].includes(kind)) {
     if (state.levelIndex !== 2) return;
     if (kind !== "takedownNext") QaJumpToPhase("harass");
@@ -3186,6 +3385,61 @@ function DrawSurfaceDiversions(width, height, surfaceY) {
   context.restore();
 }
 
+function DrawDogBarkLure(width, surfaceY) {
+  const lure = ActivePatrolLure("dogBark");
+  if (!lure) return;
+  const sourceX = WorldToScreen(lure.sourceX, width);
+  const sourceY = surfaceY - 46;
+  const progress = Math.max(0, Math.min(1, lure.age / lure.duration));
+  const pulseAge = lure.age % 1.18;
+  const pulseProgress = pulseAge / 1.18;
+  const alpha = 1 - pulseProgress;
+  const enemyCount = GetEnemyPatrols().filter((enemy) => enemy.lureKind === "dogBark").length;
+  const seconds = Math.max(0, Math.ceil(lure.remaining));
+  const cardWidth = width <= 640 ? 142 : 174;
+  const cardX = Math.max(8, Math.min(width - cardWidth - 8, sourceX - cardWidth - 14));
+  const cardY = Math.max(72, sourceY - 94);
+
+  context.save();
+  context.lineCap = "round";
+  context.strokeStyle = `rgba(239,194,105,${.82 * alpha})`;
+  context.lineWidth = width <= 640 ? 2 : 2.6;
+  [0, 1, 2].forEach((index) => {
+    const radius = 15 + pulseProgress * 48 + index * 9;
+    context.beginPath();
+    context.arc(sourceX, sourceY, radius, -1.2, 1.2);
+    context.stroke();
+  });
+  context.fillStyle = "rgba(10,14,14,.94)";
+  context.fillRect(cardX, cardY, cardWidth, 42);
+  context.fillStyle = "#d89b4f";
+  context.fillRect(cardX, cardY, 5, 42);
+  context.strokeStyle = "rgba(238,218,179,.26)";
+  context.lineWidth = 1;
+  context.strokeRect(cardX + .5, cardY + .5, cardWidth - 1, 41);
+  context.fillStyle = "#f3ead5";
+  context.font = `900 ${width <= 640 ? 10 : 12}px system-ui, sans-serif`;
+  context.textAlign = "left";
+  context.fillText(`阿土吠声 · ${enemyCount} 名追声`, cardX + 13, cardY + 17);
+  context.fillStyle = "#8fe2d9";
+  context.font = `700 ${width <= 640 ? 9 : 10}px system-ui, sans-serif`;
+  context.fillText(`敌兵离岗｜空档还剩 ${seconds} 秒`, cardX + 13, cardY + 33);
+
+  const corridorStart = Math.max(sourceX + 72, width * .28);
+  const corridorEnd = Math.min(width - 28, corridorStart + width * .2);
+  if (corridorEnd - corridorStart > 52 && progress < .92) {
+    const corridorY = surfaceY - 12;
+    context.fillStyle = "rgba(69,174,166,.15)"; context.fillRect(corridorStart, corridorY - 5, corridorEnd - corridorStart, 10);
+    context.strokeStyle = "rgba(110,222,211,.82)";
+    context.lineWidth = 2.4;
+    context.beginPath(); context.moveTo(corridorStart, corridorY - 7); context.lineTo(corridorStart, corridorY + 7); context.lineTo(corridorEnd, corridorY + 7); context.lineTo(corridorEnd, corridorY - 7); context.stroke();
+    const corridorCenter = (corridorStart + corridorEnd) / 2;
+    context.fillStyle = "rgba(8,13,14,.9)"; context.fillRect(corridorCenter - 38, corridorY - 27, 76, 18);
+    context.fillStyle = "#baf2ec"; context.font = "800 10px system-ui, sans-serif"; context.textAlign = "center"; context.fillText("通路已打开", corridorCenter, corridorY - 14);
+  }
+  context.restore();
+}
+
 function DrawDogCommandEnvironment(width, height, surfaceY, tunnelY) {
   if (state.levelIndex !== 0) return;
   const targets = [
@@ -3480,6 +3734,7 @@ function DrawFocusBrackets(x, y, halfWidth, halfHeight, color) {
 function DrawActionProps(width, height, surfaceY, tunnelY, front) {
   const sceneScale = Math.max(.72, Math.min(1.05, width / 980));
   const enemyFocus = FindFocusedEnemy();
+  const suppressMarkers = state.qaPatrolReview || Boolean(ActivePatrolLure("dogBark"));
   const focusedProp = enemyFocus ? null : state.level.actions
     .filter((action) => action.phase === state.phaseId && action.layer === state.player.layer && action.prop && Math.abs(action.x - state.player.x) <= 1.9)
     .sort((a, b) => Math.abs(a.x - state.player.x) - Math.abs(b.x - state.player.x))[0] || null;
@@ -3496,6 +3751,7 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const focused = focusedProp?.id === action.id;
     const entityScale = sceneScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
     context.save(); context.translate(x, baseY);
+    if (suppressMarkers) context.globalAlpha = .34;
     DrawPropSupport(action.prop.support, sceneScale, empty);
     context.translate(0, supportLift);
     if (present) DrawPropObject(action.prop.kind, entityScale);
@@ -3504,7 +3760,7 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
 
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * entityScale * .58;
-    if (!completed && sameLayer && !enemyFocus) {
+    if (!completed && sameLayer && !enemyFocus && !suppressMarkers) {
       const markerColor = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.82)";
       if (focused) DrawFocusBrackets(x, markerY, 25 * entityScale, 19 * entityScale, markerColor);
       else {
@@ -3512,7 +3768,7 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
         context.fillStyle = markerColor; context.fillRect(-3.5, -3.5, 7, 7); context.restore();
       }
     }
-    if (focused) {
+    if (focused && !suppressMarkers) {
       const label = completed ? (action.prop.mode === "place" ? `已布置 · ${action.prop.label}` : `已取走 · ${action.prop.label}`) : action.prop.label;
       DrawPropLabel(x, markerY - 22 * sceneScale, label, completed ? "empty" : "active");
     }
@@ -3629,8 +3885,10 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   const investigateLift = enemy.investigating && !fall ? .32 + Math.sin(state.elapsed * 4 + enemy.index) * .08 : 0;
   const limbWidth = Math.max(3.2, height * profile.limb);
 
+  const emphasized = state.qaPatrolReview || enemy.lureKind === "dogBark";
   context.save(); context.translate(x, baseY); context.scale(enemy.facing, 1);
-  if (enemy.focused === false) context.globalAlpha = .58;
+  if (emphasized) { context.shadowColor = "rgba(238,216,165,.42)"; context.shadowBlur = 5; }
+  if (enemy.focused === false) context.globalAlpha = emphasized ? .96 : .72;
   if (fall > 0) {
     context.translate(0, fall * height * .025);
     context.rotate(-fall * 1.43);
@@ -3696,7 +3954,7 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   }
   context.restore();
 
-  if (enemy.investigating && !fall) {
+  if (enemy.investigating && !fall && enemy.focused !== false) {
     context.fillStyle = "rgba(8,13,15,.9)"; context.fillRect(x - 9, baseY - height - 22, 18, 18);
     context.strokeStyle = isCollaborator ? "#d7c490" : "#e2bc67"; context.lineWidth = 1.5; context.strokeRect(x - 8.25, baseY - height - 21.25, 16.5, 16.5);
     context.fillStyle = "#f3d78f"; context.font = "900 12px system-ui"; context.textAlign = "center"; context.fillText("?", x, baseY - height - 9);
@@ -3708,7 +3966,7 @@ function DrawEnemies(width, surfaceY) {
   if (!patrols.length) return;
   const profile = actorProfiles.soldier;
   const scale = Math.min(width, 1100) / 26 * .038;
-  const height = profile.height * 39 * scale;
+  const height = profile.height * 39 * scale * (state.qaPatrolReview ? 1.14 : 1);
   const baseY = surfaceY - 5;
   const focusedEnemy = FindFocusedEnemy();
   patrols.forEach((enemy) => {
@@ -4112,7 +4370,8 @@ function DrawHumanActor(profile, roleId, height) {
 function DrawDogActor(profile, height, actor = state.player) {
   const phase = actor.step * profile.gait;
   const moving = actor.motionBlend;
-  const sniff = actor.actionKind === "crawl" || !moving ? (.5 + Math.sin(state.elapsed * 2.8) * .5) : 0;
+  const barking = actor.actionKind === "signal" && actor.actionTime > 0;
+  const sniff = barking ? 0 : actor.actionKind === "crawl" || !moving ? (.5 + Math.sin(state.elapsed * 2.8) * .5) : 0;
   const bob = Math.abs(Math.sin(phase)) * -2 * moving;
   context.translate(0, bob);
   context.fillStyle = "rgba(0,0,0,.3)"; context.beginPath(); context.ellipse(0, 1 - bob, height * .48, 5, 0, 0, Math.PI * 2); context.fill();
@@ -4121,12 +4380,17 @@ function DrawDogActor(profile, height, actor = state.player) {
   [-.27, -.08, .13, .31].forEach((offset, index) => { context.beginPath(); context.moveTo(height * offset, -height * .22); context.lineTo(height * offset + (index % 2 ? -legSwing : legSwing), 0); context.stroke(); });
   context.fillStyle = profile.body; context.beginPath(); context.ellipse(-height * .04, -height * .42, height * .48, height * .24, -.05, 0, Math.PI * 2); context.fill();
   context.fillStyle = "rgba(225,190,145,.48)"; context.beginPath(); context.ellipse(height * .08, -height * .37, height * .24, height * .12, 0, 0, Math.PI * 2); context.fill();
-  const headY = -height * (.54 - sniff * .12);
+  const headY = -height * (barking ? .69 : .54 - sniff * .12);
   context.fillStyle = profile.skin; context.beginPath(); context.arc(height * .43, headY, height * .19, 0, Math.PI * 2); context.fill();
   context.fillStyle = profile.hair; context.beginPath(); context.moveTo(height * .32, headY - height * .15); context.lineTo(height * .27, headY - height * .35); context.lineTo(height * .43, headY - height * .18); context.moveTo(height * .49, headY - height * .16); context.lineTo(height * .62, headY - height * .31); context.lineTo(height * .59, headY - height * .08); context.fill();
   context.fillStyle = "#1e2422"; context.beginPath(); context.arc(height * .56, headY + 1, 2.3, 0, Math.PI * 2); context.arc(height * .44, headY - height * .04, 1.8, 0, Math.PI * 2); context.fill();
+  if (barking) {
+    const jaw = height * (.075 + Math.sin(state.elapsed * 28) * .014);
+    context.fillStyle = "#3c1f1a"; context.beginPath(); context.ellipse(height * .55, headY + height * .105, height * .105, jaw, .12, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#d88c78"; context.beginPath(); context.ellipse(height * .585, headY + height * .13, height * .05, height * .022, .15, 0, Math.PI * 2); context.fill();
+  }
   context.fillStyle = profile.accent; context.beginPath(); context.moveTo(height * .25, -height * .53); context.lineTo(height * .48, -height * .47); context.lineTo(height * .28, -height * .33); context.closePath(); context.fill();
-  const tailWave = Math.sin(state.elapsed * (moving ? 8 : 3.5)) * .35;
+  const tailWave = Math.sin(state.elapsed * (barking ? 15 : moving ? 8 : 3.5)) * (barking ? .48 : .35);
   context.strokeStyle = profile.body; context.lineWidth = Math.max(4, height * .075); context.beginPath(); context.moveTo(-height * .46, -height * .47); context.quadraticCurveTo(-height * .72, -height * (.72 + tailWave), -height * .62, -height * (.88 + tailWave)); context.stroke();
 }
 
@@ -4152,7 +4416,7 @@ function DrawActorIdentity(profile, role, x, baseY, height) {
 }
 
 function DrawDogCompanion(width, viewportHeight, surfaceY, tunnelY) {
-  if (state.levelIndex !== 0 || state.selectedRole === "dog" || state.mode === "title") return;
+  if (!state.level.roleIds.includes("dog") || state.selectedRole === "dog" || state.mode === "title") return;
   const dog = state.dog;
   const profile = actorProfiles.dog;
   const x = WorldToScreen(dog.x, width);
@@ -4169,7 +4433,7 @@ function DrawDogCompanion(width, viewportHeight, surfaceY, tunnelY) {
 }
 
 function DrawDogCommandFocus(width, viewportHeight, surfaceY, tunnelY) {
-  if (state.levelIndex !== 0 || state.selectedRole === "dog" || !state.dog.commandId || state.mode !== "play") return;
+  if (!state.level.roleIds.includes("dog") || state.selectedRole === "dog" || !state.dog.commandId || state.mode !== "play") return;
   const dog = state.dog;
   const profile = actorProfiles.dog;
   const x = WorldToScreen(dog.x, width);
@@ -4233,13 +4497,14 @@ function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
   const role = roleDefinitions[roleId];
   const x = WorldToScreen(state.player.x, width);
   const baseY = state.player.layer === "surface" ? surfaceY - 5 : TunnelFloorYAt(state.player.x, viewportHeight, tunnelY);
-  const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
+  const barkScale = profile.animal && ActivePatrolLure("dogBark") ? 1.18 : 1;
+  const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width) * barkScale;
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
   if (profile.animal) DrawDogActor(profile, height, state.player);
   else DrawHumanActor(profile, roleId, height);
   context.restore();
-  if (!state.takedown) DrawActorIdentity(profile, role, x, baseY, height);
+  if (!state.takedown && !ActivePatrolLure("dogBark")) DrawActorIdentity(profile, role, x, baseY, height);
 }
 
 function DrawSurfaceVegetation(width, height, surfaceY) {
@@ -4588,12 +4853,13 @@ if (qaMode) {
       ventilation: state.defense.ventilation, defense: state.defense.strength, rescues: { ...state.rescues }, memories: [...state.memories],
       visibility: state.visibility, detection: state.detection, detected: state.detected, cover: state.player.coverId,
       alert: state.alert, morale: state.morale, tricks: [...state.tricks]
+      , patrolLure: state.patrolLure ? { ...state.patrolLure } : null, dogBarkCooldown: state.dogBarkCooldown
       , prepRemaining: state.prepRemaining, raid: { ...state.raid }, excavated: [...state.excavated]
       , civilians: state.civilians.map((civilian) => ({ name: civilian.name, group: civilian.group, x: civilian.x, targetX: civilian.targetX, smokeDose: civilian.smokeDose, waterDose: civilian.waterDose }))
       , dog: state.dog ? { x: state.dog.x, layer: state.dog.layer, commandId: state.dog.commandId, commandMode: state.dog.commandMode, progress: state.dog.progress } : null
       , distraction: state.raid.distraction ? { ...state.raid.distraction } : null
       , takedownCount: state.takedownCount, neutralizedEnemies: [...state.neutralizedEnemies], unconsciousCount: state.unconsciousEnemies.length
-      , enemies: GetEnemyPatrols().map((enemy) => ({ id: enemy.id, x: enemy.x, facing: enemy.facing, unitType: enemy.unitType, investigating: enemy.investigating }))
+      , enemies: GetEnemyPatrols().map((enemy) => ({ id: enemy.id, x: enemy.x, facing: enemy.facing, unitType: enemy.unitType, investigating: enemy.investigating, lureKind: enemy.lureKind, routeMin: enemy.routeMin, routeMax: enemy.routeMax }))
       , fluid: state.fluid?.GetStatistics() || null, failure: state.missionFailure
     })
   });
