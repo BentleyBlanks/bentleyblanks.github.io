@@ -274,6 +274,7 @@ function TestAct1TutorialPlayable() {
   Assert(game.includes("IsDialogueBlockingPad"), "tips must not steal dig verb");
   Assert(game.includes("forceTouchPad") || css.includes("forceTouchPad"), "touch pad forced on touch devices");
   Assert(html.includes('id="DebugModal"'), "hidden debug panel exists");
+  Assert(html.includes('id="OpenDebugButton"'), "pause modal has debug button");
   Assert(game.includes("designExit") || game.includes("误进画线"), "design trap has dig-exit path");
 }
 

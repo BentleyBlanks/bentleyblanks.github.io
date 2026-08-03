@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803v">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803w">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -132,6 +132,7 @@
         <p>已自动记下这一页。</p>
         <div class="modalActions">
           <button id="ResumeButton" class="primaryButton" type="button"><span>继续</span></button>
+          <button id="OpenDebugButton" class="secondaryButton" type="button">调试</button>
           <button id="RestartChapterButton" class="secondaryButton" type="button">重来本页</button>
           <button id="ExitTitleButton" class="secondaryButton" type="button">标题</button>
         </div>
@@ -145,7 +146,7 @@
       </article>
       <article id="DebugModal" class="modalCard debugModal" hidden>
         <h2>调试</h2>
-        <p class="debugHint">隐蔽入口：标题年款连点五下，或游戏中连点暂停三下。</p>
+        <p class="debugHint">从暂停页点「调试」进入。也可标题年款连点五下，或 ?preview=debug。</p>
         <label class="debugField">跳关
           <select id="DebugChapterSelect" aria-label="跳关"></select>
         </label>
@@ -164,6 +165,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803v"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803w"></script>
 </body>
 </html>

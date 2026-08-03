@@ -2120,6 +2120,14 @@ function BindUi() {
     SetModal("pause");
   });
   $("ResumeButton").addEventListener("click", () => SetModal(null));
+  const openDebugBtn = $("OpenDebugButton");
+  if (openDebugBtn) {
+    openDebugBtn.addEventListener("click", () => {
+      EnsureAudio();
+      SetModal("debug");
+      Beep(880, 0.05, "triangle", 0.03);
+    });
+  }
   $("RestartChapterButton").addEventListener("click", () => {
     state = RestartChapter(state);
     SetModal(null);
