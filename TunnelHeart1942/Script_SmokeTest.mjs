@@ -472,9 +472,13 @@ function TestPlayCutawayRender() {
   Assert(game.includes("Sky bleed") || game.includes("skylight") || game.includes("Sky bleed"), "climb shafts draw skylight bleed");
   Assert(game.includes("climb_out"), "climb-out interact hint mapped");
   Assert(game.includes("level.soil"), "cutaway gated on soil levels");
+  Assert(game.includes("VisibleWorldWidth") && game.includes("CameraCullX"), "soil cull uses real canvas span");
+  Assert(!/cameraX \+ VIEW_W \+ 40/.test(game), "no fixed VIEW_W soil streaming cull");
+  Assert(game.includes("state.viewW = VisibleWorldWidth"), "each frame publishes viewW");
   const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
   Assert(rules.includes("TryDescendOpenShaft"), "shaft re-entry helper");
   Assert(rules.includes("shaftExitLock"), "emerge lock prevents yo-yo re-enter");
+  Assert(rules.includes("state.viewW"), "camera follow respects wide viewW");
   Assert(rules.includes("climb_out"), "rules flag climb-out hint under open shaft");
 }
 
