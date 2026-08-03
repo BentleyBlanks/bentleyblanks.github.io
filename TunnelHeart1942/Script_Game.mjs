@@ -1714,7 +1714,7 @@ function DrawInteractPromptWorld() {
   const icon =
     hint === "dig" || hint === "need_shovel" || hint === "pickup" || hint === "follow_plan"
       ? "shovel"
-      : hint === "hatch" || hint === "design" || hint === "need_plan"
+      : hint === "hatch" || hint === "climb_out" || hint === "design" || hint === "need_plan"
         ? "hatch"
         : hint === "bell"
           ? "bell"
@@ -1996,34 +1996,125 @@ function DrawProjectiles() {
   }
 }
 
+/**
+ * Open climb-out shafts must read at a glance — surface mouth AND underground well.
+ * Plain AIR cells look identical to corridors; timber + skylight + ↑ markers sell the exit.
+ */
 function DrawOpenShaftMarkers() {
   const soil = state.level.soil;
-  if (!soil || state.player.inTunnel) return;
+  if (!soil) return;
   const s = Scale();
   const cam0 = state.cameraX - 40;
   const cam1 = state.cameraX + VIEW_W + 40;
-  const seen = new Set();
+  const inTunnel = !!state.player.inTunnel;
+  const pulse = 0.55 + 0.45 * Math.sin(((performance.now() || 0) / 1000) * 3.1);
+
   for (let c = 1; c < soil.cols - 1; c++) {
     if (GetCell(soil, c, 1) !== AIR && GetCell(soil, c, 0) !== AIR) continue;
     const x = soil.originX + (c + 0.5) * soil.cell;
     if (x < cam0 || x > cam1) continue;
-    const key = c >> 0;
-    if (seen.has(key)) continue;
-    seen.add(key);
     const sx = WX(x);
     const sy = WY(SURFACE_Y);
-    ctx.fillStyle = "rgba(42,28,18,.9)";
-    ctx.fillRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
-    ctx.strokeStyle = "#1a1410";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
-    // Dark hole into the dig band
-    ctx.fillStyle = "rgba(10,6,4,.75)";
-    ctx.beginPath();
-    if (typeof ctx.ellipse === "function") ctx.ellipse(sx, sy + 2 * s, 10 * s, 5 * s, 0, 0, Math.PI * 2);
-    else ctx.arc(sx, sy, 8 * s, 0, Math.PI * 2);
-    ctx.fill();
-    DrawPictogram("hatch", sx - 9 * s, sy - 32 * s, 18 * s);
+    const nearPlayer = Math.abs((state.player.x || 0) - x) < soil.cell * 1.35;
+
+    // Contiguous AIR column from the crust down (the climbable well).
+    let bottomR = 1;
+    for (let r = 1; r < soil.rows; r++) {
+      if (GetCell(soil, c, r) !== AIR) break;
+      bottomR = r;
+    }
+    const topRect = CellWorldRect(soil, c, 1);
+    const botRect = CellWorldRect(soil, c, bottomR);
+    const x0 = WX(topRect.x);
+    const y0 = WY(topRect.y);
+    const colW = topRect.w * s;
+    const colH = (botRect.y + botRect.h - topRect.y) * s;
+
+    if (inTunnel) {
+      // Sky bleed — brighter than corridor air so the well pops in cutaway.
+      const glow = ctx.createLinearGradient(0, y0, 0, y0 + colH);
+      glow.addColorStop(0, `rgba(240,210,130,${0.42 + pulse * 0.18})`);
+      glow.addColorStop(0.28, `rgba(190,150,70,${0.22 + pulse * 0.1})`);
+      glow.addColorStop(1, "rgba(50,34,16,0.04)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x0, y0, colW, colH);
+
+      // Timber posts
+      ctx.strokeStyle = nearPlayer
+        ? `rgba(245,200,110,${0.8 + pulse * 0.2})`
+        : "rgba(170,125,70,.75)";
+      ctx.lineWidth = Math.max(2, 2.6 * s);
+      ctx.beginPath();
+      ctx.moveTo(x0 + 3 * s, y0);
+      ctx.lineTo(x0 + 3 * s, y0 + colH);
+      ctx.moveTo(x0 + colW - 3 * s, y0);
+      ctx.lineTo(x0 + colW - 3 * s, y0 + colH);
+      ctx.stroke();
+
+      // Ladder rungs — every cell reads as climbable height.
+      ctx.strokeStyle = nearPlayer
+        ? `rgba(235,185,95,${0.7 + pulse * 0.2})`
+        : "rgba(150,110,60,.6)";
+      ctx.lineWidth = Math.max(1.5, 2 * s);
+      for (let r = 1; r <= bottomR; r++) {
+        const rr = CellWorldRect(soil, c, r);
+        const ry = WY(rr.y + rr.h * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(x0 + 7 * s, ry);
+        ctx.lineTo(x0 + colW - 7 * s, ry);
+        ctx.stroke();
+      }
+
+      // Dark mouth punched through the cut lip
+      ctx.fillStyle = `rgba(8,5,3,${0.62 + pulse * 0.2})`;
+      ctx.beginPath();
+      if (typeof ctx.ellipse === "function") {
+        ctx.ellipse(sx, sy + 2 * s, colW * 0.42, 7 * s, 0, 0, Math.PI * 2);
+      } else ctx.arc(sx, sy, Math.max(8, colW * 0.35), 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rising ↑ chevrons toward the mouth
+      ctx.fillStyle = nearPlayer
+        ? `rgba(255,220,120,${0.55 + pulse * 0.4})`
+        : `rgba(230,190,100,${0.4 + pulse * 0.25})`;
+      const baseY = y0 + 16 * s + (1 - pulse) * 10 * s;
+      for (let i = 0; i < 3; i++) {
+        const cy = baseY + i * 13 * s;
+        ctx.beginPath();
+        ctx.moveTo(sx, cy - 7 * s);
+        ctx.lineTo(sx - 9 * s, cy + 3 * s);
+        ctx.lineTo(sx + 9 * s, cy + 3 * s);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      DrawPictogram("hatch", sx - 11 * s, y0 + 2 * s, 22 * s);
+      ctx.fillStyle = nearPlayer ? `rgba(255,236,180,${0.9})` : "rgba(220,190,130,.7)";
+      ctx.font = `700 ${Math.max(10, Math.round(11 * s))}px "Noto Sans SC",sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("↑ 出井", sx, y0 + 28 * s);
+    } else {
+      // Surface mouth plate + hatch plate (re-enter with ↓).
+      ctx.fillStyle = "rgba(42,28,18,.9)";
+      ctx.fillRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
+      ctx.strokeStyle = nearPlayer ? `rgba(240,194,122,${0.7 + pulse * 0.3})` : "#1a1410";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
+      ctx.fillStyle = "rgba(10,6,4,.75)";
+      ctx.beginPath();
+      if (typeof ctx.ellipse === "function") ctx.ellipse(sx, sy + 2 * s, 10 * s, 5 * s, 0, 0, Math.PI * 2);
+      else ctx.arc(sx, sy, 8 * s, 0, Math.PI * 2);
+      ctx.fill();
+      DrawPictogram("hatch", sx - 9 * s, sy - 32 * s, 18 * s);
+      if (nearPlayer) {
+        ctx.fillStyle = `rgba(255,236,180,${0.75 + pulse * 0.2})`;
+        ctx.font = `700 ${Math.max(10, Math.round(11 * s))}px "Noto Sans SC",sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("↓ 回井", sx, sy - 34 * s);
+      }
+    }
   }
 }
 

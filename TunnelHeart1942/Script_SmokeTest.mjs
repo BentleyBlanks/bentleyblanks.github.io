@@ -19,6 +19,7 @@ import {
   GoalsRemaining,
   GrenadeAimWorldArc,
   GrenadeLobParams,
+  IsShaftOpenAt,
   LoadProgress,
   MELEE_DURATION,
   MELEE_IMPACT_AT,
@@ -407,10 +408,38 @@ function TestPlayCutawayRender() {
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("RenderPlayCutaway"), "play uses unified dig cutaway");
   Assert(game.includes("DrawOpenShaftMarkers"), "open shafts marked on surface");
+  Assert(game.includes("↑ 出井"), "underground climb shafts show exit label");
+  Assert(game.includes("Ladder rungs") || game.includes("ladder rungs"), "climb shafts draw ladder rungs");
+  Assert(game.includes("Sky bleed") || game.includes("skylight") || game.includes("Sky bleed"), "climb shafts draw skylight bleed");
+  Assert(game.includes("climb_out"), "climb-out interact hint mapped");
   Assert(game.includes("level.soil"), "cutaway gated on soil levels");
   const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
   Assert(rules.includes("TryDescendOpenShaft"), "shaft re-entry helper");
   Assert(rules.includes("shaftExitLock"), "emerge lock prevents yo-yo re-enter");
+  Assert(rules.includes("climb_out"), "rules flag climb-out hint under open shaft");
+}
+
+/** Open shaft underfoot must be visually marked while still underground. */
+function TestClimbShaftUndergroundMarker() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  const soil = state.level.soil;
+  const pc = WorldToCell(soil, state.player.x, state.player.y - 24);
+  for (let r = 1; r <= pc.r; r++) SetCell(soil, pc.c, r, AIR);
+  RebuildTunnelSolids(state.level);
+  state.player.x = soil.originX + (pc.c + 0.5) * soil.cell;
+  state.player.y = soil.originY + (pc.r + 1) * soil.cell;
+  state.player.inTunnel = true;
+  state.player.vx = 0;
+  state.input.left = false;
+  state.input.right = false;
+  state.input.dig = false;
+  StepPlay(state, 1 / 30);
+  Assert(IsShaftOpenAt(state, state.player.x), "test shaft is open to surface");
+  Assert(
+    state.interactHint === "climb_out" || state.interactHint === "hatch",
+    "under open shaft shows climb-out / hatch hint",
+  );
 }
 
 /** Crouch into a 1-high crawlway — must not X-shove to the map/soil edge. */
@@ -1141,6 +1170,7 @@ function Main() {
   TestDigUpPastHeadroom();
   TestClimbShaftToSurface();
   TestPlayCutawayRender();
+  TestClimbShaftUndergroundMarker();
   TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();
   TestMultiTalk();

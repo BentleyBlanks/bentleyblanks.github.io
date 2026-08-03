@@ -1961,11 +1961,18 @@ function RefreshHint(state) {
       return;
     }
   }
+  // Carved climb-out well underfoot — show hatch prompt even if a side wall is diggable
+  // (pad still digs via PadInteractVerb; world icon must not look like plain corridor).
+  if (state.player.inTunnel && IsShaftOpenAt(state, state.player.x)) {
+    state.interactHint = "climb_out";
+    state.openShaftX = state.player.x;
+    return;
+  }
   if (digReady) {
     state.interactHint = "dig";
     return;
   }
-  // Carved shaft mouth on the surface — ↓ goes back down (no hatch prop needed).
+  // Surface mouth — ↓ / 互动 re-enters (no hatch entity required).
   if (!state.player.inTunnel && IsShaftOpenAt(state, state.player.x)) {
     state.interactHint = "hatch";
     state.openShaftX = state.player.x;
