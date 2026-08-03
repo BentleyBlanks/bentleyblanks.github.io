@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
-import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
+import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
@@ -638,11 +638,41 @@ function Main() {
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
   Assert(!gameSrc.includes("E 继续") && !gameSrc.includes("E 关闭"), "no keyboard-letter dialogue hints");
   Assert(!/（E）/.test(NextStepText(Play(0))), "step hint has no (E) key letter");
+  TestNoKeyLetterCopy();
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
   console.log("\nTunnelHeart1942 combat-stealth smoke OK");
+}
+
+/** Player-facing copy must not teach keyboard letters (J/E/F/R…). */
+function TestNoKeyLetterCopy() {
+  const bad =
+    /按\s*[EJFReqr]|点\s*J|（[EJFRjr]）|\bE 击晕|\bE 捡|开火键|挖掘键|设计键|瞄准键|方向键|蓝线旁点|R 画线|J 挖|F 安放|点 J|按 R|按 F|按 E|按 J/;
+  const hits = [];
+  const check = (where, text) => {
+    if (text && bad.test(text)) hits.push(`${where}: ${text}`);
+  };
+  for (const ch of CHAPTERS) {
+    check(`${ch.id}.objective`, ch.objective);
+    for (const p of [...(ch.openPanels || []), ...(ch.closePanels || [])]) {
+      check(`${ch.id}.${p.id || p.speaker}`, p.text);
+    }
+    const level = BuildLevel(ch.id);
+    for (const e of level.entities || []) {
+      if (e.hint) check(`${e.id || e.type}.hint`, e.hint);
+      for (const beat of e.script || []) check(`${e.id}.script`, beat.text);
+      if (e.line) check(`${e.id}.line`, e.line);
+    }
+    const st = Play(CHAPTERS.indexOf(ch));
+    check(`${ch.id}.nextStep`, NextStepText(st));
+  }
+  for (const p of PROLOGUE_PANELS) check(`prologue.${p.speaker}`, p.text);
+  for (const [id, meta] of Object.entries(ITEM_META)) check(`item.${id}`, meta.tip);
+  const laozhong = BuildLevel("act1_connect").entities.find((e) => e.id === "npc_laozhong");
+  Assert(laozhong.script.every((b) => !/点 J|按 R|按 E|按 F/.test(b.text)), "高老忠台词无按键字母");
+  Assert(hits.length === 0, hits.length ? `key-letter copy: ${hits[0]}` : "no key-letter player copy");
 }
 
 Main();

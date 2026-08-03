@@ -132,16 +132,16 @@ function SyncHud() {
   const tutorialDig =
     !!state.level?.tutorialPlan && state.player.inTunnel && held === ITEM_SHOVEL && !state.designMode;
   if (state.designMode) {
-    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>移格标记 · 蹲+挖=厢室 · 开火键=巷道</em>`;
+    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>挪格标记 · 蹲着挖铺厢室 · 往前铺巷道</em>`;
   } else if (held === ITEM_RIFLE) {
-    const ads = state.player.aiming ? "开镜中" : "按住瞄准键开镜";
-    slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>开火键开枪 · ${ads}</em>`;
+    const ads = state.player.aiming ? "开镜中" : "按住瞄准再打";
+    slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>${ads}</em>`;
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${
-          tutorialDig ? "顺着蓝线走到格旁，点挖掘键开挖" : meta.tip
+          tutorialDig ? "顺着蓝线走到格旁开挖" : meta.tip
         }</em>`
-      : `<b></b><span>空手</span><em>走近捡道具 · 绕到背后可击晕</em>`;
+      : `<b></b><span>空手</span><em>走近捡道具 · 绕到背后可制住敌人</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }
   const badge = $("DesignBadge");

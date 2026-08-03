@@ -401,10 +401,10 @@ function TryDesign(state) {
     if (state.designMode) {
       EnsurePlanGrid(level.soil);
       state.planCursor = InitPlanCursor(level.soil, player.x, player.y, player.facing);
-      SetSubtitle(state, "设计", "蓝图模式：方向键移光标，J 标记/取消，T 厢室，C 巷道。再按 R 退出，走到蓝图旁点 J 开挖。", 5.5);
+      SetSubtitle(state, "设计", "蓝图模式：挪光标标出要挖的格子；蹲着挖可铺厢室，往前可铺巷道。画完退出，走到蓝色边上再挖。", 5.5);
     } else {
       const n = CountPlanned(level.soil);
-      SetSubtitle(state, "设计", n ? `蓝图 ${n} 格已定——走到标记旁点 J 开挖（不是长按）。` : "已退出设计。先画蓝图再挖。", 3.5);
+      SetSubtitle(state, "设计", n ? `蓝图 ${n} 格已定——走到蓝色格子旁边开挖，别站远处瞎挖。` : "已退出设计。先画蓝图再挖。", 3.5);
     }
   }
   if (!state.designMode || !state.planCursor) return;
@@ -461,10 +461,10 @@ function TryExcavate(state) {
   if (!dig) {
     const planned = CountPlanned(level.soil);
     if (planned > 0) {
-      SetSubtitle(state, "提示", "蓝图已画好——走到蓝色格子旁边，再点 J 开挖。", 2.8);
+      SetSubtitle(state, "提示", "蓝图已画好——走到蓝色格子旁边再挖。", 2.8);
       state.interactHint = "follow_plan";
     } else {
-      SetSubtitle(state, "提示", "先按 R 进入设计，把要挖的格子标成蓝图，再点 J 开挖。不能长按乱挖。", 3.2);
+      SetSubtitle(state, "提示", "先进入设计，把要挖的格子标成蓝图，再走到边上开挖。别站远处乱挖。", 3.2);
       state.interactHint = "need_plan";
     }
     return;
@@ -564,7 +564,7 @@ function FireRifle(state) {
   if ((player.ammo || 0) <= 0) {
     state.interactHint = "need_ammo";
     SetBubble(state, ["shot", "warn"], "没子弹", 1.4);
-    SetSubtitle(state, "提示", "弹药空了——去捡子弹，或摸到背后用 E 击晕。", 2.6);
+    SetSubtitle(state, "提示", "弹药空了——去捡子弹，或摸到背后悄悄制住。", 2.6);
     return;
   }
   player.ammo -= 1;
@@ -1008,7 +1008,7 @@ function TryInteract(state) {
         return;
       }
       // Planting is F / use — nudge player
-      SetBubble(state, ["charge"], "开火键安放", 1.4);
+      SetBubble(state, ["charge"], "在此安放炸药", 1.4);
       return;
     }
 
@@ -1359,8 +1359,8 @@ export function NextStepText(state) {
     if (!g.talk_linxia) return "找林霞交谈";
     if (state.player.held !== ITEM_SHOVEL) return "去井边捡铁锹";
     if (!g.enter_hatch) return "带着铁锹到地窖口下洞";
-    if (!g.link_ab) return "顺着蓝线走到格旁，点挖掘键挖通甲—乙";
-    if (!g.link_bc) return "继续沿蓝线点挖掘键，挖通乙—丙";
+    if (!g.link_ab) return "顺着蓝线走到格旁，挖通甲—乙";
+    if (!g.link_bc) return "继续沿蓝线挖通乙—丙";
     return "三家已通";
   }
   if (state.chapterId === "act5_street_hunt") {

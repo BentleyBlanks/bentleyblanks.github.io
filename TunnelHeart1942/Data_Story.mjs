@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v6";
-export const CACHE_BUST = "20260803h";
+export const CACHE_BUST = "20260803i";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -36,7 +36,7 @@ export const PROLOGUE_PANELS = [
   {
     id: "pro2",
     speaker: "目标",
-    text: "捡井边铁锹，下洞，沿蓝线点 J 挖通三家。E 捡/说话/下洞。",
+    text: "听人交代，捡井边铁锹，下洞，顺着蓝色格子挖通三家地窖。",
     mood: "tip",
   },
 ];
@@ -49,7 +49,7 @@ export const CHAPTERS = [
     title: "土洞相连",
     timeLabel: "一九四二年 · 春",
     cast: "高传宝",
-    objective: "听交代 → 井边捡铁锹 → 下洞 → 沿蓝线点 J 挖通三家。",
+    objective: "听交代 → 井边捡铁锹 → 下洞 → 顺着蓝线挖通三家。",
     goals: ["talk_laozhong", "talk_linxia", "enter_hatch", "link_ab", "link_bc"],
     // Prologue already said 背景/困难/目标 — skip a second slideshow.
     openPanels: [],
@@ -95,7 +95,7 @@ export const CHAPTERS = [
       {
         id: "p2c",
         speaker: "目标",
-        text: "挖通东窖，送乡亲入洞，再到钟下。铁锹在手，蓝线旁点 J。",
+        text: "铁锹在手，挖通东窖，送乡亲入洞，再到钟下。",
         mood: "tip",
       },
     ],
@@ -133,7 +133,7 @@ export const CHAPTERS = [
       {
         id: "p3c",
         speaker: "目标",
-        text: "挖出翻口厢室，打通卡口，识破特务并翻口制服。R 画线，J 挖。",
+        text: "先画蓝图挖出翻口厢室，打通卡口，识破特务并翻口制服。",
         mood: "tip",
       },
     ],
@@ -177,7 +177,7 @@ export const CHAPTERS = [
       {
         id: "p4c",
         speaker: "目标",
-        text: "挖穿三口竖井，出井杀光鬼子再钻回去。E 出井/开枪。",
+        text: "挖穿三口竖井，悄悄出井打完再钻回去——打一枪换一个地方。",
         mood: "tip",
       },
     ],
@@ -197,7 +197,7 @@ export const CHAPTERS = [
     timeLabel: "一九四三年 · 夏夜",
     cast: "高传宝",
     night: true,
-    objective: "弹药极少。开镜开枪、扔手雷，或绕到背后 E 击晕——别让敌人看见尸体。",
+    objective: "弹药极少。开镜开枪、扔手雷，或绕到背后制住——别让敌人看见尸体。",
     goals: ["talk_street", "clear_street"],
     openPanels: [
       {
@@ -253,7 +253,7 @@ export const CHAPTERS = [
       {
         id: "p6c",
         speaker: "目标",
-        text: "挖到药室，F 安放炸药，再上地面发信号。一次只拿一件。",
+        text: "挖到药室安放炸药，再上地面发信号。一次只拿一件。",
         mood: "tip",
       },
     ],
