@@ -89,7 +89,7 @@ function CreateState(levelIndex) {
     levelIndex,
     level,
     phaseId: level.phases[0].id,
-    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
+    player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, coverBlend: 0, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
     selectedRole: level.startRole,
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
@@ -1447,6 +1447,8 @@ function MetricsMarkup() {
 
 function Update(delta) {
   state.elapsed += delta;
+  const coverTarget = state.player.coverId ? 1 : 0;
+  state.player.coverBlend = Lerp(state.player.coverBlend || 0, coverTarget, 1 - Math.pow(.00008, delta));
   state.unconsciousEnemies.forEach((enemy) => { enemy.age += delta; });
   state.takedownGrace = Math.max(0, state.takedownGrace - delta);
   UpdateCombat(delta);
@@ -1580,6 +1582,15 @@ function Lerp(a, b, amount) { return a + (b - a) * amount; }
 function SmoothStep(edgeA, edgeB, value) {
   const progress = Math.max(0, Math.min(1, (value - edgeA) / Math.max(.0001, edgeB - edgeA)));
   return progress * progress * (3 - 2 * progress);
+}
+
+function ForegroundFocusAlpha(screenX, width, nearRadius = 52, farRadius = 138, minimum = .18) {
+  const focusXs = [WorldToScreen(state.player.x, width)];
+  const focusedEnemy = FindFocusedEnemy();
+  if (focusedEnemy) focusXs.push(WorldToScreen(focusedEnemy.x, width));
+  state.civilians.forEach((civilian) => focusXs.push(WorldToScreen(civilian.x, width)));
+  const nearest = focusXs.reduce((distance, focusX) => Math.min(distance, Math.abs(screenX - focusX)), Infinity);
+  return minimum + (1 - minimum) * SmoothStep(nearRadius, farRadius, nearest);
 }
 
 function TakedownFigureScale(width) {
@@ -1756,10 +1767,10 @@ function GetEnemyPatrols() {
 }
 
 function DrawPatrolRoutes(width, surfaceY) {
-  if (state.player.layer !== "surface" || ActivePatrolLure("dogBark")) return;
+  if (!state.qaPatrolReview || state.player.layer !== "surface" || ActivePatrolLure("dogBark")) return;
   const patrols = GetEnemyPatrols().slice().sort((left, right) => left.routeMin - right.routeMin);
   if (!patrols.length) return;
-  const review = Boolean(state.qaPatrolReview);
+  const review = true;
   const lineY = surfaceY + 10;
   context.save();
   context.textAlign = "center";
@@ -1917,16 +1928,23 @@ function Draw() {
 function DrawSceneHierarchyVeil(width, height, surfaceY, tunnelY) {
   context.save();
   if (["surface", "interior", "roof"].includes(state.player.layer)) {
+    const middleDistance = context.createLinearGradient(0, surfaceY * .35, 0, surfaceY + 8);
+    middleDistance.addColorStop(0, "rgba(176,180,169,.08)");
+    middleDistance.addColorStop(.58, "rgba(158,145,119,.055)");
+    middleDistance.addColorStop(1, "rgba(71,58,44,.015)");
+    context.fillStyle = middleDistance;
+    context.fillRect(0, surfaceY * .3, width, surfaceY * .72);
     const tunnelShade = context.createLinearGradient(0, surfaceY + 4, 0, height);
-    tunnelShade.addColorStop(0, "rgba(9,13,14,.08)");
-    tunnelShade.addColorStop(.45, "rgba(7,11,12,.2)");
-    tunnelShade.addColorStop(1, "rgba(5,8,9,.31)");
+    tunnelShade.addColorStop(0, "rgba(9,13,14,.16)");
+    tunnelShade.addColorStop(.45, "rgba(7,11,12,.34)");
+    tunnelShade.addColorStop(1, "rgba(5,8,9,.5)");
     context.fillStyle = tunnelShade;
     context.fillRect(0, surfaceY + 4, width, height - surfaceY - 4);
   } else {
     const surfaceShade = context.createLinearGradient(0, 0, 0, surfaceY + 2);
-    surfaceShade.addColorStop(0, "rgba(12,15,15,.3)");
-    surfaceShade.addColorStop(1, "rgba(10,13,14,.18)");
+    surfaceShade.addColorStop(0, "rgba(12,17,18,.47)");
+    surfaceShade.addColorStop(.62, "rgba(14,18,18,.39)");
+    surfaceShade.addColorStop(1, "rgba(13,15,14,.31)");
     context.fillStyle = surfaceShade;
     context.fillRect(0, 0, width, surfaceY + 2);
     context.fillStyle = "rgba(224,188,111,.035)";
@@ -1956,16 +1974,16 @@ function DrawMountainLayer(width, surfaceY, layer) {
   context.fillStyle = layer.color; context.fill();
 
   context.save(); context.clip();
-  const detail = Math.max(.22, layer.parallax * 2.4);
+  const detail = Math.max(.16, layer.parallax * 1.65);
   context.strokeStyle = layer.hatch || `rgba(30,31,27,${.12 + detail * .16})`;
   context.lineCap = "round";
   for (let index = 1; index < ridgePoints.length - 1; index += 1) {
-    if (index % 2 === 0) continue;
+    if (index % 3 !== 1) continue;
     const point = ridgePoints[index];
     const previous = ridgePoints[index - 1];
     const next = ridgePoints[index + 1];
     const slope = Math.max(-.85, Math.min(.85, (next.y - previous.y) / Math.max(1, next.x - previous.x)));
-    const strokeCount = 1 + Math.floor(detail * 3);
+    const strokeCount = 1 + Math.floor(detail * 1.5);
     for (let stroke = 0; stroke < strokeCount; stroke += 1) {
       const inset = 7 + stroke * (8 + detail * 5) + SceneHash(index * 13 + stroke + layer.seed) * 8;
       const startX = point.x + (stroke - strokeCount * .35) * layer.step * .18;
@@ -2010,7 +2028,7 @@ function DrawSky(width, height, surfaceY, daylight) {
   context.fillStyle = isDay ? "rgba(238,208,137,.58)" : "rgba(210,222,216,.32)"; context.beginPath(); context.arc(celestialX, celestialY, isDay ? 29 : 22, 0, Math.PI * 2); context.fill();
 
   if (!isDay) {
-    for (let star = 0; star < 34; star += 1) {
+    for (let star = 0; star < 17; star += 1) {
       const starX = (SceneHash(star + 2) * width - state.camera.x * width * .0025 + width) % width;
       const starY = 20 + SceneHash(star + 17) * surfaceY * .52;
       const twinkle = .24 + SceneHash(star + 31) * .46 + Math.sin(state.elapsed * 1.1 + star) * .08;
@@ -2070,21 +2088,21 @@ function DrawFieldDepth(width, surfaceY) {
     context.closePath(); context.fill();
   });
 
-  for (let lane = -12; lane <= 12; lane += 1) {
+  for (let lane = -6; lane <= 6; lane += 1) {
     const nearX = width * .5 + lane * width * .071;
     const bend = (SceneHash(lane + 402) - .5) * 24;
-    context.strokeStyle = lane % 3 ? "rgba(199,155,84,.2)" : "rgba(37,34,27,.5)";
-    context.lineWidth = lane % 4 === 0 ? 3.2 : 1.35;
+    context.strokeStyle = lane % 3 ? "rgba(199,155,84,.105)" : "rgba(37,34,27,.27)";
+    context.lineWidth = lane % 4 === 0 ? 2.4 : 1;
     context.beginPath();
     context.moveTo(vanishX + lane * 4.2, horizonY + 3);
     context.quadraticCurveTo(Lerp(vanishX, nearX, .57) + bend, Lerp(horizonY, surfaceY, .62), nearX, surfaceY + 6);
     context.stroke();
   }
-  for (let row = 0; row < 7; row += 1) {
-    const progress = (row + 1) / 8;
+  for (let row = 0; row < 4; row += 1) {
+    const progress = (row + 1) / 5;
     const y = Lerp(horizonY, surfaceY, Math.pow(progress, 1.7));
     const sag = (row % 2 ? -1 : 1) * (3 + row * .8);
-    context.strokeStyle = `rgba(216,175,105,${.055 + progress * .13})`; context.lineWidth = .8 + progress * 1.7;
+    context.strokeStyle = `rgba(216,175,105,${.035 + progress * .075})`; context.lineWidth = .7 + progress * 1.15;
     context.beginPath(); context.moveTo(-20, y + Math.sin(row) * 2); context.bezierCurveTo(width * .25, y + sag, vanishX, y - sag * .7, width + 20, y + sag * .35); context.stroke();
   }
 
@@ -2384,26 +2402,26 @@ function DrawVillage(width, height, surfaceY) {
   DrawVillageGroundEdge(width, surfaceY);
 
   const rearHouses = [-18, -12.8, -7.6, -2.4, 2.8, 8.1, 13.4, 18.7];
-  rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .3));
+  rearHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 34 - index % 2 * 4, 31 + index % 4 * 4, .46, index, .18));
 
   context.save();
   for (let worldX = -19; worldX <= 19; worldX += 1.65) {
     const x = LayerToScreen(worldX, width, .58);
     const baseY = surfaceY - 19 + Math.sin(worldX * .8) * 3;
     const heightScale = 17 + SceneHash(worldX + 70) * 22;
-    context.fillStyle = "rgba(45,55,39,.46)"; context.beginPath(); context.ellipse(x, baseY - heightScale * .55, 8 + heightScale * .18, heightScale * .55, worldX % 2 ? .14 : -.14, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = "rgba(72,61,42,.38)"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x, baseY); context.lineTo(x + Math.sin(worldX) * 3, baseY - heightScale); context.stroke();
+    context.fillStyle = "rgba(45,55,39,.28)"; context.beginPath(); context.ellipse(x, baseY - heightScale * .55, 8 + heightScale * .18, heightScale * .55, worldX % 2 ? .14 : -.14, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "rgba(72,61,42,.2)"; context.lineWidth = 1; context.beginPath(); context.moveTo(x, baseY); context.lineTo(x + Math.sin(worldX) * 3, baseY - heightScale); context.stroke();
   }
   context.restore();
 
   const middleHouses = [-12.6, -7.7, -2.4, 2.9, 8.1, 13.4];
-  middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .56));
+  middleHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 10 - index % 2 * 3, 49 + index % 3 * 7, .7, index + 20, .42));
 
   [
     { x: -14.8, span: 3.2, parallax: .65, variant: 0 }, { x: -7.8, span: 2.4, parallax: .7, variant: 2 },
     { x: -.8, span: 3, parallax: .67, variant: 1 }, { x: 6.2, span: 2.7, parallax: .72, variant: 0 },
     { x: 13.2, span: 3.1, parallax: .66, variant: 1 }
-  ].forEach((fence, index) => DrawVillageFenceSegment(fence.x, width, surfaceY - 8 - index % 2 * 4, fence.span, fence.parallax, fence.variant, .58));
+  ].forEach((fence, index) => DrawVillageFenceSegment(fence.x, width, surfaceY - 8 - index % 2 * 4, fence.span, fence.parallax, fence.variant, .34));
 
   const mainHouses = [-9, -5.2, -.2, 4.4, 8.3];
   mainHouses.forEach((worldX, index) => DrawPerspectiveHouse(worldX, width, surfaceY - 3, 66 + index % 2 * 12, .82, index + 40, .94));
@@ -2504,6 +2522,7 @@ function DrawCombatCovers(width, height, surfaceY, tunnelY, front) {
     const blasted = state.combat.blastScars.some((scar) => scar.layer === cover.layer && Math.abs(scar.x - cover.x) <= .9);
     const mobileFront = width <= 640 && front;
     context.save(); context.translate(x, baseY);
+    if (front && active) context.globalAlpha = 1 - .78 * state.player.coverBlend;
     context.shadowColor = "rgba(14,10,8,.42)"; context.shadowBlur = active ? 9 : 3;
     if (cover.kind === "chimney") {
       context.fillStyle = active ? "#8c5d3f" : "#6d4935"; context.strokeStyle = "#291f19"; context.lineWidth = 3;
@@ -2566,19 +2585,30 @@ function DrawCombatBlastDamage(width, height, surfaceY, tunnelY) {
 }
 
 function DrawSurfaceDepthVeil(width, height, surfaceY, daylight) {
-  const haze = context.createLinearGradient(0, surfaceY * .42, 0, surfaceY + 12);
-  haze.addColorStop(0, "rgba(214,204,177,0)");
-  haze.addColorStop(.58, daylight > .4 ? "rgba(211,196,161,.08)" : "rgba(117,126,121,.035)");
-  haze.addColorStop(1, "rgba(31,34,29,.08)");
-  context.fillStyle = haze; context.fillRect(0, surfaceY * .38, width, surfaceY * .66);
+  context.save();
+  const farHaze = context.createLinearGradient(0, surfaceY * .32, 0, surfaceY * .8);
+  farHaze.addColorStop(0, daylight > .4 ? "rgba(192,197,190,.16)" : "rgba(111,128,130,.19)");
+  farHaze.addColorStop(.56, daylight > .4 ? "rgba(180,176,157,.12)" : "rgba(119,124,119,.12)");
+  farHaze.addColorStop(1, "rgba(137,118,91,0)");
+  context.fillStyle = farHaze;
+  context.fillRect(0, surfaceY * .28, width, surfaceY * .56);
+
+  const horizonHaze = context.createLinearGradient(0, surfaceY * .56, 0, surfaceY + 12);
+  horizonHaze.addColorStop(0, "rgba(206,203,188,0)");
+  horizonHaze.addColorStop(.43, daylight > .4 ? "rgba(210,195,161,.13)" : "rgba(132,132,119,.1)");
+  horizonHaze.addColorStop(.72, daylight > .4 ? "rgba(151,131,101,.065)" : "rgba(99,91,79,.055)");
+  horizonHaze.addColorStop(1, "rgba(31,34,29,.025)");
+  context.fillStyle = horizonHaze;
+  context.fillRect(0, surfaceY * .5, width, surfaceY * .54);
   const dustOffset = state.camera.x * width * .01;
-  for (let mote = 0; mote < 22; mote += 1) {
+  for (let mote = 0; mote < 8; mote += 1) {
     const x = (SceneHash(mote + 201) * width - dustOffset + width) % width;
     const y = surfaceY * (.32 + SceneHash(mote + 230) * .61);
     const drift = Math.sin(state.elapsed * (.18 + SceneHash(mote + 250) * .2) + mote) * 8;
-    context.fillStyle = `rgba(224,196,137,${.025 + SceneHash(mote + 280) * .055})`;
-    context.beginPath(); context.arc(x + drift, y, 1 + SceneHash(mote + 300) * 2.2, 0, Math.PI * 2); context.fill();
+    context.fillStyle = `rgba(224,196,137,${.018 + SceneHash(mote + 280) * .026})`;
+    context.beginPath(); context.arc(x + drift, y, .8 + SceneHash(mote + 300) * 1.25, 0, Math.PI * 2); context.fill();
   }
+  context.restore();
 }
 
 function DrawSurfaceCovers(width, surfaceY, front) {
@@ -2593,6 +2623,7 @@ function DrawSurfaceCovers(width, surfaceY, front) {
     const active = activeId === cover.id;
     context.save();
     context.translate(x, surfaceY - 3);
+    if (front && active) context.globalAlpha = 1 - .78 * state.player.coverBlend;
 
     if (front) {
       const shadowWidth = cover.kind === "cart" ? coverWidth * .67 : cover.kind === "hay" ? coverWidth * .6 : coverWidth * .55;
@@ -4558,7 +4589,7 @@ function DrawEnemies(width, viewportHeight, surfaceY, tunnelY) {
     const baseY = LayerBaseY(enemy.layer || "surface", enemy.x, viewportHeight, surfaceY, tunnelY);
     const focused = focusedEnemy?.id === enemy.id;
     const active = !state.qaSafePreview && state.takedownGrace <= 0 && EnemyDetection(enemy) > 0;
-    if (!active && !focused) return;
+    if (!focused) return;
     const x = WorldToScreen(enemy.x, width);
     const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
     const originX = x + enemy.facing * height * .12;
@@ -4566,16 +4597,19 @@ function DrawEnemies(width, viewportHeight, surfaceY, tunnelY) {
     const farTopY = Math.min(baseY - 5, originY + height * .12);
     const farBottomY = baseY + 3;
     const gradient = context.createLinearGradient(originX, 0, endX, 0);
-    gradient.addColorStop(0, active ? "rgba(229,58,44,.44)" : "rgba(222,190,108,.1)");
-    gradient.addColorStop(1, active ? "rgba(195,43,34,.04)" : "rgba(215,184,103,0)");
+    gradient.addColorStop(0, active ? "rgba(229,58,44,.18)" : "rgba(222,190,108,.075)");
+    gradient.addColorStop(1, active ? "rgba(195,43,34,.015)" : "rgba(215,184,103,0)");
     context.fillStyle = gradient;
     context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.lineTo(endX, farBottomY); context.closePath(); context.fill();
-    context.strokeStyle = active ? "rgba(255,91,69,.9)" : "rgba(219,186,104,.24)"; context.lineWidth = active ? 2.5 : 1;
-    context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.moveTo(originX, originY); context.lineTo(endX, farBottomY); context.stroke();
+    context.strokeStyle = active ? "rgba(255,105,79,.36)" : "rgba(219,186,104,.18)"; context.lineWidth = 1;
+    context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, Lerp(farTopY, farBottomY, .5)); context.stroke();
   });
   patrols.forEach((enemy) => {
     const baseY = LayerBaseY(enemy.layer || "surface", enemy.x, viewportHeight, surfaceY, tunnelY);
+    context.save();
+    context.globalAlpha = focusedEnemy?.id === enemy.id ? 1 : .72;
     DrawEnemyUnit({ ...enemy, detecting: EnemyDetection(enemy) > 0, focused: focusedEnemy?.id === enemy.id }, height, WorldToScreen(enemy.x, width), baseY);
+    context.restore();
   });
   DrawEnemyFocusHud(width, viewportHeight, surfaceY, tunnelY, height, focusedEnemy);
 }
@@ -4628,10 +4662,6 @@ function DrawEnemyFocusHud(width, viewportHeight, surfaceY, tunnelY, enemyHeight
   const bracketY = targetBaseY - enemyHeight * .48;
   context.strokeStyle = identity.accent; context.lineWidth = combatTarget ? 2.5 : 2;
   context.beginPath(); context.moveTo(targetX - enemyHeight * .16, bracketY + enemyHeight * .5); context.lineTo(targetX - enemyHeight * .16, bracketY + enemyHeight * .57); context.lineTo(targetX + enemyHeight * .16, bracketY + enemyHeight * .57); context.lineTo(targetX + enemyHeight * .16, bracketY + enemyHeight * .5); context.stroke();
-  context.strokeStyle = combatTarget ? "rgba(239,211,151,.78)" : "rgba(233,215,178,.42)"; context.lineWidth = combatTarget ? 1.5 : 1;
-  const attachX = Math.max(cardX + 16, Math.min(cardX + cardWidth - 16, targetX));
-  const attachY = mobileCombat ? cardY : cardY + cardHeight;
-  context.beginPath(); context.moveTo(attachX, attachY); context.lineTo(targetX, targetBaseY - enemyHeight * .82); context.stroke();
   context.restore();
 }
 
@@ -5148,11 +5178,11 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
   context.save();
   context.globalAlpha = .62;
   context.strokeStyle = "rgba(18,24,21,.78)"; context.fillStyle = "rgba(23,29,24,.76)"; context.lineCap = "round";
-  const playerX = WorldToScreen(state.player.x, width);
   const foregroundClumps = [-13, -9.3, -5.4, -1.2, 3.4, 7.7, 12.1];
   foregroundClumps.forEach((worldX, clumpIndex) => {
     const baseX = LayerToScreen(worldX, width, 1.16);
-    if (Math.abs(baseX - playerX) < 76) return;
+    const focusAlpha = ForegroundFocusAlpha(baseX, width, 64, 154, .2);
+    context.save(); context.globalAlpha *= focusAlpha;
     for (let stemIndex = 0; stemIndex < 5; stemIndex += 1) {
       const offset = (stemIndex - 2) * 8;
       const stemHeight = 24 + ((clumpIndex * 9 + stemIndex * 7) % 30);
@@ -5161,6 +5191,7 @@ function DrawSurfaceVegetation(width, height, surfaceY) {
       context.beginPath(); context.moveTo(baseX + offset, surfaceY + 5); context.quadraticCurveTo(baseX + offset + sway, surfaceY - stemHeight * .55, baseX + offset + sway * 1.4, surfaceY - stemHeight); context.stroke();
       if (stemIndex % 2 === 0) { context.beginPath(); context.ellipse(baseX + offset + sway + 3, surfaceY - stemHeight * .66, 7, 2.5, -.5, 0, Math.PI * 2); context.fill(); }
     }
+    context.restore();
   });
 
   if (state.player.layer === "tunnel") {
@@ -5182,12 +5213,11 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
   context.save();
   context.globalAlpha = .62;
   const nearScale = Math.max(.72, Math.min(1.18, width / 1100));
-  const playerX = WorldToScreen(state.player.x, width);
-
   const nearStructures = [-16.2, -7.1, 3.6, 13.9, 23.1];
   nearStructures.forEach((worldX, index) => {
     const x = LayerToScreen(worldX, width, 1.2);
     if (x < -150 || x > width + 150 || (x > width * .23 && x < width * .77)) return;
+    context.save(); context.globalAlpha *= ForegroundFocusAlpha(x, width, 82, 196, .2);
     const side = x < width / 2 ? 1 : -1;
     const structureWidth = (112 + index % 2 * 26) * nearScale;
     const wallHeight = (112 + index % 3 * 18) * nearScale;
@@ -5201,12 +5231,14 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
     context.beginPath(); context.moveTo(x - structureWidth * .43, surfaceY); context.lineTo(x - structureWidth * .43, surfaceY - wallHeight + 8); context.moveTo(x + structureWidth * .43, surfaceY); context.lineTo(x + structureWidth * .43, surfaceY - wallHeight + 8); context.moveTo(x - structureWidth * .58, surfaceY - wallHeight + 9); context.lineTo(x + structureWidth * .58, surfaceY - wallHeight + 9); context.stroke();
     context.strokeStyle = "rgba(218,169,101,.18)"; context.lineWidth = 2;
     for (let beam = 0; beam < 3; beam += 1) { const beamY = surfaceY - wallHeight * (.22 + beam * .23); context.beginPath(); context.moveTo(x - structureWidth * .48, beamY); context.lineTo(x + structureWidth * .48, beamY - 3); context.stroke(); }
+    context.restore();
   });
 
   const nearCropXs = [-18.4, -13.6, -8.7, -3.9, 1.8, 6.7, 11.6, 16.4];
   nearCropXs.forEach((worldX, clumpIndex) => {
     const baseX = LayerToScreen(worldX, width, 1.29);
-    if (baseX < -90 || baseX > width + 90 || Math.abs(baseX - playerX) < 52) return;
+    if (baseX < -90 || baseX > width + 90) return;
+    context.save(); context.globalAlpha *= ForegroundFocusAlpha(baseX, width, 66, 164, .18);
     const clumpHeight = (56 + SceneHash(worldX + 510) * 82) * nearScale;
     const stalkCount = 3 + Math.floor(SceneHash(worldX + 521) * 5);
     for (let stalk = 0; stalk < stalkCount; stalk += 1) {
@@ -5223,6 +5255,7 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
       context.fill();
       if ((stalk + clumpIndex) % 3 === 0) { context.fillStyle = "rgba(105,83,43,.86)"; context.beginPath(); context.ellipse(baseX + spread + sway + stalkLean * .1, surfaceY - stalkHeight - 4, 3.8 * nearScale, 10 * nearScale, -.16, 0, Math.PI * 2); context.fill(); }
     }
+    context.restore();
   });
 
   const branchDrift = state.camera.x * 8.5;
@@ -5263,8 +5296,8 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
   const foregroundSupports = [-11.8, -6.2, -.7, 4.9, 10.5];
   foregroundSupports.forEach((worldX, index) => {
     const x = LayerToScreen(worldX, width, 1.13);
-    const nearCivilian = state.civilians.some((civilian) => Math.abs(x - WorldToScreen(civilian.x, width)) < 46);
-    if (x < -50 || x > width + 50 || nearCivilian || (state.player.layer === "tunnel" && Math.abs(x - playerX) < 46)) return;
+    if (x < -50 || x > width + 50) return;
+    context.save(); context.globalAlpha *= ForegroundFocusAlpha(x, width, 56, 142, .2);
     const centerY = TunnelCenterYAt(worldX, tunnelY);
     const localHalfHeight = TunnelHalfHeightAt(worldX, height);
     const ceilingY = centerY - localHalfHeight + 2;
@@ -5275,14 +5308,17 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
     context.beginPath(); context.moveTo(x, floorY + 16); context.lineTo(x + (index % 2 ? -5 : 5), ceilingY + 8); context.moveTo(x - 24 * nearScale, ceilingY + 8); context.lineTo(x + 25 * nearScale, ceilingY + 8); context.stroke();
     context.strokeStyle = "rgba(192,139,75,.22)"; context.lineWidth = 2;
     context.beginPath(); context.moveTo(x + 4, floorY + 10); context.lineTo(x + (index % 2 ? -1 : 9), ceilingY + 12); context.stroke();
+    context.restore();
   });
 
   const rootXs = [-9.8, -4.8, .2, 5.2, 10.2];
   rootXs.forEach((worldX, index) => {
     const x = LayerToScreen(worldX, width, 1.09);
     const rootLength = 18 + index % 3 * 12;
-    context.strokeStyle = "rgba(78,54,35,.72)"; context.lineWidth = 2.5;
+    context.save(); context.globalAlpha *= ForegroundFocusAlpha(x, width, 48, 128, .22);
+    context.strokeStyle = "rgba(78,54,35,.42)"; context.lineWidth = 1.8;
     context.beginPath(); context.moveTo(x, surfaceY + 2); context.quadraticCurveTo(x + (index % 2 ? -8 : 7), surfaceY + rootLength * .55, x + (index % 3 - 1) * 11, surfaceY + rootLength); context.stroke();
+    context.restore();
   });
 
   const floorSamples = [];
@@ -5292,7 +5328,7 @@ function DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight) {
   const lipGradient = context.createLinearGradient(0, tunnelY, 0, height);
   lipGradient.addColorStop(0, "rgba(28,22,18,.18)"); lipGradient.addColorStop(1, "rgba(5,9,11,.86)");
   context.fillStyle = lipGradient; context.beginPath(); context.moveTo(-30, height); floorSamples.forEach((point) => context.lineTo(point.x, point.y)); context.lineTo(width + 30, height); context.closePath(); context.fill();
-  context.strokeStyle = "rgba(123,88,49,.5)"; context.lineWidth = 4; context.beginPath(); floorSamples.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)); context.stroke();
+  context.strokeStyle = "rgba(123,88,49,.3)"; context.lineWidth = 2.5; context.beginPath(); floorSamples.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)); context.stroke();
 
   const nearVignette = context.createRadialGradient(width / 2, height * .54, Math.min(width, height) * .28, width / 2, height * .54, Math.max(width, height) * .76);
   nearVignette.addColorStop(0, "rgba(0,0,0,0)"); nearVignette.addColorStop(.68, "rgba(0,0,0,.025)"); nearVignette.addColorStop(1, "rgba(0,0,0,.18)"); context.fillStyle = nearVignette; context.fillRect(0, 0, width, height);
@@ -5337,7 +5373,7 @@ function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) 
 
   context.save();
   context.beginPath(); context.rect(0, surfaceY + 3, width, height - surfaceY - 3); context.clip();
-  context.strokeStyle = "rgba(31,24,19,.12)"; context.lineWidth = .8;
+  context.strokeStyle = "rgba(31,24,19,.045)"; context.lineWidth = .65;
   const hatchSpacing = Math.max(11, Math.min(17, width / 82));
   for (let offset = -height; offset < width + height; offset += hatchSpacing) {
     context.beginPath(); context.moveTo(offset, surfaceY - 12); context.lineTo(offset - height * .48, height + 12); context.stroke();
@@ -5348,16 +5384,16 @@ function DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight) 
   }
   context.restore();
 
-  context.strokeStyle = daylight > .4 ? "rgba(53,45,33,.055)" : "rgba(232,216,177,.025)";
+  context.strokeStyle = daylight > .4 ? "rgba(53,45,33,.028)" : "rgba(232,216,177,.014)";
   context.lineWidth = .7;
-  for (let line = 0; line < 22; line += 1) {
-    const y = 17 + line * surfaceY / 23;
+  for (let line = 0; line < 10; line += 1) {
+    const y = 17 + line * surfaceY / 11;
     const start = SceneHash(line + 804) * width * .62;
     const length = width * (.08 + SceneHash(line + 826) * .29);
     context.beginPath(); context.moveTo(start, y); context.quadraticCurveTo(start + length * .5, y + Math.sin(line) * 2, start + length, y + (line % 3 - 1)); context.stroke();
   }
 
-  context.globalAlpha = daylight > .4 ? .62 : .5;
+  context.globalAlpha = daylight > .4 ? .34 : .29;
   context.fillStyle = lianhuanhuaPattern;
   context.fillRect(0, 0, width, height);
 
@@ -5459,24 +5495,29 @@ function DrawCombatEffects(width, height, surfaceY, tunnelY) {
       }
       context.closePath(); context.fill();
     }
-    context.fillStyle = `rgba(39,35,29,${.82 - progress * .3})`; context.strokeStyle = "#d7b76e"; context.lineWidth = 3;
-    for (let cloud = 0; cloud < 9; cloud += 1) {
-      const angle = cloud / 9 * Math.PI * 2 + .2;
+    context.fillStyle = `rgba(39,35,29,${.78 - progress * .34})`; context.strokeStyle = "rgba(215,183,110,.68)"; context.lineWidth = 2;
+    for (let cloud = 0; cloud < 4; cloud += 1) {
+      const angle = cloud / 4 * Math.PI * 2 + .2;
       const radius = 20 + pulse * (34 + cloud % 3 * 9);
       context.beginPath(); context.arc(Math.cos(angle) * radius * .55, Math.sin(angle) * radius * .43 - pulse * 30, 14 + pulse * 17, 0, Math.PI * 2); context.fill(); context.stroke();
     }
-    context.strokeStyle = "#b54839"; context.lineWidth = 3;
-    for (let ray = 0; ray < 12; ray += 1) { const angle = ray / 12 * Math.PI * 2; context.beginPath(); context.moveTo(Math.cos(angle) * 18, Math.sin(angle) * 18); context.lineTo(Math.cos(angle) * (50 + pulse * 34), Math.sin(angle) * (50 + pulse * 34)); context.stroke(); }
-    for (let shard = 0; shard < 12; shard += 1) {
-      const angle = -.25 - Math.PI * .8 + shard / 11 * Math.PI * 1.6;
+    context.strokeStyle = "rgba(181,72,57,.82)"; context.lineWidth = 2.4;
+    for (let arc = 0; arc < 4; arc += 1) {
+      const radius = 34 + pulse * (26 + arc * 9);
+      const start = -.5 + arc * 1.52;
+      context.beginPath(); context.arc(0, -5, radius, start, start + .54); context.stroke();
+    }
+    for (let shard = 0; shard < 6; shard += 1) {
+      const angle = -.25 - Math.PI * .8 + shard / 5 * Math.PI * 1.6;
       const travel = 24 + pulse * (42 + shard % 4 * 9);
       const shardX = Math.cos(angle) * travel;
       const shardY = Math.sin(angle) * travel - pulse * 22 + progress * progress * 38;
       context.save(); context.translate(shardX, shardY); context.rotate(angle + progress * 8 * (shard % 2 ? 1 : -1));
       context.fillStyle = shard % 3 ? "#76543a" : "#b36e3e"; context.strokeStyle = "#2b2019"; context.lineWidth = 1.2; context.fillRect(-5, -2, 10, 4); context.strokeRect(-5, -2, 10, 4); context.restore();
     }
-    context.strokeStyle = `rgba(231,195,121,${.82 - progress * .45})`; context.lineWidth = 3 + pulse * 4;
-    context.beginPath(); context.ellipse(0, 1, 26 + pulse * 72, 7 + pulse * 17, 0, 0, Math.PI * 2); context.stroke();
+    context.strokeStyle = `rgba(231,195,121,${.62 - progress * .4})`; context.lineWidth = 2 + pulse * 2;
+    context.beginPath(); context.ellipse(0, 1, 26 + pulse * 72, 7 + pulse * 17, 0, -.05, Math.PI * .7); context.stroke();
+    context.beginPath(); context.ellipse(0, 1, 26 + pulse * 72, 7 + pulse * 17, 0, Math.PI * 1.1, Math.PI * 1.72); context.stroke();
     context.restore();
   });
   if (combat.muzzleFlash > 0 && state.player.layer === "roof") {

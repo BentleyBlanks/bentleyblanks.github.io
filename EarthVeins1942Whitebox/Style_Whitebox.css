@@ -566,3 +566,37 @@ h1 small { color: #bd553f; }
   #dogCommandHud { top: 210px; bottom: auto; left: 10px; }
   #civilianCommandPanel { top: 184px; right: 8px; bottom: auto; }
 }
+
+/* Visual hierarchy pass: quiet persistent chrome so the stage owns the first read. */
+#objectiveCard {
+  max-width: min(420px, 47vw);
+  padding: 6px 12px 7px 13px;
+  background: linear-gradient(90deg, rgba(220,205,174,.82), rgba(220,205,174,.46) 76%, transparent);
+  border-left-width: 2px;
+  filter: drop-shadow(1px 2px 0 rgba(31,23,17,.28));
+}
+#objectiveCard small { opacity: .72; }
+#objectiveCard p { margin-block: 3px; font-size: clamp(11px, 1.05vw, 14px); }
+#objectiveCard span { opacity: .72; }
+#metricsPanel { gap: 5px; }
+.metric {
+  min-height: 34px;
+  padding: 4px 8px 5px 5px;
+  background: rgba(34,29,24,.66);
+  border-color: rgba(221,199,159,.16);
+  box-shadow: 1px 2px 0 rgba(24,18,14,.16);
+}
+.metricIcon { opacity: .78; }
+.metricCopy small { opacity: .65; }
+#roleButtons button:not(.active) { opacity: .72; }
+
+@media (max-width: 760px), (max-height: 520px) {
+  #objectiveCard {
+    max-width: 222px;
+    padding: 4px 0 5px 8px;
+    background: linear-gradient(90deg, rgba(220,205,174,.78), rgba(220,205,174,.34) 80%, transparent);
+  }
+  #objectiveCard span { display: none; }
+  #metricsPanel { max-width: 134px; }
+  .metric { min-width: 66px; padding-right: 5px; background: rgba(34,29,24,.59); }
+}
