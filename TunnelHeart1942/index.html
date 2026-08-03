@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803p">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803q">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -100,8 +100,8 @@
         <div class="cluster actions">
           <!-- Aim / design / corridor appear only when that verb is available -->
           <button type="button" id="TouchAim" data-touch="aim" aria-label="开镜" title="开镜" hidden></button>
-          <button type="button" id="TouchDesign" data-touch="design" aria-label="画蓝图" title="画蓝图" hidden></button>
-          <button type="button" id="TouchUse" data-touch="use" aria-label="铺巷道" title="铺巷道" hidden></button>
+          <button type="button" class="wide" id="TouchDesign" data-touch="design" aria-label="画蓝图" title="画蓝图" hidden></button>
+          <button type="button" class="wide" id="TouchUse" data-touch="use" aria-label="铺巷道" title="铺巷道" hidden></button>
           <button type="button" class="wide" id="TouchInteract" data-touch="interact" aria-label="互动" title="互动"></button>
         </div>
       </div>
@@ -110,7 +110,8 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>手机：左右走，上下蹲/抬头，中间一个互动键（交谈·捡物·挖·开火按情境变）。开镜与画蓝图只在用得着时出现。</p>
+        <p>手机：左右走，上下蹲/抬头，右侧一个大键按情境变（地面交谈/捡物，地道里是铁锹开挖，开镜后是开火）。</p>
+        <p>下地道：蓝图按钮会出现——先点它画格，再点一次退出，走到蓝格旁用铁锹大键挖。第一幕已画好蓝线，直接走到边上挖即可。</p>
         <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 设计 R · 放下 Q。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
@@ -143,6 +144,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803p"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803q"></script>
 </body>
 </html>

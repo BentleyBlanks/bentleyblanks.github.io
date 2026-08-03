@@ -316,6 +316,29 @@ button {
 }
 .touchPad button.wide .padIcon { width: 52%; height: 52%; }
 .touchPad button[hidden] { display: none !important; }
+/* Underground: blueprint key must not look like optional chrome */
+.touchPad button.isNeeded {
+  opacity: 1;
+  background: rgba(74, 138, 181, .55);
+  border-color: #1a1410;
+  box-shadow: 0 0 0 2px rgba(74, 138, 181, .45), 2px 2px 0 rgba(0,0,0,.12);
+  animation: padNeedPulse 1.1s ease-in-out infinite;
+}
+.touchPad button.isActive {
+  opacity: 1;
+  background: rgba(74, 138, 181, .85);
+  border-color: #1a1410;
+  animation: none;
+}
+.touchPad button.isDig {
+  opacity: 1;
+  background: rgba(201, 164, 90, .55);
+  border-color: rgba(26, 20, 16, .7);
+}
+@keyframes padNeedPulse {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.04); }
+}
 
 .modalLayer {
   position: absolute; inset: 0; z-index: 5; background: rgba(8,6,4,.75);

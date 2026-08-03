@@ -23,6 +23,7 @@ import {
   YLiftOf,
 } from "./Script_Depth.mjs";
 import {
+  CanDigWith,
   CanPlant,
   CanShoot,
   CanThrow,
@@ -133,18 +134,22 @@ function PaintTouchPadIcons() {
 function PadInteractVerb(st) {
   const p = st.player;
   const hint = st.interactHint || "";
+  // Design mode: big key paints blueprint cells (hold down + tap = chamber).
   if (st.designMode) return st.input.crouch ? "chamber" : "plan";
   if (st.activeTalkId || st.subtitle?.comic) return "talk";
-  if (hint === "dig" || hint === "follow_plan") return "dig";
-  if (CanShoot(p.held) && p.aiming && !p.inTunnel) return "shot";
-  if (CanThrow(p.held)) return "shot";
-  if (CanPlant(p.held) && (hint === "plant_zone" || hint === "signal")) return "use";
+  // Concrete world verbs beat the underground dig default.
   if (hint === "hatch") return "hatch";
   if (hint === "stealth_ko") return "warn";
   if (hint === "pickup" || hint === "need_shovel") return "shovel";
-  if (hint === "talk" || hint === "spy_talk" || hint === "shelter") return "talk";
-  if (hint === "bell") return "talk";
+  if (hint === "talk" || hint === "spy_talk" || hint === "shelter" || hint === "bell") return "talk";
   if (hint === "shot_port" || hint === "shoot") return "shot";
+  if (hint === "plant_zone" || hint === "signal") return CanPlant(p.held) ? "use" : "talk";
+  if (hint === "flip_build" || hint === "flip_trap") return "talk";
+  // Tunnel + shovel: the big key IS dig — not a talk bubble waiting for perfect range.
+  if (p.inTunnel && CanDigWith(p.held)) return "dig";
+  if (hint === "dig" || hint === "follow_plan" || hint === "need_plan") return "dig";
+  if (CanShoot(p.held) && p.aiming && !p.inTunnel) return "shot";
+  if (CanThrow(p.held)) return "shot";
   if (hint) return "talk";
   return "talk";
 }
@@ -169,13 +174,16 @@ function SyncTouchPadActions() {
 
   const touchDesign = $("TouchDesign");
   if (touchDesign) {
+    // Underground always shows the blueprint key — dig alone cannot start a plan.
     const showDesign = inTunnel;
     touchDesign.hidden = !showDesign;
+    touchDesign.classList.toggle("isNeeded", showDesign && !design);
+    touchDesign.classList.toggle("isActive", design);
     if (showDesign && touchDesign.dataset.padMode !== (design ? "designOn" : "design")) {
       touchDesign.innerHTML = PAD_ICON.design;
       touchDesign.dataset.padMode = design ? "designOn" : "design";
-      touchDesign.setAttribute("aria-label", design ? "退出设计" : "画蓝图");
-      touchDesign.title = design ? "退出设计" : "画蓝图";
+      touchDesign.setAttribute("aria-label", design ? "退出设计去挖" : "画蓝图");
+      touchDesign.title = design ? "退出设计去挖" : "画蓝图";
     }
   }
 
@@ -206,19 +214,22 @@ function SyncTouchPadActions() {
       touchInteract.dataset.padMode = mode;
     }
     const label =
-      mode === "dig" || mode === "shovel"
-        ? "挖掘 / 捡起"
-        : mode === "shot"
-          ? "开火"
-          : mode === "hatch"
-            ? "进出井口"
-            : mode === "plan"
-              ? "标记蓝图"
-              : mode === "warn"
-                ? "制住"
-                : "互动";
+      mode === "dig"
+        ? "开挖"
+        : mode === "shovel"
+          ? "捡起"
+          : mode === "shot"
+            ? "开火"
+            : mode === "hatch"
+              ? "进出井口"
+              : mode === "plan"
+                ? "标记蓝图格"
+                : mode === "warn"
+                  ? "制住"
+                  : "互动";
     touchInteract.setAttribute("aria-label", label);
     touchInteract.title = label;
+    touchInteract.classList.toggle("isDig", mode === "dig" || mode === "plan");
   }
 }
 
@@ -231,18 +242,20 @@ function SyncHud() {
   const held = state.player.held;
   const meta = held ? ITEM_META[held] : null;
   slot.dataset.empty = held ? "0" : "1";
-  const tutorialDig =
-    !!state.level?.tutorialPlan && state.player.inTunnel && held === ITEM_SHOVEL && !state.designMode;
+  const inTunnel = !!state.player.inTunnel;
   if (state.designMode) {
-    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>挪格标记 · 蹲着挖铺厢室 · 往前铺巷道</em>`;
+    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出</em>`;
   } else if (held === ITEM_RIFLE) {
-    const ads = state.player.aiming ? "开镜中" : "按住瞄准再打";
+    const ads = state.player.aiming ? "开镜中 · 大键开火" : "按住开镜，再点大键打";
     slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>${ads}</em>`;
+  } else if (inTunnel && held === ITEM_SHOVEL) {
+    const tip = state.level?.tutorialPlan
+      ? "走到蓝色格子旁，点铁锹大键挖"
+      : "先点蓝图画格，退出后走到边上点铁锹挖";
+    slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹</span><em>${tip}</em>`;
   } else {
     slot.innerHTML = meta
-      ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${
-          tutorialDig ? "顺着蓝线走到格旁开挖" : meta.tip
-        }</em>`
+      ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
       : `<b></b><span>空手</span><em>走近捡道具 · 绕到背后可制住敌人</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }

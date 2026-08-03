@@ -1383,12 +1383,30 @@ export function GoalsRemaining(state) {
 /** Always-on next-step copy for the play HUD — Act1 is hard-gated by tutorials. */
 export function NextStepText(state) {
   const g = state.goalsDone;
+  const p = state.player;
+  // Underground controls must read on the HUD — pad merge made this easy to miss.
+  if (p.inTunnel) {
+    if (state.designMode) {
+      return "设计中：方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出后去挖";
+    }
+    if (state.chapterId === "act1_connect") {
+      if (!g.link_ab) return "地道里：走到蓝色格子旁，点铁锹大键开挖（甲—乙）";
+      if (!g.link_bc) return "继续沿蓝线走到格旁，点铁锹开挖（乙—丙）";
+      return "三家已通 · 可回井口上地面";
+    }
+    if (CanDigWith(p.held)) {
+      const planned = state.level?.soil ? CountPlanned(state.level.soil) : 0;
+      if (planned > 0) return "走到蓝色格子旁，点铁锹大键开挖；要改线先点蓝图";
+      return "先点蓝图按钮画出要挖的格子，退出后再走到边上点铁锹挖";
+    }
+    return "地道里需要铁锹才能挖；靠近井口可上地面";
+  }
   if (state.chapterId === "act1_connect") {
     if (!g.talk_laozhong) return "找高老忠交谈";
     if (!g.talk_linxia) return "找林霞交谈";
-    if (state.player.held !== ITEM_SHOVEL) return "去井边捡铁锹";
+    if (p.held !== ITEM_SHOVEL) return "去井边捡铁锹";
     if (!g.enter_hatch) return "带着铁锹到地窖口下洞";
-    if (!g.link_ab) return "顺着蓝线走到格旁，挖通甲—乙";
+    if (!g.link_ab) return "下洞后走到蓝格旁，点铁锹开挖";
     if (!g.link_bc) return "继续沿蓝线挖通乙—丙";
     return "三家已通";
   }

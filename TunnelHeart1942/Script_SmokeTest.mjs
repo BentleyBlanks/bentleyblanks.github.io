@@ -266,6 +266,8 @@ function TestAct1TutorialPlayable() {
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes('classList.toggle("isPressed"'), "pointer handlers toggle isPressed");
   Assert(game.includes("PadInteractVerb") && game.includes("SyncTouchPadActions"), "contextual pad action router");
+  Assert(game.includes("inTunnel && CanDigWith"), "tunnel defaults big key to dig");
+  Assert(css.includes("isNeeded") && css.includes("padNeedPulse"), "blueprint key pulses underground");
 }
 
 function TestNaiveAct1Bot() {
@@ -719,7 +721,17 @@ function Main() {
   Assert(/id="TouchDesign"[^>]*hidden/.test(html), "design hidden until tunnel");
   Assert(!html.includes('data-touch="dig"'), "no always-on dig key");
   Assert(html.includes('data-touch="up"') && html.includes('data-touch="crouch"'), "up/down always on pad");
+  // Underground HUD must teach dig / blueprint — not leave a silent talk key.
+  {
+    const tun = Play(0);
+    tun.player.held = ITEM_SHOVEL;
+    tun.player.inTunnel = true;
+    const tip = NextStepText(tun);
+    Assert(/铁锹|蓝图|蓝/.test(tip), "tunnel step tip names dig/blueprint controls");
+    Assert(tip.includes("点"), "tunnel tip says which pad control to tap");
+  }
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(gameSrc.includes("p.inTunnel && CanDigWith"), "pad verb digs by default underground");
   Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with SVG icons");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
