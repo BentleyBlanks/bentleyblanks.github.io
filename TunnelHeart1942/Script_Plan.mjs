@@ -158,50 +158,63 @@ export function CountPlanned(soil) {
   return n;
 }
 
-/** Soft cell next to the digger that can be excavated this tap. */
+/**
+ * Soft cell next to the digger that can be excavated this tap.
+ * digUp climbs a column (headroom is often already AIR — must look 2–4 cells up).
+ * When digUp/digDown is set, only search that axis so side digs don't steal the tap.
+ */
 export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digUp) {
   EnsurePlanGrid(soil);
   const pc = WorldToCell(soil, playerX, playerY - 24);
-  // Prefer facing / up / down, then any orthogonal neighbor.
+  const face = facing >= 0 ? 1 : -1;
   const preferred = [];
-  if (digUp) preferred.push({ c: pc.c, r: pc.r - 1 }, { c: pc.c + facing, r: pc.r - 1 });
-  if (digDown) preferred.push({ c: pc.c, r: pc.r + 1 });
-  preferred.push(
-    { c: pc.c + facing, r: pc.r },
-    { c: pc.c + facing, r: pc.r - 1 },
-    { c: pc.c + facing * 2, r: pc.r },
-    { c: pc.c + facing * 2, r: pc.r - 1 },
-    { c: pc.c, r: pc.r - 1 },
-    { c: pc.c, r: pc.r + 1 },
-    { c: pc.c - facing, r: pc.r },
-    { c: pc.c, r: pc.r },
-  );
-  const near = (c, r) => Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 2;
-  const seen = new Set();
-  // Pass 1: blue blueprint marks (tutorial / long routes).
-  for (const { c, r } of preferred) {
-    const k = `${c},${r}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    if (!InBounds(soil, c, r)) continue;
-    if (GetCell(soil, c, r) !== SOFT) continue;
-    if (!IsPlanned(soil, c, r)) continue;
-    if (!near(c, r)) continue;
-    return { c, r, rect: CellWorldRect(soil, c, r) };
+  if (digUp) {
+    // Vertical shaft: skip empty headroom, carve the next soft toward the surface.
+    for (let dr = 1; dr <= 4; dr++) {
+      preferred.push({ c: pc.c, r: pc.r - dr });
+      preferred.push({ c: pc.c + face, r: pc.r - dr });
+      preferred.push({ c: pc.c - face, r: pc.r - dr });
+    }
+  } else if (digDown) {
+    for (let dr = 1; dr <= 3; dr++) {
+      preferred.push({ c: pc.c, r: pc.r + dr });
+      preferred.push({ c: pc.c + face, r: pc.r + dr });
+    }
+  } else {
+    preferred.push(
+      { c: pc.c + face, r: pc.r },
+      { c: pc.c + face, r: pc.r - 1 },
+      { c: pc.c + face * 2, r: pc.r },
+      { c: pc.c + face * 2, r: pc.r - 1 },
+      { c: pc.c, r: pc.r - 1 },
+      { c: pc.c, r: pc.r + 1 },
+      { c: pc.c - face, r: pc.r },
+      { c: pc.c, r: pc.r },
+    );
   }
-  // Pass 2: free dig — any soft lip that already touches open air / plan.
-  seen.clear();
-  for (const { c, r } of preferred) {
-    const k = `${c},${r}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    if (!InBounds(soil, c, r)) continue;
-    if (GetCell(soil, c, r) !== SOFT) continue;
-    if (!CanPlanCell(soil, c, r)) continue;
-    if (!near(c, r)) continue;
-    return { c, r, rect: CellWorldRect(soil, c, r), free: true };
-  }
-  return null;
+  // Up/down shafts need a longer reach than sideways lip digs.
+  const near = (c, r) =>
+    digUp || digDown
+      ? Math.abs(pc.c - c) <= 1 && Math.abs(pc.r - r) <= 4
+      : Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 2;
+
+  const tryPick = (needPlan) => {
+    const seen = new Set();
+    for (const { c, r } of preferred) {
+      const k = `${c},${r}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (!InBounds(soil, c, r)) continue;
+      if (GetCell(soil, c, r) !== SOFT) continue;
+      if (needPlan && !IsPlanned(soil, c, r)) continue;
+      if (!needPlan && !CanPlanCell(soil, c, r)) continue;
+      if (!near(c, r)) continue;
+      return { c, r, rect: CellWorldRect(soil, c, r), free: !needPlan, dir: digUp ? "up" : digDown ? "down" : "side" };
+    }
+    return null;
+  };
+
+  return tryPick(true) || tryPick(false);
 }
 
 export function InitPlanCursor(soil, playerX, playerY, facing) {

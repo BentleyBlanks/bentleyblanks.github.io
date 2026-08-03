@@ -8,6 +8,7 @@ import {
   SOFT,
 } from "./Script_Dig.mjs";
 import {
+  CanPlanCell,
   ClearPlanCell,
   CountPlanned,
   EnsurePlanGrid,
@@ -112,6 +113,9 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     meleeFx: null,
     blasts: [],
     projectiles: [],
+    /** Mobile: tap ↑ then dig — keep dig-up intent briefly without two-finger hold. */
+    digAimUp: 0,
+    digAimDown: 0,
     designMode: false,
     planCursor: level.soil ? InitPlanCursor(level.soil, level.spawn.x, level.spawn.y, 1) : null,
     cameraX: Math.max(0, level.spawn.x - VIEW_W * 0.35),
@@ -545,17 +549,25 @@ function TryExcavate(state) {
     return;
   }
   EnsurePlanGrid(level.soil);
-  const digUp = !!input.up;
-  const digDown = !!input.crouch;
+  const digUp = !!input.up || (state.digAimUp || 0) > 0;
+  const digDown = !digUp && (!!input.crouch || (state.digAimDown || 0) > 0);
   const dig = PickExcavateTarget(level.soil, player.x, player.y, player.facing, digDown, digUp);
   if (!dig) {
-    const planned = CountPlanned(level.soil);
-    if (planned > 0) {
-      SetSubtitle(state, "提示", "走到蓝色格子旁边，或贴着土壁再挖。", 2.6);
-      state.interactHint = "follow_plan";
-    } else {
-      SetSubtitle(state, "提示", "贴着空洞边的软土再挖。站太远挖不着。", 2.6);
+    if (digUp) {
+      SetSubtitle(state, "提示", "往上没有软土——可能到硬顶了，换一格再挖。", 2.4);
       state.interactHint = "need_plan";
+    } else if (digDown) {
+      SetSubtitle(state, "提示", "往下没有软土可挖。", 2.2);
+      state.interactHint = "need_plan";
+    } else {
+      const planned = CountPlanned(level.soil);
+      if (planned > 0) {
+        SetSubtitle(state, "提示", "走到蓝色格子旁边，或贴着土壁再挖。", 2.6);
+        state.interactHint = "follow_plan";
+      } else {
+        SetSubtitle(state, "提示", "贴着土壁挖。往上挖：先点↑再点铁锹。", 2.6);
+        state.interactHint = "need_plan";
+      }
     }
     return;
   }
@@ -564,18 +576,25 @@ function TryExcavate(state) {
   if (CarveCell(level.soil, dig.c, dig.r)) {
     state.stats.digs += 1;
     state.stats.cellsCarved += 1;
-    // Always clear soft headroom above the dig — 1-high crawlways trap a standing digger.
+    // Clear soft headroom above the dig — 1-high crawlways trap a standing digger.
+    // When shaft-digging up, also nibble one more soft above so columns advance.
     const headR = dig.r - 1;
     if (GetCell(level.soil, dig.c, headR) === SOFT) {
       if (CarveCell(level.soil, dig.c, headR)) state.stats.cellsCarved += 1;
     }
+    if (digUp) {
+      const headR2 = dig.r - 2;
+      if (GetCell(level.soil, dig.c, headR2) === SOFT && CanPlanCell(level.soil, dig.c, headR2)) {
+        if (CarveCell(level.soil, dig.c, headR2)) state.stats.cellsCarved += 1;
+      }
+    }
     const footR = dig.r + 1;
-    if (IsPlanned(level.soil, dig.c, footR) && GetCell(level.soil, dig.c, footR) === SOFT) {
+    if (!digUp && IsPlanned(level.soil, dig.c, footR) && GetCell(level.soil, dig.c, footR) === SOFT) {
       if (CarveCell(level.soil, dig.c, footR)) state.stats.cellsCarved += 1;
     }
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
-    SetBubble(state, ["shovel"], "开挖", 0.7);
+    SetBubble(state, ["shovel"], digUp ? "往上挖" : digDown ? "往下挖" : "开挖", 0.7);
   }
 }
 
@@ -1603,6 +1622,8 @@ function AllGoalsDone(state) {
 function RefreshHint(state) {
   if (state.player.digging) return;
   state.interactHint = "";
+  const aimUp = !!state.input.up || (state.digAimUp || 0) > 0;
+  const aimDown = !aimUp && (!!state.input.crouch || (state.digAimDown || 0) > 0);
   const digReady =
     state.player.inTunnel &&
     state.level.soil &&
@@ -1613,8 +1634,8 @@ function RefreshHint(state) {
       state.player.x,
       state.player.y,
       state.player.facing,
-      !!state.input.crouch,
-      !!state.input.up,
+      aimDown,
+      aimUp,
     );
   for (const ent of state.level.entities) {
     if (ent.kind === "pickup" && !ent.taken && !ent.hidden) {
@@ -1659,6 +1680,12 @@ function RefreshHint(state) {
 export function StepPlay(state, dt) {
   if (state.phase !== "play" || state.pauseOpen || state.failed || state.completed) return state;
   const clamped = Math.min(0.033, Math.max(0, dt));
+
+  // Sticky dig aim: mobile can tap ↑ then iron-shovel without holding both.
+  if (state.input.up) state.digAimUp = 0.55;
+  else state.digAimUp = Math.max(0, (state.digAimUp || 0) - clamped);
+  if (state.input.crouch) state.digAimDown = 0.55;
+  else state.digAimDown = Math.max(0, (state.digAimDown || 0) - clamped);
 
   UpdateTransition(state, clamped);
   TryDesign(state);

@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
-import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT } from "./Script_Dig.mjs";
+import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT, WorldToCell } from "./Script_Dig.mjs";
 import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
-import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
+import { CountPlanned, EnsurePlanGrid, IsPlanned, PickExcavateTarget, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
@@ -312,6 +312,36 @@ function TestNoJump() {
   state.input.up = true;
   for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
   Assert(state.player.y >= y0 - 2, "W/up does not launch into the air");
+}
+
+/** Dig-up must climb past empty headroom; mobile sticky ↑ then dig works without two-finger hold. */
+function TestDigUpPastHeadroom() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  DebugHold(state, ITEM_SHOVEL);
+  const soil = state.level.soil;
+  EnsurePlanGrid(soil);
+  for (let r = 0; r < soil.rows; r++) {
+    for (let c = 0; c < soil.cols; c++) soil.plan[r][c] = false;
+  }
+  const pc = WorldToCell(soil, state.player.x, state.player.y - 24);
+  // Headroom already open; soft column further up (typical after sideways digs).
+  SetCell(soil, pc.c, pc.r - 1, AIR);
+  SetCell(soil, pc.c, pc.r - 2, SOFT);
+  SetCell(soil, pc.c, pc.r - 3, SOFT);
+  RebuildTunnelSolids(state.level);
+
+  const withUp = PickExcavateTarget(soil, state.player.x, state.player.y, 1, false, true);
+  Assert(!!withUp && withUp.r <= pc.r - 2, `dig-up picks past headroom (got r=${withUp?.r})`);
+
+  // Sticky: tap ↑ for one frame, release, then dig — must still carve upward.
+  state.input.up = true;
+  StepPlay(state, 1 / 30);
+  state.input.up = false;
+  Assert(state.digAimUp > 0, "dig-up sticky armed");
+  state.input.digPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(GetCell(soil, pc.c, pc.r - 2) === AIR, "sticky dig-up carves ceiling soft");
 }
 
 /** Crouch into a 1-high crawlway — must not X-shove to the map/soil edge. */
@@ -990,6 +1020,7 @@ function Main() {
   TestPlanBeforeExcavate();
   TestCarveConnectsAct1();
   TestNoJump();
+  TestDigUpPastHeadroom();
   TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();
   TestMultiTalk();

@@ -314,9 +314,12 @@ function SyncTouchPadActions() {
       touchInteract.innerHTML = InteractPadIcon(mode);
       touchInteract.dataset.padMode = mode;
     }
+    const aimingUp = !!state.input.up || (state.digAimUp || 0) > 0;
     const label =
       mode === "dig"
-        ? "开挖"
+        ? aimingUp
+          ? "往上挖"
+          : "开挖"
         : mode === "shovel"
           ? "捡起"
           : mode === "shot"
@@ -363,7 +366,11 @@ function SyncHud() {
   } else if (state.player.manningMg) {
     slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
-    slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹</span><em>贴土壁反复点大键往前挖，挖通就联通了</em>`;
+    const aimingUp = !!state.input.up || (state.digAimUp || 0) > 0;
+    const tip = aimingUp
+      ? "往上挖中 · 再点大键掏顶"
+      : "贴壁点大键挖 · 往上：先点↑再点大键";
+    slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹${aimingUp ? " · 向上" : ""}</span><em>${tip}</em>`;
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
