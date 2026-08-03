@@ -1475,8 +1475,6 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     for (const ent of state.level.entities) DrawEntity(ent);
     DrawProjectiles();
     DrawPlayer();
-    DrawSpeechBubble();
-    DrawInteractPromptWorld();
     DrawAdsOverlay();
   }
 
@@ -1495,6 +1493,12 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
 
   // Continuous near ground — full width, connected, covers rightmost map edge
   DrawContinuousNearGround(w, h, camX, pal);
+
+  // 6 UI above EVERYTHING — dialogue must never sit under front trees
+  if (playable) {
+    DrawSpeechBubble();
+    DrawInteractPromptWorld();
+  }
 }
 
 function RenderTunnelStack(w, h, camX, pal) {
@@ -1509,10 +1513,11 @@ function RenderTunnelStack(w, h, camX, pal) {
   for (const ent of state.level.entities) DrawEntity(ent);
   DrawProjectiles();
   DrawPlayer();
-  DrawSpeechBubble();
-  DrawInteractPromptWorld();
   // Front lips / dirt clumps occlude the digger
   DrawTunnelFrontLips(pal);
+  // Dialogue / prompts above tunnel lips
+  DrawSpeechBubble();
+  DrawInteractPromptWorld();
 }
 
 function Render() {

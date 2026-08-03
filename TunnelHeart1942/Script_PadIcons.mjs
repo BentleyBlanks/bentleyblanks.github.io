@@ -5,33 +5,38 @@
 
 const ink = "#1a1410";
 
-function Svg(inner, label) {
+function Svg(inner) {
   return `<svg class="padIcon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">${inner}</svg>`;
 }
 
 /** Speech bubble — matches DrawPictogram("talk") */
 export const ICON_TALK = Svg(
-  `<ellipse cx="16" cy="13" rx="10" ry="7.5" fill="${ink}"/>
-   <path d="M12 20 L9 28 L17 22 Z" fill="${ink}"/>`,
+  `<ellipse cx="16" cy="12" rx="11" ry="8" fill="${ink}"/>
+   <path d="M11 19 L8 28 L18 21 Z" fill="${ink}"/>`,
 );
 
 /** Rifle — matches DrawPictogram("shot") */
 export const ICON_SHOT = Svg(
-  `<rect x="4" y="14" width="18" height="5" fill="${ink}"/>
-   <rect x="18" y="10" width="4" height="13" fill="${ink}"/>
-   <rect x="22" y="15" width="6" height="3" fill="${ink}"/>`,
+  `<rect x="3" y="14" width="19" height="5" fill="${ink}"/>
+   <rect x="18" y="9" width="4" height="14" fill="${ink}"/>
+   <rect x="22" y="15" width="7" height="3" fill="${ink}"/>`,
 );
 
 /** Shovel — matches DrawPictogram("shovel") */
 export const ICON_SHOVEL = Svg(
-  `<rect x="14" y="3" width="4" height="16" fill="${ink}"/>
-   <path d="M8 20 L24 20 L16 29 Z" fill="${ink}"/>`,
+  `<rect x="14" y="2" width="4" height="17" fill="${ink}"/>
+   <path d="M7 20 L25 20 L16 30 Z" fill="${ink}"/>`,
 );
 
-/** Hatch / blueprint mark — matches DrawPictogram("hatch") zig */
+/**
+ * Blueprint / design — grid map + pencil.
+ * Must read as "画蓝图" at a glance (old zig-zag hatch looked like noise).
+ */
 export const ICON_PLAN = Svg(
-  `<rect x="8" y="4" width="16" height="24" fill="none" stroke="${ink}" stroke-width="2.5"/>
-   <path d="M11 9 L21 13 L11 17 L21 21 L11 25" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>`,
+  `<rect x="3" y="3" width="20" height="20" fill="none" stroke="${ink}" stroke-width="2.4"/>
+   <path d="M3 10 H23 M3 16 H23 M10 3 V23 M16 3 V23" stroke="${ink}" stroke-width="1.6"/>
+   <path d="M18 8 L29 19 L29 26 L22 26 L11 15 Z" fill="${ink}"/>
+   <path d="M18 8 L22 4 L26 8 L22 12 Z" fill="${ink}"/>`,
 );
 
 /** ADS crosshair */
@@ -43,20 +48,23 @@ export const ICON_AIM = Svg(
 
 /** Up cursor (design mode aim key) */
 export const ICON_UP = Svg(
-  `<path d="M16 6 L26 20 H6 Z" fill="${ink}"/>
-   <rect x="13" y="18" width="6" height="8" fill="${ink}"/>`,
+  `<path d="M16 5 L27 20 H5 Z" fill="${ink}"/>
+   <rect x="13" y="18" width="6" height="9" fill="${ink}"/>`,
 );
 
-/** Crouch figure */
+/**
+ * Crouch — side-view crouched body + down chevron (reads as 蹲).
+ */
 export const ICON_CROUCH = Svg(
-  `<circle cx="16" cy="8" r="4" fill="${ink}"/>
-   <path d="M8 28 L12 16 H20 L24 28" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linejoin="round"/>
-   <path d="M10 22 H22" stroke="${ink}" stroke-width="2.4"/>`,
+  `<circle cx="20" cy="9" r="3.6" fill="${ink}"/>
+   <path d="M18 12 L10 15 L8 22 L14 21 L16 17 L22 20 L24 16 Z" fill="${ink}"/>
+   <path d="M8 22 L6 28 M14 21 L12 28 M22 20 L24 28" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>
+   <path d="M4 30 L16 24 L28 30" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>`,
 );
 
 /** Move chevrons */
-export const ICON_LEFT = Svg(`<path d="M22 6 L10 16 L22 26 Z" fill="${ink}"/>`);
-export const ICON_RIGHT = Svg(`<path d="M10 6 L22 16 L10 26 Z" fill="${ink}"/>`);
+export const ICON_LEFT = Svg(`<path d="M22 5 L9 16 L22 27 Z" fill="${ink}"/>`);
+export const ICON_RIGHT = Svg(`<path d="M10 5 L23 16 L10 27 Z" fill="${ink}"/>`);
 
 export const PAD_ICON = {
   left: ICON_LEFT,

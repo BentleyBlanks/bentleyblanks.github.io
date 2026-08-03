@@ -238,6 +238,8 @@ function TestAct1TutorialPlayable() {
   Assert(!/>蹲</.test(padHtml) && !/>瞄</.test(padHtml) && !/>设计</.test(padHtml), "pad buttons have no text glyphs");
   const padIcons = readFileSync(join(here, "Script_PadIcons.mjs"), "utf8");
   Assert(padIcons.includes("ICON_TALK") && padIcons.includes("ICON_SHOT") && padIcons.includes("ICON_SHOVEL"), "pad icons match game pictograms");
+  Assert(padIcons.includes("M3 10 H23") && padIcons.includes("ICON_PLAN"), "design icon is blueprint grid + pencil");
+  Assert(padIcons.includes("L16 24 L28 30") && padIcons.includes("ICON_CROUCH"), "crouch icon is crouched figure + down chevron");
   const css = readFileSync(join(here, "Style_Game.css"), "utf8");
   Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
@@ -683,6 +685,11 @@ function Main() {
   Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with SVG icons");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
+  const surfaceStack = gameSrc.slice(gameSrc.indexOf("function RenderSurfaceStack"), gameSrc.indexOf("function RenderTunnelStack"));
+  Assert(
+    surfaceStack.indexOf("DrawContinuousNearGround") < surfaceStack.lastIndexOf("DrawSpeechBubble"),
+    "dialogue bubble draws above front trees / near ground",
+  );
   Assert(!gameSrc.includes("E 继续") && !gameSrc.includes("E 关闭"), "no keyboard-letter dialogue hints");
   Assert(!/（E）/.test(NextStepText(Play(0))), "step hint has no (E) key letter");
   TestNoKeyLetterCopy();
