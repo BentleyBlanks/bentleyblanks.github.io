@@ -309,7 +309,7 @@ function TestAct1TutorialPlayable() {
   Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
   Assert(/width:\s*74px/.test(css), "touch keys are large");
-  Assert(css.includes(".padIcon"), "pad icon sizing");
+  Assert(css.includes("width: 78%") || css.includes("width:78%"), "pad icons fill most of the key");
   Assert(css.includes("Icon_Charge.png") && css.includes("Icon_Grenade.png") && css.includes("Icon_Rifle.png"), "held slot uses generated item plates");
   Assert(css.includes(".cluster.move .vert"), "up/down stacked beside strafe");
   Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
