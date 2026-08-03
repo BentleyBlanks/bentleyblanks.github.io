@@ -1014,6 +1014,70 @@ function TestPatrolMeleeAndHurtPullback() {
   Assert(!st2.failed && st2.player.hp === 3, "death respawn clears fail + hearts");
 }
 
+/** Enemy on a well: ↓ / 互动 must KO first — never dive through them into the shaft. */
+function TestMeleeBeatsShaftDescend() {
+  const state = Play(0);
+  const hatch = state.level.entities.find((e) => e.type === "hatch");
+  Assert(!!hatch, "act1 has hatch mouth");
+  // Punch an open shaft under the hatch so ↓ re-enter is eligible.
+  const soil = state.level.soil;
+  const col = WorldToCell(soil, hatch.x, soil.originY + soil.cell * 0.5).c;
+  for (let r = 0; r <= 4; r++) SetCell(soil, col, r, AIR);
+  RebuildTunnelSolids(state.level);
+
+  const foe = {
+    id: "mouth_guard",
+    type: "enemy",
+    x: hatch.x,
+    y: 0,
+    layer: "surface",
+    homeX: hatch.x,
+    amp: 0,
+    hp: 2,
+    maxHp: 2,
+    dead: false,
+    ko: false,
+    broken: false,
+    label: "日军",
+    faction: "ijp",
+    facing: -1,
+    alert: 0,
+    highAlert: false,
+    hostile: true,
+    hidden: false,
+  };
+  state.level.entities.push(foe);
+
+  // Stand behind the 日军 (facing left) so the chop lands — priority under test is mouth vs KO.
+  foe.facing = 1;
+  state.player.inTunnel = false;
+  state.player.x = hatch.x - 36;
+  state.player.y = 0;
+  state.player.facing = 1;
+  state.player.hp = 3;
+  state.player.meleeT = 0;
+  state.player.invuln = 0;
+  state.player.crouching = true;
+  state.transition = 0;
+  state.pendingMelee = null;
+  state.input.crouch = true;
+  state.input.interactPressed = false;
+  StepPlay(state, 1 / 30);
+  Assert(!state.player.inTunnel, "holding ↓ on guarded mouth does not dive");
+  Assert(state.transition === 0, "no hatch transition while foe guards mouth");
+
+  state.input.crouch = true; // stealth stay low; must still not dive
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!!state.pendingMelee || foe.dead || foe.ko, "interact on guarded mouth starts KO");
+  Assert(!state.player.inTunnel, "interact does not dump player underground");
+  // Release ↓ while the chop lands — still assert we never dove during windup.
+  state.input.crouch = false;
+  MeleeUntilResolved(state);
+  Assert(foe.dead || foe.ko, "mouth guard can be knocked out");
+  Assert(!state.player.inTunnel || state.transition > 0, "KO resolution does not force a dive");
+}
+
 /** KO one 日军 patrol — if another faces the body, whole surface goes high alert. */
 function TestPatrolCorpseRaisesAlert() {
   const state = Play(1);
@@ -1611,6 +1675,7 @@ function Main() {
   TestAct5StreetHunt();
   TestMeleeKoFactions();
   TestPatrolMeleeAndHurtPullback();
+  TestMeleeBeatsShaftDescend();
   TestPatrolCorpseRaisesAlert();
   TestGrenadeAimArc();
   TestAct6PlantNeedsCharge();

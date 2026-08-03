@@ -298,13 +298,14 @@ function PadInteractVerb(st) {
   if (st.designMode) return "dig";
   if (IsDialogueBlockingPad(st)) return "talk";
   if (hint === "mg_nest") return "shot";
+  // KO always beats hatch — enemy on a well must not turn the big key into "下地道".
+  if (hint === "stealth_ko" || hint === "melee_risky") return "warn";
   // Underground with shovel: dig is the default — hatch only when no diggable wall.
   if (p.inTunnel && CanDigWith(p.held)) {
     if (hint === "hatch") return "hatch";
     return "dig";
   }
   if (hint === "hatch") return "hatch";
-  if (hint === "stealth_ko" || hint === "melee_risky") return "warn";
   if (hint === "pickup" || hint === "need_shovel") return "shovel";
   if (hint === "talk" || hint === "spy_talk" || hint === "shelter" || hint === "bell") return "talk";
   if (hint === "shot_port" || hint === "shoot") return "shot";

@@ -456,6 +456,45 @@ function TryEmergeFromShaft(state) {
 }
 
 /**
+ * Living surface foe in strike range (or a bit wider at a shaft mouth).
+ * Used so hatch / ↓ re-enter never steals a lined-up KO.
+ */
+function FindMeleeFoe(state, maxDist = 52) {
+  const { player, level } = state;
+  if (!player || player.inTunnel || player.manningMg) return null;
+  if ((player.meleeT || 0) > 0.12) return null;
+  let best = null;
+  let bestD = 1e9;
+  for (const ent of level.entities || []) {
+    if (!IsMeleeFoe(ent)) continue;
+    if (!LayerOk(player, ent)) continue;
+    const dx = Math.abs(player.x - ent.x);
+    if (dx > maxDist) continue;
+    if (Math.abs((player.y || 0) - (ent.y || 0)) > 48) continue;
+    if (dx < bestD) {
+      bestD = dx;
+      best = ent;
+    }
+  }
+  return best;
+}
+
+/** At an open mouth, give KO a slightly longer leash than a plain hatch tap. */
+function MeleeReachAtMouth(state) {
+  if (!state.player?.inTunnel && state.level?.soil && ShaftOpenToSurface(state.level.soil, state.player.x)) {
+    return 64;
+  }
+  const hatch = (state.level?.entities || []).find(
+    (e) =>
+      e.type === "hatch" &&
+      !e.hidden &&
+      !e.done &&
+      Math.abs((state.player?.x || 0) - e.x) < (e.radius || 56),
+  );
+  return hatch ? 64 : 52;
+}
+
+/**
  * Surface → open carved shaft. Climb-out left no hatch entity, so ↓ / 互动 must re-enter.
  */
 function TryDescendOpenShaft(state) {
@@ -463,10 +502,14 @@ function TryDescendOpenShaft(state) {
   if (player.inTunnel || player.manningMg || !level.soil || state.transition > 0) return false;
   if (state.nadeAiming) return false;
   if ((state.shaftExitLock || 0) > 0) return false;
+  // Mid-chop / queued KO — never dive out from under the strike.
+  if (state.pendingMelee || (player.meleeT || 0) > 0) return false;
   // Interact tap or hold ↓ on the mouth — sticky digAimDown alone must not yo-yo re-enter.
   const wantDown = !!input.interactPressed || !!input.crouch;
   if (!wantDown) return false;
   if (!ShaftOpenToSurface(level.soil, player.x)) return false;
+  // Foe on the mouth: never dive (↓ stealth approach used to yo-yo into the well).
+  if (FindMeleeFoe(state, MeleeReachAtMouth(state))) return false;
   // Prefer an authored hatch's tunnel anchor when standing on its mouth.
   let hatchNear = null;
   for (const ent of level.entities) {
@@ -2017,18 +2060,9 @@ function TryInteract(state) {
 
   state.stats.interactions += 1;
 
-  // Melee KO before world props — nest/hatch must not eat a lined-up takedown.
-  let bestFoe = null;
-  let bestD = 9999;
-  for (const ent of level.entities) {
-    if (!IsMeleeFoe(ent)) continue;
-    if (!CanMeleeReach(player, ent)) continue;
-    const d = Math.abs(player.x - ent.x);
-    if (d < bestD) {
-      bestD = d;
-      bestFoe = ent;
-    }
-  }
+  // Melee KO before world props — nest/hatch/↓ must not eat a lined-up takedown.
+  // At a shaft mouth the leash is a bit longer so "敌军挡口" still chops first.
+  const bestFoe = FindMeleeFoe(state, MeleeReachAtMouth(state));
   if (bestFoe) {
     TryMeleeKO(state, bestFoe);
     return true;
@@ -2087,6 +2121,14 @@ function TryInteract(state) {
     }
 
     if (ent.type === "hatch") {
+      // Mouth guarded — chop first, never dive through a living 日军.
+      if (!player.inTunnel) {
+        const guard = FindMeleeFoe(state, 64);
+        if (guard) {
+          TryMeleeKO(state, guard);
+          return true;
+        }
+      }
       // Escort drop-off: followers at the mouth go in before you dive.
       if (!player.inTunnel && DropOffShelterFollowers(state, ent.x)) {
         return true;
@@ -2510,13 +2552,14 @@ function RefreshHint(state) {
       }
     }
   }
-  for (const ent of state.level.entities) {
-    if (IsMeleeFoe(ent) && CanMeleeReach(state.player, ent)) {
-      if (ent.type === "patrol") {
+  {
+    const foe = FindMeleeFoe(state, MeleeReachAtMouth(state));
+    if (foe) {
+      if (foe.type === "patrol") {
         state.interactHint = "stealth_ko";
       } else {
-        const behind = IsBehindEnemy(state.player, ent);
-        const hard = EnemyFaction(ent) === "ijp";
+        const behind = IsBehindEnemy(state.player, foe);
+        const hard = EnemyFaction(foe) === "ijp";
         state.interactHint = hard && !behind ? "melee_risky" : "stealth_ko";
       }
       return;
@@ -2529,6 +2572,10 @@ function RefreshHint(state) {
     if (Near(state.player, ent, ent.radius || 52)) {
       // Underground with a diggable wall: dig beats hatch so the big key isn't stolen.
       if (ent.type === "hatch" && digReady) continue;
+      // Surface hatch with a living guard — keep KO hint, don't flash "地窖口".
+      if (ent.type === "hatch" && !state.player.inTunnel && FindMeleeFoe(state, 64)) {
+        continue;
+      }
       if (
         ent.type === "hatch" &&
         ent.needsShovel &&
@@ -2555,8 +2602,17 @@ function RefreshHint(state) {
   }
   // Surface mouth — ↓ / 互动 re-enters (no hatch entity required).
   // Prefer "send followers in" if any are trailing at this mouth.
+  // Living foe on the mouth keeps the KO prompt (never "下地道" while they stand there).
   if (!state.player.inTunnel && IsShaftOpenAt(state, state.player.x)) {
     state.openShaftX = state.player.x;
+    const guard = FindMeleeFoe(state, 64);
+    if (guard) {
+      state.interactHint =
+        EnemyFaction(guard) === "ijp" && !IsBehindEnemy(state.player, guard)
+          ? "melee_risky"
+          : "stealth_ko";
+      return;
+    }
     const drop = (state.level.entities || []).some(
       (e) =>
         e.type === "shelter" &&
