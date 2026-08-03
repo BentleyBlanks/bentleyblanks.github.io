@@ -608,6 +608,7 @@ function TestMultiTalk() {
   Assert(!state.subtitle, "E confirms and closes last comic bubble");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("DrawComicSpeechBubble"), "comic speech bubble draw");
+  Assert(game.includes("topSafe") && game.includes("flip below"), "comic bubble clamps / flips inside window");
 }
 
 function TestAct2MustDigBeforeShelter() {

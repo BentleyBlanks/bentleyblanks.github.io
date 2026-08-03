@@ -1218,11 +1218,12 @@ function WrapTextLines(text, maxW, maxLines = 4) {
 
 function ComicBubbleAnchor(sub) {
   const s = Scale();
-  // Narration / system lines float upper-center — not pinned to a body
+  // Narration / system lines float upper-center — not pinned to a body.
+  // Keep the anchor mid-upper so the bubble (drawn above) still clears the top chrome.
   if (/旁白|提示|危险/.test(sub.speaker || "")) {
     const w = canvas.clientWidth || innerWidth;
     const h = canvas.clientHeight || innerHeight;
-    return { x: w * 0.5, y: h * 0.2 };
+    return { x: w * 0.5, y: Math.max(h * 0.28, 120) };
   }
   let wx = sub.anchorX;
   let wy = sub.anchorY;
@@ -1245,12 +1246,18 @@ function ComicBubbleAnchor(sub) {
 
 /**
  * Comic speech bubble over the speaker's head — who speaks is who wears the bubble.
+ * Clamped inside the canvas: if the top would clip (common on PC), flip below the head.
  * E / Space / 互动 advances (see TryAdvanceActiveTalk).
  */
 function DrawComicSpeechBubble(sub) {
   const s = Scale();
   const anchor = ComicBubbleAnchor(sub);
-  const maxInner = Math.min(280, (canvas.clientWidth || innerWidth) * 0.55);
+  const screenW = canvas.clientWidth || innerWidth;
+  const screenH = canvas.clientHeight || innerHeight;
+  // Leave room for heart/pause chrome near the top edge.
+  const topSafe = Math.max(52, screenH * 0.09);
+  const botSafe = Math.max(24, screenH * 0.04);
+  const maxInner = Math.min(280, screenW * 0.55);
   ctx.save();
   ctx.font = `600 ${Math.max(13, 15 * s)}px "Noto Serif SC", "Source Han Serif SC", serif`;
   const lines = WrapTextLines(sub.text, maxInner - 28 * s, 4);
@@ -1268,9 +1275,24 @@ function DrawComicSpeechBubble(sub) {
   const iconHint = 16 * s;
   const boxH = padY * 2 + nameH + lines.length * lineH + iconHint + 4 * s;
   let bx = anchor.x - boxW / 2;
-  const screenW = canvas.clientWidth || innerWidth;
   bx = Math.max(8, Math.min(screenW - boxW - 8, bx));
-  const by = anchor.y - boxH - 10 * s;
+
+  // Prefer above the head; flip below when the bubble would leave the window.
+  const gap = 10 * s;
+  const tail = 11 * s;
+  let by = anchor.y - boxH - gap;
+  let below = false;
+  if (by < topSafe) {
+    const belowY = anchor.y + gap + tail * 0.35;
+    if (belowY + boxH <= screenH - botSafe) {
+      by = belowY;
+      below = true;
+    } else {
+      by = Math.max(topSafe, Math.min(screenH - botSafe - boxH, by));
+    }
+  } else if (by + boxH > screenH - botSafe) {
+    by = Math.max(topSafe, screenH - botSafe - boxH);
+  }
 
   ctx.fillStyle = "#efe2c8";
   ctx.strokeStyle = "#1a1410";
@@ -1281,12 +1303,18 @@ function DrawComicSpeechBubble(sub) {
   ctx.fill();
   ctx.stroke();
 
-  // Tail toward the speaker's head
+  // Tail toward the speaker — points down when bubble is above, up when flipped below.
   const tipX = Math.max(bx + 16 * s, Math.min(bx + boxW - 16 * s, anchor.x));
   ctx.beginPath();
-  ctx.moveTo(tipX - 7 * s, by + boxH - 1);
-  ctx.lineTo(tipX, by + boxH + 11 * s);
-  ctx.lineTo(tipX + 7 * s, by + boxH - 1);
+  if (below) {
+    ctx.moveTo(tipX - 7 * s, by + 1);
+    ctx.lineTo(tipX, by - tail);
+    ctx.lineTo(tipX + 7 * s, by + 1);
+  } else {
+    ctx.moveTo(tipX - 7 * s, by + boxH - 1);
+    ctx.lineTo(tipX, by + boxH + tail);
+    ctx.lineTo(tipX + 7 * s, by + boxH - 1);
+  }
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -1867,8 +1895,17 @@ function DrawSpeechBubble() {
   const gap = 4 * s;
   const w = pad * 2 + b.icons.length * iconSize + (b.icons.length - 1) * gap;
   const h = pad * 2 + iconSize;
-  const bx = x - w / 2;
-  const by = y - h - 12 * s;
+  const screenW = canvas.clientWidth || innerWidth;
+  const screenH = canvas.clientHeight || innerHeight;
+  const topSafe = Math.max(52, screenH * 0.09);
+  let bx = Math.max(8, Math.min(screenW - w - 8, x - w / 2));
+  let by = y - h - 12 * s;
+  let below = false;
+  if (by < topSafe) {
+    by = y + 14 * s;
+    below = true;
+    if (by + h > screenH - 24) by = Math.max(topSafe, screenH - 24 - h);
+  }
   ctx.save();
   ctx.fillStyle = "#efe2c8";
   ctx.strokeStyle = "#1a1410";
@@ -1879,9 +1916,15 @@ function DrawSpeechBubble() {
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(x - 6 * s, by + h);
-  ctx.lineTo(x, by + h + 10 * s);
-  ctx.lineTo(x + 6 * s, by + h);
+  if (below) {
+    ctx.moveTo(x - 6 * s, by + 1);
+    ctx.lineTo(x, by - 10 * s);
+    ctx.lineTo(x + 6 * s, by + 1);
+  } else {
+    ctx.moveTo(x - 6 * s, by + h);
+    ctx.lineTo(x, by + h + 10 * s);
+    ctx.lineTo(x + 6 * s, by + h);
+  }
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
