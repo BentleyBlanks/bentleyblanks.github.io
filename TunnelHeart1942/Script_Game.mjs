@@ -52,6 +52,7 @@ import {
   PickClip,
 } from "./Script_Puppet.mjs";
 import { InteractPadIcon, PAD_ICON, HUD_ICON_FILES } from "./Script_PadIcons.mjs";
+import { DrawFluidField, DrawSealPlugs, IsSealed } from "./Script_Fluid.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -1610,13 +1611,15 @@ function DrawEntity(ent) {
     return;
   }
 
-  if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
+  if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter" || ent.type === "refugee") {
     const nearTalk = Math.abs(state.player.x - ent.x) < 90;
     if (!ent.done && nearTalk) glow();
-    const name = ent.speaker || (ent.type === "shelter" ? "乡亲" : "民兵");
+    const name = ent.speaker || (ent.type === "shelter" || ent.type === "refugee" ? "乡亲" : "民兵");
     const pal = ent.type === "spy_talk" ? "spy" : PaletteForSpeaker(name);
-    const following = ent.type === "shelter" && ent.following && !ent.done;
-    const alpha = ent.done && ent.type === "shelter" ? 0.35 : 1;
+    const following =
+      ((ent.type === "shelter" && ent.following) || (ent.type === "refugee" && ent.order === "follow")) &&
+      !ent.done;
+    const alpha = ent.done && (ent.type === "shelter" || ent.type === "refugee") ? 0.35 : 1;
     DrawPuppet(ctx, {
       x: 0,
       y: 0,
@@ -1629,12 +1632,45 @@ function DrawEntity(ent) {
       alpha,
     });
     // Always-on who-is-who plate — puppets alone are not readable.
+    let plate = following ? `${name}·跟上` : name;
+    if (ent.type === "refugee" && !ent.done) {
+      if (ent.order === "high") plate = `${name}·上高`;
+      else if (ent.order === "exit") plate = `${name}·突口`;
+      else if (ent.order === "follow") plate = `${name}·跟上`;
+    }
     DrawNameplate(
-      following ? `${name}·跟上` : name,
+      plate,
       RoleIconForSpeaker(name),
-      following ? -88 * s : -78 * s,
+      following || ent.order === "high" || ent.order === "exit" ? -88 * s : -78 * s,
       s,
     );
+  } else if (ent.type === "seal_mouth") {
+    if (Math.abs(state.player.x - ent.x) < 80) glow();
+    const sealed = !!(state.level.soil && IsSealed(state.level.soil, ent.c, ent.r));
+    ent.sealed = sealed;
+    ctx.fillStyle = sealed ? "#5a3a1c" : "#8a6a40";
+    ctx.fillRect(-16 * s, -22 * s, 32 * s, 22 * s);
+    ctx.strokeRect(-16 * s, -22 * s, 32 * s, 22 * s);
+    DrawNameplate(sealed ? `${ent.mouthLabel || "井口"}·封` : `${ent.mouthLabel || "井口"}·封口`, "hatch", -48 * s, s);
+  } else if (ent.type === "cistern") {
+    if (Math.abs(state.player.x - ent.x) < 80) glow();
+    ctx.fillStyle = "#3a5a68";
+    ctx.beginPath();
+    ctx.ellipse(0, -6 * s, 18 * s, 10 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    DrawNameplate(ent.drunk ? "饮水窖·已饮" : "饮水窖", "down", -40 * s, s);
+  } else if (ent.type === "cart_gate") {
+    if (Math.abs(state.player.x - ent.x) < 100) glow();
+    ctx.fillStyle = "#6a4a28";
+    ctx.fillRect(-28 * s, -36 * s, 56 * s, 36 * s);
+    ctx.strokeRect(-28 * s, -36 * s, 56 * s, 36 * s);
+    ctx.fillStyle = "#2a1c12";
+    ctx.beginPath();
+    ctx.arc(-18 * s, 2 * s, 8 * s, 0, Math.PI * 2);
+    ctx.arc(18 * s, 2 * s, 8 * s, 0, Math.PI * 2);
+    ctx.fill();
+    DrawNameplate("车马道", "up", -52 * s, s);
   } else if (ent.type === "hatch") {
     if (Math.abs(state.player.x - ent.x) < 80) glow();
     ctx.fillStyle = "#2a1c12";
@@ -2339,6 +2375,51 @@ function DrawGrenadeAimArc() {
   ctx.restore();
 }
 
+/** Breath / drown meter while submerged in flood water. */
+function DrawDrownMeter() {
+  const d = state.player?.drown || 0;
+  if (d < 0.08 || !state.player.inTunnel) return;
+  const w = canvas.clientWidth || innerWidth;
+  const h = canvas.clientHeight || innerHeight;
+  const bw = Math.min(180, w * 0.28);
+  const bh = 8;
+  const x = (w - bw) / 2;
+  const y = h * 0.16;
+  ctx.save();
+  ctx.fillStyle = "rgba(10,16,22,.55)";
+  ctx.fillRect(x - 2, y - 2, bw + 4, bh + 4);
+  ctx.fillStyle = d > 0.7 ? "#a6452f" : "#3a8aaa";
+  ctx.fillRect(x, y, bw * Math.min(1, d), bh);
+  ctx.fillStyle = "#efe2c8";
+  ctx.font = '700 11px "Noto Sans SC","PingFang SC",sans-serif';
+  ctx.textAlign = "center";
+  ctx.fillText(d > 0.7 ? "呛水！" : "屏息", w / 2, y - 6);
+  ctx.restore();
+}
+
+function DrawFloodRaidBanner() {
+  const flood = state.level?.flood;
+  if (!flood?.enabled || state.phase !== "play") return;
+  const w = canvas.clientWidth || innerWidth;
+  ctx.save();
+  ctx.font = '700 12px "Noto Sans SC","PingFang SC",sans-serif';
+  ctx.textAlign = "left";
+  let text = "";
+  if (flood.phase === "prep") text = `灌水倒计时 ${Math.ceil(flood.prepTimer || 0)}s · 封口 / 上高台`;
+  else if (flood.phase === "flood") text = "灌水中 · 封不住的口子在进水";
+  else if (flood.phase === "raid") text = "日军进洞 · 击晕抢枪 · 东口突围";
+  if (!text) {
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = "rgba(18,10,6,.72)";
+  const tw = ctx.measureText(text).width;
+  ctx.fillRect(12, 48, tw + 20, 22);
+  ctx.fillStyle = flood.phase === "prep" ? "#efe2c8" : "#f0c27a";
+  ctx.fillText(text, 22, 64);
+  ctx.restore();
+}
+
 function DrawAdsOverlay() {
   if (!state.player.aiming || state.player.held !== ITEM_RIFLE || state.player.inTunnel) return;
   const w = canvas.width;
@@ -2562,6 +2643,20 @@ function RenderPlayCutaway(w, h, camX, pal) {
   ctx.restore();
   DrawPlanOverlay(pal);
 
+  const { cam0, cam1 } = CameraCullX(160);
+  const fluidView = {
+    WX,
+    WY,
+    scale: Scale(),
+    cam0,
+    cam1,
+    night: !!pal.night,
+  };
+  if (state.fluid && state.level.soil) {
+    DrawFluidField(ctx, state.fluid, state.level.soil, fluidView);
+    DrawSealPlugs(ctx, state.level.soil, fluidView);
+  }
+
   // Surface ridge props (already partly in DrawSoilCutaway); play-plane props on the lip.
   for (const prop of PropsPlay(state.level.props)) DrawProp(prop, pal, state.player.inTunnel ? 0.45 : 1);
 
@@ -2574,6 +2669,7 @@ function RenderPlayCutaway(w, h, camX, pal) {
   DrawDigFx();
   DrawMeleeFx();
   DrawAdsOverlay();
+  DrawDrownMeter();
 
   if (state.player.inTunnel) DrawTunnelFrontLips(pal);
 
@@ -2704,7 +2800,10 @@ function Render() {
     RenderSurfaceStack(w, h, camX, pal, { playable: state.phase === "play" });
   }
 
-  if (state.phase === "play") DrawDialogueBanner();
+  if (state.phase === "play") {
+    DrawDialogueBanner();
+    DrawFloodRaidBanner();
+  }
 
   if (state.transition > 0) {
     const a = state.transition < 0.5 ? state.transition * 2 : (1 - state.transition) * 2;

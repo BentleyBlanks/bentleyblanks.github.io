@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT, WorldToCell } from "./Script_Dig.mjs";
+import { FluidFillAtWorld, IsSealed, SetSealed } from "./Script_Fluid.mjs";
 import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, PickExcavateTarget, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
@@ -1188,22 +1189,69 @@ function TestDepthLayers() {
 }
 
 function TestChaptersHaveSoil() {
-  Assert(CHAPTERS.length === 8, "eight acts");
+  Assert(CHAPTERS.length === 10, "ten acts");
   Assert(CHAPTERS[4].id === "act5_street_hunt", "street hunt slotted as act5");
   Assert(CHAPTERS[5].id === "act6_heifengkou", "heifengkou is act6");
   Assert(CHAPTERS[6].id === "act7_mg_nest", "mg nest slotted as act7");
   Assert(CHAPTERS[7].id === "act8_grenade_yard", "grenade yard slotted as act8");
+  Assert(CHAPTERS[8].id === "act9_flood_raid", "flood raid slotted as act9");
+  Assert(CHAPTERS[9].id === "act10_breakout", "breakout slotted as act10");
   for (const ch of CHAPTERS) {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
+    const hasShovelPickup = level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL);
+    const startsWithShovel = level.spawnLoadout?.held === ITEM_SHOVEL;
     Assert(
-      level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL),
-      `${ch.id} has shovel pickup`,
+      hasShovelPickup || startsWithShovel || ch.id === "act10_breakout" || ch.id === "act5_street_hunt" || ch.id === "act8_grenade_yard",
+      `${ch.id} has shovel pickup or loadout exception`,
     );
     Assert(level.entities.some((e) => e.type === "talk" && e.script), `${ch.id} has talk script`);
   }
-  Assert(SAVE_KEY.endsWith("_v8"), "save v8");
+  Assert(SAVE_KEY.endsWith("_v9"), "save v9");
   Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
+}
+
+function TestFloodRaidFluidAndLoadout() {
+  const state = Play(8);
+  Assert(state.chapterId === "act9_flood_raid", "act9 flood chapter");
+  Assert(state.player.inTunnel, "flood raid starts underground");
+  Assert(!!state.fluid, "fluid field created");
+  Assert(state.level.soil.rows >= 12, "multi-layer dig band");
+  Assert(state.level.entities.some((e) => e.type === "seal_mouth"), "seal mouths authored");
+  Assert(state.level.entities.some((e) => e.type === "cistern"), "drink cistern authored");
+  Assert(state.level.entities.filter((e) => e.type === "refugee").length >= 3, "refugees to herd");
+  Assert(state.level.entities.filter((e) => e.tunnelRaid).length >= 2, "tunnel raiders staged");
+
+  const soil = state.level.soil;
+  const west = state.level.entities.find((e) => e.id === "seal_west");
+  Assert(!!west, "west seal ent");
+  // Unsealed inlet accumulates water after flood opens.
+  state.level.flood.prepTimer = 0;
+  state.level.flood.phase = "flood";
+  for (let i = 0; i < 45; i++) StepPlay(state, 1 / 30);
+  const wet = FluidFillAtWorld(state.fluid, soil, west.x, soil.originY + soil.cell * 1.5);
+  Assert(wet > 0.05, `unsealed mouth injects water (fill=${wet.toFixed(2)})`);
+
+  // Seal blocks further inlet at that column.
+  SetSealed(soil, west.c, west.r, true);
+  Assert(IsSealed(soil, west.c, west.r), "seal sticks");
+  const before = state.fluid.totalInjected;
+  for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
+  Assert(state.fluid.totalInjected >= before, "fluid keeps simulating after seal");
+
+  // Loadout carries act9 → act10.
+  state.player.held = ITEM_RIFLE;
+  state.player.ammo = 4;
+  state.player.grenades = 2;
+  state.phase = "closePanels";
+  state.panelIndex = 0;
+  state.completed = true;
+  let next = state;
+  for (let i = 0; i < 4; i++) next = AdvancePanels(next);
+  Assert(next.chapterId === "act10_breakout", "advances into breakout");
+  Assert(next.player.held === ITEM_RIFLE, "rifle carried into breakout");
+  Assert(next.player.ammo === 4, "ammo carried into breakout");
+  Assert(next.player.grenades === 2, "grenades carried into breakout");
 }
 
 function TestAct7MgNest() {
@@ -1537,6 +1585,7 @@ function Main() {
   TestMultiTalk();
   TestAct2MustDigBeforeShelter();
   TestAct4KillInvaders();
+  TestFloodRaidFluidAndLoadout();
   TestAct5StreetHunt();
   TestMeleeKoFactions();
   TestPatrolMeleeAndHurtPullback();

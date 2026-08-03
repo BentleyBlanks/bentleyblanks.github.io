@@ -10,6 +10,14 @@ import {
   WorldToCell,
 } from "./Script_Dig.mjs";
 import {
+  CreateFluidField,
+  EnsureSealGrid,
+  FluidFillAtWorld,
+  IsSealed,
+  SetSealed,
+  StepFluid,
+} from "./Script_Fluid.mjs";
+import {
   CanPlanCell,
   ClearPlanCell,
   CountPlanned,
@@ -89,16 +97,22 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
   const idx = Math.max(0, Math.min(CHAPTERS.length - 1, chapterIndex | 0));
   const chapter = CHAPTERS[idx];
   const level = BuildLevel(chapter.id);
-  if (level.soil) EnsurePlanGrid(level.soil);
+  if (level.soil) {
+    EnsurePlanGrid(level.soil);
+    EnsureSealGrid(level.soil);
+  }
   const tunnel = !!level.spawn.tunnel;
-  const loadout = level.spawnLoadout || {};
-  return {
+  // Campaign loadout (looted guns) overrides the chapter's default spawn kit.
+  const loadout = { ...(level.spawnLoadout || {}), ...(progress?.campaignLoadout || {}) };
+  const state = {
     phase: "title",
     panelIndex: 0,
     chapterIndex: idx,
     chapterId: chapter.id,
     goalsDone: Object.fromEntries(chapter.goals.map((g) => [g, false])),
     unlockedActs: progress?.unlockedActs || 1,
+    /** Persists rifle / ammo / grenades into the next chapter when set on advance. */
+    campaignLoadout: progress?.campaignLoadout || null,
     player: {
       x: level.spawn.x,
       y: level.spawn.y,
@@ -132,6 +146,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       inTunnel: tunnel,
       /** Holding ↑ in a carved air column. */
       climbing: false,
+      /** Flood raid: 0..1 submerged breath meter. */
+      drown: 0,
     },
     meleeFx: null,
     /** Dirt chips + cell flash from a shovel bite. */
@@ -176,6 +192,16 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     input: CreateInputState(),
     stats: { digs: 0, interactions: 0, shots: 0, kills: 0, cellsCarved: 0, pickups: 0 },
     muzzle: null,
+    fluid: level.soil && level.flood?.enabled ? CreateFluidField(level.soil) : null,
+  };
+  return state;
+}
+
+function SnapshotLoadout(player) {
+  return {
+    held: player?.held ?? ITEM_NONE,
+    ammo: player?.ammo ?? 0,
+    grenades: player?.grenades ?? 0,
   };
 }
 
@@ -361,6 +387,8 @@ function AirColumnAbove(state) {
 
 function ShaftOpenToSurface(soil, playerX) {
   const c = WorldToCell(soil, playerX, soil.originY + soil.cell * 0.5).c;
+  // Sealed timber plugs count as closed — blocks climb/flood inlet at that column.
+  if (IsSealed(soil, c, 1) || IsSealed(soil, c, 0)) return false;
   // Row 0 is the hard crust; row 1 open means the shaft punched through to surface.
   return GetCell(soil, c, 1) === AIR || GetCell(soil, c, 0) === AIR;
 }
@@ -2076,6 +2104,70 @@ function TryInteract(state) {
       return true;
     }
 
+    if (ent.type === "seal_mouth") {
+      if (!player.inTunnel) {
+        SetSubtitle(state, "提示", "下到井口里才能封口。", 2.0);
+        return true;
+      }
+      if (player.held !== ITEM_SHOVEL && !CanDigWith(player.held)) {
+        SetBubble(state, ["shovel", "warn"], "要铁锹", 1.4);
+        SetSubtitle(state, "提示", "用铁锹堵土封口——堵住灌水道。", 2.6);
+        return true;
+      }
+      const on = !IsSealed(level.soil, ent.c, ent.r);
+      SetSealed(level.soil, ent.c, ent.r, on);
+      ent.sealed = on;
+      SetBubble(state, on ? ["shovel", "check"] : ["shovel", "warn"], on ? "封口" : "启封", 1.3);
+      SetSubtitle(
+        state,
+        "高传宝",
+        on ? `${ent.mouthLabel || "井口"}封上了——水灌不进来。` : `${ent.mouthLabel || "井口"}打开了。`,
+        2.4,
+      );
+      SyncFloodRaidGoals(state);
+      return true;
+    }
+
+    if (ent.type === "cistern") {
+      if (!player.inTunnel) return true;
+      player.drown = 0;
+      if (player.hp < 3) player.hp = Math.min(3, player.hp + 1);
+      if (ent.goal) MarkGoal(state, ent.goal);
+      ent.drunk = true;
+      SetBubble(state, ["check"], "饮水", 1.2);
+      SetSubtitle(state, "高传宝", "窖水进肚——喘上气了。", 2.2);
+      return true;
+    }
+
+    if (ent.type === "refugee") {
+      CycleRefugeeOrder(state, ent);
+      return true;
+    }
+
+    if (ent.type === "cart_gate") {
+      // Drop escort villagers at the cart as "entered".
+      let dropped = 0;
+      for (const e of level.entities) {
+        if (e.type !== "shelter" || !e.escapeToCart || e.done) continue;
+        if (!e.following && Math.abs(e.x - ent.x) > 90) continue;
+        if (Math.abs(player.x - ent.x) > (ent.radius || 70)) continue;
+        e.done = true;
+        e.following = false;
+        e.hidden = true;
+        if (e.goal) MarkGoal(state, e.goal);
+        dropped += 1;
+      }
+      if (dropped > 0 || (level.entities.filter((e) => e.type === "shelter" && e.escapeToCart).every((e) => e.done))) {
+        if (ent.goal) MarkGoal(state, ent.goal);
+        SetSubtitle(state, "林霞", "上车！走！", 2.4);
+        SetBubble(state, ["people", "check"], "突围", 1.4);
+      } else {
+        SetSubtitle(state, "提示", "先点乡亲让他们跟上，再带到车马道。", 2.6);
+      }
+      SyncFloodRaidGoals(state);
+      return true;
+    }
+
     if (ent.type === "bell") {
       // Film beat: 高老忠敲钟殉难 — player witnesses at the bell, does not “play as” the ringer.
       if (!state.goalsDone.shelter_a || !state.goalsDone.shelter_b || !state.goalsDone.shelter_c) {
@@ -2193,6 +2285,8 @@ function UpdateActors(state, dt) {
       if (ent.hurtFlash > 0) ent.hurtFlash = Math.max(0, ent.hurtFlash - dt);
       if (ent.stunLock > 0) ent.stunLock = Math.max(0, ent.stunLock - dt);
       if (ent.dead) continue;
+      // Flood-raid tunnel hunters are stepped in UpdateTunnelRaiders.
+      if (ent.tunnelRaid) continue;
       // Locked during player KO windup — don't walk out of the chop.
       if ((ent.stunLock || 0) > 0) continue;
       const prevX = ent.x;
@@ -2428,6 +2522,193 @@ function RefreshHint(state) {
   }
 }
 
+function CycleRefugeeOrder(state, ent) {
+  const order = ent.order || "idle";
+  const next =
+    order === "idle" ? "follow" : order === "follow" ? "high" : order === "high" ? "exit" : "follow";
+  ent.order = next;
+  ent.following = next === "follow";
+  const lines = {
+    follow: "我跟着你——带路！",
+    high: "往高台躲！水上来先上高！",
+    exit: "往东突口集合——听传宝的！",
+  };
+  SetBubble(state, ["people"], next === "high" ? "上高" : next === "exit" ? "突口" : "跟上", 1.3);
+  SetSubtitle(state, ent.speaker || "乡亲", lines[next], 2.6);
+  SyncFloodRaidGoals(state);
+  return true;
+}
+
+function SyncFloodRaidGoals(state) {
+  const { level, player, chapterId } = state;
+  if (chapterId === "act9_flood_raid") {
+    const seals = (level.entities || []).filter((e) => e.type === "seal_mouth");
+    if (seals.length && seals.every((e) => IsSealed(level.soil, e.c, e.r))) {
+      MarkGoal(state, "seal_mouths");
+    }
+    const refugees = (level.entities || []).filter((e) => e.type === "refugee" && !e.done);
+    if (
+      refugees.length &&
+      refugees.every((e) => {
+        const atHigh = Math.hypot(e.x - (e.highX || 0), e.y - (e.highY || 0)) < 56;
+        return e.order === "high" && atHigh;
+      })
+    ) {
+      MarkGoal(state, "herd_high");
+    }
+    const raiders = (level.entities || []).filter((e) => e.tunnelRaid);
+    if (raiders.length && raiders.every((e) => e.dead || e.broken)) {
+      MarkGoal(state, "silence_raiders");
+    }
+    if (
+      player.held === ITEM_RIFLE ||
+      (player.ammo || 0) > 0 ||
+      (player.grenades || 0) > 0
+    ) {
+      MarkGoal(state, "grab_arms");
+    }
+  }
+  if (chapterId === "act10_breakout") {
+    const blockers = (level.entities || []).filter((e) => e.type === "enemy");
+    if (blockers.length && blockers.every((e) => e.dead)) MarkGoal(state, "clear_block");
+    const escorts = (level.entities || []).filter((e) => e.type === "shelter" && e.escapeToCart);
+    if (escorts.length && escorts.every((e) => e.done)) MarkGoal(state, "escort_gate");
+  }
+}
+
+function UpdateRefugees(state, dt) {
+  const { player, level } = state;
+  for (const ent of level.entities || []) {
+    if (ent.type !== "refugee" || ent.done || ent.hidden) continue;
+    let tx = ent.x;
+    let ty = ent.y;
+    if (ent.order === "follow") {
+      tx = player.x - player.facing * 36;
+      ty = player.y;
+    } else if (ent.order === "high") {
+      tx = ent.highX ?? ent.x;
+      ty = ent.highY ?? ent.y;
+    } else if (ent.order === "exit") {
+      tx = ent.exitX ?? ent.x;
+      ty = ent.exitY ?? ent.y;
+    } else continue;
+    const dx = tx - ent.x;
+    const dy = ty - ent.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 6) {
+      const spd = ent.order === "follow" ? 150 : 120;
+      ent.x += (dx / dist) * Math.min(dist, spd * dt);
+      ent.y += (dy / dist) * Math.min(dist, spd * dt);
+      ent.facing = Math.sign(dx) || ent.facing || 1;
+      ent.moving = true;
+    } else ent.moving = false;
+  }
+}
+
+function UpdateTunnelRaiders(state, dt) {
+  const { player, level } = state;
+  for (const ent of level.entities || []) {
+    if (!ent.tunnelRaid || ent.dead || ent.hidden) continue;
+    if ((ent.stunLock || 0) > 0) {
+      ent.stunLock = Math.max(0, ent.stunLock - dt);
+      continue;
+    }
+    if (ent.hurtFlash > 0) ent.hurtFlash = Math.max(0, ent.hurtFlash - dt);
+    ent.t = (ent.t || 0) + dt;
+    // Hunt the player in tunnel AIR — simple chase with vertical bias.
+    if (!player.inTunnel) {
+      ent.x += Math.sin((ent.t || 0) * 0.8) * 20 * dt;
+      continue;
+    }
+    const dx = player.x - ent.x;
+    const dy = player.y - ent.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const spd = EnemyFaction(ent) === "puppet" ? 95 : 110;
+    ent.x += (dx / dist) * spd * dt;
+    ent.y += (dy / dist) * spd * 0.65 * dt;
+    ent.facing = Math.sign(dx) || ent.facing || 1;
+    if (dist < 42 && Math.abs(dy) < 40 && !state.pendingMelee) {
+      HurtPlayer(state, {
+        knockDir: Math.sign(player.x - ent.x || 1),
+        knockSpeed: 160,
+        invuln: 1.2,
+        speaker: "危险",
+        line: "日军摸进地道了——绕高台、击晕抢枪！",
+        lineTime: 2.2,
+      });
+    }
+  }
+}
+
+function UpdateFloodRaid(state, dt) {
+  const flood = state.level?.flood;
+  if (!flood?.enabled || !state.level.soil) return;
+  if (!state.fluid) state.fluid = CreateFluidField(state.level.soil);
+
+  if (flood.phase === "prep") {
+    flood.prepTimer = Math.max(0, (flood.prepTimer ?? 55) - dt);
+    if (flood.prepTimer <= 0) {
+      flood.phase = "flood";
+      SetSubtitle(state, "危险", "灌水了！封不住的口子会往下灌——上高台！", 3.2);
+      SetBubble(state, ["warn"], "灌水", 1.6);
+    }
+  } else if (flood.phase === "flood") {
+    flood.raidTimer = (flood.raidTimer || 0) + dt;
+    if (flood.raidTimer >= (flood.raidDelay || 12)) {
+      flood.phase = "raid";
+      for (const e of state.level.entities || []) {
+        if (e.tunnelRaid) e.hidden = false;
+      }
+      SetSubtitle(state, "危险", "日军顺着井口下来了——辗转击晕，抢他们的枪！", 3.2);
+      SetBubble(state, ["warn"], "扫荡", 1.5);
+    }
+  }
+
+  const inlets = [];
+  if (flood.phase === "flood" || flood.phase === "raid" || flood.phase === "escape") {
+    for (const sh of state.level.shafts || []) {
+      if (!sh.floodInlet) continue;
+      const c = sh.col ?? WorldToCell(state.level.soil, sh.x, state.level.soil.originY + 20).c;
+      if (IsSealed(state.level.soil, c, 1)) continue;
+      if (GetCell(state.level.soil, c, 1) !== AIR) continue;
+      inlets.push({ c, r: 1, rate: flood.inletRate || 0.55 });
+    }
+  }
+  StepFluid(state.fluid, state.level.soil, dt, inlets);
+
+  // Drown / swim resistance when submerged in tunnel.
+  const { player } = state;
+  if (player.inTunnel) {
+    const fillChest = FluidFillAtWorld(state.fluid, state.level.soil, player.x, player.y - 28);
+    const fillHead = FluidFillAtWorld(state.fluid, state.level.soil, player.x, player.y - 44);
+    if (fillHead > 0.55) {
+      player.drown = Math.min(1, (player.drown || 0) + dt * 0.35);
+      player.vx *= 0.88;
+      if (player.drown >= 1 && (player.invuln || 0) <= 0) {
+        HurtPlayer(state, {
+          damage: 1,
+          invuln: 1.4,
+          speaker: "危险",
+          line: "要呛死了——上高台，或去饮水窖换气！",
+          lineTime: 2.4,
+        });
+        player.drown = 0.45;
+      }
+    } else if (fillChest > 0.35) {
+      player.drown = Math.max(0, (player.drown || 0) - dt * 0.15);
+      player.vx *= 0.94;
+    } else {
+      player.drown = Math.max(0, (player.drown || 0) - dt * 0.4);
+    }
+  } else {
+    player.drown = Math.max(0, (player.drown || 0) - dt);
+  }
+
+  UpdateRefugees(state, dt);
+  if (flood.phase === "raid" || flood.phase === "escape") UpdateTunnelRaiders(state, dt);
+  SyncFloodRaidGoals(state);
+}
+
 export function StepPlay(state, dt) {
   if (state.phase !== "play" || state.pauseOpen || state.failed || state.completed) return state;
   const clamped = Math.min(0.033, Math.max(0, dt));
@@ -2481,10 +2762,12 @@ export function StepPlay(state, dt) {
   SyncMgNestGoals(state);
   RefreshHint(state);
   UpdateActors(state, simDt);
+  UpdateFloodRaid(state, simDt);
   MaybeRecordSafePoint(state);
   UpdateMgWaves(state, simDt);
   UpdateProjectiles(state, simDt);
   UpdateCamera(state, simDt);
+  if (state.chapterId === "act10_breakout") SyncFloodRaidGoals(state);
 
   if (AllGoalsDone(state) && !state.completed) {
     // Hold the win beat until film subtitle queues (殉钟等) finish playing.
@@ -2542,7 +2825,12 @@ export function AdvancePanels(state) {
     state.phase = "ending";
     return state;
   }
-  const next = CreateCampaignState(state.chapterIndex + 1, { unlockedActs: state.unlockedActs });
+  // Only the flood-raid act hands looted guns into the breakout chapter.
+  const progress = { unlockedActs: state.unlockedActs };
+  if (state.chapterId === "act9_flood_raid") {
+    progress.campaignLoadout = SnapshotLoadout(state.player);
+  }
+  const next = CreateCampaignState(state.chapterIndex + 1, progress);
   next.phase = OpenPhaseFor(CHAPTERS[next.chapterIndex]);
   next.panelIndex = 0;
   return next;
@@ -2613,7 +2901,12 @@ export function RespawnPlayer(state) {
 }
 
 export function SerializeProgress(state) {
-  return { v: 7, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+  return {
+    v: 9,
+    chapterIndex: state.chapterIndex,
+    unlockedActs: state.unlockedActs,
+    campaignLoadout: state.campaignLoadout || SnapshotLoadout(state.player),
+  };
 }
 
 /** Test helper: put shovel in hand. */
@@ -2633,6 +2926,7 @@ export function LoadProgress(raw) {
   return {
     chapterIndex: Math.max(0, Math.min(CHAPTERS.length - 1, raw.chapterIndex | 0)),
     unlockedActs: Math.max(1, raw.unlockedActs | 0),
+    campaignLoadout: raw.campaignLoadout || null,
   };
 }
 
@@ -2762,6 +3056,27 @@ export function NextStepText(state) {
       return "点手雷键出瞄准弧，↑↓调角度再扔——炸开沙袋后的日伪军";
     }
     return "沙袋场已清";
+  }
+  if (state.chapterId === "act9_flood_raid") {
+    const flood = state.level.flood;
+    if (!g.talk_raid) return "找林霞听灌水扫荡交代";
+    if (!g.seal_mouths) return "带铁锹到西口/东口封土——堵住灌水道";
+    if (!g.drink_cistern) return "下到饮水窖喝一口，备着呛水";
+    if (!g.herd_high) return "点乡亲：跟上→上高台——把他们哄到上层";
+    if (flood?.phase === "prep") {
+      return `封口就绪——约 ${Math.ceil(flood.prepTimer || 0)} 秒后灌水，上高台待命`;
+    }
+    if (!g.silence_raiders) return "日军进洞了：绕高台辗转击晕，抢枪/弹药";
+    if (!g.grab_arms) return "捡起日军掉落的步枪或弹药";
+    if (!g.escape_breakout) return "带乡亲到东突口出井（武器会带进下一幕）";
+    return "灌水扫荡已突围";
+  }
+  if (state.chapterId === "act10_breakout") {
+    if (!g.talk_escape) return "听林霞交代突围";
+    if (!g.escort_gate) return "点乡亲让他们跟上，带到东边车马道";
+    if (!g.clear_block) return "清掉堵口的日伪军（可绕可敲可打）";
+    if (!g.reach_cart) return "带着乡亲到车马道点大门突围";
+    return "突围成功";
   }
   const chapter = CHAPTERS[state.chapterIndex];
   const open = GoalsRemaining(state);

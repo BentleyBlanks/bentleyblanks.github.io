@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
-export const SAVE_KEY = "tunnelheart1942_v8";
-export const CACHE_BUST = "20260803ba";
+export const SAVE_KEY = "tunnelheart1942_v9";
+export const CACHE_BUST = "20260803bb";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -345,7 +345,93 @@ export const CHAPTERS = [
       {
         id: "p8z1",
         speaker: "旁白",
-        text: "沙袋后也清了。手雷、地道、枪——高家庄又多了一招。",
+        text: "沙袋后也清了。可扫荡队还要灌水——多层地道、封口、饮水，才是下一场硬仗。",
+        mood: "wide",
+      },
+    ],
+  },
+  {
+    id: "act9_flood_raid",
+    act: 9,
+    title: "灌水扫荡",
+    timeLabel: "反攻夜",
+    cast: "高传宝 · 乡亲",
+    startTunnel: true,
+    night: true,
+    objective:
+      "封死灌水口，喝窖水，指挥乡亲上高台；日军摸进地道后辗转击晕抢枪，再从东口突围。",
+    goals: [
+      "talk_raid",
+      "seal_mouths",
+      "drink_cistern",
+      "herd_high",
+      "silence_raiders",
+      "grab_arms",
+      "escape_breakout",
+    ],
+    openPanels: [
+      {
+        id: "p9a",
+        speaker: "背景",
+        text: "扫荡队架起水车。水会从西口、东口灌进多层地道——封不住就淹。",
+        mood: "wide",
+      },
+      {
+        id: "p9b",
+        speaker: "困难",
+        text: "乡亲要先上高台。水一起来，日军顺着井口摸进来。下层有饮水窖。",
+        mood: "talk",
+      },
+      {
+        id: "p9c",
+        speaker: "目标",
+        text: "封口 → 饮水 → 乡亲上高 → 击晕抢枪 → 东口突围（武器带进下一幕）。",
+        mood: "tip",
+      },
+    ],
+    closePanels: [
+      {
+        id: "p9z1",
+        speaker: "旁白",
+        text: "枪在手里，乡亲还跟着。地面东边车马道——冲出去，高家庄才算活。",
+        mood: "wide",
+      },
+    ],
+  },
+  {
+    id: "act10_breakout",
+    act: 10,
+    title: "车马突围",
+    timeLabel: "黎明前",
+    cast: "高传宝 · 乡亲",
+    night: true,
+    objective: "带着灌水战里抢来的武器，护送乡亲冲到东边车马道突围。",
+    goals: ["talk_escape", "escort_gate", "clear_block", "reach_cart"],
+    openPanels: [
+      {
+        id: "p10a",
+        speaker: "背景",
+        text: "钻出东口。街上还有堵口的日伪军——乡亲跟在你身后。",
+        mood: "wide",
+      },
+      {
+        id: "p10b",
+        speaker: "困难",
+        text: "别恋战。枪里的子弹是命。能绕就绕，挡路就打昏。",
+        mood: "talk",
+      },
+      {
+        id: "p10c",
+        speaker: "目标",
+        text: "听交代 → 点乡亲跟上 → 清掉堵口 → 到车马道。",
+        mood: "tip",
+      },
+    ],
+    closePanels: [
+      {
+        id: "p10z1",
+        speaker: "旁白",
+        text: "车轮碾过夜色。高家庄的地道、枪、人——都还在。",
         mood: "wide",
       },
     ],

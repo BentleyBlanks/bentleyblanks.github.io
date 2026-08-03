@@ -6,6 +6,7 @@
 import {
   AirConnected,
   BuildDigBand,
+  CarveRect,
   CELL,
   CellCenter,
   CountAirInRect,
@@ -17,6 +18,7 @@ import {
   ITEM_AMMO,
   ITEM_CHARGE,
   ITEM_GRENADE,
+  ITEM_NONE,
   ITEM_RIFLE,
   ITEM_SHOVEL,
   PickupEntity,
@@ -511,8 +513,8 @@ function PlaceEnemy(id, x, opts = {}) {
     id,
     type: "enemy",
     x,
-    y: SURFACE_Y,
-    layer: "surface",
+    y: opts.y ?? SURFACE_Y,
+    layer: opts.layer || "surface",
     homeX: x,
     amp: opts.amp ?? 100,
     phase: opts.phase ?? 0,
@@ -536,7 +538,357 @@ function PlaceEnemy(id, x, opts = {}) {
     dropAmmo: opts.dropAmmo || 0,
     dropRifle: !!opts.dropRifle,
     dropGrenade: !!opts.dropGrenade,
+    /** Flood-raid: walks AIR cells underground after the sweep begins. */
+    tunnelRaid: !!opts.tunnelRaid,
+    hidden: !!opts.hidden,
   });
+}
+
+/**
+ * Act9 — 灌水扫荡: multi-layer tunnels, seal mouths before / during flood,
+ * drink cistern, herd villagers to the high ledge, KO tunnel raiders for guns.
+ */
+function BuildAct9FloodRaid() {
+  const level = BaseLevel(3000, { night: true, startTunnel: true });
+  const cols = 62;
+  const rows = 12;
+  const originX = 60;
+  const soil = BuildDigBand({
+    originX,
+    originY: DIG_ORIGIN_Y,
+    cols,
+    rows,
+    hardBlobs: [
+      { c: 24, r: 4, w: 3, h: 2 },
+      { c: 36, r: 7, w: 4, h: 2 },
+    ],
+    cellars: [],
+  });
+
+  // Multi-layer carved network: upper refuge / mid walk / lower cistern basin.
+  CarveRect(soil, 6, 2, 14, 2); // high west
+  CarveRect(soil, 40, 2, 14, 2); // high east
+  CarveRect(soil, 4, 5, 54, 2); // mid spine
+  CarveRect(soil, 10, 8, 18, 2); // low west basin
+  CarveRect(soil, 34, 8, 18, 2); // low east basin
+  // Vertical connectors (shafts) — punch row1 so mouths open to the surface crust.
+  for (const c of [10, 32, 50]) {
+    CarveRect(soil, c, 1, 1, 9);
+  }
+  // Soft side ramps between layers for looping fights.
+  CarveRect(soil, 20, 3, 2, 3);
+  CarveRect(soil, 28, 6, 2, 3);
+  CarveRect(soil, 44, 3, 2, 3);
+
+  AttachSoil(level, soil);
+  level.tunnelFloor = DIG_ORIGIN_Y + (rows - 3) * CELL;
+  level.tunnelCeil = DIG_ORIGIN_Y + CELL;
+  SpawnInCellar(level, 8, 5);
+
+  const westMouth = CellCenter(soil, 10, 1);
+  const midMouth = CellCenter(soil, 32, 1);
+  const eastMouth = CellCenter(soil, 50, 1);
+  const highWest = CellCenter(soil, 12, 2);
+  const highEast = CellCenter(soil, 46, 2);
+  const cistern = CellCenter(soil, 16, 9);
+  const exitHatch = CellCenter(soil, 50, 5);
+
+  level.shafts = [
+    { x: westMouth.x, label: "西灌水口", col: 10, floodInlet: true },
+    { x: midMouth.x, label: "中井", col: 32, floodInlet: false },
+    { x: eastMouth.x, label: "东突口", col: 50, floodInlet: true },
+  ];
+
+  level.flood = {
+    enabled: true,
+    /** Seconds of prep before 日军 open the sluices. */
+    prepTimer: 55,
+    phase: "prep", // prep → flood → raid → escape
+    raidDelay: 12,
+    raidTimer: 0,
+    inletRate: 0.55,
+  };
+  level.refugeHigh = { x: highWest.x, y: highWest.y + 10 };
+  level.refugeExit = { x: eastMouth.x, y: exitHatch.y + 10 };
+
+  level.spawnLoadout = { held: ITEM_SHOVEL, ammo: 0, grenades: 0 };
+  level.entities = [
+    Ent({
+      id: "npc_raid",
+      type: "talk",
+      x: CellCenter(soil, 9, 5).x,
+      y: CellCenter(soil, 9, 5).y + 16,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      speaker: "林霞",
+      script: [
+        {
+          text: "传宝——扫荡队要灌水！西口、东口先用土封死，别让水灌满中层。",
+          mood: "talk",
+        },
+        {
+          text: "下层有积水窖，渴了就喝一口。乡亲先哄到上层台，别站在灌水道上。",
+          mood: "tip",
+        },
+        {
+          text: "水一起来，日军会顺着井口摸进来。辗转击晕，抢枪——突围时用得着。",
+          mood: "tip",
+        },
+      ],
+      goal: "talk_raid",
+      radius: 56,
+    }),
+    Ent({
+      id: "seal_west",
+      type: "seal_mouth",
+      x: westMouth.x,
+      y: westMouth.y + 12,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      c: 10,
+      r: 1,
+      mouthLabel: "西口",
+      hint: "封西灌水口",
+      radius: 48,
+    }),
+    Ent({
+      id: "seal_east",
+      type: "seal_mouth",
+      x: eastMouth.x,
+      y: eastMouth.y + 12,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      c: 50,
+      r: 1,
+      mouthLabel: "东口",
+      hint: "封东灌水口",
+      radius: 48,
+    }),
+    Ent({
+      id: "cistern",
+      type: "cistern",
+      x: cistern.x,
+      y: cistern.y + 14,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      hint: "饮水窖",
+      goal: "drink_cistern",
+      radius: 50,
+    }),
+    Ent({
+      id: "refugee_a",
+      type: "refugee",
+      x: CellCenter(soil, 22, 5).x,
+      y: CellCenter(soil, 22, 5).y + 16,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      speaker: "大娘",
+      order: "idle",
+      highX: highWest.x,
+      highY: highWest.y + 12,
+      exitX: eastMouth.x,
+      exitY: exitHatch.y + 12,
+      radius: 52,
+    }),
+    Ent({
+      id: "refugee_b",
+      type: "refugee",
+      x: CellCenter(soil, 30, 5).x,
+      y: CellCenter(soil, 30, 5).y + 16,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      speaker: "小伙计",
+      order: "idle",
+      highX: highEast.x,
+      highY: highEast.y + 12,
+      exitX: eastMouth.x,
+      exitY: exitHatch.y + 12,
+      radius: 52,
+    }),
+    Ent({
+      id: "refugee_c",
+      type: "refugee",
+      x: CellCenter(soil, 38, 5).x,
+      y: CellCenter(soil, 38, 5).y + 16,
+      layer: "tunnel",
+      tunnelAnchored: true,
+      speaker: "乡亲",
+      order: "idle",
+      highX: highEast.x - 40,
+      highY: highEast.y + 12,
+      exitX: eastMouth.x,
+      exitY: exitHatch.y + 12,
+      radius: 52,
+    }),
+    Ent({
+      id: "escape_hatch",
+      type: "hatch",
+      x: eastMouth.x,
+      y: SURFACE_Y,
+      layer: "both",
+      tunnelX: eastMouth.x,
+      tunnelY: exitHatch.y + 16,
+      hint: "东突口——带乡亲突围",
+      goal: "escape_breakout",
+      radius: 56,
+      needsShovel: false,
+      requiresGoal: "silence_raiders",
+    }),
+    // Tunnel raiders — hidden until flood raid phase.
+    PlaceEnemy("raid_jp1", westMouth.x, {
+      y: CellCenter(soil, 10, 5).y + 16,
+      layer: "tunnel",
+      tunnelRaid: true,
+      hidden: true,
+      amp: 0,
+      hp: 2,
+      label: "日军",
+      facing: 1,
+      dropRifle: true,
+      dropAmmo: 3,
+    }),
+    PlaceEnemy("raid_jp2", midMouth.x, {
+      y: CellCenter(soil, 32, 5).y + 16,
+      layer: "tunnel",
+      tunnelRaid: true,
+      hidden: true,
+      amp: 0,
+      hp: 2,
+      label: "日军",
+      facing: -1,
+      dropAmmo: 2,
+      dropGrenade: true,
+    }),
+    PlaceEnemy("raid_pup", CellCenter(soil, 40, 5).x, {
+      y: CellCenter(soil, 40, 5).y + 16,
+      layer: "tunnel",
+      tunnelRaid: true,
+      hidden: true,
+      amp: 0,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      dropAmmo: 2,
+    }),
+  ];
+  level.props = [
+    { kind: "house", x: westMouth.x - 40, variant: 0 },
+    { kind: "well", x: midMouth.x },
+    { kind: "house", x: eastMouth.x + 20, variant: 1 },
+    { kind: "tree", x: 900 },
+    { kind: "shed", x: 2100 },
+  ];
+  return level;
+}
+
+/** Act10 — breakout with weapons looted in the flood raid. */
+function BuildAct10Breakout() {
+  const level = BaseLevel(2400, { night: true, startTunnel: false });
+  const cols = 40;
+  const soil = BuildDigBand({
+    originX: 80,
+    originY: DIG_ORIGIN_Y,
+    cols,
+    rows: DIG_ROWS,
+    hardBlobs: [],
+    cellars: [{ c: 4, r: 2, w: 4, h: 2 }],
+  });
+  AttachSoil(level, soil);
+  const hatch = CellCenter(soil, 5, 2);
+  level.spawn = { x: hatch.x, y: SURFACE_Y, tunnel: false };
+  level.spawnLoadout = { held: ITEM_NONE, ammo: 0, grenades: 0 };
+  level.shafts = [{ x: hatch.x, label: "突围井" }];
+  level.entities = [
+    Ent({
+      id: "npc_escape",
+      type: "talk",
+      x: hatch.x + 80,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "林霞",
+      script: [
+        {
+          text: "枪在你手里。乡亲跟着你——别恋战，往东车马道突。",
+          mood: "talk",
+        },
+        {
+          text: "路上还有堵口的伪军。能绕就绕，挡路就敲晕抢过去。",
+          mood: "tip",
+        },
+      ],
+      goal: "talk_escape",
+      radius: 56,
+    }),
+    Ent({
+      id: "escort_a",
+      type: "shelter",
+      x: hatch.x + 140,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "大娘",
+      hint: "点我跟上突围",
+      line: "传宝叔，我们跟你走！",
+      enterLine: "上车了——总算活着出来了！",
+      goal: "escort_gate",
+      radius: 56,
+      /** Breakout: mouth is the east cart, not a hatch. */
+      escapeToCart: true,
+    }),
+    Ent({
+      id: "escort_b",
+      type: "shelter",
+      x: hatch.x + 200,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "小伙计",
+      hint: "点我跟上突围",
+      line: "我跟着！",
+      enterLine: "上了！",
+      goal: "escort_gate",
+      radius: 56,
+      escapeToCart: true,
+    }),
+    Ent({
+      id: "cart_gate",
+      type: "cart_gate",
+      x: 2100,
+      y: SURFACE_Y,
+      layer: "surface",
+      hint: "车马道——带乡亲到这儿突围",
+      goal: "reach_cart",
+      radius: 70,
+    }),
+    PlaceEnemy("block_pup1", 1200, {
+      amp: 40,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      dropAmmo: 2,
+    }),
+    PlaceEnemy("block_jp1", 1550, {
+      amp: 30,
+      hp: 2,
+      label: "日军",
+      facing: -1,
+      dropRifle: true,
+      dropAmmo: 2,
+    }),
+    PlaceEnemy("block_pup2", 1850, {
+      amp: 50,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+    }),
+  ];
+  level.props = [
+    { kind: "house", x: hatch.x, variant: 0 },
+    { kind: "tree", x: 600 },
+    { kind: "house", x: 1000, variant: 1 },
+    { kind: "shed", x: 1400 },
+    { kind: "tree", x: 1800 },
+    { kind: "well", x: 2000 },
+  ];
+  return level;
 }
 
 /** Destructible sandbag pile — blast clears it; visual cover only (no walk collision). */
@@ -1226,6 +1578,8 @@ const BUILDERS = {
   act6_heifengkou: BuildAct6Heifengkou,
   act7_mg_nest: BuildAct7MgNest,
   act8_grenade_yard: BuildAct8GrenadeYard,
+  act9_flood_raid: BuildAct9FloodRaid,
+  act10_breakout: BuildAct10Breakout,
 };
 
 export function BuildLevel(chapterId) {
