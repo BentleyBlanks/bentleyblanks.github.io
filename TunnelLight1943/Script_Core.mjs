@@ -407,7 +407,7 @@ const SCRIPTS = {
       kind: "escort", id: "c2_escape", follower: "sister", dest: V.eastExit, stealth: true,
       objective: "带妹妹去村东口", hint: "沿着草垛和断墙的影子走",
       resetHint: "妹妹跑不快。等巡逻走远了再动。",
-      midToast: { zone: { x: 16, z: 4, r: 5 }, text: "路过的院里在拖人。柱子把妹妹的脸按在自己胸口，贴着墙根走了过去。" },
+      midToast: { zone: { x: 30, z: 0, r: 6 }, text: "路过的院里在拖人。柱子把妹妹的脸按在自己胸口，贴着墙根走了过去。" },
     },
     {
       kind: "cinematic", id: "c2_taken",
@@ -421,8 +421,24 @@ const SCRIPTS = {
             );
           } },
         { stage: "是等在这里的。", d: 2.6, cam: { kind: "ambush" } },
-        { stage: "妹妹的手从柱子手里被拽走。他扑上去，被枪托砸在背上。", d: 4.4, cam: { kind: "ambush" } },
-        { stage: "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。", d: 4.4, cam: { kind: "ambush" } },
+        { stage: "妹妹的手从柱子手里被拽走。他扑上去，被枪托砸在背上。", d: 4.4, cam: { kind: "ambush" },
+          on: (state) => {
+            const sister = state.actors.find((a) => a.id === "sister");
+            if (sister) {
+              sister.following = false;
+              sister.cineTarget = { x: 57, z: 5 };
+              sister.cineSpeed = 2.4;
+            }
+            const a1 = state.actors.find((a) => a.id === "ambush1");
+            if (a1) { a1.cineTarget = { x: 58, z: 4 }; a1.cineSpeed = 2.0; a1.cineVanish = true; }
+          } },
+        { stage: "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。", d: 4.4, cam: { kind: "ambush" },
+          on: (state) => {
+            const sister = state.actors.find((a) => a.id === "sister");
+            if (sister) sister.visible = false;
+            const a2 = state.actors.find((a) => a.id === "ambush2");
+            if (a2) { a2.cineTarget = { x: 60, z: -2 }; a2.cineVanish = true; }
+          } },
         { stage: "那天夜里，娘没有回来。", d: 3.4, cam: { kind: "dark" } },
         { stage: "柱子在高粱地里蹲到天亮。他只剩一个念头了。", d: 4.0, cam: { kind: "dark" } },
         { stage: "救回妹妹。", d: 3.0, cam: { kind: "dark" } },
@@ -505,6 +521,11 @@ const SCRIPTS = {
       note: "柱子第一次发现，爹教的活计，在地底下也用得上。",
     },
     {
+      kind: "hold", id: "c4_listen", zone: TV.entE, holdTime: 4,
+      objective: "贴在东口下面，听听上面的动静", hint: "按住 E，柱子会把听到的记在心里",
+      note: "探杆一下一下地戳。脚步散开，又聚拢。他们是按趟来的——趟与趟之间，有空子。",
+    },
+    {
       kind: "cinematic", id: "c4_smokeStart",
       lines: [
         { stage: "头顶传来闷响。泥土簌簌往下掉。", d: 3.2, cam: { kind: "tunnel" } },
@@ -558,7 +579,6 @@ const SCRIPTS = {
       kind: "cinematic", id: "c5_alarm",
       lines: [
         { stage: "没过几天，鬼子又来了。还是老一套：堵口，灌烟。", d: 3.8, cam: { kind: "smokeE" } },
-        { stage: "这一次，预警铃先响了。", d: 3.0, cam: { kind: "tunnel" } },
       ],
       onDone: (state) => { StartDrillSmoke(state); },
     },
@@ -633,13 +653,14 @@ const SCRIPTS = {
       kind: "cinematic", id: "c7_open", dynamicLines: (state) => (
         state.flags.route === "ground"
           ? [
+            { stage: "区上武工队来了两个班，和民兵分了工：地面的归他们，地下的归地道。", d: 4.4, cam: { kind: "dark" } },
             { stage: "二更天，村北先响了枪。", d: 3.0, cam: { kind: "dark" } },
             { stage: "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。", d: 3.8, cam: { kind: "dark" } },
             { stage: "突击组翻进围墙。柱子跟着最后一个下了地道——乡亲们要从地下走。", d: 4.4, cam: { kind: "tunnelWide" } },
           ]
           : [
+            { stage: "区上武工队来了两个班，埋伏在庄稼地里接应——地面不动，人从地下走。", d: 4.4, cam: { kind: "dark" } },
             { stage: "二更天，地道里一盏灯也没点。", d: 3.2, cam: { kind: "dark" } },
-            { stage: "村北的民兵按兵不动——这一次，连声势都是省下的。", d: 3.6, cam: { kind: "dark" } },
             { stage: "队伍在黑暗里贴着墙根移动，谁也不说话。", d: 3.6, cam: { kind: "tunnelWide" } },
             { stage: "柱子数着步子。到牢房地沿，要过两处没撑牢的老塌方。", d: 4.2, cam: { kind: "tunnelWide" } },
           ]
@@ -815,7 +836,7 @@ function MotherDecoyDone(state) {
 }
 
 function SpawnFortPatrols(state, reinforced) {
-  state.actors = state.actors.filter((a) => a.kind !== "soldier");
+  state.actors = state.actors.filter((a) => !IsEnemy(a));
   state.actors.push(
     MakeActor("fortA", "soldier", -22, 6, {
       patrol: [{ x: -22, z: 6 }, { x: -22, z: -28 }, { x: 22, z: -28 }, { x: 22, z: 6 }], patrolIndex: 0, speed: 1.5,
@@ -893,6 +914,9 @@ function StartDrillSmoke(state) {
   };
   state.player.x = n.entE.x;
   state.player.z = n.entE.z;
+  // 高传宝去新暗口那头接应，别站在烟道里
+  const gao = state.actors.find((a) => a.id === "gao");
+  if (gao) { gao.cineTarget = { x: n.hiddenSpot.x, z: n.hiddenSpot.z }; gao.cineSpeed = 2.4; }
   state.toast = { text: "东口的铃响成一串。人已经在往洞里下了。", t: 4 };
 }
 
@@ -1170,6 +1194,8 @@ export function StepGame(state, input, dt) {
 
 // 过场里的走位：让画面里的人做字幕说的事
 function StepCineActors(state, dt) {
+  const env = CHAPTERS[state.chapterIndex].env;
+  const tunnelLayout = (env === "tunnelVillage" || env === "tunnelFort") ? LAYOUTS[env] : null;
   for (const a of state.actors) {
     if (!a.cineTarget) continue;
     const d = Dist(a.x, a.z, a.cineTarget.x, a.cineTarget.z);
@@ -1183,6 +1209,15 @@ function StepCineActors(state, dt) {
     a.heading = Math.atan2(a.cineTarget.x - a.x, a.cineTarget.z - a.z);
     a.x += ((a.cineTarget.x - a.x) / d) * step;
     a.z += ((a.cineTarget.z - a.z) / d) * step;
+    if (tunnelLayout) {
+      // 地道里的走位贴着走廊滑，不穿白盒墙
+      const c = ConstrainToTunnel(tunnelLayout, a.x, a.z);
+      a.x = c.x; a.z = c.z;
+      if (a.cineVanish && Dist(a.x, a.z, a.cineTarget.x, a.cineTarget.z) < 2.4) {
+        a.visible = false;
+        a.cineTarget = null;
+      }
+    }
   }
 }
 
@@ -1572,10 +1607,17 @@ function StepSmokeEscape(state, def, input) {
       }
       state.toast = { text: "拴柱大爷腿一软，坐在了道口。顺子从后面追了上去：『你们先走！』", t: 5 };
     }
-    if (state.beat.lossStage === 1 && state.beat.t - state.beat.lossT > 6) {
-      state.beat.lossStage = 2;
-      if (elder1) elder1.visible = false;
-      if (shunzi) shunzi.visible = false;
+    if (state.beat.lossStage === 1) {
+      // 两人退回甲洞方向；走到甲洞附近、或烟先追上他们时才隐去——不在镜头前凭空消失
+      const nA = layout.nodes.chamberA;
+      const bothBack = [elder1, shunzi].every((a) => !a || !a.visible
+        || Dist(a.x, a.z, nA.x, nA.z) < 3.2
+        || [...state.smoke.filled].some((key) => Dist(a.x, a.z, layout.nodes[key].x, layout.nodes[key].z) < layout.nodes[key].r + 1.2));
+      if (bothBack || state.beat.t - state.beat.lossT > 16) {
+        state.beat.lossStage = 2;
+        if (elder1) { elder1.visible = false; elder1.cineTarget = null; }
+        if (shunzi) { shunzi.visible = false; shunzi.cineTarget = null; }
+      }
     }
   }
 
@@ -1664,7 +1706,7 @@ function StepRescueLoop(state, def, input, dt) {
   }
   const loose = trapped.find((a) => !a.following && !a.cineTarget && Dist(a.x, a.z, state.player.x, state.player.z) < 2.6);
   if (loose) {
-    if (!state.beat.quakeActive) state.prompt = "E · 带他们走";
+    if (!state.beat.quakeActive && !state.beat.quakeWarn) state.prompt = "E · 带他们走";
     if (input.interact) {
       for (const a of trapped) {
         if (!a.following && Dist(a.x, a.z, state.player.x, state.player.z) < 3.2) { a.following = true; a.cineTarget = null; }
