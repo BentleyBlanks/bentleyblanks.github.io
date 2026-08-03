@@ -1,96 +1,62 @@
 /**
- * Touch-pad icons — ink pictograms for DOM buttons.
- * Shovel / hatch use generated Icon_*.png assets; others stay inline SVG.
+ * Touch-pad icons — generated Icon_*.png plates (cream + ink).
+ * Keep filenames English PascalCase with Icon_ category prefix.
  */
 
 import { CACHE_BUST } from "./Data_Story.mjs";
-
-const ink = "#1a1410";
-
-function Svg(inner) {
-  return `<svg class="padIcon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">${inner}</svg>`;
-}
 
 function ImgIcon(file, label) {
   return `<img class="padIcon" src="./${file}?v=${CACHE_BUST}" alt="" width="32" height="32" draggable="false" aria-hidden="true" data-icon="${label}">`;
 }
 
-/** Speech bubble — matches DrawPictogram("talk") */
-export const ICON_TALK = Svg(
-  `<ellipse cx="16" cy="12" rx="11" ry="8" fill="${ink}"/>
-   <path d="M11 19 L8 28 L18 21 Z" fill="${ink}"/>`,
-);
+/** Speech bubble — talk / interact */
+export const ICON_TALK = ImgIcon("Icon_Talk.png", "talk");
 
-/** Rifle — matches DrawPictogram("shot") */
-export const ICON_SHOT = Svg(
-  `<rect x="3" y="14" width="19" height="5" fill="${ink}"/>
-   <rect x="18" y="9" width="4" height="14" fill="${ink}"/>
-   <rect x="22" y="15" width="7" height="3" fill="${ink}"/>`,
-);
+/** Bolt-action rifle — shoot */
+export const ICON_SHOT = ImgIcon("Icon_Shot.png", "shot");
 
-/** Real shovel plate (T-grip + pointed spade). */
+/** Iron shovel — dig */
 export const ICON_SHOVEL = ImgIcon("Icon_Shovel.png", "shovel");
 
-/**
- * Blueprint / design — grid map + pencil.
- * Must read as "画蓝图" at a glance (old zig-zag hatch looked like noise).
- */
-export const ICON_PLAN = Svg(
-  `<rect x="3" y="3" width="20" height="20" fill="none" stroke="${ink}" stroke-width="2.4"/>
-   <path d="M3 10 H23 M3 16 H23 M10 3 V23 M16 3 V23" stroke="${ink}" stroke-width="1.6"/>
-   <path d="M18 8 L29 19 L29 26 L22 26 L11 15 Z" fill="${ink}"/>
-   <path d="M18 8 L22 4 L26 8 L22 12 Z" fill="${ink}"/>`,
-);
+/** Blueprint grid + pencil — design / plan */
+export const ICON_PLAN = ImgIcon("Icon_Plan.png", "plan");
 
 /** ADS crosshair */
-export const ICON_AIM = Svg(
-  `<circle cx="16" cy="16" r="9" fill="none" stroke="${ink}" stroke-width="2.4"/>
-   <circle cx="16" cy="16" r="2.2" fill="${ink}"/>
-   <path d="M16 4 V9 M16 23 V28 M4 16 H9 M23 16 H28" stroke="${ink}" stroke-width="2.2"/>`,
-);
+export const ICON_AIM = ImgIcon("Icon_Aim.png", "aim");
 
 /** Up chevron */
-export const ICON_UP = Svg(`<path d="M16 5 L27 20 H5 Z" fill="${ink}"/>`);
+export const ICON_UP = ImgIcon("Icon_Up.png", "up");
 
-/** Down chevron (crouch / dig-down / design cursor) */
-export const ICON_DOWN = Svg(`<path d="M16 27 L5 12 H27 Z" fill="${ink}"/>`);
+/** Down chevron (crouch / dig-down) */
+export const ICON_DOWN = ImgIcon("Icon_Down.png", "down");
 
-/**
- * Crouch — side-view crouched body + down chevron (kept for smoke / legacy refs).
- */
-export const ICON_CROUCH = Svg(
-  `<circle cx="20" cy="9" r="3.6" fill="${ink}"/>
-   <path d="M18 12 L10 15 L8 22 L14 21 L16 17 L22 20 L24 16 Z" fill="${ink}"/>
-   <path d="M8 22 L6 28 M14 21 L12 28 M22 20 L24 28" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>
-   <path d="M4 30 L16 24 L28 30" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>`,
-);
+/** Crouched figure — legacy / pictogram parity */
+export const ICON_CROUCH = ImgIcon("Icon_Crouch.png", "crouch");
 
-/** Tunnel mouth / cellar hatch with ladder (地道口). */
+/** Tunnel mouth / cellar hatch with ladder (地道口) */
 export const ICON_HATCH = ImgIcon("Icon_TunnelHatch.png", "hatch");
 
 /** Corridor stamp (design mode) */
-export const ICON_CORRIDOR = Svg(
-  `<rect x="3" y="12" width="26" height="8" fill="none" stroke="${ink}" stroke-width="2.4"/>
-   <path d="M8 16 H24 M14 12 V20 M20 12 V20" stroke="${ink}" stroke-width="2"/>`,
-);
+export const ICON_CORRIDOR = ImgIcon("Icon_Corridor.png", "corridor");
 
-/** Stealth / warn slash */
-export const ICON_WARN = Svg(
-  `<path d="M16 4 L28 26 H4 Z" fill="none" stroke="${ink}" stroke-width="2.4"/>
-   <rect x="14.5" y="11" width="3" height="8" fill="${ink}"/>
-   <rect x="14.5" y="21" width="3" height="3" fill="${ink}"/>`,
-);
+/** Stealth KO fist */
+export const ICON_WARN = ImgIcon("Icon_Warn.png", "warn");
 
 /** Stick grenade */
-export const ICON_GRENADE = Svg(
-  `<rect x="14" y="4" width="4" height="14" fill="${ink}"/>
-   <ellipse cx="16" cy="24" rx="7" ry="6" fill="${ink}"/>
-   <path d="M12 8 H20" stroke="#efe2c8" stroke-width="1.6"/>`,
-);
+export const ICON_GRENADE = ImgIcon("Icon_Grenade.png", "grenade");
 
 /** Move chevrons */
-export const ICON_LEFT = Svg(`<path d="M22 5 L9 16 L22 27 Z" fill="${ink}"/>`);
-export const ICON_RIGHT = Svg(`<path d="M10 5 L23 16 L10 27 Z" fill="${ink}"/>`);
+export const ICON_LEFT = ImgIcon("Icon_Left.png", "left");
+export const ICON_RIGHT = ImgIcon("Icon_Right.png", "right");
+
+/** Extra world / HUD plates */
+export const ICON_CHARGE = ImgIcon("Icon_Charge.png", "charge");
+export const ICON_BELL = ImgIcon("Icon_Bell.png", "bell");
+export const ICON_PEOPLE = ImgIcon("Icon_People.png", "people");
+export const ICON_FLIP = ImgIcon("Icon_Flip.png", "flip");
+export const ICON_CHECK = ImgIcon("Icon_Check.png", "check");
+export const ICON_AMMO = ImgIcon("Icon_Ammo.png", "ammo");
+export const ICON_RIFLE = ImgIcon("Icon_Rifle.png", "rifle");
 
 export const PAD_ICON = {
   left: ICON_LEFT,
@@ -108,12 +74,45 @@ export const PAD_ICON = {
   design: ICON_PLAN,
   plan: ICON_PLAN,
   hatch: ICON_HATCH,
+  climb_out: ICON_HATCH,
   corridor: ICON_CORRIDOR,
   warn: ICON_WARN,
   grenade: ICON_GRENADE,
+  charge: ICON_CHARGE,
+  bell: ICON_BELL,
+  people: ICON_PEOPLE,
+  flip: ICON_FLIP,
+  check: ICON_CHECK,
+  ammo: ICON_AMMO,
+  rifle: ICON_RIFLE,
 };
 
-/** Pick pad SVG/img for the single contextual interact button. */
+/** All generated plate filenames — smoke / preload. */
+export const HUD_ICON_FILES = [
+  "Icon_Shovel.png",
+  "Icon_TunnelHatch.png",
+  "Icon_Talk.png",
+  "Icon_Shot.png",
+  "Icon_Rifle.png",
+  "Icon_Aim.png",
+  "Icon_Plan.png",
+  "Icon_Up.png",
+  "Icon_Down.png",
+  "Icon_Left.png",
+  "Icon_Right.png",
+  "Icon_Warn.png",
+  "Icon_Grenade.png",
+  "Icon_Charge.png",
+  "Icon_Bell.png",
+  "Icon_People.png",
+  "Icon_Flip.png",
+  "Icon_Check.png",
+  "Icon_Corridor.png",
+  "Icon_Crouch.png",
+  "Icon_Ammo.png",
+];
+
+/** Pick pad img for the single contextual interact button. */
 export function InteractPadIcon(mode) {
   return PAD_ICON[mode] || ICON_TALK;
 }

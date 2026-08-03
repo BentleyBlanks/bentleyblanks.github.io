@@ -220,21 +220,24 @@ button {
 }
 .heldSlot[data-empty="1"] b { background: repeating-linear-gradient(45deg, #d8c9a8, #d8c9a8 4px, #cbb996 4px, #cbb996 8px); }
 .heldSlot b[data-item="shovel"]::after {
-  content: ""; position: absolute; inset: 4px;
-  background: center / 82% no-repeat url("./Icon_Shovel.png");
+  content: ""; position: absolute; inset: 2px;
+  background: center / contain no-repeat url("./Icon_Shovel.png");
   box-shadow: none;
 }
 .heldSlot b[data-item="charge"]::after {
-  content: ""; position: absolute; left: 12px; right: 12px; top: 14px; bottom: 10px;
-  background: #2a2018; border: 2px solid #1a1410;
+  content: ""; position: absolute; inset: 2px;
+  background: center / contain no-repeat url("./Icon_Charge.png");
+  box-shadow: none;
 }
 .heldSlot b[data-item="grenade"]::after {
-  content: ""; position: absolute; left: 14px; right: 14px; top: 12px; bottom: 12px;
-  border-radius: 50%; background: #4a5a30; border: 2px solid #1a1410;
+  content: ""; position: absolute; inset: 2px;
+  background: center / contain no-repeat url("./Icon_Grenade.png");
+  box-shadow: none;
 }
 .heldSlot b[data-item="rifle"]::after {
-  content: ""; position: absolute; left: 8px; right: 8px; top: 18px; height: 6px;
-  background: #2a241c; box-shadow: 10px -4px 0 -1px #3a3228, 18px -2px 0 -2px #1a1410;
+  content: ""; position: absolute; inset: 2px;
+  background: center / contain no-repeat url("./Icon_Rifle.png");
+  box-shadow: none;
 }
 .heldSlot span {
   font-family: var(--display); font-size: 1.15rem; line-height: 1.1; color: var(--ink);

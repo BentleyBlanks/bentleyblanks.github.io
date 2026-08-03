@@ -46,20 +46,53 @@ import {
   PaletteForSpeaker,
   PickClip,
 } from "./Script_Puppet.mjs";
-import { InteractPadIcon, PAD_ICON } from "./Script_PadIcons.mjs";
+import { InteractPadIcon, PAD_ICON, HUD_ICON_FILES } from "./Script_PadIcons.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("GameCanvas");
 const ctx = canvas.getContext("2d");
 
-/** Preload shovel / hatch plates so HUD prompts match the pad icons. */
-const PICTO_IMG = {
-  shovel: new Image(),
-  hatch: new Image(),
+/** Preload every HUD plate so pad / world prompts / held slot share one art set. */
+const PICTO_IMG = Object.create(null);
+const PICTO_FILE = {
+  shovel: "Icon_Shovel.png",
+  hatch: "Icon_TunnelHatch.png",
+  climb_out: "Icon_TunnelHatch.png",
+  talk: "Icon_Talk.png",
+  shot: "Icon_Shot.png",
+  rifle: "Icon_Rifle.png",
+  aim: "Icon_Aim.png",
+  plan: "Icon_Plan.png",
+  design: "Icon_Plan.png",
+  up: "Icon_Up.png",
+  down: "Icon_Down.png",
+  crouch: "Icon_Crouch.png",
+  left: "Icon_Left.png",
+  right: "Icon_Right.png",
+  warn: "Icon_Warn.png",
+  grenade: "Icon_Grenade.png",
+  charge: "Icon_Charge.png",
+  bell: "Icon_Bell.png",
+  people: "Icon_People.png",
+  flip: "Icon_Flip.png",
+  check: "Icon_Check.png",
+  corridor: "Icon_Corridor.png",
+  ammo: "Icon_Ammo.png",
+  dig: "Icon_Shovel.png",
 };
-PICTO_IMG.shovel.src = `./Icon_Shovel.png?v=${CACHE_BUST}`;
-PICTO_IMG.hatch.src = `./Icon_TunnelHatch.png?v=${CACHE_BUST}`;
+for (const [kind, file] of Object.entries(PICTO_FILE)) {
+  const img = new Image();
+  img.decoding = "async";
+  img.src = `./${file}?v=${CACHE_BUST}`;
+  PICTO_IMG[kind] = img;
+}
+// Warm the shared file list too (pad DOM may race ahead of canvas draws).
+for (const file of HUD_ICON_FILES) {
+  const img = new Image();
+  img.decoding = "async";
+  img.src = `./${file}?v=${CACHE_BUST}`;
+}
 
 let state = CreateCampaignState(0);
 let lastTs = 0;
@@ -210,9 +243,9 @@ function PaintTouchPadIcons() {
     const kind = btn.getAttribute("data-touch");
     // Interact / aim / use icons are contextual — SyncTouchPadActions owns them.
     if (kind === "interact" || kind === "aim" || kind === "use") continue;
-    const svg = PAD_ICON[kind];
-    if (svg && !btn.dataset.iconReady) {
-      btn.innerHTML = svg;
+    const icon = PAD_ICON[kind];
+    if (icon && !btn.dataset.iconReady) {
+      btn.innerHTML = icon;
       btn.dataset.iconReady = "1";
     }
   }
@@ -1531,6 +1564,13 @@ function DrawEntity(ent) {
 
 function DrawPictogram(kind, x, y, size) {
   ctx.save();
+  const plate = PICTO_IMG[kind] || null;
+  // Generated plates already include cream + ink border — draw full tile.
+  if (plate && plate.complete && plate.naturalWidth > 0) {
+    ctx.drawImage(plate, x, y, size, size);
+    ctx.restore();
+    return;
+  }
   ctx.translate(x, y);
   ctx.strokeStyle = "#1a1410";
   ctx.fillStyle = "#efe2c8";
@@ -1541,13 +1581,7 @@ function DrawPictogram(kind, x, y, size) {
   ctx.fillStyle = "#1a1410";
   const m = size * 0.12;
   const d = size - m * 2;
-  const plate = kind === "shovel" || kind === "hatch" ? PICTO_IMG[kind] : null;
-  if (plate && plate.complete && plate.naturalWidth > 0) {
-    ctx.drawImage(plate, m, m, d, d);
-    ctx.restore();
-    return;
-  }
-  if (kind === "shovel") {
+  if (kind === "shovel" || kind === "dig") {
     // Fallback: T-grip + pointed spade (readable without the PNG).
     ctx.beginPath();
     ctx.moveTo(m + d * 0.28, m + d * 0.08);
@@ -1563,7 +1597,7 @@ function DrawPictogram(kind, x, y, size) {
     ctx.lineTo(m + d * 0.28, m + d * 0.22);
     ctx.closePath();
     ctx.fill();
-  } else if (kind === "hatch") {
+  } else if (kind === "hatch" || kind === "climb_out") {
     // Fallback: dirt mound + arched tunnel mouth + ladder.
     ctx.beginPath();
     ctx.moveTo(m + d * 0.05, m + d * 0.95);
@@ -1623,7 +1657,7 @@ function DrawPictogram(kind, x, y, size) {
     ctx.lineTo(m + d * 0.5, m + d * 0.1);
     ctx.lineTo(m + d * 0.8, m + d * 0.35);
     ctx.stroke();
-  } else if (kind === "shot") {
+  } else if (kind === "shot" || kind === "rifle") {
     ctx.fillRect(m, m + d * 0.4, d * 0.7, d * 0.2);
     ctx.fillRect(m + d * 0.55, m + d * 0.25, d * 0.15, d * 0.5);
   } else if (kind === "charge") {

@@ -274,8 +274,34 @@ function TestAct1TutorialPlayable() {
   const padIcons = readFileSync(join(here, "Script_PadIcons.mjs"), "utf8");
   Assert(padIcons.includes("ICON_TALK") && padIcons.includes("ICON_SHOT") && padIcons.includes("ICON_SHOVEL"), "pad icons match game pictograms");
   Assert(padIcons.includes("Icon_Shovel.png") && padIcons.includes("Icon_TunnelHatch.png"), "shovel/hatch use generated icon plates");
+  Assert(padIcons.includes("Icon_Talk.png") && padIcons.includes("Icon_Shot.png") && padIcons.includes("Icon_Plan.png"), "talk/shot/plan use generated plates");
+  Assert(padIcons.includes("Icon_Grenade.png") && padIcons.includes("Icon_Warn.png") && padIcons.includes("Icon_Aim.png"), "grenade/warn/aim plates");
+  Assert(padIcons.includes("HUD_ICON_FILES"), "shared HUD icon file list");
   Assert(FileExists(join(here, "Icon_Shovel.png")) && FileExists(join(here, "Icon_TunnelHatch.png")), "icon plate files present");
-  Assert(padIcons.includes("M3 10 H23") && padIcons.includes("ICON_PLAN"), "design icon is blueprint grid + pencil");
+  for (const file of [
+    "Icon_Talk.png",
+    "Icon_Shot.png",
+    "Icon_Rifle.png",
+    "Icon_Aim.png",
+    "Icon_Plan.png",
+    "Icon_Up.png",
+    "Icon_Down.png",
+    "Icon_Left.png",
+    "Icon_Right.png",
+    "Icon_Warn.png",
+    "Icon_Grenade.png",
+    "Icon_Charge.png",
+    "Icon_Bell.png",
+    "Icon_People.png",
+    "Icon_Flip.png",
+    "Icon_Check.png",
+    "Icon_Corridor.png",
+    "Icon_Crouch.png",
+    "Icon_Ammo.png",
+  ]) {
+    Assert(FileExists(join(here, file)), `${file} plate present`);
+  }
+  Assert(padIcons.includes("Icon_Plan.png") && padIcons.includes("ICON_PLAN"), "design icon is blueprint plate");
   Assert(padIcons.includes("ICON_DOWN") && padIcons.includes("ICON_UP"), "up/down chevron pad icons");
   Assert(padIcons.includes("ICON_CROUCH"), "crouch icon retained for pictogram parity");
   Assert(padIcons.includes("InteractPadIcon"), "contextual interact icon helper");
@@ -284,11 +310,13 @@ function TestAct1TutorialPlayable() {
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
   Assert(/width:\s*74px/.test(css), "touch keys are large");
   Assert(css.includes(".padIcon"), "pad icon sizing");
+  Assert(css.includes("Icon_Charge.png") && css.includes("Icon_Grenade.png") && css.includes("Icon_Rifle.png"), "held slot uses generated item plates");
   Assert(css.includes(".cluster.move .vert"), "up/down stacked beside strafe");
   Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
   Assert(css.includes(".isPressed"), "touch pad has pressed visual class");
   Assert(css.includes("scale(0.92)"), "pressed keys sink/scale");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("HUD_ICON_FILES") && game.includes("PICTO_FILE"), "game preloads full HUD icon set");
   Assert(game.includes('classList.toggle("isPressed"'), "pointer handlers toggle isPressed");
   Assert(game.includes("PadInteractVerb") && game.includes("SyncTouchPadActions"), "contextual pad action router");
   Assert(game.includes("inTunnel && CanDigWith"), "tunnel defaults big key to dig");
@@ -1204,7 +1232,7 @@ function Main() {
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(gameSrc.includes("p.inTunnel && CanDigWith"), "pad verb digs by default underground");
   Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
-  Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with SVG icons");
+  Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with icon plates");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
   const surfaceStack = gameSrc.slice(gameSrc.indexOf("function RenderSurfaceStack"), gameSrc.indexOf("function RenderTunnelStack"));
   Assert(
