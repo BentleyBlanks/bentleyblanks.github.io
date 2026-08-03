@@ -242,6 +242,7 @@ function TestAct1TutorialPlayable() {
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
   Assert(/width:\s*74px/.test(css), "touch keys are large");
   Assert(css.includes(".padIcon"), "pad icon sizing");
+  Assert(/rgba\(239,\s*226,\s*200,\s*\.3/.test(css), "touch pad buttons are translucent");
 }
 
 function TestNaiveAct1Bot() {
