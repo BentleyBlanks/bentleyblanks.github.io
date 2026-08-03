@@ -112,51 +112,100 @@ export const PALETTES = {
  */
 export const CLIPS = {
   idle: {
-    duration: 1.4,
+    duration: 1.8,
     keys: [
-      { t: 0, torso: 0, armL: 0.05, armR: -0.05, thighL: 0.02, thighR: -0.02 },
-      { t: 0.5, torso: 0.03, armL: -0.04, armR: 0.04, thighL: -0.02, thighR: 0.02 },
-      { t: 1, torso: 0, armL: 0.05, armR: -0.05, thighL: 0.02, thighR: -0.02 },
+      { t: 0, torso: 0, neck: 0, armL: 0.04, armR: -0.04, thighL: 0.02, thighR: -0.02, _hipY: 0 },
+      { t: 0.5, torso: 0.02, neck: 0.015, armL: -0.03, armR: 0.03, thighL: -0.015, thighR: 0.015, _hipY: 0.6 },
+      { t: 1, torso: 0, neck: 0, armL: 0.04, armR: -0.04, thighL: 0.02, thighR: -0.02, _hipY: 0 },
     ],
   },
+  // Contact → pass → contact → pass. Soft VH-style stride + hip bob (_hipY).
   walk: {
-    duration: 0.55,
+    duration: 0.72,
     keys: [
       {
+        // L heel contact, R toe-off
         t: 0,
-        torso: 0.06,
-        thighL: 0.55,
-        shinL: -0.25,
-        thighR: -0.45,
-        shinR: 0.15,
-        armL: -0.7,
-        foreL: 0.2,
-        armR: 0.7,
-        foreR: -0.15,
+        torso: 0.05,
+        neck: -0.02,
+        thighL: 0.34,
+        shinL: -0.08,
+        footL: 0.08,
+        thighR: -0.3,
+        shinR: 0.34,
+        footR: -0.14,
+        armL: -0.38,
+        foreL: 0.12,
+        armR: 0.34,
+        foreR: -0.08,
+        _hipY: 1.4,
       },
       {
+        // L mid-stance, R swing through (knee tucked)
+        t: 0.25,
+        torso: 0.015,
+        neck: 0.012,
+        thighL: 0.04,
+        shinL: -0.02,
+        footL: 0.02,
+        thighR: 0.14,
+        shinR: -0.44,
+        footR: 0.18,
+        armL: -0.1,
+        foreL: 0.05,
+        armR: 0.12,
+        foreR: -0.03,
+        _hipY: -0.4,
+      },
+      {
+        // R heel contact, L toe-off
         t: 0.5,
-        torso: 0.06,
-        thighL: -0.45,
-        shinL: 0.15,
-        thighR: 0.55,
-        shinR: -0.25,
-        armL: 0.7,
-        foreL: -0.15,
-        armR: -0.7,
-        foreR: 0.2,
+        torso: 0.05,
+        neck: -0.02,
+        thighL: -0.3,
+        shinL: 0.34,
+        footL: -0.14,
+        thighR: 0.34,
+        shinR: -0.08,
+        footR: 0.08,
+        armL: 0.34,
+        foreL: -0.08,
+        armR: -0.38,
+        foreR: 0.12,
+        _hipY: 1.4,
+      },
+      {
+        // R mid-stance, L swing through
+        t: 0.75,
+        torso: 0.015,
+        neck: 0.012,
+        thighL: 0.14,
+        shinL: -0.44,
+        footL: 0.18,
+        thighR: 0.04,
+        shinR: -0.02,
+        footR: 0.02,
+        armL: 0.12,
+        foreL: -0.03,
+        armR: -0.1,
+        foreR: 0.05,
+        _hipY: -0.4,
       },
       {
         t: 1,
-        torso: 0.06,
-        thighL: 0.55,
-        shinL: -0.25,
-        thighR: -0.45,
-        shinR: 0.15,
-        armL: -0.7,
-        foreL: 0.2,
-        armR: 0.7,
-        foreR: -0.15,
+        torso: 0.05,
+        neck: -0.02,
+        thighL: 0.34,
+        shinL: -0.08,
+        footL: 0.08,
+        thighR: -0.3,
+        shinR: 0.34,
+        footR: -0.14,
+        armL: -0.38,
+        foreL: 0.12,
+        armR: 0.34,
+        foreR: -0.08,
+        _hipY: 1.4,
       },
     ],
   },
@@ -247,6 +296,11 @@ function Lerp(a, b, u) {
   return a + (b - a) * u;
 }
 
+function Smoothstep(k) {
+  const t = Math.max(0, Math.min(1, k));
+  return t * t * (3 - 2 * t);
+}
+
 /** Sample bone angle offsets at time seconds. */
 export function SampleClip(clipName, timeSec) {
   const clip = CLIPS[clipName] || CLIPS.idle;
@@ -258,7 +312,7 @@ export function SampleClip(clipName, timeSec) {
   const a = keys[i];
   const b = keys[Math.min(i + 1, keys.length - 1)];
   const span = Math.max(1e-6, b.t - a.t);
-  const k = (u - a.t) / span;
+  const k = Smoothstep((u - a.t) / span);
   /** @type {Record<string, number>} */
   const out = {};
   const names = new Set([...Object.keys(a), ...Object.keys(b)]);
@@ -277,16 +331,59 @@ export function PickClip(opts) {
   return "idle";
 }
 
+/**
+ * Advance clip clock. Walk rate scales with |vx| so strides match travel
+ * (avoids moonwalk / skate at crouch or slow speeds).
+ * @param {string} clipName
+ * @param {number} timeSec
+ * @param {number} dt
+ * @param {{ vx?: number, refSpeed?: number }} [opts]
+ */
+export function AdvanceClipTime(clipName, timeSec, dt, opts = {}) {
+  const clip = CLIPS[clipName] || CLIPS.idle;
+  const dur = clip.duration || 1;
+  let rate = 1;
+  if (clipName === "walk") {
+    const ref = opts.refSpeed || 220;
+    const speed = Math.abs(opts.vx || 0);
+    rate = Math.max(0.38, Math.min(1.35, speed / ref));
+  }
+  return (((timeSec || 0) + dt * rate) % dur + dur) % dur;
+}
+
 /** Tip offset from joint for a bone angle (0 = down / +Y). */
 function TipDelta(angle, len) {
   return { x: Math.sin(angle) * len, y: Math.cos(angle) * len };
 }
 
 /**
+ * Shift skeleton so the lowest foot tip rests on y=0 (no float / bury).
+ * @param {Record<string, { x: number, y: number, angle: number }>} world
+ */
+function PlantFeet(world) {
+  let low = -Infinity;
+  for (const name of ["footL", "footR"]) {
+    const b = world[name];
+    const def = BONE_DEFS[name];
+    if (!b || !def) continue;
+    const tip = TipDelta(b.angle, def.len);
+    low = Math.max(low, b.y + tip.y);
+  }
+  if (!Number.isFinite(low)) return;
+  const dy = -low;
+  if (Math.abs(dy) < 1e-4) return;
+  for (const b of Object.values(world)) {
+    b.y += dy;
+  }
+}
+
+/**
  * World pose for each bone: joint { x, y, angle }.
  * Feet sit at y≈0 when standing; hip near y=-legLen.
+ * @param {Record<string, number>} angleOff
+ * @param {{ plantFeet?: boolean }} [opts]
  */
-export function SolveBones(angleOff) {
+export function SolveBones(angleOff, opts = {}) {
   /** @type {Record<string, { x: number, y: number, angle: number }>} */
   const world = {};
   const order = Object.keys(BONE_DEFS);
@@ -324,6 +421,7 @@ export function SolveBones(angleOff) {
       angle: p.angle + local,
     };
   }
+  if (opts.plantFeet !== false) PlantFeet(world);
   return world;
 }
 
@@ -448,8 +546,11 @@ export function DrawPuppet(ctx, opts) {
   const pal = typeof opts.palette === "string" ? PALETTES[opts.palette] || PALETTES.militia : opts.palette || PALETTES.militia;
   const clip = opts.clip || PickClip(opts);
   const angleOff = SampleClip(clip, opts.time || 0);
-  if (opts.crouching) angleOff._hipY = 10;
-  const bones = SolveBones(angleOff);
+  if (opts.crouching) angleOff._hipY = (angleOff._hipY || 0) + 10;
+  // Plant feet for upright clips; crouch/dig keep authored hip drop.
+  const bones = SolveBones(angleOff, {
+    plantFeet: clip !== "crouch" && clip !== "dig",
+  });
 
   ctx.save();
   ctx.translate(opts.x, opts.y);

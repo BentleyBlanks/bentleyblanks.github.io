@@ -21,7 +21,14 @@ import {
   StandingWouldClip,
   StepPlay,
 } from "./Script_Rules.mjs";
-import { BONE_DEFS, CLIPS, SampleClip, SolveBones, PickClip } from "./Script_Puppet.mjs";
+import {
+  AdvanceClipTime,
+  BONE_DEFS,
+  CLIPS,
+  SampleClip,
+  SolveBones,
+  PickClip,
+} from "./Script_Puppet.mjs";
 import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -660,9 +667,14 @@ function TestPuppetAnim() {
   Assert(PickClip({ digging: true }) === "dig", "dig clip pick");
   Assert(PickClip({ crouching: true }) === "crouch", "crouch clip pick");
   Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
+  const slow = AdvanceClipTime("walk", 0, 0.1, { vx: 80, refSpeed: 220 });
+  const fast = AdvanceClipTime("walk", 0, 0.1, { vx: 220, refSpeed: 220 });
+  Assert(slow < fast, "walk cycle slows with lower speed");
+  Assert(fast > 0.09 && fast < 0.14, "full-speed walk advances near wall-clock");
   const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(game.includes("DrawPuppet"), "game draws puppet");
   Assert(game.includes("Script_Puppet.mjs"), "game imports puppet");
+  Assert(game.includes("AdvanceClipTime"), "player walk uses speed-synced clip clock");
 }
 
 function Main() {

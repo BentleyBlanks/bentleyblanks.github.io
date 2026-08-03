@@ -30,7 +30,12 @@ import {
   ITEM_RIFLE,
   ITEM_SHOVEL,
 } from "./Script_Items.mjs";
-import { DrawPuppet, PaletteForSpeaker, PickClip } from "./Script_Puppet.mjs";
+import {
+  AdvanceClipTime,
+  DrawPuppet,
+  PaletteForSpeaker,
+  PickClip,
+} from "./Script_Puppet.mjs";
 import { PAD_ICON } from "./Script_PadIcons.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
@@ -1400,21 +1405,30 @@ function DrawPlayer() {
             ? "rifle"
             : null;
   // Spine-style modular puppet — walk / crouch / dig clips on bone parts
-  if (!p._animT) p._animT = 0;
+  if (p._animT == null) p._animT = 0;
+  const now = (performance.now() || 0) / 1000;
+  const animDt = p._animLastTs != null ? Math.min(0.05, Math.max(0, now - p._animLastTs)) : 0.016;
+  p._animLastTs = now;
   const moving = Math.abs(p.vx || 0) > 18;
+  const clip = PickClip({
+    digging: !!p.digging,
+    crouching: !!p.crouching,
+    vx: p.vx,
+    moving,
+  });
+  if (p._animClip !== clip) {
+    p._animT = 0;
+    p._animClip = clip;
+  }
+  p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
   DrawPuppet(ctx, {
     x,
     y,
     facing: p.facing,
     scale: s,
     palette: "militia",
-    clip: PickClip({
-      digging: !!p.digging,
-      crouching: !!p.crouching,
-      vx: p.vx,
-      moving,
-    }),
-    time: (performance.now() || 0) / 1000,
+    clip,
+    time: p._animT,
     hold,
     digging: !!p.digging,
     crouching: !!p.crouching,
