@@ -77,7 +77,7 @@ function ReadMoveInput() {
 // ---------------------------------------------------------------------------
 // 电影镜头
 // ---------------------------------------------------------------------------
-const FOLLOW_YAW = -2.35;
+const FOLLOW_YAW = 0.7; // 镜头在东南方，望向西北：院子在前景，房子退成背景
 function FollowShot(state, dist, pitchDeg, yaw = FOLLOW_YAW) {
   const gy = world.GroundY(state);
   const pitch = pitchDeg * Math.PI / 180;
@@ -149,7 +149,8 @@ const camLook = new THREE.Vector3(0, 0, 0);
 let camSnap = true;
 
 function UpdateCamera(state, dt) {
-  const inCinematic = state.phase === "playing" && CurrentBeatDef(state)?.kind === "cinematic";
+  const inCinematic = state.phase === "playing"
+    && (CurrentBeatDef(state)?.kind === "cinematic" || !!state.microCine);
   const shot = inCinematic ? CamShot(state) : DefaultShot(state);
   const targetPos = new THREE.Vector3(...shot.pos);
   const targetLook = new THREE.Vector3(...shot.look);
@@ -176,11 +177,11 @@ function HideChoice() {
 
 function SyncHud(state, dt, shotFade) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
-  const inCinematic = def?.kind === "cinematic";
+  const inCinematic = def?.kind === "cinematic" || !!state.microCine;
 
   // 黑边与字幕
   ui.cineBars.classList.toggle("active", !!inCinematic);
-  if (state.caption && inCinematic) {
+  if (state.caption && inCinematic && (state.caption.say || state.caption.stage)) {
     ui.caption.hidden = false;
     if (state.caption.who) {
       ui.capSpeaker.textContent = state.caption.who;

@@ -343,6 +343,7 @@ export function CreateWorld(canvas) {
   const ACTOR_COLORS = {
     player: PALETTE.zhuzi, sister: PALETTE.sister, family: PALETTE.mother,
     militia: PALETTE.militia, soldier: PALETTE.soldier, villager: PALETTE.villager,
+    puppet: 0x8d8060,
   };
 
   function MakeActorMesh(kind, id) {
@@ -367,6 +368,12 @@ export function CreateWorld(canvas) {
       const towel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8), Mat(0xd8d2c0));
       towel.position.y = 1.7;
       group.add(towel);
+    }
+    if (kind === "puppet") {
+      // 伪军/汉奸：软塌塌的圆帽，不背步枪
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.14, 8), Mat(0x2e2a24));
+      hat.position.y = 1.72;
+      group.add(hat);
     }
     group.userData = { kind, id, body, head };
     return group;
@@ -444,8 +451,18 @@ export function CreateWorld(canvas) {
       mesh.visible = a.visible !== false;
       mesh.position.set(a.x, gy, a.z);
       mesh.rotation.y = a.heading || 0;
-      // 士兵视锥
-      if (a.kind === "soldier") {
+      // 提灯（巡夜的马灯/灯笼）
+      if (a.lantern && !mesh.userData.lanternLight) {
+        const ll = new THREE.PointLight(0xffc978, 0.85, 8, 1.6);
+        ll.position.set(0.45, 1.1, 0.3);
+        mesh.add(ll);
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffc978 }));
+        bulb.position.copy(ll.position);
+        mesh.add(bulb);
+        mesh.userData.lanternLight = ll;
+      }
+      // 士兵/伪军视锥
+      if (a.kind === "soldier" || a.kind === "puppet") {
         let cone = coneMeshes.get(a.id);
         if (!cone) {
           cone = MakeVisionCone();

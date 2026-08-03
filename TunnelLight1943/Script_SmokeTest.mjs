@@ -184,9 +184,19 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
     }
     if (state.phase === "gameEnd") break;
 
+    // 微过场：自动按时推进，不做移动输入
+    if (state.microCine) { StepGame(state, input, DT); continue; }
+
     const target = GetBeatTarget(state);
     const def = CurrentBeatDef(state);
     if (!target) { StepGame(state, input, DT); continue; }
+
+    // 探杆预兆/响动时立定（rescueLoop 移动会吓退乡亲）
+    if (def?.kind === "rescueLoop" && (state.beat.quakeWarn || state.beat.quakeActive)) {
+      StepGame(state, input, DT);
+      if (state.detection.level > 0.9) state.detection.level = 0.9;
+      continue;
+    }
 
     if (target.action === "advance") {
       input.advance = true;

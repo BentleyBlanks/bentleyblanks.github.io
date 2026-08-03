@@ -309,7 +309,14 @@ const SCRIPTS = {
       hint: "走到木料旁按 E 扛起，送回院里工作台再按 E 放下",
     },
     {
+      kind: "collect", id: "c1_water", objective: "帮娘从井台提一桶水回来",
+      items: [{ x: 0.8, z: 5.2 }],
+      deliver: V.homeYard, carryLabel: "水桶",
+      hint: "娘在灶间忙，水缸见了底",
+    },
+    {
       kind: "goto", id: "c1_findSister", zone: V.sisterTree, objective: "去老槐树下找妹妹回家吃饭",
+      hint: "娘直起腰，朝老槐树的方向望了望",
     },
     {
       kind: "escort", id: "c1_sisterHome", follower: "sister", dest: V.homeYard,
@@ -332,11 +339,26 @@ const SCRIPTS = {
     {
       kind: "cinematic", id: "c1_father",
       lines: [
-        { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "cellarPeek" } },
+        { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "cellarPeek" },
+          on: (state) => {
+            // 两个兵进院，架住爹
+            const father = state.actors.find((a) => a.id === "father");
+            const r1 = state.actors.find((a) => a.id === "raid1");
+            const r2 = state.actors.find((a) => a.id === "raid2");
+            if (father) { father.x = -25; father.z = -17.5; father.heading = Math.PI; }
+            if (r1) { r1.patrol = null; r1.cineTarget = { x: -23.8, z: -17.2 }; r1.cineSpeed = 3; }
+            if (r2) { r2.patrol = null; r2.cineTarget = { x: -26.2, z: -17.8 }; r2.cineSpeed = 3; }
+          } },
         { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "cellarPeek" } },
         { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.0, cam: { kind: "cellarPeek" } },
         { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "cellarPeek" } },
-        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "doorframe" } },
+        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "doorframe" },
+          on: (state) => {
+            for (const id of ["father", "raid1", "raid2"]) {
+              const a = state.actors.find((x) => x.id === id);
+              if (a) { a.cineTarget = { x: -14, z: -20 }; a.cineSpeed = 1.5; a.cineVanish = true; }
+            }
+          } },
         { stage: "那道刚刻下的线，还露着新茬。", d: 3.4, cam: { kind: "doorframe" } },
       ],
     },
@@ -350,6 +372,7 @@ const SCRIPTS = {
         { stage: "柱子十六岁了，学会了爹的手艺，也学会了听见狗叫就先看村口。", d: 4.2, cam: { kind: "yard" } },
         { stage: "这天夜里，狗叫得不一样。", d: 3.0, cam: { kind: "yard" } },
         { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 4.2, cam: { kind: "high", x: 30, z: -10, dist: 44 } },
+        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。名单就是他递上去的。", d: 4.4, cam: { kind: "high", x: 20, z: -20, dist: 36 } },
       ],
       onDone: (state) => { SpawnNightSweep(state); },
     },
@@ -365,8 +388,18 @@ const SCRIPTS = {
         { stage: "前面巷口站着人。走不过去了。", d: 3.0, cam: { kind: "low" } },
         { stage: "娘把妹妹的手放进柱子手里，又把两个孩子往磨盘后面按了按。", d: 4.4, cam: { kind: "low" } },
         { stage: "她没说话。只朝村东口努了努嘴。", d: 3.4, cam: { kind: "low" } },
-        { stage: "然后她站起来，朝反方向走去，故意踢翻了一只水瓮。", d: 4.2, cam: { kind: "decoy" } },
-        { stage: "手电、喊声、脚步，全都追着那声响去了。", d: 3.8, cam: { kind: "decoy" } },
+        { stage: "然后她站起来，朝反方向走去，故意踢翻了一只水瓮。", d: 4.2, cam: { kind: "decoy" },
+          on: (state) => {
+            const mother = state.actors.find((a) => a.id === "mother");
+            if (mother) { mother.cineTarget = { x: -8, z: -34 }; mother.cineSpeed = 2.3; }
+          } },
+        { stage: "灯笼、喊声、脚步，全都追着那声响去了。", d: 3.8, cam: { kind: "decoy" },
+          on: (state) => {
+            for (const id of ["sweep1", "sweep2"]) {
+              const s = state.actors.find((a) => a.id === id);
+              if (s) { s.cineTarget = { x: -4, z: -30 }; s.cineSpeed = 2.6; }
+            }
+          } },
       ],
       onDone: (state) => { MotherDecoyDone(state); },
     },
@@ -374,12 +407,19 @@ const SCRIPTS = {
       kind: "escort", id: "c2_escape", follower: "sister", dest: V.eastExit, stealth: true,
       objective: "带妹妹去村东口", hint: "沿着草垛和断墙的影子走",
       resetHint: "妹妹跑不快。等巡逻走远了再动。",
+      midToast: { zone: { x: 16, z: 4, r: 5 }, text: "路过的院里在拖人。柱子把妹妹的脸按在自己胸口，贴着墙根走了过去。" },
     },
     {
       kind: "cinematic", id: "c2_taken",
       lines: [
         { stage: "村东口就在眼前。", d: 2.6, cam: { kind: "low" } },
-        { stage: "两盏马灯突然从路两边亮起来。", d: 3.0, cam: { kind: "ambush" } },
+        { stage: "两盏马灯突然从路两边亮起来。", d: 3.0, cam: { kind: "ambush" },
+          on: (state) => {
+            state.actors.push(
+              MakeActor("ambush1", "puppet", 52, 9, { lantern: true, heading: -2.2 }),
+              MakeActor("ambush2", "soldier", 60, 0, { lantern: true, heading: 2.6 }),
+            );
+          } },
         { stage: "是等在这里的。", d: 2.6, cam: { kind: "ambush" } },
         { stage: "妹妹的手从柱子手里被拽走。他扑上去，被枪托砸在背上。", d: 4.4, cam: { kind: "ambush" } },
         { stage: "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。", d: 4.4, cam: { kind: "ambush" } },
@@ -406,9 +446,9 @@ const SCRIPTS = {
       hint: "蹲在遮蔽点里别动，柱子会把看到的记在心里",
       resetHint: "巡逻队走近了。柱子退回庄稼地，等风声过去。",
       notes: [
-        "岗楼上两个人，换岗时背对南门，一炷香的工夫。",
+        "岗楼上两个人，换岗时背对南门，半袋烟的工夫。",
         "巡逻队沿围墙转，转到东北角会停下来抽烟。",
-        "牢房在东边，天黑后送过一次饭。押送用的骡车拴在门里。",
+        "牢房在东边。白天押着人往围墙上搬土袋，天黑后送过一次饭。押送用的骡车拴在门里。",
       ],
     },
     {
@@ -422,7 +462,7 @@ const SCRIPTS = {
     {
       kind: "goto", id: "c3_closer", zone: F.gate, stealth: true, sneakTo: true,
       objective: "趁换岗摸近南门，看清牢房方向", hint: "贴着墙根走，别进灯光",
-      resetHint: "岗楼的探照灯扫了过来。退回沟里，重新等换岗。",
+      resetHint: "岗楼上的灯扫了过来。退回沟里，重新等换岗。",
       interruptAt: 0.8,
     },
     {
@@ -436,7 +476,7 @@ const SCRIPTS = {
         { stage: "夜里，一个满身泥的交通员摸进沟来，鞋底磨穿了。", d: 4.0, cam: { kind: "ditch" } },
         { who: "交通员", say: "据点里又抓了几个人。柱子的妹妹，也在里面。", d: 4.2, cam: { kind: "ditch" } },
         { who: "高传宝", say: "先把人救出来。不能让乡亲们再被带走。", d: 4.0, cam: { kind: "ditch" } },
-        { stage: "鬼子放风说三天后押人——这是撒出来的饵。谁都听得懂。", d: 4.4, cam: { kind: "ditch" } },
+        { stage: "鬼子放出风来，要往县里押人，日子没说定——这是撒出来的饵。谁都听得懂。", d: 4.6, cam: { kind: "ditch" } },
       ],
     },
   ],
@@ -468,14 +508,15 @@ const SCRIPTS = {
       kind: "cinematic", id: "c4_smokeStart",
       lines: [
         { stage: "头顶传来闷响。泥土簌簌往下掉。", d: 3.2, cam: { kind: "tunnel" } },
+        { stage: "有人用本地口音在上面喊：地道口就在磨盘这一片，扒！", d: 3.8, cam: { kind: "tunnel" } },
         { who: "民兵", say: "鬼子发现东口了！", d: 2.6, cam: { kind: "tunnel" } },
         { stage: "一股呛人的烟，顺着东口灌了进来。", d: 3.4, cam: { kind: "smokeE" } },
       ],
       onDone: (state) => { StartSmoke(state); },
     },
     {
-      kind: "smokeEscape", id: "c4_smoke",
-      objective: "赶在烟前头，把所有人从西口转移出去",
+      kind: "smokeEscape", id: "c4_smoke", dest: TV.entW, lossScript: true,
+      objective: "赶在烟前头，把人从西口转移出去",
       hint: "烟往里灌，先带离东边近的人。E 让一群人跟上，到西口他们会自己爬出去",
       resetHint: "烟呛倒了人。民兵把大家拖回洞室，重新来。",
     },
@@ -483,7 +524,7 @@ const SCRIPTS = {
       kind: "cinematic", id: "c4_loss",
       lines: [
         { stage: "西口外，乡亲们趴在田里咳嗽。人数了两遍。", d: 3.8, cam: { kind: "fieldNight" } },
-        { stage: "顺子没出来。他回去背拴柱大爷，两个人都没出来。", d: 4.6, cam: { kind: "fieldNight" } },
+        { stage: "顺子没出来。拴柱大爷也没有。", d: 4.2, cam: { kind: "fieldNight" } },
         { stage: "第二天，鬼子又拉来了水泵，往地道里灌水。", d: 3.8, cam: { kind: "fieldNight" } },
         { stage: "民兵冒险打开另一条道，把困着的人一个个拖出来。", d: 4.0, cam: { kind: "fieldNight" } },
         { stage: "有人活着出来。有人再也没有出来。", d: 4.2, cam: { kind: "dark" } },
@@ -498,14 +539,15 @@ const SCRIPTS = {
     {
       kind: "cinematic", id: "c5_open",
       lines: [
-        { stage: "烟和水教会了所有人一件事：地道不能只会藏，得会喘气，会报信，会换个地方钻出去。", d: 5.2, cam: { kind: "tunnelWide" } },
-        { stage: "全村人轮班下洞。柱子的墨斗和刨子，成了地道里的家伙什。", d: 4.2, cam: { kind: "tunnel" } },
+        { stage: "东口封死了。第二天起，全村轮班下洞。", d: 3.6, cam: { kind: "tunnelWide" } },
+        { stage: "高传宝在门板上画了三个记号：通风眼，新暗口，预警铃。", d: 4.0, cam: { kind: "tunnel" } },
+        { stage: "柱子的墨斗和刨子，成了地道里的家伙什。", d: 3.6, cam: { kind: "tunnel" } },
       ],
     },
     {
       kind: "buildSpots", id: "c5_build",
       spots: [
-        { zone: TV.ventSpot, label: "打通风眼", holdTime: 3, note: "烟灌进来，也得给它一条出去的路。" },
+        { zone: TV.ventSpot, label: "打通风眼", holdTime: 3, note: "眼口藏在井壁里，烟能出去，地面上看不出来。" },
         { zone: TV.hiddenSpot, label: "挖新暗口", holdTime: 3, note: "旧口废了不可惜，可惜的是没有下一个口。" },
         { zone: TV.bellSpot, label: "拴预警铃", holdTime: 3, note: "东口一响，全村先知道。" },
       ],
@@ -513,17 +555,29 @@ const SCRIPTS = {
       hint: "到标记处按住 E 施工",
     },
     {
+      kind: "cinematic", id: "c5_alarm",
+      lines: [
+        { stage: "没过几天，鬼子又来了。还是老一套：堵口，灌烟。", d: 3.8, cam: { kind: "smokeE" } },
+        { stage: "这一次，预警铃先响了。", d: 3.0, cam: { kind: "tunnel" } },
+      ],
+      onDone: (state) => { StartDrillSmoke(state); },
+    },
+    {
+      kind: "smokeEscape", id: "c5_drill", dest: TV.hiddenSpot,
+      objective: "铃响了——把人从新暗口送出去",
+      hint: "通风眼会拖住甲洞的烟。别走西口，鬼子早就盯上它了",
+      resetHint: "烟追上了人。再来——这一回，地道听你们的。",
+    },
+    {
       kind: "cinematic", id: "c5_test",
       lines: [
-        { stage: "没过几天，鬼子又来了。还是老一套：堵口，灌烟。", d: 4.0, cam: { kind: "smokeE" } },
-        { stage: "预警铃先响了。人往乙洞转移，老人孩子先走新暗口。", d: 4.2, cam: { kind: "tunnelWide" } },
-        { stage: "烟从通风眼里冒出去，像一柱笔直的狼烟。", d: 4.0, cam: { kind: "ventUp" } },
+        { stage: "烟顺着井壁的暗眼散了。地面上，什么也看不出来。", d: 4.0, cam: { kind: "ventUp" } },
         { stage: "鬼子在村里翻到天黑，一个人也没找到。", d: 3.8, cam: { kind: "fieldNight" } },
         { stage: "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。", d: 4.2, cam: { kind: "tunnel" } },
         { stage: "鬼子的探杆就在头顶上戳。谁也不敢出声。", d: 3.8, cam: { kind: "tunnel" } },
         { stage: "他把手里的枪递出去，朝洞外摆了摆手。", d: 4.2, cam: { kind: "tunnel" } },
         { who: "年轻民兵", say: "带乡亲们走。", d: 3.0, cam: { kind: "tunnel" } },
-        { stage: "柱子第一次看清：这条通向妹妹的路，是有人用命在守的。", d: 4.6, cam: { kind: "dark" } },
+        { d: 2.4, cam: { kind: "dark" } },
       ],
     },
   ],
@@ -579,12 +633,13 @@ const SCRIPTS = {
       kind: "cinematic", id: "c7_open", dynamicLines: (state) => (
         state.flags.route === "ground"
           ? [
-            { stage: "夜里十点，村北先响了枪。", d: 3.0, cam: { kind: "dark" } },
-            { stage: "据点的探照灯全甩向北面。巡逻队跑步出了南门。", d: 3.8, cam: { kind: "dark" } },
+            { stage: "二更天，村北先响了枪。", d: 3.0, cam: { kind: "dark" } },
+            { stage: "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。", d: 3.8, cam: { kind: "dark" } },
             { stage: "突击组翻进围墙。柱子跟着最后一个下了地道——乡亲们要从地下走。", d: 4.4, cam: { kind: "tunnelWide" } },
           ]
           : [
-            { stage: "夜里十点，地道里一盏灯也没点。", d: 3.2, cam: { kind: "dark" } },
+            { stage: "二更天，地道里一盏灯也没点。", d: 3.2, cam: { kind: "dark" } },
+            { stage: "村北的民兵按兵不动——这一次，连声势都是省下的。", d: 3.6, cam: { kind: "dark" } },
             { stage: "队伍在黑暗里贴着墙根移动，谁也不说话。", d: 3.6, cam: { kind: "tunnelWide" } },
             { stage: "柱子数着步子。到牢房地沿，要过两处没撑牢的老塌方。", d: 4.2, cam: { kind: "tunnelWide" } },
           ]
@@ -603,7 +658,15 @@ const SCRIPTS = {
       kind: "cinematic", id: "c7_sister",
       lines: [
         { stage: "地沿的木板被顶开一条缝。霉味和哭声一起漏下来。", d: 4.0, cam: { kind: "hatch" } },
-        { stage: "民兵一个个往下接人。柱子在人堆里看见了妹妹。", d: 4.0, cam: { kind: "hatch" } },
+        { stage: "民兵一个个往下接人。柱子在人堆里看见了妹妹。", d: 4.0, cam: { kind: "hatch" },
+          on: (state) => {
+            const n = LAYOUTS.tunnelFort.nodes;
+            for (let i = 0; i < 3; i += 1) {
+              state.actors.push(MakeActor(`freed${i}`, "villager", n.cellHatch.x + 0.4 * i, n.cellHatch.z + 0.3 * i, {
+                scripted: true, cineTarget: { x: n.fieldEnt.x, z: n.fieldEnt.z }, cineSpeed: 1.7 + i * 0.25, cineVanish: true,
+              }));
+            }
+          } },
         { stage: "妹妹瘦得脱了相。她抓住柱子的袖子。", d: 3.6, cam: { kind: "close" } },
         { who: "妹妹", say: "哥，娘呢？", d: 3.0, cam: { kind: "close" } },
         { stage: "柱子没有说话。", d: 3.0, cam: { kind: "close" } },
@@ -654,6 +717,7 @@ const SCRIPTS = {
       lines: [
         { stage: "一个月后。", d: 2.6, cam: { kind: "dark" } },
         { stage: "高家庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "high", x: 0, z: 0, dist: 56 } },
+        { stage: "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。", d: 4.8, cam: { kind: "high", x: 20, z: 10, dist: 40 } },
         { stage: "柱子带着妹妹，回了一趟梁家村。", d: 3.4, cam: { kind: "high", x: -30, z: -20, dist: 40 } },
       ],
       onDone: (state) => { SetupRuinedVillage(state); },
@@ -688,15 +752,13 @@ const SCRIPTS = {
       ],
     },
     {
-      kind: "goto", id: "c8_leave", zone: V.villageEdge, objective: "去村西头，民兵在等",
+      kind: "goto", id: "c8_leave", zone: V.courtGate, objective: "走到院门口去，民兵在村西头等",
     },
     {
       kind: "cinematic", id: "c8_end",
       lines: [
         { stage: "柱子走出院子。", d: 3.0, cam: { kind: "leaveYard" } },
-        { stage: "门框上的两道刻痕，留在了身后。", d: 4.4, cam: { kind: "doorframeFar" } },
-        { stage: "一道是爹刻给他的。", d: 3.2, cam: { kind: "doorframeFar" } },
-        { stage: "一道，是他刻给这个家的。", d: 4.0, cam: { kind: "doorframeFar" } },
+        { stage: "门框上的两道刻痕，留在了身后。", d: 6.2, cam: { kind: "doorframeFar" } },
       ],
     },
   ],
@@ -723,9 +785,10 @@ function SpawnRaidSoldiers(state) {
 }
 
 function SpawnNightSweep(state) {
-  state.actors = state.actors.filter((a) => a.kind !== "soldier");
+  state.actors = state.actors.filter((a) => !IsEnemy(a));
   state.actors.push(
-    MakeActor("sweep1", "soldier", 8, -26, {
+    // 带路的翻译官挑着灯笼在前，两个兵在后
+    MakeActor("sweep1", "puppet", 8, -26, {
       patrol: [{ x: 8, z: -26 }, { x: 26, z: -26 }, { x: 26, z: -10 }, { x: 8, z: -10 }], patrolIndex: 0, speed: 1.6, lantern: true,
     }),
     MakeActor("sweep2", "soldier", 34, 2, {
@@ -763,8 +826,9 @@ function SpawnFortPatrols(state, reinforced) {
   );
   if (reinforced) {
     state.actors.push(
-      MakeActor("fortB", "soldier", 22, 10, {
-        patrol: [{ x: 22, z: 10 }, { x: -22, z: 10 }], patrolIndex: 0, speed: 1.6,
+      // 牢房外新添的游动哨：伪军，绕北墙一圈
+      MakeActor("fortB", "puppet", 4, -14, {
+        patrol: [{ x: 4, z: -14 }, { x: 17, z: -14 }, { x: 17, z: -22 }, { x: 4, z: -22 }], patrolIndex: 0, speed: 1.2, lantern: true,
       }),
       MakeActor("gate2", "soldier", 4, 4, {
         patrol: [{ x: 4, z: 4 }, { x: -4, z: 4 }], patrolIndex: 0, speed: 0.55,
@@ -807,6 +871,31 @@ function StartSmoke(state) {
   }
 }
 
+function StartDrillSmoke(state) {
+  // 验收战：预警铃先响，通风眼拖住甲洞的烟，西口是死路，新暗口是活路
+  const n = LAYOUTS.tunnelVillage.nodes;
+  state.actors = state.actors.filter((a) => a.kind !== "villager");
+  state.actors.push(
+    MakeActor("d_elder", "villager", n.chamberA.x - 0.8, n.chamberA.z + 0.6, { label: "六婶", slow: true }),
+    MakeActor("d_aunt", "villager", n.chamberB.x, n.chamberB.z, { label: "大嫂" }),
+    MakeActor("d_kid", "villager", n.chamberB.x + 0.8, n.chamberB.z + 0.5, { label: "小石头", slow: true }),
+  );
+  state.smoke = {
+    t: 0,
+    schedule: [
+      { node: "entE", at: 0 }, { node: "bellSpot", at: 4 }, { node: "juncE", at: 18 },
+      { node: "juncMid", at: 46 }, { node: "entW", at: 58 }, // 鬼子这回也堵了西口
+      { node: "chamberA", at: 85 }, // 通风眼把甲洞的烟拖慢了
+      { node: "chamberB", at: 80 }, { node: "wellLink", at: 92 },
+      { node: "ventSpot", at: 70 }, { node: "hiddenSpot", at: 999 },
+    ],
+    filled: new Set(),
+  };
+  state.player.x = n.entE.x;
+  state.player.z = n.entE.z;
+  state.toast = { text: "东口的铃响成一串。人已经在往洞里下了。", t: 4 };
+}
+
 function SetupFortTunnel(state) {
   state.collapses = {
     collapse1: { cleared: false, progress: 0 },
@@ -842,7 +931,10 @@ function StartRescueLoop(state) {
     MakeActor("trapC1", "villager", n.pocketC.x, n.pocketC.z, { label: "抱孩子的大嫂", pocket: "pocketC", slow: true }),
   );
   // 老人那段对话按剧本走：见 rescueLoop 里的 pocketB 触发
-  state.rescue = { delivered: new Set(), dialogueShown: new Set() };
+  state.rescue = { delivered: new Set(), dialogueShown: new Set(), quakeT: 0 };
+  if (state.flags.route === "ground") {
+    state.toast = { text: "村北的枪声停了。敌人正在回防——头顶的动静密了起来。", t: 5 };
+  }
 }
 
 function SetupRuinedVillage(state) {
@@ -874,7 +966,8 @@ export function CreateGame(chapterIndex = 0) {
     collapses: null,
     rescue: null,
     beat: null,
-    flags: { route: null, resets: 0, ruined: false, notesSeen: [] },
+    microCine: null,
+    flags: { route: null, resets: 0, ruined: false, carved: false, notesSeen: [] },
     caption: null,     // {who, say, stage, ...} 当前字幕
     camHint: { kind: "follow" },
     fade: 0,           // 0 正常，1 全黑
@@ -898,6 +991,7 @@ export function StartChapter(state, index) {
   state.smoke = null;
   state.collapses = null;
   state.rescue = null;
+  state.microCine = null;
   state.caption = null;
   state.prompt = null;
   state.player.carry = null;
@@ -944,7 +1038,7 @@ function EnterBeat(state) {
   const def = CurrentBeatDef(state);
   if (!def) { EndChapter(state); return; }
   state.beat = {
-    t: 0, lineIndex: 0, lineT: 0,
+    t: 0, lineIndex: 0, lineT: 0, lineFired: -1,
     itemStates: def.kind === "collect" ? def.items.map((p) => ({ x: p.x, z: p.z, carried: false, delivered: false })) : null,
     visited: new Set(),
     holdProgress: 0,
@@ -1045,12 +1139,14 @@ export function StepGame(state, input, dt) {
   state.beat.t += dt;
   state.prompt = null;
 
+  if (state.microCine) { StepMicroCine(state, input, dt); StepCineActors(state, dt); return; }
   if (def.kind === "cinematic") { StepCinematic(state, input, dt); return; }
   if (def.kind === "choice") { state.caption = null; return; } // UI 层处理选择
 
   MovePlayer(state, input, dt);
   StepFollowers(state, dt);
   StepSoldiers(state, dt);
+  StepCineActors(state, dt);
   if (state.smoke) StepSmoke(state, dt);
 
   switch (def.kind) {
@@ -1065,19 +1161,61 @@ export function StepGame(state, input, dt) {
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
     case "smokeEscape": StepSmokeEscape(state, def, input); break;
-    case "rescueLoop": StepRescueLoop(state, def, input); break;
+    case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
     default: break;
   }
 
   if (state.stealthActive && !def.noDetect) StepDetection(state, def, dt);
 }
 
+// 过场里的走位：让画面里的人做字幕说的事
+function StepCineActors(state, dt) {
+  for (const a of state.actors) {
+    if (!a.cineTarget) continue;
+    const d = Dist(a.x, a.z, a.cineTarget.x, a.cineTarget.z);
+    if (d < 0.35) {
+      if (a.cineVanish) a.visible = false;
+      a.cineTarget = null;
+      continue;
+    }
+    const speed = a.cineSpeed || 1.6;
+    const step = Math.min(speed * dt, d);
+    a.heading = Math.atan2(a.cineTarget.x - a.x, a.cineTarget.z - a.z);
+    a.x += ((a.cineTarget.x - a.x) / d) * step;
+    a.z += ((a.cineTarget.z - a.z) / d) * step;
+  }
+}
+
+// 玩法中插入的微过场（如第七章旁洞的老人对话）
+export function StartMicroCine(state, lines) {
+  state.microCine = { lines, i: 0, t: 0 };
+}
+
+function StepMicroCine(state, input, dt) {
+  const mc = state.microCine;
+  const line = mc.lines[mc.i];
+  if (!line) { state.microCine = null; state.caption = null; return; }
+  state.caption = line;
+  state.camHint = line.cam || { kind: "close" };
+  mc.t += dt;
+  if (input.advance || mc.t >= line.d) {
+    mc.i += 1;
+    mc.t = 0;
+    if (mc.i >= mc.lines.length) { state.microCine = null; state.caption = null; }
+  }
+}
+
 function StepCinematic(state, input, dt) {
   const lines = state.beatLines;
   const line = lines[state.beat.lineIndex];
   if (!line) { AdvanceBeat(state); return; }
+  if (state.beat.lineFired !== state.beat.lineIndex) {
+    state.beat.lineFired = state.beat.lineIndex;
+    line.on?.(state);
+  }
   state.caption = line;
   state.camHint = line.cam || { kind: "follow" };
+  StepCineActors(state, dt);
   state.beat.lineT += dt;
   if (input.advance || state.beat.lineT >= line.d) {
     state.beat.lineIndex += 1;
@@ -1159,9 +1297,11 @@ function StepFollowers(state, dt) {
   }
 }
 
+function IsEnemy(a) { return a.kind === "soldier" || a.kind === "puppet"; }
+
 function StepSoldiers(state, dt) {
   for (const a of state.actors) {
-    if (a.kind !== "soldier" || !a.visible || !a.patrol) continue;
+    if (!IsEnemy(a) || !a.visible || !a.patrol || a.cineTarget) continue;
     const wp = a.patrol[a.patrolIndex % a.patrol.length];
     const d = Dist(a.x, a.z, wp.x, wp.z);
     if (d < 0.4) { a.patrolIndex = (a.patrolIndex + 1) % a.patrol.length; continue; }
@@ -1194,7 +1334,7 @@ function StepDetection(state, def, dt) {
   const layout = LAYOUTS[CHAPTERS[state.chapterIndex].env];
   let seen = false;
   for (const a of state.actors) {
-    if (a.kind !== "soldier" || !a.visible) continue;
+    if (!IsEnemy(a) || !a.visible) continue;
     if (SoldierSeesPlayer(layout, a, state.player)) { seen = true; state.detection.spotter = a.id; break; }
   }
   if (seen) state.detection.level = Math.min(1, state.detection.level + dt * 0.9);
@@ -1254,6 +1394,10 @@ function StepCollect(state, def, input) {
 }
 
 function StepEscort(state, def, input) {
+  if (def.midToast && !state.beat.visited.has("midToast") && InZone(state.player.x, state.player.z, def.midToast.zone)) {
+    state.beat.visited.add("midToast");
+    state.toast = { text: def.midToast.text, t: 5 };
+  }
   const f = state.actors.find((a) => a.id === def.follower);
   if (f && !f.following && f.visible) {
     if (Dist(state.player.x, state.player.z, f.x, f.z) < 2.2) {
@@ -1365,9 +1509,9 @@ function StepBuildSpots(state, def, input, dt) {
 }
 
 function StepDigSeq(state, def, input, dt) {
-  // 探杆声：周期性“头顶有动静”，挖掘会被打断
+  // 探杆声：周期性“头顶有动静”，挖掘会被打断（地面佯动扯走了注意力时，间隔更长）
   state.beat.quakeT += dt;
-  const cycle = def.quakeInterval;
+  const cycle = def.quakeInterval + (state.flags.route === "ground" ? 4 : 0);
   state.beat.quakeActive = (state.beat.quakeT % cycle) > cycle - 2.5;
 
   const keys = ["collapse1", "collapse2"];
@@ -1405,7 +1549,37 @@ export function NodeSmoked(state, nodeKey) { return !!state.smoke?.filled.has(no
 
 function StepSmokeEscape(state, def, input) {
   const layout = LAYOUTS.tunnelVillage;
-  const villagers = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated);
+  const dest = def.dest || TV.entW;
+
+  // 第四章的注定失去：拴柱大爷在半路腿软，顺子回身去背他——两人都没能出来
+  if (def.lossScript) {
+    const elder1 = state.actors.find((a) => a.id === "elder1");
+    const shunzi = state.actors.find((a) => a.id === "shunzi");
+    if (!state.beat.lossStage && elder1?.following && elder1.x < -2) {
+      state.beat.lossStage = 1;
+      state.beat.lossT = state.beat.t;
+      elder1.following = false;
+      elder1.scripted = true;
+      elder1.cineTarget = { x: layout.nodes.chamberA.x, z: layout.nodes.chamberA.z };
+      elder1.cineSpeed = 1.0;
+      if (shunzi) {
+        shunzi.visible = true;
+        shunzi.scripted = true;
+        shunzi.x = layout.nodes.juncMid.x;
+        shunzi.z = layout.nodes.juncMid.z;
+        shunzi.cineTarget = { x: layout.nodes.chamberA.x, z: layout.nodes.chamberA.z };
+        shunzi.cineSpeed = 3.2;
+      }
+      state.toast = { text: "拴柱大爷腿一软，坐在了道口。顺子从后面追了上去：『你们先走！』", t: 5 };
+    }
+    if (state.beat.lossStage === 1 && state.beat.t - state.beat.lossT > 6) {
+      state.beat.lossStage = 2;
+      if (elder1) elder1.visible = false;
+      if (shunzi) shunzi.visible = false;
+    }
+  }
+
+  const villagers = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.scripted);
   // E 招呼附近的人跟上
   const loose = villagers.find((a) => !a.following && Dist(a.x, a.z, state.player.x, state.player.z) < 2.6);
   if (loose) {
@@ -1416,45 +1590,84 @@ function StepSmokeEscape(state, def, input) {
       }
     }
   }
-  // 到西口的人自动撤出
+  // 到出口的人自动撤出
   for (const a of villagers) {
-    if (InZone(a.x, a.z, TV.entW)) { a.evacuated = true; a.following = false; a.visible = false; }
+    if (InZone(a.x, a.z, dest)) { a.evacuated = true; a.following = false; a.visible = false; }
   }
-  // 烟追上未撤离的人 → 重置
-  for (const a of state.actors.filter((x) => x.kind === "villager" && x.visible && !x.evacuated)) {
+  // 烟追上未撤离的人 → 重置（脚本化失去的两人不参与判定）
+  for (const a of villagers) {
     for (const key of state.smoke.filled) {
       const n = layout.nodes[key];
       if (Dist(a.x, a.z, n.x, n.z) < n.r + 1.0) {
         state.flags.resets += 1;
         state.smoke.t = 0; state.smoke.filled.clear();
         RestoreSnapshot(state);
-        for (const v of state.actors.filter((x) => x.kind === "villager")) { v.following = false; v.evacuated = false; v.visible = v.id !== "shunzi"; }
+        state.beat.lossStage = 0;
+        for (const v of state.actors.filter((x) => x.kind === "villager")) {
+          v.following = false; v.evacuated = false; v.scripted = false; v.cineTarget = null;
+          v.visible = v.id !== "shunzi" || !def.lossScript;
+        }
         state.toast = { text: def.resetHint, t: 4 };
         return;
       }
     }
   }
-  const remaining = state.actors.filter((a) => a.kind === "villager" && a.id !== "shunzi" && !a.evacuated);
+  const remaining = state.actors.filter((a) => a.kind === "villager" && !a.scripted
+    && !(def.lossScript && a.id === "shunzi") && !a.evacuated);
   if (remaining.length === 0) AdvanceBeat(state);
 }
 
-function StepRescueLoop(state, def, input) {
-  const pockets = ["pocketA", "pocketB", "pocketC"];
+function StepRescueLoop(state, def, input, dt) {
   const trapped = state.actors.filter((a) => a.pocket && a.visible && !a.evacuated);
+
+  // 探杆：地面在头顶戳探。先有落土预兆，随后必须站住——动了，乡亲们会吓得缩回旁洞
+  const cycle = state.flags.route === "ground" ? 7 : 9.5;
+  state.rescue.quakeT += dt;
+  const phase = state.rescue.quakeT % cycle;
+  state.beat.quakeWarn = phase > cycle - 2.9;
+  state.beat.quakeActive = phase > cycle - 2.2;
+  const graceOver = phase > cycle - 1.8; // 探杆落定后仍在动才受罚
+  if (state.beat.quakeWarn && !state.beat.quakeActive) {
+    state.prompt = "…头顶的土簌簌往下掉";
+  }
+  if (state.beat.quakeActive) {
+    state.prompt = "！探杆就在头顶——站住，别出声";
+    const moving = Math.hypot(input.moveX, input.moveZ) > 0.1;
+    if (moving && graceOver) {
+      const followers = trapped.filter((a) => a.following);
+      if (followers.length) {
+        const n = LAYOUTS.tunnelFort.nodes;
+        for (const a of followers) {
+          a.following = false;
+          a.cineTarget = { x: n[a.pocket].x, z: n[a.pocket].z };
+          a.cineSpeed = 2.8;
+        }
+        state.toast = { text: "头顶的探杆停住了。乡亲们吓得缩回了旁洞。", t: 4 };
+        state.rescue.quakeT = 0;
+      }
+    }
+  }
+
   // 旁洞乙的老人对话（按剧本：你妹妹呢——送出去了）
   if (!state.rescue.dialogueShown.has("pocketB")) {
     const nearB = trapped.some((a) => a.pocket === "pocketB" && Dist(a.x, a.z, state.player.x, state.player.z) < 3);
     if (nearB) {
       state.rescue.dialogueShown.add("pocketB");
-      state.toast = { text: "老人认出了他：『梁家的柱子？你妹妹呢？』——『送出去了。』老人松了一口气。", t: 6 };
+      StartMicroCine(state, [
+        { stage: "扶着民兵的老人抬起头，借着灯光认出了他。", d: 3.2, cam: { kind: "close" } },
+        { who: "老人", say: "梁家的柱子？你妹妹呢？", d: 3.0, cam: { kind: "close" } },
+        { who: "柱子", say: "送出去了。", d: 2.6, cam: { kind: "close" } },
+        { stage: "老人松了一口气。", d: 2.4, cam: { kind: "close" } },
+      ]);
+      return;
     }
   }
-  const loose = trapped.find((a) => !a.following && Dist(a.x, a.z, state.player.x, state.player.z) < 2.6);
+  const loose = trapped.find((a) => !a.following && !a.cineTarget && Dist(a.x, a.z, state.player.x, state.player.z) < 2.6);
   if (loose) {
-    state.prompt = "E · 带他们走";
+    if (!state.beat.quakeActive) state.prompt = "E · 带他们走";
     if (input.interact) {
       for (const a of trapped) {
-        if (!a.following && Dist(a.x, a.z, state.player.x, state.player.z) < 3.2) a.following = true;
+        if (!a.following && Dist(a.x, a.z, state.player.x, state.player.z) < 3.2) { a.following = true; a.cineTarget = null; }
       }
     }
   }
@@ -1532,10 +1745,12 @@ export function GetBeatTarget(state) {
       return { action: "holdAt", x: TF[key].x, z: TF[key].z, pauseOnQuake: true };
     }
     case "smokeEscape": {
-      const loose = state.actors.find((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.following);
+      const dest = def.dest || TV.entW;
+      const pool = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.scripted
+        && !(def.lossScript && a.id === "shunzi"));
+      const loose = pool.find((a) => !a.following);
       if (loose) return { action: "interactAt", x: loose.x, z: loose.z };
-      const anyFollowing = state.actors.some((a) => a.kind === "villager" && a.visible && !a.evacuated && a.following);
-      if (anyFollowing) return { action: "walk", x: TV.entW.x, z: TV.entW.z };
+      if (pool.some((a) => a.following)) return { action: "walk", x: dest.x, z: dest.z };
       return null;
     }
     case "rescueLoop": {
