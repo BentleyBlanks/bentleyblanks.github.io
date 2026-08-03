@@ -1,7 +1,7 @@
 import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
-import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260804zaa";
+import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260804zab";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -156,7 +156,7 @@ function CreateState(levelIndex) {
     combat: {
       rifle: false, ammo: 0, grenades: 0, health: 3, alarm: false,
       shots: [], grenadesInFlight: [], blasts: [], blastScars: [], enemyShots: [],
-      rifleCooldown: 0, enemyFireCooldown: .8, neutralized: 0, recoveredAmmo: 0,
+      rifleCooldown: 0, enemyFireCooldown: .8, neutralized: 0, recoveredAmmo: 0, recoveredWeapons: 0,
       muzzleFlash: 0, damageFlash: 0, objectiveTriggered: false
     },
     nextRaid: null,
@@ -720,21 +720,51 @@ function UpdatePatrolLure(delta) {
   UpdateUi();
 }
 
-function FindCombatDrop() {
-  if (state.levelIndex !== 3 || !state.combat) return null;
-  return state.unconsciousEnemies
-    .filter((enemy) => enemy.layer === state.player.layer && enemy.ammoDrop > 0 && !enemy.lootTaken)
-    .map((enemy) => ({ enemy, distance: Math.abs(enemy.x - state.player.x) }))
-    .filter((candidate) => candidate.distance <= 1.15)
-    .sort((left, right) => left.distance - right.distance)[0]?.enemy || null;
+function EnemyDroppedWeaponKind(enemy) {
+  return enemy.unitType === "collaborator" ? "baton" : "rifle";
 }
 
-function CollectCombatDrop(enemy) {
+function EnemyDroppedWeaponLabel(enemy) {
+  return EnemyDroppedWeaponKind(enemy) === "rifle" ? "步枪" : "警棍";
+}
+
+function CombatDropGroundX(enemy) {
+  return enemy.x + enemy.facing * .72;
+}
+
+function FindCombatDrop() {
+  if (!state.combat) return null;
+  return state.unconsciousEnemies
+    .filter((enemy) => enemy.layer === state.player.layer && (!enemy.weaponTaken || (state.levelIndex === 3 && enemy.ammoDrop > 0 && !enemy.lootTaken)))
+    .map((enemy) => ({
+      enemy,
+      kind: !enemy.weaponTaken ? "weapon" : "ammo",
+      distance: Math.abs(CombatDropGroundX(enemy) - state.player.x)
+    }))
+    .filter((candidate) => candidate.distance <= 1.45)
+    .sort((left, right) => left.distance - right.distance)[0] || null;
+}
+
+function CollectCombatDrop(drop) {
+  const enemy = drop.enemy;
+  const pickupX = CombatDropGroundX(enemy);
+  if (drop.kind === "weapon") {
+    const weaponKind = EnemyDroppedWeaponKind(enemy);
+    enemy.weaponTaken = true;
+    state.combat.recoveredWeapons += 1;
+    if (state.levelIndex === 3 && weaponKind === "rifle") state.combat.rifle = true;
+    BeginActorAction({ id: "takeRifle" }, .62);
+    state.player.pickup = { kind: weaponKind === "rifle" ? "combatRifle" : "combatBaton", label: EnemyDroppedWeaponLabel(enemy), x: pickupX, layer: enemy.layer, time: .82, duration: .82 };
+    audioDirector.PlayCue("pickup");
+    Toast(state.levelIndex === 3 && weaponKind === "rifle" ? "捡起了落地步枪，现在可以用 F 开枪。" : `已收缴倒地${EnemyIdentity(enemy).faction}的${EnemyDroppedWeaponLabel(enemy)}。`, "success");
+    UpdateUi();
+    return;
+  }
   enemy.lootTaken = true;
   state.combat.ammo += enemy.ammoDrop;
   state.combat.recoveredAmmo += enemy.ammoDrop;
   BeginActorAction({ id: "takeAmmo" }, .62);
-  state.player.pickup = { kind: "ammoBox", label: `${enemy.ammoDrop} 发散弹`, x: enemy.x, layer: enemy.layer, time: .82, duration: .82 };
+  state.player.pickup = { kind: "ammoBox", label: `${enemy.ammoDrop} 发散弹`, x: pickupX, layer: enemy.layer, time: .82, duration: .82 };
   audioDirector.PlayCue("pickup");
   Toast(`从枪套旁摸到 ${enemy.ammoDrop} 发散弹。现在共有 ${state.combat.ammo} 发。`, "success");
   UpdateUi();
@@ -814,7 +844,8 @@ function NeutralizeCombatEnemy(enemy, cause) {
     cause,
     age: 0,
     ammoDrop: enemy.index === 1 ? 1 : 0,
-    lootTaken: false
+    lootTaken: false,
+    weaponTaken: false
   });
 }
 
@@ -1396,10 +1427,15 @@ function UpdateUi() {
   ui.metricsPanel.innerHTML = MetricsMarkup();
   const takedownTarget = FindTakedownTarget();
   const action = FindNearestAction();
+  const combatDrop = FindCombatDrop();
   const actionBlockReason = InteractionBlockReason(action, true);
-  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !state.qaPatrolReview && !ActivePatrolLure("dogBark") && !IsBlocked());
-  ui.interactionPrompt.classList.toggle("locked", Boolean(actionBlockReason));
-  if (action) {
+  Show(ui.interactionPrompt, Boolean(action || combatDrop) && !takedownTarget && !state.qaPatrolReview && !ActivePatrolLure("dogBark") && !IsBlocked());
+  ui.interactionPrompt.classList.toggle("locked", Boolean(actionBlockReason) && !combatDrop);
+  if (combatDrop) {
+    ui.interactionPrompt.querySelector("kbd").textContent = "E";
+    ui.interactionVerb.textContent = combatDrop.kind === "weapon" ? "捡起" : "拾取";
+    ui.interactionName.textContent = combatDrop.kind === "weapon" ? `落地${EnemyDroppedWeaponLabel(combatDrop.enemy)}` : `${combatDrop.enemy.ammoDrop} 发散弹`;
+  } else if (action) {
     ui.interactionPrompt.querySelector("kbd").textContent = actionBlockReason ? "!" : "E";
     ui.interactionVerb.textContent = actionBlockReason ? "未就绪" : action.verb;
     ui.interactionName.textContent = actionBlockReason || ActionDisplayName(action);
@@ -1561,7 +1597,9 @@ function ContextHint() {
   }
   const action = FindNearestAction();
   const combatDrop = FindCombatDrop();
-  if (combatDrop) return `E · 拾取倒地敌兵旁的 ${combatDrop.ammoDrop} 发散弹`;
+  if (combatDrop) return combatDrop.kind === "weapon"
+    ? `E · 捡起落地${EnemyDroppedWeaponLabel(combatDrop.enemy)}`
+    : `E · 拾取倒地敌兵旁的 ${combatDrop.enemy.ammoDrop} 发散弹`;
   if (state.levelIndex === 3 && ["engage", "secure"].includes(state.phaseId)) {
     if (action) return `E · ${action.verb}${action.prop?.label || action.title}`;
     return `F 开枪（${state.combat.ammo}） · G 手雷（${state.combat.grenades}） · E 背后无声制服`;
@@ -1921,7 +1959,7 @@ function UpdateTakedown(delta) {
     audioDirector.PlayCue("batonImpact");
   }
   if (sequence.time < sequence.duration) return;
-  state.unconsciousEnemies.push({ ...target, layer: target.layer || "surface", x: target.x, facing: target.facing, disarmed: true, age: 0, ammoDrop: state.levelIndex === 3 && target.index === 1 ? 1 : 0, lootTaken: false });
+  state.unconsciousEnemies.push({ ...target, layer: target.layer || "surface", x: target.x, facing: target.facing, disarmed: true, age: 0, ammoDrop: state.levelIndex === 3 && target.index === 1 ? 1 : 0, lootTaken: false, weaponTaken: false });
   state.takedown = null;
   state.takedownGrace = 2.2;
   state.player.actionKind = "inspect";
@@ -4528,7 +4566,7 @@ function PropSupportLift(support) {
 }
 
 function PropVisualHeight(kind) {
-  return ({ timberStack: 22, ironFittings: 26, powderJar: 34, reliefBundle: 35, capturePile: 32, hiddenLetter: 27, thimble: 29, woundedStretcher: 31, grainSacks: 34, ropeCoil: 31, soldierBoot: 28, fieldRadioMap: 48, combatRifle: 38, ammoBox: 22, combatGrenade: 27, seepBowl: 21, draftRibbon: 34, soilProbe: 39, routeMarker: 34, camoNet: 42, supportBrace: 47, drainSluice: 31, innerLatch: 37, hornValve: 42, falseHatch: 29, decoyBundle: 31 })[kind] ?? 28;
+  return ({ timberStack: 22, ironFittings: 26, powderJar: 34, reliefBundle: 35, capturePile: 32, hiddenLetter: 27, thimble: 29, woundedStretcher: 31, grainSacks: 34, ropeCoil: 31, soldierBoot: 28, fieldRadioMap: 48, combatRifle: 38, combatBaton: 22, ammoBox: 22, combatGrenade: 27, seepBowl: 21, draftRibbon: 34, soilProbe: 39, routeMarker: 34, camoNet: 42, supportBrace: 47, drainSluice: 31, innerLatch: 37, hornValve: 42, falseHatch: 29, decoyBundle: 31 })[kind] ?? 28;
 }
 
 function DrawPropSupport(support, scale, empty) {
@@ -4652,6 +4690,11 @@ function DrawPropObject(kind, scale = 1, ghost = false) {
     context.strokeStyle = "#b9bbb0"; context.lineWidth = 4; context.beginPath(); context.moveTo(2, -15); context.lineTo(39, -21); context.stroke();
     context.fillStyle = "#4a3526"; context.beginPath(); context.moveTo(-37, -12); context.lineTo(-24, -20); context.lineTo(-17, -10); context.lineTo(-34, -3); context.closePath(); context.fill();
     context.strokeStyle = "#d0c7ac"; context.lineWidth = 2; context.beginPath(); context.moveTo(-2, -16); context.lineTo(-2, -5); context.lineTo(7, -4); context.stroke(); context.restore();
+  } else if (kind === "combatBaton") {
+    context.save(); context.rotate(-.12);
+    context.strokeStyle = "rgba(24,19,16,.72)"; context.lineWidth = 8; context.lineCap = "round"; context.beginPath(); context.moveTo(-25, -7); context.lineTo(25, -16); context.stroke();
+    context.strokeStyle = "#8a6a3f"; context.lineWidth = 4; context.beginPath(); context.moveTo(-24, -9); context.lineTo(22, -17); context.stroke();
+    context.fillStyle = "#d0a75b"; context.beginPath(); context.arc(26, -17, 3.5, 0, Math.PI * 2); context.fill(); context.restore();
   } else if (kind === "ammoBox") {
     context.fillStyle = "#554b35"; context.strokeStyle = "#bbb08d"; context.lineWidth = 2; context.fillRect(-24, -17, 48, 17); context.strokeRect(-24, -17, 48, 17);
     context.fillStyle = "#b79b58"; [-15, -5, 5, 15].forEach((x) => { context.fillRect(x - 2, -27, 4, 14); context.beginPath(); context.arc(x, -27, 2, Math.PI, 0); context.fill(); });
@@ -5213,7 +5256,7 @@ function DrawUnconsciousEnemies(width, viewportHeight, surfaceY, tunnelY) {
     const height = profile.height * 39 * scale;
     const baseY = LayerBaseY(enemy.layer || "surface", enemy.x, viewportHeight, surfaceY, tunnelY);
     DrawProneEnemyBody(enemy, width, baseY, height, 1);
-    DrawDroppedEnemyEquipment(enemy, width, baseY, height, 1);
+    if (!enemy.weaponTaken) DrawDroppedEnemyEquipment(enemy, width, baseY, height, 1);
     const bodyX = WorldToScreen(enemy.x + enemy.facing * .04, width);
     const equipmentX = WorldToScreen(enemy.x + enemy.facing * .72, width);
     const breath = .5 + Math.sin(state.elapsed * 2.4) * .5;
@@ -5228,7 +5271,8 @@ function DrawUnconsciousEnemies(width, viewportHeight, surfaceY, tunnelY) {
       context.fillStyle = "#e6d8b7"; context.font = '800 10px "FangSong", serif'; context.fillText(enemy.cause === "rifle" || enemy.cause === "blast" ? "已失去战斗力" : "已制服 · 尚有呼吸", bodyX, baseY + 54);
       context.strokeStyle = "rgba(184,63,53,.7)"; context.lineWidth = 1.2; context.beginPath(); context.moveTo(equipmentX, baseY + 8); context.lineTo(equipmentX, baseY + 27); context.stroke();
       context.fillStyle = "#b83f35"; context.beginPath(); context.arc(equipmentX, baseY + 30, 3, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#d5c397"; context.font = '700 8px "FangSong", serif'; context.fillText(enemy.ammoDrop > 0 && !enemy.lootTaken ? "E · 拾取 1 发散弹" : "武器已离手", equipmentX, baseY + 72);
+      const dropLabel = !enemy.weaponTaken ? `E · 捡起${EnemyDroppedWeaponLabel(enemy)}` : enemy.ammoDrop > 0 && !enemy.lootTaken ? "E · 拾取 1 发散弹" : "武器已收缴";
+      context.fillStyle = "#d5c397"; context.font = '700 8px "FangSong", serif'; context.fillText(dropLabel, equipmentX, baseY + 72);
     }
     context.restore();
   });
@@ -6139,8 +6183,9 @@ if (qaMode) {
       , dog: state.dog ? { x: state.dog.x, layer: state.dog.layer, commandId: state.dog.commandId, commandMode: state.dog.commandMode, progress: state.dog.progress } : null
       , distraction: state.raid.distraction ? { ...state.raid.distraction } : null
       , takedownCount: state.takedownCount, neutralizedEnemies: [...state.neutralizedEnemies], unconsciousCount: state.unconsciousEnemies.length
+      , unconsciousEnemies: state.unconsciousEnemies.map((enemy) => ({ x: enemy.x, facing: enemy.facing, layer: enemy.layer, unitType: enemy.unitType, weaponTaken: Boolean(enemy.weaponTaken), ammoDrop: enemy.ammoDrop, lootTaken: Boolean(enemy.lootTaken) }))
       , audio: audioDirector.DebugState()
-      , combat: state.combat ? { rifle: state.combat.rifle, ammo: state.combat.ammo, grenades: state.combat.grenades, health: state.combat.health, alarm: state.combat.alarm, neutralized: state.combat.neutralized, shots: state.combat.shots.length, grenadesInFlight: state.combat.grenadesInFlight.length } : null
+      , combat: state.combat ? { rifle: state.combat.rifle, ammo: state.combat.ammo, grenades: state.combat.grenades, health: state.combat.health, alarm: state.combat.alarm, neutralized: state.combat.neutralized, recoveredWeapons: state.combat.recoveredWeapons, recoveredAmmo: state.combat.recoveredAmmo, shots: state.combat.shots.length, grenadesInFlight: state.combat.grenadesInFlight.length } : null
       , enemies: GetEnemyPatrols().map((enemy) => ({ id: enemy.id, x: enemy.x, facing: enemy.facing, unitType: enemy.unitType, investigating: enemy.investigating, lureKind: enemy.lureKind, routeMin: enemy.routeMin, routeMax: enemy.routeMax }))
       , fluid: state.fluid?.GetStatistics() || null, failure: state.missionFailure
     })
