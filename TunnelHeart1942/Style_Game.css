@@ -266,7 +266,8 @@ button {
 .touchPad button {
   width: 74px; height: 74px; border: 3px solid var(--ink); border-radius: 50%;
   background: rgba(239,226,200,.92); color: var(--ink);
-  font-weight: 800; font-size: 1.15rem; letter-spacing: .02em;
+  display: grid; place-items: center;
+  padding: 0;
   box-shadow: 3px 3px 0 rgba(0,0,0,.28);
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
@@ -274,8 +275,14 @@ button {
   touch-action: manipulation;
 }
 .touchPad button.wide {
-  width: 92px; border-radius: 22px; font-size: 1.2rem;
+  width: 92px; border-radius: 22px;
 }
+.touchPad button .padIcon {
+  width: 58%; height: 58%;
+  display: block;
+  pointer-events: none;
+}
+.touchPad button.wide .padIcon { width: 52%; height: 52%; }
 .touchPad button[hidden] { display: none !important; }
 
 .modalLayer {
@@ -315,8 +322,8 @@ button {
     right: max(8px, env(safe-area-inset-right, 0px));
     gap: 10px;
   }
-  .touchPad button { width: 64px; height: 64px; font-size: 1.05rem; }
-  .touchPad button.wide { width: 78px; font-size: 1.1rem; }
+  .touchPad button { width: 64px; height: 64px; }
+  .touchPad button.wide { width: 78px; }
   .touchPad .cluster { gap: 8px; max-width: min(58vw, 320px); }
   .touchPad .cluster.actions { gap: 8px; }
   .heldSlot { max-width: min(220px, 38vw); top: max(4%, env(safe-area-inset-top, 0px)); }

@@ -1008,7 +1008,7 @@ function TryInteract(state) {
         return;
       }
       // Planting is F / use — nudge player
-      SetBubble(state, ["charge"], "按 F 安放", 1.4);
+      SetBubble(state, ["charge"], "开火键安放", 1.4);
       return;
     }
 
@@ -1355,22 +1355,22 @@ export function GoalsRemaining(state) {
 export function NextStepText(state) {
   const g = state.goalsDone;
   if (state.chapterId === "act1_connect") {
-    if (!g.talk_laozhong) return "找高老忠交谈（E）";
-    if (!g.talk_linxia) return "找林霞交谈（E）";
-    if (state.player.held !== ITEM_SHOVEL) return "去井边捡铁锹（E）";
-    if (!g.enter_hatch) return "带着铁锹到地窖口按 E 下洞";
-    if (!g.link_ab) return "顺着蓝线走到格旁，点 J 挖通甲—乙";
-    if (!g.link_bc) return "继续沿蓝线点 J，挖通乙—丙";
+    if (!g.talk_laozhong) return "找高老忠交谈";
+    if (!g.talk_linxia) return "找林霞交谈";
+    if (state.player.held !== ITEM_SHOVEL) return "去井边捡铁锹";
+    if (!g.enter_hatch) return "带着铁锹到地窖口下洞";
+    if (!g.link_ab) return "顺着蓝线走到格旁，点挖掘键挖通甲—乙";
+    if (!g.link_bc) return "继续沿蓝线点挖掘键，挖通乙—丙";
     return "三家已通";
   }
   if (state.chapterId === "act5_street_hunt") {
-    if (!g.talk_street) return "听林霞交代（E）";
+    if (!g.talk_street) return "听林霞交代";
     if (!g.clear_street) {
       if ((state.player.ammo || 0) <= 0 && state.player.held !== ITEM_RIFLE) {
-        return "捡枪/弹药，或绕到敌人背后 E 击晕";
+        return "捡枪/弹药，或绕到敌人背后击晕";
       }
-      if ((state.player.ammo || 0) <= 0) return "没子弹了：捡弹药，或背后 E 击晕";
-      return "清街：开镜F开枪 / 扔手雷 / 背后E击晕（别让人看见尸体）";
+      if ((state.player.ammo || 0) <= 0) return "没子弹了：捡弹药，或背后击晕";
+      return "清街：开镜开枪 / 扔手雷 / 背后击晕（别让人看见尸体）";
     }
     return "街道已清";
   }

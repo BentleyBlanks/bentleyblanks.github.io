@@ -31,6 +31,7 @@ import {
   ITEM_SHOVEL,
 } from "./Script_Items.mjs";
 import { DrawPuppet, PaletteForSpeaker, PickClip } from "./Script_Puppet.mjs";
+import { PAD_ICON } from "./Script_PadIcons.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -107,6 +108,18 @@ function SyncPanels() {
   $("PanelCard").dataset.mood = beat.mood || "talk";
 }
 
+function PaintTouchPadIcons() {
+  for (const btn of document.querySelectorAll(".touchPad [data-touch]")) {
+    const kind = btn.getAttribute("data-touch");
+    if (kind === "aim") continue; // SyncHud swaps aim / up
+    const svg = PAD_ICON[kind];
+    if (svg && !btn.dataset.iconReady) {
+      btn.innerHTML = svg;
+      btn.dataset.iconReady = "1";
+    }
+  }
+}
+
 function SyncHud() {
   $("HeartRow").innerHTML = [0, 1, 2]
     .map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`)
@@ -119,16 +132,16 @@ function SyncHud() {
   const tutorialDig =
     !!state.level?.tutorialPlan && state.player.inTunnel && held === ITEM_SHOVEL && !state.designMode;
   if (state.designMode) {
-    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>光标移格 · J 标记 · T 厢室 · C 巷道 · R 退出</em>`;
+    slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>移格标记 · 蹲+挖=厢室 · 开火键=巷道</em>`;
   } else if (held === ITEM_RIFLE) {
-    const ads = state.player.aiming ? "开镜中" : "按住瞄/Shift 开镜";
-    slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>F 开枪 · ${ads}</em>`;
+    const ads = state.player.aiming ? "开镜中" : "按住瞄准键开镜";
+    slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>开火键开枪 · ${ads}</em>`;
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${
-          tutorialDig ? "顺着蓝线走到格旁，点 J 开挖" : `${meta.tip} · R 设计地道`
+          tutorialDig ? "顺着蓝线走到格旁，点挖掘键开挖" : meta.tip
         }</em>`
-      : `<b></b><span>空手</span><em>E 捡道具 · 背后靠近敌人可 E 击晕</em>`;
+      : `<b></b><span>空手</span><em>走近捡道具 · 绕到背后可击晕</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }
   const badge = $("DesignBadge");
@@ -151,8 +164,13 @@ function SyncHud() {
   if (touchAim) {
     const showAim = state.phase === "play" && (held === ITEM_RIFLE || state.designMode);
     touchAim.hidden = !showAim;
-    touchAim.textContent = state.designMode ? "↑" : "瞄";
+    const aimIcon = state.designMode ? PAD_ICON.up : PAD_ICON.aim;
+    if (touchAim.dataset.aimMode !== (state.designMode ? "up" : "aim")) {
+      touchAim.innerHTML = aimIcon;
+      touchAim.dataset.aimMode = state.designMode ? "up" : "aim";
+    }
     touchAim.setAttribute("aria-label", state.designMode ? "上移光标" : "开镜");
+    touchAim.title = state.designMode ? "上移光标" : "开镜";
   }
 }
 
@@ -760,7 +778,8 @@ function DrawComicSpeechBubble(sub) {
     textW = Math.max(textW, ctx.measureText(sub.speaker).width);
   }
   const boxW = Math.max(72 * s, Math.min(maxInner, textW + padX * 2));
-  const boxH = padY * 2 + nameH + lines.length * lineH + 14 * s;
+  const iconHint = 16 * s;
+  const boxH = padY * 2 + nameH + lines.length * lineH + iconHint + 4 * s;
   let bx = anchor.x - boxW / 2;
   const screenW = canvas.clientWidth || innerWidth;
   bx = Math.max(8, Math.min(screenW - boxW - 8, bx));
@@ -802,10 +821,8 @@ function DrawComicSpeechBubble(sub) {
     ctx.fillText(ln, bx + padX, ty);
     ty += lineH;
   }
-  ctx.fillStyle = "rgba(26,20,16,.45)";
-  ctx.font = `600 ${Math.max(10, 11 * s)}px IBM Plex Sans, sans-serif`;
-  ctx.textAlign = "right";
-  ctx.fillText(state.activeTalkId ? "E 继续" : "E 关闭", bx + boxW - padX, by + boxH - 12 * s);
+  // Advance hint = talk pictogram (never a keyboard letter)
+  DrawPictogram("talk", bx + boxW - padX - iconHint, by + boxH - padY - iconHint + 2 * s, iconHint);
   ctx.restore();
 }
 
@@ -841,10 +858,7 @@ function DrawDialogueBanner() {
     ctx.fillText(line, x + 16, ly);
     ly += 20;
   }
-  ctx.fillStyle = "rgba(239,226,200,.55)";
-  ctx.font = "600 12px IBM Plex Sans, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(state.designMode ? "R 退出设计" : "E 继续", x + boxW - 14, y + 76);
+  DrawPictogram(state.designMode ? "hatch" : "talk", x + boxW - 30, y + 68, 16);
   ctx.restore();
 }
 
@@ -1275,28 +1289,10 @@ function DrawInteractPromptWorld() {
   const s = Scale();
   const x = WX(state.player.x);
   const y = WY(state.player.y) - 8 * s;
-  const key =
-    hint === "dig" || hint === "design" || hint === "need_plan" || hint === "follow_plan"
-      ? hint === "design"
-        ? "J"
-        : hint === "need_plan"
-          ? "R"
-          : hint === "follow_plan"
-            ? "→"
-            : "J"
-      : hint === "plant_zone" && state.player.held === ITEM_CHARGE
-        ? "F"
-        : hint === "shoot" || hint === "ads"
-          ? "F"
-          : hint === "stealth_ko"
-            ? "E"
-            : hint === "need_ammo" || hint === "need_shovel"
-              ? "E"
-              : "E";
   const icon =
     hint === "dig" || hint === "need_shovel" || hint === "pickup" || hint === "follow_plan"
       ? "shovel"
-      : hint === "hatch"
+      : hint === "hatch" || hint === "design" || hint === "need_plan"
         ? "hatch"
         : hint === "bell"
           ? "bell"
@@ -1311,29 +1307,34 @@ function DrawInteractPromptWorld() {
                   : hint === "plant_zone" || hint === "signal"
                     ? "charge"
                     : "talk";
-  // VH floating key circle
+  // Icon-only float — never keyboard letters (E/J/F)
+  const ix = x + 22 * s;
+  const iy = y - 56 * s;
+  const size = 22 * s;
   ctx.save();
   ctx.fillStyle = "#efe2c8";
   ctx.strokeStyle = "#1a1410";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(x + 28 * s, y - 36 * s, 14 * s, 0, Math.PI * 2);
+  if (typeof ctx.roundRect === "function") ctx.roundRect(ix - 4 * s, iy - 4 * s, size + 8 * s, size + 8 * s, 4 * s);
+  else ctx.rect(ix - 4 * s, iy - 4 * s, size + 8 * s, size + 8 * s);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#1a1410";
-  ctx.font = `700 ${12 * s}px IBM Plex Sans, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(key, x + 28 * s, y - 36 * s);
-  DrawPictogram(icon, x + 40 * s, y - 52 * s, 18 * s);
+  DrawPictogram(icon, ix, iy, size);
   if (hint === "need_shovel" || hint === "need_ammo" || hint === "stealth_ko") {
-    DrawPictogram("warn", x + 58 * s, y - 52 * s, 14 * s);
+    DrawPictogram("warn", ix + size + 4 * s, iy + 2 * s, 14 * s);
   }
   if (hint === "dig" && state.player.digging) {
     ctx.strokeStyle = "#a6452f";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(x + 28 * s, y - 36 * s, 16 * s, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.player.digProgress);
+    ctx.arc(
+      ix + size / 2,
+      iy + size / 2,
+      size * 0.72,
+      -Math.PI / 2,
+      -Math.PI / 2 + Math.PI * 2 * state.player.digProgress,
+    );
     ctx.stroke();
   }
   ctx.restore();
@@ -1769,6 +1770,7 @@ function Frame(ts) {
 async function Main() {
   Resize();
   window.addEventListener("resize", Resize);
+  PaintTouchPadIcons();
   BindInput();
   BindUi();
   SyncPhaseUi();

@@ -229,13 +229,19 @@ function TestAct1TutorialPlayable() {
   Assert(html.includes('data-touch="interact"'), "mobile interact button");
   Assert(html.includes('data-touch="use"'), "mobile use/fire button");
   Assert(html.includes('id="TouchAim"'), "mobile aim key (contextual)");
-  Assert(!html.includes('data-touch="corridor"'), "corridor merged into 开火 in design");
-  Assert(!html.includes('data-touch="chamber"'), "chamber merged into 蹲+挖 in design");
+  Assert(!html.includes('data-touch="corridor"'), "corridor merged into use/fire in design");
+  Assert(!html.includes('data-touch="chamber"'), "chamber merged into crouch+dig in design");
   Assert(html.includes('id="StepHint"'), "step hint");
+  const padHtml = html.slice(html.indexOf('class="touchPad"'), html.indexOf("ModalLayer"));
+  Assert(!/>互动</.test(padHtml) && !/>开火</.test(padHtml) && !/>挖</.test(padHtml), "pad buttons are not Chinese text labels");
+  Assert(!/>蹲</.test(padHtml) && !/>瞄</.test(padHtml) && !/>设计</.test(padHtml), "pad buttons have no text glyphs");
+  const padIcons = readFileSync(join(here, "Script_PadIcons.mjs"), "utf8");
+  Assert(padIcons.includes("ICON_TALK") && padIcons.includes("ICON_SHOT") && padIcons.includes("ICON_SHOVEL"), "pad icons match game pictograms");
   const css = readFileSync(join(here, "Style_Game.css"), "utf8");
   Assert(css.includes("pointer: coarse"), "touch pad shows on coarse/touch devices");
   Assert(css.includes("(orientation: landscape) and (max-height: 520px)"), "landscape mobile pad layout");
   Assert(/width:\s*74px/.test(css), "touch keys are large");
+  Assert(css.includes(".padIcon"), "pad icon sizing");
 }
 
 function TestNaiveAct1Bot() {
@@ -627,6 +633,10 @@ function Main() {
   Assert(html.includes('class="cluster actions"'), "consolidated action cluster");
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");
   Assert(gameSrc.includes("Idle patrol: bare puppet only") || gameSrc.includes("on demand"), "enemy head HUD is on-demand");
+  Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with SVG icons");
+  Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
+  Assert(!gameSrc.includes("E 继续") && !gameSrc.includes("E 关闭"), "no keyboard-letter dialogue hints");
+  Assert(!/（E）/.test(NextStepText(Play(0))), "step hint has no (E) key letter");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);

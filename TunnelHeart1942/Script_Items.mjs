@@ -13,31 +13,31 @@ export const ITEM_META = {
     id: ITEM_SHOVEL,
     label: "铁锹",
     color: "#8a7355",
-    tip: "R 设计蓝图，点 J 开挖已标记格",
+    tip: "设计键画蓝图，挖掘键挖已标记格",
   },
   [ITEM_GRENADE]: {
     id: ITEM_GRENADE,
     label: "土制手雷",
     color: "#5a6a3a",
-    tip: "投掷：按 F 朝面朝方向扔出",
+    tip: "开火键朝面朝方向扔出",
   },
   [ITEM_CHARGE]: {
     id: ITEM_CHARGE,
     label: "炸药包",
     color: "#4a3a2a",
-    tip: "安放：在敌据点旁按 F",
+    tip: "到药室用开火键安放",
   },
   [ITEM_RIFLE]: {
     id: ITEM_RIFLE,
     label: "步枪",
     color: "#4a4030",
-    tip: "F 开枪 · 按住 瞄/Shift 开镜 · 子弹很少",
+    tip: "开火键开枪 · 按住瞄准键开镜 · 子弹很少",
   },
   [ITEM_AMMO]: {
     id: ITEM_AMMO,
     label: "子弹",
     color: "#6a5a30",
-    tip: "走近按 E 装进弹袋",
+    tip: "走近装进弹袋",
   },
 };
 
@@ -62,7 +62,7 @@ export function ItemLabel(held) {
 }
 
 export function ItemTip(held) {
-  return held && ITEM_META[held] ? ITEM_META[held].tip : "地上有道具就走近按 E 捡起";
+  return held && ITEM_META[held] ? ITEM_META[held].tip : "地上有道具就走近捡起";
 }
 
 /** Spawn a world pickup entity. */

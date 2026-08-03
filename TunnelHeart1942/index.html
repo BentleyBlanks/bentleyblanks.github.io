@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803f">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803g">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -81,7 +81,7 @@
         <button id="PauseButton" class="pauseButton" type="button" aria-label="暂停">Ⅱ</button>
       </div>
       <div id="HeldSlot" class="heldSlot" data-empty="1" aria-label="手持道具">
-        <b></b><span>空手</span><em>走近地上的道具按 E 捡起</em>
+        <b></b><span>空手</span><em>走近地上的道具捡起</em>
       </div>
       <div id="DesignBadge" class="designBadge" hidden>设计蓝图中</div>
       <div id="AdsBadge" class="adsBadge" hidden>开镜</div>
@@ -90,16 +90,16 @@
 
       <div class="touchPad" aria-label="触屏操作">
         <div class="cluster move">
-          <button type="button" data-touch="left" aria-label="左移">◀</button>
-          <button type="button" data-touch="right" aria-label="右移">▶</button>
+          <button type="button" data-touch="left" aria-label="左移" title="左移"></button>
+          <button type="button" data-touch="right" aria-label="右移" title="右移"></button>
         </div>
         <div class="cluster actions">
-          <button type="button" data-touch="crouch" aria-label="蹲下">蹲</button>
-          <button type="button" id="TouchAim" data-touch="aim" aria-label="开镜" hidden>瞄</button>
-          <button type="button" class="wide" data-touch="interact" aria-label="互动">互动</button>
-          <button type="button" class="wide" data-touch="use" aria-label="开火">开火</button>
-          <button type="button" class="wide" data-touch="dig" aria-label="挖掘">挖</button>
-          <button type="button" data-touch="design" aria-label="设计">设计</button>
+          <button type="button" data-touch="crouch" aria-label="蹲下" title="蹲下"></button>
+          <button type="button" id="TouchAim" data-touch="aim" aria-label="开镜" title="开镜" hidden></button>
+          <button type="button" class="wide" data-touch="interact" aria-label="交谈 / 互动" title="交谈 / 互动"></button>
+          <button type="button" class="wide" data-touch="use" aria-label="开火" title="开火"></button>
+          <button type="button" class="wide" data-touch="dig" aria-label="挖掘" title="挖掘"></button>
+          <button type="button" data-touch="design" aria-label="设计蓝图" title="设计蓝图"></button>
         </div>
       </div>
     </section>
@@ -140,6 +140,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803f"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803g"></script>
 </body>
 </html>

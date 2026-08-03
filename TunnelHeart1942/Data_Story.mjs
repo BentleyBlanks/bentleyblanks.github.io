@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v6";
-export const CACHE_BUST = "20260803f";
+export const CACHE_BUST = "20260803g";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -215,7 +215,7 @@ export const CHAPTERS = [
       {
         id: "p5c",
         speaker: "目标",
-        text: "F 开枪（按住瞄/Shift 开镜）· F 扔手雷 · 背后靠近 E 击晕。清光街道。",
+        text: "开镜开枪 · 扔手雷 · 绕到背后击晕。清光街道。子弹很紧，别浪。",
         mood: "tip",
       },
     ],
