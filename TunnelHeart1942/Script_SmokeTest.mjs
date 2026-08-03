@@ -6,7 +6,7 @@ import { AIR, GetCell, RebuildTunnelSolids, SetCell, SOFT, WorldToCell } from ".
 import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, PickExcavateTarget, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
-import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
+import { AirConnected, BuildLevel, EvalDigGoals, VIEW_H } from "./Script_World.mjs";
 import {
   AdvancePanels,
   CanMeleeReach,
@@ -24,6 +24,7 @@ import {
   MELEE_DURATION,
   MELEE_IMPACT_AT,
   NextStepText,
+  PlayViewHeight,
   RespawnPlayer,
   RestartChapterToPlay,
   SampleGrenadeArc,
@@ -1434,6 +1435,26 @@ function TestPuppetAnim() {
   Assert(rules.includes("DIG_SWING_DURATION") && rules.includes("SpawnDigImpactFx"), "rules spawn dig impact FX");
 }
 
+function TestTunnelViewFraming() {
+  const surface = Play(0);
+  Assert(PlayViewHeight(surface) === VIEW_H, "surface keeps default VIEW_H");
+  const tun = Play(0);
+  tun.player.inTunnel = true;
+  tun.player.y = tun.level.tunnelFloor || 300;
+  const vh = PlayViewHeight(tun);
+  Assert(vh < VIEW_H, "tunnel tightens virtual view height");
+  const soil = tun.level.soil;
+  const band = soil.rows * soil.cell;
+  Assert(vh >= band, "tunnel view at least covers dig band height");
+  Assert(vh <= band + 140, "tunnel view stays close to dig band (no half-empty PC frame)");
+  // Camera must not leave a huge empty soil slab under the dig floor.
+  for (let i = 0; i < 45; i++) StepPlay(tun, 1 / 30);
+  const digBot = soil.originY + soil.rows * soil.cell;
+  const viewBot = tun.cameraY + vh;
+  Assert(viewBot <= digBot + 48, "tunnel camera bottom hugs dig floor");
+  Assert(tun.cameraY <= soil.originY, "tunnel camera keeps dig band from the top");
+}
+
 function Main() {
   TestChaptersHaveSoil();
   TestStoryBeats();
@@ -1447,6 +1468,7 @@ function Main() {
   TestDigUpPastHeadroom();
   TestClimbShaftToSurface();
   TestPlayCutawayRender();
+  TestTunnelViewFraming();
   TestClimbShaftUndergroundMarker();
   TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();

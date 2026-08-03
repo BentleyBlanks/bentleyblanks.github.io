@@ -13,6 +13,7 @@ import {
   EnemyFaction,
   MELEE_DURATION,
   NextStepText,
+  PlayViewHeight,
   PLAYER_H,
   RestartChapter,
   RestartChapterToPlay,
@@ -506,7 +507,8 @@ function Resize() {
 
 /** Map world → screen with camera; +y is down; SURFACE_Y(0) is ground top. */
 function Scale() {
-  return (canvas.clientHeight || innerHeight) / VIEW_H;
+  const viewH = state ? PlayViewHeight(state) : VIEW_H;
+  return (canvas.clientHeight || innerHeight) / viewH;
 }
 
 /** Actual world units visible horizontally — canvas aspect often wider than VIEW_W. */

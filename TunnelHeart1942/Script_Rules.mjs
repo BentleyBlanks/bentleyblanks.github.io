@@ -35,7 +35,16 @@ import {
   ITEM_SHOVEL,
   PickupEntity,
 } from "./Script_Items.mjs";
-import { BuildLevel, EvalDigGoals, SURFACE_Y, VIEW_W } from "./Script_World.mjs";
+import {
+  BuildLevel,
+  CELL,
+  DIG_ORIGIN_Y,
+  DIG_ROWS,
+  EvalDigGoals,
+  SURFACE_Y,
+  VIEW_H,
+  VIEW_W,
+} from "./Script_World.mjs";
 
 export const PLAYER_W = 26;
 export const PLAYER_H = 48;
@@ -1403,12 +1412,38 @@ function ResolveSafePose(state) {
   return { x, y, tunnel };
 }
 
+/**
+ * Virtual world height for play framing.
+ * Underground: tighten around the dig band so tall PC windows don't leave a dead lower half of empty soil.
+ */
+export function PlayViewHeight(state) {
+  if (!state?.player?.inTunnel || !state.level?.soil) return VIEW_H;
+  const soil = state.level.soil;
+  const band = (soil.rows || DIG_ROWS) * (soil.cell || CELL);
+  // Dig band (~320) + short surface lip / floor cushion — well under VIEW_H (540).
+  return Math.min(VIEW_H, Math.max(360, band + 96));
+}
+
+/** Vertical camera target while underground — keep dig band filling the frame. */
+function TunnelCameraTargetY(state) {
+  const { player, level } = state;
+  const soil = level.soil;
+  const viewH = PlayViewHeight(state);
+  if (!soil) return player.y - viewH * 0.48;
+  const digBot = (soil.originY ?? DIG_ORIGIN_Y) + soil.rows * soil.cell;
+  let targetY = player.y - viewH * 0.42;
+  const minY = SURFACE_Y - 52;
+  const maxY = Math.max(minY, digBot - viewH + 20);
+  return Math.max(minY, Math.min(maxY, targetY));
+}
+
 /** Snap camera onto the player after a forced warp. */
 function SnapCameraToPlayer(state) {
   const { player, level } = state;
   const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
   state.cameraX = Math.max(0, Math.min((level.width || 2400) - viewW, player.x - viewW * 0.35));
-  state.cameraY = player.inTunnel ? (level.tunnelFloor || 0) - 300 : SURFACE_Y - 220;
+  if (player.inTunnel) state.cameraY = TunnelCameraTargetY(state);
+  else state.cameraY = level.soil ? SURFACE_Y - 220 : SURFACE_Y - 360;
 }
 
 /** On non-lethal hurt: yank back to the last safe stand so kill-zones don't softlock. */
@@ -1777,6 +1812,8 @@ function FinishHatch(state) {
   }
   state.player.vy = 0;
   state.player.onGround = true;
+  // Snap framing immediately — tunnel zoom must not lerp through a half-empty screen.
+  SnapCameraToPlayer(state);
   SetBubble(state, goingDown ? ["hatch", "shovel"] : ["hatch"], "", 1.6);
 }
 
@@ -2244,9 +2281,9 @@ function UpdateCamera(state, dt) {
   const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
   const targetX = player.x - viewW * 0.38;
   state.cameraX += (Math.max(0, Math.min(level.width - viewW, targetX)) - state.cameraX) * Math.min(1, dt * 6);
-  // Cutaway play shows dig under the lip — keep more of the soil band on screen.
+  // Underground: frame dig band (see PlayViewHeight). Surface cutaway keeps the VH lip.
   const targetY = player.inTunnel
-    ? player.y - 280
+    ? TunnelCameraTargetY(state)
     : level.soil
       ? SURFACE_Y - 220
       : SURFACE_Y - 360;
