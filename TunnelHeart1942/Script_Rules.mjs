@@ -924,19 +924,24 @@ export function StepPlay(state, dt) {
   return state;
 }
 
+function OpenPhaseFor(chapter) {
+  return chapter.openPanels?.length ? "panels" : "play";
+}
+
 export function AdvancePanels(state) {
   if (state.phase === "prologue") {
     if (state.panelIndex < PROLOGUE_PANELS.length - 1) {
       state.panelIndex += 1;
       return state;
     }
-    state.phase = "panels";
+    // Act1 open is empty on purpose — prologue already covered 背景/困难/目标.
+    state.phase = OpenPhaseFor(CHAPTERS[state.chapterIndex]);
     state.panelIndex = 0;
     return state;
   }
   const chapter = CHAPTERS[state.chapterIndex];
   const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
-  if (state.panelIndex < list.length - 1) {
+  if (list.length && state.panelIndex < list.length - 1) {
     state.panelIndex += 1;
     return state;
   }
@@ -949,14 +954,14 @@ export function AdvancePanels(state) {
     return state;
   }
   const next = CreateCampaignState(state.chapterIndex + 1, { unlockedActs: state.unlockedActs });
-  next.phase = "panels";
+  next.phase = OpenPhaseFor(CHAPTERS[next.chapterIndex]);
   next.panelIndex = 0;
   return next;
 }
 
 export function RestartChapter(state) {
   const next = CreateCampaignState(state.chapterIndex, { unlockedActs: state.unlockedActs });
-  next.phase = "panels";
+  next.phase = OpenPhaseFor(CHAPTERS[next.chapterIndex]);
   return next;
 }
 

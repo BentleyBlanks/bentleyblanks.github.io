@@ -8,6 +8,7 @@ import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Scrip
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
+  AdvancePanels,
   CreateCampaignState,
   DebugCarvePath,
   DebugCompleteGoal,
@@ -51,9 +52,20 @@ function HatchDown(state, id) {
 }
 
 function TestStoryBeats() {
-  Assert(PROLOGUE_PANELS.length >= 7, "prologue opening denser");
-  Assert(CHAPTERS.every((c) => c.openPanels.length >= 6), "acts have rich open panels");
-  Assert(CHAPTERS.every((c) => c.closePanels.length >= 4), "acts have denser close panels");
+  Assert(PROLOGUE_PANELS.length === 3, "prologue is 背景/困难/目标 only");
+  Assert(
+    PROLOGUE_PANELS.map((p) => p.speaker).join("/") === "背景/困难/目标",
+    "prologue speakers plain",
+  );
+  Assert(CHAPTERS[0].openPanels.length === 0, "act1 skips second slideshow");
+  Assert(
+    CHAPTERS.slice(1).every((c) => c.openPanels.length === 3),
+    "later acts open in 3 beats",
+  );
+  Assert(
+    CHAPTERS.every((c) => c.closePanels.length >= 1 && c.closePanels.length <= 2),
+    "closes stay short",
+  );
   Assert(CHAPTERS[0].goals.includes("talk_linxia"), "act1 linxia talk");
   Assert(
     CHAPTERS.some((c) => c.openPanels.some((p) => p.speaker === "山田")),
@@ -66,6 +78,14 @@ function TestStoryBeats() {
   const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
   Assert(rules.includes("QueueSubtitles"), "bell martyrdom subtitle queue");
   Assert(rules.includes("手榴弹的火光吞没钟架"), "martyrdom line staged in play");
+
+  let s = CreateCampaignState(0);
+  s.phase = "prologue";
+  s.panelIndex = 0;
+  AdvancePanels(s);
+  AdvancePanels(s);
+  AdvancePanels(s);
+  Assert(s.phase === "play", "after 3 prologue clicks → play (no second slideshow)");
 }
 
 function TestSoilNotGifted() {

@@ -88,6 +88,7 @@ function SyncPanels() {
       ? chapter.openPanels
       : chapter.closePanels;
   const beat = list[state.panelIndex];
+  if (!beat) return;
   $("PanelKicker").textContent = isPrologue ? "开场" : `第 ${chapter.act} 页`;
   $("PanelTitle").textContent = isPrologue ? "高家庄" : chapter.title;
   $("PanelSpeaker").textContent = beat.speaker;
