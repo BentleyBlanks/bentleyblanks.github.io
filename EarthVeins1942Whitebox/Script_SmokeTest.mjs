@@ -167,6 +167,9 @@ Assert(game.includes("GetEnemyPatrols") && game.includes("GetDetectionStrength")
 Assert(data.includes("这三根没受潮。你扶棚") && data.includes("别挤在同一片空地") && data.includes("他们看见西院痕迹了") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
 Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
 Assert(css.includes("Minimal narrative HUD") && css.includes("#touchControls { display: none; }") && css.includes(".metricIcon"), "极简叙事 HUD 或桌面端触控隐藏规则缺失");
+Assert(html.includes('id="hudRoleGlyph"') && html.includes('id="hudRoleName"') && html.includes('id="hudRoleSkill"') && html.includes('class="hudTaskStrip"'), "HUD 缺少角色身份牌或独立任务签");
+Assert(game.includes("ui.hudRoleGlyph.textContent = selectedProfile.mark") && game.includes("ui.hudRoleName.textContent = selectedRole.name") && game.includes("ui.hudRoleSkill.textContent = selectedRole.skill"), "HUD 没有随角色切换同步身份与能力");
+Assert(css.includes("Playable HUD: one identity plate") && css.includes(".hudIdentityPlate") && css.includes(".hudTaskStrip") && css.includes("#interactionPrompt kbd") && css.includes("background: rgba(238,222,188,.97)"), "HUD 未形成装备牌、任务签和可读交互提示的一致视觉语言");
 Assert(html.includes('id="qaPanel"') && html.includes('id="qaPhaseButtons"') && game.includes("QaJumpToPhase") && game.includes("jumpToPhase"), "DEBUG 跳关面板或阶段跳转 API 缺失");
 Assert(game.includes('if (state.mode === "title") { Show(ui.qaPanel, false); return; }'), "标题页仍显示青灰 DEBUG 面板，破坏连环画玩家向版式");
 Assert(game.includes('Object.assign(state.resources, { wood: 6, iron: 4, powder: 2, medicine: 1, grain: 2 })') && game.includes('state.buildSlots = ["floodGate", "flipGate", "smokeBaffle"]') && game.includes('state.excavated = new Set(["west", "center", "east"])'), "DEBUG 跳关没有补齐夜间收集、挖掘或建造前置状态");
@@ -230,9 +233,9 @@ Assert(game.indexOf("DrawLighting(width, height, surfaceY, tunnelY, daylight)") 
 Assert(game.includes('daylight > .4 ? \"rgba(103,72,37,.06)\" : \"rgba(91,56,35,.1)\"') && game.includes("daylight > .4 ? .34 : .29") && game.includes('rgba(31,24,19,.045)'), "lianhuanhua print treatment must remain restrained enough to preserve gameplay silhouettes");
 Assert(game.includes('if (!state.qaPatrolReview || state.player.layer !== "surface"') && game.includes("for (let lane = -6; lane <= 6; lane += 1)") && game.includes("for (let row = 0; row < 4; row += 1)"), "patrol rulers and field construction lines must not clutter normal play");
 Assert(game.includes("for (let cloud = 0; cloud < 4; cloud += 1)") && game.includes("for (let arc = 0; arc < 4; arc += 1)") && game.includes("for (let shard = 0; shard < 6; shard += 1)"), "blast effects must use a few open gestures instead of dense closed rings and debris noise");
-Assert(css.includes("Visual hierarchy pass") && css.includes("rgba(34,29,24,.66)") && css.includes("#roleButtons button:not(.active)"), "persistent HUD must be visually subordinate to the player and focused target");
-Assert(css.includes("Portrait phones keep identity and interaction UI in the sky band") && css.includes("#roleDock { top: 128px; bottom: auto") && css.includes("#civilianCommandPanel { top: 184px"), "portrait-phone HUD must stay above the tunnel playfield instead of covering villagers and props");
-Assert(css.includes("#interactionPrompt { top: 170px; bottom: auto") && css.includes("#roleDock:not([hidden]) ~ #interactionPrompt { top: 170px; bottom: auto"), "desktop interaction prompt must stay in the upper safe band instead of covering actors and props");
+Assert(css.includes("Playable HUD: one identity plate") && css.includes("background: rgba(238,222,188,.97)") && css.includes("box-shadow: 4px 4px 0 rgba(21,16,12,.34)"), "persistent HUD must read as a deliberate paper-and-ink game interface rather than translucent debug text");
+Assert(css.includes("#roleDock, #roleDock.defenseDock { top: 226px") && css.includes("#civilianCommandPanel { top: 272px"), "portrait-phone HUD must stay above the tunnel playfield instead of covering villagers and props");
+Assert(css.includes("#roleDock:not([hidden]) ~ #interactionPrompt") && css.includes("bottom: 76px") && css.includes("width: 46px"), "desktop interaction prompt must be a readable bottom-center control plate instead of a tiny floating label");
 
 const forbiddenRuntime = [/three(?:\.min)?\.js/i, /<img\b/i, /new\s+Image\s*\(/, /AudioContext/i, /https?:\/\//i];
 for (const pattern of forbiddenRuntime) {

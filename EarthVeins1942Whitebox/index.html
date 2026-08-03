@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#11171b">
   <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法与屋脊战斗白盒">
   <title>地脉：三个循环 + 屋脊战 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zv">
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zw">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -65,13 +65,23 @@
     <header id="gameHeader" hidden>
       <div class="levelStamp"><small id="levelNumber"></small><span id="levelName"></span></div>
       <div id="phaseStrip" class="phaseStrip" aria-label="循环阶段"></div>
-      <button id="menuButton" class="headerButton" type="button">关卡</button>
+      <button id="menuButton" class="headerButton" type="button" aria-label="打开关卡菜单" title="关卡菜单">关</button>
     </header>
 
-    <aside id="objectiveCard" hidden>
-      <small id="phaseLabel">当前阶段</small>
-      <p id="objectiveText"></p>
-      <span id="objectiveHint"></span>
+    <aside id="objectiveCard" aria-label="角色与当前任务" aria-live="polite" hidden>
+      <div class="hudIdentityPlate">
+        <b id="hudRoleGlyph" class="hudRoleGlyph" aria-hidden="true">领</b>
+        <div class="hudIdentityCopy">
+          <small id="phaseLabel">当前阶段</small>
+          <strong id="hudRoleName">传宝</strong>
+          <em id="hudRoleSkill">调度群众 / 诱敌封闸</em>
+        </div>
+      </div>
+      <div class="hudTaskStrip">
+        <small>当前目标</small>
+        <p id="objectiveText"></p>
+        <span id="objectiveHint"></span>
+      </div>
     </aside>
 
     <aside id="metricsPanel" hidden aria-live="polite"></aside>
@@ -172,6 +182,6 @@
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803zv"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803zw"></script>
 </body>
 </html>

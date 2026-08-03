@@ -569,36 +569,323 @@ h1 small { color: #bd553f; }
   #civilianCommandPanel { top: 184px; right: 8px; bottom: auto; }
 }
 
-/* Visual hierarchy pass: quiet persistent chrome so the stage owns the first read. */
+/* Playable HUD: one identity plate, one task strip, one compact status board. */
 #objectiveCard {
-  max-width: min(420px, 47vw);
-  padding: 6px 12px 7px 13px;
-  background: linear-gradient(90deg, rgba(220,205,174,.82), rgba(220,205,174,.46) 76%, transparent);
-  border-left-width: 2px;
-  filter: drop-shadow(1px 2px 0 rgba(31,23,17,.28));
+  top: 62px;
+  left: 16px;
+  width: min(330px, 42vw);
+  max-width: none;
+  padding: 0;
+  color: #2b241c;
+  background: transparent;
+  border: 0;
+  filter: none;
+  box-shadow: none;
 }
-#objectiveCard small { opacity: .72; }
-#objectiveCard p { margin-block: 3px; font-size: clamp(11px, 1.05vw, 14px); }
-#objectiveCard span { opacity: .72; }
-#metricsPanel { gap: 5px; }
+.hudIdentityPlate {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 68px;
+  padding: 8px 11px;
+  background: rgba(238,222,188,.97);
+  border: 2px solid #2c241d;
+  box-shadow: 4px 4px 0 rgba(21,16,12,.34);
+}
+.hudRoleGlyph {
+  position: relative;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: end center;
+  overflow: hidden;
+  color: #f7ead0;
+  font: 900 10px/1 system-ui, sans-serif;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--hud-role) 72%, #f4e4c3), var(--hud-role));
+  border: 2px solid #2e251d;
+  box-shadow: inset 0 -14px 0 color-mix(in srgb, var(--hud-accent) 76%, transparent);
+}
+.hudRoleGlyph::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  background: #d8a37c;
+  border: 1.5px solid #37281f;
+  border-radius: 50%;
+  box-shadow: 0 13px 0 7px var(--hud-role);
+}
+.hudRoleGlyph::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 18px;
+  height: 18px;
+  background: var(--hud-accent);
+  border: 2px solid #2e251d;
+  transform: rotate(45deg);
+}
+.hudIdentityCopy { min-width: 0; }
+#objectiveCard .hudIdentityCopy small {
+  display: block;
+  margin-bottom: 3px;
+  color: #9e4135;
+  font: 900 8px/1 system-ui, sans-serif;
+  letter-spacing: .13em;
+  opacity: 1;
+}
+.hudIdentityCopy strong {
+  display: block;
+  overflow: hidden;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 17px;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hudIdentityCopy em {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: rgba(49,40,31,.72);
+  font: 700 9px/1.25 system-ui, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hudTaskStrip {
+  width: calc(100% - 20px);
+  margin-top: -2px;
+  padding: 7px 10px 8px;
+  color: #f0dfbc;
+  background: rgba(39,31,24,.95);
+  border: 2px solid #211a15;
+  box-shadow: 3px 3px 0 rgba(21,16,12,.26);
+}
+#objectiveCard .hudTaskStrip small {
+  display: inline-block;
+  color: #d76a53;
+  font: 900 7px/1 system-ui, sans-serif;
+  letter-spacing: .12em;
+  opacity: 1;
+}
+#objectiveCard .hudTaskStrip p {
+  margin: 3px 0 2px;
+  color: #fff0cf;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.28;
+  text-shadow: none;
+}
+#objectiveCard .hudTaskStrip > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(226,208,172,.7);
+  font: 600 8px/1.25 system-ui, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 1;
+}
+
+#metricsPanel {
+  top: 62px;
+  right: 70px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  width: auto;
+  max-width: min(48vw, 520px);
+  overflow: hidden;
+  color: #2b241c;
+  background: rgba(238,222,188,.96);
+  border: 2px solid #2c241d;
+  box-shadow: 4px 4px 0 rgba(21,16,12,.3);
+}
 .metric {
-  min-height: 34px;
-  padding: 4px 8px 5px 5px;
-  background: rgba(34,29,24,.66);
-  border-color: rgba(221,199,159,.16);
-  box-shadow: 1px 2px 0 rgba(24,18,14,.16);
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 98px;
+  min-height: 54px;
+  padding: 7px 9px 9px 7px;
+  color: #2d251d;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid rgba(53,42,32,.28);
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
-.metricIcon { opacity: .78; }
-.metricCopy small { opacity: .65; }
-#roleButtons button:not(.active) { opacity: .72; }
+.metric:last-child { border-right: 0; }
+.metricIcon {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  color: #f3e1bd;
+  font: 900 10px/1 system-ui, sans-serif;
+  background: #9f4538;
+  border: 2px solid #35291f;
+  border-radius: 0;
+  opacity: 1;
+}
+.metricCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.metricCopy small {
+  color: rgba(58,47,36,.62);
+  font-size: 7px;
+  letter-spacing: .07em;
+  opacity: 1;
+}
+.metricCopy b {
+  max-width: 120px;
+  margin: 0;
+  overflow: hidden;
+  color: #2e251d;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.metricBar {
+  right: 7px;
+  bottom: 4px;
+  left: 43px;
+  height: 3px;
+  background: rgba(50,40,31,.14);
+  border-radius: 0;
+}
+.metricBar u { background: #777453; border-radius: 0; }
+.metricBar u.inverse { background: #a94738; }
+
+.headerButton {
+  justify-self: end;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  color: #2d251d;
+  font: 900 13px/1 system-ui, sans-serif;
+  background: #ead7b0;
+  border: 2px solid #2c241d;
+  border-radius: 0;
+  box-shadow: 3px 3px 0 rgba(21,16,12,.3);
+  backdrop-filter: none;
+}
+
+#roleDock,
+#roleDock.defenseDock {
+  top: 194px;
+  bottom: auto;
+  left: 16px;
+  width: auto;
+  max-width: min(520px, calc(100% - 32px));
+  filter: drop-shadow(3px 3px 0 rgba(21,16,12,.25));
+}
+#roleButtons { gap: 5px; }
+#roleButtons button,
+#roleButtons button:not(.active) {
+  min-width: 64px;
+  min-height: 38px;
+  padding: 4px 8px 4px 32px;
+  color: #ead8b6;
+  background: rgba(42,33,26,.93);
+  border: 1.5px solid #211a15;
+  border-radius: 0;
+  opacity: 1;
+}
+#roleButtons button.active {
+  color: #2c241c;
+  background: #e8d4ac;
+  border: 2px solid #2d241c;
+  box-shadow: 3px 3px 0 rgba(21,16,12,.25);
+  transform: translateY(-2px);
+}
+.rolePortrait { left: 5px; width: 23px; height: 28px; border-radius: 0; }
+#roleButtons b { font-size: 9px; }
+#roleButtons small { display: none; }
+
+#interactionPrompt,
+#roleDock:not([hidden]) ~ #interactionPrompt {
+  top: auto;
+  bottom: 76px;
+  gap: 0;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: drop-shadow(3px 3px 0 rgba(21,16,12,.34));
+}
+#interactionPrompt kbd {
+  width: 46px;
+  height: 46px;
+  color: #f3e2bf;
+  font-size: 15px;
+  background: #a94738;
+  border: 2px solid #2c241d;
+  border-radius: 0;
+}
+#interactionPrompt p {
+  max-width: 300px;
+  min-height: 46px;
+  justify-content: center;
+  padding: 6px 12px;
+  color: #2d251d;
+  background: rgba(238,222,188,.97);
+  border: 2px solid #2c241d;
+  border-left: 0;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+#interactionVerb { color: #9f4538; font-size: 8px; }
+#interactionName { max-width: 270px; color: #2d251d; font-size: 10px; font-weight: 800; }
 
 @media (max-width: 760px), (max-height: 520px) {
-  #objectiveCard {
-    max-width: 222px;
-    padding: 4px 0 5px 8px;
-    background: linear-gradient(90deg, rgba(220,205,174,.78), rgba(220,205,174,.34) 80%, transparent);
-  }
-  #objectiveCard span { display: none; }
-  #metricsPanel { max-width: 134px; }
-  .metric { min-width: 66px; padding-right: 5px; background: rgba(34,29,24,.59); }
+  #objectiveCard { top: 40px; left: 8px; width: min(250px, 42vw); }
+  .hudIdentityPlate { grid-template-columns: 40px minmax(0,1fr); gap: 7px; min-height: 52px; padding: 5px 7px; border-width: 1.5px; }
+  .hudRoleGlyph { width: 38px; height: 38px; font-size: 7px; border-width: 1.5px; }
+  .hudRoleGlyph::before { top: 5px; width: 11px; height: 11px; box-shadow: 0 10px 0 5px var(--hud-role); }
+  .hudIdentityCopy strong { font-size: 13px; }
+  .hudIdentityCopy em { margin-top: 2px; font-size: 7px; }
+  #objectiveCard .hudIdentityCopy small { font-size: 6px; }
+  .hudTaskStrip { width: calc(100% - 12px); padding: 4px 7px 5px; border-width: 1.5px; }
+  #objectiveCard .hudTaskStrip p { margin: 2px 0 1px; font-size: 9px; }
+  #objectiveCard .hudTaskStrip > span { font-size: 6px; }
+  #metricsPanel { top: 40px; right: 52px; display: grid; grid-template-columns: repeat(2, minmax(70px, 1fr)); max-width: min(48vw, 292px); }
+  .metric { grid-template-columns: 22px minmax(0,1fr); gap: 4px; min-width: 70px; min-height: 34px; padding: 4px 5px 6px 4px; }
+  .metricIcon { width: 21px; height: 21px; font-size: 7px; border-width: 1px; }
+  .metricCopy small { font-size: 5px; }
+  .metricCopy b { max-width: 82px; font-size: 8px; }
+  .metricBar { left: 30px; right: 4px; bottom: 2px; height: 2px; }
+  .headerButton { width: 34px; min-width: 34px; height: 34px; min-height: 34px; font-size: 10px; }
+  #roleDock, #roleDock.defenseDock { top: 137px; left: 8px; max-width: calc(100% - 16px); }
+  #roleButtons button, #roleButtons button:not(.active) { min-width: 50px; min-height: 32px; padding: 3px 5px 3px 27px; }
+  .rolePortrait { left: 3px; width: 21px; height: 25px; }
+  #roleButtons b { font-size: 7px; }
+  #interactionPrompt, #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 60px; }
+  #interactionPrompt kbd { width: 36px; height: 36px; font-size: 11px; }
+  #interactionPrompt p { min-height: 36px; max-width: 210px; padding: 4px 8px; }
+  #interactionVerb { font-size: 6px; }
+  #interactionName { max-width: 190px; font-size: 8px; }
+}
+
+@media (max-width: 520px) and (min-height: 650px) {
+  #objectiveCard { width: calc(100% - 70px); max-width: 300px; }
+  #metricsPanel { top: 145px; right: 8px; left: 8px; grid-template-columns: repeat(2,1fr); max-width: none; }
+  #roleDock, #roleDock.defenseDock { top: 226px; }
+  #interactionPrompt, #roleDock:not([hidden]) ~ #interactionPrompt { top: auto; right: auto; bottom: 78px; left: 50%; transform: translateX(-50%); }
+  #dogCommandHud { top: 272px; }
+  #civilianCommandPanel { top: 272px; }
 }

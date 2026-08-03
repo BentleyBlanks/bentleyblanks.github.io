@@ -7,7 +7,7 @@ const context = canvas.getContext("2d", { alpha: false });
 const ui = Object.fromEntries([
   "gameShell", "titleScreen", "levelCards", "startButton", "guideButton", "levelPanel", "levelList", "guidePanel",
   "gameHeader", "levelNumber", "levelName", "phaseStrip", "menuButton", "objectiveCard", "phaseLabel", "objectiveText",
-  "objectiveHint", "metricsPanel", "roleDock", "roleButtons", "interactionPrompt", "interactionVerb", "interactionName",
+  "objectiveHint", "hudRoleGlyph", "hudRoleName", "hudRoleSkill", "metricsPanel", "roleDock", "roleButtons", "interactionPrompt", "interactionVerb", "interactionName",
   "dialoguePanel", "dialogueSpeaker", "dialogueText", "dialogueNext", "buildPanel", "buildBrief", "buildOptions",
   "buildFeedback", "buildCancel", "levelComplete", "completeTitle", "completeSummary", "completeLedger", "replayButton",
   "nextLevelButton", "completeLevelsButton", "touchControls", "toast", "cinematicBars", "cinematicCaption",
@@ -1338,7 +1338,14 @@ function Toast(message, tone = "neutral") {
 function UpdateUi() {
   if (state.mode === "title") return;
   const phase = CurrentPhase();
+  const selectedRole = roleDefinitions[state.selectedRole];
+  const selectedProfile = actorProfiles[state.selectedRole];
   ui.phaseLabel.textContent = phase.label;
+  ui.hudRoleGlyph.textContent = selectedProfile.mark;
+  ui.hudRoleGlyph.style.setProperty("--hud-role", selectedProfile.body);
+  ui.hudRoleGlyph.style.setProperty("--hud-accent", selectedProfile.accent);
+  ui.hudRoleName.textContent = selectedRole.name;
+  ui.hudRoleSkill.textContent = selectedRole.skill;
   ui.objectiveText.textContent = phase.objective;
   ui.objectiveHint.textContent = ContextHint();
   ui.phaseStrip.innerHTML = state.level.phases.map((item, index) => `<span class="${item.id === state.phaseId ? "active" : index < PhaseIndex() ? "done" : ""}"><i>${index + 1}</i>${item.label}</span>`).join("");
@@ -4630,10 +4637,14 @@ function DrawPropObject(kind, scale = 1, ghost = false) {
 
 function DrawPropLabel(x, y, textValue, tone = "active") {
   context.save(); context.font = "700 11px system-ui, sans-serif"; context.textAlign = "center";
-  const labelWidth = Math.ceil(context.measureText(textValue).width) + 20;
-  context.fillStyle = tone === "empty" ? "rgba(24,28,27,.78)" : "rgba(8,14,16,.9)"; context.fillRect(x - labelWidth / 2, y - 17, labelWidth, 21);
-  context.fillStyle = tone === "empty" ? "#b9aa90" : "#f2ead7"; context.fillText(textValue, x, y - 3);
-  context.strokeStyle = tone === "empty" ? "rgba(190,160,107,.35)" : "rgba(103,221,221,.62)"; context.lineWidth = 1; context.strokeRect(x - labelWidth / 2 + .5, y - 16.5, labelWidth - 1, 20);
+  const labelWidth = Math.ceil(context.measureText(textValue).width) + 30;
+  const left = x - labelWidth / 2;
+  context.shadowColor = "rgba(20,15,11,.38)"; context.shadowOffsetX = 3; context.shadowOffsetY = 3;
+  context.fillStyle = tone === "empty" ? "rgba(42,35,28,.9)" : "rgba(236,220,185,.96)"; context.fillRect(left, y - 19, labelWidth, 24);
+  context.shadowColor = "transparent";
+  context.strokeStyle = tone === "empty" ? "rgba(198,171,126,.5)" : "#2d241c"; context.lineWidth = 2; context.strokeRect(left + 1, y - 18, labelWidth - 2, 22);
+  context.fillStyle = tone === "empty" ? "#c9b793" : "#a94738"; context.fillRect(left + 6, y - 13, 7, 7);
+  context.fillStyle = tone === "empty" ? "#d3c19e" : "#2d241c"; context.fillText(textValue, x + 5, y - 3);
   context.restore();
 }
 
@@ -4686,7 +4697,7 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const locked = Boolean(MissingRequirement(action) || PuzzleRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * entityScale * .58;
     if ((!completed || action.repeatable) && sameLayer && !enemyFocus && !suppressMarkers) {
-      const markerColor = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : choiceDimmed ? "rgba(132,145,134,.42)" : choiceSelected ? "rgba(248,205,118,.9)" : "rgba(104,225,225,.82)";
+      const markerColor = locked ? "rgba(177,126,74,.78)" : focused ? "rgba(239,218,176,.98)" : choiceDimmed ? "rgba(132,126,108,.42)" : choiceSelected ? "rgba(184,73,56,.92)" : "rgba(226,207,170,.88)";
       if (focused) DrawFocusBrackets(x, markerY, 25 * entityScale, 19 * entityScale, markerColor);
       else {
         context.save(); context.translate(x, markerY - 17 * entityScale); context.rotate(Math.PI / 4);
@@ -4726,7 +4737,7 @@ function DrawActions(width, height, surfaceY, tunnelY) {
     const y = action.layer === "tunnel" ? TunnelCenterYAt(action.x, tunnelY) - 4 : LayerBaseY(action.layer, action.x, height, surfaceY, tunnelY) - 10;
     const locked = Boolean(MissingRequirement(action) || PuzzleRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const focused = nearest?.id === action.id;
-    const tone = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.78)";
+    const tone = locked ? "rgba(177,126,74,.78)" : focused ? "rgba(239,218,176,.98)" : "rgba(226,207,170,.88)";
     context.save(); context.translate(x, y - 27);
     context.strokeStyle = tone; context.lineWidth = focused ? 2.4 : 1.8;
     context.beginPath(); context.moveTo(0, 7); context.lineTo(0, 18); context.stroke();
