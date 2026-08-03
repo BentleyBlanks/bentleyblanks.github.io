@@ -616,6 +616,11 @@ function TestDepthLayers() {
   Assert(ScaleOf(-3) < ScaleOf(-1) && ScaleOf(-1) < ScaleOf(0) && ScaleOf(0) < ScaleOf(2), "depth scale stack");
   Assert(YLiftOf(-3, 1) < YLiftOf(0, 1) && YLiftOf(0, 1) < YLiftOf(2, 1), "depth Y-lift stack");
   Assert(!level.props.some((p) => p.kind === "mudbank"), "no scattered mudbank trapezoids");
+  const midWheat = level.props.filter((p) => p.kind === "wheat" && p.depth === DEPTH_MID);
+  Assert(midWheat.length > 0 && midWheat.length < 40, "mid wheat is sparse crop patches");
+  Assert(midWheat.every((p) => (p.clump || 0) >= 5), "wheat patches carry clump size");
+  const farLitter = level.props.filter((p) => p.depth === -3);
+  Assert(farLitter.length < 12, "far prop litter stays minimal");
   const wide = BuildLevel("act5_street_hunt");
   Assert(wide.width >= 3000, "street hunt is a wide map");
   Assert(!wide.props.some((p) => p.kind === "mudbank"), "wide map also has continuous ground only");
@@ -624,6 +629,8 @@ function TestDepthLayers() {
   Assert(game.includes("PropsBehindBands"), "banded behind draw");
   Assert(game.includes("DrawContinuousNearGround"), "continuous near ground ribbon");
   Assert(!game.includes("vanishing toward mid-horizon"), "no radial floor trapezoid hatch");
+  Assert(game.includes("Stronger distance fog") || game.includes("veilFar"), "distance fog shelves");
+  Assert(game.includes("Golden stalk clump") || game.includes("grain heads"), "beautified wheat clumps");
 }
 
 function TestChaptersHaveSoil() {

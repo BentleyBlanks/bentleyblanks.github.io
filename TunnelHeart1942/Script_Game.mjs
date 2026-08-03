@@ -277,52 +277,64 @@ function DrawRidge(w, h, camX, factor, yFrac, amp, color, alpha = 1) {
 
 /** Far → near atmospheric bands (no gameplay props). */
 function DrawDepthBackdrop(w, h, camX, pal) {
-  // Stacked ridges — each closer band sits lower + scrolls faster
-  DrawRidge(w, h, camX, 0.05, 0.42, 26, pal.haze, 0.85);
-  DrawRidge(w, h, camX, 0.12, 0.5, 20, pal.night ? "#243028" : "#7a9070", 0.88);
-  DrawRidge(w, h, camX, 0.22, 0.56, 16, pal.night ? "#2a342c" : "#6a7d58", 0.92);
+  // Three soft ridges only — fewer stacked teeth, more air between planes
+  DrawRidge(w, h, camX, 0.05, 0.44, 22, pal.haze, 0.7);
+  DrawRidge(w, h, camX, 0.14, 0.52, 16, pal.night ? "#243028" : "#7a9070", 0.78);
+  DrawRidge(w, h, camX, 0.24, 0.58, 12, pal.night ? "#2a342c" : "#6a7d58", 0.85);
 
-  // Distant village tooth-row on the haze ridge
-  const baseY = h * 0.52;
-  const scroll = camX * 0.16 * Scale();
-  ctx.fillStyle = pal.night ? "#1c241e" : "#4a5a42";
-  for (let i = -3; i < 26; i++) {
-    const x = ((i * 96 - scroll) % (w + 180)) - 40;
-    const bw = 14 + ((i * 11) % 14);
-    const bh = 18 + ((i * 9) % 22);
-    ctx.globalAlpha = 0.55;
+  // Distant village as sparse silhouette clusters (not a busy tooth comb)
+  const baseY = h * 0.54;
+  const scroll = camX * 0.14 * Scale();
+  ctx.fillStyle = pal.night ? "#1c241e" : "#556850";
+  for (let i = -2; i < 12; i++) {
+    const x = ((i * 180 - scroll) % (w + 220)) - 50;
+    const bw = 18 + ((i * 11) % 12);
+    const bh = 14 + ((i * 9) % 16);
+    ctx.globalAlpha = 0.32;
     ctx.fillRect(x, baseY - bh, bw, bh);
     ctx.beginPath();
-    ctx.moveTo(x - 2, baseY - bh);
-    ctx.lineTo(x + bw * 0.5, baseY - bh - 10);
-    ctx.lineTo(x + bw + 2, baseY - bh);
+    ctx.moveTo(x - 1, baseY - bh);
+    ctx.lineTo(x + bw * 0.5, baseY - bh - 7);
+    ctx.lineTo(x + bw + 1, baseY - bh);
     ctx.closePath();
     ctx.fill();
+    // Neighbor lump — reads as one hamlet, not twenty sheds
+    if (i % 2 === 0) {
+      ctx.fillRect(x + bw + 4, baseY - bh * 0.7, bw * 0.65, bh * 0.7);
+    }
   }
   ctx.globalAlpha = 1;
 
-  // Mid field plate + furrow stripes (parallax 0.35)
-  DrawRidge(w, h, camX, 0.35, 0.64, 12, pal.field, 1);
-  const furrowY = h * 0.64;
+  // Mid field plate — soft, almost no furrow noise
+  DrawRidge(w, h, camX, 0.35, 0.66, 10, pal.field, 0.95);
+  const furrowY = h * 0.66;
   const furrowScroll = camX * 0.35 * Scale();
-  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.22)" : "rgba(40,50,28,.28)";
-  ctx.lineWidth = 1.2;
-  for (let i = -4; i < 28; i++) {
-    const x = ((i * 48 - furrowScroll) % (w + 80)) - 20;
+  ctx.strokeStyle = pal.night ? "rgba(0,0,0,.12)" : "rgba(50,60,32,.14)";
+  ctx.lineWidth = 1;
+  for (let i = -2; i < 14; i++) {
+    const x = ((i * 90 - furrowScroll) % (w + 100)) - 30;
     ctx.beginPath();
-    ctx.moveTo(x, furrowY - 8);
-    ctx.lineTo(x + (x - w * 0.5) * 0.08, furrowY + 28);
+    ctx.moveTo(x, furrowY - 4);
+    ctx.lineTo(x + (x - w * 0.5) * 0.05, furrowY + 18);
     ctx.stroke();
   }
 
-  DrawRidge(w, h, camX, 0.55, 0.72, 9, pal.earth, 1);
-  // Soft atmospheric veil over far bands so they read as distance
-  const veil = ctx.createLinearGradient(0, h * 0.38, 0, h * 0.7);
-  veil.addColorStop(0, pal.night ? "rgba(20,28,36,.35)" : "rgba(180,200,190,.22)");
-  veil.addColorStop(0.55, pal.night ? "rgba(20,28,36,.12)" : "rgba(180,200,190,.08)");
-  veil.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = veil;
-  ctx.fillRect(0, h * 0.38, w, h * 0.34);
+  DrawRidge(w, h, camX, 0.55, 0.74, 8, pal.earth, 1);
+
+  // Stronger distance fog — washes far ridges into the sky
+  const veilFar = ctx.createLinearGradient(0, h * 0.32, 0, h * 0.62);
+  veilFar.addColorStop(0, pal.night ? "rgba(18,26,34,.48)" : "rgba(200,215,205,.42)");
+  veilFar.addColorStop(0.5, pal.night ? "rgba(18,26,34,.22)" : "rgba(200,215,205,.2)");
+  veilFar.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = veilFar;
+  ctx.fillRect(0, h * 0.32, w, h * 0.32);
+
+  // Second fog shelf between mid field and walk plane
+  const veilMid = ctx.createLinearGradient(0, h * 0.58, 0, h * 0.78);
+  veilMid.addColorStop(0, pal.night ? "rgba(14,18,22,.2)" : "rgba(190,200,170,.16)");
+  veilMid.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = veilMid;
+  ctx.fillRect(0, h * 0.58, w, h * 0.22);
 }
 
 /** Haze strip between depth bands — sells air between planes. */
@@ -572,14 +584,45 @@ function DrawProp(prop, pal, alphaMul = 1) {
     else ctx.arc(16 * s, -bh * 0.25, 20 * s, 0, Math.PI * 2);
     ctx.fill();
   } else if (prop.kind === "wheat") {
-    ctx.strokeStyle = depth >= 1 ? "#2a1e0c" : "#6a5a28";
-    ctx.fillStyle = depth >= 1 ? "#3a2a12" : "#7a6a30";
-    ctx.lineWidth = 2.5 * s;
-    for (let i = -5; i <= 5; i++) {
+    // Golden stalk clump with grain heads — cooler/hazier in the mid field
+    const coolFar = depth <= -2;
+    const stem = coolFar
+      ? pal.night
+        ? "#3a4228"
+        : "#8a9858"
+      : depth >= 1
+        ? "#2e220c"
+        : "#8a6a24";
+    const head = coolFar
+      ? pal.night
+        ? "#4a5230"
+        : "#b0bc70"
+      : depth >= 1
+        ? "#5a4020"
+        : "#e0b24a";
+    const tip = coolFar ? (pal.night ? "#5a6238" : "#c8d488") : depth >= 1 ? "#6a4e28" : "#f0c86a";
+    const n = Math.max(4, Math.min(11, prop.clump || 7));
+    for (let i = 0; i < n; i++) {
+      const ox = (i - (n - 1) / 2) * (coolFar ? 4.2 : 5.2) * s;
+      const stalkH = (coolFar ? 28 : 40) * s + (i % 3) * 5 * s;
+      const bend = Math.sin(i * 1.7 + (prop.x || 0) * 0.01) * (coolFar ? 3 : 5) * s;
+      ctx.strokeStyle = stem;
+      ctx.lineWidth = Math.max(1.1, (coolFar ? 1.4 : 1.8) * s);
+      ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(i * 5 * s, 4 * s);
-      ctx.quadraticCurveTo(i * 5 * s + 4 * s, -28 * s, i * 5 * s - 2 * s, -52 * s);
+      ctx.moveTo(ox, 2 * s);
+      ctx.quadraticCurveTo(ox + bend, -stalkH * 0.55, ox + bend * 0.45, -stalkH);
       ctx.stroke();
+      const hx = ox + bend * 0.45;
+      const hy = -stalkH - 2 * s;
+      ctx.fillStyle = i % 2 === 0 ? head : tip;
+      ctx.beginPath();
+      if (typeof ctx.ellipse === "function") {
+        ctx.ellipse(hx, hy, 2.4 * s, 5.5 * s, bend * 0.03, 0, Math.PI * 2);
+      } else {
+        ctx.arc(hx, hy, 3 * s, 0, Math.PI * 2);
+      }
+      ctx.fill();
     }
   } else if (prop.kind === "post") {
     ctx.fillStyle = "#1a120c";
@@ -1449,13 +1492,15 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   // 2 stage floor (perspective plate)
   DrawStageFloor(w, h, pal);
 
-  // 3 BACK props by depth band — haze between FAR / MID / BACK
-  const hazeFar = pal.night ? "rgba(18,24,32,.28)" : "rgba(170,190,180,.2)";
-  const hazeMid = pal.night ? "rgba(16,20,24,.18)" : "rgba(140,150,120,.14)";
+  // 3 BACK props by depth band — thicker fog shelves pull planes apart
+  const hazeFar = pal.night ? "rgba(18,26,34,.45)" : "rgba(195,212,200,.4)";
+  const hazeMid = pal.night ? "rgba(14,20,24,.32)" : "rgba(175,192,165,.3)";
+  const hazeBack = pal.night ? "rgba(12,16,20,.18)" : "rgba(160,175,145,.18)";
   for (const [depth, band] of PropsBehindBands(state.level.props)) {
     for (const prop of band) DrawProp(prop, pal);
-    if (depth <= -3) DrawDepthVeil(w, h, walkY - 140 * s, walkY - 40 * s, hazeFar);
-    else if (depth === -2) DrawDepthVeil(w, h, walkY - 90 * s, walkY - 10 * s, hazeMid);
+    if (depth <= -3) DrawDepthVeil(w, h, walkY - 160 * s, walkY - 30 * s, hazeFar);
+    else if (depth === -2) DrawDepthVeil(w, h, walkY - 110 * s, walkY - 8 * s, hazeMid);
+    else if (depth === -1) DrawDepthVeil(w, h, walkY - 70 * s, walkY + 8 * s, hazeBack);
   }
   if (playable) DrawSurfaceExtras();
 
@@ -1463,9 +1508,9 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   DrawDepthVeil(
     w,
     h,
-    walkY - 50 * s,
-    walkY + 20 * s,
-    pal.night ? "rgba(10,12,16,.16)" : "rgba(90,110,90,.1)",
+    walkY - 55 * s,
+    walkY + 24 * s,
+    pal.night ? "rgba(10,12,16,.2)" : "rgba(100,120,100,.14)",
   );
 
   // 4 play-plane props + actors

@@ -44,75 +44,70 @@ export function YLiftOf(depth, scale) {
 }
 
 export function TintAlpha(depth) {
-  if (depth <= -3) return 0.42;
-  if (depth === -2) return 0.62;
-  if (depth === -1) return 0.86;
+  if (depth <= -3) return 0.28;
+  if (depth === -2) return 0.48;
+  if (depth === -1) return 0.78;
   if (depth >= 2) return 1;
   if (depth >= 1) return 1;
   return 1;
 }
 
-/** Scatter VH-like depth props so every act has back ridge + front occlusion. */
+/** Scatter VH-like depth props — far is painted as haze ridges; keep mid/front sparse. */
 export function SeedDepthDecor(level) {
   const props = level.props || (level.props = []);
   const width = level.width || 2400;
   const night = !!level.palette?.night;
 
-  // FAR — tiny silhouette village on the horizon ridge
-  for (let x = 60; x < width; x += 180 + (x % 60)) {
+  // FAR — almost empty: horizon village lives in DrawDepthBackdrop tooth-row + fog.
+  // One or two soft landmarks only, never a littered ridge.
+  for (let x = 320; x < width; x += 720 + (x % 120)) {
     props.push({ kind: "farHouse", x, depth: DEPTH_FAR, variant: (x / 60) | 0 });
   }
-  for (let x = 120; x < width; x += 260) {
-    props.push({ kind: "tree", x, depth: DEPTH_FAR, occlude: false });
-  }
 
-  // MID — orchard / crop band between horizon and village street
-  for (let x = 100; x < width; x += 90 + (x % 40)) {
-    props.push({ kind: "wheat", x, depth: DEPTH_MID });
+  // MID — crop patches as bands (not stalk-per-metre litter) + sparse orchard
+  for (let x = 160; x < width; x += 260 + (x % 60)) {
+    props.push({ kind: "wheat", x, depth: DEPTH_MID, clump: 9 });
   }
-  for (let x = 200; x < width; x += 280 + (x % 70)) {
+  for (let x = 300; x < width; x += 440 + (x % 100)) {
     props.push({ kind: "tree", x, depth: DEPTH_MID, occlude: false });
   }
-  for (let x = 160; x < width; x += 340 + (x % 90)) {
+  for (let x = 260; x < width; x += 520 + (x % 110)) {
     if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 120)) continue;
     props.push({ kind: "shed", x, depth: DEPTH_MID });
   }
 
-  // BACK — street buildings sit behind the walk plane (player walks in front)
-  for (let x = 180; x < width; x += 300 + (x % 80)) {
+  // BACK — street extras behind the walk plane (authored houses already fill this)
+  for (let x = 220; x < width; x += 380 + (x % 90)) {
     if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 100)) continue;
     props.push({ kind: "shed", x, depth: DEPTH_BACK });
   }
-  for (let x = 90; x < width; x += 200) {
+  for (let x = 160; x < width; x += 340) {
     props.push({ kind: "post", x, depth: DEPTH_BACK });
   }
 
   // PLAY — roadside clutter on the walk line
-  for (let x = 240; x < width; x += 360) {
+  for (let x = 280; x < width; x += 420) {
     if (props.some((p) => Math.abs(p.x - x) < 60 && (p.depth ?? 0) === 0)) continue;
     props.push({ kind: "stack", x, depth: DEPTH_PLAY });
   }
 
-  // FRONT — mid occluders (wheat / bush / post) between player and camera
-  for (let x = 50; x < width; x += 110 + (x % 35)) {
-    const roll = (x * 17) % 6;
-    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
-    else if (roll === 1) props.push({ kind: "wheat", x, depth: DEPTH_FRONT });
+  // FRONT — fewer stalks, more bush cover between player and camera
+  for (let x = 70; x < width; x += 150 + (x % 45)) {
+    const roll = (x * 17) % 5;
+    if (roll === 0 || roll === 1) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
     else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_FRONT });
     else if (roll === 3) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
-    else if (roll === 4) props.push({ kind: "stack", x, depth: DEPTH_FRONT });
-    else props.push({ kind: "wheat", x: x + 20, depth: DEPTH_FRONT });
+    else props.push({ kind: "wheat", x, depth: DEPTH_FRONT, clump: 5 });
   }
 
   // NEAR — hard occluders only. Continuous ground is painted in Script_Game
   // (no scattered mudbank trapezoids — those read as disconnected floor plates).
-  for (let x = 40; x < width; x += 150 + (x % 45)) {
+  for (let x = 50; x < width; x += 180 + (x % 50)) {
     const roll = (x * 13) % 4;
-    if (roll === 0 || roll === 1) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
-    else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_NEAR });
+    if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_NEAR });
     else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
   }
-  for (let x = 260; x < width; x += 360) {
+  for (let x = 300; x < width; x += 420) {
     props.push({ kind: "tree", x: x + 40, depth: DEPTH_NEAR, occlude: true });
   }
 
