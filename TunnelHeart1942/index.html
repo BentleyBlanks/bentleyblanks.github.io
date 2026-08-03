@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803t">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803u">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -23,9 +23,9 @@
       <button id="OpenHelpButton" class="quietButton" type="button">?</button>
       <div class="titleLayout">
         <article class="titleCopy">
-          <p class="eyebrow"><i></i> 一九四二年 · 冀中</p>
+          <p class="eyebrow" id="TitleEyebrow"><i></i> 一九四二年 · 冀中</p>
           <h1>地道战<br><em>高家庄</em></h1>
-          <p class="titleLead">地窖只是起点。软土要一锨锨挖穿——连通、翻口、竖井，直到黑风口。</p>
+          <p class="titleLead">地窖只是起点。贴着土壁一锨锨挖——要开长巷再画线。连通、翻口、竖井，直到黑风口。</p>
           <div class="titleActions">
             <button id="BeginButton" class="primaryButton" type="button"><span>开始</span></button>
             <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续</button>
@@ -110,11 +110,11 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>手机：左右走，上下蹲/抬头，右侧一个大键按情境变（地面交谈/捡物/靠近敲晕，地道里是铁锹开挖，开镜后是开火）。有手雷时会出现扔雷键——抬头高抛，蹲下近抛。</p>
-        <p>近战：伪军靠近就能敲晕；鬼子要摸背后——正面硬抢会被反抓。警戒中的鬼子还得蹲着从背后摸。</p>
-        <p>手雷：口袋可叠。沙袋后的敌人吃枪子不疼，炸开掩体才管用。</p>
-        <p>下地道：蓝图按钮会出现——先点它画格，再点一次退出，走到蓝格旁用铁锹大键挖。第一幕已画好蓝线，直接走到边上挖即可。</p>
-        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 设计 R · 放下 Q。</p>
+        <p>手机：左右走，上下蹲/抬头，右侧大键按情境变（交谈/捡物/敲晕；地道里铁锹开挖；开镜后开火）。有手雷时出现扔雷键。</p>
+        <p>挖地道：贴着空洞边的软土，直接点铁锹大键挖。画线按钮是可选的——要开长直巷再画。</p>
+        <p>近战：伪军靠近就能敲晕；鬼子要摸背后——正面硬抢会被反抓。</p>
+        <p>手雷：口袋可叠。沙袋后吃枪子不疼，炸开掩体才管用。</p>
+        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 画线 R · 放下 Q。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -122,7 +122,7 @@
       <article id="HistoryModal" class="modalCard" hidden>
         <h2>说明</h2>
         <p>剧情照着电影《地道战》的劲儿写：高家庄连通地窖、夜袭钟声、高老忠殉钟、翻口捉特务、神出鬼没、黑风口炸炮楼。镜头没法一比一，场面要尽量贴着片子走。</p>
-        <p>形式对齐《勇敢的心》：漫画页、对话条、单手持物。地道由你先画蓝图再挖通。</p>
+        <p>形式对齐《勇敢的心》：漫画页、对话条、单手持物。地道贴壁开挖，长巷可选用画线。</p>
         <div class="modalActions">
           <button id="CloseHistoryButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -143,9 +143,27 @@
           <button id="FailRetryButton" class="primaryButton" type="button"><span>再试</span></button>
         </div>
       </article>
+      <article id="DebugModal" class="modalCard debugModal" hidden>
+        <h2>调试</h2>
+        <p class="debugHint">隐蔽入口：标题年款连点五下，或游戏中连点暂停三下。</p>
+        <label class="debugField">跳关
+          <select id="DebugChapterSelect" aria-label="跳关"></select>
+        </label>
+        <div class="debugActions">
+          <button id="DebugJumpButton" class="primaryButton" type="button"><span>跳到该幕</span></button>
+          <button id="DebugWinGoalsButton" class="secondaryButton" type="button">完成本幕目标</button>
+          <button id="DebugShovelButton" class="secondaryButton" type="button">给铁锹</button>
+          <button id="DebugNadesButton" class="secondaryButton" type="button">手雷×6</button>
+          <button id="DebugHealButton" class="secondaryButton" type="button">回满血+无敌</button>
+          <button id="DebugTunnelButton" class="secondaryButton" type="button">进出地道</button>
+        </div>
+        <div class="modalActions">
+          <button id="CloseDebugButton" class="primaryButton" type="button"><span>关</span></button>
+        </div>
+      </article>
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803t"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803u"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ export const ITEM_META = {
     id: ITEM_SHOVEL,
     label: "铁锹",
     color: "#8a7355",
-    tip: "先画蓝图，再走到蓝色格子旁开挖",
+    tip: "贴土壁开挖 · 画线可选（开长巷）",
   },
   [ITEM_GRENADE]: {
     id: ITEM_GRENADE,

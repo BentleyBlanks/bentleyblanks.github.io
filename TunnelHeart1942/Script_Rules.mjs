@@ -351,10 +351,13 @@ function SetSubtitle(state, speaker, text, time = 4.8, opts = {}) {
     opts.anchorX != null
       ? { id: opts.anchorId || null, x: opts.anchorX, y: opts.anchorY ?? 0 }
       : ResolveSpeakerAnchor(state, speaker, fallback);
+  // System tips must NOT be comic — comic locks the mobile big key to "talk".
+  const tipSpeaker = speaker === "提示" || speaker === "设计";
+  const comic = opts.comic !== undefined ? !!opts.comic : !tipSpeaker;
   state.subtitle = {
     speaker: speaker || "",
     text,
-    comic: opts.comic !== false,
+    comic,
     anchorId: anchor.id,
     anchorX: anchor.x,
     anchorY: anchor.y,
@@ -476,10 +479,20 @@ function TryDesign(state) {
     if (state.designMode) {
       EnsurePlanGrid(level.soil);
       state.planCursor = InitPlanCursor(level.soil, player.x, player.y, player.facing);
-      SetSubtitle(state, "设计", "蓝图模式：挪光标标出要挖的格子；蹲着挖可铺厢室，往前可铺巷道。画完退出，走到蓝色边上再挖。", 5.5);
+      SetSubtitle(
+        state,
+        "设计",
+        "画线（可选）：挪格标记长巷；巷道键可连铺。再点一次退出——贴着土壁也能直接挖，不必先画线。",
+        5.2,
+      );
     } else {
       const n = CountPlanned(level.soil);
-      SetSubtitle(state, "设计", n ? `蓝图 ${n} 格已定——走到蓝色格子旁边开挖，别站远处瞎挖。` : "已退出设计。先画蓝图再挖。", 3.5);
+      SetSubtitle(
+        state,
+        "设计",
+        n ? `蓝线 ${n} 格——走到边上挖；贴土壁也可直接挖。` : "已退出画线。贴着空洞边的软土，直接点铁锹挖。",
+        3.2,
+      );
     }
   }
   if (!state.designMode || !state.planCursor) return;
@@ -536,10 +549,10 @@ function TryExcavate(state) {
   if (!dig) {
     const planned = CountPlanned(level.soil);
     if (planned > 0) {
-      SetSubtitle(state, "提示", "蓝图已画好——走到蓝色格子旁边再挖。", 2.8);
+      SetSubtitle(state, "提示", "蓝线在别处——走到蓝色格子旁边，或贴着土壁挖。", 2.6);
       state.interactHint = "follow_plan";
     } else {
-      SetSubtitle(state, "提示", "先进入设计，把要挖的格子标成蓝图，再走到边上开挖。别站远处乱挖。", 3.2);
+      SetSubtitle(state, "提示", "贴着空洞边的软土再挖。站太远挖不着；要开长巷可点画线。", 2.8);
       state.interactHint = "need_plan";
     }
     return;
@@ -1588,6 +1601,19 @@ function AllGoalsDone(state) {
 function RefreshHint(state) {
   if (state.player.digging) return;
   state.interactHint = "";
+  const digReady =
+    state.player.inTunnel &&
+    state.level.soil &&
+    CanDigWith(state.player.held) &&
+    !state.designMode &&
+    PickExcavateTarget(
+      state.level.soil,
+      state.player.x,
+      state.player.y,
+      state.player.facing,
+      !!state.input.crouch,
+      !!state.input.up,
+    );
   for (const ent of state.level.entities) {
     if (ent.kind === "pickup" && !ent.taken && !ent.hidden) {
       if (!LayerOk(state.player, ent)) continue;
@@ -1610,6 +1636,8 @@ function RefreshHint(state) {
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(state.player, ent)) continue;
     if (Near(state.player, ent, ent.radius || 52)) {
+      // Underground with a diggable wall: dig beats hatch so the big key isn't stolen.
+      if (ent.type === "hatch" && digReady) continue;
       if (
         ent.type === "hatch" &&
         ent.needsShovel &&
@@ -1623,19 +1651,7 @@ function RefreshHint(state) {
       return;
     }
   }
-  // No persistent “walking with rifle / in tunnel” head prompts — only near targets above.
-  // Dig hint only when a planned cell is actually in reach.
-  if (state.player.inTunnel && state.level.soil && CanDigWith(state.player.held) && !state.designMode) {
-    const dig = PickExcavateTarget(
-      state.level.soil,
-      state.player.x,
-      state.player.y,
-      state.player.facing,
-      !!state.input.crouch,
-      !!state.input.up,
-    );
-    if (dig) state.interactHint = "dig";
-  }
+  if (digReady) state.interactHint = "dig";
 }
 
 export function StepPlay(state, dt) {
@@ -1791,17 +1807,15 @@ export function NextStepText(state) {
   // Act7 has its own step ladder (includes surface MG phase) — skip generic tunnel tip.
   if (p.inTunnel && state.chapterId !== "act7_mg_nest") {
     if (state.designMode) {
-      return "设计中：方向挪格 · 大键标记 · 巷道键铺直道 · 再点蓝图退出后去挖";
+      return "画线中（可选）：方向挪格 · 大键标记 · 巷道键铺直道 · 再点画线退出后去挖";
     }
     if (state.chapterId === "act1_connect") {
-      if (!g.link_ab) return "地道里：走到蓝色格子旁，点铁锹大键开挖（甲—乙）";
-      if (!g.link_bc) return "继续沿蓝线走到格旁，点铁锹开挖（乙—丙）";
+      if (!g.link_ab) return "地道里：贴着土壁/蓝线，点铁锹大键开挖（甲—乙）";
+      if (!g.link_bc) return "继续沿土壁/蓝线挖通（乙—丙）";
       return "三家已通 · 可回井口上地面";
     }
     if (CanDigWith(p.held)) {
-      const planned = state.level?.soil ? CountPlanned(state.level.soil) : 0;
-      if (planned > 0) return "走到蓝色格子旁，点铁锹大键开挖；要改线先点蓝图";
-      return "先点蓝图按钮画出要挖的格子，退出后再走到边上点铁锹挖";
+      return "贴着空洞边的软土，点铁锹大键挖；要开长巷可点画线（可选）";
     }
     return "地道里需要铁锹才能挖；靠近井口可上地面";
   }

@@ -1,6 +1,7 @@
 /**
- * Tunnel blueprint design — plan first, excavate second.
- * Not Terraria hold-to-dig: soft soil only becomes diggable after you mark it.
+ * Tunnel dig + optional blueprint.
+ * Free dig: soft cells that already touch AIR (tunnel lip) can be carved immediately.
+ * Blueprint: optional long-route marks / corridor stamps — not a hard gate.
  */
 
 import {
@@ -157,11 +158,11 @@ export function CountPlanned(soil) {
   return n;
 }
 
-/** Planned soft cell next to the digger that can be excavated this tap. */
+/** Soft cell next to the digger that can be excavated this tap. */
 export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digUp) {
   EnsurePlanGrid(soil);
   const pc = WorldToCell(soil, playerX, playerY - 24);
-  // Prefer facing / up / down, then any orthogonal neighbor with a plan mark.
+  // Prefer facing / up / down, then any orthogonal neighbor.
   const preferred = [];
   if (digUp) preferred.push({ c: pc.c, r: pc.r - 1 }, { c: pc.c + facing, r: pc.r - 1 });
   if (digDown) preferred.push({ c: pc.c, r: pc.r + 1 });
@@ -175,7 +176,9 @@ export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digU
     { c: pc.c - facing, r: pc.r },
     { c: pc.c, r: pc.r },
   );
+  const near = (c, r) => Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 2;
   const seen = new Set();
+  // Pass 1: blue blueprint marks (tutorial / long routes).
   for (const { c, r } of preferred) {
     const k = `${c},${r}`;
     if (seen.has(k)) continue;
@@ -183,10 +186,20 @@ export function PickExcavateTarget(soil, playerX, playerY, facing, digDown, digU
     if (!InBounds(soil, c, r)) continue;
     if (GetCell(soil, c, r) !== SOFT) continue;
     if (!IsPlanned(soil, c, r)) continue;
-    // Manhattan ≤2 so cellar-center still reaches the east lip plan cell.
-    const nearPlayer = Math.abs(pc.c - c) + Math.abs(pc.r - r) <= 2;
-    if (!nearPlayer) continue;
+    if (!near(c, r)) continue;
     return { c, r, rect: CellWorldRect(soil, c, r) };
+  }
+  // Pass 2: free dig — any soft lip that already touches open air / plan.
+  seen.clear();
+  for (const { c, r } of preferred) {
+    const k = `${c},${r}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (!InBounds(soil, c, r)) continue;
+    if (GetCell(soil, c, r) !== SOFT) continue;
+    if (!CanPlanCell(soil, c, r)) continue;
+    if (!near(c, r)) continue;
+    return { c, r, rect: CellWorldRect(soil, c, r), free: true };
   }
   return null;
 }

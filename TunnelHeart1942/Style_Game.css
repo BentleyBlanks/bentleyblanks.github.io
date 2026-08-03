@@ -366,6 +366,27 @@ button {
 @media (hover: hover) and (pointer: fine) and (min-width: 921px) and (min-height: 521px) {
   .touchPad { display: none !important; }
 }
+/* Phones that report pointer:fine (iPad + keyboard, some Androids) still need the pad. */
+html.forceTouchPad .touchPad { display: flex !important; }
+
+.debugModal .debugHint {
+  font-size: .78rem; opacity: .72; margin-bottom: 10px;
+}
+.debugModal .debugField {
+  display: flex; flex-direction: column; gap: 6px;
+  font-weight: 700; margin-bottom: 12px;
+}
+.debugModal .debugField select {
+  font: inherit; padding: 8px 10px;
+  border: 2.5px solid #1a1410; background: #efe2c8;
+}
+.debugModal .debugActions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+}
+.debugModal .debugActions .secondaryButton,
+.debugModal .debugActions .primaryButton {
+  margin: 0; font-size: .85rem; padding: 8px 12px;
+}
 
 /* Landscape: still large keys — never shrink back to tiny dots. */
 @media (orientation: landscape) and (max-height: 520px) {

@@ -4,6 +4,8 @@ import {
   CanThrowGrenade,
   CreateCampaignState,
   CreateInputState,
+  DebugCompleteGoal,
+  DebugHold,
   GrenadeCount,
   LoadFromStorage,
   NextStepText,
@@ -87,7 +89,76 @@ function SetModal(which) {
   Show($("HistoryModal"), which === "history");
   Show($("PauseModal"), which === "pause");
   Show($("FailModal"), which === "fail");
-  state.pauseOpen = which === "pause";
+  Show($("DebugModal"), which === "debug");
+  // Debug also freezes play — same as pause.
+  state.pauseOpen = which === "pause" || which === "debug";
+  if (which === "debug") SyncDebugPanel();
+}
+
+function SyncDebugPanel() {
+  const sel = $("DebugChapterSelect");
+  if (!sel) return;
+  if (sel.options.length !== CHAPTERS.length) {
+    sel.innerHTML = CHAPTERS.map(
+      (ch, i) => `<option value="${i}">${ch.act}. ${ch.title}</option>`,
+    ).join("");
+  }
+  sel.value = String(Math.max(0, Math.min(CHAPTERS.length - 1, state.chapterIndex | 0)));
+}
+
+function EnsureTouchPadVisible() {
+  const touchy =
+    typeof navigator !== "undefined" &&
+    (navigator.maxTouchPoints > 0 || "ontouchstart" in window);
+  document.documentElement.classList.toggle("forceTouchPad", !!touchy);
+}
+
+/** Hidden QA entry: title eyebrow ×5 or pause button ×3. */
+function BindHiddenDebugEntry() {
+  let titleTaps = 0;
+  let titleTimer = 0;
+  const eyebrow = $("TitleEyebrow");
+  if (eyebrow) {
+    eyebrow.style.cursor = "default";
+    eyebrow.addEventListener("click", (e) => {
+      e.preventDefault();
+      const now = performance.now();
+      if (now - titleTimer > 1200) titleTaps = 0;
+      titleTimer = now;
+      titleTaps += 1;
+      if (titleTaps >= 5) {
+        titleTaps = 0;
+        EnsureAudio();
+        if (state.phase === "title") BeginFrom(0);
+        state.phase = "play";
+        SyncPhaseUi();
+        SetModal("debug");
+        Beep(880, 0.05, "triangle", 0.03);
+      }
+    });
+  }
+  let pauseTaps = 0;
+  let pauseTimer = 0;
+  const pauseBtn = $("PauseButton");
+  if (pauseBtn) {
+    pauseBtn.addEventListener(
+      "click",
+      (e) => {
+        const now = performance.now();
+        if (now - pauseTimer > 900) pauseTaps = 0;
+        pauseTimer = now;
+        pauseTaps += 1;
+        if (pauseTaps >= 3) {
+          pauseTaps = 0;
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          SetModal("debug");
+          Beep(880, 0.05, "triangle", 0.03);
+        }
+      },
+      true,
+    );
+  }
 }
 
 function SyncTitle() {
@@ -132,6 +203,16 @@ function PaintTouchPadIcons() {
   }
 }
 
+/** True only for real NPC comic lines — tip/design subtitles must not steal dig. */
+function IsDialogueBlockingPad(st) {
+  if (st.activeTalkId) return true;
+  const sub = st.subtitle;
+  if (!sub?.comic || !sub.text) return false;
+  const sp = sub.speaker || "";
+  if (sp === "提示" || sp === "设计" || sp === "旁白") return false;
+  return true;
+}
+
 /** What the single interact key should fire this frame. */
 function PadInteractVerb(st) {
   const p = st.player;
@@ -140,9 +221,13 @@ function PadInteractVerb(st) {
   if (p.manningMg) return "shot";
   // Design mode: big key paints blueprint cells (hold down + tap = chamber).
   if (st.designMode) return st.input.crouch ? "chamber" : "plan";
-  if (st.activeTalkId || st.subtitle?.comic) return "talk";
+  if (IsDialogueBlockingPad(st)) return "talk";
   if (hint === "mg_nest") return "shot";
-  // Concrete world verbs beat the underground dig default.
+  // Underground with shovel: dig is the default — hatch only when no diggable wall.
+  if (p.inTunnel && CanDigWith(p.held)) {
+    if (hint === "hatch") return "hatch";
+    return "dig";
+  }
   if (hint === "hatch") return "hatch";
   if (hint === "stealth_ko" || hint === "melee_risky") return "warn";
   if (hint === "pickup" || hint === "need_shovel") return "shovel";
@@ -150,8 +235,6 @@ function PadInteractVerb(st) {
   if (hint === "shot_port" || hint === "shoot") return "shot";
   if (hint === "plant_zone" || hint === "signal") return CanPlant(p.held) ? "use" : "talk";
   if (hint === "flip_build" || hint === "flip_trap") return "talk";
-  // Tunnel + shovel: the big key IS dig — not a talk bubble waiting for perfect range.
-  if (p.inTunnel && CanDigWith(p.held)) return "dig";
   if (hint === "dig" || hint === "follow_plan" || hint === "need_plan") return "dig";
   if (CanShoot(p.held) && p.aiming && !p.inTunnel) return "shot";
   // Pocket / held grenades: big key throws when rifle isn't ADS.
@@ -181,16 +264,16 @@ function SyncTouchPadActions() {
 
   const touchDesign = $("TouchDesign");
   if (touchDesign) {
-    // Underground always shows the blueprint key — dig alone cannot start a plan.
+    // Optional route sketch — free dig works without it; don't pulse as mandatory.
     const showDesign = inTunnel;
     touchDesign.hidden = !showDesign;
-    touchDesign.classList.toggle("isNeeded", showDesign && !design);
+    touchDesign.classList.toggle("isNeeded", false);
     touchDesign.classList.toggle("isActive", design);
     if (showDesign && touchDesign.dataset.padMode !== (design ? "designOn" : "design")) {
       touchDesign.innerHTML = PAD_ICON.design;
       touchDesign.dataset.padMode = design ? "designOn" : "design";
-      touchDesign.setAttribute("aria-label", design ? "退出设计去挖" : "画蓝图");
-      touchDesign.title = design ? "退出设计去挖" : "画蓝图";
+      touchDesign.setAttribute("aria-label", design ? "退出画线去挖" : "画线（可选）");
+      touchDesign.title = design ? "退出画线去挖" : "画线（可选）· 开长巷用";
     }
   }
 
@@ -273,9 +356,9 @@ function SyncHud() {
   } else if (state.player.manningMg) {
     slot.innerHTML = `<b data-item="rifle" style="--item:#3a3228"></b><span>机枪巢</span><em>大键连发扫射 · 打光来犯日伪军</em>`;
   } else if (inTunnel && held === ITEM_SHOVEL) {
-    const tip = state.level?.tutorialPlan
-      ? "走到蓝色格子旁，点铁锹大键挖"
-      : "先点蓝图画格，退出后走到边上点铁锹挖";
+    const tip = state.designMode
+      ? "画线中 · 再点画线退出后挖"
+      : "贴土壁点大键挖 · 画线可选";
     slot.innerHTML = `<b data-item="shovel" style="--item:${meta.color}"></b><span>铁锹</span><em>${tip}</em>`;
   } else {
     slot.innerHTML = meta
@@ -2030,7 +2113,11 @@ function BindUi() {
   $("CloseHelpButton").addEventListener("click", () => SetModal(null));
   $("OpenHistoryButton").addEventListener("click", () => SetModal("history"));
   $("CloseHistoryButton").addEventListener("click", () => SetModal(null));
-  $("PauseButton").addEventListener("click", () => SetModal("pause"));
+  $("PauseButton").addEventListener("click", () => {
+    // Triple-tap opens debug (capture listener); single tap still pauses.
+    if ($("DebugModal") && !$("DebugModal").hidden) return;
+    SetModal("pause");
+  });
   $("ResumeButton").addEventListener("click", () => SetModal(null));
   $("RestartChapterButton").addEventListener("click", () => {
     state = RestartChapter(state);
@@ -2060,6 +2147,73 @@ function BindUi() {
     state.phase = "title";
     SyncPhaseUi();
   });
+  BindHiddenDebugEntry();
+  const closeDebug = $("CloseDebugButton");
+  if (closeDebug) closeDebug.addEventListener("click", () => SetModal(null));
+  const jumpBtn = $("DebugJumpButton");
+  if (jumpBtn) {
+    jumpBtn.addEventListener("click", () => {
+      const idx = Number($("DebugChapterSelect")?.value || 0);
+      BeginFrom(idx);
+      state.phase = "play";
+      state.panelIndex = 0;
+      SetModal(null);
+      SyncPhaseUi();
+      Beep(620, 0.06, "triangle", 0.03);
+    });
+  }
+  const winBtn = $("DebugWinGoalsButton");
+  if (winBtn) {
+    winBtn.addEventListener("click", () => {
+      for (const id of Object.keys(state.goalsDone || {})) DebugCompleteGoal(state, id);
+      SaveToStorage(state);
+      SyncHud();
+      Beep(720, 0.06, "triangle", 0.03);
+    });
+  }
+  const shovelBtn = $("DebugShovelButton");
+  if (shovelBtn) {
+    shovelBtn.addEventListener("click", () => {
+      DebugHold(state, ITEM_SHOVEL);
+      SyncHud();
+    });
+  }
+  const nadeBtn = $("DebugNadesButton");
+  if (nadeBtn) {
+    nadeBtn.addEventListener("click", () => {
+      state.player.grenades = (state.player.grenades || 0) + 6;
+      if (!state.player.held) state.player.held = ITEM_GRENADE;
+      SyncHud();
+    });
+  }
+  const healBtn = $("DebugHealButton");
+  if (healBtn) {
+    healBtn.addEventListener("click", () => {
+      state.player.hp = 3;
+      state.player.invuln = 60;
+      state.failed = false;
+      SyncHud();
+    });
+  }
+  const tunBtn = $("DebugTunnelButton");
+  if (tunBtn) {
+    tunBtn.addEventListener("click", () => {
+      const hatch = state.level.entities.find((e) => e.type === "hatch");
+      if (state.player.inTunnel) {
+        state.player.inTunnel = false;
+        state.player.y = SURFACE_Y;
+        state.player.x = hatch?.x ?? state.player.x;
+      } else {
+        state.player.inTunnel = true;
+        state.player.x = hatch?.tunnelX ?? state.player.x;
+        state.player.y = hatch?.tunnelY ?? state.level.tunnelFloor;
+        if (!state.player.held) DebugHold(state, ITEM_SHOVEL);
+      }
+      state.designMode = false;
+      state.player.onGround = true;
+      SyncHud();
+    });
+  }
 }
 
 function Frame(ts) {
@@ -2098,6 +2252,7 @@ function Frame(ts) {
 async function Main() {
   Resize();
   window.addEventListener("resize", Resize);
+  EnsureTouchPadVisible();
   PaintTouchPadIcons();
   BindInput();
   BindUi();
@@ -2106,7 +2261,13 @@ async function Main() {
 
   // Agent / QA: /TunnelHeart1942/?preview=play boots straight into act1 surface
   const preview = new URLSearchParams(location.search).get("preview");
-  if (preview === "play" || preview === "tunnel") {
+  if (preview === "debug") {
+    BeginFrom(0);
+    state.phase = "play";
+    state.player.held = ITEM_SHOVEL;
+    SyncPhaseUi();
+    SetModal("debug");
+  } else if (preview === "play" || preview === "tunnel") {
     BeginFrom(0);
     state.phase = "play";
     state.player.inTunnel = preview === "tunnel";

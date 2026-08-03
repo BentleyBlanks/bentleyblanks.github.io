@@ -126,7 +126,7 @@ function TestPlanBeforeExcavate() {
   state.player.facing = 1;
   state.player.onGround = true;
   DebugHold(state, ITEM_SHOVEL);
-  // Wipe tutorial blueprint so this test proves plan-gate still exists.
+  // Wipe tutorial blueprint — free dig from the air lip must still work.
   EnsurePlanGrid(state.level.soil);
   for (let r = 0; r < state.level.soil.rows; r++) {
     for (let c = 0; c < state.level.soil.cols; c++) state.level.soil.plan[r][c] = false;
@@ -138,20 +138,22 @@ function TestPlanBeforeExcavate() {
   for (let i = 0; i < 90; i++) StepPlay(state, 1 / 30);
   Assert(state.stats.cellsCarved === before, "holding J does not carve");
 
-  // Tap dig without plan fails
+  // Free dig: soft lip touching AIR carves without blueprint.
   state.input.dig = false;
+  state.player.x = hatch.tunnelX;
+  state.player.y = hatch.tunnelY;
+  state.player.facing = 1;
+  state.player.onGround = true;
   state.input.digPressed = true;
   StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved === before, "tap without blueprint does not carve");
+  Assert(state.stats.cellsCarved > before, "free dig carves soft lip without blueprint");
 
-  // Design toggle + paint a soft neighbor of the digger, then excavate
+  // Optional design mode still marks cells.
+  const afterFree = state.stats.cellsCarved;
   state.input.designTogglePressed = true;
   StepPlay(state, 1 / 30);
   Assert(state.designMode, "R enters design mode");
   EnsurePlanGrid(state.level.soil);
-  // Stand at cellar, pick soft cell immediately next to the digger
-  state.player.x = hatch.tunnelX;
-  state.player.y = hatch.tunnelY;
   const chest = {
     c: Math.floor((state.player.x - state.level.soil.originX) / state.level.soil.cell),
     r: Math.floor((state.player.y - 24 - state.level.soil.originY) / state.level.soil.cell),
@@ -190,7 +192,7 @@ function TestPlanBeforeExcavate() {
   state.player.onGround = true;
   state.input.digPressed = true;
   StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved > before, "tap J excavates planned cell");
+  Assert(state.stats.cellsCarved > afterFree, "tap J excavates planned cell");
   Assert(GetCell(state.level.soil, target.c, target.r) === AIR, "cell became air");
 }
 
@@ -269,7 +271,9 @@ function TestAct1TutorialPlayable() {
   Assert(game.includes('classList.toggle("isPressed"'), "pointer handlers toggle isPressed");
   Assert(game.includes("PadInteractVerb") && game.includes("SyncTouchPadActions"), "contextual pad action router");
   Assert(game.includes("inTunnel && CanDigWith"), "tunnel defaults big key to dig");
-  Assert(css.includes("isNeeded") && css.includes("padNeedPulse"), "blueprint key pulses underground");
+  Assert(game.includes("IsDialogueBlockingPad"), "tips must not steal dig verb");
+  Assert(game.includes("forceTouchPad") || css.includes("forceTouchPad"), "touch pad forced on touch devices");
+  Assert(html.includes('id="DebugModal"'), "hidden debug panel exists");
 }
 
 function TestNaiveAct1Bot() {
@@ -1007,7 +1011,7 @@ function Main() {
     tun.player.held = ITEM_SHOVEL;
     tun.player.inTunnel = true;
     const tip = NextStepText(tun);
-    Assert(/铁锹|蓝图|蓝/.test(tip), "tunnel step tip names dig/blueprint controls");
+    Assert(/铁锹|挖|土壁|画线/.test(tip), "tunnel step tip names dig controls");
     Assert(tip.includes("点"), "tunnel tip says which pad control to tap");
   }
   const gameSrc = readFileSync(join(here, "Script_Game.mjs"), "utf8");

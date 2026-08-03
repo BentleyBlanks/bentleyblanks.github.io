@@ -1,12 +1,12 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
 export const SAVE_KEY = "tunnelheart1942_v8";
-export const CACHE_BUST = "20260803t";
+export const CACHE_BUST = "20260803u";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
-  subtitle: "白盒 · 先设计后开挖（Valiant Hearts 形式）",
-  tagline: "地窖只是起点。地道，是先画蓝图、再一锨一锨挖出来的。",
+  subtitle: "白盒 · 贴壁开挖（画线可选）",
+  tagline: "地窖只是起点。软土贴着挖——要开长巷再画线。",
   yearLabel: "一九四二年 · 冀中高家庄",
 };
 
