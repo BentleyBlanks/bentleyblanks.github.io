@@ -704,14 +704,30 @@ function SpawnDigImpactFx(state, dig, facing) {
   const soil = state.level.soil;
   const pt = CellCenter(soil, dig.c, dig.r);
   const face = facing < 0 ? -1 : 1;
+  const dir = dig.dir || "side";
   const chips = [];
   for (let i = 0; i < 12; i++) {
     const speed = 110 + Math.random() * 200;
+    let vx;
+    let vy;
+    if (dir === "up") {
+      // Ceiling bite — dirt falls back into the shaft.
+      vx = (Math.random() - 0.5) * speed * 0.9;
+      vy = 50 + Math.random() * 140;
+    } else if (dir === "down") {
+      // Floor bite — dirt kicks up.
+      vx = (Math.random() - 0.5) * speed * 0.9;
+      vy = -120 - Math.random() * 160;
+    } else {
+      // Side wall — spray back into the corridor (opposite dig face).
+      vx = -face * speed * (0.35 + Math.random() * 0.9) + (Math.random() - 0.5) * 70;
+      vy = -90 - Math.random() * 170;
+    }
     chips.push({
       x: pt.x + (Math.random() - 0.5) * 10,
       y: pt.y + (Math.random() - 0.5) * 10,
-      vx: -face * speed * (0.35 + Math.random() * 0.9) + (Math.random() - 0.5) * 70,
-      vy: -90 - Math.random() * 170,
+      vx,
+      vy,
       life: 0.26 + Math.random() * 0.3,
       maxLife: 0.45,
       size: 2.5 + Math.random() * 5.5,
@@ -724,6 +740,7 @@ function SpawnDigImpactFx(state, dig, facing) {
     x: pt.x,
     y: pt.y,
     facing: face,
+    dir,
     timer: 0.5,
     flash: 0.2,
     cellC: dig.c,
@@ -802,13 +819,17 @@ function TryExcavate(state) {
     }
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
+    // Face the cell being carved so the chop matches dig direction.
+    const digCx = dig.rect.x + dig.rect.w * 0.5;
+    const digFace = Math.sign(digCx - player.x) || player.facing || 1;
+    player.facing = digFace;
     // Punchy shovel chop — carve stays instant (tap), swing + dirt FX sell the hit.
     player.digging = true;
     player.digSwingT = DIG_SWING_DURATION;
     player.digProgress = 0;
     player._animT = 0;
     player._animClip = "dig";
-    SpawnDigImpactFx(state, dig, player.facing);
+    SpawnDigImpactFx(state, dig, digFace);
     // Dig-up pulls you into the new hollow so you're not stuck staring at a hole overhead.
     if (digUp) {
       const lift = CellCenter(level.soil, dig.c, dig.r).y + 16;

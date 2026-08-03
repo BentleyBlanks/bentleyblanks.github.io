@@ -2000,23 +2000,28 @@ function DrawDigFx() {
     ctx.strokeRect(x + 1, y + 1, rw - 2, rh - 2);
   }
 
-  // Impact crescent at the wall bite
+  // Impact crescent on the dug face (side wall / ceiling / floor).
   ctx.save();
   ctx.translate(WX(fx.x), WY(fx.y));
   ctx.globalAlpha = 0.3 + u * 0.5;
   ctx.strokeStyle = "#efe2c8";
   ctx.lineWidth = Math.max(2, 3 * s);
   const face = fx.facing || 1;
+  const digDir = fx.dir || "side";
   const r = (14 + (1 - u) * 18) * s;
   ctx.beginPath();
-  if (face > 0) ctx.arc(0, 0, r, -1.35, 0.75);
+  if (digDir === "up") ctx.arc(0, 0, r, Math.PI + 0.35, -0.35);
+  else if (digDir === "down") ctx.arc(0, 0, r, 0.35, Math.PI - 0.35);
+  else if (face > 0) ctx.arc(0, 0, r, -1.35, 0.75);
   else ctx.arc(0, 0, r, Math.PI - 0.75, Math.PI + 1.35);
   ctx.stroke();
-  // Dust puff
+  // Dust puff sprays out of the bite, not through the solid wall.
   ctx.fillStyle = `rgba(120,90,50,${0.2 + u * 0.25})`;
+  const puffX = digDir === "side" ? -face * 6 * s : 0;
+  const puffY = digDir === "up" ? 8 * s : digDir === "down" ? -8 * s : 4 * s;
   ctx.beginPath();
-  if (typeof ctx.ellipse === "function") ctx.ellipse(-face * 6 * s, 4 * s, 16 * s * (1.2 - u * 0.4), 7 * s, 0, 0, Math.PI * 2);
-  else ctx.arc(-face * 6 * s, 4 * s, 10 * s, 0, Math.PI * 2);
+  if (typeof ctx.ellipse === "function") ctx.ellipse(puffX, puffY, 16 * s * (1.2 - u * 0.4), 7 * s, 0, 0, Math.PI * 2);
+  else ctx.arc(puffX, puffY, 10 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 

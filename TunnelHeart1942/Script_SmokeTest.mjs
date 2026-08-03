@@ -1269,6 +1269,14 @@ function TestPuppetAnim() {
   Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
   Assert(CLIPS.dig.keys.length >= 4, "dig clip has coil→bite→settle keys");
   Assert(Math.abs(CLIPS.dig.duration - 0.42) < 0.01, "dig clip duration matches swing");
+  // Dig chop must strike FORWARD (local +X = facing), not swing behind the back.
+  {
+    const coil = SolveBones(SampleClip("dig", 0.24 * CLIPS.dig.duration), { plantFeet: false });
+    const bite = SolveBones(SampleClip("dig", 0.5 * CLIPS.dig.duration), { plantFeet: false });
+    Assert(coil.handR.x < -12, `dig coil parks shovel behind (x=${coil.handR.x.toFixed(1)})`);
+    Assert(bite.handR.x > 12, `dig bite drives shovel forward (x=${bite.handR.x.toFixed(1)})`);
+    Assert(bite.handR.x > coil.handR.x + 28, "dig swing travels toward facing wall");
+  }
   const slow = AdvanceClipTime("walk", 0, 0.1, { vx: 80, refSpeed: 220 });
   const fast = AdvanceClipTime("walk", 0, 0.1, { vx: 220, refSpeed: 220 });
   Assert(slow < fast, "walk cycle slows with lower speed");

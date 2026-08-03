@@ -250,72 +250,73 @@ export const CLIPS = {
       },
     ],
   },
-  // Coil shovel high → bite into the wall → settle (matches DIG_SWING_DURATION).
+  // Coil shovel BACK → bite FORWARD into the wall (local +X = facing after scale).
+  // Verified: armR≈-1.8 + torso≈0.3 → hand behind; armR≈1.9 + torso≈-0.15 → hand forward.
   dig: {
     duration: 0.42,
     keys: [
       {
         t: 0,
-        torso: -0.12,
-        neck: -0.08,
-        armR: 1.05,
-        foreR: -0.55,
-        armL: 0.45,
-        foreL: 0.2,
-        thighL: 0.28,
-        shinL: -0.18,
-        thighR: -0.22,
+        torso: 0.18,
+        neck: 0.06,
+        armR: -1.5,
+        foreR: 0.25,
+        armL: 0.4,
+        foreL: 0.15,
+        thighL: 0.26,
+        shinL: -0.16,
+        thighR: -0.2,
         shinR: 0.1,
         _hipY: 2,
       },
       {
-        t: 0.22,
-        torso: -0.28,
-        neck: -0.16,
-        armR: 1.55,
-        foreR: -0.85,
-        armL: 0.7,
-        foreL: 0.28,
-        thighL: 0.4,
-        shinL: -0.28,
+        t: 0.24,
+        torso: 0.34,
+        neck: 0.12,
+        armR: -1.85,
+        foreR: 0.35,
+        armL: 0.55,
+        foreL: 0.2,
+        thighL: 0.38,
+        shinL: -0.26,
         thighR: -0.3,
         shinR: 0.14,
         _hipY: 3.2,
       },
       {
-        t: 0.48,
-        torso: 0.58,
-        neck: 0.28,
-        armR: -2.15,
-        foreR: 0.7,
-        armL: -0.55,
-        foreL: 0.2,
-        thighL: 0.5,
-        shinL: -0.4,
-        thighR: -0.38,
-        shinR: 0.22,
-        footL: 0.12,
-        _hipY: 5,
+        t: 0.5,
+        torso: -0.16,
+        neck: -0.08,
+        armR: 1.95,
+        foreR: 0.45,
+        armL: -0.25,
+        foreL: 0.15,
+        thighL: 0.48,
+        shinL: -0.36,
+        thighR: -0.34,
+        shinR: 0.18,
+        footL: 0.1,
+        _hipY: 4.4,
       },
       {
-        t: 0.72,
-        torso: 0.32,
-        neck: 0.12,
-        armR: -1.25,
-        foreR: 0.45,
-        armL: -0.15,
-        thighL: 0.3,
-        shinL: -0.18,
-        thighR: -0.18,
-        _hipY: 2.6,
+        t: 0.74,
+        torso: 0.06,
+        neck: 0.02,
+        armR: 0.85,
+        foreR: 0.28,
+        armL: 0.1,
+        thighL: 0.28,
+        shinL: -0.16,
+        thighR: -0.16,
+        _hipY: 2.4,
       },
       {
         t: 1,
-        torso: 0.1,
+        torso: 0.08,
         neck: 0.02,
-        armR: -0.55,
-        foreR: 0.18,
-        armL: 0.12,
+        armR: -0.15,
+        foreR: 0.12,
+        armL: 0.15,
         thighL: 0.12,
         thighR: -0.08,
         _hipY: 0.8,
@@ -611,57 +612,56 @@ function DrawHeld(ctx, hand, item, pal, scale, digging) {
   if (!item || !hand) return;
   ctx.save();
   ctx.translate(hand.x * scale, hand.y * scale);
-  ctx.rotate(hand.angle);
   ctx.strokeStyle = pal.ink;
   ctx.lineWidth = Math.max(1.5, 2 * scale);
   if (item === "shovel") {
-    // T-grip + shaft + pointed spade — reads as 铁锹 even at small scale.
-    const reach = digging ? 1.25 : 1;
-    const shaft = 16 * scale * reach;
-    const tipX = shaft + 6 * scale;
-    const tipY = (digging ? 10 : 5) * scale;
+    // Align with bone like capsules (local +Y = bone dir) so the blade follows the chop.
+    ctx.rotate(-hand.angle);
+    const reach = digging ? 1.35 : 1;
+    const shaft = 18 * scale * reach;
     ctx.strokeStyle = "#5a4030";
-    ctx.fillStyle = "#8b6a45";
     ctx.lineWidth = Math.max(1.6, 2.4 * scale);
-    // T grip
     ctx.beginPath();
-    ctx.moveTo(-2 * scale, -5 * scale);
-    ctx.lineTo(6 * scale, -5 * scale);
+    ctx.moveTo(-6 * scale, 0);
+    ctx.lineTo(6 * scale, 0);
     ctx.stroke();
-    // Shaft
     ctx.beginPath();
-    ctx.moveTo(2 * scale, -4 * scale);
-    ctx.lineTo(shaft, tipY * 0.35);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, shaft);
     ctx.stroke();
-    // Blade
     ctx.fillStyle = "#6e5a3a";
     ctx.strokeStyle = "#1a1410";
     ctx.lineWidth = Math.max(1.2, 1.6 * scale);
     ctx.beginPath();
-    ctx.moveTo(shaft - 2 * scale, tipY * 0.15);
-    ctx.lineTo(tipX + 2 * scale, tipY * 0.55);
-    ctx.lineTo(shaft + 2 * scale, tipY + 4 * scale);
-    ctx.lineTo(shaft - 6 * scale, tipY * 0.7);
+    ctx.moveTo(-7 * scale, shaft - 2 * scale);
+    ctx.lineTo(7 * scale, shaft - 2 * scale);
+    ctx.lineTo(5 * scale, shaft + 8 * scale);
+    ctx.lineTo(0, shaft + 12 * scale);
+    ctx.lineTo(-5 * scale, shaft + 8 * scale);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  } else if (item === "charge") {
-    ctx.fillStyle = "#4a3a2a";
-    ctx.fillRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
-    ctx.strokeRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
-  } else if (item === "rifle") {
-    ctx.fillStyle = "#3a3228";
-    ctx.fillRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
-    ctx.strokeRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
-    ctx.fillStyle = "#2a241c";
-    ctx.fillRect(22 * scale, -5 * scale, 10 * scale, 3 * scale);
-    ctx.fillRect(4 * scale, 1 * scale, 8 * scale, 6 * scale);
-  } else if (item === "grenade") {
-    ctx.fillStyle = "#5a6a3a";
-    ctx.beginPath();
-    ctx.arc(8 * scale, 0, 5 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+  } else {
+    // Legacy +X held items keep the older rotate convention.
+    ctx.rotate(hand.angle);
+    if (item === "charge") {
+      ctx.fillStyle = "#4a3a2a";
+      ctx.fillRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
+      ctx.strokeRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
+    } else if (item === "rifle") {
+      ctx.fillStyle = "#3a3228";
+      ctx.fillRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
+      ctx.strokeRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
+      ctx.fillStyle = "#2a241c";
+      ctx.fillRect(22 * scale, -5 * scale, 10 * scale, 3 * scale);
+      ctx.fillRect(4 * scale, 1 * scale, 8 * scale, 6 * scale);
+    } else if (item === "grenade") {
+      ctx.fillStyle = "#5a6a3a";
+      ctx.beginPath();
+      ctx.arc(8 * scale, 0, 5 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
