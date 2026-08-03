@@ -1,4 +1,4 @@
-import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zn";
+import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
 
@@ -84,6 +84,12 @@ function CreateCivilians() {
 
 function CreateState(levelIndex) {
   const level = levelDefinitions[levelIndex];
+  const initialLayer = level.phases[0].layer;
+  const rolePositions = Object.fromEntries(level.roleIds.map((roleId, index) => [roleId, {
+    x: Math.max(worldMin + .6, Math.min(worldMax - .6, level.startX + index * .34)),
+    layer: initialLayer,
+    facing: 1
+  }]));
   return {
     mode: "title",
     levelIndex,
@@ -91,12 +97,13 @@ function CreateState(levelIndex) {
     phaseId: level.phases[0].id,
     player: { x: level.startX, layer: level.phases[0].layer, facing: 1, lowProfile: false, coverId: null, coverBlend: 0, step: 0, moving: false, motionBlend: 0, actionKind: null, actionTime: 0, actionDuration: 0, rolePulse: 0, pickup: null },
     selectedRole: level.startRole,
+    rolePositions,
     completed: new Set(),
     resources: { wood: 0, iron: 0, powder: 0, medicine: 0, grain: 0 },
     buildSlots: [null, null, null],
     excavated: new Set(),
-    defense: { ventilation: 0, strength: 0, enemyUnits: 8, triggered: 0, activeSlots: new Set() },
-    prepRemaining: levelIndex === 0 ? 92 : null,
+    defense: { ventilation: 0, strength: 0, enemyUnits: 8, triggered: 0, activeSlots: new Set(), siteMatches: [false, false, false] },
+    prepRemaining: levelIndex === 0 ? 128 : null,
     raid: { active: false, elapsed: 0, duration: 72, stage: "准备", announcedStage: null, smokeKnown: false, waterKnown: false, distraction: null, dogSmokeRelief: 0 },
     patrolLure: null,
     dogBarkCooldown: 0,
@@ -127,6 +134,22 @@ function CreateState(levelIndex) {
     alert: 18,
     morale: 100,
     tricks: new Set(),
+    puzzle: {
+      survey: { waterKnown: false, windKnown: false, centerKnown: false },
+      links: { west: false, center: false, east: false },
+      routes: { civiliansBriefed: false },
+      transfer: {
+        dogRouteKnown: false, patrolWindowKnown: false, camoReady: false, hatchBraced: false,
+        hatchOpen: false, childInside: false, innerGateOpen: false, forkKnown: false,
+        wideSupported: false, lowDrainOpen: false, woundedRoute: null, grainRoute: null,
+        courierBearingKnown: false, mistakes: 0
+      },
+      deception: {
+        approachKnown: false, echoKnown: false, emptyBranchKnown: false,
+        visibleDecoy: null, acousticRoute: null, falseEntrance: null,
+        solved: false, contradictions: 0, mistakes: 0, enemyBelief: "未形成"
+      }
+    },
     combat: {
       rifle: false, ammo: 0, grenades: 0, health: 3, alarm: false,
       shots: [], grenadesInFlight: [], blasts: [], blastScars: [], enemyShots: [],
@@ -160,7 +183,7 @@ function RenderLevelSelectors() {
       <small>${level.number} · ${level.subtitle}</small>
       <b>${level.title}</b>
       <span>${level.thesis}</span>
-      <i>${index === 0 ? "收集 → 建造 → 防御 → 缴获" : index === 1 ? "侦察 → 接力 → 转移 → 联通" : index === 2 ? "异常 → 恐慌 → 情报" : "入室 → 取械 → 屋脊 → 撤离"}</i>
+      <i>${index === 0 ? "勘探 → 建网 → 抗烟水 → 缴获" : index === 1 ? "侦察 → 隔墙接力 → 分路转移 → 联通" : index === 2 ? "听声辨路 → 三路配局 → 误导入网 → 情报" : "入室 → 取械 → 屋脊 → 撤离"}</i>
     </button>`).join("");
   ui.levelCards.innerHTML = markup;
   ui.levelList.innerHTML = markup;
@@ -225,6 +248,9 @@ function SelectRole(roleId) {
   if (state.selectedRole === roleId) return;
   if (roleId === "dog" && state.dog.commandId) return Toast("阿土正在执行哨令，等它拉完机关再直接接管。", "warning");
   const previousRole = state.selectedRole;
+  if (state.rolePositions?.[previousRole]) {
+    Object.assign(state.rolePositions[previousRole], { x: state.player.x, layer: state.player.layer, facing: state.player.facing });
+  }
   if (previousRole === "dog") {
     state.dog.x = state.player.x;
     state.dog.layer = state.player.layer;
@@ -235,6 +261,11 @@ function SelectRole(roleId) {
     state.player.x = state.dog.x;
     state.player.layer = state.dog.layer;
     state.player.facing = state.dog.facing;
+  } else if (state.rolePositions?.[roleId]) {
+    const position = state.rolePositions[roleId];
+    state.player.x = position.x;
+    state.player.layer = position.layer;
+    state.player.facing = position.facing;
   }
   state.player.rolePulse = 1;
   state.player.actionKind = "ready";
@@ -242,6 +273,67 @@ function SelectRole(roleId) {
   state.player.actionDuration = .62;
   RenderRoleDock();
   UpdateUi();
+}
+
+function SyncSelectedRolePosition() {
+  const position = state.rolePositions?.[state.selectedRole];
+  if (!position) return;
+  Object.assign(position, { x: state.player.x, layer: state.player.layer, facing: state.player.facing });
+  if (state.selectedRole === "dog") Object.assign(state.dog, position);
+}
+
+function PuzzleValue(path) {
+  return String(path).split(".").reduce((value, key) => value?.[key], state.puzzle);
+}
+
+function SetPuzzleValue(path, value) {
+  const keys = String(path).split(".");
+  let target = state.puzzle;
+  for (const key of keys.slice(0, -1)) {
+    if (!target[key] || typeof target[key] !== "object") target[key] = {};
+    target = target[key];
+  }
+  target[keys.at(-1)] = value;
+}
+
+function PuzzleRequirement(action) {
+  return (action.puzzleRequires || []).find((requirement) => PuzzleValue(requirement.path) !== requirement.value);
+}
+
+function ActionRemainsAvailable(action) {
+  return !state.completed.has(action.id) || action.repeatable || action.buildSlot !== undefined;
+}
+
+function ApplyPuzzleMutation(action) {
+  if (action.puzzleSet) SetPuzzleValue(action.puzzleSet.path, action.puzzleSet.value);
+  if (action.puzzleChoice) {
+    SetPuzzleValue(action.puzzleChoice.path, action.puzzleChoice.value);
+    Toast(`路线已调整：${action.puzzleChoice.label}`, "success");
+  }
+}
+
+function TryPuzzleCommit(action) {
+  const commit = action.puzzleCommit;
+  const mismatches = commit.expected.filter((requirement) => PuzzleValue(requirement.path) !== requirement.value);
+  if (mismatches.length) {
+    BeginActorAction(action);
+    const family = commit.id === "deception" ? state.puzzle.deception : state.puzzle.transfer;
+    family.mistakes += 1;
+    if (commit.failAlert) state.alert = Math.min(100, state.alert + commit.failAlert);
+    if (commit.id === "deception") {
+      state.puzzle.deception.enemyBelief = `已识破 ${mismatches.length} 处顺向线索`;
+      state.puzzle.deception.contradictions = Math.max(0, 3 - mismatches.length);
+    }
+    Toast(commit.failText, "warning");
+    UpdateUi();
+    return false;
+  }
+  if (commit.id === "deception") {
+    state.puzzle.deception.solved = true;
+    state.puzzle.deception.contradictions = 3;
+    state.puzzle.deception.enemyBelief = "西院有痕 · 东后方有人 · 中口封土通东";
+  }
+  return true;
 }
 
 function ActorActionKind(action) {
@@ -273,7 +365,7 @@ function FindNearestAction() {
   let distance = Infinity;
   for (const action of state.level.actions) {
     if (action.phase !== state.phaseId || action.layer !== state.player.layer) continue;
-    if (state.completed.has(action.id) && action.buildSlot === undefined) continue;
+    if (!ActionRemainsAvailable(action)) continue;
     if (state.dog?.commandId === action.id) continue;
     const currentDistance = Math.abs(action.x - state.player.x);
     if (currentDistance < distance) {
@@ -330,6 +422,11 @@ function PerformAction() {
     Toast(`还缺前一步：${prerequisite?.title || missing}`, "warning");
     return;
   }
+  const puzzleMissing = PuzzleRequirement(action);
+  if (puzzleMissing) {
+    Toast(puzzleMissing.label || `还没有满足：${puzzleMissing.path}`, "warning");
+    return;
+  }
   if (action.cover && GetActiveCover()?.id !== action.cover) {
     const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
     Toast(`先进入${cover?.label || "场景遮挡"}后再行动；空地上压低身子不会隐身。`, "warning");
@@ -349,13 +446,16 @@ function PerformAction() {
   }
   if (action.phaseGate) {
     if (state.buildSlots.some((slot) => !slot)) return Toast("三处机关位还没有全部完工。", "warning");
-    if (state.defense.ventilation < 3) return Toast("通风不足 3：烟会先伤到地道里的乡亲。请重建一处机关。", "warning");
-    if (state.defense.strength < 4) return Toast("防御不足 4：还无法安全分割八人扫荡队。", "warning");
+    const expectedSites = ["floodGate", "flipGate", "smokeBaffle"];
+    const wrongSites = expectedSites.map((expected, index) => state.buildSlots[index] === expected ? null : buildSiteProfiles[index].name).filter(Boolean);
+    if (wrongSites.length) return Toast(`机关位置不对：${wrongSites.join("、")}没有匹配实地水路、直道或烟道。总数值够也不能迎敌。`, "warning");
+    if (!state.puzzle.routes.civiliansBriefed) return Toast("三组乡亲还没有分到已连通的避险支路。", "warning");
     state.completed.add(action.id);
     BeginActorAction({ id: "closeSurfaceGate" });
     StartRaid(false);
     return;
   }
+  if (action.puzzleCommit && !TryPuzzleCommit(action)) return;
   ApplyAction(action);
 }
 
@@ -372,6 +472,7 @@ function ApplyAction(action) {
     };
   }
   state.completed.add(action.id);
+  ApplyPuzzleMutation(action);
   if (action.resource) {
     for (const [key, amount] of Object.entries(action.resource)) state.resources[key] += amount;
   }
@@ -405,6 +506,7 @@ function ApplyAction(action) {
   if (action.diversion) StartDiversion(action);
   if (action.id === "captureIntel") state.nextRaid = "东堤 · 拂晓 · 两路合围";
   if (action.dialogue) OpenDialogue(action.dialogue, action.role ? roleDefinitions[action.role].name : roleDefinitions[state.selectedRole].name);
+  SyncSelectedRolePosition();
   EvaluateProgress(action);
   UpdateUi();
 }
@@ -495,6 +597,7 @@ function UpdateDogPartner(delta) {
 
 function CompleteDogCommand(action) {
   state.completed.add(action.id);
+  ApplyPuzzleMutation(action);
   if (action.hazardScout === "smoke") state.raid.smokeKnown = true;
   if (action.hazardScout === "water") state.raid.waterKnown = true;
   if (action.dogRelief === "smoke") state.raid.dogSmokeRelief = Math.max(state.raid.dogSmokeRelief, 16);
@@ -504,6 +607,7 @@ function CompleteDogCommand(action) {
   state.dog.progress = 1;
   state.dog.resultTime = 3.2;
   state.dog.lastResult = action.dogCommand.task;
+  if (state.rolePositions?.dog) Object.assign(state.rolePositions.dog, { x: state.dog.x, layer: state.dog.layer, facing: state.dog.facing });
   if (action.dialogue) OpenDialogue(action.dialogue, "高传宝");
   EvaluateProgress(action);
   Toast(`阿土完成：${action.dogCommand.task}。`, "success");
@@ -761,17 +865,19 @@ function EvaluateProgress(action) {
     }
   } else if (state.levelIndex === 1) {
     if (state.phaseId === "survey" && state.completed.has("markPatrol")) {
-      SetPhase("cooperate", "十一秒暗区", "灯转一圈是十一下。赵禾，你先补网；根生跟我抬门。", "叶星");
+      SetPhase("cooperate", "十一秒暗区", "灯一转开，各走自己那一段。赵禾补外网，根生从下头支门，石头等门缝。", "叶星");
     } else if (state.phaseId === "cooperate" && state.completed.has("unbarGate")) {
-      SetPhase("transfer", "门开了", "先抬伤员。粮袋能带多少带多少。", "赵禾");
+      SetPhase("transfer", "隔墙接力完成", "门开了，但岔路还没摸清。担架不能侧，粮袋过不了低梁——先让阿土探路。", "赵禾");
     } else if (state.phaseId === "transfer" && requiredRescues.every((key) => state.rescues[key])) {
       SetPhase("outcome", "东翻口已接通", "伤员、粮、人……都齐了。石头，关门。", "赵禾");
     }
   } else if (state.levelIndex === 2) {
-    if (state.phaseId === "harass" && state.tricks.size >= 3 && state.morale <= 55) {
-      SetPhase("panic", "他们乱了", "他们不敢进屋了。再引一次，往空坡赶。", "林青禾");
-    } else if (state.phaseId === "panic" && action.id === "finalSignal") {
-      SetPhase("outcome", "扫荡队撤了", "别追。等他们走远，咱们再出去捡电台。", "林青禾");
+    if (state.phaseId === "recon" && ["readSurfaceTraces", "sniffEchoNetwork", "tapEmptyBranch"].every((id) => state.completed.has(id))) {
+      SetPhase("compose", "三条地道线索", "西院给他们看，东后方给他们听，中口封住却把土缝留向东。先接好三路，再试局。", "林青禾");
+    } else if (state.phaseId === "compose" && action.id === "testDeception" && state.puzzle.deception.solved) {
+      SetPhase("execute", "矛盾成局", "第一眼引向西，第一声从东后方来。等他们队形扭开，再把前队送进空支洞。", "林青禾");
+    } else if (state.phaseId === "execute" && action.id === "dropEmptyBranchGate") {
+      SetPhase("outcome", "错误路线已经形成", "别追。让撤退的人把假地图带回去，咱们只收他们落下的真地图和电台。", "林青禾");
     }
   } else if (state.levelIndex === 3) {
     if (state.phaseId === "infiltrate" && action.id === "unboltCellarHatch") {
@@ -794,8 +900,10 @@ function SetPhase(phaseId, label, text, speaker) {
   state.phaseId = phaseId;
   const phase = CurrentPhase();
   if (phase.layer && phase.id !== "transfer") state.player.layer = phase.layer;
+  SyncSelectedRolePosition();
   state.camera.targetX = state.player.x;
-  PlayCinematic(label, speaker, text, 2.4, state.player.x + 1.5, 1.1);
+  const revealDeceptionNetwork = state.levelIndex === 2 && phaseId === "execute" && state.puzzle.deception.solved;
+  PlayCinematic(label, speaker, text, revealDeceptionNetwork ? 2.8 : 2.4, revealDeceptionNetwork ? 0 : state.player.x + 1.5, revealDeceptionNetwork ? .84 : 1.1);
   UpdateUi();
 }
 
@@ -849,7 +957,10 @@ function OpenBuildPanel(slotIndex) {
   const siteDirection = site.flowDirection > 0 ? "左→右" : "右→左";
   const currentDescription = existing ? `当前为${buildOptions.find((item) => item.id === existing).name}，重建会退回原料` : "尚未施工";
   ui.buildBrief.textContent = `机关位 ${slotIndex + 1} · ${site.name}｜来向：${site.incoming}（${siteDirection}）｜保护：${site.protectedSide}｜${currentDescription}`;
-  ui.buildFeedback.textContent = "先看转轴、上游与导流出口，再确认组合。目标：三处合计通风 ≥ 3、防御 ≥ 4。";
+  const clueReady = [state.puzzle.survey.waterKnown, state.puzzle.survey.centerKnown, state.puzzle.survey.windKnown][slotIndex];
+  ui.buildFeedback.textContent = clueReady
+    ? "勘探证据已齐。不要凑总数值：要让这一处机关正好匹配它的水路、直道或烟道。"
+    : "这里的水路、土层或风向还没有勘探清楚；盲装可以施工，但扫荡时会产生真实后果。";
   ui.buildOptions.innerHTML = buildOptions.map((option) => {
     const isCurrent = option.id === existing;
     return `<button type="button" data-build="${option.id}" class="buildOption ${isCurrent ? "current" : ""}">
@@ -886,7 +997,8 @@ function ChooseBuild(optionId) {
   BeginActorAction({ id: "collectWood" }, .9);
   RecalculateBuild();
   Show(ui.buildPanel, false);
-  Toast(`${option.name}完工 · 通风 ${state.defense.ventilation} / 防御 ${state.defense.strength}`, state.defense.ventilation >= 3 && state.defense.strength >= 4 ? "success" : "neutral");
+  const matchCount = state.defense.siteMatches.filter(Boolean).length;
+  Toast(`${option.name}完工 · 实地匹配 ${matchCount}/3`, state.defense.siteMatches[state.currentBuildSlot] ? "success" : "warning");
   UpdateUi();
 }
 
@@ -898,6 +1010,8 @@ function RecalculateBuild() {
     state.defense.ventilation += option?.ventilation || 0;
     state.defense.strength += option?.defense || 0;
   }
+  const expectedSites = ["floodGate", "flipGate", "smokeBaffle"];
+  state.defense.siteMatches = expectedSites.map((expected, index) => state.buildSlots[index] === expected);
   SyncFluidStructures();
 }
 
@@ -967,8 +1081,8 @@ function UpdateLevelOneSystems(delta) {
     }
 
     const elapsed = state.raid.elapsed;
-    const hasEastBaffle = state.buildSlots[2] === "smokeBaffle" || state.buildSlots.includes("smokeBaffle");
-    const hasWestFloodGate = state.buildSlots[0] === "floodGate" || state.buildSlots.includes("floodGate");
+    const hasEastBaffle = state.buildSlots[2] === "smokeBaffle";
+    const hasWestFloodGate = state.buildSlots[0] === "floodGate";
     if (elapsed >= 8 && elapsed < 58) {
       const bellDiversion = ActiveDiversion("bell") && state.raid.distraction.weakens === "smoke" ? .34 : 1;
       const dogRelief = state.raid.dogSmokeRelief > 0 ? .32 : 1;
@@ -1045,8 +1159,9 @@ function CommandCivilianGroup(shelterId) {
 }
 
 function RenderCivilianCommands() {
-  if (!ui.civilianCommandPanel || state.levelIndex !== 0) return;
-  const visible = state.phaseId === "defense" && state.mode === "play";
+  if (!ui.civilianCommandPanel) return;
+  const visible = state.levelIndex === 0 && state.phaseId === "defense" && state.mode === "play";
+  ui.roleDock?.classList.toggle("defenseDock", visible);
   Show(ui.civilianCommandPanel, visible);
   if (!visible) return;
   ui.civilianGroupButtons.querySelectorAll("[data-civilian-group]").forEach((button) => {
@@ -1138,6 +1253,7 @@ function ChangeLayer(targetLayer) {
   state.player.actionKind = "climb";
   state.player.actionTime = .68;
   state.player.actionDuration = .68;
+  SyncSelectedRolePosition();
   if (state.player.layer === "tunnel") state.alert = Math.max(0, state.alert - 8);
   Toast(state.player.layer === "tunnel" ? "进入地道：敌兵视线被土层完全隔断。" : "回到地表：先找草垛、断墙或灌木，再等巡逻转身。", "neutral");
   UpdateUi();
@@ -1259,8 +1375,8 @@ function RenderQaPanel() {
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
   const levelOneQa = '<button type="button" data-qa-hazard="dogBark">诱敌：阿土吠叫</button><button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
-  const levelTwoQa = '<button type="button" data-qa-hazard="dogBark">诱敌：阿土吠叫</button><button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
-  const levelThreeQa = '<button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="enemyHud">HUD：伪军身份</button><button type="button" data-qa-hazard="enemyHudJapanese">HUD：日军身份</button><button type="button" data-qa-hazard="takedownReady">交互：靠近日军可制服</button><button type="button" data-qa-hazard="takedownReadyCollaborator">交互：靠近伪军可制服</button><button type="button" data-qa-hazard="takedownNext">交互：下一个敌人</button><button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelTwoQa = '<button type="button" data-qa-hazard="dogBark">诱敌：阿土吠叫</button><button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="transferWrong">谜题：错误分路</button><button type="button" data-qa-hazard="transferSolved">谜题：正确分路</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelThreeQa = '<button type="button" data-qa-hazard="patrolWindow">巡逻：通行窗口</button><button type="button" data-qa-hazard="deceptionWrong">谜题：顺向假情报</button><button type="button" data-qa-hazard="deceptionSolved">谜题：三重矛盾</button><button type="button" data-qa-hazard="enemyHud">HUD：伪军身份</button><button type="button" data-qa-hazard="enemyHudJapanese">HUD：日军身份</button><button type="button" data-qa-hazard="takedownReady">交互：靠近日军可制服</button><button type="button" data-qa-hazard="takedownReadyCollaborator">交互：靠近伪军可制服</button><button type="button" data-qa-hazard="takedownNext">交互：下一个敌人</button><button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
   const levelFourQa = '<button type="button" data-qa-hazard="combatLayers">镜头：地道入室上房</button><button type="button" data-qa-hazard="combatPickups">镜头：枪弹手雷实物</button><button type="button" data-qa-hazard="combatRoof">镜头：屋脊敌阵</button><button type="button" data-qa-hazard="combatFire">演出：有限开枪</button><button type="button" data-qa-hazard="combatGrenade">演出：手雷抛物线</button><button type="button" data-qa-hazard="combatTakedown">演出：屋顶无声制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
   ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? levelOneQa : state.levelIndex === 1 ? levelTwoQa : state.levelIndex === 2 ? levelThreeQa : levelFourQa;
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
@@ -1305,7 +1421,10 @@ function QaJumpToPhase(phaseId) {
       state.buildSlots = ["floodGate", "flipGate", "smokeBaffle"];
       state.excavated = new Set(["west", "center", "east"]);
       state.resources.wood = 1; state.resources.iron = 1;
-      QaComplete(["whistleDraftGap", "briefCivilians", "digWestRefuge", "digCenterBypass", "digEastPocket", "buildSlotA", "buildSlotB", "buildSlotC", "startDefense"]);
+      Object.assign(state.puzzle.survey, { waterKnown: true, windKnown: true, centerKnown: true });
+      Object.assign(state.puzzle.links, { west: true, center: true, east: true });
+      state.puzzle.routes.civiliansBriefed = true;
+      QaComplete(["inspectWestSeep", "whistleDraftGap", "probeCenterSoil", "briefCivilians", "digWestRefuge", "digCenterBypass", "digEastPocket", "buildSlotA", "buildSlotB", "buildSlotC", "startDefense"]);
       RecalculateBuild();
       state.prepRemaining = 0; state.raid.active = true; state.raid.elapsed = 10; state.raid.stage = "东口灌烟"; state.raid.announcedStage = "东口灌烟";
       state.selectedRole = "leader";
@@ -1319,22 +1438,36 @@ function QaJumpToPhase(phaseId) {
       state.player.x = 9.2;
     }
   } else if (levelIndex === 1) {
-    if (phaseIndex >= 1) { QaComplete(["sniffRoute", "markPatrol"]); state.selectedRole = "rescuer"; state.player.x = -3.4; }
-    if (phaseIndex >= 2) { QaComplete(["repairCamo", "liftHatch", "crawlGap", "unbarGate"]); state.selectedRole = "rescuer"; state.player.x = 5.2; }
+    if (phaseIndex >= 1) {
+      QaComplete(["sniffRoute", "markPatrol"]); Object.assign(state.puzzle.transfer, { dogRouteKnown: true, patrolWindowKnown: true });
+      state.selectedRole = "rescuer"; state.player.x = -3.4;
+    }
+    if (phaseIndex >= 2) {
+      QaComplete(["repairCamo", "braceHatchBelow", "liftHatch", "crawlGap", "unbarGate"]);
+      Object.assign(state.puzzle.transfer, { camoReady: true, hatchBraced: true, hatchOpen: true, childInside: true, innerGateOpen: true });
+      state.selectedRole = "dog"; state.player.x = -8.35; state.player.layer = "tunnel";
+    }
     if (phaseIndex >= 3) {
-      QaComplete(["moveWounded", "moveGrain", "freeCourier"]);
+      QaComplete(["inspectForkClearance", "shoreWideBranch", "openLowDrain", "markWoundedWide", "markGrainLow", "moveWounded", "moveGrain", "traceCourierKnock", "freeCourier"]);
+      Object.assign(state.puzzle.transfer, { forkKnown: true, wideSupported: true, lowDrainOpen: true, woundedRoute: "wide", grainRoute: "low", courierBearingKnown: true });
       Object.assign(state.rescues, { wounded: true, grain: true, courier: true });
       state.selectedRole = "child"; state.player.x = 10;
     }
   } else if (levelIndex === 2) {
     if (phaseIndex >= 1) {
-      QaComplete(["placeHelmet", "fireCracker", "routeHorn"]);
-      state.tricks = new Set(["placeHelmet", "fireCracker", "routeHorn"]);
-      state.alert = 59; state.morale = 52; state.player.x = -5.8;
+      QaComplete(["readSurfaceTraces", "sniffEchoNetwork", "tapEmptyBranch"]);
+      Object.assign(state.puzzle.deception, { approachKnown: true, echoKnown: true, emptyBranchKnown: true });
+      state.selectedRole = "scout"; state.player.x = -1.75; state.player.layer = "tunnel";
     }
     if (phaseIndex >= 2) {
-      QaComplete(["misdirectSquad", "closeFalseGate", "finalSignal"]);
-      state.morale = 6; state.player.x = 8.8;
+      QaComplete(["chooseDecoyWest", "routeHornEastRear", "sealCenterFalseEntrance", "testDeception"]);
+      Object.assign(state.puzzle.deception, { visibleDecoy: "west", acousticRoute: "eastRear", falseEntrance: "centerSealed", solved: true, contradictions: 3, enemyBelief: "西院有痕 · 东后方有人 · 中口封土通东" });
+      state.player.x = -9; state.player.layer = "surface";
+    }
+    if (phaseIndex >= 3) {
+      QaComplete(["springWestDecoy", "pulseEastHorn", "dropEmptyBranchGate"]);
+      state.tricks = new Set(["springWestDecoy", "pulseEastHorn"]); state.morale = 42;
+      state.puzzle.deception.enemyBelief = "eastEmptyBranch"; state.player.x = 8.8; state.player.layer = "tunnel";
     }
   } else if (levelIndex === 3) {
     if (phaseIndex >= 1) {
@@ -1355,6 +1488,7 @@ function QaJumpToPhase(phaseId) {
   }
   const phase = CurrentPhase();
   state.player.layer = phase.layer;
+  SyncSelectedRolePosition();
   state.camera.x = state.player.x; state.camera.targetX = state.player.x;
   state.camera.zoom = 1; state.camera.targetZoom = 1;
   Show(ui.titleScreen, false); Show(ui.levelPanel, false); Show(ui.levelComplete, false); Show(ui.missionFailure, false); Show(ui.dialoguePanel, false); Show(ui.buildPanel, false);
@@ -1399,12 +1533,13 @@ function ContextHint() {
     const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
     return `先藏到${cover?.label || "场景遮挡"}后`;
   }
-  if (state.levelIndex === 0 && ["collect", "build"].includes(state.phaseId)) return `距扫荡 ${Math.ceil(state.prepRemaining)} 秒 · 通风 ${state.defense.ventilation}/3 · 防御 ${state.defense.strength}/4`;
+  if (state.levelIndex === 0 && ["collect", "build"].includes(state.phaseId)) return `距扫荡 ${Math.ceil(state.prepRemaining)} 秒 · 勘探 ${Object.values(state.puzzle.survey).filter(Boolean).length}/3 · 机关位置 ${state.defense.siteMatches.filter(Boolean).length}/3`;
   if (state.levelIndex === 0 && state.phaseId === "defense") {
     const distraction = state.raid.distraction ? ` · ${state.raid.distraction.label} ${Math.ceil(state.raid.distraction.remaining)}秒` : "";
     return `${state.raid.stage}${distraction} · 地表调敌，地下封闸`;
   }
-  if (state.levelIndex === 2 && state.phaseId === "harass") return `至少 3 种诡计且士气 ≤ 55；已用 ${state.tricks.size} 种`;
+  if (state.levelIndex === 1 && state.phaseId === "transfer") return `担架 ${state.puzzle.transfer.woundedRoute || "未定"} · 粮 ${state.puzzle.transfer.grainRoute || "未定"} · 每个角色停留在自己的位置`;
+  if (state.levelIndex === 2 && state.phaseId === "compose") return `痕迹 ${state.puzzle.deception.visibleDecoy || "未定"} · 声路 ${state.puzzle.deception.acousticRoute || "未定"} · 假口 ${state.puzzle.deception.falseEntrance || "未定"}`;
   const layerName = ({ surface: "地表", tunnel: "地道", interior: "屋内", roof: "房顶" })[state.player.layer] || state.player.layer;
   return `${roleDefinitions[state.selectedRole].name} · ${layerName}`;
 }
@@ -1417,18 +1552,20 @@ function Metric(label, value, detail = "", meter = null, inverse = false, icon =
 function MetricsMarkup() {
   if (state.levelIndex === 0) {
     const resources = Metric("材料", `木${state.resources.wood} 铁${state.resources.iron}`, `硝灰 ${state.resources.powder} / 药 ${state.resources.medicine} / 粮 ${state.resources.grain}`, null, false, "材");
-    const timer = Metric("扫荡倒计时", `${Math.max(0, Math.ceil(state.prepRemaining))}秒`, "归零后敌军自动入村，未完工机关不会补齐", state.prepRemaining / 92 * 100, false, "时");
+    const timer = Metric("扫荡倒计时", `${Math.max(0, Math.ceil(state.prepRemaining))}秒`, "归零后敌军自动入村，错误位置的机关会把烟水送向乡亲", state.prepRemaining / 128 * 100, false, "时");
     if (state.phaseId === "collect") {
       const carried = state.level.actions.filter((action) => action.phase === "collect" && action.prop?.mode === "take" && state.completed.has(action.id)).map((action) => action.prop.label);
       return [timer, resources, Metric("已携带", `${carried.length}/4`, carried.join(" · ") || "靠近场景中的实物后拿取", carried.length / 4 * 100, false, "包")].join("");
     }
-    if (state.phaseId === "build") return [timer, resources, Metric("通风", state.defense.ventilation, "安全线 ≥ 3", state.defense.ventilation / 5 * 100, false, "风"), Metric("防御", state.defense.strength, "安全线 ≥ 4", state.defense.strength / 6 * 100, false, "守")].join("");
+    if (state.phaseId === "build") return [timer, resources, Metric("勘探", `${Object.values(state.puzzle.survey).filter(Boolean).length}/3`, "水线 · 中央土层 · 风向", Object.values(state.puzzle.survey).filter(Boolean).length / 3 * 100, false, "察"), Metric("机关位置", `${state.defense.siteMatches.filter(Boolean).length}/3`, "西井回流闸 · 中央翻板闸 · 东口导烟板", state.defense.siteMatches.filter(Boolean).length / 3 * 100, false, "构")].join("");
     const highestSmoke = Math.max(0, ...state.civilians.map((civilian) => civilian.smokeDose));
     const highestWater = Math.max(0, ...state.civilians.map((civilian) => civilian.waterDose));
     const enemyMovement = state.raid.distraction ? `${state.raid.distraction.label} ${Math.ceil(state.raid.distraction.remaining)}秒` : "分散搜查";
     return [Metric("扫荡", `${Math.ceil(state.raid.elapsed)}/${state.raid.duration}秒`, state.raid.stage, state.raid.elapsed / state.raid.duration * 100, false, "袭"), Metric("敌兵动向", enemyMovement, "警钟削弱东口灌烟；炮仗削弱西井灌水", state.raid.distraction ? state.raid.distraction.remaining / state.raid.distraction.duration * 100 : 0, false, "声"), Metric("烟剂量", `${Math.round(highestSmoke)}%`, "任一乡亲达到 100% 即失败", highestSmoke, true, "烟"), Metric("水剂量", `${Math.round(highestWater)}%`, "任一乡亲达到 100% 即失败", highestWater, true, "水")].join("");
   }
   if (state.levelIndex === 1) return [
+    Metric("跨层开路", `${[state.puzzle.transfer.camoReady, state.puzzle.transfer.hatchBraced, state.puzzle.transfer.childInside, state.puzzle.transfer.innerGateOpen].filter(Boolean).length}/4`, "外侧伪装 · 地下支门 · 孩子钻缝 · 内侧开闩", null, false, "接"),
+    Metric("路线", `伤${state.puzzle.transfer.woundedRoute === "wide" ? "宽" : state.puzzle.transfer.woundedRoute === "low" ? "低" : "—"} 粮${state.puzzle.transfer.grainRoute === "low" ? "低" : state.puzzle.transfer.grainRoute === "wide" ? "宽" : "—"}`, "担架走支护宽洞；粮包拆小走排水低梁", null, false, "路"),
     Metric("转移", requiredRescues.filter((key) => state.rescues[key]).length + "/3", "伤员 · 粮食 · 联络员", requiredRescues.filter((key) => state.rescues[key]).length / 3 * 100, false, "转"),
     Metric("记忆", `${state.memories.length}/2`, state.memories.join(" · ") || "可选，不阻塞转移", null, false, "忆")
   ].join("");
@@ -1439,9 +1576,9 @@ function MetricsMarkup() {
     Metric("屋脊敌兵", `${state.combat.neutralized}/4`, state.combat.alarm ? "已交火：敌兵会还击" : "尚未惊动：背后 E 可无声制服", state.combat.neutralized / 4 * 100, false, "敌")
   ].join("");
   return [
-    Metric("敌军警觉", Math.round(state.alert), "只由诡计和被发现改变", state.alert, true, "警"),
-    Metric("士气", Math.round(state.morale), state.morale <= 55 ? "已到恐慌断点" : "继续制造矛盾信息", state.morale, false, "志"),
-    Metric("诡计", `${state.tricks.size}/3`, "三种不同异常可触发恐慌", state.tricks.size / 3 * 100, false, "计")
+    Metric("敌军警觉", Math.round(state.alert), `试错 ${state.puzzle.deception.mistakes} 次`, state.alert, true, "警"),
+    Metric("矛盾", `${state.puzzle.deception.contradictions}/3`, "可见痕迹 · 声音来向 · 假翻口必须互相冲突", state.puzzle.deception.contradictions / 3 * 100, false, "疑"),
+    Metric("敌军判断", state.puzzle.deception.enemyBelief, "不是压空士气条，而是让敌人形成一条具体错误路线", null, false, "误")
   ].join("");
 }
 
@@ -1513,6 +1650,7 @@ function Update(delta) {
   } else {
     state.player.step += delta * .72;
   }
+  SyncSelectedRolePosition();
   UpdateCoverState();
   const targetX = Math.max(worldMin + 4, Math.min(worldMax - 4, state.player.x + state.player.facing * .7));
   state.camera.x = Lerp(state.camera.x, targetX, 1 - Math.pow(.002, delta));
@@ -1877,11 +2015,137 @@ function LayerBaseY(layer, worldX, height, surfaceY, tunnelY) {
   return surfaceY - 5;
 }
 
+function DrawPathArrow(fromX, fromY, toX, toY, color, dashed = false) {
+  context.save(); context.strokeStyle = color; context.fillStyle = color; context.lineWidth = 2.4;
+  if (dashed) context.setLineDash([7, 6]);
+  context.beginPath(); context.moveTo(fromX, fromY); context.quadraticCurveTo((fromX + toX) / 2, Math.min(fromY, toY) - 13, toX, toY); context.stroke();
+  const angle = Math.atan2(toY - fromY, toX - fromX); context.translate(toX, toY); context.rotate(angle);
+  context.beginPath(); context.moveTo(0, 0); context.lineTo(-10, -5); context.lineTo(-10, 5); context.closePath(); context.fill(); context.restore();
+}
+
+function DrawPuzzleFocusPool(screenX, screenY, radius, tone) {
+  const gradient = context.createRadialGradient(screenX, screenY, 3, screenX, screenY, radius);
+  gradient.addColorStop(0, tone);
+  gradient.addColorStop(.42, tone.replace(/[^,]+\)$/, ".08)"));
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  context.fillStyle = gradient;
+  context.beginPath(); context.arc(screenX, screenY, radius, 0, Math.PI * 2); context.fill();
+}
+
+function DrawPuzzleNodeBadge(screenX, screenY, label, tone) {
+  context.save();
+  context.font = "900 9px system-ui";
+  context.textAlign = "center";
+  const badgeWidth = Math.max(62, Math.min(104, context.measureText(label).width + 24));
+  context.shadowColor = "rgba(0,0,0,.78)";
+  context.shadowBlur = 8;
+  context.fillStyle = "rgba(12,17,16,.9)";
+  context.strokeStyle = tone;
+  context.lineWidth = 1.5;
+  context.beginPath(); context.roundRect(screenX - badgeWidth / 2, screenY - 11, badgeWidth, 22, 4); context.fill(); context.stroke();
+  context.shadowBlur = 0;
+  context.fillStyle = tone;
+  context.beginPath(); context.arc(screenX - badgeWidth / 2 + 8, screenY, 3, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "#f3ead4";
+  context.fillText(label, screenX + 4, screenY + 3);
+  context.restore();
+}
+
+function DrawPuzzleTopology(width, height, surfaceY, tunnelY) {
+  const tunnelCenter = (worldX) => (TunnelCeilingYAt(worldX, height, tunnelY) + TunnelFloorYAt(worldX, height, tunnelY)) / 2;
+  context.save(); context.font = "800 10px system-ui"; context.textAlign = "center";
+  if (state.levelIndex === 0 && ["build", "defense"].includes(state.phaseId)) {
+    if (state.puzzle.survey.waterKnown || state.phaseId === "defense") {
+      DrawPathArrow(WorldToScreen(-9.8, width), tunnelCenter(-9.8) + 24, WorldToScreen(-7.1, width), tunnelCenter(-7.1) + 27, "rgba(75,178,194,.82)");
+      context.fillStyle = "rgba(157,221,221,.82)"; context.font = "800 10px system-ui"; context.fillText("西井水线 → 低位回流", WorldToScreen(-9.25, width), tunnelCenter(-9.25) + 48);
+    }
+    if (state.puzzle.survey.centerKnown || state.phaseId === "defense") {
+      context.strokeStyle = "rgba(221,181,103,.64)"; context.lineWidth = 5; context.beginPath(); context.moveTo(WorldToScreen(-1.6, width), tunnelCenter(-1.6)); context.lineTo(WorldToScreen(1.6, width), tunnelCenter(1.6)); context.stroke();
+      context.fillStyle = "rgba(237,205,137,.8)"; context.fillText("中央直道 · 横向分割", WorldToScreen(-.7, width), tunnelCenter(-.7) - 25);
+    }
+    if (state.puzzle.survey.windKnown || state.phaseId === "defense") {
+      DrawPathArrow(WorldToScreen(9.7, width), tunnelCenter(9.7), WorldToScreen(7.2, width), tunnelCenter(7.2) - 42, "rgba(200,205,166,.82)");
+      context.fillStyle = "rgba(228,224,184,.82)"; context.fillText("东口烟气 ↗ 空支洞", WorldToScreen(7.7, width), tunnelCenter(7.7) - 52);
+    }
+  } else if (state.levelIndex === 1 && state.phaseId === "transfer") {
+    const forkX = WorldToScreen(-8.35, width); const forkY = tunnelCenter(-8.35);
+    const wideX = WorldToScreen(-2.8, width); const lowX = WorldToScreen(2.85, width);
+    DrawPathArrow(forkX, forkY - 2, wideX, tunnelCenter(-2.8) - 31, state.puzzle.transfer.wideSupported ? "rgba(92,207,198,.82)" : "rgba(179,133,78,.48)");
+    DrawPathArrow(forkX, forkY + 12, lowX, tunnelCenter(2.85) + 29, state.puzzle.transfer.lowDrainOpen ? "rgba(93,173,196,.82)" : "rgba(117,88,62,.58)");
+    context.font = "900 10px system-ui"; context.textAlign = "center";
+    context.fillStyle = state.puzzle.transfer.wideSupported ? "#bdeee4" : "#b89d74"; context.fillText(`高支洞 · ${state.puzzle.transfer.wideSupported ? "担架" : "松土"}`, WorldToScreen(-5.1, width), tunnelCenter(-5.1) - 57);
+    context.fillStyle = state.puzzle.transfer.lowDrainOpen ? "#aadce4" : "#a98b68"; context.fillText(`低梁孔 · ${state.puzzle.transfer.lowDrainOpen ? "小粮包" : "积水"}`, WorldToScreen(1.35, width), tunnelCenter(1.35) + 57);
+  } else if (state.levelIndex === 2 && ["compose", "execute"].includes(state.phaseId)) {
+    const route = state.puzzle.deception.acousticRoute;
+    const hornX = WorldToScreen(route === "westFront" ? -1.75 : .55, width);
+    const sourceY = tunnelCenter(route === "westFront" ? -1.75 : .55);
+    const exitWorldX = route === "westFront" ? -5.4 : 7.4;
+    const exitX = WorldToScreen(exitWorldX, width);
+    const decoyWorldX = state.puzzle.deception.visibleDecoy === "west" ? -9 : state.puzzle.deception.visibleDecoy === "east" ? 8.05 : -9;
+    const hatchWorldX = state.puzzle.deception.falseEntrance === "centerSealed" ? 6.65 : 4.15;
+    const decoyX = WorldToScreen(decoyWorldX, width);
+    const hatchX = WorldToScreen(hatchWorldX, width);
+    const hatchY = tunnelCenter(hatchWorldX);
+    context.save();
+    context.globalCompositeOperation = "screen";
+    DrawPuzzleFocusPool(decoyX, surfaceY - 18, 78, "rgba(224,169,76,.18)");
+    DrawPuzzleFocusPool(exitX, surfaceY - 31, 72, "rgba(72,202,205,.17)");
+    DrawPuzzleFocusPool(hatchX, hatchY, 78, "rgba(224,169,76,.16)");
+    context.restore();
+    context.shadowColor = "rgba(75,222,224,.72)"; context.shadowBlur = 7;
+    DrawPathArrow(hornX, sourceY, exitX, surfaceY - 31, route ? "rgba(103,229,227,.98)" : "rgba(111,164,163,.58)", true);
+    context.shadowColor = "rgba(232,177,85,.55)"; context.shadowBlur = 6;
+    context.strokeStyle = "rgba(238,185,89,.95)"; context.lineWidth = 3; context.setLineDash([5, 6]); context.beginPath();
+    context.moveTo(decoyX, surfaceY - 18); context.lineTo(hatchX, hatchY); context.stroke();
+    context.shadowBlur = 0; context.setLineDash([]);
+    context.font = "900 10px system-ui"; context.textAlign = "center"; context.fillStyle = "rgba(248,232,195,.96)";
+    context.fillText(`矛盾 ${state.puzzle.deception.contradictions}/3`, WorldToScreen(2.5, width), tunnelCenter(2.5) - 48);
+  }
+  context.restore();
+}
+
+function DrawPuzzleEndpointBadges(width, height, surfaceY, tunnelY) {
+  if (state.levelIndex !== 2 || !["compose", "execute"].includes(state.phaseId)) return;
+  const tunnelCenter = (worldX) => (TunnelCeilingYAt(worldX, height, tunnelY) + TunnelFloorYAt(worldX, height, tunnelY)) / 2;
+  const route = state.puzzle.deception.acousticRoute;
+  const decoyWorldX = state.puzzle.deception.visibleDecoy === "east" ? 8.05 : -9;
+  const hornWorldX = route === "westFront" ? -1.75 : .55;
+  const exitWorldX = route === "westFront" ? -5.4 : 7.4;
+  const hatchWorldX = state.puzzle.deception.falseEntrance === "centerSealed" ? 6.65 : 4.15;
+  const decoyX = WorldToScreen(decoyWorldX, width);
+  const decoyY = surfaceY - 18;
+  context.save();
+  context.strokeStyle = "rgba(231,179,92,.92)"; context.lineWidth = 1.5;
+  context.beginPath(); context.arc(decoyX, decoyY, 8, 0, Math.PI * 2); context.moveTo(decoyX, decoyY - 8); context.lineTo(decoyX, surfaceY - 76); context.stroke();
+  context.restore();
+  DrawPuzzleNodeBadge(decoyX, surfaceY - 88, state.puzzle.deception.visibleDecoy === "east" ? "东井假痕" : state.puzzle.deception.visibleDecoy === "west" ? "西院假痕" : "诱饵未定", "#e7b35c");
+  DrawPuzzleNodeBadge(WorldToScreen(exitWorldX, width), surfaceY - 70, route === "westFront" ? "西墙出声" : route === "eastRear" ? "东后出声" : "声路未定", "#76dfdd");
+  DrawPuzzleNodeBadge(WorldToScreen(hornWorldX, width), tunnelCenter(hornWorldX) - 31, "地下声门", "#76dfdd");
+  DrawPuzzleNodeBadge(WorldToScreen(hatchWorldX, width), tunnelCenter(hatchWorldX) + 35, state.puzzle.deception.falseEntrance === "centerSealed" ? "中封东引" : state.puzzle.deception.falseEntrance === "westOpen" ? "西口敞开" : "假口未定", "#e7b35c");
+}
+
+function DrawInactiveRoles(width, height, surfaceY, tunnelY) {
+  if (!state.rolePositions || state.levelIndex === 0 || state.mode === "title") return;
+  for (const roleId of state.level.roleIds) {
+    if (roleId === state.selectedRole || roleId === "dog") continue;
+    const position = state.rolePositions[roleId];
+    if (!position) continue;
+    const profile = actorProfiles[roleId];
+    const role = roleDefinitions[roleId];
+    const x = WorldToScreen(position.x, width);
+    const baseY = LayerBaseY(position.layer, position.x, height, surfaceY, tunnelY);
+    const scale = Math.min(width, 1100) / 26 * .038;
+    const figureHeight = profile.height * 39 * scale;
+    context.save(); context.globalAlpha = .56; context.translate(x, baseY); context.scale(position.facing, 1); DrawHumanActor(profile, roleId, figureHeight); context.restore();
+    context.save(); context.textAlign = "center"; context.font = "800 9px system-ui"; context.fillStyle = "rgba(8,13,15,.78)"; context.fillRect(x - 28, baseY + 6, 56, 17); context.fillStyle = "#e7dbc0"; context.fillText(`${role.short} · 等候`, x, baseY + 18); context.restore();
+  }
+}
+
 function Draw() {
   const { width, height } = ResizeCanvas();
   const surfaceY = height * .48;
   const tunnelY = height * .76;
-  const daylight = state.levelIndex === 0 && state.phaseId === "collect" ? 0 : state.levelIndex === 2 ? .2 : state.levelIndex === 3 ? .16 : .55;
+  const daylight = state.levelIndex === 0 && state.phaseId === "collect" ? 0 : state.levelIndex === 2 ? .26 : state.levelIndex === 3 ? .16 : .55;
   DrawSky(width, height, surfaceY, daylight);
   DrawVillage(width, height, surfaceY);
   DrawSurfaceDepthVeil(width, height, surfaceY, daylight);
@@ -1898,6 +2162,7 @@ function Draw() {
   DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
   DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
   DrawSceneHierarchyVeil(width, height, surfaceY, tunnelY);
+  DrawPuzzleTopology(width, height, surfaceY, tunnelY);
   if (state.levelIndex === 3) DrawCombatCovers(width, height, surfaceY, tunnelY, false);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
   if (!state.takedown && !state.qaPatrolReview && !ActivePatrolLure("dogBark")) DrawActions(width, height, surfaceY, tunnelY);
@@ -1905,6 +2170,7 @@ function Draw() {
   DrawEnemies(width, height, surfaceY, tunnelY);
   DrawUnconsciousEnemies(width, height, surfaceY, tunnelY);
   DrawTakedownTarget(width, height, surfaceY, tunnelY);
+  DrawInactiveRoles(width, height, surfaceY, tunnelY);
   DrawCivilians(width, height, tunnelY);
   DrawDogCompanion(width, height, surfaceY, tunnelY);
   if (!ActivePatrolLure("dogBark")) DrawActor(width, height, surfaceY, tunnelY);
@@ -1917,6 +2183,7 @@ function Draw() {
   DrawDogBarkLure(width, surfaceY);
   DrawDogCommandFocus(width, height, surfaceY, tunnelY);
   DrawCombatEffects(width, height, surfaceY, tunnelY);
+  DrawPuzzleEndpointBadges(width, height, surfaceY, tunnelY);
   DrawCombatHud(width, height);
   if (!ActivePatrolLure("dogBark")) DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
@@ -3335,7 +3602,7 @@ function QaInspectHazard(kind) {
   }
   if (kind === "dogBark") {
     if (!state.level.roleIds.includes("dog")) return;
-    QaJumpToPhase(state.levelIndex === 0 ? "collect" : "survey");
+    QaJumpToPhase(state.levelIndex === 0 ? "collect" : state.levelIndex === 1 ? "survey" : "recon");
     EndCinematic();
     state.selectedRole = "dog";
     state.player.layer = "surface";
@@ -3356,7 +3623,7 @@ function QaInspectHazard(kind) {
     return;
   }
   if (kind === "patrolWindow") {
-    const phaseId = state.levelIndex === 0 ? "collect" : state.levelIndex === 1 ? "survey" : "harass";
+    const phaseId = state.levelIndex === 0 ? "collect" : state.levelIndex === 1 ? "survey" : "recon";
     QaJumpToPhase(phaseId);
     EndCinematic();
     state.player.layer = "surface";
@@ -3376,9 +3643,39 @@ function QaInspectHazard(kind) {
     Toast(`巡逻已错峰：${GetEnemyPatrols().length} 名敌兵分区巡逻，中间留有可穿越空档。`, "success");
     return;
   }
+  if (["transferWrong", "transferSolved"].includes(kind)) {
+    if (state.levelIndex !== 1) return;
+    QaJumpToPhase("transfer"); EndCinematic();
+    Object.assign(state.puzzle.transfer, {
+      forkKnown: true, wideSupported: true, lowDrainOpen: true,
+      woundedRoute: kind === "transferSolved" ? "wide" : "low",
+      grainRoute: kind === "transferSolved" ? "low" : "wide"
+    });
+    QaComplete(["inspectForkClearance", "shoreWideBranch", "openLowDrain"]);
+    state.selectedRole = kind === "transferWrong" ? "rescuer" : "student"; state.player.layer = "tunnel"; state.player.x = kind === "transferWrong" ? -2.65 : -.1;
+    state.camera.x = -1.6; state.camera.targetX = -1.6; state.camera.zoom = .88; state.camera.targetZoom = .88;
+    SyncSelectedRolePosition(); RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    Toast(kind === "transferSolved" ? "正确分路：担架走支护宽洞，粮包走排水低梁。" : "错误分路：担架卡低梁，粮袋占住宽洞。", kind === "transferSolved" ? "success" : "warning");
+    return;
+  }
+  if (["deceptionWrong", "deceptionSolved"].includes(kind)) {
+    if (state.levelIndex !== 2) return;
+    QaJumpToPhase("compose"); EndCinematic();
+    Object.assign(state.puzzle.deception, {
+      visibleDecoy: "west", acousticRoute: kind === "deceptionSolved" ? "eastRear" : "westFront",
+      falseEntrance: kind === "deceptionSolved" ? "centerSealed" : "westOpen",
+      solved: kind === "deceptionSolved", contradictions: kind === "deceptionSolved" ? 3 : 0,
+      enemyBelief: kind === "deceptionSolved" ? "西院有痕 · 东后方有人 · 中口封土通东" : "三条线索都指向西院"
+    });
+    state.player.layer = "tunnel"; state.player.x = 2.15; state.camera.x = 0; state.camera.targetX = 0; state.camera.zoom = .84; state.camera.targetZoom = .84;
+    state.qaCameraFocus = { x: 0, zoom: .84 };
+    SyncSelectedRolePosition(); RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    Toast(kind === "deceptionSolved" ? "三重矛盾成立：敌军将转入东空支洞。" : "顺向线索会被一路查穿，必须重接声门和假口。", kind === "deceptionSolved" ? "success" : "warning");
+    return;
+  }
   if (["enemyHud", "enemyHudJapanese", "takedownReady", "takedownReadyCollaborator", "takedownNext"].includes(kind)) {
     if (state.levelIndex !== 2) return;
-    if (kind !== "takedownNext") QaJumpToPhase("harass");
+    if (kind !== "takedownNext") QaJumpToPhase("recon");
     EndCinematic();
     state.selectedRole = "scout";
     state.player.layer = "surface";
@@ -3408,7 +3705,7 @@ function QaInspectHazard(kind) {
   }
   if (kind === "takedown") {
     if (state.levelIndex !== 2) return;
-    QaJumpToPhase("harass");
+    QaJumpToPhase("recon");
     EndCinematic();
     const previewPatrols = GetEnemyPatrols();
     const target = { ...(previewPatrols[0] || {}), x: 1.2, facing: 1, unitType: "soldier", index: 0 };
@@ -4151,11 +4448,11 @@ function DrawLighting(width, height, surfaceY, tunnelY, daylight) {
 }
 
 function PropSupportLift(support) {
-  return ({ ground: 0, tray: -7, lowCrate: -21, plankTable: -27, jarShelf: -16, cloth: -3, pallet: -6, wellPeg: -9, crate: -27, rifleRack: -38 })[support] ?? 0;
+  return ({ ground: 0, tray: -7, lowCrate: -21, plankTable: -27, jarShelf: -16, cloth: -3, pallet: -6, wellPeg: -9, crate: -27, rifleRack: -38, wallNiche: -18 })[support] ?? 0;
 }
 
 function PropVisualHeight(kind) {
-  return ({ timberStack: 22, ironFittings: 26, powderJar: 34, reliefBundle: 35, capturePile: 32, hiddenLetter: 27, thimble: 29, woundedStretcher: 31, grainSacks: 34, ropeCoil: 31, soldierBoot: 28, fieldRadioMap: 48, combatRifle: 38, ammoBox: 22, combatGrenade: 27 })[kind] ?? 28;
+  return ({ timberStack: 22, ironFittings: 26, powderJar: 34, reliefBundle: 35, capturePile: 32, hiddenLetter: 27, thimble: 29, woundedStretcher: 31, grainSacks: 34, ropeCoil: 31, soldierBoot: 28, fieldRadioMap: 48, combatRifle: 38, ammoBox: 22, combatGrenade: 27, seepBowl: 21, draftRibbon: 34, soilProbe: 39, routeMarker: 34, camoNet: 42, supportBrace: 47, drainSluice: 31, innerLatch: 37, hornValve: 42, falseHatch: 29, decoyBundle: 31 })[kind] ?? 28;
 }
 
 function DrawPropSupport(support, scale, empty) {
@@ -4194,6 +4491,10 @@ function DrawPropSupport(support, scale, empty) {
     context.fillStyle = "#563b29"; context.fillRect(-43, -43, 86, 8); context.fillRect(-43, -15, 86, 7);
     context.strokeStyle = "#aa7c49"; context.lineWidth = 2; context.strokeRect(-43, -43, 86, 8); context.strokeRect(-43, -15, 86, 7);
     [-28, 28].forEach((x) => { context.strokeStyle = "#37271e"; context.lineWidth = 5; context.beginPath(); context.moveTo(x, -46); context.lineTo(x, -5); context.stroke(); });
+  } else if (support === "wallNiche") {
+    context.fillStyle = "rgba(15,20,18,.72)"; context.strokeStyle = "rgba(177,130,73,.55)"; context.lineWidth = 2;
+    context.beginPath(); context.roundRect(-30, -44, 60, 43, 12); context.fill(); context.stroke();
+    context.strokeStyle = "rgba(225,179,103,.28)"; context.beginPath(); context.moveTo(-22, -6); context.lineTo(21, -6); context.stroke();
   } else if (empty) {
     context.strokeStyle = "rgba(187,145,84,.35)"; context.lineWidth = 2;
     context.beginPath(); context.moveTo(-18, -1); context.lineTo(-7, -5); context.moveTo(3, -2); context.lineTo(17, -5); context.stroke();
@@ -4204,7 +4505,50 @@ function DrawPropSupport(support, scale, empty) {
 function DrawPropObject(kind, scale = 1, ghost = false) {
   context.save(); context.scale(scale, scale); context.globalAlpha = ghost ? .24 : 1;
   if (ghost) context.setLineDash([4, 3]);
-  if (kind === "timberStack") {
+  if (kind === "seepBowl") {
+    context.fillStyle = "#8b6546"; context.strokeStyle = "#d0a46c"; context.lineWidth = 2;
+    context.beginPath(); context.ellipse(0, -5, 20, 8, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = "rgba(75,156,167,.82)"; context.beginPath(); context.ellipse(0, -7, 15, 4.5, 0, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#58b8c1"; context.beginPath(); context.moveTo(-29, -2); context.quadraticCurveTo(-22, -15, -14, -7); context.moveTo(15, -8); context.quadraticCurveTo(24, -16, 30, -4); context.stroke();
+  } else if (kind === "draftRibbon") {
+    context.strokeStyle = "#8b623d"; context.lineWidth = 4; context.beginPath(); context.moveTo(-18, 2); context.lineTo(-18, -34); context.stroke();
+    context.strokeStyle = "#d6b064"; context.lineWidth = 3; context.beginPath(); context.moveTo(-17, -29); context.bezierCurveTo(-2, -36, 8, -19, 27, -27); context.stroke();
+    context.fillStyle = "#4eb9bd"; context.beginPath(); context.moveTo(27, -27); context.lineTo(17, -32); context.lineTo(20, -22); context.closePath(); context.fill();
+  } else if (kind === "soilProbe") {
+    context.strokeStyle = "#c0a062"; context.lineWidth = 4; context.beginPath(); context.moveTo(-22, 1); context.lineTo(15, -38); context.stroke();
+    context.fillStyle = "#6f4b31"; context.fillRect(8, -44, 22, 8);
+    context.strokeStyle = "#56b5b8"; context.lineWidth = 2; [-18, -3, 12].forEach((x, index) => { context.beginPath(); context.arc(x, -4 - index * 4, 4, 0, Math.PI * 2); context.stroke(); });
+  } else if (kind === "routeMarker") {
+    context.strokeStyle = "#805a36"; context.lineWidth = 5; context.beginPath(); context.moveTo(0, 2); context.lineTo(0, -31); context.stroke();
+    context.fillStyle = "#d1aa64"; context.strokeStyle = "#3a2b20"; context.lineWidth = 2; context.beginPath(); context.moveTo(-22, -34); context.lineTo(12, -34); context.lineTo(24, -24); context.lineTo(12, -14); context.lineTo(-22, -14); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = "#a64136"; context.lineWidth = 3; context.beginPath(); context.moveTo(-13, -24); context.lineTo(13, -24); context.lineTo(8, -29); context.moveTo(13, -24); context.lineTo(8, -19); context.stroke();
+  } else if (kind === "camoNet") {
+    context.strokeStyle = "#796844"; context.lineWidth = 3; context.beginPath(); context.moveTo(-31, 0); context.lineTo(-27, -39); context.lineTo(28, -34); context.lineTo(31, 1); context.stroke();
+    context.strokeStyle = "#a08b55"; context.lineWidth = 1.5; for (let x = -24; x <= 24; x += 12) { context.beginPath(); context.moveTo(x, -37); context.lineTo(x + 3, -1); context.stroke(); } for (let y = -31; y <= -7; y += 8) { context.beginPath(); context.moveTo(-28, y); context.lineTo(29, y + 4); context.stroke(); }
+    context.fillStyle = "#5f694b"; [-20, -5, 11, 22].forEach((x, index) => { context.beginPath(); context.ellipse(x, -28 + index % 2 * 12, 8, 3, -.5, 0, Math.PI * 2); context.fill(); });
+  } else if (kind === "supportBrace") {
+    context.strokeStyle = "#30251c"; context.lineWidth = 9; context.beginPath(); context.moveTo(-24, 2); context.lineTo(-20, -43); context.moveTo(24, 2); context.lineTo(20, -43); context.moveTo(-24, -40); context.lineTo(24, -40); context.stroke();
+    context.strokeStyle = "#a57543"; context.lineWidth = 5; context.beginPath(); context.moveTo(-24, 2); context.lineTo(-20, -43); context.moveTo(24, 2); context.lineTo(20, -43); context.moveTo(-24, -40); context.lineTo(24, -40); context.stroke();
+    context.fillStyle = "#d1a05d"; context.beginPath(); context.arc(0, -40, 5, 0, Math.PI * 2); context.fill();
+  } else if (kind === "drainSluice") {
+    context.fillStyle = "#5d4934"; context.strokeStyle = "#c09659"; context.lineWidth = 2; context.fillRect(-19, -27, 38, 25); context.strokeRect(-19, -27, 38, 25);
+    context.strokeStyle = "#56b8c2"; context.lineWidth = 3; context.beginPath(); context.moveTo(-30, 2); context.quadraticCurveTo(-9, -8, 7, 1); context.quadraticCurveTo(19, 7, 31, 0); context.stroke();
+    context.strokeStyle = "#d0aa66"; context.beginPath(); context.moveTo(0, -38); context.lineTo(0, -19); context.stroke();
+  } else if (kind === "innerLatch") {
+    context.fillStyle = "#7c5a38"; context.strokeStyle = "#d0a15f"; context.lineWidth = 2; context.fillRect(-31, -29, 62, 8); context.strokeRect(-31, -29, 62, 8); context.fillRect(-23, -13, 46, 7); context.strokeRect(-23, -13, 46, 7);
+    context.strokeStyle = "#5bb9bc"; context.lineWidth = 2; context.beginPath(); context.moveTo(25, -24); context.quadraticCurveTo(35, -10, 27, 3); context.stroke();
+  } else if (kind === "hornValve") {
+    context.fillStyle = "#a97d49"; context.strokeStyle = "#e0bd76"; context.lineWidth = 2; context.beginPath(); context.moveTo(-25, -18); context.lineTo(13, -32); context.lineTo(13, -5); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = "#747a68"; context.lineWidth = 7; context.beginPath(); context.moveTo(13, -18); context.lineTo(31, -18); context.stroke();
+    context.fillStyle = "#a64236"; context.beginPath(); context.arc(27, -37, 8, 0, Math.PI * 2); context.fill(); context.strokeStyle = "#e0bd76"; context.lineWidth = 2; context.beginPath(); context.moveTo(27, -37); context.lineTo(27, -18); context.stroke();
+  } else if (kind === "falseHatch") {
+    context.fillStyle = "#705038"; context.strokeStyle = "#d0a15f"; context.lineWidth = 2; context.beginPath(); context.moveTo(-29, -7); context.lineTo(23, -25); context.lineTo(31, -7); context.lineTo(-20, 9); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = "#35271f"; context.beginPath(); context.moveTo(-15, -12); context.lineTo(-7, 4); context.moveTo(2, -18); context.lineTo(10, -2); context.stroke();
+  } else if (kind === "decoyBundle") {
+    context.fillStyle = "#403332"; context.beginPath(); context.moveTo(-20, -5); context.lineTo(-15, -27); context.lineTo(0, -26); context.lineTo(3, -11); context.lineTo(21, -8); context.lineTo(24, 1); context.lineTo(-21, 1); context.closePath(); context.fill();
+    context.strokeStyle = "#c18e50"; context.lineWidth = 4; [8, 13, 18].forEach((radius) => { context.beginPath(); context.arc(19, -22, radius, 0, Math.PI * 1.55); context.stroke(); });
+    context.fillStyle = "#a64137"; context.beginPath(); context.arc(-8, -33, 4, 0, Math.PI * 2); context.fill();
+  } else if (kind === "timberStack") {
     for (let index = 0; index < 3; index += 1) {
       const y = -5 - index * 7;
       context.fillStyle = index === 1 ? "#9a7040" : "#ad7e46"; context.fillRect(-31 + index * 2, y - 6, 62, 7);
@@ -4311,7 +4655,7 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
   const enemyFocus = FindFocusedEnemy();
   const suppressMarkers = state.qaPatrolReview || Boolean(ActivePatrolLure("dogBark"));
   const focusedProp = enemyFocus ? null : state.level.actions
-    .filter((action) => action.phase === state.phaseId && action.layer === state.player.layer && action.prop && Math.abs(action.x - state.player.x) <= 1.9)
+    .filter((action) => action.phase === state.phaseId && action.layer === state.player.layer && action.prop && ActionRemainsAvailable(action) && Math.abs(action.x - state.player.x) <= 1.9)
     .sort((a, b) => Math.abs(a.x - state.player.x) - Math.abs(b.x - state.player.x))[0] || null;
   for (const action of state.level.actions) {
     if (action.phase !== state.phaseId || !action.prop || Boolean(action.prop.front) !== front) continue;
@@ -4320,23 +4664,29 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const x = WorldToScreen(propWorldX, width);
     const baseY = LayerBaseY(action.layer, propWorldX, height, surfaceY, tunnelY) - 5;
     const supportLift = PropSupportLift(action.prop.support) * sceneScale;
-    const present = action.prop.mode === "place" ? completed : !completed;
-    const empty = action.prop.mode !== "place" && completed;
+    const persistent = ["inspect", "operate"].includes(action.prop.mode);
+    const present = persistent || (action.prop.mode === "place" ? completed : !completed);
+    const empty = !persistent && action.prop.mode !== "place" && completed;
     const sameLayer = action.layer === state.player.layer;
     const focused = focusedProp?.id === action.id;
-    const entityScale = sceneScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
+    const chosenValue = action.puzzleChoice ? PuzzleValue(action.puzzleChoice.path) : null;
+    const choiceSelected = Boolean(action.puzzleChoice && chosenValue === action.puzzleChoice.value);
+    const choiceDimmed = Boolean(action.puzzleChoice && chosenValue !== null && !choiceSelected && !focused);
+    const choiceScale = action.puzzleChoice ? .82 : 1;
+    const entityScale = sceneScale * choiceScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
     context.save(); context.translate(x, baseY);
     if (suppressMarkers) context.globalAlpha = .34;
+    else if (choiceDimmed) context.globalAlpha = .22;
     DrawPropSupport(action.prop.support, sceneScale, empty);
     context.translate(0, supportLift);
     if (present) DrawPropObject(action.prop.kind, entityScale);
     else if (action.prop.mode === "place" && !completed) DrawPropObject(action.prop.kind, entityScale, true);
     context.restore();
 
-    const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
+    const locked = Boolean(MissingRequirement(action) || PuzzleRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * entityScale * .58;
-    if (!completed && sameLayer && !enemyFocus && !suppressMarkers) {
-      const markerColor = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.82)";
+    if ((!completed || action.repeatable) && sameLayer && !enemyFocus && !suppressMarkers) {
+      const markerColor = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : choiceDimmed ? "rgba(132,145,134,.42)" : choiceSelected ? "rgba(248,205,118,.9)" : "rgba(104,225,225,.82)";
       if (focused) DrawFocusBrackets(x, markerY, 25 * entityScale, 19 * entityScale, markerColor);
       else {
         context.save(); context.translate(x, markerY - 17 * entityScale); context.rotate(Math.PI / 4);
@@ -4370,11 +4720,11 @@ function DrawActions(width, height, surfaceY, tunnelY) {
   if (FindFocusedEnemy()) return;
   const nearest = FindNearestAction();
   for (const action of state.level.actions) {
-    if (action.phase !== state.phaseId || action.layer !== state.player.layer || (state.completed.has(action.id) && action.buildSlot === undefined)) continue;
+    if (action.phase !== state.phaseId || action.layer !== state.player.layer || !ActionRemainsAvailable(action)) continue;
     if (action.prop) continue;
     const x = WorldToScreen(action.x, width);
     const y = action.layer === "tunnel" ? TunnelCenterYAt(action.x, tunnelY) - 4 : LayerBaseY(action.layer, action.x, height, surfaceY, tunnelY) - 10;
-    const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
+    const locked = Boolean(MissingRequirement(action) || PuzzleRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const focused = nearest?.id === action.id;
     const tone = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.78)";
     context.save(); context.translate(x, y - 27);
@@ -5635,6 +5985,8 @@ if (qaMode) {
     getState: () => ({
       level: state.level.id, phase: state.phaseId, x: state.player.x, layer: state.player.layer,
       role: state.selectedRole, completed: [...state.completed], resources: { ...state.resources }, buildSlots: [...state.buildSlots],
+      rolePositions: Object.fromEntries(Object.entries(state.rolePositions || {}).map(([roleId, position]) => [roleId, { ...position }])),
+      puzzle: JSON.parse(JSON.stringify(state.puzzle)),
       ventilation: state.defense.ventilation, defense: state.defense.strength, rescues: { ...state.rescues }, memories: [...state.memories],
       visibility: state.visibility, detection: state.detection, detected: state.detected, cover: state.player.coverId,
       alert: state.alert, morale: state.morale, tricks: [...state.tricks]

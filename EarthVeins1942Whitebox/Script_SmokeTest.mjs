@@ -18,7 +18,7 @@ const lightCode = Read("Script_LightSimulation.mjs");
 
 Assert(levelDefinitions.length === 4, "必须包含三个核心循环与一个屋脊战斗关");
 Assert(levelDefinitions.map((level) => level.id).join(",") === "undergroundWall,ensemble,mindGame,rooftopBattle", "四个关卡 ID 或顺序错误");
-Assert(levelDefinitions.map((level) => level.phases.length).join(",") === "4,4,3,4", "四关阶段数应为 4/4/3/4");
+Assert(levelDefinitions.map((level) => level.phases.length).join(",") === "4,4,4,4", "四关阶段数应为 4/4/4/4");
 Assert(!data.includes("campaignData") && !data.includes("cinematicSequences"), "旧七章线性战役导出仍存在");
 Assert(!game.includes("campaignData") && !game.includes("chapterIndex"), "运行脚本仍引用旧线性战役");
 
@@ -41,7 +41,9 @@ for (const a of buildOptions) for (const b of buildOptions) for (const c of buil
   const defense = options.reduce((sum, option) => sum + option.defense, 0);
   if (wood <= collected.wood && iron <= collected.iron && ventilation >= 3 && defense >= 4) feasible.push(options.map((option) => option.id).join("+"));
 }
-Assert(feasible.length >= 2, "第一关采集量必须支持至少两种合格建造组合");
+Assert(feasible.includes("floodGate+flipGate+smokeBaffle"), "第一关材料必须支持西井回流闸、中央翻板闸、东口导烟板的正确实地组合");
+Assert(game.includes('const expectedSites = ["floodGate", "flipGate", "smokeBaffle"]') && game.includes("机关位置不对") && game.includes("siteMatches"), "第一关仍只凑通风/防御总数，没有按真实位置判断三处机关");
+Assert(["inspectWestSeep", "whistleDraftGap", "probeCenterSoil"].every((id) => wall.actions.some((action) => action.id === id && (action.puzzleSet || action.dogCommand))), "第一关缺少水线、风向或中央土层三项勘探证据");
 Assert(wall.actions.some((action) => action.phaseGate) && wall.actions.filter((action) => action.triggerSlot !== undefined).length === 3, "第一关缺少迎敌门槛或三机关结算");
 const excavationActions = wall.actions.filter((action) => action.excavate);
 Assert(excavationActions.length === 3 && new Set(excavationActions.map((action) => action.excavate)).size === 3, "第一关必须实际挖开西、中、东三处避难支洞");
@@ -70,14 +72,21 @@ Assert(ensemble.actions.filter((action) => action.memory && action.optional).len
 Assert(ensemble.actions.filter((action) => action.memory || action.rescue === "wounded" || action.rescue === "grain").every((action) => action.prop?.kind && action.prop?.label), "记忆物、伤员或粮袋仍只有抽象交互点");
 Assert(ensemble.actions.find((action) => action.id === "findLetter")?.prop?.support === "lowCrate" && ensemble.actions.find((action) => action.id === "findThimble")?.prop?.support === "plankTable", "家书或铜顶针没有独立承托面，容易退化成地面贴片");
 Assert(game.includes("CycleRole") && game.includes("需要${roleDefinitions[action.role].name}"), "第二关缺少角色切换或错角色反馈");
+Assert(game.includes("rolePositions") && game.includes("SyncSelectedRolePosition") && game.includes("DrawInactiveRoles"), "第二关角色仍共享同一个瞬移坐标，没有形成隔墙接力");
+Assert(ensemble.actions.find((action) => action.id === "sniffRoute")?.effect === "enterTunnel", "阿土发现低风孔后没有真实留在地下，仍会和其他角色共享位置");
+Assert(["braceHatchBelow", "liftHatch", "crawlGap", "unbarGate"].every((id) => ensemble.actions.some((action) => action.id === id)), "第二关缺少地下支门、地表抬门、孩子钻缝和内侧开闩的跨层因果链");
+Assert(ensemble.actions.filter((action) => action.puzzleChoice?.path === "transfer.woundedRoute").length === 2 && ensemble.actions.filter((action) => action.puzzleChoice?.path === "transfer.grainRoute").length === 2, "第二关没有为担架与粮包提供可逆的岔路选择");
+Assert(ensemble.actions.find((action) => action.id === "moveWounded")?.puzzleCommit && ensemble.actions.find((action) => action.id === "moveGrain")?.puzzleCommit, "第二关错误分路仍会直接完成转移，没有实体净空与排水阻断");
 
 const mindGame = levelDefinitions[2];
 const tricks = mindGame.actions.filter((action) => action.trick);
-Assert(tricks.length >= 5, "第三关至少需要五种诡计");
-Assert(tricks.every((action) => Number.isFinite(action.alert) && action.alert > 0 && Number.isFinite(action.morale) && action.morale < 0), "每种诡计都必须有警觉与士气因果");
-Assert(mindGame.actions.filter((action) => action.panicStep).length === 3, "第三关必须有三步恐慌连锁");
+Assert(tricks.length === 2 && tricks.every((action) => Number.isFinite(action.alert) && action.alert > 0 && Number.isFinite(action.morale) && action.morale < 0), "第三关执行阶段的痕迹与传声必须保留警觉/士气因果");
+Assert(mindGame.actions.filter((action) => action.panicStep).length === 1 && mindGame.actions.some((action) => action.id === "dropEmptyBranchGate"), "第三关最终误导必须落到实体空支洞分流闸");
 Assert(mindGame.actions.find((action) => action.id === "captureIntel")?.prop?.offsetX >= 1, "地图电台没有与角色站位错开，实机中会被人物遮住");
-Assert(game.includes("state.tricks.size >= 3") && game.includes("state.morale <= 55"), "恐慌断点没有按诡计种类和士气双条件实现");
+Assert(mindGame.actions.filter((action) => action.puzzleChoice?.path === "deception.visibleDecoy").length === 2 && mindGame.actions.filter((action) => action.puzzleChoice?.path === "deception.acousticRoute").length === 2 && mindGame.actions.filter((action) => action.puzzleChoice?.path === "deception.falseEntrance").length === 2, "第三关没有形成可见诱饵、地下声路与假翻口三组可逆选择");
+Assert(mindGame.actions.find((action) => action.id === "testDeception")?.puzzleCommit?.expected.length === 3 && game.includes("state.puzzle.deception.contradictions = 3"), "第三关仍靠压空数值条通关，没有验证三条矛盾情报");
+Assert(game.includes("TryPuzzleCommit") && game.includes("commit.failAlert") && game.includes("ActionRemainsAvailable"), "谜题缺少错误组合反馈、警觉后果或可重复调整能力");
+Assert(game.includes("revealDeceptionNetwork") && game.includes("revealDeceptionNetwork ? 0") && game.includes("state.qaCameraFocus = { x: 0, zoom: .84 }") && game.includes("function DrawPuzzleEndpointBadges") && game.includes("DrawPuzzleNodeBadge(decoyX, surfaceY - 88"), "第三关成局后没有完整展示西院诱饵、东后声路与中封东引的全景镜头及端点");
 
 const rooftopBattle = levelDefinitions[3];
 Assert(rooftopBattle.phases.map((phase) => phase.layer).join(",") === "tunnel,interior,roof,roof", "第四关必须从地道进入室内，再由室内上房顶");
@@ -155,7 +164,7 @@ Assert(game.includes("CommandCivilianGroup") && game.includes("civilian.targetX"
 Assert(html.includes('id="civilianCommandPanel"') && html.includes('data-civilian-group="elders"') && html.includes('data-shelter="west"') && html.includes('id="missionFailure"'), "群众分组调度或物理暴露失败界面缺失");
 Assert(game.includes("DrawLighting") && game.includes("TunnelLightSdf") && lightCode.includes("TraceSdfRay") && lightCode.includes("BuildVisibilityPolygon"), "夜间/地道光照没有接入 SDF 遮挡与可见多边形软阴影");
 Assert(game.includes("GetEnemyPatrols") && game.includes("GetDetectionStrength") && game.includes("EnemyDetection(enemy) > 0") && game.includes("state.detection"), "敌兵警戒绘制与实际侦测规则没有共用数据");
-Assert(data.includes("这三根没受潮。你扶棚") && data.includes("跟紧我") && data.includes("等他们跑到空坡") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
+Assert(data.includes("这三根没受潮。你扶棚") && data.includes("别挤在同一片空地") && data.includes("他们看见西院痕迹了") && data.includes("人齐了，我关门") && !data.includes("前肩报稳，后肩再松"), "对白仍是说明书式书面句，没有完成人话改写");
 Assert(game.includes("qaMode") && game.includes("EarthVeinsWhiteboxQa") && game.includes("DrawQa"), "QA 标尺或只读状态入口缺失");
 Assert(css.includes("Minimal narrative HUD") && css.includes("#touchControls { display: none; }") && css.includes(".metricIcon"), "极简叙事 HUD 或桌面端触控隐藏规则缺失");
 Assert(html.includes('id="qaPanel"') && html.includes('id="qaPhaseButtons"') && game.includes("QaJumpToPhase") && game.includes("jumpToPhase"), "DEBUG 跳关面板或阶段跳转 API 缺失");
@@ -214,7 +223,7 @@ Assert(rayDistance >= 8 && rayDistance <= 11, "SDF 光线没有在遮挡墙面�
 Assert(game.includes("function CivilianVisualMetrics") && game.match(/CivilianVisualMetrics\(width, civilian\)/g)?.length >= 3, "civilian drawing and tunnel-light occlusion must share one responsive size model");
 Assert(game.includes("actorReferenceHeight * (child ? .47 : signalman ? .73 : .7)") && !game.includes('children\" ? 24'), "adult and child civilians must scale from the same on-screen actor reference instead of fixed tiny pixels");
 Assert(game.includes("const visualX = { signalman: -3.1") && game.includes("* .72 + group.offset") && game.includes('civilian.id === "childAn" || civilian.id === "childShi"'), "civilian groups must keep readable spacing and must not render the children\'s mother at child scale");
-Assert(game.includes("const entityScale = sceneScale * (focused && !completed ? 1.2") && game.includes("function DrawFocusBrackets") && game.includes("context.translate(x, markerY - 17 * entityScale)"), "focused key props must use restrained brackets and unfocused props a single diamond marker");
+Assert(game.includes("const entityScale = sceneScale * choiceScale * (focused && !completed ? 1.2") && game.includes("function DrawFocusBrackets") && game.includes("context.translate(x, markerY - 17 * entityScale)"), "focused key props must use restrained brackets and unfocused props a single diamond marker");
 Assert(game.includes("coverBlend: 0") && game.includes("1 - Math.pow(.00008, delta)") && game.includes("function ForegroundFocusAlpha") && game.includes("SmoothStep(nearRadius, farRadius, nearest)"), "foreground cover visibility must ease continuously around gameplay subjects");
 Assert(!game.includes("Math.abs(baseX - playerX) < 76") && !game.includes("Math.abs(baseX - playerX) < 52") && game.includes("ForegroundFocusAlpha(baseX, width, 64, 154, .2)") && game.includes("ForegroundFocusAlpha(x, width, 56, 142, .2)"), "foreground vegetation and tunnel supports must fade instead of popping out at a hard distance threshold");
 Assert(game.indexOf("DrawLighting(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawCivilians(width, height, tunnelY)") && game.indexOf("DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawEnemies(width, height, surfaceY, tunnelY)") && game.includes("function DrawSceneHierarchyVeil") && game.includes("middleDistance") && game.includes("farHaze") && game.includes("horizonHaze"), "three-stage atmosphere must finish before crisp gameplay silhouettes");

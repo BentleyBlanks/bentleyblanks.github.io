@@ -322,6 +322,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 .metricBar u { border-radius: 2px; }
 
 #roleDock { left: 24px; bottom: 76px; width: auto; max-width: calc(100% - 48px); padding: 0; background: transparent; border: 0; filter: drop-shadow(0 4px 12px rgba(0,0,0,.62)); }
+#roleDock.defenseDock { top: 226px; bottom: auto; }
 #roleDock > small { display: none; }
 #roleButtons { display: flex; gap: 6px; }
 #roleButtons button { position: relative; display: flex; width: auto; min-width: 72px; min-height: 42px; align-items: center; padding: 5px 10px 5px 37px; overflow: hidden; text-align: left; background: rgba(8,13,15,.68); border: 1px solid rgba(236,239,226,.17); border-radius: 22px; backdrop-filter: blur(4px); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
@@ -357,7 +358,7 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #toast { width: auto; max-width: min(520px, calc(100% - 40px)); padding: 8px 14px; font-size: 10px; font-weight: 700; background: rgba(8,13,15,.82); border: 0; border-radius: 18px; backdrop-filter: blur(5px); }
 #qaPanel { top: 126px; }
 
-#civilianCommandPanel { position: absolute; z-index: 15; right: 24px; bottom: 72px; width: 250px; padding: 10px; color: #eee9da; background: rgba(7,13,15,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 6px; box-shadow: 0 12px 34px rgba(0,0,0,.42); backdrop-filter: blur(7px); }
+#civilianCommandPanel { position: absolute; z-index: 15; top: 232px; right: 24px; bottom: auto; width: 250px; padding: 10px; color: #eee9da; background: rgba(7,13,15,.78); border: 1px solid rgba(226,232,218,.2); border-radius: 6px; box-shadow: 0 12px 34px rgba(0,0,0,.42); backdrop-filter: blur(7px); }
 #civilianCommandPanel > small { display: block; margin: 0 0 7px; color: #d8b16b; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
 .civilianGroupButtons { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; }
 .civilianGroupButtons button { min-height: 25px; color: rgba(237,235,221,.64); font-size: 8px; background: rgba(255,255,255,.05); border: 1px solid transparent; border-radius: 13px; }
@@ -385,7 +386,8 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 .failurePaper .completeLedger div { border-left-color: #bd4a3f; }
 
 @media (max-width: 760px), (max-height: 520px) {
-  #civilianCommandPanel { right: 8px; bottom: 61px; width: 214px; padding: 7px; }
+  #roleDock.defenseDock { top: 126px; bottom: auto; }
+  #civilianCommandPanel { top: 162px; right: 8px; bottom: auto; width: 214px; padding: 7px; }
   #civilianCommandPanel > small { margin-bottom: 4px; font-size: 6px; }
   #dogCommandHud { left: 10px; bottom: 106px; min-width: 166px; padding: 5px 8px 6px; }
   .dogCommandPortrait { width: 25px; height: 25px; font-size: 8px; }
