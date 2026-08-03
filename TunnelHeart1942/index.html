@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803b">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803c">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -84,6 +84,8 @@
         <b></b><span>空手</span><em>走近地上的道具按 E 捡起</em>
       </div>
       <div id="DesignBadge" class="designBadge" hidden>设计蓝图中</div>
+      <div id="AdsBadge" class="adsBadge" hidden>开镜</div>
+      <p id="AmmoHud" class="ammoHud" hidden>弹药 0</p>
       <p id="StepHint" class="stepHint" aria-live="polite">下一步</p>
 
       <div class="touchPad" aria-label="触屏操作">
@@ -96,10 +98,11 @@
           <button type="button" class="wide" data-touch="dig" aria-label="标记/开挖">J</button>
           <button type="button" data-touch="chamber" aria-label="厢室蓝图">T</button>
           <button type="button" data-touch="corridor" aria-label="巷道蓝图">C</button>
+          <button type="button" data-touch="aim" aria-label="开镜瞄准">瞄</button>
           <button type="button" data-touch="crouch" aria-label="蹲/下">↓</button>
           <button type="button" data-touch="up" aria-label="上">↑</button>
           <button type="button" data-touch="interact" aria-label="捡/互动">E</button>
-          <button type="button" data-touch="use" aria-label="使用道具">F</button>
+          <button type="button" data-touch="use" aria-label="开枪/手雷">F</button>
         </div>
       </div>
     </section>
@@ -107,8 +110,8 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>A/D 走 · R 进入/退出地道设计 · 设计中：方向键移光标，J 标记/取消蓝图，T 厢室，C 巷道 · 退出后走到蓝图旁点 J 开挖（不是长按）· E 交谈/捡物 · F 用道具 · Q 放下 · Esc 暂停</p>
-        <p>先设计蓝图，再开挖。没有泰拉瑞亚式长按乱挖，也没有背包——一次只拿一件。</p>
+        <p>A/D 走 · R 设计地道 · J 标记/开挖 · E 交谈/捡物/背后击晕 · F 开枪或扔手雷 · 按住 Shift/瞄 开镜 · Q 放下 · Esc 暂停</p>
+        <p>一次只拿一件。步枪弹药在弹袋里另算。敌人看见尸体会喊人、高度警戒。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -140,6 +143,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803b"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803c"></script>
 </body>
 </html>

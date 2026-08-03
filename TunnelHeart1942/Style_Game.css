@@ -231,6 +231,10 @@ button {
   content: ""; position: absolute; left: 14px; right: 14px; top: 12px; bottom: 12px;
   border-radius: 50%; background: #4a5a30; border: 2px solid #1a1410;
 }
+.heldSlot b[data-item="rifle"]::after {
+  content: ""; position: absolute; left: 8px; right: 8px; top: 18px; height: 6px;
+  background: #2a241c; box-shadow: 10px -4px 0 -1px #3a3228, 18px -2px 0 -2px #1a1410;
+}
 .heldSlot span {
   font-family: var(--display); font-size: 1.15rem; line-height: 1.1; color: var(--ink);
 }
@@ -321,6 +325,19 @@ button {
   background: #1a3a4a; color: #d8f0ff; border: 2.5px solid #1a1410;
   padding: 6px 14px; font-weight: 700; letter-spacing: .08em;
   box-shadow: 3px 3px 0 rgba(0,0,0,.3); pointer-events: none;
+}
+.adsBadge {
+  position: absolute; top: 7%; left: 50%; transform: translateX(-50%);
+  background: #3a1a14; color: #ffe0c8; border: 2.5px solid #1a1410;
+  padding: 6px 14px; font-weight: 700; letter-spacing: .08em;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.3); pointer-events: none;
+}
+.ammoHud {
+  position: absolute; top: calc(7% + 52px); right: 14px;
+  margin: 0; padding: 6px 10px;
+  background: rgba(26, 20, 16, .82); color: #efe2c8;
+  border: 2px solid #1a1410; font-size: .78rem; font-weight: 700;
+  pointer-events: none; box-shadow: 2px 2px 0 rgba(0,0,0,.28);
 }
 
 .stepHint {

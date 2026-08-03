@@ -1,7 +1,7 @@
 /** Film beats — denser 《地道战》 feel; dig system stays the spine. */
 
-export const SAVE_KEY = "tunnelheart1942_v5";
-export const CACHE_BUST = "20260803b";
+export const SAVE_KEY = "tunnelheart1942_v6";
+export const CACHE_BUST = "20260803c";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -185,14 +185,52 @@ export const CHAPTERS = [
       {
         id: "p4z1",
         speaker: "旁白",
-        text: "进村的鬼子清了。下一步：挖到黑风口炮楼根下。",
+        text: "出击口管用了。街上还有日伪军——下一回上地面清街。",
         mood: "wide",
       },
     ],
   },
   {
-    id: "act5_heifengkou",
+    id: "act5_street_hunt",
     act: 5,
+    title: "清街",
+    timeLabel: "一九四三年 · 夏夜",
+    cast: "高传宝",
+    night: true,
+    objective: "弹药极少。开镜开枪、扔手雷，或绕到背后 E 击晕——别让敌人看见尸体。",
+    goals: ["talk_street", "clear_street"],
+    openPanels: [
+      {
+        id: "p5a",
+        speaker: "背景",
+        text: "夜里街上还有日伪军。出击口清过一轮，地面还得自己收干净。",
+        mood: "wide",
+      },
+      {
+        id: "p5b",
+        speaker: "困难",
+        text: "子弹很少。枪声会招人；尸体被看见，他们会喊同伴高度警戒。",
+        mood: "talk",
+      },
+      {
+        id: "p5c",
+        speaker: "目标",
+        text: "F 开枪（按住瞄/Shift 开镜）· F 扔手雷 · 背后靠近 E 击晕。清光街道。",
+        mood: "tip",
+      },
+    ],
+    closePanels: [
+      {
+        id: "p5z1",
+        speaker: "旁白",
+        text: "街清了。下一步：挖到黑风口炮楼根下。",
+        mood: "wide",
+      },
+    ],
+  },
+  {
+    id: "act6_heifengkou",
+    act: 6,
     title: "黑风口",
     timeLabel: "反攻前夜",
     cast: "高传宝",
@@ -201,19 +239,19 @@ export const CHAPTERS = [
     goals: ["talk_assault", "dig_charge_room", "link_charge", "plant_charge", "signal_assault"],
     openPanels: [
       {
-        id: "p5a",
+        id: "p6a",
         speaker: "背景",
         text: "黑风口炮楼压着村口。不炸掉，庄里喘不上气。",
         mood: "wide",
       },
       {
-        id: "p5b",
+        id: "p6b",
         speaker: "困难",
         text: "炮楼根下是硬地基，直挖不动——得绕软土到药室。",
         mood: "talk",
       },
       {
-        id: "p5c",
+        id: "p6c",
         speaker: "目标",
         text: "挖到药室，F 安放炸药，再上地面发信号。一次只拿一件。",
         mood: "tip",
@@ -221,7 +259,7 @@ export const CHAPTERS = [
     ],
     closePanels: [
       {
-        id: "p5z1",
+        id: "p6z1",
         speaker: "旁白",
         text: "黑风口塌了。地道是挖出来的——人也是。",
         mood: "wide",

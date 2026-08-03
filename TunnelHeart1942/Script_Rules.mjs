@@ -22,10 +22,13 @@ import {
 import {
   CanDigWith,
   CanPlant,
+  CanShoot,
   CanThrow,
+  ITEM_AMMO,
   ITEM_CHARGE,
   ITEM_GRENADE,
   ITEM_NONE,
+  ITEM_RIFLE,
   ITEM_SHOVEL,
   PickupEntity,
 } from "./Script_Items.mjs";
@@ -51,6 +54,8 @@ export function CreateInputState() {
     drop: false,
     dropPressed: false,
     crouch: false,
+    /** Hold to ADS when rifle is in hand. */
+    aim: false,
     designTogglePressed: false,
     planPaintPressed: false,
     planErasePressed: false,
@@ -65,6 +70,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
   const level = BuildLevel(chapter.id);
   if (level.soil) EnsurePlanGrid(level.soil);
   const tunnel = !!level.spawn.tunnel;
+  const loadout = level.spawnLoadout || {};
   return {
     phase: "title",
     panelIndex: 0,
@@ -80,11 +86,15 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       facing: 1,
       onGround: true,
       crouching: false,
+      aiming: false,
       digging: false,
       digProgress: 0,
       digTarget: null,
       /** Valiant Hearts: one carried item at a time — not a backpack. */
-      held: ITEM_NONE,
+      held: loadout.held ?? ITEM_NONE,
+      /** Pocket ammo — separate from held slot (rifle consumes this). */
+      ammo: loadout.ammo ?? 0,
+      shotCool: 0,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
@@ -132,9 +142,13 @@ function ResolvePhysics(state, dt) {
 
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   player.crouching = !!input.crouch && player.onGround && !input.dig;
-  const speed = player.crouching ? MOVE_SPEED * 0.55 : MOVE_SPEED;
+  player.aiming = !!input.aim && CanShoot(player.held) && !state.designMode && !player.inTunnel;
+  let speed = MOVE_SPEED;
+  if (player.crouching) speed *= 0.55;
+  if (player.aiming) speed *= 0.32;
   player.vx = move * speed;
-  if (move) player.facing = move;
+  if (move && !player.aiming) player.facing = move;
+  if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
   // No Mario jump — Valiant Hearts traversal is walk / crawl / dig / hatch.
 
   player.vy += GRAVITY * dt;
@@ -415,6 +429,17 @@ function TryPickupOrInteract(state) {
     if (ent.kind !== "pickup" || ent.taken) continue;
     if (!LayerOk(player, ent)) continue;
     if (!Near(player, ent, 46)) continue;
+    // Ammo packs fill the pocket — never occupy the held slot.
+    if (ent.itemId === ITEM_AMMO) {
+      const add = ent.ammoAmount || 3;
+      player.ammo = (player.ammo || 0) + add;
+      ent.taken = true;
+      ent.hidden = true;
+      state.stats.pickups += 1;
+      SetBubble(state, ["shot"], `+${add}发`, 1.2);
+      SetSubtitle(state, "提示", `装上 ${add} 发子弹（现有 ${player.ammo}）。`, 2.0);
+      return true;
+    }
     const previous = player.held;
     player.held = ent.itemId;
     ent.taken = true;
@@ -423,16 +448,85 @@ function TryPickupOrInteract(state) {
     if (previous) {
       level.entities.push(MakeDroppedPickup(player, previous, -1));
     }
-    const icon = ent.itemId === ITEM_SHOVEL ? "shovel" : ent.itemId === ITEM_CHARGE ? "charge" : "warn";
+    const icon =
+      ent.itemId === ITEM_SHOVEL
+        ? "shovel"
+        : ent.itemId === ITEM_CHARGE
+          ? "charge"
+          : ent.itemId === ITEM_RIFLE
+            ? "shot"
+            : "warn";
     SetBubble(state, [icon], "", 1.2);
     return true;
   }
   return false;
 }
 
+function AlertEnemiesNear(state, x, radius, alertTime = 4.2) {
+  for (const e of state.level.entities) {
+    if (e.type !== "enemy" || e.dead) continue;
+    if (Math.abs(e.x - x) < radius) {
+      e.alert = Math.max(e.alert || 0, alertTime);
+      e.alertX = x;
+    }
+  }
+}
+
+function FireRifle(state) {
+  const { player } = state;
+  if ((player.shotCool || 0) > 0) return;
+  if (!CanShoot(player.held)) return;
+  if ((player.ammo || 0) <= 0) {
+    state.interactHint = "need_ammo";
+    SetBubble(state, ["shot", "warn"], "没子弹", 1.4);
+    SetSubtitle(state, "提示", "弹药空了——去捡子弹，或摸到背后用 E 击晕。", 2.6);
+    return;
+  }
+  player.ammo -= 1;
+  player.shotCool = player.aiming ? 0.62 : 0.38;
+  state.stats.shots += 1;
+  const facing = player.facing || 1;
+  const range = player.aiming ? 440 : 210;
+  state.muzzle = {
+    x: player.x + facing * (player.aiming ? 28 : 22),
+    y: (player.y || SURFACE_Y) - (player.crouching ? 28 : 38),
+    timer: 0.16,
+    facing,
+  };
+
+  const living = state.level.entities.filter((e) => e.type === "enemy" && !e.dead && LayerOk(player, e));
+  let best = null;
+  let bestD = range;
+  for (const e of living) {
+    const dx = e.x - player.x;
+    if (facing > 0 && dx < 8) continue;
+    if (facing < 0 && dx > -8) continue;
+    const d = Math.abs(dx);
+    if (d < bestD && Math.abs((e.y || 0) - player.y) < 56) {
+      bestD = d;
+      best = e;
+    }
+  }
+  // Gunshot always draws attention.
+  AlertEnemiesNear(state, player.x, player.aiming ? 380 : 300, 5.0);
+  if (!best) {
+    SetSubtitle(state, "高传宝", player.aiming ? "开镜——没打中。" : "打空了。", 1.4);
+    return;
+  }
+  const dmg = player.aiming ? 2 : 1;
+  const killed = HurtEnemy(state, best, dmg);
+  if (killed) SetSubtitle(state, "高传宝", player.aiming ? "开镜打中——倒了。" : "打倒一个！", 1.8);
+  else SetSubtitle(state, "高传宝", "打中了！快补枪或换位。", 1.6);
+}
+
 function TryUseItem(state) {
   const { player, level, input } = state;
   if (!input.usePressed || state.transition > 0) return;
+
+  if (CanShoot(player.held)) {
+    FireRifle(state);
+    return;
+  }
 
   if (CanThrow(player.held)) {
     state.projectiles.push({
@@ -445,6 +539,7 @@ function TryUseItem(state) {
     });
     player.held = ITEM_NONE;
     SetBubble(state, ["warn"], "", 0.8);
+    AlertEnemiesNear(state, player.x, 260, 3.5);
     return;
   }
 
@@ -467,6 +562,27 @@ function TryUseItem(state) {
   }
 }
 
+function DropEnemyLoot(state, ent) {
+  if (ent.lootDropped) return;
+  ent.lootDropped = true;
+  const layer = ent.layer || "surface";
+  if (ent.dropAmmo) {
+    const p = PickupEntity(ent.x + 10, ent.y || SURFACE_Y, ITEM_AMMO, { ammoAmount: ent.dropAmmo });
+    p.layer = layer;
+    state.level.entities.push(p);
+  }
+  if (ent.dropRifle) {
+    const p = PickupEntity(ent.x - 12, ent.y || SURFACE_Y, ITEM_RIFLE);
+    p.layer = layer;
+    state.level.entities.push(p);
+  }
+  if (ent.dropGrenade) {
+    const p = PickupEntity(ent.x + 22, ent.y || SURFACE_Y, ITEM_GRENADE);
+    p.layer = layer;
+    state.level.entities.push(p);
+  }
+}
+
 function HurtEnemy(state, ent, dmg) {
   if (!ent || ent.type !== "enemy" || ent.dead) return false;
   ent.hp -= dmg;
@@ -474,17 +590,90 @@ function HurtEnemy(state, ent, dmg) {
   if (ent.hp <= 0) {
     ent.hp = 0;
     ent.dead = true;
+    ent.corpse = true;
     state.stats.kills = (state.stats.kills || 0) + 1;
+    DropEnemyLoot(state, ent);
     SyncKillGoals(state);
     return true;
   }
   return false;
 }
 
+/** Silent rear KO — works standing / crouching / aiming / any held item. */
+function KnockOutEnemy(state, ent) {
+  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  ent.hp = 0;
+  ent.dead = true;
+  ent.ko = true;
+  ent.corpse = true;
+  ent.hurtFlash = 0.2;
+  state.stats.kills = (state.stats.kills || 0) + 1;
+  state.stats.stealthKos = (state.stats.stealthKos || 0) + 1;
+  DropEnemyLoot(state, ent);
+  SyncKillGoals(state);
+  return true;
+}
+
+function EnemyFacing(ent) {
+  if (ent.facing === 1 || ent.facing === -1) return ent.facing;
+  return 1;
+}
+
+/** Player is close behind an enemy (facing away from player). */
+function CanStealthKO(player, ent) {
+  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  if (!LayerOk(player, ent)) return false;
+  const dx = player.x - ent.x;
+  const face = EnemyFacing(ent);
+  const behind = face > 0 ? dx < -10 : dx > 10;
+  if (!behind) return false;
+  if (Math.abs(dx) > 44) return false;
+  if (Math.abs((player.y || 0) - (ent.y || 0)) > 48) return false;
+  return true;
+}
+
+function RaiseCorpseAlarm(state, witness, body) {
+  if (body.discovered) return;
+  body.discovered = true;
+  state.stats.alarms = (state.stats.alarms || 0) + 1;
+  const line = witness.label === "伪军" ? "有尸体！快来人——！" : "死体だ！来い——！";
+  SetSubtitle(state, witness.label || "敌兵", line, 2.8);
+  SetBubble(state, ["warn"], "警戒", 1.4);
+  for (const e of state.level.entities) {
+    if (e.type !== "enemy" || e.dead) continue;
+    e.highAlert = true;
+    e.alert = Math.max(e.alert || 0, 7.5);
+    e.alertX = body.x;
+  }
+  state.level.alarm = true;
+}
+
+function UpdateCorpseVision(state) {
+  const foes = state.level.entities.filter((e) => e.type === "enemy");
+  const corpses = foes.filter((e) => e.dead && e.corpse && !e.hidden);
+  const living = foes.filter((e) => !e.dead);
+  for (const foe of living) {
+    const face = EnemyFacing(foe);
+    for (const body of corpses) {
+      if (body.discovered) continue;
+      const dx = body.x - foe.x;
+      if (Math.abs(dx) > 170) continue;
+      if (Math.abs((body.y || 0) - (foe.y || 0)) > 50) continue;
+      if (face > 0 && dx < 16) continue;
+      if (face < 0 && dx > -16) continue;
+      RaiseCorpseAlarm(state, foe, body);
+      return;
+    }
+  }
+}
+
 function SyncKillGoals(state) {
   const foes = state.level.entities.filter((e) => e.type === "enemy");
   if (!foes.length) return;
-  if (foes.every((e) => e.dead)) MarkGoal(state, "kill_invaders");
+  if (foes.every((e) => e.dead)) {
+    MarkGoal(state, "kill_invaders");
+    MarkGoal(state, "clear_street");
+  }
 }
 
 function FireFromPort(state, port) {
@@ -587,6 +776,28 @@ function TryInteract(state) {
   const { player, level, input } = state;
   if (!input.interactPressed || state.transition > 0) return;
   state.stats.interactions += 1;
+
+  // Stealth rear KO — any stance / any held item, but never steal hatch/port/talk E.
+  let nearWorldAction = false;
+  for (const ent of level.entities) {
+    if (ent.kind === "pickup" || ent.type === "enemy") continue;
+    if (ent.hidden || ent.done) continue;
+    if (!LayerOk(player, ent)) continue;
+    if (Near(player, ent, ent.radius || 52)) {
+      nearWorldAction = true;
+      break;
+    }
+  }
+  if (!nearWorldAction) {
+    for (const ent of level.entities) {
+      if (ent.type !== "enemy" || ent.dead) continue;
+      if (!CanStealthKO(player, ent)) continue;
+      KnockOutEnemy(state, ent);
+      SetBubble(state, ["warn"], "击晕", 0.9);
+      SetSubtitle(state, "高传宝", "从背后制住。别让他们看见尸体。", 2.4);
+      return;
+    }
+  }
 
   // Story / hatches / world actions before pickups — never let a shovel steal a talk.
   for (const ent of level.entities) {
@@ -735,21 +946,43 @@ function UpdateActors(state, dt) {
     if (ent.type === "enemy") {
       if (ent.hurtFlash > 0) ent.hurtFlash = Math.max(0, ent.hurtFlash - dt);
       if (ent.dead) continue;
+      const prevX = ent.x;
       ent.t = (ent.t || 0) + dt;
+      const high = !!ent.highAlert || !!level.alarm;
       if (ent.alert > 0) {
         ent.alert -= dt;
         const dir = Math.sign((ent.alertX ?? ent.homeX) - ent.x) || 1;
-        ent.x += dir * 95 * dt;
+        ent.x += dir * (high ? 130 : 95) * dt;
+        ent.facing = dir;
       } else {
-        ent.x = ent.homeX + Math.sin(ent.t * 0.7 + (ent.phase || 0)) * (ent.amp || 100);
+        const phase = ent.phase || 0;
+        const amp = ent.amp || 0;
+        ent.x = ent.homeX + Math.sin(ent.t * 0.7 + phase) * amp;
+        // Stationary guards keep authored facing (needed for rear-KO / corpse LOS).
+        if (amp > 1) ent.facing = Math.cos(ent.t * 0.7 + phase) >= 0 ? 1 : -1;
       }
+      if (Math.abs(ent.x - prevX) > 0.2) ent.facing = Math.sign(ent.x - prevX) || ent.facing || 1;
       if (!player.inTunnel && player.invuln <= 0) {
-        const detect = player.crouching ? 26 : 50;
+        // Surface contact / detection. High alert after corpse shout is much harsher.
+        let detect = player.crouching ? 26 : 50;
+        if (high) detect = player.crouching ? 52 : 100;
+        // Harder to be seen from behind unless high alert.
+        const dx = player.x - ent.x;
+        const face = EnemyFacing(ent);
+        const fromFront = face > 0 ? dx > 0 : dx < 0;
+        if (!fromFront && !high) detect *= 0.45;
         if (Math.abs(player.x - ent.x) < detect && Math.abs(player.y - ent.y) < 42) {
           player.hp -= 1;
           player.invuln = 1.25;
           player.vx = Math.sign(player.x - ent.x || 1) * 200;
-          SetSubtitle(state, "危险", "被鬼子发现了——蹲下或钻井！", 2.2);
+          ent.alert = Math.max(ent.alert || 0, 3.5);
+          ent.alertX = player.x;
+          SetSubtitle(
+            state,
+            "危险",
+            high ? "高度警戒——被发现了！" : "被鬼子发现了——蹲下、绕背或钻井！",
+            2.2,
+          );
           if (player.hp <= 0) state.failed = true;
         }
       }
@@ -796,6 +1029,7 @@ function UpdateActors(state, dt) {
     state.bubble.timer -= dt;
     if (state.bubble.timer <= 0) state.bubble = null;
   }
+  UpdateCorpseVision(state);
 }
 
 function UpdateCamera(state, dt) {
@@ -837,6 +1071,12 @@ function RefreshHint(state) {
     }
   }
   for (const ent of state.level.entities) {
+    if (ent.type === "enemy" && !ent.dead && CanStealthKO(state.player, ent)) {
+      state.interactHint = "stealth_ko";
+      return;
+    }
+  }
+  for (const ent of state.level.entities) {
     if (ent.kind === "pickup") continue;
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(state.player, ent)) continue;
@@ -853,6 +1093,10 @@ function RefreshHint(state) {
       }
       return;
     }
+  }
+  if (CanShoot(state.player.held) && !state.player.inTunnel) {
+    state.interactHint = state.player.ammo > 0 ? (state.player.aiming ? "ads" : "shoot") : "need_ammo";
+    return;
   }
   if (state.designMode) {
     state.interactHint = "design";
@@ -966,7 +1210,7 @@ export function RestartChapter(state) {
 }
 
 export function SerializeProgress(state) {
-  return { v: 5, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+  return { v: 6, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
 }
 
 /** Test helper: put shovel in hand. */
@@ -1031,6 +1275,17 @@ export function NextStepText(state) {
     if (!g.link_ab) return "顺着蓝线走到格旁，点 J 挖通甲—乙";
     if (!g.link_bc) return "继续沿蓝线点 J，挖通乙—丙";
     return "三家已通";
+  }
+  if (state.chapterId === "act5_street_hunt") {
+    if (!g.talk_street) return "听林霞交代（E）";
+    if (!g.clear_street) {
+      if ((state.player.ammo || 0) <= 0 && state.player.held !== ITEM_RIFLE) {
+        return "捡枪/弹药，或绕到敌人背后 E 击晕";
+      }
+      if ((state.player.ammo || 0) <= 0) return "没子弹了：捡弹药，或背后 E 击晕";
+      return "清街：开镜F开枪 / 扔手雷 / 背后E击晕（别让人看见尸体）";
+    }
+    return "街道已清";
   }
   const chapter = CHAPTERS[state.chapterIndex];
   const open = GoalsRemaining(state);

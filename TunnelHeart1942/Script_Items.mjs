@@ -4,6 +4,9 @@ export const ITEM_NONE = null;
 export const ITEM_SHOVEL = "shovel";
 export const ITEM_GRENADE = "grenade";
 export const ITEM_CHARGE = "charge";
+export const ITEM_RIFLE = "rifle";
+/** Ammo packs are auto-absorbed on pickup — never occupied as held slot. */
+export const ITEM_AMMO = "ammo";
 
 export const ITEM_META = {
   [ITEM_SHOVEL]: {
@@ -24,6 +27,18 @@ export const ITEM_META = {
     color: "#4a3a2a",
     tip: "安放：在敌据点旁按 F",
   },
+  [ITEM_RIFLE]: {
+    id: ITEM_RIFLE,
+    label: "步枪",
+    color: "#4a4030",
+    tip: "F 开枪 · 按住 瞄/Shift 开镜 · 子弹很少",
+  },
+  [ITEM_AMMO]: {
+    id: ITEM_AMMO,
+    label: "子弹",
+    color: "#6a5a30",
+    tip: "走近按 E 装进弹袋",
+  },
 };
 
 export function CanDigWith(held) {
@@ -38,6 +53,10 @@ export function CanPlant(held) {
   return held === ITEM_CHARGE;
 }
 
+export function CanShoot(held) {
+  return held === ITEM_RIFLE;
+}
+
 export function ItemLabel(held) {
   return held && ITEM_META[held] ? ITEM_META[held].label : "空手";
 }
@@ -47,7 +66,7 @@ export function ItemTip(held) {
 }
 
 /** Spawn a world pickup entity. */
-export function PickupEntity(x, y, itemId) {
+export function PickupEntity(x, y, itemId, extras = {}) {
   return {
     kind: "pickup",
     x,
@@ -56,5 +75,7 @@ export function PickupEntity(x, y, itemId) {
     h: 18,
     itemId,
     taken: false,
+    ammoAmount: extras.ammoAmount ?? (itemId === ITEM_AMMO ? 3 : 0),
+    ...extras,
   };
 }

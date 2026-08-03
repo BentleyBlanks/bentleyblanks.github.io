@@ -415,6 +415,13 @@ function DrawHeld(ctx, hand, item, pal, scale, digging) {
     ctx.fillStyle = "#4a3a2a";
     ctx.fillRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
     ctx.strokeRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);
+  } else if (item === "rifle") {
+    ctx.fillStyle = "#3a3228";
+    ctx.fillRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
+    ctx.strokeRect(2 * scale, -3 * scale, 26 * scale, 5 * scale);
+    ctx.fillStyle = "#2a241c";
+    ctx.fillRect(22 * scale, -5 * scale, 10 * scale, 3 * scale);
+    ctx.fillRect(4 * scale, 1 * scale, 8 * scale, 6 * scale);
   } else if (item === "grenade") {
     ctx.fillStyle = "#5a6a3a";
     ctx.beginPath();

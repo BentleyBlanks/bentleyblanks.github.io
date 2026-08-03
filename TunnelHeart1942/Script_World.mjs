@@ -13,10 +13,17 @@ import {
 } from "./Script_Dig.mjs";
 import { SeedDepthDecor } from "./Script_Depth.mjs";
 import { EnsurePlanGrid, PlanCorridorHeadroom, PlanSoftPath } from "./Script_Plan.mjs";
-import { ITEM_CHARGE, ITEM_GRENADE, ITEM_SHOVEL, PickupEntity } from "./Script_Items.mjs";
+import {
+  ITEM_AMMO,
+  ITEM_CHARGE,
+  ITEM_GRENADE,
+  ITEM_RIFLE,
+  ITEM_SHOVEL,
+  PickupEntity,
+} from "./Script_Items.mjs";
 
-function PlacePickup(x, y, itemId, layer = "both") {
-  const p = PickupEntity(x, y, itemId);
+function PlacePickup(x, y, itemId, layer = "both", extras = {}) {
+  const p = PickupEntity(x, y, itemId, extras);
   p.layer = layer;
   return p;
 }
@@ -497,12 +504,20 @@ function PlaceEnemy(id, x, opts = {}) {
     hp,
     maxHp: hp,
     dead: false,
+    ko: false,
+    corpse: false,
+    discovered: false,
+    highAlert: false,
+    facing: opts.facing ?? 1,
     alert: 0,
     alertX: x,
     hurtFlash: 0,
-    label: "鬼子",
+    label: opts.label || "鬼子",
     hostile: true,
     t: 0,
+    dropAmmo: opts.dropAmmo || 0,
+    dropRifle: !!opts.dropRifle,
+    dropGrenade: !!opts.dropGrenade,
   });
 }
 
@@ -622,8 +637,99 @@ function BuildAct4() {
   return level;
 }
 
-/** Act5: dig under blockhouse through soft maze around hard footings. */
-function BuildAct5() {
+/**
+ * Act5 street hunt — surface gunfight / stealth.
+ * Scarce pocket ammo, rifle+grenade pickups, ADS, rear KO, corpse alarm.
+ */
+function BuildAct5StreetHunt() {
+  const level = BaseLevel(3400, { night: true });
+  // Tiny cellar retreat — optional, not the focus.
+  const cellar = { c: 3, r: 2, w: 3, h: 2 };
+  const soil = BuildDigBand({
+    originX: 40,
+    originY: DIG_ORIGIN_Y,
+    cols: 20,
+    rows: DIG_ROWS,
+    hardBlobs: [],
+    cellars: [cellar],
+  });
+  AttachSoil(level, soil);
+  const hatch = CellCenter(soil, cellar.c + 1, cellar.r + 1);
+  level.spawn = { x: 160, y: SURFACE_Y, tunnel: false };
+  // Start with rifle but almost no ammo — force scavenging / stealth.
+  level.spawnLoadout = { held: ITEM_RIFLE, ammo: 2 };
+  level.combatStreet = true;
+  level.shafts = [{ x: hatch.x, label: "退路地窖" }];
+  level.entities = [
+    Ent({
+      id: "npc_street",
+      type: "talk",
+      x: 220,
+      y: SURFACE_Y,
+      layer: "surface",
+      speaker: "林霞",
+      script: [
+        {
+          speaker: "林霞",
+          text: "街上还有日伪军。子弹极少——能摸到背后就 E 击晕，别让他们看见尸体。",
+        },
+        {
+          speaker: "高传宝",
+          text: "有枪就开镜瞄着打。手雷在墙根。看见尸体他们会喊人。",
+        },
+      ],
+      hint: "听交代",
+      goal: "talk_street",
+    }),
+    PlacePickup(300, SURFACE_Y, ITEM_GRENADE, "surface"),
+    PlacePickup(520, SURFACE_Y, ITEM_AMMO, "surface", { ammoAmount: 3 }),
+    PlacePickup(980, SURFACE_Y, ITEM_AMMO, "surface", { ammoAmount: 2 }),
+    PlacePickup(1400, SURFACE_Y, ITEM_RIFLE, "surface"),
+    PlacePickup(1680, SURFACE_Y, ITEM_GRENADE, "surface"),
+    PlacePickup(2100, SURFACE_Y, ITEM_AMMO, "surface", { ammoAmount: 4 }),
+    PlacePickup(hatch.x - 30, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    Ent({
+      id: "h5street",
+      type: "hatch",
+      x: hatch.x,
+      y: SURFACE_Y,
+      layer: "both",
+      w: 40,
+      h: 18,
+      hint: "按 E 钻地窖躲一阵",
+      tunnelX: hatch.x,
+      tunnelY: hatch.y + 10,
+    }),
+    PlaceEnemy("jp1", 640, { amp: 55, phase: 0.3, hp: 2, label: "鬼子", dropAmmo: 2 }),
+    PlaceEnemy("pup1", 860, {
+      amp: 40,
+      phase: 1.4,
+      hp: 2,
+      label: "伪军",
+      facing: -1,
+      dropAmmo: 2,
+    }),
+    PlaceEnemy("jp2", 1180, { amp: 70, phase: 2.1, hp: 2, label: "鬼子", dropGrenade: true }),
+    PlaceEnemy("pup2", 1520, { amp: 50, phase: 0.8, hp: 2, label: "伪军", dropAmmo: 3 }),
+    PlaceEnemy("jp3", 1880, { amp: 90, phase: 1.6, hp: 3, label: "鬼子", dropRifle: true, dropAmmo: 2 }),
+    PlaceEnemy("pup3", 2280, { amp: 45, phase: 2.8, hp: 2, label: "伪军", dropAmmo: 2 }),
+    PlaceEnemy("jp4", 2680, { amp: 60, phase: 0.5, hp: 3, label: "鬼子", dropAmmo: 4 }),
+  ];
+  level.props = [
+    { kind: "house", x: 400, variant: 0 },
+    { kind: "house", x: 900, variant: 1 },
+    { kind: "well", x: 1100 },
+    { kind: "house", x: 1500, variant: 0 },
+    { kind: "tree", x: 1750 },
+    { kind: "house", x: 2100, variant: 1 },
+    { kind: "house", x: 2500, variant: 0 },
+    { kind: "tree", x: 2900 },
+  ];
+  return level;
+}
+
+/** Act6: dig under blockhouse through soft maze around hard footings. */
+function BuildAct6Heifengkou() {
   const level = BaseLevel(3000, { startTunnel: true });
   const originX = 40;
   const cols = 64;
@@ -690,7 +796,7 @@ function BuildAct5() {
       radius: 56,
     }),
     Ent({
-      id: "hatch5",
+      id: "hatch6",
       type: "hatch",
       x: s.x,
       y: SURFACE_Y,
@@ -736,7 +842,8 @@ const BUILDERS = {
   act2_bell: BuildAct2,
   act3_combat_tunnel: BuildAct3,
   act4_ambush: BuildAct4,
-  act5_heifengkou: BuildAct5,
+  act5_street_hunt: BuildAct5StreetHunt,
+  act6_heifengkou: BuildAct6Heifengkou,
 };
 
 export function BuildLevel(chapterId) {

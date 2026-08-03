@@ -21,7 +21,14 @@ import {
   TintAlpha,
   YLiftOf,
 } from "./Script_Depth.mjs";
-import { ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_SHOVEL } from "./Script_Items.mjs";
+import {
+  ITEM_AMMO,
+  ITEM_CHARGE,
+  ITEM_GRENADE,
+  ITEM_META,
+  ITEM_RIFLE,
+  ITEM_SHOVEL,
+} from "./Script_Items.mjs";
 import { DrawPuppet, PaletteForSpeaker, PickClip } from "./Script_Puppet.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
@@ -112,20 +119,31 @@ function SyncHud() {
     !!state.level?.tutorialPlan && state.player.inTunnel && held === ITEM_SHOVEL && !state.designMode;
   if (state.designMode) {
     slot.innerHTML = `<b data-item="shovel" style="--item:#4a8ab5"></b><span>设计蓝图</span><em>光标移格 · J 标记 · T 厢室 · C 巷道 · R 退出</em>`;
+  } else if (held === ITEM_RIFLE) {
+    const ads = state.player.aiming ? "开镜中" : "按住瞄/Shift 开镜";
+    slot.innerHTML = `<b data-item="rifle" style="--item:${meta.color}"></b><span>步枪 · ${state.player.ammo | 0}发</span><em>F 开枪 · ${ads}</em>`;
   } else {
     slot.innerHTML = meta
       ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${
           tutorialDig ? "顺着蓝线走到格旁，点 J 开挖" : `${meta.tip} · R 设计地道`
         }</em>`
-      : `<b></b><span>空手</span><em>E 捡道具 · 洞里 R 设计蓝图再挖</em>`;
+      : `<b></b><span>空手</span><em>E 捡道具 · 背后靠近敌人可 E 击晕</em>`;
     if (meta) slot.querySelector("b").dataset.item = held;
   }
   const badge = $("DesignBadge");
   if (badge) badge.hidden = !state.designMode;
+  const adsBadge = $("AdsBadge");
+  if (adsBadge) adsBadge.hidden = !(state.player.aiming && held === ITEM_RIFLE);
   const step = $("StepHint");
   if (step) {
     step.textContent = NextStepText(state);
     step.hidden = false;
+  }
+  const ammoHud = $("AmmoHud");
+  if (ammoHud) {
+    const showAmmo = held === ITEM_RIFLE || (state.player.ammo || 0) > 0 || !!state.level?.combatStreet;
+    ammoHud.hidden = !showAmmo || state.phase !== "play";
+    ammoHud.textContent = `弹药 ${state.player.ammo | 0}`;
   }
 }
 
@@ -779,7 +797,15 @@ function DrawEntity(ent) {
     const bob = Math.sin((performance.now() || 0) * 0.006) * 3 * s;
     ctx.translate(0, -18 * s + bob);
     const icon =
-      ent.itemId === ITEM_SHOVEL ? "shovel" : ent.itemId === ITEM_CHARGE ? "charge" : ent.itemId === ITEM_GRENADE ? "warn" : "talk";
+      ent.itemId === ITEM_SHOVEL
+        ? "shovel"
+        : ent.itemId === ITEM_CHARGE
+          ? "charge"
+          : ent.itemId === ITEM_GRENADE
+            ? "warn"
+            : ent.itemId === ITEM_RIFLE || ent.itemId === ITEM_AMMO
+              ? "shot"
+              : "talk";
     DrawPictogram(icon, -12 * s, -12 * s, 24 * s);
     ctx.restore();
     return;
@@ -847,23 +873,25 @@ function DrawEntity(ent) {
     }
   } else if (ent.type === "enemy") {
     let alpha = 1;
-    if (ent.dead) alpha = 0.28;
+    if (ent.dead) alpha = ent.ko ? 0.4 : 0.28;
     else if (ent.hurtFlash > 0) alpha = 0.55 + Math.sin(ent.hurtFlash * 40) * 0.35;
-    const facing = ent.alert > 0 ? Math.sign((ent.alertX ?? ent.x) - ent.x) || 1 : Math.sin((ent.t || 0) * 0.7) >= 0 ? 1 : -1;
+    const facing =
+      ent.facing ||
+      (ent.alert > 0 ? Math.sign((ent.alertX ?? ent.x) - ent.x) || 1 : Math.sin((ent.t || 0) * 0.7) >= 0 ? 1 : -1);
     DrawPuppet(ctx, {
       x: 0,
-      y: 0,
+      y: ent.dead ? 10 * s : 0,
       facing,
       scale: s,
       palette: "enemy",
-      clip: ent.dead ? "idle" : ent.alert > 0 ? "alert" : "walk",
+      clip: ent.dead ? "crouch" : ent.alert > 0 || ent.highAlert ? "alert" : "walk",
       time: ent.t || 0,
       moving: !ent.dead,
-      alert: (ent.alert || 0) > 0,
+      alert: (ent.alert || 0) > 0 || !!ent.highAlert,
       alpha,
     });
     if (!ent.dead) {
-      ctx.fillStyle = "rgba(155,47,47,.28)";
+      ctx.fillStyle = ent.highAlert ? "rgba(180,40,30,.4)" : "rgba(155,47,47,.28)";
       ctx.beginPath();
       ctx.moveTo(0, -18 * s);
       ctx.lineTo(facing * 72 * s, -44 * s);
@@ -879,12 +907,16 @@ function DrawEntity(ent) {
       ctx.fillStyle = "#efe2c8";
       ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("鬼子", 0, -78 * s);
+      ctx.fillText(ent.label || "鬼子", 0, -78 * s);
+      if (ent.highAlert) {
+        ctx.fillStyle = "#ffb0a0";
+        ctx.fillText("警戒!", 0, -90 * s);
+      }
     } else {
-      ctx.fillStyle = "#7a7264";
+      ctx.fillStyle = ent.discovered ? "#a6452f" : "#7a7264";
       ctx.font = `700 ${10 * s}px IBM Plex Sans, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText("毙", 0, -70 * s);
+      ctx.fillText(ent.ko ? (ent.discovered ? "尸·被发现" : "晕") : ent.discovered ? "尸·被发现" : "毙", 0, -70 * s);
     }
   } else if (ent.type === "spy") {
     DrawPuppet(ctx, {
@@ -1077,9 +1109,13 @@ function DrawInteractPromptWorld() {
             : "J"
       : hint === "plant_zone" && state.player.held === ITEM_CHARGE
         ? "F"
-        : hint === "need_shovel"
-          ? "E"
-          : "E";
+        : hint === "shoot" || hint === "ads"
+          ? "F"
+          : hint === "stealth_ko"
+            ? "E"
+            : hint === "need_ammo" || hint === "need_shovel"
+              ? "E"
+              : "E";
   const icon =
     hint === "dig" || hint === "need_shovel" || hint === "pickup" || hint === "follow_plan"
       ? "shovel"
@@ -1089,13 +1125,15 @@ function DrawInteractPromptWorld() {
           ? "bell"
           : hint === "shelter"
             ? "people"
-            : hint === "shot_port"
+            : hint === "shot_port" || hint === "shoot" || hint === "ads" || hint === "need_ammo"
               ? "shot"
-              : hint === "flip_build" || hint === "flip_trap"
-                ? "flip"
-                : hint === "plant_zone" || hint === "signal"
-                  ? "charge"
-                  : "talk";
+              : hint === "stealth_ko"
+                ? "warn"
+                : hint === "flip_build" || hint === "flip_trap"
+                  ? "flip"
+                  : hint === "plant_zone" || hint === "signal"
+                    ? "charge"
+                    : "talk";
   // VH floating key circle
   ctx.save();
   ctx.fillStyle = "#efe2c8";
@@ -1111,7 +1149,7 @@ function DrawInteractPromptWorld() {
   ctx.textBaseline = "middle";
   ctx.fillText(key, x + 28 * s, y - 36 * s);
   DrawPictogram(icon, x + 40 * s, y - 52 * s, 18 * s);
-  if (hint === "need_shovel") {
+  if (hint === "need_shovel" || hint === "need_ammo" || hint === "stealth_ko") {
     DrawPictogram("warn", x + 58 * s, y - 52 * s, 14 * s);
   }
   if (hint === "dig" && state.player.digging) {
@@ -1137,7 +1175,9 @@ function DrawPlayer() {
         ? "charge"
         : p.held === ITEM_GRENADE
           ? "grenade"
-          : null;
+          : p.held === ITEM_RIFLE
+            ? "rifle"
+            : null;
   // Spine-style modular puppet — walk / crouch / dig clips on bone parts
   if (!p._animT) p._animT = 0;
   const moving = Math.abs(p.vx || 0) > 18;
@@ -1161,6 +1201,35 @@ function DrawPlayer() {
     moving,
     alpha: blink ? 0.4 : 1,
   });
+}
+
+function DrawAdsOverlay() {
+  if (!state.player.aiming || state.player.held !== ITEM_RIFLE || state.player.inTunnel) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  const s = Scale();
+  const cx = WX(state.player.x) + state.player.facing * 90 * s;
+  const cy = WY(state.player.y) - 40 * s;
+  ctx.save();
+  ctx.fillStyle = "rgba(8,6,4,.45)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.min(w, h) * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = "rgba(239,226,200,.85)";
+  ctx.lineWidth = 2 * s;
+  ctx.beginPath();
+  ctx.moveTo(cx - 18 * s, cy);
+  ctx.lineTo(cx + 18 * s, cy);
+  ctx.moveTo(cx, cy - 18 * s);
+  ctx.lineTo(cx, cy + 18 * s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10 * s, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function DrawProjectiles() {
@@ -1230,6 +1299,7 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     DrawPlayer();
     DrawSpeechBubble();
     DrawInteractPromptWorld();
+    DrawAdsOverlay();
   }
 
   // 5 FRONT occluders — paint AFTER player (real 2.5D cover)
@@ -1353,6 +1423,10 @@ function BindInput() {
     if (["arrowleft", "a"].includes(k)) input.left = down;
     if (["arrowright", "d"].includes(k)) input.right = down;
     if (["arrowdown", "s"].includes(k)) input.crouch = down;
+    if (k === "shift") {
+      input.aim = down;
+      if (down) e.preventDefault();
+    }
     if (["j"].includes(k)) {
       input.dig = down;
       if (down) input.digPressed = true;
@@ -1420,6 +1494,7 @@ function BindInput() {
       if (kind === "left") state.input.left = down;
       if (kind === "right") state.input.right = down;
       if (kind === "crouch") state.input.crouch = down;
+      if (kind === "aim") state.input.aim = down;
       if (kind === "dig") {
         state.input.dig = down;
         if (down) state.input.digPressed = true;

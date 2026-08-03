@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
-import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
+import { ITEM_AMMO, ITEM_CHARGE, ITEM_GRENADE, ITEM_RIFLE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { CountPlanned, EnsurePlanGrid, IsPlanned, TogglePlanCell } from "./Script_Plan.mjs";
 import { DEPTH_MID, PropsBehind, PropsBehindBands, PropsFront, ScaleOf, YLiftOf } from "./Script_Depth.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
@@ -333,14 +333,20 @@ function TestAct4KillInvaders() {
 
   const port = state.level.entities.find((e) => e.id === "port1");
   for (const e of enemies) {
-    e.x = port.x + 36;
-    e.homeX = port.x + 36;
+    // Keep foes in shot range but outside rear-KO / melee overlap with the port.
+    e.x = port.x + 120;
+    e.homeX = port.x + 120;
     e.amp = 0;
     e.alert = 0;
+    e.highAlert = false;
+    e.facing = -1;
     e.hp = 1;
     e.maxHp = 1;
     e.dead = false;
+    e.corpse = false;
+    e.discovered = false;
   }
+  state.level.alarm = false;
 
   state.player.invuln = 99;
   state.input.crouch = true;
@@ -352,6 +358,7 @@ function TestAct4KillInvaders() {
     state.player.inTunnel = true;
     state.player.x = port.x;
     state.player.y = port.tunnelY;
+    state.player.invuln = 99;
     state.input.interactPressed = true;
     StepPlay(state, 1 / 30);
     for (let i = 0; i < 50; i++) StepPlay(state, 1 / 30);
@@ -375,9 +382,122 @@ function TestAct4KillInvaders() {
   Assert(state.goalsDone.kill_invaders, "kill_invaders cleared");
 }
 
-function TestAct5PlantNeedsCharge() {
+function TestAct5StreetHunt() {
   const state = Play(4);
-  Assert(state.player.inTunnel, "act5 starts underground");
+  Assert(state.chapterId === "act5_street_hunt", "street hunt chapter");
+  Assert(CHAPTERS[4].goals.includes("clear_street"), "clear_street goal");
+  Assert(state.player.held === ITEM_RIFLE, "starts with rifle");
+  Assert(state.player.ammo === 2, "scarce starting ammo");
+  Assert(state.level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_AMMO), "ammo packs");
+  Assert(state.level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_GRENADE), "grenades");
+  const foes = state.level.entities.filter((e) => e.type === "enemy");
+  Assert(foes.length >= 6, `street enemies (${foes.length})`);
+  Assert(foes.some((e) => e.label === "伪军"), "includes 伪军");
+
+  DebugCompleteGoal(state, "talk_street");
+  const target = foes[0];
+  target.x = state.player.x + 80;
+  target.homeX = target.x;
+  target.amp = 0;
+  target.facing = -1;
+  state.player.facing = 1;
+  state.player.ammo = 2;
+  state.player.shotCool = 0;
+  state.input.aim = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.aiming, "ADS while holding aim");
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.ammo === 1, "ADS shot spends 1 ammo");
+  Assert(target.hp < target.maxHp || target.dead, "ADS shot hits forward foe");
+
+  // Hide other corpses so LOS test is unambiguous.
+  for (const e of foes) {
+    if (e.dead) {
+      e.corpse = false;
+      e.hidden = true;
+      e.discovered = false;
+    }
+  }
+  const koTarget = foes.find((e) => !e.dead && e !== target) || foes[1];
+  koTarget.dead = false;
+  koTarget.hp = 2;
+  koTarget.ko = false;
+  koTarget.discovered = false;
+  koTarget.corpse = false;
+  koTarget.hidden = false;
+  koTarget.x = 800;
+  koTarget.homeX = 800;
+  koTarget.amp = 0;
+  koTarget.facing = 1;
+  state.player.x = koTarget.x - 28;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.player.facing = 1;
+  state.level.alarm = false;
+  for (const e of foes) {
+    e.highAlert = false;
+    e.alert = 0;
+  }
+  state.input.aim = false;
+  state.input.crouch = false;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(koTarget.dead && koTarget.ko, "rear KO while standing with rifle");
+  Assert(!koTarget.discovered, "KO corpse not auto-discovered");
+
+  const witness = foes.find((e) => !e.dead);
+  Assert(!!witness, "living witness remains");
+  witness.x = koTarget.x - 80;
+  witness.homeX = witness.x;
+  witness.amp = 0;
+  witness.alert = 0;
+  witness.highAlert = false;
+  witness.facing = 1;
+  state.level.alarm = false;
+  for (let i = 0; i < 8; i++) StepPlay(state, 1 / 30);
+  Assert(koTarget.discovered, "witness discovers corpse");
+  Assert(!!state.level.alarm || witness.highAlert, "corpse alarm raised");
+  Assert(
+    foes.filter((e) => !e.dead).every((e) => e.highAlert),
+    "all living foes go high alert",
+  );
+
+  const pack = state.level.entities.find((e) => e.kind === "pickup" && e.itemId === ITEM_AMMO && !e.taken);
+  state.player.x = pack.x;
+  state.player.held = ITEM_RIFLE;
+  const ammoBefore = state.player.ammo;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.held === ITEM_RIFLE, "ammo does not steal rifle slot");
+  Assert(state.player.ammo > ammoBefore, "ammo added to pocket");
+
+  // Last living foe — shoot to sync clear_street
+  for (const e of foes) {
+    if (e === witness) continue;
+    e.dead = true;
+    e.corpse = true;
+  }
+  witness.dead = false;
+  witness.hp = 1;
+  witness.x = state.player.x + 60;
+  witness.homeX = witness.x;
+  witness.amp = 0;
+  state.player.held = ITEM_RIFLE;
+  state.player.ammo = 5;
+  state.player.facing = 1;
+  state.player.shotCool = 0;
+  state.input.aim = true;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(witness.dead, "final foe down");
+  Assert(state.goalsDone.clear_street, "clear_street when all foes down");
+}
+
+function TestAct6PlantNeedsCharge() {
+  const state = Play(5);
+  Assert(state.chapterId === "act6_heifengkou", "heifengkou is act6");
+  Assert(state.player.inTunnel, "act6 starts underground");
   const chargePick = state.level.entities.find((e) => e.kind === "pickup" && e.itemId === ITEM_CHARGE);
   const zone = state.level.entities.find((e) => e.type === "plant_zone");
   Assert(!!chargePick && !!zone, "charge pickup + plant zone");
@@ -424,7 +544,9 @@ function TestDepthLayers() {
 }
 
 function TestChaptersHaveSoil() {
-  Assert(CHAPTERS.length === 5, "five acts");
+  Assert(CHAPTERS.length === 6, "six acts");
+  Assert(CHAPTERS[4].id === "act5_street_hunt", "street hunt slotted as act5");
+  Assert(CHAPTERS[5].id === "act6_heifengkou", "heifengkou is act6");
   for (const ch of CHAPTERS) {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
@@ -434,7 +556,7 @@ function TestChaptersHaveSoil() {
     );
     Assert(level.entities.some((e) => e.type === "talk" && e.script), `${ch.id} has talk script`);
   }
-  Assert(SAVE_KEY.endsWith("_v5"), "save v5");
+  Assert(SAVE_KEY.endsWith("_v6"), "save v6");
   Assert(LoadProgress(SerializeProgress(Play(0))).chapterIndex === 0, "save");
 }
 
@@ -467,15 +589,18 @@ function Main() {
   TestMultiTalk();
   TestAct2MustDigBeforeShelter();
   TestAct4KillInvaders();
-  TestAct5PlantNeedsCharge();
+  TestAct5StreetHunt();
+  TestAct6PlantNeedsCharge();
   TestNaiveAct1Bot();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 5, "act1 starts with 5 open goals");
+  const html = readFileSync(join(here, "index.html"), "utf8");
+  Assert(html.includes('data-touch="aim"'), "mobile ADS aim button");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 play-fix smoke OK");
+  console.log("\nTunnelHeart1942 combat-stealth smoke OK");
 }
 
 Main();
