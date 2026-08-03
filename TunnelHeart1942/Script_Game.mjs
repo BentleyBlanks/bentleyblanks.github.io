@@ -1538,15 +1538,15 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   }
 
   // 5 FRONT occluders — paint AFTER player (real 2.5D cover)
+  // Two thin bands (FRONT then NEAR) + veil so sparse props still stack in depth
   const front = PropsFront(state.level.props);
   for (const prop of front.filter((p) => (p.depth ?? 0) === 1)) DrawProp(prop, pal);
-  // Darken a bit before NEAR so the closest plane punches harder
   DrawDepthVeil(
     w,
     h,
-    walkY + 10 * s,
-    h * 0.92,
-    pal.night ? "rgba(0,0,0,.16)" : "rgba(20,12,8,.12)",
+    walkY + 18 * s,
+    h * 0.95,
+    pal.night ? "rgba(0,0,0,.22)" : "rgba(18,10,6,.16)",
   );
   for (const prop of front.filter((p) => (p.depth ?? 0) >= 2)) DrawProp(prop, pal);
 

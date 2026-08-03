@@ -618,10 +618,16 @@ function TestDepthLayers() {
   const level = BuildLevel("act1_connect");
   Assert(PropsBehind(level.props).length > 8, "back depth props exist");
   Assert(PropsFront(level.props).length > 8, "front occluder props exist");
+  const frontBand = level.props.filter((p) => p.depth === 1);
+  const nearBand = level.props.filter((p) => p.depth === 2);
+  Assert(frontBand.length > 3 && frontBand.length < 22, "FRONT band sparse mid-fg");
+  Assert(nearBand.length > 3 && nearBand.length < 18, "NEAR band sparse camera skirt");
   Assert(level.props.some((p) => p.depth === DEPTH_MID), "mid depth crop/orchard band");
   Assert(PropsBehindBands(level.props).length >= 2, "multiple behind depth bands");
   Assert(ScaleOf(-3) < ScaleOf(-1) && ScaleOf(-1) < ScaleOf(0) && ScaleOf(0) < ScaleOf(2), "depth scale stack");
+  Assert(ScaleOf(1) < ScaleOf(2) && YLiftOf(1, 1) < YLiftOf(2, 1), "FRONT/NEAR hierarchy gap");
   Assert(YLiftOf(-3, 1) < YLiftOf(0, 1) && YLiftOf(0, 1) < YLiftOf(2, 1), "depth Y-lift stack");
+  Assert(YLiftOf(2, 1) >= 90, "NEAR drops closer to camera");
   Assert(!level.props.some((p) => p.kind === "mudbank"), "no scattered mudbank trapezoids");
   const midWheat = level.props.filter((p) => p.kind === "wheat" && p.depth === DEPTH_MID);
   Assert(midWheat.length > 0 && midWheat.length < 40, "mid wheat is sparse crop patches");

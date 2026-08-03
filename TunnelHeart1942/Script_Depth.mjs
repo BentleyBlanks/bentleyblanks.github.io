@@ -20,8 +20,9 @@ export function ParallaxOf(depth) {
   if (depth === -2) return 0.28;
   if (depth === -1) return 0.58;
   if (depth === 0) return 1;
-  if (depth === 1) return 1.35;
-  return 1.7;
+  // Foreground closer to camera — faster scroll, clearer FRONT vs NEAR gap
+  if (depth === 1) return 1.5;
+  return 2.05;
 }
 
 export function ScaleOf(depth) {
@@ -29,8 +30,8 @@ export function ScaleOf(depth) {
   if (depth === -2) return 0.58;
   if (depth === -1) return 0.78;
   if (depth === 0) return 1;
-  if (depth === 1) return 1.38;
-  return 1.72;
+  if (depth === 1) return 1.55;
+  return 2.05;
 }
 
 /** Screen Y lift: far sits on the ridge; near drops into the camera skirt. */
@@ -39,8 +40,8 @@ export function YLiftOf(depth, scale) {
   if (depth === -2) return -72 * scale;
   if (depth === -1) return -42 * scale;
   if (depth === 0) return 0;
-  if (depth === 1) return 36 * scale;
-  return 72 * scale;
+  if (depth === 1) return 54 * scale;
+  return 108 * scale;
 }
 
 export function TintAlpha(depth) {
@@ -48,7 +49,8 @@ export function TintAlpha(depth) {
   if (depth === -2) return 0.48;
   if (depth === -1) return 0.78;
   if (depth >= 2) return 1;
-  if (depth >= 1) return 1;
+  // FRONT a touch softer so NEAR silhouettes punch as the closest plane
+  if (depth >= 1) return 0.9;
   return 1;
 }
 
@@ -91,23 +93,23 @@ export function SeedDepthDecor(level) {
     props.push({ kind: "stack", x, depth: DEPTH_PLAY });
   }
 
-  // FRONT — fewer stalks, more bush cover between player and camera
-  for (let x = 70; x < width; x += 150 + (x % 45)) {
-    const roll = (x * 17) % 5;
+  // FRONT — mid-fg skirt: sparse soft cover (bushes / crop), not a hedge wall
+  for (let x = 120; x < width; x += 300 + (x % 80)) {
+    const roll = (x * 17) % 4;
     if (roll === 0 || roll === 1) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
-    else if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_FRONT });
-    else if (roll === 3) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
-    else props.push({ kind: "wheat", x, depth: DEPTH_FRONT, clump: 5 });
+    else if (roll === 2) props.push({ kind: "wheat", x, depth: DEPTH_FRONT, clump: 4 });
+    else props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
   }
 
-  // NEAR — hard occluders only. Continuous ground is painted in Script_Game
-  // (no scattered mudbank trapezoids — those read as disconnected floor plates).
-  for (let x = 50; x < width; x += 180 + (x % 50)) {
-    const roll = (x * 13) % 4;
-    if (roll === 2) props.push({ kind: "post", x, depth: DEPTH_NEAR });
-    else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
+  // NEAR — closest camera plane: fewer, bigger punches. Keep distinct from FRONT
+  // so two occluder bands still read after thinning. Ground ribbon is Script_Game.
+  for (let x = 90; x < width; x += 380 + (x % 90)) {
+    const roll = (x * 13) % 3;
+    if (roll === 0) props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: true });
+    else if (roll === 1) props.push({ kind: "post", x, depth: DEPTH_NEAR });
+    else props.push({ kind: "bush", x, depth: DEPTH_NEAR, tall: false });
   }
-  for (let x = 300; x < width; x += 420) {
+  for (let x = 420; x < width; x += 680 + (x % 120)) {
     props.push({ kind: "tree", x: x + 40, depth: DEPTH_NEAR, occlude: true });
   }
 
