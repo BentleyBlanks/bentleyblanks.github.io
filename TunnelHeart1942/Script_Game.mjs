@@ -16,7 +16,7 @@ import {
   SaveToStorage,
   StepPlay,
 } from "./Script_Rules.mjs";
-import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
+import { AIR, HARD, SOFT, CellWorldRect, GetCell } from "./Script_Dig.mjs";
 import {
   DEPTH_NEAR,
   ParallaxOf,
@@ -1240,8 +1240,11 @@ function DrawSurfaceExtras() {
 
 function DrawEntity(ent) {
   if (ent.hidden) return;
-  if (ent.layer === "tunnel" && !state.player.inTunnel) return;
-  if (ent.layer === "surface" && state.player.inTunnel && ent.type !== "spy") return;
+  const cutaway = state.phase === "play" && !!state.level.soil;
+  if (!cutaway) {
+    if (ent.layer === "tunnel" && !state.player.inTunnel) return;
+    if (ent.layer === "surface" && state.player.inTunnel && ent.type !== "spy") return;
+  }
 
   const s = Scale();
   const worldY =
@@ -1250,6 +1253,11 @@ function DrawEntity(ent) {
   const y = WY(worldY);
   ctx.save();
   ctx.translate(x, y);
+  // Cutaway: other layer stays visible but quieter.
+  if (cutaway && ent.layer === "tunnel" && !state.player.inTunnel) ctx.globalAlpha = 0.55;
+  if (cutaway && ent.layer === "surface" && state.player.inTunnel && ent.type !== "spy") {
+    ctx.globalAlpha = 0.5;
+  }
   ctx.lineWidth = 2.5 * s;
   ctx.strokeStyle = "#1c1712";
 
@@ -1961,6 +1969,78 @@ function DrawProjectiles() {
   }
 }
 
+function DrawOpenShaftMarkers() {
+  const soil = state.level.soil;
+  if (!soil || state.player.inTunnel) return;
+  const s = Scale();
+  const cam0 = state.cameraX - 40;
+  const cam1 = state.cameraX + VIEW_W + 40;
+  const seen = new Set();
+  for (let c = 1; c < soil.cols - 1; c++) {
+    if (GetCell(soil, c, 1) !== AIR && GetCell(soil, c, 0) !== AIR) continue;
+    const x = soil.originX + (c + 0.5) * soil.cell;
+    if (x < cam0 || x > cam1) continue;
+    const key = c >> 0;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const sx = WX(x);
+    const sy = WY(SURFACE_Y);
+    ctx.fillStyle = "rgba(42,28,18,.9)";
+    ctx.fillRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 14 * s, sy - 5 * s, 28 * s, 8 * s);
+    // Dark hole into the dig band
+    ctx.fillStyle = "rgba(10,6,4,.75)";
+    ctx.beginPath();
+    if (typeof ctx.ellipse === "function") ctx.ellipse(sx, sy + 2 * s, 10 * s, 5 * s, 0, 0, Math.PI * 2);
+    else ctx.arc(sx, sy, 8 * s, 0, Math.PI * 2);
+    ctx.fill();
+    DrawPictogram("hatch", sx - 9 * s, sy - 32 * s, 18 * s);
+  }
+}
+
+/**
+ * Unified dig cutaway — surface lip + dig band visible together.
+ * Replaces the old either-or surface/tunnel stacks during play with soil.
+ */
+function RenderPlayCutaway(w, h, camX, pal) {
+  DrawSoilCutaway(w, h, camX, pal);
+  ctx.save();
+  ctx.globalAlpha = state.player.inTunnel ? 0.92 : 0.78;
+  DrawSoilGrid(pal);
+  ctx.restore();
+  DrawPlanOverlay(pal);
+
+  // Surface ridge props (already partly in DrawSoilCutaway); play-plane props on the lip.
+  for (const prop of PropsPlay(state.level.props)) DrawProp(prop, pal, state.player.inTunnel ? 0.45 : 1);
+
+  DrawOpenShaftMarkers();
+  for (const shaft of state.level.shafts || []) DrawShaft(shaft);
+  for (const ent of state.level.entities) DrawEntity(ent);
+  DrawProjectiles();
+  DrawGrenadeAimArc();
+  DrawPlayer();
+  DrawMeleeFx();
+  DrawAdsOverlay();
+
+  if (state.player.inTunnel) DrawTunnelFrontLips(pal);
+
+  // Thin near skirt only — do NOT bury the dig band under ContinuousNearGround.
+  const walkY = WY(SURFACE_Y);
+  const s = Scale();
+  DrawDepthVeil(
+    w,
+    h,
+    walkY + Math.max(180, (state.level.soil.rows * state.level.soil.cell) * s * 0.55),
+    h,
+    pal.night ? "rgba(0,0,0,.35)" : "rgba(18,10,6,.28)",
+  );
+
+  DrawSpeechBubble();
+  DrawInteractPromptWorld();
+}
+
 function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
   const playable = !!opts.playable;
   const s = Scale();
@@ -2061,6 +2141,9 @@ function Render() {
 
   if (state.phase === "title" || state.phase === "ending") {
     RenderSurfaceStack(w, h, camX * 0.35, pal, { playable: false });
+  } else if (state.phase === "play" && state.level.soil) {
+    // Always show ground lip + dig band together (Valiant Hearts dig cutaway).
+    RenderPlayCutaway(w, h, camX, pal);
   } else if (state.player.inTunnel && state.phase === "play") {
     RenderTunnelStack(w, h, camX, pal);
   } else {

@@ -392,6 +392,25 @@ function TestClimbShaftToSurface() {
   state.input.up = true;
   for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
   Assert(state.player.y >= surfY - 2, "after emerge, ↑ still does not jump");
+
+  // Must be able to drop back into the carved shaft (no hatch entity required).
+  state.input.up = false;
+  state.input.crouch = false;
+  state.shaftExitLock = 0;
+  state.input.crouch = true;
+  for (let i = 0; i < 40 && !state.player.inTunnel; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.inTunnel, "↓ on open shaft re-enters tunnel");
+  Assert(state.player.y > 20, "re-enter drops into dig band");
+}
+
+function TestPlayCutawayRender() {
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("RenderPlayCutaway"), "play uses unified dig cutaway");
+  Assert(game.includes("DrawOpenShaftMarkers"), "open shafts marked on surface");
+  Assert(game.includes("level.soil"), "cutaway gated on soil levels");
+  const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
+  Assert(rules.includes("TryDescendOpenShaft"), "shaft re-entry helper");
+  Assert(rules.includes("shaftExitLock"), "emerge lock prevents yo-yo re-enter");
 }
 
 /** Crouch into a 1-high crawlway — must not X-shove to the map/soil edge. */
@@ -1113,6 +1132,7 @@ function Main() {
   TestNoJump();
   TestDigUpPastHeadroom();
   TestClimbShaftToSurface();
+  TestPlayCutawayRender();
   TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();
   TestMultiTalk();

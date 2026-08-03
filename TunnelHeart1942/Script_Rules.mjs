@@ -131,6 +131,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     /** Valiant Hearts lob: enter aim, ↑↓ tune arc, confirm throw. */
     nadeAiming: false,
     nadeAim: 0.55,
+    /** Last climbed / descended shaft X — hint + re-entry. */
+    openShaftX: null,
     /** Mobile: tap ↑ then dig — keep dig-up intent briefly without two-finger hold. */
     digAimUp: 0,
     digAimDown: 0,
@@ -323,6 +325,24 @@ function ShaftOpenToSurface(soil, playerX) {
   return GetCell(soil, c, 1) === AIR || GetCell(soil, c, 0) === AIR;
 }
 
+export function IsShaftOpenAt(state, x = state.player?.x) {
+  const soil = state?.level?.soil;
+  if (!soil || x == null) return false;
+  return ShaftOpenToSurface(soil, x);
+}
+
+/** Drop Y inside an open shaft column (stand in the highest roomy air pocket). */
+function ShaftDropPose(soil, playerX) {
+  const c = WorldToCell(soil, playerX, soil.originY + soil.cell * 0.5).c;
+  let standR = 1;
+  for (let r = 1; r < soil.rows - 1; r++) {
+    if (GetCell(soil, c, r) !== AIR) break;
+    standR = r;
+  }
+  const center = CellCenter(soil, c, Math.max(1, standR));
+  return { x: soil.originX + (c + 0.5) * soil.cell, y: center.y + soil.cell * 0.35, c, r: standR };
+}
+
 /** When a vertical shaft reaches the top of the dig band, ↑ pops you onto surface. */
 function TryEmergeFromShaft(state) {
   const { player, level, input } = state;
@@ -340,9 +360,49 @@ function TryEmergeFromShaft(state) {
   player.climbing = false;
   player.crouching = false;
   state.digAimUp = 0;
+  state.digAimDown = 0;
   state.designMode = false;
+  state.openShaftX = player.x;
+  state.shaftExitLock = 0.45;
   SetBubble(state, ["hatch"], "出井", 1.4);
-  SetSubtitle(state, "高传宝", "钻出地面！", 1.6);
+  SetSubtitle(state, "高传宝", "钻出地面！按↓还能钻回去。", 2.0);
+  return true;
+}
+
+/**
+ * Surface → open carved shaft. Climb-out left no hatch entity, so ↓ / 互动 must re-enter.
+ */
+function TryDescendOpenShaft(state) {
+  const { player, level, input } = state;
+  if (player.inTunnel || player.manningMg || !level.soil || state.transition > 0) return false;
+  if (state.nadeAiming) return false;
+  if ((state.shaftExitLock || 0) > 0) return false;
+  // Interact tap or hold ↓ on the mouth — sticky digAimDown alone must not yo-yo re-enter.
+  const wantDown = !!input.interactPressed || !!input.crouch;
+  if (!wantDown) return false;
+  if (!ShaftOpenToSurface(level.soil, player.x)) return false;
+  // Prefer an authored hatch's tunnel anchor when standing on its mouth.
+  let hatchNear = null;
+  for (const ent of level.entities) {
+    if (ent.type !== "hatch" || ent.hidden || ent.done) continue;
+    if (Math.abs(player.x - ent.x) < (ent.radius || 52)) {
+      hatchNear = ent;
+      break;
+    }
+  }
+  const pose = hatchNear
+    ? {
+        x: hatchNear.tunnelX ?? player.x,
+        y: hatchNear.tunnelY ?? level.tunnelFloor,
+      }
+    : ShaftDropPose(level.soil, player.x);
+  BeginHatchTransition(state, true, {
+    tunnelX: pose.x,
+    tunnelY: pose.y,
+    id: hatchNear?.id || "open_shaft",
+  });
+  state.openShaftX = pose.x;
+  SetSubtitle(state, "高传宝", "钻回地道！", 1.5);
   return true;
 }
 
@@ -1504,12 +1564,12 @@ function GoalReady(state, ent) {
 
 function TryInteract(state) {
   const { player, level, input } = state;
-  if (!input.interactPressed || state.transition > 0) return;
+  if (!input.interactPressed || state.transition > 0) return false;
 
   // Comic talk: once started, E/Space/互动 always advances or confirms — no re-proximity.
   if (TryAdvanceActiveTalk(state)) {
     state.stats.interactions += 1;
-    return;
+    return true;
   }
 
   state.stats.interactions += 1;
@@ -1528,7 +1588,7 @@ function TryInteract(state) {
   }
   if (bestFoe) {
     TryMeleeKO(state, bestFoe);
-    return;
+    return true;
   }
 
   // Story / hatches / world actions before pickups — never let a shovel steal a talk.
@@ -1540,25 +1600,25 @@ function TryInteract(state) {
 
     if (!GoalReady(state, ent) && ent.type !== "hatch" && ent.type !== "talk") {
       SetBubble(state, ["shovel", "warn"], "", 1.8);
-      return;
+      return true;
     }
 
     if (ent.type === "talk") {
       AdvanceTalk(state, ent);
-      return;
+      return true;
     }
 
     if (ent.type === "mg_nest") {
       if (player.inTunnel) {
         SetSubtitle(state, "提示", "先出井，再抢机枪。", 2.0);
-        return;
+        return true;
       }
       const gunner = level.entities.find((e) => e.id === "mg_gunner");
       if (gunner && !gunner.dead) {
         SetSubtitle(state, "提示", "先制住机枪手——绕到他背后。", 2.4);
-        return;
+        return true;
       }
-      if (player.manningMg) return;
+      if (player.manningMg) return true;
       MarkGoal(state, "silence_gunner");
       player.manningMg = true;
       player.inTunnel = false;
@@ -1570,7 +1630,7 @@ function TryInteract(state) {
       level.mgWaveTimer = 0.55;
       SetSubtitle(state, "高传宝", "机枪到手！来多少日伪军，扫多少！", 3.0);
       SetBubble(state, ["shot"], "机枪", 1.2);
-      return;
+      return true;
     }
 
     if (ent.type === "hatch") {
@@ -1579,12 +1639,12 @@ function TryInteract(state) {
         state.interactHint = "need_shovel";
         SetBubble(state, ["shovel", "warn"], "先捡铁锹", 1.6);
         SetSubtitle(state, "提示", "铁锹在井边。先捡上，再下洞挖。", 2.8);
-        return;
+        return true;
       }
       if (ent.requiresGoal && !GoalReady(state, ent)) {
         SetBubble(state, ["shovel", "warn"], "地道还没挖通", 1.6);
         SetSubtitle(state, "提示", "先挖通到营盘底下，再翻这口井。", 2.6);
-        return;
+        return true;
       }
       // Don't dive back down while standing on the nest after silencing the gunner.
       if (
@@ -1597,23 +1657,23 @@ function TryInteract(state) {
       }
       BeginHatchTransition(state, !player.inTunnel, ent);
       if (ent.goal) MarkGoal(state, ent.goal);
-      return;
+      return true;
     }
 
     if (ent.type === "shelter") {
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetSubtitle(state, ent.speaker || "乡亲", ent.line, 2.4);
-      return;
+      return true;
     }
 
     if (ent.type === "bell") {
       // Film beat: 高老忠敲钟殉难 — player witnesses at the bell, does not “play as” the ringer.
       if (!state.goalsDone.shelter_a || !state.goalsDone.shelter_b || !state.goalsDone.shelter_c) {
         SetSubtitle(state, "高老忠", "先把人藏进洞——钟，我来敲！", 2.8);
-        return;
+        return true;
       }
-      if (ent.done) return;
+      if (ent.done) return true;
       ent.done = true;
       ent.ringing = true;
       if (ent.goal) MarkGoal(state, ent.goal);
@@ -1627,7 +1687,7 @@ function TryInteract(state) {
         { speaker: "旁白", text: "手榴弹的火光吞没钟架。高老忠用命，换全村进洞的时间。", time: 4.2 },
         { speaker: "高传宝", text: "叔——！", time: 2.6 },
       ]);
-      return;
+      return true;
     }
 
     if (ent.type === "flip_build") {
@@ -1635,7 +1695,7 @@ function TryInteract(state) {
       for (const f of level.entities) if (f.type === "flip_trap") f.armed = true;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetSubtitle(state, "林霞", "翻口好了。巷道再挖通到卡口。", 3.0);
-      return;
+      return true;
     }
 
     if (ent.type === "spy_talk") {
@@ -1643,24 +1703,24 @@ function TryInteract(state) {
       if (ent.goal) MarkGoal(state, ent.goal);
       for (const s of level.entities) if (s.type === "spy") s.exposed = true;
       SetSubtitle(state, "高传宝", "武工队从东沟来——你们怎么从炮楼方向进庄？", 3.5);
-      return;
+      return true;
     }
 
     if (ent.type === "flip_trap") {
       if (!ent.armed) {
         SetSubtitle(state, "提示", "先改建翻口。", 2.0);
-        return;
+        return true;
       }
       const spy = level.entities.find((e) => e.type === "spy" && e.exposed && !e.trapped);
       if (!spy || Math.abs(spy.x - ent.x) > 90) {
         SetSubtitle(state, "提示", "等特务走到翻口上方。", 2.0);
-        return;
+        return true;
       }
       spy.trapped = true;
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetSubtitle(state, "民兵", "翻口——上！", 2.6);
-      return;
+      return true;
     }
 
     if (ent.type === "shot_port") {
@@ -1668,42 +1728,44 @@ function TryInteract(state) {
       if (player.inTunnel) {
         BeginHatchTransition(state, false, ent);
         SetSubtitle(state, "高传宝", "悄悄出井……瞄准再打。", 2.0);
-        return;
+        return true;
       }
       if ((ent.cool || 0) > 0) {
         BeginHatchTransition(state, true, ent);
         SetSubtitle(state, "林霞", "枪管还烫——先钻回去换口。", 1.8);
-        return;
+        return true;
       }
       FireFromPort(state, ent);
       ent.cool = 1.6;
       BeginHatchTransition(state, true, ent);
-      return;
+      return true;
     }
 
     if (ent.type === "plant_zone") {
       if (!CanPlant(player.held)) {
         SetBubble(state, ["charge", "warn"], "先拿着炸药包", 1.6);
-        return;
+        return true;
       }
       // Planting is F / use — nudge player
       SetBubble(state, ["charge"], "在此安放炸药", 1.4);
-      return;
+      return true;
     }
 
     if (ent.type === "signal") {
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
       SetSubtitle(state, "赵平原", "总攻——黑风口！", 2.8);
-      return;
+      return true;
     }
   }
 
   // Pickups last
   const picks = state.stats.pickups;
   TryPickupOrInteract(state);
+  if (state.stats.pickups !== picks) return true;
   // Nothing grabbed — E/Space still closes a lingering comic / film line
-  if (state.stats.pickups === picks) TryDismissSubtitle(state);
+  if (TryDismissSubtitle(state)) return true;
+  return false;
 }
 
 function UpdateActors(state, dt) {
@@ -1817,7 +1879,12 @@ function UpdateCamera(state, dt) {
   const { player, level } = state;
   const targetX = player.x - VIEW_W * 0.38;
   state.cameraX += (Math.max(0, Math.min(level.width - VIEW_W, targetX)) - state.cameraX) * Math.min(1, dt * 6);
-  const targetY = player.inTunnel ? player.y - 280 : SURFACE_Y - 360;
+  // Cutaway play shows dig under the lip — keep more of the soil band on screen.
+  const targetY = player.inTunnel
+    ? player.y - 280
+    : level.soil
+      ? SURFACE_Y - 220
+      : SURFACE_Y - 360;
   state.cameraY += (targetY - state.cameraY) * Math.min(1, dt * 5);
 }
 
@@ -1894,7 +1961,15 @@ function RefreshHint(state) {
       return;
     }
   }
-  if (digReady) state.interactHint = "dig";
+  if (digReady) {
+    state.interactHint = "dig";
+    return;
+  }
+  // Carved shaft mouth on the surface — ↓ goes back down (no hatch prop needed).
+  if (!state.player.inTunnel && IsShaftOpenAt(state, state.player.x)) {
+    state.interactHint = "hatch";
+    state.openShaftX = state.player.x;
+  }
 }
 
 export function StepPlay(state, dt) {
@@ -1907,6 +1982,7 @@ export function StepPlay(state, dt) {
     simDt = clamped * 0.18;
   }
   if ((state.shake || 0) > 0) state.shake = Math.max(0, state.shake - clamped * 1.8);
+  if ((state.shaftExitLock || 0) > 0) state.shaftExitLock = Math.max(0, state.shaftExitLock - clamped);
 
   // Sticky dig aim: mobile can tap ↑ then iron-shovel without holding both.
   if (state.input.up) state.digAimUp = 0.55;
@@ -1939,7 +2015,7 @@ export function StepPlay(state, dt) {
   // X-shoved by unresolved soil solids for a frame.
   if (state.input.dropPressed) DropHeld(state);
   TryUseItem(state);
-  TryInteract(state);
+  if (!TryInteract(state)) TryDescendOpenShaft(state);
   // Excavate before physics — solids can shove the digger off the planned cell for a frame.
   // Dig always wins over design mode (auto-exits).
   TryExcavate(state);
@@ -2089,12 +2165,15 @@ export function NextStepText(state) {
     if (state.chapterId === "act1_connect") {
       if (!g.link_ab) return "联通甲—乙：贴着土壁/蓝格，反复点铁锹大键往前挖";
       if (!g.link_bc) return "联通乙—丙：继续贴壁点铁锹挖";
-      return "三家已通 · 回井口上地面（竖井挖通后也可按住↑爬出）";
+      return "三家已通 · ↑爬竖井出地面，↓再钻回去";
     }
     if (CanDigWith(p.held)) {
-      return "贴壁挖通；往上挖竖井后按住↑攀爬出地面";
+      return "贴壁挖通；往上挖竖井后按住↑出地面，地面按↓钻回";
     }
-    return "地道里需要铁锹才能挖；井口上地面，或竖井顶通后按住↑爬出";
+    return "地道里需要铁锹才能挖；↑出井 / ↓回井，井口也能上下";
+  }
+  if (!p.inTunnel && IsShaftOpenAt(state, p.x)) {
+    return "竖井口：按↓或点大键钻回地道";
   }
   if (state.chapterId === "act1_connect") {
     if (!g.talk_laozhong) return "找高老忠交谈";
