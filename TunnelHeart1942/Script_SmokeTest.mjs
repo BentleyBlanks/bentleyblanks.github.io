@@ -1013,6 +1013,68 @@ function TestPatrolMeleeAndHurtPullback() {
   Assert(!st2.failed && st2.player.hp === 3, "death respawn clears fail + hearts");
 }
 
+/** KO one 日军 patrol — if another faces the body, whole surface goes high alert. */
+function TestPatrolCorpseRaisesAlert() {
+  const state = Play(1);
+  const patrols = state.level.entities.filter((e) => e.type === "patrol" && e.hostile);
+  Assert(patrols.length >= 2, "act2 has two 日军 patrols");
+  const body = patrols[0];
+  const witness = patrols[1];
+  body.broken = true;
+  body.dead = true;
+  body.ko = true;
+  body.corpse = true;
+  body.discovered = false;
+  body.hidden = false;
+  body.amp = 0;
+  body.x = 1000;
+  body.homeX = 1000;
+  body.y = 0;
+  witness.broken = false;
+  witness.dead = false;
+  witness.hostile = true;
+  witness.amp = 0;
+  witness.x = 920;
+  witness.homeX = 920;
+  witness.y = 0;
+  witness.facing = 1; // looking toward body at 1000
+  witness.alert = 0;
+  witness.highAlert = false;
+  witness.discovered = false;
+  state.level.alarm = false;
+  state.player.inTunnel = true; // stay clear of contact while LOS resolves
+  for (let i = 0; i < 10; i++) StepPlay(state, 1 / 30);
+  Assert(body.discovered, "second patrol discovers KO'd 日军");
+  Assert(!!state.level.alarm, "corpse discovery sets level alarm");
+  Assert(witness.highAlert, "witness goes high alert");
+  Assert((witness.alert || 0) > 0, "witness investigates toward body");
+  // Facing away must not auto-spot.
+  const st3 = Play(1);
+  const [a, b] = st3.level.entities.filter((e) => e.type === "patrol" && e.hostile);
+  a.broken = true;
+  a.dead = true;
+  a.ko = true;
+  a.corpse = true;
+  a.discovered = false;
+  a.hidden = false;
+  a.amp = 0;
+  a.x = 1000;
+  a.y = 0;
+  b.broken = false;
+  b.dead = false;
+  b.amp = 0;
+  b.x = 920;
+  b.homeX = 920;
+  b.facing = -1; // looking away
+  b.alert = 0;
+  b.highAlert = false;
+  st3.level.alarm = false;
+  st3.player.inTunnel = true;
+  for (let i = 0; i < 10; i++) StepPlay(st3, 1 / 30);
+  Assert(!a.discovered, "patrol facing away does not spot corpse");
+  Assert(!st3.level.alarm, "no alarm without LOS");
+}
+
 function TestGrenadeAimArc() {
   const low = GrenadeLobParams(0);
   const mid = GrenadeLobParams(0.5);
@@ -1478,6 +1540,7 @@ function Main() {
   TestAct5StreetHunt();
   TestMeleeKoFactions();
   TestPatrolMeleeAndHurtPullback();
+  TestPatrolCorpseRaisesAlert();
   TestGrenadeAimArc();
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
@@ -1530,7 +1593,10 @@ function Main() {
     const patrols = (night.entities || []).filter((e) => e.type === "patrol");
     Assert(patrols.length >= 1, "act2 has surface hostiles");
     Assert(patrols.every((e) => e.label === "日军" || e.label === "伪军"), "patrol entities labeled 日军/伪军");
-    Assert(gameSrc.includes('DrawNameplate(down ? "晕倒"'), "KO'd patrol shows 晕倒 plate");
+    Assert(
+      gameSrc.includes("晕倒") && gameSrc.includes("晕·被发现"),
+      "KO'd patrol shows 晕倒 plate",
+    );
   }
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with icon plates");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");

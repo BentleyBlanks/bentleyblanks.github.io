@@ -1809,21 +1809,43 @@ function DrawEntity(ent) {
     if (!ent.faction) ent.faction = "ijp";
     const plate = EnemyHudPlate(ent);
     const down = !!(ent.broken || ent.ko || ent.dead);
+    const engaged = !down && ((ent.alert || 0) > 0 || !!ent.highAlert);
     DrawPuppet(ctx, {
       x: 0,
-      y: 0,
+      y: down ? 10 * s : 0,
       facing,
       scale: s,
       palette: plate.palette,
-      clip: down ? "crouch" : "walk",
+      clip: down ? "crouch" : engaged ? "alert" : "walk",
       time: ent.t || 0,
       moving: !down,
+      alert: engaged,
       hold: !down && plate.palette === "ijp" ? "rifle" : null,
       alpha: down ? 0.55 : 1,
     });
-    DrawNameplate(down ? "晕倒" : plate.name, plate.icon, -78 * s, s);
-    // Cone only when the player is close — not a permanent walking HUD.
-    if (!down && Math.abs(state.player.x - ent.x) < 160) {
+    if (!down && engaged) {
+      ctx.fillStyle = ent.highAlert ? "rgba(180,40,30,.4)" : "rgba(155,47,47,.28)";
+      ctx.beginPath();
+      ctx.moveTo(0, -18 * s);
+      ctx.lineTo(facing * 72 * s, -44 * s);
+      ctx.lineTo(facing * 72 * s, 8 * s);
+      ctx.closePath();
+      ctx.fill();
+      if (ent.highAlert) {
+        ctx.fillStyle = "#a6452f";
+        ctx.font = `700 ${10 * s}px "Noto Sans SC","PingFang SC",sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("警戒!", 0, -104 * s);
+      }
+    }
+    DrawNameplate(
+      down ? (ent.discovered ? "晕·被发现" : "晕倒") : plate.name,
+      plate.icon,
+      -78 * s,
+      s,
+    );
+    // Calm proximity cone only when not already in high-alert search.
+    if (!down && !engaged && Math.abs(state.player.x - ent.x) < 160) {
       ctx.fillStyle = "rgba(155,47,47,.22)";
       ctx.beginPath();
       ctx.moveTo(0, -20 * s);

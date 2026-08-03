@@ -1603,6 +1603,22 @@ function TryMeleeKO(state, ent) {
   return true;
 }
 
+/** Surface hostiles that can shout / investigate (日军·伪军 sentries and road patrols). */
+function IsLivingHostile(ent) {
+  if (!ent) return false;
+  if (ent.type === "enemy") return !ent.dead;
+  if (ent.type === "patrol") return !!ent.hostile && !ent.broken && !ent.dead;
+  return false;
+}
+
+/** Bodies left after a KO / kill — another living hostile can spot these. */
+function IsCorpseBody(ent) {
+  if (!ent || !ent.corpse || ent.hidden) return false;
+  if (ent.type === "enemy") return !!ent.dead;
+  if (ent.type === "patrol") return !!(ent.dead || ent.broken);
+  return false;
+}
+
 function RaiseCorpseAlarm(state, witness, body) {
   if (body.discovered) return;
   body.discovered = true;
@@ -1610,8 +1626,9 @@ function RaiseCorpseAlarm(state, witness, body) {
   const line = witness.label === "伪军" ? "有尸体！快来人——！" : "死体だ！来い——！";
   SetSubtitle(state, witness.label || "敌兵", line, 2.8);
   SetBubble(state, ["warn"], "警戒", 1.4);
+  // Every living 日军/伪军 on the surface goes high-alert and converges on the body.
   for (const e of state.level.entities) {
-    if (e.type !== "enemy" || e.dead) continue;
+    if (!IsLivingHostile(e)) continue;
     e.highAlert = true;
     e.alert = Math.max(e.alert || 0, 7.5);
     e.alertX = body.x;
@@ -1620,9 +1637,8 @@ function RaiseCorpseAlarm(state, witness, body) {
 }
 
 function UpdateCorpseVision(state) {
-  const foes = state.level.entities.filter((e) => e.type === "enemy");
-  const corpses = foes.filter((e) => e.dead && e.corpse && !e.hidden);
-  const living = foes.filter((e) => !e.dead);
+  const corpses = state.level.entities.filter(IsCorpseBody);
+  const living = state.level.entities.filter(IsLivingHostile);
   for (const foe of living) {
     const face = EnemyFacing(foe);
     for (const body of corpses) {
@@ -1630,6 +1646,7 @@ function UpdateCorpseVision(state) {
       const dx = body.x - foe.x;
       if (Math.abs(dx) > 170) continue;
       if (Math.abs((body.y || 0) - (foe.y || 0)) > 50) continue;
+      // Facing cone — must look toward the body (same LOS as enemy sentries).
       if (face > 0 && dx < 16) continue;
       if (face < 0 && dx > -16) continue;
       RaiseCorpseAlarm(state, foe, body);
@@ -2225,8 +2242,21 @@ function UpdateActors(state, dt) {
       }
       const prevX = ent.x;
       ent.t = (ent.t || 0) + dt;
-      ent.x = ent.homeX + Math.sin(ent.t * 0.65) * (ent.amp || 100);
-      if (Math.abs(ent.x - prevX) > 0.2) ent.facing = Math.sign(ent.x - prevX) || ent.facing || 1;
+      const high = !!ent.highAlert || !!level.alarm;
+      if (ent.alert > 0) {
+        // After a body shout: rush the corpse / last noise instead of idle sine patrol.
+        ent.alert -= dt;
+        const dir = Math.sign((ent.alertX ?? ent.homeX) - ent.x) || 1;
+        ent.x += dir * (high ? 125 : 90) * dt;
+        ent.facing = dir;
+      } else {
+        // amp: 0 must stay planted (don't coerce with || 100 — that flips facing and false-spots corpses).
+        const amp = ent.amp != null ? ent.amp : 100;
+        ent.x = ent.homeX + Math.sin(ent.t * 0.65) * amp;
+        if (amp > 1 && Math.abs(ent.x - prevX) > 0.2) {
+          ent.facing = Math.sign(ent.x - prevX) || ent.facing || 1;
+        }
+      }
       if (
         ent.barkYamada &&
         !ent._barked &&
@@ -2240,14 +2270,19 @@ function UpdateActors(state, dt) {
           SetSubtitle(state, "山田", ent.barkYamada, 3.0);
         }
       }
-      if (!player.inTunnel && !player.crouching && !state.pendingMelee) {
-        if (Math.abs(player.x - ent.x) < 38 && Math.abs(player.y - ent.y) < 40) {
+      if (!player.inTunnel && !state.pendingMelee) {
+        // Calm: crouch past. High alert after corpse discovery: crouch no longer safe.
+        let detect = player.crouching ? 0 : 38;
+        if (high) detect = player.crouching ? 48 : 95;
+        if (Math.abs(player.x - ent.x) < detect && Math.abs(player.y - ent.y) < 40) {
           HurtPlayer(state, {
             knockDir: Math.sign(player.x - ent.x || 1),
             knockSpeed: 180,
             invuln: 1.25,
             speaker: "危险",
-            line: "被巡逻发现——蹲下溜过，或靠近敲晕。",
+            line: high
+              ? "高度警戒——同伴倒了，日军在搜！钻井或绕开！"
+              : "被巡逻发现——蹲下溜过，或靠近敲晕。",
             lineTime: 2.2,
           });
         }
