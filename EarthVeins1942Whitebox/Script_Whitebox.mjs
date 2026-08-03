@@ -1,7 +1,7 @@
 import { actorProfiles, roleDefinitions, buildOptions, levelDefinitions, coverDefinitions } from "./Data_WhiteboxCampaign.mjs?v=20260803zt";
 import { CreateTunnelFluidSimulation } from "./Script_FluidSimulation.mjs?v=20260803zn";
 import { CreateSdfLightRenderer } from "./Script_LightSimulation.mjs?v=20260803zn";
-import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zag";
+import { CreateEarthVeinsAudioDirector } from "./Script_Audio.mjs?v=20260803zah";
 
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d", { alpha: false });
@@ -239,7 +239,7 @@ function RenderRoleDock() {
   ui.roleButtons.innerHTML = state.level.roleIds.map((roleId) => {
     const role = roleDefinitions[roleId];
     const profile = actorProfiles[roleId];
-    return `<button type="button" data-role="${roleId}" class="${state.selectedRole === roleId ? "active" : ""}">
+    return `<button type="button" data-role="${roleId}" class="${state.selectedRole === roleId ? "active" : ""}" aria-label="${role.name} · ${role.skill}" title="${role.skill}">
       <span class="rolePortrait" style="--role:${profile.body};--accent:${profile.accent}"><i>${profile.mark}</i></span><span class="roleCopy"><b>${role.short}</b><small>${role.skill}</small></span>
     </button>`;
   }).join("");
@@ -1220,7 +1220,7 @@ function RenderCivilianCommands() {
 function RenderDogCommandHud() {
   if (!ui.dogCommandHud) return;
   const lure = ActivePatrolLure("dogBark");
-  const visible = state.level.roleIds.includes("dog") && state.mode === "play" && !lure;
+  const visible = state.level.roleIds.includes("dog") && state.mode === "play" && !lure && Boolean(state.dog.commandId || state.dog.resultTime > 0 || state.selectedRole === "dog");
   Show(ui.dogCommandHud, visible);
   if (!visible) return;
   const action = state.dog.commandId ? state.level.actions.find((item) => item.id === state.dog.commandId) : null;

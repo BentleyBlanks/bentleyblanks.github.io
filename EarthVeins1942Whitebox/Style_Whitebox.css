@@ -897,3 +897,333 @@ h1 small { color: #bd553f; }
   #dogCommandHud { top: 272px; }
   #civilianCommandPanel { top: 272px; }
 }
+
+/* Quiet adventure HUD: scene-first hierarchy inspired by classic side-scrolling adventures. */
+#gameHeader {
+  top: max(11px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.levelStamp {
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: drop-shadow(1px 2px 0 rgba(20,15,11,.9));
+}
+.levelStamp small { display: none; }
+.levelStamp span {
+  font-size: 16px;
+  letter-spacing: .11em;
+}
+.phaseStrip {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+.phaseStrip span {
+  width: 8px;
+  min-width: 8px;
+  height: 8px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  color: transparent;
+  background: rgba(233,216,178,.22);
+  border: 1px solid rgba(234,218,184,.48);
+  transform: rotate(45deg);
+  transition: width .18s ease, background .18s ease;
+}
+.phaseStrip span i { display: none; }
+.phaseStrip span.done { background: rgba(181,145,78,.72); }
+.phaseStrip span.active {
+  width: auto;
+  min-width: 76px;
+  height: 20px;
+  padding: 3px 9px;
+  color: #f1dfbc;
+  font-size: 8px;
+  text-align: center;
+  background: rgba(42,33,25,.76);
+  border: 1px solid rgba(219,184,125,.62);
+  transform: translateY(-6px);
+}
+.headerActions {
+  margin-left: auto;
+  gap: 5px;
+}
+.headerButton {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  color: #ead9b7;
+  font-size: 9px;
+  background: rgba(39,31,24,.72);
+  border: 1px solid rgba(226,205,165,.42);
+  box-shadow: 2px 2px 0 rgba(18,13,10,.35);
+}
+.audioButton { color: #d87962; }
+
+#objectiveCard {
+  top: 42px;
+  left: 16px;
+  width: 242px;
+  color: #efe0c1;
+}
+.hudIdentityPlate {
+  grid-template-columns: 32px minmax(0,1fr);
+  gap: 7px;
+  min-height: 36px;
+  width: 176px;
+  padding: 3px 7px 3px 3px;
+  color: #ede0c5;
+  background: rgba(39,31,24,.72);
+  border: 1px solid rgba(224,201,160,.38);
+  box-shadow: 2px 2px 0 rgba(18,13,10,.28);
+}
+.hudRoleGlyph {
+  width: 30px;
+  height: 30px;
+  font-size: 6px;
+  border-width: 1px;
+  box-shadow: inset 0 -8px 0 color-mix(in srgb, var(--hud-accent) 68%, transparent);
+}
+.hudRoleGlyph::before {
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-width: 1px;
+  box-shadow: 0 8px 0 4px var(--hud-role);
+}
+.hudRoleGlyph::after { display: none; }
+#objectiveCard .hudIdentityCopy small {
+  margin: 0 0 2px;
+  color: #d36b55;
+  font-size: 6px;
+}
+.hudIdentityCopy strong {
+  color: #f0e3c8;
+  font-family: "FangSong", "STFangsong", serif;
+  font-size: 11px;
+}
+.hudIdentityCopy em { display: none; }
+.hudTaskStrip {
+  width: 230px;
+  margin: 3px 0 0 10px;
+  padding: 4px 8px 5px;
+  color: #f0dfbc;
+  background: linear-gradient(90deg, rgba(39,31,24,.76), rgba(39,31,24,.38) 76%, transparent);
+  border: 0;
+  border-left: 2px solid #a94738;
+  box-shadow: none;
+}
+#objectiveCard .hudTaskStrip small,
+#objectiveCard .hudTaskStrip > span { display: none; }
+#objectiveCard .hudTaskStrip p {
+  margin: 0;
+  overflow: hidden;
+  color: #f0dfbc;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#metricsPanel {
+  top: 46px;
+  right: 54px;
+  display: flex;
+  gap: 5px;
+  max-width: min(52vw, 390px);
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.metric {
+  display: grid;
+  grid-template-columns: 20px auto;
+  gap: 4px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 7px 4px 3px;
+  color: #f0dfbd;
+  background: rgba(39,31,24,.7);
+  border: 1px solid rgba(222,199,159,.28);
+  box-shadow: 2px 2px 0 rgba(20,15,11,.24);
+}
+.metricIcon {
+  width: 18px;
+  height: 18px;
+  color: #f0dfbd;
+  font-size: 7px;
+  background: #9f4538;
+  border: 0;
+}
+.metricCopy { gap: 0; justify-content: center; }
+.metricCopy small { display: none; }
+.metricCopy b {
+  max-width: 86px;
+  color: #f1e4ca;
+  font-size: 8px;
+}
+.metricBar {
+  right: 5px;
+  bottom: 2px;
+  left: 27px;
+  height: 1px;
+  background: rgba(238,220,182,.12);
+}
+
+#roleDock,
+#roleDock.defenseDock {
+  top: auto;
+  bottom: 16px;
+  left: 16px;
+  max-width: calc(100% - 32px);
+  filter: drop-shadow(2px 3px 0 rgba(18,13,10,.35));
+}
+#roleDock::before {
+  content: "Q";
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  margin-right: 2px;
+  color: rgba(234,217,181,.7);
+  font: 800 7px/1 system-ui;
+  background: rgba(38,30,23,.64);
+  border: 1px solid rgba(218,194,154,.28);
+}
+#roleDock { display: flex; align-items: center; }
+#roleButtons { display: flex; gap: 4px; }
+#roleButtons button,
+#roleButtons button:not(.active) {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  overflow: visible;
+  color: #ead8b6;
+  background: rgba(39,31,24,.7);
+  border: 1px solid rgba(219,195,154,.34);
+  opacity: .72;
+}
+#roleButtons button.active {
+  width: 74px;
+  min-width: 74px;
+  color: #2c241c;
+  background: #e2cda4;
+  border-width: 1px;
+  opacity: 1;
+  transform: translateY(-2px);
+}
+.rolePortrait {
+  left: 3px;
+  width: 25px;
+  height: 27px;
+  border: 0;
+}
+.roleCopy { display: none; }
+#roleButtons button.active .roleCopy {
+  display: block;
+  margin-left: 31px;
+  text-align: left;
+}
+#roleButtons button.active b { font-size: 8px; }
+
+#interactionPrompt,
+#roleDock:not([hidden]) ~ #interactionPrompt {
+  bottom: 20px;
+  gap: 6px;
+  filter: drop-shadow(2px 3px 0 rgba(18,13,10,.44));
+}
+#interactionPrompt kbd {
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+  background: #a94738;
+  border: 1px solid #e0bc7b;
+  border-radius: 50%;
+}
+#interactionPrompt p {
+  min-height: 0;
+  max-width: 240px;
+  padding: 4px 9px 5px;
+  color: #f0e3c8;
+  background: rgba(39,31,24,.76);
+  border: 1px solid rgba(220,197,157,.3);
+  border-radius: 2px;
+}
+#interactionVerb { color: #df8068; font-size: 6px; }
+#interactionName { max-width: 220px; color: #f0e3c8; font-size: 8px; }
+
+#dogCommandHud {
+  left: 16px;
+  bottom: 58px;
+  min-width: 0;
+  padding: 4px 7px 5px;
+  border-radius: 2px;
+}
+.dogCommandPortrait { width: 23px; height: 23px; font-size: 7px; border-width: 1px; }
+#dogCommandHud p { min-width: 116px; }
+#dogCommandHud small { display: none; }
+#dogCommandHud b { margin: 0; font-size: 8px; }
+#dogCommandProgress { right: 7px; bottom: 2px; left: 36px; height: 1px; }
+
+@media (max-width: 760px), (max-height: 520px) {
+  #gameHeader { top: 7px; left: 8px; right: 8px; }
+  .levelStamp span { font-size: 11px; }
+  .phaseStrip { top: 2px; gap: 6px; }
+  .phaseStrip span.active { min-width: 58px; height: 17px; padding: 3px 6px; font-size: 6px; }
+  .headerButton { width: 27px; min-width: 27px; height: 27px; min-height: 27px; font-size: 7px; }
+  #objectiveCard { top: 32px; left: 8px; width: 202px; }
+  .hudIdentityPlate { grid-template-columns: 26px minmax(0,1fr); width: 142px; min-height: 30px; padding: 2px 5px 2px 2px; }
+  .hudRoleGlyph { width: 24px; height: 24px; }
+  .hudRoleGlyph::before { top: 3px; width: 7px; height: 7px; box-shadow: 0 6px 0 3px var(--hud-role); }
+  #objectiveCard .hudIdentityCopy small { font-size: 5px; }
+  .hudIdentityCopy strong { font-size: 9px; }
+  .hudTaskStrip { width: 194px; margin: 2px 0 0 7px; padding: 3px 6px 4px; }
+  #objectiveCard .hudTaskStrip p { font-size: 8px; }
+  #metricsPanel { top: 34px; right: 42px; display: flex; gap: 3px; max-width: 50vw; }
+  .metric { grid-template-columns: 16px auto; gap: 3px; min-width: 0; min-height: 22px; padding: 2px 5px 3px 2px; }
+  .metricIcon { width: 15px; height: 15px; font-size: 5px; }
+  .metricCopy b { max-width: 56px; font-size: 6px; }
+  .metricBar { left: 21px; right: 3px; bottom: 1px; }
+  #roleDock,
+  #roleDock.defenseDock { top: auto; bottom: 8px; left: 106px; max-width: 43vw; }
+  #roleDock::before { width: 16px; height: 16px; font-size: 5px; }
+  #roleButtons { gap: 3px; }
+  #roleButtons button,
+  #roleButtons button:not(.active) { width: 27px; min-width: 27px; min-height: 28px; }
+  #roleButtons button.active { width: 58px; min-width: 58px; }
+  .rolePortrait { left: 2px; width: 22px; height: 24px; }
+  #roleButtons button.active .roleCopy { margin-left: 27px; }
+  #roleButtons button.active b { font-size: 6px; }
+  #interactionPrompt,
+  #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 57px; }
+  #interactionPrompt kbd { width: 27px; height: 27px; font-size: 8px; }
+  #interactionPrompt p { max-width: 175px; padding: 3px 7px 4px; }
+  #interactionName { max-width: 160px; font-size: 6px; }
+  #dogCommandHud { top: auto; bottom: 43px; left: 106px; min-width: 0; }
+  #civilianCommandPanel { top: 104px; right: 8px; width: 190px; }
+}
+
+@media (max-width: 520px) and (min-height: 650px) {
+  #objectiveCard { width: 202px; }
+  #metricsPanel { top: 92px; right: 8px; left: auto; max-width: 58vw; }
+  #roleDock,
+  #roleDock.defenseDock { top: auto; bottom: 70px; left: 10px; max-width: calc(100% - 20px); }
+  #interactionPrompt,
+  #roleDock:not([hidden]) ~ #interactionPrompt { bottom: 118px; }
+  #dogCommandHud { top: auto; bottom: 108px; left: 10px; }
+  #civilianCommandPanel { top: 138px; }
+}
