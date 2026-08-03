@@ -25,6 +25,7 @@ const worldMax = 11;
 const entrances = [-1.1, 8.6];
 const requiredCollect = ["collectWood", "collectIron", "collectPowder", "collectSupplies"];
 const requiredRescues = ["wounded", "grain", "courier"];
+const takedownRoles = new Set(["leader", "blacksmith", "scout"]);
 const inputKeys = { left: false, right: false };
 const fluidCanvas = document.createElement("canvas");
 const fluidContext = fluidCanvas.getContext("2d");
@@ -72,6 +73,10 @@ function CreateState(levelIndex) {
     selectedCivilianGroup: "elders",
     missionFailure: null,
     cleanCapture: false,
+    qaEnemyFocusId: null,
+    qaFreezePatrols: false,
+    qaPatrolTime: 0,
+    qaSafePreview: false,
     fluid: levelIndex === 0 ? CreateTunnelFluidSimulation({ columns: 152, rows: 58 }) : null,
     fluidAccumulator: 0,
     rescues: { wounded: false, grain: false, courier: false },
@@ -81,7 +86,7 @@ function CreateState(levelIndex) {
     detected: false,
     caught: null,
     takedown: null,
-    takedownUsed: false,
+    takedownCount: 0,
     takedownGrace: 0,
     neutralizedEnemies: new Set(),
     unconsciousEnemies: [],
@@ -246,6 +251,12 @@ function PerformAction() {
   const takedownTarget = FindTakedownTarget();
   if (takedownTarget) {
     StartTakedown(takedownTarget);
+    return;
+  }
+  const nearbyEnemy = FindFocusedEnemy(1.45);
+  if (nearbyEnemy && takedownRoles.has(state.selectedRole)) {
+    const interaction = EnemyInteractionState(nearbyEnemy);
+    Toast(interaction.instruction, interaction.ready ? "success" : "warning");
     return;
   }
   const action = FindNearestAction();
@@ -880,12 +891,10 @@ function UpdateUi() {
   ui.phaseStrip.innerHTML = state.level.phases.map((item, index) => `<span class="${item.id === state.phaseId ? "active" : index < PhaseIndex() ? "done" : ""}"><i>${index + 1}</i>${item.label}</span>`).join("");
   ui.metricsPanel.innerHTML = MetricsMarkup();
   const takedownTarget = FindTakedownTarget();
+  const focusedEnemy = FindFocusedEnemy();
   const action = FindNearestAction();
-  Show(ui.interactionPrompt, Boolean(takedownTarget || action) && !IsBlocked());
-  if (takedownTarget) {
-    ui.interactionVerb.textContent = "制服";
-    ui.interactionName.textContent = `${takedownTarget.unitType === "collaborator" ? "落单伪军" : "落单敌兵"} · 非致命`;
-  } else if (action) {
+  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !focusedEnemy && !IsBlocked());
+  if (action) {
     ui.interactionVerb.textContent = action.verb;
     ui.interactionName.textContent = action.prop?.label || action.title;
   }
@@ -908,7 +917,7 @@ function RenderQaPanel() {
   ui.qaLevelButtons.innerHTML = levelDefinitions.map((level, index) => `<button type="button" data-qa-level="${index}" class="${index === state.levelIndex ? "active" : ""}">${level.number} ${level.title}</button>`).join("");
   ui.qaPhaseButtons.innerHTML = state.level.phases.map((phase) => `<button type="button" data-qa-phase="${phase.id}" class="${phase.id === state.phaseId ? "active" : ""}">${phase.label}</button>`).join("");
   const levelOneQa = '<button type="button" data-qa-hazard="dog">解谜：阿土拉烟闸</button><button type="button" data-qa-hazard="bell">地表：敲警钟</button><button type="button" data-qa-hazard="crackers">地表：扔炮仗</button><button type="button" data-qa-hazard="enemies">镜头：日伪军巡逻</button><button type="button" data-qa-hazard="buildPanel">面板：东翻口选型</button><button type="button" data-qa-hazard="structuresIdle">镜头：三机关待机</button><button type="button" data-qa-hazard="structures">镜头：三机关工作</button><button type="button" data-qa-hazard="smoke">镜头：东口烟流</button><button type="button" data-qa-hazard="water">镜头：西井水流</button><button type="button" data-qa-hazard="safe">系统：三闸触发</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
-  const levelThreeQa = '<button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
+  const levelThreeQa = '<button type="button" data-qa-hazard="enemyHud">HUD：伪军身份</button><button type="button" data-qa-hazard="enemyHudJapanese">HUD：日军身份</button><button type="button" data-qa-hazard="takedownReady">交互：靠近日军可制服</button><button type="button" data-qa-hazard="takedownReadyCollaborator">交互：靠近伪军可制服</button><button type="button" data-qa-hazard="takedownNext">交互：下一个敌人</button><button type="button" data-qa-hazard="takedown">演出：背后制服</button><button type="button" data-qa-hazard="clean">截图：隐藏调试</button>';
   ui.qaHazardButtons.innerHTML = state.levelIndex === 0 ? levelOneQa : state.levelIndex === 2 ? levelThreeQa : "";
   ui.qaLevelButtons.querySelectorAll("[data-qa-level]").forEach((button) => button.addEventListener("click", () => {
     StartLevel(Number(button.dataset.qaLevel));
@@ -924,7 +933,7 @@ function RenderQaPanel() {
 function UpdateQaReadout() {
   if (!qaMode || !ui.qaStateReadout) return;
   const fluid = state.fluid?.GetStatistics();
-  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short} · 犬${state.dog?.commandMode || "—"}${fluid ? ` · 烟${Math.round(fluid.smokeMass)} 水${Math.round(fluid.waterMass)}` : ""}`;
+  ui.qaStateReadout.textContent = `${state.level.id} / ${state.phaseId} · x ${state.player.x.toFixed(1)} · ${state.player.layer} · ${roleDefinitions[state.selectedRole].short} · 制服${state.takedownCount} · 犬${state.dog?.commandMode || "—"}${fluid ? ` · 烟${Math.round(fluid.smokeMass)} 水${Math.round(fluid.waterMass)}` : ""}`;
 }
 
 function QaComplete(ids) {
@@ -997,7 +1006,16 @@ function QaJumpToPhase(phaseId) {
 
 function ContextHint() {
   const takedownTarget = FindTakedownTarget();
-  if (takedownTarget) return `E · 从${takedownTarget.unitType === "collaborator" ? "伪军" : "敌兵"}背后制服｜非致命 · 本关一次`;
+  if (takedownTarget) {
+    const identity = EnemyIdentity(takedownTarget);
+    return `E · 制服${identity.faction}${identity.role}｜非致命`;
+  }
+  const focusedEnemy = FindFocusedEnemy();
+  if (focusedEnemy) {
+    const identity = EnemyIdentity(focusedEnemy);
+    const interaction = EnemyInteractionState(focusedEnemy);
+    return `${identity.faction}${identity.role} · ${interaction.status}｜${interaction.instruction}`;
+  }
   const action = FindNearestAction();
   if (state.dog?.commandId) {
     const dogAction = state.level.actions.find((item) => item.id === state.dog.commandId);
@@ -1120,9 +1138,19 @@ function Update(delta) {
 }
 
 function UpdateDanger() {
+  if (qaMode && state.qaSafePreview) {
+    state.detection = 0;
+    state.visibility = GetActiveCover() ? 0 : 36;
+    return;
+  }
   if (state.takedownGrace > 0) {
     state.detection = 0;
     state.visibility = GetActiveCover() ? 0 : 24;
+    return;
+  }
+  if (FindTakedownOpportunity()) {
+    state.detection = 0;
+    state.visibility = GetActiveCover() ? 0 : 32;
     return;
   }
   state.detection = state.player.layer === "surface" ? GetDetectionStrength(state.player.x) : 0;
@@ -1171,20 +1199,64 @@ function TakedownFigureScale(width) {
   return width <= 640 ? Math.min(2.35, 1 + (640 - Math.max(320, width)) / 190) : 1;
 }
 
-function FindTakedownTarget() {
-  if (state.levelIndex !== 2 || state.player.layer !== "surface" || state.selectedRole !== "scout") return null;
-  if (state.takedownUsed || state.takedown || state.caught || state.detected || state.detection > 0) return null;
+function EnemyIdentity(enemy) {
+  const collaborator = enemy.unitType === "collaborator";
+  return {
+    faction: collaborator ? "伪军" : "日军",
+    role: enemy.rank === "sectionLeader" ? (collaborator ? "带队头目" : "分队长") : (collaborator ? "搜查兵" : "步枪兵"),
+    accent: collaborator ? "#c59a55" : "#b34a3d"
+  };
+}
+
+function FindFocusedEnemy(maxDistance = 4.2) {
+  if (state.player.layer !== "surface" || state.takedown) return null;
+  const patrols = GetEnemyPatrols();
+  const qaFocus = qaMode && state.qaEnemyFocusId ? patrols.find((enemy) => enemy.id === state.qaEnemyFocusId) : null;
+  if (qaFocus && Math.abs(qaFocus.x - state.player.x) <= maxDistance) return qaFocus;
+  return patrols
+    .map((enemy) => ({ enemy, distance: Math.abs(enemy.x - state.player.x) }))
+    .filter((candidate) => candidate.distance <= maxDistance)
+    .sort((left, right) => left.distance - right.distance)[0]?.enemy || null;
+}
+
+function FindTakedownOpportunity() {
+  if (state.player.layer !== "surface" || !takedownRoles.has(state.selectedRole) || state.takedown || state.takedownGrace > 0) return null;
   return GetEnemyPatrols()
     .map((enemy) => ({ enemy, distance: Math.abs(enemy.x - state.player.x), behind: (state.player.x - enemy.x) * enemy.facing }))
-    .filter((candidate) => candidate.distance >= .18 && candidate.distance <= 1.08 && candidate.behind <= -.16)
+    .filter((candidate) => candidate.distance <= 1.35 && candidate.behind <= .22 && EnemyDetection(candidate.enemy) <= 0)
+    .sort((left, right) => left.distance - right.distance)[0]?.enemy || null;
+}
+
+function EnemyInteractionState(enemy) {
+  const distance = Math.abs(enemy.x - state.player.x);
+  const behind = (state.player.x - enemy.x) * enemy.facing;
+  const roleAllowed = takedownRoles.has(state.selectedRole);
+  const unseen = !state.detected && state.detection <= 0 && EnemyDetection(enemy) <= 0;
+  const rearPosition = behind <= .22;
+  const ready = roleAllowed && unseen && rearPosition && distance <= 1.35 && state.takedownGrace <= 0;
+  let status = enemy.investigating ? "正在搜查" : "巡逻中";
+  let instruction = roleAllowed ? "贴近侧后方，等他背向你时按行动键。" : "当前角色不执行制服；切换传宝、根生或青禾。";
+  if (state.detected || state.detection > 0) { status = "已经发现你"; instruction = "已经暴露，先脱离视线。"; }
+  else if (!rearPosition && distance <= 1.35) { status = "正面警戒"; instruction = "敌人正看着这里，绕到侧后方。"; }
+  else if (ready) { status = "可非致命制服"; instruction = "按行动键制服；目标会昏迷但仍有呼吸。"; }
+  else if (distance <= 2.5 && roleAllowed) status = "接近中";
+  return { distance, behind, rearPosition, roleAllowed, unseen, ready, status, instruction };
+}
+
+function FindTakedownTarget() {
+  if (state.player.layer !== "surface" || !takedownRoles.has(state.selectedRole)) return null;
+  if (state.takedown || state.caught || state.detected || state.detection > 0 || state.takedownGrace > 0) return null;
+  return GetEnemyPatrols()
+    .map((enemy) => ({ enemy, ...EnemyInteractionState(enemy) }))
+    .filter((candidate) => candidate.ready)
     .sort((left, right) => left.distance - right.distance)[0]?.enemy || null;
 }
 
 function StartTakedown(enemy, qaPreview = false) {
-  if (!enemy || state.takedown || (!qaPreview && state.takedownUsed)) return;
+  if (!enemy || state.takedown) return;
   inputKeys.left = false;
   inputKeys.right = false;
-  state.takedownUsed = true;
+  state.takedownCount += 1;
   state.neutralizedEnemies.add(enemy.id);
   state.player.facing = enemy.facing;
   state.player.moving = false;
@@ -1248,7 +1320,8 @@ function GetEnemyPatrols() {
   else if (state.levelIndex === 2) bases = [-2.2, 2.1, 6.2, 9.2].slice(0, Math.max(2, Math.ceil(state.morale / 25)));
   const diversion = state.levelIndex === 0 && state.phaseId === "defense" && ActiveDiversion() ? state.raid.distraction : null;
   return bases.map((base, index) => {
-    const time = state.elapsed * (.42 + index * .035) + index * 1.7;
+    const patrolClock = state.qaFreezePatrols ? state.qaPatrolTime : state.elapsed;
+    const time = patrolClock * (.42 + index * .035) + index * 1.7;
     const travel = Math.sin(time) * (index % 2 ? 1.05 : 1.25);
     let x = base + travel;
     let facing = Math.cos(time) >= 0 ? 1 : -1;
@@ -1333,6 +1406,9 @@ function Draw() {
   DrawDogCommandEnvironment(width, height, surfaceY, tunnelY);
   DrawSurfaceVegetation(width, height, surfaceY);
   DrawLighting(width, height, surfaceY, tunnelY, daylight);
+  DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
+  DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
+  DrawSceneHierarchyVeil(width, height, surfaceY, tunnelY);
   DrawActionProps(width, height, surfaceY, tunnelY, false);
   if (!state.takedown) DrawActions(width, height, surfaceY, tunnelY);
   DrawEnemies(width, surfaceY);
@@ -1345,14 +1421,33 @@ function Draw() {
   DrawActionProps(width, height, surfaceY, tunnelY, true);
   DrawPickupTransfer(width, height, surfaceY, tunnelY);
   DrawSurfaceDiversions(width, height, surfaceY);
-  DrawForegroundDepthFrame(width, height, surfaceY, tunnelY, daylight);
-  DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight);
   DrawDogCommandFocus(width, height, surfaceY, tunnelY);
   DrawActorVisibilityHud(width, surfaceY);
   DrawDetectionFlash(width, height, surfaceY);
   DrawDepthHint(width, height, surfaceY, tunnelY);
   DrawTakedownCinematicOverlay(width, height);
   if (qaMode && !state.cleanCapture) DrawQa(width, height, surfaceY, tunnelY);
+}
+
+function DrawSceneHierarchyVeil(width, height, surfaceY, tunnelY) {
+  context.save();
+  if (state.player.layer === "surface") {
+    const tunnelShade = context.createLinearGradient(0, surfaceY + 4, 0, height);
+    tunnelShade.addColorStop(0, "rgba(9,13,14,.08)");
+    tunnelShade.addColorStop(.45, "rgba(7,11,12,.2)");
+    tunnelShade.addColorStop(1, "rgba(5,8,9,.31)");
+    context.fillStyle = tunnelShade;
+    context.fillRect(0, surfaceY + 4, width, height - surfaceY - 4);
+  } else {
+    const surfaceShade = context.createLinearGradient(0, 0, 0, surfaceY + 2);
+    surfaceShade.addColorStop(0, "rgba(12,15,15,.3)");
+    surfaceShade.addColorStop(1, "rgba(10,13,14,.18)");
+    context.fillStyle = surfaceShade;
+    context.fillRect(0, 0, width, surfaceY + 2);
+    context.fillStyle = "rgba(224,188,111,.035)";
+    context.fillRect(0, tunnelY - height * .12, width, height - tunnelY + height * .12);
+  }
+  context.restore();
 }
 
 function SceneHash(seed) {
@@ -1934,8 +2029,9 @@ function DrawSurfaceCovers(width, surfaceY, front) {
     }
 
     if (active) {
-      context.strokeStyle = "rgba(189,76,59,.92)"; context.lineWidth = Math.max(1.5, 2 * sceneScale); context.setLineDash([5 * sceneScale, 5 * sceneScale]);
-      context.beginPath(); context.ellipse(0, 2, coverWidth * .55, 8 * sceneScale, 0, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+      context.strokeStyle = "rgba(189,76,59,.9)"; context.lineWidth = Math.max(1.5, 2 * sceneScale);
+      const half = coverWidth * .48;
+      context.beginPath(); context.moveTo(-half, 8); context.lineTo(-half, 2); context.lineTo(-half * .58, 2); context.moveTo(half, 8); context.lineTo(half, 2); context.lineTo(half * .58, 2); context.stroke();
     }
     context.restore();
   }
@@ -1943,21 +2039,16 @@ function DrawSurfaceCovers(width, surfaceY, front) {
 
 function DrawActorVisibilityHud(width, surfaceY) {
   if (state.takedown || state.takedownGrace > 0 || state.player.layer !== "surface" || (!GetEnemyPatrols().length && !state.caught)) return;
-  const profile = actorProfiles[state.selectedRole];
-  const actorScale = Math.min(width, 1100) / 26 * .038;
-  const actorHeight = profile.height * 39 * actorScale * (state.player.lowProfile ? .7 : 1);
   const cover = GetActiveCover();
-  const label = state.detected ? "被发现" : cover ? `遮蔽 · ${cover.label}` : "无遮掩";
+  const label = state.detected ? "已发现" : cover ? "遮蔽" : "可见";
   const tone = state.detected ? "#ef6657" : cover ? "#6ed7d3" : "#d9ae65";
   const x = WorldToScreen(state.player.x, width);
-  const y = surfaceY - actorHeight - 42;
-  const panelWidth = Math.max(88, Math.min(146, 52 + label.length * 11));
-  context.save(); context.translate(x, y);
-  context.fillStyle = "rgba(8,13,15,.9)"; context.beginPath(); context.roundRect(-panelWidth / 2, -12, panelWidth, 28, 14); context.fill();
-  context.strokeStyle = tone; context.lineWidth = 1.5; context.stroke();
-  context.fillStyle = tone; context.font = "800 10px system-ui, sans-serif"; context.textAlign = "center"; context.fillText(label, 0, -1);
-  context.fillStyle = "rgba(255,255,255,.12)"; context.fillRect(-panelWidth * .32, 5, panelWidth * .64, 3);
-  context.fillStyle = tone; context.fillRect(-panelWidth * .32, 5, panelWidth * .64 * state.visibility / 100, 3);
+  const y = surfaceY + 34;
+  context.save(); context.translate(x, y); context.textAlign = "center";
+  context.fillStyle = "rgba(8,13,15,.7)"; context.fillRect(-31, -8, 62, 15);
+  context.fillStyle = tone; context.font = "800 8px system-ui, sans-serif"; context.fillText(label, 0, 2);
+  context.fillStyle = "rgba(255,255,255,.14)"; context.fillRect(-25, 8, 50, 2);
+  context.fillStyle = tone; context.fillRect(-25, 8, 50 * state.visibility / 100, 2);
   context.restore();
 }
 
@@ -1968,7 +2059,7 @@ function DrawDetectionFlash(width, height, surfaceY) {
   context.fillStyle = `rgba(170,24,22,${pulse})`; context.fillRect(0, 0, width, height);
   const x = WorldToScreen(state.player.x, width);
   context.save(); context.translate(x, surfaceY - 150);
-  context.fillStyle = "#f16759"; context.beginPath(); context.arc(0, 0, 17, 0, Math.PI * 2); context.fill();
+  context.fillStyle = "#f16759"; context.rotate(Math.PI / 4); context.fillRect(-13, -13, 26, 26); context.rotate(-Math.PI / 4);
   context.fillStyle = "#fff5e8"; context.font = "900 22px system-ui, sans-serif"; context.textAlign = "center"; context.fillText("!", 0, 8);
   context.restore();
 }
@@ -2576,6 +2667,36 @@ function QaInspectHazard(kind) {
     UpdateUi();
     return;
   }
+  if (["enemyHud", "enemyHudJapanese", "takedownReady", "takedownReadyCollaborator", "takedownNext"].includes(kind)) {
+    if (state.levelIndex !== 2) return;
+    if (kind !== "takedownNext") QaJumpToPhase("harass");
+    EndCinematic();
+    state.selectedRole = "scout";
+    state.player.layer = "surface";
+    state.detected = false;
+    state.detection = 0;
+    state.caught = null;
+    state.takedownGrace = 0;
+    state.qaFreezePatrols = true;
+    state.qaPatrolTime = 0;
+    state.qaSafePreview = true;
+    const previewPatrols = GetEnemyPatrols();
+    const target = ["enemyHud", "takedownReadyCollaborator"].includes(kind) ? previewPatrols.find((enemy) => enemy.unitType === "collaborator") : previewPatrols.find((enemy) => enemy.unitType === "soldier") || previewPatrols[0];
+    if (!target) return;
+    state.qaEnemyFocusId = target.id;
+    const approachDistance = ["takedownReady", "takedownReadyCollaborator", "takedownNext"].includes(kind) ? .86 : 2.05;
+    state.player.x = target.x - target.facing * approachDistance;
+    state.player.facing = target.facing;
+    state.lastSafeX = state.player.x;
+    state.camera.x = (target.x + state.player.x) / 2;
+    state.camera.targetX = state.camera.x;
+    state.camera.zoom = 1.14;
+    state.camera.targetZoom = 1.14;
+    UpdateCoverState();
+    RenderRoleDock(); RenderQaPanel(); UpdateUi(); ui.qaPanel.open = true;
+    Toast(["takedownReady", "takedownReadyCollaborator", "takedownNext"].includes(kind) ? "靠近侧后方：现在按 E 可非致命制服。" : `目标 HUD：${EnemyIdentity(target).faction}${EnemyIdentity(target).role}`, "success");
+    return;
+  }
   if (kind === "takedown") {
     if (state.levelIndex !== 2) return;
     QaJumpToPhase("harass");
@@ -2860,13 +2981,7 @@ function DrawCivilians(width, height, tunnelY) {
     const { bodyHeight, headRadius, visualHeight, shoulder, waist, lineScale } = metrics;
     context.save();
     context.translate(x, floorY);
-    context.globalAlpha = .97;
-    context.fillStyle = dose > 65 ? "rgba(153,56,44,.2)" : "rgba(232,213,169,.14)";
-    context.strokeStyle = dose > 65 ? "rgba(239,102,87,.52)" : "rgba(235,216,176,.38)";
-    context.lineWidth = 1.5 * lineScale;
-    context.beginPath();
-    context.ellipse(0, -visualHeight * .46, civilian.id === "wounded" ? metrics.bodyWidth * .57 : shoulder * 1.65, visualHeight * .55, 0, 0, Math.PI * 2);
-    context.fill(); context.stroke();
+    context.globalAlpha = state.player.layer === "surface" ? .74 : .98;
     context.fillStyle = "rgba(5,8,8,.46)"; context.beginPath(); context.ellipse(0, 2, civilian.id === "wounded" ? metrics.bodyWidth * .55 : shoulder * 1.25, 4.5 * lineScale, 0, 0, Math.PI * 2); context.fill();
     if (civilian.group === "stretcher" && civilian.id === "wounded") {
       const halfWidth = metrics.bodyWidth * .5;
@@ -2896,13 +3011,15 @@ function DrawCivilians(width, height, tunnelY) {
       if (civilian.id === "medic") { const patch = Math.max(5, bodyHeight * .12); context.fillStyle = "#d8d1b7"; context.fillRect(-patch / 2, -bodyHeight * .67, patch, patch); context.fillStyle = "#688c82"; context.fillRect(-lineScale, -bodyHeight * .66, 2 * lineScale, patch * .72); context.fillRect(-patch * .36, -bodyHeight * .65 + patch * .25, patch * .72, 2 * lineScale); }
     }
     const badgeY = -visualHeight - 15 * lineScale;
-    const badgeRadius = Math.max(7, 8 * lineScale);
+    const badgeSize = Math.max(15, 16 * lineScale);
     context.fillStyle = dose > 65 ? "#e46150" : "rgba(235,231,210,.9)";
-    context.beginPath(); context.arc(0, badgeY, badgeRadius, 0, Math.PI * 2); context.fill();
+    context.fillRect(-badgeSize / 2, badgeY - badgeSize / 2, badgeSize, badgeSize);
     context.fillStyle = "#172123"; context.font = `900 ${Math.max(7, 7 * lineScale)}px system-ui`; context.textAlign = "center"; context.fillText(civilian.mark, 0, badgeY + 2.5 * lineScale);
     if (dose > 4) {
       context.strokeStyle = dose > 65 ? "#ef6657" : "#d2ad67"; context.lineWidth = 2 * lineScale;
-      context.beginPath(); context.arc(0, badgeY, badgeRadius + 3 * lineScale, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, dose / 100)); context.stroke();
+      context.strokeRect(-badgeSize / 2 - 2, badgeY - badgeSize / 2 - 2, badgeSize + 4, badgeSize + 4);
+      context.fillStyle = dose > 65 ? "#ef6657" : "#d2ad67";
+      context.fillRect(-badgeSize / 2, badgeY + badgeSize / 2 + 3, badgeSize * Math.min(1, dose / 100), 2 * lineScale);
     }
     context.restore();
   }
@@ -3061,8 +3178,8 @@ function DrawSurfaceDiversions(width, height, surfaceY) {
     investigatingEnemies.forEach((enemy) => {
       const enemyX = WorldToScreen(enemy.x, width);
       const questionY = surfaceY - 5 - enemyHeight - 13;
-      context.fillStyle = "rgba(7,12,14,.94)"; context.beginPath(); context.arc(enemyX, questionY, 11, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = "rgba(246,146,75,.9)"; context.lineWidth = 1.5; context.stroke();
+      context.fillStyle = "rgba(7,12,14,.94)"; context.fillRect(enemyX - 10, questionY - 10, 20, 20);
+      context.strokeStyle = "rgba(246,146,75,.9)"; context.lineWidth = 1.5; context.strokeRect(enemyX - 9.25, questionY - 9.25, 18.5, 18.5);
       context.fillStyle = "#ffe09a"; context.font = "900 14px system-ui"; context.textAlign = "center"; context.fillText("?", enemyX, questionY + 5);
     });
   }
@@ -3347,9 +3464,23 @@ function DrawPropLabel(x, y, textValue, tone = "active") {
   context.restore();
 }
 
+function DrawFocusBrackets(x, y, halfWidth, halfHeight, color) {
+  const corner = Math.max(6, Math.min(11, halfWidth * .38));
+  context.save(); context.translate(x, y); context.strokeStyle = color; context.lineWidth = 2.1; context.lineCap = "square";
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sideX, sideY]) => {
+    context.beginPath();
+    context.moveTo(sideX * halfWidth, sideY * (halfHeight - corner));
+    context.lineTo(sideX * halfWidth, sideY * halfHeight);
+    context.lineTo(sideX * (halfWidth - corner), sideY * halfHeight);
+    context.stroke();
+  });
+  context.restore();
+}
+
 function DrawActionProps(width, height, surfaceY, tunnelY, front) {
   const sceneScale = Math.max(.72, Math.min(1.05, width / 980));
-  const focusedProp = state.level.actions
+  const enemyFocus = FindFocusedEnemy();
+  const focusedProp = enemyFocus ? null : state.level.actions
     .filter((action) => action.phase === state.phaseId && action.layer === state.player.layer && action.prop && Math.abs(action.x - state.player.x) <= 1.9)
     .sort((a, b) => Math.abs(a.x - state.player.x) - Math.abs(b.x - state.player.x))[0] || null;
   for (const action of state.level.actions) {
@@ -3365,12 +3496,6 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
     const focused = focusedProp?.id === action.id;
     const entityScale = sceneScale * (focused && !completed ? 1.2 : present && sameLayer && !completed ? 1.08 : 1);
     context.save(); context.translate(x, baseY);
-    if (!completed && sameLayer) {
-      context.fillStyle = focused ? "rgba(239,195,103,.2)" : "rgba(231,205,150,.11)";
-      context.strokeStyle = focused ? "rgba(246,210,129,.62)" : "rgba(229,211,172,.3)";
-      context.lineWidth = focused ? 2.3 : 1.3;
-      context.beginPath(); context.ellipse(0, supportLift - PropVisualHeight(action.prop.kind) * entityScale * .43, 31 * entityScale, 27 * entityScale, 0, 0, Math.PI * 2); context.fill(); context.stroke();
-    }
     DrawPropSupport(action.prop.support, sceneScale, empty);
     context.translate(0, supportLift);
     if (present) DrawPropObject(action.prop.kind, entityScale);
@@ -3379,12 +3504,13 @@ function DrawActionProps(width, height, surfaceY, tunnelY, front) {
 
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
     const markerY = baseY + supportLift - PropVisualHeight(action.prop.kind) * entityScale * .58;
-    if (!completed && sameLayer) {
-      const pulse = 1 + Math.sin(state.elapsed * 4.2 + action.x) * .1;
-      context.save(); context.translate(x, markerY); context.scale(pulse, pulse);
-      context.strokeStyle = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.9)"; context.lineWidth = focused ? 3 : 2.3;
-      context.beginPath(); context.ellipse(0, 0, (focused ? 22 : 18) * entityScale, (focused ? 15 : 12) * entityScale, 0, 0, Math.PI * 2); context.stroke();
-      context.fillStyle = locked ? "rgba(178,132,74,.2)" : focused ? "rgba(238,186,82,.2)" : "rgba(92,214,216,.14)"; context.fill(); context.restore();
+    if (!completed && sameLayer && !enemyFocus) {
+      const markerColor = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.82)";
+      if (focused) DrawFocusBrackets(x, markerY, 25 * entityScale, 19 * entityScale, markerColor);
+      else {
+        context.save(); context.translate(x, markerY - 17 * entityScale); context.rotate(Math.PI / 4);
+        context.fillStyle = markerColor; context.fillRect(-3.5, -3.5, 7, 7); context.restore();
+      }
     }
     if (focused) {
       const label = completed ? (action.prop.mode === "place" ? `已布置 · ${action.prop.label}` : `已取走 · ${action.prop.label}`) : action.prop.label;
@@ -3410,18 +3536,21 @@ function DrawPickupTransfer(width, height, surfaceY, tunnelY) {
 }
 
 function DrawActions(width, height, surfaceY, tunnelY) {
+  if (FindFocusedEnemy()) return;
+  const nearest = FindNearestAction();
   for (const action of state.level.actions) {
-    if (action.phase !== state.phaseId || (state.completed.has(action.id) && action.buildSlot === undefined)) continue;
+    if (action.phase !== state.phaseId || action.layer !== state.player.layer || (state.completed.has(action.id) && action.buildSlot === undefined)) continue;
     if (action.prop) continue;
     const x = WorldToScreen(action.x, width);
     const y = action.layer === "surface" ? surfaceY - 10 : TunnelCenterYAt(action.x, tunnelY) - 4;
     const locked = Boolean(MissingRequirement(action)) || (action.role && action.role !== state.selectedRole);
-    const pulse = 1 + Math.sin(state.elapsed * 4 + action.x) * .12;
-    context.save(); context.translate(x, y - 24); context.scale(pulse, pulse);
-    context.fillStyle = locked ? "rgba(176,143,94,.36)" : "rgba(93,205,210,.82)";
-    context.beginPath(); context.arc(0, 0, 8, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = locked ? "rgba(229,196,133,.66)" : "rgba(193,250,242,.9)"; context.lineWidth = 2;
-    context.beginPath(); context.arc(0, 0, 14, 0, Math.PI * 2); context.stroke(); context.restore();
+    const focused = nearest?.id === action.id;
+    const tone = locked ? "rgba(222,183,112,.78)" : focused ? "rgba(248,213,132,.96)" : "rgba(104,225,225,.78)";
+    context.save(); context.translate(x, y - 27);
+    context.strokeStyle = tone; context.lineWidth = focused ? 2.4 : 1.8;
+    context.beginPath(); context.moveTo(0, 7); context.lineTo(0, 18); context.stroke();
+    context.rotate(Math.PI / 4); context.fillStyle = tone; context.fillRect(focused ? -6 : -4, focused ? -6 : -4, focused ? 12 : 8, focused ? 12 : 8); context.restore();
+    if (focused) DrawPropLabel(x, y - 48, action.title, locked ? "empty" : "active");
     if (qaMode && !state.cleanCapture) {
       context.fillStyle = "#fff"; context.font = "11px monospace"; context.fillText(action.id, x - 24, y - 44);
     }
@@ -3501,14 +3630,11 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   const limbWidth = Math.max(3.2, height * profile.limb);
 
   context.save(); context.translate(x, baseY); context.scale(enemy.facing, 1);
+  if (enemy.focused === false) context.globalAlpha = .58;
   if (fall > 0) {
     context.translate(0, fall * height * .025);
     context.rotate(-fall * 1.43);
   }
-  context.fillStyle = isCollaborator ? "rgba(191,174,143,.1)" : "rgba(190,171,105,.11)";
-  context.strokeStyle = enemy.detecting ? "rgba(233,91,67,.58)" : "rgba(221,205,158,.28)";
-  context.lineWidth = 1.5;
-  context.beginPath(); context.ellipse(0, -height * .45, height * .21, height * .55, 0, 0, Math.PI * 2); context.fill(); context.stroke();
   context.fillStyle = "rgba(0,0,0,.34)"; context.beginPath(); context.ellipse(0, 3, height * .18, 4.5, 0, 0, Math.PI * 2); context.fill();
 
   const rearFoot = DrawJointedLimb(-height * .055, -height * .34, height * .205, height * .185, stride, -stride * .38, profile.pants, limbWidth + .45);
@@ -3571,8 +3697,8 @@ function DrawEnemyUnit(enemy, height, x, baseY) {
   context.restore();
 
   if (enemy.investigating && !fall) {
-    context.fillStyle = "rgba(8,13,15,.9)"; context.beginPath(); context.arc(x, baseY - height - 13, 10, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = isCollaborator ? "#d7c490" : "#e2bc67"; context.lineWidth = 1.5; context.stroke();
+    context.fillStyle = "rgba(8,13,15,.9)"; context.fillRect(x - 9, baseY - height - 22, 18, 18);
+    context.strokeStyle = isCollaborator ? "#d7c490" : "#e2bc67"; context.lineWidth = 1.5; context.strokeRect(x - 8.25, baseY - height - 21.25, 16.5, 16.5);
     context.fillStyle = "#f3d78f"; context.font = "900 12px system-ui"; context.textAlign = "center"; context.fillText("?", x, baseY - height - 9);
   }
 }
@@ -3584,36 +3710,70 @@ function DrawEnemies(width, surfaceY) {
   const scale = Math.min(width, 1100) / 26 * .038;
   const height = profile.height * 39 * scale;
   const baseY = surfaceY - 5;
+  const focusedEnemy = FindFocusedEnemy();
   patrols.forEach((enemy) => {
+    const focused = focusedEnemy?.id === enemy.id;
+    const active = !state.qaSafePreview && state.takedownGrace <= 0 && EnemyDetection(enemy) > 0;
+    if (!active && !focused) return;
     const x = WorldToScreen(enemy.x, width);
     const endX = WorldToScreen(enemy.x + enemy.facing * enemy.viewDistance, width);
     const originX = x + enemy.facing * height * .12;
     const originY = baseY - height * .82;
     const farTopY = Math.min(surfaceY - 10, originY + height * .12);
     const farBottomY = surfaceY + 3;
-    const active = state.takedownGrace <= 0 && EnemyDetection(enemy) > 0;
     const gradient = context.createLinearGradient(originX, 0, endX, 0);
-    gradient.addColorStop(0, active ? "rgba(229,58,44,.48)" : "rgba(222,190,108,.13)");
-    gradient.addColorStop(1, active ? "rgba(195,43,34,.06)" : "rgba(215,184,103,0)");
+    gradient.addColorStop(0, active ? "rgba(229,58,44,.44)" : "rgba(222,190,108,.1)");
+    gradient.addColorStop(1, active ? "rgba(195,43,34,.04)" : "rgba(215,184,103,0)");
     context.fillStyle = gradient;
     context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.lineTo(endX, farBottomY); context.closePath(); context.fill();
-    context.strokeStyle = active ? "rgba(255,91,69,.92)" : "rgba(219,186,104,.18)"; context.lineWidth = active ? 2.5 : 1;
+    context.strokeStyle = active ? "rgba(255,91,69,.9)" : "rgba(219,186,104,.24)"; context.lineWidth = active ? 2.5 : 1;
     context.beginPath(); context.moveTo(originX, originY); context.lineTo(endX, farTopY); context.moveTo(originX, originY); context.lineTo(endX, farBottomY); context.stroke();
   });
-  patrols.forEach((enemy) => DrawEnemyUnit(enemy, height, WorldToScreen(enemy.x, width), baseY));
-  DrawTakedownPrompt(width, surfaceY, height);
+  patrols.forEach((enemy) => DrawEnemyUnit({ ...enemy, detecting: EnemyDetection(enemy) > 0, focused: focusedEnemy?.id === enemy.id }, height, WorldToScreen(enemy.x, width), baseY));
+  DrawEnemyFocusHud(width, surfaceY, height, focusedEnemy);
 }
 
-function DrawTakedownPrompt(width, surfaceY, enemyHeight) {
-  const target = FindTakedownTarget();
+function DrawEnemyFocusHud(width, surfaceY, enemyHeight, target) {
   if (!target || state.takedown) return;
-  const x = WorldToScreen(target.x, width);
-  const y = surfaceY - enemyHeight - 31;
-  context.save(); context.textAlign = "center";
-  context.fillStyle = "rgba(20,18,15,.94)"; context.strokeStyle = "#bd3f35"; context.lineWidth = 1.8;
-  context.beginPath(); context.roundRect(x - 54, y - 17, 108, 26, 3); context.fill(); context.stroke();
-  context.fillStyle = "#eadbbc"; context.font = '800 11px "FangSong", serif'; context.fillText("E  背后制服", x, y);
-  context.strokeStyle = "rgba(189,63,53,.72)"; context.setLineDash([3, 3]); context.beginPath(); context.moveTo(x, y + 9); context.lineTo(x, surfaceY - enemyHeight * .73); context.stroke();
+  const identity = EnemyIdentity(target);
+  const interaction = EnemyInteractionState(target);
+  const targetX = WorldToScreen(target.x, width);
+  const mobile = width <= 640;
+  const cardWidth = mobile ? 152 : 184;
+  const cardHeight = interaction.ready ? (mobile ? 54 : 62) : (mobile ? 47 : 54);
+  const preferredX = target.facing > 0 ? targetX - cardWidth * .62 : targetX + cardWidth * .62;
+  const cardX = Math.max(8, Math.min(width - cardWidth - 8, preferredX - cardWidth / 2));
+  const cardY = Math.max(8, surfaceY - enemyHeight - cardHeight - (mobile ? 13 : 18));
+  const titleSize = mobile ? 11 : 14;
+  const bodySize = mobile ? 9 : 11;
+  const statusTone = interaction.ready ? "#e9c875" : (state.detected || EnemyDetection(target) > 0) ? "#ef6657" : "#d7c99f";
+
+  context.save();
+  context.fillStyle = "rgba(13,15,14,.94)"; context.fillRect(cardX, cardY, cardWidth, cardHeight);
+  context.fillStyle = identity.accent; context.fillRect(cardX, cardY, 5, cardHeight);
+  context.strokeStyle = "rgba(239,226,194,.24)"; context.lineWidth = 1; context.strokeRect(cardX + .5, cardY + .5, cardWidth - 1, cardHeight - 1);
+  const symbolX = cardX + 18;
+  const symbolY = cardY + (mobile ? 15 : 18);
+  context.fillStyle = identity.accent;
+  if (identity.faction === "日军") {
+    context.save(); context.translate(symbolX, symbolY); context.rotate(Math.PI / 4); context.fillRect(-6, -6, 12, 12); context.restore();
+  } else context.fillRect(symbolX - 6, symbolY - 6, 12, 12);
+  context.fillStyle = "#f4ead4"; context.font = `900 ${titleSize}px system-ui, sans-serif`; context.textAlign = "left";
+  context.fillText(`敌军 · ${identity.faction}`, cardX + 31, cardY + (mobile ? 18 : 22));
+  context.fillStyle = statusTone; context.font = `700 ${bodySize}px system-ui, sans-serif`;
+  context.fillText(`${identity.role} · ${interaction.status}`, cardX + 12, cardY + (mobile ? 36 : 42));
+  if (interaction.ready) {
+    context.fillStyle = identity.accent; context.fillRect(cardX + cardWidth - (mobile ? 48 : 56), cardY + cardHeight - (mobile ? 17 : 20), mobile ? 40 : 48, mobile ? 13 : 15);
+    context.fillStyle = "#fff5df"; context.font = `900 ${mobile ? 9 : 11}px system-ui, sans-serif`; context.textAlign = "center";
+    context.fillText("E 制服", cardX + cardWidth - (mobile ? 28 : 32), cardY + cardHeight - (mobile ? 7 : 9));
+  }
+
+  const bracketY = surfaceY - enemyHeight * .48;
+  context.strokeStyle = identity.accent; context.lineWidth = 2;
+  context.beginPath(); context.moveTo(targetX - enemyHeight * .16, bracketY + enemyHeight * .5); context.lineTo(targetX - enemyHeight * .16, bracketY + enemyHeight * .57); context.lineTo(targetX + enemyHeight * .16, bracketY + enemyHeight * .57); context.lineTo(targetX + enemyHeight * .16, bracketY + enemyHeight * .5); context.stroke();
+  context.strokeStyle = "rgba(233,215,178,.42)"; context.lineWidth = 1;
+  const attachX = Math.max(cardX + 16, Math.min(cardX + cardWidth - 16, targetX));
+  context.beginPath(); context.moveTo(attachX, cardY + cardHeight); context.lineTo(targetX, surfaceY - enemyHeight - 4); context.stroke();
   context.restore();
 }
 
@@ -3698,8 +3858,8 @@ function DrawTakedownTarget(width, surfaceY) {
   const screenX = WorldToScreen(target.x, width);
   const focus = 1 - SmoothStep(.72, 1.02, sequence.time);
   if (focus > 0) {
-    context.save(); context.globalAlpha = focus; context.strokeStyle = "#d6b66f"; context.lineWidth = 1.7; context.setLineDash([4, 4]);
-    context.beginPath(); context.arc(screenX, baseY - height * .7, height * .34, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    context.save(); context.globalAlpha = focus;
+    DrawFocusBrackets(screenX, baseY - height * .52, height * .24, height * .5, "#d6b66f");
     context.restore();
   }
   const uprightAlpha = 1 - SmoothStep(.52, .86, fall);
@@ -3984,7 +4144,7 @@ function DrawActorIdentity(profile, role, x, baseY, height) {
     const alpha = Math.min(1, state.player.rolePulse * 1.7);
     context.globalAlpha = alpha;
     context.strokeStyle = profile.accent; context.lineWidth = 3;
-    context.beginPath(); context.arc(x, baseY - height * .53, height * (.4 + (1 - state.player.rolePulse) * .13), 0, Math.PI * 2); context.stroke();
+    DrawFocusBrackets(x, baseY - height * .51, height * .25, height * .5, profile.accent);
     context.fillStyle = "rgba(8,13,15,.88)"; context.fillRect(x - 58, baseY - height - 34, 116, 24);
     context.fillStyle = "#f3efe1"; context.font = "700 12px system-ui, sans-serif"; context.fillText(`现在是 ${role.short}`, x, baseY - height - 17);
   }
@@ -4076,10 +4236,6 @@ function DrawActor(width, viewportHeight, surfaceY, tunnelY) {
   const scale = Math.min(width, 1100) / 26 * .038 * TakedownFigureScale(width);
   const height = profile.height * 39 * scale;
   context.save(); context.translate(x, baseY); context.scale(state.player.facing, 1);
-  context.fillStyle = profile.animal ? "rgba(240,196,112,.13)" : "rgba(203,231,219,.14)";
-  context.strokeStyle = profile.animal ? "rgba(246,213,150,.46)" : "rgba(214,241,227,.5)";
-  context.lineWidth = 1.7;
-  context.beginPath(); context.ellipse(0, -height * .46, profile.animal ? height * .67 : height * .21, height * .56, 0, 0, Math.PI * 2); context.fill(); context.stroke();
   if (profile.animal) DrawDogActor(profile, height, state.player);
   else DrawHumanActor(profile, roleId, height);
   context.restore();
@@ -4436,7 +4592,8 @@ if (qaMode) {
       , civilians: state.civilians.map((civilian) => ({ name: civilian.name, group: civilian.group, x: civilian.x, targetX: civilian.targetX, smokeDose: civilian.smokeDose, waterDose: civilian.waterDose }))
       , dog: state.dog ? { x: state.dog.x, layer: state.dog.layer, commandId: state.dog.commandId, commandMode: state.dog.commandMode, progress: state.dog.progress } : null
       , distraction: state.raid.distraction ? { ...state.raid.distraction } : null
-      , enemies: GetEnemyPatrols().map((enemy) => ({ x: enemy.x, facing: enemy.facing, investigating: enemy.investigating }))
+      , takedownCount: state.takedownCount, neutralizedEnemies: [...state.neutralizedEnemies], unconsciousCount: state.unconsciousEnemies.length
+      , enemies: GetEnemyPatrols().map((enemy) => ({ id: enemy.id, x: enemy.x, facing: enemy.facing, unitType: enemy.unitType, investigating: enemy.investigating }))
       , fluid: state.fluid?.GetStatistics() || null, failure: state.missionFailure
     })
   });
