@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260803at">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260803au">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -20,7 +20,7 @@
 
     <section id="TitleScreen" class="screen titleScreen">
       <a class="projectMark" href="../" aria-label="返回网站首页"><b>高家庄</b><span>after Valiant Hearts</span></a>
-      <button id="OpenHelpButton" class="quietButton" type="button">?</button>
+      <button id="OpenHelpButton" class="quietButton" type="button" title="操作与键位">键位</button>
       <div class="titleLayout">
         <article class="titleCopy">
           <p class="eyebrow" id="TitleEyebrow"><i></i> 一九四二年 · 冀中</p>
@@ -29,6 +29,7 @@
           <div class="titleActions">
             <button id="BeginButton" class="primaryButton" type="button"><span>开始</span></button>
             <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续</button>
+            <button id="OpenHelpTitleButton" class="secondaryButton" type="button">键位</button>
             <button id="OpenHistoryButton" class="secondaryButton" type="button">说明</button>
           </div>
         </article>
@@ -108,13 +109,28 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <button id="DismissHelpButton" class="modalDismiss" type="button" aria-label="关闭">×</button>
-        <h2>操作</h2>
-        <p>怎么联通：下地窖，拿铁锹，贴着土壁（或蓝格）反复点大键往前挖，挖通甲乙丙三家地窖就行。</p>
-        <p>往上挖（竖井）：先点↑再点铁锹，往头顶软土掏。挖通顶层后按住↑爬出地面；站在井口按↓可再钻回去。地道与地面同屏剖视。</p>
-        <p>手机：左右走，上下蹲/攀爬，右侧大键=交谈/捡物/挖土/开火。有手雷时多一个扔雷键。</p>
-        <p>若顶上出现「点铁锹大键退出并挖」：你误进了画线，直接点大键即可退出并开挖。</p>
-        <p>近战：伪军靠近敲晕；鬼子摸背后——蓄力劈砍有顿帧。手雷：先点手雷键出瞄准弧，↑↓调角度，再点扔出。</p>
-        <p>电脑键位（仅此处）：走 A/D · 上下 W/S · 互动 E/空格 · 开火 F · 开镜 Shift · 挖 J · 放下 Q。</p>
+        <h2>操作 · 键位</h2>
+        <h3 class="helpSection">电脑键位</h3>
+        <dl class="keyGuide" aria-label="电脑快捷键">
+          <div><dt><kbd>A</kbd><kbd>←</kbd></dt><dd>左移</dd></div>
+          <div><dt><kbd>D</kbd><kbd>→</kbd></dt><dd>右移</dd></div>
+          <div><dt><kbd>W</kbd><kbd>↑</kbd></dt><dd>上：爬井 / 往上挖 / 手雷高抛</dd></div>
+          <div><dt><kbd>S</kbd><kbd>↓</kbd></dt><dd>蹲、下井、手雷低抛</dd></div>
+          <div><dt><kbd>E</kbd><kbd>空格</kbd></dt><dd>互动：交谈 / 捡物 / 进洞 / 敲晕 / 送乡亲</dd></div>
+          <div><dt><kbd>J</kbd></dt><dd>挖土（贴壁或蓝格）</dd></div>
+          <div><dt><kbd>F</kbd></dt><dd>使用：开火 / 确认扔雷 / 安放</dd></div>
+          <div><dt><kbd>Shift</kbd></dt><dd>开镜瞄准（持枪时）</dd></div>
+          <div><dt><kbd>Q</kbd></dt><dd>放下手持道具</dd></div>
+          <div><dt><kbd>R</kbd></dt><dd>开关画蓝图</dd></div>
+          <div><dt><kbd>T</kbd> <kbd>C</kbd> <kbd>X</kbd></dt><dd>蓝图：厢室 / 巷道 / 擦除</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>暂停 / 关闭弹窗</dd></div>
+        </dl>
+        <h3 class="helpSection">怎么玩</h3>
+        <p>联通：下地窖拿铁锹，贴着土壁（或蓝格）反复挖，挖通甲乙丙三家地窖。</p>
+        <p>竖井：先按 ↑ 再按 <kbd>J</kbd> 往头顶掏；挖通后按住 ↑ 爬出地面，井口按 ↓ 再钻回去。</p>
+        <p>手机：左侧方向，右侧大键=交谈/捡物/挖土/开火。有手雷时多一个扔雷键。</p>
+        <p>近战：伪军靠近就敲；鬼子要摸背后。手雷：先出手雷瞄准，↑↓调弧，再确认扔出。</p>
+        <p>若出现「点铁锹大键退出并挖」：误进了画线，直接点大键退出并开挖。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -130,9 +146,10 @@
       </article>
       <article id="PauseModal" class="modalCard" hidden>
         <h2>暂停</h2>
-        <p>已自动记下这一页。</p>
+        <p>已自动记下这一页。忘了键位就点下面「键位」。</p>
         <div class="modalActions">
           <button id="ResumeButton" class="primaryButton" type="button"><span>继续</span></button>
+          <button id="PauseHelpButton" class="secondaryButton" type="button">键位</button>
           <button id="OpenDebugButton" class="secondaryButton" type="button">调试</button>
           <button id="RestartChapterButton" class="secondaryButton" type="button">重来本页</button>
           <button id="ExitTitleButton" class="secondaryButton" type="button">标题</button>
@@ -168,6 +185,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260803at"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260803au"></script>
 </body>
 </html>

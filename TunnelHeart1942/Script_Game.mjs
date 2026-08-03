@@ -2723,7 +2723,12 @@ function BindUi() {
     BeginFrom(Math.max(0, Math.min(CHAPTERS.length - 1, (progress?.unlockedActs || 1) - 1)));
   });
   const closeModal = () => SetModal(null);
-  $("OpenHelpButton").addEventListener("click", () => SetModal("help"));
+  const openHelp = () => SetModal("help");
+  $("OpenHelpButton").addEventListener("click", openHelp);
+  const openHelpTitle = $("OpenHelpTitleButton");
+  if (openHelpTitle) openHelpTitle.addEventListener("click", openHelp);
+  const pauseHelp = $("PauseHelpButton");
+  if (pauseHelp) pauseHelp.addEventListener("click", openHelp);
   $("CloseHelpButton").addEventListener("click", closeModal);
   const dismissHelp = $("DismissHelpButton");
   if (dismissHelp) dismissHelp.addEventListener("click", closeModal);

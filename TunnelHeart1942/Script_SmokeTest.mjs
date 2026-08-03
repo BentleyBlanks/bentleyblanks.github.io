@@ -1500,6 +1500,18 @@ function Main() {
   );
   Assert(!gameSrc.includes("E 继续") && !gameSrc.includes("E 关闭"), "no keyboard-letter dialogue hints");
   Assert(!/（E）/.test(NextStepText(Play(0))), "step hint has no (E) key letter");
+  {
+    const html = readFileSync(join(here, "index.html"), "utf8");
+    Assert(html.includes('class="keyGuide"'), "help modal has PC key guide");
+    Assert(html.includes("电脑键位"), "help modal labels PC keys section");
+    Assert(html.includes("PauseHelpButton"), "pause menu opens key help");
+    Assert(html.includes("OpenHelpTitleButton"), "title has 键位 button");
+    Assert(html.includes("<kbd>E</kbd>") && html.includes("<kbd>J</kbd>") && html.includes("<kbd>F</kbd>"), "key guide lists E/J/F");
+    Assert(html.includes("<kbd>Shift</kbd>") && html.includes("<kbd>Esc</kbd>"), "key guide lists Shift/Esc");
+    const css = readFileSync(join(here, "Style_Game.css"), "utf8");
+    Assert(css.includes(".keyGuide"), "key guide styles present");
+    Assert(gameSrc.includes("PauseHelpButton") && gameSrc.includes('SetModal("help")'), "pause 键位 wired to help modal");
+  }
   TestNoKeyLetterCopy();
   if (failed) {
     console.error(`\n${failed} failed`);

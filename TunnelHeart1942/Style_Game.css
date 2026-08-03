@@ -399,7 +399,60 @@ button {
 .modalCard h2 {
   margin: 0 36px 10px 0; font-family: var(--display); font-size: 1.7rem; font-weight: 400;
 }
+.modalCard h3.helpSection {
+  margin: 14px 0 8px;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #5a4030;
+}
+.modalCard h3.helpSection:first-of-type { margin-top: 4px; }
 .modalCard p { line-height: 1.65; margin: 0 0 12px; }
+.modalCard kbd {
+  display: inline-block;
+  min-width: 1.35em;
+  padding: 0.12em 0.42em;
+  margin: 0 2px;
+  border: 2px solid var(--ink);
+  border-bottom-width: 3px;
+  border-radius: 4px;
+  background: #efe2c8;
+  font: 700 0.82rem/1.35 "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 1px 1px 0 rgba(0,0,0,.2);
+}
+.keyGuide {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 2.5px solid var(--ink);
+  background: #efe2c8;
+}
+.keyGuide > div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 34%) 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 4px 2px;
+  border-bottom: 1px dashed rgba(26, 20, 16, 0.22);
+}
+.keyGuide > div:last-child { border-bottom: 0; }
+.keyGuide dt {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.keyGuide dd {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #2a2118;
+}
 .modalCard .modalActions {
   position: sticky;
   bottom: 0;
