@@ -1664,26 +1664,31 @@ function DrawEntity(ent) {
     });
     DrawNameplate(ent.trapped ? "特务·陷" : ent.exposed ? "特务" : "行商?", "roleSpy", -78 * s, s);
   } else if (ent.type === "patrol") {
-    const facing = Math.cos((ent.t || 0) * 0.65) >= 0 ? 1 : -1;
+    const facing = ent.facing === 1 || ent.facing === -1
+      ? ent.facing
+      : Math.cos((ent.t || 0) * 0.65) >= 0
+        ? 1
+        : -1;
     // Surface hostiles are 日军 / 伪军 — never a vague "巡逻" plate.
     if (!ent.label) ent.label = "日军";
     if (!ent.faction) ent.faction = "ijp";
     const plate = EnemyHudPlate(ent);
+    const down = !!(ent.broken || ent.ko || ent.dead);
     DrawPuppet(ctx, {
       x: 0,
       y: 0,
       facing,
       scale: s,
       palette: plate.palette,
-      clip: ent.broken ? "idle" : "walk",
+      clip: down ? "crouch" : "walk",
       time: ent.t || 0,
-      moving: !ent.broken,
-      hold: !ent.broken && plate.palette === "ijp" ? "rifle" : null,
-      alpha: ent.broken ? 0.3 : 1,
+      moving: !down,
+      hold: !down && plate.palette === "ijp" ? "rifle" : null,
+      alpha: down ? 0.55 : 1,
     });
-    DrawNameplate(plate.name, plate.icon, -78 * s, s);
+    DrawNameplate(down ? "晕倒" : plate.name, plate.icon, -78 * s, s);
     // Cone only when the player is close — not a permanent walking HUD.
-    if (!ent.broken && Math.abs(state.player.x - ent.x) < 160) {
+    if (!down && Math.abs(state.player.x - ent.x) < 160) {
       ctx.fillStyle = "rgba(155,47,47,.22)";
       ctx.beginPath();
       ctx.moveTo(0, -20 * s);

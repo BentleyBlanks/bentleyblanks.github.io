@@ -138,6 +138,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     nadeAim: 0.55,
     /** Last climbed / descended shaft X — hint + re-entry. */
     openShaftX: null,
+    /** Last safe stand — hurt pullback / soft respawn prefer this. */
+    safePoint: null,
     /** Mobile: tap ↑ then dig — keep dig-up intent briefly without two-finger hold. */
     digAimUp: 0,
     digAimDown: 0,
@@ -1270,9 +1272,23 @@ function DetonateGrenade(state, p) {
   else if (hits === 0) SetSubtitle(state, "高传宝", "炸偏了——贴着沙袋再丢。", 1.5);
 }
 
-/** Silent / melee KO finish. */
+/** Silent / melee KO finish — enemies and surface hostiles (ex-patrol). */
 function KnockOutEnemy(state, ent) {
-  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  if (!ent) return false;
+  if (ent.type === "patrol") {
+    if (ent.broken || ent.dead) return false;
+    ent.broken = true;
+    ent.dead = true;
+    ent.ko = true;
+    ent.corpse = true;
+    ent.hurtFlash = 0.35;
+    ent.hp = 0;
+    MarkGoal(state, "break_patrol");
+    state.stats.kills = (state.stats.kills || 0) + 1;
+    state.stats.stealthKos = (state.stats.stealthKos || 0) + 1;
+    return true;
+  }
+  if (ent.type !== "enemy" || ent.dead) return false;
   ent.hp = 0;
   ent.dead = true;
   ent.ko = true;
@@ -1283,6 +1299,13 @@ function KnockOutEnemy(state, ent) {
   DropEnemyLoot(state, ent);
   SyncKillGoals(state);
   return true;
+}
+
+function IsMeleeFoe(ent) {
+  if (!ent) return false;
+  if (ent.type === "enemy" && !ent.dead) return true;
+  if (ent.type === "patrol" && !ent.broken && !ent.dead) return true;
+  return false;
 }
 
 function EnemyFacing(ent) {
@@ -1306,7 +1329,7 @@ function IsBehindEnemy(player, ent) {
 
 /** Close enough to throw a fist — any angle. */
 export function CanMeleeReach(player, ent) {
-  if (!ent || ent.type !== "enemy" || ent.dead) return false;
+  if (!IsMeleeFoe(ent)) return false;
   if (!LayerOk(player, ent)) return false;
   if (player.inTunnel || player.manningMg) return false;
   if ((player.meleeT || 0) > 0.12) return false;
@@ -1341,12 +1364,97 @@ function SpawnMeleeImpactFx(state, x, y, ok) {
   state.hitStop = Math.max(state.hitStop || 0, ok ? 0.1 : 0.06);
 }
 
+function ResolveSafePose(state) {
+  const { player, level } = state;
+  if (state.safePoint) {
+    return {
+      x: state.safePoint.x,
+      y: state.safePoint.y,
+      tunnel: !!state.safePoint.tunnel,
+    };
+  }
+  let x = level.spawn.x;
+  let y = level.spawn.y;
+  let tunnel = !!level.spawn.tunnel;
+  const shaftX = state.openShaftX;
+  if (shaftX != null && IsShaftOpenAt(state, shaftX)) {
+    x = shaftX;
+    y = SURFACE_Y;
+    tunnel = false;
+  } else {
+    const hatch = (level.entities || []).find((e) => e.type === "hatch" && !e.hidden && !e.done);
+    if (hatch) {
+      x = hatch.x;
+      y = SURFACE_Y;
+      tunnel = false;
+    }
+  }
+  return { x, y, tunnel };
+}
+
+/** Snap camera onto the player after a forced warp. */
+function SnapCameraToPlayer(state) {
+  const { player, level } = state;
+  const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
+  state.cameraX = Math.max(0, Math.min((level.width || 2400) - viewW, player.x - viewW * 0.35));
+  state.cameraY = player.inTunnel ? (level.tunnelFloor || 0) - 300 : SURFACE_Y - 220;
+}
+
+/** On non-lethal hurt: yank back to the last safe stand so kill-zones don't softlock. */
+function PullToSafePoint(state) {
+  const player = state.player;
+  const pose = ResolveSafePose(state);
+  player.x = pose.x;
+  player.y = pose.y;
+  player.inTunnel = !!pose.tunnel;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = true;
+  player.climbing = false;
+  player.invuln = Math.max(player.invuln || 0, 1.85);
+  SnapCameraToPlayer(state);
+  state.shake = Math.max(state.shake || 0, 0.18);
+  SetBubble(state, ["warn", "hatch"], "撤回", 1.2);
+  SetSubtitle(state, "高传宝", "撤回到安全处——摸背后敲晕，或钻地道绕开。", 2.6);
+}
+
+/** Record a stand the player can retreat to after a hit. */
+function MaybeRecordSafePoint(state) {
+  const { player, level } = state;
+  if (!player || state.failed || player.hp <= 0) return;
+  if ((player.invuln || 0) > 0.15) return;
+  if ((player.meleeT || 0) > 0) return;
+  let safe = false;
+  if (player.inTunnel) safe = true;
+  else if (player.onGround) {
+    const nearFoe = (level.entities || []).some(
+      (e) => IsMeleeFoe(e) && Math.abs(e.x - player.x) < 110 && Math.abs((e.y || 0) - player.y) < 50,
+    );
+    safe = !nearFoe;
+  }
+  if (!safe) return;
+  state.safePoint = { x: player.x, y: player.y, tunnel: !!player.inTunnel };
+}
+
+/** Apply contact / counter damage; pull back unless this hit finishes the player. */
+function HurtPlayer(state, opts = {}) {
+  const player = state.player;
+  if ((player.invuln || 0) > 0) return false;
+  player.hp -= opts.damage ?? 1;
+  player.invuln = opts.invuln ?? 1.35;
+  if (opts.knockDir != null) player.vx = opts.knockDir * (opts.knockSpeed ?? 200);
+  if (opts.line) SetSubtitle(state, opts.speaker || "危险", opts.line, opts.lineTime ?? 2.2);
+  if (player.hp <= 0) {
+    state.failed = true;
+    return true;
+  }
+  PullToSafePoint(state);
+  return true;
+}
+
 function MeleeCounter(state, ent) {
   const player = state.player;
   const dir = Math.sign(ent.x - player.x) || player.facing || 1;
-  player.hp -= 1;
-  player.invuln = 1.15;
-  player.vx = -dir * 200;
   ent.alert = Math.max(ent.alert || 0, 5.5);
   ent.alertX = player.x;
   ent.highAlert = true;
@@ -1355,15 +1463,17 @@ function MeleeCounter(state, ent) {
   AlertEnemiesNear(state, player.x, 220, 4.5);
   SpawnMeleeImpactFx(state, (player.x + ent.x) / 2, SURFACE_Y - 36, false);
   SetBubble(state, ["warn"], "反抓", 1.1);
-  SetSubtitle(
-    state,
-    ent.label === "伪军" ? "伪军" : "日军",
-    EnemyFaction(ent) === "ijp"
-      ? "日军有防备——被反手抓住了！别正面硬抢！"
-      : "被挡住了！",
-    2.4,
-  );
-  if (player.hp <= 0) state.failed = true;
+  HurtPlayer(state, {
+    knockDir: -dir,
+    knockSpeed: 200,
+    invuln: 1.15,
+    speaker: ent.label === "伪军" ? "伪军" : "日军",
+    line:
+      EnemyFaction(ent) === "ijp"
+        ? "日军有防备——被反手抓住了！别正面硬抢！"
+        : "被挡住了！",
+    lineTime: 2.4,
+  });
   return false;
 }
 
@@ -1372,7 +1482,7 @@ function ResolvePendingMelee(state) {
   if (!pend) return;
   state.pendingMelee = null;
   const ent = pend.ent;
-  if (!ent || ent.dead) return;
+  if (!ent || ent.dead || ent.broken) return;
   const player = state.player;
   const midX = (player.x + ent.x) / 2;
   if (pend.ok) {
@@ -1422,7 +1532,11 @@ function TryMeleeKO(state, ent) {
   let ok = false;
   let line = "伪军好对付——靠近就给他一下。";
 
-  if (faction === "puppet") {
+  // Patrols block the road — any angle KO (crouch-past still works if you prefer).
+  if (ent.type === "patrol") {
+    ok = true;
+    line = "巡逻制住了——路通了。";
+  } else if (faction === "puppet") {
     ok = true;
   } else {
     const alerted = !!ent.highAlert || (ent.alert || 0) > 1.2;
@@ -1676,7 +1790,7 @@ function TryInteract(state) {
   let bestFoe = null;
   let bestD = 9999;
   for (const ent of level.entities) {
-    if (ent.type !== "enemy" || ent.dead) continue;
+    if (!IsMeleeFoe(ent)) continue;
     if (!CanMeleeReach(player, ent)) continue;
     const d = Math.abs(player.x - ent.x);
     if (d < bestD) {
@@ -1899,7 +2013,7 @@ function UpdateActors(state, dt) {
         if (amp > 1) ent.facing = Math.cos(ent.t * 0.7 + phase) >= 0 ? 1 : -1;
       }
       if (Math.abs(ent.x - prevX) > 0.2) ent.facing = Math.sign(ent.x - prevX) || ent.facing || 1;
-      if (!player.inTunnel && player.invuln <= 0) {
+      if (!player.inTunnel && !state.pendingMelee) {
         // Surface contact / detection. High alert after corpse shout is much harsher.
         let detect = player.crouching ? 26 : 50;
         if (high) detect = player.crouching ? 52 : 100;
@@ -1909,25 +2023,29 @@ function UpdateActors(state, dt) {
         const fromFront = face > 0 ? dx > 0 : dx < 0;
         if (!fromFront && !high) detect *= 0.45;
         if (Math.abs(player.x - ent.x) < detect && Math.abs(player.y - ent.y) < 42) {
-          player.hp -= 1;
-          player.invuln = 1.25;
-          player.vx = Math.sign(player.x - ent.x || 1) * 200;
           ent.alert = Math.max(ent.alert || 0, 3.5);
           ent.alertX = player.x;
-          SetSubtitle(
-            state,
-            "危险",
-            high ? "高度警戒——被发现了！" : "被鬼子发现了——蹲下、绕背或钻井！",
-            2.2,
-          );
-          if (player.hp <= 0) state.failed = true;
+          HurtPlayer(state, {
+            knockDir: Math.sign(player.x - ent.x || 1),
+            knockSpeed: 200,
+            invuln: 1.25,
+            speaker: "危险",
+            line: high ? "高度警戒——被发现了！" : "被鬼子发现了——蹲下、绕背或钻井！",
+            lineTime: 2.2,
+          });
         }
       }
       continue;
     }
-    if (ent.type === "patrol" && !ent.broken && ent.hostile) {
+    if (ent.type === "patrol" && !ent.broken && !ent.dead && ent.hostile) {
+      if (ent.stunLock && ent.stunLock > 0) {
+        ent.stunLock = Math.max(0, ent.stunLock - dt);
+        continue;
+      }
+      const prevX = ent.x;
       ent.t = (ent.t || 0) + dt;
       ent.x = ent.homeX + Math.sin(ent.t * 0.65) * (ent.amp || 100);
+      if (Math.abs(ent.x - prevX) > 0.2) ent.facing = Math.sign(ent.x - prevX) || ent.facing || 1;
       if (
         ent.barkYamada &&
         !ent._barked &&
@@ -1941,13 +2059,16 @@ function UpdateActors(state, dt) {
           SetSubtitle(state, "山田", ent.barkYamada, 3.0);
         }
       }
-      if (!player.inTunnel && player.invuln <= 0 && !player.crouching) {
+      if (!player.inTunnel && !player.crouching && !state.pendingMelee) {
         if (Math.abs(player.x - ent.x) < 38 && Math.abs(player.y - ent.y) < 40) {
-          player.hp -= 1;
-          player.invuln = 1.25;
-          player.vx = Math.sign(player.x - ent.x || 1) * 180;
-          SetSubtitle(state, "危险", "被发现了——蹲下或钻地道。", 2.2);
-          if (player.hp <= 0) state.failed = true;
+          HurtPlayer(state, {
+            knockDir: Math.sign(player.x - ent.x || 1),
+            knockSpeed: 180,
+            invuln: 1.25,
+            speaker: "危险",
+            line: "被巡逻发现——蹲下溜过，或靠近敲晕。",
+            lineTime: 2.2,
+          });
         }
       }
     }
@@ -2034,10 +2155,14 @@ function RefreshHint(state) {
     }
   }
   for (const ent of state.level.entities) {
-    if (ent.type === "enemy" && !ent.dead && CanMeleeReach(state.player, ent)) {
-      const behind = IsBehindEnemy(state.player, ent);
-      const hard = EnemyFaction(ent) === "ijp";
-      state.interactHint = hard && !behind ? "melee_risky" : "stealth_ko";
+    if (IsMeleeFoe(ent) && CanMeleeReach(state.player, ent)) {
+      if (ent.type === "patrol") {
+        state.interactHint = "stealth_ko";
+      } else {
+        const behind = IsBehindEnemy(state.player, ent);
+        const hard = EnemyFaction(ent) === "ijp";
+        state.interactHint = hard && !behind ? "melee_risky" : "stealth_ko";
+      }
       return;
     }
   }
@@ -2132,6 +2257,7 @@ export function StepPlay(state, dt) {
   SyncMgNestGoals(state);
   RefreshHint(state);
   UpdateActors(state, simDt);
+  MaybeRecordSafePoint(state);
   UpdateMgWaves(state, simDt);
   UpdateProjectiles(state, simDt);
   UpdateCamera(state, simDt);
@@ -2214,7 +2340,7 @@ export function RestartChapterToPlay(state) {
 
 /**
  * Soft respawn after HP hits 0 — keep dig progress / goals, refill hearts,
- * return to a safe mouth (spawn / hatch / last open shaft).
+ * prefer last safe stand, else hatch / open shaft / spawn.
  */
 export function RespawnPlayer(state) {
   const { player, level } = state;
@@ -2246,35 +2372,19 @@ export function RespawnPlayer(state) {
   state.shake = Math.max(state.shake || 0, 0.2);
   state.activeTalkId = null;
 
-  // Prefer last open shaft mouth, then authored hatch, else chapter spawn.
-  let x = level.spawn.x;
-  let y = level.spawn.y;
-  let tunnel = !!level.spawn.tunnel;
-  const shaftX = state.openShaftX;
-  if (shaftX != null && IsShaftOpenAt(state, shaftX)) {
-    x = shaftX;
-    y = SURFACE_Y;
-    tunnel = false;
-  } else {
-    const hatch = (level.entities || []).find((e) => e.type === "hatch" && !e.hidden && !e.done);
-    if (hatch) {
-      // Respawn on the surface mouth so the player can choose to re-enter.
-      x = hatch.x;
-      y = SURFACE_Y;
-      tunnel = false;
-    }
-  }
-  player.x = x;
-  player.y = y;
-  player.inTunnel = tunnel;
-  {
-    const viewW = Math.max(VIEW_W, state.viewW || VIEW_W);
-    state.cameraX = Math.max(0, Math.min((level.width || 2400) - viewW, player.x - viewW * 0.35));
-  }
-  state.cameraY = tunnel ? (level.tunnelFloor || 0) - 300 : SURFACE_Y - 220;
+  const pose = ResolveSafePose(state);
+  player.x = pose.x;
+  player.y = pose.y;
+  player.inTunnel = !!pose.tunnel;
+  SnapCameraToPlayer(state);
 
   SetBubble(state, ["check", "hatch"], "再起", 1.6);
-  SetSubtitle(state, "高传宝", "还没完——站起来，从井口再来。", 2.6);
+  SetSubtitle(
+    state,
+    "高传宝",
+    state.safePoint ? "还没完——从安全处再摸过去。" : "还没完——站起来，从井口再来。",
+    2.6,
+  );
   return state;
 }
 

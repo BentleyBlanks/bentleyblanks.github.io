@@ -903,6 +903,70 @@ function TestMeleeKoFactions() {
   Assert(jp.dead && jp.ko, "鬼子 rear KO still works");
 }
 
+/** Patrols block the road — any-angle melee KO, and non-lethal hurt yank to safePoint. */
+function TestPatrolMeleeAndHurtPullback() {
+  const state = Play(1);
+  const patrol = state.level.entities.find((e) => e.type === "patrol" && e.hostile);
+  Assert(!!patrol, "act2 has a hostile patrol");
+  Assert(
+    CanMeleeReach(
+      { x: patrol.x + 30, y: 0, inTunnel: false, manningMg: false, meleeT: 0 },
+      patrol,
+    ),
+    "patrol is a melee target",
+  );
+
+  // Front of a 日军-faction patrol must still KO (path blockers ≠ hard sentries).
+  patrol.broken = false;
+  patrol.dead = false;
+  patrol.ko = false;
+  patrol.amp = 0;
+  patrol.x = 900;
+  patrol.homeX = 900;
+  patrol.facing = 1;
+  patrol.t = 0;
+  state.player.x = patrol.x + 28;
+  state.player.y = 0;
+  state.player.inTunnel = false;
+  state.player.facing = -1;
+  state.player.hp = 3;
+  state.player.meleeT = 0;
+  state.player.invuln = 0;
+  state.pendingMelee = null;
+  MeleeUntilResolved(state);
+  Assert(patrol.broken && patrol.ko && patrol.dead, "patrol front melee KO");
+
+  // Safe-point pullback on non-lethal contact damage.
+  const st2 = Play(1);
+  const foe = st2.level.entities.find((e) => e.type === "patrol" && e.hostile);
+  foe.amp = 0;
+  foe.x = 1200;
+  foe.homeX = 1200;
+  foe.broken = false;
+  foe.dead = false;
+  foe.hostile = true;
+  st2.safePoint = { x: 400, y: 0, tunnel: false };
+  st2.player.x = foe.x;
+  st2.player.y = 0;
+  st2.player.inTunnel = false;
+  st2.player.crouching = false;
+  st2.player.hp = 3;
+  st2.player.invuln = 0;
+  StepPlay(st2, 1 / 30);
+  Assert(st2.player.hp === 2, "patrol contact costs 1 heart");
+  Assert(!st2.failed, "non-lethal hurt does not fail the run");
+  Assert(Math.abs(st2.player.x - 400) < 2, "hurt pulls back to last safe point");
+  Assert(st2.player.invuln > 1, "hurt pullback grants invuln");
+
+  // Soft death respawn also prefers safePoint over hatch/spawn.
+  st2.player.hp = 0;
+  st2.failed = true;
+  st2.safePoint = { x: 520, y: 0, tunnel: false };
+  RespawnPlayer(st2);
+  Assert(Math.abs(st2.player.x - 520) < 2, "death respawn prefers safePoint");
+  Assert(!st2.failed && st2.player.hp === 3, "death respawn clears fail + hearts");
+}
+
 function TestGrenadeAimArc() {
   const low = GrenadeLobParams(0);
   const mid = GrenadeLobParams(0.5);
@@ -1228,6 +1292,8 @@ function TestDeathRespawn() {
   const carvedBefore = soil.carved | 0;
   state.goalsDone.enter_hatch = true;
 
+  // Clear any tunnel safePoint from hatch-down so hatch-mouth fallback is tested.
+  state.safePoint = null;
   state.player.hp = 0;
   state.failed = true;
   RespawnPlayer(state);
@@ -1236,7 +1302,7 @@ function TestDeathRespawn() {
   Assert(state.player.invuln > 1, "soft respawn grants brief invuln");
   Assert(soil.carved === carvedBefore, "soft respawn keeps dig progress");
   Assert(state.goalsDone.enter_hatch, "soft respawn keeps goals");
-  Assert(!state.player.inTunnel, "soft respawn drops at surface hatch mouth");
+  Assert(!state.player.inTunnel, "without safePoint, soft respawn drops at hatch mouth");
   state.input.left = true;
   const x0 = state.player.x;
   StepPlay(state, 1 / 30);
@@ -1314,6 +1380,7 @@ function Main() {
   TestAct4KillInvaders();
   TestAct5StreetHunt();
   TestMeleeKoFactions();
+  TestPatrolMeleeAndHurtPullback();
   TestGrenadeAimArc();
   TestAct6PlantNeedsCharge();
   TestAct7MgNest();
@@ -1366,6 +1433,7 @@ function Main() {
     const patrols = (night.entities || []).filter((e) => e.type === "patrol");
     Assert(patrols.length >= 1, "act2 has surface hostiles");
     Assert(patrols.every((e) => e.label === "日军" || e.label === "伪军"), "patrol entities labeled 日军/伪军");
+    Assert(gameSrc.includes('DrawNameplate(down ? "晕倒"'), "KO'd patrol shows 晕倒 plate");
   }
   Assert(gameSrc.includes("PaintTouchPadIcons"), "touch pad painted with icon plates");
   Assert(gameSrc.includes("Icon-only float"), "world interact prompt is icon-only");
