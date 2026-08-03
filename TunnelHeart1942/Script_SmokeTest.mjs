@@ -344,6 +344,36 @@ function TestDigUpPastHeadroom() {
   Assert(GetCell(soil, pc.c, pc.r - 2) === AIR, "sticky dig-up carves ceiling soft");
 }
 
+/** Carved vertical shaft + hold ↑ must climb out to SURFACE_Y (dig-up alone is not enough). */
+function TestClimbShaftToSurface() {
+  const state = Play(0);
+  HatchDown(state, "hatch1");
+  DebugHold(state, ITEM_SHOVEL);
+  const soil = state.level.soil;
+  const pc = WorldToCell(soil, state.player.x, state.player.y - 24);
+  // Open a shaft from the hard crust's first diggable row down to the digger.
+  for (let r = 1; r <= pc.r; r++) SetCell(soil, pc.c, r, AIR);
+  RebuildTunnelSolids(state.level);
+  state.player.x = soil.originX + (pc.c + 0.5) * soil.cell;
+  state.player.y = soil.originY + (pc.r + 1) * soil.cell;
+  state.player.inTunnel = true;
+  state.player.vy = 0;
+  state.player.onGround = true;
+
+  const y0 = state.player.y;
+  state.input.up = true;
+  for (let i = 0; i < 200; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.y < y0 - 40, "hold ↑ climbs the carved shaft");
+  Assert(!state.player.inTunnel, "open shaft + ↑ emerges to surface");
+  Assert(state.player.y <= 2, "emerged feet land on SURFACE_Y");
+
+  // Surface ↑ still must not Mario-jump.
+  const surfY = state.player.y;
+  state.input.up = true;
+  for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.y >= surfY - 2, "after emerge, ↑ still does not jump");
+}
+
 /** Crouch into a 1-high crawlway — must not X-shove to the map/soil edge. */
 function TestCrouchCrawlNoEdgeTeleport() {
   const state = Play(0);
@@ -1021,6 +1051,7 @@ function Main() {
   TestCarveConnectsAct1();
   TestNoJump();
   TestDigUpPastHeadroom();
+  TestClimbShaftToSurface();
   TestCrouchCrawlNoEdgeTeleport();
   TestPickupShovelRequired();
   TestMultiTalk();

@@ -2,10 +2,12 @@ import { CHAPTERS, PROLOGUE_PANELS, SAVE_KEY } from "./Data_Story.mjs";
 import {
   AIR,
   CarveCell,
+  CellCenter,
   GetCell,
   RebuildTunnelSolids,
   SetCell,
   SOFT,
+  WorldToCell,
 } from "./Script_Dig.mjs";
 import {
   CanPlanCell,
@@ -40,6 +42,8 @@ export const PLAYER_H = 48;
 export const GRAVITY = 1850;
 export const MOVE_SPEED = 220;
 export const THROW_SPEED = 420;
+/** Ladder-style climb in carved air columns — not a Mario jump. */
+export const CLIMB_SPEED = 175;
 
 export function CreateInputState() {
   return {
@@ -109,6 +113,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
+      /** Holding ↑ in a carved air column. */
+      climbing: false,
     },
     meleeFx: null,
     blasts: [],
@@ -228,9 +234,19 @@ function ResolvePhysics(state, dt) {
   if (player.shotCool > 0) player.shotCool = Math.max(0, player.shotCool - dt);
   if (player.throwCool > 0) player.throwCool = Math.max(0, player.throwCool - dt);
   if (player.throwT > 0) player.throwT = Math.max(0, player.throwT - dt);
-  // No Mario jump — Valiant Hearts traversal is walk / crawl / dig / hatch.
 
-  player.vy += GRAVITY * dt;
+  // Shaft climb: hold ↑ (or sticky dig-up aim) in carved air — not a Mario jump.
+  // Digging up is useless without this ladder climb to the surface crust.
+  player.climbing = false;
+  const wantClimb = (!!input.up || (state.digAimUp || 0) > 0) && !input.crouch;
+  const canClimb = player.inTunnel && wantClimb && AirColumnAbove(state);
+  if (canClimb) {
+    player.climbing = true;
+    player.vy = -CLIMB_SPEED;
+    player.onGround = false;
+  } else {
+    player.vy += GRAVITY * dt;
+  }
 
   player.x += player.vx * dt;
   player.x = Math.max(20, Math.min(level.width - 20, player.x));
@@ -251,13 +267,14 @@ function ResolvePhysics(state, dt) {
   const prevY = player.y;
   player.y += player.vy * dt;
   aabb = PlayerAabb(player);
-  player.onGround = false;
+  if (!player.climbing) player.onGround = false;
   for (const s of solids) {
     if (!RectsOverlap(aabb, s)) continue;
     if (player.vy >= 0 && prevY <= s.y + 6) {
       player.y = s.y;
       player.vy = 0;
       player.onGround = true;
+      player.climbing = false;
     } else if (player.vy < 0 && prevY - aabb.h >= s.y + s.h - 6) {
       player.y = s.y + s.h + aabb.h;
       player.vy = 0;
@@ -266,6 +283,54 @@ function ResolvePhysics(state, dt) {
   }
 
   if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
+  TryEmergeFromShaft(state);
+}
+
+/** True when the cell above the digger (or the climb probe) is open air. */
+function AirColumnAbove(state) {
+  const { player, level } = state;
+  const soil = level.soil;
+  if (!soil) return false;
+  // Pressing into the hard lid with an open shaft below — keep climbing to emerge.
+  if (player.y <= soil.originY + soil.cell * 2.6 && ShaftOpenToSurface(soil, player.x)) return true;
+  const bodyY = player.y - (player.crouching ? PLAYER_H * 0.55 : PLAYER_H * 0.75);
+  const probe = WorldToCell(soil, player.x, bodyY - 6);
+  if (GetCell(soil, probe.c, probe.r) === AIR) return true;
+  const feet = WorldToCell(soil, player.x, player.y - 24);
+  if (GetCell(soil, feet.c, feet.r - 1) === AIR) return true;
+  if (GetCell(soil, feet.c, feet.r - 2) === AIR) return true;
+  // Already above the dig band while still flagged underground — keep climbing out.
+  if (player.y < soil.originY + soil.cell) return true;
+  return false;
+}
+
+function ShaftOpenToSurface(soil, playerX) {
+  const c = WorldToCell(soil, playerX, soil.originY + soil.cell * 0.5).c;
+  // Row 0 is the hard crust; row 1 open means the shaft punched through to surface.
+  return GetCell(soil, c, 1) === AIR || GetCell(soil, c, 0) === AIR;
+}
+
+/** When a vertical shaft reaches the top of the dig band, ↑ pops you onto surface. */
+function TryEmergeFromShaft(state) {
+  const { player, level, input } = state;
+  if (!player.inTunnel || !level.soil) return false;
+  const wantOut = !!input.up || player.climbing || (state.digAimUp || 0) > 0;
+  if (!wantOut) return false;
+  const soil = level.soil;
+  const nearTop = player.y <= soil.originY + soil.cell * 2.6;
+  if (!nearTop && player.y >= soil.originY) return false;
+  if (!ShaftOpenToSurface(soil, player.x)) return false;
+  player.inTunnel = false;
+  player.y = SURFACE_Y;
+  player.vy = 0;
+  player.onGround = true;
+  player.climbing = false;
+  player.crouching = false;
+  state.digAimUp = 0;
+  state.designMode = false;
+  SetBubble(state, ["hatch"], "出井", 1.4);
+  SetSubtitle(state, "高传宝", "钻出地面！", 1.6);
+  return true;
 }
 
 function Near(player, ent, radius = 48) {
@@ -565,7 +630,7 @@ function TryExcavate(state) {
         SetSubtitle(state, "提示", "走到蓝色格子旁边，或贴着土壁再挖。", 2.6);
         state.interactHint = "follow_plan";
       } else {
-        SetSubtitle(state, "提示", "贴着土壁挖。往上挖：先点↑再点铁锹。", 2.6);
+        SetSubtitle(state, "提示", "贴着土壁挖。往上挖通后按住↑攀爬出地面。", 2.6);
         state.interactHint = "need_plan";
       }
     }
@@ -594,7 +659,19 @@ function TryExcavate(state) {
     }
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
-    SetBubble(state, ["shovel"], digUp ? "往上挖" : digDown ? "往下挖" : "开挖", 0.7);
+    // Dig-up pulls you into the new hollow so you're not stuck staring at a hole overhead.
+    if (digUp) {
+      const lift = CellCenter(level.soil, dig.c, dig.r).y + 16;
+      if (lift < player.y - 4) {
+        player.y = lift;
+        player.vy = 0;
+        player.onGround = false;
+        player.climbing = true;
+      }
+      SetBubble(state, ["shovel"], "往上挖 · 按住↑爬出地面", 1.2);
+    } else {
+      SetBubble(state, ["shovel"], digDown ? "往下挖" : "开挖", 0.7);
+    }
   }
 }
 
@@ -1842,12 +1919,12 @@ export function NextStepText(state) {
     if (state.chapterId === "act1_connect") {
       if (!g.link_ab) return "联通甲—乙：贴着土壁/蓝格，反复点铁锹大键往前挖";
       if (!g.link_bc) return "联通乙—丙：继续贴壁点铁锹挖";
-      return "三家已通 · 回井口上地面";
+      return "三家已通 · 回井口上地面（竖井挖通后也可按住↑爬出）";
     }
     if (CanDigWith(p.held)) {
-      return "贴着土壁，反复点铁锹大键挖通";
+      return "贴壁挖通；往上挖竖井后按住↑攀爬出地面";
     }
-    return "地道里需要铁锹才能挖；靠近井口可上地面";
+    return "地道里需要铁锹才能挖；井口上地面，或竖井顶通后按住↑爬出";
   }
   if (state.chapterId === "act1_connect") {
     if (!g.talk_laozhong) return "找高老忠交谈";
