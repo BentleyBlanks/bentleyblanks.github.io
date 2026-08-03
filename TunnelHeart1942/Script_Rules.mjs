@@ -110,6 +110,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     bubble: null,
     subtitle: null,
     subtitleTimer: 0,
+    /** In-play comic talk id — E/Space advances without re-standing on the NPC. */
+    activeTalkId: null,
     /** Film beats queued after key moments (e.g. 高老忠殉钟). */
     subtitleQueue: [],
     winTimer: 0,
@@ -226,23 +228,71 @@ function GoalIcon(goalId) {
   return "check";
 }
 
+function ResolveSpeakerAnchor(state, speaker, fallbackEnt = null) {
+  const name = speaker || "";
+  if (/高传宝|^传宝$/.test(name)) {
+    return { id: "player", x: state.player.x, y: state.player.y };
+  }
+  const match = (state.level.entities || []).find(
+    (e) =>
+      !e.hidden &&
+      (e.type === "talk" || e.type === "spy_talk" || e.type === "shelter") &&
+      e.speaker === name,
+  );
+  if (match) return { id: match.id, x: match.x, y: match.y };
+  if (fallbackEnt) return { id: fallbackEnt.id, x: fallbackEnt.x, y: fallbackEnt.y };
+  return { id: "player", x: state.player.x, y: state.player.y };
+}
+
+function ClearDialogue(state) {
+  state.subtitle = null;
+  state.subtitleTimer = 0;
+  state.bubble = null;
+}
+
 function SetBubble(state, icons, mutter = "", time = 2.8) {
   state.bubble = { icons: icons || [], mutter, timer: time };
   if (mutter) {
     const prev = state.subtitle;
+    const speaker =
+      prev && prev.text === mutter && prev.speaker ? prev.speaker : prev?.speaker || "";
+    const anchor = ResolveSpeakerAnchor(state, speaker || "高传宝");
     state.subtitle = {
-      speaker: prev && prev.text === mutter && prev.speaker ? prev.speaker : prev?.speaker || "",
+      speaker,
       text: mutter,
+      comic: true,
+      anchorId: anchor.id,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
     };
     state.subtitleTimer = time;
   }
 }
 
-function SetSubtitle(state, speaker, text, time = 4.8) {
+function SetSubtitle(state, speaker, text, time = 4.8, opts = {}) {
   const icons = GuessIcons(speaker, text);
-  state.subtitle = { speaker: speaker || "", text };
+  const fallback = opts.fallbackEnt || null;
+  const anchor =
+    opts.anchorX != null
+      ? { id: opts.anchorId || null, x: opts.anchorX, y: opts.anchorY ?? 0 }
+      : ResolveSpeakerAnchor(state, speaker, fallback);
+  state.subtitle = {
+    speaker: speaker || "",
+    text,
+    comic: opts.comic !== false,
+    anchorId: anchor.id,
+    anchorX: anchor.x,
+    anchorY: anchor.y,
+  };
   state.subtitleTimer = time;
-  state.bubble = { icons, mutter: text, timer: time };
+  state.bubble = {
+    icons,
+    mutter: text,
+    timer: time,
+    anchorId: anchor.id,
+    anchorX: anchor.x,
+    anchorY: anchor.y,
+  };
 }
 
 function QueueSubtitles(state, beats) {
@@ -255,23 +305,58 @@ function DrainSubtitleQueue(state) {
   const q = state.subtitleQueue;
   if (!q || !q.length) return;
   const next = q.shift();
-  SetSubtitle(state, next.speaker || "", next.text || "", next.time ?? 3.2);
+  SetSubtitle(state, next.speaker || "", next.text || "", next.time ?? 3.2, {
+    comic: true,
+  });
 }
 
 function AdvanceTalk(state, ent) {
   const script = ent.script || (ent.line ? [{ speaker: ent.speaker || "？", text: ent.line }] : []);
   if (!script.length) {
     ent.done = true;
+    state.activeTalkId = null;
+    ClearDialogue(state);
     return;
   }
   const idx = ent.scriptIndex | 0;
   const beat = script[idx];
-  SetSubtitle(state, beat.speaker || ent.speaker || "", beat.text, 6.5);
+  const speaker = beat.speaker || ent.speaker || "";
+  SetSubtitle(state, speaker, beat.text, 12, { fallbackEnt: ent, comic: true });
   ent.scriptIndex = idx + 1;
   if (ent.scriptIndex >= script.length) {
     ent.done = true;
     if (ent.goal) MarkGoal(state, ent.goal);
+    // Conversation finished — clear active lock so the next NPC can be talked to;
+    // last bubble stays until E/Space dismiss or timer.
+    state.activeTalkId = null;
+  } else {
+    state.activeTalkId = ent.id;
   }
+}
+
+/** E/Space/互动：推进进行中的漫画对话（开聊后不要求贴着 NPC）。 */
+function TryAdvanceActiveTalk(state) {
+  if (!state.activeTalkId) return false;
+  const ent = (state.level.entities || []).find((e) => e.id === state.activeTalkId);
+  if (!ent || ent.done) {
+    state.activeTalkId = null;
+    return false;
+  }
+  AdvanceTalk(state, ent);
+  return true;
+}
+
+function TryDismissSubtitle(state) {
+  if (state.subtitle && state.subtitleTimer > 0) {
+    ClearDialogue(state);
+    DrainSubtitleQueue(state);
+    return true;
+  }
+  if (state.subtitleQueue && state.subtitleQueue.length) {
+    DrainSubtitleQueue(state);
+    return true;
+  }
+  return false;
 }
 
 function GuessIcons(speaker, text) {
@@ -775,6 +860,13 @@ function GoalReady(state, ent) {
 function TryInteract(state) {
   const { player, level, input } = state;
   if (!input.interactPressed || state.transition > 0) return;
+
+  // Comic talk: once started, E/Space/互动 always advances or confirms — no re-proximity.
+  if (TryAdvanceActiveTalk(state)) {
+    state.stats.interactions += 1;
+    return;
+  }
+
   state.stats.interactions += 1;
 
   // Stealth rear KO — any stance / any held item, but never steal hatch/port/talk E.
@@ -929,7 +1021,10 @@ function TryInteract(state) {
   }
 
   // Pickups last
+  const picks = state.stats.pickups;
   TryPickupOrInteract(state);
+  // Nothing grabbed — E/Space still closes a lingering comic / film line
+  if (state.stats.pickups === picks) TryDismissSubtitle(state);
 }
 
 function UpdateActors(state, dt) {
@@ -1020,6 +1115,10 @@ function UpdateActors(state, dt) {
     if (state.subtitleTimer <= 0) {
       state.subtitle = null;
       state.bubble = null;
+      if (state.activeTalkId) {
+        const talk = level.entities.find((e) => e.id === state.activeTalkId);
+        if (!talk || talk.done) state.activeTalkId = null;
+      }
       DrainSubtitleQueue(state);
     }
   } else {

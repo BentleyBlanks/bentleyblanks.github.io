@@ -293,12 +293,29 @@ function TestMultiTalk() {
   StepPlay(state, 1 / 30);
   Assert(!npc.done, "first line does not finish talk");
   Assert(state.subtitle?.text, "dialogue text shown in subtitle");
-  for (let i = 1; i < npc.script.length; i++) {
+  Assert(state.subtitle?.comic, "talk uses comic head bubble");
+  Assert(state.subtitle?.anchorId === "npc_laozhong", "bubble anchors on speaker NPC");
+  Assert(state.activeTalkId === "npc_laozhong", "active talk tracked for E-advance");
+  // Walk away — E must still advance (the old "must stand on NPC" bug)
+  state.player.x = npc.x + 220;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert((npc.scriptIndex | 0) >= 2, "E advances talk without re-proximity");
+  for (let i = npc.scriptIndex | 0; i < npc.script.length; i++) {
     state.input.interactPressed = true;
     StepPlay(state, 1 / 30);
   }
   Assert(npc.done, "talk completes after all lines");
   Assert(state.goalsDone.talk_laozhong, "talk goal marked");
+  Assert(!state.activeTalkId, "active talk lock clears on last line");
+  Assert(state.subtitle?.text, "last line still on screen until confirm");
+  // Stand clear of shovel / other NPCs so E only confirms the bubble
+  state.player.x = 40;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!state.subtitle, "E confirms and closes last comic bubble");
+  const game = readFileSync(join(here, "Script_Game.mjs"), "utf8");
+  Assert(game.includes("DrawComicSpeechBubble"), "comic speech bubble draw");
 }
 
 function TestAct2MustDigBeforeShelter() {

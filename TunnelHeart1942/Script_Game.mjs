@@ -695,9 +695,125 @@ function DrawPlanOverlay(pal) {
   }
 }
 
+/** Wrap a string into lines that fit maxW (canvas font must already be set). */
+function WrapTextLines(text, maxW, maxLines = 4) {
+  const lines = [];
+  let line = "";
+  for (const ch of String(text || "")) {
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxW && line) {
+      lines.push(line);
+      line = ch;
+      if (lines.length >= maxLines) return lines;
+    } else line = test;
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines;
+}
+
+function ComicBubbleAnchor(sub) {
+  const s = Scale();
+  // Narration / system lines float upper-center — not pinned to a body
+  if (/旁白|提示|危险/.test(sub.speaker || "")) {
+    const w = canvas.clientWidth || innerWidth;
+    const h = canvas.clientHeight || innerHeight;
+    return { x: w * 0.5, y: h * 0.2 };
+  }
+  let wx = sub.anchorX;
+  let wy = sub.anchorY;
+  if (sub.anchorId === "player" || wx == null) {
+    wx = state.player.x;
+    wy = state.player.y;
+  } else if (sub.anchorId) {
+    const ent = state.level.entities.find((e) => e.id === sub.anchorId);
+    if (ent) {
+      wx = ent.x;
+      wy = ent.y;
+    }
+  }
+  const crouch = sub.anchorId === "player" && state.player.crouching;
+  return {
+    x: WX(wx),
+    y: WY(wy) - (crouch ? 48 : 72) * s,
+  };
+}
+
+/**
+ * Comic speech bubble over the speaker's head — who speaks is who wears the bubble.
+ * E / Space / 互动 advances (see TryAdvanceActiveTalk).
+ */
+function DrawComicSpeechBubble(sub) {
+  const s = Scale();
+  const anchor = ComicBubbleAnchor(sub);
+  const maxInner = Math.min(280, (canvas.clientWidth || innerWidth) * 0.55);
+  ctx.save();
+  ctx.font = `600 ${Math.max(13, 15 * s)}px "Noto Serif SC", "Source Han Serif SC", serif`;
+  const lines = WrapTextLines(sub.text, maxInner - 28 * s, 4);
+  const lineH = 20 * s;
+  const padX = 14 * s;
+  const padY = 10 * s;
+  const nameH = sub.speaker ? 16 * s : 0;
+  let textW = 0;
+  for (const ln of lines) textW = Math.max(textW, ctx.measureText(ln).width);
+  if (sub.speaker) {
+    ctx.font = `700 ${Math.max(11, 12 * s)}px "Noto Serif SC", "Source Han Serif SC", serif`;
+    textW = Math.max(textW, ctx.measureText(sub.speaker).width);
+  }
+  const boxW = Math.max(72 * s, Math.min(maxInner, textW + padX * 2));
+  const boxH = padY * 2 + nameH + lines.length * lineH + 14 * s;
+  let bx = anchor.x - boxW / 2;
+  const screenW = canvas.clientWidth || innerWidth;
+  bx = Math.max(8, Math.min(screenW - boxW - 8, bx));
+  const by = anchor.y - boxH - 10 * s;
+
+  ctx.fillStyle = "#efe2c8";
+  ctx.strokeStyle = "#1a1410";
+  ctx.lineWidth = Math.max(2, 2.5 * s);
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(bx, by, boxW, boxH, 8 * s);
+  else ctx.rect(bx, by, boxW, boxH);
+  ctx.fill();
+  ctx.stroke();
+
+  // Tail toward the speaker's head
+  const tipX = Math.max(bx + 16 * s, Math.min(bx + boxW - 16 * s, anchor.x));
+  ctx.beginPath();
+  ctx.moveTo(tipX - 7 * s, by + boxH - 1);
+  ctx.lineTo(tipX, by + boxH + 11 * s);
+  ctx.lineTo(tipX + 7 * s, by + boxH - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  let ty = by + padY;
+  if (sub.speaker) {
+    ctx.fillStyle = "#8a5a28";
+    ctx.font = `700 ${Math.max(11, 12 * s)}px "Noto Serif SC", "Source Han Serif SC", serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(sub.speaker, bx + padX, ty);
+    ty += nameH + 2 * s;
+  }
+  ctx.fillStyle = "#1a1410";
+  ctx.font = `600 ${Math.max(13, 15 * s)}px "Noto Serif SC", "Source Han Serif SC", serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  for (const ln of lines) {
+    ctx.fillText(ln, bx + padX, ty);
+    ty += lineH;
+  }
+  ctx.fillStyle = "rgba(26,20,16,.45)";
+  ctx.font = `600 ${Math.max(10, 11 * s)}px IBM Plex Sans, sans-serif`;
+  ctx.textAlign = "right";
+  ctx.fillText(state.activeTalkId ? "E 继续" : "E 关闭", bx + boxW - padX, by + boxH - 12 * s);
+  ctx.restore();
+}
+
 function DrawDialogueBanner() {
   const sub = state.subtitle;
   if (!sub || !sub.text) return;
+  // Talk / story lines use the comic head bubble — no bottom strip.
+  if (sub.comic) return;
   const w = canvas.clientWidth || innerWidth;
   const h = canvas.clientHeight || innerHeight;
   const boxW = Math.min(720, w - 48);
@@ -719,19 +835,12 @@ function DrawDialogueBanner() {
   ctx.fillText(sub.speaker || "旁白", x + 16, y + 12);
   ctx.fillStyle = "#efe2c8";
   ctx.font = "400 16px IBM Plex Sans, sans-serif";
-  let line = "";
+  const lines = WrapTextLines(sub.text, boxW - 32, 2);
   let ly = y + 34;
-  const max = boxW - 32;
-  for (const ch of String(sub.text)) {
-    const test = line + ch;
-    if (ctx.measureText(test).width > max) {
-      ctx.fillText(line, x + 16, ly);
-      line = ch;
-      ly += 20;
-      if (ly > y + 72) break;
-    } else line = test;
+  for (const line of lines) {
+    ctx.fillText(line, x + 16, ly);
+    ly += 20;
   }
-  if (line && ly <= y + 72) ctx.fillText(line, x + 16, ly);
   ctx.fillStyle = "rgba(239,226,200,.55)";
   ctx.font = "600 12px IBM Plex Sans, sans-serif";
   ctx.textAlign = "right";
@@ -1119,8 +1228,15 @@ function DrawPictogram(kind, x, y, size) {
 }
 
 function DrawSpeechBubble() {
+  const sub = state.subtitle;
+  // Comic dialogue: text bubble over whoever is speaking
+  if (sub?.text && sub.comic) {
+    DrawComicSpeechBubble(sub);
+    return;
+  }
+  // Icon-only feedback (no spoken line)
   const b = state.bubble;
-  if (!b || !b.icons?.length) return;
+  if (!b || !b.icons?.length || b.mutter) return;
   const s = Scale();
   const x = WX(state.player.x);
   const y = WY(state.player.y) - (state.player.crouching ? 40 : 70) * s;
@@ -1140,7 +1256,6 @@ function DrawSpeechBubble() {
   else ctx.rect(bx, by, w, h);
   ctx.fill();
   ctx.stroke();
-  // tail
   ctx.beginPath();
   ctx.moveTo(x - 6 * s, by + h);
   ctx.lineTo(x, by + h + 10 * s);
@@ -1522,6 +1637,16 @@ function BindInput() {
   };
   window.addEventListener("keydown", (e) => setKey(e, true));
   window.addEventListener("keyup", (e) => setKey(e, false));
+
+  // Tap / click the stage to advance comic dialogue (same as E / 互动)
+  canvas.addEventListener("pointerdown", (e) => {
+    if (state.phase !== "play" || state.pauseOpen || state.failed) return;
+    if (!state.subtitle?.text && !state.activeTalkId) return;
+    // Don't steal digs / UI — only when a line is on screen
+    if (!state.subtitle?.comic && !state.activeTalkId) return;
+    state.input.interactPressed = true;
+    e.preventDefault();
+  });
 
   for (const btn of document.querySelectorAll("[data-touch]")) {
     const kind = btn.getAttribute("data-touch");
