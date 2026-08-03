@@ -1523,7 +1523,9 @@ function Main() {
     Assert(html.includes("电脑键位"), "help modal labels PC keys section");
     Assert(html.includes("PauseHelpButton"), "pause menu opens key help");
     Assert(html.includes("OpenHelpTitleButton"), "title has 键位 button");
-    Assert(html.includes("<kbd>E</kbd>") && html.includes("<kbd>J</kbd>") && html.includes("<kbd>F</kbd>"), "key guide lists E/J/F");
+    Assert(html.includes("<kbd>F</kbd><kbd>空格</kbd>") && html.includes("<kbd>J</kbd>"), "key guide: F/空格 interact");
+    Assert(html.includes("<kbd>E</kbd></dt><dd>使用"), "key guide: E is use/fire");
+    Assert(gameSrc.includes('k === "f"') && gameSrc.includes("interactPressed"), "F wired to interact");
     Assert(html.includes("<kbd>Shift</kbd>") && html.includes("<kbd>Esc</kbd>"), "key guide lists Shift/Esc");
     const css = readFileSync(join(here, "Style_Game.css"), "utf8");
     Assert(css.includes(".keyGuide"), "key guide styles present");

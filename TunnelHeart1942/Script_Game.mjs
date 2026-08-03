@@ -1247,7 +1247,7 @@ function ComicBubbleAnchor(sub) {
 /**
  * Comic speech bubble over the speaker's head — who speaks is who wears the bubble.
  * Clamped inside the canvas: if the top would clip (common on PC), flip below the head.
- * E / Space / 互动 advances (see TryAdvanceActiveTalk).
+ * F / Space / 互动 advances (see TryAdvanceActiveTalk).
  */
 function DrawComicSpeechBubble(sub) {
   const s = Scale();
@@ -2668,17 +2668,20 @@ function BindInput() {
       input.interactPressed = true;
       e.preventDefault();
     }
-    if (down && k === "e") {
+    // F = interact (talk / pick / hatch / KO). E = use (fire / throw / plant).
+    if (down && k === "f") {
       if (state.phase === "prologue" || state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
         SaveToStorage(state);
         SyncPhaseUi();
         Beep(480, 0.05);
+        e.preventDefault();
         return;
       }
       input.interactPressed = true;
+      e.preventDefault();
     }
-    if (down && k === "f") {
+    if (down && k === "e") {
       input.usePressed = true;
       e.preventDefault();
     }
