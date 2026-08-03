@@ -167,6 +167,10 @@ h1 small { color: var(--amber); font-family: inherit; font-size: .34em; letter-s
 #touchControls.locked .touchMove, #touchControls.locked .touchActions { pointer-events: none; }
 #touchControls.locked button { opacity: .3; filter: grayscale(1); transform: none; }
 #touchControls .touchPrimary { width: 76px; color: #102024; background: rgba(101,209,212,.92); border-color: var(--cyan); }
+#touchControls .combatOnly { display: none; }
+#gameShell[data-level="rooftopBattle"] #touchControls .combatOnly { display: grid; color: #f2dfb7; background: rgba(126,52,42,.92); border-color: #d0a05f; }
+#gameShell[data-level="rooftopBattle"] #touchControls [data-input="switch"] { display: none; }
+#gameShell[data-level="rooftopBattle"] #touchControls [data-input="shoot"] { box-shadow: 0 0 0 2px rgba(213,169,93,.18), 2px 3px 0 rgba(24,18,14,.45); }
 
 #toast { position: absolute; z-index: 50; top: 50%; left: 50%; width: min(520px, calc(100% - 40px)); padding: 13px 18px; transform: translate(-50%,-50%); text-align: center; font-size: 12px; font-weight: 800; background: rgba(13,20,22,.95); border: 1px solid rgba(101,209,212,.6); box-shadow: 0 18px 60px rgba(0,0,0,.55); pointer-events: none; }
 #toast[data-tone="warning"] { border-color: var(--red); }

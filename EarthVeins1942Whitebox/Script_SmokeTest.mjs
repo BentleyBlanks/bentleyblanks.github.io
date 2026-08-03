@@ -16,9 +16,9 @@ const data = Read("Data_WhiteboxCampaign.mjs");
 const fluidCode = Read("Script_FluidSimulation.mjs");
 const lightCode = Read("Script_LightSimulation.mjs");
 
-Assert(levelDefinitions.length === 3, "必须正好包含三个关卡");
-Assert(levelDefinitions.map((level) => level.id).join(",") === "undergroundWall,ensemble,mindGame", "三个关卡 ID 或顺序错误");
-Assert(levelDefinitions.map((level) => level.phases.length).join(",") === "4,4,3", "三个循环阶段数应为 4/4/3");
+Assert(levelDefinitions.length === 4, "必须包含三个核心循环与一个屋脊战斗关");
+Assert(levelDefinitions.map((level) => level.id).join(",") === "undergroundWall,ensemble,mindGame,rooftopBattle", "四个关卡 ID 或顺序错误");
+Assert(levelDefinitions.map((level) => level.phases.length).join(",") === "4,4,3,4", "四关阶段数应为 4/4/3/4");
 Assert(!data.includes("campaignData") && !data.includes("cinematicSequences"), "旧七章线性战役导出仍存在");
 Assert(!game.includes("campaignData") && !game.includes("chapterIndex"), "运行脚本仍引用旧线性战役");
 
@@ -78,6 +78,20 @@ Assert(tricks.every((action) => Number.isFinite(action.alert) && action.alert > 
 Assert(mindGame.actions.filter((action) => action.panicStep).length === 3, "第三关必须有三步恐慌连锁");
 Assert(mindGame.actions.find((action) => action.id === "captureIntel")?.prop?.offsetX >= 1, "地图电台没有与角色站位错开，实机中会被人物遮住");
 Assert(game.includes("state.tricks.size >= 3") && game.includes("state.morale <= 55"), "恐慌断点没有按诡计种类和士气双条件实现");
+
+const rooftopBattle = levelDefinitions[3];
+Assert(rooftopBattle.phases.map((phase) => phase.layer).join(",") === "tunnel,interior,roof,roof", "第四关必须从地道进入室内，再由室内上房顶");
+const combatPickups = rooftopBattle.actions.filter((action) => action.combatPickup);
+Assert(combatPickups.map((action) => action.combatPickup.kind).join(",") === "rifle,ammo,grenade", "步枪、子弹和手雷必须是三个独立场景拾取物");
+Assert(combatPickups.find((action) => action.combatPickup.kind === "ammo")?.combatPickup.amount === 4 && combatPickups.find((action) => action.combatPickup.kind === "grenade")?.combatPickup.amount === 1, "第四关必须锁定四发子弹与一枚手雷的稀缺火力");
+Assert(combatPickups.every((action) => action.prop?.kind && action.prop?.label && action.prop?.support), "第四关枪弹手雷没有绑定可见实体和承托物");
+Assert(game.includes("const combatDepthLinks") && game.includes('lower: "tunnel", upper: "interior"') && game.includes('lower: "interior", upper: "roof"'), "地道、室内与屋顶没有两段实体入口关系");
+Assert(game.includes("function FireRifle") && game.includes("function ThrowGrenade") && game.includes("function UpdateCombat") && game.includes("function NeutralizeCombatEnemy"), "有限枪战或手雷状态机缺失");
+Assert(game.includes("blastScars: []") && game.includes("function DrawCombatBlastDamage") && game.includes("duration: 1.35") && game.includes("flashGlow.addColorStop") && game.includes("context.setLineDash([7, 7])") && game.includes("const blasted = state.combat.blastScars.some") && game.includes("context.bezierCurveTo(side - 8"), "手雷缺少可持续屋脊破坏痕迹、断裂掩体、残烟或可读抛物线");
+Assert(game.includes('if (event.code === "KeyF") FireRifle()') && game.includes('if (event.code === "KeyG") ThrowGrenade()') && html.includes('data-input="shoot"') && html.includes('data-input="grenade"'), "键盘或移动端缺少开枪与手雷输入");
+Assert(/if \(state\.levelIndex === 3\) \{\s+state\.combat\.neutralized \+= 1;\s+CheckCombatSecured\(\);\s+\} else state\.alert = Math\.min\(100, state\.alert \+ 4\)/.test(game), "第四关背后制服仍会惊动其他敌兵");
+Assert(game.includes("function DrawCombatArchitecture") && game.includes("function DrawCombatEntrances") && game.includes("function DrawCombatEffects") && game.includes("function DrawCombatHud"), "室内剖面、屋顶、入口或战斗演出绘制缺失");
+Assert(game.match(/const combatMobileScale = state\.levelIndex === 3 && width <= 640 \? 1\.18 : 1;/g)?.length === 2 && game.includes("const mobileCombat = state.levelIndex === 3 && mobile") && game.includes("targetBaseY + 18") && game.includes("const mobileSideX = targetX < playerScreenX"), "手机屋脊角色比例、前景露出或目标 HUD 锚定发生回归");
 Assert(game.includes("function TriggerDetection") && game.includes("function UpdateCaught") && game.includes("state.caught = { time: 0, duration: .9 }"), "被发现后锁定操作并退回遮挡的二元失败规则缺失");
 Assert(game.includes('ui.touchControls.classList.toggle("locked"') && css.includes("#touchControls.locked"), "被发现期间移动端操作没有明确锁定反馈");
 
@@ -90,7 +104,7 @@ Assert(html.includes("W 向上攀爬，S 向下进入") && game.includes('"S  �
 Assert(css.includes("user-select: none") && css.includes("-webkit-touch-callout: none") && css.includes("touch-action: none"), "移动端长按防文本选择保护不完整");
 Assert(game.includes("setPointerCapture") && game.includes("pointercancel") && game.includes("lostpointercapture"), "移动端长按移动缺少 Pointer Capture 清理");
 Assert(!game.includes("state.exposure") && !game.includes('Metric("暴露"') && !game.includes('Metric("警戒", Math.round(state.exposure)'), "累积暴露条仍在参与潜行规则");
-Assert(Object.values(coverDefinitions).every((covers) => covers.length >= 6), "三个关卡都必须提供连续的实体遮挡点");
+Assert(Object.values(coverDefinitions).every((covers) => covers.length >= 6), "四个关卡都必须提供连续的实体遮挡点");
 Assert(Object.values(coverDefinitions).flat().every((cover) => cover.id && cover.label && cover.width >= 1.4), "实体遮挡缺少可读名称或有效宽度");
 for (const level of levelDefinitions) {
   const coverIds = new Set(coverDefinitions[level.id].map((cover) => cover.id));
@@ -121,7 +135,7 @@ Assert(game.includes("DrawDogCompanion") && game.includes("DrawDogCommandEnviron
 Assert(game.includes("function StartDiversion") && game.includes("ActiveDiversion(\"bell\")") && game.includes("ActiveDiversion(\"crackers\")") && game.includes("formationX"), "警钟/炮仗没有接入敌军调查状态与烟水源削弱因果");
 Assert(game.includes("DrawSurfaceDiversions") && game.includes("DrawSoundRings") && game.includes("trajectoryPoint") && game.includes("trailProgresses") && game.includes("investigatingEnemies") && game.includes("enemy.investigating"), "警钟、炮仗抛物线残影、落点声波或连接敌军的调查反馈没有进入实际画面");
 Assert(game.includes("const patrolRouteSets = Object.freeze") && game.includes("patrolRouteSets.collect") && game.includes("patrolRouteSets.ensemble") && game.includes("patrolRouteSets.mindGame"), "三关没有改用独立的宽幅错峰巡逻路线");
-Assert((game.match(/Object\.freeze\(\{ anchor:/g) || []).length === 10 && game.includes("routes = patrolRouteSets.defense.slice(0, count)") && game.includes("routes = patrolRouteSets.mindGame.slice(0, count)"), "巡逻路线数量或关卡人数上限发生回归");
+Assert((game.match(/Object\.freeze\(\{ anchor:/g) || []).length === 14 && game.includes("routes = patrolRouteSets.defense.slice(0, count)") && game.includes("routes = patrolRouteSets.mindGame.slice(0, count)") && game.includes("routes = patrolRouteSets.rooftopBattle"), "巡逻路线数量或关卡人数上限发生回归");
 const patrolSpecs = [...game.matchAll(/Object\.freeze\(\{ anchor: (-?\d*\.?\d+), span: (\d*\.?\d+), speed: (\d*\.?\d+), phase: (\d*\.?\d+), viewDistance: (\d*\.?\d+) \}\)/g)].map((match) => ({ span: Number(match[2]), viewDistance: Number(match[5]) }));
 Assert(patrolSpecs.length === 10 && patrolSpecs.every((route) => route.span >= 1.6 && route.viewDistance <= 3.4), "巡逻重新退化成原地小摆动，或视距再次封死通路");
 Assert(game.includes("function ActivePatrolLure") && game.includes("function StartDogBarkLure") && game.includes("function UpdatePatrolLure") && game.includes('kind: "dogBark"'), "阿土主动吠叫诱敌状态机缺失");
@@ -172,7 +186,7 @@ Assert(game.includes('ui.gameShell.classList.toggle("takedownCinematic", Boolean
 Assert(game.includes('ui.touchControls.classList.toggle("cinematic", Boolean(state.takedown))') && css.includes("#touchControls.cinematic"), "mobile controls must disappear during the takedown cinematic");
 Assert(game.includes("function TakedownFigureScale(width)") && game.includes("Math.min(2.35") && game.includes("innerWidth <= 640 ? 1.42 : 1.18") && game.match(/\.038 \* TakedownFigureScale\(width\)/g)?.length >= 3, "mobile takedown figures must stay legible across actor, target, and prone poses");
 Assert(game.match(/const cinematicFocus = width <= 640/g)?.length >= 2 && game.includes('rgba(220,190,132,.72)') && game.includes('rgba(226,199,146,.68)'), "mobile prone target and disarmed weapon need a restrained high-contrast cinematic rim");
-Assert(game.includes("const originY = baseY - height * .82") && game.includes("const farTopY = Math.min(surfaceY - 10, originY + height * .12)") && game.includes("context.lineTo(endX, farBottomY)"), "enemy alert cone must open forward and down from the face instead of pointing upward from the ground");
+Assert(game.includes("const originY = baseY - height * .82") && game.includes("const farTopY = Math.min(baseY - 5, originY + height * .12)") && game.includes("context.lineTo(endX, farBottomY)"), "enemy alert cone must open forward and down from the face instead of pointing upward from the ground");
 
 const fluid = CreateTunnelFluidSimulation({ columns: 72, rows: 32 });
 Assert(fluid.Sample(0, 0).sdf > 0 && fluid.Sample(-11, 0).sdf < 0, "SDF 没有把地道内部与墙体边界分开");
@@ -202,7 +216,7 @@ Assert(game.includes("actorReferenceHeight * (child ? .47 : signalman ? .73 : .7
 Assert(game.includes("const visualX = { signalman: -3.1") && game.includes("* .72 + group.offset") && game.includes('civilian.id === "childAn" || civilian.id === "childShi"'), "civilian groups must keep readable spacing and must not render the children\'s mother at child scale");
 Assert(game.includes("const entityScale = sceneScale * (focused && !completed ? 1.2") && game.includes("function DrawFocusBrackets") && game.includes("context.translate(x, markerY - 17 * entityScale)"), "focused key props must use restrained brackets and unfocused props a single diamond marker");
 Assert(game.includes("context.globalAlpha = .62") && game.includes("Math.abs(baseX - playerX) < 76") && game.includes('rgba(0,0,0,.28)'), "foreground depth must preserve parallax without covering the controlled character");
-Assert(game.indexOf("DrawLighting(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawCivilians(width, height, tunnelY)") && game.indexOf("DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawEnemies(width, surfaceY)") && game.includes("function DrawSceneHierarchyVeil") && game.includes("const nearCivilian = state.civilians.some"), "background treatment must finish before crisp gameplay silhouettes and hierarchy veil");
+Assert(game.indexOf("DrawLighting(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawCivilians(width, height, tunnelY)") && game.indexOf("DrawLianhuanhuaPostProcess(width, height, surfaceY, tunnelY, daylight)") < game.indexOf("DrawEnemies(width, height, surfaceY, tunnelY)") && game.includes("function DrawSceneHierarchyVeil") && game.includes("const nearCivilian = state.civilians.some"), "background treatment must finish before crisp gameplay silhouettes and hierarchy veil");
 Assert(game.includes('daylight > .4 ? \"rgba(103,72,37,.06)\" : \"rgba(91,56,35,.1)\"') && game.includes("daylight > .4 ? .62 : .5"), "lianhuanhua print treatment must stay visible without muddying gameplay silhouettes");
 Assert(css.includes("Portrait phones keep identity and interaction UI in the sky band") && css.includes("#roleDock { top: 128px; bottom: auto") && css.includes("#civilianCommandPanel { top: 184px"), "portrait-phone HUD must stay above the tunnel playfield instead of covering villagers and props");
 Assert(css.includes("#interactionPrompt { top: 170px; bottom: auto") && css.includes("#roleDock:not([hidden]) ~ #interactionPrompt { top: 170px; bottom: auto"), "desktop interaction prompt must stay in the upper safe band instead of covering actors and props");
@@ -226,6 +240,6 @@ console.log(JSON.stringify({
   feasibleBuilds: feasible,
   fluidGrid: `${fluid.columns}x${fluid.rows}`,
   sdfLightRay: Number(rayDistance.toFixed(2)),
-  mobileInputs: 5,
+  mobileInputs: 7,
   cacheVersion: cssVersion
 }, null, 2));

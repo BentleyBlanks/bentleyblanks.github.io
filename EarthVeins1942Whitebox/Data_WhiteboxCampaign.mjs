@@ -20,7 +20,7 @@ export const roleDefinitions = Object.freeze({
   scout: Object.freeze({ id: "scout", name: "林青禾 · 武工队员", skill: "布置假象与地道声路", short: "青禾" })
 });
 
-const Cover = (id, x, width, kind, label, pose = "low") => Object.freeze({ id, x, width, kind, label, pose });
+const Cover = (id, x, width, kind, label, pose = "low", layer = "surface") => Object.freeze({ id, x, width, kind, label, pose, layer });
 
 export const coverDefinitions = Object.freeze({
   undergroundWall: Object.freeze([
@@ -49,6 +49,15 @@ export const coverDefinitions = Object.freeze({
     Cover("wellCurb", 4.2, 1.5, "well", "井台矮墙"),
     Cover("shoeHay", 7.95, 1.65, "hay", "井边草垛"),
     Cover("eastReeds", 10.1, 1.45, "brush", "东坡芦苇")
+  ]),
+  rooftopBattle: Object.freeze([
+    Cover("cellarWall", -7.15, 1.9, "wall", "地窖厚墙", "low", "interior"),
+    Cover("brickStove", -2.25, 1.55, "stove", "砖灶与柴堆", "low", "interior"),
+    Cover("westChimney", -5.65, 1.45, "chimney", "西屋烟囱", "low", "roof"),
+    Cover("roofRidge", -2.3, 1.85, "ridge", "正房屋脊", "low", "roof"),
+    Cover("bridgeParapet", 1.75, 1.45, "parapet", "连屋矮墙", "low", "roof"),
+    Cover("eastChimney", 5.2, 1.5, "chimney", "东厢烟囱", "low", "roof"),
+    Cover("hayScreen", 8.25, 1.65, "hay", "屋顶晒草架", "low", "roof")
   ])
 });
 
@@ -157,6 +166,30 @@ export const levelDefinitions = Object.freeze([
       Action("closeFalseGate", 1, "tunnel", "关闭假入口后方的空闸门", "断路", { phase: "panic", requires: ["misdirectSquad"], panicStep: true, morale: -14, dialogue: "他们进来了。关空闸，让前后都听见。" }),
       Action("finalSignal", 7.2, "surface", "藏在井边草垛后，在远离群众的空坡打出最后一声土枪", "送客", { phase: "panic", cover: "shoeHay", requires: ["closeFalseGate"], panicStep: true, morale: -20, dialogue: "等他们跑到空坡……现在，放一枪。" }),
       Action("captureIntel", 8.8, "tunnel", "木箱上分开放着撤退时遗下的地图和电台", "收取", { phase: "outcome", requires: ["finalSignal"], prop: Prop("fieldRadioMap", "分开放置的地图与电台", "crate", "take", { offsetX: 1.05 }), outcome: true, dialogue: "地图在这儿。电台别碰旋钮，回去让叶星听。" })
+    ])
+  }),
+  Object.freeze({
+    id: "rooftopBattle",
+    number: "关卡四",
+    title: "屋脊火线",
+    subtitle: "地道入室与有限火力战",
+    thesis: "从地道钻进民居、由暗梯登上屋脊；每一发子弹都要替一条撤离路争时间。",
+    roleIds: Object.freeze(["leader"]),
+    startRole: "leader",
+    startX: -10,
+    phases: Object.freeze([
+      Object.freeze({ id: "infiltrate", label: "地道入室", objective: "沿支洞找到西屋地窖翻板，从屋内暗口上行", layer: "tunnel" }),
+      Object.freeze({ id: "arm", label: "屋内取械", objective: "从实物枪架、弹盒和布包中取得有限武器，打开屋顶暗梯", layer: "interior" }),
+      Object.freeze({ id: "engage", label: "屋脊火线", objective: "借烟囱与屋脊隐蔽，射击、投雷或从背后无声制服敌兵", layer: "roof" }),
+      Object.freeze({ id: "secure", label: "打开撤离线", objective: "确认屋脊安全，在东厢房顶放下通往后巷的绳梯", layer: "roof" })
+    ]),
+    actions: Object.freeze([
+      Action("unboltCellarHatch", -7.15, "tunnel", "木撑后藏着通往西屋地窖的双栓翻板", "拔栓", { phase: "infiltrate", role: "leader", dialogue: "上头就是西屋地窖。先托住翻板，再拔木栓，别让它砸响。" }),
+      Action("takeRifle", -5.7, "interior", "墙上旧枪架挂着一支缴获步枪", "取枪", { phase: "arm", role: "leader", prop: Prop("combatRifle", "枪架上的缴获步枪", "rifleRack", "take", { offsetX: .25, front: true }), combatPickup: Object.freeze({ kind: "rifle", amount: 1 }), dialogue: "枪机还能用。不到看清目标，别扣扳机。" }),
+      Action("takeAmmo", -3.65, "interior", "方桌上的木弹盒只剩四发步枪弹", "装弹", { phase: "arm", role: "leader", requires: ["takeRifle"], prop: Prop("ammoBox", "桌上的四发木弹盒", "plankTable", "take", { offsetX: .25, front: true }), combatPickup: Object.freeze({ kind: "ammo", amount: 4 }), dialogue: "就四发。屋顶上有多少人，心里先数清楚。" }),
+      Action("takeGrenade", -1.65, "interior", "砖灶旁的旧布包里压着一枚手榴弹", "收起", { phase: "arm", role: "leader", requires: ["takeAmmo"], prop: Prop("combatGrenade", "砖灶旁的一枚手榴弹", "lowCrate", "take", { offsetX: .22, front: true }), combatPickup: Object.freeze({ kind: "grenade", amount: 1 }), dialogue: "只有一枚。真被堵死再用，别往民房里扔。" }),
+      Action("openRoofHatch", .75, "interior", "房梁后的木梯通向瓦面暗口", "推开", { phase: "arm", role: "leader", requires: ["takeRifle", "takeAmmo", "takeGrenade"], dialogue: "我先把瓦片托起来。上去以后，烟囱和屋脊都能挡枪。" }),
+      Action("lowerEscapeLadder", 9.25, "roof", "东厢屋檐下捆着通往后巷的麻绳梯", "放梯", { phase: "secure", role: "leader", outcome: true, dialogue: "绳梯到底了。伤员先走，最后一个人把屋顶暗口盖回去。" })
     ])
   })
 ]);

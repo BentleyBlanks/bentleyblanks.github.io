@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#11171b">
-  <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法白盒">
-  <title>地脉：三个循环 · 纯2D白盒</title>
-  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zm">
+  <meta name="description" content="《地脉：三个循环》纯 Canvas 2D 核心玩法与屋脊战斗白盒">
+  <title>地脉：三个循环 + 屋脊战 · 纯2D白盒</title>
+  <link rel="stylesheet" href="./Style_Whitebox.css?v=20260803zq">
 </head>
 <body>
   <main id="gameShell" aria-label="地脉：三个循环纯2D白盒">
@@ -26,9 +26,9 @@
       <div class="titleGrid" aria-hidden="true"></div>
       <div class="titleCopy">
         <p class="eyebrow">PURE 2D CORE LOOP WHITEBOX · BUILD 04</p>
-        <h1 id="gameTitle"><span>地脉</span><small>三个循环</small></h1>
-        <p class="titleThesis">删除旧线性流程，直接验证三种不同核心体验：建造防御、多角色生存解谜、非对称心理战。</p>
-        <div id="levelCards" class="levelCards" aria-label="三个关卡"></div>
+        <h1 id="gameTitle"><span>地脉</span><small>三个循环 · 屋脊战</small></h1>
+        <p class="titleThesis">四场独立白盒：建造防御、多角色生存解谜、非对称心理战，以及由地道入室再上房的有限火力战。</p>
+        <div id="levelCards" class="levelCards" aria-label="四个关卡"></div>
         <div class="titleActions">
           <button id="startButton" class="primaryButton" type="button">开始选中关卡</button>
           <button id="guideButton" class="quietButton" type="button">操作与白盒目标</button>
@@ -38,7 +38,7 @@
 
     <section id="levelPanel" class="panelScreen" role="dialog" aria-modal="true" aria-labelledby="levelPanelTitle" hidden>
       <div class="panelPaper">
-        <p class="eyebrow">THREE CORE LOOPS</p>
+        <p class="eyebrow">THREE CORE LOOPS · ONE COMBAT TEST</p>
         <h2 id="levelPanelTitle">选择关卡</h2>
         <div id="levelList" class="levelList"></div>
         <button class="backButton" data-close-panel type="button">返回</button>
@@ -55,6 +55,7 @@
           <div><dt>W / S</dt><dd>靠近蓝色竖井时，W 向上攀爬，S 向下进入。</dd></div>
           <div><dt>Q</dt><dd>第二关切换角色；也可直接点击角色卡。</dd></div>
           <div><dt>E</dt><dd>执行现场动作；传宝靠近犬用暗号点时会吹哨，阿土将自己跑进人无法通过的窄洞。</dd></div>
+          <div><dt>F / G</dt><dd>仅第四关：F 开枪，G 投手榴弹。弹药极少；贴近敌兵背后按 E 可无声制服。</dd></div>
         </dl>
         <p class="guideNote">“观察”已从正式操作中移除。标尺、依赖线和测试状态只在带 <code>?qa=1</code> 的检查模式出现。</p>
         <button class="backButton" data-close-panel type="button">返回</button>
@@ -154,6 +155,8 @@
       <div class="touchActions">
         <button data-input="switch" type="button"><span>换人</span></button>
         <button data-input="depth" type="button"><span>↓ 下行</span></button>
+        <button data-input="shoot" class="combatOnly" type="button"><span>开枪</span></button>
+        <button data-input="grenade" class="combatOnly" type="button"><span>手雷</span></button>
         <button data-input="action" class="touchPrimary" type="button"><span>行动</span></button>
       </div>
     </div>
@@ -169,6 +172,6 @@
       <code id="qaStateReadout"></code>
     </details>
   </main>
-  <script type="module" src="./Script_Whitebox.mjs?v=20260803zm"></script>
+  <script type="module" src="./Script_Whitebox.mjs?v=20260803zq"></script>
 </body>
 </html>
