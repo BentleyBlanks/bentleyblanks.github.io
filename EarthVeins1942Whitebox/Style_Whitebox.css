@@ -851,18 +851,21 @@ h1 small { color: #bd553f; }
 }
 #interactionVerb { color: #9f4538; font-size: 8px; }
 #interactionName { max-width: 270px; color: #2d251d; font-size: 10px; font-weight: 800; }
+#interactionPrompt.locked kbd { color: #f0dfbd; background: #755f43; border-color: #2c241d; }
+#interactionPrompt.locked p { background: rgba(222,207,174,.97); }
+#interactionPrompt.locked #interactionVerb { color: #755f43; }
 
 @media (max-width: 760px), (max-height: 520px) {
-  #objectiveCard { top: 40px; left: 8px; width: min(250px, 42vw); }
+  #objectiveCard { top: 40px; left: 8px; width: min(280px, 46vw); }
   .hudIdentityPlate { grid-template-columns: 40px minmax(0,1fr); gap: 7px; min-height: 52px; padding: 5px 7px; border-width: 1.5px; }
   .hudRoleGlyph { width: 38px; height: 38px; font-size: 7px; border-width: 1.5px; }
   .hudRoleGlyph::before { top: 5px; width: 11px; height: 11px; box-shadow: 0 10px 0 5px var(--hud-role); }
   .hudIdentityCopy strong { font-size: 13px; }
   .hudIdentityCopy em { margin-top: 2px; font-size: 7px; }
   #objectiveCard .hudIdentityCopy small { font-size: 6px; }
-  .hudTaskStrip { width: calc(100% - 12px); padding: 4px 7px 5px; border-width: 1.5px; }
-  #objectiveCard .hudTaskStrip p { margin: 2px 0 1px; font-size: 9px; }
-  #objectiveCard .hudTaskStrip > span { font-size: 6px; }
+  .hudTaskStrip { width: calc(100% - 12px); padding: 5px 8px 6px; border-width: 1.5px; }
+  #objectiveCard .hudTaskStrip p { margin: 2px 0; font-size: 10px; }
+  #objectiveCard .hudTaskStrip > span { display: -webkit-box; overflow: hidden; font-size: 8.5px; line-height: 1.3; white-space: normal; text-overflow: clip; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   #metricsPanel { top: 40px; right: 52px; display: grid; grid-template-columns: repeat(2, minmax(70px, 1fr)); max-width: min(48vw, 292px); }
   .metric { grid-template-columns: 22px minmax(0,1fr); gap: 4px; min-width: 70px; min-height: 34px; padding: 4px 5px 6px 4px; }
   .metricIcon { width: 21px; height: 21px; font-size: 7px; border-width: 1px; }
@@ -870,7 +873,7 @@ h1 small { color: #bd553f; }
   .metricCopy b { max-width: 82px; font-size: 8px; }
   .metricBar { left: 30px; right: 4px; bottom: 2px; height: 2px; }
   .headerButton { width: 34px; min-width: 34px; height: 34px; min-height: 34px; font-size: 10px; }
-  #roleDock, #roleDock.defenseDock { top: 137px; left: 8px; max-width: calc(100% - 16px); }
+  #roleDock, #roleDock.defenseDock { top: 164px; left: 8px; max-width: calc(100% - 16px); }
   #roleButtons button, #roleButtons button:not(.active) { min-width: 50px; min-height: 32px; padding: 3px 5px 3px 27px; }
   .rolePortrait { left: 3px; width: 21px; height: 25px; }
   #roleButtons b { font-size: 7px; }

@@ -380,6 +380,58 @@ function MissingRequirement(action) {
   return (action.requires || []).find((id) => !state.completed.has(id));
 }
 
+function ActionDisplayName(action) {
+  if (!action) return "现场动作";
+  if (action.prop?.label) return action.prop.label;
+  return String(action.title || action.verb || "现场动作").split(/[，；。]/)[0].slice(0, 18);
+}
+
+function InteractionBlockReason(action, compact = false) {
+  if (!action) return null;
+  const missing = MissingRequirement(action);
+  if (missing) {
+    const prerequisite = state.level.actions.find((item) => item.id === missing);
+    const prerequisiteReason = prerequisite ? InteractionBlockReason(prerequisite, compact) : null;
+    if (prerequisiteReason) return prerequisiteReason;
+    return compact ? `先完成：${prerequisite?.verb || "处理"}${ActionDisplayName(prerequisite)}` : `还缺前一步：${prerequisite?.title || missing}`;
+  }
+  const puzzleMissing = PuzzleRequirement(action);
+  if (puzzleMissing) return puzzleMissing.label || `还没有满足：${puzzleMissing.path}`;
+  if (action.role && action.role !== state.selectedRole) {
+    const role = roleDefinitions[action.role];
+    return compact ? `换${role.short} · 再${action.verb}${ActionDisplayName(action)}` : `这一步需要${role.name}。按 Q 或点角色卡切换。`;
+  }
+  if (action.cover && GetActiveCover()?.id !== action.cover) {
+    const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
+    return compact ? `先进入${cover?.label || "场景遮挡"} · 再${action.verb}` : `先进入${cover?.label || "场景遮挡"}后再行动；空地上压低身子不会隐身。`;
+  }
+  if (action.consume) {
+    const missingResource = Object.entries(action.consume).find(([key, amount]) => (state.resources[key] || 0) < amount);
+    if (missingResource) return `还缺${missingResource[0] === "powder" ? "一份炮仗火药" : missingResource[0]}`;
+  }
+  return null;
+}
+
+function SuggestedActionHint() {
+  const action = state.level.actions.find((candidate) => {
+    if (candidate.phase !== state.phaseId || !ActionRemainsAvailable(candidate) || candidate.optional || candidate.repeatable) return false;
+    if (candidate.buildSlot !== undefined && state.buildSlots[candidate.buildSlot]) return false;
+    return !MissingRequirement(candidate) && !PuzzleRequirement(candidate);
+  });
+  if (!action) return null;
+  const roleId = action.role || state.selectedRole;
+  const role = roleDefinitions[roleId];
+  const rolePosition = state.rolePositions?.[roleId] || state.player;
+  const layerName = ({ surface: "地表", tunnel: "地道", interior: "屋内", roof: "房顶" })[action.layer] || action.layer;
+  const direction = action.x < rolePosition.x - .35 ? "向左" : action.x > rolePosition.x + .35 ? "向右" : "就近";
+  const route = [];
+  if (roleId !== state.selectedRole) route.push(`换${role.short}`);
+  if (rolePosition.layer !== action.layer) route.push(action.layer === "tunnel" ? "从蓝色入口下地道" : action.layer === "surface" ? "从蓝色竖井上地表" : `前往${layerName}`);
+  else route.push(layerName);
+  route.push(direction);
+  return `下一步：${route.join(" · ")} · ${action.verb} · ${ActionDisplayName(action)}`;
+}
+
 function PerformAction() {
   if (IsBlocked()) return;
   const action = FindNearestAction();
@@ -398,7 +450,7 @@ function PerformAction() {
     return;
   }
   const nearbyEnemy = FindFocusedEnemy(1.45);
-  if (nearbyEnemy && takedownRoles.has(state.selectedRole)) {
+  if (nearbyEnemy && takedownRoles.has(state.selectedRole) && !action) {
     const interaction = EnemyInteractionState(nearbyEnemy);
     Toast(interaction.instruction, interaction.ready ? "success" : "warning");
     return;
@@ -412,30 +464,8 @@ function PerformAction() {
     Toast(entrance !== undefined ? (state.player.layer === "surface" ? "这里按 S 向下进入地道，不是行动键。" : "这里按 W 向上回到地表，不是行动键。") : "靠近发光的现场标记后再行动。", "neutral");
     return;
   }
-  if (action.role && action.role !== state.selectedRole) {
-    Toast(`这一步需要${roleDefinitions[action.role].name}。按 Q 或点角色卡切换。`, "warning");
-    return;
-  }
-  const missing = MissingRequirement(action);
-  if (missing) {
-    const prerequisite = state.level.actions.find((item) => item.id === missing);
-    Toast(`还缺前一步：${prerequisite?.title || missing}`, "warning");
-    return;
-  }
-  const puzzleMissing = PuzzleRequirement(action);
-  if (puzzleMissing) {
-    Toast(puzzleMissing.label || `还没有满足：${puzzleMissing.path}`, "warning");
-    return;
-  }
-  if (action.cover && GetActiveCover()?.id !== action.cover) {
-    const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
-    Toast(`先进入${cover?.label || "场景遮挡"}后再行动；空地上压低身子不会隐身。`, "warning");
-    return;
-  }
-  if (action.consume) {
-    const missingResource = Object.entries(action.consume).find(([key, amount]) => (state.resources[key] || 0) < amount);
-    if (missingResource) return Toast(`还缺${missingResource[0] === "powder" ? "一份炮仗火药" : missingResource[0]}。`, "warning");
-  }
+  const blockReason = InteractionBlockReason(action);
+  if (blockReason) return Toast(blockReason, "warning");
   if (action.dogCommand) {
     IssueDogCommand(action);
     return;
@@ -1351,12 +1381,14 @@ function UpdateUi() {
   ui.phaseStrip.innerHTML = state.level.phases.map((item, index) => `<span class="${item.id === state.phaseId ? "active" : index < PhaseIndex() ? "done" : ""}"><i>${index + 1}</i>${item.label}</span>`).join("");
   ui.metricsPanel.innerHTML = MetricsMarkup();
   const takedownTarget = FindTakedownTarget();
-  const focusedEnemy = FindFocusedEnemy();
   const action = FindNearestAction();
-  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !focusedEnemy && !state.qaPatrolReview && !ActivePatrolLure("dogBark") && !IsBlocked());
+  const actionBlockReason = InteractionBlockReason(action, true);
+  Show(ui.interactionPrompt, Boolean(action) && !takedownTarget && !state.qaPatrolReview && !ActivePatrolLure("dogBark") && !IsBlocked());
+  ui.interactionPrompt.classList.toggle("locked", Boolean(actionBlockReason));
   if (action) {
-    ui.interactionVerb.textContent = action.verb;
-    ui.interactionName.textContent = action.prop?.label || action.title;
+    ui.interactionPrompt.querySelector("kbd").textContent = actionBlockReason ? "!" : "E";
+    ui.interactionVerb.textContent = actionBlockReason ? "未就绪" : action.verb;
+    ui.interactionName.textContent = actionBlockReason || ActionDisplayName(action);
   }
   ui.gameShell.dataset.layer = state.player.layer;
   ui.gameShell.dataset.level = state.level.id;
@@ -1525,21 +1557,19 @@ function ContextHint() {
   if (state.selectedRole === "dog" && state.player.layer === "surface" && action?.role !== "dog") {
     return state.dogBarkCooldown > 0 ? `吠叫冷却 ${Math.ceil(state.dogBarkCooldown)} 秒｜先利用现有空档` : "E · 原地吠叫诱敌｜敌兵追声后立刻反向跑";
   }
-  const focusedEnemy = FindFocusedEnemy();
-  if (focusedEnemy) {
-    const identity = EnemyIdentity(focusedEnemy);
-    const interaction = EnemyInteractionState(focusedEnemy);
-    return `${identity.faction}${identity.role} · ${interaction.status}｜${interaction.instruction}`;
-  }
   if (state.dog?.commandId) {
     const dogAction = state.level.actions.find((item) => item.id === state.dog.commandId);
     return `阿土：${state.dog.commandMode === "travel" ? `正去${dogAction?.dogCommand?.label}` : dogAction?.dogCommand?.task}`;
   }
-  if (action?.role && action.role !== state.selectedRole) return `需要：${roleDefinitions[action.role].name}`;
-  if (action?.cover && GetActiveCover()?.id !== action.cover) {
-    const cover = GetSurfaceCovers().find((item) => item.id === action.cover);
-    return `先藏到${cover?.label || "场景遮挡"}后`;
+  if (action) {
+    const blockReason = InteractionBlockReason(action, true);
+    return blockReason || `E · ${action.verb} · ${ActionDisplayName(action)}`;
   }
+  const preservePuzzleSummary = state.levelIndex === 0 && state.phaseId === "defense"
+    || state.levelIndex === 1 && state.phaseId === "transfer"
+    || state.levelIndex === 2 && state.phaseId === "compose";
+  const suggestedAction = preservePuzzleSummary ? null : SuggestedActionHint();
+  if (suggestedAction) return suggestedAction;
   if (state.levelIndex === 0 && ["collect", "build"].includes(state.phaseId)) return `距扫荡 ${Math.ceil(state.prepRemaining)} 秒 · 勘探 ${Object.values(state.puzzle.survey).filter(Boolean).length}/3 · 机关位置 ${state.defense.siteMatches.filter(Boolean).length}/3`;
   if (state.levelIndex === 0 && state.phaseId === "defense") {
     const distraction = state.raid.distraction ? ` · ${state.raid.distraction.label} ${Math.ceil(state.raid.distraction.remaining)}秒` : "";
@@ -1547,6 +1577,12 @@ function ContextHint() {
   }
   if (state.levelIndex === 1 && state.phaseId === "transfer") return `担架 ${state.puzzle.transfer.woundedRoute || "未定"} · 粮 ${state.puzzle.transfer.grainRoute || "未定"} · 每个角色停留在自己的位置`;
   if (state.levelIndex === 2 && state.phaseId === "compose") return `痕迹 ${state.puzzle.deception.visibleDecoy || "未定"} · 声路 ${state.puzzle.deception.acousticRoute || "未定"} · 假口 ${state.puzzle.deception.falseEntrance || "未定"}`;
+  const focusedEnemy = FindFocusedEnemy();
+  if (focusedEnemy) {
+    const identity = EnemyIdentity(focusedEnemy);
+    const interaction = EnemyInteractionState(focusedEnemy);
+    return `${identity.faction}${identity.role} · ${interaction.status}｜${interaction.instruction}`;
+  }
   const layerName = ({ surface: "地表", tunnel: "地道", interior: "屋内", roof: "房顶" })[state.player.layer] || state.player.layer;
   return `${roleDefinitions[state.selectedRole].name} · ${layerName}`;
 }
