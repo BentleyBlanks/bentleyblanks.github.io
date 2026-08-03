@@ -45,40 +45,66 @@ export function YLiftOf(depth, scale) {
 }
 
 export function TintAlpha(depth) {
-  if (depth <= -3) return 0.28;
-  if (depth === -2) return 0.48;
-  if (depth === -1) return 0.78;
+  if (depth <= -3) return 0.34;
+  if (depth === -2) return 0.62;
+  if (depth === -1) return 0.82;
   if (depth >= 2) return 1;
   // FRONT a touch softer so NEAR silhouettes punch as the closest plane
   if (depth >= 1) return 0.9;
   return 1;
 }
 
-/** Scatter VH-like depth props — far is painted as haze ridges; keep mid/front sparse. */
+/** Scatter VH-like depth props — mid band is a real crop field, not a few lonely patches. */
 export function SeedDepthDecor(level) {
   const props = level.props || (level.props = []);
   const width = level.width || 2400;
   const night = !!level.palette?.night;
 
-  // FAR — almost empty: horizon village lives in DrawDepthBackdrop tooth-row + fog.
-  // One or two soft landmarks only, never a littered ridge.
+  // FAR — horizon village landmarks only (ridge houses live in the backdrop tooth-row).
   for (let x = 320; x < width; x += 720 + (x % 120)) {
     props.push({ kind: "farHouse", x, depth: DEPTH_FAR, variant: (x / 60) | 0 });
   }
-
-  // MID — crop patches as bands (not stalk-per-metre litter) + sparse orchard
-  for (let x = 160; x < width; x += 260 + (x % 60)) {
-    props.push({ kind: "wheat", x, depth: DEPTH_MID, clump: 9 });
+  // Soft far grain haze — reads as distant 麦田, not empty dirt.
+  for (let x = 80; x < width; x += 90 + (x % 28)) {
+    props.push({
+      kind: "wheat",
+      x,
+      depth: DEPTH_FAR,
+      clump: 8 + ((x / 50) | 0) % 4,
+      rows: 2,
+    });
   }
-  for (let x = 300; x < width; x += 440 + (x % 100)) {
+
+  // MID — continuous 冀中麦田: overlapping clumps, multi-row patches.
+  for (let x = 24; x < width; x += 48 + (x % 16)) {
+    props.push({
+      kind: "wheat",
+      x,
+      depth: DEPTH_MID,
+      clump: 12 + ((x / 36) | 0) % 6,
+      rows: 2 + ((x / 80) | 0) % 2,
+    });
+  }
+  // Orchard / sheds punch holes in the field — keep sparse so crops stay the mass.
+  for (let x = 380; x < width; x += 520 + (x % 120)) {
     props.push({ kind: "tree", x, depth: DEPTH_MID, occlude: false });
   }
-  for (let x = 260; x < width; x += 520 + (x % 110)) {
+  for (let x = 300; x < width; x += 580 + (x % 130)) {
     if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 120)) continue;
     props.push({ kind: "shed", x, depth: DEPTH_MID });
   }
 
-  // BACK — street extras behind the walk plane (authored houses already fill this)
+  // BACK — nearer field edge / roadside crop, denser & taller than mid.
+  for (let x = 36; x < width; x += 56 + (x % 20)) {
+    if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 70)) continue;
+    props.push({
+      kind: "wheat",
+      x: x + 12,
+      depth: DEPTH_BACK,
+      clump: 11 + (x % 5),
+      rows: 2,
+    });
+  }
   for (let x = 220; x < width; x += 380 + (x % 90)) {
     if (props.some((p) => p.kind === "house" && Math.abs(p.x - x) < 100)) continue;
     props.push({ kind: "shed", x, depth: DEPTH_BACK });
@@ -93,12 +119,13 @@ export function SeedDepthDecor(level) {
     props.push({ kind: "stack", x, depth: DEPTH_PLAY });
   }
 
-  // FRONT — mid-fg skirt: sparse soft cover (bushes / crop), not a hedge wall
-  for (let x = 120; x < width; x += 300 + (x % 80)) {
-    const roll = (x * 17) % 4;
-    if (roll === 0 || roll === 1) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
-    else if (roll === 2) props.push({ kind: "wheat", x, depth: DEPTH_FRONT, clump: 4 });
-    else props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
+  // FRONT — mid-fg skirt: bushes + crop fringe (not a hedge wall)
+  for (let x = 100; x < width; x += 220 + (x % 70)) {
+    const roll = (x * 17) % 5;
+    if (roll <= 1) props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: false });
+    else if (roll === 2 || roll === 3) {
+      props.push({ kind: "wheat", x, depth: DEPTH_FRONT, clump: 7 + (x % 3), rows: 1 });
+    } else props.push({ kind: "bush", x, depth: DEPTH_FRONT, tall: true });
   }
 
   // NEAR — closest camera plane: fewer, bigger punches. Keep distinct from FRONT

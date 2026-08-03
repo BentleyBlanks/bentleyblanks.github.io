@@ -879,10 +879,15 @@ function TestDepthLayers() {
   Assert(YLiftOf(2, 1) >= 90, "NEAR drops closer to camera");
   Assert(!level.props.some((p) => p.kind === "mudbank"), "no scattered mudbank trapezoids");
   const midWheat = level.props.filter((p) => p.kind === "wheat" && p.depth === DEPTH_MID);
-  Assert(midWheat.length > 0 && midWheat.length < 40, "mid wheat is sparse crop patches");
-  Assert(midWheat.every((p) => (p.clump || 0) >= 5), "wheat patches carry clump size");
-  const farLitter = level.props.filter((p) => p.depth === -3);
-  Assert(farLitter.length < 12, "far prop litter stays minimal");
+  const farWheat = level.props.filter((p) => p.kind === "wheat" && p.depth === -3);
+  const backWheat = level.props.filter((p) => p.kind === "wheat" && p.depth === -1);
+  Assert(midWheat.length >= 40, "mid band is a dense continuous wheat field");
+  Assert(midWheat.every((p) => (p.clump || 0) >= 10), "mid wheat clumps are thick stalks");
+  Assert(midWheat.every((p) => (p.rows || 1) >= 2), "mid wheat patches have multiple rows");
+  Assert(farWheat.length >= 20, "far band has continuous wheat haze");
+  Assert(backWheat.length >= 30, "back band has dense roadside wheat fringe");
+  const farLitter = level.props.filter((p) => p.depth === -3 && p.kind !== "wheat");
+  Assert(farLitter.length < 8, "far non-crop landmarks stay minimal");
   const wide = BuildLevel("act5_street_hunt");
   Assert(wide.width >= 3000, "street hunt is a wide map");
   Assert(!wide.props.some((p) => p.kind === "mudbank"), "wide map also has continuous ground only");
@@ -895,7 +900,10 @@ function TestDepthLayers() {
   Assert(game.includes("DrawContinuousNearGround"), "continuous near ground ribbon");
   Assert(!game.includes("vanishing toward mid-horizon"), "no radial floor trapezoid hatch");
   Assert(game.includes("Stronger distance fog") || game.includes("veilFar"), "distance fog shelves");
-  Assert(game.includes("Golden stalk clump") || game.includes("grain heads"), "beautified wheat clumps");
+  Assert(
+    game.includes("Golden stalk") || game.includes("multi-row golden stalks") || game.includes("grain heads"),
+    "beautified wheat clumps",
+  );
 }
 
 function TestChaptersHaveSoil() {

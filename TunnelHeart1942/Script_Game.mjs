@@ -830,45 +830,72 @@ function DrawProp(prop, pal, alphaMul = 1) {
     else ctx.arc(16 * s, -bh * 0.25, 20 * s, 0, Math.PI * 2);
     ctx.fill();
   } else if (prop.kind === "wheat") {
-    // Golden stalk clump with grain heads — cooler/hazier in the mid field
+    // Golden stalk clump / grain heads — multi-row field patch; mid/far read as continuous 麦田.
     const coolFar = depth <= -2;
-    const stem = coolFar
+    const farHaze = depth <= -3;
+    const stem = farHaze
+      ? pal.night
+        ? "#2e3420"
+        : "#6a7848"
+      : coolFar
+        ? pal.night
+          ? "#3a4228"
+          : "#8a9858"
+        : depth >= 1
+          ? "#2e220c"
+          : "#8a6a24";
+    const head = farHaze
       ? pal.night
         ? "#3a4228"
-        : "#8a9858"
-      : depth >= 1
-        ? "#2e220c"
-        : "#8a6a24";
-    const head = coolFar
+        : "#9aaa60"
+      : coolFar
+        ? pal.night
+          ? "#4a5230"
+          : "#b0bc70"
+        : depth >= 1
+          ? "#5a4020"
+          : "#e0b24a";
+    const tip = farHaze
       ? pal.night
         ? "#4a5230"
-        : "#b0bc70"
-      : depth >= 1
-        ? "#5a4020"
-        : "#e0b24a";
-    const tip = coolFar ? (pal.night ? "#5a6238" : "#c8d488") : depth >= 1 ? "#6a4e28" : "#f0c86a";
-    const n = Math.max(4, Math.min(11, prop.clump || 7));
-    for (let i = 0; i < n; i++) {
-      const ox = (i - (n - 1) / 2) * (coolFar ? 4.2 : 5.2) * s;
-      const stalkH = (coolFar ? 28 : 40) * s + (i % 3) * 5 * s;
-      const bend = Math.sin(i * 1.7 + (prop.x || 0) * 0.01) * (coolFar ? 3 : 5) * s;
-      ctx.strokeStyle = stem;
-      ctx.lineWidth = Math.max(1.1, (coolFar ? 1.4 : 1.8) * s);
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(ox, 2 * s);
-      ctx.quadraticCurveTo(ox + bend, -stalkH * 0.55, ox + bend * 0.45, -stalkH);
-      ctx.stroke();
-      const hx = ox + bend * 0.45;
-      const hy = -stalkH - 2 * s;
-      ctx.fillStyle = i % 2 === 0 ? head : tip;
-      ctx.beginPath();
-      if (typeof ctx.ellipse === "function") {
-        ctx.ellipse(hx, hy, 2.4 * s, 5.5 * s, bend * 0.03, 0, Math.PI * 2);
-      } else {
-        ctx.arc(hx, hy, 3 * s, 0, Math.PI * 2);
+        : "#b0c078"
+      : coolFar
+        ? pal.night
+          ? "#5a6238"
+          : "#c8d488"
+        : depth >= 1
+          ? "#6a4e28"
+          : "#f0c86a";
+    const rows = Math.max(1, Math.min(3, prop.rows || 1));
+    const n = Math.max(6, Math.min(18, prop.clump || 10));
+    const gap = (farHaze ? 3.2 : coolFar ? 3.6 : 4.6) * s;
+    for (let row = 0; row < rows; row++) {
+      const yOff = row * (farHaze ? 5 : coolFar ? 7 : 9) * s;
+      const xOff = (row - (rows - 1) / 2) * 2.5 * s;
+      for (let i = 0; i < n; i++) {
+        const ox = xOff + (i - (n - 1) / 2) * gap;
+        const stalkH =
+          (farHaze ? 18 : coolFar ? 26 : 40) * s + ((i + row * 3) % 4) * (farHaze ? 2.5 : 4.5) * s;
+        const bend =
+          Math.sin(i * 1.7 + row * 0.9 + (prop.x || 0) * 0.01) * (farHaze ? 2 : coolFar ? 3 : 5) * s;
+        ctx.strokeStyle = stem;
+        ctx.lineWidth = Math.max(1, (farHaze ? 1.1 : coolFar ? 1.35 : 1.8) * s);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(ox, 2 * s + yOff);
+        ctx.quadraticCurveTo(ox + bend, -stalkH * 0.55 + yOff, ox + bend * 0.45, -stalkH + yOff);
+        ctx.stroke();
+        const hx = ox + bend * 0.45;
+        const hy = -stalkH - 2 * s + yOff;
+        ctx.fillStyle = (i + row) % 2 === 0 ? head : tip;
+        ctx.beginPath();
+        if (typeof ctx.ellipse === "function") {
+          ctx.ellipse(hx, hy, (farHaze ? 1.8 : 2.4) * s, (farHaze ? 4 : 5.5) * s, bend * 0.03, 0, Math.PI * 2);
+        } else {
+          ctx.arc(hx, hy, (farHaze ? 2.2 : 3) * s, 0, Math.PI * 2);
+        }
+        ctx.fill();
       }
-      ctx.fill();
     }
   } else if (prop.kind === "post") {
     ctx.fillStyle = "#1a120c";
