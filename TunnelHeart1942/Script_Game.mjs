@@ -9,6 +9,7 @@ import {
   GrenadeAimWorldArc,
   GrenadeCount,
   LoadFromStorage,
+  DIG_SWING_DURATION,
   MELEE_DURATION,
   NextStepText,
   PLAYER_H,
@@ -1918,8 +1919,9 @@ function DrawPlayer() {
   const x = WX(p.x);
   const y = WY(p.y);
   const blink = p.invuln > 0 && Math.floor(p.invuln * 18) % 2 === 0;
+  const digging = (p.digSwingT || 0) > 0 || !!p.digging;
   const hold =
-    p.held === ITEM_SHOVEL || p.digging
+    p.held === ITEM_SHOVEL || digging
       ? "shovel"
       : p.held === ITEM_CHARGE
         ? "charge"
@@ -1937,10 +1939,10 @@ function DrawPlayer() {
   const melee = (p.meleeT || 0) > 0;
   const clip = PickClip({
     melee,
-    digging: !!p.digging,
-    crouching: !!p.crouching && !melee,
+    digging,
+    crouching: !!p.crouching && !melee && !digging,
     vx: p.vx,
-    moving: moving && !melee,
+    moving: moving && !melee && !digging,
   });
   if (p._animClip !== clip) {
     p._animT = 0;
@@ -1949,6 +1951,9 @@ function DrawPlayer() {
   if (melee) {
     // Drive strike from remaining meleeT so the chop lands mid-window.
     p._animT = Math.max(0, MELEE_DURATION - p.meleeT);
+  } else if (digging && (p.digSwingT || 0) > 0) {
+    // Drive shovel chop from remaining digSwingT (coil → bite → settle).
+    p._animT = Math.max(0, DIG_SWING_DURATION - p.digSwingT);
   } else {
     p._animT = AdvanceClipTime(clip, p._animT, animDt, { vx: p.vx, refSpeed: 220 });
   }
@@ -1961,16 +1966,82 @@ function DrawPlayer() {
     clip,
     time: p._animT,
     hold: melee ? null : hold,
-    digging: !!p.digging,
-    crouching: !!p.crouching && !melee,
+    digging,
+    crouching: !!p.crouching && !melee && !digging,
     vx: p.vx,
     moving,
     alpha: blink ? 0.4 : 1,
   });
   ctx.save();
   ctx.translate(x, y);
-  DrawNameplate("高传宝", "roleHero", p.crouching ? -58 * s : -78 * s, s);
+  DrawNameplate("高传宝", "roleHero", p.crouching || digging ? -58 * s : -78 * s, s);
   ctx.restore();
+}
+
+/** Dirt chips + cell flash + shovel slash when a dig bite lands. */
+function DrawDigFx() {
+  const fx = state.digFx;
+  if (!fx || fx.timer <= 0) return;
+  const s = Scale();
+  const maxT = 0.5;
+  const u = Math.max(0, Math.min(1, fx.timer / maxT));
+
+  if ((fx.flash || 0) > 0 && state.level.soil) {
+    const rect = CellWorldRect(state.level.soil, fx.cellC, fx.cellR);
+    const a = Math.min(1, fx.flash / 0.2);
+    const x = WX(rect.x);
+    const y = WY(rect.y);
+    const rw = rect.w * s;
+    const rh = rect.h * s;
+    ctx.fillStyle = `rgba(240,194,122,${0.4 * a})`;
+    ctx.fillRect(x, y, rw, rh);
+    ctx.strokeStyle = `rgba(239,226,200,${0.85 * a})`;
+    ctx.lineWidth = Math.max(2, 2.5 * s);
+    ctx.strokeRect(x + 1, y + 1, rw - 2, rh - 2);
+  }
+
+  // Impact crescent at the wall bite
+  ctx.save();
+  ctx.translate(WX(fx.x), WY(fx.y));
+  ctx.globalAlpha = 0.3 + u * 0.5;
+  ctx.strokeStyle = "#efe2c8";
+  ctx.lineWidth = Math.max(2, 3 * s);
+  const face = fx.facing || 1;
+  const r = (14 + (1 - u) * 18) * s;
+  ctx.beginPath();
+  if (face > 0) ctx.arc(0, 0, r, -1.35, 0.75);
+  else ctx.arc(0, 0, r, Math.PI - 0.75, Math.PI + 1.35);
+  ctx.stroke();
+  // Dust puff
+  ctx.fillStyle = `rgba(120,90,50,${0.2 + u * 0.25})`;
+  ctx.beginPath();
+  if (typeof ctx.ellipse === "function") ctx.ellipse(-face * 6 * s, 4 * s, 16 * s * (1.2 - u * 0.4), 7 * s, 0, 0, Math.PI * 2);
+  else ctx.arc(-face * 6 * s, 4 * s, 10 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  for (const ch of fx.chips || []) {
+    if (ch.life <= 0) continue;
+    const lifeU = Math.max(0, Math.min(1, ch.life / (ch.maxLife || 0.4)));
+    ctx.save();
+    ctx.translate(WX(ch.x), WY(ch.y));
+    ctx.rotate(ch.rot || 0);
+    ctx.globalAlpha = 0.35 + lifeU * 0.65;
+    ctx.fillStyle = ch.tone === 1 ? "#5a3a1c" : ch.tone === 2 ? "#8a6a3a" : "#6a4a28";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 1;
+    const w = ch.size * s;
+    const h = ch.size * s * 0.65;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, 0);
+    ctx.lineTo(-w * 0.15, -h);
+    ctx.lineTo(w * 0.45, -h * 0.4);
+    ctx.lineTo(w * 0.35, h * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /** Impact slash / fail burst for melee KO. */
@@ -2288,6 +2359,7 @@ function RenderPlayCutaway(w, h, camX, pal) {
   DrawProjectiles();
   DrawGrenadeAimArc();
   DrawPlayer();
+  DrawDigFx();
   DrawMeleeFx();
   DrawAdsOverlay();
 
@@ -2347,6 +2419,7 @@ function RenderSurfaceStack(w, h, camX, pal, opts = {}) {
     DrawProjectiles();
     DrawGrenadeAimArc();
     DrawPlayer();
+    DrawDigFx();
     DrawMeleeFx();
     DrawAdsOverlay();
   }
@@ -2386,6 +2459,7 @@ function RenderTunnelStack(w, h, camX, pal) {
   for (const ent of state.level.entities) DrawEntity(ent);
   DrawProjectiles();
   DrawPlayer();
+  DrawDigFx();
   DrawMeleeFx();
   // Front lips / dirt clumps occlude the digger
   DrawTunnelFrontLips(pal);
@@ -2774,6 +2848,11 @@ function Frame(ts) {
   if (state.phase === "play" && !state.pauseOpen && !state.failed) {
     StepPlay(state, dt);
     SyncHud();
+    if (state._sfxDig) {
+      state._sfxDig = false;
+      Beep(160, 0.05, "square", 0.04);
+      Beep(85, 0.09, "triangle", 0.03);
+    }
     if (state.failed) {
       Beep(120, 0.2, "sawtooth", 0.04);
       SetModal("fail");

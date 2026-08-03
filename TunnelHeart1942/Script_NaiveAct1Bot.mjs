@@ -143,7 +143,8 @@ for (let guard = 0; guard < 900; guard++) {
     TapJ();
     state.input.right = target.dc >= 0;
     state.input.left = target.dc < 0;
-    Tick(6);
+    // Wait out digSwingT so the next tap is not eaten mid-chop.
+    Tick(14);
     ClearMove();
     continue;
   }

@@ -47,6 +47,8 @@ export const CLIMB_SPEED = 175;
 /** Hungry KO windup → impact → follow-through (matches Script_Puppet melee clip). */
 export const MELEE_DURATION = 0.68;
 export const MELEE_IMPACT_AT = 0.28;
+/** Shovel chop windup → bite → settle (matches Script_Puppet dig clip). */
+export const DIG_SWING_DURATION = 0.42;
 /** Projectile gravity scale used by stick grenades (matches UpdateProjectiles). */
 export const GRENADE_GRAVITY = GRAVITY * 0.62;
 
@@ -99,6 +101,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       aiming: false,
       digging: false,
       digProgress: 0,
+      digSwingT: 0,
       digTarget: null,
       /** Valiant Hearts: one carried item at a time — not a backpack. */
       held: loadout.held ?? ITEM_NONE,
@@ -122,6 +125,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       climbing: false,
     },
     meleeFx: null,
+    /** Dirt chips + cell flash from a shovel bite. */
+    digFx: null,
     /** Queued KO / counter — lands on the chop frame for ritual impact. */
     pendingMelee: null,
     shake: 0,
@@ -205,9 +210,31 @@ function ResolvePhysics(state, dt) {
     player.meleeT = Math.max(0, player.meleeT - dt);
     if (player.meleeFacing) player.facing = player.meleeFacing;
   }
+  if ((player.digSwingT || 0) > 0) {
+    player.digSwingT = Math.max(0, player.digSwingT - dt);
+    player.digging = true;
+    player.digProgress = 1 - player.digSwingT / DIG_SWING_DURATION;
+    if (player.digSwingT <= 0) {
+      player.digging = false;
+      player.digProgress = 0;
+    }
+  }
   if (state.meleeFx) {
     state.meleeFx.timer -= dt;
     if (state.meleeFx.timer <= 0) state.meleeFx = null;
+  }
+  if (state.digFx) {
+    state.digFx.timer -= dt;
+    if ((state.digFx.flash || 0) > 0) state.digFx.flash = Math.max(0, state.digFx.flash - dt);
+    for (const ch of state.digFx.chips || []) {
+      ch.life -= dt;
+      ch.vy += 560 * dt;
+      ch.x += ch.vx * dt;
+      ch.y += ch.vy * dt;
+      ch.rot += (ch.spin || 0) * dt;
+    }
+    state.digFx.chips = (state.digFx.chips || []).filter((ch) => ch.life > 0);
+    if (state.digFx.timer <= 0) state.digFx = null;
   }
 
   // Seized MG: pinned to the nest, always "ADS", spray with use/interact.
@@ -672,8 +699,49 @@ function TryDesign(state) {
   }
 }
 
+/** Burst of dirt chips + cell flash at the shovel bite. */
+function SpawnDigImpactFx(state, dig, facing) {
+  const soil = state.level.soil;
+  const pt = CellCenter(soil, dig.c, dig.r);
+  const face = facing < 0 ? -1 : 1;
+  const chips = [];
+  for (let i = 0; i < 12; i++) {
+    const speed = 110 + Math.random() * 200;
+    chips.push({
+      x: pt.x + (Math.random() - 0.5) * 10,
+      y: pt.y + (Math.random() - 0.5) * 10,
+      vx: -face * speed * (0.35 + Math.random() * 0.9) + (Math.random() - 0.5) * 70,
+      vy: -90 - Math.random() * 170,
+      life: 0.26 + Math.random() * 0.3,
+      maxLife: 0.45,
+      size: 2.5 + Math.random() * 5.5,
+      rot: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 14,
+      tone: i % 3,
+    });
+  }
+  state.digFx = {
+    x: pt.x,
+    y: pt.y,
+    facing: face,
+    timer: 0.5,
+    flash: 0.2,
+    cellC: dig.c,
+    cellR: dig.r,
+    chips,
+  };
+  state.shake = Math.max(state.shake || 0, 0.22);
+  state.hitStop = Math.max(state.hitStop || 0, 0.045);
+  state._sfxDig = true;
+}
+
 function TryExcavate(state) {
   const { player, level, input } = state;
+  // One chop at a time — keep the dig clip / dirt burst playing.
+  if ((player.digSwingT || 0) > 0) {
+    player.digging = true;
+    return;
+  }
   player.digging = false;
   player.digTarget = null;
   // Design mode used to block dig entirely — that stranded mobile players.
@@ -734,6 +802,13 @@ function TryExcavate(state) {
     }
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
+    // Punchy shovel chop — carve stays instant (tap), swing + dirt FX sell the hit.
+    player.digging = true;
+    player.digSwingT = DIG_SWING_DURATION;
+    player.digProgress = 0;
+    player._animT = 0;
+    player._animClip = "dig";
+    SpawnDigImpactFx(state, dig, player.facing);
     // Dig-up pulls you into the new hollow so you're not stuck staring at a hole overhead.
     if (digUp) {
       const lift = CellCenter(level.soil, dig.c, dig.r).y + 16;
@@ -2136,6 +2211,7 @@ export function RespawnPlayer(state) {
   player.aiming = false;
   player.digging = false;
   player.digProgress = 0;
+  player.digSwingT = 0;
   player.digTarget = null;
   player.onGround = true;
 
@@ -2143,6 +2219,7 @@ export function RespawnPlayer(state) {
   state.pauseOpen = false;
   state.pendingMelee = null;
   state.meleeFx = null;
+  state.digFx = null;
   state.nadeAiming = false;
   state.hitStop = 0;
   state.shake = Math.max(state.shake || 0, 0.2);

@@ -250,35 +250,75 @@ export const CLIPS = {
       },
     ],
   },
+  // Coil shovel high → bite into the wall → settle (matches DIG_SWING_DURATION).
   dig: {
-    duration: 0.45,
+    duration: 0.42,
     keys: [
       {
         t: 0,
-        torso: 0.25,
-        armR: -1.9,
-        foreR: -0.4,
-        armL: 0.3,
-        thighL: 0.25,
-        thighR: -0.15,
+        torso: -0.12,
+        neck: -0.08,
+        armR: 1.05,
+        foreR: -0.55,
+        armL: 0.45,
+        foreL: 0.2,
+        thighL: 0.28,
+        shinL: -0.18,
+        thighR: -0.22,
+        shinR: 0.1,
+        _hipY: 2,
       },
       {
-        t: 0.45,
-        torso: 0.45,
-        armR: -0.35,
-        foreR: 0.55,
-        armL: 0.5,
-        thighL: 0.35,
-        thighR: -0.05,
+        t: 0.22,
+        torso: -0.28,
+        neck: -0.16,
+        armR: 1.55,
+        foreR: -0.85,
+        armL: 0.7,
+        foreL: 0.28,
+        thighL: 0.4,
+        shinL: -0.28,
+        thighR: -0.3,
+        shinR: 0.14,
+        _hipY: 3.2,
+      },
+      {
+        t: 0.48,
+        torso: 0.58,
+        neck: 0.28,
+        armR: -2.15,
+        foreR: 0.7,
+        armL: -0.55,
+        foreL: 0.2,
+        thighL: 0.5,
+        shinL: -0.4,
+        thighR: -0.38,
+        shinR: 0.22,
+        footL: 0.12,
+        _hipY: 5,
+      },
+      {
+        t: 0.72,
+        torso: 0.32,
+        neck: 0.12,
+        armR: -1.25,
+        foreR: 0.45,
+        armL: -0.15,
+        thighL: 0.3,
+        shinL: -0.18,
+        thighR: -0.18,
+        _hipY: 2.6,
       },
       {
         t: 1,
-        torso: 0.25,
-        armR: -1.9,
-        foreR: -0.4,
-        armL: 0.3,
-        thighL: 0.25,
-        thighR: -0.15,
+        torso: 0.1,
+        neck: 0.02,
+        armR: -0.55,
+        foreR: 0.18,
+        armL: 0.12,
+        thighL: 0.12,
+        thighR: -0.08,
+        _hipY: 0.8,
       },
     ],
   },
@@ -575,15 +615,36 @@ function DrawHeld(ctx, hand, item, pal, scale, digging) {
   ctx.strokeStyle = pal.ink;
   ctx.lineWidth = Math.max(1.5, 2 * scale);
   if (item === "shovel") {
-    ctx.strokeStyle = "#8b6a45";
-    ctx.lineWidth = 2.6 * scale;
+    // T-grip + shaft + pointed spade — reads as 铁锹 even at small scale.
+    const reach = digging ? 1.25 : 1;
+    const shaft = 16 * scale * reach;
+    const tipX = shaft + 6 * scale;
+    const tipY = (digging ? 10 : 5) * scale;
+    ctx.strokeStyle = "#5a4030";
+    ctx.fillStyle = "#8b6a45";
+    ctx.lineWidth = Math.max(1.6, 2.4 * scale);
+    // T grip
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(digging ? 18 * scale : 14 * scale, digging ? 8 * scale : 4 * scale);
+    ctx.moveTo(-2 * scale, -5 * scale);
+    ctx.lineTo(6 * scale, -5 * scale);
     ctx.stroke();
+    // Shaft
+    ctx.beginPath();
+    ctx.moveTo(2 * scale, -4 * scale);
+    ctx.lineTo(shaft, tipY * 0.35);
+    ctx.stroke();
+    // Blade
     ctx.fillStyle = "#6e5a3a";
-    ctx.fillRect((digging ? 14 : 10) * scale, (digging ? 4 : 0) * scale, 10 * scale, 8 * scale);
-    ctx.strokeRect((digging ? 14 : 10) * scale, (digging ? 4 : 0) * scale, 10 * scale, 8 * scale);
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = Math.max(1.2, 1.6 * scale);
+    ctx.beginPath();
+    ctx.moveTo(shaft - 2 * scale, tipY * 0.15);
+    ctx.lineTo(tipX + 2 * scale, tipY * 0.55);
+    ctx.lineTo(shaft + 2 * scale, tipY + 4 * scale);
+    ctx.lineTo(shaft - 6 * scale, tipY * 0.7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   } else if (item === "charge") {
     ctx.fillStyle = "#4a3a2a";
     ctx.fillRect(2 * scale, -6 * scale, 12 * scale, 10 * scale);

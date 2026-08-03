@@ -168,6 +168,12 @@ function TestPlanBeforeExcavate() {
   state.input.digPressed = true;
   StepPlay(state, 1 / 30);
   Assert(state.stats.cellsCarved > before, "free dig carves soft lip without blueprint");
+  Assert((state.player.digSwingT || 0) > 0 && state.player.digging, "dig chop swing starts on carve");
+  Assert(!!state.digFx && (state.digFx.chips || []).length >= 6, "dig spawns dirt chip burst");
+  Assert((state.shake || 0) > 0, "dig bite shakes camera");
+  // Let the chop settle — mid-swing dig taps are ignored (one bite at a time).
+  for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
+  Assert(!(state.player.digSwingT > 0), "dig swing settles");
 
   // Optional design paint still works via planPaintPressed (not dig — dig must excavate).
   const afterFree = state.stats.cellsCarved;
@@ -1261,6 +1267,8 @@ function TestPuppetAnim() {
   Assert(PickClip({ digging: true }) === "dig", "dig clip pick");
   Assert(PickClip({ crouching: true }) === "crouch", "crouch clip pick");
   Assert(PickClip({ vx: 40 }) === "walk", "walk clip pick");
+  Assert(CLIPS.dig.keys.length >= 4, "dig clip has coil→bite→settle keys");
+  Assert(Math.abs(CLIPS.dig.duration - 0.42) < 0.01, "dig clip duration matches swing");
   const slow = AdvanceClipTime("walk", 0, 0.1, { vx: 80, refSpeed: 220 });
   const fast = AdvanceClipTime("walk", 0, 0.1, { vx: 220, refSpeed: 220 });
   Assert(slow < fast, "walk cycle slows with lower speed");
@@ -1269,6 +1277,9 @@ function TestPuppetAnim() {
   Assert(game.includes("DrawPuppet"), "game draws puppet");
   Assert(game.includes("Script_Puppet.mjs"), "game imports puppet");
   Assert(game.includes("AdvanceClipTime"), "player walk uses speed-synced clip clock");
+  Assert(game.includes("function DrawDigFx") && game.includes("DIG_SWING_DURATION"), "game draws dig swing FX");
+  const rules = readFileSync(join(here, "Script_Rules.mjs"), "utf8");
+  Assert(rules.includes("DIG_SWING_DURATION") && rules.includes("SpawnDigImpactFx"), "rules spawn dig impact FX");
 }
 
 function Main() {
