@@ -241,6 +241,7 @@ export function CreateWorld(canvasEl) {
   let itemMeshes = [];
   let carveState = false, carveRebuild = null;
   let otsMesh = null;
+  let otsHiddenId = null;
   let vignetteAlpha = 0;
   let dustMotes = [];
 
@@ -812,6 +813,7 @@ export function CreateWorld(canvasEl) {
     const p = state.player;
     const ps = EnsureActorSprite("player", "player");
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry);
+    ps.mesh.visible = otsHiddenId !== "player";
 
     // 扛的东西
     if (p.carry && (!ps.carryMesh || ps.carryLabel !== p.carry)) {
@@ -846,7 +848,7 @@ export function CreateWorld(canvasEl) {
     for (const a of state.actors) {
       seen.add(a.id);
       const s = EnsureActorSprite(a.id, a.kind);
-      s.mesh.visible = a.visible !== false;
+      s.mesh.visible = a.visible !== false && otsHiddenId !== a.id;
       if (!s.mesh.visible) continue;
       UpdateOne(s, a.x, a.level || "surface", a.heading, false, dt);
       // 提灯
@@ -1001,21 +1003,25 @@ export function CreateWorld(canvasEl) {
   function SetOverShoulder(state, spec) {
     if (!spec) {
       if (otsMesh) otsMesh.visible = false;
+      otsHiddenId = null;
       return;
     }
+    // 被越过的那个人由前景剪影代表，本体要藏起来，否则画面里会出现两个他
+    otsHiddenId = spec.id;
     const a = spec.id === "player" ? { kind: "player" } : state.actors.find((x) => x.id === spec.id);
     if (!a) { if (otsMesh) otsMesh.visible = false; return; }
     const kind = spec.id === "player" ? "player" : a.kind;
     if (!otsMesh || otsMesh.userData.kind !== kind) {
       if (otsMesh) layers.ots.remove(otsMesh);
-      otsMesh = MakeCharMesh(kind);
+      // 专画一张高分辨率头肩剪影：全身图集放大后会糊成一根柱子
+      otsMesh = BakeSprite(560, 460, 280, 400, (ctx, ax, ay) => {
+        ART.DrawShoulder(ctx, ax, ay - 210, 1.35, kind, "ots" + kind);
+      });
       otsMesh.userData.kind = kind;
-      otsMesh.material.color.setHex(0x2a1f18);   // 前景压成暗剪影
-      otsMesh.material.opacity = 0.96;
+      otsMesh.material.opacity = 0.97;
       layers.ots.add(otsMesh);
     }
     otsMesh.visible = true;
-    SetFrame({ mesh: otsMesh }, FRAME_IDLE, spec.facing || 1);
     otsMesh.scale.set((spec.facing || 1) * 1.9, 1.9, 1);
     otsMesh.userData.place = spec;
   }
@@ -1024,12 +1030,19 @@ export function CreateWorld(canvasEl) {
     if (!otsMesh?.visible) return;
     const spec = otsMesh.userData.place;
     const side = spec.side || -1;
-    const comp = LAYER_COMP.ots;   // 层被整体缩放过，位置要换算回局部坐标
-    otsMesh.position.set(
-      (camX + side * viewW * 0.30) / comp,
-      (camY - viewH * 0.16 + otsMesh.userData.yOffset * 1.9 * comp) / comp,
-      0,
-    );
+    const comp = LAYER_COMP.ots;        // 层被整体缩放过，位置要换算回局部坐标
+    const dist = camera.userData.dist || 24;
+    const otsZ = layers.ots.position.z;
+    // 该层比玩法层离相机近，投影会放大 M 倍；构图偏移与体量都要按 M 折算
+    const M = dist / Math.max(0.5, dist - otsZ);
+    // 剪影在屏幕上应占约 55% 画宽：先除掉透视放大倍率，再反解缩放
+    const spriteW = otsMesh.geometry.parameters.width;
+    const S = (viewW * 0.55) / (M * spriteW);
+    otsMesh.scale.set((spec.facing || 1) * S, S, 1);
+    // 头肩落在画框一侧、压住下缘，说话的人留在另一侧
+    const worldX = camX + side * (viewW / 2) * 0.58 / M;
+    const worldY = camY - (viewH / 2) * 0.62 / M + otsMesh.userData.offset.y * S;
+    otsMesh.position.set(worldX / comp, worldY / comp, 0);
   }
 
   // -------------------------------------------------------------------------
@@ -1046,6 +1059,17 @@ export function CreateWorld(canvasEl) {
     camera.lookAt(camX, camY, 0);   // 永远正视，不旋转
     camera.updateProjectionMatrix();
     camera.userData.dist = dist;
+
+    // 特写时机位很近（hw=2.2 → dist≈4.6m），固定 z 的前景层与过肩层会跑到
+    // 相机背后直接消失。把这两层的深度改成随机位距离浮动，始终在相机与
+    // 玩法层之间，正反打的过肩剪影才不会丢。
+    const otsZ = Math.min(12, dist * 0.5);
+    LAYER_COMP.ots = (D_REF - otsZ) / D_REF;
+    layers.ots.position.z = otsZ;
+    layers.ots.scale.setScalar(LAYER_COMP.ots);
+    const foreZ = Math.min(5.5, dist * 0.28);
+    layers.fore.position.z = foreZ;
+    layers.fore.scale.setScalar((D_REF - foreZ) / D_REF);
     // 浮尘在画框内循环飘
     for (const d of dustMotes) {
       const u = d.userData;

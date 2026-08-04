@@ -358,6 +358,47 @@ export function DrawCharacter(ctx, spec) {
   return { handX: x + hand.handX * facing, handY: y - bob + hand.handY, headTop: y - bodyH * 0.98 };
 }
 
+// 过肩镜头的前景剪影：只要头和肩，压成暗色，把画面"框"起来
+// 以 (x, y) 为肩线中心；facing 指向画面内侧
+export function DrawShoulder(ctx, x, y, S, kind, id) {
+  const dark = "#241a13";
+  ctx.save();
+  ctx.translate(x, y);
+  const headR = 34 * S;
+  // 肩：一条厚实的斜坡
+  InkFill(ctx, [
+    [-120 * S, 190 * S], [-96 * S, 74 * S], [-52 * S, 28 * S],
+    [52 * S, 28 * S], [96 * S, 74 * S], [120 * S, 190 * S],
+  ], id + "sh", dark, { amp: 3.2 * S, lw: 0, line: null });
+  // 脖子
+  InkFill(ctx, Rect(-22 * S, -18 * S, 44 * S, 60 * S), id + "nk", dark, { amp: 2 * S, lw: 0, line: null });
+  // 头（后脑勺）
+  InkFill(ctx, [
+    [-headR, 6 * S], [-headR * 0.86, -headR * 0.9], [0, -headR * 1.34],
+    [headR * 0.86, -headR * 0.9], [headR, 6 * S], [headR * 0.6, headR * 0.5], [-headR * 0.6, headR * 0.5],
+  ], id + "hd", dark, { amp: 2.6 * S, lw: 0, line: null });
+  // 帽子/头巾的轮廓，区分身份
+  if (kind === "soldier") {
+    InkFill(ctx, [
+      [-headR * 1.05, -headR * 0.62], [0, -headR * 1.5],
+      [headR * 1.05, -headR * 0.62], [headR * 1.2, -headR * 0.3], [-headR * 1.2, -headR * 0.3],
+    ], id + "cap", "#1c1710", { amp: 2.2 * S, lw: 0, line: null });
+  } else if (kind === "militia") {
+    InkFill(ctx, [
+      [-headR * 1.1, -headR * 0.5], [0, -headR * 1.46], [headR * 1.1, -headR * 0.5],
+      [headR * 1.0, -headR * 0.16], [-headR * 1.0, -headR * 0.16],
+    ], id + "tw", "#3d382c", { amp: 2.4 * S, lw: 0, line: null });
+  } else if (kind === "sister") {
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(-headR * 1.02, headR * (0.1 + i * 0.42), headR * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = "#1c1710";
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 // 扛着的东西
 export function DrawCarry(ctx, x, y, S, facing, label) {
   ctx.save();
