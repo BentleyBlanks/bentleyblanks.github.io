@@ -1136,6 +1136,17 @@ export function DrawSky(ctx, w, h, light, id) {
 // ---------------------------------------------------------------------------
 // 地下剖面
 // ---------------------------------------------------------------------------
+// 洞腔轮廓：给定一段 x，返回顶沿与底沿的起伏（掏出来的洞不是方槽）
+export function CavityProfile(x, id, baseTop, baseBot, amp = 1) {
+  const n1 = Math.sin(x * 0.055 + Hash(id) * 9) * 0.5 + Math.sin(x * 0.021 + 2.1) * 0.5;
+  const n2 = Math.sin(x * 0.13 + Hash(id + "b") * 7) * 0.32;
+  const n3 = Math.sin(x * 0.008 + 1.3) * 0.7;
+  return {
+    top: baseTop + (n1 * 16 + n2 * 9 + n3 * 22) * amp,
+    bot: baseBot + (Math.sin(x * 0.04 + Hash(id + "c") * 5) * 7 + Math.sin(x * 0.11) * 4) * amp,
+  };
+}
+
 export function DrawEarthStrata(ctx, x0, x1, surfaceY, bottomY, id) {
   const h = bottomY - surfaceY;
   const bands = PAL.soil.length;
@@ -1218,6 +1229,49 @@ export function DrawTunnelBore(ctx, x0, x1, topY, botY, id) {
   for (let px = x0; px <= x1; px += step) ctx.lineTo(px, botY - 3 + Sym(id + "f", Math.round(px / step), 2));
   ctx.stroke();
   ctx.restore();
+}
+
+// 歪斜的支撑木：立柱带倾角、顶木斜搭、偶尔一根斜撑
+export function DrawCrudeTimber(ctx, x, topY, botY, id, { scale = 1 } = {}) {
+  const H = botY - topY;
+  const lean = (Hash(id + "ln") - 0.5) * 0.34;
+  const w = (9 + Hash(id + "w") * 6) * scale;
+  const wood = ["#8a6a42", "#7a5c38", "#96764c"][Math.floor(Hash(id + "c") * 3)];
+  const dark = "#4a3520";
+  // 左柱
+  ctx.save();
+  ctx.translate(x - 24 * scale, botY);
+  ctx.rotate(lean * 0.6);
+  InkFill(ctx, Rect(-w / 2, -H, w, H), id + "L", wood,
+    { amp: 1.6 * scale, lw: 2.4 * scale, shade: "rgba(0,0,0,0.26)" });
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, -w * 0.2, -H * (0.2 + i * 0.26), -w * 0.15, -H * (0.34 + i * 0.26),
+      id + "g" + i, { lw: 1 * scale, color: "rgba(60,40,22,0.5)", amp: 2 });
+  }
+  ctx.restore();
+  // 右柱
+  ctx.save();
+  ctx.translate(x + 24 * scale, botY);
+  ctx.rotate(-lean * 0.8);
+  InkFill(ctx, Rect(-w / 2, -H * (0.86 + Hash(id + "h") * 0.2), w, H), id + "R", wood,
+    { amp: 1.6 * scale, lw: 2.4 * scale, shade: "rgba(0,0,0,0.26)" });
+  ctx.restore();
+  // 顶木：斜搭上去
+  ctx.save();
+  ctx.translate(x, topY + 6 * scale);
+  ctx.rotate((Hash(id + "t") - 0.5) * 0.2);
+  InkFill(ctx, Rect(-34 * scale, -5 * scale, 68 * scale, 10 * scale), id + "T", wood,
+    { amp: 1.4 * scale, lw: 2.4 * scale, shade: "rgba(0,0,0,0.22)" });
+  ctx.restore();
+  // 斜撑
+  if (Hash(id + "br") > 0.45) {
+    ctx.save();
+    ctx.translate(x - 22 * scale, botY - H * 0.28);
+    ctx.rotate(-0.72 + lean);
+    InkFill(ctx, Rect(-4 * scale, -H * 0.5, 8 * scale, H * 0.52), id + "B", dark,
+      { amp: 1.4 * scale, lw: 2 * scale });
+    ctx.restore();
+  }
 }
 
 export function DrawSupportBeam(ctx, x, topY, botY, id) {

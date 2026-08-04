@@ -472,6 +472,7 @@ requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(Frame); });
 // 测试挂钩
 window.TunnelLight = {
   version: GAME_VERSION,
+  world,
   get state() { return state; },
   StartGame,
   JumpToChapter: (i) => StartGame(i),

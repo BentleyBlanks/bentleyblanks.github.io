@@ -1301,9 +1301,11 @@ function MovePlayer(state, input, dt) {
   const inTunnel = (env === "tunnelVillage" || env === "tunnelFort") && p.level === "under";
   let forcedCrouch = false;
   if (inTunnel) {
+    // 坑道大体能直腰；只有隔一段的"矮腰"处要猫着过（按位置周期，稳定可预期）
     const roomy = scene.props.some((pr) => (pr.kind === "chamber" || pr.kind === "pocket")
-      && Math.abs(p.x - pr.x) < ((pr.w || 5.6) / 2 + 0.5));
-    forcedCrouch = !roomy;
+      && Math.abs(p.x - pr.x) < ((pr.w || 5.6) / 2 + 1.5));
+    const lowSpot = !roomy && (Math.sin(p.x * 0.21) > 0.55);
+    forcedCrouch = lowSpot;
   }
   p.crouch = forcedCrouch || !!input.crouch;
   p.forcedCrouch = forcedCrouch;
