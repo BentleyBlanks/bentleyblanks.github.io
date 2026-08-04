@@ -358,6 +358,124 @@ export function DrawCharacter(ctx, spec) {
   return { handX: x + hand.handX * facing, handY: y - bob + hand.handY, headTop: y - bodyH * 0.98 };
 }
 
+// ---------------------------------------------------------------------------
+// 骨骼动画用的零件：每块骨头单独画一张，枢轴（关节）在画布的指定点。
+// 渲染层把它们挂成层级，逐帧转关节 —— 真骨骼，不是烘死的帧。
+// 所有函数按"枢轴在 (px, py)"绘制，单位是像素。
+// ---------------------------------------------------------------------------
+export const RIG_COLOR = (kind) => (kind === "father"
+  ? [PAL.father, "#54402f"]
+  : (KIND_COLOR[kind] || KIND_COLOR.villager));
+
+// 锥形肢体：从枢轴向下延伸 len，上宽 w0 下宽 w1
+export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4 } = {}) {
+  InkFill(ctx, [
+    [px - w0 / 2, py], [px + w0 / 2, py],
+    [px + w1 / 2, py + len], [px - w1 / 2, py + len],
+  ], id, color, { amp: 1.6, lw, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
+}
+
+export function DrawFootPart(ctx, px, py, len, h, color, id) {
+  InkFill(ctx, [
+    [px - h * 0.5, py], [px + len, py], [px + len - 2, py + h], [px - h * 0.6, py + h],
+  ], id, color, { amp: 1.2, lw: 3.6, shade: "rgba(0,0,0,0.2)" });
+}
+
+// 躯干：枢轴在胯（底边中点），短褂下摆略散
+export function DrawTorsoPart(ctx, px, py, w, h, kind, id) {
+  const [coat] = RIG_COLOR(kind);
+  InkFill(ctx, [
+    [px - w * 0.40, py - h], [px + w * 0.40, py - h],
+    [px + w * 0.50, py - h * 0.22], [px + w * 0.54, py],
+    [px - w * 0.54, py], [px - w * 0.50, py - h * 0.22],
+  ], id, coat, { amp: 1.8, lw: 4.4, shade: "rgba(0,0,0,0.15)", shadeAt: 0.54 });
+  // 腰带与衣襟
+  InkLine(ctx, px - w * 0.5, py - h * 0.1, px + w * 0.5, py - h * 0.1, id + "belt",
+    { lw: 5, color: "rgba(43,31,22,0.8)", amp: 1.2 });
+  InkLine(ctx, px + w * 0.08, py - h * 0.9, px + w * 0.14, py - h * 0.14, id + "lapel",
+    { lw: 3, color: "rgba(43,31,22,0.55)", amp: 1.6 });
+  // 布料褶皱
+  for (let i = 0; i < 2; i += 1) {
+    InkLine(ctx, px - w * 0.3 + i * w * 0.2, py - h * 0.62, px - w * 0.26 + i * w * 0.2, py - h * 0.24,
+      id + "fold" + i, { lw: 2, color: "rgba(43,31,22,0.3)", amp: 2 });
+  }
+}
+
+// 头：枢轴在脖根（底边中点）
+export function DrawHeadPart(ctx, px, py, r, kind, id) {
+  const lw = 4.2;
+  // 脖子
+  InkFill(ctx, Rect(px - r * 0.26, py - r * 0.34, r * 0.52, r * 0.4), id + "neck", PAL.skinDark,
+    { amp: 1, lw: 0, line: null });
+  // 头（侧脸：后脑圆、下巴收）
+  InkFill(ctx, [
+    [px - r * 0.92, py - r * 0.30], [px - r * 0.86, py - r * 1.30],
+    [px - r * 0.10, py - r * 1.72], [px + r * 0.72, py - r * 1.36],
+    [px + r * 1.00, py - r * 0.62], [px + r * 0.86, py - r * 0.06],
+    [px - r * 0.62, py - r * 0.02],
+  ], id + "skull", PAL.skin, { amp: 1.4, lw, shade: "rgba(0,0,0,0.10)", shadeAt: 0.6 });
+  // 鼻梁
+  ctx.beginPath();
+  ctx.moveTo(px + r * 0.94, py - r * 0.78);
+  ctx.quadraticCurveTo(px + r * 1.22, py - r * 0.56, px + r * 0.90, py - r * 0.36);
+  ctx.strokeStyle = IN.inkSoft;
+  ctx.lineWidth = lw * 0.7;
+  ctx.stroke();
+  // 眼
+  ctx.fillStyle = IN.ink;
+  ctx.beginPath();
+  ctx.ellipse(px + r * 0.50, py - r * 0.86, r * 0.10, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 嘴（一道短线）
+  InkLine(ctx, px + r * 0.62, py - r * 0.36, px + r * 0.86, py - r * 0.34, id + "mouth",
+    { lw: 2.2, color: IN.inkSoft, amp: 0.6 });
+
+  // 头饰
+  if (kind === "soldier") {
+    InkFill(ctx, [
+      [px - r * 1.02, py - r * 1.18], [px + r * 0.56, py - r * 1.82],
+      [px + r * 1.06, py - r * 1.16], [px - r * 0.98, py - r * 0.82],
+    ], id + "cap", "#5f5a30", { amp: 1.2, lw: lw * 0.9 });
+    InkFill(ctx, [
+      [px + r * 0.70, py - r * 1.20], [px + r * 1.60, py - r * 0.98],
+      [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],
+    ], id + "brim", "#4a461f", { amp: 1, lw: lw * 0.8 });
+  } else if (kind === "puppet") {
+    InkFill(ctx, [
+      [px - r * 1.04, py - r * 1.02], [px - r * 0.06, py - r * 1.86],
+      [px + r * 1.06, py - r * 1.00], [px - r * 0.98, py - r * 0.72],
+    ], id + "hat", "#3a352c", { amp: 1.4, lw: lw * 0.9 });
+  } else if (kind === "militia") {
+    InkFill(ctx, [
+      [px - r * 1.06, py - r * 0.94], [px - r * 0.02, py - r * 1.80],
+      [px + r * 1.08, py - r * 0.90], [px + r * 0.98, py - r * 0.44], [px - r * 0.98, py - r * 0.50],
+    ], id + "towel", "#ddd6c2", { amp: 1.6, lw: lw * 0.9, shade: "rgba(0,0,0,0.08)" });
+    InkFill(ctx, [
+      [px - r * 1.02, py - r * 0.80], [px - r * 1.66, py - r * 0.16],
+      [px - r * 1.20, py - r * 0.02], [px - r * 0.92, py - r * 0.48],
+    ], id + "tail", "#ccc4ae", { amp: 1.4, lw: lw * 0.8 });
+  } else if (kind === "sister") {
+    InkFill(ctx, [
+      [px - r * 0.90, py - r * 1.26], [px + r * 0.18, py - r * 1.90],
+      [px + r * 1.02, py - r * 1.04], [px - r * 0.86, py - r * 0.68],
+    ], id + "hair", "#3a2a1f", { amp: 1.5, lw: lw * 0.85 });
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(px - r * 1.14 - i * r * 0.06, py - r * 0.36 + i * r * 0.5, r * 0.34, 0, Math.PI * 2);
+      ctx.fillStyle = "#3a2a1f";
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = lw * 0.6;
+      ctx.stroke();
+    }
+  } else {
+    InkFill(ctx, [
+      [px - r * 0.94, py - r * 1.20], [px + r * 0.10, py - r * 1.84],
+      [px + r * 1.00, py - r * 1.02], [px - r * 0.90, py - r * 0.62],
+    ], id + "hair", "#33251b", { amp: 1.5, lw: lw * 0.85 });
+  }
+}
+
 // 过肩镜头的前景剪影：只要头和肩，压成暗色，把画面"框"起来
 // 以 (x, y) 为肩线中心；facing 指向画面内侧
 export function DrawShoulder(ctx, x, y, S, kind, id) {

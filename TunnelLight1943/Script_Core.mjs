@@ -193,7 +193,7 @@ const SCRIPTS = {
       lines: [
         { stage: "1942年，华北敌后。梁家村。", d: 3.2, cam: { kind: "wide", x: 60 } },
         { stage: "梁木匠把刨子放下，叫住了往外跑的儿子。", d: 3.4, cam: { kind: "shot", x: 38, y: 1.8, dist: 11 } },
-        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insert", x: 33.6, y: 1.35, dist: 2.2 } },
+        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insert", x: 33.6, y: 0.72, dist: 1.8 } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
         { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
         { stage: "柱子没听懂这句话有多重。他只惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 } },
@@ -271,10 +271,15 @@ const SCRIPTS = {
         { stage: "1943年。爹没有回来。", d: 3.0, cam: { kind: "wide", x: 37 } },
         { stage: "柱子十六岁了，学会了爹的手艺，也学会了听见狗叫就先看村口。", d: 4.2, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 } },
         { stage: "这天夜里，狗叫得不一样。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 } },
-        { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 4.2, cam: { kind: "wide", x: 130, pan: -8 } },
-        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。名单就是他递上去的。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 } },
+        // 说到谁，谁就得在画面里：巡逻队在这一行进场，不是等过场演完
+        { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 4.2, cam: { kind: "wide", x: 130, pan: -8 },
+          on: (state) => { SpawnNightSweep(state); } },
+        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。名单就是他递上去的。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
+          on: (state) => {
+            const s1 = FindActor(state, "sweep1");
+            if (s1) { s1.x = 124; s1.heading = -1; }
+          } },
       ],
-      onDone: (state) => { SpawnNightSweep(state); },
     },
     {
       kind: "leadFollow", id: "c2_mother", leader: "mother", follower: "sister",
@@ -415,11 +420,20 @@ const SCRIPTS = {
     {
       kind: "cinematic", id: "c4_open",
       lines: [
-        { stage: "高家庄的地道，是乡亲们一锹一锹挖出来的。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 } },
-        { stage: "它不通向据点。它通向的是：藏得住人，转移得走，活得下去。", d: 4.4, cam: { kind: "wide", x: 90, y: -1.2, pan: -6 } },
-        { who: "高传宝", say: "想救人，先学会怎么把人藏好。", d: 3.4, cam: { kind: "shot", x: 145, y: UNDER_Y + 1.4, dist: 7 } },
+        { stage: "高家庄的地道，是乡亲们一锹一锹挖出来的。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 },
+          on: (state) => { SpawnTunnelVillagers(state); } },
+        // 说"藏得住人"，洞里就得有人：把乡亲摆在这一镜的画框里
+        { stage: "它不通向据点。它通向的是：藏得住人，转移得走，活得下去。", d: 4.4, cam: { kind: "wide", x: 90, y: -1.2, pan: -6 },
+          on: (state) => {
+            const spread = [58, 61, 84, 87, 112];
+            state.actors.filter((a) => a.kind === "villager").forEach((a, i) => {
+              a.x = spread[i % spread.length];
+              a.heading = i % 2 ? -1 : 1;
+            });
+          } },
+        { who: "高传宝", say: "想救人，先学会怎么把人藏好。", d: 3.4, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.6 },
+          on: (state) => { SpawnTunnelVillagers(state); } },
       ],
-      onDone: (state) => { SpawnTunnelVillagers(state); },
     },
     {
       kind: "lead", id: "c4_hideA", group: "elders", dest: TV.chamberA,
@@ -573,20 +587,23 @@ const SCRIPTS = {
             { stage: "区上武工队来了两个班，和民兵分了工：地面的归他们，地下的归地道。", d: 4.4, cam: { kind: "dark" } },
             { stage: "二更天，村北先响了枪。", d: 3.0, cam: { kind: "dark" } },
             { stage: "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。", d: 3.8, cam: { kind: "wide", x: 150, y: 1.5 } },
-            { stage: "突击组翻进围墙。柱子跟着最后一个下了地道——乡亲们要从地下走。", d: 4.4, cam: { kind: "wide", x: 60, y: -1.4, pan: -5 } },
+            { stage: "突击组翻进围墙。柱子跟着最后一个下了地道——乡亲们要从地下走。", d: 4.4, cam: { kind: "wide", x: 60, y: -1.4, hw: 18, pan: -5 },
+              on: (state) => { SpawnRescueSquad(state); } },
           ]
           : [
             { stage: "区上武工队来了两个班，埋伏在庄稼地里接应——地面不动，人从地下走。", d: 4.4, cam: { kind: "dark" } },
             { stage: "二更天，地道里一盏灯也没点。", d: 3.2, cam: { kind: "dark" } },
-            { stage: "队伍在黑暗里贴着墙根移动，谁也不说话。", d: 3.6, cam: { kind: "wide", x: 40, y: -1.4 } },
-            { stage: "柱子数着步子。到牢房地沿，要过两处没撑牢的老塌方。", d: 4.2, cam: { kind: "wide", x: 90, y: -1.4, pan: 6 } },
+            { stage: "队伍在黑暗里贴着墙根移动，谁也不说话。", d: 3.6, cam: { kind: "wide", x: 40, y: -1.4, hw: 18 },
+              on: (state) => { SpawnRescueSquad(state); } },
+            { stage: "这条道原本只到墙外的地里。最后那十几步，是这三天连夜掏出来的。", d: 4.6, cam: { kind: "wide", x: 90, y: -1.4, hw: 18, pan: 6 } },
+            { stage: "柱子数着步子。掏到牢房地沿，还有两处虚土要清。", d: 4.0, cam: { kind: "wide", x: 120, y: -1.4, hw: 16 } },
           ]
       ),
       onDone: (state) => { SetupFortTunnel(state); },
     },
     {
       kind: "digSeq", id: "c7_dig", spots: [TF.collapse1, TF.collapse2], holdTime: 3.5,
-      objective: "清开塌方，打通去牢房地沿的路", hint: "按住 E 清土。头顶有动静时停一停（提示会变红）",
+      objective: "掏开虚土，把最后十几步挖通到牢房地沿", hint: "按住 E 清土。头顶有动静时停一停（提示会变红）",
       quakeInterval: 9,
     },
     {
@@ -647,7 +664,8 @@ const SCRIPTS = {
             const gao = FindActor(state, "gao");
             if (gao) { gao.cineTarget = { x: 15.4 }; gao.cineSpeed = 1.0; }
           } },
-        { stage: "柱子接过灯。", d: 2.6, cam: { kind: "insert", x: 15, y: UNDER_Y + 1.1, dist: 2.0 } },
+        { stage: "柱子接过灯。", d: 2.6, cam: { kind: "insert", x: 15, y: UNDER_Y + 1.1, dist: 2.0 },
+          on: (state) => { state.player.lamp = true; } },
         { stage: "转身走回黑暗里。", d: 4.0, cam: { kind: "shot", x: 20, y: UNDER_Y + 1.4, dist: 7, pan: 3 } },
       ],
       onDone: (state) => { StartRescueLoop(state); },
@@ -849,6 +867,17 @@ function StartDrillSmoke(state) {
   state.toast = { text: "东口的铃响成一串。人已经在往洞里下了。", t: 4 };
 }
 
+// 第七章的队伍：柱子不是一个人下的地道，画面里要看得见"跟紧队伍"
+function SpawnRescueSquad(state) {
+  if (FindActor(state, "squad0")) return;
+  const base = state.player.x;
+  for (let i = 0; i < 4; i += 1) {
+    state.actors.push(MakeActor(`squad${i}`, "militia", base + 4 + i * 3.2, {
+      level: "under", heading: 1, squad: true,
+    }));
+  }
+}
+
 function SetupFortTunnel(state) {
   state.collapses = {
     collapse1: { cleared: false, progress: 0 },
@@ -958,7 +987,7 @@ export function StartChapter(state, index) {
   if (ch.id === "c1") {
     state.player.x = 38;
     state.actors.push(
-      MakeActor("father", "family", 41, { label: "爹" }),
+      MakeActor("father", "father", 41, { label: "爹" }),
       MakeActor("mother", "family", 36, { label: "娘" }),
       MakeActor("sister", "sister", 126, { label: "妹妹" }),
     );
@@ -1139,6 +1168,17 @@ function StepCinematic(state, input, dt) {
   state.camHint = line.cam || { kind: "follow" };
   state.camLineT = state.beat.lineT;
   state.camLineD = line.d;
+  // 正反打不能越轴：主体必须看着被越过的那个肩膀
+  if (state.camHint.kind === "ots") {
+    const subj = FindActor(state, state.camHint.subject)
+      || (state.camHint.subject === "player" ? state.player : null);
+    const other = FindActor(state, state.camHint.other)
+      || (state.camHint.other === "player" ? state.player : null);
+    if (subj && other) {
+      subj.heading = other.x >= subj.x ? 1 : -1;
+      other.heading = -subj.heading;
+    }
+  }
   StepCineActors(state, dt);
   state.beat.lineT += dt;
   if (input.advance || state.beat.lineT >= line.d) {

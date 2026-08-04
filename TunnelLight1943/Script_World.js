@@ -9,25 +9,11 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
+import { CreateRig, PoseRig, HandPoint, BONE } from "./Script_Rig.mjs";
 
-const PPM = 48;              // 贴图像素 / 世界米
-const CHAR_CELL = { w: 116, h: 124, baseline: 112 };
-const CHAR_SCALE = 1.35;
+const PPM = 48;              // 贴图像素 / 世界米（普通场景件）
+// 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
-// 程序化动画帧表：姿态由 DrawCharacter 按相位算出，烘成图集后按状态播放
-const WALK_FRAMES = 8;
-const IDLE_FRAMES = 6;
-const CROUCH_WALK_FRAMES = 8;
-const CROUCH_IDLE_FRAMES = 4;
-const CARRY_WALK_FRAMES = 8;
-const CARRY_IDLE_FRAMES = 2;
-const F_WALK = 0;
-const F_IDLE = F_WALK + WALK_FRAMES;                    // 8
-const F_CROUCH_WALK = F_IDLE + IDLE_FRAMES;             // 14
-const F_CROUCH_IDLE = F_CROUCH_WALK + CROUCH_WALK_FRAMES; // 22
-const F_CARRY_WALK = F_CROUCH_IDLE + CROUCH_IDLE_FRAMES;  // 26
-const F_CARRY_IDLE = F_CARRY_WALK + CARRY_WALK_FRAMES;    // 34
-const CHAR_FRAMES = F_CARRY_IDLE + CARRY_IDLE_FRAMES;     // 36
 
 // ---------------------------------------------------------------------------
 // 贴图烘焙
@@ -91,65 +77,6 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // ---------------------------------------------------------------------------
 // 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
 // ---------------------------------------------------------------------------
-const charAtlas = new Map();
-
-function FrameSpec(f) {
-  if (f < F_IDLE) {
-    return { moving: true, crouch: false, carry: false, phase: (f / WALK_FRAMES) * Math.PI * 2, breath: 0 };
-  }
-  if (f < F_CROUCH_WALK) {
-    const i = f - F_IDLE;
-    return { moving: false, crouch: false, carry: false, phase: 0, breath: (i / IDLE_FRAMES) * Math.PI * 2 };
-  }
-  if (f < F_CROUCH_IDLE) {
-    const i = f - F_CROUCH_WALK;
-    return { moving: true, crouch: true, carry: false, phase: (i / CROUCH_WALK_FRAMES) * Math.PI * 2, breath: 0 };
-  }
-  if (f < F_CARRY_WALK) {
-    const i = f - F_CROUCH_IDLE;
-    return { moving: false, crouch: true, carry: false, phase: 0, breath: (i / CROUCH_IDLE_FRAMES) * Math.PI * 2 };
-  }
-  if (f < F_CARRY_IDLE) {
-    const i = f - F_CARRY_WALK;
-    return { moving: true, crouch: false, carry: true, phase: (i / CARRY_WALK_FRAMES) * Math.PI * 2, breath: 0 };
-  }
-  const i = f - F_CARRY_IDLE;
-  return { moving: false, crouch: false, carry: true, phase: 0, breath: (i / CARRY_IDLE_FRAMES) * Math.PI * 2 };
-}
-
-function BuildCharAtlas(kind) {
-  if (charAtlas.has(kind)) return charAtlas.get(kind);
-  const { w, h, baseline } = CHAR_CELL;
-  const canvas = MakeCanvas(w * CHAR_FRAMES, h);
-  const ctx = canvas.getContext("2d");
-  for (let f = 0; f < CHAR_FRAMES; f += 1) {
-    ctx.save();
-    ctx.translate(f * w, 0);
-    const s = FrameSpec(f);
-    ART.DrawCharacter(ctx, {
-      x: w / 2, y: baseline, scale: CHAR_SCALE, facing: 1, kind, id: kind, ...s,
-    });
-    ctx.restore();
-  }
-  const tex = CanvasTexture(canvas);
-  tex.repeat.set(1 / CHAR_FRAMES, 1);
-  const entry = { canvas, tex };
-  charAtlas.set(kind, entry);
-  return entry;
-}
-
-function MakeCharMesh(kind) {
-  const atlas = BuildCharAtlas(kind);
-  const tex = atlas.tex.clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(1 / CHAR_FRAMES, 1);
-  const geo = new THREE.PlaneGeometry(CHAR_CELL.w / PPM, CHAR_CELL.h / PPM);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData.yOffset = (CHAR_CELL.baseline - CHAR_CELL.h / 2) / PPM;
-  return mesh;
-}
-
 // 扛着的物件（单独一张小贴图，跟着手走）
 function MakeCarryMesh(label) {
   const wPx = label === "水桶" ? 46 : 120;
@@ -201,7 +128,10 @@ export function CreateWorld(canvasEl) {
   }
 
   // 暗场遮罩（乘算）与光晕（加色）
-  const darkMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+  // 全屏压暗罩：绝不能参与深度，否则会把后画的灯光晕整片剔掉
+  const darkMat = new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+  });
   const darkPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), darkMat);
   darkPlane.position.z = 8;
   darkPlane.renderOrder = 50;
@@ -401,10 +331,10 @@ export function CreateWorld(canvasEl) {
     })();
     for (let i = 0; i < count; i += 1) {
       const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.13, 0.13),
+        new THREE.PlaneGeometry(0.055, 0.055),
         new THREE.MeshBasicMaterial({
           map: tex, transparent: true, depthWrite: false,
-          blending: THREE.AdditiveBlending, opacity: night ? 0.42 : 0.16,
+          blending: THREE.AdditiveBlending, opacity: night ? 0.22 : 0.09,
         }),
       );
       m.userData = {
@@ -633,7 +563,8 @@ export function CreateWorld(canvasEl) {
     builtKey = key;
     carveState = !!state.flags.carved;
     carveRebuild = null;
-    for (const k of ["sky", "hills", "farTown", "nearTrees", "play", "fore"]) ClearGroup(layers[k]);
+    for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
+    dustMotes = [];
     for (const g of glows) scene.remove(g);
     glows.length = 0;
     sceneLights = [];
@@ -766,45 +697,33 @@ export function CreateWorld(canvasEl) {
   function EnsureActorSprite(id, kind) {
     let s = actorSprites.get(id);
     if (!s) {
-      const mesh = MakeCharMesh(kind);
-      layers.play.add(mesh);
-      s = { mesh, prevX: null, phase: 0, kind, carryMesh: null, glow: null };
+      // 骨骼装配：每块骨头一张贴图，逐帧只转关节
+      const rig = CreateRig(kind);
+      layers.play.add(rig.group);
+      s = { rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null, idleT: Math.random() * 6 };
       actorSprites.set(id, s);
     }
     return s;
   }
 
-  function SetFrame(s, frame, facing) {
-    const tex = s.mesh.material.map;
-    tex.offset.x = frame / CHAR_FRAMES;
-    s.mesh.scale.x = facing >= 0 ? 1 : -1;
-  }
 
-  function UpdateOne(s, x, level, heading, crouch, dt, carry = false) {
+  function UpdateOne(s, x, level, heading, crouch, dt, carry = false, extra = {}) {
     const y = level === "under" ? UNDER_Y : SURFACE_Y;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
     s.prevX = x;
-    // 步频跟着实际位移走（不是定速循环），停下就自然收在站姿
+    // 步频跟着实际位移走（不是定速循环），停下就自然收回站姿
     const isMoving = moved > 0.006;
-    if (isMoving) s.phase += moved * 2.3;
-    s.idleT = (s.idleT || Math.random() * 6) + dt * 1.25;
+    if (isMoving) s.phase += moved * 3.4;
+    else s.phase += dt * 2.2;      // 挖土/爬梯这类原地动作也要有相位
+    s.idleT += dt * 1.4;
 
-    let frame;
-    if (carry) {
-      frame = isMoving
-        ? F_CARRY_WALK + (Math.floor(s.phase) % CARRY_WALK_FRAMES)
-        : F_CARRY_IDLE + (Math.floor(s.idleT) % CARRY_IDLE_FRAMES);
-    } else if (crouch) {
-      frame = isMoving
-        ? F_CROUCH_WALK + (Math.floor(s.phase) % CROUCH_WALK_FRAMES)
-        : F_CROUCH_IDLE + (Math.floor(s.idleT) % CROUCH_IDLE_FRAMES);
-    } else {
-      frame = isMoving
-        ? F_WALK + (Math.floor(s.phase) % WALK_FRAMES)
-        : F_IDLE + (Math.floor(s.idleT) % IDLE_FRAMES);
-    }
-    SetFrame(s, frame, heading >= 0 ? 1 : -1);
-    s.mesh.position.set(x, y + s.mesh.userData.yOffset, 0.1);
+    PoseRig(s.rig, {
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
+      climbing: extra.climbing, digging: extra.digging,
+    }, dt);
+
+    s.mesh.position.set(x, y, 0.1);
+    s.mesh.scale.x = heading >= 0 ? 1 : -1;
     return { x, y, isMoving };
   }
 
@@ -812,7 +731,13 @@ export function CreateWorld(canvasEl) {
     const seen = new Set(["player"]);
     const p = state.player;
     const ps = EnsureActorSprite("player", "player");
-    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry);
+    const def = CurrentBeatDef(state);
+    const digging = !!(state.beat && !state.beat.quakeActive
+      && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
+        || def?.kind === "buildSpots" || def?.kind === "hold")
+      && state.prompt && state.prompt.includes("%"));
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
+      { climbing: p.climbT > 0, digging });
     ps.mesh.visible = otsHiddenId !== "player";
 
     // 扛的东西
@@ -827,8 +752,9 @@ export function CreateWorld(canvasEl) {
       ps.carryLabel = null;
     }
     if (ps.carryMesh) {
-      const y = (p.level === "under" ? UNDER_Y : SURFACE_Y);
-      ps.carryMesh.position.set(p.x, y + (p.carry === "水桶" ? 0.85 : 1.95), 0.2);
+      // 挂到骨骼算出来的手上，扛的东西会跟着手臂动
+      const hand = HandPoint(ps.rig);
+      ps.carryMesh.position.set(hand.x, hand.y + (p.carry === "水桶" ? -0.18 : 0.1), 0.25);
       ps.carryMesh.scale.x = p.heading >= 0 ? 1 : -1;
     }
 
@@ -863,7 +789,7 @@ export function CreateWorld(canvasEl) {
 
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
-        layers.play.remove(s.mesh);
+        layers.play.remove(s.rig ? s.rig.group : s.mesh);
         if (s.glow) scene.remove(s.glow);
         if (s.carryMesh) layers.play.remove(s.carryMesh);
         actorSprites.delete(id);
@@ -943,7 +869,7 @@ export function CreateWorld(canvasEl) {
         const c = m.userData.canvas;
         const ctx = c.getContext("2d");
         ctx.clearRect(0, 0, c.width, c.height);
-        ART.DrawProbeRod(ctx, 20, 6, 130, "rod" + i, { jab });
+        ART.DrawProbeRod(ctx, 20, 6, 88, "rod" + i, { jab });
         m.material.map.needsUpdate = true;
         m.position.set(state.player.x - 3.2 + i * 3.1 + Math.sin(i * 7) * 1.1,
           SURFACE_Y - (200 / 2 - 6) / PPM, 0.5);
@@ -987,7 +913,7 @@ export function CreateWorld(canvasEl) {
   // 暗场：地道章节压暗，灯光晕负责照明
   function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
     const ch = CHAPTERS[state.chapterIndex];
-    const base = { day: 0, dawn: 0.06, night: 0.34, tunnel: 0.46, dark: 0.66 }[ch.light] ?? 0;
+    const base = { day: 0, dawn: 0.05, night: 0.30, tunnel: 0.38, dark: 0.45 }[ch.light] ?? 0;
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
@@ -1067,9 +993,8 @@ export function CreateWorld(canvasEl) {
     LAYER_COMP.ots = (D_REF - otsZ) / D_REF;
     layers.ots.position.z = otsZ;
     layers.ots.scale.setScalar(LAYER_COMP.ots);
-    const foreZ = Math.min(5.5, dist * 0.28);
-    layers.fore.position.z = foreZ;
-    layers.fore.scale.setScalar((D_REF - foreZ) / D_REF);
+    // 前景只服务于中远景；特写/插入/过肩本来就不该有枝叶糊在镜头前
+    layers.fore.visible = dist > 9;
     // 浮尘在画框内循环飘
     for (const d of dustMotes) {
       const u = d.userData;
@@ -1079,7 +1004,7 @@ export function CreateWorld(canvasEl) {
       d.position.set(
         camX - wrapW / 2 + ((bx * wrapW + u.vx * u.seed * 260) % wrapW),
         camY - wrapH / 2 + (((u.seed * 53) % 1) * wrapH + u.vy * u.seed * 180) % wrapH,
-        7.2,
+        0.45,
       );
     }
     PlaceOverShoulder(camX, camY, viewW, viewH);

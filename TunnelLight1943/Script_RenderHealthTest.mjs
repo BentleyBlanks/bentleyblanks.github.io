@@ -32,20 +32,22 @@ for (let chapter = 1; chapter <= 8; chapter += 1) {
     window.TunnelLight.StepFrames(40, { advance: true });
     window.TunnelLight.StepFrames(200, { advance: true });
   });
-  // 过场镜头也要走一遍：正反打/插入特写用的是另一套代码路径，
-  // 只测玩法段会漏掉那里的报错（曾漏过一次 FRAME_IDLE 未定义）
+  // 过场镜头也要走一遍：正反打/插入特写是另一套代码路径。
+  // 关键：StepFrames 只推进逻辑，渲染发生在 rAF —— 必须让浏览器真的渲染若干帧，
+  // 否则那条路径上的报错测不出来（FRAME_IDLE 未定义就是这么漏过去的）。
   await page.evaluate(() => {
     window.TunnelLight.JumpToChapter(window.TunnelLight.state.chapterIndex);
     for (let i = 0; i < 300; i += 1) {
       if (window.TunnelLight.state?.phase === "playing") break;
       window.TunnelLight.StepFrames(1, { advance: true });
     }
-    for (let i = 0; i < 14; i += 1) {
-      window.TunnelLight.StepFrames(20, {});
-      window.TunnelLight.StepFrames(1, { advance: true });
-    }
   });
-  await page.waitForTimeout(400);
+  for (let line = 0; line < 12; line += 1) {
+    await page.evaluate(() => window.TunnelLight.StepFrames(18, {}));
+    await page.waitForTimeout(220);          // 让 rAF 真渲染这一构图
+    await page.evaluate(() => window.TunnelLight.StepFrames(1, { advance: true }));
+    await page.waitForTimeout(120);
+  }
   await page.waitForTimeout(900);
 
   const health = await page.evaluate(() => {

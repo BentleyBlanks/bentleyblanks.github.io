@@ -188,12 +188,13 @@ function UpdateCamera(state, dt) {
       if (trans === "dip") dipLevel = 1;
       else if (trans === "iris") irisClosing = true;
     }
-    // 行内慢推：跨行累计，不因换行弹回
-    framing.prog = Math.min(1, framing.prog + dt * 0.055);
+    // 行内慢推/横移：按本行时长归一化，一行之内正好走完 pan，肉眼才看得见
+    const lineD = Math.max(1.2, state.camLineD || 3.4);
+    framing.prog = Math.min(1, framing.prog + dt / lineD);
     shot = {
       ...shot,
       x: shot.x + (shot.pan || 0) * framing.prog,
-      hw: framing.baseHw * (1 - 0.06 * framing.prog),
+      hw: framing.baseHw * (1 - 0.10 * framing.prog),
     };
     world.SetOverShoulder(state, shot.ots || null);
   } else {
