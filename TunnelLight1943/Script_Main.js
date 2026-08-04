@@ -37,10 +37,11 @@ import("./Script_Audio.js")
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
 
-// 声音的开关记在本地：读者多半是在办公室点开的，默认得先静音，
-// 由他自己决定什么时候放出来
+// 声音默认开着：旁白是这一版叙事的主体，关掉就少了一半。真正的"别吵到人"
+// 由浏览器兜底——AudioContext 在第一次手势之前一直是挂起的，静静躺着不出声，
+// 玩家点"从第一章开始"那一下才真正启动。不想听的按 M 或右上角关掉，记在本地。
 const SOUND_KEY = "tunnelLight1943.sound";
-let soundOn = localStorage.getItem(SOUND_KEY) === "on";
+let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
 audio.SetEnabled(soundOn);
 
 // iOS/Chrome 都要求音频在真实手势里启动，任何一次输入都拿来解锁
