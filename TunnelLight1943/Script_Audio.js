@@ -45,12 +45,14 @@ function Degree(d, base) {
 // step=一个音位多少秒，rest=整句留白的概率，reg=旋律层的八度偏移，
 // bright=音乐低通的上限，wet=送进混响的量，leadEvery=隔多少音位来一句二胡，drip=滴水概率
 const MOODS = {
-  calm:   { drone: 0.30, pluck: 0.50, lead: 0.14, pad: 0.20, pulse: 0.00, step: 1.15, rest: 0.42, reg: 0, bright: 1900, wet: 0.14, leadEvery: 40, drip: 0.000 },
-  tension: { drone: 0.42, pluck: 0.18, lead: 0.00, pad: 0.40, pulse: 0.20, step: 0.95, rest: 0.62, reg: -12, bright: 950, wet: 0.18, leadEvery: 0, drip: 0.000 },
-  raid:    { drone: 0.46, pluck: 0.00, lead: 0.00, pad: 0.34, pulse: 0.66, step: 0.62, rest: 1.00, reg: -12, bright: 700, wet: 0.10, leadEvery: 0, drip: 0.000 },
-  grief:   { drone: 0.10, pluck: 0.04, lead: 0.52, pad: 0.10, pulse: 0.00, step: 1.55, rest: 0.72, reg: 0, bright: 1300, wet: 0.26, leadEvery: 12, drip: 0.000 },
-  tunnel:  { drone: 0.40, pluck: 0.06, lead: 0.00, pad: 0.26, pulse: 0.00, step: 1.35, rest: 0.80, reg: -12, bright: 540, wet: 0.40, leadEvery: 0, drip: 0.085 },
-  resolve: { drone: 0.26, pluck: 0.44, lead: 0.28, pad: 0.28, pulse: 0.00, step: 1.05, rest: 0.28, reg: 0, bright: 2800, wet: 0.16, leadEvery: 24, drip: 0.000 },
+  // 重配过一轮：底噪整体压掉一半以上，留白拉长（rest 提高），乐句之间隔得更远
+  // （leadEvery 加大）。这是华北平原的夜，不是配乐片——大部分时候应该几乎听不见。
+  calm:   { drone: 0.13, pluck: 0.20, lead: 0.06, pad: 0.08, pulse: 0.00, step: 1.70, rest: 0.70, reg: 0, bright: 1500, wet: 0.16, leadEvery: 96, drip: 0.000 },
+  tension: { drone: 0.19, pluck: 0.07, lead: 0.00, pad: 0.17, pulse: 0.08, step: 1.45, rest: 0.80, reg: -12, bright: 820, wet: 0.20, leadEvery: 0, drip: 0.000 },
+  raid:    { drone: 0.24, pluck: 0.00, lead: 0.00, pad: 0.16, pulse: 0.30, step: 0.95, rest: 1.00, reg: -12, bright: 640, wet: 0.12, leadEvery: 0, drip: 0.000 },
+  grief:   { drone: 0.05, pluck: 0.02, lead: 0.26, pad: 0.04, pulse: 0.00, step: 2.10, rest: 0.84, reg: 0, bright: 1200, wet: 0.28, leadEvery: 20, drip: 0.000 },
+  tunnel:  { drone: 0.18, pluck: 0.02, lead: 0.00, pad: 0.11, pulse: 0.00, step: 1.90, rest: 0.88, reg: -12, bright: 480, wet: 0.42, leadEvery: 0, drip: 0.070 },
+  resolve: { drone: 0.12, pluck: 0.19, lead: 0.13, pad: 0.12, pulse: 0.00, step: 1.55, rest: 0.52, reg: 0, bright: 2400, wet: 0.18, leadEvery: 44, drip: 0.000 },
 };
 
 const LAYER_KEYS = ["drone", "pluck", "lead", "pad", "pulse"];
@@ -108,7 +110,7 @@ function Build(ac, options) {
   //   master ← sfx / voice（旁白与音效不被 duck，否则一压就听不见脚步了）
   // -------------------------------------------------------------------------
   const master = ac.createGain();
-  master.gain.value = 0.8;
+  master.gain.value = 0.52;   // 整体压低：这片平原的底噪本来就该很小
 
   // 次声切除。土层闷响、爆炸低频这类声音的能量大头落在 20Hz 以下：
   // 手机和笔记本喇叭根本放不出来，却实打实占掉动态余量，还会把限幅器压得一抖一抖。
@@ -162,6 +164,26 @@ function Build(ac, options) {
   const voiceBus = ac.createGain();
   voiceBus.gain.value = 1;
   voiceBus.connect(master);
+
+  // 分路音量：设置面板要能单独调旁白 / 音效 / 配乐。
+  // 各路有各自的基准值（混音时定好的相对关系），面板给的是 0..1 的倍率，
+  // 两者相乘——这样调音量不会把混音比例弄乱。环境音跟着音效走。
+  const BUS_BASE = { music: 0.55, amb: 0.9, sfx: 0.9, voice: 1 };
+  const busNode = { music: musicBus, amb: ambBus, sfx: sfxBus, voice: voiceBus };
+  const busLevel = { music: 1, sfx: 1, voice: 1 };
+  function ApplyBus(name) {
+    const lvl = name === "amb" ? busLevel.sfx : busLevel[name];
+    const g = busNode[name].gain;
+    const now = ac.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(BUS_BASE[name] * lvl, now + 0.12);
+  }
+  function SetBusLevel(name, v) {
+    busLevel[name] = Clamp(Number.isFinite(v) ? v : 1, 0, 1);
+    ApplyBus(name);
+    if (name === "sfx") ApplyBus("amb");
+  }
 
   // -------------------------------------------------------------------------
   // 噪声与混响
@@ -1018,6 +1040,10 @@ function Build(ac, options) {
       volume = Clamp(Number.isFinite(v) ? v : 0.8, 0, 1);
       ApplyVolume();
     },
+
+    SetMusicVolume(v) { if (!disposed) SetBusLevel("music", v); },
+    SetSfxVolume(v) { if (!disposed) SetBusLevel("sfx", v); },
+    SetVoiceVolume(v) { if (!disposed) SetBusLevel("voice", v); },
 
     SetMood(next) {
       if (disposed || !Has(MOODS, next) || next === mood) return;

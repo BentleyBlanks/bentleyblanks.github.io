@@ -14,6 +14,7 @@ const world = CreateWorld(canvas);
 // 资源没部署上去）时游戏必须照常能玩，所以走动态 import + 静音替身。
 const SILENT = {
   Unlock() {}, SetEnabled() {}, IsEnabled: () => false, SetMasterVolume() {},
+  SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
   SetMood() {}, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
   PlayVoice: () => Promise.resolve(),
 };
@@ -24,6 +25,9 @@ const soundtrack = CreateSoundtrack({
   SetEnabled: (...a) => audio.SetEnabled(...a),
   IsEnabled: () => audio.IsEnabled(),
   SetMood: (...a) => audio.SetMood(...a),
+  SetMusicVolume: (...a) => audio.SetMusicVolume(...a),
+  SetSfxVolume: (...a) => audio.SetSfxVolume(...a),
+  SetVoiceVolume: (...a) => audio.SetVoiceVolume(...a),
   Sfx: (...a) => audio.Sfx(...a),
   Duck: (...a) => audio.Duck(...a),
   PlayVoice: (...a) => audio.PlayVoice(...a),
@@ -34,6 +38,7 @@ import("./Script_Audio.js")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
+    ApplyVolumes();          // 合成器是后到的，音量得在它到位之后再喂一次
     soundtrack.SyncDurations();
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
@@ -42,6 +47,20 @@ import("./Script_Audio.js")
 // 由浏览器兜底——AudioContext 在第一次手势之前一直是挂起的，静静躺着不出声，
 // 玩家点"从第一章开始"那一下才真正启动。不想听的按 M 或右上角关掉，记在本地。
 const SOUND_KEY = "tunnelLight1943.sound";
+// 三路音量各自记住。默认配乐低一些——它只是底噪，不该压住旁白。
+const VOL_KEY = "tunnelLight1943.vol";
+const DEFAULT_VOL = { voice: 100, sfx: 100, music: 70 };
+let vol = { ...DEFAULT_VOL };
+try {
+  const saved = JSON.parse(localStorage.getItem(VOL_KEY) || "null");
+  if (saved && typeof saved === "object") vol = { ...vol, ...saved };
+} catch (ignored) { /* 存的东西坏了就用默认值 */ }
+
+function ApplyVolumes() {
+  audio.SetVoiceVolume(vol.voice / 100);
+  audio.SetSfxVolume(vol.sfx / 100);
+  audio.SetMusicVolume(vol.music / 100);
+}
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
 audio.SetEnabled(soundOn);
 
@@ -62,6 +81,8 @@ for (const id of [
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
   "choiceOverlay", "choicePrompt", "choiceList",
   "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
+  "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
+  "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
 ]) ui[id] = document.getElementById(id);
 
@@ -365,9 +386,15 @@ function SyncHud(state, dt, shotFade) {
   const objVisible = objectiveT > 0 && !inCinematic;
   ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
 
-  ui.prompt.textContent = state.prompt || "";
-  ui.prompt.hidden = !state.prompt || inCinematic;
-  ui.prompt.classList.toggle("danger", !!state.prompt && state.prompt.startsWith("！"));
+  // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来
+  const shown = state.prompt || state.climbHint || "";
+  ui.prompt.textContent = shown;
+  ui.prompt.hidden = !shown || inCinematic;
+  ui.prompt.classList.toggle("danger", !!shown && shown.startsWith("！"));
+  // 进度条用 CSS 画：拿字形拼方块会因为字体缺字变成豆腐块
+  const fill = Math.max(0, Math.min(1, state.promptFill || 0));
+  ui.prompt.style.setProperty("--fill", (fill * 100).toFixed(1) + "%");
+  ui.prompt.classList.toggle("metered", fill > 0);
 
   ui.crouchTag.hidden = true;
   if (ui.touchControls) {
@@ -572,6 +599,48 @@ if (ui.btnSound) {
   ui.btnSound.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 SyncSoundButton();
+
+// —— 设置面板：三路音量 ——
+function SyncVolumeUi() {
+  for (const [key, input, out] of [
+    ["voice", ui.volVoice, ui.volVoiceOut],
+    ["sfx", ui.volSfx, ui.volSfxOut],
+    ["music", ui.volMusic, ui.volMusicOut],
+  ]) {
+    if (!input) continue;
+    input.value = String(vol[key]);
+    if (out) out.textContent = vol[key] + "%";
+  }
+}
+function OnVolumeInput(key, input, out) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    vol[key] = Math.max(0, Math.min(100, parseInt(input.value, 10) || 0));
+    if (out) out.textContent = vol[key] + "%";
+    localStorage.setItem(VOL_KEY, JSON.stringify(vol));
+    ApplyVolumes();
+    audio.Unlock();          // 拖滑块本身就是用户手势，顺手把音频解锁了
+  });
+}
+OnVolumeInput("voice", ui.volVoice, ui.volVoiceOut);
+OnVolumeInput("sfx", ui.volSfx, ui.volSfxOut);
+OnVolumeInput("music", ui.volMusic, ui.volMusicOut);
+SyncVolumeUi();
+
+if (ui.btnSettings) {
+  ui.btnSettings.addEventListener("click", () => {
+    const open = ui.settingsPanel.hidden;
+    ui.settingsPanel.hidden = !open;
+    ui.btnSettings.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  // 点面板以外的地方就收起来
+  document.addEventListener("pointerdown", (e) => {
+    if (ui.settingsPanel.hidden) return;
+    if (ui.settingsPanel.contains(e.target) || ui.btnSettings.contains(e.target)) return;
+    ui.settingsPanel.hidden = true;
+    ui.btnSettings.setAttribute("aria-expanded", "false");
+  });
+}
 
 ui.startButton.addEventListener("click", () => StartGame(0));
 ui.endRestart.addEventListener("click", () => {

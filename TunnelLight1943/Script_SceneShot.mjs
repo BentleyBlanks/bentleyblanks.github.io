@@ -57,6 +57,7 @@ const reached = await page.evaluate(async (target) => {
     const input = { moveX: Math.abs(dx) > 1.2 ? Math.sign(dx) : 0 };
     if (tg.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
     if (tg.action === "holdAt" && Math.abs(dx) <= 1.35) input.interactHeld = true;
+    if (tg.action === "scribeAt" && Math.abs(dx) <= 1.6) { input.interactHeld = true; input.moveX = 1; }
     if (tg.action === "crouchAt" && Math.abs(dx) <= 1.35) input.crouch = true;
     if ((tg.level || "surface") !== st.player.level) input.climb = tg.level === "under" ? 1 : -1;
     tl.StepFrames(1, input);

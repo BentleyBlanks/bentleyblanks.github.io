@@ -217,7 +217,84 @@ export function PoseRig(rig, s, dt) {
   const swing = Math.sin(p);
   const swing2 = Math.sin(p + Math.PI);
 
-  if (s.climbing) {
+  // ── 一次性戏剧姿势 ──
+  // 跪、挨砸、扑上去、被架走、把人搂进肩膀……这些是过场里最重的几拍，
+  // 之前全靠字幕描述，演员站着不动。它们优先于走路/猫腰这类常态姿态。
+  if (s.pose === "kneel") {
+    // 被按着跪在地上：小腿贴地，上身被人从后面压着
+    target.hipY = -0.52; target.hipX = 0.02;
+    target.torso = 26 * DEG; target.head = -12 * DEG;
+    target.thighB = -96 * DEG; target.shinB = 96 * DEG; target.footB = 8 * DEG;
+    target.thighF = -92 * DEG; target.shinF = 100 * DEG; target.footF = 8 * DEG;
+    target.armB = -14 * DEG; target.foreB = -18 * DEG;
+    target.armF = -18 * DEG; target.foreF = -14 * DEG;
+  } else if (s.pose === "struck") {
+    // 挨了一下：上身被打得往前甩，膝一软，手先撑出去
+    target.hipY = -0.34; target.hipX = 0.14;
+    target.torso = 62 * DEG; target.head = -46 * DEG;
+    target.thighB = -70 * DEG; target.shinB = 78 * DEG; target.footB = -8 * DEG;
+    target.thighF = -30 * DEG; target.shinF = 26 * DEG; target.footF = -16 * DEG;
+    target.armB = -102 * DEG; target.foreB = -26 * DEG;
+    target.armF = -84 * DEG; target.foreF = -34 * DEG;
+  } else if (s.pose === "lunge") {
+    // 扑上去：整个人前倾，两只手往前够
+    target.hipY = -0.16; target.hipX = 0.20;
+    target.torso = 48 * DEG; target.head = -30 * DEG;
+    target.armB = -128 * DEG; target.foreB = -10 * DEG;
+    target.armF = -136 * DEG; target.foreF = -6 * DEG;
+    target.thighB = -62 * DEG; target.shinB = 40 * DEG; target.footB = -18 * DEG;
+    target.thighF = 22 * DEG; target.shinF = 16 * DEG; target.footF = -20 * DEG;
+  } else if (s.pose === "hauled") {
+    // 被两个人架着往外拖：胳膊被人从两边提起来，脚拖在地上
+    const drag = s.moving ? Math.sin(p * 2.2) * 8 : 0;
+    target.hipY = -0.22; target.hipX = -0.06;
+    target.torso = -12 * DEG; target.head = 16 * DEG;
+    target.armB = -150 * DEG; target.foreB = -8 * DEG;
+    target.armF = -150 * DEG; target.foreF = -8 * DEG;
+    target.thighB = (-16 + drag) * DEG; target.shinB = 20 * DEG; target.footB = 24 * DEG;
+    target.thighF = (6 - drag) * DEG; target.shinF = 8 * DEG; target.footF = 26 * DEG;
+  } else if (s.pose === "dragged") {
+    // 被人从背后死死抱住往回拖：身子朝前挣、脚在地上蹭
+    const drag = s.moving ? Math.sin(p * 2.6) * 10 : 0;
+    target.hipY = -0.30; target.hipX = 0.10;
+    target.torso = 30 * DEG; target.head = -18 * DEG;
+    target.armB = -118 * DEG; target.foreB = -30 * DEG;
+    target.armF = -108 * DEG; target.foreF = -38 * DEG;
+    target.thighB = (-40 + drag) * DEG; target.shinB = 54 * DEG; target.footB = 18 * DEG;
+    target.thighF = (-14 - drag) * DEG; target.shinF = 30 * DEG; target.footF = 22 * DEG;
+  } else if (s.pose === "shelter") {
+    // 把人搂进自己肩膀：近侧手臂抬起来绕过去，头低下护住
+    target.hipY = -0.06; target.hipX = 0.02;
+    target.torso = 12 * DEG; target.head = -22 * DEG;
+    target.armF = -128 * DEG; target.foreF = -62 * DEG;
+    target.armB = -26 * DEG; target.foreB = -30 * DEG;
+    target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
+    target.thighF = 10 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "leanIn") {
+    // 把额头抵在别人肩上：脖子前倾贴过去，手垂着
+    target.hipY = -0.04; target.hipX = 0.06;
+    target.torso = 20 * DEG; target.head = -34 * DEG;
+    target.armB = -12 * DEG; target.foreB = -16 * DEG;
+    target.armF = -16 * DEG; target.foreF = -20 * DEG;
+    target.thighB = -10 * DEG; target.shinB = 12 * DEG; target.footB = -4 * DEG;
+    target.thighF = 8 * DEG; target.shinF = 6 * DEG; target.footF = -6 * DEG;
+  } else if (s.pose === "mark") {
+    // 伸手在门框上比划：略侧身，近侧手臂抬到头顶那么高，另一只手扶着框
+    target.hipY = -0.04; target.hipX = 0.03;
+    target.torso = 10 * DEG; target.head = -14 * DEG;
+    target.armF = -152 * DEG; target.foreF = -16 * DEG;
+    target.armB = -46 * DEG; target.foreB = -54 * DEG;
+    target.thighB = -12 * DEG; target.shinB = 14 * DEG; target.footB = -6 * DEG;
+    target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "swing") {
+    // 抡枪托：胳膊举到头顶后方，整个人拧过去
+    target.hipY = -0.08; target.hipX = -0.10;
+    target.torso = -22 * DEG; target.head = -8 * DEG;
+    target.armB = -186 * DEG; target.foreB = -50 * DEG;
+    target.armF = -170 * DEG; target.foreF = -44 * DEG;
+    target.thighB = -34 * DEG; target.shinB = 30 * DEG; target.footB = -8 * DEG;
+    target.thighF = 20 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.climbing) {
     // 爬梯：双手交替上够，腿蹬阶
     target.hipY = 0; target.hipX = 0;
     target.torso = -4 * DEG;
