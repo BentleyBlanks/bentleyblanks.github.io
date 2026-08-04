@@ -120,7 +120,7 @@ export const SCENES = {
       { id: "surfHouseC", kind: "house", x: 24, w: 8.5, h: 3.1 },
       { id: "chamberA", kind: "chamber", x: 112, w: 12, name: "藏人洞·甲" },
       { id: "chamberB", kind: "chamber", x: 58, w: 12, name: "藏人洞·乙" },
-      { id: "ventPipe", kind: "vent", x: 112, name: "通风眼位" },
+      { id: "trapBend", kind: "waterTrap", x: 112, name: "翻口位", builtFlag: "trapBuilt" },
       { id: "bellWire", kind: "bell", x: 142, name: "预警铃位" },
     ],
     covers: [],
@@ -129,7 +129,7 @@ export const SCENES = {
       entW: { x: 34, w: 6, level: "under", label: "西口" },
       chamberA: { x: 112, w: 11, level: "under", label: "藏人洞·甲" },
       chamberB: { x: 58, w: 11, level: "under", label: "藏人洞·乙" },
-      ventSpot: { x: 112, w: 5, level: "under", label: "通风眼" },
+      trapSpot: { x: 112, w: 5, level: "under", label: "翻口" },
       bellSpot: { x: 142, w: 5, level: "under", label: "预警铃" },
       hiddenSpot: { x: 18, w: 7, level: "under", label: "新暗口" },
     },
@@ -607,18 +607,20 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c5_open",
       lines: [
         { stage: "东口封死了。第二天起，全村轮班下洞。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 } },
-        { stage: "高传宝在门板上画了三个记号：通风眼，新暗口，预警铃。", d: 4.0, cam: { kind: "shot", x: 40, y: UNDER_Y + 1.4, dist: 8 } },
+        { stage: "高传宝在门板上画了三个记号：翻口，新暗口，预警铃。", d: 4.0, cam: { kind: "shot", x: 40, y: UNDER_Y + 1.4, dist: 8 } },
         { stage: "柱子的墨斗和刨子，成了地道里的家伙什。", d: 3.6, cam: { kind: "shot", x: 40, y: UNDER_Y + 1.4, dist: 6.5 } },
       ],
     },
     {
       kind: "buildSpots", id: "c5_build",
       spots: [
-        { zone: TV.ventSpot, label: "打通风眼", holdTime: 3, note: "眼口藏在房根的夹壁里，烟能出去，地面上看不出来。" },
+        // 翻口是真实冀中地道的三防正解：把这一段挖成 U 形的弯，弯里存住水，
+        // 就是一道水封，烟和水都过不去。人猫着腰从水里钻过去。
+        { zone: TV.trapSpot, label: "挖翻口", holdTime: 3, note: "这一段挖成个下沉的弯，弯里存住水。烟推到这儿，过不去。" },
         { zone: TV.hiddenSpot, label: "挖新暗口", holdTime: 3, note: "新口开在西头第三家的猪圈底下。挖出来的土，天不亮就摊进了麦地。" },
         { zone: TV.bellSpot, label: "拴预警铃", holdTime: 3, note: "东口一响，全村先知道。" },
       ],
-      objective: "完成三处改造：通风眼、新暗口、预警铃",
+      objective: "完成三处改造：翻口、新暗口、预警铃",
       hint: "到标记处按住 E 施工",
     },
     {
@@ -632,7 +634,7 @@ export const SCRIPTS = {
     {
       kind: "smokeEscape", id: "c5_drill", dest: TV.hiddenSpot,
       objective: "铃响了——把人从新暗口送出去",
-      hint: "通风眼会拖住烟。别走西口，鬼子早就盯上它了",
+      hint: "把人带到翻口后面去。别走西口，鬼子早就盯上它了",
       resetHint: "烟追上了人。再来——这一回，地道听你们的。",
     },
     {
@@ -1030,7 +1032,7 @@ function SpawnTunnelVillagers(state) {
 
 function StartSmoke(state) {
   // 烟从东口（x=148）向西推进
-  state.smoke = { frontX: 150, speed: 0.85, ventAt: null, ventUntil: 0, active: true, sourceX: 148 };
+  state.smoke = { frontX: 150, speed: 0.85, trapAt: null, trapHeld: false, active: true, sourceX: 148 };
   for (const a of state.actors) {
     if (a.kind !== "villager") continue;
     if (a.group === "elders") a.x = TV.chamberA.x + (a.id === "elder1" ? -1 : 1);
@@ -1041,14 +1043,17 @@ function StartSmoke(state) {
 }
 
 function StartDrillSmoke(state) {
-  // 验收战：预警铃先响；通风眼拖住烟；西口被堵死，新暗口是活路
+  // 验收战：预警铃先响；烟推到翻口就过不来；西口被堵死，新暗口是活路
   state.actors = state.actors.filter((a) => a.kind !== "villager");
+  // 三个人都在翻口以东——翻口挡得住烟，可他们还在烟这一侧。
+  // 这一场的紧张就在这段路上：得赶在烟推到翻口之前，把人都带到弯的后面去。
+  // （挖翻口那一下的回报也在这儿：过了弯就是安全的，不必一路跑到新暗口。）
   state.actors.push(
-    MakeActor("d_elder", "villager", TV.chamberA.x - 1, { level: "under", label: "六婶", slow: true }),
-    MakeActor("d_aunt", "villager", TV.chamberB.x, { level: "under", label: "大嫂" }),
-    MakeActor("d_kid", "villager", TV.chamberB.x + 1.2, { level: "under", label: "小石头", slow: true }),
+    MakeActor("d_elder", "villager", TV.trapSpot.x + 14, { level: "under", label: "六婶", slow: true }),
+    MakeActor("d_aunt", "villager", TV.trapSpot.x + 8, { level: "under", label: "大嫂" }),
+    MakeActor("d_kid", "villager", TV.trapSpot.x + 9.2, { level: "under", label: "小石头", slow: true }),
   );
-  state.smoke = { frontX: 150, speed: 0.9, ventAt: SCENES.tunnelVillage.zones.ventSpot.x, ventUntil: 0, vented: false, active: true, sourceX: 148 };
+  state.smoke = { frontX: 150, speed: 0.9, trapAt: SCENES.tunnelVillage.zones.trapSpot.x, trapHeld: false, active: true, sourceX: 148 };
   state.flags.hiddenBuilt = true;
   state.flags.entWBlocked = true;
   state.player.x = 148;
@@ -1147,7 +1152,7 @@ export function CreateGame(chapterIndex = 0) {
     lightOverride: null,
     flood: null,
     floodDepth: 0,
-    flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, entWBlocked: false, notesSeen: [] },
+    flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, trapBuilt: false, entWBlocked: false, notesSeen: [] },
     caption: null,
     camHint: { kind: "follow" },
     fade: 0,
@@ -1743,6 +1748,7 @@ function StepBuildSpots(state, def, input, dt) {
           state.beat.spotDone[i] = true;
           state.toast = { text: s.note, t: 4.5 };
           if (s.zone === TV.hiddenSpot) state.flags.hiddenBuilt = true;
+          if (s.zone === TV.trapSpot) state.flags.trapBuilt = true;
         }
       }
       break;
@@ -1787,14 +1793,17 @@ function StepDigSeq(state, def, input, dt) {
 // ---------------------------------------------------------------------------
 function StepSmoke(state, dt) {
   const s = state.smoke;
-  if (s.ventAt !== null && !s.vented && s.frontX <= s.ventAt) {
-    s.vented = true;
-    s.ventUntil = state.time + 22; // 通风眼把烟拖住
-    state.toast = { text: "烟到了通风眼，打着旋儿往上走——脚下这段，慢了下来。", t: 4 };
+  // 翻口是水封，不是缓冲：烟推到弯前就到头了。第四章没有翻口，所以人没救回来；
+  // 第五章挖了，所以这一次守得住——这一章的改造在这里兑现。
+  if (s.trapAt !== null && s.frontX <= s.trapAt) {
+    s.frontX = s.trapAt;
+    if (!s.trapHeld) {
+      s.trapHeld = true;
+      state.toast = { text: "烟撞在翻口的水面上，翻了几下，没能过来。", t: 4.5 };
+    }
+    return;
   }
-  if (s.vented && state.time < s.ventUntil) return;
-  const speed = s.vented ? s.speed * 0.55 : s.speed;
-  s.frontX -= speed * dt;
+  s.frontX -= s.speed * dt;
 }
 
 export function SmokeCovers(state, x) {
@@ -1922,7 +1931,7 @@ function StepSmokeEscape(state, def, input) {
     if (SmokeCovers(state, a.x)) {
       state.flags.resets += 1;
       state.smoke.frontX = 150;
-      state.smoke.vented = false;
+      state.smoke.trapHeld = false;
       RestoreSnapshot(state);
       state.beat.lossStage = 0;
       for (const v of state.actors.filter((x) => x.kind === "villager")) {

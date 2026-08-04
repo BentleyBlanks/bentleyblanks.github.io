@@ -3,7 +3,7 @@
 // 日军往地道里灌烟、灌水，是大纲里最有画面的两件事。这里做的是真解算，
 // 不是贴图平移：半拉格朗日平流 + 雅可比压力投影 + 涡量约束，
 // 固体边界直接取地道剖面（土是墙，掏出来的洞是流场）。
-//   烟：有浮力，贴着洞顶往前爬，遇到通风眼会被抽走；
+//   烟：有浮力，贴着洞顶往前爬，遇到通风眼会被抽走、撞上翻口的水封则过不去；
 //   水：受重力，沿洞底流淌积深，先淹低处。
 
 const Clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -29,6 +29,7 @@ export class TunnelFluid {
     this.cellW = (x1 - x0) / cols;
     this.cellH = (yTop - yBottom) / rows;
     this.vents = [];
+    this.barriers = [];
     this.time = 0;
   }
 
@@ -64,6 +65,9 @@ export class TunnelFluid {
 
   /** 通风眼：把烟往上抽走 */
   SetVents(xs) { this.vents = xs.map((x) => Math.round(this.ColOf(x))); }
+  // 翻口（U 形反水弯）：弯里存着水，是一道水封——烟和水都过不去。
+  // 不写进 solid，因为那是给地道剖面用的；这里只拦流体，人照样能钻过去。
+  SetBarriers(xs) { this.barriers = xs.map((x) => Math.round(this.ColOf(x))); }
 
   Emit(worldX, worldY, { smoke = 0, water = 0, vx = 0, vy = 0, radius = 1.2 } = {}) {
     const c0 = Math.round(this.ColOf(worldX));
@@ -221,6 +225,18 @@ export class TunnelFluid {
     this.Advect(this.smoke, this.smoke0, dtc);
     this.water0.set(this.water);
     this.Advect(this.water, this.water0, dtc);
+
+    // 水封：这一列的烟直接清零、横向速度掐掉。烟到这儿就是到头了
+    for (const bc of this.barriers) {
+      for (let c = bc - 1; c <= bc + 1; c += 1) {
+        if (c < 1 || c >= cols - 1) continue;
+        for (let r = 1; r < rows - 1; r += 1) {
+          const i = this.Index(c, r);
+          this.smoke[i] = 0;
+          this.vx[i] = 0;
+        }
+      }
+    }
 
     // 通风眼抽烟
     for (const vc of this.vents) {

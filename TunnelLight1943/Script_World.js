@@ -909,6 +909,18 @@ export function CreateWorld(canvasEl) {
           ctx.fillRect(toPx(p.x) - 2.8 * PPM, toPy(UNDER_Y + 2.5), 5.6 * PPM, tunBot - toPy(UNDER_Y + 2.5));
         }
       }
+      // 翻口：地道在这一段往下沉一个 U 形弯，得跟走廊一样从土里掏出来
+      for (const p of sceneDef.props) {
+        if (p.kind !== "waterTrap") continue;
+        if (p.builtFlag && !state.flags[p.builtFlag]) continue;
+        const tw = 3.4 * PPM, td = 1.05 * PPM;
+        ctx.beginPath();
+        ctx.moveTo(toPx(p.x) - tw / 2, tunBot);
+        ctx.bezierCurveTo(toPx(p.x) - tw * 0.28, tunBot + td,
+          toPx(p.x) + tw * 0.28, tunBot + td, toPx(p.x) + tw / 2, tunBot);
+        ctx.closePath();
+        ctx.fill();
+      }
       // 竖井
       for (const shaft of sceneDef.shafts) {
         if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
@@ -1046,7 +1058,16 @@ export function CreateWorld(canvasEl) {
       group.add(sh);
     }
     for (const p of sceneDef.props) {
-      if (p.kind === "vent") {
+      if (p.kind === "waterTrap") {
+        // 挖好之前地上什么也没有——第四章那场烟正是因为还没有它
+        if (p.builtFlag && !state.flags[p.builtFlag]) continue;
+        const tw = 3.4;
+        const t = BakeSprite(Math.ceil(tw * PPM) + 24, 130, Math.ceil(tw * PPM) / 2 + 12, 8,
+          (ctx, ax, ay) => ART.DrawWaterTrap(ctx, ax, ay, tw * PPM, p.id), 0, PROP_SS);
+        // 近侧那一刀土在 z=2.2；弯要画在它之前，不然连同水一起被土盖掉
+        PlaceSprite(t, p.x, UNDER_Y, 2.0);
+        group.add(t);
+      } else if (p.kind === "vent") {
         const v = BakeSprite(60, Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), 30,
           Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), (ctx, ax, ay) => {
             ART.DrawVentPipe(ctx, ax, 4, ay, p.id);
@@ -1234,7 +1255,7 @@ export function CreateWorld(canvasEl) {
 
     // 地表道具与遮蔽
     for (const p of sceneDef.props) {
-      if (["chamber", "pocket", "vent", "bell", "collapse"].includes(p.kind)) continue;
+      if (["chamber", "pocket", "vent", "waterTrap", "bell", "collapse"].includes(p.kind)) continue;
       AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene);
     }
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
@@ -1482,6 +1503,11 @@ export function CreateWorld(canvasEl) {
         const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
         fluid.SetAirRects(occ.air);
         fluid.SetVents(sceneDef.props.filter((pp) => pp.kind === "vent").map((pp) => pp.x));
+        // 翻口是水封：挖好之后，模拟出来的烟也必须在这儿停住，
+        // 否则一维的烟锋停了、画面上的烟还在往西飘，两套说法对不上
+        fluid.SetBarriers(sceneDef.props
+          .filter((pp) => pp.kind === "waterTrap" && (!pp.builtFlag || state.flags[pp.builtFlag]))
+          .map((pp) => pp.x));
         fluidKey = builtKey;
         fluidCanvas = MakeCanvas(fluid.cols, fluid.rows);
         fluidCtx = fluidCanvas.getContext("2d");

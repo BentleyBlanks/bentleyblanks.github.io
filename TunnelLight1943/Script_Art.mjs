@@ -1360,6 +1360,45 @@ export function DrawCollapsePile(ctx, x, botY, scale, id) {
   InkLine(ctx, x - 20, botY - H * 0.7, x + 16, botY - H * 0.35, id + "beam", { lw: 5, color: "#6b4f30", amp: 2 });
 }
 
+// 翻口：地道在这一段挖成下沉的 U 形弯，弯底存着一汪水。
+// 画法上要一眼读出"底下是凹的、里面有水"——所以是一条下凹的土沿
+// 加一层带反光的水面，水面上再压一道暗，像被土压着。
+export function DrawWaterTrap(ctx, x, floorY, w, id) {
+  const half = w / 2;
+  const depth = w * 0.30;   // 是脚下一个下沉的弯，不是一口井
+  // 下凹的土坑轮廓
+  ctx.beginPath();
+  ctx.moveTo(x - half, floorY);
+  ctx.bezierCurveTo(x - half * 0.5, floorY + depth, x + half * 0.5, floorY + depth, x + half, floorY);
+  ctx.lineTo(x + half, floorY + depth * 1.25);
+  ctx.lineTo(x - half, floorY + depth * 1.25);
+  ctx.closePath();
+  ctx.fillStyle = "#2b2119";
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(x - half, floorY);
+  ctx.bezierCurveTo(x - half * 0.5, floorY + depth, x + half * 0.5, floorY + depth, x + half, floorY);
+  ctx.stroke();
+  // 水面：略高于弯底，带一点反光
+  const wy = floorY + depth * 0.52;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x - half * 0.92, wy);
+  ctx.bezierCurveTo(x - half * 0.45, wy + depth * 0.42, x + half * 0.45, wy + depth * 0.42, x + half * 0.92, wy);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(88,104,98,0.78)";   // 存在土里的水是浑的，别蓝得跳出这套土色
+  ctx.fill();
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - half * 0.6 + i * half * 0.5, wy + 3 + i * 2,
+      x - half * 0.2 + i * half * 0.5, wy + 3 + i * 2, id + "wl" + i,
+      { lw: 1.3, color: "rgba(196,206,196,0.7)", amp: 0.8 });
+  }
+  ctx.restore();
+}
+
 export function DrawVentPipe(ctx, x, topY, botY, id) {
   InkFill(ctx, Rect(x - 9, topY, 18, botY - topY), id, "#4a3a28", { amp: 1.1, lw: 2.2 });
   ctx.save();
