@@ -78,15 +78,17 @@ export class TunnelFluid {
         const d = Math.hypot((c - c0) / rc, (r - r0) / rr);
         if (d > 1) continue;
         const f = 1 - d;
-        this.smoke[i] = Math.min(1.6, this.smoke[i] + smoke * f);
-        this.water[i] = Math.min(1.6, this.water[i] + water * f);
+        this.smoke[i] = Math.min(2.4, this.smoke[i] + smoke * f);
+        this.water[i] = Math.min(2.4, this.water[i] + water * f);
         this.vx[i] += vx * f;
         this.vy[i] += vy * f;
       }
     }
   }
 
-  Advect(dst, src, dt) {
+  // velX/velY：回溯用的速度场。速度自平流必须用快照，否则会读到
+  // 正在被覆盖的同一个数组（别名），数值会滚雪球式爆掉。
+  Advect(dst, src, dt, velX = this.vx, velY = this.vy) {
     const { cols, rows } = this;
     const dtx = dt / this.cellW;
     const dty = dt / this.cellH;
@@ -94,10 +96,13 @@ export class TunnelFluid {
       for (let c = 1; c < cols - 1; c += 1) {
         const i = this.Index(c, r);
         if (this.solid[i]) { dst[i] = 0; continue; }
-        let x = c - dtx * this.vx[i];
-        let y = r - dty * this.vy[i];
+        let x = c - dtx * velX[i];
+        let y = r - dty * velY[i];
+        if (!Number.isFinite(x) || !Number.isFinite(y)) { dst[i] = 0; continue; }
         x = Clamp(x, 0.5, cols - 1.5);
         y = Clamp(y, 0.5, rows - 1.5);
+        // 回溯点落进土里就退回原格，避免质量被固体吞掉
+        if (this.solid[this.Index(Math.round(x), Math.round(y))]) { dst[i] = src[i]; continue; }
         const c0 = Math.floor(x), r0 = Math.floor(y);
         const s1 = x - c0, s0 = 1 - s1;
         const t1 = y - r0, t0 = 1 - t1;
@@ -125,13 +130,15 @@ export class TunnelFluid {
         for (let c = 1; c < cols - 1; c += 1) {
           const i = this.Index(c, r);
           if (this.solid[i]) continue;
-          let sum = 0, cnt = 0;
+          // 分母固定为 4：若按"流体邻居数"取，细长走廊里大量格子只有一个
+          // 流体邻居，全 Neumann 边界下该迭代发散 → Infinity → 相减成 NaN，
+          // 整片场会被平流污染。固定分母略损精度但稳定。
+          let sum = 0;
           for (const j of [this.Index(c - 1, r), this.Index(c + 1, r), this.Index(c, r - 1), this.Index(c, r + 1)]) {
-            if (this.solid[j]) continue;      // 固体边界：不参与压力传播
+            if (this.solid[j]) continue;      // 固体边界：视作 p=0，不传播
             sum += this.p[j];
-            cnt += 1;
           }
-          if (cnt) this.p[i] = (this.div[i] + sum) / cnt;
+          this.p[i] = (this.div[i] + sum) / 4;
         }
       }
     }
@@ -145,7 +152,21 @@ export class TunnelFluid {
     }
   }
 
+  /** 数值卫生：非有限值就地归零。解算里一个 NaN 会顺着平流污染整片场 */
+  Sanitize(tag) {
+    let bad = 0;
+    for (let i = 0; i < this.n; i += 1) {
+      if (!Number.isFinite(this.vx[i])) { this.vx[i] = 0; bad += 1; }
+      if (!Number.isFinite(this.vy[i])) { this.vy[i] = 0; bad += 1; }
+      if (!Number.isFinite(this.smoke[i])) { this.smoke[i] = 0; bad += 1; }
+      if (!Number.isFinite(this.water[i])) { this.water[i] = 0; bad += 1; }
+    }
+    if (bad) this.lastBad = { tag, bad };
+    return bad;
+  }
+
   Step(dt) {
+    if (!Number.isFinite(dt) || dt <= 0) return;
     this.time += dt;
     const { cols, rows } = this;
     const dtc = Math.min(0.05, dt);
@@ -155,11 +176,23 @@ export class TunnelFluid {
       for (let c = 1; c < cols - 1; c += 1) {
         const i = this.Index(c, r);
         if (this.solid[i]) continue;
-        this.vy[i] += this.smoke[i] * 3.2 * dtc;       // 浮力
+        this.vy[i] += this.smoke[i] * 1.15 * dtc;       // 浮力
         this.vy[i] -= this.water[i] * 9.0 * dtc;       // 重力
         // 洞顶阻尼：烟贴顶爬行
         this.vx[i] *= 0.9985;
         this.vy[i] *= 0.997;
+        // 限幅：一帧内位移不超过约一格，平流采样才稳
+        const maxVX = this.cellW / Math.max(1e-3, dtc) * 0.9;
+        const maxVY = this.cellH / Math.max(1e-3, dtc) * 0.9;
+        this.vx[i] = Clamp(this.vx[i], -maxVX, maxVX);
+        this.vy[i] = Clamp(this.vy[i], -maxVY, maxVY);
+        // 无穿透边界：贴着土的那一面不许有指向土里的速度分量。
+        // 少了这一条，浮力会把烟顶进洞顶的固体格，而平流会把进入固体的
+        // 量直接清零 —— 烟就是这么被"洞顶吃掉"的。
+        if (this.solid[this.Index(c, r + 1)] && this.vy[i] > 0) this.vy[i] = 0;
+        if (this.solid[this.Index(c, r - 1)] && this.vy[i] < 0) this.vy[i] = 0;
+        if (this.solid[this.Index(c + 1, r)] && this.vx[i] > 0) this.vx[i] = 0;
+        if (this.solid[this.Index(c - 1, r)] && this.vx[i] < 0) this.vx[i] = 0;
       }
     }
     // 涡量约束
@@ -174,13 +207,16 @@ export class TunnelFluid {
       }
     }
 
+    this.Sanitize("force");
     this.Project();
+    this.Sanitize("project1");
 
     this.vx0.set(this.vx); this.vy0.set(this.vy);
-    this.Advect(this.vx, this.vx0, dtc);
-    this.Advect(this.vy, this.vy0, dtc);
+    this.Advect(this.vx, this.vx0, dtc, this.vx0, this.vy0);
+    this.Advect(this.vy, this.vy0, dtc, this.vx0, this.vy0);
     this.Project();
 
+    this.Sanitize("advectV");
     this.smoke0.set(this.smoke);
     this.Advect(this.smoke, this.smoke0, dtc);
     this.water0.set(this.water);
@@ -219,6 +255,7 @@ export class TunnelFluid {
       }
     }
 
+    this.Sanitize("advectS");
     // 轻微耗散
     for (let i = 0; i < this.n; i += 1) {
       this.smoke[i] *= 0.99965;
@@ -256,12 +293,15 @@ export class TunnelFluid {
         const sm = Clamp(this.smoke[i], 0, 1);
         const wt = Clamp(this.water[i], 0, 1);
         if (wt > 0.02) {
-          px[o] = 96; px[o + 1] = 78; px[o + 2] = 50;
-          px[o + 3] = Math.min(255, wt * 235);
-        } else if (sm > 0.01) {
-          const v = 150 + sm * 60;
-          px[o] = v; px[o + 1] = v - 6; px[o + 2] = v - 18;
-          px[o + 3] = Math.min(240, sm * 210);
+          // 浑水：泥汤色，越深越暗；表层薄水偏亮，像刚漫过来的一层
+          const d = Math.min(1, wt * 1.6);
+          px[o] = 92 - d * 34; px[o + 1] = 70 - d * 28; px[o + 2] = 40 - d * 18;
+          px[o + 3] = Math.min(242, 120 + d * 122);
+        } else if (sm > 0.02) {
+          const d = Math.min(1, sm * 1.5);
+          const v = 148 + d * 66;
+          px[o] = v; px[o + 1] = v - 8; px[o + 2] = v - 24;
+          px[o + 3] = Math.min(230, 40 + d * 190);
         } else {
           px[o + 3] = 0;
         }

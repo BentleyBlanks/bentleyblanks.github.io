@@ -193,7 +193,7 @@ const SCRIPTS = {
       lines: [
         { stage: "1942年，华北敌后。梁家村。", d: 3.2, cam: { kind: "wide", x: 60 } },
         { stage: "梁木匠把刨子放下，叫住了往外跑的儿子。", d: 3.4, cam: { kind: "shot", x: 38, y: 1.8, dist: 11 } },
-        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insert", x: 33.6, y: 0.72, dist: 1.8 } },
+        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
         { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
         { stage: "柱子没听懂这句话有多重。他只惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 } },
@@ -345,7 +345,7 @@ const SCRIPTS = {
             );
           } },
         { stage: "是等在这里的。", d: 2.6, cam: { kind: "shot", x: 172, y: 1.3, dist: 7 } },
-        { stage: "妹妹的手从柱子手里被拽走。", d: 2.8, cam: { kind: "insert", x: 175, y: 1.0, dist: 2.4 },
+        { stage: "妹妹的手从柱子手里被拽走。", d: 3.2, cam: { kind: "insertCard", card: "hands" },
           on: (state) => {
             const sister = FindActor(state, "sister");
             if (sister) { sister.following = false; sister.cineTarget = { x: 179 }; sister.cineSpeed = 2.4; }
@@ -423,7 +423,7 @@ const SCRIPTS = {
               label: "交通员", cineTarget: { x: 13 }, cineSpeed: 2.6, heading: -1,
             }));
           } },
-        { stage: "他的鞋底磨穿了。", d: 2.6, cam: { kind: "insert", x: 13, y: 0.35, dist: 2.0 } },
+        { stage: "他的鞋底磨穿了。", d: 3.0, cam: { kind: "insertCard", card: "sole" } },
         { who: "交通员", say: "据点里又抓了几个人。柱子的妹妹，也在里面。", d: 4.2, cam: { kind: "ots", subject: "runner", other: "gao", dist: 3.6 } },
         { who: "高传宝", say: "先把人救出来。不能让乡亲们再被带走。", d: 4.0, cam: { kind: "ots", subject: "gao", other: "runner", dist: 3.6 } },
         { stage: "鬼子放出风来，要往县里押人，日子没说定——这是撒出来的饵。谁都听得懂。", d: 4.6, cam: { kind: "shot", x: 170, y: 2.2, dist: 16 } },
@@ -494,6 +494,15 @@ const SCRIPTS = {
       resetHint: "烟呛倒了人。民兵把大家拖回洞室，重新来。",
     },
     {
+      kind: "cinematic", id: "c4_floodStart",
+      lines: [
+        { stage: "第二天，鬼子又拉来了水泵。", d: 3.2, cam: { kind: "shot", x: 144, y: 0.6, dist: 11 },
+          on: (state) => { SpawnSurfaceSearch(state, 146); } },
+        { stage: "浑浊的泥水顺着东口灌下来，先淹的是最低的那一段。", d: 4.2, cam: { kind: "wide", x: 120, y: -1.2, hw: 20, pan: -8 },
+          on: (state) => { StartFlood(state); } },
+      ],
+    },
+    {
       kind: "floodRescue", id: "c4_flood", dest: TV.entW,
       objective: "水在涨——把还困在里面的人捞出西口",
       hint: "水从东边漫过来，低处先没。E 招呼人跟上",
@@ -504,9 +513,6 @@ const SCRIPTS = {
       lines: [
         { stage: "西口外，乡亲们趴在田里咳嗽。人数了两遍。", d: 3.8, cam: { kind: "shot", x: 30, y: 0.8, dist: 12 } },
         { stage: "顺子没出来。拴柱大爷也没有。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 8 } },
-        { stage: "第二天，鬼子又拉来了水泵，往地道里灌水。", d: 3.8, cam: { kind: "wide", x: 130, y: -1.2 },
-          on: (state) => { StartFlood(state); } },
-        { stage: "浑浊的泥水顺着东口灌下来，先淹的是最低的那一段。", d: 4.2, cam: { kind: "wide", x: 110, y: -1.2, pan: -8 } },
         { stage: "有人活着出来。有人再也没有出来。", d: 4.2, cam: { kind: "dark" },
           on: (state) => { state.flood = null; } },
         { stage: "柱子站在出口，看着被抬出来的乡亲，一句话也说不出。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 9 } },
@@ -697,7 +703,7 @@ const SCRIPTS = {
             const gao = FindActor(state, "gao");
             if (gao) { gao.cineTarget = { x: 15.4 }; gao.cineSpeed = 1.0; }
           } },
-        { stage: "柱子接过灯。", d: 2.6, cam: { kind: "insert", x: 15, y: UNDER_Y + 1.1, dist: 2.0 },
+        { stage: "柱子接过灯。", d: 3.0, cam: { kind: "insertCard", card: "wick" },
           on: (state) => { state.player.lamp = true; } },
         { stage: "转身走回黑暗里。", d: 4.0, cam: { kind: "shot", x: 20, y: UNDER_Y + 1.4, dist: 7, pan: 3 } },
       ],

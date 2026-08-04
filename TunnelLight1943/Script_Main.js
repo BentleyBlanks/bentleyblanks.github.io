@@ -13,7 +13,7 @@ const ui = {};
 for (const id of [
   "titleScreen", "startButton", "chapterList",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag",
-  "cineBars", "caption", "capSpeaker", "capText",
+  "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
   "choiceOverlay", "choicePrompt", "choiceList",
@@ -145,6 +145,9 @@ function HintShot(state, hint) {
       return { x: hint.x, y: hint.y ?? 1.6, hw: hint.dist ?? 8, pan: hint.pan || 0 };
     case "insert":
       return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
+    case "insertCard":
+      // 专画的一张细节插画铺满画框；机位停在原地不动
+      return { ...BaseShot(state), card: hint.card };
     case "close": {
       const t = ActorAt(state, hint.on || "player") || { x: state.player.x, level: state.player.level };
       return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: hint.dist ?? 4.2 };
@@ -197,10 +200,12 @@ function UpdateCamera(state, dt) {
       hw: framing.baseHw * (1 - 0.10 * framing.prog),
     };
     world.SetOverShoulder(state, shot.ots || null);
+    world.SetInsertCard(shot.card || null);
   } else {
     shot = BaseShot(state);
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
+    world.SetInsertCard(null);
   }
 
   if (camSnap) {
@@ -263,6 +268,8 @@ function SyncHud(state, dt, shotFade) {
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
 
   ui.cineBars.classList.toggle("active", !!inCinematic);
+  const hasCaption = !!(state.caption && inCinematic && (state.caption.say || state.caption.stage));
+  if (ui.captionScrim) ui.captionScrim.classList.toggle("active", hasCaption);
   // 地窖板缝 matte：第一章父亲被抓那场
   const slit = inCinematic && state.camHint?.slit;
   if (ui.slitMatte) ui.slitMatte.classList.toggle("active", !!slit);

@@ -940,11 +940,11 @@ export function CreateWorld(canvasEl) {
       // 灌烟口/灌水口持续注入
       if (state.smoke?.active) {
         const src = state.smoke.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
-        fluid.Emit(src, UNDER_Y + 1.9, { smoke: 1.05 * Math.min(0.05, dt) * 30, vx: -3.4, vy: 0.7, radius: 1.7 });
+        fluid.Emit(src, UNDER_Y + 1.05, { smoke: 30 * Math.min(0.05, dt), vx: -2.6, vy: 0.15, radius: 1.15 });
       }
       if (state.flood?.active) {
         const src = state.flood.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
-        fluid.Emit(src, UNDER_Y + 2.4, { water: 0.8 * Math.min(0.05, dt) * 30, vx: -1.2, vy: -2.5, radius: 1.2 });
+        fluid.Emit(src, UNDER_Y + 2.0, { water: 34 * Math.min(0.05, dt), vx: -0.8, vy: -1.6, radius: 0.8 });
       }
       fluid.Step(dt);
       fluid.Paint(fluidImage);
@@ -1070,6 +1070,46 @@ export function CreateWorld(canvasEl) {
     darkPlane.position.set(camX, camY, planeZ);
   }
 
+  // 插入特写卡：镜头真正要看的那个细节，另画一张铺满画框
+  const insertCards = new Map();
+  let insertMesh = null;
+
+  function SetInsertCard(name) {
+    if (!name) {
+      if (insertMesh) insertMesh.visible = false;
+      return;
+    }
+    if (!insertCards.has(name)) {
+      const W = 1280, H = 720;
+      const canvas = MakeCanvas(W, H);
+      ART.DrawInsertCard(canvas.getContext("2d"), W, H, name);
+      insertCards.set(name, CanvasTexture(canvas));
+    }
+    if (!insertMesh) {
+      insertMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+      );
+      insertMesh.renderOrder = 70;
+      scene.add(insertMesh);
+    }
+    insertMesh.material.map = insertCards.get(name);
+    insertMesh.material.needsUpdate = true;
+    insertMesh.visible = true;
+  }
+
+  function PlaceInsertCard(camX, camY, viewW, viewH, dist) {
+    if (!insertMesh?.visible) return;
+    const z = dist - 2;
+    const k = 2 / dist;
+    // 按画框比例铺满：宽高取大者，保证不露边
+    const cw = viewW * k, chh = viewH * k;
+    const aspect = 1280 / 720;
+    const w = Math.max(cw, chh * aspect);
+    insertMesh.scale.set(w, w / aspect, 1);
+    insertMesh.position.set(camX, camY, z);
+  }
+
   // 过肩前景：把某个角色的剪影放在画面边缘（正反打用）
   function SetOverShoulder(state, spec) {
     if (!spec) {
@@ -1153,6 +1193,7 @@ export function CreateWorld(canvasEl) {
       );
     }
     PlaceOverShoulder(camX, camY, viewW, viewH);
+    PlaceInsertCard(camX, camY, viewW, viewH, dist);
     return { viewW, viewH, dist };
   }
 
@@ -1166,7 +1207,8 @@ export function CreateWorld(canvasEl) {
   return {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
-    SetOverShoulder, ApplyCamera, Resize, Render,
+    SetOverShoulder, SetInsertCard, ApplyCamera, Resize, Render,
+    get __fluid() { return fluid; },
     get viewSize() { return { w: viewW, h: viewH }; },
   };
 }

@@ -13,6 +13,7 @@ const outDir = path.resolve(process.argv[2] || "./shots");
 const chapter = parseInt(process.argv[3] || "4", 10);
 const beatId = process.argv[4] || "";
 const seconds = parseFloat(process.argv[5] || "6");
+const forceX = process.argv[6] ? parseFloat(process.argv[6]) : null;
 fs.mkdirSync(outDir, { recursive: true });
 
 const server = await ServeRoot(rootDir, 0);
@@ -57,6 +58,7 @@ const reached = await page.evaluate(async (target) => {
   return window.TunnelLight.state ? "(未到达)" : "(无状态)";
 }, beatId);
 
+if (forceX !== null) await page.evaluate((x) => { window.TunnelLight.state.player.x = x; }, forceX);
 // 让它真跑一段时间（rAF 驱动渲染 + 流体解算）
 await page.waitForTimeout(seconds * 1000);
 await page.screenshot({ path: path.join(outDir, `c${chapter}_${beatId || "scene"}.png`) });

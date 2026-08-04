@@ -38,12 +38,14 @@ body {
   transition: opacity 0.7s ease;
 }
 #objectivePanel b {
-  display: block; font-size: 15.5px; letter-spacing: 0.1em; color: var(--paper);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  display: inline-block; padding: 6px 18px;
+  font-size: 16px; letter-spacing: 0.1em; font-weight: 600; color: #f6ecd8;
+  background: rgba(8, 6, 4, 0.55); border-radius: 999px;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
 }
 #objectivePanel span {
-  display: block; margin-top: 5px; font-size: 12.5px; color: rgba(216, 203, 176, 0.66);
-  line-height: 1.6; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  display: block; margin-top: 7px; font-size: 13px; color: #d6c9ac;
+  line-height: 1.65; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.7);
 }
 
 #crouchTag {
@@ -57,10 +59,12 @@ body {
 #prompt {
   position: absolute; left: 50%; bottom: 15%;
   transform: translateX(-50%);
-  padding: 0; font-size: 14px; letter-spacing: 0.14em;
-  color: rgba(240, 214, 150, 0.92); background: none; border: none;
-  white-space: nowrap;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+  padding: 7px 20px; font-size: 15px; letter-spacing: 0.14em; font-weight: 500;
+  color: #f7dd9a; white-space: nowrap;
+  background: rgba(8, 6, 4, 0.62);
+  border-radius: 999px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
 /* 短提示 */
@@ -93,18 +97,41 @@ body {
 #cineBars .barBottom { bottom: 0; }
 #cineBars.active .barTop, #cineBars.active .barBottom { height: 11.5vh; }
 
-/* 字幕 */
+/* 字幕：勇敢的心式——底部一条压暗的渐变把字托住，
+   旁白与对白分成两种字体色阶，任何画面亮度下都读得清 */
+#captionScrim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42vh;
+  background: linear-gradient(180deg, rgba(6, 5, 4, 0) 0%, rgba(6, 5, 4, 0.55) 55%, rgba(6, 5, 4, 0.86) 100%);
+  opacity: 0; transition: opacity 0.45s ease; pointer-events: none;
+}
+#captionScrim.active { opacity: 1; }
+
 #caption {
-  position: absolute; left: 50%; bottom: 13.5vh;
+  position: absolute; left: 50%; bottom: 14.5vh;
   transform: translateX(-50%);
-  width: min(720px, 86vw); text-align: center;
+  width: min(760px, 88vw); text-align: center;
 }
+/* 说话人：一枚小铭牌，两侧带短横线 */
 #capSpeaker {
-  display: inline-block; margin-bottom: 6px;
-  font-size: 14px; letter-spacing: 0.3em; color: var(--lamp);
+  display: inline-flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+  font-size: 14.5px; letter-spacing: 0.34em; font-weight: 600;
+  color: #f2cf72;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
 }
-#capText { font-size: 17.5px; line-height: 1.9; text-shadow: 0 1px 6px #000; }
-#capText.stage { color: #cfc4ad; font-size: 15.5px; }
+#capSpeaker::before, #capSpeaker::after {
+  content: ""; width: 26px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(242, 207, 114, 0.8), transparent);
+}
+#capText {
+  font-size: 20px; line-height: 1.95; font-weight: 500;
+  color: #f6ecd8;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.8);
+}
+/* 旁白：比对白略小、略冷，但对比度一样足 */
+#capText.stage {
+  color: #e6dcc6; font-size: 17.5px; font-weight: 400; letter-spacing: 0.02em;
+}
 
 #fadeOverlay {
   position: absolute; inset: 0; background: #030202;

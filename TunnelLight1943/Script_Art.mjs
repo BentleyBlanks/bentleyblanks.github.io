@@ -831,7 +831,6 @@ export function DrawCrops(ctx, x, groundY, w, id, { night = false } = {}) {
     // 穗
     ctx.beginPath();
     ctx.ellipse(px + Sym(id, i + 120, 8), groundY - h - 3, 2.6, 5.4, Sym(id, i, 0.5), 0, Math.PI * 2);
-    ctx.fillStyle = night ? "#6b7048" : "#b5a martian";
     ctx.fillStyle = night ? "#6b7048" : "#bfa85c";
     ctx.fill();
     ctx.strokeStyle = IN.inkSoft;
@@ -1228,7 +1227,6 @@ export function DrawInsertCard(ctx, W, H, kind) {
   switch (kind) {
     case "carve": {
       // 一只手攥着凿子，在门框上刻线；木屑正在掉
-      CardBase(ctx, W, H, "#cbb governor");
       CardBase(ctx, W, H, "#cbb68e");
       // 门框立柱（占右侧）
       InkFill(ctx, Rect(cx + 40 * S, 0, 150 * S, H), "cardPost", PAL.wood,
