@@ -636,6 +636,14 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     ctx.strokeStyle = IN.ink;
     ctx.lineWidth = 1.6 * S;
     ctx.stroke();
+  } else if (label === "刨子") {
+    // 木匠的刨子：一块矮墩墩的木身，斜插一柄刨刀，背上一道横楔
+    InkFill(ctx, Rect(-11 * S, -4 * S, 22 * S, 8 * S), "planeBody", "#8d6236",
+      { amp: 0.5 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.18)" });
+    InkFill(ctx, [[-1.5 * S, -4 * S], [3 * S, -4 * S], [1.5 * S, -9.5 * S], [-2.5 * S, -9.5 * S]],
+      "planeBlade", "#6b6f76", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
+    InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
+      { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
   } else {
     InkFill(ctx, Rect(-26 * S, -3.2 * S, 52 * S, 6.4 * S), "plank", "#a8794a",
       { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.14)" });

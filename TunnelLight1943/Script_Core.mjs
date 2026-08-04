@@ -218,12 +218,40 @@ export const SCRIPTS = {
     {
       kind: "cinematic", id: "c1_open",
       lines: [
-        { stage: "1942年，华北敌后。梁家村。", d: 3.2, cam: { kind: "wide", x: 60 } },
-        { stage: "梁木匠把刨子放下，叫住了往外跑的儿子。", d: 3.4, cam: { kind: "shot", x: 38, y: 1.8, dist: 11 } },
-        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
+        { stage: "1942年，华北敌后。梁家村。", d: 3.2, cam: { kind: "wide", x: 60 },
+          on: (state) => {
+            // 开场这场戏原来全靠字幕：爹站着不动、柱子站着不动。现在让他们演——
+            // 爹手上有刨子（放下才有"放下"可看），柱子正往外跑（叫得住才有"叫住"）
+            const father = FindActor(state, "father");
+            if (father) { father.carry = "刨子"; father.x = 41; father.heading = -1; }
+            state.player.x = 44;
+            state.player.cineWalk = { x: 49, speed: 2.6 };
+          } },
+        { stage: "梁木匠把刨子放下，叫住了往外跑的儿子。", d: 3.4, cam: { kind: "shot", x: 43, y: 1.8, dist: 11 },
+          on: (state) => {
+            const father = FindActor(state, "father");
+            // 放下刨子：手里空出来，同时工作台上多一件东西
+            if (father) { father.carry = null; father.heading = 1; }
+            // 被叫住：跑出去的脚步收住，转身走回门框
+            state.player.cineWalk = { x: 39.4, speed: 1.7 };
+          } },
+        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" },
+          on: (state) => {
+            state.player.x = 39.2;
+            state.player.cineWalk = null;
+            state.player.heading = 1;
+            const father = FindActor(state, "father");
+            if (father) { father.cineTarget = { x: 40.4 }; father.cineSpeed = 1.2; father.heading = -1; }
+          } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
         { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
-        { stage: "柱子没听懂这句话有多重。他只惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 } },
+        { stage: "他惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
+          on: (state) => {
+            // 心思已经在村东头了：眼睛先往那边去
+            state.player.heading = 1;
+            const father = FindActor(state, "father");
+            if (father) { father.heading = -1; }
+          } },
       ],
     },
     {
@@ -249,7 +277,17 @@ export const SCRIPTS = {
     {
       kind: "cinematic", id: "c1_raid",
       lines: [
-        { stage: "锣声。有人在村口喊：鬼子进村了——", d: 3.0, cam: { kind: "wide", x: 140, pan: -6 } },
+        { stage: "锣声。有人在村口喊：鬼子进村了——", d: 3.0, cam: { kind: "wide", x: 140, pan: -6 },
+          on: (state) => {
+            // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
+            // 于是"鬼子进村了"这一句对着的是一个空村口
+            SpawnRaidSoldiers(state);
+            const r1 = FindActor(state, "raid1");
+            const r2 = FindActor(state, "raid2");
+            // 从村口往里走：镜头横摇跟着他们推进
+            if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
+            if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
+          } },
         { stage: "爹把刨子塞进柴堆，转身走向院门。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 },
           on: (state) => {
             const father = FindActor(state, "father");
@@ -257,7 +295,11 @@ export const SCRIPTS = {
           } },
         { who: "爹", say: "带妹妹进地窖。别出声。", d: 3.0, cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 } },
       ],
-      onDone: (state) => { SpawnRaidSoldiers(state); },
+      onDone: (state) => {
+        // 兵在第一行就已经进场了，这里只把巡逻交还给常规逻辑
+        for (const a of state.actors) if (IsEnemy(a)) a.cineTarget = null;
+        state.stealthActive = true;
+      },
     },
     {
       kind: "escort", id: "c1_hide", follower: "sister", dest: V.cellar, stealth: true,
@@ -301,7 +343,7 @@ export const SCRIPTS = {
         // 说到谁，谁就得在画面里：巡逻队在这一行进场，不是等过场演完
         { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 4.2, cam: { kind: "wide", x: 130, pan: -8 },
           on: (state) => { SpawnNightSweep(state); } },
-        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。名单就是他递上去的。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
+        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
           on: (state) => {
             const s1 = FindActor(state, "sweep1");
             if (s1) { s1.x = 124; s1.heading = -1; }
@@ -487,12 +529,12 @@ export const SCRIPTS = {
     {
       kind: "hold", id: "c4_shore", zone: TV.entW, holdTime: 3,
       objective: "西口的顶木松了，把它撑牢", hint: "在西口按住 E，柱子会用上木匠的手艺",
-      note: "柱子第一次发现，爹教的活计，在地底下也用得上。",
+      note: "木头咬住了。他松开手，顶木没有再响。",
     },
     {
       kind: "hold", id: "c4_listen", zone: TV.entE, holdTime: 4,
       objective: "贴在东口下面，听听上面的动静", hint: "按住 E，柱子会把听到的记在心里",
-      note: "探杆一下一下地戳。脚步散开，又聚拢。他们是按趟来的——趟与趟之间，有空子。",
+      note: "探杆一下一下地戳。脚步散开，又聚拢。",
     },
     {
       kind: "cinematic", id: "c4_smokeStart",
@@ -540,10 +582,8 @@ export const SCRIPTS = {
       lines: [
         { stage: "西口外，乡亲们趴在田里咳嗽。人数了两遍。", d: 3.8, cam: { kind: "shot", x: 30, y: 0.8, dist: 12 } },
         { stage: "顺子没出来。拴柱大爷也没有。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 8 } },
-        { stage: "有人活着出来。有人再也没有出来。", d: 4.2, cam: { kind: "dark" },
-          on: (state) => { state.flood = null; } },
         { stage: "柱子站在出口，看着被抬出来的乡亲，一句话也说不出。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 9 } },
-        { who: "高传宝", say: "准备下一次行动。", d: 3.0, cam: { kind: "shot", x: 34, y: 0.8, dist: 7 } },
+        { who: "高传宝", say: "准备下一次行动。", d: 3.0, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
         { stage: "柱子背起工具，跟着队伍再次下了地道。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 } },
       ],
     },
@@ -562,7 +602,7 @@ export const SCRIPTS = {
       kind: "buildSpots", id: "c5_build",
       spots: [
         { zone: TV.ventSpot, label: "打通风眼", holdTime: 3, note: "眼口藏在房根的夹壁里，烟能出去，地面上看不出来。" },
-        { zone: TV.hiddenSpot, label: "挖新暗口", holdTime: 3, note: "旧口废了不可惜，可惜的是没有下一个口。" },
+        { zone: TV.hiddenSpot, label: "挖新暗口", holdTime: 3, note: "新口开在西头第三家的猪圈底下。挖出来的土，天不亮就摊进了麦地。" },
         { zone: TV.bellSpot, label: "拴预警铃", holdTime: 3, note: "东口一响，全村先知道。" },
       ],
       objective: "完成三处改造：通风眼、新暗口、预警铃",
@@ -587,10 +627,23 @@ export const SCRIPTS = {
       lines: [
         { stage: "烟顺着房根的暗眼散了。地面上，什么也看不出来。", d: 4.0, cam: { kind: "shot", x: 112, y: 0.4, dist: 11 } },
         { stage: "鬼子在村里翻到天黑，一个人也没找到。", d: 3.8, cam: { kind: "wide", x: 90 } },
-        { stage: "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。", d: 4.2, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.4, dist: 7 } },
+        { stage: "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。", d: 4.2, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.4, dist: 7 },
+          on: (state) => {
+            // 这场戏原来一个人都没有——柱子和民兵全靠字幕存在。说到谁，谁就得在画面里
+            if (!FindActor(state, "pinned")) {
+              state.actors.push(MakeActor("pinned", "militia", 70, {
+                level: "under", heading: -1, label: "年轻民兵",
+              }));
+            }
+            state.player.level = "under";
+            state.player.x = 72.4;
+            state.player.heading = -1;
+          } },
         { stage: "鬼子的探杆就在头顶上戳。谁也不敢出声。", d: 3.8, cam: { kind: "shot", x: 70, y: -1.0, dist: 9 } },
         { stage: "他把手里的枪递出去，朝洞外摆了摆手。", d: 4.2, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.3, dist: 5.5 } },
-        { who: "年轻民兵", say: "带乡亲们走。", d: 3.0, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.3, dist: 5.5 } },
+        { who: "年轻民兵", say: "带乡亲们走。", d: 3.0, cam: { kind: "ots", subject: "pinned", other: "player", dist: 3.4 } },
+        // 柱子的反应镜头：这场戏此前完全没有他，看完像是别人的事
+        { stage: "", d: 2.6, cam: { kind: "ots", subject: "player", other: "pinned", dist: 3.2 } },
         { d: 2.4, cam: { kind: "dark" } },
       ],
     },
@@ -604,7 +657,6 @@ export const SCRIPTS = {
         { stage: "谁都知道这是个套：他们要的不是这十几个乡亲，是来救乡亲的人。", d: 4.6, cam: { kind: "wide", x: 150, pan: -5 } },
         { stage: "高传宝的法子是两头一起动：地面上打出动静把人引开，地下从地道把乡亲接走。", d: 4.8, cam: { kind: "wide", x: 90, pan: -6 } },
         { who: "高传宝", say: "套是套。人，也是真的人。", d: 3.4, cam: { kind: "shot", x: 8, y: 1.2, dist: 6.5 } },
-        { stage: "柱子这回没有躲在沟里等。他主动领了侦查的活。", d: 3.8, cam: { kind: "shot", x: 12, y: 1.4, dist: 8 } },
       ],
       onDone: (state) => { SpawnFortPatrols(state, true); },
     },
@@ -638,9 +690,9 @@ export const SCRIPTS = {
       lines: [
         { stage: "行动前夜。油灯把门板图照得发黄。", d: 3.6, cam: { kind: "shot", x: 7, y: 1.2, dist: 6.5 } },
         { stage: "柱子站在图前，指着据点的方向。", d: 3.2, cam: { kind: "shot", x: 8, y: 1.2, dist: 5.5 } },
-        { who: "柱子", say: "我去。", d: 2.4, cam: { kind: "shot", x: 8, y: 1.2, dist: 4.8 } },
+        { who: "柱子", say: "我去。", d: 2.4, cam: { kind: "ots", subject: "player", other: "gao", dist: 3.2 } },
         { stage: "高传宝看了他一眼。没有劝。", d: 3.0, cam: { kind: "shot", x: 6.5, y: 1.2, dist: 4.8 } },
-        { who: "高传宝", say: "跟紧队伍。", d: 2.6, cam: { kind: "shot", x: 6.5, y: 1.2, dist: 4.8 } },
+        { who: "高传宝", say: "跟紧队伍。", d: 2.6, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
       ],
     },
   ],
@@ -1841,10 +1893,12 @@ function StepRescueLoop(state, def, input, dt) {
     if (nearB) {
       state.rescue.dialogueShown.add("pocketB");
       StartMicroCine(state, [
+        // 特意沿用第三章高传宝认出他时的景别（3.4 / 3.2）：同一个构图出现两次——
+        // 头一回他是被认出来的孩子，这一回他是被指望的那个人
         { stage: "扶着民兵的老人抬起头，借着灯光认出了他。", d: 3.2, cam: { kind: "shot", x: 92, y: UNDER_Y + 1.3, dist: 5 } },
-        { who: "老人", say: "梁家的柱子？你妹妹呢？", d: 3.0, cam: { kind: "shot", x: 92, y: UNDER_Y + 1.3, dist: 4.6 } },
-        { who: "柱子", say: "送出去了。", d: 2.6, cam: { kind: "shot", x: 92, y: UNDER_Y + 1.3, dist: 4.6 } },
-        { stage: "老人松了一口气。", d: 2.4, cam: { kind: "shot", x: 92, y: UNDER_Y + 1.3, dist: 4.6 } },
+        { who: "老人", say: "梁家的柱子？你妹妹呢？", d: 3.0, cam: { kind: "ots", subject: "trapB1", other: "player", dist: 3.4 } },
+        { who: "柱子", say: "送出去了。", d: 2.6, cam: { kind: "ots", subject: "player", other: "trapB1", dist: 3.2 } },
+        { stage: "老人松了一口气。", d: 2.4, cam: { kind: "ots", subject: "trapB1", other: "player", dist: 3.4 } },
       ]);
       return;
     }

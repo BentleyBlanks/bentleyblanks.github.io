@@ -1321,6 +1321,41 @@ export function CreateWorld(canvasEl) {
     return { x, y, isMoving };
   }
 
+  // 手里/肩上的东西。原先只有玩家有，于是"梁木匠把刨子放下"这种戏只能靠
+  // 字幕说——演员手上空空。现在所有演员共用这一套。
+  function SyncCarry(s, label, heading) {
+    if (label && (!s.carryMesh || s.carryLabel !== label)) {
+      if (s.carryMesh) layers.play.remove(s.carryMesh);
+      s.carryMesh = MakeCarryMesh(label);
+      s.carryLabel = label;
+      layers.play.add(s.carryMesh);
+      SetPlayOrder(s.carryMesh, CARRY_Z);
+    } else if (!label && s.carryMesh) {
+      layers.play.remove(s.carryMesh);
+      s.carryMesh = null;
+      s.carryLabel = null;
+    }
+    if (!s.carryMesh) return;
+    // 水桶和刨子提在手上，木料扛在肩上——挂点不同
+    const inHand = label === "水桶" || label === "刨子";
+    const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
+    const bs = s.bodyScale || 1;
+    s.carryMesh.position.set(anchor.x, anchor.y + (inHand ? -0.20 : 0.10), CARRY_Z);
+    s.carryMesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
+    s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
+  }
+
+  // 夜戏里人得从背景里读得出来。全屏压暗罩会把演员和土墙一起压成一团，
+  // 在手机那种小屏 + 低亮度上就成了"人都看不见"。做法跟《勇敢的心》一样：
+  // 把演员本身提亮，让他们始终比环境亮一档——主角比配角再亮一点。
+  const NIGHT_LIFT = { day: 1, dawn: 1.06, night: 1.34, tunnel: 1.30, dark: 1.42 };
+  function LiftActor(s, light, isPlayer) {
+    const lift = (NIGHT_LIFT[light] ?? 1) * (isPlayer ? 1.08 : 1);
+    if (s.liftApplied === lift) return;
+    s.liftApplied = lift;
+    s.mesh.traverse((o) => { if (o.isMesh && o.material?.color) o.material.color.setScalar(lift); });
+  }
+
   function UpdateActors(state, time, dt) {
     const ch = CHAPTERS[state.chapterIndex];
     const sceneDef = SCENES[ch.scene];
@@ -1337,27 +1372,9 @@ export function CreateWorld(canvasEl) {
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
       { climbing: p.climbT > 0, digging, bodyScale: boyScale });
     ps.mesh.visible = otsHiddenId !== "player";
+    LiftActor(ps, ch.light, true);
 
-    // 扛的东西
-    if (p.carry && (!ps.carryMesh || ps.carryLabel !== p.carry)) {
-      if (ps.carryMesh) layers.play.remove(ps.carryMesh);
-      ps.carryMesh = MakeCarryMesh(p.carry);
-      ps.carryLabel = p.carry;
-      layers.play.add(ps.carryMesh);
-      SetPlayOrder(ps.carryMesh, CARRY_Z);
-    } else if (!p.carry && ps.carryMesh) {
-      layers.play.remove(ps.carryMesh);
-      ps.carryMesh = null;
-      ps.carryLabel = null;
-    }
-    if (ps.carryMesh) {
-      // 水桶提在手上，木料扛在肩上——挂点不同
-      const anchor = p.carry === "水桶" ? HandPoint(ps.rig) : ShoulderPoint(ps.rig);
-      const bs = ps.bodyScale || 1;
-      ps.carryMesh.position.set(anchor.x, anchor.y + (p.carry === "水桶" ? -0.20 : 0.10), CARRY_Z);
-      ps.carryMesh.scale.set((p.heading >= 0 ? 1 : -1) * bs, bs, 1);
-      ps.carryMesh.rotation.z = p.carry === "水桶" ? 0 : (p.heading >= 0 ? -0.14 : 0.14);
-    }
+    SyncCarry(ps, p.carry, p.heading);
 
     // 煤油灯
     if (p.lamp) {
@@ -1392,8 +1409,10 @@ export function CreateWorld(canvasEl) {
       const roomy = underTunnel && sceneDef.props.some((pr) =>
         (pr.kind === "chamber" || pr.kind === "pocket")
         && Math.abs(a.x - pr.x) < ((pr.w || 5.6) / 2 + 0.5));
-      UpdateOne(s, a.x, a.level || "surface", a.heading, underTunnel && !roomy, dt, false,
+      UpdateOne(s, a.x, a.level || "surface", a.heading, underTunnel && !roomy, dt, !!a.carry,
         sisterScale ? { bodyScale: sisterScale } : {});
+      SyncCarry(s, a.carry, a.heading);
+      LiftActor(s, ch.light, false);
       // 提灯
       if (a.lantern) {
         if (!s.glow || s.glowKey !== builtKey) {

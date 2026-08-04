@@ -19,7 +19,14 @@ fs.mkdirSync(outDir, { recursive: true });
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+// 手机横屏的画幅比桌面扁得多（16:9 → 19.5:9），构图问题只在那个比例下才露出来，
+// 所以取景可以按 SHOT_W/SHOT_H 换成真机尺寸
+const shotW = parseInt(process.env.SHOT_W || "1600", 10);
+const shotH = parseInt(process.env.SHOT_H || "900", 10);
+const page = await browser.newPage({
+  viewport: { width: shotW, height: shotH },
+  isMobile: shotW < 1000, hasTouch: shotW < 1000, deviceScaleFactor: shotW < 1000 ? 3 : 1,
+});
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
@@ -61,7 +68,7 @@ const reached = await page.evaluate(async (target) => {
 if (forceX !== null) await page.evaluate((x) => { window.TunnelLight.state.player.x = x; }, forceX);
 // 让它真跑一段时间（rAF 驱动渲染 + 流体解算）
 await page.waitForTimeout(seconds * 1000);
-await page.screenshot({ path: path.join(outDir, `c${chapter}_${beatId || "scene"}.png`) });
+await page.screenshot({ path: path.join(outDir, `c${chapter}_${beatId || "scene"}_${shotW}x${shotH}.png`) });
 
 await browser.close();
 server.close();
