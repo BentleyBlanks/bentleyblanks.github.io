@@ -156,7 +156,7 @@ export function SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y) {
   const range = sceneDef.walk.under;
   if (range) {
     // 地道走廊：掏成空气
-    air.push({ x0: range[0] - 1.5, y0: UNDER_Y - 0.2, x1: range[1] + 1.5, y1: UNDER_Y + 2.15 });
+    air.push({ x0: range[0] - 1.5, y0: UNDER_Y - 0.2, x1: range[1] + 1.5, y1: UNDER_Y + 1.55 });
     // 洞室与旁洞更高
     for (const p of sceneDef.props) {
       if (p.kind === "chamber") {

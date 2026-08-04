@@ -527,19 +527,36 @@ export function CreateWorld(canvasEl) {
   }
 
   // 落地投影：没有影子的物件永远像浮在地面线上
+  // 光向：太阳偏在画面左后方，影子朝右前方斜出去
+  const SUN = { dx: 0.85, dz: 1.0 };
+
+  // 方向性投影：一片躺在地平面上的影子（随地面一起透视），
+  // 不再是贴在物件脚下的一团。有了它，东西才真的"站"在地上。
+  function MakeFlatShadow(lengthM, widthM, strength) {
+    const wPx = 256, hPx = 256;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createRadialGradient(wPx * 0.5, hPx * 0.32, 0, wPx * 0.5, hPx * 0.5, hPx * 0.5);
+    g.addColorStop(0, `rgba(28,20,12,${strength})`);
+    g.addColorStop(0.55, `rgba(28,20,12,${strength * 0.5})`);
+    g.addColorStop(1, "rgba(28,20,12,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, wPx, hPx);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(widthM, lengthM),
+      new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = -5;
+    return mesh;
+  }
+
   function AddGroundShadow(group, x, halfW, strength = 0.28, z = 0) {
-    const wPx = Math.ceil(halfW * 2.6 * PPM);
-    const hPx = Math.ceil(0.9 * PPM);
-    const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx * 0.5, (ctx, ax, ay) => {
-      const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, wPx / 2);
-      g.addColorStop(0, `rgba(30,22,14,${strength})`);
-      g.addColorStop(1, "rgba(30,22,14,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(ax, ay, wPx / 2, hPx / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    PlaceSprite(mesh, x, SURFACE_Y + 0.02, z - 0.05);
+    const w = halfW * 2.3;
+    const len = halfW * 3.0;
+    const mesh = MakeFlatShadow(len, w, strength);
+    // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
+    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, z + SUN.dz * len * 0.34);
     group.add(mesh);
   }
 
@@ -677,7 +694,7 @@ export function CreateWorld(canvasEl) {
 
     const mesh = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
-      const tunTop = toPy(UNDER_Y + 2.15);
+      const tunTop = toPy(UNDER_Y + 1.5);
       const tunBot = toPy(UNDER_Y);
       ART.DrawTunnelBore(ctx, toPx(range[0]), toPx(range[1]), tunTop, tunBot, sceneKey + "bore");
       // 洞室 / 旁洞
@@ -720,7 +737,8 @@ export function CreateWorld(canvasEl) {
 
   // -------------------------------------------------------------------------
   function BuildEnvironment(state) {
-    const ch = CHAPTERS[state.chapterIndex];
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const key = `${ch.scene}:${ch.light}:${state.flags.ruined ? 1 : 0}:${state.flags.hiddenBuilt ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
@@ -872,9 +890,11 @@ export function CreateWorld(canvasEl) {
       // 骨骼装配：每块骨头一张贴图，逐帧只转关节
       const rig = CreateRig(kind);
       layers.play.add(rig.group);
+      const shadow = MakeFlatShadow(1.9, 1.15, 0.30);
+      layers.play.add(shadow);
       s = {
         rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null,
-        idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+        shadow, idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
       };
       actorSprites.set(id, s);
     }
@@ -900,10 +920,24 @@ export function CreateWorld(canvasEl) {
     s.mesh.position.set(x, y, 0.1);
     const bs = extra.bodyScale || s.bodyScale || 1;
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
+    if (s.shadow) {
+      // 地下没有太阳，影子由手里的灯给，落在脚边就够
+      const under = level === "under";
+      s.shadow.visible = true;
+      s.shadow.scale.set(bs, bs * (under ? 0.55 : 1), 1);
+      s.shadow.position.set(
+        x + (under ? 0 : SUN.dx * 0.55) * bs,
+        y + 0.015,
+        0.1 + (under ? 0.12 : SUN.dz * 0.62) * bs,
+      );
+      s.shadow.material.opacity = under ? 0.5 : 1;
+    }
     return { x, y, isMoving };
   }
 
   function UpdateActors(state, time, dt) {
+    const ch = CHAPTERS[state.chapterIndex];
+    const sceneDef = SCENES[ch.scene];
     const seen = new Set(["player"]);
     const p = state.player;
     const ps = EnsureActorSprite("player", "player");
@@ -965,7 +999,13 @@ export function CreateWorld(canvasEl) {
       s.mesh.visible = a.visible !== false && otsHiddenId !== a.id;
       if (!s.mesh.visible) continue;
       const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
-      UpdateOne(s, a.x, a.level || "surface", a.heading, false, dt, false,
+      // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
+      const underTunnel = (a.level === "under")
+        && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort");
+      const roomy = underTunnel && sceneDef.props.some((pr) =>
+        (pr.kind === "chamber" || pr.kind === "pocket")
+        && Math.abs(a.x - pr.x) < ((pr.w || 5.6) / 2 + 0.5));
+      UpdateOne(s, a.x, a.level || "surface", a.heading, underTunnel && !roomy, dt, false,
         sisterScale ? { bodyScale: sisterScale } : {});
       // 提灯
       if (a.lantern) {
@@ -985,6 +1025,7 @@ export function CreateWorld(canvasEl) {
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
         layers.play.remove(s.rig ? s.rig.group : s.mesh);
+        if (s.shadow) layers.play.remove(s.shadow);
         if (s.glow) scene.remove(s.glow);
         if (s.carryMesh) layers.play.remove(s.carryMesh);
         actorSprites.delete(id);
@@ -1169,7 +1210,8 @@ export function CreateWorld(canvasEl) {
 
   // 暗场：地道章节压暗，灯光晕负责照明
   function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
-    const ch = CHAPTERS[state.chapterIndex];
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const base = { day: 0, dawn: 0.05, night: 0.28, tunnel: 0.30, dark: 0.36 }[ch.light] ?? 0;
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;

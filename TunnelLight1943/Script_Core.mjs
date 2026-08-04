@@ -733,7 +733,8 @@ const SCRIPTS = {
         { stage: "柱子坐在田埂上，灯芯已经烧到了头。", d: 3.8, cam: { kind: "insert", x: 16.4, y: 1.0, dist: 2.2 } },
         { stage: "他把灯吹灭了。", d: 2.6, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => { state.player.lamp = false; } },
-        { stage: "天亮了。", d: 4.0, cam: { kind: "wide", x: 40, y: 2.6, pan: 8 } },
+        { stage: "天亮了。", d: 4.6, cam: { kind: "wide", x: 40, y: 2.6, pan: 8 },
+          on: (state) => { state.lightOverride = "dawn"; } },
       ],
     },
   ],
@@ -988,6 +989,7 @@ export function CreateGame(chapterIndex = 0) {
     beat: null,
     microCine: null,
     lamps: null,
+    lightOverride: null,
     flood: null,
     floodDepth: 0,
     flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, entWBlocked: false, notesSeen: [] },
@@ -1016,6 +1018,7 @@ export function StartChapter(state, index) {
   state.rescue = null;
   state.microCine = null;
   state.lamps = null;
+  state.lightOverride = null;
   state.flood = null;
   state.floodDepth = 0;
   state.caption = null;
@@ -1290,10 +1293,20 @@ export function StepGame(state, input, dt) {
 function MovePlayer(state, input, dt) {
   const def = CurrentBeatDef(state);
   const scene = SceneOf(state);
+  const env = CHAPTERS[state.chapterIndex].scene;
   const p = state.player;
   if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
 
-  p.crouch = !!input.crouch;
+  // 地道走廊净高只有一米五，人必须猫着腰；藏人洞与旁洞才直得起腰
+  const inTunnel = (env === "tunnelVillage" || env === "tunnelFort") && p.level === "under";
+  let forcedCrouch = false;
+  if (inTunnel) {
+    const roomy = scene.props.some((pr) => (pr.kind === "chamber" || pr.kind === "pocket")
+      && Math.abs(p.x - pr.x) < ((pr.w || 5.6) / 2 + 0.5));
+    forcedCrouch = !roomy;
+  }
+  p.crouch = forcedCrouch || !!input.crouch;
+  p.forcedCrouch = forcedCrouch;
   let speed = p.crouch ? 2.1 : 4.2;
   if (def?.slow) speed = 1.8;
   if (p.carry) speed = 3.0;
