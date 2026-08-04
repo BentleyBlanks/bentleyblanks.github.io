@@ -479,90 +479,142 @@ export function DrawHeadPart(ctx, px, py, r, kind, id) {
 // 过肩镜头的前景剪影：只要头和肩，压成暗色，把画面"框"起来
 // 以 (x, y) 为肩线中心；facing 指向画面内侧
 export function DrawShoulder(ctx, x, y, S, kind, id) {
-  // 不是纯黑块：暗部也要有形。耳廓、发际、衣领、迎光的一道边光，
-  // 三笔就能让观众认出"这是越过谁的肩膀在看"。
-  const dark = "#33261c";
-  const darker = "#241a13";
-  const rim = "rgba(246, 226, 178, 0.30)";
+  // 过肩前景：后脑 + 双肩。关键比例——肩宽约等于 2.6 个头宽，肩线近乎水平
+  // 只在两端向下收成三角肌；脖子从肩线正中升起，比头窄一圈。
+  // 枢轴 (x,y) 在颈根。头在上，肩向左右铺开并被画框下缘切掉。
+  const coat = "#3d2e22";
+  const shade = "#2b2018";
+  const hair = "#241a13";
+  const rim = "rgba(250, 233, 190, 0.32)";
+  const R = 54 * S;               // 头宽的一半
+
   ctx.save();
   ctx.translate(x, y);
-  const headR = 34 * S;
 
-  // 肩：厚实的斜坡
+  // —— 双肩：上缘几乎是水平的，两端落下去；下缘出画框
   InkFill(ctx, [
-    [-120 * S, 190 * S], [-96 * S, 74 * S], [-52 * S, 28 * S],
-    [52 * S, 28 * S], [96 * S, 74 * S], [120 * S, 190 * S],
-  ], id + "sh", dark, { amp: 3.2 * S, lw: 0, line: null });
-  // 衣领：一道折线把肩和脖子分开
+    [-R * 2.75, R * 3.6],
+    [-R * 2.62, R * 1.55],        // 左三角肌
+    [-R * 2.05, R * 0.86],
+    [-R * 1.05, R * 0.52],        // 斜方肌接颈
+    [-R * 0.40, R * 0.34],
+    [R * 0.40, R * 0.34],
+    [R * 1.05, R * 0.52],
+    [R * 2.05, R * 0.86],
+    [R * 2.62, R * 1.55],         // 右三角肌
+    [R * 2.75, R * 3.6],
+  ], id + "sh", coat, { amp: 1.8 * S, lw: 0, line: null });
+
+  // 衣领：贴着颈根绕一圈，是"这是个人"最强的一条线
   ctx.beginPath();
-  ctx.moveTo(-56 * S, 34 * S);
-  ctx.quadraticCurveTo(0, 6 * S, 56 * S, 34 * S);
-  ctx.strokeStyle = darker;
-  ctx.lineWidth = 7 * S;
+  ctx.moveTo(-R * 1.02, R * 0.54);
+  ctx.quadraticCurveTo(0, R * 0.16, R * 1.02, R * 0.54);
+  ctx.strokeStyle = shade;
+  ctx.lineWidth = 7.5 * S;
+  ctx.lineCap = "round";
   ctx.stroke();
-
-  InkFill(ctx, Rect(-22 * S, -18 * S, 44 * S, 60 * S), id + "nk", darker, { amp: 2 * S, lw: 0, line: null });
-
-  // 头（后脑勺）
+  // 后领口：一小块更暗，撑出厚度
   InkFill(ctx, [
-    [-headR, 6 * S], [-headR * 0.86, -headR * 0.9], [0, -headR * 1.34],
-    [headR * 0.86, -headR * 0.9], [headR, 6 * S], [headR * 0.6, headR * 0.5], [-headR * 0.6, headR * 0.5],
-  ], id + "hd", dark, { amp: 2.6 * S, lw: 0, line: null });
+    [-R * 0.72, R * 0.46], [0, R * 0.10], [R * 0.72, R * 0.46],
+    [R * 0.52, R * 0.80], [-R * 0.52, R * 0.80],
+  ], id + "collar", shade, { amp: 1.4 * S, lw: 0, line: null });
 
-  // 耳廓：侧影里最关键的识别点
+  // —— 脖子：短、比头窄
+  InkFill(ctx, [
+    [-R * 0.40, R * 0.42], [-R * 0.36, -R * 0.34],
+    [R * 0.36, -R * 0.34], [R * 0.40, R * 0.42],
+  ], id + "neck", shade, { amp: 1.2 * S, lw: 0, line: null });
+
+  // —— 头：后脑饱满的椭圆，略比宽高一点；右侧收出下颌
+  InkFill(ctx, [
+    [-R * 0.96, -R * 0.34],
+    [-R * 1.02, -R * 1.02],
+    [-R * 0.66, -R * 1.62],
+    [R * 0.06, -R * 1.82],
+    [R * 0.74, -R * 1.48],
+    [R * 0.98, -R * 0.86],
+    [R * 0.88, -R * 0.30],
+    [R * 0.48, -R * 0.36],
+    [-R * 0.44, -R * 0.34],
+  ], id + "head", coat, { amp: 1.6 * S, lw: 0, line: null });
+
+  // 头发：盖住颅顶与后脑，留出耳与下颌
+  InkFill(ctx, [
+    [-R * 0.99, -R * 0.52],
+    [-R * 1.02, -R * 1.06],
+    [-R * 0.68, -R * 1.60],
+    [R * 0.06, -R * 1.80],
+    [R * 0.70, -R * 1.44],
+    [R * 0.80, -R * 1.06],
+    [R * 0.30, -R * 1.22],
+    [-R * 0.34, -R * 1.16],
+    [-R * 0.76, -R * 0.86],
+  ], id + "hair", hair, { amp: 1.8 * S, lw: 0, line: null });
+
+  // 耳：贴在头的中后部
   ctx.beginPath();
-  ctx.ellipse(headR * 0.62, -headR * 0.18, headR * 0.26, headR * 0.36, -0.2, 0, Math.PI * 2);
-  ctx.fillStyle = darker;
+  ctx.ellipse(R * 0.52, -R * 0.86, R * 0.19, R * 0.28, -0.12, 0, Math.PI * 2);
+  ctx.fillStyle = shade;
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(headR * 0.62, -headR * 0.18, headR * 0.12, headR * 0.19, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(R * 0.52, -R * 0.84, R * 0.08, R * 0.14, -0.12, 0, Math.PI * 2);
   ctx.strokeStyle = rim;
   ctx.lineWidth = 2.4 * S;
   ctx.stroke();
 
-  // 发际：后脑到颈的一圈碎笔触
+  // 颈后碎发
+  // 发际线：一道贴着后脑落下来的弧，比排一串短线干净
   ctx.save();
-  ctx.strokeStyle = darker;
+  ctx.strokeStyle = hair;
   ctx.lineWidth = 3.4 * S;
-  for (let i = 0; i < 9; i += 1) {
-    const a = -2.5 + i * 0.22;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * headR * 0.92, Math.sin(a) * headR * 0.92 - headR * 0.1);
-    ctx.lineTo(Math.cos(a) * headR * 1.14, Math.sin(a) * headR * 1.12 - headR * 0.1);
-    ctx.stroke();
-  }
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-R * 0.86, -R * 0.92);
+  ctx.quadraticCurveTo(-R * 0.62, -R * 0.44, -R * 0.30, -R * 0.36);
+  ctx.stroke();
   ctx.restore();
 
-  // 边光：迎着场景那一侧的轮廓亮一线，剪影才不糊成一团
+  // 边光：左侧轮廓一道，从头顶顺到肩头
   ctx.save();
   ctx.strokeStyle = rim;
-  ctx.lineWidth = 4.2 * S;
+  ctx.lineWidth = 4.4 * S;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-headR * 0.98, headR * 0.1);
-  ctx.quadraticCurveTo(-headR * 1.02, -headR * 1.1, 0, -headR * 1.34);
+  ctx.moveTo(-R * 0.98, -R * 0.40);
+  ctx.quadraticCurveTo(-R * 1.10, -R * 1.20, R * 0.04, -R * 1.80);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(-58 * S, 30 * S);
-  ctx.lineTo(-104 * S, 84 * S);
+  ctx.moveTo(-R * 1.10, R * 0.56);
+  ctx.quadraticCurveTo(-R * 2.10, R * 0.80, -R * 2.66, R * 1.70);
   ctx.stroke();
   ctx.restore();
 
   // 头饰
   if (kind === "soldier") {
     InkFill(ctx, [
-      [-headR * 1.05, -headR * 0.62], [0, -headR * 1.5],
-      [headR * 1.05, -headR * 0.62], [headR * 1.2, -headR * 0.3], [-headR * 1.2, -headR * 0.3],
-    ], id + "cap", "#1c1710", { amp: 2.2 * S, lw: 0, line: null });
-  } else if (kind === "militia") {
+      [-R * 1.10, -R * 1.02], [R * 0.06, -R * 1.98], [R * 1.02, -R * 1.10],
+      [R * 1.08, -R * 0.80], [-R * 1.14, -R * 0.72],
+    ], id + "cap", "#1e1811", { amp: 1.8 * S, lw: 0, line: null });
+  } else if (kind === "puppet") {
     InkFill(ctx, [
-      [-headR * 1.1, -headR * 0.5], [0, -headR * 1.46], [headR * 1.1, -headR * 0.5],
-      [headR * 1.0, -headR * 0.16], [-headR * 1.0, -headR * 0.16],
-    ], id + "tw", "#4d4739", { amp: 2.4 * S, lw: 0, line: null });
+      [-R * 1.12, -R * 0.92], [R * 0.04, -R * 2.02], [R * 1.08, -R * 0.96], [-R * 1.14, -R * 0.70],
+    ], id + "hat", "#241f18", { amp: 2.0 * S, lw: 0, line: null });
+  } else if (kind === "militia") {
+    // 白毛巾：贴着颅顶缠一圈，前低后高，脑后垂下一角
+    InkFill(ctx, [
+      [-R * 1.06, -R * 0.94], [-R * 0.98, -R * 1.44], [-R * 0.42, -R * 1.76],
+      [R * 0.30, -R * 1.80], [R * 0.92, -R * 1.44], [R * 1.02, -R * 0.98],
+      [R * 0.86, -R * 0.86], [R * 0.20, -R * 1.10], [-R * 0.50, -R * 1.06],
+      [-R * 0.92, -R * 0.82],
+    ], id + "towel", "#7d7566", { amp: 2.2 * S, lw: 0, line: null });
+    InkFill(ctx, [
+      [-R * 1.02, -R * 1.02], [-R * 1.46, -R * 0.52], [-R * 1.18, -R * 0.34], [-R * 0.94, -R * 0.78],
+    ], id + "towelTail", "#6e6759", { amp: 2.0 * S, lw: 0, line: null });
   } else if (kind === "sister") {
-    for (let i = 0; i < 3; i += 1) {
+    for (let k = 0; k < 3; k += 1) {
       ctx.beginPath();
-      ctx.arc(-headR * 1.02, headR * (0.1 + i * 0.42), headR * 0.28, 0, Math.PI * 2);
-      ctx.fillStyle = darker;
+      ctx.arc(-R * 1.02 - k * R * 0.04, -R * 0.30 + k * R * 0.40, R * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = hair;
       ctx.fill();
     }
   }

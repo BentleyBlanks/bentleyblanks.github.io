@@ -180,6 +180,15 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 #touchControls #btnAct { width: 76px; height: 76px; font-size: 24px; background: rgba(232, 193, 90, 0.24); }
 #touchControls #btnCrouch { font-size: 17px; }
 #touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
+#touchControls button img {
+  width: 62%; height: 62%; object-fit: contain; pointer-events: none;
+  filter: brightness(1.5) saturate(0.7) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+#touchControls #btnAct img { width: 58%; height: 58%; }
+#touchControls button img.flipX { transform: scaleX(-1); }
+#touchControls button img.rotUp { transform: rotate(-90deg); }
+#touchControls button img.rotDown { transform: rotate(90deg); }
+#touchControls button.pressed img { filter: brightness(0.35) drop-shadow(none); }
 
 /* 竖屏提示 */
 #rotateHint {

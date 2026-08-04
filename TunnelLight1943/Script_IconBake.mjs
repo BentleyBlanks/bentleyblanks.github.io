@@ -17,6 +17,9 @@ const JOBS = [
   { src: "_lamp_raw.png", out: "Icon_Lamp.png", size: 384 },
   { src: "_ground_raw.png", out: "Icon_ChoiceGround.png", size: 512 },
   { src: "_tunnel_raw.png", out: "Icon_ChoiceTunnel.png", size: 512 },
+  { src: "_arrow_raw.png", out: "Icon_Arrow.png", size: 256 },
+  { src: "_hand_raw.png", out: "Icon_Hand.png", size: 256 },
+  { src: "_crouch_raw.png", out: "Icon_Crouch.png", size: 256 },
 ];
 
 const server = await ServeRoot(rootDir, 0);
