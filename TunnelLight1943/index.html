@@ -31,6 +31,7 @@
     <div id="prompt" hidden></div>
     <div id="detectionVignette" aria-hidden="true"></div>
     <div id="irisOverlay" aria-hidden="true"></div>
+    <div id="slitMatte" aria-hidden="true"><i></i><i></i></div>
     <div id="cineBars" aria-hidden="true"><i class="barTop"></i><i class="barBottom"></i></div>
     <section id="caption" hidden>
       <b id="capSpeaker" hidden></b>
@@ -56,7 +57,24 @@
       <p>地道还在。人还在。日子还要往下过。</p>
       <button id="endRestart" type="button">回到标题</button>
     </section>
+
+    <div id="touchControls" aria-label="触屏操作">
+      <div class="padLeft">
+        <button id="btnLeft" type="button" aria-label="向左走">◀</button>
+        <button id="btnRight" type="button" aria-label="向右走">▶</button>
+      </div>
+      <div class="padRight">
+        <div class="climbCol">
+          <button id="btnUp" type="button" aria-label="上">▲</button>
+          <button id="btnDown" type="button" aria-label="下">▼</button>
+        </div>
+        <button id="btnCrouch" type="button" aria-label="蹲下">蹲</button>
+        <button id="btnAct" type="button" aria-label="互动">E</button>
+      </div>
+    </div>
   </div>
+
+  <div id="rotateHint" hidden><span>请把手机横过来</span></div>
 
   <section id="titleScreen">
     <div class="titleInner">

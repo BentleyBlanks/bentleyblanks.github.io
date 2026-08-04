@@ -23,16 +23,21 @@ body {
 #hud { position: absolute; inset: 0; pointer-events: none; }
 #hud button { pointer-events: auto; }
 
-/* 目标 */
+/* 目标：只在变化时露一下，之后让画面自己说话（克制 HUD） */
 #objectivePanel {
-  position: absolute; top: 22px; left: 26px; max-width: 380px;
-  padding: 10px 16px;
-  background: rgba(10, 9, 8, 0.62);
-  border-left: 3px solid var(--lamp);
-  transition: opacity 0.4s;
+  position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+  max-width: 520px; text-align: center; padding: 0;
+  background: none; border: none;
+  transition: opacity 0.7s ease;
 }
-#objectivePanel b { display: block; font-size: 16px; letter-spacing: 0.06em; }
-#objectivePanel span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+#objectivePanel b {
+  display: block; font-size: 15.5px; letter-spacing: 0.1em; color: var(--paper);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+}
+#objectivePanel span {
+  display: block; margin-top: 5px; font-size: 12.5px; color: rgba(216, 203, 176, 0.66);
+  line-height: 1.6; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
 
 #crouchTag {
   position: absolute; top: 22px; right: 26px;
@@ -43,23 +48,24 @@ body {
 
 /* 交互提示 */
 #prompt {
-  position: absolute; left: 50%; bottom: 17%;
+  position: absolute; left: 50%; bottom: 15%;
   transform: translateX(-50%);
-  padding: 8px 18px; font-size: 15px; letter-spacing: 0.1em;
-  color: var(--lamp); background: rgba(10, 9, 8, 0.7);
-  border: 1px solid rgba(232, 193, 90, 0.4);
+  padding: 0; font-size: 14px; letter-spacing: 0.14em;
+  color: rgba(240, 214, 150, 0.92); background: none; border: none;
   white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
 }
 
 /* 短提示 */
+/* 手记条：像从本子上撕下来的一条纸 */
 #toast {
-  position: absolute; left: 50%; top: 15%;
+  position: absolute; left: 50%; top: 12%;
   transform: translateX(-50%) translateY(-8px);
-  max-width: 560px; padding: 10px 20px; text-align: center;
-  font-size: 14.5px; line-height: 1.7; color: var(--paper);
-  background: rgba(16, 13, 10, 0.82);
-  border-top: 1px solid rgba(232, 193, 90, 0.5);
-  border-bottom: 1px solid rgba(232, 193, 90, 0.2);
+  max-width: 520px; padding: 12px 24px; text-align: center;
+  font-size: 14px; line-height: 1.85; color: #2e2418;
+  background: linear-gradient(180deg, #e0d0aa 0%, #d2bf95 100%);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(1% 6%, 99% 0%, 100% 94%, 0% 100%);
   opacity: 0; transition: opacity 0.45s, transform 0.45s;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -103,6 +109,53 @@ body {
   position: absolute; inset: 0;
   opacity: 0; pointer-events: none;
 }
+
+/* 地窖板缝 matte：从缝里往外看 */
+#slitMatte i {
+  position: absolute; left: 0; right: 0; height: 0; background: #050403;
+  transition: height 0.5s ease;
+}
+#slitMatte i:first-child { top: 0; }
+#slitMatte i:last-child { bottom: 0; }
+#slitMatte.active i:first-child { height: 33vh; }
+#slitMatte.active i:last-child { height: 30vh; }
+
+/* 触屏操作 */
+#touchControls { display: none; }
+body.touchDevice #touchControls {
+  display: block; position: absolute; inset: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+body.touchDevice #touchControls.dimmed { opacity: 0.28; }
+#touchControls .padLeft { position: absolute; left: max(16px, env(safe-area-inset-left)); bottom: 20px; display: flex; gap: 12px; }
+#touchControls .padRight {
+  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 20px;
+  display: flex; align-items: flex-end; gap: 12px;
+}
+#touchControls .climbCol { display: flex; flex-direction: column; gap: 10px; }
+#touchControls button {
+  pointer-events: auto; width: 62px; height: 62px; border-radius: 50%;
+  background: rgba(16, 13, 10, 0.5); color: var(--lamp);
+  border: 1.5px solid rgba(232, 193, 90, 0.42);
+  font-family: inherit; font-size: 20px; line-height: 1;
+  -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none;
+  backdrop-filter: blur(2px);
+}
+#touchControls .climbCol button { width: 52px; height: 52px; font-size: 17px; }
+#touchControls #btnAct { width: 76px; height: 76px; font-size: 24px; background: rgba(232, 193, 90, 0.24); }
+#touchControls #btnCrouch { font-size: 17px; }
+#touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
+
+/* 竖屏提示 */
+#rotateHint {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: #070605; color: var(--lamp);
+  font-size: 18px; letter-spacing: 0.24em;
+}
+#rotateHint span::before { content: "⟳"; display: block; font-size: 44px; margin-bottom: 18px; }
+
+#prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
 
 #prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
 

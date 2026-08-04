@@ -1,332 +1,618 @@
-// 《地道里的光》 —— Three.js 横版 2.5D 渲染层（勇敢的心式分层视差 + 地道剖面）。
-// 只消费 Script_Core.mjs 的场景数据与状态，不持有玩法逻辑。
-// 层次：z=0 玩法层；z<0 背景视差层；地下以剖面呈现（地表条带 + 掏空的地道内壁）。
+// 《地道里的光》 —— Three.js 2D 渲染层（正交相机 + 手绘贴图精灵）。
+// 画面是纯 2D：所有形体由 Script_Art 的手绘矢量画笔烘到离屏 canvas，
+// 再作为带透明通道的平面贴图挂进 Three 场景。留在 Three 里是为了保留
+// 混合模式、加色光晕、暗场遮罩与后续着色器的自由度。
+//
+// 层次（z 越小越远）：远山 -30 / 远房 -20 / 近树 -12 / 玩法层 0 / 前景 +6 / 过肩前景 +9
+// 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, GetBeatTarget, CurrentBeatDef, SmokeCovers } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers } from "./Script_Core.mjs";
+import * as ART from "./Script_Art.mjs";
 
-const PALETTE = {
-  zhuzi: 0xc8863c, sister: 0xb0616a, mother: 0x8a6a58, father: 0x6b4f3a,
-  militia: 0x4a5d68, soldier: 0x6f6b42, villager: 0x8d8272, puppet: 0x8d8060,
-  lamp: 0xffb356, marker: 0xe8c15a, beamCalm: 0xd8b83c, beamAlert: 0xd8543c,
-  smoke: 0x8f8d85,
-};
+const PPM = 48;              // 贴图像素 / 世界米
+const CHAR_CELL = { w: 116, h: 124, baseline: 112 };
+const CHAR_SCALE = 1.35;
 
-function Mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
+// 程序化动画帧表：姿态由 DrawCharacter 按相位算出，烘成图集后按状态播放
+const WALK_FRAMES = 8;
+const IDLE_FRAMES = 6;
+const CROUCH_WALK_FRAMES = 8;
+const CROUCH_IDLE_FRAMES = 4;
+const CARRY_WALK_FRAMES = 8;
+const CARRY_IDLE_FRAMES = 2;
+const F_WALK = 0;
+const F_IDLE = F_WALK + WALK_FRAMES;                    // 8
+const F_CROUCH_WALK = F_IDLE + IDLE_FRAMES;             // 14
+const F_CROUCH_IDLE = F_CROUCH_WALK + CROUCH_WALK_FRAMES; // 22
+const F_CARRY_WALK = F_CROUCH_IDLE + CROUCH_IDLE_FRAMES;  // 26
+const F_CARRY_IDLE = F_CARRY_WALK + CARRY_WALK_FRAMES;    // 34
+const CHAR_FRAMES = F_CARRY_IDLE + CARRY_IDLE_FRAMES;     // 36
 
-function AddBox(group, w, h, d, color, x, y, z, opts = {}) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Mat(color, opts));
-  mesh.position.set(x, y, z);
-  group.add(mesh);
+// ---------------------------------------------------------------------------
+// 贴图烘焙
+// ---------------------------------------------------------------------------
+function MakeCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(w));
+  c.height = Math.max(1, Math.ceil(h));
+  return c;
+}
+
+function CanvasTexture(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// 把一段绘制烘成 sprite：drawFn(ctx, originX, groundY) 以 (originX, groundY) 为地面锚点
+// blur：假景深——越远的层烘焙时糊得越厉害，前景也糊一点
+function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0) {
+  const canvas = MakeCanvas(wPx, hPx);
+  const ctx = canvas.getContext("2d");
+  if (blur > 0) ctx.filter = `blur(${blur}px)`;
+  drawFn(ctx, anchorX, groundYPx);
+  ctx.filter = "none";
+  const tex = CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(wPx / PPM, hPx / PPM);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  // 让世界坐标 (x, y) 对应贴图里的 (anchorX, groundYPx)
+  mesh.userData.offset = {
+    x: (wPx / 2 - anchorX) / PPM,
+    y: (groundYPx - hPx / 2) / PPM,
+  };
   return mesh;
 }
 
+function PlaceSprite(mesh, x, y, z) {
+  mesh.position.set(x + mesh.userData.offset.x, y + mesh.userData.offset.y, z);
+  mesh.userData.anchor = { x, y, z };
+}
+
+// 缩放时保持地面锚点不动（否则远景会整体浮起来）
+function ScaleKeepGround(mesh, sx, sy = sx) {
+  mesh.scale.set(sx, sy, 1);
+  const h = mesh.geometry.parameters.height;
+  const w = mesh.geometry.parameters.width;
+  const a = mesh.userData.anchor;
+  mesh.position.set(
+    a.x + mesh.userData.offset.x * sx + (w / 2) * 0 ,
+    a.y + mesh.userData.offset.y * sy,
+    a.z,
+  );
+  // offset.y 是"锚点到中心"的距离，按 sy 缩放后即可保持贴地
+  void h;
+}
+
 // ---------------------------------------------------------------------------
-export function CreateWorld(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
+// ---------------------------------------------------------------------------
+const charAtlas = new Map();
+
+function FrameSpec(f) {
+  if (f < F_IDLE) {
+    return { moving: true, crouch: false, carry: false, phase: (f / WALK_FRAMES) * Math.PI * 2, breath: 0 };
+  }
+  if (f < F_CROUCH_WALK) {
+    const i = f - F_IDLE;
+    return { moving: false, crouch: false, carry: false, phase: 0, breath: (i / IDLE_FRAMES) * Math.PI * 2 };
+  }
+  if (f < F_CROUCH_IDLE) {
+    const i = f - F_CROUCH_WALK;
+    return { moving: true, crouch: true, carry: false, phase: (i / CROUCH_WALK_FRAMES) * Math.PI * 2, breath: 0 };
+  }
+  if (f < F_CARRY_WALK) {
+    const i = f - F_CROUCH_IDLE;
+    return { moving: false, crouch: true, carry: false, phase: 0, breath: (i / CROUCH_IDLE_FRAMES) * Math.PI * 2 };
+  }
+  if (f < F_CARRY_IDLE) {
+    const i = f - F_CARRY_WALK;
+    return { moving: true, crouch: false, carry: true, phase: (i / CARRY_WALK_FRAMES) * Math.PI * 2, breath: 0 };
+  }
+  const i = f - F_CARRY_IDLE;
+  return { moving: false, crouch: false, carry: true, phase: 0, breath: (i / CARRY_IDLE_FRAMES) * Math.PI * 2 };
+}
+
+function BuildCharAtlas(kind) {
+  if (charAtlas.has(kind)) return charAtlas.get(kind);
+  const { w, h, baseline } = CHAR_CELL;
+  const canvas = MakeCanvas(w * CHAR_FRAMES, h);
+  const ctx = canvas.getContext("2d");
+  for (let f = 0; f < CHAR_FRAMES; f += 1) {
+    ctx.save();
+    ctx.translate(f * w, 0);
+    const s = FrameSpec(f);
+    ART.DrawCharacter(ctx, {
+      x: w / 2, y: baseline, scale: CHAR_SCALE, facing: 1, kind, id: kind, ...s,
+    });
+    ctx.restore();
+  }
+  const tex = CanvasTexture(canvas);
+  tex.repeat.set(1 / CHAR_FRAMES, 1);
+  const entry = { canvas, tex };
+  charAtlas.set(kind, entry);
+  return entry;
+}
+
+function MakeCharMesh(kind) {
+  const atlas = BuildCharAtlas(kind);
+  const tex = atlas.tex.clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1 / CHAR_FRAMES, 1);
+  const geo = new THREE.PlaneGeometry(CHAR_CELL.w / PPM, CHAR_CELL.h / PPM);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.yOffset = (CHAR_CELL.baseline - CHAR_CELL.h / 2) / PPM;
+  return mesh;
+}
+
+// 扛着的物件（单独一张小贴图，跟着手走）
+function MakeCarryMesh(label) {
+  const wPx = label === "水桶" ? 46 : 120;
+  const hPx = label === "水桶" ? 42 : 30;
+  return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
+    ART.DrawCarry(ctx, ax, ay - (label === "水桶" ? 8 : 0), 1.5, 1, label);
+  });
+}
+
+// ---------------------------------------------------------------------------
+export function CreateWorld(canvasEl) {
+  const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.1, 300);
+  // 正交相机：真 2D 投影，无透视畸变
+  const camera = new THREE.OrthographicCamera(-10, 10, 6, -6, -100, 100);
 
-  const envGroup = new THREE.Group();
-  const actorGroup = new THREE.Group();
-  const fxGroup = new THREE.Group();
-  scene.add(envGroup, actorGroup, fxGroup);
+  // 视差层容器
+  const layers = {
+    sky: new THREE.Group(),        // 天光
+    ridge: new THREE.Group(),      // 最远的山脊（糊得最厉害）
+    hills: new THREE.Group(),      // 远山
+    farTown: new THREE.Group(),    // 远处的村落
+    midTrees: new THREE.Group(),   // 中景树列
+    nearTrees: new THREE.Group(),  // 近景树
+    play: new THREE.Group(),       // 玩法层（清晰）
+    fore: new THREE.Group(),       // 前景（掠过镜头，微糊）
+    fx: new THREE.Group(),
+    ots: new THREE.Group(),        // 过肩前景
+  };
+  const PARALLAX = {
+    sky: 0.02, ridge: 0.07, hills: 0.16, farTown: 0.34, midTrees: 0.52,
+    nearTrees: 0.72, play: 1, fore: 1.28, fx: 1, ots: 1,
+  };
+  const LAYER_Z = {
+    sky: -50, ridge: -40, hills: -32, farTown: -22, midTrees: -16,
+    nearTrees: -10, play: 0, fore: 6, fx: 7, ots: 9,
+  };
+  // 假景深：离玩法层越远，烘焙时越糊
+  const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
+  for (const k of Object.keys(layers)) {
+    layers[k].position.z = LAYER_Z[k];
+    scene.add(layers[k]);
+  }
 
-  const lights = { hemi: null, sun: null, lamp: null, points: [] };
-  const actorMeshes = new Map();
-  const beamMeshes = new Map();
-  let smokeMesh = null;
-  let smokePuffs = null;
-  let carveMark = null;
-  let collapseMeshes = {};
-  let planksMeshes = [];
-  let markerArrow = null;
-  let probeRods = [];
+  // 暗场遮罩（乘算）与光晕（加色）
+  const darkMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+  const darkPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), darkMat);
+  darkPlane.position.z = 8;
+  darkPlane.renderOrder = 50;
+  scene.add(darkPlane);
+
+  const glowTex = (() => {
+    const c = MakeCanvas(128, 128);
+    const g = c.getContext("2d");
+    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255,220,150,1)");
+    grad.addColorStop(0.35, "rgba(255,180,90,0.42)");
+    grad.addColorStop(1, "rgba(255,160,70,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    return CanvasTexture(c);
+  })();
+
+  function MakeGlow(radius, color = 0xffc878, opacity = 1) {
+    const mat = new THREE.MeshBasicMaterial({
+      map: glowTex, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, color, opacity,
+    });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
+    m.renderOrder = 60;
+    return m;
+  }
+
+  const actorSprites = new Map();
+  const glows = [];
   let builtKey = "";
+  let sceneLights = [];   // 静态灯位 {x,y,r,mesh}
+  let smokeMesh = null, smokeCanvas = null, smokeCtx = null;
+  let probeMeshes = [];
+  let markerMesh = null, markerCanvas = null, markerCtx = null;
+  let collapseMeshes = {};
+  let itemMeshes = [];
+  let carveState = false, carveRebuild = null;
+  let otsMesh = null;
+  let vignetteAlpha = 0;
+  let dustMotes = [];
 
-  function ClearGroup(group) {
-    while (group.children.length) {
-      const child = group.children.pop();
-      child.traverse?.((o) => { o.geometry?.dispose?.(); });
-      group.remove(child);
-    }
-  }
-
-  function SetLights(kind) {
-    for (const p of lights.points) scene.remove(p);
-    lights.points = [];
-    if (lights.hemi) scene.remove(lights.hemi);
-    if (lights.sun) scene.remove(lights.sun);
-    if (kind === "day") {
-      scene.background = new THREE.Color(0xd9cba6);
-      scene.fog = new THREE.Fog(0xd9cba6, 55, 140);
-      lights.hemi = new THREE.HemisphereLight(0xf4e8cd, 0x6b5b3f, 1.1);
-      lights.sun = new THREE.DirectionalLight(0xffe8bb, 1.15);
-      lights.sun.position.set(-30, 50, 40);
-    } else if (kind === "night") {
-      scene.background = new THREE.Color(0x131a2c);
-      scene.fog = new THREE.Fog(0x131a2c, 45, 130);
-      lights.hemi = new THREE.HemisphereLight(0x6a7a9e, 0x2c2930, 1.1);
-      lights.sun = new THREE.DirectionalLight(0x9fb3d8, 0.85);
-      lights.sun.position.set(20, 60, 45);
-    } else if (kind === "dawn") {
-      scene.background = new THREE.Color(0xbcae97);
-      scene.fog = new THREE.Fog(0xbcae97, 55, 140);
-      lights.hemi = new THREE.HemisphereLight(0xe0d2b8, 0x5c5448, 1.1);
-      lights.sun = new THREE.DirectionalLight(0xe8b98a, 0.9);
-      lights.sun.position.set(60, 25, 40);
-    } else if (kind === "tunnel") {
-      scene.background = new THREE.Color(0x1a1712);
-      scene.fog = new THREE.Fog(0x1a1712, 45, 120);
-      lights.hemi = new THREE.HemisphereLight(0x9a866a, 0x241d12, 1.5);
-      lights.sun = new THREE.DirectionalLight(0xc8b490, 0.7);
-      lights.sun.position.set(0, 40, 50);
-    } else { // dark：第七章
-      scene.background = new THREE.Color(0x0b0908);
-      scene.fog = new THREE.Fog(0x0b0908, 16, 70);
-      lights.hemi = new THREE.HemisphereLight(0x54432e, 0x0c0906, 0.78);
-      lights.sun = new THREE.DirectionalLight(0x000000, 0);
-      lights.sun.position.set(0, 40, 50);
-    }
-    scene.add(lights.hemi, lights.sun);
-  }
-
-  function AddPointLamp(x, y, z, intensity = 0.9, distance = 12, color = PALETTE.lamp) {
-    const p = new THREE.PointLight(color, intensity, distance, 1.6);
-    p.position.set(x, y, z);
-    scene.add(p);
-    lights.points.push(p);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color }));
-    bulb.position.copy(p.position);
-    envGroup.add(bulb);
-    return p;
-  }
-
-  // -------------------------------------------------------------------------
-  // 视差背景：一排排剪影
-  // -------------------------------------------------------------------------
-  function AddParallaxHouses(xFrom, xTo, z, color, hBase = 3) {
-    for (let x = xFrom; x < xTo; x += 14 + ((x * 7) % 9)) {
-      const w = 8 + ((x * 13) % 6);
-      const h = hBase + ((x * 5) % 3) * 0.5;
-      AddBox(envGroup, w, h, 2, color, x, h / 2, z);
-      AddBox(envGroup, w + 1, 0.5, 2.4, color, x, h + 0.2, z);
-    }
-  }
-
-  function AddParallaxTrees(xFrom, xTo, z, color) {
-    for (let x = xFrom; x < xTo; x += 17 + ((x * 11) % 13)) {
-      AddBox(envGroup, 0.5, 2.6, 0.5, color, x, 1.3, z);
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.9 + ((x * 3) % 3) * 0.4, 7, 6), Mat(color));
-      crown.position.set(x, 3.6, z);
-      envGroup.add(crown);
-    }
-  }
-
-  function AddHills(length, z, color) {
-    for (let x = -20; x < length + 40; x += 46) {
-      const hill = new THREE.Mesh(new THREE.SphereGeometry(26, 10, 8), Mat(color));
-      hill.scale.set(1.6, 0.32, 1);
-      hill.position.set(x, 0, z);
-      envGroup.add(hill);
+  function ClearGroup(g) {
+    while (g.children.length) {
+      const c = g.children.pop();
+      c.geometry?.dispose?.();
+      if (c.material?.map && c.material.map !== glowTex) c.material.map.dispose?.();
+      c.material?.dispose?.();
+      g.remove(c);
     }
   }
 
   // -------------------------------------------------------------------------
-  // 地表道具
+  // 场景搭建
   // -------------------------------------------------------------------------
-  function BuildProp(p, light, ruined) {
+  function AddStrip(group, xFrom, xTo, topY, botY, colors, id) {
+    // 一条横向色带（地表/天空），带手绘边缘
+    const wPx = Math.ceil((xTo - xFrom) * PPM);
+    const hPx = Math.ceil((topY - botY) * PPM);
+    const mesh = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, hPx);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(1, colors[1] || colors[0]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, wPx, hPx);
+    });
+    PlaceSprite(mesh, xFrom, botY, 0);
+    group.add(mesh);
+    return mesh;
+  }
+
+  function AddGroundBand(group, xFrom, xTo, groundY, light, id, depthM = 3.2) {
+    const wPx = Math.ceil((xTo - xFrom) * PPM);
+    const hPx = Math.round(depthM * PPM);
+    const colors = light === "day" ? ART.PAL.earthDay
+      : light === "dawn" ? ART.PAL.earthDawn
+        : light === "night" ? ART.PAL.earthNight : ["#5a4a34", "#3d3123"];
+    const grassColor = light === "night" ? ART.PAL.grassNight : ART.PAL.grass;
+    const mesh = BakeSprite(wPx, hPx, 0, 6, (ctx) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, hPx);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(1, colors[1]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 6, wPx, hPx - 6);
+      // 地表线（手绘起伏）
+      ctx.beginPath();
+      ctx.moveTo(0, 6);
+      for (let px = 0; px <= wPx; px += 40) {
+        ctx.lineTo(px, 6 + (ART.Hash(id + px) - 0.5) * 4);
+      }
+      ctx.strokeStyle = ART.IN.ink;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      // 草簇与车辙
+      for (let i = 0; i < wPx / 34; i += 1) {
+        const gx = ART.Hash(id + "g" + i) * wPx;
+        ctx.strokeStyle = grassColor;
+        ctx.lineWidth = 1.5;
+        for (let b = 0; b < 3; b += 1) {
+          ctx.beginPath();
+          ctx.moveTo(gx + b * 2.5, 7);
+          ctx.lineTo(gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 7, 7 - 5 - ART.Hash(id + "h" + i + b) * 6);
+          ctx.stroke();
+        }
+      }
+      ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+    });
+    PlaceSprite(mesh, xFrom, groundY, 0);
+    group.add(mesh);
+  }
+
+  function AddRidgeBand(group, length, color, id, { amp = 26, base = 34, blur = 2.2, lift = 0.6, opacity = 1 } = {}) {
+    const worldW = length * 0.5 + 90;
+    const wPx = Math.ceil(worldW * PPM * 0.34);
+    const hPx = 180;
+    const mesh = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(0, hPx);
+      for (let px = 0; px <= wPx; px += 22) {
+        const y = hPx - base - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
+        ctx.lineTo(px, y);
+      }
+      ctx.lineTo(wPx, hPx);
+      ctx.closePath();
+      ctx.fill();
+    }, blur);
+    PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
+    ScaleKeepGround(mesh, 2.9, 1);
+    mesh.material.opacity = opacity;
+    group.add(mesh);
+  }
+
+  // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
+  function AddForeground(group, length, night, id) {
+    for (let x = 6; x < length; x += 26 + ART.Hash(id + x) * 22) {
+      const kind = ART.Hash(id + "k" + x) > 0.62 ? "branch" : "grass";
+      const wPx = kind === "branch" ? 340 : 220;
+      const hPx = kind === "branch" ? 200 : 150;
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
+        const tint = night ? "#0f1218" : "#3d3524";
+        if (kind === "grass") {
+          for (let i = 0; i < 22; i += 1) {
+            const gx = ax - 90 + ART.Hash(id + x + i) * 180;
+            const gh = 40 + ART.Hash(id + "h" + x + i) * 78;
+            ctx.beginPath();
+            ctx.moveTo(gx, ay);
+            ctx.quadraticCurveTo(gx + (ART.Hash(id + "c" + i) - 0.5) * 26, ay - gh * 0.6,
+              gx + (ART.Hash(id + "t" + i) - 0.5) * 52, ay - gh);
+            ctx.strokeStyle = tint;
+            ctx.lineWidth = 3.4;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          }
+        } else {
+          // 从画框上缘垂下来的一枝
+          ctx.beginPath();
+          ctx.moveTo(ax - 150, 6);
+          ctx.quadraticCurveTo(ax, 40, ax + 150, 16);
+          ctx.strokeStyle = tint;
+          ctx.lineWidth = 7;
+          ctx.stroke();
+          for (let i = 0; i < 12; i += 1) {
+            const t = i / 12;
+            const lx = ax - 150 + t * 300;
+            const ly = 12 + Math.sin(t * Math.PI) * 26;
+            ctx.beginPath();
+            ctx.ellipse(lx, ly + 12, 13, 7, ART.Hash(id + i) * 2, 0, Math.PI * 2);
+            ctx.fillStyle = tint;
+            ctx.fill();
+          }
+        }
+      }, LAYER_BLUR.fore);
+      // 压到画框下缘/上缘之外，只让边角掠过——一点点就够
+      PlaceSprite(mesh, x, kind === "branch" ? SURFACE_Y + 6.4 : SURFACE_Y - 3.1, 0);
+      ScaleKeepGround(mesh, 1.5);
+      mesh.material.opacity = night ? 0.42 : 0.26;
+      group.add(mesh);
+    }
+  }
+
+  // 空气里的浮尘：光束里看得见的那种
+  function AddDust(count, night) {
+    const dust = [];
+    const tex = (() => {
+      const c = MakeCanvas(32, 32);
+      const g = c.getContext("2d");
+      const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, "rgba(255,236,196,0.9)");
+      grad.addColorStop(1, "rgba(255,220,160,0)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 32, 32);
+      return CanvasTexture(c);
+    })();
+    for (let i = 0; i < count; i += 1) {
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.13, 0.13),
+        new THREE.MeshBasicMaterial({
+          map: tex, transparent: true, depthWrite: false,
+          blending: THREE.AdditiveBlending, opacity: night ? 0.42 : 0.16,
+        }),
+      );
+      m.userData = {
+        seed: Math.random() * 100,
+        vy: 0.05 + Math.random() * 0.12,
+        vx: (Math.random() - 0.5) * 0.14,
+      };
+      layers.fx.add(m);
+      dust.push(m);
+    }
+    return dust;
+  }
+
+  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false } = {}) {
+    for (let x = xFrom; x < xTo; x += 16 + ART.Hash(id + x) * 12) {
+      const w = 9 + ART.Hash(id + "w" + x) * 7;
+      const h = 2.6 + ART.Hash(id + "h" + x) * 1.6;
+      const wPx = Math.ceil((w + 4) * PPM), hPx = Math.ceil((h + 1.6) * PPM);
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx, (ctx, ax, ay) => {
+        const W = w * PPM, H = h * PPM;
+        // 远景屋：墙 + 出檐坡顶 + 一点窗，比纯剪影耐看
+        ART.InkFill(ctx, ART.Rect(ax - W / 2, ay - H, W, H), id + x, color,
+          { amp: 1.6, lw: 1.6, line: "rgba(43,31,22,0.35)" });
+        ART.InkFill(ctx, [
+          [ax - W / 2 - 10, ay - H], [ax - W * 0.26, ay - H - 26],
+          [ax + W * 0.26, ay - H - 26], [ax + W / 2 + 10, ay - H],
+        ], id + "r" + x, color, { amp: 1.4, lw: 1.6, line: "rgba(43,31,22,0.35)", shade: "rgba(0,0,0,0.12)" });
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "rgba(30,22,16,0.6)";
+        ctx.fillRect(ax - W * 0.2, ay - H * 0.62, W * 0.16, H * 0.2);
+        ctx.globalAlpha = 1;
+        if (ruined) {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
+          ctx.globalCompositeOperation = "source-over";
+        }
+      }, LAYER_BLUR.farTown);
+      PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
+      // 空气透视：远景压小、降对比，才读得出纵深
+      ScaleKeepGround(mesh, 0.46);
+      mesh.material.opacity = 0.42;
+      group.add(mesh);
+    }
+  }
+
+  function AddParallaxTrees(group, xFrom, xTo, night, id, { blur = 0, scale = 0.72, opacity = 0.85, step = 19 } = {}) {
+    for (let x = xFrom; x < xTo; x += step + ART.Hash(id + x) * 16) {
+      const wPx = 150, hPx = 200;
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
+        ART.DrawTree(ctx, ax, ay, id + x, { big: false, night });
+      }, blur);
+      PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
+      ScaleKeepGround(mesh, scale);
+      mesh.material.opacity = opacity;
+      group.add(mesh);
+    }
+  }
+
+  function AddProp(group, p, light, ruined, sceneKey) {
+    const night = light === "night" || light === "tunnel" || light === "dark";
+    const gy = SURFACE_Y;
+    const mk = (wPx, hPx, ax, ay, fn, x = p.x, y = gy, z = 0) => {
+      const mesh = BakeSprite(wPx, hPx, ax, ay, fn);
+      PlaceSprite(mesh, x, y, z);
+      group.add(mesh);
+      return mesh;
+    };
     switch (p.kind) {
       case "house": {
-        if (ruined && p.burnable) {
-          AddBox(envGroup, p.w * 0.9, 1.1, 1.6, 0x35302b, p.x + 1, 0.55, -0.8);
-          AddBox(envGroup, 0.5, 2.6, 1.4, 0x3d3630, p.x - p.w / 2 + 1, 1.3, -0.8);
-          AddBox(envGroup, p.w * 0.4, 0.5, 1.4, 0x413a32, p.x + 2, 0.25, -0.4);
-        } else {
-          AddBox(envGroup, p.w, p.h, 3, 0xa89577, p.x, p.h / 2, -1.6);
-          AddBox(envGroup, p.w + 1.2, 0.55, 3.6, 0x7d6a52, p.x, p.h + 0.27, -1.6);
-          // 立面细节：窗与檐下阴影线，破掉大色块
-          AddBox(envGroup, 1.1, 1.1, 0.2, 0x4a3f30, p.x - p.w / 4, 1.9, -0.08);
-          AddBox(envGroup, 1.1, 1.1, 0.2, 0x4a3f30, p.x + p.w / 4, 1.9, -0.08);
-          AddBox(envGroup, p.w, 0.18, 0.2, 0x6b5b45, p.x, p.h - 0.2, -0.08);
-        }
+        const W = p.w * PPM, H = p.h * PPM;
+        mk(W + 90, H + 90, (W + 90) / 2, H + 84,
+          (ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
         break;
       }
       case "doorframe": {
-        AddBox(envGroup, 0.22, 2.3, 0.3, 0x9c7c50, p.x - 0.62, 1.15, 0.1);
-        AddBox(envGroup, 0.22, 2.3, 0.3, 0x9c7c50, p.x + 0.62, 1.15, 0.1);
-        AddBox(envGroup, 1.5, 0.22, 0.3, 0x9c7c50, p.x, 2.35, 0.1);
-        const mark1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.1), new THREE.MeshBasicMaterial({ color: 0xe8d9a8 }));
-        mark1.position.set(p.x - 0.62, 1.32, 0.28);
-        envGroup.add(mark1);
-        carveMark = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.1), new THREE.MeshBasicMaterial({ color: 0xf4e6b4 }));
-        carveMark.position.set(p.x - 0.62, 1.62, 0.28);
-        carveMark.visible = false;
-        envGroup.add(carveMark);
+        const mesh = mk(120, 130, 60, 120, (ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, { carved: carveState }));
+        carveRebuild = () => {
+          const c = mesh.material.map.image;
+          const ctx = c.getContext("2d");
+          ctx.clearRect(0, 0, c.width, c.height);
+          ART.DrawDoorframe(ctx, 60, 120, p.id, { carved: true });
+          mesh.material.map.needsUpdate = true;
+        };
         break;
       }
-      case "bench": AddBox(envGroup, 2.2, 0.9, 1, 0x8a6f4d, p.x, 0.45, 0); break;
-      case "stool": AddBox(envGroup, 0.5, 0.45, 0.4, 0x8a6f4d, p.x, 0.22, 0.3); break;
-      case "wallSeg": AddBox(envGroup, p.w || 1, p.h || 1.8, 0.5, 0x968465, p.x, (p.h || 1.8) / 2, 0); break;
-      case "hatch": AddBox(envGroup, 1.8, 0.18, 1.4, 0x4f4436, p.x, 0.09, 0); break;
-      case "well": {
-        AddBox(envGroup, 2.2, 0.9, 1.6, 0x7d7568, p.x, 0.45, -0.4);
-        AddBox(envGroup, 0.14, 2.2, 0.14, 0x6b5a45, p.x - 0.9, 1.1, -0.4);
-        AddBox(envGroup, 0.14, 2.2, 0.14, 0x6b5a45, p.x + 0.9, 1.1, -0.4);
-        AddBox(envGroup, 2.0, 0.12, 0.12, 0x6b5a45, p.x, 2.2, -0.4);
-        break;
-      }
-      case "millstone": {
-        const stone = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.5, 12), Mat(0x8d867c));
-        stone.position.set(p.x, 0.25, -0.2);
-        envGroup.add(stone);
-        break;
-      }
-      case "woodpile": AddBox(envGroup, 2.6, 1.1, 1.4, 0x7a5f3e, p.x, 0.55, 0); break;
-      case "tree": {
-        AddBox(envGroup, 0.6, 3.6, 0.6, 0x5d4a33, p.x, 1.8, -0.6);
-        const crown = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 6), Mat(0x4a5c38));
-        crown.position.set(p.x, 4.9, -0.6);
-        envGroup.add(crown);
-        break;
-      }
-      case "lamppost": {
-        AddBox(envGroup, 0.16, 2.6, 0.16, 0x5a4a38, p.x, 1.3, -0.3);
-        if (light === "night") AddPointLamp(p.x, 2.5, 0, 0.8, 10, 0xffc978);
-        break;
-      }
-      case "ditch": AddBox(envGroup, p.w, 0.9, 3.4, 0x22262b, p.x, -0.42, 0.2); break;
-      case "crops": {
-        for (let x = p.x - p.w / 2; x < p.x + p.w / 2; x += 1.4) {
-          AddBox(envGroup, 0.16, 1.5 + ((x * 7) % 4) * 0.1, 0.16, 0x6e7a42, x, 0.75, ((x * 5) % 3) * 0.5 - 0.5);
-        }
-        break;
-      }
-      case "fortWall": AddBox(envGroup, p.w, p.h, 2, 0x7d7565, p.x, p.h / 2, -1); break;
+      case "bench": mk(130, 70, 65, 62, (ctx, ax, ay) => ART.DrawBench(ctx, ax, ay, p.id)); break;
+      case "stool": mk(60, 40, 30, 34, (ctx, ax, ay) => ART.DrawStool(ctx, ax, ay, p.id)); break;
+      case "wallSeg": mk(p.w * PPM + 30, (p.h || 1.8) * PPM + 40, (p.w * PPM + 30) / 2, (p.h || 1.8) * PPM + 30,
+        (ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, p.w * PPM, (p.h || 1.8) * PPM, p.id, { burnt: ruined })); break;
+      case "hatch": mk(70, 50, 35, 26, (ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true })); break;
+      case "well": mk(140, 120, 70, 108, (ctx, ax, ay) => ART.DrawWell(ctx, ax, ay, p.id, { night })); break;
+      case "millstone": mk(110, 70, 55, 62, (ctx, ax, ay) => ART.DrawMillstone(ctx, ax, ay, p.id)); break;
+      case "woodpile": mk(120, 80, 60, 74, (ctx, ax, ay) => ART.DrawWoodpile(ctx, ax, ay, p.id)); break;
+      case "tree": mk(p.big ? 220 : 150, p.big ? 250 : 200, (p.big ? 220 : 150) / 2, (p.big ? 250 : 200) - 6,
+        (ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, night, bare: ruined })); break;
+      case "lamppost": mk(70, 130, 35, 124, (ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
+      case "ditch": mk(p.w * PPM + 40, 90, (p.w * PPM + 40) / 2, 40,
+        (ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "crops": mk(p.w * PPM + 40, 110, (p.w * PPM + 40) / 2, 102,
+        (ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night })); break;
+      case "fortWall": mk(p.w * PPM + 60, p.h * PPM + 90, (p.w * PPM + 60) / 2, p.h * PPM + 66,
+        (ctx, ax, ay) => ART.DrawFortWall(ctx, ax, ay, p.w * PPM, p.h * PPM, p.id)); break;
       case "fortGate": {
-        AddBox(envGroup, 0.4, 3, 0.8, 0x6b6357, p.x - 1.6, 1.5, -0.8);
-        AddBox(envGroup, 0.4, 3, 0.8, 0x6b6357, p.x + 1.6, 1.5, -0.8);
-        AddPointLamp(p.x, 2.8, 0, 0.7, 10, 0xffc978);
+        mk(160, 150, 80, 142, (ctx, ax, ay) => {
+          ART.DrawFortWall(ctx, ax - 56, ay, 34, 116, p.id + "l");
+          ART.DrawFortWall(ctx, ax + 56, ay, 34, 116, p.id + "r");
+          ART.DrawLamppost(ctx, ax, ay, p.id + "lamp", { lit: true });
+        });
         break;
       }
-      case "blockhouse": {
-        AddBox(envGroup, 6, 8.5, 5, 0x6b6357, p.x, 4.25, -6);
-        AddBox(envGroup, 6.8, 1, 5.6, 0x57503f, p.x, 8.9, -6);
-        AddPointLamp(p.x - 2, 8.2, -3, 0.9, 16, 0xffdf9a);
-        break;
-      }
-      case "prison": {
-        AddBox(envGroup, 8, 3, 4, 0x746c5c, p.x, 1.5, -4);
-        for (let i = 0; i < 3; i += 1) AddBox(envGroup, 0.1, 1, 0.1, 0x2a2620, p.x - 2 + i * 2, 1.7, -1.9);
-        AddPointLamp(p.x, 2.2, -1.5, 0.6, 8, 0xd8b56a);
-        break;
-      }
+      case "blockhouse": mk(190, 300, 95, 292, (ctx, ax, ay) => ART.DrawBlockhouse(ctx, ax, ay, p.id, { lit: true })); break;
+      case "prison": mk(180, 160, 90, 152, (ctx, ax, ay) => ART.DrawPrison(ctx, ax, ay, p.id, { night: true })); break;
       case "fortSilhouette": {
-        AddBox(envGroup, p.w, 3, 3, 0x3a352c, p.x, 1.5, -8);
-        AddBox(envGroup, 5, 7.5, 4, 0x332f27, p.x + 18, 3.75, -9);
+        const mesh = BakeSprite(p.w * PPM, 260, 0, 254, (ctx) => {
+          ctx.fillStyle = "#2a251e";
+          ctx.fillRect(0, 150, p.w * PPM, 110);
+          ART.DrawBlockhouse(ctx, p.w * PPM * 0.72, 254, p.id, { lit: false });
+        });
+        PlaceSprite(mesh, p.x - p.w / 2, SURFACE_Y, 0);
+        group.add(mesh);
+        break;
+      }
+      case "pump": {
+        mk(140, 120, 70, 112, (ctx, ax, ay) => {
+          // 水泵/风箱：日军灌烟灌水用的家伙
+          ART.InkFill(ctx, ART.Rect(ax - 44, ay - 46, 88, 46), p.id, "#5f5a4a",
+            { amp: 1.4, lw: 2.4, shade: "rgba(0,0,0,0.24)" });
+          ART.InkFill(ctx, ART.Rect(ax - 12, ay - 74, 24, 30), p.id + "t", "#6b6555", { amp: 1.1, lw: 2.2 });
+          ART.InkLine(ctx, ax + 40, ay - 30, ax + 78, ay - 8, p.id + "hose", { lw: 5, color: "#3e372c", amp: 3 });
+          ART.InkLine(ctx, ax - 30, ay - 50, ax - 52, ay - 74, p.id + "handle", { lw: 4, color: "#7a5433" });
+        });
         break;
       }
       default: break;
     }
   }
 
-  function BuildCover(c, light) {
+  function AddCover(group, c, light) {
+    const night = light === "night" || light === "dark" || light === "tunnel";
+    const gy = SURFACE_Y;
+    const mk = (wPx, hPx, ax, ay, fn) => {
+      const mesh = BakeSprite(wPx, hPx, ax, ay, fn);
+      PlaceSprite(mesh, c.x, gy, 0);
+      group.add(mesh);
+    };
     switch (c.kind) {
-      case "haystack": {
-        const hs = new THREE.Mesh(new THREE.ConeGeometry(c.w / 2 + 0.4, 2.3, 8), Mat(light === "day" ? 0xb09a58 : 0x6e6448));
-        hs.position.set(c.x, 1.15, 0.3);
-        envGroup.add(hs);
-        break;
-      }
-      case "firewood": AddBox(envGroup, c.w, 1.2, 1, 0x6e5638, c.x, 0.6, 0.3); break;
-      case "wallSeg": AddBox(envGroup, c.w, 1.5, 0.5, 0x968465, c.x, 0.75, 0.3); break;
-      case "bush": {
-        const b = new THREE.Mesh(new THREE.SphereGeometry(c.w / 2 + 0.5, 7, 6), Mat(0x44523a));
-        b.scale.y = 0.75;
-        b.position.set(c.x, 0.9, 0.3);
-        envGroup.add(b);
-        break;
-      }
-      case "ridge": AddBox(envGroup, c.w, 0.9, 1.4, 0x4a4438, c.x, 0.45, 0.3); break;
+      case "haystack": mk(c.w * PPM + 60, c.w * PPM + 90, (c.w * PPM + 60) / 2, c.w * PPM + 80,
+        (ctx, ax, ay) => ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+      case "firewood": mk(c.w * PPM + 60, 90, (c.w * PPM + 60) / 2, 82,
+        (ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id)); break;
+      case "wallSeg": mk(c.w * PPM + 40, 120, (c.w * PPM + 40) / 2, 106,
+        (ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, c.w * PPM, 72, c.id, { burnt: false })); break;
+      case "bush": mk(c.w * PPM + 70, 110, (c.w * PPM + 70) / 2, 100,
+        (ctx, ax, ay) => ART.DrawBush(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+      case "ridge": mk(c.w * PPM + 50, 90, (c.w * PPM + 50) / 2, 78,
+        (ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, c.w * PPM, c.id)); break;
+      case "crops": mk(c.w * PPM + 40, 110, (c.w * PPM + 40) / 2, 102,
+        (ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+      case "ditch": break; // 由 props 里的 ditch 绘制
       default: break;
     }
   }
 
-  // -------------------------------------------------------------------------
-  // 地下剖面
-  // -------------------------------------------------------------------------
-  function BuildUnderground(sceneDef, state) {
+  // 地下剖面：一整条烘成大贴图（含土层/空腔/支撑木/洞室/竖井）
+  function AddUnderground(group, sceneDef, state, sceneKey) {
     const range = sceneDef.walk.under;
     if (!range) return;
-    const tunnelTop = UNDER_Y + 2.1;
-    // 地道内壁背板（暖土色）
-    AddBox(envGroup, range[1] - range[0] + 3, 2.3, 0.3, 0x94764e, (range[0] + range[1]) / 2, UNDER_Y + 1.05, -1.3);
-    // 地道地板与顶沿
-    AddBox(envGroup, range[1] - range[0] + 3, 0.25, 2.6, 0x75593a, (range[0] + range[1]) / 2, UNDER_Y - 0.12, -0.2);
-    AddBox(envGroup, range[1] - range[0] + 3, 0.3, 2.6, 0x3a2f22, (range[0] + range[1]) / 2, tunnelTop + 0.15, -0.2);
-    // 地表与地道之间的土层
-    AddBox(envGroup, range[1] - range[0] + 20, -tunnelTop - 0.5, 2.2, 0x2b2318,
-      (range[0] + range[1]) / 2, (tunnelTop + (-0.5)) / 2, -0.9);
-    // 地道两端的封土
-    AddBox(envGroup, 3, 2.6, 2.4, 0x2b2318, range[0] - 2, UNDER_Y + 1.2, -0.4);
-    AddBox(envGroup, 3, 2.6, 2.4, 0x2b2318, range[1] + 2, UNDER_Y + 1.2, -0.4);
-    // 深处的底土
-    AddBox(envGroup, range[1] - range[0] + 30, 2.5, 3, 0x1c1610, (range[0] + range[1]) / 2, UNDER_Y - 1.6, -0.9);
+    // 土层铺满整条场景，别在半路露出"地的尽头"
+    const x0 = Math.min(range[0] - 6, -20);
+    const x1 = Math.max(range[1] + 6, sceneDef.length + 20);
+    const wPx = Math.ceil((x1 - x0) * PPM);
+    const topWorld = SURFACE_Y;
+    const botWorld = UNDER_Y - 2.6;
+    const hPx = Math.ceil((topWorld - botWorld) * PPM);
+    const toPx = (wx) => (wx - x0) * PPM;
+    const toPy = (wy) => (topWorld - wy) * PPM;
 
-    // 支撑木柱（每隔一段一组，地道战剖面的标志性画面）
-    for (let x = range[0] + 4; x < range[1] - 2; x += 9) {
-      AddBox(envGroup, 0.22, 2.1, 0.22, 0x7a5f3e, x, UNDER_Y + 1.05, -1.0);
-      AddBox(envGroup, 1.4, 0.18, 0.22, 0x7a5f3e, x, tunnelTop - 0.1, -1.0);
-    }
-
-    // 竖井（爬梯口）
-    for (const shaft of sceneDef.shafts) {
-      if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-      AddBox(envGroup, 1.7, -UNDER_Y - 2.0 + 2.4, 0.3, 0x5c4a34, shaft.x, (tunnelTop + 0.3) / 2 + 0.4, -1.25);
-      for (let y = UNDER_Y + 0.6; y < 0; y += 0.55) {
-        AddBox(envGroup, 1.1, 0.09, 0.12, 0x8a6f4d, shaft.x, y, -0.9);
+    const mesh = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+      ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
+      const tunTop = toPy(UNDER_Y + 2.15);
+      const tunBot = toPy(UNDER_Y);
+      ART.DrawTunnelBore(ctx, toPx(range[0]), toPx(range[1]), tunTop, tunBot, sceneKey + "bore");
+      // 洞室 / 旁洞
+      for (const p of sceneDef.props) {
+        if (p.kind === "chamber") {
+          ART.DrawChamberVault(ctx, toPx(p.x), p.w * PPM, toPy(UNDER_Y + 3.0), tunBot, p.id);
+        } else if (p.kind === "pocket") {
+          ART.DrawChamberVault(ctx, toPx(p.x), 5.6 * PPM, toPy(UNDER_Y + 2.5), tunBot, p.id);
+        }
       }
-      AddBox(envGroup, 2.2, 0.16, 1.2, 0x4f4436, shaft.x, 0.08, 0);
-    }
+      // 支撑木
+      for (let x = range[0] + 4; x < range[1] - 2; x += 9) {
+        ART.DrawSupportBeam(ctx, toPx(x), tunTop + 4, tunBot, sceneKey + "beam" + x);
+      }
+      // 竖井
+      for (const shaft of sceneDef.shafts) {
+        if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
+        ART.DrawShaft(ctx, toPx(shaft.x), toPy(SURFACE_Y) - 2, tunTop + 6, shaft.id);
+      }
+      // 通风眼 / 预警铃
+      for (const p of sceneDef.props) {
+        if (p.kind === "vent") ART.DrawVentPipe(ctx, toPx(p.x), toPy(SURFACE_Y), tunTop + 4, p.id);
+        if (p.kind === "bell") ART.DrawBell(ctx, toPx(p.x), tunTop + 22, p.id, { ringing: false });
+      }
+    });
+    PlaceSprite(mesh, x0, SURFACE_Y, 0);
+    group.add(mesh);
   }
 
-  function BuildTunnelExtras(sceneDef, state, sceneKey) {
+  function AddCollapses(group, sceneDef) {
     collapseMeshes = {};
     for (const p of sceneDef.props) {
-      if (p.kind === "chamber") {
-        // 藏人洞：更高的拱室 + 木框
-        AddBox(envGroup, p.w, 3.1, 0.3, 0xa0805a, p.x, UNDER_Y + 1.45, -1.28);
-        AddBox(envGroup, 0.25, 2.9, 0.25, 0x7a5f3e, p.x - p.w / 2 + 0.4, UNDER_Y + 1.45, -1.0);
-        AddBox(envGroup, 0.25, 2.9, 0.25, 0x7a5f3e, p.x + p.w / 2 - 0.4, UNDER_Y + 1.45, -1.0);
-        AddBox(envGroup, p.w - 0.4, 0.2, 0.25, 0x7a5f3e, p.x, UNDER_Y + 2.8, -1.0);
-        AddBox(envGroup, 1.6, 0.5, 1.2, 0x5a4a38, p.x - p.w / 2 + 1.4, UNDER_Y + 0.25, -0.5);
-        if (sceneKey === "tunnelVillage") AddPointLamp(p.x, UNDER_Y + 1.9, 0, 1.1, 10);
-      } else if (p.kind === "pocket") {
-        AddBox(envGroup, 5.5, 2.6, 0.3, 0x8a6c48, p.x, UNDER_Y + 1.2, -1.28);
-        AddBox(envGroup, 0.22, 2.3, 0.22, 0x7a5f3e, p.x - 2.4, UNDER_Y + 1.15, -1.0);
-        AddBox(envGroup, 0.22, 2.3, 0.22, 0x7a5f3e, p.x + 2.4, UNDER_Y + 1.15, -1.0);
-      } else if (p.kind === "vent") {
-        // 通风眼：从地道顶通到井壁的暗管
-        AddBox(envGroup, 0.55, -UNDER_Y - 1.4, 0.4, 0x4a3c2c, p.x, (UNDER_Y + 2.1) / 2 + 0.7, -1.2);
-      } else if (p.kind === "bell") {
-        const bell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 6), Mat(0xb8a15c));
-        bell.position.set(p.x, UNDER_Y + 1.9, -0.6);
-        envGroup.add(bell);
-        AddBox(envGroup, 0.04, 0.5, 0.04, 0x8d8272, p.x, UNDER_Y + 2.2, -0.6);
-      } else if (p.kind === "collapse") {
-        const pile = new THREE.Group();
-        for (let i = 0; i < 6; i += 1) {
-          const rock = new THREE.Mesh(new THREE.BoxGeometry(0.8 - i * 0.07, 0.55, 0.9), Mat(0x413a32));
-          rock.position.set(p.x + ((i * 31) % 10) / 12 - 0.4, UNDER_Y + 0.28 + i * 0.34, ((i * 17) % 8) / 10 - 0.4);
-          rock.rotation.z = i * 0.4;
-          pile.add(rock);
-        }
-        envGroup.add(pile);
-        collapseMeshes[p.id] = pile;
-      } else {
-        BuildProp(p, "night", false);
-      }
+      if (p.kind !== "collapse") continue;
+      const mesh = BakeSprite(130, 110, 65, 104, (ctx, ax, ay) => ART.DrawCollapsePile(ctx, ax, ay, 1, p.id));
+      PlaceSprite(mesh, p.x, UNDER_Y, 0);
+      group.add(mesh);
+      collapseMeshes[p.id] = mesh;
     }
   }
 
@@ -336,305 +622,421 @@ export function CreateWorld(canvas) {
     const key = `${ch.scene}:${ch.light}:${state.flags.ruined ? 1 : 0}:${state.flags.hiddenBuilt ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
-    ClearGroup(envGroup);
-    for (const p of lights.points) scene.remove(p);
-    lights.points = [];
-    carveMark = null;
-    SetLights(ch.light);
+    carveState = !!state.flags.carved;
+    carveRebuild = null;
+    for (const k of ["sky", "hills", "farTown", "nearTrees", "play", "fore"]) ClearGroup(layers[k]);
+    for (const g of glows) scene.remove(g);
+    glows.length = 0;
+    sceneLights = [];
 
     const sceneDef = SCENES[ch.scene];
-    const groundColor = ch.light === "day" ? 0x8a7a55 : (ch.light === "dawn" ? 0x7d786a : (ch.light === "night" ? 0x3d434d : 0x3a3126));
-    // 地表条带
-    AddBox(envGroup, sceneDef.length + 120, 0.6, 14, groundColor, sceneDef.length / 2, -0.3, -3);
+    const L = sceneDef.length;
+    const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
 
-    if (ch.scene === "village") {
-      AddHills(sceneDef.length, -46, ch.light === "day" ? 0x9a8c68 : 0x232b3a);
-      AddParallaxHouses(-10, sceneDef.length + 10, -22, ch.light === "day" ? 0x8d7c60 : (state.flags.ruined ? 0x3a352c : 0x2e3442), 2.6);
-      AddParallaxTrees(6, sceneDef.length, -12, ch.light === "day" ? 0x5c6b42 : 0x28323c);
-      for (const p of sceneDef.props) BuildProp(p, ch.light, state.flags.ruined);
-      for (const c of sceneDef.covers) BuildCover(c, ch.light);
-      BuildUnderground(sceneDef, state); // 地窖
-    } else if (ch.scene === "fields") {
-      AddHills(sceneDef.length, -46, 0x1e2733);
-      AddParallaxTrees(0, sceneDef.length - 60, -18, 0x252e28);
-      for (const p of sceneDef.props) BuildProp(p, ch.light, false);
-      for (const c of sceneDef.covers) BuildCover(c, ch.light);
-    } else {
-      // 地道剖面场景：地表建筑 + 地下网络
-      AddHills(sceneDef.length, -46, ch.scene === "tunnelFort" ? 0x141210 : 0x1c1a14);
-      if (ch.scene === "tunnelVillage") {
-        AddParallaxHouses(0, sceneDef.length, -20, 0x2a251c, 2.6);
-      }
-      for (const p of sceneDef.props.filter((x) => ["millstone", "well", "house", "fortSilhouette"].includes(x.kind))) {
-        BuildProp(p, "night", false);
-      }
-      BuildUnderground(sceneDef, state);
-      BuildTunnelExtras(sceneDef, state, ch.scene);
+    // 天空
+    const skyColors = {
+      day: ["#cfd8dc", "#e6dcc0"], night: ["#0e1424", "#1e2740"],
+      dawn: ["#8f8fa6", "#e0bc92"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
+    }[ch.light] || ["#cfd8dc", "#e6dcc0"];
+    AddStrip(layers.sky, -80, L + 80, 26, -14, skyColors, "sky");
+    // 地平线暖雾：把天和地缝起来，也是纵深的一部分
+    {
+      const hazeColor = {
+        day: "rgba(214,190,148,0.55)", dawn: "rgba(226,186,142,0.6)",
+        night: "rgba(58,68,96,0.5)", tunnel: "rgba(52,44,32,0.5)", dark: "rgba(30,26,22,0.5)",
+      }[ch.light] || "rgba(214,190,148,0.5)";
+      const wPx = Math.ceil((L + 160) * PPM * 0.2);
+      const hPx = 200;
+      const haze = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, hPx);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, hazeColor);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, wPx, hPx);
+      }, 2);
+      PlaceSprite(haze, -80, SURFACE_Y - 0.5, 0);
+      ScaleKeepGround(haze, 5, 1);
+      layers.hills.add(haze);
     }
+
+    // 远景分层（越远越糊越淡：假景深）
+    const pal = {
+      day: { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" },
+      dawn: { ridge: "#a89c8c", hill: "#8d8474", town: "#9c9080" },
+      night: { ridge: "#2a3244", hill: "#212938", town: "#39415a" },
+      tunnel: { ridge: "#2a2a30", hill: "#232227", town: "#33313a" },
+      dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
+    }[ch.light] || { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" };
+
+    AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
+      { amp: 40, base: 58, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7 });
+    AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
+      { amp: 26, base: 34, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88 });
+    if (ch.scene === "village" || ch.scene === "tunnelVillage") {
+      AddParallaxTown(layers.farTown, -10, L + 10,
+        state.flags.ruined && ch.light !== "night" ? "#7d7466" : pal.town,
+        ch.scene + "town", { ruined: state.flags.ruined });
+    }
+    if (ch.scene !== "tunnelFort") {
+      AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
+        { blur: LAYER_BLUR.midTrees, scale: 0.5, opacity: 0.6, step: 24 });
+      AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
+        { blur: LAYER_BLUR.nearTrees, scale: 0.72, opacity: 0.85 });
+      AddForeground(layers.fore, L, night, ch.scene + "fg");
+    }
+
+    // 地表带：没有地道剖面的场景要一直填到画面下缘，别露出天空底色
+    AddGroundBand(layers.play, -30, L + 30, SURFACE_Y, ch.light, ch.scene + "ground",
+      sceneDef.walk.under ? 3.2 : 16);
+
+    // 地下剖面
+    AddUnderground(layers.play, sceneDef, state, ch.scene);
+    AddCollapses(layers.play, sceneDef);
+
+    // 地表道具与遮蔽
+    for (const p of sceneDef.props) {
+      if (["chamber", "pocket", "vent", "bell", "collapse"].includes(p.kind)) continue;
+      AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene);
+    }
+    for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light);
+
+    // 静态灯位
+    const lampSpots = [];
+    for (const p of sceneDef.props) {
+      if (p.kind === "lamppost" && night) lampSpots.push({ x: p.x, y: 1.6, r: 4.5, i: 0.9 });
+      if (p.kind === "fortGate") lampSpots.push({ x: p.x, y: 2.6, r: 5.5, i: 1.0 });
+      if (p.kind === "blockhouse") lampSpots.push({ x: p.x, y: 6.4, r: 7, i: 1.1 });
+      if (p.kind === "prison") lampSpots.push({ x: p.x, y: 1.5, r: 4, i: 0.75 });
+      if (p.kind === "chamber" && ch.scene === "tunnelVillage") lampSpots.push({ x: p.x, y: UNDER_Y + 1.5, r: 4.2, i: 1.0 });
+    }
+    for (const spot of lampSpots) {
+      const g = MakeGlow(spot.r, 0xffc878, spot.i);
+      g.position.set(spot.x, spot.y, 7.5);
+      scene.add(g);
+      glows.push(g);
+      sceneLights.push(spot);
+    }
+
+    // 浮尘
+    for (const d of dustMotes) layers.fx.remove(d);
+    dustMotes = AddDust(ch.scene === "tunnelFort" ? 26 : 18, night);
   }
 
   // -------------------------------------------------------------------------
   // 角色
   // -------------------------------------------------------------------------
-  const ACTOR_COLORS = {
-    player: PALETTE.zhuzi, sister: PALETTE.sister, family: PALETTE.mother,
-    militia: PALETTE.militia, soldier: PALETTE.soldier, villager: PALETTE.villager,
-    puppet: PALETTE.puppet,
-  };
-
-  function MakeActorMesh(kind, id) {
-    const group = new THREE.Group();
-    let color = ACTOR_COLORS[kind] ?? PALETTE.villager;
-    if (id === "father") color = PALETTE.father;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 1.15, 8), Mat(color));
-    body.position.y = 0.72;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), Mat(0xc9a276));
-    head.position.y = 1.55;
-    group.add(body, head);
-    if (kind === "soldier") {
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.29, 0.16, 8), Mat(0x55522f));
-      cap.position.y = 1.72;
-      group.add(cap);
-      const rifle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), Mat(0x3d3126));
-      rifle.position.set(0, 1.0, -0.42);
-      rifle.rotation.x = 0.25;
-      group.add(rifle);
+  function EnsureActorSprite(id, kind) {
+    let s = actorSprites.get(id);
+    if (!s) {
+      const mesh = MakeCharMesh(kind);
+      layers.play.add(mesh);
+      s = { mesh, prevX: null, phase: 0, kind, carryMesh: null, glow: null };
+      actorSprites.set(id, s);
     }
-    if (kind === "puppet") {
-      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.14, 8), Mat(0x2e2a24));
-      hat.position.y = 1.72;
-      group.add(hat);
-    }
-    if (kind === "militia") {
-      const towel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8), Mat(0xd8d2c0));
-      towel.position.y = 1.7;
-      group.add(towel);
-    }
-    group.userData = { kind, id };
-    return group;
+    return s;
   }
 
-  function EnsureActorMesh(id, kind) {
-    let mesh = actorMeshes.get(id);
-    if (!mesh) {
-      mesh = MakeActorMesh(kind, id);
-      actorMeshes.set(id, mesh);
-      actorGroup.add(mesh);
-    }
-    return mesh;
+  function SetFrame(s, frame, facing) {
+    const tex = s.mesh.material.map;
+    tex.offset.x = frame / CHAR_FRAMES;
+    s.mesh.scale.x = facing >= 0 ? 1 : -1;
   }
 
-  function LevelY(level) { return level === "under" ? UNDER_Y : SURFACE_Y; }
+  function UpdateOne(s, x, level, heading, crouch, dt, carry = false) {
+    const y = level === "under" ? UNDER_Y : SURFACE_Y;
+    const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
+    s.prevX = x;
+    // 步频跟着实际位移走（不是定速循环），停下就自然收在站姿
+    const isMoving = moved > 0.006;
+    if (isMoving) s.phase += moved * 2.3;
+    s.idleT = (s.idleT || Math.random() * 6) + dt * 1.25;
 
-  function UpdateActors(state, time) {
+    let frame;
+    if (carry) {
+      frame = isMoving
+        ? F_CARRY_WALK + (Math.floor(s.phase) % CARRY_WALK_FRAMES)
+        : F_CARRY_IDLE + (Math.floor(s.idleT) % CARRY_IDLE_FRAMES);
+    } else if (crouch) {
+      frame = isMoving
+        ? F_CROUCH_WALK + (Math.floor(s.phase) % CROUCH_WALK_FRAMES)
+        : F_CROUCH_IDLE + (Math.floor(s.idleT) % CROUCH_IDLE_FRAMES);
+    } else {
+      frame = isMoving
+        ? F_WALK + (Math.floor(s.phase) % WALK_FRAMES)
+        : F_IDLE + (Math.floor(s.idleT) % IDLE_FRAMES);
+    }
+    SetFrame(s, frame, heading >= 0 ? 1 : -1);
+    s.mesh.position.set(x, y + s.mesh.userData.yOffset, 0.1);
+    return { x, y, isMoving };
+  }
+
+  function UpdateActors(state, time, dt) {
     const seen = new Set(["player"]);
     const p = state.player;
-    const playerMesh = EnsureActorMesh("player", "player");
-    playerMesh.position.set(p.x, LevelY(p.level), 0);
-    playerMesh.rotation.y = (p.heading || 1) > 0 ? Math.PI / 2 : -Math.PI / 2;
-    playerMesh.scale.y = p.crouch ? 0.68 : 1;
+    const ps = EnsureActorSprite("player", "player");
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry);
 
-    let carryMesh = playerMesh.userData.carryMesh;
-    if (p.carry && !carryMesh) {
-      carryMesh = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.15, 1.7), Mat(0x9a7a4d));
-      carryMesh.position.set(0, 1.95, 0);
-      playerMesh.add(carryMesh);
-      playerMesh.userData.carryMesh = carryMesh;
-    } else if (!p.carry && carryMesh) {
-      playerMesh.remove(carryMesh);
-      playerMesh.userData.carryMesh = null;
+    // 扛的东西
+    if (p.carry && (!ps.carryMesh || ps.carryLabel !== p.carry)) {
+      if (ps.carryMesh) layers.play.remove(ps.carryMesh);
+      ps.carryMesh = MakeCarryMesh(p.carry);
+      ps.carryLabel = p.carry;
+      layers.play.add(ps.carryMesh);
+    } else if (!p.carry && ps.carryMesh) {
+      layers.play.remove(ps.carryMesh);
+      ps.carryMesh = null;
+      ps.carryLabel = null;
+    }
+    if (ps.carryMesh) {
+      const y = (p.level === "under" ? UNDER_Y : SURFACE_Y);
+      ps.carryMesh.position.set(p.x, y + (p.carry === "水桶" ? 0.85 : 1.95), 0.2);
+      ps.carryMesh.scale.x = p.heading >= 0 ? 1 : -1;
     }
 
+    // 煤油灯
     if (p.lamp) {
-      if (!lights.lamp) {
-        lights.lamp = new THREE.PointLight(PALETTE.lamp, 1.6, 12, 1.4);
-        scene.add(lights.lamp);
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: PALETTE.lamp }));
-        bulb.position.set(0, 1.0, 0.4);
-        playerMesh.add(bulb);
-        playerMesh.userData.lampBulb = bulb;
+      if (!ps.glow) {
+        ps.glow = MakeGlow(6.5, 0xffb85c, 1.25);
+        scene.add(ps.glow);
       }
-      lights.lamp.intensity = 1.5 + Math.sin(time * 9.7) * 0.14 + Math.sin(time * 23.3) * 0.07;
-      lights.lamp.position.set(p.x, LevelY(p.level) + 1.2, 0.5);
-    } else if (lights.lamp) {
-      scene.remove(lights.lamp);
-      lights.lamp = null;
-      if (playerMesh.userData.lampBulb) {
-        playerMesh.remove(playerMesh.userData.lampBulb);
-        playerMesh.userData.lampBulb = null;
-      }
+      ps.glow.position.set(p.x + p.heading * 0.3, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.1, 7.6);
+      ps.glow.material.opacity = 1.15 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23) * 0.05;
+    } else if (ps.glow) {
+      scene.remove(ps.glow);
+      ps.glow = null;
     }
 
     for (const a of state.actors) {
       seen.add(a.id);
-      const mesh = EnsureActorMesh(a.id, a.kind);
-      mesh.visible = a.visible !== false;
-      mesh.position.set(a.x, LevelY(a.level || "surface"), 0);
-      mesh.rotation.y = (a.heading || 1) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      const s = EnsureActorSprite(a.id, a.kind);
+      s.mesh.visible = a.visible !== false;
+      if (!s.mesh.visible) continue;
+      UpdateOne(s, a.x, a.level || "surface", a.heading, false, dt);
       // 提灯
-      if (a.lantern && !mesh.userData.lanternLight) {
-        const ll = new THREE.PointLight(0xffc978, 0.9, 9, 1.6);
-        ll.position.set(0, 1.1, 0.5);
-        mesh.add(ll);
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffc978 }));
-        bulb.position.copy(ll.position);
-        mesh.add(bulb);
-        mesh.userData.lanternLight = ll;
-      }
-      // 视线光束（横向）
-      if (a.kind === "soldier" || a.kind === "puppet") {
-        let beam = beamMeshes.get(a.id);
-        if (!beam) {
-          beam = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 0.55, 0.4),
-            new THREE.MeshBasicMaterial({ color: PALETTE.beamCalm, transparent: true, opacity: 0.14, depthWrite: false }),
-          );
-          beamMeshes.set(a.id, beam);
-          fxGroup.add(beam);
-        }
-        const len = 15 * 0.8;
-        beam.visible = mesh.visible && state.stealthActive;
-        beam.scale.x = len;
-        beam.position.set(a.x + (a.heading || 1) * len / 2, LevelY(a.level || "surface") + 1.2, 0.3);
-        const alert = state.detection.spotter === a.id ? state.detection.level : 0;
-        beam.material.color.setHex(alert > 0.15 ? PALETTE.beamAlert : PALETTE.beamCalm);
-        beam.material.opacity = 0.1 + alert * 0.3;
+      if (a.lantern) {
+        if (!s.glow) { s.glow = MakeGlow(4.2, 0xffc878, 0.95); scene.add(s.glow); }
+        s.glow.position.set(a.x + (a.heading || 1) * 0.35, (a.level === "under" ? UNDER_Y : SURFACE_Y) + 1.05, 7.6);
+        s.glow.visible = true;
+      } else if (s.glow) {
+        s.glow.visible = false;
       }
     }
-    for (const [id, mesh] of actorMeshes) {
+
+    for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
-        actorGroup.remove(mesh);
-        actorMeshes.delete(id);
-        const beam = beamMeshes.get(id);
-        if (beam) { fxGroup.remove(beam); beamMeshes.delete(id); }
+        layers.play.remove(s.mesh);
+        if (s.glow) scene.remove(s.glow);
+        if (s.carryMesh) layers.play.remove(s.carryMesh);
+        actorSprites.delete(id);
+      } else if (id !== "player") {
+        const a = state.actors.find((x) => x.id === id);
+        if (s.glow && (!a || a.visible === false)) s.glow.visible = false;
       }
-    }
-    for (const [id, beam] of beamMeshes) {
-      if (!seen.has(id)) { fxGroup.remove(beam); beamMeshes.delete(id); }
     }
   }
 
   // -------------------------------------------------------------------------
-  function UpdateProps(state, time) {
+  // 特效层
+  // -------------------------------------------------------------------------
+  function UpdateProps(state, time, dt) {
+    const ch = CHAPTERS[state.chapterIndex];
+    const sceneDef = SCENES[ch.scene];
     const def = CurrentBeatDef(state);
-    // 木料/水桶
+
+    // 可拾取物件
     if (def?.kind === "collect" && state.beat.itemStates) {
-      while (planksMeshes.length < state.beat.itemStates.length) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 1.7), Mat(0x9a7a4d));
-        fxGroup.add(m);
-        planksMeshes.push(m);
+      while (itemMeshes.length < state.beat.itemStates.length) {
+        const label = def.carryLabel;
+        const m = MakeCarryMesh(label);
+        layers.play.add(m);
+        itemMeshes.push(m);
       }
       state.beat.itemStates.forEach((it, i) => {
-        const m = planksMeshes[i];
+        const m = itemMeshes[i];
         m.visible = !it.carried && !it.delivered;
-        m.position.set(it.x, 0.4 + i * 0.18, 0.3);
+        m.position.set(it.x, SURFACE_Y + (def.carryLabel === "水桶" ? 0.32 : 0.22 + i * 0.16), 0.15);
       });
-    } else if (planksMeshes.length) {
-      for (const m of planksMeshes) fxGroup.remove(m);
-      planksMeshes = [];
+    } else if (itemMeshes.length) {
+      for (const m of itemMeshes) layers.play.remove(m);
+      itemMeshes = [];
     }
 
-    // 烟：从东侧充满到 frontX
-    if (state.smoke?.active) {
-      const sceneDef = SCENES[CHAPTERS[state.chapterIndex].scene];
+    // 烟：一张随前锋滚动的贴图
+    if (state.smoke?.active && sceneDef.walk.under) {
       const range = sceneDef.walk.under;
-      if (range) {
-        const east = range[1] + 2;
-        const w = Math.max(0.1, east - state.smoke.frontX);
-        if (!smokeMesh) {
-          smokeMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 2.3, 2.2),
-            new THREE.MeshLambertMaterial({ color: PALETTE.smoke, transparent: true, opacity: 0.5 }),
-          );
-          fxGroup.add(smokeMesh);
-          smokePuffs = new THREE.Group();
-          for (let i = 0; i < 3; i += 1) {
-            const s = new THREE.Mesh(
-              new THREE.SphereGeometry(0.5 + i * 0.25, 7, 6),
-              new THREE.MeshLambertMaterial({ color: PALETTE.smoke, transparent: true, opacity: 0.38 - i * 0.08 }),
-            );
-            smokePuffs.add(s);
-          }
-          fxGroup.add(smokePuffs);
-        }
-        smokeMesh.scale.x = w;
-        smokeMesh.position.set(state.smoke.frontX + w / 2, UNDER_Y + 1.05, 0);
-        smokePuffs.children.forEach((s, i) => {
-          s.position.set(state.smoke.frontX - 0.3 - i * 0.7, UNDER_Y + 0.8 + i * 0.5 + Math.sin(time * 1.6 + i * 2) * 0.15, 0.2);
-        });
+      const east = range[1] + 3;
+      const front = Math.max(range[0] - 3, state.smoke.frontX);
+      const wWorld = Math.max(0.2, east - front);
+      if (!smokeMesh) {
+        smokeCanvas = MakeCanvas(1024, 128);
+        smokeCtx = smokeCanvas.getContext("2d");
+        const tex = CanvasTexture(smokeCanvas);
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.92 });
+        smokeMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+        smokeMesh.renderOrder = 20;
+        layers.fx.add(smokeMesh);
       }
+      smokeCtx.clearRect(0, 0, 1024, 128);
+      ART.DrawSmoke(smokeCtx, 0, 1024, 0, 128, time, "smoke");
+      smokeMesh.material.map.needsUpdate = true;
+      smokeMesh.scale.set(wWorld, 2.4, 1);
+      smokeMesh.position.set(front + wWorld / 2, UNDER_Y + 1.1, 0.4);
+      smokeMesh.visible = true;
     } else if (smokeMesh) {
-      fxGroup.remove(smokeMesh);
-      fxGroup.remove(smokePuffs);
-      smokeMesh = null;
-      smokePuffs = null;
+      smokeMesh.visible = false;
     }
 
-    // 塌方
-    if (state.collapses) {
-      for (const key of Object.keys(state.collapses)) {
-        const pile = collapseMeshes[key];
-        if (!pile) continue;
-        const c = state.collapses[key];
-        pile.visible = !c.cleared;
-        if (!c.cleared && c.progress > 0) pile.scale.setScalar(Math.max(0.3, 1 - (c.progress / 3.5) * 0.7));
-      }
-    }
-
-    // 探杆：预兆/响动时从地表往下戳
+    // 探杆
     const quakeOn = state.beat && (state.beat.quakeWarn || state.beat.quakeActive)
       && (def?.kind === "digSeq" || def?.kind === "rescueLoop");
     if (quakeOn) {
-      if (!probeRods.length) {
+      if (!probeMeshes.length) {
         for (let i = 0; i < 3; i += 1) {
-          const rod = new THREE.Mesh(new THREE.BoxGeometry(0.09, 2.6, 0.09), Mat(0x4a4438));
-          fxGroup.add(rod);
-          probeRods.push(rod);
+          const m = BakeSprite(40, 200, 20, 0, () => {});
+          m.userData.canvas = m.material.map.image;
+          layers.fx.add(m);
+          probeMeshes.push(m);
         }
       }
-      probeRods.forEach((rod, i) => {
-        rod.visible = true;
-        const jab = state.beat.quakeActive ? Math.abs(Math.sin(time * 5 + i * 1.7)) : 0.2;
-        rod.position.set(state.player.x - 3 + i * 3 + Math.sin(i * 7) * 1.2, 0.6 - jab * 1.8, -0.4);
+      probeMeshes.forEach((m, i) => {
+        m.visible = true;
+        const jab = state.beat.quakeActive ? Math.abs(Math.sin(time * 5 + i * 1.7)) : 0.15;
+        const c = m.userData.canvas;
+        const ctx = c.getContext("2d");
+        ctx.clearRect(0, 0, c.width, c.height);
+        ART.DrawProbeRod(ctx, 20, 6, 130, "rod" + i, { jab });
+        m.material.map.needsUpdate = true;
+        m.position.set(state.player.x - 3.2 + i * 3.1 + Math.sin(i * 7) * 1.1,
+          SURFACE_Y - (200 / 2 - 6) / PPM, 0.5);
       });
     } else {
-      for (const rod of probeRods) rod.visible = false;
+      for (const m of probeMeshes) m.visible = false;
     }
 
-    // 第八章新刻痕
-    if (carveMark) carveMark.visible = !!state.flags.carved;
+    // 刻痕
+    if (state.flags.carved && !carveState) {
+      carveState = true;
+      carveRebuild?.();
+    }
 
-    // 目标指示：跳动的小箭头
+    // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
     const showMarker = target && target.x !== undefined && def?.kind !== "cinematic" && !state.microCine;
     if (showMarker) {
-      if (!markerArrow) {
-        markerArrow = new THREE.Mesh(
-          new THREE.ConeGeometry(0.32, 0.6, 4),
-          new THREE.MeshBasicMaterial({ color: PALETTE.marker, transparent: true, opacity: 0.85 }),
+      if (!markerMesh) {
+        markerCanvas = MakeCanvas(48, 48);
+        markerCtx = markerCanvas.getContext("2d");
+        const tex = CanvasTexture(markerCanvas);
+        markerMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(48 / PPM, 48 / PPM),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
         );
-        markerArrow.rotation.x = Math.PI;
-        fxGroup.add(markerArrow);
+        markerMesh.renderOrder = 30;
+        layers.fx.add(markerMesh);
       }
-      markerArrow.visible = true;
-      const baseY = LevelY(target.level || "surface");
-      markerArrow.position.set(target.x, baseY + 2.5 + Math.sin(time * 4) * 0.18, 0);
-    } else if (markerArrow) {
-      markerArrow.visible = false;
+      markerMesh.visible = true;
+      markerCtx.clearRect(0, 0, 48, 48);
+      ART.DrawMarker(markerCtx, 24, 30, time);
+      markerMesh.material.map.needsUpdate = true;
+      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+      markerMesh.position.set(target.x, by + 2.5, 0.6);
+    } else if (markerMesh) {
+      markerMesh.visible = false;
     }
+  }
+
+  // 暗场：地道章节压暗，灯光晕负责照明
+  function UpdateAtmosphere(state, viewW, viewH, camX, camY) {
+    const ch = CHAPTERS[state.chapterIndex];
+    const base = { day: 0, dawn: 0.06, night: 0.34, tunnel: 0.46, dark: 0.66 }[ch.light] ?? 0;
+    // 呛烟时压得更暗一点
+    const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
+    vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
+    darkMat.opacity = vignetteAlpha;
+    darkPlane.scale.set(viewW * 1.2, viewH * 1.2, 1);
+    darkPlane.position.set(camX, camY, 8);
+  }
+
+  // 过肩前景：把某个角色的剪影放在画面边缘（正反打用）
+  function SetOverShoulder(state, spec) {
+    if (!spec) {
+      if (otsMesh) otsMesh.visible = false;
+      return;
+    }
+    const a = spec.id === "player" ? { kind: "player" } : state.actors.find((x) => x.id === spec.id);
+    if (!a) { if (otsMesh) otsMesh.visible = false; return; }
+    const kind = spec.id === "player" ? "player" : a.kind;
+    if (!otsMesh || otsMesh.userData.kind !== kind) {
+      if (otsMesh) layers.ots.remove(otsMesh);
+      otsMesh = MakeCharMesh(kind);
+      otsMesh.userData.kind = kind;
+      otsMesh.material.color.setHex(0x2a1f18);   // 前景压成暗剪影
+      otsMesh.material.opacity = 0.96;
+      layers.ots.add(otsMesh);
+    }
+    otsMesh.visible = true;
+    SetFrame({ mesh: otsMesh }, FRAME_IDLE, spec.facing || 1);
+    otsMesh.scale.set((spec.facing || 1) * 1.9, 1.9, 1);
+    otsMesh.userData.place = spec;
+  }
+
+  function PlaceOverShoulder(camX, camY, viewW, viewH) {
+    if (!otsMesh?.visible) return;
+    const spec = otsMesh.userData.place;
+    const side = spec.side || -1;
+    otsMesh.position.set(
+      camX + side * viewW * 0.33,
+      camY - viewH * 0.12 + otsMesh.userData.yOffset * 1.9,
+      0,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  let viewW = 20, viewH = 11.25;
+
+  function ApplyCamera(camX, camY, halfWidth) {
+    viewW = halfWidth * 2;
+    viewH = viewW / (camera.userData.aspect || 16 / 9);
+    camera.left = -halfWidth;
+    camera.right = halfWidth;
+    camera.top = viewH / 2;
+    camera.bottom = -viewH / 2;
+    camera.position.set(camX, camY, 40);
+    camera.updateProjectionMatrix();
+    // 视差：各层按系数反向偏移
+    for (const k of Object.keys(layers)) {
+      const p = PARALLAX[k];
+      layers[k].position.x = camX * (1 - p);
+      // 远层随相机上下轻微浮动，强化纵深
+      layers[k].position.y = camY * (1 - p) * 0.35;
+    }
+    // 浮尘在画框内循环飘
+    for (const d of dustMotes) {
+      const u = d.userData;
+      u.seed += 0.0016;
+      const wrapW = viewW * 1.1, wrapH = viewH * 1.1;
+      const bx = ((u.seed * 37 + d.id) % 1);
+      d.position.set(
+        camX - wrapW / 2 + ((bx * wrapW + u.vx * u.seed * 260) % wrapW),
+        camY - wrapH / 2 + (((u.seed * 53) % 1) * wrapH + u.vy * u.seed * 180) % wrapH,
+        7.2,
+      );
+    }
+    PlaceOverShoulder(camX, camY, viewW, viewH);
+    return { viewW, viewH };
   }
 
   function Resize(width, height) {
     renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    camera.userData.aspect = width / height;
   }
 
   function Render() { renderer.render(scene, camera); }
 
   return {
     THREE, renderer, scene, camera,
-    BuildEnvironment, UpdateActors, UpdateProps, Resize, Render,
-    LevelY,
+    BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
+    SetOverShoulder, ApplyCamera, Resize, Render,
+    get viewSize() { return { w: viewW, h: viewH }; },
   };
 }

@@ -1,4 +1,5 @@
-// 《地道里的光》 —— 主循环：横版输入、勇敢的心式镜头（硬切+慢推，永不旋转）、HUD。
+// 《地道里的光》 —— 主循环：横版输入（键盘 + 移动端触屏）、
+// 镜头语法（硬切 / 慢推 / 横移 / 过肩正反打 / 插入特写）、HUD。
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint,
@@ -13,10 +14,10 @@ for (const id of [
   "titleScreen", "startButton", "chapterList",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag",
   "cineBars", "caption", "capSpeaker", "capText",
-  "detectionVignette", "fadeOverlay", "irisOverlay",
+  "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
   "choiceOverlay", "choicePrompt", "choiceList",
-  "endScreen", "endRestart",
+  "endScreen", "endRestart", "touchControls", "rotateHint",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -35,9 +36,10 @@ function Unlock(index) {
 }
 
 // ---------------------------------------------------------------------------
-// 输入：A/D 走，W/S 爬梯口上下，E 互动，C 蹲
+// 输入：键盘 + 触屏
 // ---------------------------------------------------------------------------
 const keys = new Set();
+const touch = { left: false, right: false, up: false, down: false, act: false, crouchEdge: false };
 let interactEdge = false, advanceEdge = false, crouchToggle = false;
 
 window.addEventListener("keydown", (e) => {
@@ -49,57 +51,116 @@ window.addEventListener("keydown", (e) => {
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "1" || k === "2") {
     const def = state && CurrentBeatDef(state);
-    if (def?.kind === "choice") {
-      MakeChoice(state, def.options[k === "1" ? 0 : 1].key);
-      HideChoice();
-    }
+    if (def?.kind === "choice") { MakeChoice(state, def.options[k === "1" ? 0 : 1].key); HideChoice(); }
   }
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 canvas.addEventListener("pointerdown", () => { advanceEdge = true; });
 
+// 触屏按钮：按下即持续，抬起清除
+function BindTouchButton(el, prop, { edge = false } = {}) {
+  if (!el) return;
+  const on = (e) => {
+    e.preventDefault();
+    if (edge) {
+      if (prop === "act") { interactEdge = true; advanceEdge = true; touch.act = true; }
+      else if (prop === "crouch") crouchToggle = !crouchToggle;
+    } else touch[prop] = true;
+    el.classList.add("pressed");
+  };
+  const off = (e) => {
+    e.preventDefault();
+    if (!edge) touch[prop] = false;
+    if (prop === "act") touch.act = false;
+    el.classList.remove("pressed");
+  };
+  el.addEventListener("pointerdown", on);
+  el.addEventListener("pointerup", off);
+  el.addEventListener("pointercancel", off);
+  el.addEventListener("pointerleave", off);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+function SetupTouch() {
+  if (!ui.touchControls) return;
+  BindTouchButton(document.getElementById("btnLeft"), "left");
+  BindTouchButton(document.getElementById("btnRight"), "right");
+  BindTouchButton(document.getElementById("btnUp"), "up");
+  BindTouchButton(document.getElementById("btnDown"), "down");
+  BindTouchButton(document.getElementById("btnAct"), "act", { edge: true });
+  BindTouchButton(document.getElementById("btnCrouch"), "crouch", { edge: true });
+  const isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+  if (isTouch) document.body.classList.add("touchDevice");
+}
+
+function CheckOrientation() {
+  const isTouch = document.body.classList.contains("touchDevice");
+  const portrait = window.innerHeight > window.innerWidth;
+  if (ui.rotateHint) ui.rotateHint.hidden = !(isTouch && portrait);
+}
+
 function ReadInput() {
   let moveX = 0, climb = 0;
-  if (keys.has("a") || keys.has("arrowleft")) moveX -= 1;
-  if (keys.has("d") || keys.has("arrowright")) moveX += 1;
-  if (keys.has("w") || keys.has("arrowup")) climb -= 1;
-  if (keys.has("s") || keys.has("arrowdown")) climb += 1;
+  if (keys.has("a") || keys.has("arrowleft") || touch.left) moveX -= 1;
+  if (keys.has("d") || keys.has("arrowright") || touch.right) moveX += 1;
+  if (keys.has("w") || keys.has("arrowup") || touch.up) climb -= 1;
+  if (keys.has("s") || keys.has("arrowdown") || touch.down) climb += 1;
   return { moveX, climb };
 }
 
 // ---------------------------------------------------------------------------
-// 镜头：横版语法——只有 横移 / 升降 / 推拉。
-// 过场：每换一行若构图变了就硬切，然后在行内慢推/慢移（pan）。
+// 镜头语法
+//   基线：中距离横向跟随
+//   过场：构图变了才硬切；同构图连续行不重切、推进累计（一个镜头屏住呼吸）
+//   语汇：wide 全景 / shot 定点 / close 特写 / ots 过肩正反打 / insert 插入特写 / dark 黑场
 // ---------------------------------------------------------------------------
-const cam = { x: 60, y: 2.2, dist: 13 };
+const cam = { x: 60, y: 2.2, hw: 11 };
 let camSnap = true;
-let lastShotKey = "";
+let framing = { key: "", prog: 0, baseHw: 11 };
+
+function ActorAt(state, id) {
+  if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
+  const a = state.actors.find((x) => x.id === id && x.visible !== false);
+  return a ? { x: a.x, level: a.level || "surface", heading: a.heading } : null;
+}
+
+function LevelY(level) { return level === "under" ? UNDER_Y : SURFACE_Y; }
 
 function BaseShot(state) {
   const ch = CHAPTERS[state.chapterIndex];
   const p = state.player;
-  const lookAhead = (p.heading || 1) * 2.2;
-  if (ch.scene === "tunnelVillage") {
-    // 剖面全景：地表与地道同框
-    return { x: p.x + lookAhead, y: -1.1, dist: 15.5 };
-  }
-  if (ch.scene === "tunnelFort") {
-    return { x: p.x + lookAhead, y: UNDER_Y + 1.7, dist: 10 };
-  }
-  const y = p.level === "under" ? UNDER_Y + 1.6 : 2.1;
-  return { x: p.x + lookAhead, y, dist: ch.light === "night" ? 12 : 13 };
+  const lookAhead = (p.heading || 1) * 2.0;
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -0.9, hw: 13 };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.3, hw: 9 };
+  // 地表：视平线压低，地面只占画面下缘约四分之一
+  const y = LevelY(p.level) + (p.level === "under" ? 1.4 : 2.7);
+  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 10.5 : 11.5 };
 }
 
-function HintShot(state) {
-  const hint = state.camHint || { kind: "follow" };
+function HintShot(state, hint) {
   switch (hint.kind) {
     case "wide":
-      return { x: hint.x, y: hint.y ?? 2.2, dist: 30, pan: hint.pan || 0 };
+      return { x: hint.x, y: hint.y ?? 2.4, hw: hint.hw ?? 26, pan: hint.pan || 0 };
     case "shot":
-      return { x: hint.x, y: hint.y ?? 1.6, dist: hint.dist ?? 8, pan: hint.pan || 0 };
+      return { x: hint.x, y: hint.y ?? 1.6, hw: hint.dist ?? 8, pan: hint.pan || 0 };
+    case "insert":
+      return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
     case "close": {
-      const p = state.player;
-      return { x: p.x, y: (p.level === "under" ? UNDER_Y : 0) + 1.3, dist: 4.8 };
+      const t = ActorAt(state, hint.on || "player") || { x: state.player.x, level: state.player.level };
+      return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: hint.dist ?? 4.2 };
+    }
+    case "ots": {
+      // 过肩：主体在画面偏一侧，被越过的肩膀作为前景剪影
+      const subj = ActorAt(state, hint.subject);
+      const other = ActorAt(state, hint.other);
+      if (!subj) return BaseShot(state);
+      const side = hint.side || (other && other.x > subj.x ? 1 : -1);
+      return {
+        x: subj.x + side * 0.9,
+        y: LevelY(subj.level) + 1.25,
+        hw: hint.dist ?? 3.6,
+        ots: { id: hint.other, side, facing: -side },
+      };
     }
     case "dark":
       return { ...BaseShot(state), fade: 0.94 };
@@ -112,59 +173,73 @@ function UpdateCamera(state, dt) {
   const inCinematic = state.phase === "playing"
     && (CurrentBeatDef(state)?.kind === "cinematic" || !!state.microCine);
 
-  let shot, cut = false;
+  let shot;
   if (inCinematic) {
-    shot = HintShot(state);
-    const shotKey = `${state.beatIndex}:${state.beat?.lineIndex ?? 0}:${state.microCine ? "mc" + state.microCine.i : ""}`;
-    if (shotKey !== lastShotKey) { lastShotKey = shotKey; cut = true; }
-    // 行内慢推 + 可选横移（勇敢的心的呼吸感）
-    const prog = state.camLineD ? Math.min(1, (state.camLineT || 0) / state.camLineD) : 0;
+    const hint = state.camHint || { kind: "follow" };
+    shot = HintShot(state, hint);
+    // 构图指纹：位置/高度/景别有实质变化才算换镜头
+    const fp = `${Math.round(shot.x * 2)}|${Math.round(shot.y * 3)}|${Math.round(shot.hw * 3)}|${shot.ots ? shot.ots.id + shot.ots.side : ""}`;
+    if (fp !== framing.key) {
+      const first = framing.key === "";
+      framing = { key: fp, prog: 0, baseHw: shot.hw };
+      camSnap = true;                       // 硬切
+      // 转场语汇：硬切 / 黑场闪断 / 圆形收光——按行上标注的 trans 走
+      const trans = (state.camHint && state.camHint.trans) || (first ? "iris" : "cut");
+      if (trans === "dip") dipLevel = 1;
+      else if (trans === "iris") irisClosing = true;
+    }
+    // 行内慢推：跨行累计，不因换行弹回
+    framing.prog = Math.min(1, framing.prog + dt * 0.055);
     shot = {
       ...shot,
-      x: shot.x + (shot.pan || 0) * prog,
-      dist: shot.dist * (1 - 0.05 * prog),
+      x: shot.x + (shot.pan || 0) * framing.prog,
+      hw: framing.baseHw * (1 - 0.06 * framing.prog),
     };
+    world.SetOverShoulder(state, shot.ots || null);
   } else {
     shot = BaseShot(state);
-    if (lastShotKey !== "") { lastShotKey = ""; } // 回到跟随：平滑过去，不切
+    if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
+    world.SetOverShoulder(state, null);
   }
 
-  if (cut || camSnap) {
-    cam.x = shot.x; cam.y = shot.y; cam.dist = shot.dist;
+  if (camSnap) {
+    cam.x = shot.x; cam.y = shot.y; cam.hw = shot.hw;
     camSnap = false;
   } else {
-    const k = Math.min(1, dt * (inCinematic ? 2.2 : 4.5));
+    const k = Math.min(1, dt * (inCinematic ? 2.4 : 5.2));
     cam.x += (shot.x - cam.x) * k;
     cam.y += (shot.y - cam.y) * k;
-    cam.dist += (shot.dist - cam.dist) * k;
+    cam.hw += (shot.hw - cam.hw) * k;
   }
-
-  world.camera.position.set(cam.x, cam.y, cam.dist);
-  world.camera.lookAt(cam.x, cam.y, 0);
+  const view = world.ApplyCamera(cam.x, cam.y, cam.hw);
+  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y);
   return shot.fade || 0;
 }
 
 // ---------------------------------------------------------------------------
-// 圆形收光转场（iris）：过场进出与章节开场
+// iris 圆形收光（默片式转场）
 // ---------------------------------------------------------------------------
-let irisLevel = 1; // 1 = 全开
-let irisTarget = 1;
+let irisLevel = 1;
+let irisClosing = false;
 let lastBeatKind = null;
+let dipLevel = 0;   // 黑场闪断：切到新构图时短促地压一下黑
 
 function StepIris(state, dt) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
   const kind = state.phase !== "playing" ? state.phase : (def?.kind === "cinematic" ? "cine" : "play");
   if (kind !== lastBeatKind) {
-    if (lastBeatKind !== null && (kind === "cine" || lastBeatKind === "cine")) {
-      irisLevel = 0; // 切换瞬间收到底，再张开
-    }
+    if (lastBeatKind !== null && (kind === "cine" || lastBeatKind === "cine")) irisClosing = true;
     lastBeatKind = kind;
   }
-  irisTarget = 1;
-  irisLevel = Math.min(irisTarget, irisLevel + dt * 2.2);
+  if (irisClosing) {
+    irisLevel -= dt * 5.5;
+    if (irisLevel <= 0) { irisLevel = 0; irisClosing = false; }
+  } else {
+    irisLevel = Math.min(1, irisLevel + dt * 2.4);
+  }
   const r = Math.round(irisLevel * 78);
   ui.irisOverlay.style.background =
-    `radial-gradient(circle at 50% 50%, transparent ${r}%, #030202 ${Math.min(100, r + 4)}%)`;
+    `radial-gradient(circle at 50% 50%, transparent ${r}%, #060402 ${Math.min(100, r + 5)}%)`;
   ui.irisOverlay.style.opacity = irisLevel >= 1 ? 0 : 1;
 }
 
@@ -174,6 +249,8 @@ function StepIris(state, dt) {
 let toastShown = null;
 let choiceBuilt = false;
 let fadeLevel = 1;
+let lastObjective = undefined;
+let objectiveT = 0;
 
 function HideChoice() {
   ui.choiceOverlay.hidden = true;
@@ -185,6 +262,10 @@ function SyncHud(state, dt, shotFade) {
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
 
   ui.cineBars.classList.toggle("active", !!inCinematic);
+  // 地窖板缝 matte：第一章父亲被抓那场
+  const slit = inCinematic && state.camHint?.slit;
+  if (ui.slitMatte) ui.slitMatte.classList.toggle("active", !!slit);
+
   if (state.caption && inCinematic && (state.caption.say || state.caption.stage)) {
     ui.caption.hidden = false;
     if (state.caption.who) {
@@ -201,25 +282,33 @@ function SyncHud(state, dt, shotFade) {
     ui.caption.hidden = true;
   }
 
+  // 目标：只在变化时露一小会儿（勇敢的心式克制 HUD），之后画面自己说话
   const objective = GetObjective(state);
-  ui.objectiveText.textContent = objective || "";
-  ui.hintText.textContent = (objective && GetHint(state)) || "";
-  ui.objectiveText.parentElement.style.opacity = objective && !inCinematic ? 1 : 0;
+  if (objective !== lastObjective) {
+    lastObjective = objective;
+    objectiveT = objective ? 6.5 : 0;
+    ui.objectiveText.textContent = objective || "";
+    ui.hintText.textContent = (objective && GetHint(state)) || "";
+  }
+  if (objectiveT > 0) objectiveT -= dt;
+  const objVisible = objectiveT > 0 && !inCinematic;
+  ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
 
   ui.prompt.textContent = state.prompt || "";
   ui.prompt.hidden = !state.prompt || inCinematic;
   ui.prompt.classList.toggle("danger", !!state.prompt && state.prompt.startsWith("！"));
 
-  ui.crouchTag.hidden = !crouchToggle || inCinematic || state.phase !== "playing";
+  ui.crouchTag.hidden = true;
+  if (ui.touchControls) {
+    ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
+  }
 
   if (state.toast !== toastShown) {
     toastShown = state.toast;
     if (state.toast) {
       ui.toast.textContent = state.toast.text;
       ui.toast.classList.add("show");
-    } else {
-      ui.toast.classList.remove("show");
-    }
+    } else ui.toast.classList.remove("show");
   }
 
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
@@ -232,11 +321,9 @@ function SyncHud(state, dt, shotFade) {
     ui.cardNum.textContent = showNext ? "下一章 · " + ch.num : ch.num;
     ui.cardTitle.textContent = ch.title;
     ui.cardYear.textContent = ch.year;
-    ui.cardContinue.textContent = "按 E 继续";
+    ui.cardContinue.textContent = "点击继续";
     Unlock(state.chapterIndex + (showNext ? 1 : 0));
-  } else {
-    ui.chapterCard.hidden = true;
-  }
+  } else ui.chapterCard.hidden = true;
 
   if (def?.kind === "choice") {
     if (!choiceBuilt) {
@@ -252,19 +339,18 @@ function SyncHud(state, dt, shotFade) {
       });
       ui.choiceOverlay.hidden = false;
     }
-  } else if (choiceBuilt) {
-    HideChoice();
-  }
+  } else if (choiceBuilt) HideChoice();
 
   ui.endScreen.hidden = state.phase !== "gameEnd";
 
+  if (dipLevel > 0) dipLevel = Math.max(0, dipLevel - dt * 3.2);
   const targetFade = state.phase === "gameEnd" ? 0.75 : shotFade;
   fadeLevel += (targetFade - fadeLevel) * Math.min(1, dt * 2.4);
-  ui.fadeOverlay.style.opacity = fadeLevel.toFixed(3);
+  ui.fadeOverlay.style.opacity = Math.max(fadeLevel, dipLevel).toFixed(3);
 }
 
 // ---------------------------------------------------------------------------
-// 标题界面
+// 标题
 // ---------------------------------------------------------------------------
 function BuildTitle() {
   const unlocked = GetUnlocked();
@@ -284,8 +370,10 @@ function StartGame(chapterIndex) {
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
+  framing = { key: "", prog: 0, baseHw: 11 };
   fadeLevel = 1;
   irisLevel = 0;
+  irisClosing = false;
   lastBeatKind = null;
 }
 
@@ -317,14 +405,17 @@ function Frame(now) {
       moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
       interact: interactEdge,
-      interactHeld: keys.has("e") || keys.has("f"),
+      interactHeld: keys.has("e") || keys.has("f") || touch.act,
       advance: advanceEdge,
     }, stepDt);
-    if (state.chapterIndex !== prevChapter) { camSnap = true; crouchToggle = false; irisLevel = 0; }
+    if (state.chapterIndex !== prevChapter) {
+      camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
+      framing = { key: "", prog: 0, baseHw: 11 };
+    }
 
     world.BuildEnvironment(state);
-    world.UpdateActors(state, now / 1000);
-    world.UpdateProps(state, now / 1000);
+    world.UpdateActors(state, now / 1000, dt);
+    world.UpdateProps(state, now / 1000, dt);
     const shotFade = UpdateCamera(state, dt);
     StepIris(state, dt);
     SyncHud(state, dt, shotFade);
@@ -335,16 +426,19 @@ function Frame(now) {
 }
 
 function Resize() {
-  world.Resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  world.Resize(w, h);
+  CheckOrientation();
 }
 window.addEventListener("resize", Resize);
+window.addEventListener("orientationchange", () => setTimeout(Resize, 200));
+SetupTouch();
 Resize();
 BuildTitle();
 
 const chapterParam = parseInt(params.get("chapter") || "0", 10);
-if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
-  StartGame(chapterParam - 1);
-}
+if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) StartGame(chapterParam - 1);
 
 requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(Frame); });
 
