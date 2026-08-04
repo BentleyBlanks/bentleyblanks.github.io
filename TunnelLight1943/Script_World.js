@@ -1394,6 +1394,7 @@ export function CreateWorld(canvasEl) {
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
+      track: extra.track, trackT: extra.trackT,
     }, dt);
 
     s.mesh.position.set(x, y, ACTOR_Z);
@@ -1557,6 +1558,7 @@ export function CreateWorld(canvasEl) {
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
+        track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
         light: NearestLight(p.x, LevelYOf(p.level)),
       });
@@ -1608,7 +1610,7 @@ export function CreateWorld(canvasEl) {
       UpdateOne(s, a.x, a.level || "surface", a.heading,
         posture === "squat" || posture === "crawl", dt, !!a.carry,
         {
-          posture, pose: a.pose,
+          posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });

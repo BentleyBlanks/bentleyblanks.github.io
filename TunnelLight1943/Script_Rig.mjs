@@ -197,6 +197,97 @@ export function CreateRig(kind) {
 const DEG = Math.PI / 180;
 function Lerp(a, b, t) { return a + (b - a) * t; }
 
+// ---------------------------------------------------------------------------
+// 关键帧轨道：给过场里最重的几拍用的逐帧动画。
+//
+// 静态姿势（pose）只有"摆到位"，没有"怎么到位"——按跪、挨砸这类动作的分量
+// 全在过程里。轨道就是一列带时间戳的关节快照，采样时在相邻两帧之间用
+// smoothstep 过渡：匀速插值看着像机器人，缓入缓出才有肌肉的感觉。
+//
+// 数值是照着即梦生成的参考视频（按跪审问那一段）逐帧对出来的：
+// 挣扎向上是慢的、被按回去是快的；抡枪托前有一个明显的蓄力后仰；
+// 被砸中后先是整个人向前砸出去，用手撑住，再花很长时间才抬起头。
+// 角度单位：度；hipY/hipX：米。缺省关节沿用上一帧的值。
+export const TRACKS = {
+  // 被按跪着挣扎（循环）：想起身——被按回去——喘一口——再想起身
+  pressedStruggle: {
+    dur: 3.6, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.44, hipX: 0.02, torso: 26, head: -12, thighB: -10, shinB: 98, footB: 26, thighF: -4, shinF: 94, footF: 26, armB: -14, foreB: -18, armF: -18, foreF: -14 },
+      { t: 0.9, hipY: -0.40, hipX: 0.00, torso: 6, head: -30, armB: -30, foreB: -26, armF: -34, foreF: -22 },   // 挣起来一点，头抬起
+      { t: 1.25, hipY: -0.46, hipX: 0.05, torso: 34, head: -6, armB: -12, foreB: -16, armF: -16, foreF: -12 },  // 被按回去：快
+      { t: 1.7, hipY: -0.45, hipX: 0.03, torso: 30, head: -16 },                                               // 伏着喘
+      { t: 2.6, hipY: -0.41, hipX: 0.01, torso: 10, head: -34, armB: -28, armF: -32 },                          // 又一次
+      { t: 3.1, hipY: -0.46, hipX: 0.05, torso: 34, head: -4 },
+      { t: 3.6, hipY: -0.44, hipX: 0.02, torso: 26, head: -12 },
+    ],
+  },
+  // 按人的兵（循环）：双手压着，对方一挣就再压下去
+  pressHold: {
+    dur: 3.6, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.18, hipX: 0.10, torso: 38, head: -20, armB: -74, foreB: -30, armF: -82, foreF: -24, thighB: -44, shinB: 52, thighF: -20, shinF: 24 },
+      { t: 0.9, hipY: -0.14, torso: 30, armB: -66, armF: -74 },        // 对方挣起来，手被顶起一点
+      { t: 1.25, hipY: -0.22, torso: 44, head: -14, armB: -80, armF: -88 },  // 重新压死：快
+      { t: 2.6, hipY: -0.16, torso: 32, armB: -68, armF: -76 },
+      { t: 3.1, hipY: -0.22, torso: 44, armB: -80, armF: -88 },
+      { t: 3.6, hipY: -0.18, torso: 38, armB: -74, armF: -82 },
+    ],
+  },
+  // 抡枪托（单次）：蓄力后仰慢，抡下去快，收住有回弹
+  buttStrike: {
+    dur: 2.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.06, hipX: -0.04, torso: -8, head: -4, armB: -120, foreB: -40, armF: -108, foreF: -36, thighB: -26, shinB: 26, thighF: 14, shinF: 10 },
+      { t: 0.75, hipY: -0.10, hipX: -0.14, torso: -30, head: -10, armB: -196, foreB: -54, armF: -182, foreF: -48 },  // 举过头顶：蓄力
+      { t: 0.95, hipY: -0.16, hipX: 0.16, torso: 46, head: -26, armB: -52, foreB: -18, armF: -40, foreF: -12 },      // 砸下：0.2s，全程最快的一下
+      { t: 1.25, hipY: -0.12, hipX: 0.10, torso: 34, head: -18, armB: -64, foreB: -24, armF: -52, foreF: -18 },      // 回弹
+      { t: 2.2, hipY: -0.06, hipX: -0.02, torso: -4, head: -6, armB: -58, foreB: -44, armF: -46, foreF: -38 },      // 收回，枪垂在身前
+    ],
+  },
+  // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
+  struckFall: {
+    dur: 3.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.44, hipX: 0.02, torso: 26, head: -12, thighB: -10, shinB: 98, footB: 26, thighF: -4, shinF: 94, footF: 26, armB: -14, foreB: -18, armF: -18, foreF: -14 },
+      { t: 0.18, hipY: -0.50, hipX: 0.24, torso: 74, head: -40, armB: -96, foreB: -14, armF: -104, foreF: -10 },  // 被砸得扑出去：0.18s
+      { t: 0.55, hipY: -0.52, hipX: 0.22, torso: 78, head: -34, armB: -90, foreB: -12, armF: -98, foreF: -8 },    // 撑住，沉底
+      { t: 1.6, hipY: -0.50, hipX: 0.18, torso: 66, head: -50 },                                                  // 半天不动
+      { t: 2.3, hipY: -0.48, hipX: 0.13, torso: 54, head: -30 },                                                  // 慢慢起来一点
+      { t: 2.7, hipY: -0.48, hipX: 0.13, torso: 56, head: -42 },                                                  // 摇头：一边
+      { t: 3.05, hipY: -0.47, hipX: 0.12, torso: 52, head: -22 },                                                 // 另一边
+      { t: 3.4, hipY: -0.46, hipX: 0.09, torso: 44, head: -28 },
+    ],
+  },
+};
+
+const TRACK_JOINTS = ["torso", "head", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "armF", "foreF"];
+
+// 采样：找到 t 两侧的关键帧，缺省关节先向前找最近一次显式赋值
+function SampleTrack(name, time) {
+  const tr = TRACKS[name];
+  if (!tr) return null;
+  const t = tr.loop ? time % tr.dur : Math.min(time, tr.dur - 1e-4);
+  const keys = tr.keys;
+  let i = 0;
+  while (i < keys.length - 1 && keys[i + 1].t <= t) i += 1;
+  const a = keys[i];
+  const b = keys[Math.min(i + 1, keys.length - 1)];
+  const span = Math.max(1e-4, b.t - a.t);
+  let u = Math.max(0, Math.min(1, (t - a.t) / span));
+  u = u * u * (3 - 2 * u);           // smoothstep：缓入缓出
+  const ValAt = (ki, joint) => {
+    for (let k = ki; k >= 0; k -= 1) if (keys[k][joint] !== undefined) return keys[k][joint];
+    for (let k = ki + 1; k < keys.length; k += 1) if (keys[k][joint] !== undefined) return keys[k][joint];
+    return 0;
+  };
+  const out = {};
+  for (const joint of ["hipY", "hipX"]) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u);
+  for (const joint of TRACK_JOINTS) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u) * DEG;
+  return out;
+}
+
+
 /**
  * 姿态解算：把状态映射成关节角度。
  * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture}
@@ -216,6 +307,15 @@ export function PoseRig(rig, s, dt) {
   const target = {};
   const swing = Math.sin(p);
   const swing2 = Math.sin(p + Math.PI);
+
+  // ── 关键帧轨道：过场里最重的几拍，逐帧对着参考视频 K 的 ──
+  const tracked = s.track ? SampleTrack(s.track, s.trackT || 0) : null;
+  if (tracked) {
+    Object.assign(target, tracked);
+    // 轨道自己带节奏，混合只是防跳变——太重会把 0.2s 的砸击糊成慢动作
+    ApplyPose(rig, t, target, Math.min(1, (dt || 0.016) * 26));
+    return;
+  }
 
   // ── 一次性戏剧姿势 ──
   // 跪、挨砸、扑上去、被架走、把人搂进肩膀……这些是过场里最重的几拍，
@@ -422,6 +522,12 @@ export function PoseRig(rig, s, dt) {
     target.armF = (-4 - br * 2) * DEG; target.foreF = (-14 - br * 3) * DEG;
   }
 
+  ApplyPose(rig, t, target, blend);
+}
+
+// 混合进当前姿态并写到关节上。轨道采样和状态姿势都从这儿出去
+function ApplyPose(rig, t, target, blend) {
+  const j = rig.joints;
   for (const k of Object.keys(target)) t[k] = Lerp(t[k], target[k], blend);
 
   j.root.position.set(t.hipX, BONE.hipY + t.hipY, 0);

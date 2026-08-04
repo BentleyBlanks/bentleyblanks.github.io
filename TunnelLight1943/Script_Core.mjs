@@ -395,7 +395,9 @@ export const SCRIPTS = {
         { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "shot", x: 33, y: 0.9, dist: 8, slit: true },
           on: (state) => {
             const father = FindActor(state, "father");
-            if (father) { father.x = 38; father.heading = 1; }
+            // cineTarget 必须清：上一段过场让他往院门走，走没走到都可能悬着。
+            // 不清的话这场戏他会一边"跪"一边往 47 滑——传送演员前先掐断走位
+            if (father) { father.x = 38; father.heading = 1; father.cineTarget = null; }
             const r1 = FindActor(state, "raid1");
             const r2 = FindActor(state, "raid2");
             if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
@@ -403,20 +405,29 @@ export const SCRIPTS = {
           } },
         { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
           on: (state) => {
+            // 跪不是一张定格：他在挣，兵在按。两条循环轨道错开半拍咬在一起
             const father = FindActor(state, "father");
-            if (father) { father.pose = "kneel"; father.heading = 1; }
+            if (father) { father.track = { name: "pressedStruggle", t: 0 }; father.heading = 1; }
             const r1 = FindActor(state, "raid1");
-            if (r1) { r1.x = 36.2; r1.heading = 1; }
+            // 手要按在肩上：0.55m，再远就是按空气
+            if (r1) { r1.x = 37.45; r1.heading = 1; r1.cineTarget = null; r1.track = { name: "pressHold", t: 0 }; }
             const r2 = FindActor(state, "raid2");
-            if (r2) { r2.x = 40; r2.heading = -1; }
+            if (r2) { r2.x = 39.3; r2.heading = -1; r2.cineTarget = null; }
+            // 娘被推跪在一边——不能让她站在画面正中看戏
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.x = 35.1; mother.heading = 1; mother.pose = "kneel"; }
           } },
-        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.0, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
+        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
           on: (state) => {
-            // 抡下去的那个人和挨了一下的那个人都得真做动作
+            // 抡的轨道在 0.95s 到达落点；挨砸的轨道用 -0.95 的起点等在那儿，
+            // 两个人在同一帧接上——这就是照参考视频 K 的那一下
             const r2 = FindActor(state, "raid2");
-            if (r2) r2.pose = "swing";
+            if (r2) r2.track = { name: "buttStrike", t: 0 };
             const father = FindActor(state, "father");
-            if (father) father.pose = "struck";
+            if (father) father.track = { name: "struckFall", t: -0.95 };
+            const r1 = FindActor(state, "raid1");
+            if (r1) r1.track = null;      // 按人的松开手，退半步
+            if (r1) { r1.cineTarget = { x: 36.4 }; r1.cineSpeed = 1.2; }
           } },
         { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
@@ -1393,7 +1404,8 @@ export function CreateGame(chapterIndex = 0) {
 // 一次性戏剧姿势用完就得收：不清的话，被架走的爹会一路架着走完全场
 function ClearPoses(state) {
   state.player.pose = null;
-  for (const a of state.actors) a.pose = null;
+  state.player.track = null;
+  for (const a of state.actors) { a.pose = null; a.track = null; }
 }
 
 export function StartChapter(state, index) {
@@ -1553,6 +1565,10 @@ export function ConfirmChapterCard(state) {
 // 过场走位与微过场
 // ---------------------------------------------------------------------------
 function StepCineActors(state, dt) {
+  // 关键帧轨道的时钟。t 允许从负数起步：负的那一段是"等待"，
+  // 用来把两个演员的轨道对齐到同一个落点（枪托砸到的那一帧）。
+  if (state.player.track) state.player.track.t += dt;
+  for (const a of state.actors) if (a.track) a.track.t += dt;
   for (const a of state.actors) {
     if (!a.cineTarget) continue;
     const d = Math.abs(a.x - a.cineTarget.x);
