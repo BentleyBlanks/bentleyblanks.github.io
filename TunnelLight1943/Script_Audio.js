@@ -165,6 +165,26 @@ function Build(ac, options) {
   voiceBus.gain.value = 1;
   voiceBus.connect(master);
 
+  // 分路音量：设置面板要能单独调旁白 / 音效 / 配乐。
+  // 各路有各自的基准值（混音时定好的相对关系），面板给的是 0..1 的倍率，
+  // 两者相乘——这样调音量不会把混音比例弄乱。环境音跟着音效走。
+  const BUS_BASE = { music: 0.55, amb: 0.9, sfx: 0.9, voice: 1 };
+  const busNode = { music: musicBus, amb: ambBus, sfx: sfxBus, voice: voiceBus };
+  const busLevel = { music: 1, sfx: 1, voice: 1 };
+  function ApplyBus(name) {
+    const lvl = name === "amb" ? busLevel.sfx : busLevel[name];
+    const g = busNode[name].gain;
+    const now = ac.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(BUS_BASE[name] * lvl, now + 0.12);
+  }
+  function SetBusLevel(name, v) {
+    busLevel[name] = Clamp(Number.isFinite(v) ? v : 1, 0, 1);
+    ApplyBus(name);
+    if (name === "sfx") ApplyBus("amb");
+  }
+
   // -------------------------------------------------------------------------
   // 噪声与混响
   // -------------------------------------------------------------------------
@@ -1020,6 +1040,10 @@ function Build(ac, options) {
       volume = Clamp(Number.isFinite(v) ? v : 0.8, 0, 1);
       ApplyVolume();
     },
+
+    SetMusicVolume(v) { if (!disposed) SetBusLevel("music", v); },
+    SetSfxVolume(v) { if (!disposed) SetBusLevel("sfx", v); },
+    SetVoiceVolume(v) { if (!disposed) SetBusLevel("voice", v); },
 
     SetMood(next) {
       if (disposed || !Has(MOODS, next) || next === mood) return;

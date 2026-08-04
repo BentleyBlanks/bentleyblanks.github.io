@@ -93,6 +93,11 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
         if (target.action === "crouchAt" && Math.abs(dx) <= 1.35) { input.crouch = true; input.moveX = 0; }
+        // 划线：按住 E 的同时还得左右推，粉笔才走
+        if (target.action === "scribeAt" && Math.abs(dx) <= 1.6) {
+          input.interactHeld = true;
+          input.moveX = 1;
+        }
         if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;

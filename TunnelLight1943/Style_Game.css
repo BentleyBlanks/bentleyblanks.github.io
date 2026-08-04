@@ -343,3 +343,78 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   background: rgba(226, 216, 188, 0.5);
   transform: rotate(-45deg);
 }
+
+
+/* 设置：跟声音开关并排的一个小齿轮，点开是一张压在右上角的窄面板。
+   刻意做得小而暗——它不该跟画面抢注意力。 */
+#btnSettings {
+  position: absolute;
+  top: 14px;
+  right: 62px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(214, 190, 140, 0.34);
+  background: rgba(18, 15, 11, 0.52);
+  color: #d8c79c;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+}
+#btnSettings:hover { background: rgba(30, 25, 18, 0.72); }
+
+#settingsPanel {
+  position: absolute;
+  top: 60px;
+  right: 14px;
+  width: 208px;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 190, 140, 0.26);
+  background: rgba(16, 13, 10, 0.9);
+  color: #ddcfae;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  z-index: 7;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+#settingsPanel[hidden] { display: none; }
+#settingsPanel h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: #b9a681;
+}
+#settingsPanel label {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 4px;
+  color: #c8b894;
+}
+#settingsPanel output { color: #9d8a63; }
+#settingsPanel input[type="range"] {
+  width: 100%;
+  accent-color: #c8a05e;
+  background: transparent;
+}
+
+
+/* 提示条上的进度：用背景填充，不用字符拼。字体里没有 ▮▯ 这类方块，
+   拼出来是一排豆腐块。 */
+#prompt.metered {
+  position: relative;
+  overflow: hidden;
+}
+#prompt.metered::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--fill, 0%);
+  background: linear-gradient(90deg, rgba(200, 160, 94, 0.34), rgba(226, 196, 132, 0.5));
+  transition: width 90ms linear;
+  pointer-events: none;
+}
+#prompt.metered > * { position: relative; }

@@ -307,11 +307,20 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 刻线这件事，孩子那一头的活儿就是"站住别动"。让玩家按住不放，
-      // 三秒里什么也不能做——被量身高的人是他，操作也该在他手上。
-      kind: "hold", id: "c1_carve", zone: V.doorframe, holdTime: 3.0,
-      objective: "站直，别动", hint: "按住 E。爹在门框上比着你的头顶划线",
+      kind: "scribe", id: "c1_carve", zone: V.doorframe, speed: 0.5, markY: 1.28,
+      objective: "爹比着你的头顶，在门框上划一道", hint: "按住 E，再左右推着划过去",
       note: "墨斗线弹在木头上，留下一道浅浅的印。",
+      onStart: (state) => {
+        // 爹得真的走过来伸手够门框，不能站在院子那头让字幕替他划
+        const father = FindActor(state, "father");
+        if (father) { father.x = V.doorframe.x + 1.1; father.heading = -1; father.pose = "mark"; }
+        state.player.x = V.doorframe.x - 0.35;
+        state.player.heading = 1;
+      },
+      onDone: (state) => {
+        const father = FindActor(state, "father");
+        if (father) father.pose = null;
+      },
     },
     {
       kind: "cinematic", id: "c1_mark",
@@ -1379,7 +1388,7 @@ export function StartChapter(state, index) {
     state.actors.push(
       MakeActor("father", "father", 41, { label: "爹" }),
       MakeActor("mother", "family", 36, { label: "娘" }),
-      MakeActor("sister", "sister", 126, { label: "妹妹" }),
+      MakeActor("sister", "sister", V.sisterTree.x + 1, { label: "妹妹" }),
     );
   } else if (ch.id === "c2") {
     state.player.x = 38;
@@ -1584,6 +1593,7 @@ function StepCinematic(state, input, dt) {
 // input: {moveX(-1..1), climb(-1上/+1下…实际 W=-1 上), crouch, interact, interactHeld, advance}
 // ---------------------------------------------------------------------------
 export function StepGame(state, input, dt) {
+  state.promptFill = 0;
   if (state.phase === "gameEnd") return;
   state.time += dt;
   if (state.toast && (state.toast.t -= dt) <= 0) state.toast = null;
@@ -1621,6 +1631,7 @@ export function StepGame(state, input, dt) {
     case "doomedHold": StepDoomedHold(state, def, input, dt); break;
     case "mapBoard": StepMapBoard(state, def, input); break;
     case "actSeq": StepActSeq(state, def, input); break;
+    case "scribe": StepScribe(state, def, input, dt); break;
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
     case "douseLamps": StepDouseLamps(state, def, input); break;
@@ -2148,6 +2159,38 @@ function StepSmokeEscape(state, def, input) {
   if (remaining.length === 0) AdvanceBeat(state);
 }
 
+// 划线：一个很小的交互。按住 E，再左右推，粉笔就沿着门框划过去；
+// 松手或不推就停。线划满一道就算成。
+//
+// 叙事上是爹在划——所以爹必须真的走过来、伸手够到门框（pose="mark"）；
+// 玩家手里控制的是那支粉笔。让玩家亲手把这道线拉出来，比看一张插画卡重。
+function StepScribe(state, def, input, dt) {
+  const b = state.beat;
+  if (b.drawn === undefined) {
+    b.drawn = 0;
+    def.onStart?.(state);
+  }
+  const inZone = Math.abs(state.player.x - def.zone.x) < (def.zone.w || 3) / 2 + 1.2;
+  if (!inZone) {
+    state.prompt = "";
+    state.scribe = null;
+    return;
+  }
+  const held = input.interactHeld || input.interact;
+  const push = Math.abs(input.moveX) > 0.05;
+  if (held && push) b.drawn = Math.min(1, b.drawn + dt * (def.speed || 0.5));
+  state.prompt = b.drawn >= 1 ? "划好了" : "按住 E，左右推着划";
+  state.promptFill = b.drawn;
+  // 交给渲染层把这道线画出来
+  state.scribe = { x: def.zone.x, y: def.markY ?? 1.25, t: b.drawn };
+  if (b.drawn >= 1) {
+    if (def.note) state.toast = { text: def.note, t: 4.5 };
+    def.onDone?.(state);
+    state.scribe = null;
+    AdvanceBeat(state);
+  }
+}
+
 // 按顺序做完几个动作。用来把"该由玩家亲手做"的事从过场里拿回来——
 // 第七章顶点处松开妹妹的手、接过灯，这两下由脚本代劳和由玩家按下去，
 // 是完全不同的两件事。
@@ -2240,10 +2283,8 @@ function StepDoomedHold(state, def, input, dt) {
   }
   // 不给百分比：一个封了顶、永远到不了 100 的进度条，只会让玩家以为是自己手慢。
   // 用力到什么程度由画面说——妹妹被拽开的距离、土面刨下去又塌回来。
-  const bars = Math.round(b.grip / def.cap * 6);
-  state.prompt = b.quakeActive
-    ? "…探杆就在头顶。停手，别出声"
-    : `${def.prompt}  ${"▮".repeat(bars)}${"▯".repeat(6 - bars)}`;
+  state.prompt = b.quakeActive ? "…探杆就在头顶。停手，别出声" : def.prompt;
+  state.promptFill = b.quakeActive ? 0 : b.grip / def.cap;
 
   // 让进度条不只是个数字：抓得越牢，她被拖走得越慢——但一直在走。
   // 手里那点距离就是进度条本身。
@@ -2393,6 +2434,8 @@ export function GetBeatTarget(state) {
     // 自动通关只要一直按住就行——反正按住也留不住她
     case "doomedHold": return { action: "holdAt", x: state.player.x, level: state.player.level };
     case "mapBoard": return { action: "interactAt", x: def.zone.x, level: def.zone.level || "surface" };
+    // 自动通关：按住 E 同时往前推就行
+    case "scribe": return { action: "scribeAt", x: def.zone.x, level: "surface" };
     case "actSeq": {
       const st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;

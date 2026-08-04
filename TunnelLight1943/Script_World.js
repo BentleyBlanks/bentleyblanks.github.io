@@ -254,6 +254,7 @@ export function CreateWorld(canvasEl) {
   let fluid = null, fluidKey = "", fluidMesh = null, fluidCanvas = null, fluidCtx = null, fluidImage = null;
   let probeMeshes = [];
   let itemLabel = null;
+  let scribeMesh = null;
   let markerMesh = null, markerCanvas = null, markerCtx = null;
   let collapseMeshes = {};
   let itemMeshes = [];
@@ -1533,6 +1534,26 @@ export function CreateWorld(canvasEl) {
       for (const m of itemMeshes) layers.play.remove(m);
       itemMeshes = [];
       itemLabel = null;
+    }
+
+    // 划线：那道正在被拉出来的白线。宽度随进度长，所以用一个纯色片
+    // 缩放，不每帧重烘贴图。
+    if (state.scribe) {
+      if (!scribeMesh) {
+        scribeMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(1, 0.055),
+          new THREE.MeshBasicMaterial({ color: 0xf2ead4, transparent: true, opacity: 0.95, depthWrite: false }),
+        );
+        scribeMesh.userData.fixedOrder = LAYER_ORDER.play + 300;
+        layers.play.add(scribeMesh);
+      }
+      const w = Math.max(0.02, state.scribe.t * 1.15);
+      scribeMesh.visible = true;
+      scribeMesh.scale.set(w, 1, 1);
+      // 从门框左沿往右长
+      scribeMesh.position.set(state.scribe.x - 0.55 + w / 2, state.scribe.y, 0.5);
+    } else if (scribeMesh) {
+      scribeMesh.visible = false;
     }
 
     // 烟与水：真解算（半拉格朗日平流 + 压力投影），固体边界就是地道剖面

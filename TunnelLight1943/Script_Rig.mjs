@@ -278,6 +278,14 @@ export function PoseRig(rig, s, dt) {
     target.armF = -16 * DEG; target.foreF = -20 * DEG;
     target.thighB = -10 * DEG; target.shinB = 12 * DEG; target.footB = -4 * DEG;
     target.thighF = 8 * DEG; target.shinF = 6 * DEG; target.footF = -6 * DEG;
+  } else if (s.pose === "mark") {
+    // 伸手在门框上比划：略侧身，近侧手臂抬到头顶那么高，另一只手扶着框
+    target.hipY = -0.04; target.hipX = 0.03;
+    target.torso = 10 * DEG; target.head = -14 * DEG;
+    target.armF = -152 * DEG; target.foreF = -16 * DEG;
+    target.armB = -46 * DEG; target.foreB = -54 * DEG;
+    target.thighB = -12 * DEG; target.shinB = 14 * DEG; target.footB = -6 * DEG;
+    target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
   } else if (s.pose === "swing") {
     // 抡枪托：胳膊举到头顶后方，整个人拧过去
     target.hipY = -0.08; target.hipX = -0.10;
