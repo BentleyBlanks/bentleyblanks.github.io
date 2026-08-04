@@ -57,6 +57,22 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 canvas.addEventListener("pointerdown", () => { advanceEdge = true; });
 
+// iOS Safari 会忽略 user-scalable=no：双击与捏合都得在 JS 里挡掉，
+// 否则画面会被缩放，横版布局直接错位。
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 320) e.preventDefault();   // 双击缩放
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener("touchmove", (e) => {
+  if (e.touches.length > 1) e.preventDefault();       // 双指捏合
+}, { passive: false });
+for (const evt of ["gesturestart", "gesturechange", "gestureend"]) {
+  document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+
 // 触屏按钮：按下即持续，抬起清除
 function BindTouchButton(el, prop, { edge = false } = {}) {
   if (!el) return;
@@ -114,9 +130,9 @@ function ReadInput() {
 //   过场：构图变了才硬切；同构图连续行不重切、推进累计（一个镜头屏住呼吸）
 //   语汇：wide 全景 / shot 定点 / close 特写 / ots 过肩正反打 / insert 插入特写 / dark 黑场
 // ---------------------------------------------------------------------------
-const cam = { x: 60, y: 2.2, hw: 11 };
+const cam = { x: 60, y: 2.0, hw: 7.2 };
 let camSnap = true;
-let framing = { key: "", prog: 0, baseHw: 11 };
+let framing = { key: "", prog: 0, baseHw: 7.2 };
 
 function ActorAt(state, id) {
   if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
@@ -130,11 +146,11 @@ function BaseShot(state) {
   const ch = CHAPTERS[state.chapterIndex];
   const p = state.player;
   const lookAhead = (p.heading || 1) * 2.0;
-  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -0.9, hw: 13 };
-  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.3, hw: 9 };
-  // 地表：视平线压低，地面只占画面下缘约四分之一
-  const y = LevelY(p.level) + (p.level === "under" ? 1.4 : 2.7);
-  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 10.5 : 11.5 };
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.6 };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.4 };
+  // 地表：中近景，人物约占画高三分之一；视平线略高于人头，地面向后退
+  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.95);
+  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.6 : 7.2 };
 }
 
 function HintShot(state, hint) {
@@ -381,7 +397,7 @@ function StartGame(chapterIndex) {
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
-  framing = { key: "", prog: 0, baseHw: 11 };
+  framing = { key: "", prog: 0, baseHw: 7.2 };
   fadeLevel = 1;
   irisLevel = 0;
   irisClosing = false;
@@ -421,7 +437,7 @@ function Frame(now) {
     }, stepDt);
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
-      framing = { key: "", prog: 0, baseHw: 11 };
+      framing = { key: "", prog: 0, baseHw: 7.2 };
     }
 
     world.BuildEnvironment(state);

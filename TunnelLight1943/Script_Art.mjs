@@ -479,23 +479,75 @@ export function DrawHeadPart(ctx, px, py, r, kind, id) {
 // 过肩镜头的前景剪影：只要头和肩，压成暗色，把画面"框"起来
 // 以 (x, y) 为肩线中心；facing 指向画面内侧
 export function DrawShoulder(ctx, x, y, S, kind, id) {
-  const dark = "#241a13";
+  // 不是纯黑块：暗部也要有形。耳廓、发际、衣领、迎光的一道边光，
+  // 三笔就能让观众认出"这是越过谁的肩膀在看"。
+  const dark = "#33261c";
+  const darker = "#241a13";
+  const rim = "rgba(246, 226, 178, 0.30)";
   ctx.save();
   ctx.translate(x, y);
   const headR = 34 * S;
-  // 肩：一条厚实的斜坡
+
+  // 肩：厚实的斜坡
   InkFill(ctx, [
     [-120 * S, 190 * S], [-96 * S, 74 * S], [-52 * S, 28 * S],
     [52 * S, 28 * S], [96 * S, 74 * S], [120 * S, 190 * S],
   ], id + "sh", dark, { amp: 3.2 * S, lw: 0, line: null });
-  // 脖子
-  InkFill(ctx, Rect(-22 * S, -18 * S, 44 * S, 60 * S), id + "nk", dark, { amp: 2 * S, lw: 0, line: null });
+  // 衣领：一道折线把肩和脖子分开
+  ctx.beginPath();
+  ctx.moveTo(-56 * S, 34 * S);
+  ctx.quadraticCurveTo(0, 6 * S, 56 * S, 34 * S);
+  ctx.strokeStyle = darker;
+  ctx.lineWidth = 7 * S;
+  ctx.stroke();
+
+  InkFill(ctx, Rect(-22 * S, -18 * S, 44 * S, 60 * S), id + "nk", darker, { amp: 2 * S, lw: 0, line: null });
+
   // 头（后脑勺）
   InkFill(ctx, [
     [-headR, 6 * S], [-headR * 0.86, -headR * 0.9], [0, -headR * 1.34],
     [headR * 0.86, -headR * 0.9], [headR, 6 * S], [headR * 0.6, headR * 0.5], [-headR * 0.6, headR * 0.5],
   ], id + "hd", dark, { amp: 2.6 * S, lw: 0, line: null });
-  // 帽子/头巾的轮廓，区分身份
+
+  // 耳廓：侧影里最关键的识别点
+  ctx.beginPath();
+  ctx.ellipse(headR * 0.62, -headR * 0.18, headR * 0.26, headR * 0.36, -0.2, 0, Math.PI * 2);
+  ctx.fillStyle = darker;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(headR * 0.62, -headR * 0.18, headR * 0.12, headR * 0.19, -0.2, 0, Math.PI * 2);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 2.4 * S;
+  ctx.stroke();
+
+  // 发际：后脑到颈的一圈碎笔触
+  ctx.save();
+  ctx.strokeStyle = darker;
+  ctx.lineWidth = 3.4 * S;
+  for (let i = 0; i < 9; i += 1) {
+    const a = -2.5 + i * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * headR * 0.92, Math.sin(a) * headR * 0.92 - headR * 0.1);
+    ctx.lineTo(Math.cos(a) * headR * 1.14, Math.sin(a) * headR * 1.12 - headR * 0.1);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 边光：迎着场景那一侧的轮廓亮一线，剪影才不糊成一团
+  ctx.save();
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 4.2 * S;
+  ctx.beginPath();
+  ctx.moveTo(-headR * 0.98, headR * 0.1);
+  ctx.quadraticCurveTo(-headR * 1.02, -headR * 1.1, 0, -headR * 1.34);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-58 * S, 30 * S);
+  ctx.lineTo(-104 * S, 84 * S);
+  ctx.stroke();
+  ctx.restore();
+
+  // 头饰
   if (kind === "soldier") {
     InkFill(ctx, [
       [-headR * 1.05, -headR * 0.62], [0, -headR * 1.5],
@@ -505,12 +557,12 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
     InkFill(ctx, [
       [-headR * 1.1, -headR * 0.5], [0, -headR * 1.46], [headR * 1.1, -headR * 0.5],
       [headR * 1.0, -headR * 0.16], [-headR * 1.0, -headR * 0.16],
-    ], id + "tw", "#3d382c", { amp: 2.4 * S, lw: 0, line: null });
+    ], id + "tw", "#4d4739", { amp: 2.4 * S, lw: 0, line: null });
   } else if (kind === "sister") {
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
       ctx.arc(-headR * 1.02, headR * (0.1 + i * 0.42), headR * 0.28, 0, Math.PI * 2);
-      ctx.fillStyle = "#1c1710";
+      ctx.fillStyle = darker;
       ctx.fill();
     }
   }

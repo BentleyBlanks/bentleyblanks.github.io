@@ -129,7 +129,7 @@ export function CreateWorld(canvasEl) {
   };
   const LAYER_Z = {
     sky: -150, ridge: -62, hills: -44, farTown: -26, midTrees: -15,
-    nearTrees: -7.5, play: 0, fore: 5.5, fx: 0, ots: 12,
+    nearTrees: -7.5, play: 0, fore: 3.4, fx: 0, ots: 12,
   };
   // 透视补偿：整层按 (D_REF - z)/D_REF 放大，于是每个元素仍落在作者标注的
   // 世界坐标与尺寸上，只是移动速率按透视自然变慢——经典视差，且随推拉变化
@@ -359,10 +359,11 @@ export function CreateWorld(canvasEl) {
 
   // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
   function AddForeground(group, length, night, id) {
-    for (let x = 6; x < length; x += 26 + ART.Hash(id + x) * 22) {
-      // 只留从画框上缘垂下的枝条：前景一点点就够，压在下缘的草丛会糊成一团
-      if (ART.Hash(id + "k" + x) < 0.45) continue;
-      const kind = "branch";
+    for (let x = 6; x < length; x += 15 + ART.Hash(id + x) * 14) {
+      // 前景：镜头推近之后画框空，需要有东西从边缘掠过带出纵深。
+      // 上缘垂枝、下缘草丛、偶尔一段篱笆——都压暗微糊，只当框景用。
+      const h0 = ART.Hash(id + "k" + x);
+      const kind = h0 > 0.62 ? "branch" : (h0 > 0.3 ? "grass" : "fence");
       const wPx = kind === "branch" ? 340 : 220;
       const hPx = kind === "branch" ? 200 : 150;
       const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
@@ -378,6 +379,28 @@ export function CreateWorld(canvasEl) {
             ctx.strokeStyle = tint;
             ctx.lineWidth = 3.4;
             ctx.lineCap = "round";
+            ctx.stroke();
+          }
+        } else if (kind === "fence") {
+          // 一段矮篱笆横在镜头前
+          for (let i = 0; i < 7; i += 1) {
+            const fx = ax - 140 + i * 46;
+            ctx.beginPath();
+            ctx.moveTo(fx, ay);
+            ctx.lineTo(fx + (ART.Hash(id + "f" + i) - 0.5) * 12, ay - 60 - ART.Hash(id + "fh" + i) * 26);
+            ctx.strokeStyle = tint;
+            ctx.lineWidth = 9;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          }
+          for (let r = 0; r < 2; r += 1) {
+            ctx.beginPath();
+            ctx.moveTo(ax - 150, ay - 26 - r * 26);
+            for (let t = 0; t <= 8; t += 1) {
+              ctx.lineTo(ax - 150 + t * 40, ay - 26 - r * 26 + (ART.Hash(id + "r" + r + t) - 0.5) * 9);
+            }
+            ctx.strokeStyle = tint;
+            ctx.lineWidth = 7;
             ctx.stroke();
           }
         } else {
@@ -440,7 +463,7 @@ export function CreateWorld(canvasEl) {
   }
 
   function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1 } = {}) {
-    for (let x = xFrom; x < xTo; x += 16 + ART.Hash(id + x) * 12) {
+    for (let x = xFrom; x < xTo; x += 9 + ART.Hash(id + x) * 9) {
       const w = 9 + ART.Hash(id + "w" + x) * 7;
       const h = 2.6 + ART.Hash(id + "h" + x) * 1.6;
       const wPx = Math.ceil((w + 4) * PPM), hPx = Math.ceil((h + 1.6) * PPM);
@@ -457,6 +480,25 @@ export function CreateWorld(canvasEl) {
         ctx.fillStyle = "rgba(30,22,16,0.6)";
         ctx.fillRect(ax - W * 0.2, ay - H * 0.62, W * 0.16, H * 0.2);
         ctx.globalAlpha = 1;
+        // 院落配件：矮院墙、柴垛、井架、旗杆——远处也要有生活痕迹
+        const v = ART.Hash(id + "v" + x);
+        ART.InkFill(ctx, ART.Rect(ax - W / 2 - 34, ay - 26, 34, 26), id + "yard" + x, color,
+          { amp: 1.4, lw: 1.4, line: "rgba(43,31,22,0.3)" });
+        if (v > 0.72) {
+          // 井架
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 10, ay - 46, 5, 46), id + "wp" + x, color, { amp: 1, lw: 1.2, line: null });
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 30, ay - 46, 5, 46), id + "wq" + x, color, { amp: 1, lw: 1.2, line: null });
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 6, ay - 52, 33, 6), id + "wt" + x, color, { amp: 1, lw: 1.2, line: null });
+        } else if (v > 0.46) {
+          // 柴垛
+          for (let k = 0; k < 3; k += 1) {
+            ART.InkFill(ctx, ART.Rect(ax + W / 2 + 8, ay - 12 - k * 10, 30 - k * 6, 10),
+              id + "wd" + x + k, color, { amp: 1.2, lw: 1.2, line: null });
+          }
+        } else if (v > 0.3) {
+          // 旗杆
+          ART.InkFill(ctx, ART.Rect(ax - W / 2 - 18, ay - 74, 4, 74), id + "fp" + x, color, { amp: 1, lw: 1, line: null });
+        }
         if (ruined) {
           ctx.globalCompositeOperation = "destination-out";
           ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
@@ -465,7 +507,7 @@ export function CreateWorld(canvasEl) {
       }, LAYER_BLUR.farTown, 1, HazeFor("farTown"));
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
       // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
-      ScaleKeepGround(mesh, objScale);
+      ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
       mesh.material.opacity = 0.62;
       group.add(mesh);
     }
@@ -1249,7 +1291,7 @@ export function CreateWorld(canvasEl) {
     layers.ots.position.z = otsZ;
     layers.ots.scale.setScalar(LAYER_COMP.ots);
     // 前景只服务于中远景；特写/插入/过肩本来就不该有枝叶糊在镜头前
-    layers.fore.visible = dist > 9;
+    layers.fore.visible = dist > 7;
     // 浮尘在画框内循环飘
     for (const d of dustMotes) {
       const u = d.userData;
