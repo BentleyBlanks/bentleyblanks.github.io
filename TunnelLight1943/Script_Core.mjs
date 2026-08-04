@@ -186,7 +186,34 @@ const TF = SCENES.tunnelFort.zones;
 
 function FindActor(state, id) { return state.actors.find((a) => a.id === id); }
 
-const SCRIPTS = {
+// 配音行 id：按"说话人 + 文本"取哈希。抽词脚本（Script_VoiceExtract）与
+// 运行时查表都走这一个函数——两边各写一份迟早会对不上，音频就整批哑掉。
+// 用文本而不是行序做键，改动剧本顺序不会让已烘的音频失效，重复的句子也
+// 自然共用同一个文件。
+export function VoiceLineId(who, text) {
+  const src = (who || "") + "|" + text;
+  let h = 2166136261;
+  for (let i = 0; i < src.length; i += 1) {
+    h ^= src.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h.toString(36).padStart(7, "0");
+}
+
+// 配音时长表：开了声音之后，一行字幕至少得停到旁白念完，否则每句都被
+// 切在半截。剧本里手写的 d 仍然是下限——它定的是"这一拍该有多长"，
+// 配音只负责把太短的那些撑开。静音时这张表是空的，节奏回到原样。
+let VOICE_DUR = null;
+export function SetVoiceDurations(map) { VOICE_DUR = map; }
+function LineDuration(line) {
+  if (!VOICE_DUR) return line.d;
+  const text = line.say || line.stage;
+  if (!text) return line.d;
+  const v = VOICE_DUR.get(VoiceLineId(line.say ? (line.who || "") : "", text));
+  return v ? Math.max(line.d, v + 0.35) : line.d;
+}
+
+export const SCRIPTS = {
   c1: [
     {
       kind: "cinematic", id: "c1_open",
@@ -1197,7 +1224,7 @@ function StepMicroCine(state, input, dt) {
   state.caption = line;
   state.camHint = line.cam || { kind: "close" };
   mc.t += dt;
-  if (input.advance || mc.t >= line.d) {
+  if (input.advance || mc.t >= LineDuration(line)) {
     mc.i += 1;
     mc.t = 0;
     if (mc.i >= mc.lines.length) { state.microCine = null; state.caption = null; }
@@ -1215,7 +1242,7 @@ function StepCinematic(state, input, dt) {
   state.caption = line;
   state.camHint = line.cam || { kind: "follow" };
   state.camLineT = state.beat.lineT;
-  state.camLineD = line.d;
+  state.camLineD = LineDuration(line);
   // 正反打不能越轴：主体必须看着被越过的那个肩膀
   if (state.camHint.kind === "ots") {
     const subj = FindActor(state, state.camHint.subject)
@@ -1229,7 +1256,7 @@ function StepCinematic(state, input, dt) {
   }
   StepCineActors(state, dt);
   state.beat.lineT += dt;
-  if (input.advance || state.beat.lineT >= line.d) {
+  if (input.advance || state.beat.lineT >= LineDuration(line)) {
     state.beat.lineIndex += 1;
     state.beat.lineT = 0;
     if (state.beat.lineIndex >= lines.length) AdvanceBeat(state);

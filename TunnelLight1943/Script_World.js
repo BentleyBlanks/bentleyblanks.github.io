@@ -235,6 +235,7 @@ export function CreateWorld(canvasEl) {
       return m;
     }
     const m = CreateOccludedLight(occluder, { radius, color, intensity: opacity });
+    m.renderOrder = ORDER_GLOW;
     return m;
   }
 
@@ -873,9 +874,9 @@ export function CreateWorld(canvasEl) {
       ctx.save();
       ctx.globalCompositeOperation = "source-atop";
       const dk = ctx.createLinearGradient(0, toPy(SURFACE_Y), 0, hPx);
-      dk.addColorStop(0, "rgba(14,10,6,0.30)");
-      dk.addColorStop(0.35, "rgba(14,10,6,0.66)");
-      dk.addColorStop(1, "rgba(10,7,4,0.80)");
+      dk.addColorStop(0, "rgba(12,9,5,0.44)");
+      dk.addColorStop(0.35, "rgba(10,7,4,0.80)");
+      dk.addColorStop(1, "rgba(6,4,2,0.92)");
       ctx.fillStyle = dk;
       ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
       ctx.restore();

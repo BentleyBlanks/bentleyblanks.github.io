@@ -5,9 +5,51 @@ import {
   CurrentBeatDef, MakeChoice, GetObjective, GetHint,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
+import { CreateSoundtrack } from "./Script_Soundtrack.js";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
+// 声音是增强项，不是依赖：合成器加载失败（旧浏览器、被拦的 WebAudio、
+// 资源没部署上去）时游戏必须照常能玩，所以走动态 import + 静音替身。
+const SILENT = {
+  Unlock() {}, SetEnabled() {}, IsEnabled: () => false, SetMasterVolume() {},
+  SetMood() {}, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
+  PlayVoice: () => Promise.resolve(),
+};
+let audio = SILENT;
+const soundtrack = CreateSoundtrack({
+  // 转发到当前的 audio 实例：合成器是异步到位的，这层壳让上面的代码不必等
+  Unlock: (...a) => audio.Unlock(...a),
+  SetEnabled: (...a) => audio.SetEnabled(...a),
+  IsEnabled: () => audio.IsEnabled(),
+  SetMood: (...a) => audio.SetMood(...a),
+  Sfx: (...a) => audio.Sfx(...a),
+  Duck: (...a) => audio.Duck(...a),
+  PlayVoice: (...a) => audio.PlayVoice(...a),
+  StopVoice: () => audio.StopVoice(),
+  Update: (...a) => audio.Update(...a),
+});
+import("./Script_Audio.js")
+  .then((m) => {
+    audio = m.CreateAudio();
+    audio.SetEnabled(soundOn);
+    soundtrack.SyncDurations();
+  })
+  .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
+
+// 声音的开关记在本地：读者多半是在办公室点开的，默认得先静音，
+// 由他自己决定什么时候放出来
+const SOUND_KEY = "tunnelLight1943.sound";
+let soundOn = localStorage.getItem(SOUND_KEY) === "on";
+audio.SetEnabled(soundOn);
+
+// iOS/Chrome 都要求音频在真实手势里启动，任何一次输入都拿来解锁
+function UnlockAudio() {
+  audio.Unlock();
+}
+for (const evt of ["pointerdown", "keydown", "touchstart"]) {
+  window.addEventListener(evt, UnlockAudio, { passive: true });
+}
 
 const ui = {};
 for (const id of [
@@ -17,7 +59,7 @@ for (const id of [
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
   "choiceOverlay", "choicePrompt", "choiceList",
-  "endScreen", "endRestart", "touchControls", "rotateHint",
+  "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -55,6 +97,7 @@ window.addEventListener("keydown", (e) => {
   }
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
 canvas.addEventListener("pointerdown", () => { advanceEdge = true; });
 
 // iOS Safari 会忽略 user-scalable=no：双击与捏合都得在 JS 里挡掉，
@@ -404,6 +447,25 @@ function StartGame(chapterIndex) {
   lastBeatKind = null;
 }
 
+function SyncSoundButton() {
+  if (!ui.btnSound) return;
+  ui.btnSound.setAttribute("aria-pressed", soundOn ? "true" : "false");
+  ui.btnSound.title = soundOn ? "关闭声音" : "打开声音（旁白 / 音效 / 配乐）";
+}
+function ToggleSound() {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
+  audio.SetEnabled(soundOn);
+  if (soundOn) audio.Unlock();
+  soundtrack.SyncDurations();
+  SyncSoundButton();
+}
+if (ui.btnSound) {
+  ui.btnSound.addEventListener("click", ToggleSound);
+  ui.btnSound.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+SyncSoundButton();
+
 ui.startButton.addEventListener("click", () => StartGame(0));
 ui.endRestart.addEventListener("click", () => {
   ui.endScreen.hidden = true;
@@ -446,6 +508,7 @@ function Frame(now) {
     const shotFade = UpdateCamera(state, dt);
     StepIris(state, dt);
     SyncHud(state, dt, shotFade);
+    soundtrack.Step(state, dt);
   }
   world.Render();
   interactEdge = false;

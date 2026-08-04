@@ -312,3 +312,34 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   #chapterList { grid-template-columns: repeat(2, 1fr); }
   #objectivePanel { max-width: 62vw; }
 }
+
+/* 声音开关：贴在右上角，克制到几乎看不见——勇敢的心的 HUD 从不抢戏 */
+#btnSound {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 1px solid rgba(226, 216, 188, 0.22);
+  border-radius: 50%;
+  background: rgba(18, 15, 11, 0.42);
+  color: rgba(226, 216, 188, 0.5);
+  font-size: 17px; line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.25s, border-color 0.25s, background 0.25s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+}
+#btnSound[aria-pressed="true"] {
+  color: rgba(255, 206, 130, 0.92);
+  border-color: rgba(255, 206, 130, 0.42);
+  background: rgba(40, 28, 14, 0.55);
+}
+/* 关掉时划一道斜杠，不用换字形 */
+#btnSound[aria-pressed="false"]::after {
+  content: ""; position: absolute;
+  width: 22px; height: 1px;
+  background: rgba(226, 216, 188, 0.5);
+  transform: rotate(-45deg);
+}
