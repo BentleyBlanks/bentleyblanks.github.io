@@ -271,14 +271,28 @@ export const SCRIPTS = {
             // 被叫住：跑出去的脚步收住，转身走回门框
             state.player.cineWalk = { x: 39.4, speed: 1.7 };
           } },
-        { stage: "他让柱子靠着门框站直，用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" },
+        { stage: "爹朝门框那边扬了扬下巴。", d: 2.8, cam: { kind: "shot", x: 38, y: 1.8, dist: 9 },
           on: (state) => {
-            state.player.x = 39.2;
             state.player.cineWalk = null;
-            state.player.heading = 1;
             const father = FindActor(state, "father");
-            if (father) { father.cineTarget = { x: 40.4 }; father.cineSpeed = 1.2; father.heading = -1; }
+            if (father) { father.cineTarget = { x: 35.6 }; father.cineSpeed = 1.4; father.heading = -1; }
           } },
+      ],
+    },
+    {
+      // 门框上的刻痕是全篇的题眼，一头一尾却都由脚本代劳。这是第一次：
+      // 他是被量的那个人，所以玩家要做的就是走过去、自己靠上去、站直。
+      kind: "actSeq", id: "c1_doorframe",
+      objective: "爹在门框那儿等着", hint: "走到门框边",
+      steps: [
+        { x: V.doorframe.x, r: 1.4, prompt: "E · 靠着门框站直",
+          on: (state) => { state.player.heading = 1; } },
+      ],
+    },
+    {
+      kind: "cinematic", id: "c1_mark",
+      lines: [
+        { stage: "爹用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
         { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
         { stage: "他惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
@@ -513,6 +527,15 @@ export const SCRIPTS = {
         "岗楼上两个人，换岗时背对南门，半袋烟的工夫。",
         "巡逻队沿墙根来回走，走到头会停下来抽袋烟。",
         "牢房在东边。白天押着人往围墙上搬土袋，天黑后送过一次饭。押送用的骡车拴在门里。",
+      ],
+      // 每看完一处，切到他正望着的那样东西上。第三章的功课是"学会看"，
+      // 那就得让画面替他看，不是让字幕替他记。
+      watchCine: [
+        [{ stage: "岗楼上那两个人换班的时候，背是朝着南门的。", d: 3.6, cam: { kind: "insert", x: 184, y: 5.4, dist: 5.5 } },
+         { stage: "从背过身到重新站定，大约半袋烟的工夫。", d: 3.2, cam: { kind: "insert", x: 184, y: 5.4, dist: 4.6 } }],
+        [{ stage: "巡逻队沿着墙根来回走。走到头，会停下来抽袋烟。", d: 3.8, cam: { kind: "insert", x: 176, y: 1.4, dist: 6.5 } }],
+        [{ stage: "牢房在东边。白天押着人往围墙上搬土袋。", d: 3.6, cam: { kind: "insert", x: 192, y: 1.6, dist: 6 } },
+         { stage: "门里拴着一辆骡车。车辕上空着。", d: 3.6, cam: { kind: "insert", x: 190, y: 1.0, dist: 3.4 } }],
       ],
     },
     {
@@ -753,7 +776,13 @@ export const SCRIPTS = {
       resetHint: "差一点被发现。柱子把心跳按下去，重新贴回土里。",
       notes: [
         "南门加了双岗，但换岗还是背对庄稼地。",
-        "牢房外多了一个游动哨，绕到北墙要一袋烟的工夫。",
+        "牢房外多了一个游动哨。门里那辆骡车还拴在原处，车辕上一直空着。",
+      ],
+      watchCine: [
+        [{ stage: "南门加了双岗。换岗的时候，背还是朝着庄稼地。", d: 3.8, cam: { kind: "insert", x: 172, y: 2.2, dist: 5.5 } }],
+        [{ stage: "牢房外多了一个游动哨，绕到北墙要一袋烟的工夫。", d: 3.8, cam: { kind: "insert", x: 192, y: 1.6, dist: 6 } },
+         // 押送的日子一推再推，车却始终没套——第六章的推理就架在这两条上
+         { stage: "那辆骡车还拴在原处。车辕上一直空着。", d: 3.8, cam: { kind: "insert", x: 190, y: 1.0, dist: 3.2 } }],
       ],
     },
     {
@@ -964,17 +993,31 @@ export const SCRIPTS = {
       lines: [
         { stage: "院子烧毁了。只剩一堵残墙。", d: 3.6, cam: { kind: "shot", x: 37, y: 1.6, dist: 11 } },
         { stage: "门框还在。", d: 3.0, cam: { kind: "shot", x: 34, y: 1.5, dist: 6.5 } },
-        { stage: "妹妹走过去，伸手摸了一下爹刻的那道线。", d: 4.0, cam: { kind: "shot", x: 34, y: 1.4, dist: 5.5 },
+        { stage: "妹妹走过去，伸手摸了一下爹刻的那道线。", d: 4.0, cam: { kind: "shot", x: 34, y: 1.5, dist: 6.5 },
           on: (state) => {
             const sister = FindActor(state, "sister");
             if (sister) { sister.following = false; sister.cineTarget = { x: 33.2 }; sister.cineSpeed = 1.1; }
           } },
-        { stage: "她的手停了一会儿。", d: 3.2, cam: { kind: "shot", x: 34, y: 1.4, dist: 4.8 } },
-        { stage: "那道线，比她记忆里高了许多。", d: 3.8, cam: { kind: "shot", x: 34, y: 1.4, dist: 4.4 } },
+        { stage: "她的手停了一会儿。", d: 3.2, cam: { kind: "shot", x: 34, y: 1.5, dist: 6.5 } },
       ],
     },
     {
-      kind: "hold", id: "c8_carve", zone: V.doorframe, holdTime: 2.5,
+      // 第一章他被爹按在门框上量；这一回轮到他量妹妹。
+      // 两道线差多少，画面自己会说——不要旁白替观众念出来。
+      kind: "actSeq", id: "c8_measure",
+      objective: "门框还在", hint: "妹妹站在门框边上",
+      steps: [
+        { x: V.doorframe.x, r: 1.6, prompt: "E · 让妹妹靠上门框",
+          toast: "妹妹后背贴上门框，站直了。",
+          on: (state) => {
+            const sister = FindActor(state, "sister");
+            if (sister) { sister.x = V.doorframe.x - 0.5; sister.heading = 1; sister.cineTarget = null; }
+            state.player.heading = -1;
+          } },
+      ],
+    },
+    {
+      kind: "hold", id: "c8_carve", zone: V.doorframe, holdTime: 4.5,
       objective: "在旧刻痕旁，刻下一道新的线", hint: "按住 E",
       note: "刻完，柱子用拇指抹平了木屑。",
       onDone: (state) => { state.flags.carved = true; },
@@ -1761,10 +1804,15 @@ function StepObserve(state, def, dt) {
     state.beat.holdProgress += dt;
     state.prompt = `观察中… ${Math.min(100, Math.round(state.beat.holdProgress / def.watchTime * 100))}%`;
     if (state.beat.holdProgress >= def.watchTime) {
-      if (def.notes?.[i]) { state.toast = { text: "柱子记下：" + def.notes[i], t: 5.5 }; state.flags.notesSeen.push(def.notes[i]); }
+      if (def.notes?.[i]) state.flags.notesSeen.push(def.notes[i]);
       state.beat.holdProgress = 0;
       state.beat.spotIndex += 1;
-      if (state.beat.spotIndex >= def.spots.length) AdvanceBeat(state);
+      const done = state.beat.spotIndex >= def.spots.length;
+      // "学会看"这件事得让玩家看见。原来是蹲够五秒弹一条 toast 把结论念出来，
+      // 现在切一个插入镜头到他正望着的那个东西上——note 仍旧入账供第六章推理用。
+      if (def.watchCine?.[i]) StartMicroCine(state, def.watchCine[i]);
+      else if (def.notes?.[i]) state.toast = { text: "柱子记下：" + def.notes[i], t: 5.5 };
+      if (done) AdvanceBeat(state);
     }
   } else if (ZoneReached(state, spot)) {
     state.prompt = "C · 蹲下才能安心观察";
