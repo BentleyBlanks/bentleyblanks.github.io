@@ -1,0 +1,90 @@
+{
+  "reviewDate": "2026-08-05",
+  "artist": "Scott Buckley",
+  "artistLibrary": "https://www.scottbuckley.com.au/library/",
+  "license": {
+    "name": "Creative Commons Attribution 4.0 International",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "attributionTemplate": "'{title}' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au"
+  },
+  "localEncoding": {
+    "purpose": "Full-length local audition copies for BGM selection",
+    "sampleRateHz": 44100,
+    "channels": 2,
+    "bitrateKbps": 128,
+    "targetIntegratedLoudnessLufs": -18,
+    "targetTruePeakDb": -1.5
+  },
+  "tracks": [
+    {
+      "title": "Cicadas",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_Cicadas.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/cicadas/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/12/Cicadas.mp3"
+    },
+    {
+      "title": "With These Hands",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_WithTheseHands.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/with-these-hands/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2026/06/WithTheseHands.mp3"
+    },
+    {
+      "title": "Unraveling",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_Unraveling.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/unraveling/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2026/05/Unraveling.mp3"
+    },
+    {
+      "title": "Nightfall",
+      "variant": "No Solo Strings",
+      "localFile": "Audio/AudioBgm_NightfallNoSoloStrings.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/nightfall/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/05/sb_nightfall_nosolostrings.mp3"
+    },
+    {
+      "title": "Shadows and Dust",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_ShadowsAndDust.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/shadows-and-dust/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/11/ShadowsAndDust.mp3"
+    },
+    {
+      "title": "Signal to Noise",
+      "variant": "No Piano Melody",
+      "localFile": "Audio/AudioBgm_SignalToNoiseNoMelody.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/signal-to-noise/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2020/04/sb_signaltonoise_nomelody.mp3"
+    },
+    {
+      "title": "The Long Dark",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_TheLongDark.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/the-long-dark/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/01/TheLongDark.mp3"
+    },
+    {
+      "title": "Undertow",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_Undertow.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/undertow/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/12/sb_undertow.mp3"
+    },
+    {
+      "title": "The Climb",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_TheClimb.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/the-climb/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2021/02/sb_theclimb.mp3"
+    },
+    {
+      "title": "A Kind Of Hope",
+      "variant": "Full Mix",
+      "localFile": "Audio/AudioBgm_AKindOfHope.mp3",
+      "sourcePage": "https://www.scottbuckley.com.au/library/a-kind-of-hope/",
+      "sourceAudio": "https://www.scottbuckley.com.au/library/wp-content/uploads/2022/10/AKindOfHope.mp3"
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex">
+  <title>《地道里的光》BGM 选曲室</title>
+  <link rel="stylesheet" href="./Style_BgmReview.css?v=20260805">
+</head>
+<body>
+  <header class="hero">
+    <div class="heroGlow" aria-hidden="true"></div>
+    <nav class="topNav" aria-label="页面导航">
+      <a href="../">← 返回游戏</a>
+      <span>本地试听 · 10 首 · 8 章</span>
+    </nav>
+    <div class="heroInner">
+      <p class="eyebrow">TUNNEL LIGHT 1943 · MUSIC REVIEW</p>
+      <h1>地道里的光<br><span>BGM 选曲室</span></h1>
+      <p class="lead">不是给八章硬塞八首歌，而是比较五种声音功能：乡村与手艺、突袭与失去、侦察与潜入、地道压迫、营救与黎明。</p>
+      <div class="heroFacts" aria-label="试听说明">
+        <span>全部音频已本地化</span>
+        <span>统一到约 −18 LUFS</span>
+        <span>一次只播放一首</span>
+        <span>选择自动保存在本机</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="principlePanel" aria-labelledby="principleTitle">
+      <div>
+        <p class="sectionKicker">先听功能，不先听“好不好听”</p>
+        <h2 id="principleTitle">三条选曲底线</h2>
+      </div>
+      <ol>
+        <li><b>不替人物煽情。</b>旁白、脚步、土石和呼吸优先，旋律必须让位。</li>
+        <li><b>不把反击写成爽片。</b>危险段要有压力，但不靠凯旋式铜管制造胜利幻觉。</li>
+        <li><b>不必一章一首到底。</b>有些章节最适合“日常／突袭”或“施工／牺牲”分段切换。</li>
+      </ol>
+    </section>
+
+    <section class="sectionBlock" aria-labelledby="chapterTitle">
+      <div class="sectionHead">
+        <div>
+          <p class="sectionKicker">CHAPTER BY CHAPTER</p>
+          <h2 id="chapterTitle">按章节听</h2>
+        </div>
+        <p>点“试听”会从建议段落开始；点“选为本章”记录你的决定。每章可写一句备注。</p>
+      </div>
+      <div id="chapterGrid" class="chapterGrid"></div>
+    </section>
+
+    <section class="decisionPanel" aria-labelledby="decisionTitle">
+      <div>
+        <p class="sectionKicker">YOUR CUT</p>
+        <h2 id="decisionTitle">你的选择</h2>
+        <p id="decisionSummary" class="decisionSummary">还没有选择。可以先从第一、二、四、七、八章开始，它们决定全剧音乐语言。</p>
+      </div>
+      <div class="decisionActions">
+        <button id="copyDecision" type="button">复制选择结果</button>
+        <button id="downloadDecision" type="button">下载 JSON</button>
+        <button id="clearDecision" class="quietButton" type="button">清空</button>
+      </div>
+      <p id="decisionStatus" class="statusLine" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="sectionBlock" aria-labelledby="libraryTitle">
+      <div class="sectionHead">
+        <div>
+          <p class="sectionKicker">TEN FULL-LENGTH CANDIDATES</p>
+          <h2 id="libraryTitle">完整候选曲库</h2>
+        </div>
+        <p>这里能看清每首的功能、风险与适用章节。所有文件都是完整长度，不是截取片段。</p>
+      </div>
+      <div id="trackGrid" class="trackGrid"></div>
+    </section>
+
+    <section class="licensePanel" aria-labelledby="licenseTitle">
+      <p class="sectionKicker">LICENSE &amp; PROVENANCE</p>
+      <h2 id="licenseTitle">授权与来源</h2>
+      <p>10 首候选均由 <a href="https://www.scottbuckley.com.au/library/" target="_blank" rel="noreferrer">Scott Buckley</a> 创作，并按 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">Creative Commons Attribution 4.0</a> 发布：可以用于包括商业项目在内的作品，但必须署名。</p>
+      <p>试听页中的文件是从作者官网完整混音转制的本地试听副本：44.1 kHz、双声道、128 kbps，并统一响度，方便横向比较。若最终接入游戏，仍需在游戏页面或说明中保留每首曲目的署名。</p>
+      <pre>“曲名” by Scott Buckley — released under CC BY 4.0 · www.scottbuckley.com.au</pre>
+    </section>
+  </main>
+
+  <footer>
+    <p>为《地道里的光》白盒原型准备 · 2026-08-05</p>
+  </footer>
+
+  <aside id="playerDock" class="playerDock" aria-label="音频播放器" hidden>
+    <audio id="audioPlayer" preload="metadata"></audio>
+    <div class="nowPlaying">
+      <p>正在试听</p>
+      <b id="playerTitle">—</b>
+      <span id="playerContext">—</span>
+    </div>
+    <div class="transport">
+      <button id="skipBack" type="button" aria-label="后退 30 秒">−30</button>
+      <button id="playerToggle" class="playerToggle" type="button" aria-label="播放">▶</button>
+      <button id="skipForward" type="button" aria-label="前进 30 秒">+30</button>
+    </div>
+    <div class="timeline">
+      <span id="currentTime">0:00</span>
+      <input id="playerSeek" type="range" min="0" max="100" step="0.1" value="0" aria-label="播放进度">
+      <span id="durationTime">0:00</span>
+    </div>
+    <div class="playerOptions">
+      <button id="loopToggle" type="button" aria-pressed="false">循环</button>
+      <label>音量 <input id="volumeControl" type="range" min="0" max="1" step="0.05" value="0.78"></label>
+      <button id="closePlayer" type="button" aria-label="关闭播放器">×</button>
+    </div>
+  </aside>
+
+  <script src="./Script_BgmReview.js?v=20260805"></script>
+</body>
+</html>
