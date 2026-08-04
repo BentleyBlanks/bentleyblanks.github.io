@@ -98,6 +98,14 @@ body {
   opacity: 1; pointer-events: none;
 }
 
+/* 圆形收光转场（勇敢的心式 iris）：圆内透明、圆外黑，半径由 JS 控制 */
+#irisOverlay {
+  position: absolute; inset: 0;
+  opacity: 0; pointer-events: none;
+}
+
+#prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
+
 /* 章节卡 */
 #chapterCard {
   position: absolute; inset: 0;

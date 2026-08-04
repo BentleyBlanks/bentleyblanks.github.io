@@ -1,8 +1,7 @@
-// 《地道里的光》 —— 主循环：输入、电影镜头、HUD 同步。
-import * as THREE from "three";
+// 《地道里的光》 —— 主循环：横版输入、勇敢的心式镜头（硬切+慢推，永不旋转）、HUD。
 import {
-  GAME_VERSION, CHAPTERS, LAYOUTS, CreateGame, StepGame, StartChapter,
-  CurrentBeatDef, MakeChoice, GetObjective, GetHint, GetBeatTarget,
+  GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
+  CurrentBeatDef, MakeChoice, GetObjective, GetHint,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 
@@ -11,10 +10,10 @@ const world = CreateWorld(canvas);
 
 const ui = {};
 for (const id of [
-  "titleScreen", "startButton", "chapterList", "controlsNote",
-  "hud", "objectiveText", "hintText", "prompt", "toast", "crouchTag",
+  "titleScreen", "startButton", "chapterList",
+  "objectiveText", "hintText", "prompt", "toast", "crouchTag",
   "cineBars", "caption", "capSpeaker", "capText",
-  "detectionVignette", "fadeOverlay",
+  "detectionVignette", "fadeOverlay", "irisOverlay",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
   "choiceOverlay", "choicePrompt", "choiceList",
   "endScreen", "endRestart",
@@ -36,7 +35,7 @@ function Unlock(index) {
 }
 
 // ---------------------------------------------------------------------------
-// 输入
+// 输入：A/D 走，W/S 爬梯口上下，E 互动，C 蹲
 // ---------------------------------------------------------------------------
 const keys = new Set();
 let interactEdge = false, advanceEdge = false, crouchToggle = false;
@@ -59,108 +58,114 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 canvas.addEventListener("pointerdown", () => { advanceEdge = true; });
 
-function ReadMoveInput() {
-  let ix = 0, iz = 0;
-  if (keys.has("w") || keys.has("arrowup")) iz -= 1;
-  if (keys.has("s") || keys.has("arrowdown")) iz += 1;
-  if (keys.has("a") || keys.has("arrowleft")) ix -= 1;
-  if (keys.has("d") || keys.has("arrowright")) ix += 1;
-  if (ix === 0 && iz === 0) return { x: 0, z: 0 };
-  // 以相机朝向为前方
-  const dir = new THREE.Vector3();
-  world.camera.getWorldDirection(dir);
-  const yaw = Math.atan2(dir.x, dir.z);
-  const cos = Math.cos(yaw), sin = Math.sin(yaw);
-  return { x: iz * sin + ix * cos, z: iz * cos - ix * sin };
+function ReadInput() {
+  let moveX = 0, climb = 0;
+  if (keys.has("a") || keys.has("arrowleft")) moveX -= 1;
+  if (keys.has("d") || keys.has("arrowright")) moveX += 1;
+  if (keys.has("w") || keys.has("arrowup")) climb -= 1;
+  if (keys.has("s") || keys.has("arrowdown")) climb += 1;
+  return { moveX, climb };
 }
 
 // ---------------------------------------------------------------------------
-// 电影镜头
+// 镜头：横版语法——只有 横移 / 升降 / 推拉。
+// 过场：每换一行若构图变了就硬切，然后在行内慢推/慢移（pan）。
 // ---------------------------------------------------------------------------
-const FOLLOW_YAW = 0.7; // 镜头在东南方，望向西北：院子在前景，房子退成背景
-function FollowShot(state, dist, pitchDeg, yaw = FOLLOW_YAW) {
-  const gy = world.GroundY(state);
-  const pitch = pitchDeg * Math.PI / 180;
-  const p = state.player;
-  return {
-    pos: [p.x + Math.sin(yaw) * dist * Math.cos(pitch), gy + dist * Math.sin(pitch) + 1.4, p.z + Math.cos(yaw) * dist * Math.cos(pitch)],
-    look: [p.x, gy + 1.1, p.z],
-  };
-}
+const cam = { x: 60, y: 2.2, dist: 13 };
+let camSnap = true;
+let lastShotKey = "";
 
-function DefaultShot(state) {
+function BaseShot(state) {
   const ch = CHAPTERS[state.chapterIndex];
-  if (ch.env === "tunnelVillage") return FollowShot(state, 12, 56);
-  if (ch.env === "tunnelFort") return FollowShot(state, 9.5, 52);
-  if (ch.light === "night") return FollowShot(state, 17, 47);
-  return FollowShot(state, 21, 50);
+  const p = state.player;
+  const lookAhead = (p.heading || 1) * 2.2;
+  if (ch.scene === "tunnelVillage") {
+    // 剖面全景：地表与地道同框
+    return { x: p.x + lookAhead, y: -1.1, dist: 15.5 };
+  }
+  if (ch.scene === "tunnelFort") {
+    return { x: p.x + lookAhead, y: UNDER_Y + 1.7, dist: 10 };
+  }
+  const y = p.level === "under" ? UNDER_Y + 1.6 : 2.1;
+  return { x: p.x + lookAhead, y, dist: ch.light === "night" ? 12 : 13 };
 }
 
-const TF_NODES = LAYOUTS.tunnelFort.nodes;
-const TV_NODES = LAYOUTS.tunnelVillage.nodes;
-
-function CamShot(state) {
+function HintShot(state) {
   const hint = state.camHint || { kind: "follow" };
-  const gy = world.GroundY(state);
   switch (hint.kind) {
-    case "high": {
-      const d = hint.dist || 40;
-      return { pos: [hint.x + d * 0.55, d, hint.z + d * 0.75], look: [hint.x, 0, hint.z] };
-    }
-    case "yard": return { pos: [-14, 6, -8], look: [-27, 1, -20] };
-    case "ruin": return { pos: [-14, 4.2, -9], look: [-28, 1, -20] };
-    case "doorframe": return { pos: [-23.8, 1.9, -14.6], look: [-26.5, 1.5, -19.8] };
-    case "doorframeFar": return { pos: [-18, 2.8, -10], look: [-26.5, 1.5, -19.8] };
-    case "stool": return { pos: [-24.2, 1.7, -16.2], look: [-27.5, 0.6, -21.5] };
-    case "leaveYard": return { pos: [-31, 2.5, -13.5], look: [-16, 1.2, -20] };
-    case "cellarPeek": return { pos: [-32.6, 1.1, -13.4], look: [-21.5, 1.3, -17.6] };
-    case "decoy": return { pos: [8, 4.2, 8], look: [20, 1, -4] };
-    case "ambush": return { pos: [47, 2.8, 13], look: [56, 1.2, 4] };
-    case "ditch": return { pos: [8, 2.6, 50], look: [-1, 0.9, 43] };
-    case "lamp": return FollowShot(state, 5, 18);
-    case "lampOut": return FollowShot(state, 4.5, 14);
-    case "close": return FollowShot(state, 4.6, 13);
-    case "low": return FollowShot(state, 6.8, 20);
-    case "dark": return { ...FollowShot(state, 8, 30), fade: 0.92 };
-    case "tunnelWide": {
+    case "wide":
+      return { x: hint.x, y: hint.y ?? 2.2, dist: 30, pan: hint.pan || 0 };
+    case "shot":
+      return { x: hint.x, y: hint.y ?? 1.6, dist: hint.dist ?? 8, pan: hint.pan || 0 };
+    case "close": {
       const p = state.player;
-      return { pos: [p.x + 2, gy + 17, p.z + 9], look: [p.x, gy, p.z] };
+      return { x: p.x, y: (p.level === "under" ? UNDER_Y : 0) + 1.3, dist: 4.8 };
     }
-    case "tunnel": return FollowShot(state, 7.5, 42);
-    case "smokeE": return { pos: [12, gy + 4.5, 7], look: [TV_NODES.entE.x, gy + 1, TV_NODES.entE.z] };
-    case "fieldNight": return { pos: [-31, gy + 6.5, 14], look: [TV_NODES.entW.x, gy + 1, TV_NODES.entW.z] };
-    case "ventUp": return { pos: [2, gy + 1.6, -15], look: [TV_NODES.ventSpot.x, gy + 5, TV_NODES.ventSpot.z] };
-    case "hatch": return { pos: [TF_NODES.cellHatch.x - 4.5, gy + 2.6, TF_NODES.cellHatch.z + 3.4], look: [TF_NODES.cellHatch.x, gy + 1.2, TF_NODES.cellHatch.z] };
-    case "hatchUp": return { pos: [TF_NODES.fieldEnt.x + 3, gy + 1.8, TF_NODES.fieldEnt.z + 3], look: [TF_NODES.fieldEnt.x, gy + 3.4, TF_NODES.fieldEnt.z] };
-    case "lampTurn": {
-      const p = state.player;
-      return { pos: [p.x + Math.sin(p.heading) * 4.4, gy + 1.7, p.z + Math.cos(p.heading) * 4.4], look: [p.x, gy + 1.2, p.z] };
-    }
-    case "dawn": {
-      const p = state.player;
-      return { pos: [p.x + 9, gy + 11, p.z + 13], look: [p.x, gy, p.z] };
-    }
-    default: return DefaultShot(state);
+    case "dark":
+      return { ...BaseShot(state), fade: 0.94 };
+    default:
+      return BaseShot(state);
   }
 }
-
-const camPos = new THREE.Vector3(0, 30, 30);
-const camLook = new THREE.Vector3(0, 0, 0);
-let camSnap = true;
 
 function UpdateCamera(state, dt) {
   const inCinematic = state.phase === "playing"
     && (CurrentBeatDef(state)?.kind === "cinematic" || !!state.microCine);
-  const shot = inCinematic ? CamShot(state) : DefaultShot(state);
-  const targetPos = new THREE.Vector3(...shot.pos);
-  const targetLook = new THREE.Vector3(...shot.look);
-  const k = camSnap ? 1 : Math.min(1, dt * (inCinematic ? 1.6 : 3.2));
-  camPos.lerp(targetPos, k);
-  camLook.lerp(targetLook, k);
-  camSnap = false;
-  world.camera.position.copy(camPos);
-  world.camera.lookAt(camLook);
+
+  let shot, cut = false;
+  if (inCinematic) {
+    shot = HintShot(state);
+    const shotKey = `${state.beatIndex}:${state.beat?.lineIndex ?? 0}:${state.microCine ? "mc" + state.microCine.i : ""}`;
+    if (shotKey !== lastShotKey) { lastShotKey = shotKey; cut = true; }
+    // 行内慢推 + 可选横移（勇敢的心的呼吸感）
+    const prog = state.camLineD ? Math.min(1, (state.camLineT || 0) / state.camLineD) : 0;
+    shot = {
+      ...shot,
+      x: shot.x + (shot.pan || 0) * prog,
+      dist: shot.dist * (1 - 0.05 * prog),
+    };
+  } else {
+    shot = BaseShot(state);
+    if (lastShotKey !== "") { lastShotKey = ""; } // 回到跟随：平滑过去，不切
+  }
+
+  if (cut || camSnap) {
+    cam.x = shot.x; cam.y = shot.y; cam.dist = shot.dist;
+    camSnap = false;
+  } else {
+    const k = Math.min(1, dt * (inCinematic ? 2.2 : 4.5));
+    cam.x += (shot.x - cam.x) * k;
+    cam.y += (shot.y - cam.y) * k;
+    cam.dist += (shot.dist - cam.dist) * k;
+  }
+
+  world.camera.position.set(cam.x, cam.y, cam.dist);
+  world.camera.lookAt(cam.x, cam.y, 0);
   return shot.fade || 0;
+}
+
+// ---------------------------------------------------------------------------
+// 圆形收光转场（iris）：过场进出与章节开场
+// ---------------------------------------------------------------------------
+let irisLevel = 1; // 1 = 全开
+let irisTarget = 1;
+let lastBeatKind = null;
+
+function StepIris(state, dt) {
+  const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
+  const kind = state.phase !== "playing" ? state.phase : (def?.kind === "cinematic" ? "cine" : "play");
+  if (kind !== lastBeatKind) {
+    if (lastBeatKind !== null && (kind === "cine" || lastBeatKind === "cine")) {
+      irisLevel = 0; // 切换瞬间收到底，再张开
+    }
+    lastBeatKind = kind;
+  }
+  irisTarget = 1;
+  irisLevel = Math.min(irisTarget, irisLevel + dt * 2.2);
+  const r = Math.round(irisLevel * 78);
+  ui.irisOverlay.style.background =
+    `radial-gradient(circle at 50% 50%, transparent ${r}%, #030202 ${Math.min(100, r + 4)}%)`;
+  ui.irisOverlay.style.opacity = irisLevel >= 1 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +184,6 @@ function SyncHud(state, dt, shotFade) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
 
-  // 黑边与字幕
   ui.cineBars.classList.toggle("active", !!inCinematic);
   if (state.caption && inCinematic && (state.caption.say || state.caption.stage)) {
     ui.caption.hidden = false;
@@ -197,7 +201,6 @@ function SyncHud(state, dt, shotFade) {
     ui.caption.hidden = true;
   }
 
-  // 目标与提示
   const objective = GetObjective(state);
   ui.objectiveText.textContent = objective || "";
   ui.hintText.textContent = (objective && GetHint(state)) || "";
@@ -205,6 +208,7 @@ function SyncHud(state, dt, shotFade) {
 
   ui.prompt.textContent = state.prompt || "";
   ui.prompt.hidden = !state.prompt || inCinematic;
+  ui.prompt.classList.toggle("danger", !!state.prompt && state.prompt.startsWith("！"));
 
   ui.crouchTag.hidden = !crouchToggle || inCinematic || state.phase !== "playing";
 
@@ -218,11 +222,9 @@ function SyncHud(state, dt, shotFade) {
     }
   }
 
-  // 被发现的红晕
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
     ? Math.min(0.85, state.detection.level) : 0;
 
-  // 章节卡
   if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
     const showNext = state.phase === "chapterEnd";
     const ch = CHAPTERS[state.chapterIndex + (showNext ? 1 : 0)];
@@ -236,7 +238,6 @@ function SyncHud(state, dt, shotFade) {
     ui.chapterCard.hidden = true;
   }
 
-  // 抉择
   if (def?.kind === "choice") {
     if (!choiceBuilt) {
       choiceBuilt = true;
@@ -255,10 +256,8 @@ function SyncHud(state, dt, shotFade) {
     HideChoice();
   }
 
-  // 结局
   ui.endScreen.hidden = state.phase !== "gameEnd";
 
-  // 渐隐
   const targetFade = state.phase === "gameEnd" ? 0.75 : shotFade;
   fadeLevel += (targetFade - fadeLevel) * Math.min(1, dt * 2.4);
   ui.fadeOverlay.style.opacity = fadeLevel.toFixed(3);
@@ -286,6 +285,8 @@ function StartGame(chapterIndex) {
   ui.endScreen.hidden = true;
   camSnap = true;
   fadeLevel = 1;
+  irisLevel = 0;
+  lastBeatKind = null;
 }
 
 ui.startButton.addEventListener("click", () => StartGame(0));
@@ -308,23 +309,24 @@ function Frame(now) {
   lastT = now;
 
   if (state) {
-    const move = state.phase === "playing" ? ReadMoveInput() : { x: 0, z: 0 };
+    const move = state.phase === "playing" ? ReadInput() : { moveX: 0, climb: 0 };
     const def = CurrentBeatDef(state);
     const stepDt = (fastCinematic && def?.kind === "cinematic") ? dt * 5 : dt;
     const prevChapter = state.chapterIndex;
     StepGame(state, {
-      moveX: move.x, moveZ: move.z,
+      moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
       interact: interactEdge,
       interactHeld: keys.has("e") || keys.has("f"),
       advance: advanceEdge,
     }, stepDt);
-    if (state.chapterIndex !== prevChapter) { camSnap = true; crouchToggle = false; }
+    if (state.chapterIndex !== prevChapter) { camSnap = true; crouchToggle = false; irisLevel = 0; }
 
     world.BuildEnvironment(state);
     world.UpdateActors(state, now / 1000);
     world.UpdateProps(state, now / 1000);
     const shotFade = UpdateCamera(state, dt);
+    StepIris(state, dt);
     SyncHud(state, dt, shotFade);
   }
   world.Render();
@@ -339,7 +341,6 @@ window.addEventListener("resize", Resize);
 Resize();
 BuildTitle();
 
-// URL 直达：?chapter=3 从第三章开始（1 基）
 const chapterParam = parseInt(params.get("chapter") || "0", 10);
 if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
   StartGame(chapterParam - 1);
@@ -357,7 +358,7 @@ window.TunnelLight = {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {
       StepGame(state, {
-        moveX: 0, moveZ: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...input,
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...input,
       }, 1 / 30);
     }
   },

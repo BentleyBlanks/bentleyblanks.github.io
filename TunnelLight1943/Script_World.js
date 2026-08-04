@@ -1,34 +1,21 @@
-// 《地道里的光》 —— Three.js 白盒渲染层。
-// 只消费 Script_Core.mjs 的布局数据与状态，不持有任何玩法逻辑。
+// 《地道里的光》 —— Three.js 横版 2.5D 渲染层（勇敢的心式分层视差 + 地道剖面）。
+// 只消费 Script_Core.mjs 的场景数据与状态，不持有玩法逻辑。
+// 层次：z=0 玩法层；z<0 背景视差层；地下以剖面呈现（地表条带 + 掏空的地道内壁）。
 
 import * as THREE from "three";
-import { LAYOUTS, CHAPTERS, GetBeatTarget, CurrentBeatDef, NodeSmoked } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, GetBeatTarget, CurrentBeatDef, SmokeCovers } from "./Script_Core.mjs";
 
 const PALETTE = {
-  earthDay: 0x8a7a55, earthNight: 0x3a3f47, earthDawn: 0x7d786a,
-  wallDay: 0xa89577, roof: 0x7d6a52, burnt: 0x35302b, rubble: 0x413a32,
-  fortWall: 0x7d7565, blockhouse: 0x6b6357,
-  tunnelFloor: 0x8a7458, tunnelWall: 0x5c4a34, tunnelDark: 0x0b0907,
-  hay: 0xb09a58, tree: 0x4a5c38, trunk: 0x5d4a33, crops: 0x7c8a4a,
   zhuzi: 0xc8863c, sister: 0xb0616a, mother: 0x8a6a58, father: 0x6b4f3a,
-  militia: 0x4a5d68, soldier: 0x6f6b42, villager: 0x8d8272,
-  lamp: 0xffb356, marker: 0xe8c15a, visionCalm: 0xd8b83c, visionAlert: 0xd8543c,
+  militia: 0x4a5d68, soldier: 0x6f6b42, villager: 0x8d8272, puppet: 0x8d8060,
+  lamp: 0xffb356, marker: 0xe8c15a, beamCalm: 0xd8b83c, beamAlert: 0xd8543c,
   smoke: 0x8f8d85,
 };
 
-function Mat(color, opts = {}) {
-  return new THREE.MeshLambertMaterial({ color, ...opts });
-}
+function Mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
 
 function AddBox(group, w, h, d, color, x, y, z, opts = {}) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Mat(color, opts));
-  mesh.position.set(x, y, z);
-  group.add(mesh);
-  return mesh;
-}
-
-function AddCylinder(group, rTop, rBottom, h, color, x, y, z, seg = 10, opts = {}) {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, h, seg), Mat(color, opts));
   mesh.position.set(x, y, z);
   group.add(mesh);
   return mesh;
@@ -39,7 +26,7 @@ export function CreateWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.1, 400);
+  const camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.1, 300);
 
   const envGroup = new THREE.Group();
   const actorGroup = new THREE.Group();
@@ -48,15 +35,16 @@ export function CreateWorld(canvas) {
 
   const lights = { hemi: null, sun: null, lamp: null, points: [] };
   const actorMeshes = new Map();
-  const coneMeshes = new Map();
-  const smokeMeshes = new Map();
+  const beamMeshes = new Map();
+  let smokeMesh = null;
+  let smokePuffs = null;
   let carveMark = null;
   let collapseMeshes = {};
   let planksMeshes = [];
-  let markerRing = null;
+  let markerArrow = null;
+  let probeRods = [];
   let builtKey = "";
 
-  // -------------------------------------------------------------------------
   function ClearGroup(group) {
     while (group.children.length) {
       const child = group.children.pop();
@@ -71,262 +59,281 @@ export function CreateWorld(canvas) {
     if (lights.hemi) scene.remove(lights.hemi);
     if (lights.sun) scene.remove(lights.sun);
     if (kind === "day") {
-      scene.background = new THREE.Color(0xd9ccab);
-      scene.fog = new THREE.Fog(0xd9ccab, 70, 190);
-      lights.hemi = new THREE.HemisphereLight(0xf4e8cd, 0x6b5b3f, 1.05);
-      lights.sun = new THREE.DirectionalLight(0xffe8bb, 1.2);
-      lights.sun.position.set(-40, 60, -30);
+      scene.background = new THREE.Color(0xd9cba6);
+      scene.fog = new THREE.Fog(0xd9cba6, 55, 140);
+      lights.hemi = new THREE.HemisphereLight(0xf4e8cd, 0x6b5b3f, 1.1);
+      lights.sun = new THREE.DirectionalLight(0xffe8bb, 1.15);
+      lights.sun.position.set(-30, 50, 40);
     } else if (kind === "night") {
-      scene.background = new THREE.Color(0x101625);
-      scene.fog = new THREE.Fog(0x101625, 50, 150);
-      lights.hemi = new THREE.HemisphereLight(0x6a7a9e, 0x2c2930, 1.15);
-      lights.sun = new THREE.DirectionalLight(0x9fb3d8, 0.9);
-      lights.sun.position.set(30, 70, -20);
+      scene.background = new THREE.Color(0x131a2c);
+      scene.fog = new THREE.Fog(0x131a2c, 45, 130);
+      lights.hemi = new THREE.HemisphereLight(0x6a7a9e, 0x2c2930, 1.1);
+      lights.sun = new THREE.DirectionalLight(0x9fb3d8, 0.85);
+      lights.sun.position.set(20, 60, 45);
     } else if (kind === "dawn") {
-      scene.background = new THREE.Color(0xb6ac9c);
-      scene.fog = new THREE.Fog(0xb6ac9c, 60, 170);
-      lights.hemi = new THREE.HemisphereLight(0xe0d2b8, 0x5c5448, 1.15);
-      lights.sun = new THREE.DirectionalLight(0xe8b98a, 0.95);
-      lights.sun.position.set(60, 30, 20);
+      scene.background = new THREE.Color(0xbcae97);
+      scene.fog = new THREE.Fog(0xbcae97, 55, 140);
+      lights.hemi = new THREE.HemisphereLight(0xe0d2b8, 0x5c5448, 1.1);
+      lights.sun = new THREE.DirectionalLight(0xe8b98a, 0.9);
+      lights.sun.position.set(60, 25, 40);
     } else if (kind === "tunnel") {
-      scene.background = new THREE.Color(0x070605);
-      scene.fog = new THREE.Fog(0x070605, 16, 60);
-      lights.hemi = new THREE.HemisphereLight(0x7a6850, 0x1d1810, 1.3);
+      scene.background = new THREE.Color(0x1a1712);
+      scene.fog = new THREE.Fog(0x1a1712, 45, 120);
+      lights.hemi = new THREE.HemisphereLight(0x9a866a, 0x241d12, 1.5);
+      lights.sun = new THREE.DirectionalLight(0xc8b490, 0.7);
+      lights.sun.position.set(0, 40, 50);
+    } else { // dark：第七章
+      scene.background = new THREE.Color(0x0b0908);
+      scene.fog = new THREE.Fog(0x0b0908, 16, 70);
+      lights.hemi = new THREE.HemisphereLight(0x54432e, 0x0c0906, 0.78);
       lights.sun = new THREE.DirectionalLight(0x000000, 0);
-      lights.sun.position.set(0, 50, 0);
-    } else { // dark：第七章据点地道，压暗留给煤油灯，但轮廓要能读出来
-      scene.background = new THREE.Color(0x050404);
-      scene.fog = new THREE.Fog(0x050404, 9, 40);
-      lights.hemi = new THREE.HemisphereLight(0x4a3a28, 0x0a0705, 0.55);
-      lights.sun = new THREE.DirectionalLight(0x000000, 0);
-      lights.sun.position.set(0, 50, 0);
+      lights.sun.position.set(0, 40, 50);
     }
     scene.add(lights.hemi, lights.sun);
   }
 
-  function AddPointLamp(x, y, z, intensity = 0.9, distance = 14, color = PALETTE.lamp) {
+  function AddPointLamp(x, y, z, intensity = 0.9, distance = 12, color = PALETTE.lamp) {
     const p = new THREE.PointLight(color, intensity, distance, 1.6);
     p.position.set(x, y, z);
     scene.add(p);
     lights.points.push(p);
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 6, 6),
-      new THREE.MeshBasicMaterial({ color }),
-    );
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color }));
     bulb.position.copy(p.position);
     envGroup.add(bulb);
     return p;
   }
 
   // -------------------------------------------------------------------------
-  function BuildVillage(light, ruined) {
-    const L = LAYOUTS.village;
-    const groundColor = light === "night" ? PALETTE.earthNight : (light === "dawn" ? PALETTE.earthDawn : PALETTE.earthDay);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(L.size + 60, L.size + 60), Mat(groundColor));
-    ground.rotation.x = -Math.PI / 2;
-    envGroup.add(ground);
+  // 视差背景：一排排剪影
+  // -------------------------------------------------------------------------
+  function AddParallaxHouses(xFrom, xTo, z, color, hBase = 3) {
+    for (let x = xFrom; x < xTo; x += 14 + ((x * 7) % 9)) {
+      const w = 8 + ((x * 13) % 6);
+      const h = hBase + ((x * 5) % 3) * 0.5;
+      AddBox(envGroup, w, h, 2, color, x, h / 2, z);
+      AddBox(envGroup, w + 1, 0.5, 2.4, color, x, h + 0.2, z);
+    }
+  }
 
-    for (const b of L.buildings) {
-      const isBurnt = ruined && b.burnable;
-      if (isBurnt) {
-        // 烧毁：只剩矮墙和瓦砾
-        AddBox(envGroup, b.w, 1.0, 0.4, PALETTE.burnt, b.x, 0.5, b.z - b.d / 2);
-        AddBox(envGroup, 0.4, 1.3, b.d, PALETTE.burnt, b.x - b.w / 2, 0.65, b.z);
-        AddBox(envGroup, b.w * 0.5, 0.6, b.d * 0.5, PALETTE.rubble, b.x + b.w * 0.1, 0.3, b.z + b.d * 0.1);
-        if (b.id === "homeHouse") {
-          // 残墙 + 门框：故事的锚点，必须立着
-          AddBox(envGroup, 0.4, 2.6, b.d * 0.8, PALETTE.burnt, b.x + b.w / 2 - 0.2, 1.3, b.z);
-        }
-      } else {
-        AddBox(envGroup, b.w, b.h, b.d, PALETTE.wallDay, b.x, b.h / 2, b.z);
-        AddBox(envGroup, b.w + 0.6, 0.5, b.d + 0.6, PALETTE.roof, b.x, b.h + 0.25, b.z);
-      }
-    }
-    for (const w of L.walls) {
-      const len = Math.hypot(w.x2 - w.x1, w.z2 - w.z1);
-      const wall = AddBox(envGroup, len, w.h, 0.5, ruined ? PALETTE.burnt : 0x968465,
-        (w.x1 + w.x2) / 2, w.h / 2, (w.z1 + w.z2) / 2);
-      wall.rotation.y = -Math.atan2(w.z2 - w.z1, w.x2 - w.x1);
-    }
-    for (const h of L.haystacks) {
-      const hs = new THREE.Mesh(new THREE.ConeGeometry(h.r, 2.2, 8), Mat(ruined ? 0x6e6350 : PALETTE.hay));
-      hs.position.set(h.x, 1.1, h.z);
-      envGroup.add(hs);
-    }
-    for (const t of L.trees) {
-      AddCylinder(envGroup, 0.25, 0.35, t.big ? 3.4 : 2.2, PALETTE.trunk, t.x, (t.big ? 3.4 : 2.2) / 2, t.z, 6);
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(t.big ? 2.8 : 1.6, 8, 6), Mat(ruined ? 0x5c5a48 : PALETTE.tree));
-      crown.position.set(t.x, t.big ? 4.6 : 3.0, t.z);
+  function AddParallaxTrees(xFrom, xTo, z, color) {
+    for (let x = xFrom; x < xTo; x += 17 + ((x * 11) % 13)) {
+      AddBox(envGroup, 0.5, 2.6, 0.5, color, x, 1.3, z);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.9 + ((x * 3) % 3) * 0.4, 7, 6), Mat(color));
+      crown.position.set(x, 3.6, z);
       envGroup.add(crown);
     }
-    planksMeshes = [];
-    for (const p of L.props) {
-      if (p.kind === "well") {
-        AddCylinder(envGroup, 1.1, 1.1, 0.9, 0x7d7568, p.x, 0.45, p.z, 10);
-      } else if (p.kind === "bench") {
-        AddBox(envGroup, 2.2, 0.9, 0.9, 0x8a6f4d, p.x, 0.45, p.z);
-      } else if (p.kind === "doorframe") {
-        // 门框与身高线：第一章与第八章的情感锚点
-        AddBox(envGroup, 0.22, 2.3, 0.22, 0x9c7c50, p.x - 0.6, 1.15, p.z);
-        AddBox(envGroup, 0.22, 2.3, 0.22, 0x9c7c50, p.x + 0.6, 1.15, p.z);
-        AddBox(envGroup, 1.42, 0.22, 0.22, 0x9c7c50, p.x, 2.35, p.z);
-        const mark1 = AddBox(envGroup, 0.06, 0.03, 0.26, 0xe8d9a8, p.x - 0.6, 1.32, p.z);
-        mark1.material = new THREE.MeshBasicMaterial({ color: 0xe8d9a8 });
-        carveMark = AddBox(envGroup, 0.06, 0.03, 0.26, 0xf4e6b4, p.x - 0.6, 1.62, p.z);
-        carveMark.material = new THREE.MeshBasicMaterial({ color: 0xf4e6b4 });
+  }
+
+  function AddHills(length, z, color) {
+    for (let x = -20; x < length + 40; x += 46) {
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(26, 10, 8), Mat(color));
+      hill.scale.set(1.6, 0.32, 1);
+      hill.position.set(x, 0, z);
+      envGroup.add(hill);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 地表道具
+  // -------------------------------------------------------------------------
+  function BuildProp(p, light, ruined) {
+    switch (p.kind) {
+      case "house": {
+        if (ruined && p.burnable) {
+          AddBox(envGroup, p.w * 0.9, 1.1, 1.6, 0x35302b, p.x + 1, 0.55, -0.8);
+          AddBox(envGroup, 0.5, 2.6, 1.4, 0x3d3630, p.x - p.w / 2 + 1, 1.3, -0.8);
+          AddBox(envGroup, p.w * 0.4, 0.5, 1.4, 0x413a32, p.x + 2, 0.25, -0.4);
+        } else {
+          AddBox(envGroup, p.w, p.h, 3, 0xa89577, p.x, p.h / 2, -1.6);
+          AddBox(envGroup, p.w + 1.2, 0.55, 3.6, 0x7d6a52, p.x, p.h + 0.27, -1.6);
+          // 立面细节：窗与檐下阴影线，破掉大色块
+          AddBox(envGroup, 1.1, 1.1, 0.2, 0x4a3f30, p.x - p.w / 4, 1.9, -0.08);
+          AddBox(envGroup, 1.1, 1.1, 0.2, 0x4a3f30, p.x + p.w / 4, 1.9, -0.08);
+          AddBox(envGroup, p.w, 0.18, 0.2, 0x6b5b45, p.x, p.h - 0.2, -0.08);
+        }
+        break;
+      }
+      case "doorframe": {
+        AddBox(envGroup, 0.22, 2.3, 0.3, 0x9c7c50, p.x - 0.62, 1.15, 0.1);
+        AddBox(envGroup, 0.22, 2.3, 0.3, 0x9c7c50, p.x + 0.62, 1.15, 0.1);
+        AddBox(envGroup, 1.5, 0.22, 0.3, 0x9c7c50, p.x, 2.35, 0.1);
+        const mark1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.1), new THREE.MeshBasicMaterial({ color: 0xe8d9a8 }));
+        mark1.position.set(p.x - 0.62, 1.32, 0.28);
+        envGroup.add(mark1);
+        carveMark = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.1), new THREE.MeshBasicMaterial({ color: 0xf4e6b4 }));
+        carveMark.position.set(p.x - 0.62, 1.62, 0.28);
         carveMark.visible = false;
-      } else if (p.kind === "cellar") {
-        AddBox(envGroup, 1.6, 0.25, 1.6, 0x4f4436, p.x, 0.12, p.z);
-      } else if (p.kind === "millstone") {
-        AddCylinder(envGroup, 1.3, 1.3, 0.5, 0x8d867c, p.x, 0.25, p.z, 12);
-      } else if (p.kind === "woodpile") {
-        AddBox(envGroup, 2.4, 1.1, 1.4, 0x7a5f3e, p.x, 0.55, p.z);
-      } else if (p.kind === "stool" && ruined) {
-        AddBox(envGroup, 0.5, 0.45, 0.35, 0x8a6f4d, p.x, 0.22, p.z);
+        envGroup.add(carveMark);
+        break;
       }
-    }
-    if (light === "night") {
-      AddPointLamp(56, 2.4, 4, 0.8, 12, 0xffc978); // 村东口的马灯（第二章伏击的伏笔）
+      case "bench": AddBox(envGroup, 2.2, 0.9, 1, 0x8a6f4d, p.x, 0.45, 0); break;
+      case "stool": AddBox(envGroup, 0.5, 0.45, 0.4, 0x8a6f4d, p.x, 0.22, 0.3); break;
+      case "wallSeg": AddBox(envGroup, p.w || 1, p.h || 1.8, 0.5, 0x968465, p.x, (p.h || 1.8) / 2, 0); break;
+      case "hatch": AddBox(envGroup, 1.8, 0.18, 1.4, 0x4f4436, p.x, 0.09, 0); break;
+      case "well": {
+        AddBox(envGroup, 2.2, 0.9, 1.6, 0x7d7568, p.x, 0.45, -0.4);
+        AddBox(envGroup, 0.14, 2.2, 0.14, 0x6b5a45, p.x - 0.9, 1.1, -0.4);
+        AddBox(envGroup, 0.14, 2.2, 0.14, 0x6b5a45, p.x + 0.9, 1.1, -0.4);
+        AddBox(envGroup, 2.0, 0.12, 0.12, 0x6b5a45, p.x, 2.2, -0.4);
+        break;
+      }
+      case "millstone": {
+        const stone = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.5, 12), Mat(0x8d867c));
+        stone.position.set(p.x, 0.25, -0.2);
+        envGroup.add(stone);
+        break;
+      }
+      case "woodpile": AddBox(envGroup, 2.6, 1.1, 1.4, 0x7a5f3e, p.x, 0.55, 0); break;
+      case "tree": {
+        AddBox(envGroup, 0.6, 3.6, 0.6, 0x5d4a33, p.x, 1.8, -0.6);
+        const crown = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 6), Mat(0x4a5c38));
+        crown.position.set(p.x, 4.9, -0.6);
+        envGroup.add(crown);
+        break;
+      }
+      case "lamppost": {
+        AddBox(envGroup, 0.16, 2.6, 0.16, 0x5a4a38, p.x, 1.3, -0.3);
+        if (light === "night") AddPointLamp(p.x, 2.5, 0, 0.8, 10, 0xffc978);
+        break;
+      }
+      case "ditch": AddBox(envGroup, p.w, 0.9, 3.4, 0x22262b, p.x, -0.42, 0.2); break;
+      case "crops": {
+        for (let x = p.x - p.w / 2; x < p.x + p.w / 2; x += 1.4) {
+          AddBox(envGroup, 0.16, 1.5 + ((x * 7) % 4) * 0.1, 0.16, 0x6e7a42, x, 0.75, ((x * 5) % 3) * 0.5 - 0.5);
+        }
+        break;
+      }
+      case "fortWall": AddBox(envGroup, p.w, p.h, 2, 0x7d7565, p.x, p.h / 2, -1); break;
+      case "fortGate": {
+        AddBox(envGroup, 0.4, 3, 0.8, 0x6b6357, p.x - 1.6, 1.5, -0.8);
+        AddBox(envGroup, 0.4, 3, 0.8, 0x6b6357, p.x + 1.6, 1.5, -0.8);
+        AddPointLamp(p.x, 2.8, 0, 0.7, 10, 0xffc978);
+        break;
+      }
+      case "blockhouse": {
+        AddBox(envGroup, 6, 8.5, 5, 0x6b6357, p.x, 4.25, -6);
+        AddBox(envGroup, 6.8, 1, 5.6, 0x57503f, p.x, 8.9, -6);
+        AddPointLamp(p.x - 2, 8.2, -3, 0.9, 16, 0xffdf9a);
+        break;
+      }
+      case "prison": {
+        AddBox(envGroup, 8, 3, 4, 0x746c5c, p.x, 1.5, -4);
+        for (let i = 0; i < 3; i += 1) AddBox(envGroup, 0.1, 1, 0.1, 0x2a2620, p.x - 2 + i * 2, 1.7, -1.9);
+        AddPointLamp(p.x, 2.2, -1.5, 0.6, 8, 0xd8b56a);
+        break;
+      }
+      case "fortSilhouette": {
+        AddBox(envGroup, p.w, 3, 3, 0x3a352c, p.x, 1.5, -8);
+        AddBox(envGroup, 5, 7.5, 4, 0x332f27, p.x + 18, 3.75, -9);
+        break;
+      }
+      default: break;
     }
   }
 
-  function BuildFields() {
-    const L = LAYOUTS.fields;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(L.size + 60, L.size + 60), Mat(0x3a4149));
-    ground.rotation.x = -Math.PI / 2;
-    envGroup.add(ground);
-
-    for (const b of L.buildings) {
-      const color = b.id === "blockhouse" ? PALETTE.blockhouse : PALETTE.fortWall;
-      AddBox(envGroup, b.w, b.h, b.d, color, b.x, b.h / 2, b.z);
-      if (b.id === "blockhouse") {
-        AddBox(envGroup, b.w * 0.7, 1.2, b.d * 0.7, 0x57503f, b.x, b.h + 0.6, b.z);
+  function BuildCover(c, light) {
+    switch (c.kind) {
+      case "haystack": {
+        const hs = new THREE.Mesh(new THREE.ConeGeometry(c.w / 2 + 0.4, 2.3, 8), Mat(light === "day" ? 0xb09a58 : 0x6e6448));
+        hs.position.set(c.x, 1.15, 0.3);
+        envGroup.add(hs);
+        break;
       }
-      if (b.id === "prisonShed") {
-        // 牢房窗上的一点灯：柱子在第三章远远看到的方向
-        AddPointLamp(b.x, 2.2, b.z + b.d / 2 + 0.3, 0.55, 8, 0xd8b56a);
-        for (let i = 0; i < 3; i += 1) {
-          AddBox(envGroup, 0.08, 1.0, 0.08, 0x2a2620, b.x - 2 + i * 2, 1.6, b.z + b.d / 2 + 0.05);
-        }
+      case "firewood": AddBox(envGroup, c.w, 1.2, 1, 0x6e5638, c.x, 0.6, 0.3); break;
+      case "wallSeg": AddBox(envGroup, c.w, 1.5, 0.5, 0x968465, c.x, 0.75, 0.3); break;
+      case "bush": {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(c.w / 2 + 0.5, 7, 6), Mat(0x44523a));
+        b.scale.y = 0.75;
+        b.position.set(c.x, 0.9, 0.3);
+        envGroup.add(b);
+        break;
       }
-    }
-    for (const w of L.walls) {
-      const len = Math.hypot(w.x2 - w.x1, w.z2 - w.z1);
-      const wall = AddBox(envGroup, len, w.h, 0.6, PALETTE.fortWall, (w.x1 + w.x2) / 2, w.h / 2, (w.z1 + w.z2) / 2);
-      wall.rotation.y = -Math.atan2(w.z2 - w.z1, w.x2 - w.x1);
-    }
-    // 角楼
-    AddCylinder(envGroup, 1.4, 1.6, 5.2, 0x615a4b, -20, 2.6, -26, 8);
-    AddCylinder(envGroup, 1.4, 1.6, 5.2, 0x615a4b, 20, 2.6, -26, 8);
-    AddPointLamp(-20, 5.6, -26, 0.7, 16, 0xffdf9a);
-    AddPointLamp(20, 5.6, -26, 0.7, 16, 0xffdf9a);
-    AddPointLamp(0, 3.0, 3, 0.7, 10, 0xffc978); // 南门岗哨灯
-
-    for (const h of L.haystacks) {
-      const hs = new THREE.Mesh(new THREE.ConeGeometry(h.r, 2.2, 8), Mat(0x6e6448));
-      hs.position.set(h.x, 1.1, h.z);
-      envGroup.add(hs);
-    }
-    for (const t of L.trees) {
-      AddCylinder(envGroup, 0.25, 0.35, 2.2, PALETTE.trunk, t.x, 1.1, t.z, 6);
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 6), Mat(0x39442e));
-      crown.position.set(t.x, 3.0, t.z);
-      envGroup.add(crown);
-    }
-    for (const p of L.props) {
-      if (p.kind === "crops") {
-        // 庄稼地：一片片矮秆
-        for (let i = 0; i < 24; i += 1) {
-          const gx = p.x + ((i * 37) % 14) - 7;
-          const gz = p.z + ((i * 53) % 12) - 6;
-          AddBox(envGroup, 0.14, 1.5, 0.14, PALETTE.crops, gx, 0.75, gz);
-        }
-      } else if (p.kind === "ditch") {
-        AddBox(envGroup, 26, 0.3, 3.4, 0x191d22, p.x, 0.05, p.z);
-      }
+      case "ridge": AddBox(envGroup, c.w, 0.9, 1.4, 0x4a4438, c.x, 0.45, 0.3); break;
+      default: break;
     }
   }
 
-  function BuildTunnel(envKey) {
-    const L = LAYOUTS[envKey];
-    const depth = L.depth;
-    // 覆土层：让画面读出“我们在地下”
-    const cap = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), Mat(PALETTE.tunnelDark));
-    cap.rotation.x = -Math.PI / 2;
-    cap.position.y = depth - 0.2;
-    envGroup.add(cap);
+  // -------------------------------------------------------------------------
+  // 地下剖面
+  // -------------------------------------------------------------------------
+  function BuildUnderground(sceneDef, state) {
+    const range = sceneDef.walk.under;
+    if (!range) return;
+    const tunnelTop = UNDER_Y + 2.1;
+    // 地道内壁背板（暖土色）
+    AddBox(envGroup, range[1] - range[0] + 3, 2.3, 0.3, 0x94764e, (range[0] + range[1]) / 2, UNDER_Y + 1.05, -1.3);
+    // 地道地板与顶沿
+    AddBox(envGroup, range[1] - range[0] + 3, 0.25, 2.6, 0x75593a, (range[0] + range[1]) / 2, UNDER_Y - 0.12, -0.2);
+    AddBox(envGroup, range[1] - range[0] + 3, 0.3, 2.6, 0x3a2f22, (range[0] + range[1]) / 2, tunnelTop + 0.15, -0.2);
+    // 地表与地道之间的土层
+    AddBox(envGroup, range[1] - range[0] + 20, -tunnelTop - 0.5, 2.2, 0x2b2318,
+      (range[0] + range[1]) / 2, (tunnelTop + (-0.5)) / 2, -0.9);
+    // 地道两端的封土
+    AddBox(envGroup, 3, 2.6, 2.4, 0x2b2318, range[0] - 2, UNDER_Y + 1.2, -0.4);
+    AddBox(envGroup, 3, 2.6, 2.4, 0x2b2318, range[1] + 2, UNDER_Y + 1.2, -0.4);
+    // 深处的底土
+    AddBox(envGroup, range[1] - range[0] + 30, 2.5, 3, 0x1c1610, (range[0] + range[1]) / 2, UNDER_Y - 1.6, -0.9);
 
-    const wallH = 1.9;
-    for (const [a, b] of L.edges) {
-      const na = L.nodes[a], nb = L.nodes[b];
-      const len = Math.hypot(nb.x - na.x, nb.z - na.z);
-      const cx = (na.x + nb.x) / 2, cz = (na.z + nb.z) / 2;
-      const ang = -Math.atan2(nb.z - na.z, nb.x - na.x);
-      const hw = L.corridorHalfWidth;
-      const floor = AddBox(envGroup, len + hw * 2, 0.16, hw * 2, PALETTE.tunnelFloor, cx, depth, cz);
-      floor.rotation.y = ang;
-      const wallN = AddBox(envGroup, len + hw * 2, wallH, 0.3, PALETTE.tunnelWall, cx, depth + wallH / 2, cz);
-      wallN.rotation.y = ang;
-      wallN.translateZ(-(hw + 0.15));
-      const wallS = AddBox(envGroup, len + hw * 2, wallH, 0.3, PALETTE.tunnelWall, cx, depth + wallH / 2, cz);
-      wallS.rotation.y = ang;
-      wallS.translateZ(hw + 0.15);
+    // 支撑木柱（每隔一段一组，地道战剖面的标志性画面）
+    for (let x = range[0] + 4; x < range[1] - 2; x += 9) {
+      AddBox(envGroup, 0.22, 2.1, 0.22, 0x7a5f3e, x, UNDER_Y + 1.05, -1.0);
+      AddBox(envGroup, 1.4, 0.18, 0.22, 0x7a5f3e, x, tunnelTop - 0.1, -1.0);
     }
-    for (const key of Object.keys(L.nodes)) {
-      const n = L.nodes[key];
-      AddCylinder(envGroup, n.r + 0.4, n.r + 0.4, 0.18, PALETTE.tunnelFloor, n.x, depth + 0.02, n.z, 14);
-      if (n.name) {
-        // 洞室矮墙一圈（留通道口不封）
-        const ring = new THREE.Mesh(
-          new THREE.CylinderGeometry(n.r + 0.6, n.r + 0.6, wallH * 0.8, 12, 1, true),
-          new THREE.MeshLambertMaterial({ color: PALETTE.tunnelWall, side: THREE.BackSide, transparent: true, opacity: 0.7 }),
-        );
-        ring.position.set(n.x, depth + wallH * 0.4, n.z);
-        envGroup.add(ring);
+
+    // 竖井（爬梯口）
+    for (const shaft of sceneDef.shafts) {
+      if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
+      AddBox(envGroup, 1.7, -UNDER_Y - 2.0 + 2.4, 0.3, 0x5c4a34, shaft.x, (tunnelTop + 0.3) / 2 + 0.4, -1.25);
+      for (let y = UNDER_Y + 0.6; y < 0; y += 0.55) {
+        AddBox(envGroup, 1.1, 0.09, 0.12, 0x8a6f4d, shaft.x, y, -0.9);
       }
+      AddBox(envGroup, 2.2, 0.16, 1.2, 0x4f4436, shaft.x, 0.08, 0);
     }
-    if (envKey === "tunnelVillage") {
-      // 村地道常备的油灯：微弱但活着
-      AddPointLamp(L.nodes.chamberA.x, depth + 1.4, L.nodes.chamberA.z, 1.3, 12);
-      AddPointLamp(L.nodes.chamberB.x, depth + 1.4, L.nodes.chamberB.z, 1.3, 12);
-      AddPointLamp(L.nodes.entW.x, depth + 1.4, L.nodes.entW.z, 0.9, 9);
-      AddPointLamp(L.nodes.juncE.x, depth + 1.4, L.nodes.juncE.z, 0.8, 9);
-    }
-    // 出入口竖井微光
-    const entKeys = envKey === "tunnelVillage" ? ["entE", "entW"] : ["fieldEnt", "cellHatch"];
-    for (const key of entKeys) {
-      const n = L.nodes[key];
-      const shaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.8, 0.8, -depth, 8, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0x2e3140, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
-      );
-      shaft.position.set(n.x, depth / 2, n.z);
-      envGroup.add(shaft);
-    }
-    // 据点地道的塌方堆
+  }
+
+  function BuildTunnelExtras(sceneDef, state, sceneKey) {
     collapseMeshes = {};
-    if (envKey === "tunnelFort") {
-      for (const key of ["collapse1", "collapse2"]) {
-        const n = L.nodes[key];
+    for (const p of sceneDef.props) {
+      if (p.kind === "chamber") {
+        // 藏人洞：更高的拱室 + 木框
+        AddBox(envGroup, p.w, 3.1, 0.3, 0xa0805a, p.x, UNDER_Y + 1.45, -1.28);
+        AddBox(envGroup, 0.25, 2.9, 0.25, 0x7a5f3e, p.x - p.w / 2 + 0.4, UNDER_Y + 1.45, -1.0);
+        AddBox(envGroup, 0.25, 2.9, 0.25, 0x7a5f3e, p.x + p.w / 2 - 0.4, UNDER_Y + 1.45, -1.0);
+        AddBox(envGroup, p.w - 0.4, 0.2, 0.25, 0x7a5f3e, p.x, UNDER_Y + 2.8, -1.0);
+        AddBox(envGroup, 1.6, 0.5, 1.2, 0x5a4a38, p.x - p.w / 2 + 1.4, UNDER_Y + 0.25, -0.5);
+        if (sceneKey === "tunnelVillage") AddPointLamp(p.x, UNDER_Y + 1.9, 0, 1.1, 10);
+      } else if (p.kind === "pocket") {
+        AddBox(envGroup, 5.5, 2.6, 0.3, 0x8a6c48, p.x, UNDER_Y + 1.2, -1.28);
+        AddBox(envGroup, 0.22, 2.3, 0.22, 0x7a5f3e, p.x - 2.4, UNDER_Y + 1.15, -1.0);
+        AddBox(envGroup, 0.22, 2.3, 0.22, 0x7a5f3e, p.x + 2.4, UNDER_Y + 1.15, -1.0);
+      } else if (p.kind === "vent") {
+        // 通风眼：从地道顶通到井壁的暗管
+        AddBox(envGroup, 0.55, -UNDER_Y - 1.4, 0.4, 0x4a3c2c, p.x, (UNDER_Y + 2.1) / 2 + 0.7, -1.2);
+      } else if (p.kind === "bell") {
+        const bell = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 6), Mat(0xb8a15c));
+        bell.position.set(p.x, UNDER_Y + 1.9, -0.6);
+        envGroup.add(bell);
+        AddBox(envGroup, 0.04, 0.5, 0.04, 0x8d8272, p.x, UNDER_Y + 2.2, -0.6);
+      } else if (p.kind === "collapse") {
         const pile = new THREE.Group();
-        for (let i = 0; i < 5; i += 1) {
-          const rock = new THREE.Mesh(
-            new THREE.BoxGeometry(0.7 - i * 0.08, 0.5, 0.7 - i * 0.06),
-            Mat(PALETTE.rubble),
-          );
-          rock.position.set(n.x + ((i * 31) % 10) / 10 - 0.5, depth + 0.25 + i * 0.28, n.z + ((i * 17) % 10) / 10 - 0.5);
-          rock.rotation.y = i * 0.7;
+        for (let i = 0; i < 6; i += 1) {
+          const rock = new THREE.Mesh(new THREE.BoxGeometry(0.8 - i * 0.07, 0.55, 0.9), Mat(0x413a32));
+          rock.position.set(p.x + ((i * 31) % 10) / 12 - 0.4, UNDER_Y + 0.28 + i * 0.34, ((i * 17) % 8) / 10 - 0.4);
+          rock.rotation.z = i * 0.4;
           pile.add(rock);
         }
         envGroup.add(pile);
-        collapseMeshes[key] = pile;
+        collapseMeshes[p.id] = pile;
+      } else {
+        BuildProp(p, "night", false);
       }
     }
   }
 
+  // -------------------------------------------------------------------------
   function BuildEnvironment(state) {
     const ch = CHAPTERS[state.chapterIndex];
-    const key = `${ch.env}:${ch.light}:${state.flags.ruined ? 1 : 0}`;
+    const key = `${ch.scene}:${ch.light}:${state.flags.ruined ? 1 : 0}:${state.flags.hiddenBuilt ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
     ClearGroup(envGroup);
@@ -334,23 +341,52 @@ export function CreateWorld(canvas) {
     lights.points = [];
     carveMark = null;
     SetLights(ch.light);
-    if (ch.env === "village") BuildVillage(ch.light, state.flags.ruined);
-    else if (ch.env === "fields") BuildFields();
-    else BuildTunnel(ch.env);
+
+    const sceneDef = SCENES[ch.scene];
+    const groundColor = ch.light === "day" ? 0x8a7a55 : (ch.light === "dawn" ? 0x7d786a : (ch.light === "night" ? 0x3d434d : 0x3a3126));
+    // 地表条带
+    AddBox(envGroup, sceneDef.length + 120, 0.6, 14, groundColor, sceneDef.length / 2, -0.3, -3);
+
+    if (ch.scene === "village") {
+      AddHills(sceneDef.length, -46, ch.light === "day" ? 0x9a8c68 : 0x232b3a);
+      AddParallaxHouses(-10, sceneDef.length + 10, -22, ch.light === "day" ? 0x8d7c60 : (state.flags.ruined ? 0x3a352c : 0x2e3442), 2.6);
+      AddParallaxTrees(6, sceneDef.length, -12, ch.light === "day" ? 0x5c6b42 : 0x28323c);
+      for (const p of sceneDef.props) BuildProp(p, ch.light, state.flags.ruined);
+      for (const c of sceneDef.covers) BuildCover(c, ch.light);
+      BuildUnderground(sceneDef, state); // 地窖
+    } else if (ch.scene === "fields") {
+      AddHills(sceneDef.length, -46, 0x1e2733);
+      AddParallaxTrees(0, sceneDef.length - 60, -18, 0x252e28);
+      for (const p of sceneDef.props) BuildProp(p, ch.light, false);
+      for (const c of sceneDef.covers) BuildCover(c, ch.light);
+    } else {
+      // 地道剖面场景：地表建筑 + 地下网络
+      AddHills(sceneDef.length, -46, ch.scene === "tunnelFort" ? 0x141210 : 0x1c1a14);
+      if (ch.scene === "tunnelVillage") {
+        AddParallaxHouses(0, sceneDef.length, -20, 0x2a251c, 2.6);
+      }
+      for (const p of sceneDef.props.filter((x) => ["millstone", "well", "house", "fortSilhouette"].includes(x.kind))) {
+        BuildProp(p, "night", false);
+      }
+      BuildUnderground(sceneDef, state);
+      BuildTunnelExtras(sceneDef, state, ch.scene);
+    }
   }
 
+  // -------------------------------------------------------------------------
+  // 角色
   // -------------------------------------------------------------------------
   const ACTOR_COLORS = {
     player: PALETTE.zhuzi, sister: PALETTE.sister, family: PALETTE.mother,
     militia: PALETTE.militia, soldier: PALETTE.soldier, villager: PALETTE.villager,
-    puppet: 0x8d8060,
+    puppet: PALETTE.puppet,
   };
 
   function MakeActorMesh(kind, id) {
     const group = new THREE.Group();
     let color = ACTOR_COLORS[kind] ?? PALETTE.villager;
     if (id === "father") color = PALETTE.father;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 1.15, 8), Mat(color));
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 1.15, 8), Mat(color));
     body.position.y = 0.72;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), Mat(0xc9a276));
     head.position.y = 1.55;
@@ -360,22 +396,21 @@ export function CreateWorld(canvas) {
       cap.position.y = 1.72;
       group.add(cap);
       const rifle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), Mat(0x3d3126));
-      rifle.position.set(0.42, 1.0, 0);
-      rifle.rotation.z = 0.25;
+      rifle.position.set(0, 1.0, -0.42);
+      rifle.rotation.x = 0.25;
       group.add(rifle);
+    }
+    if (kind === "puppet") {
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.14, 8), Mat(0x2e2a24));
+      hat.position.y = 1.72;
+      group.add(hat);
     }
     if (kind === "militia") {
       const towel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8), Mat(0xd8d2c0));
       towel.position.y = 1.7;
       group.add(towel);
     }
-    if (kind === "puppet") {
-      // 伪军/汉奸：软塌塌的圆帽，不背步枪
-      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.14, 8), Mat(0x2e2a24));
-      hat.position.y = 1.72;
-      group.add(hat);
-    }
-    group.userData = { kind, id, body, head };
+    group.userData = { kind, id };
     return group;
   }
 
@@ -389,53 +424,38 @@ export function CreateWorld(canvas) {
     return mesh;
   }
 
-  function MakeVisionCone() {
-    const geo = new THREE.CircleGeometry(10.5, 20, Math.PI / 2 - 0.61, 1.22);
-    const mat = new THREE.MeshBasicMaterial({
-      color: PALETTE.visionCalm, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
-    return mesh;
-  }
-
-  function GroundY(state) {
-    const env = CHAPTERS[state.chapterIndex].env;
-    return (env === "tunnelVillage" || env === "tunnelFort") ? LAYOUTS[env].depth : 0;
-  }
+  function LevelY(level) { return level === "under" ? UNDER_Y : SURFACE_Y; }
 
   function UpdateActors(state, time) {
-    const gy = GroundY(state);
     const seen = new Set(["player"]);
-    // 玩家
+    const p = state.player;
     const playerMesh = EnsureActorMesh("player", "player");
-    playerMesh.position.set(state.player.x, gy, state.player.z);
-    playerMesh.rotation.y = state.player.heading;
-    playerMesh.scale.y = state.player.crouch ? 0.68 : 1;
-    // 搬木料
+    playerMesh.position.set(p.x, LevelY(p.level), 0);
+    playerMesh.rotation.y = (p.heading || 1) > 0 ? Math.PI / 2 : -Math.PI / 2;
+    playerMesh.scale.y = p.crouch ? 0.68 : 1;
+
     let carryMesh = playerMesh.userData.carryMesh;
-    if (state.player.carry && !carryMesh) {
-      carryMesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.14, 0.24), Mat(0x9a7a4d));
-      carryMesh.position.set(0, 1.9, 0);
+    if (p.carry && !carryMesh) {
+      carryMesh = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.15, 1.7), Mat(0x9a7a4d));
+      carryMesh.position.set(0, 1.95, 0);
       playerMesh.add(carryMesh);
       playerMesh.userData.carryMesh = carryMesh;
-    } else if (!state.player.carry && carryMesh) {
+    } else if (!p.carry && carryMesh) {
       playerMesh.remove(carryMesh);
       playerMesh.userData.carryMesh = null;
     }
-    // 煤油灯
-    if (state.player.lamp) {
+
+    if (p.lamp) {
       if (!lights.lamp) {
-        lights.lamp = new THREE.PointLight(PALETTE.lamp, 1.5, 13, 1.4);
+        lights.lamp = new THREE.PointLight(PALETTE.lamp, 1.6, 12, 1.4);
         scene.add(lights.lamp);
         const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: PALETTE.lamp }));
-        bulb.position.set(0.4, 1.0, 0.2);
+        bulb.position.set(0, 1.0, 0.4);
         playerMesh.add(bulb);
         playerMesh.userData.lampBulb = bulb;
       }
-      const flicker = 1.35 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23.3) * 0.06;
-      lights.lamp.intensity = flicker;
-      lights.lamp.position.set(state.player.x, gy + 1.2, state.player.z);
+      lights.lamp.intensity = 1.5 + Math.sin(time * 9.7) * 0.14 + Math.sin(time * 23.3) * 0.07;
+      lights.lamp.position.set(p.x, LevelY(p.level) + 1.2, 0.5);
     } else if (lights.lamp) {
       scene.remove(lights.lamp);
       lights.lamp = null;
@@ -449,127 +469,158 @@ export function CreateWorld(canvas) {
       seen.add(a.id);
       const mesh = EnsureActorMesh(a.id, a.kind);
       mesh.visible = a.visible !== false;
-      mesh.position.set(a.x, gy, a.z);
-      mesh.rotation.y = a.heading || 0;
-      // 提灯（巡夜的马灯/灯笼）
+      mesh.position.set(a.x, LevelY(a.level || "surface"), 0);
+      mesh.rotation.y = (a.heading || 1) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      // 提灯
       if (a.lantern && !mesh.userData.lanternLight) {
-        const ll = new THREE.PointLight(0xffc978, 0.85, 8, 1.6);
-        ll.position.set(0.45, 1.1, 0.3);
+        const ll = new THREE.PointLight(0xffc978, 0.9, 9, 1.6);
+        ll.position.set(0, 1.1, 0.5);
         mesh.add(ll);
         const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffc978 }));
         bulb.position.copy(ll.position);
         mesh.add(bulb);
         mesh.userData.lanternLight = ll;
       }
-      // 士兵/伪军视锥
+      // 视线光束（横向）
       if (a.kind === "soldier" || a.kind === "puppet") {
-        let cone = coneMeshes.get(a.id);
-        if (!cone) {
-          cone = MakeVisionCone();
-          coneMeshes.set(a.id, cone);
-          fxGroup.add(cone);
+        let beam = beamMeshes.get(a.id);
+        if (!beam) {
+          beam = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 0.55, 0.4),
+            new THREE.MeshBasicMaterial({ color: PALETTE.beamCalm, transparent: true, opacity: 0.14, depthWrite: false }),
+          );
+          beamMeshes.set(a.id, beam);
+          fxGroup.add(beam);
         }
-        cone.visible = mesh.visible && state.stealthActive;
-        cone.position.set(a.x, gy + 0.06, a.z);
-        cone.rotation.z = -(a.heading || 0);
+        const len = 15 * 0.8;
+        beam.visible = mesh.visible && state.stealthActive;
+        beam.scale.x = len;
+        beam.position.set(a.x + (a.heading || 1) * len / 2, LevelY(a.level || "surface") + 1.2, 0.3);
         const alert = state.detection.spotter === a.id ? state.detection.level : 0;
-        cone.material.color.setHex(alert > 0.15 ? PALETTE.visionAlert : PALETTE.visionCalm);
-        cone.material.opacity = 0.13 + alert * 0.25;
+        beam.material.color.setHex(alert > 0.15 ? PALETTE.beamAlert : PALETTE.beamCalm);
+        beam.material.opacity = 0.1 + alert * 0.3;
       }
     }
-    // 清理离场角色
     for (const [id, mesh] of actorMeshes) {
       if (id !== "player" && !seen.has(id)) {
         actorGroup.remove(mesh);
         actorMeshes.delete(id);
-        const cone = coneMeshes.get(id);
-        if (cone) { fxGroup.remove(cone); coneMeshes.delete(id); }
+        const beam = beamMeshes.get(id);
+        if (beam) { fxGroup.remove(beam); beamMeshes.delete(id); }
       }
     }
-    for (const [id, cone] of coneMeshes) {
-      if (!seen.has(id)) { fxGroup.remove(cone); coneMeshes.delete(id); }
+    for (const [id, beam] of beamMeshes) {
+      if (!seen.has(id)) { fxGroup.remove(beam); beamMeshes.delete(id); }
     }
   }
 
+  // -------------------------------------------------------------------------
   function UpdateProps(state, time) {
-    const gy = GroundY(state);
-    // 木料（第一章）
     const def = CurrentBeatDef(state);
+    // 木料/水桶
     if (def?.kind === "collect" && state.beat.itemStates) {
       while (planksMeshes.length < state.beat.itemStates.length) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.14, 0.24), Mat(0x9a7a4d));
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 1.7), Mat(0x9a7a4d));
         fxGroup.add(m);
         planksMeshes.push(m);
       }
       state.beat.itemStates.forEach((it, i) => {
         const m = planksMeshes[i];
         m.visible = !it.carried && !it.delivered;
-        m.position.set(it.x, gy + 0.4, it.z);
-        m.rotation.y = i * 0.6;
+        m.position.set(it.x, 0.4 + i * 0.18, 0.3);
       });
     } else if (planksMeshes.length) {
       for (const m of planksMeshes) fxGroup.remove(m);
       planksMeshes = [];
     }
-    // 烟（第四章）
-    if (state.smoke) {
-      const L = LAYOUTS.tunnelVillage;
-      for (const key of state.smoke.filled) {
-        if (!smokeMeshes.has(key)) {
-          const n = L.nodes[key];
-          const cluster = new THREE.Group();
+
+    // 烟：从东侧充满到 frontX
+    if (state.smoke?.active) {
+      const sceneDef = SCENES[CHAPTERS[state.chapterIndex].scene];
+      const range = sceneDef.walk.under;
+      if (range) {
+        const east = range[1] + 2;
+        const w = Math.max(0.1, east - state.smoke.frontX);
+        if (!smokeMesh) {
+          smokeMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 2.3, 2.2),
+            new THREE.MeshLambertMaterial({ color: PALETTE.smoke, transparent: true, opacity: 0.5 }),
+          );
+          fxGroup.add(smokeMesh);
+          smokePuffs = new THREE.Group();
           for (let i = 0; i < 3; i += 1) {
             const s = new THREE.Mesh(
-              new THREE.SphereGeometry(0.7 + i * 0.35, 8, 6),
-              new THREE.MeshLambertMaterial({ color: PALETTE.smoke, transparent: true, opacity: 0.4 - i * 0.08 }),
+              new THREE.SphereGeometry(0.5 + i * 0.25, 7, 6),
+              new THREE.MeshLambertMaterial({ color: PALETTE.smoke, transparent: true, opacity: 0.38 - i * 0.08 }),
             );
-            s.position.set(((i * 13) % 5) / 3 - 0.7, 0.6 + i * 0.5, ((i * 7) % 5) / 3 - 0.7);
-            cluster.add(s);
+            smokePuffs.add(s);
           }
-          cluster.position.set(n.x, L.depth + 0.4, n.z);
-          fxGroup.add(cluster);
-          smokeMeshes.set(key, cluster);
+          fxGroup.add(smokePuffs);
         }
+        smokeMesh.scale.x = w;
+        smokeMesh.position.set(state.smoke.frontX + w / 2, UNDER_Y + 1.05, 0);
+        smokePuffs.children.forEach((s, i) => {
+          s.position.set(state.smoke.frontX - 0.3 - i * 0.7, UNDER_Y + 0.8 + i * 0.5 + Math.sin(time * 1.6 + i * 2) * 0.15, 0.2);
+        });
       }
-      for (const [, cluster] of smokeMeshes) {
-        cluster.children.forEach((s, i) => { s.position.y = 0.6 + i * 0.5 + Math.sin(time * 1.4 + i) * 0.12; });
-      }
-    } else if (smokeMeshes.size) {
-      for (const [, m] of smokeMeshes) fxGroup.remove(m);
-      smokeMeshes.clear();
+    } else if (smokeMesh) {
+      fxGroup.remove(smokeMesh);
+      fxGroup.remove(smokePuffs);
+      smokeMesh = null;
+      smokePuffs = null;
     }
-    // 塌方（第七章）
+
+    // 塌方
     if (state.collapses) {
       for (const key of Object.keys(state.collapses)) {
         const pile = collapseMeshes[key];
         if (!pile) continue;
         const c = state.collapses[key];
         pile.visible = !c.cleared;
-        if (!c.cleared && c.progress > 0) {
-          pile.scale.setScalar(Math.max(0.25, 1 - (c.progress / 3.5) * 0.75));
-        }
+        if (!c.cleared && c.progress > 0) pile.scale.setScalar(Math.max(0.3, 1 - (c.progress / 3.5) * 0.7));
       }
     }
+
+    // 探杆：预兆/响动时从地表往下戳
+    const quakeOn = state.beat && (state.beat.quakeWarn || state.beat.quakeActive)
+      && (def?.kind === "digSeq" || def?.kind === "rescueLoop");
+    if (quakeOn) {
+      if (!probeRods.length) {
+        for (let i = 0; i < 3; i += 1) {
+          const rod = new THREE.Mesh(new THREE.BoxGeometry(0.09, 2.6, 0.09), Mat(0x4a4438));
+          fxGroup.add(rod);
+          probeRods.push(rod);
+        }
+      }
+      probeRods.forEach((rod, i) => {
+        rod.visible = true;
+        const jab = state.beat.quakeActive ? Math.abs(Math.sin(time * 5 + i * 1.7)) : 0.2;
+        rod.position.set(state.player.x - 3 + i * 3 + Math.sin(i * 7) * 1.2, 0.6 - jab * 1.8, -0.4);
+      });
+    } else {
+      for (const rod of probeRods) rod.visible = false;
+    }
+
     // 第八章新刻痕
     if (carveMark) carveMark.visible = !!state.flags.carved;
-    // 目标指示环
+
+    // 目标指示：跳动的小箭头
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
-    const showRing = target && target.x !== undefined && CurrentBeatDef(state)?.kind !== "cinematic";
-    if (showRing) {
-      if (!markerRing) {
-        markerRing = new THREE.Mesh(
-          new THREE.RingGeometry(0.8, 1.05, 24),
-          new THREE.MeshBasicMaterial({ color: PALETTE.marker, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+    const showMarker = target && target.x !== undefined && def?.kind !== "cinematic" && !state.microCine;
+    if (showMarker) {
+      if (!markerArrow) {
+        markerArrow = new THREE.Mesh(
+          new THREE.ConeGeometry(0.32, 0.6, 4),
+          new THREE.MeshBasicMaterial({ color: PALETTE.marker, transparent: true, opacity: 0.85 }),
         );
-        markerRing.rotation.x = -Math.PI / 2;
-        fxGroup.add(markerRing);
+        markerArrow.rotation.x = Math.PI;
+        fxGroup.add(markerArrow);
       }
-      markerRing.visible = true;
-      markerRing.position.set(target.x, gy + 0.08, target.z);
-      const pulse = 1 + Math.sin(time * 3.2) * 0.18;
-      markerRing.scale.setScalar(pulse);
-    } else if (markerRing) {
-      markerRing.visible = false;
+      markerArrow.visible = true;
+      const baseY = LevelY(target.level || "surface");
+      markerArrow.position.set(target.x, baseY + 2.5 + Math.sin(time * 4) * 0.18, 0);
+    } else if (markerArrow) {
+      markerArrow.visible = false;
     }
   }
 
@@ -583,7 +634,7 @@ export function CreateWorld(canvas) {
 
   return {
     THREE, renderer, scene, camera,
-    BuildEnvironment, UpdateActors, UpdateProps, Resize, Render, GroundY,
-    GetActorMesh: (id) => actorMeshes.get(id),
+    BuildEnvironment, UpdateActors, UpdateProps, Resize, Render,
+    LevelY,
   };
 }
