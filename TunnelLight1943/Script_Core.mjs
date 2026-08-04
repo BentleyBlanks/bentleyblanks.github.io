@@ -309,6 +309,21 @@ const SCRIPTS = {
               if (s) { s.cineTarget = { x: 78 }; s.cineSpeed = 2.6; }
             }
           } },
+        // 娘的结局不在台词里：镜头不动，只看几盏灯往一处汇、重叠、停住
+        { stage: "", d: 4.4, cam: { kind: "shot", x: 76, y: 1.5, dist: 11, trans: "dip" },
+          on: (state) => {
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.cineTarget = { x: 66 }; mother.cineSpeed = 1.9; }
+            for (const [id, tx] of [["sweep1", 70], ["sweep2", 74], ["sweep3", 78]]) {
+              const s = FindActor(state, id);
+              if (s) { s.visible = true; s.lantern = true; s.cineTarget = { x: tx }; s.cineSpeed = 2.2; }
+            }
+          } },
+        { stage: "灯停住了。", d: 3.0, cam: { kind: "shot", x: 72, y: 1.5, dist: 8 },
+          on: (state) => {
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.visible = false; mother.cineTarget = null; }
+          } },
       ],
       onDone: (state) => { MotherDecoyDone(state); },
     },
@@ -431,8 +446,7 @@ const SCRIPTS = {
               a.heading = i % 2 ? -1 : 1;
             });
           } },
-        { who: "高传宝", say: "想救人，先学会怎么把人藏好。", d: 3.4, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.6 },
-          on: (state) => { SpawnTunnelVillagers(state); } },
+        { who: "高传宝", say: "想救人，先学会怎么把人藏好。", d: 3.4, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.6 } },
       ],
     },
     {
@@ -464,6 +478,14 @@ const SCRIPTS = {
         { stage: "一股呛人的烟，顺着东口灌了进来。", d: 3.4, cam: { kind: "shot", x: 142, y: -1.2, dist: 12 } },
       ],
       onDone: (state) => { StartSmoke(state); },
+    },
+    {
+      // 大纲原文：「村民立刻熄灭油灯」——地道里最要紧的一件事，也是标题本身
+      kind: "douseLamps", id: "c4_douse",
+      lamps: [148, 128, 112, 92, 74, 58, 40],
+      objective: "把地道里的灯一盏盏吹灭",
+      hint: "走到灯边按 E。留最后一盏在自己手里",
+      note: "最后一盏灯攥在柱子手里。地道一下子只剩这一点光。",
     },
     {
       kind: "smokeEscape", id: "c4_smoke", dest: TV.entW, lossScript: true,
@@ -539,6 +561,7 @@ const SCRIPTS = {
       lines: [
         { stage: "押送定在后天。据点里外都加了岗。", d: 3.4, cam: { kind: "wide", x: 170 } },
         { stage: "谁都知道这是个套：他们要的不是这十几个乡亲，是来救乡亲的人。", d: 4.6, cam: { kind: "wide", x: 150, pan: -5 } },
+        { stage: "高传宝的法子是两头一起动：地面上打出动静把人引开，地下从地道把乡亲接走。", d: 4.8, cam: { kind: "wide", x: 90, pan: -6 } },
         { who: "高传宝", say: "套是套。人，也是真的人。", d: 3.4, cam: { kind: "shot", x: 8, y: 1.2, dist: 6.5 } },
         { stage: "柱子这回没有躲在沟里等。他主动领了侦查的活。", d: 3.8, cam: { kind: "shot", x: 12, y: 1.4, dist: 8 } },
       ],
@@ -559,13 +582,15 @@ const SCRIPTS = {
       hint: "柱子用木匠画线的手，把据点画在了门板上",
     },
     {
+      // 大纲写的是"地面制造声势 + 地下进人"同时发生，不是二选一。
+      // 所以选的不是打法，是柱子站在哪一边。
       kind: "choice", id: "c6_plan",
-      prompt: "高传宝把门板图转向大家：人怎么进去？",
+      prompt: "两路都得有人。高传宝看着柱子：你跟哪一路？",
       options: [
-        { key: "ground", label: "地面佯动", detail: "民兵在村北打枪扯动巡逻，突击组趁乱从南门附近翻墙——快，但撤人的路上全是明处。" },
-        { key: "tunnel", label: "地下进人", detail: "顺着挖到据点边上的地道摸到牢房地沿——慢，土层不稳，但乡亲们能从地下走。" },
+        { key: "ground", label: "跟地面佯动组", detail: "在村北打枪、点火、把巡逻往外扯——动静大，撤下来的路全在明处。" },
+        { key: "tunnel", label: "跟地下接应组", detail: "在地道里掏最后一段、接人、往回带——慢，土层不稳，但乡亲们能从地下走。" },
       ],
-      objective: "定下营救的路子",
+      objective: "定下自己跟哪一路",
     },
     {
       kind: "cinematic", id: "c6_eve",
@@ -948,6 +973,7 @@ export function CreateGame(chapterIndex = 0) {
     rescue: null,
     beat: null,
     microCine: null,
+    lamps: null,
     flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, entWBlocked: false, notesSeen: [] },
     caption: null,
     camHint: { kind: "follow" },
@@ -973,6 +999,7 @@ export function StartChapter(state, index) {
   state.collapses = null;
   state.rescue = null;
   state.microCine = null;
+  state.lamps = null;
   state.caption = null;
   state.prompt = null;
   state.player.carry = null;
@@ -1229,6 +1256,7 @@ export function StepGame(state, input, dt) {
     case "hold": StepHold(state, def, input, dt); break;
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
+    case "douseLamps": StepDouseLamps(state, def, input); break;
     case "smokeEscape": StepSmokeEscape(state, def, input); break;
     case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
     default: break;
@@ -1581,6 +1609,28 @@ export function SmokeCovers(state, x) {
   return !!state.smoke?.active && x >= state.smoke.frontX;
 }
 
+// 熄灯：一盏盏吹灭，最后一盏留在自己手里
+function StepDouseLamps(state, def, input) {
+  if (!state.lamps) {
+    state.lamps = def.lamps.map((x) => ({ x, lit: true }));
+    state.toast = { text: "铃响了。头顶的脚步就在磨盘那一片。", t: 3.5 };
+  }
+  const remaining = state.lamps.filter((l) => l.lit);
+  if (remaining.length <= 1) {
+    // 留最后一盏：柱子把它提在手里
+    for (const l of state.lamps) l.lit = false;
+    state.player.lamp = true;
+    if (def.note) state.toast = { text: def.note, t: 4.5 };
+    AdvanceBeat(state);
+    return;
+  }
+  const near = remaining.find((l) => Math.abs(l.x - state.player.x) < 1.8);
+  if (near) {
+    state.prompt = "E · 吹灭这盏灯";
+    if (input.interact) near.lit = false;
+  }
+}
+
 function StepSmokeEscape(state, def, input) {
   const dest = def.dest || TV.entW;
 
@@ -1775,6 +1825,11 @@ export function GetBeatTarget(state) {
       const key = keys[state.beat.digIndex];
       if (!key) return null;
       return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
+    }
+    case "douseLamps": {
+      const lit = (state.lamps || []).filter((l) => l.lit);
+      if (lit.length <= 1) return null;
+      return { action: "interactAt", x: lit[0].x, level: "under" };
     }
     case "smokeEscape": {
       const dest = def.dest || TV.entW;

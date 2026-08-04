@@ -174,6 +174,7 @@ export function CreateWorld(canvasEl) {
   let otsHiddenId = null;
   let vignetteAlpha = 0;
   let dustMotes = [];
+  let lampMeshes = [];
 
   function ClearGroup(g) {
     while (g.children.length) {
@@ -876,6 +877,39 @@ export function CreateWorld(canvasEl) {
       });
     } else {
       for (const m of probeMeshes) m.visible = false;
+    }
+
+    // 地道油灯：熄灯那一段，灯是一盏盏灭下去的
+    if (state.lamps) {
+      while (lampMeshes.length < state.lamps.length) {
+        const i = lampMeshes.length;
+        const body = BakeSprite(46, 60, 23, 54, (ctx, ax, ay) => {
+          ART.InkFill(ctx, [[ax - 11, ay], [ax + 11, ay], [ax + 8, ay - 16], [ax - 8, ay - 16]],
+            "lampBody" + i, "#8a6a45", { amp: 1, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+          ART.InkFill(ctx, [[ax - 7, ay - 16], [ax + 7, ay - 16], [ax + 5, ay - 30], [ax - 5, ay - 30]],
+            "lampGlass" + i, "#d8c58a", { amp: 0.9, lw: 2 });
+          ART.InkLine(ctx, ax, ay - 30, ax, ay - 40, "lampWire" + i, { lw: 1.6, color: "#6b5a3f" });
+        });
+        layers.play.add(body);
+        const glow = MakeGlow(3.4, 0xffc06a, 1.0);
+        scene.add(glow);
+        lampMeshes.push({ body, glow });
+      }
+      state.lamps.forEach((l, i) => {
+        const m = lampMeshes[i];
+        if (!m) return;
+        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, 0.2);
+        m.body.visible = true;
+        m.glow.visible = l.lit;
+        m.glow.position.set(l.x, UNDER_Y + 1.4, 0.4);
+        m.body.material.opacity = l.lit ? 1 : 0.55;
+      });
+      for (let i = state.lamps.length; i < lampMeshes.length; i += 1) {
+        lampMeshes[i].body.visible = false;
+        lampMeshes[i].glow.visible = false;
+      }
+    } else if (lampMeshes.length) {
+      for (const m of lampMeshes) { m.body.visible = false; m.glow.visible = false; }
     }
 
     // 刻痕
