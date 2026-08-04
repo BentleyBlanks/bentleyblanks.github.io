@@ -6,7 +6,7 @@
 // 配音只有旁白与关键台词——剧本本身就几乎不写对白（117 条舞台提示对 18 句
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
-import { CurrentBeatDef, SetVoiceDurations, VoiceLineId } from "./Script_Core.mjs";
+import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
 
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。
@@ -38,6 +38,10 @@ export function CreateSoundtrack(audio) {
       SetVoiceDurations(new Map(manifest.lines.map((l) => [l.id, l.dur || 0])));
     } else SetVoiceDurations(null);
   }
+
+  // 过场靠这个判断"还能不能切下一行"
+  let speaking = false;
+  SetVoiceGate(() => speaking);
 
   const prev = {
     chapter: -1, carry: null, level: null, lamp: false,
@@ -108,8 +112,13 @@ export function CreateSoundtrack(audio) {
     if (key !== prev.captionKey) {
       prev.captionKey = key;
       const url = VoiceUrlFor(cap);
-      if (url) audio.PlayVoice(url);
-      else audio.StopVoice();
+      if (url) {
+        speaking = true;
+        Promise.resolve(audio.PlayVoice(url)).catch(() => {}).then(() => { speaking = false; });
+      } else {
+        speaking = false;
+        audio.StopVoice();
+      }
     }
   }
   let digT = 0;

@@ -208,13 +208,13 @@
       "dur": 3.2
     },
     {
-      "id": "1k70p7a",
+      "id": "06wt8ak",
       "who": "",
-      "text": "爹用墨斗线在门框上刻下一道线。",
+      "text": "爹用凿子把那道印刻深了一点。",
       "voice": "Kangkang",
       "pitch": "-8%",
       "rate": "-18%",
-      "dur": 3.95
+      "dur": 3.31
     },
     {
       "id": "1njt2mt",
@@ -442,13 +442,22 @@
       "dur": 3.17
     },
     {
-      "id": "1yfv482",
+      "id": "1uxnwj5",
       "who": "",
-      "text": "他扑上去，被枪托砸在背上。",
+      "text": "他扑上去。",
       "voice": "Kangkang",
       "pitch": "-8%",
       "rate": "-18%",
-      "dur": 3.25
+      "dur": 1.11
+    },
+    {
+      "id": "0cexsif",
+      "who": "",
+      "text": "枪托砸在背上。",
+      "voice": "Kangkang",
+      "pitch": "-8%",
+      "rate": "-18%",
+      "dur": 1.8
     },
     {
       "id": "0wjzkxb",

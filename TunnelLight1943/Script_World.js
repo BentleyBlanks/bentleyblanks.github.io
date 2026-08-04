@@ -253,6 +253,7 @@ export function CreateWorld(canvasEl) {
   let sceneLights = [];   // 静态灯位 {x,y,r,mesh}
   let fluid = null, fluidKey = "", fluidMesh = null, fluidCanvas = null, fluidCtx = null, fluidImage = null;
   let probeMeshes = [];
+  let itemLabel = null;
   let markerMesh = null, markerCanvas = null, markerCtx = null;
   let collapseMeshes = {};
   let itemMeshes = [];
@@ -1072,7 +1073,9 @@ export function CreateWorld(canvasEl) {
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
           ART.DrawShaft(ctx, ax, 4, ay - 0.3 * PPM, shaft.id);
         }, 0, 2);
-      PlaceSprite(sh, shaft.x, UNDER_Y, -1.2);
+      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。摆在行走线略前
+      // （仍在演员 ACTOR_Z 之后），免得被洞口、磨盘这些中景件压掉。
+      PlaceSprite(sh, shaft.x, UNDER_Y, 0.45);
       group.add(sh);
     }
     for (const p of sceneDef.props) {
@@ -1344,7 +1347,7 @@ export function CreateWorld(canvasEl) {
 
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
-      climbing: extra.climbing, digging: extra.digging, posture: extra.posture,
+      climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
     }, dt);
 
     s.mesh.position.set(x, y, ACTOR_Z);
@@ -1414,7 +1417,7 @@ export function CreateWorld(canvasEl) {
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
-      { climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture });
+      { climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose });
     ps.mesh.visible = otsHiddenId !== "player";
     LiftActor(ps, ch.light, true);
 
@@ -1454,7 +1457,7 @@ export function CreateWorld(canvasEl) {
       const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
       UpdateOne(s, a.x, a.level || "surface", a.heading,
         posture === "squat" || posture === "crawl", dt, !!a.carry,
-        { posture, ...(sisterScale ? { bodyScale: sisterScale } : {}) });
+        { posture, pose: a.pose, ...(sisterScale ? { bodyScale: sisterScale } : {}) });
       SyncCarry(s, a.carry, a.heading);
       LiftActor(s, ch.light, false);
       // 提灯
@@ -1496,21 +1499,40 @@ export function CreateWorld(canvasEl) {
 
     // 可拾取物件
     if (def?.kind === "collect" && state.beat.itemStates) {
+      // 贴图是按 label 烘的。上一拍搬木料、这一拍提水桶时，网格如果沿用
+      // 就会拿木料的贴图去当水桶——所以 label 一变就整批重建。
+      if (itemLabel !== def.carryLabel) {
+        for (const m of itemMeshes) layers.play.remove(m);
+        itemMeshes = [];
+        itemLabel = def.carryLabel;
+      }
       while (itemMeshes.length < state.beat.itemStates.length) {
-        const label = def.carryLabel;
-        const m = MakeCarryMesh(label);
+        const m = MakeCarryMesh(itemLabel);
         layers.play.add(m);
         SetPlayOrder(m, BAND.walk);   // 地上的待拾物：玩家从它前面走过
         itemMeshes.push(m);
       }
+      const bucket = def.carryLabel === "水桶";
+      let stacked = 0;
       state.beat.itemStates.forEach((it, i) => {
         const m = itemMeshes[i];
-        m.visible = !it.carried && !it.delivered;
-        m.position.set(it.x, SURFACE_Y + (def.carryLabel === "水桶" ? 0.32 : 0.22 + i * 0.16), 0.15);
+        m.visible = !it.carried;
+        if (it.delivered) {
+          // 放下的东西要留在原地看得见——堆在交付点上，一件一件摞起来。
+          // 原来一交付就整个隐藏，玩家会觉得自己刚放下的木料凭空没了。
+          m.position.set(def.deliver.x + (stacked % 2) * 0.5 - 0.25,
+            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, 0.18);
+          m.rotation.z = bucket ? 0 : (stacked % 2 ? 0.05 : -0.04);
+          stacked += 1;
+        } else {
+          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), 0.15);
+          m.rotation.z = 0;
+        }
       });
     } else if (itemMeshes.length) {
       for (const m of itemMeshes) layers.play.remove(m);
       itemMeshes = [];
+      itemLabel = null;
     }
 
     // 烟与水：真解算（半拉格朗日平流 + 压力投影），固体边界就是地道剖面

@@ -1328,19 +1328,21 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
 }
 
 export function DrawShaft(ctx, x, topY, botY, id) {
-  // 竖井：掏空 + 爬梯横档
+  // 竖井 + 一架看得清的木梯。
+  // 之前梯子只有半透明的一根杆和几道暗横档，玩家在画面上根本认不出"这儿能上下"，
+  // 所以改成两根立杆 + 高对比横档 + 井口一圈木沿，远看就是一架梯子。
   InkFill(ctx, Rect(x - 17, topY, 34, botY - topY), id, PAL.tunnelAir, { amp: 1.4, lw: 2.4, line: "#3a2a1a" });
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.strokeStyle = "#7a5c3a";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x - 15, topY);
-  ctx.lineTo(x - 15, botY);
-  ctx.stroke();
-  ctx.restore();
-  for (let y = topY + 12; y < botY - 4; y += 17) {
-    InkFill(ctx, Rect(x - 13, y, 26, 4.6), id + "r" + Math.round(y), "#a07f4e", { amp: 0.7, lw: 1.7 });
+  // 井口木沿：地面上认路的记号
+  InkFill(ctx, Rect(x - 21, topY - 5, 42, 7), id + "lip", "#8a6b45", { amp: 0.8, lw: 2 });
+  // 两根立杆
+  for (const dx of [-12, 12]) {
+    InkFill(ctx, Rect(x + dx - 2.6, topY + 2, 5.2, botY - topY - 4), id + "rail" + dx, "#9c7a4c",
+      { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+  }
+  // 横档：亮一档、暗一档，看着有厚度
+  for (let y = topY + 13; y < botY - 4; y += 15) {
+    InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
+      { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
   }
 }
 

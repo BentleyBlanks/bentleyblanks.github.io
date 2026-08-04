@@ -64,7 +64,7 @@ export const SCENES = {
       courtGate: { x: 47, w: 4, label: "院门口" },
       cellar: { x: 26, w: 7, level: "under", label: "地窖" },
       well: { x: 58, w: 5, label: "井台" },
-      sisterTree: { x: 126, w: 6, label: "老槐树下" },
+      sisterTree: { x: 78, w: 6, label: "老槐树下" },
       eastExit: { x: 172, w: 7, label: "村东口" },
       woodpile: { x: 70, w: 6, label: "木料堆" },
     },
@@ -241,6 +241,23 @@ export function VoiceLineId(who, text) {
 // 配音只负责把太短的那些撑开。静音时这张表是空的，节奏回到原样。
 let VOICE_DUR = null;
 export function SetVoiceDurations(map) { VOICE_DUR = map; }
+
+// 旁白还在念的时候不许切下一行。
+//
+// 原先只靠 Script_VoiceEncode 算出来的时长去撑 d，但那有两个漏洞：清单是
+// 异步 fetch 来的，开场头一两行往往在它到达之前就已经开始跑了；而 141 条
+// 里有 111 条配音比剧本写的 d 长，最多的超 5 秒。于是"话没说完就切镜"。
+// 直接问播放器有没有念完，这两个洞一起堵上。
+let VOICE_BUSY = null;
+export function SetVoiceGate(fn) { VOICE_BUSY = fn; }
+// 万一 promise 卡住（文件 404、解码失败），最多多等这么久就往下走
+const VOICE_WAIT_CAP = 14;
+function LineHeld(line, t) {
+  const d = LineDuration(line);
+  if (t < d) return true;
+  if (t > d + VOICE_WAIT_CAP) return false;
+  return !!(VOICE_BUSY && VOICE_BUSY());
+}
 function LineDuration(line) {
   if (!VOICE_DUR) return line.d;
   const text = line.say || line.stage;
@@ -290,9 +307,16 @@ export const SCRIPTS = {
       ],
     },
     {
+      // 刻线这件事，孩子那一头的活儿就是"站住别动"。让玩家按住不放，
+      // 三秒里什么也不能做——被量身高的人是他，操作也该在他手上。
+      kind: "hold", id: "c1_carve", zone: V.doorframe, holdTime: 3.0,
+      objective: "站直，别动", hint: "按住 E。爹在门框上比着你的头顶划线",
+      note: "墨斗线弹在木头上，留下一道浅浅的印。",
+    },
+    {
       kind: "cinematic", id: "c1_mark",
       lines: [
-        { stage: "爹用墨斗线在门框上刻下一道线。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
+        { stage: "爹用凿子把那道印刻深了一点。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
         { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
         { stage: "他惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
@@ -305,14 +329,14 @@ export const SCRIPTS = {
       ],
     },
     {
-      kind: "collect", id: "c1_planks", objective: "帮爹把三根木料搬回工作台",
-      items: [{ x: 69 }, { x: 71.5 }, { x: 73.5 }],
+      kind: "collect", id: "c1_planks", objective: "帮爹把木料搬回工作台",
+      items: [{ x: 52 }, { x: 54.5 }],
       deliver: V.workbench, carryLabel: "木料",
       hint: "走到木料旁按 E 扛起，送回院里工作台再按 E 放下",
     },
     {
       kind: "collect", id: "c1_water", objective: "帮娘从井台提一桶水回来",
-      items: [{ x: 59 }],
+      items: [{ x: 48 }],
       deliver: V.homeYard, carryLabel: "水桶",
       hint: "娘在灶间忙，水缸见了底",
     },
@@ -368,11 +392,40 @@ export const SCRIPTS = {
             if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
             if (r2) { r2.patrol = null; r2.cineTarget = { x: 40.5 }; r2.cineSpeed = 3; }
           } },
-        { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
-        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.0, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true } },
-        { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 } },
+        { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
+          on: (state) => {
+            const father = FindActor(state, "father");
+            if (father) { father.pose = "kneel"; father.heading = 1; }
+            const r1 = FindActor(state, "raid1");
+            if (r1) { r1.x = 36.2; r1.heading = 1; }
+            const r2 = FindActor(state, "raid2");
+            if (r2) { r2.x = 40; r2.heading = -1; }
+          } },
+        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.0, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
+          on: (state) => {
+            // 抡下去的那个人和挨了一下的那个人都得真做动作
+            const r2 = FindActor(state, "raid2");
+            if (r2) r2.pose = "swing";
+            const father = FindActor(state, "father");
+            if (father) father.pose = "struck";
+          } },
+        { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
+          on: (state) => {
+            state.player.pose = "shelter";
+            const sister = FindActor(state, "sister");
+            if (sister) {
+              sister.pose = "leanIn";
+              sister.x = state.player.x + 0.42;
+              sister.heading = -1;
+              sister.visible = true;
+            }
+          } },
         { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 42, y: 1.2, dist: 11, pan: 1.5 },
           on: (state) => {
+            const father = FindActor(state, "father");
+            if (father) { father.pose = "hauled"; father.heading = -1; }   // 脸还朝着门框那边
+            const r2 = FindActor(state, "raid2");
+            if (r2) r2.pose = null;
             for (const id of ["father", "raid1", "raid2"]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
@@ -492,14 +545,37 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c2_taken2",
       lines: [
         { stage: "妹妹的手从柱子手里被拽走。", d: 3.2, cam: { kind: "insertCard", card: "hands" } },
-        { stage: "他扑上去，被枪托砸在背上。", d: 3.4, cam: { kind: "close", on: "player", dist: 3.6 },
-          on: (state) => { state.player.cineWalk = { x: state.player.x + 1.4, speed: 2.2 }; } },
+        { stage: "他扑上去。", d: 2.2, cam: { kind: "close", on: "player", dist: 3.6 },
+          on: (state) => {
+            state.player.pose = "lunge";
+            state.player.cineWalk = { x: state.player.x + 1.4, speed: 2.2 };
+          } },
+        { stage: "枪托砸在背上。", d: 2.6, cam: { kind: "close", on: "player", dist: 3.0 },
+          on: (state) => {
+            state.player.cineWalk = null;
+            state.player.pose = "struck";
+            const a2 = FindActor(state, "ambush2");
+            if (a2) { a2.pose = "swing"; a2.x = state.player.x + 1.3; a2.heading = -1; }
+          } },
         { stage: "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。", d: 4.4, cam: { kind: "shot", x: 168, y: 1.0, dist: 8 },
           on: (state) => {
+            state.player.pose = "dragged";
+            // 七叔得在画面里：从沟里出来，抱住他往西拖
+            state.actors.push(MakeActor("qishu", "villager", state.player.x - 0.7,
+              { label: "七叔", heading: 1, pose: "lunge" }));
+            const q = FindActor(state, "qishu");
+            if (q) { q.cineTarget = { x: state.player.x - 9 }; q.cineSpeed = 1.6; }
+            state.player.cineWalk = { x: state.player.x - 8.4, speed: 1.5 };
             const sister = FindActor(state, "sister");
             if (sister) sister.visible = false;
             const a2 = FindActor(state, "ambush2");
-            if (a2) { a2.cineTarget = { x: 184 }; a2.cineVanish = true; }
+            if (a2) { a2.pose = null; a2.cineTarget = { x: 184 }; a2.cineVanish = true; }
+          } },
+        { stage: "", d: 1.8, cam: { kind: "shot", x: 160, y: 1.0, dist: 10, trans: "dip" },
+          on: (state) => {
+            state.player.pose = null;
+            const q = FindActor(state, "qishu");
+            if (q) { q.visible = false; q.cineTarget = null; }
           } },
         { stage: "那天夜里，娘没有回来。", d: 3.4, cam: { kind: "dark" } },
         { stage: "柱子在高粱地里蹲到天亮。他只剩一个念头了。", d: 4.0, cam: { kind: "dark" } },
@@ -888,7 +964,12 @@ export const SCRIPTS = {
         // 正反打：问 → 不答 → 明白
         { who: "妹妹", say: "哥，娘呢？", d: 3.0, cam: { kind: "ots", subject: "sister", other: "player", dist: 3.2 } },
         { stage: "柱子没有说话。", d: 3.0, cam: { kind: "ots", subject: "player", other: "sister", dist: 3.2 } },
-        { stage: "妹妹看着哥哥的眼睛，慢慢松开了手，又慢慢把额头抵在他肩上。", d: 5.0, cam: { kind: "ots", subject: "sister", other: "player", dist: 3.0 } },
+        { stage: "妹妹看着哥哥的眼睛，慢慢松开了手，又慢慢把额头抵在他肩上。", d: 5.0, cam: { kind: "ots", subject: "sister", other: "player", dist: 3.0 },
+          on: (state) => {
+            const sister = FindActor(state, "sister");
+            if (sister) { sister.pose = "leanIn"; sister.x = state.player.x + 0.42; sister.heading = -1; }
+            state.player.pose = "shelter";
+          } },
         { stage: "她明白了。", d: 2.8, cam: { kind: "close", on: "sister", dist: 3.4 } },
       ],
       onDone: (state) => { AttachSister(state); },
@@ -1259,6 +1340,12 @@ export function CreateGame(chapterIndex = 0) {
   return state;
 }
 
+// 一次性戏剧姿势用完就得收：不清的话，被架走的爹会一路架着走完全场
+function ClearPoses(state) {
+  state.player.pose = null;
+  for (const a of state.actors) a.pose = null;
+}
+
 export function StartChapter(state, index) {
   const ch = CHAPTERS[index];
   state.chapterIndex = index;
@@ -1369,6 +1456,7 @@ function RestoreSnapshot(state) {
 }
 
 function AdvanceBeat(state) {
+  ClearPoses(state);
   const def = CurrentBeatDef(state);
   def?.onDone?.(state);
   state.beatIndex += 1;
@@ -1452,7 +1540,7 @@ function StepMicroCine(state, input, dt) {
   state.caption = line;
   state.camHint = line.cam || { kind: "close" };
   mc.t += dt;
-  if (input.advance || mc.t >= LineDuration(line)) {
+  if (input.advance || !LineHeld(line, mc.t)) {
     mc.i += 1;
     mc.t = 0;
     if (mc.i >= mc.lines.length) { state.microCine = null; state.caption = null; }
@@ -1484,7 +1572,7 @@ function StepCinematic(state, input, dt) {
   }
   StepCineActors(state, dt);
   state.beat.lineT += dt;
-  if (input.advance || state.beat.lineT >= LineDuration(line)) {
+  if (input.advance || !LineHeld(line, state.beat.lineT)) {
     state.beat.lineIndex += 1;
     state.beat.lineT = 0;
     if (state.beat.lineIndex >= lines.length) AdvanceBeat(state);
@@ -1569,6 +1657,17 @@ function MovePlayer(state, input, dt) {
   if (Math.abs(input.moveX) > 0.05) {
     p.x += Math.sign(input.moveX) * speed * dt;
     p.heading = Math.sign(input.moveX);
+  }
+
+  // 站在竖井口要给提示。原先这里一个字都没有，玩家根本不知道脚下能上能下——
+  // 单独存一个字段，免得跟节拍自己的 prompt 抢。
+  state.climbHint = "";
+  for (const shaft of scene.shafts) {
+    if (Math.abs(p.x - shaft.x) > 1.4) continue;
+    if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
+    if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 顺梯子上去";
+    else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
+    break;
   }
 
   // 爬梯口：W 上 / S 下

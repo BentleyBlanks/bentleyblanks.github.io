@@ -362,9 +362,11 @@ function SyncHud(state, dt, shotFade) {
   const objVisible = objectiveT > 0 && !inCinematic;
   ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
 
-  ui.prompt.textContent = state.prompt || "";
-  ui.prompt.hidden = !state.prompt || inCinematic;
-  ui.prompt.classList.toggle("danger", !!state.prompt && state.prompt.startsWith("！"));
+  // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来
+  const shown = state.prompt || state.climbHint || "";
+  ui.prompt.textContent = shown;
+  ui.prompt.hidden = !shown || inCinematic;
+  ui.prompt.classList.toggle("danger", !!shown && shown.startsWith("！"));
 
   ui.crouchTag.hidden = true;
   if (ui.touchControls) {
