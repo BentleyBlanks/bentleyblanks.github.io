@@ -682,7 +682,12 @@ export function CreateWorld(canvasEl) {
   function AddUnderground(group, sceneDef, state, sceneKey) {
     const range = sceneDef.walk.under;
     if (!range) return;
-    // 土层铺满整条场景，别在半路露出"地的尽头"
+    // 地道不是一张平贴图：近侧土层剖面掏空 → 看进去是后退的地面 →
+    // 尽头是后壁；支撑木分布在不同 z 上，人从木柱之间穿过去。
+    const NEAR_Z = 2.2;     // 近侧剖面（被切开的那一刀）
+    const BACK_Z = -5.5;    // 地道后壁
+    const TUN_TOP = UNDER_Y + 1.5;
+
     const x0 = Math.min(range[0] - 6, -20);
     const x1 = Math.max(range[1] + 6, sceneDef.length + 20);
     const wPx = Math.ceil((x1 - x0) * PPM);
@@ -691,37 +696,174 @@ export function CreateWorld(canvasEl) {
     const hPx = Math.ceil((topWorld - botWorld) * PPM);
     const toPx = (wx) => (wx - x0) * PPM;
     const toPy = (wy) => (topWorld - wy) * PPM;
+    const tunTop = toPy(TUN_TOP);
+    const tunBot = toPy(UNDER_Y);
 
-    const mesh = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+    // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
+    const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
-      const tunTop = toPy(UNDER_Y + 1.5);
-      const tunBot = toPy(UNDER_Y);
-      ART.DrawTunnelBore(ctx, toPx(range[0]), toPx(range[1]), tunTop, tunBot, sceneKey + "bore");
-      // 洞室 / 旁洞
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      // 走廊
+      ctx.fillRect(toPx(range[0]), tunTop, toPx(range[1]) - toPx(range[0]), tunBot - tunTop);
+      // 洞室 / 旁洞更高
       for (const p of sceneDef.props) {
         if (p.kind === "chamber") {
-          ART.DrawChamberVault(ctx, toPx(p.x), p.w * PPM, toPy(UNDER_Y + 3.0), tunBot, p.id);
+          ctx.fillRect(toPx(p.x - p.w / 2), toPy(UNDER_Y + 3.0), p.w * PPM, tunBot - toPy(UNDER_Y + 3.0));
         } else if (p.kind === "pocket") {
-          ART.DrawChamberVault(ctx, toPx(p.x), 5.6 * PPM, toPy(UNDER_Y + 2.5), tunBot, p.id);
+          ctx.fillRect(toPx(p.x) - 2.8 * PPM, toPy(UNDER_Y + 2.5), 5.6 * PPM, tunBot - toPy(UNDER_Y + 2.5));
         }
-      }
-      // 支撑木
-      for (let x = range[0] + 4; x < range[1] - 2; x += 9) {
-        ART.DrawSupportBeam(ctx, toPx(x), tunTop + 4, tunBot, sceneKey + "beam" + x);
       }
       // 竖井
       for (const shaft of sceneDef.shafts) {
         if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-        ART.DrawShaft(ctx, toPx(shaft.x), toPy(SURFACE_Y) - 2, tunTop + 6, shaft.id);
+        ctx.fillRect(toPx(shaft.x) - 0.85 * PPM, toPy(SURFACE_Y), 1.7 * PPM, tunTop - toPy(SURFACE_Y));
       }
-      // 通风眼 / 预警铃
-      for (const p of sceneDef.props) {
-        if (p.kind === "vent") ART.DrawVentPipe(ctx, toPx(p.x), toPy(SURFACE_Y), tunTop + 4, p.id);
-        if (p.kind === "bell") ART.DrawBell(ctx, toPx(p.x), tunTop + 22, p.id, { ringing: false });
-      }
+      ctx.restore();
+      // 切口沿边：一道深色让"这是被切开的土"读得出来
+      ctx.strokeStyle = "rgba(30,22,14,0.55)";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(toPx(range[0]), tunTop, toPx(range[1]) - toPx(range[0]), tunBot - tunTop);
     });
-    PlaceSprite(mesh, x0, SURFACE_Y, 0);
-    group.add(mesh);
+    PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
+    group.add(face);
+
+    // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它
+    const vign = BakeSprite(
+      Math.ceil((range[1] - range[0] + 4) * PPM), Math.ceil(1.55 * PPM),
+      0, Math.ceil(1.55 * PPM),
+      (ctx) => {
+        const w = Math.ceil((range[1] - range[0] + 4) * PPM);
+        const h = Math.ceil(1.55 * PPM);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
+        grd.addColorStop(0, "rgba(18,13,8,0.72)");
+        grd.addColorStop(0.42, "rgba(18,13,8,0.18)");
+        grd.addColorStop(1, "rgba(18,13,8,0.30)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, w, h);
+      });
+    PlaceSprite(vign, range[0] - 2, UNDER_Y, NEAR_Z - 0.4);
+    vign.material.depthWrite = false;
+    group.add(vign);
+
+    // —— 2) 地道地面：躺平的几何，从近侧一直铺到后壁，会向纵深收
+    const floorTex = (() => {
+      const c = MakeCanvas(1200, 400);
+      const g = c.getContext("2d");
+      const grd = g.createLinearGradient(0, 0, 0, 400);
+      grd.addColorStop(0, "#4a3722");    // 远端（后壁根）更暗
+      grd.addColorStop(1, "#8a6b46");    // 近端
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 1200, 400);
+      // 踩出来的一条路，和几道拖痕
+      g.save();
+      g.globalAlpha = 0.30;
+      g.strokeStyle = "#6b5236";
+      for (let i = 0; i < 24; i += 1) {
+        const y = 40 + ART.Hash(sceneKey + "fl" + i) * 320;
+        g.lineWidth = 2 + ART.Hash(sceneKey + "fw" + i) * 5;
+        g.beginPath();
+        g.moveTo(0, y);
+        for (let t = 0; t <= 12; t += 1) g.lineTo((t / 12) * 1200, y + (ART.Hash(sceneKey + "f" + i + t) - 0.5) * 12);
+        g.stroke();
+      }
+      g.restore();
+      ART.Speckle(g, 0, 0, 1200, 400, sceneKey + "fsp", { count: 300, alpha: 0.14, size: 3, color: "#3a2c1c" });
+      return CanvasTexture(c);
+    })();
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(range[1] - range[0] + 4, NEAR_Z - BACK_Z),
+      new THREE.MeshBasicMaterial({ map: floorTex }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set((range[0] + range[1]) / 2, UNDER_Y, (NEAR_Z + BACK_Z) / 2);
+    floor.renderOrder = -8;
+    group.add(floor);
+
+    // —— 3) 后壁：地道尽头那面土墙，带镐痕
+    const backW = range[1] - range[0] + 4;
+    const back = BakeSprite(Math.ceil(backW * PPM), Math.ceil(3.6 * PPM), 0, Math.ceil(3.6 * PPM), (ctx) => {
+      const w = Math.ceil(backW * PPM), h = Math.ceil(3.6 * PPM);
+      const grd = ctx.createLinearGradient(0, 0, 0, h);
+      grd.addColorStop(0, "#3a2c1c");
+      grd.addColorStop(1, "#5c4630");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, w, h);
+      // 镐痕：一道道弧
+      ctx.save();
+      ctx.globalAlpha = 0.26;
+      ctx.strokeStyle = "#2b2015";
+      ctx.lineWidth = 3;
+      for (let i = 0; i < w / 26; i += 1) {
+        const px = i * 26 + ART.Hash(sceneKey + "pk" + i) * 14;
+        const py = 20 + ART.Hash(sceneKey + "pky" + i) * (h - 40);
+        ctx.beginPath();
+        ctx.arc(px, py, 12 + ART.Hash(sceneKey + "pr" + i) * 10, 0.6, 2.4);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ART.Speckle(ctx, 0, 0, w, h, sceneKey + "bsp", { count: Math.round(w / 12), alpha: 0.18, size: 3, color: "#241a10" });
+    });
+    PlaceSprite(back, range[0] - 2, UNDER_Y, BACK_Z);
+    group.add(back);
+
+    // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去
+    const beamZ = [BACK_Z + 1.2, -2.4, -0.3, 1.6];
+    let bi = 0;
+    for (let x = range[0] + 4; x < range[1] - 2; x += 4.0) {
+      const z = beamZ[bi % beamZ.length];
+      bi += 1;
+      const beamH = Math.ceil(1.55 * PPM);
+      const beam = BakeSprite(150, beamH, 75, beamH, (ctx, ax, ay) => {
+        ART.DrawSupportBeam(ctx, ax, 5, ay, sceneKey + "bm" + x);
+      }, 0, 3);
+      PlaceSprite(beam, x, UNDER_Y, z);
+      // 越近越亮越大（挡在人前面），越远越暗越小 —— 前后关系就读出来了
+      const t = (z - BACK_Z) / (NEAR_Z - BACK_Z);          // 0 远 → 1 近
+      const tint = 0.74 + t * 0.42;
+      beam.material.color.setRGB(tint, tint * 0.97, tint * 0.92);
+      beam.material.opacity = 0.9 + t * 0.1;
+      group.add(beam);
+    }
+
+    // —— 5) 竖井与洞里的零件（贴在中景，人可以从它前后经过）
+    for (const shaft of sceneDef.shafts) {
+      if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
+      const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
+        Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
+          ART.DrawShaft(ctx, ax, 4, ay - 0.3 * PPM, shaft.id);
+        }, 0, 2);
+      PlaceSprite(sh, shaft.x, UNDER_Y, -1.2);
+      group.add(sh);
+    }
+    for (const p of sceneDef.props) {
+      if (p.kind === "vent") {
+        const v = BakeSprite(60, Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), 30,
+          Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), (ctx, ax, ay) => {
+            ART.DrawVentPipe(ctx, ax, 4, ay, p.id);
+          }, 0, 2);
+        PlaceSprite(v, p.x, TUN_TOP, -2.0);
+        group.add(v);
+      } else if (p.kind === "bell") {
+        const b = BakeSprite(80, 90, 40, 78, (ctx, ax, ay) => ART.DrawBell(ctx, ax, ay - 40, p.id, {}), 0, 3);
+        PlaceSprite(b, p.x, TUN_TOP - 0.7, -1.0);
+        group.add(b);
+      } else if (p.kind === "chamber" || p.kind === "pocket") {
+        // 洞室的后壁再退一层，读出"这里更深"
+        const cw = (p.kind === "chamber" ? p.w : 5.6);
+        const cb = BakeSprite(Math.ceil(cw * PPM), Math.ceil(3.4 * PPM), 0, Math.ceil(3.4 * PPM), (ctx) => {
+          const w = Math.ceil(cw * PPM), h = Math.ceil(3.4 * PPM);
+          const grd = ctx.createLinearGradient(0, 0, 0, h);
+          grd.addColorStop(0, "#2e2317");
+          grd.addColorStop(1, "#4a3a26");
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, w, h);
+          ART.Speckle(ctx, 0, 0, w, h, p.id + "sp", { count: 90, alpha: 0.2, size: 3, color: "#1e1710" });
+        });
+        PlaceSprite(cb, p.x - cw / 2, UNDER_Y, BACK_Z - 2.5);
+        group.add(cb);
+      }
+    }
   }
 
   function AddCollapses(group, sceneDef) {
