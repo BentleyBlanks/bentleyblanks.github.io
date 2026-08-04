@@ -276,6 +276,65 @@ export function CreateWorld(canvasEl) {
     group.add(mesh);
   }
 
+  // 真正的水平地面：其余元素都是竖直广告牌，只有这块是躺平的几何。
+  // 相机在 y≈2.7 平视，于是它自然向地平线收敛 —— 垄沟与车辙的收敛线
+  // 就是 2.5D 纵深最强的读法，是此前一直缺的那一块。
+  function AddGroundPlane(group, length, light, id) {
+    const nearZ = 2.5, farZ = -72;
+    const depth = nearZ - farZ;
+    const wWorld = length + 220;
+    // 贴图：u 沿 x，v 沿纵深；沿 x 等距的线在透视下会收敛
+    const wPx = 1400, hPx = 900;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const pal = {
+      day: ["#c6a86c", "#a98c58"], dawn: ["#b09a7c", "#8f7c62"],
+      night: ["#3f4756", "#2e3542"], tunnel: ["#3a3229", "#2b251d"], dark: ["#251f1a", "#181410"],
+    }[light] || ["#c6a86c", "#a98c58"];
+    const g = ctx.createLinearGradient(0, 0, 0, hPx);
+    g.addColorStop(0, pal[1]);   // 远端更暗（空气透视）
+    g.addColorStop(1, pal[0]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, wPx, hPx);
+    // 垄沟：沿纵深方向的长线，透视里会收敛到消失点
+    ctx.save();
+    ctx.globalAlpha = 0.30;
+    ctx.strokeStyle = "#5b4a32";
+    for (let i = 0; i < 46; i += 1) {
+      const x = (i / 46) * wPx + ART.Hash(id + i) * 12;
+      ctx.lineWidth = 1.6 + ART.Hash(id + "w" + i) * 2.6;
+      ctx.beginPath();
+      ctx.moveTo(x, hPx);
+      for (let t = 1; t <= 8; t += 1) {
+        ctx.lineTo(x + (ART.Hash(id + i + t) - 0.5) * 10, hPx - (t / 8) * hPx);
+      }
+      ctx.stroke();
+    }
+    // 横向的田埂与车辙
+    ctx.globalAlpha = 0.22;
+    for (let j = 0; j < 9; j += 1) {
+      const y = hPx - Math.pow(j / 9, 1.7) * hPx;
+      ctx.lineWidth = 2 + (8 - j) * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for (let t = 0; t <= 14; t += 1) ctx.lineTo((t / 14) * wPx, y + (ART.Hash(id + "h" + j + t) - 0.5) * 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ART.Speckle(ctx, 0, 0, wPx, hPx, id + "sp", { count: 520, alpha: 0.10, size: 3, color: "#3d3020" });
+
+    const tex = CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(wWorld, depth),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: false, depthWrite: true }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(length / 2, SURFACE_Y - 0.02, (nearZ + farZ) / 2);
+    mesh.renderOrder = -10;
+    group.add(mesh);
+    return mesh;
+  }
+
   function AddRidgeBand(group, length, color, id, { amp = 26, base = 34, blur = 2.2, lift = 0.6, opacity = 1 } = {}) {
     const worldW = length * 0.5 + 90;
     const wPx = Math.ceil(worldW * PPM * 0.34);
@@ -426,7 +485,7 @@ export function CreateWorld(canvasEl) {
   }
 
   // 落地投影：没有影子的物件永远像浮在地面线上
-  function AddGroundShadow(group, x, halfW, strength = 0.28) {
+  function AddGroundShadow(group, x, halfW, strength = 0.28, z = 0) {
     const wPx = Math.ceil(halfW * 2.6 * PPM);
     const hPx = Math.ceil(0.9 * PPM);
     const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx * 0.5, (ctx, ax, ay) => {
@@ -438,21 +497,29 @@ export function CreateWorld(canvasEl) {
       ctx.ellipse(ax, ay, wPx / 2, hPx / 2, 0, 0, Math.PI * 2);
       ctx.fill();
     });
-    PlaceSprite(mesh, x, SURFACE_Y + 0.02, -0.05);
+    PlaceSprite(mesh, x, SURFACE_Y + 0.02, z - 0.05);
     group.add(mesh);
   }
 
   function AddProp(group, p, light, ruined, sceneKey) {
     const night = light === "night" || light === "tunnel" || light === "dark";
     const gy = SURFACE_Y;
-    const mk = (wPx, hPx, ax, ay, fn, x = p.x, y = gy, z = 0) => {
+    const mk = (wPx, hPx, ax, ay, fn, x = p.x, y = gy, z = pz) => {
       const mesh = BakeSprite(wPx, hPx, ax, ay, fn, 0, PROP_SS);
       PlaceSprite(mesh, x, y, z);
       group.add(mesh);
       return mesh;
     };
+    // 玩法层内部的纵深：房子退到行走线之后，桌凳门框贴在行走线上，
+    // 井台磨盘略微靠前。近大远小与前后遮挡由透视自然给出。
+    const KIND_Z = {
+      house: -3.4, prison: -4.2, blockhouse: -5.0, fortWall: -2.6, fortGate: -1.6,
+      tree: -2.2, crops: -1.4, lamppost: -0.8, doorframe: 0.15, bench: 0.3,
+      stool: 0.45, well: 0.6, millstone: 0.7, woodpile: 0.5, hatch: 0.2, ditch: 0.35,
+    };
+    const pz = KIND_Z[p.kind] ?? 0;
     if (["house", "tree", "well", "millstone", "woodpile", "bench", "blockhouse", "prison"].includes(p.kind)) {
-      AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, p.kind === "house" ? 0.34 : 0.26);
+      AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, p.kind === "house" ? 0.34 : 0.26, pz);
     }
     switch (p.kind) {
       case "house": {
@@ -527,10 +594,11 @@ export function CreateWorld(canvasEl) {
   function AddCover(group, c, light) {
     const night = light === "night" || light === "dark" || light === "tunnel";
     const gy = SURFACE_Y;
-    AddGroundShadow(group, c.x, (c.w || 2) / 2 + 0.5, 0.22);
+    const cz = -1.6 + ART.Hash("cz" + c.id) * 2.6;   // 有的在身后，有的在身前
+    AddGroundShadow(group, c.x, (c.w || 2) / 2 + 0.5, 0.22, cz);
     const mk = (wPx, hPx, ax, ay, fn) => {
       const mesh = BakeSprite(wPx, hPx, ax, ay, fn, 0, PROP_SS);
-      PlaceSprite(mesh, c.x, gy, 0);
+      PlaceSprite(mesh, c.x, gy, cz);
       group.add(mesh);
     };
     switch (c.kind) {
@@ -714,7 +782,9 @@ export function CreateWorld(canvasEl) {
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
 
-    // 地表带：没有地道剖面的场景要一直填到画面下缘，别露出天空底色
+    // 真正的地面（躺平的几何，向地平线收敛）
+    AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
+    // 近处的断面带：把玩法线前缘收住，也遮住地平面的近端接缝
     AddGroundBand(layers.play, -30, L + 30, SURFACE_Y, ch.light, ch.scene + "ground",
       sceneDef.walk.under ? 3.2 : 16);
 
