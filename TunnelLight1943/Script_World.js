@@ -179,6 +179,14 @@ export function CreateWorld(canvasEl) {
     (LAYER_ORDER[layerKey] ?? 6000) + Math.round((Math.max(-12, Math.min(12, z)) + 12) * 20);
   // 给一个动态对象（演员骨架、携带物、掉落物）派发 play 层的绘制序号。
   // 骨架内部各骨头共用同一序号，彼此的前后仍由各自的局部 z 决定。
+  // 钉死一个元素的绘制序号：既写进 userData（ApplyDepthOrder 重跑时不会被
+  // 覆盖），也立刻生效——懒创建的元素（流体、标记）等不到下一趟派发。
+  function FixOrder(obj, order) {
+    obj.userData.fixedOrder = order;
+    obj.renderOrder = order;
+    return obj;
+  }
+
   function SetPlayOrder(obj, z) {
     const order = DepthOrder("play", z);
     obj.traverse((o) => { if (o.isMesh) o.renderOrder = order; });
@@ -335,7 +343,7 @@ export function CreateWorld(canvasEl) {
     );
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set((xFrom + xTo) / 2, SURFACE_Y + 0.012, z);
-    mesh.userData.fixedOrder = LAYER_ORDER.play - 25 + Math.round(z);
+    FixOrder(mesh, LAYER_ORDER.play - 25 + Math.round(z));
     group.add(mesh);
     return mesh;
   }
@@ -434,7 +442,7 @@ export function CreateWorld(canvasEl) {
     );
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(length / 2, SURFACE_Y - 0.02, (nearZ + farZ) / 2);
-    mesh.userData.fixedOrder = LAYER_ORDER.play - 40;   // 地面躺在整个玩法层之下
+    FixOrder(mesh, LAYER_ORDER.play - 40);   // 地面躺在整个玩法层之下
     group.add(mesh);
     return mesh;
   }
@@ -651,7 +659,7 @@ export function CreateWorld(canvasEl) {
       new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
     );
     mesh.rotation.x = -Math.PI / 2;
-    mesh.userData.fixedOrder = LAYER_ORDER.play - 20;  // 投影压在地面上、在所有立面之下
+    FixOrder(mesh, LAYER_ORDER.play - 20);  // 投影压在地面上、在所有立面之下
     return mesh;
   }
 
@@ -978,7 +986,7 @@ export function CreateWorld(canvasEl) {
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set((range[0] + range[1]) / 2, UNDER_Y, (NEAR_Z + BACK_Z) / 2);
-    floor.userData.fixedOrder = LAYER_ORDER.play - 30;
+    FixOrder(floor, LAYER_ORDER.play - 30);
     group.add(floor);
 
     // —— 3) 后壁：地道尽头那面土墙，带镐痕
@@ -1467,7 +1475,7 @@ export function CreateWorld(canvasEl) {
         fluidMesh = new THREE.Mesh(new THREE.PlaneGeometry(
           fluid.x1 - fluid.x0, fluid.yTop - fluid.yBottom), mat);
         fluidMesh.position.set((fluid.x0 + fluid.x1) / 2, (fluid.yBottom + fluid.yTop) / 2, 0.35);
-        fluidMesh.userData.fixedOrder = LAYER_ORDER.fx + 220;
+        FixOrder(fluidMesh, LAYER_ORDER.fx + 220);
         layers.fx.add(fluidMesh);
       }
       // 灌烟口/灌水口持续注入
@@ -1575,7 +1583,7 @@ export function CreateWorld(canvasEl) {
           new THREE.PlaneGeometry(48 / PPM, 48 / PPM),
           new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
         );
-        markerMesh.userData.fixedOrder = LAYER_ORDER.fx + 300;
+        FixOrder(markerMesh, LAYER_ORDER.fx + 300);
         layers.fx.add(markerMesh);
       }
       markerMesh.visible = true;
