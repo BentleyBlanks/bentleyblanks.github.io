@@ -414,13 +414,26 @@ export const SCRIPTS = {
             );
           } },
         { stage: "是等在这里的。", d: 2.6, cam: { kind: "shot", x: 172, y: 1.3, dist: 7 } },
-        { stage: "妹妹的手从柱子手里被拽走。", d: 3.2, cam: { kind: "insertCard", card: "hands" },
-          on: (state) => {
-            const sister = FindActor(state, "sister");
-            if (sister) { sister.following = false; sister.cineTarget = { x: 179 }; sister.cineSpeed = 2.4; }
-            const a1 = FindActor(state, "ambush1");
-            if (a1) { a1.cineTarget = { x: 184 }; a1.cineSpeed = 2.0; a1.cineVanish = true; }
-          } },
+      ],
+    },
+    {
+      // 关卡设计写的是"带妹妹逃离失败——柱子第一次真正面对：自己保护不了家人"。
+      // 这件事不能用过场演给玩家看，得让他自己按着不放、然后眼看着按不住。
+      // 进度条永远到不了头：越用力掉得越快，这是设计，不是数值没调好。
+      kind: "doomedHold", id: "c2_grip", duration: 4.6, cap: 0.72,
+      objective: "别松手", hint: "按住 E",
+      prompt: "按住 E · 别松手",
+      onFail: (state) => {
+        const sister = FindActor(state, "sister");
+        if (sister) { sister.following = false; sister.cineTarget = { x: 179 }; sister.cineSpeed = 2.4; }
+        const a1 = FindActor(state, "ambush1");
+        if (a1) { a1.cineTarget = { x: 184 }; a1.cineSpeed = 2.0; a1.cineVanish = true; }
+      },
+    },
+    {
+      kind: "cinematic", id: "c2_taken2",
+      lines: [
+        { stage: "妹妹的手从柱子手里被拽走。", d: 3.2, cam: { kind: "insertCard", card: "hands" } },
         { stage: "他扑上去，被枪托砸在背上。", d: 3.4, cam: { kind: "close", on: "player", dist: 3.6 },
           on: (state) => { state.player.cineWalk = { x: state.player.x + 1.4, speed: 2.2 }; } },
         { stage: "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。", d: 4.4, cam: { kind: "shot", x: 168, y: 1.0, dist: 8 },
@@ -495,7 +508,7 @@ export const SCRIPTS = {
         { stage: "他的鞋底磨穿了。", d: 3.0, cam: { kind: "insertCard", card: "sole" } },
         { who: "交通员", say: "据点里又抓了几个人。柱子的妹妹，也在里面。", d: 4.2, cam: { kind: "ots", subject: "runner", other: "gao", dist: 3.6 } },
         { who: "高传宝", say: "先把人救出来。不能让乡亲们再被带走。", d: 4.0, cam: { kind: "ots", subject: "gao", other: "runner", dist: 3.6 } },
-        { stage: "鬼子放出风来，要往县里押人，日子没说定——这是撒出来的饵。谁都听得懂。", d: 4.6, cam: { kind: "shot", x: 170, y: 2.2, dist: 16 } },
+        { stage: "鬼子放出风来，要往县里押人，日子没说定。", d: 4.6, cam: { kind: "shot", x: 170, y: 2.2, dist: 16 } },
       ],
     },
   ],
@@ -654,9 +667,8 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c6_open",
       lines: [
         { stage: "押送定在后天。据点里外都加了岗。", d: 3.4, cam: { kind: "wide", x: 170 } },
-        { stage: "谁都知道这是个套：他们要的不是这十几个乡亲，是来救乡亲的人。", d: 4.6, cam: { kind: "wide", x: 150, pan: -5 } },
         { stage: "高传宝的法子是两头一起动：地面上打出动静把人引开，地下从地道把乡亲接走。", d: 4.8, cam: { kind: "wide", x: 90, pan: -6 } },
-        { who: "高传宝", say: "套是套。人，也是真的人。", d: 3.4, cam: { kind: "shot", x: 8, y: 1.2, dist: 6.5 } },
+        { stage: "高传宝把柱子叫住，让他先去看清楚。", d: 3.2, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
       ],
       onDone: (state) => { SpawnFortPatrols(state, true); },
     },
@@ -671,8 +683,37 @@ export const SCRIPTS = {
       ],
     },
     {
-      kind: "goto", id: "c6_report", zone: F.campTable, objective: "回歇脚点，把看到的画下来",
-      hint: "柱子用木匠画线的手，把据点画在了门板上",
+      // 原来这里是个走过去就过的 goto。可"这是个套"这个结论，此前是旁白直接
+      // 说给玩家听的——玩家自己一次都没推出来过。材料其实早就在手里：第三章
+      // 观察和问乡亲收集的 note 都存在 flags.notesSeen 里，只是弹了个 toast 就没了。
+      // 现在把它们一条条钉上门板，让两条对不上的线自己现形。
+      // 漏看观察点的玩家凑不齐这两条，也就推不出来——侦查这才有代价。
+      kind: "mapBoard", id: "c6_report", zone: F.campTable,
+      objective: "回歇脚点，把看到的钉在门板上",
+      hint: "柱子用木匠画线的手，把据点画在了门板上。按 E 一条条钉上去",
+      // 这两条互相矛盾：日子一天天往后推，车却从来没套过
+      contradiction: ["骡车", "押人"],
+      deduction: "押送的日子一推再推，可那辆骡车从上回看见起就没套过。",
+    },
+    {
+      // 推出来与没推出来，是两场不同的戏。玩家漏了观察点就凑不齐那两条，
+      // 只能听高传宝把答案说出来——那一刻的失落，正是"侦查有代价"该有的样子。
+      kind: "cinematic", id: "c6_brief", dynamicLines: (state) => (
+        state.flags.deduced
+          ? [
+            { who: "高传宝", say: "你说说看。", d: 2.6, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
+            { stage: "柱子指了指门板上钉在一起的那两条。", d: 3.4, cam: { kind: "ots", subject: "player", other: "gao", dist: 3.2 } },
+            { stage: "屋里安静了一会儿。", d: 2.8, cam: { kind: "shot", x: 8, y: 1.2, dist: 6.5 } },
+            { who: "高传宝", say: "套是套。人，也是真的人。", d: 3.4, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
+          ]
+          : [
+            { who: "高传宝", say: "你说说看。", d: 2.6, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
+            { stage: "柱子说不上来。", d: 2.6, cam: { kind: "ots", subject: "player", other: "gao", dist: 3.2 } },
+            { stage: "高传宝在门板上把日子和那辆骡车圈到了一起。", d: 4.0, cam: { kind: "insert", x: 8, y: 1.3, dist: 2.6 } },
+            { who: "高传宝", say: "他们要的不是这十几个乡亲。是来救乡亲的人。", d: 4.2, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
+            { who: "高传宝", say: "套是套。人，也是真的人。", d: 3.4, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 } },
+          ]
+      ),
     },
     {
       // 大纲写的是"地面制造声势 + 地下进人"同时发生，不是二选一。
@@ -702,10 +743,10 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c7_open", dynamicLines: (state) => (
         state.flags.route === "ground"
           ? [
-            { stage: "区上武工队来了两个班，和民兵分了工：地面的归他们，地下的归地道。", d: 4.4, cam: { kind: "dark" } },
-            { stage: "二更天，村北先响了枪。", d: 3.0, cam: { kind: "dark" } },
+            { stage: "二更天，村北先响了枪。柱子在那头。", d: 3.4, cam: { kind: "dark" } },
             { stage: "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。", d: 3.8, cam: { kind: "wide", x: 150, y: 1.5 } },
-            { stage: "突击组翻进围墙。柱子跟着最后一个下了地道——乡亲们要从地下走。", d: 4.4, cam: { kind: "wide", x: 60, y: -1.4, hw: 18, pan: -5 },
+            { stage: "枪声把人引出去多远，地底下就多出多少工夫。", d: 3.8, cam: { kind: "wide", x: 150, y: 1.5, pan: -4 } },
+            { stage: "打完那一阵，他才从北边退回来下的地道。接应组已经走在前头了。", d: 4.6, cam: { kind: "wide", x: 60, y: -1.4, hw: 18, pan: -5 },
               on: (state) => { SpawnRescueSquad(state); } },
           ]
           : [
@@ -990,7 +1031,11 @@ function StartDrillSmoke(state) {
 function SpawnRescueSquad(state) {
   if (FindActor(state, "squad0")) return;
   const base = state.player.x;
-  for (let i = 0; i < 4; i += 1) {
+  // 跟地面佯动组的人是打完仗才退回来的，接应组早走在前头——手边就少两个人。
+  // 这是那个选择在玩法上唯一的、也是够用的差别：地面把敌人引开了（塌方间隔更长、
+  // 探杆更稀），代价是救人时没人搭手，一趟只能带一个。
+  const n = state.flags.route === "ground" ? 2 : 4;
+  for (let i = 0; i < n; i += 1) {
     state.actors.push(MakeActor(`squad${i}`, "militia", base + 4 + i * 3.2, {
       level: "under", heading: 1, squad: true,
     }));
@@ -1354,6 +1399,8 @@ export function StepGame(state, input, dt) {
     case "lead": StepLead(state, def, input); break;
     case "observe": StepObserve(state, def, dt); break;
     case "hold": StepHold(state, def, input, dt); break;
+    case "doomedHold": StepDoomedHold(state, def, input, dt); break;
+    case "mapBoard": StepMapBoard(state, def, input); break;
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
     case "douseLamps": StepDouseLamps(state, def, input); break;
@@ -1859,8 +1906,66 @@ function StepSmokeEscape(state, def, input) {
   if (remaining.length === 0) AdvanceBeat(state);
 }
 
+// 情报板：把收集到的 note 一条条钉上去。凑齐互相矛盾的两条之后，
+// 才允许玩家把记号钉在它们中间——那一下就是"他自己看出来了"。
+function StepMapBoard(state, def, input) {
+  const b = state.beat;
+  if (!b.pinned) { b.pinned = 0; b.deduced = false; }
+  const notes = state.flags.notesSeen;
+  const inZone = Math.abs(state.player.x - def.zone.x) < 1.6
+    && (state.player.level || "surface") === (def.zone.level || "surface");
+  if (!inZone) { state.prompt = ""; return; }
+
+  if (b.pinned < notes.length) {
+    state.prompt = `E · 钉上一条（${b.pinned}/${notes.length}）`;
+    if (input.interact) {
+      state.toast = { text: notes[b.pinned], t: 4.5 };
+      b.pinned += 1;
+    }
+    return;
+  }
+  // 两条对不上的都在板上了，才给推理这一下
+  const hasBoth = def.contradiction.every((k) => notes.some((n) => n.includes(k)));
+  if (hasBoth && !b.deduced) {
+    state.prompt = "E · 把对不上的两条钉在一起";
+    if (input.interact) {
+      b.deduced = true;
+      state.flags.deduced = true;
+      state.toast = { text: def.deduction, t: 6 };
+    }
+    return;
+  }
+  state.prompt = "E · 交给高传宝";
+  if (input.interact) AdvanceBeat(state);
+}
+
+// 注定失败的按住：进度只涨到 cap 就再也上不去，时间一到必然松脱。
+// 手感上要让玩家真的在"使劲"——按住时涨，但涨到接近上限就开始往回掉，
+// 松手掉得更快。玩家不会怀疑自己没按对，只会知道抓不住。
+function StepDoomedHold(state, def, input, dt) {
+  const b = state.beat;
+  if (b.grip === undefined) { b.grip = 0; b.t = 0; }
+  b.t += dt;
+  const held = input.interactHeld || input.interact;
+  if (held) {
+    // 越接近上限，往回掉的分量越重
+    const strain = Math.max(0, b.grip - def.cap * 0.55) * 1.35;
+    b.grip = Math.min(def.cap, b.grip + (0.55 - strain) * dt);
+  } else {
+    b.grip = Math.max(0, b.grip - 0.75 * dt);
+  }
+  state.prompt = `${def.prompt}  ${Math.round(b.grip * 100)}%`;
+  if (b.t >= def.duration) {
+    def.onFail?.(state);
+    state.toast = { text: "抓不住。", t: 3.5 };
+    AdvanceBeat(state);
+  }
+}
+
 function StepRescueLoop(state, def, input, dt) {
   const trapped = state.actors.filter((a) => a.pocket && a.visible && !a.evacuated);
+  // 手边有几个人，一趟就能带几个
+  const leadCap = state.flags.route === "ground" ? 1 : 3;
 
   // 探杆：预兆→落定→宽限
   const cycle = state.flags.route === "ground" ? 7 : 9.5;
@@ -1903,12 +2008,20 @@ function StepRescueLoop(state, def, input, dt) {
       return;
     }
   }
+  const followingNow = trapped.filter((a) => a.following).length;
+  const room = leadCap - followingNow;
   const loose = trapped.find((a) => !a.following && !a.cineTarget && Math.abs(a.x - state.player.x) < 2.6);
   if (loose) {
-    if (!state.beat.quakeActive && !state.beat.quakeWarn) state.prompt = "E · 带他们走";
-    if (input.interact) {
+    if (!state.beat.quakeActive && !state.beat.quakeWarn) {
+      state.prompt = room > 0 ? "E · 带他们走" : "手上顾不过来了——先把这个送出去";
+    }
+    if (input.interact && room > 0) {
+      let left = room;
       for (const a of trapped) {
-        if (!a.following && Math.abs(a.x - state.player.x) < 3.4) { a.following = true; a.cineTarget = null; }
+        if (left <= 0) break;
+        if (!a.following && Math.abs(a.x - state.player.x) < 3.4) {
+          a.following = true; a.cineTarget = null; left -= 1;
+        }
       }
     }
   }
@@ -1975,6 +2088,9 @@ export function GetBeatTarget(state) {
       return s ? { action: "crouchAt", x: s.x, level: s.level || "surface" } : null;
     }
     case "hold": return { action: "holdAt", x: def.zone.x, level: def.zone.level || "surface" };
+    // 自动通关只要一直按住就行——反正按住也留不住她
+    case "doomedHold": return { action: "holdAt", x: state.player.x, level: state.player.level };
+    case "mapBoard": return { action: "interactAt", x: def.zone.x, level: def.zone.level || "surface" };
     case "buildSpots": {
       const i = state.beat.spotDone.findIndex((d) => !d);
       if (i < 0) return null;

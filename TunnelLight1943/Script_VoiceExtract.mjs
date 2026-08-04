@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SCRIPTS, VoiceLineId } from "./Script_Core.mjs";
+import { VoiceLineId } from "./Script_Core.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const outPath = process.argv[2] || path.join(projectDir, "Audio", "Voice_Manifest.json");
@@ -31,19 +31,31 @@ const CAST = {
 };
 const DEFAULT_CAST = { voice: "Kangkang", pitch: "0%", rate: "-8%" };
 
+// 直接扫源码而不是遍历 SCRIPTS 对象。
+//
+// 遍历对象会漏掉两类台词，而且是静悄悄地漏：
+//   1) dynamicLines 的分支剧本（第七章整段开场都在里面）——它是个函数，
+//      不喂 state 根本拿不到内容；
+//   2) StartMicroCine 里的微过场（第七章认出柱子的老人就在这儿）——
+//      它写在 step 函数体里，压根不在 beats 数组上。
+// 两类加起来漏了十几条，表现是"这几句永远没有旁白"，还很难发现。
+// 扫源码则不管台词写在哪一层，一条都跑不掉。
+const src = fs.readFileSync(path.join(projectDir, "Script_Core.mjs"), "utf8");
 const seen = new Map();
-for (const [key, beats] of Object.entries(SCRIPTS)) {
-  for (const beat of beats) {
-    for (const line of beat.lines || []) {
-      const text = line.say || line.stage;
-      if (!text) continue;
-      const who = line.say ? (line.who || "") : "";
-      const id = VoiceLineId(who, text);
-      if (seen.has(id)) continue;
-      const cast = CAST[who] ?? DEFAULT_CAST;
-      seen.set(id, { id, who, text, chapter: key, ...cast });
-    }
-  }
+const Add = (who, text) => {
+  if (!text) return;
+  const id = VoiceLineId(who, text);
+  if (seen.has(id)) return;
+  const cast = CAST[who] ?? DEFAULT_CAST;
+  seen.set(id, { id, who, text, ...cast });
+};
+// 人物台词：{ who: "爹", say: "…" }
+for (const m of src.matchAll(/\{\s*who:\s*"([^"]+)"\s*,\s*say:\s*"([^"]+)"/g)) {
+  Add(m[1], m[2]);
+}
+// 旁白：{ stage: "…" }
+for (const m of src.matchAll(/\{\s*stage:\s*"([^"]*)"/g)) {
+  Add("", m[1]);
 }
 
 const lines = [...seen.values()];
