@@ -199,7 +199,8 @@ function Lerp(a, b, t) { return a + (b - a) * t; }
 
 /**
  * 姿态解算：把状态映射成关节角度。
- * state: {phase, moving, crouch, carry, climbing, digging, aiming}
+ * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture}
+ * posture: stand | stoop | squat | crawl —— 地道各段净高不同，见 Core 的 TunnelPosture
  * 所有角度用弧度，正值 = 顺时针（面朝 +x 时向前）
  */
 export function PoseRig(rig, s, dt) {
@@ -242,8 +243,44 @@ export function PoseRig(rig, s, dt) {
     target.foreF = (-46 - push * 28) * DEG;
     target.thighB = -26 * DEG; target.shinB = 32 * DEG; target.footB = -6 * DEG;
     target.thighF = 16 * DEG; target.shinF = 12 * DEG; target.footF = -14 * DEG;
+  } else if (s.posture === "crawl") {
+    // 爬行：手脚并用。躯干压到近水平，四肢交替往前够——地道最窄的那几段
+    // （卡口、连夜赶工掏出来的新口）只能这么过去。
+    const c = s.moving ? 1 : 0;
+    target.hipY = -0.66 + (c ? Math.abs(Math.sin(p)) * 0.02 : 0);
+    target.hipX = 0.10;
+    target.torso = 76 * DEG;
+    target.head = -62 * DEG;          // 躯干快趴平了，脖子得抬起来才看得见前面
+    target.armB = (-96 + (c ? swing * 30 : 0)) * DEG;
+    target.foreB = -18 * DEG;
+    target.armF = (-96 + (c ? swing2 * 30 : 0)) * DEG;
+    target.foreF = -18 * DEG;
+    target.thighB = (-88 + (c ? swing2 * 20 : 0)) * DEG;
+    target.shinB = 92 * DEG;
+    target.footB = -30 * DEG;
+    target.thighF = (-88 + (c ? swing * 20 : 0)) * DEG;
+    target.shinF = 92 * DEG;
+    target.footF = -30 * DEG;
+  } else if (s.posture === "stoop") {
+    // 猫腰：地道里的常态。不是蹲，是弓着背走——胯只略沉，腰折下去，
+    // 头压在洞顶底下，手垂在身前随时撑一把。走得比站着慢，但还是在走。
+    const c = s.moving ? 1 : 0;
+    target.hipY = -0.14 + (c ? Math.abs(Math.sin(p)) * 0.024 : 0);
+    target.hipX = 0.05;
+    target.torso = 46 * DEG;
+    target.head = -34 * DEG;
+    target.armB = (-38 + (c ? swing * 18 : 0)) * DEG;
+    target.foreB = -40 * DEG;
+    target.armF = (-44 + (c ? swing2 * 18 : 0)) * DEG;
+    target.foreF = -36 * DEG;
+    target.thighB = (-30 + (c ? swing2 * 26 : 0)) * DEG;
+    target.shinB = (40 - (c ? swing2 * 18 : 0)) * DEG;
+    target.footB = -12 * DEG;
+    target.thighF = (-30 + (c ? swing * 26 : 0)) * DEG;
+    target.shinF = (40 - (c ? swing * 18 : 0)) * DEG;
+    target.footF = -12 * DEG;
   } else if (s.crouch) {
-    // 蹲伏：胯下沉、上身前倾、膝深弯；移动时小步挪
+    // 半蹲：胯下沉、上身前倾、膝深弯；移动时小步挪
     const c = s.moving ? 1 : 0;
     target.hipY = -0.30 + (c ? Math.abs(Math.sin(p)) * 0.03 : 0);
     target.hipX = 0.04;

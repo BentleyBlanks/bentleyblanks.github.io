@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -904,23 +904,30 @@ export function CreateWorld(canvasEl) {
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
+      // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照
+      // 都从 TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
+      const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
+        + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
       ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), tunTop);
-      for (let wx = range[0]; wx <= range[1]; wx += 1.2) {
-        ctx.lineTo(toPx(wx), tunTop + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top);
-      }
+      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
+      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
       for (let wx = range[1]; wx >= range[0]; wx -= 1.2) {
         ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
       }
       ctx.closePath();
       ctx.fill();
-      // 洞室 / 旁洞更高
+      // 洞室 / 旁洞：直得起腰的地方。顶要拱起来，不能是个平顶方盒——
+      // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位
+      const Dome = (cx, halfW, topY) => {
+        ctx.beginPath();
+        ctx.moveTo(toPx(cx - halfW), tunBot);
+        ctx.bezierCurveTo(toPx(cx - halfW * 0.72), topY, toPx(cx + halfW * 0.72), topY, toPx(cx + halfW), tunBot);
+        ctx.closePath();
+        ctx.fill();
+      };
       for (const p of sceneDef.props) {
-        if (p.kind === "chamber") {
-          ctx.fillRect(toPx(p.x - p.w / 2), toPy(UNDER_Y + 3.0), p.w * PPM, tunBot - toPy(UNDER_Y + 3.0));
-        } else if (p.kind === "pocket") {
-          ctx.fillRect(toPx(p.x) - 2.8 * PPM, toPy(UNDER_Y + 2.5), 5.6 * PPM, tunBot - toPy(UNDER_Y + 2.5));
-        }
+        if (p.kind === "chamber") Dome(p.x, p.w / 2, toPy(UNDER_Y + 2.5));
+        else if (p.kind === "pocket") Dome(p.x, 2.8, toPy(UNDER_Y + 2.2));
       }
       // 翻口：地道在这一段往下沉一个 U 形弯，得跟走廊一样从土里掏出来
       for (const p of sceneDef.props) {
@@ -943,10 +950,8 @@ export function CreateWorld(canvasEl) {
       // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
       ctx.globalCompositeOperation = "source-over";
       ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), tunTop);
-      for (let wx = range[0]; wx <= range[1]; wx += 1.2) {
-        ctx.lineTo(toPx(wx), tunTop + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top);
-      }
+      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
+      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
       ctx.strokeStyle = "rgba(24,17,10,0.75)";
       ctx.lineWidth = 7;
       ctx.stroke();
@@ -1339,7 +1344,7 @@ export function CreateWorld(canvasEl) {
 
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
-      climbing: extra.climbing, digging: extra.digging,
+      climbing: extra.climbing, digging: extra.digging, posture: extra.posture,
     }, dt);
 
     s.mesh.position.set(x, y, ACTOR_Z);
@@ -1409,7 +1414,7 @@ export function CreateWorld(canvasEl) {
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
-      { climbing: p.climbT > 0, digging, bodyScale: boyScale });
+      { climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture });
     ps.mesh.visible = otsHiddenId !== "player";
     LiftActor(ps, ch.light, true);
 
@@ -1445,11 +1450,11 @@ export function CreateWorld(canvasEl) {
       // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
       const underTunnel = (a.level === "under")
         && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort");
-      const roomy = underTunnel && sceneDef.props.some((pr) =>
-        (pr.kind === "chamber" || pr.kind === "pocket")
-        && Math.abs(a.x - pr.x) < ((pr.w || 5.6) / 2 + 0.5));
-      UpdateOne(s, a.x, a.level || "surface", a.heading, underTunnel && !roomy, dt, !!a.carry,
-        sisterScale ? { bodyScale: sisterScale } : {});
+      // NPC 跟玩家走同一段净高：一群人猫着腰、里头一个直着腰，立刻出戏
+      const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
+      UpdateOne(s, a.x, a.level || "surface", a.heading,
+        posture === "squat" || posture === "crawl", dt, !!a.carry,
+        { posture, ...(sisterScale ? { bodyScale: sisterScale } : {}) });
       SyncCarry(s, a.carry, a.heading);
       LiftActor(s, ch.light, false);
       // 提灯

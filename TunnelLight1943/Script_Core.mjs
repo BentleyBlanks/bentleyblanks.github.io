@@ -16,8 +16,8 @@ export const CHAPTERS = [
   { id: "c1", num: "第一章", title: "门框上的刻痕", year: "1942 · 华北敌后 · 梁家村", scene: "village", light: "day" },
   { id: "c2", num: "第二章", title: "第一次失去", year: "1943 · 春 · 梁家村", scene: "village", light: "night" },
   { id: "c3", num: "第三章", title: "寻找妹妹", year: "1943 · 据点外的庄稼地", scene: "fields", light: "night" },
-  { id: "c4", num: "第四章", title: "地道里的第一次光", year: "1943 · 高家庄地道", scene: "tunnelVillage", light: "tunnel" },
-  { id: "c5", num: "第五章", title: "反击地道", year: "1943 · 夏 · 高家庄地道", scene: "tunnelVillage", light: "tunnel" },
+  { id: "c4", num: "第四章", title: "地道里的第一次光", year: "1943 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
+  { id: "c5", num: "第五章", title: "反击地道", year: "1943 · 夏 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
   { id: "c6", num: "第六章", title: "敌人的陷阱", year: "1943 · 押送前夜", scene: "fields", light: "night" },
   { id: "c7", num: "第七章", title: "地道里的光", year: "1943 · 据点地道", scene: "tunnelFort", light: "dark" },
   { id: "c8", num: "第八章", title: "回家的路", year: "一个月后 · 梁家村", scene: "village", light: "dawn" },
@@ -105,7 +105,8 @@ export const SCENES = {
     },
   },
 
-  // 高家庄地道：剖面——地表在上，地道在下，东口进烟往西灌
+  // 沙河庄地道：剖面——地表在上，地道在下，东口进烟往西灌
+  // tight：得爬过去的窄段。新掏的暗口那一截是赶工挖的，最窄
   tunnelVillage: {
     length: 170,
     walk: { surface: [6, 164], under: [12, 151] },
@@ -126,6 +127,11 @@ export const SCENES = {
       { id: "bellWire", kind: "bell", x: 142, name: "预警铃位" },
     ],
     covers: [],
+    // 卡口与赶工掏出来的段：只能爬过去
+    tight: [
+      { x0: 19, x1: 29, mode: "crawl" },   // 新暗口那一截，天不亮才掏通的
+      { x0: 68, x1: 73, mode: "crawl" },   // 卡口：敌人钻不过来，自己也得趴下
+    ],
     zones: {
       entE: { x: 148, w: 6, level: "under", label: "东口" },
       entW: { x: 34, w: 6, level: "under", label: "西口" },
@@ -155,6 +161,11 @@ export const SCENES = {
       { id: "collapse2", kind: "collapse", x: 118, name: "塌方·二" },
     ],
     covers: [],
+    // 通到牢房地沿那最后几十步是这三天连夜掏的，最窄
+    tight: [
+      { x0: 132, x1: 150, mode: "crawl" },
+      { x0: 150, x1: 166, mode: "squat" },
+    ],
     zones: {
       fieldEnt: { x: 14, w: 7, level: "under", label: "地里入口" },
       collapse1: { x: 66, w: 5, level: "under", label: "塌方处" },
@@ -193,6 +204,28 @@ function FindActor(state, id) { return state.actors.find((a) => a.id === id); }
 // 运行时查表都走这一个函数——两边各写一份迟早会对不上，音频就整批哑掉。
 // 用文本而不是行序做键，改动剧本顺序不会让已烘的音频失效，重复的句子也
 // 自然共用同一个文件。
+// 地道净高：一段一段不一样。冀中地道干线净高多在 1.2–1.5 米，
+// **猫腰是常态**；卡口、新掏的段更矮，得半蹲甚至爬过去；能直起腰的只有
+// 藏人洞和洞室。四档姿态由这一个函数说了算——玩法（速度、姿势）、
+// 美术（洞腔画多高）、光照（空气腔多高）都从这儿取，免得三边各说各的。
+export const POSTURE_HEAD = { stand: 2.05, stoop: 1.45, squat: 1.05, crawl: 0.72 };
+export const POSTURE_SPEED = { stand: 1.0, stoop: 0.72, squat: 0.5, crawl: 0.34 };
+
+export function TunnelPosture(scene, x) {
+  // 藏人洞与洞室：唯一直得起腰的地方
+  for (const pr of scene.props) {
+    if (pr.kind !== "chamber" && pr.kind !== "pocket") continue;
+    if (Math.abs(x - pr.x) < (pr.w || 5.6) / 2 - 0.6) return "stand";
+  }
+  // 剧情指定的窄段（卡口 / 连夜掏出来的那几十步）：得爬
+  for (const t of scene.tight || []) {
+    if (x >= t.x0 && x <= t.x1) return t.mode || "crawl";
+  }
+  // 其余：猫腰打底，隔一段一处半蹲的矮腰。按位置取值，稳定可预期
+  const n = Math.sin(x * 0.17) * 0.6 + Math.sin(x * 0.052 + 1.7) * 0.4;
+  return n > 0.30 ? "squat" : "stoop";
+}
+
 export function VoiceLineId(who, text) {
   const src = (who || "") + "|" + text;
   let h = 2166136261;
@@ -528,7 +561,7 @@ export const SCRIPTS = {
     {
       kind: "cinematic", id: "c4_open",
       lines: [
-        { stage: "高家庄的地道，是乡亲们一锹一锹挖出来的。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 },
+        { stage: "沙河庄的地道，是乡亲们一锹一锹挖出来的。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 },
           on: (state) => { SpawnTunnelVillagers(state); } },
         // 说"藏得住人"，洞里就得有人：把乡亲摆在这一镜的画框里
         { stage: "它不通向据点。它通向的是：藏得住人，转移得走，活得下去。", d: 4.4, cam: { kind: "wide", x: 90, y: -1.2, pan: -6 },
@@ -916,7 +949,7 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c8_open",
       lines: [
         { stage: "一个月后。", d: 2.6, cam: { kind: "dark" } },
-        { stage: "高家庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "wide", x: 90 } },
+        { stage: "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "wide", x: 90 } },
         { stage: "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。", d: 4.8, cam: { kind: "wide", x: 130, pan: 5 } },
         { stage: "柱子带着妹妹，回了一趟梁家村。", d: 3.4, cam: { kind: "wide", x: 100, pan: -8 } },
       ],
@@ -1479,19 +1512,14 @@ function MovePlayer(state, input, dt) {
   const p = state.player;
   if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
 
-  // 地道走廊净高只有一米五，人必须猫着腰；藏人洞与旁洞才直得起腰
+  // 地道里的姿态由所在段的净高决定：猫腰是常态，半蹲是局部，
+  // 直立（藏人洞）和爬行（卡口/新掏段）是少数。见 TunnelPosture。
   const inTunnel = (env === "tunnelVillage" || env === "tunnelFort") && p.level === "under";
-  let forcedCrouch = false;
-  if (inTunnel) {
-    // 坑道大体能直腰；只有隔一段的"矮腰"处要猫着过（按位置周期，稳定可预期）
-    const roomy = scene.props.some((pr) => (pr.kind === "chamber" || pr.kind === "pocket")
-      && Math.abs(p.x - pr.x) < ((pr.w || 5.6) / 2 + 1.5));
-    const lowSpot = !roomy && (Math.sin(p.x * 0.21) > 0.55);
-    forcedCrouch = lowSpot;
-  }
-  p.crouch = forcedCrouch || !!input.crouch;
-  p.forcedCrouch = forcedCrouch;
-  let speed = p.crouch ? 2.1 : 4.2;
+  const posture = inTunnel ? TunnelPosture(scene, p.x) : (input.crouch ? "squat" : "stand");
+  p.posture = posture;
+  p.forcedCrouch = inTunnel && posture !== "stand";
+  p.crouch = posture === "squat" || posture === "crawl" || (!inTunnel && !!input.crouch);
+  let speed = 4.2 * (POSTURE_SPEED[posture] ?? 1);
   if (def?.slow) speed = 1.8;
   if (p.carry) speed = 3.0;
 
