@@ -42,9 +42,10 @@ function Degree(d, base) {
 // 每个 mood 就是一张"谁在响、响多大"的表。旋律层（pluck/lead）在扫荡时必须归零：
 // 危险的段落一旦有调子就变成动作片，情绪立刻跑偏。
 //   drone 低音持续 / pluck 古筝式衰减音 / lead 二胡 / pad 低沉气声 / pulse 低频脉动
+// step=一个音位多少秒，rest=整句留白的概率，reg=旋律层的八度偏移，
+// bright=音乐低通的上限，wet=送进混响的量，leadEvery=隔多少音位来一句二胡，drip=滴水概率
 const MOODS = {
-  //        drone pluck lead  pad   pulse  step  rest  reg   bright  wet   leadEvery drip
-  calm:    { drone: 0.30, pluck: 0.50, lead: 0.14, pad: 0.20, pulse: 0.00, step: 1.15, rest: 0.42, reg: 0, bright: 1900, wet: 0.14, leadEvery: 40, drip: 0.000 },
+  calm:   { drone: 0.30, pluck: 0.50, lead: 0.14, pad: 0.20, pulse: 0.00, step: 1.15, rest: 0.42, reg: 0, bright: 1900, wet: 0.14, leadEvery: 40, drip: 0.000 },
   tension: { drone: 0.42, pluck: 0.18, lead: 0.00, pad: 0.40, pulse: 0.20, step: 0.95, rest: 0.62, reg: -12, bright: 950, wet: 0.18, leadEvery: 0, drip: 0.000 },
   raid:    { drone: 0.46, pluck: 0.00, lead: 0.00, pad: 0.34, pulse: 0.66, step: 0.62, rest: 1.00, reg: -12, bright: 700, wet: 0.10, leadEvery: 0, drip: 0.000 },
   grief:   { drone: 0.10, pluck: 0.04, lead: 0.52, pad: 0.10, pulse: 0.00, step: 1.55, rest: 0.72, reg: 0, bright: 1300, wet: 0.26, leadEvery: 12, drip: 0.000 },
@@ -913,6 +914,7 @@ function Build(ac, options) {
   // 每帧状态
   // -------------------------------------------------------------------------
   let level = "surface";
+  let levelApplied = false;        // 已排进自动化的地上/地下状态（false=地上）
   let stepPhase = 999;
   let heartPhase = 0;
   let detection = 0;
@@ -943,6 +945,24 @@ function Build(ac, options) {
     master.gain.linearRampToValueAtTime(target, now + 0.12);
   }
 
+  // 关掉声音之后还让几十个振荡器加一个卷积混响空转，纯粹是浪费电。
+  // 但不能立刻挂起：得等淡出走完，否则等于把淡出斩断成一声"咔"。
+  let parkTimer = null;
+  function ApplyPower() {
+    if (offline) return;                       // 离线渲染的时钟由宿主推，不能碰
+    if (parkTimer !== null) { clearTimeout(parkTimer); parkTimer = null; }
+    if (!enabled) {
+      parkTimer = setTimeout(() => {
+        parkTimer = null;
+        if (disposed || enabled || typeof ac.suspend !== "function") return;
+        try { const p = ac.suspend(); if (p && p.catch) p.catch(() => {}); } catch (ignored) { /* 已挂起 */ }
+      }, 260);
+    } else if (ac.state === "suspended" && typeof ac.resume === "function") {
+      // 重新打开一般发生在设置面板里，本身就在用户手势中，iOS 也放行
+      try { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); } catch (ignored) { /* 手势外被拒 */ }
+    }
+  }
+
   // 旁白：用 HTMLAudioElement 播，尽量接进音频图（这样总音量/静音才管得住它）
   let voiceEl = null;
   let voiceNode = null;
@@ -968,8 +988,9 @@ function Build(ac, options) {
       if (disposed) return;
       try {
         // iOS Safari 的上下文出生就是 suspended，且只有用户手势里 resume 才管用。
-        // 反复调无害：已经 running 时 resume 是空操作
-        if (!offline && ac.state !== "running" && typeof ac.resume === "function") {
+        // 反复调无害：已经 running 时 resume 是空操作。
+        // 用户主动关过声音就别叫醒它，否则设置里的开关会被下一次点击推翻
+        if (enabled && !offline && ac.state !== "running" && typeof ac.resume === "function") {
           const p = ac.resume();
           if (p && typeof p.catch === "function") p.catch(() => {});
         }
@@ -985,6 +1006,7 @@ function Build(ac, options) {
       const next = !!on;
       if (next === enabled) return;
       enabled = next;
+      ApplyPower();
       ApplyVolume();
       if (enabled) { nextNote = ac.currentTime + 0.15; StartTimer(); Tick(); }
     },
@@ -1072,6 +1094,8 @@ function Build(ac, options) {
       else if (voiceEl) { ClearVoice(); duckVoice = false; ApplyDuck(); }
     },
 
+    // 第二个参数在外部叫 ctx（{moving, level, crouch, detection}），
+    // 这里改叫 frame：本文件里 ctx 已经是 AudioContext 的意思，混着用早晚出事
     Update(dt, frame = {}) {
       if (disposed) return;
       const step = Clamp(Number.isFinite(dt) ? dt : 0, 0, 0.25);
@@ -1083,9 +1107,14 @@ function Build(ac, options) {
 
       if (frame.level === "under" || frame.level === "surface") level = frame.level;
       const under = level === "under";
-      ambSurface.gain.setTargetAtTime(under ? 0 : 1, now, 0.45);
-      ambUnder.gain.setTargetAtTime(under ? 1 : 0, now, 0.45);
-      if (sfxWet) sfxWet.gain.setTargetAtTime(under ? 0.34 : 0.09, now, 0.6);
+      // 只在真的换了地方时才排自动化。每帧都调 setTargetAtTime 的话，
+      // 半小时下来单个参数上会堆出十万条事件，纯属白烧 CPU
+      if (under !== levelApplied) {
+        levelApplied = under;
+        ambSurface.gain.setTargetAtTime(under ? 0 : 1, now, 0.45);
+        ambUnder.gain.setTargetAtTime(under ? 1 : 0, now, 0.45);
+        if (sfxWet) sfxWet.gain.setTargetAtTime(under ? 0.34 : 0.09, now, 0.6);
+      }
 
       // 环境点缀：地面偶有蝉/鸟，地下偶有滴水。间隔拉得很开，多了就成了音效展示
       if (ambNext <= 0) ambNext = now + Rand(1.5, 4);
@@ -1136,6 +1165,7 @@ function Build(ac, options) {
       if (disposed) return;
       disposed = true;
       if (timer !== null) { clearInterval(timer); timer = null; }
+      if (parkTimer !== null) { clearTimeout(parkTimer); parkTimer = null; }
       api.StopVoice();
       for (let i = live.length - 1; i >= 0; i -= 1) Reap(live[i]);
       live.length = 0;
