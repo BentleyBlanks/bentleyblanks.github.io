@@ -164,8 +164,12 @@ export function CreateWorld(canvasEl) {
   const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
-  // 正交相机：真 2D 投影，无透视畸变
-  const camera = new THREE.OrthographicCamera(-10, 10, 6, -6, -100, 100);
+  // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
+  // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
+  const FOV = 30;
+  const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 400);
+  // 参考机位距离：各层贴图按 (D_REF + z深度)/D_REF 预放大，保证默认景别下比例正确
+  const D_REF = 24;
 
   // 视差层容器
   const layers = {
@@ -180,18 +184,19 @@ export function CreateWorld(canvasEl) {
     fx: new THREE.Group(),
     ots: new THREE.Group(),        // 过肩前景
   };
-  const PARALLAX = {
-    sky: 0.02, ridge: 0.07, hills: 0.16, farTown: 0.34, midTrees: 0.52,
-    nearTrees: 0.72, play: 1, fore: 1.28, fx: 1, ots: 1,
-  };
   const LAYER_Z = {
-    sky: -50, ridge: -40, hills: -32, farTown: -22, midTrees: -16,
-    nearTrees: -10, play: 0, fore: 6, fx: 7, ots: 9,
+    sky: -150, ridge: -62, hills: -44, farTown: -26, midTrees: -15,
+    nearTrees: -7.5, play: 0, fore: 5.5, fx: 0, ots: 12,
   };
+  // 透视补偿：整层按 (D_REF - z)/D_REF 放大，于是每个元素仍落在作者标注的
+  // 世界坐标与尺寸上，只是移动速率按透视自然变慢——经典视差，且随推拉变化
+  const LAYER_COMP = {};
+  for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
   // 假景深：离玩法层越远，烘焙时越糊
   const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
   for (const k of Object.keys(layers)) {
     layers[k].position.z = LAYER_Z[k];
+    layers[k].scale.setScalar(LAYER_COMP[k]);
     scene.add(layers[k]);
   }
 
@@ -221,6 +226,7 @@ export function CreateWorld(canvasEl) {
     });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
     m.renderOrder = 60;
+    m.position.z = 0.4;   // 贴着玩法层，别被透视放大
     return m;
   }
 
@@ -332,7 +338,9 @@ export function CreateWorld(canvasEl) {
   // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
   function AddForeground(group, length, night, id) {
     for (let x = 6; x < length; x += 26 + ART.Hash(id + x) * 22) {
-      const kind = ART.Hash(id + "k" + x) > 0.62 ? "branch" : "grass";
+      // 只留从画框上缘垂下的枝条：前景一点点就够，压在下缘的草丛会糊成一团
+      if (ART.Hash(id + "k" + x) < 0.45) continue;
+      const kind = "branch";
       const wPx = kind === "branch" ? 340 : 220;
       const hPx = kind === "branch" ? 200 : 150;
       const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
@@ -370,9 +378,9 @@ export function CreateWorld(canvasEl) {
         }
       }, LAYER_BLUR.fore);
       // 压到画框下缘/上缘之外，只让边角掠过——一点点就够
-      PlaceSprite(mesh, x, kind === "branch" ? SURFACE_Y + 6.4 : SURFACE_Y - 3.1, 0);
-      ScaleKeepGround(mesh, 1.5);
-      mesh.material.opacity = night ? 0.42 : 0.26;
+      PlaceSprite(mesh, x, kind === "branch" ? SURFACE_Y + 6.6 : SURFACE_Y - 4.4, 0);
+      ScaleKeepGround(mesh, 1.5 / LAYER_COMP.fore);
+      mesh.material.opacity = night ? 0.34 : 0.2;
       group.add(mesh);
     }
   }
@@ -409,7 +417,7 @@ export function CreateWorld(canvasEl) {
     return dust;
   }
 
-  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false } = {}) {
+  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1 } = {}) {
     for (let x = xFrom; x < xTo; x += 16 + ART.Hash(id + x) * 12) {
       const w = 9 + ART.Hash(id + "w" + x) * 7;
       const h = 2.6 + ART.Hash(id + "h" + x) * 1.6;
@@ -434,9 +442,9 @@ export function CreateWorld(canvasEl) {
         }
       }, LAYER_BLUR.farTown);
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
-      // 空气透视：远景压小、降对比，才读得出纵深
-      ScaleKeepGround(mesh, 0.46);
-      mesh.material.opacity = 0.42;
+      // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
+      ScaleKeepGround(mesh, objScale);
+      mesh.material.opacity = 0.62;
       group.add(mesh);
     }
   }
@@ -448,7 +456,7 @@ export function CreateWorld(canvasEl) {
         ART.DrawTree(ctx, ax, ay, id + x, { big: false, night });
       }, blur);
       PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
-      ScaleKeepGround(mesh, scale);
+      if (scale !== 1) ScaleKeepGround(mesh, scale);
       mesh.material.opacity = opacity;
       group.add(mesh);
     }
@@ -672,16 +680,45 @@ export function CreateWorld(canvasEl) {
       { amp: 40, base: 58, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7 });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
       { amp: 26, base: 34, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88 });
+
+    // 各深度层各铺一条地面：透视下它们逐级收向地平线，地就"退"出去了
+    const farEarth = {
+      day: ["#c0a675", "#ad9260"], dawn: ["#ab9880", "#94826c"],
+      night: ["#3f4757", "#333b4a"], tunnel: ["#3a352c", "#2e2a22"], dark: ["#26231e", "#1d1b17"],
+    }[ch.light] || ["#c0a675", "#ad9260"];
+    for (const [key, tint, depth] of [
+      ["hills", 0.55, 9], ["farTown", 0.72, 7], ["midTrees", 0.85, 6], ["nearTrees", 1, 5],
+    ]) {
+      if (ch.scene === "tunnelFort" && key !== "nearTrees") continue;
+      const wPx = Math.ceil((L + 160) * PPM);
+      const hPx = Math.round(depth * PPM);
+      const band = BakeSprite(wPx, hPx, 0, 4, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, hPx);
+        g.addColorStop(0, farEarth[0]);
+        g.addColorStop(1, farEarth[1]);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 4, wPx, hPx - 4);
+        ctx.strokeStyle = "rgba(43,31,22,0.5)";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
+        ctx.stroke();
+      }, LAYER_BLUR[key] || 0);
+      PlaceSprite(band, -80, SURFACE_Y, 0);
+      band.material.opacity = tint;
+      layers[key].add(band);
+    }
     if (ch.scene === "village" || ch.scene === "tunnelVillage") {
       AddParallaxTown(layers.farTown, -10, L + 10,
         state.flags.ruined && ch.light !== "night" ? "#7d7466" : pal.town,
-        ch.scene + "town", { ruined: state.flags.ruined });
+        ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown });
     }
     if (ch.scene !== "tunnelFort") {
       AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
-        { blur: LAYER_BLUR.midTrees, scale: 0.5, opacity: 0.6, step: 24 });
+        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.72, step: 24 });
       AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
-        { blur: LAYER_BLUR.nearTrees, scale: 0.72, opacity: 0.85 });
+        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.92 });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
 
@@ -711,7 +748,7 @@ export function CreateWorld(canvasEl) {
     }
     for (const spot of lampSpots) {
       const g = MakeGlow(spot.r, 0xffc878, spot.i);
-      g.position.set(spot.x, spot.y, 7.5);
+      g.position.set(spot.x, spot.y, 0.4);
       scene.add(g);
       glows.push(g);
       sceneLights.push(spot);
@@ -946,15 +983,18 @@ export function CreateWorld(canvasEl) {
   }
 
   // 暗场：地道章节压暗，灯光晕负责照明
-  function UpdateAtmosphere(state, viewW, viewH, camX, camY) {
+  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
     const ch = CHAPTERS[state.chapterIndex];
     const base = { day: 0, dawn: 0.06, night: 0.34, tunnel: 0.46, dark: 0.66 }[ch.light] ?? 0;
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
     darkMat.opacity = vignetteAlpha;
-    darkPlane.scale.set(viewW * 1.2, viewH * 1.2, 1);
-    darkPlane.position.set(camX, camY, 8);
+    // 暗场贴在相机前 3m，按该距离处的视口尺寸铺满
+    const planeZ = dist - 3;
+    const k = 3 / dist;
+    darkPlane.scale.set(viewW * k * 1.2, viewH * k * 1.2, 1);
+    darkPlane.position.set(camX, camY, planeZ);
   }
 
   // 过肩前景：把某个角色的剪影放在画面边缘（正反打用）
@@ -984,9 +1024,10 @@ export function CreateWorld(canvasEl) {
     if (!otsMesh?.visible) return;
     const spec = otsMesh.userData.place;
     const side = spec.side || -1;
+    const comp = LAYER_COMP.ots;   // 层被整体缩放过，位置要换算回局部坐标
     otsMesh.position.set(
-      camX + side * viewW * 0.33,
-      camY - viewH * 0.12 + otsMesh.userData.yOffset * 1.9,
+      (camX + side * viewW * 0.30) / comp,
+      (camY - viewH * 0.16 + otsMesh.userData.yOffset * 1.9 * comp) / comp,
       0,
     );
   }
@@ -995,21 +1036,16 @@ export function CreateWorld(canvasEl) {
   let viewW = 20, viewH = 11.25;
 
   function ApplyCamera(camX, camY, halfWidth) {
+    const aspect = camera.userData.aspect || 16 / 9;
+    // 由目标景别反推机位距离：视差与地面退缩随之自然发生
+    const dist = halfWidth / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
     viewW = halfWidth * 2;
-    viewH = viewW / (camera.userData.aspect || 16 / 9);
-    camera.left = -halfWidth;
-    camera.right = halfWidth;
-    camera.top = viewH / 2;
-    camera.bottom = -viewH / 2;
-    camera.position.set(camX, camY, 40);
+    viewH = viewW / aspect;
+    camera.aspect = aspect;
+    camera.position.set(camX, camY, dist);
+    camera.lookAt(camX, camY, 0);   // 永远正视，不旋转
     camera.updateProjectionMatrix();
-    // 视差：各层按系数反向偏移
-    for (const k of Object.keys(layers)) {
-      const p = PARALLAX[k];
-      layers[k].position.x = camX * (1 - p);
-      // 远层随相机上下轻微浮动，强化纵深
-      layers[k].position.y = camY * (1 - p) * 0.35;
-    }
+    camera.userData.dist = dist;
     // 浮尘在画框内循环飘
     for (const d of dustMotes) {
       const u = d.userData;
@@ -1023,7 +1059,7 @@ export function CreateWorld(canvasEl) {
       );
     }
     PlaceOverShoulder(camX, camY, viewW, viewH);
-    return { viewW, viewH };
+    return { viewW, viewH, dist };
   }
 
   function Resize(width, height) {
