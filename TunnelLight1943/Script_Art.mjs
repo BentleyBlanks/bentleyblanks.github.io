@@ -671,8 +671,48 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
   InkFill(ctx, Rect(x - W / 2, groundY - H, W, H), id, PAL.wallWarm,
     { amp: 1.6, lw: 2.6, shade: "rgba(74,56,42,0.18)", shadeAt: 0.62 });
   Speckle(ctx, x - W / 2, groundY - H, W, H, id + "sp", { count: 30, alpha: 0.10, size: 1.8 });
+  // 夯土层理：一版一版夯上去的横线，华北土墙的标志
+  ctx.save();
+  ctx.globalAlpha = 0.20;
+  ctx.strokeStyle = "#6b5539";
+  for (let ly = 1; ly * (H * 0.16) < H; ly += 1) {
+    const yy = groundY - ly * H * 0.16;
+    ctx.lineWidth = 1.4 + (ly % 2) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x - W / 2 + 2, yy);
+    for (let t = 0; t <= 10; t += 1) ctx.lineTo(x - W / 2 + (W * t) / 10, yy + Sym(id + "ly" + ly, t, 2.2));
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 墙根返潮：贴地一条深色，往上晕开
+  ctx.save();
+  const damp = ctx.createLinearGradient(0, groundY - H * 0.30, 0, groundY);
+  damp.addColorStop(0, "rgba(70,54,36,0)");
+  damp.addColorStop(1, "rgba(70,54,36,0.42)");
+  ctx.fillStyle = damp;
+  ctx.fillRect(x - W / 2, groundY - H * 0.30, W, H * 0.30);
+  ctx.restore();
+  // 屋檐投影：檐下一条压暗，墙才有厚度
+  ctx.save();
+  const eave = ctx.createLinearGradient(0, groundY - H, 0, groundY - H * 0.74);
+  eave.addColorStop(0, "rgba(48,36,24,0.42)");
+  eave.addColorStop(1, "rgba(48,36,24,0)");
+  ctx.fillStyle = eave;
+  ctx.fillRect(x - W / 2, groundY - H, W, H * 0.26);
+  ctx.restore();
+  // 剥落与旧联的残纸
+  for (let i = 0; i < 3; i += 1) {
+    const px = x - W / 2 + 14 + Rnd(id + "pl", i) * (W - 28);
+    const py = groundY - H * (0.3 + Rnd(id + "pl2", i) * 0.5);
+    InkFill(ctx, [[px, py], [px + 10, py - 4], [px + 13, py + 9], [px + 2, py + 11]],
+      id + "peel" + i, "#b9a37e", { amp: 1.2, lw: 1.4, line: "rgba(43,31,22,0.35)" });
+  }
   // 墙基石
   InkFill(ctx, Rect(x - W / 2, groundY - H * 0.16, W, H * 0.16), id + "base", PAL.wallShade, { amp: 1.2, lw: 2 });
+  for (let i = 0; i * 26 < W; i += 1) {
+    InkLine(ctx, x - W / 2 + i * 26, groundY - H * 0.16, x - W / 2 + i * 26, groundY,
+      id + "bs" + i, { lw: 1.2, color: "rgba(60,46,32,0.45)", amp: 1.2 });
+  }
   // 瓦顶：略微外挑 + 一排瓦楞
   const rw = W + 22, rh = H * 0.30;
   InkFill(ctx, [
@@ -1046,6 +1086,51 @@ export function DrawPrison(ctx, x, groundY, id, { night = true } = {}) {
     }
   }
   InkFill(ctx, Rect(x - 12, groundY - 34, 24, 34), id + "door", "#4a3d2c", { amp: 1.1, lw: 2.4 });
+}
+
+// 天空：白天有水彩云，夜里有星，黎明贴地一条暖带
+export function DrawSky(ctx, w, h, light, id) {
+  if (light === "night" || light === "dark" || light === "tunnel") {
+    ctx.save();
+    for (let i = 0; i < Math.round(w / 34); i += 1) {
+      const sx = Hash(id + "sx" + i) * w;
+      const sy = Hash(id + "sy" + i) * h * 0.72;
+      const r = 0.6 + Hash(id + "sr" + i) * 1.5;
+      ctx.globalAlpha = 0.25 + Hash(id + "sa" + i) * 0.5;
+      ctx.fillStyle = "#e8ecf6";
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 一弯月
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "#e6e2cf";
+    ctx.beginPath();
+    ctx.arc(w * 0.74, h * 0.2, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(w * 0.755, h * 0.185, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  // 水彩云：几团横向拉长的淡色
+  ctx.save();
+  for (let i = 0; i < Math.round(w / 220); i += 1) {
+    const cx = Hash(id + "cx" + i) * w;
+    const cy = h * (0.16 + Hash(id + "cy" + i) * 0.42);
+    const cw = 120 + Hash(id + "cw" + i) * 220;
+    ctx.globalAlpha = 0.16 + Hash(id + "ca" + i) * 0.16;
+    ctx.fillStyle = light === "dawn" ? "#f2dcc0" : "#f6f2e6";
+    for (let k = 0; k < 4; k += 1) {
+      ctx.beginPath();
+      ctx.ellipse(cx + (k - 1.5) * cw * 0.28, cy + Sym(id + "ck" + i, k, 10),
+        cw * (0.34 - k * 0.03), 15 + Hash(id + "ch" + i + k) * 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------

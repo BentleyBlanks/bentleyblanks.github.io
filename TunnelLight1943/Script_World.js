@@ -626,10 +626,51 @@ export function CreateWorld(canvasEl) {
       case "blockhouse": mk(190, 300, 95, 292, (ctx, ax, ay) => ART.DrawBlockhouse(ctx, ax, ay, p.id, { lit: true })); break;
       case "prison": mk(180, 160, 90, 152, (ctx, ax, ay) => ART.DrawPrison(ctx, ax, ay, p.id, { night: true })); break;
       case "fortSilhouette": {
-        const mesh = BakeSprite(p.w * PPM, 260, 0, 254, (ctx) => {
-          ctx.fillStyle = "#2a251e";
-          ctx.fillRect(0, 150, p.w * PPM, 110);
-          ART.DrawBlockhouse(ctx, p.w * PPM * 0.72, 254, p.id, { lit: false });
+        const mesh = BakeSprite(p.w * PPM, 300, 0, 294, (ctx) => {
+          const W2 = p.w * PPM;
+          const base = 294;
+          // 围墙 + 垛口起伏
+          ctx.fillStyle = "#2f2921";
+          ctx.fillRect(0, base - 96, W2, 96);
+          for (let i = 0; i * 34 < W2; i += 1) {
+            const hh = 16 + ART.Hash(p.id + "cr" + i) * 12;
+            ctx.fillRect(i * 34, base - 96 - hh, 19, hh);
+          }
+          // 铁丝网
+          ctx.save();
+          ctx.globalAlpha = 0.55;
+          ctx.strokeStyle = "#3d3730";
+          ctx.lineWidth = 2;
+          for (let r = 0; r < 3; r += 1) {
+            ctx.beginPath();
+            ctx.moveTo(0, base - 122 - r * 8);
+            for (let t = 0; t <= 24; t += 1) {
+              ctx.lineTo((W2 * t) / 24, base - 122 - r * 8 + (ART.Hash(p.id + "w" + r + t) - 0.5) * 9);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+          // 院里错落的房脊
+          for (let i = 0; i < 5; i += 1) {
+            const rx = W2 * (0.12 + ART.Hash(p.id + "rx" + i) * 0.7);
+            const rw = 60 + ART.Hash(p.id + "rw" + i) * 70;
+            const rh = 34 + ART.Hash(p.id + "rh" + i) * 26;
+            ctx.fillStyle = "#332d25";
+            ctx.beginPath();
+            ctx.moveTo(rx - rw / 2, base - 96);
+            ctx.lineTo(rx - rw * 0.3, base - 96 - rh);
+            ctx.lineTo(rx + rw * 0.3, base - 96 - rh);
+            ctx.lineTo(rx + rw / 2, base - 96);
+            ctx.closePath();
+            ctx.fill();
+          }
+          // 炮楼与探照灯杆
+          ART.DrawBlockhouse(ctx, W2 * 0.74, base, p.id, { lit: false });
+          ctx.fillStyle = "#2b261f";
+          ctx.fillRect(W2 * 0.28, base - 200, 5, 104);
+          ctx.beginPath();
+          ctx.arc(W2 * 0.28 + 2, base - 204, 10, 0, Math.PI * 2);
+          ctx.fill();
         });
         PlaceSprite(mesh, p.x - p.w / 2, SURFACE_Y, 0);
         group.add(mesh);
@@ -650,7 +691,7 @@ export function CreateWorld(canvasEl) {
     }
   }
 
-  function AddCover(group, c, light) {
+  function AddCover(group, c, light, ruinedScene = false) {
     const night = light === "night" || light === "dark" || light === "tunnel";
     const gy = SURFACE_Y;
     const cz = -1.6 + ART.Hash("cz" + c.id) * 2.6;   // 有的在身后，有的在身前
@@ -662,7 +703,18 @@ export function CreateWorld(canvasEl) {
     };
     switch (c.kind) {
       case "haystack": mk(c.w * PPM + 60, c.w * PPM + 90, (c.w * PPM + 60) / 2, c.w * PPM + 80,
-        (ctx, ax, ay) => ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+        (ctx, ax, ay) => {
+          if (ruinedScene) {
+            // 烧塌的草垛：只剩一圈焦黑的底与几根残秆
+            ART.InkFill(ctx, [[ax - c.w * PPM * 0.5, ay], [ax - c.w * PPM * 0.3, ay - 22],
+              [ax + c.w * PPM * 0.28, ay - 16], [ax + c.w * PPM * 0.5, ay]],
+              c.id + "burn", "#3a332a", { amp: 2.4, lw: 2.2, shade: "rgba(0,0,0,0.3)" });
+            for (let i = 0; i < 5; i += 1) {
+              ART.InkLine(ctx, ax - 20 + i * 10, ay - 8, ax - 26 + i * 12, ay - 34 - ART.Hash(c.id + i) * 18,
+                c.id + "st" + i, { lw: 2, color: "#241f18" });
+            }
+          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night });
+        }); break;
       case "firewood": mk(c.w * PPM + 60, 90, (c.w * PPM + 60) / 2, 82,
         (ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id)); break;
       case "wallSeg": mk(c.w * PPM + 40, 120, (c.w * PPM + 40) / 2, 106,
@@ -908,7 +960,21 @@ export function CreateWorld(canvasEl) {
       day: ["#cfd8dc", "#e6dcc0"], night: ["#0e1424", "#1e2740"],
       dawn: ["#8f8fa6", "#e0bc92"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
     }[ch.light] || ["#cfd8dc", "#e6dcc0"];
-    AddStrip(layers.sky, -80, L + 80, 26, -14, skyColors, "sky");
+    {
+      const skyW = Math.ceil((L + 160) * PPM * 0.14);
+      const skyH = 520;
+      const skyMesh = BakeSprite(skyW, skyH, 0, skyH, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, skyH);
+        g.addColorStop(0, skyColors[0]);
+        g.addColorStop(1, skyColors[1] || skyColors[0]);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, skyW, skyH);
+        ART.DrawSky(ctx, skyW, skyH, ch.light, ch.scene + "sky");
+      });
+      PlaceSprite(skyMesh, -80, -14, 0);
+      ScaleKeepGround(skyMesh, 7.2, (26 + 14) / (skyH / PPM));
+      layers.sky.add(skyMesh);
+    }
     // 地平线暖雾：把天和地缝起来，也是纵深的一部分
     {
       const hazeColor = {
@@ -986,6 +1052,14 @@ export function CreateWorld(canvasEl) {
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
+    // 第八章：院子一带留下焦土
+    if (state.flags.ruined) {
+      for (const bx of [30, 62, 92]) {
+        const scorch = MakeFlatShadow(9, 16, 0.34);
+        scorch.position.set(bx, SURFACE_Y + 0.02, -1.2);
+        layers.play.add(scorch);
+      }
+    }
     // 近处的断面带：把玩法线前缘收住，也遮住地平面的近端接缝
     AddGroundBand(layers.play, -30, L + 30, SURFACE_Y, ch.light, ch.scene + "ground",
       sceneDef.walk.under ? 3.2 : 16);
@@ -999,7 +1073,7 @@ export function CreateWorld(canvasEl) {
       if (["chamber", "pocket", "vent", "bell", "collapse"].includes(p.kind)) continue;
       AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene);
     }
-    for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light);
+    for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
 
     // 静态灯位
     const lampSpots = [];
