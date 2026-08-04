@@ -62,6 +62,10 @@ void main() {
 }
 `;
 
+// 动态遮挡体上限。人是站在灯前的，投出的影子比土墙的更会说话——
+// 一盏马灯扫过院子，墙上先出现的是提灯那个人被拉长的影子。
+export const MAX_BLOCKERS = 8;
+
 const FRAG = `
 precision highp float;
 uniform sampler2D uMask;
@@ -72,12 +76,27 @@ uniform float uRadius;
 uniform vec3 uColor;
 uniform float uIntensity;
 uniform float uSoft;
+uniform int uBlockerCount;
+uniform vec4 uBlockers[${MAX_BLOCKERS}];   // xy=中心 zw=半宽半高
 varying vec2 vWorld;
 
 float SolidAt(vec2 w) {
   vec2 uv = (w - uMaskMin) / uMaskSize;
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
   return texture2D(uMask, uv).r;
+}
+
+// 动态遮挡（人体）：软边一点，人的影子边缘本来就不该是刀切的
+float BlockedAt(vec2 p) {
+  float hit = 0.0;
+  for (int i = 0; i < ${MAX_BLOCKERS}; i++) {
+    if (i >= uBlockerCount) break;
+    vec4 b = uBlockers[i];
+    vec2 q = abs(p - b.xy) - b.zw;
+    float inside = max(q.x, q.y);
+    hit = max(hit, 1.0 - smoothstep(-0.06, 0.07, inside));
+  }
+  return hit;
 }
 
 void main() {
@@ -100,6 +119,8 @@ void main() {
       lit = 0.0;
       break;
     }
+    // 人挡光不挡死：半影里还留一点点，才不像贴了张黑纸
+    lit = min(lit, 1.0 - BlockedAt(p) * 0.92);
   }
   // 软化：贴着遮挡面的一圈不要硬切
   float edge = smoothstep(0.0, uSoft, dist);
@@ -110,6 +131,8 @@ void main() {
 
 /** 造一盏带遮挡的灯 */
 export function CreateOccludedLight(occluder, { radius = 5, color = 0xffc878, intensity = 1 } = {}) {
+  const blockers = [];
+  for (let i = 0; i < MAX_BLOCKERS; i += 1) blockers.push(new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uMask: { value: occluder.texture },
@@ -120,6 +143,8 @@ export function CreateOccludedLight(occluder, { radius = 5, color = 0xffc878, in
       uColor: { value: new THREE.Color(color) },
       uIntensity: { value: intensity },
       uSoft: { value: 0.55 },
+      uBlockerCount: { value: 0 },
+      uBlockers: { value: blockers },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -135,6 +160,27 @@ export function CreateOccludedLight(occluder, { radius = 5, color = 0xffc878, in
     mat.uniforms.uLightPos.value.set(x, y);
   };
   mesh.userData.SetIntensity = (v) => { mat.uniforms.uIntensity.value = v; };
+  // boxes: [{x, y, hw, hh}]，只取离本灯最近的前 MAX_BLOCKERS 个
+  mesh.userData.SetBlockers = (boxes) => {
+    const lx = mat.uniforms.uLightPos.value.x;
+    const ly = mat.uniforms.uLightPos.value.y;
+    const r = mat.uniforms.uRadius.value;
+    const near = [];
+    for (const b of boxes) {
+      // 灯就在这个体积里（提灯的人自己）——照他自己不算被挡
+      if (Math.abs(lx - b.x) < b.hw + 0.05 && Math.abs(ly - b.y) < b.hh + 0.05) continue;
+      const d = Math.hypot(lx - b.x, ly - b.y);
+      if (d > r) continue;
+      near.push({ b, d });
+    }
+    near.sort((p, q) => p.d - q.d);
+    const n = Math.min(near.length, MAX_BLOCKERS);
+    for (let i = 0; i < n; i += 1) {
+      const { b } = near[i];
+      mat.uniforms.uBlockers.value[i].set(b.x, b.y, b.hw, b.hh);
+    }
+    mat.uniforms.uBlockerCount.value = n;
+  };
   mesh.userData.SetRadius = (r) => {
     mat.uniforms.uRadius.value = r;
     mesh.geometry.dispose();

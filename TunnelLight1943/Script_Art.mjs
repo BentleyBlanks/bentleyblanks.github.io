@@ -621,6 +621,65 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
   ctx.restore();
 }
 
+// ---------------------------------------------------------------------------
+// 手里的灯。之前"提灯"只是凭空一团光晕，看着像人在发光；
+// 现在光有来处：一盏实物挂在手上，光晕从它的火心发出去。
+//   kind = "lantern"   纸灯笼（挑在竹竿上带路的就是这个）
+//   kind = "hurricane" 马灯（铁提梁 + 玻璃罩）
+// ---------------------------------------------------------------------------
+// 坐标约定：(x,y) 是手的握点，画布 y 向下（灯挂在手下面 = 正 y）
+export function DrawHandLamp(ctx, x, y, S, kind = "hurricane") {
+  ctx.save();
+  ctx.translate(x, y);
+  if (kind === "lantern") {
+    // 竹竿从手里斜挑出去，灯笼吊在竿头
+    InkLine(ctx, -9 * S, 4 * S, 8 * S, -9 * S, "lantPole", { lw: 1.6 * S, color: "#7a5c3a", amp: 0.6 });
+    InkLine(ctx, 7 * S, -8 * S, 7 * S, -5 * S, "lantCord", { lw: 1 * S, color: "#5c4530", amp: 0.4 });
+    // 纸罩：竖长的六边，上下两道木箍
+    InkFill(ctx, [
+      [3.9 * S, -5 * S], [2.9 * S, 1.5 * S], [3.9 * S, 8 * S],
+      [10.1 * S, 8 * S], [11.1 * S, 1.5 * S], [10.1 * S, -5 * S],
+    ], "lantPaper", "#e8b25c", { amp: 0.5 * S, lw: 1.5 * S, shade: "rgba(140,70,20,0.26)", shadeAt: 0.62 });
+    InkLine(ctx, 3.9 * S, -5 * S, 10.1 * S, -5 * S, "lantHoopT", { lw: 1.4 * S, color: "#6b5034" });
+    InkLine(ctx, 3.9 * S, 8 * S, 10.1 * S, 8 * S, "lantHoopB", { lw: 1.4 * S, color: "#6b5034" });
+    const g = ctx.createRadialGradient(7 * S, 1.5 * S, 0, 7 * S, 1.5 * S, 6 * S);
+    g.addColorStop(0, "rgba(255,246,220,0.95)");
+    g.addColorStop(1, "rgba(255,190,92,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(7 * S, 1.5 * S, 6 * S, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // 马灯：提梁挂在手上，铁顶 + 玻璃罩 + 铁底座往下垂
+    ctx.beginPath();
+    ctx.moveTo(-4.2 * S, 5.6 * S);
+    ctx.quadraticCurveTo(0, -1 * S, 4.2 * S, 5.6 * S);
+    ctx.strokeStyle = "#4a4238";
+    ctx.lineWidth = 1.5 * S;
+    ctx.stroke();
+    InkFill(ctx, Rect(-5 * S, 5 * S, 10 * S, 2.6 * S), "hurTop", "#5c5348", { amp: 0.4 * S, lw: 1.3 * S });
+    InkFill(ctx, [
+      [-4.4 * S, 7.6 * S], [4.4 * S, 7.6 * S], [3.8 * S, 15.6 * S], [-3.8 * S, 15.6 * S],
+    ], "hurGlass", "#f0cf86", { amp: 0.35 * S, lw: 1.3 * S, shade: "rgba(150,90,20,0.22)", shadeAt: 0.62 });
+    InkFill(ctx, Rect(-5 * S, 15.6 * S, 10 * S, 2.8 * S), "hurBase", "#544b40", { amp: 0.4 * S, lw: 1.3 * S });
+    const g = ctx.createRadialGradient(0, 11.5 * S, 0, 0, 11.5 * S, 5.4 * S);
+    g.addColorStop(0, "rgba(255,248,224,1)");
+    g.addColorStop(0.45, "rgba(255,206,120,0.6)");
+    g.addColorStop(1, "rgba(255,180,80,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 11.5 * S, 5.4 * S, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 火心相对握点的偏移，与 DrawHandLamp 同一套坐标（未乘 S，y 向下）
+export const HAND_LAMP_FLAME = {
+  hurricane: { x: 0, y: 11.5 },
+  lantern: { x: 7, y: 1.5 },
+};
+
 // 扛着的东西
 export function DrawCarry(ctx, x, y, S, facing, label) {
   ctx.save();
@@ -1536,6 +1595,28 @@ export function DrawMarker(ctx, x, y, t) {
   ctx.save();
   ctx.translate(x, y + bob);
   InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
+  ctx.restore();
+}
+
+// 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。
+// 目标标记是黄色实心三角（指路），玩家标记就得长得完全不一样——
+// 一枚空心的细线人字标，只有轮廓，不抢画面。
+export function DrawPlayerTag(ctx, x, y, t) {
+  const bob = Math.sin(t * 2.6) * 2.4;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-8, -7);
+  ctx.lineTo(0, 2);
+  ctx.lineTo(8, -7);
+  ctx.strokeStyle = "rgba(20,14,8,0.55)";
+  ctx.lineWidth = 5.2;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,232,178,0.95)";
+  ctx.lineWidth = 2.6;
+  ctx.stroke();
   ctx.restore();
 }
 

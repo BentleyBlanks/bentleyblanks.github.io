@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0a0908">
   <meta name="description" content="《地道里的光》——1942-1943 华北敌后，一个木匠儿子在地道里学会保护更多人的白盒原型">
   <title>地道里的光 · 白盒原型</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=011">
+  <link rel="stylesheet" href="./Style_Game.css?v=012">
   <script type="importmap">
     {
       "imports": {
@@ -79,6 +79,18 @@
 
   <div id="rotateHint" hidden><span>请把手机横过来</span></div>
 
+  <button id="btnDebug" type="button" title="调试面板（` 或 F2）">DEBUG</button>
+  <section id="debugPanel" hidden aria-label="调试面板">
+    <header>
+      <b>调试 · 跳到第 N 幕</b>
+      <span id="debugNow"></span>
+      <button id="debugClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <nav id="debugChapters"></nav>
+    <ol id="debugBeats"></ol>
+    <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
+  </section>
+
   <section id="titleScreen">
     <div class="titleInner">
       <p class="eyebrow">WHITEBOX PROTOTYPE · 1942–1943 华北敌后</p>
@@ -100,6 +112,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=011"></script>
+<script type="module" src="./Script_Main.js?v=012"></script>
 </body>
 </html>
