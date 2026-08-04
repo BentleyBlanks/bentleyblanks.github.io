@@ -331,10 +331,13 @@ function SyncHud(state, dt, shotFade) {
       choiceBuilt = true;
       ui.choicePrompt.textContent = def.prompt;
       ui.choiceList.innerHTML = "";
+      const OPTION_ICON = { ground: "./Icon/Icon_ChoiceGround.png", tunnel: "./Icon/Icon_ChoiceTunnel.png" };
       def.options.forEach((opt, i) => {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.innerHTML = `<b>${i + 1} · ${opt.label}</b><span>${opt.detail}</span>`;
+        const icon = OPTION_ICON[opt.key];
+        btn.innerHTML = (icon ? `<img class="choiceIcon" src="${icon}" alt="">` : "")
+          + `<b>${i + 1} · ${opt.label}</b><span>${opt.detail}</span>`;
         btn.addEventListener("click", () => { MakeChoice(state, opt.key); HideChoice(); });
         ui.choiceList.appendChild(btn);
       });

@@ -1207,3 +1207,155 @@ export function DrawMarker(ctx, x, y, t) {
   InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// 插入特写卡：把镜头真正要看的那个细节单独画一张，铺满画框。
+// 勇敢的心就是这么处理特写的——不去放大世界里的精灵，另画一张。
+// 画布约定：以 (0,0)-(W,H) 为画框，构图自带留白。
+// ---------------------------------------------------------------------------
+function CardBase(ctx, W, H, tint = "#d8c8a4") {
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.46, H * 0.1, W * 0.5, H * 0.5, H * 0.86);
+  g.addColorStop(0, tint);
+  g.addColorStop(1, "#6b5c44");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "cardgrain", { count: Math.round(W / 6), alpha: 0.07, size: 2.4 });
+}
+
+export function DrawInsertCard(ctx, W, H, kind) {
+  const cx = W * 0.5, cy = H * 0.52;
+  const S = H / 420;                       // 以高度归一，构图不随分辨率变
+  switch (kind) {
+    case "carve": {
+      // 一只手攥着凿子，在门框上刻线；木屑正在掉
+      CardBase(ctx, W, H, "#cbb governor");
+      CardBase(ctx, W, H, "#cbb68e");
+      // 门框立柱（占右侧）
+      InkFill(ctx, Rect(cx + 40 * S, 0, 150 * S, H), "cardPost", PAL.wood,
+        { amp: 3 * S, lw: 5 * S, shade: "rgba(0,0,0,0.18)" });
+      for (let i = 0; i < 5; i += 1) {
+        InkLine(ctx, cx + 66 * S, H * (0.1 + i * 0.18), cx + 74 * S, H * (0.24 + i * 0.18),
+          "cardGrain" + i, { lw: 2.4 * S, color: "rgba(90,60,35,0.5)", amp: 6 * S });
+      }
+      // 爹刻的旧线
+      InkLine(ctx, cx + 44 * S, cy + 96 * S, cx + 186 * S, cy + 92 * S, "cardOld",
+        { lw: 7 * S, color: "#f0e2b4", amp: 2 * S });
+      // 新刻的一道（正在刻）
+      InkLine(ctx, cx + 44 * S, cy - 40 * S, cx + 150 * S, cy - 44 * S, "cardNew",
+        { lw: 8 * S, color: "#fff2cc", amp: 2 * S });
+      // 凿子
+      ctx.save();
+      ctx.translate(cx - 10 * S, cy - 30 * S);
+      ctx.rotate(-0.18);
+      InkFill(ctx, Rect(-120 * S, -16 * S, 150 * S, 32 * S), "cardChisel", "#8a6a45",
+        { amp: 2 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.2)" });
+      InkFill(ctx, [[30 * S, -13 * S], [82 * S, -6 * S], [82 * S, 6 * S], [30 * S, 13 * S]],
+        "cardBlade", "#b9b3a4", { amp: 1.6 * S, lw: 4 * S, shade: "rgba(0,0,0,0.22)" });
+      ctx.restore();
+      // 手（握拳的侧面）
+      InkFill(ctx, [
+        [cx - 250 * S, cy + 10 * S], [cx - 150 * S, cy - 60 * S], [cx - 60 * S, cy - 52 * S],
+        [cx - 30 * S, cy - 8 * S], [cx - 62 * S, cy + 62 * S], [cx - 210 * S, cy + 86 * S],
+      ], "cardHand", PAL.skin, { amp: 3 * S, lw: 5.5 * S, shade: "rgba(0,0,0,0.14)" });
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, cx - 150 * S + i * 34 * S, cy - 48 * S, cx - 142 * S + i * 34 * S, cy - 6 * S,
+          "cardKnuck" + i, { lw: 3 * S, color: "rgba(120,80,50,0.55)", amp: 3 * S });
+      }
+      // 掉下来的木屑
+      for (let i = 0; i < 9; i += 1) {
+        const fx = cx + 20 * S + Hash("chip" + i) * 120 * S;
+        const fy = cy + 40 * S + Hash("chipy" + i) * H * 0.34;
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.rotate(Hash("chipr" + i) * 3);
+        InkFill(ctx, [[-14 * S, 0], [0, -7 * S], [16 * S, 2 * S], [2 * S, 8 * S]], "chip" + i, "#e0c78e",
+          { amp: 1.4 * S, lw: 2.4 * S });
+        ctx.restore();
+      }
+      break;
+    }
+    case "sole": {
+      // 交通员磨穿的鞋底
+      CardBase(ctx, W, H, "#b8a684");
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-0.12);
+      InkFill(ctx, [
+        [-210 * S, -70 * S], [40 * S, -96 * S], [188 * S, -52 * S], [206 * S, 12 * S],
+        [120 * S, 78 * S], [-140 * S, 92 * S], [-224 * S, 22 * S],
+      ], "cardSole", "#6b5236", { amp: 4 * S, lw: 6 * S, shade: "rgba(0,0,0,0.24)" });
+      // 磨穿的洞
+      InkFill(ctx, [
+        [-40 * S, -20 * S], [58 * S, -34 * S], [92 * S, 12 * S], [16 * S, 44 * S], [-52 * S, 22 * S],
+      ], "cardHole", "#241a12", { amp: 3.4 * S, lw: 4.5 * S });
+      // 露出来的布与脚
+      InkFill(ctx, [[-16 * S, -8 * S], [46 * S, -18 * S], [58 * S, 8 * S], [-4 * S, 24 * S]],
+        "cardFoot", PAL.skinDark, { amp: 2.4 * S, lw: 3.4 * S });
+      // 针脚
+      for (let i = 0; i < 14; i += 1) {
+        const t = i / 13;
+        InkLine(ctx, -206 * S + t * 400 * S, -78 * S + Math.sin(t * 3) * 14 * S,
+          -206 * S + t * 400 * S, -62 * S + Math.sin(t * 3) * 14 * S,
+          "stitch" + i, { lw: 2.6 * S, color: "rgba(40,30,20,0.6)", amp: 1.6 * S });
+      }
+      // 泥
+      Speckle(ctx, cx - 240 * S, cy - 100 * S, 460 * S, 200 * S, "mud", { count: 40, alpha: 0.22, size: 4 * S, color: "#3d2f1e" });
+      ctx.restore();
+      break;
+    }
+    case "wick": {
+      // 烧到头的灯芯
+      CardBase(ctx, W, H, "#4a3826");
+      // 灯盏
+      InkFill(ctx, [
+        [cx - 170 * S, cy + 120 * S], [cx + 170 * S, cy + 120 * S],
+        [cx + 120 * S, cy + 20 * S], [cx - 120 * S, cy + 20 * S],
+      ], "cardLamp", "#8a6a45", { amp: 3 * S, lw: 5.5 * S, shade: "rgba(0,0,0,0.24)" });
+      // 灯油
+      InkFill(ctx, [[cx - 112 * S, cy + 24 * S], [cx + 112 * S, cy + 24 * S], [cx + 100 * S, cy + 48 * S], [cx - 100 * S, cy + 48 * S]],
+        "cardOil", "#3a2a18", { amp: 2 * S, lw: 3 * S });
+      // 灯芯：只剩一小截，头上一点红
+      InkFill(ctx, Rect(cx - 9 * S, cy - 30 * S, 18 * S, 58 * S), "cardWick", "#2e241a",
+        { amp: 1.6 * S, lw: 3.4 * S });
+      const g = ctx.createRadialGradient(cx, cy - 44 * S, 0, cx, cy - 44 * S, 150 * S);
+      g.addColorStop(0, "rgba(255,230,170,0.95)");
+      g.addColorStop(0.3, "rgba(255,170,70,0.55)");
+      g.addColorStop(1, "rgba(255,140,50,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - 160 * S, cy - 200 * S, 320 * S, 320 * S);
+      InkFill(ctx, [
+        [cx - 13 * S, cy - 30 * S], [cx, cy - 76 * S], [cx + 13 * S, cy - 30 * S],
+      ], "cardFlame", "#ffd98a", { amp: 2 * S, lw: 0, line: null });
+      break;
+    }
+    case "hands": {
+      // 两只手被拽开
+      CardBase(ctx, W, H, "#3a4152");
+      InkFill(ctx, [
+        [cx - 300 * S, cy - 60 * S], [cx - 120 * S, cy - 84 * S], [cx - 44 * S, cy - 24 * S],
+        [cx - 88 * S, cy + 44 * S], [cx - 280 * S, cy + 54 * S],
+      ], "cardHandA", PAL.skin, { amp: 3.4 * S, lw: 5.5 * S, shade: "rgba(0,0,0,0.2)" });
+      InkFill(ctx, [
+        [cx + 300 * S, cy - 40 * S], [cx + 130 * S, cy - 76 * S], [cx + 40 * S, cy - 10 * S],
+        [cx + 96 * S, cy + 58 * S], [cx + 286 * S, cy + 70 * S],
+      ], "cardHandB", "#d0a074", { amp: 3.4 * S, lw: 5.5 * S, shade: "rgba(0,0,0,0.2)" });
+      // 指尖之间已经断开的那一小段距离
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, cx - 40 * S + i * 6 * S, cy - 16 * S + i * 18 * S,
+          cx + 34 * S - i * 6 * S, cy - 6 * S + i * 18 * S,
+          "gap" + i, { lw: 2 * S, color: "rgba(255,220,180,0.18)", amp: 4 * S });
+      }
+      break;
+    }
+    default: {
+      CardBase(ctx, W, H);
+      break;
+    }
+  }
+  // 四角压暗，像一张老照片
+  const v = ctx.createRadialGradient(cx, cy, H * 0.28, cx, cy, H * 0.82);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(20,14,8,0.62)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+}

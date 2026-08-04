@@ -163,7 +163,6 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 }
 #rotateHint span::before { content: "⟳"; display: block; font-size: 44px; margin-bottom: 18px; }
 
-#prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
 
 #prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
 
@@ -173,6 +172,12 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; background: #050403; text-align: center;
 }
+#cardLamp {
+  width: 92px; margin-bottom: 18px; opacity: 0.92;
+  filter: drop-shadow(0 0 26px rgba(255, 190, 92, 0.35));
+  animation: lampBreath 4.5s ease-in-out infinite;
+}
+@keyframes lampBreath { 50% { opacity: 0.72; filter: drop-shadow(0 0 34px rgba(255, 190, 92, 0.5)); } }
 #chapterCard small { font-size: 14px; letter-spacing: 0.5em; color: var(--dim); }
 #chapterCard h2 { font-size: 40px; letter-spacing: 0.24em; color: var(--paper); font-weight: 600; }
 #chapterCard p { font-size: 14px; letter-spacing: 0.2em; color: #8f8371; }
@@ -195,6 +200,10 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 }
 #choiceList button:hover { border-color: var(--lamp); background: rgba(38, 31, 21, 0.95); }
 #choiceList button b { display: block; font-size: 17px; margin-bottom: 8px; color: var(--lamp); }
+.choiceIcon {
+  display: block; width: 100%; max-width: 190px; margin: 0 auto 12px;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));
+}
 #choiceList button span { font-size: 13.5px; line-height: 1.7; color: var(--dim); }
 
 /* 结局 */

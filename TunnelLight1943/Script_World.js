@@ -42,13 +42,22 @@ function CanvasTexture(canvas) {
 // blur：假景深——越远的层烘焙时糊得越厉害，前景也糊一点
 // ss：超采样倍率。调用处仍按 48px/米 标注尺寸，内部把画布加密 ss 倍，
 // 世界尺寸不变、贴图密度变高 —— 特写推到 480px/米 也不糊。
-function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1) {
+function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze = null) {
   const canvas = MakeCanvas(wPx * ss, hPx * ss);
   const ctx = canvas.getContext("2d");
   ctx.scale(ss, ss);
   if (blur > 0) ctx.filter = `blur(${blur}px)`;
   drawFn(ctx, anchorX, groundYPx);
   ctx.filter = "none";
+  // 空气透视：只染这一张精灵本身（source-atop），不是往画面上盖一层雾
+  if (haze && haze.amount > 0) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = haze.amount;
+    ctx.fillStyle = haze.color;
+    ctx.fillRect(0, 0, wPx, hPx);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
   const tex = CanvasTexture(canvas);
   const geo = new THREE.PlaneGeometry(wPx / PPM, hPx / PPM);
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
@@ -128,22 +137,11 @@ export function CreateWorld(canvasEl) {
   for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
   // 假景深：离玩法层越远，烘焙时越糊
   const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
-  // 空气透视：越远越向雾色靠拢、对比越低——只糊不褪色是读不出纵深的
-  const LAYER_FADE = { ridge: 0.72, hills: 0.58, farTown: 0.40, midTrees: 0.24, nearTrees: 0.10, play: 0, fore: 0.30 };
-  const hazeMesh = {};   // 每层压一张雾片，按层次把颜色往天色里推
+  // 空气透视：越远越向雾色靠拢——在烘焙时染进贴图，见 BakeSprite 的 haze 参数
+  const LAYER_FADE = { ridge: 0.62, hills: 0.48, farTown: 0.34, midTrees: 0.20, nearTrees: 0.09, play: 0, fore: 0.26 };
+  let hazeColor = "#e2d8bc";
+  const HazeFor = (key) => (LAYER_FADE[key] ? { color: hazeColor, amount: LAYER_FADE[key] } : null);
 
-  function ApplyHaze(key, hazeColor, length) {
-    const fade = LAYER_FADE[key];
-    if (!fade) return;
-    const m = new THREE.Mesh(
-      new THREE.PlaneGeometry((length + 200), 90),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(hazeColor), transparent: true, opacity: fade, depthWrite: false, depthTest: false }),
-    );
-    m.position.set(length / 2, 20, 0.02);
-    m.renderOrder = 5;
-    layers[key].add(m);
-    hazeMesh[key] = m;
-  }
   for (const k of Object.keys(layers)) {
     layers[k].position.z = LAYER_Z[k];
     layers[k].scale.setScalar(LAYER_COMP[k]);
@@ -293,7 +291,7 @@ export function CreateWorld(canvasEl) {
       ctx.lineTo(wPx, hPx);
       ctx.closePath();
       ctx.fill();
-    }, blur);
+    }, blur, 1, { color: hazeColor, amount: opacity < 0.9 ? 0.5 : 0.35 });
     PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
     ScaleKeepGround(mesh, 2.9, 1);
     mesh.material.opacity = opacity;
@@ -341,7 +339,7 @@ export function CreateWorld(canvasEl) {
             ctx.fill();
           }
         }
-      }, LAYER_BLUR.fore);
+      }, LAYER_BLUR.fore, 1, HazeFor("fore"));
       // 压到画框下缘/上缘之外，只让边角掠过——一点点就够
       PlaceSprite(mesh, x, kind === "branch" ? SURFACE_Y + 6.6 : SURFACE_Y - 4.4, 0);
       ScaleKeepGround(mesh, 1.5 / LAYER_COMP.fore);
@@ -405,7 +403,7 @@ export function CreateWorld(canvasEl) {
           ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
           ctx.globalCompositeOperation = "source-over";
         }
-      }, LAYER_BLUR.farTown);
+      }, LAYER_BLUR.farTown, 1, HazeFor("farTown"));
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
       // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
       ScaleKeepGround(mesh, objScale);
@@ -414,12 +412,12 @@ export function CreateWorld(canvasEl) {
     }
   }
 
-  function AddParallaxTrees(group, xFrom, xTo, night, id, { blur = 0, scale = 0.72, opacity = 0.85, step = 19 } = {}) {
+  function AddParallaxTrees(group, xFrom, xTo, night, id, { blur = 0, scale = 0.72, opacity = 0.85, step = 19, hazeOpt = null } = {}) {
     for (let x = xFrom; x < xTo; x += step + ART.Hash(id + x) * 16) {
       const wPx = 150, hPx = 200;
       const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
         ART.DrawTree(ctx, ax, ay, id + x, { big: false, night });
-      }, blur);
+      }, blur, 1, hazeOpt);
       PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
       if (scale !== 1) ScaleKeepGround(mesh, scale);
       mesh.material.opacity = opacity;
@@ -627,6 +625,9 @@ export function CreateWorld(canvasEl) {
     const sceneDef = SCENES[ch.scene];
     const L = sceneDef.length;
     const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
+    hazeColor = {
+      day: "#e2d8bc", dawn: "#d8c6a8", night: "#2a3752", tunnel: "#2c2318", dark: "#171310",
+    }[ch.light] || "#e2d8bc";
 
     // 遮挡掩码：土是实心的，地道/洞室/竖井是掏出来的空气
     const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
@@ -695,7 +696,7 @@ export function CreateWorld(canvasEl) {
         ctx.moveTo(0, 4);
         for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
         ctx.stroke();
-      }, LAYER_BLUR[key] || 0);
+      }, LAYER_BLUR[key] || 0, 1, HazeFor(key));
       PlaceSprite(band, -80, SURFACE_Y, 0);
       band.material.opacity = tint;
       layers[key].add(band);
@@ -707,9 +708,9 @@ export function CreateWorld(canvasEl) {
     }
     if (ch.scene !== "tunnelFort") {
       AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
-        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.72, step: 24 });
+        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.86, step: 24, hazeOpt: HazeFor("midTrees") });
       AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
-        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.92 });
+        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.96, hazeOpt: HazeFor("nearTrees") });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
 
@@ -744,12 +745,6 @@ export function CreateWorld(canvasEl) {
       glows.push(g);
       sceneLights.push(spot);
     }
-
-    // 空气透视：把远层往天色里推
-    const hazeTint = {
-      day: "#e2d8bc", dawn: "#d8c6a8", night: "#243049", tunnel: "#241d14", dark: "#12100c",
-    }[ch.light] || "#e2d8bc";
-    for (const k of ["ridge", "hills", "farTown", "midTrees", "nearTrees", "fore"]) ApplyHaze(k, hazeTint, L);
 
     // 浮尘
     for (const d of dustMotes) layers.fx.remove(d);
