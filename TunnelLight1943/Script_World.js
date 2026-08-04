@@ -692,6 +692,7 @@ export function CreateWorld(canvasEl) {
       fortWall: BAND.building, fortGate: BAND.yard, tree: BAND.yard,
       crops: BAND.yard, lamppost: BAND.yard,
       doorframe: BAND.walk, bench: BAND.walk, stool: BAND.walk, well: BAND.walk,
+      mapBoard: -0.9,   // 紧贴行走线之后：玩家走到它跟前，不会被它挡住
       millstone: BAND.walk, woodpile: BAND.walk, hatch: BAND.walk, ditch: BAND.walk,
     };
     const pz = KIND_Z[p.kind] ?? 0;
@@ -700,6 +701,18 @@ export function CreateWorld(canvasEl) {
       AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, p.kind === "house" ? 0.34 : 0.26, pz);
     }
     switch (p.kind) {
+      case "mapBoard": {
+        // 卸下来的旧门板，斜靠在歇脚点：第六章把情报一条条钉上去
+        const bw = 2.4, bh = 1.9;
+        const b = BakeSprite(Math.ceil(bw * PPM) + 24, Math.ceil(bh * PPM) + 20,
+          Math.ceil(bw * PPM) / 2 + 12, Math.ceil(bh * PPM) + 12,
+          (ctx, ax, ay) => ART.DrawMapBoard(ctx, ax, ay, bw * PPM, bh * PPM, p.id,
+            { pinned: pinnedNotes }), 0, PROP_SS);
+        PlaceSprite(b, p.x, SURFACE_Y, pz);
+        tagKind(b);
+        group.add(b);
+        break;
+      }
       case "house": {
         const W = p.w * PPM, H = p.h * PPM;
         mk(W + 90, H + 90, (W + 90) / 2, H + 84,
@@ -1108,7 +1121,12 @@ export function CreateWorld(canvasEl) {
   }
 
   // -------------------------------------------------------------------------
+  let pinnedNotes = 0;
+
   function BuildEnvironment(state) {
+    // 门板上的纸条是烘进贴图的，钉一条就得重烘一次
+    const pins = state.beat?.pinned || 0;
+    if (pins !== pinnedNotes) { pinnedNotes = pins; builtKey = ""; }
     const ch0 = CHAPTERS[state.chapterIndex];
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const key = `${ch.scene}:${ch.light}:${state.flags.ruined ? 1 : 0}:${state.flags.hiddenBuilt ? 1 : 0}`;

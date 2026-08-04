@@ -76,6 +76,8 @@ export const SCENES = {
     shafts: [],
     props: [
       { id: "ditch", kind: "ditch", x: 8, w: 14, name: "交通沟" },
+      // 歇脚点那扇卸下来的门板：第六章要往上钉情报，得看得见它
+      { id: "mapBoard", kind: "mapBoard", x: 19, name: "门板" },
       { id: "cropsA", kind: "crops", x: 34, w: 28 },
       { id: "cropsB", kind: "crops", x: 106, w: 30 },
       { id: "fortWall", kind: "fortWall", x: 178, w: 5, h: 2.8, name: "据点围墙" },
@@ -92,7 +94,7 @@ export const SCENES = {
       { id: "cropCoverB", kind: "crops", x: 112, w: 18 },
     ],
     zones: {
-      campTable: { x: 7, w: 9, label: "民兵歇脚点" },
+      campTable: { x: 19, w: 9, label: "民兵歇脚点" },
       ditchSouth: { x: 8, w: 12, label: "交通沟" },
       contactA: { x: 40, w: 6, label: "赶车的乡亲" },
       contactB: { x: 120, w: 6, label: "拾柴的大娘" },
@@ -132,6 +134,7 @@ export const SCENES = {
       trapSpot: { x: 112, w: 5, level: "under", label: "翻口" },
       bellSpot: { x: 142, w: 5, level: "under", label: "预警铃" },
       hiddenSpot: { x: 18, w: 7, level: "under", label: "新暗口" },
+      behindTrap: { x: 104, w: 7, level: "under", label: "翻口后面" },
     },
   },
 
@@ -423,6 +426,14 @@ export const SCRIPTS = {
       kind: "doomedHold", id: "c2_grip", duration: 4.6, cap: 0.72,
       objective: "别松手", hint: "按住 E",
       prompt: "按住 E · 别松手",
+      pull: { actor: "sister", from: 174.2, to: 179 },
+      onStart: (state) => {
+        state.player.x = 173;
+        state.player.heading = 1;
+        const sister = FindActor(state, "sister");
+        // 手拉着手才有"被拽走"可言——她原先站在几米开外，进度条就成了个抽象数字
+        if (sister) { sister.x = 174.2; sister.following = false; sister.heading = -1; }
+      },
       onFail: (state) => {
         const sister = FindActor(state, "sister");
         if (sister) { sister.following = false; sister.cineTarget = { x: 179 }; sister.cineSpeed = 2.4; }
@@ -632,15 +643,15 @@ export const SCRIPTS = {
       onDone: (state) => { StartDrillSmoke(state); },
     },
     {
-      kind: "smokeEscape", id: "c5_drill", dest: TV.hiddenSpot,
-      objective: "铃响了——把人从新暗口送出去",
+      kind: "smokeEscape", id: "c5_drill", dest: TV.behindTrap,
+      objective: "铃响了——赶在烟到翻口之前，把人带到弯后面",
       hint: "把人带到翻口后面去。别走西口，鬼子早就盯上它了",
       resetHint: "烟追上了人。再来——这一回，地道听你们的。",
     },
     {
       kind: "cinematic", id: "c5_test",
       lines: [
-        { stage: "烟顺着房根的暗眼散了。地面上，什么也看不出来。", d: 4.0, cam: { kind: "shot", x: 112, y: 0.4, dist: 11 } },
+        { stage: "烟堵在弯里，一夜没退。地面上，什么也看不出来。", d: 4.0, cam: { kind: "shot", x: 112, y: 0.4, dist: 11 } },
         { stage: "鬼子在村里翻到天黑，一个人也没找到。", d: 3.8, cam: { kind: "wide", x: 90 } },
         { stage: "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。", d: 4.2, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.4, dist: 7 },
           on: (state) => {
@@ -663,6 +674,14 @@ export const SCRIPTS = {
       // 清不完不是手慢：探杆一次比一次密，你每次都得停手。
       kind: "doomedHold", id: "c5_pinned", duration: 11, cap: 0.8,
       probe: { from: 5.2, to: 2.6 },
+      failToast: "土太深了。他的腿还在下面。",
+      onStart: (state) => {
+        state.player.level = "under";
+        state.player.x = 72.2;
+        state.player.heading = -1;
+        const pinned = FindActor(state, "pinned");
+        if (pinned) { pinned.x = 70.4; pinned.heading = 1; }
+      },
       objective: "把压住他腿的土清开",
       hint: "按住 E 清土。探杆到头顶上的时候必须停手",
       prompt: "按住 E · 清土",
@@ -715,7 +734,7 @@ export const SCRIPTS = {
       hint: "柱子用木匠画线的手，把据点画在了门板上。按 E 一条条钉上去",
       // 这两条互相矛盾：日子一天天往后推，车却从来没套过
       contradiction: ["骡车", "押人"],
-      deduction: "押送的日子一推再推，可那辆骡车从上回看见起就没套过。",
+      deduction: "要往县里押人的话传了一遍又一遍，可拴在门里的那辆骡车，一直没套。",
     },
     {
       // 推出来与没推出来，是两场不同的戏。玩家漏了观察点就凑不齐那两条，
@@ -772,7 +791,7 @@ export const SCRIPTS = {
               on: (state) => { SpawnRescueSquad(state); } },
           ]
           : [
-            { stage: "区上武工队来了两个班，埋伏在庄稼地里接应——地面不动，人从地下走。", d: 4.4, cam: { kind: "dark" } },
+            { stage: "区上武工队来了两个班。佯动组已经摸到村北去了——这边不动，人从地下走。", d: 4.4, cam: { kind: "dark" } },
             { stage: "二更天，地道里一盏灯也没点。", d: 3.2, cam: { kind: "dark" } },
             { stage: "队伍在黑暗里贴着墙根移动，谁也不说话。", d: 3.6, cam: { kind: "wide", x: 40, y: -1.4, hw: 18 },
               on: (state) => { SpawnRescueSquad(state); } },
@@ -841,8 +860,8 @@ export const SCRIPTS = {
       // 现在两句删掉，操作交还回去——出口就在头顶、完全通着、没有任何东西拦你，
       // 妹妹还牵在手里。要回去，得他自己先松开手。
       kind: "actSeq", id: "c7_turn2",
-      objective: "出口就在上面",
-      hint: "妹妹还牵着你的手",
+      objective: "该走了",
+      hint: "妹妹还牵着你的手。上面就是庄稼地",
       steps: [
         {
           x: 12.6, level: "under", prompt: "E · 松开手",
@@ -1152,7 +1171,7 @@ export function CreateGame(chapterIndex = 0) {
     lightOverride: null,
     flood: null,
     floodDepth: 0,
-    flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, trapBuilt: false, entWBlocked: false, notesSeen: [] },
+    flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [] },
     caption: null,
     camHint: { kind: "follow" },
     fade: 0,
@@ -1491,6 +1510,8 @@ function MovePlayer(state, input, dt) {
           state.toast = { text: "西口上面有动静——不能走这儿！", t: 2.5 };
           break;
         }
+        // 据点地道没有做地表：真让他爬上去会掉进一个空场景，提示全消失
+        if (!scene.walk.surface) break;
         p.level = "surface"; p.climbT = 0.55; p.x = shaft.x;
       } else if (input.climb > 0 && p.level === "surface" && scene.walk.under) {
         p.level = "under"; p.climbT = 0.55; p.x = shaft.x;
@@ -1613,7 +1634,12 @@ function StepGotoSeq(state, def, input) {
   const spot = def.spots[i];
   if (!spot) { AdvanceBeat(state); return; }
   if (ZoneReached(state, spot)) {
-    if (def.notes?.[i]) state.toast = { text: def.notes[i], t: 5 };
+    if (def.notes?.[i]) {
+      state.toast = { text: def.notes[i], t: 5 };
+      // 乡亲的口信也是情报。原来只弹个 toast 不入账，于是第六章门板上
+      // 永远凑不齐互相矛盾的那两条，"自己推出来"那一支从来没上过场。
+      state.flags.notesSeen.push(def.notes[i]);
+    }
     state.beat.spotIndex += 1;
     if (state.beat.spotIndex >= def.spots.length) AdvanceBeat(state);
   }
@@ -1980,7 +2006,8 @@ function StepMapBoard(state, def, input) {
   if (b.pinned < notes.length) {
     state.prompt = `E · 钉上一条（${b.pinned}/${notes.length}）`;
     if (input.interact) {
-      state.toast = { text: notes[b.pinned], t: 4.5 };
+      // 停留久一点：这是玩家唯一能读到这条情报内容的地方
+      state.toast = { text: notes[b.pinned], t: 7 };
       b.pinned += 1;
     }
     return;
@@ -1988,7 +2015,8 @@ function StepMapBoard(state, def, input) {
   // 两条对不上的都在板上了，才给推理这一下
   const hasBoth = def.contradiction.every((k) => notes.some((n) => n.includes(k)));
   if (hasBoth && !b.deduced) {
-    state.prompt = "E · 把对不上的两条钉在一起";
+    // 明说是哪两条：玩家读到的是几条一闪而过的 toast，不点名等于让他猜
+    state.prompt = "E · 把「骡车」和「押人」那两条钉在一起";
     if (input.interact) {
       b.deduced = true;
       state.flags.deduced = true;
@@ -2005,7 +2033,11 @@ function StepMapBoard(state, def, input) {
 // 松手掉得更快。玩家不会怀疑自己没按对，只会知道抓不住。
 function StepDoomedHold(state, def, input, dt) {
   const b = state.beat;
-  if (b.grip === undefined) { b.grip = 0; b.t = 0; }
+  if (b.grip === undefined) {
+    b.grip = 0; b.t = 0; b.drag = 0;
+    state.toast = null;          // 上一拍的提示别赖在这一场上
+    def.onStart?.(state);
+  }
   b.t += dt;
   // 头顶的探杆：周期一次比一次密，逼你一次次停手。土清不完的真正原因是
   // 时间不在你这边，不是你手慢
@@ -2014,8 +2046,15 @@ function StepDoomedHold(state, def, input, dt) {
     const cycle = def.probe.from + (def.probe.to - def.probe.from) * k;
     b.quakeActive = (b.t % cycle) > cycle - 1.15;
   }
-  const held = (input.interactHeld || input.interact) && !b.quakeActive;
+  const pressing = input.interactHeld || input.interact;
+  const held = pressing && !b.quakeActive;
   if (b.quakeActive) {
+    // 探杆下来还硬刨，声音会把人招来——不停手是要付代价的，
+    // 否则"必须停手"就成了一句空话，玩家迟早会发现按着不放毫无区别
+    if (pressing) {
+      b.grip = Math.max(0, b.grip - 1.4 * dt);
+      state.detection.level = Math.min(1, state.detection.level + 0.5 * dt);
+    }
     b.grip = Math.max(0, b.grip - 0.5 * dt);
   } else if (held) {
     // 越接近上限，往回掉的分量越重
@@ -2024,12 +2063,26 @@ function StepDoomedHold(state, def, input, dt) {
   } else {
     b.grip = Math.max(0, b.grip - 0.75 * dt);
   }
+  // 不给百分比：一个封了顶、永远到不了 100 的进度条，只会让玩家以为是自己手慢。
+  // 用力到什么程度由画面说——妹妹被拽开的距离、土面刨下去又塌回来。
+  const bars = Math.round(b.grip / def.cap * 6);
   state.prompt = b.quakeActive
     ? "…探杆就在头顶。停手，别出声"
-    : `${def.prompt}  ${Math.round(b.grip * 100)}%`;
+    : `${def.prompt}  ${"▮".repeat(bars)}${"▯".repeat(6 - bars)}`;
+
+  // 让进度条不只是个数字：抓得越牢，她被拖走得越慢——但一直在走。
+  // 手里那点距离就是进度条本身。
+  if (def.pull) {
+    const a = FindActor(state, def.pull.actor);
+    if (a) {
+      b.drag = Math.min(1, b.drag + (1 - b.grip * 0.75) * dt / def.duration);
+      a.x = def.pull.from + (def.pull.to - def.pull.from) * b.drag;
+      a.heading = def.pull.to >= def.pull.from ? 1 : -1;
+    }
+  }
   if (b.t >= def.duration) {
     def.onFail?.(state);
-    state.toast = { text: "抓不住。", t: 3.5 };
+    state.toast = { text: def.failToast || "抓不住。", t: 3.5 };
     AdvanceBeat(state);
   }
 }
@@ -2040,7 +2093,9 @@ function StepRescueLoop(state, def, input, dt) {
   const leadCap = state.flags.route === "ground" ? 1 : 3;
 
   // 探杆：预兆→落定→宽限
-  const cycle = state.flags.route === "ground" ? 7 : 9.5;
+  // 代价只留一项：手边人少、一趟只能带一个（见 SpawnRescueSquad）。
+  // 探杆周期不再跟着变——三项一起惩罚，选地面就纯粹是受罪。
+  const cycle = 9.5;
   state.rescue.quakeT += dt;
   const phase = state.rescue.quakeT % cycle;
   state.beat.quakeWarn = phase > cycle - 2.9;

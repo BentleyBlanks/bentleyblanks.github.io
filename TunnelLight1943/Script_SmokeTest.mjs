@@ -212,6 +212,11 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   const state = AutoPlay(CreateGame(0), "tunnel", { log: true });
   assert.equal(state.phase, "gameEnd", "全流程必须能打到终章");
   assert.equal(state.flags.route, "tunnel");
+  // 正常打完一遍必须能推出"这是个套"。这条断言是补上的：门板那套机制曾经
+  // 整个是死的——gotoSeq 收集的乡亲口信没有入账 notesSeen，于是互相矛盾的
+  // 两条永远凑不齐，`deduced` 永远为假，"自己推出来"那一支从没上过场。
+  // 机制悄悄失效不会让任何测试变红，只能靠这种断言盯住。
+  assert.equal(state.flags.deduced, true, "第六章的情报推理必须走得通");
   console.log(`  ✓ 八章全通（${((Date.now() - t0) / 1000).toFixed(1)}s 实耗）`);
 }
 

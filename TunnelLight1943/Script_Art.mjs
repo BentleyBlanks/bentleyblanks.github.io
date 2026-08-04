@@ -1363,6 +1363,48 @@ export function DrawCollapsePile(ctx, x, botY, scale, id) {
 // 翻口：地道在这一段挖成下沉的 U 形弯，弯底存着一汪水。
 // 画法上要一眼读出"底下是凹的、里面有水"——所以是一条下凹的土沿
 // 加一层带反光的水面，水面上再压一道暗，像被土压着。
+// 民兵歇脚点的门板：卸下来的一扇旧门斜靠着，柱子用木匠画线的手把据点画在上面。
+// pinned 是已经钉上去的情报条数——钉一条露一条，玩家看得见自己在往上凑。
+export function DrawMapBoard(ctx, x, groundY, w, h, id, { pinned = 0 } = {}) {
+  const lean = w * 0.06;
+  InkFill(ctx, [[x - w / 2 + lean, groundY - h], [x + w / 2, groundY - h + lean * 0.5],
+    [x + w / 2 - lean, groundY], [x - w / 2, groundY - lean * 0.4]],
+    id + "board", "#8a6d47", { amp: 1.2, lw: 2.4, shade: "rgba(0,0,0,0.16)" });
+  // 门板的横撑与门轴痕
+  for (let i = 1; i <= 2; i += 1) {
+    InkLine(ctx, x - w / 2 + lean, groundY - h * (i / 3), x + w / 2 - lean * 0.4, groundY - h * (i / 3) + lean * 0.4,
+      id + "rail" + i, { lw: 1.6, color: "rgba(70,48,28,0.6)", amp: 1.1 });
+  }
+  // 画在门板上的据点草图：围墙一圈、岗楼两个点、牢房一小块
+  ctx.save();
+  ctx.globalAlpha = 0.62;
+  ctx.strokeStyle = "#3b2c1c";
+  ctx.lineWidth = 1.8;
+  ctx.strokeRect(x - w * 0.28, groundY - h * 0.72, w * 0.56, h * 0.34);
+  ctx.fillStyle = "#3b2c1c";
+  for (const dx of [-0.28, 0.28]) {
+    ctx.beginPath();
+    ctx.arc(x + w * dx, groundY - h * 0.72, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillRect(x + w * 0.12, groundY - h * 0.52, w * 0.14, h * 0.12);
+  ctx.restore();
+  // 钉上去的纸条：一条条往上加
+  for (let i = 0; i < pinned; i += 1) {
+    const px = x - w * 0.34 + (i % 3) * w * 0.26;
+    const py = groundY - h * 0.30 + Math.floor(i / 3) * h * 0.11;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate((Hash(id + "n" + i) - 0.5) * 0.3);
+    InkFill(ctx, Rect(-w * 0.09, -h * 0.035, w * 0.18, h * 0.07), id + "note" + i, "#ded2b4",
+      { amp: 0.5, lw: 1.2 });
+    ctx.fillStyle = "rgba(70,58,40,0.55)";
+    ctx.fillRect(-w * 0.06, -h * 0.012, w * 0.12, 1.4);
+    ctx.fillRect(-w * 0.06, h * 0.006, w * 0.09, 1.4);
+    ctx.restore();
+  }
+}
+
 export function DrawWaterTrap(ctx, x, floorY, w, id) {
   const half = w / 2;
   const depth = w * 0.30;   // 是脚下一个下沉的弯，不是一口井
