@@ -838,11 +838,17 @@ export function CreateWorld(canvasEl) {
         ps.glow = MakeGlow(6.5, 0xffb85c, 1.25);
         ps.glowKey = builtKey;
         scene.add(ps.glow);
+        // 暗适应：一圈很弱的大范围光，让走廊轮廓读得出，不至于是个黑洞
+        if (ps.adapt) scene.remove(ps.adapt);
+        ps.adapt = MakeGlow(17, 0xc9a878, 0.30);
+        scene.add(ps.adapt);
       }
+      if (ps.adapt) ps.adapt.userData.SetLight(p.x, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.0);
       ps.glow.position.set(p.x + p.heading * 0.3, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.1, 7.6);
       ps.glow.material.opacity = 1.15 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23) * 0.05;
     } else if (ps.glow) {
       scene.remove(ps.glow);
+      if (ps.adapt) { scene.remove(ps.adapt); ps.adapt = null; }
       ps.glow = null;
     }
 
@@ -939,7 +945,7 @@ export function CreateWorld(canvasEl) {
       // 灌烟口/灌水口持续注入
       if (state.smoke?.active) {
         const src = state.smoke.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
-        fluid.Emit(src, UNDER_Y + 1.9, { smoke: 0.55 * Math.min(0.05, dt) * 30, vx: -2.6, vy: 0.6, radius: 1.5 });
+        fluid.Emit(src, UNDER_Y + 1.9, { smoke: 1.05 * Math.min(0.05, dt) * 30, vx: -3.4, vy: 0.7, radius: 1.7 });
       }
       if (state.flood?.active) {
         const src = state.flood.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
@@ -950,8 +956,14 @@ export function CreateWorld(canvasEl) {
       fluidCtx.putImageData(fluidImage, 0, 0);
       fluidMesh.material.map.needsUpdate = true;
       fluidMesh.visible = true;
-      // 把解算出来的烟前锋回灌给玩法层，玩法与画面是同一件事
-      if (state.smoke?.active) state.smoke.frontX = fluid.SmokeFrontX();
+      // 把解算出来的烟前锋回灌给玩法层，玩法与画面是同一件事。
+      // 只在解算确实有烟时才接管，否则保留核心层的解析推进——
+      // 玩法判定不能因为解算抽风就失效。
+      if (state.smoke?.active) {
+        const f = fluid.SmokeFrontX();
+        if (f < fluid.x1 - 1.5) state.smoke.frontX = Math.min(state.smoke.frontX, f);
+      }
+      if (state.flood?.active) state.floodDepth = fluid.WaterDepthAt(state.player.x);
     } else if (fluidMesh) {
       fluidMesh.visible = false;
     }
@@ -1051,7 +1063,7 @@ export function CreateWorld(canvasEl) {
   // 暗场：地道章节压暗，灯光晕负责照明
   function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
     const ch = CHAPTERS[state.chapterIndex];
-    const base = { day: 0, dawn: 0.05, night: 0.30, tunnel: 0.38, dark: 0.45 }[ch.light] ?? 0;
+    const base = { day: 0, dawn: 0.05, night: 0.28, tunnel: 0.30, dark: 0.36 }[ch.light] ?? 0;
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;

@@ -158,8 +158,8 @@ export class TunnelFluid {
         this.vy[i] += this.smoke[i] * 3.2 * dtc;       // 浮力
         this.vy[i] -= this.water[i] * 9.0 * dtc;       // 重力
         // 洞顶阻尼：烟贴顶爬行
-        this.vx[i] *= 0.995;
-        this.vy[i] *= 0.992;
+        this.vx[i] *= 0.9985;
+        this.vy[i] *= 0.997;
       }
     }
     // 涡量约束
@@ -193,7 +193,7 @@ export class TunnelFluid {
           if (c < 1 || c >= cols - 1) continue;
           const i = this.Index(c, r);
           if (this.solid[i]) continue;
-          this.smoke[i] *= 0.90;
+          this.smoke[i] *= 0.965;
           this.vy[i] += 2.4 * dtc;
         }
       }
@@ -221,8 +221,8 @@ export class TunnelFluid {
 
     // 轻微耗散
     for (let i = 0; i < this.n; i += 1) {
-      this.smoke[i] *= 0.9985;
-      if (this.smoke[i] < 0.002) this.smoke[i] = 0;
+      this.smoke[i] *= 0.99965;
+      if (this.smoke[i] < 0.0015) this.smoke[i] = 0;
     }
   }
 
