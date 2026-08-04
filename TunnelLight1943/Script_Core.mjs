@@ -653,6 +653,26 @@ export const SCRIPTS = {
             state.player.heading = -1;
           } },
         { stage: "鬼子的探杆就在头顶上戳。谁也不敢出声。", d: 3.8, cam: { kind: "shot", x: 70, y: -1.0, dist: 9 } },
+      ],
+    },
+    {
+      // 大纲写的是"柱子第一次看见，这条通往妹妹的路，也有人在用命守着"。
+      // 那句话不能由旁白说——得让玩家自己去刨那堆土，刨到时间用完为止。
+      // 清不完不是手慢：探杆一次比一次密，你每次都得停手。
+      kind: "doomedHold", id: "c5_pinned", duration: 11, cap: 0.8,
+      probe: { from: 5.2, to: 2.6 },
+      objective: "把压住他腿的土清开",
+      hint: "按住 E 清土。探杆到头顶上的时候必须停手",
+      prompt: "按住 E · 清土",
+      onFail: (state) => {
+        const pinned = FindActor(state, "pinned");
+        if (pinned) pinned.heading = 1;
+      },
+    },
+    {
+      kind: "cinematic", id: "c5_gun",
+      lines: [
+        { stage: "那只手从土里伸出来，把柱子推开了。", d: 3.6, cam: { kind: "insert", x: 70.6, y: UNDER_Y + 0.9, dist: 2.4 } },
         { stage: "他把手里的枪递出去，朝洞外摆了摆手。", d: 4.2, cam: { kind: "shot", x: 70, y: UNDER_Y + 1.3, dist: 5.5 } },
         { who: "年轻民兵", say: "带乡亲们走。", d: 3.0, cam: { kind: "ots", subject: "pinned", other: "player", dist: 3.4 } },
         // 柱子的反应镜头：这场戏此前完全没有他，看完像是别人的事
@@ -811,21 +831,32 @@ export const SCRIPTS = {
         { stage: "一个民兵跌跌撞撞从地道里追出来。", d: 3.2, cam: { kind: "shot", x: 22, y: UNDER_Y + 1.4, dist: 8 } },
         { who: "民兵", say: "还有人没出来！东边旁洞里，还有几个乡亲！", d: 4.0, cam: { kind: "ots", subject: "msg", other: "player", dist: 3.6 } },
         { stage: "头顶上，搜查的脚步声越来越密。", d: 3.4, cam: { kind: "shot", x: 16, y: -0.4, dist: 9 } },
-        { stage: "妹妹就在眼前。柱子等这一天，等了整整一年。", d: 4.2, cam: { kind: "ots", subject: "player", other: "sister", dist: 3.2 } },
-        { stage: "可旁洞里那几个人，也在等有人回去。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 } },
-        { stage: "柱子把妹妹的手放进一位大娘手里。", d: 3.6, cam: { kind: "insert", x: 12.6, y: UNDER_Y + 1.0, dist: 2.4 },
+      ],
+    },
+    {
+      // 全篇的顶点，原来是十行过场：松手、接灯、转身，都由脚本替他做了。
+      // 那两句"妹妹就在眼前……可旁洞里那几个人也在等"更是把两难替玩家想完了。
+      // 现在两句删掉，操作交还回去——出口就在头顶、完全通着、没有任何东西拦你，
+      // 妹妹还牵在手里。要回去，得他自己先松开手。
+      kind: "actSeq", id: "c7_turn2",
+      objective: "出口就在上面",
+      hint: "妹妹还牵着你的手",
+      steps: [
+        {
+          x: 12.6, level: "under", prompt: "E · 松开手",
+          toast: "柱子把妹妹的手放进大娘手里。",
           on: (state) => {
             const sister = FindActor(state, "sister");
             if (sister) { sister.following = false; sister.cineTarget = { x: 11.4 }; sister.cineSpeed = 1.2; }
-          } },
-        { stage: "高传宝没有拦他。只把一盏煤油灯递了过来。", d: 4.0, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.4 },
-          on: (state) => {
             const gao = FindActor(state, "gao");
             if (gao) { gao.cineTarget = { x: 15.4 }; gao.cineSpeed = 1.0; }
-          } },
-        { stage: "柱子接过灯。", d: 3.0, cam: { kind: "insertCard", card: "wick" },
-          on: (state) => { state.player.lamp = true; } },
-        { stage: "转身走回黑暗里。", d: 4.0, cam: { kind: "shot", x: 20, y: UNDER_Y + 1.4, dist: 7, pan: 3 } },
+          },
+        },
+        {
+          x: 15.4, level: "under", prompt: "E · 接过灯",
+          on: (state) => { state.player.lamp = true; },
+        },
+        { x: 22, level: "under", walk: true },
       ],
       onDone: (state) => { StartRescueLoop(state); },
     },
@@ -1401,6 +1432,7 @@ export function StepGame(state, input, dt) {
     case "hold": StepHold(state, def, input, dt); break;
     case "doomedHold": StepDoomedHold(state, def, input, dt); break;
     case "mapBoard": StepMapBoard(state, def, input); break;
+    case "actSeq": StepActSeq(state, def, input); break;
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
     case "douseLamps": StepDouseLamps(state, def, input); break;
@@ -1906,6 +1938,26 @@ function StepSmokeEscape(state, def, input) {
   if (remaining.length === 0) AdvanceBeat(state);
 }
 
+// 按顺序做完几个动作。用来把"该由玩家亲手做"的事从过场里拿回来——
+// 第七章顶点处松开妹妹的手、接过灯，这两下由脚本代劳和由玩家按下去，
+// 是完全不同的两件事。
+function StepActSeq(state, def, input) {
+  const b = state.beat;
+  if (b.stepIndex === undefined) b.stepIndex = 0;
+  const st = def.steps[b.stepIndex];
+  if (!st) { AdvanceBeat(state); return; }
+  const near = Math.abs(state.player.x - st.x) < (st.r || 1.6)
+    && (state.player.level || "surface") === (st.level || "surface");
+  if (!near) { state.prompt = ""; return; }
+  if (st.walk) { st.on?.(state); b.stepIndex += 1; return; }
+  state.prompt = st.prompt;
+  if (input.interact) {
+    st.on?.(state);
+    if (st.toast) state.toast = { text: st.toast, t: 4.5 };
+    b.stepIndex += 1;
+  }
+}
+
 // 情报板：把收集到的 note 一条条钉上去。凑齐互相矛盾的两条之后，
 // 才允许玩家把记号钉在它们中间——那一下就是"他自己看出来了"。
 function StepMapBoard(state, def, input) {
@@ -1946,15 +1998,26 @@ function StepDoomedHold(state, def, input, dt) {
   const b = state.beat;
   if (b.grip === undefined) { b.grip = 0; b.t = 0; }
   b.t += dt;
-  const held = input.interactHeld || input.interact;
-  if (held) {
+  // 头顶的探杆：周期一次比一次密，逼你一次次停手。土清不完的真正原因是
+  // 时间不在你这边，不是你手慢
+  if (def.probe) {
+    const k = Math.min(1, b.t / def.duration);
+    const cycle = def.probe.from + (def.probe.to - def.probe.from) * k;
+    b.quakeActive = (b.t % cycle) > cycle - 1.15;
+  }
+  const held = (input.interactHeld || input.interact) && !b.quakeActive;
+  if (b.quakeActive) {
+    b.grip = Math.max(0, b.grip - 0.5 * dt);
+  } else if (held) {
     // 越接近上限，往回掉的分量越重
     const strain = Math.max(0, b.grip - def.cap * 0.55) * 1.35;
     b.grip = Math.min(def.cap, b.grip + (0.55 - strain) * dt);
   } else {
     b.grip = Math.max(0, b.grip - 0.75 * dt);
   }
-  state.prompt = `${def.prompt}  ${Math.round(b.grip * 100)}%`;
+  state.prompt = b.quakeActive
+    ? "…探杆就在头顶。停手，别出声"
+    : `${def.prompt}  ${Math.round(b.grip * 100)}%`;
   if (b.t >= def.duration) {
     def.onFail?.(state);
     state.toast = { text: "抓不住。", t: 3.5 };
@@ -2091,6 +2154,11 @@ export function GetBeatTarget(state) {
     // 自动通关只要一直按住就行——反正按住也留不住她
     case "doomedHold": return { action: "holdAt", x: state.player.x, level: state.player.level };
     case "mapBoard": return { action: "interactAt", x: def.zone.x, level: def.zone.level || "surface" };
+    case "actSeq": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      return { action: st.walk ? "walk" : "interactAt", x: st.x, level: st.level || "surface" };
+    }
     case "buildSpots": {
       const i = state.beat.spotDone.findIndex((d) => !d);
       if (i < 0) return null;
