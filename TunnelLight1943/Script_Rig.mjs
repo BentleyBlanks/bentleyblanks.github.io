@@ -14,6 +14,13 @@ import * as ART from "./Script_Art.mjs";
 
 const PART_PPM = 150;   // 零件贴图密度（像素/米）——比场景件高得多，特写不糊
 
+// 体型（相对成年男子）。柱子在第一章还是个半大孩子，后面才抽条；
+// 妹妹比他矮一头多。个头差本身就是叙事：门框上的刻痕量的就是这个。
+export const BODY_SCALE = {
+  father: 1.0, soldier: 0.99, puppet: 0.97, militia: 0.98,
+  family: 0.93, villager: 0.95, player: 0.93, sister: 0.66,
+};
+
 // 骨长（米），按 1.72m 身高排布
 export const BONE = {
   hipY: 0.62,
@@ -253,13 +260,18 @@ export function PoseRig(rig, s, dt) {
     target.armF = (-30 + (c ? swing2 * 10 : 0)) * DEG;
     target.foreF = -58 * DEG;
   } else if (s.carry) {
-    // 扛东西：双臂上举扶肩，腰后仰配重
-    target.hipY = s.moving ? Math.abs(Math.sin(p)) * 0.022 : 0;
-    target.hipX = 0;
-    target.torso = -6 * DEG;
-    target.head = 4 * DEG;
-    target.armB = -142 * DEG; target.foreB = -28 * DEG;
-    target.armF = -148 * DEG; target.foreF = -24 * DEG;
+    // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
+    // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。
+    target.hipY = s.moving ? Math.abs(Math.sin(p)) * 0.026 : 0;
+    target.hipX = -0.02;
+    target.torso = -7 * DEG;
+    target.head = 6 * DEG;
+    // 前臂：大臂抬到近水平、小臂折回来，手正好搭在肩头的木料上
+    target.armF = -104 * DEG;
+    target.foreF = -64 * DEG;
+    // 后臂：不参与扶，随步子自然摆
+    target.armB = (s.moving ? Math.sin(p) * 18 : 6) * DEG;
+    target.foreB = -18 * DEG;
     const st = s.moving ? 1 : 0;
     target.thighB = swing2 * 20 * st * DEG;
     target.shinB = Math.max(0, -swing2) * 34 * st * DEG;
@@ -316,10 +328,17 @@ export function PoseRig(rig, s, dt) {
   j.armFront.position.y = BONE.torso * 0.86;
 }
 
-/** 前臂末端（手）的局部坐标，用于把扛的东西挂到手上 */
+/** 前臂末端（手）的世界坐标 */
 export function HandPoint(rig) {
   const j = rig.joints;
   const v = new THREE.Vector3(0, -BONE.foreArm, 0);
   j.foreFront.updateWorldMatrix(true, false);
   return v.applyMatrix4(j.foreFront.matrixWorld);
+}
+
+/** 肩点的世界坐标：扛的东西搁在这儿 */
+export function ShoulderPoint(rig) {
+  const j = rig.joints;
+  j.armFront.updateWorldMatrix(true, false);
+  return new THREE.Vector3(0, 0.06, 0).applyMatrix4(j.armFront.matrixWorld);
 }

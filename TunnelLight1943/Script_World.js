@@ -9,9 +9,13 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, BONE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
+import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
+import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 
-const PPM = 48;              // 贴图像素 / 世界米（普通场景件）
+const PPM = 48;              // 贴图像素 / 世界米（尺寸标尺）
+const PROP_SS = 4;           // 道具/遮蔽物的贴图超采样倍率（特写不糊）
+const DETAIL_SS = 3;         // 塌方堆、油灯这类会被特写到的小件
 // 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
 
@@ -36,9 +40,12 @@ function CanvasTexture(canvas) {
 
 // 把一段绘制烘成 sprite：drawFn(ctx, originX, groundY) 以 (originX, groundY) 为地面锚点
 // blur：假景深——越远的层烘焙时糊得越厉害，前景也糊一点
-function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0) {
-  const canvas = MakeCanvas(wPx, hPx);
+// ss：超采样倍率。调用处仍按 48px/米 标注尺寸，内部把画布加密 ss 倍，
+// 世界尺寸不变、贴图密度变高 —— 特写推到 480px/米 也不糊。
+function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1) {
+  const canvas = MakeCanvas(wPx * ss, hPx * ss);
   const ctx = canvas.getContext("2d");
+  ctx.scale(ss, ss);
   if (blur > 0) ctx.filter = `blur(${blur}px)`;
   drawFn(ctx, anchorX, groundYPx);
   ctx.filter = "none";
@@ -83,7 +90,7 @@ function MakeCarryMesh(label) {
   const hPx = label === "水桶" ? 42 : 30;
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
     ART.DrawCarry(ctx, ax, ay - (label === "水桶" ? 8 : 0), 1.5, 1, label);
-  });
+  }, 0, DETAIL_SS);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +128,22 @@ export function CreateWorld(canvasEl) {
   for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
   // 假景深：离玩法层越远，烘焙时越糊
   const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
+  // 空气透视：越远越向雾色靠拢、对比越低——只糊不褪色是读不出纵深的
+  const LAYER_FADE = { ridge: 0.72, hills: 0.58, farTown: 0.40, midTrees: 0.24, nearTrees: 0.10, play: 0, fore: 0.30 };
+  const hazeMesh = {};   // 每层压一张雾片，按层次把颜色往天色里推
+
+  function ApplyHaze(key, hazeColor, length) {
+    const fade = LAYER_FADE[key];
+    if (!fade) return;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry((length + 200), 90),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(hazeColor), transparent: true, opacity: fade, depthWrite: false, depthTest: false }),
+    );
+    m.position.set(length / 2, 20, 0.02);
+    m.renderOrder = 5;
+    layers[key].add(m);
+    hazeMesh[key] = m;
+  }
   for (const k of Object.keys(layers)) {
     layers[k].position.z = LAYER_Z[k];
     layers[k].scale.setScalar(LAYER_COMP[k]);
@@ -149,14 +172,24 @@ export function CreateWorld(canvasEl) {
     return CanvasTexture(c);
   })();
 
+  let occluder = null;
+
+  // 灯：走遮挡光照着色器——照不穿土层与墙，能顺着竖井漏下去
   function MakeGlow(radius, color = 0xffc878, opacity = 1) {
-    const mat = new THREE.MeshBasicMaterial({
-      map: glowTex, transparent: true, blending: THREE.AdditiveBlending,
-      depthWrite: false, color, opacity,
-    });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
-    m.renderOrder = 60;
-    m.position.z = 0.4;   // 贴着玩法层，别被透视放大
+    if (!occluder) {
+      // 掩码还没烘好时退回普通加色晕，避免首帧崩
+      const mat = new THREE.MeshBasicMaterial({
+        map: glowTex, transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, depthTest: false, color, opacity,
+      });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
+      m.renderOrder = 60;
+      m.position.z = 0.4;
+      m.userData.SetLight = (x, y) => m.position.set(x, y, 0.4);
+      m.userData.SetIntensity = (v) => { mat.opacity = v; };
+      return m;
+    }
+    const m = CreateOccludedLight(occluder, { radius, color, intensity: opacity });
     return m;
   }
 
@@ -164,7 +197,7 @@ export function CreateWorld(canvasEl) {
   const glows = [];
   let builtKey = "";
   let sceneLights = [];   // 静态灯位 {x,y,r,mesh}
-  let smokeMesh = null, smokeCanvas = null, smokeCtx = null;
+  let fluid = null, fluidKey = "", fluidMesh = null, fluidCanvas = null, fluidCtx = null, fluidImage = null;
   let probeMeshes = [];
   let markerMesh = null, markerCanvas = null, markerCtx = null;
   let collapseMeshes = {};
@@ -394,15 +427,35 @@ export function CreateWorld(canvasEl) {
     }
   }
 
+  // 落地投影：没有影子的物件永远像浮在地面线上
+  function AddGroundShadow(group, x, halfW, strength = 0.28) {
+    const wPx = Math.ceil(halfW * 2.6 * PPM);
+    const hPx = Math.ceil(0.9 * PPM);
+    const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx * 0.5, (ctx, ax, ay) => {
+      const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, wPx / 2);
+      g.addColorStop(0, `rgba(30,22,14,${strength})`);
+      g.addColorStop(1, "rgba(30,22,14,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(ax, ay, wPx / 2, hPx / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    PlaceSprite(mesh, x, SURFACE_Y + 0.02, -0.05);
+    group.add(mesh);
+  }
+
   function AddProp(group, p, light, ruined, sceneKey) {
     const night = light === "night" || light === "tunnel" || light === "dark";
     const gy = SURFACE_Y;
     const mk = (wPx, hPx, ax, ay, fn, x = p.x, y = gy, z = 0) => {
-      const mesh = BakeSprite(wPx, hPx, ax, ay, fn);
+      const mesh = BakeSprite(wPx, hPx, ax, ay, fn, 0, PROP_SS);
       PlaceSprite(mesh, x, y, z);
       group.add(mesh);
       return mesh;
     };
+    if (["house", "tree", "well", "millstone", "woodpile", "bench", "blockhouse", "prison"].includes(p.kind)) {
+      AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, p.kind === "house" ? 0.34 : 0.26);
+    }
     switch (p.kind) {
       case "house": {
         const W = p.w * PPM, H = p.h * PPM;
@@ -476,8 +529,9 @@ export function CreateWorld(canvasEl) {
   function AddCover(group, c, light) {
     const night = light === "night" || light === "dark" || light === "tunnel";
     const gy = SURFACE_Y;
+    AddGroundShadow(group, c.x, (c.w || 2) / 2 + 0.5, 0.22);
     const mk = (wPx, hPx, ax, ay, fn) => {
-      const mesh = BakeSprite(wPx, hPx, ax, ay, fn);
+      const mesh = BakeSprite(wPx, hPx, ax, ay, fn, 0, PROP_SS);
       PlaceSprite(mesh, c.x, gy, 0);
       group.add(mesh);
     };
@@ -549,7 +603,7 @@ export function CreateWorld(canvasEl) {
     collapseMeshes = {};
     for (const p of sceneDef.props) {
       if (p.kind !== "collapse") continue;
-      const mesh = BakeSprite(130, 110, 65, 104, (ctx, ax, ay) => ART.DrawCollapsePile(ctx, ax, ay, 1, p.id));
+      const mesh = BakeSprite(130, 110, 65, 104, (ctx, ax, ay) => ART.DrawCollapsePile(ctx, ax, ay, 1, p.id), 0, DETAIL_SS);
       PlaceSprite(mesh, p.x, UNDER_Y, 0);
       group.add(mesh);
       collapseMeshes[p.id] = mesh;
@@ -573,6 +627,10 @@ export function CreateWorld(canvasEl) {
     const sceneDef = SCENES[ch.scene];
     const L = sceneDef.length;
     const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
+
+    // 遮挡掩码：土是实心的，地道/洞室/竖井是掏出来的空气
+    const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
+    occluder = BuildOccluder(occ.bounds, occ.solids, occ.air);
 
     // 天空
     const skyColors = {
@@ -681,11 +739,17 @@ export function CreateWorld(canvasEl) {
     }
     for (const spot of lampSpots) {
       const g = MakeGlow(spot.r, 0xffc878, spot.i);
-      g.position.set(spot.x, spot.y, 0.4);
+      g.userData.SetLight(spot.x, spot.y);
       scene.add(g);
       glows.push(g);
       sceneLights.push(spot);
     }
+
+    // 空气透视：把远层往天色里推
+    const hazeTint = {
+      day: "#e2d8bc", dawn: "#d8c6a8", night: "#243049", tunnel: "#241d14", dark: "#12100c",
+    }[ch.light] || "#e2d8bc";
+    for (const k of ["ridge", "hills", "farTown", "midTrees", "nearTrees", "fore"]) ApplyHaze(k, hazeTint, L);
 
     // 浮尘
     for (const d of dustMotes) layers.fx.remove(d);
@@ -701,7 +765,10 @@ export function CreateWorld(canvasEl) {
       // 骨骼装配：每块骨头一张贴图，逐帧只转关节
       const rig = CreateRig(kind);
       layers.play.add(rig.group);
-      s = { rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null, idleT: Math.random() * 6 };
+      s = {
+        rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null,
+        idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+      };
       actorSprites.set(id, s);
     }
     return s;
@@ -724,7 +791,8 @@ export function CreateWorld(canvasEl) {
     }, dt);
 
     s.mesh.position.set(x, y, 0.1);
-    s.mesh.scale.x = heading >= 0 ? 1 : -1;
+    const bs = extra.bodyScale || s.bodyScale || 1;
+    s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     return { x, y, isMoving };
   }
 
@@ -737,8 +805,10 @@ export function CreateWorld(canvasEl) {
       && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
         || def?.kind === "buildSpots" || def?.kind === "hold")
       && state.prompt && state.prompt.includes("%"));
+    // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
+    const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
-      { climbing: p.climbT > 0, digging });
+      { climbing: p.climbT > 0, digging, bodyScale: boyScale });
     ps.mesh.visible = otsHiddenId !== "player";
 
     // 扛的东西
@@ -753,16 +823,20 @@ export function CreateWorld(canvasEl) {
       ps.carryLabel = null;
     }
     if (ps.carryMesh) {
-      // 挂到骨骼算出来的手上，扛的东西会跟着手臂动
-      const hand = HandPoint(ps.rig);
-      ps.carryMesh.position.set(hand.x, hand.y + (p.carry === "水桶" ? -0.18 : 0.1), 0.25);
-      ps.carryMesh.scale.x = p.heading >= 0 ? 1 : -1;
+      // 水桶提在手上，木料扛在肩上——挂点不同
+      const anchor = p.carry === "水桶" ? HandPoint(ps.rig) : ShoulderPoint(ps.rig);
+      const bs = ps.bodyScale || 1;
+      ps.carryMesh.position.set(anchor.x, anchor.y + (p.carry === "水桶" ? -0.20 : 0.10), 0.25);
+      ps.carryMesh.scale.set((p.heading >= 0 ? 1 : -1) * bs, bs, 1);
+      ps.carryMesh.rotation.z = p.carry === "水桶" ? 0 : (p.heading >= 0 ? -0.14 : 0.14);
     }
 
     // 煤油灯
     if (p.lamp) {
-      if (!ps.glow) {
+      if (!ps.glow || ps.glowKey !== builtKey) {
+        if (ps.glow) scene.remove(ps.glow);
         ps.glow = MakeGlow(6.5, 0xffb85c, 1.25);
+        ps.glowKey = builtKey;
         scene.add(ps.glow);
       }
       ps.glow.position.set(p.x + p.heading * 0.3, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.1, 7.6);
@@ -777,11 +851,18 @@ export function CreateWorld(canvasEl) {
       const s = EnsureActorSprite(a.id, a.kind);
       s.mesh.visible = a.visible !== false && otsHiddenId !== a.id;
       if (!s.mesh.visible) continue;
-      UpdateOne(s, a.x, a.level || "surface", a.heading, false, dt);
+      const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
+      UpdateOne(s, a.x, a.level || "surface", a.heading, false, dt, false,
+        sisterScale ? { bodyScale: sisterScale } : {});
       // 提灯
       if (a.lantern) {
-        if (!s.glow) { s.glow = MakeGlow(4.2, 0xffc878, 0.95); scene.add(s.glow); }
-        s.glow.position.set(a.x + (a.heading || 1) * 0.35, (a.level === "under" ? UNDER_Y : SURFACE_Y) + 1.05, 7.6);
+        if (!s.glow || s.glowKey !== builtKey) {
+          if (s.glow) scene.remove(s.glow);
+          s.glow = MakeGlow(4.2, 0xffc878, 0.95);
+          s.glowKey = builtKey;
+          scene.add(s.glow);
+        }
+        s.glow.userData.SetLight(a.x + (a.heading || 1) * 0.35, (a.level === "under" ? UNDER_Y : SURFACE_Y) + 1.05);
         s.glow.visible = true;
       } else if (s.glow) {
         s.glow.visible = false;
@@ -827,29 +908,52 @@ export function CreateWorld(canvasEl) {
       itemMeshes = [];
     }
 
-    // 烟：一张随前锋滚动的贴图
-    if (state.smoke?.active && sceneDef.walk.under) {
+    // 烟与水：真解算（半拉格朗日平流 + 压力投影），固体边界就是地道剖面
+    const wantsFluid = !!(state.smoke?.active || state.flood?.active);
+    if (wantsFluid && sceneDef.walk.under) {
       const range = sceneDef.walk.under;
-      const east = range[1] + 3;
-      const front = Math.max(range[0] - 3, state.smoke.frontX);
-      const wWorld = Math.max(0.2, east - front);
-      if (!smokeMesh) {
-        smokeCanvas = MakeCanvas(1024, 128);
-        smokeCtx = smokeCanvas.getContext("2d");
-        const tex = CanvasTexture(smokeCanvas);
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.92 });
-        smokeMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
-        smokeMesh.renderOrder = 20;
-        layers.fx.add(smokeMesh);
+      if (!fluid || fluidKey !== builtKey) {
+        fluid = CreateTunnelFluid({
+          x0: range[0] - 3, x1: range[1] + 3,
+          yBottom: UNDER_Y - 0.15, yTop: UNDER_Y + 3.1,
+          cols: 200, rows: 26,
+        });
+        const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
+        fluid.SetAirRects(occ.air);
+        fluid.SetVents(sceneDef.props.filter((pp) => pp.kind === "vent").map((pp) => pp.x));
+        fluidKey = builtKey;
+        fluidCanvas = MakeCanvas(fluid.cols, fluid.rows);
+        fluidCtx = fluidCanvas.getContext("2d");
+        fluidImage = fluidCtx.createImageData(fluid.cols, fluid.rows);
+        const tex = CanvasTexture(fluidCanvas);
+        tex.minFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        if (fluidMesh) layers.fx.remove(fluidMesh);
+        fluidMesh = new THREE.Mesh(new THREE.PlaneGeometry(
+          fluid.x1 - fluid.x0, fluid.yTop - fluid.yBottom), mat);
+        fluidMesh.position.set((fluid.x0 + fluid.x1) / 2, (fluid.yBottom + fluid.yTop) / 2, 0.35);
+        fluidMesh.renderOrder = 22;
+        layers.fx.add(fluidMesh);
       }
-      smokeCtx.clearRect(0, 0, 1024, 128);
-      ART.DrawSmoke(smokeCtx, 0, 1024, 0, 128, time, "smoke");
-      smokeMesh.material.map.needsUpdate = true;
-      smokeMesh.scale.set(wWorld, 2.4, 1);
-      smokeMesh.position.set(front + wWorld / 2, UNDER_Y + 1.1, 0.4);
-      smokeMesh.visible = true;
-    } else if (smokeMesh) {
-      smokeMesh.visible = false;
+      // 灌烟口/灌水口持续注入
+      if (state.smoke?.active) {
+        const src = state.smoke.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
+        fluid.Emit(src, UNDER_Y + 1.9, { smoke: 0.55 * Math.min(0.05, dt) * 30, vx: -2.6, vy: 0.6, radius: 1.5 });
+      }
+      if (state.flood?.active) {
+        const src = state.flood.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
+        fluid.Emit(src, UNDER_Y + 2.4, { water: 0.8 * Math.min(0.05, dt) * 30, vx: -1.2, vy: -2.5, radius: 1.2 });
+      }
+      fluid.Step(dt);
+      fluid.Paint(fluidImage);
+      fluidCtx.putImageData(fluidImage, 0, 0);
+      fluidMesh.material.map.needsUpdate = true;
+      fluidMesh.visible = true;
+      // 把解算出来的烟前锋回灌给玩法层，玩法与画面是同一件事
+      if (state.smoke?.active) state.smoke.frontX = fluid.SmokeFrontX();
+    } else if (fluidMesh) {
+      fluidMesh.visible = false;
     }
 
     // 探杆
@@ -889,7 +993,7 @@ export function CreateWorld(canvasEl) {
           ART.InkFill(ctx, [[ax - 7, ay - 16], [ax + 7, ay - 16], [ax + 5, ay - 30], [ax - 5, ay - 30]],
             "lampGlass" + i, "#d8c58a", { amp: 0.9, lw: 2 });
           ART.InkLine(ctx, ax, ay - 30, ax, ay - 40, "lampWire" + i, { lw: 1.6, color: "#6b5a3f" });
-        });
+        }, 0, DETAIL_SS);
         layers.play.add(body);
         const glow = MakeGlow(3.4, 0xffc06a, 1.0);
         scene.add(glow);
@@ -901,7 +1005,7 @@ export function CreateWorld(canvasEl) {
         PlaceSprite(m.body, l.x, UNDER_Y + 1.5, 0.2);
         m.body.visible = true;
         m.glow.visible = l.lit;
-        m.glow.position.set(l.x, UNDER_Y + 1.4, 0.4);
+        m.glow.userData.SetLight(l.x, UNDER_Y + 1.4);
         m.body.material.opacity = l.lit ? 1 : 0.55;
       });
       for (let i = state.lamps.length; i < lampMeshes.length; i += 1) {

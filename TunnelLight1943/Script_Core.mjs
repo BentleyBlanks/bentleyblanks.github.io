@@ -494,13 +494,21 @@ const SCRIPTS = {
       resetHint: "烟呛倒了人。民兵把大家拖回洞室，重新来。",
     },
     {
+      kind: "floodRescue", id: "c4_flood", dest: TV.entW,
+      objective: "水在涨——把还困在里面的人捞出西口",
+      hint: "水从东边漫过来，低处先没。E 招呼人跟上",
+      resetHint: "水太深了，人被冲散。民兵把大家托回高处，再来一次。",
+    },
+    {
       kind: "cinematic", id: "c4_loss",
       lines: [
         { stage: "西口外，乡亲们趴在田里咳嗽。人数了两遍。", d: 3.8, cam: { kind: "shot", x: 30, y: 0.8, dist: 12 } },
         { stage: "顺子没出来。拴柱大爷也没有。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 8 } },
-        { stage: "第二天，鬼子又拉来了水泵，往地道里灌水。", d: 3.8, cam: { kind: "wide", x: 100, y: -1.2 } },
-        { stage: "民兵冒险打开另一条道，把困着的人一个个拖出来。", d: 4.0, cam: { kind: "wide", x: 60, y: -1.2, pan: -4 } },
-        { stage: "有人活着出来。有人再也没有出来。", d: 4.2, cam: { kind: "dark" } },
+        { stage: "第二天，鬼子又拉来了水泵，往地道里灌水。", d: 3.8, cam: { kind: "wide", x: 130, y: -1.2 },
+          on: (state) => { StartFlood(state); } },
+        { stage: "浑浊的泥水顺着东口灌下来，先淹的是最低的那一段。", d: 4.2, cam: { kind: "wide", x: 110, y: -1.2, pan: -8 } },
+        { stage: "有人活着出来。有人再也没有出来。", d: 4.2, cam: { kind: "dark" },
+          on: (state) => { state.flood = null; } },
         { stage: "柱子站在出口，看着被抬出来的乡亲，一句话也说不出。", d: 4.2, cam: { kind: "shot", x: 34, y: 0.6, dist: 9 } },
         { who: "高传宝", say: "准备下一次行动。", d: 3.0, cam: { kind: "shot", x: 34, y: 0.8, dist: 7 } },
         { stage: "柱子背起工具，跟着队伍再次下了地道。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 } },
@@ -864,7 +872,7 @@ function SpawnTunnelVillagers(state) {
 
 function StartSmoke(state) {
   // 烟从东口（x=148）向西推进
-  state.smoke = { frontX: 150, speed: 0.85, ventAt: null, ventUntil: 0, active: true };
+  state.smoke = { frontX: 150, speed: 0.85, ventAt: null, ventUntil: 0, active: true, sourceX: 148 };
   for (const a of state.actors) {
     if (a.kind !== "villager") continue;
     if (a.group === "elders") a.x = TV.chamberA.x + (a.id === "elder1" ? -1 : 1);
@@ -882,7 +890,7 @@ function StartDrillSmoke(state) {
     MakeActor("d_aunt", "villager", TV.chamberB.x, { level: "under", label: "大嫂" }),
     MakeActor("d_kid", "villager", TV.chamberB.x + 1.2, { level: "under", label: "小石头", slow: true }),
   );
-  state.smoke = { frontX: 150, speed: 0.9, ventAt: SCENES.tunnelVillage.zones.ventSpot.x, ventUntil: 0, vented: false, active: true };
+  state.smoke = { frontX: 150, speed: 0.9, ventAt: SCENES.tunnelVillage.zones.ventSpot.x, ventUntil: 0, vented: false, active: true, sourceX: 148 };
   state.flags.hiddenBuilt = true;
   state.flags.entWBlocked = true;
   state.player.x = 148;
@@ -974,6 +982,8 @@ export function CreateGame(chapterIndex = 0) {
     beat: null,
     microCine: null,
     lamps: null,
+    flood: null,
+    floodDepth: 0,
     flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, entWBlocked: false, notesSeen: [] },
     caption: null,
     camHint: { kind: "follow" },
@@ -1000,6 +1010,8 @@ export function StartChapter(state, index) {
   state.rescue = null;
   state.microCine = null;
   state.lamps = null;
+  state.flood = null;
+  state.floodDepth = 0;
   state.caption = null;
   state.prompt = null;
   state.player.carry = null;
@@ -1257,6 +1269,7 @@ export function StepGame(state, input, dt) {
     case "buildSpots": StepBuildSpots(state, def, input, dt); break;
     case "digSeq": StepDigSeq(state, def, input, dt); break;
     case "douseLamps": StepDouseLamps(state, def, input); break;
+    case "floodRescue": StepFloodRescue(state, def, input); break;
     case "smokeEscape": StepSmokeEscape(state, def, input); break;
     case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
     default: break;
@@ -1631,6 +1644,52 @@ function StepDouseLamps(state, def, input) {
   }
 }
 
+function StartFlood(state) {
+  state.smoke = null;
+  state.flood = { active: true, sourceX: 148, t: 0 };
+  const n = SCENES.tunnelVillage.zones;
+  state.actors = state.actors.filter((a) => a.kind !== "villager");
+  state.actors.push(
+    MakeActor("fl1", "villager", n.chamberA.x, { level: "under", label: "困住的乡亲" }),
+    MakeActor("fl2", "villager", n.chamberA.x + 2, { level: "under", label: "困住的乡亲", slow: true }),
+    MakeActor("fl3", "villager", n.chamberB.x + 3, { level: "under", label: "抱孩子的大嫂", slow: true }),
+  );
+  state.player.x = 96;
+  state.player.level = "under";
+  state.player.lamp = true;
+}
+
+// 灌水：水深由流体解算回灌，站在深水里会被冲散
+function StepFloodRescue(state, def, input) {
+  const dest = def.dest || TV.entW;
+  const villagers = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated);
+  const loose = villagers.find((a) => !a.following && Math.abs(a.x - state.player.x) < 2.8);
+  if (loose) {
+    state.prompt = "E · 招呼他们跟上";
+    if (input.interact) {
+      for (const a of villagers) {
+        if (!a.following && Math.abs(a.x - state.player.x) < 3.6) a.following = true;
+      }
+    }
+  }
+  for (const a of villagers) {
+    if (InZone(a.x, a.level, dest)) { a.evacuated = true; a.following = false; a.visible = false; }
+  }
+  // 水深超过腰就站不住（深度由渲染层的解算回灌）
+  const depth = state.floodDepth || 0;
+  if (depth > 1.15) {
+    state.flags.resets += 1;
+    RestoreSnapshot(state);
+    for (const v of state.actors.filter((x) => x.kind === "villager")) {
+      v.following = false; v.evacuated = false; v.visible = true;
+    }
+    if (state.flood) state.flood.t = 0;
+    state.toast = { text: def.resetHint, t: 4 };
+    return;
+  }
+  if (villagers.length === 0) AdvanceBeat(state);
+}
+
 function StepSmokeEscape(state, def, input) {
   const dest = def.dest || TV.entW;
 
@@ -1825,6 +1884,13 @@ export function GetBeatTarget(state) {
       const key = keys[state.beat.digIndex];
       if (!key) return null;
       return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
+    }
+    case "floodRescue": {
+      const pool = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated);
+      const loose = pool.find((a) => !a.following);
+      if (loose) return { action: "interactAt", x: loose.x, level: "under" };
+      if (pool.length) return { action: "walk", x: (def.dest || TV.entW).x, level: "under" };
+      return null;
     }
     case "douseLamps": {
       const lit = (state.lamps || []).filter((l) => l.lit);
