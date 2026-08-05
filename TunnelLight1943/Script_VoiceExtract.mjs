@@ -1,6 +1,6 @@
 // 抽台词：把八章剧本里的旁白（stage）与人物台词（say）导成一张配音清单。
 //
-// 这部剧本刻意几乎不写对白——117 条舞台提示、只有 18 句人物台词。所以配音的
+// 这部剧本刻意几乎不写对白——122 条舞台提示、只有 20 句人物台词。所以配音的
 // 主体是"旁白独白"，人物只在关键处开口，跟《勇敢的心》的处理是一路的。
 //
 // 行 id 用文本哈希：同一句话在别处复用就自然共用一个音频文件，行序调整
@@ -14,22 +14,14 @@ import { VoiceLineId } from "./Script_Core.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const outPath = process.argv[2] || path.join(projectDir, "Audio", "Voice_Manifest.json");
+const castData = JSON.parse(fs.readFileSync(path.join(projectDir, "Data_VoiceCast.json"), "utf8"));
 
-// 声库只有三个中文声音（Kangkang 男 / Huihui 女 / Yaoyao 女），人物却更多，
-// 所以靠音高与语速把角色区分开：爹压低放慢、柱子提高、妹妹又高又快。
-const CAST = {
-  "": { voice: "Kangkang", pitch: "-8%", rate: "-18%" },        // 旁白：沉一点、慢一点
-  "爹": { voice: "Kangkang", pitch: "-22%", rate: "-22%" },
-  "娘": { voice: "Huihui", pitch: "-6%", rate: "-14%" },
-  "柱子": { voice: "Kangkang", pitch: "+16%", rate: "-4%" },
-  "妹妹": { voice: "Yaoyao", pitch: "+30%", rate: "+6%" },
-  "高传宝": { voice: "Kangkang", pitch: "-14%", rate: "-14%" },
-  "交通员": { voice: "Kangkang", pitch: "+4%", rate: "+4%" },
-  "民兵": { voice: "Kangkang", pitch: "+8%", rate: "+8%" },
-  "年轻民兵": { voice: "Kangkang", pitch: "+14%", rate: "+10%" },
-  "老人": { voice: "Kangkang", pitch: "-26%", rate: "-26%" },
-};
-const DEFAULT_CAST = { voice: "Kangkang", pitch: "0%", rate: "-8%" };
+// 对应关系和声线设计资料只保存在 Data_VoiceCast.json，避免抽取器与参考资产
+// 各维护一份后悄悄分叉。
+const CAST = Object.fromEntries(
+  Object.entries(castData.speakerMap).map(([who, voice]) => [who, { voice }]),
+);
+const DEFAULT_CAST = { voice: castData.defaultVoice };
 
 // 直接扫源码而不是遍历 SCRIPTS 对象。
 //
@@ -58,9 +50,20 @@ for (const m of src.matchAll(/\{\s*stage:\s*"([^"]*)"/g)) {
   Add("", m[1]);
 }
 
-const lines = [...seen.values()];
+let previousManifest = null;
+if (fs.existsSync(outPath)) {
+  try { previousManifest = JSON.parse(fs.readFileSync(outPath, "utf8")); }
+  catch { previousManifest = null; }
+}
+const previousLines = new Map((previousManifest?.lines || []).map((line) => [line.id, line]));
+const lines = [...seen.values()].map((line) => {
+  const previousDuration = previousLines.get(line.id)?.dur;
+  return previousDuration == null ? line : { ...line, dur: previousDuration };
+});
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify({ lines }, null, 2), "utf8");
+const manifest = { lines };
+if (previousManifest?.voiceRelease) manifest.voiceRelease = previousManifest.voiceRelease;
+fs.writeFileSync(outPath, JSON.stringify(manifest, null, 2), "utf8");
 
 const byWho = new Map();
 for (const l of lines) byWho.set(l.who || "旁白", (byWho.get(l.who || "旁白") || 0) + 1);

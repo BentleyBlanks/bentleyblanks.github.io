@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "release": "20260805Qwen3",
+  "language": "Chinese",
+  "designModel": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+  "designRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
+  "cloneModel": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "cloneRevision": "fd4b254389122332181a7c3db7f27e918eec64e3",
+  "modelSource": "https://github.com/QwenLM/Qwen3-TTS",
+  "modelLicense": "Apache-2.0",
+  "referenceDirectory": "Audio/VoiceReference",
+  "defaultVoice": "Militia",
+  "speakerMap": {
+    "": "Narrator",
+    "爹": "Father",
+    "娘": "Mother",
+    "柱子": "Zhuzi",
+    "妹妹": "Sister",
+    "高传宝": "GaoChuanbao",
+    "交通员": "Militia",
+    "民兵": "Militia",
+    "年轻民兵": "Militia",
+    "赶车乡亲": "Militia",
+    "大娘": "Mother",
+    "老人": "Elder",
+    "村口喊声": "Militia",
+    "日军": "Enemy"
+  },
+  "roles": {
+    "Narrator": {
+      "seed": 1943001,
+      "referenceAsset": "AudioVoiceRef_Narrator_V1.flac",
+      "referenceSha256": "9C7E383F4E78FA1DD807369D6B225B2EDDD8025BDB46526CFB2254A345A35C4C",
+      "referenceText": "1942年，华北敌后。梁家村。夜风从残墙边吹过去，村里没人说话。",
+      "instruction": "四十五岁左右的华北男性叙事者，中低音，温厚但克制，普通话自然，带极轻的华北乡音。像坐在灶火旁讲亲历往事，不像新闻播音或纪录片解说。句间有呼吸和停顿，情绪藏在字后面，不煽情，不拖腔。干声近讲，无音乐、混响或环境声。"
+    },
+    "Father": {
+      "seed": 1943002,
+      "referenceAsset": "AudioVoiceRef_Father_V1.flac",
+      "referenceSha256": "A07E0E03EF26F9BCE0B37DDC3A8A8FF04E754A951BB4AAD7A3E344CE7D87826D",
+      "referenceText": "再过几年，这个家就靠你了。带妹妹进地窖，别出声。",
+      "instruction": "四十多岁的华北农村木匠，男中低音，嗓音被风沙磨得略粗，话少、沉稳、有父亲的保护感。普通话朴素自然，极轻乡音；不是舞台腔，不喊口号。短句落得干净，紧张时仍压低声音。干声近讲，无音乐、混响或环境声。"
+    },
+    "Mother": {
+      "seed": 1943008,
+      "referenceAsset": "AudioVoiceRef_Mother_V1.flac",
+      "referenceSha256": "C94DE5ADC3760E93FC050EEF4DB9E1FB8EC00E91F3773B4E5E85A7C1E76C3F78",
+      "referenceText": "你带妹妹先走，贴着墙根，到了地窖千万别出声。",
+      "instruction": "四十岁左右的华北农村母亲，朴素温暖的成年女声，略带劳作后的沙哑和疲惫。普通话自然，带极轻乡音；危急时压低声音，坚定而不哭喊，不是苦情戏或广播剧腔。干声近讲，无音乐、混响或环境声。"
+    },
+    "Zhuzi": {
+      "seed": 1943003,
+      "referenceAsset": "AudioVoiceRef_Zhuzi_V1.flac",
+      "referenceSha256": "250EAEAE3E77AC0D518E69D1E3E4035EB71E79A41BCD93EDDB0C5DEFD9ABCB2C",
+      "referenceText": "我去。妹妹已经送出去了，地道那边还缺人。",
+      "instruction": "十六岁的华北农村少年，清亮偏薄的青年男声，尚未完全成熟，紧张时呼吸会浅一点，但不怯懦。普通话自然，带极轻乡音；真诚直接，不动漫化，不耍帅，不用宣传片腔。干声近讲，无音乐、混响或环境声。"
+    },
+    "Sister": {
+      "seed": 1943004,
+      "referenceAsset": "AudioVoiceRef_Sister_V1.flac",
+      "referenceSha256": "A7EF1DDAFDEBA1D07029998E3F2458477FF194830E4755680F65BE204D7A044F",
+      "referenceText": "哥，我会跟紧你，不出声，也不乱跑。",
+      "instruction": "九岁左右的华北农村小女孩，声音轻、真实、略疲惫，依赖哥哥但努力忍住哭。普通话自然，极轻乡音；绝不卖萌，不使用夸张童声或卡通腔。音量偏小，字句清楚。干声近讲，无音乐、混响或环境声。"
+    },
+    "GaoChuanbao": {
+      "seed": 1943005,
+      "referenceAsset": "AudioVoiceRef_GaoChuanbao_V1.flac",
+      "referenceSha256": "4446FDAC74412BC23363E32BBADE81E76D12DB29F48932D9DD5ABBC72025EE4D",
+      "referenceText": "先把人救出来。不能让乡亲们再被带走。",
+      "instruction": "三十多岁的华北民兵负责人，结实的男中音，沉着、有判断力，命令简短但不粗暴。普通话自然，带很轻的华北乡音；不是首长播音腔，不高喊口号。危急时语速稍快，重音落在行动上。干声近讲，无音乐、混响或环境声。"
+    },
+    "Militia": {
+      "seed": 1943006,
+      "referenceAsset": "AudioVoiceRef_Militia_V1.flac",
+      "referenceSha256": "77568ACBEC72EC2445410EFCA644686D63319E47F6CB3B4146C7D0AF25AD0A34",
+      "referenceText": "东口有动静。跟紧队伍，先把乡亲们带出去。",
+      "instruction": "二十多岁的华北青年民兵，清楚有力的青年男声，跑动后略带急促呼吸。普通话自然，带极轻乡音；紧急但不咆哮，不像游戏报点或宣传片配音。干声近讲，无音乐、混响或环境声。"
+    },
+    "Elder": {
+      "seed": 1943007,
+      "referenceAsset": "AudioVoiceRef_Elder_V1.flac",
+      "referenceSha256": "A300F0B734A3F0AD81F64BBC828DB02F294E5B42E1313EA06B60481FEE805A5C",
+      "referenceText": "孩子，慢些走。地道里黑，脚下要踩稳。",
+      "instruction": "七十岁左右的华北老人，偏低而干的老年男声，气息稍弱，语气温和、有生活磨出来的迟缓。普通话朴素，带轻微华北乡音；不故作苍老，不颤得夸张。干声近讲，无音乐、混响或环境声。"
+    },
+    "Enemy": {
+      "seed": 1943009,
+      "referenceAsset": "AudioVoiceRef_Enemy_V1.flac",
+      "referenceSha256": "7CCE0322F7816FD6C3BFC0A98CDB3A5CBE0F169331C7CACA50CC0206A2706E70",
+      "language": "Japanese",
+      "referenceText": "言え！どこに隠した！早くしろ！",
+      "instruction": "三十多岁的日军下级军官，粗粝紧绷的男中音，审问时的喝骂——短句、命令式、压迫感来自音量与顿挫，不是嘶吼到破音。标准日语，军队腔。干声近讲，无音乐、混响或环境声。"
+    }
+  }
+}

@@ -52,6 +52,8 @@ export function CreateSoundtrack(audio) {
     if (!ready || !caption) return null;
     const text = caption.say || caption.stage;
     if (!text) return null;
+    // noSub 的行照样出声（日军的日语原声就靠它）——只是字幕不显示，
+    // 那是 HUD 的事，不是声音的事
     const id = VoiceLineId(caption.say ? (caption.who || "") : "", text);
     return manifest.lines.some((l) => l.id === id) ? base + id + ".mp3" : null;
   }
@@ -104,6 +106,12 @@ export function CreateSoundtrack(audio) {
       digT += dt;
       if (digT > 0.42) { digT = 0; audio.Sfx("dig"); }
     } else digT = 0;
+
+    // 剧情里的一次性响动：Core 只负责喊"发生了什么"，声音在这儿点名
+    if (state.cues && state.cues.length) {
+      for (const cue of state.cues) audio.Sfx(cue.name, { gain: cue.gain ?? 1 });
+      state.cues.length = 0;
+    }
 
     // —— 旁白：字幕换一行就念一行
     const inCine = def?.kind === "cinematic" || !!state.microCine;

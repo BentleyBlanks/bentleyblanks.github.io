@@ -7,7 +7,14 @@
   <meta name="theme-color" content="#0a0908">
   <meta name="description" content="《地道里的光》——1942-1943 华北敌后，一个木匠儿子在地道里学会保护更多人的白盒原型">
   <title>地道里的光 · 白盒原型</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=022">
+  <!-- 正文字体必须真的加载下来。CSS 里写着 Noto Serif SC 却没人去取，Windows 上
+       就回退到 SimSun；而 HUD 用了 500/600 字重，SimSun 根本没有这两档，浏览器
+       只好合成假粗体——糊就是这么来的。这里把 400/500/600/700 四档都取回来。
+       Google Fonts 的 CJK 走 unicode-range 分片，只下用到的那几片。 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="./Style_Game.css?v=024">
   <script type="importmap">
     {
       "imports": {
@@ -64,6 +71,7 @@
     <div id="irisOverlay" aria-hidden="true"></div>
     <div id="slitMatte" aria-hidden="true"><i></i><i></i></div>
     <div id="cineBars" aria-hidden="true"><i class="barTop"></i><i class="barBottom"></i></div>
+    <button id="btnSkipCine" type="button" hidden>跳过序章 ▸</button>
     <div id="captionScrim" aria-hidden="true"></div>
     <section id="caption" hidden>
       <b id="capSpeaker" hidden></b>
@@ -162,6 +170,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=022"></script>
+<script type="module" src="./Script_Main.js?v=024"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import {
   CHAPTERS, SCENES, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
-  SoldierSeesPlayer, SmokeCovers,
+  SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump,
 } from "./Script_Core.mjs";
 
 const DT = 1 / 30;
@@ -219,6 +219,65 @@ function TestDetectionReset() {
   console.log("  ✓ 潜行探测与失败重置");
 }
 
+// 潜行段必须真的跑得掉。
+//
+// 这条断言是拿真事故换来的：第一章考场的巡逻带压在了玩家的重置点上，被发现
+// 一次之后，退回原地 = 退回敌人脸前，立刻再被发现——「永远也跑不掉」。
+// 自动通关测试抓不到它，因为驱动器把 detection 钳在 0.9 从不真的失败。
+//
+// 所以这里两头都验：① 重置点不能在任何人的视线里（死循环的充分条件）；
+// ② 一个不读视线、不蹲、不投石的「笨玩家」一路直走要能过去。
+function TestStealthEscapable() {
+  const CASES = [
+    { chapter: 0, beat: "c1_hide", startX: 42.3, label: "C1 带妹妹躲进地窖" },
+    { chapter: 1, beat: "c2_escape1", label: "C2 东行第一段" },
+    { chapter: 1, beat: "c2_escape2", label: "C2 东行第二段" },
+  ];
+  for (const c of CASES) {
+    const state = CreateGame(c.chapter);
+    const script = ChapterBeatList(c.chapter);
+    const idx = script.findIndex((b) => b.id === c.beat);
+    assert.ok(idx >= 0, `找不到 beat ${c.beat}`);
+    DebugJump(state, c.chapter, idx);
+    // 跳幕落点未必等于实战落点（过场结算不搬人）：按实战起点摆，连 snapshot 一起改
+    if (c.startX !== undefined) {
+      state.player.x = c.startX;
+      state.beat.snapshot.player.x = c.startX;
+      const sis = state.actors.find((a) => a.id === "sister");
+      if (sis) {
+        sis.x = c.startX + 0.6;
+        const snap = state.beat.snapshot.actors.find((a) => a.id === "sister");
+        if (snap) snap.x = sis.x;
+      }
+    }
+
+    const scene = SCENES[CHAPTERS[c.chapter].scene];
+    const spotters = state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet")
+      && a.visible !== false && !a.decor
+      && SoldierSeesPlayer(scene, a, state.player, VisionScale(state)));
+    assert.equal(spotters.length, 0,
+      `${c.label}：重置点就在 ${spotters.map((a) => a.id).join(",")} 的视线里——被抓一次就再也跑不掉`);
+
+    const startBeat = state.beatIndex;
+    let t = 0;
+    for (let i = 0; i < 60 * 30 && state.beatIndex === startBeat; i += 1) {
+      t += DT;
+      const target = GetBeatTarget(state);
+      const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+      if (target && target.x !== undefined) {
+        const dx = target.x - state.player.x;
+        if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
+        else if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
+        else if (target.level && target.level !== state.player.level) input.climb = target.level === "under" ? 1 : -1;
+      }
+      StepGame(state, input, DT);   // 不钳 detection：真失败就让它失败
+    }
+    assert.notEqual(state.beatIndex, startBeat,
+      `${c.label}：一路直走 60 秒也没过去（被抓 ${state.flags.resets} 次）——这段跑不掉`);
+    console.log(`  ✓ ${c.label} 可逃脱（笨玩家 ${t.toFixed(1)}s，被抓 ${state.flags.resets} 次）`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
@@ -228,6 +287,7 @@ TestVision();
 TestClimb();
 TestSmokeFront();
 TestDetectionReset();
+TestStealthEscapable();
 
 console.log("— 全流程自动通关（第六章走『地下进人』）—");
 {
@@ -244,6 +304,10 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   // （物品拿不到、投掷永远不中、狗喂不上）不会让通关测试变红——
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
   assert.equal(state.flags.clothDown, true, "C1 投掷教学必须真的把布巾打下来");
+  assert.equal(state.flags.barrowHome, true, "C1 独轮车必须把木料推到爹跟前");
+  assert.equal(state.flags.henFlew, true, "C1 扛第二根木料必须惊走那只母鸡");
+  assert.equal(state.flags.wellRopeBroken, false, "C1 打水链走完，井绳必须是接好的");
+  assert.equal(state.flags.raidStarted, true, "C1 扫荡的考场布防必须落旗");
   assert.equal(state.flags.dogFed, true, "C2 的狗必须喂得上");
   assert.equal(state.flags.lanternOut, true, "C2 的马灯必须打得灭");
   assert.equal(state.flags.trapBuilt, true, "C5 翻口链必须走得通");

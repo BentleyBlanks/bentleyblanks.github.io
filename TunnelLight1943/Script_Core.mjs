@@ -61,6 +61,23 @@ export const SCENES = {
       { id: "yardDog", kind: "dog", x: 138, name: "王家的狗" },
       { id: "stonesEast", kind: "stonePile", x: 152, name: "石子堆" },
       { id: "hangLantern", kind: "hangLantern", x: 160, name: "巷口的马灯" },
+      // 一章的家务道具：独轮车（运木料，兼教「推」）、木料上那只不肯挪窝的母鸡、
+      // 去老槐树半道上的田埂（翻越的复用）、院墙角那枚可选探索的顶针
+      { id: "barrow", kind: "barrow", x: 50.5, name: "独轮车" },
+      { id: "henProp", kind: "hen", x: 56.4, name: "母鸡", hideFlag: "henFlew" },
+      { id: "ridgeMid", kind: "ridge", x: 96, w: 3, name: "田埂" },
+      { id: "thimbleProp", kind: "thimble", x: 48.8, name: "顶针", hideFlag: "thimbleFound" },
+      // 扫荡后才出现：慌乱中撞塌的柴垛（压力下复用翻越）与院里的石子堆（软窗口）。
+      // 柴垛必须压在撤退路线上（42→27）才叫「路线上的障碍」，搁在东边就白设了
+      { id: "fallenWood", kind: "fallenWood", x: 38, name: "倒塌的柴垛", showFlag: "raidStarted" },
+      { id: "stonesYard", kind: "stonePile", x: 43.5, name: "石子堆", showFlag: "raidStarted" },
+    ],
+    // 可翻越物（贴近自动手脚并用翻过去；轮廓语法：肩高、顶沿磨亮/有缺口）。
+    // 院墙缺口教第一次，田埂 30 秒内复用，倒塌柴垛在扫荡压力下考第三次。
+    vaults: [
+      { x: 47, w: 1.0, top: 1.8 },
+      { x: 96, w: 1.4, top: 0.85 },
+      { x: 38, w: 1.6, top: 1.55, flag: "raidStarted" },
     ],
     // 掩体链：这条村道是第二章的潜行场地，掩体的疏密就是关卡节奏本身。
     // tall（草垛、齐胸的断墙）站着就挡得住；矮的（柴堆、水瓮）得蹲下去。
@@ -310,8 +327,15 @@ function LineDuration(line) {
 // 狗认吃不认人；灯有周期。动词凑齐了，关卡才有"想一下"的时刻。
 // ---------------------------------------------------------------------------
 const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
+const VAULT_DUR = 0.62;
 
 function GiveItem(state, item) { state.player.item = { ...item }; }
+
+// 一次性音效由这里排队，Script_Soundtrack 每帧取走去点名。
+// Core 不认识合成器，只说"发生了什么"。
+function Cue(state, name, opts) {
+  if (state.cues) state.cues.push(opts ? { name, ...opts } : { name });
+}
 
 // 规范：每个玩法动词都要有对应的角色动画。瞬时动作（拾、投）打一个
 // 带时限的姿势，持续动作（摇辘轳、划线）每帧续期——到时自动收回常态。
@@ -417,7 +441,11 @@ function StepChain(state, def, input, dt) {
   const th = StepThrown(state, dt);
   if (th) {
     if (st.type === "throwHit" && th.hit) { finish(); return; }
-    if (st.type === "throwHit") state.toast = { text: st.missNote || "石子擦着边飞过去了。再捡一颗。", t: 3 };
+    if (st.type === "throwHit") {
+      // 投空不白投：miss 回调让失败自己变成演示（惊飞麻雀=石子落地会出声）
+      st.miss?.(state, th.x1);
+      state.toast = { text: st.missNote || "石子擦着边飞过去了。再捡一颗。", t: 3 };
+    }
   }
 
   switch (st.type) {
@@ -426,7 +454,37 @@ function StepChain(state, def, input, dt) {
       if (!near) return;
       if (p.item) { state.prompt = "手里拿着" + p.item.label + "——一次只能拿一样"; return; }
       state.prompt = st.prompt || `E · 拿起${st.item.label}`;
-      if (input.interact) { GiveItem(state, st.item); FlashPose(state, "bow", 0.5); finish(); }
+      if (input.interact) { GiveItem(state, st.item); FlashPose(state, "bow", 0.5); Cue(state, "pickup"); finish(); }
+      return;
+    }
+    // 放下换手：单格物品栏的另一半——「翻堆要双手」的地方，得先把手里的搁下。
+    // 放在哪儿记进 flags，渲染层照着画，折回来还能捡
+    case "drop": {
+      if (!InZone(p.x, lvl, st.zone)) return;
+      if (p.item?.id !== st.itemId) return;
+      state.prompt = st.prompt || `E · 放下${p.item.label}`;
+      if (input.interact) {
+        state.flags[st.storeIn] = Math.round(p.x * 10) / 10;
+        state.player.item = null;
+        FlashPose(state, "bow", 0.5);
+        Cue(state, "drop");
+        finish();
+      }
+      return;
+    }
+    // 折回取：从 drop 记下的位置把东西捡回来
+    case "pickupGround": {
+      const gx = state.flags[st.flagX];
+      if (typeof gx !== "number" || Math.abs(p.x - gx) > 1.7) return;
+      if (p.item) { state.prompt = "手里拿着" + p.item.label + "——一次只能拿一样"; return; }
+      state.prompt = st.prompt || `E · 拿回${st.item.label}`;
+      if (input.interact) {
+        GiveItem(state, st.item);
+        state.flags[st.flagX] = null;
+        FlashPose(state, "bow", 0.5);
+        Cue(state, "pickup");
+        finish();
+      }
       return;
     }
     case "use": {
@@ -459,8 +517,15 @@ function StepChain(state, def, input, dt) {
         return;
       }
       if (p.item.id !== "stone") return;
+      // 弧线预览：站位不够是灰虚线，走进射程变实线——命中与否全归因于玩家
+      const dxAim = (st.target.x - p.x) * p.heading;
+      state.throwAim = {
+        x0: p.x + p.heading * 0.4, y0: 1.35,
+        x1: st.target.x, y1: st.target.y ?? 1.6,
+        ok: dxAim >= THROW_MIN && dxAim <= THROW_MAX,
+      };
       state.prompt = st.prompt || "F · 朝着它投出去（站得不远不近才砸得到）";
-      if (input.throw || (input.interact && !nearPile)) { StartThrow(state, st); FlashPose(state, "throwArm", 0.45); }
+      if (input.throw || (input.interact && !nearPile)) { StartThrow(state, st); FlashPose(state, "throwArm", 0.45); Cue(state, "whoosh"); }
       return;
     }
     case "talk": {
@@ -474,7 +539,7 @@ function StepChain(state, def, input, dt) {
       return;
     }
     case "push": {
-      if (!state.cart) state.cart = { x: st.from };
+      if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart" };
       const cart = state.cart;
       if (Math.abs(p.x - cart.x) > 2.6) return;
       state.prompt = st.prompt || "按住 E · 顶住车往前推";
@@ -483,6 +548,7 @@ function StepChain(state, def, input, dt) {
         cart.x += st.dir * 0.85 * dt;
         p.x = cart.x - st.dir * 1.7;
         p.heading = st.dir;
+        FlashPose(state, "push", 0.25);
         if ((cart.x - st.from) * st.dir >= st.dist) finish();
       }
       return;
@@ -573,8 +639,105 @@ function StepCartRide(state, def, input, dt) {
   }
 }
 
+// 击打（合榫敲木楔）：两组——三下吃紧；爹演示四下变奏，玩家跟着敲。
+// 不设失败：教的是「节奏会变」这件事本身。嗜头写死在第三下：敲歪，爹瞪一眼，
+// 弯腰扶正，接着来。每一下都有挥臂动画与木榫的笃声（动词动画铁律）。
+function StepStrike(state, def, input, dt) {
+  const b = state.beat;
+  if (b.si === undefined) {
+    b.si = 0; b.hi = 0; b.gagT = 0; b.demoLeft = 0; b.demoT = 0;
+    const father = FindActor(state, "father");
+    if (father) { father.x = def.zone.x + 1.0; father.heading = -1; }
+  }
+  const father = FindActor(state, "father");
+  const set = def.sets[b.si];
+  if (!set) { state.tenon = null; AdvanceBeat(state); return; }
+  state.tenon = { si: b.si, hi: b.hi, total: set.hits, crooked: b.gagT > 0.7 };
+
+  // 嗜头进行中：爹瞪一眼（转向玩家），后半段弯腰把楔子扶正
+  if (b.gagT > 0) {
+    b.gagT -= dt;
+    if (father) {
+      father.heading = state.player.x >= father.x ? 1 : -1;
+      father.pose = b.gagT < 0.7 ? "bow" : null;
+    }
+    if (b.gagT <= 0) {
+      if (father) father.pose = null;
+      Cue(state, "tenon");        // 扶正的那一下
+      // 第一组完：爹先示范第二组的四下变奏
+      b.si += 1; b.hi = 0;
+      b.demoLeft = def.sets[b.si]?.hits || 0;
+      b.demoT = 0.6;
+    }
+    return;
+  }
+  // 爹的示范：四下，节奏比第一组密
+  if (b.demoLeft > 0) {
+    b.demoT -= dt;
+    if (b.demoT <= 0) {
+      b.demoLeft -= 1;
+      b.demoT = 0.38;
+      if (father) { father.pose = "swing"; father.poseFlash = 0.3; }
+      Cue(state, "tenon", { gain: 0.6 });
+    }
+    if (father?.poseFlash !== undefined) {
+      father.poseFlash -= dt;
+      if (father.poseFlash <= 0) { father.pose = null; father.poseFlash = undefined; }
+    }
+    if (b.demoLeft <= 0 && (father?.poseFlash === undefined)) state.toast = null;
+    return;
+  }
+
+  const near = Math.abs(state.player.x - def.zone.x) < (def.zone.w || 4) / 2 + 1.2;
+  if (!near) { state.prompt = ""; return; }
+  state.prompt = b.si === 0 ? "E · 敲木楔（三下吃紧）" : "E · 跟着那个节奏——四下";
+  if (input.interact) {
+    b.hi += 1;
+    FlashPose(state, "swing", 0.35);
+    Cue(state, "tenon");
+    if (b.si === 0 && b.hi === set.hits) {
+      // 第三下敲歪：爹瞪一眼。gagT 顺带挡住输入，一秒半的哑剧
+      b.gagT = 1.4;
+      return;
+    }
+    if (b.hi >= set.hits) {
+      b.si += 1; b.hi = 0;
+      if (b.si >= def.sets.length) {
+        state.tenon = null;
+        if (father) father.pose = null;
+        state.toast = { text: "榫合上了。爹用手掌抹了一把接缝。", t: 4 };
+        AdvanceBeat(state);
+      }
+    }
+  }
+}
+
 export const SCRIPTS = {
   c1: [
+    {
+      // 序章（对标《勇敢的心》两分钟新闻片）：从卢沟桥一路收拢到一道门框。
+      // 节奏不是均速平推——1–5 段快切叠画，9 段推镜变速，10 段起骤然放慢，
+      // 13 段是快慢之间的沉降拍（粮的铰链：c1_father 审问问的正是粮）。
+      // 每段一幅专画的卡（渲染层做慢推的 Ken Burns，定格画片才不像幻灯片）。
+      kind: "cinematic", id: "c1_prologue", prologue: true,
+      lines: [
+        { stage: "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。", d: 4.6, cam: { kind: "insertCard", card: "pro1" } },
+        { stage: "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。", d: 4.4, cam: { kind: "insertCard", card: "pro2" } },
+        { stage: "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。", d: 4.6, cam: { kind: "insertCard", card: "pro3" } },
+        { stage: "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。", d: 4.8, cam: { kind: "insertCard", card: "pro4" } },
+        { stage: "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。", d: 5.4, cam: { kind: "insertCard", card: "pro5" } },
+        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertCard", card: "pro6" } },
+        { stage: "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。", d: 6.0, cam: { kind: "insertCard", card: "pro7" } },
+        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertCard", card: "pro8" } },
+        { stage: "这个故事，发生在冀中一个普通的村庄。", d: 5.2, cam: { kind: "insertCard", card: "pro9" } },
+        { stage: "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。", d: 7.6, cam: { kind: "insertCard", card: "pro10" } },
+        { stage: "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。", d: 7.8, cam: { kind: "insertCard", card: "pro11" } },
+        { stage: "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。", d: 8.2, cam: { kind: "insertCard", card: "pro12" } },
+        { stage: "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。", d: 7.0, cam: { kind: "insertCard", card: "pro13" } },
+        { stage: "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。", d: 8.0, cam: { kind: "insertCard", card: "pro14" } },
+        { stage: "这天早上，梁木匠把儿子叫到了门框跟前。", d: 4.0, cam: { kind: "wide", x: 42 } },
+      ],
+    },
     {
       kind: "cinematic", id: "c1_open",
       lines: [
@@ -587,7 +750,9 @@ export const SCRIPTS = {
             state.player.x = 44;
             state.player.cineWalk = { x: 49, speed: 2.6 };
           } },
-        { stage: "梁木匠把刨子放下，叫住了往外跑的儿子。", d: 3.4, cam: { kind: "shot", x: 43, y: 1.8, dist: 11 },
+        // 旁白铁律：画面内的动作不实况解说。这一拍是纯走位表演——
+        // 爹放下刨子、往外跑的儿子收步回身，大动作在这个镜距下自己会说话
+        { stage: "", d: 3.2, cam: { kind: "shot", x: 43, y: 1.8, dist: 11 },
           on: (state) => {
             const father = FindActor(state, "father");
             // 放下刨子：手里空出来，同时工作台上多一件东西
@@ -637,10 +802,17 @@ export const SCRIPTS = {
       lines: [
         { stage: "爹用凿子把那道印刻深了一点。", d: 4.0, cam: { kind: "insertCard", card: "carve" } },
         { who: "爹", say: "再过几年，这个家就靠你了。", d: 3.6, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 } },
-        { stage: "柱子仰着头，不太懂。", d: 2.8, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 } },
+        // 旁白铁律：「仰着头不太懂」改哑剧——歪头 + 头顶冒「？」，画面自己说
+        { stage: "", d: 2.6, cam: { kind: "ots", subject: "player", other: "father", dist: 3.2 },
+          on: (state) => {
+            state.player.pose = "puzzled";
+            // 气泡要陪满整行（收尾采样在 d-0.15），下一行的 on() 里由姿势归位带走
+            state.bubbleFlash = { who: "player", icon: "q", t: 3.0 };
+          } },
         { stage: "他惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
           on: (state) => {
             // 心思已经在村东头了：眼睛先往那边去
+            state.player.pose = null;
             state.player.heading = 1;
             const father = FindActor(state, "father");
             if (father) { father.heading = -1; }
@@ -648,36 +820,106 @@ export const SCRIPTS = {
       ],
     },
     {
-      kind: "collect", id: "c1_planks", objective: "帮爹把木料搬回工作台",
-      items: [{ x: 52 }, { x: 54.5 }],
-      deliver: V.workbench, carryLabel: "木料",
-      hint: "走到木料旁按 E 扛起，送回院里工作台再按 E 放下",
-    },
-    {
-      // 教「链」：水桶挂上去才发现井绳断了——障碍缺一样东西，东西在别处。
-      // 《勇敢的心》的关卡语法从这口井开始。
-      kind: "chain", id: "c1_water",
-      objective: "帮娘打一桶水回来", hint: "水缸见了底。水桶在院里",
+      // 独轮车运木料：一件家务同时教「扛放」与「推」（C3 推陷车/跟车的前置）。
+      // 去木料堆的路上先翻院墙缺口——「翻越」的第一次，贴近自动手脚并用，
+      // 可翻越物的轮廓语法（肩高、顶沿缺口）从这堵墙定死。
+      kind: "chain", id: "c1_barrow",
+      objective: "帮爹把木料运回来", hint: "村东头那两根木料，独轮车就在墙缺口外",
+      bubbles: (state) => {
+        // 爹缺木料：图形气泡挂在他头上，直到两根都上了车
+        if ((state.flags.barrowPlanks || 0) < 2) state.bubbles.push({ who: "father", icon: "plank" });
+      },
+      onStart: (state) => {
+        const father = FindActor(state, "father");
+        if (father) { father.x = V.workbench.x + 0.6; father.heading = 1; }
+      },
       steps: [
-        { type: "pickup", x: 44, item: { id: "bucket", label: "水桶" }, prompt: "E · 拎起水桶" },
-        { type: "use", zone: V.well, needs: "bucket", prompt: "E · 把桶挂上井绳",
-          note: "井绳断了半截——桶放下去，够不着水面。得找根麻绳。" },
-        { type: "pickup", x: 70, item: { id: "rope", label: "麻绳" }, prompt: "E · 从木料堆里抽出麻绳" },
-        { type: "use", zone: V.well, needs: "rope", hold: 1.2, prompt: "按住 E · 接上井绳",
-          note: "麻绳接上了。辘轳又能转了。" },
-        { type: "winch", zone: V.well,
-          gives: { id: "fullBucket", label: "一桶水", big: true },
-          note: "水打上来了。桶沿一路往下滴。" },
-        { type: "use", zone: V.homeYard, needs: "fullBucket", prompt: "E · 把水倒进缸里",
-          note: "水缸满了。娘直起腰，朝他笑了笑。" },
+        // 木料别搁在草垛（52±1.6）里：捡的东西必须看得见（目标同屏原则的底线）
+        { type: "pickup", x: 54.4, item: { id: "plankA", label: "木料", big: true }, prompt: "E · 扛起木料" },
+        { type: "use", zone: { x: 50.5, w: 2.6 }, needs: "plankA", prompt: "E · 把木料放上独轮车",
+          effect: (state) => { state.flags.barrowPlanks = 1; Cue(state, "drop"); } },
+        { type: "pickup", x: 56.4, item: { id: "plankB", label: "木料", big: true },
+          prompt: "E · 扛起木料（上头蹲着只母鸡）",
+          effect: (state) => {
+            // 嗜头：母鸡扑棱着飞下去。也是「动静会惊动活物」的第一次暗示
+            state.flags.henFlew = true;
+            state.henFlee = { x: 56.4, t: 0 };
+            Cue(state, "henSquawk");
+          } },
+        { type: "use", zone: { x: 50.5, w: 2.6 }, needs: "plankB", prompt: "E · 把木料放上独轮车",
+          effect: (state) => { state.flags.barrowPlanks = 2; Cue(state, "drop"); } },
+        { type: "push", from: 50.5, dist: 9.2, dir: -1, obj: "barrow",
+          prompt: "按住 E · 推着独轮车去爹跟前",
+          note: "木料到了。爹拍了拍车帮，转身拿家伙。",
+          effect: (state) => { state.flags.barrowHome = true; state.cart = null; } },
       ],
     },
     {
-      // 教「投掷」：无压力的一投。第二章同一个动词要在灯下用第二次。
-      // （历史检查：不是风筝——1942 年敌后农村的孩子头上是花布巾，
-      // 风刮上树的只会是这类日常物件。）
+      // 帮爹合榫（教「击打」）：两组木楔——三下吃紧，第二组四下变奏，
+      // 教的是「节奏会变」（第七章凿地沿才不突兀）。嗜头：第三下敲歪，爹瞪一眼。
+      kind: "strike", id: "c1_tenon", zone: V.workbench,
+      sets: [{ hits: 3 }, { hits: 4 }],
+      objective: "帮爹合榫", hint: "到工作台边，跟着爹的手势敲",
+    },
+    {
+      // 教「链＋单格换手」：两跳半——挂桶才知绳断；翻堆要双手，得先放下桶；
+      // 接好绳还得折回来取桶。「大件占手、放下换手」在无压力下成为肌肉记忆
+      //（C4 限时链的根在这里）。
+      kind: "chain", id: "c1_water",
+      objective: "帮娘打一桶水回来", hint: "水缸见了底。水桶在屋里",
+      bubbles: (state) => {
+        // 井台缺绳：断绳气泡挂在井上，直到接好
+        if (state.flags.wellRopeBroken) state.bubbles.push({ x: V.well.x, y: 2.6, icon: "rope" });
+      },
+      steps: [
+        { type: "pickup", x: 31, item: { id: "bucket", label: "空水桶" }, prompt: "E · 拎起水桶" },
+        { type: "use", zone: V.well, needs: "bucket", consume: false, prompt: "E · 把桶挂上井绳",
+          note: "井绳断了半截——桶放不下去。得找根麻绳。",
+          effect: (state) => { state.flags.wellRopeBroken = true; } },
+        { type: "drop", zone: V.woodpile, itemId: "bucket", storeIn: "bucketAt",
+          prompt: "翻堆得腾出两只手——E · 先放下桶" },
+        { type: "pickup", x: 70, item: { id: "rope", label: "麻绳" },
+          prompt: "E · 抽出那截外露的绳头",
+          effect: (state) => {
+            // 嗜头：翻堆惊出一只田鼠，贴着地皮蹿没影了
+            state.mouseFlee = { x: 70, t: 0 };
+            state.flags.ropeTaken = true;
+          } },
+        { type: "use", zone: V.well, needs: "rope", hold: 1.2, prompt: "按住 E · 接上井绳",
+          note: "麻绳接上了。辘轳又能转了。",
+          effect: (state) => { state.flags.wellRopeBroken = false; } },
+        { type: "pickupGround", flagX: "bucketAt", item: { id: "bucket", label: "空水桶" },
+          prompt: "E · 拎回水桶" },
+        { type: "winch", zone: V.well, needs: "bucket",
+          gives: { id: "fullBucket", label: "一桶水", big: true },
+          note: "水打上来了。桶沿一路往下滴。",
+          effect: (state) => {
+            // 娘出来接：满桶回家那一屏路的尽头是人，不是水缸
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.cineTarget = { x: 36.4 }; mother.cineSpeed = 1.3; }
+          } },
+        { type: "use", zone: { x: 35.8, w: 2.6 }, needs: "fullBucket", prompt: "E · 把水交给娘",
+          note: "娘接过桶，颠了颠分量，朝他笑了笑。",
+          effect: (state) => {
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.carry = "桶"; mother.heading = 1; }
+            Cue(state, "drop");
+          } },
+      ],
+    },
+    {
+      // 教「投掷」＋「声音」的前一半：无压力的一投。妹妹在树下仰头跳着够——
+      // 她的视线就是引导线；投空的石子惊飞一群麻雀，失败本身成为
+      // 「石子落地会出声」的无压力演示（C2 声东击西的前置认知）。
+      // 去的路上再翻一道田埂（翻越 30 秒内复用、换语境）。
+      // （历史检查：不是风筝——1942 年敌后农村的孩子头上是花布巾。）
       kind: "chain", id: "c1_cloth",
       objective: "去老槐树下找妹妹回家吃饭", hint: "娘直起腰，朝老槐树的方向望了望",
+      onStart: (state) => {
+        // 妹妹仰头跳着够：动态显著性就是引导，不用文字
+        const sister = FindActor(state, "sister");
+        if (sister) { sister.track = { name: "reachJump", t: 0 }; sister.heading = 1; }
+      },
       steps: [
         { type: "talk", actor: "sister", prompt: "E · 问妹妹怎么了",
           lines: [
@@ -685,10 +927,19 @@ export const SCRIPTS = {
             { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
           ] },
         { type: "throwHit", pickupX: 120, target: { x: 127.6, y: 5.2, r: 2 },
-          prompt: "F · 朝树杈上的头巾投（站得不远不近才砸得到）",
-          missNote: "石子从布巾边上擦过去了。再捡一颗。",
+          prompt: "F · 朝树杈上的头巾投",
+          missNote: "石子落了空——扑棱棱惊起一片麻雀。",
+          miss: (state, land) => {
+            // 投空不白投：麻雀炸窝，「石子落地会出声」这件事画面自己演了
+            state.sparrowBurst = { x: land, t: 0 };
+            Cue(state, "flutter");
+          },
           note: "布巾打着旋儿飘下来了。",
-          effect: (state) => { state.flags.clothDown = true; } },
+          effect: (state) => {
+            state.flags.clothDown = true;
+            const sister = FindActor(state, "sister");
+            if (sister) sister.track = null;
+          } },
         { type: "pickup", x: 129, item: { id: "cloth", label: "花布巾" }, prompt: "E · 拾起头巾" },
         { type: "use", zone: { x: 124, w: 4 }, needs: "cloth", prompt: "E · 把头巾给妹妹系上",
           note: "妹妹把头巾系好，肯跟着回家了。" },
@@ -697,11 +948,14 @@ export const SCRIPTS = {
     {
       kind: "escort", id: "c1_sisterHome", follower: "sister", dest: V.homeYard,
       objective: "带妹妹回家", hint: "妹妹会跟着你走",
+      // J-cut：锣声先于切镜半拍响起——教学收尾的最后两秒，声音已经变了天
+      onDone: (state) => { Cue(state, "gong"); },
     },
     {
       kind: "cinematic", id: "c1_raid",
       lines: [
-        { stage: "锣声。有人在村口喊：鬼子进村了——", d: 3.0, cam: { kind: "wide", x: 140, pan: -6 },
+        // 惊变时刻旁白闭嘴、同期声接管：村口是画外真人的喊声，不是叙事者的转述
+        { who: "村口喊声", say: "鬼子进村了——", d: 3.0, far: true, cam: { kind: "wide", x: 140, pan: -6 },
           on: (state) => {
             // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
             // 于是"鬼子进村了"这一句对着的是一个空村口
@@ -711,12 +965,30 @@ export const SCRIPTS = {
             // 从村口往里走：镜头横摇跟着他们推进
             if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
             if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
+            // 镜头此刻在村东口，院子不在画框里——趁这三秒把娘和妹妹走位到位：
+            // 护送收束时妹妹可能还落在半路，娘还站在门口。硬切回院子之前必须站定
+            const p = state.player;
+            const sister = FindActor(state, "sister");
+            const mother = FindActor(state, "mother");
+            if (sister) { sister.following = false; sister.cineTarget = { x: p.x + 1.6 }; sister.cineSpeed = 3.4; }
+            if (mother) { mother.carry = null; mother.cineTarget = { x: p.x + 2.6 }; mother.cineSpeed = 3.4; }
           } },
         { stage: "爹把刨子塞进柴堆，转身走向院门。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 },
           on: (state) => {
             // 塞柴堆得手里先有刨子：从工作台上抄起来，走向院门边的柴堆
             const father = FindActor(state, "father");
             if (father) { father.carry = "刨子"; father.cineTarget = { x: 44.5 }; father.cineSpeed = 2.6; }
+          } },
+        // 无声走位：娘把妹妹往柱子那边一推，自己转身朝院门——一个动作同时完成
+        // 「交托」与「娘为何留在院里」。没有字幕，两秒的表演
+        { stage: "", d: 2.2, cam: { kind: "shot", x: 39, y: 1.6, dist: 8 },
+          on: (state) => {
+            const p = state.player;
+            const mother = FindActor(state, "mother");
+            const sister = FindActor(state, "sister");
+            // 推得着才叫推：娘就在妹妹身后半步（line0 已走位到位），弯腰一送
+            if (sister) { sister.cineTarget = { x: p.x + 0.6 }; sister.cineSpeed = 2.4; sister.heading = -1; }
+            if (mother) { mother.cineTarget = null; mother.heading = -1; mother.pose = "bow"; }
           } },
         { who: "爹", say: "带妹妹进地窖。别出声。", d: 3.0, cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 },
           on: (state) => {
@@ -725,18 +997,47 @@ export const SCRIPTS = {
             const father = FindActor(state, "father");
             if (father) { father.carry = null; father.cineTarget = null; }
             if (father) state.player.cineWalk = { x: father.x - 2.2, speed: 2.6 };
+            // 娘转身朝院门口去——她留在院里的原因，走位已经交代了。
+            // 目标点要压过推妹妹时的落位（sister.x+1.0 最东 ≈46.1），不然一步就"到了"
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.pose = null; mother.cineTarget = { x: 47.6 }; mother.cineSpeed = 1.7; }
           } },
       ],
       onDone: (state) => {
-        // 兵在第一行就已经进场了，这里只把巡逻交还给常规逻辑
-        for (const a of state.actors) if (IsEnemy(a)) a.cineTarget = null;
+        // 考场布防。两条铁律定死了它的形状：
+        //   ① 撤退方向必须是空的——地窖口在 27，柱子站在 42，这 15m 是活路，
+        //      不能有人站在上面。兵全在东边（院门外的街上），朝东背着院子。
+        //   ② 重置点不能落在任何人的视线里，否则一复位又被看见，就是死循环。
+        // 兵在街上朝外，你从他们背后往西溜进自家屋——「背对路线站定」就是这个意思。
+        state.flags.raidStarted = true;
+        const r1 = FindActor(state, "raid1");
+        const r2 = FindActor(state, "raid2");
+        // 巡街的：来回走，走到西头（49）才够得着院子东半边
+        if (r1) { r1.cineTarget = null; r1.x = 57; r1.heading = 1; r1.patrol = [49, 57]; r1.speed = 1.05; }
+        // 站定的那个：搁在院门外，脸朝街——他就是石子那道软窗口的对象
+        if (r2) { r2.cineTarget = null; r2.x = 51; r2.heading = 1; r2.patrol = null; }
         state.stealthActive = true;
       },
     },
     {
       kind: "escort", id: "c1_hide", follower: "sister", dest: V.cellar, stealth: true,
-      objective: "带妹妹躲进地窖", hint: "地窖口在屋西边，走到口上按 S 下去",
+      objective: "带妹妹躲进地窖", hint: "地窖口在屋里西头，贴着影子走，到口上按 S 下去",
       resetHint: "被巡逻的鬼子看见了。再试一次——柱子还只是个孩子，跑不过刺刀。",
+      // 这是教学关的考场，考的是「用过」不是「用熟」：白昼 15m 的视距会把整条
+      // 撤退路线扣死，这一幕收到六成多。收的是同一个数——渲染层画的光带、
+      // 判定用的视距都走 VisionScale，画出来的和判出来的永远是一条线。
+      visionScale: 0.62,
+      // 出发前可扒墙缝看一眼街上的刺刀（E 观察，预教第三章的「看」）——
+      // 两个无字幕的插入镜头替代文字威胁说明。位置在院墙上，兵在墙外街上
+      peek: {
+        x: 45.6, prompt: "E · 扒着院墙缝看一眼",
+        lines: [
+          { stage: "", d: 2.6, cam: { kind: "insert", x: 51, y: 1.3, dist: 5 } },
+          { stage: "", d: 2.2, cam: { kind: "insert", x: 55, y: 1.3, dist: 4.2 } },
+        ],
+      },
+      // 软性窗口：院里的石子堆——朝街上扔一颗，把街上那两个引得更远（非必选）
+      stonePile: { x: 43.5 },
     },
     {
       kind: "cinematic", id: "c1_father",
@@ -752,7 +1053,7 @@ export const SCRIPTS = {
             if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
             if (r2) { r2.patrol = null; r2.cineTarget = { x: 40.5 }; r2.cineSpeed = 3; }
           } },
-        { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
+        { stage: "爹被两个兵按着跪在地上。", d: 3.4, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
           on: (state) => {
             // 跪不是一张定格：他在挣，兵在按。两条循环轨道错开半拍咬在一起
             const father = FindActor(state, "father");
@@ -766,6 +1067,11 @@ export const SCRIPTS = {
             const mother = FindActor(state, "mother");
             if (mother) { mother.x = 35.1; mother.heading = 1; mother.pose = "kneel"; }
           } },
+        // 审问是日语原声、不加字幕：板缝后的孩子听不懂，玩家也不必懂
+        //（《勇敢的心》咕噜拟声的历史化等价物）。旁白只补画面给不了的那一句。
+        { who: "日军", say: "言え！八路の食糧はどこに隠した！", noSub: true, d: 3.0,
+          cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
+        { stage: "他们在问粮。", d: 2.4, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
         { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
           on: (state) => {
             // 抡的轨道在 0.95s 到达落点；挨砸的轨道用 -0.95 的起点等在那儿，
@@ -778,8 +1084,10 @@ export const SCRIPTS = {
             if (r1) r1.track = null;      // 按人的松开手，退半步
             if (r1) { r1.cineTarget = { x: 36.4 }; r1.cineSpeed = 1.2; }
           } },
-        { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
+        // 「妹妹想哭」由憋泣的呼吸声演（压低、闷），旁白只说画面外那半句
+        { stage: "柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
+            Cue(state, "sobBreath");
             state.player.pose = "shelter";
             const sister = FindActor(state, "sister");
             if (sister) {
@@ -806,7 +1114,9 @@ export const SCRIPTS = {
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
             }
           } },
-        { stage: "那道刚刻下的线，还露着新茬。", d: 3.4, cam: { kind: "shot", x: 34, y: 1.5, dist: 5.5 } },
+        { stage: "那道刚刻下的线，还露着新茬。", d: 3.4, cam: { kind: "shot", x: 34, y: 1.5, dist: 5.5 },
+          // iris 收在情感物件上：圆心对准门框刻痕收拢落黑
+          on: (state) => { state.irisFocus = { x: 34.05, y: 1.30 }; } },
       ],
     },
   ],
@@ -2014,13 +2324,23 @@ export function CreateGame(chapterIndex = 0) {
     beatIndex: 0,
     time: 0,
     cardTimer: 0,
-    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, cineWalk: null },
+    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, vaultT: 0, cineWalk: null },
     actors: [],
     cart: null,
     thrown: null,
     noiseAt: null,
     searchlight: null,
     dogBark: null,
+    cues: [],
+    bubbles: [],
+    bubbleFlash: null,
+    throwAim: null,
+    sparrowBurst: null,
+    henFlee: null,
+    mouseFlee: null,
+    tenon: null,
+    spotFlash: null,
+    irisFocus: null,
     stealthActive: false,
     detection: { level: 0, spotter: null },
     smoke: null,
@@ -2036,6 +2356,8 @@ export function CreateGame(chapterIndex = 0) {
       route: null, resets: 0, ruined: false, carved: false,
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
       clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
+      barrowPlanks: 0, barrowHome: false, henFlew: false, wellRopeBroken: false, ropeTaken: false,
+      bucketAt: null, raidStarted: false, thimbleFound: false,
     },
     caption: null,
     camHint: { kind: "follow" },
@@ -2088,8 +2410,28 @@ export function StartChapter(state, index) {
   state.dogBark = null;
   if (index !== 7) state.flags.ruined = false;
   if (index < 4) { state.flags.hiddenBuilt = false; state.flags.entWBlocked = false; }
+  state.player.vaultT = 0;
+  state.cues = [];
+  state.bubbles = [];
+  state.bubbleFlash = null;
+  state.throwAim = null;
+  state.sparrowBurst = null;
+  state.henFlee = null;
+  state.mouseFlee = null;
+  state.tenon = null;
+  state.spotFlash = null;
+  state.irisFocus = null;
   // 从章节菜单单独进某一章时，本章谜题的旗标要归零
-  if (index === 0) state.flags.clothDown = false;
+  if (index === 0) {
+    state.flags.clothDown = false;
+    state.flags.barrowPlanks = 0;
+    state.flags.barrowHome = false;
+    state.flags.henFlew = false;
+    state.flags.wellRopeBroken = false;
+    state.flags.ropeTaken = false;
+    state.flags.bucketAt = null;
+    state.flags.raidStarted = false;
+  }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
   if (index === 4) { state.flags.dogFed2 = false; state.flags.bellBuilt = false; }
@@ -2146,6 +2488,7 @@ function EnterBeat(state) {
     spotDone: def.kind === "buildSpots" ? def.spots.map(() => false) : null,
     digIndex: 0,
     quakeT: 0, quakeActive: false, quakeWarn: false,
+    graceT: 0, failN: 0,
     lossStage: 0, lossT: 0,
     snapshot: SnapshotPositions(state),
     choiceMade: null,
@@ -2182,8 +2525,19 @@ function AdvanceBeat(state) {
   state.beatIndex += 1;
   state.caption = null;
   state.prompt = null;
+  state.tenon = null;
+  state.throwAim = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
+}
+
+// 跳过序章：整段一次性结算掉（序章的行没有走位副作用，直接翻页即可）。
+// 只对 c1_prologue 生效——正片的过场不给整段跳，逐行点按仍是唯一的快进。
+export function SkipPrologue(state) {
+  const def = CurrentBeatDef(state);
+  if (!def || def.id !== "c1_prologue") return false;
+  AdvanceBeat(state);
+  return true;
 }
 
 function EndChapter(state) {
@@ -2318,6 +2672,16 @@ export function StepGame(state, input, dt) {
     state.player.pose = null;
     state.player.poseT = undefined;
   }
+  // 引导气泡逐帧重算（节拍的 bubbles 回调往里推）；一次性气泡走计时
+  state.bubbles = [];
+  state.throwAim = null;
+  if (state.bubbleFlash && (state.bubbleFlash.t -= dt) <= 0) state.bubbleFlash = null;
+  if (state.spotFlash && (state.spotFlash.t -= dt) <= 0) state.spotFlash = null;
+  // 小活物的一次性动画：麻雀炸窝、母鸡扑棱、田鼠蹿走——各自跑完就清
+  for (const key of ["sparrowBurst", "henFlee", "mouseFlee"]) {
+    const fx = state[key];
+    if (fx && (fx.t += dt) > 2.2) state[key] = null;
+  }
 
   if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
     state.cardTimer += dt;
@@ -2354,6 +2718,51 @@ export function StepGame(state, input, dt) {
   state.winchLock = false;
   state.winchView = null;
 
+  // 节拍声明的引导气泡（图形气泡=「我缺什么」，无文字引导三层配方之一）
+  def.bubbles?.(state);
+
+  // 链外的通用投掷：手里有能扔的就能扔（软性窗口靠它——石子落地出声引开人）。
+  // 链内的投掷仍由 StepChain 自己管（要判命中）
+  if (def.kind !== "chain") {
+    StepThrown(state, dt);
+    if (input.throw && state.player.item?.throwable && !state.thrown) {
+      StartThrow(state, null);
+      FlashPose(state, "throwArm", 0.45);
+      Cue(state, "whoosh");
+    }
+  }
+  // 路边的石子堆（潜行段的软性窗口）：捡一颗在手，第一次靠近给个一次性提示
+  if (def.stonePile && !state.player.item && state.player.level === "surface"
+    && Math.abs(state.player.x - def.stonePile.x) < 1.6) {
+    if (!state.beat.stoneHinted) {
+      state.beat.stoneHinted = true;
+      state.bubbleFlash = { x: def.stonePile.x, y: 1.9, icon: "stone", t: 3.2 };
+    }
+    if (!state.prompt) {
+      state.prompt = "E · 捡一颗石子";
+      if (input.interact) { GiveItem(state, { id: "stone", label: "石子", throwable: true }); FlashPose(state, "bow", 0.45); Cue(state, "pickup"); }
+    }
+  }
+  // 扒墙缝看一眼（可选观察，预教第三章的「看」）：无字幕的插入镜头
+  if (def.peek && !state.beat.peeked && !state.microCine
+    && Math.abs(state.player.x - def.peek.x) < 1.5 && state.player.level === "surface") {
+    if (!state.prompt) {
+      state.prompt = def.peek.prompt;
+      if (input.interact) { state.beat.peeked = true; StartMicroCine(state, def.peek.lines); }
+    }
+  }
+  // 可选探索：院墙角那枚顶针（历史小卡的雏形——训练「离开主路径看一眼」）
+  if (CHAPTERS[state.chapterIndex].id === "c1" && !state.flags.thimbleFound
+    && !state.prompt && !state.player.item && state.player.level === "surface"
+    && Math.abs(state.player.x - 48.8) < 1.2) {
+    state.prompt = "E · 捡起来看看";
+    if (input.interact) {
+      state.flags.thimbleFound = true;
+      Cue(state, "pickup");
+      state.toast = { text: "一枚铜顶针。娘纳鞋底时顶针眼用的，不知什么时候滚到了墙根。", t: 5 };
+    }
+  }
+
   switch (def.kind) {
     case "goto": StepGoto(state, def, input); break;
     case "gotoSeq": StepGotoSeq(state, def, input); break;
@@ -2376,6 +2785,7 @@ export function StepGame(state, input, dt) {
     case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
     case "chain": StepChain(state, def, input, dt); break;
     case "cartRide": StepCartRide(state, def, input, dt); break;
+    case "strike": StepStrike(state, def, input, dt); break;
     default: break;
   }
 
@@ -2391,6 +2801,15 @@ function MovePlayer(state, input, dt) {
   const env = CHAPTERS[state.chapterIndex].scene;
   const p = state.player;
   if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
+  // 翻越进行中：手脚并用翻过去，0.6 秒内锁操作，人沿一条小弧挪到另一侧
+  if (p.vaultT > 0) {
+    p.vaultT -= dt;
+    const k = 1 - Math.max(0, p.vaultT) / VAULT_DUR;
+    p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * k;
+    p.pose = "vault";
+    if (p.vaultT <= 0) { p.pose = null; p.vaultT = 0; }
+    return;
+  }
 
   // 地道里的姿态由所在段的净高决定：猫腰是常态，半蹲是局部，
   // 直立（藏人洞）和爬行（卡口/新掏段）是少数。见 TunnelPosture。
@@ -2406,9 +2825,28 @@ function MovePlayer(state, input, dt) {
   if (p.carry) speed = 3.0;
   if (p.item?.big) speed = Math.min(speed, 2.6);   // 扛大件（门板/顶木/满桶水）再慢一档
 
+  const prevX = p.x;
   if (Math.abs(input.moveX) > 0.05) {
     p.x += Math.sign(input.moveX) * speed * dt;
     p.heading = Math.sign(input.moveX);
+  }
+
+  // 可翻越物：挡路，但贴上去就自动手脚并用翻过去——无按键交互，
+  // 可读性全靠统一轮廓（肩高、顶沿缺口）。过场走位（cineWalk）不触发。
+  if (p.level === "surface" && !state.microCine) {
+    for (const v of scene.vaults || []) {
+      if (v.flag && !state.flags[v.flag]) continue;
+      const crossed = (prevX - v.x) * (p.x - v.x) < 0;
+      if (!crossed && Math.abs(p.x - v.x) > 0.45) continue;
+      const dir = Math.sign(p.x - prevX) || p.heading || 1;
+      p.vaultFrom = v.x - dir * ((v.w || 1) / 2 + 0.45);
+      p.vaultTo = v.x + dir * ((v.w || 1) / 2 + 0.55);
+      p.x = p.vaultFrom;
+      p.vaultT = VAULT_DUR;
+      p.heading = dir;
+      Cue(state, "vault");
+      break;
+    }
   }
 
   // 站在竖井口要给提示。原先这里一个字都没有，玩家根本不知道脚下能上能下——
@@ -2478,6 +2916,7 @@ function MovePlayer(state, input, dt) {
 
 function StepFollowers(state, dt) {
   const p = state.player;
+  const scene = SceneOf(state);
   for (const a of state.actors) {
     if (!a.following || !a.visible) continue;
     a.level = p.level;
@@ -2489,6 +2928,16 @@ function StepFollowers(state, dt) {
       a.x += dir * speed * dt;
       a.heading = dir;
     }
+    // 妹妹铁律的可见一半：镜像玩家的姿态（你蹲她蹲），过翻越物她也翻。
+    // 她本就不参与任何暴露判定（探测只看玩家）——失败源只能是柱子本人
+    a.crouch = p.crouch;
+    let nearVault = false;
+    for (const v of scene.vaults || []) {
+      if (v.flag && !state.flags[v.flag]) continue;
+      if (Math.abs(a.x - v.x) < 0.8) { nearVault = true; break; }
+    }
+    if (nearVault) a.pose = "vault";
+    else if (a.pose === "vault") a.pose = null;
   }
 }
 
@@ -2521,10 +2970,13 @@ function IsEnemy(a) { return a.kind === "soldier" || a.kind === "puppet"; }
 export const VISION_RANGE = 15;
 
 // 夜里提着灯笼，人眼只够得着灯照亮的那一截——视距打七折。
-// 渲染层画视线光带也用这一个数，画出来的和判出来的必须是同一条线。
+// 渲染层画视线光带也用这一个数，画出来的和判出来的必须是同一条线：
+// 三个调用点（探测判定、娘的"能不能冲"、渲染层的光带）都从这里取值，
+// 所以节拍级的收缩（def.visionScale）也自动在画面上兑现。
 export function VisionScale(state) {
   const L = CHAPTERS[state.chapterIndex].light;
-  return (L === "night" || L === "dark") ? 0.72 : 1;
+  const night = (L === "night" || L === "dark") ? 0.72 : 1;
+  return night * (CurrentBeatDef(state)?.visionScale ?? 1);
 }
 
 export function SoldierSeesPlayer(scene, soldier, player, rangeScale = 1) {
@@ -2546,6 +2998,14 @@ export function SoldierSeesPlayer(scene, soldier, player, rangeScale = 1) {
 
 function StepDetection(state, def, dt) {
   const scene = SceneOf(state);
+  // 刚被退回来的那一秒半不判定。没有这道闸，只要重置点落进任何一个人的视线，
+  // 玩家就会在原地被反复抓住——那不是难，是永远也跑不掉。
+  // （布防本身要保证重置点是安全的；这道闸是兜底，防的是以后再改坏。）
+  if (state.beat.graceT > 0) {
+    state.beat.graceT -= dt;
+    state.detection.level = 0;
+    return;
+  }
   let seen = false;
   for (const a of state.actors) {
     // decor 的兵只组队形、不看人：十几个人一起判视线，这段就没法玩了
@@ -2558,9 +3018,18 @@ function StepDetection(state, def, dt) {
   else state.detection.level = Math.max(0, state.detection.level - dt * 0.8);
   if (state.detection.level >= 1) {
     state.flags.resets += 1;
+    // 失败文案分级：首败无文字，只给视觉复盘（谁看见的，头顶亮一记「！」）；
+    // 第二次起才出整句提示——玩家先自己读一遍失败，读不出来再给答案
+    state.beat.failN = (state.beat.failN || 0) + 1;
+    state.beat.graceT = 1.5;
+    const spotterId = state.detection.spotter;
     RestoreSnapshot(state);
     def.onReset?.(state);
-    state.toast = { text: def.resetHint || "被发现了。退回来，重新等机会。", t: 4 };
+    const who = state.actors.find((a) => a.id === spotterId);
+    if (who) state.spotFlash = { x: who.x, y: 2.3, t: 2.2 };
+    state.toast = state.beat.failN >= 2
+      ? { text: def.resetHint || "被发现了。退回来，重新等机会。", t: 4 }
+      : null;
   }
 }
 
@@ -3450,11 +3919,20 @@ export function GetBeatTarget(state) {
       }
       return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
     }
+    case "strike": {
+      // 自动通关：站到工位上连着按 E 就行——嗜头与示范的停顿由执行器自己走
+      return { action: "interactAt", x: def.zone.x, level: "surface" };
+    }
     case "chain": {
       const st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;
       switch (st.type) {
         case "pickup": return { action: "interactAt", x: st.x, level: st.level || "surface" };
+        case "drop": return { action: "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
+        case "pickupGround": {
+          const gx = state.flags[st.flagX];
+          return typeof gx === "number" ? { action: "interactAt", x: gx, level: "surface" } : null;
+        }
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
         case "throwHit":
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
@@ -3543,7 +4021,7 @@ export function ChapterBeatList(chapterIndex) {
 // 起点开场——最难看的一种是"目的地就在脚下"，escort 刚进就自动完成。
 function SettleDest(def) {
   switch (def.kind) {
-    case "goto": case "hold": case "mapBoard": case "scribe": return def.zone;
+    case "goto": case "hold": case "mapBoard": case "scribe": case "strike": return def.zone;
     case "escort": case "lead": case "smokeEscape": case "floodRescue": return def.dest;
     case "leadFollow": return def.waypoints?.[def.waypoints.length - 1];
     case "coverRun": {
@@ -3610,6 +4088,8 @@ function SettleBeat(state, def) {
         if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);
         st.effect?.(state);
       }
+      // drop/pickupGround 这对步骤在结算里相互抵消：东西最后不在地上
+      for (const st of def.steps || []) if (st.type === "drop") state.flags[st.storeIn] = null;
       state.player.item = null;
       break;
     case "cartRide":
@@ -3659,6 +4139,8 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.prompt = null;
   state.promptFill = null;
   state.scribe = null;
+  state.bubbleFlash = null;
+  state.spotFlash = null;
   state.detection = { level: 0, spotter: null };
   // 结算过程里可能留下没走完的走位指令与一次性姿势，别让它们接管玩家刚接手的这一幕
   for (const a of state.actors) { a.cineTarget = null; a.cineSpeed = undefined; }

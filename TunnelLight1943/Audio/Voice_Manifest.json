@@ -4,1137 +4,1061 @@
       "id": "1gyza6y",
       "who": "爹",
       "text": "再过几年，这个家就靠你了。",
-      "voice": "Kangkang",
-      "pitch": "-22%",
-      "rate": "-22%"
+      "voice": "Father"
+    },
+    {
+      "id": "193bk7e",
+      "who": "妹妹",
+      "text": "哥——风把我的头巾刮到树上去了！",
+      "voice": "Sister",
+      "dur": 3.57
+    },
+    {
+      "id": "16b0o19",
+      "who": "村口喊声",
+      "text": "鬼子进村了——",
+      "voice": "Militia",
+      "dur": 0.98
     },
     {
       "id": "10nu4w4",
       "who": "爹",
       "text": "带妹妹进地窖。别出声。",
-      "voice": "Kangkang",
-      "pitch": "-22%",
-      "rate": "-22%"
+      "voice": "Father"
+    },
+    {
+      "id": "1rvzvgr",
+      "who": "日军",
+      "text": "言え！八路の食糧はどこに隠した！",
+      "voice": "Enemy",
+      "dur": 4.07
+    },
+    {
+      "id": "1eogin5",
+      "who": "娘",
+      "text": "灯扫过来，就蹲进影子里，贴着草垛别动。",
+      "voice": "Mother",
+      "dur": 3.79
+    },
+    {
+      "id": "1j8os7a",
+      "who": "娘",
+      "text": "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。",
+      "voice": "Mother",
+      "dur": 6.02
+    },
+    {
+      "id": "1r5jx8c",
+      "who": "大娘",
+      "text": "孩子，帮我找找柴刀——手一抖，掉进田埂那头了。",
+      "voice": "Mother",
+      "dur": 5.43
+    },
+    {
+      "id": "1iqfyzo",
+      "who": "赶车乡亲",
+      "text": "给据点支差送草——车陷在这儿了。搭把手；躲着点巡逻的。",
+      "voice": "Militia",
+      "dur": 4.57
     },
     {
       "id": "1e5ktsg",
       "who": "高传宝",
       "text": "梁家村的柱子？",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "02bl0b1",
       "who": "高传宝",
       "text": "你爹以前帮过乡亲。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "0iow91j",
       "who": "交通员",
       "text": "据点里又抓了几个人。柱子的妹妹，也在里面。",
-      "voice": "Kangkang",
-      "pitch": "+4%",
-      "rate": "+4%"
+      "voice": "Militia"
     },
     {
       "id": "0kmncfm",
       "who": "高传宝",
       "text": "先把人救出来。不能让乡亲们再被带走。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "1ot20mi",
       "who": "高传宝",
       "text": "想救人，先学会怎么把人藏好。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "0z5idaw",
       "who": "民兵",
       "text": "鬼子发现东口了！",
-      "voice": "Kangkang",
-      "pitch": "+8%",
-      "rate": "+8%"
+      "voice": "Militia"
     },
     {
       "id": "0genp2f",
       "who": "高传宝",
       "text": "准备下一次行动。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
+    },
+    {
+      "id": "0g36xue",
+      "who": "高传宝",
+      "text": "缺什么，上去拿。什么时候上去，你们自己看。",
+      "voice": "GaoChuanbao",
+      "dur": 3.54
     },
     {
       "id": "18xbokb",
       "who": "年轻民兵",
       "text": "带乡亲们走。",
-      "voice": "Kangkang",
-      "pitch": "+14%",
-      "rate": "+10%"
+      "voice": "Militia"
     },
     {
       "id": "1n1ts0l",
       "who": "高传宝",
       "text": "你说说看。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "06aujs8",
       "who": "高传宝",
       "text": "套是套。人，也是真的人。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "0i41772",
       "who": "高传宝",
       "text": "他们要的不是这十几个乡亲。是来救乡亲的人。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "0ft4qpy",
       "who": "柱子",
       "text": "我去。",
-      "voice": "Kangkang",
-      "pitch": "+16%",
-      "rate": "-4%"
+      "voice": "Zhuzi"
     },
     {
       "id": "0wtthzw",
       "who": "高传宝",
       "text": "跟紧队伍。",
-      "voice": "Kangkang",
-      "pitch": "-14%",
-      "rate": "-14%"
+      "voice": "GaoChuanbao"
     },
     {
       "id": "1u72yhv",
       "who": "妹妹",
       "text": "哥，娘呢？",
-      "voice": "Yaoyao",
-      "pitch": "+30%",
-      "rate": "+6%"
+      "voice": "Sister"
     },
     {
       "id": "02dqiaq",
       "who": "民兵",
       "text": "还有人没出来！东边旁洞里，还有几个乡亲！",
-      "voice": "Kangkang",
-      "pitch": "+8%",
-      "rate": "+8%"
+      "voice": "Militia"
     },
     {
       "id": "0rb1r1z",
       "who": "民兵",
       "text": "柱子，地道那边还缺人。",
-      "voice": "Kangkang",
-      "pitch": "+8%",
-      "rate": "+8%"
+      "voice": "Militia"
     },
     {
       "id": "1ymfd34",
       "who": "老人",
       "text": "梁家的柱子？你妹妹呢？",
-      "voice": "Kangkang",
-      "pitch": "-26%",
-      "rate": "-26%"
+      "voice": "Elder"
     },
     {
       "id": "1yn6f7c",
       "who": "柱子",
       "text": "送出去了。",
-      "voice": "Kangkang",
-      "pitch": "+16%",
-      "rate": "-4%"
+      "voice": "Zhuzi"
+    },
+    {
+      "id": "0tv20sp",
+      "who": "",
+      "text": "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。",
+      "voice": "Narrator",
+      "dur": 6.22
+    },
+    {
+      "id": "0r0r9mn",
+      "who": "",
+      "text": "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。",
+      "voice": "Narrator",
+      "dur": 6.72
+    },
+    {
+      "id": "010ww8u",
+      "who": "",
+      "text": "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。",
+      "voice": "Narrator",
+      "dur": 6.56
+    },
+    {
+      "id": "03p0l74",
+      "who": "",
+      "text": "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。",
+      "voice": "Narrator",
+      "dur": 6.96
+    },
+    {
+      "id": "0v0cfsc",
+      "who": "",
+      "text": "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。",
+      "voice": "Narrator",
+      "dur": 7.08
+    },
+    {
+      "id": "1hqxjsi",
+      "who": "",
+      "text": "扫荡一年比一年狠。抢粮，烧屋，抓人。",
+      "voice": "Narrator",
+      "dur": 4.63
+    },
+    {
+      "id": "17fgeq0",
+      "who": "",
+      "text": "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。",
+      "voice": "Narrator",
+      "dur": 8.42
+    },
+    {
+      "id": "1s1jcq0",
+      "who": "",
+      "text": "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。",
+      "voice": "Narrator",
+      "dur": 8.66
+    },
+    {
+      "id": "1qwcp68",
+      "who": "",
+      "text": "这个故事，发生在冀中一个普通的村庄。",
+      "voice": "Narrator",
+      "dur": 3.49
+    },
+    {
+      "id": "0fc66qg",
+      "who": "",
+      "text": "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。",
+      "voice": "Narrator",
+      "dur": 6.27
+    },
+    {
+      "id": "1b05nyp",
+      "who": "",
+      "text": "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。",
+      "voice": "Narrator",
+      "dur": 6.05
+    },
+    {
+      "id": "1oztvvz",
+      "who": "",
+      "text": "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。",
+      "voice": "Narrator",
+      "dur": 8.82
+    },
+    {
+      "id": "1ao8w21",
+      "who": "",
+      "text": "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。",
+      "voice": "Narrator",
+      "dur": 8.18
+    },
+    {
+      "id": "0el89h6",
+      "who": "",
+      "text": "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。",
+      "voice": "Narrator",
+      "dur": 8.63
+    },
+    {
+      "id": "01kspzr",
+      "who": "",
+      "text": "这天早上，梁木匠把儿子叫到了门框跟前。",
+      "voice": "Narrator",
+      "dur": 3.81
     },
     {
       "id": "1eg6pfw",
       "who": "",
       "text": "1942年，华北敌后。梁家村。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
-    },
-    {
-      "id": "1igsot7",
-      "who": "",
-      "text": "梁木匠把刨子放下，叫住了往外跑的儿子。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1ae1d6a",
       "who": "",
       "text": "爹朝门框那边扬了扬下巴。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "06wt8ak",
       "who": "",
       "text": "爹用凿子把那道印刻深了一点。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
-    },
-    {
-      "id": "1njt2mt",
-      "who": "",
-      "text": "柱子仰着头，不太懂。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0vtcze1",
       "who": "",
       "text": "他惦记着村东头那堆没搬完的木料。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
-      "id": "12gcypf",
+      "id": "1vf9zqb",
       "who": "",
-      "text": "锣声。有人在村口喊：鬼子进村了——",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "text": "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。",
+      "voice": "Narrator",
+      "dur": 5.08
     },
     {
       "id": "0fcs7gv",
       "who": "",
       "text": "爹把刨子塞进柴堆，转身走向院门。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0tqr9pg",
       "who": "",
       "text": "地窖板的缝里，能看见院子。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
-      "id": "00ownni",
+      "id": "0crwnf9",
       "who": "",
-      "text": "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "text": "爹被两个兵按着跪在地上。",
+      "voice": "Narrator",
+      "dur": 2.61
+    },
+    {
+      "id": "01t0rcj",
+      "who": "",
+      "text": "他们在问粮。",
+      "voice": "Narrator",
+      "dur": 1.2
     },
     {
       "id": "1co1tdi",
       "who": "",
       "text": "爹摇头。枪托砸下来。他又摇头。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
-      "id": "1sm1eh1",
+      "id": "0n2sly7",
       "who": "",
-      "text": "妹妹想哭。柱子把她的脸按进自己肩膀。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "text": "柱子把她的脸按进自己肩膀。",
+      "voice": "Narrator",
+      "dur": 3.1
     },
     {
       "id": "0a09d97",
       "who": "",
       "text": "爹被拖出院门的时候，回头看了一眼门框。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0oi83da",
       "who": "",
       "text": "那道刚刻下的线，还露着新茬。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0u421cc",
       "who": "",
       "text": "1943年。爹没有回来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1wl11yv",
       "who": "",
       "text": "柱子十六岁了，学会了爹的手艺，也学会了听见狗叫就先看村口。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1xbrppm",
       "who": "",
       "text": "这天夜里，狗叫得不一样。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0gavc5r",
       "who": "",
       "text": "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0pu5f3l",
       "who": "",
       "text": "前头挑灯笼带路的，是邻村据点里的翻译官。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
+    },
+    {
+      "id": "1mof6zx",
+      "who": "",
+      "text": "娘把两个孩子拉到草垛后头，按着蹲下。",
+      "voice": "Narrator",
+      "dur": 4.32
+    },
+    {
+      "id": "17up2i5",
+      "who": "",
+      "text": "一盏灯笼从东边巡了过来。",
+      "voice": "Narrator",
+      "dur": 2.37
+    },
+    {
+      "id": "0kdlkf8",
+      "who": "",
+      "text": "灯影在草垛根下一寸一寸挪过来。谁也没出声。",
+      "voice": "Narrator",
+      "dur": 4.71
+    },
+    {
+      "id": "0klkolt",
+      "who": "",
+      "text": "灯光从草垛沿上掠过去，顿了顿，又移开了。",
+      "voice": "Narrator",
+      "dur": 5.2
     },
     {
       "id": "1r0ncw6",
       "who": "",
       "text": "前面巷口站着人。走不过去了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
-      "id": "1dblhk0",
+      "id": "1l3g1t5",
       "who": "",
-      "text": "娘把妹妹的手放进柱子手里，又把两个孩子往磨盘后面按了按。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "text": "娘把妹妹的手放进柱子手里，又把两个孩子往石碾后面按了按。",
+      "voice": "Narrator",
+      "dur": 5.38
     },
     {
       "id": "0ii6uuf",
       "who": "",
       "text": "她没说话。只朝村东口努了努嘴。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0eo8yxh",
       "who": "",
       "text": "然后她站起来，朝反方向走去，故意踢翻了一只水瓮。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1pbixke",
       "who": "",
       "text": "灯笼、喊声、脚步，全都追着那声响去了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "08bz909",
       "who": "",
       "text": "灯停住了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "04qmnsx",
       "who": "",
       "text": "村东口就在眼前。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1obx0k4",
       "who": "",
       "text": "两盏马灯突然从路两边亮起来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "024yrv6",
       "who": "",
       "text": "是等在这里的。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1thbtu6",
       "who": "",
       "text": "妹妹的手从柱子手里被拽走。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1uxnwj5",
       "who": "",
       "text": "他扑上去。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0cexsif",
       "who": "",
       "text": "枪托砸在背上。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0wjzkxb",
       "who": "",
       "text": "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0zxrlti",
       "who": "",
       "text": "那天夜里，娘没有回来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ax4h16",
       "who": "",
       "text": "柱子在高粱地里蹲到天亮。他只剩一个念头了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0fvo6jw",
       "who": "",
       "text": "救回妹妹。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "17ci9jy",
       "who": "",
       "text": "乡亲们说，被抓的人关进了河东的据点。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "13gmty1",
       "who": "",
       "text": "柱子沿着运输队的车辙，摸到了据点外的庄稼地。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1hf3lkc",
       "who": "",
       "text": "他不敢靠近。他先学会了看。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "119yk4y",
       "who": "",
       "text": "岗楼上那两个人换班的时候，背是朝着南门的。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "133dx4y",
       "who": "",
       "text": "从背过身到重新站定，大约半袋烟的工夫。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1blw197",
       "who": "",
       "text": "巡逻队沿着墙根来回走。走到头，会停下来抽袋烟。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1pm8cmu",
       "who": "",
       "text": "牢房在东边。白天押着人往围墙上搬土袋。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0tllr43",
       "who": "",
       "text": "门里拴着一辆骡车。车辕上空着。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0bturhm",
       "who": "",
       "text": "身后突然伸过来一只手，把柱子整个按进田埂下面。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0dbwbrv",
       "who": "",
       "text": "巡逻队的脚步声从头顶的田埂上过去了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "193nbog",
       "who": "",
       "text": "沟里蹲着几个背枪的庄稼人。领头的把他上下打量了一遍。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "19dia78",
       "who": "",
       "text": "柱子没敢答话。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0dkehge",
       "who": "",
       "text": "夜里，一个满身泥的交通员摸进沟来，鞋底磨穿了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "18bmt0s",
       "who": "",
       "text": "他的鞋底磨穿了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "02abmya",
       "who": "",
       "text": "鬼子放出风来，要往县里押人，日子没说定。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1qboovh",
       "who": "",
       "text": "沙河庄的地道，是乡亲们一锹一锹挖出来的。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1feuu6n",
       "who": "",
       "text": "它不通向据点。它通向的是：藏得住人，转移得走，活得下去。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "16c31aq",
       "who": "",
       "text": "头顶传来闷响。泥土簌簌往下掉。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "03kdrpm",
       "who": "",
       "text": "有人用本地口音在上面喊：地道口就在磨盘这一片，扒！",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0o3jqzp",
       "who": "",
       "text": "一股呛人的烟，顺着东口灌了进来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1ptfr39",
       "who": "",
       "text": "第二天，鬼子又拉来了水泵。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "06jhzh2",
       "who": "",
       "text": "浑浊的泥水顺着东口灌下来，先淹的是最低的那一段。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ooevgx",
       "who": "",
       "text": "西口外，乡亲们趴在田里咳嗽。人数了两遍。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0s4wwj3",
       "who": "",
       "text": "顺子没出来。拴柱大爷也没有。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0s74noo",
       "who": "",
       "text": "柱子站在出口，看着被抬出来的乡亲，一句话也说不出。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1f0lp5e",
       "who": "",
       "text": "柱子背起工具，跟着队伍再次下了地道。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "160632l",
       "who": "",
       "text": "东口封死了。第二天起，全村轮班下洞。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0p4w3r9",
       "who": "",
       "text": "高传宝在门板上画了三个记号：翻口，新暗口，预警铃。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ydpwx3",
       "who": "",
       "text": "柱子的墨斗和刨子，成了地道里的家伙什。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
+    },
+    {
+      "id": "1b12oee",
+      "who": "",
+      "text": "白天，两个伪军就在村里翻翻捡捡地转。头顶的脚步，地道里听得一清二楚。",
+      "voice": "Narrator",
+      "dur": 7.47
     },
     {
       "id": "09q498f",
       "who": "",
       "text": "没过几天，鬼子又来了。还是老一套：堵口，灌烟。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "09a4z1d",
       "who": "",
       "text": "烟堵在弯里，一夜没退。地面上，什么也看不出来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ffp4o7",
       "who": "",
       "text": "鬼子在村里翻到天黑，一个人也没找到。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1bbsa2u",
       "who": "",
       "text": "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1f26mgy",
       "who": "",
       "text": "鬼子的探杆就在头顶上戳。谁也不敢出声。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0drwo1y",
       "who": "",
       "text": "那只手从土里伸出来，把柱子推开了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0xtc3zj",
       "who": "",
       "text": "他把手里的枪递出去，朝洞外摆了摆手。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0h5axpo",
       "who": "",
       "text": "押送定在后天。据点里外都加了岗。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "154hijw",
       "who": "",
       "text": "高传宝的法子是两头一起动：地面上打出动静把人引开，地下从地道把乡亲接走。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "08y5vfr",
       "who": "",
       "text": "高传宝把柱子叫住，让他先去看清楚。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "04e4qsr",
       "who": "",
       "text": "南门加了双岗。换岗的时候，背还是朝着庄稼地。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "15qg6hs",
       "who": "",
       "text": "牢房外多了一个游动哨，绕到北墙要一袋烟的工夫。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1nuioe9",
       "who": "",
       "text": "那辆骡车还拴在原处。车辕上一直空着。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0uuvsxz",
       "who": "",
       "text": "柱子指了指门板上钉在一起的那两条。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "06fm3db",
       "who": "",
       "text": "屋里安静了一会儿。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ovpn66",
       "who": "",
       "text": "柱子说不上来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1ox0i4n",
       "who": "",
       "text": "高传宝在门板上把日子和那辆骡车圈到了一起。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1fqp8iq",
       "who": "",
       "text": "行动前夜。油灯把门板图照得发黄。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1t92ulg",
       "who": "",
       "text": "柱子站在图前，指着据点的方向。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0issfvm",
       "who": "",
       "text": "高传宝看了他一眼。没有劝。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1jhny3r",
       "who": "",
       "text": "二更天，村北先响了枪。柱子在那头。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1ltepi5",
       "who": "",
       "text": "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0wovr15",
       "who": "",
       "text": "枪声把人引出去多远，地底下就多出多少工夫。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0twhnvd",
       "who": "",
       "text": "打完那一阵，他才从北边退回来下的地道。接应组已经走在前头了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0yi9nnu",
       "who": "",
       "text": "区上武工队来了两个班。佯动组已经摸到村北去了——这边不动，人从地下走。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1bimod6",
       "who": "",
       "text": "二更天，地道里一盏灯也没点。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "134r6ls",
       "who": "",
       "text": "队伍在黑暗里贴着墙根移动，谁也不说话。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1lbh33p",
       "who": "",
       "text": "这条道原本只到墙外的地里。最后那十几步，是这三天连夜掏出来的。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1hxugme",
       "who": "",
       "text": "柱子数着步子。掏到牢房地沿，还有两处虚土要清。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0yvsckb",
       "who": "",
       "text": "地沿的木板被顶开一条缝。霉味和哭声一起漏下来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1dfiyve",
       "who": "",
       "text": "民兵一个个往下接人。柱子在人堆里看见了妹妹。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1uvz4wd",
       "who": "",
       "text": "妹妹瘦得脱了相。她抓住柱子的袖子。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0phwy7f",
       "who": "",
       "text": "柱子没有说话。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0s9x14p",
       "who": "",
       "text": "妹妹看着哥哥的眼睛，慢慢松开了手，又慢慢把额头抵在他肩上。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1xyvxnf",
       "who": "",
       "text": "她明白了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1c4abg1",
       "who": "",
       "text": "入口上面就是庄稼地，就是活路。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0bu0lf6",
       "who": "",
       "text": "一个民兵跌跌撞撞从地道里追出来。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0kg4h88",
       "who": "",
       "text": "头顶上，搜查的脚步声越来越密。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1bcncf2",
       "who": "",
       "text": "最后一个乡亲被推出洞口的时候，东边天已经泛白。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0wi6bmn",
       "who": "",
       "text": "人数了三遍。一个不少。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "19d7nys",
       "who": "",
       "text": "柱子坐在田埂上，灯芯已经烧到了头。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0ygzbsy",
       "who": "",
       "text": "他把灯吹灭了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1mp762g",
       "who": "",
       "text": "天亮了。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1hkpkjb",
       "who": "",
       "text": "一个月后。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0wbu7yt",
       "who": "",
       "text": "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0njcj2r",
       "who": "",
       "text": "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1tjwidj",
       "who": "",
       "text": "柱子带着妹妹，回了一趟梁家村。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0aa6lx7",
       "who": "",
       "text": "院子烧毁了。只剩一堵残墙。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0nsfpsl",
       "who": "",
       "text": "门框还在。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1v4oq3o",
       "who": "",
       "text": "妹妹走过去，伸手摸了一下爹刻的那道线。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0cknfx2",
       "who": "",
       "text": "她的手停了一会儿。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1jmrnvz",
       "who": "",
       "text": "院外传来民兵喊他的声音。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1qwk3y8",
       "who": "",
       "text": "柱子放下工具，回头看了一眼妹妹。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1gwsgab",
       "who": "",
       "text": "妹妹抱着爹留下的旧木凳，点了点头。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1mcw34k",
       "who": "",
       "text": "柱子走出院子。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "07zc9x0",
       "who": "",
       "text": "门框上的两道刻痕，留在了身后。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "1hik0yg",
       "who": "",
       "text": "扶着民兵的老人抬起头，借着灯光认出了他。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     },
     {
       "id": "0k2jzu7",
       "who": "",
       "text": "老人松了一口气。",
-      "voice": "Kangkang",
-      "pitch": "-8%",
-      "rate": "-18%"
+      "voice": "Narrator"
     }
-  ]
+  ],
+  "voiceRelease": {
+    "release": "20260805Qwen3",
+    "engine": "Qwen3-TTS",
+    "designModel": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+    "designRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
+    "cloneModel": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "cloneRevision": "fd4b254389122332181a7c3db7f27e918eec64e3",
+    "language": "Chinese",
+    "modelLicense": "Apache-2.0",
+    "sampleRate": 24000,
+    "bitrateKbps": 48,
+    "realVoiceReferenceUsed": false
+  }
 }

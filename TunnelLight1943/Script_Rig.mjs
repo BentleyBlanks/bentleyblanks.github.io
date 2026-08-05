@@ -245,6 +245,19 @@ export const TRACKS = {
       { t: 2.2, hipY: -0.06, hipX: -0.02, torso: -4, head: -6, armB: -58, foreB: -44, armF: -46, foreF: -38 },      // 收回，枪垂在身前
     ],
   },
+  // 妹妹在树下仰头跳着够（循环）：蹲一下、蹦起来伸手、落地、望着喘口气——
+  // 她的视线与够不着的那只手就是引导线（无文字引导三层配方之三）
+  reachJump: {
+    dur: 1.7, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12, armB: -12, foreB: -10, thighB: -18, shinB: 24, footB: -4, thighF: -14, shinF: 20, footF: -4 },
+      { t: 0.22, hipY: 0.15, hipX: 0.03, torso: -4, head: -30, armF: -166, foreF: -6, armB: -20, foreB: -8, thighB: -24, shinB: 34, thighF: -30, shinF: 40 },
+      { t: 0.45, hipY: -0.02, hipX: 0.02, torso: 10, head: -28, armF: -70, foreF: -14, thighB: -14, shinB: 18, thighF: -10, shinF: 14 },
+      { t: 0.78, hipY: -0.11, hipX: 0.02, torso: 12, head: -26, armF: -34, foreF: -12 },
+      { t: 1.15, hipY: -0.04, hipX: 0.02, torso: 6, head: -34, armF: -48, foreF: -12 },
+      { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
+    ],
+  },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
   struckFall: {
     dur: 3.4, loop: false,
@@ -421,6 +434,35 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-82 - ca * 26) * DEG; target.foreB = (-36 - cb * 20) * DEG;
     target.thighB = -18 * DEG; target.shinB = 20 * DEG; target.footB = -6 * DEG;
     target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "vault") {
+    // 翻越：双手撑在顶沿上，身子折过去，腿收起来荡过——手脚并用的那一下
+    target.hipY = -0.02; target.hipX = 0.18;
+    target.torso = 40 * DEG; target.head = -18 * DEG;
+    target.armF = -96 * DEG; target.foreF = 8 * DEG;
+    target.armB = -88 * DEG; target.foreB = 6 * DEG;
+    target.thighB = -84 * DEG; target.shinB = 92 * DEG; target.footB = 12 * DEG;
+    target.thighF = -58 * DEG; target.shinF = 66 * DEG; target.footF = 8 * DEG;
+  } else if (s.pose === "puzzled") {
+    // 哑剧的「不太懂」：微微后仰、仰着头，手垂着——配头顶的「？」气泡
+    target.hipY = -0.02; target.hipX = -0.02;
+    target.torso = -6 * DEG; target.head = -34 * DEG;
+    target.armB = -8 * DEG; target.foreB = -12 * DEG;
+    target.armF = -12 * DEG; target.foreF = -16 * DEG;
+    target.thighB = -6 * DEG; target.shinB = 8 * DEG; target.footB = -2 * DEG;
+    target.thighF = 6 * DEG; target.shinF = 4 * DEG; target.footF = -4 * DEG;
+  } else if (s.pose === "push") {
+    // 推车：前倾压着车把，腿在后面蹬——腿保留走步摆动，人不是滑过去的
+    const c = s.moving;
+    target.hipY = -0.10; target.hipX = 0.14;
+    target.torso = 32 * DEG; target.head = -12 * DEG;
+    target.armF = -74 * DEG; target.foreF = -26 * DEG;
+    target.armB = -66 * DEG; target.foreB = -30 * DEG;
+    target.thighB = (-26 + (c ? swing2 * 22 : 0)) * DEG;
+    target.shinB = (34 - (c ? swing2 * 16 : 0)) * DEG;
+    target.footB = -8 * DEG;
+    target.thighF = (-20 + (c ? swing * 22 : 0)) * DEG;
+    target.shinF = (28 - (c ? swing * 16 : 0)) * DEG;
+    target.footF = -8 * DEG;
   } else if (s.climbing) {
     // 爬梯：双手交替上够，腿蹬阶
     target.hipY = 0; target.hipX = 0;

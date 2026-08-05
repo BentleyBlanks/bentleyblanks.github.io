@@ -804,6 +804,62 @@ function Build(ac, options) {
       }
       NoiseHit(t, { level: 0.09 * k, attack: 0.001, decay: 0.05, type: "bandpass", freq: base * 4, q: 2, pan });
     },
+    // 铜锣：报警的那一面锣——比钟更"哐"，衰减里带着颤
+    gong(t, k, pan) {
+      const base = 396;
+      const partials = [1, 1.48, 2.31, 3.62, 5.04];
+      const gains = [1, 0.6, 0.38, 0.2, 0.1];
+      for (let i = 0; i < partials.length; i += 1) {
+        Tone(t, {
+          level: 0.16 * k * gains[i], attack: 0.003, decay: 2.4 - i * 0.34,
+          type: "sine", freq: base * partials[i], pan,
+        });
+      }
+      // 锣面的沙震
+      NoiseHit(t, { level: 0.12 * k, attack: 0.002, decay: 0.5, freq: 900, sweep: 300, q: 1.1, brown: true, pan });
+      NoiseHit(t + 0.02, { level: 0.05 * k, attack: 0.01, decay: 1.2, freq: 2400, sweep: 600, q: 2, pan });
+    },
+    // 母鸡受惊：两声急促的咯哒 + 扑翅
+    henSquawk(t, k, pan) {
+      for (let i = 0; i < 2; i += 1) {
+        Tone(t + i * 0.14, { level: 0.09 * k, attack: 0.006, decay: 0.1, type: "square", freq: 760 - i * 120, to: 420, pan });
+      }
+      for (let i = 0; i < 5; i += 1) {
+        NoiseHit(t + 0.05 + i * 0.07, { level: 0.05 * k, attack: 0.004, decay: 0.05, freq: 1500, sweep: 500, q: 1.2, pan });
+      }
+    },
+    // 惊飞的麻雀：一阵密集的小扑翅由近到远
+    flutter(t, k, pan) {
+      for (let i = 0; i < 9; i += 1) {
+        NoiseHit(t + i * 0.05, {
+          level: (0.05 - i * 0.004) * k, attack: 0.003, decay: 0.04,
+          freq: 2200 + Rand(-400, 400), sweep: 700, q: 1.4, pan: Clamp(pan + Rand(-0.4, 0.4), -1, 1),
+        });
+      }
+      Tone(t + 0.1, { level: 0.03 * k, attack: 0.01, decay: 0.12, type: "sine", freq: 3400, to: 4200, pan });
+    },
+    // 憋着的哭：压低的两下抽气——不是哭声，是不许自己哭出声的呼吸
+    sobBreath(t, k, pan) {
+      NoiseHit(t, { level: 0.05 * k, attack: 0.09, decay: 0.16, freq: 700, sweep: 380, q: 2.4, pan });
+      NoiseHit(t + 0.42, { level: 0.065 * k, attack: 0.06, decay: 0.2, freq: 640, sweep: 320, q: 2.6, pan });
+      NoiseHit(t + 1.1, { level: 0.04 * k, attack: 0.1, decay: 0.3, freq: 560, sweep: 240, q: 2.2, pan });
+    },
+    // 敲木楔：比 knock 更实的一记——榫头吃紧的"笃"
+    tenon(t, k, pan, r) {
+      NoiseHit(t, { level: 0.17 * k, attack: 0.001, decay: 0.05, freq: 420 * r, q: 6, pan });
+      Tone(t, { level: 0.09 * k, attack: 0.002, decay: 0.12, type: "triangle", freq: 190 * r, to: 120 * r, pan });
+      NoiseHit(t + 0.015, { level: 0.05 * k, attack: 0.001, decay: 0.03, freq: 2100, q: 1.6, pan });
+    },
+    // 投掷破空：很短的一瞬风声
+    whoosh(t, k, pan) {
+      NoiseHit(t, { level: 0.07 * k, attack: 0.015, decay: 0.16, freq: 1300, sweep: 2800, q: 0.8, pan });
+    },
+    // 翻越：手脚蹬墙的蹭土 + 落地一记
+    vault(t, k, pan) {
+      NoiseHit(t, { level: 0.07 * k, attack: 0.006, decay: 0.12, freq: 1100, sweep: 420, q: 0.9, pan });
+      NoiseHit(t + 0.3, { level: 0.05 * k, attack: 0.004, decay: 0.08, freq: 1600, sweep: 500, q: 1, pan });
+      Tone(t + 0.5, { level: 0.08 * k, attack: 0.003, decay: 0.1, type: "sine", freq: 110, to: 70, pan });
+    },
     // 点灯：火柴擦一下，然后油捻子起来
     lampOn(t, k, pan) {
       NoiseHit(t, { level: 0.10 * k, attack: 0.006, decay: 0.16, freq: 3000, sweep: 900, q: 0.8, pan });

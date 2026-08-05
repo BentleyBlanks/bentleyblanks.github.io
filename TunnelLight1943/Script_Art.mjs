@@ -685,7 +685,7 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(facing, 1);
-  if (label === "水桶") {
+  if (label === "水桶" || label === "空水桶" || label === "桶") {
     InkFill(ctx, [[-7 * S, 0], [7 * S, 0], [5.4 * S, 11 * S], [-5.4 * S, 11 * S]], "bucket", "#9a7a4d",
       { amp: 0.5 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.16)" });
     InkLine(ctx, -7 * S, 2.4 * S, 7 * S, 2.4 * S, "bucketHoop", { lw: 1.5 * S, color: "#5c4530" });
@@ -1382,6 +1382,192 @@ export function DrawCart(ctx, x, groundY, id) {
   }
 }
 
+// 独轮车：1942 冀中最标志性的农具——独轮居中，两根车把，木架车盘。
+// planks: 0/1/2 —— 装了几根木料
+export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
+  // 独轮
+  const wy = groundY - 15;
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 3.2;
+  ctx.beginPath(); ctx.arc(x, wy, 15, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 1.5;
+  for (let s = 0; s < 5; s += 1) {
+    ctx.beginPath();
+    ctx.moveTo(x - Math.cos(s * 0.63) * 13, wy - Math.sin(s * 0.63) * 13);
+    ctx.lineTo(x + Math.cos(s * 0.63) * 13, wy + Math.sin(s * 0.63) * 13);
+    ctx.stroke();
+  }
+  // 车架：轮子两侧的木框与车把（把手朝右）
+  InkFill(ctx, [[x - 34, groundY - 30], [x + 20, groundY - 33], [x + 52, groundY - 26], [x + 50, groundY - 21], [x - 32, groundY - 25]],
+    id + "frame", "#8a6a45", { amp: 1.4, lw: 2.4, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x - 30, groundY - 26, x - 20, groundY - 4, id + "legA", { lw: 3, color: "#6b4d2e" });
+  InkLine(ctx, x + 46, groundY - 23, x + 60, groundY - 18, id + "handle", { lw: 3, color: "#6b4d2e" });
+  // 装上的木料
+  for (let i = 0; i < planks; i += 1) {
+    InkFill(ctx, Rect(x - 40, groundY - 40 - i * 8, 84, 8), id + "plank" + i, "#c09a62",
+      { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.18)" });
+  }
+}
+
+// 蹲在木料上的母鸡：土黄的团身、小红冠——嗜头担当
+export function DrawHen(ctx, x, y, id) {
+  InkFill(ctx, [
+    [x - 12, y], [x - 13, y - 8], [x - 6, y - 13], [x + 5, y - 13], [x + 12, y - 7], [x + 15, y - 2], [x + 10, y + 1],
+  ], id + "body", "#b89058", { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.16)" });
+  // 尾羽翘起
+  InkFill(ctx, [[x - 12, y - 7], [x - 20, y - 15], [x - 14, y - 4]], id + "tail", "#8d6a3c", { amp: 1, lw: 1.8 });
+  // 头与冠
+  ctx.beginPath(); ctx.arc(x + 12, y - 12, 4.4, 0, Math.PI * 2);
+  ctx.fillStyle = "#b89058"; ctx.fill();
+  ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6; ctx.stroke();
+  InkFill(ctx, [[x + 10, y - 16], [x + 12, y - 20], [x + 14, y - 16]], id + "comb", "#b0432e", { amp: 0.6, lw: 1.2 });
+  // 喙
+  InkFill(ctx, [[x + 16, y - 12], [x + 20, y - 11], [x + 16, y - 9]], id + "beak", "#d8a83c", { amp: 0.5, lw: 1.1 });
+}
+
+// 倒塌的柴垛：可翻越（肩高、顶沿有缺口）——扫荡中撞翻的那一堆
+export function DrawFallenWood(ctx, x, groundY, id) {
+  // 底层散开的柴
+  for (let i = 0; i < 6; i += 1) {
+    const lx = x - 26 + i * 10 + Sym(id + "l" + i, 0, 4);
+    ctx.save();
+    ctx.translate(lx, groundY - 5);
+    ctx.rotate(Sym(id + "r" + i, 1, 0.5));
+    InkFill(ctx, Rect(-16, -4, 32, 7), id + "log" + i, i % 2 ? "#8a6a45" : "#7a5a38",
+      { amp: 1, lw: 2 });
+    ctx.restore();
+  }
+  // 斜塌的主堆：一头高一头塌，顶沿一个缺口（可翻越的轮廓语法）
+  InkFill(ctx, [
+    [x - 30, groundY], [x - 26, groundY - 40], [x - 8, groundY - 52], [x + 2, groundY - 44],
+    [x + 10, groundY - 50], [x + 26, groundY - 30], [x + 32, groundY],
+  ], id + "pile", "#96703f", { amp: 2.4, lw: 2.6, shade: "rgba(0,0,0,0.22)" });
+  // 顶沿磨亮
+  InkLine(ctx, x - 10, groundY - 52, x + 4, groundY - 45, id + "worn", { lw: 2.6, color: "rgba(240,225,180,0.85)", amp: 1 });
+  // 几根戳出来的柴梢
+  for (let i = 0; i < 4; i += 1) {
+    InkLine(ctx, x - 18 + i * 11, groundY - 36 - Hash(id + "t" + i) * 12,
+      x - 24 + i * 11, groundY - 52 - Hash(id + "t2" + i) * 10, id + "tip" + i,
+      { lw: 2, color: "#5c4328" });
+  }
+}
+
+// 翻越缺口标记：画在可翻越物顶沿上的一小段磨亮痕（统一轮廓语法的记号）
+export function DrawVaultNotch(ctx, x, topY, id) {
+  InkLine(ctx, x - 9, topY + 1, x + 9, topY - 1, id + "worn", { lw: 3, color: "rgba(240,225,180,0.8)", amp: 1.2 });
+  InkFill(ctx, [[x - 4, topY - 1], [x + 1, topY - 5], [x + 5, topY - 1]], id + "chip", "rgba(240,225,180,0.55)", { lw: 0, line: null });
+}
+
+// 院墙角的顶针：铜色的小圈，反着一点光——可选探索物
+export function DrawThimble(ctx, x, groundY, id) {
+  ctx.beginPath();
+  ctx.arc(x, groundY - 3, 3.4, 0, Math.PI * 2);
+  ctx.fillStyle = "#c8963c";
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, groundY - 3, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#5c4328";
+  ctx.fill();
+  // 一点反光
+  ctx.beginPath();
+  ctx.arc(x - 1.2, groundY - 4.4, 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,240,200,0.9)";
+  ctx.fill();
+}
+
+// 一只麻雀：v 形的翅、团起的身——供惊飞的炸窝动画用（phase 0..1 扑翅）
+export function DrawSparrow(ctx, x, y, id, phase = 0) {
+  const flap = Math.sin(phase * Math.PI * 2) * 6;
+  InkFill(ctx, [[x - 5, y], [x - 2, y - 4], [x + 4, y - 3], [x + 6, y + 1], [x, y + 3]],
+    id + "body", "#8d6a4a", { amp: 0.8, lw: 1.6 });
+  ctx.beginPath(); ctx.arc(x + 6, y - 3, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = "#8d6a4a"; ctx.fill();
+  ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.2; ctx.stroke();
+  InkLine(ctx, x - 1, y - 3, x - 7, y - 8 - flap, id + "wingB", { lw: 2, color: "#5c4328", amp: 0.6 });
+  InkLine(ctx, x + 1, y - 3, x + 7, y - 9 + flap, id + "wingF", { lw: 2, color: "#5c4328", amp: 0.6 });
+}
+
+// 一只田鼠：贴着地皮蹿——身子一条、尾巴一条
+export function DrawMouse(ctx, x, y, id) {
+  InkFill(ctx, [[x - 6, y], [x - 3, y - 4], [x + 4, y - 4], [x + 7, y - 1], [x + 4, y + 1], [x - 4, y + 1]],
+    id + "body", "#7a6a52", { amp: 0.7, lw: 1.5 });
+  InkLine(ctx, x - 6, y - 1, x - 13, y + 1, id + "tail", { lw: 1.2, color: "#5c4a38", amp: 1.4 });
+  ctx.beginPath(); ctx.arc(x + 6, y - 3, 1.4, 0, Math.PI * 2);
+  ctx.fillStyle = "#5c4a38"; ctx.fill();
+}
+
+// ---------------------------------------------------------------------------
+// 引导图形气泡（无文字引导三层配方之一）：NPC/物件头顶的「我缺什么」。
+// 全部图标共用同一套手绘语汇——纸面底、墨线框、图形不写字。
+// icon: plank 木料 | rope 断绳 | q 疑问 | stone 石子
+// ---------------------------------------------------------------------------
+export function DrawIconBubble(ctx, x, y, icon, id) {
+  // 气泡：圆角方带一个小尾巴
+  const w = 34, h = 28;
+  InkFill(ctx, [
+    [x - w / 2, y - h], [x + w / 2, y - h], [x + w / 2, y - h + h * 0.82],
+    [x + 6, y - h + h * 0.82], [x, y], [x - 4, y - h + h * 0.82], [x - w / 2, y - h + h * 0.82],
+  ], id + "bub", "rgba(238,226,192,0.94)", { amp: 1.2, lw: 2.2 });
+  const cx = x, cy = y - h * 0.58;
+  switch (icon) {
+    case "plank":
+      InkFill(ctx, Rect(cx - 11, cy - 5, 22, 4.4), id + "pA", "#c09a62", { amp: 0.6, lw: 1.6 });
+      InkFill(ctx, Rect(cx - 11, cy + 1, 22, 4.4), id + "pB", "#a8794a", { amp: 0.6, lw: 1.6 });
+      break;
+    case "rope": {
+      // 断成两截的绳：中间断口的毛茬
+      ctx.strokeStyle = "#8a6a45";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - 11, cy - 4);
+      ctx.quadraticCurveTo(cx - 4, cy + 2, cx - 2, cy - 1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + 3, cy + 1);
+      ctx.quadraticCurveTo(cx + 6, cy + 4, cx + 11, cy + 5);
+      ctx.stroke();
+      for (const [fx, fy, a] of [[cx - 2, cy - 1, -0.5], [cx + 3, cy + 1, 2.4]]) {
+        for (let i = 0; i < 3; i += 1) {
+          InkLine(ctx, fx, fy, fx + Math.cos(a + i * 0.5) * 4.4, fy + Math.sin(a + i * 0.5) * 4.4,
+            id + "fray" + fx + i, { lw: 1.1, color: "#8a6a45" });
+        }
+      }
+      break;
+    }
+    case "q":
+      // 手绘的问号：一段弧 + 短颈 + 点
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(cx, cy - 3.4, 5.2, Math.PI * 0.95, Math.PI * 2.22);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + 1.6, cy + 0.6);
+      ctx.lineTo(cx + 0.4, cy + 4.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy + 8.4, 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = IN.ink;
+      ctx.fill();
+      break;
+    case "stone":
+      // 一颗石子 + 三道短促的动线（能扔出去的意思）
+      InkFill(ctx, [[cx - 5, cy + 3], [cx - 6, cy - 2], [cx - 1, cy - 5], [cx + 4, cy - 3], [cx + 5, cy + 2], [cx, cy + 5]],
+        id + "st", "#9a8a70", { amp: 0.8, lw: 1.8 });
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, cx + 7, cy - 4 + i * 3.4, cx + 12, cy - 6 + i * 3.4, id + "fly" + i,
+          { lw: 1.4, color: "rgba(43,31,22,0.6)" });
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 export function DrawSky(ctx, w, h, light, id) {
   if (light === "night" || light === "dark" || light === "tunnel") {
     ctx.save();
@@ -1911,6 +2097,20 @@ export function DrawInsertCard(ctx, W, H, kind) {
           { amp: 1.4 * S, lw: 2.4 * S });
         ctx.restore();
       }
+      // 视角人物在场（演出规范）：背景里柱子仰着头看——淡墨剪影，不抢前景的手
+      ctx.save();
+      ctx.globalAlpha = 0.34;
+      const kx = cx - 300 * S, ky = cy + 150 * S;
+      InkFill(ctx, [
+        [kx - 40 * S, ky + 120 * S], [kx - 34 * S, ky + 10 * S], [kx - 16 * S, ky - 24 * S],
+        [kx + 18 * S, ky - 26 * S], [kx + 34 * S, ky + 6 * S], [kx + 40 * S, ky + 120 * S],
+      ], "carveKidBody", "#4a382a", { amp: 3 * S, lw: 0, line: null });
+      // 仰起的头：脸朝右上（朝着刻线的方向）
+      InkFill(ctx, [
+        [kx - 14 * S, ky - 22 * S], [kx - 4 * S, ky - 52 * S], [kx + 26 * S, ky - 56 * S],
+        [kx + 36 * S, ky - 34 * S], [kx + 20 * S, ky - 18 * S],
+      ], "carveKidHead", "#4a382a", { amp: 2.4 * S, lw: 0, line: null });
+      ctx.restore();
       break;
     }
     case "sole": {
@@ -1987,6 +2187,7 @@ export function DrawInsertCard(ctx, W, H, kind) {
       break;
     }
     default: {
+      if (kind && kind.startsWith("pro")) { DrawPrologueCard(ctx, W, H, kind); break; }
       CardBase(ctx, W, H);
       break;
     }
@@ -1997,4 +2198,577 @@ export function DrawInsertCard(ctx, W, H, kind) {
   v.addColorStop(1, "rgba(20,14,8,0.62)");
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------------------
+// 序章画卡：水墨地图＋剪纸剪影＋定格画片。1–9 段是冷的历史（羊皮纸上的墨），
+// 10–14 段进村转暖（水彩的生活）。构图对着「关卡设计·第一章」的分镜表画。
+// ---------------------------------------------------------------------------
+const MAP_INK = "#33261a";
+
+// 羊皮纸地图底：偏冷的纸色 + 平原的淡痕
+function MapBase(ctx, W, H, id) {
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.44, H * 0.12, W * 0.5, H * 0.5, H * 0.9);
+  g.addColorStop(0, "#ddcda6");
+  g.addColorStop(1, "#8d7a58");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // 平原上的淡水系（地图的底纹）
+  for (let i = 0; i < 4; i += 1) {
+    InkLine(ctx, W * (0.1 + Hash(id + "r" + i) * 0.3), H * (0.15 + i * 0.2),
+      W * (0.6 + Hash(id + "r2" + i) * 0.35), H * (0.3 + i * 0.18),
+      id + "river" + i, { lw: 2.2, color: "rgba(90,110,120,0.28)", amp: 14 });
+  }
+  Speckle(ctx, 0, 0, W, H, id + "grain", { count: Math.round(W / 7), alpha: 0.06, size: 2.6 });
+}
+
+// 一团渗开的墨（占领区）：核心实、边缘破碎
+function InkBlot(ctx, x, y, r, id, alpha = 0.8) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const pts = [];
+  for (let i = 0; i < 12; i += 1) {
+    const a = (i / 12) * Math.PI * 2;
+    const rr = r * (0.65 + Hash(id + "b" + i) * 0.55);
+    pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.82]);
+  }
+  InkFill(ctx, pts, id, MAP_INK, { amp: r * 0.14, lw: 0, line: null });
+  for (let i = 0; i < 7; i += 1) {
+    const a = Hash(id + "s" + i) * Math.PI * 2;
+    const rr = r * (1.0 + Hash(id + "s2" + i) * 0.5);
+    InkFill(ctx, [[x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.4]],
+      id + "sp" + i, null, { line: null, lw: 0 });
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.8, r * (0.05 + Hash(id + "s3" + i) * 0.06), 0, Math.PI * 2);
+    ctx.fillStyle = MAP_INK;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 村落小点：留在原地的人
+function MapDots(ctx, W, H, id, count, alpha = 0.75) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (let i = 0; i < count; i += 1) {
+    const x = W * (0.12 + Hash(id + "x" + i) * 0.76);
+    const y = H * (0.2 + Hash(id + "y" + i) * 0.62);
+    ctx.beginPath();
+    ctx.arc(x, y, H * 0.008 + Hash(id + "r" + i) * H * 0.006, 0, Math.PI * 2);
+    ctx.strokeStyle = MAP_INK;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// 剪影人（剪纸风）：几笔的人形，朝 dir 走
+function SilFigure(ctx, x, y, h, id, dir = 1, { carry = false } = {}) {
+  const w = h * 0.34;
+  InkFill(ctx, [
+    [x - w * 0.5 * dir, y], [x - w * 0.34 * dir, y - h * 0.55], [x - w * 0.1 * dir, y - h * 0.72],
+    [x + w * 0.26 * dir, y - h * 0.66], [x + w * 0.5 * dir, y - h * 0.3], [x + w * 0.3 * dir, y],
+  ], id + "b", "#241a10", { amp: h * 0.04, lw: 0, line: null });
+  ctx.beginPath();
+  ctx.arc(x + w * 0.02 * dir, y - h * 0.84, h * 0.13, 0, Math.PI * 2);
+  ctx.fillStyle = "#241a10";
+  ctx.fill();
+  if (carry) {
+    InkLine(ctx, x - w * 0.7 * dir, y - h * 0.62, x + w * 0.7 * dir, y - h * 0.78, id + "pole",
+      { lw: h * 0.05, color: "#241a10", amp: h * 0.02 });
+  }
+}
+
+export function DrawPrologueCard(ctx, W, H, kind) {
+  const cx = W * 0.5, cy = H * 0.5;
+  const S = H / 420;
+  switch (kind) {
+    case "pro1": {
+      // 卢沟桥：一点墨从宛平渗开；桥的剪影压在下缘
+      MapBase(ctx, W, H, "p1");
+      MapDots(ctx, W, H, "p1d", 14, 0.4);
+      InkBlot(ctx, cx + W * 0.08, cy - H * 0.1, H * 0.09, "p1blot");
+      // 枪声的放射短线
+      for (let i = 0; i < 8; i += 1) {
+        const a = (i / 8) * Math.PI * 2 + 0.2;
+        InkLine(ctx, cx + W * 0.08 + Math.cos(a) * H * 0.12, cy - H * 0.1 + Math.sin(a) * H * 0.1,
+          cx + W * 0.08 + Math.cos(a) * H * 0.19, cy - H * 0.1 + Math.sin(a) * H * 0.16,
+          "p1ray" + i, { lw: 2.6, color: "rgba(51,38,26,0.7)", amp: 1.4 });
+      }
+      // 桥：一串矮拱
+      const by = H * 0.84;
+      InkFill(ctx, Rect(W * 0.18, by - 10 * S, W * 0.64, 12 * S), "p1deck", "#241a10", { amp: 2.4, lw: 0, line: null });
+      for (let i = 0; i < 9; i += 1) {
+        const ax = W * 0.2 + i * W * 0.072;
+        ctx.beginPath();
+        ctx.arc(ax, by + 12 * S, 12 * S, Math.PI, 0);
+        ctx.strokeStyle = "#241a10";
+        ctx.lineWidth = 5 * S;
+        ctx.stroke();
+      }
+      break;
+    }
+    case "pro2": {
+      // 墨沿铁路线漫开：两座城的墨团，虚线铁路把它们串起来
+      MapBase(ctx, W, H, "p2");
+      MapDots(ctx, W, H, "p2d", 14, 0.4);
+      InkBlot(ctx, W * 0.36, H * 0.3, H * 0.11, "p2beiping");
+      InkBlot(ctx, W * 0.66, H * 0.44, H * 0.09, "p2tianjin");
+      ctx.save();
+      ctx.setLineDash([9 * S, 7 * S]);
+      ctx.beginPath();
+      ctx.moveTo(W * 0.36, H * 0.3);
+      ctx.quadraticCurveTo(W * 0.5, H * 0.34, W * 0.66, H * 0.44);
+      ctx.quadraticCurveTo(W * 0.8, H * 0.54, W * 0.9, H * 0.72);
+      ctx.strokeStyle = MAP_INK;
+      ctx.lineWidth = 3.4 * S;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      // 沿线换了的小旗
+      for (let i = 0; i < 4; i += 1) {
+        const t = 0.2 + i * 0.22;
+        const fx = W * (0.36 + t * 0.5), fy = H * (0.31 + t * 0.36);
+        InkLine(ctx, fx, fy, fx, fy - 26 * S, "p2fpole" + i, { lw: 2.6, color: MAP_INK });
+        InkFill(ctx, [[fx, fy - 26 * S], [fx + 18 * S, fy - 21 * S], [fx, fy - 15 * S]], "p2flag" + i, MAP_INK, { lw: 0, line: null });
+      }
+      break;
+    }
+    case "pro3": {
+      // 大军南去：几支粗箭头压向下缘；村落小点留在原地
+      MapBase(ctx, W, H, "p3");
+      InkBlot(ctx, W * 0.5, H * 0.18, H * 0.13, "p3north", 0.65);
+      for (let i = 0; i < 3; i += 1) {
+        const ax = W * (0.3 + i * 0.18);
+        const y0 = H * 0.3, y1 = H * (0.72 + i * 0.05);
+        InkLine(ctx, ax, y0, ax - W * 0.05, y1, "p3arrow" + i, { lw: 9 * S, color: "rgba(51,38,26,0.72)", amp: 6 });
+        InkFill(ctx, [
+          [ax - W * 0.05 - 16 * S, y1 - 8 * S], [ax - W * 0.05, y1 + 22 * S], [ax - W * 0.05 + 16 * S, y1 - 8 * S],
+        ], "p3head" + i, "rgba(51,38,26,0.72)", { lw: 0, line: null });
+      }
+      MapDots(ctx, W, H, "p3d", 18, 0.85);
+      break;
+    }
+    case "pro4": {
+      // 有人不肯走：太行山纹长出来，剪影的人朝着山和平原走回去（向上/向左）
+      MapBase(ctx, W, H, "p4");
+      // 太行山：左侧一列锯齿山纹
+      for (let r = 0; r < 3; r += 1) {
+        const pts = [];
+        for (let i = 0; i <= 8; i += 1) {
+          pts.push([W * (0.06 + r * 0.055) + (i % 2) * W * 0.03, H * (0.12 + i * 0.1)]);
+        }
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (const p of pts) ctx.lineTo(p[0], p[1]);
+        ctx.strokeStyle = "rgba(51,38,26,0.6)";
+        ctx.lineWidth = 3 * S;
+        ctx.stroke();
+      }
+      MapDots(ctx, W, H, "p4d", 16, 0.6);
+      // 逆着人流方向走的几个人（朝左上，朝山里）
+      for (let i = 0; i < 4; i += 1) {
+        SilFigure(ctx, W * (0.62 - i * 0.09), H * (0.62 + Hash("p4f" + i) * 0.1), H * 0.1, "p4fig" + i, -1, { carry: i % 2 === 0 });
+      }
+      break;
+    }
+    case "pro5": {
+      // 治安区：棋盘封锁线一格格亮起，格点上是炮楼
+      MapBase(ctx, W, H, "p5");
+      MapDots(ctx, W, H, "p5d", 12, 0.4);
+      ctx.save();
+      ctx.globalAlpha = 0.66;
+      for (let i = 0; i <= 5; i += 1) {
+        InkLine(ctx, W * 0.14 + i * W * 0.144, H * 0.12, W * 0.14 + i * W * 0.144, H * 0.88,
+          "p5v" + i, { lw: 3 * S, color: MAP_INK, amp: 3 });
+        InkLine(ctx, W * 0.14, H * 0.12 + i * H * 0.152, W * 0.86, H * 0.12 + i * H * 0.152,
+          "p5h" + i, { lw: 3 * S, color: MAP_INK, amp: 3 });
+      }
+      ctx.restore();
+      // 格点上的炮楼：小方塔
+      for (let i = 0; i < 8; i += 1) {
+        const gx = W * (0.14 + (1 + Math.floor(Hash("p5tx" + i) * 4)) * 0.144);
+        const gy = H * (0.12 + (1 + Math.floor(Hash("p5ty" + i) * 4)) * 0.152);
+        InkFill(ctx, [
+          [gx - 9 * S, gy], [gx - 6 * S, gy - 26 * S], [gx + 6 * S, gy - 26 * S], [gx + 9 * S, gy],
+        ], "p5tower" + i, "#241a10", { lw: 0, line: null });
+        InkFill(ctx, Rect(gx - 9 * S, gy - 32 * S, 18 * S, 7 * S), "p5cap" + i, "#241a10", { lw: 0, line: null });
+      }
+      break;
+    }
+    case "pro6": {
+      // 扫荡：火光里的村廓——地平线上的黑村子，火舌与烟柱
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#2e2018");
+      g.addColorStop(0.62, "#6b3a22");
+      g.addColorStop(1, "#8d5a2e");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // 村子的黑剪影
+      const base = H * 0.72;
+      for (let i = 0; i < 7; i += 1) {
+        const hx = W * (0.08 + i * 0.13);
+        const hw = W * 0.1, hh = H * (0.1 + Hash("p6h" + i) * 0.05);
+        InkFill(ctx, Rect(hx, base - hh, hw, hh), "p6house" + i, "#1a120c", { amp: 3, lw: 0, line: null });
+        InkFill(ctx, [[hx - 6 * S, base - hh], [hx + hw / 2, base - hh - 26 * S], [hx + hw + 6 * S, base - hh]],
+          "p6roof" + i, "#1a120c", { lw: 0, line: null });
+      }
+      ctx.fillStyle = "#1a120c";
+      ctx.fillRect(0, base, W, H - base);
+      // 火舌
+      for (let i = 0; i < 5; i += 1) {
+        const fx = W * (0.16 + i * 0.16);
+        InkFill(ctx, [
+          [fx - 16 * S, base - 8 * S], [fx - 6 * S, base - 70 * S - Hash("p6f" + i) * 40 * S],
+          [fx + 4 * S, base - 30 * S], [fx + 14 * S, base - 90 * S - Hash("p6f2" + i) * 50 * S],
+          [fx + 22 * S, base - 6 * S],
+        ], "p6flame" + i, "#e8933c", { amp: 4, lw: 0, line: null });
+      }
+      // 烟柱
+      for (let i = 0; i < 3; i += 1) {
+        const sx = W * (0.24 + i * 0.24);
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        InkFill(ctx, [
+          [sx - 10 * S, base - 60 * S], [sx - 30 * S, H * 0.2], [sx + 20 * S, H * 0.08],
+          [sx + 44 * S, H * 0.3], [sx + 16 * S, base - 60 * S],
+        ], "p6smoke" + i, "#3a2c20", { amp: 12, lw: 0, line: null });
+        ctx.restore();
+      }
+      break;
+    }
+    case "pro7": {
+      // 把命藏进土里：一把锹插进地，剪影人往下钻；天压得很低
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#8d7a58");
+      g.addColorStop(0.5, "#6b5638");
+      g.addColorStop(1, "#3a2c1c");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.55;
+      ctx.fillStyle = "#241a10";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 挖开的坑：斜著往下的口子
+      InkFill(ctx, [
+        [cx - 120 * S, gy], [cx + 130 * S, gy], [cx + 70 * S, gy + 90 * S], [cx - 60 * S, gy + 110 * S],
+      ], "p7pit", "#120c08", { amp: 6, lw: 0, line: null });
+      // 插着的锹
+      InkLine(ctx, cx + 150 * S, gy - 110 * S, cx + 120 * S, gy + 8 * S, "p7haft", { lw: 7 * S, color: "#241a10" });
+      InkFill(ctx, [
+        [cx + 112 * S, gy + 2 * S], [cx + 138 * S, gy - 4 * S], [cx + 146 * S, gy + 34 * S], [cx + 118 * S, gy + 38 * S],
+      ], "p7blade", "#241a10", { lw: 0, line: null });
+      // 往下钻的人：只剩上半身在坑沿上
+      InkFill(ctx, [
+        [cx - 40 * S, gy + 30 * S], [cx - 26 * S, gy - 30 * S], [cx + 6 * S, gy - 38 * S],
+        [cx + 26 * S, gy - 6 * S], [cx + 14 * S, gy + 40 * S],
+      ], "p7digger", "#120c08", { amp: 4, lw: 0, line: null });
+      ctx.beginPath();
+      ctx.arc(cx - 6 * S, gy - 52 * S, 15 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#120c08";
+      ctx.fill();
+      break;
+    }
+    case "pro8": {
+      // 地下的线长成网：与正戏同构的 2.5D 剖面——地表一线小房，地下点连成网
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#c8b488");
+      g.addColorStop(1, "#9a7850");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.3;
+      // 地表：薄薄一条，几座小房
+      ctx.fillStyle = "#8a6b45";
+      ctx.fillRect(0, gy, W, H - gy);
+      for (let i = 0; i < 5; i += 1) {
+        const hx = W * (0.1 + i * 0.19);
+        InkFill(ctx, Rect(hx, gy - 26 * S, 44 * S, 26 * S), "p8h" + i, "#4a382a", { lw: 2, amp: 2 });
+        InkFill(ctx, [[hx - 5 * S, gy - 26 * S], [hx + 22 * S, gy - 42 * S], [hx + 49 * S, gy - 26 * S]],
+          "p8r" + i, "#4a382a", { lw: 2, amp: 2 });
+      }
+      // 地下的网：节点（地窖）与连线（地道）
+      const nodes = [];
+      for (let i = 0; i < 9; i += 1) {
+        nodes.push([W * (0.1 + Hash("p8nx" + i) * 0.8), gy + H * (0.12 + Hash("p8ny" + i) * 0.45)]);
+      }
+      for (let i = 0; i < nodes.length - 1; i += 1) {
+        InkLine(ctx, nodes[i][0], nodes[i][1], nodes[i + 1][0], nodes[i + 1][1],
+          "p8t" + i, { lw: 4.4 * S, color: "#241a10", amp: 8 });
+      }
+      InkLine(ctx, nodes[2][0], nodes[2][1], nodes[6][0], nodes[6][1], "p8tx", { lw: 4.4 * S, color: "#241a10", amp: 8 });
+      for (let i = 0; i < nodes.length; i += 1) {
+        ctx.beginPath();
+        ctx.arc(nodes[i][0], nodes[i][1], 8 * S, 0, Math.PI * 2);
+        ctx.fillStyle = "#241a10";
+        ctx.fill();
+      }
+      // 通向地表的竖井两三口
+      for (const i of [1, 4, 7]) {
+        InkLine(ctx, nodes[i][0], nodes[i][1], nodes[i][0], gy, "p8shaft" + i, { lw: 3.2 * S, color: "#241a10", amp: 2 });
+      }
+      break;
+    }
+    case "pro9": {
+      // 镜头从地图收拢到一个普通村庄：圆形光圈里一小簇村舍
+      MapBase(ctx, W, H, "p9");
+      MapDots(ctx, W, H, "p9d", 20, 0.5);
+      ctx.save();
+      const vg = ctx.createRadialGradient(cx, cy, H * 0.1, cx, cy, H * 0.6);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(30,22,14,0.72)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      // 圈心的村子
+      for (let i = 0; i < 4; i += 1) {
+        const hx = cx - 70 * S + i * 42 * S;
+        InkFill(ctx, Rect(hx, cy - 4 * S, 30 * S, 22 * S), "p9h" + i, "#4a382a", { lw: 2, amp: 1.6 });
+        InkFill(ctx, [[hx - 4 * S, cy - 4 * S], [hx + 15 * S, cy - 18 * S], [hx + 34 * S, cy - 4 * S]],
+          "p9r" + i, "#4a382a", { lw: 2, amp: 1.6 });
+      }
+      InkLine(ctx, cx - 90 * S, cy + 26 * S, cx + 100 * S, cy + 24 * S, "p9road", { lw: 3 * S, color: "rgba(51,38,26,0.5)", amp: 4 });
+      break;
+    }
+    case "pro10": {
+      // 梁家村：一口井、一盘磨、一棵老槐树——暖起来的水彩
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#d8c8a0");
+      g.addColorStop(0.6, "#c0a874");
+      g.addColorStop(1, "#a08856");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.74;
+      ctx.fillStyle = "#8d7448";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 屋脊线（一百来户的意思）：远景一排屋顶
+      for (let i = 0; i < 8; i += 1) {
+        const hx = W * (0.02 + i * 0.13);
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        InkFill(ctx, [[hx, gy - 30 * S], [hx + 26 * S, gy - 48 * S], [hx + 52 * S, gy - 30 * S], [hx + 52 * S, gy - 6 * S], [hx, gy - 6 * S]],
+          "p10far" + i, "#6b5636", { lw: 2, amp: 2 });
+        ctx.restore();
+      }
+      // 老槐树：占右侧
+      const tx = W * 0.74;
+      InkFill(ctx, [
+        [tx - 12 * S, gy], [tx - 8 * S, gy - 120 * S], [tx - 30 * S, gy - 150 * S],
+        [tx + 20 * S, gy - 140 * S], [tx + 10 * S, gy - 110 * S], [tx + 14 * S, gy],
+      ], "p10trunk", "#6b4f30", { amp: 3, lw: 3 });
+      for (let i = 0; i < 5; i += 1) {
+        const a = -0.6 - i * 0.42;
+        const bx = tx + Math.cos(a) * 90 * S, by = gy - 150 * S + Math.sin(a) * 60 * S;
+        ctx.beginPath();
+        ctx.arc(bx, by, (34 + Hash("p10c" + i) * 18) * S, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 ? "#5c7040" : "#6d8148";
+        ctx.fill();
+      }
+      // 井（带辘轳架）与磨盘
+      const wx = W * 0.22;
+      InkFill(ctx, Rect(wx - 26 * S, gy - 22 * S, 52 * S, 22 * S), "p10well", "#8a7a5c", { lw: 3, amp: 2, shade: "rgba(0,0,0,0.2)" });
+      InkLine(ctx, wx - 30 * S, gy - 22 * S, wx - 18 * S, gy - 66 * S, "p10wa", { lw: 3.4 * S, color: "#4a382a" });
+      InkLine(ctx, wx + 30 * S, gy - 22 * S, wx + 18 * S, gy - 66 * S, "p10wb", { lw: 3.4 * S, color: "#4a382a" });
+      InkLine(ctx, wx - 22 * S, gy - 62 * S, wx + 22 * S, gy - 62 * S, "p10wc", { lw: 4 * S, color: "#4a382a" });
+      const mx = W * 0.46;
+      ctx.beginPath();
+      ctx.ellipse(mx, gy - 8 * S, 40 * S, 13 * S, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#9a8a6c";
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      break;
+    }
+    case "pro11": {
+      // 木匠：工作台前刨木头的剪影，刨花打着卷
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#c8b088");
+      g.addColorStop(1, "#8d7048");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.78;
+      ctx.fillStyle = "#6b5636";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 工作台
+      InkFill(ctx, Rect(cx - 170 * S, gy - 70 * S, 340 * S, 16 * S), "p11top", "#a8794a", { lw: 3, amp: 2, shade: "rgba(0,0,0,0.2)" });
+      InkLine(ctx, cx - 150 * S, gy - 54 * S, cx - 150 * S, gy, "p11l1", { lw: 6 * S, color: "#7a5433" });
+      InkLine(ctx, cx + 150 * S, gy - 54 * S, cx + 150 * S, gy, "p11l2", { lw: 6 * S, color: "#7a5433" });
+      // 台上的木料
+      InkFill(ctx, Rect(cx - 120 * S, gy - 88 * S, 240 * S, 18 * S), "p11plank", "#c09a62", { lw: 2.6, amp: 1.8 });
+      // 刨木头的人：前倾用力的剪影
+      InkFill(ctx, [
+        [cx - 60 * S, gy - 70 * S], [cx - 30 * S, gy - 150 * S], [cx + 14 * S, gy - 165 * S],
+        [cx + 30 * S, gy - 130 * S], [cx + 60 * S, gy - 96 * S], [cx + 30 * S, gy - 70 * S],
+      ], "p11man", "#4a382a", { amp: 3, lw: 0, line: null });
+      ctx.beginPath();
+      ctx.arc(cx + 14 * S, gy - 178 * S, 16 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#4a382a";
+      ctx.fill();
+      // 两条胳膊往前压着刨子
+      InkLine(ctx, cx + 20 * S, gy - 130 * S, cx + 78 * S, gy - 92 * S, "p11arm", { lw: 9 * S, color: "#4a382a" });
+      InkFill(ctx, Rect(cx + 66 * S, gy - 100 * S, 40 * S, 14 * S), "p11plane", "#4a382a", { lw: 0, line: null });
+      // 刨花：打卷的细线
+      for (let i = 0; i < 5; i += 1) {
+        const sx = cx + 100 * S + i * 16 * S;
+        ctx.beginPath();
+        ctx.arc(sx, gy - 70 * S - Hash("p11s" + i) * 30 * S, (7 + Hash("p11s2" + i) * 5) * S, 0.4, Math.PI * 1.7);
+        ctx.strokeStyle = "#e0c78e";
+        ctx.lineWidth = 3 * S;
+        ctx.stroke();
+      }
+      break;
+    }
+    case "pro12": {
+      // 起名的盼头：房梁下，爹的剪影把手搭在孩子肩上，孩子仰头看梁
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#b89868");
+      g.addColorStop(1, "#7a5f3c");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // 头顶的梁与柱
+      InkFill(ctx, Rect(W * 0.08, H * 0.14, W * 0.84, 22 * S), "p12beam", "#5c4328", { lw: 3, amp: 2.4, shade: "rgba(0,0,0,0.24)" });
+      InkFill(ctx, Rect(W * 0.16, H * 0.14, 18 * S, H * 0.7), "p12postA", "#5c4328", { lw: 3, amp: 2 });
+      InkFill(ctx, Rect(W * 0.8, H * 0.14, 18 * S, H * 0.7), "p12postB", "#5c4328", { lw: 3, amp: 2 });
+      const gy = H * 0.84;
+      ctx.fillStyle = "#4a3a26";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 爹（高）与柱子（小）：都仰着头看梁
+      InkFill(ctx, [
+        [cx - 90 * S, gy], [cx - 82 * S, gy - 140 * S], [cx - 60 * S, gy - 168 * S],
+        [cx - 30 * S, gy - 160 * S], [cx - 20 * S, gy - 120 * S], [cx - 26 * S, gy],
+      ], "p12dad", "#33261a", { amp: 3, lw: 0, line: null });
+      ctx.beginPath();
+      ctx.arc(cx - 52 * S, gy - 180 * S, 17 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#33261a";
+      ctx.fill();
+      InkFill(ctx, [
+        [cx + 30 * S, gy], [cx + 34 * S, gy - 76 * S], [cx + 50 * S, gy - 92 * S],
+        [cx + 68 * S, gy - 84 * S], [cx + 74 * S, gy - 60 * S], [cx + 68 * S, gy],
+      ], "p12kid", "#33261a", { amp: 2.6, lw: 0, line: null });
+      ctx.beginPath();
+      ctx.arc(cx + 52 * S, gy - 104 * S, 12 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#33261a";
+      ctx.fill();
+      // 爹的手搭在孩子肩上
+      InkLine(ctx, cx - 30 * S, gy - 120 * S, cx + 44 * S, gy - 88 * S, "p12arm", { lw: 8 * S, color: "#33261a" });
+      break;
+    }
+    case "pro13": {
+      // 粮的铰链：青黄不接的麦田 + 见底的粮囤（沉降拍，冷下来）
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#b0a880");
+      g.addColorStop(0.55, "#8d8058");
+      g.addColorStop(1, "#5c5236");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.66;
+      ctx.fillStyle = "#4a4028";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 稀稀拉拉的麦子：该密不密
+      for (let i = 0; i < 26; i += 1) {
+        const sx = W * (0.04 + Hash("p13w" + i) * 0.92);
+        const sh = (26 + Hash("p13h" + i) * 22) * S;
+        InkLine(ctx, sx, gy, sx + Sym("p13s" + i, 1, 6 * S), gy - sh, "p13stalk" + i,
+          { lw: 2 * S, color: "rgba(150,138,90,0.8)", amp: 2 });
+      }
+      // 前景的粮囤：口开着，里头是黑的
+      const bx = W * 0.68, by = H * 0.86;
+      InkFill(ctx, [
+        [bx - 110 * S, by], [bx - 90 * S, by - 120 * S], [bx + 90 * S, by - 120 * S], [bx + 110 * S, by],
+      ], "p13bin", "#8d7448", { amp: 3, lw: 4, shade: "rgba(0,0,0,0.25)" });
+      for (let i = 0; i < 4; i += 1) {
+        InkLine(ctx, bx - (96 - i * 5) * S, by - 24 * S - i * 26 * S, bx + (96 - i * 5) * S, by - 24 * S - i * 26 * S,
+          "p13ring" + i, { lw: 2.2 * S, color: "rgba(60,44,26,0.6)", amp: 2 });
+      }
+      ctx.beginPath();
+      ctx.ellipse(bx, by - 120 * S, 88 * S, 20 * S, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#1a120c";
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      // 囤边斜着一只空瓢
+      InkFill(ctx, [
+        [bx + 96 * S, by - 10 * S], [bx + 150 * S, by - 26 * S], [bx + 156 * S, by - 8 * S], [bx + 110 * S, by + 4 * S],
+      ], "p13scoop", "#6b5636", { amp: 2, lw: 2.6 });
+      break;
+    }
+    case "pro14": {
+      // 娘在院门口喊人，妹妹从她腿边探出头——两个角色的登场（一幅画完成）
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#e0cfa2");
+      g.addColorStop(0.6, "#c8ae7a");
+      g.addColorStop(1, "#a08a58");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      const gy = H * 0.8;
+      ctx.fillStyle = "#8d7448";
+      ctx.fillRect(0, gy, W, H - gy);
+      // 院门：门垛与门楣（占右侧）
+      InkFill(ctx, Rect(W * 0.6, gy - 190 * S, 26 * S, 190 * S), "p14postA", "#b89b72", { lw: 3, amp: 2, shade: "rgba(0,0,0,0.2)" });
+      InkFill(ctx, Rect(W * 0.86, gy - 190 * S, 26 * S, 190 * S), "p14postB", "#b89b72", { lw: 3, amp: 2, shade: "rgba(0,0,0,0.2)" });
+      InkFill(ctx, Rect(W * 0.57, gy - 214 * S, W * 0.38, 26 * S), "p14lintel", "#8a6a52", { lw: 3, amp: 2 });
+      // 院墙往画左延伸
+      InkFill(ctx, Rect(0, gy - 110 * S, W * 0.62, 110 * S), "p14wall", "#c0a26e", { lw: 3, amp: 2.6, shade: "rgba(0,0,0,0.14)" });
+      // 娘：站在门洞里，一只手拢在嘴边喊
+      const mx = W * 0.73, mb = gy + 4 * S;
+      InkFill(ctx, [
+        [mx - 26 * S, mb], [mx - 22 * S, mb - 120 * S], [mx - 6 * S, mb - 150 * S],
+        [mx + 18 * S, mb - 144 * S], [mx + 28 * S, mb - 90 * S], [mx + 22 * S, mb],
+      ], "p14mom", "#6d5340", { amp: 3, lw: 3 });
+      ctx.beginPath();
+      ctx.arc(mx - 2 * S, mb - 164 * S, 15 * S, 0, Math.PI * 2);
+      ctx.fillStyle = PAL.skin;
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      // 拢在嘴边的手
+      InkLine(ctx, mx + 16 * S, mb - 120 * S, mx + 4 * S, mb - 158 * S, "p14arm", { lw: 7 * S, color: "#6d5340" });
+      // 发髻
+      ctx.beginPath();
+      ctx.arc(mx - 16 * S, mb - 170 * S, 6.5 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#2b1f16";
+      ctx.fill();
+      // 妹妹：从娘腿边探出半个身子
+      const sx2 = mx - 34 * S;
+      InkFill(ctx, [
+        [sx2 - 16 * S, mb], [sx2 - 14 * S, mb - 52 * S], [sx2 - 2 * S, mb - 64 * S],
+        [sx2 + 12 * S, mb - 56 * S], [sx2 + 14 * S, mb],
+      ], "p14sis", PAL.sister, { amp: 2.4, lw: 2.6 });
+      ctx.beginPath();
+      ctx.arc(sx2 - 2 * S, mb - 76 * S, 11 * S, 0, Math.PI * 2);
+      ctx.fillStyle = PAL.skin;
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      // 小辫
+      ctx.beginPath();
+      ctx.arc(sx2 - 13 * S, mb - 82 * S, 4 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#2b1f16";
+      ctx.fill();
+      // 晨光：门洞里透出的一道暖
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      const lg = ctx.createLinearGradient(W * 0.62, 0, W * 0.3, 0);
+      lg.addColorStop(0, "#ffe6a8");
+      lg.addColorStop(1, "rgba(255,230,168,0)");
+      ctx.fillStyle = lg;
+      ctx.fillRect(W * 0.2, gy - 200 * S, W * 0.42, 200 * S);
+      ctx.restore();
+      // 磨与鸡的远景点缀
+      ctx.beginPath();
+      ctx.ellipse(W * 0.16, gy - 6 * S, 30 * S, 10 * S, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#9a8a6c";
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      break;
+    }
+    default: {
+      CardBase(ctx, W, H);
+      break;
+    }
+  }
 }

@@ -3,7 +3,7 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint,
-  ChapterBeatList, DebugJump,
+  ChapterBeatList, DebugJump, SkipPrologue,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
@@ -84,7 +84,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide",
+  "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide", "btnSkipCine",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -423,8 +423,18 @@ function StepIris(state, dt) {
     irisLevel = Math.min(1, irisLevel + dt * 2.4);
   }
   const r = Math.round(irisLevel * 78);
+  // iris 收在情感物件上：剧本标了 irisFocus（世界坐标）就把圆心投到它身上——
+  // 第一章末尾那道刻痕，落黑的最后一眼必须是它
+  let cx = 50, cy = 50;
+  if (state?.irisFocus) {
+    const vs = world.viewSize;
+    if (vs?.w) {
+      cx = Math.max(8, Math.min(92, 50 + ((state.irisFocus.x - cam.x) / vs.w) * 100));
+      cy = Math.max(8, Math.min(92, 50 - ((SURFACE_Y + state.irisFocus.y - cam.y) / vs.h) * 100));
+    }
+  }
   ui.irisOverlay.style.background =
-    `radial-gradient(circle at 50% 50%, transparent ${r}%, #060402 ${Math.min(100, r + 5)}%)`;
+    `radial-gradient(circle at ${cx.toFixed(1)}% ${cy.toFixed(1)}%, transparent ${r}%, #060402 ${Math.min(100, r + 5)}%)`;
   ui.irisOverlay.style.opacity = irisLevel >= 1 ? 0 : 1;
 }
 
@@ -447,13 +457,18 @@ function SyncHud(state, dt, shotFade) {
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
 
   ui.cineBars.classList.toggle("active", !!inCinematic);
-  const hasCaption = !!(state.caption && inCinematic && (state.caption.say || state.caption.stage));
+  // noSub：有声无字（日军的日语原声不配字幕——听不懂本身就是设计）
+  const hasCaption = !!(state.caption && inCinematic
+    && (state.caption.say || state.caption.stage) && !state.caption.noSub);
   if (ui.captionScrim) ui.captionScrim.classList.toggle("active", hasCaption);
   // 地窖板缝 matte：第一章父亲被抓那场
   const slit = inCinematic && state.camHint?.slit;
   if (ui.slitMatte) ui.slitMatte.classList.toggle("active", !!slit);
 
-  if (state.caption && inCinematic && (state.caption.say || state.caption.stage)) {
+  // 序章可跳过：只在 c1_prologue 这一段亮出跳过键
+  if (ui.btnSkipCine) ui.btnSkipCine.hidden = !(def?.prologue && state.phase === "playing");
+
+  if (hasCaption) {
     ui.caption.hidden = false;
     if (state.caption.who) {
       ui.capSpeaker.textContent = state.caption.who;
@@ -768,6 +783,11 @@ if (ui.btnSettings) {
     ui.btnSettings.setAttribute("aria-expanded", "false");
   });
 }
+
+// 序章跳过：整段结算掉直接进正戏；正在念的旁白同时收声
+ui.btnSkipCine?.addEventListener("click", () => {
+  if (state && SkipPrologue(state)) audio.StopVoice();
+});
 
 ui.startButton.addEventListener("click", () => StartGame(0));
 ui.endRestart.addEventListener("click", () => {

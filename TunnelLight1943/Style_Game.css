@@ -13,7 +13,10 @@ html, body { height: 100%; }
 body {
   background: #0a0908;
   color: var(--paper);
-  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  /* 回退链故意不落到宋体：SimSun 只有一档字重，HUD 用的 500/600 会被合成
+     假粗体，小字号下糊成一团。微软雅黑是 Windows 上唯一为屏幕做过 hinting
+     的中文字体，取不到网络字体时至少还是清楚的。 */
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "Microsoft YaHei", sans-serif;
   overflow: hidden;
   /* 移动端长按不弹选词/放大镜/回调菜单 */
   -webkit-user-select: none;
@@ -30,9 +33,14 @@ body {
 #hud { position: absolute; inset: 0; pointer-events: none; }
 #hud button { pointer-events: auto; }
 
+/* 居中一律走布局（left:0/right:0 + margin auto），不用 translateX(-50%)。
+   transform 会让 Chrome 关掉次像素抗锯齿，宽度为奇数时还会把整块文字钉在
+   半个像素上——两件事叠起来就是「HUD 有点糊」。 */
+
 /* 目标：只在变化时露一下，之后让画面自己说话（克制 HUD） */
 #objectivePanel {
-  position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 26px; left: 0; right: 0;
+  margin-inline: auto; width: fit-content;
   max-width: 520px; text-align: center; padding: 0;
   background: none; border: none;
   transition: opacity 0.7s ease;
@@ -45,7 +53,9 @@ body {
 }
 #objectivePanel span {
   display: block; margin-top: 7px; font-size: 13px; color: #d6c9ac;
-  line-height: 1.65; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.7);
+  /* 13px 的字配 12px 的光晕，等于给每个笔画糊一圈；收成贴身的一圈暗边，
+     该有的对比度还在，字的边缘干净了 */
+  line-height: 1.65; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.98), 0 0 6px rgba(0, 0, 0, 0.8);
 }
 
 #crouchTag {
@@ -68,8 +78,8 @@ body {
 
 /* 交互提示 */
 #prompt {
-  position: absolute; left: 50%; bottom: 15%;
-  transform: translateX(-50%);
+  position: absolute; left: 0; right: 0; bottom: 15%;
+  margin-inline: auto; width: fit-content;
   padding: 7px 20px; font-size: 15px; letter-spacing: 0.14em; font-weight: 500;
   color: #f7dd9a; white-space: nowrap;
   background: rgba(8, 6, 4, 0.62);
@@ -81,8 +91,9 @@ body {
 /* 短提示 */
 /* 手记条：像从本子上撕下来的一条纸 */
 #toast {
-  position: absolute; left: 50%; top: 12%;
-  transform: translateX(-50%) translateY(-8px);
+  position: absolute; left: 0; right: 0; top: 12%;
+  margin-inline: auto; width: fit-content;
+  transform: translateY(-8px);
   max-width: 520px; padding: 12px 24px; text-align: center;
   font-size: 14px; line-height: 1.85; color: #2e2418;
   background: linear-gradient(180deg, #e0d0aa 0%, #d2bf95 100%);
@@ -90,7 +101,8 @@ body {
   clip-path: polygon(1% 6%, 99% 0%, 100% 94%, 0% 100%);
   opacity: 0; transition: opacity 0.45s, transform 0.45s;
 }
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* 停稳之后 transform 归零：动画期间糊一点没人看得出，停下来读的时候必须是清的 */
+#toast.show { opacity: 1; transform: none; }
 
 /* 被发现红晕 */
 #detectionVignette {
@@ -108,6 +120,17 @@ body {
 #cineBars .barBottom { bottom: 0; }
 #cineBars.active .barTop, #cineBars.active .barBottom { height: 11.5vh; }
 
+/* 序章跳过键：压在下黑边上，右下角一枚安静的字钮——看得见、不抢戏 */
+#btnSkipCine {
+  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 3.2vh;
+  z-index: 30; pointer-events: auto;
+  padding: 7px 14px; border: 1px solid rgba(232, 217, 184, 0.34); border-radius: 4px;
+  background: rgba(10, 8, 6, 0.55); color: rgba(232, 217, 184, 0.82);
+  font: 500 13px/1 "Noto Serif SC", serif; letter-spacing: 0.14em;
+  cursor: pointer; transition: background 0.2s ease, color 0.2s ease;
+}
+#btnSkipCine:hover { background: rgba(28, 22, 16, 0.8); color: #f2e6c4; }
+
 /* 字幕：勇敢的心式——底部一条压暗的渐变把字托住，
    旁白与对白分成两种字体色阶，任何画面亮度下都读得清 */
 #captionScrim {
@@ -118,8 +141,8 @@ body {
 #captionScrim.active { opacity: 1; }
 
 #caption {
-  position: absolute; left: 50%; bottom: 14.5vh;
-  transform: translateX(-50%);
+  position: absolute; left: 0; right: 0; bottom: 14.5vh;
+  margin-inline: auto;
   width: min(760px, 88vw); text-align: center;
 }
 /* 说话人：一枚小铭牌，两侧带短横线 */
@@ -137,7 +160,8 @@ body {
 #capText {
   font-size: 20px; line-height: 1.95; font-weight: 500;
   color: #f6ecd8;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.8);
+  /* 底下已经有 captionScrim 那道压暗的渐变托着，字自己不必再背 18px 的光晕 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.98), 0 0 10px rgba(0, 0, 0, 0.7);
 }
 /* 旁白：比对白略小、略冷，但对比度一样足 */
 #capText.stage {
@@ -511,8 +535,8 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
    走到头线就划完了。桌面按住 E 左右推，触屏直接拖。
    --------------------------------------------------------------------------- */
 #scribeGuide {
-  position: absolute; left: 50%; bottom: 16%;
-  transform: translateX(-50%);
+  position: absolute; left: 0; right: 0; bottom: 16%;
+  margin-inline: auto;
   width: min(340px, 62vw);
   pointer-events: none;
   text-align: center;
