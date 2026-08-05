@@ -243,6 +243,7 @@ export function CreateWorld(canvasEl) {
       m.position.z = 0.4;
       m.userData.SetLight = (x, y) => m.position.set(x, y, 0.4);
       m.userData.SetIntensity = (v) => { mat.opacity = v; };
+      m.userData.SetBlockers = () => {};
       return m;
     }
     const m = CreateOccludedLight(occluder, { radius, color, intensity: opacity });
@@ -251,6 +252,11 @@ export function CreateWorld(canvasEl) {
   }
 
   const actorSprites = new Map();
+  // 这一帧场上所有会挡光的人体，交给每盏灯做遮挡查询（见 Script_Light 的 uBlockers）。
+  // 只取躯干那一柱，不是整个人的包围盒——太宽的话人自己就先被自己的影子吃掉了。
+  const bodyBlockers = [];
+  // 这一帧场上所有的光源（提灯 / 玩家的煤油灯 / 地道油灯），用来定影子的方向
+  const lightSources = [];
   const glows = [];
   let builtKey = "";
   let sceneLights = [];   // 静态灯位 {x,y,r,mesh}
@@ -698,6 +704,40 @@ export function CreateWorld(canvasEl) {
     );
     mesh.rotation.x = -Math.PI / 2;
     FixOrder(mesh, LAYER_ORDER.play - 20);  // 投影压在地面上、在所有立面之下
+    return mesh;
+  }
+
+  // 灯打出来的影子：从脚下往背光方向拖一条，近端浓、远端散开。
+  // 贴图的 u=0 一端是脚下，靠 scale.x 的正负决定往哪边拖。
+  function MakeCastShadow(strength) {
+    const wPx = 256, hPx = 128;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const gx = ctx.createLinearGradient(0, 0, wPx, 0);
+    gx.addColorStop(0, `rgba(20,14,8,${strength})`);
+    gx.addColorStop(0.42, `rgba(20,14,8,${strength * 0.55})`);
+    gx.addColorStop(1, "rgba(20,14,8,0)");
+    ctx.fillStyle = gx;
+    ctx.fillRect(0, 0, wPx, hPx);
+    // 纵向收成一条从脚下张开的椭圆，边缘不留硬口
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.save();
+    ctx.translate(0, hPx / 2);
+    ctx.scale(wPx, hPx / 2);
+    const gy = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gy.addColorStop(0, "rgba(0,0,0,1)");
+    gy.addColorStop(0.6, "rgba(0,0,0,0.92)");
+    gy.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = gy;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+    ctx.globalCompositeOperation = "source-over";
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+    );
+    mesh.rotation.x = -Math.PI / 2;   // 躺在地面上，长边沿世界 X
+    FixOrder(mesh, LAYER_ORDER.play - 19);
     return mesh;
   }
 
@@ -1389,9 +1429,14 @@ export function CreateWorld(canvasEl) {
       shadow.userData.persist = true;
       layers.play.add(shadow);
       SetPlayOrder(shadow, ACTOR_Z - 0.05);
+      // 灯打出来的那条长影子，跟脚下那团分开管：一个说"他站在地上"，
+      // 一个说"光在他左边"。同时在的时候两条一起读，才像真的有盏灯
+      const castShadow = MakeCastShadow(0.42);
+      castShadow.visible = false;
+      layers.play.add(castShadow);
       s = {
         rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null,
-        shadow, idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+        shadow, castShadow, idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
       };
       actorSprites.set(id, s);
     }
@@ -1412,13 +1457,14 @@ export function CreateWorld(canvasEl) {
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
+      track: extra.track, trackT: extra.trackT,
     }, dt);
 
     s.mesh.position.set(x, y, ACTOR_Z);
     const bs = extra.bodyScale || s.bodyScale || 1;
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (s.shadow) {
-      // 地下没有太阳，影子由手里的灯给，落在脚边就够
+      // 地下没有太阳，脚下这团只负责"他确实站在地上"
       const under = level === "under";
       s.shadow.visible = true;
       s.shadow.scale.set(bs, bs * (under ? 0.55 : 1), 1);
@@ -1428,6 +1474,27 @@ export function CreateWorld(canvasEl) {
         ACTOR_Z - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
       s.shadow.material.opacity = under ? 0.5 : 1;
+    }
+    // 灯打出来的长影子：背着最近那盏灯拖出去，离得越远越长越淡
+    if (s.castShadow) {
+      const lit = extra.light;
+      if (lit) {
+        const dx = x - lit.x;
+        const dist = Math.abs(dx);
+        const dir = dx >= 0 ? 1 : -1;
+        // 灯低、人高 → 影子被拉得比人还长；这里按距离线性放，够读就行
+        const len = Math.min(6.4, (0.9 + dist * 0.78)) * bs;
+        const wid = (0.85 + dist * 0.10) * bs;
+        s.castShadow.visible = true;
+        s.castShadow.scale.set(dir * len, wid, 1);
+        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, ACTOR_Z - 0.04);
+        // 站在灯正下方没有影子可言；出了灯的照射范围也就没影子了
+        const near = Math.min(1, dist / 0.75);
+        const far = 1 - Math.min(1, Math.max(0, (dist - lit.r * 0.55) / (lit.r * 0.5)));
+        s.castShadow.material.opacity = near * far * (lit.i ?? 1);
+      } else {
+        s.castShadow.visible = false;
+      }
     }
     return { x, y, isMoving };
   }
@@ -1469,6 +1536,41 @@ export function CreateWorld(canvasEl) {
     s.mesh.traverse((o) => { if (o.isMesh && o.material?.color) o.material.color.setScalar(lift); });
   }
 
+  // 手里的灯：一盏实物挂在手上，光晕从它的火心发出去（不是人整个在发光）
+  const LAMP_W = 46, LAMP_H = 46;    // 贴图画幅（像素，PPM 密度）
+  const LAMP_AX = 18, LAMP_AY = 15;  // 握点在画幅里的位置
+  const LAMP_S = 0.92;               // DrawHandLamp 的绘制单位 → 贴图像素
+  function SyncHandLamp(s, on, kind, heading, hand, bs) {
+    if (!on || !hand) {
+      if (s.lampMesh) s.lampMesh.visible = false;
+      return null;
+    }
+    if (!s.lampMesh || s.lampKind !== kind) {
+      if (s.lampMesh) layers.play.remove(s.lampMesh);
+      // 灯会被特写扫到（"灯停住了"那一镜），按细节件的密度烘
+      s.lampMesh = BakeSprite(LAMP_W, LAMP_H, LAMP_AX, LAMP_AY, (ctx, ax, ay) => {
+        ART.DrawHandLamp(ctx, ax, ay, LAMP_S, kind);
+      }, 0, DETAIL_SS * 2);
+      s.lampKind = kind;
+      layers.play.add(s.lampMesh);
+      SetPlayOrder(s.lampMesh, CARRY_Z);
+    }
+    s.lampMesh.visible = true;
+    const dir = heading >= 0 ? 1 : -1;
+    s.lampMesh.scale.set(dir * bs, bs, 1);
+    s.lampMesh.position.set(
+      hand.x + dir * s.lampMesh.userData.offset.x * bs,
+      hand.y + s.lampMesh.userData.offset.y * bs,
+      CARRY_Z,
+    );
+    // 火心的世界坐标：光就从这儿发出去（画布 y 向下，世界 y 向上）
+    const f = ART.HAND_LAMP_FLAME[kind] || ART.HAND_LAMP_FLAME.hurricane;
+    return {
+      x: hand.x + dir * (f.x * LAMP_S / PPM) * bs,
+      y: hand.y - (f.y * LAMP_S / PPM) * bs,
+    };
+  }
+
   function UpdateActors(state, time, dt) {
     const ch = CHAPTERS[state.chapterIndex];
     const sceneDef = SCENES[ch.scene];
@@ -1476,18 +1578,62 @@ export function CreateWorld(canvasEl) {
     const p = state.player;
     const ps = EnsureActorSprite("player", "player");
     const def = CurrentBeatDef(state);
+    const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
+
+    // ① 先把这一帧的光源点清出来：影子朝哪边拖、谁挡谁的光，都要先知道灯在哪
+    lightSources.length = 0;
+    if (p.lamp) lightSources.push({ x: p.x + p.heading * 0.42, y: LevelYOf(p.level) + 0.95, r: 6.5, i: 1.1 });
+    for (const a of state.actors) {
+      if (!a.lantern || a.visible === false) continue;
+      lightSources.push({ x: a.x + (a.heading || 1) * 0.42, y: LevelYOf(a.level) + 0.95, r: 4.6, i: 1 });
+    }
+    for (const l of state.lamps || []) if (l.lit) lightSources.push({ x: l.x, y: UNDER_Y + 1.4, r: 3.4, i: 0.8 });
+    for (const l of sceneLights) lightSources.push({ x: l.x, y: l.y, r: l.r, i: l.i });
+
+    // 离 x 最近、且还照得到的那盏灯负责投影（同一个人身上叠两条影子会很脏）
+    const NearestLight = (x, y) => {
+      let best = null, bestD = Infinity;
+      for (const l of lightSources) {
+        if (Math.abs(l.y - y) > 4) continue;             // 不是同一层的灯别管
+        const d = Math.abs(l.x - x);
+        if (d > l.r || d > bestD) continue;
+        bestD = d; best = l;
+      }
+      return best;
+    };
+
+    // ② 挡光的人体：只取躯干那一柱（半宽 0.17m），细长一条影子比一整块黑更像人
+    bodyBlockers.length = 0;
+    const PushBlocker = (x, level, crouch, bs) => {
+      const h = (crouch ? 0.62 : 0.92) * bs;
+      bodyBlockers.push({ x, y: LevelYOf(level) + h, hw: 0.20 * bs, hh: h });
+    };
     const digging = !!(state.beat && !state.beat.quakeActive
       && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
         || def?.kind === "buildSpots" || def?.kind === "hold")
       && state.prompt && state.prompt.includes("%"));
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
-    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!(p.carry || p.item),
-      { climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose });
+    PushBlocker(p.x, p.level, p.crouch, boyScale);
+    for (const a of state.actors) {
+      if (a.visible === false) continue;
+      PushBlocker(a.x, a.level || "surface", false, BODY_SCALE[a.kind] ?? 1);
+    }
+
+    // 手里那一格（谜题链的物品）和肩上扛的木料一样要摆出携带姿势
+    const held = p.carry || (p.item ? p.item.label : null);
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!held,
+      {
+        climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
+        track: p.track?.name, trackT: p.track?.t,
+        // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
+        light: NearestLight(p.x, LevelYOf(p.level)),
+      });
     ps.mesh.visible = otsHiddenId !== "player";
     LiftActor(ps, ch.light, true);
 
-    SyncCarry(ps, p.carry || (p.item ? p.item.label : null), p.heading);
+    SyncCarry(ps, held, p.heading);
+    UpdatePlayerTag(state, ps, p, boyScale, time, dt);
 
     // 煤油灯
     if (p.lamp) {
@@ -1501,10 +1647,16 @@ export function CreateWorld(canvasEl) {
         ps.adapt = MakeGlow(17, 0xc9a878, 0.30);
         scene.add(ps.adapt);
       }
-      if (ps.adapt) ps.adapt.userData.SetLight(p.x, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.0);
-      ps.glow.position.set(p.x + p.heading * 0.3, (p.level === "under" ? UNDER_Y : SURFACE_Y) + 1.1, 7.6);
-      ps.glow.material.opacity = 1.15 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23) * 0.05;
+      if (ps.adapt) ps.adapt.userData.SetLight(p.x, LevelYOf(p.level) + 1.0);
+      // 灯挂在手上，光从火心出去；SetLight 必须走 userData（着色器要拿 uLightPos，
+      // 直接改 mesh.position 的话灯的位置还留在世界原点，整片光会被距离判定丢掉）
+      const hand = HandPoint(ps.rig);
+      const flame = SyncHandLamp(ps, true, "hurricane", p.heading, hand, boyScale)
+        || { x: p.x + p.heading * 0.3, y: LevelYOf(p.level) + 1.05 };
+      ps.glow.userData.SetLight(flame.x, flame.y);
+      ps.glow.userData.SetIntensity(1.15 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23) * 0.05);
     } else if (ps.glow) {
+      SyncHandLamp(ps, false);
       scene.remove(ps.glow);
       if (ps.adapt) { scene.remove(ps.adapt); ps.adapt = null; }
       ps.glow = null;
@@ -1521,38 +1673,101 @@ export function CreateWorld(canvasEl) {
         && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort");
       // NPC 跟玩家走同一段净高：一群人猫着腰、里头一个直着腰，立刻出戏
       const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
+      const bs = sisterScale || BODY_SCALE[a.kind] || 1;
       UpdateOne(s, a.x, a.level || "surface", a.heading,
         posture === "squat" || posture === "crawl", dt, !!a.carry,
-        { posture, pose: a.pose, ...(sisterScale ? { bodyScale: sisterScale } : {}) });
+        {
+          posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          ...(sisterScale ? { bodyScale: sisterScale } : {}),
+          light: NearestLight(a.x, LevelYOf(a.level)),
+        });
       SyncCarry(s, a.carry, a.heading);
       LiftActor(s, ch.light, false);
-      // 提灯
+      // 提灯：先把灯挂到手上，光晕再从灯的火心发出去
+      const lampKind = a.lantern ? (a.lanternKind || (a.kind === "puppet" ? "lantern" : "hurricane")) : null;
+      const hand = a.lantern ? HandPoint(s.rig) : null;
+      const flame = SyncHandLamp(s, !!a.lantern, lampKind, a.heading, hand, bs);
       if (a.lantern) {
         if (!s.glow || s.glowKey !== builtKey) {
           if (s.glow) scene.remove(s.glow);
-          s.glow = MakeGlow(4.2, 0xffc878, 0.95);
+          s.glow = MakeGlow(4.6, 0xffc878, 0.85);
           s.glowKey = builtKey;
           scene.add(s.glow);
         }
-        s.glow.userData.SetLight(a.x + (a.heading || 1) * 0.35, (a.level === "under" ? UNDER_Y : SURFACE_Y) + 1.05);
+        s.glow.userData.SetLight(flame.x, flame.y);
+        // 油灯的火苗自己在抖，光斑也跟着抖
+        s.glow.userData.SetIntensity(0.85 + Math.sin(time * 8.3 + a.x) * 0.08 + Math.sin(time * 19.7) * 0.035);
         s.glow.visible = true;
       } else if (s.glow) {
         s.glow.visible = false;
       }
     }
 
+    // ③ 每盏灯认领离自己最近的几个人体做遮挡：人挡在灯前，墙上、地上才有影子
+    for (const [, s] of actorSprites) {
+      if (s.glow?.visible) s.glow.userData.SetBlockers(bodyBlockers);
+    }
+    for (const g of glows) if (g.visible) g.userData.SetBlockers?.(bodyBlockers);
+    for (const m of lampMeshes) if (m.glow?.visible) m.glow.userData.SetBlockers?.(bodyBlockers);
+
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
         layers.play.remove(s.rig ? s.rig.group : s.mesh);
         if (s.shadow) layers.play.remove(s.shadow);
+        if (s.castShadow) layers.play.remove(s.castShadow);
         if (s.glow) scene.remove(s.glow);
         if (s.carryMesh) layers.play.remove(s.carryMesh);
+        if (s.lampMesh) layers.play.remove(s.lampMesh);
         actorSprites.delete(id);
       } else if (id !== "player") {
         const a = state.actors.find((x) => x.id === id);
-        if (s.glow && (!a || a.visible === false)) s.glow.visible = false;
+        if (!a || a.visible === false) {
+          if (s.glow) s.glow.visible = false;
+          if (s.lampMesh) s.lampMesh.visible = false;
+          if (s.castShadow) s.castShadow.visible = false;
+        }
       }
     }
+  }
+
+  // 「你控制的是哪一个」：夜里三个同样身高的土布短褂站在村道上，玩家分不出自己。
+  // 常驻一枚很淡的人字标（不是黄三角，那是指路的），刚接手 / 站着不动 / 刚被抓回来
+  // 的时候亮一下，一走起来就退回几乎看不见——不抢画面，但永远能找到自己。
+  let tagT = 0, tagKey = "", tagLevel = 0;
+  function UpdatePlayerTag(state, ps, p, bs, time, dt) {
+    if (!ps.tagMesh) {
+      const canvas = MakeCanvas(48, 32);
+      ps.tagCtx = canvas.getContext("2d");
+      ps.tagMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(48 / PPM * 0.72, 32 / PPM * 0.72),
+        new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+      );
+      FixOrder(ps.tagMesh, LAYER_ORDER.fx + 280);
+      layers.fx.add(ps.tagMesh);
+    }
+    const def = CurrentBeatDef(state);
+    const inCine = def?.kind === "cinematic" || !!state.microCine;
+    const key = `${state.chapterIndex}/${state.beatIndex}/${state.flags.resets}`;
+    if (key !== tagKey) { tagKey = key; tagT = 0; }
+    tagT += dt;
+    const moving = Math.abs(p.x - (ps.tagPrevX ?? p.x)) > 0.002;
+    ps.tagPrevX = p.x;
+    // 刚接手这一幕的前 3.2 秒、或者站着发呆超过 2.5 秒 → 亮起来
+    if (!moving) tagLevel += dt * 0.4; else tagLevel = 0;
+    const want = inCine || otsHiddenId === "player" ? 0
+      : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
+    ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
+    ps.tagMesh.visible = ps.tagAlpha > 0.02;
+    if (!ps.tagMesh.visible) return;
+    ps.tagCtx.clearRect(0, 0, 48, 32);
+    ART.DrawPlayerTag(ps.tagCtx, 24, 18, time);
+    ps.tagMesh.material.map.needsUpdate = true;
+    ps.tagMesh.material.opacity = ps.tagAlpha;
+    // 贴着头顶上方一点点：再高就飘成 HUD 了，那是另一种出戏
+    // （用骨架实际的头顶高度，不是 POSTURE_HEAD——那量的是地道净空）
+    const TAG_HEAD = { stand: 1.35, stoop: 1.10, squat: 0.92, crawl: 0.62 };
+    const head = TAG_HEAD[p.posture] ?? (p.crouch ? 0.95 : 1.35);
+    ps.tagMesh.position.set(p.x, (p.level === "under" ? UNDER_Y : SURFACE_Y) + head * bs + 0.18, 0.62);
   }
 
   // -------------------------------------------------------------------------

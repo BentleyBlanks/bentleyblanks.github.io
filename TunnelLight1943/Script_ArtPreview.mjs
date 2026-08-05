@@ -18,7 +18,9 @@ page.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
 await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html`, { waitUntil: "domcontentloaded" });
 const dataUrl = await page.evaluate(async (what) => {
   const ART = await import("./Script_Art.mjs");
-  const kinds = ["player", "father", "sister", "militia", "soldier", "puppet"];
+  const kinds = what === "lamp"
+    ? ["hurricane", "lantern"]
+    : ["player", "father", "sister", "militia", "soldier", "puppet"];
   const cw = 380, chh = 560;
   const c = document.createElement("canvas");
   c.width = cw * kinds.length; c.height = chh;
@@ -30,7 +32,15 @@ const dataUrl = await page.evaluate(async (what) => {
     ctx.translate(i * cw, 0);
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.strokeRect(0.5, 0.5, cw - 1, chh - 1);
-    if (what === "shoulder") ART.DrawShoulder(ctx, cw * 0.55, chh * 0.46, 1.25, k, "prev" + k);
+    if (what === "lamp") {
+      // 手的握点画一个十字，看灯是不是挂在手上
+      ART.DrawHandLamp(ctx, cw * 0.5, chh * 0.32, 8, k);
+      ctx.strokeStyle = "rgba(200,40,40,0.8)";
+      ctx.beginPath();
+      ctx.moveTo(cw * 0.5 - 10, chh * 0.32); ctx.lineTo(cw * 0.5 + 10, chh * 0.32);
+      ctx.moveTo(cw * 0.5, chh * 0.32 - 10); ctx.lineTo(cw * 0.5, chh * 0.32 + 10);
+      ctx.stroke();
+    } else if (what === "shoulder") ART.DrawShoulder(ctx, cw * 0.55, chh * 0.46, 1.25, k, "prev" + k);
     ctx.fillStyle = "#2b1f16";
     ctx.font = "20px sans-serif";
     ctx.fillText(k, 12, 28);

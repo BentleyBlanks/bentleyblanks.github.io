@@ -650,7 +650,9 @@ export const SCRIPTS = {
         { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "shot", x: 33, y: 0.9, dist: 8, slit: true },
           on: (state) => {
             const father = FindActor(state, "father");
-            if (father) { father.x = 38; father.heading = 1; }
+            // cineTarget 必须清：上一段过场让他往院门走，走没走到都可能悬着。
+            // 不清的话这场戏他会一边"跪"一边往 47 滑——传送演员前先掐断走位
+            if (father) { father.x = 38; father.heading = 1; father.cineTarget = null; }
             const r1 = FindActor(state, "raid1");
             const r2 = FindActor(state, "raid2");
             if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
@@ -658,20 +660,29 @@ export const SCRIPTS = {
           } },
         { stage: "爹被两个兵按着跪在地上。他们问他八路把粮藏在哪。", d: 4.2, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
           on: (state) => {
+            // 跪不是一张定格：他在挣，兵在按。两条循环轨道错开半拍咬在一起
             const father = FindActor(state, "father");
-            if (father) { father.pose = "kneel"; father.heading = 1; }
+            if (father) { father.track = { name: "pressedStruggle", t: 0 }; father.heading = 1; }
             const r1 = FindActor(state, "raid1");
-            if (r1) { r1.x = 36.2; r1.heading = 1; }
+            // 手要按在肩上：0.55m，再远就是按空气
+            if (r1) { r1.x = 37.45; r1.heading = 1; r1.cineTarget = null; r1.track = { name: "pressHold", t: 0 }; }
             const r2 = FindActor(state, "raid2");
-            if (r2) { r2.x = 40; r2.heading = -1; }
+            if (r2) { r2.x = 39.3; r2.heading = -1; r2.cineTarget = null; }
+            // 娘被推跪在一边——不能让她站在画面正中看戏
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.x = 35.1; mother.heading = 1; mother.pose = "kneel"; }
           } },
-        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.0, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
+        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
           on: (state) => {
-            // 抡下去的那个人和挨了一下的那个人都得真做动作
+            // 抡的轨道在 0.95s 到达落点；挨砸的轨道用 -0.95 的起点等在那儿，
+            // 两个人在同一帧接上——这就是照参考视频 K 的那一下
             const r2 = FindActor(state, "raid2");
-            if (r2) r2.pose = "swing";
+            if (r2) r2.track = { name: "buttStrike", t: 0 };
             const father = FindActor(state, "father");
-            if (father) father.pose = "struck";
+            if (father) father.track = { name: "struckFall", t: -0.95 };
+            const r1 = FindActor(state, "raid1");
+            if (r1) r1.track = null;      // 按人的松开手，退半步
+            if (r1) { r1.cineTarget = { x: 36.4 }; r1.cineSpeed = 1.2; }
           } },
         { stage: "妹妹想哭。柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
@@ -708,7 +719,10 @@ export const SCRIPTS = {
         { stage: "柱子十六岁了，学会了爹的手艺，也学会了听见狗叫就先看村口。", d: 4.2, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 } },
         { stage: "这天夜里，狗叫得不一样。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 } },
         // 说到谁，谁就得在画面里：巡逻队在这一行进场，不是等过场演完
-        { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 4.2, cam: { kind: "wide", x: 130, pan: -8 },
+        // 队伍从村东口进来，镜头往西横移跟着走：一条村道上排开十几个人和几盏灯，
+        // "又来了"这三个字才有分量
+        { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 5.0,
+          cam: { kind: "wide", x: 154, y: 3.4, hw: 30, pan: -18 },
           on: (state) => { SpawnNightSweep(state); } },
         { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
           on: (state) => {
@@ -1586,14 +1600,42 @@ function SpawnRaidSoldiers(state) {
   state.stealthActive = true;
 }
 
+// 1943 年春的一次夜间"清剿"，来的是据点一个小队加上伪军：进村就分头堵路、
+// 挨家踹门，前后能拉开大半个村子。原先只放三个人，"鬼子又来了"这句话在画面上
+// 就落不到实处——一条村道上站着一个人，那不叫扫荡。
+//
+// 但真参与潜行判定的仍然只有 sweep1/2/3（十几个人一起看着，这段没法玩）。
+// 其余标 decor：他们组成队形、举着灯、在院门口翻找，只负责让这一夜看着像那一夜。
 function SpawnNightSweep(state) {
   state.actors = state.actors.filter((a) => !IsEnemy(a));
   state.actors.push(
     // 带路的翻译官挑着灯笼在前，两个兵在后
-    MakeActor("sweep1", "puppet", 74, { patrol: [70, 108], speed: 1.5, lantern: true }),
+    MakeActor("sweep1", "puppet", 74, { patrol: [70, 108], speed: 1.5, lantern: true, lanternKind: "lantern" }),
     MakeActor("sweep2", "soldier", 100, { patrol: [92, 138], speed: 1.4, lantern: true }),
     MakeActor("sweep3", "soldier", 150, { patrol: [144, 158], speed: 1.15, lantern: true }),
   );
+  // 进村的纵队：从村东口一路排下来，走走停停。间距故意不匀——
+  // 队列走进村子会散，散开的样子比整齐的样子更像真的
+  const column = [
+    { x: 180, kind: "soldier", speed: 1.05, lantern: true },
+    { x: 174, kind: "soldier", speed: 1.15 },
+    { x: 169, kind: "puppet", speed: 1.3 },
+    { x: 162, kind: "soldier", speed: 1.1 },
+    { x: 156, kind: "soldier", speed: 1.35, lantern: true },
+    { x: 147, kind: "puppet", speed: 0.9 },
+    { x: 140, kind: "soldier", speed: 1.2 },
+    { x: 132, kind: "soldier", speed: 1.4, lantern: true },
+    { x: 124, kind: "soldier", speed: 1.05 },
+    { x: 116, kind: "puppet", speed: 1.25 },
+    { x: 106, kind: "soldier", speed: 1.15 },
+    { x: 96, kind: "soldier", speed: 0.95, lantern: true },
+  ];
+  column.forEach((c, i) => {
+    state.actors.push(MakeActor(`col${i}`, c.kind, c.x, {
+      patrol: [c.x - 6.5, c.x + 6.5], speed: c.speed, heading: -1, decor: true,
+      lantern: !!c.lantern, lanternKind: c.kind === "puppet" ? "lantern" : "hurricane",
+    }));
+  });
   state.stealthActive = true;
   const mother = FindActor(state, "mother");
   if (mother) { mother.x = 40; mother.visible = true; }
@@ -1609,6 +1651,16 @@ function MotherDecoyDone(state) {
   if (s2) { s2.patrol = [56, 88]; s2.speed = 1.3; s2.cineTarget = { x: 86 }; s2.cineSpeed = 2.2; }
   const s3 = FindActor(state, "sweep3");
   if (s3) { s3.cineTarget = null; }
+  // 娘踢翻水瓮那一声之后，整队都朝村西压过去：村东这一线松开，柱子才走得了。
+  // 玩家往东走的一路上回头能看见——十几盏灯全挤在娘去的那个方向。
+  state.actors = state.actors.filter((a) => !a.decor || a.x < 150);
+  for (const a of state.actors) {
+    if (!a.decor) continue;
+    const nx = 56 + ((a.x * 7) % 24);
+    a.x = nx;
+    a.patrol = [nx - 5, nx + 5];
+    a.heading = -1;
+  }
 }
 
 function SpawnFortPatrols(state, reinforced) {
@@ -1805,7 +1857,8 @@ export function CreateGame(chapterIndex = 0) {
 // 一次性戏剧姿势用完就得收：不清的话，被架走的爹会一路架着走完全场
 function ClearPoses(state) {
   state.player.pose = null;
-  for (const a of state.actors) a.pose = null;
+  state.player.track = null;
+  for (const a of state.actors) { a.pose = null; a.track = null; }
 }
 
 export function StartChapter(state, index) {
@@ -1976,6 +2029,10 @@ export function ConfirmChapterCard(state) {
 // 过场走位与微过场
 // ---------------------------------------------------------------------------
 function StepCineActors(state, dt) {
+  // 关键帧轨道的时钟。t 允许从负数起步：负的那一段是"等待"，
+  // 用来把两个演员的轨道对齐到同一个落点（枪托砸到的那一帧）。
+  if (state.player.track) state.player.track.t += dt;
+  for (const a of state.actors) if (a.track) a.track.t += dt;
   for (const a of state.actors) {
     if (!a.cineTarget) continue;
     const d = Math.abs(a.x - a.cineTarget.x);
@@ -2272,7 +2329,8 @@ function StepDetection(state, def, dt) {
   const scene = SceneOf(state);
   let seen = false;
   for (const a of state.actors) {
-    if (!IsEnemy(a) || !a.visible) continue;
+    // decor 的兵只组队形、不看人：十几个人一起判视线，这段就没法玩了
+    if (!IsEnemy(a) || !a.visible || a.decor) continue;
     if (SoldierSeesPlayer(scene, a, state.player)) { seen = true; state.detection.spotter = a.id; break; }
   }
   if (seen) state.detection.level = Math.min(1, state.detection.level + dt * 0.9);
@@ -3034,4 +3092,155 @@ export function GetBeatTarget(state) {
     }
     default: return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 调试跳转：直接落到任意一章的任意一幕
+//
+// 前序各幕不真跑，只把它们「结算」掉：过场逐行触发 on()（人该进场就进场），
+// 走位一次落位，玩法段按 kind 补上它真正改过的那几个 flag。做不到与正常
+// 流程逐帧一致，但目标幕开场时该在的人、该建好的工事、该选过的分支都在。
+// ---------------------------------------------------------------------------
+function BeatLabel(def) {
+  if (def.objective) return def.objective;
+  if (def.kind === "cinematic") {
+    const first = (def.lines || []).find((l) => l.stage || l.say);
+    if (first) return first.stage || `${first.who || ""}：${first.say}`;
+    return "过场";
+  }
+  if (def.kind === "choice") return def.prompt || "抉择";
+  return def.prompt || def.id;
+}
+
+/** 某一章的分幕清单（调试面板用） */
+export function ChapterBeatList(chapterIndex) {
+  const ch = CHAPTERS[chapterIndex];
+  if (!ch) return [];
+  return (SCRIPTS[ch.id] || []).map((def, index) => ({
+    index, id: def.id, kind: def.kind, label: BeatLabel(def),
+  }));
+}
+
+// 这一幕结束时玩家应该站在哪儿。跳幕时不把他挪过去的话，下一幕会用上一幕的
+// 起点开场——最难看的一种是"目的地就在脚下"，escort 刚进就自动完成。
+function SettleDest(def) {
+  switch (def.kind) {
+    case "goto": case "hold": case "mapBoard": case "scribe": return def.zone;
+    case "escort": case "lead": case "smokeEscape": case "floodRescue": return def.dest;
+    case "leadFollow": return def.waypoints?.[def.waypoints.length - 1];
+    case "gotoSeq": case "observe": return def.spots?.[def.spots.length - 1];
+    case "buildSpots": return def.spots?.[def.spots.length - 1]?.zone;
+    case "digSeq": return def.spots?.[def.spots.length - 1];
+    case "actSeq": {
+      const s = def.steps?.[def.steps.length - 1];
+      return s ? { x: s.x, level: s.level } : null;
+    }
+    case "chain": {
+      // 链的落点是最后一步动手的地方
+      const s = def.steps?.[def.steps.length - 1];
+      if (!s) return null;
+      if (s.zone) return s.zone;
+      if (s.x !== undefined) return { x: s.x, level: s.level };
+      if (s.target) return { x: s.target.x, level: "surface" };
+      return null;
+    }
+    case "cartRide": return { x: def.to, level: "surface" };
+    default: return null;
+  }
+}
+
+function SettleBeat(state, def) {
+  const dest = SettleDest(def);
+  if (dest && dest.x !== undefined) {
+    state.player.x = dest.x;
+    if (dest.level) state.player.level = dest.level;
+  }
+  switch (def.kind) {
+    case "cinematic": {
+      const lines = state.beatLines || def.lines || [];
+      for (let i = Math.max(0, state.beat.lineIndex); i < lines.length; i += 1) lines[i].on?.(state);
+      // 让 cineTarget 一次走到位（大步长空转，而不是把人瞬移过去——
+      // cineVanish 这类到点才触发的效果还得照常发生）
+      for (let i = 0; i < 300; i += 1) StepCineActors(state, 0.25);
+      break;
+    }
+    case "buildSpots":
+      for (const s of def.spots) {
+        if (s.zone === TV.hiddenSpot) state.flags.hiddenBuilt = true;
+        if (s.zone === TV.trapSpot) state.flags.trapBuilt = true;
+      }
+      break;
+    case "choice":
+      state.flags.route = def.options?.[0]?.key || "tunnel";
+      state.beat.choiceMade = state.flags.route;
+      break;
+    case "observe":
+    case "gotoSeq":
+      for (const n of def.notes || []) if (n) state.flags.notesSeen.push(n);
+      break;
+    case "mapBoard":
+      state.flags.deduced = true;
+      break;
+    // 跳过一条链，就等于这条链上每一步都做过了：旗标要落、口信要入账
+    // （第六章的推理要用），手里那格清空——东西都已经用出去了。
+    case "chain":
+      for (const st of def.steps || []) {
+        if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);
+        st.effect?.(state);
+      }
+      state.player.item = null;
+      break;
+    case "cartRide":
+      state.cart = { x: def.to };
+      break;
+    default:
+      break;
+  }
+}
+
+/**
+ * 跳到 chapterIndex 章的 beatIndex 幕，直接进入 playing（不放章节卡）。
+ * 返回落地的 beat id。
+ */
+export function DebugJump(state, chapterIndex, beatIndex = 0) {
+  const ci = Math.max(0, Math.min(chapterIndex, CHAPTERS.length - 1));
+  // 先把前面各章整章结算一遍。情报、旗标、抉择是跨章累积的——第六章门板上
+  // 要对上的那两条，一条来自第三章问乡亲，一条来自第六章观察；只结算本章的话
+  // 跳过去永远凑不齐，"自己推出来"那一支在调试里根本走不到。
+  for (let c = 0; c < ci; c += 1) {
+    StartChapter(state, c);
+    state.phase = "playing";
+    const past = SCRIPTS[CHAPTERS[c].id];
+    let g = 0;
+    while (state.beatIndex < past.length && g < 400) {
+      g += 1;
+      const def = CurrentBeatDef(state);
+      if (!def) break;
+      SettleBeat(state, def);
+      AdvanceBeat(state);
+    }
+  }
+  StartChapter(state, ci);
+  state.phase = "playing";
+  const script = CurrentScript(state);
+  const target = Math.max(0, Math.min(beatIndex, script.length - 1));
+  let guard = 0;
+  while (state.beatIndex < target && guard < 400) {
+    guard += 1;
+    const def = CurrentBeatDef(state);
+    if (!def) break;
+    SettleBeat(state, def);
+    AdvanceBeat(state);
+  }
+  state.caption = null;
+  state.toast = null;
+  state.prompt = null;
+  state.promptFill = null;
+  state.scribe = null;
+  state.detection = { level: 0, spotter: null };
+  // 结算过程里可能留下没走完的走位指令与一次性姿势，别让它们接管玩家刚接手的这一幕
+  for (const a of state.actors) { a.cineTarget = null; a.cineSpeed = undefined; }
+  state.player.cineWalk = null;
+  ClearPoses(state);
+  return CurrentBeatDef(state)?.id || null;
 }

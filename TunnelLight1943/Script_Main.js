@@ -3,6 +3,7 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint,
+  ChapterBeatList, DebugJump,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
@@ -82,6 +83,7 @@ for (const id of [
   "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
+  "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -114,6 +116,7 @@ window.addEventListener("keydown", (e) => {
   if (k === "f") { throwEdge = true; advanceEdge = true; }   // F 专职投掷（手里有石子才有用）
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
+  if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
   if (k === "1" || k === "2") {
     const def = state && CurrentBeatDef(state);
     if (def?.kind === "choice") { MakeChoice(state, def.options[k === "1" ? 0 : 1].key); HideChoice(); }
@@ -472,6 +475,109 @@ function BuildTitle() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// 调试面板：跳到任意一章的任意一幕
+//
+// 白盒期最贵的成本是"为了看第五章的一个镜头，把前四章重打一遍"。这个面板把
+// 每一章拆成分幕清单，点哪一幕就落到哪一幕，前序按脚本结算（见 Core.DebugJump）。
+// 开关：左下角 DEBUG 按钮 / ` / F2。
+// ---------------------------------------------------------------------------
+let debugChapter = 0;
+
+function EscapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function BuildDebugChapters() {
+  if (!ui.debugChapters) return;
+  ui.debugChapters.innerHTML = "";
+  CHAPTERS.forEach((ch, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = `${i + 1} · ${ch.title}`;
+    btn.title = `${ch.num}　${ch.year}`;
+    btn.setAttribute("aria-selected", i === debugChapter ? "true" : "false");
+    btn.addEventListener("click", () => { debugChapter = i; BuildDebugChapters(); BuildDebugBeats(); });
+    ui.debugChapters.appendChild(btn);
+  });
+}
+
+function BuildDebugBeats() {
+  if (!ui.debugBeats) return;
+  const beats = ChapterBeatList(debugChapter);
+  const atChapter = state && state.chapterIndex === debugChapter;
+  ui.debugBeats.innerHTML = "";
+  beats.forEach((b) => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    if (atChapter && state.beatIndex === b.index) btn.classList.add("current");
+    btn.innerHTML = `<i>${String(b.index + 1).padStart(2, "0")}</i>`
+      + `<span><em>${EscapeHtml(b.label)}</em><small>${EscapeHtml(b.kind)} · ${EscapeHtml(b.id)}</small></span>`;
+    btn.addEventListener("click", () => JumpToBeat(debugChapter, b.index));
+    li.appendChild(btn);
+    ui.debugBeats.appendChild(li);
+  });
+}
+
+function SyncDebugNow() {
+  if (!ui.debugNow) return;
+  if (!state) { ui.debugNow.textContent = "未开局"; return; }
+  const def = CurrentBeatDef(state);
+  ui.debugNow.textContent = `${CHAPTERS[state.chapterIndex].num} · ${state.beatIndex + 1} · ${def?.id || state.phase}`;
+}
+
+function JumpToBeat(chapterIndex, beatIndex) {
+  if (!state) StartGame(chapterIndex);
+  DebugJump(state, chapterIndex, beatIndex);
+  ui.titleScreen.hidden = true;
+  ui.endScreen.hidden = true;
+  HideChoice();
+  Unlock(chapterIndex);
+  camSnap = true;
+  framing = { key: "", prog: 0, baseHw: 7.2 };
+  fadeLevel = 0;
+  irisLevel = 0;
+  irisClosing = false;
+  lastBeatKind = null;
+  crouchToggle = false;
+  interactEdge = false;
+  advanceEdge = false;
+  BuildDebugBeats();
+  SyncDebugNow();
+}
+
+// 面板开着的时候跟住实际进度：正常玩过一幕，清单上的高亮也跟着走
+let debugSyncKey = "";
+function SyncDebugPanel() {
+  if (!ui.debugPanel || ui.debugPanel.hidden || !state) return;
+  const key = `${state.chapterIndex}/${state.beatIndex}/${state.phase}`;
+  if (key === debugSyncKey) return;
+  debugSyncKey = key;
+  if (state.chapterIndex !== debugChapter) {
+    debugChapter = state.chapterIndex;
+    BuildDebugChapters();
+  }
+  BuildDebugBeats();
+  SyncDebugNow();
+}
+
+function ToggleDebug(force) {
+  if (!ui.debugPanel) return;
+  const open = force === undefined ? ui.debugPanel.hidden : force;
+  ui.debugPanel.hidden = !open;
+  document.body.classList.toggle("debugOpen", open);
+  if (open) {
+    debugChapter = state ? state.chapterIndex : 0;
+    BuildDebugChapters();
+    BuildDebugBeats();
+    SyncDebugNow();
+  }
+}
+
+ui.btnDebug?.addEventListener("click", () => ToggleDebug(true));
+ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
+
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);
   ui.titleScreen.hidden = true;
@@ -592,6 +698,7 @@ function Frame(now) {
     StepIris(state, dt);
     SyncHud(state, dt, shotFade);
     soundtrack.Step(state, dt);
+    SyncDebugPanel();
   }
   world.Render();
   interactEdge = false;
@@ -612,7 +719,13 @@ Resize();
 BuildTitle();
 
 const chapterParam = parseInt(params.get("chapter") || "0", 10);
-if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) StartGame(chapterParam - 1);
+const beatParam = parseInt(params.get("beat") || "0", 10);
+if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
+  StartGame(chapterParam - 1);
+  // ?beat=N 直接落到第 N 幕（1 起算），配合调试面板用
+  if (beatParam >= 1) JumpToBeat(chapterParam - 1, beatParam - 1);
+}
+if (params.get("debug") === "1") ToggleDebug(true);
 
 requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(Frame); });
 
@@ -623,6 +736,8 @@ window.TunnelLight = {
   get state() { return state; },
   StartGame,
   JumpToChapter: (i) => StartGame(i),
+  JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
+  ToggleDebug: (v) => ToggleDebug(v),
   StepFrames: (n, input = {}) => {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {

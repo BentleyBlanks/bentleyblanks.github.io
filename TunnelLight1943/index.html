@@ -92,6 +92,18 @@
 
   <div id="rotateHint" hidden><span>请把手机横过来</span></div>
 
+  <button id="btnDebug" type="button" title="调试面板（` 或 F2）">DEBUG</button>
+  <section id="debugPanel" hidden aria-label="调试面板">
+    <header>
+      <b>调试 · 跳到第 N 幕</b>
+      <span id="debugNow"></span>
+      <button id="debugClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <nav id="debugChapters"></nav>
+    <ol id="debugBeats"></ol>
+    <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
+  </section>
+
   <section id="titleScreen">
     <div class="titleInner">
       <p class="eyebrow">WHITEBOX PROTOTYPE · 1942–1943 华北敌后</p>
