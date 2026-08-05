@@ -219,13 +219,17 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 /* 投掷键只在手里真有能扔的东西时冒出来——平时右手就两个键 */
 #touchControls #btnThrow { font-size: 19px; letter-spacing: 0.05em; }
 #touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
-#touchControls button img {
-  width: 62%; height: 62%; object-fit: contain; pointer-events: none;
-  filter: brightness(1.5) saturate(0.7) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+/* 操作键图标与右上角设置钮同一套线描：stroke 走 currentColor，
+   按下时随按钮的 color 一起翻成墨色，不用再滤镜换色 */
+#touchControls button svg {
+  width: 58%; height: 58%;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
 }
-#touchControls #btnAct img { width: 58%; height: 58%; }
-#touchControls button img.flipX { transform: scaleX(-1); }
-#touchControls button.pressed img { filter: brightness(0.35) drop-shadow(none); }
+#touchControls button svg circle { fill: currentColor; stroke: none; }
+#touchControls #btnCrouch svg circle { fill: none; stroke: currentColor; }
 
 /* 竖屏提示 */
 #rotateHint {
