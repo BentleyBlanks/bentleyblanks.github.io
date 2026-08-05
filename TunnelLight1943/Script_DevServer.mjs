@@ -43,13 +43,33 @@ export function ServeRoot(rootDir, port = 0) {
     if (route.endsWith("/")) route += "index.html";
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
-    fs.readFile(filePath, (error, data) => {
-      if (error) { response.writeHead(404).end(); return; }
-      response.writeHead(200, {
+    fs.stat(filePath, (error, stat) => {
+      if (error || !stat.isFile()) { response.writeHead(404).end(); return; }
+      const headers = {
         "Content-Type": MIME[path.extname(filePath).toLowerCase()] ?? "application/octet-stream",
         "Cache-Control": "no-store",
-      });
-      response.end(data);
+        "Accept-Ranges": "bytes",
+      };
+      const range = request.headers.range;
+      if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (!match) { response.writeHead(416, { ...headers, "Content-Range": `bytes */${stat.size}` }).end(); return; }
+        const start = match[1] ? Number(match[1]) : Math.max(0, stat.size - Number(match[2] || 0));
+        const end = match[2] && match[1] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1;
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= stat.size) {
+          response.writeHead(416, { ...headers, "Content-Range": `bytes */${stat.size}` }).end();
+          return;
+        }
+        response.writeHead(206, {
+          ...headers,
+          "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+          "Content-Length": end - start + 1,
+        });
+        fs.createReadStream(filePath, { start, end }).pipe(response);
+        return;
+      }
+      response.writeHead(200, { ...headers, "Content-Length": stat.size });
+      fs.createReadStream(filePath).pipe(response);
     });
   });
   return new Promise((resolve) => server.listen(port, "127.0.0.1", () => resolve(server)));

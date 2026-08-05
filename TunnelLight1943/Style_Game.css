@@ -478,6 +478,14 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   color: #c8b894;
 }
 #settingsPanel output { color: #9d8a63; }
+#settingsPanel .bgmCredit {
+  margin: 8px 0 2px;
+  color: #8f846d;
+  font-size: 10px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+}
+#settingsPanel .bgmCredit a { color: #bda574; text-underline-offset: 2px; }
 /* 滑块自己画：默认样式在触屏上滑钮太小，拇指按不准；
    touch-action:none 是关键——否则拖动被浏览器当成页面滚动手势吃掉。 */
 #settingsPanel input[type="range"] {

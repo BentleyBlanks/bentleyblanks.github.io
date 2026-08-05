@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "policy": {
+    "instrumentalOnly": true,
+    "allowSinging": false,
+    "allowVocalTextures": false,
+    "notes": "正式项目只使用纯器乐；演唱、吟唱、合唱和人声氛围音色均淘汰。"
+  },
+  "master": {
+    "format": "MP3",
+    "bitrateKbps": 320,
+    "targetIntegratedLoudnessLufs": -20,
+    "targetTruePeakDbtp": -2.5
+  },
+  "tracks": [
+    {
+      "chapter": 1,
+      "id": "withTheseHands",
+      "title": "With These Hands",
+      "file": "AudioBgm_WithTheseHands.mp3",
+      "cue": 42,
+      "gain": 0.82,
+      "hasVocals": false,
+      "source": "https://www.scottbuckley.com.au/library/with-these-hands/",
+      "credit": "'With These Hands' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au"
+    },
+    {
+      "chapter": 2,
+      "id": "nightFalls",
+      "title": "暮色压下来",
+      "file": "AudioBgm_NightFalls.mp3",
+      "cue": 18,
+      "gain": 0.72,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 3,
+      "id": "secretRendezvous",
+      "title": "高粱地接头",
+      "file": "AudioBgm_SecretRendezvous.mp3",
+      "cue": 12,
+      "gain": 0.68,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 4,
+      "id": "tunnelExploration",
+      "title": "土壁深处",
+      "file": "AudioBgm_TunnelExploration.mp3",
+      "cue": 18,
+      "gain": 0.7,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 5,
+      "id": "diggingTogether",
+      "title": "一锹一锹",
+      "file": "AudioBgm_DiggingTogether.mp3",
+      "cue": 18,
+      "gain": 0.76,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 6,
+      "id": "enemyAssessment",
+      "title": "门板上的岗哨",
+      "file": "AudioBgm_EnemyAssessment.mp3",
+      "cue": 12,
+      "gain": 0.67,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 7,
+      "id": "rescueRelay",
+      "title": "旁洞还有人",
+      "file": "AudioBgm_RescueRelay.mp3",
+      "cue": 20,
+      "gain": 0.75,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    },
+    {
+      "chapter": 8,
+      "id": "ruinsAtDawn",
+      "title": "残墙见光",
+      "file": "AudioBgm_RuinsAtDawn.mp3",
+      "cue": 24,
+      "gain": 0.72,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "id": "whatWeDontSay",
+      "title": "What We Don't Say",
+      "reason": "含人声音色，不符合纯器乐政策。"
+    }
+  ]
+}

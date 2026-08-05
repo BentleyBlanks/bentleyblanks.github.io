@@ -61,7 +61,8 @@ const LAYER_KEYS = ["drone", "pluck", "lead", "pad", "pulse"];
 function MakeSilent() {
   return {
     Unlock() {}, SetEnabled() {}, IsEnabled() { return false; },
-    SetMasterVolume() {}, SetMood() {}, Sfx() {}, Duck() {},
+    SetMasterVolume() {}, SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
+    SetMood() {}, SetBgm() {}, StopBgm() {}, GetBgmState() { return null; }, Sfx() {}, Duck() {},
     PlayVoice() { return Promise.resolve(false); }, StopVoice() {},
     Update() {}, Dispose() {},
   };
@@ -152,6 +153,12 @@ function Build(ac, options) {
   const musicBus = ac.createGain();
   musicBus.gain.value = 0.55;
   musicBus.connect(musicFilter);
+
+  // 程序化配乐保留为录音 BGM 加载失败时的降级层。正式母带开始播放后把它淡出，
+  // 避免两套旋律叠在一起；环境声和音效仍走各自总线，不受影响。
+  const synthBus = ac.createGain();
+  synthBus.gain.value = 1;
+  synthBus.connect(musicBus);
 
   const ambBus = ac.createGain();
   ambBus.gain.value = 0.9;
@@ -345,7 +352,7 @@ function Build(ac, options) {
   for (const k of LAYER_KEYS) {
     const g = ac.createGain();
     g.gain.value = 0;
-    g.connect(musicBus);
+    g.connect(synthBus);
     layers[k] = { node: g, from: 0, goal: 0, t0: 0 };
   }
 
@@ -1055,6 +1062,108 @@ function Build(ac, options) {
     voiceFinish = null;
   }
 
+  // 章节录音 BGM：双播放器交叉淡化，MediaElementSource 接入 musicBus，因而自动继承
+  // 配乐滑块、旁白 ducking、侦测低通与总线限幅。曲尾回到 cue，而不是回到片头静音。
+  const bgmSlots = [];
+  let activeBgm = null;
+  let requestedBgm = null;
+  let bgmSerial = 0;
+
+  function RampParam(param, value, seconds = 1.4) {
+    const now = ac.currentTime;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(value, now + seconds);
+  }
+
+  function PauseBgmSlot(slot, clearSource = false) {
+    if (!slot) return;
+    try { slot.el.pause(); } catch (ignored) { /* 已停 */ }
+    if (clearSource) {
+      try { slot.el.removeAttribute("src"); slot.el.load(); } catch (ignored) { /* 已清 */ }
+      slot.id = "";
+    }
+  }
+
+  function MakeBgmSlot() {
+    if (typeof Audio === "undefined" || typeof ac.createMediaElementSource !== "function") return null;
+    try {
+      const el = new Audio();
+      el.preload = "auto";
+      const node = ac.createMediaElementSource(el);
+      const gain = ac.createGain();
+      gain.gain.value = 0;
+      node.connect(gain);
+      gain.connect(musicBus);
+      const slot = { el, node, gain, id: "", cue: 0, targetGain: 0, serial: 0, pauseTimer: null };
+      el.addEventListener("ended", () => {
+        if (disposed || slot !== activeBgm || !requestedBgm || slot.id !== requestedBgm.id) return;
+        try {
+          el.currentTime = slot.cue;
+          if (enabled) {
+            const p = el.play();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (ignored) { /* 浏览器稍后会再尝试 */ }
+      });
+      bgmSlots.push(slot);
+      return slot;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function FadeToSynth() {
+    RampParam(synthBus.gain, 1, 1.1);
+  }
+
+  function ActivateBgm(slot, serial) {
+    if (disposed || serial !== bgmSerial || !requestedBgm || slot.id !== requestedBgm.id) return;
+    const old = activeBgm;
+    activeBgm = slot;
+    RampParam(slot.gain.gain, slot.targetGain, 1.5);
+    RampParam(synthBus.gain, 0, 1.5);
+    if (old && old !== slot) {
+      RampParam(old.gain.gain, 0, 1.5);
+      if (old.pauseTimer !== null) clearTimeout(old.pauseTimer);
+      old.pauseTimer = setTimeout(() => {
+        old.pauseTimer = null;
+        if (old !== activeBgm) PauseBgmSlot(old, true);
+      }, 1650);
+    }
+  }
+
+  function TryPlayBgm(slot, serial) {
+    if (disposed || !enabled || serial !== bgmSerial || !requestedBgm || slot.id !== requestedBgm.id) return;
+    try {
+      if (Number.isFinite(slot.el.duration) && slot.el.duration > 0
+        && (!Number.isFinite(slot.el.currentTime) || slot.el.currentTime < slot.cue - 0.25)) {
+        slot.el.currentTime = Math.min(slot.cue, Math.max(0, slot.el.duration - 0.25));
+      }
+      const p = slot.el.play();
+      if (p && typeof p.then === "function") p.then(() => ActivateBgm(slot, serial)).catch(() => {});
+      else ActivateBgm(slot, serial);
+    } catch (ignored) { /* 下一次用户手势会重试 */ }
+  }
+
+  function ResumeBgm() {
+    if (!enabled || !requestedBgm) return;
+    const slot = bgmSlots.find((item) => item.id === requestedBgm.id);
+    if (slot) TryPlayBgm(slot, slot.serial);
+  }
+
+  function ClearBgm() {
+    bgmSerial += 1;
+    requestedBgm = null;
+    activeBgm = null;
+    for (const slot of bgmSlots) {
+      if (slot.pauseTimer !== null) { clearTimeout(slot.pauseTimer); slot.pauseTimer = null; }
+      RampParam(slot.gain.gain, 0, 0.7);
+      PauseBgmSlot(slot, true);
+    }
+    FadeToSynth();
+  }
+
   ApplyMood();
   BuildDrone();
   BuildPad();
@@ -1077,6 +1186,7 @@ function Build(ac, options) {
       if (ambNext <= 0) ambNext = ac.currentTime + Rand(1.5, 4);
       StartTimer();
       Tick();
+      ResumeBgm();
     },
 
     SetEnabled(on) {
@@ -1086,7 +1196,8 @@ function Build(ac, options) {
       enabled = next;
       ApplyPower();
       ApplyVolume();
-      if (enabled) { nextNote = ac.currentTime + 0.15; StartTimer(); Tick(); }
+      if (enabled) { nextNote = ac.currentTime + 0.15; StartTimer(); Tick(); ResumeBgm(); }
+      else for (const slot of bgmSlots) PauseBgmSlot(slot);
     },
 
     IsEnabled() { return enabled && !disposed; },
@@ -1105,6 +1216,59 @@ function Build(ac, options) {
       if (disposed || !Has(MOODS, next) || next === mood) return;
       mood = next;
       ApplyMood();
+    },
+
+    SetBgm(next) {
+      if (disposed || offline || !next || !next.id || !next.url || next.hasVocals !== false) return;
+      if (requestedBgm?.id === next.id) return;
+      requestedBgm = {
+        id: String(next.id), url: String(next.url),
+        cue: Math.max(0, Number(next.cue) || 0),
+        gain: Clamp(Number.isFinite(next.gain) ? next.gain : 0.72, 0, 1),
+      };
+      const serial = ++bgmSerial;
+      let slot = bgmSlots.find((item) => item !== activeBgm) || MakeBgmSlot();
+      if (!slot) { FadeToSynth(); return; }
+      PauseBgmSlot(slot, true);
+      slot.id = requestedBgm.id;
+      slot.cue = requestedBgm.cue;
+      slot.targetGain = requestedBgm.gain;
+      slot.serial = serial;
+      slot.gain.gain.value = 0;
+      const fail = () => {
+        if (serial !== bgmSerial || slot.id !== requestedBgm?.id) return;
+        if (activeBgm && activeBgm !== slot) {
+          RampParam(activeBgm.gain.gain, 0, 0.8);
+          PauseBgmSlot(activeBgm);
+          activeBgm = null;
+        }
+        FadeToSynth();
+      };
+      slot.el.addEventListener("error", fail, { once: true });
+      slot.el.addEventListener("loadedmetadata", () => {
+        if (serial !== bgmSerial || slot.id !== requestedBgm?.id) return;
+        try { slot.el.currentTime = Math.min(slot.cue, Math.max(0, slot.el.duration - 0.25)); } catch (ignored) { /* 等 canplay */ }
+        TryPlayBgm(slot, serial);
+      }, { once: true });
+      try { slot.el.src = requestedBgm.url; slot.el.load(); } catch (error) { fail(); }
+    },
+
+    StopBgm() {
+      if (disposed) return;
+      ClearBgm();
+    },
+
+    // 只读诊断口，供浏览器冒烟测试确认真正起播、cue 与静音状态；不暴露控制能力。
+    GetBgmState() {
+      return {
+        requested: requestedBgm?.id || null,
+        active: activeBgm?.id || null,
+        paused: activeBgm ? activeBgm.el.paused : true,
+        currentTime: activeBgm ? activeBgm.el.currentTime : 0,
+        cue: activeBgm ? activeBgm.cue : 0,
+        synthGain: synthBus.gain.value,
+        musicLevel: busLevel.music,
+      };
     },
 
     Sfx(name, opts = {}) {
@@ -1245,10 +1409,11 @@ function Build(ac, options) {
 
     Dispose() {
       if (disposed) return;
-      disposed = true;
       if (timer !== null) { clearInterval(timer); timer = null; }
       if (parkTimer !== null) { clearTimeout(parkTimer); parkTimer = null; }
       api.StopVoice();
+      ClearBgm();
+      disposed = true;
       for (let i = live.length - 1; i >= 0; i -= 1) Reap(live[i]);
       live.length = 0;
       for (const n of resident) {
@@ -1257,7 +1422,11 @@ function Build(ac, options) {
       }
       resident.length = 0;
       for (const k of LAYER_KEYS) { try { layers[k].node.disconnect(); } catch (ignored) { /* 已断 */ } }
-      for (const n of [musicBus, musicFilter, musicWet, sfxWet, ambWet, ambBus, ambSurface, ambUnder,
+      for (const slot of bgmSlots) {
+        try { slot.node.disconnect(); } catch (ignored) { /* 已断 */ }
+        try { slot.gain.disconnect(); } catch (ignored) { /* 已断 */ }
+      }
+      for (const n of [synthBus, musicBus, musicFilter, musicWet, sfxWet, ambWet, ambBus, ambSurface, ambUnder,
         ambEvent, sfxBus, voiceBus, duck, master, rumbleCut, limiter]) {
         try { if (n) n.disconnect(); } catch (ignored) { /* 已断 */ }
       }

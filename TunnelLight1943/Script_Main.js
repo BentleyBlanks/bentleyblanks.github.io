@@ -15,7 +15,7 @@ const world = CreateWorld(canvas);
 const SILENT = {
   Unlock() {}, SetEnabled() {}, IsEnabled: () => false, SetMasterVolume() {},
   SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
-  SetMood() {}, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
+  SetMood() {}, SetBgm() {}, StopBgm() {}, GetBgmState: () => null, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
   PlayVoice: () => Promise.resolve(),
 };
 let audio = SILENT;
@@ -25,6 +25,8 @@ const soundtrack = CreateSoundtrack({
   SetEnabled: (...a) => audio.SetEnabled(...a),
   IsEnabled: () => audio.IsEnabled(),
   SetMood: (...a) => audio.SetMood(...a),
+  SetBgm: (...a) => audio.SetBgm(...a),
+  StopBgm: () => audio.StopBgm(),
   SetMusicVolume: (...a) => audio.SetMusicVolume(...a),
   SetSfxVolume: (...a) => audio.SetSfxVolume(...a),
   SetVoiceVolume: (...a) => audio.SetVoiceVolume(...a),
@@ -791,6 +793,7 @@ ui.btnSkipCine?.addEventListener("click", () => {
 
 ui.startButton.addEventListener("click", () => StartGame(0));
 ui.endRestart.addEventListener("click", () => {
+  soundtrack.StopBgm();
   ui.endScreen.hidden = true;
   ui.titleScreen.hidden = false;
   state = null;
@@ -890,6 +893,7 @@ window.TunnelLight = {
   },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
+  GetBgmState: () => audio.GetBgmState(),
   StepFrames: (n, input = {}) => {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {

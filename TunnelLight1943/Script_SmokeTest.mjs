@@ -4,10 +4,14 @@
 // 运行：node TunnelLight1943/Script_SmokeTest.mjs
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump,
 } from "./Script_Core.mjs";
+import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 
 const DT = 1 / 30;
 
@@ -278,6 +282,36 @@ function TestStealthEscapable() {
   }
 }
 
+function TestInstrumentalBgmManifest() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  assert.equal(manifest.policy.instrumentalOnly, true, "正式 BGM 必须启用纯器乐政策");
+  assert.equal(manifest.policy.allowSinging, false, "不得允许演唱");
+  assert.equal(manifest.policy.allowVocalTextures, false, "不得允许人声氛围音色");
+  assert.equal(manifest.tracks.length, CHAPTERS.length, "八章应各有一首 BGM");
+  assert.equal(CHAPTER_BGM.length, CHAPTERS.length, "代码映射应覆盖八章");
+  for (let i = 0; i < manifest.tracks.length; i += 1) {
+    const item = manifest.tracks[i];
+    const code = CHAPTER_BGM[i];
+    assert.equal(item.chapter, i + 1, `BGM 清单第 ${i + 1} 项章节号错误`);
+    assert.equal(item.hasVocals, false, `${item.id} 不得带人声`);
+    assert.equal(code.hasVocals, false, `${code.id} 代码配置不得带人声`);
+    assert.equal(code.id, item.id, `第 ${i + 1} 章曲目 ID 不一致`);
+    assert.equal(code.cue, item.cue, `${item.id} cue 不一致`);
+    assert.equal(code.gain, item.gain, `${item.id} gain 不一致`);
+    assert.equal(path.basename(code.file), item.file, `${item.id} 文件名不一致`);
+    const audioPath = path.join(here, "Audio", "Bgm", item.file);
+    assert.ok(fs.existsSync(audioPath), `${item.file} 必须存在`);
+    assert.ok(fs.statSync(audioPath).size > 100000, `${item.file} 不应是空壳文件`);
+  }
+  assert.ok(manifest.rejectedCandidates.some((item) => item.id === "whatWeDontSay"),
+    "含人声的 What We Don't Say 必须留在淘汰记录中");
+  assert.ok(!manifest.tracks.some((item) => item.id === "whatWeDontSay"),
+    "含人声曲目不得进入正式清单");
+  console.log("  ✓ 八章纯器乐 BGM 清单 / 文件 / 淘汰规则");
+}
+
 // ---------------------------------------------------------------------------
 console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
@@ -288,6 +322,7 @@ TestClimb();
 TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
+TestInstrumentalBgmManifest();
 
 console.log("— 全流程自动通关（第六章走『地下进人』）—");
 {

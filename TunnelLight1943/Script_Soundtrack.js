@@ -7,6 +7,7 @@
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
+import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。
@@ -60,6 +61,11 @@ export function CreateSoundtrack(audio) {
 
   function Step(state, dt) {
     if (!state) return;
+
+    // 每帧幂等同步，保证异步到位的 Audio 模块也能拿到当前章节，而不漏掉开局首帧。
+    const bgm = CHAPTER_BGM[state.chapterIndex];
+    if (bgm) audio.SetBgm({ ...bgm, url: new URL(bgm.file, import.meta.url).href });
+    else audio.StopBgm();
 
     // —— 配乐情绪：按章定底色，抓捕/淹水这类段落临时压过去
     const chapterMood = CHAPTER_MOOD[state.chapterIndex] || "calm";
@@ -137,6 +143,7 @@ export function CreateSoundtrack(audio) {
     SyncDurations,
     // 剧情里的一次性响动由 Main 直接点名
     Sfx: (name, opts) => audio.Sfx(name, opts),
+    StopBgm: () => audio.StopBgm(),
     HasVoice: () => ready,
   };
 }
