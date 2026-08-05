@@ -22,6 +22,24 @@ const MIME = {
 export function ServeRoot(rootDir, port = 0) {
   const server = http.createServer((request, response) => {
     let route = decodeURIComponent(request.url.split("?")[0]);
+    // 只在本机开发时用的截图回写口：页面把 canvas 抓帧 POST 过来落成文件，
+    // 审查工具再去读——比把几十 KB 的 base64 在别处倒手干净得多。
+    // 只允许写进 _shots/ 目录，文件名只收 [A-Za-z0-9_-]。
+    if (request.method === "POST" && route === "/__shot") {
+      const name = (new URLSearchParams(request.url.split("?")[1] || "").get("name") || "shot")
+        .replace(/[^A-Za-z0-9_-]/g, "");
+      const chunks = [];
+      request.on("data", (c) => chunks.push(c));
+      request.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        const b64 = body.replace(/^data:image\/\w+;base64,/, "");
+        const dir = path.join(rootDir, "TunnelLight1943", "_shots");
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, name + ".jpg"), Buffer.from(b64, "base64"));
+        response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      });
+      return;
+    }
     if (route.endsWith("/")) route += "index.html";
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }

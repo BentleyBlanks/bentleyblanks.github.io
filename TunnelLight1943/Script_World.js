@@ -2067,8 +2067,8 @@ export function CreateWorld(canvasEl) {
         const c = MakeCanvas(160, 40);
         const cctx = c.getContext("2d");
         const gh = cctx.createLinearGradient(0, 0, 160, 0);
-        gh.addColorStop(0, "rgba(255,224,150,0.85)");
-        gh.addColorStop(0.55, "rgba(255,224,150,0.4)");
+        gh.addColorStop(0, "rgba(255,224,150,1)");
+        gh.addColorStop(0.5, "rgba(255,224,150,0.55)");
         gh.addColorStop(1, "rgba(255,224,150,0)");
         cctx.fillStyle = gh;
         cctx.fillRect(0, 0, 160, 40);
@@ -2084,14 +2084,19 @@ export function CreateWorld(canvasEl) {
         coneTex.minFilter = THREE.LinearFilter;
       }
       while (coneMeshes.length < enemies.length) {
+        // 贴地矮光带：竖片但只有 0.6m 高、下沿贴着地面、上沿在贴图里柔掉。
+        // 平视机位下躺平的光池会投影成几像素的细缝（和影子一样），根本读不出；
+        // 而 1.2m 的光墙又会把整条夜街的地面观感改掉——0.6m 是两头都留住的高度。
         const m = new THREE.Mesh(
-          new THREE.PlaneGeometry(1, 1),
+          new THREE.PlaneGeometry(1, 0.6),
           new THREE.MeshBasicMaterial({
-            map: coneTex, transparent: true, opacity: 0.15,
+            map: coneTex, transparent: true, opacity: 0.2,
             blending: THREE.AdditiveBlending, depthWrite: false,
+            // 朝西的光带靠负缩放翻贴图，绕序跟着翻——单面材质会把它整个剔除，
+            // 于是"面朝西的兵没有视线光"这种只在一半情况出现的隐形 bug
+            side: THREE.DoubleSide,
           }),
         );
-        m.rotation.x = -Math.PI / 2;   // 躺平在地面上
         FixOrder(m, LAYER_ORDER.fx + 206);
         layers.fx.add(m);
         coneMeshes.push(m);
@@ -2102,11 +2107,13 @@ export function CreateWorld(canvasEl) {
         const range = VISION_RANGE * VisionScale(state);
         const dir = (a.heading || 1) >= 0 ? 1 : -1;
         m.visible = true;
-        // 躺平后：几何 x → 世界 x（负值翻贴图朝向），几何 y → 世界 z（进深 2.6m）
-        m.scale.set(dir * range, 2.6, 1);
+        m.scale.set(dir * range, 1, 1);
         m.position.set(a.x + dir * range / 2,
-          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.04, 0.2);
-        m.material.opacity = 0.14 + Math.sin(time * 2.6 + i * 1.9) * 0.025;
+          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.28, 0.2);
+        // 夜里灯就是主角，光带要一眼读得出——白天淡一点（是"视线"不是灯）
+        const night2 = CHAPTERS[state.chapterIndex].light === "night" || CHAPTERS[state.chapterIndex].light === "dark";
+        const base = night2 ? 0.38 : 0.14;
+        m.material.opacity = base + Math.sin(time * 2.6 + i * 1.9) * 0.04;
       });
     }
 

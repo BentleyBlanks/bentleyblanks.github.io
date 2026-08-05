@@ -28,3 +28,4 @@ tmp/
 # TunnelBell1942 调试临时文件（agent 跑 trace 用，不进仓库）
 TunnelBell1942/*_tmp.mjs
 Screens_TunnelBell/
+TunnelLight1943/_shots/

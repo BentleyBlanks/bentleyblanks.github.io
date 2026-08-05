@@ -63,7 +63,9 @@ export const SCENES = {
       { id: "hangLantern", kind: "hangLantern", x: 160, name: "巷口的马灯" },
     ],
     covers: [
-      { id: "firewood", kind: "firewood", x: 30, w: 2.2 },
+      // 柴堆在院门边：屋子做成可进入的室内之后，柴堆搁在屋里不成话；
+      // 挪到院门口，第一章"把刨子塞进柴堆"这场戏也才有处可塞
+      { id: "firewood", kind: "firewood", x: 44.5, w: 2.2 },
       { id: "hayA", kind: "haystack", x: 52, w: 3.2 },
       { id: "hayB", kind: "haystack", x: 68, w: 3.2 },
       { id: "hayC", kind: "haystack", x: 88, w: 3.2 },
@@ -704,10 +706,18 @@ export const SCRIPTS = {
           } },
         { stage: "爹把刨子塞进柴堆，转身走向院门。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 },
           on: (state) => {
+            // 塞柴堆得手里先有刨子：从工作台上抄起来，走向院门边的柴堆
             const father = FindActor(state, "father");
-            if (father) { father.cineTarget = { x: 47 }; father.cineSpeed = 1.5; }
+            if (father) { father.carry = "刨子"; father.cineTarget = { x: 44.5 }; father.cineSpeed = 2.6; }
           } },
-        { who: "爹", say: "带妹妹进地窖。别出声。", d: 3.0, cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 } },
+        { who: "爹", say: "带妹妹进地窖。别出声。", d: 3.0, cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 },
+          on: (state) => {
+            // 刨子塞进了柴堆（手空了）；他站定回头叮嘱，柱子跑近两步——
+            // 隔着半个院子打正反打，画面里根本凑不齐两个人
+            const father = FindActor(state, "father");
+            if (father) { father.carry = null; father.cineTarget = null; }
+            if (father) state.player.cineWalk = { x: father.x - 2.2, speed: 2.6 };
+          } },
       ],
       onDone: (state) => {
         // 兵在第一行就已经进场了，这里只把巡逻交还给常规逻辑
@@ -774,9 +784,15 @@ export const SCRIPTS = {
         { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 42, y: 1.2, dist: 11, pan: 1.5 },
           on: (state) => {
             const father = FindActor(state, "father");
-            if (father) { father.pose = "hauled"; father.heading = -1; }   // 脸还朝着门框那边
+            // 脸还朝着门框那边：cineKeepHeading 不让行走方向把头扳回去
+            if (father) { father.pose = "hauled"; father.heading = -1; father.cineKeepHeading = true; }
             const r2 = FindActor(state, "raid2");
             if (r2) r2.pose = null;
+            // "架着走"得真的架着：两个兵一左一右贴在肩上，同速同向，
+            // 全程钳成一个三人组。原先三个人隔着几米各走各的，谁也没在拖谁
+            const r1 = FindActor(state, "raid1");
+            if (father && r1) { r1.x = father.x - 0.72; }
+            if (father && r2) { r2.x = father.x + 0.72; }
             for (const id of ["father", "raid1", "raid2"]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
@@ -815,9 +831,13 @@ export const SCRIPTS = {
       lines: [
         { stage: "娘把两个孩子拉到草垛后头，按着蹲下。", d: 3.2, cam: { kind: "shot", x: 52, y: 1.3, dist: 7 },
           on: (state) => {
+            // 上一镜在据点方向（x≈120），这一镜硬切回草垛——切镜时把人预摆到
+            // 画框边上再走进来。原先从 38 起步走 14 米，三秒根本到不了，
+            // 于是"拉到草垛后头"的柱子一直站在画框外
             const mother = FindActor(state, "mother");
-            if (mother) { mother.cineTarget = { x: 50.5 }; mother.cineSpeed = 2.4; }
-            state.player.cineWalk = { x: 52.5, speed: 2.6 };
+            if (mother) { mother.x = 46; mother.cineTarget = { x: 50.5 }; mother.cineSpeed = 2.2; }
+            state.player.x = 47;
+            state.player.cineWalk = { x: 52.5, speed: 2.4 };
             const sister = FindActor(state, "sister");
             if (sister) { sister.x = 53.5; sister.heading = -1; }
           } },
@@ -827,6 +847,9 @@ export const SCRIPTS = {
             state.player.crouch = true;
             const sister = FindActor(state, "sister");
             if (sister) sister.pose = "leanIn";
+            // 按着孩子蹲下的娘不能自己站得笔直：弯腰压着两个孩子，贴在跟前
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.pose = "bow"; mother.cineTarget = null; mother.x = 51.4; mother.heading = 1; }
             // 开场过场把这个兵留在了 x≈124（挑灯带路那一镜）——不先把他挪到
             // 画框右沿外一步，"巡了过来"就是一句空话：灯根本进不了画面。
             // 说到谁，谁就得在画面里。走得慢：教学不赶时间，灯压过来的
@@ -869,10 +892,21 @@ export const SCRIPTS = {
       lines: [
         { stage: "前面巷口站着人。走不过去了。", d: 3.0, cam: { kind: "shot", x: 136, y: 1.4, dist: 9 },
           on: (state) => {
+            // 巷口那个人得真站在巷口：他此刻可能巡到 150 开外，三秒走不进画。
+            // 切镜时把他放到画框右沿内，一步步逼近堵死路口
             const s3 = FindActor(state, "sweep3");
-            if (s3) { s3.cineTarget = { x: 138 }; s3.cineSpeed = 1.4; }
+            if (s3) { s3.x = 143; s3.heading = -1; s3.cineTarget = { x: 138 }; s3.cineSpeed = 1.6; }
           } },
-        { stage: "娘把妹妹的手放进柱子手里，又把两个孩子往磨盘后面按了按。", d: 4.4, cam: { kind: "insert", x: 118, y: 1.0, dist: 2.8 } },
+        { stage: "娘把妹妹的手放进柱子手里，又把两个孩子往石碾后面按了按。", d: 4.4, cam: { kind: "insert", x: 118, y: 1.0, dist: 2.8 },
+          on: (state) => {
+            // 特写只有 ±2.8m：手递手的三个人必须真的凑在石碾跟前
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.x = 118; mother.heading = 1; }
+            state.player.x = 116.9;
+            state.player.heading = 1;
+            const sister = FindActor(state, "sister");
+            if (sister) { sister.x = 118.7; sister.heading = -1; }
+          } },
         { stage: "她没说话。只朝村东口努了努嘴。", d: 3.4, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
         { stage: "然后她站起来，朝反方向走去，故意踢翻了一只水瓮。", d: 4.2, cam: { kind: "shot", x: 112, y: 1.6, dist: 11, pan: -4 },
           on: (state) => {
@@ -881,19 +915,23 @@ export const SCRIPTS = {
           } },
         { stage: "灯笼、喊声、脚步，全都追着那声响去了。", d: 3.8, cam: { kind: "shot", x: 92, y: 1.8, dist: 15, pan: -3 },
           on: (state) => {
-            for (const id of ["sweep1", "sweep2"]) {
-              const s = FindActor(state, id);
-              if (s) { s.cineTarget = { x: 78 }; s.cineSpeed = 2.6; }
-            }
+            // 追声响的两盏灯从画框东沿外一步赶进来——巡逻此刻散在哪儿都有可能，
+            // 不显式摆位，这句话就对着空街说
+            const s1 = FindActor(state, "sweep1");
+            if (s1) { s1.x = 100; s1.cineTarget = { x: 78 }; s1.cineSpeed = 2.6; }
+            const s2 = FindActor(state, "sweep2");
+            if (s2) { s2.x = 109; s2.cineTarget = { x: 80 }; s2.cineSpeed = 2.6; }
           } },
         // 娘的结局不在台词里：镜头不动，只看几盏灯往一处汇、重叠、停住
         { stage: "", d: 4.4, cam: { kind: "shot", x: 76, y: 1.5, dist: 11, trans: "dip" },
           on: (state) => {
+            // 这一镜带黑场闪断（dip）：黑场里把追灯的三个人重新排到汇拢的起点，
+            // speed 取 2.4——正好在下一行"灯停住了"之前全部走到、站定
             const mother = FindActor(state, "mother");
-            if (mother) { mother.cineTarget = { x: 66 }; mother.cineSpeed = 1.9; }
-            for (const [id, tx] of [["sweep1", 70], ["sweep2", 74], ["sweep3", 78]]) {
+            if (mother) { mother.x = 84; mother.cineTarget = { x: 66 }; mother.cineSpeed = 2.6; }
+            for (const [id, sx, tx] of [["sweep1", 84, 70], ["sweep2", 87, 74], ["sweep3", 88, 78]]) {
               const s = FindActor(state, id);
-              if (s) { s.visible = true; s.lantern = true; s.cineTarget = { x: tx }; s.cineSpeed = 2.2; }
+              if (s) { s.visible = true; s.lantern = true; s.x = sx; s.cineTarget = { x: tx }; s.cineSpeed = 2.6; }
             }
           } },
         { stage: "灯停住了。", d: 3.0, cam: { kind: "shot", x: 72, y: 1.5, dist: 8 },
@@ -2177,7 +2215,8 @@ function StepCineActors(state, dt) {
     }
     const speed = a.cineSpeed || 1.6;
     const dir = Math.sign(a.cineTarget.x - a.x);
-    a.heading = dir;
+    // cineKeepHeading：被拖走还回头望的人，脸不许被行走方向扳回去
+    if (!a.cineKeepHeading) a.heading = dir;
     a.x += dir * Math.min(speed * dt, d);
   }
   // 玩家的过场走位（第八章结尾：走出画面）
