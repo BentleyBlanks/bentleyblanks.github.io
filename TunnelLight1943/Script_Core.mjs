@@ -62,16 +62,24 @@ export const SCENES = {
       { id: "stonesEast", kind: "stonePile", x: 152, name: "石子堆" },
       { id: "hangLantern", kind: "hangLantern", x: 160, name: "巷口的马灯" },
     ],
+    // 掩体链：这条村道是第二章的潜行场地，掩体的疏密就是关卡节奏本身。
+    // tall（草垛、齐胸的断墙）站着就挡得住；矮的（柴堆、水瓮）得蹲下去。
+    // 间距刻意不匀：贴着走的几处给喘息，88→107、107→132 两段长空地是难点，
+    // 那里另有一辆推着走的板车当移动掩体。
     covers: [
       // 柴堆在院门边：屋子做成可进入的室内之后，柴堆搁在屋里不成话；
       // 挪到院门口，第一章"把刨子塞进柴堆"这场戏也才有处可塞
       { id: "firewood", kind: "firewood", x: 44.5, w: 2.2 },
-      { id: "hayA", kind: "haystack", x: 52, w: 3.2 },
-      { id: "hayB", kind: "haystack", x: 68, w: 3.2 },
-      { id: "hayC", kind: "haystack", x: 88, w: 3.2 },
-      { id: "ruinWall", kind: "wallSeg", x: 107, w: 5, h: 1.5 },
-      { id: "hayD", kind: "haystack", x: 132, w: 3.2 },
-      { id: "hayE", kind: "haystack", x: 152, w: 3.2 },
+      { id: "hayA", kind: "haystack", x: 52, w: 3.2, tall: true },
+      { id: "vatA", kind: "wallSeg", x: 60, w: 2.4, h: 1.1 },
+      { id: "hayB", kind: "haystack", x: 68, w: 3.2, tall: true },
+      { id: "woodB", kind: "firewood", x: 78, w: 2.6 },
+      { id: "hayC", kind: "haystack", x: 88, w: 3.2, tall: true },
+      { id: "ruinWall", kind: "wallSeg", x: 107, w: 5, h: 1.5, tall: true },
+      { id: "hayD", kind: "haystack", x: 132, w: 3.2, tall: true },
+      { id: "wallB", kind: "wallSeg", x: 142, w: 4, h: 1.5, tall: true },
+      { id: "hayE", kind: "haystack", x: 152, w: 3.2, tall: true },
+      { id: "wallC", kind: "wallSeg", x: 163, w: 4, h: 1.4, tall: true },
     ],
     zones: {
       homeYard: { x: 37, w: 13, label: "家里的院子" },
@@ -882,10 +890,24 @@ export const SCRIPTS = {
       },
     },
     {
-      kind: "leadFollow", id: "c2_mother", leader: "mother", follower: "sister",
-      waypoints: [{ x: 60, w: 4 }, { x: 88, w: 4 }, { x: 118, w: 4 }],
-      objective: "跟紧娘，别出声", hint: "灯扫过来就蹲进草垛的影子里（C）；红圈涨满前躲好就没事",
-      resetHint: "灯把人照满了。退回上一个路口，等灯走远再动。",
+      // 一段掩体接一段掩体地往前挪。娘看准空当就冲，冲到就贴着掩体等你——
+      // 你学的是"什么时候能动"。88→107、107→132 两段长空地没有掩体，
+      // 那里有一辆被征去运粮的板车来回推着走，跟着车影过。
+      kind: "coverRun", id: "c2_mother", leader: "mother", follower: "sister",
+      covers: [52, 60, 68, 78, 88, 107, 118],
+      movingCover: { from: 88, to: 118, speed: 1.5, r: 2.9 },
+      cartDriver: "hauler",
+      objective: "跟着娘，一段一段往村东挪",
+      hint: "草垛和断墙站着就藏得住，柴堆水瓮得蹲下（C）；空地上跟着板车的影子走",
+      resetHint: "灯把人照满了。退回上一处掩体。",
+      onEnter: (state) => {
+        // 夜里被叫起来出夫的乡亲，一车草料往东送，来回推。
+        // 对搜村的人来说他是自己人的差役，谁也不拦——所以那片车影是安全的
+        if (!FindActor(state, "hauler")) {
+          state.actors.push(MakeActor("hauler", "villager", 90, { label: "出夫的乡亲" }));
+        }
+      },
+      onDone: (state) => { state.cart = null; state.cartCoverR = undefined; },
     },
     {
       kind: "cinematic", id: "c2_decoy",
@@ -2338,6 +2360,7 @@ export function StepGame(state, input, dt) {
     case "collect": StepCollect(state, def, input); break;
     case "escort": StepEscort(state, def, input); break;
     case "leadFollow": StepLeadFollow(state, def, dt); break;
+    case "coverRun": StepCoverRun(state, def, input, dt); break;
     case "lead": StepLead(state, def, input); break;
     case "observe": StepObserve(state, def, dt); break;
     case "hold": StepHold(state, def, input, dt); break;
@@ -2441,12 +2464,16 @@ function MovePlayer(state, input, dt) {
   }
 
   // 躲藏：蹲在遮蔽物后
+  // 躲掩体：高的（草垛、齐胸断墙）站着就挡得住，矮的（柴堆、水瓮）得蹲下去。
+  // 找掩体本身才是玩法——不该再多按一个键才生效。
   p.hidden = false;
-  if (p.crouch) {
-    for (const c of scene.covers) {
-      if (Math.abs(p.x - c.x) < c.w / 2 + 0.9) { p.hidden = true; break; }
-    }
+  for (const c of scene.covers) {
+    if (Math.abs(p.x - c.x) >= c.w / 2 + 0.9) continue;
+    if (c.tall || p.crouch) { p.hidden = true; break; }
   }
+  // 移动掩体：贴着板车走，车影就是一段会自己往前挪的墙
+  if (!p.hidden && state.cart && p.level === "surface"
+    && Math.abs(p.x - state.cart.x) < (state.cartCoverR ?? 2.8)) p.hidden = true;
 }
 
 function StepFollowers(state, dt) {
@@ -2606,6 +2633,88 @@ function StepEscort(state, def, input) {
   }
   if (f?.following && ZoneReached(state, def.zone || def.dest)) {
     if (Math.abs(f.x - state.player.x) < 4) AdvanceBeat(state);
+  }
+}
+
+// 某一段路此刻有没有被视线扫着——娘就是靠这个判断"能不能冲"的。
+// 用的是探测逻辑同一个视距，所以她的判断和玩家看到的光带永远一致。
+function PathLit(state, x0, x1) {
+  const lo = Math.min(x0, x1) - 1.2, hi = Math.max(x0, x1) + 1.2;
+  const range = VISION_RANGE * VisionScale(state);
+  for (const a of state.actors) {
+    if (!IsEnemy(a) || !a.visible || a.decor) continue;
+    const end = a.x + (a.heading || 1) * range;
+    if (Math.max(a.x, end) >= lo && Math.min(a.x, end) <= hi) return true;
+  }
+  return false;
+}
+
+// 掩体推进（勇敢的心式）：一串掩体连成的路，娘在掩体之间带路——
+// 她看准空当就冲下一个，到了就贴着掩体等你跟上。玩家学的是"什么时候能动"，
+// 而不是"蹲在原地等灯走远"：节奏由她演示，安全由掩体给。
+// 最长的两段空地上有一辆推着走的板车，跟着车影就能过去。
+function StepCoverRun(state, def, input, dt) {
+  const b = state.beat;
+  const leader = FindActor(state, def.leader);
+  if (!leader) { AdvanceBeat(state); return; }
+  const covers = def.covers;
+  const p = state.player;
+  if (b.coverIndex === undefined) {
+    b.coverIndex = 0;
+    leader.x = covers[0];
+    if (def.movingCover) {
+      state.cart = { x: def.movingCover.from };
+      state.cartCoverR = def.movingCover.r ?? 2.8;
+      b.cartDir = Math.sign(def.movingCover.to - def.movingCover.from) || 1;
+    }
+  }
+
+  // 板车：一趟一趟地推。它不理会敌我，只是自顾自地走——
+  // 玩家要做的是算准它什么时候路过自己这一段
+  if (def.movingCover && state.cart) {
+    const mc = def.movingCover;
+    state.cart.x += b.cartDir * mc.speed * dt;
+    if (state.cart.x > Math.max(mc.from, mc.to)) b.cartDir = -1;
+    if (state.cart.x < Math.min(mc.from, mc.to)) b.cartDir = 1;
+    // 推车的人在车后面顶着走，不是在前面拉——车往哪走，他就在哪一头的反侧
+    const driver = FindActor(state, def.cartDriver);
+    if (driver) { driver.x = state.cart.x - 2.0 * b.cartDir; driver.heading = b.cartDir; }
+  }
+
+  const hereX = covers[b.coverIndex];
+  const nextX = covers[b.coverIndex + 1];
+
+  if (nextX === undefined) {
+    if (Math.abs(p.x - hereX) < 5.5) AdvanceBeat(state);
+    else state.prompt = "跟上娘";
+    return;
+  }
+
+  if (b.dashing) {
+    const d = nextX - leader.x;
+    if (Math.abs(d) < 0.5) {
+      leader.x = nextX;
+      b.dashing = false;
+      b.coverIndex += 1;
+      // 每到一个掩体存一次点：失败退回这儿，不是退回整段开头
+      b.snapshot = SnapshotPositions(state);
+    } else {
+      leader.x += Math.sign(d) * 3.6 * dt;
+      leader.heading = Math.sign(d);
+    }
+    return;
+  }
+
+  // 娘贴着掩体等你跟上来
+  if (Math.abs(p.x - hereX) > 5.5) {
+    state.prompt = "跟上娘——贴着草垛和断墙走";
+    return;
+  }
+  if (!PathLit(state, leader.x, nextX)) {
+    b.dashing = true;
+    state.prompt = null;
+  } else {
+    state.prompt = "娘按住你——等这一段的光挪开";
   }
 }
 
@@ -3293,6 +3402,12 @@ export function GetBeatTarget(state) {
       const leader = FindActor(state, def.leader);
       return leader ? { action: "walk", x: leader.x, level: leader.level } : null;
     }
+    case "coverRun": {
+      // 跟着娘走到她所在的掩体；她不动的时候就贴着她站定
+      const leader = FindActor(state, def.leader);
+      const hereX = def.covers[state.beat.coverIndex ?? 0];
+      return { action: "walk", x: leader ? leader.x : hereX, level: "surface" };
+    }
     case "lead": {
       const group = state.actors.filter((a) => a.group === def.group && a.visible);
       const looseA = group.find((a) => !a.following);
@@ -3431,6 +3546,10 @@ function SettleDest(def) {
     case "goto": case "hold": case "mapBoard": case "scribe": return def.zone;
     case "escort": case "lead": case "smokeEscape": case "floodRescue": return def.dest;
     case "leadFollow": return def.waypoints?.[def.waypoints.length - 1];
+    case "coverRun": {
+      const last = def.covers?.[def.covers.length - 1];
+      return last === undefined ? null : { x: last, w: 5 };
+    }
     case "gotoSeq": case "observe": return def.spots?.[def.spots.length - 1];
     case "buildSpots": return def.spots?.[def.spots.length - 1]?.zone;
     case "digSeq": return def.spots?.[def.spots.length - 1];
