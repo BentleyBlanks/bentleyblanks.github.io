@@ -534,8 +534,11 @@ export const SCRIPTS = {
       ],
     },
     {
+      // 镜头推到门框上：这一下要看得见木头的纹、孩子的头顶、和那支粉笔。
+      // 全景里划线只是一个像素在动，凑近了才是"爹在给我量身高"。
       kind: "scribe", id: "c1_carve", zone: V.doorframe, speed: 0.5, markY: 1.28,
-      objective: "爹比着你的头顶，在门框上划一道", hint: "按住 E，再左右推着划过去",
+      cam: { kind: "shot", x: 34.9, y: 1.42, dist: 2.9 },
+      objective: "爹比着你的头顶，在门框上划一道", hint: "拖着粉笔划过去（或按住 E 左右推）",
       note: "墨斗线弹在木头上，留下一道浅浅的印。",
       onStart: (state) => {
         // 爹得真的走过来伸手够门框，不能站在院子那头让字幕替他划
@@ -1545,8 +1548,11 @@ export const SCRIPTS = {
       ],
     },
     {
-      kind: "hold", id: "c8_carve", zone: V.doorframe, holdTime: 4.5,
-      objective: "在旧刻痕旁，刻下一道新的线", hint: "按住 E",
+      // 第一章是爹的手，这一回是他自己的手——同一个动作，同一个景别。
+      // 两道线之间隔着的东西，画面自己会说。
+      kind: "scribe", id: "c8_carve", zone: V.doorframe, speed: 0.42, markY: 1.08,
+      cam: { kind: "shot", x: 34.9, y: 1.30, dist: 2.9 },
+      objective: "在旧刻痕旁，刻下一道新的线", hint: "拖着划过去（或按住 E 左右推）",
       note: "刻完，柱子用拇指抹平了木屑。",
       onDone: (state) => { state.flags.carved = true; },
     },
@@ -2760,18 +2766,22 @@ function StepScribe(state, def, input, dt) {
     state.scribe = null;
     return;
   }
+  // 两种握法，同一件事：桌面按住 E 往一边推，触屏直接把粉笔拖过去。
+  // 拖动是位移驱动的（拖多少走多少），手上有"蹭着木头走"的实感；
+  // 按键那路仍按时间推进，不然键盘玩家没法控制快慢。
   const held = input.interactHeld || input.interact;
   const push = Math.abs(input.moveX) > 0.05;
-  if (held && push) b.drawn = Math.min(1, b.drawn + dt * (def.speed || 0.5));
-  state.prompt = b.drawn >= 1 ? "划好了" : "按住 E，左右推着划";
-  state.promptFill = b.drawn;
-  // 交给渲染层把这道线画出来
-  state.scribe = { x: def.zone.x, y: def.markY ?? 1.25, t: b.drawn };
+  if (held && push) b.drawn += dt * (def.speed || 0.5);
+  if (input.dragX) b.drawn += input.dragX;
+  b.drawn = Math.max(0, Math.min(1, b.drawn));
+  b.everMoved = b.everMoved || b.drawn > 0.02;
+  state.prompt = null;   // 这一拍的引导由 QTE 轨道给，不占中间那条提示
+  // 交给 HUD 画轨道、渲染层画线
+  state.scribe = { x: def.zone.x, y: def.markY ?? 1.25, t: b.drawn, idle: !b.everMoved };
   if (b.drawn >= 1) {
     if (def.note) state.toast = { text: def.note, t: 4.5 };
-    def.onDone?.(state);
     state.scribe = null;
-    AdvanceBeat(state);
+    AdvanceBeat(state);   // onDone 由它统一调，这里再调一次就成了两遍
   }
 }
 

@@ -84,6 +84,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
+  "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -105,7 +106,9 @@ function Unlock(index) {
 // 输入：键盘 + 触屏
 // ---------------------------------------------------------------------------
 const keys = new Set();
-const touch = { left: false, right: false, up: false, down: false, act: false, crouchEdge: false };
+const touch = { act: false };
+// 摇杆状态：moveX/climb 是给玩法层的数字量（Core 只取符号），nx/ny 供旋钮显示
+const stick = { active: false, id: null, moveX: 0, climb: 0, cx: 0, cy: 0, r: 60 };
 let interactEdge = false, advanceEdge = false, crouchToggle = false, throwEdge = false;
 
 window.addEventListener("keydown", (e) => {
@@ -124,7 +127,29 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
-canvas.addEventListener("pointerdown", () => { advanceEdge = true; });
+// 划线那一拍：手指（或鼠标）直接在画面上把粉笔拖过去。位移驱动——
+// 拖多少走多少，手上才有蹭着木头走的实感。整整一道线约等于拖过 45% 画宽。
+const scribeDrag = { active: false, id: null, lastX: 0, accum: 0 };
+canvas.addEventListener("pointerdown", (e) => {
+  advanceEdge = true;
+  if (state && CurrentBeatDef(state)?.kind === "scribe") {
+    scribeDrag.active = true;
+    scribeDrag.id = e.pointerId;
+    scribeDrag.lastX = e.clientX;
+    try { canvas.setPointerCapture?.(e.pointerId); } catch (ignored) { /* 同上 */ }
+  }
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!scribeDrag.active || e.pointerId !== scribeDrag.id) return;
+  const span = Math.max(120, canvas.clientWidth * 0.45);
+  scribeDrag.accum += (e.clientX - scribeDrag.lastX) / span;
+  scribeDrag.lastX = e.clientX;
+});
+for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
+  canvas.addEventListener(evt, (e) => {
+    if (e.pointerId === scribeDrag.id) { scribeDrag.active = false; scribeDrag.id = null; }
+  });
+}
 
 // iOS Safari 会忽略 user-scalable=no：双击与捏合都得在 JS 里挡掉，
 // 否则画面会被缩放，横版布局直接错位。
@@ -150,6 +175,7 @@ function BindTouchButton(el, prop, { edge = false } = {}) {
     if (edge) {
       if (prop === "act") { interactEdge = true; advanceEdge = true; touch.act = true; }
       else if (prop === "crouch") crouchToggle = !crouchToggle;
+      else if (prop === "throw") throwEdge = true;
     } else touch[prop] = true;
     el.classList.add("pressed");
   };
@@ -166,14 +192,75 @@ function BindTouchButton(el, prop, { edge = false } = {}) {
   el.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
+// 摇杆。一根拇指同时管走路和上下梯：横推走，竖推爬。
+// 竖直分量要明显压过水平分量才判成爬梯——走路时手指难免上下漂，
+// 不设这道坎的话，路过梯口就会被莫名其妙送上去。
+const STICK_DEAD = 0.30;      // 死区：拇指搭着不动不该走起来
+const STICK_CLIMB = 0.55;     // 竖推到这个深度才考虑爬梯
+function StickGeometry() {
+  const base = ui.stickBase?.getBoundingClientRect();
+  if (!base || !base.width) return false;
+  stick.cx = base.left + base.width / 2;
+  stick.cy = base.top + base.height / 2;
+  stick.r = base.width / 2;
+  return true;
+}
+function StickApply(clientX, clientY) {
+  const dx = (clientX - stick.cx) / stick.r;
+  const dy = (clientY - stick.cy) / stick.r;
+  const len = Math.hypot(dx, dy);
+  const k = len > 1 ? 1 / len : 1;
+  const nx = dx * k, ny = dy * k;
+  stick.moveX = Math.abs(nx) > STICK_DEAD ? Math.sign(nx) : 0;
+  stick.climb = (Math.abs(ny) > STICK_CLIMB && Math.abs(ny) > Math.abs(nx) * 1.25) ? Math.sign(ny) : 0;
+  if (ui.stickKnob) {
+    ui.stickKnob.style.transform = `translate(${(nx * stick.r * 0.6).toFixed(1)}px, ${(ny * stick.r * 0.6).toFixed(1)}px)`;
+  }
+  ui.stick?.classList.toggle("climbing", stick.climb !== 0);
+}
+function StickReset() {
+  stick.active = false;
+  stick.id = null;
+  stick.moveX = 0;
+  stick.climb = 0;
+  if (ui.stickKnob) ui.stickKnob.style.transform = "translate(0px, 0px)";
+  ui.stick?.classList.remove("active", "climbing");
+}
+function SetupStick() {
+  const el = ui.stick;
+  if (!el) return;
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (!StickGeometry()) return;
+    stick.active = true;
+    stick.id = e.pointerId;
+    el.classList.add("active");
+    // 捕获是锦上添花：拇指滑出盘子还能继续操。指针已经抬起或是合成事件时
+    // 它会抛，不接住的话整个 handler 断在这儿，摇杆就成了死的。
+    try { el.setPointerCapture?.(e.pointerId); } catch (ignored) { /* 捕获不到就算了 */ }
+    StickApply(e.clientX, e.clientY);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!stick.active || e.pointerId !== stick.id) return;
+    e.preventDefault();
+    StickApply(e.clientX, e.clientY);
+  });
+  for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
+    el.addEventListener(evt, (e) => {
+      if (e.pointerId !== stick.id) return;
+      e.preventDefault();
+      StickReset();
+    });
+  }
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
 function SetupTouch() {
   if (!ui.touchControls) return;
-  BindTouchButton(document.getElementById("btnLeft"), "left");
-  BindTouchButton(document.getElementById("btnRight"), "right");
-  BindTouchButton(document.getElementById("btnUp"), "up");
-  BindTouchButton(document.getElementById("btnDown"), "down");
+  SetupStick();
   BindTouchButton(document.getElementById("btnAct"), "act", { edge: true });
   BindTouchButton(document.getElementById("btnCrouch"), "crouch", { edge: true });
+  BindTouchButton(document.getElementById("btnThrow"), "throw", { edge: true });
   const isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
   if (isTouch) document.body.classList.add("touchDevice");
 }
@@ -186,11 +273,15 @@ function CheckOrientation() {
 
 function ReadInput() {
   let moveX = 0, climb = 0;
-  if (keys.has("a") || keys.has("arrowleft") || touch.left) moveX -= 1;
-  if (keys.has("d") || keys.has("arrowright") || touch.right) moveX += 1;
-  if (keys.has("w") || keys.has("arrowup") || touch.up) climb -= 1;
-  if (keys.has("s") || keys.has("arrowdown") || touch.down) climb += 1;
-  return { moveX, climb };
+  if (keys.has("a") || keys.has("arrowleft")) moveX -= 1;
+  if (keys.has("d") || keys.has("arrowright")) moveX += 1;
+  if (keys.has("w") || keys.has("arrowup")) climb -= 1;
+  if (keys.has("s") || keys.has("arrowdown")) climb += 1;
+  if (stick.active) { moveX += stick.moveX; climb += stick.climb; }
+  return {
+    moveX: Math.max(-1, Math.min(1, moveX)),
+    climb: Math.max(-1, Math.min(1, climb)),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +378,10 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, shot.ots || null);
     world.SetInsertCard(shot.card || null);
   } else {
-    shot = BaseShot(state);
+    // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
+    // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
+    const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
+    shot = def?.cam ? HintShot(state, def.cam) : BaseShot(state);
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null);
@@ -400,10 +494,23 @@ function SyncHud(state, dt, shotFade) {
   ui.crouchTag.hidden = true;
   // 手里那格：单格物品栏。拿着石子时顺带把 F 键提示挂上
   const item = state.player?.item;
+  const showItem = !!item && !inCinematic && state.phase === "playing";
   if (ui.itemTag) {
-    ui.itemTag.hidden = !item || inCinematic || state.phase !== "playing";
+    ui.itemTag.hidden = !showItem;
     if (item && ui.itemName) {
       ui.itemName.textContent = item.label + (item.throwable ? "（F 投掷）" : "");
+    }
+  }
+  // 触屏的投掷键：手里真有能扔的东西才冒出来
+  if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
+
+  // 划线的 QTE 轨道：粉笔头跟着进度走，没动起来时轻轻晃一下招呼玩家来拖
+  if (ui.scribeGuide) {
+    const sc = state.scribe;
+    ui.scribeGuide.hidden = !sc;
+    if (sc) {
+      ui.scribeGuide.style.setProperty("--fill", (sc.t * 100).toFixed(1) + "%");
+      ui.scribeGuide.classList.toggle("idle", !!sc.idle);
     }
   }
   if (ui.touchControls) {
@@ -575,7 +682,14 @@ function ToggleDebug(force) {
   }
 }
 
-ui.btnDebug?.addEventListener("click", () => ToggleDebug(true));
+// 入口在设置面板里，点开调试就把设置收起来——两张面板都压在右上角，别叠着
+ui.btnDebug?.addEventListener("click", () => {
+  if (ui.settingsPanel) {
+    ui.settingsPanel.hidden = true;
+    ui.btnSettings?.setAttribute("aria-expanded", "false");
+  }
+  ToggleDebug(true);
+});
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
 
 function StartGame(chapterIndex) {
@@ -669,7 +783,13 @@ function Frame(now) {
   requestAnimationFrame(Frame);
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
+  RunFrame(now, dt);
+}
 
+// 一帧的全部：推进玩法、搭场景、走镜头、刷 HUD。抽出来是为了让测试也能
+// 驱动它——浏览器面板不显示时 rAF 整个停摆，只调 StepGame 是看不到镜头
+// 和 HUD 的（它们只在这里更新），验证会变成自欺欺人。
+function RunFrame(now, dt) {
   if (state) {
     const move = state.phase === "playing" ? ReadInput() : { moveX: 0, climb: 0 };
     const def = CurrentBeatDef(state);
@@ -684,8 +804,10 @@ function Frame(now) {
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
       throw: throwEdge,
+      dragX: scribeDrag.accum,
       advance: advanceEdge,
     }, stepDt);
+    scribeDrag.accum = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
       framing = { key: "", prog: 0, baseHw: 7.2 };
@@ -736,6 +858,12 @@ window.TunnelLight = {
   get state() { return state; },
   StartGame,
   JumpToChapter: (i) => StartGame(i),
+  // 走一遍真实输入路径（键盘 + 摇杆），用来验证控件确实驱动得动玩法
+  ReadInput: () => ReadInput(),
+  // 完整跑 n 帧（含镜头与 HUD）。面板隐藏时 rAF 停摆，验证得靠它。
+  Tick: (n = 1, dt = 1 / 30) => {
+    for (let i = 0; i < n; i += 1) RunFrame(performance.now(), dt);
+  },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
   StepFrames: (n, input = {}) => {
