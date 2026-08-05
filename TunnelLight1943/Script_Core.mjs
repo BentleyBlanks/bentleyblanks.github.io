@@ -1152,6 +1152,10 @@ export const SCRIPTS = {
       objective: "改造一：挖翻口，灌上水", hint: "挖成下沉的弯，弯里存住水。水在地表的井里",
       resetHint: "上面的伪军看见了人影。柱子缩回洞里，等他转过身去。",
       steps: [
+        // 挖翻口的位置，就是大爷和顺子没出来的位置。先把烟袋拾起来，再动土——
+        // 两章之间的账，用一个弯腰接上，不用字幕
+        { type: "use", zone: TV.trapSpot, prompt: "E · 拾起地上的烟袋",
+          note: "拴柱大爷的烟袋躺在土里，锅底烧穿了一个洞。柱子把它揣进怀里，抄起了锹。" },
         { type: "use", zone: TV.trapSpot, hold: 3, prompt: "按住 E · 挖翻口",
           note: "弯挖出来了。可干弯挡不住烟——得灌上水。" },
         { type: "pickup", x: 30, level: "under", item: { id: "bucket2", label: "空桶" }, prompt: "E · 拎起西口的空桶" },
@@ -2200,6 +2204,8 @@ function MovePlayer(state, input, dt) {
   p.forcedCrouch = inTunnel && posture !== "stand";
   p.crouch = posture === "squat" || posture === "crawl" || (!inTunnel && !!input.crouch);
   let speed = 4.2 * (POSTURE_SPEED[posture] ?? 1);
+  // 背着大爷：一个大活人在背上，快不起来
+  if (state.beat?.carryElder) speed = Math.min(speed, 1.8);
   if (def?.slow) speed = 1.8;
   if (p.carry) speed = 3.0;
   if (p.item?.big) speed = Math.min(speed, 2.6);   // 扛大件（门板/顶木/满桶水）再慢一档
@@ -2507,6 +2513,17 @@ function StepBuildSpots(state, def, input, dt) {
     const s = def.spots[i];
     if (state.beat.spotDone[i]) continue;
     if (ZoneReached(state, s.zone)) {
+      // 有的工位上先躺着一样东西。挖翻口的位置就是大爷和顺子没出来的位置——
+      // 先把烟袋拾起来，再动土。两章之间的账，用一个弯腰接上，不用字幕
+      if (s.pickup && !state.beat.pickedUp?.[i]) {
+        state.prompt = `E · ${s.pickup.prompt}`;
+        if (input.interact) {
+          if (!state.beat.pickedUp) state.beat.pickedUp = {};
+          state.beat.pickedUp[i] = true;
+          state.toast = { text: s.pickup.toast, t: 5 };
+        }
+        break;
+      }
       state.prompt = `按住 E · ${s.label} ${Math.round(state.beat.spotProgress[i] / s.holdTime * 100)}%`;
       if (input.interactHeld) {
         state.beat.spotProgress[i] += dt;
@@ -2620,7 +2637,30 @@ function StepDouseLamps(state, def, input) {
   }
   const remaining = state.lamps.filter((l) => l.lit);
   if (remaining.length <= 1) {
-    // 留最后一盏：柱子把它提在手里
+    // 最后一盏在顺子手里。他把灯递给柱子——这是顺子在这个游戏里唯一一次
+    // 和玩家交手；下一拍他回身进烟里，玩家手里提着的就是他给的灯。
+    const shunzi = FindActor(state, "shunzi");
+    const lampX = remaining[0]?.x ?? state.player.x;
+    if (shunzi && !state.beat.lampHanded) {
+      shunzi.visible = true;
+      // 走位指令只下一次。每帧重设的话：他一到位指令被清、又立刻被设回去，
+      // "已到位"永远不成立，递灯的提示一辈子出不来
+      if (!state.beat.shunziSent) {
+        state.beat.shunziSent = true;
+        if (Math.abs(shunzi.x - lampX) > 0.9) { shunzi.cineTarget = { x: lampX + 0.7 }; shunzi.cineSpeed = 2.6; }
+      }
+      if (Math.abs(state.player.x - shunzi.x) < 1.7) {
+        state.prompt = "E · 接过顺子手里的灯";
+        if (input.interact) {
+          state.beat.lampHanded = true;
+          for (const l of state.lamps) l.lit = false;
+          state.player.lamp = true;
+          state.toast = { text: "顺子把灯柄塞进柱子手里：『你提着。你认路。』", t: 4.5 };
+          AdvanceBeat(state);
+        }
+      }
+      return;
+    }
     for (const l of state.lamps) l.lit = false;
     state.player.lamp = true;
     if (def.note) state.toast = { text: def.note, t: 4.5 };
@@ -2683,7 +2723,11 @@ function StepFloodRescue(state, def, input) {
 function StepSmokeEscape(state, def, input) {
   const dest = def.dest || TV.entW;
 
-  // 第四章的注定失去：拴柱大爷半路腿软，顺子回身去背他
+  // 第四章的注定失去：拴柱大爷半路腿软。
+  // 这里原来是纯脚本：大爷必死，玩家只能看——可前一分钟游戏才教过他
+  // "烟碰到人=失手重来"，两套规则打架，失去读起来像自己手慢。
+  // 现在把选择交到玩家手上：可以背起大爷，但背着他走不快、也腾不出手
+  // 招呼别人——试过一次就会明白"救一个还是带三个"不是旁白说的，是手感。
   if (def.lossScript) {
     const elder1 = FindActor(state, "elder1");
     const shunzi = FindActor(state, "shunzi");
@@ -2692,18 +2736,43 @@ function StepSmokeEscape(state, def, input) {
       state.beat.lossT = state.beat.t;
       elder1.following = false;
       elder1.scripted = true;
-      elder1.cineTarget = { x: 112 };   // 退回藏人洞·甲；烟约 45s 追到，吞没时序才成立
-      elder1.cineSpeed = 0.9;
-      if (shunzi) {
-        shunzi.visible = true;
-        shunzi.scripted = true;
-        shunzi.x = 78;
-        shunzi.cineTarget = { x: 112 };
-        shunzi.cineSpeed = 3.2;
-      }
-      state.toast = { text: "拴柱大爷腿一软，坐在了道口。顺子从后面追了上去：『你们先走！』", t: 5 };
+      elder1.pose = "kneel";           // 坐在道口，就地
+      state.toast = { text: "拴柱大爷腿一软，坐在了道口。", t: 4 };
     }
-    if (state.beat.lossStage === 1) {
+    // 坐着等：玩家可以背他
+    if (state.beat.lossStage === 1 && elder1 && !state.beat.carryElder) {
+      if (Math.abs(state.player.x - elder1.x) < 1.7) {
+        state.prompt = "E · 背起大爷";
+        if (input.interact) {
+          state.beat.carryElder = true;
+          elder1.pose = null;
+          elder1.following = true;
+          elder1.scripted = false;
+          // 背上一个人，手就腾不出来了：跟着的其他人只能原地等
+          for (const a of state.actors) {
+            if (a.kind === "villager" && a.id !== "elder1") a.following = false;
+          }
+          state.toast = { text: "大爷伏在柱子背上，轻得吓人。", t: 3.5 };
+        }
+      }
+      // 玩家往前走远了，或耗得太久：顺子回身去背——原来的时序从这儿接上
+      const waited = state.beat.t - state.beat.lossT;
+      if (state.player.x < elder1.x - 8 || waited > 12) {
+        state.beat.lossStage = 1.5;
+        elder1.cineTarget = { x: 112 };   // 退回藏人洞·甲；烟约 45s 追到，吞没时序才成立
+        elder1.cineSpeed = 0.9;
+        elder1.pose = null;
+        if (shunzi) {
+          shunzi.visible = true;
+          shunzi.scripted = true;
+          shunzi.x = Math.max(60, state.player.x - 6);
+          shunzi.cineTarget = { x: 112 };
+          shunzi.cineSpeed = 3.2;
+        }
+        state.toast = { text: "顺子从后面追了上去：『你们先走！』", t: 5 };
+      }
+    }
+    if (state.beat.lossStage === 1.5) {
       // 烟追上他们时才隐去——两个人影消失在烟里
       const gone = [elder1, shunzi].every((a) => !a || !a.visible || SmokeCovers(state, a.x));
       if (gone || state.beat.t - state.beat.lossT > 50) {
@@ -2715,12 +2784,19 @@ function StepSmokeEscape(state, def, input) {
   }
 
   const villagers = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.scripted);
-  const loose = villagers.find((a) => !a.following && Math.abs(a.x - state.player.x) < 2.6);
-  if (loose) {
-    state.prompt = "E · 招呼他们跟上";
-    if (input.interact) {
-      for (const a of villagers) {
-        if (!a.following && Math.abs(a.x - state.player.x) < 3.4) a.following = true;
+  // 大爷坐下之后就不再是"招呼跟上"的对象（他有自己的 E·背起提示）；
+  // 坐下之前照常招呼——他得先跟上、走到半路，腿才会软
+  const elderDown = (id) => id === "elder1" && state.beat.lossStage;
+  const loose = villagers.find((a) => !a.following && !elderDown(a.id) && Math.abs(a.x - state.player.x) < 2.6);
+  if (loose && !state.prompt) {
+    if (state.beat.carryElder) {
+      state.prompt = "背着大爷，腾不出手招呼人";
+    } else {
+      state.prompt = "E · 招呼他们跟上";
+      if (input.interact) {
+        for (const a of villagers) {
+          if (!a.following && !elderDown(a.id) && Math.abs(a.x - state.player.x) < 3.4) a.following = true;
+        }
       }
     }
   }
@@ -2734,13 +2810,20 @@ function StepSmokeEscape(state, def, input) {
       state.flags.resets += 1;
       state.smoke.frontX = 150;
       state.smoke.trapHeld = false;
+      const carried = state.beat.carryElder;
       RestoreSnapshot(state);
       state.beat.lossStage = 0;
+      state.beat.carryElder = false;
       for (const v of state.actors.filter((x) => x.kind === "villager")) {
-        v.following = false; v.evacuated = false; v.scripted = false; v.cineTarget = null;
+        v.following = false; v.evacuated = false; v.scripted = false; v.cineTarget = null; v.pose = null;
         v.visible = v.id !== "shunzi" || !def.lossScript;
       }
-      state.toast = { text: def.resetHint, t: 4 };
+      state.toast = {
+        text: carried
+          ? "背上大爷，就顾不上还能走的人。大爷推开了他的手——先把能走的带出去。"
+          : def.resetHint,
+        t: 5,
+      };
       return;
     }
   }
@@ -3037,6 +3120,10 @@ export function GetBeatTarget(state) {
     }
     case "buildSpots": {
       const i = state.beat.spotDone.findIndex((d) => !d);
+      // 工位上有没捡的东西：先按一下 E 拾起来，再按住施工
+      if (i >= 0 && def.spots[i].pickup && !state.beat.pickedUp?.[i]) {
+        return { action: "interactAt", x: def.spots[i].zone.x, level: def.spots[i].zone.level || "under" };
+      }
       if (i < 0) return null;
       const z = def.spots[i].zone;
       return { action: "holdAt", x: z.x, level: z.level || "surface" };
@@ -3081,7 +3168,12 @@ export function GetBeatTarget(state) {
     }
     case "douseLamps": {
       const lit = (state.lamps || []).filter((l) => l.lit);
-      if (lit.length <= 1) return null;
+      if (lit.length <= 1) {
+        // 最后一盏在顺子手里：走到他跟前接过来
+        const shunzi = FindActor(state, "shunzi");
+        if (shunzi && shunzi.visible) return { action: "interactAt", x: shunzi.x, level: "under" };
+        return null;
+      }
       return { action: "interactAt", x: lit[0].x, level: "under" };
     }
     case "smokeEscape": {
