@@ -12,15 +12,19 @@ export const UNDER_Y = -3.6;
 // ---------------------------------------------------------------------------
 // 章节元数据
 // ---------------------------------------------------------------------------
+// 章名取各章自己最硬的那个意象，不用"失去/陷阱/反击"这类空话：
+// 灯停住了=娘的结局那一镜；半袋烟的工夫=换岗的空当，学会看的那一课；
+// 最后一盏灯=熄灯后攥在手里的那盏；东口的铃=改造的回报；
+// 没套的骡车=推理的破绽本身；第二道刻痕与第一章首尾成对。
 export const CHAPTERS = [
   { id: "c1", num: "第一章", title: "门框上的刻痕", year: "1942 · 华北敌后 · 梁家村", scene: "village", light: "day" },
-  { id: "c2", num: "第二章", title: "第一次失去", year: "1943 · 春 · 梁家村", scene: "village", light: "night" },
-  { id: "c3", num: "第三章", title: "寻找妹妹", year: "1943 · 据点外的庄稼地", scene: "fields", light: "night" },
-  { id: "c4", num: "第四章", title: "地道里的第一次光", year: "1943 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
-  { id: "c5", num: "第五章", title: "反击地道", year: "1943 · 夏 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
-  { id: "c6", num: "第六章", title: "敌人的陷阱", year: "1943 · 押送前夜", scene: "fields", light: "night" },
+  { id: "c2", num: "第二章", title: "灯停住了", year: "1943 · 春 · 梁家村", scene: "village", light: "night" },
+  { id: "c3", num: "第三章", title: "半袋烟的工夫", year: "1943 · 据点外的庄稼地", scene: "fields", light: "night" },
+  { id: "c4", num: "第四章", title: "最后一盏灯", year: "1943 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
+  { id: "c5", num: "第五章", title: "东口的铃", year: "1943 · 夏 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
+  { id: "c6", num: "第六章", title: "没套的骡车", year: "1943 · 押送前夜", scene: "fields", light: "night" },
   { id: "c7", num: "第七章", title: "地道里的光", year: "1943 · 据点地道", scene: "tunnelFort", light: "dark" },
-  { id: "c8", num: "第八章", title: "回家的路", year: "一个月后 · 梁家村", scene: "village", light: "dawn" },
+  { id: "c8", num: "第八章", title: "第二道刻痕", year: "一个月后 · 梁家村", scene: "village", light: "dawn" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -817,22 +821,34 @@ export const SCRIPTS = {
             const sister = FindActor(state, "sister");
             if (sister) { sister.x = 53.5; sister.heading = -1; }
           } },
-        { stage: "一盏灯笼从东边巡了过来。", d: 2.8, cam: { kind: "shot", x: 60, y: 1.4, dist: 9 },
+        { stage: "一盏灯笼从东边巡了过来。", d: 4.2, cam: { kind: "shot", x: 59, y: 1.4, dist: 10 },
           on: (state) => {
             state.player.cineWalk = null;
             state.player.crouch = true;
             const sister = FindActor(state, "sister");
             if (sister) sister.pose = "leanIn";
+            // 开场过场把这个兵留在了 x≈124（挑灯带路那一镜）——不先把他挪到
+            // 画框右沿外一步，"巡了过来"就是一句空话：灯根本进不了画面。
+            // 说到谁，谁就得在画面里。走得慢：教学不赶时间，灯压过来的
+            // 每一步都是给玩家看的。
             const s1 = FindActor(state, "sweep1");
-            if (s1) { s1.cineTarget = { x: 59 }; s1.cineSpeed = 2.0; s1.heading = -1; }
+            if (s1) {
+              s1.x = 71;
+              s1.heading = -1;
+              s1.lantern = true;
+              s1.cineTarget = { x: 58.5 };
+              s1.cineSpeed = 1.6;
+            }
           } },
-        { who: "娘", say: "灯扫过来，就蹲进影子里，贴着草垛别动。", d: 3.8, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
-        { stage: "灯光从草垛沿上掠过去，又移开了。谁也没出声。", d: 3.6, cam: { kind: "shot", x: 55, y: 1.2, dist: 6.5 },
+        // 这两行不切走：镜头停在草垛上，看着灯一寸一寸压过来——教学的正片是这一镜
+        { who: "娘", say: "灯扫过来，就蹲进影子里，贴着草垛别动。", d: 4.4, cam: { kind: "shot", x: 57, y: 1.3, dist: 8 } },
+        { stage: "灯影在草垛根下一寸一寸挪过来。谁也没出声。", d: 4.2, cam: { kind: "shot", x: 56.5, y: 1.1, dist: 6.5 } },
+        { stage: "灯光从草垛沿上掠过去，顿了顿，又移开了。", d: 4.6, cam: { kind: "shot", x: 56, y: 1.2, dist: 7 },
           on: (state) => {
             const s1 = FindActor(state, "sweep1");
-            if (s1) { s1.cineTarget = { x: 76 }; s1.cineSpeed = 2.0; }
+            if (s1) { s1.cineTarget = { x: 78 }; s1.cineSpeed = 1.8; }
           } },
-        { who: "娘", say: "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。", d: 4.0, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
+        { who: "娘", say: "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。", d: 4.6, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
       ],
       onDone: (state) => {
         state.player.crouch = false;

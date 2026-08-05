@@ -136,7 +136,7 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
 function TestChapterMeta() {
   assert.equal(CHAPTERS.length, 8, "必须完整覆盖文档中的八个章节");
   const titles = CHAPTERS.map((c) => c.title).join("|");
-  for (const expected of ["门框上的刻痕", "第一次失去", "寻找妹妹", "地道里的第一次光", "反击地道", "敌人的陷阱", "地道里的光", "回家的路"]) {
+  for (const expected of ["门框上的刻痕", "灯停住了", "半袋烟的工夫", "最后一盏灯", "东口的铃", "没套的骡车", "地道里的光", "第二道刻痕"]) {
     assert.ok(titles.includes(expected), `缺少章节：${expected}`);
   }
   console.log("  ✓ 章节元数据对齐关卡设计文档");

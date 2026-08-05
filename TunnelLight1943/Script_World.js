@@ -2052,17 +2052,18 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, 1.5);
     } else if (cartMesh) cartMesh.visible = false;
 
-    // 敌人视线可见化：每个巡逻兵面前一条淡光带，长度就是探测逻辑用的
-    // 视距（同一个数，画出来的和判出来的必须是同一条线）。玩家凭这条
-    // 光读得出"影子在哪、什么时候能动"——潜行的公平从看得见开始。
+    // 敌人视线可见化：每个巡逻兵面前一片**躺在地上的光池**，长度就是探测
+    // 逻辑用的视距（同一个数，画出来的和判出来的必须是同一条线）。
+    // 平铺而不是立一堵光墙——立着的光带会把夜里整条街的地面观感改掉；
+    // 躺平的光池只是"灯照到了这片地"，和影子同一种语言。
+    // 过场里也画：第二章教学幕全靠这片光扫过草垛来演示规则。
     {
-      const showCones = state.stealthActive && state.phase === "playing"
-        && CurrentBeatDef(state)?.kind !== "cinematic" && !state.microCine;
+      const showCones = state.stealthActive && state.phase === "playing";
       const enemies = showCones
         ? state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet") && a.visible !== false && !a.decor)
         : [];
       if (enemies.length && !coneTex) {
-        // 一张横向渐变：靠人最亮，往视距尽头收干净；上下沿也柔掉
+        // 一张横向渐变：靠人最亮，往视距尽头收干净；纵向（进深）也柔掉
         const c = MakeCanvas(160, 40);
         const cctx = c.getContext("2d");
         const gh = cctx.createLinearGradient(0, 0, 160, 0);
@@ -2084,12 +2085,13 @@ export function CreateWorld(canvasEl) {
       }
       while (coneMeshes.length < enemies.length) {
         const m = new THREE.Mesh(
-          new THREE.PlaneGeometry(1, 1.2),
+          new THREE.PlaneGeometry(1, 1),
           new THREE.MeshBasicMaterial({
-            map: coneTex, transparent: true, opacity: 0.13,
+            map: coneTex, transparent: true, opacity: 0.15,
             blending: THREE.AdditiveBlending, depthWrite: false,
           }),
         );
+        m.rotation.x = -Math.PI / 2;   // 躺平在地面上
         FixOrder(m, LAYER_ORDER.fx + 206);
         layers.fx.add(m);
         coneMeshes.push(m);
@@ -2100,10 +2102,11 @@ export function CreateWorld(canvasEl) {
         const range = VISION_RANGE * VisionScale(state);
         const dir = (a.heading || 1) >= 0 ? 1 : -1;
         m.visible = true;
-        m.scale.set(dir * range, 1, 1);   // 负缩放翻转贴图朝向
+        // 躺平后：几何 x → 世界 x（负值翻贴图朝向），几何 y → 世界 z（进深 2.6m）
+        m.scale.set(dir * range, 2.6, 1);
         m.position.set(a.x + dir * range / 2,
-          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.6, 0.3);
-        m.material.opacity = 0.12 + Math.sin(time * 2.6 + i * 1.9) * 0.02;
+          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.04, 0.2);
+        m.material.opacity = 0.14 + Math.sin(time * 2.6 + i * 1.9) * 0.025;
       });
     }
 
