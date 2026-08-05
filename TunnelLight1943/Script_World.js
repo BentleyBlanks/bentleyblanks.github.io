@@ -96,7 +96,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // 扛着的物件（单独一张小贴图，跟着手走）
 function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；其余小件给一块方画布免得圆形图案被裁
-  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "风筝", "鞭炮", "一挂鞭炮",
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     "空桶", "满桶水", "一桶水", "棉被", "湿棉被", "铁皮桶", "刨子"];
   const wPx = label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120;
   const hPx = label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30;
@@ -263,7 +263,7 @@ export function CreateWorld(canvasEl) {
   let fluid = null, fluidKey = "", fluidMesh = null, fluidCanvas = null, fluidCtx = null, fluidImage = null;
   let probeMeshes = [];
   let itemLabel = null;
-  let scribeMesh = null;
+  let scribeMesh = null, scribeCanvas = null, scribeCtx = null, scribeLastT = 0, scribeTip = null;
   let markerMesh = null, markerCanvas = null, markerCtx = null;
   let collapseMeshes = {};
   let itemMeshes = [];
@@ -276,6 +276,8 @@ export function CreateWorld(canvasEl) {
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null;
   let thrownMesh = null;
+  let winchRope = null, winchBucket = null;
+  let homeFacade = null, homeRange = null;
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
   let chainItemMesh = null, chainItemLabel = null;
@@ -306,12 +308,14 @@ export function CreateWorld(canvasEl) {
     itemMeshes = [];
     itemLabel = null;
     markerMesh = null; markerCanvas = null; markerCtx = null;
-    scribeMesh = null;
+    scribeMesh = null; scribeCanvas = null; scribeCtx = null; scribeLastT = 0; scribeTip = null;
     collapseMeshes = {};
     fluid = null; fluidKey = ""; fluidMesh = null;
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
     cartMesh = null;
     thrownMesh = null;
+    winchRope = null; winchBucket = null;
+    homeFacade = null; homeRange = null;
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
     chainItemMesh = null; chainItemLabel = null;
@@ -772,7 +776,7 @@ export function CreateWorld(canvasEl) {
       doorframe: BAND.walk, bench: BAND.walk, stool: BAND.walk, well: BAND.walk,
       mapBoard: -0.9,   // 紧贴行走线之后：玩家走到它跟前，不会被它挡住
       millstone: BAND.walk, woodpile: BAND.walk, hatch: BAND.walk, ditch: BAND.walk,
-      dog: BAND.walk, stonePile: BAND.walk, hangLantern: BAND.yard, kite: BAND.yard, vat: 0.2,
+      dog: BAND.walk, stonePile: BAND.walk, hangLantern: BAND.yard, cloth: BAND.yard, vat: 0.2,
     };
     const pz = KIND_Z[p.kind] ?? 0;
     const tagKind = (m) => { if (m) m.userData.kind = p.kind; return m; };
@@ -794,6 +798,22 @@ export function CreateWorld(canvasEl) {
       }
       case "house": {
         const W = p.w * PPM, H = p.h * PPM;
+        // 可进入的屋子：里外两层。室内剖面画在建筑纵深带上，立面盖在
+        // 行走线之前（z=0.4，在家具之上、演员之下）；人走进门里，
+        // UpdateProps 把立面淡出——勇敢的心式的里外切换
+        if (p.interior && !(ruined && p.burnable)) {
+          const inner = BakeSprite(W + 90, H + 90, (W + 90) / 2, H + 84,
+            (ctx, ax, ay) => ART.DrawHomeInterior(ctx, ax, ay, W, H, p.id, { night }), 0, PROP_SS);
+          PlaceSprite(inner, p.x, SURFACE_Y, BAND.building);
+          group.add(inner);
+          const facade = BakeSprite(W + 90, H + 90, (W + 90) / 2, H + 84,
+            (ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }), 0, PROP_SS);
+          PlaceSprite(facade, p.x, SURFACE_Y, 0.4);
+          group.add(facade);
+          homeFacade = facade;
+          homeRange = { x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2 };
+          break;
+        }
         mk(W + 90, H + 90, (W + 90) / 2, H + 84,
           (ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
         break;
@@ -893,10 +913,10 @@ export function CreateWorld(canvasEl) {
         mk(150, 130, 60, 122, (ctx, ax, ay) =>
           ART.DrawHangLantern(ctx, ax, ay, p.id, { lit: night && !state?.flags.lanternOut }));
         break;
-      case "kite": {
+      case "cloth": {
         // 只在第一章、还没被打下来之前挂在树上
-        if (state?.chapterIndex !== 0 || state?.flags.kiteDown) break;
-        mk(80, 100, 40, 50, (ctx, ax, ay) => ART.DrawKite(ctx, ax, ay, p.id), p.x, SURFACE_Y + 5.2, BAND.yard);
+        if (state?.chapterIndex !== 0 || state?.flags.clothDown) break;
+        mk(80, 100, 40, 50, (ctx, ax, ay) => ART.DrawCloth(ctx, ax, ay, p.id), p.x, SURFACE_Y + 5.2, BAND.yard);
         break;
       }
       case "vat": mk(80, 90, 40, 82, (ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id), p.x, UNDER_Y, 0.2); break;
@@ -1230,7 +1250,7 @@ export function CreateWorld(canvasEl) {
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
-      + `:${state.chapterIndex}:${f.kiteDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
+      + `:${state.chapterIndex}:${f.clothDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
     carveState = !!state.flags.carved;
@@ -1516,7 +1536,7 @@ export function CreateWorld(canvasEl) {
     }
     if (!s.carryMesh) return;
     // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同
-    const inHand = ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "风筝",
+    const inHand = ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾",
       "鞭炮", "一挂鞭炮", "空桶", "满桶水", "一桶水"].includes(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
@@ -1610,7 +1630,7 @@ export function CreateWorld(canvasEl) {
     };
     const digging = !!(state.beat && !state.beat.quakeActive
       && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
-        || def?.kind === "buildSpots" || def?.kind === "hold")
+        || def?.kind === "buildSpots" || def?.kind === "hold" || def?.kind === "chain")
       && state.prompt && state.prompt.includes("%"));
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
@@ -1816,24 +1836,80 @@ export function CreateWorld(canvasEl) {
       itemLabel = null;
     }
 
-    // 划线：那道正在被拉出来的白线。宽度随进度长，所以用一个纯色片
-    // 缩放，不每帧重烘贴图。
+    // 划线：石笔真的在木头上蹭出一道印——不是一个变长的纯色片。
+    // 一张画布贴在门框那一段上，手每推进一点就往画布上补几粒粉痕：
+    // 颗粒、断续、深浅不匀，全是石笔蹭木纹该有的样子。手可以往回蹭，
+    // 已经划下的印子不会消失（Core 里 drawn 只进不退）。
     if (state.scribe) {
+      const sc = state.scribe;
+      const spanW = (sc.x1 - sc.x0) + 0.36;
       if (!scribeMesh) {
+        scribeCanvas = MakeCanvas(288, 44);
+        scribeCtx = scribeCanvas.getContext("2d");
+        scribeLastT = 0;
+        const tex = CanvasTexture(scribeCanvas);
+        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearFilter;
         scribeMesh = new THREE.Mesh(
-          new THREE.PlaneGeometry(1, 0.055),
-          new THREE.MeshBasicMaterial({ color: 0xf2ead4, transparent: true, opacity: 0.95, depthWrite: false }),
+          new THREE.PlaneGeometry(spanW, 0.22),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
         );
         scribeMesh.userData.fixedOrder = LAYER_ORDER.play + 300;
         layers.play.add(scribeMesh);
+        // 石笔头：一小截浅色的笔，跟着手走
+        scribeTip = BakeSprite(26, 30, 13, 15, (ctx, ax, ay) => {
+          ctx.save();
+          ctx.translate(ax, ay);
+          ctx.rotate(-0.6);
+          ctx.fillStyle = "#e8dbba";
+          ctx.strokeStyle = "rgba(60,45,25,0.8)";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(-3.5, 10); ctx.lineTo(3.5, 10); ctx.lineTo(2.2, -10); ctx.lineTo(-2.2, -10);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.restore();
+        }, 0, DETAIL_SS);
+        scribeTip.userData.fixedOrder = LAYER_ORDER.play + 301;
+        layers.play.add(scribeTip);
       }
-      const w = Math.max(0.02, state.scribe.t * 1.15);
+      // 章节重开（进度回到 0）：擦掉画布重来
+      if (sc.t < scribeLastT - 0.01) {
+        scribeCtx.clearRect(0, 0, scribeCanvas.width, scribeCanvas.height);
+        scribeLastT = 0;
+      }
+      // 把新推进的那一小段补上粉痕
+      if (sc.t > scribeLastT) {
+        const W = scribeCanvas.width, H = scribeCanvas.height;
+        const pad = (0.18 / spanW) * W;
+        const usable = W - pad * 2;
+        scribeCtx.fillStyle = "#f2e6c4";
+        for (let u = scribeLastT; u < sc.t; u += 0.008) {
+          const px = pad + u * usable;
+          const wob = Math.sin(u * 61.7) * 1.7 + Math.sin(u * 23.3 + 1.2) * 1.1;
+          // 断续：偶尔跳过一粒，石笔蹭过木纹的坑
+          if (Math.sin(u * 197.3) > 0.88) continue;
+          const alpha = 0.5 + Math.abs(Math.sin(u * 83.1)) * 0.45;
+          scribeCtx.globalAlpha = alpha;
+          scribeCtx.fillRect(px, H / 2 + wob - 1.6, 2.6, 3.2);
+          if (Math.sin(u * 311.9) > 0.3) {           // 掉下来的粉屑
+            scribeCtx.globalAlpha = alpha * 0.35;
+            scribeCtx.fillRect(px + 0.8, H / 2 + wob + 3.5, 1.2, 1.2);
+          }
+        }
+        scribeCtx.globalAlpha = 1;
+        scribeMesh.material.map.needsUpdate = true;
+        scribeLastT = sc.t;
+      }
       scribeMesh.visible = true;
-      scribeMesh.scale.set(w, 1, 1);
-      // 从门框左沿往右长
-      scribeMesh.position.set(state.scribe.x - 0.55 + w / 2, state.scribe.y, 0.5);
-    } else if (scribeMesh) {
-      scribeMesh.visible = false;
+      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, 0.5);
+      if (scribeTip) {
+        scribeTip.visible = true;
+        const hx = sc.x0 + (sc.head ?? sc.t) * (sc.x1 - sc.x0);
+        scribeTip.position.set(hx + 0.06, sc.y + 0.09, 0.52);
+      }
+    } else {
+      if (scribeMesh) scribeMesh.visible = false;
+      if (scribeTip) scribeTip.visible = false;
     }
 
     // 烟与水：真解算（半拉格朗日平流 + 压力投影），固体边界就是地道剖面
@@ -1973,6 +2049,48 @@ export function CreateWorld(canvasEl) {
       cartMesh.visible = true;
       PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, 1.5);
     } else if (cartMesh) cartMesh.visible = false;
+
+    // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
+    // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
+    if (homeFacade && homeRange) {
+      const pp = state.player;
+      const inside = pp.level === "surface" && pp.x > homeRange.x0 && pp.x < homeRange.x1;
+      const goal = inside ? 0.07 : 1;
+      const cur = homeFacade.material.opacity ?? 1;
+      if (Math.abs(cur - goal) > 0.005) {
+        homeFacade.material.transparent = true;
+        homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
+      }
+    }
+
+    // 辘轳打水：井绳与桶跟着玩家的操作升降。绳从井架垂到桶梁，
+    // 桶沉下井口、灌满、再一把一把摇上来——全程看得见
+    if (state.winchView) {
+      const wv = state.winchView;
+      if (!winchRope) {
+        winchRope = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.045, 1),
+          new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
+        );
+        winchRope.userData.fixedOrder = LAYER_ORDER.play + 290;
+        layers.play.add(winchRope);
+        winchBucket = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶"), 0, DETAIL_SS);
+        winchBucket.userData.fixedOrder = LAYER_ORDER.play + 291;
+        layers.play.add(winchBucket);
+      }
+      const topY = SURFACE_Y + 1.62;                       // 井架横杆
+      const bucketY = SURFACE_Y + 1.05 - wv.depth * 1.5;   // 沉进井口
+      winchRope.visible = true;
+      winchRope.scale.set(1, Math.max(0.05, topY - bucketY), 1);
+      winchRope.position.set(wv.x, (topY + bucketY) / 2, 0.42);
+      winchBucket.visible = wv.hooked;
+      winchBucket.position.set(wv.x, bucketY, 0.43);
+      // 灌满了桶身压得低一点
+      winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
+    } else if (winchRope) {
+      winchRope.visible = false;
+      winchBucket.visible = false;
+    }
 
     // 飞出去的石子：一维横轴上的一道小弧线
     if (state.thrown) {

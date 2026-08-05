@@ -740,11 +740,12 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     ctx.beginPath();
     ctx.arc(2 * S, -2 * S, 6 * S, Math.PI * 0.15, Math.PI * 1.05);
     ctx.stroke();
-  } else if (label === "风筝") {
-    InkFill(ctx, [[0, -8 * S], [6 * S, 0], [0, 8 * S], [-6 * S, 0]], "kiteC", "#c96f52",
-      { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.12)" });
-    InkLine(ctx, 0, -8 * S, 0, 8 * S, "kiteSpine", { lw: 1 * S, color: "rgba(60,30,20,0.6)" });
-    InkLine(ctx, -6 * S, 0, 6 * S, 0, "kiteCross", { lw: 1 * S, color: "rgba(60,30,20,0.6)" });
+  } else if (label === "花布巾") {
+    // 叠起来的一方花布：洗得发白的底子，两道印花条
+    InkFill(ctx, [[-7 * S, 3 * S], [-6 * S, -4 * S], [0, -6 * S], [6.5 * S, -3.5 * S], [7 * S, 3 * S], [0, 5 * S]],
+      "clothFold", "#c9a9a0", { amp: 0.9 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.14)" });
+    InkLine(ctx, -5 * S, -1 * S, 5.5 * S, -0.5 * S, "clothStripe1", { lw: 1.1 * S, color: "rgba(150,80,70,0.65)", amp: 1.2 });
+    InkLine(ctx, -4.5 * S, 2 * S, 5 * S, 2.4 * S, "clothStripe2", { lw: 1.1 * S, color: "rgba(150,80,70,0.5)", amp: 1.2 });
   } else if (label === "鞭炮" || label === "一挂鞭炮") {
     for (let i = 0; i < 6; i += 1) {
       InkFill(ctx, Rect(-6 * S + (i % 2) * 6 * S, (-9 + i * 3) * S, 5 * S, 2.6 * S), "fc" + i, "#a8453a",
@@ -773,7 +774,48 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
 // ---------------------------------------------------------------------------
 // 建筑与道具
 // ---------------------------------------------------------------------------
-export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = false } = {}) {
+// 可进入的屋子的内里（剖面）：土墙面、炕、灶台、水缸、房梁。
+// 立面淡出后看到的就是这一层——像蚂蚁农场一样把家剖开给你看。
+export function DrawHomeInterior(ctx, x, groundY, w, h, id, { night = false } = {}) {
+  const W = w, H = h;
+  // 内墙面：比外墙暖一点、亮一点（烟火气熏出来的浅黄）
+  InkFill(ctx, Rect(x - W / 2, groundY - H, W, H), id + "inWall", night ? "#4a4034" : "#b09c78",
+    { amp: 1.4, lw: 2.4, shade: "rgba(60,45,30,0.16)", shadeAt: 0.7 });
+  Speckle(ctx, x - W / 2, groundY - H, W, H, id + "inSp", { count: 22, alpha: 0.08, size: 1.6 });
+  // 房梁：两根压在墙头
+  InkLine(ctx, x - W / 2 + 4, groundY - H + 10, x + W / 2 - 4, groundY - H + 8, id + "beam1",
+    { lw: 6, color: "#4a3826", amp: 1.6 });
+  InkLine(ctx, x - W / 2 + 10, groundY - H + 24, x + W / 2 - 10, groundY - H + 22, id + "beam2",
+    { lw: 4, color: "rgba(74,56,38,0.55)", amp: 1.8 });
+  // 炕：西头一方土台，铺席、卷着被褥
+  const kw = W * 0.42, kh = 26;
+  InkFill(ctx, Rect(x - W / 2 + 8, groundY - kh, kw, kh), id + "kang", "#8a6f4c",
+    { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.18)" });
+  InkLine(ctx, x - W / 2 + 10, groundY - kh + 5, x - W / 2 + 6 + kw, groundY - kh + 5, id + "mat",
+    { lw: 1.2, color: "rgba(60,45,25,0.5)", amp: 1.4 });
+  InkFill(ctx, [[x - W / 2 + 14, groundY - kh], [x - W / 2 + 16, groundY - kh - 14],
+    [x - W / 2 + 34, groundY - kh - 12], [x - W / 2 + 36, groundY - kh]],
+    id + "quiltRoll", "#9a8468", { amp: 1.4, lw: 1.8, shade: "rgba(0,0,0,0.14)" });
+  // 灶台：连着炕（炕灶相连是华北民居的常态），上面坐一口锅
+  const zx = x - W / 2 + 12 + kw;
+  InkFill(ctx, Rect(zx, groundY - 20, 30, 20), id + "stove", "#7a6248", { amp: 1.2, lw: 2 });
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(zx + 15, groundY - 20, 9, Math.PI, 0); ctx.stroke();
+  InkFill(ctx, [[zx + 6, groundY - 20], [zx + 24, groundY - 20], [zx + 22, groundY - 26], [zx + 8, groundY - 26]],
+    id + "pot", "#3d3a36", { amp: 0.8, lw: 1.6 });
+  // 水缸：靠门那头
+  InkFill(ctx, [[x + W / 2 - 30, groundY], [x + W / 2 - 33, groundY - 16], [x + W / 2 - 29, groundY - 26],
+    [x + W / 2 - 13, groundY - 26], [x + W / 2 - 9, groundY - 16], [x + W / 2 - 12, groundY]],
+    id + "vat", "#6e5b44", { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.22)" });
+  // 小窗：西墙上一方纸窗，白天透一格亮
+  InkFill(ctx, Rect(x - W / 2 + 14, groundY - H + 34, 22, 18), id + "win", night ? "#2c2822" : "#d8c9a2",
+    { amp: 0.8, lw: 2 });
+  InkLine(ctx, x - W / 2 + 25, groundY - H + 34, x - W / 2 + 25, groundY - H + 52, id + "winBar",
+    { lw: 1.2, color: "rgba(70,50,30,0.7)" });
+}
+
+export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = false, door = false } = {}) {
   const W = w, H = h;
   if (burnt) {
     // 残墙：一堵立着，其余塌成瓦砾
@@ -854,8 +896,22 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
   }
   ctx.restore();
   // 门与窗
-  const dw = Math.min(20, W * 0.2), dh = H * 0.55;
-  InkFill(ctx, Rect(x - W * 0.28, groundY - dh, dw, dh), id + "door", "#5c452f", { amp: 1.2, lw: 2.2 });
+  // door=true 是可进入的家：门开在东头（对着院子），洞是敞的——
+  // 人从这儿走进去，立面就淡出让位给屋里
+  if (door) {
+    const dw2 = 30, dh2 = H * 0.66;
+    const dx2 = x + W / 2 - dw2 - 10;
+    InkFill(ctx, Rect(dx2, groundY - dh2, dw2, dh2), id + "doorway", "#241d15", { amp: 1.2, lw: 2.4 });
+    // 门洞里透出一线屋内的暖色
+    ctx.save();
+    ctx.globalAlpha = night ? 0.14 : 0.3;
+    ctx.fillStyle = "#8a6f4c";
+    ctx.fillRect(dx2 + 4, groundY - dh2 * 0.7, dw2 - 8, dh2 * 0.7);
+    ctx.restore();
+  } else {
+    const dw = Math.min(20, W * 0.2), dh = H * 0.55;
+    InkFill(ctx, Rect(x - W * 0.28, groundY - dh, dw, dh), id + "door", "#5c452f", { amp: 1.2, lw: 2.2 });
+  }
   const ww = Math.min(17, W * 0.17);
   InkFill(ctx, Rect(x + W * 0.14, groundY - H * 0.66, ww, ww * 0.85), id + "win",
     night ? "#c99b4a" : "#4a3a2a", { amp: 1.2, lw: 2.2 });
@@ -875,10 +931,12 @@ export function DrawDoorframe(ctx, x, groundY, id, { carved = false } = {}) {
     InkLine(ctx, x - W / 2 + 2, groundY - H + 12 + i * 20, x - W / 2 + 2, groundY - H + 28 + i * 20,
       id + "g" + i, { lw: 0.9, color: "rgba(90,60,35,0.55)", amp: 1.6 });
   }
-  // 爹刻的那道线
-  InkLine(ctx, x - W / 2 + 1, groundY - 30, x - W / 2 + 8, groundY - 30, id + "mark1", { lw: 2.4, color: "#f0e0b0", amp: 0.4 });
+  // 爹刻的那道线：高度必须跟划线玩法的 markY 对上（1.28m×48ppm≈61px），
+  // 否则玩家亲手划的线消失后，永久刻痕落在另一个高度上
+  InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 2.4, color: "#f0e0b0", amp: 0.4 });
   if (carved) {
-    InkLine(ctx, x - W / 2 + 1, groundY - 44, x - W / 2 + 8, groundY - 44, id + "mark2", { lw: 2.4, color: "#fff0c8", amp: 0.4 });
+    // 第八章给妹妹刻的：矮一头（1.08m）
+    InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 2.4, color: "#fff0c8", amp: 0.4 });
   }
 }
 
@@ -1260,14 +1318,17 @@ export function DrawHangLantern(ctx, x, groundY, id, { lit = true } = {}) {
   }
 }
 
-// 挂在树杈上的风筝
-export function DrawKite(ctx, x, y, id) {
-  InkFill(ctx, [[x, y - 16], [x + 12, y], [x, y + 16], [x - 12, y]], id + "face", "#c96f52",
-    { amp: 1, lw: 2, shade: "rgba(0,0,0,0.12)" });
-  InkLine(ctx, x, y - 16, x, y + 16, id + "sp", { lw: 1.4, color: "rgba(60,30,20,0.6)" });
-  InkLine(ctx, x - 12, y, x + 12, y, id + "cr", { lw: 1.4, color: "rgba(60,30,20,0.6)" });
-  // 挂着的线与尾穗
-  InkLine(ctx, x, y + 16, x + 7, y + 34, id + "tail", { lw: 1.2, color: "rgba(80,50,35,0.7)", amp: 2.2 });
+// 刮上树杈的花布头巾：一角勾在杈上，其余的随风搭下来
+export function DrawCloth(ctx, x, y, id) {
+  InkFill(ctx, [[x - 2, y - 14], [x + 5, y - 10], [x + 9, y + 2], [x + 3, y + 14], [x - 6, y + 10], [x - 8, y - 2]],
+    id + "body", "#c9a9a0", { amp: 1.8, lw: 1.8, shade: "rgba(0,0,0,0.14)" });
+  // 印花条
+  InkLine(ctx, x - 5, y - 4, x + 6, y - 1, id + "st1", { lw: 1.2, color: "rgba(150,80,70,0.6)", amp: 1.6 });
+  InkLine(ctx, x - 4, y + 4, x + 5, y + 7, id + "st2", { lw: 1.2, color: "rgba(150,80,70,0.45)", amp: 1.6 });
+  // 勾在树杈上的那一角
+  InkLine(ctx, x - 2, y - 14, x + 2, y - 20, id + "snag", { lw: 1.4, color: "rgba(90,60,45,0.8)" });
+  // 垂下来被风掀起的边
+  InkLine(ctx, x + 3, y + 14, x + 10, y + 20, id + "flap", { lw: 1.6, color: "#b8968e", amp: 2.4 });
 }
 
 // 石子堆：投掷的"弹药箱"

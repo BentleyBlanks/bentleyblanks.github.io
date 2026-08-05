@@ -394,6 +394,33 @@ export function PoseRig(rig, s, dt) {
     target.armF = -170 * DEG; target.foreF = -44 * DEG;
     target.thighB = -34 * DEG; target.shinB = 30 * DEG; target.footB = -8 * DEG;
     target.thighF = 20 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.pose === "bow") {
+    // ── 动词姿势（规范：每个玩法动词都要有对应动画）──
+    // 弯腰拾东西：塌腰探手，另一只手向后压着找平衡
+    target.hipY = -0.30; target.hipX = 0.10;
+    target.torso = 58 * DEG; target.head = -30 * DEG;
+    target.armF = -78 * DEG; target.foreF = -18 * DEG;
+    target.armB = -22 * DEG; target.foreB = -10 * DEG;
+    target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
+    target.thighF = -22 * DEG; target.shinF = 30 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "throwArm") {
+    // 投掷收势：石子刚出手，臂甩到前上方，上身跟着送出去
+    target.hipY = -0.06; target.hipX = 0.16;
+    target.torso = 24 * DEG; target.head = -10 * DEG;
+    target.armF = -122 * DEG; target.foreF = -4 * DEG;
+    target.armB = -6 * DEG; target.foreB = -22 * DEG;
+    target.thighB = -42 * DEG; target.shinB = 30 * DEG; target.footB = -10 * DEG;
+    target.thighF = 18 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.pose === "crank") {
+    // 摇辘轳：两手一前一后画圈，脚步扎稳
+    const ph = p * 2.4;
+    const ca = Math.sin(ph), cb = Math.cos(ph);
+    target.hipY = -0.10; target.hipX = 0.08;
+    target.torso = 18 * DEG; target.head = -10 * DEG;
+    target.armF = (-96 + ca * 26) * DEG; target.foreF = (-30 + cb * 20) * DEG;
+    target.armB = (-82 - ca * 26) * DEG; target.foreB = (-36 - cb * 20) * DEG;
+    target.thighB = -18 * DEG; target.shinB = 20 * DEG; target.footB = -6 * DEG;
+    target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
   } else if (s.climbing) {
     // 爬梯：双手交替上够，腿蹬阶
     target.hipY = 0; target.hipX = 0;

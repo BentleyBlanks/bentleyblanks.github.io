@@ -105,6 +105,12 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           if (Math.abs(dx) <= 2.2) { input.interactHeld = true; input.moveX = target.dir; }
           else input.moveX = Math.sign(dx);
         }
+        // 辘轳：没灌满一直往下放（S），灌满了一直往上摇（W）
+        if (target.action === "winchAt" && Math.abs(dx) <= 1.35) {
+          const w = state.beat?.winch;
+          input.climb = w?.filled ? -1 : 1;
+          input.moveX = 0;
+        }
         // 划线：按住 E 的同时还得左右推，粉笔才走
         if (target.action === "scribeAt" && Math.abs(dx) <= 1.6) {
           input.interactHeld = true;
@@ -237,7 +243,7 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   // 谜题动词层的旗标：链走完了这些必须是真的。链的某一步悄悄断掉
   // （物品拿不到、投掷永远不中、狗喂不上）不会让通关测试变红——
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
-  assert.equal(state.flags.kiteDown, true, "C1 投掷教学必须真的把风筝打下来");
+  assert.equal(state.flags.clothDown, true, "C1 投掷教学必须真的把布巾打下来");
   assert.equal(state.flags.dogFed, true, "C2 的狗必须喂得上");
   assert.equal(state.flags.lanternOut, true, "C2 的马灯必须打得灭");
   assert.equal(state.flags.trapBuilt, true, "C5 翻口链必须走得通");

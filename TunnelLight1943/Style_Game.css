@@ -362,42 +362,39 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   pointer-events: auto;
 }
 
+/* 声音开关搬进设置面板了：右上角只留一个入口。这里是面板里的一行。 */
 #btnSound {
-  position: relative;
-  width: 38px; height: 38px;
-  flex: none;
-  display: grid; place-items: center;
-  border: 1px solid rgba(226, 216, 188, 0.22);
-  border-radius: 50%;
-  background: rgba(18, 15, 11, 0.42);
-  color: rgba(226, 216, 188, 0.5);
-  font-size: 17px; line-height: 1;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 11px;
+  border: 1px solid rgba(214, 190, 140, 0.28);
+  border-radius: 6px;
+  background: rgba(30, 24, 15, 0.5);
+  color: #d9c9a4;
+  font-family: inherit; font-size: 12.5px; letter-spacing: 0.05em;
   cursor: pointer;
   pointer-events: auto;
-  transition: color 0.25s, border-color 0.25s, background 0.25s;
   -webkit-tap-highlight-color: transparent;
-  user-select: none; -webkit-user-select: none;
 }
-#btnSound[aria-pressed="true"] {
-  color: rgba(255, 206, 130, 0.92);
-  border-color: rgba(255, 206, 130, 0.42);
-  background: rgba(40, 28, 14, 0.55);
+#btnSound .state {
+  font-size: 12px; letter-spacing: 0.14em;
+  padding: 2px 9px; border-radius: 999px;
 }
-/* 关掉时划一道斜杠，不用换字形 */
-#btnSound[aria-pressed="false"]::after {
-  content: ""; position: absolute;
-  width: 22px; height: 1px;
-  background: rgba(226, 216, 188, 0.5);
-  transform: rotate(-45deg);
-}
+#btnSound[aria-pressed="true"] .state { color: #ffce82; background: rgba(255, 206, 130, 0.16); }
+#btnSound[aria-pressed="false"] { color: #9a8f7a; }
+#btnSound[aria-pressed="false"] .state { color: #9a8f7a; background: rgba(154, 143, 122, 0.14); }
+/* 关掉声音时把三条音量滑轨压暗——它们此刻不起作用 */
+#settingsPanel.muted label,
+#settingsPanel.muted input[type="range"] { opacity: 0.38; }
 
 
 /* 设置：跟声音开关并排的一个小齿轮，点开是一张压在右上角的窄面板。
    刻意做得小而暗——它不该跟画面抢注意力。 */
 #btnSettings {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: none;
   display: grid;
   place-items: center;
@@ -412,6 +409,13 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   -webkit-tap-highlight-color: transparent;
 }
 #btnSettings:hover { background: rgba(30, 25, 18, 0.72); }
+#btnSettings svg {
+  width: 21px; height: 21px;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round;
+}
+#btnSettings svg circle { fill: rgba(18, 15, 11, 0.95); }
+#btnSettings[aria-expanded="true"] { color: #ffce82; border-color: rgba(255, 206, 130, 0.5); }
 
 #settingsPanel {
   position: absolute;

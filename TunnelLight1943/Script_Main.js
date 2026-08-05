@@ -127,7 +127,7 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
-// 划线那一拍：手指（或鼠标）直接在画面上把粉笔拖过去。位移驱动——
+// 划线那一拍：手指（或鼠标）直接在画面上把石笔拖过去。位移驱动——
 // 拖多少走多少，手上才有蹭着木头走的实感。整整一道线约等于拖过 45% 画宽。
 const scribeDrag = { active: false, id: null, lastX: 0, accum: 0 };
 canvas.addEventListener("pointerdown", (e) => {
@@ -504,7 +504,7 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线的 QTE 轨道：粉笔头跟着进度走，没动起来时轻轻晃一下招呼玩家来拖
+  // 划线的 QTE 轨道：石笔头跟着进度走，没动起来时轻轻晃一下招呼玩家来拖
   if (ui.scribeGuide) {
     const sc = state.scribe;
     ui.scribeGuide.hidden = !sc;
@@ -708,6 +708,10 @@ function SyncSoundButton() {
   if (!ui.btnSound) return;
   ui.btnSound.setAttribute("aria-pressed", soundOn ? "true" : "false");
   ui.btnSound.title = soundOn ? "关闭声音" : "打开声音（旁白 / 音效 / 配乐）";
+  const state = ui.btnSound.querySelector(".state");
+  if (state) state.textContent = soundOn ? "开" : "关";
+  // 关掉时把三条音量滑轨压暗：它们这会儿不起作用
+  ui.settingsPanel?.classList.toggle("muted", !soundOn);
 }
 function ToggleSound() {
   soundOn = !soundOn;

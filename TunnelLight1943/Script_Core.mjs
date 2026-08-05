@@ -33,7 +33,9 @@ export const SCENES = {
     walk: { surface: [4, 186], under: [21, 31] }, // under = 地窖
     shafts: [{ id: "cellarHatch", x: 27, name: "地窖口" }],
     props: [
-      { id: "homeHouse", kind: "house", x: 30, w: 9.5, h: 3.6, name: "柱子家", burnable: true },
+      // interior：可走进去的家。门开在东墙（x≈34，正是刻身高线的那个门框——
+      // 露天立一个门框不成话，线就该刻在自家门口的框上）
+      { id: "homeHouse", kind: "house", x: 30, w: 9.5, h: 3.6, name: "柱子家", burnable: true, interior: true },
       { id: "houseB", kind: "house", x: 62, w: 8.5, h: 3.3 },
       { id: "houseC", kind: "house", x: 92, w: 9, h: 3.4, burnable: true },
       { id: "houseD", kind: "house", x: 148, w: 8, h: 3.2 },
@@ -47,9 +49,9 @@ export const SCENES = {
       { id: "woodpile", kind: "woodpile", x: 70, name: "木料堆" },
       { id: "bigTree", kind: "tree", x: 126, big: true, name: "老槐树" },
       { id: "gatePost", kind: "lamppost", x: 174, name: "村东口" },
-      // 谜题道具：风筝挂在老槐树上（一章）；石碾上晾着窝头、王家的狗、
-      // 巷口的马灯、两处石子堆（二章的潜行链）
-      { id: "kite", kind: "kite", x: 127.6, name: "风筝" },
+      // 谜题道具：妹妹的花布头巾被风刮上老槐树（一章）；石碾上晾着窝头、
+      // 王家的狗、巷口的马灯、两处石子堆（二章的潜行链）
+      { id: "cloth", kind: "cloth", x: 127.6, name: "花布巾" },
       { id: "stonesTree", kind: "stonePile", x: 120, name: "石子堆" },
       { id: "grindstone", kind: "millstone", x: 118, name: "石碾" },
       { id: "yardDog", kind: "dog", x: 138, name: "王家的狗" },
@@ -297,6 +299,13 @@ const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
 
 function GiveItem(state, item) { state.player.item = { ...item }; }
 
+// 规范：每个玩法动词都要有对应的角色动画。瞬时动作（拾、投）打一个
+// 带时限的姿势，持续动作（摇辘轳、划线）每帧续期——到时自动收回常态。
+function FlashPose(state, name, dur = 0.5) {
+  state.player.pose = name;
+  state.player.poseT = dur;
+}
+
 // 投掷：面朝方向 3~10.5m 内有本步的目标就砸它（一维横轴上不做抛物线瞄准，
 // 站位就是瞄准）；否则石子落在 7.5m 外，白出一声响
 function StartThrow(state, st) {
@@ -403,7 +412,7 @@ function StepChain(state, def, input, dt) {
       if (!near) return;
       if (p.item) { state.prompt = "手里拿着" + p.item.label + "——一次只能拿一样"; return; }
       state.prompt = st.prompt || `E · 拿起${st.item.label}`;
-      if (input.interact) { GiveItem(state, st.item); finish(); }
+      if (input.interact) { GiveItem(state, st.item); FlashPose(state, "bow", 0.5); finish(); }
       return;
     }
     case "use": {
@@ -431,13 +440,13 @@ function StepChain(state, def, input, dt) {
       if (!p.item) {
         if (nearPile) {
           state.prompt = "E · 捡一颗石子";
-          if (input.interact) GiveItem(state, { id: "stone", label: "石子", throwable: true });
+          if (input.interact) { GiveItem(state, { id: "stone", label: "石子", throwable: true }); FlashPose(state, "bow", 0.45); }
         }
         return;
       }
       if (p.item.id !== "stone") return;
       state.prompt = st.prompt || "F · 朝着它投出去（站得不远不近才砸得到）";
-      if (input.throw || (input.interact && !nearPile)) StartThrow(state, st);
+      if (input.throw || (input.interact && !nearPile)) { StartThrow(state, st); FlashPose(state, "throwArm", 0.45); }
       return;
     }
     case "talk": {
@@ -466,6 +475,63 @@ function StepChain(state, def, input, dt) {
     }
     case "goto": {
       if (InZone(p.x, lvl, st.zone)) finish();
+      return;
+    }
+    case "winch": {
+      // 辘轳打水：不是长按——S 放绳把桶送下去，触水灌满，W 一把一把摇上来。
+      // 满桶沉，松手辘轳会倒转，桶又坐回水里。手上的分量就在这一下。
+      const w = b.winch || (b.winch = { depth: 0, filled: false, hooked: !st.needs, slipT: 0 });
+      if (!InZone(p.x, lvl, st.zone)) return;
+      state.winchLock = true;   // 井口的竖推交给辘轳，不再当爬梯（c5 井台正压在竖井口上）
+      if (!w.hooked) {
+        if (p.item?.id === st.needs) {
+          state.prompt = st.hookPrompt || "E · 把桶挂上辘轳";
+          if (input.interact) { w.hooked = true; p.item = null; FlashPose(state, "bow", 0.4); }
+        } else {
+          state.prompt = st.missPrompt || `得有${st.needsLabel || "桶"}才打得上水`;
+        }
+        state.winchView = { x: st.zone.x, depth: w.depth, filled: w.filled, hooked: w.hooked };
+        return;
+      }
+      const climb = input.climb || 0;
+      if (!w.filled) {
+        if (climb > 0.05) {
+          w.depth = Math.min(1, w.depth + dt * 0.62);
+          FlashPose(state, "crank", 0.25);
+        }
+        state.prompt = "S · 放绳，把桶送下去";
+        state.promptFill = w.depth;
+        if (w.depth >= 1) {
+          w.filled = true;
+          state.toast = { text: "桶触到水面，咕咚一声灌满了。", t: 2.6 };
+        }
+      } else {
+        if (climb < -0.05) {
+          w.depth = Math.max(0, w.depth - dt * 0.34);
+          w.slipT = 0.3;
+          FlashPose(state, "crank", 0.25);
+        } else {
+          // 松手：辘轳倒转。留 0.3s 的棘齿宽限，换手不至于立刻坠
+          w.slipT = Math.max(0, w.slipT - dt);
+          if (w.slipT <= 0 && w.depth < 1) {
+            w.depth = Math.min(1, w.depth + dt * 0.45);
+            if (w.depth >= 1 && !w.slipShown) {
+              w.slipShown = true;
+              state.toast = { text: "手一松，辘轳呼噜噜倒转——桶又坐回了水里。", t: 3 };
+            }
+          }
+        }
+        state.prompt = "W · 一把一把摇上来（松手辘轳会倒转）";
+        state.promptFill = 1 - w.depth;
+        if (w.depth <= 0) {
+          if (st.gives) GiveItem(state, st.gives);
+          if (st.transform) state.player.item = { ...st.transform };
+          state.winchView = null;
+          finish();
+          return;
+        }
+      }
+      state.winchView = { x: st.zone.x, depth: w.depth, filled: w.filled, hooked: true };
       return;
     }
     default: return;
@@ -534,11 +600,11 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 镜头推到门框上：这一下要看得见木头的纹、孩子的头顶、和那支粉笔。
+      // 镜头推到门框上：这一下要看得见木头的纹、孩子的头顶、和那支石笔。
       // 全景里划线只是一个像素在动，凑近了才是"爹在给我量身高"。
       kind: "scribe", id: "c1_carve", zone: V.doorframe, speed: 0.5, markY: 1.28,
       cam: { kind: "shot", x: 34.9, y: 1.42, dist: 2.9 },
-      objective: "爹比着你的头顶，在门框上划一道", hint: "拖着粉笔划过去（或按住 E 左右推）",
+      objective: "爹比着你的头顶，在门框上划一道", hint: "拖着石笔划过去（或按住 E 左右推）",
       note: "墨斗线弹在木头上，留下一道浅浅的印。",
       onStart: (state) => {
         // 爹得真的走过来伸手够门框，不能站在院子那头让字幕替他划
@@ -585,30 +651,33 @@ export const SCRIPTS = {
         { type: "pickup", x: 70, item: { id: "rope", label: "麻绳" }, prompt: "E · 从木料堆里抽出麻绳" },
         { type: "use", zone: V.well, needs: "rope", hold: 1.2, prompt: "按住 E · 接上井绳",
           note: "麻绳接上了。辘轳又能转了。" },
-        { type: "use", zone: V.well, hold: 1.4, prompt: "按住 E · 打水",
-          gives: { id: "fullBucket", label: "一桶水", big: true } },
+        { type: "winch", zone: V.well,
+          gives: { id: "fullBucket", label: "一桶水", big: true },
+          note: "水打上来了。桶沿一路往下滴。" },
         { type: "use", zone: V.homeYard, needs: "fullBucket", prompt: "E · 把水倒进缸里",
           note: "水缸满了。娘直起腰，朝他笑了笑。" },
       ],
     },
     {
       // 教「投掷」：无压力的一投。第二章同一个动词要在灯下用第二次。
-      kind: "chain", id: "c1_kite",
+      // （历史检查：不是风筝——1942 年敌后农村的孩子头上是花布巾，
+      // 风刮上树的只会是这类日常物件。）
+      kind: "chain", id: "c1_cloth",
       objective: "去老槐树下找妹妹回家吃饭", hint: "娘直起腰，朝老槐树的方向望了望",
       steps: [
         { type: "talk", actor: "sister", prompt: "E · 问妹妹怎么了",
           lines: [
-            { who: "妹妹", say: "哥——风筝，风筝挂上头了！", d: 3.0, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
-            { stage: "纸糊的风筝卡在老槐树的树杈上，线还在风里飘。", d: 3.4, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
+            { who: "妹妹", say: "哥——风把我的头巾刮到树上去了！", d: 3.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
+            { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
           ] },
         { type: "throwHit", pickupX: 120, target: { x: 127.6, y: 5.2, r: 2 },
-          prompt: "F · 朝树杈上的风筝投（站得不远不近才砸得到）",
-          missNote: "石子从风筝边上擦过去了。再捡一颗。",
-          note: "风筝晃了两晃，打着旋儿落下来了。",
-          effect: (state) => { state.flags.kiteDown = true; } },
-        { type: "pickup", x: 129, item: { id: "kite", label: "风筝" }, prompt: "E · 捡起风筝" },
-        { type: "use", zone: { x: 124, w: 4 }, needs: "kite", prompt: "E · 把风筝还给妹妹",
-          note: "妹妹抱着风筝，肯跟着回家了。" },
+          prompt: "F · 朝树杈上的头巾投（站得不远不近才砸得到）",
+          missNote: "石子从布巾边上擦过去了。再捡一颗。",
+          note: "布巾打着旋儿飘下来了。",
+          effect: (state) => { state.flags.clothDown = true; } },
+        { type: "pickup", x: 129, item: { id: "cloth", label: "花布巾" }, prompt: "E · 拾起头巾" },
+        { type: "use", zone: { x: 124, w: 4 }, needs: "cloth", prompt: "E · 把头巾给妹妹系上",
+          note: "妹妹把头巾系好，肯跟着回家了。" },
       ],
     },
     {
@@ -799,7 +868,7 @@ export const SCRIPTS = {
       ],
     },
     {
-      // C1 打的是风筝，这回打的是灯：同一个动词，第二次用在命上。
+      // C1 打的是树杈上的布巾，这回打的是灯：同一个动词，第二次用在命上。
       kind: "chain", id: "c2_lantern",
       objective: "巷口的马灯照住了必经的路", hint: "草垛边有石子堆。灯挂得高，够不着",
       light: { zone: [156, 164], cycle: 1, lit: 1, offFlag: "lanternOut", src: { x: 160, y: 2.4 } },
@@ -1155,7 +1224,7 @@ export const SCRIPTS = {
         { type: "use", zone: TV.trapSpot, hold: 3, prompt: "按住 E · 挖翻口",
           note: "弯挖出来了。可干弯挡不住烟——得灌上水。" },
         { type: "pickup", x: 30, level: "under", item: { id: "bucket2", label: "空桶" }, prompt: "E · 拎起西口的空桶" },
-        { type: "use", zone: TV.wellTop, needs: "bucket2", hold: 1.5, prompt: "按住 E · 井台打水",
+        { type: "winch", zone: TV.wellTop, needs: "bucket2", needsLabel: "空桶",
           transform: { id: "fullBucket2", label: "满桶水", big: true },
           note: "桶沉了。上面还有人在转——挑好下去的时候。" },
         { type: "use", zone: TV.trapSpot, needs: "fullBucket2", hold: 1, prompt: "按住 E · 把水倒进弯里",
@@ -1550,7 +1619,7 @@ export const SCRIPTS = {
     {
       // 第一章是爹的手，这一回是他自己的手——同一个动作，同一个景别。
       // 两道线之间隔着的东西，画面自己会说。
-      kind: "scribe", id: "c8_carve", zone: V.doorframe, speed: 0.42, markY: 1.08,
+      kind: "scribe", id: "c8_carve", zone: V.doorframe, speed: 0.42, markY: 1.08, selfMark: true,
       cam: { kind: "shot", x: 34.9, y: 1.30, dist: 2.9 },
       objective: "在旧刻痕旁，刻下一道新的线", hint: "拖着划过去（或按住 E 左右推）",
       note: "刻完，柱子用拇指抹平了木屑。",
@@ -1847,7 +1916,7 @@ export function CreateGame(chapterIndex = 0) {
     flags: {
       route: null, resets: 0, ruined: false, carved: false,
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
-      kiteDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
+      clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
     },
     caption: null,
     camHint: { kind: "follow" },
@@ -1901,7 +1970,7 @@ export function StartChapter(state, index) {
   if (index !== 7) state.flags.ruined = false;
   if (index < 4) { state.flags.hiddenBuilt = false; state.flags.entWBlocked = false; }
   // 从章节菜单单独进某一章时，本章谜题的旗标要归零
-  if (index === 0) state.flags.kiteDown = false;
+  if (index === 0) state.flags.clothDown = false;
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
   if (index === 4) { state.flags.dogFed2 = false; state.flags.bellBuilt = false; }
@@ -2124,6 +2193,11 @@ export function StepGame(state, input, dt) {
   if (state.phase === "gameEnd") return;
   state.time += dt;
   if (state.toast && (state.toast.t -= dt) <= 0) state.toast = null;
+  // 动词姿势到时收回（过场里由脚本设的 pose 没有 poseT，不受影响）
+  if (state.player.poseT !== undefined && (state.player.poseT -= dt) <= 0) {
+    state.player.pose = null;
+    state.player.poseT = undefined;
+  }
 
   if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
     state.cardTimer += dt;
@@ -2154,6 +2228,11 @@ export function StepGame(state, input, dt) {
   StepDogs(state, dt);
   StepLightHazard(state, def, dt);
   if (state.noiseAt && (state.noiseAt.t -= dt) <= 0) state.noiseAt = null;
+
+  // 辘轳锁在这里清、在 beat 执行器里立——MovePlayer 在前面用的是上一帧的值，
+  // 这一帧的时序正好让"井口竖推当摇辘轳"不与"竖推当爬梯"打架
+  state.winchLock = false;
+  state.winchView = null;
 
   switch (def.kind) {
     case "goto": StepGoto(state, def, input); break;
@@ -2220,8 +2299,8 @@ function MovePlayer(state, input, dt) {
     break;
   }
 
-  // 爬梯口：W 上 / S 下
-  if (Math.abs(input.climb || 0) > 0.05) {
+  // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
+  if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {
     for (const shaft of scene.shafts) {
       if (Math.abs(p.x - shaft.x) > 1.4) continue;
       if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
@@ -2749,11 +2828,11 @@ function StepSmokeEscape(state, def, input) {
   if (remaining.length === 0) AdvanceBeat(state);
 }
 
-// 划线：一个很小的交互。按住 E，再左右推，粉笔就沿着门框划过去；
+// 划线：一个很小的交互。按住 E，再左右推，石笔就沿着门框划过去；
 // 松手或不推就停。线划满一道就算成。
 //
 // 叙事上是爹在划——所以爹必须真的走过来、伸手够到门框（pose="mark"）；
-// 玩家手里控制的是那支粉笔。让玩家亲手把这道线拉出来，比看一张插画卡重。
+// 玩家手里控制的是那支石笔。让玩家亲手把这道线拉出来，比看一张插画卡重。
 function StepScribe(state, def, input, dt) {
   const b = state.beat;
   if (b.drawn === undefined) {
@@ -2766,18 +2845,29 @@ function StepScribe(state, def, input, dt) {
     state.scribe = null;
     return;
   }
-  // 两种握法，同一件事：桌面按住 E 往一边推，触屏直接把粉笔拖过去。
+  // 两种握法，同一件事：桌面按住 E 往一边推，触屏直接把石笔拖过去。
   // 拖动是位移驱动的（拖多少走多少），手上有"蹭着木头走"的实感；
   // 按键那路仍按时间推进，不然键盘玩家没法控制快慢。
+  //
+  // 手（head）与线（drawn）是两回事：手可以往回蹭，划下的印子不会跟着退。
+  // 线只在手走到过的最远处累积——这才是石笔，不是一根进度条。
+  if (b.head === undefined) b.head = 0;
   const held = input.interactHeld || input.interact;
   const push = Math.abs(input.moveX) > 0.05;
-  if (held && push) b.drawn += dt * (def.speed || 0.5);
-  if (input.dragX) b.drawn += input.dragX;
-  b.drawn = Math.max(0, Math.min(1, b.drawn));
-  b.everMoved = b.everMoved || b.drawn > 0.02;
+  if (held && push) b.head += Math.sign(input.moveX) * dt * (def.speed || 0.5);
+  if (input.dragX) b.head += input.dragX;
+  b.head = Math.max(0, Math.min(1, b.head));
+  b.drawn = Math.max(b.drawn, b.head);
+  b.everMoved = b.everMoved || b.head > 0.02;
+  // 第八章他自己刻：抬臂比着框（第一章是爹在划，玩家是被量的那个）
+  if (def.selfMark) FlashPose(state, "mark", 0.3);
   state.prompt = null;   // 这一拍的引导由 QTE 轨道给，不占中间那条提示
-  // 交给 HUD 画轨道、渲染层画线
-  state.scribe = { x: def.zone.x, y: def.markY ?? 1.25, t: b.drawn, idle: !b.everMoved };
+  // 交给 HUD 画轨道、渲染层画线：x0→x1 是这道线的起止，head 是石笔尖在哪
+  state.scribe = {
+    x: def.zone.x, y: def.markY ?? 1.25,
+    x0: def.markX0 ?? (def.zone.x - 0.52), x1: def.markX1 ?? (def.zone.x + 0.52),
+    t: b.drawn, head: b.head, idle: !b.everMoved,
+  };
   if (b.drawn >= 1) {
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     state.scribe = null;
@@ -3067,6 +3157,11 @@ export function GetBeatTarget(state) {
         }
         case "push": return { action: "pushAt", x: state.cart ? state.cart.x : st.from, dir: st.dir };
         case "goto": return { action: "walk", x: st.zone.x, level: st.zone.level || "surface" };
+        case "winch": {
+          const w = state.beat.winch;
+          if (w && !w.hooked) return { action: "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
+          return { action: "winchAt", x: st.zone.x, level: st.zone.level || "surface" };
+        }
         default: return null;
       }
     }

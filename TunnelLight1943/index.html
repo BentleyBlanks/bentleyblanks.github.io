@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0a0908">
   <meta name="description" content="《地道里的光》——1942-1943 华北敌后，一个木匠儿子在地道里学会保护更多人的白盒原型">
   <title>地道里的光 · 白盒原型</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=016">
+  <link rel="stylesheet" href="./Style_Game.css?v=017">
   <script type="importmap">
     {
       "imports": {
@@ -29,11 +29,21 @@
     <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
     <div id="itemTag" hidden><small>手里</small><b id="itemName"></b></div>
     <div id="topRight">
-      <button id="btnSettings" type="button" aria-label="设置" aria-expanded="false"><span>⚙</span></button>
-      <button id="btnSound" type="button" aria-label="声音开关" aria-pressed="false"><span>♪</span></button>
+      <!-- 三道滑轨：比齿轮省事，也正好是面板里的东西 -->
+      <button id="btnSettings" type="button" aria-label="设置" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3.6 7.4h16.8M3.6 12h16.8M3.6 16.6h16.8"/>
+          <circle cx="9.1" cy="7.4" r="2.3"/>
+          <circle cx="15.2" cy="12" r="2.3"/>
+          <circle cx="7.4" cy="16.6" r="2.3"/>
+        </svg>
+      </button>
     </div>
-    <section id="settingsPanel" hidden aria-label="声音设置">
+    <section id="settingsPanel" hidden aria-label="设置">
       <h4>声音</h4>
+      <button id="btnSound" type="button" aria-pressed="false">
+        <span>旁白 · 音效 · 配乐</span><b class="state">开</b>
+      </button>
       <label for="volVoice">旁白 <output id="volVoiceOut">100%</output></label>
       <input id="volVoice" type="range" min="0" max="100" step="5" value="100">
       <label for="volSfx">音效 <output id="volSfxOut">100%</output></label>
@@ -45,10 +55,10 @@
     </section>
     <div id="toast"></div>
     <div id="prompt" hidden></div>
-    <!-- 划线：一条 QTE 式的轨道。手指（或按住 E 推）把粉笔沿着它拖过去 -->
+    <!-- 划线：一条 QTE 式的轨道。手指（或按住 E 推）把石笔沿着它拖过去 -->
     <div id="scribeGuide" hidden>
       <div class="track"><i class="fill"></i><span class="knob">✎</span></div>
-      <p class="tip">拖着粉笔划过去</p>
+      <p class="tip">拖着石笔划过去</p>
     </div>
     <div id="detectionVignette" aria-hidden="true"></div>
     <div id="irisOverlay" aria-hidden="true"></div>
@@ -133,6 +143,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=016"></script>
+<script type="module" src="./Script_Main.js?v=017"></script>
 </body>
 </html>
