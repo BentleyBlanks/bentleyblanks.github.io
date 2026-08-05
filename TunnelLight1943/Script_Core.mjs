@@ -804,10 +804,49 @@ export const SCRIPTS = {
       ],
     },
     {
+      // 潜行开打之前，规则必须先演一遍给玩家看：娘按着你蹲下、第一盏灯
+      // 从草垛沿上扫过去、没事——这一遍是安全的。没有这一拍，玩家走到
+      // 半路被灯照满就只会觉得"什么意思？"，不会觉得自己学会了什么。
+      kind: "cinematic", id: "c2_teach",
+      lines: [
+        { stage: "娘把两个孩子拉到草垛后头，按着蹲下。", d: 3.2, cam: { kind: "shot", x: 52, y: 1.3, dist: 7 },
+          on: (state) => {
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.cineTarget = { x: 50.5 }; mother.cineSpeed = 2.4; }
+            state.player.cineWalk = { x: 52.5, speed: 2.6 };
+            const sister = FindActor(state, "sister");
+            if (sister) { sister.x = 53.5; sister.heading = -1; }
+          } },
+        { stage: "一盏灯笼从东边巡了过来。", d: 2.8, cam: { kind: "shot", x: 60, y: 1.4, dist: 9 },
+          on: (state) => {
+            state.player.cineWalk = null;
+            state.player.crouch = true;
+            const sister = FindActor(state, "sister");
+            if (sister) sister.pose = "leanIn";
+            const s1 = FindActor(state, "sweep1");
+            if (s1) { s1.cineTarget = { x: 59 }; s1.cineSpeed = 2.0; s1.heading = -1; }
+          } },
+        { who: "娘", say: "灯扫过来，就蹲进影子里，贴着草垛别动。", d: 3.8, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
+        { stage: "灯光从草垛沿上掠过去，又移开了。谁也没出声。", d: 3.6, cam: { kind: "shot", x: 55, y: 1.2, dist: 6.5 },
+          on: (state) => {
+            const s1 = FindActor(state, "sweep1");
+            if (s1) { s1.cineTarget = { x: 76 }; s1.cineSpeed = 2.0; }
+          } },
+        { who: "娘", say: "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。", d: 4.0, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
+      ],
+      onDone: (state) => {
+        state.player.crouch = false;
+        const sister = FindActor(state, "sister");
+        if (sister) sister.pose = null;
+        const s1 = FindActor(state, "sweep1");
+        if (s1) s1.cineTarget = null;   // 交还常规巡逻
+      },
+    },
+    {
       kind: "leadFollow", id: "c2_mother", leader: "mother", follower: "sister",
       waypoints: [{ x: 60, w: 4 }, { x: 88, w: 4 }, { x: 118, w: 4 }],
-      objective: "跟紧娘，别出声", hint: "娘走你就走，娘停你就蹲下（C 蹲低）",
-      resetHint: "灯笼扫过来的时候要蹲进影子里。",
+      objective: "跟紧娘，别出声", hint: "灯扫过来就蹲进草垛的影子里（C）；红圈涨满前躲好就没事",
+      resetHint: "灯把人照满了。退回上一个路口，等灯走远再动。",
     },
     {
       kind: "cinematic", id: "c2_decoy",
@@ -2397,14 +2436,21 @@ function StepSoldiers(state, dt) {
 
 function IsEnemy(a) { return a.kind === "soldier" || a.kind === "puppet"; }
 
-const VISION_RANGE = 15;
+export const VISION_RANGE = 15;
 
-export function SoldierSeesPlayer(scene, soldier, player) {
+// 夜里提着灯笼，人眼只够得着灯照亮的那一截——视距打七折。
+// 渲染层画视线光带也用这一个数，画出来的和判出来的必须是同一条线。
+export function VisionScale(state) {
+  const L = CHAPTERS[state.chapterIndex].light;
+  return (L === "night" || L === "dark") ? 0.72 : 1;
+}
+
+export function SoldierSeesPlayer(scene, soldier, player, rangeScale = 1) {
   if (player.hidden) return false;
   if ((soldier.level || "surface") !== player.level) return false;
   const dx = player.x - soldier.x;
   if (Math.sign(dx) !== Math.sign(soldier.heading || 1)) return Math.abs(dx) < 1.2;
-  const range = player.crouch ? VISION_RANGE * 0.65 : VISION_RANGE;
+  const range = (player.crouch ? VISION_RANGE * 0.65 : VISION_RANGE) * rangeScale;
   if (Math.abs(dx) > range) return false;
   // 高遮蔽物挡视线（房屋、高墙）
   for (const pr of scene.props) {
@@ -2422,10 +2468,12 @@ function StepDetection(state, def, dt) {
   for (const a of state.actors) {
     // decor 的兵只组队形、不看人：十几个人一起判视线，这段就没法玩了
     if (!IsEnemy(a) || !a.visible || a.decor) continue;
-    if (SoldierSeesPlayer(scene, a, state.player)) { seen = true; state.detection.spotter = a.id; break; }
+    if (SoldierSeesPlayer(scene, a, state.player, VisionScale(state))) { seen = true; state.detection.spotter = a.id; break; }
   }
-  if (seen) state.detection.level = Math.min(1, state.detection.level + dt * 0.9);
-  else state.detection.level = Math.max(0, state.detection.level - dt * 0.5);
+  // 被照到不是立刻完蛋：红圈涨满要两秒多，来得及缩回影子里；
+  // 缩回去消得也快——"差点被看见"该是心跳，不是重开
+  if (seen) state.detection.level = Math.min(1, state.detection.level + dt * 0.45);
+  else state.detection.level = Math.max(0, state.detection.level - dt * 0.8);
   if (state.detection.level >= 1) {
     state.flags.resets += 1;
     RestoreSnapshot(state);
@@ -2517,6 +2565,9 @@ function StepLeadFollow(state, def, dt) {
     const d = Math.abs(leader.x - wp.x);
     if (d < 1.2) {
       state.beat.spotIndex += 1;
+      // 每过一个路口存一次点：走了大半段被灯照满，退回来的是最近的路口，
+      // 不是整段开头——失败的代价是"这一步"，不是"这一路"
+      state.beat.snapshot = SnapshotPositions(state);
       if (state.beat.spotIndex >= wps.length) { AdvanceBeat(state); return; }
     } else {
       const dir = Math.sign(wp.x - leader.x);

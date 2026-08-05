@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -278,6 +278,7 @@ export function CreateWorld(canvasEl) {
   let thrownMesh = null;
   let winchRope = null, winchBucket = null;
   let homeFacade = null, homeRange = null;
+  let coneMeshes = [], coneTex = null;
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
   let chainItemMesh = null, chainItemLabel = null;
@@ -316,6 +317,7 @@ export function CreateWorld(canvasEl) {
     thrownMesh = null;
     winchRope = null; winchBucket = null;
     homeFacade = null; homeRange = null;
+    coneMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
     chainItemMesh = null; chainItemLabel = null;
@@ -2049,6 +2051,61 @@ export function CreateWorld(canvasEl) {
       cartMesh.visible = true;
       PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, 1.5);
     } else if (cartMesh) cartMesh.visible = false;
+
+    // 敌人视线可见化：每个巡逻兵面前一条淡光带，长度就是探测逻辑用的
+    // 视距（同一个数，画出来的和判出来的必须是同一条线）。玩家凭这条
+    // 光读得出"影子在哪、什么时候能动"——潜行的公平从看得见开始。
+    {
+      const showCones = state.stealthActive && state.phase === "playing"
+        && CurrentBeatDef(state)?.kind !== "cinematic" && !state.microCine;
+      const enemies = showCones
+        ? state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet") && a.visible !== false && !a.decor)
+        : [];
+      if (enemies.length && !coneTex) {
+        // 一张横向渐变：靠人最亮，往视距尽头收干净；上下沿也柔掉
+        const c = MakeCanvas(160, 40);
+        const cctx = c.getContext("2d");
+        const gh = cctx.createLinearGradient(0, 0, 160, 0);
+        gh.addColorStop(0, "rgba(255,224,150,0.85)");
+        gh.addColorStop(0.55, "rgba(255,224,150,0.4)");
+        gh.addColorStop(1, "rgba(255,224,150,0)");
+        cctx.fillStyle = gh;
+        cctx.fillRect(0, 0, 160, 40);
+        cctx.globalCompositeOperation = "destination-in";
+        const gv = cctx.createLinearGradient(0, 0, 0, 40);
+        gv.addColorStop(0, "rgba(0,0,0,0)");
+        gv.addColorStop(0.5, "rgba(0,0,0,1)");
+        gv.addColorStop(1, "rgba(0,0,0,0)");
+        cctx.fillStyle = gv;
+        cctx.fillRect(0, 0, 160, 40);
+        coneTex = CanvasTexture(c);
+        coneTex.generateMipmaps = false;
+        coneTex.minFilter = THREE.LinearFilter;
+      }
+      while (coneMeshes.length < enemies.length) {
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(1, 1.2),
+          new THREE.MeshBasicMaterial({
+            map: coneTex, transparent: true, opacity: 0.13,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        );
+        FixOrder(m, LAYER_ORDER.fx + 206);
+        layers.fx.add(m);
+        coneMeshes.push(m);
+      }
+      coneMeshes.forEach((m, i) => {
+        const a = enemies[i];
+        if (!a) { m.visible = false; return; }
+        const range = VISION_RANGE * VisionScale(state);
+        const dir = (a.heading || 1) >= 0 ? 1 : -1;
+        m.visible = true;
+        m.scale.set(dir * range, 1, 1);   // 负缩放翻转贴图朝向
+        m.position.set(a.x + dir * range / 2,
+          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.6, 0.3);
+        m.material.opacity = 0.12 + Math.sin(time * 2.6 + i * 1.9) * 0.02;
+      });
+    }
 
     // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
     // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
