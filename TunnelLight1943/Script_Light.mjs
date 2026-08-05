@@ -89,21 +89,26 @@ void main() {
   float fall = 1.0 - dist / uRadius;
   fall = fall * fall * (0.35 + 0.65 * fall);
 
-  // 沿光线步进：撞到实心即被挡住。步长按距离自适应，近处省算力
-  const int STEPS = 18;
+  // 沿光线步进：撞到实心即被挡住。
+  // 步长必须按**世界尺度**取，不能把固定步数摊到整段距离上——地道净高不到
+  // 两米、洞顶到地表的土层也就两米出头，而暗适应那盏灯半径 17 米，等分 18 步
+  // 时步长将近一米，斜着穿过土层的光线会整段跳过去，于是灯光糊到土里。
+  const int STEPS = 48;
+  float stepLen = max(dist / float(STEPS), 0.16);
+  vec2 dir = d / max(dist, 1e-4);
   float lit = 1.0;
   for (int i = 1; i <= STEPS; i++) {
-    float t = float(i) / float(STEPS + 1);
-    vec2 p = mix(vWorld, uLightPos, t);
-    if (SolidAt(p) > 0.5) {
-      // 越靠近光源被挡，衰减越硬；靠近墙面留一点软边
-      lit = 0.0;
-      break;
-    }
+    float t = float(i) * stepLen;
+    if (t >= dist) break;
+    if (SolidAt(vWorld - dir * t) > 0.5) { lit = 0.0; break; }
   }
+  // 着色点本身就在土里：只留一点点，让洞壁上下沿有受光感；
+  // 再往土里深一点，上面的步进会判成全黑。光就此收在地道的上下边缘里。
+  float selfSolid = SolidAt(vWorld);
+
   // 软化：贴着遮挡面的一圈不要硬切
   float edge = smoothstep(0.0, uSoft, dist);
-  float v = fall * mix(1.0, lit, edge) * uIntensity;
+  float v = fall * mix(1.0, lit, edge) * uIntensity * mix(1.0, 0.22, selfSolid);
   gl_FragColor = vec4(uColor * v, v);
 }
 `;

@@ -95,8 +95,11 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // ---------------------------------------------------------------------------
 // 扛着的物件（单独一张小贴图，跟着手走）
 function MakeCarryMesh(label) {
-  const wPx = label === "水桶" ? 46 : 120;
-  const hPx = label === "水桶" ? 42 : 30;
+  // 木料/门板/顶木是横长条；桶是小方块；其余小件给一块方画布免得圆形图案被裁
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "风筝", "鞭炮", "一挂鞭炮",
+    "空桶", "满桶水", "一桶水", "棉被", "湿棉被", "铁皮桶", "刨子"];
+  const wPx = label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120;
+  const hPx = label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30;
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
     ART.DrawCarry(ctx, ax, ay - (label === "水桶" ? 8 : 0), 1.5, 1, label);
   }, 0, DETAIL_SS);
@@ -264,15 +267,48 @@ export function CreateWorld(canvasEl) {
   let vignetteAlpha = 0;
   let dustMotes = [];
   let lampMeshes = [];
+  // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
+  let cartMesh = null;
+  let thrownMesh = null;
+  let lightStrip = null, lightBeam = null, lightKey = "";
+  let barkMesh = null;
+  let chainItemMesh = null, chainItemLabel = null;
 
+  // 清空一层。标了 persist 的（演员骨架、影子、手里的东西）留下来并且
+  // **绝不 dispose**：骨架的几何体与贴图是 rigCache 里所有角色共用的
+  // （CreateRig 只克隆材质），销毁一具就等于销毁了全场的人。
   function ClearGroup(g) {
+    const keep = [];
     while (g.children.length) {
       const c = g.children.pop();
+      if (c.userData.persist) { keep.push(c); continue; }
       c.geometry?.dispose?.();
       if (c.material?.map && c.material.map !== glowTex) c.material.map.dispose?.();
       c.material?.dispose?.();
       g.remove(c);
     }
+    for (const k of keep) g.add(k);
+  }
+
+  // BuildEnvironment 会把各层整个清掉重建，缓存在闭包里的那些懒创建网格
+  // （标记、探杆、油灯、流体面、车、石子…）也一并没了，可变量还指着已经
+  // dispose 的对象——于是 `if (!markerMesh)` 之类的判断全部落空，那些东西
+  // 再也不会回来。重建时把引用一起清零。
+  function InvalidateSceneCaches() {
+    probeMeshes = [];
+    lampMeshes = [];
+    itemMeshes = [];
+    itemLabel = null;
+    markerMesh = null; markerCanvas = null; markerCtx = null;
+    scribeMesh = null;
+    collapseMeshes = {};
+    fluid = null; fluidKey = ""; fluidMesh = null;
+    fluidCanvas = null; fluidCtx = null; fluidImage = null;
+    cartMesh = null;
+    thrownMesh = null;
+    lightStrip = null; lightBeam = null; lightKey = "";
+    barkMesh = null;
+    chainItemMesh = null; chainItemLabel = null;
   }
 
   // -------------------------------------------------------------------------
@@ -674,7 +710,7 @@ export function CreateWorld(canvasEl) {
     group.add(mesh);
   }
 
-  function AddProp(group, p, light, ruined, sceneKey) {
+  function AddProp(group, p, light, ruined, sceneKey, state) {
     const night = light === "night" || light === "tunnel" || light === "dark";
     const gy = SURFACE_Y;
     const mk = (wPx, hPx, ax, ay, fn, x = p.x, y = gy, z = pz) => {
@@ -696,6 +732,7 @@ export function CreateWorld(canvasEl) {
       doorframe: BAND.walk, bench: BAND.walk, stool: BAND.walk, well: BAND.walk,
       mapBoard: -0.9,   // 紧贴行走线之后：玩家走到它跟前，不会被它挡住
       millstone: BAND.walk, woodpile: BAND.walk, hatch: BAND.walk, ditch: BAND.walk,
+      dog: BAND.walk, stonePile: BAND.walk, hangLantern: BAND.yard, kite: BAND.yard, vat: 0.2,
     };
     const pz = KIND_Z[p.kind] ?? 0;
     const tagKind = (m) => { if (m) m.userData.kind = p.kind; return m; };
@@ -810,6 +847,19 @@ export function CreateWorld(canvasEl) {
         group.add(mesh);
         break;
       }
+      case "dog": tagKind(mk(130, 80, 65, 68, (ctx, ax, ay) => ART.DrawDog(ctx, ax, ay, p.id))); break;
+      case "stonePile": mk(80, 50, 40, 42, (ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
+      case "hangLantern":
+        mk(150, 130, 60, 122, (ctx, ax, ay) =>
+          ART.DrawHangLantern(ctx, ax, ay, p.id, { lit: night && !state?.flags.lanternOut }));
+        break;
+      case "kite": {
+        // 只在第一章、还没被打下来之前挂在树上
+        if (state?.chapterIndex !== 0 || state?.flags.kiteDown) break;
+        mk(80, 100, 40, 50, (ctx, ax, ay) => ART.DrawKite(ctx, ax, ay, p.id), p.x, SURFACE_Y + 5.2, BAND.yard);
+        break;
+      }
+      case "vat": mk(80, 90, 40, 82, (ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id), p.x, UNDER_Y, 0.2); break;
       case "pump": {
         mk(140, 120, 70, 112, (ctx, ax, ay) => {
           // 水泵/风箱：日军灌烟灌水用的家伙
@@ -1138,12 +1188,15 @@ export function CreateWorld(canvasEl) {
     if (pins !== pinnedNotes) { pinnedNotes = pins; builtKey = ""; }
     const ch0 = CHAPTERS[state.chapterIndex];
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
-    const key = `${ch.scene}:${ch.light}:${state.flags.ruined ? 1 : 0}:${state.flags.hiddenBuilt ? 1 : 0}`;
+    const f = state.flags;
+    const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
+      + `:${state.chapterIndex}:${f.kiteDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
     carveState = !!state.flags.carved;
     carveRebuild = null;
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
+    InvalidateSceneCaches();
     dustMotes = [];
     for (const g of glows) scene.remove(g);
     glows.length = 0;
@@ -1283,14 +1336,22 @@ export function CreateWorld(canvasEl) {
     // 地表道具与遮蔽
     for (const p of sceneDef.props) {
       if (["chamber", "pocket", "vent", "waterTrap", "bell", "collapse"].includes(p.kind)) continue;
-      AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene);
+      AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene, state);
     }
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
+
+    // 第四章堵在东段卡口的湿棉被：堵上之后一直留在剖面里
+    if (ch.scene === "tunnelVillage" && state.flags.quiltPlugged) {
+      const m = BakeSprite(120, 130, 60, 118, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 3.6, 1, "湿棉被"), 0, DETAIL_SS);
+      PlaceSprite(m, 124, UNDER_Y + 0.6, 0.25);
+      layers.play.add(m);
+    }
 
     // 静态灯位
     const lampSpots = [];
     for (const p of sceneDef.props) {
       if (p.kind === "lamppost" && night) lampSpots.push({ x: p.x, y: 1.6, r: 4.5, i: 0.9 });
+      if (p.kind === "hangLantern" && night && !state.flags.lanternOut) lampSpots.push({ x: p.x + 0.5, y: 2.2, r: 4.6, i: 0.95 });
       if (p.kind === "fortGate") lampSpots.push({ x: p.x, y: 2.6, r: 5.5, i: 1.0 });
       if (p.kind === "blockhouse") lampSpots.push({ x: p.x, y: 6.4, r: 7, i: 1.1 });
       if (p.kind === "prison") lampSpots.push({ x: p.x, y: 1.5, r: 4, i: 0.75 });
@@ -1321,9 +1382,11 @@ export function CreateWorld(canvasEl) {
     if (!s) {
       // 骨骼装配：每块骨头一张贴图，逐帧只转关节
       const rig = CreateRig(kind);
+      rig.group.userData.persist = true;   // 见 ClearGroup：骨架资源是全场共享的
       layers.play.add(rig.group);
       SetPlayOrder(rig.group, ACTOR_Z);
       const shadow = MakeFlatShadow(1.9, 1.15, 0.30);
+      shadow.userData.persist = true;
       layers.play.add(shadow);
       SetPlayOrder(shadow, ACTOR_Z - 0.05);
       s = {
@@ -1375,6 +1438,7 @@ export function CreateWorld(canvasEl) {
     if (label && (!s.carryMesh || s.carryLabel !== label)) {
       if (s.carryMesh) layers.play.remove(s.carryMesh);
       s.carryMesh = MakeCarryMesh(label);
+      s.carryMesh.userData.persist = true;   // 跟着演员走，不该被环境重建清掉
       s.carryLabel = label;
       layers.play.add(s.carryMesh);
       SetPlayOrder(s.carryMesh, CARRY_Z);
@@ -1384,8 +1448,9 @@ export function CreateWorld(canvasEl) {
       s.carryLabel = null;
     }
     if (!s.carryMesh) return;
-    // 水桶和刨子提在手上，木料扛在肩上——挂点不同
-    const inHand = label === "水桶" || label === "刨子";
+    // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同
+    const inHand = ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "风筝",
+      "鞭炮", "一挂鞭炮", "空桶", "满桶水", "一桶水"].includes(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
     s.carryMesh.position.set(anchor.x, anchor.y + (inHand ? -0.20 : 0.10), CARRY_Z);
@@ -1417,12 +1482,12 @@ export function CreateWorld(canvasEl) {
       && state.prompt && state.prompt.includes("%"));
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
-    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!p.carry,
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!(p.carry || p.item),
       { climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose });
     ps.mesh.visible = otsHiddenId !== "player";
     LiftActor(ps, ch.light, true);
 
-    SyncCarry(ps, p.carry, p.heading);
+    SyncCarry(ps, p.carry || (p.item ? p.item.label : null), p.heading);
 
     // 煤油灯
     if (p.lamp) {
@@ -1681,6 +1746,127 @@ export function CreateWorld(canvasEl) {
       carveState = true;
       carveRebuild?.();
     }
+
+    // —— 谜题动词层的动态元素 ——
+    // 驴车（第三章推车/跟车）：车画在演员前面一点，贴着车走就是躲进车影
+    if (state.cart) {
+      if (!cartMesh) {
+        cartMesh = BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
+        layers.play.add(cartMesh);
+        SetPlayOrder(cartMesh, 1.5);
+      }
+      cartMesh.visible = true;
+      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, 1.5);
+    } else if (cartMesh) cartMesh.visible = false;
+
+    // 飞出去的石子：一维横轴上的一道小弧线
+    if (state.thrown) {
+      if (!thrownMesh) {
+        thrownMesh = BakeSprite(16, 16, 8, 8, (ctx, ax, ay) => {
+          ctx.fillStyle = "#8b857a";
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(ax, ay, 4.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }, 0, DETAIL_SS);
+        layers.fx.add(thrownMesh);
+        FixOrder(thrownMesh, LAYER_ORDER.fx + 320);
+      }
+      const th = state.thrown;
+      const k = Math.min(1, th.t / th.dur);
+      const y0 = SURFACE_Y + 1.25;
+      const y1 = SURFACE_Y + (th.y1 ?? 0.2);
+      thrownMesh.visible = true;
+      thrownMesh.position.set(
+        th.x0 + (th.x1 - th.x0) * k,
+        y0 + (y1 - y0) * k + Math.sin(k * Math.PI) * 2.4,
+        0.6,
+      );
+    } else if (thrownMesh) thrownMesh.visible = false;
+
+    // 探照灯 / 马灯光带：亮的时候一条光落在地上，节奏一目了然
+    if (state.searchlight) {
+      const sl = state.searchlight;
+      const kkey = `${sl.x0}:${sl.x1}:${sl.src ? sl.src.x : "n"}`;
+      if (!lightStrip || lightKey !== kkey) {
+        if (lightStrip) layers.fx.remove(lightStrip);
+        if (lightBeam) layers.fx.remove(lightBeam);
+        lightKey = kkey;
+        lightStrip = new THREE.Mesh(
+          new THREE.PlaneGeometry(sl.x1 - sl.x0, 1.6),
+          new THREE.MeshBasicMaterial({
+            color: 0xffe9b0, transparent: true, opacity: 0.22,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        );
+        lightStrip.position.set((sl.x0 + sl.x1) / 2, SURFACE_Y + 0.8, 0.3);
+        FixOrder(lightStrip, LAYER_ORDER.fx + 210);
+        layers.fx.add(lightStrip);
+        lightBeam = null;
+        if (sl.src) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([
+            sl.src.x, sl.src.y, 0.28,
+            sl.x0, SURFACE_Y + 0.15, 0.28,
+            sl.x1, SURFACE_Y + 0.15, 0.28,
+          ]), 3));
+          lightBeam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0xffe9b0, transparent: true, opacity: 0.1,
+            blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          FixOrder(lightBeam, LAYER_ORDER.fx + 205);
+          layers.fx.add(lightBeam);
+        }
+      }
+      lightStrip.visible = sl.lit;
+      if (lightBeam) lightBeam.visible = sl.lit;
+      if (sl.lit) {
+        const flick = 0.85 + Math.sin(time * 13) * 0.1;
+        lightStrip.material.opacity = 0.22 * flick;
+        if (lightBeam) lightBeam.material.opacity = 0.1 * flick;
+      }
+    } else if (lightStrip) {
+      lightStrip.visible = false;
+      if (lightBeam) lightBeam.visible = false;
+    }
+
+    // 狗叫：头顶蹦出来的"汪！"
+    if (state.dogBark) {
+      if (!barkMesh) {
+        barkMesh = BakeSprite(96, 64, 48, 54, (ctx, ax, ay) => {
+          ctx.font = "700 30px 'Noto Serif SC', serif";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#e8dcbc";
+          ctx.strokeStyle = "rgba(0,0,0,0.75)";
+          ctx.lineWidth = 5;
+          ctx.strokeText("汪！", ax, ay - 16);
+          ctx.fillText("汪！", ax, ay - 16);
+        }, 0, DETAIL_SS);
+        layers.fx.add(barkMesh);
+        FixOrder(barkMesh, LAYER_ORDER.fx + 330);
+      }
+      barkMesh.visible = Math.sin(time * 14) > -0.4;
+      barkMesh.position.set(state.dogBark.x + 0.8, SURFACE_Y + 1.9 + Math.sin(time * 7) * 0.08, 0.6);
+    } else if (barkMesh) barkMesh.visible = false;
+
+    // 链上的待拾物：当前一步要捡的东西就摆在那儿，看得见才谈得上"找"
+    let chainPickup = null;
+    if (def?.kind === "chain" && state.beat) {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (st?.type === "pickup") chainPickup = st;
+    }
+    if (chainPickup) {
+      const label = chainPickup.item.label;
+      if (!chainItemMesh || chainItemLabel !== label) {
+        if (chainItemMesh) layers.play.remove(chainItemMesh);
+        chainItemLabel = label;
+        chainItemMesh = BakeSprite(96, 76, 48, 44, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 1.6, 1, label), 0, DETAIL_SS);
+        layers.play.add(chainItemMesh);
+        SetPlayOrder(chainItemMesh, BAND.walk);
+      }
+      chainItemMesh.visible = true;
+      PlaceSprite(chainItemMesh, chainPickup.x,
+        (chainPickup.level === "under" ? UNDER_Y : SURFACE_Y) + 0.42, 0.18);
+    } else if (chainItemMesh) chainItemMesh.visible = false;
 
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;

@@ -55,6 +55,17 @@ body {
   border: 1px solid rgba(150, 170, 200, 0.35);
 }
 
+/* 单格物品栏：手里拿着什么，一直挂在左下角 */
+#itemTag {
+  position: absolute; left: 26px; bottom: 26px;
+  padding: 7px 13px; display: flex; align-items: baseline; gap: 8px;
+  color: #e8dcbc; background: rgba(20, 16, 10, 0.72);
+  border: 1px solid rgba(214, 190, 140, 0.4);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
+}
+#itemTag small { font-size: 11px; color: #a89878; letter-spacing: 0.12em; }
+#itemTag b { font-size: 14.5px; letter-spacing: 0.05em; }
+
 /* 交互提示 */
 #prompt {
   position: absolute; left: 50%; bottom: 15%;
@@ -314,11 +325,21 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 }
 
 /* 声音开关：贴在右上角，克制到几乎看不见——勇敢的心的 HUD 从不抢戏 */
-#btnSound {
+/* 右上角这一排：声音、设置。用 flex 排，安全区只在容器上算一次——
+   两个按钮各自算 safe-area 时，有刘海的机器上一个会挪、一个不会，直接叠在一起。 */
+#topRight {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 14px);
   right: calc(env(safe-area-inset-right, 0px) + 16px);
+  display: flex; align-items: center; gap: 10px;
+  z-index: 8;
+  pointer-events: auto;
+}
+
+#btnSound {
+  position: relative;
   width: 38px; height: 38px;
+  flex: none;
   display: grid; place-items: center;
   border: 1px solid rgba(226, 216, 188, 0.22);
   border-radius: 50%;
@@ -348,11 +369,12 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 /* 设置：跟声音开关并排的一个小齿轮，点开是一张压在右上角的窄面板。
    刻意做得小而暗——它不该跟画面抢注意力。 */
 #btnSettings {
-  position: absolute;
-  top: 14px;
-  right: 62px;
+  position: relative;
   width: 38px;
   height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
   border: 1px solid rgba(214, 190, 140, 0.34);
   background: rgba(18, 15, 11, 0.52);
@@ -367,9 +389,9 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 
 #settingsPanel {
   position: absolute;
-  top: 60px;
-  right: 14px;
-  width: 208px;
+  top: calc(env(safe-area-inset-top, 0px) + 60px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  width: 228px;
   padding: 12px 14px 14px;
   border-radius: 10px;
   border: 1px solid rgba(214, 190, 140, 0.26);
@@ -377,8 +399,11 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   color: #ddcfae;
   font-size: 12.5px;
   letter-spacing: 0.04em;
-  z-index: 7;
+  z-index: 9;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  /* #hud 整层是 pointer-events:none，只给 button 开了例外——
+     不在这儿显式开，面板里的滑块永远拖不动（触屏上尤其明显）。 */
+  pointer-events: auto;
 }
 #settingsPanel[hidden] { display: none; }
 #settingsPanel h4 {
@@ -395,10 +420,38 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   color: #c8b894;
 }
 #settingsPanel output { color: #9d8a63; }
+/* 滑块自己画：默认样式在触屏上滑钮太小，拇指按不准；
+   touch-action:none 是关键——否则拖动被浏览器当成页面滚动手势吃掉。 */
 #settingsPanel input[type="range"] {
   width: 100%;
-  accent-color: #c8a05e;
+  height: 30px;
+  margin: 0;
   background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#settingsPanel input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 3px;
+  background: rgba(214, 190, 140, 0.26);
+}
+#settingsPanel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; margin-top: -10px;
+  border-radius: 50%;
+  background: #c8a05e;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+#settingsPanel input[type="range"]::-moz-range-track {
+  height: 5px; border-radius: 3px;
+  background: rgba(214, 190, 140, 0.26);
+}
+#settingsPanel input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #c8a05e; border: 1px solid rgba(0, 0, 0, 0.45);
 }
 
 

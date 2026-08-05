@@ -36,7 +36,7 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
       console.log(`  [${CHAPTERS[state.chapterIndex].id}] beat ${CurrentBeatDef(state)?.id}`);
     }
 
-    const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+    const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
 
     if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
       input.advance = true;
@@ -93,6 +93,18 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
         if (target.action === "crouchAt" && Math.abs(dx) <= 1.35) { input.crouch = true; input.moveX = 0; }
+        // 投掷：走到投掷位、面朝目标方向，然后 F
+        if (target.action === "throwAt") {
+          if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
+          else if ((p.heading || 1) !== (target.face || 1)) input.moveX = target.face || 1;
+          else if (!state.thrown) { input.throw = true; input.moveX = 0; }
+          else input.moveX = 0;
+        }
+        // 推车：贴住车帮，按住 E 往推进方向使劲
+        if (target.action === "pushAt") {
+          if (Math.abs(dx) <= 2.2) { input.interactHeld = true; input.moveX = target.dir; }
+          else input.moveX = Math.sign(dx);
+        }
         // 划线：按住 E 的同时还得左右推，粉笔才走
         if (target.action === "scribeAt" && Math.abs(dx) <= 1.6) {
           input.interactHeld = true;
@@ -222,6 +234,16 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   // 两条永远凑不齐，`deduced` 永远为假，"自己推出来"那一支从没上过场。
   // 机制悄悄失效不会让任何测试变红，只能靠这种断言盯住。
   assert.equal(state.flags.deduced, true, "第六章的情报推理必须走得通");
+  // 谜题动词层的旗标：链走完了这些必须是真的。链的某一步悄悄断掉
+  // （物品拿不到、投掷永远不中、狗喂不上）不会让通关测试变红——
+  // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
+  assert.equal(state.flags.kiteDown, true, "C1 投掷教学必须真的把风筝打下来");
+  assert.equal(state.flags.dogFed, true, "C2 的狗必须喂得上");
+  assert.equal(state.flags.lanternOut, true, "C2 的马灯必须打得灭");
+  assert.equal(state.flags.trapBuilt, true, "C5 翻口链必须走得通");
+  assert.equal(state.flags.hiddenBuilt, true, "C5 新暗口链必须走得通");
+  assert.equal(state.flags.bellBuilt, true, "C5 预警铃链必须走得通");
+  assert.equal(state.flags.dogFed2, true, "C5 猪圈的狗必须喂得上");
   console.log(`  ✓ 八章全通（${((Date.now() - t0) / 1000).toFixed(1)}s 实耗）`);
 }
 

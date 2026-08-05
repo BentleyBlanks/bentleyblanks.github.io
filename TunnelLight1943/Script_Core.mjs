@@ -4,7 +4,7 @@
 // 空间语法：x 为横向米数，level 为 surface（地表 y=0）/ under（地道 y=-3.6）。
 // 地道场景是「剖面视角」：地表与地下同屏，烟、探杆、转移全部在一维横轴上展开。
 
-export const GAME_VERSION = "0.2.0";
+export const GAME_VERSION = "0.3.0";
 
 export const SURFACE_Y = 0;
 export const UNDER_Y = -3.6;
@@ -47,6 +47,14 @@ export const SCENES = {
       { id: "woodpile", kind: "woodpile", x: 70, name: "木料堆" },
       { id: "bigTree", kind: "tree", x: 126, big: true, name: "老槐树" },
       { id: "gatePost", kind: "lamppost", x: 174, name: "村东口" },
+      // 谜题道具：风筝挂在老槐树上（一章）；石碾上晾着窝头、王家的狗、
+      // 巷口的马灯、两处石子堆（二章的潜行链）
+      { id: "kite", kind: "kite", x: 127.6, name: "风筝" },
+      { id: "stonesTree", kind: "stonePile", x: 120, name: "石子堆" },
+      { id: "grindstone", kind: "millstone", x: 118, name: "石碾" },
+      { id: "yardDog", kind: "dog", x: 138, name: "王家的狗" },
+      { id: "stonesEast", kind: "stonePile", x: 152, name: "石子堆" },
+      { id: "hangLantern", kind: "hangLantern", x: 160, name: "巷口的马灯" },
     ],
     covers: [
       { id: "firewood", kind: "firewood", x: 30, w: 2.2 },
@@ -64,9 +72,11 @@ export const SCENES = {
       courtGate: { x: 47, w: 4, label: "院门口" },
       cellar: { x: 26, w: 7, level: "under", label: "地窖" },
       well: { x: 58, w: 5, label: "井台" },
-      sisterTree: { x: 78, w: 6, label: "老槐树下" },
+      sisterTree: { x: 124, w: 6, label: "老槐树下" },
       eastExit: { x: 172, w: 7, label: "村东口" },
       woodpile: { x: 70, w: 6, label: "木料堆" },
+      dogYard: { x: 138, w: 4, label: "王家院外" },
+      treeShade: { x: 130, w: 5, label: "槐树影里" },
     },
   },
 
@@ -76,6 +86,7 @@ export const SCENES = {
     shafts: [],
     props: [
       { id: "ditch", kind: "ditch", x: 8, w: 14, name: "交通沟" },
+      { id: "northBank", kind: "ridge", x: 5, w: 3, name: "村北土坎" },
       // 歇脚点那扇卸下来的门板：第六章要往上钉情报，得看得见它
       { id: "mapBoard", kind: "mapBoard", x: 19, name: "门板" },
       { id: "cropsA", kind: "crops", x: 34, w: 28 },
@@ -102,6 +113,9 @@ export const SCENES = {
       obsSouth: { x: 104, w: 6, label: "草垛后" },
       obsEast: { x: 142, w: 6, label: "田埂下" },
       gate: { x: 168, w: 6, label: "据点南门" },
+      auntSpot: { x: 120, w: 5, label: "拾柴的大娘" },
+      cartSpot: { x: 108, w: 5, label: "陷住的驴车" },
+      northBank: { x: 5, w: 4, label: "村北土坎" },
     },
   },
 
@@ -125,12 +139,16 @@ export const SCENES = {
       { id: "chamberB", kind: "chamber", x: 58, w: 12, name: "藏人洞·乙" },
       { id: "trapBend", kind: "waterTrap", x: 112, name: "翻口位", builtFlag: "trapBuilt" },
       { id: "bellWire", kind: "bell", x: 142, name: "预警铃位" },
+      // 谜题道具：藏人洞里备着的水瓮（四章浸棉被）；西头第三家的猪圈狗（五章）
+      { id: "waterVat", kind: "vat", x: 116, level: "under", name: "水瓮" },
+      { id: "pigpenDog", kind: "dog", x: 22, name: "猪圈的狗" },
     ],
     covers: [],
     // 卡口与赶工掏出来的段：只能爬过去
     tight: [
       { x0: 19, x1: 29, mode: "crawl" },   // 新暗口那一截，天不亮才掏通的
       { x0: 68, x1: 73, mode: "crawl" },   // 卡口：敌人钻不过来，自己也得趴下
+      { x0: 121, x1: 126, mode: "crawl" }, // 东段卡口：四章拿湿棉被堵烟的地方
     ],
     zones: {
       entE: { x: 148, w: 6, level: "under", label: "东口" },
@@ -141,6 +159,10 @@ export const SCENES = {
       bellSpot: { x: 142, w: 5, level: "under", label: "预警铃" },
       hiddenSpot: { x: 18, w: 7, level: "under", label: "新暗口" },
       behindTrap: { x: 104, w: 7, level: "under", label: "翻口后面" },
+      plugSpot: { x: 124, w: 4, level: "under", label: "东段卡口" },
+      wellTop: { x: 34, w: 4, label: "井台" },
+      millTop: { x: 148, w: 4, label: "磨盘" },
+      dogPen: { x: 22, w: 4, label: "猪圈外" },
     },
   },
 
@@ -266,6 +288,211 @@ function LineDuration(line) {
   return v ? Math.max(line.d, v + 0.35) : line.d;
 }
 
+// ---------------------------------------------------------------------------
+// 谜题动词层（v0.3 关卡重做）：单格物品栏 / 投掷 / 狗 / 灯光 / 声响引敌
+// 《勇敢的心》的关卡语法：每个障碍缺一样东西，东西在别处；石子落地出声；
+// 狗认吃不认人；灯有周期。动词凑齐了，关卡才有"想一下"的时刻。
+// ---------------------------------------------------------------------------
+const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
+
+function GiveItem(state, item) { state.player.item = { ...item }; }
+
+// 投掷：面朝方向 3~10.5m 内有本步的目标就砸它（一维横轴上不做抛物线瞄准，
+// 站位就是瞄准）；否则石子落在 7.5m 外，白出一声响
+function StartThrow(state, st) {
+  const p = state.player;
+  let land = p.x + p.heading * THROW_FLAT;
+  let hit = false;
+  if (st?.target) {
+    const dx = (st.target.x - p.x) * p.heading;
+    if (dx >= THROW_MIN && dx <= THROW_MAX) { land = st.target.x; hit = true; }
+  }
+  state.thrown = { x0: p.x, x1: land, y1: hit ? (st.target.y ?? 1.6) : 0.15, t: 0, dur: THROW_TIME, hit };
+  state.player.item = null;
+}
+
+function StepThrown(state, dt) {
+  const th = state.thrown;
+  if (!th) return null;
+  th.t += dt;
+  if (th.t < th.dur) return null;
+  state.thrown = null;
+  MakeNoise(state, th.x1, "surface");   // 石子落地出声：附近的敌人会过来看
+  return th;
+}
+
+function MakeNoise(state, x, level) {
+  state.noiseAt = { x, t: 0.6 };
+  for (const a of state.actors) {
+    if (!IsEnemy(a) || !a.visible || (a.level || "surface") !== level) continue;
+    if (Math.abs(a.x - x) <= 15) a.investigate = { x: x + (a.x < x ? -1.2 : 1.2), until: state.time + 5.5 };
+  }
+}
+
+// 拴着的狗：不咬人，会叫。叫声把巡逻招过来——不是立刻失败，是招来麻烦。
+// 喂了就不叫了（认吃不认人）。
+const DOG_SPOTS = {
+  c2: [{ x: 138, flag: "dogFed" }],
+  c5: [{ x: 22, flag: "dogFed2" }],
+};
+
+function StepDogs(state, dt) {
+  state.dogBark = null;
+  const dogs = DOG_SPOTS[CHAPTERS[state.chapterIndex].id];
+  if (!dogs) return;
+  const p = state.player;
+  for (const d of dogs) {
+    if (state.flags[d.flag]) continue;
+    if (p.level !== "surface" || Math.abs(p.x - d.x) >= 5.5) continue;
+    state.dogBark = { x: d.x };
+    if (!state.beat.dogToastShown) {
+      state.beat.dogToastShown = true;
+      state.toast = { text: "狗叫起来了——这动静会把人招来。", t: 3.5 };
+    }
+    state.beat.dogNoiseT = (state.beat.dogNoiseT || 0) + dt;
+    if (state.beat.dogNoiseT > 1.1) { state.beat.dogNoiseT = 0; MakeNoise(state, d.x, "surface"); }
+  }
+}
+
+// 周期型灯光（探照灯 / 马灯的光池）：危险有周期，读懂周期就是解谜。
+// def.light = { zone:[x0,x1], cycle, lit, offFlag?, src? } —— cycle=lit 即常亮
+function StepLightHazard(state, def, dt) {
+  const L = def?.light;
+  if (!L || (L.offFlag && state.flags[L.offFlag])) { state.searchlight = null; return; }
+  const phase = state.beat.t % L.cycle;
+  const lit = phase < L.lit;
+  state.searchlight = { x0: L.zone[0], x1: L.zone[1], lit, phase, cycle: L.cycle, litDur: L.lit, src: L.src || null };
+  if (!lit) return;
+  const p = state.player;
+  if (p.level !== "surface" || p.hidden) return;
+  if (p.x < L.zone[0] || p.x > L.zone[1]) return;
+  if (state.cart && def.kind === "cartRide" && Math.abs(p.x - state.cart.x) <= (def.safeR ?? 2.6)) return; // 车影里
+  state.detection.level = Math.min(1, state.detection.level + dt * 1.35);
+  state.detection.spotter = "light";
+}
+
+// 链式谜题：有序的一串步骤——拾取 / 使用 / 投中 / 交谈 / 推。
+// 单格物品栏：步骤自己管理手里那格；失败重置不清链、不清物品。
+function StepChain(state, def, input, dt) {
+  const b = state.beat;
+  if (b.stepIndex === undefined) { b.stepIndex = 0; b.holdP = 0; def.onStart?.(state); }
+  const st = def.steps[b.stepIndex];
+  if (!st) { AdvanceBeat(state); return; }
+  const p = state.player;
+  const lvl = p.level || "surface";
+
+  const finish = () => {
+    if (st.note) state.toast = { text: st.note, t: 4.5 };
+    if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);   // 口信也是情报，入账供第六章推理
+    st.effect?.(state);
+    b.stepIndex += 1;
+    b.holdP = 0;
+    if (b.stepIndex >= def.steps.length) AdvanceBeat(state);
+  };
+
+  // 石子在空中：等它落地，砸中了才算过
+  const th = StepThrown(state, dt);
+  if (th) {
+    if (st.type === "throwHit" && th.hit) { finish(); return; }
+    if (st.type === "throwHit") state.toast = { text: st.missNote || "石子擦着边飞过去了。再捡一颗。", t: 3 };
+  }
+
+  switch (st.type) {
+    case "pickup": {
+      const near = Math.abs(p.x - st.x) < 1.7 && lvl === (st.level || "surface");
+      if (!near) return;
+      if (p.item) { state.prompt = "手里拿着" + p.item.label + "——一次只能拿一样"; return; }
+      state.prompt = st.prompt || `E · 拿起${st.item.label}`;
+      if (input.interact) { GiveItem(state, st.item); finish(); }
+      return;
+    }
+    case "use": {
+      if (!InZone(p.x, lvl, st.zone)) return;
+      if (st.needs && p.item?.id !== st.needs) {
+        state.prompt = st.missPrompt || `这儿缺${st.needsLabel || "样东西"}`;
+        return;
+      }
+      if (st.hold) {
+        state.prompt = `${st.prompt} ${Math.round(b.holdP / st.hold * 100)}%`;
+        state.promptFill = b.holdP / st.hold;
+        if (input.interactHeld) {
+          b.holdP += dt;
+          if (b.holdP >= st.hold) { ApplyUse(state, st); finish(); }
+        } else b.holdP = Math.max(0, b.holdP - dt * 2);
+      } else {
+        state.prompt = st.prompt;
+        if (input.interact) { ApplyUse(state, st); finish(); }
+      }
+      return;
+    }
+    case "throwHit": {
+      if (state.thrown) return;
+      const nearPile = Math.abs(p.x - st.pickupX) < 1.7 && lvl === "surface";
+      if (!p.item) {
+        if (nearPile) {
+          state.prompt = "E · 捡一颗石子";
+          if (input.interact) GiveItem(state, { id: "stone", label: "石子", throwable: true });
+        }
+        return;
+      }
+      if (p.item.id !== "stone") return;
+      state.prompt = st.prompt || "F · 朝着它投出去（站得不远不近才砸得到）";
+      if (input.throw || (input.interact && !nearPile)) StartThrow(state, st);
+      return;
+    }
+    case "talk": {
+      const a = FindActor(state, st.actor);
+      if (!a || !a.visible || Math.abs(a.x - p.x) > 2.4 || (a.level || "surface") !== lvl) return;
+      state.prompt = st.prompt || `E · 跟${a.label || "他"}说话`;
+      if (input.interact) {
+        if (st.lines) StartMicroCine(state, st.lines);
+        finish();
+      }
+      return;
+    }
+    case "push": {
+      if (!state.cart) state.cart = { x: st.from };
+      const cart = state.cart;
+      if (Math.abs(p.x - cart.x) > 2.6) return;
+      state.prompt = st.prompt || "按住 E · 顶住车往前推";
+      state.promptFill = Math.abs(cart.x - st.from) / st.dist;
+      if (input.interactHeld) {
+        cart.x += st.dir * 0.85 * dt;
+        p.x = cart.x - st.dir * 1.7;
+        p.heading = st.dir;
+        if ((cart.x - st.from) * st.dir >= st.dist) finish();
+      }
+      return;
+    }
+    case "goto": {
+      if (InZone(p.x, lvl, st.zone)) finish();
+      return;
+    }
+    default: return;
+  }
+}
+
+function ApplyUse(state, st) {
+  if (st.needs && st.consume !== false) state.player.item = null;
+  if (st.transform) state.player.item = { ...st.transform };
+  if (st.gives) GiveItem(state, st.gives);
+}
+
+// 跟车掩护：车把式赶着车走，人落远了他就吁住牲口等；灯扫过来时，
+// 贴着车走才在影子里（危险判定在 StepLightHazard）
+function StepCartRide(state, def, input, dt) {
+  if (!state.cart) state.cart = { x: def.from };
+  const cart = state.cart;
+  const p = state.player;
+  if (Math.abs(p.x - cart.x) < 6.5) cart.x = Math.min(def.to, cart.x + def.speed * dt);
+  const driver = FindActor(state, def.driver);
+  if (driver) { driver.x = cart.x + 1.7; driver.heading = 1; driver.level = "surface"; }
+  if (cart.x >= def.to - 0.4 && Math.abs(p.x - cart.x) < 5.5) {
+    if (def.note) state.toast = { text: def.note, t: 5 };
+    AdvanceBeat(state);
+  }
+}
+
 export const SCRIPTS = {
   c1: [
     {
@@ -344,14 +571,42 @@ export const SCRIPTS = {
       hint: "走到木料旁按 E 扛起，送回院里工作台再按 E 放下",
     },
     {
-      kind: "collect", id: "c1_water", objective: "帮娘从井台提一桶水回来",
-      items: [{ x: 48 }],
-      deliver: V.homeYard, carryLabel: "水桶",
-      hint: "娘在灶间忙，水缸见了底",
+      // 教「链」：水桶挂上去才发现井绳断了——障碍缺一样东西，东西在别处。
+      // 《勇敢的心》的关卡语法从这口井开始。
+      kind: "chain", id: "c1_water",
+      objective: "帮娘打一桶水回来", hint: "水缸见了底。水桶在院里",
+      steps: [
+        { type: "pickup", x: 44, item: { id: "bucket", label: "水桶" }, prompt: "E · 拎起水桶" },
+        { type: "use", zone: V.well, needs: "bucket", prompt: "E · 把桶挂上井绳",
+          note: "井绳断了半截——桶放下去，够不着水面。得找根麻绳。" },
+        { type: "pickup", x: 70, item: { id: "rope", label: "麻绳" }, prompt: "E · 从木料堆里抽出麻绳" },
+        { type: "use", zone: V.well, needs: "rope", hold: 1.2, prompt: "按住 E · 接上井绳",
+          note: "麻绳接上了。辘轳又能转了。" },
+        { type: "use", zone: V.well, hold: 1.4, prompt: "按住 E · 打水",
+          gives: { id: "fullBucket", label: "一桶水", big: true } },
+        { type: "use", zone: V.homeYard, needs: "fullBucket", prompt: "E · 把水倒进缸里",
+          note: "水缸满了。娘直起腰，朝他笑了笑。" },
+      ],
     },
     {
-      kind: "goto", id: "c1_findSister", zone: V.sisterTree, objective: "去老槐树下找妹妹回家吃饭",
-      hint: "娘直起腰，朝老槐树的方向望了望",
+      // 教「投掷」：无压力的一投。第二章同一个动词要在灯下用第二次。
+      kind: "chain", id: "c1_kite",
+      objective: "去老槐树下找妹妹回家吃饭", hint: "娘直起腰，朝老槐树的方向望了望",
+      steps: [
+        { type: "talk", actor: "sister", prompt: "E · 问妹妹怎么了",
+          lines: [
+            { who: "妹妹", say: "哥——风筝，风筝挂上头了！", d: 3.0, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
+            { stage: "纸糊的风筝卡在老槐树的树杈上，线还在风里飘。", d: 3.4, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
+          ] },
+        { type: "throwHit", pickupX: 120, target: { x: 127.6, y: 5.2, r: 2 },
+          prompt: "F · 朝树杈上的风筝投（站得不远不近才砸得到）",
+          missNote: "石子从风筝边上擦过去了。再捡一颗。",
+          note: "风筝晃了两晃，打着旋儿落下来了。",
+          effect: (state) => { state.flags.kiteDown = true; } },
+        { type: "pickup", x: 129, item: { id: "kite", label: "风筝" }, prompt: "E · 捡起风筝" },
+        { type: "use", zone: { x: 124, w: 4 }, needs: "kite", prompt: "E · 把风筝还给妹妹",
+          note: "妹妹抱着风筝，肯跟着回家了。" },
+      ],
     },
     {
       kind: "escort", id: "c1_sisterHome", follower: "sister", dest: V.homeYard,
@@ -509,10 +764,42 @@ export const SCRIPTS = {
       onDone: (state) => { MotherDecoyDone(state); },
     },
     {
-      kind: "escort", id: "c2_escape", follower: "sister", dest: V.eastExit, stealth: true,
-      objective: "带妹妹去村东口", hint: "沿着草垛和断墙的影子走",
+      kind: "escort", id: "c2_escape1", follower: "sister", dest: V.treeShade, stealth: true,
+      objective: "带妹妹往村东口去", hint: "沿着草垛和断墙的影子走",
       resetHint: "妹妹跑不快。等巡逻走远了再动。",
-      midToast: { zone: { x: 140, w: 10 }, text: "路过的院里在拖人。柱子把妹妹的脸按在自己胸口，贴着墙根走了过去。" },
+    },
+    {
+      // C1 的窝头喂的是妹妹，这回喂的是狗：同一个村子，两种夜晚。
+      // 狗叫不是立刻失败——它把巡逻招过来，麻烦是滚起来的。
+      kind: "chain", id: "c2_dog",
+      objective: "王家的狗拴在路边——不能让它叫", hint: "狗认吃不认人。石碾上晾着几个窝头",
+      resetHint: "灯笼追着狗叫围过来了。退回槐树影里，等他们散开。",
+      steps: [
+        { type: "pickup", x: 118, item: { id: "bun", label: "窝头" }, prompt: "E · 从石碾上拿个窝头" },
+        { type: "use", zone: V.dogYard, needs: "bun", prompt: "E · 把窝头丢过去",
+          note: "狗埋下头去啃。尾巴摇了摇，没再出声。",
+          effect: (state) => { state.flags.dogFed = true; } },
+      ],
+    },
+    {
+      // C1 打的是风筝，这回打的是灯：同一个动词，第二次用在命上。
+      kind: "chain", id: "c2_lantern",
+      objective: "巷口的马灯照住了必经的路", hint: "草垛边有石子堆。灯挂得高，够不着",
+      light: { zone: [156, 164], cycle: 1, lit: 1, offFlag: "lanternOut", src: { x: 160, y: 2.4 } },
+      resetHint: "灯光里晃过人影，巡逻的喝了一声。退回草垛后面，重新想辙。",
+      steps: [
+        { type: "throwHit", pickupX: 152, target: { x: 160, y: 2.3, r: 2 },
+          prompt: "F · 把马灯打灭",
+          missNote: "石子磕在墙上，弹进了黑影里。再捡一颗。",
+          note: "灯罩一声脆响，火苗灭了。影子一直接到了村东口。",
+          effect: (state) => { state.flags.lanternOut = true; } },
+      ],
+    },
+    {
+      kind: "escort", id: "c2_escape2", follower: "sister", dest: V.eastExit, stealth: true,
+      objective: "带妹妹去村东口", hint: "灯灭了，影子是连着的",
+      resetHint: "妹妹跑不快。等巡逻走远了再动。",
+      midToast: { zone: { x: 165, w: 6 }, text: "路过的院里在拖人。柱子把妹妹的脸按在自己胸口，贴着墙根走了过去。" },
     },
     {
       kind: "cinematic", id: "c2_taken",
@@ -601,7 +888,14 @@ export const SCRIPTS = {
         { stage: "柱子沿着运输队的车辙，摸到了据点外的庄稼地。", d: 3.8, cam: { kind: "wide", x: 150, pan: 6 } },
         { stage: "他不敢靠近。他先学会了看。", d: 3.2, cam: { kind: "shot", x: 20, y: 1.4, dist: 8 } },
       ],
-      onDone: (state) => { SpawnFortPatrols(state, false); },
+      onDone: (state) => {
+        SpawnFortPatrols(state, false);
+        // 地里的乡亲：不是任务点，是要搭把手的人。帮了忙，话才敢说出口
+        state.actors.push(
+          MakeActor("aunt", "villager", F.auntSpot.x, { label: "拾柴的大娘" }),
+          MakeActor("cartman", "villager", 107, { label: "赶车乡亲" }),
+        );
+      },
     },
     {
       kind: "observe", id: "c3_watch", spots: [F.obsWest, F.obsSouth, F.obsEast], watchTime: 5,
@@ -624,17 +918,56 @@ export const SCRIPTS = {
       ],
     },
     {
-      kind: "gotoSeq", id: "c3_contacts", spots: [F.contactA, F.contactB],
-      objective: "去问问地里的乡亲", hint: "乡亲们敢说话，但只敢小声说",
-      notes: [
-        "赶车的乡亲：『里头新关了十几个，有女娃。别靠南门，狗鼻子灵。』",
-        "拾柴的大娘：『过几天要往县里押人。孩子，你一个人不行。』",
+      // 帮了忙，话才敢说：柴刀换来的那句口信，是第六章推理的半边
+      kind: "chain", id: "c3_aunt",
+      objective: "拾柴的大娘朝这边招了招手", hint: "乡亲们敢说话，但只敢小声说",
+      resetHint: "巡逻队走近了。柱子退回庄稼地，等风声过去。",
+      steps: [
+        { type: "talk", actor: "aunt", prompt: "E · 上前搭话",
+          lines: [
+            { who: "大娘", say: "孩子，帮我找找柴刀——手一抖，掉进田埂那头了。", d: 3.8, cam: { kind: "ots", subject: "aunt", other: "player", dist: 3.4 } },
+          ] },
+        { type: "pickup", x: 134, item: { id: "sickle", label: "柴刀" }, prompt: "E · 从田沟里摸出柴刀" },
+        { type: "use", zone: F.auntSpot, needs: "sickle", prompt: "E · 把柴刀还给大娘",
+          noteAdd: "拾柴的大娘：『过几天要往县里押人。孩子，你一个人不行。』",
+          note: "大娘攥住他的手腕，压低了声：『过几天要往县里押人。孩子，你一个人不行。』" },
       ],
     },
     {
+      // 教「推」。推出来的不是路——是一片会走路的影子
+      kind: "chain", id: "c3_cart",
+      objective: "赶车乡亲的驴车陷住了", hint: "车帮上还搭着半车干草",
+      resetHint: "巡逻队回头了。退进庄稼地，等他们走远。",
+      steps: [
+        { type: "talk", actor: "cartman", prompt: "E · 上前搭话",
+          lines: [
+            { who: "赶车乡亲", say: "给据点支差送草——车陷在这儿了。搭把手；躲着点巡逻的。", d: 4.2, cam: { kind: "ots", subject: "cartman", other: "player", dist: 3.4 } },
+          ],
+          noteAdd: "赶车的乡亲：『里头新关了十几个，有女娃。别靠南门，狗鼻子灵。』" },
+        { type: "push", from: 106, dir: 1, dist: 4, prompt: "按住 E · 顶住车帮往前推",
+          note: "车轮从辙里蹦出来了。乡亲把缰绳一抖。" },
+      ],
+    },
+    {
+      // 《勇敢的心》式移动掩体段：车影是探照灯下唯一的影子
+      kind: "cartRide", id: "c3_ride", from: 110, to: 144, speed: 1.35, safeR: 2.8, driver: "cartman",
+      light: { zone: [120, 142], cycle: 7.5, lit: 2.4, src: { x: 184, y: 6 } },
+      objective: "贴着草车走——灯扫过来时，车影是唯一的影子",
+      hint: "别掉队。掉出车影又赶上灯，就全完了",
+      resetHint: "灯从车帮上扫过去——差一点。乡亲把车又吁回了辙口。",
+      note: "到草垛这儿，乡亲一抬下巴：前头的路，你自己贴着黑走。",
+      onReset: (state) => { if (state.cart) state.cart.x = 110; },
+      onDone: (state) => {
+        // 车把式赶着车进据点交差去了
+        const cm = FindActor(state, "cartman");
+        if (cm) { cm.cineTarget = { x: 174 }; cm.cineSpeed = 1.5; cm.cineVanish = true; }
+      },
+    },
+    {
       kind: "goto", id: "c3_closer", zone: F.gate, stealth: true,
-      objective: "趁换岗摸近南门，看清牢房方向", hint: "贴着墙根走，别进灯光",
-      resetHint: "岗楼上的灯扫了过来。退回沟里，重新等换岗。",
+      objective: "趁灯的间隙摸近南门，看清牢房方向", hint: "蹲在田埂下，读准探照灯的节奏再动",
+      light: { zone: [146, 170], cycle: 8, lit: 2.6, src: { x: 184, y: 6 } },
+      resetHint: "岗楼上的灯扫了过来。退回田埂下，重新数灯的节奏。",
       interruptAt: 0.8,
     },
     {
@@ -692,9 +1025,14 @@ export const SCRIPTS = {
       objective: "把大嫂和孩子带到藏人洞·乙", hint: "孩子走得慢，别落下他们",
     },
     {
-      kind: "hold", id: "c4_shore", zone: TV.entW, holdTime: 3,
-      objective: "西口的顶木松了，把它撑牢", hint: "在西口按住 E，柱子会用上木匠的手艺",
-      note: "木头咬住了。他松开手，顶木没有再响。",
+      // C1 的链搬进地道：猫腰＋扛大件双重降速，第一次体会地道里搬东西的分量
+      kind: "chain", id: "c4_shore",
+      objective: "西口的顶木松了", hint: "光用手是按不住的——藏人洞乙备着撑木",
+      steps: [
+        { type: "pickup", x: 61, level: "under", item: { id: "prop", label: "撑木", big: true }, prompt: "E · 扛起撑木" },
+        { type: "use", zone: TV.entW, needs: "prop", hold: 2.2, prompt: "按住 E · 把撑木顶上去",
+          note: "木头咬住了。他松开手，顶木没有再响。" },
+      ],
     },
     {
       kind: "hold", id: "c4_listen", zone: TV.entE, holdTime: 4,
@@ -716,16 +1054,38 @@ export const SCRIPTS = {
     {
       // 大纲原文：「村民立刻熄灭油灯」——地道里最要紧的一件事，也是标题本身
       kind: "douseLamps", id: "c4_douse",
-      lamps: [148, 128, 112, 92, 74, 58, 40],
+      smokeFloor: 133,   // 熄灯期间烟被顶木和弯道拖着，最多压到东数第二盏灯外
+      lamps: [148, 132, 116, 96, 74],
       objective: "把地道里的灯一盏盏吹灭",
       hint: "走到灯边按 E。留最后一盏在自己手里",
       note: "最后一盏灯攥在柱子手里。地道一下子只剩这一点光。",
+    },
+    {
+      // 第一次限时物品链：烟一直在推进。历史正解——冀中地道用湿被褥堵烟。
+      // 干被子堵不住，这一步「浸湿」就是链上多出来的那个心眼
+      kind: "chain", id: "c4_quilt",
+      smokeFloor: 127.5,   // 卡口窄，烟在这儿灌得慢——玩家要堵的位置不能先被吞掉
+      objective: "烟还在往里灌——把它堵在东段卡口外", hint: "藏人洞里备着棉被和水瓮。干被子堵不住烟",
+      steps: [
+        { type: "pickup", x: 110, level: "under", item: { id: "quilt", label: "棉被", big: true }, prompt: "E · 抱起棉被" },
+        { type: "use", zone: { x: 116, w: 3, level: "under" }, needs: "quilt", hold: 1.2, prompt: "按住 E · 把棉被按进水瓮",
+          transform: { id: "wetQuilt", label: "湿棉被", big: true },
+          note: "棉被吃透了水，沉得坠手。" },
+        { type: "use", zone: TV.plugSpot, needs: "wetQuilt", hold: 1.6, prompt: "按住 E · 把湿棉被堵进卡口",
+          note: "烟撞在湿棉被上，打着旋儿退了回去。呛人的味道淡下来了。",
+          effect: (state) => { state.flags.quiltPlugged = true; if (state.smoke) state.smoke.speed = 0.05; } },
+      ],
     },
     {
       kind: "smokeEscape", id: "c4_smoke", dest: TV.entW, lossScript: true,
       objective: "赶在烟前头，把人从西口转移出去",
       hint: "烟往西灌，先带东边的人。E 让一群人跟上，到西口他们会自己爬出去",
       resetHint: "烟呛倒了人。民兵把大家拖回洞室，重新来。",
+      onEnter: (state) => {
+        // 鬼子加了风箱：被子挡得住一时，挡不住一夜
+        if (state.smoke) state.smoke.speed = 0.42;
+        state.toast = { text: "上面拉来了风箱。烟从被子边上一丝丝挤进来——得走了。", t: 4.5 };
+      },
     },
     {
       kind: "cinematic", id: "c4_floodStart",
@@ -761,19 +1121,62 @@ export const SCRIPTS = {
         { stage: "东口封死了。第二天起，全村轮班下洞。", d: 3.6, cam: { kind: "wide", x: 90, y: -1.2 } },
         { stage: "高传宝在门板上画了三个记号：翻口，新暗口，预警铃。", d: 4.0, cam: { kind: "shot", x: 40, y: UNDER_Y + 1.4, dist: 8 } },
         { stage: "柱子的墨斗和刨子，成了地道里的家伙什。", d: 3.6, cam: { kind: "shot", x: 40, y: UNDER_Y + 1.4, dist: 6.5 } },
+        // 双层潜行的题面：改造缺的东西全在地表，地表有人。
+        // 剖面视角的独门好处在这一章兑现——从地下看地上，一清二楚
+        { stage: "白天，两个伪军就在村里翻翻捡捡地转。头顶的脚步，地道里听得一清二楚。", d: 4.4, cam: { kind: "wide", x: 90, y: -1.2, pan: 5 },
+          on: (state) => { SpawnC5Snoops(state); } },
+        { who: "高传宝", say: "缺什么，上去拿。什么时候上去，你们自己看。", d: 3.8, cam: { kind: "ots", subject: "gao", other: "player", dist: 3.6 } },
       ],
     },
     {
-      kind: "buildSpots", id: "c5_build",
-      spots: [
-        // 翻口是真实冀中地道的三防正解：把这一段挖成 U 形的弯，弯里存住水，
-        // 就是一道水封，烟和水都过不去。人猫着腰从水里钻过去。
-        { zone: TV.trapSpot, label: "挖翻口", holdTime: 3, note: "这一段挖成个下沉的弯，弯里存住水。烟推到这儿，过不去。" },
-        { zone: TV.hiddenSpot, label: "挖新暗口", holdTime: 3, note: "新口开在西头第三家的猪圈底下。挖出来的土，天不亮就摊进了麦地。" },
-        { zone: TV.bellSpot, label: "拴预警铃", holdTime: 3, note: "东口一响，全村先知道。" },
+      // 翻口是真实冀中地道的三防正解：把这一段挖成 U 形的弯，弯里存住水，
+      // 就是一道水封，烟和水都过不去。人猫着腰从水里钻过去。
+      kind: "chain", id: "c5_trap",
+      objective: "改造一：挖翻口，灌上水", hint: "挖成下沉的弯，弯里存住水。水在地表的井里",
+      resetHint: "上面的伪军看见了人影。柱子缩回洞里，等他转过身去。",
+      steps: [
+        { type: "use", zone: TV.trapSpot, hold: 3, prompt: "按住 E · 挖翻口",
+          note: "弯挖出来了。可干弯挡不住烟——得灌上水。" },
+        { type: "pickup", x: 30, level: "under", item: { id: "bucket2", label: "空桶" }, prompt: "E · 拎起西口的空桶" },
+        { type: "use", zone: TV.wellTop, needs: "bucket2", hold: 1.5, prompt: "按住 E · 井台打水",
+          transform: { id: "fullBucket2", label: "满桶水", big: true },
+          note: "桶沉了。上面还有人在转——挑好下去的时候。" },
+        { type: "use", zone: TV.trapSpot, needs: "fullBucket2", hold: 1, prompt: "按住 E · 把水倒进弯里",
+          note: "水面在弯底晃了晃，定住了。翻口成了。",
+          effect: (state) => { state.flags.trapBuilt = true; } },
       ],
-      objective: "完成三处改造：翻口、新暗口、预警铃",
-      hint: "到标记处按住 E 施工",
+    },
+    {
+      // 门板＋狗：C2 的回call。这条道要真的「暗」，先得让狗闭嘴
+      kind: "chain", id: "c5_hidden",
+      objective: "改造二：新暗口", hint: "新口开在西头第三家的猪圈底下。口上得盖块门板",
+      resetHint: "差点撞上翻查的伪军。退回地道，重新等空当。",
+      steps: [
+        { type: "use", zone: TV.hiddenSpot, hold: 3, prompt: "按住 E · 掏新暗口",
+          note: "口子掏通了，就差个盖。挖出来的土，天不亮就得摊进麦地。" },
+        { type: "pickup", x: 62, level: "under", item: { id: "bun2", label: "窝头" }, prompt: "E · 从干粮袋里拿个窝头" },
+        { type: "use", zone: TV.dogPen, needs: "bun2", prompt: "E · 把窝头丢给狗",
+          note: "猪圈的狗埋头去啃。它不叫，这条道才算真的暗。",
+          effect: (state) => { state.flags.dogFed2 = true; } },
+        { type: "pickup", x: 26, item: { id: "plank", label: "门板", big: true }, prompt: "E · 卸下院里的门板" },
+        { type: "use", zone: TV.hiddenSpot, needs: "plank", hold: 1.2, prompt: "按住 E · 把门板盖上",
+          note: "口子盖严了。上头是猪食槽，谁也不会去翻。",
+          effect: (state) => { state.flags.hiddenBuilt = true; } },
+      ],
+    },
+    {
+      kind: "chain", id: "c5_bell",
+      objective: "改造三：预警铃", hint: "铃铛挂在磨盘边的骡套上，麻绳在藏人洞乙",
+      resetHint: "东头的伪军回过头来。柱子缩回了洞里。",
+      steps: [
+        { type: "pickup", x: 56, level: "under", item: { id: "rope2", label: "麻绳" }, prompt: "E · 取下盘好的麻绳" },
+        { type: "use", zone: TV.bellSpot, needs: "rope2", hold: 1, prompt: "按住 E · 把绳拴上梁",
+          note: "绳头从东口的顶木上垂下来，就差铃了。" },
+        { type: "pickup", x: 148, item: { id: "bell", label: "铃铛" }, prompt: "E · 摘下骡套上的铃铛" },
+        { type: "use", zone: TV.bellSpot, needs: "bell", hold: 1, prompt: "按住 E · 拴好预警铃",
+          note: "指头一拨，铃舌轻轻一响。东口一动，全村先知道。",
+          effect: (state) => { state.flags.bellBuilt = true; } },
+      ],
     },
     {
       kind: "cinematic", id: "c5_alarm",
@@ -904,6 +1307,20 @@ export const SCRIPTS = {
       ),
     },
     {
+      // 历史梗：一挂鞭炮在铁桶里炸，一里外听着就是机枪。
+      // 单格物品栏的教学在这儿反着用一次——两样东西，得跑两趟
+      kind: "chain", id: "c6_prep",
+      objective: "给佯动组备家伙：铁桶里的鞭炮", hint: "鞭炮和铁桶都在歇脚点，村北土坎上会合",
+      steps: [
+        { type: "pickup", x: 16, item: { id: "firecracker", label: "一挂鞭炮" }, prompt: "E · 拿上交通员捎来的鞭炮" },
+        { type: "use", zone: F.northBank, needs: "firecracker", prompt: "E · 把鞭炮搁在土坎上" },
+        { type: "pickup", x: 26, item: { id: "tin", label: "铁皮桶", big: true }, prompt: "E · 扛起铁皮桶" },
+        { type: "use", zone: F.northBank, needs: "tin", prompt: "E · 把桶架好" },
+        { type: "use", zone: F.northBank, hold: 2, prompt: "按住 E · 装好引信",
+          note: "鞭炮盘进桶底，引信探出来。夜里一点，就是一挺『机枪』。" },
+      ],
+    },
+    {
       // 大纲写的是"地面制造声势 + 地下进人"同时发生，不是二选一。
       // 所以选的不是打法，是柱子站在哪一边。
       kind: "choice", id: "c6_plan",
@@ -950,11 +1367,18 @@ export const SCRIPTS = {
     },
     {
       kind: "digSeq", id: "c7_dig", spots: [TF.collapse1, TF.collapse2], holdTime: 3.5,
-      objective: "掏开虚土，把最后十几步挖通到牢房地沿", hint: "按住 E 清土。头顶有动静时停一停（提示会变红）",
+      shore: { collapse1: { beamX: 44 }, collapse2: { beamX: 92 } },
+      objective: "支起顶木，掏开虚土，把最后十几步挖通", hint: "顶木在旁洞里。头顶有动静时停一停（提示会变红）",
       quakeInterval: 9,
     },
     {
       kind: "goto", id: "c7_reach", zone: TF.cellHatch, objective: "摸到牢房地沿",
+    },
+    {
+      // 木匠的手艺最后一次替爹用上：地沿的木板是从上面钉死的
+      kind: "hold", id: "c7_pry", zone: TF.cellHatch, holdTime: 3,
+      objective: "地沿的木板从上面钉死了", hint: "按住 E——爹的凿子，他一直带在身上",
+      note: "凿刃咬进钉缝，一下，一下。木板松了。",
     },
     {
       kind: "cinematic", id: "c7_sister",
@@ -1113,6 +1537,14 @@ export const SCRIPTS = {
       onDone: (state) => { state.flags.carved = true; },
     },
     {
+      kind: "actSeq", id: "c8_stool",
+      objective: "爹留下的旧木凳", hint: "凳腿松了",
+      steps: [
+        { x: 32, r: 1.8, prompt: "E · 把松了的凳腿敲紧",
+          toast: "手艺是爹的，手是他自己的。" },
+      ],
+    },
+    {
       kind: "cinematic", id: "c8_call",
       lines: [
         { stage: "院外传来民兵喊他的声音。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.6, dist: 10 } },
@@ -1195,6 +1627,17 @@ function SpawnFortPatrols(state, reinforced) {
   state.stealthActive = true;
 }
 
+// 第五章白天的两个伪军：改造要的东西全在地表，他们就是「什么时候上去」的题面。
+// 路线从剖面里一眼可见——读他们的脚程，就是读题。
+function SpawnC5Snoops(state) {
+  state.actors = state.actors.filter((a) => !IsEnemy(a));
+  state.actors.push(
+    MakeActor("snoopW", "puppet", 40, { patrol: [16, 62], speed: 0.95 }),
+    MakeActor("snoopE", "puppet", 130, { patrol: [98, 158], speed: 1.05 }),
+  );
+  state.stealthActive = true;
+}
+
 // 地表搜查队：剖面视角里"头顶在翻找、脚下在屏息"的同框构图（纯演出，不参与潜行判定）
 function SpawnSurfaceSearch(state, centerX) {
   state.actors.push(
@@ -1216,8 +1659,9 @@ function SpawnTunnelVillagers(state) {
 }
 
 function StartSmoke(state) {
-  // 烟从东口（x=148）向西推进
-  state.smoke = { frontX: 150, speed: 0.85, trapAt: null, trapHeld: false, active: true, sourceX: 148 };
+  // 烟从东口（x=148）向西推进。压得慢：这一章要留出熄灯＋湿棉被两段链的工夫，
+  // 真正的加速在 c4_smoke 的 onEnter（风箱到了）
+  state.smoke = { frontX: 150, speed: 0.32, trapAt: null, trapHeld: false, active: true, sourceX: 148 };
   for (const a of state.actors) {
     if (a.kind !== "villager") continue;
     if (a.group === "elders") a.x = TV.chamberA.x + (a.id === "elder1" ? -1 : 1);
@@ -1265,8 +1709,8 @@ function SpawnRescueSquad(state) {
 
 function SetupFortTunnel(state) {
   state.collapses = {
-    collapse1: { cleared: false, progress: 0 },
-    collapse2: { cleared: false, progress: 0 },
+    collapse1: { cleared: false, progress: 0, shored: false },
+    collapse2: { cleared: false, progress: 0, shored: false },
   };
   state.actors = state.actors.filter((a) => a.kind !== "villager" && !IsEnemy(a));
   state.player.x = 16;
@@ -1324,8 +1768,13 @@ export function CreateGame(chapterIndex = 0) {
     beatIndex: 0,
     time: 0,
     cardTimer: 0,
-    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, lamp: false, hidden: false, climbT: 0, cineWalk: null },
+    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, cineWalk: null },
     actors: [],
+    cart: null,
+    thrown: null,
+    noiseAt: null,
+    searchlight: null,
+    dogBark: null,
     stealthActive: false,
     detection: { level: 0, spotter: null },
     smoke: null,
@@ -1337,7 +1786,11 @@ export function CreateGame(chapterIndex = 0) {
     lightOverride: null,
     flood: null,
     floodDepth: 0,
-    flags: { route: null, resets: 0, ruined: false, carved: false, hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [] },
+    flags: {
+      route: null, resets: 0, ruined: false, carved: false,
+      hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
+      kiteDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
+    },
     caption: null,
     camHint: { kind: "follow" },
     fade: 0,
@@ -1375,13 +1828,24 @@ export function StartChapter(state, index) {
   state.caption = null;
   state.prompt = null;
   state.player.carry = null;
+  state.player.item = null;
   state.player.lamp = false;
   state.player.crouch = false;
   state.player.climbT = 0;
   state.player.cineWalk = null;
   state.player.level = "surface";
+  state.cart = null;
+  state.thrown = null;
+  state.noiseAt = null;
+  state.searchlight = null;
+  state.dogBark = null;
   if (index !== 7) state.flags.ruined = false;
   if (index < 4) { state.flags.hiddenBuilt = false; state.flags.entWBlocked = false; }
+  // 从章节菜单单独进某一章时，本章谜题的旗标要归零
+  if (index === 0) state.flags.kiteDown = false;
+  if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
+  if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
+  if (index === 4) { state.flags.dogFed2 = false; state.flags.bellBuilt = false; }
 
   if (ch.id === "c1") {
     state.player.x = 38;
@@ -1613,11 +2077,20 @@ export function StepGame(state, input, dt) {
   if (def.kind === "cinematic") { StepCinematic(state, input, dt); return; }
   if (def.kind === "choice") { state.caption = null; return; }
 
+  // 有的节拍给烟锋设了下限（第四章熄灯/堵卡口那两段）：烟在卡口外打转，
+  // 不会把玩家要去的位置先吞掉——手慢不该变成死局。放在 MovePlayer 之前，
+  // 因为渲染层的流体解算会在两帧之间把 frontX 往低改。
+  if (def.smokeFloor !== undefined && state.smoke?.active && state.smoke.frontX < def.smokeFloor) {
+    state.smoke.frontX = def.smokeFloor;
+  }
   MovePlayer(state, input, dt);
   StepFollowers(state, dt);
   StepSoldiers(state, dt);
   StepCineActors(state, dt);
   if (state.smoke?.active) StepSmoke(state, dt);
+  StepDogs(state, dt);
+  StepLightHazard(state, def, dt);
+  if (state.noiseAt && (state.noiseAt.t -= dt) <= 0) state.noiseAt = null;
 
   switch (def.kind) {
     case "goto": StepGoto(state, def, input); break;
@@ -1638,6 +2111,8 @@ export function StepGame(state, input, dt) {
     case "floodRescue": StepFloodRescue(state, def, input); break;
     case "smokeEscape": StepSmokeEscape(state, def, input); break;
     case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
+    case "chain": StepChain(state, def, input, dt); break;
+    case "cartRide": StepCartRide(state, def, input, dt); break;
     default: break;
   }
 
@@ -1664,6 +2139,7 @@ function MovePlayer(state, input, dt) {
   let speed = 4.2 * (POSTURE_SPEED[posture] ?? 1);
   if (def?.slow) speed = 1.8;
   if (p.carry) speed = 3.0;
+  if (p.item?.big) speed = Math.min(speed, 2.6);   // 扛大件（门板/顶木/满桶水）再慢一档
 
   if (Math.abs(input.moveX) > 0.05) {
     p.x += Math.sign(input.moveX) * speed * dt;
@@ -1749,7 +2225,20 @@ function StepFollowers(state, dt) {
 
 function StepSoldiers(state, dt) {
   for (const a of state.actors) {
-    if (!IsEnemy(a) || !a.visible || !a.patrol || a.cineTarget) continue;
+    if (!IsEnemy(a) || !a.visible || a.cineTarget) continue;
+    // 听见动静就过去看：压过巡逻，但不压过过场走位
+    if (a.investigate) {
+      if (state.time > a.investigate.until) { a.investigate = null; }
+      else {
+        const d = a.investigate.x - a.x;
+        if (Math.abs(d) > 0.5) {
+          a.x += Math.sign(d) * (a.speed || 1.2) * 1.5 * dt;
+          a.heading = Math.sign(d);
+        }
+        continue;
+      }
+    }
+    if (!a.patrol) continue;
     if (a.patrolDir === undefined) a.patrolDir = 1;
     a.x += a.patrolDir * a.speed * dt;
     if (a.x >= a.patrol[1]) { a.x = a.patrol[1]; a.patrolDir = -1; }
@@ -1791,6 +2280,7 @@ function StepDetection(state, def, dt) {
   if (state.detection.level >= 1) {
     state.flags.resets += 1;
     RestoreSnapshot(state);
+    def.onReset?.(state);
     state.toast = { text: def.resetHint || "被发现了。退回来，重新等机会。", t: 4 };
   }
 }
@@ -1981,6 +2471,32 @@ function StepDigSeq(state, def, input, dt) {
   if (!key) { AdvanceBeat(state); return; }
   const c = state.collapses[key];
   const zone = TF[key];
+
+  // 连夜掏的段全是虚土：不先支根顶木，挖一下塌一下。
+  // 顶木在旁洞里——扛着它爬过低段，是这条路收的过路钱。
+  if (def.shore && !c.shored) {
+    const sp = def.shore[key];
+    const p = state.player;
+    if (p.item?.id === "beam") {
+      if (ZoneReached(state, zone)) {
+        state.prompt = "E · 把顶木支上";
+        if (input.interact) {
+          c.shored = true;
+          p.item = null;
+          state.toast = { text: "顶木咬住了虚土。可以动手了。", t: 3.5 };
+        }
+      }
+      return;
+    }
+    if (Math.abs(p.x - sp.beamX) < 1.9 && p.level === "under") {
+      state.prompt = "E · 扛起旁洞里的顶木";
+      if (input.interact) GiveItem(state, { id: "beam", label: "顶木", big: true });
+    } else if (ZoneReached(state, zone)) {
+      state.prompt = "虚土会塌——得先从旁洞扛根顶木来支上";
+    }
+    return;
+  }
+
   if (ZoneReached(state, zone)) {
     if (state.beat.quakeActive) {
       state.prompt = "！头顶有动静——停下，别出声";
@@ -2027,6 +2543,16 @@ function StepDouseLamps(state, def, input) {
   if (!state.lamps) {
     state.lamps = def.lamps.map((x) => ({ x, lit: true }));
     state.toast = { text: "铃响了。头顶的脚步就在磨盘那一片。", t: 3.5 };
+  }
+  // 被烟吞掉的灯，烟自己会把它压灭——玩家手慢了不该因为够不着灯而卡死
+  for (const l of state.lamps) {
+    if (l.lit && SmokeCovers(state, l.x)) {
+      l.lit = false;
+      if (!state.beat.smokeDoused) {
+        state.beat.smokeDoused = true;
+        state.toast = { text: "烟漫过来，把东头那盏灯压灭了。", t: 3 };
+      }
+    }
   }
   const remaining = state.lamps.filter((l) => l.lit);
   if (remaining.length <= 1) {
@@ -2451,8 +2977,33 @@ export function GetBeatTarget(state) {
       const keys = ["collapse1", "collapse2"];
       const key = keys[state.beat.digIndex];
       if (!key) return null;
+      const c = state.collapses[key];
+      if (def.shore && !c.shored) {
+        if (p.item?.id === "beam") return { action: "interactAt", x: TF[key].x, level: "under" };
+        return { action: "interactAt", x: def.shore[key].beamX, level: "under" };
+      }
       return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
     }
+    case "chain": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      switch (st.type) {
+        case "pickup": return { action: "interactAt", x: st.x, level: st.level || "surface" };
+        case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
+        case "throwHit":
+          if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
+          return { action: "throwAt", x: st.target.x - 6, level: "surface", face: 1 };
+        case "talk": {
+          const a = FindActor(state, st.actor);
+          return a ? { action: "interactAt", x: a.x, level: a.level || "surface" } : null;
+        }
+        case "push": return { action: "pushAt", x: state.cart ? state.cart.x : st.from, dir: st.dir };
+        case "goto": return { action: "walk", x: st.zone.x, level: st.zone.level || "surface" };
+        default: return null;
+      }
+    }
+    case "cartRide":
+      return { action: "walk", x: state.cart ? state.cart.x : def.from, level: "surface" };
     case "floodRescue": {
       const pool = state.actors.filter((a) => a.kind === "villager" && a.visible && !a.evacuated);
       const loose = pool.find((a) => !a.following);

@@ -74,7 +74,7 @@ for (const evt of ["pointerdown", "keydown", "touchstart"]) {
 const ui = {};
 for (const id of [
   "titleScreen", "startButton", "chapterList",
-  "objectiveText", "hintText", "prompt", "toast", "crouchTag",
+  "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
@@ -104,13 +104,14 @@ function Unlock(index) {
 // ---------------------------------------------------------------------------
 const keys = new Set();
 const touch = { left: false, right: false, up: false, down: false, act: false, crouchEdge: false };
-let interactEdge = false, advanceEdge = false, crouchToggle = false;
+let interactEdge = false, advanceEdge = false, crouchToggle = false, throwEdge = false;
 
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   const k = e.key.toLowerCase();
   keys.add(k);
-  if (k === "e" || k === "f") { interactEdge = true; advanceEdge = true; }
+  if (k === "e") { interactEdge = true; advanceEdge = true; }
+  if (k === "f") { throwEdge = true; advanceEdge = true; }   // F 专职投掷（手里有石子才有用）
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "1" || k === "2") {
@@ -394,6 +395,14 @@ function SyncHud(state, dt, shotFade) {
   ui.prompt.classList.toggle("metered", fill > 0);
 
   ui.crouchTag.hidden = true;
+  // 手里那格：单格物品栏。拿着石子时顺带把 F 键提示挂上
+  const item = state.player?.item;
+  if (ui.itemTag) {
+    ui.itemTag.hidden = !item || inCinematic || state.phase !== "playing";
+    if (item && ui.itemName) {
+      ui.itemName.textContent = item.label + (item.throwable ? "（F 投掷）" : "");
+    }
+  }
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
   }
@@ -558,13 +567,17 @@ function Frame(now) {
   if (state) {
     const move = state.phase === "playing" ? ReadInput() : { moveX: 0, climb: 0 };
     const def = CurrentBeatDef(state);
-    const stepDt = (fastCinematic && def?.kind === "cinematic") ? dt * 5 : dt;
+    // ?fast=1 是给自动截图/测试用的快进。开着声音时不生效——否则过场以 5 倍速
+    // 推进、旁白还在正常语速念，每句都被切在半截，看上去就像"台词没说完就切镜头"
+    // 那个老毛病又回来了。快进与听旁白本来就是互斥的两件事。
+    const stepDt = (fastCinematic && !soundOn && def?.kind === "cinematic") ? dt * 5 : dt;
     const prevChapter = state.chapterIndex;
     StepGame(state, {
       moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
       interact: interactEdge,
-      interactHeld: keys.has("e") || keys.has("f") || touch.act,
+      interactHeld: keys.has("e") || touch.act,
+      throw: throwEdge,
       advance: advanceEdge,
     }, stepDt);
     if (state.chapterIndex !== prevChapter) {
@@ -583,6 +596,7 @@ function Frame(now) {
   world.Render();
   interactEdge = false;
   advanceEdge = false;
+  throwEdge = false;
 }
 
 function Resize() {

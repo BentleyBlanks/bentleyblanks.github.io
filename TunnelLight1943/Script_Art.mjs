@@ -644,6 +644,65 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       "planeBlade", "#6b6f76", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
     InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
       { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
+  } else if (label === "满桶水" || label === "一桶水" || label === "空桶") {
+    DrawCarry(ctx, 0, 0, S, 1, "水桶");
+    if (label !== "空桶") {
+      InkFill(ctx, [[-5 * S, 1.6 * S], [5 * S, 1.6 * S], [4.6 * S, 3.4 * S], [-4.6 * S, 3.4 * S]],
+        "bucketWater", "#5a7a8c", { amp: 0.4 * S, lw: 1.2 * S });
+    }
+  } else if (label === "铁皮桶") {
+    InkFill(ctx, [[-8 * S, -12 * S], [8 * S, -12 * S], [7 * S, 10 * S], [-7 * S, 10 * S]], "tin", "#7d8188",
+      { amp: 0.5 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.2)" });
+    InkLine(ctx, -7.6 * S, -4 * S, 7.6 * S, -4 * S, "tinHoop1", { lw: 1.3 * S, color: "#4c5057" });
+    InkLine(ctx, -7.3 * S, 4 * S, 7.3 * S, 4 * S, "tinHoop2", { lw: 1.3 * S, color: "#4c5057" });
+  } else if (label === "石子") {
+    InkFill(ctx, [[-4 * S, 2 * S], [-1 * S, -3.5 * S], [4 * S, -1.5 * S], [3 * S, 3 * S]], "stone1", "#8b857a",
+      { amp: 0.4 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.22)" });
+  } else if (label === "窝头") {
+    InkFill(ctx, [[-5.5 * S, 3 * S], [-4 * S, -3.5 * S], [0, -6 * S], [4 * S, -3.5 * S], [5.5 * S, 3 * S]],
+      "bun", "#c8a35c", { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.16)" });
+  } else if (label === "麻绳") {
+    ctx.strokeStyle = "#9a7d4f";
+    ctx.lineWidth = 2.2 * S;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(0, 0, (4 + i * 2.2) * S, 0.3 + i * 0.5, Math.PI * 1.8 + i * 0.4);
+      ctx.stroke();
+    }
+  } else if (label === "铃铛") {
+    InkFill(ctx, [[-4.5 * S, 2 * S], [-3.5 * S, -4 * S], [0, -5.5 * S], [3.5 * S, -4 * S], [4.5 * S, 2 * S]],
+      "bell", "#a9915a", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
+    ctx.fillStyle = IN.ink;
+    ctx.beginPath(); ctx.arc(0, 3.4 * S, 1.3 * S, 0, Math.PI * 2); ctx.fill();
+  } else if (label === "柴刀") {
+    InkLine(ctx, -8 * S, 4 * S, -1 * S, 1 * S, "sickleHandle", { lw: 2.4 * S, color: "#7a5433" });
+    ctx.strokeStyle = "#8d9298";
+    ctx.lineWidth = 2.2 * S;
+    ctx.beginPath();
+    ctx.arc(2 * S, -2 * S, 6 * S, Math.PI * 0.15, Math.PI * 1.05);
+    ctx.stroke();
+  } else if (label === "风筝") {
+    InkFill(ctx, [[0, -8 * S], [6 * S, 0], [0, 8 * S], [-6 * S, 0]], "kiteC", "#c96f52",
+      { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.12)" });
+    InkLine(ctx, 0, -8 * S, 0, 8 * S, "kiteSpine", { lw: 1 * S, color: "rgba(60,30,20,0.6)" });
+    InkLine(ctx, -6 * S, 0, 6 * S, 0, "kiteCross", { lw: 1 * S, color: "rgba(60,30,20,0.6)" });
+  } else if (label === "鞭炮" || label === "一挂鞭炮") {
+    for (let i = 0; i < 6; i += 1) {
+      InkFill(ctx, Rect(-6 * S + (i % 2) * 6 * S, (-9 + i * 3) * S, 5 * S, 2.6 * S), "fc" + i, "#a8453a",
+        { amp: 0.3 * S, lw: 1.1 * S });
+    }
+    InkLine(ctx, 0, -10 * S, 0, 9 * S, "fcString", { lw: 1 * S, color: "#6b5a3f", amp: 1.6 });
+  } else if (label === "棉被" || label === "湿棉被") {
+    const wet = label === "湿棉被";
+    InkFill(ctx, [[-10 * S, 4 * S], [-9 * S, -4 * S], [-3 * S, -7 * S], [6 * S, -6 * S], [10 * S, 1 * S], [4 * S, 6 * S]],
+      "quiltRoll", wet ? "#5f6a70" : "#b8a284", { amp: 1.1 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.2)" });
+    ctx.strokeStyle = wet ? "rgba(40,60,70,0.7)" : "rgba(120,95,65,0.7)";
+    ctx.lineWidth = 1 * S;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(-2 * S, 0, (3 + i * 2.4) * S, Math.PI * 0.3, Math.PI * 1.4);
+      ctx.stroke();
+    }
   } else {
     InkFill(ctx, Rect(-26 * S, -3.2 * S, 52 * S, 6.4 * S), "plank", "#a8794a",
       { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.14)" });
@@ -1097,6 +1156,112 @@ export function DrawPrison(ctx, x, groundY, id, { night = true } = {}) {
 }
 
 // 天空：白天有水彩云，夜里有星，黎明贴地一条暖带
+// 拴着的看门狗：卧姿，链子拴在木桩上。叫不叫由玩法层决定，这里只画它趴着
+export function DrawDog(ctx, x, groundY, id, { alert = false } = {}) {
+  const bx = x, by = groundY;
+  // 木桩与链子
+  InkLine(ctx, bx - 26, by, bx - 26, by - 18, id + "post", { lw: 4, color: "#6b5136" });
+  ctx.strokeStyle = "#57504a";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(bx - 25, by - 14);
+  ctx.quadraticCurveTo(bx - 12, by - 2 + Hash(id) * 3, bx + 2, by - 9);
+  ctx.stroke();
+  // 身子（卧）
+  InkFill(ctx, [[bx - 8, by], [bx - 6, by - 10], [bx + 12, by - 11], [bx + 20, by - 4], [bx + 18, by]],
+    id + "body", "#8a7350", { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.22)" });
+  // 头（警觉时抬起）
+  const hy = alert ? 20 : 13;
+  InkFill(ctx, [[bx + 12, by - hy + 6], [bx + 14, by - hy - 2], [bx + 22, by - hy - 1], [bx + 24, by - hy + 5]],
+    id + "head", "#8a7350", { amp: 0.8, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
+  // 耳朵
+  InkFill(ctx, [[bx + 14, by - hy - 1], [bx + 16, by - hy - 7], [bx + 18, by - hy - 1]], id + "ear", "#6f5c40",
+    { amp: 0.4, lw: 1.4 });
+  // 尾巴
+  InkLine(ctx, bx - 7, by - 8, bx - 14, by - 14, id + "tail", { lw: 2.6, color: "#6f5c40", amp: 1.4 });
+}
+
+// 挂在巷口的马灯：一根挑出来的木杆，底下吊一盏
+export function DrawHangLantern(ctx, x, groundY, id, { lit = true } = {}) {
+  InkLine(ctx, x - 4, groundY, x - 4, groundY - 96, id + "pole", { lw: 4.5, color: "#5f4a32" });
+  InkLine(ctx, x - 6, groundY - 92, x + 16, groundY - 84, id + "arm", { lw: 3.5, color: "#5f4a32" });
+  InkLine(ctx, x + 14, groundY - 85, x + 14, groundY - 72, id + "wire", { lw: 1.6, color: "#4c4238" });
+  // 灯体
+  InkFill(ctx, [[x + 8, groundY - 72], [x + 20, groundY - 72], [x + 18, groundY - 52], [x + 10, groundY - 52]],
+    id + "body", lit ? "#e0b568" : "#5c5244", { amp: 0.7, lw: 1.9, shade: "rgba(0,0,0,0.2)" });
+  if (lit) {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    const g = ctx.createRadialGradient(x + 14, groundY - 62, 2, x + 14, groundY - 62, 26);
+    g.addColorStop(0, "rgba(255,214,140,0.9)");
+    g.addColorStop(1, "rgba(255,214,140,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - 20, groundY - 96, 68, 60);
+    ctx.restore();
+  }
+}
+
+// 挂在树杈上的风筝
+export function DrawKite(ctx, x, y, id) {
+  InkFill(ctx, [[x, y - 16], [x + 12, y], [x, y + 16], [x - 12, y]], id + "face", "#c96f52",
+    { amp: 1, lw: 2, shade: "rgba(0,0,0,0.12)" });
+  InkLine(ctx, x, y - 16, x, y + 16, id + "sp", { lw: 1.4, color: "rgba(60,30,20,0.6)" });
+  InkLine(ctx, x - 12, y, x + 12, y, id + "cr", { lw: 1.4, color: "rgba(60,30,20,0.6)" });
+  // 挂着的线与尾穗
+  InkLine(ctx, x, y + 16, x + 7, y + 34, id + "tail", { lw: 1.2, color: "rgba(80,50,35,0.7)", amp: 2.2 });
+}
+
+// 石子堆：投掷的"弹药箱"
+export function DrawStonePile(ctx, x, groundY, id) {
+  for (let i = 0; i < 7; i += 1) {
+    const px = x - 14 + (i % 4) * 8 + Hash(id + "x" + i) * 5;
+    const py = groundY - 3 - Math.floor(i / 4) * 6 - Hash(id + "y" + i) * 3;
+    InkFill(ctx, [[px - 4, py + 3], [px - 2, py - 3], [px + 3, py - 2], [px + 4, py + 3]],
+      id + "st" + i, i % 2 ? "#8b857a" : "#7a746a", { amp: 0.5, lw: 1.4, shade: "rgba(0,0,0,0.18)" });
+  }
+}
+
+// 洞室里的水瓮
+export function DrawVat(ctx, x, groundY, id) {
+  InkFill(ctx, [[x - 12, groundY], [x - 15, groundY - 18], [x - 10, groundY - 30], [x + 10, groundY - 30],
+    [x + 15, groundY - 18], [x + 12, groundY]],
+    id + "body", "#6e5b44", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
+  // 口沿与水面
+  InkLine(ctx, x - 10, groundY - 30, x + 10, groundY - 30, id + "rim", { lw: 2.4, color: IN.ink });
+  InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "water", "#4d6a78", { amp: 0.5, lw: 1 });
+}
+
+// 驴车：能推、能跟着走的那片影子。车板 + 两个大轮 + 半车干草
+export function DrawCart(ctx, x, groundY, id) {
+  // 车板
+  InkFill(ctx, Rect(x - 44, groundY - 34, 88, 10), id + "bed", "#7d5c38",
+    { amp: 1, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  // 车辕
+  InkLine(ctx, x + 42, groundY - 30, x + 74, groundY - 22, id + "shaft1", { lw: 3, color: "#6b4d2e" });
+  // 干草
+  InkFill(ctx, [[x - 40, groundY - 34], [x - 30, groundY - 58], [x - 6, groundY - 66], [x + 22, groundY - 60],
+    [x + 36, groundY - 40], [x + 40, groundY - 34]],
+    id + "hay", "#b89a58", { amp: 2.2, lw: 2, shade: "rgba(0,0,0,0.16)" });
+  for (let i = 0; i < 6; i += 1) {
+    InkLine(ctx, x - 30 + i * 12, groundY - 40 - Hash(id + i) * 16,
+      x - 36 + i * 12, groundY - 30 - Hash(id + "b" + i) * 6, id + "straw" + i,
+      { lw: 1.2, color: "rgba(120,95,45,0.75)" });
+  }
+  // 车轮
+  for (const wx of [x - 22, x + 22]) {
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(wx, groundY - 13, 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1.4;
+    for (let s = 0; s < 4; s += 1) {
+      ctx.beginPath();
+      ctx.moveTo(wx - Math.cos(s * 0.78) * 11, groundY - 13 - Math.sin(s * 0.78) * 11);
+      ctx.lineTo(wx + Math.cos(s * 0.78) * 11, groundY - 13 + Math.sin(s * 0.78) * 11);
+      ctx.stroke();
+    }
+  }
+}
+
 export function DrawSky(ctx, w, h, light, id) {
   if (light === "night" || light === "dark" || light === "tunnel") {
     ctx.save();
