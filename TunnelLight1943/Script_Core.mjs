@@ -1005,6 +1005,9 @@ export const SCRIPTS = {
       onDone: (state) => {
         const father = FindActor(state, "father");
         if (father) father.pose = null;
+        // 这道刻痕从现在起长在门框上（在此之前门框是空的——不能让玩家
+        // 攥着笔去划一条已经画好的线）
+        state.flags.marked = true;
       },
     },
     {
@@ -2639,7 +2642,7 @@ export function CreateGame(chapterIndex = 0) {
     flood: null,
     floodDepth: 0,
     flags: {
-      route: null, resets: 0, ruined: false, carved: false,
+      route: null, resets: 0, ruined: false, marked: false, carved: false,
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
       clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
       barrowPlanks: 0, barrowHome: false, henFlew: false, wellRopeBroken: false, ropeTaken: false,
@@ -2721,6 +2724,7 @@ export function StartChapter(state, index) {
   state.pip = null;
   // 从章节菜单单独进某一章时，本章谜题的旗标要归零
   if (index === 0) {
+    state.flags.marked = false;   // 门框重新变回空的，那道线等玩家自己划
     state.flags.clothDown = false;
     state.flags.barrowPlanks = 0;
     state.flags.barrowHome = false;

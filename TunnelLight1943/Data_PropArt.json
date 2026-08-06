@@ -31,9 +31,9 @@
       }
     },
     "doorframe": {
-      "art": "DrawDoorframe", "band": "walk", "ss": "prop",
+      "art": "DrawDoorframe", "band": "walk", "ss": "closeup",
       "sprite": { "w": 120, "h": 130, "anchor": "center", "baseline": 10 },
-      "note": "刻痕（flags.carved）由 carveRebuild 就地重绘这张贴图"
+      "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档"
     },
     "bench": {
       "art": "DrawBench", "band": "walk", "ss": "prop", "shadow": 0.26,

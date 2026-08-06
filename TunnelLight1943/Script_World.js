@@ -320,7 +320,7 @@ export function CreateWorld(canvasEl) {
   let markerMesh = null, markerCanvas = null, markerCtx = null;
   let collapseMeshes = {};
   let itemMeshes = [];
-  let carveState = false, carveRebuild = null;
+  let carveState = { marked: false, carved: false }, carveRebuild = null;
   let otsMesh = null;
   let otsHiddenId = null;
   let vignetteAlpha = 0;
@@ -887,8 +887,9 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "doorframe": {
-        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, { carved: carveState }));
-        carveRebuild = () => {
+        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, carveState));
+        // 两道刻痕分别由 flags.marked / flags.carved 把门，划完才长出来
+        carveRebuild = (marks) => {
           const c = mesh.material.map.image;
           const ctx = c.getContext("2d");
           // 就地重绘这张贴图：清空要按画布真实像素（含超采样），
@@ -897,7 +898,7 @@ export function CreateWorld(canvasEl) {
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, c.width, c.height);
           ctx.restore();
-          ART.DrawDoorframe(ctx, S.ax, S.ay, p.id, { carved: true });
+          ART.DrawDoorframe(ctx, S.ax, S.ay, p.id, marks);
           mesh.material.map.needsUpdate = true;
         };
         break;
@@ -1356,7 +1357,7 @@ export function CreateWorld(canvasEl) {
       + `:${f.henFlew ? 1 : 0}:${f.thimbleFound ? 1 : 0}:${f.raidStarted ? 1 : 0}:${f.ropeTaken ? 1 : 0}:${f.wellRopeBroken ? 1 : 0}`;
     if (key === builtKey) return;
     builtKey = key;
-    carveState = !!state.flags.carved;
+    carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved };
     carveRebuild = null;
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
     InvalidateSceneCaches();
@@ -1911,7 +1912,11 @@ export function CreateWorld(canvasEl) {
     ps.tagPrevX = p.x;
     // 刚接手这一幕的前 3.2 秒、或者站着发呆超过 2.5 秒 → 亮起来
     if (!moving) tagLevel += dt * 0.4; else tagLevel = 0;
-    const want = inCine || otsHiddenId === "player" ? 0
+    // 近景里不要它：这枚标是给"夜里三个同样身高的短褂站在村道上"认人用的，
+    // 镜头推到 5 米以内时画面上就那么一两个人，它只会盖住真正在演的东西
+    //（划线那一拍它正好压在石笔上）
+    const closeUp = viewW < 5.0;
+    const want = inCine || closeUp || otsHiddenId === "player" ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
     ps.tagMesh.visible = ps.tagAlpha > 0.02;
@@ -2223,9 +2228,12 @@ export function CreateWorld(canvasEl) {
     }
 
     // 刻痕
-    if (state.flags.carved && !carveState) {
-      carveState = true;
-      carveRebuild?.();
+    {
+      const marks = { marked: !!state.flags.marked, carved: !!state.flags.carved };
+      if (marks.marked !== carveState.marked || marks.carved !== carveState.carved) {
+        carveState = marks;
+        carveRebuild?.(marks);
+      }
     }
 
     // —— 谜题动词层的动态元素 ——
@@ -2459,7 +2467,8 @@ export function CreateWorld(canvasEl) {
           new THREE.MeshBasicMaterial({ map: CanvasTexture(planeBoardCanvas), transparent: true, depthWrite: false }),
         );
         layers.play.add(planeBoardMesh);
-        SetPlayOrder(planeBoardMesh, 0.5);      // 料在台面上，人在台子前面
+        // 料摊在台面上、人站在台子这一侧：正是 loose 带的定义（行走线之前、演员之后）
+        SetPlayOrder(planeBoardMesh, BAND.loose, "planeBoard");
         planeBoardMesh.userData.k = "";
         // 刨子本体：真家伙就巴掌长（≈0.34m）。S=0.74 让 DrawCarry 的 22S 像素
         // 正好落在这个尺寸上——上一版按 S=1.9 画，一把刨子有 0.9m 长
@@ -2476,7 +2485,8 @@ export function CreateWorld(canvasEl) {
           new THREE.MeshBasicMaterial({ map: CanvasTexture(planePileCanvas), transparent: true, depthWrite: false }),
         );
         layers.play.add(planePileMesh);
-        SetPlayOrder(planePileMesh, 0.72);      // 落在台子这一侧的地上
+        // 刨花落在台子这一侧的地上：同属 loose 带，排在料之后免得两张贴图打架
+        FixOrder(planePileMesh, DepthOrder("play", BAND.loose) + 1);
         planePileMesh.userData.k = -1;
       }
       // 毛面按 12 档重画（连续重画一块 PROP_SS 的画布太亏）
@@ -2906,7 +2916,9 @@ export function CreateWorld(canvasEl) {
 
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
-    const showMarker = target && target.x !== undefined && def?.kind !== "cinematic" && !state.microCine;
+    // 同人字标：指路的箭头在特写里没有意义——你已经站在它跟前了
+    const showMarker = target && target.x !== undefined && def?.kind !== "cinematic"
+      && !state.microCine && viewW >= 5.0;
     if (showMarker) {
       if (!markerMesh) {
         markerCanvas = MakeCanvas(48 * HINT_SS, 48 * HINT_SS);

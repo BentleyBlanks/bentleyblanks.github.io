@@ -578,9 +578,12 @@ function TestChalkIsAPencilNotASlider() {
     step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } });
     assert.ok(s.beat.drawn > 0, "攥住往前拉，必须留下印子");
     assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
+    // 玩家要做的事，画面上事先不能已经做完了：门框此刻必须还是空的
+    assert.equal(s.flags.marked, false, "没划完之前，门框上不该已经有那道刻痕");
     // 一直拉到底
     step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } }, 120);
     assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "拉满一道线，这一拍必须过");
+    assert.equal(s.flags.marked, true, "划完了，刻痕才长在门框上");
   }
 
   // ③ 手飘离刻线：笔脱手，印子当场停住

@@ -946,7 +946,7 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
     id + "winBar2", { lw: 1.4, color: IN.ink });
 }
 
-export function DrawDoorframe(ctx, x, groundY, id, { carved = false } = {}) {
+export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false } = {}) {
   const H = 74, W = 40;
   InkFill(ctx, Rect(x - W / 2, groundY - H, 8, H), id + "l", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
   InkFill(ctx, Rect(x + W / 2 - 8, groundY - H, 8, H), id + "r", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
@@ -957,11 +957,16 @@ export function DrawDoorframe(ctx, x, groundY, id, { carved = false } = {}) {
       id + "g" + i, { lw: 0.9, color: "rgba(90,60,35,0.55)", amp: 1.6 });
   }
   // 爹刻的那道线：高度必须跟划线玩法的 markY 对上（1.28m×48ppm≈61px），
-  // 否则玩家亲手划的线消失后，永久刻痕落在另一个高度上
-  InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 2.4, color: "#f0e0b0", amp: 0.4 });
+  // 否则玩家亲手划的线消失后，永久刻痕落在另一个高度上。
+  // **必须等玩家真的划完才出现**（marked）——它以前是无条件画的，于是那一拍
+  // 玩家攥着笔去划一条已经在木头上的线，整个交互当场失去意义。
+  // 粗细跟玩家划出来的那道对齐（1.8px≈3.7cm），否则划完一瞬间线会突然变胖。
+  if (marked) {
+    InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
+  }
   if (carved) {
     // 第八章给妹妹刻的：矮一头（1.08m）
-    InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 2.4, color: "#fff0c8", amp: 0.4 });
+    InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 1.8, color: "#fff0c8", amp: 0.4 });
   }
 }
 

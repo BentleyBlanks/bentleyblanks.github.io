@@ -15,7 +15,9 @@ export const PPM = 48;
 // 贴图超采样档（世界尺寸不变，只是贴图更密）
 // hint 档 12：引导气泡/失败「！」总在 3.2m 过肩特写里出镜（密度 ~600px/米），
 // 4x 顶不住——页内 A/B 实测 12 才不糊（边缘梯度 46→167）。贴图很小，代价可忽略。
-export const SS = { prop: 4, detail: 3, hint: 12 };
+// closeup 给会被推到 2m 以内特写的主角道具——门框在划线那一拍占了半个画面，
+// prop 那一档在这个景别下就开始糊了
+export const SS = { prop: 4, detail: 3, hint: 12, closeup: 8 };
 
 // 同构读取：Node 走 fs，浏览器走 fetch。两边都是 ESM 顶层 await，
 // 调用方什么都不用改（模块图会等它加载完）。
