@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
+  WINCH_HUB_Y,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -121,11 +122,9 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           input.interactHeld = true;
           input.moveX = 1;
         }
-        // 刨料：站到工位上按住 E 一趟趟推；推到头了掉头把刨子拖回来
-        if (target.action === "planeAt") {
-          if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
-          else { input.interactHeld = true; input.moveX = target.back ? -1 : 1; }
-        }
+        // 刨料：驱动器只按键盘（CLAUDE.md 铁律），按住 E 就行——方向由节拍自己判。
+        // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
+        if (target.action === "planeAt") input.interactHeld = true;
         if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
@@ -394,6 +393,222 @@ function TestVaultC1() {
   console.log("  ✓ 翻越：挡路+按键才翻 / 不占跑腿路线 / 抬升弧 / 扛大件变奏 / 推车不触发");
 }
 
+// 落地道具：自由放下（落点避开掩体足迹）→ 悬浮气泡 → 拾回。
+// 掩体带的 z 专职挡人，桶落进草垛=凭空消失——DropSpot 必须把落点推出去。
+function TestGroundItems() {
+  const state = CreateGame(0);
+  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
+  DebugJump(state, 0, water.index);
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  // 链步骤一：拎起屋里的水桶
+  state.player.x = 31;
+  state.player.level = "surface";
+  step({}, 2);
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "链步骤一：要能拎起水桶");
+  // 拾取后的保护窗：紧接着的 E 不许顺手把它又扔了
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "刚拿起的东西不许被同一串 E 顺手放下");
+  // 站进 hayB 草垛掩体（x=68, w=3.2）正中间放下：落点必须被推出掩体足迹
+  state.player.x = 68;
+  step({}, 14);
+  step({ interact: true });
+  assert.equal(state.player.item, null, "空地上按 E 要能自由放下");
+  assert.equal(state.groundItems.length, 1, "放下后地上要有一件落地道具");
+  const g = state.groundItems[0];
+  assert.ok(g.x <= 65.9 + 1e-6 || g.x >= 70.1 - 1e-6,
+    `落点必须避开 hayB 掩体足迹（实际 x=${g.x}）`);
+  // 悬浮提示：附近要有它自己的小样气泡
+  state.player.x = g.x - 1.2;
+  step({});
+  assert.ok(state.bubbles.some((b) => b.icon === "item:空水桶"), "落地道具头顶要挂小样气泡");
+  // 走近拾回
+  state.player.x = g.x;
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "走近按 E 要能拾回");
+  assert.equal(state.groundItems.length, 0, "拾回后地上不该有残影");
+  console.log("  ✓ 落地道具：自由放下避开掩体足迹、悬浮气泡、拾回");
+}
+
+// 接绳打结（键盘后备路径）：按住 E 缠满一圈再收紧，井绳必须接好
+function TestKnotKeyboardFallback() {
+  const state = CreateGame(0);
+  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
+  DebugJump(state, 0, water.index);
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  // 直接把链推进到接绳那一步：桶已放下、绳已在手
+  state.beat.stepIndex = 4;
+  state.flags.wellRopeBroken = true;
+  state.flags.bucketAt = 70.1;
+  state.groundItems.push({ uid: "gT", id: "bucket", label: "空水桶", x: 70.1, level: "surface" });
+  state.player.item = { id: "rope", label: "麻绳" };
+  state.player.x = SCENES.village.zones.well.x;
+  state.player.level = "surface";
+  step({ interactHeld: true }, Math.ceil(3.0 / DT));
+  assert.ok(state.beat.knotState?.t >= 1, "按住 E 必须能把绳缠满");
+  step({ interactHeld: true }, Math.ceil(1.2 / DT));
+  assert.equal(state.flags.wellRopeBroken, false, "收紧后井绳必须接好");
+  assert.equal(state.player.item, null, "麻绳缠上去就离手了");
+  console.log("  ✓ 接绳打结：键盘后备路径能缠满并勒紧");
+}
+
+// 辘轳是个转盘，不是一根拉杆：鼠标绕轴心转圈才走绳——顺时针放、逆时针收、
+// 脱手倒转；上手的同时镜头必须推成井口特写（不在大全景下摇转盘）。
+function TestWinchIsACrankNotALever() {
+  const state = CreateGame(0);
+  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
+  DebugJump(state, 0, water.index);
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  // 直接把链推进到辘轳那一步：绳已接好、桶在手里
+  state.beat.stepIndex = 6;
+  state.flags.wellRopeBroken = false;
+  state.player.item = { id: "bucket", label: "空水桶" };
+  const wx = SCENES.village.zones.well.x;
+  state.player.x = wx;
+  state.player.level = "surface";
+  step({}, 2);
+  step({ interact: true });   // 挂上辘轳
+  const w = state.beat.winch;
+  assert.ok(w?.hooked, "拿着桶按 E 必须挂上辘轳");
+  step({});
+  assert.ok(state.closeUp, "挂上辘轳后镜头必须推成井口特写");
+  assert.ok(state.closeUp.hw < 4, `特写景别要真的近（实际 ${state.closeUp?.hw}）`);
+
+  const hubY = WINCH_HUB_Y;   // SURFACE_Y = 0
+  const circle = (dir, n) => {
+    // dir=-1 顺时针（放绳）/ +1 逆时针（摇起）。步长 0.3rad/帧，半径 0.5
+    for (let i = 0; i < n; i += 1) {
+      const a = (state.beat.winch.prevA ?? 0) + dir * 0.3;
+      step({ pointerHeld: true, pointerWorld: { x: wx + Math.cos(a) * 0.5, y: hubY + Math.sin(a) * 0.5 } });
+    }
+  };
+  // 顺时针绕圈：绳往下走
+  step({ pointerHeld: true, pointerWorld: { x: wx + 0.5, y: hubY } });   // 手搭上转盘
+  const d0 = w.depth;
+  circle(-1, 8);
+  assert.ok(w.depth > d0 + 0.1, `顺时针转了两圈半，桶得实实在在往下走（${d0}→${w.depth}）`);
+  assert.equal(state.gesture?.kind, "crankDown", "放绳阶段的手势提示是顺时针转圈");
+  // 逆时针倒着转不放绳
+  const d1 = w.depth;
+  circle(1, 6);
+  assert.ok(w.depth <= d1 + 1e-9, "空桶阶段逆时针转不该把绳送下去");
+  // 一路顺时针到触水
+  circle(-1, 60);
+  assert.ok(w.filled, "转到底桶必须触水灌满");
+  // 逆时针往上摇
+  const d2 = w.depth;
+  circle(1, 10);
+  assert.ok(w.depth < d2 - 0.08, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
+  assert.equal(state.gesture?.kind, "crankUp", "摇起阶段的手势提示是逆时针转圈");
+  const crankMid = w.crankA;
+  // 脱手：过了棘齿宽限辘轳倒转，桶自己往下坠，摇把跟着倒着抡
+  const d3 = w.depth;
+  step({}, Math.ceil(1.2 / DT));
+  assert.ok(w.depth > d3 + 0.15, "脱手过了宽限，辘轳必须倒转（桶坠回去）");
+  assert.ok(w.crankA < crankMid, "倒转时摇把必须真的倒着转（crankA 回退）");
+  // 键盘 W 仍是完整后备：一路摇到顶
+  step({ climb: -1 }, Math.ceil(4.2 / DT));
+  assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
+    "键盘 W 摇到顶必须能收完这一步");
+  assert.equal(state.player.item?.id, "fullBucket", "摇上来手里必须是一桶水");
+  console.log("  ✓ 辘轳转盘：顺放逆收 / 特写推近 / 脱手倒转 / 键盘后备");
+}
+
+// 石笔：玩家攥的是一支笔，不是一根滑块。三条硬规矩各验一遍。
+function TestChalkIsAPencilNotASlider() {
+  const carve = ChapterBeatList(0).find((b) => b.id === "c1_carve");
+  const mk = () => {
+    const state = CreateGame(0);
+    DebugJump(state, 0, carve.index);
+    state.player.x = 34;
+    state.player.level = "surface";
+    return state;
+  };
+  const step = (state, input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  const LINE_Y = 1.28;          // c1_carve 的 markY
+  const X0 = 34 - 0.52, X1 = 34 + 0.52;
+
+  // ① 手没落在笔上就按下去拖：笔不动（这正是"不是 slider"的意思）
+  {
+    const s = mk();
+    step(s, {}, 2);
+    for (let i = 0; i < 40; i += 1) {
+      step(s, { pointerHeld: true, pointerWorld: { x: X0 + 0.9 + i * 0.01, y: LINE_Y } });
+    }
+    assert.equal(s.beat.drawn, 0, "手没抓着笔，怎么拖都不该划出印子");
+  }
+
+  // ② 攥住笔再拉：印子跟着出来，且笔有摩擦——拉不过 CHALK_SPEED
+  {
+    const s = mk();
+    step(s, {}, 2);
+    step(s, { pointerHeld: true, pointerWorld: { x: X0, y: LINE_Y } });   // 落在笔尖上=攥住
+    assert.ok(s.beat.grabbed, "手落在笔身上按下去，必须攥得住");
+    // 手瞬间甩到另一头：笔只能一寸一寸蹭过去，一帧绝不会到底
+    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } });
+    assert.ok(s.beat.drawn > 0, "攥住往前拉，必须留下印子");
+    assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
+    // 玩家要做的事，画面上事先不能已经做完了：门框此刻必须还是空的
+    assert.equal(s.flags.marked, false, "没划完之前，门框上不该已经有那道刻痕");
+    // 一直拉到底
+    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } }, 120);
+    assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "拉满一道线，这一拍必须过");
+    assert.equal(s.flags.marked, true, "划完了，刻痕才长在门框上");
+  }
+
+  // ③ 手飘离刻线：笔脱手，印子当场停住
+  {
+    const s = mk();
+    step(s, {}, 2);
+    step(s, { pointerHeld: true, pointerWorld: { x: X0, y: LINE_Y } });
+    // 只拖 4 帧：DT=1/30 下笔速 0.62m/s，帧数多了 15 公分的线会直接划完、
+    // 节拍推进，脱手就没得验了
+    step(s, { pointerHeld: true, pointerWorld: { x: X0 + 0.3, y: LINE_Y } }, 4);
+    const drawnBefore = s.beat.drawn;
+    assert.ok(drawnBefore > 0, "先得划出一点");
+    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y + 0.9 } }, 30);
+    assert.equal(s.beat.grabbed, false, "手抬离刻线太远，笔必须脱手");
+    assert.equal(s.beat.drawn, drawnBefore, "脱手之后印子不该再长");
+  }
+
+  // ④ 键盘后备仍在（自动通关测试与无鼠标的玩家都靠它）
+  {
+    const s = mk();
+    step(s, {}, 2);
+    step(s, { interactHeld: true, moveX: 1 }, 200);
+    assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "按住 E 往右推必须也能划完");
+  }
+  console.log("  ✓ 石笔：抓不住就划不动 / 有摩擦 / 会脱手 / 键盘后备可用");
+}
+
 function TestInstrumentalBgmManifest() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
@@ -479,43 +694,55 @@ function TestPlaneBeat() {
   assert.equal(def.kind, "plane", "合榫那一拍已经换成刨料");
   assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
 
-  // 爹的示范先走完
-  for (let i = 0; i < 150; i += 1) StepGame(state, idle(), DT);
-  assert.ok(state.planing, "刨料期间台面上必须有那块料");
+  // 爹的示范 + 柱子自己上前接手。**这一段绝不许在测试里挪 player.x**——
+  // 上一版每处断言都先 `state.player.x = workX` 把人瞬移到工位，正好跳过了
+  // "玩家怎么走到工位"这一整段；线上示范一完人站在判定圈外，屏幕上什么都不出，
+  // 全绿的测试一个字都没提。凡是"玩家自己要走到某处"的节拍，测试必须走真实路径。
   const workX = def.zone.x - 0.55;
-  state.player.x = workX;
+  for (let i = 0; i < 200; i += 1) StepGame(state, idle(), DT);
+  assert.ok(state.planing, "刨料期间台面上必须有那块料");
+  assert.ok(Math.abs(state.player.x - workX) < 0.06,
+    `示范完必须由节拍把柱子送到工位（现在停在 ${state.player.x.toFixed(2)}，工位 ${workX}）`);
+  assert.ok(state.dragTrack && state.dragTrack.drag, "站到工位就必须亮出拖动轨道，玩家不该猜该干什么");
 
-  // ① 倒着拖不吃木头
+  // ① 按住 A/D 不许把人走开——这一拍人钉在台前（上一版按住 D 能一路散步）
+  for (let i = 0; i < 40; i += 1) StepGame(state, { ...idle(), moveX: 1 }, DT);
+  assert.ok(Math.abs(state.player.x - workX) < 0.06, "刨料时走路输入不该把人挪走");
+  // 键盘后备（CLAUDE.md：鼠标玩法必须留等价按键路径，否则自动通关卡死）：
+  // 光按住 E 就推得动，而且**不掺 A/D**——方向由这一趟的状态给
+  const beforeKb = state.planing.u;
+  for (let i = 0; i < 12; i += 1) StepGame(state, { ...idle(), interactHeld: true }, DT);
+  assert.ok(state.planing.u > beforeKb, "按住 E 必须能把刨子推出去（键盘后备）");
+
+  // ② 倒着拖不吃木头
   const before = state.planing.smooth;
-  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), interactHeld: true, moveX: -1 }, DT);
+  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), dragX: -0.05 }, DT);
   assert.equal(state.planing.smooth, before, "回程不该刨掉木头");
 
-  // ② 一趟推到底：刨花出来、木头亮一分
+  // ③ 一趟推到底：刨花出来、木头亮一分
   let guard = 0;
   while (state.planing && state.planing.smooth === before && guard < 400) {
     guard += 1;
-    StepGame(state, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+    StepGame(state, { ...idle(), dragX: 0.05 }, DT);
   }
   assert.ok(state.planing === null || state.planing.smooth > before, "一趟推到底必须刨掉一层");
   assert.ok(state.flags.planedOnce, "第一趟推完必须落旗");
 
-  // ③ 中间顿一下：这一趟不齐，刨花短一截（但仍然算数，不会卡死）
+  // ④ 中间顿一下：这一趟不齐，刨花短一截（但仍然算数，不会卡死）
   const s2 = CreateGame(0);
   DebugJump(s2, 0, beats.indexOf("c1_tenon"));
-  for (let i = 0; i < 150; i += 1) StepGame(s2, idle(), DT);
-  s2.player.x = def.zone.x - 0.55;
-  for (let i = 0; i < 14; i += 1) StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+  for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
+  for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
   for (let i = 0; i < 20; i += 1) StepGame(s2, idle(), DT);          // 停在半道
   let g2 = 0, curlLen = null;
   while (s2.planing && g2 < 400) {
     g2 += 1;
-    StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
-    if (s2.planeCurl && curlLen === null) curlLen = s2.planeCurl.len;
-    if (curlLen !== null) break;
+    StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
+    if (s2.planeCurl && curlLen === null) { curlLen = s2.planeCurl.len; break; }
   }
   assert.ok(curlLen !== null && curlLen < 1, "顿过的那一趟，刨花必须短一截");
 
-  // ④ 自动通关能过（不会卡在"推到头忘了拖回来"）
+  // ⑤ 自动通关能过（不会卡在"推到头忘了拖回来"）
   const s3 = CreateGame(0);
   DebugJump(s3, 0, beats.indexOf("c1_tenon"));
   let g3 = 0;
@@ -523,11 +750,7 @@ function TestPlaneBeat() {
     g3 += 1;
     const t = GetBeatTarget(s3);
     const inp = idle();
-    if (t?.action === "planeAt") {
-      const d = t.x - s3.player.x;
-      if (Math.abs(d) > 0.6) inp.moveX = Math.sign(d);
-      else { inp.interactHeld = true; inp.moveX = t.back ? -1 : 1; }
-    }
+    if (t?.action === "planeAt") inp.dragX = t.back ? -0.05 : 0.05;
     StepGame(s3, inp, DT);
   }
   assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
@@ -601,6 +824,10 @@ TestStealthEscapable();
 TestPromptsAreDeviceNeutral();
 TestWorkStations();
 TestVaultC1();
+TestGroundItems();
+TestKnotKeyboardFallback();
+TestWinchIsACrankNotALever();
+TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestInstrumentalBgmManifest();
 TestQuieterAudioMix();

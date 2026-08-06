@@ -12,7 +12,12 @@
 import * as THREE from "three";
 import * as ART from "./Script_Art.mjs";
 
-const PART_PPM = 150;   // 零件贴图密度（像素/米）——比场景件高得多，特写不糊
+// 零件贴图密度（像素/米）。150 是给中景定的：镜头推到 4.1m 画宽（刨料那一拍）时
+// 画面密度到 ~900px/米，150 的贴图要放大六倍，人就糊成一团。480 之后放大不到两倍。
+// 骨头都是巴掌大的小图，八种角色一共也就十来兆，代价换得起。
+// INK_K 把所有写死的墨线粗细/抖动按同一比例带上来——不然线会细成蛛丝。
+const PART_PPM = 480;
+const INK_K = PART_PPM / 150;
 
 // 体型（相对成年男子）。柱子在第一章还是个半大孩子，后面才抽条；
 // 妹妹比他矮一头多。个头差本身就是叙事：门框上的刻痕量的就是这个。
@@ -52,7 +57,7 @@ function Tex(canvas) {
 // 把一段绘制烘成"枢轴在原点"的贴图片
 // drawFn(ctx, px, py) 以 (px,py) 为枢轴；padding 留给墨线与抖动
 function BakePart(wM, hM, pivotU, pivotV, drawFn) {
-  const pad = 10;
+  const pad = Math.round(10 * INK_K);   // 留给墨线抖动的边，也要随密度长
   const w = wM * PART_PPM + pad * 2;
   const h = hM * PART_PPM + pad * 2;
   const canvas = MakeCanvas(w, h);
@@ -77,44 +82,44 @@ function BuildParts(kind) {
   const P = PART_PPM;
   const parts = {
     torso: () => BakePart(0.42, BONE.torso + 0.06, 0.5, 1,
-      (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, 0.42 * P, BONE.torso * P, kind, kind + "torso")),
+      (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, 0.42 * P, BONE.torso * P, kind, kind + "torso", INK_K)),
     head: () => BakePart(0.46, 0.46, 0.42, 1,
-      (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head")),
+      (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K)),
     upperArmB: () => BakePart(0.13, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coatDark, kind + "uab")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coatDark, kind + "uab", { k: INK_K })),
     foreArmB: () => BakePart(0.12, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coatDark, kind + "fab");
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coatDark, kind + "fab", { k: INK_K });
         ctx.beginPath();
         ctx.arc(px, py + BONE.foreArm * P, 0.045 * P, 0, Math.PI * 2);
         ctx.fillStyle = ART.PAL.skinDark;
         ctx.fill();
       }),
     upperArmF: () => BakePart(0.13, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coat, kind + "uaf")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coat, kind + "uaf", { k: INK_K })),
     foreArmF: () => BakePart(0.12, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coat, kind + "faf");
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coat, kind + "faf", { k: INK_K });
         ctx.beginPath();
         ctx.arc(px, py + BONE.foreArm * P, 0.047 * P, 0, Math.PI * 2);
         ctx.fillStyle = ART.PAL.skin;
         ctx.fill();
         ctx.strokeStyle = ART.IN.ink;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * INK_K;
         ctx.stroke();
       }),
     thighB: () => BakePart(0.17, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coatDark, kind + "thb")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coatDark, kind + "thb", { k: INK_K })),
     shinB: () => BakePart(0.14, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#6b5540", kind + "shb")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#6b5540", kind + "shb", { k: INK_K })),
     footB: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb")),
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb", INK_K)),
     thighF: () => BakePart(0.17, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coat, kind + "thf")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coat, kind + "thf", { k: INK_K })),
     shinF: () => BakePart(0.14, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#7d6349", kind + "shf")),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#7d6349", kind + "shf", { k: INK_K })),
     footF: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf")),
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf", INK_K)),
   };
   const built = {};
   for (const k of Object.keys(parts)) built[k] = parts[k]();

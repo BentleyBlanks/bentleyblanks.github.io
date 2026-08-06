@@ -1,0 +1,209 @@
+{
+  "_readme": [
+    "每种物体「长什么样、埋多深」的唯一事实来源。Data_Scenes.json 只说某个物体在哪，",
+    "它的贴图与深度按 kind 查这里。加载与校验走 Data_Scenes.mjs。",
+    "",
+    "art —— 这套白盒没有图片文件：所有贴图都由 Script_Art.mjs 的手绘矢量画笔实时烘到",
+    "  离屏 canvas。所以「引用的贴图」= 这里的画笔函数名。换皮 = 换这个名字。",
+    "band —— 深度带名，取自 Data_DepthSpec.mjs 的 BAND 表。禁止写裸数字。",
+    "ss —— 贴图超采样档：prop=4（会被特写的道具）/ detail=3（小件）/ hint=4（提示图标）。",
+    "sprite —— 烘焙画布的尺寸与锚点，单位是贴图像素（标尺 48 px/米）：",
+    "    w / h    数字=固定；{pad, per, default} = pad + 物体的 per 轴(米) × 48",
+    "    anchor   \"center\" 或像素数：贴图里哪一列对准物体的世界 x",
+    "    baseline 贴图底边往上数多少像素是「脚」——物体的脚永远踩在所在层的地平线上",
+    "yOffset —— 可选，锚点抬离地平线的米数（挂在树上的东西才用）",
+    "placeAt —— 可选，\"left\" 表示世界 x 对准物体左边缘而不是中心",
+    "shadow —— 可选，地面投影强度；省略=不投影",
+    "drawnBy —— 有这个字段的 kind 不在 AddProp 里画（地道剖面/动态道具自己管），",
+    "    登记在这里只为让校验器知道它是有意为之，不是漏配"
+  ],
+
+  "props": {
+    "house": {
+      "art": "DrawHouse", "band": "building", "ss": "prop", "shadow": 0.34,
+      "sprite": { "w": { "pad": 90, "per": "w" }, "h": { "pad": 90, "per": "h" }, "anchor": "center", "baseline": 6 },
+      "variants": {
+        "interior": {
+          "note": "可进入的屋子=里外两层：室内剖面画在 building 带，立面盖在 facade 带（家具之上、演员之下），人走进门 UpdateProps 把立面淡出",
+          "innerArt": "DrawHomeInterior", "innerBand": "building",
+          "facadeArt": "DrawHouse", "facadeBand": "facade"
+        }
+      }
+    },
+    "doorframe": {
+      "art": "DrawDoorframe", "band": "walk", "ss": "closeup",
+      "sprite": { "w": 120, "h": 130, "anchor": "center", "baseline": 10 },
+      "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档"
+    },
+    "bench": {
+      "art": "DrawBench", "band": "walk", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 130, "h": 70, "anchor": "center", "baseline": 8 }
+    },
+    "stool": {
+      "art": "DrawStool", "band": "walk", "ss": "prop",
+      "sprite": { "w": 60, "h": 40, "anchor": "center", "baseline": 6 }
+    },
+    "wallSeg": {
+      "art": "DrawWall", "band": "walk", "ss": "prop",
+      "sprite": { "w": { "pad": 30, "per": "w" }, "h": { "pad": 40, "per": "h", "default": 1.8 }, "anchor": "center", "baseline": 10 }
+    },
+    "hatch": {
+      "art": "DrawHatch", "band": "walk", "ss": "prop",
+      "sprite": { "w": 70, "h": 50, "anchor": "center", "baseline": 24 }
+    },
+    "well": {
+      "art": "DrawWell", "band": "walk", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 140, "h": 120, "anchor": "center", "baseline": 12 },
+      "note": "第一章绳断时（flags.wellRopeBroken）辘轳上加画一小截毛茬朝下的断头"
+    },
+    "millstone": {
+      "art": "DrawMillstone", "band": "walk", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 110, "h": 70, "anchor": "center", "baseline": 8 }
+    },
+    "woodpile": {
+      "art": "DrawWoodpile", "band": "walk", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 120, "h": 80, "anchor": "center", "baseline": 6 },
+      "note": "没拿走绳之前（!flags.ropeTaken）堆里露一截绳头——目标同屏露一角"
+    },
+    "hen": {
+      "art": "DrawHen", "band": "walk", "ss": "prop",
+      "sprite": { "w": 60, "h": 50, "anchor": "center", "baseline": 6 }
+    },
+    "woodStack": {
+      "art": "DrawWoodStack", "band": "walk", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": { "pad": 34, "per": "w" }, "h": { "pad": 34, "per": "h", "default": 1.24 }, "anchor": "center", "baseline": 8 },
+      "note": "码好的柴垛：可翻越物的轮廓样板（肩高、顶沿磨亮、缺一角）"
+    },
+    "ridge": {
+      "art": "DrawRidge", "band": "walk", "ss": "prop",
+      "sprite": { "w": { "pad": 50, "per": "w", "default": 3 }, "h": 90, "anchor": "center", "baseline": 12 }
+    },
+    "fallenWood": {
+      "art": "DrawFallenWood", "band": "walk", "ss": "prop",
+      "sprite": { "w": 130, "h": 110, "anchor": "center", "baseline": 10 }
+    },
+    "thimble": {
+      "art": "DrawThimble", "band": "clutter", "ss": "prop",
+      "sprite": { "w": 30, "h": 24, "anchor": "center", "baseline": 6 }
+    },
+    "tree": {
+      "art": "DrawTree", "band": "yard", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 150, "h": 200, "anchor": "center", "baseline": 6 },
+      "spriteBig": { "w": 220, "h": 250, "anchor": "center", "baseline": 6 }
+    },
+    "lamppost": {
+      "art": "DrawLamppost", "band": "yard", "ss": "prop",
+      "sprite": { "w": 70, "h": 130, "anchor": "center", "baseline": 6 }
+    },
+    "stonePile": {
+      "art": "DrawStonePile", "band": "walk", "ss": "prop",
+      "sprite": { "w": 80, "h": 50, "anchor": "center", "baseline": 8 }
+    },
+    "dog": {
+      "art": "DrawDog", "band": "walk", "ss": "prop",
+      "sprite": { "w": 130, "h": 80, "anchor": "center", "baseline": 12 }
+    },
+    "hangLantern": {
+      "art": "DrawHangLantern", "band": "yard", "ss": "prop",
+      "sprite": { "w": 150, "h": 130, "anchor": 60, "baseline": 8 },
+      "note": "锚点不是画布中心：灯挂在杆子一侧，60 才对得上杆脚"
+    },
+    "cloth": {
+      "art": "DrawCloth", "band": "yard", "ss": "prop",
+      "sprite": { "w": 80, "h": 100, "anchor": "center", "baseline": 50 },
+      "yOffset": 5.2,
+      "note": "挂在老槐树杈上，所以是全场唯一抬离地平线的道具；只在第一章且没被打下来时出现"
+    },
+    "vat": {
+      "art": "DrawVat", "band": "loose", "ss": "prop",
+      "sprite": { "w": 80, "h": 90, "anchor": "center", "baseline": 8 },
+      "note": "地道里的水瓮（level: under）。原先在代码里写死 z=0.2 绕开了深度带，externalize 时归入 loose"
+    },
+    "mapBoard": {
+      "art": "DrawMapBoard", "band": "nearBack", "ss": "prop",
+      "sprite": { "w": 140, "h": 112, "anchor": "center", "baseline": 8 },
+      "drawSize": { "w": 2.4, "h": 1.9 },
+      "note": "卸下来的旧门板斜靠在歇脚点；第六章把情报一条条钉上去（pinnedNotes）"
+    },
+    "ditch": {
+      "art": "DrawDitch", "band": "walk", "ss": "prop",
+      "sprite": { "w": { "pad": 40, "per": "w" }, "h": 90, "anchor": "center", "baseline": 50 }
+    },
+    "crops": {
+      "art": "DrawCrops", "band": "yard", "ss": "prop",
+      "sprite": { "w": { "pad": 40, "per": "w" }, "h": 110, "anchor": "center", "baseline": 8 }
+    },
+    "fortWall": {
+      "art": "DrawFortWall", "band": "building", "ss": "prop",
+      "sprite": { "w": { "pad": 60, "per": "w" }, "h": { "pad": 90, "per": "h" }, "anchor": "center", "baseline": 24 }
+    },
+    "fortGate": {
+      "art": "DrawFortWall+DrawLamppost", "band": "yard", "ss": "prop",
+      "sprite": { "w": 160, "h": 150, "anchor": "center", "baseline": 8 },
+      "note": "两垛墙夹一盏灯：一张贴图里画三笔（左右墙各 34×116，中间灯）"
+    },
+    "blockhouse": {
+      "art": "DrawBlockhouse", "band": "backdrop", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 190, "h": 300, "anchor": "center", "baseline": 8 }
+    },
+    "prison": {
+      "art": "DrawPrison", "band": "building", "ss": "prop", "shadow": 0.26,
+      "sprite": { "w": 180, "h": 160, "anchor": "center", "baseline": 8 }
+    },
+    "fortSilhouette": {
+      "art": "inline:据点剪影", "band": "walk", "ss": "prop",
+      "sprite": { "w": { "pad": 0, "per": "w" }, "h": 300, "anchor": 0, "baseline": 6 },
+      "placeAt": "left",
+      "note": "围墙+垛口+铁丝网+院内房脊+炮楼探照灯杆，整幅现画（不走单个 Draw 函数）"
+    },
+    "pump": {
+      "art": "inline:水泵风箱", "band": "walk", "ss": "prop",
+      "sprite": { "w": 140, "h": 120, "anchor": "center", "baseline": 8 },
+      "note": "日军灌烟灌水用的家伙。目前没有场景摆它，留着备用"
+    },
+
+    "barrow": { "drawnBy": "UpdateProps", "note": "独轮车是动态件：装几根木料、推到哪儿都随玩法变" },
+    "chamber": { "drawnBy": "AddUnderground", "note": "藏人洞：在地道剖面上掏一个拱顶" },
+    "pocket": { "drawnBy": "AddUnderground", "note": "旁洞：同上，小一号" },
+    "waterTrap": { "drawnBy": "AddUnderground", "note": "翻口（水封）" },
+    "bell": { "drawnBy": "AddUnderground", "note": "预警铃的线" },
+    "collapse": { "drawnBy": "AddUnderground", "note": "塌方堆：清挖进度由 state.collapses 驱动" }
+  },
+
+  "_coversNote": [
+    "掩体的深度不能抽签：高过腰的一旦落到人前面，会把角色连人带扛的木料整个吞掉。",
+    "所以矮的（h ≤ 1.2 且不在 alwaysTall 里）进 clutter 带挡人，高的退到 yard/building —",
+    "两者之间按 id 的哈希稳定二选一，让一排草垛不至于全部一样深。"
+  ],
+  "coverBands": { "low": "clutter", "tallPick": ["yard", "building"], "lowMaxHeight": 1.2, "alwaysTall": ["haystack", "bush", "wallSeg", "tree"] },
+
+  "covers": {
+    "haystack": {
+      "art": "DrawHaystack", "ss": "prop",
+      "sprite": { "w": { "pad": 60, "per": "w" }, "h": { "pad": 90, "per": "w" }, "anchor": "center", "baseline": 10 },
+      "note": "高度按宽度长：草垛是个堆，越宽越高。烧过的场景（ruined）改画焦黑底+残秆"
+    },
+    "firewood": {
+      "art": "DrawFirewood", "ss": "prop",
+      "sprite": { "w": { "pad": 60, "per": "w" }, "h": 90, "anchor": "center", "baseline": 8 }
+    },
+    "wallSeg": {
+      "art": "DrawWall", "ss": "prop",
+      "sprite": { "w": { "pad": 40, "per": "w" }, "h": 120, "anchor": "center", "baseline": 14 },
+      "drawHeightPx": 72
+    },
+    "bush": {
+      "art": "DrawBush", "ss": "prop",
+      "sprite": { "w": { "pad": 70, "per": "w" }, "h": 110, "anchor": "center", "baseline": 10 }
+    },
+    "ridge": {
+      "art": "DrawRidge", "ss": "prop",
+      "sprite": { "w": { "pad": 50, "per": "w" }, "h": 90, "anchor": "center", "baseline": 12 }
+    },
+    "crops": {
+      "art": "DrawCrops", "ss": "prop",
+      "sprite": { "w": { "pad": 40, "per": "w" }, "h": 110, "anchor": "center", "baseline": 8 }
+    },
+    "ditch": { "drawnBy": "AddProp", "note": "交通沟由 props 里的同名物体画，掩体项只提供躲藏判定" }
+  }
+}
