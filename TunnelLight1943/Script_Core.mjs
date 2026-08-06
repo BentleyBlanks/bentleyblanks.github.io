@@ -923,7 +923,7 @@ function FatherSaw(state) {
   father.x = V.workbench.x + 0.9;
   father.heading = -1;              // 面朝工作台锯
   father.cineTarget = null;
-  father.track = { name: "sawing", t: 0 };
+  father.track = { name: "sawing", t: 0, ambient: true };
   father.carry = "锯";
 }
 function MotherHoe(state) {
@@ -932,7 +932,7 @@ function MotherHoe(state) {
   mother.cineTarget = null;
   mother.x = V_PATCH_X;
   mother.heading = -1;              // 面朝菜畦
-  mother.track = { name: "hoeing", t: 0 };
+  mother.track = { name: "hoeing", t: 0, ambient: true };
   mother.carry = "锄头";
 }
 
@@ -2679,10 +2679,19 @@ export function CreateGame(chapterIndex = 0) {
 }
 
 // 一次性戏剧姿势用完就得收：不清的话，被架走的爹会一路架着走完全场
+// 换幕时把过场留下的姿势/轨道抹掉，免得它们渗进下一拍。
+// **但干活的循环不算过场**：爹在工作台前拉锯、娘在菜畦锄地是这一章的底噪，
+// 它们打 ambient 标记，换幕不清。以前一并清掉，于是"把水交给娘"那一下
+// 链走完、AdvanceBeat 一调 ClearPoses，爹的锯和娘的锄同时定格——
+// 两个大活人从此站在院子里一动不动。要停活的地方（扫荡时爹去抄刨子）
+// 本来就显式写了 track = null，不靠这里代劳。
 function ClearPoses(state) {
   state.player.pose = null;
-  state.player.track = null;
-  for (const a of state.actors) { a.pose = null; a.track = null; }
+  if (!state.player.track?.ambient) state.player.track = null;
+  for (const a of state.actors) {
+    a.pose = null;
+    if (!a.track?.ambient) a.track = null;
+  }
 }
 
 export function StartChapter(state, index) {
