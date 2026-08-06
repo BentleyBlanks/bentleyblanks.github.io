@@ -112,6 +112,22 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // 顶在脑袋上。所以只此一处列全，画布与挂点都从这里取。
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
+// 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
+const ALONG_ARM = ["锯", "锄头", "步枪"];
+// 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
+// hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
+const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
+  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶"];
+// 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
+// Rig 的 hold 姿势按它插值——不列的按小件算。
+const HOLD_WEIGHT = {
+  "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
+  "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
+  "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+};
+const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
+const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
+
 // ---------------------------------------------------------------------------
 // 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
 // ---------------------------------------------------------------------------
@@ -121,7 +137,7 @@ function MakeCarryMesh(label) {
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const TALL = { "锯": [70, 110], "锄头": [70, 140] };
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 96] };   // 收窄后的画幅，别再给一根柱子留地方
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -348,7 +364,7 @@ export function CreateWorld(canvasEl) {
   let shadeMeshes = [], shadeTex = null;   // 掩体背光那一侧的影子（"安全在哪儿"要画出来）
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
-  let chainItemMesh = null, chainItemLabel = null;
+  let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
   let barrowMesh = null;
   // 自由放下的落地道具：uid → mesh（uid 在 Core 里随放下动作分配）
@@ -409,7 +425,7 @@ export function CreateWorld(canvasEl) {
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
-    chainItemMesh = null; chainItemLabel = null;
+    chainItemMeshes = [];
     barrowMesh = null;
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
@@ -1633,7 +1649,8 @@ export function CreateWorld(canvasEl) {
   }
 
 
-  function UpdateOne(s, x, level, heading, crouch, dt, carry = false, extra = {}) {
+  // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
+  function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
     // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
     const lift = extra.lift || 0;
@@ -1646,8 +1663,10 @@ export function CreateWorld(canvasEl) {
     else s.phase += dt * 2.2;      // 挖土/爬梯这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
+    const holding = IsHandHeld(held);
     PoseRig(s.rig, {
-      phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
+      carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
@@ -1713,13 +1732,21 @@ export function CreateWorld(canvasEl) {
     // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同。
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
-    const alongArm = label === "锯" || label === "锄头";
-    const inHand = alongArm || [...BUCKETS, "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳",
-      "花布巾", "鞭炮", "一挂鞭炮"].includes(label);
+    const alongArm = ALONG_ARM.includes(label);
+    const inHand = IsHandHeld(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
-    s.carryMesh.position.set(anchor.x, anchor.y + (alongArm ? 0 : inHand ? -0.20 : 0.10), CARRY_Z);
-    s.carryMesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
+    // 提在手里的：贴图中心就是桶沿，挂在拳头底下一点点就够了。原先垂 0.20m 是
+    // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
+    // 柱子（才一米出头）手里的桶就杵在地上了。
+    // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
+    const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
+    s.carryMesh.position.set(anchor.x + forward,
+      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z);
+    // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
+    // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
+    // （锯和锄本来就绕柄对称，不镜像也看不出来。）
+    s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
       const elbow = ElbowPoint(s.rig);
@@ -1829,7 +1856,7 @@ export function CreateWorld(canvasEl) {
 
     // 手里那一格（谜题链的物品）和肩上扛的木料一样要摆出携带姿势
     const held = p.carry || (p.item ? p.item.label : null);
-    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!held,
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, held,
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
@@ -1895,7 +1922,7 @@ export function CreateWorld(canvasEl) {
       const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
       const bs = sisterScale || BODY_SCALE[a.kind] || 1;
       UpdateOne(s, a.x, a.level || "surface", a.heading,
-        posture === "squat" || posture === "crawl" || !!a.crouch, dt, !!a.carry,
+        posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
@@ -1904,7 +1931,10 @@ export function CreateWorld(canvasEl) {
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
       if (a.pose === "planePush") planeHandRig = s.rig;
-      SyncCarry(s, a.carry, a.heading);
+      // 兵手里默认有枪。剧本不必给每一处敌人写 carry——枪是他们的常态，
+      // 而且必须是**真握在手里**的物件：抡枪托那一下砸下来的就是它
+      const carry = a.carry ?? ((a.kind === "soldier" || a.kind === "puppet") ? "步枪" : null);
+      SyncCarry(s, carry, a.heading);
       LiftActor(s, ch.light, false);
       // 提灯：先把灯挂到手上，光晕再从灯的火心发出去
       const lampKind = a.lantern ? (a.lanternKind || (a.kind === "puppet" ? "lantern" : "hurricane")) : null;
@@ -3059,27 +3089,34 @@ export function CreateWorld(canvasEl) {
       barkMesh.position.set(state.dogBark.x + 0.8, SURFACE_Y + 1.9 + Math.sin(time * 7) * 0.08, 0.6);
     } else if (barkMesh) barkMesh.visible = false;
 
-    // 链上的待拾物：当前一步要捡的东西就摆在那儿，看得见才谈得上"找"
-    let chainPickup = null;
+    // 链上的待拾物：**这条链里还没捡的东西全都摆在那儿**。
+    // 原来只画"当前这一步"要捡的那一件，于是院子里那两根木料一次只出现一根：
+    // 扛走第一根，第二根才凭空冒出来——连带蹲在第二根上的母鸡也蹲在空气里。
+    // 东西本来就该在那儿，是玩家还没走到而已。
+    const chainPickups = [];
     if (def?.kind === "chain" && state.beat) {
-      const st = def.steps[state.beat.stepIndex || 0];
-      if (st?.type === "pickup") chainPickup = st;
-    }
-    if (chainPickup) {
-      const label = chainPickup.item.label;
-      if (!chainItemMesh || chainItemLabel !== label) {
-        if (chainItemMesh) layers.play.remove(chainItemMesh);
-        chainItemLabel = label;
-        chainItemMesh = MakeGroundItemMesh(label);
-        layers.play.add(chainItemMesh);
-        // loose+1：待拾物与放下物挤在同一处时（木料堆上的绳头 vs 搁下的桶），
-        // 当前要捡的那件永远在上面
-        FixOrder(chainItemMesh, DepthOrder("play", BAND.loose) + 1);
+      const from = state.beat.stepIndex || 0;
+      for (let i = from; i < def.steps.length; i += 1) {
+        const st = def.steps[i];
+        if (st?.type === "pickup") chainPickups.push(st);
       }
-      chainItemMesh.visible = true;
-      PlaceSprite(chainItemMesh, chainPickup.x,
-        chainPickup.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
-    } else if (chainItemMesh) chainItemMesh.visible = false;
+    }
+    while (chainItemMeshes.length < chainPickups.length) chainItemMeshes.push({ mesh: null, label: null });
+    chainItemMeshes.forEach((slot, i) => {
+      const st = chainPickups[i];
+      if (!st) { if (slot.mesh) slot.mesh.visible = false; return; }
+      if (!slot.mesh || slot.label !== st.item.label) {
+        if (slot.mesh) layers.play.remove(slot.mesh);
+        slot.label = st.item.label;
+        slot.mesh = MakeGroundItemMesh(slot.label);
+        layers.play.add(slot.mesh);
+        // loose+1：待拾物与放下物挤在同一处时（木料堆上的绳头 vs 搁下的桶），
+        // 要捡的那件永远在上面
+        FixOrder(slot.mesh, DepthOrder("play", BAND.loose) + 1);
+      }
+      slot.mesh.visible = true;
+      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+    });
 
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;

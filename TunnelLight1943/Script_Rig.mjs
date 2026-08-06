@@ -23,13 +23,14 @@ const INK_K = PART_PPM / 150;
 // 妹妹比他矮一头多。个头差本身就是叙事：门框上的刻痕量的就是这个。
 export const BODY_SCALE = {
   father: 1.0, soldier: 0.99, puppet: 0.97, militia: 0.98,
-  family: 0.93, villager: 0.95, player: 0.93, sister: 0.66,
+  family: 0.90, villager: 0.95, player: 0.93, sister: 0.66,
 };
 
 // 骨长（米），按 1.72m 身高排布
 export const BONE = {
   hipY: 0.62,
   torso: 0.52,
+  torsoW: 0.29,   // 侧视躯干厚度（＝胸廓前后厚，不是肩宽）
   headR: 0.115,
   upperArm: 0.25,
   foreArm: 0.24,
@@ -80,26 +81,29 @@ function BuildParts(kind) {
   if (rigCache.has(kind)) return rigCache.get(kind);
   const [coat, coatDark] = ART.RIG_COLOR(kind);
   const P = PART_PPM;
+  const LONG_COAT = kind === "family" || kind === "sister";   // 大襟褂过胯
   const parts = {
-    torso: () => BakePart(0.42, BONE.torso + 0.06, 0.5, 1,
-      (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, 0.42 * P, BONE.torso * P, kind, kind + "torso", INK_K)),
+    torso: () => BakePart(BONE.torsoW, BONE.torso + (LONG_COAT ? 0.16 : 0.08), 0.5,
+      // 枢轴（胯）在画布下沿往上留出下摆的位置
+      LONG_COAT ? 0.72 : 0.88,
+      (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K)),
     head: () => BakePart(0.46, 0.46, 0.42, 1,
       (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K)),
-    upperArmB: () => BakePart(0.13, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coatDark, kind + "uab", { k: INK_K })),
-    foreArmB: () => BakePart(0.12, BONE.foreArm + 0.05, 0.5, 0,
+    upperArmB: () => BakePart(0.115, BONE.upperArm, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coatDark, kind + "uab", { k: INK_K })),
+    foreArmB: () => BakePart(0.105, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coatDark, kind + "fab", { k: INK_K });
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coatDark, kind + "fab", { k: INK_K });
         ctx.beginPath();
         ctx.arc(px, py + BONE.foreArm * P, 0.045 * P, 0, Math.PI * 2);
         ctx.fillStyle = ART.PAL.skinDark;
         ctx.fill();
       }),
-    upperArmF: () => BakePart(0.13, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.13 * P, 0.105 * P, coat, kind + "uaf", { k: INK_K })),
-    foreArmF: () => BakePart(0.12, BONE.foreArm + 0.05, 0.5, 0,
+    upperArmF: () => BakePart(0.115, BONE.upperArm, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coat, kind + "uaf", { k: INK_K })),
+    foreArmF: () => BakePart(0.105, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.105 * P, 0.085 * P, coat, kind + "faf", { k: INK_K });
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coat, kind + "faf", { k: INK_K });
         ctx.beginPath();
         ctx.arc(px, py + BONE.foreArm * P, 0.047 * P, 0, Math.PI * 2);
         ctx.fillStyle = ART.PAL.skin;
@@ -108,16 +112,16 @@ function BuildParts(kind) {
         ctx.lineWidth = 3 * INK_K;
         ctx.stroke();
       }),
-    thighB: () => BakePart(0.17, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coatDark, kind + "thb", { k: INK_K })),
-    shinB: () => BakePart(0.14, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#6b5540", kind + "shb", { k: INK_K })),
+    thighB: () => BakePart(0.145, BONE.thigh, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
+    shinB: () => BakePart(0.12, BONE.shin, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#6b5540", kind + "shb", { k: INK_K })),
     footB: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb", INK_K)),
-    thighF: () => BakePart(0.17, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.17 * P, 0.13 * P, coat, kind + "thf", { k: INK_K })),
-    shinF: () => BakePart(0.14, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.13 * P, 0.10 * P, "#7d6349", kind + "shf", { k: INK_K })),
+    thighF: () => BakePart(0.145, BONE.thigh, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
+    shinF: () => BakePart(0.12, BONE.shin, 0.5, 0,
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#7d6349", kind + "shf", { k: INK_K })),
     footF: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf", INK_K)),
   };
@@ -334,7 +338,9 @@ function SampleTrack(name, time) {
 
 /**
  * 姿态解算：把状态映射成关节角度。
- * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture, pose, poseK}
+ * state: {phase, moving, crouch, carry, hold, holdW, climbing, digging, aiming, posture, pose, poseK}
+ * carry = 扛在肩上（木料/门板/棉被）；hold = 提在手里（水桶/绳/石子），
+ * holdW 0..1 是分量：0 拎块石子、1 满满一桶水。两者互斥，由渲染层按标签判定
  * posture: stand | stoop | squat | crawl —— 地道各段净高不同，见 Core 的 TunnelPosture
  * poseK: 0..1 的动作进度，驱动 planePush（推程）/ vault（翻越）这类姿势——不是时间
  * 所有角度用弧度，正值 = 顺时针（面朝 +x 时向前）
@@ -652,6 +658,33 @@ export function PoseRig(rig, s, dt) {
     target.foreB = -52 * DEG;
     target.armF = (-30 + (c ? swing2 * 10 : 0)) * DEG;
     target.foreF = -58 * DEG;
+  } else if (s.hold) {
+    // 提：东西吊在近侧那只手上（水桶/麻绳/石子都走这儿），不是扛在肩上。
+    // 空手走/站的姿势打底，按分量 holdW 往"坠"的方向拉——侧视里"沉"只读得出
+    // 三笔：**胳膊被坠直**（肘伸开、摆幅收掉）、**身子往后仰配重**、
+    // **另一只手甩得更开**。拎块石子(0.15)几乎还是空手的样子，
+    // 提满满一桶水(1.0)才是另一个人。
+    const w = Math.min(1, Math.max(0, s.holdW ?? 1));
+    const c = s.moving ? 1 : 0;
+    const br = Math.sin(s.breath || 0);
+    target.hipY = c ? Math.abs(Math.sin(p)) * (0.035 - 0.009 * w) : br * 0.012;
+    target.hipX = 0;
+    target.torso = ((c ? 5 : 1.5 + br * 1.2) - 9 * w) * DEG;
+    target.head = ((c ? -2 : -1 - br * 1.5) + 5 * w) * DEG;
+    // 腿：提着重物迈不开大步，步幅与小腿折度都按分量收一档
+    const legAmp = 30 - 9 * w, shinAmp = 52 - 14 * w;
+    target.thighB = (c ? swing2 * legAmp : -3) * DEG;
+    target.shinB = (c ? Math.max(0, -swing2) * shinAmp : 4) * DEG;
+    target.footB = (c ? -swing2 * 12 - 4 : -3) * DEG;
+    target.thighF = (c ? swing * legAmp : 3) * DEG;
+    target.shinF = (c ? Math.max(0, -swing) * shinAmp : 2) * DEG;
+    target.footF = (c ? -swing * 12 - 4 : -3) * DEG;
+    // 远侧那只手空着：越重甩得越开，配重全靠它
+    target.armB = (c ? swing * (26 + 12 * w) : 4 + br * 2) * DEG;
+    target.foreB = (c ? -16 + Math.max(0, swing) * 20 : -12 - br * 3) * DEG;
+    // 近侧提东西那只：摆幅按分量收掉，肘按分量伸开（w=1 时几乎是一根直杆）
+    target.armF = ((c ? swing2 * (26 - 20 * w) : -4 - br * 2) + 6 * w) * DEG;
+    target.foreF = ((c ? -16 + Math.max(0, swing2) * 20 : -14 - br * 3) * (1 - w) - 4 * w) * DEG;
   } else if (s.carry) {
     // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
     // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。

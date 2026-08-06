@@ -933,7 +933,7 @@ function FatherSaw(state) {
   father.x = V.workbench.x + 0.9;
   father.heading = -1;              // 面朝工作台锯
   father.cineTarget = null;
-  father.track = { name: "sawing", t: 0 };
+  father.track = { name: "sawing", t: 0, ambient: true };
   father.carry = "锯";
 }
 function MotherHoe(state) {
@@ -942,7 +942,7 @@ function MotherHoe(state) {
   mother.cineTarget = null;
   mother.x = V_PATCH_X;
   mother.heading = -1;              // 面朝菜畦
-  mother.track = { name: "hoeing", t: 0 };
+  mother.track = { name: "hoeing", t: 0, ambient: true };
   mother.carry = "锄头";
 }
 
@@ -1222,9 +1222,11 @@ export const SCRIPTS = {
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
           lines: [
             { who: "妹妹", say: "哥——风把我的头巾刮到树上去了！", d: 3.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
-            { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
+            { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 126.45, y: 2.43, dist: 3.2 } },
           ] },
-        { type: "throwHit", pickupX: 120, target: { x: 127.6, y: 5.2, r: 2 },
+        // 靶心 = 花布巾实际挂着的那一点（Data_Scenes 的 cloth.x + Data_PropArt 的
+        // cloth.yOffset）。这三处必须一起改——它们曾经一起指着树顶上方两米的空气
+        { type: "throwHit", pickupX: 119, target: { x: 126.45, y: 2.43, r: 1.5 },
           prompt: "F · 投",
           missNote: "石子落了空——扑棱棱惊起一片麻雀。",
           miss: (state, land) => {
@@ -1334,8 +1336,12 @@ export const SCRIPTS = {
           { stage: "", d: 2.2, cam: { kind: "insert", x: 55, y: 1.3, dist: 4.2 } },
         ],
       },
-      // 软性窗口：院里的石子堆——朝街上扔一颗，把街上那两个引得更远（非必选）
-      stonePile: { x: 43.5 },
+      // 这儿**没有**石子堆。曾经放过一个"朝街上扔一颗把兵引远"的软性窗口，
+      // 但这一幕的视距已经收到六成多（visionScale 0.62），撤退路线上根本没有
+      // 需要解决的压力——TestStealthEscapable 断言的就是"笨玩家一路直走 4 秒
+      // 走到底、一次都不会被抓"。给一个没有问题要解决的工具，玩家只会来回
+      // 试它、然后发现它什么也不干。石子会响这件事在 c1_cloth 已经教过
+      //（投空惊飞麻雀），真正用它解决问题留给第二章的声东击西。
     },
     {
       kind: "cinematic", id: "c1_father",
@@ -2755,12 +2761,21 @@ export function CreateGame(chapterIndex = 0) {
 }
 
 // 一次性戏剧姿势用完就得收：不清的话，被架走的爹会一路架着走完全场
+// 换幕时把过场留下的姿势/轨道抹掉，免得它们渗进下一拍。
+// **但干活的循环不算过场**：爹在工作台前拉锯、娘在菜畦锄地是这一章的底噪，
+// 它们打 ambient 标记，换幕不清。以前一并清掉，于是"把水交给娘"那一下
+// 链走完、AdvanceBeat 一调 ClearPoses，爹的锯和娘的锄同时定格——
+// 两个大活人从此站在院子里一动不动。要停活的地方（扫荡时爹去抄刨子）
+// 本来就显式写了 track = null，不靠这里代劳。
 function ClearPoses(state) {
   state.player.pose = null;
-  state.player.track = null;
+  if (!state.player.track?.ambient) state.player.track = null;
   state.pressHold = null;          // 按住是一次性状态，绝不能跨幕带过去
   state.player.forcedCrouch = false;
-  for (const a of state.actors) { a.pose = null; a.track = null; }
+  for (const a of state.actors) {
+    a.pose = null;
+    if (!a.track?.ambient) a.track = null;
+  }
 }
 
 export function StartChapter(state, index) {
