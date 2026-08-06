@@ -166,16 +166,52 @@ function TestSingleChapterEntry() {
 
 function TestVision() {
   const scene = SCENES.village;
-  const soldier = { x: 100, heading: 1, level: "surface" };
-  assert.ok(SoldierSeesPlayer(scene, soldier, { x: 108, level: "surface", hidden: false, crouch: false }), "面朝方向 8m 应被看见");
-  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 90, level: "surface", hidden: false, crouch: false }), "背后不应被看见");
-  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 108, level: "surface", hidden: true, crouch: true }), "躲藏状态不应被看见");
+  // 96→100 这一段两头都不挨掩体（hayC 收在 89.4，ruinWall 起于 103.6）
+  const soldier = { x: 96, heading: 1, level: "surface" };
+  assert.ok(SoldierSeesPlayer(scene, soldier, { x: 100, level: "surface", hidden: false, crouch: false }), "面朝方向 4m 的空地应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 92, level: "surface", hidden: false, crouch: false }), "背后不应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 100, level: "surface", hidden: true, crouch: true }), "躲藏状态不应被看见");
   assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 130, level: "surface", hidden: false, crouch: false }), "超出视距不应被看见");
-  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 108, level: "under", hidden: false, crouch: false }), "不同层不应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, soldier, { x: 100, level: "under", hidden: false, crouch: false }), "不同层不应被看见");
   // 房屋挡视线：柱子家在 x=34 (w=20)，士兵在西、玩家在东
   const s2 = { x: 20, heading: 1, level: "surface" };
   assert.ok(!SoldierSeesPlayer(SCENES.village, s2, { x: 47, level: "surface", hidden: false, crouch: false }), "房屋应挡住视线");
   console.log("  ✓ 横向视线：朝向 / 层 / 躲藏 / 房屋遮挡");
+}
+
+// 藏 = 站到掩体**背光的那一面**。
+//
+// 这条是第二章躲避玩法重做的地基：老版只要走进掩体范围就隐身，于是"找到掩体"
+// 之后这一段再没有可做的事（用户原话「一点策略也没有」）。现在草垛挡的是从它
+// 另一侧照过来的光——兵绕过去，你就得跟着绕。
+function TestCoverIsDirectional() {
+  const scene = SCENES.village;
+  const hay = scene.covers.find((c) => c.id === "hayB");     // 高掩体：草垛 x=68
+  const wood = scene.covers.find((c) => c.id === "woodB");   // 矮掩体：柴堆 x=78
+  assert.ok(hay?.tall && !wood?.tall, "断言依赖 hayB 是高掩体、woodB 是矮掩体");
+
+  const west = { x: 62, heading: 1, level: "surface" };      // 灯在草垛西边，朝东照
+  const behind = { x: 70.2, level: "surface", hidden: false, crouch: false };
+  const front = { x: 66.2, level: "surface", hidden: false, crouch: false };
+  assert.ok(!SoldierSeesPlayer(scene, west, behind, 1), "站在草垛背光那一面应藏得住");
+  assert.ok(SoldierSeesPlayer(scene, west, front, 1), "站在草垛迎光那一面应露馅——不然掩体就没有正反面");
+
+  // 灯绕到东边：刚才安全的那一侧当场易手，这就是"跟着绕"
+  const east = { x: 76, heading: -1, level: "surface" };
+  assert.ok(SoldierSeesPlayer(scene, east, behind, 1), "灯绕到东边后，草垛东侧不再安全");
+  assert.ok(!SoldierSeesPlayer(scene, east, front, 1), "灯绕到东边后，草垛西侧才是影子");
+
+  // 矮掩体仍旧要蹲：站着挡不住
+  const nearWood = { x: 79.6, level: "surface", hidden: false, crouch: false };
+  assert.ok(SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, nearWood, 1), "矮柴堆后面站着应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, { ...nearWood, crouch: true }, 1), "蹲在矮柴堆后面应藏得住");
+
+  // 钻得进去的掩体（沟/庄稼地/灌木）没有正反面
+  const fields = SCENES.fields;
+  const inDitch = { x: 6, level: "surface", hidden: false, crouch: true };
+  assert.ok(!SoldierSeesPlayer(fields, { x: 2, heading: 1, level: "surface" }, inDitch, 1), "沟里从西边看不见");
+  assert.ok(!SoldierSeesPlayer(fields, { x: 12, heading: -1, level: "surface" }, inDitch, 1), "沟里从东边也看不见");
+  console.log("  ✓ 掩体有正反面（高/矮 · 易手 · 钻进去的除外）");
 }
 
 function TestClimb() {
@@ -242,6 +278,7 @@ function TestDetectionReset() {
 function TestStealthEscapable() {
   const CASES = [
     { chapter: 0, beat: "c1_hide", startX: 42.3, label: "C1 带妹妹躲进地窖" },
+    { chapter: 1, beat: "c2_mother", startX: 50, label: "C2 掩体推进", budget: 120 },
     { chapter: 1, beat: "c2_escape1", label: "C2 东行第一段" },
     { chapter: 1, beat: "c2_escape2", label: "C2 东行第二段" },
   ];
@@ -271,8 +308,9 @@ function TestStealthEscapable() {
       `${c.label}：重置点就在 ${spotters.map((a) => a.id).join(",")} 的视线里——被抓一次就再也跑不掉`);
 
     const startBeat = state.beatIndex;
+    const budget = c.budget ?? 60;
     let t = 0;
-    for (let i = 0; i < 60 * 30 && state.beatIndex === startBeat; i += 1) {
+    for (let i = 0; i < budget * 30 && state.beatIndex === startBeat; i += 1) {
       t += DT;
       const target = GetBeatTarget(state);
       const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
@@ -287,9 +325,108 @@ function TestStealthEscapable() {
       StepGame(state, input, DT);   // 不钳 detection：真失败就让它失败
     }
     assert.notEqual(state.beatIndex, startBeat,
-      `${c.label}：一路直走 60 秒也没过去（被抓 ${state.flags.resets} 次）——这段跑不掉`);
+      `${c.label}：一路直走 ${budget} 秒也没过去（被抓 ${state.flags.resets} 次）——这段跑不掉`);
     console.log(`  ✓ ${c.label} 可逃脱（笨玩家 ${t.toFixed(1)}s，被抓 ${state.flags.resets} 次）`);
   }
+}
+
+// 第二章躲避段重做的三条断言（三条都是用户当场退回来的意见换的）：
+//   ①「哪里按住了？」——"娘按住你"必须真的发生：她扑回来、手落在肩上（pose
+//     "press"）、玩家的操作被拿走那一下，而且确实因此没被照见；
+//   ②「娘自己不用遮蔽？」——她被灯照到时必须自己躲进掩体背面（或蹲下）；
+//   ③「就不能马车从远处开过来 直接从左侧出现吗」——板车单向：从画框左外
+//     驶入、往东出画，绝不在两点之间来回横推。
+function TestC2Evasion() {
+  const state = CreateGame(1);
+  const idx = ChapterBeatList(1).findIndex((b) => b.id === "c2_mother");
+  DebugJump(state, 1, idx);
+  const def = CurrentBeatDef(state);
+  assert.equal(def.id, "c2_mother");
+  assert.ok(!JSON.stringify(def).includes("按住"), "「娘按住你」不许再作为提示文案出现——它得是动作，不是字幕");
+
+  const scene = SCENES.village;
+  const mother = state.actors.find((a) => a.id === "mother");
+  const sweep1 = state.actors.find((a) => a.id === "sweep1");
+  assert.ok(mother && sweep1);
+  assert.ok(sweep1.scanEvery > 0, "巡逻必须会停下回头扫，否则掩体背面一藏就是一劳永逸");
+
+  // ① 把玩家丢在灯里站着，娘应当扑过来把他按下去
+  state.player.x = 62; state.player.level = "surface"; state.player.crouch = false;
+  mother.x = 66;
+  sweep1.x = 71; sweep1.heading = -1; sweep1.patrol = null; sweep1.scanEvery = 0;
+  let pressed = false, motherPose = null;
+  for (let i = 0; i < 120 && !pressed; i += 1) {
+    StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false }, DT);
+    if (state.pressHold) { pressed = true; motherPose = mother.pose; }
+  }
+  assert.ok(pressed, "站在灯里，娘应该扑回来把柱子按下去（不是屏幕下方写一行字）");
+  assert.equal(motherPose, "press", "按住的那一下娘必须有对应姿势——不许人站着不动、字幕替她做");
+  const heldX = state.player.x;
+  StepGame(state, { moveX: 1, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false }, DT);
+  assert.ok(Math.abs(state.player.x - heldX) < 0.02, "被按住的那一下推方向键也走不动——「按住」得真的按得住");
+  assert.ok(state.player.crouch && state.player.hidden, "被按下去就该藏住了：这一下必须真的管用");
+
+  // ② 娘自己也得躲：等按住结束、灯还在，她应当退到掩体背面（或蹲下）
+  let guard = 0;
+  while (state.pressHold && (guard += 1) < 200) {
+    StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false }, DT);
+  }
+  state.player.x = 70; state.player.crouch = true;          // 玩家自己藏好，别再触发救援
+  sweep1.x = 62; sweep1.heading = 1;                        // 灯从西边照过来，冲着娘
+  mother.x = 66;
+  let motherSafe = false;
+  for (let i = 0; i < 300 && !motherSafe; i += 1) {
+    StepGame(state, { moveX: 0, climb: 0, crouch: true, interact: false, interactHeld: false, throw: false, advance: false }, DT);
+    motherSafe = !SoldierSeesPlayer(scene, sweep1,
+      { x: mother.x, level: "surface", hidden: false, crouch: !!mother.crouch }, VisionScale(state));
+  }
+  assert.ok(motherSafe, "灯扫过来时娘必须自己找掩体——她不能站在亮地里不眨眼");
+
+  // ③ 板车：单向。从玩家西边（画框左外）驶入，一路往东出画，再从西边重来
+  const state2 = CreateGame(1);
+  DebugJump(state2, 1, idx);
+  state2.player.x = 90;                                     // 走到长空地跟前，发车
+  const cv = CurrentBeatDef(state2).convoy;
+  assert.ok(cv.spawn < cv.exit, "板车必须从西往东单向走");
+  let sawSpawn = false, sawExit = false, lastX = null, reversed = false, spawnedWestOfPlayer = false;
+  for (let i = 0; i < 60 * 30; i += 1) {
+    StepGame(state2, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false }, DT);
+    const x = state2.cart ? state2.cart.x : null;
+    if (x !== null && lastX === null) {
+      sawSpawn = true;
+      if (x < state2.player.x - 6) spawnedWestOfPlayer = true;   // 从远处、画框左外进来
+    }
+    if (x === null && lastX !== null) sawExit = true;
+    if (x !== null && lastX !== null && x < lastX - 1e-6) reversed = true;
+    lastX = x;
+  }
+  assert.ok(sawSpawn && spawnedWestOfPlayer, "板车要从玩家西边的远处驶来（画框左外），不是就地出现");
+  assert.ok(sawExit, "板车要开出画去，不是停在原地");
+  assert.ok(!reversed, "板车绝不许倒着走——来回横推就成了「等一辆来回开的公交车」");
+
+  // ④ 石子换窗口：石子落在灯的**背后**，他就得把脸转过去，玩家当场脱离照射。
+  // 规则是"扔过他头顶"——投掷平飞 7.5m，而站着的视距 10.8m，所以想扔到他背后
+  // 就得先蹲着摸近（蹲着的视距只有 7m）。只让他"走到响动跟前"是不够的：石子
+  // 落在他脚边时他几乎不挪窝，脸还冲着原来那一头，那颗石子就白扔了。
+  const st3 = CreateGame(1);
+  DebugJump(st3, 1, idx);
+  const g = (id) => st3.actors.find((a) => a.id === id);
+  const lamp = g("sweep1");
+  lamp.x = 79.5; lamp.heading = -1; lamp.patrolDir = -1; lamp.scanEvery = 0; lamp.patrol = null;
+  g("sweep2").visible = false; g("searcher").x = 40;
+  st3.player.x = CurrentBeatDef(st3).stonePile.x;
+  const none = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const seen = () => SoldierSeesPlayer(scene, lamp,
+    { x: st3.player.x, level: "surface", hidden: false, crouch: st3.player.crouch }, VisionScale(st3));
+  for (let i = 0; i < 4; i += 1) StepGame(st3, { ...none(), interact: true }, DT);
+  assert.equal(st3.player.item?.id, "stone", "潜行段路边该有一堆石子捡得起来");
+  assert.ok(seen(), "布置有误：扔石子之前玩家本该在灯里");
+  for (let i = 0; i < 3; i += 1) StepGame(st3, { ...none(), moveX: 1 }, DT);   // 面朝东
+  StepGame(st3, { ...none(), throw: true }, DT);
+  let freed = 0;
+  for (let i = 0; i < 150; i += 1) { StepGame(st3, none(), DT); if (!seen()) freed += 1; }
+  assert.ok(freed > 90, `石子该把灯引开三秒以上（实测 ${(freed * DT).toFixed(1)}s）——引不开就不算一条出路`);
+  console.log("  ✓ 二章躲避：娘真的按住你 / 娘自己躲掩体 / 板车从远处单向驶来 / 石子引得开灯");
 }
 
 // 翻越：三处可翻越物都得真的翻得过去——而且是"翻"，不是换个姿势平移过去。
@@ -817,10 +954,12 @@ console.log("— 机制定点断言 —");
 TestChapterMeta();
 TestSingleChapterEntry();
 TestVision();
+TestCoverIsDirectional();
 TestClimb();
 TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
+TestC2Evasion();
 TestPromptsAreDeviceNeutral();
 TestWorkStations();
 TestVaultC1();

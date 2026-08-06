@@ -39,6 +39,7 @@
         { "id": "gatePost", "kind": "lamppost", "x": 174, "name": "村东口" },
 
         { "id": "cloth", "kind": "cloth", "x": 127.6, "name": "花布巾", "note": "妹妹的头巾被风刮上老槐树（一章投掷教学的靶）" },
+        { "id": "stonesRoad", "kind": "stonePile", "x": 73.5, "name": "石子堆", "note": "二章掩体推进段的软窗口：88 之前那段路上唯一一堆石子，扔一颗把最近的灯引开。位置卡在 hayB(69.6 终) 与 woodB(76.7 起) 之间的空档" },
         { "id": "stonesTree", "kind": "stonePile", "x": 120, "name": "石子堆" },
         { "id": "grindstone", "kind": "millstone", "x": 118, "name": "石碾" },
         { "id": "yardDog", "kind": "dog", "x": 138, "name": "王家的狗" },

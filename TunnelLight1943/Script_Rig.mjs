@@ -415,6 +415,28 @@ export function PoseRig(rig, s, dt) {
     target.armB = -26 * DEG; target.foreB = -30 * DEG;
     target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
     target.thighF = 10 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "pressed") {
+    // 被按下去的那一下：不是自己蹲的——膝盖是被压弯的，肩往下沉、脖子缩起来。
+    // 比常规半蹲低一大截，娘的手才落得到肩上（两个姿势是一对，一起改）
+    target.hipY = -0.54; target.hipX = 0.04;
+    target.torso = 24 * DEG; target.head = -30 * DEG;
+    target.armB = -18 * DEG; target.foreB = -66 * DEG;
+    target.armF = -24 * DEG; target.foreF = -72 * DEG;
+    target.thighB = -86 * DEG; target.shinB = 98 * DEG; target.footB = -18 * DEG;
+    target.thighF = -80 * DEG; target.shinF = 92 * DEG; target.footF = -18 * DEG;
+  } else if (s.pose === "press") {
+    // 把孩子按下去：自己先蹲到最低，近侧手臂横过去压在他肩上，另一只手撑地。
+    // 这一拍必须一眼看出"手落在人身上"——第二章那句"娘按住你"以前只是字幕，
+    // 画面上谁也没碰谁（用户原话：「哪里按住了？」）。
+    target.hipY = -0.46; target.hipX = 0.08;
+    target.torso = 22 * DEG; target.head = -18 * DEG;
+    // 压人的那只手：往前够足、小臂再压下去——手要真的落在半人高（被按住的
+    // 孩子的肩）上。角度往负走是抬高，别过头，不然成了"举手投降"
+    target.armF = -84 * DEG; target.foreF = -34 * DEG;
+    // 另一只手撑在地上找平衡
+    target.armB = -30 * DEG; target.foreB = -52 * DEG;
+    target.thighB = -104 * DEG; target.shinB = 104 * DEG; target.footB = 14 * DEG;
+    target.thighF = -88 * DEG; target.shinF = 96 * DEG; target.footF = 12 * DEG;
   } else if (s.pose === "leanIn") {
     // 把额头抵在别人肩上：脖子前倾贴过去，手垂着
     target.hipY = -0.04; target.hipX = 0.06;

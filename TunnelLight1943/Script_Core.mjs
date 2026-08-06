@@ -331,7 +331,15 @@ function MakeNoise(state, x, level) {
   state.noiseAt = { x, t: 0.6 };
   for (const a of state.actors) {
     if (!IsEnemy(a) || !a.visible || (a.level || "surface") !== level) continue;
-    if (Math.abs(a.x - x) <= 15) a.investigate = { x: x + (a.x < x ? -1.2 : 1.2), until: state.time + 5.5 };
+    if (Math.abs(a.x - x) > 15) continue;
+    // face：**朝着响动看**。只写"走到响动跟前"是不够的——石子落在他脚边一米
+    // 的时候他几乎不用挪窝，脸就还冲着原来那一头，那颗石子等于白扔。
+    // 引开一盏灯，靠的是他把脸转过去。
+    a.investigate = {
+      x: x + (a.x < x ? -1.2 : 1.2),
+      until: state.time + 5.5,
+      face: Math.sign(x - a.x) || (a.heading || 1),
+    };
   }
 }
 
@@ -372,6 +380,8 @@ function StepLightHazard(state, def, dt) {
   const p = state.player;
   if (p.level !== "surface" || p.hidden) return;
   if (p.x < L.zone[0] || p.x > L.zone[1]) return;
+  // 掩体挡光：有光源坐标就按方向判（背着灯的那一面才是影子），没有就不问方向
+  if (CoverHides(SceneOf(state), L.src ? L.src.x : null, p.x, p.crouch)) return;
   if (state.cart && def.kind === "cartRide" && Math.abs(p.x - state.cart.x) <= (def.safeR ?? 2.6)) return; // 车影里
   state.detection.level = Math.min(1, state.detection.level + dt * 1.35);
   state.detection.spotter = "light";
@@ -1470,42 +1480,111 @@ export const SCRIPTS = {
             }
           } },
         // 这两行不切走：镜头停在草垛上，看着灯一寸一寸压过来——教学的正片是这一镜
-        { who: "娘", say: "灯扫过来，就蹲进影子里，贴着草垛别动。", d: 4.4, cam: { kind: "shot", x: 57, y: 1.3, dist: 8 } },
+        // 说话的人必须在画框里：娘蹲在 51.4，dist 8 的半宽约 3.8m，框住 50.2~57.8
+        { who: "娘", say: "灯扫过来，就躲到草垛背光的那一头去。别在亮地里站着。", d: 4.6, cam: { kind: "shot", x: 54, y: 1.3, dist: 8 } },
         { stage: "灯影在草垛根下一寸一寸挪过来。谁也没出声。", d: 4.2, cam: { kind: "shot", x: 56.5, y: 1.1, dist: 6.5 } },
-        { stage: "灯光从草垛沿上掠过去，顿了顿，又移开了。", d: 4.6, cam: { kind: "shot", x: 56, y: 1.2, dist: 7 },
+        // 规则的第二半：灯从哪边来，影子就在哪一头——所以背面**会易手**。
+        // 娘领着两个孩子从草垛东侧绕到西侧，一步都不解释；这一绕就是教学本身。
+        // 镜头压到 51.5：三个人的落点（50.2 / 49.4 / 48.6）都得留在画框里，
+        // 否则"娘揽着两个孩子挪到西边"演给谁看
+        { stage: "灯绕到了草垛东头。娘揽着两个孩子，贴着垛根挪到了西边。", d: 4.6, cam: { kind: "shot", x: 51.5, y: 1.2, dist: 7.5 },
           on: (state) => {
             const s1 = FindActor(state, "sweep1");
-            if (s1) { s1.cineTarget = { x: 78 }; s1.cineSpeed = 1.8; }
+            if (s1) { s1.cineTarget = { x: 55.5 }; s1.cineSpeed = 1.4; }
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.pose = "bow"; mother.cineTarget = { x: 50.2 }; mother.cineSpeed = 1.5; }
+            state.player.cineWalk = { x: 49.4, speed: 1.6 };
+            const sister = FindActor(state, "sister");
+            if (sister) { sister.pose = null; sister.cineTarget = { x: 48.6 }; sister.cineSpeed = 1.6; }
           } },
-        { who: "娘", say: "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。", d: 4.6, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
+        { stage: "灯光从草垛沿上掠过去，顿了顿，又移开了。", d: 4.4, cam: { kind: "shot", x: 51.5, y: 1.2, dist: 7.5 },
+          on: (state) => {
+            state.player.cineWalk = null;
+            const s1 = FindActor(state, "sweep1");
+            if (s1) { s1.cineTarget = { x: 74 }; s1.cineSpeed = 1.8; }
+          } },
+        { who: "娘", say: "记住：灯在哪边，你就在草垛的另一边。灯一走，赶紧挪下一垛。", d: 4.8, cam: { kind: "ots", subject: "mother", other: "player", dist: 3.4 } },
       ],
       onDone: (state) => {
         state.player.crouch = false;
         const sister = FindActor(state, "sister");
-        if (sister) sister.pose = null;
+        if (sister) { sister.pose = null; sister.cineTarget = null; }
+        const mother = FindActor(state, "mother");
+        if (mother) { mother.pose = null; mother.cineTarget = null; }
         const s1 = FindActor(state, "sweep1");
         if (s1) s1.cineTarget = null;   // 交还常规巡逻
       },
     },
     {
-      // 一段掩体接一段掩体地往前挪。娘看准空当就冲，冲到就贴着掩体等你——
-      // 你学的是"什么时候能动"。88→107、107→132 两段长空地没有掩体，
-      // 那里有一辆被征去运粮的板车来回推着走，跟着车影过。
+      // 一段掩体接一段掩体地往东挪。娘在前头找掩体、自己蹲下——她不再替你
+      // 判断"什么时候能动"（那是老版唯一的玩法，也是"一点策略也没有"的根）。
+      // 你自己要做的三件事：站到掩体背光的那一面、读巡逻回头扫的节奏、
+      // 在过不去的长空地上拿石子换一个窗口或者等板车的影子。
       kind: "coverRun", id: "c2_mother", leader: "mother", follower: "sister",
-      covers: [52, 60, 68, 78, 88, 107, 118],
-      movingCover: { from: 88, to: 118, speed: 1.5, r: 2.9 },
+      to: 116, lead: 5.0,
+      // 走过一处掩体存一次点（失败退回这儿，不是退回整段开头）
+      checkpoints: [52, 60, 68, 78, 88, 107],
+      // 板车从村西的黑地里驶出来，一路往东拐进老槐树那边的院子。**单向**：
+      // 走到 84 跟前第一趟才发车，正好从画框左外进来
+      convoy: { armAt: 78, spawn: 66, exit: 124, speed: 2.6, gap: 7, r: 2.6 },
       cartDriver: "hauler",
-      objective: "跟着娘，一段一段往村东挪",
-      hint: "草垛和断墙站着就藏得住，柴堆水瓮得蹲下；空地上跟着板车的影子走",
-      resetHint: "灯把人照满了。退回上一处掩体。",
+      // 路边的石子堆：捡一颗扔出去，落地那一声能把最近的灯引开——自己造窗口
+      stonePile: { x: 73.5 },
+      // 挨家挨户搜过来的那一队。慢（0.55 m/s，人走路的八分之一），但不停：
+      // 没有它，最优解永远是蹲着不动等灯走远
+      pressure: { id: "searcher", leash: 10 },
+      objective: "带着妹妹跟上娘，往村东挪",
+      hint: "灯在哪边，就藏到掩体的另一边；矮的柴堆水瓮得蹲下",
+      resetHint: "灯把人照满了。退回上一处掩体，看准灯回头的空当再动。",
+      // 卡了十几秒才出的一句状态行（不含键名）。说的是规则不是操作：
+      // 石子得落在灯的背后他才会转身（所以要蹲着摸近），长空地那段等板车
+      stuckHint: "石子要落在灯的背后，他才会转过去",
       onEnter: (state) => {
-        // 夜里被叫起来出夫的乡亲，一车草料往东送，来回推。
-        // 对搜村的人来说他是自己人的差役，谁也不拦——所以那片车影是安全的
+        // 夜里被叫起来出夫的乡亲，一车草料往东送。对搜村的人来说他是自己人的
+        // 差役，谁也不拦——所以那片车影是安全的
         if (!FindActor(state, "hauler")) {
-          state.actors.push(MakeActor("hauler", "villager", 90, { label: "出夫的乡亲" }));
+          state.actors.push(MakeActor("hauler", "villager", 74, { label: "出夫的乡亲", visible: false }));
+        }
+        // 搜家的：一手灯一手枪托砸门，从村西往东推
+        if (!FindActor(state, "searcher")) {
+          state.actors.push(MakeActor("searcher", "soldier", 38, {
+            lantern: true, heading: 1, advance: 0.55, searchHold: 2.2,
+          }));
+        }
+        // 布防分两段，一段一道题：
+        //  · sweep1 在掩体密的那一半（52~88）来回走、还会停下回头扫——
+        //    考的是"绕到掩体背面去"，草垛断墙够多，走错一步有得救；
+        //  · sweep2 是**堵在巷口的哨兵**，脸朝西钉在 88→107 那段长空地的
+        //    另一头，而那一段一处掩体也没有。他每隔几秒回一次头（脸朝东），
+        //    那就是窗口。考的是"拿什么换这个窗口"：数他回头的节奏冲过去，
+        //    或者干脆等板车，跟着车影一路走过去。
+        const s1 = FindActor(state, "sweep1");
+        if (s1) { s1.x = 74; s1.patrol = [54, 88]; s1.speed = 1.5; s1.scanEvery = 5.0; s1.scanHold = 2.2; }
+        const s2 = FindActor(state, "sweep2");
+        if (s2) {
+          // 钉住不动：来回踱步会让他的脸也来回转，窗口就成了白送的。
+          // 他的脸只由"回头扫"这一件事翻——那是玩家要读的唯一一个节奏。
+          // postX/postHeading：被石子引开之后他会走回岗位、重新朝西
+          s2.x = 101; s2.patrol = null; s2.heading = -1; s2.speed = 1.3;
+          s2.postX = 101; s2.postHeading = -1;
+          s2.scanEvery = 6.0; s2.scanHold = 3.4;
         }
       },
-      onDone: (state) => { state.cart = null; state.cartCoverR = undefined; },
+      onReset: (state) => {
+        // 铁律：重置点不能落在任何人的视线里。退回掩体的同时，搜家的那一队
+        // 也退回存点时的位置（snapshot 已经搬了他），压力线跟着一起重算
+        state.beat.furthestX = state.beat.snapshot.player.x;
+      },
+      onDone: (state) => {
+        state.cart = null;
+        state.cartCoverR = undefined;
+        const h = FindActor(state, "hauler");
+        if (h) h.visible = false;
+        state.actors = state.actors.filter((a) => a.id !== "searcher");
+        // 哨兵解除岗位，否则下一幕娘把巡逻引去村西时他会被 postX 拽回巷口
+        const s2 = FindActor(state, "sweep2");
+        if (s2) { s2.postX = undefined; s2.postHeading = undefined; }
+      },
     },
     {
       kind: "cinematic", id: "c2_decoy",
@@ -2647,6 +2726,7 @@ export function CreateGame(chapterIndex = 0) {
     pip: null,
     stealthActive: false,
     detection: { level: 0, spotter: null },
+    pressHold: null,      // 娘按住你的那一下（见 MovePlayer）
     smoke: null,
     collapses: null,
     rescue: null,
@@ -2678,6 +2758,8 @@ export function CreateGame(chapterIndex = 0) {
 function ClearPoses(state) {
   state.player.pose = null;
   state.player.track = null;
+  state.pressHold = null;          // 按住是一次性状态，绝不能跨幕带过去
+  state.player.forcedCrouch = false;
   for (const a of state.actors) { a.pose = null; a.track = null; }
 }
 
@@ -2690,6 +2772,7 @@ export function StartChapter(state, index) {
   state.actors = [];
   state.stealthActive = false;
   state.detection = { level: 0, spotter: null };
+  state.pressHold = null;
   state.smoke = null;
   state.collapses = null;
   state.rescue = null;
@@ -3137,6 +3220,29 @@ function MovePlayer(state, input, dt) {
   const scene = SceneOf(state);
   const env = CHAPTERS[state.chapterIndex].scene;
   const p = state.player;
+
+  // 娘按住你。以前屏幕下方写着"娘按住你"，画面上谁也没按住谁，玩家随时能走开——
+  // 用户的第一句话就是「哪里按住了？」。现在它是真的：她的手落在你肩上（pose
+  // "press"），你被按成蹲姿、这一下走不动，也真的因此没被照见。
+  // 这层保险有冷却，而且娘去引开搜村的人之后就没有了——关卡的情感在机制上兑现。
+  if (state.pressHold) {
+    state.pressHold.t -= dt;
+    if (state.pressHold.t <= 0) {
+      state.pressHold = null;
+      if (p.pose === "pressed") p.pose = null;
+    } else {
+      p.crouch = true;
+      p.forcedCrouch = true;
+      p.posture = "squat";
+      p.pose = "pressed";       // 膝盖是被压弯的，不是自己蹲的（与娘的 press 成对）
+      p.hidden = true;
+      p.moving = false;
+      state.vaultHint = "";
+      state.climbHint = "";
+      return;
+    }
+  }
+
   if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
   // 横向用 smoothstep（起手几乎不动，手在撑；过顶沿最快；落地收住），
@@ -3184,7 +3290,9 @@ function MovePlayer(state, input, dt) {
     && Math.abs(p.x - def.zone.x) < (def.zone.w || 3) / 2 + 1.2;
 
   const prevX = p.x;
-  if (Math.abs(input.moveX) > 0.05 && !holdingChalk) {
+  // 迈开腿了没有——探测速率要用它（在灯里快走比蹲着不动显眼得多）
+  p.moving = Math.abs(input.moveX) > 0.05 && !holdingChalk;
+  if (p.moving) {
     p.x += Math.sign(input.moveX) * speed * dt;
     p.heading = Math.sign(input.moveX);
   }
@@ -3280,17 +3388,15 @@ function MovePlayer(state, input, dt) {
     p.x -= Math.sign(input.moveX || 1) * speed * dt * 0.35;
   }
 
-  // 躲藏：蹲在遮蔽物后
-  // 躲掩体：高的（草垛、齐胸断墙）站着就挡得住，矮的（柴堆、水瓮）得蹲下去。
-  // 找掩体本身才是玩法——不该再多按一个键才生效。
+  // 躲藏：p.hidden 是"任何方向都看不见"的强隐身。
+  // **静态掩体不再走这条**——它按方向判（见 CoverHides / SoldierSeesPlayer）：
+  // 藏是"站到掩体背光的那一面"，兵绕过来你就得绕过去，这才是这一段的玩法。
   p.hidden = false;
-  for (const c of scene.covers) {
-    if (Math.abs(p.x - c.x) >= c.w / 2 + 0.9) continue;
-    if (c.tall || p.crouch) { p.hidden = true; break; }
-  }
   // 移动掩体：贴着板车走，车影就是一段会自己往前挪的墙
-  if (!p.hidden && state.cart && p.level === "surface"
+  if (state.cart && p.level === "surface"
     && Math.abs(p.x - state.cart.x) < (state.cartCoverR ?? 2.8)) p.hidden = true;
+  // 娘把你按下去的那一下：她的身子替你挡住这一段光
+  if (state.pressHold) p.hidden = true;
 }
 
 function StepFollowers(state, dt) {
@@ -3332,6 +3438,37 @@ function StepFollowers(state, dt) {
   }
 }
 
+// 停下来回头照一照。
+//
+// 有了掩体正反面，"藏"才有得算；但如果灯的方向永远不变，算一次就一劳永逸了。
+// 所以巡逻走着走着会停下、把灯举起来顿一下（**预兆**），再转身往回扫一段，
+// 扫完转回去接着走。背面会易手，你得跟着绕——这就是这一段真正的动作。
+// 危险必须先看得见再生效：那 0.9 秒的举灯就是给玩家看的。
+const SCAN_TELL = 0.9;
+
+function StepScan(state, a, dt) {
+  if (!a.scanEvery) return false;
+  a.scanT = (a.scanT || 0) + dt;
+  const phase = a.scanPhase || "walk";
+  if (phase === "walk") {
+    if (a.scanT < a.scanEvery) return false;
+    a.scanPhase = "tell"; a.scanT = 0; a.scanLift = 0;
+    Cue(state, "lampOn");
+    return true;
+  }
+  if (phase === "tell") {
+    a.scanLift = Math.min(1, a.scanT / SCAN_TELL);
+    if (a.scanT >= SCAN_TELL) { a.scanPhase = "back"; a.scanT = 0; a.heading = -(a.heading || 1); }
+    return true;
+  }
+  a.scanLift = 1;
+  if (a.scanT >= (a.scanHold ?? 2.0)) {
+    a.scanPhase = "walk"; a.scanT = 0; a.scanLift = 0;
+    a.heading = -(a.heading || 1);
+  }
+  return true;
+}
+
 function StepSoldiers(state, dt) {
   for (const a of state.actors) {
     if (!IsEnemy(a) || !a.visible || a.cineTarget) continue;
@@ -3343,9 +3480,36 @@ function StepSoldiers(state, dt) {
         if (Math.abs(d) > 0.5) {
           a.x += Math.sign(d) * (a.speed || 1.2) * 1.5 * dt;
           a.heading = Math.sign(d);
+        } else {
+          a.heading = a.investigate.face || a.heading;   // 到跟前了就朝着响动那一头看
         }
         continue;
       }
+    }
+    // 堵路口的哨兵：被石子引开之后要回到自己的岗位、回到原来的朝向。
+    // 不收这一下，一颗石子就能把他永久挪走，那道门就再也不是门了
+    if (a.postX !== undefined) {
+      const d = a.postX - a.x;
+      if (Math.abs(d) > 0.2) {
+        a.x += Math.sign(d) * (a.speed || 1.2) * dt;
+        a.heading = Math.sign(d);
+        continue;
+      }
+      a.x = a.postX;
+      if (!a.scanPhase || a.scanPhase === "walk") a.heading = a.postHeading || -1;
+    }
+    if (StepScan(state, a, dt)) continue;
+    // 挨家挨户搜过来的那种：不巡逻，只朝一个方向推，走到掩体就停下翻一翻。
+    // 它是压力，不是追兵——推进速度只有人走路的八分之一
+    if (a.advance) {
+      a.heading = Math.sign(a.advance);
+      if ((a.searchPause || 0) > 0) { a.searchPause -= dt; continue; }
+      const before = a.x;
+      a.x += a.advance * dt;
+      for (const c of (SceneOf(state).covers || [])) {
+        if ((before - c.x) * (a.x - c.x) <= 0) { a.searchPause = a.searchHold ?? 1.8; break; }
+      }
+      continue;
     }
     if (!a.patrol) continue;
     if (a.patrolDir === undefined) a.patrolDir = 1;
@@ -3370,6 +3534,45 @@ export function VisionScale(state) {
   return night * (CurrentBeatDef(state)?.visionScale ?? 1);
 }
 
+// 掩体判定的"跟前"余量：站在掩体足迹外这么多米以内都算贴着它
+export const COVER_PAD = 0.9;
+// 钻得进去的掩体没有正反面：人是在沟里、庄稼地里、灌木丛里，不是在它"后面"
+const INSIDE_COVERS = new Set(["ditch", "crops", "bush"]);
+
+/**
+ * 藏 = 站到掩体**背光的那一面**，不是站进掩体的范围里。
+ *
+ * 一维横版里"掩体有正反面"是最自然、也最有得算的一条规则：草垛挡的是从它另一侧
+ * 照过来的光；兵绕到西边，你就得挪到东边去。老写法是"进了掩体范围就隐身"——找到
+ * 掩体之后这一段就再没有可做的事，用户的原话是「一点策略也没有」。
+ *
+ * threatX = null 表示不问方向（没有明确光源的场合）。高掩体（草垛/齐胸断墙）
+ * 站着就挡得住，矮的（柴堆/水瓮）必须蹲下去——这条没变。
+ */
+export function CoverHides(scene, threatX, x, crouch) {
+  for (const c of scene.covers || []) {
+    if (Math.abs(x - c.x) >= c.w / 2 + COVER_PAD) continue;
+    if (!c.tall && !crouch) continue;
+    if (threatX === null || INSIDE_COVERS.has(c.kind)) return true;
+    const side = x - c.x;
+    // 贴着垛根站（两边都不露）也算；否则必须与光源分处掩体两侧
+    if (Math.abs(side) < 0.45 || side * (threatX - c.x) <= 0) return true;
+  }
+  return false;
+}
+
+/** 离 x 最近、且此刻正照着这一带的那个敌人的位置（没有就是 null） */
+export function NearestThreatX(state, x, span = 18) {
+  let best = null, bestD = Infinity;
+  for (const a of state.actors) {
+    if (!IsEnemy(a) || !a.visible || a.decor) continue;
+    const d = Math.abs(a.x - x);
+    if (d > span || d >= bestD) continue;
+    bestD = d; best = a.x;
+  }
+  return best;
+}
+
 export function SoldierSeesPlayer(scene, soldier, player, rangeScale = 1) {
   if (player.hidden) return false;
   if ((soldier.level || "surface") !== player.level) return false;
@@ -3384,6 +3587,8 @@ export function SoldierSeesPlayer(scene, soldier, player, rangeScale = 1) {
       if (pr.x - (pr.w || 2) / 2 > lo && pr.x + (pr.w || 2) / 2 < hi) return false;
     }
   }
+  // 掩体：只挡背着他的那一面
+  if (CoverHides(scene, soldier.x, player.x, player.crouch)) return false;
   return true;
 }
 
@@ -3403,9 +3608,14 @@ function StepDetection(state, def, dt) {
     if (!IsEnemy(a) || !a.visible || a.decor) continue;
     if (SoldierSeesPlayer(scene, a, state.player, VisionScale(state))) { seen = true; state.detection.spotter = a.id; break; }
   }
-  // 被照到不是立刻完蛋：红圈涨满要两秒多，来得及缩回影子里；
-  // 缩回去消得也快——"差点被看见"该是心跳，不是重开
-  if (seen) state.detection.level = Math.min(1, state.detection.level + dt * 0.45);
+  // 被照到不是立刻完蛋：涨满要一两秒，来得及缩回影子里；缩回去消得更快——
+  // "差点被看见"该是心跳，不是重开。
+  // 但**动得越猛越显眼**：在灯里直着腰快走，一秒半就被喊住；猫着腰不动，
+  // 三秒才涨满。没有这一档，最优解永远是「按住方向键一路跑过去」——
+  // 蹲下就成了没用的键，掩体也就成了摆设。
+  const p = state.player;
+  const gain = 0.45 * (p.crouch ? 0.7 : 1) * (p.moving ? 1.5 : 1);
+  if (seen) state.detection.level = Math.min(1, state.detection.level + dt * gain);
   else state.detection.level = Math.max(0, state.detection.level - dt * 0.8);
   if (state.detection.level >= 1) {
     state.flags.resets += 1;
@@ -3496,86 +3706,195 @@ function StepEscort(state, def, input) {
   }
 }
 
-// 某一段路此刻有没有被视线扫着——娘就是靠这个判断"能不能冲"的。
-// 用的是探测逻辑同一个视距，所以她的判断和玩家看到的光带永远一致。
-function PathLit(state, x0, x1) {
-  const lo = Math.min(x0, x1) - 1.2, hi = Math.max(x0, x1) + 1.2;
-  const range = VISION_RANGE * VisionScale(state);
+// 某个位置此刻有没有被灯照着。判定用的是探测逻辑同一条视线（连掩体正反面
+// 一起算），所以娘的判断、玩家看到的光池、抓人用的那条线永远是同一个东西。
+function LitAt(state, x, crouch = false) {
+  const scene = SceneOf(state);
+  const probe = { x, level: "surface", hidden: false, crouch };
   for (const a of state.actors) {
     if (!IsEnemy(a) || !a.visible || a.decor) continue;
-    const end = a.x + (a.heading || 1) * range;
-    if (Math.max(a.x, end) >= lo && Math.min(a.x, end) <= hi) return true;
+    if (SoldierSeesPlayer(scene, a, probe, VisionScale(state))) return true;
   }
   return false;
 }
 
-// 掩体推进（勇敢的心式）：一串掩体连成的路，娘在掩体之间带路——
-// 她看准空当就冲下一个，到了就贴着掩体等你跟上。玩家学的是"什么时候能动"，
-// 而不是"蹲在原地等灯走远"：节奏由她演示，安全由掩体给。
-// 最长的两段空地上有一辆推着走的板车，跟着车影就能过去。
+// 离 x 最近的那处掩体的**背光面**站位（矮掩体连"得蹲下"一起给出来）。
+// 娘和玩家用的是同一套规则——她也得躲，这是用户第二条意见的正面回答。
+function SafeSpot(state, x, span = 16) {
+  const scene = SceneOf(state);
+  let best = null, bestD = Infinity;
+  for (const c of scene.covers || []) {
+    const d = Math.abs(x - c.x);
+    if (d > span || d >= bestD) continue;
+    const threatX = NearestThreatX(state, c.x);
+    const side = threatX === null ? -1 : (Math.sign(c.x - threatX) || 1);
+    bestD = d;
+    best = { x: c.x + side * (c.w / 2 + 0.4), crouch: !c.tall, cover: c };
+  }
+  return best;
+}
+
+const PRESS_DUR = 0.95;    // 被按住的那一下有多长
+const PRESS_CD = 7.5;      // 她不能一路替你躲：两次之间的冷却
+
+// 板车：从村西的黑地里驶出来，一路往东，拐进东头的院子。**单向**。
+// 老版让它在两点之间来回横推，等于让玩家站在原地等一辆来回开的公交车
+//（用户原话：「就不能马车从远处开过来 直接从左侧出现吗」）。现在它总是从
+// 画框左外进来、从右外出去；错过一趟就得另想办法或者等下一趟——这是选择，
+// 不是罚站。
+function StepConvoy(state, def, dt) {
+  const cv = def.convoy;
+  if (!cv) return;
+  const b = state.beat;
+  const driver = def.cartDriver ? FindActor(state, def.cartDriver) : null;
+  if (!state.cart) {
+    // armAt：玩家走到那段长空地跟前，第一趟车才从远处驶来（不是一开局就在跑）
+    if (cv.armAt !== undefined && !b.convoyArmed) {
+      if (state.player.x < cv.armAt) { if (driver) driver.visible = false; return; }
+      b.convoyArmed = true;
+      b.convoyT = 0;
+    }
+    b.convoyT = (b.convoyT ?? 0) - dt;
+    if (driver) driver.visible = false;
+    if (b.convoyT <= 0) {
+      state.cart = { x: cv.spawn };
+      state.cartCoverR = cv.r ?? 2.6;
+      b.convoyTrips = (b.convoyTrips || 0) + 1;
+    }
+    return;
+  }
+  state.cart.x += (cv.speed ?? 2.4) * dt;
+  // 推车的乡亲在车后面顶着走，不是在前面拉
+  if (driver) {
+    driver.visible = true;
+    driver.x = state.cart.x - 2.0;
+    driver.heading = 1;
+    driver.pose = "push";
+    driver.moving = true;
+  }
+  if (state.cart.x > cv.exit) {
+    state.cart = null;
+    state.cartCoverR = undefined;
+    b.convoyT = cv.gap ?? 7;
+    if (driver) { driver.visible = false; driver.pose = null; }
+  }
+}
+
+// 娘也得躲。她原来站在 covers[] 的坐标上一动不动，被灯照满了也不眨眼——
+// 用户的原话是「娘自己不用遮蔽？」。现在她跟玩家一套规则：贴掩体、站背面、
+// 矮掩体就蹲下去；灯一走开，她再往东挪一段，永远只领先你几米。
+// 她**不再决定你什么时候能动**——那是老版唯一的"玩法"，也是"一点策略也没有"
+// 的根。她只是先走一步做给你看。
+function StepCompanion(state, def, m, dt) {
+  const p = state.player;
+  const b = state.beat;
+  b.pressCd = Math.max(0, b.pressCd - dt);
+
+  // ① 娘按住你。你在亮地里直着腰站着——她**丢下自己的掩体扑回来**，
+  // 一把把你按在垛根底下。这才是"按住"：她的手真的落在你肩上，你的操作
+  // 也真的被拿走那一下，而且确实因此没被照见。（老版这句话只是屏幕下方
+  // 的一行字，画面上谁也没按住谁——用户的第一句话就是「哪里按住了？」。）
+  // 她替你挡的这一下有冷却，而且等她去引开搜村的人，这层保险就没了。
+  if (state.pressHold) { m.pose = "press"; m.crouch = true; m.moving = false; return; }
+  const inTrouble = !p.crouch && p.level === "surface"
+    && (LitAt(state, p.x, false) || state.detection.level > 0.1);
+  const gap = p.x - m.x;
+  if (b.pressCd <= 0 && inTrouble && Math.abs(gap) < 7.5) {
+    // 追到手够得着为止。**别去追"玩家身后 0.62m"那个点**：两个人一交错，
+    // 那个点就跳到另一边，她会左右横跳永远够不着（第一版就是这么写坏的）
+    if (Math.abs(gap) > 0.60) {
+      m.x += Math.sign(gap) * Math.min(6.0 * dt, Math.abs(gap) - 0.5);
+      m.heading = Math.sign(gap);
+      m.moving = true; m.crouch = false; m.pose = null;
+      return;
+    }
+    state.pressHold = { t: PRESS_DUR, who: m.id };
+    b.pressCd = PRESS_CD;
+    b.pressN = (b.pressN || 0) + 1;
+    m.pose = "press"; m.crouch = true; m.moving = false;
+    m.heading = Math.sign(gap) || 1;         // 脸朝着被按的那个孩子
+    Cue(state, "sobBreath");
+    return;
+  }
+
+  // ② 平时：在你前头几米找掩体、自己蹲下——她也得躲
+  const behind = gap > 2.0;                  // 你冲到她前头去了：她得赶上来
+  const goalX = behind ? p.x - 1.2 : Math.min(def.to, p.x + (def.lead ?? 5));
+  const lit = LitAt(state, m.x, m.crouch);
+  const spot = lit ? SafeSpot(state, m.x, 12) : null;
+  let target = goalX;
+  m.crouch = false;
+  if (spot) {
+    target = spot.x;
+    // 到位了就蹲下/贴住；还在路上就先跑到位
+    if (Math.abs(m.x - spot.x) < 0.6) { m.crouch = !!spot.crouch; m.x = spot.x; }
+  } else if (!behind && LitAt(state, goalX, false)) {
+    target = m.x;      // 前面那段正亮着：她不往枪口上撞，就地等
+  }
+  const d = target - m.x;
+  if (Math.abs(d) > 0.25) {
+    const speed = spot ? 3.6 : (behind ? 4.4 : 2.3);
+    m.x += Math.sign(d) * Math.min(speed * dt, Math.abs(d));
+    m.heading = Math.sign(d);
+    m.moving = true;
+  } else {
+    m.moving = false;
+    if (!m.crouch) m.heading = 1;
+  }
+  m.pose = m.pose === "press" && state.pressHold ? "press" : null;
+}
+
+// ---------------------------------------------------------------------------
+// 掩体推进（第二章的躲避段，2026-08-07 重做）
+//
+// 老版：娘看准空当就冲，你跟上；屏幕下方写着"娘按住你——等这一段的光挪开"，
+// 而画面上谁也没按住谁。玩家全程只按一个方向键。
+//
+// 这一版把三件事交回玩家手里：
+//   ① **藏在哪一面**——掩体有正反，兵绕过来你就得绕过去（CoverHides）；
+//   ② **什么时候动**——巡逻会举灯、停步、回头扫，节奏看得见（StepScan）；
+//   ③ **拿什么换窗口**——扔石子把人引开 / 等板车的影子 / 硬等；而西边搜家的
+//      队伍在一路往东推，硬等是有代价的。
+// 娘变成同伴：自己找掩体、自己蹲下，只在你贴着她又还站着的时候真的把你按下去。
+// ---------------------------------------------------------------------------
 function StepCoverRun(state, def, input, dt) {
   const b = state.beat;
-  const leader = FindActor(state, def.leader);
-  if (!leader) { AdvanceBeat(state); return; }
-  const covers = def.covers;
   const p = state.player;
-  if (b.coverIndex === undefined) {
-    b.coverIndex = 0;
-    leader.x = covers[0];
-    if (def.movingCover) {
-      state.cart = { x: def.movingCover.from };
-      state.cartCoverR = def.movingCover.r ?? 2.8;
-      b.cartDir = Math.sign(def.movingCover.to - def.movingCover.from) || 1;
-    }
+  const m = def.leader ? FindActor(state, def.leader) : null;
+
+  if (b.checkIndex === undefined) {
+    b.checkIndex = 0;
+    b.furthestX = p.x;
+    b.pressCd = 0;
+    b.stuckT = 0;
+    if (m) m.x = Math.max(m.x, p.x + 2.5);
   }
 
-  // 板车：一趟一趟地推。它不理会敌我，只是自顾自地走——
-  // 玩家要做的是算准它什么时候路过自己这一段
-  if (def.movingCover && state.cart) {
-    const mc = def.movingCover;
-    state.cart.x += b.cartDir * mc.speed * dt;
-    if (state.cart.x > Math.max(mc.from, mc.to)) b.cartDir = -1;
-    if (state.cart.x < Math.min(mc.from, mc.to)) b.cartDir = 1;
-    // 推车的人在车后面顶着走，不是在前面拉——车往哪走，他就在哪一头的反侧
-    const driver = FindActor(state, def.cartDriver);
-    if (driver) { driver.x = state.cart.x - 2.0 * b.cartDir; driver.heading = b.cartDir; }
+  StepConvoy(state, def, dt);
+
+  // 搜家的队伍：慢，但不停。它永远落在玩家走过的最远处之后 leash 米——
+  // 是压力，不是前后夹击（重置点必须是安全的，那是拿事故换来的铁律）。
+  b.furthestX = Math.max(b.furthestX, p.x);
+  if (def.pressure) {
+    const s = FindActor(state, def.pressure.id);
+    if (s) s.x = Math.min(s.x, b.furthestX - (def.pressure.leash ?? 9));
   }
 
-  const hereX = covers[b.coverIndex];
-  const nextX = covers[b.coverIndex + 1];
-
-  if (nextX === undefined) {
-    if (Math.abs(p.x - hereX) < 5.5) AdvanceBeat(state);
-    else state.prompt = "跟上娘";
-    return;
+  // 走过一处掩体就存一次点：失败退回这儿，不是退回整段开头
+  const checks = def.checkpoints || [];
+  while (b.checkIndex < checks.length && p.x > checks[b.checkIndex] + 1.2) {
+    b.checkIndex += 1;
+    b.snapshot = SnapshotPositions(state);
   }
 
-  if (b.dashing) {
-    const d = nextX - leader.x;
-    if (Math.abs(d) < 0.5) {
-      leader.x = nextX;
-      b.dashing = false;
-      b.coverIndex += 1;
-      // 每到一个掩体存一次点：失败退回这儿，不是退回整段开头
-      b.snapshot = SnapshotPositions(state);
-    } else {
-      leader.x += Math.sign(d) * 3.6 * dt;
-      leader.heading = Math.sign(d);
-    }
-    return;
-  }
+  if (m) StepCompanion(state, def, m, dt);
 
-  // 娘贴着掩体等你跟上来
-  if (Math.abs(p.x - hereX) > 5.5) {
-    state.prompt = "跟上娘——贴着草垛和断墙走";
-    return;
-  }
-  if (!PathLit(state, leader.x, nextX)) {
-    b.dashing = true;
-    state.prompt = null;
-  } else {
-    state.prompt = "娘按住你——等这一段的光挪开";
-  }
+  if (p.x >= def.to - 1.2) { AdvanceBeat(state); return; }
+
+  // 状态行只在真的卡住时才出（没有键名、不替玩家做判断）。
+  // 光带、举起来的灯、娘的动作已经把该说的都说了。
+  if (Math.abs(p.x - b.hintX0) < 1.5) b.stuckT += dt; else { b.stuckT = 0; b.hintX0 = p.x; }
+  if (b.stuckT > 14) state.prompt = def.stuckHint || null;
 }
 
 function StepLeadFollow(state, def, dt) {
@@ -4321,12 +4640,9 @@ export function GetBeatTarget(state) {
       const leader = FindActor(state, def.leader);
       return leader ? { action: "walk", x: leader.x, level: leader.level } : null;
     }
-    case "coverRun": {
-      // 跟着娘走到她所在的掩体；她不动的时候就贴着她站定
-      const leader = FindActor(state, def.leader);
-      const hereX = def.covers[state.beat.coverIndex ?? 0];
-      return { action: "walk", x: leader ? leader.x : hereX, level: "surface" };
-    }
+    // 娘不再是节拍器：终点是村东那头，一路往东走就是了（掩体、石子、板车
+    // 都是玩家的选择，驱动器只验"走得到"）
+    case "coverRun": return { action: "walk", x: def.to, level: "surface" };
     case "lead": {
       const group = state.actors.filter((a) => a.group === def.group && a.visible);
       const looseA = group.find((a) => !a.following);
@@ -4481,10 +4797,7 @@ function SettleDest(def) {
     case "goto": case "hold": case "mapBoard": case "scribe": case "plane": return def.zone;
     case "escort": case "lead": case "smokeEscape": case "floodRescue": return def.dest;
     case "leadFollow": return def.waypoints?.[def.waypoints.length - 1];
-    case "coverRun": {
-      const last = def.covers?.[def.covers.length - 1];
-      return last === undefined ? null : { x: last, w: 5 };
-    }
+    case "coverRun": return def.to === undefined ? null : { x: def.to, w: 5 };
     case "gotoSeq": case "observe": return def.spots?.[def.spots.length - 1];
     case "buildSpots": return def.spots?.[def.spots.length - 1]?.zone;
     case "digSeq": return def.spots?.[def.spots.length - 1];

@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, WINCH_HUB_Y } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -345,6 +345,7 @@ export function CreateWorld(canvasEl) {
     && (homeFacade.material.opacity ?? 1) > 0.5
     && level === "surface" && x > homeRange.x0 && x < homeRange.door;
   let coneMeshes = [], coneTex = null;
+  let shadeMeshes = [], shadeTex = null;   // 掩体背光那一侧的影子（"安全在哪儿"要画出来）
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
   let chainItemMesh = null, chainItemLabel = null;
@@ -405,6 +406,7 @@ export function CreateWorld(canvasEl) {
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     homeFacade = null; homeRange = null;
     coneMeshes = [];
+    shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
     chainItemMesh = null; chainItemLabel = null;
@@ -2732,9 +2734,84 @@ export function CreateWorld(canvasEl) {
           (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.28, 0.2);
         // 夜里灯就是主角，光带要一眼读得出——白天淡一点（是"视线"不是灯）
         const night2 = CHAPTERS[state.chapterIndex].light === "night" || CHAPTERS[state.chapterIndex].light === "dark";
-        const base = night2 ? 0.38 : 0.14;
-        m.material.opacity = base + Math.sin(time * 2.6 + i * 1.9) * 0.04;
+        // 夜里这一片光就是玩法本身（照到哪儿=不能站哪儿），得一眼读得出
+        const base = night2 ? 0.52 : 0.16;
+        // 举灯预兆（要回头扫了）：光收紧、亮一档——危险先看得见再生效
+        const lift = a.scanLift || 0;
+        m.material.opacity = base * (1 + lift * 0.9) + Math.sin(time * 2.6 + i * 1.9) * 0.04;
       });
+
+      // 掩体的**影子**：这一段路真正的玩法长在这上面。
+      //
+      // 藏 = 站到掩体背光的那一面，所以"安全在哪儿"必须画出来，不能靠玩家
+      // 猜。每处被灯照到的掩体，在它背光的一侧铺一条暗带——那条暗带的长短
+      // 与判定用的余量（COVER_PAD）是同一个数，站进去就是藏住了。灯绕到另一
+      // 边，影子当场换头，玩家看见的就是"该挪窝了"。
+      {
+        const scene = SCENES[CHAPTERS[state.chapterIndex].scene];
+        const covers = (showCones ? scene.covers : null) || [];
+        const range = VISION_RANGE * VisionScale(state);
+        const shades = [];
+        for (const c of covers) {
+          // 谁在照它——取最近的那个，影子只有一条（一维里也只可能有一条主光）
+          let lit = null, bestD = Infinity;
+          for (const a of enemies) {
+            const dx = c.x - a.x;
+            if (Math.sign(dx) !== Math.sign(a.heading || 1)) continue;
+            const d = Math.abs(dx);
+            if (d > range + c.w / 2 || d >= bestD) continue;
+            bestD = d; lit = a;
+          }
+          if (!lit) continue;
+          const side = Math.sign(c.x - lit.x) || 1;      // 背光那一头
+          const x0 = c.x + side * (c.w / 2 - 0.15);
+          const x1 = c.x + side * (c.w / 2 + COVER_PAD);
+          shades.push({ x: (x0 + x1) / 2, w: Math.abs(x1 - x0), dir: side, tall: !!c.tall });
+        }
+        if (shades.length && !shadeTex) {
+          // 一张"贴着垛根最深、往外化开"的软影：硬边的方块读起来是 UI，
+          // 不是影子。横向从掩体那一头浓到淡，纵向两头收干净——和光池同一种语言
+          const c = MakeCanvas(96, 40);
+          const cctx = c.getContext("2d");
+          const gh = cctx.createLinearGradient(0, 0, 96, 0);
+          gh.addColorStop(0, "rgba(6,10,20,1)");
+          gh.addColorStop(0.45, "rgba(6,10,20,0.72)");
+          gh.addColorStop(1, "rgba(6,10,20,0)");
+          cctx.fillStyle = gh;
+          cctx.fillRect(0, 0, 96, 40);
+          cctx.globalCompositeOperation = "destination-in";
+          const gv = cctx.createLinearGradient(0, 0, 0, 40);
+          gv.addColorStop(0, "rgba(0,0,0,0)");
+          gv.addColorStop(0.62, "rgba(0,0,0,1)");
+          gv.addColorStop(1, "rgba(0,0,0,0.35)");
+          cctx.fillStyle = gv;
+          cctx.fillRect(0, 0, 96, 40);
+          shadeTex = CanvasTexture(c);
+          shadeTex.generateMipmaps = false;
+          shadeTex.minFilter = THREE.LinearFilter;
+        }
+        while (shadeMeshes.length < shades.length) {
+          const m = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 0.72),
+            new THREE.MeshBasicMaterial({
+              map: shadeTex, transparent: true, opacity: 0.3, depthWrite: false,
+              side: THREE.DoubleSide,          // 朝西的影子靠负缩放翻贴图，绕序跟着翻
+            }),
+          );
+          FixOrder(m, LAYER_ORDER.fx + 205);            // 压在光池之下：影子是被光衬出来的
+          layers.fx.add(m);
+          shadeMeshes.push(m);
+        }
+        shadeMeshes.forEach((m, i) => {
+          const s = shades[i];
+          if (!s) { m.visible = false; return; }
+          m.visible = true;
+          m.scale.set(s.dir * s.w, 1, 1);               // 浓的那一端贴着垛根
+          m.position.set(s.x, SURFACE_Y + 0.30, 0.19);
+          // 高掩体的影子实、矮掩体的虚一档——"这个得蹲下去"也在画面里说了
+          m.material.opacity = (s.tall ? 0.72 : 0.42) + Math.sin(time * 1.7 + i) * 0.04;
+        });
+      }
     }
 
     // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
