@@ -640,43 +640,58 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
    划线：镜头推到门框上，这条轨道告诉手往哪儿使劲。粉笔头跟着进度走，
    走到头线就划完了。桌面按住 E 左右推，触屏直接拖。
    --------------------------------------------------------------------------- */
-#scribeGuide {
-  position: absolute; left: 0; right: 0; bottom: 16%;
+/* 手势提示：一枚会动的小圆点，演示当前节拍要的那只手——
+   dragDown 往下拖 / pullUp 一把一把上拉 / circle 绕圈 / tap 点按。
+   纯 CSS 动画，无文字（提示语在中央那条 prompt 里）。 */
+#gestureHint {
+  position: absolute; left: 0; right: 0; bottom: calc(15% + 46px);
   margin-inline: auto;
-  width: min(340px, 62vw);
+  width: 54px; height: 54px;
   pointer-events: none;
-  text-align: center;
+  border: 1px solid rgba(226, 196, 132, 0.4);
+  border-radius: 50%;
+  background: rgba(8, 6, 4, 0.45);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
-#scribeGuide .track {
-  position: relative; height: 10px;
-  border-radius: 999px;
-  background: rgba(10, 8, 6, 0.6);
-  border: 1px solid rgba(226, 196, 132, 0.42);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+#gestureHint .gDot {
+  position: absolute; left: 50%; top: 50%;
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #f7dd9a;
+  box-shadow: 0 0 8px rgba(247, 221, 154, 0.8);
 }
-#scribeGuide .fill {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: var(--fill, 0%);
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(226, 196, 132, 0.5), rgba(247, 221, 154, 0.85));
-  transition: width 70ms linear;
+#gestureHint[data-kind="dragDown"] .gDot { animation: gDragDown 1.3s ease-in-out infinite; }
+@keyframes gDragDown {
+  0% { transform: translateY(-13px); opacity: 0.2; }
+  18% { opacity: 1; }
+  70% { transform: translateY(13px); opacity: 1; }
+  100% { transform: translateY(13px); opacity: 0; }
 }
-#scribeGuide .knob {
-  position: absolute; top: 50%; left: var(--fill, 0%);
-  transform: translate(-50%, -55%);
-  font-size: 21px; line-height: 1; color: #f7dd9a;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
-  transition: left 70ms linear;
+#gestureHint[data-kind="pullUp"] .gDot { animation: gPullUp 1.1s ease-in-out infinite; }
+@keyframes gPullUp {
+  0% { transform: translateY(13px); opacity: 0.25; }
+  20% { opacity: 1; }
+  62% { transform: translateY(-11px); opacity: 1; }
+  /* 松手回落一点：辘轳会倒转这件事，图标自己就在演 */
+  100% { transform: translateY(-4px); opacity: 0; }
 }
-/* 还没动起来时轻轻晃一下，告诉玩家该拖它 */
-#scribeGuide.idle .knob { animation: scribeNudge 1.5s ease-in-out infinite; }
-@keyframes scribeNudge {
-  0%, 100% { transform: translate(-50%, -55%); }
-  50% { transform: translate(calc(-50% + 9px), -55%); }
+#gestureHint[data-kind="circle"] .gDot { animation: gCircle 1.6s linear infinite; }
+@keyframes gCircle {
+  0% { transform: rotate(0deg) translateX(14px); }
+  100% { transform: rotate(360deg) translateX(14px); }
 }
-#scribeGuide .tip {
-  margin-top: 9px; font-size: 13px; letter-spacing: 0.16em; color: #e8dcbc;
-  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
+/* 辘轳转盘：顺时针放绳、逆时针摇上来——图标转的方向就是手要转的方向 */
+#gestureHint[data-kind="crankDown"] .gDot { animation: gCircle 1.1s linear infinite; }
+#gestureHint[data-kind="crankUp"] .gDot { animation: gCircleCcw 1.5s linear infinite; }
+@keyframes gCircleCcw {
+  0% { transform: rotate(360deg) translateX(14px); }
+  100% { transform: rotate(0deg) translateX(14px); }
+}
+#gestureHint[data-kind="tap"] .gDot { animation: gTap 0.9s ease-in-out infinite; }
+@keyframes gTap {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  22% { transform: scale(1.9); opacity: 1; }
+  40% { transform: scale(1); opacity: 0.85; }
 }
 
 /* ---------------------------------------------------------------------------

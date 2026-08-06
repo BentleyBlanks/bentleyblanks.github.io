@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=031">
+  <link rel="stylesheet" href="./Style_Game.css?v=032">
   <script type="importmap">
     {
       "imports": {
@@ -75,11 +75,10 @@
          照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
          （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
     <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
-    <!-- 划线：一条 QTE 式的轨道。手指（或按住 E 推）把石笔沿着它拖过去 -->
-    <div id="scribeGuide" hidden>
-      <div class="track"><i class="fill"></i><span class="knob">✎</span></div>
-      <p class="tip">拖着石笔划过去</p>
-    </div>
+    <!-- 划线那一拍没有 HUD：玩家攥的是画面里那支石笔本身 -->
+    <!-- 手势提示：放绳（下拖）/ 拽桶（上拉）/ 打结（绕圈）/ 敲楔（点按）
+         的动效小图标，纯 CSS 循环动画，data-kind 切换 -->
+    <div id="gestureHint" hidden aria-hidden="true"><i class="gDot"></i></div>
     <div id="detectionVignette" aria-hidden="true"></div>
     <div id="irisOverlay" aria-hidden="true"></div>
     <div id="slitMatte" aria-hidden="true"><i></i><i></i></div>
@@ -173,7 +172,8 @@
       <dl id="controlsNote">
         <div><dt>A / D</dt><dd>左右移动（手机：左下摇杆横推）</dd></div>
         <div><dt>W / S</dt><dd>在梯口 / 地道口上下（手机：摇杆竖推）</dd></div>
-        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车（手机：右下大圆钮）</dd></div>
+        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车；手里有东西随时可放下（手机：右下大圆钮）</dd></div>
+        <div><dt>鼠标</dt><dd>直接上手：摇辘轳转盘、绕圈打结、攥笔划线、点按抡锤（键盘同样能做）</dd></div>
         <div><dt>F</dt><dd>投掷，先捡石子（手机：手里有能扔的东西才冒出来的那个钮）</dd></div>
         <div><dt>C</dt><dd>蹲低，躲在草垛断墙后能避开视线（手机：右下蹲人钮）</dd></div>
         <div><dt>1 / 2</dt><dd>做出抉择（手机：直接点那张牌）</dd></div>
@@ -183,6 +183,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=031"></script>
+<script type="module" src="./Script_Main.js?v=032"></script>
 </body>
 </html>

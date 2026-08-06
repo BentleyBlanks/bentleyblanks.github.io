@@ -1,0 +1,92 @@
+# TunnelLight1943 项目规范（agent 必读）
+
+《地道里的光》2.5D 横版白盒。改这个目录前先读本文件；改完跑「验证」一节。
+
+## 场景数据在哪（改东西之前先看这里）
+
+**场景物体不写在代码里**。要挪一个东西、换一张贴图、改一档深度，改 JSON 就够了：
+
+| 文件 | 管什么 |
+|---|---|
+| `Data_Scenes.json` | 每个物体**在哪**：x / level / w / h / 旗标门 / 区域 / 掩体 / 翻越物 / 窄段 |
+| `Data_PropArt.json` | 每一类物体**长什么样、埋多深**：画笔名 / 深度带 / 烘焙画布 / 投影 |
+| `Data_DepthSpec.mjs` | 深度带的**数值**（`building` 是 -3.4 这种） |
+| `Data_Scenes.mjs` | 加载 + 解析 + **开局校验**（配错立即抛，不静默少画一个物体） |
+
+这套白盒没有图片文件：贴图全由 `Script_Art.mjs` 的手绘矢量画笔实时烘到 canvas，
+所以「引用的贴图」= `art` 字段里的画笔函数名，换皮就是换这个名字。
+
+查看与体检（要挪东西、或者"这玩意儿怎么不见了"，先跑它）：
+
+```bash
+npm run scene:tunnelLight1943
+```
+
+它按场景列出全部物体的坐标/深度带/画笔/贴图尺寸，并交叉校验：剧本里的放置点
+压没压掩体、挡人的矮物件是不是真的矮、翻越物撞没撞掩体、行走线上有没有穿插。
+
+**新增一种 kind**：先在 `Data_PropArt.json` 的 `props`（或 `covers`）登记
+`art` / `band` / `sprite`，再在 `Data_Scenes.json` 摆位置。漏登记会在加载时报错。
+只有**条件绘制**（断了的井绳、露出的绳头、烧过的屋子）才写进 `Script_World.js`
+的 `AddProp` switch —— 那是逻辑，不是数据。
+
+## Z 轴深度规范（血泪最多的一条）
+
+画面全是不写深度缓冲的半透明贴图，**前后完全由绘制顺序决定**。规则：
+
+1. **带的数值**在 `Data_DepthSpec.mjs`（`BAND` + `ACTOR_Z/CARRY_Z/NEAR_CLUTTER`），
+   **哪类物体用哪个带**在 `Data_PropArt.json` 的 `band` 字段。两处都不许写裸数字。
+2. **动态物**（放下的、飞着的、演出用的）用
+   `SetPlayOrder(mesh, BAND.xxx, "标签")` 或 `FixOrder(mesh, DepthOrder("play", BAND.xxx))`。
+   **禁止在放置代码里写裸数字 z / renderOrder**——历史事故（道具把人吞掉、
+   桶被草垛挡住隐形）全是裸数字造成的。
+3. **带的语义**：固定在地上的道具 = `walk`；玩家放下/待拾的活动道具 = `loose`
+   （压在 walk 之前、演员之后，永远看得见）；允许挡人的矮掩体 = `clutter` 或
+   `NEAR_CLUTTER` 区间（高过腰 1.2m 的一律退到负带，否则会把人整个吞掉）。
+4. **落地贴图底边 = 地平线**（地表 `SURFACE_Y`、地道 `UNDER_Y`），y 不许为了
+   观感手动抬高——贴地由 `sprite.baseline` 或 `MakeGroundItemMesh` 的 alpha 扫底
+   负责。真要抬（挂树上的布巾）走 `yOffset`，那是声明出来的例外。
+5. **道具落点不得进掩体足迹**：掩体带专职挡人。玩家/脚本放东西一律走 Core 的
+   `DropSpot()`（会自动避开 `scene.covers`/`vaults` 并夹进行走范围）。
+6. **校验**：`CheckBandZ` 会对表外 z 发 console.warn；浏览器里
+   `TunnelLight.world.DepthViolations()` 可拿告警单，必须为空。
+   例外词汇表（不受 BAND 约束）：地道剖面构件（`NEAR_Z`/`BACK_Z` 一族）和
+   fx/fore/ots 层的 `LAYER_ORDER` 偏移。
+
+## 世界内提示（HUD）清晰度
+
+- 默认镜头下屏幕像素密度已是贴图标尺 PPM 的近三倍，特写还会推近——**任何
+  会被玩家盯着看的 canvas 纹理必须超采样**：提示类用 `HINT_SS`，道具用
+  `PROP_SS`，小件用 `DETAIL_SS`。逐帧重画的 canvas 用 `setTransform(SS,…)`。
+- DOM HUD 的字体规矩见 `Style_Game.css` 顶部注释：居中走布局不走 transform、
+  text-shadow 收贴身、字体必须真的加载（index.html 的 Google Fonts 四档字重）。
+
+## 交互动词
+
+- 每个玩法动词必须配角色动画（`FlashPose`），不许「人站着不动、字幕替他做」。
+- 单格物品栏：手里任何道具随时可自由放下（`StepGroundItems`），落地道具自动
+  挂图形气泡提示（`item:标签`）。链式步骤不要假设玩家手里还拿着东西——
+  用 `needs` 声明，缺了给图形气泡/提示。
+- 沉浸式手势输入已有词汇：`input.pull/pullHeld`（竖向拖）、`input.pointerWorld`
+  （指尖世界坐标）、`input.tap`（点按）。新玩法先复用这三样 + `state.gesture`
+  的 HUD 提示（dragDown/pullUp/circle/tap），别再发明新输入通道。
+- **键盘必须是完整后备**：自动通关测试只按键盘（W/S/E/F），任何鼠标玩法都要
+  留等价按键路径，否则 SmokeTest 会卡死。
+
+## 历史与叙事铁律（改玩法/文案前过一遍）
+
+- 每个玩法元素过「1942-43 华北敌后穷苦农村会有这个吗」检查。
+- 旁白不实况复述画面动作；惊变时刻旁白闭嘴走同期声；日军讲日语无字幕。
+- 妹妹等被护送者永不成为失败原因；首败无文字；重试 ≤15 秒。
+- 潜行重置点不得落在任何敌人视线里，撤退方向必须是空的。
+
+## 验证
+
+```bash
+npm run test:tunnelLight1943            # node：自动通关全 8 章双分支 + 机制断言 + 场景体检
+npm run scene:tunnelLight1943           # 场景清单：谁在哪、埋多深、用哪支画笔
+npm run test:tunnelLight1943:browser    # 浏览器：逐章渲染健康 + 跳幕体检
+node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
+```
+
+改台词以代码为准，用 scratchpad 的 extract-script 流程回写 Notion（见项目记忆）。

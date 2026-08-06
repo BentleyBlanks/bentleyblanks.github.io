@@ -93,8 +93,8 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide", "btnSkipCine",
-  "actPrompt", "itemThrow", "pipFrame", "pipView",
+  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
+  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -142,28 +142,44 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
-// 划线那一拍：手指（或鼠标）直接在画面上把石笔拖过去。位移驱动——
-// 拖多少走多少，手上才有蹭着木头走的实感。整整一道线约等于拖过 45% 画宽。
-const scribeDrag = { active: false, id: null, lastX: 0, accum: 0 };
+// 沉浸式手势的唯一入口：手按在画面上的**世界坐标**（不是屏幕位移），
+// 加上竖向拖动量与点按。所有上手的玩法都从这三样里取——
+// 攥石笔靠 world（手得真落在笔上）、放绳拽桶靠 dy、敲楔靠 tap。
+const gest = { active: false, id: null, lastX: 0, lastY: 0, dy: 0, downT: 0, moved: 0, world: null };
+let tapEdge = false;
 canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" || e.pointerType === "pen") inputMode = "touch";
   advanceEdge = true;
-  if (state && CurrentBeatDef(state)?.kind === "scribe") {
-    scribeDrag.active = true;
-    scribeDrag.id = e.pointerId;
-    scribeDrag.lastX = e.clientX;
-    try { canvas.setPointerCapture?.(e.pointerId); } catch (ignored) { /* 同上 */ }
-  }
+  if (!state) return;
+  gest.active = true;
+  gest.id = e.pointerId;
+  gest.lastX = e.clientX;
+  gest.lastY = e.clientY;
+  gest.downT = performance.now();
+  gest.moved = 0;
+  gest.dy = 0;
+  gest.world = world.ScreenToWorld(e.clientX, e.clientY);
+  // 捕获是锦上添花：手滑出画布还能接着操。指针已抬起或是合成事件时它会抛，
+  // 不接住会把整个 handler 断在这儿
+  try { canvas.setPointerCapture?.(e.pointerId); } catch (ignored) { /* 捕获不到就算了 */ }
 });
 canvas.addEventListener("pointermove", (e) => {
-  if (!scribeDrag.active || e.pointerId !== scribeDrag.id) return;
-  const span = Math.max(120, canvas.clientWidth * 0.45);
-  scribeDrag.accum += (e.clientX - scribeDrag.lastX) / span;
-  scribeDrag.lastX = e.clientX;
+  if (!gest.active || e.pointerId !== gest.id) return;
+  const span = Math.max(160, canvas.clientHeight * 0.55);
+  gest.dy += (e.clientY - gest.lastY) / span;
+  gest.moved += Math.abs(e.clientX - gest.lastX) + Math.abs(e.clientY - gest.lastY);
+  gest.lastX = e.clientX;
+  gest.lastY = e.clientY;
+  gest.world = world.ScreenToWorld(e.clientX, e.clientY);
 });
 for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
   canvas.addEventListener(evt, (e) => {
-    if (e.pointerId === scribeDrag.id) { scribeDrag.active = false; scribeDrag.id = null; }
+    // 捕获在手时 pointerleave 会误报，抬手与取消才算真结束
+    if (evt === "pointerleave" || e.pointerId !== gest.id) return;
+    if (evt === "pointerup" && performance.now() - gest.downT < 420 && gest.moved < 14) tapEdge = true;
+    gest.active = false;
+    gest.id = null;
+    gest.dy = 0;
   });
 }
 
@@ -403,8 +419,12 @@ function UpdateCamera(state, dt) {
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
+    // state.closeUp 是玩法步骤级的特写（摇辘轳/打结：交互本身长在特写里，
+    // 不在大全景下做），优先于节拍级的 def.cam；步骤一结束它就没了，镜头拉回。
     const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
-    shot = def?.cam ? HintShot(state, def.cam) : BaseShot(state);
+    const cu = state.phase === "playing" ? state.closeUp : null;
+    shot = cu ? HintShot(state, { kind: "shot", x: cu.x, y: cu.y, dist: cu.hw })
+      : def?.cam ? HintShot(state, def.cam) : BaseShot(state);
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
@@ -652,34 +672,38 @@ function SyncHud(state, dt, shotFade) {
   SyncPip(state, inCinematic);
 
   ui.crouchTag.hidden = true;
-  // 手里那格：单格物品栏。拿着石子时顺带把 F 键提示挂上
+  // 手里那格：单格物品栏。可投的挂 F、可放下的挂 E——「放下」是常态，
+  // 但提示走物品栏角标，不占画面中央那条（勇敢的心式克制）
   const item = state.player?.item;
   const showItem = !!item && !inCinematic && state.phase === "playing";
   if (ui.itemTag) {
     ui.itemTag.hidden = !showItem;
-    // 能扔的东西后面挂一枚小徽章，不写"（F 投掷）"——那三个字在手机上没有对应物
-    const tagFp = item ? `${inputMode}|${item.label}|${item.throwable ? 1 : 0}` : "";
+    // 能扔的/能放下的各挂一枚小徽章，不写"（F 投掷）"——键名不进文案，
+    // 手机上那三个字没有对应物。「放下」提示走这里的角标，不占画面中央那条。
+    const tagFp = item ? `${inputMode}|${item.label}|${item.throwable ? 1 : 0}|${state.canDrop ? 1 : 0}` : "";
     if (ui.itemName && tagFp !== itemTagShown) {
       itemTagShown = tagFp;
       ui.itemName.textContent = item ? item.label : "";
       if (ui.itemThrow) {
-        ui.itemThrow.hidden = !item?.throwable;
-        ui.itemThrow.innerHTML = item?.throwable ? KeyChipHtml("throw") : "";
+        const chips = [];
+        if (item?.throwable) chips.push(KeyChipHtml("throw"));
+        if (state.canDrop) chips.push(KeyChipHtml("interact"));
+        ui.itemThrow.hidden = chips.length === 0;
+        ui.itemThrow.innerHTML = chips.join("");
       }
     }
+  }
+  // 手势提示：用手的节拍（放绳/拽桶/绕圈打结/敲楔）给一枚会动的小图标
+  if (ui.gestureHint) {
+    const g = !inCinematic && state.phase === "playing" ? state.gesture : null;
+    ui.gestureHint.hidden = !g;
+    if (g && ui.gestureHint.dataset.kind !== g.kind) ui.gestureHint.dataset.kind = g.kind;
   }
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线的 QTE 轨道：石笔头跟着进度走，没动起来时轻轻晃一下招呼玩家来拖
-  if (ui.scribeGuide) {
-    const sc = state.scribe;
-    ui.scribeGuide.hidden = !sc;
-    if (sc) {
-      ui.scribeGuide.style.setProperty("--fill", (sc.t * 100).toFixed(1) + "%");
-      ui.scribeGuide.classList.toggle("idle", !!sc.idle);
-    }
-  }
+  // 划线那一拍没有 HUD：玩家攥的是画面里那支笔，进度就是木头上那道印子本身。
+  //（原先这里有一条 QTE 轨道，等于把"控制一支笔"降级成"拖一根 slider"。）
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
   }
@@ -981,10 +1005,15 @@ function RunFrame(now, dt) {
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
       throw: throwEdge,
-      dragX: scribeDrag.accum,
+      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），pointerWorld=指尖的世界坐标
+      pull: gest.active ? gest.dy : 0,
+      pullHeld: gest.active,
+      pointerHeld: gest.active,
+      pointerWorld: gest.world,
+      tap: tapEdge,
       advance: advanceEdge,
     }, stepDt);
-    scribeDrag.accum = 0;
+    gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
       framing = { key: "", prog: 0, baseHw: 7.2 };
@@ -1004,6 +1033,7 @@ function RunFrame(now, dt) {
   interactEdge = false;
   advanceEdge = false;
   throwEdge = false;
+  tapEdge = false;
 }
 
 function Resize() {

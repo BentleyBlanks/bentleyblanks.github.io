@@ -907,6 +907,12 @@ function Build(ac, options) {
       Tone(t, { level: 0.09 * k, attack: 0.002, decay: 0.12, type: "triangle", freq: 190 * r, to: 120 * r, pan });
       NoiseHit(t + 0.015, { level: 0.05 * k, attack: 0.001, decay: 0.03, freq: 2100, q: 1.6, pan });
     },
+    // 石笔蹭木头：一粒沙沙。Core 按"蹭过多少距离"一粒一粒地发，不是定时循环——
+    // 于是手快声音就密、手一停声音就断，耳朵跟着手走
+    scribe(t, k, pan, r) {
+      NoiseHit(t, { level: 0.030 * k, attack: 0.001, decay: 0.045, type: "highpass", freq: 2700 * r, q: 0.8, pan });
+      NoiseHit(t + 0.008, { level: 0.016 * k, attack: 0.002, decay: 0.075, freq: 1350 * r, sweep: 520, q: 1.7, pan });
+    },
     // 投掷破空：很短的一瞬风声
     whoosh(t, k, pan) {
       NoiseHit(t, { level: 0.07 * k, attack: 0.015, decay: 0.16, freq: 1300, sweep: 2800, q: 0.8, pan });
