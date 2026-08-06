@@ -7,7 +7,7 @@
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
-import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
+import { CHAPTER_BGM } from "./Data_BgmConfig.mjs?v=026";
 
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。

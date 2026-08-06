@@ -6,7 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=026";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=026";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -36,7 +37,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js")
+import("./Script_Audio.js?v=026")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -51,7 +52,7 @@ import("./Script_Audio.js")
 const SOUND_KEY = "tunnelLight1943.sound";
 // 三路音量各自记住。默认配乐低一些——它只是底噪，不该压住旁白。
 const VOL_KEY = "tunnelLight1943.vol";
-const DEFAULT_VOL = { voice: 100, sfx: 100, music: 70 };
+const DEFAULT_VOL = { ...AUDIO_DEFAULT_LEVELS };
 let vol = { ...DEFAULT_VOL };
 try {
   const saved = JSON.parse(localStorage.getItem(VOL_KEY) || "null");

@@ -12,6 +12,7 @@ import {
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
+import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
 
 const DT = 1 / 30;
 
@@ -309,7 +310,22 @@ function TestInstrumentalBgmManifest() {
     "含人声的 What We Don't Say 必须留在淘汰记录中");
   assert.ok(!manifest.tracks.some((item) => item.id === "whatWeDontSay"),
     "含人声曲目不得进入正式清单");
+  for (const rejectedId of ["nightFalls", "huabeiVillageDawn"]) {
+    assert.ok(manifest.rejectedCandidates.some((item) => item.id === rejectedId),
+      `${rejectedId} 必须留在用户试听淘汰记录中`);
+    assert.ok(!manifest.tracks.some((item) => item.id === rejectedId),
+      `${rejectedId} 不得进入正式清单`);
+  }
   console.log("  ✓ 八章纯器乐 BGM 清单 / 文件 / 淘汰规则");
+}
+
+function TestQuieterAudioMix() {
+  assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
+  assert.ok(AUDIO_BUS_BASE.amb <= 0.72, "环境声总线必须保持在降低后的基准");
+  assert.equal(AUDIO_DEFAULT_LEVELS.sfx, 80, "新玩家的默认音效应为 80%");
+  assert.equal(AUDIO_DEFAULT_LEVELS.voice, 100, "降低音效不应压低旁白");
+  assert.equal(AUDIO_DEFAULT_LEVELS.music, 70, "降低音效不应改变配乐默认值");
+  console.log("  ✓ 音效与环境声降噪混音契约");
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +339,7 @@ TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
 TestInstrumentalBgmManifest();
+TestQuieterAudioMix();
 
 console.log("— 全流程自动通关（第六章走『地下进人』）—");
 {

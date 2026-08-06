@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=025">
+  <link rel="stylesheet" href="./Style_Game.css?v=026">
   <script type="importmap">
     {
       "imports": {
@@ -53,12 +53,13 @@
       </button>
       <label for="volVoice">旁白 <output id="volVoiceOut">100%</output></label>
       <input id="volVoice" type="range" min="0" max="100" step="5" value="100">
-      <label for="volSfx">音效 <output id="volSfxOut">100%</output></label>
-      <input id="volSfx" type="range" min="0" max="100" step="5" value="100">
+      <label for="volSfx">音效 <output id="volSfxOut">80%</output></label>
+      <input id="volSfx" type="range" min="0" max="100" step="5" value="80">
       <label for="volMusic">配乐 <output id="volMusicOut">70%</output></label>
       <input id="volMusic" type="range" min="0" max="100" step="5" value="70">
-      <p class="bgmCredit">正式配乐均为纯器乐，不含演唱、吟唱或人声音色。第一章使用
+      <p class="bgmCredit">正式配乐均为纯器乐，不含演唱、吟唱或人声音色。第一、二章使用
         <a href="https://www.scottbuckley.com.au/library/with-these-hands/" target="_blank" rel="noopener">With These Hands</a>
+        与 <a href="https://www.scottbuckley.com.au/library/the-long-dark/" target="_blank" rel="noopener">The Long Dark</a>
         · Scott Buckley · CC BY 4.0；其余为本项目生成母带。</p>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
@@ -173,6 +174,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=025"></script>
+<script type="module" src="./Script_Main.js?v=026"></script>
 </body>
 </html>

@@ -16,6 +16,8 @@
 // 可选 CreateAudio({ context }) 注入自带的 AudioContext —— 只给离线测试用，
 // 注入时不起 setInterval，排程完全由 Update() 驱动。
 
+import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs?v=026";
+
 const FADE = 2.5;          // mood 交叉淡入淡出时长（秒）
 const LOOKAHEAD = 0.4;     // 排程视野：足够盖住一次 tick，又不至于让 mood 切换迟钝
 const TICK_MS = 100;
@@ -161,11 +163,11 @@ function Build(ac, options) {
   synthBus.connect(musicBus);
 
   const ambBus = ac.createGain();
-  ambBus.gain.value = 0.9;
+  ambBus.gain.value = 0.72;
   ambBus.connect(duck);
 
   const sfxBus = ac.createGain();
-  sfxBus.gain.value = 0.9;
+  sfxBus.gain.value = 0.68;
   sfxBus.connect(master);
 
   const voiceBus = ac.createGain();
@@ -175,7 +177,9 @@ function Build(ac, options) {
   // 分路音量：设置面板要能单独调旁白 / 音效 / 配乐。
   // 各路有各自的基准值（混音时定好的相对关系），面板给的是 0..1 的倍率，
   // 两者相乘——这样调音量不会把混音比例弄乱。环境音跟着音效走。
-  const BUS_BASE = { music: 0.55, amb: 0.9, sfx: 0.9, voice: 1 };
+  // 音效整体收低：用户已经存过 100% 时也必须真正变安静，不能只改新用户默认值。
+  // 环境声略高于动作音效，保留风、土和滴水的空间感，但都不再抢旁白。
+  const BUS_BASE = AUDIO_BUS_BASE;
   const busNode = { music: musicBus, amb: ambBus, sfx: sfxBus, voice: voiceBus };
   const busLevel = { music: 1, sfx: 1, voice: 1 };
   function ApplyBus(name) {
