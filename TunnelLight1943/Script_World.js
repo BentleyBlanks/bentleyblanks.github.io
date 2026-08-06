@@ -121,7 +121,7 @@ function MakeCarryMesh(label) {
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const TALL = { "锯": [70, 110], "锄头": [70, 140] };
+  const TALL = { "锯": [52, 80], "锄头": [48, 100] };   // 收窄后的画幅，别再给一根柱子留地方
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -347,7 +347,7 @@ export function CreateWorld(canvasEl) {
   let coneMeshes = [], coneTex = null;
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
-  let chainItemMesh = null, chainItemLabel = null;
+  let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
   let barrowMesh = null;
   // 自由放下的落地道具：uid → mesh（uid 在 Core 里随放下动作分配）
@@ -407,7 +407,7 @@ export function CreateWorld(canvasEl) {
     coneMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
-    chainItemMesh = null; chainItemLabel = null;
+    chainItemMeshes = [];
     barrowMesh = null;
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
@@ -1717,7 +1717,10 @@ export function CreateWorld(canvasEl) {
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
     s.carryMesh.position.set(anchor.x, anchor.y + (alongArm ? 0 : inHand ? -0.20 : 0.10), CARRY_Z);
-    s.carryMesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
+    // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
+    // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
+    // （锯和锄本来就绕柄对称，不镜像也看不出来。）
+    s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
       const elbow = ElbowPoint(s.rig);
@@ -2982,27 +2985,34 @@ export function CreateWorld(canvasEl) {
       barkMesh.position.set(state.dogBark.x + 0.8, SURFACE_Y + 1.9 + Math.sin(time * 7) * 0.08, 0.6);
     } else if (barkMesh) barkMesh.visible = false;
 
-    // 链上的待拾物：当前一步要捡的东西就摆在那儿，看得见才谈得上"找"
-    let chainPickup = null;
+    // 链上的待拾物：**这条链里还没捡的东西全都摆在那儿**。
+    // 原来只画"当前这一步"要捡的那一件，于是院子里那两根木料一次只出现一根：
+    // 扛走第一根，第二根才凭空冒出来——连带蹲在第二根上的母鸡也蹲在空气里。
+    // 东西本来就该在那儿，是玩家还没走到而已。
+    const chainPickups = [];
     if (def?.kind === "chain" && state.beat) {
-      const st = def.steps[state.beat.stepIndex || 0];
-      if (st?.type === "pickup") chainPickup = st;
-    }
-    if (chainPickup) {
-      const label = chainPickup.item.label;
-      if (!chainItemMesh || chainItemLabel !== label) {
-        if (chainItemMesh) layers.play.remove(chainItemMesh);
-        chainItemLabel = label;
-        chainItemMesh = MakeGroundItemMesh(label);
-        layers.play.add(chainItemMesh);
-        // loose+1：待拾物与放下物挤在同一处时（木料堆上的绳头 vs 搁下的桶），
-        // 当前要捡的那件永远在上面
-        FixOrder(chainItemMesh, DepthOrder("play", BAND.loose) + 1);
+      const from = state.beat.stepIndex || 0;
+      for (let i = from; i < def.steps.length; i += 1) {
+        const st = def.steps[i];
+        if (st?.type === "pickup") chainPickups.push(st);
       }
-      chainItemMesh.visible = true;
-      PlaceSprite(chainItemMesh, chainPickup.x,
-        chainPickup.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
-    } else if (chainItemMesh) chainItemMesh.visible = false;
+    }
+    while (chainItemMeshes.length < chainPickups.length) chainItemMeshes.push({ mesh: null, label: null });
+    chainItemMeshes.forEach((slot, i) => {
+      const st = chainPickups[i];
+      if (!st) { if (slot.mesh) slot.mesh.visible = false; return; }
+      if (!slot.mesh || slot.label !== st.item.label) {
+        if (slot.mesh) layers.play.remove(slot.mesh);
+        slot.label = st.item.label;
+        slot.mesh = MakeGroundItemMesh(slot.label);
+        layers.play.add(slot.mesh);
+        // loose+1：待拾物与放下物挤在同一处时（木料堆上的绳头 vs 搁下的桶），
+        // 要捡的那件永远在上面
+        FixOrder(slot.mesh, DepthOrder("play", BAND.loose) + 1);
+      }
+      slot.mesh.visible = true;
+      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+    });
 
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
