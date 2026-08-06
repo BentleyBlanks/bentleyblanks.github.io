@@ -314,12 +314,9 @@ export function DrawCharacter(ctx, spec) {
     InkFill(ctx, [
       [4.6 * S, headY - 5.4 * S], [10.2 * S, headY - 4.2 * S], [9.8 * S, headY - 2.8 * S], [4.6 * S, headY - 3.6 * S],
     ], id + "brim", "#4a461f", { amp: 0.4 * S, lw: lw * 0.8 });
-    // 步枪（背在身后）
-    ctx.save();
-    ctx.translate(-6 * S, hipY - 2 * S);
-    ctx.rotate(-0.42);
-    InkFill(ctx, Rect(-1.6 * S, -22 * S, 3.2 * S, 30 * S), id + "rifle", "#54402c", { amp: 0.35 * S, lw: lw * 0.7 });
-    ctx.restore();
+    // 枪不画在这儿。它以前是烘死在身体贴图上的一根"背在身后"的棍子，
+    // 于是抡枪托那一下胳膊在挥、枪还老老实实背在背上。现在它跟锯、锄头一样
+    // 是真握在手里、跟着前臂转的物件（DrawCarry 的 "步枪" + World 的 alongArm）。
   } else if (kind === "puppet") {
     InkFill(ctx, [
       [-6.6 * S, headY - 4.6 * S], [0, headY - 8.4 * S], [7.0 * S, headY - 4.4 * S], [-6.2 * S, headY - 3.0 * S],
@@ -733,6 +730,19 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       "planeBlade", "#6b6f76", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
     InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
       { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
+  } else if (label === "步枪") {
+    // 三八式：握把在原点，枪身顺着"手往下"画（同锯/锄头，渲染层让它跟着前臂转）。
+    // 抡枪托砸下来的时候，砸在最前头的就是这头的托——所以托必须画在枪身末端，
+    // 不能像以前那样把整支枪烘死在背上当装饰：胳膊抡了，枪还在背上。
+    // 细长的一根，只有末端那块托是宽的——轮廓一眼读得出是枪不是板子
+    const L = 27;
+    InkFill(ctx, [[-0.9 * S, -3 * S], [0.9 * S, -3 * S], [0.8 * S, (L - 9) * S], [-0.8 * S, (L - 9) * S]],
+      "rifleBarrel", "#4d4a44", { amp: 0.22 * S, lw: 0.9 * S });                        // 枪管：细
+    InkFill(ctx, [[-1.7 * S, (L - 13) * S], [1.7 * S, (L - 13) * S], [1.5 * S, (L - 3) * S], [-1.5 * S, (L - 3) * S]],
+      "rifleBody", "#5b452e", { amp: 0.28 * S, lw: 1.0 * S, shade: "rgba(0,0,0,0.2)" }); // 护木与机匣
+    InkFill(ctx, [[-2.4 * S, (L - 4) * S], [2.0 * S, (L - 4) * S], [2.6 * S, (L + 4.5) * S], [-1.6 * S, (L + 4.5) * S]],
+      "rifleButt", "#46351f", { amp: 0.36 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.26)" }); // 枪托：砸人的那头
+    InkLine(ctx, 0, -3 * S, 0, -8.5 * S, "rifleBayo", { lw: 0.9 * S, color: "#9aa0a6" }); // 刺刀
   } else if (label === "锯") {
     // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
     // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，

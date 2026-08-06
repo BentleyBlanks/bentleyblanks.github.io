@@ -1,0 +1,44 @@
+# GitHub Pages 部署。
+#
+# 为什么不用默认的分支构建：站点已经 416MB / 2000+ 个文件（几个 Godot wasm、
+# 十几段序章短片、几十兆 BGM），老式 legacy 构建器在这个体量上稳定超时——
+# 2026-08-06 起连续 errored，线上因此卡在旧版本好几轮没人发现。
+# `.nojekyll` 只是关掉 Jekyll 处理，救不了超时。
+#
+# 走 Actions 就是纯粹的「打包 → 上传 → 发布」，没有 Jekyll，也不受那个超时约束。
+name: Deploy Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同时只跑一个部署；新的推上来就把排队中的那个顶掉（并行会话推得很勤，
+# 排队会让最新一版迟迟不上线）。不取消正在跑的那个，免得发布到一半被腰斩。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/configure-pages@v5
+      # 整个仓库就是站点（没有构建步骤，各 demo 的产物都已提升到服务根，
+      # 见 _dev/ 各自的部署说明）
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
