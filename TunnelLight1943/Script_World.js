@@ -107,6 +107,11 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
   void h;
 }
 
+// 同一只桶，一路上换了好几个叫法：链上是「空水桶」→「一桶水」，娘手里那只
+// 叫「桶」。哪张表漏认一个，桶就会被当成木料——横长条画布裁掉半只，还扛到肩上
+// 顶在脑袋上。所以只此一处列全，画布与挂点都从这里取。
+const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
+
 // ---------------------------------------------------------------------------
 // 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
 // ---------------------------------------------------------------------------
@@ -115,7 +120,7 @@ function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
-    "空桶", "满桶水", "一桶水", "棉被", "湿棉被", "铁皮桶", "刨子"];
+    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
   const TALL = { "锯": [70, 110], "锄头": [70, 140] };
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
@@ -243,7 +248,9 @@ export function CreateWorld(canvasEl) {
     const order = DepthOrder("play", z);
     // 同时写进 userData：BuildEnvironment 重建后 ApplyDepthOrder 重跑派发时，
     // 不至于改按 position.z 重新猜（动态物的 position.z 与深度带曾经不一致，
-    // 「桶忽前忽后」就是这么来的）
+    // 「桶忽前忽后」就是这么来的）。对骨架尤其致命：骨头各自的**局部** z 全是
+    // 0，重派一次整个人就被打回行走线那一档，沉到房子立面后头去，而手上提的
+    // 桶是层的直接子物、局部 z 就是 CARRY_Z，照旧浮在墙外。
     obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
   }
 
@@ -331,6 +338,12 @@ export function CreateWorld(canvasEl) {
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
   let homeFacade = null, homeRange = null;
+  // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
+  // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
+  // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
+  const IndoorHidden = (x, level) => !!homeFacade && !!homeRange
+    && (homeFacade.material.opacity ?? 1) > 0.5
+    && level === "surface" && x > homeRange.x0 && x < homeRange.door;
   let coneMeshes = [], coneTex = null;
   let lightStrip = null, lightBeam = null, lightKey = "";
   let barkMesh = null;
@@ -882,7 +895,12 @@ export function CreateWorld(canvasEl) {
             { z: BAND[V2.innerBand] });
           homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
             { z: BAND[V2.facadeBand] });
-          homeRange = { x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2 };
+          // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
+          // 洞宽 30px）。NPC 得走到门口才消失在屋里，不能一挨着东墙就没影
+          homeRange = {
+            x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2,
+            door: p.x + p.w / 2 - 25 / PPM,
+          };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
@@ -1689,12 +1707,13 @@ export function CreateWorld(canvasEl) {
       s.carryLabel = null;
     }
     if (!s.carryMesh) return;
+    s.carryMesh.visible = true;   // 人从屋里出来了：手上那件跟着回到画面
     // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同。
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = label === "锯" || label === "锄头";
-    const inHand = alongArm || ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾",
-      "鞭炮", "一挂鞭炮", "空桶", "满桶水", "一桶水"].includes(label);
+    const inHand = alongArm || [...BUCKETS, "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳",
+      "花布巾", "鞭炮", "一挂鞭炮"].includes(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
     s.carryMesh.position.set(anchor.x, anchor.y + (alongArm ? 0 : inHand ? -0.20 : 0.10), CARRY_Z);
@@ -1856,8 +1875,16 @@ export function CreateWorld(canvasEl) {
     for (const a of state.actors) {
       seen.add(a.id);
       const s = EnsureActorSprite(a.id, a.kind);
-      s.mesh.visible = a.visible !== false && otsHiddenId !== a.id;
-      if (!s.mesh.visible) continue;
+      // 跟着走的人（妹妹）不算"进屋"：玩家在地窖口下梯子的那一两秒她还在地面上，
+      // 按屋里算会让她凭空消失一下
+      s.mesh.visible = a.visible !== false && otsHiddenId !== a.id
+        && !(!a.following && IndoorHidden(a.x, a.level || "surface"));
+      if (!s.mesh.visible) {
+        // 人不在画面里，跟着他的那几件也得一起收：影子、手上提的、提着的灯。
+        // 不这么写，娘走进屋之后墙上会剩一只浮着的桶、门口留一团没人的影子
+        for (const m of [s.shadow, s.castShadow, s.carryMesh, s.lampMesh]) if (m) m.visible = false;
+        continue;
+      }
       const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
       // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
       const underTunnel = (a.level === "under")

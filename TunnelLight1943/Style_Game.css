@@ -141,9 +141,12 @@ body {
   position: absolute;
   right: max(18px, env(safe-area-inset-right));
   top: max(64px, calc(env(safe-area-inset-top) + 56px));
-  width: min(24vw, 236px);
-  border: 6px solid #d8c69c;
-  border-bottom-width: 13px;                 /* 照片的白边下宽 */
+  /* 窗里是几十米外的一个人直起腰回望——小了就只剩一个色块，读不出她在看谁。
+     按原先的两倍多开；窄屏靠 vw 收着别挤掉顶上的目标条，手机横屏那种扁画幅
+     再靠 vh 收一道，否则这扇窗要占掉半个屏 */
+  width: min(34vw, 55vh, 520px);
+  border: 8px solid #d8c69c;
+  border-bottom-width: 18px;                 /* 照片的白边下宽 */
   border-radius: 2px;
   background: transparent;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(90, 70, 40, 0.55);
