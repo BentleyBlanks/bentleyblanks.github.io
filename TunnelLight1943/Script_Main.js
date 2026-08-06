@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=030";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=030";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=031";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=031";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=029")
+import("./Script_Audio.js?v=031")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -633,7 +633,10 @@ function SyncHud(state, dt, shotFade) {
   // 仍旧躺在底边——两种东西，两个位置，别混在一条 pill 里。
   // 章节卡/终局那几拍 StepGame 提前 return，state.prompt 是上一幕留下的死值——
   // 徽章现在浮在画面中间，赖着不走就直接盖在章节卡上了
-  const raw = state.phase === "playing" ? (state.prompt || state.climbHint || "") : "";
+  // 翻越的提示排在最前：被一垛柴挡住去路是此刻最要紧的事，
+  // 盖过节拍那句「跟上娘」是对的——手上没按那一下，他哪儿也去不了
+  const raw = state.phase === "playing"
+    ? (state.vaultHint || state.prompt || state.climbHint || "") : "";
   const pr = (!raw || inCinematic) ? null : SplitPrompt(raw);
   const status = pr && !pr.act ? pr : null;
   const fill = Math.max(0, Math.min(1, state.promptFill || 0));

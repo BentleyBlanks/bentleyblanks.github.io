@@ -128,6 +128,9 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
       }
     }
 
+    // 可翻越物挡在去路上：提示一出来就按下去（翻越是主动动作，不再自动触发）
+    if (state.vaultHint) input.interact = true;
+
     StepGame(state, input, DT);
     // 驱动器不做真人级躲藏走位：钳制探测避免无限重置（探测机制单测另行覆盖）
     if (state.detection.level > 0.9) state.detection.level = 0.9;
@@ -275,6 +278,8 @@ function TestStealthEscapable() {
         else if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
         else if (target.level && target.level !== state.player.level) input.climb = target.level === "under" ? 1 : -1;
       }
+      // 挡在路上的可翻越物：屏幕上写着「翻过去」，笨玩家也会照着按
+      if (state.vaultHint) input.interact = true;
       StepGame(state, input, DT);   // 不钳 detection：真失败就让它失败
     }
     assert.notEqual(state.beatIndex, startBeat,
@@ -290,8 +295,8 @@ function TestVaultC1() {
   const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
   const list = ChapterBeatList(0);
   const cases = [
-    { beat: "c1_barrow", from: 42, to: 52, top: 1.24, label: "院门口的柴垛（教学）" },
-    { beat: "c1_cloth", from: 92, to: 102, top: 0.55, label: "田埂（30 秒内复用）" },
+    { beat: "c1_cloth", from: 79, to: 92, top: 1.24, label: "路边的柴垛（教学）" },
+    { beat: "c1_cloth", from: 92, to: 79, top: 1.24, label: "路边的柴垛（回程复用）" },
     { beat: "c1_hide", from: 42, to: 32, top: 1.08, label: "倒塌的柴垛（扫荡压力下）" },
   ];
   for (const c of cases) {
@@ -299,12 +304,19 @@ function TestVaultC1() {
     DebugJump(state, 0, list.findIndex((b) => b.id === c.beat));
     state.player.x = c.from;
     const dir = Math.sign(c.to - c.from);
-    let peakLift = 0, sawPose = false, started = false;
+    let peakLift = 0, sawPose = false, started = false, sawHint = false, blockedX = null;
     const cues = [];
     for (let i = 0; i < 900; i += 1) {
-      StepGame(state, { ...NONE, moveX: dir }, 1 / 60);
+      // 只走路：先确认它真的**挡住**了（走 3 秒都过不去），再按键翻
+      const press = i > 180 && state.vaultHint;
+      if (state.vaultHint) { sawHint = true; if (blockedX === null) blockedX = state.player.x; }
+      StepGame(state, { ...NONE, moveX: dir, interact: !!press }, 1 / 60);
       for (const cue of state.cues) cues.push(cue.name);
       state.cues.length = 0;
+      if (i === 179) {
+        assert.ok(!started, `${c.label}：没按键就翻过去了——翻越必须是玩家主动按的`);
+        assert.ok(sawHint, `${c.label}：走到跟前必须出「翻过去」的提示`);
+      }
       if (state.player.vaultT > 0) {
         started = true;
         peakLift = Math.max(peakLift, state.player.lift || 0);
@@ -312,7 +324,8 @@ function TestVaultC1() {
       }
       if (dir > 0 ? state.player.x >= c.to : state.player.x <= c.to) break;
     }
-    assert.ok(started, `${c.label}：朝它走过去必须起手翻越`);
+    assert.ok(sawHint, `${c.label}：走到跟前必须出「翻过去」的提示`);
+    assert.ok(started, `${c.label}：按下互动键必须起手翻越`);
     assert.ok(sawPose, `${c.label}：翻越过程中必须有翻越姿势`);
     // 抬升峰值取障碍高度的七成上下——人必须真的离地，不能是平移
     assert.ok(peakLift > c.top * 0.6, `${c.label}：抬升峰值 ${peakLift.toFixed(2)} 太低，人没离地`);
@@ -320,40 +333,60 @@ function TestVaultC1() {
     assert.ok(cues.includes("vault") || cues.includes("vaultHeavy"), `${c.label}：缺起手音效`);
     assert.ok(cues.includes("vaultLand"), `${c.label}：缺落地音效`);
     assert.equal(state.player.lift || 0, 0, `${c.label}：翻完必须落回地面`);
+    assert.ok(dir > 0 ? state.player.x >= c.to : state.player.x <= c.to,
+      `${c.label}：翻完必须真的到了另一侧`);
   }
+
+  // 摆位铁律：跑腿路线（院子 31~70：水桶、木料、独轮车都在这一段）上
+  // 一块可翻越物都不许有。玩家的原话是"提着水桶扛着木头的途中居然要翻越"。
+  // 带旗标的不算——倒塌的柴垛只在扫荡开始后才存在，那会儿家务早结束了，
+  // 手里空着；反过来说，**它也必须带着旗标**，否则就压在打水那条路上。
+  {
+    const always = SCENES.village.vaults.filter((v) => !v.flag);
+    const errand = always.filter((v) => v.x > 30 && v.x < 72);
+    assert.equal(errand.length, 0,
+      `跑腿路线上不该有常驻的可翻越物，却有 ${errand.map((v) => v.x).join(",")}`);
+    for (const v of SCENES.village.vaults) {
+      if (v.x > 30 && v.x < 72) {
+        assert.equal(v.flag, "raidStarted", `院子里的可翻越物 ${v.x} 必须只在扫荡后出现`);
+      }
+    }
+  }
+
   // 扛着大件是另一档：更慢、另一套姿势（clamber）
   {
     const state = CreateGame(0);
-    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_barrow"));
-    state.player.x = 42;
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_cloth"));
+    state.player.x = 79;
     state.player.item = { id: "plankA", label: "木料", big: true };
     let heavy = false, dur = 0;
     for (let i = 0; i < 900; i += 1) {
-      StepGame(state, { ...NONE, moveX: 1 }, 1 / 60);
+      StepGame(state, { ...NONE, moveX: 1, interact: !!state.vaultHint }, 1 / 60);
       state.cues.length = 0;
       if (state.player.pose === "clamber") heavy = true;
       if (state.player.vaultT > 0) dur = Math.max(dur, state.player.vaultDur);
-      if (state.player.x >= 52) break;
+      if (state.player.x >= 92) break;
     }
     assert.ok(heavy, "扛着木料翻越必须走 clamber 那一档");
     assert.ok(dur > 0.9, "扛着东西翻越必须更慢");
   }
-  // 推着车不翻：车是从缺口里推过去的，不是被抱过垛顶的
+
+  // 推着车不翻：提示都不该出（车是从旁边推过去的，不是被抱过垛顶的）
   {
     const state = CreateGame(0);
-    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_barrow"));
-    state.cart = { x: 47.4, kind: "barrow" };
-    state.player.x = 45.6;
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_cloth"));
+    state.cart = { x: 84.4, kind: "barrow" };
+    state.player.x = 82.6;
     let vaulted = false;
     for (let i = 0; i < 120; i += 1) {
-      StepGame(state, { ...NONE, moveX: 1 }, 1 / 60);
+      StepGame(state, { ...NONE, moveX: 1, interact: true }, 1 / 60);
       state.cues.length = 0;
       if (state.player.vaultT > 0) vaulted = true;
       state.cart.x = state.player.x + 1.7;
     }
-    assert.ok(!vaulted, "推着独轮车时不该触发翻越");
+    assert.ok(!vaulted, "推着车时不该触发翻越");
   }
-  console.log("  ✓ 翻越：三处可翻越物 / 抬升弧 / 扛大件变奏 / 推车不触发");
+  console.log("  ✓ 翻越：挡路+按键才翻 / 不占跑腿路线 / 抬升弧 / 扛大件变奏 / 推车不触发");
 }
 
 function TestInstrumentalBgmManifest() {
@@ -431,10 +464,13 @@ function TestWorkStations() {
 
 function TestQuieterAudioMix() {
   assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
-  assert.ok(AUDIO_BUS_BASE.amb <= 0.72, "环境声总线必须保持在降低后的基准");
+  // 环境声（风）是从头响到尾的底噪，玩家反馈「太吵」——基准压到 0.34 以下。
+  // 它跟「音效」滑杆共用一个电平，所以只能从基准压：压滑杆会把动作音一起带走
+  assert.ok(AUDIO_BUS_BASE.amb <= 0.34, "环境声总线必须保持在降低后的基准");
+  assert.ok(AUDIO_BUS_BASE.music <= 0.42, "配乐总线必须保持在降低后的基准");
   assert.equal(AUDIO_DEFAULT_LEVELS.sfx, 80, "新玩家的默认音效应为 80%");
-  assert.equal(AUDIO_DEFAULT_LEVELS.voice, 100, "降低音效不应压低旁白");
-  assert.equal(AUDIO_DEFAULT_LEVELS.music, 70, "降低音效不应改变配乐默认值");
+  assert.equal(AUDIO_DEFAULT_LEVELS.voice, 100, "降低背景声不应压低旁白");
+  assert.ok(AUDIO_DEFAULT_LEVELS.music <= 60, "新玩家的默认配乐不应高于 60%");
   console.log("  ✓ 音效与环境声降噪混音契约");
 }
 

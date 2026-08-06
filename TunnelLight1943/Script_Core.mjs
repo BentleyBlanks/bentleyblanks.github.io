@@ -65,9 +65,12 @@ export const SCENES = {
       { id: "doorframe", kind: "doorframe", x: 34, name: "门框" },
       { id: "workbench", kind: "bench", x: 40.5, name: "工作台" },
       { id: "stool", kind: "stool", x: 32, name: "旧木凳" },
-      // 院门口那垛码好的劈柴：教「翻越」的第一课就长在它身上（关卡设计 C1 步3）。
-      // 它是院子的东界，肩高、顶沿磨得发亮还缺了一角——可翻越物的轮廓语法从这垛柴定死
-      { id: "gateStack", kind: "woodStack", x: 47, w: 1.7, h: 1.24, name: "码好的柴垛" },
+      // 路边那垛码好的劈柴：教「翻越」的第一课长在它身上。
+      // **它必须离跑腿路线远远的**——手里提着水桶、肩上扛着木料的时候
+      // 被半路要求翻个墙，是这一版最先被骂的地方。院子（31~70）是干活的地方，
+      // 一块可翻越物都不放；这垛柴挪到去老槐树的路上，那趟路空着手来回。
+      // 肩高、顶沿磨得发亮还缺了一角——可翻越物的轮廓语法从这垛柴定死
+      { id: "roadStack", kind: "woodStack", x: 84, w: 1.7, h: 1.24, name: "码好的柴垛" },
       { id: "cellarMouth", kind: "hatch", x: 27, name: "地窖口" },
       { id: "well", kind: "well", x: 58, name: "水井" },
       { id: "millstone", kind: "millstone", x: 76, name: "磨盘" },
@@ -83,7 +86,7 @@ export const SCENES = {
       { id: "stonesEast", kind: "stonePile", x: 152, name: "石子堆" },
       { id: "hangLantern", kind: "hangLantern", x: 160, name: "巷口的马灯" },
       // 一章的家务道具：独轮车（运木料，兼教「推」）、木料上那只不肯挪窝的母鸡、
-      // 去老槐树半道上的田埂（翻越的复用）、院墙角那枚可选探索的顶针
+      // 去老槐树半道上的田埂（地形，跨得过去，不用翻）、院墙角那枚可选探索的顶针
       { id: "barrow", kind: "barrow", x: 50.5, name: "独轮车" },
       { id: "henProp", kind: "hen", x: 56.4, name: "母鸡", hideFlag: "henFlew" },
       // 娘的活计：屋西头一小片菜畦。柱子跑腿的时候，爹在锯木头、娘在地里——
@@ -96,13 +99,17 @@ export const SCENES = {
       { id: "fallenWood", kind: "fallenWood", x: 38, name: "倒塌的柴垛", showFlag: "raidStarted" },
       { id: "stonesYard", kind: "stonePile", x: 43.5, name: "石子堆", showFlag: "raidStarted" },
     ],
-    // 可翻越物（贴近自动手脚并用翻过去；轮廓语法：肩高、顶沿磨亮/有缺口）。
-    // 一次教学、两次复用：院门口的柴垛教第一次（出屋干活的第一步就撞上它），
-    // 去老槐树路上的田埂 30 秒内换个语境复用，扫荡时倒塌的柴垛在压力下考第三次。
+    // 可翻越物（挡路；贴上去出提示，按互动键才翻——不是走过去就自动翻）。
+    // 轮廓语法：肩高、顶沿磨亮/有缺口。
+    //
+    // **摆位铁律：可翻越物一律不许压在跑腿路线上**。院子那一段（x 31~70）是
+    // 打水、扛木料、推车的地方，手里有东西的时候被要求翻越很别扭——这两处
+    // 都放在空着手走的路上：
+    //   · 路边的柴垛 84：去老槐树找妹妹那一趟（往返都空手），教学与复用同一垛；
+    //   · 倒塌的柴垛 38：扫荡撤退（也是空手），压力下的考场。
     // top 必须与美术画出来的高度对齐——抬升弧是按它算的，写错了人会飞过头顶。
     vaults: [
-      { x: 47, w: 1.7, top: 1.24 },
-      { x: 96, w: 1.6, top: 0.55 },
+      { x: 84, w: 1.7, top: 1.24 },
       { x: 38, w: 1.35, top: 1.08, flag: "raidStarted" },
     ],
     // 掩体链：这条村道是第二章的潜行场地，掩体的疏密就是关卡节奏本身。
@@ -2568,6 +2575,7 @@ export function StartChapter(state, index) {
   state.player.lift = 0;
   state.player.vaultBig = false;
   state.vaultDust = null;
+  state.vaultHint = "";
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -3013,32 +3021,41 @@ function MovePlayer(state, input, dt) {
     p.heading = Math.sign(input.moveX);
   }
 
-  // 可翻越物：挡路，但朝它走过去就自动手脚并用翻过去——无按键交互，
-  // 可读性全靠统一轮廓（肩高、顶沿磨亮/有缺口）。
-  // 三处不触发：过场走位（cineWalk / microCine）、推着车走（车从缺口里过去，
-  // 不是翻过去）、以及人已经站在障碍里（调试跳幕会这样落点）。
+  // 可翻越物：**挡路**。走到跟前顶住，头顶出一枚「翻过去」的徽章，
+  // 按下互动键才翻——自动翻越是上一版的做法，玩家的原话是"居然是自动翻越"：
+  // 一个会打断走路的动作必须由玩家自己按下去，否则那就不是他的动作。
+  // 过场走位（cineWalk / microCine）与推着车走不参与。
+  state.vaultHint = "";
   const pushingCart = !!state.cart && Math.abs(p.x - state.cart.x) < 2.6;
-  const moved = p.x - prevX;
-  if (p.level === "surface" && !state.microCine && !p.cineWalk && !pushingCart
-    && Math.abs(moved) > 1e-4) {
-    const dir = Math.sign(moved);
+  if (p.level === "surface" && !state.microCine && !p.cineWalk && !pushingCart) {
     for (const v of scene.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
-      const half = (v.w || 1) / 2;
-      // 触发线是近侧那一面：只有朝它走、并且这一帧刚够着，才起手
-      const face = v.x - dir * half;
-      if ((prevX - face) * (p.x - face) > 0) continue;
-      const big = !!(p.item?.big || p.carry);
-      p.vaultDur = big ? VAULT_DUR_BIG : VAULT_DUR;
-      p.vaultFrom = p.x;                                   // 从脚下起手，不往回弹
-      p.vaultTo = v.x + dir * (half + 0.52);
-      p.vaultTop = v.top ?? 1.2;
-      p.vaultBig = big;
-      p.vaultT = p.vaultDur;
-      p.vaultK = 0;
-      p.vaultLanded = false;
-      p.heading = dir;
-      Cue(state, big ? "vaultHeavy" : "vault");
+      const stop = (v.w || 1) / 2 + 0.2;                   // 顶住的位置：贴着近侧那一面
+      const d = p.x - v.x;
+      if (Math.abs(d) > stop + 0.55) continue;             // 还没走到跟前
+      // 站在哪一侧：贴住之后 d 就不会再是 0，起步那一帧用上一帧的位置兜底
+      const side = Math.sign(d) || Math.sign(prevX - v.x) || -(p.heading || 1);
+      if (Math.abs(d) < stop) p.x = v.x + side * stop;     // 挡住，过不去
+      // 提示只在**朝着它**的时候出。刚翻下来背对着它的那一秒也在范围内，
+      // 那会儿再出一次提示，按键玩家会当场原路翻回去——来回弹个没完
+      if (p.heading !== -side) break;
+      state.vaultHint = "E · 翻过去";
+      if (input.interact) {
+        input.interact = false;                            // 吃掉这一下，别再被节拍拿去用
+        const dir = -side;                                 // 往障碍的另一侧翻
+        const big = !!(p.item?.big || p.carry);
+        p.vaultDur = big ? VAULT_DUR_BIG : VAULT_DUR;
+        p.vaultFrom = p.x;                                 // 从脚下起手，不往回弹
+        p.vaultTo = v.x + dir * ((v.w || 1) / 2 + 0.52);
+        p.vaultTop = v.top ?? 1.2;
+        p.vaultBig = big;
+        p.vaultT = p.vaultDur;
+        p.vaultK = 0;
+        p.vaultLanded = false;
+        p.heading = dir;
+        state.vaultHint = "";
+        Cue(state, big ? "vaultHeavy" : "vault");
+      }
       break;
     }
   }
