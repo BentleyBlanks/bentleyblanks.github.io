@@ -2604,20 +2604,99 @@ export function CreateWorld(canvasEl) {
   let insertMesh = null;
   let insertCardName = null, insertCardT = 0;
 
-  function SetInsertCard(name) {
-    if (!name) {
+  // 序章的插卡改成了即梦生成的过场短片（Video/Pro_NN.mp4，一行旁白一段）。
+  // 手绘卡没删——片子还没缓冲好就先顶上去，画面永远不会空一拍。
+  const insertVideos = new Map();
+  let insertVideoList = [];
+  let insertVideoName = null;
+  let insertVideoLive = false;      // 本段片子出过第一帧没有（出过就不再退回手绘卡）
+  let insertIsVideo = false;
+
+  function GetInsertVideo(name) {
+    let v = insertVideos.get(name);
+    if (v) return v;
+    const el = document.createElement("video");
+    el.src = new URL(`./Video/${name}.mp4`, import.meta.url).href;
+    // 静音是浏览器允许自动播放的前提；这些片子烘的时候本来也去掉了音轨
+    el.muted = true;
+    el.defaultMuted = true;
+    el.playsInline = true;
+    el.preload = "auto";
+    const tex = new THREE.VideoTexture(el);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;   // 视频贴图不能开 mipmap
+    tex.generateMipmaps = false;
+    v = { el, tex };
+    insertVideos.set(name, v);
+    return v;
+  }
+
+  // 片单只用来做"下一段提前拉"，切镜时才不会黑一下
+  function SetInsertVideoList(names) {
+    insertVideoList = names || [];
+    if (insertVideoList.length) GetInsertVideo(insertVideoList[0]);
+  }
+
+  // name=手绘卡名（兜底），video=片名，lineT=这一行已经走了多久
+  function SetInsertCard(name, video, lineT) {
+    if (!name && !video) {
       if (insertMesh) insertMesh.visible = false;
+      if (insertVideoName) { insertVideos.get(insertVideoName)?.el.pause(); insertVideoName = null; }
       insertCardName = null;
+      insertVideoLive = false;
+      insertIsVideo = false;
       return;
     }
     // 定格画片的慢推（Ken Burns）：换一张卡从头推，同一张卡持续累积
     if (name !== insertCardName) { insertCardName = name; insertCardT = 0; }
     else insertCardT += 1 / 60;
-    if (!insertCards.has(name)) {
-      const W = 1280, H = 720;
-      const canvas = MakeCanvas(W, H);
-      ART.DrawInsertCard(canvas.getContext("2d"), W, H, name);
-      insertCards.set(name, CanvasTexture(canvas));
+
+    let tex = null;
+    insertIsVideo = false;
+    if (video) {
+      const v = GetInsertVideo(video);
+      if (video !== insertVideoName) {
+        if (insertVideoName) insertVideos.get(insertVideoName)?.el.pause();
+        insertVideoName = video;
+        insertVideoLive = false;
+        try { v.el.currentTime = 0; } catch { /* 还没 metadata，等就绪后由对时补上 */ }
+        v.el.play().catch(() => { /* 自动播放被拦就一直用手绘卡 */ });
+        const i = insertVideoList.indexOf(video);
+        if (i >= 0 && i + 1 < insertVideoList.length) GetInsertVideo(insertVideoList[i + 1]);
+      }
+      const el = v.el;
+      // 出过第一帧就认了，之后不再回退到手绘卡：seek 会把 readyState 打回 1，
+      // 那时候切回卡片就是card/视频来回闪——贴图里存着的仍是最后一帧，稳得很。
+      if (!insertVideoLive && el.readyState >= 2) insertVideoLive = true;
+      if (insertVideoLive) {
+        // 对时只管真跑偏（暂停、切后台、?fast=1 快进）。起播本来就比旁白慢小半秒，
+        // 死区给窄了就会每帧 seek 一次，每次 seek 都是一下卡顿。
+        const want = Math.min(lineT || 0, Math.max(0, (el.duration || 0) - 0.05));
+        if (!el.seeking && Number.isFinite(want) && Math.abs(el.currentTime - want) > 1.0) el.currentTime = want;
+        if (el.paused && !el.seeking) el.play().catch(() => {});
+        // three 的 VideoTexture 靠 video.requestVideoFrameCallback 置 needsUpdate，
+        // 而它和 rAF 一样，页面不可见时根本不触发 —— 贴图于是一次都没上传过。
+        // 本项目的画面验证（DebugShot / ShotTest / cine-audit）全是在这个状态下
+        // 手动驱动渲染的，不补这一下，序章截出来永远是兜底手绘卡，还看不出错在哪。
+        // 只在 hidden 时补：正常游玩仍走 rVFC，不做多余的每帧上传。
+        if (document.hidden) v.tex.needsUpdate = true;
+        tex = v.tex;
+        insertIsVideo = true;
+      }
+    } else if (insertVideoName) {
+      insertVideos.get(insertVideoName)?.el.pause();
+      insertVideoName = null;
+    }
+
+    if (!tex) {
+      if (!name) { if (insertMesh) insertMesh.visible = false; return; }
+      if (!insertCards.has(name)) {
+        const W = 1280, H = 720;
+        const canvas = MakeCanvas(W, H);
+        ART.DrawInsertCard(canvas.getContext("2d"), W, H, name);
+        insertCards.set(name, CanvasTexture(canvas));
+      }
+      tex = insertCards.get(name);
     }
     if (!insertMesh) {
       insertMesh = new THREE.Mesh(
@@ -2627,7 +2706,7 @@ export function CreateWorld(canvasEl) {
       insertMesh.renderOrder = ORDER_INSERT;
       scene.add(insertMesh);
     }
-    insertMesh.material.map = insertCards.get(name);
+    insertMesh.material.map = tex;
     insertMesh.material.needsUpdate = true;
     insertMesh.visible = true;
   }
@@ -2639,8 +2718,9 @@ export function CreateWorld(canvasEl) {
     // 按画框比例铺满：宽高取大者，保证不露边
     const cw = viewW * k, chh = viewH * k;
     const aspect = 1280 / 720;
-    // 慢推：十秒推 6%——定格画片不是幻灯片，镜头永远在呼吸
-    const kb = 1.015 + Math.min(0.06, insertCardT * 0.006);
+    // 慢推：十秒推 6%——定格画片不是幻灯片，镜头永远在呼吸。
+    // 但片子自己已经在推/横移了，再叠一层就是两个镜头打架，只留一点点安全溢出。
+    const kb = insertIsVideo ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
     const w = Math.max(cw, chh * aspect) * kb;
     insertMesh.scale.set(w, w / aspect, 1);
     insertMesh.position.set(camX, camY, z);
@@ -2743,7 +2823,16 @@ export function CreateWorld(canvasEl) {
   return {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
-    SetOverShoulder, SetInsertCard, ApplyCamera, Resize, Render,
+    SetOverShoulder, SetInsertCard, SetInsertVideoList, ApplyCamera, Resize, Render,
+    // 过场短片在放没放，截图上看不出来（兜底手绘卡长得也像回事）——只能问它
+    __insertVideo() {
+      if (!insertVideoName) return null;
+      const el = insertVideos.get(insertVideoName)?.el;
+      return {
+        name: insertVideoName, live: insertIsVideo, readyState: el?.readyState ?? -1,
+        paused: el?.paused ?? true, t: +(el?.currentTime ?? 0).toFixed(2), d: el?.duration || 0,
+      };
+    },
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),

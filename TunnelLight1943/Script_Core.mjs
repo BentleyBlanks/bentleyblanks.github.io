@@ -721,20 +721,20 @@ export const SCRIPTS = {
       // 每段一幅专画的卡（渲染层做慢推的 Ken Burns，定格画片才不像幻灯片）。
       kind: "cinematic", id: "c1_prologue", prologue: true,
       lines: [
-        { stage: "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。", d: 4.6, cam: { kind: "insertCard", card: "pro1" } },
-        { stage: "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。", d: 4.4, cam: { kind: "insertCard", card: "pro2" } },
-        { stage: "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。", d: 4.6, cam: { kind: "insertCard", card: "pro3" } },
-        { stage: "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。", d: 4.8, cam: { kind: "insertCard", card: "pro4" } },
-        { stage: "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。", d: 5.4, cam: { kind: "insertCard", card: "pro5" } },
-        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertCard", card: "pro6" } },
-        { stage: "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。", d: 6.0, cam: { kind: "insertCard", card: "pro7" } },
-        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertCard", card: "pro8" } },
-        { stage: "这个故事，发生在冀中一个普通的村庄。", d: 5.2, cam: { kind: "insertCard", card: "pro9" } },
-        { stage: "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。", d: 7.6, cam: { kind: "insertCard", card: "pro10" } },
-        { stage: "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。", d: 7.8, cam: { kind: "insertCard", card: "pro11" } },
-        { stage: "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。", d: 8.2, cam: { kind: "insertCard", card: "pro12" } },
-        { stage: "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。", d: 7.0, cam: { kind: "insertCard", card: "pro13" } },
-        { stage: "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。", d: 8.0, cam: { kind: "insertCard", card: "pro14" } },
+        { stage: "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
+        { stage: "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。", d: 4.4, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro2" } },
+        { stage: "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
+        { stage: "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。", d: 4.8, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
+        { stage: "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。", d: 5.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
+        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro6" } },
+        { stage: "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro7" } },
+        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro8" } },
+        { stage: "这个故事，发生在冀中一个普通的村庄。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro9" } },
+        { stage: "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。", d: 7.6, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro10" } },
+        { stage: "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。", d: 7.8, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro11" } },
+        { stage: "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。", d: 8.2, cam: { kind: "insertVideo", clip: "Pro_12", card: "pro12" } },
+        { stage: "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。", d: 7.0, cam: { kind: "insertVideo", clip: "Pro_13", card: "pro13" } },
+        { stage: "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。", d: 8.0, cam: { kind: "insertVideo", clip: "Pro_14", card: "pro14" } },
         { stage: "这天早上，梁木匠把儿子叫到了门框跟前。", d: 4.0, cam: { kind: "wide", x: 42 } },
       ],
     },
@@ -2087,6 +2087,13 @@ export const SCRIPTS = {
     },
   ],
 };
+
+// 序章过场短片的片单，顺序就是播放顺序——渲染层拿它做"下一段提前拉"。
+// 从脚本里读而不是另抄一份：改了哪一行的 clip，这里自动跟着变。
+export const PROLOGUE_CLIPS = SCRIPTS.c1
+  .find((b) => b.id === "c1_prologue")
+  .lines.map((l) => l.cam?.clip)
+  .filter(Boolean);
 
 // ---------------------------------------------------------------------------
 // 角色与事件生成

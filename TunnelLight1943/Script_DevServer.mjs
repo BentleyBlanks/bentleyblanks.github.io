@@ -17,6 +17,8 @@ const MIME = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
 };
 
 export function ServeRoot(rootDir, port = 0) {

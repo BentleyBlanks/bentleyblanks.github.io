@@ -3,13 +3,15 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint,
-  ChapterBeatList, DebugJump, SkipPrologue,
+  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
+// 序章过场短片：登记片单，开局先把第一段拉下来，正片一开口就有画面
+world.SetInsertVideoList(PROLOGUE_CLIPS);
 // 声音是增强项，不是依赖：合成器加载失败（旧浏览器、被拦的 WebAudio、
 // 资源没部署上去）时游戏必须照常能玩，所以走动态 import + 静音替身。
 const SILENT = {
@@ -326,6 +328,9 @@ function HintShot(state, hint) {
     case "insertCard":
       // 专画的一张细节插画铺满画框；机位停在原地不动
       return { ...BaseShot(state), card: hint.card };
+    case "insertVideo":
+      // 序章：一行旁白一段过场短片铺满画框。card 是兜底——片子没缓冲好就先上手绘卡
+      return { ...BaseShot(state), card: hint.card, video: hint.clip };
     case "close": {
       const t = ActorAt(state, hint.on || "player") || { x: state.player.x, level: state.player.level };
       return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: hint.dist ?? 4.2 };
@@ -378,7 +383,7 @@ function UpdateCamera(state, dt) {
       hw: framing.baseHw * (1 - 0.10 * framing.prog),
     };
     world.SetOverShoulder(state, shot.ots || null);
-    world.SetInsertCard(shot.card || null);
+    world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
@@ -386,7 +391,7 @@ function UpdateCamera(state, dt) {
     shot = def?.cam ? HintShot(state, def.cam) : BaseShot(state);
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
-    world.SetInsertCard(null);
+    world.SetInsertCard(null, null, 0);
   }
 
   if (camSnap) {
