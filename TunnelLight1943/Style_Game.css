@@ -76,6 +76,101 @@ body {
 #itemTag small { font-size: 11px; color: #a89878; letter-spacing: 0.12em; }
 #itemTag b { font-size: 14.5px; letter-spacing: 0.05em; }
 
+/* 交互徽章：勇敢的心式——按钮画出来，动词写一个词，两样都浮在人头顶上。
+   键名不进文案（手机上没有键盘），徽章的脸随输入设备换：键帽 / 触屏线描图标。 */
+#actPrompt {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  pointer-events: none;
+}
+#actPrompt .pKey {
+  position: relative; width: 36px; height: 36px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: rgba(12, 9, 6, 0.72);
+  box-shadow: inset 0 0 0 2px rgba(240, 222, 180, 0.88), 0 3px 12px rgba(0, 0, 0, 0.55);
+  color: #f6e6bc; font-size: 17px; font-weight: 600; line-height: 1;
+}
+#actPrompt .pKey svg {
+  width: 21px; height: 21px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+#actPrompt .pKey svg circle.solid { fill: currentColor; stroke: none; }
+/* 招手的一圈涟漪：把眼睛引过去，但不动徽章本身——缩放静止的字会糊 */
+#actPrompt .pKey::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid rgba(242, 207, 114, 0.7);
+  animation: actPing 2.1s ease-out infinite;
+}
+@keyframes actPing {
+  0% { transform: scale(1); opacity: 0.7; }
+  70%, 100% { transform: scale(1.75); opacity: 0; }
+}
+/* 长按：徽章外面套一圈进度环。百分比不写成字——环走到头就是走到头 */
+#actPrompt.hold .pKey::before { animation: none; opacity: 0; }
+#actPrompt.hold .pKey::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(#f2cf72 calc(var(--fill) * 1%), rgba(240, 222, 180, 0.18) 0);
+  -webkit-mask: radial-gradient(circle, transparent 0 62%, #000 64%);
+  mask: radial-gradient(circle, transparent 0 62%, #000 64%);
+}
+#actPrompt .pVerb {
+  font-size: 13.5px; font-weight: 500; letter-spacing: 0.1em;
+  color: #f4e4bd; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.98), 0 0 7px rgba(0, 0, 0, 0.75);
+}
+
+/* 手里那格上的投掷键：同一枚徽章，缩小一号 */
+#itemTag .pKey {
+  position: relative; width: 22px; height: 22px;
+  display: inline-grid; place-items: center; border-radius: 50%;
+  background: rgba(12, 9, 6, 0.6); box-shadow: inset 0 0 0 1.5px rgba(240, 222, 180, 0.75);
+  color: #f6e6bc; font-size: 11.5px; font-weight: 600; line-height: 1;
+}
+#itemTag .pKey svg {
+  width: 14px; height: 14px; fill: none; stroke: currentColor;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+#itemTag .pKey svg circle.solid { fill: currentColor; stroke: none; }
+
+/* 后果小窗（勇敢的心式画中画）：一张压在角落的老照片。画面本体是 WebGL 在
+   同一块画布上的剪裁区，从相框中间透出来——所以框只能用 border 画，
+   背景必须是透的；#pipView 的矩形每帧量给渲染层对剪裁区。
+   注意不能用 transform 做出场（旋转/缩放会让 DOM 相框和 GL 剪裁区对不上），
+   出场就靠一记快门白闪 + 边框浮现。 */
+#pipFrame {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  width: min(24vw, 236px);
+  border: 6px solid #d8c69c;
+  border-bottom-width: 13px;                 /* 照片的白边下宽 */
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(90, 70, 40, 0.55);
+  pointer-events: none;
+  z-index: 24;
+}
+#pipView {
+  display: block; width: 100%; aspect-ratio: 16 / 10;
+  position: relative;
+}
+/* 照片感：一圈压角的暗晕 + 很淡的暖色罩（盖在 GL 上面） */
+#pipView::after {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(214, 176, 96, 0.07);
+  box-shadow: inset 0 0 22px rgba(10, 6, 2, 0.72);
+}
+/* 快门白闪：小窗弹出那一下"拍了张照" */
+#pipView::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: #f4ecd8; opacity: 0;
+}
+#pipFrame.show #pipView::before { animation: pipFlash 0.45s ease-out; }
+@keyframes pipFlash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
 /* 交互提示 */
 #prompt {
   position: absolute; left: 0; right: 0; bottom: 15%;
@@ -120,9 +215,12 @@ body {
 #cineBars .barBottom { bottom: 0; }
 #cineBars.active .barTop, #cineBars.active .barBottom { height: 11.5vh; }
 
-/* 序章跳过键：压在下黑边上，右下角一枚安静的字钮——看得见、不抢戏 */
+/* 序章跳过键：压在**上**黑边上，左上角一枚安静的字钮——看得见、不抢戏。
+   原先在右下角，手机上正压着右侧那排触屏钮（互动/蹲/投掷）——两层东西叠在
+   同一块拇指落点上。左上是全屏唯一没人占的角：目标条居中、手里那格在左下、
+   设置在右上、触屏操作全在下半屏。 */
 #btnSkipCine {
-  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 3.2vh;
+  position: absolute; left: max(16px, env(safe-area-inset-left)); top: max(3.2vh, env(safe-area-inset-top));
   z-index: 30; pointer-events: auto;
   padding: 7px 14px; border: 1px solid rgba(232, 217, 184, 0.34); border-radius: 4px;
   background: rgba(10, 8, 6, 0.55); color: rgba(232, 217, 184, 0.82);

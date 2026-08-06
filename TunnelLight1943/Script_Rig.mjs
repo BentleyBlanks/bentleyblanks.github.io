@@ -258,6 +258,32 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
+  // 拉锯（循环）：木匠的常态活。推出去那一下吃力（躯干跟着送），回拉轻快；
+  // 后手搭在料上不动。锯（DrawCarry「锯」）挂在前手上、随前臂转——
+  // 手臂一伸一屈，锯就一进一出。
+  sawing: {
+    dur: 1.5, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12, armB: -46, foreB: -22, thighB: -22, shinB: 28, footB: -6, thighF: 14, shinF: 8, footF: -8 },
+      { t: 0.42, hipY: -0.06, hipX: 0.00, torso: 17, head: -18, armF: -86, foreF: -46 },   // 回拉：肘折回来
+      { t: 0.78, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },   // 再推
+      { t: 1.14, hipY: -0.06, hipX: 0.01, torso: 18, head: -18, armF: -84, foreF: -44 },
+      { t: 1.5, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },
+    ],
+  },
+  // 锄地（循环）：扬起来慢、落下去快，落了还要往回带一下松土。
+  // 双手都在把上（前后臂同相位），锄（DrawCarry「锄头」）随前臂转——
+  // 扬过肩、砸进土、拖回来，一整套都在手上。
+  hoeing: {
+    dur: 2.3, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36, thighB: -16, shinB: 20, footB: -6, thighF: 10, shinF: 6, footF: -8 },
+      { t: 0.45, hipY: -0.22, hipX: 0.12, torso: 44, head: -26, armF: -46, foreF: -10, armB: -38, foreB: -14 },  // 落锄：全程最快的一下
+      { t: 0.9, hipY: -0.18, hipX: 0.08, torso: 38, head: -22, armF: -56, foreF: -24, armB: -46, foreB: -26 },   // 往回带，松土
+      { t: 1.55, hipY: -0.07, hipX: 0.00, torso: 8, head: -12, armF: -94, foreF: -28, armB: -82, foreB: -32 },   // 慢慢扬起来
+      { t: 2.3, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36 },
+    ],
+  },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
   struckFall: {
     dur: 3.4, loop: false,
@@ -434,14 +460,46 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-82 - ca * 26) * DEG; target.foreB = (-36 - cb * 20) * DEG;
     target.thighB = -18 * DEG; target.shinB = 20 * DEG; target.footB = -6 * DEG;
     target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
-  } else if (s.pose === "vault") {
-    // 翻越：双手撑在顶沿上，身子折过去，腿收起来荡过——手脚并用的那一下
-    target.hipY = -0.02; target.hipX = 0.18;
-    target.torso = 40 * DEG; target.head = -18 * DEG;
-    target.armF = -96 * DEG; target.foreF = 8 * DEG;
-    target.armB = -88 * DEG; target.foreB = 6 * DEG;
-    target.thighB = -84 * DEG; target.shinB = 92 * DEG; target.footB = 12 * DEG;
-    target.thighF = -58 * DEG; target.shinF = 66 * DEG; target.footF = 8 * DEG;
+  } else if (s.pose === "vault" || s.pose === "clamber") {
+    // 翻越：三段——① 手够上顶沿、后腿蹬地；② 撑起来把腿收到胸前荡过去；
+    // ③ 脚先落地、屈膝卸力。姿势按 poseK（Core 给的动作进度）在关键帧之间插，
+    // 而不是从头到尾摆一个造型平移过去——那就是"没做动画"的样子。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.5));
+    const heavy = s.pose === "clamber";
+    // ① 起手：够顶沿
+    const A = {
+      hipY: -0.10, hipX: 0.12, torso: 46, head: -26,
+      armF: -128, foreF: -14, armB: -34, foreB: -20,
+      thighB: -38, shinB: 44, footB: -10, thighF: 10, shinF: 18, footF: -12,
+    };
+    // ② 顶点：两臂笔直撑住，膝盖收到胸口——整个人骑在顶沿上方
+    const B = {
+      hipY: 0.06, hipX: 0.20, torso: 54, head: -30,
+      armF: -74, foreF: 10, armB: -62, foreB: 8,
+      thighB: -104, shinB: 112, footB: 16, thighF: -86, shinF: 98, footF: 14,
+    };
+    // ③ 落地：腿先伸出去接地，上身还压着，胳膊甩到后面找平衡
+    const C = {
+      hipY: -0.22, hipX: 0.06, torso: 30, head: -14,
+      armF: -30, foreF: -26, armB: 26, foreB: -18,
+      thighB: -18, shinB: 34, footB: -6, thighF: -46, shinF: 40, footF: -16,
+    };
+    // 扛着东西那一档：一只手始终拎着，撑不成两手，所以身子更低、更慢
+    if (heavy) {
+      B.armF = -22; B.foreF = -34; B.torso = 62; B.hipY = -0.04;
+      C.armF = -18; C.foreF = -30;
+    }
+    const mid = heavy ? 0.48 : 0.42;
+    let from = A, to = B, u = k / mid;
+    if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
+    u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
+    for (const key of Object.keys(A)) {
+      const v = from[key] + (to[key] - from[key]) * u;
+      target[key] = (key === "hipY" || key === "hipX") ? v : v * DEG;
+    }
+    // 翻越是硬动作，混合给到最快——0.8 秒的戏被平滑掉就成了慢动作
+    ApplyPose(rig, t, target, Math.min(1, (dt || 0.016) * 30));
+    return;
   } else if (s.pose === "puzzled") {
     // 哑剧的「不太懂」：微微后仰、仰着头，手垂着——配头顶的「？」气泡
     target.hipY = -0.02; target.hipX = -0.02;
@@ -623,6 +681,13 @@ export function HandPoint(rig) {
   const v = new THREE.Vector3(0, -BONE.foreArm, 0);
   j.foreFront.updateWorldMatrix(true, false);
   return v.applyMatrix4(j.foreFront.matrixWorld);
+}
+
+/** 肘点的世界坐标：手里的长家伙（锯/锄头）要顺着前臂的方向摆 */
+export function ElbowPoint(rig) {
+  const j = rig.joints;
+  j.foreFront.updateWorldMatrix(true, false);
+  return new THREE.Vector3(0, 0, 0).applyMatrix4(j.foreFront.matrixWorld);
 }
 
 /** 肩点的世界坐标：扛的东西搁在这儿 */

@@ -16,6 +16,8 @@
 // 可选 CreateAudio({ context }) 注入自带的 AudioContext —— 只给离线测试用，
 // 注入时不起 setInterval，排程完全由 Update() 驱动。
 
+import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs?v=026";
+
 const FADE = 2.5;          // mood 交叉淡入淡出时长（秒）
 const LOOKAHEAD = 0.4;     // 排程视野：足够盖住一次 tick，又不至于让 mood 切换迟钝
 const TICK_MS = 100;
@@ -63,6 +65,7 @@ function MakeSilent() {
     Unlock() {}, SetEnabled() {}, IsEnabled() { return false; },
     SetMasterVolume() {}, SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
     SetMood() {}, SetBgm() {}, StopBgm() {}, GetBgmState() { return null; }, Sfx() {}, Duck() {},
+    LoadSfxPack() {}, SfxPackSize() { return 0; },
     PlayVoice() { return Promise.resolve(false); }, StopVoice() {},
     Update() {}, Dispose() {},
   };
@@ -161,11 +164,11 @@ function Build(ac, options) {
   synthBus.connect(musicBus);
 
   const ambBus = ac.createGain();
-  ambBus.gain.value = 0.9;
+  ambBus.gain.value = 0.72;
   ambBus.connect(duck);
 
   const sfxBus = ac.createGain();
-  sfxBus.gain.value = 0.9;
+  sfxBus.gain.value = 0.68;
   sfxBus.connect(master);
 
   const voiceBus = ac.createGain();
@@ -175,7 +178,9 @@ function Build(ac, options) {
   // 分路音量：设置面板要能单独调旁白 / 音效 / 配乐。
   // 各路有各自的基准值（混音时定好的相对关系），面板给的是 0..1 的倍率，
   // 两者相乘——这样调音量不会把混音比例弄乱。环境音跟着音效走。
-  const BUS_BASE = { music: 0.55, amb: 0.9, sfx: 0.9, voice: 1 };
+  // 音效整体收低：用户已经存过 100% 时也必须真正变安静，不能只改新用户默认值。
+  // 环境声略高于动作音效，保留风、土和滴水的空间感，但都不再抢旁白。
+  const BUS_BASE = AUDIO_BUS_BASE;
   const busNode = { music: musicBus, amb: ambBus, sfx: sfxBus, voice: voiceBus };
   const busLevel = { music: 1, sfx: 1, voice: 1 };
   function ApplyBus(name) {
@@ -342,6 +347,51 @@ function Build(ac, options) {
     if (p) { tail.connect(p); p.connect(dest); return [p]; }
     tail.connect(dest);
     return [];
+  }
+
+  // -------------------------------------------------------------------------
+  // 采样音效层（第一章的动作音由本机 MiniMax 烘出来，见 Script_SfxBake.mjs）
+  //
+  // 合成器那一套一个都不删：采样是**盖在**它上面的一层。清单拉不到、解码失败、
+  // 或者某个 cue 还没烘出来，Sfx() 自动落回合成——离线、单测、老浏览器全都还有声。
+  // -------------------------------------------------------------------------
+  const samples = new Map();          // cue 名 → AudioBuffer
+
+  function LoadSamples(baseUrl) {
+    if (offline || typeof fetch !== "function" || !baseUrl) return;
+    const base = String(baseUrl).replace(/\/?$/, "/");
+    fetch(base + "Data_SfxManifest.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((manifest) => {
+        if (!manifest?.cues) return;
+        const jobs = Object.keys(manifest.cues).map((cue) => fetch(base + manifest.cues[cue].file)
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("404"))))
+          // decodeAudioData 的 Promise 形式在 Safari 上要老回调签名兜一下
+          .then((buf) => new Promise((res, rej) => {
+            const ok = ac.decodeAudioData(buf, res, rej);
+            if (ok && typeof ok.then === "function") ok.then(res, rej);
+          }))
+          .then((audioBuffer) => { if (!disposed) samples.set(cue, audioBuffer); })
+          .catch(() => { /* 缺一个就少一个，退回合成 */ }));
+        return Promise.all(jobs);
+      })
+      .catch(() => { /* 整包拉不到就整包用合成 */ });
+  }
+
+  /** 放一发采样。同一个音连着触发时轻微变速变调，免得听出"贴图"感 */
+  function PlaySample(name, t, k, pan, r) {
+    const buffer = samples.get(name);
+    if (!buffer || Full()) return false;
+    const s = ac.createBufferSource();
+    s.buffer = buffer;
+    s.playbackRate.value = Clamp(r * (0.96 + Math.random() * 0.08), 0.25, 4);
+    const g = ac.createGain();
+    g.gain.value = Clamp(k, 0, 4) * 0.9;
+    s.connect(g);
+    const tail = Out(g, sfxBus, pan);
+    s.start(t);
+    Spawn([s, g, ...tail], [s], t + buffer.duration / s.playbackRate.value + 0.05);
+    return true;
   }
 
   // -------------------------------------------------------------------------
@@ -861,11 +911,48 @@ function Build(ac, options) {
     whoosh(t, k, pan) {
       NoiseHit(t, { level: 0.07 * k, attack: 0.015, decay: 0.16, freq: 1300, sweep: 2800, q: 0.8, pan });
     },
-    // 翻越：手脚蹬墙的蹭土 + 落地一记
+    // 翻越起手：两只手掌拍在柴垛顶沿上，柴棍互相一错——落地是另一条 cue，
+    // 因为脚落地比动作结束早，声音得跟着脚走
     vault(t, k, pan) {
-      NoiseHit(t, { level: 0.07 * k, attack: 0.006, decay: 0.12, freq: 1100, sweep: 420, q: 0.9, pan });
-      NoiseHit(t + 0.3, { level: 0.05 * k, attack: 0.004, decay: 0.08, freq: 1600, sweep: 500, q: 1, pan });
-      Tone(t + 0.5, { level: 0.08 * k, attack: 0.003, decay: 0.1, type: "sine", freq: 110, to: 70, pan });
+      NoiseHit(t, { level: 0.10 * k, attack: 0.002, decay: 0.07, freq: 620, q: 2.2, pan });
+      NoiseHit(t + 0.02, { level: 0.055 * k, attack: 0.002, decay: 0.05, freq: 2100, q: 1.4, pan });
+      // 柴棍错动：三四粒木头互相磕
+      for (let i = 0; i < 4; i += 1) {
+        NoiseHit(t + 0.05 + Rand(0, 0.22), { level: Rand(0.018, 0.038) * k, attack: 0.001, decay: Rand(0.02, 0.05), freq: Rand(900, 2600), q: 3, pan: Clamp(pan + Rand(-0.15, 0.15), -1, 1) });
+      }
+      NoiseHit(t + 0.18, { level: 0.045 * k, attack: 0.02, decay: 0.16, freq: 1400, sweep: 600, q: 0.9, pan });
+    },
+    // 扛着东西翻：先把东西撂上顶沿（一记闷响），再翻
+    vaultHeavy(t, k, pan) {
+      NoiseHit(t, { level: 0.09 * k, attack: 0.002, decay: 0.11, freq: 380, q: 2.6, pan });
+      Tone(t, { level: 0.06 * k, attack: 0.003, decay: 0.14, type: "triangle", freq: 150, to: 92, pan });
+      SFX.vault(t + 0.22, k * 0.9, pan);
+    },
+    // 落地：脚掌拍在干土上，一点碎土跟着落
+    vaultLand(t, k, pan) {
+      NoiseHit(t, { level: 0.085 * k, attack: 0.002, decay: 0.09, freq: 520, sweep: 200, q: 1.2, brown: true, pan });
+      Tone(t, { level: 0.07 * k, attack: 0.003, decay: 0.10, type: "sine", freq: 104, to: 62, pan });
+      for (let i = 0; i < 3; i += 1) {
+        NoiseHit(t + 0.06 + Rand(0, 0.18), { level: Rand(0.008, 0.02) * k, attack: 0.002, decay: 0.03, freq: Rand(1600, 3600), q: 3, pan });
+      }
+    },
+    // 石子落地：一记小而干的磕碰，再滚两下停住。声音引敌那条规则就靠它被听见
+    stoneLand(t, k, pan) {
+      NoiseHit(t, { level: 0.075 * k, attack: 0.001, decay: 0.045, freq: 1500, q: 3.2, pan });
+      Tone(t, { level: 0.03 * k, attack: 0.002, decay: 0.06, type: "triangle", freq: 380, to: 210, pan });
+      for (let i = 0; i < 2; i += 1) {
+        NoiseHit(t + 0.08 + i * 0.07, { level: (0.028 - i * 0.01) * k, attack: 0.001, decay: 0.03, freq: Rand(1800, 3000), q: 3, pan });
+      }
+    },
+    // 辘轳：木轴在木架里叫的一声，带一点绳子过木头的摩擦
+    crank(t, k, pan, r) {
+      Tone(t, { level: 0.045 * k, attack: 0.05, decay: 0.30, type: "sawtooth", freq: 210 * r, to: 168 * r, pan });
+      NoiseHit(t + 0.02, { level: 0.03 * k, attack: 0.06, decay: 0.26, freq: 900, sweep: 520, q: 2.6, pan });
+    },
+    // 石笔划木头：一段砂砂的蹭，不是"叮"一声
+    scribe(t, k, pan) {
+      NoiseHit(t, { level: 0.05 * k, attack: 0.05, decay: 0.42, freq: 2400, sweep: 1500, q: 1.1, pan });
+      NoiseHit(t + 0.06, { level: 0.022 * k, attack: 0.08, decay: 0.34, freq: 1100, q: 1.8, brown: true, pan });
     },
     // 点灯：火柴擦一下，然后油捻子起来
     lampOn(t, k, pan) {
@@ -1271,17 +1358,24 @@ function Build(ac, options) {
       };
     },
 
+    LoadSfxPack(baseUrl) { try { LoadSamples(baseUrl); } catch (ignored) { /* 没有采样就用合成 */ } },
+    SfxPackSize() { return samples.size; },
+
     Sfx(name, opts = {}) {
-      if (disposed || !enabled || !Has(SFX, name)) return;   // 不认识的名字静默忽略
-      const fn = SFX[name];
-      if (typeof fn !== "function") return;
+      if (disposed || !enabled) return;
+      // Has 是防原型链的：SFX["toString"] 也是个函数，但它不是音效
+      const fn = Has(SFX, name) ? SFX[name] : null;
+      // 采样优先、合成兜底：名字两边都不认识才真的什么也不发
+      if (!samples.has(name) && typeof fn !== "function") return;
       try {
         const k = Clamp(Number.isFinite(opts.gain) ? opts.gain : 1, 0, 4);
         const pan = Clamp(Number.isFinite(opts.pan) ? opts.pan : 0, -1, 1);
         const r = Clamp(Number.isFinite(opts.rate) ? opts.rate : 1, 0.25, 4);
         const delay = Math.max(0, Number.isFinite(opts.delay) ? opts.delay : 0);
         // 推后一点点再发：正好落在当前渲染块之后，起音的第一个采样点才是完整的
-        fn(ac.currentTime + 0.012 + delay, k, pan, r);
+        const t = ac.currentTime + 0.012 + delay;
+        if (PlaySample(name, t, k, pan, r)) return;
+        if (typeof fn === "function") fn(t, k, pan, r);
       } catch (ignored) { /* 单个音效炸了不能拖垮主循环 */ }
     },
 

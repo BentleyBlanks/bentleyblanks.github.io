@@ -703,6 +703,31 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       "planeBlade", "#6b6f76", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
     InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
       { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
+  } else if (label === "锯") {
+    // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
+    // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，
+    // 手一伸一屈，锯就一进一出。握点（原点）在近侧立柱上端。
+    const L = 30;    // 锯全长（绘制单位，×S）
+    InkLine(ctx, 0, -3 * S, 0, (L + 2) * S, "sawPostA", { lw: 2.6 * S, color: "#8d6236" });          // 近侧立柱（手握这根）
+    InkLine(ctx, -9 * S, 2 * S, -9 * S, (L - 2) * S, "sawPostB", { lw: 2.2 * S, color: "#8d6236" }); // 远侧立柱
+    InkLine(ctx, -9 * S, 6 * S, 0, 3 * S, "sawBeam", { lw: 2.4 * S, color: "#7a5433" });             // 横梁
+    // 锯条：立柱下端之间绷直的一道铁色，带细齿
+    ctx.strokeStyle = "#8d9298";
+    ctx.lineWidth = 1.6 * S;
+    ctx.beginPath(); ctx.moveTo(-9 * S, (L - 2) * S); ctx.lineTo(0, (L + 2) * S); ctx.stroke();
+    for (let i = 0; i < 6; i += 1) {
+      const tx = -8 * S + i * 1.5 * S;
+      const ty = (L - 1.4 + i * 0.62) * S;
+      InkLine(ctx, tx, ty, tx + 0.8 * S, ty + 1.2 * S, "sawTooth" + i, { lw: 0.9 * S, color: "#6b6f76" });
+    }
+    // 绞绳：横梁上方两立柱之间的一道麻色缠绕
+    InkLine(ctx, -9 * S, 3 * S, 0, 0, "sawCord", { lw: 1.3 * S, color: "#9a7d4f", amp: 1.4 });
+  } else if (label === "锄头") {
+    // 长柄锄：木柄顺着"手往下"的方向（跟着前臂转——扬过肩、落进土都是它），
+    // 柄端一块弯下去的铁锄板。握点（原点）在柄上三分之一处。
+    InkLine(ctx, 0, -16 * S, 0, 34 * S, "hoeShaft", { lw: 2.6 * S, color: "#8d6236" });
+    InkFill(ctx, [[-1.5 * S, 32 * S], [7 * S, 36 * S], [9 * S, 41 * S], [1.5 * S, 38 * S]],
+      "hoeBlade", "#6b6f76", { amp: 0.5 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.25)" });
   } else if (label === "满桶水" || label === "一桶水" || label === "空桶") {
     DrawCarry(ctx, 0, 0, S, 1, "水桶");
     if (label !== "空桶") {
@@ -1111,6 +1136,60 @@ export function DrawFirewood(ctx, x, groundY, w, id) {
     ctx.rotate(ang);
     InkFill(ctx, Rect(-11, -2.4, 22, 4.8), id + i, i % 2 ? "#7d5a33" : "#8f6b3d", { amp: 0.6, lw: 1.7 });
     ctx.restore();
+  }
+}
+
+// 码得整齐的劈柴垛：可翻越物的轮廓语法样板——齐肩高、顶沿被手掌磨得发亮、
+// 顶上缺一块（那是天天翻的人踩塌的）。玩家不认字也该一眼看出"这儿能过去"。
+export function DrawWoodStack(ctx, x, groundY, w, h, id) {
+  const rows = Math.max(3, Math.round(h / 13));
+  const notchX = x + w * 0.10;                 // 缺口偏右：不对称才像被人踩出来的
+  for (let r = 0; r < rows; r += 1) {
+    const py = groundY - 6 - r * (h - 8) / rows;
+    // 越往上收一点，垛才立得住
+    const rw = w * (1 - r * 0.035);
+    const count = Math.max(2, Math.round(rw / 15));
+    for (let i = 0; i < count; i += 1) {
+      const px = x - rw / 2 + 7 + i * ((rw - 14) / Math.max(1, count - 1));
+      // 顶层缺口：那一段不码柴
+      if (r >= rows - 1 && Math.abs(px - notchX) < w * 0.16) continue;
+      const jig = Sym(id + "j" + r + i, 0, 1.6);
+      if (r % 2 === 0) {
+        // 横码：一头一头的截面朝外
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(px + jig, py, 7.0, 5.2, 0, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 ? "#a8794a" : "#93663c";
+        ctx.fill();
+        ctx.strokeStyle = IN.ink;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        // 年轮那一小圈：没有它就是一堆棕色鹅卵石
+        ctx.beginPath();
+        ctx.ellipse(px + jig, py, 3.2, 2.2, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(70,45,25,0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // 竖码：劈开的柴侧着搭，纹路是竖的
+        InkFill(ctx, Rect(px - 5 + jig, py - 6, 10, 12), id + "b" + r + i,
+          i % 2 ? "#8b6238" : "#7a5330", { amp: 0.7, lw: 1.7 });
+      }
+    }
+  }
+  // 顶沿磨亮：天天有人手掌撑在这条线上
+  InkLine(ctx, x - w / 2 + 5, groundY - h + 3, notchX - w * 0.16, groundY - h + 1,
+    id + "worn", { lw: 2.6, color: "rgba(240,225,180,0.8)", amp: 1.1 });
+  InkLine(ctx, notchX + w * 0.16, groundY - h + 2, x + w / 2 - 4, groundY - h + 4,
+    id + "worn2", { lw: 2.4, color: "rgba(240,225,180,0.7)", amp: 1.1 });
+  // 缺口里塌下去的两根
+  InkFill(ctx, Rect(notchX - w * 0.13, groundY - h + 8, w * 0.26, 5), id + "fall",
+    "#6d4c2c", { amp: 0.8, lw: 1.7 });
+  // 底下压着的散柴梢
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - w / 2 - 6 + i * 5, groundY - 2, x - w / 2 + 9 + i * 6, groundY - 5 - i * 2,
+      id + "sp" + i, { lw: 1.8, color: "#5c4328" });
   }
 }
 

@@ -7,7 +7,7 @@
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
-import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
+import { CHAPTER_BGM } from "./Data_BgmConfig.mjs?v=026";
 
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。
@@ -139,6 +139,10 @@ export function CreateSoundtrack(audio) {
 
   return {
     Step,
+    // 动作音效包（本机 MiniMax 烘的拟音，见 Script_SfxBake.mjs）。
+    // 由 Main 在合成器真正到位之后调一次——它是异步 import 进来的，
+    // 建声轨那会儿 audio 还是静音替身，早调等于没调。拉不到就一直用合成兜底。
+    LoadSfxPack: () => audio.LoadSfxPack(new URL("./Audio/Sfx/", import.meta.url).href),
     // 声音开关变化时要重算节奏：静音就该回到剧本手写的停留时间
     SyncDurations,
     // 剧情里的一次性响动由 Main 直接点名

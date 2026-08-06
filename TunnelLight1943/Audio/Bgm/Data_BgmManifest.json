@@ -26,13 +26,14 @@
     },
     {
       "chapter": 2,
-      "id": "nightFalls",
-      "title": "暮色压下来",
-      "file": "AudioBgm_NightFalls.mp3",
-      "cue": 18,
-      "gain": 0.72,
+      "id": "theLongDark",
+      "title": "The Long Dark",
+      "file": "AudioBgm_TheLongDark.mp3",
+      "cue": 28,
+      "gain": 0.7,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.scottbuckley.com.au/library/the-long-dark/",
+      "credit": "'The Long Dark' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au"
     },
     {
       "chapter": 3,
@@ -100,6 +101,16 @@
       "id": "whatWeDontSay",
       "title": "What We Don't Say",
       "reason": "含人声音色，不符合纯器乐政策。"
+    },
+    {
+      "id": "nightFalls",
+      "title": "暮色压下来",
+      "reason": "用户试听确认含有人声听感，已从正式项目及试听池移除。"
+    },
+    {
+      "id": "huabeiVillageDawn",
+      "title": "村口晨雾",
+      "reason": "用户试听确认含有人声听感，已从试听池移除。"
     }
   ]
 }

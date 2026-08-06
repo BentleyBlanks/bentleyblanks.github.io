@@ -2,11 +2,12 @@
 // 镜头语法（硬切 / 慢推 / 横移 / 过肩正反打 / 插入特写）、HUD。
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
-  CurrentBeatDef, MakeChoice, GetObjective, GetHint,
+  CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=029";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=029";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -18,6 +19,7 @@ const SILENT = {
   Unlock() {}, SetEnabled() {}, IsEnabled: () => false, SetMasterVolume() {},
   SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
   SetMood() {}, SetBgm() {}, StopBgm() {}, GetBgmState: () => null, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
+  LoadSfxPack() {}, SfxPackSize: () => 0,
   PlayVoice: () => Promise.resolve(),
 };
 let audio = SILENT;
@@ -33,16 +35,19 @@ const soundtrack = CreateSoundtrack({
   SetSfxVolume: (...a) => audio.SetSfxVolume(...a),
   SetVoiceVolume: (...a) => audio.SetVoiceVolume(...a),
   Sfx: (...a) => audio.Sfx(...a),
+  LoadSfxPack: (...a) => audio.LoadSfxPack(...a),
+  SfxPackSize: () => audio.SfxPackSize(),
   Duck: (...a) => audio.Duck(...a),
   PlayVoice: (...a) => audio.PlayVoice(...a),
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js")
+import("./Script_Audio.js?v=029")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
     ApplyVolumes();          // 合成器是后到的，音量得在它到位之后再喂一次
+    soundtrack.LoadSfxPack();  // 采样音效包也一样：这会儿才有 AudioContext 可解码
     soundtrack.SyncDurations();
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
@@ -53,7 +58,7 @@ import("./Script_Audio.js")
 const SOUND_KEY = "tunnelLight1943.sound";
 // 三路音量各自记住。默认配乐低一些——它只是底噪，不该压住旁白。
 const VOL_KEY = "tunnelLight1943.vol";
-const DEFAULT_VOL = { voice: 100, sfx: 100, music: 70 };
+const DEFAULT_VOL = { ...AUDIO_DEFAULT_LEVELS };
 let vol = { ...DEFAULT_VOL };
 try {
   const saved = JSON.parse(localStorage.getItem(VOL_KEY) || "null");
@@ -89,6 +94,7 @@ for (const id of [
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide", "btnSkipCine",
+  "actPrompt", "itemThrow", "pipFrame", "pipView",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -111,12 +117,17 @@ function Unlock(index) {
 // ---------------------------------------------------------------------------
 const keys = new Set();
 const touch = { act: false };
+// 提示上那枚按钮画成什么，取决于玩家此刻用的是什么。混合设备（带触屏的笔记本）
+// 也认：谁最后动过谁说了算——玩家刚用手指点完，提示不该还在教他按 E。
+let inputMode = (window.matchMedia?.("(pointer: coarse)").matches || "ontouchstart" in window)
+  ? "touch" : "key";
 // 摇杆状态：moveX/climb 是给玩法层的数字量（Core 只取符号），nx/ny 供旋钮显示
 const stick = { active: false, id: null, moveX: 0, climb: 0, cx: 0, cy: 0, r: 60 };
 let interactEdge = false, advanceEdge = false, crouchToggle = false, throwEdge = false;
 
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
+  inputMode = "key";
   const k = e.key.toLowerCase();
   keys.add(k);
   if (k === "e") { interactEdge = true; advanceEdge = true; }
@@ -135,6 +146,7 @@ window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") Tog
 // 拖多少走多少，手上才有蹭着木头走的实感。整整一道线约等于拖过 45% 画宽。
 const scribeDrag = { active: false, id: null, lastX: 0, accum: 0 };
 canvas.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch" || e.pointerType === "pen") inputMode = "touch";
   advanceEdge = true;
   if (state && CurrentBeatDef(state)?.kind === "scribe") {
     scribeDrag.active = true;
@@ -176,6 +188,7 @@ function BindTouchButton(el, prop, { edge = false } = {}) {
   if (!el) return;
   const on = (e) => {
     e.preventDefault();
+    inputMode = "touch";
     if (edge) {
       if (prop === "act") { interactEdge = true; advanceEdge = true; touch.act = true; }
       else if (prop === "crouch") crouchToggle = !crouchToggle;
@@ -235,6 +248,7 @@ function SetupStick() {
   if (!el) return;
   el.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    inputMode = "touch";
     if (!StickGeometry()) return;
     stick.active = true;
     stick.id = e.pointerId;
@@ -310,11 +324,13 @@ function BaseShot(state) {
   const ch = CHAPTERS[state.chapterIndex];
   const p = state.player;
   const lookAhead = (p.heading || 1) * 2.0;
-  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.6 };
-  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.4 };
-  // 地表：中近景，人物约占画高三分之一；视平线略高于人头，地面向后退
-  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.95);
-  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.6 : 7.2 };
+  // 景别整体推近一档（勇敢的心式：人物更大、更贴戏）——画面外的后果
+  // 由角落的照片小窗兜着，不用为了"都看见"把镜头拉远
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.0 };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.0 };
+  // 地表：中近景，人物约占画高三分之一强；视平线略高于人头，地面向后退
+  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.85);
+  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.15 : 6.3 };
 }
 
 function HintShot(state, hint) {
@@ -459,6 +475,115 @@ function HideChoice() {
   choiceBuilt = false;
 }
 
+// ---------------------------------------------------------------------------
+// 交互徽章（勇敢的心式）
+//
+// 提示里不写键名——写了在手机上就是句废话。Core 只给动词，键位藏在 `E ·`
+// 前缀里（见 Core.SplitPrompt），这里按当前输入设备把它翻成一枚看得懂的按钮：
+// 键盘玩家看到键帽，手指玩家看到的就是右下角那几个钮的同一套线描图形。
+// 徽章浮在柱子头顶上，而不是钉在屏幕底边——按哪个键、对着什么按，一眼都在。
+// ---------------------------------------------------------------------------
+const KEY_GLYPH = { interact: "E", throw: "F", crouch: "C", up: "W", down: "S" };
+// 触屏图形与 index.html 里那三个钮逐笔一致，玩家不用在两套语汇之间翻译；
+// 爬梯的上下是摇杆——画成盘子里的一支箭
+const TOUCH_GLYPH = {
+  interact: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 12.2V7.4M11.4 11.6V6.2M14.6 12.2V7.4"/>'
+    + '<path d="M8.2 12.2v1.5c0 3 1.8 5 4.3 5s4.3-2 4.3-5V9.6"/><path d="M8.2 13.4l-2.4-2.2"/></svg>',
+  throw: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle class="solid" cx="5.2" cy="16.4" r="1.5"/>'
+    + '<path d="M6.8 14.6C9.4 8.6 14 6.4 19 8.8"/><path d="M19 8.8l-3.2-.2M19 8.8l-1-3"/></svg>',
+  crouch: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6.6" r="2.2"/>'
+    + '<path d="M10.6 8.9c2.6 1 4.1 2.6 4.3 5.2l-3.5 3.3.4 3.2"/><path d="M12.4 11.6l-3.4 2.6 1 3.4"/></svg>',
+  up: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M12 15.8V8.6M12 8.6l-3 3M12 8.6l3 3"/></svg>',
+  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M12 8.2v7.2M12 15.4l-3-3M12 15.4l3-3"/></svg>',
+};
+
+function KeyChipHtml(act) {
+  if (!act) return "";
+  return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
+}
+
+let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
+let actShown = "";                 // 换了文案/设备才重排 DOM
+
+// ---------------------------------------------------------------------------
+// 后果小窗（勇敢的心式画中画）：Core 立 state.pip = {who, hw, t}，这里管三件事——
+// 相框 DOM 的显隐、把相框内窗的位置量给渲染层（world.RenderPip 往那块剪裁区里
+// 再画一遍世界）、以及跟着目标演员每帧刷新第二台相机的取景。
+// ---------------------------------------------------------------------------
+let pipRect = null;
+
+function SyncPip(state, inCinematic) {
+  const el = ui.pipFrame;
+  if (!el) return;
+  const spec = state.phase === "playing" && !inCinematic ? state.pip : null;
+  let shot = null;
+  if (spec) {
+    const a = spec.who === "player"
+      ? { x: state.player.x, level: state.player.level, visible: true }
+      : state.actors.find((x) => x.id === spec.who);
+    if (a && a.visible !== false) {
+      shot = {
+        x: a.x + (spec.dx || 0),
+        y: (a.level === "under" ? UNDER_Y : SURFACE_Y) + (spec.y ?? 1.1),
+        hw: spec.hw ?? 3.5,
+      };
+    }
+  }
+  if (!shot) {
+    if (!el.hidden) { el.hidden = true; el.classList.remove("show"); }
+    pipRect = null;
+    world.SetPip(null);
+    return;
+  }
+  if (el.hidden) {
+    el.hidden = false;
+    // 重新触发出场动画（快门白闪 + 落下来）
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+  }
+  world.SetPip(shot);
+  // 内窗在画布上的位置：每帧量一次——出场动画在动、窗口在变尺寸，都跟得上
+  const view = ui.pipView.getBoundingClientRect();
+  const cRect = canvas.getBoundingClientRect();
+  pipRect = {
+    x: Math.round(view.left - cRect.left), y: Math.round(view.top - cRect.top),
+    w: Math.round(view.width), h: Math.round(view.height),
+  };
+}
+let actBox = { w: 96, h: 58 };     // 量过的整块尺寸：每帧读 offsetWidth 会同步刷布局
+
+function SyncActPrompt(state, pr, fill) {
+  const el = ui.actPrompt;
+  if (!el) return;
+  if (!pr) { el.hidden = true; actShown = ""; return; }
+  const fp = `${inputMode}|${pr.act}|${pr.text}`;
+  if (fp !== actShown) {
+    actShown = fp;
+    el.hidden = false;
+    el.querySelector(".pKey").innerHTML = KeyChipHtml(pr.act);
+    el.querySelector(".pVerb").textContent = pr.text;
+    actBox = { w: el.offsetWidth || actBox.w, h: el.offsetHeight || actBox.h };
+  }
+  el.hidden = false;
+  el.classList.toggle("hold", !!pr.hold);
+  el.style.setProperty("--fill", (fill * 100).toFixed(1));
+
+  // 落点：柱子头顶。世界→屏幕换算与 iris 收光同一套（cam + world.viewSize），
+  // 位置一律取整像素落位——半个像素上的字就是"HUD 有点糊"的老根。
+  const vs = world.viewSize;
+  const cw = canvas.clientWidth, chh = canvas.clientHeight;
+  if (!vs?.w || !cw || !chh) { el.style.left = "50%"; el.style.top = "70%"; return; }
+  const p = state.player;
+  const headY = LevelY(p.level) + (p.crouch ? 1.55 : 2.15);
+  const sx = cw * (0.5 + (p.x - cam.x) / vs.w);
+  const sy = chh * (0.5 - (headY - cam.y) / vs.h);
+  el.style.left = Math.round(Math.max(10, Math.min(cw - actBox.w - 10, sx - actBox.w / 2))) + "px";
+  el.style.top = Math.round(Math.max(10, Math.min(chh - actBox.h - 10, sy - actBox.h - 6))) + "px";
+}
+
 function SyncHud(state, dt, shotFade) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
@@ -503,15 +628,25 @@ function SyncHud(state, dt, shotFade) {
   const objVisible = objectiveT > 0 && !inCinematic;
   ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
 
-  // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来
-  const shown = state.prompt || state.climbHint || "";
-  ui.prompt.textContent = shown;
-  ui.prompt.hidden = !shown || inCinematic;
-  ui.prompt.classList.toggle("danger", !!shown && shown.startsWith("！"));
-  // 进度条用 CSS 画：拿字形拼方块会因为字体缺字变成豆腐块
+  // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来。
+  // 带按键的走头顶那枚徽章，没按键的状态行（"跟上娘""！探杆就在头顶"）
+  // 仍旧躺在底边——两种东西，两个位置，别混在一条 pill 里。
+  // 章节卡/终局那几拍 StepGame 提前 return，state.prompt 是上一幕留下的死值——
+  // 徽章现在浮在画面中间，赖着不走就直接盖在章节卡上了
+  const raw = state.phase === "playing" ? (state.prompt || state.climbHint || "") : "";
+  const pr = (!raw || inCinematic) ? null : SplitPrompt(raw);
+  const status = pr && !pr.act ? pr : null;
   const fill = Math.max(0, Math.min(1, state.promptFill || 0));
+  SyncActPrompt(state, pr && pr.act ? pr : null, fill);
+
+  ui.prompt.textContent = status ? status.text : "";
+  ui.prompt.hidden = !status;
+  ui.prompt.classList.toggle("danger", !!status && status.text.startsWith("！"));
+  // 进度条用 CSS 画：拿字形拼方块会因为字体缺字变成豆腐块
   ui.prompt.style.setProperty("--fill", (fill * 100).toFixed(1) + "%");
-  ui.prompt.classList.toggle("metered", fill > 0);
+  ui.prompt.classList.toggle("metered", !!status && fill > 0);
+
+  SyncPip(state, inCinematic);
 
   ui.crouchTag.hidden = true;
   // 手里那格：单格物品栏。拿着石子时顺带把 F 键提示挂上
@@ -519,8 +654,15 @@ function SyncHud(state, dt, shotFade) {
   const showItem = !!item && !inCinematic && state.phase === "playing";
   if (ui.itemTag) {
     ui.itemTag.hidden = !showItem;
-    if (item && ui.itemName) {
-      ui.itemName.textContent = item.label + (item.throwable ? "（F 投掷）" : "");
+    // 能扔的东西后面挂一枚小徽章，不写"（F 投掷）"——那三个字在手机上没有对应物
+    const tagFp = item ? `${inputMode}|${item.label}|${item.throwable ? 1 : 0}` : "";
+    if (ui.itemName && tagFp !== itemTagShown) {
+      itemTagShown = tagFp;
+      ui.itemName.textContent = item ? item.label : "";
+      if (ui.itemThrow) {
+        ui.itemThrow.hidden = !item?.throwable;
+        ui.itemThrow.innerHTML = item?.throwable ? KeyChipHtml("throw") : "";
+      }
     }
   }
   // 触屏的投掷键：手里真有能扔的东西才冒出来
@@ -855,6 +997,7 @@ function RunFrame(now, dt) {
     SyncDebugPanel();
   }
   world.Render();
+  world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
   interactEdge = false;
   advanceEdge = false;
   throwEdge = false;
@@ -899,6 +1042,9 @@ window.TunnelLight = {
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
   GetBgmState: () => audio.GetBgmState(),
+  // 采样音效包装了几个（0 = 全靠合成器兜底）
+  SfxPackSize: () => audio.SfxPackSize(),
+  Sfx: (name, opts) => audio.Sfx(name, opts),
   StepFrames: (n, input = {}) => {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {
