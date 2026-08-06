@@ -319,6 +319,43 @@ function TestInstrumentalBgmManifest() {
   console.log("  ✓ 八章纯器乐 BGM 清单 / 文件 / 淘汰规则");
 }
 
+// 跑腿的时候家里人都得在干活（爹拉锯、娘锄地），不许站着围观；
+// 桶灌满娘要有反应（后果小窗 + 停锄望井台）。这些全是"悄悄断了也没测试红"的
+// 表演层状态机，得点名盯住。
+function TestWorkStations() {
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  const state = CreateGame(0);
+
+  DebugJump(state, 0, beats.indexOf("c1_barrow"));
+  StepGame(state, idle, DT);   // 第一帧跑 onStart：各就各位
+  const father = state.actors.find((a) => a.id === "father");
+  const mother = state.actors.find((a) => a.id === "mother");
+  assert.equal(father?.track?.name, "sawing", "运木料时爹必须在拉锯");
+  assert.equal(father?.carry, "锯", "拉锯的爹手上必须有锯");
+  assert.ok(mother?.cineTarget || mother?.track, "运木料时娘必须动身去菜畦或已在干活");
+
+  DebugJump(state, 0, beats.indexOf("c1_water"));
+  StepGame(state, idle, DT);
+  assert.equal(state.actors.find((a) => a.id === "father")?.track?.name, "sawing", "打水时爹必须在拉锯");
+  const m2 = state.actors.find((a) => a.id === "mother");
+  assert.equal(m2?.track?.name, "hoeing", "打水时娘必须在菜畦锄地");
+  assert.equal(m2?.carry, "锄头", "锄地的娘手上必须有锄头");
+
+  // 桶触水：娘停锄、后果小窗开
+  const water = SCRIPTS.c1.find((b) => b.id === "c1_water");
+  const winch = water.steps.find((s) => s.type === "winch");
+  winch.onFilled(state);
+  assert.equal(state.flags.waterFilled, true);
+  assert.ok(state.pip && state.pip.who === "mother", "桶灌满必须开一扇看娘的后果小窗");
+  assert.equal(m2.track, null, "听见咕咚声，娘得停下锄头");
+  // 小窗到时自己收，onEnd 别把锄地误恢复（水已经打上来了）
+  StepGame(state, idle, state.pip.t + 0.1);
+  assert.equal(state.pip, null, "后果小窗必须到时收起");
+  assert.equal(m2.track, null, "水打上来之后娘不该再回去锄地");
+  console.log("  ✓ 干活的家人（爹拉锯/娘锄地）与后果小窗");
+}
+
 function TestQuieterAudioMix() {
   assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
   assert.ok(AUDIO_BUS_BASE.amb <= 0.72, "环境声总线必须保持在降低后的基准");
@@ -381,6 +418,7 @@ TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
 TestPromptsAreDeviceNeutral();
+TestWorkStations();
 TestInstrumentalBgmManifest();
 TestQuieterAudioMix();
 
@@ -403,6 +441,8 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   assert.equal(state.flags.henFlew, true, "C1 扛第二根木料必须惊走那只母鸡");
   assert.equal(state.flags.wellRopeBroken, false, "C1 打水链走完，井绳必须是接好的");
   assert.equal(state.flags.raidStarted, true, "C1 扫荡的考场布防必须落旗");
+  assert.equal(state.flags.waterFilled, true, "C1 打水链的桶必须真的触过水");
+  assert.equal(state.flags.pipShown, true, "C1 后果小窗（娘听见桶灌满）必须开过");
   assert.equal(state.flags.dogFed, true, "C2 的狗必须喂得上");
   assert.equal(state.flags.lanternOut, true, "C2 的马灯必须打得灭");
   assert.equal(state.flags.trapBuilt, true, "C5 翻口链必须走得通");

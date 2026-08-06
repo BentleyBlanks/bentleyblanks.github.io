@@ -84,6 +84,9 @@ export const SCENES = {
       // 去老槐树半道上的田埂（翻越的复用）、院墙角那枚可选探索的顶针
       { id: "barrow", kind: "barrow", x: 50.5, name: "独轮车" },
       { id: "henProp", kind: "hen", x: 56.4, name: "母鸡", hideFlag: "henFlew" },
+      // 娘的活计：屋西头一小片菜畦。柱子跑腿的时候，爹在锯木头、娘在地里——
+      // 家里没有站着围观的人，人人手上都有活
+      { id: "veggieWest", kind: "crops", x: 16.5, w: 5, name: "菜畦" },
       { id: "ridgeMid", kind: "ridge", x: 96, w: 3, name: "田埂" },
       { id: "thimbleProp", kind: "thimble", x: 48.8, name: "顶针", hideFlag: "thimbleFound" },
       // 扫荡后才出现：慌乱中撞塌的柴垛（压力下复用翻越）与院里的石子堆（软窗口）。
@@ -447,12 +450,22 @@ function StepChain(state, def, input, dt) {
   const p = state.player;
   const lvl = p.level || "surface";
 
+  // 很久没动静：链卡在同一步超过 after 秒 → 后果小窗惦记一眼（负数=冷却期）
+  if (def.pipIdle) {
+    b.pipIdleT = (b.pipIdleT || 0) + dt;
+    if (b.pipIdleT >= def.pipIdle.after) {
+      b.pipIdleT = -(def.pipIdle.cooldown ?? 30);
+      def.pipIdle.on?.(state);
+    }
+  }
+
   const finish = () => {
     if (st.note) state.toast = { text: st.note, t: 4.5 };
     if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);   // 口信也是情报，入账供第六章推理
     st.effect?.(state);
     b.stepIndex += 1;
     b.holdP = 0;
+    b.pipIdleT = 0;                // 链动了一步，"没动静"从头计
     if (b.stepIndex >= def.steps.length) AdvanceBeat(state);
   };
 
@@ -603,6 +616,7 @@ function StepChain(state, def, input, dt) {
         if (w.depth >= 1) {
           w.filled = true;
           state.toast = { text: "桶触到水面，咕咚一声灌满了。", t: 2.6 };
+          st.onFilled?.(state);   // 咕咚声传出去：后果小窗等钩子在这儿挂
         }
       } else {
         if (climb < -0.05) {
@@ -666,7 +680,8 @@ function StepStrike(state, def, input, dt) {
   if (b.si === undefined) {
     b.si = 0; b.hi = 0; b.gagT = 0; b.demoLeft = 0; b.demoT = 0;
     const father = FindActor(state, "father");
-    if (father) { father.x = def.zone.x + 1.0; father.heading = -1; }
+    // 撂下锯换锤：教合榫这一拍，爹的手上不能还占着拉锯的活
+    if (father) { father.x = def.zone.x + 1.0; father.heading = -1; father.track = null; father.carry = null; }
   }
   const father = FindActor(state, "father");
   const set = def.sets[b.si];
@@ -729,6 +744,38 @@ function StepStrike(state, def, input, dt) {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// 后果小窗（勇敢的心式画中画）：玩家的操作在画面外起了作用，就在角落里开一扇
+// 照片小窗给他看一眼——桶灌满的咕咚声传到菜畦，娘直起腰；水摇上来了，娘往门口走。
+// 渲染层照 who 的位置架第二台相机（Script_World.RenderPip），这里只管开与关。
+// ---------------------------------------------------------------------------
+function ShowPip(state, spec) {
+  state.pip = { hw: 3.5, t: 3.2, ...spec };
+  state.flags.pipShown = true;   // 冒烟测试盯这面旗：小窗机制断了不会有别的测试变红
+}
+
+// 干活的人（无文字引导的一部分：家里没人站着围观）。
+// 爹在工作台前拉锯，娘在菜畦锄地——谁被叫去做别的事，谁再放下手里的活。
+const V_PATCH_X = 16.8;   // 菜畦（veggieWest prop）里娘锄地的站位
+function FatherSaw(state) {
+  const father = FindActor(state, "father");
+  if (!father) return;
+  father.x = V.workbench.x + 0.9;
+  father.heading = -1;              // 面朝工作台锯
+  father.cineTarget = null;
+  father.track = { name: "sawing", t: 0 };
+  father.carry = "锯";
+}
+function MotherHoe(state) {
+  const mother = FindActor(state, "mother");
+  if (!mother) return;
+  mother.cineTarget = null;
+  mother.x = V_PATCH_X;
+  mother.heading = -1;              // 面朝菜畦
+  mother.track = { name: "hoeing", t: 0 };
+  mother.carry = "锄头";
 }
 
 export const SCRIPTS = {
@@ -849,8 +896,21 @@ export const SCRIPTS = {
         if ((state.flags.barrowPlanks || 0) < 2) state.bubbles.push({ who: "father", icon: "plank" });
       },
       onStart: (state) => {
-        const father = FindActor(state, "father");
-        if (father) { father.x = V.workbench.x + 0.6; father.heading = 1; }
+        // 柱子跑腿，家里人不站着围观：爹在工作台前拉锯（他等的就是这批料），
+        // 娘挎着锄头往屋西头的菜畦去——走着去，不凭空出现
+        FatherSaw(state);
+        const mother = FindActor(state, "mother");
+        if (mother) {
+          mother.carry = "锄头";
+          mother.cineTarget = { x: V_PATCH_X };
+          mother.cineSpeed = 1.45;
+        }
+      },
+      tick: (state) => {
+        // 娘走到菜畦就开始锄地（走位到点没有回调，这里每帧看一眼）
+        const mother = FindActor(state, "mother");
+        if (mother && !mother.cineTarget && !mother.track
+          && Math.abs(mother.x - V_PATCH_X) < 1.2) MotherHoe(state);
       },
       steps: [
         // 木料别搁在草垛（52±1.6）里：捡的东西必须看得见（目标同屏原则的底线）
@@ -890,6 +950,28 @@ export const SCRIPTS = {
         // 井台缺绳：断绳气泡挂在井上，直到接好
         if (state.flags.wellRopeBroken) state.bubbles.push({ x: V.well.x, y: 2.6, icon: "rope" });
       },
+      onStart: (state) => {
+        // 合完榫，各回各的活：爹接着拉锯，娘已经在菜畦里了
+        FatherSaw(state);
+        if (!state.flags.waterFilled) MotherHoe(state);
+      },
+      // 打水这一路磕磕绊绊（绳断、翻堆、接绳），玩家一旦停在半道太久，
+      // 后果小窗开一眼菜畦：娘直起腰朝井台望——不打断，只惦记
+      pipIdle: {
+        after: 22, cooldown: 40,
+        on: (state) => {
+          if (state.flags.waterFilled) return;
+          const mother = FindActor(state, "mother");
+          if (mother) { mother.track = null; mother.heading = 1; }
+          ShowPip(state, {
+            who: "mother", t: 3.0,
+            onEnd: (s) => {
+              // 望完接着干活——水还没打上来，地不能撂着
+              if (!s.flags.waterFilled) MotherHoe(s);
+            },
+          });
+        },
+      },
       steps: [
         { type: "pickup", x: 31, item: { id: "bucket", label: "空水桶" }, prompt: "E · 拎起桶" },
         { type: "use", zone: V.well, needs: "bucket", consume: false, prompt: "E · 挂上井绳",
@@ -912,16 +994,31 @@ export const SCRIPTS = {
         { type: "winch", zone: V.well, needs: "bucket",
           gives: { id: "fullBucket", label: "一桶水", big: true },
           note: "水打上来了。桶沿一路往下滴。",
-          effect: (state) => {
-            // 娘出来接：满桶回家那一屏路的尽头是人，不是水缸
+          // 桶触水灌满的咕咚声传到菜畦：娘直起腰、朝井台望——后果小窗给玩家看这一眼
+          onFilled: (state) => {
+            state.flags.waterFilled = true;
             const mother = FindActor(state, "mother");
-            if (mother) { mother.cineTarget = { x: 36.4 }; mother.cineSpeed = 1.3; }
+            if (mother) { mother.track = null; mother.heading = 1; }
+            ShowPip(state, { who: "mother", t: 3.0 });
+          },
+          effect: (state) => {
+            // 娘出来接：满桶回家那一屏路的尽头是人，不是水缸。
+            // 锄头搁在畦沿上，人往门口去——小窗再开一眼，玩家知道她动身了
+            const mother = FindActor(state, "mother");
+            if (mother) {
+              mother.track = null;
+              mother.carry = null;
+              mother.cineTarget = { x: 36.4 };
+              mother.cineSpeed = 2.0;
+            }
+            ShowPip(state, { who: "mother", t: 3.4 });
           } },
         { type: "use", zone: { x: 35.8, w: 2.6 }, needs: "fullBucket", prompt: "E · 交给娘",
           note: "娘接过桶，颠了颠分量，朝他笑了笑。",
           effect: (state) => {
+            // 接过桶就进屋倒进水缸——水有去处，人有下一件事
             const mother = FindActor(state, "mother");
-            if (mother) { mother.carry = "桶"; mother.heading = 1; }
+            if (mother) { mother.carry = "桶"; mother.cineTarget = { x: 32.4 }; mother.cineSpeed = 1.2; }
             Cue(state, "drop");
           } },
       ],
@@ -994,9 +1091,9 @@ export const SCRIPTS = {
           } },
         { stage: "爹把刨子塞进柴堆，转身走向院门。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 },
           on: (state) => {
-            // 塞柴堆得手里先有刨子：从工作台上抄起来，走向院门边的柴堆
+            // 塞柴堆得手里先有刨子：撂下锯，从工作台上抄起刨子，走向院门边的柴堆
             const father = FindActor(state, "father");
-            if (father) { father.carry = "刨子"; father.cineTarget = { x: 44.5 }; father.cineSpeed = 2.6; }
+            if (father) { father.track = null; father.carry = "刨子"; father.cineTarget = { x: 44.5 }; father.cineSpeed = 2.6; }
           } },
         // 无声走位：娘把妹妹往柱子那边一推，自己转身朝院门——一个动作同时完成
         // 「交托」与「娘为何留在院里」。没有字幕，两秒的表演
@@ -2360,6 +2457,7 @@ export function CreateGame(chapterIndex = 0) {
     tenon: null,
     spotFlash: null,
     irisFocus: null,
+    pip: null,
     stealthActive: false,
     detection: { level: 0, spotter: null },
     smoke: null,
@@ -2440,6 +2538,7 @@ export function StartChapter(state, index) {
   state.tenon = null;
   state.spotFlash = null;
   state.irisFocus = null;
+  state.pip = null;
   // 从章节菜单单独进某一章时，本章谜题的旗标要归零
   if (index === 0) {
     state.flags.clothDown = false;
@@ -2450,6 +2549,7 @@ export function StartChapter(state, index) {
     state.flags.ropeTaken = false;
     state.flags.bucketAt = null;
     state.flags.raidStarted = false;
+    state.flags.waterFilled = false;
   }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
@@ -2696,6 +2796,12 @@ export function StepGame(state, input, dt) {
   state.throwAim = null;
   if (state.bubbleFlash && (state.bubbleFlash.t -= dt) <= 0) state.bubbleFlash = null;
   if (state.spotFlash && (state.spotFlash.t -= dt) <= 0) state.spotFlash = null;
+  // 后果小窗到时收起；onEnd 给"看完这一眼之后"的收尾用（娘接着锄地）
+  if (state.pip && (state.pip.t -= dt) <= 0) {
+    const done = state.pip;
+    state.pip = null;
+    done.onEnd?.(state);
+  }
   // 小活物的一次性动画：麻雀炸窝、母鸡扑棱、田鼠蹿走——各自跑完就清
   for (const key of ["sparrowBurst", "henFlee", "mouseFlee"]) {
     const fx = state[key];
@@ -2739,6 +2845,8 @@ export function StepGame(state, input, dt) {
 
   // 节拍声明的引导气泡（图形气泡=「我缺什么」，无文字引导三层配方之一）
   def.bubbles?.(state);
+  // 节拍的每帧回调（走位到点接活计这类小状态机）
+  def.tick?.(state, dt);
 
   // 链外的通用投掷：手里有能扔的就能扔（软性窗口靠它——石子落地出声引开人）。
   // 链内的投掷仍由 StepChain 自己管（要判命中）
@@ -4162,6 +4270,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.scribe = null;
   state.bubbleFlash = null;
   state.spotFlash = null;
+  state.pip = null;
   state.detection = { level: 0, spotter: null };
   // 结算过程里可能留下没走完的走位指令与一次性姿势，别让它们接管玩家刚接手的这一幕
   for (const a of state.actors) { a.cineTarget = null; a.cineSpeed = undefined; }

@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 
@@ -99,11 +99,13 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // ---------------------------------------------------------------------------
 // 扛着的物件（单独一张小贴图，跟着手走）
 function MakeCarryMesh(label) {
-  // 木料/门板/顶木是横长条；桶是小方块；其余小件给一块方画布免得圆形图案被裁
+  // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
+  // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     "空桶", "满桶水", "一桶水", "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const wPx = label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120;
-  const hPx = label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30;
+  const TALL = { "锯": [70, 110], "锄头": [70, 140] };
+  const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
+  const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
     ART.DrawCarry(ctx, ax, ay - (label === "水桶" ? 8 : 0), 1.5, 1, label);
   }, 0, DETAIL_SS);
@@ -1612,14 +1614,23 @@ export function CreateWorld(canvasEl) {
       s.carryLabel = null;
     }
     if (!s.carryMesh) return;
-    // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同
-    const inHand = ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾",
+    // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同。
+    // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
+    // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
+    const alongArm = label === "锯" || label === "锄头";
+    const inHand = alongArm || ["水桶", "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾",
       "鞭炮", "一挂鞭炮", "空桶", "满桶水", "一桶水"].includes(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
-    s.carryMesh.position.set(anchor.x, anchor.y + (inHand ? -0.20 : 0.10), CARRY_Z);
+    s.carryMesh.position.set(anchor.x, anchor.y + (alongArm ? 0 : inHand ? -0.20 : 0.10), CARRY_Z);
     s.carryMesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
-    s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
+    if (alongArm) {
+      // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
+      const elbow = ElbowPoint(s.rig);
+      s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y));
+    } else {
+      s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
+    }
   }
 
   // 夜戏里人得从背景里读得出来。全屏压暗罩会把演员和土墙一起压成一团，
@@ -1705,10 +1716,12 @@ export function CreateWorld(canvasEl) {
       const h = (crouch ? 0.62 : 0.92) * bs;
       bodyBlockers.push({ x, y: LevelYOf(level) + h, hw: 0.20 * bs, hh: h });
     };
+    // 施工中=长按进度在涨。原来看提示文案里有没有"%"，但百分比已经改画成
+    // 进度环、不进文案了——判据换成 promptFill 本身
     const digging = !!(state.beat && !state.beat.quakeActive
       && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
         || def?.kind === "buildSpots" || def?.kind === "hold" || def?.kind === "chain")
-      && state.prompt && state.prompt.includes("%"));
+      && (state.promptFill || 0) > 0.001);
     // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
     const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
     PushBlocker(p.x, p.level, p.crouch, boyScale);
@@ -2743,17 +2756,48 @@ export function CreateWorld(canvasEl) {
     return { viewW, viewH, dist };
   }
 
+  let rendererCssW = 0, rendererCssH = 0;
   function Resize(width, height) {
     renderer.setSize(width, height, false);
     camera.userData.aspect = width / height;
+    rendererCssW = width;
+    rendererCssH = height;
   }
 
   function Render() { renderer.render(scene, camera); }
+
+  // -------------------------------------------------------------------------
+  // 后果小窗（勇敢的心式画中画）：主画面渲染完后，用第二台相机把同一个世界
+  // 的另一处再画进角落的一块剪裁区。视差层都锚在世界坐标上，第二台相机
+  // 看过去透视自然成立，不用为它做任何搬动。
+  // -------------------------------------------------------------------------
+  const pipCamera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 400);
+  let pipShot = null;
+  function SetPip(spec) { pipShot = spec; }
+
+  // rect：小窗在画布上的位置（CSS 像素，左上原点）——与 DOM 相框的内窗对齐
+  function RenderPip(rect) {
+    if (!pipShot || !rect || rect.w < 8 || rect.h < 8 || !rendererCssW) return;
+    const aspect = rect.w / rect.h;
+    const dist = pipShot.hw / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
+    pipCamera.aspect = aspect;
+    pipCamera.position.set(pipShot.x, pipShot.y, dist);
+    pipCamera.lookAt(pipShot.x, pipShot.y, 0);
+    pipCamera.updateProjectionMatrix();
+    const yUp = rendererCssH - rect.y - rect.h;   // WebGL 视口原点在左下
+    renderer.setScissorTest(true);
+    renderer.setScissor(rect.x, yUp, rect.w, rect.h);
+    renderer.setViewport(rect.x, yUp, rect.w, rect.h);
+    renderer.render(scene, pipCamera);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, rendererCssW, rendererCssH);
+  }
 
   return {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
     SetOverShoulder, SetInsertCard, ApplyCamera, Resize, Render,
+    SetPip, RenderPip,
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),

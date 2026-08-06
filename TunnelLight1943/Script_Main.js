@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=027";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=027";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=028";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=028";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -37,7 +37,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=027")
+import("./Script_Audio.js?v=028")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -88,7 +88,7 @@ for (const id of [
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "scribeGuide", "btnSkipCine",
-  "actPrompt", "itemThrow",
+  "actPrompt", "itemThrow", "pipFrame", "pipView",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -318,11 +318,13 @@ function BaseShot(state) {
   const ch = CHAPTERS[state.chapterIndex];
   const p = state.player;
   const lookAhead = (p.heading || 1) * 2.0;
-  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.6 };
-  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.4 };
-  // 地表：中近景，人物约占画高三分之一；视平线略高于人头，地面向后退
-  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.95);
-  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.6 : 7.2 };
+  // 景别整体推近一档（勇敢的心式：人物更大、更贴戏）——画面外的后果
+  // 由角落的照片小窗兜着，不用为了"都看见"把镜头拉远
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.0 };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.0 };
+  // 地表：中近景，人物约占画高三分之一强；视平线略高于人头，地面向后退
+  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.85);
+  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.15 : 6.3 };
 }
 
 function HintShot(state, hint) {
@@ -495,6 +497,53 @@ function KeyChipHtml(act) {
 
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
 let actShown = "";                 // 换了文案/设备才重排 DOM
+
+// ---------------------------------------------------------------------------
+// 后果小窗（勇敢的心式画中画）：Core 立 state.pip = {who, hw, t}，这里管三件事——
+// 相框 DOM 的显隐、把相框内窗的位置量给渲染层（world.RenderPip 往那块剪裁区里
+// 再画一遍世界）、以及跟着目标演员每帧刷新第二台相机的取景。
+// ---------------------------------------------------------------------------
+let pipRect = null;
+
+function SyncPip(state, inCinematic) {
+  const el = ui.pipFrame;
+  if (!el) return;
+  const spec = state.phase === "playing" && !inCinematic ? state.pip : null;
+  let shot = null;
+  if (spec) {
+    const a = spec.who === "player"
+      ? { x: state.player.x, level: state.player.level, visible: true }
+      : state.actors.find((x) => x.id === spec.who);
+    if (a && a.visible !== false) {
+      shot = {
+        x: a.x + (spec.dx || 0),
+        y: (a.level === "under" ? UNDER_Y : SURFACE_Y) + (spec.y ?? 1.1),
+        hw: spec.hw ?? 3.5,
+      };
+    }
+  }
+  if (!shot) {
+    if (!el.hidden) { el.hidden = true; el.classList.remove("show"); }
+    pipRect = null;
+    world.SetPip(null);
+    return;
+  }
+  if (el.hidden) {
+    el.hidden = false;
+    // 重新触发出场动画（快门白闪 + 落下来）
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+  }
+  world.SetPip(shot);
+  // 内窗在画布上的位置：每帧量一次——出场动画在动、窗口在变尺寸，都跟得上
+  const view = ui.pipView.getBoundingClientRect();
+  const cRect = canvas.getBoundingClientRect();
+  pipRect = {
+    x: Math.round(view.left - cRect.left), y: Math.round(view.top - cRect.top),
+    w: Math.round(view.width), h: Math.round(view.height),
+  };
+}
 let actBox = { w: 96, h: 58 };     // 量过的整块尺寸：每帧读 offsetWidth 会同步刷布局
 
 function SyncActPrompt(state, pr, fill) {
@@ -587,6 +636,8 @@ function SyncHud(state, dt, shotFade) {
   // 进度条用 CSS 画：拿字形拼方块会因为字体缺字变成豆腐块
   ui.prompt.style.setProperty("--fill", (fill * 100).toFixed(1) + "%");
   ui.prompt.classList.toggle("metered", !!status && fill > 0);
+
+  SyncPip(state, inCinematic);
 
   ui.crouchTag.hidden = true;
   // 手里那格：单格物品栏。拿着石子时顺带把 F 键提示挂上
@@ -937,6 +988,7 @@ function RunFrame(now, dt) {
     SyncDebugPanel();
   }
   world.Render();
+  world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
   interactEdge = false;
   advanceEdge = false;
   throwEdge = false;

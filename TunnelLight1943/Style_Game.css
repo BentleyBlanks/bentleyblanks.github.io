@@ -132,6 +132,45 @@ body {
 }
 #itemTag .pKey svg circle.solid { fill: currentColor; stroke: none; }
 
+/* 后果小窗（勇敢的心式画中画）：一张压在角落的老照片。画面本体是 WebGL 在
+   同一块画布上的剪裁区，从相框中间透出来——所以框只能用 border 画，
+   背景必须是透的；#pipView 的矩形每帧量给渲染层对剪裁区。
+   注意不能用 transform 做出场（旋转/缩放会让 DOM 相框和 GL 剪裁区对不上），
+   出场就靠一记快门白闪 + 边框浮现。 */
+#pipFrame {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  width: min(24vw, 236px);
+  border: 6px solid #d8c69c;
+  border-bottom-width: 13px;                 /* 照片的白边下宽 */
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(90, 70, 40, 0.55);
+  pointer-events: none;
+  z-index: 24;
+}
+#pipView {
+  display: block; width: 100%; aspect-ratio: 16 / 10;
+  position: relative;
+}
+/* 照片感：一圈压角的暗晕 + 很淡的暖色罩（盖在 GL 上面） */
+#pipView::after {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(214, 176, 96, 0.07);
+  box-shadow: inset 0 0 22px rgba(10, 6, 2, 0.72);
+}
+/* 快门白闪：小窗弹出那一下"拍了张照" */
+#pipView::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: #f4ecd8; opacity: 0;
+}
+#pipFrame.show #pipView::before { animation: pipFlash 0.45s ease-out; }
+@keyframes pipFlash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
 /* 交互提示 */
 #prompt {
   position: absolute; left: 0; right: 0; bottom: 15%;

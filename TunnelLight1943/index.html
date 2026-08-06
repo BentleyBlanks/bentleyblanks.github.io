@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=027">
+  <link rel="stylesheet" href="./Style_Game.css?v=028">
   <script type="importmap">
     {
       "imports": {
@@ -71,6 +71,10 @@
     <div id="actPrompt" hidden><i class="pKey"></i><b class="pVerb"></b></div>
     <!-- 底部那条只剩没有按键的状态行（"跟上娘""！探杆就在头顶"） -->
     <div id="prompt" hidden></div>
+    <!-- 后果小窗（勇敢的心式画中画）：玩家的操作在画面外起了作用，角落里开一扇
+         照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
+         （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
+    <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
     <!-- 划线：一条 QTE 式的轨道。手指（或按住 E 推）把石笔沿着它拖过去 -->
     <div id="scribeGuide" hidden>
       <div class="track"><i class="fill"></i><span class="knob">✎</span></div>
@@ -179,6 +183,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=027"></script>
+<script type="module" src="./Script_Main.js?v=028"></script>
 </body>
 </html>

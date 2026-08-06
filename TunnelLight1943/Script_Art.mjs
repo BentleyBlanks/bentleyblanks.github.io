@@ -703,6 +703,31 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       "planeBlade", "#6b6f76", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
     InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
       { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
+  } else if (label === "锯") {
+    // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
+    // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，
+    // 手一伸一屈，锯就一进一出。握点（原点）在近侧立柱上端。
+    const L = 30;    // 锯全长（绘制单位，×S）
+    InkLine(ctx, 0, -3 * S, 0, (L + 2) * S, "sawPostA", { lw: 2.6 * S, color: "#8d6236" });          // 近侧立柱（手握这根）
+    InkLine(ctx, -9 * S, 2 * S, -9 * S, (L - 2) * S, "sawPostB", { lw: 2.2 * S, color: "#8d6236" }); // 远侧立柱
+    InkLine(ctx, -9 * S, 6 * S, 0, 3 * S, "sawBeam", { lw: 2.4 * S, color: "#7a5433" });             // 横梁
+    // 锯条：立柱下端之间绷直的一道铁色，带细齿
+    ctx.strokeStyle = "#8d9298";
+    ctx.lineWidth = 1.6 * S;
+    ctx.beginPath(); ctx.moveTo(-9 * S, (L - 2) * S); ctx.lineTo(0, (L + 2) * S); ctx.stroke();
+    for (let i = 0; i < 6; i += 1) {
+      const tx = -8 * S + i * 1.5 * S;
+      const ty = (L - 1.4 + i * 0.62) * S;
+      InkLine(ctx, tx, ty, tx + 0.8 * S, ty + 1.2 * S, "sawTooth" + i, { lw: 0.9 * S, color: "#6b6f76" });
+    }
+    // 绞绳：横梁上方两立柱之间的一道麻色缠绕
+    InkLine(ctx, -9 * S, 3 * S, 0, 0, "sawCord", { lw: 1.3 * S, color: "#9a7d4f", amp: 1.4 });
+  } else if (label === "锄头") {
+    // 长柄锄：木柄顺着"手往下"的方向（跟着前臂转——扬过肩、落进土都是它），
+    // 柄端一块弯下去的铁锄板。握点（原点）在柄上三分之一处。
+    InkLine(ctx, 0, -16 * S, 0, 34 * S, "hoeShaft", { lw: 2.6 * S, color: "#8d6236" });
+    InkFill(ctx, [[-1.5 * S, 32 * S], [7 * S, 36 * S], [9 * S, 41 * S], [1.5 * S, 38 * S]],
+      "hoeBlade", "#6b6f76", { amp: 0.5 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.25)" });
   } else if (label === "满桶水" || label === "一桶水" || label === "空桶") {
     DrawCarry(ctx, 0, 0, S, 1, "水桶");
     if (label !== "空桶") {

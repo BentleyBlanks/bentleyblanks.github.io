@@ -258,6 +258,32 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
+  // 拉锯（循环）：木匠的常态活。推出去那一下吃力（躯干跟着送），回拉轻快；
+  // 后手搭在料上不动。锯（DrawCarry「锯」）挂在前手上、随前臂转——
+  // 手臂一伸一屈，锯就一进一出。
+  sawing: {
+    dur: 1.5, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12, armB: -46, foreB: -22, thighB: -22, shinB: 28, footB: -6, thighF: 14, shinF: 8, footF: -8 },
+      { t: 0.42, hipY: -0.06, hipX: 0.00, torso: 17, head: -18, armF: -86, foreF: -46 },   // 回拉：肘折回来
+      { t: 0.78, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },   // 再推
+      { t: 1.14, hipY: -0.06, hipX: 0.01, torso: 18, head: -18, armF: -84, foreF: -44 },
+      { t: 1.5, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },
+    ],
+  },
+  // 锄地（循环）：扬起来慢、落下去快，落了还要往回带一下松土。
+  // 双手都在把上（前后臂同相位），锄（DrawCarry「锄头」）随前臂转——
+  // 扬过肩、砸进土、拖回来，一整套都在手上。
+  hoeing: {
+    dur: 2.3, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36, thighB: -16, shinB: 20, footB: -6, thighF: 10, shinF: 6, footF: -8 },
+      { t: 0.45, hipY: -0.22, hipX: 0.12, torso: 44, head: -26, armF: -46, foreF: -10, armB: -38, foreB: -14 },  // 落锄：全程最快的一下
+      { t: 0.9, hipY: -0.18, hipX: 0.08, torso: 38, head: -22, armF: -56, foreF: -24, armB: -46, foreB: -26 },   // 往回带，松土
+      { t: 1.55, hipY: -0.07, hipX: 0.00, torso: 8, head: -12, armF: -94, foreF: -28, armB: -82, foreB: -32 },   // 慢慢扬起来
+      { t: 2.3, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36 },
+    ],
+  },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
   struckFall: {
     dur: 3.4, loop: false,
@@ -623,6 +649,13 @@ export function HandPoint(rig) {
   const v = new THREE.Vector3(0, -BONE.foreArm, 0);
   j.foreFront.updateWorldMatrix(true, false);
   return v.applyMatrix4(j.foreFront.matrixWorld);
+}
+
+/** 肘点的世界坐标：手里的长家伙（锯/锄头）要顺着前臂的方向摆 */
+export function ElbowPoint(rig) {
+  const j = rig.joints;
+  j.foreFront.updateWorldMatrix(true, false);
+  return new THREE.Vector3(0, 0, 0).applyMatrix4(j.foreFront.matrixWorld);
 }
 
 /** 肩点的世界坐标：扛的东西搁在这儿 */
