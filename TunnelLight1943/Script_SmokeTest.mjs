@@ -122,11 +122,9 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           input.interactHeld = true;
           input.moveX = 1;
         }
-        // 刨料：站到工位上按住 E 一趟趟推；推到头了掉头把刨子拖回来
-        if (target.action === "planeAt") {
-          if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
-          else { input.interactHeld = true; input.moveX = target.back ? -1 : 1; }
-        }
+        // 刨料：驱动器只按键盘（CLAUDE.md 铁律），按住 E 就行——方向由节拍自己判。
+        // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
+        if (target.action === "planeAt") input.interactHeld = true;
         if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
@@ -693,43 +691,55 @@ function TestPlaneBeat() {
   assert.equal(def.kind, "plane", "合榫那一拍已经换成刨料");
   assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
 
-  // 爹的示范先走完
-  for (let i = 0; i < 150; i += 1) StepGame(state, idle(), DT);
-  assert.ok(state.planing, "刨料期间台面上必须有那块料");
+  // 爹的示范 + 柱子自己上前接手。**这一段绝不许在测试里挪 player.x**——
+  // 上一版每处断言都先 `state.player.x = workX` 把人瞬移到工位，正好跳过了
+  // "玩家怎么走到工位"这一整段；线上示范一完人站在判定圈外，屏幕上什么都不出，
+  // 全绿的测试一个字都没提。凡是"玩家自己要走到某处"的节拍，测试必须走真实路径。
   const workX = def.zone.x - 0.55;
-  state.player.x = workX;
+  for (let i = 0; i < 200; i += 1) StepGame(state, idle(), DT);
+  assert.ok(state.planing, "刨料期间台面上必须有那块料");
+  assert.ok(Math.abs(state.player.x - workX) < 0.06,
+    `示范完必须由节拍把柱子送到工位（现在停在 ${state.player.x.toFixed(2)}，工位 ${workX}）`);
+  assert.ok(state.dragTrack && state.dragTrack.drag, "站到工位就必须亮出拖动轨道，玩家不该猜该干什么");
 
-  // ① 倒着拖不吃木头
+  // ① 按住 A/D 不许把人走开——这一拍人钉在台前（上一版按住 D 能一路散步）
+  for (let i = 0; i < 40; i += 1) StepGame(state, { ...idle(), moveX: 1 }, DT);
+  assert.ok(Math.abs(state.player.x - workX) < 0.06, "刨料时走路输入不该把人挪走");
+  // 键盘后备（CLAUDE.md：鼠标玩法必须留等价按键路径，否则自动通关卡死）：
+  // 光按住 E 就推得动，而且**不掺 A/D**——方向由这一趟的状态给
+  const beforeKb = state.planing.u;
+  for (let i = 0; i < 12; i += 1) StepGame(state, { ...idle(), interactHeld: true }, DT);
+  assert.ok(state.planing.u > beforeKb, "按住 E 必须能把刨子推出去（键盘后备）");
+
+  // ② 倒着拖不吃木头
   const before = state.planing.smooth;
-  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), interactHeld: true, moveX: -1 }, DT);
+  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), dragX: -0.05 }, DT);
   assert.equal(state.planing.smooth, before, "回程不该刨掉木头");
 
-  // ② 一趟推到底：刨花出来、木头亮一分
+  // ③ 一趟推到底：刨花出来、木头亮一分
   let guard = 0;
   while (state.planing && state.planing.smooth === before && guard < 400) {
     guard += 1;
-    StepGame(state, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+    StepGame(state, { ...idle(), dragX: 0.05 }, DT);
   }
   assert.ok(state.planing === null || state.planing.smooth > before, "一趟推到底必须刨掉一层");
   assert.ok(state.flags.planedOnce, "第一趟推完必须落旗");
 
-  // ③ 中间顿一下：这一趟不齐，刨花短一截（但仍然算数，不会卡死）
+  // ④ 中间顿一下：这一趟不齐，刨花短一截（但仍然算数，不会卡死）
   const s2 = CreateGame(0);
   DebugJump(s2, 0, beats.indexOf("c1_tenon"));
-  for (let i = 0; i < 150; i += 1) StepGame(s2, idle(), DT);
-  s2.player.x = def.zone.x - 0.55;
-  for (let i = 0; i < 14; i += 1) StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+  for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
+  for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
   for (let i = 0; i < 20; i += 1) StepGame(s2, idle(), DT);          // 停在半道
   let g2 = 0, curlLen = null;
   while (s2.planing && g2 < 400) {
     g2 += 1;
-    StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
-    if (s2.planeCurl && curlLen === null) curlLen = s2.planeCurl.len;
-    if (curlLen !== null) break;
+    StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
+    if (s2.planeCurl && curlLen === null) { curlLen = s2.planeCurl.len; break; }
   }
   assert.ok(curlLen !== null && curlLen < 1, "顿过的那一趟，刨花必须短一截");
 
-  // ④ 自动通关能过（不会卡在"推到头忘了拖回来"）
+  // ⑤ 自动通关能过（不会卡在"推到头忘了拖回来"）
   const s3 = CreateGame(0);
   DebugJump(s3, 0, beats.indexOf("c1_tenon"));
   let g3 = 0;
@@ -737,11 +747,7 @@ function TestPlaneBeat() {
     g3 += 1;
     const t = GetBeatTarget(s3);
     const inp = idle();
-    if (t?.action === "planeAt") {
-      const d = t.x - s3.player.x;
-      if (Math.abs(d) > 0.6) inp.moveX = Math.sign(d);
-      else { inp.interactHeld = true; inp.moveX = t.back ? -1 : 1; }
-    }
+    if (t?.action === "planeAt") inp.dragX = t.back ? -0.05 : 0.05;
     StepGame(s3, inp, DT);
   }
   assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
