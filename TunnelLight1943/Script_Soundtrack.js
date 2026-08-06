@@ -9,6 +9,8 @@
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs?v=026";
 
+const VOICE_RELEASE = "20260806Chapter1Hybrid";
+
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。
 const CHAPTER_MOOD = [
@@ -28,7 +30,7 @@ export function CreateSoundtrack(audio) {
   const base = new URL("./Audio/Voice/", import.meta.url).href;
 
   // 清单是烘焙产物；拿不到就静默降级成"只有音效和配乐"，不能让整个游戏卡住
-  fetch(new URL("./Audio/Voice_Manifest.json", import.meta.url))
+  fetch(new URL(`./Audio/Voice_Manifest.json?v=${VOICE_RELEASE}`, import.meta.url))
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => { manifest = j; ready = !!j; SyncDurations(); })
     .catch(() => { ready = false; });
@@ -56,7 +58,7 @@ export function CreateSoundtrack(audio) {
     // noSub 的行照样出声（日军的日语原声就靠它）——只是字幕不显示，
     // 那是 HUD 的事，不是声音的事
     const id = VoiceLineId(caption.say ? (caption.who || "") : "", text);
-    return manifest.lines.some((l) => l.id === id) ? base + id + ".mp3" : null;
+    return manifest.lines.some((l) => l.id === id) ? `${base}${id}.mp3?v=${VOICE_RELEASE}` : null;
   }
 
   function Step(state, dt) {

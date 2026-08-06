@@ -31,7 +31,7 @@
       "who": "日军",
       "text": "言え！八路の食糧はどこに隠した！",
       "voice": "Enemy",
-      "dur": 4.07
+      "dur": 3.541
     },
     {
       "id": "1eogin5",
@@ -1049,8 +1049,8 @@
     }
   ],
   "voiceRelease": {
-    "release": "20260805Qwen3",
-    "engine": "Qwen3-TTS",
+    "release": "20260806Chapter1Hybrid",
+    "engine": "Qwen3-TTS + MiniMax Speech",
     "designModel": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
     "designRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
     "cloneModel": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
@@ -1059,6 +1059,20 @@
     "modelLicense": "Apache-2.0",
     "sampleRate": 24000,
     "bitrateKbps": 48,
-    "realVoiceReferenceUsed": false
+    "realVoiceReferenceUsed": false,
+    "productionRouting": {
+      "default": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "bySpeaker": {
+        "高传宝": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "妹妹": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "娘": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "柱子": "MiniMax/speech-2.8-hd",
+        "交通员": "MiniMax/speech-2.8-hd",
+        "日军": "MiniMax/speech-2.8-hd"
+      }
+    },
+    "chapter1MiniMaxLineIds": [
+      "1rvzvgr"
+    ]
   }
 }

@@ -10,6 +10,17 @@
   "modelLicense": "Apache-2.0",
   "referenceDirectory": "Audio/VoiceReference",
   "defaultVoice": "Militia",
+  "productionRouting": {
+    "default": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "bySpeaker": {
+      "高传宝": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "妹妹": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "娘": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "柱子": "MiniMax/speech-2.8-hd",
+      "交通员": "MiniMax/speech-2.8-hd",
+      "日军": "MiniMax/speech-2.8-hd"
+    }
+  },
   "speakerMap": {
     "": "Narrator",
     "爹": "Father",

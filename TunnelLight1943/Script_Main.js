@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=029";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=029";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=030";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=030";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
