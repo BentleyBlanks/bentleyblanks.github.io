@@ -334,7 +334,9 @@ function SampleTrack(name, time) {
 
 /**
  * 姿态解算：把状态映射成关节角度。
- * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture, pose, poseK}
+ * state: {phase, moving, crouch, carry, hold, holdW, climbing, digging, aiming, posture, pose, poseK}
+ * carry = 扛在肩上（木料/门板/棉被）；hold = 提在手里（水桶/绳/石子），
+ * holdW 0..1 是分量：0 拎块石子、1 满满一桶水。两者互斥，由渲染层按标签判定
  * posture: stand | stoop | squat | crawl —— 地道各段净高不同，见 Core 的 TunnelPosture
  * poseK: 0..1 的动作进度，驱动 planePush（推程）/ vault（翻越）这类姿势——不是时间
  * 所有角度用弧度，正值 = 顺时针（面朝 +x 时向前）
@@ -630,6 +632,33 @@ export function PoseRig(rig, s, dt) {
     target.foreB = -52 * DEG;
     target.armF = (-30 + (c ? swing2 * 10 : 0)) * DEG;
     target.foreF = -58 * DEG;
+  } else if (s.hold) {
+    // 提：东西吊在近侧那只手上（水桶/麻绳/石子都走这儿），不是扛在肩上。
+    // 空手走/站的姿势打底，按分量 holdW 往"坠"的方向拉——侧视里"沉"只读得出
+    // 三笔：**胳膊被坠直**（肘伸开、摆幅收掉）、**身子往后仰配重**、
+    // **另一只手甩得更开**。拎块石子(0.15)几乎还是空手的样子，
+    // 提满满一桶水(1.0)才是另一个人。
+    const w = Math.min(1, Math.max(0, s.holdW ?? 1));
+    const c = s.moving ? 1 : 0;
+    const br = Math.sin(s.breath || 0);
+    target.hipY = c ? Math.abs(Math.sin(p)) * (0.035 - 0.009 * w) : br * 0.012;
+    target.hipX = 0;
+    target.torso = ((c ? 5 : 1.5 + br * 1.2) - 9 * w) * DEG;
+    target.head = ((c ? -2 : -1 - br * 1.5) + 5 * w) * DEG;
+    // 腿：提着重物迈不开大步，步幅与小腿折度都按分量收一档
+    const legAmp = 30 - 9 * w, shinAmp = 52 - 14 * w;
+    target.thighB = (c ? swing2 * legAmp : -3) * DEG;
+    target.shinB = (c ? Math.max(0, -swing2) * shinAmp : 4) * DEG;
+    target.footB = (c ? -swing2 * 12 - 4 : -3) * DEG;
+    target.thighF = (c ? swing * legAmp : 3) * DEG;
+    target.shinF = (c ? Math.max(0, -swing) * shinAmp : 2) * DEG;
+    target.footF = (c ? -swing * 12 - 4 : -3) * DEG;
+    // 远侧那只手空着：越重甩得越开，配重全靠它
+    target.armB = (c ? swing * (26 + 12 * w) : 4 + br * 2) * DEG;
+    target.foreB = (c ? -16 + Math.max(0, swing) * 20 : -12 - br * 3) * DEG;
+    // 近侧提东西那只：摆幅按分量收掉，肘按分量伸开（w=1 时几乎是一根直杆）
+    target.armF = ((c ? swing2 * (26 - 20 * w) : -4 - br * 2) + 6 * w) * DEG;
+    target.foreF = ((c ? -16 + Math.max(0, swing2) * 20 : -14 - br * 3) * (1 - w) - 4 * w) * DEG;
   } else if (s.carry) {
     // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
     // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。

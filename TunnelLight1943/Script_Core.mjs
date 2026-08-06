@@ -1212,9 +1212,11 @@ export const SCRIPTS = {
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
           lines: [
             { who: "妹妹", say: "哥——风把我的头巾刮到树上去了！", d: 3.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
-            { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 127.6, y: 5.2, dist: 3.2 } },
+            { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 126.45, y: 2.43, dist: 3.2 } },
           ] },
-        { type: "throwHit", pickupX: 120, target: { x: 127.6, y: 5.2, r: 2 },
+        // 靶心 = 花布巾实际挂着的那一点（Data_Scenes 的 cloth.x + Data_PropArt 的
+        // cloth.yOffset）。这三处必须一起改——它们曾经一起指着树顶上方两米的空气
+        { type: "throwHit", pickupX: 119, target: { x: 126.45, y: 2.43, r: 1.5 },
           prompt: "F · 投",
           missNote: "石子落了空——扑棱棱惊起一片麻雀。",
           miss: (state, land) => {

@@ -112,6 +112,21 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 // 顶在脑袋上。所以只此一处列全，画布与挂点都从这里取。
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
+// 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
+// hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
+// 长家伙（锯/锄头）也在手上，只是要顺着前臂转。
+const HAND_HELD = [...BUCKETS, "锯", "锄头", "刨子", "石子", "窝头", "铃铛", "柴刀",
+  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶"];
+// 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
+// Rig 的 hold 姿势按它插值——不列的按小件算。
+const HOLD_WEIGHT = {
+  "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
+  "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
+  "锄头": 0.45, "锯": 0.4, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+};
+const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
+const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
+
 // ---------------------------------------------------------------------------
 // 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
 // ---------------------------------------------------------------------------
@@ -1631,7 +1646,8 @@ export function CreateWorld(canvasEl) {
   }
 
 
-  function UpdateOne(s, x, level, heading, crouch, dt, carry = false, extra = {}) {
+  // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
+  function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
     // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
     const lift = extra.lift || 0;
@@ -1644,8 +1660,10 @@ export function CreateWorld(canvasEl) {
     else s.phase += dt * 2.2;      // 挖土/爬梯这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
+    const holding = IsHandHeld(held);
     PoseRig(s.rig, {
-      phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
+      carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
@@ -1712,11 +1730,16 @@ export function CreateWorld(canvasEl) {
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = label === "锯" || label === "锄头";
-    const inHand = alongArm || [...BUCKETS, "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳",
-      "花布巾", "鞭炮", "一挂鞭炮"].includes(label);
+    const inHand = IsHandHeld(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
     const bs = s.bodyScale || 1;
-    s.carryMesh.position.set(anchor.x, anchor.y + (alongArm ? 0 : inHand ? -0.20 : 0.10), CARRY_Z);
+    // 提在手里的：贴图中心就是桶沿，挂在拳头底下一点点就够了。原先垂 0.20m 是
+    // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
+    // 柱子（才一米出头）手里的桶就杵在地上了
+    // 侧视里手臂垂在身体正中，桶就整个盖在人身上——往前挪一掌，剪影才分得开
+    const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
+    s.carryMesh.position.set(anchor.x + forward,
+      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z);
     s.carryMesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
@@ -1827,7 +1850,7 @@ export function CreateWorld(canvasEl) {
 
     // 手里那一格（谜题链的物品）和肩上扛的木料一样要摆出携带姿势
     const held = p.carry || (p.item ? p.item.label : null);
-    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!held,
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, held,
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
@@ -1893,7 +1916,7 @@ export function CreateWorld(canvasEl) {
       const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
       const bs = sisterScale || BODY_SCALE[a.kind] || 1;
       UpdateOne(s, a.x, a.level || "surface", a.heading,
-        posture === "squat" || posture === "crawl" || !!a.crouch, dt, !!a.carry,
+        posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）

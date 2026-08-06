@@ -38,8 +38,8 @@
         { "id": "bigTree", "kind": "tree", "x": 126, "big": true, "name": "老槐树" },
         { "id": "gatePost", "kind": "lamppost", "x": 174, "name": "村东口" },
 
-        { "id": "cloth", "kind": "cloth", "x": 127.6, "name": "花布巾", "note": "妹妹的头巾被风刮上老槐树（一章投掷教学的靶）" },
-        { "id": "stonesTree", "kind": "stonePile", "x": 120, "name": "石子堆" },
+        { "id": "cloth", "kind": "cloth", "x": 126.45, "name": "花布巾", "note": "妹妹的头巾被风刮上老槐树（一章投掷教学的靶）。x 贴着树冠右缘：一半衬着叶子一半衬着天，远远就读得出" },
+        { "id": "stonesTree", "kind": "stonePile", "x": 119, "name": "石子堆", "note": "投布巾用的弹药堆。必须离投掷站位（靶心西 6m）一米半以上——挨太近的话，捡完石子转身面朝东那一下会把人推出站位，然后走回来、再转身，来回没完（自动通关驱动器直接卡死）" },
         { "id": "grindstone", "kind": "millstone", "x": 118, "name": "石碾" },
         { "id": "yardDog", "kind": "dog", "x": 138, "name": "王家的狗" },
         { "id": "stonesEast", "kind": "stonePile", "x": 152, "name": "石子堆" },
