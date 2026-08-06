@@ -810,26 +810,23 @@ function MotherHoe(state) {
 export const SCRIPTS = {
   c1: [
     {
-      // 序章（对标《勇敢的心》两分钟新闻片）：从卢沟桥一路收拢到一道门框。
-      // 节奏不是均速平推——1–5 段快切叠画，9 段推镜变速，10 段起骤然放慢，
-      // 13 段是快慢之间的沉降拍（粮的铰链：c1_father 审问问的正是粮）。
-      // 每段一幅专画的卡（渲染层做慢推的 Ken Burns，定格画片才不像幻灯片）。
+      // 序章 v2（2026-08-06 砍半重排）：一分钟从卢沟桥收拢到一道门框。
+      // v1 的十四行摊得太开——宏观战史占了五行，人的苦难只有一行半，
+      // 「为什么被逼到地底下」反而没说透。现在 8+1 行三段式：
+      //   1 行战争压境 → 3 行苦难与被逼入土（新增第 3 行专写扫荡过后的活不下去）
+      //   → 1 行地道成网（题眼，全文最长一行保住）→ 3 行落到梁家村和柱子。
+      // 第 8 行粮的铰链仍保留（c1_father 审问问的正是粮）。
+      // 每行一段过场短片（Video/Pro_NN.mp4），手绘插卡兜底。
       kind: "cinematic", id: "c1_prologue", prologue: true,
       lines: [
-        { stage: "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
-        { stage: "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。", d: 4.4, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro2" } },
-        { stage: "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
-        { stage: "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。", d: 4.8, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
-        { stage: "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。", d: 5.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
-        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro6" } },
-        { stage: "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro7" } },
-        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro8" } },
-        { stage: "这个故事，发生在冀中一个普通的村庄。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro9" } },
-        { stage: "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。", d: 7.6, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro10" } },
-        { stage: "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。", d: 7.8, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro11" } },
-        { stage: "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。", d: 8.2, cam: { kind: "insertVideo", clip: "Pro_12", card: "pro12" } },
-        { stage: "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。", d: 7.0, cam: { kind: "insertVideo", clip: "Pro_13", card: "pro13" } },
-        { stage: "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。", d: 8.0, cam: { kind: "insertVideo", clip: "Pro_14", card: "pro14" } },
+        { stage: "民国二十六年，卢沟桥一声枪响。不出一年，华北尽落敌手。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
+        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro6" } },
+        { stage: "粮被抢空，屋烧成断墙。活下来的人，连哭都不敢出声。", d: 5.5, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro13" } },
+        { stage: "无山可靠，无林可藏。庄稼人被逼到头，把命藏进了脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro7" } },
+        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro8" } },
+        { stage: "故事，发生在冀中的梁家村。村东头，住着个姓梁的木匠。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro11" } },
+        { stage: "他有个儿子叫柱子——房梁的梁，柱子的柱，起的是盼头。", d: 5.6, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro12" } },
+        { stage: "这年春上，粮比什么都金贵——谁家囤里，都在数着过。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
         { stage: "这天早上，梁木匠把儿子叫到了门框跟前。", d: 4.0, cam: { kind: "wide", x: 42 } },
       ],
     },
