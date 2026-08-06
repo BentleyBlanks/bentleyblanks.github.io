@@ -34,7 +34,9 @@ export const PAL = {
   // 人物
   zhuzi: "#c8843c", zhuziDark: "#a2662a",
   sister: "#b8636e", sisterDark: "#934b56",
-  mother: "#8a7060", father: "#6d5340",
+  // 娘穿靛蓝土布（华北农妇最常见的一身），爹穿土褐短褂——
+  // 侧视白盒里认人主要靠色相，两个人都是褐色就永远分不出谁是谁
+  mother: "#4e5c6b", motherDark: "#39434f", father: "#6d5340",
   militia: "#5a6b74", militiaDark: "#44535b",
   soldier: "#7a7448", soldierDark: "#5c5732",
   puppet: "#8d8464", puppetDark: "#6d6549",
@@ -174,7 +176,7 @@ export function Speckle(ctx, x, y, w, h, id, { count = 24, color = IN.ink, alpha
 const KIND_COLOR = {
   player: [PAL.zhuzi, PAL.zhuziDark],
   sister: [PAL.sister, PAL.sisterDark],
-  family: [PAL.mother, "#6d5748"],
+  family: [PAL.mother, PAL.motherDark],
   militia: [PAL.militia, PAL.militiaDark],
   soldier: [PAL.soldier, PAL.soldierDark],
   puppet: [PAL.puppet, PAL.puppetDark],
@@ -382,21 +384,36 @@ export function DrawFootPart(ctx, px, py, len, h, color, id, k = 1) {
 }
 
 // 躯干：枢轴在胯（底边中点），短褂下摆略散
+// 躯干：枢轴在胯（底边中点）。
+// 侧视轮廓按真人的比例走——肩略收、胸廓最厚、腰掐进去、褂子下摆再散开。
+// 原来是一只"上窄下更宽"的木桶（通体 0.42m 厚，真人胸廓侧视才 0.24m 左右），
+// 所以人看着像块板子。娘的大襟褂比爹的短褂长一截，下摆也更散。
 export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
   const [coat] = RIG_COLOR(kind);
+  const longCoat = kind === "family" || kind === "sister";   // 大襟褂过胯
+  const hem = longCoat ? 0.10 : 0.02;                        // 下摆探出胯多少（按 h 比例）
+  const flare = longCoat ? 0.46 : 0.40;                      // 下摆散开的程度
   InkFill(ctx, [
-    [px - w * 0.40, py - h], [px + w * 0.40, py - h],
-    [px + w * 0.50, py - h * 0.22], [px + w * 0.54, py],
-    [px - w * 0.54, py], [px - w * 0.50, py - h * 0.22],
+    [px - w * 0.30, py - h],                 // 后肩
+    [px + w * 0.24, py - h],                 // 前肩（略收，肩不是方的）
+    [px + w * 0.44, py - h * 0.66],          // 胸最厚处
+    [px + w * 0.30, py - h * 0.26],          // 腰掐进去
+    [px + w * flare, py + h * hem],          // 下摆（前）
+    [px - w * (flare + 0.04), py + h * hem], // 下摆（后）
+    [px - w * 0.34, py - h * 0.28],          // 腰（后）
+    [px - w * 0.46, py - h * 0.70],          // 背最厚处
   ], id, coat, { amp: 1.8 * k, lw: 4.4 * k, shade: "rgba(0,0,0,0.15)", shadeAt: 0.54 });
-  // 腰带与衣襟
-  InkLine(ctx, px - w * 0.5, py - h * 0.1, px + w * 0.5, py - h * 0.1, id + "belt",
-    { lw: 5 * k, color: "rgba(43,31,22,0.8)", amp: 1.2 * k });
-  InkLine(ctx, px + w * 0.08, py - h * 0.9, px + w * 0.14, py - h * 0.14, id + "lapel",
-    { lw: 3 * k, color: "rgba(43,31,22,0.55)", amp: 1.6 * k });
+  // 腰带（男的束在腰上；女的大襟褂不束腰，只压一道襟线）
+  if (!longCoat) {
+    InkLine(ctx, px - w * 0.36, py - h * 0.22, px + w * 0.34, py - h * 0.24, id + "belt",
+      { lw: 5 * k, color: "rgba(43,31,22,0.8)", amp: 1.2 * k });
+  }
+  // 衣襟：从领口斜下来（大襟褂斜得更明显——这是女式的记号）
+  InkLine(ctx, px + w * 0.06, py - h * 0.92, px + w * (longCoat ? 0.30 : 0.16), py - h * 0.2,
+    id + "lapel", { lw: 3 * k, color: "rgba(43,31,22,0.55)", amp: 1.6 * k });
   // 布料褶皱
   for (let i = 0; i < 2; i += 1) {
-    InkLine(ctx, px - w * 0.3 + i * w * 0.2, py - h * 0.62, px - w * 0.26 + i * w * 0.2, py - h * 0.24,
+    InkLine(ctx, px - w * 0.22 + i * w * 0.16, py - h * 0.60, px - w * 0.18 + i * w * 0.16, py - h * 0.22,
       id + "fold" + i, { lw: 2 * k, color: "rgba(43,31,22,0.3)", amp: 2 * k });
   }
 }
@@ -468,11 +485,24 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       ctx.lineWidth = lw * 0.6;
       ctx.stroke();
     }
+  } else if (kind === "family") {
+    // 娘：抿到脑后挽成一个髻。侧视里这是"一眼认出是谁"最省的一笔
+    InkFill(ctx, [
+      [px - r * 0.96, py - r * 1.16], [px + r * 0.10, py - r * 1.86],
+      [px + r * 1.00, py - r * 1.04], [px - r * 0.92, py - r * 0.58],
+    ], id + "hair", "#2f2219", { amp: 1.5 * k, lw: lw * 0.85 });
+    ctx.beginPath();
+    ctx.arc(px - r * 1.12, py - r * 0.86, r * 0.40, 0, Math.PI * 2);
+    ctx.fillStyle = "#2f2219";
+    ctx.fill();
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = lw * 0.7;
+    ctx.stroke();
   } else {
     InkFill(ctx, [
       [px - r * 0.94, py - r * 1.20], [px + r * 0.10, py - r * 1.84],
       [px + r * 1.00, py - r * 1.02], [px - r * 0.90, py - r * 0.62],
-    ], id + "hair", "#33251b", { amp: 1.5, lw: lw * 0.85 });
+    ], id + "hair", "#33251b", { amp: 1.5 * k, lw: lw * 0.85 });
   }
 }
 
@@ -707,27 +737,27 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
     // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，
     // 手一伸一屈，锯就一进一出。握点（原点）在近侧立柱上端。
-    const L = 30;    // 锯全长（绘制单位，×S）
-    InkLine(ctx, 0, -3 * S, 0, (L + 2) * S, "sawPostA", { lw: 2.6 * S, color: "#8d6236" });          // 近侧立柱（手握这根）
-    InkLine(ctx, -9 * S, 2 * S, -9 * S, (L - 2) * S, "sawPostB", { lw: 2.2 * S, color: "#8d6236" }); // 远侧立柱
-    InkLine(ctx, -9 * S, 6 * S, 0, 3 * S, "sawBeam", { lw: 2.4 * S, color: "#7a5433" });             // 横梁
+    const L = 21;    // 锯全长（绘制单位，×S）≈0.75m，框锯本来就不长
+    InkLine(ctx, 0, -3 * S, 0, (L + 2) * S, "sawPostA", { lw: 1.15 * S, color: "#8d6236" });         // 近侧立柱（手握这根）
+    InkLine(ctx, -7 * S, 1 * S, -7 * S, (L - 2) * S, "sawPostB", { lw: 1.0 * S, color: "#8d6236" }); // 远侧立柱
+    InkLine(ctx, -7 * S, 4 * S, 0, 2 * S, "sawBeam", { lw: 1.1 * S, color: "#7a5433" });             // 横梁
     // 锯条：立柱下端之间绷直的一道铁色，带细齿
     ctx.strokeStyle = "#8d9298";
-    ctx.lineWidth = 1.6 * S;
-    ctx.beginPath(); ctx.moveTo(-9 * S, (L - 2) * S); ctx.lineTo(0, (L + 2) * S); ctx.stroke();
+    ctx.lineWidth = 1.0 * S;
+    ctx.beginPath(); ctx.moveTo(-7 * S, (L - 2) * S); ctx.lineTo(0, (L + 2) * S); ctx.stroke();
     for (let i = 0; i < 6; i += 1) {
-      const tx = -8 * S + i * 1.5 * S;
-      const ty = (L - 1.4 + i * 0.62) * S;
+      const tx = -6 * S + i * 1.1 * S;
+      const ty = (L - 1.4 + i * 0.56) * S;
       InkLine(ctx, tx, ty, tx + 0.8 * S, ty + 1.2 * S, "sawTooth" + i, { lw: 0.9 * S, color: "#6b6f76" });
     }
     // 绞绳：横梁上方两立柱之间的一道麻色缠绕
-    InkLine(ctx, -9 * S, 3 * S, 0, 0, "sawCord", { lw: 1.3 * S, color: "#9a7d4f", amp: 1.4 });
+    InkLine(ctx, -7 * S, 2 * S, 0, 0, "sawCord", { lw: 0.8 * S, color: "#9a7d4f", amp: 1.4 });
   } else if (label === "锄头") {
     // 长柄锄：木柄顺着"手往下"的方向（跟着前臂转——扬过肩、落进土都是它），
     // 柄端一块弯下去的铁锄板。握点（原点）在柄上三分之一处。
-    InkLine(ctx, 0, -16 * S, 0, 34 * S, "hoeShaft", { lw: 2.6 * S, color: "#8d6236" });
-    InkFill(ctx, [[-1.5 * S, 32 * S], [7 * S, 36 * S], [9 * S, 41 * S], [1.5 * S, 38 * S]],
-      "hoeBlade", "#6b6f76", { amp: 0.5 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.25)" });
+    InkLine(ctx, 0, -12 * S, 0, 25 * S, "hoeShaft", { lw: 1.15 * S, color: "#8d6236" });
+    InkFill(ctx, [[-1.2 * S, 23.5 * S], [5.2 * S, 26.5 * S], [6.6 * S, 30.5 * S], [1.2 * S, 28 * S]],
+      "hoeBlade", "#6b6f76", { amp: 0.4 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.25)" });
   } else if (label === "满桶水" || label === "一桶水" || label === "空桶") {
     DrawCarry(ctx, 0, 0, S, 1, "水桶");
     if (label !== "空桶") {
