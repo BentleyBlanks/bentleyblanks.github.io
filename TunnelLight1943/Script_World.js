@@ -121,7 +121,7 @@ function MakeCarryMesh(label) {
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const TALL = { "锯": [70, 110], "锄头": [70, 140] };
+  const TALL = { "锯": [70, 110], "锄头": [70, 140], "步枪": [64, 130] };
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -1711,7 +1711,7 @@ export function CreateWorld(canvasEl) {
     // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同。
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
-    const alongArm = label === "锯" || label === "锄头";
+    const alongArm = label === "锯" || label === "锄头" || label === "步枪";
     const inHand = alongArm || [...BUCKETS, "刨子", "石子", "窝头", "铃铛", "柴刀", "麻绳",
       "花布巾", "鞭炮", "一挂鞭炮"].includes(label);
     const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
@@ -1902,7 +1902,10 @@ export function CreateWorld(canvasEl) {
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
       if (a.pose === "planePush") planeHandRig = s.rig;
-      SyncCarry(s, a.carry, a.heading);
+      // 兵手里默认有枪。剧本不必给每一处敌人写 carry——枪是他们的常态，
+      // 而且必须是**真握在手里**的物件：抡枪托那一下砸下来的就是它
+      const carry = a.carry ?? ((a.kind === "soldier" || a.kind === "puppet") ? "步枪" : null);
+      SyncCarry(s, carry, a.heading);
       LiftActor(s, ch.light, false);
       // 提灯：先把灯挂到手上，光晕再从灯的火心发出去
       const lampKind = a.lantern ? (a.lanternKind || (a.kind === "puppet" ? "lantern" : "hurricane")) : null;

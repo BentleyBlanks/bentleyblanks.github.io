@@ -32,6 +32,8 @@
         { "id": "veggieWest", "kind": "crops", "x": 16.5, "w": 5, "name": "菜畦", "note": "娘的活计：柱子跑腿时爹在锯木头、娘在这儿锄地——家里没有站着围观的人" },
         { "id": "roadStack", "kind": "woodStack", "x": 84, "w": 1.7, "h": 1.24, "name": "码好的柴垛", "note": "教「翻越」的第一课。必须离跑腿路线（院子 31~70）远远的——提着桶扛着木料被要求翻墙是这一版最先被骂的地方；挪到去老槐树的路上，那趟路空着手来回。肩高、顶沿磨得发亮还缺一角=可翻越物的轮廓语法" },
         { "id": "cellarMouth", "kind": "hatch", "x": 27, "name": "地窖口" },
+        { "id": "cellarRoom", "kind": "chamber", "x": 26, "w": 11, "name": "地窖",
+          "note": "自家地窖是**直得起腰**的：玩法侧早就按站立算（MovePlayer 的 inTunnel 不含 village），美术侧却拿地道的猫腰净高去掏土层剖面，于是近侧那张 z=2.2 的剖面把站在窖里的人整个盖住。登记成 chamber，TunnelPosture 与 AddUnderground 就都按站立掏了" },
         { "id": "well", "kind": "well", "x": 58, "name": "水井" },
         { "id": "millstone", "kind": "millstone", "x": 76, "name": "磨盘" },
         { "id": "woodpile", "kind": "woodpile", "x": 70, "name": "木料堆" },
