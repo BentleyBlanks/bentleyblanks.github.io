@@ -674,6 +674,13 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   0%, 100% { transform: translate(-50%, -55%); }
   50% { transform: translate(calc(-50% + 9px), -55%); }
 }
+/* 刨子推到头了：该往回拖。轨道退成暗的，旋钮反着晃——方向自己会说 */
+#scribeGuide.back .fill { background: rgba(226, 196, 132, 0.22); }
+#scribeGuide.back .knob { animation: scribeNudgeBack 1.1s ease-in-out infinite; }
+@keyframes scribeNudgeBack {
+  0%, 100% { transform: translate(-50%, -55%); }
+  50% { transform: translate(calc(-50% - 11px), -55%); }
+}
 #scribeGuide .tip {
   margin-top: 9px; font-size: 13px; letter-spacing: 0.16em; color: #e8dcbc;
   text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);

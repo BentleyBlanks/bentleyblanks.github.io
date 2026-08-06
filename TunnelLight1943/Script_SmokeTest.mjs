@@ -121,6 +121,11 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           input.interactHeld = true;
           input.moveX = 1;
         }
+        // 刨料：站到工位上按住 E 一趟趟推；推到头了掉头把刨子拖回来
+        if (target.action === "planeAt") {
+          if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
+          else { input.interactHeld = true; input.moveX = target.back ? -1 : 1; }
+        }
         if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
@@ -462,6 +467,73 @@ function TestWorkStations() {
   console.log("  ✓ 干活的家人（爹拉锯/娘锄地）与后果小窗");
 }
 
+// 刨料这一拍是"手上真有活"的教学，几条硬约束：镜头必须推到台面上
+// （老版是十几米外按 E 敲木楔，木楔只有几个像素）；顺纹才吃木头、倒着拖不算；
+// 中间顿一下这一趟就不齐（刨花短一截），但**永远不会卡死**——推够趟数就过。
+function TestPlaneBeat() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  const state = CreateGame(0);
+  DebugJump(state, 0, beats.indexOf("c1_tenon"));
+  const def = CurrentBeatDef(state);
+  assert.equal(def.kind, "plane", "合榫那一拍已经换成刨料");
+  assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
+
+  // 爹的示范先走完
+  for (let i = 0; i < 150; i += 1) StepGame(state, idle(), DT);
+  assert.ok(state.planing, "刨料期间台面上必须有那块料");
+  const workX = def.zone.x - 0.55;
+  state.player.x = workX;
+
+  // ① 倒着拖不吃木头
+  const before = state.planing.smooth;
+  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), interactHeld: true, moveX: -1 }, DT);
+  assert.equal(state.planing.smooth, before, "回程不该刨掉木头");
+
+  // ② 一趟推到底：刨花出来、木头亮一分
+  let guard = 0;
+  while (state.planing && state.planing.smooth === before && guard < 400) {
+    guard += 1;
+    StepGame(state, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+  }
+  assert.ok(state.planing === null || state.planing.smooth > before, "一趟推到底必须刨掉一层");
+  assert.ok(state.flags.planedOnce, "第一趟推完必须落旗");
+
+  // ③ 中间顿一下：这一趟不齐，刨花短一截（但仍然算数，不会卡死）
+  const s2 = CreateGame(0);
+  DebugJump(s2, 0, beats.indexOf("c1_tenon"));
+  for (let i = 0; i < 150; i += 1) StepGame(s2, idle(), DT);
+  s2.player.x = def.zone.x - 0.55;
+  for (let i = 0; i < 14; i += 1) StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+  for (let i = 0; i < 20; i += 1) StepGame(s2, idle(), DT);          // 停在半道
+  let g2 = 0, curlLen = null;
+  while (s2.planing && g2 < 400) {
+    g2 += 1;
+    StepGame(s2, { ...idle(), interactHeld: true, moveX: 1 }, DT);
+    if (s2.planeCurl && curlLen === null) curlLen = s2.planeCurl.len;
+    if (curlLen !== null) break;
+  }
+  assert.ok(curlLen !== null && curlLen < 1, "顿过的那一趟，刨花必须短一截");
+
+  // ④ 自动通关能过（不会卡在"推到头忘了拖回来"）
+  const s3 = CreateGame(0);
+  DebugJump(s3, 0, beats.indexOf("c1_tenon"));
+  let g3 = 0;
+  while (CurrentBeatDef(s3)?.id === "c1_tenon" && g3 < 3000) {
+    g3 += 1;
+    const t = GetBeatTarget(s3);
+    const inp = idle();
+    if (t?.action === "planeAt") {
+      const d = t.x - s3.player.x;
+      if (Math.abs(d) > 0.6) inp.moveX = Math.sign(d);
+      else { inp.interactHeld = true; inp.moveX = t.back ? -1 : 1; }
+    }
+    StepGame(s3, inp, DT);
+  }
+  assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
+  console.log("  ✓ 刨料：镜头推近 / 顺纹才吃木 / 顿一下刨花短 / 推得完");
+}
+
 function TestQuieterAudioMix() {
   assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
   // 环境声（风）是从头响到尾的底噪，玩家反馈「太吵」——基准压到 0.34 以下。
@@ -529,6 +601,7 @@ TestStealthEscapable();
 TestPromptsAreDeviceNeutral();
 TestWorkStations();
 TestVaultC1();
+TestPlaneBeat();
 TestInstrumentalBgmManifest();
 TestQuieterAudioMix();
 

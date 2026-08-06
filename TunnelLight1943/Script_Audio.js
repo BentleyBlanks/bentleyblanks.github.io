@@ -907,6 +907,24 @@ function Build(ac, options) {
       Tone(t, { level: 0.09 * k, attack: 0.002, decay: 0.12, type: "triangle", freq: 190 * r, to: 120 * r, pan });
       NoiseHit(t + 0.015, { level: 0.05 * k, attack: 0.001, decay: 0.03, freq: 2100, q: 1.6, pan });
     },
+    // 刨刃吃木头：一粒很短的沙沙。推的过程里每 8cm 出一粒，连起来就是
+    // 那条"唰——"；推得快粒就密，手上一直有东西在响
+    planeCut(t, k, pan) {
+      NoiseHit(t, { level: 0.045 * k, attack: 0.004, decay: 0.075, freq: 2600, sweep: -900, q: 0.7, pan });
+      NoiseHit(t + 0.012, { level: 0.02 * k, attack: 0.002, decay: 0.04, freq: 4200, q: 1.1, pan });
+    },
+    // 一趟推到头，刨花脱刃：末尾一声轻快的翘 + 木头的余韵。
+    // rate 由这一趟的成绩给——推得齐就长而亮，顿过就短而闷
+    planeCurl(t, k, pan, r) {
+      NoiseHit(t, { level: 0.075 * k, attack: 0.006, decay: 0.22 * r, freq: 1900 * r, sweep: 1200, q: 0.6, pan });
+      Tone(t + 0.02, { level: 0.032 * k, attack: 0.006, decay: 0.26 * r, type: "triangle", freq: 340 * r, to: 220 * r, pan });
+      NoiseHit(t + 0.16 * r, { level: 0.022 * k, attack: 0.01, decay: 0.12, freq: 900, sweep: -300, q: 1.4, pan });
+    },
+    // 推到半道停住：刨刃啃进木头，一声闷顿。不是失败音，是"手上不对"
+    planeStall(t, k, pan) {
+      NoiseHit(t, { level: 0.07 * k, attack: 0.002, decay: 0.07, freq: 380, q: 4.5, pan });
+      Tone(t, { level: 0.045 * k, attack: 0.003, decay: 0.1, type: "sawtooth", freq: 150, to: 96, pan });
+    },
     // 投掷破空：很短的一瞬风声
     whoosh(t, k, pan) {
       NoiseHit(t, { level: 0.07 * k, attack: 0.015, decay: 0.16, freq: 1300, sweep: 2800, q: 0.8, pan });

@@ -329,8 +329,9 @@ function SampleTrack(name, time) {
 
 /**
  * 姿态解算：把状态映射成关节角度。
- * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture}
+ * state: {phase, moving, crouch, carry, climbing, digging, aiming, posture, pose, poseK}
  * posture: stand | stoop | squat | crawl —— 地道各段净高不同，见 Core 的 TunnelPosture
+ * poseK: 0..1 的动作进度，驱动 planePush（推程）/ vault（翻越）这类姿势——不是时间
  * 所有角度用弧度，正值 = 顺时针（面朝 +x 时向前）
  */
 export function PoseRig(rig, s, dt) {
@@ -450,6 +451,30 @@ export function PoseRig(rig, s, dt) {
     target.armB = -6 * DEG; target.foreB = -22 * DEG;
     target.thighB = -42 * DEG; target.shinB = 30 * DEG; target.footB = -10 * DEG;
     target.thighF = 18 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.pose === "planePush") {
+    // 刨料：**姿势由推程直接驱动**（s.poseK 0→1），不是播一段循环给玩家看。
+    // 他推多远，这具身子就送多远——手上的分量就是从这儿来的。
+    // 起手弓腰、重心在后脚、两手压在刨子上；推出去时胯往前送、双臂伸直、
+    // 上身跟着压下去。中国木匠是在矮长凳上刨料的，所以腰折得很深。
+    const u = Math.max(0, Math.min(1, s.poseK ?? 0));
+    const e = u * u * (3 - 2 * u);            // 缓入缓出：起步与收势都不生硬
+    target.hipY = -0.13 - e * 0.05;
+    target.hipX = -0.05 + e * 0.30;
+    // 腰弓到 34° 就够了：再深头就埋进台面，画面上分不清人和木头
+    target.torso = (32 + e * 8) * DEG;
+    target.head = (-20 - e * 6) * DEG;
+    // 双手都压在刨子上：前后臂同相位，随推程从"折回胸前"伸到"探到最远"
+    target.armF = (-52 - e * 34) * DEG;
+    target.foreF = (-58 + e * 50) * DEG;
+    target.armB = (-44 - e * 32) * DEG;
+    target.foreB = (-54 + e * 48) * DEG;
+    // 前脚蹬住、后腿把身子往前送
+    target.thighB = (-34 + e * 18) * DEG;
+    target.shinB = (40 - e * 14) * DEG;
+    target.footB = -10 * DEG;
+    target.thighF = (18 - e * 10) * DEG;
+    target.shinF = (10 + e * 8) * DEG;
+    target.footF = -10 * DEG;
   } else if (s.pose === "crank") {
     // 摇辘轳：两手一前一后画圈，脚步扎稳
     const ph = p * 2.4;
