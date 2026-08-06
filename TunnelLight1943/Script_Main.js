@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=030";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=030";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=032";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=032";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=029")
+import("./Script_Audio.js?v=032")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -148,7 +148,9 @@ const scribeDrag = { active: false, id: null, lastX: 0, accum: 0 };
 canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" || e.pointerType === "pen") inputMode = "touch";
   advanceEdge = true;
-  if (state && CurrentBeatDef(state)?.kind === "scribe") {
+  // 划线与刨料是同一种手势：把它推过去。两拍共用这套位移驱动的拖动
+  const dragKind = state && CurrentBeatDef(state)?.kind;
+  if (dragKind === "scribe" || dragKind === "plane") {
     scribeDrag.active = true;
     scribeDrag.id = e.pointerId;
     scribeDrag.lastX = e.clientX;
@@ -504,6 +506,7 @@ function KeyChipHtml(act) {
   return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
 }
 
+let dragTipShown = "";             // QTE 轨道那行小字（换了才重写 DOM）
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
 let actShown = "";                 // 换了文案/设备才重排 DOM
 
@@ -633,7 +636,10 @@ function SyncHud(state, dt, shotFade) {
   // 仍旧躺在底边——两种东西，两个位置，别混在一条 pill 里。
   // 章节卡/终局那几拍 StepGame 提前 return，state.prompt 是上一幕留下的死值——
   // 徽章现在浮在画面中间，赖着不走就直接盖在章节卡上了
-  const raw = state.phase === "playing" ? (state.prompt || state.climbHint || "") : "";
+  // 翻越的提示排在最前：被一垛柴挡住去路是此刻最要紧的事，
+  // 盖过节拍那句「跟上娘」是对的——手上没按那一下，他哪儿也去不了
+  const raw = state.phase === "playing"
+    ? (state.vaultHint || state.prompt || state.climbHint || "") : "";
   const pr = (!raw || inCinematic) ? null : SplitPrompt(raw);
   const status = pr && !pr.act ? pr : null;
   const fill = Math.max(0, Math.min(1, state.promptFill || 0));
@@ -668,13 +674,19 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线的 QTE 轨道：石笔头跟着进度走，没动起来时轻轻晃一下招呼玩家来拖
+  // 拖动的 QTE 轨道：划线的石笔、刨料的刨子共用这一条。旋钮跟着进度走，
+  // 没动起来时轻轻晃一下招呼玩家来拖；刨子推到头要拖回来时轨道翻个方向。
   if (ui.scribeGuide) {
-    const sc = state.scribe;
-    ui.scribeGuide.hidden = !sc;
-    if (sc) {
-      ui.scribeGuide.style.setProperty("--fill", (sc.t * 100).toFixed(1) + "%");
-      ui.scribeGuide.classList.toggle("idle", !!sc.idle);
+    const dt2 = state.dragTrack;
+    ui.scribeGuide.hidden = !dt2 || inCinematic;
+    if (dt2) {
+      ui.scribeGuide.style.setProperty("--fill", (dt2.t * 100).toFixed(1) + "%");
+      ui.scribeGuide.classList.toggle("idle", !!dt2.idle);
+      ui.scribeGuide.classList.toggle("back", !!dt2.back);
+      if (dragTipShown !== dt2.tip) {
+        dragTipShown = dt2.tip;
+        ui.scribeGuide.querySelector(".tip").textContent = dt2.tip;
+      }
     }
   }
   if (ui.touchControls) {

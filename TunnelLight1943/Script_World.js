@@ -296,9 +296,13 @@ export function CreateWorld(canvasEl) {
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
-  let tenonMesh = null, tenonCanvas = null, tenonCtx = null;
+  // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
+  let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
+  let planeToolMesh = null;
+  let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
+  let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
+  let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
   let spotFlashMesh = null;
-  const V_WORKBENCH_X = 40.5;
 
   // 清空一层。标了 persist 的（演员骨架、影子、手里的东西）留下来并且
   // **绝不 dispose**：骨架的几何体与贴图是 rigCache 里所有角色共用的
@@ -345,7 +349,10 @@ export function CreateWorld(canvasEl) {
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
-    tenonMesh = null; tenonCanvas = null; tenonCtx = null;
+    planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
+    planeToolMesh = null; planeHandRig = null;
+    planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
+    planePileMesh = null; planePileCanvas = null; planePileCtx = null;
     spotFlashMesh = null;
   }
 
@@ -1695,6 +1702,7 @@ export function CreateWorld(canvasEl) {
     const sceneDef = SCENES[ch.scene];
     const seen = new Set(["player"]);
     const p = state.player;
+    planeHandRig = null;   // 这一帧谁在推刨子（UpdateProps 拿它挂刨子）
     const ps = EnsureActorSprite("player", "player");
     const def = CurrentBeatDef(state);
     const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
@@ -1747,12 +1755,15 @@ export function CreateWorld(canvasEl) {
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
-        lift: p.lift || 0, poseK: p.vaultK,
+        // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
+        // 翻越取 vaultK，刨料取 poseU（推程）。两者互斥，有哪个用哪个
+        lift: p.lift || 0, poseK: p.vaultK ?? p.poseU,
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
         light: NearestLight(p.x, LevelYOf(p.level)),
       });
     ps.mesh.visible = otsHiddenId !== "player";
+    if (p.pose === "planePush") planeHandRig = ps.rig;
     LiftActor(ps, ch.light, true);
 
     SyncCarry(ps, held, p.heading);
@@ -1802,10 +1813,11 @@ export function CreateWorld(canvasEl) {
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
-          lift: a.lift || 0, poseK: a.vaultK,
+          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
+      if (a.pose === "planePush") planeHandRig = s.rig;
       SyncCarry(s, a.carry, a.heading);
       LiftActor(s, ch.light, false);
       // 提灯：先把灯挂到手上，光晕再从灯的火心发出去
@@ -2346,48 +2358,110 @@ export function CreateWorld(canvasEl) {
       } else if (dustMesh) dustMesh.visible = false;
     }
 
-    // 合榫的楔子：工作台面上一排小木楔，敲一下吃进一分；敲歪的那下斜着。
-    // 楔子是巴掌大的东西——贴着台面画，不是悬在半空的门板
-    if (state.tenon) {
-      const tn = state.tenon;
-      const key = `${tn.si}/${tn.hi}/${tn.crooked ? 1 : 0}/${tn.total}`;
-      if (!tenonMesh) {
-        // 楔子是巴掌大的东西，玩家会凑到台面上敲——按 PROP_SS 加密（只在
-        // 状态变化时重画，7 个状态一共重画 7 次，代价可以忽略）
-        tenonCanvas = MakeCanvas(160 * PROP_SS, 44 * PROP_SS);
-        tenonCtx = tenonCanvas.getContext("2d");
-        tenonCtx.scale(PROP_SS, PROP_SS);
-        const tex = CanvasTexture(tenonCanvas);
-        tenonMesh = new THREE.Mesh(
-          new THREE.PlaneGeometry(1.5, 0.41),
-          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+    // 刨料：台面上那块毛料 + 骑在手上的刨子 + 打着卷落下来的刨花 + 地上那堆。
+    // 这一拍镜头推到 2.9m，木头是主角——料的毛面要能看出一趟趟被削平。
+    if (state.planing) {
+      const pl = state.planing;
+      const boardW = pl.span + 0.26;
+      if (!planeBoardMesh) {
+        const wPx = Math.round(boardW * PPM);
+        planeBoardCanvas = MakeCanvas(wPx * PROP_SS, 40 * PROP_SS);
+        planeBoardCtx = planeBoardCanvas.getContext("2d");
+        planeBoardCtx.scale(PROP_SS, PROP_SS);
+        planeBoardMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(boardW, 40 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planeBoardCanvas), transparent: true, depthWrite: false }),
         );
-        FixOrder(tenonMesh, LAYER_ORDER.fx + 180);
-        layers.fx.add(tenonMesh);
-        tenonMesh.userData.k = "";
+        layers.play.add(planeBoardMesh);
+        SetPlayOrder(planeBoardMesh, 0.5);      // 料在台面上，人在台子前面
+        planeBoardMesh.userData.k = "";
+        // 刨子本体：真家伙就巴掌长（≈0.34m）。S=0.74 让 DrawCarry 的 22S 像素
+        // 正好落在这个尺寸上——上一版按 S=1.9 画，一把刨子有 0.9m 长
+        planeToolMesh = BakeSprite(26, 20, 13, 14,
+          (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 0.74, 1, "刨子"), 0, DETAIL_SS * 4);
+        layers.play.add(planeToolMesh);
+        SetPlayOrder(planeToolMesh, CARRY_Z);   // 攥在手里，与其它手持物同一层
+        // 地上的刨花堆
+        planePileCanvas = MakeCanvas(64 * PROP_SS, 26 * PROP_SS);
+        planePileCtx = planePileCanvas.getContext("2d");
+        planePileCtx.scale(PROP_SS, PROP_SS);
+        planePileMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(64 / PPM, 26 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planePileCanvas), transparent: true, depthWrite: false }),
+        );
+        layers.play.add(planePileMesh);
+        SetPlayOrder(planePileMesh, 0.72);      // 落在台子这一侧的地上
+        planePileMesh.userData.k = -1;
       }
-      if (tenonMesh.userData.k !== key) {
-        tenonMesh.userData.k = key;
-        const c = tenonCtx;
-        c.clearRect(0, 0, 160, 44);
-        // 榫料：一根横木，楔眼排在上面
-        ART.InkFill(c, ART.Rect(6, 26, 148, 12), "tenonRail", "#8d6236", { amp: 1, lw: 2, shade: "rgba(0,0,0,0.2)" });
-        for (let i = 0; i < tn.total; i += 1) {
-          const px = 30 + i * (100 / Math.max(1, tn.total - 1));
-          const hit = i < tn.hi;
-          const depth = hit ? 7 : 0;
-          c.save();
-          c.translate(px, 18 + depth);
-          if (tn.crooked && i === tn.hi - 1) c.rotate(0.4);
-          ART.InkFill(c, [[-4, -10], [4, -10], [3, 10], [-3, 10]], "peg" + i, hit ? "#a8794a" : "#e0c78e",
-            { amp: 0.6, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
-          c.restore();
-        }
-        tenonMesh.material.map.needsUpdate = true;
+      // 毛面按 12 档重画（连续重画一块 PROP_SS 的画布太亏）
+      const bucket = Math.round(pl.smooth * 12);
+      if (planeBoardMesh.userData.k !== bucket) {
+        planeBoardMesh.userData.k = bucket;
+        const wPx = Math.round(boardW * PPM);
+        planeBoardCtx.clearRect(0, 0, wPx, 40);
+        ART.DrawPlaneBoard(planeBoardCtx, wPx / 2, 14, pl.span * PPM, bucket / 12, "c1board");
+        planeBoardMesh.material.map.needsUpdate = true;
       }
-      tenonMesh.visible = true;
-      tenonMesh.position.set(V_WORKBENCH_X, SURFACE_Y + 0.98, 0.5);
-    } else if (tenonMesh) tenonMesh.visible = false;
+      planeBoardMesh.visible = true;
+      // 料的上沿画在画布 y=14，网格中心是 y=20。画布 y 向下、世界 y 向上，
+      // 所以中心要落在上沿**之下** 6px——符号写反的话料就飘在台面上方
+      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, 0.5);
+
+      // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
+      // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
+      // （另算一份 u→x 的话，两条线迟早对不上，刨子就飘在手外面了。）
+      const hand = planeHandRig ? HandPoint(planeHandRig) : null;
+      planeToolMesh.visible = !!hand;
+      if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, 0.56);
+
+      if (planePileMesh.userData.k !== pl.pile) {
+        planePileMesh.userData.k = pl.pile;
+        planePileCtx.clearRect(0, 0, 64, 26);
+        ART.DrawShavingPile(planePileCtx, 32, 22, pl.pile, "c1pile");
+        planePileMesh.material.map.needsUpdate = true;
+      }
+      planePileMesh.visible = pl.pile > 0;
+      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, 0.58);
+    } else {
+      if (planeBoardMesh) planeBoardMesh.visible = false;
+      if (planeToolMesh) planeToolMesh.visible = false;
+      if (planePileMesh) planePileMesh.visible = false;
+    }
+
+    // 刚削下来的那条刨花：从刨刃口弹出来，打着旋儿飘到地上
+    if (state.planeCurl) {
+      const cu = state.planeCurl;
+      if (!planeCurlMesh) {
+        planeCurlCanvas = MakeCanvas(26 * PROP_SS, 26 * PROP_SS);
+        planeCurlCtx = planeCurlCanvas.getContext("2d");
+        planeCurlCtx.scale(PROP_SS, PROP_SS);
+        planeCurlMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(26 / PPM, 26 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planeCurlCanvas), transparent: true, depthWrite: false }),
+        );
+        FixOrder(planeCurlMesh, LAYER_ORDER.fx + 200);
+        layers.fx.add(planeCurlMesh);
+        planeCurlMesh.userData.k = -1;
+      }
+      const lb = Math.round(cu.len * 4);
+      if (planeCurlMesh.userData.k !== lb) {
+        planeCurlMesh.userData.k = lb;
+        planeCurlCtx.clearRect(0, 0, 26, 26);
+        ART.DrawShaving(planeCurlCtx, 13, 13, 0.4, Math.max(0.3, lb / 4), "curl" + lb);
+        planeCurlMesh.material.map.needsUpdate = true;
+      }
+      // 自由落体 + 空气里打旋：飘得越久转得越慢
+      const t = cu.t;
+      const fall = 0.35 * t + 0.9 * t * t;
+      planeCurlMesh.visible = t < 1.6;
+      planeCurlMesh.material.opacity = Math.max(0, 1 - Math.max(0, t - 1.0) / 0.6);
+      planeCurlMesh.rotation.z = t * 3.4 * (0.4 + cu.len);
+      planeCurlMesh.position.set(
+        cu.x + 0.12 + Math.sin(t * 4.1) * 0.06,
+        Math.max(SURFACE_Y + 0.06, SURFACE_Y + cu.y - fall),
+        0.6,
+      );
+    } else if (planeCurlMesh) planeCurlMesh.visible = false;
 
     // 潜行失败的视觉复盘：谁看见的，头顶亮一记「！」（首败不给文字，给这个）
     if (state.spotFlash) {
