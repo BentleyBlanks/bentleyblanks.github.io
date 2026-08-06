@@ -18,10 +18,12 @@ permissions:
   pages: write
   id-token: write
 
-# 同时只跑一个部署；新的推上来就把排队中的那个顶掉（并行会话推得很勤，
-# 排队会让最新一版迟迟不上线）。不取消正在跑的那个，免得发布到一半被腰斩。
+# 组名不能叫 `pages`：那是 GitHub 内建 Pages 部署占用的组，撞上去会被它连坐
+# 取消（本次就是这么白等了二十分钟——job 一个 runner 都没拿到就 cancelled）。
+# 同组内新的顶掉排队中的（并行会话推得勤，排队会让最新一版迟迟不上线），
+# 但不打断正在发布的那个。
 concurrency:
-  group: pages
+  group: pages-deploy
   cancel-in-progress: false
 
 jobs:
