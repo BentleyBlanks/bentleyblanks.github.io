@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=028";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=028";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=029";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=029";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -17,6 +17,7 @@ const SILENT = {
   Unlock() {}, SetEnabled() {}, IsEnabled: () => false, SetMasterVolume() {},
   SetMusicVolume() {}, SetSfxVolume() {}, SetVoiceVolume() {},
   SetMood() {}, SetBgm() {}, StopBgm() {}, GetBgmState: () => null, Sfx() {}, Duck() {}, StopVoice() {}, Update() {}, Dispose() {},
+  LoadSfxPack() {}, SfxPackSize: () => 0,
   PlayVoice: () => Promise.resolve(),
 };
 let audio = SILENT;
@@ -32,16 +33,19 @@ const soundtrack = CreateSoundtrack({
   SetSfxVolume: (...a) => audio.SetSfxVolume(...a),
   SetVoiceVolume: (...a) => audio.SetVoiceVolume(...a),
   Sfx: (...a) => audio.Sfx(...a),
+  LoadSfxPack: (...a) => audio.LoadSfxPack(...a),
+  SfxPackSize: () => audio.SfxPackSize(),
   Duck: (...a) => audio.Duck(...a),
   PlayVoice: (...a) => audio.PlayVoice(...a),
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=028")
+import("./Script_Audio.js?v=029")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
     ApplyVolumes();          // 合成器是后到的，音量得在它到位之后再喂一次
+    soundtrack.LoadSfxPack();  // 采样音效包也一样：这会儿才有 AudioContext 可解码
     soundtrack.SyncDurations();
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
@@ -1033,6 +1037,9 @@ window.TunnelLight = {
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
   GetBgmState: () => audio.GetBgmState(),
+  // 采样音效包装了几个（0 = 全靠合成器兜底）
+  SfxPackSize: () => audio.SfxPackSize(),
+  Sfx: (name, opts) => audio.Sfx(name, opts),
   StepFrames: (n, input = {}) => {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {

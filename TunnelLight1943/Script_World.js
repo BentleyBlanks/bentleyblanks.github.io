@@ -295,6 +295,7 @@ export function CreateWorld(canvasEl) {
   const bubbleTex = new Map();
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
+  let dustMesh = null, dustCanvas = null, dustCtx = null;
   let tenonMesh = null, tenonCanvas = null, tenonCtx = null;
   let spotFlashMesh = null;
   const V_WORKBENCH_X = 40.5;
@@ -343,6 +344,7 @@ export function CreateWorld(canvasEl) {
     bubbleTex.clear();
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
+    dustMesh = null; dustCanvas = null; dustCtx = null;
     tenonMesh = null; tenonCanvas = null; tenonCtx = null;
     spotFlashMesh = null;
   }
@@ -807,10 +809,11 @@ export function CreateWorld(canvasEl) {
       millstone: BAND.walk, woodpile: BAND.walk, hatch: BAND.walk, ditch: BAND.walk,
       dog: BAND.walk, stonePile: BAND.walk, hangLantern: BAND.yard, cloth: BAND.yard, vat: 0.2,
       hen: BAND.walk, ridge: BAND.walk, fallenWood: BAND.walk, thimble: BAND.clutter,
+      woodStack: BAND.walk,
     };
     const pz = KIND_Z[p.kind] ?? 0;
     const tagKind = (m) => { if (m) m.userData.kind = p.kind; return m; };
-    if (["house", "tree", "well", "millstone", "woodpile", "bench", "blockhouse", "prison"].includes(p.kind)) {
+    if (["house", "tree", "well", "millstone", "woodpile", "woodStack", "bench", "blockhouse", "prison"].includes(p.kind)) {
       AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, p.kind === "house" ? 0.34 : 0.26, pz);
     }
     switch (p.kind) {
@@ -863,6 +866,9 @@ export function CreateWorld(canvasEl) {
       case "stool": mk(60, 40, 30, 34, (ctx, ax, ay) => ART.DrawStool(ctx, ax, ay, p.id)); break;
       case "wallSeg": mk(p.w * PPM + 30, (p.h || 1.8) * PPM + 40, (p.w * PPM + 30) / 2, (p.h || 1.8) * PPM + 30,
         (ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, p.w * PPM, (p.h || 1.8) * PPM, p.id, { burnt: ruined })); break;
+      // 码好的柴垛：可翻越物的轮廓样板（肩高、顶沿磨亮、缺一角）
+      case "woodStack": mk(p.w * PPM + 34, (p.h || 1.24) * PPM + 34, (p.w * PPM + 34) / 2, (p.h || 1.24) * PPM + 26,
+        (ctx, ax, ay) => ART.DrawWoodStack(ctx, ax, ay, p.w * PPM, (p.h || 1.24) * PPM, p.id)); break;
       case "hatch": mk(70, 50, 35, 26, (ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true })); break;
       case "well": {
         mk(140, 120, 70, 108, (ctx, ax, ay) => {
@@ -1544,7 +1550,10 @@ export function CreateWorld(canvasEl) {
 
 
   function UpdateOne(s, x, level, heading, crouch, dt, carry = false, extra = {}) {
-    const y = level === "under" ? UNDER_Y : SURFACE_Y;
+    const ground = level === "under" ? UNDER_Y : SURFACE_Y;
+    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
+    const lift = extra.lift || 0;
+    const y = ground + lift;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
     s.prevX = x;
     // 步频跟着实际位移走（不是定速循环），停下就自然收回站姿
@@ -1556,7 +1565,7 @@ export function CreateWorld(canvasEl) {
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, carry,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
-      track: extra.track, trackT: extra.trackT,
+      poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
 
     s.mesh.position.set(x, y, ACTOR_Z);
@@ -1565,14 +1574,16 @@ export function CreateWorld(canvasEl) {
     if (s.shadow) {
       // 地下没有太阳，脚下这团只负责"他确实站在地上"
       const under = level === "under";
+      // 人离地了影子就该缩、该淡——这是"他真的上去了"最便宜也最有效的一笔
+      const air = Math.min(1, lift / 1.1);
       s.shadow.visible = true;
-      s.shadow.scale.set(bs, bs * (under ? 0.55 : 1), 1);
+      s.shadow.scale.set(bs * (1 - air * 0.42), bs * (under ? 0.55 : 1) * (1 - air * 0.42), 1);
       s.shadow.position.set(
         x + (under ? 0 : SUN.dx * 0.55) * bs,
-        y + 0.015,
+        ground + 0.015,
         ACTOR_Z - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
-      s.shadow.material.opacity = under ? 0.5 : 1;
+      s.shadow.material.opacity = (under ? 0.5 : 1) * (1 - air * 0.55);
     }
     // 灯打出来的长影子：背着最近那盏灯拖出去，离得越远越长越淡
     if (s.castShadow) {
@@ -1735,6 +1746,8 @@ export function CreateWorld(canvasEl) {
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, !!held,
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
+        // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
+        lift: p.lift || 0, poseK: p.vaultK,
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
         light: NearestLight(p.x, LevelYOf(p.level)),
@@ -1788,6 +1801,8 @@ export function CreateWorld(canvasEl) {
         posture === "squat" || posture === "crawl" || !!a.crouch, dt, !!a.carry,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
+          lift: a.lift || 0, poseK: a.vaultK,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
@@ -2296,6 +2311,39 @@ export function CreateWorld(canvasEl) {
         const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x;
         critterMesh.position.set(baseX, SURFACE_Y + 1.0, 0.5);
       } else if (critterMesh) critterMesh.visible = false;
+    }
+
+    // 翻越落地扬起的干土：半秒就散，但没有它落地就是"啪"一声没有画面
+    {
+      const vd = state.vaultDust;
+      if (vd && vd.t < 0.62) {
+        if (!dustMesh) {
+          dustCanvas = MakeCanvas(160, 90);
+          dustCtx = dustCanvas.getContext("2d");
+          dustMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(160 / PPM, 90 / PPM),
+            new THREE.MeshBasicMaterial({ map: CanvasTexture(dustCanvas), transparent: true, depthWrite: false }),
+          );
+          FixOrder(dustMesh, LAYER_ORDER.fx + 250);
+          layers.fx.add(dustMesh);
+        }
+        const c = dustCtx;
+        c.clearRect(0, 0, 160, 90);
+        const t = vd.t;
+        c.globalAlpha = Math.max(0, 1 - t / 0.62) * 0.55;
+        for (let i = 0; i < 5; i += 1) {
+          const dir = i % 2 ? 1 : -1;
+          const px = 80 + dir * (6 + t * (46 + i * 12));
+          const py = 78 - t * (14 + i * 5);
+          c.beginPath();
+          c.arc(px, py, 5 + t * (13 + i * 2), 0, Math.PI * 2);
+          c.fillStyle = i % 2 ? "rgba(196,178,140,0.75)" : "rgba(172,152,116,0.65)";
+          c.fill();
+        }
+        dustMesh.material.map.needsUpdate = true;
+        dustMesh.visible = true;
+        dustMesh.position.set(vd.x, SURFACE_Y + 0.42, 0.52);
+      } else if (dustMesh) dustMesh.visible = false;
     }
 
     // 合榫的楔子：工作台面上一排小木楔，敲一下吃进一分；敲歪的那下斜着。

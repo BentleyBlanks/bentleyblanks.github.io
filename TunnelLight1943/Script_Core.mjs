@@ -65,7 +65,9 @@ export const SCENES = {
       { id: "doorframe", kind: "doorframe", x: 34, name: "门框" },
       { id: "workbench", kind: "bench", x: 40.5, name: "工作台" },
       { id: "stool", kind: "stool", x: 32, name: "旧木凳" },
-      { id: "yardWallE", kind: "wallSeg", x: 47, w: 1, h: 1.8 },
+      // 院门口那垛码好的劈柴：教「翻越」的第一课就长在它身上（关卡设计 C1 步3）。
+      // 它是院子的东界，肩高、顶沿磨得发亮还缺了一角——可翻越物的轮廓语法从这垛柴定死
+      { id: "gateStack", kind: "woodStack", x: 47, w: 1.7, h: 1.24, name: "码好的柴垛" },
       { id: "cellarMouth", kind: "hatch", x: 27, name: "地窖口" },
       { id: "well", kind: "well", x: 58, name: "水井" },
       { id: "millstone", kind: "millstone", x: 76, name: "磨盘" },
@@ -95,11 +97,13 @@ export const SCENES = {
       { id: "stonesYard", kind: "stonePile", x: 43.5, name: "石子堆", showFlag: "raidStarted" },
     ],
     // 可翻越物（贴近自动手脚并用翻过去；轮廓语法：肩高、顶沿磨亮/有缺口）。
-    // 院墙缺口教第一次，田埂 30 秒内复用，倒塌柴垛在扫荡压力下考第三次。
+    // 一次教学、两次复用：院门口的柴垛教第一次（出屋干活的第一步就撞上它），
+    // 去老槐树路上的田埂 30 秒内换个语境复用，扫荡时倒塌的柴垛在压力下考第三次。
+    // top 必须与美术画出来的高度对齐——抬升弧是按它算的，写错了人会飞过头顶。
     vaults: [
-      { x: 47, w: 1.0, top: 1.8 },
-      { x: 96, w: 1.4, top: 0.85 },
-      { x: 38, w: 1.6, top: 1.55, flag: "raidStarted" },
+      { x: 47, w: 1.7, top: 1.24 },
+      { x: 96, w: 1.6, top: 0.55 },
+      { x: 38, w: 1.35, top: 1.08, flag: "raidStarted" },
     ],
     // 掩体链：这条村道是第二章的潜行场地，掩体的疏密就是关卡节奏本身。
     // tall（草垛、齐胸的断墙）站着就挡得住；矮的（柴堆、水瓮）得蹲下去。
@@ -349,7 +353,21 @@ function LineDuration(line) {
 // 狗认吃不认人；灯有周期。动词凑齐了，关卡才有"想一下"的时刻。
 // ---------------------------------------------------------------------------
 const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
-const VAULT_DUR = 0.62;
+// 翻越：撑上顶沿 → 收腿荡过去 → 落地缓冲。比一步慢，慢到看得清是"手脚并用"，
+// 又不至于打断走路的节奏。手里拎着东西得先把东西撂上顶沿，所以更慢一档。
+const VAULT_DUR = 0.78;
+const VAULT_DUR_BIG = 1.05;
+
+// 翻越的抬升曲线：人真的离地，不是换个姿势平移过去。
+// 峰值取障碍高度的七成左右——胯骨压过顶沿的那一下，脚正好在顶沿上方。
+// 扛着东西那一档在顶上多待一会儿（撂下、跨过、再拎起），所以是带平台的弧。
+function VaultArc(k, big) {
+  const u = Math.max(0, Math.min(1, k));
+  if (!big) return 0.74 * Math.sin(Math.PI * Math.pow(u, 0.92));
+  if (u < 0.32) return 0.82 * Math.sin((u / 0.32) * (Math.PI / 2));
+  if (u < 0.66) return 0.82;
+  return 0.82 * Math.sin(((1 - u) / 0.34) * (Math.PI / 2));
+}
 
 function GiveItem(state, item) { state.player.item = { ...item }; }
 
@@ -386,7 +404,10 @@ function StepThrown(state, dt) {
   th.t += dt;
   if (th.t < th.dur) return null;
   state.thrown = null;
-  MakeNoise(state, th.x1, "surface");   // 石子落地出声：附近的敌人会过来看
+  // 石子落地出声：附近的敌人会过来看——这一声玩家也必须听见，
+  // 否则「声音会引人」这条规则永远只是文字说明
+  Cue(state, "stoneLand");
+  MakeNoise(state, th.x1, "surface");
   return th;
 }
 
@@ -606,16 +627,23 @@ function StepChain(state, def, input, dt) {
         return;
       }
       const climb = input.climb || 0;
+      // 辘轳的木轴一圈一圈地叫：手在摇才响，摇得快叫得密
+      const Creak = (rate) => {
+        w.creakT = (w.creakT ?? 0) + dt;
+        if (w.creakT > rate) { w.creakT = 0; Cue(state, "crank", { gain: 0.8 }); }
+      };
       if (!w.filled) {
         if (climb > 0.05) {
           w.depth = Math.min(1, w.depth + dt * 0.62);
           FlashPose(state, "crank", 0.25);
+          Creak(0.62);
         }
         state.prompt = "S · 放绳下去";
         state.promptFill = w.depth;
         if (w.depth >= 1) {
           w.filled = true;
           state.toast = { text: "桶触到水面，咕咚一声灌满了。", t: 2.6 };
+          Cue(state, "waterSplash");
           st.onFilled?.(state);   // 咕咚声传出去：后果小窗等钩子在这儿挂
         }
       } else {
@@ -623,6 +651,7 @@ function StepChain(state, def, input, dt) {
           w.depth = Math.max(0, w.depth - dt * 0.34);
           w.slipT = 0.3;
           FlashPose(state, "crank", 0.25);
+          Creak(0.5);
         } else {
           // 松手：辘轳倒转。留 0.3s 的棘齿宽限，换手不至于立刻坠
           w.slipT = Math.max(0, w.slipT - dt);
@@ -2440,7 +2469,7 @@ export function CreateGame(chapterIndex = 0) {
     beatIndex: 0,
     time: 0,
     cardTimer: 0,
-    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, vaultT: 0, cineWalk: null },
+    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, vaultT: 0, vaultK: 0, lift: 0, cineWalk: null },
     actors: [],
     cart: null,
     thrown: null,
@@ -2528,6 +2557,10 @@ export function StartChapter(state, index) {
   if (index !== 7) state.flags.ruined = false;
   if (index < 4) { state.flags.hiddenBuilt = false; state.flags.entWBlocked = false; }
   state.player.vaultT = 0;
+  state.player.vaultK = 0;
+  state.player.lift = 0;
+  state.player.vaultBig = false;
+  state.vaultDust = null;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -2803,7 +2836,7 @@ export function StepGame(state, input, dt) {
     done.onEnd?.(state);
   }
   // 小活物的一次性动画：麻雀炸窝、母鸡扑棱、田鼠蹿走——各自跑完就清
-  for (const key of ["sparrowBurst", "henFlee", "mouseFlee"]) {
+  for (const key of ["sparrowBurst", "henFlee", "mouseFlee", "vaultDust"]) {
     const fx = state[key];
     if (fx && (fx.t += dt) > 2.2) state[key] = null;
   }
@@ -2928,13 +2961,28 @@ function MovePlayer(state, input, dt) {
   const env = CHAPTERS[state.chapterIndex].scene;
   const p = state.player;
   if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
-  // 翻越进行中：手脚并用翻过去，0.6 秒内锁操作，人沿一条小弧挪到另一侧
+  // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
+  // 横向用 smoothstep（起手几乎不动，手在撑；过顶沿最快；落地收住），
+  // 纵向走 VaultArc —— 人是真的抬离地面的，渲染层读 p.lift。
   if (p.vaultT > 0) {
     p.vaultT -= dt;
-    const k = 1 - Math.max(0, p.vaultT) / VAULT_DUR;
-    p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * k;
-    p.pose = "vault";
-    if (p.vaultT <= 0) { p.pose = null; p.vaultT = 0; }
+    const dur = p.vaultDur || VAULT_DUR;
+    const k = Math.max(0, Math.min(1, 1 - Math.max(0, p.vaultT) / dur));
+    p.vaultK = k;
+    p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * (k * k * (3 - 2 * k));
+    p.lift = (p.vaultTop || 1.2) * VaultArc(k, p.vaultBig);
+    p.pose = p.vaultBig ? "clamber" : "vault";
+    // 垛顶上藏不住人：翻越是要露头的，这也是把它放进扫荡段的意义
+    p.hidden = false;
+    // 脚先落地，最后那一小段是屈膝卸力——落地声和尘土跟着脚走，不跟着动作结束走
+    if (!p.vaultLanded && k >= 0.80) {
+      p.vaultLanded = true;
+      Cue(state, "vaultLand");
+      state.vaultDust = { x: p.x, t: 0 };
+    }
+    if (p.vaultT <= 0) {
+      p.pose = null; p.vaultT = 0; p.vaultK = 0; p.lift = 0; p.vaultBig = false;
+    }
     return;
   }
 
@@ -2958,20 +3006,32 @@ function MovePlayer(state, input, dt) {
     p.heading = Math.sign(input.moveX);
   }
 
-  // 可翻越物：挡路，但贴上去就自动手脚并用翻过去——无按键交互，
-  // 可读性全靠统一轮廓（肩高、顶沿缺口）。过场走位（cineWalk）不触发。
-  if (p.level === "surface" && !state.microCine) {
+  // 可翻越物：挡路，但朝它走过去就自动手脚并用翻过去——无按键交互，
+  // 可读性全靠统一轮廓（肩高、顶沿磨亮/有缺口）。
+  // 三处不触发：过场走位（cineWalk / microCine）、推着车走（车从缺口里过去，
+  // 不是翻过去）、以及人已经站在障碍里（调试跳幕会这样落点）。
+  const pushingCart = !!state.cart && Math.abs(p.x - state.cart.x) < 2.6;
+  const moved = p.x - prevX;
+  if (p.level === "surface" && !state.microCine && !p.cineWalk && !pushingCart
+    && Math.abs(moved) > 1e-4) {
+    const dir = Math.sign(moved);
     for (const v of scene.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
-      const crossed = (prevX - v.x) * (p.x - v.x) < 0;
-      if (!crossed && Math.abs(p.x - v.x) > 0.45) continue;
-      const dir = Math.sign(p.x - prevX) || p.heading || 1;
-      p.vaultFrom = v.x - dir * ((v.w || 1) / 2 + 0.45);
-      p.vaultTo = v.x + dir * ((v.w || 1) / 2 + 0.55);
-      p.x = p.vaultFrom;
-      p.vaultT = VAULT_DUR;
+      const half = (v.w || 1) / 2;
+      // 触发线是近侧那一面：只有朝它走、并且这一帧刚够着，才起手
+      const face = v.x - dir * half;
+      if ((prevX - face) * (p.x - face) > 0) continue;
+      const big = !!(p.item?.big || p.carry);
+      p.vaultDur = big ? VAULT_DUR_BIG : VAULT_DUR;
+      p.vaultFrom = p.x;                                   // 从脚下起手，不往回弹
+      p.vaultTo = v.x + dir * (half + 0.52);
+      p.vaultTop = v.top ?? 1.2;
+      p.vaultBig = big;
+      p.vaultT = p.vaultDur;
+      p.vaultK = 0;
+      p.vaultLanded = false;
       p.heading = dir;
-      Cue(state, "vault");
+      Cue(state, big ? "vaultHeavy" : "vault");
       break;
     }
   }
@@ -3045,7 +3105,8 @@ function StepFollowers(state, dt) {
   const p = state.player;
   const scene = SceneOf(state);
   for (const a of state.actors) {
-    if (!a.following || !a.visible) continue;
+    // 不跟着走的人一律落回地面：不清这一下，刚好在垛顶上停止跟随的人会一直悬着
+    if (!a.following || !a.visible) { if (a.lift) a.lift = 0; continue; }
     a.level = p.level;
     const targetX = p.x - p.heading * 1.3;
     const d = Math.abs(a.x - targetX);
@@ -3058,12 +3119,23 @@ function StepFollowers(state, dt) {
     // 妹妹铁律的可见一半：镜像玩家的姿态（你蹲她蹲），过翻越物她也翻。
     // 她本就不参与任何暴露判定（探测只看玩家）——失败源只能是柱子本人
     a.crouch = p.crouch;
-    let nearVault = false;
+    // 她翻的是同一垛柴：抬升按到障碍中心的距离连续算——不用给她单独排一套
+    // 计时器，跟着走就自然是一条弧（走到一半停下来，她就骑在顶沿上等你）
+    let lift = 0, phase = 0.5;
     for (const v of scene.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
-      if (Math.abs(a.x - v.x) < 0.8) { nearVault = true; break; }
+      const span = (v.w || 1) / 2 + 0.5;
+      const d = Math.abs(a.x - v.x);
+      if (d > span) continue;
+      const up = (v.top ?? 1.2) * 0.68 * Math.sin((1 - d / span) * (Math.PI / 2));
+      if (up <= lift) continue;
+      lift = up;
+      // 动作进度顺着她的行进方向算：还没过中线是撑上去，过了是落下来
+      phase = Math.max(0, Math.min(1, 0.5 + ((a.x - v.x) * (a.heading || 1)) / (2 * span)));
     }
-    if (nearVault) a.pose = "vault";
+    a.lift = lift;
+    a.vaultK = phase;
+    if (lift > 0.02) { a.pose = "vault"; a.crouch = false; }
     else if (a.pose === "vault") a.pose = null;
   }
 }
@@ -3750,9 +3822,15 @@ function StepScribe(state, def, input, dt) {
   if (b.head === undefined) b.head = 0;
   const held = input.interactHeld || input.interact;
   const push = Math.abs(input.moveX) > 0.05;
+  const before = b.head;
   if (held && push) b.head += Math.sign(input.moveX) * dt * (def.speed || 0.5);
   if (input.dragX) b.head += input.dragX;
   b.head = Math.max(0, Math.min(1, b.head));
+  // 石笔蹭木头：手真的在动才出声，一段一段接上（划完再响一次就成了念白）
+  if (Math.abs(b.head - before) > 0.001) {
+    b.scribeT = (b.scribeT ?? 0) + dt;
+    if (b.scribeT > 0.5) { b.scribeT = 0; Cue(state, "scribe", { gain: 0.7 }); }
+  } else b.scribeT = 0.42;                       // 停手再动，几乎立刻续上
   b.drawn = Math.max(b.drawn, b.head);
   b.everMoved = b.everMoved || b.head > 0.02;
   // 第八章他自己刻：抬臂比着框（第一章是爹在划，玩家是被量的那个）

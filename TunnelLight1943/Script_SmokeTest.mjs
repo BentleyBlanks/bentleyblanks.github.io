@@ -283,6 +283,79 @@ function TestStealthEscapable() {
   }
 }
 
+// 翻越：三处可翻越物都得真的翻得过去——而且是"翻"，不是换个姿势平移过去。
+// 这条断言是补出来的：翻越以前只有一个静止姿势 + 一条直线位移，人从不离地，
+// 玩起来就跟没做一样（关卡设计文档里它一直挂着"待实装"）。
+function TestVaultC1() {
+  const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+  const list = ChapterBeatList(0);
+  const cases = [
+    { beat: "c1_barrow", from: 42, to: 52, top: 1.24, label: "院门口的柴垛（教学）" },
+    { beat: "c1_cloth", from: 92, to: 102, top: 0.55, label: "田埂（30 秒内复用）" },
+    { beat: "c1_hide", from: 42, to: 32, top: 1.08, label: "倒塌的柴垛（扫荡压力下）" },
+  ];
+  for (const c of cases) {
+    const state = CreateGame(0);
+    DebugJump(state, 0, list.findIndex((b) => b.id === c.beat));
+    state.player.x = c.from;
+    const dir = Math.sign(c.to - c.from);
+    let peakLift = 0, sawPose = false, started = false;
+    const cues = [];
+    for (let i = 0; i < 900; i += 1) {
+      StepGame(state, { ...NONE, moveX: dir }, 1 / 60);
+      for (const cue of state.cues) cues.push(cue.name);
+      state.cues.length = 0;
+      if (state.player.vaultT > 0) {
+        started = true;
+        peakLift = Math.max(peakLift, state.player.lift || 0);
+        if (state.player.pose === "vault" || state.player.pose === "clamber") sawPose = true;
+      }
+      if (dir > 0 ? state.player.x >= c.to : state.player.x <= c.to) break;
+    }
+    assert.ok(started, `${c.label}：朝它走过去必须起手翻越`);
+    assert.ok(sawPose, `${c.label}：翻越过程中必须有翻越姿势`);
+    // 抬升峰值取障碍高度的七成上下——人必须真的离地，不能是平移
+    assert.ok(peakLift > c.top * 0.6, `${c.label}：抬升峰值 ${peakLift.toFixed(2)} 太低，人没离地`);
+    assert.ok(peakLift < c.top * 1.1, `${c.label}：抬升峰值 ${peakLift.toFixed(2)} 过头了`);
+    assert.ok(cues.includes("vault") || cues.includes("vaultHeavy"), `${c.label}：缺起手音效`);
+    assert.ok(cues.includes("vaultLand"), `${c.label}：缺落地音效`);
+    assert.equal(state.player.lift || 0, 0, `${c.label}：翻完必须落回地面`);
+  }
+  // 扛着大件是另一档：更慢、另一套姿势（clamber）
+  {
+    const state = CreateGame(0);
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_barrow"));
+    state.player.x = 42;
+    state.player.item = { id: "plankA", label: "木料", big: true };
+    let heavy = false, dur = 0;
+    for (let i = 0; i < 900; i += 1) {
+      StepGame(state, { ...NONE, moveX: 1 }, 1 / 60);
+      state.cues.length = 0;
+      if (state.player.pose === "clamber") heavy = true;
+      if (state.player.vaultT > 0) dur = Math.max(dur, state.player.vaultDur);
+      if (state.player.x >= 52) break;
+    }
+    assert.ok(heavy, "扛着木料翻越必须走 clamber 那一档");
+    assert.ok(dur > 0.9, "扛着东西翻越必须更慢");
+  }
+  // 推着车不翻：车是从缺口里推过去的，不是被抱过垛顶的
+  {
+    const state = CreateGame(0);
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_barrow"));
+    state.cart = { x: 47.4, kind: "barrow" };
+    state.player.x = 45.6;
+    let vaulted = false;
+    for (let i = 0; i < 120; i += 1) {
+      StepGame(state, { ...NONE, moveX: 1 }, 1 / 60);
+      state.cues.length = 0;
+      if (state.player.vaultT > 0) vaulted = true;
+      state.cart.x = state.player.x + 1.7;
+    }
+    assert.ok(!vaulted, "推着独轮车时不该触发翻越");
+  }
+  console.log("  ✓ 翻越：三处可翻越物 / 抬升弧 / 扛大件变奏 / 推车不触发");
+}
+
 function TestInstrumentalBgmManifest() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
@@ -419,6 +492,7 @@ TestDetectionReset();
 TestStealthEscapable();
 TestPromptsAreDeviceNeutral();
 TestWorkStations();
+TestVaultC1();
 TestInstrumentalBgmManifest();
 TestQuieterAudioMix();
 

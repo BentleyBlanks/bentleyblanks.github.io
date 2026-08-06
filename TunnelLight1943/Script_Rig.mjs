@@ -460,14 +460,46 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-82 - ca * 26) * DEG; target.foreB = (-36 - cb * 20) * DEG;
     target.thighB = -18 * DEG; target.shinB = 20 * DEG; target.footB = -6 * DEG;
     target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
-  } else if (s.pose === "vault") {
-    // 翻越：双手撑在顶沿上，身子折过去，腿收起来荡过——手脚并用的那一下
-    target.hipY = -0.02; target.hipX = 0.18;
-    target.torso = 40 * DEG; target.head = -18 * DEG;
-    target.armF = -96 * DEG; target.foreF = 8 * DEG;
-    target.armB = -88 * DEG; target.foreB = 6 * DEG;
-    target.thighB = -84 * DEG; target.shinB = 92 * DEG; target.footB = 12 * DEG;
-    target.thighF = -58 * DEG; target.shinF = 66 * DEG; target.footF = 8 * DEG;
+  } else if (s.pose === "vault" || s.pose === "clamber") {
+    // 翻越：三段——① 手够上顶沿、后腿蹬地；② 撑起来把腿收到胸前荡过去；
+    // ③ 脚先落地、屈膝卸力。姿势按 poseK（Core 给的动作进度）在关键帧之间插，
+    // 而不是从头到尾摆一个造型平移过去——那就是"没做动画"的样子。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.5));
+    const heavy = s.pose === "clamber";
+    // ① 起手：够顶沿
+    const A = {
+      hipY: -0.10, hipX: 0.12, torso: 46, head: -26,
+      armF: -128, foreF: -14, armB: -34, foreB: -20,
+      thighB: -38, shinB: 44, footB: -10, thighF: 10, shinF: 18, footF: -12,
+    };
+    // ② 顶点：两臂笔直撑住，膝盖收到胸口——整个人骑在顶沿上方
+    const B = {
+      hipY: 0.06, hipX: 0.20, torso: 54, head: -30,
+      armF: -74, foreF: 10, armB: -62, foreB: 8,
+      thighB: -104, shinB: 112, footB: 16, thighF: -86, shinF: 98, footF: 14,
+    };
+    // ③ 落地：腿先伸出去接地，上身还压着，胳膊甩到后面找平衡
+    const C = {
+      hipY: -0.22, hipX: 0.06, torso: 30, head: -14,
+      armF: -30, foreF: -26, armB: 26, foreB: -18,
+      thighB: -18, shinB: 34, footB: -6, thighF: -46, shinF: 40, footF: -16,
+    };
+    // 扛着东西那一档：一只手始终拎着，撑不成两手，所以身子更低、更慢
+    if (heavy) {
+      B.armF = -22; B.foreF = -34; B.torso = 62; B.hipY = -0.04;
+      C.armF = -18; C.foreF = -30;
+    }
+    const mid = heavy ? 0.48 : 0.42;
+    let from = A, to = B, u = k / mid;
+    if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
+    u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
+    for (const key of Object.keys(A)) {
+      const v = from[key] + (to[key] - from[key]) * u;
+      target[key] = (key === "hipY" || key === "hipX") ? v : v * DEG;
+    }
+    // 翻越是硬动作，混合给到最快——0.8 秒的戏被平滑掉就成了慢动作
+    ApplyPose(rig, t, target, Math.min(1, (dt || 0.016) * 30));
+    return;
   } else if (s.pose === "puzzled") {
     // 哑剧的「不太懂」：微微后仰、仰着头，手垂着——配头顶的「？」气泡
     target.hipY = -0.02; target.hipX = -0.02;

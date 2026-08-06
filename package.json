@@ -8,6 +8,7 @@
     "test:tunnelLight1943": "node TunnelLight1943/Script_SmokeTest.mjs",
     "test:tunnelLight1943:browser": "node TunnelLight1943/Script_RenderHealthTest.mjs && node TunnelLight1943/Script_DebugJumpTest.mjs",
     "shots:tunnelLight1943": "node TunnelLight1943/Script_ShotTest.mjs",
+    "bake:tunnelLight1943:sfx": "node TunnelLight1943/Script_SfxBake.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",
     "test:tunnelBell1942:browser": "node TunnelBell1942/Script_RenderHealthTest.mjs",
     "shots:tunnelBell1942": "node TunnelBell1942/Script_Screenshot.mjs",

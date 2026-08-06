@@ -139,6 +139,10 @@ export function CreateSoundtrack(audio) {
 
   return {
     Step,
+    // 动作音效包（本机 MiniMax 烘的拟音，见 Script_SfxBake.mjs）。
+    // 由 Main 在合成器真正到位之后调一次——它是异步 import 进来的，
+    // 建声轨那会儿 audio 还是静音替身，早调等于没调。拉不到就一直用合成兜底。
+    LoadSfxPack: () => audio.LoadSfxPack(new URL("./Audio/Sfx/", import.meta.url).href),
     // 声音开关变化时要重算节奏：静音就该回到剧本手写的停留时间
     SyncDurations,
     // 剧情里的一次性响动由 Main 直接点名

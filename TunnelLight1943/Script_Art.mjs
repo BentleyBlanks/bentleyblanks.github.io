@@ -1139,6 +1139,60 @@ export function DrawFirewood(ctx, x, groundY, w, id) {
   }
 }
 
+// 码得整齐的劈柴垛：可翻越物的轮廓语法样板——齐肩高、顶沿被手掌磨得发亮、
+// 顶上缺一块（那是天天翻的人踩塌的）。玩家不认字也该一眼看出"这儿能过去"。
+export function DrawWoodStack(ctx, x, groundY, w, h, id) {
+  const rows = Math.max(3, Math.round(h / 13));
+  const notchX = x + w * 0.10;                 // 缺口偏右：不对称才像被人踩出来的
+  for (let r = 0; r < rows; r += 1) {
+    const py = groundY - 6 - r * (h - 8) / rows;
+    // 越往上收一点，垛才立得住
+    const rw = w * (1 - r * 0.035);
+    const count = Math.max(2, Math.round(rw / 15));
+    for (let i = 0; i < count; i += 1) {
+      const px = x - rw / 2 + 7 + i * ((rw - 14) / Math.max(1, count - 1));
+      // 顶层缺口：那一段不码柴
+      if (r >= rows - 1 && Math.abs(px - notchX) < w * 0.16) continue;
+      const jig = Sym(id + "j" + r + i, 0, 1.6);
+      if (r % 2 === 0) {
+        // 横码：一头一头的截面朝外
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(px + jig, py, 7.0, 5.2, 0, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 ? "#a8794a" : "#93663c";
+        ctx.fill();
+        ctx.strokeStyle = IN.ink;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        // 年轮那一小圈：没有它就是一堆棕色鹅卵石
+        ctx.beginPath();
+        ctx.ellipse(px + jig, py, 3.2, 2.2, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(70,45,25,0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // 竖码：劈开的柴侧着搭，纹路是竖的
+        InkFill(ctx, Rect(px - 5 + jig, py - 6, 10, 12), id + "b" + r + i,
+          i % 2 ? "#8b6238" : "#7a5330", { amp: 0.7, lw: 1.7 });
+      }
+    }
+  }
+  // 顶沿磨亮：天天有人手掌撑在这条线上
+  InkLine(ctx, x - w / 2 + 5, groundY - h + 3, notchX - w * 0.16, groundY - h + 1,
+    id + "worn", { lw: 2.6, color: "rgba(240,225,180,0.8)", amp: 1.1 });
+  InkLine(ctx, notchX + w * 0.16, groundY - h + 2, x + w / 2 - 4, groundY - h + 4,
+    id + "worn2", { lw: 2.4, color: "rgba(240,225,180,0.7)", amp: 1.1 });
+  // 缺口里塌下去的两根
+  InkFill(ctx, Rect(notchX - w * 0.13, groundY - h + 8, w * 0.26, 5), id + "fall",
+    "#6d4c2c", { amp: 0.8, lw: 1.7 });
+  // 底下压着的散柴梢
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - w / 2 - 6 + i * 5, groundY - 2, x - w / 2 + 9 + i * 6, groundY - 5 - i * 2,
+      id + "sp" + i, { lw: 1.8, color: "#5c4328" });
+  }
+}
+
 export function DrawHatch(ctx, x, groundY, id, { open = false } = {}) {
   InkFill(ctx, [[x - 22, groundY], [x + 22, groundY], [x + 19, groundY - 7], [x - 19, groundY - 7]],
     id, "#6b5236", { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.2)" });
