@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=031";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=031";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=032";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=032";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=031")
+import("./Script_Audio.js?v=032")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -93,7 +93,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
+  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine", "scribeGuide",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
 ]) ui[id] = document.getElementById(id);
 
@@ -143,9 +143,10 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
 // 沉浸式手势的唯一入口：手按在画面上的**世界坐标**（不是屏幕位移），
-// 加上竖向拖动量与点按。所有上手的玩法都从这三样里取——
-// 攥石笔靠 world（手得真落在笔上）、放绳拽桶靠 dy、敲楔靠 tap。
-const gest = { active: false, id: null, lastX: 0, lastY: 0, dy: 0, downT: 0, moved: 0, world: null };
+// 加上横竖两路拖动量与点按。所有上手的玩法都从这几样里取——
+// 攥石笔靠 world（手得真落在笔上）、转辘轳/打结靠 world 绕圈、
+// 刨料靠 dx（拖过 45% 画宽=一整趟）、勒紧靠 dy。
+const gest = { active: false, id: null, lastX: 0, lastY: 0, dx: 0, dy: 0, downT: 0, moved: 0, world: null };
 let tapEdge = false;
 canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" || e.pointerType === "pen") inputMode = "touch";
@@ -157,6 +158,7 @@ canvas.addEventListener("pointerdown", (e) => {
   gest.lastY = e.clientY;
   gest.downT = performance.now();
   gest.moved = 0;
+  gest.dx = 0;
   gest.dy = 0;
   gest.world = world.ScreenToWorld(e.clientX, e.clientY);
   // 捕获是锦上添花：手滑出画布还能接着操。指针已抬起或是合成事件时它会抛，
@@ -166,6 +168,8 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   if (!gest.active || e.pointerId !== gest.id) return;
   const span = Math.max(160, canvas.clientHeight * 0.55);
+  const spanX = Math.max(240, canvas.clientWidth * 0.45);
+  gest.dx += (e.clientX - gest.lastX) / spanX;
   gest.dy += (e.clientY - gest.lastY) / span;
   gest.moved += Math.abs(e.clientX - gest.lastX) + Math.abs(e.clientY - gest.lastY);
   gest.lastX = e.clientX;
@@ -179,6 +183,7 @@ for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
     if (evt === "pointerup" && performance.now() - gest.downT < 420 && gest.moved < 14) tapEdge = true;
     gest.active = false;
     gest.id = null;
+    gest.dx = 0;
     gest.dy = 0;
   });
 }
@@ -524,6 +529,7 @@ function KeyChipHtml(act) {
   return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
 }
 
+let dragTipShown = "";             // QTE 轨道那行小字（换了才重写 DOM）
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
 let actShown = "";                 // 换了文案/设备才重排 DOM
 
@@ -703,7 +709,21 @@ function SyncHud(state, dt, shotFade) {
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
   // 划线那一拍没有 HUD：玩家攥的是画面里那支笔，进度就是木头上那道印子本身。
-  //（原先这里有一条 QTE 轨道，等于把"控制一支笔"降级成"拖一根 slider"。）
+  // 刨料仍有一条拖动 QTE 轨道（state.dragTrack）：旋钮跟着推程走，
+  // 没动起来时轻轻晃一下招呼玩家来拖；推到头要拖回来时轨道翻个方向。
+  if (ui.scribeGuide) {
+    const dt2 = state.dragTrack;
+    ui.scribeGuide.hidden = !dt2 || inCinematic;
+    if (dt2) {
+      ui.scribeGuide.style.setProperty("--fill", (dt2.t * 100).toFixed(1) + "%");
+      ui.scribeGuide.classList.toggle("idle", !!dt2.idle);
+      ui.scribeGuide.classList.toggle("back", !!dt2.back);
+      if (dragTipShown !== dt2.tip) {
+        dragTipShown = dt2.tip;
+        ui.scribeGuide.querySelector(".tip").textContent = dt2.tip;
+      }
+    }
+  }
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
   }
@@ -1005,14 +1025,17 @@ function RunFrame(now, dt) {
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
       throw: throwEdge,
-      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），pointerWorld=指尖的世界坐标
+      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），dragX=本帧横向拖动
+      //（刨料的推程），pointerWorld=指尖的世界坐标
       pull: gest.active ? gest.dy : 0,
       pullHeld: gest.active,
+      dragX: gest.active ? gest.dx : 0,
       pointerHeld: gest.active,
       pointerWorld: gest.world,
       tap: tapEdge,
       advance: advanceEdge,
     }, stepDt);
+    gest.dx = 0;
     gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;

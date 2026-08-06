@@ -177,39 +177,11 @@
       "voice": "Zhuzi"
     },
     {
-      "id": "0tv20sp",
+      "id": "1k2lso3",
       "who": "",
-      "text": "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。",
+      "text": "民国二十六年，卢沟桥一声枪响。不出一年，华北尽落敌手。",
       "voice": "Narrator",
-      "dur": 6.22
-    },
-    {
-      "id": "0r0r9mn",
-      "who": "",
-      "text": "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。",
-      "voice": "Narrator",
-      "dur": 6.72
-    },
-    {
-      "id": "010ww8u",
-      "who": "",
-      "text": "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。",
-      "voice": "Narrator",
-      "dur": 6.56
-    },
-    {
-      "id": "03p0l74",
-      "who": "",
-      "text": "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。",
-      "voice": "Narrator",
-      "dur": 6.96
-    },
-    {
-      "id": "0v0cfsc",
-      "who": "",
-      "text": "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。",
-      "voice": "Narrator",
-      "dur": 7.08
+      "dur": 6.2
     },
     {
       "id": "1hqxjsi",
@@ -219,11 +191,18 @@
       "dur": 4.63
     },
     {
-      "id": "17fgeq0",
+      "id": "0kwrdsa",
       "who": "",
-      "text": "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。",
+      "text": "粮被抢空，屋烧成断墙。活下来的人，连哭都不敢出声。",
       "voice": "Narrator",
-      "dur": 8.42
+      "dur": 5.7
+    },
+    {
+      "id": "0n8ep8a",
+      "who": "",
+      "text": "无山可靠，无林可藏。庄稼人被逼到头，把命藏进了脚下的土。",
+      "voice": "Narrator",
+      "dur": 6.31
     },
     {
       "id": "1s1jcq0",
@@ -233,46 +212,25 @@
       "dur": 8.66
     },
     {
-      "id": "1qwcp68",
+      "id": "1s692de",
       "who": "",
-      "text": "这个故事，发生在冀中一个普通的村庄。",
+      "text": "故事，发生在冀中的梁家村。村东头，住着个姓梁的木匠。",
       "voice": "Narrator",
-      "dur": 3.49
+      "dur": 6.0
     },
     {
-      "id": "0fc66qg",
+      "id": "1fd99di",
       "who": "",
-      "text": "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。",
+      "text": "他有个儿子叫柱子——房梁的梁，柱子的柱，起的是盼头。",
       "voice": "Narrator",
-      "dur": 6.27
+      "dur": 5.27
     },
     {
-      "id": "1b05nyp",
+      "id": "1rl7f77",
       "who": "",
-      "text": "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。",
+      "text": "这年春上，粮比什么都金贵——谁家囤里，都在数着过。",
       "voice": "Narrator",
-      "dur": 6.05
-    },
-    {
-      "id": "1oztvvz",
-      "who": "",
-      "text": "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。",
-      "voice": "Narrator",
-      "dur": 8.82
-    },
-    {
-      "id": "1ao8w21",
-      "who": "",
-      "text": "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。",
-      "voice": "Narrator",
-      "dur": 8.18
-    },
-    {
-      "id": "0el89h6",
-      "who": "",
-      "text": "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。",
-      "voice": "Narrator",
-      "dur": 8.63
+      "dur": 5.65
     },
     {
       "id": "01kspzr",
@@ -1049,8 +1007,8 @@
     }
   ],
   "voiceRelease": {
-    "release": "20260806Chapter1Hybrid",
-    "engine": "Qwen3-TTS + MiniMax Speech",
+    "release": "20260805Qwen3",
+    "engine": "Qwen3-TTS",
     "designModel": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
     "designRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
     "cloneModel": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
@@ -1059,20 +1017,6 @@
     "modelLicense": "Apache-2.0",
     "sampleRate": 24000,
     "bitrateKbps": 48,
-    "realVoiceReferenceUsed": false,
-    "productionRouting": {
-      "default": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "bySpeaker": {
-        "高传宝": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-        "妹妹": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-        "娘": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-        "柱子": "MiniMax/speech-2.8-hd",
-        "交通员": "MiniMax/speech-2.8-hd",
-        "日军": "MiniMax/speech-2.8-hd"
-      }
-    },
-    "chapter1MiniMaxLineIds": [
-      "1rvzvgr"
-    ]
+    "realVoiceReferenceUsed": false
   }
 }

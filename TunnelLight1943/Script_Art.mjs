@@ -1115,9 +1115,107 @@ export function DrawBench(ctx, x, groundY, id) {
   InkFill(ctx, Rect(x - 26, groundY - 26, 52, 8), id, PAL.wood, { amp: 1, lw: 2.3, shade: "rgba(0,0,0,0.14)" });
   InkFill(ctx, Rect(x - 22, groundY - 18, 6, 18), id + "l1", PAL.woodDark, { amp: 0.8, lw: 2 });
   InkFill(ctx, Rect(x + 16, groundY - 18, 6, 18), id + "l2", PAL.woodDark, { amp: 0.8, lw: 2 });
-  // 台面上的刨子与墨斗
-  InkFill(ctx, Rect(x - 14, groundY - 34, 22, 8), id + "plane", "#8a6a45", { amp: 0.8, lw: 2 });
-  InkLine(ctx, x - 10, groundY - 34, x + 2, groundY - 40, id + "handle", { lw: 2.2, color: "#5c4530" });
+  // 台面上原来画着一把"装饰用"的刨子。刨料那一拍现在有真刨子在玩家手里，
+  // 台面上再摆一把假的就成了两把——换成墨斗（木匠画线的家伙，也呼应门框刻痕）
+  InkFill(ctx, Rect(x + 8, groundY - 32, 11, 6), id + "inkpot", "#6f5636", { amp: 0.7, lw: 1.8 });
+  InkLine(ctx, x + 10, groundY - 32, x + 17, groundY - 36, id + "inkline",
+    { lw: 1.2, color: "rgba(50,38,24,0.8)", amp: 1.2 });
+}
+
+// 台面上待刨的那块料（侧剖）。smooth 0→1：毛料的起伏一趟趟被削平，
+// 木色也一点点亮起来——"刨了几趟"这件事不靠数字，靠这块木头自己说。
+export function DrawPlaneBoard(ctx, x, topY, wPx, smooth, id) {
+  const h = 8;          // ≈0.17m 厚：一根门框料的分量，不是一块砖
+  const rough = 1 - smooth;
+  // 木身。毛料是灰扑扑的旧木色，刨过之后一层层透出新木的黄——
+  // 和台面（PAL.wood）拉开色阶，不然料和台子在这个景别下会糊成一块。
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  const rgb = mix([154, 138, 112], [222, 178, 112], smooth);
+  InkFill(ctx, Rect(x - wPx / 2, topY, wPx, h), id + "body",
+    `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`, { amp: 0.7, lw: 2, shade: "rgba(0,0,0,0.16)" });
+  // 料压在台面上的那道接触暗边：两块木头才分得开
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = "rgba(48,34,20,0.9)";
+  ctx.fillRect(x - wPx / 2, topY + h - 0.6, wPx, 1.4);
+  ctx.restore();
+  // 上沿的毛面：起伏不平的一道边，随 smooth 一趟趟塌下去。
+  // 画成连着的折线而不是一排竖条——竖条在这个尺寸下看着像把梳子
+  if (rough > 0.02) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x - wPx / 2, topY + 1);
+    for (let i = 0; i <= 16; i += 1) {
+      const px = x - wPx / 2 + (i / 16) * wPx;
+      const bump = (0.6 + Rnd(id, i) * 2.6) * rough;
+      ctx.lineTo(px, topY - bump);
+    }
+    ctx.lineTo(x + wPx / 2, topY + 1);
+    ctx.closePath();
+    ctx.fillStyle = "#8d6236";
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.restore();
+  }
+  // 刨亮的那一面：沿着木纹的两道高光
+  if (smooth > 0.08) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.75, smooth);
+    InkLine(ctx, x - wPx / 2 + 3, topY + 2.0, x + wPx / 2 - 3, topY + 1.9, id + "sheen1",
+      { lw: 1.2, color: "rgba(246,228,186,0.9)", amp: 0.9 });
+    InkLine(ctx, x - wPx / 2 + 6, topY + 4.0, x + wPx / 2 - 5, topY + 4.2, id + "sheen2",
+      { lw: 0.9, color: "rgba(240,214,164,0.7)", amp: 1.1 });
+    ctx.restore();
+  }
+  // 木纹
+  InkLine(ctx, x - wPx / 2 + 2, topY + 6.2, x + wPx / 2 - 2, topY + 6.0, id + "grain",
+    { lw: 0.8, color: "rgba(80,52,28,0.5)", amp: 1.4 });
+}
+
+// 一条打着卷的刨花。len 0.35~1：推得稳就是长长一条，中间顿了就是一小截碎屑。
+export function DrawShaving(ctx, x, y, S, len, id) {
+  const turns = 1.1 + len * 2.2;         // 卷的圈数
+  const r0 = 2.2 * S;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = "#e0bc82";
+  ctx.lineWidth = 1.9 * S;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i += 1) {
+    const t = (i / 40) * turns * Math.PI * 2;
+    const r = r0 + t * 0.62 * S * (0.55 + len * 0.55);
+    const px = Math.cos(t) * r;
+    const py = Math.sin(t) * r * 0.72;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  // 卷内侧的暗边：让它看得出是一片有厚度的薄木，不是一根铁丝
+  ctx.strokeStyle = "rgba(150,110,62,0.55)";
+  ctx.lineWidth = 0.8 * S;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 地上那堆刨花：刨了几趟就堆多高——玩家干过的活留在画面上
+export function DrawShavingPile(ctx, x, groundY, n, id) {
+  const count = Math.min(16, n * 2);
+  for (let i = 0; i < count; i += 1) {
+    const px = x + (Rnd(id, i) - 0.5) * (11 + n * 2.2);
+    const py = groundY - Rnd(id, i + 50) * (1.6 + n * 0.9);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate((Rnd(id, i + 90) - 0.5) * 1.6);
+    ctx.strokeStyle = i % 3 ? "#dcb87e" : "#c9a166";
+    ctx.lineWidth = 0.9;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-2.6, 0);
+    ctx.quadraticCurveTo(0, -1.9, 2.6, 0);
+    ctx.quadraticCurveTo(0.8, 1.0, -1, 0.35);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 export function DrawStool(ctx, x, groundY, id) {

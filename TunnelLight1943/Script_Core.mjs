@@ -747,82 +747,145 @@ function StepCartRide(state, def, input, dt) {
   }
 }
 
-// 击打（合榫敲木楔）：两组——三下吃紧；爹演示四下变奏，玩家跟着敲。
-// 不设失败：教的是「节奏会变」这件事本身。嗜头写死在第三下：敲歪，爹瞪一眼，
-// 弯腰扶正，接着来。每一下都有挥臂动画与木榫的笃声（动词动画铁律）。
-function StepStrike(state, def, input, dt) {
+// 刨料：木匠的第一课，也是这一章唯一一次"手上真有活"的教学。
+//
+// 上一版是「站在工作台边按 E 敲三下木楔」——镜头在十几米外，木楔只有几个
+// 像素，按键落下去画面上什么都没发生，玩家手上没有任何分量。刨不一样：
+// 它是**长推**的活。一推到底，一条刨花打着卷落下来，木头亮一分；推到半道
+// 松了手，刨刃啃住木头，出来的是一小截碎屑，那一趟就白费了大半。
+// 「推得稳不稳」这件事，用不着一个字去说。
+//
+// 输入与划线同一套语汇（位移驱动）：桌面按住 E 往前推，触屏直接把刨子拖过去。
+// 顺纹（+x）才吃木头，回程只是把刨子拖回来——木匠不会倒着刨。
+function StepPlane(state, def, input, dt) {
   const b = state.beat;
-  if (b.si === undefined) {
-    b.si = 0; b.hi = 0; b.gagT = 0; b.demoLeft = 0; b.demoT = 0;
-    const father = FindActor(state, "father");
-    // 撂下锯换锤：教合榫这一拍，爹的手上不能还占着拉锯的活
-    if (father) { father.x = def.zone.x + 1.0; father.heading = -1; father.track = null; father.carry = null; }
-  }
   const father = FindActor(state, "father");
-  const set = def.sets[b.si];
-  if (!set) { state.tenon = null; AdvanceBeat(state); return; }
-  state.tenon = { si: b.si, hi: b.hi, total: set.hits, crooked: b.gagT > 0.7 };
+  const bx = def.zone.x;
+  const span = def.span ?? 0.62;
+  const workX = bx - 0.55;                 // 干活的站位（台子近端）
+  const need = def.passes ?? 3;
 
-  // 嗜头进行中：爹瞪一眼（转向玩家），后半段弯腰把楔子扶正
-  if (b.gagT > 0) {
-    b.gagT -= dt;
+  if (b.u === undefined) {
+    b.u = 0; b.passes = 0; b.stalls = 0; b.idleT = 0; b.armed = true;
+    b.pile = 0; b.everMoved = false; b.grainD = 0;
+    b.demoT = def.demoTime ?? 3.0; b.demoU = 0; b.demoCurl = false;
+    // 撂下锯：教刨料这一拍，爹手上不能还占着拉锯的活。他先站到工位上示范
     if (father) {
-      father.heading = state.player.x >= father.x ? 1 : -1;
-      father.pose = b.gagT < 0.7 ? "bow" : null;
+      father.track = null; father.carry = null;
+      father.x = workX; father.heading = 1; father.cineTarget = null;
     }
-    if (b.gagT <= 0) {
-      if (father) father.pose = null;
-      Cue(state, "tenon");        // 扶正的那一下
-      // 第一组完：爹先示范第二组的四下变奏
-      b.si += 1; b.hi = 0;
-      b.demoLeft = def.sets[b.si]?.hits || 0;
-      b.demoT = 0.6;
-    }
-    return;
+    // 看爹示范的站位：往里收一点，不然在 4.1m 的画框里他半个人挂在边上
+    state.player.x = workX - 0.92;
+    state.player.heading = 1;
   }
-  // 爹的示范：四下，节奏比第一组密
-  if (b.demoLeft > 0) {
+
+  const Publish = (u, active) => {
+    state.planing = {
+      x: bx, y: def.boardY ?? 0.60, span,
+      u, active,
+      smooth: Math.min(1, b.passes / need),      // 木头被刨亮了多少
+      pile: b.pile,                              // 地上那堆刨花
+      returning: !b.armed,                       // 自动通关驱动器看这个掉头
+    };
+  };
+
+  // ── 爹的示范：一趟到底，一条长刨花。没有字幕，看就是了 ──
+  if (b.demoT > 0) {
     b.demoT -= dt;
+    const k = Math.min(1, Math.max(0, (def.demoTime ?? 3.0) - b.demoT - 0.5) / 1.9);
+    b.demoU = k;
+    if (father) { father.pose = "planePush"; father.poseU = k; }
+    // 推的过程里持续出刨花声（每推过 8cm 一粒），到头甩出一条长刨花
+    b.grainD += Math.max(0, k - (b.prevDemoU ?? 0)) * span;
+    b.prevDemoU = k;
+    if (b.grainD > 0.08) { b.grainD = 0; Cue(state, "planeCut", { gain: 0.55 }); }
+    if (k >= 1 && !b.demoCurl) {
+      b.demoCurl = true;
+      b.pile += 1;
+      state.planeCurl = { x: bx + span / 2, y: (def.boardY ?? 0.60) + 0.16, len: 1, t: 0 };
+      Cue(state, "planeCurl");
+    }
     if (b.demoT <= 0) {
-      b.demoLeft -= 1;
-      b.demoT = 0.38;
-      if (father) { father.pose = "swing"; father.poseFlash = 0.3; }
-      Cue(state, "tenon", { gain: 0.6 });
+      // 让开工位，站到台子另一头看着
+      if (father) { father.pose = null; father.poseU = undefined; father.x = bx + 1.05; father.heading = -1; }
+      b.demoU = 0;
     }
-    if (father?.poseFlash !== undefined) {
-      father.poseFlash -= dt;
-      if (father.poseFlash <= 0) { father.pose = null; father.poseFlash = undefined; }
-    }
-    if (b.demoLeft <= 0 && (father?.poseFlash === undefined)) state.toast = null;
+    Publish(b.demoU, false);
     return;
   }
 
-  const near = Math.abs(state.player.x - def.zone.x) < (def.zone.w || 4) / 2 + 1.2;
-  if (!near) { state.prompt = ""; return; }
-  state.prompt = b.si === 0 ? "E · 敲木楔" : "E · 跟着敲";
-  state.gesture = { kind: "tap" };
-  // 沉浸式：屏幕上点一下 = 抡一锤；快速下拽的甩腕也算（0.3s 冷却防连发）
-  b.flickCd = Math.max(0, (b.flickCd || 0) - dt);
-  const flick = input.pullHeld && (input.pull || 0) > 0.11 && b.flickCd <= 0;
-  if (flick) b.flickCd = 0.3;
-  if (input.interact || input.tap || flick) {
-    b.hi += 1;
-    FlashPose(state, "swing", 0.35);
-    Cue(state, "tenon");
-    if (b.si === 0 && b.hi === set.hits) {
-      // 第三下敲歪：爹瞪一眼。gagT 顺带挡住输入，一秒半的哑剧
-      b.gagT = 1.4;
-      return;
-    }
-    if (b.hi >= set.hits) {
-      b.si += 1; b.hi = 0;
-      if (b.si >= def.sets.length) {
-        state.tenon = null;
-        if (father) father.pose = null;
-        state.toast = { text: "榫合上了。爹用手掌抹了一把接缝。", t: 4 };
-        AdvanceBeat(state);
-      }
-    }
+  const near = Math.abs(state.player.x - workX) < 0.85;
+  if (!near) {
+    state.player.pose = state.player.pose === "planePush" ? null : state.player.pose;
+    Publish(b.u, false);
+    state.prompt = "";
+    return;
+  }
+
+  // 两种握法，同一件事（与划线同源）：按住 E 往前推 / 直接把刨子拖过去
+  const held = input.interactHeld || input.interact;
+  const push = Math.abs(input.moveX) > 0.05;
+  let dv = 0;
+  if (held && push) dv += Math.sign(input.moveX) * dt * (def.speed ?? 0.62);
+  if (input.dragX) dv += input.dragX;
+  // 按住 E 推的时候人不许跟着走——MovePlayer 排在节拍执行器前面，
+  // 不钉住的话 A/D 会把柱子一路推出工位，刨到一半人就没了。
+  // 松开 E 就还能走开（这一拍不锁死玩家）。身子往前送的观感由姿势的 hipX 给。
+  if (held) { state.player.x = workX; state.player.heading = 1; }
+
+  const prevU = b.u;
+  b.u = Math.max(0, Math.min(1, b.u + dv));
+  const forward = b.u - prevU;
+  if (Math.abs(forward) > 0.0005) b.everMoved = true;
+
+  if (forward > 0 && b.armed) {
+    // 吃木头：每推过 8cm 出一粒刨花声，手上一直有东西在响
+    b.idleT = 0;
+    b.grainD += forward * span;
+    if (b.grainD > 0.08) { b.grainD = 0; Cue(state, "planeCut", { gain: 0.5 + Math.random() * 0.2 }); }
+  } else if (b.armed && b.u > 0.06 && b.u < 0.94) {
+    // 停在半道：刨刃啃住木头。停一次扣一档，不是失败，是"这一趟不齐"
+    b.idleT += dt;
+    if (b.idleT > 0.26) { b.idleT = -1e9; b.stalls += 1; Cue(state, "planeStall", { gain: 0.8 }); }
+  }
+  if (forward > 0.0005 && b.idleT < 0) b.idleT = 0;   // 又推起来了，重新开始计停顿
+
+  // 一趟推到头：刨花的长短就是这一趟的成绩
+  if (b.armed && b.u >= 0.995) {
+    const quality = b.stalls === 0 ? 1 : b.stalls === 1 ? 0.6 : 0.35;
+    b.passes += quality;
+    b.pile += 1;
+    state.flags.planedOnce = true;
+    state.planeCurl = { x: bx + span / 2, y: (def.boardY ?? 0.60) + 0.16, len: quality, t: 0 };
+    Cue(state, "planeCurl", { gain: 0.6 + quality * 0.5, rate: 0.9 + quality * 0.25 });
+    if (b.stalls === 0 && b.passes < need) state.toast = { text: "一整条刨花打着卷落下来。", t: 2.2 };
+    else if (b.stalls > 0) state.toast = { text: "中间顿了一下——出来的是碎屑。一推到底才齐。", t: 3 };
+    b.stalls = 0;
+    b.armed = false;                     // 得把刨子拖回来才能再推一趟
+  }
+  if (!b.armed && b.u <= 0.05) b.armed = true;
+
+  // 动词动画：姿势由推程直接驱动——玩家的手推多远，柱子的身子就送多远。
+  // 这是"交互感"的根：不是播一段动画给他看，是他自己在带着这具身子干活。
+  state.player.pose = "planePush";
+  state.player.poseU = b.u;
+  state.player.poseT = undefined;
+  state.prompt = null;                   // 引导交给 QTE 轨道，不占中间那条
+  state.dragTrack = {
+    t: b.u, idle: !b.everMoved,
+    tip: b.armed ? "顺着木纹，一推到底" : "把刨子拖回来",
+    back: !b.armed,
+  };
+  Publish(b.u, true);
+
+  if (b.passes >= need) {
+    state.planing = null;
+    state.dragTrack = null;
+    state.player.pose = null;
+    state.player.poseU = undefined;
+    if (father) { father.pose = null; father.poseU = undefined; }
+    if (def.note) state.toast = { text: def.note, t: 4.5 };
+    AdvanceBeat(state);
   }
 }
 
@@ -861,26 +924,23 @@ function MotherHoe(state) {
 export const SCRIPTS = {
   c1: [
     {
-      // 序章（对标《勇敢的心》两分钟新闻片）：从卢沟桥一路收拢到一道门框。
-      // 节奏不是均速平推——1–5 段快切叠画，9 段推镜变速，10 段起骤然放慢，
-      // 13 段是快慢之间的沉降拍（粮的铰链：c1_father 审问问的正是粮）。
-      // 每段一幅专画的卡（渲染层做慢推的 Ken Burns，定格画片才不像幻灯片）。
+      // 序章 v2（2026-08-06 砍半重排）：一分钟从卢沟桥收拢到一道门框。
+      // v1 的十四行摊得太开——宏观战史占了五行，人的苦难只有一行半，
+      // 「为什么被逼到地底下」反而没说透。现在 8+1 行三段式：
+      //   1 行战争压境 → 3 行苦难与被逼入土（新增第 3 行专写扫荡过后的活不下去）
+      //   → 1 行地道成网（题眼，全文最长一行保住）→ 3 行落到梁家村和柱子。
+      // 第 8 行粮的铰链仍保留（c1_father 审问问的正是粮）。
+      // 每行一段过场短片（Video/Pro_NN.mp4），手绘插卡兜底。
       kind: "cinematic", id: "c1_prologue", prologue: true,
       lines: [
-        { stage: "民国二十六年，七月。卢沟桥的枪声，把华北的夏天拦腰打断。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
-        { stage: "北平陷落。天津陷落。铁路沿线的城池，一座接一座换了旗子。", d: 4.4, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro2" } },
-        { stage: "大军往南去了。可华北还在——几万万人的华北，留在了铁蹄底下。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
-        { stage: "有人不肯走。他们钻进太行山，扎进冀中平原，在敌人背后扎下根来。", d: 4.8, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
-        { stage: "据点、炮楼、封锁沟，把平原割成一块一块的棋盘。他们管这叫『治安区』。", d: 5.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
-        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro6" } },
-        { stage: "平原上无山可靠，无林可藏。庄稼人把命，藏进了他们唯一有的东西——脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro7" } },
-        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro8" } },
-        { stage: "这个故事，发生在冀中一个普通的村庄。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro9" } },
-        { stage: "梁家村。一百来户人家。一口井，一盘磨，一棵老槐树。", d: 7.6, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro10" } },
-        { stage: "村东头住着一个木匠，姓梁。斧凿一响，十里八乡都请他。", d: 7.8, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro11" } },
-        { stage: "他有个儿子，叫柱子——房梁的梁，柱子的柱。庄稼人给孩子起名，起的都是盼头。", d: 8.2, cam: { kind: "insertVideo", clip: "Pro_12", card: "pro12" } },
-        { stage: "1942年，春。仗打了五年，粮比往年更金贵——地里的、囤里的，谁都在数。", d: 7.0, cam: { kind: "insertVideo", clip: "Pro_13", card: "pro13" } },
-        { stage: "可在梁家村，日子还得往下过：鸡叫了，磨响了，柱子家的娘在院门口喊孩子回家吃饭。", d: 8.0, cam: { kind: "insertVideo", clip: "Pro_14", card: "pro14" } },
+        { stage: "民国二十六年，卢沟桥一声枪响。不出一年，华北尽落敌手。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
+        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro6" } },
+        { stage: "粮被抢空，屋烧成断墙。活下来的人，连哭都不敢出声。", d: 5.5, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro13" } },
+        { stage: "无山可靠，无林可藏。庄稼人被逼到头，把命藏进了脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro7" } },
+        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro8" } },
+        { stage: "故事，发生在冀中的梁家村。村东头，住着个姓梁的木匠。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro11" } },
+        { stage: "他有个儿子叫柱子——房梁的梁，柱子的柱，起的是盼头。", d: 5.6, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro12" } },
+        { stage: "这年春上，粮比什么都金贵——谁家囤里，都在数着过。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
         { stage: "这天早上，梁木匠把儿子叫到了门框跟前。", d: 4.0, cam: { kind: "wide", x: 42 } },
       ],
     },
@@ -1018,11 +1078,20 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 帮爹合榫（教「击打」）：两组木楔——三下吃紧，第二组四下变奏，
-      // 教的是「节奏会变」（第七章凿地沿才不突兀）。嗜头：第三下敲歪，爹瞪一眼。
-      kind: "strike", id: "c1_tenon", zone: V.workbench,
-      sets: [{ hits: 3 }, { hits: 4 }],
-      objective: "帮爹合榫", hint: "到工作台边，跟着爹的手势敲",
+      // 帮爹把料刨平（教「长推」）。镜头推到台面上——刨花、木纹、两双手，
+      // 这一拍要看得见木头。爹先一趟示范，然后让开工位。
+      // 这块刨平的料就是他接下来要合的榫；也是扫荡时他慌忙塞进柴堆的那把刨子
+      // 唯一一次真正在玩家手里用过——藏的是刚才教会你的那件东西。
+      kind: "plane", id: "c1_tenon", zone: V.workbench,
+      // boardY = 料的**上沿**。台面在 0.54m（DrawBench 的板厚），料厚 0.17m，
+      // 所以上沿落在 0.71——低了就陷进台子里，高了就浮在半空
+      passes: 3, span: 0.62, boardY: 0.71, speed: 0.62, demoTime: 3.0,
+      // 景别按"木头是主角"定：4.1m 画宽、2.3m 画高——柱子占画高六成，
+      // 刨子在屏幕上有七十来个像素，刨花落下来看得清是一条卷。
+      // （老版这一拍根本没写 cam，用的是 12.6m 的跟随景别，木楔只有几个像素。）
+      cam: { kind: "shot", x: 40.35, y: 0.88, dist: 2.05 },
+      objective: "帮爹把这块料刨平", hint: "顺着木纹一推到底，中间别停",
+      note: "料平了。爹用手掌从头到尾抹了一遍，没说话，点了下头。",
     },
     {
       // 教「链＋单格换手」：两跳半——挂桶才知绳断；翻堆要双手，得先放下桶；
@@ -2552,7 +2621,9 @@ export function CreateGame(chapterIndex = 0) {
     sparrowBurst: null,
     henFlee: null,
     mouseFlee: null,
-    tenon: null,
+    planing: null,
+    planeCurl: null,
+    dragTrack: null,
     spotFlash: null,
     irisFocus: null,
     pip: null,
@@ -2642,7 +2713,9 @@ export function StartChapter(state, index) {
   state.sparrowBurst = null;
   state.henFlee = null;
   state.mouseFlee = null;
-  state.tenon = null;
+  state.planing = null;
+  state.planeCurl = null;
+  state.dragTrack = null;
   state.spotFlash = null;
   state.irisFocus = null;
   state.pip = null;
@@ -2657,6 +2730,7 @@ export function StartChapter(state, index) {
     state.flags.bucketAt = null;
     state.flags.raidStarted = false;
     state.flags.waterFilled = false;
+    state.flags.planedOnce = false;
   }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
@@ -2751,7 +2825,8 @@ function AdvanceBeat(state) {
   state.beatIndex += 1;
   state.caption = null;
   state.prompt = null;
-  state.tenon = null;
+  state.planing = null;
+  state.dragTrack = null;
   state.throwAim = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
@@ -2903,6 +2978,8 @@ export function StepGame(state, input, dt) {
   state.throwAim = null;
   if (state.bubbleFlash && (state.bubbleFlash.t -= dt) <= 0) state.bubbleFlash = null;
   if (state.spotFlash && (state.spotFlash.t -= dt) <= 0) state.spotFlash = null;
+  // 飘落的刨花：渲染层拿它跑一段自由落体，落到地上就并进那堆里
+  if (state.planeCurl && (state.planeCurl.t += dt) > 1.8) state.planeCurl = null;
   // 后果小窗到时收起；onEnd 给"看完这一眼之后"的收尾用（娘接着锄地）
   if (state.pip && (state.pip.t -= dt) <= 0) {
     const done = state.pip;
@@ -3023,7 +3100,7 @@ export function StepGame(state, input, dt) {
     case "rescueLoop": StepRescueLoop(state, def, input, dt); break;
     case "chain": StepChain(state, def, input, dt); break;
     case "cartRide": StepCartRide(state, def, input, dt); break;
-    case "strike": StepStrike(state, def, input, dt); break;
+    case "plane": StepPlane(state, def, input, dt); break;
     default: break;
   }
 
@@ -3923,6 +4000,7 @@ function StepScribe(state, def, input, dt) {
     state.prompt = "";
     state.scribe = null;
     b.grabbed = false;
+    state.dragTrack = null;
     return;
   }
 
@@ -3985,9 +4063,12 @@ function StepScribe(state, def, input, dt) {
     idle: !b.everMoved,
     speed,
   };
+  // 划线与刨料共用同一条 QTE 轨道（两件事都是"把它推过去"）
+  state.dragTrack = { t: b.head, idle: !b.everMoved, tip: "拖着石笔划过去" };
   if (b.drawn >= 1) {
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     state.scribe = null;
+    state.dragTrack = null;
     AdvanceBeat(state);   // onDone 由它统一调，这里再调一次就成了两遍
   }
 }
@@ -4269,9 +4350,12 @@ export function GetBeatTarget(state) {
       }
       return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
     }
-    case "strike": {
-      // 自动通关：站到工位上连着按 E 就行——嗜头与示范的停顿由执行器自己走
-      return { action: "interactAt", x: def.zone.x, level: "surface" };
+    case "plane": {
+      // 自动通关：站到工位上，按住 E 一趟一趟地推（到头了掉头拖回来）
+      return {
+        action: "planeAt", x: def.zone.x - 0.55, level: "surface",
+        back: !!state.planing?.returning,
+      };
     }
     case "chain": {
       const st = def.steps[state.beat.stepIndex || 0];
@@ -4375,7 +4459,7 @@ export function ChapterBeatList(chapterIndex) {
 // 起点开场——最难看的一种是"目的地就在脚下"，escort 刚进就自动完成。
 function SettleDest(def) {
   switch (def.kind) {
-    case "goto": case "hold": case "mapBoard": case "scribe": case "strike": return def.zone;
+    case "goto": case "hold": case "mapBoard": case "scribe": case "plane": return def.zone;
     case "escort": case "lead": case "smokeEscape": case "floodRescue": return def.dest;
     case "leadFollow": return def.waypoints?.[def.waypoints.length - 1];
     case "coverRun": {

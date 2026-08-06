@@ -75,9 +75,14 @@
          照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
          （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
     <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
-    <!-- 划线那一拍没有 HUD：玩家攥的是画面里那支石笔本身 -->
-    <!-- 手势提示：放绳（下拖）/ 拽桶（上拉）/ 打结（绕圈）/ 敲楔（点按）
-         的动效小图标，纯 CSS 循环动画，data-kind 切换 -->
+    <!-- 划线那一拍没有 HUD：玩家攥的是画面里那支石笔本身。
+         刨料仍走这条拖动 QTE 轨道（state.dragTrack 驱动） -->
+    <div id="scribeGuide" hidden>
+      <div class="track"><i class="fill"></i><span class="knob">✎</span></div>
+      <p class="tip">顺着木纹，一推到底</p>
+    </div>
+    <!-- 手势提示：转辘轳（绕圈）/ 打结（绕圈）/ 勒紧（下拽）的动效小图标，
+         纯 CSS 循环动画，data-kind 切换 -->
     <div id="gestureHint" hidden aria-hidden="true"><i class="gDot"></i></div>
     <div id="detectionVignette" aria-hidden="true"></div>
     <div id="irisOverlay" aria-hidden="true"></div>

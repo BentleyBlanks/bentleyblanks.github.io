@@ -1,76 +1,62 @@
-# TunnelLight1943 / Video —— 序章开场过场短片
+# TunnelLight1943 / Video —— 序章开场过场短片（v2，砍半版）
 
-序章那 14 张手绘插卡现在有了动起来的版本：**一行旁白一段短片**，
-`Pro_01.mp4` … `Pro_14.mp4` 对应 `Script_Core.mjs` 里 `c1_prologue` 的第 1–14 行。
+序章开场：**一行旁白一段短片**，`Pro_01.mp4` … `Pro_08.mp4` 对应
+`Script_Core.mjs` 里 `c1_prologue` 的第 1–8 行（第 9 行是落回实景的 wide，无片）。
 
-手绘插卡（`Script_Art.mjs` 的 `DrawInsertCard`，卡名 `pro1`…`pro14`）**没有删**，
-仍然是兜底：片子没缓冲好、自动播放被浏览器拦掉、或者文件缺失时，画面自动退回插卡，
-不会黑屏、不会报错。想整段回到插卡版本，把脚本里 `kind: "insertVideo"` 改回
-`kind: "insertCard"` 即可，其余代码不用动。
+**v2（2026-08-06）**：v1 十四行 109.5s 被判「铺垫过长、苦难写得不够」，重排成
+8+1 行、开声约 55s——宏观战史压成一行，新增一行专写扫荡过后的活不下去
+（第 3 行），「被逼」写进第 4 行；地道成网的题眼行保住全长；三行落到梁家村。
+手绘插卡（`DrawInsertCard`，卡名映射见脚本里各行的 `card:`）仍是兜底，
+整段回退把 `kind:"insertVideo"` 改回 `kind:"insertCard"` 即可。
 
 ## 一、镜头表
 
-| 文件 | 时长 | 对应旁白 | 画面 |
-|---|---|---|---|
-| `Pro_01.mp4` | 9.0s | 卢沟桥的枪声 | 石狮桥栏剪影，墨从桥头渗开，远处枪火 |
-| `Pro_02.mp4` | 8.1s | 北平陷落，天津陷落 | 墨顺铁路把两座城连通，城头换旗 |
-| `Pro_03.mp4` | 10.0s | 大军往南去了 | 粗箭头压向南，村落小点留在原地 |
-| `Pro_04.mp4` | 8.1s | 有人不肯走 | 背行李的剪影逆着箭头走进太行山 |
-| `Pro_05.mp4` | 11.0s | 据点、炮楼、封锁沟 | 棋盘格田野，炮楼探照灯一格格扫过 |
-| `Pro_06.mp4` | 6.1s | 扫荡一年比一年狠 | 地平线上的村子在烧，烟柱翻卷 |
-| `Pro_07.mp4` | 13.0s | 把命藏进脚下的土 | 低压天空，铁锹插土，人在坑里往下挖 |
-| `Pro_08.mp4` | 10.1s | 地底下长出另一个华北 | 2.5D 剖面：地表一线小房，地下地道连成网 |
-| `Pro_09.mp4` | 13.0s | 冀中一个普通的村庄 | 地图上的圆形光晕打开，收拢到一簇村舍 |
-| `Pro_10.mp4` | 8.1s | 一口井，一盘磨，一棵老槐树 | 梁家村清晨，槐树摇动，光斑晃 |
-| `Pro_11.mp4` | 8.1s | 村东头住着一个木匠 | 推刨子，刨花打卷飞出 |
-| `Pro_12.mp4` | 9.0s | 他有个儿子，叫柱子 | 镜头沿房梁升起——「房梁的梁，柱子的柱」 |
-| `Pro_13.mp4` | 15.1s | 粮比往年更金贵 | 青黄不接的麦田，见底的粮囤 |
-| `Pro_14.mp4` | 10.1s | 娘在院门口喊孩子回家吃饭 | 娘扶门框喊人，妹妹探头，鸡在刨食 |
+| 文件 | 时长 | 对应旁白 | 画面 | 来源 |
+|---|---|---|---|---|
+| `Pro_01.mp4` | 9.0s | 卢沟桥一声枪响，华北尽落敌手 | 石狮桥栏剪影，墨从桥头渗开 | v1 沿用 |
+| `Pro_02.mp4` | 6.1s | 扫荡一年比一年狠 | 地平线上的村子在烧，烟柱翻卷 | v1 沿用 |
+| `Pro_03.mp4` | 8.1s | 粮被抢空，连哭都不敢出声 | 翻倒见底的粮囤，一家人蹲在残墙根，兵的剪影走远 | v2 新做 |
+| `Pro_04.mp4` | 9.0s | 庄稼人被逼到头，把命藏进土里 | 固定全景：人在坑里一下下挖土 | v2 重出（v1 推得太猛） |
+| `Pro_05.mp4` | 10.1s | 地底下长出另一个华北 | 2.5D 剖面：地道连成网 | v1 沿用 |
+| `Pro_06.mp4` | 8.1s | 冀中梁家村，村东头的木匠 | 推刨子，刨花打卷 | v1 沿用 |
+| `Pro_07.mp4` | 8.1s | 儿子叫柱子，起的是盼头 | 父子仰望房梁（两人全程在画内） | v2 重出（v1 摇出画外） |
+| `Pro_08.mp4` | 15.1s | 这年春上粮金贵 | 青黄不接的麦田，见底的粮囤 | v1 沿用 |
 
-**时长必须 ≥ 对应那一行的实际时长**。注意那一行有多长不是由脚本里的 `d` 决定的——
-`LineDuration()` 会把它撑到旁白配音念完（`d` 只是下限）。开了声音的序章是 **109.5 秒**，
-不是 `d` 加起来的 85 秒。重烘任何一段之前先按这个算，别拿 `d` 当依据。
+**时长必须 ≥ 对应那一行的实际时长**——那一行有多长不是脚本里的 `d` 说了算：
+`LineDuration()` 会把它撑到旁白配音念完（`d` 只是下限）。改台词/换配音后先跑
+`Script_VoiceExtract` + Qwen 烘焙，再用 manifest 里的 `dur` 核对每段片长。
 
 ## 二、怎么做出来的
 
-1. **分镜**：Lovart（project `oKHfWa1O2A`，与前面九章分镜同一个 thread，
-   画风就是从那两张参考图定下来的）出两张分镜总图——一张 8 格 2048×2048、
-   一张 6 格 2048×1536，每格 16:9、格内不带文字，直接当视频首帧用。
-2. **切图**：按亮缝检测出格子边界，抹掉左上角镜号（拿右邻块水平镜像盖掉），
-   16:9 中心裁切后放到 1280×720。
-3. **生视频**：即梦 `dreamina image2video`，`--model_version=seedance2.0_vip`
-   `--video_resolution=720p`，时长逐镜指定。提示词里**每一条都写死「镜头只做平移或推拉，
-   绝不旋转、不俯仰、不环绕」**——这是项目铁律（见 `tunnellight-25d-feedback`），
-   AI 视频不写就会给你环绕运镜。
-4. **转码**：即梦出的是 60fps / ~15Mbps，单段 14–33MB，网页版扛不住。
-   转成 30fps + CRF 26 + faststart + 去音轨（旁白和配乐是游戏自己的）：
+1. **分镜**：Lovart（project `oKHfWa1O2A`，与九章分镜同 thread，画风同源）。
+   v1 出过两张分镜总图（8 格 2048² + 6 格 2048×1536），v2 补了一张单格 16:9
+   （扫荡过后）。总图按亮缝检测切格、镜像补丁抹镜号，16:9 中心裁切到 1280×720。
+2. **生视频**：即梦 `dreamina image2video`，`--model_version=seedance2.0_vip`
+   `--video_resolution=720p`。提示词每条写死「镜头绝不旋转、不俯仰、不环绕」
+   （项目铁律）；固定机位的戏要额外写「机位固定不动、绝不推近」，否则模型
+   默认会给你加运镜。
+3. **配音**：新台词过 `Script_VoiceExtract.mjs` 重建 manifest，再用
+   `TunnelLightQwenTtsCuda_20260805` venv 跑
+   `Script_VoiceBakeQwen.py --workDir TunnelLightQwen17Work_20260805 --stage bake
+   --lineId <id>…`（只烘缺的行；mp3 与 `dur` 回写都是它管）。
+4. **转码**：即梦出片 60fps/~15Mbps 太肥，
+   `ffmpeg -r 30 -crf 26 -preset slow -movflags +faststart -an` 压到约 1/13。
 
-   ```
-   ffmpeg -i in.mp4 -c:v libx264 -profile:v high -pix_fmt yuv420p \
-     -r 30 -crf 26 -preset slow -movflags +faststart -an out.mp4
-   ```
-
-   14 段共 23MB。CRF 24/26/28 四倍放大逐帧对比过，26 与原始 15Mbps 肉眼无差别
-   （源本身就是 AI 视频，细节不丰富，再给码率是浪费）。
-
-**即梦没有 seedance2.5**。CLI 暴露的视频模型只到 seedance2.0 家族
-（`seedance2.0` / `2.0fast` / `2.0_vip` / `2.0fast_vip` / `2.0mini`，外加旧的 1.0 / 1.5pro），
-`seedance2.0_vip` 是其中的旗舰档，也是唯一能出 720p 以上的。别再去找 2.5。
+**即梦没有 seedance2.5**：CLI 只到 seedance2.0 家族，`seedance2.0_vip` 是旗舰档。
 
 ## 三、播放实现里两个踩过的坑
 
 都在 `Script_World.js` 的 `SetInsertCard()`：
 
 - **对时死区不能给窄**。片子跟着 `state.beat.lineT` 走而不信视频自己的钟（这样暂停、
-  切后台、`?fast=1` 快进都能对上），但起播天生比旁白慢小半秒。死区给到 0.35s 时
-  每帧都会 `currentTime=` 一次，而每次 seek 都把 `readyState` 打回 1 →
-  当帧退回兜底插卡 → 画面在插卡和视频之间来回闪。现在死区 1.0s，且出过第一帧就
-  `insertVideoLive` latch 住，之后不再退回插卡。
-- **页面不可见时 `VideoTexture` 一帧都不上传**。three 的 `VideoTexture` 靠
-  `video.requestVideoFrameCallback` 置 `needsUpdate`，而它和 rAF 一样，
+  切后台、`?fast=1` 快进都能对上），但起播天生比旁白慢小半秒。死区 0.35s 时
+  每帧 seek 一次，每次 seek 都把 `readyState` 打回 1 → 当帧退回兜底插卡 →
+  画面来回闪。现在死区 1.0s，且出过第一帧就 `insertVideoLive` latch 住不再回退。
+- **页面不可见时 `VideoTexture` 一帧都不上传**。three 靠
+  `video.requestVideoFrameCallback` 置 `needsUpdate`，它和 rAF 一样
   `document.hidden` 时不触发。本项目的画面验证（`Script_DebugShot` / `Script_ShotTest` /
-  scratchpad 的 `cine-audit`）全是在面板隐藏、手动驱动渲染的状态下截图的——
-  不补这一下，序章截出来永远是兜底插卡，而且看不出错在哪。所以 hidden 时手动
-  `tex.needsUpdate = true`；正常游玩仍走 rVFC，不做多余的每帧上传。
+  cine-audit）全是面板隐藏、手动驱动渲染状态下截图的——不补
+  `if (document.hidden) tex.needsUpdate = true`，序章截出来永远是兜底插卡，
+  而且看不出错在哪。正常游玩仍走 rVFC。
 
 调试用 `world.__insertVideo()` 能问出当前片名 / 是否在放 / readyState / 播放头。
