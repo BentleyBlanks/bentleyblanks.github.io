@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=026">
+  <link rel="stylesheet" href="./Style_Game.css?v=027">
   <script type="importmap">
     {
       "imports": {
@@ -34,7 +34,7 @@
       <span id="hintText"></span>
     </section>
     <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
-    <div id="itemTag" hidden><small>手里</small><b id="itemName"></b></div>
+    <div id="itemTag" hidden><small>手里</small><b id="itemName"></b><i id="itemThrow" class="pKey" hidden></i></div>
     <div id="topRight">
       <!-- 三道滑轨：比齿轮省事，也正好是面板里的东西 -->
       <button id="btnSettings" type="button" aria-label="设置" aria-expanded="false">
@@ -65,6 +65,11 @@
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
     </section>
     <div id="toast"></div>
+    <!-- 交互徽章（勇敢的心式）：一枚按钮 + 一个短动词，浮在柱子头顶上。
+         按钮的脸由当前输入设备决定——键盘是键帽，手指是右下角那几个钮的
+         同一套线描图形。文案里一个键名都不写。 -->
+    <div id="actPrompt" hidden><i class="pKey"></i><b class="pVerb"></b></div>
+    <!-- 底部那条只剩没有按键的状态行（"跟上娘""！探杆就在头顶"） -->
     <div id="prompt" hidden></div>
     <!-- 划线：一条 QTE 式的轨道。手指（或按住 E 推）把石笔沿着它拖过去 -->
     <div id="scribeGuide" hidden>
@@ -164,16 +169,16 @@
       <dl id="controlsNote">
         <div><dt>A / D</dt><dd>左右移动（手机：左下摇杆横推）</dd></div>
         <div><dt>W / S</dt><dd>在梯口 / 地道口上下（手机：摇杆竖推）</dd></div>
-        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车</dd></div>
-        <div><dt>F</dt><dd>投掷（先捡石子；站得不远不近才砸得到）</dd></div>
-        <div><dt>C</dt><dd>蹲低（躲在草垛断墙后能避开视线）</dd></div>
-        <div><dt>1 / 2</dt><dd>做出抉择</dd></div>
+        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车（手机：右下大圆钮）</dd></div>
+        <div><dt>F</dt><dd>投掷，先捡石子（手机：手里有能扔的东西才冒出来的那个钮）</dd></div>
+        <div><dt>C</dt><dd>蹲低，躲在草垛断墙后能避开视线（手机：右下蹲人钮）</dd></div>
+        <div><dt>1 / 2</dt><dd>做出抉择（手机：直接点那张牌）</dd></div>
         <div><dt>M</dt><dd>开关声音（旁白 / 音效 / 配乐）</dd></div>
       </dl>
       <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=026"></script>
+<script type="module" src="./Script_Main.js?v=027"></script>
 </body>
 </html>

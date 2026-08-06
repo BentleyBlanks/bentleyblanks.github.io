@@ -16,6 +16,10 @@ import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 const PPM = 48;              // 贴图像素 / 世界米（尺寸标尺）
 const PROP_SS = 4;           // 道具/遮蔽物的贴图超采样倍率（特写不糊）
 const DETAIL_SS = 3;         // 塌方堆、油灯这类会被特写到的小件
+// 引导气泡、失败「！」这类**图标提示**：它们巴掌大（1.2m 见方），却偏偏总在
+// 过肩特写里出镜——3.2m 景别下画面密度到 600px/米，按标尺 48px/米 烘出来的
+// 贴图要被放大十几倍，糊成一团。这一档单独给足密度；贴图很小，代价可以忽略。
+const ICON_SS = 12;
 // 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
 
@@ -2180,8 +2184,11 @@ export function CreateWorld(canvasEl) {
         const b = wants[i];
         if (!b) { m.visible = false; return; }
         if (!bubbleTex.has(b.icon)) {
-          const c = MakeCanvas(56, 48);
-          ART.DrawIconBubble(c.getContext("2d"), 28, 44, b.icon, "bub" + b.icon);
+          // 世界尺寸仍按 56×48 / 48px 米标注，只把画布加密——推到特写也不糊
+          const c = MakeCanvas(56 * ICON_SS, 48 * ICON_SS);
+          const g = c.getContext("2d");
+          g.scale(ICON_SS, ICON_SS);
+          ART.DrawIconBubble(g, 28, 44, b.icon, "bub" + b.icon);
           bubbleTex.set(b.icon, CanvasTexture(c));
         }
         if (m.material.map !== bubbleTex.get(b.icon)) {
@@ -2284,8 +2291,11 @@ export function CreateWorld(canvasEl) {
       const tn = state.tenon;
       const key = `${tn.si}/${tn.hi}/${tn.crooked ? 1 : 0}/${tn.total}`;
       if (!tenonMesh) {
-        tenonCanvas = MakeCanvas(160, 44);
+        // 楔子是巴掌大的东西，玩家会凑到台面上敲——按 PROP_SS 加密（只在
+        // 状态变化时重画，7 个状态一共重画 7 次，代价可以忽略）
+        tenonCanvas = MakeCanvas(160 * PROP_SS, 44 * PROP_SS);
         tenonCtx = tenonCanvas.getContext("2d");
+        tenonCtx.scale(PROP_SS, PROP_SS);
         const tex = CanvasTexture(tenonCanvas);
         tenonMesh = new THREE.Mesh(
           new THREE.PlaneGeometry(1.5, 0.41),
@@ -2332,7 +2342,7 @@ export function CreateWorld(canvasEl) {
           ctx.beginPath(); ctx.moveTo(ax, ay - 40); ctx.lineTo(ax, ay - 16); ctx.stroke();
           ctx.fillStyle = "#ffd98a";
           ctx.beginPath(); ctx.arc(ax, ay - 5, 2.6, 0, Math.PI * 2); ctx.fill();
-        }, 0, DETAIL_SS);
+        }, 0, ICON_SS);
         layers.fx.add(spotFlashMesh);
         FixOrder(spotFlashMesh, LAYER_ORDER.fx + 340);
       }

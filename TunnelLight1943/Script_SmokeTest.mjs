@@ -8,8 +8,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CHAPTERS, SCENES, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
-  SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump,
+  CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
+  SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -328,6 +328,48 @@ function TestQuieterAudioMix() {
   console.log("  ✓ 音效与环境声降噪混音契约");
 }
 
+// 提示的写法：键名只许出现在 `E · ` 这个前缀里，由 HUD 按输入设备翻成
+// 键帽或触屏图标。文案（动词、hint、objective、toast）里但凡还写着"按 E"
+// "按住 E""（C）"，手机玩家读到的就是一句废话——这条断言就是盯这个的。
+function TestPromptsAreDeviceNeutral() {
+  const bad = [];
+  const KEY_IN_TEXT = /(按住?\s*[EFCWS]\b)|([（(]\s*[EFCWS]\s*[)）])|(\b[EFCWS]\s*(键|让|招呼|一条条))/;
+
+  const check = (label, raw) => {
+    if (typeof raw !== "string" || !raw) return;
+    const pr = SplitPrompt(raw);
+    // 前缀之后剩下的那部分才是玩家读到的字
+    if (KEY_IN_TEXT.test(pr.text)) bad.push(`${label}: ${raw}`);
+    // 动词要短：一眼扫过去就懂。超过 6 个字的多半是把说明写进了徽章——
+    // 为什么、怎么做交给画面、气泡和手记条，徽章上只留"做什么"
+    if (pr.act && pr.text.length > 6) bad.push(`${label}（动词过长 ${pr.text.length} 字）: ${raw}`);
+  };
+
+  const walk = (node, trail) => {
+    if (Array.isArray(node)) { node.forEach((v, i) => walk(v, `${trail}[${i}]`)); return; }
+    if (!node || typeof node !== "object") return;
+    for (const [k, v] of Object.entries(node)) {
+      if (typeof v === "string" && /prompt|hint|objective|note|label/i.test(k)) check(`${trail}.${k}`, v);
+      else if (v && typeof v === "object") walk(v, `${trail}.${k}`);
+    }
+  };
+  for (const [ch, beats] of Object.entries(SCRIPTS)) walk(beats, ch);
+
+  // 执行器里写死的那些提示也过一遍同一把尺
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const src = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  for (const m of src.matchAll(/state\.(?:prompt|climbHint)\s*=\s*"([^"]+)"/g)) {
+    check("Core", m[1]);
+  }
+
+  assert.deepEqual(bad, [], "提示文案里不许直接写键名／不许写成一句话：\n  " + bad.join("\n  "));
+  // 前缀本身必须还认得出来，否则徽章会集体退化成没有按钮的状态行
+  assert.deepEqual(SplitPrompt("按住 E · 接绳"), { act: "interact", hold: true, text: "接绳" });
+  assert.deepEqual(SplitPrompt("F · 投"), { act: "throw", hold: false, text: "投" });
+  assert.deepEqual(SplitPrompt("跟上娘"), { act: null, hold: false, text: "跟上娘" });
+  console.log("  ✓ 提示文案与设备无关（键名只在前缀里）");
+}
+
 // ---------------------------------------------------------------------------
 console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
@@ -338,6 +380,7 @@ TestClimb();
 TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
+TestPromptsAreDeviceNeutral();
 TestInstrumentalBgmManifest();
 TestQuieterAudioMix();
 
