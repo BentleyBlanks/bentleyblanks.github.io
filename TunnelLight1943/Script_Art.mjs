@@ -368,52 +368,52 @@ export const RIG_COLOR = (kind) => (kind === "father"
   : (KIND_COLOR[kind] || KIND_COLOR.villager));
 
 // 锥形肢体：从枢轴向下延伸 len，上宽 w0 下宽 w1
-export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4 } = {}) {
+export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4, k = 1 } = {}) {
   InkFill(ctx, [
     [px - w0 / 2, py], [px + w0 / 2, py],
     [px + w1 / 2, py + len], [px - w1 / 2, py + len],
-  ], id, color, { amp: 1.6, lw, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
+  ], id, color, { amp: 1.6 * k, lw: lw * k, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
 }
 
-export function DrawFootPart(ctx, px, py, len, h, color, id) {
+export function DrawFootPart(ctx, px, py, len, h, color, id, k = 1) {
   InkFill(ctx, [
-    [px - h * 0.5, py], [px + len, py], [px + len - 2, py + h], [px - h * 0.6, py + h],
-  ], id, color, { amp: 1.2, lw: 3.6, shade: "rgba(0,0,0,0.2)" });
+    [px - h * 0.5, py], [px + len, py], [px + len - 2 * k, py + h], [px - h * 0.6, py + h],
+  ], id, color, { amp: 1.2 * k, lw: 3.6 * k, shade: "rgba(0,0,0,0.2)" });
 }
 
 // 躯干：枢轴在胯（底边中点），短褂下摆略散
-export function DrawTorsoPart(ctx, px, py, w, h, kind, id) {
+export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
   const [coat] = RIG_COLOR(kind);
   InkFill(ctx, [
     [px - w * 0.40, py - h], [px + w * 0.40, py - h],
     [px + w * 0.50, py - h * 0.22], [px + w * 0.54, py],
     [px - w * 0.54, py], [px - w * 0.50, py - h * 0.22],
-  ], id, coat, { amp: 1.8, lw: 4.4, shade: "rgba(0,0,0,0.15)", shadeAt: 0.54 });
+  ], id, coat, { amp: 1.8 * k, lw: 4.4 * k, shade: "rgba(0,0,0,0.15)", shadeAt: 0.54 });
   // 腰带与衣襟
   InkLine(ctx, px - w * 0.5, py - h * 0.1, px + w * 0.5, py - h * 0.1, id + "belt",
-    { lw: 5, color: "rgba(43,31,22,0.8)", amp: 1.2 });
+    { lw: 5 * k, color: "rgba(43,31,22,0.8)", amp: 1.2 * k });
   InkLine(ctx, px + w * 0.08, py - h * 0.9, px + w * 0.14, py - h * 0.14, id + "lapel",
-    { lw: 3, color: "rgba(43,31,22,0.55)", amp: 1.6 });
+    { lw: 3 * k, color: "rgba(43,31,22,0.55)", amp: 1.6 * k });
   // 布料褶皱
   for (let i = 0; i < 2; i += 1) {
     InkLine(ctx, px - w * 0.3 + i * w * 0.2, py - h * 0.62, px - w * 0.26 + i * w * 0.2, py - h * 0.24,
-      id + "fold" + i, { lw: 2, color: "rgba(43,31,22,0.3)", amp: 2 });
+      id + "fold" + i, { lw: 2 * k, color: "rgba(43,31,22,0.3)", amp: 2 * k });
   }
 }
 
 // 头：枢轴在脖根（底边中点）
-export function DrawHeadPart(ctx, px, py, r, kind, id) {
-  const lw = 4.2;
+export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
+  const lw = 4.2 * k;
   // 脖子
   InkFill(ctx, Rect(px - r * 0.26, py - r * 0.34, r * 0.52, r * 0.4), id + "neck", PAL.skinDark,
-    { amp: 1, lw: 0, line: null });
+    { amp: 1 * k, lw: 0, line: null });
   // 头（侧脸：后脑圆、下巴收）
   InkFill(ctx, [
     [px - r * 0.92, py - r * 0.30], [px - r * 0.86, py - r * 1.30],
     [px - r * 0.10, py - r * 1.72], [px + r * 0.72, py - r * 1.36],
     [px + r * 1.00, py - r * 0.62], [px + r * 0.86, py - r * 0.06],
     [px - r * 0.62, py - r * 0.02],
-  ], id + "skull", PAL.skin, { amp: 1.4, lw, shade: "rgba(0,0,0,0.10)", shadeAt: 0.6 });
+  ], id + "skull", PAL.skin, { amp: 1.4 * k, lw, shade: "rgba(0,0,0,0.10)", shadeAt: 0.6 });
   // 鼻梁
   ctx.beginPath();
   ctx.moveTo(px + r * 0.94, py - r * 0.78);
@@ -428,14 +428,14 @@ export function DrawHeadPart(ctx, px, py, r, kind, id) {
   ctx.fill();
   // 嘴（一道短线）
   InkLine(ctx, px + r * 0.62, py - r * 0.36, px + r * 0.86, py - r * 0.34, id + "mouth",
-    { lw: 2.2, color: IN.inkSoft, amp: 0.6 });
+    { lw: 2.2 * k, color: IN.inkSoft, amp: 0.6 * k });
 
   // 头饰
   if (kind === "soldier") {
     InkFill(ctx, [
       [px - r * 1.02, py - r * 1.18], [px + r * 0.56, py - r * 1.82],
       [px + r * 1.06, py - r * 1.16], [px - r * 0.98, py - r * 0.82],
-    ], id + "cap", "#5f5a30", { amp: 1.2, lw: lw * 0.9 });
+    ], id + "cap", "#5f5a30", { amp: 1.2 * k, lw: lw * 0.9 });
     InkFill(ctx, [
       [px + r * 0.70, py - r * 1.20], [px + r * 1.60, py - r * 0.98],
       [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],

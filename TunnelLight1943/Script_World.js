@@ -844,9 +844,11 @@ export function CreateWorld(canvasEl) {
   // 都不该动这个文件。
   function AddProp(group, p, light, ruined, sceneKey, state) {
     const night = light === "night" || light === "tunnel" || light === "dark";
-    // 旗标门：扫荡后才出现的（倒塌柴垛/石子堆）、被拿走就消失的（母鸡/顶针）
-    if (p.showFlag && !state?.flags[p.showFlag]) return;
-    if (p.hideFlag && state?.flags[p.hideFlag]) return;
+    // 旗标门（扫荡后才出现的柴垛石堆 / 被拿走就消失的母鸡顶针）：**一律先建出来**，
+    // 之后由 UpdateProps 每帧切 visible。以前这两个旗标编在 builtKey 里，于是
+    // "捡一枚顶针" ＝ 整个场景重建：几十张超采样贴图重烘，实测 931ms 的一卡。
+    // 出没是每帧状态，不该惊动环境构建。
+    const meshFrom = group.children.length;
     const S = SpriteOf(p.kind, p);
     if (!S) return;    // drawnBy：地道剖面 / 动态件自己画，这里不管
     CheckBandZ("prop:" + p.kind, S.z);
@@ -910,43 +912,55 @@ export function CreateWorld(canvasEl) {
       case "woodStack": mk((ctx, ax, ay) => ART.DrawWoodStack(ctx, ax, ay, p.w * PPM, (p.h || 1.24) * PPM, p.id)); break;
       case "hatch": mk((ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true })); break;
       case "well": {
-        mk((ctx, ax, ay) => {
+        // 第一章：井绳断了半截——辘轳上垂着一小截断头，毛茬朝下。
+        // 断没断只改这一张贴图，所以它走 propRedraw 单张重烘，不进 builtKey
+        const Paint = (ctx, ax, ay, broken) => {
           ART.DrawWell(ctx, ax, ay, p.id, { night });
-          // 第一章：井绳断了半截——辘轳上垂着一小截断头，毛茬朝下
-          if (sceneKey === "village" && state?.flags.wellRopeBroken) {
-            ctx.strokeStyle = "#9a7d4f";
-            ctx.lineWidth = 2.6;
-            ctx.beginPath();
-            ctx.moveTo(ax, ay - 74);
-            ctx.quadraticCurveTo(ax + 2, ay - 62, ax - 1, ay - 52);
-            ctx.stroke();
-            for (let i = 0; i < 3; i += 1) {
-              ART.InkLine(ctx, ax - 1, ay - 52, ax - 4 + i * 3.4, ay - 45 - (i % 2) * 2,
-                p.id + "fray" + i, { lw: 1.4, color: "#8a6a45" });
-            }
+          if (!(sceneKey === "village" && broken)) return;
+          ctx.strokeStyle = "#9a7d4f";
+          ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay - 74);
+          ctx.quadraticCurveTo(ax + 2, ay - 62, ax - 1, ay - 52);
+          ctx.stroke();
+          for (let i = 0; i < 3; i += 1) {
+            ART.InkLine(ctx, ax - 1, ay - 52, ax - 4 + i * 3.4, ay - 45 - (i % 2) * 2,
+              p.id + "fray" + i, { lw: 1.4, color: "#8a6a45" });
           }
-        });
+        };
+        const wellMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.wellRopeBroken));
+        if (sceneKey === "village") {
+          propRedraw.push({ flag: "wellRopeBroken", last: !!state?.flags.wellRopeBroken,
+            run: (st) => RedrawProp(wellMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.wellRopeBroken)) });
+        }
         break;
       }
       case "millstone": mk((ctx, ax, ay) => ART.DrawMillstone(ctx, ax, ay, p.id)); break;
       case "woodpile": {
-        mk((ctx, ax, ay) => {
+        // 第一章打水链：麻绳绳头从堆里露出一截（目标同屏露一角），拿走就没了
+        const Paint = (ctx, ax, ay, taken) => {
           ART.DrawWoodpile(ctx, ax, ay, p.id);
-          // 第一章打水链：麻绳绳头从堆里露出一截（目标同屏露一角），拿走就没了
-          if (sceneKey === "village" && !state?.flags.ropeTaken) {
-            ctx.strokeStyle = "#9a7d4f";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(ax + 18, ay - 34);
-            ctx.quadraticCurveTo(ax + 34, ay - 40, ax + 40, ay - 26);
-            ctx.quadraticCurveTo(ax + 44, ay - 16, ax + 38, ay - 12);
-            ctx.stroke();
-            ART.InkLine(ctx, ax + 38, ay - 12, ax + 44, ay - 6, p.id + "ropeTip", { lw: 2.4, color: "#8a6a45" });
-          }
-        });
+          if (sceneKey !== "village" || taken) return;
+          ctx.strokeStyle = "#9a7d4f";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ax + 18, ay - 34);
+          ctx.quadraticCurveTo(ax + 34, ay - 40, ax + 40, ay - 26);
+          ctx.quadraticCurveTo(ax + 44, ay - 16, ax + 38, ay - 12);
+          ctx.stroke();
+          ART.InkLine(ctx, ax + 38, ay - 12, ax + 44, ay - 6, p.id + "ropeTip", { lw: 2.4, color: "#8a6a45" });
+        };
+        const pileMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.ropeTaken));
+        if (sceneKey === "village") {
+          propRedraw.push({ flag: "ropeTaken", last: !!state?.flags.ropeTaken,
+            run: (st) => RedrawProp(pileMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.ropeTaken)) });
+        }
         break;
       }
-      case "hen": mk((ctx, ax, ay) => ART.DrawHen(ctx, ax, ay - 16, p.id)); break;
+      // 母鸡蹲在那根待搬的木料上：爪子抬到 0.5m，让她整个落在木料上沿之上。
+      // 原来是 16px（0.33m），正好和木料重叠——同一条深度带谁先谁后全看进场
+      // 顺序，于是她时不时被自己蹲的那根木料盖住。分开画就没有先后可争。
+      case "hen": mk((ctx, ax, ay) => ART.DrawHen(ctx, ax, ay - 13, p.id)); break;
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
       case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
@@ -1040,6 +1054,8 @@ export function CreateWorld(canvasEl) {
       }
       default: break;
     }
+    // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
+    if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -1345,6 +1361,22 @@ export function CreateWorld(canvasEl) {
   // -------------------------------------------------------------------------
   let pinnedNotes = 0;
 
+  // 只随旗标"出没"的道具（建一次，切 visible）与"只改画法"的道具（只重烘自己那张）
+  let flagProps = [];
+  let propRedraw = [];
+
+  // 重烘一张道具贴图。BakeSprite 按 ss 给画布加了密，重画得把缩放补回去
+  function RedrawProp(mesh, S, drawFn) {
+    const canvas = mesh?.material?.map?.image;
+    if (!canvas?.getContext) return;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(S.ss, 0, 0, S.ss, 0, 0);
+    ctx.clearRect(0, 0, S.w, S.h);
+    drawFn(ctx, S.ax, S.ay);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    mesh.material.map.needsUpdate = true;
+  }
+
   function BuildEnvironment(state) {
     // 门板上的纸条是烘进贴图的，钉一条就得重烘一次
     const pins = state.beat?.pinned || 0;
@@ -1353,10 +1385,14 @@ export function CreateWorld(canvasEl) {
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
-      + `:${state.chapterIndex}:${f.clothDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`
-      + `:${f.henFlew ? 1 : 0}:${f.thimbleFound ? 1 : 0}:${f.raidStarted ? 1 : 0}:${f.ropeTaken ? 1 : 0}:${f.wellRopeBroken ? 1 : 0}`;
+      + `:${state.chapterIndex}:${f.clothDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
+    // henFlew / thimbleFound / raidStarted 只决定某个道具在不在（flagProps 切 visible），
+    // ropeTaken / wellRopeBroken 只改一张贴图的画法（propRedraw 单张重烘）——
+    // 一个都不进 builtKey。进了就是"捡个顶针卡一下"。
     if (key === builtKey) return;
     builtKey = key;
+    flagProps = [];
+    propRedraw = [];
     carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved };
     carveRebuild = null;
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
@@ -1941,6 +1977,20 @@ export function CreateWorld(canvasEl) {
     const sceneDef = SCENES[ch.scene];
     const def = CurrentBeatDef(state);
 
+    // 旗标门的道具：只切显隐，不重建世界（顶针、母鸡、扫荡后的柴垛石堆）
+    for (const fp of flagProps) {
+      const on = (!fp.p.showFlag || !!state.flags[fp.p.showFlag])
+        && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
+      for (const m of fp.meshes) m.visible = on;
+    }
+    // 画法随旗标变的那几张（井绳断口、木料堆里露出的绳头）：只重烘自己那一张
+    for (const r of propRedraw) {
+      const v = !!state.flags[r.flag];
+      if (r.last === v) continue;
+      r.last = v;
+      r.run(state);
+    }
+
     // 可拾取物件
     if (def?.kind === "collect" && state.beat.itemStates) {
       // 贴图是按 label 烘的。上一拍搬木料、这一拍提水桶时，网格如果沿用
@@ -2370,7 +2420,15 @@ export function CreateWorld(canvasEl) {
       throwAimLine.visible = true;
     } else if (throwAimLine) throwAimLine.visible = false;
 
-    // 惊飞的麻雀 / 扑棱下地的母鸡 / 蹿走的田鼠：一张小画布逐帧重画
+    // 惊飞的麻雀 / 扑棱下地的母鸡 / 蹿走的田鼠：一张小画布逐帧重画。
+    //
+    // 画布挂在 SURFACE_Y + CRITTER_LIFT 上，**世界地面在画布里是 CG**，不是画布
+    // 底边。原来几个 y 是写死的像素（母鸡 118→166、田鼠 186），换算过来是
+    // 母鸡落到地下 0.38m、田鼠一路在地下 0.8m 跑——"扑棱下地"成了钻地。
+    // 一律按"离地多少米"算。
+    const CRITTER_LIFT = 1.0;
+    const CG = 100 + CRITTER_LIFT * PPM;      // 地平线在这块画布里的 y
+    const AtY = (m) => CG - m * PPM;          // 离地 m 米 → 画布 y
     {
       const fx = state.sparrowBurst || state.henFlee || state.mouseFlee;
       if (fx) {
@@ -2382,8 +2440,11 @@ export function CreateWorld(canvasEl) {
             new THREE.PlaneGeometry(320 / PPM, 200 / PPM),
             new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
           );
-          FixOrder(critterMesh, LAYER_ORDER.fx + 260);
-          layers.fx.add(critterMesh);
+          // 小活物是玩法层里的东西，得和人、车、柴堆一起按深度排。挂在 fx 层
+          // （基序号比 play 高一整档）＝永远压在所有人前面：母鸡会从柱子脸前飞过去。
+          // loose 带正好是"看得见但不挡人"，比演员靠后一档。
+          layers.play.add(critterMesh);
+          SetPlayOrder(critterMesh, BAND.loose, "critter");
         }
         const c = critterCtx;
         c.setTransform(2, 0, 0, 2, 0, 0);
@@ -2395,13 +2456,16 @@ export function CreateWorld(canvasEl) {
           for (let i = 0; i < 4; i += 1) {
             const dir = i % 2 ? 1 : -1;
             const sx = 160 + dir * (14 + t * (34 + i * 15));
-            const sy = 168 - t * (66 + i * 22) + Math.sin(t * 9 + i) * 6;
+            // 从落石处炸窝：贴着地起飞，各自窜上去
+            const sy = AtY(0.18 + t * (1.38 + i * 0.46)) + Math.sin(t * 9 + i) * 6;
             ART.DrawSparrow(c, sx, sy, "sp" + i, (t * 5 + i * 0.3) % 1);
           }
         } else if (state.henFlee) {
           const t = state.henFlee.t;
           c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.4));
-          const hx = 160 + t * 62, hy = 118 + Math.min(1, t / 0.5) * 48 + Math.sin(t * 16) * 4;
+          // 从木料上（0.42m）扑棱到地面（0.06m），一路小跑着走开
+          const hx = 160 + t * 62;
+          const hy = AtY(0.27 - Math.min(1, t / 0.5) * 0.21) + Math.sin(t * 16) * 3;
           ART.DrawHen(c, hx, hy, "fleeHen");
           // 扑棱的翅
           ART.InkLine(c, hx - 2, hy - 12, hx - 12, hy - 22 - Math.sin(t * 22) * 6, "henWing",
@@ -2409,13 +2473,13 @@ export function CreateWorld(canvasEl) {
         } else if (state.mouseFlee) {
           const t = state.mouseFlee.t;
           c.globalAlpha = Math.max(0, 1 - t / 1.1);
-          ART.DrawMouse(c, 160 - t * 150, 186 + Math.sin(t * 30) * 2, "fleeMouse");
+          ART.DrawMouse(c, 160 - t * 150, AtY(0.05) + Math.sin(t * 30) * 2, "fleeMouse");
         }
         c.restore();
         critterMesh.material.map.needsUpdate = true;
         critterMesh.visible = true;
         const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x;
-        critterMesh.position.set(baseX, SURFACE_Y + 1.0, 0.5);
+        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, BAND.loose);
       } else if (critterMesh) critterMesh.visible = false;
     }
 
@@ -2467,7 +2531,7 @@ export function CreateWorld(canvasEl) {
           new THREE.MeshBasicMaterial({ map: CanvasTexture(planeBoardCanvas), transparent: true, depthWrite: false }),
         );
         layers.play.add(planeBoardMesh);
-        // 料摊在台面上、人站在台子这一侧：正是 loose 带的定义（行走线之前、演员之后）
+        // 料搁在台面上：压在行走线道具（台子）之前、演员之后 —— 正是 loose 带
         SetPlayOrder(planeBoardMesh, BAND.loose, "planeBoard");
         planeBoardMesh.userData.k = "";
         // 刨子本体：真家伙就巴掌长（≈0.34m）。S=0.74 让 DrawCarry 的 22S 像素
@@ -2475,7 +2539,7 @@ export function CreateWorld(canvasEl) {
         planeToolMesh = BakeSprite(26, 20, 13, 14,
           (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 0.74, 1, "刨子"), 0, DETAIL_SS * 4);
         layers.play.add(planeToolMesh);
-        SetPlayOrder(planeToolMesh, CARRY_Z);   // 攥在手里，与其它手持物同一层
+        SetPlayOrder(planeToolMesh, CARRY_Z, "planeTool");   // 攥在手里，与其它手持物同一层
         // 地上的刨花堆
         planePileCanvas = MakeCanvas(64 * PROP_SS, 26 * PROP_SS);
         planePileCtx = planePileCanvas.getContext("2d");
@@ -2485,8 +2549,7 @@ export function CreateWorld(canvasEl) {
           new THREE.MeshBasicMaterial({ map: CanvasTexture(planePileCanvas), transparent: true, depthWrite: false }),
         );
         layers.play.add(planePileMesh);
-        // 刨花落在台子这一侧的地上：同属 loose 带，排在料之后免得两张贴图打架
-        FixOrder(planePileMesh, DepthOrder("play", BAND.loose) + 1);
+        SetPlayOrder(planePileMesh, BAND.loose, "planePile");   // 落在台子这一侧的地上
         planePileMesh.userData.k = -1;
       }
       // 毛面按 12 档重画（连续重画一块 PROP_SS 的画布太亏）
@@ -2501,14 +2564,14 @@ export function CreateWorld(canvasEl) {
       planeBoardMesh.visible = true;
       // 料的上沿画在画布 y=14，网格中心是 y=20。画布 y 向下、世界 y 向上，
       // 所以中心要落在上沿**之下** 6px——符号写反的话料就飘在台面上方
-      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, 0.5);
+      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, BAND.loose);
 
       // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
       // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
       // （另算一份 u→x 的话，两条线迟早对不上，刨子就飘在手外面了。）
       const hand = planeHandRig ? HandPoint(planeHandRig) : null;
       planeToolMesh.visible = !!hand;
-      if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, 0.56);
+      if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
 
       if (planePileMesh.userData.k !== pl.pile) {
         planePileMesh.userData.k = pl.pile;
@@ -2517,7 +2580,7 @@ export function CreateWorld(canvasEl) {
         planePileMesh.material.map.needsUpdate = true;
       }
       planePileMesh.visible = pl.pile > 0;
-      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, 0.58);
+      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, BAND.loose);
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
@@ -2535,7 +2598,7 @@ export function CreateWorld(canvasEl) {
           new THREE.PlaneGeometry(26 / PPM, 26 / PPM),
           new THREE.MeshBasicMaterial({ map: CanvasTexture(planeCurlCanvas), transparent: true, depthWrite: false }),
         );
-        FixOrder(planeCurlMesh, LAYER_ORDER.fx + 200);
+        FixOrder(planeCurlMesh, LAYER_ORDER.fx + 200);   // 飞在空中的刨花：fx 层例外（见 CLAUDE.md 词汇表）
         layers.fx.add(planeCurlMesh);
         planeCurlMesh.userData.k = -1;
       }

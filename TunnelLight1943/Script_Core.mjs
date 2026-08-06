@@ -809,29 +809,43 @@ function StepPlane(state, def, input, dt) {
       // 让开工位，站到台子另一头看着
       if (father) { father.pose = null; father.poseU = undefined; father.x = bx + 1.05; father.heading = -1; }
       b.demoU = 0;
+      b.stepUp = true;          // 爹一让开，柱子自己上前接手
     }
     Publish(b.demoU, false);
     return;
   }
 
-  const near = Math.abs(state.player.x - workX) < 0.85;
-  if (!near) {
-    state.player.pose = state.player.pose === "planePush" ? null : state.player.pose;
+  // ── 上前接手 ──
+  // 这一步必须由游戏自己走完。上一版让玩家自己走到工位，而工位判定只有
+  // ±0.85m、又没有任何提示——示范一完人站在 0.92m 外，屏幕上什么都不出，
+  // 玩家只能干瞪眼。教学关不该把"该站哪"变成一道谜题。
+  if (b.stepUp) {
+    const d = workX - state.player.x;
+    if (Math.abs(d) < 0.05) { state.player.x = workX; b.stepUp = false; }
+    else state.player.x += Math.sign(d) * Math.min(Math.abs(d), 1.7 * dt);
+    state.player.heading = 1;
     Publish(b.u, false);
-    state.prompt = "";
     return;
   }
 
-  // 两种握法，同一件事（与划线同源）：按住 E 往前推 / 直接把刨子拖过去
-  const held = input.interactHeld || input.interact;
-  const push = Math.abs(input.moveX) > 0.05;
-  let dv = 0;
-  if (held && push) dv += Math.sign(input.moveX) * dt * (def.speed ?? 0.62);
-  if (input.dragX) dv += input.dragX;
-  // 按住 E 推的时候人不许跟着走——MovePlayer 排在节拍执行器前面，
-  // 不钉住的话 A/D 会把柱子一路推出工位，刨到一半人就没了。
-  // 松开 E 就还能走开（这一拍不锁死玩家）。身子往前送的观感由姿势的 hipX 给。
-  if (held) { state.player.x = workX; state.player.heading = 1; }
+  // 站定了就钉在台前：这一拍人不走路。A/D 在这儿没有意义——
+  // 上一版按住 D 能一路走开，把刨料变成了"散步"。
+  state.player.x = workX;
+  state.player.heading = 1;
+
+  // ── 推刨：拖动为主 ──
+  // 刨是"把它推过去"的动作，对应的操作就该是把它推过去：鼠标按住拖 / 手指拖。
+  // input.dragX 是位移量——拖多少走多少，手上有"蹭着木头走"的实感。
+  //
+  // 键盘留一条等价后备（CLAUDE.md 的硬要求：自动通关只按键盘，鼠标玩法必须有
+  // 按键路径，否则测试卡死）：**光按住 E 就往前推**，不掺 A/D。上一版要
+  // "按住 E 再按 D"，于是 D 单独按下去就是走路——玩家一路走出了工位。
+  // 这一拍人本来就钉在台前，A/D 不参与，冲突从根上没了。
+  // 键盘后备只认"按住 E"一个键，方向由这一趟的状态给：还没推到头就往前推，
+  // 推到头了就往回带。玩家不用去想方向，也就不会和走路抢键。
+  const keyDir = b.armed ? 1 : -1;
+  const dv = (input.dragX || 0)
+    + (input.interactHeld ? keyDir * dt * (def.keySpeed ?? 0.55) : 0);
 
   const prevU = b.u;
   b.u = Math.max(0, Math.min(1, b.u + dv));
@@ -875,6 +889,7 @@ function StepPlane(state, def, input, dt) {
     t: b.u, idle: !b.everMoved,
     tip: b.armed ? "顺着木纹，一推到底" : "把刨子拖回来",
     back: !b.armed,
+    drag: true,          // HUD 据此把"怎么操作"按鼠标/手指说清楚
   };
   Publish(b.u, true);
 
@@ -1088,7 +1103,7 @@ export const SCRIPTS = {
       kind: "plane", id: "c1_tenon", zone: V.workbench,
       // boardY = 料的**上沿**。台面在 0.54m（DrawBench 的板厚），料厚 0.17m，
       // 所以上沿落在 0.71——低了就陷进台子里，高了就浮在半空
-      passes: 3, span: 0.62, boardY: 0.71, speed: 0.62, demoTime: 3.0,
+      passes: 3, span: 0.62, boardY: 0.71, demoTime: 3.0,
       // 景别按"木头是主角"定：4.1m 画宽、2.3m 画高——柱子占画高六成，
       // 刨子在屏幕上有七十来个像素，刨花落下来看得清是一条卷。
       // （老版这一拍根本没写 cam，用的是 12.6m 的跟随景别，木楔只有几个像素。）

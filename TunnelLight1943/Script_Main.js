@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=032";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=032";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=034";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=034";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=032")
+import("./Script_Audio.js?v=034")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -718,9 +718,13 @@ function SyncHud(state, dt, shotFade) {
       ui.scribeGuide.style.setProperty("--fill", (dt2.t * 100).toFixed(1) + "%");
       ui.scribeGuide.classList.toggle("idle", !!dt2.idle);
       ui.scribeGuide.classList.toggle("back", !!dt2.back);
-      if (dragTipShown !== dt2.tip) {
-        dragTipShown = dt2.tip;
-        ui.scribeGuide.querySelector(".tip").textContent = dt2.tip;
+      // 怎么操作要说清楚，而且按当前设备说：鼠标玩家听不懂"拖"是拖什么。
+      // （刨料那一拍是纯拖动——键盘在这个动作上没有对应物。）
+      const how = dt2.drag ? (inputMode === "touch" ? "　·　用手指拖" : "　·　按住鼠标左键拖") : "";
+      const line = dt2.tip + how;
+      if (dragTipShown !== line) {
+        dragTipShown = line;
+        ui.scribeGuide.querySelector(".tip").textContent = line;
       }
     }
   }
