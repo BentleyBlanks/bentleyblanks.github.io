@@ -6,6 +6,7 @@
   "scripts": {
     "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942 && npm run test:tunnelLight1943 && npm run test:reedSignal1942",
     "test:reedSignal1942": "node ReedSignal1942/Script_SmokeTest.mjs",
+    "test:reedSignal1942:browser": "node ReedSignal1942/Script_RenderHealthTest.mjs",
     "test:tunnelLight1943": "node TunnelLight1943/Script_SmokeTest.mjs && node TunnelLight1943/Script_SceneAudit.mjs --quiet",
     "test:tunnelLight1943:browser": "node TunnelLight1943/Script_RenderHealthTest.mjs && node TunnelLight1943/Script_DebugJumpTest.mjs",
     "scene:tunnelLight1943": "node TunnelLight1943/Script_SceneAudit.mjs",

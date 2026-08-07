@@ -1,10 +1,4 @@
-import {
-  Chapters,
-  GameMetadata,
-  HistoricalSources,
-  GetAllChildNames,
-  GetChapter,
-} from "./Data_World.mjs";
+import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs";
 import {
   CreateGameState,
   RestoreGameState,
@@ -13,18 +7,21 @@ import {
   GetAvailableAction,
   GetBlockedActionReason,
   GetGroundY,
-  GetLightTarget,
   GetObjective,
   GetWindStrength,
   IsWindGust,
   IsChapterReady,
   AdvanceChapter,
+  CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs";
+} from "./Script_Rules.mjs?v=20260808e";
+import { CreateRender3D } from "./Script_Render3D.mjs?v=20260808e";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
   canvas: document.getElementById("GameCanvas"),
+  loading: document.getElementById("LoadingScreen"),
+  loadingText: document.getElementById("LoadingText"),
   title: document.getElementById("TitleScreen"),
   start: document.getElementById("StartButton"),
   continue: document.getElementById("ContinueButton"),
@@ -88,7 +85,6 @@ const Ui = {
   touchControls: document.getElementById("TouchControls"),
 };
 
-const Context = Ui.canvas.getContext("2d", { alpha: false });
 const InputState = {
   left: false,
   right: false,
@@ -102,14 +98,10 @@ const InputState = {
 const Runtime = {
   state: null,
   previewState: CreateGameState(0),
-  cameraX: 620,
+  render: null,
   previousTime: performance.now(),
-  cssWidth: 1280,
-  cssHeight: 720,
-  scale: 1,
   storyUntil: 0,
   storyQueue: [],
-  currentStory: "",
   lastSaveSignature: "",
   lastSaveAt: 0,
   introPendingState: null,
@@ -120,40 +112,29 @@ const Runtime = {
   transientKeys: new Map(),
   chapterCompleteShown: false,
   lastFootstepAt: 0,
-  titleStartedAt: performance.now(),
+  error: null,
 };
-
-function ResizeCanvas() {
-  const rectangle = Ui.canvas.getBoundingClientRect();
-  Runtime.cssWidth = Math.max(320, rectangle.width);
-  Runtime.cssHeight = Math.max(240, rectangle.height);
-  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
-  Ui.canvas.width = Math.round(Runtime.cssWidth * pixelRatio);
-  Ui.canvas.height = Math.round(Runtime.cssHeight * pixelRatio);
-  Context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  Runtime.scale = Math.max(0.72, Math.min(1.16, Runtime.cssHeight / 720));
-}
 
 function CreateAudio() {
   if (Runtime.audio) return Runtime.audio;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return null;
-  const audio = new AudioContextClass();
-  const master = audio.createGain();
-  master.gain.value = Runtime.muted ? 0 : 0.34;
-  master.connect(audio.destination);
-  Runtime.audio = { context: audio, master };
-  const buffer = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
+  const context = new AudioContextClass();
+  const master = context.createGain();
+  master.gain.value = Runtime.muted ? 0 : 0.3;
+  master.connect(context.destination);
+  Runtime.audio = { context, master };
+  const buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
   const data = buffer.getChannelData(0);
-  for (let index = 0; index < data.length; index += 1) data[index] = (Math.random() * 2 - 1) * (0.35 + Math.sin(index * 0.00021) * 0.18);
-  const source = audio.createBufferSource();
-  const filter = audio.createBiquadFilter();
-  const gain = audio.createGain();
+  for (let index = 0; index < data.length; index += 1) data[index] = (Math.random() * 2 - 1) * (0.31 + Math.sin(index * 0.00021) * 0.17);
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
   source.buffer = buffer;
   source.loop = true;
   filter.type = "lowpass";
-  filter.frequency.value = 540;
-  gain.gain.value = 0.055;
+  filter.frequency.value = 510;
+  gain.gain.value = 0.048;
   source.connect(filter).connect(gain).connect(master);
   source.start();
   Runtime.ambient = { source, gain, filter };
@@ -174,34 +155,23 @@ function PlayTone(kind = "soft") {
   const gain = audio.context.createGain();
   const filter = audio.context.createBiquadFilter();
   const settings = {
-    soft: [180, 0.08, 0.16, "sine"],
-    action: [248, 0.11, 0.24, "triangle"],
-    alert: [92, 0.14, 0.35, "sawtooth"],
-    bell: [392, 0.18, 1.7, "sine"],
-    water: [128, 0.09, 0.62, "sine"],
-  }[kind] || [180, 0.08, 0.16, "sine"];
+    soft: [156, 0.052, 0.15, "sine"],
+    action: [226, 0.09, 0.26, "triangle"],
+    alert: [82, 0.12, 0.38, "sawtooth"],
+    bell: [371, 0.15, 2.1, "sine"],
+    water: [116, 0.075, 0.66, "sine"],
+  }[kind] || [156, 0.052, 0.15, "sine"];
   oscillator.type = settings[3];
   oscillator.frequency.setValueAtTime(settings[0], now);
-  if (kind === "bell") oscillator.frequency.exponentialRampToValueAtTime(196, now + settings[2]);
+  if (kind === "bell") oscillator.frequency.exponentialRampToValueAtTime(184, now + settings[2]);
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.exponentialRampToValueAtTime(settings[1], now + 0.025);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + settings[2]);
   filter.type = "lowpass";
-  filter.frequency.value = kind === "alert" ? 380 : 1300;
+  filter.frequency.value = kind === "alert" ? 360 : 1180;
   oscillator.connect(filter).connect(gain).connect(audio.master);
   oscillator.start(now);
-  oscillator.stop(now + settings[2] + 0.04);
-}
-
-function ShowHistory(returnTarget = "title") {
-  Runtime.historyReturn = returnTarget;
-  Ui.history.hidden = false;
-  Ui.history.scrollTop = 0;
-}
-
-function CloseHistory() {
-  Ui.history.hidden = true;
-  if (Runtime.historyReturn === "pause") Ui.pause.hidden = false;
+  oscillator.stop(now + settings[2] + 0.05);
 }
 
 function PopulateHistory() {
@@ -222,21 +192,26 @@ function PopulateHistory() {
   }
 }
 
+function ShowHistory(returnTarget = "title") {
+  Runtime.historyReturn = returnTarget;
+  Ui.history.hidden = false;
+  Ui.history.scrollTop = 0;
+}
+
+function CloseHistory() {
+  Ui.history.hidden = true;
+  if (Runtime.historyReturn === "pause") Ui.pause.hidden = false;
+}
+
 function HasSave() {
-  try {
-    return Boolean(localStorage.getItem(GameMetadata.saveKey));
-  } catch {
-    return false;
-  }
+  try { return Boolean(localStorage.getItem(GameMetadata.saveKey)); } catch { return false; }
 }
 
 function ReadSave() {
   try {
     const serialized = localStorage.getItem(GameMetadata.saveKey);
     return serialized ? RestoreGameState(serialized) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function WriteSave(force = false) {
@@ -250,18 +225,25 @@ function WriteSave(force = false) {
     Runtime.lastSaveSignature = serialized;
     Runtime.lastSaveAt = now;
     Ui.continue.hidden = false;
-  } catch {
-    // Local storage can be disabled; checkpoints still work for the current run.
-  }
+  } catch { /* storage is optional */ }
 }
 
 function ClearSave() {
-  try {
-    localStorage.removeItem(GameMetadata.saveKey);
-  } catch {
-    // No persistent storage is a supported mode.
-  }
+  try { localStorage.removeItem(GameMetadata.saveKey); } catch { /* storage is optional */ }
   Runtime.lastSaveSignature = "";
+}
+
+function SetGameplayChrome(visible) {
+  Ui.gameHeader.hidden = !visible;
+  Ui.objectiveCard.hidden = !visible;
+  Ui.controlGuide.hidden = !visible;
+  Ui.touchControls.hidden = !visible;
+  if (!visible) {
+    Ui.windCard.hidden = true;
+    Ui.suspicionCard.hidden = true;
+    Ui.teamCard.hidden = true;
+    Ui.interaction.hidden = true;
+  }
 }
 
 function PrepareChapterIntro(state) {
@@ -270,14 +252,7 @@ function PrepareChapterIntro(state) {
   Ui.pause.hidden = true;
   Ui.complete.hidden = true;
   Ui.ending.hidden = true;
-  Ui.gameHeader.hidden = true;
-  Ui.objectiveCard.hidden = true;
-  Ui.windCard.hidden = true;
-  Ui.suspicionCard.hidden = true;
-  Ui.teamCard.hidden = true;
-  Ui.controlGuide.hidden = true;
-  Ui.touchControls.hidden = true;
-  Ui.interaction.hidden = true;
+  SetGameplayChrome(false);
   Ui.title.classList.remove("isVisible");
   Ui.title.hidden = true;
   Ui.intro.hidden = false;
@@ -297,21 +272,18 @@ function EnterChapter() {
   ResumeAudio();
   Runtime.state = Runtime.introPendingState || CreateGameState(0);
   Runtime.introPendingState = null;
-  Runtime.cameraX = Runtime.state.player.x + 250;
   Runtime.chapterCompleteShown = false;
   Runtime.storyQueue.length = 0;
   Runtime.storyUntil = 0;
   Ui.intro.hidden = true;
   Ui.complete.hidden = true;
   Ui.ending.hidden = true;
-  Ui.gameHeader.hidden = false;
-  Ui.objectiveCard.hidden = false;
-  Ui.controlGuide.hidden = false;
-  Ui.touchControls.hidden = false;
+  SetGameplayChrome(true);
   const chapter = GetChapter(Runtime.state.chapterIndex);
   Ui.hudChapterNumber.textContent = chapter.number;
   Ui.hudChapterTitle.textContent = chapter.title;
   Runtime.state.mode = "playing";
+  Runtime.render.SetChapter(Runtime.state.chapterIndex, chapter, Runtime.state);
   Ui.canvas.focus({ preventScroll: true });
   WriteSave(true);
 }
@@ -324,26 +296,22 @@ function StartNewStory() {
 
 function ContinueStory() {
   ResumeAudio();
-  const savedState = ReadSave();
-  PrepareChapterIntro(savedState || CreateGameState(0));
+  PrepareChapterIntro(ReadSave() || CreateGameState(0));
 }
 
 function ReturnToTitle() {
   if (Runtime.state) WriteSave(true);
   Runtime.state = null;
-  Runtime.introPendingState = null;
+  Runtime.previewState = CreateGameState(0);
+  Runtime.previewState.player.x = 430;
+  Runtime.previewState.player.crouching = true;
+  Runtime.render.SetChapter(0, GetChapter(0), Runtime.previewState);
   Ui.pause.hidden = true;
   Ui.complete.hidden = true;
   Ui.ending.hidden = true;
   Ui.intro.hidden = true;
-  Ui.gameHeader.hidden = true;
-  Ui.objectiveCard.hidden = true;
-  Ui.windCard.hidden = true;
-  Ui.suspicionCard.hidden = true;
-  Ui.teamCard.hidden = true;
-  Ui.touchControls.hidden = true;
-  Ui.controlGuide.hidden = true;
-  Ui.interaction.hidden = true;
+  SetGameplayChrome(false);
+  Ui.storyCaption.hidden = true;
   Ui.title.hidden = false;
   requestAnimationFrame(() => Ui.title.classList.add("isVisible"));
   Ui.continue.hidden = !HasSave();
@@ -364,9 +332,7 @@ function ResumeGame() {
 
 function RestartCurrentChapter() {
   if (!Runtime.state) return;
-  const chapterIndex = Runtime.state.chapterIndex;
-  PrepareChapterIntro(CreateGameState(chapterIndex));
-  Ui.pause.hidden = true;
+  PrepareChapterIntro(CreateGameState(Runtime.state.chapterIndex));
 }
 
 function ShowChapterComplete() {
@@ -386,20 +352,12 @@ function ShowChapterComplete() {
 
 function GoToNextChapter() {
   if (!Runtime.state) return;
-  const nextState = AdvanceChapter(Runtime.state);
-  PrepareChapterIntro(nextState);
+  PrepareChapterIntro(AdvanceChapter(Runtime.state));
 }
 
 function ShowEnding() {
-  if (!Runtime.state) return;
-  Ui.gameHeader.hidden = true;
-  Ui.objectiveCard.hidden = true;
-  Ui.windCard.hidden = true;
-  Ui.suspicionCard.hidden = true;
-  Ui.teamCard.hidden = true;
-  Ui.touchControls.hidden = true;
-  Ui.controlGuide.hidden = true;
-  Ui.interaction.hidden = true;
+  if (!Runtime.state || !Ui.ending.hidden) return;
+  SetGameplayChrome(false);
   Ui.storyCaption.hidden = true;
   Ui.ending.hidden = false;
   Ui.rollCallButton.hidden = false;
@@ -421,18 +379,11 @@ function ShowEnding() {
 function BeginRollCall() {
   Ui.rollCallButton.disabled = true;
   Ui.rollCallButton.hidden = true;
-  PlayTone("soft");
   const items = [...Ui.rollCallList.children];
   items.forEach((item, index) => {
-    window.setTimeout(() => {
-      item.classList.add("isCalled");
-      PlayTone("soft");
-    }, 420 + index * 660);
+    window.setTimeout(() => { item.classList.add("isCalled"); PlayTone("soft"); }, 420 + index * 660);
   });
-  window.setTimeout(() => {
-    Ui.endingQuote.hidden = false;
-    PlayTone("bell");
-  }, 650 + items.length * 660);
+  window.setTimeout(() => { Ui.endingQuote.hidden = false; PlayTone("bell"); }, 650 + items.length * 660);
   window.setTimeout(() => {
     Ui.endingHistory.hidden = false;
     Ui.endingActions.hidden = false;
@@ -441,7 +392,6 @@ function BeginRollCall() {
 
 function ShowStory(text, type = "story") {
   if (!text) return;
-  Runtime.currentStory = text;
   Runtime.storyUntil = performance.now() + (type === "story" ? 3300 : 2200);
   Ui.storyText.textContent = text;
   Ui.storyCaption.hidden = false;
@@ -470,7 +420,6 @@ function DrainEvents() {
     WriteSave(true);
   } else {
     Ui.storyCaption.hidden = true;
-    Runtime.currentStory = "";
   }
 }
 
@@ -482,10 +431,9 @@ function UpdateHud() {
   Ui.objectiveText.textContent = objective.label;
   Ui.objectiveCount.textContent = `${objective.done} / ${objective.total}`;
   Ui.objectiveCard.classList.toggle("isPulse", state.objectivePulse > 0);
-  Ui.dangerWash.style.opacity = String(Math.max(0, state.suspicion * 0.82));
+  Ui.dangerWash.style.opacity = String(Math.max(0, state.suspicion * 0.78));
   Ui.suspicionCard.hidden = state.suspicion < 0.035;
   Ui.suspicionFill.style.width = `${Math.round(state.suspicion * 100)}%`;
-
   Ui.windCard.hidden = chapter.id !== "blockade";
   if (chapter.id === "blockade") {
     const wind = GetWindStrength(state.elapsed);
@@ -493,15 +441,11 @@ function UpdateHud() {
     Ui.windNeedle.style.transform = `rotate(${(-18 + wind * 36).toFixed(1)}deg)`;
     Ui.windText.textContent = IsWindGust(state.elapsed) ? "现在——风声正满" : "看苇梢，别急着走";
   }
-
   Ui.teamCard.hidden = state.followers.length < 2;
   if (state.followers.length >= 2) {
-    if (Ui.teamDots.children.length !== state.followers.length) {
-      Ui.teamDots.replaceChildren(...state.followers.map(() => document.createElement("i")));
-    }
+    if (Ui.teamDots.children.length !== state.followers.length) Ui.teamDots.replaceChildren(...state.followers.map(() => document.createElement("i")));
     Ui.teamState.textContent = state.followersHolding ? "留在遮蔽后" : "跟紧阿苇";
   }
-
   let action = GetAvailableAction(state);
   let isCart = false;
   if (!action && chapter.cart && !state.completed.has("cartPlaced") && RequirementsMet(state, chapter.actions.find((item) => item.id === "cartPlaced")) && Math.abs(state.player.x - state.cartX) <= 92) {
@@ -525,392 +469,20 @@ function ConsumePressedInput() {
   InputState.commandPressed = false;
 }
 
-function WorldXToScreen(worldX, cameraX = Runtime.cameraX) {
-  return (worldX - cameraX) * Runtime.scale + Runtime.cssWidth * 0.5;
-}
-
-function WorldYToScreen(worldY) {
-  return Runtime.cssHeight * 0.74 - worldY * Runtime.scale;
-}
-
-function DrawSky(chapter, state) {
-  const width = Runtime.cssWidth;
-  const height = Runtime.cssHeight;
-  const gradient = Context.createLinearGradient(0, 0, 0, height);
-  if (chapter.id === "ferry") {
-    gradient.addColorStop(0, "#233337");
-    gradient.addColorStop(0.63, "#42504b");
-    gradient.addColorStop(1, "#111b1b");
-  } else if (chapter.id === "tunnel") {
-    gradient.addColorStop(0, "#171713");
-    gradient.addColorStop(1, "#080b0b");
-  } else {
-    gradient.addColorStop(0, "#112126");
-    gradient.addColorStop(0.58, "#253431");
-    gradient.addColorStop(1, "#111a19");
-  }
-  Context.fillStyle = gradient;
-  Context.fillRect(0, 0, width, height);
-
-  if (chapter.id !== "tunnel") {
-    Context.fillStyle = chapter.id === "ferry" ? "rgba(218,210,176,.63)" : "rgba(205,207,181,.38)";
-    Context.beginPath();
-    Context.arc(width * 0.78, height * 0.18, Math.min(width, height) * 0.052, 0, Math.PI * 2);
-    Context.fill();
-    const parallax = Runtime.cameraX * 0.08;
-    Context.fillStyle = "rgba(21,34,34,.72)";
-    Context.beginPath();
-    Context.moveTo(0, height * 0.57);
-    for (let x = -80; x <= width + 120; x += 120) {
-      const ridgeX = x - (parallax % 120);
-      const ridgeY = height * 0.5 + Math.sin((x + chapter.id.length * 47) * 0.012) * 31;
-      Context.lineTo(ridgeX, ridgeY);
-    }
-    Context.lineTo(width, height);
-    Context.lineTo(0, height);
-    Context.closePath();
-    Context.fill();
-  }
-
-  if (chapter.id === "tunnel") {
-    Context.fillStyle = "rgba(112,86,55,.14)";
-    for (let x = -40; x < width + 50; x += 92) {
-      Context.fillRect(x + Math.sin(x) * 5, height * 0.18, 4, height * 0.56);
-    }
-  }
-  DrawBackdropDetails(chapter, state);
-}
-
-function DrawBackdropDetails(chapter, state) {
-  const groundScreenY = WorldYToScreen(0);
-  Context.save();
-  Context.fillStyle = "rgba(8,15,15,.62)";
-  if (chapter.id === "school") {
-    const schoolX = WorldXToScreen(410);
-    Context.fillRect(schoolX - 270 * Runtime.scale, groundScreenY - 245 * Runtime.scale, 570 * Runtime.scale, 245 * Runtime.scale);
-    Context.beginPath();
-    Context.moveTo(schoolX - 310 * Runtime.scale, groundScreenY - 245 * Runtime.scale);
-    Context.lineTo(schoolX, groundScreenY - 340 * Runtime.scale);
-    Context.lineTo(schoolX + 340 * Runtime.scale, groundScreenY - 245 * Runtime.scale);
-    Context.fill();
-    Context.clearRect(schoolX - 40 * Runtime.scale, groundScreenY - 125 * Runtime.scale, 75 * Runtime.scale, 125 * Runtime.scale);
-  } else if (chapter.id === "blockade") {
-    Context.fillStyle = "rgba(5,12,13,.48)";
-    Context.fillRect(0, groundScreenY + 10, Runtime.cssWidth, Runtime.cssHeight - groundScreenY);
-    for (let worldX = 0; worldX < chapter.width; worldX += 115) DrawReedClump(WorldXToScreen(worldX), groundScreenY + 8, 0.55, "rgba(13,25,23,.66)");
-  } else if (chapter.id === "tunnel") {
-    const kilnX = WorldXToScreen(1540);
-    Context.fillStyle = "rgba(65,48,31,.35)";
-    Context.beginPath();
-    Context.arc(kilnX, groundScreenY - 165 * Runtime.scale, 390 * Runtime.scale, Math.PI, 0);
-    Context.fill();
-    for (let beamX = 280; beamX < chapter.width; beamX += 440) {
-      const x = WorldXToScreen(beamX);
-      Context.fillStyle = "rgba(86,66,40,.72)";
-      Context.fillRect(x - 7, groundScreenY - 118 * Runtime.scale, 14, 132 * Runtime.scale);
-      Context.fillRect(x - 80 * Runtime.scale, groundScreenY - 120 * Runtime.scale, 160 * Runtime.scale, 10);
-    }
-  } else if (chapter.id === "ferry") {
-    Context.fillStyle = "rgba(20,34,31,.62)";
-    for (let worldX = 0; worldX < chapter.width; worldX += 150) DrawReedClump(WorldXToScreen(worldX), groundScreenY + 5, 0.65, "rgba(15,29,26,.68)");
-    const boatX = WorldXToScreen(3360);
-    Context.fillStyle = "#111b1a";
-    Context.beginPath();
-    Context.moveTo(boatX - 150 * Runtime.scale, groundScreenY - 8);
-    Context.lineTo(boatX + 160 * Runtime.scale, groundScreenY - 8);
-    Context.lineTo(boatX + 105 * Runtime.scale, groundScreenY + 45 * Runtime.scale);
-    Context.lineTo(boatX - 105 * Runtime.scale, groundScreenY + 45 * Runtime.scale);
-    Context.closePath();
-    Context.fill();
-  }
-  Context.restore();
-}
-
-function DrawReedClump(x, groundY, size = 1, color = "#283a32") {
-  Context.save();
-  Context.strokeStyle = color;
-  Context.lineWidth = Math.max(1, 2 * Runtime.scale * size);
-  const wind = Runtime.state ? GetWindStrength(Runtime.state.elapsed) : 0.4;
-  for (let index = 0; index < 8; index += 1) {
-    const offset = (index - 3.5) * 8 * Runtime.scale * size;
-    const height = (75 + (index % 3) * 24) * Runtime.scale * size;
-    const bend = (wind * 13 + (index % 2) * 5) * Runtime.scale;
-    Context.beginPath();
-    Context.moveTo(x + offset, groundY);
-    Context.quadraticCurveTo(x + offset - bend * 0.3, groundY - height * 0.55, x + offset + bend, groundY - height);
-    Context.stroke();
-  }
-  Context.restore();
-}
-
-function DrawTerrain(chapter, state) {
-  for (const segment of chapter.terrain) {
-    if (segment.dynamic === "sluiceBridge" && !state.completed.has("raiseSluice")) continue;
-    const x0 = WorldXToScreen(segment.x0);
-    const x1 = WorldXToScreen(segment.x1);
-    const y = WorldYToScreen(segment.y);
-    Context.fillStyle = chapter.id === "tunnel" ? "#211d16" : segment.dynamic ? "#554a35" : "#1d2925";
-    Context.fillRect(x0, y, x1 - x0 + 1, Runtime.cssHeight - y);
-    Context.fillStyle = chapter.id === "tunnel" ? "#6f5c3e" : "#71806a";
-    Context.fillRect(x0, y - 3, x1 - x0 + 1, 3);
-    if (segment.dynamic) {
-      for (let plankX = x0; plankX < x1; plankX += 34 * Runtime.scale) {
-        Context.fillStyle = "rgba(199,177,126,.23)";
-        Context.fillRect(plankX, y - 7, 25 * Runtime.scale, 5);
-      }
-    }
-  }
-  if (chapter.id === "blockade") {
-    const waterX0 = WorldXToScreen(1840);
-    const waterX1 = WorldXToScreen(2240);
-    const waterY = WorldYToScreen(-82 + state.waterLevel * 102);
-    const gradient = Context.createLinearGradient(0, waterY, 0, Runtime.cssHeight);
-    gradient.addColorStop(0, "rgba(92,119,113,.82)");
-    gradient.addColorStop(1, "rgba(18,40,40,.92)");
-    Context.fillStyle = gradient;
-    Context.fillRect(waterX0, waterY, waterX1 - waterX0, Runtime.cssHeight - waterY);
-  }
-}
-
-function DrawSearchlights(chapter, state) {
-  Context.save();
-  Context.globalCompositeOperation = "screen";
-  for (const hazard of chapter.hazards || []) {
-    if (hazard.kind !== "searchlight") continue;
-    const sourceX = WorldXToScreen(hazard.sourceX);
-    const sourceY = WorldYToScreen(340);
-    const targetX = WorldXToScreen(GetLightTarget(hazard, state));
-    const targetY = WorldYToScreen(0);
-    const halfWidth = hazard.width * Runtime.scale;
-    const gradient = Context.createLinearGradient(sourceX, sourceY, targetX, targetY);
-    gradient.addColorStop(0, "rgba(239,226,174,.05)");
-    gradient.addColorStop(1, "rgba(239,226,174,.22)");
-    Context.fillStyle = gradient;
-    Context.beginPath();
-    Context.moveTo(sourceX, sourceY);
-    Context.lineTo(targetX - halfWidth, targetY + 30);
-    Context.lineTo(targetX + halfWidth, targetY + 30);
-    Context.closePath();
-    Context.fill();
-    Context.fillStyle = "rgba(238,221,158,.48)";
-    Context.beginPath();
-    Context.arc(sourceX, sourceY, 6 * Runtime.scale, 0, Math.PI * 2);
-    Context.fill();
-  }
-  Context.restore();
-}
-
-function DrawCover(chapter, state, cover) {
-  if (cover.requires && !state.completed.has(cover.requires)) return;
-  const x0 = WorldXToScreen(cover.x0);
-  const x1 = WorldXToScreen(cover.x1);
-  if (x1 < -100 || x0 > Runtime.cssWidth + 100) return;
-  const ground = GetGroundY(chapter, (cover.x0 + cover.x1) * 0.5, state, 0) ?? 0;
-  const y = WorldYToScreen(ground);
-  if (["tallReeds", "reedBank", "willows", "ferryShade"].includes(cover.kind)) {
-    for (let x = x0; x <= x1; x += 45 * Runtime.scale) DrawReedClump(x, y + 4, 0.85, "rgba(20,38,32,.94)");
-    return;
-  }
-  if (cover.kind === "underground") return;
-  const heights = {
-    schoolWall: 205,
-    reedBlind: 148,
-    collapsedWall: 92,
-    ditch: 32,
-    bank: 82,
-    boatShed: 170,
-    sluiceWall: 130,
-    reedStack: 118,
-    haystack: 130,
-    reedScreen: 155,
-    dike: 85,
-  };
-  const height = (heights[cover.kind] || 105) * Runtime.scale;
-  Context.fillStyle = cover.kind.includes("reed") || cover.kind === "haystack" ? "#344037" : "#2c3028";
-  Context.fillRect(x0, y - height, x1 - x0, height + 5);
-  Context.strokeStyle = "rgba(176,164,126,.22)";
-  Context.lineWidth = 1;
-  for (let stripe = x0 + 10; stripe < x1; stripe += 19 * Runtime.scale) {
-    Context.beginPath();
-    Context.moveTo(stripe, y - height);
-    Context.lineTo(stripe + 8 * Runtime.scale, y);
-    Context.stroke();
-  }
-}
-
-function DrawCart(chapter, state) {
-  if (!chapter.cart || state.cartX === null) return;
-  const x = WorldXToScreen(state.cartX);
-  const y = WorldYToScreen(GetGroundY(chapter, state.cartX, state, 0) ?? 0);
-  Context.fillStyle = "#544936";
-  Context.fillRect(x - 62 * Runtime.scale, y - 72 * Runtime.scale, 104 * Runtime.scale, 55 * Runtime.scale);
-  Context.strokeStyle = "#1b1b16";
-  Context.lineWidth = 7 * Runtime.scale;
-  Context.beginPath();
-  Context.arc(x - 28 * Runtime.scale, y - 13 * Runtime.scale, 28 * Runtime.scale, 0, Math.PI * 2);
-  Context.stroke();
-  Context.strokeStyle = "#77694e";
-  Context.lineWidth = 5 * Runtime.scale;
-  Context.beginPath();
-  Context.moveTo(x + 38 * Runtime.scale, y - 55 * Runtime.scale);
-  Context.lineTo(x + 100 * Runtime.scale, y - 100 * Runtime.scale);
-  Context.stroke();
-}
-
-function DrawSmoke(chapter, state) {
-  if (!chapter.smoke || state.completed.has("sealEastCrack")) return;
-  const x = WorldXToScreen(state.smokeFrontX);
-  const gradient = Context.createLinearGradient(x - 250, 0, x + 80, 0);
-  gradient.addColorStop(0, "rgba(93,98,87,0)");
-  gradient.addColorStop(1, "rgba(121,123,105,.46)");
-  Context.fillStyle = gradient;
-  Context.fillRect(x - 260, WorldYToScreen(160), Runtime.cssWidth - x + 300, WorldYToScreen(-140) - WorldYToScreen(160));
-}
-
-function DrawActionMarkers(chapter, state) {
-  const now = performance.now() * 0.004;
-  for (const action of chapter.actions) {
-    if (action.special === "cart" || state.completed.has(action.id) || !RequirementsMet(state, action)) continue;
-    const x = WorldXToScreen(action.x);
-    if (x < -40 || x > Runtime.cssWidth + 40) continue;
-    const ground = GetGroundY(chapter, action.x, state, state.player.y) ?? state.player.y;
-    const y = WorldYToScreen(ground) - 75 * Runtime.scale;
-    const pulse = 8 + Math.sin(now + action.x) * 2;
-    Context.strokeStyle = "rgba(220,202,151,.72)";
-    Context.lineWidth = 1.5;
-    Context.beginPath();
-    Context.arc(x, y, pulse * Runtime.scale, 0, Math.PI * 2);
-    Context.stroke();
-    Context.fillStyle = "rgba(220,202,151,.8)";
-    Context.beginPath();
-    Context.arc(x, y, 2.5 * Runtime.scale, 0, Math.PI * 2);
-    Context.fill();
-  }
-}
-
-function DrawPerson(x, y, options = {}) {
-  const child = Boolean(options.child);
-  const crouching = Boolean(options.crouching);
-  const facing = options.facing || 1;
-  const active = options.active !== false;
-  const scale = Runtime.scale * (child ? 0.72 : 1);
-  const baseX = WorldXToScreen(x);
-  const baseY = WorldYToScreen(y);
-  const walk = Math.sin((options.walkPhase || 0) * 8) * (options.moving ? 1 : 0);
-  const bodyHeight = crouching ? 47 : 74;
-  Context.save();
-  Context.translate(baseX, baseY);
-  Context.scale(facing, 1);
-  Context.strokeStyle = active ? (child ? "#c3b995" : "#d3d1bd") : "#6f7870";
-  Context.fillStyle = active ? (child ? "#766c52" : "#424b43") : "#303934";
-  Context.lineCap = "round";
-  Context.lineWidth = 7 * scale;
-  Context.beginPath();
-  Context.moveTo(-8 * scale, -bodyHeight * scale * 0.52);
-  Context.lineTo((-12 + walk * 8) * scale, -3 * scale);
-  Context.moveTo(9 * scale, -bodyHeight * scale * 0.5);
-  Context.lineTo((13 - walk * 8) * scale, -3 * scale);
-  Context.stroke();
-  Context.fillRect(-15 * scale, -bodyHeight * scale, 30 * scale, bodyHeight * scale * 0.58);
-  Context.strokeStyle = active ? "#b7b59f" : "#626b64";
-  Context.lineWidth = 6 * scale;
-  Context.beginPath();
-  Context.moveTo(-8 * scale, -bodyHeight * scale * 0.78);
-  Context.lineTo((22 + Math.abs(walk) * 3) * scale, -bodyHeight * scale * 0.54);
-  Context.stroke();
-  Context.fillStyle = active ? "#c3b998" : "#6b7269";
-  Context.beginPath();
-  Context.arc(0, -(bodyHeight + 13) * scale, 12 * scale, 0, Math.PI * 2);
-  Context.fill();
-  if (options.carrying) {
-    Context.fillStyle = "#83765a";
-    Context.beginPath();
-    Context.arc(18 * scale, -bodyHeight * scale * 0.72, 12 * scale, 0, Math.PI * 2);
-    Context.fill();
-  }
-  Context.restore();
-}
-
-function DrawActors(chapter, state) {
-  for (const follower of state.followers) {
-    DrawPerson(follower.x, follower.y, {
-      child: true,
-      facing: follower.facing,
-      moving: !state.followersHolding && Math.abs(state.player.vx) > 8,
-      walkPhase: state.elapsed + follower.nameIndex * 0.17,
-    });
-  }
-  DrawPerson(state.player.x, state.player.y, {
-    facing: state.player.facing,
-    crouching: state.player.crouching,
-    carrying: state.player.carrying,
-    moving: Math.abs(state.player.vx) > 8,
-    walkPhase: state.elapsed,
-  });
-  if (chapter.id === "ferry" && !state.completed.has("motherSignal")) {
-    DrawPerson(2020, 0, { facing: -1, active: true });
-  } else if (chapter.id === "ferry" && state.completed.has("motherSignal")) {
-    const motherX = 2070 + Math.min(480, Math.max(0, state.elapsed - 1) * 10);
-    DrawPerson(motherX, 0, { facing: 1, active: false, moving: true, walkPhase: state.elapsed });
-    const lampX = WorldXToScreen(motherX + 24);
-    const lampY = WorldYToScreen(62);
-    const glow = Context.createRadialGradient(lampX, lampY, 2, lampX, lampY, 60 * Runtime.scale);
-    glow.addColorStop(0, "rgba(229,177,86,.65)");
-    glow.addColorStop(1, "rgba(229,177,86,0)");
-    Context.fillStyle = glow;
-    Context.beginPath();
-    Context.arc(lampX, lampY, 60 * Runtime.scale, 0, Math.PI * 2);
-    Context.fill();
-  }
-}
-
-function DrawForeground(chapter) {
-  if (chapter.id === "tunnel") {
-    Context.fillStyle = "rgba(8,9,8,.82)";
-    Context.fillRect(0, 0, Runtime.cssWidth, Runtime.cssHeight * 0.13);
-    return;
-  }
-  const y = Runtime.cssHeight + 10;
-  for (let x = -30; x < Runtime.cssWidth + 50; x += 78) DrawReedClump(x, y, 1.15, "rgba(5,12,11,.72)");
-}
-
-function RenderGame(state) {
-  const chapter = GetChapter(state.chapterIndex);
-  DrawSky(chapter, state);
-  DrawSearchlights(chapter, state);
-  DrawTerrain(chapter, state);
-  DrawSmoke(chapter, state);
-  for (const cover of chapter.covers) DrawCover(chapter, state, cover);
-  DrawCart(chapter, state);
-  DrawActionMarkers(chapter, state);
-  DrawActors(chapter, state);
-  DrawForeground(chapter);
-
-  Context.save();
-  Context.fillStyle = "rgba(222,217,190,.35)";
-  Context.font = `${Math.round(10 * Runtime.scale)}px ui-sans-serif, system-ui, sans-serif`;
-  Context.letterSpacing = "1px";
-  Context.fillText(`${chapter.location} · ${chapter.date}`, 18, Runtime.cssHeight - 18);
-  Context.restore();
-}
-
 function UpdatePreview(deltaTime) {
-  Runtime.previewState.elapsed += deltaTime;
-  Runtime.previewState.player.x = 520 + Math.sin(Runtime.previewState.elapsed * 0.17) * 140;
-  Runtime.previewState.player.y = GetGroundY(GetChapter(0), Runtime.previewState.player.x, Runtime.previewState, 0) ?? 0;
-  Runtime.previewState.player.crouching = true;
-  Runtime.cameraX += (720 - Runtime.cameraX) * Math.min(1, deltaTime * 0.4);
+  const state = Runtime.previewState;
+  state.elapsed += deltaTime;
+  state.player.x = 420 + Math.sin(state.elapsed * 0.18) * 52;
+  state.player.y = GetGroundY(GetChapter(0), state.player.x, state, 0) ?? 0;
+  state.player.vx = Math.cos(state.elapsed * 0.18) * 9;
+  state.player.facing = state.player.vx >= 0 ? 1 : -1;
+  state.player.crouching = false;
 }
 
 function UpdateGame(deltaTime) {
   if (!Runtime.state) return;
   if (Runtime.state.mode === "playing") {
     StepGameState(Runtime.state, InputState, deltaTime);
-    const desiredCamera = Runtime.state.player.x + Runtime.state.player.facing * Math.min(250, Runtime.cssWidth * 0.18 / Runtime.scale);
-    const chapter = GetChapter(Runtime.state.chapterIndex);
-    const halfView = Runtime.cssWidth * 0.5 / Runtime.scale;
-    const clampedCamera = Math.max(halfView * 0.72, Math.min(chapter.width - halfView * 0.72, desiredCamera));
-    Runtime.cameraX += (clampedCamera - Runtime.cameraX) * Math.min(1, deltaTime * 3.1);
     DrainEvents();
     UpdateHud();
     WriteSave();
@@ -920,20 +492,33 @@ function UpdateGame(deltaTime) {
       Runtime.lastFootstepAt = performance.now();
       PlayTone("soft");
     }
-  } else {
-    DrainEvents();
-  }
+  } else DrainEvents();
 }
 
 function AnimationFrame(now) {
   const deltaTime = Math.min(0.05, Math.max(0, (now - Runtime.previousTime) / 1000));
   Runtime.previousTime = now;
-  if (Runtime.state) {
-    UpdateGame(deltaTime);
-    RenderGame(Runtime.state);
-  } else {
-    UpdatePreview(deltaTime);
-    RenderGame(Runtime.previewState);
+  try {
+    if (Runtime.state) {
+      UpdateGame(deltaTime);
+      Runtime.render.Render(Runtime.state, GetChapter(Runtime.state.chapterIndex), deltaTime);
+    } else {
+      UpdatePreview(deltaTime);
+      Runtime.render.Render(Runtime.previewState, GetChapter(0), deltaTime);
+    }
+    const stats = Runtime.render.stats;
+    Ui.canvas.dataset.renderCalls = String(stats.calls || 0);
+    Ui.canvas.dataset.renderTriangles = String(stats.triangles || 0);
+    Ui.canvas.dataset.renderQuality = stats.quality || "unknown";
+    Ui.canvas.dataset.renderChapter = stats.chapter || "school";
+    Ui.canvas.dataset.playerScreenX = String((stats.playerNdcX * 0.5 + 0.5) * Ui.canvas.clientWidth);
+    Ui.canvas.dataset.playerScreenTop = String((-stats.playerTopNdcY * 0.5 + 0.5) * Ui.canvas.clientHeight);
+    Ui.canvas.dataset.playerScreenHeight = String((stats.playerTopNdcY - stats.playerBottomNdcY) * 0.5 * Ui.canvas.clientHeight);
+  } catch (error) {
+    Runtime.error = error instanceof Error ? error.stack || error.message : String(error);
+    console.error(error);
+    if (Ui.loadingText) Ui.loadingText.textContent = "3D 场景初始化失败，请刷新页面或更新浏览器。";
+    if (Ui.loading) Ui.loading.hidden = false;
   }
   ConsumePressedInput();
   requestAnimationFrame(AnimationFrame);
@@ -968,26 +553,22 @@ function HandleKeyUp(event) {
 }
 
 function BindTouchControls() {
-  const buttons = Ui.touchControls.querySelectorAll("button[data-input]");
-  for (const button of buttons) {
+  for (const button of Ui.touchControls.querySelectorAll("button[data-input]")) {
     const name = button.dataset.input;
     const press = (event) => {
       event.preventDefault();
       ResumeAudio();
       button.setPointerCapture?.(event.pointerId);
       button.classList.add("isHeld");
-      if (name === "left" || name === "right" || name === "crouch") InputState[name] = true;
-      if (name === "interact") {
-        InputState.interact = true;
-        InputState.interactPressed = true;
-      }
+      if (["left", "right", "crouch"].includes(name)) InputState[name] = true;
+      if (name === "interact") { InputState.interact = true; InputState.interactPressed = true; }
       if (name === "jump") InputState.jumpPressed = true;
       if (name === "command") InputState.commandPressed = true;
     };
     const release = (event) => {
       event.preventDefault();
       button.classList.remove("isHeld");
-      if (name === "left" || name === "right" || name === "crouch") InputState[name] = false;
+      if (["left", "right", "crouch"].includes(name)) InputState[name] = false;
       if (name === "interact") InputState.interact = false;
     };
     button.addEventListener("pointerdown", press);
@@ -1016,7 +597,7 @@ function BindUi() {
   Ui.soundButton.addEventListener("click", () => {
     Runtime.muted = !Runtime.muted;
     Ui.soundButton.classList.toggle("isMuted", Runtime.muted);
-    if (Runtime.audio) Runtime.audio.master.gain.setTargetAtTime(Runtime.muted ? 0 : 0.34, Runtime.audio.context.currentTime, 0.05);
+    if (Runtime.audio) Runtime.audio.master.gain.setTargetAtTime(Runtime.muted ? 0 : 0.3, Runtime.audio.context.currentTime, 0.05);
   });
   window.addEventListener("keydown", HandleKeyDown, { passive: false });
   window.addEventListener("keyup", HandleKeyUp);
@@ -1026,29 +607,60 @@ function BindUi() {
     InputState.crouch = false;
     InputState.interact = false;
   });
-  window.addEventListener("resize", ResizeCanvas);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden && Runtime.state?.mode === "playing") PauseGame();
-  });
+  window.addEventListener("resize", () => Runtime.render?.Resize());
+  document.addEventListener("visibilitychange", () => { if (document.hidden && Runtime.state?.mode === "playing") PauseGame(); });
   BindTouchControls();
+}
+
+function StartQaChapter(chapterIndex, playerX = null, completedIds = []) {
+  Runtime.state = CreateGameState(Math.max(0, Math.min(Chapters.length - 1, chapterIndex)));
+  const chapter = GetChapter(Runtime.state.chapterIndex);
+  for (const action of chapter.actions) if (completedIds.includes(action.id)) CompleteAction(Runtime.state, action);
+  if (Number.isFinite(playerX)) {
+    Runtime.state.player.x = playerX;
+    Runtime.state.player.y = GetGroundY(GetChapter(Runtime.state.chapterIndex), playerX, Runtime.state, 0) ?? 0;
+  }
+  Runtime.state.mode = "paused";
+  Ui.title.hidden = true;
+  Ui.intro.hidden = true;
+  Ui.loading.hidden = true;
+  SetGameplayChrome(false);
+  Runtime.render.SetChapter(Runtime.state.chapterIndex, chapter, Runtime.state);
+  return Runtime.state;
 }
 
 function Initialize() {
   PopulateHistory();
   BindUi();
-  ResizeCanvas();
+  Runtime.previewState.player.x = 430;
+  Runtime.previewState.player.crouching = true;
+  Runtime.render = CreateRender3D(Ui.canvas, GetChapter(0), Runtime.previewState);
   Ui.continue.hidden = !HasSave();
+  Ui.loading.hidden = true;
   Runtime.previousTime = performance.now();
+  const query = new URLSearchParams(window.location.search);
+  if (query.has("qaChapter")) {
+    const completedIds = (query.get("qaCompleted") || "").split(",").map((id) => id.trim()).filter(Boolean);
+    StartQaChapter(Number(query.get("qaChapter")), query.has("qaX") ? Number(query.get("qaX")) : null, completedIds);
+  }
   requestAnimationFrame(AnimationFrame);
+}
+
+window.addEventListener("error", (event) => { Runtime.error = event.error?.stack || event.message; });
+window.addEventListener("unhandledrejection", (event) => { Runtime.error = event.reason?.stack || String(event.reason); });
+
+try {
+  Initialize();
+} catch (error) {
+  Runtime.error = error instanceof Error ? error.stack || error.message : String(error);
+  console.error(error);
+  if (Ui.loadingText) Ui.loadingText.textContent = "无法建立 3D 场景，请刷新页面或更新浏览器。";
 }
 
 window.ReedSignal1942 = Object.freeze({
   GetState: () => Runtime.state,
-  StartChapter: (chapterIndex) => {
-    Runtime.introPendingState = CreateGameState(chapterIndex);
-    EnterChapter();
-  },
+  GetError: () => Runtime.error,
+  StartChapter: StartQaChapter,
   ShowHistory,
+  render: Runtime.render,
 });
-
-Initialize();

@@ -23,12 +23,27 @@
 - 侵略责任明确属于侵华日军及其占领体系；不将罪行转化为对现实民族群体的仇恨。
 - 玩家只能影响一次虚构的局部转移，不能改写真实战役、真实损失或 1945 年抗战胜利的历史结局。
 
+## 3D 表现契约
+
+- 玩法坐标仍由 `Script_Rules.mjs` 管理；渲染换算固定为 `100 玩法单位 = 1 米`。
+- 横版使用长焦透视相机：FOV 22—28°，相机位于玩法平面 `+Z`，只沿 X/Y 平移，不横滚、不广角旋转。
+- 舞台必须有真实厚度：地面、墙、屋顶、沟渠、桥、船和人物都是 3D 实体；远中近景依靠 Z 深度、雾和材质对比区分。
+- 视觉探照灯必须与规则层的 `GetLightTarget` 使用同一目标，不能出现“画面没照到但规则判定被发现”。
+- `Script_Render3D.mjs` / `Script_Scene3D.mjs` / `Script_Actor3D.mjs` 只读玩法 state，不得写 state。
+- 所有运行时依赖必须来自仓库内 `TunnelBell1942/vendor/three`，禁止 CDN、外部图片和外部音频。
+- 桌面目标：1600×900 下 60fps、draw calls < 260、三角形 < 150k；移动目标：draw calls < 140、三角形 < 80k、像素比上限 1.35、关闭实时阴影。
+
 ## 文件职责
 
 - `Data_World.mjs`：历史框架、章节、地形、威胁、互动数据。
 - `Script_Rules.mjs`：纯规则、移动、潜行、队伍、存档与关卡图验证。
-- `Script_Game.mjs`：DOM、输入、Canvas 绘制、音频与流程集成。
+- `Data_Scene3D.mjs`：逐章调色、镜头区、布景与性能档位。
+- `Script_Actor3D.mjs`：程序化角色、衣着层次与骨架动画；只读角色状态。
+- `Script_Scene3D.mjs`：程序化 3D 场景和动态布景；只读玩法状态。
+- `Script_Render3D.mjs`：Three.js 渲染器、相机、灯光、雾、色调映射与章节重建。
+- `Script_Game.mjs`：DOM、输入、程序化音频与流程集成；不得包含 Canvas 2D 绘制回退。
 - `Script_SmokeTest.mjs`：纯 Node 冒烟测试，含机器人通关与机制断言。
+- `Script_RenderHealthTest.mjs`：真实浏览器逐章渲染、像素、取景与性能检查。
 - `index.html` / `Style_Game.css`：页面结构与响应式界面。
 
 ## 交付检查
@@ -36,6 +51,7 @@
 ```text
 node ReedSignal1942/Script_SmokeTest.mjs
 node --check ReedSignal1942/Script_Game.mjs
+node ReedSignal1942/Script_RenderHealthTest.mjs
 ```
 
 页面运行时零外部依赖；存档键固定为 `reedsignal1942_campaign_v1`。

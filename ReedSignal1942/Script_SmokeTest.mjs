@@ -8,6 +8,7 @@ import {
   HistoricalSources,
   GetAllChildNames,
 } from "./Data_World.mjs";
+import { ChapterVisuals, RenderProfiles } from "./Data_Scene3D.mjs";
 import {
   CreateGameState,
   CompleteAction,
@@ -34,6 +35,10 @@ const styleSource = readFileSync(join(rootDirectory, "Style_Game.css"), "utf8");
 const gameSource = readFileSync(join(rootDirectory, "Script_Game.mjs"), "utf8");
 const rulesSource = readFileSync(join(rootDirectory, "Script_Rules.mjs"), "utf8");
 const dataSource = readFileSync(join(rootDirectory, "Data_World.mjs"), "utf8");
+const sceneDataSource = readFileSync(join(rootDirectory, "Data_Scene3D.mjs"), "utf8");
+const actorSource = readFileSync(join(rootDirectory, "Script_Actor3D.mjs"), "utf8");
+const renderSource = readFileSync(join(rootDirectory, "Script_Render3D.mjs"), "utf8");
+const sceneSource = readFileSync(join(rootDirectory, "Script_Scene3D.mjs"), "utf8");
 
 const validation = ValidateCampaign();
 assert.equal(validation.valid, true, validation.errors.join("\n"));
@@ -152,6 +157,11 @@ assert.match(GetBlockedActionReason(teamState, ferryAction), /重新跟上/, "a 
 ToggleFollowers(teamState);
 teamState.followers.forEach((follower, index) => { follower.x = teamState.player.x - 38 * (index + 1); });
 assert.equal(GetBlockedActionReason(teamState, ferryAction), "", "the ferry must accept a physically gathered group");
+const finalLight = Chapters[3].hazards.find((hazard) => hazard.distractBy === "motherSignal");
+const signalState = CreateGameState(3);
+signalState.completed.add("motherSignal");
+signalState.distractionUntil = Number.POSITIVE_INFINITY;
+assert.equal(GetLightTarget(finalLight, signalState), finalLight.x1 + 260, "the mother's white-cloth signal must draw the final searchlight toward the south branch");
 
 for (let chapterIndex = 0; chapterIndex < Chapters.length; chapterIndex += 1) {
   const chapter = Chapters[chapterIndex];
@@ -206,4 +216,28 @@ assert.match(gameSource, /createBufferSource/, "ambient audio must be synthesize
 assert.doesNotMatch(gameSource, /from\s+["']https?:\/\//, "runtime imports must remain local");
 assert.doesNotMatch(rulesSource, /document\.|window\.|Canvas|AudioContext/, "the rules layer must remain runnable in plain Node");
 
-console.log(`ReedSignal1942 smoke test passed: ${Chapters.length} chapters, ${validation.actionCount} world actions, ${GetAllChildNames().length} children, light/sound/team/water/smoke rules verified.`);
+assert.doesNotMatch(gameSource, /getContext\(["']2d["']\)/, "the game controller must not restore the rejected Canvas2D renderer");
+assert.match(gameSource, /CreateRender3D/, "the browser controller must boot the 3D renderer");
+assert.match(renderSource, /vendor\/three\/build\/three\.module\.mjs/, "Three.js must stay repository-local");
+assert.match(renderSource, /PerspectiveCamera/, "the side view must use a real perspective camera");
+assert.match(renderSource, /ACESFilmicToneMapping/, "cinematic highlights need ACES tone mapping");
+assert.match(renderSource, /SRGBColorSpace/, "the renderer must output sRGB");
+assert.match(renderSource, /FogExp2/, "chapters need depth-separated atmospheric fog");
+assert.match(renderSource, /GetLightTarget/, "visual searchlights must share the rules-layer target");
+assert.match(renderSource, /renderer\.info\.render/, "runtime draw calls and triangles must be observable");
+for (const builder of ["BuildSchool", "BuildBlockade", "BuildTunnel", "BuildFerry"]) {
+  assert.match(sceneSource, new RegExp(`function ${builder}\\(`), `missing authored 3D chapter builder: ${builder}`);
+}
+assert.match(sceneSource, /InstancedMesh/, "dense reeds and terrain detail must use instancing");
+assert.match(sceneSource, /CreateWaterRipples/, "water chapters need readable moving surface detail");
+assert.match(actorSource, /CreateActor3D/, "player and civilians need procedural 3D rigs");
+assert.doesNotMatch(`${renderSource}\n${sceneSource}\n${actorSource}\n${sceneDataSource}`, /from\s+["']https?:\/\//, "3D runtime imports must not use a CDN");
+for (const [chapterId, profile] of Object.entries(ChapterVisuals)) {
+  assert.ok(profile.camera.fov >= 22 && profile.camera.fov <= 28, `${chapterId}: long-lens FOV must stay between 22 and 28 degrees`);
+  assert.ok(profile.camera.distance > 12, `${chapterId}: camera needs real stage depth`);
+  assert.ok(profile.fogDensity > 0 && profile.fogDensity < 0.06, `${chapterId}: fog must separate depth without blanking the frame`);
+}
+assert.equal(RenderProfiles.desktop.shadows, true, "desktop mode must retain real-time shadows");
+assert.equal(RenderProfiles.mobile.shadows, false, "mobile mode must drop the expensive shadow pass");
+
+console.log(`ReedSignal1942 smoke test passed: ${Chapters.length} 3D chapters, ${validation.actionCount} world actions, ${GetAllChildNames().length} children, cinematic render and light/sound/team/water/smoke rules verified.`);
