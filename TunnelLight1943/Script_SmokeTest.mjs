@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -1008,7 +1008,85 @@ TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
 TestC2Evasion();
+// 拟物做功（CLAUDE.md「拟物交互」）：长做功不许是进度条——手真的动，功才涨。
+// 三条硬断言：①对的方向的笔画涨、错的方向不涨；②绕圈真的要绕（指针停着不涨）；
+// ③键盘按住 E 仍是完整后备（自动通关只按键盘）。
+function TestStrokeWork() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const beats4 = ChapterBeatList(3).map((b) => b.id);
+
+  // — c4_shore 顶撑木（stroke:"up"）—
+  const st = CreateGame(3);
+  DebugJump(st, 3, beats4.indexOf("c4_shore"));
+  const shore = SCRIPTS.c4.find((b) => b.id === "c4_shore");
+  const upStep = shore.steps.find((x) => x.stroke === "up");
+  assert.ok(upStep, "撑木必须声明向上的笔画");
+  StepGame(st, idle(), DT);              // 先让链初始化（onStart / holdP 建账）
+  st.beat.stepIndex = shore.steps.indexOf(upStep);
+  st.player.item = { id: "prop", label: "撑木", big: true };
+  st.player.x = upStep.zone.x; st.player.level = "under";
+  StepGame(st, idle(), DT);
+  // 往下拽（错方向）：不涨
+  for (let i = 0; i < 20; i += 1) StepGame(st, { ...idle(), pullHeld: true, pull: 0.05 }, DT);
+  assert.equal(st.beat.holdP, 0, "撑木往下拽不该涨（方向要对）");
+  // 往上顶：涨
+  for (let i = 0; i < 12; i += 1) StepGame(st, { ...idle(), pullHeld: true, pull: -0.05 }, DT);
+  assert.ok(st.beat.holdP > 0, "往上顶必须做得上功");
+  assert.equal(st.gesture?.kind, "pullUp", "HUD 得提示往上顶");
+  // 松手泄劲
+  const was = st.beat.holdP;
+  for (let i = 0; i < 10; i += 1) StepGame(st, idle(), DT);
+  assert.ok(st.beat.holdP < was, "松手功要慢慢泄掉");
+  // 键盘后备干完
+  let g1 = 0;
+  while (st.beat.stepIndex === shore.steps.indexOf(upStep) && g1 < 400) {
+    g1 += 1; StepGame(st, { ...idle(), interactHeld: true }, DT);
+  }
+  assert.ok(g1 < 400, "键盘按住 E 必须能把撑木顶上去");
+
+  // — c5 拴铃（stroke:"circle"）：指针停着不涨，绕着圈走才涨 —
+  const beats5 = ChapterBeatList(4).map((b) => b.id);
+  const s5 = CreateGame(4);
+  const bellBeat = SCRIPTS.c5.findIndex((b) => b.steps?.some((x) => x.stroke === "circle"));
+  assert.ok(bellBeat >= 0, "c5 必须有绕圈的笔画（拴绳/拴铃）");
+  DebugJump(s5, 4, bellBeat);
+  const chain5 = SCRIPTS.c5[bellBeat];
+  const circStep = chain5.steps.find((x) => x.stroke === "circle");
+  StepGame(s5, idle(), DT);              // 同上：先初始化链
+  s5.beat.stepIndex = chain5.steps.indexOf(circStep);
+  s5.player.item = { id: circStep.needs, label: "麻绳" };
+  s5.player.x = circStep.zone.x; s5.player.level = circStep.zone.level || "under";
+  const baseY = (circStep.zone.level === "under" || s5.player.level === "under") ? UNDER_Y : SURFACE_Y;
+  const cy = baseY + (circStep.gestureY ?? 1.25);
+  // 指针钉在一个点上：不涨
+  for (let i = 0; i < 20; i += 1) {
+    StepGame(s5, { ...idle(), pointerHeld: true, pointerWorld: { x: circStep.zone.x + 0.8, y: cy } }, DT);
+  }
+  assert.equal(s5.beat.holdP, 0, "指针停着不动，圈就没绕，不该涨");
+  // 真的绕圈：涨（先只绕小半圈采样——绕满一圈这步就干完了，holdP 会归零）
+  const stepIdx = s5.beat.stepIndex;
+  for (let i = 0; i < 9; i += 1) {
+    const a = i * 0.3;
+    StepGame(s5, { ...idle(), pointerHeld: true, pointerWorld: {
+      x: circStep.zone.x + Math.cos(a) * 0.8, y: cy + Math.sin(a) * 0.8,
+    } }, DT);
+  }
+  assert.ok(s5.beat.holdP > 0, "绕着圈走必须做得上功");
+  // 接着绕到头：这一步必须真的能绕完
+  let g2c = 0;
+  while (s5.beat.stepIndex === stepIdx && g2c < 300) {
+    g2c += 1;
+    const a = (9 + g2c) * 0.3;
+    StepGame(s5, { ...idle(), pointerHeld: true, pointerWorld: {
+      x: circStep.zone.x + Math.cos(a) * 0.8, y: cy + Math.sin(a) * 0.8,
+    } }, DT);
+  }
+  assert.ok(g2c < 300, "绕圈必须能把绳拴完");
+  console.log("  ✓ 拟物做功：方向要对 / 圈要真绕 / 松手泄劲 / 键盘后备");
+}
+
 TestPromptsAreDeviceNeutral();
+TestStrokeWork();
 TestWorkStations();
 TestVaultC1();
 TestGroundItems();

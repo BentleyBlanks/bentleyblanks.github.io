@@ -387,6 +387,68 @@ function StepLightHazard(state, def, dt) {
   state.detection.spotter = "light";
 }
 
+// ---------------------------------------------------------------------------
+// 拟物做功（全作交互标准，规则见 CLAUDE.md「拟物交互」）
+//
+// 挖、按、顶、拴这类"对物体做功"的长交互**不走进度条**：玩家的手真的动一下，
+// 功才涨一分。三种笔画（stroke）：
+//   down   = 往下拽（铲土/按棉被/盖门板/灌水）
+//   up     = 往上顶（撑木/撬地沿）
+//   circle = 绕工作点转圈（拴绳/缠引信）——同辘轳/打结，指针得真的绕着圈走
+// 键盘照旧是完整后备：按住 E 以 0.85 倍速自动做功（自动通关驱动器只按键盘）。
+// 每攒满一"下"，物体答一声话（cue + 姿势）——做功要听得见、看得着。
+// ---------------------------------------------------------------------------
+const STROKE_LEN = 0.30;      // 一下拽/顶的行程（归一化拖动量，≈1/3 屏高）
+function StrokeWork(state, mem, input, dt, opts) {
+  const hold = opts.hold;
+  const kind = opts.stroke || "down";
+  const strokesN = Math.max(2, Math.round(hold / 0.7));   // 这活总共几下
+  let gain = 0;
+
+  if (kind === "circle") {
+    const turns = Math.min(3, Math.max(1, hold * 0.9));   // 总共绕几圈
+    const cx = opts.at?.x ?? state.player.x;
+    const cy = (opts.at?.baseY ?? SURFACE_Y) + (opts.at?.y ?? 1.25);
+    const pw = input.pointerWorld;
+    if (input.pointerHeld && pw) {
+      const dx = pw.x - cx, dy = pw.y - cy;
+      const r = Math.hypot(dx, dy);
+      if (r > 0.1 && r < 1.7) {
+        const a = Math.atan2(dy, dx);
+        if (mem.prevA != null) {
+          let d = a - mem.prevA;
+          if (d > Math.PI) d -= Math.PI * 2;
+          if (d < -Math.PI) d += Math.PI * 2;
+          if (Math.abs(d) < 1.0) gain = Math.abs(d) / (Math.PI * 2 * turns) * hold;
+        }
+        mem.prevA = a;
+      } else mem.prevA = null;
+    } else mem.prevA = null;
+    state.gesture = { kind: "circle" };
+  } else {
+    // 竖向笔画：只认对的方向（铲子不往上抡，撑木不往下砸）
+    const dir = kind === "up" ? -1 : 1;
+    const pull = input.pullHeld ? Math.max(0, (input.pull || 0) * dir) : 0;
+    gain = pull / (STROKE_LEN * strokesN) * hold;
+    state.gesture = { kind: kind === "up" ? "pullUp" : "dragDown" };
+  }
+
+  // 键盘后备走同一个账本：手感稍慢，但一样能干完
+  if (input.interactHeld) gain += dt * 0.85;
+
+  // 攒满一"下"：物体答话。键盘与手势共用节拍，Cue 不会重复也不会漏
+  if (gain > 0) {
+    mem.acc = (mem.acc || 0) + gain;
+    const quantum = hold / strokesN;
+    if (mem.acc >= quantum) {
+      mem.acc -= quantum;
+      Cue(state, opts.cue || "dig", { gain: 0.7, rate: 0.92 + Math.random() * 0.16 });
+      FlashPose(state, opts.pose || (kind === "circle" ? "mark" : kind === "up" ? "push" : "bow"), 0.3);
+    }
+  }
+  return gain;
+}
+
 // 链式谜题：有序的一串步骤——拾取 / 使用 / 投中 / 交谈 / 推。
 // 单格物品栏：步骤自己管理手里那格；失败重置不清链、不清物品。
 function StepChain(state, def, input, dt) {
@@ -531,12 +593,21 @@ function StepChain(state, def, input, dt) {
         return;
       }
       if (st.hold) {
+        // 长做功走拟物笔画（st.stroke: down/up/circle，缺省 down）——
+        // 铲一下涨一分，站着按住 E 是键盘后备。松手功慢慢泄掉
+        if (b.holdP === undefined) b.holdP = 0;   // 调试跳幕可能绕过链的初始化
         state.prompt = st.prompt;          // 百分比不进文案，promptFill 画成进度环
         state.promptFill = b.holdP / st.hold;
-        if (input.interactHeld) {
-          b.holdP += dt;
-          if (b.holdP >= st.hold) { ApplyUse(state, st); finish(); }
-        } else b.holdP = Math.max(0, b.holdP - dt * 2);
+        const g = StrokeWork(state, b.strokeMem || (b.strokeMem = {}), input, dt, {
+          hold: st.hold, stroke: st.stroke,
+          at: { x: st.zone.x, y: st.gestureY, baseY: (st.zone.level === "under" || lvl === "under") ? UNDER_Y : SURFACE_Y },
+        });
+        if (g > 0) {
+          b.holdP += g;
+          if (b.holdP >= st.hold) { b.strokeMem = null; ApplyUse(state, st); finish(); }
+        } else if (!input.interactHeld) {
+          b.holdP = Math.max(0, b.holdP - dt * 1.2);
+        }
       } else {
         state.prompt = st.prompt;
         if (input.interact) { ApplyUse(state, st); finish(); }
@@ -1949,12 +2020,12 @@ export const SCRIPTS = {
       objective: "西口的顶木松了", hint: "光用手是按不住的——藏人洞乙备着撑木",
       steps: [
         { type: "pickup", x: 61, level: "under", item: { id: "prop", label: "撑木", big: true }, prompt: "E · 扛起撑木" },
-        { type: "use", zone: TV.entW, needs: "prop", hold: 2.2, prompt: "按住 E · 顶上撑木",
+        { type: "use", zone: TV.entW, needs: "prop", hold: 2.2, stroke: "up", gestureY: 1.7, prompt: "按住 E · 顶上撑木",
           note: "木头咬住了。他松开手，顶木没有再响。" },
       ],
     },
     {
-      kind: "hold", id: "c4_listen", zone: TV.entE, holdTime: 4, holdPrompt: "按住 E · 听",
+      kind: "hold", id: "c4_listen", zone: TV.entE, holdTime: 4, sustain: true, holdPrompt: "按住 E · 听",
       objective: "贴在东口下面，听听上面的动静", hint: "贴住不动，柱子会把听到的记在心里",
       note: "探杆一下一下地戳。脚步散开，又聚拢。",
     },
@@ -1987,10 +2058,10 @@ export const SCRIPTS = {
       objective: "烟还在往里灌——把它堵在东段卡口外", hint: "藏人洞里备着棉被和水瓮。干被子堵不住烟",
       steps: [
         { type: "pickup", x: 110, level: "under", item: { id: "quilt", label: "棉被", big: true }, prompt: "E · 抱起棉被" },
-        { type: "use", zone: { x: 116, w: 3, level: "under" }, needs: "quilt", hold: 1.2, prompt: "按住 E · 浸湿棉被",
+        { type: "use", zone: { x: 116, w: 3, level: "under" }, needs: "quilt", hold: 1.2, stroke: "down", prompt: "按住 E · 浸湿棉被",
           transform: { id: "wetQuilt", label: "湿棉被", big: true },
           note: "棉被吃透了水，沉得坠手。" },
-        { type: "use", zone: TV.plugSpot, needs: "wetQuilt", hold: 1.6, prompt: "按住 E · 堵住卡口",
+        { type: "use", zone: TV.plugSpot, needs: "wetQuilt", hold: 1.6, stroke: "down", prompt: "按住 E · 堵住卡口",
           note: "烟撞在湿棉被上，打着旋儿退了回去。呛人的味道淡下来了。",
           effect: (state) => { state.flags.quiltPlugged = true; if (state.smoke) state.smoke.speed = 0.05; } },
       ],
@@ -2058,13 +2129,13 @@ export const SCRIPTS = {
         // 两章之间的账，用一个弯腰接上，不用字幕
         { type: "use", zone: TV.trapSpot, prompt: "E · 拾起烟袋",
           note: "拴柱大爷的烟袋躺在土里，锅底烧穿了一个洞。柱子把它揣进怀里，抄起了锹。" },
-        { type: "use", zone: TV.trapSpot, hold: 3, prompt: "按住 E · 挖翻口",
+        { type: "use", zone: TV.trapSpot, hold: 3, stroke: "down", prompt: "按住 E · 挖翻口",
           note: "弯挖出来了。可干弯挡不住烟——得灌上水。" },
         { type: "pickup", x: 30, level: "under", item: { id: "bucket2", label: "空桶" }, prompt: "E · 拎起空桶" },
         { type: "winch", zone: TV.wellTop, needs: "bucket2", needsLabel: "空桶",
           transform: { id: "fullBucket2", label: "满桶水", big: true },
           note: "桶沉了。上面还有人在转——挑好下去的时候。" },
-        { type: "use", zone: TV.trapSpot, needs: "fullBucket2", hold: 1, prompt: "按住 E · 灌水",
+        { type: "use", zone: TV.trapSpot, needs: "fullBucket2", hold: 1, stroke: "down", prompt: "按住 E · 灌水",
           note: "水面在弯底晃了晃，定住了。翻口成了。",
           effect: (state) => { state.flags.trapBuilt = true; } },
       ],
@@ -2075,14 +2146,14 @@ export const SCRIPTS = {
       objective: "改造二：新暗口", hint: "新口开在西头第三家的猪圈底下。口上得盖块门板",
       resetHint: "差点撞上翻查的伪军。退回地道，重新等空当。",
       steps: [
-        { type: "use", zone: TV.hiddenSpot, hold: 3, prompt: "按住 E · 掏暗口",
+        { type: "use", zone: TV.hiddenSpot, hold: 3, stroke: "down", prompt: "按住 E · 掏暗口",
           note: "口子掏通了，就差个盖。挖出来的土，天不亮就得摊进麦地。" },
         { type: "pickup", x: 62, level: "under", item: { id: "bun2", label: "窝头" }, prompt: "E · 拿个窝头" },
         { type: "use", zone: TV.dogPen, needs: "bun2", prompt: "E · 丢给狗",
           note: "猪圈的狗埋头去啃。它不叫，这条道才算真的暗。",
           effect: (state) => { state.flags.dogFed2 = true; } },
         { type: "pickup", x: 26, item: { id: "plank", label: "门板", big: true }, prompt: "E · 卸下门板" },
-        { type: "use", zone: TV.hiddenSpot, needs: "plank", hold: 1.2, prompt: "按住 E · 盖上门板",
+        { type: "use", zone: TV.hiddenSpot, needs: "plank", hold: 1.2, stroke: "down", prompt: "按住 E · 盖上门板",
           note: "口子盖严了。上头是猪食槽，谁也不会去翻。",
           effect: (state) => { state.flags.hiddenBuilt = true; } },
       ],
@@ -2093,10 +2164,10 @@ export const SCRIPTS = {
       resetHint: "东头的伪军回过头来。柱子缩回了洞里。",
       steps: [
         { type: "pickup", x: 56, level: "under", item: { id: "rope2", label: "麻绳" }, prompt: "E · 取下麻绳" },
-        { type: "use", zone: TV.bellSpot, needs: "rope2", hold: 1, prompt: "按住 E · 拴上梁",
+        { type: "use", zone: TV.bellSpot, needs: "rope2", hold: 1, stroke: "circle", gestureY: 1.6, prompt: "按住 E · 拴上梁",
           note: "绳头从东口的顶木上垂下来，就差铃了。" },
         { type: "pickup", x: 148, item: { id: "bell", label: "铃铛" }, prompt: "E · 摘下铃铛" },
-        { type: "use", zone: TV.bellSpot, needs: "bell", hold: 1, prompt: "按住 E · 拴好铃",
+        { type: "use", zone: TV.bellSpot, needs: "bell", hold: 1, stroke: "circle", gestureY: 1.6, prompt: "按住 E · 拴好铃",
           note: "指头一拨，铃舌轻轻一响。东口一动，全村先知道。",
           effect: (state) => { state.flags.bellBuilt = true; } },
       ],
@@ -2239,7 +2310,7 @@ export const SCRIPTS = {
         { type: "use", zone: F.northBank, needs: "firecracker", prompt: "E · 搁下鞭炮" },
         { type: "pickup", x: 26, item: { id: "tin", label: "铁皮桶", big: true }, prompt: "E · 扛起铁桶" },
         { type: "use", zone: F.northBank, needs: "tin", prompt: "E · 架好桶" },
-        { type: "use", zone: F.northBank, hold: 2, prompt: "按住 E · 装引信",
+        { type: "use", zone: F.northBank, hold: 2, stroke: "circle", gestureY: 0.8, prompt: "按住 E · 装引信",
           note: "鞭炮盘进桶底，引信探出来。夜里一点，就是一挺『机枪』。" },
       ],
     },
@@ -2299,7 +2370,7 @@ export const SCRIPTS = {
     },
     {
       // 木匠的手艺最后一次替爹用上：地沿的木板是从上面钉死的
-      kind: "hold", id: "c7_pry", zone: TF.cellHatch, holdTime: 3, holdPrompt: "按住 E · 撬",
+      kind: "hold", id: "c7_pry", zone: TF.cellHatch, holdTime: 3, stroke: "up", gestureY: 1.9, holdPrompt: "按住 E · 撬",
       objective: "地沿的木板从上面钉死了", hint: "爹的凿子，他一直带在身上",
       note: "凿刃咬进钉缝，一下，一下。木板松了。",
     },
@@ -4016,18 +4087,28 @@ function StepObserve(state, def, dt) {
 }
 
 function StepHold(state, def, input, dt) {
-  if (ZoneReached(state, def.zone)) {
-    state.prompt = def.holdPrompt || `按住 E · ${def.objective}`;
-    state.promptFill = state.beat.holdProgress / def.holdTime;
-    if (input.interactHeld) {
-      state.beat.holdProgress += dt;
-      if (state.beat.holdProgress >= def.holdTime) {
-        if (def.note) state.toast = { text: def.note, t: 4.5 };
-        AdvanceBeat(state);
-      }
-    } else if (state.beat.holdProgress > 0) {
-      state.beat.holdProgress = Math.max(0, state.beat.holdProgress - dt * 2);
+  if (!ZoneReached(state, def.zone)) return;
+  state.prompt = def.holdPrompt || `按住 E · ${def.objective}`;
+  state.promptFill = state.beat.holdProgress / def.holdTime;
+  // sustain=保持一个状态（贴着听、按住不动）——量的是时间本身，长按是诚实的。
+  // 其余都是对物体做功：走拟物笔画（def.stroke，c7 撬地沿是往上扳）
+  let g;
+  if (def.sustain) {
+    g = input.interactHeld ? dt : 0;
+  } else {
+    g = StrokeWork(state, state.beat.strokeMem || (state.beat.strokeMem = {}), input, dt, {
+      hold: def.holdTime, stroke: def.stroke,
+      at: { x: def.zone.x, y: def.gestureY, baseY: def.zone.level === "under" ? UNDER_Y : SURFACE_Y },
+    });
+  }
+  if (g > 0) {
+    state.beat.holdProgress += g;
+    if (state.beat.holdProgress >= def.holdTime) {
+      if (def.note) state.toast = { text: def.note, t: 4.5 };
+      AdvanceBeat(state);
     }
+  } else if (state.beat.holdProgress > 0 && !input.interactHeld) {
+    state.beat.holdProgress = Math.max(0, state.beat.holdProgress - dt * 2);
   }
 }
 
@@ -4105,14 +4186,21 @@ function StepDigSeq(state, def, input, dt) {
   if (ZoneReached(state, zone)) {
     if (state.beat.quakeActive) {
       state.prompt = "！头顶有动静——停下，别出声";
+      state.gesture = null;
       c.progress = Math.max(0, c.progress - dt * 0.3);
     } else {
+      // 清土是一铲一铲挖出来的：往下拽一下=挖一铲（键盘按住 E 是后备）
       state.prompt = "按住 E · 清土";
       state.promptFill = c.progress / def.holdTime;
-      if (input.interactHeld) {
-        c.progress += dt;
+      const g = StrokeWork(state, state.beat.strokeMem || (state.beat.strokeMem = {}), input, dt, {
+        hold: def.holdTime, stroke: "down",
+        at: { x: zone.x, baseY: UNDER_Y },
+      });
+      if (g > 0) {
+        c.progress += g;
         if (c.progress >= def.holdTime) {
           c.cleared = true;
+          state.beat.strokeMem = null;
           state.toast = { text: "土清开了。前面的路通了。", t: 3 };
           state.beat.digIndex += 1;
           if (state.beat.digIndex >= keys.length) AdvanceBeat(state);
