@@ -1912,6 +1912,100 @@ export function DrawCart(ctx, x, groundY, id) {
   }
 }
 
+// 自行车（伪军的"洋车子"）：侧视朝 -x（车头在左）。骑手是独立演员骑在上面
+//（pose rideBike + lift），这里只画车。轮子不做旋转——辐条画密一点、
+// 加一圈挡泥板，滚动感靠车速与蹬踏动画撑
+export function DrawBicycle(ctx, x, groundY, id) {
+  const r = 15, y = groundY - r;              // 轮半径 ~0.31m
+  const fx = x - 25, bx = x + 25;             // 前/后轮心
+  const Wheel = (wx) => {
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(wx, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(40,40,40,0.7)";
+    for (let s = 0; s < 6; s += 1) {
+      ctx.beginPath();
+      ctx.moveTo(wx - Math.cos(s * 0.52) * (r - 2), y - Math.sin(s * 0.52) * (r - 2));
+      ctx.lineTo(wx + Math.cos(s * 0.52) * (r - 2), y + Math.sin(s * 0.52) * (r - 2));
+      ctx.stroke();
+    }
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(wx, y, 2.4, 0, Math.PI * 2); ctx.stroke();
+  };
+  Wheel(fx); Wheel(bx);
+  // 挡泥板
+  ctx.strokeStyle = "#39424a";
+  ctx.lineWidth = 3.4;
+  ctx.beginPath(); ctx.arc(fx, y, r + 2.6, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(bx, y, r + 2.6, Math.PI * 1.2, Math.PI * 1.95); ctx.stroke();
+  // 车架（大梁三角 + 后叉）：黑漆钢管
+  const seatX = x + 9, seatY = y - 22;        // 座管顶
+  const headX = x - 19, headY = y - 21;       // 车把立管顶
+  const crankX = x + 2, crankY = y - 2;       // 中轴
+  for (const [x1, y1, x2, y2] of [
+    [headX, headY, fx, y],                    // 前叉
+    [headX, headY, crankX, crankY],           // 下管
+    [headX, headY - 1, seatX, seatY + 3],     // 上管（大梁）
+    [seatX, seatY, crankX, crankY],           // 座管
+    [seatX, seatY + 2, bx, y],                // 后上叉
+    [crankX, crankY, bx, y],                  // 后下叉
+  ]) {
+    InkLine(ctx, x1, y1, x2, y2, id + "f" + x1 + y2, { lw: 2.8, color: "#232a30", amp: 0.4 });
+  }
+  // 车把（往骑行方向探出一截再回勾）与座
+  InkLine(ctx, headX, headY, headX - 6, headY - 7, id + "stem", { lw: 2.6, color: "#232a30", amp: 0.3 });
+  InkLine(ctx, headX - 6, headY - 7, headX - 12, headY - 4, id + "bar", { lw: 3, color: "#1c2126", amp: 0.3 });
+  InkFill(ctx, [[seatX - 6, seatY - 3], [seatX + 6, seatY - 3], [seatX + 4, seatY], [seatX - 4, seatY]],
+    id + "saddle", "#3a2e22", { lw: 1.6, amp: 0.4 });
+  // 曲柄踏板（斜着定格）+ 后货架——伪军驮包袱的地方
+  InkLine(ctx, crankX - 5, crankY + 5, crankX + 5, crankY - 5, id + "crank", { lw: 2.4, color: "#1c2126", amp: 0.3 });
+  InkFill(ctx, Rect(bx - 12, y - r - 4, 22, 3.4), id + "rack", "#4a4038", { lw: 1.6, amp: 0.5 });
+}
+
+// 挎斗摩托（日军三轮挎斗车）：侧视朝 -x。挎斗画在近侧（压在车身前），
+// 斗里的兵是独立演员（pose sitSide，pinTo 钉在车上）。军土黄涂装
+export function DrawMotorcycle(ctx, x, groundY, id) {
+  const r = 16, y = groundY - r;
+  const fx = x - 38, bx = x + 30;
+  const Wheel = (wx, wr) => {
+    const wy = groundY - wr;                   // 轮心随半径落地
+    ctx.fillStyle = "#2b2b28";
+    ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    ctx.fillStyle = "#8a7a4a";
+    ctx.beginPath(); ctx.arc(wx, wy, wr * 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.4; ctx.stroke();
+  };
+  Wheel(fx, r); Wheel(bx, r);
+  // 前叉与车把
+  InkLine(ctx, fx, y, fx + 8, y - 26, id + "fork", { lw: 3, color: "#5c5436", amp: 0.4 });
+  InkLine(ctx, fx + 8, y - 26, fx + 2, y - 34, id + "bar", { lw: 3, color: "#2e2a1c", amp: 0.3 });
+  // 车身：油箱 + 座 + 尾架，一条压低的流线——留出轮子，别糊成一坨
+  InkFill(ctx, [
+    [fx + 12, y - 18], [x - 10, y - 25], [x + 8, y - 24], [bx - 2, y - 17],
+    [bx - 4, y - 9], [x, y - 11], [fx + 14, y - 10],
+  ], id + "body", "#8a7a4a", { lw: 2.2, amp: 0.8, shade: "rgba(0,0,0,0.22)" });
+  InkFill(ctx, [[x - 8, y - 29], [x + 9, y - 28], [x + 8, y - 24], [x - 9, y - 25]],
+    id + "seat", "#3a3226", { lw: 1.8, amp: 0.5 });
+  // 排气管：从发动机拖到后轮边
+  InkLine(ctx, fx + 16, y - 6, bx - 6, y - 3, id + "pipe", { lw: 2.4, color: "#6e6248", amp: 0.5 });
+  // —— 挎斗（近侧，整个压在车身之前）：船形斗偏后挂，小轮明显小一号，
+  // 斗沿抬高——斗里的兵下半身要被它盖住才叫"坐在斗里"
+  const sx = x + 6;                            // 斗中心（偏后）
+  Wheel(sx + 3, r * 0.55);
+  InkFill(ctx, [
+    [sx - 22, y - 24], [sx + 16, y - 26], [sx + 22, y - 16], [sx + 18, y - 6],
+    [sx - 16, y - 6], [sx - 24, y - 15],
+  ], id + "tub", "#94824e", { lw: 2.4, amp: 0.9, shade: "rgba(0,0,0,0.18)" });
+  // 斗沿高光与蒙皮接缝
+  InkLine(ctx, sx - 22, y - 23, sx + 16, y - 25, id + "rim", { lw: 1.8, color: "rgba(240,225,180,0.5)", amp: 0.5 });
+  InkLine(ctx, sx - 18, y - 15, sx + 16, y - 17, id + "seam", { lw: 1.2, color: "rgba(40,35,20,0.5)", amp: 0.4 });
+}
+
 // 独轮车：1942 冀中最标志性的农具——独轮居中，两根车把，木架车盘。
 // planks: 0/1/2 —— 装了几根木料
 export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {

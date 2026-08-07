@@ -374,6 +374,9 @@ export function CreateWorld(canvasEl) {
   let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
   let barrowMesh = null;
+  // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
+  // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
+  const mountMeshes = new Map();
   // 自由放下的落地道具：uid → mesh（uid 在 Core 里随放下动作分配）
   const groundItemMeshes = new Map();
   let bubbleMeshes = [];
@@ -434,6 +437,7 @@ export function CreateWorld(canvasEl) {
     barkMesh = null;
     chainItemMeshes = [];
     barrowMesh = null;
+    mountMeshes.clear();
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
     bubbleMeshes = [];
@@ -1928,6 +1932,31 @@ export function CreateWorld(canvasEl) {
   // 字幕说——演员手上空空。现在所有演员共用这一套。
   // s.layerKey 缺省是 play；背景层的乡亲把自己那层的名字带进来，
   // 手上的家伙就跟着挂到同一层（不然锄头会留在前景，隔着十几米跟着人走）
+  // 坐骑：车是一张贴图，骑手是正常演员。自行车摆在骑手**身后**（细钢管架，
+  // 人要整个压在车上才读得出"骑"）；挎斗摩托摆在**身前**（近侧的斗得盖住
+  // 斗里那个兵的下半身，他才是"坐在斗里"而不是"蹲在车顶上"）。
+  // 画笔一律画朝 -x（车头在左），朝 +x 走时整张镜像。
+  function SyncMount(a, show) {
+    let m = mountMeshes.get(a.id);
+    if (!a.mount || !show) {
+      if (m) m.visible = false;
+      return;
+    }
+    if (!m || m.userData.mountKind !== a.mount) {
+      if (m) layers.play.remove(m);
+      m = a.mount === "bicycle"
+        ? BakeSprite(130, 64, 65, 58, (ctx, ax, ay) => ART.DrawBicycle(ctx, ax, ay, a.id + "bike"), 0, PROP_SS)
+        : BakeSprite(160, 74, 80, 68, (ctx, ax, ay) => ART.DrawMotorcycle(ctx, ax, ay, a.id + "moto"), 0, PROP_SS);
+      m.userData.mountKind = a.mount;
+      SetPlayOrder(m, a.mount === "bicycle" ? BAND.loose : CARRY_Z, "mount:" + a.mount);
+      layers.play.add(m);
+      mountMeshes.set(a.id, m);
+    }
+    m.visible = true;
+    PlaceSprite(m, a.x, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
+  }
+
   function SyncCarry(s, label, heading) {
     const layerKey = s.layerKey || "play";
     const host = layers[layerKey];
@@ -2133,8 +2162,11 @@ export function CreateWorld(canvasEl) {
         // 人不在画面里，跟着他的那几件也得一起收：影子、手上提的、提着的灯。
         // 不这么写，娘走进屋之后墙上会剩一只浮着的桶、门口留一团没人的影子
         for (const m of [s.shadow, s.castShadow, s.carryMesh, s.lampMesh]) if (m) m.visible = false;
+        SyncMount(a, false);
         continue;
       }
+      // 坐骑（自行车/挎斗摩托）：车跟人走，人骑在车上（pose + lift 是 Core 给的）
+      SyncMount(a, true);
       const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
       // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
       const underTunnel = (a.level === "under")
@@ -2183,6 +2215,11 @@ export function CreateWorld(canvasEl) {
     }
     for (const g of glows) if (g.visible) g.userData.SetBlockers?.(bodyBlockers);
     for (const m of lampMeshes) if (m.glow?.visible) m.glow.userData.SetBlockers?.(bodyBlockers);
+
+    // 人没了车也得收（SpawnRaidSoldiers 会整批换敌人）
+    for (const [id, m] of mountMeshes) {
+      if (!seen.has(id)) { layers.play.remove(m); mountMeshes.delete(id); }
+    }
 
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {

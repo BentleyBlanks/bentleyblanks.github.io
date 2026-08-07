@@ -612,6 +612,36 @@ export function PoseRig(rig, s, dt) {
     target.thighF = (-20 + (c ? swing * 22 : 0)) * DEG;
     target.shinF = (28 - (c ? swing * 16 : 0)) * DEG;
     target.footF = -8 * DEG;
+  } else if (s.pose === "rideBike") {
+    // 骑自行车：微前倾扶把，腿在踏板上画圈——蹬踏相位由位移驱动（phase），
+    // 车停了腿就搭在踏板上不转
+    const c = s.moving;
+    target.hipY = 0; target.hipX = 0.05;
+    target.torso = 16 * DEG; target.head = -8 * DEG;
+    target.armF = -58 * DEG; target.foreF = -20 * DEG;
+    target.armB = -50 * DEG; target.foreB = -24 * DEG;
+    target.thighB = (-62 + (c ? swing2 * 18 : 0)) * DEG;
+    target.shinB = (58 - (c ? swing2 * 24 : 8)) * DEG;
+    target.footB = 8 * DEG;
+    target.thighF = (-58 + (c ? swing * 18 : -6)) * DEG;
+    target.shinF = (52 - (c ? swing * 24 : 0)) * DEG;
+    target.footF = 8 * DEG;
+  } else if (s.pose === "rideMoto") {
+    // 骑挎斗摩托：坐得比自行车深，两臂前伸压住宽把，腿踩在脚踏上不动
+    target.hipY = -0.04; target.hipX = 0.10;
+    target.torso = 22 * DEG; target.head = -10 * DEG;
+    target.armF = -66 * DEG; target.foreF = -8 * DEG;
+    target.armB = -58 * DEG; target.foreB = -12 * DEG;
+    target.thighB = -74 * DEG; target.shinB = 70 * DEG; target.footB = 12 * DEG;
+    target.thighF = -70 * DEG; target.shinF = 64 * DEG; target.footF = 10 * DEG;
+  } else if (s.pose === "sitSide") {
+    // 挎斗里的兵：整个人蜷进斗里，膝盖顶到胸口，枪抱在怀里（枪走 carry）
+    target.hipY = -0.30; target.hipX = 0.04;
+    target.torso = 6 * DEG; target.head = -4 * DEG;
+    target.armF = -46 * DEG; target.foreF = -52 * DEG;
+    target.armB = -40 * DEG; target.foreB = -48 * DEG;
+    target.thighB = -96 * DEG; target.shinB = 88 * DEG; target.footB = 10 * DEG;
+    target.thighF = -90 * DEG; target.shinF = 82 * DEG; target.footF = 8 * DEG;
   } else if (s.climbing) {
     // 爬梯：双手交替上够，腿蹬阶
     target.hipY = 0; target.hipX = 0;
