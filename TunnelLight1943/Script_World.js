@@ -395,7 +395,7 @@ export function CreateWorld(canvasEl) {
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
-  let planeToolMesh = null, planeGlowMesh = null;
+  let planeToolMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
@@ -455,7 +455,7 @@ export function CreateWorld(canvasEl) {
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
-    planeToolMesh = null; planeGlowMesh = null; planeHandRig = null;
+    planeToolMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
     spotFlashMesh = null;
@@ -2983,39 +2983,11 @@ export function CreateWorld(canvasEl) {
       // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
       // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
       // （另算一份 u→x 的话，两条线迟早对不上，刨子就飘在手外面了。）
+      // 世界里这一份是替补：玩家真正操作的是铺满画框的那张刨料卡
+      //（Art.DrawPlaneCard），卡永远盖着它，只有卡没画出来时才露脸。
       const hand = planeHandRig ? HandPoint(planeHandRig) : null;
       planeToolMesh.visible = !!hand;
       if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
-      // 把"刨子画在了哪儿"回填给玩法层：攥取判定必须贴着玩家看见的这把刨子，
-      // 不许贴着 u 的直线映射（手臂几何让两者差出小半米，照公式判就抓空了）
-      state.planeToolView = hand ? { x: hand.x + 0.02, y: hand.y - 0.05 } : null;
-
-      // 玩家推的是这把刨子本身（没有 HUD 轨道）。等着被攥住时它透一圈
-      // 会呼吸的光——"来拿我"由刨子自己说；按下了没抓着就闪快些催一下
-      if (!planeGlowMesh) {
-        planeGlowMesh = BakeSprite(64, 64, 32, 32, (ctx, ax, ay) => {
-          const g = ctx.createRadialGradient(ax, ay, 3, ax, ay, 24);
-          g.addColorStop(0, "rgba(255,240,196,0.7)");
-          g.addColorStop(0.5, "rgba(255,232,172,0.18)");
-          g.addColorStop(1, "rgba(255,232,172,0)");
-          ctx.fillStyle = g;
-          ctx.fillRect(ax - 32, ay - 32, 64, 64);
-        }, 0, DETAIL_SS);
-        planeGlowMesh.scale.setScalar(0.55);   // 一圈贴着刨身的光，不是一片白昼
-        // 加法混合：那圈光要在大白天的木头上也看得见（普通透明度会糊进底色）
-        planeGlowMesh.material.blending = THREE.AdditiveBlending;
-        // 光垫在刨子背后一层（同在 carry 带里，紧贴其下）
-        FixOrder(planeGlowMesh, DepthOrder("play", CARRY_Z) - 1);
-        layers.play.add(planeGlowMesh);
-      }
-      const glowWant = (pl.invite && hand)
-        ? (pl.reaching
-          ? 0.55 + 0.25 * Math.sin(time * 13)
-          : 0.30 + 0.20 * Math.sin(time * 3.1))
-        : 0;
-      planeGlowMesh.material.opacity = Math.max(0, glowWant);
-      planeGlowMesh.visible = glowWant > 0.03;
-      if (hand) planeGlowMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
 
       if (planePileMesh.userData.k !== pl.pile) {
         planePileMesh.userData.k = pl.pile;
@@ -3028,9 +3000,7 @@ export function CreateWorld(canvasEl) {
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
-      if (planeGlowMesh) planeGlowMesh.visible = false;
       if (planePileMesh) planePileMesh.visible = false;
-      state.planeToolView = null;
     }
 
     // 刚削下来的那条刨花：从刨刃口弹出来，打着旋儿飘到地上
@@ -3690,8 +3660,15 @@ export function CreateWorld(canvasEl) {
   let liveCanvas = null, liveCtx = null, liveTex = null, liveCardOn = false, liveT = 0;
   const cardFrac = { w: 1, h: 1 };
 
-  function SetLiveCard(view, layout, dt) {
-    if (!view || !layout) {
+  // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
+  // 铺满画框的活卡上，画笔按 kind 分派。
+  const LIVE_CARD_ART = { scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard };
+
+  function SetLiveCard(spec, dt) {
+    const view = spec?.view;
+    const layout = spec?.layout;
+    const draw = LIVE_CARD_ART[spec?.kind];
+    if (!view || !layout || !draw) {
       // 只收自己那一张：同一帧里若已经换上了定格卡/过场片，别把人家关掉
       if (liveCardOn) {
         liveCardOn = false;
@@ -3701,7 +3678,7 @@ export function CreateWorld(canvasEl) {
       return;
     }
     if (!liveCanvas) {
-      // 玩家会盯着笔尖看，这张卡烘得比定格卡密一档
+      // 玩家会盯着笔尖/刨口看，这张卡烘得比定格卡密一档
       liveCanvas = MakeCanvas(1600, 900);
       liveCtx = liveCanvas.getContext("2d");
       liveTex = CanvasTexture(liveCanvas);
@@ -3714,7 +3691,7 @@ export function CreateWorld(canvasEl) {
     insertCardName = null;
     liveCtx.setTransform(1, 0, 0, 1, 0, 0);
     liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
-    ART.DrawScribeCard(liveCtx, liveCanvas.width, liveCanvas.height, view, layout, liveT);
+    draw(liveCtx, liveCanvas.width, liveCanvas.height, view, layout, liveT);
     liveTex.needsUpdate = true;
     if (!insertMesh) {
       insertMesh = new THREE.Mesh(
@@ -3882,6 +3859,8 @@ export function CreateWorld(canvasEl) {
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
     SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, Resize, Render,
     SetPip, RenderPip, ScreenToWorld, ScreenToCard,
+    // 卡面↔画框的尺寸比（测试要把卡上的坐标换回屏幕像素去点）
+    __cardFrac: () => ({ ...cardFrac }),
     // 过场短片在放没放，截图上看不出来（兜底手绘卡长得也像回事）——只能问它
     __insertVideo() {
       if (!insertVideoName) return null;

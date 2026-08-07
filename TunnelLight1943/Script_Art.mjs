@@ -3002,6 +3002,181 @@ export function DrawInsertCard(ctx, W, H, kind) {
 }
 
 // ---------------------------------------------------------------------------
+// 刨料特写卡（会动的那一张，和下面的划线卡同一套路数）。
+//
+// 为什么也得单独画一张：世界里那把刨子只有 0.34m，2.05m 的特写下在 844×390 的
+// 手机上只有 **90×45 像素**——一块木头色的小方块，摆在木头色的台面上、人身子
+// 前面。实测（真触摸事件）机制是通的、三趟都推得完，但玩家**认不出那是能抓的
+// 东西**，推到头也不知道要拖回来。用户为此退回过两次。
+// 结论与石笔同源（CLAUDE.md 拟物交互第 4 条）：手指按不着/认不出的东西，
+// 推镜头治不好，得换成铺满画框的手绘活卡。
+//
+// 版面由 Core 的 PLANE_CARD 定（判定与作画共用同一套归一化坐标）。
+
+// 料：刨过的那一段发亮、边是齐的；没刨的还毛着，上沿一层茬。
+function PlaneBoard(ctx, W, H, S, L, view) {
+  const top = H * L.v;                       // 料的上表面＝刨底走的那条线
+  const bot = H * (L.v + 0.18);
+  const x0 = -40 * S, x1 = W + 40 * S;
+  const smooth = Math.max(0, Math.min(1, view.smooth || 0));
+  // 整块料的底色随"刨了几趟"从旧木转成新木的黄。毛料也得是木头色，
+  // 别调成灰的——上一版灰得像一条水泥台，整张卡就废了。
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  const [r, g, b] = mix([176, 146, 104], [226, 182, 116], smooth);
+  InkFill(ctx, [[x0, top], [x1, top], [x1, bot], [x0, bot]], "pcBoard",
+    `rgb(${r},${g},${b})`, { amp: 3 * S, lw: 6 * S, shade: "rgba(0,0,0,0.16)", shadeAt: 0.0 });
+  // 本趟已经刨过的那一段（刨底左边）：亮一层，上沿一道顺光
+  const headX = W * (L.u0 + (view.head ?? 0) * (L.u1 - L.u0));
+  if (view.armed !== false) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, top - 8 * S, Math.max(0, headX - x0), (bot - top) * 0.55);
+    ctx.clip();
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = "#f0d49a";
+    ctx.fillRect(x0, top, W, (bot - top) * 0.55);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    InkLine(ctx, x0 + 10 * S, top + 7 * S, Math.max(x0 + 12 * S, headX - 10 * S), top + 6 * S,
+      "pcSheen", { lw: 4 * S, color: "#fdf0c8", amp: 2 * S });
+    ctx.restore();
+  }
+  // 还没刨到的那一段：上沿一层毛茬（右边）
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  for (let i = 0; i < 60; i += 1) {
+    const px = headX + 14 * S + i * 26 * S;
+    if (px > x1) break;
+    const hgt = (3 + Hash("pcFuzz" + i) * 8) * S * (1 - smooth * 0.55);
+    InkLine(ctx, px, top + 2 * S, px + (Hash("pcFz2" + i) - 0.5) * 6 * S, top - hgt,
+      "pcFuzz" + i, { lw: 2.4 * S, color: "rgba(96,72,44,0.65)", amp: 1.5 * S });
+  }
+  ctx.restore();
+  // 木纹
+  for (let i = 0; i < 7; i += 1) {
+    const gy = top + (26 + i * 22) * S;
+    if (gy > bot - 6 * S) break;
+    InkLine(ctx, x0, gy, x1, gy + (Hash("pcG" + i) - 0.5) * 18 * S,
+      "pcGrain" + i, { lw: 2.6 * S, color: "rgba(92,60,34,0.22)", amp: 20 * S });
+  }
+}
+
+// 刨子：中式长刨——一块矮墩墩的木身，斜插刨刀，一根横楔穿过身子当把手。
+// 整组按 (cx, baseY) 摆：baseY 是刨底贴着料的那条线。
+//
+// 构图跟石笔卡同一套语法：**一件大家伙 + 一只攥住它的手 + 一截出画的小臂**。
+// 手在做功方向的后上方（左上），绝不横过刚刨亮的那一段——那是拿掉进度条
+// 换来的东西，手一盖就白拿了。两只手试过，拳头把刨子挤没了，改回一只。
+function PlaneInHand(ctx, cx, baseY, S, lift, tilt, cutting, skin) {
+  ctx.save();
+  ctx.translate(cx, baseY - lift);
+  ctx.rotate(tilt);
+  // 小臂：从左上压下来，出上画框
+  InkFill(ctx, [
+    [-200 * S, -142 * S], [-78 * S, -176 * S], [150 * S, -760 * S], [-10 * S, -780 * S],
+  ], "pcArm", "#6d5340", { amp: 4 * S, lw: 7 * S, shade: "rgba(0,0,0,0.20)" });
+  // 袖口
+  InkFill(ctx, [
+    [-196 * S, -136 * S], [-86 * S, -170 * S], [-54 * S, -252 * S], [-176 * S, -224 * S],
+  ], "pcCuff", "#7b6448", { amp: 3 * S, lw: 6 * S, shade: "rgba(0,0,0,0.18)" });
+  // 刨身：长而矮，一眼是刨不是砖
+  InkFill(ctx, [
+    [-196 * S, -84 * S], [192 * S, -90 * S], [202 * S, -4 * S], [-204 * S, 2 * S],
+  ], "pcBody", "#8d6236", { amp: 3 * S, lw: 7 * S, shade: "rgba(0,0,0,0.20)" });
+  // 木纹一道，读得出是木头
+  InkLine(ctx, -168 * S, -44 * S, 168 * S, -48 * S, "pcBodyGrain",
+    { lw: 3.4 * S, color: "rgba(70,45,25,0.4)", amp: 6 * S });
+  // 刨口（斜槽）与露出来的刨刀
+  InkFill(ctx, [[36 * S, -88 * S], [86 * S, -90 * S], [56 * S, -2 * S], [16 * S, -2 * S]],
+    "pcThroat", "#43301c", { amp: 2 * S, lw: 4.5 * S });
+  InkFill(ctx, [[30 * S, -168 * S], [88 * S, -170 * S], [80 * S, -80 * S], [26 * S, -80 * S]],
+    "pcBlade", "#b9b3a4", { amp: 1.8 * S, lw: 5.5 * S, shade: "rgba(0,0,0,0.24)" });
+  // 横楔：穿过刨身伸出两头，手就攥这根
+  InkFill(ctx, [
+    [-252 * S, -76 * S], [252 * S, -82 * S], [252 * S, -40 * S], [-252 * S, -34 * S],
+  ], "pcBar", "#a8794a", { amp: 2.4 * S, lw: 6 * S, shade: "rgba(0,0,0,0.18)" });
+  // 攥住横楔的那只拳头（在刨身左上，压着横楔的近端）
+  InkFill(ctx, [
+    [-196 * S, -152 * S], [-78 * S, -160 * S], [-50 * S, -94 * S],
+    [-86 * S, -38 * S], [-180 * S, -34 * S], [-214 * S, -94 * S],
+  ], "pcFist", skin, { amp: 3.4 * S, lw: 7 * S, shade: "rgba(70,40,22,0.16)" });
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, -172 * S + i * 40 * S, -142 * S, -166 * S + i * 40 * S, -84 * S,
+      "pcK" + i, { lw: 3.6 * S, color: "rgba(118,74,44,0.45)", amp: 3 * S });
+  }
+  ctx.restore();
+  // 刨花：只有真在吃木头时才从刨口卷出来
+  if (cutting > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, cutting);
+    DrawShaving(ctx, cx + 96 * S, baseY - lift - 138 * S, 2.8 * S, 0.9, "pcCurl");
+    DrawShaving(ctx, cx + 176 * S, baseY - lift - 92 * S, 2.0 * S, 0.6, "pcCurl2");
+    ctx.restore();
+  }
+}
+
+/**
+ * 每帧重画的刨料卡。view = Core 的 state.planeCard，L = PLANE_CARD，t = 秒。
+ */
+export function DrawPlaneCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  const head = Math.max(0, Math.min(1, view.head || 0));
+  const headX = W * (L.u0 + head * (L.u1 - L.u0));
+  const baseY = H * L.v;
+
+  CardBase(ctx, W, H, "#dcc79e");
+  // 台面：料下面那块大板
+  InkFill(ctx, [[-40 * S, H * (L.v + 0.18)], [W + 40 * S, H * (L.v + 0.18)],
+    [W + 40 * S, H + 40 * S], [-40 * S, H + 40 * S]], "pcBench", "#7c5a37",
+  { amp: 3 * S, lw: 7 * S, shade: "rgba(0,0,0,0.30)", shadeAt: 0.0 });
+  PlaneBoard(ctx, W, H, S, L, view);
+
+  // 地上那堆刨花（右下角，越刨越多）
+  if (view.pile > 0) {
+    ctx.save();
+    ctx.translate(W * 0.09, H * 0.955);
+    DrawShavingPile(ctx, 0, 0, view.pile, "pcPile");
+    ctx.restore();
+  }
+
+  const gripped = !!view.gripped;
+  // 推到头了得拖回来：刨子**抬离料面**、鼻子翘起来——木匠回程本来就是抬着走的，
+  // 画面自己把"这趟完了，往回带"说清楚，不用一根轨道也不用一行字
+  const back = view.armed === false;
+  const lift = (back ? 26 : 0) * S + (gripped ? 0 : 6 * S)
+    + (gripped ? 0 : Math.sin(t * 3.4) * 3 * S);
+  const tilt = back ? -0.07 : 0;
+
+  // 没攥住就透一圈会呼吸的光（按错地方闪快些催一下）
+  if (!gripped) {
+    const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.45 + 0.35 * Math.sin(t * 3.0);
+    const r = L.grabR * W * 1.15;
+    ctx.save();
+    ctx.globalAlpha = 0.20 + pulse * 0.26;
+    const g = ctx.createRadialGradient(headX, baseY - lift - 70 * S, r * 0.1,
+      headX, baseY - lift - 70 * S, r);
+    g.addColorStop(0, "rgba(255,242,200,0.95)");
+    g.addColorStop(0.55, "rgba(255,232,172,0.30)");
+    g.addColorStop(1, "rgba(255,232,172,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(headX, baseY - lift - 70 * S, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  PlaneInHand(ctx, headX, baseY, S, lift, tilt,
+    gripped && !back ? Math.min(1, 0.35 + (view.speed || 0) * 2.2) : 0, PAL.skin);
+
+  const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.42, W * 0.5, H * 0.5, H * 0.95);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(20,14,8,0.30)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------------------
 // 划线特写卡（**会动的那一张**）：和上面几张定格插卡同一个景别、同一支笔，
 // 区别是它每帧重画——因为玩家的手就按在这张卡上，攥着画面里那支石笔。
 //
