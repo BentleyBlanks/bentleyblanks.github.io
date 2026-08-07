@@ -532,6 +532,54 @@ function TestVaultC1() {
 
 // 落地道具：自由放下（落点避开掩体足迹）→ 悬浮气泡 → 拾回。
 // 掩体带的 z 专职挡人，桶落进草垛=凭空消失——DropSpot 必须把落点推出去。
+// 半路把东西撂下，链不许卡死。
+// 「手里的东西随时能放下」和链里那句「必须从手里放在这儿」不接上的话，
+// 只要玩家在走到木料堆之前随手放下水桶，链就永远停在那一步：没有提示、
+// 后面那截绳头捡不起来、按 E 毫无反应——玩家只会以为游戏坏了。
+function TestChainSurvivesEarlyDrop() {
+  const state = CreateGame(0);
+  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
+  DebugJump(state, 0, water.index);
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  // 拎桶 → 挂井绳（发现绳断）
+  state.player.x = 31; state.player.level = "surface";
+  step({}, 3); step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "先得拎起桶");
+  state.player.x = SCENES.village.zones.well.x; step({}, 3); step({ interact: true });
+  assert.equal(state.flags.wellRopeBroken, true, "挂桶必须发现绳断了");
+  // ★ 半路（不在木料堆）随手把桶撂下
+  state.player.x = 50; step({}, 24); step({ interact: true });
+  assert.equal(state.player.item, null, "半路应该放得下");
+  assert.equal(state.groundItems.length, 1, "桶该躺在半路上");
+  // 走到绳头：这一截必须捡得起来，不能没反应
+  state.player.x = 70; step({}, 6);
+  assert.ok(state.prompt && state.prompt.includes("绳"),
+    `站到绳头处必须给得出提示，实为 ${JSON.stringify(state.prompt)}`);
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "rope", "半路撂过桶，也必须捡得起绳头");
+  // 接着把绳接上，链就走到「折回取桶」——这时撂在远处的桶必须被标出来，
+  // 否则玩家根本不知道自己把它扔哪儿了
+  state.player.x = SCENES.village.zones.well.x;
+  step({}, 3);
+  step({ interactHeld: true }, Math.ceil(6 / DT));
+  assert.equal(state.flags.wellRopeBroken, false, "绳该接好了");
+  step({}, 3);
+  const marked = state.bubbles.some((b) => b.icon === "item:空水桶");
+  assert.ok(marked, "折回取桶时，撂在远处的桶必须挂气泡");
+  // 走回去真的能捡起来
+  const g = state.groundItems.find((it) => it.id === "bucket");
+  state.player.x = g.x; step({}, 3); step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "撂在哪儿就该能从哪儿捡回来");
+  console.log("  ✓ 链不怕半路撂东西：绳头照样捡得起，撂下的桶有气泡标着、捡得回来");
+}
+
 function TestGroundItems() {
   const state = CreateGame(0);
   const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
@@ -964,6 +1012,7 @@ TestPromptsAreDeviceNeutral();
 TestWorkStations();
 TestVaultC1();
 TestGroundItems();
+TestChainSurvivesEarlyDrop();
 TestKnotKeyboardFallback();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();

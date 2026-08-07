@@ -397,6 +397,21 @@ function StepChain(state, def, input, dt) {
   const p = state.player;
   const lvl = p.level || "surface";
 
+  // 这一步在等某件东西，而它正躺在地上（玩家半路撂下的、或上一步放下的）：
+  // 给它挂一枚气泡。手里能随时放下，就一定会有人撂下东西再走开——不标出来的话，
+  // 玩家站在原地按 E 没反应，只会以为游戏坏了（无文字引导三层配方之一）。
+  {
+    const wantId = st.needs || st.itemId || st.item?.id;
+    if (wantId && p.item?.id !== wantId) {
+      const g = state.groundItems.find((it) => it.id === wantId);
+      if (g) {
+        state.bubbles.push({
+          x: g.x, y: (g.level === "under" ? UNDER_Y : SURFACE_Y) + 1.15, icon: "item:" + g.label,
+        });
+      }
+    }
+  }
+
   // 很久没动静：链卡在同一步超过 after 秒 → 后果小窗惦记一眼（负数=冷却期）
   if (def.pipIdle) {
     b.pipIdleT = (b.pipIdleT || 0) + dt;
@@ -449,6 +464,26 @@ function StepChain(state, def, input, dt) {
     // 放下换手：单格物品栏的另一半——「翻堆要双手」的地方，得先把手里的搁下。
     // 落成一件真的落地道具（走 DropSpot 避开掩体带），折回来还能捡
     case "drop": {
+      // 这一步要的是「手腾出来了」，不是「必须从手里放在这块地上」。
+      // 玩家有权在任何地方把东西撂下（自由放下），要是这里非等着他攥着走过来，
+      // 半路撂下桶的人就把链卡死在这一步——而且一点提示都没有：
+      // 后面那截绳头捡不起来、按 E 毫无反应，玩家只会以为游戏坏了。
+      // 东西已经躺在地上（哪儿都算），这一步就算过；位置照实记，
+      // 「折回取桶」自然就走回那儿。
+      {
+        const onGround = state.groundItems.find((g) => g.id === st.itemId);
+        if (onGround) {
+          state.flags[st.storeIn] = onGround.x;
+          // 撂得远的话，给它挂一枚气泡：玩家得看得见自己把桶扔哪儿了
+          state.bubbles.push({
+            x: onGround.x,
+            y: (onGround.level === "under" ? UNDER_Y : SURFACE_Y) + 1.15,
+            icon: "item:" + onGround.label,
+          });
+          finish();
+          return;
+        }
+      }
       if (!InZone(p.x, lvl, st.zone)) return;
       if (p.item?.id !== st.itemId) return;
       state.prompt = st.prompt || `E · 放下${p.item.label}`;
