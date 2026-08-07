@@ -439,11 +439,14 @@ export function PoseRig(rig, s, dt) {
     target.thighB = (-40 + drag) * DEG; target.shinB = 54 * DEG; target.footB = 18 * DEG;
     target.thighF = (-14 - drag) * DEG; target.shinF = 30 * DEG; target.footF = 22 * DEG;
   } else if (s.pose === "shelter") {
-    // 把人搂进自己肩膀：近侧手臂抬起来绕过去，头低下护住
-    target.hipY = -0.06; target.hipX = 0.02;
-    target.torso = 12 * DEG; target.head = -22 * DEG;
-    target.armF = -128 * DEG; target.foreF = -62 * DEG;
-    target.armB = -26 * DEG; target.foreB = -30 * DEG;
+    // 把人搂进自己肩膀。老版把近侧上臂甩到 -128°（举过头顶）、前臂再折 -62°，
+    // 特写下读出来是「举手挥舞」而不是「搂着」——手根本没落到妹妹身上。
+    // 现在：上臂垂到体侧偏前、**前臂横过身前兜住她的背**，手落在她另一侧的肩，
+    // 头压低偏向她那边；另一只手护在她后脑。这是一对姿势，配 leanIn 一起看。
+    target.hipY = -0.08; target.hipX = 0.03;
+    target.torso = 16 * DEG; target.head = -30 * DEG;
+    target.armF = -58 * DEG; target.foreF = -96 * DEG;   // 前臂横过来兜背
+    target.armB = -42 * DEG; target.foreB = -78 * DEG;   // 另一只手护后脑
     target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
     target.thighF = 10 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
   } else if (s.pose === "pressed") {
@@ -469,11 +472,12 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -104 * DEG; target.shinB = 104 * DEG; target.footB = 14 * DEG;
     target.thighF = -88 * DEG; target.shinF = 96 * DEG; target.footF = 12 * DEG;
   } else if (s.pose === "leanIn") {
-    // 把额头抵在别人肩上：脖子前倾贴过去，手垂着
-    target.hipY = -0.04; target.hipX = 0.06;
-    target.torso = 20 * DEG; target.head = -34 * DEG;
-    target.armB = -12 * DEG; target.foreB = -16 * DEG;
-    target.armF = -16 * DEG; target.foreF = -20 * DEG;
+    // 把额头抵在别人肩上：整个人往对方那边倒过去（不只是脖子前伸），
+    // 两只小手蜷在自己胸口——不是垂着，那是站军姿。配 shelter 一起看
+    target.hipY = -0.05; target.hipX = 0.10;
+    target.torso = 26 * DEG; target.head = -40 * DEG;
+    target.armB = -34 * DEG; target.foreB = -84 * DEG;
+    target.armF = -30 * DEG; target.foreF = -88 * DEG;
     target.thighB = -10 * DEG; target.shinB = 12 * DEG; target.footB = -4 * DEG;
     target.thighF = 8 * DEG; target.shinF = 6 * DEG; target.footF = -6 * DEG;
   } else if (s.pose === "mark") {

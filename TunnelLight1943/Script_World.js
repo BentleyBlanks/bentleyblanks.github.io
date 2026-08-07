@@ -1953,7 +1953,12 @@ export function CreateWorld(canvasEl) {
       mountMeshes.set(a.id, m);
     }
     m.visible = true;
-    PlaceSprite(m, a.x, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    // 车的贴图中心不是**座位**：自行车的鞍座画在中心偏后 9px、摩托偏后 1px。
+    // 演员站在自己的 x 上，所以车要往前挪那么多，人才是「坐在座上」而不是
+    // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
+    const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
+    const dir = a.heading > 0 ? -1 : 1;
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
     m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
   }
 

@@ -1182,11 +1182,40 @@ function TestRaidColumn() {
   console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
 }
 
+// 过场的演出不许站在路障里。obstacle 带的东西（塌墙、撞倒的柴垛）比演员近，
+// 谁站在它坐标上谁就被整个盖住——c1_father 的审问戏曾经就跪在柴垛（x=38）里，
+// 一整场戏只看得见一根枪管（用户截图为证）。这条盯的是"演员与路障的水平间距"。
+function TestCineActorsClearOfObstacles() {
+  const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const list = ChapterBeatList(0);
+  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_father"));
+  const scene = SCENES.village;
+  const bad = [];
+  for (let i = 0; i < 3000; i += 1) {
+    StepGame(state, { ...NONE, advance: false }, DT);
+    for (const a of state.actors) {
+      if (a.visible === false || a.level !== "surface" || a.decor) continue;
+      for (const v of scene.vaults || []) {
+        if (v.flag && !state.flags[v.flag]) continue;
+        // 半宽 + 半个身位：贴着站没关系，压在正中间就是被吞
+        const clear = (v.w || 1) / 2 + 0.35;
+        if (Math.abs(a.x - v.x) < clear) bad.push(`${a.id}@${a.x.toFixed(1)} 压在路障 ${v.x} 上`);
+      }
+    }
+    if (bad.length) break;
+    if (state.phase !== "playing") break;
+  }
+  assert.equal(bad.length, 0, `过场演员被路障挡住：${bad.slice(0, 3).join("；")}`);
+  console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
+TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestKnotKeyboardFallback();

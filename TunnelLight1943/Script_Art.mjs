@@ -2119,29 +2119,55 @@ export function DrawHen(ctx, x, y, id, k = 0.55) {
 }
 
 // 倒塌的柴垛：可翻越（肩高、顶沿有缺口）——扫荡中撞翻的那一堆
+// 撞塌的柴垛：**摊开的一堆劈柴，不是一个麻袋**。
+// 老版画的是一整块 1.08m 高的多边形色块，比 sprite 画布还高、顶上被裁平，
+// 读起来就是「路当中戳着一口麻袋」（用户原话：这什么鬼）。现在改成
+// 一根根横七竖八的柴：塌下来只有 0.72m＝柱子的胯高（34px），跨得过去。
+// 轮廓语法仍在：中间略高、右边塌下去豁一个口、顶沿被踩得发亮。
 export function DrawFallenWood(ctx, x, groundY, id) {
-  // 底层散开的柴
-  for (let i = 0; i < 6; i += 1) {
-    const lx = x - 26 + i * 10 + Sym(id + "l" + i, 0, 4);
+  const H = 34;                       // 0.72m × 48px/m —— 与 vaults[].top 对齐
+  const W = 77;                       // 1.6m 宽，与 vault 的 w 对齐
+  // 一根柴：中间粗两头略收的短棒，带一条木纹
+  const Log = (cx, cy, len, ang, dark) => {
     ctx.save();
-    ctx.translate(lx, groundY - 5);
-    ctx.rotate(Sym(id + "r" + i, 1, 0.5));
-    InkFill(ctx, Rect(-16, -4, 32, 7), id + "log" + i, i % 2 ? "#8a6a45" : "#7a5a38",
-      { amp: 1, lw: 2 });
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    InkFill(ctx, [
+      [-len / 2, -3.2], [len / 2, -2.6], [len / 2 + 2, 0], [len / 2, 2.6],
+      [-len / 2, 3.2], [-len / 2 - 2, 0],
+    ], id + "lg" + cx + cy, dark ? "#7a5a38" : "#946f42", { amp: 0.7, lw: 1.8 });
+    InkLine(ctx, -len / 2 + 3, -0.6, len / 2 - 3, 0.4, id + "gr" + cx + cy,
+      { lw: 0.9, color: "rgba(60,42,24,0.5)", amp: 0.4 });
     ctx.restore();
+  };
+  // ① 塌到最外圈的几根：贴地、散得最开（左右各探出去一点）
+  for (let i = 0; i < 5; i += 1) {
+    const t = i / 4;
+    Log(x - W / 2 - 4 + t * (W + 8), groundY - 3.5 + Sym(id + "o" + i, 0, 1.6),
+      20 + Hash(id + "ow" + i) * 12, Sym(id + "oa" + i, 1, 0.16), i % 2 === 0);
   }
-  // 斜塌的主堆：一头高一头塌，顶沿一个缺口（可翻越的轮廓语法）
-  InkFill(ctx, [
-    [x - 30, groundY], [x - 26, groundY - 40], [x - 8, groundY - 52], [x + 2, groundY - 44],
-    [x + 10, groundY - 50], [x + 26, groundY - 30], [x + 32, groundY],
-  ], id + "pile", "#96703f", { amp: 2.4, lw: 2.6, shade: "rgba(0,0,0,0.22)" });
-  // 顶沿磨亮
-  InkLine(ctx, x - 10, groundY - 52, x + 4, groundY - 45, id + "worn", { lw: 2.6, color: "rgba(240,225,180,0.85)", amp: 1 });
-  // 几根戳出来的柴梢
-  for (let i = 0; i < 4; i += 1) {
-    InkLine(ctx, x - 18 + i * 11, groundY - 36 - Hash(id + "t" + i) * 12,
-      x - 24 + i * 11, groundY - 52 - Hash(id + "t2" + i) * 10, id + "tip" + i,
-      { lw: 2, color: "#5c4328" });
+  // ② 中间那一摞：还叠着，但已经垮成一道缓坡——左高右塌，右肩就是缺口
+  const rows = 4;
+  for (let r = 0; r < rows; r += 1) {
+    const y = groundY - 7 - r * (H - 10) / rows;
+    // 越往上越窄，且整体向右下垮（塌的方向）
+    const spanL = x - W / 2 + 6 + r * 4;
+    const spanR = x + W / 2 - 10 - r * 11;
+    const n = Math.max(2, Math.round((spanR - spanL) / 17));
+    for (let i = 0; i < n; i += 1) {
+      const px = spanL + (n === 1 ? 0 : i * (spanR - spanL) / (n - 1));
+      Log(px, y + Sym(id + "m" + r + i, 0, 1.2), 16 + Hash(id + "mw" + r + i) * 8,
+        Sym(id + "ma" + r + i, 1, 0.13), (r + i) % 2 === 0);
+    }
+  }
+  // ③ 顶沿磨亮：天天有人手撑着翻过去的那条线（只在左半边——右边是豁口）
+  InkLine(ctx, x - W / 2 + 8, groundY - H + 2, x + 2, groundY - H + 6, id + "worn",
+    { lw: 2.4, color: "rgba(240,225,180,0.8)", amp: 0.9 });
+  // ④ 两根从堆里斜戳出来的柴梢：矮堆也要有轮廓的"刺"，一眼认出是柴不是土
+  for (let i = 0; i < 2; i += 1) {
+    const bx = x - 12 + i * 22;
+    InkLine(ctx, bx, groundY - 12 - i * 4, bx - 9 + i * 18, groundY - H - 3 - Hash(id + "t" + i) * 5,
+      id + "tip" + i, { lw: 2.2, color: "#5c4328", amp: 0.8 });
   }
 }
 
