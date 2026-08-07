@@ -297,6 +297,9 @@ body.touchDevice #touchControls {
   transition: opacity 0.3s;
 }
 body.touchDevice #touchControls.dimmed { opacity: 0.28; }
+/* 划线那一拍：整张特写卡就是操作面，摇杆和按钮全让开（那一拍走不动路，
+   留着只会把落在小臂上的手指截走） */
+body.touchDevice #touchControls.gone { display: none; }
 /* 摇杆：一个盘子 + 一个跟着手指走的钮。走路是横推，爬梯下地道是竖推——
    两个动作共用一根拇指，右手就只剩蹲和动手两个键。 */
 #stick {

@@ -72,8 +72,9 @@ npm run scene:tunnelLight1943
 
 | 交互形态 | 输入 | 范例 |
 |---|---|---|
-| 长推（有始有终的一趟） | `input.dragX` 位移驱动 | 刨子（停半道刨花断）、门框划线 |
-| 攥住拖（工具在指尖） | `input.pointerWorld` 抓住实物 | 石笔（有摩擦、抓不稳会脱手） |
+| 长推（有始有终的一趟） | `input.dragX` 位移驱动 | 刨子（停半道刨花断） |
+| 攥住拖（工具在指尖） | `input.pointerWorld` 抓住实物 | 辘轳把手、绳头 |
+| 在特写卡上攥住拖 | `input.pointerCard` 抓住卡上的实物 | 石笔（有摩擦、抓不稳会脱手） |
 | 绕圈（轴/结） | `pointerWorld` 绕轴心累计转角 | 辘轳（顺放逆收、脱手倒转）、接绳缠圈 |
 | 笔画做功（一下一下干） | `StrokeWork`：down/up/circle | 挖土、按棉被、顶撑木、拴铃、装引信、撬地沿 |
 | 竖拽 | `input.pull/pullHeld` | 勒紧绳结 |
@@ -86,9 +87,23 @@ npm run scene:tunnelLight1943
    刨刃啃住、辘轳倒转、结松开、功慢慢泄掉。
 2. **长按+进度环只保留给"保持一个状态"的动作**（听、憋住别动、别松手）：
    那量的是时间本身，不是功——声明 `sustain: true`。
+   同理，**做功的那一拍画面里不许出现任何可拖的 HUD 轨道**（`state.dragTrack`）：
+   只要有一根条，玩家就永远去拖那根条，被动道具白做。划线这一拍由 SmokeTest
+   逐帧盯着 `state.dragTrack === null`，别再把它加回来。
+   （目前只剩刨料还挂着这根轨道 —— 那一拍拖的是整个画宽、刨子本体也在动，
+   还没轮到它；新玩法一律不许再用。）
 3. **手势要贴着做功的方向**：铲土往下、撑木往上、拴绳绕圈（`stroke:` 声明在
    step/beat 上）。方向不对不涨——铲子不往上抡。
 4. **指尖功夫推特写**（`state.closeUp`：辘轳、打结）；抡膀子的活保持中景。
+   **手指按不着的东西，推镜头是治不好的**——世界里那支石笔只有 9 厘米，
+   1.9 米的特写下也才十来个像素，玩家只好去够旁边那根 QTE 轨道，"攥住一支笔"
+   当场退化成拖 slider。这类"指尖上的小物件"改用**铺满画框的手绘活卡**：
+   `state.scribeCard` → `Art.DrawScribeCard` 每帧重画，`World.SetLiveCard` 摆位
+   （复用插入特写卡那套铺满逻辑），手落在卡上的位置由 `World.ScreenToCard` 换算
+   成 `input.pointerCard`（u 沿卡宽 / v 沿卡高）。版面只有一份：Core 的
+   `SCRIBE_CARD`，判定与作画共用，绝不许在 Art 里另抄一套坐标。
+   构图有一条硬规矩：**握把要在做功方向的后上方**，手不能压住刚做出来的功
+   （拳头盖住刚划出的印子 = 又看不见进度了，那正是拿掉进度条要换来的东西）。
 5. **键盘必须是完整后备**：按住 E = 慢速自动做功（`StrokeWork` 内建 0.85×）。
    自动通关测试只按键盘（W/S/E/F），漏了后备 SmokeTest 会卡死。
 6. HUD 手势提示走 `state.gesture`（dragDown/pullUp/circle/crankDown/crankUp/tap），

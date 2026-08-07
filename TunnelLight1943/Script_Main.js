@@ -3,7 +3,7 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
-  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS,
+  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 import { CreateSoundtrack } from "./Script_Soundtrack.js?v=038";
@@ -144,9 +144,13 @@ window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
 // 沉浸式手势的唯一入口：手按在画面上的**世界坐标**（不是屏幕位移），
 // 加上横竖两路拖动量与点按。所有上手的玩法都从这几样里取——
-// 攥石笔靠 world（手得真落在笔上）、转辘轳/打结靠 world 绕圈、
-// 刨料靠 dx（拖过 45% 画宽=一整趟）、勒紧靠 dy。
-const gest = { active: false, id: null, lastX: 0, lastY: 0, dx: 0, dy: 0, downT: 0, moved: 0, world: null };
+// 转辘轳/打结靠 world 绕圈、刨料靠 dx（拖过 45% 画宽=一整趟）、勒紧靠 dy。
+// 攥石笔靠 card：那一拍画面是一张铺满画框的特写卡，玩家按的是卡上那支笔，
+// 世界坐标在那儿没有意义（世界里的笔只有十来个像素，按不着）。
+const gest = {
+  active: false, id: null, lastX: 0, lastY: 0, dx: 0, dy: 0, downT: 0, moved: 0,
+  world: null, card: null,
+};
 let tapEdge = false;
 canvas.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "touch" || e.pointerType === "pen") inputMode = "touch";
@@ -161,6 +165,7 @@ canvas.addEventListener("pointerdown", (e) => {
   gest.dx = 0;
   gest.dy = 0;
   gest.world = world.ScreenToWorld(e.clientX, e.clientY);
+  gest.card = world.ScreenToCard(e.clientX, e.clientY);
   // 捕获是锦上添花：手滑出画布还能接着操。指针已抬起或是合成事件时它会抛，
   // 不接住会把整个 handler 断在这儿
   try { canvas.setPointerCapture?.(e.pointerId); } catch (ignored) { /* 捕获不到就算了 */ }
@@ -175,6 +180,7 @@ canvas.addEventListener("pointermove", (e) => {
   gest.lastX = e.clientX;
   gest.lastY = e.clientY;
   gest.world = world.ScreenToWorld(e.clientX, e.clientY);
+  gest.card = world.ScreenToCard(e.clientX, e.clientY);
 });
 for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
   canvas.addEventListener(evt, (e) => {
@@ -434,6 +440,10 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
   }
+  // 划线的活卡：铺满画框、每帧重画，玩家的手就按在上面。必须排在
+  // SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera 之前
+  //（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
+  world.SetLiveCard(state.phase === "playing" ? state.scribeCard : null, SCRIBE_CARD, dt);
 
   if (camSnap) {
     cam.x = shot.x; cam.y = shot.y; cam.hw = shot.hw;
@@ -708,9 +718,10 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线那一拍没有 HUD：玩家攥的是画面里那支笔，进度就是木头上那道印子本身。
-  // 刨料仍有一条拖动 QTE 轨道（state.dragTrack）：旋钮跟着推程走，
-  // 没动起来时轻轻晃一下招呼玩家来拖；推到头要拖回来时轨道翻个方向。
+  // 划线那一拍**一格 HUD 都没有**：玩家攥的是特写卡上那支笔，进度就是木头上
+  // 那道印子本身，招呼玩家来拿也是笔自己在晃（StepScribe 从不写 dragTrack，
+  // SmokeTest 盯着这一条）。刨料仍有一条拖动 QTE 轨道（state.dragTrack）：
+  // 旋钮跟着推程走，没动起来时轻轻晃一下招呼玩家来拖；推到头要拖回来时轨道翻个方向。
   if (ui.scribeGuide) {
     const dt2 = state.dragTrack;
     ui.scribeGuide.hidden = !dt2 || inCinematic;
@@ -730,6 +741,9 @@ function SyncHud(state, dt, shotFade) {
   }
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
+    // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
+    // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
+    ui.touchControls.classList.toggle("gone", !!state.scribeCard && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {
@@ -1036,6 +1050,7 @@ function RunFrame(now, dt) {
       dragX: gest.active ? gest.dx : 0,
       pointerHeld: gest.active,
       pointerWorld: gest.world,
+      pointerCard: gest.card,
       tap: tapEdge,
       advance: advanceEdge,
     }, stepDt);
