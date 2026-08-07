@@ -93,7 +93,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine", "scribeGuide",
+  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
 ]) ui[id] = document.getElementById(id);
 
@@ -529,7 +529,6 @@ function KeyChipHtml(act) {
   return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
 }
 
-let dragTipShown = "";             // QTE 轨道那行小字（换了才重写 DOM）
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
 let actShown = "";                 // 换了文案/设备才重排 DOM
 
@@ -708,26 +707,11 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线那一拍没有 HUD：玩家攥的是画面里那支笔，进度就是木头上那道印子本身。
-  // 刨料仍有一条拖动 QTE 轨道（state.dragTrack）：旋钮跟着推程走，
-  // 没动起来时轻轻晃一下招呼玩家来拖；推到头要拖回来时轨道翻个方向。
-  if (ui.scribeGuide) {
-    const dt2 = state.dragTrack;
-    ui.scribeGuide.hidden = !dt2 || inCinematic;
-    if (dt2) {
-      ui.scribeGuide.style.setProperty("--fill", (dt2.t * 100).toFixed(1) + "%");
-      ui.scribeGuide.classList.toggle("idle", !!dt2.idle);
-      ui.scribeGuide.classList.toggle("back", !!dt2.back);
-      // 怎么操作要说清楚，而且按当前设备说：鼠标玩家听不懂"拖"是拖什么。
-      // （刨料那一拍是纯拖动——键盘在这个动作上没有对应物。）
-      const how = dt2.drag ? (inputMode === "touch" ? "　·　用手指拖" : "　·　按住鼠标左键拖") : "";
-      const line = dt2.tip + how;
-      if (dragTipShown !== line) {
-        dragTipShown = line;
-        ui.scribeGuide.querySelector(".tip").textContent = line;
-      }
-    }
-  }
+  // 划线与刨料都没有 HUD 轨道：玩家攥的是画面里那支笔、那把刨子本身，
+  // 进度就是木头上那道印子、被刨亮的那一片和地上那堆刨花。
+  // （这里曾有一条 QTE 轨道，等于把"操作一件工具"降级成"拖一根 slider"，
+  //   用户两次退回，别再加回来。）
+
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
   }

@@ -884,6 +884,11 @@ function StepCartRide(state, def, input, dt) {
 //
 // 输入与划线同一套语汇（位移驱动）：桌面按住 E 往前推，触屏直接把刨子拖过去。
 // 顺纹（+x）才吃木头，回程只是把刨子拖回来——木匠不会倒着刨。
+// 攥住刨子的判定半径 / 脱手高度 / 刨子跟手的最快行程（每秒推过全长的几成）
+const PLANE_GRAB_R = 0.30;
+const PLANE_SLIP_Y = 0.26;
+const PLANE_SPEED = 0.85;
+
 function StepPlane(state, def, input, dt) {
   const b = state.beat;
   const father = FindActor(state, "father");
@@ -960,19 +965,41 @@ function StepPlane(state, def, input, dt) {
   state.player.x = workX;
   state.player.heading = 1;
 
-  // ── 推刨：拖动为主 ──
-  // 刨是"把它推过去"的动作，对应的操作就该是把它推过去：鼠标按住拖 / 手指拖。
-  // input.dragX 是位移量——拖多少走多少，手上有"蹭着木头走"的实感。
+  // ── 推刨：玩家攥的是**那把刨子本身**，不是一根进度条 ──
   //
-  // 键盘留一条等价后备（CLAUDE.md 的硬要求：自动通关只按键盘，鼠标玩法必须有
-  // 按键路径，否则测试卡死）：**光按住 E 就往前推**，不掺 A/D。上一版要
-  // "按住 E 再按 D"，于是 D 单独按下去就是走路——玩家一路走出了工位。
-  // 这一拍人本来就钉在台前，A/D 不参与，冲突从根上没了。
-  // 键盘后备只认"按住 E"一个键，方向由这一趟的状态给：还没推到头就往前推，
-  // 推到头了就往回带。玩家不用去想方向，也就不会和走路抢键。
+  // 规矩与石笔同源（见 CLAUDE.md「拟物交互」）：
+  //   ① **得先攥住它**——按下去那一帧，手必须落在刨子上（PLANE_GRAB_R 之内）。
+  //      在画面别处一拖，刨子不动。这是"操作一把刨子"与"拖一根 slider"
+  //      最根本的区别，也是这一拍被退回来重做的原因。
+  //   ② **刨子有分量**——它跟着手走，但每秒最多蹭 PLANE_SPEED 的行程。手甩得
+  //      再快，刨子也只能一寸寸吃过去，那点滞后就是刨刃啃在木头上的手感。
+  //   ③ **会脱手**——手飘离料面太高太低（PLANE_SLIP_Y），刨子从手里滑掉，
+  //      这一趟当场断在那儿（刨刃啃住，出来的是碎屑）。
+  //
+  // 键盘留一条等价后备（自动通关只按键盘）：光按住 E 就往前推，不掺 A/D——
+  // 这一拍人钉在台前，A/D 不参与，"按住 E 再按 D 结果走开了"那个冲突从根上没了。
+  const boardY = SURFACE_Y + (def.boardY ?? 0.60);
+  const toolX = bx - span / 2 + b.u * span;      // 刨子此刻在料上的位置
+  const pw = input.pointerWorld;
+  const held = !!input.pointerHeld && !!pw;
+  if (held && !b.wasHeld) {
+    b.grabbed = Math.hypot(pw.x - toolX, pw.y - boardY) < PLANE_GRAB_R;
+    if (b.grabbed) Cue(state, "pickup", { gain: 0.3 });
+  }
+  if (!held) b.grabbed = false;
+  b.wasHeld = held;
+  if (b.grabbed && Math.abs(pw.y - boardY) > PLANE_SLIP_Y) b.grabbed = false;
+
+  let dv = 0;
+  if (b.grabbed) {
+    const target = Math.max(0, Math.min(1, (pw.x - (bx - span / 2)) / span));
+    const step = PLANE_SPEED * dt;
+    dv = Math.max(-step, Math.min(step, target - b.u));
+  }
+  // 键盘后备：方向由这一趟的状态给（没推到头往前，推到头往回带），
+  // 玩家不用想方向，也就不会和走路抢键
   const keyDir = b.armed ? 1 : -1;
-  const dv = (input.dragX || 0)
-    + (input.interactHeld ? keyDir * dt * (def.keySpeed ?? 0.55) : 0);
+  if (!b.grabbed && input.interactHeld) dv += keyDir * dt * (def.keySpeed ?? 0.55);
 
   const prevU = b.u;
   b.u = Math.max(0, Math.min(1, b.u + dv));
@@ -1011,18 +1038,13 @@ function StepPlane(state, def, input, dt) {
   state.player.pose = "planePush";
   state.player.poseU = b.u;
   state.player.poseT = undefined;
-  state.prompt = null;                   // 引导交给 QTE 轨道，不占中间那条
-  state.dragTrack = {
-    t: b.u, idle: !b.everMoved,
-    tip: b.armed ? "顺着木纹，一推到底" : "把刨子拖回来",
-    back: !b.armed,
-    drag: true,          // HUD 据此把"怎么操作"按鼠标/手指说清楚
-  };
+  // 这一拍没有 HUD 轨道：玩家攥的是画面里那把刨子，进度就是木头上被刨亮的
+  // 那一片、和地上那堆刨花本身。把它降级成一根 slider 是不行的（用户退回过两次）。
+  state.prompt = null;
   Publish(b.u, true);
 
   if (b.passes >= need) {
     state.planing = null;
-    state.dragTrack = null;
     state.player.pose = null;
     state.player.poseU = undefined;
     if (father) { father.pose = null; father.poseU = undefined; }
@@ -2940,7 +2962,6 @@ export function CreateGame(chapterIndex = 0) {
     mouseFlee: null,
     planing: null,
     planeCurl: null,
-    dragTrack: null,
     spotFlash: null,
     irisFocus: null,
     pip: null,
@@ -3045,7 +3066,6 @@ export function StartChapter(state, index) {
   state.mouseFlee = null;
   state.planing = null;
   state.planeCurl = null;
-  state.dragTrack = null;
   state.spotFlash = null;
   state.irisFocus = null;
   state.pip = null;
@@ -3168,7 +3188,6 @@ function AdvanceBeat(state) {
   state.caption = null;
   state.prompt = null;
   state.planing = null;
-  state.dragTrack = null;
   state.throwAim = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
@@ -4635,8 +4654,7 @@ function StepScribe(state, def, input, dt) {
     state.prompt = "";
     state.scribe = null;
     b.grabbed = false;
-    state.dragTrack = null;
-    return;
+      return;
   }
 
   const y = def.markY ?? 1.25;
@@ -4698,12 +4716,9 @@ function StepScribe(state, def, input, dt) {
     idle: !b.everMoved,
     speed,
   };
-  // 划线与刨料共用同一条 QTE 轨道（两件事都是"把它推过去"）
-  state.dragTrack = { t: b.head, idle: !b.everMoved, tip: "拖着石笔划过去" };
   if (b.drawn >= 1) {
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     state.scribe = null;
-    state.dragTrack = null;
     AdvanceBeat(state);   // onDone 由它统一调，这里再调一次就成了两遍
   }
 }

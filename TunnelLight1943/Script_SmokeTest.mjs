@@ -905,7 +905,31 @@ function TestPlaneBeat() {
   assert.ok(state.planing, "刨料期间台面上必须有那块料");
   assert.ok(Math.abs(state.player.x - workX) < 0.06,
     `示范完必须由节拍把柱子送到工位（现在停在 ${state.player.x.toFixed(2)}，工位 ${workX}）`);
-  assert.ok(state.dragTrack && state.dragTrack.drag, "站到工位就必须亮出拖动轨道，玩家不该猜该干什么");
+  // 玩家攥的是**那把刨子本身**（用户两次退回过 slider）：手没落在刨子上，
+  // 在画面别处怎么拖都不许动
+  const boardY = SURFACE_Y + (def.boardY ?? 0.60);
+  const ToolX = (st) => def.zone.x - (def.span ?? 0.62) / 2 + st.planing.u * (def.span ?? 0.62);
+  {
+    const u0 = state.planing.u;
+    for (let i = 0; i < 30; i += 1) {
+      StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: ToolX(state) + 1.4 + i * 0.02, y: boardY } }, DT);
+    }
+    assert.equal(state.planing.u, u0, "手没抓着刨子，怎么拖都不该推动它");
+    StepGame(state, idle(), DT);   // 松手：攥住只认按下去那一帧
+  }
+  {
+    // 落在刨子上按下去 = 攥住；随后它跟着手走，但有分量（一帧到不了头）
+    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: ToolX(state), y: boardY } }, DT);
+    assert.ok(state.beat.grabbed, "手落在刨子上按下去，必须攥得住");
+    const u1 = state.planing.u;
+    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: def.zone.x + (def.span ?? 0.62), y: boardY } }, DT);
+    assert.ok(state.planing.u > u1, "攥住往前推，刨子必须跟着走");
+    assert.ok(state.planing.u < u1 + 0.2, `刨子有分量，一帧不该窜到 ${state.planing.u}`);
+    // 手抬离料面 → 脱手
+    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: def.zone.x, y: boardY + 0.9 } }, DT);
+    assert.equal(state.beat.grabbed, false, "手飘离料面，刨子必须脱手");
+    StepGame(state, idle(), DT);   // 松手，回到干净状态
+  }
 
   // ① 按住 A/D 不许把人走开——这一拍人钉在台前（上一版按住 D 能一路散步）
   for (let i = 0; i < 40; i += 1) StepGame(state, { ...idle(), moveX: 1 }, DT);
@@ -918,14 +942,16 @@ function TestPlaneBeat() {
 
   // ② 倒着拖不吃木头
   const before = state.planing.smooth;
-  for (let i = 0; i < 20; i += 1) StepGame(state, { ...idle(), dragX: -0.05 }, DT);
+  for (let i = 0; i < 24; i += 1) {
+    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: ToolX(state) - 0.06, y: boardY } }, DT);
+  }
   assert.equal(state.planing.smooth, before, "回程不该刨掉木头");
 
   // ③ 一趟推到底：刨花出来、木头亮一分
   let guard = 0;
   while (state.planing && state.planing.smooth === before && guard < 400) {
     guard += 1;
-    StepGame(state, { ...idle(), dragX: 0.05 }, DT);
+    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: def.zone.x + (def.span ?? 0.62), y: boardY } }, DT);
   }
   assert.ok(state.planing === null || state.planing.smooth > before, "一趟推到底必须刨掉一层");
   assert.ok(state.flags.planedOnce, "第一趟推完必须落旗");
@@ -934,12 +960,16 @@ function TestPlaneBeat() {
   const s2 = CreateGame(0);
   DebugJump(s2, 0, beats.indexOf("c1_tenon"));
   for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
-  for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
-  for (let i = 0; i < 20; i += 1) StepGame(s2, idle(), DT);          // 停在半道
+  const bY2 = SURFACE_Y + (def.boardY ?? 0.60);
+  const far2 = def.zone.x + (def.span ?? 0.62);
+  const Tool2 = () => def.zone.x - (def.span ?? 0.62) / 2 + s2.planing.u * (def.span ?? 0.62);
+  StepGame(s2, { ...idle(), pointerHeld: true, pointerWorld: { x: Tool2(), y: bY2 } }, DT);   // 攥住
+  for (let i = 0; i < 8; i += 1) StepGame(s2, { ...idle(), pointerHeld: true, pointerWorld: { x: far2, y: bY2 } }, DT);
+  for (let i = 0; i < 20; i += 1) StepGame(s2, { ...idle(), pointerHeld: true, pointerWorld: { x: Tool2(), y: bY2 } }, DT);  // 停在半道
   let g2 = 0, curlLen = null;
   while (s2.planing && g2 < 400) {
     g2 += 1;
-    StepGame(s2, { ...idle(), dragX: 0.05 }, DT);
+    StepGame(s2, { ...idle(), pointerHeld: true, pointerWorld: { x: far2, y: bY2 } }, DT);
     if (s2.planeCurl && curlLen === null) { curlLen = s2.planeCurl.len; break; }
   }
   assert.ok(curlLen !== null && curlLen < 1, "顿过的那一趟，刨花必须短一截");
@@ -952,11 +982,11 @@ function TestPlaneBeat() {
     g3 += 1;
     const t = GetBeatTarget(s3);
     const inp = idle();
-    if (t?.action === "planeAt") inp.dragX = t.back ? -0.05 : 0.05;
+    if (t?.action === "planeAt") inp.interactHeld = true;   // 键盘后备：方向由这一趟的状态给
     StepGame(s3, inp, DT);
   }
   assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
-  console.log("  ✓ 刨料：镜头推近 / 顺纹才吃木 / 顿一下刨花短 / 推得完");
+  console.log("  ✓ 刨料：抓不住就推不动 / 有分量 / 会脱手 / 顺纹才吃木 / 顿一下刨花短 / 推得完");
 }
 
 function TestQuieterAudioMix() {
