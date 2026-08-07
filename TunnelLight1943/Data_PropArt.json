@@ -119,6 +119,29 @@
       "sprite": { "w": 80, "h": 90, "anchor": "center", "baseline": 8 },
       "note": "地道里的水瓮（level: under）。原先在代码里写死 z=0.2 绕开了深度带，externalize 时归入 loose"
     },
+    "yardWall": {
+      "art": "DrawYardWall", "band": "building", "ss": "prop",
+      "sprite": { "w": { "pad": 30, "per": "w" }, "h": 110, "anchor": "center", "baseline": 8 },
+      "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人"
+    },
+    "henCoop": {
+      "art": "DrawHenCoop", "band": "yard", "ss": "prop",
+      "sprite": { "w": 70, "h": 66, "anchor": "center", "baseline": 8 }
+    },
+    "clothesline": {
+      "art": "DrawClothesline", "band": "yard", "ss": "prop",
+      "sprite": { "w": 130, "h": 110, "anchor": "center", "baseline": 8 }
+    },
+    "tuberPile": {
+      "art": "DrawTuberPile", "band": "walk", "ss": "prop",
+      "sprite": { "w": 76, "h": 50, "anchor": "center", "baseline": 6 },
+      "note": "地窖里过冬的红薯堆，搭半领草苫（level: under 的陈设）"
+    },
+    "cellarShelf": {
+      "art": "DrawCellarShelf", "band": "walk", "ss": "prop",
+      "sprite": { "w": 96, "h": 90, "anchor": "center", "baseline": 8 },
+      "note": "地窖搁板：木桩架旧板，荆条筐+布盖坛（level: under 的陈设）"
+    },
     "mapBoard": {
       "art": "DrawMapBoard", "band": "nearBack", "ss": "prop",
       "sprite": { "w": 140, "h": 112, "anchor": "center", "baseline": 8 },

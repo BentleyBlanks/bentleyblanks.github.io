@@ -1363,6 +1363,12 @@ export const SCRIPTS = {
         // 惊变时刻旁白闭嘴、同期声接管：村口是画外真人的喊声，不是叙事者的转述
         { who: "村口喊声", say: "鬼子进村了——", d: 3.0, far: true, cam: { kind: "wide", x: 140, pan: -6 },
           on: (state) => {
+            // 喊声一起，街上干活的乡亲四散躲回家——镜头此刻在村东口，
+            // 他们不在画框里，直接收掉即可；raidStarted 旗标同时把鸡藏了
+            for (const vid of ["auntFeed", "oldSweep"]) {
+              const v = FindActor(state, vid);
+              if (v) { v.visible = false; v.track = null; }
+            }
             // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
             // 于是"鬼子进村了"这一句对着的是一个空村口
             SpawnRaidSoldiers(state);
@@ -2965,6 +2971,11 @@ export function StartChapter(state, index) {
       MakeActor("father", "father", 41, { label: "爹" }),
       MakeActor("mother", "family", 36, { label: "娘" }),
       MakeActor("sister", "sister", V.sisterTree.x + 1, { label: "妹妹" }),
+      // 街上还有别人家的日子在过：李婶在鸡窝前撒食，东头的老汉扫院。
+      // 人人手上有活的规矩不只管自家人——一条整街只有一家四口才是真的说不过去。
+      // 鬼子进村的喊声一起就都收进屋（c1_raid 第一行），鸡跟着 raidStarted 旗标藏
+      MakeActor("auntFeed", "villager", 65.8, { label: "李婶", heading: -1, track: { name: "scatterFeed", t: 0, ambient: true } }),
+      MakeActor("oldSweep", "villager", 145.5, { label: "扫院的老汉", heading: 1, carry: "扫帚", track: { name: "sweeping", t: 0, ambient: true } }),
     );
   } else if (ch.id === "c2") {
     state.player.x = 38;
@@ -3298,6 +3309,27 @@ export function StepGame(state, input, dt) {
       state.flags.thimbleFound = true;
       Cue(state, "pickup");
       state.toast = { text: "一枚铜顶针。娘纳鞋底时顶针眼用的，不知什么时候滚到了墙根。", t: 5 };
+    }
+  }
+  // 邻居家的细节（scene.lookables）：白天路过看一眼，出一条手记。
+  // 村子不是布景——每一眼都是别人家正在过的日子。每章每处一次；
+  // 夜里/潜行中不出（那时候没人有闲心看鸡窝）
+  {
+    const ch = CHAPTERS[state.chapterIndex];
+    const lookables = SCENES[ch.scene].lookables;
+    const daylight = !["night", "dark", "tunnel"].includes(ch.light || "day");
+    if (lookables && daylight && !state.stealthActive && !state.prompt
+      && !state.microCine && state.player.level === "surface") {
+      for (const spot of lookables) {
+        if (state.lookSeen?.[spot.id]) continue;
+        if (Math.abs(state.player.x - spot.x) > (spot.w || 1.4)) continue;
+        state.prompt = "E · 看一眼";
+        if (input.interact) {
+          (state.lookSeen ??= {})[spot.id] = true;
+          state.toast = { text: spot.note, t: 5 };
+        }
+        break;
+      }
     }
   }
 

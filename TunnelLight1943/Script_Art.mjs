@@ -768,6 +768,15 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     InkLine(ctx, 0, -12 * S, 0, 25 * S, "hoeShaft", { lw: 1.15 * S, color: "#8d6236" });
     InkFill(ctx, [[-1.2 * S, 23.5 * S], [5.2 * S, 26.5 * S], [6.6 * S, 30.5 * S], [1.2 * S, 28 * S]],
       "hoeBlade", "#6b6f76", { amp: 0.4 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.25)" });
+  } else if (label === "扫帚") {
+    // 大扫帚：竹柄扎一蓬糜子苗，柄顺前臂、苗蹭着地。握点在柄上三分之一
+    InkLine(ctx, 0, -10 * S, 0, 22 * S, "broomShaft", { lw: 1.7 * S, color: "#7a5433" });
+    for (let i = 0; i < 6; i += 1) {
+      const spread = (i - 2.5) * 1.9 * S;
+      InkLine(ctx, 0, 21 * S, spread, 31 * S - Math.abs(i - 2.5) * 0.8 * S,
+        "broomTwig" + i, { lw: 1.3 * S, color: i % 2 ? "#8f7a43" : "#6f5c35", amp: 1.1 });
+    }
+    InkLine(ctx, -1.8 * S, 21.5 * S, 1.8 * S, 21.5 * S, "broomBind", { lw: 1 * S, color: "#6b5136" });
   } else if (label === "满桶水" || label === "一桶水" || label === "空桶") {
     DrawCarry(ctx, 0, 0, S, 1, "水桶");
     if (label !== "空桶") {
@@ -786,13 +795,21 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     InkFill(ctx, [[-5.5 * S, 3 * S], [-4 * S, -3.5 * S], [0, -6 * S], [4 * S, -3.5 * S], [5.5 * S, 3 * S]],
       "bun", "#c8a35c", { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.16)" });
   } else if (label === "麻绳") {
+    // 一盘草绳：圈要小（真绳盘也就半尺），留一截绳头耷拉出来才读得出是绳。
+    // 原先半径给到 (4+2×2.2)×S，落地物又按 S=2 画——地上躺一个磨盘大的甜甜圈
     ctx.strokeStyle = "#9a7d4f";
-    ctx.lineWidth = 2.2 * S;
+    // 线宽必须小于圈距（1.9×S），不然三圈糊成一块饼
+    ctx.lineWidth = 1.1 * S;
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
-      ctx.arc(0, 0, (4 + i * 2.2) * S, 0.3 + i * 0.5, Math.PI * 1.8 + i * 0.4);
+      ctx.arc(0, 0, (2.2 + i * 1.9) * S, 0.3 + i * 0.5, Math.PI * 1.8 + i * 0.4);
       ctx.stroke();
     }
+    ctx.beginPath();
+    ctx.moveTo(5.2 * S, 1.6 * S);
+    ctx.quadraticCurveTo(8.2 * S, 3.4 * S, 9.4 * S, 6.6 * S);
+    ctx.lineWidth = 1.4 * S;
+    ctx.stroke();
   } else if (label === "铃铛") {
     InkFill(ctx, [[-4.5 * S, 2 * S], [-3.5 * S, -4 * S], [0, -5.5 * S], [3.5 * S, -4 * S], [4.5 * S, 2 * S]],
       "bell", "#a9915a", { amp: 0.35 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
@@ -933,12 +950,12 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
   ctx.fillStyle = eave;
   ctx.fillRect(x - W / 2, groundY - H, W, H * 0.26);
   ctx.restore();
-  // 剥落与旧联的残纸
+  // 剥落与旧联的残纸：只贴墙上半段——落到门窗边上就成了一块悬空的方牌
   for (let i = 0; i < 3; i += 1) {
     const px = x - W / 2 + 14 + Rnd(id + "pl", i) * (W - 28);
-    const py = groundY - H * (0.3 + Rnd(id + "pl2", i) * 0.5);
+    const py = groundY - H * (0.56 + Rnd(id + "pl2", i) * 0.24);
     InkFill(ctx, [[px, py], [px + 10, py - 4], [px + 13, py + 9], [px + 2, py + 11]],
-      id + "peel" + i, "#b9a37e", { amp: 1.2, lw: 1.4, line: "rgba(43,31,22,0.35)" });
+      id + "peel" + i, "#c3ae8a", { amp: 1.2, lw: 1.2, line: "rgba(43,31,22,0.18)" });
   }
   // 墙基石
   InkFill(ctx, Rect(x - W / 2, groundY - H * 0.16, W, H * 0.16), id + "base", PAL.wallShade, { amp: 1.2, lw: 2 });
@@ -1125,12 +1142,98 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
       { lw: 1, color: "rgba(90,72,52,0.45)", amp: 1.4 });
   }
   Speckle(ctx, x - w / 2, groundY - h, w, h, id + "sp", { count: 16, alpha: 0.12 });
+  // 墙根：塌下来的碎土坯壅在脚下，两头淌开——没有这一堆，断墙就是一块
+  // 悬着的白纸板；断墙的"断"也正是从墙根的碎处读出来的
+  InkFill(ctx, [
+    [x - w / 2 - 9, groundY], [x - w / 2 - 3, groundY - 6 - Rnd(id + "fL", 1) * 4],
+    [x - w * 0.24, groundY - 9 - Rnd(id + "fM", 2) * 4], [x + w * 0.2, groundY - 8],
+    [x + w / 2 + 2, groundY - 5 - Rnd(id + "fR", 3) * 4], [x + w / 2 + 9, groundY],
+  ], id + "foot", burnt ? "#4a4038" : "#a8926c", { amp: 1.6, lw: 1.8, shade: "rgba(0,0,0,0.16)" });
+  for (let i = 0; i < 4; i += 1) {
+    const bx = x - w / 2 + 4 + Rnd(id + "brk", i) * (w - 14);
+    InkFill(ctx, Rect(bx, groundY - 5 - Rnd(id + "brk2", i) * 4, 9, 5), id + "brick" + i,
+      burnt ? "#3c342c" : "#96805c", { amp: 0.8, lw: 1.2 });
+  }
   // 墙头草
   for (let i = 0; i < 4; i += 1) {
     const gx = x - w / 2 + 6 + Rnd(id, i) * (w - 12);
     InkLine(ctx, gx, groundY - h, gx + Sym(id, i + 5, 4), groundY - h - 7 - Rnd(id, i + 9) * 5,
       id + "g" + i, { lw: 1.2, color: burnt ? "#5a5348" : "#7d8c4a" });
   }
+}
+
+// 邻家院墙：一段土坯墙 + 中间的柴门（荆条编的），墙头压着谷草。
+// 背景件——把村街的"后沿"围起来，房与房之间才不是漏风的空地
+export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
+  const H = 74;
+  const gw = gate ? 34 : 0;
+  const seg = (x0, x1) => {
+    InkFill(ctx, Rect(x0, groundY - H, x1 - x0, H), id + "w" + x0, "#b39c74",
+      { amp: 1.6, lw: 2.2, shade: "rgba(74,56,42,0.18)" });
+    for (let i = 1; i * 13 < H; i += 1) {
+      InkLine(ctx, x0 + 2, groundY - i * 13, x1 - 2, groundY - i * 13, id + "l" + x0 + i,
+        { lw: 1, color: "rgba(90,72,52,0.4)", amp: 1.3 });
+    }
+    // 墙头苫的谷草：一层深色压顶
+    InkFill(ctx, Rect(x0 - 3, groundY - H - 7, x1 - x0 + 6, 8), id + "cap" + x0, "#8a7448",
+      { amp: 1.8, lw: 1.6, shade: "rgba(0,0,0,0.14)" });
+    // 墙根壅土
+    InkFill(ctx, [[x0 - 4, groundY], [x0 + 2, groundY - 5], [(x0 + x1) / 2, groundY - 7],
+      [x1 - 2, groundY - 5], [x1 + 4, groundY]], id + "ft" + x0, "#a8926c", { amp: 1.4, lw: 1.4 });
+  };
+  seg(x - w / 2, gate ? x - gw / 2 : x + w / 2);
+  if (gate) {
+    seg(x + gw / 2, x + w / 2);
+    // 柴门：荆条编的两扇，斜纹；门轴那侧钉在墙上
+    InkFill(ctx, Rect(x - gw / 2 + 2, groundY - 56, gw - 4, 56), id + "gate", "#84663e",
+      { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.12)" });
+    for (let i = 0; i < 4; i += 1) {
+      InkLine(ctx, x - gw / 2 + 4, groundY - 48 + i * 11, x + gw / 2 - 4, groundY - 54 + i * 11,
+        id + "gd" + i, { lw: 1.2, color: "rgba(70,52,30,0.55)", amp: 1.4 });
+    }
+    InkLine(ctx, x - gw / 2 + 2, groundY - 56, x - gw / 2 + 2, groundY, id + "hinge", { lw: 2.2, color: IN.ink });
+  }
+}
+
+// 鸡窝：半人高的土坯拱洞，顶上苫草，洞口垫一块踏脚石
+export function DrawHenCoop(ctx, x, groundY, id) {
+  InkFill(ctx, [[x - 24, groundY], [x - 24, groundY - 20], [x - 16, groundY - 34], [x + 2, groundY - 40],
+    [x + 18, groundY - 32], [x + 24, groundY - 18], [x + 24, groundY]],
+    id + "body", "#b09a72", { amp: 1.8, lw: 2.2, shade: "rgba(74,56,42,0.2)" });
+  // 洞口（黑）
+  InkFill(ctx, [[x - 8, groundY], [x - 10, groundY - 12], [x - 2, groundY - 18], [x + 8, groundY - 12], [x + 6, groundY]],
+    id + "hole", "#2a2118", { amp: 1.2, lw: 1.6 });
+  // 苫草顶
+  InkFill(ctx, [[x - 22, groundY - 30], [x + 2, groundY - 46], [x + 22, groundY - 28], [x + 2, groundY - 36]],
+    id + "thatch", "#a08a52", { amp: 2, lw: 1.6, shade: "rgba(0,0,0,0.12)" });
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - 12 + i * 10, groundY - 34 - i * 2, x - 6 + i * 10, groundY - 42 - i,
+      id + "st" + i, { lw: 1.1, color: "rgba(70,55,28,0.55)" });
+  }
+  InkFill(ctx, Rect(x - 12, groundY - 4, 22, 4), id + "step", "#8b857a", { amp: 0.8, lw: 1.4 });
+}
+
+// 晾衣绳：两根木杆绷一道绳，挂着打补丁的粗布衫和一条裤——风里鼓着
+export function DrawClothesline(ctx, x, groundY, id) {
+  const span = 92;
+  InkLine(ctx, x - span / 2, groundY, x - span / 2 - 4, groundY - 88, id + "pL", { lw: 4, color: "#6b5136", amp: 1.4 });
+  InkLine(ctx, x + span / 2, groundY, x + span / 2 + 4, groundY - 86, id + "pR", { lw: 4, color: "#6b5136", amp: 1.4 });
+  // 绳：中间坠一点
+  ctx.beginPath();
+  ctx.moveTo(x - span / 2 - 4, groundY - 84);
+  ctx.quadraticCurveTo(x, groundY - 76, x + span / 2 + 4, groundY - 82);
+  ctx.strokeStyle = "#8a7350";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // 粗布衫：袖子摊开搭在绳上，胸口一块补丁
+  InkFill(ctx, [[x - 30, groundY - 80], [x - 6, groundY - 81], [x - 2, groundY - 62], [x - 8, groundY - 40],
+    [x - 26, groundY - 40], [x - 34, groundY - 60]],
+    id + "shirt", "#9aa0a8", { amp: 1.8, lw: 1.8, shade: "rgba(0,0,0,0.1)" });
+  InkFill(ctx, Rect(x - 22, groundY - 62, 10, 9), id + "patch", "#7d838c", { amp: 0.8, lw: 1.2 });
+  // 裤：两条腿分开垂
+  InkFill(ctx, [[x + 8, groundY - 79], [x + 30, groundY - 80], [x + 28, groundY - 44], [x + 21, groundY - 44],
+    [x + 20, groundY - 62], [x + 17, groundY - 44], [x + 10, groundY - 44]],
+    id + "pants", "#6e7078", { amp: 1.6, lw: 1.8, shade: "rgba(0,0,0,0.1)" });
 }
 
 export function DrawWoodpile(ctx, x, groundY, id) {
@@ -1365,23 +1468,57 @@ export function DrawBush(ctx, x, groundY, w, id, { night = false } = {}) {
   }
 }
 
-export function DrawCrops(ctx, x, groundY, w, id, { night = false } = {}) {
+export function DrawCrops(ctx, x, groundY, w, id, { night = false, veggie = false } = {}) {
   const color = night ? "#5a6640" : PAL.crop;
+  // 脚下先给一条翻过土的畦垄——没有这条土，秆子就是插在光板地上的牙签
+  ctx.save();
+  ctx.fillStyle = night ? "rgba(30,24,16,0.5)" : "rgba(96,74,48,0.38)";
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2 - 6, groundY);
+  for (let t = 0; t <= 12; t += 1) {
+    ctx.lineTo(x - w / 2 - 6 + ((w + 12) * t) / 12, groundY - 3.5 - Sym(id + "bed", t, 2.2));
+  }
+  ctx.lineTo(x + w / 2 + 6, groundY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  if (veggie) {
+    // 菜畦：贴地的叶簇（春天的白菜秧/韭菜），不是齐腰的秆子
+    const n = Math.max(8, Math.round(w / 14));
+    for (let i = 0; i < n; i += 1) {
+      const px = x - w / 2 + (i + 0.3 + Rnd(id, i) * 0.4) * (w / n);
+      const r = 5 + Rnd(id, i + 40) * 3.5;
+      for (let k = 0; k < 5; k += 1) {
+        const a = -Math.PI * (0.18 + k * 0.16) + Sym(id + "lf" + i, k, 0.12);
+        ctx.beginPath();
+        ctx.moveTo(px, groundY - 1);
+        ctx.quadraticCurveTo(px + Math.cos(a) * r * 0.7, groundY - 1 + Math.sin(a) * r * 0.9,
+          px + Math.cos(a) * r * 1.25, groundY - 1 + Math.sin(a) * r * 1.35);
+        ctx.strokeStyle = k % 2 ? color : (night ? "#4c5836" : "#87975a");
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+    }
+    return;
+  }
   const n = Math.max(6, Math.round(w / 9));
   for (let i = 0; i < n; i += 1) {
     const px = x - w / 2 + (i + Rnd(id, i) * 0.6) * (w / n);
     const h = 34 + Rnd(id, i + 50) * 16;
+    const tipX = px + Sym(id, i + 120, 8);
     ctx.beginPath();
     ctx.moveTo(px, groundY);
-    ctx.quadraticCurveTo(px + Sym(id, i + 90, 4), groundY - h * 0.6, px + Sym(id, i + 120, 8), groundY - h);
+    ctx.quadraticCurveTo(px + Sym(id, i + 90, 4), groundY - h * 0.6, tipX, groundY - h);
     ctx.strokeStyle = color;
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.stroke();
-    // 穗
+    // 穗：实心、骑在秆顶上（中心压低半个穗高）。原先填色跟底色几乎同色、
+    // 中心又抬在秆顶上方——只剩描边的空心圈飘在半空，一排看过去像铁丝网
     ctx.beginPath();
-    ctx.ellipse(px + Sym(id, i + 120, 8), groundY - h - 3, 2.6, 5.4, Sym(id, i, 0.5), 0, Math.PI * 2);
-    ctx.fillStyle = night ? "#6b7048" : "#bfa85c";
+    ctx.ellipse(tipX, groundY - h + 2.2, 2.6, 5.4, Sym(id, i, 0.5), 0, Math.PI * 2);
+    ctx.fillStyle = night ? "#55603e" : "#a3853e";
     ctx.fill();
     ctx.strokeStyle = IN.inkSoft;
     ctx.lineWidth = 1;
@@ -1573,6 +1710,49 @@ export function DrawVat(ctx, x, groundY, id) {
   InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "water", "#4d6a78", { amp: 0.5, lw: 1 });
 }
 
+// 地窖里的红薯堆：过冬的口粮码在窖底，上面搭半领草苫
+export function DrawTuberPile(ctx, x, groundY, id) {
+  for (let i = 0; i < 11; i += 1) {
+    const px = x - 22 + (i % 5) * 11 + Hash(id + "tx" + i) * 5;
+    const py = groundY - 5 - Math.floor(i / 5) * 9 - Hash(id + "ty" + i) * 3;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(px, py, 7 + Hash(id + "tr" + i) * 2.5, 4.6, Sym(id + "ta", i, 0.5), 0, Math.PI * 2);
+    ctx.fillStyle = i % 3 ? "#8a5f3c" : "#96684a";
+    ctx.fill();
+    ctx.strokeStyle = IN.inkSoft;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+  // 草苫搭在堆顶一角
+  InkFill(ctx, [[x - 26, groundY - 20], [x - 4, groundY - 30], [x + 20, groundY - 26], [x + 8, groundY - 17]],
+    id + "mat", "#a08a52", { amp: 1.8, lw: 1.6, shade: "rgba(0,0,0,0.14)" });
+  for (let i = 0; i < 4; i += 1) {
+    InkLine(ctx, x - 20 + i * 11, groundY - 21 - i * 2, x - 14 + i * 11, groundY - 27 - i * 1.5,
+      id + "straw" + i, { lw: 1.1, color: "rgba(70,55,28,0.6)" });
+  }
+}
+
+// 地窖搁板：两根木桩架一块旧板，板上一只荆条筐、一只盖着布的坛子
+export function DrawCellarShelf(ctx, x, groundY, id) {
+  InkFill(ctx, Rect(x - 30, groundY - 40, 6, 40), id + "legL", "#5c452f", { amp: 1, lw: 2 });
+  InkFill(ctx, Rect(x + 24, groundY - 40, 6, 40), id + "legR", "#5c452f", { amp: 1, lw: 2 });
+  InkFill(ctx, Rect(x - 36, groundY - 46, 72, 7), id + "board", "#7d5c38", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  // 荆条筐
+  InkFill(ctx, [[x - 26, groundY - 46], [x - 23, groundY - 64], [x - 3, groundY - 64], [x, groundY - 46]],
+    id + "basket", "#9a7d4f", { amp: 1.4, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
+  for (let i = 1; i < 3; i += 1) {
+    InkLine(ctx, x - 25 + i, groundY - 46 - i * 6, x - 1 - i, groundY - 46 - i * 6, id + "wv" + i,
+      { lw: 1, color: "rgba(60,45,25,0.55)", amp: 1.2 });
+  }
+  // 布盖小坛
+  InkFill(ctx, [[x + 8, groundY - 46], [x + 6, groundY - 58], [x + 12, groundY - 66], [x + 22, groundY - 66],
+    [x + 27, groundY - 58], [x + 25, groundY - 46]], id + "jar", "#6e5b44", { amp: 1, lw: 1.8, shade: "rgba(0,0,0,0.22)" });
+  InkFill(ctx, [[x + 9, groundY - 64], [x + 17, groundY - 70], [x + 25, groundY - 64], [x + 17, groundY - 61]],
+    id + "cloth", "#a8927a", { amp: 1.2, lw: 1.4 });
+}
+
 // 驴车：能推、能跟着走的那片影子。车板 + 两个大轮 + 半车干草
 export function DrawCart(ctx, x, groundY, id) {
   // 车板
@@ -1632,7 +1812,13 @@ export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
 }
 
 // 蹲在木料上的母鸡：土黄的团身、小红冠——嗜头担当
-export function DrawHen(ctx, x, y, id) {
+// k：整体缩放（绕锚点）。原始坐标画出来的鸡有 0.8m 长——跟条狗似的；
+// 0.55 收到不到半米，才是院子里啄食的芦花鸡
+export function DrawHen(ctx, x, y, id, k = 0.55) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.translate(-x, -y);
   InkFill(ctx, [
     [x - 12, y], [x - 13, y - 8], [x - 6, y - 13], [x + 5, y - 13], [x + 12, y - 7], [x + 15, y - 2], [x + 10, y + 1],
   ], id + "body", "#b89058", { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.16)" });
@@ -1645,6 +1831,7 @@ export function DrawHen(ctx, x, y, id) {
   InkFill(ctx, [[x + 10, y - 16], [x + 12, y - 20], [x + 14, y - 16]], id + "comb", "#b0432e", { amp: 0.6, lw: 1.2 });
   // 喙
   InkFill(ctx, [[x + 16, y - 12], [x + 20, y - 11], [x + 16, y - 9]], id + "beak", "#d8a83c", { amp: 0.5, lw: 1.1 });
+  ctx.restore();
 }
 
 // 倒塌的柴垛：可翻越（肩高、顶沿有缺口）——扫荡中撞翻的那一堆

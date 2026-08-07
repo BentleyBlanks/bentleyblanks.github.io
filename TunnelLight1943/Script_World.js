@@ -113,7 +113,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
-const ALONG_ARM = ["锯", "锄头", "步枪"];
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚"];
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
@@ -123,7 +123,7 @@ const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃�
 const HOLD_WEIGHT = {
   "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
-  "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+  "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -137,7 +137,7 @@ function MakeCarryMesh(label) {
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 96] };   // 收窄后的画幅，别再给一根柱子留地方
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 96], "扫帚": [44, 92] };   // 收窄后的画幅，别再给一根柱子留地方
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -736,7 +736,7 @@ export function CreateWorld(canvasEl) {
     return dust;
   }
 
-  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1 } = {}) {
+  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1, opacity = 0.62 } = {}) {
     for (let x = xFrom; x < xTo; x += 9 + ART.Hash(id + x) * 9) {
       const w = 9 + ART.Hash(id + "w" + x) * 7;
       const h = 2.6 + ART.Hash(id + "h" + x) * 1.6;
@@ -782,7 +782,7 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
       // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
       ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
-      mesh.material.opacity = 0.62;
+      mesh.material.opacity = opacity;
       group.add(mesh);
     }
   }
@@ -996,14 +996,20 @@ export function CreateWorld(canvasEl) {
       // 母鸡蹲在那根待搬的木料上：爪子抬到 0.5m，让她整个落在木料上沿之上。
       // 原来是 16px（0.33m），正好和木料重叠——同一条深度带谁先谁后全看进场
       // 顺序，于是她时不时被自己蹲的那根木料盖住。分开画就没有先后可争。
-      case "hen": mk((ctx, ax, ay) => ART.DrawHen(ctx, ax, ay - 13, p.id)); break;
+      // 栖高只属于蹲在木料堆上的那只（perch）；院里啄食的鸡贴地站。
+      // 夜里散养的鸡都回窝了——第二章的夜街上不该站着两只发呆的鸡
+      case "hen": {
+        if (night && !p.perch) break;
+        mk((ctx, ax, ay) => ART.DrawHen(ctx, ax, ay - (p.perch ? 13 : 0), p.id));
+        break;
+      }
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
       case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
       case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, night, bare: ruined })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
-      case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night })); break;
+      case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
       case "fortWall": mk((ctx, ax, ay) => ART.DrawFortWall(ctx, ax, ay, p.w * PPM, p.h * PPM, p.id)); break;
       case "fortGate": {
         mk((ctx, ax, ay) => {
@@ -1077,6 +1083,11 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "vat": mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id)); break;
+      case "tuberPile": mk((ctx, ax, ay) => ART.DrawTuberPile(ctx, ax, ay, p.id)); break;
+      case "cellarShelf": mk((ctx, ax, ay) => ART.DrawCellarShelf(ctx, ax, ay, p.id)); break;
+      case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false })); break;
+      case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
+      case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
       case "pump": {
         mk((ctx, ax, ay) => {
           // 水泵/风箱：日军灌烟灌水用的家伙
@@ -1192,9 +1203,10 @@ export function CreateWorld(canvasEl) {
         ctx.closePath();
         ctx.fill();
       };
+      const domes = [];
       for (const p of sceneDef.props) {
-        if (p.kind === "chamber") Dome(p.x, p.w / 2, toPy(UNDER_Y + 2.5));
-        else if (p.kind === "pocket") Dome(p.x, 2.8, toPy(UNDER_Y + 2.2));
+        if (p.kind === "chamber") { Dome(p.x, p.w / 2, toPy(UNDER_Y + 2.5)); domes.push([p.x, p.w / 2, toPy(UNDER_Y + 2.5)]); }
+        else if (p.kind === "pocket") { Dome(p.x, 2.8, toPy(UNDER_Y + 2.2)); domes.push([p.x, 2.8, toPy(UNDER_Y + 2.2)]); }
       }
       // 翻口：地道在这一段往下沉一个 U 形弯，得跟走廊一样从土里掏出来
       for (const p of sceneDef.props) {
@@ -1230,17 +1242,30 @@ export function CreateWorld(canvasEl) {
       ctx.strokeStyle = "rgba(24,17,10,0.6)";
       ctx.lineWidth = 5;
       ctx.stroke();
+      // 洞室的穹顶也要有洞沿：走廊的墨线只描到 CeilY，洞室那一段是
+      // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块
+      for (const [cx, halfW, topY] of domes) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(cx - halfW), tunBot);
+        ctx.bezierCurveTo(toPx(cx - halfW * 0.72), topY, toPx(cx + halfW * 0.72), topY, toPx(cx + halfW), tunBot);
+        ctx.strokeStyle = "rgba(24,17,10,0.7)";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+      }
     });
     PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
     group.add(face);
 
-    // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它
+    // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它。
+    // 高度要盖满这一段最高的空腔——村里的地窖直得起腰（2.5m 穹顶），
+    // 还按地道走廊的 1.55m 烘的话，暗角在窖里拦腰一道硬缝
+    const vignH = sceneDef.props.some((p) => p.kind === "chamber") ? 2.55 : 1.55;
     const vign = BakeSprite(
-      Math.ceil((range[1] - range[0] + 4) * PPM), Math.ceil(1.55 * PPM),
-      0, Math.ceil(1.55 * PPM),
+      Math.ceil((range[1] - range[0] + 4) * PPM), Math.ceil(vignH * PPM),
+      0, Math.ceil(vignH * PPM),
       (ctx) => {
         const w = Math.ceil((range[1] - range[0] + 4) * PPM);
-        const h = Math.ceil(1.55 * PPM);
+        const h = Math.ceil(vignH * PPM);
         const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, "rgba(18,13,8,0.72)");
         grd.addColorStop(0.42, "rgba(18,13,8,0.18)");
@@ -1534,13 +1559,19 @@ export function CreateWorld(canvasEl) {
     if (ch.scene === "village" || ch.scene === "tunnelVillage") {
       AddParallaxTown(layers.farTown, -10, L + 10,
         state.flags.ruined && ch.light !== "night" ? "#7d7466" : pal.town,
-        ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown });
+        ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown,
+          // 站在村街上，身后就是全村的房——村庄场景的远景要密一档、实一档，
+          // 不然中景一空整个画面只剩天和地两条色带
+          opacity: 0.78 });
     }
     if (ch.scene !== "tunnelFort") {
+      const dense = ch.scene === "village" || ch.scene === "tunnelVillage";
       AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
-        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.86, step: 24, hazeOpt: HazeFor("midTrees") });
+        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.86,
+          step: dense ? 16 : 24, hazeOpt: HazeFor("midTrees") });
       AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
-        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.96, hazeOpt: HazeFor("nearTrees") });
+        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.96,
+          ...(dense ? { step: 14 } : {}), hazeOpt: HazeFor("nearTrees") });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
 

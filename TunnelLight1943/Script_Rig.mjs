@@ -293,6 +293,31 @@ export const TRACKS = {
       { t: 2.3, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36 },
     ],
   },
+  // 撒食喂鸡（循环）：胳膊肘挎着笸箩，另一只手抓一把、扬出去，
+  // 顿一顿看鸡抢食，再抓一把。扬手那一下最快，其余都是等
+  scatterFeed: {
+    dur: 2.8, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armB: -66, foreB: -74, armF: -30, foreF: -20, thighB: -6, shinB: 8, footB: -4, thighF: 4, shinF: 4, footF: -4 },
+      { t: 0.5, hipY: -0.04, hipX: 0.03, torso: 14, head: -10, armF: -52, foreF: -46 },   // 手伸进笸箩抓食
+      { t: 0.85, hipY: 0.0, hipX: 0.0, torso: 4, head: -4, armF: 26, foreF: 8 },          // 扬出去（最快的一下）
+      { t: 1.25, hipY: -0.01, hipX: 0.01, torso: 7, head: -7, armF: 10, foreF: -6 },      // 收手，看鸡抢
+      { t: 2.8, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armF: -30, foreF: -20 },
+    ],
+  },
+  // 扫院（循环）：扫帚在近侧手里顺前臂摆，一推一带、蹭着地走。
+  // 幅度比锄地小得多——扫地是胳膊的活，不是腰的活
+  sweeping: {
+    dur: 1.9, loop: true,
+    keys: [
+      // 胳膊只在垂线前后小幅摆：扫帚顺前臂挂着，臂一抬高帚就横过来端着了——
+      // 扫地的帚头得蹭着地走
+      { t: 0.0, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22, thighB: -10, shinB: 14, footB: -5, thighF: 6, shinF: 5, footF: -5 },
+      { t: 0.7, hipY: -0.07, hipX: 0.05, torso: 24, head: -16, armF: -30, foreF: -14, armB: -46, foreB: -28 },  // 往前推
+      { t: 1.2, hipY: -0.05, hipX: 0.03, torso: 21, head: -14, armF: -22, foreF: -11, armB: -40, foreB: -25 },  // 带回来
+      { t: 1.9, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22 },
+    ],
+  },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
   struckFall: {
     dur: 3.4, loop: false,

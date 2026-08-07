@@ -29,9 +29,13 @@
         { "id": "doorframe", "kind": "doorframe", "x": 34, "name": "门框" },
         { "id": "workbench", "kind": "bench", "x": 40.5, "name": "工作台" },
         { "id": "stool", "kind": "stool", "x": 32, "name": "旧木凳" },
-        { "id": "veggieWest", "kind": "crops", "x": 16.5, "w": 5, "name": "菜畦", "note": "娘的活计：柱子跑腿时爹在锯木头、娘在这儿锄地——家里没有站着围观的人" },
+        { "id": "veggieWest", "kind": "crops", "x": 16.5, "w": 5, "veggie": true, "name": "菜畦", "note": "娘的活计：柱子跑腿时爹在锯木头、娘在这儿锄地——家里没有站着围观的人。veggie=贴地叶簇画法：春天的菜畦是低矮的秧苗，不是齐腰的秆子" },
         { "id": "roadStack", "kind": "woodStack", "x": 84, "w": 1.7, "h": 1.24, "name": "码好的柴垛", "note": "教「翻越」的第一课。必须离跑腿路线（院子 31~70）远远的——提着桶扛着木料被要求翻墙是这一版最先被骂的地方；挪到去老槐树的路上，那趟路空着手来回。肩高、顶沿磨得发亮还缺一角=可翻越物的轮廓语法" },
         { "id": "cellarMouth", "kind": "hatch", "x": 27, "name": "地窖口" },
+        { "id": "cellarVat", "kind": "vat", "x": 22.3, "level": "under", "name": "腌菜缸" },
+        { "id": "cellarVatB", "kind": "vat", "x": 23.6, "level": "under", "name": "腌菜缸" },
+        { "id": "cellarTubers", "kind": "tuberPile", "x": 25.2, "level": "under", "name": "红薯堆" },
+        { "id": "cellarShelf", "kind": "cellarShelf", "x": 29.6, "level": "under", "name": "搁板", "note": "地窖陈设都靠西/东墙根摆，梯子口（27）留空——躲扫荡那一幕一家人要挤在这儿" },
         { "id": "cellarRoom", "kind": "chamber", "x": 26, "w": 11, "name": "地窖",
           "note": "自家地窖是**直得起腰**的：玩法侧早就按站立算（MovePlayer 的 inTunnel 不含 village），美术侧却拿地道的猫腰净高去掏土层剖面，于是近侧那张 z=2.2 的剖面把站在窖里的人整个盖住。登记成 chamber，TunnelPosture 与 AddUnderground 就都按站立掏了" },
         { "id": "well", "kind": "well", "x": 58, "name": "水井" },
@@ -39,6 +43,18 @@
         { "id": "woodpile", "kind": "woodpile", "x": 70, "name": "木料堆" },
         { "id": "bigTree", "kind": "tree", "x": 126, "big": true, "name": "老槐树" },
         { "id": "gatePost", "kind": "lamppost", "x": 174, "name": "村东口" },
+
+        { "id": "courtWall", "kind": "yardWall", "x": 47.5, "w": 6, "name": "自家院墙", "note": "院门口 zone(47) 正对柴门——「院门口」从此有门可指" },
+        { "id": "yardWallB", "kind": "yardWall", "x": 100.5, "w": 7, "name": "赵家院墙", "note": "96-107 那段长空地的后沿；柴门朝街" },
+        { "id": "yardWallC", "kind": "yardWall", "x": 112, "w": 6, "gate": false, "name": "院墙" },
+        { "id": "yardWallD", "kind": "yardWall", "x": 168.5, "w": 5, "gate": false, "name": "村东头的院墙" },
+        { "id": "henCoop", "kind": "henCoop", "x": 64.8, "name": "李婶家的鸡窝" },
+        { "id": "henYardA", "kind": "hen", "x": 63.9, "hideFlag": "raidStarted", "name": "芦花鸡" },
+        { "id": "henYardB", "kind": "hen", "x": 66.1, "hideFlag": "raidStarted", "name": "芦花鸡" },
+        { "id": "clotheslineC", "kind": "clothesline", "x": 94.5, "name": "赵家的晾衣绳" },
+        { "id": "treeHome", "kind": "tree", "x": 21.5, "name": "枣树" },
+        { "id": "treeMid", "kind": "tree", "x": 104.5, "name": "榆树" },
+        { "id": "treeEast", "kind": "tree", "x": 158.5, "name": "枣树" },
 
         { "id": "cloth", "kind": "cloth", "x": 126.45, "name": "花布巾", "note": "妹妹的头巾被风刮上老槐树（一章投掷教学的靶）。x 贴着树冠右缘：一半衬着叶子一半衬着天，远远就读得出" },
         { "id": "stonesRoad", "kind": "stonePile", "x": 73.5, "name": "石子堆", "note": "二章掩体推进段的软窗口：88 之前那段路上唯一一堆石子，蹲着摸近、把石子扔到灯的背后去。位置卡在 hayB(69.6 终) 与 woodB(76.7 起) 之间的空档" },
@@ -49,7 +65,7 @@
         { "id": "hangLantern", "kind": "hangLantern", "x": 160, "name": "巷口的马灯" },
 
         { "id": "barrow", "kind": "barrow", "x": 50.5, "name": "独轮车", "note": "运木料，兼教「推」；实际网格由 UpdateProps 动态摆，这里只登记它属于本场景" },
-        { "id": "henProp", "kind": "hen", "x": 56.4, "name": "母鸡", "hideFlag": "henFlew", "note": "赖在木料上不挪窝，扛第二根时惊飞" },
+        { "id": "henProp", "kind": "hen", "x": 56.4, "perch": true, "name": "母鸡", "hideFlag": "henFlew", "note": "赖在木料上不挪窝，扛第二根时惊飞；perch=栖在木料上的垫高" },
         { "id": "ridgeMid", "kind": "ridge", "x": 96, "w": 3, "name": "田埂", "note": "去老槐树半道上的地形，跨得过去，不用翻" },
         { "id": "thimbleProp", "kind": "thimble", "x": 48.8, "name": "顶针", "hideFlag": "thimbleFound", "note": "可选探索：训练「离开主路径看一眼」" },
 
@@ -74,6 +90,13 @@
         { "id": "wallB", "kind": "wallSeg", "x": 142, "w": 4, "h": 1.5, "tall": true },
         { "id": "hayE", "kind": "haystack", "x": 152, "w": 3.2, "tall": true },
         { "id": "wallC", "kind": "wallSeg", "x": 163, "w": 4, "h": 1.4, "tall": true }
+      ],
+      "_lookablesNote": "邻居家的细节：白天路过按 E 看一眼，出一条手记（Core 通用处理，每章每处一次；潜行/夜里不出）。村子不是布景——每一眼都是别人家正在过的日子",
+      "lookables": [
+        { "id": "lookCoop", "x": 64.8, "note": "李婶家的芦花鸡又抱窝了。窝里攒着三个蛋，她数得比谁都勤。" },
+        { "id": "lookLine", "x": 94.5, "note": "赵家晾的粗布衫打着三块补丁。风一鼓，空袖子像在招手。" },
+        { "id": "lookMill", "x": 118, "w": 1.8, "note": "碾盘上还留着昨儿碾谷的糠皮。全村就这一台碾子，谁家碾米都得排着来。" },
+        { "id": "lookDog", "x": 138, "w": 1.8, "note": "王家的大黄狗睡得正沉，尾巴梢偶尔抖一下。村里人他一个都不咬。" }
       ],
       "zones": {
         "homeYard": { "x": 37, "w": 13, "label": "家里的院子" },
