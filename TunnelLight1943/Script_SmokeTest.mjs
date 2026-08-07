@@ -25,6 +25,7 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
   let chapterT = 0;
   let lastChapter = state.chapterIndex;
   let lastBeat = -1;
+  let knotAngle = 0;      // 打结那一拍：驱动器手上画圈的角度
 
   const started = Date.now();
   while (!state.done) {
@@ -130,6 +131,23 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
         }
+        // 打结：没有长按后备了，驱动器得**真的绕圈**——绕对方向（世界角度
+        // 递增），缠满之后改竖拽勒紧。这也是这条路径唯一的自动化验证
+        if (target.action === "knotAt" && Math.abs(dx) <= 1.35) {
+          input.moveX = 0;
+          const kn = state.beat?.knotState;
+          if (kn && kn.t >= 1) {
+            input.pullHeld = true;
+            input.pull = 0.35;
+          } else {
+            knotAngle += 0.22;                       // 正向＝缠上去
+            input.pointerHeld = true;
+            input.pointerWorld = {
+              x: target.cx + Math.cos(knotAngle) * target.r,
+              y: target.cy + Math.sin(knotAngle) * target.r,
+            };
+          }
+        } else knotAngle = 0;
       }
     }
 
@@ -610,7 +628,16 @@ function TestChainSurvivesEarlyDrop() {
   // 否则玩家根本不知道自己把它扔哪儿了
   state.player.x = SCENES.village.zones.well.x;
   step({}, 3);
-  step({ interactHeld: true }, Math.ceil(6 / DT));
+  // 打结没有长按后备了（见 TestKnotNeedsRealCircling）：这儿也得真绕圈
+  {
+    const t = GetBeatTarget(state);
+    let a = 0;
+    for (let i = 0; i < 400 && !(state.beat.knotState?.t >= 1); i += 1) {
+      a += 0.22;
+      step({ pointerHeld: true, pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r } });
+    }
+    step({ pullHeld: true, pull: 0.35 }, Math.ceil(2 / DT));
+  }
   assert.equal(state.flags.wellRopeBroken, false, "绳该接好了");
   step({}, 3);
   const marked = state.bubbles.some((b) => b.icon === "item:空水桶");
@@ -668,11 +695,27 @@ function TestGroundItems() {
 }
 
 // 接绳打结（键盘后备路径）：按住 E 缠满一圈再收紧，井绳必须接好
-function TestKnotKeyboardFallback() {
-  const state = CreateGame(0);
-  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
-  DebugJump(state, 0, water.index);
-  const step = (input = {}, n = 1) => {
+// 打结**没有长按后备**（2026-08-08 用户明令："为什么还支持长按交互按钮的模式？
+// 干掉"）。手不落在绳头上、不真的绕圈，就一点进展都没有；而且**方向有意义**：
+// 正向缠上去、反向解回来。老版取 Math.abs(d) 两头都算涨，于是转哪边都能过，
+// 同时 HUD 那枚图标演的还是相反的方向（CSS 的 rotate 正值在屏幕上是顺时针，
+// 而绳圈按世界角度递增画＝屏幕逆时针）——提示和绳子当场打架。
+function TestKnotNeedsRealCircling() {
+  const Setup = () => {
+    const state = CreateGame(0);
+    const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
+    DebugJump(state, 0, water.index);
+    // 直接把链推进到接绳那一步：桶已放下、绳已在手
+    state.beat.stepIndex = 4;
+    state.flags.wellRopeBroken = true;
+    state.flags.bucketAt = 70.1;
+    state.groundItems.push({ uid: "gT", id: "bucket", label: "空水桶", x: 70.1, level: "surface" });
+    state.player.item = { id: "rope", label: "麻绳" };
+    state.player.x = SCENES.village.zones.well.x;
+    state.player.level = "surface";
+    return state;
+  };
+  const step = (state, input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
       StepGame(state, {
         moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
@@ -680,20 +723,77 @@ function TestKnotKeyboardFallback() {
       }, DT);
     }
   };
-  // 直接把链推进到接绳那一步：桶已放下、绳已在手
-  state.beat.stepIndex = 4;
-  state.flags.wellRopeBroken = true;
-  state.flags.bucketAt = 70.1;
-  state.groundItems.push({ uid: "gT", id: "bucket", label: "空水桶", x: 70.1, level: "surface" });
-  state.player.item = { id: "rope", label: "麻绳" };
-  state.player.x = SCENES.village.zones.well.x;
-  state.player.level = "surface";
-  step({ interactHeld: true }, Math.ceil(3.0 / DT));
-  assert.ok(state.beat.knotState?.t >= 1, "按住 E 必须能把绳缠满");
-  step({ interactHeld: true }, Math.ceil(1.2 / DT));
-  assert.equal(state.flags.wellRopeBroken, false, "收紧后井绳必须接好");
-  assert.equal(state.player.item, null, "麻绳缠上去就离手了");
-  console.log("  ✓ 接绳打结：键盘后备路径能缠满并勒紧");
+  const knotAt = (state) => {
+    const t = GetBeatTarget(state);
+    assert.equal(t?.action, "knotAt", "打结那一步的驱动目标应该是绕圈，不是长按");
+    return t;
+  };
+
+  // ① 长按互动键：一点用都没有
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    step(state, { interactHeld: true }, Math.ceil(6.0 / DT));
+    assert.ok(!(state.beat.knotState?.t > 0.01),
+      `长按 E 居然把绳缠上了（t=${state.beat.knotState?.t}）——这条后备必须是死的`);
+    assert.equal(state.flags.wellRopeBroken, true, "长按不该把井绳接好");
+  }
+
+  // ② 手落在绳头上正向绕圈：缠得满；再竖拽勒紧＝接好
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const t = knotAt(state);
+    let a = 0;
+    for (let i = 0; i < 400 && !(state.beat.knotState?.t >= 1); i += 1) {
+      a += 0.22;
+      step(state, {
+        pointerHeld: true,
+        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
+      });
+    }
+    assert.ok(state.beat.knotState?.t >= 1, "正向绕圈必须能把绳缠满");
+    assert.equal(state.player.item, null, "麻绳缠上去就离手了");
+    step(state, { pullHeld: true, pull: 0.35 }, Math.ceil(2.0 / DT));
+    assert.equal(state.flags.wellRopeBroken, false, "缠满后竖拽勒紧，井绳必须接好");
+  }
+
+  // ③ 反向绕圈：不但不涨，还得把已经缠上的退回来
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const t = knotAt(state);
+    let a = 0;
+    for (let i = 0; i < 60; i += 1) {
+      a += 0.22;
+      step(state, {
+        pointerHeld: true,
+        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
+      });
+    }
+    const wound = state.beat.knotState.t;
+    assert.ok(wound > 0.1, "先得缠上一些才能验反向");
+    for (let i = 0; i < 40; i += 1) {
+      a -= 0.22;                       // 反着转＝往下解
+      step(state, {
+        pointerHeld: true,
+        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
+      });
+    }
+    assert.ok(state.beat.knotState.t < wound - 0.05,
+      `反着转绳圈必须退回来（${wound.toFixed(2)} → ${state.beat.knotState.t.toFixed(2)}）`
+      + "——两个方向都算涨的话，那不是缠绳，是在这儿画圈满角度");
+  }
+
+  // ④ 不留 HUD 手势图标：招呼玩家的是绳头自己
+  {
+    const state = Setup();
+    step(state, {}, 3);
+    assert.ok(!state.gesture, "打结那一拍不该再挂 HUD 手势图标");
+    assert.ok(!state.prompt || !/[EFCWS]\s*·/.test(state.prompt),
+      `打结那一拍不该出按键提示，实为「${state.prompt}」`);
+  }
+  console.log("  ✓ 接绳打结：长按无效 / 手真绕圈才缠得上 / 反向会解开 / 无 HUD 图标");
 }
 
 // 辘轳是个转盘，不是一根拉杆：鼠标绕轴心转圈才走绳——顺时针放、逆时针收、
@@ -1323,15 +1423,80 @@ function TestCineActorsClearOfObstacles() {
   console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
 }
 
+// 拟物投掷：攥住石子往后拽开瞄准，弹道是真物理；键盘 F 仍是完整后备。
+// 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
+function TestSlingThrow() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const st = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  DebugJump(st, 0, beats.indexOf("c1_cloth"));
+  StepGame(st, idle(), DT);
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_cloth");
+  const thr = cloth.steps.find((x) => x.type === "throwHit");
+  st.beat.stepIndex = cloth.steps.indexOf(thr);
+  st.player.item = { id: "stone", label: "石子", throwable: true };
+  st.player.x = thr.target.x - 6;
+  st.player.heading = 1;
+  StepGame(st, idle(), DT);
+
+  // ① 按下那一帧手必须落在石子上——在别处按一律攥不住
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: st.player.x - 3, y: SURFACE_Y + 1.1 } }, DT);
+  assert.ok(!st.sling, "在别处按下不该攥住石子");
+  StepGame(st, idle(), DT);   // 松开，重下
+
+  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列
+  const hx = st.player.x + st.player.heading * 0.24;
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: SURFACE_Y + 1.12 } }, DT);
+  assert.ok(st.sling, "按在石子上必须攥得住");
+  // 反解一条正好穿过靶心的拽法：T=0.7s 的弹道，拽向 = -v/K
+  const T = 0.7;
+  const vx = (thr.target.x - hx) / T;
+  const vy = (thr.target.y - 1.12) / T + 0.5 * 12.5 * T;
+  const drag = { x: hx - vx / 7.4, y: SURFACE_Y + 1.12 - vy / 7.4 };
+  for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: drag }, DT);
+  assert.ok(st.throwAim?.pts?.length > 5, "拽开必须给出弹道预览点列");
+  assert.equal(st.player.pose, "throwWind", "拽着时必须是蓄力姿势");
+  assert.ok(st.player.poseK > 0.4, "拉弓量必须驱动姿势");
+
+  // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 妹妹欢呼夸人
+  StepGame(st, idle(), DT);
+  assert.ok(st.thrown, "松手必须出手");
+  assert.ok(st.thrown.vx > 0, "往后拽，石子必须朝前飞");
+  let guard = 0;
+  const idx0 = st.beat.stepIndex;
+  while (st.thrown && guard < 200) { guard += 1; StepGame(st, idle(), DT); }
+  assert.equal(st.flags.clothDown, true, "照着靶心拽出去的弧必须打中布巾");
+  assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
+  const sis = st.actors.find((a) => a.id === "sister");
+  assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
+  assert.ok(st.microCine, "妹妹必须开口夸哥");
+
+  // ④ 键盘后备：站进射程按 F，照样命中（自动通关走的就是这条）
+  const st2 = CreateGame(0);
+  DebugJump(st2, 0, beats.indexOf("c1_cloth"));
+  StepGame(st2, idle(), DT);
+  st2.beat.stepIndex = cloth.steps.indexOf(thr);
+  st2.player.item = { id: "stone", label: "石子", throwable: true };
+  st2.player.x = thr.target.x - 6;
+  st2.player.heading = 1;
+  StepGame(st2, { ...idle(), throw: true }, DT);
+  assert.ok(st2.thrown, "键盘 F 必须照常出手");
+  guard = 0;
+  while (st2.thrown && guard < 200) { guard += 1; StepGame(st2, idle(), DT); }
+  assert.equal(st2.flags.clothDown, true, "键盘后备在射程内必须命中");
+  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中 / 妹妹接着乐 / 键盘后备");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
+TestSlingThrow();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
 TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
-TestKnotKeyboardFallback();
+TestKnotNeedsRealCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();

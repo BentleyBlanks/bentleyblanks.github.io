@@ -282,6 +282,20 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
+  // 欢呼（循环）：布巾打下来了，妹妹拍着手原地小跳——两下轻跳、一下拍手定住。
+  // 幅度照孩子来：蹦得高、胳膊抡得开，跟大人的克制拉开
+  cheerHop: {
+    dur: 1.6, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.06, hipX: 0.0, torso: -4, head: -8, armF: -136, foreF: -18, armB: -128, foreB: -14, thighB: -14, shinB: 18, footB: -5, thighF: -10, shinF: 14, footF: -5 },
+      { t: 0.22, hipY: 0.12, hipX: 0.02, torso: -8, head: -12, armF: -158, foreF: -8, armB: -150, foreB: -6, thighB: -22, shinB: 30, thighF: -18, shinF: 26 },   // 蹦起来，双臂抡过头
+      { t: 0.44, hipY: -0.08, hipX: 0.0, torso: -2, head: -6, armF: -120, foreF: -24, armB: -112, foreB: -20 },   // 落地缓一下
+      { t: 0.66, hipY: 0.10, hipX: 0.02, torso: -8, head: -12, armF: -152, foreF: -10, armB: -144, foreB: -8 },   // 再蹦一下
+      { t: 0.92, hipY: -0.05, hipX: 0.0, torso: -2, head: -8, armF: -96, foreF: -52, armB: -88, foreB: -48 },     // 拍手：两手收到胸前
+      { t: 1.14, hipY: -0.04, hipX: 0.0, torso: -3, head: -8, armF: -104, foreF: -44, armB: -96, foreB: -40 },
+      { t: 1.6, hipY: -0.06, hipX: 0.0, torso: -4, head: -8, armF: -136, foreF: -18, armB: -128, foreB: -14 },
+    ],
+  },
   // 拉锯（循环）。这一条改过一次，原因值得写下来：
   // 锯是 alongArm 挂件，**贴图方向 = 前臂的世界角 = armF + foreF**。老版本靠开合
   // 肘部来"一进一出"，前臂世界角从 -72° 荡到 -132°——锯在空中划了 60° 的钟摆，
@@ -542,6 +556,18 @@ export function PoseRig(rig, s, dt) {
     target.armB = -6 * DEG; target.foreB = -22 * DEG;
     target.thighB = -42 * DEG; target.shinB = 30 * DEG; target.footB = -10 * DEG;
     target.thighF = 18 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.pose === "throwWind") {
+    // 投掷蓄力：**由拉弓量直接驱动**（poseK 0→1，玩家把石子往后拽多远，
+    // 身子就拧多紧）——臂向后下抡开、重心压到后腿、上身拧过去蓄住。
+    // 松手那一帧切 throwArm，甩出去的劲是这里攒的。
+    const k = s.poseK ?? 0.5;
+    target.hipY = -0.04 - 0.06 * k; target.hipX = -0.02 - 0.10 * k;
+    target.torso = (-4 - 18 * k) * DEG; target.head = (2 + 6 * k) * DEG;
+    target.armF = (30 + 64 * k) * DEG;     // 正角=向后抡（同 vault 的符号语义）
+    target.foreF = (-14 - 18 * k) * DEG;
+    target.armB = (-16 - 10 * k) * DEG; target.foreB = -26 * DEG;
+    target.thighB = (-10 - 18 * k) * DEG; target.shinB = (14 + 14 * k) * DEG; target.footB = -6 * DEG;
+    target.thighF = (4 + 12 * k) * DEG; target.shinF = (6 + 6 * k) * DEG; target.footF = -6 * DEG;
   } else if (s.pose === "planePush") {
     // 刨料：**姿势由推程直接驱动**（s.poseK 0→1），不是播一段循环给玩家看。
     // 他推多远，这具身子就送多远——手上的分量就是从这儿来的。
