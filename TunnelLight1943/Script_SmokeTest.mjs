@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -731,7 +731,11 @@ function TestWinchIsACrankNotALever() {
   console.log("  ✓ 辘轳转盘：顺放逆收 / 特写推近 / 脱手倒转 / 键盘后备");
 }
 
-// 石笔：玩家攥的是一支笔，不是一根滑块。三条硬规矩各验一遍。
+// 石笔：玩家攥的是一支笔，不是一根滑块。
+//
+// 这一拍长在一张铺满画框的手绘特写卡上（state.scribeCard），手落在**卡面**
+// 的哪儿说了算（pointerCard，u 沿卡宽 / v 沿卡高的归一化坐标）。世界坐标那条
+// 老路子已经废了——世界里那支笔只有十来个像素，按不着。五条硬规矩各验一遍。
 function TestChalkIsAPencilNotASlider() {
   const carve = ChapterBeatList(0).find((b) => b.id === "c1_carve");
   const mk = () => {
@@ -749,48 +753,49 @@ function TestChalkIsAPencilNotASlider() {
       }, DT);
     }
   };
-  const LINE_Y = 1.28;          // c1_carve 的 markY
-  const X0 = 34 - 0.52, X1 = 34 + 0.52;
+  const L = SCRIBE_CARD;
+  // 笔尖在起点时，拳心（该按的那一点）落在这儿
+  const GRIP = { u: L.u0 + L.gripDU, v: L.v + L.gripDV };
 
   // ① 手没落在笔上就按下去拖：笔不动（这正是"不是 slider"的意思）
   {
     const s = mk();
     step(s, {}, 2);
     for (let i = 0; i < 40; i += 1) {
-      step(s, { pointerHeld: true, pointerWorld: { x: X0 + 0.9 + i * 0.01, y: LINE_Y } });
+      // 从画框左边一路拖到右边，全程避开那支笔
+      step(s, { pointerHeld: true, pointerCard: { u: 0.06 + i * 0.02, v: L.v + 0.34 } });
     }
     assert.equal(s.beat.drawn, 0, "手没抓着笔，怎么拖都不该划出印子");
   }
 
-  // ② 攥住笔再拉：印子跟着出来，且笔有摩擦——拉不过 CHALK_SPEED
+  // ② 攥住笔再拉：印子跟着出来，且笔有摩擦——拉不过 SCRIBE_CARD.speed
   {
     const s = mk();
     step(s, {}, 2);
-    step(s, { pointerHeld: true, pointerWorld: { x: X0, y: LINE_Y } });   // 落在笔尖上=攥住
+    step(s, { pointerHeld: true, pointerCard: { ...GRIP } });   // 落在拳心上=攥住
     assert.ok(s.beat.grabbed, "手落在笔身上按下去，必须攥得住");
     // 手瞬间甩到另一头：笔只能一寸一寸蹭过去，一帧绝不会到底
-    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } });
+    step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } });
     assert.ok(s.beat.drawn > 0, "攥住往前拉，必须留下印子");
     assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
     // 玩家要做的事，画面上事先不能已经做完了：门框此刻必须还是空的
     assert.equal(s.flags.marked, false, "没划完之前，门框上不该已经有那道刻痕");
     // 一直拉到底
-    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y } }, 120);
+    step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } }, 240);
     assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "拉满一道线，这一拍必须过");
     assert.equal(s.flags.marked, true, "划完了，刻痕才长在门框上");
+    assert.equal(s.scribeCard, null, "划完了，那张卡必须收走");
   }
 
   // ③ 手飘离刻线：笔脱手，印子当场停住
   {
     const s = mk();
     step(s, {}, 2);
-    step(s, { pointerHeld: true, pointerWorld: { x: X0, y: LINE_Y } });
-    // 只拖 4 帧：DT=1/30 下笔速 0.62m/s，帧数多了 15 公分的线会直接划完、
-    // 节拍推进，脱手就没得验了
-    step(s, { pointerHeld: true, pointerWorld: { x: X0 + 0.3, y: LINE_Y } }, 4);
+    step(s, { pointerHeld: true, pointerCard: { ...GRIP } });
+    step(s, { pointerHeld: true, pointerCard: { u: GRIP.u + 0.08, v: GRIP.v } }, 4);
     const drawnBefore = s.beat.drawn;
     assert.ok(drawnBefore > 0, "先得划出一点");
-    step(s, { pointerHeld: true, pointerWorld: { x: X1, y: LINE_Y + 0.9 } }, 30);
+    step(s, { pointerHeld: true, pointerCard: { u: L.u1, v: GRIP.v + L.slipV + 0.08 } }, 30);
     assert.equal(s.beat.grabbed, false, "手抬离刻线太远，笔必须脱手");
     assert.equal(s.beat.drawn, drawnBefore, "脱手之后印子不该再长");
   }
@@ -802,7 +807,23 @@ function TestChalkIsAPencilNotASlider() {
     step(s, { interactHeld: true, moveX: 1 }, 200);
     assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "按住 E 往右推必须也能划完");
   }
-  console.log("  ✓ 石笔：抓不住就划不动 / 有摩擦 / 会脱手 / 键盘后备可用");
+
+  // ⑤ 这一拍不许出现任何 HUD 轨道：**用户反复要过的就是这一条**——
+  // 画面里有一根可拖的条，玩家就永远去拖那根条，"攥住一支笔"当场作废。
+  {
+    const s = mk();
+    step(s, {}, 2);
+    assert.ok(s.scribeCard, "站定就该亮出那张特写卡");
+    let moved = 0;
+    for (let i = 0; i < 60 && CurrentBeatDef(s)?.id === "c1_carve"; i += 1) {
+      step(s, { pointerHeld: true, pointerCard: { u: GRIP.u + i * 0.006, v: GRIP.v } });
+      assert.ok(!s.dragTrack, "划线这一拍绝不许有拖动轨道（slider）");
+      moved = Math.max(moved, s.scribeCard?.head || 0);
+    }
+    assert.ok(moved > 0, "卡上那支笔得真的跟着手走");
+    assert.ok(!s.dragTrack, "划完之后也不许留下一根轨道");
+  }
+  console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
 }
 
 function TestInstrumentalBgmManifest() {
