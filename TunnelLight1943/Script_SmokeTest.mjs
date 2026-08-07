@@ -1151,10 +1151,40 @@ function TestStrokeWork() {
   console.log("  ✓ 拟物做功：方向要对 / 圈要真绕 / 松手泄劲 / 键盘后备");
 }
 
+// 进村的是一支队伍，不是两个人（用户拿景区实拍立的规矩）：
+// 自行车伪军 + 挎斗摩托（驾驶+斗里的兵）+ 徒步纵队。潜行判定仍只有两个兵——
+// 其余全 decor，否则考场没法玩。这条断言盯两头：队伍要在、考场不许变难。
+function TestRaidColumn() {
+  const state = CreateGame(0);
+  const list = ChapterBeatList(0);
+  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_hide"));
+  const enemies = state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet") && a.visible !== false);
+  const active = enemies.filter((a) => !a.decor);
+  assert.ok(enemies.length >= 10, `进村的得是一支队伍，现在只有 ${enemies.length} 个`);
+  assert.equal(active.length, 2, `参与潜行判定的必须恰好两个兵，现在 ${active.length} 个`);
+  assert.ok(enemies.some((a) => a.mount === "bicycle"), "队伍里得有骑车的伪军");
+  assert.ok(enemies.some((a) => a.mount === "motorcycle"), "队伍里得有挎斗摩托");
+  const side = enemies.find((a) => a.pinTo);
+  assert.ok(side, "挎斗里得坐着一个兵");
+  // 大队伍全部撂在东街（x≥110），撤退线 42→27 与街口 49-57 一个不多占
+  for (const a of enemies) {
+    if (a.decor && a.id !== "traitor") assert.ok(a.x >= 110, `decor 兵 ${a.id} 站到考场里来了（x=${a.x.toFixed(1)}）`);
+  }
+  // 钉在车上的兵要真的跟着车走
+  const moto = state.actors.find((a) => a.id === "motoLead");
+  moto.cineTarget = { x: moto.x - 6 };
+  moto.cineSpeed = 3;
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  for (let i = 0; i < 90; i += 1) StepGame(state, idle, DT);
+  assert.ok(Math.abs(side.x - (moto.x + side.pinTo.dx)) < 0.05, "挎斗里的兵没跟住车");
+  console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestWorkStations();
 TestVaultC1();
+TestRaidColumn();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestKnotKeyboardFallback();

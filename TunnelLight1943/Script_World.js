@@ -259,6 +259,13 @@ export function CreateWorld(canvasEl) {
     return obj;
   }
 
+  // 背景层里也有演员（远处那条街上干活的乡亲）：同一套深度带，只是层基数不同
+  function SetLayerOrder(obj, layerKey, z, tag = layerKey) {
+    CheckBandZ(tag, z);
+    const order = DepthOrder(layerKey, z);
+    obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
+  }
+
   function SetPlayOrder(obj, z, tag = "SetPlayOrder") {
     CheckBandZ(tag, z);
     const order = DepthOrder("play", z);
@@ -367,6 +374,9 @@ export function CreateWorld(canvasEl) {
   let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
   let barrowMesh = null;
+  // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
+  // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
+  const mountMeshes = new Map();
   // 自由放下的落地道具：uid → mesh（uid 在 Core 里随放下动作分配）
   const groundItemMeshes = new Map();
   let bubbleMeshes = [];
@@ -427,6 +437,7 @@ export function CreateWorld(canvasEl) {
     barkMesh = null;
     chainItemMeshes = [];
     barrowMesh = null;
+    mountMeshes.clear();
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
     bubbleMeshes = [];
@@ -609,7 +620,11 @@ export function CreateWorld(canvasEl) {
     return mesh;
   }
 
-  function AddRidgeBand(group, length, color, id, { amp = 26, base = 34, blur = 2.2, lift = 0.6, opacity = 1 } = {}) {
+  // 地平线那两条远带。**这是冀中平原，不是山区**——地道战打的就是无险可守的
+  // 大平原（正因为一马平川，才只能往地下挖）。所以起伏一律压到几个像素：
+  // 剩下的纵深不靠山脊，靠一层层雾、地里的树行、和远处村落的剪影。
+  // 原来 amp 给到 40/26，画出来是两道山梁——地理错了，故事也就跟着不成立。
+  function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, opacity = 1, rows = 0 } = {}) {
     const worldW = length * 0.5 + 90;
     const wPx = Math.ceil(worldW * PPM * 0.34);
     const hPx = 180;
@@ -618,17 +633,80 @@ export function CreateWorld(canvasEl) {
       ctx.beginPath();
       ctx.moveTo(0, hPx);
       for (let px = 0; px <= wPx; px += 22) {
+        // 平原的地平线不是一把尺子：留一点极缓的起伏（田块与土路的高差）
         const y = hPx - base - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
         ctx.lineTo(px, y);
       }
       ctx.lineTo(wPx, hPx);
       ctx.closePath();
       ctx.fill();
+      // 平原的纵深全靠地平线上那一排小东西：防风林的树行、几户人家的屋脊。
+      // 跟带子同色同一张贴图里画完，不额外增加网格
+      for (let i = 0; i < rows; i += 1) {
+        const px = (i + 0.5) * (wPx / rows) + ART.Hash(id + "r" + i) * 60 - 30;
+        const top = hPx - base - 2;
+        if (ART.Hash(id + "k" + i) > 0.45) {
+          // 树行：几团挨着的圆冠，一带就是一道防风林
+          const n = 3 + Math.floor(ART.Hash(id + "n" + i) * 4);
+          for (let t = 0; t < n; t += 1) {
+            const tx = px + t * 9 - n * 4.5;
+            const r = 4.5 + ART.Hash(id + "t" + i + t) * 3;
+            ctx.beginPath();
+            ctx.ellipse(tx, top - r * 0.5, r, r * 0.9, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          // 远处的一户：矮墙 + 一道屋脊
+          const w2 = 14 + ART.Hash(id + "w" + i) * 12;
+          ctx.fillRect(px - w2 / 2, top - 7, w2, 8);
+          ctx.beginPath();
+          ctx.moveTo(px - w2 / 2 - 3, top - 7);
+          ctx.lineTo(px, top - 13);
+          ctx.lineTo(px + w2 / 2 + 3, top - 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }, blur, 1, { color: hazeColor, amount: opacity < 0.9 ? 0.5 : 0.35 });
     PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
     ScaleKeepGround(mesh, 2.9, 1);
     mesh.material.opacity = opacity;
     group.add(mesh);
+  }
+
+  // 地平线上的炮楼。1942-43 年的冀中，日军「囚笼政策」把平原用公路、封锁沟和
+  // **每隔几里一座的炮楼**割成小块——站在村里往哪边看都能看见一两座，
+  // 这就是"敌后"两个字的字面意思。所以它们不是布景，是这一章的处境本身。
+  //
+  // 摆在 hills/farTown 层：一律**只画剪影**（层的糊与雾色会把细节吃掉，
+  // 画细了是白费）。夜里楼顶点一粒灯——这游戏讲的就是灯。
+  // 把远景带的颜色压深一档：炮楼是这片空地上唯一的硬边，跟地平线同色就白摆了
+  const Darken = (hex, k) => {
+    const n = parseInt(hex.slice(1), 16);
+    const f = (v) => Math.max(0, Math.round(v * k));
+    return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  };
+
+  function AddHorizonForts(list, pal, night, ruined) {
+    for (const spec of list || []) {
+      const key = spec.layer;
+      const group = layers[key];
+      if (!group) continue;
+      const hM = spec.h || 12;                   // 炮楼一般十来米，平原上老远就看得见
+      const wPx = 150, hPx = Math.ceil(hM * PPM * 0.42) + 40;
+      // 糊与雾都只给该层的一半：一片空地上竖着的砖石塔，本来就比田野的
+      // 轮廓硬、比远村的色深。按整层的量去糊，它就化进地平线里没了
+      const haze = HazeFor(key);
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 6, (ctx, ax, ay) => {
+        ART.DrawHorizonFort(ctx, ax, ay, hM * PPM * 0.42, spec.id,
+          { color: Darken(pal, night ? 0.82 : 0.72), lit: night && !ruined });
+      }, (LAYER_BLUR[key] || 0) * 0.45, 1, haze && { color: haze.color, amount: haze.amount * 0.5 });
+      PlaceSprite(mesh, spec.x, SURFACE_Y - 0.1, 0);
+      // 层的补偿只服务于铺满画框的背景板；离散的建筑要按透视自然变小
+      ScaleKeepGround(mesh, 1 / LAYER_COMP[key]);
+      mesh.material.opacity = key === "hills" ? 0.95 : 0.88;
+      group.add(mesh);
+    }
   }
 
   // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
@@ -784,6 +862,105 @@ export function CreateWorld(canvasEl) {
       ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
       mesh.material.opacity = opacity;
       group.add(mesh);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 背景里的乡亲：远处那条街上也有人在过日子
+  //
+  // **不能拿一张静止贴图平移**——那正是"翻越做了等于没做"的老毛病，一眼看出是
+  // 块滑动的板子。这里用的是跟前景一模一样的骨架：远处的人真的在迈腿、真的在
+  // 一下一下落锄。代价是每人十来个小网格，几个人的量换得起。
+  //
+  // 摆位/缩放/隐没三件事都跟着所在层走：
+  //   · 层已经整体放大了 LAYER_COMP，离散物件要按 1/COMP 抵消回去，
+  //     人才会按透视自然变小（跟 AddParallaxTrees 的 scale 是同一回事）；
+  //   · 不透明度 = (1 - 该层空气透视量) × 该层树的不透明度，
+  //     人就跟树一起往雾色里退——背景层的糊是烘进贴图的，骨架糊不了，
+  //     只能靠这个把他们"推远"；
+  //   · 绘制序号走 ACTOR_Z，于是本层的人永远站在本层的树之前。
+  // ---------------------------------------------------------------------------
+  let backdropFolk = [];
+
+  // 各层树列用的不透明度（AddParallaxTrees 的 opacity）——背景里的人跟着树走，
+  // 一层里的东西该有一样的"实"度
+  const LAYER_TREE_ALPHA = { midTrees: 0.86, nearTrees: 0.96 };
+
+  // 干什么活 → 用哪条循环轨道、手里拿什么、朝哪边。走动的另给 from/to
+  const FOLK_ACT = {
+    hoe: { track: "hoeing", carry: "锄头" },
+    saw: { track: "sawing", carry: "锯" },
+    sweep: { track: "sweeping", carry: "扫帚" },
+    feed: { track: "scatterFeed", carry: null },
+    walk: { track: null, carry: null },
+    haul: { track: null, carry: "木料" },   // 扛着木料走的：carry 姿势 + 走路
+  };
+
+  function ClearBackdropFolk() {
+    // 骨架的 group 是 THREE.Group，ClearGroup 只 dispose 直接子级里的 Mesh，
+    // 碰不到它们——材质是 CloneMesh 克隆出来的（贴图共享，不能动），自己收
+    for (const f of backdropFolk) {
+      f.rig.group.traverse((o) => { if (o.isMesh) o.material.dispose(); });
+    }
+    backdropFolk = [];
+  }
+
+  function AddBackdropFolk(sceneDef, ch, night) {
+    const list = sceneDef.backdropFolk || [];
+    // 天黑了乡亲都在屋里（第二章是夜里的扫荡，街上只该有灯和兵）
+    if (night || !list.length) return;
+    for (const spec of list) {
+      const key = spec.layer;
+      const host = layers[key];
+      if (!host) continue;
+      const act = FOLK_ACT[spec.act];
+      if (!act) continue;
+      const kind = spec.kind || "villager";
+      const rig = CreateRig(kind);
+      host.add(rig.group);
+      SetLayerOrder(rig.group, key, ACTOR_Z, "folk:" + key);
+      // 空气透视：背景层的糊与雾色是**烘进贴图**的，骨架烘不了，只能靠半透
+      // 让背景色透上来——那正好就是雾色，效果等价。系数比树再重半档：
+      // 树是一团色块，人有一圈墨线，同样的透明度下人显得比树"实"
+      const fade = (1 - (LAYER_FADE[key] || 0) * 1.5) * (LAYER_TREE_ALPHA[key] ?? 0.9);
+      rig.group.traverse((o) => { if (o.isMesh) o.material.opacity = fade; });
+      const scale = (BODY_SCALE[kind] ?? 1) / LAYER_COMP[key];
+      const f = {
+        rig, layerKey: key, bodyScale: scale, scale,
+        x: spec.x, from: spec.from, to: spec.to,
+        speed: spec.speed || 0.9, dir: spec.heading ?? 1,
+        heading: spec.heading ?? (spec.act === "hoe" || spec.act === "saw" ? -1 : 1),
+        track: act.track, trackT: ART.Hash(spec.id) * 2.4,   // 错开相位，免得几个人同手同脚
+        carryLabel: act.carry, shoulder: spec.act === "haul",
+        phase: ART.Hash(spec.id + "p") * 6, idleT: ART.Hash(spec.id + "i") * 6,
+        carryMesh: null, carryLabel0: null,
+      };
+      rig.group.position.set(f.x, SURFACE_Y, 0);
+      backdropFolk.push(f);
+    }
+  }
+
+  function StepBackdropFolk(dt) {
+    for (const f of backdropFolk) {
+      let moved = 0;
+      if (f.from !== undefined && f.to !== undefined) {
+        const nx = f.x + f.dir * f.speed * dt;
+        if (nx >= f.to) { f.x = f.to; f.dir = -1; }
+        else if (nx <= f.from) { f.x = f.from; f.dir = 1; }
+        else { moved = Math.abs(nx - f.x); f.x = nx; }
+        f.heading = f.dir;
+        f.rig.group.position.x = f.x;
+      }
+      const moving = moved > 1e-4;
+      f.phase += moving ? moved * 3.4 : dt * 2.2;
+      f.idleT += dt * 1.4;
+      if (f.track) f.trackT += dt;
+      PoseRig(f.rig, {
+        phase: f.phase, breath: f.idleT, moving,
+        carry: f.shoulder, track: f.track, trackT: f.trackT,
+      }, dt);
+      f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
+      if (f.carryLabel) SyncCarry(f, f.carryLabel, f.heading);
     }
   }
 
@@ -1458,6 +1635,7 @@ export function CreateWorld(canvasEl) {
     propRedraw = [];
     carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved };
     carveRebuild = null;
+    ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
     InvalidateSceneCaches();
     dustMotes = [];
@@ -1525,10 +1703,13 @@ export function CreateWorld(canvasEl) {
       dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
     }[ch.light] || { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" };
 
+    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
     AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
-      { amp: 40, base: 58, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7 });
+      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7, rows: 14 });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
-      { amp: 26, base: 34, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88 });
+      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88, rows: 20 });
+    // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
+    AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
 
     // 各深度层各铺一条地面：透视下它们逐级收向地平线，地就"退"出去了
     const farEarth = {
@@ -1576,6 +1757,8 @@ export function CreateWorld(canvasEl) {
           ...(dense ? { step: 14 } : {}), hazeOpt: HazeFor("nearTrees") });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
+    // 背景层的乡亲最后放：他们要挂在已经建好的树列之间
+    AddBackdropFolk(sceneDef, ch, night);
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
@@ -1747,16 +1930,47 @@ export function CreateWorld(canvasEl) {
 
   // 手里/肩上的东西。原先只有玩家有，于是"梁木匠把刨子放下"这种戏只能靠
   // 字幕说——演员手上空空。现在所有演员共用这一套。
+  // s.layerKey 缺省是 play；背景层的乡亲把自己那层的名字带进来，
+  // 手上的家伙就跟着挂到同一层（不然锄头会留在前景，隔着十几米跟着人走）
+  // 坐骑：车是一张贴图，骑手是正常演员。自行车摆在骑手**身后**（细钢管架，
+  // 人要整个压在车上才读得出"骑"）；挎斗摩托摆在**身前**（近侧的斗得盖住
+  // 斗里那个兵的下半身，他才是"坐在斗里"而不是"蹲在车顶上"）。
+  // 画笔一律画朝 -x（车头在左），朝 +x 走时整张镜像。
+  function SyncMount(a, show) {
+    let m = mountMeshes.get(a.id);
+    if (!a.mount || !show) {
+      if (m) m.visible = false;
+      return;
+    }
+    if (!m || m.userData.mountKind !== a.mount) {
+      if (m) layers.play.remove(m);
+      m = a.mount === "bicycle"
+        ? BakeSprite(130, 64, 65, 58, (ctx, ax, ay) => ART.DrawBicycle(ctx, ax, ay, a.id + "bike"), 0, PROP_SS)
+        : BakeSprite(160, 74, 80, 68, (ctx, ax, ay) => ART.DrawMotorcycle(ctx, ax, ay, a.id + "moto"), 0, PROP_SS);
+      m.userData.mountKind = a.mount;
+      SetPlayOrder(m, a.mount === "bicycle" ? BAND.loose : CARRY_Z, "mount:" + a.mount);
+      layers.play.add(m);
+      mountMeshes.set(a.id, m);
+    }
+    m.visible = true;
+    PlaceSprite(m, a.x, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
+  }
+
   function SyncCarry(s, label, heading) {
+    const layerKey = s.layerKey || "play";
+    const host = layers[layerKey];
     if (label && (!s.carryMesh || s.carryLabel !== label)) {
-      if (s.carryMesh) layers.play.remove(s.carryMesh);
+      if (s.carryMesh) host.remove(s.carryMesh);
       s.carryMesh = MakeCarryMesh(label);
-      s.carryMesh.userData.persist = true;   // 跟着演员走，不该被环境重建清掉
+      // 前景演员的家伙要挺过环境重建（人是 persist 的）；背景乡亲整批随层重建，
+      // 标了 persist 反而会剩一把没人的锄头浮在那儿
+      if (layerKey === "play") s.carryMesh.userData.persist = true;
       s.carryLabel = label;
-      layers.play.add(s.carryMesh);
-      SetPlayOrder(s.carryMesh, CARRY_Z);
+      host.add(s.carryMesh);
+      SetLayerOrder(s.carryMesh, layerKey, CARRY_Z, "carry:" + layerKey);
     } else if (!label && s.carryMesh) {
-      layers.play.remove(s.carryMesh);
+      host.remove(s.carryMesh);
       s.carryMesh = null;
       s.carryLabel = null;
     }
@@ -1767,7 +1981,10 @@ export function CreateWorld(canvasEl) {
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = ALONG_ARM.includes(label);
     const inHand = IsHandHeld(label);
-    const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
+    // HandPoint/ShoulderPoint 给的是**世界**坐标；背景层带着自己的缩放与 z 偏移，
+    // 直接拿去当局部坐标，锄头会飞到十几米外。换算回本层的局部系再摆
+    const ToLocal = (v) => (layerKey === "play" ? v : host.worldToLocal(v));
+    const anchor = ToLocal(inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig));
     const bs = s.bodyScale || 1;
     // 提在手里的：贴图中心就是桶沿，挂在拳头底下一点点就够了。原先垂 0.20m 是
     // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
@@ -1782,7 +1999,7 @@ export function CreateWorld(canvasEl) {
     s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
-      const elbow = ElbowPoint(s.rig);
+      const elbow = ToLocal(ElbowPoint(s.rig));
       s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y));
     } else {
       s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
@@ -1945,8 +2162,11 @@ export function CreateWorld(canvasEl) {
         // 人不在画面里，跟着他的那几件也得一起收：影子、手上提的、提着的灯。
         // 不这么写，娘走进屋之后墙上会剩一只浮着的桶、门口留一团没人的影子
         for (const m of [s.shadow, s.castShadow, s.carryMesh, s.lampMesh]) if (m) m.visible = false;
+        SyncMount(a, false);
         continue;
       }
+      // 坐骑（自行车/挎斗摩托）：车跟人走，人骑在车上（pose + lift 是 Core 给的）
+      SyncMount(a, true);
       const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
       // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
       const underTunnel = (a.level === "under")
@@ -1995,6 +2215,11 @@ export function CreateWorld(canvasEl) {
     }
     for (const g of glows) if (g.visible) g.userData.SetBlockers?.(bodyBlockers);
     for (const m of lampMeshes) if (m.glow?.visible) m.glow.userData.SetBlockers?.(bodyBlockers);
+
+    // 人没了车也得收（SpawnRaidSoldiers 会整批换敌人）
+    for (const [id, m] of mountMeshes) {
+      if (!seen.has(id)) { layers.play.remove(m); mountMeshes.delete(id); }
+    }
 
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
@@ -2075,6 +2300,7 @@ export function CreateWorld(canvasEl) {
         && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
       for (const m of fp.meshes) m.visible = on;
     }
+    StepBackdropFolk(dt);
     // 画法随旗标变的那几张（井绳断口、木料堆里露出的绳头）：只重烘自己那一张
     for (const r of propRedraw) {
       const v = !!state.flags[r.flag];
@@ -3569,6 +3795,11 @@ export function CreateWorld(canvasEl) {
         paused: el?.paused ?? true, t: +(el?.currentTime ?? 0).toFixed(2), d: el?.duration || 0,
       };
     },
+    // 背景乡亲动没动，截图上不好逐帧比——问它
+    __folk: () => backdropFolk.map((f) => ({
+      x: +f.x.toFixed(2), act: f.track || (f.shoulder ? "haul" : "walk"),
+      t: +f.trackT.toFixed(2), phase: +f.phase.toFixed(2), layer: f.layerKey,
+    })),
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),

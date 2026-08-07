@@ -77,6 +77,27 @@
         { "x": 84, "w": 1.5, "top": 0.82 },
         { "x": 38, "w": 1.6, "top": 0.72, "flag": "raidStarted" }
       ],
+      "_horizonFortsNote": [
+        "地平线上的炮楼。1942-43 年冀中的「囚笼政策」：公路、封锁沟，外加**每隔几里一座的炮楼**，",
+        "把一马平川切成小块——站在村里往哪边看都能看见一两座。这不是布景，是「敌后」两个字的字面意思，",
+        "也是全作地理的前提：正因为无险可守，才只能往地下挖。所以远景那两条带子是压平的平原，不是山梁。",
+        "layer：**只用 hills(-44m，comp 2.833)**，一条地平线一排塔。试过再往 farTown(-26m) 加一档近的——两层的视差速率不同，走着走着两座就叠在一起，同形同色叠出来是个畸形轮廓，读不成两座楼。同层排列间距固定，永远不会撞。",
+        "**x 是层内坐标**（同 backdropFolk）：某座在 camX ∈ x*COMP ± 6.3*(dist+|z|)/dist 时进画面，",
+        "村庄默认机位 dist=13.8 → hills ±26.4，一屏能看见 18.6 个层内单位。间距取 6~8（不匀）＝同屏两三座，这就是「囚笼」四个字看得见的样子。",
+        "h 是米（炮楼一般十来米）。夜里楼顶自动点一粒灯；村子烧过之后(ruined)不点。"
+      ],
+      "horizonForts": [
+        { "id": "hf1", "layer": "hills", "x": 3, "h": 12 },
+        { "id": "hf2", "layer": "hills", "x": 10.5, "h": 10.5 },
+        { "id": "hf3", "layer": "hills", "x": 16, "h": 13 },
+        { "id": "hf4", "layer": "hills", "x": 24, "h": 11 },
+        { "id": "hf5", "layer": "hills", "x": 30.5, "h": 12.5 },
+        { "id": "hf6", "layer": "hills", "x": 38, "h": 10 },
+        { "id": "hf7", "layer": "hills", "x": 44, "h": 13.5 },
+        { "id": "hf8", "layer": "hills", "x": 51.5, "h": 11.5 },
+        { "id": "hf9", "layer": "hills", "x": 58, "h": 12 },
+        { "id": "hf10", "layer": "hills", "x": 65, "h": 10.5 }
+      ],
       "_coversNote": "掩体链=第二章的潜行场地，疏密就是关卡节奏。tall（草垛/齐胸断墙）站着就挡得住，矮的（柴堆/水瓮）得蹲。间距刻意不匀：88→107、107→132 两段长空地是难点，那里另有推着走的板车当移动掩体",
       "covers": [
         { "id": "firewood", "kind": "firewood", "x": 44.5, "w": 2.2, "note": "在院门边：屋子做成可进入之后柴堆不能搁屋里；第一章「把刨子塞进柴堆」也才有处可塞" },
@@ -97,6 +118,25 @@
         { "id": "lookLine", "x": 94.5, "note": "赵家晾的粗布衫打着三块补丁。风一鼓，空袖子像在招手。" },
         { "id": "lookMill", "x": 118, "w": 1.8, "note": "碾盘上还留着昨儿碾谷的糠皮。全村就这一台碾子，谁家碾米都得排着来。" },
         { "id": "lookDog", "x": 138, "w": 1.8, "note": "王家的大黄狗睡得正沉，尾巴梢偶尔抖一下。村里人他一个都不咬。" }
+      ],
+      "_backdropFolkNote": [
+        "背景层里干活的乡亲：视差层的树列之间也得有人。他们是**骨架不是贴图**——真迈腿、真落锄（静止贴图平移一眼就看出是块滑动的板子）。天黑不出，夜里乡亲都在屋里。",
+        "layer：一律 midTrees(-15m)。**别用 nearTrees**——那层只退到 -7.5m，人有前景的六成半大，会跟玩家抢戏，看着像第二个主角。midTrees 是四成八，一眼就是背景。",
+        "act 见 World 的 FOLK_ACT：hoe/saw/sweep/feed 是定点循环，walk/haul 要另给 from/to/speed。",
+        "**x 是层内坐标，不是前景的 x**——背景层整体放大过 LAYER_COMP，视差还会让它随镜头漂。",
+        "换算：某人在镜头 camX 时看起来落在前景的 apparent = camX + (x*COMP - camX)*dist/(dist+|z|)，",
+        "村庄默认机位 dist=13.8、画宽 12.6，于是他在玩家走到 camX ∈ x*COMP ± (6.3*(dist+|z|)/dist) 时出现在画面里：",
+        "midTrees(COMP 1.625) 覆盖 ±13.2 米、nearTrees(COMP 1.3125) 覆盖 ±9.7 米。",
+        "下面这串就是按这个窗口首尾相接排的，玩家沿街走过去总有人在远处干活；村东口(166 以东)故意留空——那是出村的路，本来就荒。"
+      ],
+      "backdropFolk": [
+        { "id": "bfHoeW", "layer": "midTrees", "x": 8.6, "act": "hoe", "heading": -1, "note": "村西头田里锄地的：跟娘的菜畦一远一近，同一件活" },
+        { "id": "bfSweepW", "layer": "midTrees", "x": 24.6, "act": "sweep", "heading": -1 },
+        { "id": "bfWalkW", "layer": "midTrees", "x": 40.6, "act": "walk", "from": 38, "to": 44, "speed": 0.7 },
+        { "id": "bfFeedM", "layer": "midTrees", "x": 56.6, "act": "feed", "heading": -1 },
+        { "id": "bfSawE", "layer": "midTrees", "x": 72.6, "act": "saw", "heading": 1, "note": "爹不是村里唯一的木匠。**别摆在工作台(40.5)正后方**——那一格的背景人跟爹同一个动作又同一条竖线，看着像重影；这个坑位覆盖的是玩家在老槐树一带(105~131)的时候" },
+        { "id": "bfHaulE", "layer": "midTrees", "x": 88.6, "act": "haul", "from": 86, "to": 92, "speed": 0.6 },
+        { "id": "bfHoeE", "layer": "midTrees", "x": 104.6, "act": "hoe", "heading": 1 }
       ],
       "zones": {
         "homeYard": { "x": 37, "w": 13, "label": "家里的院子" },
@@ -129,6 +169,14 @@
         { "id": "gate", "kind": "fortGate", "x": 172, "name": "据点南门" },
         { "id": "blockhouse", "kind": "blockhouse", "x": 184, "name": "炮楼" },
         { "id": "prisonShed", "kind": "prison", "x": 192, "name": "牢房" }
+      ],
+      "horizonForts": [
+        { "id": "hfF1", "layer": "hills", "x": 4, "h": 12 },
+        { "id": "hfF2", "layer": "hills", "x": 12, "h": 10.5 },
+        { "id": "hfF3", "layer": "hills", "x": 21, "h": 13 },
+        { "id": "hfF4", "layer": "hills", "x": 30, "h": 11 },
+        { "id": "hfF5", "layer": "hills", "x": 40, "h": 12.5 },
+        { "id": "hfF6", "layer": "hills", "x": 50, "h": 11 }
       ],
       "covers": [
         { "id": "ditchCover", "kind": "ditch", "x": 8, "w": 12 },
@@ -175,6 +223,15 @@
         { "id": "bellWire", "kind": "bell", "x": 142, "name": "预警铃位" },
         { "id": "waterVat", "kind": "vat", "x": 116, "level": "under", "name": "水瓮", "note": "藏人洞里备着的：四章浸棉被" },
         { "id": "pigpenDog", "kind": "dog", "x": 22, "name": "猪圈的狗", "note": "西头第三家（五章）" }
+      ],
+      "horizonForts": [
+        { "id": "hfT1", "layer": "hills", "x": 3, "h": 12 },
+        { "id": "hfT2", "layer": "hills", "x": 11, "h": 11 },
+        { "id": "hfT3", "layer": "hills", "x": 19, "h": 13 },
+        { "id": "hfT4", "layer": "hills", "x": 27, "h": 10.5 },
+        { "id": "hfT5", "layer": "hills", "x": 35, "h": 12.5 },
+        { "id": "hfT6", "layer": "hills", "x": 44, "h": 11.5 },
+        { "id": "hfT7", "layer": "hills", "x": 52, "h": 12 }
       ],
       "covers": [],
       "_tightNote": "卡口与赶工掏出来的段：只能爬过去",

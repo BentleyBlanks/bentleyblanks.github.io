@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=039";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=039";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=040";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=040";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=039")
+import("./Script_Audio.js?v=040")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -715,10 +715,11 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider）：划线攥的是特写卡
-  // 上那支笔，刨料攥的是世界里那把刨子——进度长在木头上（印子/毛面变亮），
-  // 招呼玩家上手的是道具自己（笔会晃、刨子透光呼吸）。这里曾有一块
-  // #scribeGuide 拖动轨道的同步代码，已连元素和 CSS 一起拆掉，别加回来。
+  // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider，两次退回）：
+  // 划线攥的是特写卡上那支笔，刨料攥的是世界里那把刨子——进度长在木头上
+  // （印子/被刨亮的那一片/地上那堆刨花），招呼玩家上手的是道具自己
+  // （笔会晃、刨子透光呼吸）。这里曾有一块 #scribeGuide 拖动轨道的同步代码，
+  // 已连元素和 CSS 一起拆掉，别加回来。
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
