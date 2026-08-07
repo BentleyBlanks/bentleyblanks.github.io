@@ -36,6 +36,29 @@ const ALLOWED = new Set([
   ...Object.values(BAND), ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z,
 ]);
 
+// ---------------------------------------------------------------------------
+// 翻越尺度规范（2026-08-07 用户定，以第一章那堵塌墙为基准）
+//
+// 「翻越」这个动作的定义是**一只手撑在顶沿上、身子绕着那只手转过去**。
+// 撑得住的前提是顶沿不高过撑手的人的胯——高过胯就得先把身子拽上去，
+// 那是"攀"不是"翻"，两套动作、两套动画，不许混用一个 vault。
+//
+// 基准：第一章巷口那堵塌墙 top = 0.82m。柱子这年 1.38m 高、站立胯高约 0.50m，
+// 0.82m 落在他胸口下沿——单手撑住、腿从顶上扫过去，是这个动作的**上限**。
+// 所以：
+export const VAULT_MAX_TOP = 0.85;   // 可翻越物顶沿高度硬上限（世界米）
+export const VAULT_MIN_TOP = 0.25;   // 低于这个就是"跨一步"，不值得占一个按键
+// 站立胯高（第一章柱子：BONE.hipY 0.62 × bodyScale 0.80）。抬升按
+// 「顶沿 + 余量 − 胯高」算绝对值，不按顶沿的百分比——百分比会让矮障碍
+// 抬得过高、高障碍抬得不够，两头都不像撑手翻越。
+export const VAULT_HIP_STAND = 0.50;
+export const VAULT_HIP_CLEAR = 0.10;   // 胯骨压过顶沿的余量
+
+/** 一件可翻越物该把人抬多高（米）。挡在 [MIN,MAX] 之外的高度由加载期校验拦掉 */
+export function VaultLiftFor(top) {
+  return Math.max(0.05, (top ?? 0) + VAULT_HIP_CLEAR - VAULT_HIP_STAND);
+}
+
 const warned = new Set();
 /**
  * 放置校验：z 不在规范表里就告警（每个 tag+z 只报一次，不打断运行）。

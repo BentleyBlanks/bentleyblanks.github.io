@@ -14,6 +14,7 @@ import {
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
 
 const DT = 1 / 30;
 
@@ -447,6 +448,7 @@ function TestVaultC1() {
     const dir = Math.sign(c.to - c.from);
     let peakLift = 0, sawPose = false, started = false, sawHint = false, blockedX = null;
     const cues = [];
+    const liftTrace = [];
     for (let i = 0; i < 900; i += 1) {
       // 只走路：先确认它真的**挡住**了（走 3 秒都过不去），再按键翻
       const press = i > 180 && state.vaultHint;
@@ -461,6 +463,7 @@ function TestVaultC1() {
       if (state.player.vaultT > 0) {
         started = true;
         peakLift = Math.max(peakLift, state.player.lift || 0);
+        liftTrace.push(state.player.lift || 0);
         if (state.player.pose === "vault" || state.player.pose === "clamber") sawPose = true;
       }
       if (dir > 0 ? state.player.x >= c.to : state.player.x <= c.to) break;
@@ -476,11 +479,42 @@ function TestVaultC1() {
       `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，没越过 ${c.top} 的顶沿——那是平移不是翻`);
     assert.ok(hipPeak < c.top + 0.45,
       `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，比顶沿高出太多——腾空了，撑手就按不住墙头`);
+    // **这一条盯的是「翻」和「跳」的分水岭**：撑手翻越的高度曲线是带平台的
+    // 梯形（手是支点，胯骑在顶沿上、腿从顶上扫过），跳跃是对称的抛物线。
+    // 这个动作被退回过两次，两次都是因为用了正弦弧——所以直接量平台。
+    assert.equal(peakLift.toFixed(3), VaultLiftFor(c.top).toFixed(3),
+      `${c.label}：抬升峰值必须按规范算（VaultLiftFor＝顶沿+余量−站立胯高）`);
+    const plateau = liftTrace.filter((v) => v > peakLift - 0.005).length;
+    assert.ok(plateau / liftTrace.length > 0.25,
+      `${c.label}：顶点只停了 ${(plateau / liftTrace.length * 100).toFixed(0)}% 的时长——`
+      + "尖顶的弧就是抛物线，那是跳不是翻。撑手翻越必须在顶沿高度上停一段（腿扫过去）");
+    // 落下要比撑起来快（松手之后是重力说了算），否则读起来还是"飘"下来的
+    const up = Math.max(...liftTrace.map((v, i) => (i ? v - liftTrace[i - 1] : 0)));
+    const down = Math.max(...liftTrace.map((v, i) => (i ? liftTrace[i - 1] - v : 0)));
+    assert.ok(down > up * 0.9, `${c.label}：落下比撑起来还慢——松手之后该是重力接手`);
     assert.ok(cues.includes("vault") || cues.includes("vaultHeavy"), `${c.label}：缺起手音效`);
     assert.ok(cues.includes("vaultLand"), `${c.label}：缺落地音效`);
     assert.equal(state.player.lift || 0, 0, `${c.label}：翻完必须落回地面`);
     assert.ok(dir > 0 ? state.player.x >= c.to : state.player.x <= c.to,
       `${c.label}：翻完必须真的到了另一侧`);
+  }
+
+  // 翻越尺度规范（全作，不只第一章）：顶沿高过撑手的人的胯，「翻」就成了
+  // 「攀」。上限以第一章那堵塌墙（0.82m）为基准定在 VAULT_MAX_TOP。
+  // 加载期 Data_Scenes 已经会抛，这里再明写一遍——规范要看得见，不能只藏在校验里。
+  {
+    for (const [key, scene] of Object.entries(SCENES)) {
+      for (const v of scene.vaults || []) {
+        assert.ok(typeof v.top === "number", `${key} 的可翻越物 x=${v.x} 没写 top`);
+        assert.ok(v.top <= VAULT_MAX_TOP,
+          `${key} 的可翻越物 x=${v.x} 顶沿 ${v.top}m 超过上限 ${VAULT_MAX_TOP}m（高过胯就撑不住了）`);
+        assert.ok(v.top >= VAULT_MIN_TOP,
+          `${key} 的可翻越物 x=${v.x} 顶沿 ${v.top}m 低于下限 ${VAULT_MIN_TOP}m（一步就跨过去了）`);
+      }
+    }
+    // 基准本身别被人悄悄改大：0.82 是第一章那堵墙，它就是这条规范的样板
+    assert.ok(VAULT_MAX_TOP >= 0.82 && VAULT_MAX_TOP <= 0.90,
+      `翻越上限 ${VAULT_MAX_TOP} 偏离了基准（第一章那堵塌墙 0.82m）`);
   }
 
   // 摆位铁律：跑腿路线（院子 31~70：水桶、木料、独轮车都在这一段）上

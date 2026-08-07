@@ -600,6 +600,15 @@ export function PoseRig(rig, s, dt) {
       thighB: -96, shinB: 104, footB: 14, thighF: -78, shinF: 92, footF: 12,
     };
     // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
+    // ②′ 还骑在顶沿上，但**腿已经从后面扫到了前面**——这一帧是"翻"和"跳"
+    //    的分水岭：高度不变（撑手是支点），变的是腿从墙这边扫到墙那边。
+    //    少了它，中段就成了一动不动的抱膝定格，读出来还是腾空
+    const B2 = {
+      hipY: 0.00, hipX: 0.22, torso: 30, head: -16,
+      armF: 44, foreF: -14, armB: 26, foreB: -10,
+      thighB: -46, shinB: 62, footB: 6, thighF: -70, shinF: 46, footF: -4,
+    };
+    // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
     const C = {
       hipY: -0.24, hipX: 0.04, torso: 26, head: -12,
       armF: 22, foreF: -30, armB: 34, foreB: -22,
@@ -611,11 +620,17 @@ export function PoseRig(rig, s, dt) {
       A.armF = -46; A.torso = 50;
       B.armF = 14; B.foreF = -20; B.torso = 46; B.hipY = -0.06;
       B.thighB = -74; B.shinB = 86; B.thighF = -58; B.shinF = 78;
+      B2.armF = 20; B2.torso = 42; B2.hipY = -0.08;
+      B2.thighB = -40; B2.shinB = 56; B2.thighF = -60; B2.shinF = 44;
       C.armF = -14; C.foreF = -30;
     }
-    const mid = heavy ? 0.48 : 0.44;
-    let from = A, to = B, u = k / mid;
-    if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
+    // 姿势的三段必须和**抬升曲线**的三段对齐（Core.VaultArc 的 rise/fall）：
+    // 撑起来 → 骑在顶沿上腿扫过 → 松手落下。对不齐就会出现"人还在墙头上、
+    // 腿却已经摆出落地姿势"这种一眼假
+    const rise = 0.30, fall = heavy ? 0.72 : 0.64;
+    let from = A, to = B, u = k / rise;
+    if (k >= fall) { from = B2; to = C; u = (k - fall) / (1 - fall); }
+    else if (k >= rise) { from = B; to = B2; u = (k - rise) / (fall - rise); }
     u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
     for (const key of Object.keys(A)) {
       const v = from[key] + (to[key] - from[key]) * u;

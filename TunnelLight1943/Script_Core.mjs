@@ -7,6 +7,7 @@
 // 场景布局是数据不是代码：坐标/尺寸/旗标门在 Data_Scenes.json，贴图与深度带在
 // Data_PropArt.json，加载与校验在 Data_Scenes.mjs（配错在加载时就抛）。
 import { SCENES } from "./Data_Scenes.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP } from "./Data_DepthSpec.mjs";
 
 export const GAME_VERSION = "0.3.0";
 
@@ -163,14 +164,31 @@ function VaultTravel(k) {
   return 0.58 + 0.42 * (u * (2 - u));                           // 腿过了顶沿，荡下去
 }
 
-// 抬升弧（相对障碍高度的倍数）。峰值不该比障碍高出一大截——0.74 时髋部
-// 飞到齐胸，人是"腾"过去的；0.58 让髋刚好擦着顶沿过，撑手才按得住墙头。
-function VaultArc(k, big) {
+// 抬升曲线（返回**绝对米数**，不再是障碍高度的倍数）。
+//
+// 这里被退回过两次，症结每次都一样：**对称的正弦弧＝抛物线＝跳跃**。
+// 起跳、到顶、落下三段等时等距，读出来就是"蹦过去"，跟撑手翻越没关系。
+// 撑手翻越的高度曲线是一条**带平台的梯形**：
+//   ① 手按上顶沿、身子被撑起来（快，0.3 秒不到）
+//   ② **停在顶沿高度**——这一段是全动作的题眼：手是支点，胯骑在墙头上，
+//      腿从顶上扫过去。高度几乎不变，所以看得出他是"撑着"不是"飞着"
+//   ③ 手一松，人比升起来时更快地落下去（重力不讲道理），落地屈膝卸力
+// 另外峰值按 VaultLiftFor(top) 算绝对值（顶沿 + 余量 − 站立胯高），
+// 不按顶沿的百分比：百分比会让矮障碍抬过头、高障碍抬不够，两头都不像。
+function VaultArc(k, big, top) {
   const u = Math.max(0, Math.min(1, k));
-  if (!big) return 0.58 * Math.sin(Math.PI * Math.pow(u, 0.92));
-  if (u < 0.32) return 0.82 * Math.sin((u / 0.32) * (Math.PI / 2));
-  if (u < 0.66) return 0.82;
-  return 0.82 * Math.sin(((1 - u) / 0.34) * (Math.PI / 2));
+  const peak = VaultLiftFor(top);
+  // 扛着东西那一档：先把东西撂上顶沿，所以在顶上多骑一会儿
+  const rise = big ? 0.30 : 0.30;
+  const fall = big ? 0.72 : 0.64;
+  if (u < rise) {
+    // 撑起来：起手最猛（蹬地那一下），到顶沿收住
+    const t = u / rise;
+    return peak * Math.sin(t * (Math.PI / 2));
+  }
+  if (u < fall) return peak;                          // 骑在顶沿上，腿扫过去
+  const t = (u - fall) / (1 - fall);
+  return peak * (1 - t * t);                          // 松手，加速落下
 }
 
 // pickedT：拿起的时刻。E 既是拾取也是放下，没有这 0.35s 的窗口，
@@ -3761,7 +3779,7 @@ function MovePlayer(state, input, dt) {
     // 腿甩过顶沿之后才荡下去。上一版用对称的 smoothstep，人在墙上方匀速平移，
     // 于是"撑"这件事根本看不出来——那是最像悬浮的一段。
     p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * VaultTravel(k);
-    p.lift = (p.vaultTop || 1.2) * VaultArc(k, p.vaultBig);
+    p.lift = VaultArc(k, p.vaultBig, p.vaultTop);
     p.pose = p.vaultBig ? "clamber" : "vault";
     // 垛顶上藏不住人：翻越是要露头的，这也是把它放进扫荡段的意义
     p.hidden = false;
@@ -3933,7 +3951,9 @@ function StepFollowers(state, dt) {
       const span = (v.w || 1) / 2 + 0.5;
       const d = Math.abs(a.x - v.x);
       if (d > span) continue;
-      const up = (v.top ?? 1.2) * 0.68 * Math.sin((1 - d / span) * (Math.PI / 2));
+      // 跟主角同一条规范（VaultLiftFor），只是她按"离墙多远"连续算而不是排时间轴。
+      // 妹妹比柱子矮一头多，胯更低，所以同一堵墙她要多抬一点
+      const up = (VaultLiftFor(v.top) + 0.12) * Math.sin((1 - d / span) * (Math.PI / 2));
       if (up <= lift) continue;
       lift = up;
       // 动作进度顺着她的行进方向算：还没过中线是撑上去，过了是落下来
