@@ -7,7 +7,7 @@
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
-import { CHAPTER_BGM } from "./Data_BgmConfig.mjs?v=026";
+import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 
 const VOICE_RELEASE = "20260806Chapter1Hybrid";
 

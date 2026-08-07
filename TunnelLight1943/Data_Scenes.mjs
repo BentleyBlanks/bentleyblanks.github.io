@@ -19,11 +19,17 @@ export const PPM = 48;
 // prop 那一档在这个景别下就开始糊了
 export const SS = { prop: 4, detail: 3, hint: 12, closeup: 8 };
 
+// 本模块自己是带版本戳进来的（index.html 的 import map），把那个戳原样接到
+// JSON 上——不然场景数据会独自留在手机缓存里：代码是新的、物体位置是旧的。
+// Node 那边 import.meta.url 没有 query，天然是空串。
+const DATA_VER = new URL(import.meta.url).search;
+
 // 同构读取：Node 走 fs，浏览器走 fetch。两边都是 ESM 顶层 await，
 // 调用方什么都不用改（模块图会等它加载完）。
 async function LoadJson(name) {
-  const url = new URL(name, import.meta.url);
   const isNode = typeof process !== "undefined" && !!process.versions?.node;
+  // fs 读不了带 query 的 URL，所以版本戳只加在 fetch 这条路上
+  const url = new URL(isNode ? name : name + DATA_VER, import.meta.url);
   const text = isNode
     ? await (await import("node:fs/promises")).readFile(url, "utf8")
     : await (await fetch(url)).text();

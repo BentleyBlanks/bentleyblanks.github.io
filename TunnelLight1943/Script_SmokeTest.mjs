@@ -1023,6 +1023,52 @@ function TestPlaneBeat() {
   console.log("  ✓ 刨料：攥的是刨子不是滑块 / 抓不住推不动 / 有上限 / 会脱手 / 顿一下刨花短 / 键盘后备可用");
 }
 
+// 缓存版本戳必须盖到**整张模块图**上。
+//
+// 事故（2026-08-07，手机上报「刨子推不动」）：index.html 只给入口
+// Script_Main.js 盖了 ?v=，它 import 的 Script_Core.mjs 是裸 URL——手机上于是
+// 新 Main 配旧 Core：新 Main 不再发 dragX、旧 Core 只认 dragX，刨子怎么拖都不动；
+// 旧 Core 写的 dragTrack 又没有元素接（新 html 已删），连轨道都不出来。
+// 桌面一刷新就好，手机 Safari 的模块缓存黏得多，所以只在移动端复现。
+//
+// 现在版本戳由 index.html 的 import map 一张表统一盖。这条测试盯两件事：
+//   ① 每个第一方模块都在表里（漏一个，它就又会从缓存里漏出来）；
+//   ② 源码里不许再自己写 ?v=（同一个模块两个 URL＝加载两份，实测出过）。
+function TestModuleGraphIsCacheBusted() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
+  const map = JSON.parse(html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]);
+  const imports = map.imports || {};
+
+  // 入口自己走 <script src>，其余全靠 import map
+  const entry = html.match(/src="\.\/Script_Main\.js\?v=(\d+)"/);
+  assert.ok(entry, "index.html 的入口 Script_Main.js 必须带 ?v= 版本戳");
+  const ver = entry[1];
+
+  // 浏览器真正跑的那些第一方模块，逐个查表
+  const browserModules = [
+    "Script_Core.mjs", "Script_World.js", "Script_Art.mjs", "Script_Rig.mjs",
+    "Script_Light.mjs", "Script_Fluid.mjs", "Script_Soundtrack.js", "Script_Audio.js",
+    "Data_Scenes.mjs", "Data_DepthSpec.mjs", "Data_BgmConfig.mjs", "Data_AudioMix.mjs",
+  ];
+  for (const m of browserModules) {
+    assert.equal(imports[`./${m}`], `./${m}?v=${ver}`,
+      `${m} 必须登记在 index.html 的 import map 里并盖上 ?v=${ver}——`
+      + "漏掉的模块会独自留在手机缓存里，新壳配旧芯");
+  }
+
+  // 源码里不许再自己写版本戳：同一个模块两个 URL = 浏览器加载两份实例
+  for (const f of fs.readdirSync(here).filter((n) => /^(Script|Data)_.*\.(js|mjs)$/.test(n))) {
+    const src = fs.readFileSync(path.join(here, f), "utf8");
+    for (const line of src.split("\n")) {
+      if (!/^\s*(import|.*\bimport\()/.test(line)) continue;
+      assert.ok(!/\.(mjs|js)\?v=/.test(line),
+        `${f} 里不该自己写版本戳（交给 index.html 的 import map）：${line.trim()}`);
+    }
+  }
+  console.log(`  ✓ 缓存版本戳盖满整张模块图（v=${ver}，${browserModules.length} 个模块）`);
+}
+
 function TestQuieterAudioMix() {
   assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
   // 环境声（风）是从头响到尾的底噪，玩家反馈「太吵」——基准压到 0.34 以下。
@@ -1236,6 +1282,7 @@ TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestInstrumentalBgmManifest();
+TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 
 console.log("— 全流程自动通关（第六章走『地下进人』）—");

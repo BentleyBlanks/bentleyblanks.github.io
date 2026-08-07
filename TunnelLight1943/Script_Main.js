@@ -6,8 +6,10 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=041";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=041";
+// 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
+//（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
+import { CreateSoundtrack } from "./Script_Soundtrack.js";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +44,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=041")
+import("./Script_Audio.js")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
