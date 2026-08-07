@@ -1133,6 +1133,84 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
   }
 }
 
+// 塌进巷子的院墙残段（可翻越）。两家隔墙倒了半截，土坯碴子横在路当中——
+// 「路上凭空码一垛柴」说不通，这个说得通：绕不过去（两头顶着人家院墙），
+// 也拆不动，只能跨过去。
+//
+// 可翻越物的轮廓语法全在这张图里：**齐胯高**（一手撑得住）、**顶沿被踩磨得
+// 圆亮**（有人天天从这儿过）、**豁一个口**（手往哪儿按一目了然）、根脚散着
+// 掉下来的坯块（它是"塌"的，不是"砌"的）。
+export function DrawBrokenWall(ctx, x, groundY, w, h, id) {
+  const half = w / 2;
+  const notch = x + half * 0.16;          // 顶沿的豁口：手往这儿按
+  // 墙的轮廓：左边还立着，右边被拽塌成一道斜茬
+  const outline = [
+    [x - half, groundY],
+    [x - half, groundY - h],
+    [notch - h * 0.30, groundY - h],
+    [notch - h * 0.10, groundY - h + h * 0.17],   // 豁口塌下去一块
+    [notch + h * 0.22, groundY - h + h * 0.12],
+    [notch + h * 0.42, groundY - h * 0.90],
+    [x + half * 0.66, groundY - h * 0.58],
+    [x + half, groundY - h * 0.14],
+    [x + half, groundY],
+  ];
+
+  // ① 塌下来的坯块：散在墙**两侧的地上**（画在墙身之前，但落点要在轮廓之外，
+  //    压在里面就被墙身盖没了——上一版就是这么白画的）
+  for (let i = 0; i < 5; i += 1) {
+    const left = i % 2 === 0;
+    const bx = left ? x - half - 4 - Rnd(id, i) * 10 : x + half + 2 + Rnd(id, i) * 12;
+    const by = groundY - 1.5 - Rnd(id, i + 7) * 3;
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate((Rnd(id, i + 20) - 0.5) * 0.9);
+    const bw = 7 + Rnd(id, i + 40) * 5;      // 大小不一，才像塌下来的碴子
+    InkFill(ctx, Rect(-bw / 2, -2.4, bw, 4.8), id + "b" + i, i % 2 ? "#a68d68" : "#b89f79",
+      { amp: 1.1, lw: 1.3, shade: "rgba(0,0,0,0.18)" });
+    ctx.restore();
+  }
+
+  // ② 墙身。shade 不加方向性——上一版 shadeAt:0.5 在墙中间劈出一道生硬的
+  //    竖向明暗界，看着像两块拼起来的板子
+  InkFill(ctx, outline, id, "#bda683", { amp: 1.6, lw: 2.4, shade: "rgba(70,52,36,0.16)" });
+
+  // ③ 土坯：一层层错缝垒起来的。剪在轮廓里画砖缝，这是"墙"与"板子"的分界
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(outline[0][0], outline[0][1]);
+  for (let i = 1; i < outline.length; i += 1) ctx.lineTo(outline[i][0], outline[i][1]);
+  ctx.closePath();
+  ctx.clip();
+  const course = Math.max(4.5, h / 5.5);        // 一层坯的厚度
+  const brick = course * 2.1;                   // 一块坯的长度
+  for (let r = 0; r * course < h + course; r += 1) {
+    const y = groundY - r * course;
+    // 横缝
+    InkLine(ctx, x - half - 2, y, x + half + 2, y, id + "c" + r,
+      { lw: 1.1, color: "rgba(84,64,44,0.42)", amp: 1.3 });
+    // 竖缝：隔层错开半块
+    const off = (r % 2) * brick * 0.5;
+    for (let bx = x - half - 2 + off; bx < x + half + 2; bx += brick) {
+      InkLine(ctx, bx, y, bx, y - course, id + "v" + r + "_" + Math.round(bx),
+        { lw: 0.9, color: "rgba(84,64,44,0.3)", amp: 1.0 });
+    }
+  }
+  Speckle(ctx, x - half, groundY - h, w, h, id + "sp", { count: 22, alpha: 0.16 });
+  ctx.restore();
+
+  // ④ 顶沿被踩磨圆亮的那一小段——"从这儿翻"的记号。只是一道包浆，粗了、白了
+  //    就成了横在墙头的一根骨头，还会跟按上去的那只手抢眼
+  InkLine(ctx, x - half + 7, groundY - h + 1.6, notch - h * 0.42, groundY - h + 1.6,
+    id + "worn", { lw: 0.9, color: "rgba(236,222,192,0.5)", amp: 0.4 });
+  // 墙头草：只长在没人踩的那一头
+  for (let i = 0; i < 2; i += 1) {
+    const gx = x - half + 3 + Rnd(id, i + 30) * (half * 0.34);
+    InkLine(ctx, gx, groundY - h, gx + Sym(id, i + 5, 2.5), groundY - h - 5 - Rnd(id, i + 9) * 3,
+      id + "g" + i, { lw: 1.1, color: "#7d8c4a" });
+  }
+}
+
 export function DrawWoodpile(ctx, x, groundY, id) {
   for (let row = 0; row < 3; row += 1) {
     for (let i = 0; i < 4 - row; i += 1) {
