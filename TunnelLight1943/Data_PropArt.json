@@ -311,7 +311,8 @@
     },
     "henCoop": {
       "art": "DrawHenCoop", "band": "yard", "ss": "prop",
-      "sprite": { "w": 70, "h": 66, "anchor": "center", "baseline": 8 }
+      "sprite": { "w": 84, "h": 48, "anchor": "center", "baseline": 6 },
+      "note": "土坯垒的矮鸡窝，倚在背风墙根（houseB 的东山墙下）。窝身齐膝≈0.55m——上一版画成 1.4m 见方的对称人字顶小房子，那是西式狗窝；画幅跟着改宽改矮，右边要留出食槽、左边留出挪开的挡板石"
     },
     "clothesline": {
       "art": "DrawClothesline", "band": "yard", "ss": "prop",
