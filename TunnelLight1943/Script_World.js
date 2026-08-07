@@ -357,7 +357,7 @@ export function CreateWorld(canvasEl) {
   let dustMotes = [];
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
-  let cartMesh = null;
+  let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
   let homeFacade = null, homeRange = null;
@@ -373,7 +373,7 @@ export function CreateWorld(canvasEl) {
   let barkMesh = null;
   let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
-  let barrowMesh = null;
+  let barrowMesh = null, barrowWheel = null;
   // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
   // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
   const mountMeshes = new Map();
@@ -427,7 +427,7 @@ export function CreateWorld(canvasEl) {
     collapseMeshes = {};
     fluid = null; fluidKey = ""; fluidMesh = null;
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
-    cartMesh = null;
+    cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     homeFacade = null; homeRange = null;
@@ -436,7 +436,7 @@ export function CreateWorld(canvasEl) {
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
     chainItemMeshes = [];
-    barrowMesh = null;
+    barrowMesh = null; barrowWheel = null;
     mountMeshes.clear();
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
@@ -1953,7 +1953,12 @@ export function CreateWorld(canvasEl) {
       mountMeshes.set(a.id, m);
     }
     m.visible = true;
-    PlaceSprite(m, a.x, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    // 车的贴图中心不是**座位**：自行车的鞍座画在中心偏后 9px、摩托偏后 1px。
+    // 演员站在自己的 x 上，所以车要往前挪那么多，人才是「坐在座上」而不是
+    // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
+    const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
+    const dir = a.heading > 0 ? -1 : 1;
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
     m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
   }
 
@@ -2609,19 +2614,42 @@ export function CreateWorld(canvasEl) {
     // 车画在演员前面一点，贴着车走就是躲进车影
     if (state.cart) {
       const cartKind = state.cart.kind || "cart";
+      // 玩家**推着**的独轮车（第一章）要退到 loose 带：人在近侧握着车把，
+      // 身子和手得画在车前面。第三章那辆驴车是**移动掩体**，得挡住人，
+      // 所以留在 CART_COVER_Z——两种角色，两个深度。
+      const pushed = cartKind === "barrow";
+      const cz = pushed ? BAND.loose : CART_COVER_Z;
       if (!cartMesh || cartMesh.userData.cartKind !== cartKind) {
         if (cartMesh) layers.play.remove(cartMesh);
-        cartMesh = cartKind === "barrow"
-          ? BakeSprite(160, 110, 80, 100, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: 2 }), 0, PROP_SS)
+        if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
+        cartMesh = pushed
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: 2 }), 0, PROP_SS)
           : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
         cartMesh.userData.cartKind = cartKind;
         layers.play.add(cartMesh);
-        // 移动掩体：跟静态掩体一样走 NEAR_CLUTTER 区间（允许挡人的矮物件）
-        SetPlayOrder(cartMesh, CART_COVER_Z, "cart(movingCover)");
+        SetPlayOrder(cartMesh, cz, "cart(" + cartKind + ")");
+        if (pushed) {
+          // 轮子单开一张，绕轮心转——车走多远轮转多少弧长，不是"贴图在平移"
+          const R = ART.BARROW_WHEEL_R;
+          cartWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "pushWheel"), 0, PROP_SS);
+          layers.play.add(cartWheel);
+          SetPlayOrder(cartWheel, cz, "cartWheel");
+        }
       }
       cartMesh.visible = true;
-      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, CART_COVER_Z);
-    } else if (cartMesh) cartMesh.visible = false;
+      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, cz);
+      if (cartWheel) {
+        cartWheel.visible = true;
+        const R = ART.BARROW_WHEEL_R / PPM;              // 轮半径（米）
+        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, cz);
+        // 滚过的弧长 = 走过的路程：θ = -s/R（往前走轮子顺时针转）
+        cartWheel.rotation.z = -((state.cart.roll || 0) / R);
+      }
+    } else {
+      if (cartMesh) cartMesh.visible = false;
+      if (cartWheel) cartWheel.visible = false;
+    }
 
     // 独轮车（不在推的时候是静物）：装了几根木料照几根；推到家就停在爹跟前
     {
@@ -2631,15 +2659,30 @@ export function CreateWorld(canvasEl) {
         const key = "b" + planks;
         if (!barrowMesh || barrowMesh.userData.k !== key) {
           if (barrowMesh) layers.play.remove(barrowMesh);
-          barrowMesh = BakeSprite(160, 110, 80, 100, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
+          if (barrowWheel) { layers.play.remove(barrowWheel); barrowWheel = null; }
+          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
           barrowMesh.userData.k = key;
           layers.play.add(barrowMesh);
           SetPlayOrder(barrowMesh, BAND.walk);
+          // 停着的车轮子也单开一张（不转，但得跟推着的那辆长一个样）
+          const R = ART.BARROW_WHEEL_R;
+          barrowWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "parkWheel"), 0, PROP_SS);
+          layers.play.add(barrowWheel);
+          SetPlayOrder(barrowWheel, BAND.walk);
         }
         barrowMesh.visible = true;
+        if (barrowWheel) {
+          barrowWheel.visible = true;
+          barrowWheel.position.set(state.flags.barrowHome ? 42.6 : 50.5,
+            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, BAND.walk);
+        }
         // 停在工作台东边一步：递完木料的车不挡合榫的戏
         PlaceSprite(barrowMesh, state.flags.barrowHome ? 42.6 : 50.5, SURFACE_Y, BAND.walk);
-      } else if (barrowMesh) barrowMesh.visible = false;
+      } else {
+        if (barrowMesh) barrowMesh.visible = false;
+        if (barrowWheel) barrowWheel.visible = false;
+      }
     }
 
     // 落地道具：手里放下的东西（自由放下 + 链里的「放下换手」共用一套）。

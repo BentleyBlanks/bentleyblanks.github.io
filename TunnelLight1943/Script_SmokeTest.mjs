@@ -903,6 +903,21 @@ function TestWorkStations() {
   StepGame(state, idle, state.pip.t + 0.1);
   assert.equal(state.pip, null, "后果小窗必须到时收起");
   assert.equal(m2.track, null, "水打上来之后娘不该再回去锄地");
+  // 锯必须一直躺在锯口里：锯是 alongArm 挂件，贴图角度 = 前臂世界角 = armF+foreF。
+  // 老版本靠开合肘部做"一进一出"，这个和从 -72° 荡到 -132°，锯在空中划了个 60°
+  // 的钟摆。行程只许来自肩（armF），肘角跟着补偿。Rig 里带 THREE/document，
+  // node 侧进不来，就直接盯源码里那几个关键帧。
+  const rigSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
+  const sawBlock = rigSrc.slice(rigSrc.indexOf("  sawing: {"), rigSrc.indexOf("  hoeing: {"));
+  assert.ok(sawBlock.length > 100, "找不到 sawing 轨道");
+  const sums = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+),\s*foreF:\s*(-?[\d.]+)/g)]
+    .map((m) => Number(m[1]) + Number(m[2]));
+  assert.ok(sums.length >= 4, "sawing 轨道的关键帧太少，读不出行程");
+  const spread = Math.max(...sums) - Math.min(...sums);
+  assert.ok(spread <= 6, `锯身角度全程必须锁死（前臂世界角摆动 ${spread.toFixed(1)}°>6°，锯会变成钟摆）`);
+  const armFs = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+)/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...armFs) - Math.min(...armFs) >= 24, "肩的行程太小，锯推不出去");
   console.log("  ✓ 干活的家人（爹拉锯/娘锄地）与后果小窗");
 }
 
@@ -1180,11 +1195,40 @@ function TestRaidColumn() {
   console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
 }
 
+// 过场的演出不许站在路障里。obstacle 带的东西（塌墙、撞倒的柴垛）比演员近，
+// 谁站在它坐标上谁就被整个盖住——c1_father 的审问戏曾经就跪在柴垛（x=38）里，
+// 一整场戏只看得见一根枪管（用户截图为证）。这条盯的是"演员与路障的水平间距"。
+function TestCineActorsClearOfObstacles() {
+  const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const list = ChapterBeatList(0);
+  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_father"));
+  const scene = SCENES.village;
+  const bad = [];
+  for (let i = 0; i < 3000; i += 1) {
+    StepGame(state, { ...NONE, advance: false }, DT);
+    for (const a of state.actors) {
+      if (a.visible === false || a.level !== "surface" || a.decor) continue;
+      for (const v of scene.vaults || []) {
+        if (v.flag && !state.flags[v.flag]) continue;
+        // 半宽 + 半个身位：贴着站没关系，压在正中间就是被吞
+        const clear = (v.w || 1) / 2 + 0.35;
+        if (Math.abs(a.x - v.x) < clear) bad.push(`${a.id}@${a.x.toFixed(1)} 压在路障 ${v.x} 上`);
+      }
+    }
+    if (bad.length) break;
+    if (state.phase !== "playing") break;
+  }
+  assert.equal(bad.length, 0, `过场演员被路障挡住：${bad.slice(0, 3).join("；")}`);
+  console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
+TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestKnotKeyboardFallback();

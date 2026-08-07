@@ -658,16 +658,23 @@ function StepChain(state, def, input, dt) {
       return;
     }
     case "push": {
-      if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart" };
+      if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart", roll: 0 };
       const cart = state.cart;
       if (Math.abs(p.x - cart.x) > 2.6) return;
       state.prompt = st.prompt || "按住 E · 推车";
       state.promptFill = Math.abs(cart.x - st.from) / st.dist;
+      // 手扶在车把上是**站位决定的，不是按键决定的**：走到车跟前就搭上手，
+      // 松开 E 只是不再使劲，手不会撒把。上一版只在 interactHeld 里打姿势，
+      // 于是一停手人就飘回站姿、两只手在空中慢慢晃——车还在，人却放开了。
+      FlashPose(state, "push", 0.2);
+      p.heading = st.dir;
       if (input.interactHeld) {
-        cart.x += st.dir * 0.85 * dt;
-        p.x = cart.x - st.dir * 1.7;
-        p.heading = st.dir;
-        FlashPose(state, "push", 0.25);
+        const step = st.dir * 0.85 * dt;
+        cart.x += step;
+        // **有向**位移：往左推，轮子就得往左滚（逆时针）。存绝对值的话
+        // 车往哪边走轮子都朝一个方向转，倒着推就穿帮了
+        cart.roll = (cart.roll || 0) + step;
+        p.x = cart.x - st.dir * 1.58;   // 站近一点，手正好搭在车把上
         if ((cart.x - st.from) * st.dir >= st.dist) finish();
       }
       return;
@@ -1090,7 +1097,7 @@ const V_PATCH_X = 16.8;   // 菜畦（veggieWest prop）里娘锄地的站位
 function FatherSaw(state) {
   const father = FindActor(state, "father");
   if (!father) return;
-  father.x = V.workbench.x + 0.9;
+  father.x = V.workbench.x + 0.72;   // 站近一点：锯口才落在案上那块料里
   father.heading = -1;              // 面朝工作台锯
   father.cineTarget = null;
   father.track = { name: "sawing", t: 0, ambient: true };
@@ -1477,7 +1484,10 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c1_raid",
       lines: [
         // 惊变时刻旁白闭嘴、同期声接管：村口是画外真人的喊声，不是叙事者的转述
-        { who: "村口喊声", say: "鬼子进村了——", d: 3.0, far: true, cam: { kind: "wide", x: 148, pan: -5 },
+        // 喊声这一镜给村口的**中景**（不是 52m 画宽的大远景——那种景别下
+        // 一个人只有十几像素，"一支队伍"看着就是几粒沙子，玩家的原话是
+        // "还是没看到鬼子的队伍"）。dist 13 ≈ 20m 画宽，正好装下车队头尾
+        { who: "村口喊声", say: "鬼子进村了——", d: 3.4, far: true, cam: { kind: "shot", x: 166, y: 1.9, dist: 13, pan: -6 },
           on: (state) => {
             // 喊声一起，街上还没进屋的乡亲直接收掉（正常流程里报信民兵那一环
             // 已经让他们走着进过门了，这里是调试跳幕的兜底）；raidStarted 旗标同时把鸡藏了
@@ -1520,8 +1530,8 @@ export const SCRIPTS = {
         // 车队从画框里压过去的一镜：无字幕——车铃、引擎和皮靴自己说。
         // 这一镜是用户拿景区实拍立的：日军进村不可能只有两个人。
         // 构图卡在自行车、摩托、纵队头都在框内的那一段街上
-        { stage: "", d: 3.4, cam: { kind: "shot", x: 158, y: 1.8, dist: 17, pan: -7 },
-          on: (state) => { Cue(state, "motorPutt"); Cue(state, "bikeBell", { delay: 1.2 }); } },
+        { stage: "", d: 4.2, cam: { kind: "shot", x: 150, y: 1.7, dist: 12, pan: -7 },
+          on: (state) => { Cue(state, "motorPutt"); Cue(state, "bikeBell", { delay: 1.4 }); } },
         // 藏家伙不是慌乱中的怪动作，是学来的规矩：上一回扫荡就有工匠
         // 连人带家伙被掳走。这句旁白说的是画面外的旧事，也是爹结局的伏笔
         { stage: "家伙什儿得藏。上回扫荡，西头的铁匠连人带铁砧，都让抓去了据点。", d: 4.4, cam: { kind: "shot", x: 41, y: 1.8, dist: 10 } },
@@ -1617,43 +1627,59 @@ export const SCRIPTS = {
     {
       kind: "cinematic", id: "c1_father",
       lines: [
-        { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "shot", x: 33, y: 0.9, dist: 8, slit: true },
+        { stage: "地窖板的缝里，能看见院子。", d: 3.0, cam: { kind: "shot", x: 36.6, y: 0.9, dist: 8, slit: true },
           on: (state) => {
+            // 整场审问的站位比原来东移了 3.6m。原先爹跪在 41.6-3.6=38——
+            // 那正是撞塌的柴垛（fallenWood）的坐标，而柴垛走 obstacle 带、
+            // 比演员近，于是**整场戏被一堆柴挡得严严实实**（实测截图为证）。
+            // 演出与路障不许同坐标：路障归撤退路线，演出挪到它东边的空地上。
             const father = FindActor(state, "father");
             // cineTarget 必须清：上一段过场让他往院门走，走没走到都可能悬着。
             // 不清的话这场戏他会一边"跪"一边往 47 滑——传送演员前先掐断走位
-            if (father) { father.x = 38; father.heading = 1; father.cineTarget = null; }
+            if (father) { father.x = 41.6; father.heading = 1; father.cineTarget = null; }
+            // 妹妹这会儿跟柱子一起蹲在地窖里（护送刚把她带下来）。不显式钉住的话，
+            // 调试跳幕落点会把她留在院子的地面上——正好站进柴垛里被吞掉
+            const sis = FindActor(state, "sister");
+            if (sis) {
+              sis.following = false;
+              sis.level = state.player.level;
+              sis.x = state.player.x + 0.34;
+              sis.heading = -1;
+              sis.cineTarget = null;
+            }
             const r1 = FindActor(state, "raid1");
             const r2 = FindActor(state, "raid2");
-            if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
-            if (r2) { r2.patrol = null; r2.cineTarget = { x: 40.5 }; r2.cineSpeed = 3; }
+            if (r1) { r1.patrol = null; r1.cineTarget = { x: 39.6 }; r1.cineSpeed = 3; }
+            if (r2) { r2.patrol = null; r2.cineTarget = { x: 44.1 }; r2.cineSpeed = 3; }
             // 翻译官跟进院，站在兵后面半步——问话的日语就是从他那边递进来的
             const tr = FindActor(state, "traitor");
-            if (tr) { tr.cineTarget = { x: 41.6 }; tr.cineSpeed = 2.6; }
+            if (tr) { tr.cineTarget = { x: 45.2 }; tr.cineSpeed = 2.6; }
           } },
-        { stage: "爹被两个兵按着跪在地上。", d: 3.4, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
+        { stage: "爹被两个兵按着跪在地上。", d: 3.4, cam: { kind: "shot", x: 41.6, y: 0.9, dist: 7, slit: true },
           on: (state) => {
             // 跪不是一张定格：他在挣，兵在按。两条循环轨道错开半拍咬在一起
             const father = FindActor(state, "father");
             if (father) { father.track = { name: "pressedStruggle", t: 0 }; father.heading = 1; }
             const r1 = FindActor(state, "raid1");
             // 手要按在肩上：0.55m，再远就是按空气
-            if (r1) { r1.x = 37.45; r1.heading = 1; r1.cineTarget = null; r1.track = { name: "pressHold", t: 0 }; }
+            if (r1) { r1.x = 41.05; r1.heading = 1; r1.cineTarget = null; r1.track = { name: "pressHold", t: 0 }; }
             const r2 = FindActor(state, "raid2");
-            if (r2) { r2.x = 39.3; r2.heading = -1; r2.cineTarget = null; }
+            if (r2) { r2.x = 42.9; r2.heading = -1; r2.cineTarget = null; }
             // 娘被推跪在一边——不能让她站在画面正中看戏
             const mother = FindActor(state, "mother");
-            if (mother) { mother.x = 35.1; mother.heading = 1; mother.pose = "kneel"; }
+            // 39.6 是挑出来的：爹（41.6）西边两米、柴垛（38）东边一米六——
+            // 两头都不压。往西一点就跪进柴垛里了
+            if (mother) { mother.x = 39.6; mother.heading = 1; mother.pose = "kneel"; }
           } },
         // 审问是日语原声、不加字幕：板缝后的孩子听不懂，玩家也不必懂
         //（《勇敢的心》咕噜拟声的历史化等价物）。旁白只补画面给不了的那一句。
         { who: "日军", say: "言え！八路の食糧はどこに隠した！", noSub: true, d: 3.0,
-          cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
+          cam: { kind: "shot", x: 41.6, y: 0.9, dist: 7, slit: true } },
         // 日语孩子听不懂——把话递成中文的是院里那个翻译官（他就站在兵后头）。
         // 汉奸在第一章有了声音，第二章夜里认出他才有锚点；旁白也少解说一行
         { who: "翻译官", say: "太君问你——八路的粮食，藏到哪儿去了！", d: 3.6,
-          cam: { kind: "shot", x: 40, y: 0.9, dist: 6, slit: true } },
-        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
+          cam: { kind: "shot", x: 43.6, y: 0.9, dist: 6, slit: true } },
+        { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 41.6, y: 1.0, dist: 3.2, slit: true },
           on: (state) => {
             // 抡的轨道在 0.95s 到达落点；挨砸的轨道用 -0.95 的起点等在那儿，
             // 两个人在同一帧接上——这就是照参考视频 K 的那一下
@@ -1663,26 +1689,33 @@ export const SCRIPTS = {
             if (father) father.track = { name: "struckFall", t: -0.95 };
             const r1 = FindActor(state, "raid1");
             if (r1) r1.track = null;      // 按人的松开手，退半步
-            if (r1) { r1.cineTarget = { x: 36.4 }; r1.cineSpeed = 1.2; }
+            if (r1) { r1.cineTarget = { x: 40.0 }; r1.cineSpeed = 1.2; }
           } },
         // 抓他的理由压在拒绝之后：摇头先立住骨气，名单再落下来，
         // 「问粮原来只是过场」的凉意才出来。呼应 c1_raid 的铁匠旧事，
         // 也给第七章据点里找到爹埋因
-        { stage: "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。", d: 5.0, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
+        { stage: "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。", d: 5.0, cam: { kind: "shot", x: 41.6, y: 0.9, dist: 7, slit: true } },
         // 「妹妹想哭」由憋泣的呼吸声演（压低、闷），旁白只说画面外那半句
         { stage: "柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
             Cue(state, "sobBreath");
             state.player.pose = "shelter";
+            state.player.heading = 1;
             const sister = FindActor(state, "sister");
             if (sister) {
               sister.pose = "leanIn";
-              sister.x = state.player.x + 0.42;
+              // **她得跟他在同一层**。护送收束时她的 level 还留在地面，
+              // 于是这一拍柱子一个人在地窖里搂空气、妹妹站在头顶的院子里
+              //（特写只框柱子，看上去就是他抱着一团空气发呆）
+              sister.level = state.player.level;
+              sister.x = state.player.x + 0.34;
               sister.heading = -1;
               sister.visible = true;
+              sister.crouch = false;
+              sister.track = null;
             }
           } },
-        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 42, y: 1.2, dist: 11, pan: 1.5 },
+        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 45.6, y: 1.2, dist: 11, pan: 1.5 },
           on: (state) => {
             const father = FindActor(state, "father");
             // 脸还朝着门框那边：cineKeepHeading 不让行走方向把头扳回去
@@ -1696,7 +1729,7 @@ export const SCRIPTS = {
             if (father && r2) { r2.x = father.x + 0.72; }
             // 翻译官走在押人队伍前头——带路进村的是他，领人出村的也是他
             const tr = FindActor(state, "traitor");
-            if (tr) { tr.x = 43.5; tr.heading = 1; }
+            if (tr) { tr.x = 47.1; tr.heading = 1; }
             for (const id of ["father", "raid1", "raid2", "traitor"]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
@@ -2790,10 +2823,11 @@ function SpawnRaidSoldiers(state) {
     MakeActor("traitor", "puppet", 168, { label: "翻译官", decor: true }),
     // 骑车的伪军：车是他自己的，腿上的活也是他自己的（蹬踏跟着位移走）。
     // carry:"" 压掉兵默认的手持步枪——骑车的手在车把上，枪是背着的
-    MakeActor("bikeScout", "puppet", 166, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.34, heading: -1, carry: "" }),
+    // lift = 座高 − 站立胯高(≈0.60m)。给多了人就浮在车上面，给少了像蹲在车边
+    MakeActor("bikeScout", "puppet", 166, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
     // 挎斗摩托：驾驶的兵 + 挎斗里的兵（钉在车侧，跟着车走）
-    MakeActor("motoLead", "soldier", 170, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.36, heading: -1, carry: "" }),
-    MakeActor("motoSide", "soldier", 170.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.30, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
+    MakeActor("motoLead", "soldier", 170, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
+    MakeActor("motoSide", "soldier", 170.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
   );
   // 徒步纵队：紧跟在车后（车在村道上也就比步行快半拍），间距刻意不匀——
   // 队列走长路会散。整支队伍要能装进车队镜的一个画框里
