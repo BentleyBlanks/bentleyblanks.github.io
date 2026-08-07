@@ -1690,6 +1690,56 @@ export function DrawBlockhouse(ctx, x, groundY, id, { lit = true } = {}) {
   }
 }
 
+// 地平线上的炮楼（远景剪影）。近处那座走 DrawBlockhouse，这一支是给
+// hills/farTown 层用的：那两层的糊与雾色会把细节整个吃掉，画细了白费——
+// 要的是**轮廓**：略收分的方塔 + 外挑的顶台 + 一圈垛口 + 楼根的围墙。
+// 华北的炮楼十来米高，在一马平川上就是这么一根戳出来的东西。
+export function DrawHorizonFort(ctx, x, groundY, h, id, { color = "#a08e6a", lit = false } = {}) {
+  // 高宽比压到 1:2.4 上下。给到 1:3 就成了烟囱——炮楼是五六米见方、十来米高的
+  // 砖砌方筒，敦实是它的样子，也是它难打的原因
+  const w = h * 0.42;                  // 方塔的收分：底比顶宽一点
+  const topW = w * 1.2;                // 顶台外挑
+  ctx.fillStyle = color;
+  // 楼根那圈围墙：炮楼从不单独立着，脚下总有一道矮墙和壕。压得低、收得窄，
+  // 太宽就成了塔的底座——它是院墙，不是基座
+  ctx.fillRect(x - w * 1.5, groundY - h * 0.085, w * 3, h * 0.085);
+  // 塔身：略收分的方塔
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2, groundY);
+  ctx.lineTo(x - w * 0.4, groundY - h);
+  ctx.lineTo(x + w * 0.4, groundY - h);
+  ctx.lineTo(x + w / 2, groundY);
+  ctx.closePath();
+  ctx.fill();
+  // 顶：外挑一圈檐台，上面压一道**齐平不断口的女墙**。
+  // 一排均匀的垛口是欧洲城堡的语汇——华北的炮楼是砖砌方筒加一圈平女墙，
+  // 远看就是"一根戳出来的柱子顶着一个方帽子"，任何缺口都会把它读成城堡
+  ctx.fillRect(x - topW / 2, groundY - h - h * 0.07, topW, h * 0.07);
+  ctx.fillRect(x - topW * 0.42, groundY - h - h * 0.155, topW * 0.84, h * 0.09);
+  // 射击孔：塔身上几粒暗点，只在不太糊的层上看得出，糊了也不碍事
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "rgba(30,24,18,0.9)";
+  for (let r = 0; r < 3; r += 1) {
+    const ry = groundY - h * (0.42 + r * 0.2);
+    ctx.fillRect(x - w * 0.16, ry, w * 0.13, h * 0.05);
+    ctx.fillRect(x + w * 0.04, ry, w * 0.13, h * 0.05);
+  }
+  ctx.restore();
+  // 夜里楼顶那一粒灯：这游戏讲的就是灯——地平线上每隔几里就点着一颗
+  if (lit) {
+    ctx.fillStyle = PAL.lampCore;
+    ctx.beginPath();
+    ctx.arc(x, groundY - h - h * 0.2, Math.max(1.6, h * 0.045), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    ctx.arc(x, groundY - h - h * 0.2, Math.max(4, h * 0.12), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
 export function DrawPrison(ctx, x, groundY, id, { night = true } = {}) {
   const W = 96, H = 62;
   InkFill(ctx, Rect(x - W / 2, groundY - H, W, H), id, "#8a8071",

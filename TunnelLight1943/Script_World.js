@@ -616,7 +616,11 @@ export function CreateWorld(canvasEl) {
     return mesh;
   }
 
-  function AddRidgeBand(group, length, color, id, { amp = 26, base = 34, blur = 2.2, lift = 0.6, opacity = 1 } = {}) {
+  // 地平线那两条远带。**这是冀中平原，不是山区**——地道战打的就是无险可守的
+  // 大平原（正因为一马平川，才只能往地下挖）。所以起伏一律压到几个像素：
+  // 剩下的纵深不靠山脊，靠一层层雾、地里的树行、和远处村落的剪影。
+  // 原来 amp 给到 40/26，画出来是两道山梁——地理错了，故事也就跟着不成立。
+  function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, opacity = 1, rows = 0 } = {}) {
     const worldW = length * 0.5 + 90;
     const wPx = Math.ceil(worldW * PPM * 0.34);
     const hPx = 180;
@@ -625,17 +629,80 @@ export function CreateWorld(canvasEl) {
       ctx.beginPath();
       ctx.moveTo(0, hPx);
       for (let px = 0; px <= wPx; px += 22) {
+        // 平原的地平线不是一把尺子：留一点极缓的起伏（田块与土路的高差）
         const y = hPx - base - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
         ctx.lineTo(px, y);
       }
       ctx.lineTo(wPx, hPx);
       ctx.closePath();
       ctx.fill();
+      // 平原的纵深全靠地平线上那一排小东西：防风林的树行、几户人家的屋脊。
+      // 跟带子同色同一张贴图里画完，不额外增加网格
+      for (let i = 0; i < rows; i += 1) {
+        const px = (i + 0.5) * (wPx / rows) + ART.Hash(id + "r" + i) * 60 - 30;
+        const top = hPx - base - 2;
+        if (ART.Hash(id + "k" + i) > 0.45) {
+          // 树行：几团挨着的圆冠，一带就是一道防风林
+          const n = 3 + Math.floor(ART.Hash(id + "n" + i) * 4);
+          for (let t = 0; t < n; t += 1) {
+            const tx = px + t * 9 - n * 4.5;
+            const r = 4.5 + ART.Hash(id + "t" + i + t) * 3;
+            ctx.beginPath();
+            ctx.ellipse(tx, top - r * 0.5, r, r * 0.9, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          // 远处的一户：矮墙 + 一道屋脊
+          const w2 = 14 + ART.Hash(id + "w" + i) * 12;
+          ctx.fillRect(px - w2 / 2, top - 7, w2, 8);
+          ctx.beginPath();
+          ctx.moveTo(px - w2 / 2 - 3, top - 7);
+          ctx.lineTo(px, top - 13);
+          ctx.lineTo(px + w2 / 2 + 3, top - 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }, blur, 1, { color: hazeColor, amount: opacity < 0.9 ? 0.5 : 0.35 });
     PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
     ScaleKeepGround(mesh, 2.9, 1);
     mesh.material.opacity = opacity;
     group.add(mesh);
+  }
+
+  // 地平线上的炮楼。1942-43 年的冀中，日军「囚笼政策」把平原用公路、封锁沟和
+  // **每隔几里一座的炮楼**割成小块——站在村里往哪边看都能看见一两座，
+  // 这就是"敌后"两个字的字面意思。所以它们不是布景，是这一章的处境本身。
+  //
+  // 摆在 hills/farTown 层：一律**只画剪影**（层的糊与雾色会把细节吃掉，
+  // 画细了是白费）。夜里楼顶点一粒灯——这游戏讲的就是灯。
+  // 把远景带的颜色压深一档：炮楼是这片空地上唯一的硬边，跟地平线同色就白摆了
+  const Darken = (hex, k) => {
+    const n = parseInt(hex.slice(1), 16);
+    const f = (v) => Math.max(0, Math.round(v * k));
+    return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  };
+
+  function AddHorizonForts(list, pal, night, ruined) {
+    for (const spec of list || []) {
+      const key = spec.layer;
+      const group = layers[key];
+      if (!group) continue;
+      const hM = spec.h || 12;                   // 炮楼一般十来米，平原上老远就看得见
+      const wPx = 150, hPx = Math.ceil(hM * PPM * 0.42) + 40;
+      // 糊与雾都只给该层的一半：一片空地上竖着的砖石塔，本来就比田野的
+      // 轮廓硬、比远村的色深。按整层的量去糊，它就化进地平线里没了
+      const haze = HazeFor(key);
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 6, (ctx, ax, ay) => {
+        ART.DrawHorizonFort(ctx, ax, ay, hM * PPM * 0.42, spec.id,
+          { color: Darken(pal, night ? 0.82 : 0.72), lit: night && !ruined });
+      }, (LAYER_BLUR[key] || 0) * 0.45, 1, haze && { color: haze.color, amount: haze.amount * 0.5 });
+      PlaceSprite(mesh, spec.x, SURFACE_Y - 0.1, 0);
+      // 层的补偿只服务于铺满画框的背景板；离散的建筑要按透视自然变小
+      ScaleKeepGround(mesh, 1 / LAYER_COMP[key]);
+      mesh.material.opacity = key === "hills" ? 0.95 : 0.88;
+      group.add(mesh);
+    }
   }
 
   // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
@@ -1632,10 +1699,13 @@ export function CreateWorld(canvasEl) {
       dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
     }[ch.light] || { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" };
 
+    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
     AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
-      { amp: 40, base: 58, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7 });
+      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7, rows: 14 });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
-      { amp: 26, base: 34, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88 });
+      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88, rows: 20 });
+    // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
+    AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
 
     // 各深度层各铺一条地面：透视下它们逐级收向地平线，地就"退"出去了
     const farEarth = {
