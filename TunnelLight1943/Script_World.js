@@ -212,6 +212,15 @@ export function CreateWorld(canvasEl) {
   const LAYER_FADE = { ridge: 0.62, hills: 0.48, farTown: 0.34, midTrees: 0.20, nearTrees: 0.09, play: 0, fore: 0.26 };
   let hazeColor = "#e2d8bc";
   const HazeFor = (key) => (LAYER_FADE[key] ? { color: hazeColor, amount: LAYER_FADE[key] } : null);
+  // **空气透视只许用染色，不许用半透明。** haze 是 source-atop 染在精灵自己
+  // 身上的，颜色推向雾色而精灵仍是实心；material.opacity 则让身后的东西透过来——
+  // 远村的房子里透出一座炮楼、炮楼里透出一间房，糊成一坨（2026-08-07 用户截图）。
+  // 旧的 (opacity a, haze f) 折算成等效的纯染色：f' = f + (1-a)(1-f)。
+  const HazeSolid = (key, oldAlpha = 1, scale = 1) => {
+    const f = Math.min(0.95, (LAYER_FADE[key] || 0) * scale);
+    const amount = Math.min(0.88, f + (1 - oldAlpha) * (1 - f));
+    return amount > 0.001 ? { color: hazeColor, amount } : null;
+  };
 
   for (const k of Object.keys(layers)) {
     layers[k].position.z = LAYER_Z[k];
@@ -581,6 +590,36 @@ export function CreateWorld(canvasEl) {
     g.addColorStop(1, pal[0]);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, wPx, hPx);
+    // 庄稼：村子外头那一大片是**地**，不是空场。1943 年春的冀中，去年秋播的
+    // 冬麦已经返青——远处该是一块块青的。只铺在纵深的远半段（贴图上半部），
+    // 近处那一条留给村道与院子，不然人就走在麦田里了
+    const crop = {
+      day: ["#8d9a58", "#a8bf6a"], dawn: ["#7b8560", "#8f9c6b"],
+      night: ["#39434a", "#414d52"], tunnel: ["#35362a", "#3c3d2f"], dark: ["#23241c", "#282920"],
+    }[light] || ["#8d9a58", "#a8bf6a"];
+    ctx.save();
+    for (let row = 0; row < 5; row += 1) {
+      // 行高按透视收：越远越扁
+      const v0 = (row / 5) ** 1.5, v1 = ((row + 1) / 5) ** 1.5;
+      const y0 = v0 * hPx * 0.62, y1 = v1 * hPx * 0.62;
+      let x = -ART.Hash(id + "fo" + row) * 200;
+      let i = 0;
+      while (x < wPx) {
+        const bw = 90 + ART.Hash(id + "fw" + row + i) * 190;
+        if (ART.Hash(id + "fc" + row + i) > 0.4) {
+          ctx.globalAlpha = 0.34 + row * 0.07;      // 越近越实
+          ctx.fillStyle = ART.Hash(id + "fk" + row + i) > 0.5 ? crop[0] : crop[1];
+          ctx.fillRect(x, y0, bw, y1 - y0 + 1);
+        }
+        // 田埂：地块之间踩出来的土脊
+        ctx.globalAlpha = 0.24;
+        ctx.fillStyle = "#5b4a32";
+        ctx.fillRect(x, y0, 2.4, y1 - y0);
+        x += bw;
+        i += 1;
+      }
+    }
+    ctx.restore();
     // 垄沟：沿纵深方向的长线，透视里会收敛到消失点
     ctx.save();
     ctx.globalAlpha = 0.30;
@@ -624,7 +663,7 @@ export function CreateWorld(canvasEl) {
   // 大平原（正因为一马平川，才只能往地下挖）。所以起伏一律压到几个像素：
   // 剩下的纵深不靠山脊，靠一层层雾、地里的树行、和远处村落的剪影。
   // 原来 amp 给到 40/26，画出来是两道山梁——地理错了，故事也就跟着不成立。
-  function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, opacity = 1, rows = 0 } = {}) {
+  function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, haze = 0.4, rows = 0 } = {}) {
     const worldW = length * 0.5 + 90;
     const wPx = Math.ceil(worldW * PPM * 0.34);
     const hPx = 180;
@@ -642,6 +681,8 @@ export function CreateWorld(canvasEl) {
       ctx.fill();
       // 平原的纵深全靠地平线上那一排小东西：防风林的树行、几户人家的屋脊。
       // 跟带子同色同一张贴图里画完，不额外增加网格
+      // 比带子本身深一档：同色画上去等于没画（用户："背景里有一些山看不清"）
+      ctx.fillStyle = Darken(color, 0.82);
       for (let i = 0; i < rows; i += 1) {
         const px = (i + 0.5) * (wPx / rows) + ART.Hash(id + "r" + i) * 60 - 30;
         const top = hPx - base - 2;
@@ -667,10 +708,11 @@ export function CreateWorld(canvasEl) {
           ctx.fill();
         }
       }
-    }, blur, 1, { color: hazeColor, amount: opacity < 0.9 ? 0.5 : 0.35 });
+      // 平原的地平线本来就淡，再叠一层半透明就整个化进天里读不出来了——
+      // 这两条带子也一律实心，退感只由染色量给（用户："背景里有一些山看不清"）
+    }, blur, 1, { color: hazeColor, amount: haze });
     PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
     ScaleKeepGround(mesh, 2.9, 1);
-    mesh.material.opacity = opacity;
     group.add(mesh);
   }
 
@@ -696,15 +738,13 @@ export function CreateWorld(canvasEl) {
       const wPx = 150, hPx = Math.ceil(hM * PPM * 0.42) + 40;
       // 糊与雾都只给该层的一半：一片空地上竖着的砖石塔，本来就比田野的
       // 轮廓硬、比远村的色深。按整层的量去糊，它就化进地平线里没了
-      const haze = HazeFor(key);
       const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 6, (ctx, ax, ay) => {
         ART.DrawHorizonFort(ctx, ax, ay, hM * PPM * 0.42, spec.id,
           { color: Darken(pal, night ? 0.82 : 0.72), lit: night && !ruined });
-      }, (LAYER_BLUR[key] || 0) * 0.45, 1, haze && { color: haze.color, amount: haze.amount * 0.5 });
+      }, (LAYER_BLUR[key] || 0) * 0.45, 1, HazeSolid(key, key === "hills" ? 0.95 : 0.88, 0.5));
       PlaceSprite(mesh, spec.x, SURFACE_Y - 0.1, 0);
       // 层的补偿只服务于铺满画框的背景板；离散的建筑要按透视自然变小
       ScaleKeepGround(mesh, 1 / LAYER_COMP[key]);
-      mesh.material.opacity = key === "hills" ? 0.95 : 0.88;
       group.add(mesh);
     }
   }
@@ -856,11 +896,10 @@ export function CreateWorld(canvasEl) {
           ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
           ctx.globalCompositeOperation = "source-over";
         }
-      }, LAYER_BLUR.farTown, 1, HazeFor("farTown"));
+      }, LAYER_BLUR.farTown, 1, HazeSolid("farTown", opacity));
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
       // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
       ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
-      mesh.material.opacity = opacity;
       group.add(mesh);
     }
   }
@@ -916,14 +955,12 @@ export function CreateWorld(canvasEl) {
       const act = FOLK_ACT[spec.act];
       if (!act) continue;
       const kind = spec.kind || "villager";
-      const rig = CreateRig(kind);
+      // 骨架也走**染色**不走半透明：CreateRig 收一份雾量，按它单独烘一套零件
+      // （缓存键带雾量，一种角色最多多一两套）。半透明的人身上会透出树和炮楼。
+      // 系数比树再重半档——树是一团色块，人有一圈墨线，同样的量下人显得更"实"
+      const rig = CreateRig(kind, HazeSolid(key, LAYER_TREE_ALPHA[key] ?? 0.9, 1.5));
       host.add(rig.group);
       SetLayerOrder(rig.group, key, ACTOR_Z, "folk:" + key);
-      // 空气透视：背景层的糊与雾色是**烘进贴图**的，骨架烘不了，只能靠半透
-      // 让背景色透上来——那正好就是雾色，效果等价。系数比树再重半档：
-      // 树是一团色块，人有一圈墨线，同样的透明度下人显得比树"实"
-      const fade = (1 - (LAYER_FADE[key] || 0) * 1.5) * (LAYER_TREE_ALPHA[key] ?? 0.9);
-      rig.group.traverse((o) => { if (o.isMesh) o.material.opacity = fade; });
       const scale = (BODY_SCALE[kind] ?? 1) / LAYER_COMP[key];
       const f = {
         rig, layerKey: key, bodyScale: scale, scale,
@@ -972,7 +1009,6 @@ export function CreateWorld(canvasEl) {
       }, blur, 1, hazeOpt);
       PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
       if (scale !== 1) ScaleKeepGround(mesh, scale);
-      mesh.material.opacity = opacity;
       group.add(mesh);
     }
   }
@@ -1696,8 +1732,8 @@ export function CreateWorld(canvasEl) {
 
     // 远景分层（越远越糊越淡：假景深）
     const pal = {
-      day: { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" },
-      dawn: { ridge: "#a89c8c", hill: "#8d8474", town: "#9c9080" },
+      day: { ridge: "#a1957a", hill: "#8a7850", town: "#96836a" },
+      dawn: { ridge: "#968a79", hill: "#7c7364", town: "#8a7e6f" },
       night: { ridge: "#2a3244", hill: "#212938", town: "#39415a" },
       tunnel: { ridge: "#2a2a30", hill: "#232227", town: "#33313a" },
       dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
@@ -1705,9 +1741,9 @@ export function CreateWorld(canvasEl) {
 
     // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
     AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
-      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, opacity: 0.7, rows: 14 });
+      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, haze: 0.5, rows: 26 });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
-      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, opacity: 0.88, rows: 20 });
+      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, haze: 0.3, rows: 34 });
     // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
     AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
 
@@ -1716,6 +1752,15 @@ export function CreateWorld(canvasEl) {
       day: ["#c0a675", "#ad9260"], dawn: ["#ab9880", "#94826c"],
       night: ["#3f4757", "#333b4a"], tunnel: ["#3a352c", "#2e2a22"], dark: ["#26231e", "#1d1b17"],
     }[ch.light] || ["#c0a675", "#ad9260"];
+    // 田块的三种颜色：返青的冬麦 / 留茬翻过的地 / 田埂。
+    // 1943 春的冀中，麦子是去年秋播、开春返青的——地里该是绿的，不是荒的
+    const cropPal = {
+      day: { wheat: "#8d9a58", stubble: "#b79a67", ridge: "rgba(96,74,46,0.5)" },
+      dawn: { wheat: "#7d8760", stubble: "#a38f72", ridge: "rgba(84,68,48,0.5)" },
+      night: { wheat: "#39485044", stubble: "#3a4250", ridge: "rgba(22,28,38,0.55)" },
+      tunnel: { wheat: "#35362a", stubble: "#37332a", ridge: "rgba(24,20,14,0.5)" },
+      dark: { wheat: "#23241c", stubble: "#24221d", ridge: "rgba(16,14,10,0.5)" },
+    }[ch.light] || { wheat: "#8d9a58", stubble: "#b79a67", ridge: "rgba(96,74,46,0.5)" };
     for (const [key, tint, depth] of [
       ["hills", 0.55, 9], ["farTown", 0.72, 7], ["midTrees", 0.85, 6], ["nearTrees", 1, 5],
     ]) {
@@ -1728,15 +1773,23 @@ export function CreateWorld(canvasEl) {
         g.addColorStop(1, farEarth[1]);
         ctx.fillStyle = g;
         ctx.fillRect(0, 4, wPx, hPx - 4);
+        // 冀中平原一眼望去全是耕地——地不能是一条纯色板
+        ART.PaintFarmland(ctx, wPx, hPx, key + "farm", {
+          wheat: cropPal.wheat, stubble: cropPal.stubble, ridge: cropPal.ridge,
+          // 越远的带子块越碎、垄沟越细（近处那条才看得出一垄一垄）
+          strips: depth >= 8 ? 26 : depth >= 7 ? 22 : 18, furrow: depth <= 6,
+        });
         ctx.strokeStyle = "rgba(43,31,22,0.5)";
         ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(0, 4);
         for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
         ctx.stroke();
-      }, LAYER_BLUR[key] || 0, 1, HazeFor(key));
+        // 雾量只取该层本来的空气透视值：这点带压带的半透明原本混的是同为
+        // 土色的下一条带，不是天——照 HazeSolid 折算会把整块地洗成天色，
+        // 田块和麦子全看不见了
+      }, LAYER_BLUR[key] || 0, 1, HazeSolid(key, 1, 0.65));
       PlaceSprite(band, -80, SURFACE_Y, 0);
-      band.material.opacity = tint;
       layers[key].add(band);
     }
     if (ch.scene === "village" || ch.scene === "tunnelVillage") {
@@ -1750,11 +1803,11 @@ export function CreateWorld(canvasEl) {
     if (ch.scene !== "tunnelFort") {
       const dense = ch.scene === "village" || ch.scene === "tunnelVillage";
       AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
-        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees, opacity: 0.86,
-          step: dense ? 16 : 24, hazeOpt: HazeFor("midTrees") });
+        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees,
+          step: dense ? 16 : 24, hazeOpt: HazeSolid("midTrees", 0.86) });
       AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
-        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees, opacity: 0.96,
-          ...(dense ? { step: 14 } : {}), hazeOpt: HazeFor("nearTrees") });
+        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees,
+          ...(dense ? { step: 14 } : {}), hazeOpt: HazeSolid("nearTrees", 0.96) });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
     // 背景层的乡亲最后放：他们要挂在已经建好的树列之间

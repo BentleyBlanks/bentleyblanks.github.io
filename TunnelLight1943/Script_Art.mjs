@@ -1690,6 +1690,54 @@ export function DrawBlockhouse(ctx, x, groundY, id, { lit = true } = {}) {
   }
 }
 
+// 平原上的耕地：把一条纯色的地面带子切成条田。
+// 冀中一马平川，从村口望出去到地平线全是地——一块块拼过去，
+// 有返青的冬麦（1943 年春，去年秋播的麦子该绿了），有翻过留茬的空地，
+// 中间是一道道田埂。近处的带子还看得出一垄一垄的垄沟，远的就只剩色块。
+export function PaintFarmland(ctx, w, h, id, { wheat, stubble, ridge, strips = 20, furrow = false } = {}) {
+  // **画之前必须把模糊滤镜摘掉。** BakeSprite 在整个 drawFn 期间都开着
+  // `ctx.filter = blur(...)`；条田要画上千个矩形，每一个都过一遍高斯，
+  // 主线程会卡到 load 事件都发不出来（页面直接打不开，2026-08-07 踩过）。
+  // 何况该糊的是地平线那道边，不是地里的垄——田块清楚一点反而对。
+  const prevFilter = ctx.filter;
+  ctx.filter = "none";
+  const top = 4;
+  // 沿纵深切三层：越靠上（越远）的地块越扁，透视自然收
+  const rows = 3;
+  for (let r = 0; r < rows; r += 1) {
+    const y0 = top + (h - top) * (r / rows) ** 1.35;
+    const y1 = top + (h - top) * ((r + 1) / rows) ** 1.35;
+    let x = -Hash(id + "o" + r) * 180;
+    let i = 0;
+    while (x < w) {
+      const bw = (w / strips) * (0.55 + Hash(id + "w" + r + i) * 1.1);
+      const isWheat = Hash(id + "c" + r + i) > 0.42;
+      ctx.fillStyle = isWheat ? wheat : stubble;
+      ctx.globalAlpha = 0.5 + (r / rows) * 0.35;      // 越远越淡，跟着空气透视走
+      ctx.fillRect(x, y0, bw + 1, y1 - y0 + 1);
+      // 垄沟：只有最近那两层才分得出，远处一画就成了噪点
+      if (furrow && r >= 1) {
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = ridge;
+        // 垄距按真尺寸给：48px/米下一垄约 0.35 米＝17px。给到 5px 那不是垄，是噪点
+        for (let fx = x + 4; fx < x + bw; fx += 17) ctx.fillRect(fx, y0, 1.6, y1 - y0);
+      }
+      // 田埂：地块之间那道踩出来的土脊
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = ridge;
+      ctx.fillRect(x, y0, 1.6, y1 - y0);
+      x += bw;
+      i += 1;
+    }
+    // 横向的田埂/地界：把纵深分层，也是"地在往后退"的读法
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = ridge;
+    ctx.fillRect(0, y0, w, 1.4);
+  }
+  ctx.globalAlpha = 1;
+  ctx.filter = prevFilter;
+}
+
 // 地平线上的炮楼（远景剪影）。近处那座走 DrawBlockhouse，这一支是给
 // hills/farTown 层用的：那两层的糊与雾色会把细节整个吃掉，画细了白费——
 // 要的是**轮廓**：略收分的方塔 + 外挑的顶台 + 一圈垛口 + 楼根的围墙。
