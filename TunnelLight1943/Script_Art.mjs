@@ -1029,39 +1029,160 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   }
 }
 
+// 一根带锥度的枝：沿二次贝塞尔取样，两侧按半宽外扩成多边形。
+// 树之所以不像树，八成是因为枝是等宽的直棍——真的枝越往梢越细、还带一点弓。
+function Limb(ctx, x0, y0, x1, y1, w0, w1, id, fill, { bow = 0, lw = 2, shade = null, amp = 0.5 } = {}) {
+  const cx = (x0 + x1) / 2 + bow;
+  const cy = (y0 + y1) / 2;
+  const N = 8;
+  const left = [], right = [];
+  for (let i = 0; i <= N; i += 1) {
+    const t = i / N, mt = 1 - t;
+    const px = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
+    const py = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
+    // 切线（贝塞尔导数），用来求法向
+    const dx = 2 * mt * (cx - x0) + 2 * t * (x1 - cx);
+    const dy = 2 * mt * (cy - y0) + 2 * t * (y1 - cy);
+    const d = Math.hypot(dx, dy) || 1;
+    const hw = (w0 + (w1 - w0) * t) / 2;
+    left.push([px - dy / d * hw, py + dx / d * hw]);
+    right.push([px + dy / d * hw, py - dx / d * hw]);
+  }
+  InkFill(ctx, [...left, ...right.reverse()], id, fill, { amp, lw, shade });
+}
+
+// 一团树叶：不规则多边形。起伏要**浅**——隔一个点就往里收 1/4 的话，
+// 画出来是一片枫叶标本，不是一簇叶子（第一版就栽在这儿）
+function LeafClump(ctx, cx, cy, r, id, fill, { line = null, lw = 0, squash = 0.82 } = {}) {
+  const n = 16;
+  const pts = [];
+  for (let a = 0; a < n; a += 1) {
+    const ang = (a / n) * Math.PI * 2;
+    const rr = r * (a % 3 === 0 ? 0.9 : 1.0) * (0.9 + Rnd(id, a) * 0.16);
+    pts.push([cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr * squash]);
+  }
+  InkFill(ctx, pts, id + "f", fill, { amp: 1.6, lw, line });
+}
+
+// 树。**不许再画成棒棒糖**：一根等宽的棍上顶一个绿球，是这版被打回来的样子。
+// 树的形是从下往上分出来的——根盘摊在土面上、主干带锥度、到腰上分叉、
+// 每根枝的梢上才挂叶团；叶团分前后两层，后层压暗，树冠才有厚度。
 export function DrawTree(ctx, x, groundY, id, { big = false, night = false, bare = false } = {}) {
-  const H = big ? 120 : 74;
-  const trunkW = big ? 13 : 8;
-  // 树干：略弯 + 分叉
+  const H = big ? 150 : 104;
+  const trunkW = big ? 15 : 9.5;
+  const bark = night ? "#3e3427" : "#6b5136";
+  const barkDark = night ? "#2e2820" : "#513d29";
+  const forkY = groundY - H * 0.44;
+  const forkX = x + Sym(id + "lean", 0, H * 0.05);
+
+  // 脚下那圈土：没有它，树就是插在地上的一根柱子（"像被路遮住了一半"正是这么来的）
+  ctx.save();
+  ctx.globalAlpha = night ? 0.20 : 0.16;
+  ctx.fillStyle = "#3a2c1c";
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 1, trunkW * 2.6, trunkW * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 根盘：干脚往两边摊开，还有两三条爬出土面的根
+  const rw = trunkW * 1.9;
   InkFill(ctx, [
-    [x - trunkW / 2, groundY], [x - trunkW / 2 + 2, groundY - H * 0.62],
-    [x - trunkW * 0.9, groundY - H * 0.78], [x + trunkW * 0.2, groundY - H * 0.70],
-    [x + trunkW * 1.1, groundY - H * 0.84], [x + trunkW / 2 + 1, groundY - H * 0.58],
-    [x + trunkW / 2, groundY],
-  ], id + "trunk", "#6b5136", { amp: 1.6, lw: 2.4, shade: "rgba(0,0,0,0.18)" });
+    [x - rw, groundY + 2], [x - rw * 0.6, groundY - 6],
+    [x - trunkW * 0.66, groundY - 15], [x + trunkW * 0.66, groundY - 15],
+    [x + rw * 0.62, groundY - 5], [x + rw, groundY + 2],
+  ], id + "root", bark, { amp: 1.3, lw: 2.2, shade: "rgba(0,0,0,0.20)" });
   for (let i = 0; i < 3; i += 1) {
-    InkLine(ctx, x - 2, groundY - 8 - i * 16, x - 2, groundY - 20 - i * 16, id + "bark" + i,
-      { lw: 1, color: "rgba(50,36,24,0.6)", amp: 1.4 });
+    const dir = i === 1 ? -1 : 1;
+    const reach = rw * (0.9 + Rnd(id + "rt", i) * 0.8) * dir;
+    InkLine(ctx, x + reach * 0.35, groundY - 5, x + reach, groundY + 1, id + "rr" + i,
+      { lw: 2.6, color: barkDark, amp: 1.1 });
+  }
+
+  // 主干：往上收细，略带一道弓
+  Limb(ctx, x, groundY - 9, forkX, forkY, trunkW * 1.25, trunkW * 0.72, id + "trunk", bark,
+    { bow: Sym(id + "bow", 1, trunkW * 0.8), lw: 2.4, shade: "rgba(0,0,0,0.18)", amp: 0.9 });
+  // 树皮：顺着干的竖纹，不是横道
+  const barkN = big ? 6 : 4;
+  const baseY = groundY - 9;
+  for (let i = 0; i < barkN; i += 1) {
+    const t0 = 0.08 + (i / barkN) * 0.68;
+    const off = Sym(id + "bk", i, trunkW * 0.32);
+    const At = (t) => [x + (forkX - x) * t + off, baseY + (forkY - baseY) * t];
+    const [bx0, by0] = At(t0);
+    const [bx1, by1] = At(t0 + 0.17);
+    InkLine(ctx, bx0, by0, bx1, by1, id + "bark" + i,
+      { lw: 1.1, color: night ? "rgba(20,16,12,0.5)" : "rgba(50,36,24,0.5)", amp: 1.2 });
+  }
+
+  // 分枝：从分叉点扇出，梢上留坐标给叶团。
+  // 张角/枝长/冠径这三个数是**贴着画布边算过的**（小树 150px 宽、大树 220px），
+  // 再放大树冠就要越出画布被切一刀——切掉的那一下比棒棒糖还难看
+  const nB = big ? 5 : 4;
+  const tips = [];
+  for (let i = 0; i < nB; i += 1) {
+    const t = (i + 0.5) / nB;
+    const ang = -Math.PI / 2 + (t - 0.5) * 1.5 + Sym(id + "ba", i, 0.16);
+    const len = H * (0.34 + Rnd(id + "bl", i) * 0.14);
+    const tx = forkX + Math.cos(ang) * len;
+    const ty = forkY + Math.sin(ang) * len * 0.92;
+    Limb(ctx, forkX + Math.cos(ang) * trunkW * 0.25, forkY + trunkW * 0.2, tx, ty,
+      trunkW * 0.66, trunkW * 0.18, id + "br" + i, bark,
+      { bow: Sym(id + "bb", i, trunkW * 1.1), lw: 1.9, amp: 0.8 });
+    tips.push([tx, ty]);
+    // 二级小枝：每根主枝再叉一根，冬天（bare）时的剪影全靠它
+    const a2 = ang + (i % 2 ? 0.42 : -0.42);
+    const l2 = len * 0.42;
+    Limb(ctx, forkX + Math.cos(ang) * len * 0.55, forkY + Math.sin(ang) * len * 0.5,
+      forkX + Math.cos(ang) * len * 0.55 + Math.cos(a2) * l2,
+      forkY + Math.sin(ang) * len * 0.5 + Math.sin(a2) * l2 * 0.92,
+      trunkW * 0.3, trunkW * 0.1, id + "bs" + i, barkDark, { lw: 1.4, amp: 0.7 });
   }
   if (bare) return;
-  // 树冠：几团叠加的不规则块
-  const cy = groundY - H * 0.86;
-  const cr = big ? 46 : 28;
+
+  // 叶团：先铺后层（暗、往里收），再压前层（亮）。同一枝上挂两团，错开一点
   const base = night ? PAL.treeDark : PAL.tree;
-  for (let i = 0; i < 4; i += 1) {
-    const ox = Sym(id + "c", i, cr * 0.55);
-    const oy = Sym(id + "c", i + 10, cr * 0.3);
-    const r = cr * (0.62 + Rnd(id + "c", i + 20) * 0.4);
-    const pts = [];
-    for (let a = 0; a < 9; a += 1) {
-      const ang = (a / 9) * Math.PI * 2;
-      const rr = r * (0.82 + Rnd(id + "c" + i, a) * 0.36);
-      pts.push([x + ox + Math.cos(ang) * rr, cy + oy + Math.sin(ang) * rr * 0.78]);
-    }
-    InkFill(ctx, pts, id + "crown" + i, i % 2 ? base : (night ? "#33422f" : "#4e6237"),
-      { amp: 2.4, lw: i === 0 ? 2.4 : 0, line: i === 0 ? IN.ink : null });
+  const backC = night ? "#2b3826" : "#41542c";
+  const litC = night ? "#4a5c3a" : "#78904a";
+  const cr = (big ? 31 : 21);
+  // 冠底：先把整顶铺成一团暗的，各枝的叶团才连得成一顶树冠；
+  // 少了这一层，画面上就是几片飘在空中互不相干的绿斑
+  let cx0 = 0, cy0 = 0, minX = 1e9, maxX = -1e9;
+  for (const [tx] of tips) { minX = Math.min(minX, tx); maxX = Math.max(maxX, tx); }
+  for (const [tx, ty] of tips) { cx0 += tx; cy0 += ty; }
+  cx0 /= tips.length; cy0 /= tips.length;
+  // 冠底比枝展略小：枝头那几团要能顶出轮廓去，树冠才不是一颗土豆
+  const crownR = (maxX - minX) * 0.5 + cr * 0.52;
+  LeafClump(ctx, cx0, cy0 - cr * 0.10, crownR, id + "mass", backC,
+    { line: IN.inkSoft, lw: 2.0, squash: 0.76 });
+
+  // 枝头的叶团：往冠心收一点（收得太散就散架），后层压暗、前层提亮
+  const back = [], front = [];
+  for (let i = 0; i < tips.length; i += 1) {
+    const [tx0, ty0] = tips[i];
+    const tx = tx0 + (cx0 - tx0) * 0.12;
+    const ty = ty0 + (cy0 - ty0) * 0.12;
+    const r = cr * (0.78 + Rnd(id + "cr", i) * 0.30);
+    back.push([tx + Sym(id + "cx", i, r * 0.3), ty + r * 0.26 + Sym(id + "cy", i, r * 0.18), r * 0.86]);
+    front.push([tx + Sym(id + "dx", i, r * 0.28), ty - r * 0.22 + Sym(id + "dy", i, r * 0.16), r * 0.80]);
   }
-  Speckle(ctx, x - cr, cy - cr, cr * 2, cr * 1.6, id + "leaf", { count: 30, alpha: 0.14, size: 2.2, color: "#243018" });
+  for (let i = 0; i < back.length; i += 1) LeafClump(ctx, back[i][0], back[i][1], back[i][2], id + "kb" + i, backC);
+  for (let i = 0; i < front.length; i += 1) {
+    LeafClump(ctx, front[i][0], front[i][1], front[i][2], id + "kf" + i, i % 2 ? base : litC,
+      { line: "rgba(43,31,22,0.45)", lw: 1.4 });
+  }
+  // 受光的一侧：左上角一道亮边
+  for (let i = 0; i < front.length; i += 2) {
+    const [fx, fy, fr] = front[i];
+    LeafClump(ctx, fx - fr * 0.26, fy - fr * 0.30, fr * 0.46, id + "hl" + i, litC);
+  }
+  // 冠里透出去的两根枝梢：全是叶子就成了一坨绿
+  for (let i = 0; i < tips.length; i += 2) {
+    const [tx, ty] = tips[i];
+    InkLine(ctx, tx, ty, tx + Sym(id + "tw", i, cr * 0.6), ty - cr * (0.6 + Rnd(id + "tw2", i) * 0.5),
+      id + "twig" + i, { lw: 1.3, color: barkDark, amp: 1.6 });
+  }
+  Speckle(ctx, cx0 - crownR, cy0 - crownR * 0.8, crownR * 2, crownR * 1.5, id + "leaf",
+    { count: big ? 46 : 30, alpha: 0.12, size: 2.2, color: "#243018" });
 }
 
 export function DrawHaystack(ctx, x, groundY, w, id, { night = false } = {}) {
@@ -1090,24 +1211,171 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false } = {}) {
   InkLine(ctx, x - W * 0.06, groundY - H, x - W * 0.02, groundY - H - 11, id + "pole", { lw: 2, color: "#6b5433" });
 }
 
-export function DrawWell(ctx, x, groundY, id, { night = false } = {}) {
-  // 井台
-  InkFill(ctx, [[x - 26, groundY], [x - 22, groundY - 22], [x + 22, groundY - 22], [x + 26, groundY]],
-    id, "#9a938a", { amp: 1.6, lw: 2.6, shade: "rgba(0,0,0,0.18)" });
-  // 井口的黑
-  InkFill(ctx, [[x - 15, groundY - 22], [x + 15, groundY - 22], [x + 12, groundY - 27], [x - 12, groundY - 27]],
-    id + "hole", "#1b1611", { amp: 1, lw: 2 });
-  // 石缝
-  for (let i = 0; i < 4; i += 1) {
-    InkLine(ctx, x - 20 + i * 11, groundY - 2, x - 20 + i * 11, groundY - 20, id + "s" + i,
-      { lw: 1.1, color: "rgba(60,50,40,0.5)", amp: 1.2 });
+// 水井。**辘轳轴心钉死在 groundY-69px（=WINCH_HUB_Y 1.43m×48）**——摇辘轳那一拍，
+// Core 按这个高度算摇把的轴心，World 把会转的摇把贴在同一点上。改这张画的高度，
+// 就要同步改 Core 的 WINCH_HUB_Y，否则玩家的手落在轴心外面，转不动。
+//
+// 上一版是「一个灰梯形 + 一座牌坊」：井台只有 22px 高、没有砌石、没有辘轳鼓，
+// 脚下也没有一点湿泥，于是它既不像井，又像被路截了一半。这一版按真物件重排：
+// 圆井台（正面砌石 + 椭圆台面 + 黑井口）、两根埋进土里的立柱、柱间一只辘轳鼓、
+// 鼓上缠绳、绳垂进井口，脚下压一圈常年泼出来的湿地。
+export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, crank = true } = {}) {
+  // 石头是**暖灰**，不是白瓷：上一版调到 #a8a094，画出来整口井比黄土路还亮，
+  // 成了画面里最跳的一块。井是背景，不该抢主角的明度。
+  // 注意这套贴图上屏时会被整体提亮（画布贴图没声明 sRGB，见 CanvasTexture），
+  // 想要屏幕上一档灰，源色就得比直觉再压两档——#6f685c 上屏约莫是中灰
+  const stone = night ? "#41413f" : "#6f685c";
+  const stoneLit = night ? "#525250" : "#847b6c";
+  const stoneDark = night ? "#2c2c2b" : "#4c463d";
+  const wood = night ? "#6a4c30" : PAL.wood;
+  const woodDark = night ? "#4c3722" : PAL.woodDark;
+  // 井台要**高而窄**（0.73m 高、0.5m 半径）：矮而宽 + 一圈大椭圆台面，
+  // 画出来是一只洗脸盆，不是一口井
+  const CURB = 35;        // 井台高（px）：0.73m，蹲下去打水刚好搭得上手
+  const RX = 25;          // 井台半径
+  const HUB = groundY - 69;
+
+  // 常年泼出来的那一圈湿地：井脚有水痕，才不像一块摆在路当中的石头
+  ctx.save();
+  ctx.globalAlpha = night ? 0.26 : 0.20;
+  ctx.fillStyle = "#4a3a24";
+  ctx.beginPath();
+  ctx.ellipse(x + 2, groundY - 1, RX * 1.75, 9.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = night ? 0.16 : 0.12;
+  ctx.beginPath();
+  ctx.ellipse(x - RX * 1.1, groundY + 1, 13, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 辘轳架：两根埋进土里的立柱，上头开口卡住轴。**先画柱子再画井台**——
+  // 柱子立在井台后侧，反过来画就成了两根挡在井前面的门框
+  for (const s of [-1, 1]) {
+    const px = x + s * (RX - 1);
+    InkFill(ctx, [
+      [px - 3.2 - s * 0.6, groundY - 2], [px - 2.8, HUB - 5], [px + 2.8, HUB - 5], [px + 3.2 + s * 0.6, groundY - 2],
+    ], id + "post" + s, s < 0 ? wood : woodDark, { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.22)" });
+    // 卡轴的凹口
+    InkLine(ctx, px - 3, HUB - 3, px + 3, HUB - 3, id + "notch" + s, { lw: 2, color: "rgba(30,22,14,0.7)" });
   }
-  // 辘轳架
-  InkFill(ctx, Rect(x - 22, groundY - 66, 6, 46), id + "p1", PAL.woodDark, { amp: 1, lw: 2.2 });
-  InkFill(ctx, Rect(x + 16, groundY - 66, 6, 46), id + "p2", PAL.woodDark, { amp: 1, lw: 2.2 });
-  InkFill(ctx, Rect(x - 26, groundY - 72, 52, 7), id + "top", PAL.wood, { amp: 1.2, lw: 2.2 });
-  InkLine(ctx, x - 2, groundY - 65, x - 2, groundY - 38, id + "rope", { lw: 1.4, color: "#6b5c45", amp: 1.6 });
-  InkFill(ctx, Rect(x - 8, groundY - 38, 13, 12), id + "bucket", "#8a6a45", { amp: 1, lw: 2 });
+
+  // 井台正面（圆台的前半），砌石一层三块、上下错缝
+  const curbPts = [
+    [x - RX, groundY - 2], [x - RX + 1.5, groundY - CURB],
+    [x + RX - 1.5, groundY - CURB], [x + RX, groundY - 2],
+  ];
+  InkFill(ctx, curbPts, id + "curb", stone, { amp: 0.8, lw: 2.6 });
+  // 圆的东西要有圆的明暗：左受光、右背光、根部压暗。
+  // 只在右半边糊一块死黑（InkFill 的 shade）读出来是一张对折的纸
+  ctx.save();
+  WobblyPath(ctx, curbPts, id + "curb", 0.8, true);
+  ctx.clip();
+  const cyl = ctx.createLinearGradient(x - RX, 0, x + RX, 0);
+  cyl.addColorStop(0, "rgba(255,245,220,0.15)");
+  cyl.addColorStop(0.34, "rgba(255,245,220,0.03)");
+  cyl.addColorStop(0.62, "rgba(0,0,0,0.07)");
+  cyl.addColorStop(1, "rgba(0,0,0,0.30)");
+  ctx.fillStyle = cyl;
+  ctx.fillRect(x - RX - 2, groundY - CURB - 2, RX * 2 + 4, CURB + 4);
+  const foot = ctx.createLinearGradient(0, groundY - 13, 0, groundY);
+  foot.addColorStop(0, "rgba(0,0,0,0)");
+  foot.addColorStop(1, "rgba(30,20,10,0.32)");
+  ctx.fillStyle = foot;
+  ctx.fillRect(x - RX - 2, groundY - 13, RX * 2 + 4, 15);
+  ctx.restore();
+  const ROWS = 3;
+  const rh = (CURB - 4) / ROWS;
+  for (let r = 0; r < ROWS; r += 1) {
+    const ry = groundY - 3 - r * rh;
+    if (r > 0) InkLine(ctx, x - RX + 2, ry, x + RX - 2, ry, id + "j" + r, { lw: 2.2, color: stoneDark, amp: 1.2 });
+    const n = 3;
+    for (let c = 0; c < n; c += 1) {
+      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / n) * RX * 2;
+      if (jx > x - RX + 4 && jx < x + RX - 4) {
+        InkLine(ctx, jx, ry - 1.5, jx, ry - rh + 1.5, id + "v" + r + c, { lw: 2, color: stoneDark, amp: 0.9 });
+      }
+    }
+  }
+  Speckle(ctx, x - RX, groundY - CURB, RX * 2, CURB, id + "sp", { count: 24, alpha: 0.12, size: 2 });
+
+  // 台面：一圈磨光的石沿
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - CURB, RX, 6.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = stoneLit;
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 2.6;
+  ctx.stroke();
+  ctx.restore();
+  // 井口：黑，永远看不到底。口不能开太大——满面的黑会读成一口锅
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - CURB + 0.8, RX - 11, 3.6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = night ? "#0e0c0a" : "#1b1611";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(20,15,10,0.85)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+  // 井绳在石沿上磨出来的槽：一口用了几十年的井该有的痕
+  for (let i = 0; i < 2; i += 1) {
+    InkLine(ctx, x - 5 + i * 10, groundY - CURB - 3.5, x - 5 + i * 10, groundY - CURB + 2,
+      id + "wear" + i, { lw: 1.5, color: "rgba(60,50,40,0.45)", amp: 0.4 });
+  }
+
+  // 辘轳鼓：一段圆木。两头各一枚端面椭圆才读得出"圆"，两道铁箍箍住，
+  // 中段缠着井绳（绳圈只缠中间那一段——缠满全长就成了一架木琴）
+  const DR = 6.8, DL = 18;
+  InkFill(ctx, [
+    [x - DL, HUB - DR], [x + DL, HUB - DR], [x + DL, HUB + DR], [x - DL, HUB + DR],
+  ], id + "drum", wood, { amp: 0.6, lw: 2.4, shade: "rgba(0,0,0,0.24)" });
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(x + s * DL, HUB, 3.2, DR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = s > 0 ? wood : woodDark;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    InkLine(ctx, x + s * 12, HUB - DR, x + s * 12, HUB + DR, id + "hoop" + s,
+      { lw: 1.8, color: night ? "#33302c" : "#4c463c", amp: 0.3 });
+  }
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  for (let i = 0; i < 5; i += 1) {
+    InkLine(ctx, x - 7 + i * 3.4, HUB - DR + 0.8, x - 7 + i * 3.4, HUB + DR - 0.8, id + "coil" + i,
+      { lw: 1.7, color: "#8a7350", amp: 0.3 });
+  }
+  ctx.restore();
+
+  // 摇把：轴销 + 一段柄臂 + 一节握手，钉在右端面上。摇辘轳那一拍由 World
+  // 换上会转的那只，这里就不画了（两只摇把会叉在同一根轴上）
+  if (crank) {
+    InkLine(ctx, x + DL + 2, HUB, x + DL + 14, HUB + 7, id + "arm", { lw: 5.2, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, x + DL + 2, HUB, x + DL + 14, HUB + 7, id + "arm2", { lw: 3.2, color: woodDark, amp: 0.2 });
+    InkLine(ctx, x + DL + 14, HUB + 2, x + DL + 14, HUB + 13, id + "grip0", { lw: 6.4, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, x + DL + 14, HUB + 2, x + DL + 14, HUB + 13, id + "grip", { lw: 4.2, color: wood, amp: 0.2 });
+    ctx.beginPath();
+    ctx.arc(x + DL + 2, HUB, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = night ? "#3a3a3c" : "#5c5a56";
+    ctx.fill();
+  }
+
+  // 井绳：从鼓上垂下去，钻进井口的黑里。断了的话只剩一截毛茬朝下的绳头
+  if (broken) {
+    InkLine(ctx, x - 2, HUB + 7, x - 3, groundY - CURB - 16, id + "stub",
+      { lw: 2.6, color: "#9a7d4f", amp: 1.4 });
+    for (let i = 0; i < 3; i += 1) {
+      InkLine(ctx, x - 3, groundY - CURB - 16, x - 6 + i * 3.2, groundY - CURB - 9 - (i % 2) * 2,
+        id + "fray" + i, { lw: 1.4, color: "#8a6a45" });
+    }
+  } else {
+    InkLine(ctx, x - 2, HUB + 6, x - 2, groundY - CURB + 1, id + "rope",
+      { lw: 1.7, color: "#6f5c3d", amp: 1 });
+  }
 }
 
 export function DrawMillstone(ctx, x, groundY, id) {
@@ -1932,13 +2200,79 @@ export function DrawCloth(ctx, x, y, id) {
   InkLine(ctx, x + 3, y + 14, x + 10, y + 20, id + "flap", { lw: 1.6, color: "#b8968e", amp: 2.4 });
 }
 
-// 石子堆：投掷的"弹药箱"
+// 石子堆：投掷的"弹药箱"。
+// 上一版是七块平底的灰楔子——平底 + 路面上那道横车辙，读出来就是"半埋在路里"
+// （用户原话：像被路遮住了一半）。这一版每颗都是滚圆的河卵石，整颗都在土面之上，
+// 底下压一小片自己的影子与土窝，堆成前低后高的一小堆。
 export function DrawStonePile(ctx, x, groundY, id) {
-  for (let i = 0; i < 7; i += 1) {
-    const px = x - 14 + (i % 4) * 8 + Hash(id + "x" + i) * 5;
-    const py = groundY - 3 - Math.floor(i / 4) * 6 - Hash(id + "y" + i) * 3;
-    InkFill(ctx, [[px - 4, py + 3], [px - 2, py - 3], [px + 3, py - 2], [px + 4, py + 3]],
-      id + "st" + i, i % 2 ? "#8b857a" : "#7a746a", { amp: 0.5, lw: 1.4, shade: "rgba(0,0,0,0.18)" });
+  // 土窝：石头堆久了压出来的一小片浅坑
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "#3a2c1c";
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 1.5, 24, 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 一颗石头。**大小、扁瘦、色深都得各不相同**——一模一样的圆疙瘩码成金字塔，
+  // 读出来是一堆炮弹，不是村口路边捡的石子
+  const Stone = (px, py, rr, k, squash) => {
+    // 每颗自己的接地影：石头是"搁"在土上的，不是"插"进去的
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#33281a";
+    ctx.beginPath();
+    ctx.ellipse(px + 1.4, py + rr * squash * 0.78, rr * 1.1, rr * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const pts = [];
+    const n = 7;
+    const spin = Hash(id + "sa" + k) * 2.6;
+    for (let a = 0; a < n; a += 1) {
+      const ang = (a / n) * Math.PI * 2 + spin;
+      const q = rr * (0.72 + Hash(id + "sq" + k + "_" + a) * 0.52);
+      pts.push([px + Math.cos(ang) * q, py + Math.sin(ang) * q * squash]);
+    }
+    // 配色跟着土走（原先偏冷的青灰跟黄土路打架）。源色压得比直觉低两档：
+    // 贴图上屏会被整体提亮（见 DrawWell 里那条注）。四档灰里混一档偏土的
+    const FACE = ["#79715f", "#645d50", "#877f6c", "#6e6350"];
+    InkFill(ctx, pts, id + "st" + k, FACE[k % 4], {
+      amp: 0.6, lw: 1.3, line: IN.inkSoft, shade: "rgba(0,0,0,0.18)",
+    });
+    // 受光的一小道（不是整颗提亮，那会变成弹珠）
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#c6bca8";
+    ctx.beginPath();
+    ctx.ellipse(px - rr * 0.26, py - rr * squash * 0.36, rr * 0.34, rr * 0.16, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // 三层：底 5 颗、中 3 颗、顶 2 颗，越往上越小
+  const ROWS = [
+    { n: 5, y: 5.0, r: 5.0, span: 16 },
+    { n: 3, y: 11.0, r: 4.4, span: 10 },
+    { n: 2, y: 16.0, r: 3.6, span: 5 },
+  ];
+  let k = 0;
+  for (let r = 0; r < ROWS.length; r += 1) {
+    const row = ROWS[r];
+    for (let i = 0; i < row.n; i += 1) {
+      k += 1;
+      const t = row.n === 1 ? 0.5 : i / (row.n - 1);
+      Stone(x + (t - 0.5) * 2 * row.span + Sym(id + "sx", k, 1.9),
+        groundY - row.y + Sym(id + "sy", k, 1.3),
+        row.r * (0.70 + Hash(id + "sr" + k) * 0.66), k,
+        0.72 + Hash(id + "sf" + k) * 0.30);
+    }
+  }
+  // 滚出去的几颗小的：码得太整齐就成了摆件
+  for (let i = 0; i < 3; i += 1) {
+    k += 1;
+    Stone(x + (i === 1 ? -1 : 1) * (17 + Hash(id + "lx" + i) * 8),
+      groundY - 1.8 - Hash(id + "ly" + i) * 1.5,
+      2.0 + Hash(id + "lr" + i) * 1.4, k, 0.7);
   }
 }
 

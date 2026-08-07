@@ -1164,26 +1164,20 @@ export function CreateWorld(canvasEl) {
       case "hatch": mk((ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true })); break;
       case "well": {
         // 第一章：井绳断了半截——辘轳上垂着一小截断头，毛茬朝下。
-        // 断没断只改这一张贴图，所以它走 propRedraw 单张重烘，不进 builtKey
-        const Paint = (ctx, ax, ay, broken) => {
-          ART.DrawWell(ctx, ax, ay, p.id, { night });
-          if (!(sceneKey === "village" && broken)) return;
-          ctx.strokeStyle = "#9a7d4f";
-          ctx.lineWidth = 2.6;
-          ctx.beginPath();
-          ctx.moveTo(ax, ay - 74);
-          ctx.quadraticCurveTo(ax + 2, ay - 62, ax - 1, ay - 52);
-          ctx.stroke();
-          for (let i = 0; i < 3; i += 1) {
-            ART.InkLine(ctx, ax - 1, ay - 52, ax - 4 + i * 3.4, ay - 45 - (i % 2) * 2,
-              p.id + "fray" + i, { lw: 1.4, color: "#8a6a45" });
-          }
-        };
-        const wellMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.wellRopeBroken));
-        if (sceneKey === "village") {
-          propRedraw.push({ flag: "wellRopeBroken", last: !!state?.flags.wellRopeBroken,
-            run: (st) => RedrawProp(wellMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.wellRopeBroken)) });
-        }
+        // 断没断只改这一张贴图，所以它走 propRedraw 单张重烘，不进 builtKey。
+        // 摇把同理：摇辘轳那一拍 World 会在轴心贴一只**会转的**摇把，
+        // 静态贴图上那只必须让位——否则同一根轴上叉着两把手。
+        const Paint = (ctx, ax, ay, st) => ART.DrawWell(ctx, ax, ay, p.id, {
+          night,
+          broken: sceneKey === "village" && !!st?.flags.wellRopeBroken,
+          crank: !st?.winchView,
+        });
+        const wellMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, state));
+        propRedraw.push({
+          read: (st) => `${!!st.flags.wellRopeBroken}|${!!st.winchView}`,
+          last: `${!!state?.flags.wellRopeBroken}|${!!state?.winchView}`,
+          run: (st) => RedrawProp(wellMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, st)),
+        });
         break;
       }
       case "millstone": mk((ctx, ax, ay) => ART.DrawMillstone(ctx, ax, ay, p.id)); break;
@@ -2359,9 +2353,10 @@ export function CreateWorld(canvasEl) {
       for (const m of fp.meshes) m.visible = on;
     }
     StepBackdropFolk(dt);
-    // 画法随旗标变的那几张（井绳断口、木料堆里露出的绳头）：只重烘自己那一张
+    // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：
+    // 只重烘自己那一张。r.flag 是单个旗标的简写，r.read 是任意状态摘要
     for (const r of propRedraw) {
-      const v = !!state.flags[r.flag];
+      const v = r.read ? r.read(state) : !!state.flags[r.flag];
       if (r.last === v) continue;
       r.last = v;
       r.run(state);

@@ -120,7 +120,7 @@
         "anchor": "center",
         "baseline": 12
       },
-      "note": "第一章绳断时（flags.wellRopeBroken）辘轳上加画一小截毛茬朝下的断头"
+      "note": "圆井台(0.65m)+两根立柱+辘轳鼓，鼓心钉死在 groundY-69px（=Core 的 WINCH_HUB_Y 1.43m×48），会转的摇把就贴在这一点上——改画高就要改 WINCH_HUB_Y。两处条件绘制都在 DrawWell 里：绳断（flags.wellRopeBroken）换成一截毛茬朝下的断头；摇辘轳那一拍（state.winchView）静态摇把让位给会转的那只，由 World 的 propRedraw 单张重烘"
     },
     "millstone": {
       "art": "DrawMillstone",
@@ -290,7 +290,7 @@
         "baseline": 50
       },
       "yOffset": 2.43,
-      "note": "挂在老槐树杈上，所以是全场唯一抬离地平线的道具；只在第一章且没被打下来时出现。yOffset 必须跟着 DrawTree 的树冠走：big 树 H=120px、冠心在 groundY-0.86H≈2.15m、冠半径≈0.96m，勾住的那一角画在锚点上方 20px(0.42m)，所以 2.43 把勾住的那一角送进冠内偏上，布巾下缘落在 2.0m——刚好高过柱子伸手够得着的高度（够得着就不用投石子了）。原先写 5.2——那是树顶再往上两米多的空中，布巾整个飘在天上。改这个数就要同步改 Core 里 c1_cloth 的投掷靶心与插入镜头"
+      "note": "挂在老槐树杈上，所以是全场唯一抬离地平线的道具；只在第一章且没被打下来时出现。yOffset 必须跟着 DrawTree 的树冠走：big 树 H=150px、分叉在 groundY-66px、枝梢挂的叶团铺开在 groundY-74…-175px（1.55m~3.65m），勾住的那一角画在锚点上方 20px(0.42m)，所以 2.43 落在冠内偏下、正对着几根侧枝，布巾下缘落在 2.0m——刚好高过柱子伸手够得着的高度（够得着就不用投石子了）。原先写 5.2——那是树顶再往上两米多的空中，布巾整个飘在天上。改这个数就要同步改 Core 里 c1_cloth 的投掷靶心与插入镜头"
     },
     "vat": {
       "art": "DrawVat",
