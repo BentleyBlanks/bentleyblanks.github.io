@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=038";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=038";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=039";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=039";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=038")
+import("./Script_Audio.js?v=039")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);

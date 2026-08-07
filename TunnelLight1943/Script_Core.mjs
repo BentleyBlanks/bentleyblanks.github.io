@@ -1087,9 +1087,18 @@ export const SCRIPTS = {
       ],
     },
     {
+      // 开场先给村子，再给这一家：三个空镜把「他们住在什么样的世道里」说完
+      //（据点在八里外压着、粮刚交完、碾上碾的是糠），第四镜才切进院子。
+      // 没有这三镜，扫荡就是从天上掉下来的——玩家的原话是「完全没有前情提要」。
       kind: "cinematic", id: "c1_open",
       lines: [
-        { stage: "1942年，华北敌后。梁家村。", d: 3.2, cam: { kind: "wide", x: 60 },
+        // 村街的全景是活的：李婶撒鸡食，担水的乡亲在井台和家门之间来回
+        { stage: "1942年，华北敌后。梁家村。", d: 3.4, cam: { kind: "wide", x: 60 } },
+        // 旁白说的是画面外的东西（据点在八里外）：镜头只给村东的土路——
+        // 威胁不露脸，露脸的是「村里人抬眼就躲不开它」这件事
+        { stage: "村东八里是鬼子的据点。炮楼比村里最高的树还高，天晴的日子，从村口就望得见。", d: 5.2, cam: { kind: "wide", x: 150, pan: 5 } },
+        { stage: "开春刚交完据点摊派的粮。囤里的米、瓮底的盐，家家都得掰着指头过。", d: 5.0, cam: { kind: "shot", x: 118.6, y: 1.4, dist: 6.5 } },
+        { stage: "村东头的木匠家，一大早就有响动。", d: 3.2, cam: { kind: "wide", x: 42 },
           on: (state) => {
             // 开场这场戏原来全靠字幕：爹站着不动、柱子站着不动。现在让他们演——
             // 爹手上有刨子（放下才有"放下"可看），柱子正往外跑（叫得住才有"叫住"）
@@ -1164,7 +1173,9 @@ export const SCRIPTS = {
             // 气泡要陪满整行（收尾采样在 d-0.15），下一行的 on() 里由姿势归位带走
             state.bubbleFlash = { who: "player", icon: "q", t: 3.0 };
           } },
-        { stage: "他惦记着村东头那堆没搬完的木料。", d: 3.8, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
+        // 木料不是闲活：王家用半袋高粱换爹打一张榆木门。封锁沟里外，
+        // 钱换不来东西——这年头，手艺就是一家人的口粮
+        { stage: "他惦记着村东头那堆木料——王家订的榆木门，讲好了用半袋高粱换。", d: 4.6, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
           on: (state) => {
             // 心思已经在村东头了：眼睛先往那边去
             state.player.pose = null;
@@ -1252,6 +1263,21 @@ export const SCRIPTS = {
         // 合完榫，各回各的活：爹接着拉锯，娘已经在菜畦里了
         FatherSaw(state);
         if (!state.flags.waterFilled) MotherHoe(state);
+        // 差事得有人派：娘在菜畦那头直起腰喊一嗓子，不是目标文本凭空掉下来。
+        // 全章她只这一句台词——够了，一家人过日子不靠念台词
+        const mother = FindActor(state, "mother");
+        if (mother) { mother.track = null; mother.heading = 1; }
+        StartMicroCine(state, [
+          { who: "娘", say: "柱子——缸见底了，给娘拎桶水来！", d: 3.2, cam: { kind: "shot", x: V_PATCH_X + 2, y: 1.6, dist: 8 } },
+        ]);
+      },
+      // 喊完那嗓子接着锄地：micro-cine 一收人不能一直杵在菜畦里
+      //（pip 开着时不抢——望井台那一眼有自己的归位逻辑）
+      tick: (state) => {
+        if (state.microCine || state.pip || state.flags.waterFilled) return;
+        const mother = FindActor(state, "mother");
+        if (mother && !mother.track && !mother.cineTarget
+          && Math.abs(mother.x - V_PATCH_X) < 1.2) MotherHoe(state);
       },
       // 打水这一路磕磕绊绊（绳断、翻堆、接绳），玩家一旦停在半道太久，
       // 后果小窗开一眼菜畦：娘直起腰朝井台望——不打断，只惦记
@@ -1273,7 +1299,9 @@ export const SCRIPTS = {
       steps: [
         { type: "pickup", x: 31, item: { id: "bucket", label: "空水桶" }, prompt: "E · 拎起桶" },
         { type: "use", zone: V.well, needs: "bucket", consume: false, prompt: "E · 挂上井绳",
-          note: "井绳断了半截——桶放不下去。得找根麻绳。",
+          // 绳断了不是巧合是世道：伪军挨家收过麻，好绳都交上去了，
+          // 井上挂的本就是截旧的。艰苦不用喊，一根接不上的绳就够了
+          note: "井绳断了半截。好麻绳去年就让伪军挨家收走了——得再寻一根。",
           effect: (state) => { state.flags.wellRopeBroken = true; } },
         { type: "drop", zone: V.woodpile, itemId: "bucket", storeIn: "bucketAt",
           prompt: "E · 放下桶腾手" },
@@ -1338,8 +1366,11 @@ export const SCRIPTS = {
       steps: [
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
           lines: [
-            { who: "妹妹", say: "哥——风把我的头巾刮到树上去了！", d: 3.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
+            { who: "妹妹", say: "哥——风把俺的头巾刮到树上去了！", d: 3.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
             { stage: "那块洗得发白的花布巾挂在树杈上，风一过就扑棱一下。", d: 3.6, cam: { kind: "insert", x: 126.45, y: 2.43, dist: 3.2 } },
+            // 她待在树下的原因，也是青黄不接写在孩子身上的样子：
+            // 惦记的不是玩，是能吃的槐花
+            { who: "妹妹", say: "娘说槐花开了就蒸槐花饭。俺来瞅瞅开了没有……", d: 4.2, cam: { kind: "shot", x: 126, y: 2.6, dist: 6.5 } },
           ] },
         // 靶心 = 花布巾实际挂着的那一点（Data_Scenes 的 cloth.x + Data_PropArt 的
         // cloth.yOffset）。这三处必须一起改——它们曾经一起指着树顶上方两米的空气
@@ -1365,6 +1396,37 @@ export const SCRIPTS = {
     {
       kind: "escort", id: "c1_sisterHome", follower: "sister", dest: V.homeYard,
       objective: "带妹妹回家", hint: "妹妹会跟着你走",
+      // 扫荡不从天上掉下来：走到半路，报信的民兵先一步跑过——街上的人
+      // 各自进屋，门一关，村子在两句话之间空了。这是警讯链的第一环
+      //（民兵报信 → 村里锣响 → 村口喊声），也是"平常日子"翻面的那一瞬
+      tick: (state) => {
+        const b = state.beat;
+        const sister = FindActor(state, "sister");
+        if (b.warned || !sister?.following || state.player.x > 98) return;
+        b.warned = true;
+        const runner = MakeActor("runner", "militia", state.player.x + 13, { label: "报信的民兵" });
+        runner.cineTarget = { x: 16 };
+        runner.cineSpeed = 4.6;
+        runner.cineVanish = true;
+        runner.heading = -1;
+        state.actors.push(runner);
+        // 街坊收工进屋：撒鸡食的、扫院的、担水的各回各家，走着进门再消失
+        //（c1_raid 第一行的兜底收人对他们不再有活可干）
+        for (const id of ["auntFeed", "oldSweep", "carrier", "grindAunt"]) {
+          const a = FindActor(state, id);
+          if (!a || a.visible === false) continue;
+          a.track = null;
+          a.wander = null;
+          a.carry = null;
+          a.cineTarget = { x: a.x < 90 ? 62.5 : (a.x > 135 ? 148.5 : 92.5) };
+          a.cineSpeed = 3.1;
+          a.cineVanish = true;
+        }
+        StartMicroCine(state, [
+          { who: "民兵", say: "鬼子出据点了，朝这边来——都家去，关门！", d: 3.6, cam: { kind: "shot", x: state.player.x + 6, y: 1.7, dist: 10 } },
+          { stage: "街上转眼就空了。连狗都没了声。", d: 3.2, cam: { kind: "wide", x: 84 } },
+        ]);
+      },
       // J-cut：锣声先于切镜半拍响起——教学收尾的最后两秒，声音已经变了天
       onDone: (state) => { Cue(state, "gong"); },
     },
@@ -1374,11 +1436,11 @@ export const SCRIPTS = {
         // 惊变时刻旁白闭嘴、同期声接管：村口是画外真人的喊声，不是叙事者的转述
         { who: "村口喊声", say: "鬼子进村了——", d: 3.0, far: true, cam: { kind: "wide", x: 140, pan: -6 },
           on: (state) => {
-            // 喊声一起，街上干活的乡亲四散躲回家——镜头此刻在村东口，
-            // 他们不在画框里，直接收掉即可；raidStarted 旗标同时把鸡藏了
-            for (const vid of ["auntFeed", "oldSweep"]) {
+            // 喊声一起，街上还没进屋的乡亲直接收掉（正常流程里报信民兵那一环
+            // 已经让他们走着进过门了，这里是调试跳幕的兜底）；raidStarted 旗标同时把鸡藏了
+            for (const vid of ["auntFeed", "oldSweep", "carrier", "grindAunt", "runner"]) {
               const v = FindActor(state, vid);
-              if (v) { v.visible = false; v.track = null; }
+              if (v) { v.visible = false; v.track = null; v.wander = null; v.cineTarget = null; }
             }
             // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
             // 于是"鬼子进村了"这一句对着的是一个空村口
@@ -1388,6 +1450,10 @@ export const SCRIPTS = {
             // 从村口往里走：镜头横摇跟着他们推进
             if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
             if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
+            // 带路的翻译官走在兵后头——第二章夜里挑灯笼带路的就是他。
+            // 脸要在第一章就露过，"又来了"三个字在第二章才有分量
+            const tr = FindActor(state, "traitor");
+            if (tr) { tr.x = 168; tr.heading = -1; tr.cineTarget = { x: 150 }; tr.cineSpeed = 1.7; }
             // 镜头此刻在村东口，院子不在画框里——趁这三秒把娘和妹妹走位到位：
             // 护送收束时妹妹可能还落在半路，娘还站在门口。硬切回院子之前必须站定
             const p = state.player;
@@ -1396,6 +1462,9 @@ export const SCRIPTS = {
             if (sister) { sister.following = false; sister.cineTarget = { x: p.x + 1.6 }; sister.cineSpeed = 3.4; }
             if (mother) { mother.carry = null; mother.cineTarget = { x: p.x + 2.6 }; mother.cineSpeed = 3.4; }
           } },
+        // 藏家伙不是慌乱中的怪动作，是学来的规矩：上一回扫荡就有工匠
+        // 连人带家伙被掳走。这句旁白说的是画面外的旧事，也是爹结局的伏笔
+        { stage: "家伙什儿得藏。上回扫荡，西头的铁匠连人带铁砧，都让抓去了据点。", d: 4.4, cam: { kind: "shot", x: 41, y: 1.8, dist: 10 } },
         { stage: "爹把刨子塞进柴堆，转身走向院门。", d: 3.0, cam: { kind: "shot", x: 40, y: 1.8, dist: 10 },
           on: (state) => {
             // 塞柴堆得手里先有刨子：撂下锯，从工作台上抄起刨子，走向院门边的柴堆
@@ -1439,6 +1508,9 @@ export const SCRIPTS = {
         if (r1) { r1.cineTarget = null; r1.x = 57; r1.heading = 1; r1.patrol = [49, 57]; r1.speed = 1.05; }
         // 站定的那个：搁在院门外，脸朝街——他就是石子那道软窗口的对象
         if (r2) { r2.cineTarget = null; r2.x = 51; r2.heading = 1; r2.patrol = null; }
+        // 翻译官在街东头站着对名单（decor，不参与视线判定）
+        const tr = FindActor(state, "traitor");
+        if (tr) { tr.cineTarget = null; tr.x = 55.5; tr.heading = 1; }
         state.stealthActive = true;
       },
     },
@@ -1479,6 +1551,9 @@ export const SCRIPTS = {
             const r2 = FindActor(state, "raid2");
             if (r1) { r1.patrol = null; r1.cineTarget = { x: 36 }; r1.cineSpeed = 3; }
             if (r2) { r2.patrol = null; r2.cineTarget = { x: 40.5 }; r2.cineSpeed = 3; }
+            // 翻译官跟进院，站在兵后面半步——问话的日语就是从他那边递进来的
+            const tr = FindActor(state, "traitor");
+            if (tr) { tr.cineTarget = { x: 41.6 }; tr.cineSpeed = 2.6; }
           } },
         { stage: "爹被两个兵按着跪在地上。", d: 3.4, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true },
           on: (state) => {
@@ -1498,7 +1573,10 @@ export const SCRIPTS = {
         //（《勇敢的心》咕噜拟声的历史化等价物）。旁白只补画面给不了的那一句。
         { who: "日军", say: "言え！八路の食糧はどこに隠した！", noSub: true, d: 3.0,
           cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
-        { stage: "他们在问粮。", d: 2.4, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
+        // 日语孩子听不懂——把话递成中文的是院里那个翻译官（他就站在兵后头）。
+        // 汉奸在第一章有了声音，第二章夜里认出他才有锚点；旁白也少解说一行
+        { who: "翻译官", say: "太君问你——八路的粮食，藏到哪儿去了！", d: 3.6,
+          cam: { kind: "shot", x: 40, y: 0.9, dist: 6, slit: true } },
         { stage: "爹摇头。枪托砸下来。他又摇头。", d: 4.4, cam: { kind: "insert", x: 38, y: 1.0, dist: 3.2, slit: true },
           on: (state) => {
             // 抡的轨道在 0.95s 到达落点；挨砸的轨道用 -0.95 的起点等在那儿，
@@ -1511,6 +1589,10 @@ export const SCRIPTS = {
             if (r1) r1.track = null;      // 按人的松开手，退半步
             if (r1) { r1.cineTarget = { x: 36.4 }; r1.cineSpeed = 1.2; }
           } },
+        // 抓他的理由压在拒绝之后：摇头先立住骨气，名单再落下来，
+        // 「问粮原来只是过场」的凉意才出来。呼应 c1_raid 的铁匠旧事，
+        // 也给第七章据点里找到爹埋因
+        { stage: "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。", d: 5.0, cam: { kind: "shot", x: 38, y: 0.9, dist: 7, slit: true } },
         // 「妹妹想哭」由憋泣的呼吸声演（压低、闷），旁白只说画面外那半句
         { stage: "柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
@@ -1536,7 +1618,10 @@ export const SCRIPTS = {
             const r1 = FindActor(state, "raid1");
             if (father && r1) { r1.x = father.x - 0.72; }
             if (father && r2) { r2.x = father.x + 0.72; }
-            for (const id of ["father", "raid1", "raid2"]) {
+            // 翻译官走在押人队伍前头——带路进村的是他，领人出村的也是他
+            const tr = FindActor(state, "traitor");
+            if (tr) { tr.x = 43.5; tr.heading = 1; }
+            for (const id of ["father", "raid1", "raid2", "traitor"]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
             }
@@ -1561,7 +1646,9 @@ export const SCRIPTS = {
         { stage: "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。", d: 5.0,
           cam: { kind: "wide", x: 154, y: 3.4, hw: 30, pan: -18 },
           on: (state) => { SpawnNightSweep(state); } },
-        { stage: "前头挑灯笼带路的，是邻村据点里的翻译官。", d: 4.4, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
+        // 与第一章接上：抓走爹那天带路的就是这张脸。仇不是抽象的"敌人"，
+        // 是一个认得出来的人——第二章的夜才和柱子有私仇
+        { stage: "前头挑灯笼带路的，是据点的翻译官——去年领着兵抓走爹的，就是他。", d: 5.0, cam: { kind: "shot", x: 120, y: 1.6, dist: 9 },
           on: (state) => {
             const s1 = FindActor(state, "sweep1");
             if (s1) { s1.x = 124; s1.heading = -1; }
@@ -2604,6 +2691,10 @@ function SpawnRaidSoldiers(state) {
   state.actors.push(
     MakeActor("raid1", "soldier", 120, { patrol: [58, 120], speed: 1.5 }),
     MakeActor("raid2", "soldier", 88, { patrol: [50, 90], speed: 1.35 }),
+    // 据点的翻译官：带路的、递名单的。decor——他不参与潜行判定（两个兵
+    // 已经把考场撑满了），但他得在场：第二章挑灯笼带路的、审问时递话的，
+    // 都是这一个人。汉奸不是符号，是个有脸的邻人，才可恨
+    MakeActor("traitor", "puppet", 168, { label: "翻译官", decor: true }),
   );
   state.stealthActive = true;
 }
@@ -2991,6 +3082,12 @@ export function StartChapter(state, index) {
       // 鬼子进村的喊声一起就都收进屋（c1_raid 第一行），鸡跟着 raidStarted 旗标藏
       MakeActor("auntFeed", "villager", 65.8, { label: "李婶", heading: -1, track: { name: "scatterFeed", t: 0, ambient: true } }),
       MakeActor("oldSweep", "villager", 145.5, { label: "扫院的老汉", heading: 1, carry: "扫帚", track: { name: "sweeping", t: 0, ambient: true } }),
+      // 再添两个有营生的：担水的在井台和家门之间来回（wander），
+      // 碾糠的大娘守着石碾——开场第三空镜（交完粮、碾上碾的是糠）拍的就是她，
+      // 她也是老槐树下妹妹身边的大人（孩子不是孤零零撂在村东头）。
+      // 警讯一到（c1_sisterHome 的报信民兵）都随街清空
+      MakeActor("carrier", "villager", 60.5, { label: "担水的乡亲", carry: "桶", wander: { x0: 58.8, x1: 63.5, speed: 0.85 } }),
+      MakeActor("grindAunt", "villager", 119.3, { label: "碾糠的大娘", pose: "push", heading: -1 }),
     );
   } else if (ch.id === "c2") {
     state.player.x = 38;
@@ -3133,6 +3230,22 @@ function StepCineActors(state, dt) {
   // 用来把两个演员的轨道对齐到同一个落点（枪托砸到的那一帧）。
   if (state.player.track) state.player.track.t += dt;
   for (const a of state.actors) if (a.track) a.track.t += dt;
+  // 乡亲的日常走动（担水的、串门的）：一小段路来回，到头歇一口气再折返——
+  // 不打磕巴地来回是钟摆，不是人。放在这里而不是玩法循环里，
+  // 是因为过场里的村子也得活着（开场那几个空镜靠的就是他们）。
+  for (const a of state.actors) {
+    const w = a.wander;
+    if (!w || a.visible === false || a.cineTarget) continue;
+    if (w.tx === undefined) w.tx = w.x1;
+    const d = w.tx - a.x;
+    if (Math.abs(d) < 0.15) {
+      w.dwell = (w.dwell ?? (1.4 + Math.random() * 1.8)) - dt;
+      if (w.dwell <= 0) { w.tx = w.tx === w.x1 ? w.x0 : w.x1; w.dwell = undefined; }
+      continue;
+    }
+    a.x += Math.sign(d) * (w.speed || 1) * dt;
+    a.heading = Math.sign(d);
+  }
   for (const a of state.actors) {
     if (!a.cineTarget) continue;
     const d = Math.abs(a.x - a.cineTarget.x);

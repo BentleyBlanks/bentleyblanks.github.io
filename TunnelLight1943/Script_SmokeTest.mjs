@@ -553,6 +553,9 @@ function TestChainSurvivesEarlyDrop() {
       }, DT);
     }
   };
+  // 开拍娘的派活 micro-cine 在第一帧起——先推完
+  step({}, 1);
+  for (let i = 0; i < 300 && state.microCine; i += 1) step({ advance: true });
   // 拎桶 → 挂井绳（发现绳断）
   state.player.x = 31; state.player.level = "surface";
   step({}, 3); step({ interact: true });
@@ -597,6 +600,9 @@ function TestGroundItems() {
       }, DT);
     }
   };
+  // 开拍娘先喊一嗓子派活（micro-cine 在第一帧起）——推完再开始拎桶
+  step({}, 1);
+  for (let i = 0; i < 300 && state.microCine; i += 1) step({ advance: true });
   // 链步骤一：拎起屋里的水桶
   state.player.x = 31;
   state.player.level = "surface";
@@ -874,9 +880,15 @@ function TestWorkStations() {
 
   DebugJump(state, 0, beats.indexOf("c1_water"));
   StepGame(state, idle, DT);
-  assert.equal(state.actors.find((a) => a.id === "father")?.track?.name, "sawing", "打水时爹必须在拉锯");
+  // 开拍娘先直起腰喊人（micro-cine 派活），喊完 tick 会把她放回锄地——
+  // 先把这句喊话推完再验工位
   const m2 = state.actors.find((a) => a.id === "mother");
-  assert.equal(m2?.track?.name, "hoeing", "打水时娘必须在菜畦锄地");
+  assert.ok(state.microCine, "打水开拍娘必须喊一嗓子派活");
+  assert.equal(m2?.track, null, "喊话的娘得直起腰，不能一边锄地一边喊");
+  for (let i = 0; i < 300 && state.microCine; i += 1) StepGame(state, { ...idle, advance: true }, DT);
+  StepGame(state, idle, DT);
+  assert.equal(state.actors.find((a) => a.id === "father")?.track?.name, "sawing", "打水时爹必须在拉锯");
+  assert.equal(m2?.track?.name, "hoeing", "喊完话娘必须回去锄地");
   assert.equal(m2?.carry, "锄头", "锄地的娘手上必须有锄头");
 
   // 桶触水：娘停锄、后果小窗开
