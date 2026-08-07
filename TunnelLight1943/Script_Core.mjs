@@ -148,15 +148,26 @@ function LineDuration(line) {
 const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
 // 翻越：撑上顶沿 → 收腿荡过去 → 落地缓冲。比一步慢，慢到看得清是"手脚并用"，
 // 又不至于打断走路的节奏。手里拎着东西得先把东西撂上顶沿，所以更慢一档。
-const VAULT_DUR = 0.78;
+const VAULT_DUR = 0.62;      // 齐胯高的墙一撑就过，拖长了就成了慢动作
 const VAULT_DUR_BIG = 1.05;
 
 // 翻越的抬升曲线：人真的离地，不是换个姿势平移过去。
 // 峰值取障碍高度的七成左右——胯骨压过顶沿的那一下，脚正好在顶沿上方。
 // 扛着东西那一档在顶上多待一会儿（撂下、跨过、再拎起），所以是带平台的弧。
+// 横移的节奏：迈上去 → 绕着撑手转（几乎原地）→ 荡下去落地。
+// 三段的比例决定了"撑"看不看得出来——中段挪得越少，手按在墙头这件事越明显。
+function VaultTravel(k) {
+  if (k < 0.34) return 0.40 * Math.pow(k / 0.34, 1.5);          // 迈上去、手够住顶沿
+  if (k < 0.66) return 0.40 + 0.18 * ((k - 0.34) / 0.32);       // 绕着撑手转，人几乎不前进
+  const u = (k - 0.66) / 0.34;
+  return 0.58 + 0.42 * (u * (2 - u));                           // 腿过了顶沿，荡下去
+}
+
+// 抬升弧（相对障碍高度的倍数）。峰值不该比障碍高出一大截——0.74 时髋部
+// 飞到齐胸，人是"腾"过去的；0.58 让髋刚好擦着顶沿过，撑手才按得住墙头。
 function VaultArc(k, big) {
   const u = Math.max(0, Math.min(1, k));
-  if (!big) return 0.74 * Math.sin(Math.PI * Math.pow(u, 0.92));
+  if (!big) return 0.58 * Math.sin(Math.PI * Math.pow(u, 0.92));
   if (u < 0.32) return 0.82 * Math.sin((u / 0.32) * (Math.PI / 2));
   if (u < 0.66) return 0.82;
   return 0.82 * Math.sin(((1 - u) / 0.34) * (Math.PI / 2));
@@ -3405,7 +3416,10 @@ function MovePlayer(state, input, dt) {
     const dur = p.vaultDur || VAULT_DUR;
     const k = Math.max(0, Math.min(1, 1 - Math.max(0, p.vaultT) / dur));
     p.vaultK = k;
-    p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * (k * k * (3 - 2 * k));
+    // 横移不是匀速滑过去的：撑手一按住，人就绕着那只手转，这半程几乎不前进；
+    // 腿甩过顶沿之后才荡下去。上一版用对称的 smoothstep，人在墙上方匀速平移，
+    // 于是"撑"这件事根本看不出来——那是最像悬浮的一段。
+    p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * VaultTravel(k);
     p.lift = (p.vaultTop || 1.2) * VaultArc(k, p.vaultBig);
     p.pose = p.vaultBig ? "clamber" : "vault";
     // 垛顶上藏不住人：翻越是要露头的，这也是把它放进扫荡段的意义

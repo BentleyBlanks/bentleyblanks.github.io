@@ -436,9 +436,9 @@ function TestVaultC1() {
   const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
   const list = ChapterBeatList(0);
   const cases = [
-    { beat: "c1_cloth", from: 79, to: 92, top: 1.24, label: "路边的柴垛（教学）" },
-    { beat: "c1_cloth", from: 92, to: 79, top: 1.24, label: "路边的柴垛（回程复用）" },
-    { beat: "c1_hide", from: 42, to: 32, top: 1.08, label: "倒塌的柴垛（扫荡压力下）" },
+    { beat: "c1_cloth", from: 79, to: 92, top: 0.82, label: "塌进巷子的院墙（教学）" },
+    { beat: "c1_cloth", from: 92, to: 79, top: 0.82, label: "塌进巷子的院墙（回程复用）" },
+    { beat: "c1_hide", from: 42, to: 32, top: 0.72, label: "倒塌的柴垛（扫荡压力下）" },
   ];
   for (const c of cases) {
     const state = CreateGame(0);
@@ -468,9 +468,14 @@ function TestVaultC1() {
     assert.ok(sawHint, `${c.label}：走到跟前必须出「翻过去」的提示`);
     assert.ok(started, `${c.label}：按下互动键必须起手翻越`);
     assert.ok(sawPose, `${c.label}：翻越过程中必须有翻越姿势`);
-    // 抬升峰值取障碍高度的七成上下——人必须真的离地，不能是平移
-    assert.ok(peakLift > c.top * 0.6, `${c.label}：抬升峰值 ${peakLift.toFixed(2)} 太低，人没离地`);
-    assert.ok(peakLift < c.top * 1.1, `${c.label}：抬升峰值 ${peakLift.toFixed(2)} 过头了`);
+    // 髋必须真的越过顶沿，又不许飞到齐胸——「翻」既不能是平移，也不能是腾空。
+    // 用髋的绝对高度判，不再挂在某个倍率上：换了障碍高度这条断言照样成立。
+    const hipRest = 0.62 * 0.80;                 // 柱子在第一章是 0.80 的体型
+    const hipPeak = hipRest + peakLift;
+    assert.ok(hipPeak > c.top + 0.05,
+      `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，没越过 ${c.top} 的顶沿——那是平移不是翻`);
+    assert.ok(hipPeak < c.top + 0.45,
+      `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，比顶沿高出太多——腾空了，撑手就按不住墙头`);
     assert.ok(cues.includes("vault") || cues.includes("vaultHeavy"), `${c.label}：缺起手音效`);
     assert.ok(cues.includes("vaultLand"), `${c.label}：缺落地音效`);
     assert.equal(state.player.lift || 0, 0, `${c.label}：翻完必须落回地面`);

@@ -946,6 +946,8 @@ export function CreateWorld(canvasEl) {
       case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, p.w * PPM, (p.h || 1.8) * PPM, p.id, { burnt: ruined })); break;
       // 码好的柴垛：可翻越物的轮廓样板（肩高、顶沿磨亮、缺一角）
       case "woodStack": mk((ctx, ax, ay) => ART.DrawWoodStack(ctx, ax, ay, p.w * PPM, (p.h || 1.24) * PPM, p.id)); break;
+      // 塌进巷子的院墙（可翻越）：宽高从场景数据来，画法见 DrawBrokenWall
+      case "brokenWall": mk((ctx, ax, ay) => ART.DrawBrokenWall(ctx, ax, ay, p.w * PPM, (p.h || 0.82) * PPM, p.id)); break;
       case "hatch": mk((ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true })); break;
       case "well": {
         // 第一章：井绳断了半截——辘轳上垂着一小截断头，毛茬朝下。

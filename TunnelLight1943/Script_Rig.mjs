@@ -549,30 +549,38 @@ export function PoseRig(rig, s, dt) {
     // 而不是从头到尾摆一个造型平移过去——那就是"没做动画"的样子。
     const k = Math.max(0, Math.min(1, s.poseK ?? 0.5));
     const heavy = s.pose === "clamber";
-    // ① 起手：够顶沿
+    // 关键：**撑手要一直按在顶沿上**。上一版三帧里手都甩在头顶，人整个被
+    // lift 抬着飘过去——"翻"字全靠位移，看着像悬浮。现在按真实的单手撑越
+    // 摆：手往斜下方按住墙头（armF 只有 -40~-58，肘微屈），髋绕着那只手转。
+    // ① 起手：伸手够墙头，后腿蹬地，上身压过去
     const A = {
-      hipY: -0.10, hipX: 0.12, torso: 46, head: -26,
-      armF: -128, foreF: -14, armB: -34, foreB: -20,
-      thighB: -38, shinB: 44, footB: -10, thighF: 10, shinF: 18, footF: -12,
+      hipY: -0.12, hipX: 0.10, torso: 40, head: -22,
+      armF: -58, foreF: -18, armB: -18, foreB: -24,
+      thighB: -42, shinB: 50, footB: -12, thighF: 8, shinF: 16, footF: -12,
     };
-    // ② 顶点：两臂笔直撑住，膝盖收到胸口——整个人骑在顶沿上方
+    // ② 过顶：撑手已经在髋**后下方**按着墙头——真做单手撑越，到顶那一下手
+    //    是压在身后的，不是举在胸前。所以 armF 转到负角之外（+ 为向后），
+    //    肘几乎伸直；髋绕着这个支点荡过去，两腿收起来贴着顶沿甩到前侧
     const B = {
-      hipY: 0.06, hipX: 0.20, torso: 54, head: -30,
-      armF: -74, foreF: 10, armB: -62, foreB: 8,
-      thighB: -104, shinB: 112, footB: 16, thighF: -86, shinF: 98, footF: 14,
+      hipY: 0.02, hipX: 0.26, torso: 34, head: -20,
+      armF: 30, foreF: -8, armB: 20, foreB: -12,
+      thighB: -96, shinB: 104, footB: 14, thighF: -78, shinF: 92, footF: 12,
     };
-    // ③ 落地：腿先伸出去接地，上身还压着，胳膊甩到后面找平衡
+    // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
     const C = {
-      hipY: -0.22, hipX: 0.06, torso: 30, head: -14,
-      armF: -30, foreF: -26, armB: 26, foreB: -18,
-      thighB: -18, shinB: 34, footB: -6, thighF: -46, shinF: 40, footF: -16,
+      hipY: -0.24, hipX: 0.04, torso: 26, head: -12,
+      armF: 22, foreF: -30, armB: 34, foreB: -22,
+      thighB: -14, shinB: 32, footB: -6, thighF: -42, shinF: 38, footF: -16,
     };
-    // 扛着东西那一档：一只手始终拎着，撑不成两手，所以身子更低、更慢
+    // 扛着东西那一档：一只手拎着东西，撑不上劲——改成压着墙头蹭过去，
+    // 身子更低、腿收不高
     if (heavy) {
-      B.armF = -22; B.foreF = -34; B.torso = 62; B.hipY = -0.04;
-      C.armF = -18; C.foreF = -30;
+      A.armF = -46; A.torso = 50;
+      B.armF = 14; B.foreF = -20; B.torso = 46; B.hipY = -0.06;
+      B.thighB = -74; B.shinB = 86; B.thighF = -58; B.shinF = 78;
+      C.armF = -14; C.foreF = -30;
     }
-    const mid = heavy ? 0.48 : 0.42;
+    const mid = heavy ? 0.48 : 0.44;
     let from = A, to = B, u = k / mid;
     if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
     u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
