@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#101a1b">
-  <meta name="description" content="《苇声：1942 · 最后一次点名》是一款原创的抗战敌后背景2D横版潜行解谜游戏。借光、声、队伍纪律与水利地形，护送六名孩子穿过封锁线。">
+  <meta name="description" content="《苇声：1942 · 最后一次点名》是一款原创的抗战敌后背景3D横版潜行解谜游戏。借光、声、队伍纪律与水利地形，护送六名孩子穿过封锁线。">
   <meta property="og:title" content="苇声：1942 · 最后一次点名">
   <meta property="og:description" content="没有攻击键。让风掩住脚步，让每个名字都得到回应。">
   <meta property="og:url" content="https://bentleyblanks.github.io/ReedSignal1942/">
   <title>苇声：1942 · 最后一次点名</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260808a">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260808e">
 </head>
 <body>
   <main id="GameShell" aria-label="苇声1942横版叙事解谜游戏">
@@ -17,16 +17,14 @@
     <div class="filmGrain" aria-hidden="true"></div>
     <div id="DangerWash" class="dangerWash" aria-hidden="true"></div>
 
+    <section id="LoadingScreen" class="loadingScreen" aria-live="polite">
+      <div class="loadingMark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <p id="LoadingText">正在让雾、灯与芦苇落到这片土地上……</p>
+    </section>
+
     <section id="TitleScreen" class="fullScreen titleScreen isVisible" aria-labelledby="GameTitle">
-      <div class="titleLandscape" aria-hidden="true">
-        <span class="moon"></span>
-        <span class="watchBeam"></span>
-        <span class="reedLine reedLineFar"></span>
-        <span class="reedLine reedLineNear"></span>
-        <span class="childSilhouette"></span>
-      </div>
       <article class="titleCopy">
-        <p class="eyebrow">原创 2D 横版潜行解谜 · 冀中敌后</p>
+        <p class="eyebrow">原创 3D 横版潜行解谜 · 冀中敌后</p>
         <h1 id="GameTitle"><span>苇声</span><small>1942</small></h1>
         <p class="subtitle">最后一次点名</p>
         <blockquote>“点名不是数数，<br>是确认每个人都还在。”</blockquote>
@@ -172,6 +170,6 @@
   </main>
 
   <noscript>本游戏需要 JavaScript 才能运行。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=20260808a"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260808e"></script>
 </body>
 </html>

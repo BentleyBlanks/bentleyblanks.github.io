@@ -20,20 +20,21 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 
 #GameShell { position: relative; width: 100%; height: 100%; min-height: 420px; overflow: hidden; background: #111c1e; isolation: isolate; }
 #GameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #111c1e; }
-.filmGrain { position: absolute; inset: -30%; z-index: 4; pointer-events: none; opacity: .13; background-image: repeating-linear-gradient(106deg, transparent 0 17px, rgba(255,255,255,.08) 18px, transparent 19px 31px); animation: GrainShift .32s steps(2) infinite; mix-blend-mode: overlay; }
+.filmGrain { position: absolute; inset: -30%; z-index: 4; pointer-events: none; opacity: .075; background-image: repeating-linear-gradient(106deg, transparent 0 17px, rgba(255,255,255,.07) 18px, transparent 19px 31px); animation: GrainShift .32s steps(2) infinite; mix-blend-mode: soft-light; }
+.filmGrain::after { content: ""; position: absolute; inset: 22%; background: radial-gradient(circle at 50% 47%, transparent 38%, rgba(1,4,5,.2) 72%, rgba(1,4,5,.62) 100%); }
 .dangerWash { position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 60%, transparent 38%, rgba(125,38,26,.72)); transition: opacity .12s linear; }
 
+.loadingScreen { position: absolute; inset: 0; z-index: 60; display: grid; place-content: center; gap: 18px; background: #0a1213; text-align: center; }
+.loadingScreen p { margin: 0; color: #929f97; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: .14em; }
+.loadingMark { display: flex; justify-content: center; gap: 7px; height: 42px; align-items: flex-end; }
+.loadingMark i { display: block; width: 2px; height: 24px; background: #819185; transform-origin: bottom; animation: LoadingReed 1.4s ease-in-out infinite alternate; }
+.loadingMark i:nth-child(2) { height: 35px; animation-delay: -.7s; }
+.loadingMark i:nth-child(3) { height: 30px; animation-delay: -.28s; }
+.loadingMark i:nth-child(4) { height: 39px; animation-delay: -.95s; }
+
 .fullScreen, .panelScreen, .historyScreen { position: absolute; inset: 0; z-index: 20; }
-.titleScreen { display: grid; align-items: center; padding: 6vh max(6vw, 34px); background: linear-gradient(90deg, rgba(7,13,14,.98) 0%, rgba(9,16,17,.88) 42%, rgba(9,16,17,.17) 72%, rgba(9,16,17,.5) 100%); opacity: 0; pointer-events: none; transition: opacity .7s ease; }
+.titleScreen { display: grid; align-items: center; padding: 6vh max(6vw, 34px); background: linear-gradient(90deg, rgba(5,10,11,.97) 0%, rgba(7,13,14,.84) 36%, rgba(7,13,14,.18) 67%, rgba(7,13,14,.06) 100%); opacity: 0; pointer-events: none; transition: opacity .7s ease; }
 .titleScreen.isVisible { opacity: 1; pointer-events: auto; }
-.titleLandscape { position: absolute; inset: 0; overflow: hidden; z-index: -1; background: linear-gradient(#122125 0 53%, #1c2c2a 54%, #0b1415 100%); }
-.moon { position: absolute; right: 15vw; top: 13vh; width: min(11vw, 150px); aspect-ratio: 1; border-radius: 50%; background: #d9d4b8; box-shadow: 0 0 70px rgba(215,210,184,.25); opacity: .76; }
-.watchBeam { position: absolute; right: 4vw; top: 33vh; width: 55vw; height: 12vh; transform: rotate(8deg); transform-origin: right center; background: linear-gradient(90deg, transparent, rgba(225,220,177,.14)); clip-path: polygon(0 42%,100% 0,100% 100%,0 58%); animation: TitleBeam 7s ease-in-out infinite alternate; }
-.reedLine { position: absolute; left: -4%; right: -4%; bottom: 0; height: 42%; background: repeating-linear-gradient(83deg, transparent 0 18px, rgba(7,12,12,.9) 19px 23px, transparent 24px 36px); transform-origin: bottom; }
-.reedLineFar { bottom: 17%; opacity: .5; transform: scaleY(.7) skewX(-3deg); }
-.reedLineNear { opacity: .92; animation: ReedsSway 5s ease-in-out infinite alternate; }
-.childSilhouette { position: absolute; right: 21vw; bottom: 18%; width: 22px; height: 110px; background: #070b0c; border-radius: 11px 11px 4px 4px; box-shadow: 35px 19px 0 -3px #070b0c, 70px 25px 0 -5px #070b0c; }
-.childSilhouette::before { content: ""; position: absolute; left: -2px; top: -18px; width: 26px; height: 27px; border-radius: 50%; background: #070b0c; box-shadow: 37px 21px 0 -2px #070b0c, 73px 27px 0 -4px #070b0c; }
 
 .titleCopy { width: min(590px, 90vw); }
 .eyebrow { margin: 0 0 18px; color: var(--amber); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: .28em; text-transform: uppercase; }
@@ -54,7 +55,7 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .textButton:hover { color: var(--ink); }
 .titleNote { margin-top: 22px; color: #76847c; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10px; letter-spacing: .12em; }
 
-.introScreen { display: grid; place-items: center; padding: 36px; background: rgba(7,13,14,.96); }
+.introScreen { display: grid; place-items: center; padding: 36px; background: linear-gradient(90deg, rgba(7,13,14,.94), rgba(7,13,14,.78)); backdrop-filter: blur(3px); }
 .introScreen article { width: min(660px, 90vw); }
 .chapterNumber { margin: 0; color: #7f8c85; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; letter-spacing: .2em; }
 .introScreen h2 { margin: 10px 0 26px; font-size: clamp(38px, 7vw, 72px); font-weight: 500; }
@@ -161,9 +162,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .rotateNotice p { max-width: 300px; line-height: 1.7; }
 
 @keyframes GrainShift { to { transform: translate(2.7%, -1.8%); } }
-@keyframes TitleBeam { to { transform: rotate(-7deg); opacity: .55; } }
-@keyframes ReedsSway { to { transform: skewX(3deg); } }
 @keyframes WaterLine { to { transform: translateX(8%); } }
+@keyframes LoadingReed { to { transform: skewX(9deg) scaleY(.82); opacity: .56; } }
 
 @media (pointer: coarse), (max-width: 820px) {
   .touchControls { display: flex !important; }

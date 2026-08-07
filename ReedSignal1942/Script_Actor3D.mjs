@@ -1,0 +1,200 @@
+import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
+
+const ActorGeometries = Object.freeze({
+  head: new THREE.SphereGeometry(0.145, 10, 8),
+  hair: new THREE.SphereGeometry(0.151, 9, 6, 0, Math.PI * 2, 0, Math.PI * 0.58),
+  torso: new THREE.CylinderGeometry(0.205, 0.255, 0.62, 7),
+  coatSkirt: new THREE.CylinderGeometry(0.24, 0.32, 0.38, 7),
+  upperLimb: new THREE.CylinderGeometry(0.067, 0.076, 0.43, 6),
+  lowerLimb: new THREE.CylinderGeometry(0.058, 0.067, 0.4, 6),
+  hand: new THREE.SphereGeometry(0.068, 7, 5),
+  boot: new THREE.BoxGeometry(0.14, 0.11, 0.27),
+  scarf: new THREE.BoxGeometry(0.37, 0.075, 0.22),
+  satchel: new THREE.BoxGeometry(0.27, 0.32, 0.12),
+  bundle: new THREE.SphereGeometry(0.17, 8, 6),
+});
+
+const RolePalettes = Object.freeze({
+  player: Object.freeze({ cloth: 0x3e5048, clothDark: 0x273630, skin: 0xb49a76, hair: 0x181813, scarf: 0x8b7150, satchel: 0x4d3826 }),
+  child: Object.freeze({ cloth: 0x6d6650, clothDark: 0x3f4235, skin: 0xb69b75, hair: 0x1a1914, scarf: 0x80704e, satchel: 0x4b3927 }),
+  mother: Object.freeze({ cloth: 0x4d5148, clothDark: 0x2b302b, skin: 0xb09670, hair: 0x171713, scarf: 0x725e42, satchel: 0x493421 }),
+});
+
+function CreateMaterial(color, roughness = 0.9) {
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, flatShading: true });
+}
+
+function PrepareMesh(mesh, castShadow = true) {
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = true;
+  mesh.userData.actorMesh = true;
+  return mesh;
+}
+
+function CreateLimb(upperMaterial, lowerMaterial, endpointMaterial, isArm = false) {
+  const upperPivot = new THREE.Group();
+  const upper = PrepareMesh(new THREE.Mesh(ActorGeometries.upperLimb, upperMaterial));
+  upper.position.y = -0.205;
+  upperPivot.add(upper);
+  const lowerPivot = new THREE.Group();
+  lowerPivot.position.y = -0.4;
+  const lower = PrepareMesh(new THREE.Mesh(ActorGeometries.lowerLimb, lowerMaterial));
+  lower.position.y = -0.19;
+  lowerPivot.add(lower);
+  if (isArm) {
+    const hand = PrepareMesh(new THREE.Mesh(ActorGeometries.hand, endpointMaterial));
+    hand.position.y = -0.405;
+    hand.scale.setScalar(0.82);
+    lowerPivot.add(hand);
+  } else {
+    const boot = PrepareMesh(new THREE.Mesh(ActorGeometries.boot, endpointMaterial));
+    boot.position.set(0, -0.42, 0.065);
+    lowerPivot.add(boot);
+  }
+  upperPivot.add(lowerPivot);
+  return { root: upperPivot, lower: lowerPivot };
+}
+
+export function CreateActor3D(role = "player", childIndex = 0) {
+  const palette = RolePalettes[role] || RolePalettes.player;
+  const root = new THREE.Group();
+  root.name = `Actor_${role}_${childIndex}`;
+  const rig = new THREE.Group();
+  root.add(rig);
+
+  const cloth = CreateMaterial(palette.cloth + (role === "child" ? childIndex * 0x030201 : 0));
+  const clothDark = CreateMaterial(palette.clothDark);
+  const skin = CreateMaterial(palette.skin, 0.96);
+  const hair = CreateMaterial(palette.hair, 0.98);
+  const scarfMaterial = CreateMaterial(palette.scarf, 0.94);
+  const satchelMaterial = CreateMaterial(palette.satchel, 1);
+
+  const pelvis = new THREE.Group();
+  pelvis.position.y = 0.86;
+  rig.add(pelvis);
+  const torso = PrepareMesh(new THREE.Mesh(ActorGeometries.torso, cloth));
+  torso.position.y = 0.29;
+  pelvis.add(torso);
+  const skirt = PrepareMesh(new THREE.Mesh(ActorGeometries.coatSkirt, cloth));
+  skirt.position.y = -0.02;
+  pelvis.add(skirt);
+  const scarf = PrepareMesh(new THREE.Mesh(ActorGeometries.scarf, scarfMaterial));
+  scarf.position.set(0, 0.58, 0.01);
+  scarf.rotation.z = 0.05;
+  pelvis.add(scarf);
+
+  const headPivot = new THREE.Group();
+  headPivot.position.y = 0.78;
+  pelvis.add(headPivot);
+  const head = PrepareMesh(new THREE.Mesh(ActorGeometries.head, skin));
+  headPivot.add(head);
+  const hairCap = PrepareMesh(new THREE.Mesh(ActorGeometries.hair, hair));
+  hairCap.position.y = 0.025;
+  headPivot.add(hairCap);
+  const braid = PrepareMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.35, 6), hair));
+  braid.position.set(-0.1, -0.15, -0.055);
+  braid.rotation.z = 0.22;
+  headPivot.add(braid);
+  const nose = PrepareMesh(new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 5), skin), false);
+  nose.position.set(0, -0.015, 0.145);
+  nose.rotation.x = Math.PI * 0.5;
+  headPivot.add(nose);
+
+  const leftLeg = CreateLimb(clothDark, clothDark, hair, false);
+  const rightLeg = CreateLimb(clothDark, clothDark, hair, false);
+  leftLeg.root.position.set(-0.13, 0.01, 0);
+  rightLeg.root.position.set(0.13, 0.01, 0);
+  pelvis.add(leftLeg.root, rightLeg.root);
+
+  const leftArm = CreateLimb(cloth, cloth, skin, true);
+  const rightArm = CreateLimb(cloth, cloth, skin, true);
+  leftArm.root.position.set(-0.25, 0.48, 0);
+  rightArm.root.position.set(0.25, 0.48, 0);
+  leftArm.root.rotation.z = -0.08;
+  rightArm.root.rotation.z = 0.08;
+  pelvis.add(leftArm.root, rightArm.root);
+
+  const buttonMaterial = CreateMaterial(palette.clothDark, 1);
+  for (let index = 0; index < 3; index += 1) {
+    const button = PrepareMesh(new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), buttonMaterial), false);
+    button.position.set(0, 0.43 - index * 0.16, 0.198);
+    pelvis.add(button);
+  }
+
+  const satchel = PrepareMesh(new THREE.Mesh(ActorGeometries.satchel, satchelMaterial));
+  satchel.position.set(-0.27, 0.1, -0.08);
+  satchel.rotation.z = 0.12;
+  pelvis.add(satchel);
+  const strap = PrepareMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.92, 5), satchelMaterial), false);
+  strap.position.set(-0.05, 0.32, -0.03);
+  strap.rotation.z = -0.5;
+  pelvis.add(strap);
+
+  const carriedBundle = new THREE.Group();
+  const blanket = PrepareMesh(new THREE.Mesh(ActorGeometries.bundle, scarfMaterial));
+  blanket.scale.set(1.35, 1.65, 1.1);
+  carriedBundle.add(blanket);
+  carriedBundle.position.set(0.23, 0.36, 0.25);
+  carriedBundle.visible = false;
+  pelvis.add(carriedBundle);
+
+  const roleScale = role === "child" ? 0.72 + (childIndex % 3) * 0.025 : role === "mother" ? 0.97 : 0.93;
+  root.scale.setScalar(roleScale);
+  root.userData.rig = { rig, pelvis, torso, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale };
+  return root;
+}
+
+function Damp(current, target, speed, deltaTime) {
+  return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-speed * deltaTime));
+}
+
+export function UpdateActor3D(actor, pose, deltaTime) {
+  const rig = actor.userData.rig;
+  if (!rig) return;
+  const moving = Math.abs(pose.velocity || 0) > 0.08;
+  const speed = Math.min(1.35, Math.abs(pose.velocity || 0) / 1.55);
+  const phase = (pose.time || 0) * (moving ? 7.6 : 1.3) + (pose.phase || 0);
+  const stride = moving ? Math.sin(phase) * 0.62 * speed : 0;
+  const crouch = pose.crouching ? 1 : 0;
+  const held = pose.holding ? 1 : 0;
+  const breath = Math.sin((pose.time || 0) * 1.8 + (pose.phase || 0)) * 0.012;
+
+  rig.rig.position.y = Damp(rig.rig.position.y, -crouch * 0.36 + Math.abs(Math.sin(phase * 2)) * 0.026 * speed + breath, 10, deltaTime);
+  rig.rig.rotation.z = Damp(rig.rig.rotation.z, -stride * 0.035, 8, deltaTime);
+  rig.pelvis.rotation.x = Damp(rig.pelvis.rotation.x, crouch * 0.38 + (pose.carrying ? 0.12 : 0), 10, deltaTime);
+  rig.torso.scale.y = Damp(rig.torso.scale.y, 1 - crouch * 0.08, 9, deltaTime);
+  rig.headPivot.rotation.x = Damp(rig.headPivot.rotation.x, crouch * -0.16 + (pose.alert ? 0.09 : 0), 7, deltaTime);
+  rig.headPivot.rotation.y = Damp(rig.headPivot.rotation.y, pose.lookOffset || 0, 5, deltaTime);
+  rig.braid.rotation.z = Damp(rig.braid.rotation.z, 0.22 - stride * 0.12, 5, deltaTime);
+
+  rig.leftLeg.root.rotation.x = Damp(rig.leftLeg.root.rotation.x, stride - crouch * 0.7, 13, deltaTime);
+  rig.rightLeg.root.rotation.x = Damp(rig.rightLeg.root.rotation.x, -stride - crouch * 0.7, 13, deltaTime);
+  rig.leftLeg.lower.rotation.x = Damp(rig.leftLeg.lower.rotation.x, Math.max(0, -stride) * 0.72 + crouch * 1.1, 13, deltaTime);
+  rig.rightLeg.lower.rotation.x = Damp(rig.rightLeg.lower.rotation.x, Math.max(0, stride) * 0.72 + crouch * 1.1, 13, deltaTime);
+
+  const carryArm = pose.carrying ? -1.08 : 0;
+  rig.leftArm.root.rotation.x = Damp(rig.leftArm.root.rotation.x, -stride * 0.7 + carryArm, 11, deltaTime);
+  rig.rightArm.root.rotation.x = Damp(rig.rightArm.root.rotation.x, stride * 0.7 + carryArm, 11, deltaTime);
+  rig.leftArm.lower.rotation.x = Damp(rig.leftArm.lower.rotation.x, pose.carrying ? -1.35 : -0.12, 11, deltaTime);
+  rig.rightArm.lower.rotation.x = Damp(rig.rightArm.lower.rotation.x, pose.carrying ? -1.35 : -0.12, 11, deltaTime);
+  rig.leftArm.root.rotation.z = Damp(rig.leftArm.root.rotation.z, held ? -0.55 : -0.08, 9, deltaTime);
+  rig.rightArm.root.rotation.z = Damp(rig.rightArm.root.rotation.z, held ? 0.12 : 0.08, 9, deltaTime);
+  rig.carriedBundle.visible = Boolean(pose.carrying);
+
+  actor.rotation.y = Damp(actor.rotation.y, pose.facing >= 0 ? Math.PI * 0.5 : -Math.PI * 0.5, 12, deltaTime);
+  actor.position.set(pose.x, pose.y, pose.z || 0);
+  actor.visible = pose.visible !== false;
+}
+
+export function DisposeActor3D(actor) {
+  const materials = new Set();
+  const geometries = new Set();
+  const sharedGeometries = new Set(Object.values(ActorGeometries));
+  actor.traverse((object) => {
+    if (!object.isMesh) return;
+    if (object.material) materials.add(object.material);
+    if (object.geometry && !sharedGeometries.has(object.geometry)) geometries.add(object.geometry);
+  });
+  for (const material of materials) material.dispose?.();
+  for (const geometry of geometries) geometry.dispose?.();
+}

@@ -125,10 +125,10 @@ export function IsPositionCovered(chapter, state, x, crouching = true) {
 }
 
 export function GetLightTarget(hazard, state) {
+  if (hazard.distractBy === "motherSignal" && state.completed.has("motherSignal")) return hazard.x1 + 260;
   if (hazard.distractBy && state.completed.has(hazard.distractBy) && state.elapsed < state.distractionUntil) {
     return hazard.x0 - 180;
   }
-  if (hazard.distractBy === "motherSignal" && state.completed.has("motherSignal")) return hazard.x1 + 260;
   const normalized = (Math.sin((state.elapsed / hazard.period) * Math.PI * 2 + hazard.phase) + 1) * 0.5;
   return hazard.x0 + normalized * (hazard.x1 - hazard.x0);
 }
