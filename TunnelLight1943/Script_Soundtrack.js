@@ -117,7 +117,10 @@ export function CreateSoundtrack(audio) {
 
     // 剧情里的一次性响动：Core 只负责喊"发生了什么"，声音在这儿点名
     if (state.cues && state.cues.length) {
-      for (const cue of state.cues) audio.Sfx(cue.name, { gain: cue.gain ?? 1 });
+      // gain 之外把 delay/pan/rate 也带过去——车铃要比引擎晚一拍响，靠的就是 delay
+      for (const cue of state.cues) {
+        audio.Sfx(cue.name, { gain: cue.gain ?? 1, delay: cue.delay, pan: cue.pan, rate: cue.rate });
+      }
       state.cues.length = 0;
     }
 
@@ -127,6 +130,7 @@ export function CreateSoundtrack(audio) {
     const key = cap ? (cap.who || "") + "|" + (cap.say || cap.stage || "") : "";
     if (key !== prev.captionKey) {
       prev.captionKey = key;
+      speakingT = 0;
       const url = VoiceUrlFor(cap);
       if (url) {
         speaking = true;
@@ -136,8 +140,16 @@ export function CreateSoundtrack(audio) {
         audio.StopVoice();
       }
     }
+    // 看门狗：voice 的播放 promise 一旦悬死（自动播放被拦、文件半路断流），
+    // speaking 会永远是 true——整场过场就此冻住，静音都解不开。
+    // 没有一句旁白该念 15 秒；超时就当它念完，戏比声音大
+    if (speaking && (speakingT += dt) > 15) {
+      speaking = false;
+      audio.StopVoice();
+    }
   }
   let digT = 0;
+  let speakingT = 0;
 
   return {
     Step,
