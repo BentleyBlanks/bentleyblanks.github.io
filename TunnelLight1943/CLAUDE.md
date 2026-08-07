@@ -80,6 +80,7 @@ npm run scene:tunnelLight1943
 | 绕圈（轴/结） | `pointerWorld` 绕轴心累计转角 | 辘轳（顺放逆收、脱手倒转）、接绳缠圈 |
 | 笔画做功（一下一下干） | `StrokeWork`：down/up/circle | 挖土、按棉被、顶撑木、拴铃、装引信、撬地沿 |
 | 竖拽 | `input.pull/pullHeld` | 勒紧绳结 |
+| 拽弓投掷（攥住手里的石子往后拽开） | `pointerWorld` 攥住 + 松手反向出手 | 石子（真弹道重力积分、预览弧=同一套物理、蓄力姿势 throwWind 由拉弓量驱动；F=站位自动解弧的键盘后备） |
 | 点按 | `input.tap` | 瞬时动作 |
 
 规则：

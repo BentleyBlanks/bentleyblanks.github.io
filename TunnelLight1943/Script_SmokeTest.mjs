@@ -1323,8 +1323,73 @@ function TestCineActorsClearOfObstacles() {
   console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
 }
 
+// 拟物投掷：攥住石子往后拽开瞄准，弹道是真物理；键盘 F 仍是完整后备。
+// 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
+function TestSlingThrow() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const st = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  DebugJump(st, 0, beats.indexOf("c1_cloth"));
+  StepGame(st, idle(), DT);
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_cloth");
+  const thr = cloth.steps.find((x) => x.type === "throwHit");
+  st.beat.stepIndex = cloth.steps.indexOf(thr);
+  st.player.item = { id: "stone", label: "石子", throwable: true };
+  st.player.x = thr.target.x - 6;
+  st.player.heading = 1;
+  StepGame(st, idle(), DT);
+
+  // ① 按下那一帧手必须落在石子上——在别处按一律攥不住
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: st.player.x - 3, y: SURFACE_Y + 1.1 } }, DT);
+  assert.ok(!st.sling, "在别处按下不该攥住石子");
+  StepGame(st, idle(), DT);   // 松开，重下
+
+  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列
+  const hx = st.player.x + st.player.heading * 0.24;
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: SURFACE_Y + 1.12 } }, DT);
+  assert.ok(st.sling, "按在石子上必须攥得住");
+  // 反解一条正好穿过靶心的拽法：T=0.7s 的弹道，拽向 = -v/K
+  const T = 0.7;
+  const vx = (thr.target.x - hx) / T;
+  const vy = (thr.target.y - 1.12) / T + 0.5 * 12.5 * T;
+  const drag = { x: hx - vx / 7.4, y: SURFACE_Y + 1.12 - vy / 7.4 };
+  for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: drag }, DT);
+  assert.ok(st.throwAim?.pts?.length > 5, "拽开必须给出弹道预览点列");
+  assert.equal(st.player.pose, "throwWind", "拽着时必须是蓄力姿势");
+  assert.ok(st.player.poseK > 0.4, "拉弓量必须驱动姿势");
+
+  // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 妹妹欢呼夸人
+  StepGame(st, idle(), DT);
+  assert.ok(st.thrown, "松手必须出手");
+  assert.ok(st.thrown.vx > 0, "往后拽，石子必须朝前飞");
+  let guard = 0;
+  const idx0 = st.beat.stepIndex;
+  while (st.thrown && guard < 200) { guard += 1; StepGame(st, idle(), DT); }
+  assert.equal(st.flags.clothDown, true, "照着靶心拽出去的弧必须打中布巾");
+  assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
+  const sis = st.actors.find((a) => a.id === "sister");
+  assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
+  assert.ok(st.microCine, "妹妹必须开口夸哥");
+
+  // ④ 键盘后备：站进射程按 F，照样命中（自动通关走的就是这条）
+  const st2 = CreateGame(0);
+  DebugJump(st2, 0, beats.indexOf("c1_cloth"));
+  StepGame(st2, idle(), DT);
+  st2.beat.stepIndex = cloth.steps.indexOf(thr);
+  st2.player.item = { id: "stone", label: "石子", throwable: true };
+  st2.player.x = thr.target.x - 6;
+  st2.player.heading = 1;
+  StepGame(st2, { ...idle(), throw: true }, DT);
+  assert.ok(st2.thrown, "键盘 F 必须照常出手");
+  guard = 0;
+  while (st2.thrown && guard < 200) { guard += 1; StepGame(st2, idle(), DT); }
+  assert.equal(st2.flags.clothDown, true, "键盘后备在射程内必须命中");
+  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中 / 妹妹接着乐 / 键盘后备");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
+TestSlingThrow();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();

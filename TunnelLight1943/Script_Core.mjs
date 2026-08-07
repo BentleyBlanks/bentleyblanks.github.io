@@ -146,7 +146,7 @@ function LineDuration(line) {
 // 《勇敢的心》的关卡语法：每个障碍缺一样东西，东西在别处；石子落地出声；
 // 狗认吃不认人；灯有周期。动词凑齐了，关卡才有"想一下"的时刻。
 // ---------------------------------------------------------------------------
-const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
+const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5;
 // 翻越：撑上顶沿 → 收腿荡过去 → 落地缓冲。比一步慢，慢到看得清是"手脚并用"，
 // 又不至于打断走路的节奏。手里拎着东西得先把东西撂上顶沿，所以更慢一档。
 const VAULT_DUR = 0.62;      // 齐胯高的墙一撑就过，拖长了就成了慢动作
@@ -329,30 +329,117 @@ function FlashPose(state, name, dur = 0.5) {
   state.player.poseT = dur;
 }
 
-// 投掷：面朝方向 3~10.5m 内有本步的目标就砸它（一维横轴上不做抛物线瞄准，
-// 站位就是瞄准）；否则石子落在 7.5m 外，白出一声响
+// ---------------------------------------------------------------------------
+// 投掷。飞行是真弹道（重力积分），不是两点插值——瞄准才有意义。
+//
+// 拟物路径（StepSlingAim）：攥住手里那颗石子（按下那一帧手要落在石子上），
+// 往后下方拽开——拽多远劲多大，出手方向是拽开方向的反向；弧线预览由**同一套
+// 物理**模拟出来，预览即所得。松手出手，拽得太少算把石子收回手心。
+// 蓄力姿势（throwWind）由拉弓量直接驱动：拽多远身子拧多紧。
+//
+// 键盘后备（StartThrow，F）：站位就是瞄准——面朝方向 3~10.5m 内有本步目标
+// 就照着它解一条正好穿过的弧；否则落在 7.5m 外，白出一声响。
+// ---------------------------------------------------------------------------
+const THROW_G = 12.5;        // 石子的重力。略沉于真实——弧线利落，不拖泥带水
+const SLING_MAX = 1.6;       // 拽满的长度（米）
+const SLING_K = 7.4;         // 拽开 1m ≈ 7.4m/s 出手速；拽满约 12m/s，射程 ≈ THROW_MAX
+const SLING_HAND_Y = 1.12;   // 攥石子的手离地高
+
+function LaunchStone(state, x0, y0, vx, vy, target) {
+  state.thrown = { x: x0, y: y0, vx, vy, target: target || null, hit: false };
+  state.player.item = null;
+  state.sling = null;
+  FlashPose(state, "throwArm", 0.45);
+  Cue(state, "whoosh");
+}
+
 function StartThrow(state, st) {
   const p = state.player;
-  let land = p.x + p.heading * THROW_FLAT;
+  let tx = p.x + p.heading * THROW_FLAT;
+  let ty = 0.15;
   let hit = false;
   if (st?.target) {
     const dx = (st.target.x - p.x) * p.heading;
-    if (dx >= THROW_MIN && dx <= THROW_MAX) { land = st.target.x; hit = true; }
+    if (dx >= THROW_MIN && dx <= THROW_MAX) { tx = st.target.x; ty = st.target.y ?? 1.6; hit = true; }
   }
-  state.thrown = { x0: p.x, x1: land, y1: hit ? (st.target.y ?? 1.6) : 0.15, t: 0, dur: THROW_TIME, hit };
-  state.player.item = null;
+  // 解一条 T 秒后正好路过 (tx,ty) 的弧：vy 里补上重力欠的那一截
+  const y0 = 1.25;
+  const T = 0.42 + Math.abs(tx - p.x) * 0.05;
+  LaunchStone(state, p.x + p.heading * 0.3, y0,
+    (tx - p.x) / T, (ty - y0) / T + 0.5 * THROW_G * T, hit ? st.target : null);
+}
+
+// 每帧的拟物瞄准。返回"正攥着"——攥着时按键路径让位。
+// st 只为出手时把命中目标带上；链外自由投掷传 null。
+function StepSlingAim(state, input, st) {
+  if (state.slingTicked) return !!state.sling;   // 链内已代管，链外别再步进一遍
+  state.slingTicked = true;
+  const p = state.player;
+  const gy = SURFACE_Y;   // 拟物投掷只在地表玩法里出现
+  const hx = p.x + p.heading * 0.24;
+  const pw = input.pointerWorld;
+  if (!state.sling && state.ptrPressed && pw
+    && Math.hypot(pw.x - hx, pw.y - (gy + SLING_HAND_Y)) < 0.7) {
+    state.sling = { power: 0, vx: 0, vy: 0 };
+  }
+  const sl = state.sling;
+  if (!sl) return false;
+  if (input.pointerHeld && pw) {
+    // 拽开的向量（手→指尖），出手是它的反向；拽过头按拽满算
+    let dx = pw.x - hx, dy = pw.y - (gy + SLING_HAND_Y);
+    const len = Math.hypot(dx, dy);
+    if (len > SLING_MAX) { dx *= SLING_MAX / len; dy *= SLING_MAX / len; }
+    sl.power = Math.min(1, Math.hypot(dx, dy) / SLING_MAX);
+    sl.vx = -dx * SLING_K;
+    sl.vy = -dy * SLING_K;
+    // 预览弧 = 同一套物理跑出来的点列；灰/亮只说"够不够劲"，打不打得中看你瞄
+    const pts = [];
+    let x = hx, y = SLING_HAND_Y, vx = sl.vx, vy = sl.vy;
+    for (let i = 0; i < 26 && y > 0.08; i += 1) {
+      pts.push([x, y]);
+      vy -= THROW_G * 0.055;
+      x += vx * 0.055;
+      y += vy * 0.055;
+    }
+    state.throwAim = { pts, ok: sl.power > 0.22 };
+    // 蓄力：拽多远，身子拧多紧；往哪边拽，人反着转身瞄
+    if (Math.abs(sl.vx) > 0.4) p.heading = sl.vx >= 0 ? 1 : -1;
+    p.pose = "throwWind";
+    p.poseK = sl.power;
+    p.poseT = 0.25;
+    state.gesture = { kind: "dragDown" };
+    return true;
+  }
+  // 松手：够劲出手，不够收回手心
+  state.sling = null;
+  if (sl.power > 0.22) LaunchStone(state, hx, 1.25, sl.vx, sl.vy, st?.target || null);
+  else { p.pose = null; p.poseK = undefined; }
+  return false;
 }
 
 function StepThrown(state, dt) {
   const th = state.thrown;
   if (!th) return null;
-  th.t += dt;
-  if (th.t < th.dur) return null;
+  // 小步长积分：命中判定贴着弧线走，不会一帧跨过目标
+  const n = 3;
+  for (let i = 0; i < n; i += 1) {
+    const h = dt / n;
+    th.x += th.vx * h;
+    th.vy -= THROW_G * h;
+    th.y += th.vy * h;
+    if (th.target
+      && Math.hypot(th.x - th.target.x, th.y - (th.target.y ?? 1.6)) <= (th.target.r ?? 1.2) * 0.55) {
+      th.hit = true;
+      break;
+    }
+    if (th.y <= 0.12 && th.vy < 0) break;
+  }
+  if (!th.hit && !(th.y <= 0.12 && th.vy < 0)) return null;
   state.thrown = null;
   // 石子落地出声：附近的敌人会过来看——这一声玩家也必须听见，
   // 否则「声音会引人」这条规则永远只是文字说明
   Cue(state, "stoneLand");
-  MakeNoise(state, th.x1, "surface");
+  MakeNoise(state, th.x, "surface");
   return th;
 }
 
@@ -528,7 +615,7 @@ function StepChain(state, def, input, dt) {
     if (st.type === "throwHit" && th.hit) { finish(); return; }
     if (st.type === "throwHit") {
       // 投空不白投：miss 回调让失败自己变成演示（惊飞麻雀=石子落地会出声）
-      st.miss?.(state, th.x1);
+      st.miss?.(state, th.x);
       state.toast = { text: st.missNote || "石子擦着边飞过去了。再捡一颗。", t: 3 };
     }
   }
@@ -654,7 +741,9 @@ function StepChain(state, def, input, dt) {
         return;
       }
       if (p.item.id !== "stone") return;
-      // 弧线预览：站位不够是灰虚线，走进射程变实线——命中与否全归因于玩家
+      // 拟物路径：攥住石子往后拽开瞄准（预览弧即弹道）。攥着时按键路径让位
+      if (StepSlingAim(state, input, st)) return;
+      // 键盘后备的弧线预览：站位不够是灰虚线，走进射程变实线——归因清楚
       const dxAim = (st.target.x - p.x) * p.heading;
       state.throwAim = {
         x0: p.x + p.heading * 0.4, y0: 1.35,
@@ -662,7 +751,7 @@ function StepChain(state, def, input, dt) {
         ok: dxAim >= THROW_MIN && dxAim <= THROW_MAX,
       };
       state.prompt = st.prompt || "F · 投";
-      if (input.throw || (input.interact && !nearPile)) { StartThrow(state, st); FlashPose(state, "throwArm", 0.45); Cue(state, "whoosh"); }
+      if (input.throw || (input.interact && !nearPile)) StartThrow(state, st);
       return;
     }
     case "talk": {
@@ -1522,12 +1611,22 @@ export const SCRIPTS = {
           note: "布巾打着旋儿飘下来了。",
           effect: (state) => {
             state.flags.clothDown = true;
+            // 哥砸下来了，妹妹得乐：拍手蹦 + 亲口夸一句——玩家的成功要有人接着
             const sister = FindActor(state, "sister");
-            if (sister) sister.track = null;
+            if (sister) { sister.track = { name: "cheerHop", t: 0 }; sister.heading = -1; }
+            StartMicroCine(state, [
+              { who: "妹妹", say: "下来喽下来喽——还是俺哥中！", d: 2.6,
+                cam: { kind: "shot", x: 126.4, y: 1.7, dist: 5.5 } },
+            ]);
           } },
         { type: "pickup", x: 129, item: { id: "cloth", label: "花布巾" }, prompt: "E · 拾起头巾" },
         { type: "use", zone: { x: 124, w: 4 }, needs: "cloth", prompt: "E · 系上头巾",
-          note: "妹妹把头巾系好，肯跟着回家了。" },
+          note: "妹妹把头巾系好，肯跟着回家了。",
+          // 头巾到手，欢呼收住——跟着回家的路上不能一路蹦
+          effect: (state) => {
+            const sister = FindActor(state, "sister");
+            if (sister) sister.track = null;
+          } },
       ],
     },
     {
@@ -3270,6 +3369,7 @@ export function StartChapter(state, index) {
   state.bubbles = [];
   state.bubbleFlash = null;
   state.throwAim = null;
+  state.sling = null;
   state.sparrowBurst = null;
   state.henFlee = null;
   state.mouseFlee = null;
@@ -3295,6 +3395,7 @@ export function StartChapter(state, index) {
     state.flags.waterFilled = false;
     state.flags.planedOnce = false;
     state.flags.tenonDone = false;
+    state.flags.clothDown = false;   // 重玩第一章：布巾重新挂回树上
   }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
@@ -3405,6 +3506,7 @@ function AdvanceBeat(state) {
   state.scribeCard = null;
   state.planeCard = null;
   state.throwAim = null;
+  state.sling = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
 }
@@ -3571,6 +3673,10 @@ export function StepGame(state, input, dt) {
   state.promptFill = 0;
   if (state.phase === "gameEnd") return;
   state.time += dt;
+  // 指尖按下的那一帧（拟物投掷"攥住"只认这一帧——手必须落在石子上才攥得住）
+  state.ptrPressed = !!input.pointerHeld && !state.ptrWasHeld;
+  state.ptrWasHeld = !!input.pointerHeld;
+  state.slingTicked = false;   // 拟物投掷每帧只步进一次（链内代管则链外让位）
   if (state.toast && (state.toast.t -= dt) <= 0) state.toast = null;
   // 动词姿势到时收回（过场里由脚本设的 pose 没有 poseT，不受影响）
   if (state.player.poseT !== undefined && (state.player.poseT -= dt) <= 0) {
@@ -3579,7 +3685,7 @@ export function StepGame(state, input, dt) {
   }
   // 引导气泡逐帧重算（节拍的 bubbles 回调往里推）；一次性气泡走计时
   state.bubbles = [];
-  state.throwAim = null;
+  state.throwAim = null;   // 预览弧逐帧重立；sling 本体是跨帧状态，只在幕/章切换清
   if (state.bubbleFlash && (state.bubbleFlash.t -= dt) <= 0) state.bubbleFlash = null;
   if (state.spotFlash && (state.spotFlash.t -= dt) <= 0) state.spotFlash = null;
   // 飘落的刨花：渲染层拿它跑一段自由落体，落到地上就并进那堆里
@@ -3644,10 +3750,9 @@ export function StepGame(state, input, dt) {
   // 链内的投掷仍由 StepChain 自己管（要判命中）
   if (def.kind !== "chain") {
     StepThrown(state, dt);
-    if (input.throw && state.player.item?.throwable && !state.thrown) {
-      StartThrow(state, null);
-      FlashPose(state, "throwArm", 0.45);
-      Cue(state, "whoosh");
+    if (state.player.item?.throwable && !state.thrown) {
+      const aiming = StepSlingAim(state, input, null);   // 拽着瞄：落点自己定
+      if (!aiming && input.throw) StartThrow(state, null);
     }
   }
   // 路边的石子堆（潜行段的软性窗口）：捡一颗在手，第一次靠近给个一次性提示
@@ -5520,6 +5625,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   }
   state.caption = null;
   state.toast = null;
+  state.microCine = null;   // 结算里 effect 起的小过场别漏进跳到的这一幕
   state.prompt = null;
   state.promptFill = null;
   state.scribe = null;

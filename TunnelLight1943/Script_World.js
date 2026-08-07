@@ -1290,8 +1290,9 @@ export function CreateWorld(canvasEl) {
           ART.DrawHangLantern(ctx, ax, ay, p.id, { lit: night && !state?.flags.lanternOut }));
         break;
       case "cloth": {
-        // 只在第一章、还没被打下来之前挂在树上
-        if (state?.chapterIndex !== 0 || state?.flags.clothDown) break;
+        // 打没打下来由 hideFlag(clothDown) 走 flagProps 切 visible——命中那一帧
+        // 不重建（重建=打中卡一顿）。二章起 clothDown 已在结算里落真，自然不显示；
+        // 重玩一章由 StartChapter 把旗清回假，布巾重新挂上树
         mk((ctx, ax, ay) => ART.DrawCloth(ctx, ax, ay, p.id));
         break;
       }
@@ -1660,10 +1661,11 @@ export function CreateWorld(canvasEl) {
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
-      + `:${state.chapterIndex}:${f.clothDown ? 1 : 0}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
-    // henFlew / thimbleFound / raidStarted 只决定某个道具在不在（flagProps 切 visible），
-    // ropeTaken / wellRopeBroken 只改一张贴图的画法（propRedraw 单张重烘）——
-    // 一个都不进 builtKey。进了就是"捡个顶针卡一下"。
+      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
+    // henFlew / thimbleFound / raidStarted / clothDown 只决定某个道具在不在
+    //（flagProps 切 visible），ropeTaken / wellRopeBroken 只改一张贴图的画法
+    //（propRedraw 单张重烘）——一个都不进 builtKey。进了就是"捡个顶针卡一下"
+    //（clothDown 就犯过：石子打中头巾那一帧整场重建，正打中的高兴劲卡个顿）。
     if (key === builtKey) return;
     builtKey = key;
     flagProps = [];
@@ -2820,13 +2822,21 @@ export function CreateWorld(canvasEl) {
         layers.fx.add(throwAimLine);
       }
       const pos = throwAimLine.geometry.attributes.position;
-      const y0 = SURFACE_Y + ta.y0, y1 = SURFACE_Y + ta.y1;
-      const apex = Math.max(y0, y1) + Math.min(2.2, Math.abs(ta.x1 - ta.x0) * 0.22);
-      for (let i = 0; i < 22; i += 1) {
-        const t = i / 21;
-        const x = ta.x0 + (ta.x1 - ta.x0) * t;
-        const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * apex + t * t * y1;
-        pos.setXYZ(i, x, y, 0.55);
+      if (ta.pts) {
+        // 拟物瞄准：预览点列由 Core 用同一套弹道物理模拟出来，预览即所得
+        for (let i = 0; i < 22; i += 1) {
+          const src = ta.pts[Math.min(ta.pts.length - 1, Math.round(i / 21 * (ta.pts.length - 1)))];
+          pos.setXYZ(i, src[0], SURFACE_Y + src[1], 0.55);
+        }
+      } else {
+        const y0 = SURFACE_Y + ta.y0, y1 = SURFACE_Y + ta.y1;
+        const apex = Math.max(y0, y1) + Math.min(2.2, Math.abs(ta.x1 - ta.x0) * 0.22);
+        for (let i = 0; i < 22; i += 1) {
+          const t = i / 21;
+          const x = ta.x0 + (ta.x1 - ta.x0) * t;
+          const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * apex + t * t * y1;
+          pos.setXYZ(i, x, y, 0.55);
+        }
       }
       pos.needsUpdate = true;
       throwAimLine.computeLineDistances();
@@ -3371,16 +3381,10 @@ export function CreateWorld(canvasEl) {
         layers.fx.add(thrownMesh);
         FixOrder(thrownMesh, LAYER_ORDER.fx + 320);
       }
+      // 真弹道：Core 每帧积分出 (x,y)，这里只把石子摆上去——飞哪儿是瞄出来的
       const th = state.thrown;
-      const k = Math.min(1, th.t / th.dur);
-      const y0 = SURFACE_Y + 1.25;
-      const y1 = SURFACE_Y + (th.y1 ?? 0.2);
       thrownMesh.visible = true;
-      thrownMesh.position.set(
-        th.x0 + (th.x1 - th.x0) * k,
-        y0 + (y1 - y0) * k + Math.sin(k * Math.PI) * 2.4,
-        0.6,
-      );
+      thrownMesh.position.set(th.x, SURFACE_Y + th.y, 0.6);
     } else if (thrownMesh) thrownMesh.visible = false;
 
     // 探照灯 / 马灯光带：亮的时候一条光落在地上，节奏一目了然
