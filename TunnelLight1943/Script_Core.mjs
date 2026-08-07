@@ -882,8 +882,24 @@ function StepCartRide(state, def, input, dt) {
 // 松了手，刨刃啃住木头，出来的是一小截碎屑，那一趟就白费了大半。
 // 「推得稳不稳」这件事，用不着一个字去说。
 //
-// 输入与划线同一套语汇（位移驱动）：桌面按住 E 往前推，触屏直接把刨子拖过去。
+// **玩家推的是画面里那把刨子**（全作铁律：对物体做功=直接操纵那个物体）。
+// 这一拍镜头在 2.05m 半宽，0.34m 的刨子在屏幕上有一百多个像素——按得着，
+// 所以不用石笔那张特写卡，直接在世界里攥：
+//   ① 按下去那一下，手得落在刨子上（PLANE_GRAB_R 之内），别处拖不动它；
+//   ② 刨子吃着木头，跟手有上限——顺纹吃木最快 PLANE_CUT_SPEED，
+//      空拖回来轻些（PLANE_BACK_SPEED）；
+//   ③ 手飘离台面太高（PLANE_SLIP_Y），刨柄脱手，这一趟停在半道——
+//      停顿的代价由原有的 stalls 逻辑收（刨刃啃住，刨花短一截）。
+// 曾经这里有一条 HUD 拖动轨道（dragTrack）代替刨子受拖——那就是一根 slider，
+// 用户明令禁止，已整根拆掉：轨道元素、CSS、输入通路都不在了，别加回来。
+//
+// 键盘后备照旧：光按住 E 就往前推（回程自动往回带），自动通关测试全靠它。
 // 顺纹（+x）才吃木头，回程只是把刨子拖回来——木匠不会倒着刨。
+const PLANE_GRAB_R = 0.38;    // 攥住刨子的判定半径（米）
+const PLANE_SLIP_Y = 0.5;     // 手离刨柄该在的高度这么远，脱手
+const PLANE_CUT_SPEED = 0.85; // 吃着木头最快推多快（米/秒）
+const PLANE_BACK_SPEED = 1.35;// 空拖回来的上限（米/秒）
+
 function StepPlane(state, def, input, dt) {
   const b = state.beat;
   const father = FindActor(state, "father");
@@ -906,6 +922,15 @@ function StepPlane(state, def, input, dt) {
     state.player.heading = 1;
   }
 
+  // 攥取判定的靶子＝**画面上那把刨子**。World 每帧把它画在哪儿回填到
+  // state.planeToolView（它挂在手上，手由姿势驱动，和 u 的直线映射差着一段
+  // 手臂几何）——判定必须贴着玩家看见的东西走，不许贴着公式走。
+  // 无渲染环境（node 测试）没有回填，退回 u 的直线映射。
+  const anchor = state.planeToolView || {
+    x: bx - span / 2 + b.u * span,
+    y: SURFACE_Y + (def.boardY ?? 0.60) + 0.09,
+  };
+
   const Publish = (u, active) => {
     state.planing = {
       x: bx, y: def.boardY ?? 0.60, span,
@@ -913,6 +938,9 @@ function StepPlane(state, def, input, dt) {
       smooth: Math.min(1, b.passes / need),      // 木头被刨亮了多少
       pile: b.pile,                              // 地上那堆刨花
       returning: !b.armed,                       // 自动通关驱动器看这个掉头
+      gripped: !!b.grabbed,                      // 手正攥着刨柄
+      reaching: !!b.reaching,                    // 按下了却没抓着刨子 → 光催一下
+      invite: active && !b.grabbed,              // 等着被攥住：刨子透光呼吸
     };
   };
 
@@ -960,19 +988,35 @@ function StepPlane(state, def, input, dt) {
   state.player.x = workX;
   state.player.heading = 1;
 
-  // ── 推刨：拖动为主 ──
-  // 刨是"把它推过去"的动作，对应的操作就该是把它推过去：鼠标按住拖 / 手指拖。
-  // input.dragX 是位移量——拖多少走多少，手上有"蹭着木头走"的实感。
-  //
-  // 键盘留一条等价后备（CLAUDE.md 的硬要求：自动通关只按键盘，鼠标玩法必须有
-  // 按键路径，否则测试卡死）：**光按住 E 就往前推**，不掺 A/D。上一版要
-  // "按住 E 再按 D"，于是 D 单独按下去就是走路——玩家一路走出了工位。
-  // 这一拍人本来就钉在台前，A/D 不参与，冲突从根上没了。
-  // 键盘后备只认"按住 E"一个键，方向由这一趟的状态给：还没推到头就往前推，
-  // 推到头了就往回带。玩家不用去想方向，也就不会和走路抢键。
+  // ── 攥住刨子 ──
+  const pw = input.pointerWorld;
+  const held = !!input.pointerHeld && !!pw;
+  if (held && !b.wasHeld) {
+    b.grabbed = Math.hypot(pw.x - anchor.x, pw.y - anchor.y) < PLANE_GRAB_R;
+    // 记住攥住那一刻的手位与推程：之后手挪多少、刨子跟多少（相对量），
+    // 刨子不"跳"到指尖底下
+    if (b.grabbed) { b.refX = pw.x; b.refU = b.u; Cue(state, "pickup", { gain: 0.25 }); }
+  }
+  if (!held) b.grabbed = false;
+  b.wasHeld = held;
+  b.reaching = held && !b.grabbed;
+  // 脱手：手飘离刨柄该在的高度太远。刨刃啃在半道的代价由下面的 stalls 逻辑收
+  if (b.grabbed && Math.abs(pw.y - anchor.y) > PLANE_SLIP_Y) b.grabbed = false;
+
+  // ── 推刨 ──
+  // 拖多少走多少，但吃着木头有上限——手甩得再快，刨子也只能一寸一寸啃过去。
+  let dv = 0;
+  if (b.grabbed) {
+    const target = Math.max(0, Math.min(1, (b.refU || 0) + (pw.x - b.refX) / span));
+    const want = target - b.u;
+    // 顺纹吃木最沉；空拖（回程、或半道往回带）轻些
+    const cap = ((want > 0 && b.armed) ? PLANE_CUT_SPEED : PLANE_BACK_SPEED) * dt / span;
+    dv = Math.max(-cap, Math.min(cap, want));
+  }
+  // 键盘后备（自动通关测试也走这条）：光按住 E，方向由这一趟的状态给——
+  // 还没推到头就往前推，推到头了就往回带。不掺 A/D，不和走路抢键。
   const keyDir = b.armed ? 1 : -1;
-  const dv = (input.dragX || 0)
-    + (input.interactHeld ? keyDir * dt * (def.keySpeed ?? 0.55) : 0);
+  if (!b.grabbed && input.interactHeld) dv += keyDir * dt * (def.keySpeed ?? 0.55);
 
   const prevU = b.u;
   b.u = Math.max(0, Math.min(1, b.u + dv));
@@ -1011,18 +1055,11 @@ function StepPlane(state, def, input, dt) {
   state.player.pose = "planePush";
   state.player.poseU = b.u;
   state.player.poseT = undefined;
-  state.prompt = null;                   // 引导交给 QTE 轨道，不占中间那条
-  state.dragTrack = {
-    t: b.u, idle: !b.everMoved,
-    tip: b.armed ? "顺着木纹，一推到底" : "把刨子拖回来",
-    back: !b.armed,
-    drag: true,          // HUD 据此把"怎么操作"按鼠标/手指说清楚
-  };
+  state.prompt = null;   // 引导由那把刨子自己给（透光呼吸、攥住就压实），不占中间那条
   Publish(b.u, true);
 
   if (b.passes >= need) {
     state.planing = null;
-    state.dragTrack = null;
     state.player.pose = null;
     state.player.poseU = undefined;
     if (father) { father.pose = null; father.poseU = undefined; }
@@ -2940,7 +2977,6 @@ export function CreateGame(chapterIndex = 0) {
     mouseFlee: null,
     planing: null,
     planeCurl: null,
-    dragTrack: null,
     scribe: null,
     scribeCard: null,       // 划线那一拍铺满画框的手绘特写卡（见 StepScribe）
     spotFlash: null,
@@ -3047,7 +3083,6 @@ export function StartChapter(state, index) {
   state.mouseFlee = null;
   state.planing = null;
   state.planeCurl = null;
-  state.dragTrack = null;
   state.scribe = null;
   state.scribeCard = null;
   state.spotFlash = null;
@@ -3172,7 +3207,6 @@ function AdvanceBeat(state) {
   state.caption = null;
   state.prompt = null;
   state.planing = null;
-  state.dragTrack = null;
   state.scribe = null;
   state.scribeCard = null;
   state.throwAim = null;

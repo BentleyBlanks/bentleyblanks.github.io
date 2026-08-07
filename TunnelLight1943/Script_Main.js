@@ -93,7 +93,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine", "scribeGuide",
+  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
 ]) ui[id] = document.getElementById(id);
 
@@ -142,13 +142,15 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
-// 沉浸式手势的唯一入口：手按在画面上的**世界坐标**（不是屏幕位移），
-// 加上横竖两路拖动量与点按。所有上手的玩法都从这几样里取——
-// 转辘轳/打结靠 world 绕圈、刨料靠 dx（拖过 45% 画宽=一整趟）、勒紧靠 dy。
+// 沉浸式手势的唯一入口：手按在画面上的**位置**（世界坐标 / 特写卡坐标），
+// 加上竖向拖动量与点按。所有上手的玩法都从这几样里取——
+// 转辘轳/打结靠 world 绕圈、攥刨子靠 world 落在刨子上、勒紧靠 dy；
 // 攥石笔靠 card：那一拍画面是一张铺满画框的特写卡，玩家按的是卡上那支笔，
 // 世界坐标在那儿没有意义（世界里的笔只有十来个像素，按不着）。
+// 故意没有横向位移量（dragX）通道：位移量拖哪儿都涨，本质是根看不见的
+// slider——对物体做功必须攥住那个物体本身。
 const gest = {
-  active: false, id: null, lastX: 0, lastY: 0, dx: 0, dy: 0, downT: 0, moved: 0,
+  active: false, id: null, lastX: 0, lastY: 0, dy: 0, downT: 0, moved: 0,
   world: null, card: null,
 };
 let tapEdge = false;
@@ -162,7 +164,6 @@ canvas.addEventListener("pointerdown", (e) => {
   gest.lastY = e.clientY;
   gest.downT = performance.now();
   gest.moved = 0;
-  gest.dx = 0;
   gest.dy = 0;
   gest.world = world.ScreenToWorld(e.clientX, e.clientY);
   gest.card = world.ScreenToCard(e.clientX, e.clientY);
@@ -173,8 +174,6 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   if (!gest.active || e.pointerId !== gest.id) return;
   const span = Math.max(160, canvas.clientHeight * 0.55);
-  const spanX = Math.max(240, canvas.clientWidth * 0.45);
-  gest.dx += (e.clientX - gest.lastX) / spanX;
   gest.dy += (e.clientY - gest.lastY) / span;
   gest.moved += Math.abs(e.clientX - gest.lastX) + Math.abs(e.clientY - gest.lastY);
   gest.lastX = e.clientX;
@@ -189,7 +188,6 @@ for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
     if (evt === "pointerup" && performance.now() - gest.downT < 420 && gest.moved < 14) tapEdge = true;
     gest.active = false;
     gest.id = null;
-    gest.dx = 0;
     gest.dy = 0;
   });
 }
@@ -539,7 +537,6 @@ function KeyChipHtml(act) {
   return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
 }
 
-let dragTipShown = "";             // QTE 轨道那行小字（换了才重写 DOM）
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
 let actShown = "";                 // 换了文案/设备才重排 DOM
 
@@ -718,27 +715,10 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线那一拍**一格 HUD 都没有**：玩家攥的是特写卡上那支笔，进度就是木头上
-  // 那道印子本身，招呼玩家来拿也是笔自己在晃（StepScribe 从不写 dragTrack，
-  // SmokeTest 盯着这一条）。刨料仍有一条拖动 QTE 轨道（state.dragTrack）：
-  // 旋钮跟着推程走，没动起来时轻轻晃一下招呼玩家来拖；推到头要拖回来时轨道翻个方向。
-  if (ui.scribeGuide) {
-    const dt2 = state.dragTrack;
-    ui.scribeGuide.hidden = !dt2 || inCinematic;
-    if (dt2) {
-      ui.scribeGuide.style.setProperty("--fill", (dt2.t * 100).toFixed(1) + "%");
-      ui.scribeGuide.classList.toggle("idle", !!dt2.idle);
-      ui.scribeGuide.classList.toggle("back", !!dt2.back);
-      // 怎么操作要说清楚，而且按当前设备说：鼠标玩家听不懂"拖"是拖什么。
-      // （刨料那一拍是纯拖动——键盘在这个动作上没有对应物。）
-      const how = dt2.drag ? (inputMode === "touch" ? "　·　用手指拖" : "　·　按住鼠标左键拖") : "";
-      const line = dt2.tip + how;
-      if (dragTipShown !== line) {
-        dragTipShown = line;
-        ui.scribeGuide.querySelector(".tip").textContent = line;
-      }
-    }
-  }
+  // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider）：划线攥的是特写卡
+  // 上那支笔，刨料攥的是世界里那把刨子——进度长在木头上（印子/毛面变亮），
+  // 招呼玩家上手的是道具自己（笔会晃、刨子透光呼吸）。这里曾有一块
+  // #scribeGuide 拖动轨道的同步代码，已连元素和 CSS 一起拆掉，别加回来。
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
@@ -1043,18 +1023,18 @@ function RunFrame(now, dt) {
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
       throw: throwEdge,
-      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），dragX=本帧横向拖动
-      //（刨料的推程），pointerWorld=指尖的世界坐标
+      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
+      // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
+      // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
+      // 就是根看不见的 slider（刨料曾用它，已改成攥住刨子本身），别加回来。
       pull: gest.active ? gest.dy : 0,
       pullHeld: gest.active,
-      dragX: gest.active ? gest.dx : 0,
       pointerHeld: gest.active,
       pointerWorld: gest.world,
       pointerCard: gest.card,
       tap: tapEdge,
       advance: advanceEdge,
     }, stepDt);
-    gest.dx = 0;
     gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;

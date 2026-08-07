@@ -376,7 +376,7 @@ export function CreateWorld(canvasEl) {
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
-  let planeToolMesh = null;
+  let planeToolMesh = null, planeGlowMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
@@ -435,7 +435,7 @@ export function CreateWorld(canvasEl) {
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
-    planeToolMesh = null; planeHandRig = null;
+    planeToolMesh = null; planeGlowMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
     spotFlashMesh = null;
@@ -2664,6 +2664,36 @@ export function CreateWorld(canvasEl) {
       const hand = planeHandRig ? HandPoint(planeHandRig) : null;
       planeToolMesh.visible = !!hand;
       if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
+      // 把"刨子画在了哪儿"回填给玩法层：攥取判定必须贴着玩家看见的这把刨子，
+      // 不许贴着 u 的直线映射（手臂几何让两者差出小半米，照公式判就抓空了）
+      state.planeToolView = hand ? { x: hand.x + 0.02, y: hand.y - 0.05 } : null;
+
+      // 玩家推的是这把刨子本身（没有 HUD 轨道）。等着被攥住时它透一圈
+      // 会呼吸的光——"来拿我"由刨子自己说；按下了没抓着就闪快些催一下
+      if (!planeGlowMesh) {
+        planeGlowMesh = BakeSprite(64, 64, 32, 32, (ctx, ax, ay) => {
+          const g = ctx.createRadialGradient(ax, ay, 3, ax, ay, 24);
+          g.addColorStop(0, "rgba(255,240,196,0.7)");
+          g.addColorStop(0.5, "rgba(255,232,172,0.18)");
+          g.addColorStop(1, "rgba(255,232,172,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(ax - 32, ay - 32, 64, 64);
+        }, 0, DETAIL_SS);
+        planeGlowMesh.scale.setScalar(0.55);   // 一圈贴着刨身的光，不是一片白昼
+        // 加法混合：那圈光要在大白天的木头上也看得见（普通透明度会糊进底色）
+        planeGlowMesh.material.blending = THREE.AdditiveBlending;
+        // 光垫在刨子背后一层（同在 carry 带里，紧贴其下）
+        FixOrder(planeGlowMesh, DepthOrder("play", CARRY_Z) - 1);
+        layers.play.add(planeGlowMesh);
+      }
+      const glowWant = (pl.invite && hand)
+        ? (pl.reaching
+          ? 0.55 + 0.25 * Math.sin(time * 13)
+          : 0.30 + 0.20 * Math.sin(time * 3.1))
+        : 0;
+      planeGlowMesh.material.opacity = Math.max(0, glowWant);
+      planeGlowMesh.visible = glowWant > 0.03;
+      if (hand) planeGlowMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
 
       if (planePileMesh.userData.k !== pl.pile) {
         planePileMesh.userData.k = pl.pile;
@@ -2676,7 +2706,9 @@ export function CreateWorld(canvasEl) {
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
+      if (planeGlowMesh) planeGlowMesh.visible = false;
       if (planePileMesh) planePileMesh.visible = false;
+      state.planeToolView = null;
     }
 
     // 刚削下来的那条刨花：从刨刃口弹出来，打着旋儿飘到地上
