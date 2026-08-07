@@ -19,12 +19,18 @@ permissions:
   id-token: write
 
 # 组名不能叫 `pages`：那是 GitHub 内建 Pages 部署占用的组，撞上去会被它连坐
-# 取消（本次就是这么白等了二十分钟——job 一个 runner 都没拿到就 cancelled）。
-# 同组内新的顶掉排队中的（并行会话推得勤，排队会让最新一版迟迟不上线），
-# 但不打断正在发布的那个。
+# 取消（那次白等了二十分钟——job 一个 runner 都没拿到就 cancelled）。
+#
+# cancel-in-progress 必须是 **true**。原来写 false，本意是「别打断正在发布的
+# 那个」——可**一个卡在 queued、始终分不到 runner 的 job，在并发闸门看来跟
+# "正在发布"没有区别**：2026-08-07 有个 job 排了两小时四十分没拿到机器，
+# 后面每次推送都堵在它身后（GitHub 只留最新一个 pending、其余 cancelled），
+# 线上因此停在两个多小时前的版本，还得手动 gh run cancel 才化开。
+# 排队卡死 GitHub 要 24 小时才收，timeout-minutes 也救不了——那只管执行时间。
+# 站点没有构建步骤，永远是「最新一版赢」，被顶掉的那个本来就该被顶掉。
 concurrency:
   group: pages-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:

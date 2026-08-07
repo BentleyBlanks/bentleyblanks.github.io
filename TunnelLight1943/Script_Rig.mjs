@@ -57,7 +57,7 @@ function Tex(canvas) {
 
 // 把一段绘制烘成"枢轴在原点"的贴图片
 // drawFn(ctx, px, py) 以 (px,py) 为枢轴；padding 留给墨线与抖动
-function BakePart(wM, hM, pivotU, pivotV, drawFn) {
+function BakePart(wM, hM, pivotU, pivotV, drawFn, haze = null) {
   const pad = Math.round(10 * INK_K);   // 留给墨线抖动的边，也要随密度长
   const w = wM * PART_PPM + pad * 2;
   const h = hM * PART_PPM + pad * 2;
@@ -66,6 +66,16 @@ function BakePart(wM, hM, pivotU, pivotV, drawFn) {
   const px = pad + pivotU * wM * PART_PPM;
   const py = pad + pivotV * hM * PART_PPM;
   drawFn(ctx, px, py);
+  // 空气透视：染在这块骨头**自己**身上（source-atop），不是把整个人调半透明。
+  // 背景层的人一半透明，身后的树和炮楼就从他身上透出来——那是穿帮不是雾。
+  if (haze && haze.amount > 0) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = haze.amount;
+    ctx.fillStyle = haze.color;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
   const geo = new THREE.PlaneGeometry(w / PART_PPM, h / PART_PPM);
   // 平移几何体，让枢轴落在网格原点
   geo.translate(w / PART_PPM / 2 - px / PART_PPM, -(h / PART_PPM / 2 - py / PART_PPM), 0);
@@ -77,21 +87,26 @@ function BakePart(wM, hM, pivotU, pivotV, drawFn) {
 
 const rigCache = new Map();
 
-function BuildParts(kind) {
-  if (rigCache.has(kind)) return rigCache.get(kind);
+// haze：远景层的骨架按该层的雾量烘一套单独的零件（缓存键带上雾量）。
+// 一种角色最多多出一两套，代价可以忽略——换来的是背景里的人是**实心**的。
+function BuildParts(kind, haze = null) {
+  const cacheKey = haze ? `${kind}|${haze.color}|${haze.amount.toFixed(2)}` : kind;
+  if (rigCache.has(cacheKey)) return rigCache.get(cacheKey);
   const [coat, coatDark] = ART.RIG_COLOR(kind);
   const P = PART_PPM;
+  // 这一套零件统一带上该层的雾量
+  const Bake = (wM, hM, pu, pv, fn) => BakePart(wM, hM, pu, pv, fn, haze);
   const LONG_COAT = kind === "family" || kind === "sister";   // 大襟褂过胯
   const parts = {
-    torso: () => BakePart(BONE.torsoW, BONE.torso + (LONG_COAT ? 0.16 : 0.08), 0.5,
+    torso: () => Bake(BONE.torsoW, BONE.torso + (LONG_COAT ? 0.16 : 0.08), 0.5,
       // 枢轴（胯）在画布下沿往上留出下摆的位置
       LONG_COAT ? 0.72 : 0.88,
       (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K)),
-    head: () => BakePart(0.46, 0.46, 0.42, 1,
+    head: () => Bake(0.46, 0.46, 0.42, 1,
       (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K)),
-    upperArmB: () => BakePart(0.115, BONE.upperArm, 0.5, 0,
+    upperArmB: () => Bake(0.115, BONE.upperArm, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coatDark, kind + "uab", { k: INK_K })),
-    foreArmB: () => BakePart(0.105, BONE.foreArm + 0.05, 0.5, 0,
+    foreArmB: () => Bake(0.105, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
         ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coatDark, kind + "fab", { k: INK_K });
         ctx.beginPath();
@@ -99,9 +114,9 @@ function BuildParts(kind) {
         ctx.fillStyle = ART.PAL.skinDark;
         ctx.fill();
       }),
-    upperArmF: () => BakePart(0.115, BONE.upperArm, 0.5, 0,
+    upperArmF: () => Bake(0.115, BONE.upperArm, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coat, kind + "uaf", { k: INK_K })),
-    foreArmF: () => BakePart(0.105, BONE.foreArm + 0.05, 0.5, 0,
+    foreArmF: () => Bake(0.105, BONE.foreArm + 0.05, 0.5, 0,
       (ctx, px, py) => {
         ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coat, kind + "faf", { k: INK_K });
         ctx.beginPath();
@@ -112,22 +127,22 @@ function BuildParts(kind) {
         ctx.lineWidth = 3 * INK_K;
         ctx.stroke();
       }),
-    thighB: () => BakePart(0.145, BONE.thigh, 0.5, 0,
+    thighB: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
-    shinB: () => BakePart(0.12, BONE.shin, 0.5, 0,
+    shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#6b5540", kind + "shb", { k: INK_K })),
-    footB: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
+    footB: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb", INK_K)),
-    thighF: () => BakePart(0.145, BONE.thigh, 0.5, 0,
+    thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
-    shinF: () => BakePart(0.12, BONE.shin, 0.5, 0,
+    shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#7d6349", kind + "shf", { k: INK_K })),
-    footF: () => BakePart(BONE.foot + 0.05, 0.10, 0.16, 0,
+    footF: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf", INK_K)),
   };
   const built = {};
   for (const k of Object.keys(parts)) built[k] = parts[k]();
-  rigCache.set(kind, built);
+  rigCache.set(cacheKey, built);
   return built;
 }
 
@@ -139,8 +154,8 @@ function CloneMesh(src) {
 }
 
 /** 组装一具骨架，返回 {group, joints} */
-export function CreateRig(kind) {
-  const proto = BuildParts(kind);
+export function CreateRig(kind, haze = null) {
+  const proto = BuildParts(kind, haze);
   const group = new THREE.Group();          // 原点在脚底
   const root = new THREE.Group();           // 胯
   root.position.y = BONE.hipY;
