@@ -4,14 +4,36 @@
       "id": "1gyza6y",
       "who": "爹",
       "text": "再过几年，这个家就靠你了。",
-      "voice": "Father"
+      "voice": "Father",
+      "dur": 2.74
     },
     {
-      "id": "193bk7e",
+      "id": "1dol6cl",
+      "who": "娘",
+      "text": "柱子——缸见底了，给娘拎桶水来！",
+      "voice": "Mother",
+      "dur": 3.77
+    },
+    {
+      "id": "0dyuwxn",
       "who": "妹妹",
-      "text": "哥——风把我的头巾刮到树上去了！",
+      "text": "哥——风把俺的头巾刮到树上去了！",
       "voice": "Sister",
-      "dur": 3.57
+      "dur": 3.48
+    },
+    {
+      "id": "0qph8p6",
+      "who": "妹妹",
+      "text": "娘说槐花开了就蒸槐花饭。俺来瞅瞅开了没有……",
+      "voice": "Sister",
+      "dur": 5.47
+    },
+    {
+      "id": "0pbxp64",
+      "who": "民兵",
+      "text": "鬼子出据点了，朝这边来——都家去，关门！",
+      "voice": "Militia",
+      "dur": 3.43
     },
     {
       "id": "16b0o19",
@@ -24,7 +46,8 @@
       "id": "10nu4w4",
       "who": "爹",
       "text": "带妹妹进地窖。别出声。",
-      "voice": "Father"
+      "voice": "Father",
+      "dur": 2.54
     },
     {
       "id": "1rvzvgr",
@@ -34,18 +57,25 @@
       "dur": 3.541
     },
     {
-      "id": "1eogin5",
-      "who": "娘",
-      "text": "灯扫过来，就蹲进影子里，贴着草垛别动。",
-      "voice": "Mother",
-      "dur": 3.79
+      "id": "1qj2n7x",
+      "who": "翻译官",
+      "text": "太君问你——八路的粮食，藏到哪儿去了！",
+      "voice": "Traitor",
+      "dur": 5.18
     },
     {
-      "id": "1j8os7a",
+      "id": "0xwwdjd",
       "who": "娘",
-      "text": "记住：被照到了别慌，缩回影子里就没事。灯走了，再走。",
+      "text": "灯扫过来，就躲到草垛背光的那一头去。别在亮地里站着。",
       "voice": "Mother",
-      "dur": 6.02
+      "dur": 5.32
+    },
+    {
+      "id": "0glm86e",
+      "who": "娘",
+      "text": "记住：灯在哪边，你就在草垛的另一边。灯一走，赶紧挪下一垛。",
+      "voice": "Mother",
+      "dur": 6.49
     },
     {
       "id": "1r5jx8c",
@@ -65,43 +95,50 @@
       "id": "1e5ktsg",
       "who": "高传宝",
       "text": "梁家村的柱子？",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 1.18
     },
     {
       "id": "02bl0b1",
       "who": "高传宝",
       "text": "你爹以前帮过乡亲。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 1.46
     },
     {
       "id": "0iow91j",
       "who": "交通员",
       "text": "据点里又抓了几个人。柱子的妹妹，也在里面。",
-      "voice": "Militia"
+      "voice": "Militia",
+      "dur": 3.74
     },
     {
       "id": "0kmncfm",
       "who": "高传宝",
       "text": "先把人救出来。不能让乡亲们再被带走。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 2.95
     },
     {
       "id": "1ot20mi",
       "who": "高传宝",
       "text": "想救人，先学会怎么把人藏好。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 2.38
     },
     {
       "id": "0z5idaw",
       "who": "民兵",
       "text": "鬼子发现东口了！",
-      "voice": "Militia"
+      "voice": "Militia",
+      "dur": 1.82
     },
     {
       "id": "0genp2f",
       "who": "高传宝",
       "text": "准备下一次行动。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 1.3
     },
     {
       "id": "0g36xue",
@@ -114,67 +151,78 @@
       "id": "18xbokb",
       "who": "年轻民兵",
       "text": "带乡亲们走。",
-      "voice": "Militia"
+      "voice": "Militia",
+      "dur": 1.1
     },
     {
       "id": "1n1ts0l",
       "who": "高传宝",
       "text": "你说说看。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 0.82
     },
     {
       "id": "06aujs8",
       "who": "高传宝",
       "text": "套是套。人，也是真的人。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 3
     },
     {
       "id": "0i41772",
       "who": "高传宝",
       "text": "他们要的不是这十几个乡亲。是来救乡亲的人。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 3.12
     },
     {
       "id": "0ft4qpy",
       "who": "柱子",
       "text": "我去。",
-      "voice": "Zhuzi"
+      "voice": "Zhuzi",
+      "dur": 0.86
     },
     {
       "id": "0wtthzw",
       "who": "高传宝",
       "text": "跟紧队伍。",
-      "voice": "GaoChuanbao"
+      "voice": "GaoChuanbao",
+      "dur": 0.94
     },
     {
       "id": "1u72yhv",
       "who": "妹妹",
       "text": "哥，娘呢？",
-      "voice": "Sister"
+      "voice": "Sister",
+      "dur": 1.82
     },
     {
       "id": "02dqiaq",
       "who": "民兵",
       "text": "还有人没出来！东边旁洞里，还有几个乡亲！",
-      "voice": "Militia"
+      "voice": "Militia",
+      "dur": 4.03
     },
     {
       "id": "0rb1r1z",
       "who": "民兵",
       "text": "柱子，地道那边还缺人。",
-      "voice": "Militia"
+      "voice": "Militia",
+      "dur": 1.75
     },
     {
       "id": "1ymfd34",
       "who": "老人",
       "text": "梁家的柱子？你妹妹呢？",
-      "voice": "Elder"
+      "voice": "Elder",
+      "dur": 2.76
     },
     {
       "id": "1yn6f7c",
       "who": "柱子",
       "text": "送出去了。",
-      "voice": "Zhuzi"
+      "voice": "Zhuzi",
+      "dur": 1.06
     },
     {
       "id": "1k2lso3",
@@ -216,7 +264,7 @@
       "who": "",
       "text": "故事，发生在冀中的梁家村。村东头，住着个姓梁的木匠。",
       "voice": "Narrator",
-      "dur": 6.0
+      "dur": 6
     },
     {
       "id": "1fd99di",
@@ -243,25 +291,50 @@
       "id": "1eg6pfw",
       "who": "",
       "text": "1942年，华北敌后。梁家村。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.58
+    },
+    {
+      "id": "0zl084d",
+      "who": "",
+      "text": "村东八里是鬼子的据点。炮楼比村里最高的树还高，天晴的日子，从村口就望得见。",
+      "voice": "Narrator",
+      "dur": 7.82
+    },
+    {
+      "id": "0i3lx9o",
+      "who": "",
+      "text": "开春刚交完据点摊派的粮。囤里的米、瓮底的盐，家家都得掰着指头过。",
+      "voice": "Narrator",
+      "dur": 6.86
+    },
+    {
+      "id": "0cu8akz",
+      "who": "",
+      "text": "村东头的木匠家，一大早就有响动。",
+      "voice": "Narrator",
+      "dur": 3.1
     },
     {
       "id": "1ae1d6a",
       "who": "",
       "text": "爹朝门框那边扬了扬下巴。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.5
     },
     {
       "id": "06wt8ak",
       "who": "",
       "text": "爹用凿子把那道印刻深了一点。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.88
     },
     {
-      "id": "0vtcze1",
+      "id": "1nlyr42",
       "who": "",
-      "text": "他惦记着村东头那堆没搬完的木料。",
-      "voice": "Narrator"
+      "text": "他惦记着村东头那堆木料——王家订的榆木门，讲好了用半袋高粱换。",
+      "voice": "Narrator",
+      "dur": 6.38
     },
     {
       "id": "1vf9zqb",
@@ -271,16 +344,32 @@
       "dur": 5.08
     },
     {
+      "id": "1vb1ayo",
+      "who": "",
+      "text": "街上转眼就空了。连狗都没了声。",
+      "voice": "Narrator",
+      "dur": 3.36
+    },
+    {
+      "id": "018oq5c",
+      "who": "",
+      "text": "家伙什儿得藏。上回扫荡，西头的铁匠连人带铁砧，都让抓去了据点。",
+      "voice": "Narrator",
+      "dur": 7.18
+    },
+    {
       "id": "0fcs7gv",
       "who": "",
       "text": "爹把刨子塞进柴堆，转身走向院门。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.67
     },
     {
       "id": "0tqr9pg",
       "who": "",
       "text": "地窖板的缝里，能看见院子。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.76
     },
     {
       "id": "0crwnf9",
@@ -290,17 +379,18 @@
       "dur": 2.61
     },
     {
-      "id": "01t0rcj",
-      "who": "",
-      "text": "他们在问粮。",
-      "voice": "Narrator",
-      "dur": 1.2
-    },
-    {
       "id": "1co1tdi",
       "who": "",
       "text": "爹摇头。枪托砸下来。他又摇头。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.03
+    },
+    {
+      "id": "0j3zbw0",
+      "who": "",
+      "text": "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。",
+      "voice": "Narrator",
+      "dur": 7.46
     },
     {
       "id": "0n2sly7",
@@ -313,43 +403,50 @@
       "id": "0a09d97",
       "who": "",
       "text": "爹被拖出院门的时候，回头看了一眼门框。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.72
     },
     {
       "id": "0oi83da",
       "who": "",
       "text": "那道刚刻下的线，还露着新茬。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3
     },
     {
       "id": "0u421cc",
       "who": "",
       "text": "1943年。爹没有回来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.9
     },
     {
       "id": "1wl11yv",
       "who": "",
       "text": "柱子十六岁了，学会了爹的手艺，也学会了听见狗叫就先看村口。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.02
     },
     {
       "id": "1xbrppm",
       "who": "",
       "text": "这天夜里，狗叫得不一样。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.62
     },
     {
       "id": "0gavc5r",
       "who": "",
       "text": "鬼子又来了。这回他们拿着名单，挨家找帮过八路的人。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.3
     },
     {
-      "id": "0pu5f3l",
+      "id": "1y365hl",
       "who": "",
-      "text": "前头挑灯笼带路的，是邻村据点里的翻译官。",
-      "voice": "Narrator"
+      "text": "前头挑灯笼带路的，是据点的翻译官——去年领着兵抓走爹的，就是他。",
+      "voice": "Narrator",
+      "dur": 6.26
     },
     {
       "id": "1mof6zx",
@@ -373,6 +470,13 @@
       "dur": 4.71
     },
     {
+      "id": "118ukel",
+      "who": "",
+      "text": "灯绕到了草垛东头。娘揽着两个孩子，贴着垛根挪到了西边。",
+      "voice": "Narrator",
+      "dur": 5.48
+    },
+    {
       "id": "0klkolt",
       "who": "",
       "text": "灯光从草垛沿上掠过去，顿了顿，又移开了。",
@@ -383,7 +487,8 @@
       "id": "1r0ncw6",
       "who": "",
       "text": "前面巷口站着人。走不过去了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.95
     },
     {
       "id": "1l3g1t5",
@@ -396,259 +501,302 @@
       "id": "0ii6uuf",
       "who": "",
       "text": "她没说话。只朝村东口努了努嘴。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.58
     },
     {
       "id": "0eo8yxh",
       "who": "",
       "text": "然后她站起来，朝反方向走去，故意踢翻了一只水瓮。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.02
     },
     {
       "id": "1pbixke",
       "who": "",
       "text": "灯笼、喊声、脚步，全都追着那声响去了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.63
     },
     {
       "id": "08bz909",
       "who": "",
       "text": "灯停住了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.22
     },
     {
       "id": "04qmnsx",
       "who": "",
       "text": "村东口就在眼前。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.92
     },
     {
       "id": "1obx0k4",
       "who": "",
       "text": "两盏马灯突然从路两边亮起来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3
     },
     {
       "id": "024yrv6",
       "who": "",
       "text": "是等在这里的。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.99
     },
     {
       "id": "1thbtu6",
       "who": "",
       "text": "妹妹的手从柱子手里被拽走。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.62
     },
     {
       "id": "1uxnwj5",
       "who": "",
       "text": "他扑上去。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.58
     },
     {
       "id": "0cexsif",
       "who": "",
       "text": "枪托砸在背上。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.66
     },
     {
       "id": "0wjzkxb",
       "who": "",
       "text": "邻居七叔从沟里死死抱住他，捂着他的嘴，把他拖进高粱地。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.3
     },
     {
       "id": "0zxrlti",
       "who": "",
       "text": "那天夜里，娘没有回来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.45
     },
     {
       "id": "0ax4h16",
       "who": "",
       "text": "柱子在高粱地里蹲到天亮。他只剩一个念头了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.51
     },
     {
       "id": "0fvo6jw",
       "who": "",
       "text": "救回妹妹。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.25
     },
     {
       "id": "17ci9jy",
       "who": "",
       "text": "乡亲们说，被抓的人关进了河东的据点。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.74
     },
     {
       "id": "13gmty1",
       "who": "",
       "text": "柱子沿着运输队的车辙，摸到了据点外的庄稼地。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.01
     },
     {
       "id": "1hf3lkc",
       "who": "",
       "text": "他不敢靠近。他先学会了看。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.88
     },
     {
       "id": "119yk4y",
       "who": "",
       "text": "岗楼上那两个人换班的时候，背是朝着南门的。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.89
     },
     {
       "id": "133dx4y",
       "who": "",
       "text": "从背过身到重新站定，大约半袋烟的工夫。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.01
     },
     {
       "id": "1blw197",
       "who": "",
       "text": "巡逻队沿着墙根来回走。走到头，会停下来抽袋烟。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.11
     },
     {
       "id": "1pm8cmu",
       "who": "",
       "text": "牢房在东边。白天押着人往围墙上搬土袋。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.46
     },
     {
       "id": "0tllr43",
       "who": "",
       "text": "门里拴着一辆骡车。车辕上空着。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.53
     },
     {
       "id": "0bturhm",
       "who": "",
       "text": "身后突然伸过来一只手，把柱子整个按进田埂下面。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.49
     },
     {
       "id": "0dbwbrv",
       "who": "",
       "text": "巡逻队的脚步声从头顶的田埂上过去了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.84
     },
     {
       "id": "193nbog",
       "who": "",
       "text": "沟里蹲着几个背枪的庄稼人。领头的把他上下打量了一遍。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.44
     },
     {
       "id": "19dia78",
       "who": "",
       "text": "柱子没敢答话。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.46
     },
     {
       "id": "0dkehge",
       "who": "",
       "text": "夜里，一个满身泥的交通员摸进沟来，鞋底磨穿了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.38
     },
     {
       "id": "18bmt0s",
       "who": "",
       "text": "他的鞋底磨穿了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.56
     },
     {
       "id": "02abmya",
       "who": "",
       "text": "鬼子放出风来，要往县里押人，日子没说定。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.42
     },
     {
       "id": "1qboovh",
       "who": "",
       "text": "沙河庄的地道，是乡亲们一锹一锹挖出来的。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.42
     },
     {
       "id": "1feuu6n",
       "who": "",
       "text": "它不通向据点。它通向的是：藏得住人，转移得走，活得下去。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 7.01
     },
     {
       "id": "16c31aq",
       "who": "",
       "text": "头顶传来闷响。泥土簌簌往下掉。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.7
     },
     {
       "id": "03kdrpm",
       "who": "",
       "text": "有人用本地口音在上面喊：地道口就在磨盘这一片，扒！",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.21
     },
     {
       "id": "0o3jqzp",
       "who": "",
       "text": "一股呛人的烟，顺着东口灌了进来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.24
     },
     {
       "id": "1ptfr39",
       "who": "",
       "text": "第二天，鬼子又拉来了水泵。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.76
     },
     {
       "id": "06jhzh2",
       "who": "",
       "text": "浑浊的泥水顺着东口灌下来，先淹的是最低的那一段。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.23
     },
     {
       "id": "0ooevgx",
       "who": "",
       "text": "西口外，乡亲们趴在田里咳嗽。人数了两遍。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.56
     },
     {
       "id": "0s4wwj3",
       "who": "",
       "text": "顺子没出来。拴柱大爷也没有。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.36
     },
     {
       "id": "0s74noo",
       "who": "",
       "text": "柱子站在出口，看着被抬出来的乡亲，一句话也说不出。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.3
     },
     {
       "id": "1f0lp5e",
       "who": "",
       "text": "柱子背起工具，跟着队伍再次下了地道。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.38
     },
     {
       "id": "160632l",
       "who": "",
       "text": "东口封死了。第二天起，全村轮班下洞。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.99
     },
     {
       "id": "0p4w3r9",
       "who": "",
       "text": "高传宝在门板上画了三个记号：翻口，新暗口，预警铃。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.98
     },
     {
       "id": "0ydpwx3",
       "who": "",
       "text": "柱子的墨斗和刨子，成了地道里的家伙什。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.67
     },
     {
       "id": "1b12oee",
@@ -661,349 +809,407 @@
       "id": "09q498f",
       "who": "",
       "text": "没过几天，鬼子又来了。还是老一套：堵口，灌烟。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.45
     },
     {
       "id": "09a4z1d",
       "who": "",
       "text": "烟堵在弯里，一夜没退。地面上，什么也看不出来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.54
     },
     {
       "id": "0ffp4o7",
       "who": "",
       "text": "鬼子在村里翻到天黑，一个人也没找到。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.53
     },
     {
       "id": "1bbsa2u",
       "who": "",
       "text": "撤下来的时候，一个年轻民兵被塌下的土石压住了腿。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.16
     },
     {
       "id": "1f26mgy",
       "who": "",
       "text": "鬼子的探杆就在头顶上戳。谁也不敢出声。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.74
     },
     {
       "id": "0drwo1y",
       "who": "",
       "text": "那只手从土里伸出来，把柱子推开了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.48
     },
     {
       "id": "0xtc3zj",
       "who": "",
       "text": "他把手里的枪递出去，朝洞外摆了摆手。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.43
     },
     {
       "id": "0h5axpo",
       "who": "",
       "text": "押送定在后天。据点里外都加了岗。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.58
     },
     {
       "id": "154hijw",
       "who": "",
       "text": "高传宝的法子是两头一起动：地面上打出动静把人引开，地下从地道把乡亲接走。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 7.32
     },
     {
       "id": "08y5vfr",
       "who": "",
       "text": "高传宝把柱子叫住，让他先去看清楚。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.48
     },
     {
       "id": "04e4qsr",
       "who": "",
       "text": "南门加了双岗。换岗的时候，背还是朝着庄稼地。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.99
     },
     {
       "id": "15qg6hs",
       "who": "",
       "text": "牢房外多了一个游动哨，绕到北墙要一袋烟的工夫。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.56
     },
     {
       "id": "1nuioe9",
       "who": "",
       "text": "那辆骡车还拴在原处。车辕上一直空着。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.89
     },
     {
       "id": "0uuvsxz",
       "who": "",
       "text": "柱子指了指门板上钉在一起的那两条。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.6
     },
     {
       "id": "06fm3db",
       "who": "",
       "text": "屋里安静了一会儿。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.58
     },
     {
       "id": "0ovpn66",
       "who": "",
       "text": "柱子说不上来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.11
     },
     {
       "id": "1ox0i4n",
       "who": "",
       "text": "高传宝在门板上把日子和那辆骡车圈到了一起。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.06
     },
     {
       "id": "1fqp8iq",
       "who": "",
       "text": "行动前夜。油灯把门板图照得发黄。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.1
     },
     {
       "id": "1t92ulg",
       "who": "",
       "text": "柱子站在图前，指着据点的方向。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.07
     },
     {
       "id": "0issfvm",
       "who": "",
       "text": "高传宝看了他一眼。没有劝。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.62
     },
     {
       "id": "1jhny3r",
       "who": "",
       "text": "二更天，村北先响了枪。柱子在那头。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.42
     },
     {
       "id": "1ltepi5",
       "who": "",
       "text": "据点岗楼上的灯全甩向北面。巡逻队跑步出了南门。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.9
     },
     {
       "id": "0wovr15",
       "who": "",
       "text": "枪声把人引出去多远，地底下就多出多少工夫。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.42
     },
     {
       "id": "0twhnvd",
       "who": "",
       "text": "打完那一阵，他才从北边退回来下的地道。接应组已经走在前头了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.17
     },
     {
       "id": "0yi9nnu",
       "who": "",
       "text": "区上武工队来了两个班。佯动组已经摸到村北去了——这边不动，人从地下走。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 7.2
     },
     {
       "id": "1bimod6",
       "who": "",
       "text": "二更天，地道里一盏灯也没点。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.05
     },
     {
       "id": "134r6ls",
       "who": "",
       "text": "队伍在黑暗里贴着墙根移动，谁也不说话。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.72
     },
     {
       "id": "1lbh33p",
       "who": "",
       "text": "这条道原本只到墙外的地里。最后那十几步，是这三天连夜掏出来的。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.34
     },
     {
       "id": "1hxugme",
       "who": "",
       "text": "柱子数着步子。掏到牢房地沿，还有两处虚土要清。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.11
     },
     {
       "id": "0yvsckb",
       "who": "",
       "text": "地沿的木板被顶开一条缝。霉味和哭声一起漏下来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.21
     },
     {
       "id": "1dfiyve",
       "who": "",
       "text": "民兵一个个往下接人。柱子在人堆里看见了妹妹。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.92
     },
     {
       "id": "1uvz4wd",
       "who": "",
       "text": "妹妹瘦得脱了相。她抓住柱子的袖子。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.06
     },
     {
       "id": "0phwy7f",
       "who": "",
       "text": "柱子没有说话。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.44
     },
     {
       "id": "0s9x14p",
       "who": "",
       "text": "妹妹看着哥哥的眼睛，慢慢松开了手，又慢慢把额头抵在他肩上。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.43
     },
     {
       "id": "1xyvxnf",
       "who": "",
       "text": "她明白了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 0.98
     },
     {
       "id": "1c4abg1",
       "who": "",
       "text": "入口上面就是庄稼地，就是活路。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.12
     },
     {
       "id": "0bu0lf6",
       "who": "",
       "text": "一个民兵跌跌撞撞从地道里追出来。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.38
     },
     {
       "id": "0kg4h88",
       "who": "",
       "text": "头顶上，搜查的脚步声越来越密。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.46
     },
     {
       "id": "1bcncf2",
       "who": "",
       "text": "最后一个乡亲被推出洞口的时候，东边天已经泛白。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 5.3
     },
     {
       "id": "0wi6bmn",
       "who": "",
       "text": "人数了三遍。一个不少。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.4
     },
     {
       "id": "19d7nys",
       "who": "",
       "text": "柱子坐在田埂上，灯芯已经烧到了头。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 4.18
     },
     {
       "id": "0ygzbsy",
       "who": "",
       "text": "他把灯吹灭了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.54
     },
     {
       "id": "1mp762g",
       "who": "",
       "text": "天亮了。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 0.98
     },
     {
       "id": "1hkpkjb",
       "who": "",
       "text": "一个月后。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.13
     },
     {
       "id": "0wbu7yt",
       "who": "",
       "text": "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.5
     },
     {
       "id": "0njcj2r",
       "who": "",
       "text": "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 6.79
     },
     {
       "id": "1tjwidj",
       "who": "",
       "text": "柱子带着妹妹，回了一趟梁家村。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.22
     },
     {
       "id": "0aa6lx7",
       "who": "",
       "text": "院子烧毁了。只剩一堵残墙。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.7
     },
     {
       "id": "0nsfpsl",
       "who": "",
       "text": "门框还在。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.27
     },
     {
       "id": "1v4oq3o",
       "who": "",
       "text": "妹妹走过去，伸手摸了一下爹刻的那道线。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.65
     },
     {
       "id": "0cknfx2",
       "who": "",
       "text": "她的手停了一会儿。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.61
     },
     {
       "id": "1jmrnvz",
       "who": "",
       "text": "院外传来民兵喊他的声音。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 2.35
     },
     {
       "id": "1qwk3y8",
       "who": "",
       "text": "柱子放下工具，回头看了一眼妹妹。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.05
     },
     {
       "id": "1gwsgab",
       "who": "",
       "text": "妹妹抱着爹留下的旧木凳，点了点头。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.43
     },
     {
       "id": "1mcw34k",
       "who": "",
       "text": "柱子走出院子。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.49
     },
     {
       "id": "07zc9x0",
       "who": "",
       "text": "门框上的两道刻痕，留在了身后。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.02
     },
     {
       "id": "1hik0yg",
       "who": "",
       "text": "扶着民兵的老人抬起头，借着灯光认出了他。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 3.86
     },
     {
       "id": "0k2jzu7",
       "who": "",
       "text": "老人松了一口气。",
-      "voice": "Narrator"
+      "voice": "Narrator",
+      "dur": 1.61
     }
   ],
   "voiceRelease": {
