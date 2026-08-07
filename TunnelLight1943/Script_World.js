@@ -259,6 +259,13 @@ export function CreateWorld(canvasEl) {
     return obj;
   }
 
+  // 背景层里也有演员（远处那条街上干活的乡亲）：同一套深度带，只是层基数不同
+  function SetLayerOrder(obj, layerKey, z, tag = layerKey) {
+    CheckBandZ(tag, z);
+    const order = DepthOrder(layerKey, z);
+    obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
+  }
+
   function SetPlayOrder(obj, z, tag = "SetPlayOrder") {
     CheckBandZ(tag, z);
     const order = DepthOrder("play", z);
@@ -784,6 +791,105 @@ export function CreateWorld(canvasEl) {
       ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
       mesh.material.opacity = opacity;
       group.add(mesh);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 背景里的乡亲：远处那条街上也有人在过日子
+  //
+  // **不能拿一张静止贴图平移**——那正是"翻越做了等于没做"的老毛病，一眼看出是
+  // 块滑动的板子。这里用的是跟前景一模一样的骨架：远处的人真的在迈腿、真的在
+  // 一下一下落锄。代价是每人十来个小网格，几个人的量换得起。
+  //
+  // 摆位/缩放/隐没三件事都跟着所在层走：
+  //   · 层已经整体放大了 LAYER_COMP，离散物件要按 1/COMP 抵消回去，
+  //     人才会按透视自然变小（跟 AddParallaxTrees 的 scale 是同一回事）；
+  //   · 不透明度 = (1 - 该层空气透视量) × 该层树的不透明度，
+  //     人就跟树一起往雾色里退——背景层的糊是烘进贴图的，骨架糊不了，
+  //     只能靠这个把他们"推远"；
+  //   · 绘制序号走 ACTOR_Z，于是本层的人永远站在本层的树之前。
+  // ---------------------------------------------------------------------------
+  let backdropFolk = [];
+
+  // 各层树列用的不透明度（AddParallaxTrees 的 opacity）——背景里的人跟着树走，
+  // 一层里的东西该有一样的"实"度
+  const LAYER_TREE_ALPHA = { midTrees: 0.86, nearTrees: 0.96 };
+
+  // 干什么活 → 用哪条循环轨道、手里拿什么、朝哪边。走动的另给 from/to
+  const FOLK_ACT = {
+    hoe: { track: "hoeing", carry: "锄头" },
+    saw: { track: "sawing", carry: "锯" },
+    sweep: { track: "sweeping", carry: "扫帚" },
+    feed: { track: "scatterFeed", carry: null },
+    walk: { track: null, carry: null },
+    haul: { track: null, carry: "木料" },   // 扛着木料走的：carry 姿势 + 走路
+  };
+
+  function ClearBackdropFolk() {
+    // 骨架的 group 是 THREE.Group，ClearGroup 只 dispose 直接子级里的 Mesh，
+    // 碰不到它们——材质是 CloneMesh 克隆出来的（贴图共享，不能动），自己收
+    for (const f of backdropFolk) {
+      f.rig.group.traverse((o) => { if (o.isMesh) o.material.dispose(); });
+    }
+    backdropFolk = [];
+  }
+
+  function AddBackdropFolk(sceneDef, ch, night) {
+    const list = sceneDef.backdropFolk || [];
+    // 天黑了乡亲都在屋里（第二章是夜里的扫荡，街上只该有灯和兵）
+    if (night || !list.length) return;
+    for (const spec of list) {
+      const key = spec.layer;
+      const host = layers[key];
+      if (!host) continue;
+      const act = FOLK_ACT[spec.act];
+      if (!act) continue;
+      const kind = spec.kind || "villager";
+      const rig = CreateRig(kind);
+      host.add(rig.group);
+      SetLayerOrder(rig.group, key, ACTOR_Z, "folk:" + key);
+      // 空气透视：背景层的糊与雾色是**烘进贴图**的，骨架烘不了，只能靠半透
+      // 让背景色透上来——那正好就是雾色，效果等价。系数比树再重半档：
+      // 树是一团色块，人有一圈墨线，同样的透明度下人显得比树"实"
+      const fade = (1 - (LAYER_FADE[key] || 0) * 1.5) * (LAYER_TREE_ALPHA[key] ?? 0.9);
+      rig.group.traverse((o) => { if (o.isMesh) o.material.opacity = fade; });
+      const scale = (BODY_SCALE[kind] ?? 1) / LAYER_COMP[key];
+      const f = {
+        rig, layerKey: key, bodyScale: scale, scale,
+        x: spec.x, from: spec.from, to: spec.to,
+        speed: spec.speed || 0.9, dir: spec.heading ?? 1,
+        heading: spec.heading ?? (spec.act === "hoe" || spec.act === "saw" ? -1 : 1),
+        track: act.track, trackT: ART.Hash(spec.id) * 2.4,   // 错开相位，免得几个人同手同脚
+        carryLabel: act.carry, shoulder: spec.act === "haul",
+        phase: ART.Hash(spec.id + "p") * 6, idleT: ART.Hash(spec.id + "i") * 6,
+        carryMesh: null, carryLabel0: null,
+      };
+      rig.group.position.set(f.x, SURFACE_Y, 0);
+      backdropFolk.push(f);
+    }
+  }
+
+  function StepBackdropFolk(dt) {
+    for (const f of backdropFolk) {
+      let moved = 0;
+      if (f.from !== undefined && f.to !== undefined) {
+        const nx = f.x + f.dir * f.speed * dt;
+        if (nx >= f.to) { f.x = f.to; f.dir = -1; }
+        else if (nx <= f.from) { f.x = f.from; f.dir = 1; }
+        else { moved = Math.abs(nx - f.x); f.x = nx; }
+        f.heading = f.dir;
+        f.rig.group.position.x = f.x;
+      }
+      const moving = moved > 1e-4;
+      f.phase += moving ? moved * 3.4 : dt * 2.2;
+      f.idleT += dt * 1.4;
+      if (f.track) f.trackT += dt;
+      PoseRig(f.rig, {
+        phase: f.phase, breath: f.idleT, moving,
+        carry: f.shoulder, track: f.track, trackT: f.trackT,
+      }, dt);
+      f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
+      if (f.carryLabel) SyncCarry(f, f.carryLabel, f.heading);
     }
   }
 
@@ -1458,6 +1564,7 @@ export function CreateWorld(canvasEl) {
     propRedraw = [];
     carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved };
     carveRebuild = null;
+    ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
     InvalidateSceneCaches();
     dustMotes = [];
@@ -1576,6 +1683,8 @@ export function CreateWorld(canvasEl) {
           ...(dense ? { step: 14 } : {}), hazeOpt: HazeFor("nearTrees") });
       AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
+    // 背景层的乡亲最后放：他们要挂在已经建好的树列之间
+    AddBackdropFolk(sceneDef, ch, night);
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
@@ -1747,16 +1856,22 @@ export function CreateWorld(canvasEl) {
 
   // 手里/肩上的东西。原先只有玩家有，于是"梁木匠把刨子放下"这种戏只能靠
   // 字幕说——演员手上空空。现在所有演员共用这一套。
+  // s.layerKey 缺省是 play；背景层的乡亲把自己那层的名字带进来，
+  // 手上的家伙就跟着挂到同一层（不然锄头会留在前景，隔着十几米跟着人走）
   function SyncCarry(s, label, heading) {
+    const layerKey = s.layerKey || "play";
+    const host = layers[layerKey];
     if (label && (!s.carryMesh || s.carryLabel !== label)) {
-      if (s.carryMesh) layers.play.remove(s.carryMesh);
+      if (s.carryMesh) host.remove(s.carryMesh);
       s.carryMesh = MakeCarryMesh(label);
-      s.carryMesh.userData.persist = true;   // 跟着演员走，不该被环境重建清掉
+      // 前景演员的家伙要挺过环境重建（人是 persist 的）；背景乡亲整批随层重建，
+      // 标了 persist 反而会剩一把没人的锄头浮在那儿
+      if (layerKey === "play") s.carryMesh.userData.persist = true;
       s.carryLabel = label;
-      layers.play.add(s.carryMesh);
-      SetPlayOrder(s.carryMesh, CARRY_Z);
+      host.add(s.carryMesh);
+      SetLayerOrder(s.carryMesh, layerKey, CARRY_Z, "carry:" + layerKey);
     } else if (!label && s.carryMesh) {
-      layers.play.remove(s.carryMesh);
+      host.remove(s.carryMesh);
       s.carryMesh = null;
       s.carryLabel = null;
     }
@@ -1767,7 +1882,10 @@ export function CreateWorld(canvasEl) {
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = ALONG_ARM.includes(label);
     const inHand = IsHandHeld(label);
-    const anchor = inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig);
+    // HandPoint/ShoulderPoint 给的是**世界**坐标；背景层带着自己的缩放与 z 偏移，
+    // 直接拿去当局部坐标，锄头会飞到十几米外。换算回本层的局部系再摆
+    const ToLocal = (v) => (layerKey === "play" ? v : host.worldToLocal(v));
+    const anchor = ToLocal(inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig));
     const bs = s.bodyScale || 1;
     // 提在手里的：贴图中心就是桶沿，挂在拳头底下一点点就够了。原先垂 0.20m 是
     // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
@@ -1782,7 +1900,7 @@ export function CreateWorld(canvasEl) {
     s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
-      const elbow = ElbowPoint(s.rig);
+      const elbow = ToLocal(ElbowPoint(s.rig));
       s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y));
     } else {
       s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
@@ -2075,6 +2193,7 @@ export function CreateWorld(canvasEl) {
         && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
       for (const m of fp.meshes) m.visible = on;
     }
+    StepBackdropFolk(dt);
     // 画法随旗标变的那几张（井绳断口、木料堆里露出的绳头）：只重烘自己那一张
     for (const r of propRedraw) {
       const v = !!state.flags[r.flag];
@@ -3475,6 +3594,11 @@ export function CreateWorld(canvasEl) {
         paused: el?.paused ?? true, t: +(el?.currentTime ?? 0).toFixed(2), d: el?.duration || 0,
       };
     },
+    // 背景乡亲动没动，截图上不好逐帧比——问它
+    __folk: () => backdropFolk.map((f) => ({
+      x: +f.x.toFixed(2), act: f.track || (f.shoulder ? "haul" : "walk"),
+      t: +f.trackT.toFixed(2), phase: +f.phase.toFixed(2), layer: f.layerKey,
+    })),
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),
