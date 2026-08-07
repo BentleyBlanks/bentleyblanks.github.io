@@ -884,6 +884,11 @@ function StepCartRide(state, def, input, dt) {
 //
 // 输入与划线同一套语汇（位移驱动）：桌面按住 E 往前推，触屏直接把刨子拖过去。
 // 顺纹（+x）才吃木头，回程只是把刨子拖回来——木匠不会倒着刨。
+// 攥住刨子的判定半径 / 脱手高度 / 刨子跟手的最快行程（每秒推过全长的几成）
+const PLANE_GRAB_R = 0.30;
+const PLANE_SLIP_Y = 0.26;
+const PLANE_SPEED = 0.85;
+
 function StepPlane(state, def, input, dt) {
   const b = state.beat;
   const father = FindActor(state, "father");
@@ -960,19 +965,41 @@ function StepPlane(state, def, input, dt) {
   state.player.x = workX;
   state.player.heading = 1;
 
-  // ── 推刨：拖动为主 ──
-  // 刨是"把它推过去"的动作，对应的操作就该是把它推过去：鼠标按住拖 / 手指拖。
-  // input.dragX 是位移量——拖多少走多少，手上有"蹭着木头走"的实感。
+  // ── 推刨：玩家攥的是**那把刨子本身**，不是一根进度条 ──
   //
-  // 键盘留一条等价后备（CLAUDE.md 的硬要求：自动通关只按键盘，鼠标玩法必须有
-  // 按键路径，否则测试卡死）：**光按住 E 就往前推**，不掺 A/D。上一版要
-  // "按住 E 再按 D"，于是 D 单独按下去就是走路——玩家一路走出了工位。
-  // 这一拍人本来就钉在台前，A/D 不参与，冲突从根上没了。
-  // 键盘后备只认"按住 E"一个键，方向由这一趟的状态给：还没推到头就往前推，
-  // 推到头了就往回带。玩家不用去想方向，也就不会和走路抢键。
+  // 规矩与石笔同源（见 CLAUDE.md「拟物交互」）：
+  //   ① **得先攥住它**——按下去那一帧，手必须落在刨子上（PLANE_GRAB_R 之内）。
+  //      在画面别处一拖，刨子不动。这是"操作一把刨子"与"拖一根 slider"
+  //      最根本的区别，也是这一拍被退回来重做的原因。
+  //   ② **刨子有分量**——它跟着手走，但每秒最多蹭 PLANE_SPEED 的行程。手甩得
+  //      再快，刨子也只能一寸寸吃过去，那点滞后就是刨刃啃在木头上的手感。
+  //   ③ **会脱手**——手飘离料面太高太低（PLANE_SLIP_Y），刨子从手里滑掉，
+  //      这一趟当场断在那儿（刨刃啃住，出来的是碎屑）。
+  //
+  // 键盘留一条等价后备（自动通关只按键盘）：光按住 E 就往前推，不掺 A/D——
+  // 这一拍人钉在台前，A/D 不参与，"按住 E 再按 D 结果走开了"那个冲突从根上没了。
+  const boardY = SURFACE_Y + (def.boardY ?? 0.60);
+  const toolX = bx - span / 2 + b.u * span;      // 刨子此刻在料上的位置
+  const pw = input.pointerWorld;
+  const held = !!input.pointerHeld && !!pw;
+  if (held && !b.wasHeld) {
+    b.grabbed = Math.hypot(pw.x - toolX, pw.y - boardY) < PLANE_GRAB_R;
+    if (b.grabbed) Cue(state, "pickup", { gain: 0.3 });
+  }
+  if (!held) b.grabbed = false;
+  b.wasHeld = held;
+  if (b.grabbed && Math.abs(pw.y - boardY) > PLANE_SLIP_Y) b.grabbed = false;
+
+  let dv = 0;
+  if (b.grabbed) {
+    const target = Math.max(0, Math.min(1, (pw.x - (bx - span / 2)) / span));
+    const step = PLANE_SPEED * dt;
+    dv = Math.max(-step, Math.min(step, target - b.u));
+  }
+  // 键盘后备：方向由这一趟的状态给（没推到头往前，推到头往回带），
+  // 玩家不用想方向，也就不会和走路抢键
   const keyDir = b.armed ? 1 : -1;
-  const dv = (input.dragX || 0)
-    + (input.interactHeld ? keyDir * dt * (def.keySpeed ?? 0.55) : 0);
+  if (!b.grabbed && input.interactHeld) dv += keyDir * dt * (def.keySpeed ?? 0.55);
 
   const prevU = b.u;
   b.u = Math.max(0, Math.min(1, b.u + dv));
@@ -1011,18 +1038,13 @@ function StepPlane(state, def, input, dt) {
   state.player.pose = "planePush";
   state.player.poseU = b.u;
   state.player.poseT = undefined;
-  state.prompt = null;                   // 引导交给 QTE 轨道，不占中间那条
-  state.dragTrack = {
-    t: b.u, idle: !b.everMoved,
-    tip: b.armed ? "顺着木纹，一推到底" : "把刨子拖回来",
-    back: !b.armed,
-    drag: true,          // HUD 据此把"怎么操作"按鼠标/手指说清楚
-  };
+  // 这一拍没有 HUD 轨道：玩家攥的是画面里那把刨子，进度就是木头上被刨亮的
+  // 那一片、和地上那堆刨花本身。把它降级成一根 slider 是不行的（用户退回过两次）。
+  state.prompt = null;
   Publish(b.u, true);
 
   if (b.passes >= need) {
     state.planing = null;
-    state.dragTrack = null;
     state.player.pose = null;
     state.player.poseU = undefined;
     if (father) { father.pose = null; father.poseU = undefined; }
@@ -2940,7 +2962,8 @@ export function CreateGame(chapterIndex = 0) {
     mouseFlee: null,
     planing: null,
     planeCurl: null,
-    dragTrack: null,
+    scribe: null,
+    scribeCard: null,       // 划线那一拍铺满画框的手绘特写卡（见 StepScribe）
     spotFlash: null,
     irisFocus: null,
     pip: null,
@@ -3045,7 +3068,8 @@ export function StartChapter(state, index) {
   state.mouseFlee = null;
   state.planing = null;
   state.planeCurl = null;
-  state.dragTrack = null;
+  state.scribe = null;
+  state.scribeCard = null;
   state.spotFlash = null;
   state.irisFocus = null;
   state.pip = null;
@@ -3168,7 +3192,8 @@ function AdvanceBeat(state) {
   state.caption = null;
   state.prompt = null;
   state.planing = null;
-  state.dragTrack = null;
+  state.scribe = null;
+  state.scribeCard = null;
   state.throwAim = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
@@ -4606,36 +4631,60 @@ function StepSmokeEscape(state, def, input) {
 
 // 划线：玩家攥着的是一支真的石笔，不是一根进度条。
 //
+// **这一拍长在一张铺满画框的手绘特写卡里**（`state.scribeCard` → Art 的
+// DrawScribeCard）。原因是量出来的：世界里那支笔只有 9 厘米，就算镜头推到
+// 1.9 米的特写，它在 1400px 宽的屏幕上也只有十来个像素——玩家根本按不着，
+// 于是只能去拖旁边那条 QTE 轨道，"攥住一支笔"就退化成了拖 slider。
+// 插入卡这个景别（爹的手攥着家伙什、木头的纹、正在长出来的那道印，各占半个
+// 画框）本来就是这一下该有的画面，把交互直接放进去：手指按住画面里那支笔，
+// 拖着它蹭过木头。**这一拍不许有任何 HUD 轨道**（见下面的 dragTrack 断言）。
+//
 // 三条规矩让它成为"一支笔"而不是一个滑块：
-//   ① **得先攥住它**——按下去那一下，手必须落在笔身上（CHALK_GRAB_R 之内）。
-//      在画面别处一拖，笔不动。这是"控制一支笔"与"拖一根 slider"最根本的区别。
-//   ② **笔有摩擦**——笔尖跟着手走，但每秒最多蹭 CHALK_SPEED 米。手甩得再快，
-//      笔也只能一寸一寸蹭过去，那点滞后就是石笔压在木头上的手感。
-//   ③ **会脱手**——手抬得太高或垂得太低（离刻线超过 CHALK_SLIP_Y），笔就从
-//      手里滑掉，印子当场断在那儿。想划直，手就得贴着木头走。
+//   ① **得先攥住它**——按下去那一下，手必须落在画面里那支笔上（SCRIBE_CARD.grabR
+//      之内）。在画面别处一拖，笔不动。这是"控制一支笔"与"拖一根 slider"
+//      最根本的区别。攥住的那一点还会被记下来（grabOff），笔不会"跳"到指尖。
+//   ② **笔有摩擦**——笔尖跟着手走，但每秒最多蹭 SCRIBE_CARD.speed 那么多画宽。
+//      手甩得再快，笔也只能一寸一寸蹭过去，那点滞后就是石笔压在木头上的手感。
+//   ③ **会脱手**——手抬得太高或垂得太低（离刻线超过 slipV），笔就从手里滑掉，
+//      印子当场断在那儿。想划直，手就得贴着木头走。
 //
 // 印子（drawn）只在笔尖真正压着木头蹭过的地方累积，往回蹭不会擦掉——
 // 这才是石笔留下的痕，不是一个可增可减的进度值。
 //
 // 叙事上是爹在划——所以爹必须真的走过来、伸手够到门框（pose="mark"）；
 // 玩家手里控制的是那支石笔。让玩家亲手把这道线拉出来，比看一张插画卡重。
-const CHALK_GRAB_R = 0.34;   // 攥住笔的判定半径（米）
-const CHALK_SLIP_Y = 0.62;   // 手离刻线这么远，笔就脱手
-const CHALK_SPEED = 0.62;    // 笔尖最快蹭多快（米/秒）
+
+// 特写卡的版面：Core（判定）与 Art（作画）共用这一套归一化坐标。
+// u 沿卡宽、v 沿卡高，卡的长宽比固定 16:9（World 按画框铺满，两边溢出裁掉）。
+export const SCRIBE_CARD = {
+  aspect: 16 / 9,
+  u0: 0.505, u1: 0.855,   // 笔尖行程：木头正面那 15 公分，占三分之一个画宽
+  v: 0.455,               // 刻线高度
+  // 攥握点（拳心）相对笔尖的偏移。手从左上压下来——笔杆要是横在刻线那一头，
+  // 拳头就把刚划出来的印子全盖住了（Art 的 DrawScribeCard 里写着为什么）。
+  gripDU: -0.114, gripDV: -0.189,
+  grabR: 0.105,           // 攥得住的判定半径（按卡宽；圆形，v 折算成同尺度）
+  slipV: 0.19,            // 手飘离**该在的握把高度**这么远，笔脱手（按卡高）
+  speed: 0.26,            // 笔尖最快蹭多快（卡宽/秒）
+};
+export const SCRIBE_BINS = 56;   // 印子分这么多格记深浅（见 b.press）
 
 function StepScribe(state, def, input, dt) {
   const b = state.beat;
   if (b.drawn === undefined) {
     b.drawn = 0;
     b.head = 0;
+    // 印子的深浅一格一格记下来：手慢压得实、手快是虚的。记住而不是每帧照
+    // 当前手速重画整条线——已经划下的那一段不该再变，那才是"痕"。
+    b.press = new Array(SCRIBE_BINS).fill(0);
     def.onStart?.(state);
   }
   const inZone = Math.abs(state.player.x - def.zone.x) < (def.zone.w || 3) / 2 + 1.2;
   if (!inZone) {
     state.prompt = "";
     state.scribe = null;
+    state.scribeCard = null;
     b.grabbed = false;
-    state.dragTrack = null;
     return;
   }
 
@@ -4643,27 +4692,35 @@ function StepScribe(state, def, input, dt) {
   const x0 = def.markX0 ?? (def.zone.x - 0.52);
   const x1 = def.markX1 ?? (def.zone.x + 0.52);
   const span = x1 - x0;
-  const lineY = SURFACE_Y + y;
-  const tipX = x0 + b.head * span;
 
-  const pw = input.pointerWorld;
-  const held = !!input.pointerHeld && !!pw;
-  // ① 攥住：只认按下去那一帧，且手得落在笔上
+  const L = SCRIBE_CARD;
+  const uSpan = L.u1 - L.u0;
+  const tipU = L.u0 + b.head * uSpan;
+
+  // 手落在卡上的位置（World.ScreenToCard 换算好的归一化坐标）
+  const pc = input.pointerCard;
+  const held = !!input.pointerHeld && !!pc;
+  // ① 攥住：只认按下去那一帧，且手得落在画面里那支笔上
   if (held && !b.wasHeld) {
-    b.grabbed = Math.hypot(pw.x - tipX, pw.y - lineY) < CHALK_GRAB_R;
-    if (b.grabbed) Cue(state, "pickup", { gain: 0.3 });
+    const gu = tipU + L.gripDU, gv = L.v + L.gripDV;
+    // v 是按卡高归一的，要折成卡宽的尺度才能量一个圆
+    const d = Math.hypot(pc.u - gu, (pc.v - gv) / L.aspect);
+    b.grabbed = d < L.grabR;
+    // 攥住的是笔身上的哪一点就记住哪一点：笔不会"跳"到指尖底下
+    if (b.grabbed) { b.grabOff = pc.u - tipU; Cue(state, "pickup", { gain: 0.3 }); }
   }
   if (!held) b.grabbed = false;
   b.wasHeld = held;
-  // ③ 脱手：手飘离刻线太远
-  if (b.grabbed && Math.abs(pw.y - lineY) > CHALK_SLIP_Y) b.grabbed = false;
+  // ③ 脱手：手飘离该在的握把高度太远（手要贴着木头走，线才划得直）
+  if (b.grabbed && Math.abs(pc.v - (L.v + L.gripDV)) > L.slipV) b.grabbed = false;
 
   const prevHead = b.head;
   let onWood = false;
   if (b.grabbed) {
-    // ② 笔跟着手走，但一帧只挪得动 CHALK_SPEED×dt
-    const target = Math.max(0, Math.min(1, (pw.x - x0) / span));
-    const step = (CHALK_SPEED * dt) / span;
+    // ② 笔跟着手走，但一帧只挪得动 speed×dt
+    const wantU = pc.u - (b.grabOff || 0);
+    const target = Math.max(0, Math.min(1, (wantU - L.u0) / uSpan));
+    const step = (L.speed * dt) / uSpan;
     b.head += Math.max(-step, Math.min(step, target - b.head));
     onWood = true;
   }
@@ -4674,8 +4731,17 @@ function StepScribe(state, def, input, dt) {
     onWood = true;
   }
   b.head = Math.max(0, Math.min(1, b.head));
+  const prevDrawn = b.drawn;
   b.drawn = Math.max(b.drawn, b.head);
   b.everMoved = b.everMoved || b.head > 0.02;
+  // 新蹭出来的那几格，按当下的手速定深浅（慢=1，快≈0.45）——记一次就不再改
+  if (b.drawn > prevDrawn) {
+    const uSpeed = dt > 0 ? (b.head - prevHead) / dt : 0;
+    const press = 1 - Math.min(0.55, Math.abs(uSpeed) * 0.55);
+    for (let i = Math.floor(prevDrawn * SCRIBE_BINS); i < Math.ceil(b.drawn * SCRIBE_BINS); i += 1) {
+      if (i >= 0 && i < SCRIBE_BINS && !b.press[i]) b.press[i] = press;
+    }
+  }
 
   // 沙沙声：只在笔真的蹭动时响，一粒一粒按蹭过的距离出（不是定时循环），
   // 于是手快声音就密、手停声音就断——听觉跟着手走
@@ -4686,10 +4752,14 @@ function StepScribe(state, def, input, dt) {
     b.scratchAcc = 0;
     Cue(state, "scribe", { gain: 0.55 + Math.min(0.45, speed) });
   }
+  // 脱手是有代价的一下：断在哪儿看得见，还得给一声
+  if (!b.grabbed && b.wasGrabbed && held) Cue(state, "drop", { gain: 0.28 });
+  b.wasGrabbed = b.grabbed;
 
   // 第八章他自己刻：抬臂比着框（第一章是爹在划，玩家是被量的那个）
   if (def.selfMark) FlashPose(state, "mark", 0.3);
   state.prompt = null;   // 引导由那支笔自己给（会晃、会脱手），不占中间那条提示
+  // 世界里那一份是替补：卡永远铺满画框盖着它，只有卡没画出来时才露脸
   state.scribe = {
     x: def.zone.x, y, x0, x1,
     t: b.drawn, head: b.head,
@@ -4698,12 +4768,21 @@ function StepScribe(state, def, input, dt) {
     idle: !b.everMoved,
     speed,
   };
-  // 划线与刨料共用同一条 QTE 轨道（两件事都是"把它推过去"）
-  state.dragTrack = { t: b.head, idle: !b.everMoved, tip: "拖着石笔划过去" };
+  // 这一拍的全部画面与全部 UI 就是这张卡：铺满画框的手、笔、木头。
+  state.scribeCard = {
+    head: b.head, drawn: b.drawn, press: b.press,
+    gripped: onWood && b.grabbed,          // 真攥在手里压着木头
+    keying: onWood && !b.grabbed,          // 键盘后备在推
+    reaching: held && !b.grabbed,          // 手按下了却没抓着笔
+    idle: !b.everMoved,
+    speed: dt > 0 ? Math.abs(b.head - prevHead) / dt : 0,   // 卡宽/秒的量纲
+    selfMark: !!def.selfMark,              // 第八章是他自己的手
+    oldMark: !!state.flags.marked,         // 门框上那道旧刻痕已经在了
+  };
   if (b.drawn >= 1) {
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     state.scribe = null;
-    state.dragTrack = null;
+    state.scribeCard = null;
     AdvanceBeat(state);   // onDone 由它统一调，这里再调一次就成了两遍
   }
 }
@@ -5216,6 +5295,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.prompt = null;
   state.promptFill = null;
   state.scribe = null;
+  state.scribeCard = null;
   state.knot = null;
   state.gesture = null;
   state.closeUp = null;

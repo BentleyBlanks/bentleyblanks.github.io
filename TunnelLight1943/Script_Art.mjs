@@ -2688,6 +2688,240 @@ export function DrawInsertCard(ctx, W, H, kind) {
 }
 
 // ---------------------------------------------------------------------------
+// 划线特写卡（**会动的那一张**）：和上面几张定格插卡同一个景别、同一支笔，
+// 区别是它每帧重画——因为玩家的手就按在这张卡上，攥着画面里那支石笔。
+//
+// 为什么这一下要单独画一张、而不是把世界里的镜头再推近：那支笔在世界里只有
+// 9 厘米，1.9 米的特写下也才十来个像素，手指根本按不着。插卡这个景别里，
+// 手、笔、木头各占半个画框——按得着，也看得清笔尖蹭出来的每一粒粉。
+//
+// 版面（u 沿卡宽、v 沿卡高的归一化坐标）由 Core 的 SCRIBE_CARD 定，判定与
+// 作画共用同一套数——改一处两边一起动，绝不许在这儿另写一份坐标。
+// ---------------------------------------------------------------------------
+
+// 已经划下的那一段印子：颗粒、断续、深浅不匀，是石笔蹭木纹的样子，
+// 不是一条纯色的填充条（那就又变回进度条了）。
+//
+// 深浅按 press[] 一格一格取——那是当初蹭过这一格时的手速留下的，慢的地方
+// 压得实、甩过去的地方是虚的。已经划下的那一段永远不再变：它是痕，不是读数。
+function ChalkStroke(ctx, x0, x1, y, S, drawn, press) {
+  ctx.save();
+  ctx.fillStyle = "#f4e8c6";
+  const bins = press?.length || 0;
+  const span = x1 - x0;
+  for (let x = x0; x < x0 + drawn * span; x += 1.6 * S) {
+    const f = span > 0 ? (x - x0) / span : 0;
+    const p = bins ? (press[Math.min(bins - 1, Math.floor(f * bins))] || 0.5) : 0.85;
+    const u = (x - x0) / (60 * S);
+    if (Math.sin(u * 39.1) > 0.60 + p * 0.28) continue;        // 蹭过木纹的坑，跳一粒
+    const wob = Math.sin(u * 7.7) * 2.6 * S + Math.sin(u * 2.9 + 1.2) * 1.7 * S;
+    ctx.globalAlpha = (0.46 + Math.abs(Math.sin(u * 11.3)) * 0.48) * p;
+    ctx.fillRect(x, y + wob - 3.4 * S, 3.2 * S, (4.4 + p * 2.6) * S);
+    if (Math.sin(u * 23.7) > 0.35) {                            // 掉下来的粉屑
+      ctx.globalAlpha *= 0.32;
+      ctx.fillRect(x + 1.2 * S, y + wob + 8 * S + Hash("cs" + Math.round(x)) * 16 * S, 2 * S, 2 * S);
+    }
+  }
+  ctx.restore();
+}
+
+// 一支攥在拳头里的石笔：笔尖朝右下压着木头，笔杆往左上斜出去，
+// 拳头攥在笔杆的后半截，小臂出画。整组按 (tx,ty) 摆——那是笔尖。
+//
+// 比例是这张卡的命根子：笔杆必须**露出来一大截**（拳头只攥后半段），
+// 玩家一眼看见的得是"一支笔"，不是"一只拳头前面有个白点"。
+function ChalkInHand(ctx, tx, ty, S, lean, skin, sleeve, cuff) {
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.rotate(lean);
+  // 小臂先画（压在最底下）：一截出画的胳膊 + 袖口。
+  // 手是同一双（都是庄稼人的手），认得出是谁靠这身短褂的颜色——
+  // 第一章那只袖子是爹的土褐，第八章是柱子自己的那身。
+  InkFill(ctx, [
+    [-330 * S, -52 * S], [-820 * S, 10 * S], [-820 * S, 190 * S], [-336 * S, 88 * S],
+  ], "cardArm", sleeve, { amp: 4 * S, lw: 6.5 * S, shade: "rgba(0,0,0,0.20)" });
+  InkFill(ctx, [
+    [-260 * S, -62 * S], [-340 * S, -46 * S], [-348 * S, 86 * S], [-266 * S, 92 * S],
+  ], "cardCuff", cuff, { amp: 3.4 * S, lw: 6 * S, shade: "rgba(0,0,0,0.18)" });
+  // 笔杆：后粗前细，磨秃的尖朝右下（本地坐标里朝 +x）。
+  // 从笔尖一路伸到拳头里，露在外面的是 -12 → -175 这一大截。
+  InkFill(ctx, [
+    [-12 * S, -26 * S], [-150 * S, -50 * S], [-290 * S, -58 * S],
+    [-292 * S, 44 * S], [-150 * S, 34 * S], [-12 * S, 20 * S],
+  ], "cardChalkBody", "#e9dcbb", { amp: 2.6 * S, lw: 5.5 * S, shade: "rgba(84,62,34,0.22)" });
+  // 笔杆上的一道棱：读得出是根柱子，不是一片纸
+  InkLine(ctx, -30 * S, -12 * S, -270 * S, -40 * S, "cardChalkEdge",
+    { lw: 4 * S, color: "rgba(120,92,52,0.32)", amp: 4 * S });
+  // 磨出来的斜尖（压在木头上的那一头）
+  InkFill(ctx, [[-16 * S, -24 * S], [10 * S, -6 * S], [8 * S, 12 * S], [-16 * S, 18 * S]],
+    "cardChalkTip", "#f8efd6", { amp: 1.8 * S, lw: 4.5 * S });
+  // 攥住笔杆后半截的拳头（侧面）：指节朝上，虎口卡着笔
+  InkFill(ctx, [
+    [-176 * S, -86 * S], [-248 * S, -104 * S], [-320 * S, -62 * S], [-326 * S, 56 * S],
+    [-252 * S, 102 * S], [-172 * S, 76 * S], [-152 * S, -6 * S],
+  ], "cardFist", skin, { amp: 3.6 * S, lw: 6.5 * S, shade: "rgba(70,40,22,0.16)" });
+  // 四道指节
+  for (let i = 0; i < 4; i += 1) {
+    InkLine(ctx, -190 * S - i * 36 * S, -74 * S, -186 * S - i * 36 * S, -18 * S,
+      "cardKnuck" + i, { lw: 3.6 * S, color: "rgba(118,74,44,0.5)", amp: 3 * S });
+  }
+  // 拇指压在笔杆上（伸到拳头前面来，抵住笔）
+  InkFill(ctx, [
+    [-190 * S, -78 * S], [-126 * S, -54 * S], [-112 * S, -12 * S], [-176 * S, -18 * S],
+  ], "cardThumb", skin, { amp: 2.6 * S, lw: 5.5 * S, shade: "rgba(70,40,22,0.14)" });
+  ctx.restore();
+}
+
+/**
+ * 每帧重画的划线卡。
+ * view：Core 的 state.scribeCard + World 补的 t（秒）与版面 L（SCRIBE_CARD）。
+ */
+export function DrawScribeCard(ctx, W, H, view, L, t) {
+  const S = H / 720;                       // 以卡高归一，构图不随分辨率变
+  const uX = (u) => u * W;                 // 归一化 → 画布像素
+  const vY = (v) => v * H;
+  const lineY = vY(L.v);
+  const x0 = uX(L.u0), x1 = uX(L.u1);
+  const head = Math.max(0, Math.min(1, view.head || 0));
+  const drawn = Math.max(0, Math.min(1, view.drawn || 0));
+  const headX = x0 + head * (x1 - x0);
+
+  CardBase(ctx, W, H, "#c9b48c");
+
+  // 立柱：右边大半个画框都是这根木头。左缘那道亮边把"正面"读出来
+  const postX = uX(0.435);
+  InkFill(ctx, Rect(postX, -20 * S, W - postX + 40 * S, H + 40 * S), "cardPost", PAL.wood,
+    { amp: 4 * S, lw: 7 * S, shade: "rgba(0,0,0,0.16)", shadeAt: 0.62 });
+  ctx.save();
+  ctx.globalAlpha = 0.26;
+  ctx.fillStyle = "#e6c894";
+  ctx.fillRect(postX, 0, 26 * S, H);
+  ctx.restore();
+  // 木纹：竖着走，间距不匀
+  for (let i = 0; i < 7; i += 1) {
+    const gx = postX + (60 + i * 118) * S + Hash("cardGrain" + i) * 40 * S;
+    if (gx > W) break;
+    InkLine(ctx, gx, -30 * S, gx + (Hash("cardGrainD" + i) - 0.5) * 46 * S, H + 30 * S,
+      "cardGrainL" + i, { lw: 3 * S, color: "rgba(92,60,34,0.34)", amp: 26 * S });
+  }
+
+  // 被量的那个人：柱子背靠木头站直了，**头顶正好顶在这条线上**——
+  // 这道线量的是什么，画面自己说，不用旁白讲。侧影，不抢前景那只手。
+  ctx.save();
+  ctx.globalAlpha = 0.46;
+  const kx = uX(0.735);
+  const kTop = lineY + 6 * S;                 // 头顶，就压在线下面
+  InkFill(ctx, [                              // 肩与身子，出下画框
+    [kx - 128 * S, H + 30 * S], [kx - 112 * S, kTop + 218 * S], [kx - 58 * S, kTop + 172 * S],
+    [kx + 56 * S, kTop + 176 * S], [kx + 116 * S, kTop + 224 * S], [kx + 132 * S, H + 30 * S],
+  ], "cardKidBody", "#584330", { amp: 5 * S, lw: 0, line: null });
+  InkFill(ctx, [                              // 脖子
+    [kx - 30 * S, kTop + 128 * S], [kx + 30 * S, kTop + 128 * S],
+    [kx + 32 * S, kTop + 182 * S], [kx - 32 * S, kTop + 182 * S],
+  ], "cardKidNeck", "#584330", { amp: 3 * S, lw: 0, line: null });
+  InkFill(ctx, [                              // 侧脸：额头、鼻梁、下巴朝左
+    [kx - 62 * S, kTop + 60 * S], [kx - 52 * S, kTop + 20 * S], [kx - 8 * S, kTop],
+    [kx + 44 * S, kTop + 10 * S], [kx + 68 * S, kTop + 56 * S], [kx + 62 * S, kTop + 112 * S],
+    [kx + 20 * S, kTop + 140 * S], [kx - 36 * S, kTop + 130 * S], [kx - 70 * S, kTop + 96 * S],
+  ], "cardKidHead", "#584330", { amp: 3.6 * S, lw: 0, line: null });
+  InkFill(ctx, [                              // 鼻尖那一点，侧影才不是个罐子
+    [kx - 66 * S, kTop + 76 * S], [kx - 88 * S, kTop + 90 * S], [kx - 64 * S, kTop + 100 * S],
+  ], "cardKidNose", "#584330", { amp: 2 * S, lw: 0, line: null });
+  ctx.restore();
+
+  // 第八章：爹当年给柱子刻的那道旧痕早就在木头上了。它在**新线上头**——
+  // 那年的柱子（1.28m）比今天的妹妹（1.08m）高，两个数在 Data 里摆着，
+  // 画面不许跟它对不上。两道线之间隔着的东西，画面自己会说。
+  if (view.oldMark) {
+    const oy = lineY - 168 * S;
+    InkLine(ctx, x0 - 10 * S, oy, x1 + 10 * S, oy - 3 * S, "cardOldMark",
+      { lw: 5.5 * S, color: "rgba(74,48,26,0.5)", amp: 2.6 * S });
+    InkLine(ctx, x0 - 8 * S, oy - 4 * S, x1 + 8 * S, oy - 7 * S, "cardOldMarkHi",
+      { lw: 3 * S, color: "rgba(238,224,178,0.42)", amp: 2.6 * S });
+  }
+
+  // 还没划到的那一段：木头上一道极淡的墨斗印（要划到哪儿，看得见）
+  ctx.save();
+  ctx.globalAlpha = 0.30;
+  ctx.setLineDash([10 * S, 12 * S]);
+  ctx.beginPath();
+  ctx.moveTo(x0, lineY);
+  ctx.lineTo(x1, lineY);
+  ctx.strokeStyle = "#5c4128";
+  ctx.lineWidth = 3.4 * S;
+  ctx.stroke();
+  ctx.restore();
+
+  // 已经划下的印子
+  if (drawn > 0.002) ChalkStroke(ctx, x0, x1, lineY, S, drawn, view.press);
+
+  // 那支笔本身就是这一拍的全部 UI：
+  //   攥住了 → 压进木头、按手劲往后倒；没攥住 → 抬起来轻轻晃，招呼玩家来拿
+  // 手从**左上方**压下来（笔杆朝左上、小臂出上画框）。这不是构图偏好，是必需的：
+  // 手要是横在刻线那一头，玩家刚划出来的印子就全被自己的拳头盖住了，
+  // "看得见自己划了多少"当场作废——那正是我们要拿掉进度条换来的东西。
+  const gripped = !!view.gripped;
+  const wob = gripped ? 0
+    : Math.sin(t * (view.reaching ? 15 : 4.6)) * (view.reaching ? 9 : 5) * S;
+  const lift = gripped ? 0 : 14 * S;
+  // 压着走时笔杆往后倒（手在推），抬起来就立回去一点
+  const lean = gripped ? 0.62 - Math.min(0.16, (view.speed || 0) * 0.8) : 0.70;
+  const tipX = headX + wob * 0.4;
+  const tipY = lineY - lift + wob * 0.5;
+
+  // 没攥住的时候，笔身后面透出一圈会呼吸的光，把这支笔从木头上"提"起来——
+  // "按这儿"由那支笔自己说，不用一行字，更不用一根轨道
+  if (!gripped) {
+    const gx = tipX + L.gripDU * W, gy = tipY + L.gripDV * H;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3.1);
+    const r = L.grabR * W * 1.35;
+    ctx.save();
+    ctx.globalAlpha = 0.26 + pulse * 0.30;
+    const g = ctx.createRadialGradient(gx, gy, r * 0.12, gx, gy, r);
+    g.addColorStop(0, "rgba(255,240,196,0.95)");
+    g.addColorStop(0.55, "rgba(255,232,172,0.34)");
+    g.addColorStop(1, "rgba(255,232,172,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(gx, gy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // 笔尖底下一小片影子：笔是**抬起来**的，落回木头才开始出印子
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "rgba(60,38,18,1)";
+    ctx.beginPath();
+    ctx.ellipse(headX, lineY + 8 * S, 34 * S, 8 * S, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ChalkInHand(ctx, tipX, tipY, S, lean, PAL.skin,
+    view.selfMark ? PAL.zhuzi : "#6d5340", view.selfMark ? PAL.zhuziDark : "#7b6448");
+
+  // 笔尖的粉尘：只有真在蹭木头才扬起来
+  const dust = gripped ? Math.min(1, 0.35 + (view.speed || 0) * 2.4) : 0;
+  if (dust > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = dust * 0.75;
+    ctx.fillStyle = "#f4e8c6";
+    for (let i = 0; i < 9; i += 1) {
+      const a = i * 1.9 + t * 1.4;
+      ctx.fillRect(headX + Math.cos(a) * (8 + i * 5) * S,
+        lineY + 10 * S + Math.abs(Math.sin(a)) * (10 + i * 6) * S, 3.4 * S, 3.4 * S);
+    }
+    ctx.restore();
+  }
+
+  // 四角压暗，和别的插卡一个调子
+  const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.86);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(20,14,8,0.55)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------------------
 // 序章画卡：水墨地图＋剪纸剪影＋定格画片。1–9 段是冷的历史（羊皮纸上的墨），
 // 10–14 段进村转暖（水彩的生活）。构图对着「关卡设计·第一章」的分镜表画。
 // ---------------------------------------------------------------------------

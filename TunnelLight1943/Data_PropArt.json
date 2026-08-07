@@ -195,7 +195,7 @@
     },
     "fallenWood": {
       "art": "DrawFallenWood",
-      "band": "walk",
+      "band": "obstacle",
       "ss": "prop",
       "sprite": {
         "w": 96,
@@ -203,7 +203,7 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "扫荡中撞塌的柴垛：塌下来就是矮矮摊一片（0.72m＝柱子的胯高），跨得过去；不是立着的垛"
+      "note": "扫荡中撞塌的柴垛：塌下来就是矮矮摊一片（0.72m＝柱子的胯高），跨得过去。同 brokenWall 走 obstacle 带——横在路上的东西得挡得住小腿"
     },
     "thimble": {
       "art": "DrawThimble",
@@ -478,7 +478,7 @@
     },
     "brokenWall": {
       "art": "DrawBrokenWall",
-      "band": "walk",
+      "band": "obstacle",
       "ss": "prop",
       "sprite": {
         "w": 104,
@@ -486,7 +486,7 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "塌进巷子的土坯墙残段（可翻越）。顶沿磨圆+豁口=翻越轮廓语法；根脚散着掉下来的坯块"
+      "note": "塌进巷子的土坯墙残段（可翻越）。**band 必须是 obstacle**：挂在 walk 上演员永远画在它前面，那读起来就是「墙在路后头的景里」，看不出它拦路；挂到 clutter 又会被透视放大成齐胸的一堵大墙。顶沿磨圆+豁口=翻越轮廓语法；根脚散着掉下来的坯块"
     }
   },
   "_coversNote": [

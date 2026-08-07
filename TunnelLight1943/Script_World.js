@@ -3436,10 +3436,72 @@ export function CreateWorld(canvasEl) {
     const aspect = 1280 / 720;
     // 慢推：十秒推 6%——定格画片不是幻灯片，镜头永远在呼吸。
     // 但片子自己已经在推/横移了，再叠一层就是两个镜头打架，只留一点点安全溢出。
-    const kb = insertIsVideo ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
+    // 活卡（划线）不推：玩家的手正按在上面，画面一动手就跟着偏。
+    const kb = (insertIsVideo || liveCardOn) ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
     const w = Math.max(cw, chh * aspect) * kb;
     insertMesh.scale.set(w, w / aspect, 1);
     insertMesh.position.set(camX, camY, z);
+    // 屏幕 ↔ 卡面的换算：卡与画框同在 z 平面上、同一个中心，于是屏幕上
+    // 的一段比例就是卡上的一段比例，只差画框与卡的尺寸比。ScreenToCard 靠它。
+    cardFrac.w = cw / w;
+    cardFrac.h = chh / (w / aspect);
+  }
+
+  // -------------------------------------------------------------------------
+  // 活卡：和插入特写卡同一个景别、同一块铺满画框的画布，区别是它每帧重画，
+  // 而且玩家的手就按在上面（划线那一拍——攥着画面里那支石笔拖）。
+  // 复用 insertMesh 的摆位，所以"铺满画框"这件事只有一份实现。
+  // -------------------------------------------------------------------------
+  let liveCanvas = null, liveCtx = null, liveTex = null, liveCardOn = false, liveT = 0;
+  const cardFrac = { w: 1, h: 1 };
+
+  function SetLiveCard(view, layout, dt) {
+    if (!view || !layout) {
+      // 只收自己那一张：同一帧里若已经换上了定格卡/过场片，别把人家关掉
+      if (liveCardOn) {
+        liveCardOn = false;
+        liveT = 0;
+        if (insertMesh && insertMesh.material.map === liveTex) insertMesh.visible = false;
+      }
+      return;
+    }
+    if (!liveCanvas) {
+      // 玩家会盯着笔尖看，这张卡烘得比定格卡密一档
+      liveCanvas = MakeCanvas(1600, 900);
+      liveCtx = liveCanvas.getContext("2d");
+      liveTex = CanvasTexture(liveCanvas);
+      liveTex.generateMipmaps = false;
+      liveTex.minFilter = THREE.LinearFilter;
+    }
+    liveT += Math.min(0.05, dt || 1 / 60);
+    liveCardOn = true;
+    insertIsVideo = false;
+    insertCardName = null;
+    liveCtx.setTransform(1, 0, 0, 1, 0, 0);
+    liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+    ART.DrawScribeCard(liveCtx, liveCanvas.width, liveCanvas.height, view, layout, liveT);
+    liveTex.needsUpdate = true;
+    if (!insertMesh) {
+      insertMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+      );
+      insertMesh.renderOrder = ORDER_INSERT;
+      scene.add(insertMesh);
+    }
+    insertMesh.material.map = liveTex;
+    insertMesh.material.needsUpdate = true;
+    insertMesh.visible = true;
+  }
+
+  // 屏幕坐标 → 卡面归一化坐标（u 沿卡宽、v 沿卡高，0..1；画框裁掉的部分会出界）。
+  // 攥住画面里那支笔靠它——世界坐标在这一拍没有意义，玩家按的是卡。
+  function ScreenToCard(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const sx = (clientX - rect.left) / rect.width - 0.5;
+    const sy = (clientY - rect.top) / rect.height - 0.5;
+    return { u: 0.5 + sx * cardFrac.w, v: 0.5 + sy * cardFrac.h };
   }
 
   // 过肩前景：把某个角色的剪影放在画面边缘（正反打用）
@@ -3583,8 +3645,8 @@ export function CreateWorld(canvasEl) {
   return {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
-    SetOverShoulder, SetInsertCard, SetInsertVideoList, ApplyCamera, Resize, Render,
-    SetPip, RenderPip, ScreenToWorld,
+    SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, Resize, Render,
+    SetPip, RenderPip, ScreenToWorld, ScreenToCard,
     // 过场短片在放没放，截图上看不出来（兜底手绘卡长得也像回事）——只能问它
     __insertVideo() {
       if (!insertVideoName) return null;
