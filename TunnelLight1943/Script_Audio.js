@@ -16,7 +16,9 @@
 // 可选 CreateAudio({ context }) 注入自带的 AudioContext —— 只给离线测试用，
 // 注入时不起 setInterval，排程完全由 Update() 驱动。
 
-import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs?v=026";
+// 版本戳由 index.html 的 import map 统一盖：这儿自己写一个 ?v= 会让同一个模块
+// 被两个 URL 各加载一份（实测过：Data_AudioMix 同时出现 v=042 和 v=026）
+import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs";
 
 const FADE = 2.5;          // mood 交叉淡入淡出时长（秒）
 const LOOKAHEAD = 0.4;     // 排程视野：足够盖住一次 tick，又不至于让 mood 切换迟钝

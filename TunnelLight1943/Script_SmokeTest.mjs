@@ -10,10 +10,11 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
 
 const DT = 1 / 30;
 
@@ -447,6 +448,7 @@ function TestVaultC1() {
     const dir = Math.sign(c.to - c.from);
     let peakLift = 0, sawPose = false, started = false, sawHint = false, blockedX = null;
     const cues = [];
+    const liftTrace = [];
     for (let i = 0; i < 900; i += 1) {
       // 只走路：先确认它真的**挡住**了（走 3 秒都过不去），再按键翻
       const press = i > 180 && state.vaultHint;
@@ -461,6 +463,7 @@ function TestVaultC1() {
       if (state.player.vaultT > 0) {
         started = true;
         peakLift = Math.max(peakLift, state.player.lift || 0);
+        liftTrace.push(state.player.lift || 0);
         if (state.player.pose === "vault" || state.player.pose === "clamber") sawPose = true;
       }
       if (dir > 0 ? state.player.x >= c.to : state.player.x <= c.to) break;
@@ -476,11 +479,42 @@ function TestVaultC1() {
       `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，没越过 ${c.top} 的顶沿——那是平移不是翻`);
     assert.ok(hipPeak < c.top + 0.45,
       `${c.label}：髋顶到 ${hipPeak.toFixed(2)}，比顶沿高出太多——腾空了，撑手就按不住墙头`);
+    // **这一条盯的是「翻」和「跳」的分水岭**：撑手翻越的高度曲线是带平台的
+    // 梯形（手是支点，胯骑在顶沿上、腿从顶上扫过），跳跃是对称的抛物线。
+    // 这个动作被退回过两次，两次都是因为用了正弦弧——所以直接量平台。
+    assert.equal(peakLift.toFixed(3), VaultLiftFor(c.top).toFixed(3),
+      `${c.label}：抬升峰值必须按规范算（VaultLiftFor＝顶沿+余量−站立胯高）`);
+    const plateau = liftTrace.filter((v) => v > peakLift - 0.005).length;
+    assert.ok(plateau / liftTrace.length > 0.25,
+      `${c.label}：顶点只停了 ${(plateau / liftTrace.length * 100).toFixed(0)}% 的时长——`
+      + "尖顶的弧就是抛物线，那是跳不是翻。撑手翻越必须在顶沿高度上停一段（腿扫过去）");
+    // 落下要比撑起来快（松手之后是重力说了算），否则读起来还是"飘"下来的
+    const up = Math.max(...liftTrace.map((v, i) => (i ? v - liftTrace[i - 1] : 0)));
+    const down = Math.max(...liftTrace.map((v, i) => (i ? liftTrace[i - 1] - v : 0)));
+    assert.ok(down > up * 0.9, `${c.label}：落下比撑起来还慢——松手之后该是重力接手`);
     assert.ok(cues.includes("vault") || cues.includes("vaultHeavy"), `${c.label}：缺起手音效`);
     assert.ok(cues.includes("vaultLand"), `${c.label}：缺落地音效`);
     assert.equal(state.player.lift || 0, 0, `${c.label}：翻完必须落回地面`);
     assert.ok(dir > 0 ? state.player.x >= c.to : state.player.x <= c.to,
       `${c.label}：翻完必须真的到了另一侧`);
+  }
+
+  // 翻越尺度规范（全作，不只第一章）：顶沿高过撑手的人的胯，「翻」就成了
+  // 「攀」。上限以第一章那堵塌墙（0.82m）为基准定在 VAULT_MAX_TOP。
+  // 加载期 Data_Scenes 已经会抛，这里再明写一遍——规范要看得见，不能只藏在校验里。
+  {
+    for (const [key, scene] of Object.entries(SCENES)) {
+      for (const v of scene.vaults || []) {
+        assert.ok(typeof v.top === "number", `${key} 的可翻越物 x=${v.x} 没写 top`);
+        assert.ok(v.top <= VAULT_MAX_TOP,
+          `${key} 的可翻越物 x=${v.x} 顶沿 ${v.top}m 超过上限 ${VAULT_MAX_TOP}m（高过胯就撑不住了）`);
+        assert.ok(v.top >= VAULT_MIN_TOP,
+          `${key} 的可翻越物 x=${v.x} 顶沿 ${v.top}m 低于下限 ${VAULT_MIN_TOP}m（一步就跨过去了）`);
+      }
+    }
+    // 基准本身别被人悄悄改大：0.82 是第一章那堵墙，它就是这条规范的样板
+    assert.ok(VAULT_MAX_TOP >= 0.82 && VAULT_MAX_TOP <= 0.90,
+      `翻越上限 ${VAULT_MAX_TOP} 偏离了基准（第一章那堵塌墙 0.82m）`);
   }
 
   // 摆位铁律：跑腿路线（院子 31~70：水桶、木料、独轮车都在这一段）上
@@ -878,8 +912,15 @@ function TestWorkStations() {
   assert.equal(father?.track?.name, "sawing", "运木料时爹必须在拉锯");
   assert.equal(father?.carry, "锯", "拉锯的爹手上必须有锯");
   assert.ok(mother?.cineTarget || mother?.track, "运木料时娘必须动身去菜畦或已在干活");
+  // 差事的前因后果：爹开拍亲口派活（不能只有目标文本），
+  // 妹妹同一拍从家门跑向老槐树——她在哪，娘的喊话与这一路交代掉
+  assert.ok(state.microCine, "运木料开拍爹必须亲口派活");
+  const sis = state.actors.find((a) => a.id === "sister");
+  assert.ok(sis?.cineTarget && sis.cineTarget.x > 100, "开拍妹妹必须动身往老槐树跑");
 
   DebugJump(state, 0, beats.indexOf("c1_water"));
+  // 跳过了刨料：完工旗必须结算——工作台边那扇半成的门扇（doorLeafWip）靠它现身
+  assert.equal(state.flags.tenonDone, true, "跳过刨料也得落 tenonDone（门扇雏形）");
   StepGame(state, idle, DT);
   // 开拍娘先直起腰喊人（micro-cine 派活），喊完 tick 会把她放回锄地——
   // 先把这句喊话推完再验工位
@@ -935,10 +976,12 @@ function TestPlaneBeat() {
   assert.equal(def.kind, "plane", "合榫那一拍已经换成刨料");
   assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
 
-  // 刨子在木头上的位置（与 Core 同一套公式）：攥取判定的靶子
-  const span = def.span ?? 0.62;
-  const planeX = (s) => def.zone.x - span / 2 + (s.beat.u || 0) * span;
-  const planeY = SURFACE_Y + (def.boardY ?? 0.6) + 0.09;
+  // 刨子在**卡上**的位置（与 Core 同一套版面）：攥取判定的靶子。
+  // 这一拍长在铺满画框的刨料卡上——世界里那把刨子在手机上只有 90×45 像素，
+  // 玩家认不出也按不着（实测），所以判定走 pointerCard，不走 pointerWorld。
+  const PL = PLANE_CARD;
+  const gripU = (s) => PL.u0 + (s.beat.u || 0) * (PL.u1 - PL.u0) + PL.gripDU;
+  const gripV = PL.v + PL.gripDV;
 
   // 爹的示范 + 柱子自己上前接手。**这一段绝不许在测试里挪 player.x**——
   // 上一版每处断言都先 `state.player.x = workX` 把人瞬移到工位，正好跳过了
@@ -950,44 +993,45 @@ function TestPlaneBeat() {
   assert.ok(Math.abs(state.player.x - workX) < 0.06,
     `示范完必须由节拍把柱子送到工位（现在停在 ${state.player.x.toFixed(2)}，工位 ${workX}）`);
   assert.ok(!state.dragTrack, "刨料这一拍绝不许有拖动轨道（slider 已明令禁止）");
-  assert.ok(state.planing.invite, "刨子等着被攥住时必须透光招呼玩家，不该猜该干什么");
+  assert.ok(state.planeCard, "站到工位就该亮出那张刨料特写卡");
+  assert.equal(state.planeCard.armed, true, "开头是往前推的一趟");
   // ① 按住 A/D 不许把人走开——这一拍人钉在台前（上一版按住 D 能一路散步）
   for (let i = 0; i < 40; i += 1) StepGame(state, { ...idle(), moveX: 1 }, DT);
   assert.ok(Math.abs(state.player.x - workX) < 0.06, "刨料时走路输入不该把人挪走");
 
   // ② 手没落在刨子上就按下去拖：刨子不动（这正是"不是 slider"的意思）
   for (let i = 0; i < 30; i += 1) {
-    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state) + 1.6 + i * 0.02, y: planeY } }, DT);
+    StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: 0.03 + i * 0.03, v: gripV + 0.34 } }, DT);
   }
   assert.equal(state.beat.u, 0, "手没抓着刨子，怎么拖都不该推得动");
   assert.ok(state.planing.reaching, "按下了没抓着，刨子的光得闪快些催一下");
 
   // ③ 攥住再推：跟手，但吃着木头有上限——一帧甩不到头
   StepGame(state, { ...idle(), pointerHeld: false }, DT);
-  StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state), y: planeY } }, DT);
+  StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: gripU(state), v: gripV } }, DT);
   assert.ok(state.beat.grabbed, "手落在刨子上按下去，必须攥得住");
   assert.ok(state.planing.gripped, "攥住了，透光就收——手感在刨子上，不在光上");
-  StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state) + 3, y: planeY } }, DT);
+  StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: PL.u1 + 0.2, v: gripV } }, DT);
   assert.ok(state.beat.u > 0, "攥住往前推，刨子必须走");
   assert.ok(state.beat.u < 0.2, `刨子吃着木头，一帧不该窜到 ${state.beat.u}`);
 
   // ④ 手飘离台面：刨柄脱手
   for (let i = 0; i < 4; i += 1) {
-    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state) + 3, y: planeY + 0.9 } }, DT);
+    StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: PL.u1 + 0.2, v: gripV + PL.slipV + 0.1 } }, DT);
   }
   assert.equal(state.beat.grabbed, false, "手抬离台面太高，刨柄必须脱手");
 
   // ⑤ 攥回来一趟推到底：刨花出来、木头亮一分；倒着拖不吃木头
   const before = state.planing.smooth;
   StepGame(state, { ...idle(), pointerHeld: false }, DT);
-  StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state), y: planeY } }, DT);
+  StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: gripU(state), v: gripV } }, DT);
   assert.ok(state.beat.grabbed, "半道也得攥得回来");
-  for (let i = 0; i < 6; i += 1) StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state) - 3, y: planeY } }, DT);
+  for (let i = 0; i < 6; i += 1) StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: PL.u0 - 0.2, v: gripV } }, DT);
   assert.equal(state.planing.smooth, before, "倒着拖不该刨掉木头");
   let guard = 0;
   while (state.planing && state.planing.smooth === before && guard < 400) {
     guard += 1;
-    StepGame(state, { ...idle(), pointerHeld: true, pointerWorld: { x: planeX(state) + 3, y: planeY } }, DT);
+    StepGame(state, { ...idle(), pointerHeld: true, pointerCard: { u: PL.u1 + 0.2, v: gripV } }, DT);
   }
   assert.ok(state.planing === null || state.planing.smooth > before, "一趟推到底必须刨掉一层");
   assert.ok(state.flags.planedOnce, "第一趟推完必须落旗");
@@ -1020,7 +1064,63 @@ function TestPlaneBeat() {
     StepGame(s3, inp, DT);
   }
   assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
-  console.log("  ✓ 刨料：攥的是刨子不是滑块 / 抓不住推不动 / 有上限 / 会脱手 / 顿一下刨花短 / 键盘后备可用");
+  assert.equal(s3.planeCard, null, "推完了，那张卡必须收走");
+
+  // ⑧ 推到头之后**画面自己得说"往回带"**：卡上那把刨子抬离料面（armed=false）。
+  // 这是拿掉 HUD 轨道之后唯一的回程提示，丢了玩家就会卡在那头以为坏了。
+  const s4 = CreateGame(0);
+  DebugJump(s4, 0, beats.indexOf("c1_tenon"));
+  for (let i = 0; i < 200; i += 1) StepGame(s4, idle(), DT);
+  let g4 = 0;
+  while (s4.planeCard?.armed !== false && g4 < 600) { g4 += 1; StepGame(s4, { ...idle(), interactHeld: true }, DT); }
+  assert.equal(s4.planeCard?.armed, false, "推到头，卡上那把刨子必须抬起来（回程提示）");
+  console.log("  ✓ 刨料：长在特写卡上 / 抓不住推不动 / 有上限 / 会脱手 / 到头抬刨提示回程 / 无 slider / 键盘后备可用");
+}
+
+// 缓存版本戳必须盖到**整张模块图**上。
+//
+// 事故（2026-08-07，手机上报「刨子推不动」）：index.html 只给入口
+// Script_Main.js 盖了 ?v=，它 import 的 Script_Core.mjs 是裸 URL——手机上于是
+// 新 Main 配旧 Core：新 Main 不再发 dragX、旧 Core 只认 dragX，刨子怎么拖都不动；
+// 旧 Core 写的 dragTrack 又没有元素接（新 html 已删），连轨道都不出来。
+// 桌面一刷新就好，手机 Safari 的模块缓存黏得多，所以只在移动端复现。
+//
+// 现在版本戳由 index.html 的 import map 一张表统一盖。这条测试盯两件事：
+//   ① 每个第一方模块都在表里（漏一个，它就又会从缓存里漏出来）；
+//   ② 源码里不许再自己写 ?v=（同一个模块两个 URL＝加载两份，实测出过）。
+function TestModuleGraphIsCacheBusted() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
+  const map = JSON.parse(html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]);
+  const imports = map.imports || {};
+
+  // 入口自己走 <script src>，其余全靠 import map
+  const entry = html.match(/src="\.\/Script_Main\.js\?v=(\d+)"/);
+  assert.ok(entry, "index.html 的入口 Script_Main.js 必须带 ?v= 版本戳");
+  const ver = entry[1];
+
+  // 浏览器真正跑的那些第一方模块，逐个查表
+  const browserModules = [
+    "Script_Core.mjs", "Script_World.js", "Script_Art.mjs", "Script_Rig.mjs",
+    "Script_Light.mjs", "Script_Fluid.mjs", "Script_Soundtrack.js", "Script_Audio.js",
+    "Data_Scenes.mjs", "Data_DepthSpec.mjs", "Data_BgmConfig.mjs", "Data_AudioMix.mjs",
+  ];
+  for (const m of browserModules) {
+    assert.equal(imports[`./${m}`], `./${m}?v=${ver}`,
+      `${m} 必须登记在 index.html 的 import map 里并盖上 ?v=${ver}——`
+      + "漏掉的模块会独自留在手机缓存里，新壳配旧芯");
+  }
+
+  // 源码里不许再自己写版本戳：同一个模块两个 URL = 浏览器加载两份实例
+  for (const f of fs.readdirSync(here).filter((n) => /^(Script|Data)_.*\.(js|mjs)$/.test(n))) {
+    const src = fs.readFileSync(path.join(here, f), "utf8");
+    for (const line of src.split("\n")) {
+      if (!/^\s*(import|.*\bimport\()/.test(line)) continue;
+      assert.ok(!/\.(mjs|js)\?v=/.test(line),
+        `${f} 里不该自己写版本戳（交给 index.html 的 import map）：${line.trim()}`);
+    }
+  }
+  console.log(`  ✓ 缓存版本戳盖满整张模块图（v=${ver}，${browserModules.length} 个模块）`);
 }
 
 function TestQuieterAudioMix() {
@@ -1236,6 +1336,7 @@ TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestInstrumentalBgmManifest();
+TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 
 console.log("— 全流程自动通关（第六章走『地下进人』）—");

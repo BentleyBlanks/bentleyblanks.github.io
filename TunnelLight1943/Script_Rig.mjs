@@ -332,17 +332,19 @@ export const TRACKS = {
       { t: 2.8, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armF: -30, foreF: -20 },
     ],
   },
-  // 扫院（循环）：扫帚在近侧手里顺前臂摆，一推一带、蹭着地走。
-  // 幅度比锄地小得多——扫地是胳膊的活，不是腰的活
+  // 扫院（循环）。老版本的错在把扫帚当"顺前臂垂下来的棍"：帚柄与前臂共线，
+  // 柄的上半截就叠在小臂上、直戳到脑袋边——看着是根倚在身上的杆子，不是握着的
+  // 扫帚。真拿扫帚，柄在手心里是**斜着**的（比前臂平一档）——这个偏角由 World
+  // 的 ARM_TOOL_TILT 给（绕握点转，握点还在手心里）。这里管的是身体：
+  // 弯下腰去（扫地的手位很低），前臂**伸直探到身前**（θ=armF+foreF 决定帚的
+  // 朝向），后手在腹前虚扶柄的上端。一推一带都从前肩出。
   sweeping: {
     dur: 1.9, loop: true,
     keys: [
-      // 胳膊只在垂线前后小幅摆：扫帚顺前臂挂着，臂一抬高帚就横过来端着了——
-      // 扫地的帚头得蹭着地走
-      { t: 0.0, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22, thighB: -10, shinB: 14, footB: -5, thighF: 6, shinF: 5, footF: -5 },
-      { t: 0.7, hipY: -0.07, hipX: 0.05, torso: 24, head: -16, armF: -30, foreF: -14, armB: -46, foreB: -28 },  // 往前推
-      { t: 1.2, hipY: -0.05, hipX: 0.03, torso: 21, head: -14, armF: -22, foreF: -11, armB: -40, foreB: -25 },  // 带回来
-      { t: 1.9, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22 },
+      { t: 0.0, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52, thighB: -12, shinB: 16, footB: -5, thighF: 7, shinF: 6, footF: -5 },
+      { t: 0.7, hipY: -0.11, hipX: 0.09, torso: 30, head: -18, armF: -38, foreF: -10, armB: -22, foreB: -56 },  // 往前推
+      { t: 1.2, hipY: -0.08, hipX: 0.06, torso: 24, head: -15, armF: -17, foreF: -8, armB: -10, foreB: -48 },   // 带回来
+      { t: 1.9, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52 },
     ],
   },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
@@ -598,6 +600,15 @@ export function PoseRig(rig, s, dt) {
       thighB: -96, shinB: 104, footB: 14, thighF: -78, shinF: 92, footF: 12,
     };
     // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
+    // ②′ 还骑在顶沿上，但**腿已经从后面扫到了前面**——这一帧是"翻"和"跳"
+    //    的分水岭：高度不变（撑手是支点），变的是腿从墙这边扫到墙那边。
+    //    少了它，中段就成了一动不动的抱膝定格，读出来还是腾空
+    const B2 = {
+      hipY: 0.00, hipX: 0.22, torso: 30, head: -16,
+      armF: 44, foreF: -14, armB: 26, foreB: -10,
+      thighB: -46, shinB: 62, footB: 6, thighF: -70, shinF: 46, footF: -4,
+    };
+    // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
     const C = {
       hipY: -0.24, hipX: 0.04, torso: 26, head: -12,
       armF: 22, foreF: -30, armB: 34, foreB: -22,
@@ -609,11 +620,17 @@ export function PoseRig(rig, s, dt) {
       A.armF = -46; A.torso = 50;
       B.armF = 14; B.foreF = -20; B.torso = 46; B.hipY = -0.06;
       B.thighB = -74; B.shinB = 86; B.thighF = -58; B.shinF = 78;
+      B2.armF = 20; B2.torso = 42; B2.hipY = -0.08;
+      B2.thighB = -40; B2.shinB = 56; B2.thighF = -60; B2.shinF = 44;
       C.armF = -14; C.foreF = -30;
     }
-    const mid = heavy ? 0.48 : 0.44;
-    let from = A, to = B, u = k / mid;
-    if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
+    // 姿势的三段必须和**抬升曲线**的三段对齐（Core.VaultArc 的 rise/fall）：
+    // 撑起来 → 骑在顶沿上腿扫过 → 松手落下。对不齐就会出现"人还在墙头上、
+    // 腿却已经摆出落地姿势"这种一眼假
+    const rise = 0.30, fall = heavy ? 0.72 : 0.64;
+    let from = A, to = B, u = k / rise;
+    if (k >= fall) { from = B2; to = C; u = (k - fall) / (1 - fall); }
+    else if (k >= rise) { from = B; to = B2; u = (k - rise) / (fall - rise); }
     u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
     for (const key of Object.keys(A)) {
       const v = from[key] + (to[key] - from[key]) * u;

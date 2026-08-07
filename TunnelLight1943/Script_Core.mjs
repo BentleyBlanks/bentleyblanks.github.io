@@ -7,6 +7,7 @@
 // 场景布局是数据不是代码：坐标/尺寸/旗标门在 Data_Scenes.json，贴图与深度带在
 // Data_PropArt.json，加载与校验在 Data_Scenes.mjs（配错在加载时就抛）。
 import { SCENES } from "./Data_Scenes.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP } from "./Data_DepthSpec.mjs";
 
 export const GAME_VERSION = "0.3.0";
 
@@ -163,14 +164,31 @@ function VaultTravel(k) {
   return 0.58 + 0.42 * (u * (2 - u));                           // 腿过了顶沿，荡下去
 }
 
-// 抬升弧（相对障碍高度的倍数）。峰值不该比障碍高出一大截——0.74 时髋部
-// 飞到齐胸，人是"腾"过去的；0.58 让髋刚好擦着顶沿过，撑手才按得住墙头。
-function VaultArc(k, big) {
+// 抬升曲线（返回**绝对米数**，不再是障碍高度的倍数）。
+//
+// 这里被退回过两次，症结每次都一样：**对称的正弦弧＝抛物线＝跳跃**。
+// 起跳、到顶、落下三段等时等距，读出来就是"蹦过去"，跟撑手翻越没关系。
+// 撑手翻越的高度曲线是一条**带平台的梯形**：
+//   ① 手按上顶沿、身子被撑起来（快，0.3 秒不到）
+//   ② **停在顶沿高度**——这一段是全动作的题眼：手是支点，胯骑在墙头上，
+//      腿从顶上扫过去。高度几乎不变，所以看得出他是"撑着"不是"飞着"
+//   ③ 手一松，人比升起来时更快地落下去（重力不讲道理），落地屈膝卸力
+// 另外峰值按 VaultLiftFor(top) 算绝对值（顶沿 + 余量 − 站立胯高），
+// 不按顶沿的百分比：百分比会让矮障碍抬过头、高障碍抬不够，两头都不像。
+function VaultArc(k, big, top) {
   const u = Math.max(0, Math.min(1, k));
-  if (!big) return 0.58 * Math.sin(Math.PI * Math.pow(u, 0.92));
-  if (u < 0.32) return 0.82 * Math.sin((u / 0.32) * (Math.PI / 2));
-  if (u < 0.66) return 0.82;
-  return 0.82 * Math.sin(((1 - u) / 0.34) * (Math.PI / 2));
+  const peak = VaultLiftFor(top);
+  // 扛着东西那一档：先把东西撂上顶沿，所以在顶上多骑一会儿
+  const rise = big ? 0.30 : 0.30;
+  const fall = big ? 0.72 : 0.64;
+  if (u < rise) {
+    // 撑起来：起手最猛（蹬地那一下），到顶沿收住
+    const t = u / rise;
+    return peak * Math.sin(t * (Math.PI / 2));
+  }
+  if (u < fall) return peak;                          // 骑在顶沿上，腿扫过去
+  const t = (u - fall) / (1 - fall);
+  return peak * (1 - t * t);                          // 松手，加速落下
 }
 
 // pickedT：拿起的时刻。E 既是拾取也是放下，没有这 0.35s 的窗口，
@@ -889,23 +907,45 @@ function StepCartRide(state, def, input, dt) {
 // 松了手，刨刃啃住木头，出来的是一小截碎屑，那一趟就白费了大半。
 // 「推得稳不稳」这件事，用不着一个字去说。
 //
-// **玩家推的是画面里那把刨子**（全作铁律：对物体做功=直接操纵那个物体）。
-// 这一拍镜头在 2.05m 半宽，0.34m 的刨子在屏幕上有一百多个像素——按得着，
-// 所以不用石笔那张特写卡，直接在世界里攥：
-//   ① 按下去那一下，手得落在刨子上（PLANE_GRAB_R 之内），别处拖不动它；
-//   ② 刨子吃着木头，跟手有上限——顺纹吃木最快 PLANE_CUT_SPEED，
-//      空拖回来轻些（PLANE_BACK_SPEED）；
-//   ③ 手飘离台面太高（PLANE_SLIP_Y），刨柄脱手，这一趟停在半道——
-//      停顿的代价由原有的 stalls 逻辑收（刨刃啃住，刨花短一截）。
+// **这一拍和划线一样，长在一张铺满画框的手绘特写卡里**（state.planeCard →
+// Art 的 DrawPlaneCard）。
+//
+// 中间走过一版"直接在世界里攥那把刨子"，退回来了。退回的理由是量出来的：
+// 世界里的刨子 0.34m，2.05m 的特写下在 844×390 的手机上只有 **90×45 像素**——
+// 一块木头色的小方块，压在木头色的台面上、人身子前头。用真触摸事件测过，
+// 机制是通的（偏 20px 也抓得住、三趟推得完），但玩家**认不出那是能抓的东西**，
+// 推到头更不知道要拖回来。能不能过测试和能不能上手，是两回事。
+// 结论与石笔同源（CLAUDE.md 拟物交互第 4 条）：手指按不着/认不出的东西，
+// 推镜头治不好，得换成铺满画框的活卡——卡上那把刨子占三分之一个画宽。
+//
+// 三条规矩照旧（和石笔同源）：
+//   ① 按下去那一帧，手得落在卡上那把刨子上（PLANE_CARD.grabR 之内），
+//      别处拖一律不动它；
+//   ② 刨子有分量——跟手走但有速度上限，顺纹吃木沉、空拖回来轻；
+//   ③ 手飘离横楔该在的高度就脱手，这一趟停在半道（刨刃啃住，刨花短一截）。
+//
 // 曾经这里有一条 HUD 拖动轨道（dragTrack）代替刨子受拖——那就是一根 slider，
 // 用户明令禁止，已整根拆掉：轨道元素、CSS、输入通路都不在了，别加回来。
+// "推到头要拖回来"也不靠字：卡上那把刨子会抬离料面、鼻子翘起来。
 //
 // 键盘后备照旧：光按住 E 就往前推（回程自动往回带），自动通关测试全靠它。
 // 顺纹（+x）才吃木头，回程只是把刨子拖回来——木匠不会倒着刨。
-const PLANE_GRAB_R = 0.38;    // 攥住刨子的判定半径（米）
-const PLANE_SLIP_Y = 0.5;     // 手离刨柄该在的高度这么远，脱手
-const PLANE_CUT_SPEED = 0.85; // 吃着木头最快推多快（米/秒）
-const PLANE_BACK_SPEED = 1.35;// 空拖回来的上限（米/秒）
+
+// 刨料特写卡的版面：Core（判定）与 Art（作画）共用这一套归一化坐标。
+export const PLANE_CARD = {
+  aspect: 16 / 9,
+  u0: 0.27, u1: 0.75,     // 刨子中心的行程（两头都留出刨身，不许顶出画框）
+  v: 0.62,                // 料的上表面（刨底走的那条线）——压在下三分之一，
+                          // 上面留给刨子和那只手，画面才不是"一条大灰带"
+  gripDU: -0.03, gripDV: -0.085,   // 横楔（手攥的地方）相对刨底的偏移
+  grabR: 0.15,            // 攥得住的判定半径（按卡宽）——两手抱的大家伙，给得宽
+  slipV: 0.26,            // 手飘离横楔这么远就脱手（按卡高）
+  // 吃木/空拖的速度上限（卡宽/秒）。刨子要有分量，但**一次舒服的划动得能走完
+  // 一趟**——上限压太低，玩家一趟得分两次拖，中间那一下松手还要吃"顿住"的罚，
+  // 手感就成了"它不听话"。0.55 下走完 0.48 的行程约 0.9 秒，正是一刨的时长。
+  cut: 0.55,
+  back: 1.0,
+};
 
 function StepPlane(state, def, input, dt) {
   const b = state.beat;
@@ -929,15 +969,6 @@ function StepPlane(state, def, input, dt) {
     state.player.heading = 1;
   }
 
-  // 攥取判定的靶子＝**画面上那把刨子**。World 每帧把它画在哪儿回填到
-  // state.planeToolView（它挂在手上，手由姿势驱动，和 u 的直线映射差着一段
-  // 手臂几何）——判定必须贴着玩家看见的东西走，不许贴着公式走。
-  // 无渲染环境（node 测试）没有回填，退回 u 的直线映射。
-  const anchor = state.planeToolView || {
-    x: bx - span / 2 + b.u * span,
-    y: SURFACE_Y + (def.boardY ?? 0.60) + 0.09,
-  };
-
   const Publish = (u, active) => {
     state.planing = {
       x: bx, y: def.boardY ?? 0.60, span,
@@ -949,6 +980,17 @@ function StepPlane(state, def, input, dt) {
       reaching: !!b.reaching,                    // 按下了却没抓着刨子 → 光催一下
       invite: active && !b.grabbed,              // 等着被攥住：刨子透光呼吸
     };
+    // 这一拍的全部画面与全部 UI 就是这张卡：铺满画框的料、刨子、两只手
+    state.planeCard = active ? {
+      head: u,
+      smooth: Math.min(1, b.passes / need),
+      pile: b.pile,
+      armed: b.armed,                            // false = 推到头了，得拖回来
+      gripped: !!b.grabbed,
+      reaching: !!b.reaching,
+      speed: dt > 0 ? Math.abs(u - (b.prevPub ?? u)) / dt : 0,
+    } : null;
+    b.prevPub = u;
   };
 
   // ── 爹的示范：一趟到底，一条长刨花。没有字幕，看就是了 ──
@@ -995,32 +1037,34 @@ function StepPlane(state, def, input, dt) {
   state.player.x = workX;
   state.player.heading = 1;
 
-  // ── 攥住刨子 ──
-  // （与 origin/master 的同题实现合并时取了这一版：攥取靶子是 World 回填的
-  // 画面位置而不是 u 的直线映射——手臂几何让两者在行程末端差出小半米，
-  // 照公式判，玩家点在**看得见的刨子**上反而抓空。）
-  const pw = input.pointerWorld;
-  const held = !!input.pointerHeld && !!pw;
+  // ── 攥住刨子（在卡上）──
+  const L = PLANE_CARD;
+  const uSpan = L.u1 - L.u0;
+  const gripU = L.u0 + b.u * uSpan + L.gripDU;   // 横楔此刻在卡上的位置
+  const gripV = L.v + L.gripDV;
+  const pc = input.pointerCard;
+  const held = !!input.pointerHeld && !!pc;
   if (held && !b.wasHeld) {
-    b.grabbed = Math.hypot(pw.x - anchor.x, pw.y - anchor.y) < PLANE_GRAB_R;
+    // v 是按卡高归一的，折成卡宽的尺度才能量一个圆
+    b.grabbed = Math.hypot(pc.u - gripU, (pc.v - gripV) / L.aspect) < L.grabR;
     // 记住攥住那一刻的手位与推程：之后手挪多少、刨子跟多少（相对量），
     // 刨子不"跳"到指尖底下
-    if (b.grabbed) { b.refX = pw.x; b.refU = b.u; Cue(state, "pickup", { gain: 0.25 }); }
+    if (b.grabbed) { b.refU = pc.u; b.refHead = b.u; Cue(state, "pickup", { gain: 0.25 }); }
   }
   if (!held) b.grabbed = false;
   b.wasHeld = held;
   b.reaching = held && !b.grabbed;
-  // 脱手：手飘离刨柄该在的高度太远。刨刃啃在半道的代价由下面的 stalls 逻辑收
-  if (b.grabbed && Math.abs(pw.y - anchor.y) > PLANE_SLIP_Y) b.grabbed = false;
+  // 脱手：手飘离横楔该在的高度太远。刨刃啃在半道的代价由下面的 stalls 逻辑收
+  if (b.grabbed && Math.abs(pc.v - gripV) > L.slipV) b.grabbed = false;
 
   // ── 推刨 ──
   // 拖多少走多少，但吃着木头有上限——手甩得再快，刨子也只能一寸一寸啃过去。
   let dv = 0;
   if (b.grabbed) {
-    const target = Math.max(0, Math.min(1, (b.refU || 0) + (pw.x - b.refX) / span));
+    const target = Math.max(0, Math.min(1, (b.refHead || 0) + (pc.u - b.refU) / uSpan));
     const want = target - b.u;
     // 顺纹吃木最沉；空拖（回程、或半道往回带）轻些
-    const cap = ((want > 0 && b.armed) ? PLANE_CUT_SPEED : PLANE_BACK_SPEED) * dt / span;
+    const cap = ((want > 0 && b.armed) ? L.cut : L.back) * dt / uSpan;
     dv = Math.max(-cap, Math.min(cap, want));
   }
   // 键盘后备（自动通关测试也走这条）：光按住 E，方向由这一趟的状态给——
@@ -1040,8 +1084,9 @@ function StepPlane(state, def, input, dt) {
     if (b.grainD > 0.08) { b.grainD = 0; Cue(state, "planeCut", { gain: 0.5 + Math.random() * 0.2 }); }
   } else if (b.armed && b.u > 0.06 && b.u < 0.94) {
     // 停在半道：刨刃啃住木头。停一次扣一档，不是失败，是"这一趟不齐"
+    // 宽限放到 0.45 秒：换个手、指头挪一下不该算"顿住"，真停下来才算
     b.idleT += dt;
-    if (b.idleT > 0.26) { b.idleT = -1e9; b.stalls += 1; Cue(state, "planeStall", { gain: 0.8 }); }
+    if (b.idleT > 0.45) { b.idleT = -1e9; b.stalls += 1; Cue(state, "planeStall", { gain: 0.8 }); }
   }
   if (forward > 0.0005 && b.idleT < 0) b.idleT = 0;   // 又推起来了，重新开始计停顿
 
@@ -1053,8 +1098,15 @@ function StepPlane(state, def, input, dt) {
     state.flags.planedOnce = true;
     state.planeCurl = { x: bx + span / 2, y: (def.boardY ?? 0.60) + 0.16, len: quality, t: 0 };
     Cue(state, "planeCurl", { gain: 0.6 + quality * 0.5, rate: 0.9 + quality * 0.25 });
-    if (b.stalls === 0 && b.passes < need) state.toast = { text: "一整条刨花打着卷落下来。", t: 2.2 };
-    else if (b.stalls > 0) state.toast = { text: "中间顿了一下——出来的是碎屑。一推到底才齐。", t: 3 };
+    // 头一趟到头时把"回程"说一次：这是木匠的第一课，教一句是应该的。
+    // 之后就不再说了——卡上那把刨子会抬起来、鼻子翘着，画面自己在说。
+    if (b.passes <= 1 && b.passes < need) {
+      state.toast = { text: "一整条刨花打着卷落下来。抬起刨子拖回来，再走一趟。", t: 3.4 };
+    } else if (b.stalls === 0 && b.passes < need) {
+      state.toast = { text: "一整条刨花打着卷落下来。", t: 2.2 };
+    } else if (b.stalls > 0) {
+      state.toast = { text: "中间顿了一下——出来的是碎屑。一推到底才齐。", t: 3 };
+    }
     b.stalls = 0;
     b.armed = false;                     // 得把刨子拖回来才能再推一趟
   }
@@ -1073,9 +1125,11 @@ function StepPlane(state, def, input, dt) {
 
   if (b.passes >= need) {
     state.planing = null;
+    state.planeCard = null;
     state.player.pose = null;
     state.player.poseU = undefined;
     if (father) { father.pose = null; father.poseU = undefined; }
+    if (def.doneFlag) state.flags[def.doneFlag] = true;   // 数据声明的完工旗（门扇雏形靠它现身）
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     AdvanceBeat(state);
   }
@@ -1225,7 +1279,7 @@ export const SCRIPTS = {
           } },
         // 木料不是闲活：王家用半袋高粱换爹打一张榆木门。封锁沟里外，
         // 钱换不来东西——这年头，手艺就是一家人的口粮
-        { stage: "他惦记着村东头那堆木料——王家订的榆木门，讲好了用半袋高粱换。", d: 4.6, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
+        { stage: "他惦记着场院边那两根榆木料——王家订的门，讲好了用半袋高粱换。", d: 4.6, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
           on: (state) => {
             // 心思已经在村东头了：眼睛先往那边去
             state.player.pose = null;
@@ -1237,10 +1291,13 @@ export const SCRIPTS = {
     },
     {
       // 独轮车运木料：一件家务同时教「扛放」与「推」（C3 推陷车/跟车的前置）。
-      // 去木料堆的路上先翻院墙缺口——「翻越」的第一次，贴近自动手脚并用，
-      // 可翻越物的轮廓语法（肩高、顶沿缺口）从这堵墙定死。
+      // 这趟差事的前因后果一件都不省（用户退回过：「为什么搬？解决什么问题？
+      // 送给谁？」）：料是**王家订门自家备的**（主家备料、木匠出工，半袋高粱
+      // 换手艺——c1_mark 的旁白先把这笔账说了），王家的大车只能送到场院，
+      // 窄巷这一段得靠自家独轮车倒短——爹开拍亲口派活，一句话把三个问号说完。
+      // 刨完料，工作台边会立起那扇半成的门扇（doorLeafWip）——料的去处看得见。
       kind: "chain", id: "c1_barrow",
-      objective: "帮爹把木料运回来", hint: "村东头那两根木料，独轮车就在墙缺口外",
+      objective: "把王家送来的门料拉回来", hint: "大车只到场院——料在草垛边，独轮车停在自家院墙外",
       bubbles: (state) => {
         // 爹缺木料：图形气泡挂在他头上，直到两根都上了车
         if ((state.flags.barrowPlanks || 0) < 2) state.bubbles.push({ who: "father", icon: "plank" });
@@ -1255,6 +1312,25 @@ export const SCRIPTS = {
           mother.cineTarget = { x: V_PATCH_X };
           mother.cineSpeed = 1.45;
         }
+        // 妹妹这会儿才从家门里蹽出来，一路往村东头跑——娘那句喊话把
+        // 「妹妹在哪」钉死在老槐树底下。没有这一嗓子，c1_cloth 让玩家去找她
+        // 就是没头没脑的（用户原话：一开始我也不知道妹妹就在那么远的地方）。
+        // 顺路她会从取料的玩家身边跑过——「碰巧看见妹妹往东去了」
+        const sister = FindActor(state, "sister");
+        if (sister) {
+          sister.x = 33.2;
+          sister.heading = 1;
+          sister.cineTarget = { x: V.sisterTree.x + 1 };
+          sister.cineSpeed = 3.3;
+        }
+        StartMicroCine(state, [
+          { who: "爹", say: "王家把门料送到场院了，大车进不了这条窄巷。去，推车拉回来。", d: 3.6,
+            cam: { kind: "shot", x: 41, y: 1.6, dist: 7 } },
+          // 镜头切到场院口：妹妹正好从画面里跑过去——娘在画外喊。
+          //（别用 wide——那是全村大全景，人在里头只有蚂蚁大）
+          { who: "娘", say: "哎——慢着点儿跑！就在老槐树底下玩，不许往村东口去！", d: 3.6,
+            cam: { kind: "shot", x: 52, y: 1.7, dist: 7 } },
+        ]);
       },
       tick: (state) => {
         // 娘走到菜畦就开始锄地（走位到点没有回调，这里每帧看一眼）
@@ -1288,7 +1364,7 @@ export const SCRIPTS = {
       // 这一拍要看得见木头。爹先一趟示范，然后让开工位。
       // 这块刨平的料就是他接下来要合的榫；也是扫荡时他慌忙塞进柴堆的那把刨子
       // 唯一一次真正在玩家手里用过——藏的是刚才教会你的那件东西。
-      kind: "plane", id: "c1_tenon", zone: V.workbench,
+      kind: "plane", id: "c1_tenon", zone: V.workbench, doneFlag: "tenonDone",
       // boardY = 料的**上沿**。台面在 0.54m（DrawBench 的板厚），料厚 0.17m，
       // 所以上沿落在 0.71——低了就陷进台子里，高了就浮在半空
       passes: 3, span: 0.62, boardY: 0.71, demoTime: 3.0,
@@ -1297,7 +1373,9 @@ export const SCRIPTS = {
       // （老版这一拍根本没写 cam，用的是 12.6m 的跟随景别，木楔只有几个像素。）
       cam: { kind: "shot", x: 40.35, y: 0.88, dist: 2.05 },
       objective: "帮爹把这块料刨平", hint: "顺着木纹一推到底，中间别停",
-      note: "料平了。爹用手掌从头到尾抹了一遍，没说话，点了下头。",
+      // 完工旗立起工作台边那扇半成的门扇（doorLeafWip）：料从场院拉回来、
+      // 在台上刨平、合进门扇——一条线走完，去处全在画面里
+      note: "料平了。爹抹了一遍，点了下头，把它合进靠墙那扇门样里——王家的门，起了个头。",
     },
     {
       // 教「链＋单格换手」：两跳半——挂桶才知绳断；翻堆要双手，得先放下桶；
@@ -1411,7 +1489,16 @@ export const SCRIPTS = {
       onStart: (state) => {
         // 妹妹仰头跳着够：动态显著性就是引导，不用文字
         const sister = FindActor(state, "sister");
-        if (sister) { sister.track = { name: "reachJump", t: 0 }; sister.heading = 1; }
+        if (sister) {
+          // 跳幕/极速通关时她可能还在半道上（c1_barrow 才把她从家门放出去跑）：
+          // 这一拍开场她必须已经在老槐树底下，不然玩家按提示跑过去扑个空
+          if (Math.abs(sister.x - (V.sisterTree.x + 1)) > 2) {
+            sister.x = V.sisterTree.x + 1;
+            sister.cineTarget = null;
+          }
+          sister.track = { name: "reachJump", t: 0 };
+          sister.heading = 1;
+        }
       },
       steps: [
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
@@ -3081,7 +3168,9 @@ export function CreateGame(chapterIndex = 0) {
     planing: null,
     planeCurl: null,
     scribe: null,
-    scribeCard: null,       // 划线那一拍铺满画框的手绘特写卡（见 StepScribe）
+    // 铺满画框、每帧重画的手绘活卡：做功的那两拍都长在卡上
+    scribeCard: null,      // 划线（见 StepScribe）
+    planeCard: null,       // 刨料（见 StepPlane）
     spotFlash: null,
     irisFocus: null,
     pip: null,
@@ -3188,6 +3277,7 @@ export function StartChapter(state, index) {
   state.planeCurl = null;
   state.scribe = null;
   state.scribeCard = null;
+  state.planeCard = null;
   state.spotFlash = null;
   state.irisFocus = null;
   state.pip = null;
@@ -3204,6 +3294,7 @@ export function StartChapter(state, index) {
     state.flags.raidStarted = false;
     state.flags.waterFilled = false;
     state.flags.planedOnce = false;
+    state.flags.tenonDone = false;
   }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
@@ -3312,6 +3403,7 @@ function AdvanceBeat(state) {
   state.planing = null;
   state.scribe = null;
   state.scribeCard = null;
+  state.planeCard = null;
   state.throwAim = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
   else EnterBeat(state);
@@ -3687,7 +3779,7 @@ function MovePlayer(state, input, dt) {
     // 腿甩过顶沿之后才荡下去。上一版用对称的 smoothstep，人在墙上方匀速平移，
     // 于是"撑"这件事根本看不出来——那是最像悬浮的一段。
     p.x = p.vaultFrom + (p.vaultTo - p.vaultFrom) * VaultTravel(k);
-    p.lift = (p.vaultTop || 1.2) * VaultArc(k, p.vaultBig);
+    p.lift = VaultArc(k, p.vaultBig, p.vaultTop);
     p.pose = p.vaultBig ? "clamber" : "vault";
     // 垛顶上藏不住人：翻越是要露头的，这也是把它放进扫荡段的意义
     p.hidden = false;
@@ -3859,7 +3951,9 @@ function StepFollowers(state, dt) {
       const span = (v.w || 1) / 2 + 0.5;
       const d = Math.abs(a.x - v.x);
       if (d > span) continue;
-      const up = (v.top ?? 1.2) * 0.68 * Math.sin((1 - d / span) * (Math.PI / 2));
+      // 跟主角同一条规范（VaultLiftFor），只是她按"离墙多远"连续算而不是排时间轴。
+      // 妹妹比柱子矮一头多，胯更低，所以同一堵墙她要多抬一点
+      const up = (VaultLiftFor(v.top) + 0.12) * Math.sin((1 - d / span) * (Math.PI / 2));
       if (up <= lift) continue;
       lift = up;
       // 动作进度顺着她的行进方向算：还没过中线是撑上去，过了是落下来
@@ -5356,6 +5450,11 @@ function SettleBeat(state, def) {
     case "mapBoard":
       state.flags.deduced = true;
       break;
+    // 跳过刨料：完工旗照落——门扇雏形（doorLeafWip）靠它现身
+    case "plane":
+      state.flags.planedOnce = true;
+      if (def.doneFlag) state.flags[def.doneFlag] = true;
+      break;
     // 跳过一条链，就等于这条链上每一步都做过了：旗标要落、口信要入账
     // （第六章的推理要用），手里那格清空——东西都已经用出去了。
     case "chain":
@@ -5425,6 +5524,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.promptFill = null;
   state.scribe = null;
   state.scribeCard = null;
+  state.planeCard = null;
   state.knot = null;
   state.gesture = null;
   state.closeUp = null;

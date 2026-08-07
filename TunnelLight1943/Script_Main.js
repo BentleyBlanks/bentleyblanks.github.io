@@ -3,11 +3,13 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
-  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
+  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=041";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=041";
+// 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
+//（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
+import { CreateSoundtrack } from "./Script_Soundtrack.js";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +44,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=041")
+import("./Script_Audio.js")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -144,9 +146,10 @@ window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
 // 沉浸式手势的唯一入口：手按在画面上的**位置**（世界坐标 / 特写卡坐标），
 // 加上竖向拖动量与点按。所有上手的玩法都从这几样里取——
-// 转辘轳/打结靠 world 绕圈、攥刨子靠 world 落在刨子上、勒紧靠 dy；
-// 攥石笔靠 card：那一拍画面是一张铺满画框的特写卡，玩家按的是卡上那支笔，
-// 世界坐标在那儿没有意义（世界里的笔只有十来个像素，按不着）。
+// 转辘轳/打结靠 world 绕圈、勒紧靠 dy；
+// 攥石笔、攥刨子靠 card：那两拍画面是一张铺满画框的特写卡，玩家按的是卡上
+// 那件家伙什，世界坐标在那儿没有意义（世界里的笔十来个像素、刨子 90×45，
+// 都是认不出也按不着的尺寸——实测过）。
 // 故意没有横向位移量（dragX）通道：位移量拖哪儿都涨，本质是根看不见的
 // slider——对物体做功必须攥住那个物体本身。
 const gest = {
@@ -441,7 +444,13 @@ function UpdateCamera(state, dt) {
   // 划线的活卡：铺满画框、每帧重画，玩家的手就按在上面。必须排在
   // SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera 之前
   //（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
-  world.SetLiveCard(state.phase === "playing" ? state.scribeCard : null, SCRIBE_CARD, dt);
+  const playing = state.phase === "playing";
+  world.SetLiveCard(
+    playing && state.scribeCard ? { kind: "scribe", view: state.scribeCard, layout: SCRIBE_CARD }
+      : playing && state.planeCard ? { kind: "plane", view: state.planeCard, layout: PLANE_CARD }
+        : null,
+    dt,
+  );
 
   if (camSnap) {
     cam.x = shot.x; cam.y = shot.y; cam.hw = shot.hw;
@@ -724,7 +733,7 @@ function SyncHud(state, dt, shotFade) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    ui.touchControls.classList.toggle("gone", !!state.scribeCard && state.phase === "playing");
+    ui.touchControls.classList.toggle("gone", !!(state.scribeCard || state.planeCard) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {

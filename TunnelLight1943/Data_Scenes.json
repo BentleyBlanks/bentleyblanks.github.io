@@ -28,6 +28,7 @@
         { "id": "houseD", "kind": "house", "x": 148, "w": 8, "h": 3.2 },
         { "id": "doorframe", "kind": "doorframe", "x": 34, "name": "门框" },
         { "id": "workbench", "kind": "bench", "x": 40.5, "name": "工作台" },
+        { "id": "doorLeafWip", "kind": "doorLeaf", "x": 46.2, "showFlag": "tenonDone", "name": "王家的门扇（半成）" },
         { "id": "stool", "kind": "stool", "x": 32, "name": "旧木凳" },
         { "id": "veggieWest", "kind": "crops", "x": 16.5, "w": 5, "veggie": true, "name": "菜畦", "note": "娘的活计：柱子跑腿时爹在锯木头、娘在这儿锄地——家里没有站着围观的人。veggie=贴地叶簇画法：春天的菜畦是低矮的秧苗，不是齐腰的秆子" },
         { "id": "laneWall", "kind": "brokenWall", "x": 84, "w": 1.5, "h": 0.82, "name": "塌进巷子的院墙", "note": "教「翻越」的第一课。路当中码一垛柴说不通——两家院子的隔墙塌了半截，土坯碴子横在巷口，才有理由既绕不过去又只能跨过去。侧视里的 w 是**沿路方向的厚度**（塌下来的碴子摊开一米半），不是墙的长度；高 0.82m＝柱子的胯高（他 1.38m），一只手撑得住；顶沿被人踩磨得圆亮、豁一个口＝可翻越物的轮廓语法。离跑腿路线（院子 31~70）远，那趟路空着手来回" },

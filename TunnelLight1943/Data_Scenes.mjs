@@ -8,7 +8,7 @@
 // 这里做三件事：读进来、把带名解析成 z、**在加载时就把配错的地方抛出来**——
 // 场景数据配错的代价是"某个东西在画面上不见了"，那是最难查的一类 bug，
 // 所以宁可开局就崩，也不要静默地少画一个物体。
-import { BAND } from "./Data_DepthSpec.mjs";
+import { BAND, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
 
 // 贴图像素 / 世界米。整套美术的尺寸标尺，渲染层也从这里取。
 export const PPM = 48;
@@ -19,11 +19,17 @@ export const PPM = 48;
 // prop 那一档在这个景别下就开始糊了
 export const SS = { prop: 4, detail: 3, hint: 12, closeup: 8 };
 
+// 本模块自己是带版本戳进来的（index.html 的 import map），把那个戳原样接到
+// JSON 上——不然场景数据会独自留在手机缓存里：代码是新的、物体位置是旧的。
+// Node 那边 import.meta.url 没有 query，天然是空串。
+const DATA_VER = new URL(import.meta.url).search;
+
 // 同构读取：Node 走 fs，浏览器走 fetch。两边都是 ESM 顶层 await，
 // 调用方什么都不用改（模块图会等它加载完）。
 async function LoadJson(name) {
-  const url = new URL(name, import.meta.url);
   const isNode = typeof process !== "undefined" && !!process.versions?.node;
+  // fs 读不了带 query 的 URL，所以版本戳只加在 fetch 这条路上
+  const url = new URL(isNode ? name : name + DATA_VER, import.meta.url);
   const text = isNode
     ? await (await import("node:fs/promises")).readFile(url, "utf8")
     : await (await fetch(url)).text();
@@ -85,6 +91,31 @@ for (const [key, scene] of Object.entries(SCENES)) {
   }
   for (const c of scene.covers || []) {
     if (!COVER_ART[c.kind]) throw new Error(`场景 ${key} 的掩体 ${c.id} 用了没登记的 kind "${c.kind}"（补进 Data_PropArt.json 的 covers）`);
+  }
+  // 翻越尺度规范：顶沿高过撑手的人的胯，「翻」就成了「攀」——那是另一套
+  // 动作。上限见 Data_DepthSpec 的 VAULT_MAX_TOP（以第一章那堵塌墙 0.82m 为基准）。
+  // 这里抛而不是告警：配了一堵一米二的墙，翻越动画会当场穿帮，不该静默上线。
+  for (const v of scene.vaults || []) {
+    if (typeof v.top !== "number") {
+      throw new Error(`场景 ${key} 的可翻越物 x=${v.x} 没写 top（顶沿高度，米）`);
+    }
+    if (v.top > VAULT_MAX_TOP) {
+      throw new Error(`场景 ${key} 的可翻越物 x=${v.x} 顶沿 ${v.top}m 超过上限 ${VAULT_MAX_TOP}m`
+        + "——高过胯就撑不住了，那是攀不是翻。要么压矮，要么别把它做成可翻越物");
+    }
+    if (v.top < VAULT_MIN_TOP) {
+      throw new Error(`场景 ${key} 的可翻越物 x=${v.x} 顶沿只有 ${v.top}m，比 ${VAULT_MIN_TOP}m 还矮`
+        + "——那是一步跨过去的东西，不值得占一个按键");
+    }
+    // 顶沿高度必须和美术画出来的一样高，否则手会撑在空气里
+    const art = PROP_ART[(scene.props || []).find((p) => Math.abs(p.x - v.x) < 0.9)?.kind];
+    if (art?.sprite?.h && typeof art.sprite.h === "number") {
+      const drawn = (art.sprite.h - (art.sprite.baseline || 0)) / 48;   // PPM=48
+      if (drawn < v.top - 0.02) {
+        throw new Error(`场景 ${key} 的可翻越物 x=${v.x}：贴图只有 ${drawn.toFixed(2)}m 高，`
+          + `却声称顶沿在 ${v.top}m——画笔会画出画布被裁平（"那口麻袋"就是这么来的）`);
+      }
+    }
   }
   // 行走线上的物体跑到行走范围外＝玩家永远走不到它跟前，多半是坐标打错了。
   // 背景带（远景建筑/院墙/炮楼/牢房）本来就在走不到的地方，不查。
