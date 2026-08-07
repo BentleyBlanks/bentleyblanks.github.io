@@ -3362,7 +3362,13 @@ export function CreateWorld(canvasEl) {
       knotRope.visible = true;
       knotTip.visible = true;
       const tipA = a0 + Math.max(0.02, kn.t) * turns * Math.PI * 2;
-      knotTip.position.set(kn.x + Math.cos(tipA) * r, cy + Math.sin(tipA) * r * 0.82, BAND.loose);
+      // 还没上手时绳头自己晃两下——HUD 那枚手势图标已经删掉（用户："不需要
+      // 这么简单的提示"），招呼玩家上手的只能是绳头本身。晃的方向就是该绕的
+      // 方向（沿引导圈往前蹭一点点），顺带把"往哪边转"也演了
+      const nudge = kn.idle ? Math.max(0, Math.sin(kn.idle * 2.2)) * 0.22 : 0;
+      const showA = tipA + nudge;
+      knotTip.position.set(kn.x + Math.cos(showA) * r, cy + Math.sin(showA) * r * 0.82, BAND.loose);
+      knotTip.scale.setScalar(1 + (kn.idle ? Math.sin(kn.idle * 4.4) * 0.10 : 0));
     } else if (knotGuide) {
       knotGuide.visible = false;
       knotRope.visible = false;

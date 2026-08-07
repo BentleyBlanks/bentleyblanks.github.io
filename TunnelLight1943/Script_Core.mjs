@@ -920,9 +920,13 @@ function StepChain(state, def, input, dt) {
       // 特写：打结是指尖上的活，镜头推到断头跟前——引导圈、缠上去的绳、
       // 收紧的结都要看得清；离开井台自动拉回
       state.closeUp = { x: cx, y: cyRel - 0.25, hw: st.closeHw ?? 2.6 };
-      // 指针绕圈：真实位置驱动——手得真的在断头附近画圈
+      // 指针绕圈：真实位置驱动——手得真的在断头附近画圈。
+      // **方向是有意义的**：绳只能顺着一个方向往上缠（世界角度递增＝画面上
+      // 逆时针，与 World 里绳圈的画法同一个方向）。反着转就是在往下解，
+      // 圈会一圈圈退回来。老版取 Math.abs(d) 两头都算涨，于是转哪边都能过——
+      // 那就不是"缠绳"，是"在这儿画圈满一定角度"。
       const pw = input.pointerWorld;
-      if (input.pointerHeld && pw && kn.t < 1) {
+      if (input.pointerHeld && pw) {
         const dx = pw.x - cx, dy = pw.y - (SURFACE_Y + cyRel);
         const r = Math.hypot(dx, dy);
         if (r > 0.12 && r < 1.5) {
@@ -932,8 +936,16 @@ function StepChain(state, def, input, dt) {
             if (d > Math.PI) d -= Math.PI * 2;
             if (d < -Math.PI) d += Math.PI * 2;
             if (Math.abs(d) < 1.0) {
-              kn.t = Math.min(1, kn.t + Math.abs(d) / (Math.PI * 2 * KNOT_TURNS));
-              FlashPose(state, "mark", 0.25);
+              const turn = d / (Math.PI * 2 * KNOT_TURNS);
+              if (kn.t < 1) {
+                // 缠：正向涨；反向退（解开的手感，退得比缠快一点点）
+                kn.t = Math.max(0, Math.min(1, kn.t + (turn > 0 ? turn : turn * 1.25)));
+                if (turn > 0) FlashPose(state, "mark", 0.25);
+              } else if (turn < 0) {
+                // 已经缠满了还往回转＝把结解开，退回缠绳这一步
+                kn.t = Math.max(0, 1 + turn * 1.25);
+                kn.cinch = 0;
+              }
             }
           }
           kn.prevA = a;
@@ -941,21 +953,21 @@ function StepChain(state, def, input, dt) {
       } else kn.prevA = null;
       // 缠上第一把，绳就离手挂在井架上了
       if (kn.t > 0.03 && p.item?.id === st.needs) { p.item = null; FlashPose(state, "mark", 0.4); }
-      if (kn.t < 1) {
-        if (input.interactHeld) { kn.t = Math.min(1, kn.t + dt / 2.8); FlashPose(state, "mark", 0.25); }
-        state.prompt = st.prompt || "按住 E · 缠绳";
-        state.gesture = { kind: "circle" };
-        state.promptFill = kn.t * 0.8;
-        if (kn.t >= 1) Cue(state, "pickup", { gain: 0.7 });
-      } else {
+      // **没有长按后备**（用户明令："为什么还支持长按交互按钮的模式？干掉"）。
+      // 打结是指尖上的活：手不落在绳头上、不真的绕圈，就一点进展都没有。
+      // 也**没有 HUD 手势图标**——招呼玩家上手的是绳头自己（它在断头上晃），
+      // 转对了绳圈一圈圈缠上去、转反了退回来，物体自己把方向教了。
+      if (kn.t >= 1) {
+        if (!kn.wound) { kn.wound = true; Cue(state, "pickup", { gain: 0.7 }); }
+        // 缠满了改竖拽勒紧（同样只认手上的动作，没有长按）
         const pull2 = input.pullHeld ? Math.max(0, input.pull || 0) : 0;
         if (pull2 > 0) { kn.cinch = Math.min(1, kn.cinch + Math.min(pull2 * 2.2, dt * 4)); FlashPose(state, "crank", 0.25); }
-        if (input.interactHeld) kn.cinch = Math.min(1, kn.cinch + dt / 0.9);
-        state.prompt = "按住 E · 勒紧";
-        state.gesture = { kind: "dragDown" };
-        state.promptFill = 0.8 + kn.cinch * 0.2;
-      }
-      state.knot = { x: cx, y: cyRel, t: kn.t, cinch: kn.cinch, turns: KNOT_TURNS };
+      } else kn.wound = false;
+      // 还没上手时绳头自己晃两下——这是唯一的"招呼"，代替原来那个 HUD 图标
+      state.knot = {
+        x: cx, y: cyRel, t: kn.t, cinch: kn.cinch, turns: KNOT_TURNS,
+        idle: kn.prevA === null && kn.t < 0.02 ? state.time : 0,
+      };
       if (kn.cinch >= 1) {
         Cue(state, "ladder", { gain: 0.75 });   // 麻绳勒紧时木架受力的吱嘎
         state.knot = null;
@@ -5410,7 +5422,12 @@ export function GetBeatTarget(state) {
         }
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
         // 打结：按住 E 的键盘后备路径就能缠满 + 勒紧
-        case "knot": return { action: "holdAt", x: st.zone.x, level: st.zone.level || "surface" };
+        // 打结没有长按后备（用户明令删掉），驱动器只能真的绕圈——
+        // 所以给它一个专门的动作，把圆心与半径一并交出去
+        case "knot": return {
+          action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
+          cx: st.zone.x, cy: SURFACE_Y + (st.knotY ?? 1.5), r: 0.45,
+        };
         case "throwHit":
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
           return { action: "throwAt", x: st.target.x - 6, level: "surface", face: 1 };
