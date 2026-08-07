@@ -57,6 +57,18 @@
       },
       "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档"
     },
+    "doorLeaf": {
+      "art": "DrawDoorLeaf",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 72,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "王家订的门扇（半成品）：合完榫（flags.tenonDone）才立到工作台边——搬料/刨料这两件活的去处，画面自己交代"
+    },
     "bench": {
       "art": "DrawBench",
       "band": "walk",

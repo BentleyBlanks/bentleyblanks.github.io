@@ -878,8 +878,15 @@ function TestWorkStations() {
   assert.equal(father?.track?.name, "sawing", "运木料时爹必须在拉锯");
   assert.equal(father?.carry, "锯", "拉锯的爹手上必须有锯");
   assert.ok(mother?.cineTarget || mother?.track, "运木料时娘必须动身去菜畦或已在干活");
+  // 差事的前因后果：爹开拍亲口派活（不能只有目标文本），
+  // 妹妹同一拍从家门跑向老槐树——她在哪，娘的喊话与这一路交代掉
+  assert.ok(state.microCine, "运木料开拍爹必须亲口派活");
+  const sis = state.actors.find((a) => a.id === "sister");
+  assert.ok(sis?.cineTarget && sis.cineTarget.x > 100, "开拍妹妹必须动身往老槐树跑");
 
   DebugJump(state, 0, beats.indexOf("c1_water"));
+  // 跳过了刨料：完工旗必须结算——工作台边那扇半成的门扇（doorLeafWip）靠它现身
+  assert.equal(state.flags.tenonDone, true, "跳过刨料也得落 tenonDone（门扇雏形）");
   StepGame(state, idle, DT);
   // 开拍娘先直起腰喊人（micro-cine 派活），喊完 tick 会把她放回锄地——
   // 先把这句喊话推完再验工位

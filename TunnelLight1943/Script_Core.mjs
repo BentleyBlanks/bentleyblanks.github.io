@@ -1111,6 +1111,7 @@ function StepPlane(state, def, input, dt) {
     state.player.pose = null;
     state.player.poseU = undefined;
     if (father) { father.pose = null; father.poseU = undefined; }
+    if (def.doneFlag) state.flags[def.doneFlag] = true;   // 数据声明的完工旗（门扇雏形靠它现身）
     if (def.note) state.toast = { text: def.note, t: 4.5 };
     AdvanceBeat(state);
   }
@@ -1260,7 +1261,7 @@ export const SCRIPTS = {
           } },
         // 木料不是闲活：王家用半袋高粱换爹打一张榆木门。封锁沟里外，
         // 钱换不来东西——这年头，手艺就是一家人的口粮
-        { stage: "他惦记着村东头那堆木料——王家订的榆木门，讲好了用半袋高粱换。", d: 4.6, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
+        { stage: "他惦记着场院边那两根榆木料——王家订的门，讲好了用半袋高粱换。", d: 4.6, cam: { kind: "shot", x: 40, y: 1.8, dist: 12 },
           on: (state) => {
             // 心思已经在村东头了：眼睛先往那边去
             state.player.pose = null;
@@ -1272,10 +1273,13 @@ export const SCRIPTS = {
     },
     {
       // 独轮车运木料：一件家务同时教「扛放」与「推」（C3 推陷车/跟车的前置）。
-      // 去木料堆的路上先翻院墙缺口——「翻越」的第一次，贴近自动手脚并用，
-      // 可翻越物的轮廓语法（肩高、顶沿缺口）从这堵墙定死。
+      // 这趟差事的前因后果一件都不省（用户退回过：「为什么搬？解决什么问题？
+      // 送给谁？」）：料是**王家订门自家备的**（主家备料、木匠出工，半袋高粱
+      // 换手艺——c1_mark 的旁白先把这笔账说了），王家的大车只能送到场院，
+      // 窄巷这一段得靠自家独轮车倒短——爹开拍亲口派活，一句话把三个问号说完。
+      // 刨完料，工作台边会立起那扇半成的门扇（doorLeafWip）——料的去处看得见。
       kind: "chain", id: "c1_barrow",
-      objective: "帮爹把木料运回来", hint: "村东头那两根木料，独轮车就在墙缺口外",
+      objective: "把王家送来的门料拉回来", hint: "大车只到场院——料在草垛边，独轮车停在自家院墙外",
       bubbles: (state) => {
         // 爹缺木料：图形气泡挂在他头上，直到两根都上了车
         if ((state.flags.barrowPlanks || 0) < 2) state.bubbles.push({ who: "father", icon: "plank" });
@@ -1290,6 +1294,25 @@ export const SCRIPTS = {
           mother.cineTarget = { x: V_PATCH_X };
           mother.cineSpeed = 1.45;
         }
+        // 妹妹这会儿才从家门里蹽出来，一路往村东头跑——娘那句喊话把
+        // 「妹妹在哪」钉死在老槐树底下。没有这一嗓子，c1_cloth 让玩家去找她
+        // 就是没头没脑的（用户原话：一开始我也不知道妹妹就在那么远的地方）。
+        // 顺路她会从取料的玩家身边跑过——「碰巧看见妹妹往东去了」
+        const sister = FindActor(state, "sister");
+        if (sister) {
+          sister.x = 33.2;
+          sister.heading = 1;
+          sister.cineTarget = { x: V.sisterTree.x + 1 };
+          sister.cineSpeed = 3.3;
+        }
+        StartMicroCine(state, [
+          { who: "爹", say: "王家把门料送到场院了，大车进不了这条窄巷。去，推车拉回来。", d: 3.6,
+            cam: { kind: "shot", x: 41, y: 1.6, dist: 7 } },
+          // 镜头切到场院口：妹妹正好从画面里跑过去——娘在画外喊。
+          //（别用 wide——那是全村大全景，人在里头只有蚂蚁大）
+          { who: "娘", say: "哎——慢着点儿跑！就在老槐树底下玩，不许往村东口去！", d: 3.6,
+            cam: { kind: "shot", x: 52, y: 1.7, dist: 7 } },
+        ]);
       },
       tick: (state) => {
         // 娘走到菜畦就开始锄地（走位到点没有回调，这里每帧看一眼）
@@ -1323,7 +1346,7 @@ export const SCRIPTS = {
       // 这一拍要看得见木头。爹先一趟示范，然后让开工位。
       // 这块刨平的料就是他接下来要合的榫；也是扫荡时他慌忙塞进柴堆的那把刨子
       // 唯一一次真正在玩家手里用过——藏的是刚才教会你的那件东西。
-      kind: "plane", id: "c1_tenon", zone: V.workbench,
+      kind: "plane", id: "c1_tenon", zone: V.workbench, doneFlag: "tenonDone",
       // boardY = 料的**上沿**。台面在 0.54m（DrawBench 的板厚），料厚 0.17m，
       // 所以上沿落在 0.71——低了就陷进台子里，高了就浮在半空
       passes: 3, span: 0.62, boardY: 0.71, demoTime: 3.0,
@@ -1332,7 +1355,9 @@ export const SCRIPTS = {
       // （老版这一拍根本没写 cam，用的是 12.6m 的跟随景别，木楔只有几个像素。）
       cam: { kind: "shot", x: 40.35, y: 0.88, dist: 2.05 },
       objective: "帮爹把这块料刨平", hint: "顺着木纹一推到底，中间别停",
-      note: "料平了。爹用手掌从头到尾抹了一遍，没说话，点了下头。",
+      // 完工旗立起工作台边那扇半成的门扇（doorLeafWip）：料从场院拉回来、
+      // 在台上刨平、合进门扇——一条线走完，去处全在画面里
+      note: "料平了。爹抹了一遍，点了下头，把它合进靠墙那扇门样里——王家的门，起了个头。",
     },
     {
       // 教「链＋单格换手」：两跳半——挂桶才知绳断；翻堆要双手，得先放下桶；
@@ -1446,7 +1471,16 @@ export const SCRIPTS = {
       onStart: (state) => {
         // 妹妹仰头跳着够：动态显著性就是引导，不用文字
         const sister = FindActor(state, "sister");
-        if (sister) { sister.track = { name: "reachJump", t: 0 }; sister.heading = 1; }
+        if (sister) {
+          // 跳幕/极速通关时她可能还在半道上（c1_barrow 才把她从家门放出去跑）：
+          // 这一拍开场她必须已经在老槐树底下，不然玩家按提示跑过去扑个空
+          if (Math.abs(sister.x - (V.sisterTree.x + 1)) > 2) {
+            sister.x = V.sisterTree.x + 1;
+            sister.cineTarget = null;
+          }
+          sister.track = { name: "reachJump", t: 0 };
+          sister.heading = 1;
+        }
       },
       steps: [
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
@@ -3242,6 +3276,7 @@ export function StartChapter(state, index) {
     state.flags.raidStarted = false;
     state.flags.waterFilled = false;
     state.flags.planedOnce = false;
+    state.flags.tenonDone = false;
   }
   if (index === 1) { state.flags.dogFed = false; state.flags.lanternOut = false; }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
@@ -5394,6 +5429,11 @@ function SettleBeat(state, def) {
       break;
     case "mapBoard":
       state.flags.deduced = true;
+      break;
+    // 跳过刨料：完工旗照落——门扇雏形（doorLeafWip）靠它现身
+    case "plane":
+      state.flags.planedOnce = true;
+      if (def.doneFlag) state.flags[def.doneFlag] = true;
       break;
     // 跳过一条链，就等于这条链上每一步都做过了：旗标要落、口信要入账
     // （第六章的推理要用），手里那格清空——东西都已经用出去了。

@@ -114,6 +114,10 @@ const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
 const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚"];
+// 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
+// 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
+// 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
+const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
@@ -1297,6 +1301,7 @@ export function CreateWorld(canvasEl) {
         mk((ctx, ax, ay) => ART.DrawCloth(ctx, ax, ay, p.id));
         break;
       }
+      case "doorLeaf": mk((ctx, ax, ay) => ART.DrawDoorLeaf(ctx, ax, ay, p.id)); break;
       case "vat": mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id)); break;
       case "tuberPile": mk((ctx, ax, ay) => ART.DrawTuberPile(ctx, ax, ay, p.id)); break;
       case "cellarShelf": mk((ctx, ax, ay) => ART.DrawCellarShelf(ctx, ax, ay, p.id)); break;
@@ -2056,9 +2061,11 @@ export function CreateWorld(canvasEl) {
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
     s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (alongArm) {
-      // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上
+      // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上，
+      // 再加上这件工具在手心里的固有偏角（扫帚不与前臂共线，见 ARM_TOOL_TILT）
       const elbow = ToLocal(ElbowPoint(s.rig));
-      s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y));
+      s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y))
+        + (ARM_TOOL_TILT[label] || 0) * (heading >= 0 ? 1 : -1);
     } else {
       s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
     }

@@ -332,17 +332,19 @@ export const TRACKS = {
       { t: 2.8, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armF: -30, foreF: -20 },
     ],
   },
-  // 扫院（循环）：扫帚在近侧手里顺前臂摆，一推一带、蹭着地走。
-  // 幅度比锄地小得多——扫地是胳膊的活，不是腰的活
+  // 扫院（循环）。老版本的错在把扫帚当"顺前臂垂下来的棍"：帚柄与前臂共线，
+  // 柄的上半截就叠在小臂上、直戳到脑袋边——看着是根倚在身上的杆子，不是握着的
+  // 扫帚。真拿扫帚，柄在手心里是**斜着**的（比前臂平一档）——这个偏角由 World
+  // 的 ARM_TOOL_TILT 给（绕握点转，握点还在手心里）。这里管的是身体：
+  // 弯下腰去（扫地的手位很低），前臂**伸直探到身前**（θ=armF+foreF 决定帚的
+  // 朝向），后手在腹前虚扶柄的上端。一推一带都从前肩出。
   sweeping: {
     dur: 1.9, loop: true,
     keys: [
-      // 胳膊只在垂线前后小幅摆：扫帚顺前臂挂着，臂一抬高帚就横过来端着了——
-      // 扫地的帚头得蹭着地走
-      { t: 0.0, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22, thighB: -10, shinB: 14, footB: -5, thighF: 6, shinF: 5, footF: -5 },
-      { t: 0.7, hipY: -0.07, hipX: 0.05, torso: 24, head: -16, armF: -30, foreF: -14, armB: -46, foreB: -28 },  // 往前推
-      { t: 1.2, hipY: -0.05, hipX: 0.03, torso: 21, head: -14, armF: -22, foreF: -11, armB: -40, foreB: -25 },  // 带回来
-      { t: 1.9, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22 },
+      { t: 0.0, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52, thighB: -12, shinB: 16, footB: -5, thighF: 7, shinF: 6, footF: -5 },
+      { t: 0.7, hipY: -0.11, hipX: 0.09, torso: 30, head: -18, armF: -38, foreF: -10, armB: -22, foreB: -56 },  // 往前推
+      { t: 1.2, hipY: -0.08, hipX: 0.06, torso: 24, head: -15, armF: -17, foreF: -8, armB: -10, foreB: -48 },   // 带回来
+      { t: 1.9, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52 },
     ],
   },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来

@@ -1401,6 +1401,36 @@ export function DrawWoodpile(ctx, x, groundY, id) {
   }
 }
 
+// 王家订的那扇榆木门（半成品）：斜靠着的门扇骨架——两根边梃、三根抹头，
+// 门芯板只装了下面一块，上面还空着两档。刨平的料一趟趟填进去，
+// 「搬木料是在给谁干活」这件事就立在工作台边上，不用字幕说。
+// 斜靠：整扇向右倒 6°——摆位（Data_Scenes 的 doorLeafWip）在自家院墙西端，
+// 上端正好搭在墙面上
+export function DrawDoorLeaf(ctx, x, groundY, id) {
+  ctx.save();
+  ctx.translate(x, groundY);
+  ctx.rotate(0.10);
+  const W = 40, H = 92;          // ≈0.8m 宽、1.84m 高
+  // 两根边梃
+  InkFill(ctx, Rect(-W / 2, -H, 7, H), id + "stL", "#a8794a", { amp: 1.0, lw: 2.2, shade: "rgba(0,0,0,0.16)" });
+  InkFill(ctx, Rect(W / 2 - 7, -H, 7, H), id + "stR", "#9f7244", { amp: 1.0, lw: 2.2, shade: "rgba(0,0,0,0.16)" });
+  // 三根抹头（上/中/下）
+  for (const [i, yy] of [[0, -H + 4], [1, -H * 0.55], [2, -13]]) {
+    InkFill(ctx, Rect(-W / 2 + 6, yy, W - 12, 6), id + "r" + i, "#b08150",
+      { amp: 0.9, lw: 2, shade: "rgba(0,0,0,0.13)" });
+  }
+  // 只装上了下面一块门芯板：新刨的料，比骨架亮一档——刚干完的活看得出新
+  InkFill(ctx, Rect(-W / 2 + 6, -13 + 6 - 24, W - 12, 18), id + "panel", "#d3ab6e",
+    { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.10)" });
+  // 上面两档还空着：从空档里透出后面的墙色，靠两道浅浅的内框线说"这儿缺料"
+  InkLine(ctx, -W / 2 + 7, -H * 0.55 - 3, W / 2 - 7, -H * 0.55 - 3, id + "gap",
+    { lw: 1.1, color: "rgba(80,60,40,0.35)", amp: 0.8 });
+  // 榫头：中抹头两端各探出一点——木匠活的记号
+  InkFill(ctx, Rect(-W / 2 - 3, -H * 0.55 + 1, 4, 4), id + "tnL", "#8d6236", { amp: 0.5, lw: 1.4 });
+  InkFill(ctx, Rect(W / 2 - 1, -H * 0.55 + 1, 4, 4), id + "tnR", "#8d6236", { amp: 0.5, lw: 1.4 });
+  ctx.restore();
+}
+
 export function DrawBench(ctx, x, groundY, id) {
   InkFill(ctx, Rect(x - 26, groundY - 26, 52, 8), id, PAL.wood, { amp: 1, lw: 2.3, shade: "rgba(0,0,0,0.14)" });
   InkFill(ctx, Rect(x - 22, groundY - 18, 6, 18), id + "l1", PAL.woodDark, { amp: 0.8, lw: 2 });
