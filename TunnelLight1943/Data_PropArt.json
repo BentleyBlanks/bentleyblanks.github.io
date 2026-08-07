@@ -132,7 +132,7 @@
         "anchor": "center",
         "baseline": 12
       },
-      "note": "圆井台(0.65m)+两根立柱+辘轳鼓，鼓心钉死在 groundY-69px（=Core 的 WINCH_HUB_Y 1.43m×48），会转的摇把就贴在这一点上——改画高就要改 WINCH_HUB_Y。两处条件绘制都在 DrawWell 里：绳断（flags.wellRopeBroken）换成一截毛茬朝下的断头；摇辘轳那一拍（state.winchView）静态摇把让位给会转的那只，由 World 的 propRedraw 单张重烘"
+      "note": "圆井台(0.73m 高、0.52m 半径——矮而宽会读成洗脸盆)+两根立柱+辘轳鼓，鼓心钉死在 groundY-69px（=Core 的 WINCH_HUB_Y 1.43m×48），会转的摇把就贴在这一点上——改画高就要改 WINCH_HUB_Y。两处条件绘制都在 DrawWell 里：绳断（flags.wellRopeBroken）换成一截毛茬朝下的断头；摇辘轳那一拍（state.winchView）静态摇把让位给会转的那只，由 World 的 propRedraw 单张重烘"
     },
     "millstone": {
       "art": "DrawMillstone",
