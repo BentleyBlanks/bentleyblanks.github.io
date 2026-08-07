@@ -6,8 +6,8 @@ import {
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateSoundtrack } from "./Script_Soundtrack.js?v=040";
-import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=040";
+import { CreateSoundtrack } from "./Script_Soundtrack.js?v=041";
+import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs?v=041";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -42,7 +42,7 @@ const soundtrack = CreateSoundtrack({
   StopVoice: () => audio.StopVoice(),
   Update: (...a) => audio.Update(...a),
 });
-import("./Script_Audio.js?v=040")
+import("./Script_Audio.js?v=041")
   .then((m) => {
     audio = m.CreateAudio();
     audio.SetEnabled(soundOn);
@@ -142,13 +142,15 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
-// 沉浸式手势的唯一入口：手按在画面上的**世界坐标**（不是屏幕位移），
-// 加上横竖两路拖动量与点按。所有上手的玩法都从这几样里取——
-// 转辘轳/打结靠 world 绕圈、刨料靠 dx（拖过 45% 画宽=一整趟）、勒紧靠 dy。
+// 沉浸式手势的唯一入口：手按在画面上的**位置**（世界坐标 / 特写卡坐标），
+// 加上竖向拖动量与点按。所有上手的玩法都从这几样里取——
+// 转辘轳/打结靠 world 绕圈、攥刨子靠 world 落在刨子上、勒紧靠 dy；
 // 攥石笔靠 card：那一拍画面是一张铺满画框的特写卡，玩家按的是卡上那支笔，
 // 世界坐标在那儿没有意义（世界里的笔只有十来个像素，按不着）。
+// 故意没有横向位移量（dragX）通道：位移量拖哪儿都涨，本质是根看不见的
+// slider——对物体做功必须攥住那个物体本身。
 const gest = {
-  active: false, id: null, lastX: 0, lastY: 0, dx: 0, dy: 0, downT: 0, moved: 0,
+  active: false, id: null, lastX: 0, lastY: 0, dy: 0, downT: 0, moved: 0,
   world: null, card: null,
 };
 let tapEdge = false;
@@ -162,7 +164,6 @@ canvas.addEventListener("pointerdown", (e) => {
   gest.lastY = e.clientY;
   gest.downT = performance.now();
   gest.moved = 0;
-  gest.dx = 0;
   gest.dy = 0;
   gest.world = world.ScreenToWorld(e.clientX, e.clientY);
   gest.card = world.ScreenToCard(e.clientX, e.clientY);
@@ -173,8 +174,6 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   if (!gest.active || e.pointerId !== gest.id) return;
   const span = Math.max(160, canvas.clientHeight * 0.55);
-  const spanX = Math.max(240, canvas.clientWidth * 0.45);
-  gest.dx += (e.clientX - gest.lastX) / spanX;
   gest.dy += (e.clientY - gest.lastY) / span;
   gest.moved += Math.abs(e.clientX - gest.lastX) + Math.abs(e.clientY - gest.lastY);
   gest.lastX = e.clientX;
@@ -189,7 +188,6 @@ for (const evt of ["pointerup", "pointercancel", "pointerleave"]) {
     if (evt === "pointerup" && performance.now() - gest.downT < 420 && gest.moved < 14) tapEdge = true;
     gest.active = false;
     gest.id = null;
-    gest.dx = 0;
     gest.dy = 0;
   });
 }
@@ -717,11 +715,11 @@ function SyncHud(state, dt, shotFade) {
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
-  // 划线与刨料都没有 HUD 轨道：玩家攥的是画面里那支笔、那把刨子本身，
-  // 进度就是木头上那道印子、被刨亮的那一片和地上那堆刨花。
-  // （这里曾有一条 QTE 轨道，等于把"操作一件工具"降级成"拖一根 slider"，
-  //   用户两次退回，别再加回来。）
-
+  // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider，两次退回）：
+  // 划线攥的是特写卡上那支笔，刨料攥的是世界里那把刨子——进度长在木头上
+  // （印子/被刨亮的那一片/地上那堆刨花），招呼玩家上手的是道具自己
+  // （笔会晃、刨子透光呼吸）。这里曾有一块 #scribeGuide 拖动轨道的同步代码，
+  // 已连元素和 CSS 一起拆掉，别加回来。
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
@@ -1026,18 +1024,18 @@ function RunFrame(now, dt) {
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
       throw: throwEdge,
-      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），dragX=本帧横向拖动
-      //（刨料的推程），pointerWorld=指尖的世界坐标
+      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
+      // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
+      // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
+      // 就是根看不见的 slider（刨料曾用它，已改成攥住刨子本身），别加回来。
       pull: gest.active ? gest.dy : 0,
       pullHeld: gest.active,
-      dragX: gest.active ? gest.dx : 0,
       pointerHeld: gest.active,
       pointerWorld: gest.world,
       pointerCard: gest.card,
       tap: tapEdge,
       advance: advanceEdge,
     }, stepDt);
-    gest.dx = 0;
     gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;

@@ -747,7 +747,9 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
     // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，
     // 手一伸一屈，锯就一进一出。握点（原点）在近侧立柱上端。
-    const L = 21;    // 锯全长（绘制单位，×S）≈0.75m，框锯本来就不长
+    // 全长按"锯口落在案子上那块料上"倒推：握把离料面约 0.55m（见 Rig 的 sawing
+    // 注释），锯再长，刃口就从案沿探出去凿空气了
+    const L = 16;    // 锯全长（绘制单位，×S）≈0.57m
     InkLine(ctx, 0, -3 * S, 0, (L + 2) * S, "sawPostA", { lw: 1.15 * S, color: "#8d6236" });         // 近侧立柱（手握这根）
     InkLine(ctx, -7 * S, 1 * S, -7 * S, (L - 2) * S, "sawPostB", { lw: 1.0 * S, color: "#8d6236" }); // 远侧立柱
     InkLine(ctx, -7 * S, 4 * S, 0, 2 * S, "sawBeam", { lw: 1.1 * S, color: "#7a5433" });             // 横梁
@@ -1196,21 +1198,83 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
 }
 
 // 鸡窝：半人高的土坯拱洞，顶上苫草，洞口垫一块踏脚石
+// 鸡窝。上一版画成了对称人字顶 + 拱门 + 门前一块台阶石——那是**西式狗窝**，
+// 1942 年冀中农家不会有这东西。按华北旱作区的实物重画：
+//
+//   · **土坯垒的矮窝，倚在背风墙根**——不是院子当中孤零零一座小房子。
+//     冀中不产竹（南方那种编的鸡罩在这儿没有），墙根一溜土坯垒到齐膝高，
+//     单面坡，后墙借人家的山墙，这样最省料，也最挡西北风。
+//   · **秫秸（高粱秆）苫顶，上头压块石头**——平原上柴禾就是高粱秆，
+//     苫完抹一层泥，风大就压石头。绝不是尖顶。
+//   · **窝口很小，夜里拿石板堵上**——黄鼠狼是头号敌人，这块挡板就是"门"，
+//     白天挪到一边靠着。窝口只够一只鸡侧身进，不是给狗进的拱门。
+//   · **谷草拧成草绳、一圈圈螺旋盘出来的草窝**（华北特有的做法），
+//     搁在窝口里头，下蛋就在这上头。
+//   · 门口一只豁了口的破瓦盆当食槽，半埋在土里，周围撒着谷糠。
+//
+// 尺度也改了：原来 1.4m 见方，比鸡高出好几倍；现在窝身齐膝（≈0.55m）。
 export function DrawHenCoop(ctx, x, groundY, id) {
-  InkFill(ctx, [[x - 24, groundY], [x - 24, groundY - 20], [x - 16, groundY - 34], [x + 2, groundY - 40],
-    [x + 18, groundY - 32], [x + 24, groundY - 18], [x + 24, groundY]],
-    id + "body", "#b09a72", { amp: 1.8, lw: 2.2, shade: "rgba(74,56,42,0.2)" });
-  // 洞口（黑）
-  InkFill(ctx, [[x - 8, groundY], [x - 10, groundY - 12], [x - 2, groundY - 18], [x + 8, groundY - 12], [x + 6, groundY]],
-    id + "hole", "#2a2118", { amp: 1.2, lw: 1.6 });
-  // 苫草顶
-  InkFill(ctx, [[x - 22, groundY - 30], [x + 2, groundY - 46], [x + 22, groundY - 28], [x + 2, groundY - 36]],
-    id + "thatch", "#a08a52", { amp: 2, lw: 1.6, shade: "rgba(0,0,0,0.12)" });
-  for (let i = 0; i < 3; i += 1) {
-    InkLine(ctx, x - 12 + i * 10, groundY - 34 - i * 2, x - 6 + i * 10, groundY - 42 - i,
-      id + "st" + i, { lw: 1.1, color: "rgba(70,55,28,0.55)" });
+  const L = x - 26, R = x + 22;            // 窝身左右（≈1m）
+  const backY = groundY - 30;              // 靠墙那头高
+  const frontY = groundY - 21;             // 朝院子这头矮 → 单面坡
+
+  // ── 土坯垒的窝身：一层层坯，缝不齐 ──
+  InkFill(ctx, [[L, groundY], [L, frontY + 2], [R, backY + 2], [R, groundY]],
+    id + "body", "#a6906c", { amp: 1.4, lw: 2, shade: "rgba(74,56,42,0.22)" });
+  // 坯缝：三层横缝 + 错开的竖缝，读得出是一块块垒的，不是一坨泥
+  for (let r = 0; r < 3; r += 1) {
+    const t = (r + 1) / 4;
+    const yl = groundY + (frontY + 2 - groundY) * t;
+    const yr = groundY + (backY + 2 - groundY) * t;
+    InkLine(ctx, L + 1, yl, R - 1, yr, id + "seam" + r, { lw: 1, color: "rgba(96,72,46,0.5)", amp: 1.1 });
+    for (let c = 0; c < 3; c += 1) {
+      const u = (c + (r % 2 ? 0.5 : 0)) / 3 + 0.12;
+      const px = L + (R - L) * u;
+      const py = yl + (yr - yl) * u;
+      InkLine(ctx, px, py, px, py + 6, id + `v${r}_${c}`, { lw: 0.9, color: "rgba(96,72,46,0.42)", amp: 0.8 });
+    }
   }
-  InkFill(ctx, Rect(x - 12, groundY - 4, 22, 4), id + "step", "#8b857a", { amp: 0.8, lw: 1.4 });
+
+  // ── 秫秸苫顶：一层斜铺的高粱秆，出檐一点，边上抹了泥 ──
+  InkFill(ctx, [[L - 5, frontY + 3], [R + 4, backY + 1], [R + 4, backY - 4], [L - 5, frontY - 2]],
+    id + "thatch", "#9c8a56", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.14)" });
+  for (let i = 0; i < 7; i += 1) {
+    const u = i / 6;
+    const sx = L - 4 + (R + 3 - (L - 4)) * u;
+    const sy = (frontY + 1) + ((backY - 1) - (frontY + 1)) * u;
+    InkLine(ctx, sx, sy + 2, sx + 2, sy - 3, id + "stalk" + i, { lw: 0.9, color: "rgba(74,58,30,0.5)", amp: 0.9 });
+  }
+  // 压顶的石头：风大，苫顶得拿石头压住
+  InkFill(ctx, [[x + 2, backY - 3], [x + 9, backY - 5], [x + 12, backY - 1], [x + 5, backY + 1]],
+    id + "stone", "#8f8a80", { amp: 0.7, lw: 1.3, shade: "rgba(0,0,0,0.2)" });
+
+  // ── 窝口：小、贴地、黑。只够一只鸡侧身进 ──
+  InkFill(ctx, [[L + 7, groundY], [L + 7, groundY - 12], [L + 11, groundY - 15],
+    [L + 18, groundY - 14], [L + 19, groundY]],
+    id + "mouth", "#241c14", { amp: 0.9, lw: 1.5 });
+  // 谷草拧的草窝：草绳一圈圈螺旋盘起来，窝口里露出小半个
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = i === 0 ? "#c9b47a" : "rgba(184,162,110,0.75)";
+    ctx.lineWidth = 1.5;
+    ctx.ellipse(L + 13, groundY - 3 - i * 2.2, 6.2 - i * 1.6, 2.4 - i * 0.6, 0, Math.PI * 0.08, Math.PI * 0.98);
+    ctx.stroke();
+  }
+  // 夜里堵窝口的那块石板：白天挪到一边靠着（防黄鼠狼的"门"）
+  InkFill(ctx, [[L + 22, groundY], [L + 21, groundY - 13], [L + 27, groundY - 14], [L + 28, groundY]],
+    id + "slab", "#9a948a", { amp: 0.8, lw: 1.5, shade: "rgba(0,0,0,0.18)" });
+
+  // ── 门口：豁了口的破瓦盆当食槽，半埋在土里；周围撒着谷糠 ──
+  InkFill(ctx, [[R - 2, groundY], [R - 1, groundY - 5], [R + 9, groundY - 5], [R + 10, groundY]],
+    id + "trough", "#8a6a4e", { amp: 0.8, lw: 1.4, shade: "rgba(0,0,0,0.16)" });
+  InkLine(ctx, R + 1, groundY - 4, R + 7, groundY - 4, id + "feed", { lw: 1.4, color: "#c0a86e", amp: 0.9 });
+  for (let i = 0; i < 7; i += 1) {
+    const gx = L + 4 + Hash(id + "ch" + i) * (R - L + 16);
+    const gy = groundY - Hash(id + "cy" + i) * 2.2;
+    InkLine(ctx, gx, gy, gx + 1.8, gy - 0.8, id + "chaff" + i, { lw: 0.8, color: "rgba(176,152,96,0.6)" });
+  }
+  // 掉的一根羽毛
+  InkLine(ctx, L - 3, groundY - 1, L + 1, groundY - 5, id + "feather", { lw: 1, color: "rgba(210,196,160,0.8)", amp: 1.4 });
 }
 
 // 晾衣绳：两根木杆绷一道绳，挂着打补丁的粗布衫和一条裤——风里鼓着
@@ -1343,8 +1407,10 @@ export function DrawBench(ctx, x, groundY, id) {
   InkFill(ctx, Rect(x + 16, groundY - 18, 6, 18), id + "l2", PAL.woodDark, { amp: 0.8, lw: 2 });
   // 台面上原来画着一把"装饰用"的刨子。刨料那一拍现在有真刨子在玩家手里，
   // 台面上再摆一把假的就成了两把——换成墨斗（木匠画线的家伙，也呼应门框刻痕）
-  InkFill(ctx, Rect(x + 8, groundY - 32, 11, 6), id + "inkpot", "#6f5636", { amp: 0.7, lw: 1.8 });
-  InkLine(ctx, x + 10, groundY - 32, x + 17, groundY - 36, id + "inkline",
+  // 墨斗搁在台子远端：爹拉锯那一拍，锯身正好横在台面右半边，
+  // 摆中间会被锯架压住（两块木色叠一块，谁也看不清）
+  InkFill(ctx, Rect(x - 23, groundY - 32, 11, 6), id + "inkpot", "#6f5636", { amp: 0.7, lw: 1.8 });
+  InkLine(ctx, x - 21, groundY - 32, x - 14, groundY - 36, id + "inkline",
     { lw: 1.2, color: "rgba(50,38,24,0.8)", amp: 1.2 });
 }
 
@@ -2056,28 +2122,58 @@ export function DrawMotorcycle(ctx, x, groundY, id) {
 
 // 独轮车：1942 冀中最标志性的农具——独轮居中，两根车把，木架车盘。
 // planks: 0/1/2 —— 装了几根木料
-export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
-  // 独轮
-  const wy = groundY - 15;
+// 独轮车的轮子：**单独一张**，画在原点上——车身与轮分开烘，渲染层才转得动它。
+// 车推起来轮子不转是最容易被一眼看穿的假动作。
+export const BARROW_WHEEL_R = 13;      // 轮半径（像素/PPM=0.27m）
+export const BARROW_WHEEL_Y = 13;      // 轮心离地
+export const BARROW_GRIP = { x: 58, y: 34 };   // 车把末端（相对车轮中心的绘制坐标）
+export function DrawCartWheel(ctx, x, y, r, id) {
+  InkFill(ctx, [
+    [x - r, y], [x - r * 0.7, y - r * 0.7], [x, y - r], [x + r * 0.7, y - r * 0.7],
+    [x + r, y], [x + r * 0.7, y + r * 0.7], [x, y + r], [x - r * 0.7, y + r * 0.7],
+  ], id + "rim", "#8a6a45", { amp: 0.7, lw: 2.6, shade: "rgba(0,0,0,0.18)" });
+  // 辐条：转起来靠它才看得出在转
   ctx.strokeStyle = IN.ink;
-  ctx.lineWidth = 3.2;
-  ctx.beginPath(); ctx.arc(x, wy, 15, 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 1.5;
-  for (let s = 0; s < 5; s += 1) {
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 5; i += 1) {
+    const a = i * (Math.PI / 5);
     ctx.beginPath();
-    ctx.moveTo(x - Math.cos(s * 0.63) * 13, wy - Math.sin(s * 0.63) * 13);
-    ctx.lineTo(x + Math.cos(s * 0.63) * 13, wy + Math.sin(s * 0.63) * 13);
+    ctx.moveTo(x - Math.cos(a) * (r - 2), y - Math.sin(a) * (r - 2));
+    ctx.lineTo(x + Math.cos(a) * (r - 2), y + Math.sin(a) * (r - 2));
     ctx.stroke();
   }
-  // 车架：轮子两侧的木框与车把（把手朝右）
-  InkFill(ctx, [[x - 34, groundY - 30], [x + 20, groundY - 33], [x + 52, groundY - 26], [x + 50, groundY - 21], [x - 32, groundY - 25]],
-    id + "frame", "#8a6a45", { amp: 1.4, lw: 2.4, shade: "rgba(0,0,0,0.2)" });
-  InkLine(ctx, x - 30, groundY - 26, x - 20, groundY - 4, id + "legA", { lw: 3, color: "#6b4d2e" });
-  InkLine(ctx, x + 46, groundY - 23, x + 60, groundY - 18, id + "handle", { lw: 3, color: "#6b4d2e" });
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.22, 0, Math.PI * 2);
+  ctx.fillStyle = "#6b4d2e";
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+}
+
+// 独轮车的车身（不含轮子）。整车约 1.6m 长——上一版画了两米多，加上它挂在
+// 近相机的深度带上被透视又放大四成，车比人还大一圈，车把根本伸不到人手里。
+// 姿态是**推着走的姿态**：车把抬到 0.7m 上下，正是柱子两手够得着的高度。
+export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
+  const g = BARROW_GRIP;
+  // 车斗：轮子上方的浅斗
+  InkFill(ctx, [
+    [x - 26, groundY - 26], [x + 14, groundY - 29], [x + 20, groundY - 24], [x - 24, groundY - 20],
+  ], id + "tray", "#8a6a45", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  // 两根车辕：从轮轴斜着往上伸到车把
+  InkLine(ctx, x - 20, groundY - 21, x + g.x, groundY - g.y, id + "shaftA",
+    { lw: 2.4, color: "#7a5a38", amp: 0.7 });
+  InkLine(ctx, x - 19, groundY - 24, x + g.x - 1, groundY - g.y + 3.5, id + "shaftB",
+    { lw: 2.0, color: "#6b4d2e", amp: 0.7 });
+  // 车把（末端两个握头，人的手就搭在这儿）
+  InkFill(ctx, Rect(x + g.x - 4, groundY - g.y - 3, 9, 6), id + "grip", "#6b4d2e",
+    { amp: 0.7, lw: 1.8 });
+  // 支腿：停下来时撑住车斗
+  InkLine(ctx, x - 22, groundY - 20, x - 20, groundY - 2, id + "legA", { lw: 2.6, color: "#6b4d2e" });
   // 装上的木料
   for (let i = 0; i < planks; i += 1) {
-    InkFill(ctx, Rect(x - 40, groundY - 40 - i * 8, 84, 8), id + "plank" + i, "#c09a62",
-      { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.18)" });
+    InkFill(ctx, Rect(x - 26, groundY - 34 - i * 7, 46, 7), id + "plank" + i, "#c09a62",
+      { amp: 1.1, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
   }
 }
 
@@ -2105,29 +2201,55 @@ export function DrawHen(ctx, x, y, id, k = 0.55) {
 }
 
 // 倒塌的柴垛：可翻越（肩高、顶沿有缺口）——扫荡中撞翻的那一堆
+// 撞塌的柴垛：**摊开的一堆劈柴，不是一个麻袋**。
+// 老版画的是一整块 1.08m 高的多边形色块，比 sprite 画布还高、顶上被裁平，
+// 读起来就是「路当中戳着一口麻袋」（用户原话：这什么鬼）。现在改成
+// 一根根横七竖八的柴：塌下来只有 0.72m＝柱子的胯高（34px），跨得过去。
+// 轮廓语法仍在：中间略高、右边塌下去豁一个口、顶沿被踩得发亮。
 export function DrawFallenWood(ctx, x, groundY, id) {
-  // 底层散开的柴
-  for (let i = 0; i < 6; i += 1) {
-    const lx = x - 26 + i * 10 + Sym(id + "l" + i, 0, 4);
+  const H = 34;                       // 0.72m × 48px/m —— 与 vaults[].top 对齐
+  const W = 77;                       // 1.6m 宽，与 vault 的 w 对齐
+  // 一根柴：中间粗两头略收的短棒，带一条木纹
+  const Log = (cx, cy, len, ang, dark) => {
     ctx.save();
-    ctx.translate(lx, groundY - 5);
-    ctx.rotate(Sym(id + "r" + i, 1, 0.5));
-    InkFill(ctx, Rect(-16, -4, 32, 7), id + "log" + i, i % 2 ? "#8a6a45" : "#7a5a38",
-      { amp: 1, lw: 2 });
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    InkFill(ctx, [
+      [-len / 2, -3.2], [len / 2, -2.6], [len / 2 + 2, 0], [len / 2, 2.6],
+      [-len / 2, 3.2], [-len / 2 - 2, 0],
+    ], id + "lg" + cx + cy, dark ? "#7a5a38" : "#946f42", { amp: 0.7, lw: 1.8 });
+    InkLine(ctx, -len / 2 + 3, -0.6, len / 2 - 3, 0.4, id + "gr" + cx + cy,
+      { lw: 0.9, color: "rgba(60,42,24,0.5)", amp: 0.4 });
     ctx.restore();
+  };
+  // ① 塌到最外圈的几根：贴地、散得最开（左右各探出去一点）
+  for (let i = 0; i < 5; i += 1) {
+    const t = i / 4;
+    Log(x - W / 2 - 4 + t * (W + 8), groundY - 3.5 + Sym(id + "o" + i, 0, 1.6),
+      20 + Hash(id + "ow" + i) * 12, Sym(id + "oa" + i, 1, 0.16), i % 2 === 0);
   }
-  // 斜塌的主堆：一头高一头塌，顶沿一个缺口（可翻越的轮廓语法）
-  InkFill(ctx, [
-    [x - 30, groundY], [x - 26, groundY - 40], [x - 8, groundY - 52], [x + 2, groundY - 44],
-    [x + 10, groundY - 50], [x + 26, groundY - 30], [x + 32, groundY],
-  ], id + "pile", "#96703f", { amp: 2.4, lw: 2.6, shade: "rgba(0,0,0,0.22)" });
-  // 顶沿磨亮
-  InkLine(ctx, x - 10, groundY - 52, x + 4, groundY - 45, id + "worn", { lw: 2.6, color: "rgba(240,225,180,0.85)", amp: 1 });
-  // 几根戳出来的柴梢
-  for (let i = 0; i < 4; i += 1) {
-    InkLine(ctx, x - 18 + i * 11, groundY - 36 - Hash(id + "t" + i) * 12,
-      x - 24 + i * 11, groundY - 52 - Hash(id + "t2" + i) * 10, id + "tip" + i,
-      { lw: 2, color: "#5c4328" });
+  // ② 中间那一摞：还叠着，但已经垮成一道缓坡——左高右塌，右肩就是缺口
+  const rows = 4;
+  for (let r = 0; r < rows; r += 1) {
+    const y = groundY - 7 - r * (H - 10) / rows;
+    // 越往上越窄，且整体向右下垮（塌的方向）
+    const spanL = x - W / 2 + 6 + r * 4;
+    const spanR = x + W / 2 - 10 - r * 11;
+    const n = Math.max(2, Math.round((spanR - spanL) / 17));
+    for (let i = 0; i < n; i += 1) {
+      const px = spanL + (n === 1 ? 0 : i * (spanR - spanL) / (n - 1));
+      Log(px, y + Sym(id + "m" + r + i, 0, 1.2), 16 + Hash(id + "mw" + r + i) * 8,
+        Sym(id + "ma" + r + i, 1, 0.13), (r + i) % 2 === 0);
+    }
+  }
+  // ③ 顶沿磨亮：天天有人手撑着翻过去的那条线（只在左半边——右边是豁口）
+  InkLine(ctx, x - W / 2 + 8, groundY - H + 2, x + 2, groundY - H + 6, id + "worn",
+    { lw: 2.4, color: "rgba(240,225,180,0.8)", amp: 0.9 });
+  // ④ 两根从堆里斜戳出来的柴梢：矮堆也要有轮廓的"刺"，一眼认出是柴不是土
+  for (let i = 0; i < 2; i += 1) {
+    const bx = x - 12 + i * 22;
+    InkLine(ctx, bx, groundY - 12 - i * 4, bx - 9 + i * 18, groundY - H - 3 - Hash(id + "t" + i) * 5,
+      id + "tip" + i, { lw: 2.2, color: "#5c4328", amp: 0.8 });
   }
 }
 

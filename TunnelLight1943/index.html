@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=040">
+  <link rel="stylesheet" href="./Style_Game.css?v=042">
   <script type="importmap">
     {
       "imports": {
@@ -77,6 +77,8 @@
          照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
          （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
     <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
+    <!-- 做功的节拍没有 HUD 轨道（禁 slider）：划线攥特写卡上那支笔，
+         刨料攥世界里那把刨子。这里曾有一条 #scribeGuide 拖动轨道，已拆。 -->
     <!-- 手势提示：转辘轳（绕圈）/ 打结（绕圈）/ 勒紧（下拽）的动效小图标，
          纯 CSS 循环动画，data-kind 切换 -->
     <div id="gestureHint" hidden aria-hidden="true"><i class="gDot"></i></div>
@@ -184,6 +186,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=040"></script>
+<script type="module" src="./Script_Main.js?v=042"></script>
 </body>
 </html>

@@ -366,7 +366,7 @@ export function CreateWorld(canvasEl) {
   let dustMotes = [];
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
-  let cartMesh = null;
+  let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
   let homeFacade = null, homeRange = null;
@@ -382,7 +382,7 @@ export function CreateWorld(canvasEl) {
   let barkMesh = null;
   let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
-  let barrowMesh = null;
+  let barrowMesh = null, barrowWheel = null;
   // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
   // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
   const mountMeshes = new Map();
@@ -395,7 +395,7 @@ export function CreateWorld(canvasEl) {
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
-  let planeToolMesh = null;
+  let planeToolMesh = null, planeGlowMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
@@ -436,7 +436,7 @@ export function CreateWorld(canvasEl) {
     collapseMeshes = {};
     fluid = null; fluidKey = ""; fluidMesh = null;
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
-    cartMesh = null;
+    cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     homeFacade = null; homeRange = null;
@@ -445,7 +445,7 @@ export function CreateWorld(canvasEl) {
     lightStrip = null; lightBeam = null; lightKey = "";
     barkMesh = null;
     chainItemMeshes = [];
-    barrowMesh = null;
+    barrowMesh = null; barrowWheel = null;
     mountMeshes.clear();
     groundItemMeshes.clear();
     knotGuide = null; knotRope = null; knotTip = null;
@@ -455,7 +455,7 @@ export function CreateWorld(canvasEl) {
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
-    planeToolMesh = null; planeHandRig = null;
+    planeToolMesh = null; planeGlowMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
     spotFlashMesh = null;
@@ -2006,7 +2006,12 @@ export function CreateWorld(canvasEl) {
       mountMeshes.set(a.id, m);
     }
     m.visible = true;
-    PlaceSprite(m, a.x, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    // 车的贴图中心不是**座位**：自行车的鞍座画在中心偏后 9px、摩托偏后 1px。
+    // 演员站在自己的 x 上，所以车要往前挪那么多，人才是「坐在座上」而不是
+    // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
+    const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
+    const dir = a.heading > 0 ? -1 : 1;
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
     m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
   }
 
@@ -2662,19 +2667,42 @@ export function CreateWorld(canvasEl) {
     // 车画在演员前面一点，贴着车走就是躲进车影
     if (state.cart) {
       const cartKind = state.cart.kind || "cart";
+      // 玩家**推着**的独轮车（第一章）要退到 loose 带：人在近侧握着车把，
+      // 身子和手得画在车前面。第三章那辆驴车是**移动掩体**，得挡住人，
+      // 所以留在 CART_COVER_Z——两种角色，两个深度。
+      const pushed = cartKind === "barrow";
+      const cz = pushed ? BAND.loose : CART_COVER_Z;
       if (!cartMesh || cartMesh.userData.cartKind !== cartKind) {
         if (cartMesh) layers.play.remove(cartMesh);
-        cartMesh = cartKind === "barrow"
-          ? BakeSprite(160, 110, 80, 100, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: 2 }), 0, PROP_SS)
+        if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
+        cartMesh = pushed
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: 2 }), 0, PROP_SS)
           : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
         cartMesh.userData.cartKind = cartKind;
         layers.play.add(cartMesh);
-        // 移动掩体：跟静态掩体一样走 NEAR_CLUTTER 区间（允许挡人的矮物件）
-        SetPlayOrder(cartMesh, CART_COVER_Z, "cart(movingCover)");
+        SetPlayOrder(cartMesh, cz, "cart(" + cartKind + ")");
+        if (pushed) {
+          // 轮子单开一张，绕轮心转——车走多远轮转多少弧长，不是"贴图在平移"
+          const R = ART.BARROW_WHEEL_R;
+          cartWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "pushWheel"), 0, PROP_SS);
+          layers.play.add(cartWheel);
+          SetPlayOrder(cartWheel, cz, "cartWheel");
+        }
       }
       cartMesh.visible = true;
-      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, CART_COVER_Z);
-    } else if (cartMesh) cartMesh.visible = false;
+      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, cz);
+      if (cartWheel) {
+        cartWheel.visible = true;
+        const R = ART.BARROW_WHEEL_R / PPM;              // 轮半径（米）
+        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, cz);
+        // 滚过的弧长 = 走过的路程：θ = -s/R（往前走轮子顺时针转）
+        cartWheel.rotation.z = -((state.cart.roll || 0) / R);
+      }
+    } else {
+      if (cartMesh) cartMesh.visible = false;
+      if (cartWheel) cartWheel.visible = false;
+    }
 
     // 独轮车（不在推的时候是静物）：装了几根木料照几根；推到家就停在爹跟前
     {
@@ -2684,15 +2712,30 @@ export function CreateWorld(canvasEl) {
         const key = "b" + planks;
         if (!barrowMesh || barrowMesh.userData.k !== key) {
           if (barrowMesh) layers.play.remove(barrowMesh);
-          barrowMesh = BakeSprite(160, 110, 80, 100, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
+          if (barrowWheel) { layers.play.remove(barrowWheel); barrowWheel = null; }
+          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
           barrowMesh.userData.k = key;
           layers.play.add(barrowMesh);
           SetPlayOrder(barrowMesh, BAND.walk);
+          // 停着的车轮子也单开一张（不转，但得跟推着的那辆长一个样）
+          const R = ART.BARROW_WHEEL_R;
+          barrowWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "parkWheel"), 0, PROP_SS);
+          layers.play.add(barrowWheel);
+          SetPlayOrder(barrowWheel, BAND.walk);
         }
         barrowMesh.visible = true;
+        if (barrowWheel) {
+          barrowWheel.visible = true;
+          barrowWheel.position.set(state.flags.barrowHome ? 42.6 : 50.5,
+            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, BAND.walk);
+        }
         // 停在工作台东边一步：递完木料的车不挡合榫的戏
         PlaceSprite(barrowMesh, state.flags.barrowHome ? 42.6 : 50.5, SURFACE_Y, BAND.walk);
-      } else if (barrowMesh) barrowMesh.visible = false;
+      } else {
+        if (barrowMesh) barrowMesh.visible = false;
+        if (barrowWheel) barrowWheel.visible = false;
+      }
     }
 
     // 落地道具：手里放下的东西（自由放下 + 链里的「放下换手」共用一套）。
@@ -2943,6 +2986,36 @@ export function CreateWorld(canvasEl) {
       const hand = planeHandRig ? HandPoint(planeHandRig) : null;
       planeToolMesh.visible = !!hand;
       if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
+      // 把"刨子画在了哪儿"回填给玩法层：攥取判定必须贴着玩家看见的这把刨子，
+      // 不许贴着 u 的直线映射（手臂几何让两者差出小半米，照公式判就抓空了）
+      state.planeToolView = hand ? { x: hand.x + 0.02, y: hand.y - 0.05 } : null;
+
+      // 玩家推的是这把刨子本身（没有 HUD 轨道）。等着被攥住时它透一圈
+      // 会呼吸的光——"来拿我"由刨子自己说；按下了没抓着就闪快些催一下
+      if (!planeGlowMesh) {
+        planeGlowMesh = BakeSprite(64, 64, 32, 32, (ctx, ax, ay) => {
+          const g = ctx.createRadialGradient(ax, ay, 3, ax, ay, 24);
+          g.addColorStop(0, "rgba(255,240,196,0.7)");
+          g.addColorStop(0.5, "rgba(255,232,172,0.18)");
+          g.addColorStop(1, "rgba(255,232,172,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(ax - 32, ay - 32, 64, 64);
+        }, 0, DETAIL_SS);
+        planeGlowMesh.scale.setScalar(0.55);   // 一圈贴着刨身的光，不是一片白昼
+        // 加法混合：那圈光要在大白天的木头上也看得见（普通透明度会糊进底色）
+        planeGlowMesh.material.blending = THREE.AdditiveBlending;
+        // 光垫在刨子背后一层（同在 carry 带里，紧贴其下）
+        FixOrder(planeGlowMesh, DepthOrder("play", CARRY_Z) - 1);
+        layers.play.add(planeGlowMesh);
+      }
+      const glowWant = (pl.invite && hand)
+        ? (pl.reaching
+          ? 0.55 + 0.25 * Math.sin(time * 13)
+          : 0.30 + 0.20 * Math.sin(time * 3.1))
+        : 0;
+      planeGlowMesh.material.opacity = Math.max(0, glowWant);
+      planeGlowMesh.visible = glowWant > 0.03;
+      if (hand) planeGlowMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
 
       if (planePileMesh.userData.k !== pl.pile) {
         planePileMesh.userData.k = pl.pile;
@@ -2955,7 +3028,9 @@ export function CreateWorld(canvasEl) {
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
+      if (planeGlowMesh) planeGlowMesh.visible = false;
       if (planePileMesh) planePileMesh.visible = false;
+      state.planeToolView = null;
     }
 
     // 刚削下来的那条刨花：从刨刃口弹出来，打着旋儿飘到地上
