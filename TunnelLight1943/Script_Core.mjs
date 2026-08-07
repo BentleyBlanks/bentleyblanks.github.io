@@ -658,16 +658,23 @@ function StepChain(state, def, input, dt) {
       return;
     }
     case "push": {
-      if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart" };
+      if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart", roll: 0 };
       const cart = state.cart;
       if (Math.abs(p.x - cart.x) > 2.6) return;
       state.prompt = st.prompt || "按住 E · 推车";
       state.promptFill = Math.abs(cart.x - st.from) / st.dist;
+      // 手扶在车把上是**站位决定的，不是按键决定的**：走到车跟前就搭上手，
+      // 松开 E 只是不再使劲，手不会撒把。上一版只在 interactHeld 里打姿势，
+      // 于是一停手人就飘回站姿、两只手在空中慢慢晃——车还在，人却放开了。
+      FlashPose(state, "push", 0.2);
+      p.heading = st.dir;
       if (input.interactHeld) {
-        cart.x += st.dir * 0.85 * dt;
-        p.x = cart.x - st.dir * 1.7;
-        p.heading = st.dir;
-        FlashPose(state, "push", 0.25);
+        const step = st.dir * 0.85 * dt;
+        cart.x += step;
+        // **有向**位移：往左推，轮子就得往左滚（逆时针）。存绝对值的话
+        // 车往哪边走轮子都朝一个方向转，倒着推就穿帮了
+        cart.roll = (cart.roll || 0) + step;
+        p.x = cart.x - st.dir * 1.58;   // 站近一点，手正好搭在车把上
         if ((cart.x - st.from) * st.dir >= st.dist) finish();
       }
       return;
@@ -1069,7 +1076,7 @@ const V_PATCH_X = 16.8;   // 菜畦（veggieWest prop）里娘锄地的站位
 function FatherSaw(state) {
   const father = FindActor(state, "father");
   if (!father) return;
-  father.x = V.workbench.x + 0.9;
+  father.x = V.workbench.x + 0.72;   // 站近一点：锯口才落在案上那块料里
   father.heading = -1;              // 面朝工作台锯
   father.cineTarget = null;
   father.track = { name: "sawing", t: 0, ambient: true };

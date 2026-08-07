@@ -267,17 +267,29 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
-  // 拉锯（循环）：木匠的常态活。推出去那一下吃力（躯干跟着送），回拉轻快；
-  // 后手搭在料上不动。锯（DrawCarry「锯」）挂在前手上、随前臂转——
-  // 手臂一伸一屈，锯就一进一出。
+  // 拉锯（循环）。这一条改过一次，原因值得写下来：
+  // 锯是 alongArm 挂件，**贴图方向 = 前臂的世界角 = armF + foreF**。老版本靠开合
+  // 肘部来"一进一出"，前臂世界角从 -72° 荡到 -132°——锯在空中划了 60° 的钟摆，
+  // 一会儿扎地一会儿指天，怎么看都不像在锯木头。
+  // 现在把前臂世界角**锁死在 θ = -81°**（刃口朝前下 9°，一直躺在锯口里），
+  // 行程改由肩来出：上臂摆到与刃口垂直（armF ≈ θ + 90°），肩转的切线方向正好
+  // 平行于刃口，手就顺着锯身来回滑。每帧 foreF 必须 = θ - armF，别单独改一个。
+  // armF 小 = 送出去（上臂垂下来），armF 大 = 拉回来（上臂向后甩）。
+  // 中式框锯拉回来那一下才吃劲：回程慢、躯干坐下去，送出去快而轻。
+  // 后手按住料不动（少许起伏），身子随行程前后送一寸。
   sawing: {
     dur: 1.5, loop: true,
     keys: [
-      { t: 0.0, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12, armB: -46, foreB: -22, thighB: -22, shinB: 28, footB: -6, thighF: 14, shinF: 8, footF: -8 },
-      { t: 0.42, hipY: -0.06, hipX: 0.00, torso: 17, head: -18, armF: -86, foreF: -46 },   // 回拉：肘折回来
-      { t: 0.78, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },   // 再推
-      { t: 1.14, hipY: -0.06, hipX: 0.01, torso: 18, head: -18, armF: -84, foreF: -44 },
-      { t: 1.5, hipY: -0.08, hipX: 0.07, torso: 26, head: -20, armF: -60, foreF: -12 },
+      // 送到头（手在最前）
+      { t: 0.0, hipY: -0.09, hipX: 0.09, torso: 27, head: -21, armF: -9, foreF: -72, armB: -30, foreB: -62, thighB: -22, shinB: 28, footB: -6, thighF: 14, shinF: 8, footF: -8 },
+      { t: 0.09, hipY: -0.09, hipX: 0.085, torso: 26, head: -20, armF: -6, foreF: -75, armB: -32, foreB: -60 },   // 到头顿一下
+      { t: 0.42, hipY: -0.06, hipX: -0.01, torso: 15, head: -16, armF: 27, foreF: -108, armB: -26, foreB: -66 }, // 拉回来：吃劲的一程，慢
+      { t: 0.51, hipY: -0.06, hipX: -0.005, torso: 16, head: -16, armF: 24, foreF: -105 },                        // 换向
+      { t: 0.75, hipY: -0.09, hipX: 0.09, torso: 27, head: -21, armF: -9, foreF: -72, armB: -30, foreB: -62 },     // 送出去：快而轻
+      { t: 0.84, hipY: -0.09, hipX: 0.085, torso: 26, head: -20, armF: -6, foreF: -75, armB: -32, foreB: -60 },
+      { t: 1.17, hipY: -0.06, hipX: -0.01, torso: 15, head: -16, armF: 27, foreF: -108, armB: -26, foreB: -66 },
+      { t: 1.26, hipY: -0.06, hipX: -0.005, torso: 16, head: -16, armF: 24, foreF: -105 },
+      { t: 1.5, hipY: -0.09, hipX: 0.09, torso: 27, head: -21, armF: -9, foreF: -72, armB: -30, foreB: -62 },
     ],
   },
   // 锄地（循环）：扬起来慢、落下去快，落了还要往回带一下松土。
@@ -604,12 +616,14 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -6 * DEG; target.shinB = 8 * DEG; target.footB = -2 * DEG;
     target.thighF = 6 * DEG; target.shinF = 4 * DEG; target.footF = -4 * DEG;
   } else if (s.pose === "push") {
-    // 推车：前倾压着车把，腿在后面蹬——腿保留走步摆动，人不是滑过去的
+    // 推车：前倾压着车把，腿在后面蹬——腿保留走步摆动，人不是滑过去的。
+    // 两条胳膊要**斜着往下前方伸**，手落在 0.7m 上下的车把上；上一版举到
+    // 74°，手停在胸口，车把在膝盖那么低的地方，谁也没握着谁。
     const c = s.moving;
     target.hipY = -0.10; target.hipX = 0.14;
     target.torso = 32 * DEG; target.head = -12 * DEG;
-    target.armF = -74 * DEG; target.foreF = -26 * DEG;
-    target.armB = -66 * DEG; target.foreB = -30 * DEG;
+    target.armF = -54 * DEG; target.foreF = -34 * DEG;
+    target.armB = -48 * DEG; target.foreB = -36 * DEG;
     target.thighB = (-26 + (c ? swing2 * 22 : 0)) * DEG;
     target.shinB = (34 - (c ? swing2 * 16 : 0)) * DEG;
     target.footB = -8 * DEG;

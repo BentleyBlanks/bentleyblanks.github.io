@@ -902,6 +902,21 @@ function TestWorkStations() {
   StepGame(state, idle, state.pip.t + 0.1);
   assert.equal(state.pip, null, "后果小窗必须到时收起");
   assert.equal(m2.track, null, "水打上来之后娘不该再回去锄地");
+  // 锯必须一直躺在锯口里：锯是 alongArm 挂件，贴图角度 = 前臂世界角 = armF+foreF。
+  // 老版本靠开合肘部做"一进一出"，这个和从 -72° 荡到 -132°，锯在空中划了个 60°
+  // 的钟摆。行程只许来自肩（armF），肘角跟着补偿。Rig 里带 THREE/document，
+  // node 侧进不来，就直接盯源码里那几个关键帧。
+  const rigSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
+  const sawBlock = rigSrc.slice(rigSrc.indexOf("  sawing: {"), rigSrc.indexOf("  hoeing: {"));
+  assert.ok(sawBlock.length > 100, "找不到 sawing 轨道");
+  const sums = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+),\s*foreF:\s*(-?[\d.]+)/g)]
+    .map((m) => Number(m[1]) + Number(m[2]));
+  assert.ok(sums.length >= 4, "sawing 轨道的关键帧太少，读不出行程");
+  const spread = Math.max(...sums) - Math.min(...sums);
+  assert.ok(spread <= 6, `锯身角度全程必须锁死（前臂世界角摆动 ${spread.toFixed(1)}°>6°，锯会变成钟摆）`);
+  const armFs = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+)/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...armFs) - Math.min(...armFs) >= 24, "肩的行程太小，锯推不出去");
   console.log("  ✓ 干活的家人（爹拉锯/娘锄地）与后果小窗");
 }
 
