@@ -68,15 +68,21 @@ for (const sequence of Object.values(CinematicSequences)) {
 }
 assert.equal(CinematicSequences.endingDeparture.blocksEnding, true, "the ferry must leave in 3D before the ending screen appears");
 assert.equal(CinematicSequences.endingDeparture.segments[1].effects.playerBoarding, 0, "all six children must board before Awei");
-assert.deepEqual(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, [0, 1], "Awei must board during the authored third shot");
-assert.equal(CinematicSequences.endingDeparture.segments.length, 5, "the finale needs boarding, Awei's answer, and the departure wide shot");
+assert.equal(CinematicSequences.endingDeparture.segments[2].actors.player, "writeKneel", "Awei must visibly add Zhou He's eighth line before boarding");
+assert.equal(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, 0, "Awei must finish the eighth line on shore");
+assert.deepEqual(CinematicSequences.endingDeparture.segments[3].effects.playerBoarding, [0, 1], "Awei must board only after writing Zhou He's name");
+assert.deepEqual(CinematicSequences.endingDeparture.segments[5].effects.motherDeparture, [0.72, 1], "Zhou He's southward lantern route must remain visible through the final wide shot");
+assert.equal(CinematicSequences.endingDeparture.segments.length, 6, "the finale needs boarding, the eighth line, both answers, and the departure wide shot");
+assert.match(CinematicSequences.endingDeparture.segments[5].caption, /周禾老师/);
+assert.equal(CinematicSequences.schoolOpening.segments.length, 4, "the school opening must establish village scale, empty shoes, register, and departure");
+assert.ok(CinematicSequences.schoolOpening.segments.some((segment) => segment.blocking), "school actors need authored blocking instead of static mannequin poses");
 assert.deepEqual(CinematicSequences.sluiceRise.segments[1].effects.bridgeRaise, [0.42, 1], "the bridge must visibly rise during its causal shot");
 assert.deepEqual(CinematicSequences.emptyBoatDiversion.segments[1].effects.emptyBoatRelease, [0.35, 1], "the empty boat must visibly drift during its diversion shot");
 
 const naturalDirector = CreateCinematicDirector();
 assert.equal(naturalDirector.Start("schoolOpening"), true);
 assert.equal(naturalDirector.GetFrame()?.id, "schoolOpening");
-for (let step = 0; step < 180 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
+for (let step = 0; step < 260 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
 assert.equal(naturalDirector.IsPlaying(), false, "opening cinematic must finish deterministically");
 assert.deepEqual(naturalDirector.ConsumeFinished(), {
   id: "schoolOpening",

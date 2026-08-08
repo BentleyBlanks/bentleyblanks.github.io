@@ -219,8 +219,8 @@ try {
   }
 
   for (const budgetProbe of [
-    { id: "schoolOpening", chapter: 0, x: 330, duration: 7.8 },
-    { id: "ferryOpening", chapter: 3, x: 520, duration: 6.3 },
+    { id: "schoolOpening", chapter: 0, x: 330, duration: 11.6 },
+    { id: "ferryOpening", chapter: 3, x: 520, duration: 7.8 },
   ]) {
     await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=${budgetProbe.chapter}&qaX=${budgetProbe.x}&qaCinematic=${budgetProbe.id}`, { waitUntil: "load", timeout: 60000 });
     await page.waitForFunction((id) => document.getElementById("GameCanvas")?.dataset.cinematic === id, budgetProbe.id, { timeout: 60000 });
@@ -322,6 +322,21 @@ try {
   Assert(endingCinematic.overlayVisible, "ending cinematic: 3D 过场遮罩必须可见");
   Assert(endingCinematic.caption.length > 0, "ending cinematic: 镜头必须带有当前叙事字幕");
   Assert(endingCinematic.endingHidden, "ending cinematic: 船离岸前不得提前显示结算页");
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.42, null, { timeout: 15000 });
+  const eighthLineStaging = await page.evaluate(() => {
+    const handle = window.ReedSignal1942?.render;
+    const player = handle?.chapterScene?.actors?.player;
+    const mother = handle?.chapterScene?.actors?.mother;
+    return player && mother ? {
+      action: player.userData.motion?.action || "",
+      registerVisible: Boolean(player.userData.rig?.registerBook?.visible),
+      motherVisible: mother.visible,
+      separation: Math.abs(player.position.x - mother.position.x),
+    } : null;
+  });
+  Assert(eighthLineStaging?.action === "writeKneel", "ending cinematic: 阿苇必须在岸边跪写第八行");
+  Assert(Boolean(eighthLineStaging?.registerVisible), "ending cinematic: 写下周禾时点名簿必须真实可见");
+  Assert(Boolean(eighthLineStaging?.motherVisible && eighthLineStaging.separation > 8), "ending cinematic: 周禾已经向南走远而不是站在阿苇身边");
   await page.evaluate(() => {
     window.__reedSignalMaximumCinematicCalls = 0;
     window.__reedSignalBudgetTimer = window.setInterval(() => {
@@ -332,15 +347,26 @@ try {
     }, 40);
   });
   await page.locator("#SkipCinematicButton").waitFor({ state: "visible", timeout: 10000 });
-  await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.progress || 0) > 0.76, null, { timeout: 15000 });
+  await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.progress || 0) > 0.78, null, { timeout: 22000 });
   await page.waitForTimeout(700);
   const finaleLod = await page.evaluate(() => {
     const handle = window.ReedSignal1942?.render;
     const followers = handle?.chapterScene?.actors?.followers || [];
+    const huddle = handle?.chapterScene?.dynamic?.ferryHuddle;
+    let visibleLodInstances = 0;
+    if (huddle?.bodies && huddle.matrix && huddle.scale) {
+      for (let index = 0; index < huddle.bodies.count; index += 1) {
+        huddle.bodies.getMatrixAt(index, huddle.matrix);
+        huddle.scale.setFromMatrixScale(huddle.matrix);
+        if (Math.max(huddle.scale.x, huddle.scale.y, huddle.scale.z) > 0.5) visibleLodInstances += 1;
+      }
+    }
     const dataset = document.getElementById("GameCanvas").dataset;
     window.clearInterval(window.__reedSignalBudgetTimer);
     return {
-      huddleVisible: Boolean(handle?.chapterScene?.dynamic?.ferryHuddle?.group?.visible),
+      huddleVisible: Boolean(huddle?.group?.visible),
+      huddleDrawMeshes: huddle?.group?.children?.filter((child) => child.visible).length || 0,
+      visibleLodInstances,
       detailedFollowers: followers.filter((actor) => actor.visible).length,
       calls: Number(dataset.renderCalls),
       triangles: Number(dataset.renderTriangles),
@@ -349,6 +375,8 @@ try {
     };
   });
   Assert(finaleLod.huddleVisible && finaleLod.detailedFollowers === 2, "ending cinematic: 远景使用四名实例群像与两名完整骨架");
+  Assert(finaleLod.visibleLodInstances === 4, `ending cinematic: 四名实例孩子都具有非零姿态矩阵（${finaleLod.visibleLodInstances}）`);
+  Assert(finaleLod.huddleDrawMeshes === 2, `ending cinematic: 群像合批为衣装与头部两个 draw mesh（${finaleLod.huddleDrawMeshes}）`);
   Assert(finaleLod.maximumCalls > 0 && finaleLod.maximumCalls < 260, `ending cinematic: 登船到离岸全程低于 260 calls（峰值 ${finaleLod.maximumCalls}）`);
   Assert(finaleLod.calls < 260 && finaleLod.triangles < 80000, `ending cinematic: 终章远景保持性能预算（${finaleLod.calls} calls / ${finaleLod.triangles} tris）`);
   Assert(finaleLod.endingHidden, "ending cinematic: 最终远景仍未提前显示结算页");

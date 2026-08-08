@@ -1,7 +1,8 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z2";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z2";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z2";
+import { mergeGeometries } from "../TunnelBell1942/vendor/three/examples/jsm/utils/BufferGeometryUtils.mjs";
+import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z3";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z3";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z3";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -561,6 +562,50 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   horizonBand.receiveShadow = false;
 }
 
+function BuildRegionalScaleMarkers(root, chapter, profile, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const random = CreateRandom(19420 + chapter.id.length * 71);
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.fog).multiplyScalar(chapter.id === "ferry" ? 0.42 : 0.31),
+    fog: true,
+    transparent: true,
+    opacity: chapter.id === "ferry" ? 0.24 : 0.27,
+    depthWrite: false,
+  });
+  const trunkGeometry = new THREE.CylinderGeometry(0.11, 0.2, 1, 7);
+  const canopyGeometry = new THREE.SphereGeometry(1, 10, 8);
+  const count = chapter.id === "blockade" ? 7 : 8;
+  const trunks = CreateInstancedSilhouette(root, trunkGeometry, material, count);
+  const canopies = CreateInstancedSilhouette(root, canopyGeometry, material, count * 3);
+  const matrix = new THREE.Matrix4();
+  for (let index = 0; index < count; index += 1) {
+    const x = -8 + index * ((length + 16) / Math.max(1, count - 1)) + (random() - 0.5) * 2.6;
+    const z = -17.5 - random() * 7.5;
+    const height = (chapter.id === "blockade" ? 7.8 : 7.0) + random() * 3.8;
+    SetInstance(trunks, index, [x, height * 0.5 - 0.5, z], [0, random() * 0.18, (random() - 0.5) * 0.035], [0.9, height, 0.9], matrix);
+    for (let crownIndex = 0; crownIndex < 3; crownIndex += 1) {
+      const crownY = height * (0.67 + crownIndex * 0.1);
+      const crownWidth = 0.64 + random() * 0.36;
+      SetInstance(
+        canopies,
+        index * 3 + crownIndex,
+        [x + (random() - 0.5) * 0.42, crownY, z + (random() - 0.5) * 0.55],
+        [0, random() * Math.PI, (random() - 0.5) * 0.08],
+        [crownWidth, 1.25 + random() * 0.64, crownWidth * 0.82],
+        matrix,
+      );
+    }
+  }
+  trunks.instanceMatrix.needsUpdate = true;
+  canopies.instanceMatrix.needsUpdate = true;
+  trunks.renderOrder = -1;
+  canopies.renderOrder = -1;
+  dynamic.ownedMaterials.push(material);
+  dynamic.ownedGeometries.push(trunkGeometry, canopyGeometry);
+  dynamic.regionalScaleMarkers = { trunks, canopies };
+}
+
 function BuildNearScaleLayer(root, chapter, profile, dynamic) {
   if (chapter.id === "tunnel") return;
   const length = chapter.width * WorldScale;
@@ -569,14 +614,14 @@ function BuildNearScaleLayer(root, chapter, profile, dynamic) {
     color: new THREE.Color(profile.ground).multiplyScalar(0.28),
     fog: true,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.34,
     depthWrite: false,
   });
   const leafMaterial = new THREE.MeshBasicMaterial({
     color: new THREE.Color(profile.reed).multiplyScalar(0.16),
     fog: true,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.18,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -593,14 +638,14 @@ function BuildNearScaleLayer(root, chapter, profile, dynamic) {
     const cluster = Math.floor(index / 4);
     const clusterCenter = -5.5 + cluster * ((length + 11) / Math.max(1, Math.ceil(count / 4) - 1));
     const x = clusterCenter + (random() - 0.5) * 0.75;
-    const z = 2.75 + random() * 1.15;
+    const z = 3.05 + random() * 1.0;
     const height = 0.78 + random() * 1.48;
     const bend = (random() - 0.5) * 0.24;
     SetInstance(stalks, index, [x, -0.3 + height * 0.5, z], [0, random() * Math.PI, bend], [0.78 + random() * 0.34, height, 0.78 + random() * 0.34], matrix);
     const leafY = -0.32 + height * (0.68 + random() * 0.22);
     const leafTilt = index % 2 === 0 ? -0.82 : 0.82;
-    SetInstance(leaves, index * 2, [x + Math.sin(leafTilt) * 0.11, leafY, z], [0, random() * Math.PI, leafTilt], [0.075 + random() * 0.035, 0.25 + random() * 0.12, 0.038], matrix);
-    SetInstance(leaves, index * 2 + 1, [x - Math.sin(leafTilt) * 0.09, leafY - 0.22, z + 0.015], [0, random() * Math.PI, -leafTilt * 0.78], [0.06 + random() * 0.03, 0.2 + random() * 0.1, 0.034], matrix);
+    SetInstance(leaves, index * 2, [x + Math.sin(leafTilt) * 0.11, leafY, z], [0, random() * Math.PI, leafTilt], [0.065 + random() * 0.028, 0.19 + random() * 0.09, 0.034], matrix);
+    SetInstance(leaves, index * 2 + 1, [x - Math.sin(leafTilt) * 0.09, leafY - 0.2, z + 0.015], [0, random() * Math.PI, -leafTilt * 0.78], [0.052 + random() * 0.025, 0.16 + random() * 0.075, 0.03], matrix);
   }
   stalks.instanceMatrix.needsUpdate = true;
   leaves.instanceMatrix.needsUpdate = true;
@@ -615,6 +660,9 @@ function BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile) {
   const chamberMaterial = new THREE.MeshBasicMaterial({
     color: new THREE.Color(profile.earth).multiplyScalar(0.28),
     fog: true,
+    transparent: true,
+    opacity: 0.25,
+    depthWrite: false,
     side: THREE.DoubleSide,
   });
   const coldMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.moon).multiplyScalar(0.42), fog: true });
@@ -623,9 +671,9 @@ function BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile) {
   // playable crawlspace, making the children visibly small without changing
   // collision or the historical role of the early shelter.
   AddMesh(root, new THREE.TorusGeometry(4.8, 0.62, 10, 28, Math.PI), chamberMaterial, [16.4, 0.05, -5.8], [0, 0, 0], [1.38, 1.12, 1], false);
-  AddBox(root, [13.2, 0.5, 1.1], [16.4, 4.18, -5.65], chamberMaterial, null, false);
+  AddBox(root, [11.8, 0.22, 0.8], [16.4, 4.05, -5.65], chamberMaterial, null, false);
   for (const shaftX of [5.9, 22.9]) {
-    AddBox(root, [1.65, 7.8, 1.5], [shaftX, 5.95, -4.9], chamberMaterial, null, false);
+    AddCylinder(root, 0.72, 1.05, 7.8, [shaftX, 5.95, -4.9], chamberMaterial, 12, null, false);
     const shaftMouth = AddMesh(root, new THREE.CircleGeometry(0.72, 18), coldMaterial, [shaftX, 9.75, -4.12], [0, 0, 0], null, false);
     shaftMouth.renderOrder = 0;
   }
@@ -668,9 +716,9 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   const indices = [];
   for (let index = 0; index <= segments; index += 1) {
     const x = -padding + span * index / segments;
-    const topY = GetTerrainY(chapter, x) - 1.02 + Math.sin(index * 1.71) * 0.045 + Math.sin(index * 0.37) * 0.065;
-    const z = 2.18 + Math.sin(index * 0.29) * 0.08;
-    positions.push(x, topY, z, x, topY - 1.9, z + 0.03);
+    const topY = GetTerrainY(chapter, x) - 1.1 + Math.sin(index * 1.71) * 0.04 + Math.sin(index * 0.37) * 0.055;
+    const z = 2.46 + Math.sin(index * 0.29) * 0.07;
+    positions.push(x, topY, z, x, topY - 1.5, z + 0.03);
     if (index < segments) {
       const base = index * 2;
       indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
@@ -683,7 +731,7 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   const material = new THREE.MeshBasicMaterial({
     color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.72),
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.2,
     depthWrite: false,
     fog: true,
     side: THREE.DoubleSide,
@@ -697,7 +745,7 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   for (let index = 0; index < rockCount; index += 1) {
     const x = -2.5 + index * ((length + 5) / Math.max(1, rockCount - 1)) + Math.sin(index * 4.13) * 0.55;
     const randomScale = 0.72 + (index * 0.37 % 1) * 0.5;
-    SetInstance(rocks, index, [x, GetTerrainY(chapter, x) - 0.84, 2.24 + (index % 3) * 0.1], [0, index * 0.73, (index % 2 ? 1 : -1) * 0.08], [0.38 * randomScale, 0.14 * randomScale, 0.58 * randomScale], rockMatrix);
+    SetInstance(rocks, index, [x, GetTerrainY(chapter, x) - 0.91, 2.5 + (index % 3) * 0.08], [0, index * 0.73, (index % 2 ? 1 : -1) * 0.08], [0.3 * randomScale, 0.1 * randomScale, 0.46 * randomScale], rockMatrix);
   }
   rocks.instanceMatrix.needsUpdate = true;
   rocks.renderOrder = 4;
@@ -743,6 +791,35 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
     AddBox(building, [0.06, 0.48, 0.06], [deskX - 0.22, 0.26, -1.8 + (index % 2) * 0.5], materials.wood);
     AddBox(building, [0.06, 0.48, 0.06], [deskX + 0.22, 0.26, -1.8 + (index % 2) * 0.5], materials.wood);
   }
+  const shoeGeometry = new THREE.CapsuleGeometry(0.072, 0.15, 4, 8);
+  shoeGeometry.rotateX(Math.PI * 0.5);
+  const shoeMaterial = CreateMaterial(0x151918, { roughness: 1, emissive: 0x080a09, emissiveIntensity: 0.18 });
+  const shoes = new THREE.InstancedMesh(shoeGeometry, shoeMaterial, 12);
+  const shoeMatrix = new THREE.Matrix4();
+  const shoePosition = new THREE.Vector3();
+  const shoeQuaternion = new THREE.Quaternion();
+  const shoeScale = new THREE.Vector3();
+  for (let childIndex = 0; childIndex < 6; childIndex += 1) {
+    const row = childIndex % 2;
+    const deskIndex = Math.min(4, childIndex);
+    const baseX = 2.2 + deskIndex * 0.85 + (row ? 0.12 : -0.08);
+    const baseZ = -1.7 + (deskIndex % 2) * 0.5;
+    for (let footIndex = 0; footIndex < 2; footIndex += 1) {
+      shoePosition.set(baseX + (footIndex ? 0.09 : -0.09), 0.08, baseZ + 0.18 + row * 0.08);
+      shoeQuaternion.setFromEuler(new THREE.Euler(0, (footIndex ? -1 : 1) * (0.08 + childIndex * 0.015), (childIndex % 3 - 1) * 0.025));
+      shoeScale.set(0.9 + row * 0.05, 0.48, 0.92 + (childIndex % 3) * 0.035);
+      shoeMatrix.compose(shoePosition, shoeQuaternion, shoeScale);
+      shoes.setMatrixAt(childIndex * 2 + footIndex, shoeMatrix);
+    }
+  }
+  shoes.instanceMatrix.needsUpdate = true;
+  shoes.castShadow = true;
+  shoes.receiveShadow = true;
+  shoes.name = "EmptySchoolShoes";
+  building.add(shoes);
+  dynamic.emptyShoes = shoes;
+  dynamic.ownedGeometries.push(shoeGeometry);
+  dynamic.ownedMaterials.push(shoeMaterial);
   const papers = new THREE.MeshStandardMaterial({ color: 0xbeb79a, roughness: 1, side: THREE.DoubleSide });
   dynamic.ownedMaterials.push(papers);
   AddMesh(building, new THREE.PlaneGeometry(0.28, 0.36), papers, [3.3, 0.69, -1.45], [-Math.PI * 0.5, 0, 0.2], null, false);
@@ -939,7 +1016,28 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
     castShadow: false,
   });
   if (tunnelVista) dynamic.blenderAssets.push(tunnelVista);
-  AddBox(root, [32, 0.65, 4.8], [15, 2.52, -2.0], materials.earth, null, false);
+  const ceilingEdgeGeometry = new THREE.BufferGeometry();
+  const ceilingEdgePositions = [];
+  const ceilingEdgeIndices = [];
+  const ceilingSegments = 48;
+  for (let index = 0; index <= ceilingSegments; index += 1) {
+    const x = -1 + index * (32 / ceilingSegments);
+    const lowerY = 2.42
+      + Math.sin(index * 0.73) * 0.09
+      + Math.sin(index * 0.21 + 1.3) * 0.075
+      - (index % 7 === 0 ? 0.07 : 0);
+    ceilingEdgePositions.push(x, 3.18, 0.22, x, lowerY, 0.18 + Math.sin(index * 0.37) * 0.035);
+    if (index < ceilingSegments) {
+      const base = index * 2;
+      ceilingEdgeIndices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+  }
+  ceilingEdgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(ceilingEdgePositions, 3));
+  ceilingEdgeGeometry.setIndex(ceilingEdgeIndices);
+  ceilingEdgeGeometry.computeVertexNormals();
+  const ceilingEdge = AddMesh(root, ceilingEdgeGeometry, materials.earth, [0, 0, 0], null, null, false);
+  ceilingEdge.receiveShadow = true;
+  dynamic.ownedGeometries.push(ceilingEdgeGeometry);
   AddBox(root, [32, 4.8, 0.75], [15, 0.35, -3.55], materials.earth, null, false);
   AddBox(root, [32, 0.16, 0.42], [15, -0.18, 0.18], materials.earthDark, null, false);
   AddBox(root, [32, 1.02, 0.12], [15, -1.22, 1.02], materials.terrainSide, null, false);
@@ -970,9 +1068,9 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
   const ceilingGeometry = new THREE.IcosahedronGeometry(0.72, 1);
   const ceilingLumps = new THREE.InstancedMesh(ceilingGeometry, materials.earthDark, 18);
   for (let index = 0; index < 18; index += 1) {
-    wallPosition.set(0.4 + wallRandom() * 29.2, 2.18 + wallRandom() * 0.26, -0.55 + (wallRandom() - 0.5) * 2.4);
+    wallPosition.set(0.4 + wallRandom() * 29.2, 2.36 + wallRandom() * 0.22, -0.55 + (wallRandom() - 0.5) * 2.4);
     wallQuaternion.setFromEuler(new THREE.Euler(wallRandom(), wallRandom(), wallRandom()));
-    wallScale.set(0.75 + wallRandom() * 1.15, 0.18 + wallRandom() * 0.2, 0.62 + wallRandom() * 1.0);
+    wallScale.set(0.72 + wallRandom() * 1.08, 0.12 + wallRandom() * 0.16, 0.6 + wallRandom() * 0.92);
     wallMatrix.compose(wallPosition, wallQuaternion, wallScale);
     ceilingLumps.setMatrixAt(index, wallMatrix);
   }
@@ -1073,62 +1171,93 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   // would spend hundreds of draw calls on details smaller than a pixel.  A
   // two-draw instanced huddle keeps the authored 2x3 silhouette while the
   // close boarding shots continue to use the complete rigs.
-  const huddleBodyGeometry = new THREE.CylinderGeometry(0.14, 0.2, 0.6, 8);
-  const huddleHeadGeometry = new THREE.SphereGeometry(0.12, 10, 7);
-  const huddleArmGeometry = new THREE.CylinderGeometry(0.032, 0.043, 0.36, 7);
+  const huddleBodyPart = new THREE.CylinderGeometry(0.14, 0.2, 0.6, 8);
+  huddleBodyPart.scale(1.04, 1.1, 1.04);
+  const huddleKneePart = new THREE.SphereGeometry(0.12, 10, 7);
+  huddleKneePart.scale(1.38, 0.74, 1.05);
+  huddleKneePart.translate(0.13, -0.37, 0);
+  const huddleLeftArmPart = new THREE.CylinderGeometry(0.032, 0.043, 0.36, 7);
+  huddleLeftArmPart.rotateZ(-0.44);
+  huddleLeftArmPart.translate(-0.135, 0.08, 0.015);
+  const huddleRightArmPart = new THREE.CylinderGeometry(0.032, 0.043, 0.36, 7);
+  huddleRightArmPart.rotateZ(0.44);
+  huddleRightArmPart.translate(0.135, 0.08, 0.015);
+  const huddleClothGeometry = mergeGeometries([huddleBodyPart, huddleKneePart, huddleLeftArmPart, huddleRightArmPart]);
+  huddleBodyPart.dispose();
+  huddleKneePart.dispose();
+  huddleLeftArmPart.dispose();
+  huddleRightArmPart.dispose();
+
+  const huddleHeadPart = new THREE.SphereGeometry(0.12, 10, 7);
+  const huddleHairPart = new THREE.SphereGeometry(0.126, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.58);
+  huddleHairPart.translate(0, 0.025, -0.004);
+  const ApplyPartColor = (geometry, colorValue) => {
+    const color = new THREE.Color(colorValue);
+    const colors = new Float32Array(geometry.attributes.position.count * 3);
+    for (let index = 0; index < geometry.attributes.position.count; index += 1) {
+      colors[index * 3] = color.r;
+      colors[index * 3 + 1] = color.g;
+      colors[index * 3 + 2] = color.b;
+    }
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  };
+  ApplyPartColor(huddleHeadPart, 0xb69a76);
+  ApplyPartColor(huddleHairPart, 0x151712);
+  const huddleHeadGeometry = mergeGeometries([huddleHeadPart, huddleHairPart]);
+  huddleHeadPart.dispose();
+  huddleHairPart.dispose();
   const huddleBodyMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 1,
     metalness: 0,
     vertexColors: true,
-    emissive: 0x11130f,
-    emissiveIntensity: 0.32,
+    emissive: 0x252a22,
+    emissiveIntensity: 0.48,
   });
-  const huddleSkinMaterial = new THREE.MeshStandardMaterial({ color: 0x9f8463, roughness: 1, metalness: 0 });
-  const huddleBodies = new THREE.InstancedMesh(huddleBodyGeometry, huddleBodyMaterial, 6);
-  const huddleKnees = new THREE.InstancedMesh(huddleHeadGeometry, huddleBodyMaterial, 6);
-  const huddleHeads = new THREE.InstancedMesh(huddleHeadGeometry, huddleSkinMaterial, 6);
-  const huddleHair = new THREE.InstancedMesh(huddleHeadGeometry, materials.woodDark, 6);
-  const huddleArms = new THREE.InstancedMesh(huddleArmGeometry, huddleBodyMaterial, 12);
-  const huddleColors = [0x4c4b3e, 0x424b42, 0x51473d, 0x3e4745, 0x554d41, 0x44473b];
+  const huddleHeadMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 1,
+    metalness: 0,
+    vertexColors: true,
+    emissive: 0x241c14,
+    emissiveIntensity: 0.36,
+  });
+  const huddleCloth = new THREE.InstancedMesh(huddleClothGeometry, huddleBodyMaterial, 6);
+  const huddleHeads = new THREE.InstancedMesh(huddleHeadGeometry, huddleHeadMaterial, 6);
+  const huddleColors = [0x666452, 0x59675d, 0x6a5d50, 0x526460, 0x706657, 0x5d6154];
   huddleColors.forEach((color, index) => {
-    huddleBodies.setColorAt(index, new THREE.Color(color));
-    huddleKnees.setColorAt(index, new THREE.Color(color));
-    huddleArms.setColorAt(index * 2, new THREE.Color(color));
-    huddleArms.setColorAt(index * 2 + 1, new THREE.Color(color));
+    huddleCloth.setColorAt(index, new THREE.Color(color));
   });
-  if (huddleBodies.instanceColor) huddleBodies.instanceColor.needsUpdate = true;
-  if (huddleKnees.instanceColor) huddleKnees.instanceColor.needsUpdate = true;
-  if (huddleArms.instanceColor) huddleArms.instanceColor.needsUpdate = true;
-  huddleBodies.castShadow = false;
-  huddleBodies.receiveShadow = true;
-  huddleKnees.castShadow = false;
-  huddleKnees.receiveShadow = true;
+  if (huddleCloth.instanceColor) huddleCloth.instanceColor.needsUpdate = true;
+  huddleCloth.castShadow = false;
+  huddleCloth.receiveShadow = true;
+  huddleCloth.frustumCulled = false;
   huddleHeads.castShadow = false;
   huddleHeads.receiveShadow = true;
-  huddleHair.castShadow = false;
-  huddleHair.receiveShadow = true;
-  huddleArms.castShadow = false;
-  huddleArms.receiveShadow = true;
+  huddleHeads.frustumCulled = false;
   const ferryHuddle = new THREE.Group();
   ferryHuddle.name = "FerryChildrenHuddleLod";
   ferryHuddle.visible = false;
-  ferryHuddle.add(huddleBodies, huddleKnees, huddleHeads, huddleHair, huddleArms);
+  ferryHuddle.add(huddleCloth, huddleHeads);
   root.add(ferryHuddle);
-  dynamic.ownedGeometries.push(huddleBodyGeometry, huddleHeadGeometry, huddleArmGeometry);
-  dynamic.ownedMaterials.push(huddleBodyMaterial, huddleSkinMaterial);
+  dynamic.ownedGeometries.push(huddleClothGeometry, huddleHeadGeometry);
+  dynamic.ownedMaterials.push(huddleBodyMaterial, huddleHeadMaterial);
   dynamic.ferryHuddle = {
     group: ferryHuddle,
-    bodies: huddleBodies,
-    knees: huddleKnees,
+    cloth: huddleCloth,
+    bodies: huddleCloth,
     heads: huddleHeads,
-    hair: huddleHair,
-    arms: huddleArms,
     matrix: new THREE.Matrix4(),
     position: new THREE.Vector3(),
     quaternion: new THREE.Quaternion(),
     scale: new THREE.Vector3(1, 1, 1),
   };
+
+  const ferryFillLight = new THREE.PointLight(0xc6c9b2, 3.2, 6.6, 2.1);
+  ferryFillLight.position.set(33.0, 2.15, 1.55);
+  ferryFillLight.castShadow = false;
+  root.add(ferryFillLight);
+  dynamic.ferryFillLight = ferryFillLight;
 
   const motherLantern = new THREE.Group();
   AddCylinder(motherLantern, 0.055, 0.08, 0.2, [0, 0, 0], materials.metal, 8, null, false);
@@ -1141,6 +1270,27 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   root.add(motherLantern);
   dynamic.motherLantern = motherLantern;
   dynamic.motherLanternLight = motherLight;
+
+  // A sparse after-image makes Zhou He's southbound light readable in the
+  // final crane shot without turning it into a game objective marker.
+  const lanternTrailGeometry = new THREE.BufferGeometry();
+  lanternTrailGeometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(18), 3));
+  const lanternTrailMaterial = new THREE.PointsMaterial({
+    color: profile.accent,
+    size: 0.075,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    sizeAttenuation: true,
+    fog: true,
+  });
+  const lanternTrail = new THREE.Points(lanternTrailGeometry, lanternTrailMaterial);
+  lanternTrail.visible = false;
+  lanternTrail.frustumCulled = false;
+  root.add(lanternTrail);
+  dynamic.motherLanternTrail = lanternTrail;
+  dynamic.ownedGeometries.push(lanternTrailGeometry);
+  dynamic.ownedMaterials.push(lanternTrailMaterial);
 
   CreateReedField(root, chapter, -1, 30.8, Math.round(210 * density), -2.45, -0.75, materials.reedSway, 61, 0.98);
   CreateReedField(root, chapter, 34, 39, Math.round(75 * density), -1.8, 0.4, materials.reedSway, 62, 1.08);
@@ -1293,12 +1443,15 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     ferryHome: null,
     motherLantern: null,
     motherLanternLight: null,
+    motherLanternTrail: null,
+    ferryFillLight: null,
   };
   const materials = CreateMaterials(profile, dynamic, chapter.id);
   BuildSkyBackdrop(root, profile, chapter, dynamic);
   BuildAtmosphericLayers(root, profile, chapter, dynamic);
   BuildTerrain(root, chapter, materials, dynamic);
   if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic, chapter.id);
+  BuildRegionalScaleMarkers(root, chapter, profile, dynamic);
   const density = renderProfile.reedDensity;
   if (chapter.id === "school") BuildSchool(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "blockade") BuildBlockade(root, chapter, materials, dynamic, profile, density);
@@ -1318,6 +1471,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   root.add(actors.player, actors.mother, ...actors.followers);
   actors.mother.visible = chapter.id === "ferry";
 
+  function SetActorShadowCasting(actor, enabled) {
+    actor.traverse((object) => {
+      if (!object.isMesh || !object.userData.actorMesh) return;
+      if (object.userData.authoredCastShadow === undefined) object.userData.authoredCastShadow = object.castShadow;
+      object.castShadow = enabled && object.userData.authoredCastShadow;
+    });
+  }
+
   function Update(state, deltaTime, time, windStrength, cinematicFrame = null) {
     const cueState = state.cinematicCue;
     const cueAge = cueState && Number.isFinite(cueState.startedAt) ? state.elapsed - cueState.startedAt : Infinity;
@@ -1333,6 +1494,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     const followerCue = followerActionId ? GetCinematicCue(followerActionId) : null;
     const directorActors = cinematicFrame?.actors;
     const directorEffects = cinematicFrame?.effects || {};
+    const directorBlocking = cinematicFrame?.blocking || {};
     const playerAction = directorActors?.player || playerCue?.pose || null;
     const followerAction = directorActors?.followers || followerCue?.followerPose || null;
     const directorActionTime = cinematicFrame ? cinematicFrame.segmentProgress : null;
@@ -1358,6 +1520,10 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       dynamic.ferry.rotation.z = Math.sin(time * 0.72) * (0.018 + ferryDeparture * 0.012);
       dynamic.ferry.rotation.y = -ferryDeparture * 0.055;
     }
+    if (dynamic.ferryFillLight) {
+      dynamic.ferryFillLight.position.set(ferryX - 0.12, ferryY + 2.35, ferryZ + 1.4);
+      dynamic.ferryFillLight.intensity = cinematicFrame?.id === "endingDeparture" ? 3.8 : 2.7;
+    }
     const playerBoardBlend = THREE.MathUtils.clamp(playerBoarding, 0, 1);
     const useFerryHuddle = Boolean(dynamic.ferryHuddle && state.followers.length >= 4);
     if (dynamic.ferryHuddle) {
@@ -1374,10 +1540,15 @@ export function CreateChapterScene3D(chapter, renderProfile) {
             : 0;
           const detailedAnchor = index === 0 || index === 2;
           const lodScale = detailedAnchor ? 0 : 1;
-          const ferryChildX = ferryX - 0.88 + column * 0.62 + row * 0.28;
+          const ferryChildX = ferryX - 0.98 + column * 0.66 + row * 0.33;
           const huddleBreath = Math.sin(time * 1.55 + index * 0.92) * 0.015;
-          const ferryChildY = ferryY + 0.75 + row * 0.05 + huddleBreath;
-          const ferryChildZ = ferryZ + 0.32 - row * 0.72;
+          const finalRollCall = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex >= 4;
+          const attention = finalRollCall
+            ? THREE.MathUtils.clamp((cinematicFrame.segmentProgress - index * 0.07) * 4.2, 0, 1)
+            : 0;
+          const leanToAwei = attention * (0.026 + (index % 2) * 0.012);
+          const ferryChildY = ferryY + 0.98 + row * 0.035 + huddleBreath + attention * 0.018;
+          const ferryChildZ = ferryZ + 0.22 - row * 0.43;
           const shoreChildX = (follower?.x ?? state.player.x) * WorldScale;
           const shoreChildY = (follower?.y ?? state.player.y) * WorldScale + 0.62;
           const shoreChildZ = 0.2 - index * 0.035;
@@ -1385,52 +1556,38 @@ export function CreateChapterScene3D(chapter, renderProfile) {
           const childY = THREE.MathUtils.lerp(shoreChildY, ferryChildY, followerBoardBlend);
           const childZ = THREE.MathUtils.lerp(shoreChildZ, ferryChildZ, followerBoardBlend);
           huddle.position.set(childX, childY, childZ);
-          huddle.quaternion.setFromEuler(new THREE.Euler(0, 0, -0.1 + column * 0.025));
+          huddle.quaternion.setFromEuler(new THREE.Euler(0, 0, -0.075 + column * 0.02 - leanToAwei));
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
-          huddle.bodies.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX + 0.13, childY - 0.37, childZ);
-          huddle.quaternion.identity();
-          huddle.scale.set(1.38 * lodScale, 0.74 * lodScale, 1.05 * lodScale);
-          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
-          huddle.knees.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX + 0.055, childY + 0.49, childZ);
-          huddle.quaternion.identity();
+          huddle.cloth.setMatrixAt(index, huddle.matrix);
+          huddle.position.set(childX + 0.055 + attention * 0.035, childY + 0.49 + attention * 0.025, childZ);
+          huddle.quaternion.setFromEuler(new THREE.Euler(0, attention * -0.28, -leanToAwei));
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.heads.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX - 0.005, childY + 0.54, childZ - 0.008);
-          huddle.scale.set(0.9 * lodScale, 0.88 * lodScale, 0.92 * lodScale);
-          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
-          huddle.hair.setMatrixAt(index, huddle.matrix);
-          for (let armIndex = 0; armIndex < 2; armIndex += 1) {
-            const side = armIndex === 0 ? -1 : 1;
-            const finalEmbrace = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex === 4 ? 1 : 0;
-            huddle.position.set(childX + side * 0.135, childY + 0.08, childZ + 0.015);
-            huddle.quaternion.setFromEuler(new THREE.Euler(0.08 * row, 0, side * (0.2 + finalEmbrace * (0.2 + (index % 2) * 0.08))));
-            huddle.scale.setScalar(lodScale);
-            huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
-            huddle.arms.setMatrixAt(index * 2 + armIndex, huddle.matrix);
-          }
         }
-        huddle.bodies.instanceMatrix.needsUpdate = true;
-        huddle.knees.instanceMatrix.needsUpdate = true;
+        huddle.cloth.instanceMatrix.needsUpdate = true;
         huddle.heads.instanceMatrix.needsUpdate = true;
-        huddle.hair.instanceMatrix.needsUpdate = true;
-        huddle.arms.instanceMatrix.needsUpdate = true;
       }
     }
     const playerGround = state.player.y * WorldScale;
     const motherHandoffActive = registerSequence === "motherHandoff";
-    const authoredPlayerX = motherHandoffActive ? 18.46 : state.player.x * WorldScale;
+    const blockedPlayerX = Number(directorBlocking.playerX);
+    const blockedPlayerFacing = Number(directorBlocking.playerFacing);
+    const blockedPlayerVelocity = Number(directorBlocking.playerVelocity);
+    const authoredPlayerX = Number.isFinite(blockedPlayerX)
+      ? blockedPlayerX
+      : motherHandoffActive ? 18.46 : state.player.x * WorldScale;
     const schoolHandoffActive = ["schoolOpening", "registerHandoff"].includes(registerSequence);
     UpdateActor3D(actors.player, {
       x: THREE.MathUtils.lerp(authoredPlayerX, ferryX + 1.02, playerBoardBlend),
       y: THREE.MathUtils.lerp(playerGround, ferryY + 0.34, playerBoardBlend),
       z: THREE.MathUtils.lerp(0.36, ferryZ + 0.3, playerBoardBlend),
-      velocity: playerBoardBlend > 0.8 ? ferryDeparture * 0.5 : state.player.vx * WorldScale,
-      facing: schoolHandoffActive ? -1 : state.player.facing,
-      crouching: state.player.crouching,
+      velocity: Number.isFinite(blockedPlayerVelocity)
+        ? blockedPlayerVelocity
+        : playerBoardBlend > 0.8 ? ferryDeparture * 0.5 : state.player.vx * WorldScale,
+      facing: Number.isFinite(blockedPlayerFacing) ? blockedPlayerFacing : schoolHandoffActive ? -1 : state.player.facing,
+      crouching: directorBlocking.playerCrouch ?? state.player.crouching,
       carrying: state.player.carrying,
       alert: state.suspicion > 0.25,
       fear: state.suspicion,
@@ -1441,7 +1598,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       registerBook: playerHasRegister,
       actionTime: directorActionTime ?? playerActionTime,
       actionDuration: cinematicFrame ? 1 : playerActionDuration,
-      positionSnap: playerBoardBlend > 0 || motherHandoffActive,
+      positionSnap: playerBoardBlend > 0 || motherHandoffActive || Number.isFinite(blockedPlayerX),
       time,
     }, deltaTime);
     for (let index = 0; index < actors.followers.length; index += 1) {
@@ -1460,21 +1617,24 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       const followerBoardBlend = THREE.MathUtils.clamp((boarding - boardThreshold) * 7.5, 0, 1);
       const ferryRow = Math.floor(index / 3);
       const ferryColumn = index % 3;
-      const followerTargetX = ferryX - 0.88 + ferryColumn * 0.62 + ferryRow * 0.28;
-      const followerTargetY = ferryY + 0.32 + ferryRow * 0.07;
-      const followerTargetZ = ferryZ + 0.32 - ferryRow * 0.72;
+      const followerTargetX = ferryX - 0.98 + ferryColumn * 0.66 + ferryRow * 0.33;
+      const followerTargetY = ferryY + 0.33 + ferryRow * 0.045;
+      const followerTargetZ = ferryZ + 0.22 - ferryRow * 0.43;
+      const finalRollCall = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex >= 4;
       UpdateActor3D(actor, {
         x: THREE.MathUtils.lerp(follower.x * WorldScale, followerTargetX, followerBoardBlend),
         y: THREE.MathUtils.lerp(follower.y * WorldScale, followerTargetY, followerBoardBlend),
         z: THREE.MathUtils.lerp(0.2 - index * 0.035, followerTargetZ, followerBoardBlend),
         velocity: followerBoardBlend > 0.75 ? ferryDeparture * 0.5 : state.followersHolding ? 0 : (follower.vx ?? state.player.vx * 0.82) * WorldScale,
-        facing: follower.facing,
+        facing: finalRollCall ? 1 : follower.facing,
         crouching: state.followersHolding || state.player.crouching,
         holding: state.followersHolding,
         alert: state.suspicion > 0.22,
         fear: Math.min(1, state.suspicion + index * 0.025),
         grounded: true,
-        lookOffset: state.followersHolding ? (index % 2 ? -0.12 : 0.1) : Math.sin(time * 0.72 + index * 1.31) * 0.06,
+        lookOffset: finalRollCall
+          ? 0.08 + THREE.MathUtils.clamp((cinematicFrame.segmentProgress - index * 0.07) * 3.8, 0, 1) * 0.12
+          : state.followersHolding ? (index % 2 ? -0.12 : 0.1) : Math.sin(time * 0.72 + index * 1.31) * 0.06,
         action: followerAction,
         actionTime: cinematicFrame
           ? Math.max(0, cinematicFrame.segmentProgress - index * Number(directorActors?.followerStagger || 0))
@@ -1488,14 +1648,21 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }
     if (chapter.id === "ferry") {
       const signaled = state.completed.has("motherSignal");
-      const motherTargetX = motherHandoffActive ? 19.22 : signaled ? 23.4 : 20.2;
+      const motherDeparture = THREE.MathUtils.clamp(Number(directorEffects.motherDeparture || 0), 0, 1);
+      const blockedMotherX = Number(directorBlocking.motherX);
+      const blockedMotherFacing = Number(directorBlocking.motherFacing);
+      const blockedMotherVelocity = Number(directorBlocking.motherVelocity);
+      const motherTargetX = Number.isFinite(blockedMotherX)
+        ? blockedMotherX
+        : motherHandoffActive ? 19.22 : signaled ? 23.4 - motherDeparture * 6.8 : 20.2;
+      const motherTargetZ = 0.08 - motherDeparture * 2.1;
       dynamic.motherX = THREE.MathUtils.lerp(dynamic.motherX ?? motherTargetX, motherTargetX, 1 - Math.exp(-(motherHandoffActive ? 8 : 0.62) * deltaTime));
       UpdateActor3D(actors.mother, {
         x: dynamic.motherX,
         y: 0,
-        z: 0.08,
-        velocity: motherHandoffActive ? 0 : signaled ? 0.42 : 0,
-        facing: motherHandoffActive ? -1 : signaled ? 1 : -1,
+        z: motherTargetZ,
+        velocity: Number.isFinite(blockedMotherVelocity) ? blockedMotherVelocity : motherHandoffActive ? 0 : motherDeparture > 0 ? -0.58 : signaled ? 0.42 : 0,
+        facing: Number.isFinite(blockedMotherFacing) ? blockedMotherFacing : motherHandoffActive ? -1 : motherDeparture > 0 ? -1 : signaled ? 1 : -1,
         action: directorActors?.mother || (cueLive && cueState.actionId === "motherSignal" ? "signal" : null),
         registerBook: motherHasRegister,
         actionTime: directorActionTime ?? (cueLive ? cueAge : 0),
@@ -1505,6 +1672,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         fear: signaled ? 0.52 : 0.12,
         grounded: true,
         lookOffset: signaled ? -0.2 : 0.08,
+        positionSnap: Number.isFinite(blockedMotherX),
       }, deltaTime);
       const finaleVisible = cinematicFrame?.id === "endingDeparture";
       actors.mother.visible = !state.endingReady || finaleVisible;
@@ -1516,20 +1684,39 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       }
       if (dynamic.motherLantern) {
         dynamic.motherLantern.visible = state.completed.has("meetMother") && (!state.endingReady || finaleVisible);
-        dynamic.motherLantern.position.set(dynamic.motherX - 0.22, 0.62 + Math.sin(time * 2.1) * 0.025, 0.44);
-        dynamic.motherLanternLight.intensity = signaled ? 5.2 : 3.6;
+        dynamic.motherLantern.position.set(dynamic.motherX - 0.22, 0.62 + Math.sin(time * 2.1) * 0.025, motherTargetZ + 0.36);
+        dynamic.motherLanternLight.intensity = (signaled ? 6.1 : 3.8) * THREE.MathUtils.lerp(1, 0.72, motherDeparture);
+      }
+      if (dynamic.motherLanternTrail) {
+        const trail = dynamic.motherLanternTrail;
+        trail.visible = finaleVisible && motherDeparture > 0.16;
+        trail.material.opacity = THREE.MathUtils.lerp(0.12, 0.28, motherDeparture);
+        const positions = trail.geometry.attributes.position;
+        for (let index = 0; index < positions.count; index += 1) {
+          const distance = (index + 1) * (0.24 + motherDeparture * 0.18);
+          positions.setXYZ(
+            index,
+            dynamic.motherX - 0.22 + distance,
+            0.77 + Math.sin(time * 1.7 - index * 0.9) * 0.018,
+            motherTargetZ + 0.36 + distance * 0.32,
+          );
+        }
+        positions.needsUpdate = true;
       }
     } else if (chapter.id === "school") {
       const teacherActive = Boolean(directorActors?.mother && ["schoolOpening", "registerHandoff"].includes(cinematicFrame?.id));
       actors.mother.visible = teacherActive;
       if (teacherActive) {
         const registerHandoff = cinematicFrame?.id === "registerHandoff";
+        const blockedTeacherX = Number(directorBlocking.motherX);
+        const blockedTeacherFacing = Number(directorBlocking.motherFacing);
+        const blockedTeacherVelocity = Number(directorBlocking.motherVelocity);
         UpdateActor3D(actors.mother, {
-          x: registerHandoff ? 2.48 : 2.38,
+          x: Number.isFinite(blockedTeacherX) ? blockedTeacherX : registerHandoff ? 2.48 : 2.38,
           y: 0,
           z: -0.02,
-          velocity: 0,
-          facing: 1,
+          velocity: Number.isFinite(blockedTeacherVelocity) ? blockedTeacherVelocity : 0,
+          facing: Number.isFinite(blockedTeacherFacing) ? blockedTeacherFacing : 1,
           action: directorActors.mother,
           registerBook: motherHasRegister,
           actionTime: directorActionTime,
@@ -1620,10 +1807,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         firstShaft.pool.scale.set(1.2 * openingWidth, 0.56 * openingWidth, 1);
       }
     }
-    const trimOpeningActors = cinematicFrame?.id === "schoolOpening";
+    const trimOpeningActors = cinematicFrame?.id === "schoolOpening" || cinematicFrame?.id === "endingDeparture";
     for (const actor of [actors.player, actors.mother]) {
       for (const optionalMesh of actor.userData.lodOptional || []) optionalMesh.visible = !trimOpeningActors;
     }
+    // Secondary-character shadow passes are invisible at authored camera
+    // distances but cost one draw per limb.  Keep the hero shadow and each
+    // actor's soft contact patch; trim only the guide while a movie shot runs.
+    SetActorShadowCasting(actors.mother, !cinematicFrame);
     if (dynamic.foregroundRocks) {
       dynamic.foregroundRocks.visible = !cinematicFrame?.camera || Number(cinematicFrame.camera.viewDistance || 99) >= 11;
     }

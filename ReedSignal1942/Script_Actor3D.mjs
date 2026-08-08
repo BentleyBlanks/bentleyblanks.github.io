@@ -343,7 +343,10 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   const rightLift = Math.max(0, stepCos) * gait;
   const plantedLeft = Math.max(0, stepCos) * gait;
   const plantedRight = Math.max(0, -stepCos) * gait;
-  const crouch = pose.crouching ? 1 : 0;
+  // Authored floor poses own their complete centre-of-gravity shift.  Folding
+  // the generic crouch on top of them made the hips collapse twice and was the
+  // main source of the old marionette silhouette in the finale.
+  const crouch = pose.crouching && pose.action !== "writeKneel" ? 1 : 0;
   const held = pose.holding ? 1 : 0;
   const time = pose.time || 0;
   const fearTarget = Clamp(pose.fear ?? (pose.alert ? 0.72 : 0), 0, 1);
@@ -367,6 +370,7 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   // Locomotion starts at the planted foot: hips drop over contact, shoulders
   // counter-rotate, and the head resists the body's acceleration.  This keeps
   // the low-poly silhouette readable while giving every step visible weight.
+  let rigX = stepCos * 0.018 * speed * gait + idleWeight * 0.12;
   let rigY = -crouch * 0.36 + (leftLift + rightLift) * 0.026 * speed + Math.abs(stepSin) * 0.018 * gait + breath - motion.fear * 0.025;
   let rigRotX = startStopLean * 0.16;
   let rigRotZ = -stride * 0.035 - startStopLean * (pose.facing >= 0 ? 1 : -1) + idleWeight;
@@ -374,6 +378,7 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   let pelvisRotY = -stepSin * 0.082 * speed * gait - motion.turn * 0.04;
   let pelvisRotZ = (plantedLeft - plantedRight) * 0.052 * speed + idleWeight * 0.42;
   let torsoRotX = -startStopLean * 0.24;
+  let torsoRotY = -stepSin * 0.035 * speed * gait;
   let torsoRotZ = -pelvisRotZ * 0.32;
   let shouldersRotX = 0;
   let shouldersRotY = stepSin * 0.105 * speed * gait + motion.turn * 0.07;
@@ -391,6 +396,10 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   let rightArmY = stepCos * 0.035 * gait;
   let leftHandX = -0.08;
   let rightHandX = -0.08;
+  let leftHandZ = 0;
+  let rightHandZ = 0;
+  let leftElbowZ = 0;
+  let rightElbowZ = 0;
   let leftLegX = stride - crouch * 0.7;
   let rightLegX = -stride - crouch * 0.7;
   let leftLowerLegX = leftLift * (0.34 + speed * 0.48) + crouch * 1.1;
@@ -414,7 +423,42 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightFootX += 0.14;
   }
 
-  if (gesture === "write" || gesture === "count") {
+  if (gesture === "writeKneel") {
+    const lower = SmoothStep(0.04, 0.36, gestureProgress);
+    const writing = SmoothStep(0.24, 0.74, gestureProgress);
+    const stroke = Math.sin(gestureProgress * Math.PI * 7.5) * writing * (1 - SmoothStep(0.82, 1, gestureProgress));
+    const penPressure = Math.sin(gestureProgress * Math.PI * 3.75) * writing * 0.018;
+    rigY -= 0.27 * lower;
+    rigX += (pose.facing >= 0 ? 1 : -1) * 0.018 * lower;
+    rigRotX += 0.025 * lower;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.022 * lower;
+    pelvisRotX += 0.22 * lower;
+    torsoRotX += (0.12 + penPressure) * lower;
+    torsoRotY += (pose.facing >= 0 ? -1 : 1) * 0.045 * lower;
+    headRotX -= 0.28 * lower;
+    headRotY += stroke * 0.024;
+    // One planted foot and one shin laid back on the bank keep the pose
+    // anatomically legible in profile, even at the finale's long lens.
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.94, lower);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, 0.26, lower);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 1.02, lower);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 1.48, lower);
+    leftFootX = THREE.MathUtils.lerp(leftFootX, -0.1, lower);
+    rightFootX = THREE.MathUtils.lerp(rightFootX, -1.06, lower);
+    // The left hand forms the lap-table; the right hand writes across it.
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.58, lower);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.42 + stroke * 0.035, writing);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, 1.76, lower);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, 1.62 + stroke * 0.08, writing);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.2, lower);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.16, lower);
+    leftElbowZ = -0.08 * lower;
+    rightElbowZ = (0.07 + stroke * 0.035) * writing;
+    leftHandX = -0.32;
+    rightHandX = -0.28 + stroke * 0.13;
+    leftHandZ = -0.05;
+    rightHandZ = stroke * 0.055;
+  } else if (gesture === "write" || gesture === "count") {
     const writing = gesture === "write";
     const stroke = gestureBeat * gestureAttack;
     const countBeat = writing ? 0 : Math.abs(Math.sin(gestureProgress * Math.PI * 3)) * gestureAttack;
@@ -430,6 +474,8 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.24, gestureAttack);
     rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.15 + stroke * 0.035, gestureAttack);
     rightHandX = -0.2 + stroke * 0.22;
+    leftElbowZ = -0.08 * gestureAttack;
+    rightElbowZ = 0.1 * gestureAttack;
   } else if (gesture === "peek" || gesture === "shield") {
     const shield = gesture === "shield";
     const weight = gestureAttack;
@@ -494,6 +540,43 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.74, reach);
     leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.34, reach);
     rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.18, reach);
+    leftHandZ = -0.16 * reach;
+    rightHandZ = 0.08 * reach;
+  } else if (gesture === "answer") {
+    const gather = SmoothStep(0.06, 0.42, gestureProgress);
+    const answer = Bell(gestureProgress, 0.62, 0.34);
+    rigY += answer * 0.018;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.025 * gather;
+    pelvisRotX -= 0.05 * answer;
+    torsoRotX -= 0.1 * answer;
+    headRotX -= 0.14 * answer;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.08 * gather;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.46, gather);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.18, gather);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.16, gather);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.2, gather);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.42, gather);
+    leftHandX = -0.26;
+  } else if (gesture === "call") {
+    const call = SmoothStep(0.05, 0.4, gestureProgress);
+    const release = SmoothStep(0.72, 1, gestureProgress);
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (0.06 - release * 0.025) * call;
+    torsoRotX += 0.08 * call;
+    headRotX -= 0.09 * call;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.12 * call;
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.78, call);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.36, call);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.22, call);
+    rightHandX = -0.34;
+    rightHandZ = 0.18;
+  } else if (gesture === "goodbye") {
+    const turnBack = SmoothStep(0.12, 0.62, gestureProgress);
+    headRotY += (pose.facing >= 0 ? -1 : 1) * 0.58 * turnBack;
+    headRotZ += (pose.facing >= 0 ? 1 : -1) * 0.05 * turnBack;
+    shouldersRotY += (pose.facing >= 0 ? -1 : 1) * 0.12 * turnBack;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.34, turnBack);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.92, turnBack);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.16, turnBack);
   } else if (gesture === "signal") {
     const raise = BackOut(SmoothStep(0.04, 0.55, gestureProgress));
     const windResistance = Math.sin(gestureProgress * Math.PI * 7) * gestureArc * 0.035;
@@ -583,6 +666,7 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightFootX += stepUp * 0.1;
   }
 
+  rig.rig.position.x = Damp(rig.rig.position.x, rigX, 9, deltaTime);
   rig.rig.position.y = Damp(rig.rig.position.y, rigY, 10, deltaTime);
   rig.rig.rotation.x = Damp(rig.rig.rotation.x, rigRotX, 7, deltaTime);
   rig.rig.rotation.z = Damp(rig.rig.rotation.z, rigRotZ, 8, deltaTime);
@@ -594,6 +678,7 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.shoulders.rotation.z = Damp(rig.shoulders.rotation.z, shouldersRotZ, 8, deltaTime);
   rig.shoulders.rotation.y = Damp(rig.shoulders.rotation.y, shouldersRotY, 8, deltaTime);
   rig.torso.rotation.x = Damp(rig.torso.rotation.x, torsoRotX, 8, deltaTime);
+  rig.torso.rotation.y = Damp(rig.torso.rotation.y, torsoRotY, 8, deltaTime);
   rig.torso.rotation.z = Damp(rig.torso.rotation.z, torsoRotZ, 8, deltaTime);
   rig.torso.scale.y = Damp(rig.torso.scale.y, 1 - crouch * 0.08, 9, deltaTime);
   rig.headPivot.rotation.x = Damp(rig.headPivot.rotation.x, headRotX, 7, deltaTime);
@@ -622,24 +707,28 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.rightArm.root.rotation.x = Damp(rig.rightArm.root.rotation.x, rightArmX, 11, deltaTime);
   rig.leftArm.lower.rotation.x = Damp(rig.leftArm.lower.rotation.x, leftArmLowerX, 11, deltaTime);
   rig.rightArm.lower.rotation.x = Damp(rig.rightArm.lower.rotation.x, rightArmLowerX, 11, deltaTime);
+  rig.leftArm.lower.rotation.z = Damp(rig.leftArm.lower.rotation.z, leftElbowZ, 9, deltaTime);
+  rig.rightArm.lower.rotation.z = Damp(rig.rightArm.lower.rotation.z, rightElbowZ, 9, deltaTime);
   rig.leftArm.root.rotation.z = Damp(rig.leftArm.root.rotation.z, leftArmZ, 9, deltaTime);
   rig.rightArm.root.rotation.z = Damp(rig.rightArm.root.rotation.z, rightArmZ, 9, deltaTime);
   rig.leftArm.root.rotation.y = Damp(rig.leftArm.root.rotation.y, leftArmY, 8, deltaTime);
   rig.rightArm.root.rotation.y = Damp(rig.rightArm.root.rotation.y, rightArmY, 8, deltaTime);
   rig.leftArm.endpoint.rotation.x = Damp(rig.leftArm.endpoint.rotation.x, leftHandX, 9, deltaTime);
   rig.rightArm.endpoint.rotation.x = Damp(rig.rightArm.endpoint.rotation.x, rightHandX, 9, deltaTime);
+  rig.leftArm.endpoint.rotation.z = Damp(rig.leftArm.endpoint.rotation.z, leftHandZ, 9, deltaTime);
+  rig.rightArm.endpoint.rotation.z = Damp(rig.rightArm.endpoint.rotation.z, rightHandZ, 9, deltaTime);
   rig.carriedBundle.visible = Boolean(pose.carrying || gesture === "lift");
   rig.carriedBundle.position.x = Damp(rig.carriedBundle.position.x, bundleX, 8, deltaTime);
   rig.carriedBundle.position.y = Damp(rig.carriedBundle.position.y, bundleY, 8, deltaTime);
   rig.carriedBundle.position.z = Damp(rig.carriedBundle.position.z, bundleZ, 8, deltaTime);
   rig.carriedBundle.scale.setScalar(Damp(rig.carriedBundle.scale.x, bundleScale, 8, deltaTime));
   const registerActive = Boolean(pose.registerBook);
-  const registerExtended = gesture === "pass" ? gestureArc : gesture === "write" || gesture === "count" ? 0.32 : 0;
+  const registerExtended = gesture === "pass" ? gestureArc : gesture === "writeKneel" ? 0.46 : gesture === "write" || gesture === "count" ? 0.32 : 0;
   rig.registerBook.visible = registerActive;
-  rig.registerBook.position.x = Damp(rig.registerBook.position.x, gesture === "write" ? -0.02 : 0.04, 10, deltaTime);
-  rig.registerBook.position.y = Damp(rig.registerBook.position.y, gesture === "write" ? 0.31 : 0.36 + registerExtended * 0.05, 10, deltaTime);
-  rig.registerBook.position.z = Damp(rig.registerBook.position.z, 0.28 + registerExtended * 0.2, 10, deltaTime);
-  rig.registerBook.rotation.x = Damp(rig.registerBook.rotation.x, gesture === "write" || gesture === "count" ? -0.72 : -0.18, 10, deltaTime);
+  rig.registerBook.position.x = Damp(rig.registerBook.position.x, gesture === "write" || gesture === "writeKneel" ? 0 : 0.04, 10, deltaTime);
+  rig.registerBook.position.y = Damp(rig.registerBook.position.y, gesture === "writeKneel" ? 0.22 : gesture === "write" ? 0.31 : 0.36 + registerExtended * 0.05, 10, deltaTime);
+  rig.registerBook.position.z = Damp(rig.registerBook.position.z, gesture === "writeKneel" ? 0.27 : 0.28 + registerExtended * 0.2, 10, deltaTime);
+  rig.registerBook.rotation.x = Damp(rig.registerBook.rotation.x, gesture === "writeKneel" ? -1.18 : gesture === "write" || gesture === "count" ? -0.72 : -0.18, 10, deltaTime);
   rig.registerBook.rotation.y = DampAngle(rig.registerBook.rotation.y, -desiredFacing, 12, deltaTime);
   rig.registerBook.rotation.z = Damp(rig.registerBook.rotation.z, gesture === "pass" ? -0.02 : -0.09, 10, deltaTime);
 

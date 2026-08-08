@@ -1,4 +1,4 @@
-import { GetCinematicSequence } from "./Data_Cinematics.mjs?v=20260808z2";
+import { GetCinematicSequence } from "./Data_Cinematics.mjs?v=20260808z3";
 
 function Clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -16,6 +16,12 @@ function ResolveEffectValue(value, progress) {
   return value;
 }
 
+function ResolveAuthoredMap(source, progress) {
+  const resolved = {};
+  for (const [key, value] of Object.entries(source || {})) resolved[key] = ResolveEffectValue(value, progress);
+  return Object.freeze(resolved);
+}
+
 function BuildFrame(active) {
   if (!active) return null;
   const sequence = active.sequence;
@@ -23,8 +29,8 @@ function BuildFrame(active) {
   const segmentIndex = Math.max(0, sequence.segments.findIndex((segment) => sequenceTime < segment.to));
   const segment = sequence.segments[segmentIndex] || sequence.segments[sequence.segments.length - 1];
   const localProgress = Clamp01((sequenceTime - segment.from) / Math.max(0.001, segment.to - segment.from));
-  const effects = {};
-  for (const [key, value] of Object.entries(segment.effects || {})) effects[key] = ResolveEffectValue(value, localProgress);
+  const effects = ResolveAuthoredMap(segment.effects, localProgress);
+  const blocking = ResolveAuthoredMap(segment.blocking, localProgress);
   const locksInput = sequence.lockInput === "all" || sequenceTime < Number(sequence.lockInput || 0);
   return Object.freeze({
     active: true,
@@ -36,7 +42,8 @@ function BuildFrame(active) {
     segmentProgress: localProgress,
     camera: segment.camera || null,
     actors: segment.actors || null,
-    effects: Object.freeze(effects),
+    effects,
+    blocking,
     caption: segment.caption || "",
     soundCue: segment.soundCue || "",
     eventKey: `${sequence.id}:${segmentIndex}`,
