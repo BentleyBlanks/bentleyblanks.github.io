@@ -1428,20 +1428,20 @@ export const SCRIPTS = {
   // =========================================================================
   c1: [
     {
-      // 序章 v2（沿用）：一分钟从卢沟桥收拢到一扇门。
+      // 序章最终旁白：11 镜、总长 120 秒；每镜一段静音短片。
       kind: "cinematic", id: "c1_prologue", prologue: true, timeOfDay: "dawn",
       lines: [
-        { stage: "民国二十六年，卢沟桥一声枪响。不出一年，华北尽落敌手。", d: 4.6, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro1" } },
-        { stage: "扫荡一年比一年狠。抢粮，烧屋，抓人。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro6" } },
-        { stage: "粮被抢空，屋烧成断墙。活下来的人，连哭都不敢出声。", d: 5.5, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro13" } },
-        { stage: "无山可靠，无林可藏。庄稼人被逼到头，把命藏进了脚下的土。", d: 6.0, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro7" } },
-        { stage: "先是一家的地窖，后来是两家相通的洞。再后来，村连着村——庄稼地底下，长出了另一个华北。", d: 6.4, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro8" } },
-        { stage: "故事，发生在冀中的梁家村。村东头，住着个姓梁的木匠。", d: 5.0, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro11" } },
-        { stage: "他有个儿子叫柱子——房梁的梁，柱子的柱，起的是盼头。", d: 5.6, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro12" } },
-        { stage: "这年春上，粮比什么都金贵——谁家囤里，都在数着过。", d: 5.2, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
-        // 短片之后第一眼真实世界：就给梁家门口这一段（镜头规范：玩法景别）
-        { stage: "这天天刚亮，梁家的门就响了——那扇旧门，晃了半个月。", d: 4.2,
-          cam: { kind: "shot", x: 37, y: 1.7, dist: 7.4 } },
+        { stage: "九一八事变后，日本占领东北，又不断把侵略推进华北。", d: 7, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro2" } },
+        { stage: "1937年7月，日军在卢沟桥挑起战事，随后进攻北平、天津，全面侵华战争爆发。", d: 8, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro1" } },
+        { stage: "此后一年，华北多数县城和铁路沿线相继沦陷，部分正规军向南、向西转进。", d: 8, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
+        { stage: "在许多失去常驻守军的乡村，八路军深入敌后，发动群众，坚持抗战。", d: 7, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
+        { stage: "梁家村就在这样的敌占区。村外有据点、卡口和封锁沟；日伪强征粮食、摊派民夫，扫荡时还直接进村抢粮。", d: 13, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
+        { stage: "柱子家四口，靠三四亩薄田、换工和农闲杂活过日子。家里没有牲口和车，耕牛、农具都得向邻里借。", d: 13, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro9" } },
+        { stage: "乡亲叫柱子爹“梁木匠”，可地里的活才是他的本分。农闲时，他背着锯刨给人换犁把、修门轴，收几把粮。", d: 14, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro11" } },
+        { stage: "娘把已经不能穿的旧褂拆开，挑尚结实的布补裤膝和袖肘。能下锅的粮已经见底，留种的小布包却单独封在瓦罐里，谁也不能动。", d: 14, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
+        { stage: "因为会木工，柱子爹被点名抓走，关在据点工地。白天扛料锯木，干慢了挨打，夜里也不准回村。第七天，他走不了路，被两名乡亲架回家。", d: 18, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro6" } },
+        { stage: "柱子十五岁。爹的手还握不住锄头，他得分担农活、照看妹妹，也得保住最后一点粮。", d: 8, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro12" } },
+        { stage: "日伪按册点户，也进屋搜粮；少一个人就可能被盘问。可梁家的旧地窖只有一个口。", d: 10, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro7" } },
       ],
     },
     {

@@ -3703,7 +3703,7 @@ export function CreateWorld(canvasEl) {
     let v = insertVideos.get(name);
     if (v) return v;
     const el = document.createElement("video");
-    el.src = new URL(`./Video/${name}.mp4`, import.meta.url).href;
+    el.src = new URL(`./Video/${name}.mp4?v=051`, import.meta.url).href;
     // 静音是浏览器允许自动播放的前提；这些片子烘的时候本来也去掉了音轨
     el.muted = true;
     el.defaultMuted = true;
