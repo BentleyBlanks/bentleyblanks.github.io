@@ -10,6 +10,14 @@ import {
 } from "./Data_World.mjs";
 import { ChapterVisuals, RenderProfiles } from "./Data_Scene3D.mjs";
 import {
+  ActionCinematics,
+  ChapterOpeningCinematics,
+  CinematicSequences,
+  GetActionCinematic,
+  GetChapterOpeningCinematic,
+} from "./Data_Cinematics.mjs";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs";
+import {
   CreateGameState,
   CompleteAction,
   GetAvailableAction,
@@ -42,6 +50,51 @@ const sceneSource = readFileSync(join(rootDirectory, "Script_Scene3D.mjs"), "utf
 const postFxSource = readFileSync(join(rootDirectory, "Script_PostFX3D.mjs"), "utf8");
 const assetSource = readFileSync(join(rootDirectory, "Script_Assets3D.mjs"), "utf8");
 const assetKitSize = statSync(join(rootDirectory, "Model_ReedSignalEnvironmentKit.glb")).size;
+
+assert.equal(Object.keys(CinematicSequences).length, 9, "four openings and five story cinematics must remain authored");
+assert.equal(Object.keys(ChapterOpeningCinematics).length, Chapters.length, "every chapter needs a continuous-space opening shot");
+assert.equal(Object.keys(ActionCinematics).length, 5, "all five emotional action beats need a 3D cinematic");
+for (const chapter of Chapters) assert.ok(GetChapterOpeningCinematic(chapter.id), `${chapter.id}: opening cinematic missing`);
+for (const actionId of ["findChildren", "handShuanUp", "meetMother", "motherSignal", "boardFerry"]) {
+  assert.ok(GetActionCinematic(actionId), `${actionId}: story action cinematic missing`);
+}
+for (const sequence of Object.values(CinematicSequences)) {
+  assert.ok(sequence.duration > 0 && sequence.segments.length > 0, `${sequence.id}: cinematic timing missing`);
+  assert.equal(sequence.segments[0].from, 0, `${sequence.id}: cinematic must start at zero`);
+  assert.equal(sequence.segments.at(-1).to, sequence.duration, `${sequence.id}: cinematic must end at its declared duration`);
+  sequence.segments.forEach((segment, index) => {
+    if (index) assert.equal(segment.from, sequence.segments[index - 1].to, `${sequence.id}: cinematic segments must be continuous`);
+    assert.ok(segment.camera && segment.caption, `${sequence.id}: every shot needs camera authorship and a human story beat`);
+  });
+}
+assert.equal(CinematicSequences.endingDeparture.blocksEnding, true, "the ferry must leave in 3D before the ending screen appears");
+assert.equal(CinematicSequences.endingDeparture.segments[1].effects.playerBoarding, 0, "all six children must board before Awei");
+assert.deepEqual(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, [0, 1], "Awei must board during the authored third shot");
+
+const naturalDirector = CreateCinematicDirector();
+assert.equal(naturalDirector.Start("schoolOpening"), true);
+assert.equal(naturalDirector.GetFrame()?.id, "schoolOpening");
+for (let step = 0; step < 140 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
+assert.equal(naturalDirector.IsPlaying(), false, "opening cinematic must finish deterministically");
+assert.deepEqual(naturalDirector.ConsumeFinished(), {
+  id: "schoolOpening",
+  reason: "complete",
+  blocksCompletion: false,
+  blocksEnding: false,
+});
+
+const skipDirector = CreateCinematicDirector();
+skipDirector.Start("endingDeparture");
+for (let step = 0; step < 50; step += 1) skipDirector.Update(0.05);
+assert.equal(skipDirector.GetFrame()?.canSkip, true, "long ending shot must become skippable after its authored hold");
+skipDirector.Update(0.05, true);
+assert.equal(skipDirector.IsPlaying(), false, "skip input must finish the cinematic cleanly");
+assert.deepEqual(skipDirector.ConsumeFinished(), {
+  id: "endingDeparture",
+  reason: "skipped",
+  blocksCompletion: true,
+  blocksEnding: true,
+});
 
 const validation = ValidateCampaign();
 assert.equal(validation.valid, true, validation.errors.join("\n"));
@@ -203,7 +256,7 @@ assert.ok(restoredDistraction.distractionUntil > restoredDistraction.elapsed, "r
 
 const htmlIds = [...htmlSource.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
 assert.equal(new Set(htmlIds).size, htmlIds.length, "HTML ids must be unique");
-for (const id of ["GameCanvas", "StartButton", "HistoryScreen", "ObjectiveCard", "TouchControls", "EndingScreen", "RollCallList"]) {
+for (const id of ["GameCanvas", "StartButton", "HistoryScreen", "ObjectiveCard", "TouchControls", "CinematicOverlay", "EndingScreen", "RollCallList"]) {
   assert.ok(htmlIds.includes(id), `required interface id missing: ${id}`);
 }
 for (const control of ["left", "right", "crouch", "jump", "command", "interact"]) {
@@ -214,6 +267,7 @@ assert.match(styleSource, /@media \(pointer: coarse\)/, "touch layouts need a co
 assert.match(styleSource, /prefers-reduced-motion/, "motion-sensitive players need a reduced-motion mode");
 assert.match(styleSource, /orientation: portrait/, "portrait phones need a rotation notice");
 assert.match(gameSource, /window\.ReedSignal1942/, "browser QA needs a small public inspection surface");
+assert.match(gameSource, /Runtime\.state\.cinematicCue = null/, "director-owned story actions must not replay their short rule-layer cue after the shot");
 assert.match(gameSource, /localStorage\.setItem\(GameMetadata\.saveKey/, "the runtime must persist authored checkpoints");
 assert.match(gameSource, /createBufferSource/, "ambient audio must be synthesized at runtime");
 assert.doesNotMatch(gameSource, /from\s+["']https?:\/\//, "runtime imports must remain local");
@@ -238,7 +292,17 @@ assert.match(assetSource, /GLTFLoader/, "BlenderMCP-authored GLB assets need the
 assert.match(postFxSource, /DepthTexture/, "cinematic post-processing must use scene depth for restrained focus separation");
 assert.match(postFxSource, /uFocusDistance/, "cinematic focus must track the playable subject");
 assert.match(postFxSource, /uVignetteStrength/, "cinematic grading must keep a controlled vignette rather than CSS-only filtering");
-for (const assetName of ["Asset_SchoolFacade", "Asset_WaterSluice", "Asset_CivilianSampan", "Asset_TunnelInteriorKit", "Asset_DistantVillageCluster"]) {
+for (const assetName of [
+  "Asset_SchoolFacade",
+  "Asset_WaterSluice",
+  "Asset_CivilianSampan",
+  "Asset_TunnelInteriorKit",
+  "Asset_DistantVillageCluster",
+  "Asset_SchoolCourtyardVista",
+  "Asset_BlockadeVista",
+  "Asset_TunnelShaftVista",
+  "Asset_FerryRiverbankVista",
+]) {
   assert.match(assetSource, new RegExp(assetName), `Blender asset library missing: ${assetName}`);
 }
 assert.ok(assetKitSize > 1_000_000 && assetKitSize < 8_000_000, `embedded GLB asset kit should stay web-sized (${assetKitSize} bytes)`);

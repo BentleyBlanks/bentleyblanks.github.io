@@ -4,9 +4,9 @@ const GradeProfiles = Object.freeze({
   school: Object.freeze({
     shadow: 0x90aaa4,
     highlight: 0xffd9a2,
-    saturation: 0.72,
-    contrast: 1.025,
-    vignette: 0.2,
+    saturation: 0.62,
+    contrast: 1.075,
+    vignette: 0.27,
     bloom: 0.08,
     dof: 0.16,
     focusRange: 7.2,
@@ -16,9 +16,9 @@ const GradeProfiles = Object.freeze({
   blockade: Object.freeze({
     shadow: 0x719b9c,
     highlight: 0xf1d39a,
-    saturation: 0.68,
-    contrast: 1.035,
-    vignette: 0.25,
+    saturation: 0.58,
+    contrast: 1.085,
+    vignette: 0.3,
     bloom: 0.09,
     dof: 0.18,
     focusRange: 7.4,
@@ -28,21 +28,21 @@ const GradeProfiles = Object.freeze({
   tunnel: Object.freeze({
     shadow: 0x886e58,
     highlight: 0xffc37b,
-    saturation: 0.68,
-    contrast: 1.025,
-    vignette: 0.24,
+    saturation: 0.6,
+    contrast: 1.075,
+    vignette: 0.29,
     bloom: 0.1,
     dof: 0.12,
     focusRange: 6.5,
-    gain: 1.28,
-    lift: 0.01,
+    gain: 1.33,
+    lift: 0.014,
   }),
   ferry: Object.freeze({
     shadow: 0x829ba0,
     highlight: 0xffdda5,
-    saturation: 0.7,
-    contrast: 1.025,
-    vignette: 0.22,
+    saturation: 0.61,
+    contrast: 1.08,
+    vignette: 0.28,
     bloom: 0.08,
     dof: 0.16,
     focusRange: 7.4,
@@ -147,7 +147,12 @@ const FragmentShader = `
     color *= mix(vec3(1.0), uShadowTint, shadowWeight * 0.18);
     color *= mix(vec3(1.0), uHighlightTint, highlightWeight * 0.12);
     color = color * uGain + vec3(uLift);
-    color = max((color - 0.5) * uContrast + 0.5, vec3(0.0));
+    // Night photography needs contrast without treating middle grey as the
+    // pivot: a 0.5 pivot crushed almost every earth tone to black.  A low
+    // photographic pivot keeps readable shadow separation while the vignette
+    // and ACES shoulder still hold the frame together.
+    const float contrastPivot = 0.18;
+    color = max((color - contrastPivot) * uContrast + contrastPivot, vec3(0.0));
 
     vec2 vignetteUv = centered * vec2(1.0, 0.86);
     float vignette = smoothstep(0.28, 0.72, length(vignetteUv));

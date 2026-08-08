@@ -1,4 +1,5 @@
-import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs";
+import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808w";
+import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808w";
 import {
   CreateGameState,
   RestoreGameState,
@@ -14,8 +15,9 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808n";
-import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808n";
+} from "./Script_Rules.mjs?v=20260808w";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808w";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808w";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
@@ -64,6 +66,9 @@ const Ui = {
   interactionProgress: document.getElementById("InteractionProgress"),
   storyCaption: document.getElementById("StoryCaption"),
   storyText: document.getElementById("StoryText"),
+  cinematicOverlay: document.getElementById("CinematicOverlay"),
+  cinematicCaption: document.getElementById("CinematicCaption"),
+  cinematicSkip: document.getElementById("SkipCinematicButton"),
   dangerWash: document.getElementById("DangerWash"),
   complete: document.getElementById("ChapterCompleteScreen"),
   completeTitle: document.getElementById("CompleteTitle"),
@@ -93,6 +98,7 @@ const InputState = {
   interact: false,
   interactPressed: false,
   commandPressed: false,
+  cinematicSkipPressed: false,
 };
 
 const Runtime = {
@@ -111,6 +117,10 @@ const Runtime = {
   ambient: null,
   transientKeys: new Map(),
   chapterCompleteShown: false,
+  cinematics: CreateCinematicDirector({ reducedMotion: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches }),
+  cinematicFrame: null,
+  lastCinematicEvent: "",
+  pendingEnding: false,
   lastFootstepAt: 0,
   error: null,
 };
@@ -160,6 +170,13 @@ function PlayTone(kind = "soft") {
     alert: [82, 0.12, 0.38, "sawtooth"],
     bell: [371, 0.15, 2.1, "sine"],
     water: [116, 0.075, 0.66, "sine"],
+    paper: [244, 0.024, 0.11, "triangle"],
+    wind: [94, 0.038, 0.82, "sine"],
+    smoke: [68, 0.032, 0.74, "sawtooth"],
+    knock: [184, 0.052, 0.09, "square"],
+    cloth: [132, 0.026, 0.16, "triangle"],
+    plank: [108, 0.072, 0.14, "triangle"],
+    rope: [88, 0.043, 0.24, "sawtooth"],
   }[kind] || [156, 0.052, 0.15, "sine"];
   oscillator.type = settings[3];
   oscillator.frequency.setValueAtTime(settings[0], now);
@@ -172,6 +189,53 @@ function PlayTone(kind = "soft") {
   oscillator.connect(filter).connect(gain).connect(audio.master);
   oscillator.start(now);
   oscillator.stop(now + settings[2] + 0.05);
+}
+
+function ResetCinematic() {
+  Runtime.cinematics.Finish("cancelled");
+  Runtime.cinematics.ConsumeFinished();
+  Runtime.cinematicFrame = null;
+  Runtime.lastCinematicEvent = "";
+  Runtime.pendingEnding = false;
+  Ui.cinematicOverlay.hidden = true;
+  Ui.shell.classList.remove("isCinematic");
+}
+
+function BeginCinematic(sequenceId) {
+  if (!sequenceId || !Runtime.cinematics.Start(sequenceId)) return false;
+  Runtime.cinematicFrame = Runtime.cinematics.GetFrame();
+  Runtime.lastCinematicEvent = "";
+  Ui.cinematicOverlay.hidden = false;
+  Ui.shell.classList.add("isCinematic");
+  return true;
+}
+
+function UpdateCinematic(deltaTime) {
+  const frame = Runtime.cinematics.Update(deltaTime, InputState.cinematicSkipPressed);
+  Runtime.cinematicFrame = frame;
+  if (frame) {
+    Ui.cinematicOverlay.hidden = false;
+    Ui.shell.classList.add("isCinematic");
+    Ui.cinematicCaption.textContent = frame.caption;
+    Ui.cinematicSkip.hidden = !frame.canSkip;
+    if (frame.eventKey !== Runtime.lastCinematicEvent) {
+      Runtime.lastCinematicEvent = frame.eventKey;
+      if (frame.soundCue) PlayTone(frame.soundCue);
+    }
+    Ui.storyCaption.hidden = true;
+  } else {
+    const finished = Runtime.cinematics.ConsumeFinished();
+    if (finished) {
+      Ui.cinematicOverlay.hidden = true;
+      Ui.shell.classList.remove("isCinematic");
+      Runtime.lastCinematicEvent = "";
+      if (finished.blocksEnding && Runtime.state?.endingReady) {
+        Runtime.pendingEnding = true;
+        Runtime.state.mode = "ending";
+      }
+    }
+  }
+  return frame;
 }
 
 function PopulateHistory() {
@@ -247,6 +311,7 @@ function SetGameplayChrome(visible) {
 }
 
 function PrepareChapterIntro(state) {
+  ResetCinematic();
   const chapter = GetChapter(state.chapterIndex);
   Runtime.introPendingState = state;
   Ui.pause.hidden = true;
@@ -275,6 +340,7 @@ function EnterChapter() {
   Runtime.chapterCompleteShown = false;
   Runtime.storyQueue.length = 0;
   Runtime.storyUntil = 0;
+  Runtime.pendingEnding = false;
   Ui.intro.hidden = true;
   Ui.complete.hidden = true;
   Ui.ending.hidden = true;
@@ -284,6 +350,7 @@ function EnterChapter() {
   Ui.hudChapterTitle.textContent = chapter.title;
   Runtime.state.mode = "playing";
   Runtime.render.SetChapter(Runtime.state.chapterIndex, chapter, Runtime.state);
+  BeginCinematic(GetChapterOpeningCinematic(chapter.id));
   Ui.canvas.focus({ preventScroll: true });
   WriteSave(true);
 }
@@ -305,6 +372,7 @@ function ReturnToTitle() {
   Runtime.previewState = CreateGameState(0);
   Runtime.previewState.player.x = 430;
   Runtime.previewState.player.crouching = true;
+  ResetCinematic();
   Runtime.render.SetChapter(0, GetChapter(0), Runtime.previewState);
   Ui.pause.hidden = true;
   Ui.complete.hidden = true;
@@ -357,6 +425,9 @@ function GoToNextChapter() {
 
 function ShowEnding() {
   if (!Runtime.state || !Ui.ending.hidden) return;
+  Runtime.pendingEnding = false;
+  Ui.cinematicOverlay.hidden = true;
+  Ui.shell.classList.remove("isCinematic");
   SetGameplayChrome(false);
   Ui.storyCaption.hidden = true;
   Ui.ending.hidden = false;
@@ -411,8 +482,13 @@ function DrainEvents() {
       if (now - lastSeen < 1700) continue;
       Runtime.transientKeys.set(event.onceKey, now);
     }
+    const sequenceId = event.cue ? GetActionCinematic(event.cue) : null;
+    if (sequenceId && BeginCinematic(sequenceId) && Runtime.state.cinematicCue?.actionId === event.cue) {
+      Runtime.state.cinematicCue = null;
+    }
     Runtime.storyQueue.push(event);
   }
+  if (Runtime.cinematics.IsPlaying()) return;
   if (Runtime.storyUntil > now) return;
   if (Runtime.storyQueue.length) {
     const event = Runtime.storyQueue.shift();
@@ -467,6 +543,7 @@ function ConsumePressedInput() {
   InputState.jumpPressed = false;
   InputState.interactPressed = false;
   InputState.commandPressed = false;
+  InputState.cinematicSkipPressed = false;
 }
 
 function UpdatePreview(deltaTime) {
@@ -481,18 +558,28 @@ function UpdatePreview(deltaTime) {
 
 function UpdateGame(deltaTime) {
   if (!Runtime.state) return;
+  const cinematic = Runtime.state.mode === "paused" ? Runtime.cinematics.GetFrame() : UpdateCinematic(deltaTime);
   if (Runtime.state.mode === "playing") {
-    StepGameState(Runtime.state, InputState, deltaTime);
+    if (!cinematic?.locksInput) StepGameState(Runtime.state, InputState, deltaTime);
+    else Runtime.state.player.vx = 0;
     DrainEvents();
     UpdateHud();
     WriteSave();
-    if (Runtime.state.mode === "ending" || Runtime.state.endingReady) ShowEnding();
-    else if (IsChapterReady(Runtime.state) && Runtime.storyQueue.length === 0 && performance.now() > Runtime.storyUntil) ShowChapterComplete();
+    if (!Runtime.state.endingReady && !Runtime.cinematics.IsPlaying() && IsChapterReady(Runtime.state) && Runtime.storyQueue.length === 0 && performance.now() > Runtime.storyUntil) ShowChapterComplete();
     if (Math.abs(Runtime.state.player.vx) > 30 && Runtime.state.player.grounded && performance.now() - Runtime.lastFootstepAt > (Runtime.state.player.crouching ? 620 : 390)) {
       Runtime.lastFootstepAt = performance.now();
       PlayTone("soft");
     }
-  } else DrainEvents();
+  } else {
+    DrainEvents();
+  }
+  if (Runtime.state.endingReady) {
+    Runtime.pendingEnding = Runtime.cinematics.IsPlaying();
+    if (!Runtime.pendingEnding) {
+      Runtime.state.mode = "ending";
+      ShowEnding();
+    }
+  }
 }
 
 function AnimationFrame(now) {
@@ -501,7 +588,7 @@ function AnimationFrame(now) {
   try {
     if (Runtime.state) {
       UpdateGame(deltaTime);
-      Runtime.render.Render(Runtime.state, GetChapter(Runtime.state.chapterIndex), deltaTime);
+      Runtime.render.Render(Runtime.state, GetChapter(Runtime.state.chapterIndex), deltaTime, Runtime.cinematicFrame);
     } else {
       UpdatePreview(deltaTime);
       Runtime.render.Render(Runtime.previewState, GetChapter(0), deltaTime);
@@ -515,6 +602,7 @@ function AnimationFrame(now) {
     Ui.canvas.dataset.assetKitReady = String(Boolean(stats.assetKitReady));
     Ui.canvas.dataset.postFxReady = String(Boolean(stats.postFxReady));
     Ui.canvas.dataset.postFxQuality = String(stats.postFxQuality ?? 0);
+    Ui.canvas.dataset.cinematic = Runtime.cinematicFrame?.id || "";
     Ui.canvas.dataset.playerScreenX = String((stats.playerNdcX * 0.5 + 0.5) * Ui.canvas.clientWidth);
     Ui.canvas.dataset.playerScreenTop = String((-stats.playerTopNdcY * 0.5 + 0.5) * Ui.canvas.clientHeight);
     Ui.canvas.dataset.playerScreenHeight = String((stats.playerTopNdcY - stats.playerBottomNdcY) * 0.5 * Ui.canvas.clientHeight);
@@ -531,7 +619,9 @@ function AnimationFrame(now) {
 function HandleKeyDown(event) {
   const code = event.code;
   if (["ArrowLeft", "ArrowRight", "ArrowDown", "Space", "KeyA", "KeyD", "KeyS", "KeyE", "KeyF"].includes(code)) event.preventDefault();
+  if (!event.repeat && Runtime.cinematics.IsPlaying()) InputState.cinematicSkipPressed = true;
   if (code === "Escape") {
+    if (Runtime.cinematics.IsPlaying()) return;
     if (!Ui.history.hidden) CloseHistory();
     else if (Runtime.state?.mode === "paused") ResumeGame();
     else PauseGame();
@@ -564,6 +654,7 @@ function BindTouchControls() {
       ResumeAudio();
       button.setPointerCapture?.(event.pointerId);
       button.classList.add("isHeld");
+      if (Runtime.cinematics.IsPlaying()) InputState.cinematicSkipPressed = true;
       if (["left", "right", "crouch"].includes(name)) InputState[name] = true;
       if (name === "interact") { InputState.interact = true; InputState.interactPressed = true; }
       if (name === "jump") InputState.jumpPressed = true;
@@ -597,6 +688,7 @@ function BindUi() {
   Ui.returnTitle.addEventListener("click", ReturnToTitle);
   Ui.nextChapter.addEventListener("click", GoToNextChapter);
   Ui.rollCallButton.addEventListener("click", BeginRollCall);
+  Ui.cinematicSkip.addEventListener("click", () => { InputState.cinematicSkipPressed = true; });
   Ui.restartStory.addEventListener("click", StartNewStory);
   Ui.soundButton.addEventListener("click", () => {
     Runtime.muted = !Runtime.muted;
@@ -617,6 +709,7 @@ function BindUi() {
 }
 
 function StartQaChapter(chapterIndex, playerX = null, completedIds = []) {
+  ResetCinematic();
   Runtime.state = CreateGameState(Math.max(0, Math.min(Chapters.length - 1, chapterIndex)));
   const chapter = GetChapter(Runtime.state.chapterIndex);
   for (const action of chapter.actions) if (completedIds.includes(action.id)) CompleteAction(Runtime.state, action);
@@ -647,6 +740,10 @@ async function Initialize() {
   if (query.has("qaChapter")) {
     const completedIds = (query.get("qaCompleted") || "").split(",").map((id) => id.trim()).filter(Boolean);
     StartQaChapter(Number(query.get("qaChapter")), query.has("qaX") ? Number(query.get("qaX")) : null, completedIds);
+    if (query.get("qaCinematic")) {
+      Runtime.state.mode = "playing";
+      BeginCinematic(query.get("qaCinematic"));
+    }
   }
   requestAnimationFrame(AnimationFrame);
 }
@@ -664,6 +761,8 @@ window.ReedSignal1942 = Object.freeze({
   GetState: () => Runtime.state,
   GetError: () => Runtime.error,
   StartChapter: StartQaChapter,
+  StartCinematic: BeginCinematic,
+  GetCinematic: () => Runtime.cinematicFrame,
   ShowHistory,
   get render() { return Runtime.render; },
 });

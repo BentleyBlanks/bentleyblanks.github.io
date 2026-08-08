@@ -237,6 +237,38 @@ try {
     Assert(Math.abs(raisedSluice.rippleOffsetY - 0.54) < 0.001, `blockade solved: 波纹跟随高水位（offset ${raisedSluice.rippleOffsetY.toFixed(2)}）`);
   }
 
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=3&qaX=3290&qaCompleted=countChildren,raiseScreen,meetMother,motherSignal,boardFerry&qaCinematic=endingDeparture`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => document.getElementById("GameCanvas")?.dataset.cinematic === "endingDeparture", null, { timeout: 60000 });
+  const endingCinematic = await page.evaluate(() => ({
+    overlayVisible: !document.getElementById("CinematicOverlay").hidden,
+    caption: document.getElementById("CinematicCaption").textContent,
+    endingHidden: document.getElementById("EndingScreen").hidden,
+  }));
+  Assert(endingCinematic.overlayVisible, "ending cinematic: 3D 过场遮罩必须可见");
+  Assert(endingCinematic.caption.length > 0, "ending cinematic: 镜头必须带有当前叙事字幕");
+  Assert(endingCinematic.endingHidden, "ending cinematic: 船离岸前不得提前显示结算页");
+  await page.locator("#SkipCinematicButton").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.render?.chapterScene?.dynamic?.ferryHuddle?.group?.visible, null, { timeout: 10000 });
+  await page.waitForTimeout(700);
+  const finaleLod = await page.evaluate(() => {
+    const handle = window.ReedSignal1942?.render;
+    const followers = handle?.chapterScene?.actors?.followers || [];
+    const dataset = document.getElementById("GameCanvas").dataset;
+    return {
+      huddleVisible: Boolean(handle?.chapterScene?.dynamic?.ferryHuddle?.group?.visible),
+      detailedFollowers: followers.filter((actor) => actor.visible).length,
+      calls: Number(dataset.renderCalls),
+      triangles: Number(dataset.renderTriangles),
+      endingHidden: document.getElementById("EndingScreen").hidden,
+    };
+  });
+  Assert(finaleLod.huddleVisible && finaleLod.detailedFollowers === 2, "ending cinematic: 远景使用四名实例群像与两名完整骨架");
+  Assert(finaleLod.calls < 260 && finaleLod.triangles < 80000, `ending cinematic: 终章远景保持性能预算（${finaleLod.calls} calls / ${finaleLod.triangles} tris）`);
+  Assert(finaleLod.endingHidden, "ending cinematic: 最终远景仍未提前显示结算页");
+  await page.locator("#SkipCinematicButton").click();
+  await page.waitForFunction(() => !document.getElementById("EndingScreen").hidden, null, { timeout: 5000 });
+  Assert(true, "ending cinematic: 跳过后才进入结算页");
+
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=mobile&qaChapter=1&qaX=1750`, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => document.getElementById("GameCanvas")?.dataset.renderQuality === "mobile", null, { timeout: 60000 });
   const mobile = await page.evaluate(() => {

@@ -1,9 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808n";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808n";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808n";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808n";
-import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808n";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808w";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808w";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808w";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808w";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808w";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
@@ -225,6 +225,8 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     hemisphere: null,
     moonLight: null,
     cinematicKey: null,
+    activeCueId: null,
+    activeCueStartedAt: 0,
     environmentTarget: null,
     environmentSource: null,
     chapterRoot,
@@ -263,6 +265,8 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     handle.hemisphere = null;
     handle.moonLight = null;
     handle.cinematicKey = null;
+    handle.activeCueId = null;
+    handle.activeCueStartedAt = 0;
     scene.environment = null;
     handle.environmentTarget?.dispose?.();
     handle.environmentSource?.dispose?.();
@@ -305,7 +309,7 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     lightRoot.add(moon, moon.target);
     handle.moonLight = moon;
 
-    const cinematicKey = new THREE.SpotLight(profile.moon, chapter.id === "tunnel" ? 7.6 : 8.2, 15, 0.48, 1, 2);
+    const cinematicKey = new THREE.SpotLight(profile.moon, chapter.id === "tunnel" ? 9.4 : 10.2, 15, 0.46, 0.92, 2);
     cinematicKey.castShadow = false;
     lightRoot.add(cinematicKey, cinematicKey.target);
     handle.cinematicKey = cinematicKey;
@@ -356,24 +360,54 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     }
   }
 
-  function UpdateCamera(state, deltaTime) {
+  function UpdateCamera(state, deltaTime, cinematicFrame = null) {
     const chapter = handle.chapter;
     const profile = GetVisualProfile(chapter.id);
     const shot = GetCameraShot(chapter.id, state.player.x);
     const forwardLook = shot.anchorX === undefined ? state.player.facing * 175 : 0;
-    const targetGameX = shot.anchorX ?? (state.player.x + forwardLook);
-    const targetX = targetGameX * WorldScale;
+    const baseTargetGameX = shot.anchorX ?? (state.player.x + forwardLook);
+    const baseTargetX = baseTargetGameX * WorldScale;
     const playerY = state.player.y * WorldScale;
-    const desiredY = playerY + (shot.lift ?? profile.camera.lift);
-    const desiredZ = shot.viewDistance ?? profile.camera.distance;
-    camera.position.x = Damp(camera.position.x, targetX, 3.15, deltaTime);
-    camera.position.y = Damp(camera.position.y, desiredY, 2.7, deltaTime);
-    camera.position.z = Damp(camera.position.z, desiredZ - state.suspicion * 0.65, 2.4, deltaTime);
-    camera.fov = Damp(camera.fov, profile.camera.fov - state.suspicion * 1.2, 2.5, deltaTime);
+    const baseDesiredY = playerY + (shot.lift ?? profile.camera.lift);
+    const baseDesiredZ = shot.viewDistance ?? profile.camera.distance;
+    const cueState = state.cinematicCue;
+    const cueId = cueState?.actionId || null;
+    if (cueId !== handle.activeCueId) {
+      handle.activeCueId = cueId;
+      handle.activeCueStartedAt = handle.time;
+    }
+    const cueAge = cueState ? handle.time - handle.activeCueStartedAt : Infinity;
+    const cueDuration = cueState?.duration || 0;
+    const cueProgress = cueDuration > 0 ? THREE.MathUtils.clamp(cueAge / cueDuration, 0, 1) : 0;
+    // Ease in and out so a cue reads as a shot change, never as a hard camera
+    // snap.  Offsets are authored in metres, matching the scene's world scale.
+    const cueBlend = !cinematicFrame?.camera && cueState?.camera && cueProgress > 0 && cueProgress < 1
+      ? Math.sin(cueProgress * Math.PI)
+      : 0;
+    const cueCamera = cueState?.camera;
+    const cueTargetX = cueCamera ? state.player.x * WorldScale + cueCamera.targetX : baseTargetX;
+    const targetX = THREE.MathUtils.lerp(baseTargetX, cueTargetX, cueBlend);
+    const desiredY = THREE.MathUtils.lerp(baseDesiredY, baseDesiredY + (cueCamera?.targetY || 0), cueBlend);
+    const desiredZ = THREE.MathUtils.lerp(baseDesiredZ, baseDesiredZ + (cueCamera?.positionZ || 0), cueBlend);
+    const desiredCameraX = THREE.MathUtils.lerp(targetX, targetX + (cueCamera?.positionX || 0), cueBlend);
+    const desiredCameraY = THREE.MathUtils.lerp(desiredY, desiredY + (cueCamera?.positionY || 0), cueBlend);
+    const directorCamera = cinematicFrame?.camera;
+    const directorTargetX = Number.isFinite(directorCamera?.anchorX) ? directorCamera.anchorX * WorldScale : state.player.x * WorldScale;
+    const finalTargetX = directorCamera ? directorTargetX : targetX;
+    const finalCameraX = directorCamera ? directorTargetX : desiredCameraX;
+    const finalCameraY = directorCamera ? playerY + directorCamera.lift : desiredCameraY;
+    const finalCameraZ = directorCamera ? directorCamera.viewDistance : desiredZ - state.suspicion * 0.65;
+    const cameraSpeed = directorCamera ? 4.8 : cueBlend > 0 ? 6.2 : 3.15;
+    camera.position.x = Damp(camera.position.x, finalCameraX, cameraSpeed, deltaTime);
+    camera.position.y = Damp(camera.position.y, finalCameraY, directorCamera ? 4.4 : cueBlend > 0 ? 5.4 : 2.7, deltaTime);
+    camera.position.z = Damp(camera.position.z, finalCameraZ, directorCamera ? 4.0 : 2.4, deltaTime);
+    camera.fov = Damp(camera.fov, directorCamera?.fov ?? (profile.camera.fov - state.suspicion * 1.2), directorCamera ? 4.2 : 2.5, deltaTime);
     camera.updateProjectionMatrix();
-    handle.cameraTarget.x = Damp(handle.cameraTarget.x, targetX, 3.2, deltaTime);
-    handle.cameraTarget.y = Damp(handle.cameraTarget.y, playerY + profile.camera.lookLift, 3.2, deltaTime);
-    handle.cameraTarget.z = Damp(handle.cameraTarget.z, -0.45, 2, deltaTime);
+    handle.cameraTarget.x = Damp(handle.cameraTarget.x, finalTargetX, directorCamera ? 4.8 : cueBlend > 0 ? 6.2 : 3.2, deltaTime);
+    const baseLookLift = shot.lookLift ?? profile.camera.lookLift;
+    const finalLookLift = directorCamera?.lookLift ?? (baseLookLift + (cueCamera?.targetY || 0) * cueBlend);
+    handle.cameraTarget.y = Damp(handle.cameraTarget.y, playerY + finalLookLift, directorCamera ? 4.4 : cueBlend > 0 ? 5.4 : 3.2, deltaTime);
+    handle.cameraTarget.z = Damp(handle.cameraTarget.z, directorCamera?.targetZ ?? -0.45, directorCamera ? 4.2 : 2, deltaTime);
     camera.lookAt(handle.cameraTarget);
     camera.rotateZ(Math.sin(handle.time * 0.29) * 0.0012 + state.suspicion * 0.0018);
     if (handle.moonLight) {
@@ -385,7 +419,7 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       const playerX = state.player.x * WorldScale;
       handle.cinematicKey.position.set(playerX - state.player.facing * 1.2, playerY + 3.4, -2.55);
       handle.cinematicKey.target.position.set(playerX, playerY + 0.82, 0.1);
-      handle.cinematicKey.intensity = (chapter.id === "tunnel" ? 7.6 : 8.2) * (1 + state.suspicion * 0.08);
+      handle.cinematicKey.intensity = (chapter.id === "tunnel" ? 9.4 : 10.2) * (1 + state.suspicion * 0.08);
     }
   }
 
@@ -398,14 +432,14 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     postFx.Resize(safeWidth, safeHeight, renderer.getPixelRatio());
   }
 
-  function Render(state, chapter, deltaTime) {
+  function Render(state, chapter, deltaTime, cinematicFrame = null) {
     if (handle.disposed) return;
     handle.time += deltaTime;
     SetChapter(state.chapterIndex, chapter, state);
     const wind = GetWindStrength(state.elapsed || handle.time);
-    handle.chapterScene.Update(state, deltaTime, handle.time, wind);
+    handle.chapterScene.Update(state, deltaTime, handle.time, wind, cinematicFrame);
     UpdateSearchlights(state);
-    UpdateCamera(state, deltaTime);
+    UpdateCamera(state, deltaTime, cinematicFrame);
     if (handle.atmosphere) {
       handle.atmosphere.points.position.x = camera.position.x;
       handle.atmosphere.points.rotation.y = handle.time * 0.006;
@@ -436,6 +470,7 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       assetKitReady: GetSceneAssetStatus3D().ready,
       postFxReady: postFx.enabled,
       postFxQuality: postFx.quality,
+      cinematic: cinematicFrame?.id || "",
     };
   }
 

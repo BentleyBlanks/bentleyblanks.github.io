@@ -9,7 +9,7 @@
   <meta property="og:description" content="没有攻击键。让风掩住脚步，让每个名字都得到回应。">
   <meta property="og:url" content="https://bentleyblanks.github.io/ReedSignal1942/">
   <title>苇声：1942 · 最后一次点名</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260808n">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260808w">
 </head>
 <body>
   <main id="GameShell" aria-label="苇声1942横版叙事解谜游戏">
@@ -84,6 +84,16 @@
 
     <section id="StoryCaption" class="storyCaption" aria-live="polite" hidden>
       <span></span><p id="StoryText"></p>
+    </section>
+
+    <section id="CinematicOverlay" class="cinematicOverlay" aria-live="polite" hidden>
+      <i class="cinematicBar cinematicBarTop" aria-hidden="true"></i>
+      <div class="cinematicCopy">
+        <span aria-hidden="true"></span>
+        <p id="CinematicCaption"></p>
+        <button id="SkipCinematicButton" type="button" hidden>按任意键略过</button>
+      </div>
+      <i class="cinematicBar cinematicBarBottom" aria-hidden="true"></i>
     </section>
 
     <section id="ChapterCompleteScreen" class="panelScreen" hidden aria-live="polite">
@@ -173,6 +183,6 @@
   <script type="importmap">
     {"imports":{"three":"../TunnelBell1942/vendor/three/build/three.module.mjs"}}
   </script>
-  <script type="module" src="./Script_Game.mjs?v=20260808n"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260808w"></script>
 </body>
 </html>

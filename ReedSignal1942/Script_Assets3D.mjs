@@ -1,7 +1,7 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
 import { GLTFLoader } from "../TunnelBell1942/vendor/three/examples/jsm/loaders/GLTFLoader.mjs";
 
-const AssetKitUrl = "./Model_ReedSignalEnvironmentKit.glb?v=20260808j";
+const AssetKitUrl = "./Model_ReedSignalEnvironmentKit.glb?v=20260808w";
 const RequiredAssetNames = Object.freeze([
   "Asset_SchoolFacade",
   "Asset_WoodenHandcart",
@@ -10,6 +10,10 @@ const RequiredAssetNames = Object.freeze([
   "Asset_CivilianSampan",
   "Asset_TunnelInteriorKit",
   "Asset_DistantVillageCluster",
+  "Asset_SchoolCourtyardVista",
+  "Asset_BlockadeVista",
+  "Asset_TunnelShaftVista",
+  "Asset_FerryRiverbankVista",
 ]);
 
 let assetLoadPromise = null;

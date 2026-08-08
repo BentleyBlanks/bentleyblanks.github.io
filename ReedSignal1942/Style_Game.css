@@ -105,6 +105,16 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .storyCaption span { display: block; width: 36px; height: 1px; margin: 0 auto 10px; background: var(--amber); }
 .storyCaption p { margin: 0; color: #e5e3d5; font-size: clamp(14px, 1.8vw, 19px); line-height: 1.6; }
 
+.cinematicOverlay { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+.cinematicBar { position: absolute; left: 0; right: 0; display: block; height: clamp(42px, 8.5vh, 88px); background: #030707; box-shadow: 0 0 32px rgba(0,0,0,.7); transition: transform .55s cubic-bezier(.22,.75,.2,1); }
+.cinematicBarTop { top: 0; transform-origin: top; }
+.cinematicBarBottom { bottom: 0; transform-origin: bottom; }
+.cinematicCopy { position: absolute; left: 50%; bottom: clamp(54px, 10.5vh, 108px); width: min(760px, calc(100vw - 48px)); padding: 12px 28px 10px; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 12px #000; }
+.cinematicCopy > span { display: block; width: 42px; height: 1px; margin: 0 auto 11px; background: rgba(215,170,98,.82); }
+.cinematicCopy p { min-height: 1.6em; margin: 0; color: #ece8d8; font-size: clamp(15px, 1.7vw, 20px); line-height: 1.62; letter-spacing: .04em; }
+.cinematicCopy button { margin-top: 8px; padding: 5px 10px; border: 0; color: rgba(223,228,217,.54); background: transparent; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 9px; letter-spacing: .16em; cursor: pointer; pointer-events: auto; }
+.isCinematic .gameHeader, .isCinematic .objectiveCard, .isCinematic .windCard, .isCinematic .suspicionCard, .isCinematic .teamCard, .isCinematic .interactionPrompt, .isCinematic .controlGuide, .isCinematic .touchControls { opacity: 0; pointer-events: none; transition: opacity .28s ease; }
+
 .panelScreen { display: grid; place-items: center; padding: 28px; background: rgba(6,11,12,.86); backdrop-filter: blur(9px); }
 .panelScreen article { width: min(570px, 92vw); padding: 34px; border: 1px solid rgba(223,228,217,.16); background: #111d1e; box-shadow: 0 22px 80px #000; }
 .panelScreen h2 { margin: 0 0 22px; font-size: clamp(30px, 5vw, 54px); font-weight: 500; }
@@ -178,6 +188,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
   .titleCopy { width: min(480px, 88vw); }
   .titleCopy h1 { font-size: clamp(58px, 17vw, 112px); }
   .historyGrid { grid-template-columns: 1fr; }
+  .cinematicBar { height: clamp(34px, 7.5vh, 62px); }
+  .cinematicCopy { bottom: clamp(42px, 9vh, 76px); width: calc(100vw - 28px); padding-inline: 8px; }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -196,4 +208,5 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  .cinematicBar, .isCinematic .gameHeader, .isCinematic .objectiveCard, .isCinematic .windCard, .isCinematic .suspicionCard, .isCinematic .teamCard, .isCinematic .interactionPrompt, .isCinematic .controlGuide, .isCinematic .touchControls { transition: none !important; }
 }

@@ -40,9 +40,11 @@
 - `Data_World.mjs`：历史框架、章节、地形、威胁、互动数据。
 - `Script_Rules.mjs`：纯规则、移动、潜行、队伍、存档与关卡图验证。
 - `Data_Scene3D.mjs`：逐章调色、镜头区、布景与性能档位。
+- `Data_Cinematics.mjs`：四章开场与五个关键行动的连续 3D 分镜数据；只描述镜头、姿态、字幕、声音提示与展示效果，不改规则结果。
 - `Model_ReedSignalEnvironmentKit.glb`：Blender 制作并按材质合批的学校、木车、瞭望塔、水闸、篷船、地道和冀中村落环境组件；纹理全部内嵌。
-- `Script_Assets3D.mjs`：预载 GLB、校验资产清单、按局部原点克隆场景组件，并向场景层提供只读实例。
+- `Script_Assets3D.mjs`：预载 GLB、校验 11 个资产根节点、按局部原点克隆场景组件，并向场景层提供只读实例。
 - `Script_Actor3D.mjs`：程序化角色、衣着层次与骨架动画；只读角色状态。
+- `Script_Cinematics3D.mjs`：纯状态过场导演，负责确定性推进、跳过闸门与完成回执；不依赖 Three.js 或 DOM。
 - `Script_Scene3D.mjs`：程序化 3D 场景和动态布景；只读玩法状态。
 - `Script_Render3D.mjs`：Three.js 渲染器、相机、灯光、雾、色调映射与章节重建。
 - `Script_PostFX3D.mjs`：基于颜色与深度缓冲的克制景深、分离调色、微光、颗粒与暗角；焦点必须跟随玩家，移动端使用低质量档。
