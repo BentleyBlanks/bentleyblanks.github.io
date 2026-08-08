@@ -1,8 +1,8 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
 import { mergeGeometries } from "../TunnelBell1942/vendor/three/examples/jsm/utils/BufferGeometryUtils.mjs";
-import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z3";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z3";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z3";
+import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z4";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z4";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z4";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -222,7 +222,7 @@ function BuildSkyBackdrop(root, profile, chapter, dynamic) {
   if (chapter.id === "tunnel") return;
   const texture = CreateSkyTexture(profile, chapter.id);
   const material = new THREE.MeshBasicMaterial({ map: texture, fog: false, depthWrite: false, side: THREE.DoubleSide });
-  const width = Math.max(72, chapter.width * WorldScale + 34);
+  const width = Math.max(116, chapter.width * WorldScale + 84);
   const mesh = AddMesh(root, new THREE.PlaneGeometry(width, 22), material, [chapter.width * WorldScale * 0.5, 6.4, -27], null, null, false);
   mesh.renderOrder = -10;
   dynamic.ownedTextures.push(texture);
@@ -262,7 +262,7 @@ function CreateMistTexture(profile, seed) {
 
 function BuildAtmosphericLayers(root, profile, chapter, dynamic) {
   if (chapter.id === "tunnel") return;
-  const width = chapter.width * WorldScale + 26;
+  const width = Math.max(108, chapter.width * WorldScale + 76);
   for (let index = 0; index < 2; index += 1) {
     const texture = CreateMistTexture(profile, 7100 + chapter.id.length * 17 + index * 101);
     texture.repeat.set(index ? 1.7 : 1.15, 1);
@@ -553,7 +553,7 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
 
   const horizonBand = AddBox(
     root,
-    [length + 28, chapterId === "blockade" ? 1.25 : 0.72, 2.2],
+    [length + 80, chapterId === "blockade" ? 1.25 : 0.72, 2.2],
     [length * 0.5, chapterId === "blockade" ? 0.24 : -0.02, -6.7],
     infrastructureMaterial,
     null,
@@ -604,6 +604,49 @@ function BuildRegionalScaleMarkers(root, chapter, profile, dynamic) {
   dynamic.ownedMaterials.push(material);
   dynamic.ownedGeometries.push(trunkGeometry, canopyGeometry);
   dynamic.regionalScaleMarkers = { trunks, canopies };
+}
+
+function BuildVanishingFieldLines(root, chapter, profile, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const lineCount = chapter.id === "ferry" ? 7 : 6;
+  const nearZ = chapter.id === "ferry" ? -2.7 : -2.3;
+  const farZ = chapter.id === "ferry" ? -26 : -22;
+  const vanishX = length * (chapter.id === "blockade" ? 0.62 : chapter.id === "ferry" ? 0.72 : 0.48);
+  const positions = [];
+  const indices = [];
+  for (let index = 0; index < lineCount; index += 1) {
+    const lane = lineCount === 1 ? 0 : index / (lineCount - 1);
+    const nearX = -5 + lane * (length + 10);
+    const farX = vanishX + (nearX - vanishX) * 0.26;
+    const nearWidth = 0.07 + (index % 2) * 0.025;
+    const farWidth = 0.025;
+    const base = positions.length / 3;
+    positions.push(
+      nearX - nearWidth, -0.29, nearZ,
+      nearX + nearWidth, -0.29, nearZ,
+      farX - farWidth, -0.12, farZ,
+      farX + farWidth, -0.12, farZ,
+    );
+    indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(chapter.id === "ferry" ? profile.moon : profile.ground).multiplyScalar(chapter.id === "ferry" ? 0.34 : 0.24),
+    transparent: true,
+    opacity: chapter.id === "ferry" ? 0.13 : 0.18,
+    depthWrite: false,
+    fog: true,
+    side: THREE.DoubleSide,
+  });
+  const mesh = AddMesh(root, geometry, material, [0, 0, 0], null, null, false);
+  mesh.renderOrder = -2;
+  dynamic.ownedGeometries.push(geometry);
+  dynamic.ownedMaterials.push(material);
+  dynamic.vanishingFieldLines = mesh;
 }
 
 function BuildNearScaleLayer(root, chapter, profile, dynamic) {
@@ -1452,6 +1495,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   BuildTerrain(root, chapter, materials, dynamic);
   if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic, chapter.id);
   BuildRegionalScaleMarkers(root, chapter, profile, dynamic);
+  BuildVanishingFieldLines(root, chapter, profile, dynamic);
   const density = renderProfile.reedDensity;
   if (chapter.id === "school") BuildSchool(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "blockade") BuildBlockade(root, chapter, materials, dynamic, profile, density);
@@ -1497,15 +1541,17 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     const directorBlocking = cinematicFrame?.blocking || {};
     const playerAction = directorActors?.player || playerCue?.pose || null;
     const followerAction = directorActors?.followers || followerCue?.followerPose || null;
+    const followerFocusIndex = Number(directorActors?.followerFocusIndex);
+    const followerFocusAction = directorActors?.followerFocusAction || null;
     const directorActionTime = cinematicFrame ? cinematicFrame.segmentProgress : null;
     const registerSequence = cinematicFrame?.id || "";
     const registerProgress = Number(cinematicFrame?.progress || 0);
     const playerHasRegister = ["ferryOpening", "tunnelRollCall", "ferryRollCall", "endingDeparture"].includes(registerSequence)
       || (registerSequence === "registerHandoff" && registerProgress >= 0.23)
-      || (registerSequence === "motherHandoff" && (registerProgress < 0.2 || registerProgress >= 0.72));
+      || (registerSequence === "motherHandoff" && (registerProgress < 0.24 || registerProgress >= 0.76));
     const motherHasRegister = registerSequence === "schoolOpening"
       || (registerSequence === "registerHandoff" && registerProgress < 0.23)
-      || (registerSequence === "motherHandoff" && registerProgress >= 0.2 && registerProgress < 0.72);
+      || (registerSequence === "motherHandoff" && registerProgress >= 0.24 && registerProgress < 0.48);
     const boarding = Number(cinematicFrame?.effects?.boarding || 0);
     const playerBoarding = Number(cinematicFrame?.effects?.playerBoarding || 0);
     const ferryDeparture = Number(cinematicFrame?.effects?.ferryDeparture || 0);
@@ -1603,7 +1649,16 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }, deltaTime);
     for (let index = 0; index < actors.followers.length; index += 1) {
       const actor = actors.followers[index];
-      const follower = state.followers[index];
+      const stateFollower = state.followers[index];
+      // Shuaner has been found but is not a gameplay follower until the next
+      // action lifts him. Keep that rules-layer distinction while staging his
+      // silent raised-hand answer as a temporary cinematic actor.
+      const isTunnelRollCallChild = !stateFollower
+        && cinematicFrame?.id === "tunnelRollCall"
+        && index === 5;
+      const follower = stateFollower || (isTunnelRollCallChild
+        ? { x: 1970, y: 0, vx: 0, facing: -1 }
+        : null);
       if (!follower) {
         actor.visible = false;
         continue;
@@ -1621,6 +1676,9 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       const followerTargetY = ferryY + 0.33 + ferryRow * 0.045;
       const followerTargetZ = ferryZ + 0.22 - ferryRow * 0.43;
       const finalRollCall = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex >= 4;
+      const focusedFollowerAction = Number.isInteger(followerFocusIndex) && followerFocusIndex === index && followerFocusAction
+        ? followerFocusAction
+        : followerAction;
       UpdateActor3D(actor, {
         x: THREE.MathUtils.lerp(follower.x * WorldScale, followerTargetX, followerBoardBlend),
         y: THREE.MathUtils.lerp(follower.y * WorldScale, followerTargetY, followerBoardBlend),
@@ -1635,7 +1693,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         lookOffset: finalRollCall
           ? 0.08 + THREE.MathUtils.clamp((cinematicFrame.segmentProgress - index * 0.07) * 3.8, 0, 1) * 0.12
           : state.followersHolding ? (index % 2 ? -0.12 : 0.1) : Math.sin(time * 0.72 + index * 1.31) * 0.06,
-        action: followerAction,
+        action: focusedFollowerAction,
         actionTime: cinematicFrame
           ? Math.max(0, cinematicFrame.segmentProgress - index * Number(directorActors?.followerStagger || 0))
           : cueLive ? cueAge + index * 0.1 : state.actionProgress + index * 0.1,
@@ -1811,10 +1869,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     for (const actor of [actors.player, actors.mother]) {
       for (const optionalMesh of actor.userData.lodOptional || []) optionalMesh.visible = !trimOpeningActors;
     }
-    // Secondary-character shadow passes are invisible at authored camera
-    // distances but cost one draw per limb.  Keep the hero shadow and each
-    // actor's soft contact patch; trim only the guide while a movie shot runs.
+    // Limb-by-limb shadow passes are sub-pixel in the large establishing
+    // shots. Keep every actor's soft contact patch but spend the shadow budget
+    // only after the camera has returned close enough to read the anatomy.
+    const wideCinematic = Boolean(cinematicFrame?.camera)
+      && Number(cinematicFrame.camera.viewDistance || 0) >= 26;
+    SetActorShadowCasting(actors.player, !wideCinematic);
     SetActorShadowCasting(actors.mother, !cinematicFrame);
+    for (const actor of actors.followers) SetActorShadowCasting(actor, !wideCinematic);
     if (dynamic.foregroundRocks) {
       dynamic.foregroundRocks.visible = !cinematicFrame?.camera || Number(cinematicFrame.camera.viewDistance || 99) >= 11;
     }
