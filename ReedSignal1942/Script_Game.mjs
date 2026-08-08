@@ -14,8 +14,8 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808e";
-import { CreateRender3D } from "./Script_Render3D.mjs?v=20260808e";
+} from "./Script_Rules.mjs?v=20260808j";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808j";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
@@ -511,6 +511,8 @@ function AnimationFrame(now) {
     Ui.canvas.dataset.renderTriangles = String(stats.triangles || 0);
     Ui.canvas.dataset.renderQuality = stats.quality || "unknown";
     Ui.canvas.dataset.renderChapter = stats.chapter || "school";
+    Ui.canvas.dataset.blenderAssets = String(stats.blenderAssets || 0);
+    Ui.canvas.dataset.assetKitReady = String(Boolean(stats.assetKitReady));
     Ui.canvas.dataset.playerScreenX = String((stats.playerNdcX * 0.5 + 0.5) * Ui.canvas.clientWidth);
     Ui.canvas.dataset.playerScreenTop = String((-stats.playerTopNdcY * 0.5 + 0.5) * Ui.canvas.clientHeight);
     Ui.canvas.dataset.playerScreenHeight = String((stats.playerTopNdcY - stats.playerBottomNdcY) * 0.5 * Ui.canvas.clientHeight);
@@ -629,11 +631,12 @@ function StartQaChapter(chapterIndex, playerX = null, completedIds = []) {
   return Runtime.state;
 }
 
-function Initialize() {
+async function Initialize() {
   PopulateHistory();
   BindUi();
   Runtime.previewState.player.x = 430;
   Runtime.previewState.player.crouching = true;
+  await PreloadRender3D();
   Runtime.render = CreateRender3D(Ui.canvas, GetChapter(0), Runtime.previewState);
   Ui.continue.hidden = !HasSave();
   Ui.loading.hidden = true;
@@ -649,18 +652,16 @@ function Initialize() {
 window.addEventListener("error", (event) => { Runtime.error = event.error?.stack || event.message; });
 window.addEventListener("unhandledrejection", (event) => { Runtime.error = event.reason?.stack || String(event.reason); });
 
-try {
-  Initialize();
-} catch (error) {
+Initialize().catch((error) => {
   Runtime.error = error instanceof Error ? error.stack || error.message : String(error);
   console.error(error);
   if (Ui.loadingText) Ui.loadingText.textContent = "无法建立 3D 场景，请刷新页面或更新浏览器。";
-}
+});
 
 window.ReedSignal1942 = Object.freeze({
   GetState: () => Runtime.state,
   GetError: () => Runtime.error,
   StartChapter: StartQaChapter,
   ShowHistory,
-  render: Runtime.render,
+  get render() { return Runtime.render; },
 });

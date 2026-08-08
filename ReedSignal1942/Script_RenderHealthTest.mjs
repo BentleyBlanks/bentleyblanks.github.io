@@ -119,10 +119,10 @@ async function CollectPixels(page, clip = null) {
 }
 
 const probes = [
-  { chapter: 0, x: 330, id: "school", minimumMean: 16 },
-  { chapter: 1, x: 1750, id: "blockade", minimumMean: 15 },
-  { chapter: 2, x: 1500, id: "tunnel", minimumMean: 22 },
-  { chapter: 3, x: 2070, id: "ferry", minimumMean: 15, completed: "meetMother,motherSignal" },
+  { chapter: 0, x: 330, id: "school", minimumMean: 16, minimumAssets: 5 },
+  { chapter: 1, x: 1750, id: "blockade", minimumMean: 15, minimumAssets: 4 },
+  { chapter: 2, x: 1500, id: "tunnel", minimumMean: 22, minimumAssets: 2 },
+  { chapter: 3, x: 2070, id: "ferry", minimumMean: 15, minimumAssets: 3, completed: "meetMother,motherSignal" },
 ];
 
 const server = await ServeRepository();
@@ -137,7 +137,8 @@ try {
     if (message.type() === "error" && !/favicon|404/.test(message.text())) pageErrors.push(message.text());
   });
   page.on("requestfailed", (request) => {
-    if (!/favicon/.test(request.url())) pageErrors.push(`request failed: ${request.url()}`);
+    const failure = request.failure()?.errorText || "";
+    if (!/favicon/.test(request.url()) && failure !== "net::ERR_ABORTED") pageErrors.push(`request failed: ${request.url()} (${failure})`);
   });
 
   for (const probe of probes) {
@@ -154,6 +155,8 @@ try {
         triangles: Number(canvas.dataset.renderTriangles),
         quality: canvas.dataset.renderQuality,
         chapter: canvas.dataset.renderChapter,
+        assetKitReady: canvas.dataset.assetKitReady === "true",
+        blenderAssets: Number(canvas.dataset.blenderAssets),
         width: canvas.clientWidth,
         height: canvas.clientHeight,
         playerScreenX: Number(canvas.dataset.playerScreenX),
@@ -166,6 +169,8 @@ try {
     Assert(runtime.engine === "three.js r160", `${probe.id}: 使用仓库内 Three.js 3D 渲染器`);
     Assert(runtime.chapter === probe.id, `${probe.id}: 载入正确的章节 3D 舞台`);
     Assert(runtime.quality === "desktop", `${probe.id}: 桌面视觉档生效`);
+    Assert(runtime.assetKitReady, `${probe.id}: BlenderMCP 原创 GLB 资产包已加载`);
+    Assert(runtime.blenderAssets >= probe.minimumAssets, `${probe.id}: Blender 资产实例达到构图要求（${runtime.blenderAssets}）`);
     Assert(runtime.glError === 0, `${probe.id}: WebGL 无错误（${runtime.glError}）`);
     Assert(runtime.calls > 25 && runtime.calls < 260, `${probe.id}: draw calls 受控（${runtime.calls}）`);
     Assert(runtime.triangles > 1000 && runtime.triangles < 150000, `${probe.id}: 三角形预算受控（${runtime.triangles}）`);

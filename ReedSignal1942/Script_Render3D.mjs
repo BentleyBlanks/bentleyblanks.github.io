@@ -1,7 +1,13 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808e";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808e";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808e";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808j";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808j";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808j";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808j";
+
+export async function PreloadRender3D() {
+  await LoadSceneAssetKit3D();
+  return GetSceneAssetStatus3D();
+}
 
 function SelectRenderProfile() {
   const query = new URLSearchParams(window.location.search);
@@ -347,6 +353,8 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       playerNdcX: handle.playerHeadProjection.x,
       playerTopNdcY: handle.playerHeadProjection.y,
       playerBottomNdcY: handle.playerFeetProjection.y,
+      blenderAssets: handle.chapterScene.dynamic.blenderAssets.length,
+      assetKitReady: GetSceneAssetStatus3D().ready,
     };
   }
 

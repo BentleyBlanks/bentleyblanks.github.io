@@ -1,6 +1,7 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808e";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808e";
+import { GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808j";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808j";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808j";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -133,6 +134,12 @@ function AddBox(root, size, position, material, rotation = null, shadows = true)
   return AddMesh(root, new THREE.BoxGeometry(size[0], size[1], size[2]), material, position, rotation, null, shadows);
 }
 
+function AddBlenderAsset(root, name, options) {
+  const asset = InstantiateSceneAsset3D(name, options);
+  if (asset) root.add(asset);
+  return asset;
+}
+
 function AddCylinder(root, radiusTop, radiusBottom, height, position, material, radialSegments = 8, rotation = null, shadows = true) {
   return AddMesh(root, new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments), material, position, rotation, null, shadows);
 }
@@ -171,6 +178,59 @@ function BuildSkyBackdrop(root, profile, chapter, dynamic) {
   mesh.renderOrder = -10;
   dynamic.ownedTextures.push(texture);
   dynamic.ownedMaterials.push(material);
+}
+
+function CreateMistTexture(profile, seed) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  const random = CreateRandom(seed);
+  const fog = new THREE.Color(profile.fog);
+  const color = `${Math.round(fog.r * 255)},${Math.round(fog.g * 255)},${Math.round(fog.b * 255)}`;
+  const vertical = context.createLinearGradient(0, 0, 0, 128);
+  vertical.addColorStop(0, `rgba(${color},0)`);
+  vertical.addColorStop(0.34, `rgba(${color},0.22)`);
+  vertical.addColorStop(0.72, `rgba(${color},0.15)`);
+  vertical.addColorStop(1, `rgba(${color},0)`);
+  context.fillStyle = vertical;
+  context.fillRect(0, 0, 512, 128);
+  for (let index = 0; index < 18; index += 1) {
+    const x = random() * 512;
+    const y = 30 + random() * 76;
+    const width = 70 + random() * 150;
+    const cloud = context.createRadialGradient(x, y, 0, x, y, width);
+    cloud.addColorStop(0, `rgba(${color},${0.025 + random() * 0.055})`);
+    cloud.addColorStop(1, `rgba(${color},0)`);
+    context.fillStyle = cloud;
+    context.fillRect(x - width, y - width * 0.35, width * 2, width * 0.7);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  return texture;
+}
+
+function BuildAtmosphericLayers(root, profile, chapter, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const width = chapter.width * WorldScale + 26;
+  for (let index = 0; index < 2; index += 1) {
+    const texture = CreateMistTexture(profile, 7100 + chapter.id.length * 17 + index * 101);
+    texture.repeat.set(index ? 1.7 : 1.15, 1);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: index ? 0.42 : 0.58,
+      depthWrite: false,
+      fog: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = AddMesh(root, new THREE.PlaneGeometry(width, index ? 5.2 : 4.1), material, [chapter.width * WorldScale * 0.5, index ? 2.45 : 1.62, index ? -11.6 : -5.4], null, null, false);
+    mesh.renderOrder = index ? -6 : 1;
+    dynamic.mistLayers.push(mesh);
+    dynamic.ownedTextures.push(texture);
+    dynamic.ownedMaterials.push(material);
+  }
 }
 
 function GetTerrainY(chapter, worldX) {
@@ -298,14 +358,31 @@ function CreateWaterRipples(root, x0, x1, z0, z1, count, material, seed = 1, wat
   return mesh;
 }
 
-function BuildDistantVillage(root, profile, material, seed, length) {
+function BuildDistantVillage(root, profile, material, seed, length, dynamic) {
   const random = CreateRandom(seed);
-  for (let x = -2; x < length + 4; x += 2.4 + random() * 2.6) {
-    const width = 1.2 + random() * 1.4;
-    const height = 0.8 + random() * 0.9;
-    const z = -6.5 - random() * 3.5;
-    AddBox(root, [width, height, 1.3], [x, height * 0.5 - 0.05, z], material, null, false);
-    AddGableRoof(root, width + 0.42, 1.72, 0.34 + random() * 0.16, [x, height - 0.02, z], material).castShadow = false;
+  const villagePositions = [length * 0.24, length * 0.74];
+  let detailedVillageCount = 0;
+  for (let index = 0; index < villagePositions.length; index += 1) {
+    const village = AddBlenderAsset(root, "Asset_DistantVillageCluster", {
+      position: [villagePositions[index], -0.08, -8.2 - index * 1.4],
+      rotation: [0, index ? Math.PI : 0, 0],
+      scale: index ? 0.52 : 0.58,
+      castShadow: false,
+      materialTint: profile.fog,
+      tintAmount: 0.62 + index * 0.1,
+    });
+    if (!village) continue;
+    detailedVillageCount += 1;
+    dynamic.blenderAssets.push(village);
+  }
+  if (!detailedVillageCount) {
+    for (let x = -2; x < length + 4; x += 2.4 + random() * 2.6) {
+      const width = 1.2 + random() * 1.4;
+      const height = 0.8 + random() * 0.9;
+      const z = -6.5 - random() * 3.5;
+      AddBox(root, [width, height, 1.3], [x, height * 0.5 - 0.05, z], material, null, false);
+      AddGableRoof(root, width + 0.42, 1.72, 0.34 + random() * 0.16, [x, height - 0.02, z], material).castShadow = false;
+    }
   }
   const hillMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.fog).multiplyScalar(0.48), fog: true });
   for (let index = 0; index < 7; index += 1) {
@@ -314,11 +391,13 @@ function BuildDistantVillage(root, profile, material, seed, length) {
 }
 
 function BuildTerrain(root, chapter, materials, dynamic) {
+  const terrainDepth = chapter.id === "tunnel" ? 5.4 : 4.75;
+  const terrainZ = chapter.id === "tunnel" ? -1.05 : -1.28;
   for (const segment of chapter.terrain) {
     const width = (segment.x1 - segment.x0) * WorldScale;
     const x = (segment.x0 + segment.x1) * 0.5 * WorldScale;
     const y = segment.y * WorldScale;
-    const mesh = AddBox(root, [width + 0.03, 0.72, 6.8], [x, y - 0.36, -0.5], segment.dynamic ? materials.wood : materials.ground);
+    const mesh = AddBox(root, [width + 0.03, 0.72, terrainDepth], [x, y - 0.36, terrainZ], segment.dynamic ? materials.wood : materials.ground);
     if (segment.dynamic) {
       mesh.visible = false;
       dynamic.bridge = mesh;
@@ -330,13 +409,20 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
   const building = new THREE.Group();
   building.name = "Schoolhouse";
   root.add(building);
-  AddBox(building, [5.8, 0.22, 3.0], [4.2, 2.28, -2.25], materials.roof, [0, 0, -0.035]);
-  AddGableRoof(building, 5.95, 3.15, 0.62, [4.2, 2.3, -2.25], materials.roof);
-  AddBox(building, [5.55, 2.32, 0.18], [4.2, 1.08, -3.15], materials.plaster);
-  AddBox(building, [0.18, 2.25, 2.75], [1.45, 1.06, -1.78], materials.plaster);
-  AddBox(building, [0.18, 2.25, 2.75], [6.95, 1.06, -1.78], materials.plaster);
-  AddBox(building, [2.25, 0.92, 0.22], [2.63, 0.46, -0.42], materials.plasterDark);
-  AddBox(building, [1.25, 1.45, 0.18], [6.25, 0.72, -0.42], materials.plasterDark);
+  const detailedSchool = AddBlenderAsset(root, "Asset_SchoolFacade", {
+    position: [4.2, -0.02, -3.22],
+    scale: 0.68,
+  });
+  if (detailedSchool) dynamic.blenderAssets.push(detailedSchool);
+  if (!detailedSchool) {
+    AddBox(building, [5.8, 0.22, 3.0], [4.2, 2.28, -2.25], materials.roof, [0, 0, -0.035]);
+    AddGableRoof(building, 5.95, 3.15, 0.62, [4.2, 2.3, -2.25], materials.roof);
+    AddBox(building, [5.55, 2.32, 0.18], [4.2, 1.08, -3.15], materials.plaster);
+    AddBox(building, [0.18, 2.25, 2.75], [1.45, 1.06, -1.78], materials.plaster);
+    AddBox(building, [0.18, 2.25, 2.75], [6.95, 1.06, -1.78], materials.plaster);
+    AddBox(building, [2.25, 0.92, 0.22], [2.63, 0.46, -0.42], materials.plasterDark);
+    AddBox(building, [1.25, 1.45, 0.18], [6.25, 0.72, -0.42], materials.plasterDark);
+  }
   const chalkTexture = CreateChalkTexture();
   dynamic.ownedTextures.push(chalkTexture);
   const chalkMaterial = new THREE.MeshStandardMaterial({ map: chalkTexture, roughness: 1, emissive: 0x111a16, emissiveIntensity: 0.35 });
@@ -354,20 +440,27 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
   AddCylinder(building, 0.055, 0.08, 0.22, [3.08, 0.78, -1.3], materials.metal, 8);
   const lampGlass = AddMesh(building, new THREE.SphereGeometry(0.072, 10, 7), materials.lampGlow, [3.08, 0.94, -1.3], null, [1, 1.35, 1], false);
   lampGlass.renderOrder = 3;
-  const registerLight = new THREE.PointLight(profile.accent, 34, 5.8, 1.8);
+  const registerLight = new THREE.PointLight(profile.accent, 18, 4.8, 1.8);
   registerLight.position.set(3.08, 1.08, -0.82);
   registerLight.castShadow = false;
   building.add(registerLight);
 
-  const tower = new THREE.Group();
-  tower.position.set(17.1, 0, -1.6);
-  root.add(tower);
-  for (const x of [-0.52, 0.52]) for (const z of [-0.45, 0.45]) AddBox(tower, [0.13, 4.3, 0.13], [x, 2.15, z], materials.wood);
-  AddBox(tower, [1.5, 0.18, 1.35], [0, 3.45, 0], materials.wood);
-  AddBox(tower, [1.8, 0.16, 1.65], [0, 4.35, 0], materials.roof, [0, 0, 0.03]);
-  for (let y = 0.35; y < 3.3; y += 0.34) AddBox(tower, [0.75, 0.055, 0.055], [-0.65, y, 0.52], materials.wood);
-  AddBox(tower, [0.07, 3.15, 0.07], [-0.98, 1.82, 0.52], materials.wood);
-  AddBox(tower, [0.07, 3.15, 0.07], [-0.32, 1.82, 0.52], materials.wood);
+  const detailedTower = AddBlenderAsset(root, "Asset_CheckpointWatchtower", {
+    position: [17.1, 0, -1.6],
+    scale: 0.82,
+  });
+  if (detailedTower) dynamic.blenderAssets.push(detailedTower);
+  else {
+    const tower = new THREE.Group();
+    tower.position.set(17.1, 0, -1.6);
+    root.add(tower);
+    for (const x of [-0.52, 0.52]) for (const z of [-0.45, 0.45]) AddBox(tower, [0.13, 4.3, 0.13], [x, 2.15, z], materials.wood);
+    AddBox(tower, [1.5, 0.18, 1.35], [0, 3.45, 0], materials.wood);
+    AddBox(tower, [1.8, 0.16, 1.65], [0, 4.35, 0], materials.roof, [0, 0, 0.03]);
+    for (let y = 0.35; y < 3.3; y += 0.34) AddBox(tower, [0.75, 0.055, 0.055], [-0.65, y, 0.52], materials.wood);
+    AddBox(tower, [0.07, 3.15, 0.07], [-0.98, 1.82, 0.52], materials.wood);
+    AddBox(tower, [0.07, 3.15, 0.07], [-0.32, 1.82, 0.52], materials.wood);
+  }
 
   const blind = new THREE.Group();
   blind.position.set(9.0, 0, 0.3);
@@ -381,17 +474,24 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
   for (let index = 0; index < 10; index += 1) AddBox(wall, [0.42 + (index % 2) * 0.12, 0.52 + (index % 3) * 0.18, 0.82], [(index - 5) * 0.46, 0.3, (index % 2) * 0.08], materials.plasterDark, [0.03 * (index % 2), 0.04, (index - 4) * 0.02]);
   root.add(wall);
 
-  const cart = new THREE.Group();
-  const cartBody = AddBox(cart, [1.08, 0.62, 0.75], [0, 0.72, 0], materials.wood);
-  cartBody.rotation.z = -0.035;
-  for (const z of [-0.43, 0.43]) {
-    const wheel = AddCylinder(cart, 0.36, 0.36, 0.08, [-0.32, 0.35, z], materials.woodDark, 14, [Math.PI * 0.5, 0, 0]);
-    AddCylinder(wheel, 0.05, 0.05, 0.12, [0, 0, 0], materials.metal, 8, [Math.PI * 0.5, 0, 0]);
+  let cart = AddBlenderAsset(root, "Asset_WoodenHandcart", {
+    position: [chapter.cart.startX * WorldScale, 0, 0],
+    scale: 0.58,
+  });
+  if (cart) dynamic.blenderAssets.push(cart);
+  else {
+    cart = new THREE.Group();
+    const cartBody = AddBox(cart, [1.08, 0.62, 0.75], [0, 0.72, 0], materials.wood);
+    cartBody.rotation.z = -0.035;
+    for (const z of [-0.43, 0.43]) {
+      const wheel = AddCylinder(cart, 0.36, 0.36, 0.08, [-0.32, 0.35, z], materials.woodDark, 14, [Math.PI * 0.5, 0, 0]);
+      AddCylinder(wheel, 0.05, 0.05, 0.12, [0, 0, 0], materials.metal, 8, [Math.PI * 0.5, 0, 0]);
+    }
+    AddBox(cart, [1.35, 0.07, 0.08], [0.92, 0.83, -0.3], materials.wood, [0, 0, -0.22]);
+    AddBox(cart, [1.35, 0.07, 0.08], [0.92, 0.83, 0.3], materials.wood, [0, 0, -0.22]);
+    cart.position.x = chapter.cart.startX * WorldScale;
+    root.add(cart);
   }
-  AddBox(cart, [1.35, 0.07, 0.08], [0.92, 0.83, -0.3], materials.wood, [0, 0, -0.22]);
-  AddBox(cart, [1.35, 0.07, 0.08], [0.92, 0.83, 0.3], materials.wood, [0, 0, -0.22]);
-  cart.position.x = chapter.cart.startX * WorldScale;
-  root.add(cart);
   dynamic.cart = cart;
 
   CreateReedField(root, chapter, 21.6, 29.5, Math.round(120 * density), 0.9, 3.8, materials.reedSway, 14, 0.82);
@@ -412,31 +512,45 @@ function BuildBlockade(root, chapter, materials, dynamic, profile, density) {
   root.add(shed);
   const shedLamp = AddMesh(shed, new THREE.SphereGeometry(0.058, 9, 6), materials.lampGlow, [0.72, 1.12, 0.5], null, [1, 1.3, 1], false);
   shedLamp.renderOrder = 3;
-  const shedLight = new THREE.PointLight(profile.accent, 24, 4.8, 1.8);
+  const shedLight = new THREE.PointLight(profile.accent, 12, 4.2, 1.8);
   shedLight.position.set(0.72, 1.12, 0.48);
   shed.add(shedLight);
 
-  const emptyBoat = new THREE.Group();
-  emptyBoat.position.set(11.2, -0.18, 0.25);
-  AddBox(emptyBoat, [1.65, 0.18, 0.72], [0, 0.03, 0], materials.wood, [0, 0, 0.02]);
-  AddBox(emptyBoat, [1.5, 0.32, 0.08], [0, 0.18, -0.36], materials.wood);
-  AddBox(emptyBoat, [1.5, 0.32, 0.08], [0, 0.18, 0.36], materials.wood);
-  AddBox(emptyBoat, [0.07, 0.07, 2.1], [0.5, 0.25, 0.25], materials.wood, [0, 0.22, 0.18]);
-  root.add(emptyBoat);
+  let emptyBoat = AddBlenderAsset(root, "Asset_CivilianSampan", {
+    position: [11.2, -0.45, 0.25],
+    scale: 0.38,
+  });
+  if (emptyBoat) dynamic.blenderAssets.push(emptyBoat);
+  else {
+    emptyBoat = new THREE.Group();
+    emptyBoat.position.set(11.2, -0.18, 0.25);
+    AddBox(emptyBoat, [1.65, 0.18, 0.72], [0, 0.03, 0], materials.wood, [0, 0, 0.02]);
+    AddBox(emptyBoat, [1.5, 0.32, 0.08], [0, 0.18, -0.36], materials.wood);
+    AddBox(emptyBoat, [1.5, 0.32, 0.08], [0, 0.18, 0.36], materials.wood);
+    AddBox(emptyBoat, [0.07, 0.07, 2.1], [0.5, 0.25, 0.25], materials.wood, [0, 0.22, 0.18]);
+    root.add(emptyBoat);
+  }
   dynamic.emptyBoat = emptyBoat;
 
-  const sluice = new THREE.Group();
-  sluice.position.set(17.35, 0, -0.1);
-  AddBox(sluice, [0.34, 2.8, 0.42], [-0.85, 1.38, 0], materials.stone);
-  AddBox(sluice, [0.34, 2.8, 0.42], [0.85, 1.38, 0], materials.stone);
-  AddBox(sluice, [2.25, 0.34, 0.55], [0, 2.58, 0], materials.stone);
-  AddBox(sluice, [1.42, 1.5, 0.16], [0, 0.78, 0], materials.woodDark);
+  const sluice = AddBlenderAsset(root, "Asset_WaterSluice", {
+    position: [17.35, -0.12, -0.1],
+    scale: 0.72,
+  }) || new THREE.Group();
+  if (sluice.userData.blenderAsset) dynamic.blenderAssets.push(sluice);
+  else {
+    sluice.position.set(17.35, 0, -0.1);
+    AddBox(sluice, [0.34, 2.8, 0.42], [-0.85, 1.38, 0], materials.stone);
+    AddBox(sluice, [0.34, 2.8, 0.42], [0.85, 1.38, 0], materials.stone);
+    AddBox(sluice, [2.25, 0.34, 0.55], [0, 2.58, 0], materials.stone);
+    AddBox(sluice, [1.42, 1.5, 0.16], [0, 0.78, 0], materials.woodDark);
+    root.add(sluice);
+  }
   const leverPivot = new THREE.Group();
-  leverPivot.position.set(-0.74, 2.12, 0.38);
+  leverPivot.position.set(sluice.userData.blenderAsset ? 16.72 : -0.74, sluice.userData.blenderAsset ? 2.35 : 2.12, sluice.userData.blenderAsset ? 0.38 : 0.38);
   AddBox(leverPivot, [2.55, 0.12, 0.12], [1.1, 0, 0], materials.wood, [0, 0, 0.2]);
-  sluice.add(leverPivot);
+  if (sluice.userData.blenderAsset) root.add(leverPivot);
+  else sluice.add(leverPivot);
   dynamic.sluiceLever = leverPivot;
-  root.add(sluice);
 
   const bridge = new THREE.Group();
   bridge.position.set(20.4, -0.52, 0.18);
@@ -504,6 +618,14 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
   AddBox(root, [32, 0.85, 6.6], [15, 2.65, -0.55], materials.earth, null, false);
   AddBox(root, [32, 4.8, 0.75], [15, 0.35, -3.55], materials.earth, null, false);
   AddBox(root, [32, 0.5, 0.5], [15, -0.36, 2.7], materials.earthDark, null, false);
+  for (const x of [8.0, 22.2]) {
+    const tunnelKit = AddBlenderAsset(root, "Asset_TunnelInteriorKit", {
+      position: [x, -0.12, -0.35],
+      scale: 0.67,
+      castShadow: true,
+    });
+    if (tunnelKit) dynamic.blenderAssets.push(tunnelKit);
+  }
   const wallRandom = CreateRandom(1942);
   const wallGeometry = new THREE.PlaneGeometry(32, 4.4, 64, 12);
   const wallVertices = wallGeometry.getAttribute("position");
@@ -550,13 +672,13 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
     shaftVolume.renderOrder = 3;
     const shaftPool = AddMesh(root, new THREE.CircleGeometry(0.88, 28), materials.shaftPool, [x, GetTerrainY(chapter, x) + 0.015, -0.1], [-Math.PI * 0.5, 0, 0], [1.2, 0.56, 1], false);
     shaftPool.renderOrder = 3;
-    const shaftLight = new THREE.PointLight(profile.moon, x < 10 ? 28 : 20, 6.2, 1.75);
+    const shaftLight = new THREE.PointLight(profile.moon, x < 10 ? 20 : 14, 5.8, 1.75);
     shaftLight.position.set(x, 2.3, -0.2);
     root.add(shaftLight);
     dynamic.shaftLights.push(shaftLight);
   }
   for (let x = 7.8; x < 26; x += 4.7) {
-    const lamp = new THREE.PointLight(profile.accent, 16, 4.2, 1.8);
+    const lamp = new THREE.PointLight(profile.accent, 14, 4.0, 1.8);
     lamp.position.set(x, 0.82, -1.3);
     root.add(lamp);
     AddCylinder(root, 0.065, 0.085, 0.19, [x, 0.46, -1.25], materials.metal, 8);
@@ -595,21 +717,28 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   dynamic.signalCloth = cloth;
   root.add(signal);
 
-  const ferry = new THREE.Group();
-  ferry.position.set(33.1, -0.24, 0.08);
-  AddBox(ferry, [3.15, 0.22, 1.12], [0, 0.04, 0], materials.wood, [0, 0, 0.018]);
-  AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, -0.54], materials.wood);
-  AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, 0.54], materials.wood);
-  for (let x = -1.2; x <= 1.2; x += 0.6) AddBox(ferry, [0.08, 0.12, 1.0], [x, 0.19, 0], materials.woodDark);
-  AddBox(ferry, [0.08, 0.08, 3.6], [1.05, 0.52, 0.55], materials.wood, [0, 0.12, -0.18]);
-  root.add(ferry);
+  let ferry = AddBlenderAsset(root, "Asset_CivilianSampan", {
+    position: [33.1, -0.38, 0.08],
+    scale: 0.62,
+  });
+  if (ferry) dynamic.blenderAssets.push(ferry);
+  else {
+    ferry = new THREE.Group();
+    ferry.position.set(33.1, -0.24, 0.08);
+    AddBox(ferry, [3.15, 0.22, 1.12], [0, 0.04, 0], materials.wood, [0, 0, 0.018]);
+    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, -0.54], materials.wood);
+    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, 0.54], materials.wood);
+    for (let x = -1.2; x <= 1.2; x += 0.6) AddBox(ferry, [0.08, 0.12, 1.0], [x, 0.19, 0], materials.woodDark);
+    AddBox(ferry, [0.08, 0.08, 3.6], [1.05, 0.52, 0.55], materials.wood, [0, 0.12, -0.18]);
+    root.add(ferry);
+  }
   dynamic.ferry = ferry;
 
   const motherLantern = new THREE.Group();
   AddCylinder(motherLantern, 0.055, 0.08, 0.2, [0, 0, 0], materials.metal, 8, null, false);
   const motherFlame = AddMesh(motherLantern, new THREE.SphereGeometry(0.055, 9, 6), materials.lampGlow, [0, 0.15, 0], null, [0.8, 1.45, 0.8], false);
   motherFlame.renderOrder = 4;
-  const motherLight = new THREE.PointLight(profile.accent, 12, 4.6, 1.85);
+  const motherLight = new THREE.PointLight(profile.accent, 10, 4.2, 1.85);
   motherLight.position.set(0, 0.18, 0.12);
   motherLantern.add(motherLight);
   motherLantern.visible = false;
@@ -721,7 +850,9 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     ownedMaterials: [],
     ownedTextures: [],
     ownedGeometries: [],
+    blenderAssets: [],
     shaftLights: [],
+    mistLayers: [],
     bridge: null,
     cart: null,
     water: null,
@@ -737,8 +868,9 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   };
   const materials = CreateMaterials(profile, dynamic, chapter.id);
   BuildSkyBackdrop(root, profile, chapter, dynamic);
+  BuildAtmosphericLayers(root, profile, chapter, dynamic);
   BuildTerrain(root, chapter, materials, dynamic);
-  if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale);
+  if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic);
   const density = renderProfile.reedDensity;
   if (chapter.id === "school") BuildSchool(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "blockade") BuildBlockade(root, chapter, materials, dynamic, profile, density);
@@ -859,7 +991,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
 
   function Dispose() {
     root.traverse((object) => {
-      if ((object.isMesh || object.isPoints) && !object.userData.actorMesh) object.geometry?.dispose?.();
+      if ((object.isMesh || object.isPoints) && !object.userData.actorMesh && !object.userData.blenderAssetMesh) object.geometry?.dispose?.();
     });
     DisposeActor3D(actors.player);
     DisposeActor3D(actors.mother);

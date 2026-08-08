@@ -1,15 +1,19 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
 
 const ActorGeometries = Object.freeze({
-  head: new THREE.SphereGeometry(0.145, 10, 8),
-  hair: new THREE.SphereGeometry(0.151, 9, 6, 0, Math.PI * 2, 0, Math.PI * 0.58),
-  torso: new THREE.CylinderGeometry(0.205, 0.255, 0.62, 7),
-  coatSkirt: new THREE.CylinderGeometry(0.24, 0.32, 0.38, 7),
-  upperLimb: new THREE.CylinderGeometry(0.067, 0.076, 0.43, 6),
-  lowerLimb: new THREE.CylinderGeometry(0.058, 0.067, 0.4, 6),
-  hand: new THREE.SphereGeometry(0.068, 7, 5),
-  boot: new THREE.BoxGeometry(0.14, 0.11, 0.27),
+  head: new THREE.SphereGeometry(0.142, 14, 10),
+  hair: new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62),
+  shoulders: new THREE.SphereGeometry(0.245, 12, 8),
+  torso: new THREE.CylinderGeometry(0.19, 0.245, 0.62, 10),
+  coatSkirt: new THREE.CylinderGeometry(0.235, 0.305, 0.4, 10),
+  upperLimb: new THREE.CylinderGeometry(0.064, 0.073, 0.43, 8),
+  lowerLimb: new THREE.CylinderGeometry(0.054, 0.064, 0.4, 8),
+  hand: new THREE.SphereGeometry(0.064, 9, 6),
+  boot: new THREE.BoxGeometry(0.135, 0.105, 0.29),
   scarf: new THREE.BoxGeometry(0.37, 0.075, 0.22),
+  scarfTail: new THREE.BoxGeometry(0.11, 0.42, 0.045),
+  coatBack: new THREE.BoxGeometry(0.34, 0.58, 0.045),
+  belt: new THREE.BoxGeometry(0.48, 0.055, 0.28),
   satchel: new THREE.BoxGeometry(0.27, 0.32, 0.12),
   bundle: new THREE.SphereGeometry(0.17, 8, 6),
 });
@@ -21,7 +25,7 @@ const RolePalettes = Object.freeze({
 });
 
 function CreateMaterial(color, roughness = 0.9) {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, flatShading: true });
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, flatShading: false });
 }
 
 function PrepareMesh(mesh, castShadow = true) {
@@ -75,13 +79,28 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   const torso = PrepareMesh(new THREE.Mesh(ActorGeometries.torso, cloth));
   torso.position.y = 0.29;
   pelvis.add(torso);
+  const shoulders = PrepareMesh(new THREE.Mesh(ActorGeometries.shoulders, cloth));
+  shoulders.position.y = 0.48;
+  shoulders.scale.set(1.2, 0.46, 0.72);
+  pelvis.add(shoulders);
   const skirt = PrepareMesh(new THREE.Mesh(ActorGeometries.coatSkirt, cloth));
   skirt.position.y = -0.02;
   pelvis.add(skirt);
+  const coatBack = PrepareMesh(new THREE.Mesh(ActorGeometries.coatBack, clothDark));
+  coatBack.position.set(0, 0.06, -0.235);
+  coatBack.rotation.x = -0.04;
+  pelvis.add(coatBack);
+  const belt = PrepareMesh(new THREE.Mesh(ActorGeometries.belt, clothDark));
+  belt.position.set(0, 0.12, 0);
+  pelvis.add(belt);
   const scarf = PrepareMesh(new THREE.Mesh(ActorGeometries.scarf, scarfMaterial));
   scarf.position.set(0, 0.58, 0.01);
   scarf.rotation.z = 0.05;
   pelvis.add(scarf);
+  const scarfTail = PrepareMesh(new THREE.Mesh(ActorGeometries.scarfTail, scarfMaterial));
+  scarfTail.position.set(-0.13, 0.39, -0.17);
+  scarfTail.rotation.z = 0.08;
+  pelvis.add(scarfTail);
 
   const headPivot = new THREE.Group();
   headPivot.position.y = 0.78;
@@ -140,7 +159,7 @@ export function CreateActor3D(role = "player", childIndex = 0) {
 
   const roleScale = role === "child" ? 0.72 + (childIndex % 3) * 0.025 : role === "mother" ? 0.97 : 0.93;
   root.scale.setScalar(roleScale);
-  root.userData.rig = { rig, pelvis, torso, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale };
+  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale };
   return root;
 }
 
@@ -166,6 +185,9 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.headPivot.rotation.x = Damp(rig.headPivot.rotation.x, crouch * -0.16 + (pose.alert ? 0.09 : 0), 7, deltaTime);
   rig.headPivot.rotation.y = Damp(rig.headPivot.rotation.y, pose.lookOffset || 0, 5, deltaTime);
   rig.braid.rotation.z = Damp(rig.braid.rotation.z, 0.22 - stride * 0.12, 5, deltaTime);
+  rig.coatBack.rotation.x = Damp(rig.coatBack.rotation.x, -0.04 - stride * 0.09 + speed * 0.05, 6, deltaTime);
+  rig.scarfTail.rotation.z = Damp(rig.scarfTail.rotation.z, 0.08 - stride * 0.14, 5, deltaTime);
+  rig.scarfTail.rotation.x = Damp(rig.scarfTail.rotation.x, speed * 0.16 + crouch * 0.08, 5, deltaTime);
 
   rig.leftLeg.root.rotation.x = Damp(rig.leftLeg.root.rotation.x, stride - crouch * 0.7, 13, deltaTime);
   rig.rightLeg.root.rotation.x = Damp(rig.rightLeg.root.rotation.x, -stride - crouch * 0.7, 13, deltaTime);
