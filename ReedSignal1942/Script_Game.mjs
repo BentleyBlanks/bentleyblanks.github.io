@@ -1,5 +1,5 @@
-import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808z8";
-import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808z8";
+import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808z11";
+import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808z11";
 import {
   CreateGameState,
   RestoreGameState,
@@ -15,9 +15,9 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808z8";
-import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808z8";
-import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808z8";
+} from "./Script_Rules.mjs?v=20260808z11";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808z11";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808z11";
 
 const Ui = {
   shell: document.getElementById("GameShell"),

@@ -235,6 +235,44 @@ try {
     Assert(maximumCalls > 0 && maximumCalls < 260, `${budgetProbe.id}: 整段建立镜头与返回玩法均低于 260 calls（峰值 ${maximumCalls}）`);
   }
 
+  for (const openingProbe of [
+    { id: "blockadeOpening", chapter: 1 },
+    { id: "tunnelOpening", chapter: 2 },
+    { id: "ferryOpening", chapter: 3 },
+  ]) {
+    await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=${openingProbe.chapter}&qaCinematic=${openingProbe.id}`, { waitUntil: "load", timeout: 60000 });
+    await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.72, null, { timeout: 12000 });
+    const openingStaging = await page.evaluate(() => {
+      const handle = window.ReedSignal1942?.render;
+      const player = handle?.chapterScene?.actors?.player;
+      if (!handle || !player) return null;
+      const world = player.position.clone();
+      player.parent.localToWorld(world);
+      world.y += 0.72;
+      world.project(handle.camera);
+      return {
+        action: player.userData.motion?.action || "",
+        ndcX: world.x,
+        ndcY: world.y,
+        startX: window.ReedSignal1942.GetState().player.x,
+      };
+    });
+    Assert(Boolean(openingStaging && Math.abs(openingStaging.ndcX) < 0.92 && Math.abs(openingStaging.ndcY) < 0.92), `${openingProbe.id}: 正常章节起点的人物动作进入画面（ndc ${openingStaging?.ndcX?.toFixed(2) ?? "missing"}）`);
+  }
+
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=0&qaCinematic=schoolOpening`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.18, null, { timeout: 12000 });
+  const schoolCameraStart = await page.evaluate(() => window.ReedSignal1942.render.camera.position.toArray());
+  await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.segmentProgress || 0) > 0.82, null, { timeout: 8000 });
+  const schoolHumanBeat = await page.evaluate(() => ({
+    camera: window.ReedSignal1942.render.camera.position.toArray(),
+    teacherAction: window.ReedSignal1942.render.chapterScene.actors.mother.userData.motion?.action || "",
+    shoeOrder: Number(window.ReedSignal1942.GetCinematic()?.effects?.shoeOrder || 0),
+  }));
+  const schoolCameraTravel = Math.hypot(...schoolHumanBeat.camera.map((value, index) => value - schoolCameraStart[index]));
+  Assert(schoolCameraTravel > 1.2, `school opening: 同一镜头连续推近人物而非静态舞台（${schoolCameraTravel.toFixed(2)}m）`);
+  Assert(schoolHumanBeat.teacherAction === "arrangeShoes" && schoolHumanBeat.shoeOrder > 0.8, "school opening: 周禾的手势与六双鞋的真实矩阵变化同步");
+
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=0&qaX=320&qaCompleted=takeRegister&qaCinematic=registerHandoff`, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => document.getElementById("GameCanvas")?.dataset.cinematic === "registerHandoff", null, { timeout: 60000 });
   await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.segmentProgress) > 0.42, null, { timeout: 10000 });
@@ -337,11 +375,9 @@ try {
       otherFeaturedChildren: followers.slice(1).filter((actor) => actor.visible && actor.userData.motion?.action === "shoulderBrace").length,
       childToCart: Math.abs(child.position.x - cart.position.x),
       childRigY: child.userData.rig.rig.position.y,
-      handToHandle: Math.min(
-        leftHand.distanceTo(nearHandle),
-        leftHand.distanceTo(farHandle),
-        rightHand.distanceTo(nearHandle),
-        rightHand.distanceTo(farHandle),
+      pairedHandToHandle: Math.min(
+        Math.max(leftHand.distanceTo(nearHandle), rightHand.distanceTo(farHandle)),
+        Math.max(leftHand.distanceTo(farHandle), rightHand.distanceTo(nearHandle)),
       ),
     };
   });
@@ -350,7 +386,7 @@ try {
   if (cartContact) {
     Assert(cartContact.childToCart < 0.42, `handcart: Mizi's body reaches the cart instead of pushing air (${cartContact.childToCart.toFixed(2)}m)`);
     Assert(cartContact.childRigY < -0.1, `handcart: Mizi lowers her center of gravity under load (${cartContact.childRigY.toFixed(2)}m)`);
-    Assert(cartContact.handToHandle < 0.62, `handcart: Awei's hands remain on the lowered handles (${cartContact.handToHandle.toFixed(2)}m)`);
+    Assert(cartContact.pairedHandToHandle < 0.25, `handcart: Awei's two hands each remain on a lowered handle (${cartContact.pairedHandToHandle.toFixed(2)}m)`);
   }
 
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=1&qaX=1735&qaCompleted=readWind,releaseBoat,raiseSluice&qaCinematic=sluiceRise`, { waitUntil: "load", timeout: 60000 });
@@ -379,6 +415,25 @@ try {
     Assert(ventMidShot.shaftWidth > 0.4 && ventMidShot.shaftWidth < 0.9, `well vent cinematic: 光柱随井口渐宽（${ventMidShot.shaftWidth.toFixed(2)}）`);
     Assert(ventMidShot.smokeOpacity > 0.06 && ventMidShot.smokeOpacity < 0.13, `well vent cinematic: 烟雾在过程里逐步变薄（${ventMidShot.smokeOpacity.toFixed(3)}）`);
   }
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.5, null, { timeout: 10000 });
+  const suppressedCough = await page.evaluate(() => {
+    const child = window.ReedSignal1942?.render?.chapterScene?.actors?.followers?.[0];
+    if (!child) return null;
+    const rig = child.userData.rig;
+    const head = child.position.clone().set(0, 0, 0);
+    const leftHand = child.position.clone().set(0, 0, 0);
+    const rightHand = child.position.clone().set(0, 0, 0);
+    rig.headPivot.getWorldPosition(head);
+    rig.leftArm.endpoint.getWorldPosition(leftHand);
+    rig.rightArm.endpoint.getWorldPosition(rightHand);
+    return {
+      action: child.userData.motion?.action || "",
+      handToMouth: Math.min(leftHand.distanceTo(head), rightHand.distanceTo(head)),
+      rigY: rig.rig.position.y,
+    };
+  });
+  Assert(suppressedCough?.action === "suppressCough", "well vent cinematic: 麦子用可见动作把咳嗽压回掌心");
+  if (suppressedCough) Assert(suppressedCough.handToMouth < 0.54 && suppressedCough.rigY < -0.05, `well vent cinematic: 手抵近口部且身体压低（${suppressedCough.handToMouth.toFixed(2)}m / ${suppressedCough.rigY.toFixed(2)}m）`);
   await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.52, null, { timeout: 10000 });
   const ventChildren = await page.evaluate(() => {
     const scene = window.ReedSignal1942?.render?.chapterScene;
@@ -462,6 +517,26 @@ try {
   Assert(shuanerAnswer?.gameplayFollowers === 5, "tunnel roll call: 临时过场演员不提前改写跟队状态");
 
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=3&qaX=1880&qaCompleted=countChildren,raiseScreen,meetMother&qaCinematic=motherHandoff`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.58, null, { timeout: 12000 });
+  const touchSeventhLine = await page.evaluate(() => {
+    const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
+    const player = actors?.player;
+    const mother = actors?.mother;
+    if (!player || !mother) return null;
+    const leftHand = player.position.clone().set(0, 0, 0);
+    const rightHand = player.position.clone().set(0, 0, 0);
+    const register = mother.position.clone().set(0, 0, 0);
+    player.userData.rig.leftArm.endpoint.getWorldPosition(leftHand);
+    player.userData.rig.rightArm.endpoint.getWorldPosition(rightHand);
+    mother.userData.rig.registerBook.getWorldPosition(register);
+    return {
+      action: player.userData.motion?.action || "",
+      registerVisible: Boolean(mother.userData.rig.registerBook.visible),
+      handToRegister: Math.min(leftHand.distanceTo(register), rightHand.distanceTo(register)),
+    };
+  });
+  Assert(touchSeventhLine?.action === "touchName" && touchSeventhLine?.registerVisible, "mother handoff: 阿苇看见第七行后触碰自己的名字");
+  if (touchSeventhLine) Assert(touchSeventhLine.handToRegister < 0.62, `mother handoff: 手指确实抵达周禾手中的点名簿（${touchSeventhLine.handToRegister.toFixed(2)}m）`);
   await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.62, null, { timeout: 15000 });
   const motherEmbrace = await page.evaluate(() => {
     const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
@@ -527,6 +602,20 @@ try {
   Assert(endingCinematic.overlayVisible, "ending cinematic: 3D 过场遮罩必须可见");
   Assert(endingCinematic.caption.length > 0, "ending cinematic: 镜头必须带有当前叙事字幕");
   Assert(endingCinematic.endingHidden, "ending cinematic: 船离岸前不得提前显示结算页");
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.58, null, { timeout: 12000 });
+  const stoppedGoodbye = await page.evaluate(() => {
+    const player = window.ReedSignal1942?.render?.chapterScene?.actors?.player;
+    if (!player) return null;
+    const hand = player.position.clone().set(0, 0, 0);
+    player.userData.rig.leftArm.endpoint.getWorldPosition(hand);
+    return {
+      action: player.userData.motion?.action || "",
+      handAboveRoot: hand.y - player.position.y,
+      registerVisible: Boolean(player.userData.rig.registerBook.visible),
+    };
+  });
+  Assert(stoppedGoodbye?.action === "reachGoodbye", "ending cinematic: 阿苇先抬手想叫住周禾，而不是直接进入字幕");
+  if (stoppedGoodbye) Assert(stoppedGoodbye.handAboveRoot > 0.48, `ending cinematic: 临别的手清楚停在半空（高差 ${stoppedGoodbye.handAboveRoot.toFixed(2)}m）`);
   await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.42, null, { timeout: 15000 });
   const eighthLineStaging = await page.evaluate(() => {
     const handle = window.ReedSignal1942?.render;

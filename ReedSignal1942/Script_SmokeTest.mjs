@@ -8,7 +8,7 @@ import {
   HistoricalSources,
   GetAllChildNames,
 } from "./Data_World.mjs";
-import { ChapterVisuals, RenderProfiles } from "./Data_Scene3D.mjs";
+import { ChapterVisuals, GetCameraShot, RenderProfiles } from "./Data_Scene3D.mjs";
 import {
   ActionCinematics,
   ChapterOpeningCinematics,
@@ -50,6 +50,7 @@ const sceneSource = readFileSync(join(rootDirectory, "Script_Scene3D.mjs"), "utf
 const postFxSource = readFileSync(join(rootDirectory, "Script_PostFX3D.mjs"), "utf8");
 const assetSource = readFileSync(join(rootDirectory, "Script_Assets3D.mjs"), "utf8");
 const assetKitSize = statSync(join(rootDirectory, "Model_ReedSignalEnvironmentKit.glb")).size;
+const GetActorAction = (directive) => typeof directive === "string" ? directive : directive?.action;
 
 assert.equal(Object.keys(CinematicSequences).length, 24, "four openings and every world action need an authored 3D cinematic");
 assert.equal(Object.keys(ChapterOpeningCinematics).length, Chapters.length, "every chapter needs a continuous-space opening shot");
@@ -68,23 +69,23 @@ for (const sequence of Object.values(CinematicSequences)) {
 }
 assert.equal(CinematicSequences.endingDeparture.blocksEnding, true, "the ferry must leave in 3D before the ending screen appears");
 assert.equal(CinematicSequences.endingDeparture.segments[1].effects.playerBoarding, 0, "all six children must board before Awei");
-assert.equal(CinematicSequences.endingDeparture.segments[2].actors.player, "writeKneel", "Awei must visibly add Zhou He's eighth line before boarding");
+assert.equal(GetActorAction(CinematicSequences.endingDeparture.segments[2].actors.player), "writeKneel", "Awei must visibly add Zhou He's eighth line before boarding");
 assert.equal(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, 0, "Awei must finish the eighth line on shore");
 assert.deepEqual(CinematicSequences.endingDeparture.segments[3].effects.playerBoarding, [0, 1], "Awei must board only after writing Zhou He's name");
 assert.deepEqual(CinematicSequences.endingDeparture.segments[5].effects.motherDeparture, [0.72, 1], "Zhou He's southward lantern route must remain visible through the final wide shot");
 assert.equal(CinematicSequences.endingDeparture.segments.length, 7, "the finale needs boarding, the eighth line, both answers, departure, and a silent final hold");
-assert.match(CinematicSequences.endingDeparture.segments[5].caption, /周禾老师/);
-assert.equal(CinematicSequences.endingDeparture.segments[6].actors.player, "holdRegister", "the final image must leave Awei physically holding the register");
+assert.match(CinematicSequences.endingDeparture.segments[5].caption, /第八行|周禾/);
+assert.equal(GetActorAction(CinematicSequences.endingDeparture.segments[6].actors.player), "holdRegister", "the final image must leave Awei physically holding the register");
 assert.equal(CinematicSequences.endingDeparture.segments[6].effects.ferryDeparture, 1, "the final hold must happen after the ferry has fully separated from shore");
 assert.equal(CinematicSequences.schoolOpening.segments.length, 4, "the school opening must establish village scale, empty shoes, register, and departure");
 assert.ok(CinematicSequences.schoolOpening.segments.some((segment) => segment.blocking), "school actors need authored blocking instead of static mannequin poses");
 assert.equal(CinematicSequences.tunnelRollCall.segments.length, 4, "the tunnel roll call needs knock, four answers, Shuaner's hand, and Awei's answer");
-assert.equal(CinematicSequences.tunnelRollCall.segments[0].actors.player, "tap", "Awei must physically knock before waiting for answers");
-assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusAction, "raiseHand", "Shuaner must answer with a hand rather than a generic group pose");
+assert.equal(GetActorAction(CinematicSequences.tunnelRollCall.segments[0].actors.player), "tap", "Awei must physically knock before waiting for answers");
+assert.equal(GetActorAction(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusAction), "raiseHand", "Shuaner must answer with a hand rather than a generic group pose");
 assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusIndex, 5, "only the sixth child may receive Shuaner's featured gesture");
 assert.equal(CinematicSequences.miziHandoff.segments.length, 3, "Mizi's first contact needs descent, sleeve grip, and mutual release");
-assert.equal(CinematicSequences.miziHandoff.segments[1].actors.player, "kneelListen", "Awei must lower herself to Mizi's eye line");
-assert.equal(CinematicSequences.miziHandoff.segments[1].actors.followerFocusAction, "gripSleeve", "Mizi must make physical contact instead of being described only by caption");
+assert.equal(GetActorAction(CinematicSequences.miziHandoff.segments[1].actors.player), "kneelListen", "Awei must lower herself to Mizi's eye line");
+assert.equal(GetActorAction(CinematicSequences.miziHandoff.segments[1].actors.followerFocusAction), "gripSleeve", "Mizi must make physical contact instead of being described only by caption");
 assert.equal(CinematicSequences.cartBrace.segments.length, 3, "the handcart beat needs strain, shared weight, and release");
 assert.equal(CinematicSequences.cartBrace.segments[0].actors.followerFocusAction, "shoulderBrace", "Mizi must visibly put her shoulder into the handcart");
 assert.equal(CinematicSequences.drainPassage.segments[1].actors.followerFocusAction, "lookBack", "Mizi must look back before Awei follows into the drain");
@@ -92,15 +93,33 @@ assert.equal(CinematicSequences.wellVent.segments.length, 3, "the well opening n
 assert.equal(CinematicSequences.wellVent.segments[2].actors.followerStandIns.length, 4, "the four still-missing children must enter the cinematic without becoming gameplay followers");
 assert.ok(CinematicSequences.wellVent.segments[2].actors.followerStandIns.every((standIn) => standIn.x > 1480), "the missing children must remain beyond the sealed gate, not teleport beside the well");
 assert.equal(CinematicSequences.motherHandoff.segments.length, 4, "the reunion needs the register, seventh line, embrace, and release");
-assert.equal(CinematicSequences.motherHandoff.segments[2].actors.player, "receiveComfort", "Awei must visibly react to being held");
-assert.equal(CinematicSequences.motherHandoff.segments[2].actors.mother, "embrace", "Zhou He must physically initiate the embrace");
-assert.equal(CinematicSequences.motherHandoff.segments[3].actors.player, "holdRegister", "Awei must keep the register against her chest when Zhou He leaves");
+assert.equal(GetActorAction(CinematicSequences.motherHandoff.segments[2].actors.player), "receiveComfort", "Awei must visibly react to being held");
+assert.equal(GetActorAction(CinematicSequences.motherHandoff.segments[2].actors.mother), "embrace", "Zhou He must physically initiate the embrace");
+assert.equal(GetActorAction(CinematicSequences.motherHandoff.segments[3].actors.player), "holdRegister", "Awei must keep the register against her chest when Zhou He leaves");
+assert.equal(GetActorAction(CinematicSequences.schoolOpening.segments[1].actors.mother), "arrangeShoes", "Zhou He must physically straighten the empty shoes");
+assert.deepEqual(CinematicSequences.schoolOpening.segments[1].effects.shoeOrder, [0, 1], "the six shoe pairs must visibly settle into order");
+assert.equal(GetActorAction(CinematicSequences.tunnelOpening.segments[1].actors.followerFocusAction), "suppressCough", "the tunnel opening needs a visible suppressed cough");
+assert.equal(GetActorAction(CinematicSequences.wellVent.segments[1].actors.player), "steadyChild", "Awei must physically steady Mizi when the vent opens");
+assert.equal(GetActorAction(CinematicSequences.motherHandoff.segments[1].actors.player), "touchName", "Awei must touch the seventh line before the embrace");
+assert.equal(GetActorAction(CinematicSequences.endingDeparture.segments[1].actors.player), "reachGoodbye", "Awei must reach after Zhou He and stop herself before writing");
+assert.ok(Array.isArray(CinematicSequences.schoolOpening.segments[0].camera.viewDistance), "authored openings need an in-shot dolly rather than only hard cuts");
+assert.equal(CinematicSequences.schoolOpening.segments[1].camera.cut, false, "the school establish must flow into its human beat without a hard cut");
+for (const sequence of Object.values(CinematicSequences)) {
+  for (const segment of sequence.segments) {
+    assert.equal(segment.camera.roll, undefined, `${sequence.id}: side-view camera must never roll`);
+    assert.equal(segment.camera.sway, undefined, `${sequence.id}: camera motion must remain on the authored X/Y/Z track`);
+  }
+}
 assert.deepEqual(CinematicSequences.sluiceRise.segments[1].effects.bridgeRaise, [0.42, 1], "the bridge must visibly rise during its causal shot");
 assert.deepEqual(CinematicSequences.emptyBoatDiversion.segments[1].effects.emptyBoatRelease, [0.35, 1], "the empty boat must visibly drift during its diversion shot");
 
 const naturalDirector = CreateCinematicDirector();
 assert.equal(naturalDirector.Start("schoolOpening"), true);
 assert.equal(naturalDirector.GetFrame()?.id, "schoolOpening");
+const openingDistanceStart = naturalDirector.GetFrame()?.camera?.viewDistance;
+for (let step = 0; step < 32; step += 1) naturalDirector.Update(0.05);
+const openingDistanceMid = naturalDirector.GetFrame()?.camera?.viewDistance;
+assert.ok(openingDistanceMid < openingDistanceStart - 2, "camera arrays must resolve into a real in-shot dolly");
 for (let step = 0; step < 260 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
 assert.equal(naturalDirector.IsPlaying(), false, "opening cinematic must finish deterministically");
 assert.deepEqual(naturalDirector.ConsumeFinished(), {
@@ -316,6 +335,8 @@ for (const builder of ["BuildSchool", "BuildBlockade", "BuildTunnel", "BuildFerr
 }
 assert.match(sceneSource, /InstancedMesh/, "dense reeds and terrain detail must use instancing");
 assert.match(sceneSource, /CreateWaterRipples/, "water chapters need readable moving surface detail");
+assert.doesNotMatch(sceneSource, /const horizonBand = AddBox/, "the county horizon must not regress to a full-width theatre band");
+assert.doesNotMatch(sceneSource, /\[32, 4\.8, 0\.75\]/, "the tunnel must not regress to a complete rear-wall box");
 assert.match(actorSource, /CreateActor3D/, "player and civilians need procedural 3D rigs");
 assert.match(assetSource, /GLTFLoader/, "BlenderMCP-authored GLB assets need the repository-local glTF loader");
 assert.match(postFxSource, /DepthTexture/, "cinematic post-processing must use scene depth for restrained focus separation");
@@ -340,7 +361,11 @@ for (const [chapterId, profile] of Object.entries(ChapterVisuals)) {
   assert.ok(profile.camera.fov >= 22 && profile.camera.fov <= 28, `${chapterId}: long-lens FOV must stay between 22 and 28 degrees`);
   assert.ok(profile.camera.distance > 12, `${chapterId}: camera needs real stage depth`);
   assert.ok(profile.fogDensity > 0 && profile.fogDensity < 0.06, `${chapterId}: fog must separate depth without blanking the frame`);
+  const establishShot = GetCameraShot(chapterId, 0);
+  assert.ok(establishShot.lift - establishShot.lookLift < 1.45, `${chapterId}: wide camera must stay near level so the ground remains in the lower quarter`);
 }
+const tunnelActionShot = GetCameraShot("tunnel", 1900);
+assert.ok(tunnelActionShot.lookLift > 1.65, "the tunnel action camera must not expose a heavy empty floor band");
 assert.equal(RenderProfiles.desktop.shadows, true, "desktop mode must retain real-time shadows");
 assert.equal(RenderProfiles.mobile.shadows, false, "mobile mode must drop the expensive shadow pass");
 

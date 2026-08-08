@@ -1,9 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z8";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z8";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z8";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z8";
-import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z8";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z11";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z11";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z11";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z11";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z11";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
@@ -368,7 +368,7 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     const forwardLook = shot.anchorX === undefined ? state.player.facing * 175 : 0;
     const anchorFollow = shot.anchorX === undefined
       ? 0
-      : THREE.MathUtils.clamp(state.player.x - shot.anchorX, -280, 280) * 0.55;
+      : THREE.MathUtils.clamp(state.player.x - shot.anchorX, -340, 340) * 0.82;
     const baseTargetGameX = shot.anchorX === undefined ? state.player.x + forwardLook : shot.anchorX + anchorFollow;
     const baseTargetX = baseTargetGameX * WorldScale;
     const playerY = state.player.y * WorldScale;
@@ -409,10 +409,10 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     const finalCameraY = directorCamera ? playerY + directorCamera.lift + directorCrane : desiredCameraY;
     const finalCameraZ = directorCamera ? directorCamera.viewDistance + directorDolly : desiredZ - state.suspicion * 0.65;
     const directorSegmentKey = directorCamera ? `${cinematicFrame.id}:${cinematicFrame.segmentIndex}` : "";
-    const directorCut = Boolean(directorCamera && directorSegmentKey !== handle.cinematicSegmentKey);
+    const directorCut = Boolean(directorCamera && directorCamera.cut !== false && directorSegmentKey !== handle.cinematicSegmentKey);
     handle.cinematicSegmentKey = directorSegmentKey;
     const cameraSpeed = directorCamera ? 4.8 : cueBlend > 0 ? 6.2 : 3.15;
-    const finalFov = directorCamera?.fov ?? (profile.camera.fov - state.suspicion * 1.2);
+    const finalFov = directorCamera?.fov ?? ((shot.fov ?? profile.camera.fov) - state.suspicion * 1.2);
     camera.position.x = directorCut ? finalCameraX : Damp(camera.position.x, finalCameraX, cameraSpeed, deltaTime);
     camera.position.y = directorCut ? finalCameraY : Damp(camera.position.y, finalCameraY, directorCamera ? 4.4 : cueBlend > 0 ? 5.4 : 2.7, deltaTime);
     camera.position.z = directorCut ? finalCameraZ : Damp(camera.position.z, finalCameraZ, directorCamera ? 4.0 : 2.4, deltaTime);
@@ -424,9 +424,11 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       ? (directorCamera.lookLift ?? baseLookLift) + directorCrane * 0.3
       : baseLookLift + (cueCamera?.targetY || 0) * cueBlend;
     handle.cameraTarget.y = directorCut ? playerY + finalLookLift : Damp(handle.cameraTarget.y, playerY + finalLookLift, directorCamera ? 4.4 : cueBlend > 0 ? 5.4 : 3.2, deltaTime);
-    handle.cameraTarget.z = directorCut ? (directorCamera?.targetZ ?? -0.45) : Damp(handle.cameraTarget.z, directorCamera?.targetZ ?? -0.45, directorCamera ? 4.2 : 2, deltaTime);
+    const playableTargetZ = shot.targetZ ?? -0.45;
+    handle.cameraTarget.z = directorCut
+      ? (directorCamera?.targetZ ?? playableTargetZ)
+      : Damp(handle.cameraTarget.z, directorCamera?.targetZ ?? playableTargetZ, directorCamera ? 4.2 : 1.65, deltaTime);
     camera.lookAt(handle.cameraTarget);
-    camera.rotateZ(Math.sin(handle.time * 0.29) * 0.0012 + state.suspicion * 0.0018);
     if (handle.moonLight) {
       handle.moonLight.position.x = camera.position.x + (chapter.id === "ferry" ? -9 : 11);
       handle.moonLight.target.position.x = camera.position.x;
