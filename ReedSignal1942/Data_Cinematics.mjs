@@ -359,7 +359,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 0,
         to: 2.35,
-        camera: { anchorX: 590, viewDistance: 9.8, lift: 1.46, lookLift: 0.72, targetZ: -0.2 },
+        camera: { anchorX: 590, viewDistance: 9.6, lift: 1.46, lookLift: 0.72, targetZ: -0.2, trackX: 14, dolly: -0.42 },
         actors: { player: "lift", followers: "shield" },
         effects: { ventOpening: [0, 1], smokeRetreat: [0, 0.24] },
         caption: "井板上的土一层层落下来。上面的夜，终于漏进一线。",
@@ -368,7 +368,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 2.35,
         to: 4.8,
-        camera: { anchorX: 760, viewDistance: 15.4, lift: 2.34, lookLift: 1.02, targetZ: -2.15 },
+        camera: { anchorX: 720, viewDistance: 12.9, lift: 2.06, lookLift: 0.94, targetZ: -1.25, trackX: 18, dolly: -0.36 },
         actors: { player: "listen", followers: "count", followerStagger: 0.1 },
         effects: { ventOpening: 1, smokeRetreat: [0.24, 0.48] },
         caption: "孩子们先听见风，再敢吸下一口气。",
@@ -575,7 +575,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 0,
         to: 1.8,
-        camera: { anchorX: 1900, viewDistance: 11.6, lift: 2.06, lookLift: 0.9, targetZ: -0.1 },
+        camera: { anchorX: 1885, viewDistance: 9.5, lift: 1.82, lookLift: 0.84, targetZ: 0.02, trackX: 8, dolly: -0.34 },
         actors: { player: "pass", followers: "peek", mother: "pass" },
         caption: "周禾翻过六行。每个名字后面，都有一声不一样的“到”。",
         soundCue: "paper",
@@ -583,7 +583,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 1.8,
         to: 3.85,
-        camera: { anchorX: 2040, viewDistance: 12.8, lift: 2.18, lookLift: 0.94, targetZ: -0.3 },
+        camera: { anchorX: 1888, viewDistance: 8.9, lift: 1.7, lookLift: 0.8, targetZ: 0.06, trackX: -6, dolly: -0.28 },
         actors: { player: "listen", followers: "count", mother: "write" },
         caption: "她在第七行写下“阿苇”，说：“你也还只是个孩子。”",
         soundCue: "paper",
@@ -591,8 +591,8 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 3.85,
         to: 5.6,
-        camera: { anchorX: 1980, viewDistance: 10.9, lift: 1.96, lookLift: 0.88, targetZ: -0.18 },
-        actors: { player: "pass", followers: "listen", mother: "pass" },
+        camera: { anchorX: 1882, viewDistance: 8.6, lift: 1.68, lookLift: 0.8, targetZ: 0.08, trackX: 7, dolly: -0.24 },
+        actors: { player: "listen", followers: "listen", mother: "comfort" },
         caption: "“过河以后，把自己的名字也念出来。”",
         soundCue: "soft",
       },
@@ -636,7 +636,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 0,
         to: 2.55,
-        camera: { anchorX: 3230, viewDistance: 12.8, lift: 2.18, lookLift: 0.92, targetZ: 0.05 },
+        camera: { anchorX: 3230, viewDistance: 11.9, lift: 2.08, lookLift: 0.9, targetZ: 0.08, trackX: 14, dolly: -0.32 },
         actors: { player: "pass", followers: "board", followerStagger: 0.18, mother: "listen" },
         effects: { boarding: [0, 0.55], playerBoarding: 0, ferryDeparture: 0 },
         caption: "麦子。杏花。小锁。春妮。石头。栓儿。",
@@ -645,7 +645,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 2.55,
         to: 4.9,
-        camera: { anchorX: 3290, viewDistance: 11.8, lift: 2.05, lookLift: 0.86, targetZ: 0.12 },
+        camera: { anchorX: 3290, viewDistance: 10.9, lift: 1.98, lookLift: 0.84, targetZ: 0.14, trackX: 12, dolly: -0.28 },
         actors: { player: "count", followers: "board", followerStagger: 0.15, mother: "listen" },
         effects: { boarding: [0.55, 1], playerBoarding: 0, ferryDeparture: 0 },
         caption: "六声“到”，先过了船板。",
@@ -654,7 +654,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 4.9,
         to: 7.2,
-        camera: { anchorX: 3310, viewDistance: 12.6, lift: 2.18, lookLift: 0.9, targetZ: 0.08 },
+        camera: { anchorX: 3310, viewDistance: 11.4, lift: 2.06, lookLift: 0.88, targetZ: 0.12, trackX: 16, dolly: -0.34 },
         actors: { player: "board", followers: "count", followerStagger: 0.11, mother: "signal" },
         effects: { boarding: 1, playerBoarding: [0, 1], ferryDeparture: [0, 0.08] },
         caption: "阿苇最后上船，把第七行贴在离心口最近的地方。",
@@ -663,7 +663,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 7.2,
         to: 9.55,
-        camera: { anchorX: 3370, viewDistance: 12.2, lift: 2.16, lookLift: 0.9, targetZ: -0.08 },
+        camera: { anchorX: 3370, viewDistance: 11.2, lift: 2.04, lookLift: 0.88, targetZ: 0.02, trackX: 18, dolly: -0.28 },
         actors: { player: "count", followers: "count", followerStagger: 0.1, mother: "listen" },
         effects: { boarding: 1, playerBoarding: 1, ferryDeparture: [0.08, 0.24] },
         caption: "麦子仰头叫：“阿苇姐。”阿苇停了一下，答：“到。”",
@@ -672,7 +672,7 @@ export const CinematicSequences = DeepFreeze({
       {
         from: 9.55,
         to: 13.4,
-        camera: { anchorX: 3460, viewDistance: 21.5, lift: 3.52, lookLift: 1.24, targetZ: -2.55 },
+        camera: { anchorX: 3460, viewDistance: 19.2, lift: 3.18, lookLift: 1.16, targetZ: -1.75, trackX: 42, dolly: 1.6, crane: 0.28 },
         actors: { player: "listen", followers: "huddle", mother: "listen" },
         effects: { boarding: 1, playerBoarding: 1, ferryDeparture: [0.24, 1] },
         caption: "最后一行没有回应。阿苇没有划掉它。船向北，灯向南。",

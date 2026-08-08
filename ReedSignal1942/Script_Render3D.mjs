@@ -1,9 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808y";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808y";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808y";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808y";
-import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808y";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z2";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z2";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z2";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z2";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z2";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
@@ -396,11 +396,18 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     const desiredCameraX = THREE.MathUtils.lerp(targetX, targetX + (cueCamera?.positionX || 0), cueBlend);
     const desiredCameraY = THREE.MathUtils.lerp(desiredY, desiredY + (cueCamera?.positionY || 0), cueBlend);
     const directorCamera = cinematicFrame?.camera;
-    const directorTargetX = Number.isFinite(directorCamera?.anchorX) ? directorCamera.anchorX * WorldScale : state.player.x * WorldScale;
+    const directorRawProgress = THREE.MathUtils.clamp(Number(cinematicFrame?.segmentProgress || 0), 0, 1);
+    const directorProgress = directorRawProgress * directorRawProgress * (3 - 2 * directorRawProgress);
+    const directorTrackX = Number(directorCamera?.trackX || 0) * directorProgress;
+    const directorDolly = Number(directorCamera?.dolly || 0) * directorProgress;
+    const directorCrane = Number(directorCamera?.crane || 0) * directorProgress;
+    const directorTargetX = Number.isFinite(directorCamera?.anchorX)
+      ? (directorCamera.anchorX + directorTrackX) * WorldScale
+      : state.player.x * WorldScale;
     const finalTargetX = directorCamera ? directorTargetX : targetX;
     const finalCameraX = directorCamera ? directorTargetX : desiredCameraX;
-    const finalCameraY = directorCamera ? playerY + directorCamera.lift : desiredCameraY;
-    const finalCameraZ = directorCamera ? directorCamera.viewDistance : desiredZ - state.suspicion * 0.65;
+    const finalCameraY = directorCamera ? playerY + directorCamera.lift + directorCrane : desiredCameraY;
+    const finalCameraZ = directorCamera ? directorCamera.viewDistance + directorDolly : desiredZ - state.suspicion * 0.65;
     const directorSegmentKey = directorCamera ? `${cinematicFrame.id}:${cinematicFrame.segmentIndex}` : "";
     const directorCut = Boolean(directorCamera && directorSegmentKey !== handle.cinematicSegmentKey);
     handle.cinematicSegmentKey = directorSegmentKey;
@@ -413,7 +420,9 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     camera.updateProjectionMatrix();
     handle.cameraTarget.x = directorCut ? finalTargetX : Damp(handle.cameraTarget.x, finalTargetX, directorCamera ? 4.8 : cueBlend > 0 ? 6.2 : 3.2, deltaTime);
     const baseLookLift = shot.lookLift ?? profile.camera.lookLift;
-    const finalLookLift = directorCamera?.lookLift ?? (baseLookLift + (cueCamera?.targetY || 0) * cueBlend);
+    const finalLookLift = directorCamera
+      ? (directorCamera.lookLift ?? baseLookLift) + directorCrane * 0.3
+      : baseLookLift + (cueCamera?.targetY || 0) * cueBlend;
     handle.cameraTarget.y = directorCut ? playerY + finalLookLift : Damp(handle.cameraTarget.y, playerY + finalLookLift, directorCamera ? 4.4 : cueBlend > 0 ? 5.4 : 3.2, deltaTime);
     handle.cameraTarget.z = directorCut ? (directorCamera?.targetZ ?? -0.45) : Damp(handle.cameraTarget.z, directorCamera?.targetZ ?? -0.45, directorCamera ? 4.2 : 2, deltaTime);
     camera.lookAt(handle.cameraTarget);

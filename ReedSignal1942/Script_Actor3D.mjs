@@ -3,6 +3,9 @@ import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
 const ActorGeometries = Object.freeze({
   head: new THREE.SphereGeometry(0.142, 18, 12),
   hair: new THREE.SphereGeometry(0.151, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62),
+  hairBun: new THREE.SphereGeometry(0.105, 14, 9),
+  shawl: new THREE.ConeGeometry(0.335, 0.42, 14, 1, true),
+  headClothTail: new THREE.BoxGeometry(0.12, 0.34, 0.035),
   neck: new THREE.CylinderGeometry(0.062, 0.074, 0.115, 10),
   shoulders: new THREE.SphereGeometry(0.245, 12, 8),
   torso: new THREE.CylinderGeometry(0.185, 0.235, 0.62, 12),
@@ -36,7 +39,15 @@ const RolePalettes = Object.freeze({
 const ChildClothColors = Object.freeze([0x4c4b3e, 0x424b42, 0x51473d, 0x3e4745, 0x554d41, 0x44473b]);
 
 function CreateMaterial(color, roughness = 0.9) {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, flatShading: false });
+  const base = new THREE.Color(color);
+  return new THREE.MeshStandardMaterial({
+    color: base,
+    roughness,
+    metalness: 0,
+    flatShading: false,
+    emissive: base.clone().multiplyScalar(0.055),
+    emissiveIntensity: 0.72,
+  });
 }
 
 function CreateContactShadowMaterial() {
@@ -171,6 +182,16 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   braid.position.set(-0.1, -0.15, -0.055);
   braid.rotation.z = 0.22;
   headPivot.add(braid);
+  const hairBun = PrepareMesh(new THREE.Mesh(ActorGeometries.hairBun, hair));
+  hairBun.position.set(0, -0.015, -0.142);
+  hairBun.scale.set(0.92, 1.08, 0.78);
+  hairBun.visible = role === "mother";
+  headPivot.add(hairBun);
+  braid.visible = role === "player" || (role === "child" && childIndex % 3 === 1);
+  if (role === "child") {
+    hairCap.scale.set(0.96 + (childIndex % 2) * 0.04, 0.88 + (childIndex % 3) * 0.035, 0.95);
+    braid.scale.setScalar(0.78);
+  }
   const nose = PrepareMesh(new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 5), skin), false);
   nose.position.set(0, -0.015, 0.145);
   nose.rotation.x = Math.PI * 0.5;
@@ -189,6 +210,21 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   leftArm.root.rotation.z = -0.08;
   rightArm.root.rotation.z = 0.08;
   pelvis.add(leftArm.root, rightArm.root);
+
+  // The adult guide needs to read instantly against A-Wei's short jacket and
+  // satchel.  A low hair bun, shoulder shawl and loose head-cloth tail create
+  // a historically plausible rural silhouette without facial exposition.
+  const shawl = PrepareMesh(new THREE.Mesh(ActorGeometries.shawl, scarfMaterial));
+  shawl.position.set(0, 0.41, -0.015);
+  shawl.rotation.y = Math.PI * 0.25;
+  shawl.scale.set(1.02, 0.88, 0.74);
+  shawl.visible = role === "mother";
+  pelvis.add(shawl);
+  const headClothTail = PrepareMesh(new THREE.Mesh(ActorGeometries.headClothTail, clothDark));
+  headClothTail.position.set(0.09, 0.62, -0.19);
+  headClothTail.rotation.set(-0.08, 0.08, -0.18);
+  headClothTail.visible = role === "mother";
+  pelvis.add(headClothTail);
 
   const buttonMaterial = CreateMaterial(palette.clothDark, 1);
   const buttons = [];
@@ -239,8 +275,8 @@ export function CreateActor3D(role = "player", childIndex = 0) {
 
   const roleScale = role === "child" ? 0.72 + (childIndex % 3) * 0.025 : role === "mother" ? 0.97 : 0.93;
   root.scale.setScalar(roleScale);
-  root.userData.lodOptional = [contactShadow, coatBack, scarfTail, belt, satchel, strap, ...buttons];
-  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, contactShadow, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, registerBook, carriedBundle, roleScale, role, childIndex };
+  root.userData.lodOptional = [contactShadow, coatBack, scarfTail, belt, satchel, strap, headClothTail, ...buttons];
+  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, contactShadow, headPivot, braid, hairBun, shawl, headClothTail, leftLeg, rightLeg, leftArm, rightArm, satchel, registerBook, carriedBundle, roleScale, role, childIndex };
   root.userData.motion = {
     phase: childIndex * 0.73 + (role === "mother" ? 0.31 : 0),
     velocity: 0,
@@ -347,8 +383,8 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   let headRotZ = -rigRotZ * 0.28 + Math.sin(time * 0.43 + rig.childIndex) * 0.012;
   let leftArmX = -stride * 0.52 + (pose.carrying ? -0.78 : 0) + startStopLean * 0.28;
   let rightArmX = stride * 0.48 + (pose.carrying ? -0.78 : 0) + startStopLean * 0.24;
-  let leftArmLowerX = pose.carrying ? -1.08 : -0.18;
-  let rightArmLowerX = pose.carrying ? -1.08 : -0.18;
+  let leftArmLowerX = pose.carrying ? -1.08 : -0.24;
+  let rightArmLowerX = pose.carrying ? -1.08 : -0.22;
   let leftArmZ = held ? -0.55 : -0.08;
   let rightArmZ = held ? 0.12 : 0.08;
   let leftArmY = -stepCos * 0.035 * gait;
@@ -444,6 +480,20 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.38, listen);
     leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.18, listen);
     rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.12, listen);
+  } else if (gesture === "comfort") {
+    const reach = SmoothStep(0.08, 0.58, gestureProgress);
+    const settle = SmoothStep(0.58, 1, gestureProgress);
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.055 * reach;
+    pelvisRotY += (pose.facing >= 0 ? -1 : 1) * 0.08 * reach;
+    shouldersRotY -= (pose.facing >= 0 ? -1 : 1) * 0.12 * reach;
+    headRotX -= 0.08 * reach;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * (0.12 + settle * 0.08);
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.06 + settle * 0.08, reach);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.4, reach);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.42 + settle * 0.12, reach);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.74, reach);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.34, reach);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.18, reach);
   } else if (gesture === "signal") {
     const raise = BackOut(SmoothStep(0.04, 0.55, gestureProgress));
     const windResistance = Math.sin(gestureProgress * Math.PI * 7) * gestureArc * 0.035;
@@ -486,12 +536,12 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     shouldersRotY -= (pose.facing >= 0 ? -1 : 1) * 0.15 * reach;
     headRotX -= 0.1 * reach;
     headRotY += (pose.facing >= 0 ? 1 : -1) * 0.12 * release;
-    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.36, reach);
-    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.05, reach);
-    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.64 + release * 0.12, reach);
-    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.48 + release * 0.1, reach);
-    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.52, reach);
-    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.4, reach);
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.82, reach);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.2, reach);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.1 + release * 0.1, reach);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.55 + release * 0.1, reach);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.3, reach);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.36, reach);
   } else if (gesture === "huddle") {
     const huddle = gestureAttack;
     const shiver = Math.sin(time * 7.2 + rig.childIndex * 1.7) * motion.fear * 0.012;
@@ -550,6 +600,9 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.headPivot.rotation.y = Damp(rig.headPivot.rotation.y, headRotY, 5, deltaTime);
   rig.headPivot.rotation.z = Damp(rig.headPivot.rotation.z, headRotZ, 5.5, deltaTime);
   rig.braid.rotation.z = Damp(rig.braid.rotation.z, 0.22 - stride * 0.18 - startStopLean * 0.26 - headRotY * 0.08, 4.1, deltaTime);
+  rig.hairBun.rotation.z = Damp(rig.hairBun.rotation.z, -stride * 0.06 - headRotY * 0.025, 4.4, deltaTime);
+  rig.shawl.rotation.z = Damp(rig.shawl.rotation.z, -stride * 0.055 - startStopLean * 0.08, 4.2, deltaTime);
+  rig.headClothTail.rotation.z = Damp(rig.headClothTail.rotation.z, -0.18 - stride * 0.12 - startStopLean * 0.18, 4, deltaTime);
   rig.coatBack.rotation.x = Damp(rig.coatBack.rotation.x, -0.04 - stride * 0.13 + speed * 0.08 - startStopLean * 0.3, 4.8, deltaTime);
   rig.scarfTail.rotation.z = Damp(rig.scarfTail.rotation.z, 0.08 - stride * 0.2 - startStopLean * 0.34 + pelvisRotZ * 0.22, 4.2, deltaTime);
   rig.scarfTail.rotation.x = Damp(rig.scarfTail.rotation.x, speed * 0.2 + crouch * 0.08 + Math.abs(startStopLean) * 0.28, 4.2, deltaTime);

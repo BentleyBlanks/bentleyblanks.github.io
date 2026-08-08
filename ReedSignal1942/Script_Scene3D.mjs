@@ -1,7 +1,7 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808y";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808y";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808y";
+import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z2";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z2";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z2";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -431,8 +431,15 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   const farColor = new THREE.Color(profile.fog).multiplyScalar(chapterId === "ferry" ? 0.34 : 0.27);
   const middleColor = new THREE.Color(profile.plasterDark).multiplyScalar(0.42).lerp(new THREE.Color(profile.fog), 0.12);
   const silhouetteMaterial = new THREE.MeshBasicMaterial({ color: farColor, fog: true });
-  const middleMaterial = new THREE.MeshBasicMaterial({ color: middleColor, fog: true, transparent: true, opacity: 0.82 });
-  dynamic.ownedMaterials.push(silhouetteMaterial, middleMaterial);
+  const middleMaterial = new THREE.MeshBasicMaterial({ color: middleColor, fog: true, transparent: true, opacity: 0.7 });
+  const arborealMaterial = new THREE.MeshBasicMaterial({
+    color: middleColor.clone().multiplyScalar(0.88),
+    fog: true,
+    transparent: true,
+    opacity: 0.64,
+    depthWrite: false,
+  });
+  dynamic.ownedMaterials.push(silhouetteMaterial, middleMaterial, arborealMaterial);
 
   const landmarkVillage = AddBlenderAsset(root, "Asset_DistantVillageCluster", {
     position: [length * 0.76, -0.16, -11.8],
@@ -474,29 +481,65 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   roofs.instanceMatrix.needsUpdate = true;
   dynamic.ownedGeometries.push(buildingGeometry, roofGeometry);
 
-  const treeCount = Math.max(14, Math.ceil(length / 2.05));
-  const trunkGeometry = new THREE.CylinderGeometry(0.08, 0.13, 1, 5);
-  const crownGeometry = new THREE.DodecahedronGeometry(1, 0);
-  const trunks = CreateInstancedSilhouette(root, trunkGeometry, middleMaterial, treeCount);
-  const crowns = CreateInstancedSilhouette(root, crownGeometry, middleMaterial, treeCount * 2);
+  // Background trees read as masses with a visible branching rhythm rather
+  // than a row of poles carrying detached low-poly gems.  All foliage remains
+  // three instanced draw calls so the extra silhouette detail is effectively
+  // free at runtime.
+  const treeCount = Math.max(12, Math.ceil(length / 2.65));
+  const trunkGeometry = new THREE.CylinderGeometry(0.075, 0.15, 1, 7);
+  const crownGeometry = new THREE.SphereGeometry(1, 9, 7);
+  const trunks = CreateInstancedSilhouette(root, trunkGeometry, arborealMaterial, treeCount);
+  const branches = CreateInstancedSilhouette(root, trunkGeometry, arborealMaterial, treeCount * 4);
+  const crowns = CreateInstancedSilhouette(root, crownGeometry, arborealMaterial, treeCount * 5);
   for (let index = 0; index < treeCount; index += 1) {
     const x = -6 + index * ((length + 12) / Math.max(1, treeCount - 1)) + (random() - 0.5) * 1.5;
-    const z = -6.2 - random() * 4.6;
-    const height = 4.8 + random() * 4.6;
-    const crownWidth = 0.42 + random() * 0.58;
-    SetInstance(trunks, index, [x, height * 0.5 - 0.12, z], [0, random() * 0.15, (random() - 0.5) * 0.045], [1, height, 1], matrix);
-    const crownX = x + (random() - 0.5) * 0.2;
-    SetInstance(crowns, index * 2, [crownX, height - 0.72, z], [random() * 0.1, random() * Math.PI, 0], [crownWidth * 1.18, 0.92 + random() * 0.38, crownWidth * 0.86], matrix);
-    SetInstance(crowns, index * 2 + 1, [crownX + (random() - 0.5) * 0.18, height + 0.18, z], [random() * 0.1, random() * Math.PI, 0], [crownWidth * 0.82, 1.02 + random() * 0.48, crownWidth * 0.68], matrix);
+    const z = -7.2 - random() * 5.8;
+    const height = 3.15 + random() * 2.35;
+    const crownWidth = 0.62 + random() * 0.52;
+    const trunkLean = (random() - 0.5) * 0.08;
+    SetInstance(trunks, index, [x, height * 0.5 - 0.18, z], [0, random() * 0.18, trunkLean], [0.9 + random() * 0.32, height, 0.9 + random() * 0.25], matrix);
+    for (let branchIndex = 0; branchIndex < 4; branchIndex += 1) {
+      const side = branchIndex % 2 ? 1 : -1;
+      const branchY = height * (0.5 + branchIndex * 0.095);
+      const branchLength = 0.72 + random() * 0.62;
+      SetInstance(
+        branches,
+        index * 4 + branchIndex,
+        [x + side * (0.12 + branchIndex * 0.035), branchY, z + (random() - 0.5) * 0.12],
+        [(random() - 0.5) * 0.14, random() * 0.35, side * (0.64 + random() * 0.28)],
+        [0.56 + random() * 0.24, branchLength, 0.56 + random() * 0.2],
+        matrix,
+      );
+    }
+    const crownCenterY = height * 0.79;
+    const crownOffsets = [
+      [-0.52, -0.18, 1.0, 0.78],
+      [0.48, -0.12, 0.94, 0.82],
+      [-0.18, 0.34, 0.88, 1.0],
+      [0.32, 0.48, 0.74, 0.86],
+      [0.02, -0.48, 1.08, 0.7],
+    ];
+    for (let crownIndex = 0; crownIndex < crownOffsets.length; crownIndex += 1) {
+      const [offsetX, offsetY, widthScale, heightScale] = crownOffsets[crownIndex];
+      SetInstance(
+        crowns,
+        index * crownOffsets.length + crownIndex,
+        [x + offsetX * crownWidth + (random() - 0.5) * 0.12, crownCenterY + offsetY * crownWidth, z + (random() - 0.5) * 0.28],
+        [random() * 0.16, random() * Math.PI, (random() - 0.5) * 0.12],
+        [crownWidth * widthScale, crownWidth * heightScale, crownWidth * (0.7 + random() * 0.18)],
+        matrix,
+      );
+    }
   }
   trunks.instanceMatrix.needsUpdate = true;
+  branches.instanceMatrix.needsUpdate = true;
   crowns.instanceMatrix.needsUpdate = true;
   dynamic.ownedGeometries.push(trunkGeometry, crownGeometry);
 
   const infrastructureMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.plasterDark).multiplyScalar(0.3), fog: true });
   dynamic.ownedMaterials.push(infrastructureMaterial);
   const postGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const postCount = chapterId === "blockade" ? 8 : chapterId === "ferry" ? 5 : 4;
+  const postCount = chapterId === "blockade" ? 8 : chapterId === "ferry" ? 5 : chapterId === "school" ? 1 : 4;
   const posts = CreateInstancedSilhouette(root, postGeometry, infrastructureMaterial, postCount * 2);
   for (let index = 0; index < postCount; index += 1) {
     const x = length * ((index + 0.45) / postCount);
@@ -522,29 +565,50 @@ function BuildNearScaleLayer(root, chapter, profile, dynamic) {
   if (chapter.id === "tunnel") return;
   const length = chapter.width * WorldScale;
   const random = CreateRandom(880 + chapter.id.length * 29);
-  const material = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(profile.ground).multiplyScalar(0.24),
+  const stalkMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.ground).multiplyScalar(0.28),
     fog: true,
     transparent: true,
-    opacity: 0.66,
-    depthWrite: true,
+    opacity: 0.5,
+    depthWrite: false,
   });
-  const stalkGeometry = new THREE.ConeGeometry(0.055, 1, 4);
-  const count = Math.max(12, Math.ceil((length + 12) / 3.25));
-  const stalks = CreateInstancedSilhouette(root, stalkGeometry, material, count);
+  const leafMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.reed).multiplyScalar(0.16),
+    fog: true,
+    transparent: true,
+    opacity: 0.3,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const layer = new THREE.Group();
+  layer.name = "ForegroundReedClusters";
+  root.add(layer);
+  const stalkGeometry = new THREE.CylinderGeometry(0.018, 0.034, 1, 5);
+  const leafGeometry = new THREE.DodecahedronGeometry(1, 0);
+  const count = Math.max(20, Math.ceil((length + 12) / 1.75));
+  const stalks = CreateInstancedSilhouette(layer, stalkGeometry, stalkMaterial, count);
+  const leaves = CreateInstancedSilhouette(layer, leafGeometry, leafMaterial, count * 2);
   const matrix = new THREE.Matrix4();
   for (let index = 0; index < count; index += 1) {
-    const x = -6 + index * ((length + 12) / Math.max(1, count - 1)) + (random() - 0.5) * 0.7;
-    const z = 2.45 + random() * 1.75;
-    const height = 1.25 + random() * 2.65;
-    const sideBias = index % 5 === 0 ? 1.1 : 0.58;
-    SetInstance(stalks, index, [x, -0.25 + height * 0.5, z], [0, random() * Math.PI, (random() - 0.5) * 0.11], [sideBias, height, sideBias], matrix);
+    const cluster = Math.floor(index / 4);
+    const clusterCenter = -5.5 + cluster * ((length + 11) / Math.max(1, Math.ceil(count / 4) - 1));
+    const x = clusterCenter + (random() - 0.5) * 0.75;
+    const z = 2.75 + random() * 1.15;
+    const height = 0.78 + random() * 1.48;
+    const bend = (random() - 0.5) * 0.24;
+    SetInstance(stalks, index, [x, -0.3 + height * 0.5, z], [0, random() * Math.PI, bend], [0.78 + random() * 0.34, height, 0.78 + random() * 0.34], matrix);
+    const leafY = -0.32 + height * (0.68 + random() * 0.22);
+    const leafTilt = index % 2 === 0 ? -0.82 : 0.82;
+    SetInstance(leaves, index * 2, [x + Math.sin(leafTilt) * 0.11, leafY, z], [0, random() * Math.PI, leafTilt], [0.075 + random() * 0.035, 0.25 + random() * 0.12, 0.038], matrix);
+    SetInstance(leaves, index * 2 + 1, [x - Math.sin(leafTilt) * 0.09, leafY - 0.22, z + 0.015], [0, random() * Math.PI, -leafTilt * 0.78], [0.06 + random() * 0.03, 0.2 + random() * 0.1, 0.034], matrix);
   }
   stalks.instanceMatrix.needsUpdate = true;
+  leaves.instanceMatrix.needsUpdate = true;
   stalks.renderOrder = 5;
-  dynamic.ownedMaterials.push(material);
-  dynamic.ownedGeometries.push(stalkGeometry);
-  dynamic.nearScaleLayer = stalks;
+  leaves.renderOrder = 5;
+  dynamic.ownedMaterials.push(stalkMaterial, leafMaterial);
+  dynamic.ownedGeometries.push(stalkGeometry, leafGeometry);
+  dynamic.nearScaleLayer = layer;
 }
 
 function BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile) {
@@ -604,7 +668,7 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   const indices = [];
   for (let index = 0; index <= segments; index += 1) {
     const x = -padding + span * index / segments;
-    const topY = GetTerrainY(chapter, x) - 0.92 + Math.sin(index * 1.71) * 0.025 + Math.sin(index * 0.37) * 0.035;
+    const topY = GetTerrainY(chapter, x) - 1.02 + Math.sin(index * 1.71) * 0.045 + Math.sin(index * 0.37) * 0.065;
     const z = 2.18 + Math.sin(index * 0.29) * 0.08;
     positions.push(x, topY, z, x, topY - 1.9, z + 0.03);
     if (index < segments) {
@@ -619,16 +683,29 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   const material = new THREE.MeshBasicMaterial({
     color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.72),
     transparent: true,
-    opacity: 0.58,
-    depthWrite: true,
+    opacity: 0.34,
+    depthWrite: false,
     fog: true,
     side: THREE.DoubleSide,
   });
   const mesh = AddMesh(root, geometry, material, [0, 0, 0], null, null, false);
   mesh.renderOrder = 4;
+  const rockGeometry = new THREE.IcosahedronGeometry(1, 2);
+  const rockCount = Math.max(5, Math.ceil(length / 6.2));
+  const rocks = CreateInstancedSilhouette(root, rockGeometry, material, rockCount);
+  const rockMatrix = new THREE.Matrix4();
+  for (let index = 0; index < rockCount; index += 1) {
+    const x = -2.5 + index * ((length + 5) / Math.max(1, rockCount - 1)) + Math.sin(index * 4.13) * 0.55;
+    const randomScale = 0.72 + (index * 0.37 % 1) * 0.5;
+    SetInstance(rocks, index, [x, GetTerrainY(chapter, x) - 0.84, 2.24 + (index % 3) * 0.1], [0, index * 0.73, (index % 2 ? 1 : -1) * 0.08], [0.38 * randomScale, 0.14 * randomScale, 0.58 * randomScale], rockMatrix);
+  }
+  rocks.instanceMatrix.needsUpdate = true;
+  rocks.renderOrder = 4;
   dynamic.ownedGeometries.push(geometry);
+  dynamic.ownedGeometries.push(rockGeometry);
   dynamic.ownedMaterials.push(material);
   dynamic.foreground = mesh;
+  dynamic.foregroundRocks = rocks;
 }
 
 function BuildSchool(root, chapter, materials, dynamic, profile, density) {
@@ -865,7 +942,7 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
   AddBox(root, [32, 0.65, 4.8], [15, 2.52, -2.0], materials.earth, null, false);
   AddBox(root, [32, 4.8, 0.75], [15, 0.35, -3.55], materials.earth, null, false);
   AddBox(root, [32, 0.16, 0.42], [15, -0.18, 0.18], materials.earthDark, null, false);
-  AddBox(root, [32, 1.6, 0.12], [15, -1.3, 1.02], materials.terrainSide, null, false);
+  AddBox(root, [32, 1.02, 0.12], [15, -1.22, 1.02], materials.terrainSide, null, false);
   for (const x of [8.0, 22.2]) {
     const tunnelKit = AddBlenderAsset(root, "Asset_TunnelInteriorKit", {
       position: [x, -0.12, -0.35],
@@ -944,9 +1021,11 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
 
 function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   const riverbankVista = AddBlenderAsset(root, "Asset_FerryRiverbankVista", {
-    position: [18.2, -0.24, -8.2],
-    scale: 0.78,
+    position: [18.2, -0.62, -18.5],
+    scale: 0.46,
     castShadow: false,
+    materialTint: new THREE.Color(profile.ground).multiplyScalar(0.42),
+    tintAmount: 0.64,
   });
   if (riverbankVista) dynamic.blenderAssets.push(riverbankVista);
   const water = AddMesh(root, new THREE.PlaneGeometry(18, 13, 24, 6), materials.water, [32.3, -0.42, -0.8], [-Math.PI * 0.5, 0, 0], null, false);
@@ -996,6 +1075,7 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   // close boarding shots continue to use the complete rigs.
   const huddleBodyGeometry = new THREE.CylinderGeometry(0.14, 0.2, 0.6, 8);
   const huddleHeadGeometry = new THREE.SphereGeometry(0.12, 10, 7);
+  const huddleArmGeometry = new THREE.CylinderGeometry(0.032, 0.043, 0.36, 7);
   const huddleBodyMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 1,
@@ -1009,13 +1089,17 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   const huddleKnees = new THREE.InstancedMesh(huddleHeadGeometry, huddleBodyMaterial, 6);
   const huddleHeads = new THREE.InstancedMesh(huddleHeadGeometry, huddleSkinMaterial, 6);
   const huddleHair = new THREE.InstancedMesh(huddleHeadGeometry, materials.woodDark, 6);
+  const huddleArms = new THREE.InstancedMesh(huddleArmGeometry, huddleBodyMaterial, 12);
   const huddleColors = [0x4c4b3e, 0x424b42, 0x51473d, 0x3e4745, 0x554d41, 0x44473b];
   huddleColors.forEach((color, index) => {
     huddleBodies.setColorAt(index, new THREE.Color(color));
     huddleKnees.setColorAt(index, new THREE.Color(color));
+    huddleArms.setColorAt(index * 2, new THREE.Color(color));
+    huddleArms.setColorAt(index * 2 + 1, new THREE.Color(color));
   });
   if (huddleBodies.instanceColor) huddleBodies.instanceColor.needsUpdate = true;
   if (huddleKnees.instanceColor) huddleKnees.instanceColor.needsUpdate = true;
+  if (huddleArms.instanceColor) huddleArms.instanceColor.needsUpdate = true;
   huddleBodies.castShadow = false;
   huddleBodies.receiveShadow = true;
   huddleKnees.castShadow = false;
@@ -1024,12 +1108,14 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   huddleHeads.receiveShadow = true;
   huddleHair.castShadow = false;
   huddleHair.receiveShadow = true;
+  huddleArms.castShadow = false;
+  huddleArms.receiveShadow = true;
   const ferryHuddle = new THREE.Group();
   ferryHuddle.name = "FerryChildrenHuddleLod";
   ferryHuddle.visible = false;
-  ferryHuddle.add(huddleBodies, huddleKnees, huddleHeads, huddleHair);
+  ferryHuddle.add(huddleBodies, huddleKnees, huddleHeads, huddleHair, huddleArms);
   root.add(ferryHuddle);
-  dynamic.ownedGeometries.push(huddleBodyGeometry, huddleHeadGeometry);
+  dynamic.ownedGeometries.push(huddleBodyGeometry, huddleHeadGeometry, huddleArmGeometry);
   dynamic.ownedMaterials.push(huddleBodyMaterial, huddleSkinMaterial);
   dynamic.ferryHuddle = {
     group: ferryHuddle,
@@ -1037,6 +1123,7 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
     knees: huddleKnees,
     heads: huddleHeads,
     hair: huddleHair,
+    arms: huddleArms,
     matrix: new THREE.Matrix4(),
     position: new THREE.Vector3(),
     quaternion: new THREE.Quaternion(),
@@ -1086,7 +1173,8 @@ function BuildCoverProps(root, chapter, materials, dynamic) {
       for (let index = 0; index < 8; index += 1) AddCylinder(group, width * (0.34 + index * 0.015), width * (0.38 + index * 0.012), 0.22, [(index % 2 - 0.5) * width * 0.18, 0.12 + index * 0.16, (index % 3 - 1) * 0.14], materials.reed, 9, [0, 0, Math.PI * 0.5]);
     } else if (["bank", "dike"].includes(cover.kind)) {
       const count = Math.max(5, Math.ceil(width / 0.48));
-      const geometry = new THREE.IcosahedronGeometry(0.52, 1);
+      AddBox(group, [width, 0.34, 0.9], [0, 0.08, -0.08], materials.earthDark, [0, 0, cover.kind === "dike" ? -0.025 : 0.018]);
+      const geometry = new THREE.IcosahedronGeometry(0.28, 2);
       const stones = new THREE.InstancedMesh(geometry, materials.earth, count);
       const matrix = new THREE.Matrix4();
       const position = new THREE.Vector3();
@@ -1094,9 +1182,9 @@ function BuildCoverProps(root, chapter, materials, dynamic) {
       const scale = new THREE.Vector3();
       for (let index = 0; index < count; index += 1) {
         const t = count === 1 ? 0.5 : index / (count - 1);
-        position.set((t - 0.5) * width, 0.24 + Math.sin(index * 1.73) * 0.08, (index % 3 - 1) * 0.13);
+        position.set((t - 0.5) * width, 0.26 + Math.sin(index * 1.73) * 0.035, (index % 3 - 1) * 0.11);
         quaternion.setFromEuler(new THREE.Euler(index * 0.31, index * 0.57, index * 0.19));
-        scale.set(0.68 + (index % 3) * 0.13, 0.5 + (index % 2) * 0.2, 0.8 + (index % 4) * 0.08);
+        scale.set(0.72 + (index % 3) * 0.11, 0.48 + (index % 2) * 0.12, 0.78 + (index % 4) * 0.06);
         matrix.compose(position, quaternion, scale);
         stones.setMatrixAt(index, matrix);
       }
@@ -1287,7 +1375,8 @@ export function CreateChapterScene3D(chapter, renderProfile) {
           const detailedAnchor = index === 0 || index === 2;
           const lodScale = detailedAnchor ? 0 : 1;
           const ferryChildX = ferryX - 0.88 + column * 0.62 + row * 0.28;
-          const ferryChildY = ferryY + 0.75 + row * 0.05;
+          const huddleBreath = Math.sin(time * 1.55 + index * 0.92) * 0.015;
+          const ferryChildY = ferryY + 0.75 + row * 0.05 + huddleBreath;
           const ferryChildZ = ferryZ + 0.32 - row * 0.72;
           const shoreChildX = (follower?.x ?? state.player.x) * WorldScale;
           const shoreChildY = (follower?.y ?? state.player.y) * WorldScale + 0.62;
@@ -1314,20 +1403,33 @@ export function CreateChapterScene3D(chapter, renderProfile) {
           huddle.scale.set(0.9 * lodScale, 0.88 * lodScale, 0.92 * lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.hair.setMatrixAt(index, huddle.matrix);
+          for (let armIndex = 0; armIndex < 2; armIndex += 1) {
+            const side = armIndex === 0 ? -1 : 1;
+            const finalEmbrace = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex === 4 ? 1 : 0;
+            huddle.position.set(childX + side * 0.135, childY + 0.08, childZ + 0.015);
+            huddle.quaternion.setFromEuler(new THREE.Euler(0.08 * row, 0, side * (0.2 + finalEmbrace * (0.2 + (index % 2) * 0.08))));
+            huddle.scale.setScalar(lodScale);
+            huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
+            huddle.arms.setMatrixAt(index * 2 + armIndex, huddle.matrix);
+          }
         }
         huddle.bodies.instanceMatrix.needsUpdate = true;
         huddle.knees.instanceMatrix.needsUpdate = true;
         huddle.heads.instanceMatrix.needsUpdate = true;
         huddle.hair.instanceMatrix.needsUpdate = true;
+        huddle.arms.instanceMatrix.needsUpdate = true;
       }
     }
     const playerGround = state.player.y * WorldScale;
+    const motherHandoffActive = registerSequence === "motherHandoff";
+    const authoredPlayerX = motherHandoffActive ? 18.46 : state.player.x * WorldScale;
+    const schoolHandoffActive = ["schoolOpening", "registerHandoff"].includes(registerSequence);
     UpdateActor3D(actors.player, {
-      x: THREE.MathUtils.lerp(state.player.x * WorldScale, ferryX + 1.02, playerBoardBlend),
+      x: THREE.MathUtils.lerp(authoredPlayerX, ferryX + 1.02, playerBoardBlend),
       y: THREE.MathUtils.lerp(playerGround, ferryY + 0.34, playerBoardBlend),
       z: THREE.MathUtils.lerp(0.36, ferryZ + 0.3, playerBoardBlend),
       velocity: playerBoardBlend > 0.8 ? ferryDeparture * 0.5 : state.player.vx * WorldScale,
-      facing: state.player.facing,
+      facing: schoolHandoffActive ? -1 : state.player.facing,
       crouching: state.player.crouching,
       carrying: state.player.carrying,
       alert: state.suspicion > 0.25,
@@ -1339,7 +1441,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       registerBook: playerHasRegister,
       actionTime: directorActionTime ?? playerActionTime,
       actionDuration: cinematicFrame ? 1 : playerActionDuration,
-      positionSnap: playerBoardBlend > 0,
+      positionSnap: playerBoardBlend > 0 || motherHandoffActive,
       time,
     }, deltaTime);
     for (let index = 0; index < actors.followers.length; index += 1) {
@@ -1386,13 +1488,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }
     if (chapter.id === "ferry") {
       const signaled = state.completed.has("motherSignal");
-      dynamic.motherX = THREE.MathUtils.lerp(dynamic.motherX ?? 20.2, signaled ? 23.4 : 20.2, 1 - Math.exp(-0.62 * deltaTime));
+      const motherTargetX = motherHandoffActive ? 19.22 : signaled ? 23.4 : 20.2;
+      dynamic.motherX = THREE.MathUtils.lerp(dynamic.motherX ?? motherTargetX, motherTargetX, 1 - Math.exp(-(motherHandoffActive ? 8 : 0.62) * deltaTime));
       UpdateActor3D(actors.mother, {
         x: dynamic.motherX,
         y: 0,
         z: 0.08,
-        velocity: signaled ? 0.42 : 0,
-        facing: signaled ? 1 : -1,
+        velocity: motherHandoffActive ? 0 : signaled ? 0.42 : 0,
+        facing: motherHandoffActive ? -1 : signaled ? 1 : -1,
         action: directorActors?.mother || (cueLive && cueState.actionId === "motherSignal" ? "signal" : null),
         registerBook: motherHasRegister,
         actionTime: directorActionTime ?? (cueLive ? cueAge : 0),
@@ -1422,11 +1525,11 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       if (teacherActive) {
         const registerHandoff = cinematicFrame?.id === "registerHandoff";
         UpdateActor3D(actors.mother, {
-          x: registerHandoff ? 2.55 : 3.06,
+          x: registerHandoff ? 2.48 : 2.38,
           y: 0,
           z: -0.02,
           velocity: 0,
-          facing: registerHandoff ? 1 : -1,
+          facing: 1,
           action: directorActors.mother,
           registerBook: motherHasRegister,
           actionTime: directorActionTime,
@@ -1520,6 +1623,9 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     const trimOpeningActors = cinematicFrame?.id === "schoolOpening";
     for (const actor of [actors.player, actors.mother]) {
       for (const optionalMesh of actor.userData.lodOptional || []) optionalMesh.visible = !trimOpeningActors;
+    }
+    if (dynamic.foregroundRocks) {
+      dynamic.foregroundRocks.visible = !cinematicFrame?.camera || Number(cinematicFrame.camera.viewDistance || 99) >= 11;
     }
     const reedShader = materials.reedSway.userData.shader;
     if (reedShader) {
