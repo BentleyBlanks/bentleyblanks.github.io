@@ -113,7 +113,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
-const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚"];
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀"];
 // 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
 // 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
 // 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
@@ -128,6 +128,7 @@ const HOLD_WEIGHT = {
   "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+  "军刀": 0.25,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -141,7 +142,7 @@ function MakeCarryMesh(label) {
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
-  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 96], "扫帚": [44, 92] };   // 收窄后的画幅，别再给一根柱子留地方
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 96], "扫帚": [44, 92], "军刀": [34, 72] };   // 收窄后的画幅，别再给一根柱子留地方
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -975,14 +976,53 @@ export function CreateWorld(canvasEl) {
         carryLabel: act.carry, shoulder: spec.act === "haul",
         phase: ART.Hash(spec.id + "p") * 6, idleT: ART.Hash(spec.id + "i") * 6,
         carryMesh: null, carryLabel0: null,
+        // 警讯响了要收工回屋，事后（重玩本章）还得能复原：原样存一份
+        track0: act.track, carry0: act.carry,
+        fleeDir: ART.Hash(spec.id + "f") < 0.5 ? -1 : 1,
+        flee: null,
       };
       rig.group.position.set(f.x, SURFACE_Y, 0);
       backdropFolk.push(f);
     }
   }
 
-  function StepBackdropFolk(dt) {
+  // 背景乡亲收工的行程：撂下家伙、扭头小跑两秒半、进门没影
+  const FOLK_FLEE_T = 2.5, FOLK_FLEE_SPEED = 2.9;
+
+  function StepBackdropFolk(dt, state) {
+    // 警讯（民兵报信 / 村口喊声）一响，**背景层这一排也得收工进屋**。
+    // 只收前景那四个是不够的：远处照样在锄地扫院，"街上转眼就空了"
+    // 那句字幕当场被画面拆穿（用户 2026-08-08 报的）。
+    // 走 visible 切换，不进 builtKey——重建一次整场就是一个卡顿。
+    const alarm = !!state?.flags?.villageAlarm;
     for (const f of backdropFolk) {
+      if (alarm && !f.flee) {
+        // 撂下手里的活：轨道停、家伙收进屋（SyncCarry 见 label 为空就摘网格）
+        f.flee = { t: 0 };
+        f.track = null;
+        f.carryLabel = null;
+        f.from = undefined; f.to = undefined;   // 来回踱步的也改成一头走
+      } else if (!alarm && f.flee) {
+        // 重玩本章：旗清了，人回到地里接着干活
+        f.flee = null;
+        f.track = f.track0;
+        f.carryLabel = f.carry0;
+        f.rig.group.visible = true;
+      }
+      if (f.flee) {
+        f.flee.t += dt;
+        if (f.flee.t >= FOLK_FLEE_T) { f.rig.group.visible = false; continue; }
+        f.rig.group.visible = true;
+        f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
+        f.heading = f.fleeDir;
+        f.rig.group.position.x = f.x;
+        f.phase += FOLK_FLEE_SPEED * dt * 3.4;
+        f.idleT += dt * 1.4;
+        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
+        f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
+        if (f.carryMesh) SyncCarry(f, null, f.heading);   // 家伙已经撂下了
+        continue;
+      }
       let moved = 0;
       if (f.from !== undefined && f.to !== undefined) {
         const nx = f.x + f.dir * f.speed * dt;
@@ -2361,7 +2401,7 @@ export function CreateWorld(canvasEl) {
         && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
       for (const m of fp.meshes) m.visible = on;
     }
-    StepBackdropFolk(dt);
+    StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：
     // 只重烘自己那一张。r.flag 是单个旗标的简写，r.read 是任意状态摘要
     for (const r of propRedraw) {

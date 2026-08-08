@@ -39,6 +39,9 @@ export const PAL = {
   mother: "#4e5c6b", motherDark: "#39434f", father: "#6d5340",
   militia: "#5a6b74", militiaDark: "#44535b",
   soldier: "#7a7448", soldierDark: "#5c5732",
+  // 军官：将校呢比士兵的土黄卡其深一档、偏墨绿——审问那一拍是 6m 的近景，
+  // 光靠帽子分不开，衣服的色阶才是三米外就读得出的那一档
+  officer: "#333827", officerDark: "#20241a",
   puppet: "#8d8464", puppetDark: "#6d6549",
   villager: "#9a8d78", villagerDark: "#7a705c",
   skin: "#d8ab7c", skinDark: "#b98a5c",
@@ -179,6 +182,7 @@ const KIND_COLOR = {
   family: [PAL.mother, PAL.motherDark],
   militia: [PAL.militia, PAL.militiaDark],
   soldier: [PAL.soldier, PAL.soldierDark],
+  officer: [PAL.officer, PAL.officerDark],
   puppet: [PAL.puppet, PAL.puppetDark],
   villager: [PAL.villager, PAL.villagerDark],
 };
@@ -307,7 +311,7 @@ export function DrawCharacter(ctx, spec) {
   ctx.fill();
 
   // 头饰
-  if (kind === "soldier") {
+  if (kind === "soldier" || kind === "officer") {
     InkFill(ctx, [
       [-6.4 * S, headY - 5.6 * S], [4.2 * S, headY - 8.2 * S], [7.4 * S, headY - 5.2 * S], [-6.0 * S, headY - 3.4 * S],
     ], id + "cap", "#5f5a30", { amp: 0.5 * S, lw: lw * 0.9 });
@@ -454,6 +458,22 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 0.70, py - r * 1.20], [px + r * 1.60, py - r * 0.98],
       [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],
     ], id + "brim", "#4a461f", { amp: 1, lw: lw * 0.8 });
+  } else if (kind === "officer") {
+    // 大檐帽：圆顶更高更方，帽墙一道深色，帽檐长而硬——士兵那顶软战斗帽
+    // 是塌下去的斜面，两者的剪影在 6m 近景下一眼分得开
+    InkFill(ctx, [
+      [px - r * 1.06, py - r * 1.24], [px - r * 0.92, py - r * 1.86],
+      [px + r * 0.62, py - r * 1.92], [px + r * 1.02, py - r * 1.30],
+      [px + r * 1.06, py - r * 1.02], [px - r * 1.02, py - r * 0.96],
+    ], id + "cap", "#4a4f34", { amp: 1.1 * k, lw: lw * 0.9 });
+    InkFill(ctx, [
+      [px - r * 1.04, py - r * 1.10], [px + r * 1.06, py - r * 1.14],
+      [px + r * 1.06, py - r * 0.96], [px - r * 1.02, py - r * 0.92],
+    ], id + "band", "#2f3320", { amp: 0.8 * k, lw: lw * 0.7 });
+    InkFill(ctx, [
+      [px + r * 0.86, py - r * 1.06], [px + r * 1.92, py - r * 0.94],
+      [px + r * 1.88, py - r * 0.66], [px + r * 0.86, py - r * 0.80],
+    ], id + "visor", "#232616", { amp: 0.7 * k, lw: lw * 0.8 });
   } else if (kind === "puppet") {
     InkFill(ctx, [
       [px - r * 1.04, py - r * 1.02], [px - r * 0.06, py - r * 1.86],
@@ -617,7 +637,7 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
   ctx.restore();
 
   // 头饰
-  if (kind === "soldier") {
+  if (kind === "soldier" || kind === "officer") {
     InkFill(ctx, [
       [-R * 1.10, -R * 1.02], [R * 0.06, -R * 1.98], [R * 1.02, -R * 1.10],
       [R * 1.08, -R * 0.80], [-R * 1.14, -R * 0.72],
@@ -764,6 +784,23 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     }
     // 绞绳：横梁上方两立柱之间的一道麻色缠绕
     InkLine(ctx, -7 * S, 2 * S, 0, 0, "sawCord", { lw: 0.8 * S, color: "#9a7d4f", amp: 1.4 });
+  } else if (label === "军刀") {
+    // 军官的佩刀（连鞘）：不出鞘——他不亲自动手，刀是拎在手里的身份。
+    // 顺前臂挂（ALONG_ARM），胳膊垂着刀就斜指地面。
+    // **握点在刀鞘中段**，不在护手上：垂手站着时手心离地只有 0.56m，
+    // 攥着护手的话 0.85m 的刀会整根拖在地上（实测过，鞘尖扎进土里）。
+    // 攥中段之后柄从拳头上方探出来、鞘尖离地还有两拃——照片里就是这么拎的。
+    InkFill(ctx, [
+      [-0.9 * S, -8 * S], [1.5 * S, -8 * S], [2.9 * S, 2 * S], [3.4 * S, 10.6 * S],
+      [1.6 * S, 11.1 * S], [0.9 * S, 2 * S],
+    ], "sabreSheath", "#2b2d24", { amp: 0.5 * S, lw: 1.0 * S, shade: "rgba(0,0,0,0.22)" });
+    // 护手与柄：都在握点**上方**（做功方向的后上方，同拟物交互规范）
+    InkFill(ctx, [[-2.6 * S, -9.6 * S], [3.2 * S, -9.6 * S], [3.0 * S, -8.0 * S], [-2.4 * S, -8.0 * S]],
+      "sabreGuard", "#5d5334", { amp: 0.4 * S, lw: 0.9 * S });
+    InkLine(ctx, 0.3 * S, -15.5 * S, 0.3 * S, -9.4 * S, "sabreGrip", { lw: 1.9 * S, color: "#2b2620" });
+    // 鞘口的两道箍
+    InkLine(ctx, 1.0 * S, -2.6 * S, 2.7 * S, -2.6 * S, "sabreRing1", { lw: 0.8 * S, color: "#6d6244" });
+    InkLine(ctx, 1.4 * S, 3.4 * S, 3.1 * S, 3.4 * S, "sabreRing2", { lw: 0.8 * S, color: "#6d6244" });
   } else if (label === "锄头") {
     // 长柄锄：木柄顺着"手往下"的方向（跟着前臂转——扬过肩、落进土都是它），
     // 柄端一块弯下去的铁锄板。握点（原点）在柄上三分之一处。

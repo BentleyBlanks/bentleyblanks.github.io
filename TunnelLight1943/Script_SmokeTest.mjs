@@ -1395,6 +1395,99 @@ function TestRaidColumn() {
   console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
 }
 
+// 队序：**徒步的大部队永远不许超过自行车和摩托**（用户 2026-08-08 退回）。
+// 老版本给每个人各写一套起点/终点/速度，两个步兵起手就站在车前头，
+// 整支队伍读出来是"步兵开路、车在后面追"。这条逐帧盯着整段行军的先后。
+function TestConvoyKeepsFormation() {
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  DebugJump(state, 0, beats.indexOf("c1_raid"));
+  StepGame(state, idle, DT);   // 第一帧跑 line0 的 on()：整支队伍生成并起步
+
+  const At = (id) => state.actors.find((a) => a.id === id);
+  const colIds = state.actors.filter((a) => a.id.startsWith("c1col")).map((a) => a.id);
+  assert.ok(colIds.length >= 12, `摩托后面的徒步队太少了，只有 ${colIds.length} 个`);
+
+  // 队伍朝 -x 开进村：队头 x 最小。逐帧验"车头 < 车 < 所有徒步兵"
+  for (let f = 0; f < 240; f += 1) {
+    StepGame(state, idle, DT);
+    const bike = At("bikeScout");
+    const moto = At("motoLead");
+    if (!bike || !moto || bike.visible === false) break;
+    assert.ok(bike.x < moto.x, `第 ${f} 帧：摩托跑到自行车前头了（${moto.x.toFixed(1)} < ${bike.x.toFixed(1)}）`);
+    for (const id of colIds) {
+      const c = At(id);
+      if (!c || c.visible === false) continue;
+      assert.ok(c.x > moto.x,
+        `第 ${f} 帧：徒步兵 ${id} 超到摩托前头了（${c.x.toFixed(1)} ≤ ${moto.x.toFixed(1)}）`);
+    }
+  }
+
+  // 搜村停下来之后，车仍停在队头（最深入村的那一段）
+  const st2 = CreateGame(0);
+  DebugJump(st2, 0, beats.indexOf("c1_hide"));
+  const bike2 = st2.actors.find((a) => a.id === "bikeScout");
+  const moto2 = st2.actors.find((a) => a.id === "motoLead");
+  const feet = st2.actors.filter((a) => a.id.startsWith("c1col"));
+  assert.ok(bike2.x < moto2.x, "搜村时自行车得停在摩托前头");
+  for (const c of feet) {
+    assert.ok(c.x > moto2.x, `搜村时徒步兵 ${c.id} 站到车前头去了（${c.x.toFixed(1)}）`);
+  }
+  console.log("  ✓ 队序：徒步的大部队全程没超过自行车/摩托（行进 + 搜村都验）");
+}
+
+// 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
+// 顺带盯背景层乡亲跟着警讯收工——街上空了字幕说过一次，画面得对上。
+function TestRaidTakesMoreThanFather() {
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+
+  DebugJump(state, 0, beats.indexOf("c1_hide"));
+  const taken = state.actors.filter((a) => a.id.startsWith("taken"));
+  assert.equal(taken.length, 3, "被抓的邻居必须在场（只抓木匠一个说不过去）");
+  for (const t of taken) assert.ok(t.x >= 110, `被抓的乡亲 ${t.id} 站进考场了（x=${t.x.toFixed(1)}）`);
+  const officer = state.actors.find((a) => a.id === "officer");
+  assert.ok(officer, "带队的军官必须在场");
+  assert.equal(officer.kind, "officer", "军官得用自己那套外观，不能跟大头兵一个样");
+  assert.equal(officer.carry, "军刀", "军官的身份标记是那把连鞘军刀");
+
+  // 警讯一响，背景层的乡亲也得收工（World 的 StepBackdropFolk 盯这面旗）
+  assert.equal(state.flags.villageAlarm, true, "扫荡开始了，全村警讯旗必须立起来");
+
+  // 审问：军官有台词（日语无字幕），翻译官把话递成中文
+  const father = SCRIPTS.c1.find((b) => b.id === "c1_father");
+  const offLines = father.lines.filter((l) => l.who === "日军军官");
+  assert.ok(offLines.length >= 1, "军官必须有台词");
+  for (const l of offLines) assert.ok(l.noSub, "日军讲日语一律不给字幕（叙事铁律）");
+  assert.ok(father.lines.some((l) => l.who === "翻译官" && /炮楼/.test(l.say)),
+    "军官那句傲慢话得由翻译官递成中文，玩家才接得住");
+
+  // 押走那一拍：被抓的邻居和爹同批出村。**按真实节奏演**（不猛按 advance）——
+  // 一帧一句地冲过去，最后一句的 on() 刚落地这一幕就结束了，
+  // AdvanceBeat 的 ClearPoses 会把姿势收掉，验的就成了散场之后的空壳。
+  DebugJump(state, 0, beats.indexOf("c1_father"));
+  const fatherIdx = beats.indexOf("c1_father");
+  const hauledLine = father.lines.findIndex((l) => /拖出院门/.test(l.stage || ""));
+  let guard = 0;
+  while (state.beat.lineIndex < hauledLine && state.beatIndex === fatherIdx && guard < 3000) {
+    guard += 1;
+    StepGame(state, idle, DT);
+  }
+  assert.equal(state.beat.lineIndex, hauledLine, "没演到押人出院门那一句");
+  for (let i = 0; i < 45; i += 1) StepGame(state, idle, DT);   // 让这一句演一秒半
+
+  const gone = state.actors.filter((a) => a.id.startsWith("taken"));
+  assert.ok(gone.length > 0, "被抓的邻居不该在散场时凭空消失");
+  for (const a of gone) {
+    assert.equal(a.pose, "hauled", `${a.id} 得是被拽着走的姿势`);
+    assert.equal(a.heading, 1, `${a.id} 得朝村口走`);
+    assert.ok((a.cineTarget?.x ?? 0) > 150, `${a.id} 没跟着队伍出村`);
+  }
+  console.log("  ✓ 扫荡：抓的不止木匠 / 军官有外观有台词 / 背景乡亲跟着收工");
+}
+
 // 过场的演出不许站在路障里。obstacle 带的东西（塌墙、撞倒的柴垛）比演员近，
 // 谁站在它坐标上谁就被整个盖住——c1_father 的审问戏曾经就跪在柴垛（x=38）里，
 // 一整场戏只看得见一根枪管（用户截图为证）。这条盯的是"演员与路障的水平间距"。
@@ -1493,6 +1586,8 @@ TestSlingThrow();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
+TestConvoyKeepsFormation();
+TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();

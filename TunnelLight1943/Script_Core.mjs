@@ -1665,6 +1665,11 @@ export const SCRIPTS = {
         const sister = FindActor(state, "sister");
         if (b.warned || !sister?.following || state.player.x > 98) return;
         b.warned = true;
+        // 全村警讯。**背景层视差里干活的乡亲也照这面旗收工**（World 的
+        // StepBackdropFolk）——原先只收前景那四个，远处那一排照样在锄地扫院，
+        // "街上转眼就空了"这句字幕当场被画面拆穿。旗标不进 builtKey：
+        // 背景乡亲是逐帧步进的骨架，切显隐不用重建世界
+        state.flags.villageAlarm = true;
         const runner = MakeActor("runner", "militia", state.player.x + 13, { label: "报信的民兵" });
         runner.cineTarget = { x: 16 };
         runner.cineSpeed = 4.6;
@@ -1698,7 +1703,7 @@ export const SCRIPTS = {
         // 喊声这一镜给村口的**中景**（不是 52m 画宽的大远景——那种景别下
         // 一个人只有十几像素，"一支队伍"看着就是几粒沙子，玩家的原话是
         // "还是没看到鬼子的队伍"）。dist 13 ≈ 20m 画宽，正好装下车队头尾
-        { who: "村口喊声", say: "鬼子进村了——", d: 3.4, far: true, cam: { kind: "shot", x: 166, y: 1.9, dist: 13, pan: -6 },
+        { who: "村口喊声", say: "鬼子进村了——", d: 3.4, far: true, cam: { kind: "shot", x: 160.5, y: 1.9, dist: 10, pan: -7 },
           on: (state) => {
             // 喊声一起，街上还没进屋的乡亲直接收掉（正常流程里报信民兵那一环
             // 已经让他们走着进过门了，这里是调试跳幕的兜底）；raidStarted 旗标同时把鸡藏了
@@ -1706,28 +1711,24 @@ export const SCRIPTS = {
               const v = FindActor(state, vid);
               if (v) { v.visible = false; v.track = null; v.wander = null; v.cineTarget = null; }
             }
+            state.flags.villageAlarm = true;   // 背景层的乡亲也一并收工（跳幕兜底）
             // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
             // 于是"鬼子进村了"这一句对着的是一个空村口
             SpawnRaidSoldiers(state);
-            const r1 = FindActor(state, "raid1");
-            const r2 = FindActor(state, "raid2");
-            // 从村口往里走：镜头横摇跟着他们推进
-            if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
-            if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
-            // 带路的翻译官走在兵后头——第二章夜里挑灯笼带路的就是他。
-            // 脸要在第一章就露过，"又来了"三个字在第二章才有分量
-            const tr = FindActor(state, "traitor");
-            if (tr) { tr.x = 168; tr.heading = -1; tr.cineTarget = { x: 150 }; tr.cineSpeed = 1.7; }
-            // 车队与纵队压进村：自行车稍快、摩托压着队走、徒步兵紧跟——
-            // 速度差压小，整支队伍才装得进车队镜的一个画框
-            const bike = FindActor(state, "bikeScout");
-            if (bike) { bike.cineTarget = { x: 116 }; bike.cineSpeed = 2.6; }
-            const moto = FindActor(state, "motoLead");
-            if (moto) { moto.cineTarget = { x: 126 }; moto.cineSpeed = 2.3; }
-            for (let i = 0; i < RAID_COLUMN; i += 1) {
-              const c = FindActor(state, "c1col" + i);
-              if (c) { c.cineTarget = { x: 138 + i * 1.9 }; c.cineSpeed = 1.9; }
-            }
+            // 整支队伍**按队序**（RAID_ORDER）一起往里开：起手位由队序给，
+            // 行进只是把整条队伍整体西移 26m——每个人走一样远、速度差 0.15 以内，
+            // 于是**谁也超不过谁**，徒步的永远咬在车屁股后面。
+            //（老版本给每个人各写一套起点/终点/速度，两个步兵直接跑到车前头去了。）
+            const MARCH = 26;
+            const Roll = (id, i = 0) => {
+              const a = FindActor(state, id);
+              if (!a) return;
+              a.heading = -1;
+              a.cineTarget = { x: a.x - MARCH };
+              a.cineSpeed = 2.1 + ((i % 3) - 1) * 0.05;   // 走走停停的微差，不足以换位
+            };
+            for (const e of RAID_ORDER) Roll(e.id);
+            for (let i = 0; i < RAID_COLUMN; i += 1) Roll("c1col" + i, i);
             Cue(state, "bikeBell");
             Cue(state, "motorPutt");
             // 镜头此刻在村东口，院子不在画框里——趁这三秒把娘和妹妹走位到位：
@@ -1740,8 +1741,14 @@ export const SCRIPTS = {
           } },
         // 车队从画框里压过去的一镜：无字幕——车铃、引擎和皮靴自己说。
         // 这一镜是用户拿景区实拍立的：日军进村不可能只有两个人。
-        // 构图卡在自行车、摩托、纵队头都在框内的那一段街上
-        { stage: "", d: 4.2, cam: { kind: "shot", x: 150, y: 1.7, dist: 12, pan: -7 },
+        //
+        // 两镜分工：上一镜给**队头**（自行车、摩托、军官），这一镜往东摇给
+        // **队身**——后面还在源源不断地进村。一个画框塞不下四十多米长的队伍，
+        // 硬塞的结果是每个人只有十几像素。pan 的速度跟队伍走速（2.1m/s）配平，
+        // 队伍才是"从画框里压过去"，不是被镜头甩在后头。
+        // dist ≤ 12：镜头规范只有一个景别档，"看得见队伍"要靠**两镜横摇串起来**，
+        // 不许把画框拉宽（拉宽了每个人只剩十几像素，还越过了 wide 的封顶）
+        { stage: "", d: 4.2, cam: { kind: "shot", x: 166, y: 1.75, dist: 10, pan: -8 },
           on: (state) => { Cue(state, "motorPutt"); Cue(state, "bikeBell", { delay: 1.4 }); } },
         // 藏家伙不是慌乱中的怪动作，是学来的规矩：上一回扫荡就有工匠
         // 连人带家伙被掳走。这句旁白说的是画面外的旧事，也是爹结局的伏笔
@@ -1792,21 +1799,32 @@ export const SCRIPTS = {
         // 翻译官在街东头站着对名单（decor，不参与视线判定）
         const tr = FindActor(state, "traitor");
         if (tr) { tr.cineTarget = null; tr.x = 55.5; tr.heading = 1; }
-        // 大队伍在东街散开挨家搜（全 decor）：车靠边停、兵三三两两踹门。
+        // 大队伍在东街散开挨家搜（全 decor）：车停在队头（最深入村的那一段），
+        // 徒步的散在车**后头**挨家踹门——队序在停下来之后也不许倒过来。
         // 全部撂在 x≥112——考场（撤退线 42→27、街上 49-57）一个不多占
         const bike = FindActor(state, "bikeScout");
         if (bike) { bike.cineTarget = null; bike.x = 114; bike.heading = -1; }
         const moto = FindActor(state, "motoLead");
-        if (moto) { moto.cineTarget = null; moto.x = 124; moto.heading = -1; }
+        if (moto) { moto.cineTarget = null; moto.x = 120; moto.heading = -1; }
         for (let i = 0; i < RAID_COLUMN; i += 1) {
           const c = FindActor(state, "c1col" + i);
           if (!c) continue;
           c.cineTarget = null;
-          c.x = 132 + i * 3.4;
+          c.x = 130 + i * 3.2;
           c.heading = i % 2 ? 1 : -1;
-          // 两个来回走动的，街上才不是一排木桩
-          if (i === 1) { c.patrol = [130, 140]; c.speed = 1.0; }
-          if (i === 4) { c.patrol = [144, 154]; c.speed = 0.9; }
+          // 三个来回走动的，街上才不是一排木桩
+          if (i === 1) { c.patrol = [128, 138]; c.speed = 1.0; }
+          if (i === 5) { c.patrol = [144, 154]; c.speed = 0.9; }
+          if (i === 10) { c.patrol = [160, 168]; c.speed = 1.05; }
+        }
+        // 军官押着队站在东街：搜出人来才轮到他进院子（c1_father 里他才过来）
+        const off = FindActor(state, "officer");
+        if (off) { off.cineTarget = null; off.x = 131.5; off.heading = 1; }
+        // 被叫出来的邻居：跪在街边，边上有兵看着。玩家从墙缝往外看的那一眼
+        // （c1_hide 的 peek）看见的不只是刺刀——还有已经蹲在地上的乡亲
+        for (const t of ["taken0", "taken1", "taken2"]) {
+          const a = FindActor(state, t);
+          if (a) { a.visible = true; a.pose = "kneel"; a.heading = 1; a.cineTarget = null; }
         }
         state.stealthActive = true;
       },
@@ -1902,10 +1920,52 @@ export const SCRIPTS = {
             if (r1) r1.track = null;      // 按人的松开手，退半步
             if (r1) { r1.cineTarget = { x: 40.0 }; r1.cineSpeed = 1.2; }
           } },
+        // 军官这才踱进院子。审到这儿他一直没露面——问粮是底下人的活，
+        // 他是来点收"料"的。日语原声不加字幕（铁律），话由翻译官递过来；
+        // 傲慢不写在形容词里，写在他嫌麻烦的那个"够了"和那句"这是你的福气"上
+        { who: "日军军官", say: "もういい。手間を掛けさせるな。", noSub: true, d: 2.8,
+          cam: { kind: "shot", x: 43.2, y: 1.0, dist: 6.5, slit: true },
+          on: (state) => {
+            // 他背着手从院门口走进来，绕到爹跟前——手上空着（carry:""），
+            // 这是白盒里"这人不扛枪"的唯一标记
+            const off = FindActor(state, "officer");
+            if (off) { off.x = 47.4; off.heading = -1; off.cineTarget = { x: 43.4 }; off.cineSpeed = 1.15; }
+          } },
+        { who: "日军军官", say: "腕のいい大工だそうだな。砲楼の普請に使ってやる。光栄に思え。", noSub: true, d: 4.2,
+          cam: { kind: "shot", x: 42.6, y: 1.0, dist: 6, slit: true },
+          on: (state) => {
+            const off = FindActor(state, "officer");
+            if (off) { off.cineTarget = null; off.x = 43.4; off.heading = -1; }
+          } },
         // 抓他的理由压在拒绝之后：摇头先立住骨气，名单再落下来，
         // 「问粮原来只是过场」的凉意才出来。呼应 c1_raid 的铁匠旧事，
         // 也给第七章据点里找到爹埋因
-        { stage: "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。", d: 5.0, cam: { kind: "shot", x: 41.6, y: 0.9, dist: 7, slit: true } },
+        { who: "翻译官", say: "太君说，粮不粮的，不打紧了——听说你手艺好？据点正修炮楼，抬举你去干活。这是你的福气。", d: 5.4,
+          cam: { kind: "shot", x: 43.6, y: 0.9, dist: 7, slit: true } },
+        // 抓走的不止一个：名单上要的是手艺人和壮劳力，街上早站了几个。
+        // 这一镜把"扫荡"落到实处——不是冲着一家来的
+        { stage: "院门外的街上蹲了一排：赵家的老三、碾房的王二、李婶家的男人。名单上要的是手艺人和壮劳力。", d: 5.2,
+          cam: { kind: "shot", x: 57.2, y: 1.15, dist: 8.4 },
+          on: (state) => {
+            // 被抓的邻居从东街押到院门外集合。**蹲着**不是站着——一排蹲在地上的人
+            // 加上站着端枪的兵，"这些人是被抓的"不用字幕说；间距收到 1.8m，
+            // 三个人才读成"一排"，不是散在街上的三个路人
+            const spots = [55.2, 57.0, 58.8];
+            ["taken0", "taken1", "taken2"].forEach((id, i) => {
+              const a = FindActor(state, id);
+              if (!a) return;
+              a.visible = true;
+              a.x = spots[i];
+              a.heading = 1;
+              a.pose = "kneel";
+              a.cineTarget = null;
+            });
+            // 押着他们的兵：从纵队里抽两个过来站在这一排的两头，脸对着人
+            const g1 = FindActor(state, "c1col0");
+            if (g1) { g1.patrol = null; g1.cineTarget = null; g1.x = 53.3; g1.heading = 1; }
+            const g2 = FindActor(state, "c1col1");
+            if (g2) { g2.patrol = null; g2.cineTarget = null; g2.x = 60.7; g2.heading = -1; }
+          } },
         // 「妹妹想哭」由憋泣的呼吸声演（压低、闷），旁白只说画面外那半句
         { stage: "柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
@@ -1926,7 +1986,9 @@ export const SCRIPTS = {
               sister.track = null;
             }
           } },
-        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 45.6, y: 1.2, dist: 11, pan: 1.5 },
+        // 镜头往东多带 4 米：爹不是被两个人拎走的，是被**推进那一排人里**——
+        // 街上站着的邻居必须和他同框，"抓的不止木匠一个"才算落到画面上
+        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 48, y: 1.2, dist: 12, pan: 4 },
           on: (state) => {
             const father = FindActor(state, "father");
             // 脸还朝着门框那边：cineKeepHeading 不让行走方向把头扳回去
@@ -1945,15 +2007,29 @@ export const SCRIPTS = {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
             }
+            // 被抓的邻居一起走：爹被推进的就是这一排人。他们比押人的小队
+            // 先动身，爹在后头被推着跟上——同一条路、同一个去处
+            ["taken0", "taken1", "taken2"].forEach((id, i) => {
+              const a = FindActor(state, id);
+              if (!a) return;
+              a.pose = "hauled";     // 被拽起来了，弓着背往前赶
+              a.heading = 1;
+              a.cineTarget = { x: 196 };
+              a.cineSpeed = 1.5;
+              a.cineVanish = true;
+              a.x = 53.4 + i * 1.9;   // 别压在井台（58）上，辘轳架子会盖住人
+            });
             // 整支队伍收队出村：摩托先响、纵队跟上——爹是被押进那支队伍里
-            // 带走的，不是被两个人拎走的。引擎声由远及无
+            // 带走的，不是被两个人拎走的。引擎声由远及无。
+            // **速度按队序发**：车比人快得有限（1.2 倍），够它们保持在队头，
+            // 又不会当着玩家的面从徒步队里穿过去（用户退回过"步兵跑到车前头"）
             Cue(state, "motorPutt", { gain: 0.7 });
             for (const a of state.actors) {
               // 翻译官走押人那一小队（上面已排）；挎斗里的兵钉在车上跟车走
               if (!a.decor || a.pinTo || a.id === "traitor") continue;
               a.patrol = null;
               a.cineTarget = { x: 196 };
-              a.cineSpeed = a.mount === "motorcycle" ? 2.8 : (a.mount === "bicycle" ? 3.2 : 1.6);
+              a.cineSpeed = a.mount ? 1.85 : 1.55;
               a.cineVanish = true;
               a.heading = 1;
             }
@@ -3022,29 +3098,81 @@ function MakeActor(id, kind, x, extra = {}) {
 // 伪军骑自行车在前头探路，挎斗摩托压在中间，后面一列扛枪的徒步兵。
 // 参与潜行判定的仍只有 raid1/raid2——十几个人一起判视线这段就没法玩了，
 // 其余全部 decor：他们负责让「鬼子进村」这四个字在画面上是真的。
-const RAID_COLUMN = 6;
+const RAID_COLUMN = 14;
+// 进村行军的**队序**（从队头/最深处往村口数）。这张表是唯一的真相：
+// 入场起手位、行进目标、搜村时的停车位都从它推，别在三处各写一套。
+//
+// 硬规矩（用户 2026-08-08 退回过）：**徒步的大部队永远不许超过自行车和摩托**。
+// 老版本把 raid1/raid2 起手放在 152/160、车却在 166/170——两个步兵从第一帧起
+// 就走在车前头，整支队伍读出来就是"步兵开路、车在后面追"。
+// 现在队序写死在这里，而且**全队速度差压到 0.15 以内**：速度差一大，
+// 走上二十秒谁都能把谁套圈。队序 = 起手位的先后 + 几乎一致的速度。
+const RAID_ORDER = [
+  { id: "bikeScout", gap: 0 },      // 骑车的伪军探路，队头
+  { id: "motoLead", gap: 5.0 },     // 挎斗摩托压在车队里
+  { id: "raid1", gap: 5.5 },        // 进院子的那两个（下一幕的考官）
+  { id: "raid2", gap: 3.0 },
+  { id: "officer", gap: 3.2 },      // 军官走在徒步队的头里
+  { id: "traitor", gap: 2.2 },      // 带路递名单的翻译官贴着军官
+];
+const RAID_LEAD_X = 150;            // 队头（自行车）入场时的位置（已进了村东口）
+const RAID_COL_GAP = 1.9;           // 徒步纵队的兵间距
+// 队序里每个人的入场 x（队头最靠西/最深入村）
+function RaidStartX(id) {
+  let x = RAID_LEAD_X;
+  for (const e of RAID_ORDER) {
+    x += e.gap;
+    if (e.id === id) return x;
+  }
+  return x;
+}
+const RAID_COL_HEAD = RaidStartX("traitor") + 3.4;   // 徒步纵队第一个人
+
 function SpawnRaidSoldiers(state) {
-  state.actors = state.actors.filter((a) => !IsEnemy(a));
+  // 军官（kind "officer"）与被抓的乡亲（kind "villager"）都不是 IsEnemy，
+  // 光按敌我过滤会在重复生成时叠出两份，得连 id 一起清
+  state.actors = state.actors.filter((a) => !IsEnemy(a)
+    && a.id !== "officer" && !a.id.startsWith("taken"));
   state.actors.push(
     MakeActor("raid1", "soldier", 120, { patrol: [58, 120], speed: 1.5 }),
     MakeActor("raid2", "soldier", 88, { patrol: [50, 90], speed: 1.35 }),
+    // 带队的军官：单独一种外观 kind（将校呢深一档 + 大檐帽 + 连鞘军刀），
+    // 三样加起来在 6m 的审问近景下一眼分得出他不是普通兵。
+    // 他不参与潜行判定——考场只准两个兵；kind 不是 soldier/puppet，
+    // 所以 SpawnRaidSoldiers 开头那道 IsEnemy 过滤扫不掉他，得点名清
+    MakeActor("officer", "officer", RaidStartX("officer"), {
+      label: "日军军官", decor: true, heading: -1, carry: "军刀",
+    }),
     // 据点的翻译官：带路的、递名单的。decor——他不参与潜行判定（两个兵
     // 已经把考场撑满了），但他得在场：第二章挑灯笼带路的、审问时递话的，
     // 都是这一个人。汉奸不是符号，是个有脸的邻人，才可恨
-    MakeActor("traitor", "puppet", 168, { label: "翻译官", decor: true }),
+    MakeActor("traitor", "puppet", RaidStartX("traitor"), { label: "翻译官", decor: true, heading: -1 }),
     // 骑车的伪军：车是他自己的，腿上的活也是他自己的（蹬踏跟着位移走）。
     // carry:"" 压掉兵默认的手持步枪——骑车的手在车把上，枪是背着的
     // lift = 座高 − 站立胯高(≈0.60m)。给多了人就浮在车上面，给少了像蹲在车边
-    MakeActor("bikeScout", "puppet", 166, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
+    MakeActor("bikeScout", "puppet", RaidStartX("bikeScout"), { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
     // 挎斗摩托：驾驶的兵 + 挎斗里的兵（钉在车侧，跟着车走）
-    MakeActor("motoLead", "soldier", 170, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
-    MakeActor("motoSide", "soldier", 170.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
+    MakeActor("motoLead", "soldier", RaidStartX("motoLead"), { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
+    MakeActor("motoSide", "soldier", RaidStartX("motoLead") + 0.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
   );
-  // 徒步纵队：紧跟在车后（车在村道上也就比步行快半拍），间距刻意不匀——
-  // 队列走长路会散。整支队伍要能装进车队镜的一个画框里
+  // 徒步纵队：跟在车队后头，一个都不许走到车前面去（见 RAID_ORDER 的硬规矩）。
+  // 间距刻意不匀——队列走长路会散，散开的样子比排整齐更像真的
   for (let i = 0; i < RAID_COLUMN; i += 1) {
-    state.actors.push(MakeActor("c1col" + i, "soldier", 173.5 + i * 1.8 + (i % 2) * 0.5, {
+    state.actors.push(MakeActor("c1col" + i, "soldier", RAID_COL_HEAD + i * RAID_COL_GAP + (i % 3) * 0.45, {
       decor: true, heading: -1,
+    }));
+  }
+  // 被叫出来的邻居。抓走的不止木匠一个——这一条是"扫荡"两个字的分量所在：
+  // 名单上写的是手艺人（爹是木匠、西头的铁匠上回就被掳走了），顺手还要壮劳力。
+  // 全 decor、全撂在东街（x≥110），一个不进考场
+  const TAKEN = [
+    { id: "taken0", label: "赵家的老三", x: 121.5 },
+    { id: "taken1", label: "碾房的王二", x: 124.6 },
+    { id: "taken2", label: "李婶家的男人", x: 127.4 },
+  ];
+  for (const t of TAKEN) {
+    state.actors.push(MakeActor(t.id, "villager", t.x, {
+      label: t.label, decor: true, heading: 1, pose: "kneel", visible: false,
     }));
   }
   state.stealthActive = true;
@@ -3315,7 +3443,7 @@ export function CreateGame(chapterIndex = 0) {
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
       clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
       barrowPlanks: 0, barrowHome: false, henFlew: false, wellRopeBroken: false, ropeTaken: false,
-      bucketAt: null, raidStarted: false, thimbleFound: false,
+      bucketAt: null, raidStarted: false, villageAlarm: false, thimbleFound: false,
     },
     caption: null,
     camHint: { kind: "follow" },
@@ -3417,6 +3545,7 @@ export function StartChapter(state, index) {
     state.flags.ropeTaken = false;
     state.flags.bucketAt = null;
     state.flags.raidStarted = false;
+    state.flags.villageAlarm = false;   // 重玩本章：背景乡亲回到地里接着干活
     state.flags.waterFilled = false;
     state.flags.planedOnce = false;
     state.flags.tenonDone = false;
