@@ -72,10 +72,20 @@ assert.equal(CinematicSequences.endingDeparture.segments[2].actors.player, "writ
 assert.equal(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, 0, "Awei must finish the eighth line on shore");
 assert.deepEqual(CinematicSequences.endingDeparture.segments[3].effects.playerBoarding, [0, 1], "Awei must board only after writing Zhou He's name");
 assert.deepEqual(CinematicSequences.endingDeparture.segments[5].effects.motherDeparture, [0.72, 1], "Zhou He's southward lantern route must remain visible through the final wide shot");
-assert.equal(CinematicSequences.endingDeparture.segments.length, 6, "the finale needs boarding, the eighth line, both answers, and the departure wide shot");
+assert.equal(CinematicSequences.endingDeparture.segments.length, 7, "the finale needs boarding, the eighth line, both answers, departure, and a silent final hold");
 assert.match(CinematicSequences.endingDeparture.segments[5].caption, /周禾老师/);
+assert.equal(CinematicSequences.endingDeparture.segments[6].actors.player, "holdRegister", "the final image must leave Awei physically holding the register");
+assert.equal(CinematicSequences.endingDeparture.segments[6].effects.ferryDeparture, 1, "the final hold must happen after the ferry has fully separated from shore");
 assert.equal(CinematicSequences.schoolOpening.segments.length, 4, "the school opening must establish village scale, empty shoes, register, and departure");
 assert.ok(CinematicSequences.schoolOpening.segments.some((segment) => segment.blocking), "school actors need authored blocking instead of static mannequin poses");
+assert.equal(CinematicSequences.tunnelRollCall.segments.length, 4, "the tunnel roll call needs knock, four answers, Shuaner's hand, and Awei's answer");
+assert.equal(CinematicSequences.tunnelRollCall.segments[0].actors.player, "tap", "Awei must physically knock before waiting for answers");
+assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusAction, "raiseHand", "Shuaner must answer with a hand rather than a generic group pose");
+assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusIndex, 5, "only the sixth child may receive Shuaner's featured gesture");
+assert.equal(CinematicSequences.motherHandoff.segments.length, 4, "the reunion needs the register, seventh line, embrace, and release");
+assert.equal(CinematicSequences.motherHandoff.segments[2].actors.player, "receiveComfort", "Awei must visibly react to being held");
+assert.equal(CinematicSequences.motherHandoff.segments[2].actors.mother, "embrace", "Zhou He must physically initiate the embrace");
+assert.equal(CinematicSequences.motherHandoff.segments[3].actors.player, "holdRegister", "Awei must keep the register against her chest when Zhou He leaves");
 assert.deepEqual(CinematicSequences.sluiceRise.segments[1].effects.bridgeRaise, [0.42, 1], "the bridge must visibly rise during its causal shot");
 assert.deepEqual(CinematicSequences.emptyBoatDiversion.segments[1].effects.emptyBoatRelease, [0.35, 1], "the empty boat must visibly drift during its diversion shot");
 

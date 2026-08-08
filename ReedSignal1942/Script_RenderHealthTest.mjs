@@ -219,8 +219,10 @@ try {
   }
 
   for (const budgetProbe of [
-    { id: "schoolOpening", chapter: 0, x: 330, duration: 11.6 },
-    { id: "ferryOpening", chapter: 3, x: 520, duration: 7.8 },
+    { id: "schoolOpening", chapter: 0, x: 330, duration: 12.8 },
+    { id: "blockadeOpening", chapter: 1, x: 520, duration: 7.6 },
+    { id: "tunnelOpening", chapter: 2, x: 590, duration: 7.8 },
+    { id: "ferryOpening", chapter: 3, x: 520, duration: 8.6 },
   ]) {
     await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=${budgetProbe.chapter}&qaX=${budgetProbe.x}&qaCinematic=${budgetProbe.id}`, { waitUntil: "load", timeout: 60000 });
     await page.waitForFunction((id) => document.getElementById("GameCanvas")?.dataset.cinematic === id, budgetProbe.id, { timeout: 60000 });
@@ -292,6 +294,83 @@ try {
     Assert(ventMidShot.smokeOpacity > 0.06 && ventMidShot.smokeOpacity < 0.13, `well vent cinematic: 烟雾在过程里逐步变薄（${ventMidShot.smokeOpacity.toFixed(3)}）`);
   }
 
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=2&qaX=1620&qaCompleted=openWellVent,sealEastCrack,findChildren&qaCinematic=tunnelRollCall`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 0 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.5, null, { timeout: 10000 });
+  const tunnelKnock = await page.evaluate(() => {
+    const actor = window.ReedSignal1942?.render?.chapterScene?.actors?.player;
+    const rig = actor?.userData?.rig;
+    if (!actor || !rig) return null;
+    const hand = rig.rightArm.endpoint.position.clone().set(0, 0, 0);
+    rig.rightArm.endpoint.getWorldPosition(hand);
+    return {
+      action: actor.userData.motion?.action || "",
+      handX: hand.x,
+      contactDistance: Math.abs(hand.x - 16.725),
+      registerVisible: Boolean(rig.registerBook.visible),
+    };
+  });
+  Assert(tunnelKnock?.action === "tap", "tunnel roll call: 阿苇先以可见的敲击动作等待回应");
+  Assert(Boolean(tunnelKnock?.registerVisible), "tunnel roll call: 敲击时点名簿仍由阿苇保管");
+  if (tunnelKnock) Assert(tunnelKnock.contactDistance < 0.34, `tunnel roll call: 指节真正抵达木支柱（距离 ${tunnelKnock.contactDistance.toFixed(2)}m）`);
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.55, null, { timeout: 10000 });
+  const shuanerAnswer = await page.evaluate(() => {
+    const followers = window.ReedSignal1942?.render?.chapterScene?.actors?.followers || [];
+    const child = followers[5];
+    if (!child) return null;
+    const rig = child.userData.rig;
+    const hand = rig.rightArm.endpoint.position.clone().set(0, 0, 0);
+    const head = rig.headPivot.position.clone().set(0, 0, 0);
+    rig.rightArm.endpoint.getWorldPosition(hand);
+    rig.headPivot.getWorldPosition(head);
+    return {
+      visibleActors: followers.filter((actor) => actor.visible).length,
+      raisedActors: followers.filter((actor) => actor.userData.motion?.action === "raiseHand").length,
+      action: child.userData.motion?.action || "",
+      handAboveHead: hand.y - head.y,
+      gameplayFollowers: window.ReedSignal1942.GetState().followers.length,
+    };
+  });
+  Assert(shuanerAnswer?.visibleActors === 6, "tunnel roll call: 黑暗里六个孩子都进入实时 3D 镜头");
+  Assert(shuanerAnswer?.raisedActors === 1 && shuanerAnswer?.action === "raiseHand", "tunnel roll call: 只有栓儿以举手回应");
+  if (shuanerAnswer) Assert(shuanerAnswer.handAboveHead > 0.12, `tunnel roll call: 栓儿的手清楚举过额头（高差 ${shuanerAnswer.handAboveHead.toFixed(2)}m）`);
+  Assert(shuanerAnswer?.gameplayFollowers === 5, "tunnel roll call: 临时过场演员不提前改写跟队状态");
+
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=3&qaX=1880&qaCompleted=countChildren,raiseScreen,meetMother&qaCinematic=motherHandoff`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.62, null, { timeout: 15000 });
+  const motherEmbrace = await page.evaluate(() => {
+    const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
+    const player = actors?.player;
+    const mother = actors?.mother;
+    if (!player || !mother) return null;
+    const motherRig = mother.userData.rig;
+    return {
+      playerAction: player.userData.motion?.action || "",
+      motherAction: mother.userData.motion?.action || "",
+      separation: Math.abs(player.position.x - mother.position.x),
+      visibleRegisters: [player, mother].filter((actor) => actor.userData.rig?.registerBook?.visible).length,
+      motherLeftElbow: motherRig.leftArm.lower.rotation.x,
+      motherRightElbow: motherRig.rightArm.lower.rotation.x,
+    };
+  });
+  Assert(motherEmbrace?.playerAction === "receiveComfort" && motherEmbrace?.motherAction === "embrace", "mother handoff: 阿苇僵住、周禾主动抱住她");
+  if (motherEmbrace) Assert(motherEmbrace.separation < 0.4, `mother handoff: 两具身体真正接触而非隔空摆姿势（${motherEmbrace.separation.toFixed(2)}m）`);
+  Assert(motherEmbrace?.visibleRegisters === 0, "mother handoff: 拥抱时点名簿退出两人身体之间");
+  if (motherEmbrace) Assert(motherEmbrace.motherLeftElbow > 0.18 && motherEmbrace.motherRightElbow > -0.04, "mother handoff: 周禾双臂绕向肩背而非折过阿苇的脸");
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 3 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.45, null, { timeout: 10000 });
+  const motherRelease = await page.evaluate(() => {
+    const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
+    const player = actors?.player;
+    const mother = actors?.mother;
+    return player && mother ? {
+      playerAction: player.userData.motion?.action || "",
+      motherAction: mother.userData.motion?.action || "",
+      registerVisible: Boolean(player.userData.rig?.registerBook?.visible),
+      separation: Math.abs(player.position.x - mother.position.x),
+    } : null;
+  });
+  Assert(motherRelease?.playerAction === "holdRegister" && motherRelease?.registerVisible, "mother handoff: 放手后阿苇把点名簿抱回胸前");
+  Assert(motherRelease?.motherAction === "goodbye" && motherRelease?.separation > 0.42, "mother handoff: 周禾松手并开始离开，而不是定格在拥抱里");
+
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=1&qaX=2000&qaCompleted=readWind,releaseBoat,raiseSluice`, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => Number(document.getElementById("GameCanvas")?.dataset.renderCalls) > 0, null, { timeout: 60000 });
   const raisedSluice = await page.evaluate(() => {
@@ -347,7 +426,7 @@ try {
     }, 40);
   });
   await page.locator("#SkipCinematicButton").waitFor({ state: "visible", timeout: 10000 });
-  await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.progress || 0) > 0.78, null, { timeout: 22000 });
+  await page.waitForFunction(() => Number(window.ReedSignal1942?.GetCinematic()?.progress || 0) > 0.91, null, { timeout: 25000 });
   await page.waitForTimeout(700);
   const finaleLod = await page.evaluate(() => {
     const handle = window.ReedSignal1942?.render;
@@ -368,6 +447,8 @@ try {
       huddleDrawMeshes: huddle?.group?.children?.filter((child) => child.visible).length || 0,
       visibleLodInstances,
       detailedFollowers: followers.filter((actor) => actor.visible).length,
+      playerAction: handle?.chapterScene?.actors?.player?.userData?.motion?.action || "",
+      registerVisible: Boolean(handle?.chapterScene?.actors?.player?.userData?.rig?.registerBook?.visible),
       calls: Number(dataset.renderCalls),
       triangles: Number(dataset.renderTriangles),
       maximumCalls: Number(window.__reedSignalMaximumCinematicCalls || 0),
@@ -377,6 +458,7 @@ try {
   Assert(finaleLod.huddleVisible && finaleLod.detailedFollowers === 2, "ending cinematic: 远景使用四名实例群像与两名完整骨架");
   Assert(finaleLod.visibleLodInstances === 4, `ending cinematic: 四名实例孩子都具有非零姿态矩阵（${finaleLod.visibleLodInstances}）`);
   Assert(finaleLod.huddleDrawMeshes === 2, `ending cinematic: 群像合批为衣装与头部两个 draw mesh（${finaleLod.huddleDrawMeshes}）`);
+  Assert(finaleLod.playerAction === "holdRegister" && finaleLod.registerVisible, "ending cinematic: 最终静默远景中阿苇仍把第八行抱在胸前");
   Assert(finaleLod.maximumCalls > 0 && finaleLod.maximumCalls < 260, `ending cinematic: 登船到离岸全程低于 260 calls（峰值 ${finaleLod.maximumCalls}）`);
   Assert(finaleLod.calls < 260 && finaleLod.triangles < 80000, `ending cinematic: 终章远景保持性能预算（${finaleLod.calls} calls / ${finaleLod.triangles} tris）`);
   Assert(finaleLod.endingHidden, "ending cinematic: 最终远景仍未提前显示结算页");
