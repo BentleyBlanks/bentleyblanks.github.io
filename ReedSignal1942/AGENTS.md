@@ -29,6 +29,8 @@
 - 横版使用长焦透视相机：FOV 22—28°，相机位于玩法平面 `+Z`，只沿 X/Y 平移，不横滚、不广角旋转。
 - 舞台必须有真实厚度：地面、墙、屋顶、沟渠、桥、船和人物都是 3D 实体；远中近景依靠 Z 深度、雾和材质对比区分。
 - 视觉探照灯必须与规则层的 `GetLightTarget` 使用同一目标，不能出现“画面没照到但规则判定被发现”。
+- Blender 场景组件导出前必须以自身可见几何包围盒归一化到局部原点，禁止依赖 Blender 父级变换修正落位；合批后必须重新验证原点、尺度和包围盒。
+- GLB 的纹理必须内嵌，运行时不得引用 Blender 临时目录、绝对路径或网络资源；新增资产仍须通过零 CDN / 零外链冒烟断言。
 - `Script_Render3D.mjs` / `Script_Scene3D.mjs` / `Script_Actor3D.mjs` 只读玩法 state，不得写 state。
 - 所有运行时依赖必须来自仓库内 `TunnelBell1942/vendor/three`，禁止 CDN、外部图片和外部音频。
 - 桌面目标：1600×900 下 60fps、draw calls < 260、三角形 < 150k；移动目标：draw calls < 140、三角形 < 80k、像素比上限 1.35、关闭实时阴影。
@@ -38,9 +40,14 @@
 - `Data_World.mjs`：历史框架、章节、地形、威胁、互动数据。
 - `Script_Rules.mjs`：纯规则、移动、潜行、队伍、存档与关卡图验证。
 - `Data_Scene3D.mjs`：逐章调色、镜头区、布景与性能档位。
+- `Data_Cinematics.mjs`：四章开场与五个关键行动的连续 3D 分镜数据；只描述镜头、姿态、字幕、声音提示与展示效果，不改规则结果。
+- `Model_ReedSignalEnvironmentKit.glb`：Blender 制作并按材质合批的学校、木车、瞭望塔、水闸、篷船、地道和冀中村落环境组件；纹理全部内嵌。
+- `Script_Assets3D.mjs`：预载 GLB、校验 11 个资产根节点、按局部原点克隆场景组件，并向场景层提供只读实例。
 - `Script_Actor3D.mjs`：程序化角色、衣着层次与骨架动画；只读角色状态。
+- `Script_Cinematics3D.mjs`：纯状态过场导演，负责确定性推进、跳过闸门与完成回执；不依赖 Three.js 或 DOM。
 - `Script_Scene3D.mjs`：程序化 3D 场景和动态布景；只读玩法状态。
 - `Script_Render3D.mjs`：Three.js 渲染器、相机、灯光、雾、色调映射与章节重建。
+- `Script_PostFX3D.mjs`：基于颜色与深度缓冲的克制景深、分离调色、微光、颗粒与暗角；焦点必须跟随玩家，移动端使用低质量档。
 - `Script_Game.mjs`：DOM、输入、程序化音频与流程集成；不得包含 Canvas 2D 绘制回退。
 - `Script_SmokeTest.mjs`：纯 Node 冒烟测试，含机器人通关与机制断言。
 - `Script_RenderHealthTest.mjs`：真实浏览器逐章渲染、像素、取景与性能检查。

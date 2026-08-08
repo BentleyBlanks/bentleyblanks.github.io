@@ -25,7 +25,6 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
   let chapterT = 0;
   let lastChapter = state.chapterIndex;
   let lastBeat = -1;
-  let knotAngle = 0;      // 打结那一拍：驱动器手上画圈的角度
 
   const started = Date.now();
   while (!state.done) {
@@ -131,23 +130,18 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
         }
-        // 打结：没有长按后备了，驱动器得**真的绕圈**——绕对方向（世界角度
-        // 递增），缠满之后改竖拽勒紧。这也是这条路径唯一的自动化验证
-        if (target.action === "knotAt" && Math.abs(dx) <= 1.35) {
+        // 接绳：没有长按后备了，驱动器得**真的顺着绳拖**——先按在绳头上攥住，
+        // 再沿 target.path 一路往前挪。这也是这条路径唯一的自动化验证
+        if (target.action === "knotAt" && Math.abs(dx) <= 1.35 && target.path) {
           input.moveX = 0;
           const kn = state.beat?.knotState;
-          if (kn && kn.t >= 1) {
-            input.pullHeld = true;
-            input.pull = 0.35;
-          } else {
-            knotAngle += 0.22;                       // 正向＝缠上去
-            input.pointerHeld = true;
-            input.pointerWorld = {
-              x: target.cx + Math.cos(knotAngle) * target.r,
-              y: target.cy + Math.sin(knotAngle) * target.r,
-            };
-          }
-        } else knotAngle = 0;
+          const u = kn ? kn.u : 0;
+          // 攥住之前先按在绳头上；攥住之后目标点略微超前，绳子就一直被带着走
+          const aim = kn?.grab ? Math.min(1, u + 0.10) : u;
+          const q = target.path[Math.min(target.path.length - 1, Math.round(aim * (target.path.length - 1)))];
+          input.pointerHeld = true;
+          input.pointerWorld = { x: q[0], y: q[1] };
+        }
       }
     }
 
@@ -628,16 +622,8 @@ function TestChainSurvivesEarlyDrop() {
   // 否则玩家根本不知道自己把它扔哪儿了
   state.player.x = SCENES.village.zones.well.x;
   step({}, 3);
-  // 打结没有长按后备了（见 TestKnotNeedsRealCircling）：这儿也得真绕圈
-  {
-    const t = GetBeatTarget(state);
-    let a = 0;
-    for (let i = 0; i < 400 && !(state.beat.knotState?.t >= 1); i += 1) {
-      a += 0.22;
-      step({ pointerHeld: true, pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r } });
-    }
-    step({ pullHeld: true, pull: 0.35 }, Math.ceil(2 / DT));
-  }
+  // 接绳没有长按后备了（见 TestKnotIsThreadingNotCircling）：这儿也得真顺着绳拖
+  DragKnotThrough(state, (inp) => step(inp));
   assert.equal(state.flags.wellRopeBroken, false, "绳该接好了");
   step({}, 3);
   const marked = state.bubbles.some((b) => b.icon === "item:空水桶");
@@ -694,13 +680,27 @@ function TestGroundItems() {
   console.log("  ✓ 落地道具：自由放下避开掩体足迹、悬浮气泡、拾回");
 }
 
-// 接绳打结（键盘后备路径）：按住 E 缠满一圈再收紧，井绳必须接好
-// 打结**没有长按后备**（2026-08-08 用户明令："为什么还支持长按交互按钮的模式？
-// 干掉"）。手不落在绳头上、不真的绕圈，就一点进展都没有；而且**方向有意义**：
-// 正向缠上去、反向解回来。老版取 Math.abs(d) 两头都算涨，于是转哪边都能过，
-// 同时 HUD 那枚图标演的还是相反的方向（CSS 的 rotate 正值在屏幕上是顺时针，
-// 而绳圈按世界角度递增画＝屏幕逆时针）——提示和绳子当场打架。
-function TestKnotNeedsRealCircling() {
+// 接绳＝**把绳头穿过圈再拉紧**，不是绕圈（2026-08-08 用户退回：「链接麻绳
+// 为什么也是转圈圈？不太合理」——绕圈是缠辘轳轴的动作）。
+// 这条盯四件事：①长按无效（用户明令删掉后备）②按下那一帧手必须落在绳头上
+// ③顺着绳拖才走、往回拖会退出来 ④手飘离绳子的走向会脱手、进度当场断。
+//
+// 复用给别处：把绳头一路拖到底（链式测试与自动通关驱动共用同一条路）
+function DragKnotThrough(state, drive) {
+  const t = GetBeatTarget(state);
+  assert.equal(t?.action, "knotAt", "接绳那一步的驱动目标应该是拖绳头，不是长按");
+  assert.ok(Array.isArray(t.path) && t.path.length > 4, "驱动目标得把绳子的那条路交出来");
+  const At = (u) => t.path[Math.min(t.path.length - 1, Math.round(u * (t.path.length - 1)))];
+  for (let i = 0; i < 600 && !(state.beat.knotState?.u >= 1); i += 1) {
+    const kn = state.beat.knotState;
+    const aim = kn?.grab ? Math.min(1, kn.u + 0.10) : (kn?.u ?? 0);
+    const q = At(aim);
+    drive({ pointerHeld: true, pointerWorld: { x: q[0], y: q[1] } });
+  }
+  return state.beat.knotState?.u ?? 0;
+}
+
+function TestKnotIsThreadingNotCircling() {
   const Setup = () => {
     const state = CreateGame(0);
     const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
@@ -723,77 +723,95 @@ function TestKnotNeedsRealCircling() {
       }, DT);
     }
   };
-  const knotAt = (state) => {
-    const t = GetBeatTarget(state);
-    assert.equal(t?.action, "knotAt", "打结那一步的驱动目标应该是绕圈，不是长按");
-    return t;
-  };
 
   // ① 长按互动键：一点用都没有
   {
     const state = Setup();
     step(state, {}, 2);
     step(state, { interactHeld: true }, Math.ceil(6.0 / DT));
-    assert.ok(!(state.beat.knotState?.t > 0.01),
-      `长按 E 居然把绳缠上了（t=${state.beat.knotState?.t}）——这条后备必须是死的`);
+    assert.ok(!(state.beat.knotState?.u > 0.01),
+      `长按 E 居然把绳穿过去了（u=${state.beat.knotState?.u}）——这条后备必须是死的`);
     assert.equal(state.flags.wellRopeBroken, true, "长按不该把井绳接好");
   }
 
-  // ② 手落在绳头上正向绕圈：缠得满；再竖拽勒紧＝接好
+  // ② 按下那一帧手没落在绳头上：攥不住，怎么拖都不动
   {
     const state = Setup();
     step(state, {}, 2);
-    const t = knotAt(state);
-    let a = 0;
-    for (let i = 0; i < 400 && !(state.beat.knotState?.t >= 1); i += 1) {
-      a += 0.22;
-      step(state, {
-        pointerHeld: true,
-        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
-      });
-    }
-    assert.ok(state.beat.knotState?.t >= 1, "正向绕圈必须能把绳缠满");
-    assert.equal(state.player.item, null, "麻绳缠上去就离手了");
-    step(state, { pullHeld: true, pull: 0.35 }, Math.ceil(2.0 / DT));
-    assert.equal(state.flags.wellRopeBroken, false, "缠满后竖拽勒紧，井绳必须接好");
-  }
-
-  // ③ 反向绕圈：不但不涨，还得把已经缠上的退回来
-  {
-    const state = Setup();
-    step(state, {}, 2);
-    const t = knotAt(state);
-    let a = 0;
-    for (let i = 0; i < 60; i += 1) {
-      a += 0.22;
-      step(state, {
-        pointerHeld: true,
-        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
-      });
-    }
-    const wound = state.beat.knotState.t;
-    assert.ok(wound > 0.1, "先得缠上一些才能验反向");
+    const t = GetBeatTarget(state);
+    const far = { x: t.cx + 1.4, y: t.cy + 0.9 };
+    step(state, { pointerHeld: true, pointerWorld: far }, 4);
     for (let i = 0; i < 40; i += 1) {
-      a -= 0.22;                       // 反着转＝往下解
-      step(state, {
-        pointerHeld: true,
-        pointerWorld: { x: t.cx + Math.cos(a) * t.r, y: t.cy + Math.sin(a) * t.r },
-      });
+      const q = t.path[Math.min(t.path.length - 1, Math.round((i / 40) * (t.path.length - 1)))];
+      step(state, { pointerHeld: true, pointerWorld: { x: q[0], y: q[1] } });
     }
-    assert.ok(state.beat.knotState.t < wound - 0.05,
-      `反着转绳圈必须退回来（${wound.toFixed(2)} → ${state.beat.knotState.t.toFixed(2)}）`
-      + "——两个方向都算涨的话，那不是缠绳，是在这儿画圈满角度");
+    assert.ok(!state.beat.knotState?.grab, "手没落在绳头上就按下去，不该攥得住");
+    assert.ok(!(state.beat.knotState?.u > 0.02),
+      `在别处按下再拖，绳子不该动（u=${state.beat.knotState?.u}）`);
   }
 
-  // ④ 不留 HUD 手势图标：招呼玩家的是绳头自己
+  // ③ 攥住绳头顺着绳拖到底：穿过去 + 拉紧＝井绳接好
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const u = DragKnotThrough(state, (inp) => step(state, inp));
+    assert.ok(u >= 1, `顺着绳拖到底必须接得上（只走到 u=${u.toFixed(2)}）`);
+    assert.equal(state.player.item, null, "绳头一上手，麻绳就该离开物品栏");
+    assert.equal(state.flags.wellRopeBroken, false, "拖到底＝结勒死，井绳必须接好");
+  }
+
+  // ④ 往回拖：绳头退出来，进度跟着退（方向是有意义的）
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const t = GetBeatTarget(state);
+    const At = (u) => t.path[Math.min(t.path.length - 1, Math.round(u * (t.path.length - 1)))];
+    for (let i = 0; i < 120 && !(state.beat.knotState?.u > 0.55); i += 1) {
+      const kn = state.beat.knotState;
+      const q = At(kn?.grab ? Math.min(1, kn.u + 0.10) : (kn?.u ?? 0));
+      step(state, { pointerHeld: true, pointerWorld: { x: q[0], y: q[1] } });
+    }
+    const far = state.beat.knotState.u;
+    assert.ok(far > 0.5, "先得穿过去一截才能验往回拖");
+    assert.ok(state.beat.knotState.threaded, "过了圈眼就该记成「穿好了」");
+    for (let i = 0; i < 60; i += 1) {
+      const q = At(Math.max(0, state.beat.knotState.u - 0.10));
+      step(state, { pointerHeld: true, pointerWorld: { x: q[0], y: q[1] } });
+    }
+    assert.ok(state.beat.knotState.u < far - 0.1,
+      `往回拖绳头必须退出来（${far.toFixed(2)} → ${state.beat.knotState.u.toFixed(2)}）`
+      + "——两个方向都算涨的话，那就不是在穿绳");
+  }
+
+  // ⑤ 手飘离绳子的走向：脱手，进度当场断
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const t = GetBeatTarget(state);
+    const At = (u) => t.path[Math.min(t.path.length - 1, Math.round(u * (t.path.length - 1)))];
+    for (let i = 0; i < 120 && !(state.beat.knotState?.u > 0.4); i += 1) {
+      const kn = state.beat.knotState;
+      const q = At(kn?.grab ? Math.min(1, kn.u + 0.10) : (kn?.u ?? 0));
+      step(state, { pointerHeld: true, pointerWorld: { x: q[0], y: q[1] } });
+    }
+    const held = state.beat.knotState.u;
+    assert.ok(state.beat.knotState.grab, "这会儿手上还攥着绳头");
+    const q = At(held);
+    step(state, { pointerHeld: true, pointerWorld: { x: q[0], y: q[1] + 0.9 } }, 2);
+    assert.ok(!state.beat.knotState.grab, "手飘出绳子的走向必须脱手");
+    assert.ok(state.beat.knotState.u < held, "脱手了绳头得缩回去一截，不能停在原地");
+  }
+
+  // ⑥ 不留 HUD 手势图标 / 按键提示：招呼玩家的是绳头自己
   {
     const state = Setup();
     step(state, {}, 3);
-    assert.ok(!state.gesture, "打结那一拍不该再挂 HUD 手势图标");
+    assert.ok(!state.gesture, "接绳那一拍不该再挂 HUD 手势图标");
     assert.ok(!state.prompt || !/[EFCWS]\s*·/.test(state.prompt),
-      `打结那一拍不该出按键提示，实为「${state.prompt}」`);
+      `接绳那一拍不该出按键提示，实为「${state.prompt}」`);
+    assert.ok(state.knot && state.knot.u < 0.02, "还没上手时得把绳头交给渲染层去晃");
   }
-  console.log("  ✓ 接绳打结：长按无效 / 手真绕圈才缠得上 / 反向会解开 / 无 HUD 图标");
+  console.log("  ✓ 接绳：穿过去不是绕圈 / 长按无效 / 按不准攥不住 / 往回拖会退 / 飘出去脱手");
 }
 
 // 辘轳是个转盘，不是一根拉杆：鼠标绕轴心转圈才走绳——顺时针放、逆时针收、
@@ -1395,6 +1413,122 @@ function TestRaidColumn() {
   console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
 }
 
+// 队序：**徒步的大部队永远不许超过自行车和摩托**（用户 2026-08-08 退回）。
+// 老版本给每个人各写一套起点/终点/速度，两个步兵起手就站在车前头，
+// 整支队伍读出来是"步兵开路、车在后面追"。这条逐帧盯着整段行军的先后。
+function TestConvoyKeepsFormation() {
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+  DebugJump(state, 0, beats.indexOf("c1_raid"));
+  StepGame(state, idle, DT);   // 第一帧跑 line0 的 on()：整支队伍生成并起步
+
+  const At = (id) => state.actors.find((a) => a.id === id);
+  const pups = state.actors.filter((a) => a.id.startsWith("c1pup")).map((a) => a.id);
+  const jpF = state.actors.filter((a) => a.id.startsWith("c1jpF")).map((a) => a.id);
+  // 用户 2026-08-08 定的队形：**十个伪军打头**，日军**五对两人并排**殿后
+  assert.equal(pups.length, 10, `打头的伪军该有十个，现在 ${pups.length} 个`);
+  assert.equal(jpF.length, 5, `日军该有五对，现在 ${jpF.length} 对`);
+  for (const id of pups) assert.equal(At(id).kind, "puppet", `${id} 该是伪军（打头的是他们）`);
+  for (const id of jpF) assert.equal(At(id).kind, "soldier", `${id} 该是日军`);
+
+  // 队伍朝 -x 开进村：队头 x 最小。队序 = 自行车 → 十个伪军 → 摩托 → 日军五对。
+  // 逐帧验整条队序不许换位——速度差一大，走上二十秒谁都能把谁套圈
+  const order = ["bikeScout", ...pups, "motoLead", ...jpF];
+  for (let f = 0; f < 240; f += 1) {
+    StepGame(state, idle, DT);
+    const bike = At("bikeScout");
+    if (!bike || bike.visible === false) break;
+    for (let i = 1; i < order.length; i += 1) {
+      const a = At(order[i - 1]);
+      const b = At(order[i]);
+      if (!a || !b || a.visible === false || b.visible === false) continue;
+      assert.ok(a.x < b.x,
+        `第 ${f} 帧：${order[i]} 超到 ${order[i - 1]} 前头了（${b.x.toFixed(1)} ≤ ${a.x.toFixed(1)}）`);
+    }
+    // **并排的一对不许被拉开**：这正是"日军两人并排走、不是一个个前后跟着"
+    // 那条要求的判据。横版里"并排"靠的是后排那个的 rank（深度档），不是 x
+    for (let i = 0; i < jpF.length; i += 1) {
+      const F = At("c1jpF" + i);
+      const B = At("c1jpB" + i);
+      if (!F || !B) continue;
+      assert.ok(Math.abs((B.x - F.x) - 0.22) < 0.05,
+        `第 ${f} 帧：第 ${i} 对日军被拉开了（相距 ${(B.x - F.x).toFixed(2)}m，该是 0.22m）`);
+      assert.equal(B.rank, 1, `第 ${i} 对的后排必须声明 rank:1——横版里"并排"全靠它`);
+    }
+  }
+  // 摩托紧贴着伪军队尾、又贴着日军队头：用户嫌"摩托和日军距离有点远"，
+  // 这一档间距别再被人调回去
+  const gapJp = At("c1jpF0").x - At("motoLead").x;
+  assert.ok(gapJp > 0 && gapJp < 8,
+    `摩托到日军队头 ${gapJp.toFixed(1)}m——太远了（用户点名要"拉得近一点"）`);
+
+  // 搜村停下来之后，车仍停在队头（最深入村的那一段），徒步的散在车后头
+  const st2 = CreateGame(0);
+  DebugJump(st2, 0, beats.indexOf("c1_hide"));
+  const bike2 = st2.actors.find((a) => a.id === "bikeScout");
+  const moto2 = st2.actors.find((a) => a.id === "motoLead");
+  const feet = st2.actors.filter((a) => /^c1(pup|jp)/.test(a.id) && a.x > 100);
+  assert.ok(bike2.x < moto2.x, "搜村时自行车得停在摩托前头");
+  for (const c of feet) {
+    assert.ok(c.x > moto2.x, `搜村时徒步兵 ${c.id} 站到车前头去了（${c.x.toFixed(1)}）`);
+    // 散开就不再是队列：并排的排别必须清掉，否则搜村看着像阅兵
+    assert.ok(!c.rank, `搜村时 ${c.id} 还挂着行军的排别 rank=${c.rank}`);
+  }
+  console.log("  ✓ 队形：十个伪军打头 / 日军五对两人并排 / 队序全程不换位 / 搜村散开");
+}
+
+// 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
+// 顺带盯背景层乡亲跟着警讯收工——街上空了字幕说过一次，画面得对上。
+function TestRaidTakesMoreThanFather() {
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0).map((b) => b.id);
+
+  DebugJump(state, 0, beats.indexOf("c1_hide"));
+  const taken = state.actors.filter((a) => a.id.startsWith("taken"));
+  assert.equal(taken.length, 3, "被抓的邻居必须在场（只抓木匠一个说不过去）");
+  for (const t of taken) assert.ok(t.x >= 110, `被抓的乡亲 ${t.id} 站进考场了（x=${t.x.toFixed(1)}）`);
+  const officer = state.actors.find((a) => a.id === "officer");
+  assert.ok(officer, "带队的军官必须在场");
+  assert.equal(officer.kind, "officer", "军官得用自己那套外观，不能跟大头兵一个样");
+  assert.equal(officer.carry, "军刀", "军官的身份标记是那把连鞘军刀");
+
+  // 警讯一响，背景层的乡亲也得收工（World 的 StepBackdropFolk 盯这面旗）
+  assert.equal(state.flags.villageAlarm, true, "扫荡开始了，全村警讯旗必须立起来");
+
+  // 审问：军官有台词（日语无字幕），翻译官把话递成中文
+  const father = SCRIPTS.c1.find((b) => b.id === "c1_father");
+  const offLines = father.lines.filter((l) => l.who === "日军军官");
+  assert.ok(offLines.length >= 1, "军官必须有台词");
+  for (const l of offLines) assert.ok(l.noSub, "日军讲日语一律不给字幕（叙事铁律）");
+  assert.ok(father.lines.some((l) => l.who === "翻译官" && /炮楼/.test(l.say)),
+    "军官那句傲慢话得由翻译官递成中文，玩家才接得住");
+
+  // 押走那一拍：被抓的邻居和爹同批出村。**按真实节奏演**（不猛按 advance）——
+  // 一帧一句地冲过去，最后一句的 on() 刚落地这一幕就结束了，
+  // AdvanceBeat 的 ClearPoses 会把姿势收掉，验的就成了散场之后的空壳。
+  DebugJump(state, 0, beats.indexOf("c1_father"));
+  const fatherIdx = beats.indexOf("c1_father");
+  const hauledLine = father.lines.findIndex((l) => /拖出院门/.test(l.stage || ""));
+  let guard = 0;
+  while (state.beat.lineIndex < hauledLine && state.beatIndex === fatherIdx && guard < 3000) {
+    guard += 1;
+    StepGame(state, idle, DT);
+  }
+  assert.equal(state.beat.lineIndex, hauledLine, "没演到押人出院门那一句");
+  for (let i = 0; i < 45; i += 1) StepGame(state, idle, DT);   // 让这一句演一秒半
+
+  const gone = state.actors.filter((a) => a.id.startsWith("taken"));
+  assert.ok(gone.length > 0, "被抓的邻居不该在散场时凭空消失");
+  for (const a of gone) {
+    assert.equal(a.pose, "hauled", `${a.id} 得是被拽着走的姿势`);
+    assert.equal(a.heading, 1, `${a.id} 得朝村口走`);
+    assert.ok((a.cineTarget?.x ?? 0) > 150, `${a.id} 没跟着队伍出村`);
+  }
+  console.log("  ✓ 扫荡：抓的不止木匠 / 军官有外观有台词 / 背景乡亲跟着收工");
+}
+
 // 过场的演出不许站在路障里。obstacle 带的东西（塌墙、撞倒的柴垛）比演员近，
 // 谁站在它坐标上谁就被整个盖住——c1_father 的审问戏曾经就跪在柴垛（x=38）里，
 // 一整场戏只看得见一根枪管（用户截图为证）。这条盯的是"演员与路障的水平间距"。
@@ -1493,10 +1627,12 @@ TestSlingThrow();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
+TestConvoyKeepsFormation();
+TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
-TestKnotNeedsRealCircling();
+TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();

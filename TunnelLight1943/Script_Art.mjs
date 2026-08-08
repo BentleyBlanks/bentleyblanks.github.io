@@ -39,6 +39,9 @@ export const PAL = {
   mother: "#4e5c6b", motherDark: "#39434f", father: "#6d5340",
   militia: "#5a6b74", militiaDark: "#44535b",
   soldier: "#7a7448", soldierDark: "#5c5732",
+  // 军官：将校呢比士兵的土黄卡其深一档、偏墨绿——审问那一拍是 6m 的近景，
+  // 光靠帽子分不开，衣服的色阶才是三米外就读得出的那一档
+  officer: "#333827", officerDark: "#20241a",
   puppet: "#8d8464", puppetDark: "#6d6549",
   villager: "#9a8d78", villagerDark: "#7a705c",
   skin: "#d8ab7c", skinDark: "#b98a5c",
@@ -179,6 +182,7 @@ const KIND_COLOR = {
   family: [PAL.mother, PAL.motherDark],
   militia: [PAL.militia, PAL.militiaDark],
   soldier: [PAL.soldier, PAL.soldierDark],
+  officer: [PAL.officer, PAL.officerDark],
   puppet: [PAL.puppet, PAL.puppetDark],
   villager: [PAL.villager, PAL.villagerDark],
 };
@@ -307,7 +311,7 @@ export function DrawCharacter(ctx, spec) {
   ctx.fill();
 
   // 头饰
-  if (kind === "soldier") {
+  if (kind === "soldier" || kind === "officer") {
     InkFill(ctx, [
       [-6.4 * S, headY - 5.6 * S], [4.2 * S, headY - 8.2 * S], [7.4 * S, headY - 5.2 * S], [-6.0 * S, headY - 3.4 * S],
     ], id + "cap", "#5f5a30", { amp: 0.5 * S, lw: lw * 0.9 });
@@ -454,6 +458,22 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 0.70, py - r * 1.20], [px + r * 1.60, py - r * 0.98],
       [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],
     ], id + "brim", "#4a461f", { amp: 1, lw: lw * 0.8 });
+  } else if (kind === "officer") {
+    // 大檐帽：圆顶更高更方，帽墙一道深色，帽檐长而硬——士兵那顶软战斗帽
+    // 是塌下去的斜面，两者的剪影在 6m 近景下一眼分得开
+    InkFill(ctx, [
+      [px - r * 1.06, py - r * 1.24], [px - r * 0.92, py - r * 1.86],
+      [px + r * 0.62, py - r * 1.92], [px + r * 1.02, py - r * 1.30],
+      [px + r * 1.06, py - r * 1.02], [px - r * 1.02, py - r * 0.96],
+    ], id + "cap", "#4a4f34", { amp: 1.1 * k, lw: lw * 0.9 });
+    InkFill(ctx, [
+      [px - r * 1.04, py - r * 1.10], [px + r * 1.06, py - r * 1.14],
+      [px + r * 1.06, py - r * 0.96], [px - r * 1.02, py - r * 0.92],
+    ], id + "band", "#2f3320", { amp: 0.8 * k, lw: lw * 0.7 });
+    InkFill(ctx, [
+      [px + r * 0.86, py - r * 1.06], [px + r * 1.92, py - r * 0.94],
+      [px + r * 1.88, py - r * 0.66], [px + r * 0.86, py - r * 0.80],
+    ], id + "visor", "#232616", { amp: 0.7 * k, lw: lw * 0.8 });
   } else if (kind === "puppet") {
     InkFill(ctx, [
       [px - r * 1.04, py - r * 1.02], [px - r * 0.06, py - r * 1.86],
@@ -617,7 +637,7 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
   ctx.restore();
 
   // 头饰
-  if (kind === "soldier") {
+  if (kind === "soldier" || kind === "officer") {
     InkFill(ctx, [
       [-R * 1.10, -R * 1.02], [R * 0.06, -R * 1.98], [R * 1.02, -R * 1.10],
       [R * 1.08, -R * 0.80], [-R * 1.14, -R * 0.72],
@@ -731,18 +751,43 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     InkLine(ctx, -9 * S, -1.2 * S, 9 * S, -1.2 * S, "planeGrain",
       { lw: 0.9 * S, color: "rgba(70,45,25,0.65)", amp: 1.1 });
   } else if (label === "步枪") {
-    // 三八式：握把在原点，枪身顺着"手往下"画（同锯/锄头，渲染层让它跟着前臂转）。
-    // 抡枪托砸下来的时候，砸在最前头的就是这头的托——所以托必须画在枪身末端，
-    // 不能像以前那样把整支枪烘死在背上当装饰：胳膊抡了，枪还在背上。
-    // 细长的一根，只有末端那块托是宽的——轮廓一眼读得出是枪不是板子
-    const L = 27;
-    InkFill(ctx, [[-0.9 * S, -3 * S], [0.9 * S, -3 * S], [0.8 * S, (L - 9) * S], [-0.8 * S, (L - 9) * S]],
-      "rifleBarrel", "#4d4a44", { amp: 0.22 * S, lw: 0.9 * S });                        // 枪管：细
-    InkFill(ctx, [[-1.7 * S, (L - 13) * S], [1.7 * S, (L - 13) * S], [1.5 * S, (L - 3) * S], [-1.5 * S, (L - 3) * S]],
-      "rifleBody", "#5b452e", { amp: 0.28 * S, lw: 1.0 * S, shade: "rgba(0,0,0,0.2)" }); // 护木与机匣
-    InkFill(ctx, [[-2.4 * S, (L - 4) * S], [2.0 * S, (L - 4) * S], [2.6 * S, (L + 4.5) * S], [-1.6 * S, (L + 4.5) * S]],
-      "rifleButt", "#46351f", { amp: 0.36 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.26)" }); // 枪托：砸人的那头
-    InkLine(ctx, 0, -3 * S, 0, -8.5 * S, "rifleBayo", { lw: 0.9 * S, color: "#9aa0a6" }); // 刺刀
+    // 三八式。**握点（原点）在护木**——手真正握枪的地方，不是枪口。
+    //
+    // 老版把原点放在枪口、整支枪往"手往下"画到 +31.5u（≈0.98m）：兵垂手站着
+    // 时手心离地才 0.7m 出头，于是枪托穿过地面戳进土里，枪管只在手上方露一小截
+    // ——用户看到的"绑定点位错误"就是这个。三八式的握点离托底约 0.45m、
+    // 离枪口约 0.83m（枪全长 1.28m，加刺刀 1.66m），所以枪身**大头在手上方**。
+    //
+    // 坐标：+y 是"手往下"（渲染层把它转到肘→手的方向），所以
+    //   托在 +y 一小截、枪管与刺刀在 -y 一大截。垂手站着＝枪竖着提，
+    //   托离地一拳；抡起来砸人时托跟着手甩到外侧，砸下来的仍是托。
+    const BUTT = 13.4;      // 握点→枪托底（≈0.42m）
+    const GRIP = 5.0;       // 机匣后端
+    const WOOD = -13.0;     // 护木前端
+    const MUZZLE = -26.6;   // 枪口（≈0.83m）
+    const BAYO = -37.7;     // 刺刀尖（≈1.18m）
+    // 粗细按实物折算，别按"看得见"折算：三八式枪管直径 ~2cm、护木宽 ~4.5cm、
+    // 枪托侧视高 ~10cm。第一版按 0.85/1.7/2.6 画，出来是 5/10/16cm——
+    // 侧视里护木跟人的躯干一样宽，枪托成了一块板子。
+    // 枪管：细长的一根（≈2.5cm）
+    InkFill(ctx, [[-0.42 * S, MUZZLE * S], [0.42 * S, MUZZLE * S], [0.5 * S, WOOD * S], [-0.5 * S, WOOD * S]],
+      "rifleBarrel", "#4d4a44", { amp: 0.16 * S, lw: 0.7 * S });
+    // 护木与机匣：手就握在这一段（原点落在它中间），≈5cm
+    InkFill(ctx, [[-0.85 * S, WOOD * S], [0.85 * S, WOOD * S], [0.95 * S, GRIP * S], [-0.95 * S, GRIP * S]],
+      "rifleBody", "#5b452e", { amp: 0.2 * S, lw: 0.8 * S, shade: "rgba(0,0,0,0.2)" });
+    // 枪托：砸人的那头。往下渐宽到 ≈11cm，托底斜切（前低后高，枪托的招牌轮廓）
+    InkFill(ctx, [[-0.95 * S, GRIP * S], [0.95 * S, GRIP * S], [1.5 * S, (BUTT - 2) * S],
+      [1.4 * S, BUTT * S], [-0.9 * S, (BUTT - 0.6) * S]],
+      "rifleButt", "#46351f", { amp: 0.24 * S, lw: 0.9 * S, shade: "rgba(0,0,0,0.26)" });
+    // 刺刀：枪口再探出去一截寒光
+    InkLine(ctx, 0, MUZZLE * S, 0, BAYO * S, "rifleBayo", { lw: 0.7 * S, color: "#9aa0a6" });
+    // 背带：从护木前端垂到托后，一道松弛的弧——没有它就是一根光棍
+    ctx.beginPath();
+    ctx.moveTo(-0.8 * S, (WOOD + 3) * S);
+    ctx.quadraticCurveTo(-3.4 * S, (GRIP - 1) * S, -0.9 * S, (BUTT - 2.5) * S);
+    ctx.strokeStyle = "rgba(74,58,40,0.8)";
+    ctx.lineWidth = 0.6 * S;
+    ctx.stroke();
   } else if (label === "锯") {
     // 华北木匠的框锯：工字木框，一边绷锯条、一边绞麻绳。
     // 画的时候锯条顺着"手往下"的方向（局部 +y）——渲染层让它跟着前臂转，
@@ -764,6 +809,23 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     }
     // 绞绳：横梁上方两立柱之间的一道麻色缠绕
     InkLine(ctx, -7 * S, 2 * S, 0, 0, "sawCord", { lw: 0.8 * S, color: "#9a7d4f", amp: 1.4 });
+  } else if (label === "军刀") {
+    // 军官的佩刀（连鞘）：不出鞘——他不亲自动手，刀是拎在手里的身份。
+    // 顺前臂挂（ALONG_ARM），胳膊垂着刀就斜指地面。
+    // **握点在刀鞘中段**，不在护手上：垂手站着时手心离地只有 0.56m，
+    // 攥着护手的话 0.85m 的刀会整根拖在地上（实测过，鞘尖扎进土里）。
+    // 攥中段之后柄从拳头上方探出来、鞘尖离地还有两拃——照片里就是这么拎的。
+    InkFill(ctx, [
+      [-0.9 * S, -8 * S], [1.5 * S, -8 * S], [2.9 * S, 2 * S], [3.4 * S, 10.6 * S],
+      [1.6 * S, 11.1 * S], [0.9 * S, 2 * S],
+    ], "sabreSheath", "#2b2d24", { amp: 0.5 * S, lw: 1.0 * S, shade: "rgba(0,0,0,0.22)" });
+    // 护手与柄：都在握点**上方**（做功方向的后上方，同拟物交互规范）
+    InkFill(ctx, [[-2.6 * S, -9.6 * S], [3.2 * S, -9.6 * S], [3.0 * S, -8.0 * S], [-2.4 * S, -8.0 * S]],
+      "sabreGuard", "#5d5334", { amp: 0.4 * S, lw: 0.9 * S });
+    InkLine(ctx, 0.3 * S, -15.5 * S, 0.3 * S, -9.4 * S, "sabreGrip", { lw: 1.9 * S, color: "#2b2620" });
+    // 鞘口的两道箍
+    InkLine(ctx, 1.0 * S, -2.6 * S, 2.7 * S, -2.6 * S, "sabreRing1", { lw: 0.8 * S, color: "#6d6244" });
+    InkLine(ctx, 1.4 * S, 3.4 * S, 3.1 * S, 3.4 * S, "sabreRing2", { lw: 0.8 * S, color: "#6d6244" });
   } else if (label === "锄头") {
     // 长柄锄：木柄顺着"手往下"的方向（跟着前臂转——扬过肩、落进土都是它），
     // 柄端一块弯下去的铁锄板。握点（原点）在柄上三分之一处。
@@ -1546,6 +1608,79 @@ export function DrawHenCoop(ctx, x, groundY, id) {
 }
 
 // 晾衣绳：两根木杆绷一道绳，挂着打补丁的粗布衫和一条裤——风里鼓着
+// 接绳的结（逐帧重画）。
+//
+// **不能用 THREE.Line 画**：`linewidth` 在绝大多数平台上被忽略，绳子永远只有
+// 一个像素——贴在辘轳那堆木色上根本看不见，"穿过去"这个动作等于没演。
+// 所以整套结走 canvas：真笔画、真粗细、真墨线包边。
+//
+// 压叠关系是这一拍的题眼：圈的**远侧**画在麻绳之前、**近侧**画在麻绳之后，
+// 于是绳是"从圈里穿过去"的，不是"从圈上划过去"的。少了这一层，玩家看见的
+// 只是两条线交叉。
+//
+// spec 里的坐标都是**相对挂点的米数**（y 向上），几何一律由 Core 算好传进来
+// （判定与作画共用一份，同石笔/刨子那条规矩）。
+export function DrawKnot(ctx, ox, oy, ppm, spec) {
+  const P = (q) => [ox + q[0] * ppm, oy - q[1] * ppm];   // 米→画布（y 翻转）
+  const HEMP = "#c69a5c", HEMP_D = "#a97f45", NEWR = "#dcb877", INK = "rgba(46,33,20,0.85)";
+  const w = Math.max(2, ppm * 0.030);      // 绳粗 ≈3cm
+  const stroke = (pts, color, width, dash) => {
+    if (pts.length < 2) return;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    const a = P(pts[0]);
+    ctx.moveTo(a[0], a[1]);
+    for (let i = 1; i < pts.length; i += 1) { const b = P(pts[i]); ctx.lineTo(b[0], b[1]); }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    ctx.restore();
+  };
+  // 墨线包边＋绳身：先粗一圈深色，再压一道本色，麻绳就有了体积
+  const rope = (pts, color, k = 1) => {
+    stroke(pts, INK, w * k + Math.max(1.6, ppm * 0.010));
+    stroke(pts, color, w * k);
+  };
+  // ① 井绳断头：从辘轳上垂下来
+  rope(spec.stand, HEMP_D, 1.05);
+  // ② 圈的远侧（画在麻绳之前）
+  rope(spec.eyeBack, HEMP, 1.0);
+  // ③ 还没走到的那截路：细虚线，只是"绳还得往哪儿去"的暗示，拉到底就没了
+  if (spec.rest && spec.restAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = spec.restAlpha;
+    stroke(spec.rest, "rgba(120,102,74,0.9)", Math.max(1.4, ppm * 0.008), [ppm * 0.035, ppm * 0.03]);
+    ctx.restore();
+  }
+  // ④ 麻绳（新绳比旧井绳亮一档，两根分得开）
+  rope(spec.rope, NEWR, 1.0);
+  // ⑤ 圈的近侧（压住麻绳）——"穿过去"就是靠这一笔成立的
+  rope(spec.eyeFront, HEMP, 1.0);
+  // ⑥ 绳头：攥住的时候鼓一点，让玩家知道手上有东西
+  const tp = P(spec.tip);
+  const tr = w * (spec.grab ? 1.05 : 0.85);
+  ctx.beginPath();
+  ctx.arc(tp[0], tp[1], tr, 0, Math.PI * 2);
+  ctx.fillStyle = NEWR;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1.6, ppm * 0.009);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+  // 散开的麻头：绳头总是毛的
+  for (let i = 0; i < 3; i += 1) {
+    const a = -0.5 + i * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(tp[0], tp[1]);
+    ctx.lineTo(tp[0] + Math.cos(a) * tr * 2.1, tp[1] + Math.sin(a) * tr * 2.1);
+    ctx.strokeStyle = "rgba(169,127,69,0.75)";
+    ctx.lineWidth = Math.max(1, ppm * 0.005);
+    ctx.stroke();
+  }
+}
+
 export function DrawClothesline(ctx, x, groundY, id) {
   const span = 92;
   InkLine(ctx, x - span / 2, groundY, x - span / 2 - 4, groundY - 88, id + "pL", { lw: 4, color: "#6b5136", amp: 1.4 });

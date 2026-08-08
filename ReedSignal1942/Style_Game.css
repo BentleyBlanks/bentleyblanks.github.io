@@ -20,8 +20,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 
 #GameShell { position: relative; width: 100%; height: 100%; min-height: 420px; overflow: hidden; background: #111c1e; isolation: isolate; }
 #GameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #111c1e; }
-.filmGrain { position: absolute; inset: -30%; z-index: 4; pointer-events: none; opacity: .075; background-image: repeating-linear-gradient(106deg, transparent 0 17px, rgba(255,255,255,.07) 18px, transparent 19px 31px); animation: GrainShift .32s steps(2) infinite; mix-blend-mode: soft-light; }
-.filmGrain::after { content: ""; position: absolute; inset: 22%; background: radial-gradient(circle at 50% 47%, transparent 38%, rgba(1,4,5,.2) 72%, rgba(1,4,5,.62) 100%); }
+.filmGrain { position: absolute; inset: -30%; z-index: 4; pointer-events: none; opacity: .018; background-image: repeating-radial-gradient(circle at 37% 43%, rgba(255,255,255,.08) 0 1px, transparent 1px 5px), repeating-radial-gradient(circle at 63% 57%, rgba(0,0,0,.1) 0 1px, transparent 1px 7px); background-size: 23px 21px, 31px 37px; animation: GrainShift .32s steps(2) infinite; mix-blend-mode: soft-light; }
+.filmGrain::after { content: ""; position: absolute; inset: 22%; background: none; }
 .dangerWash { position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 60%, transparent 38%, rgba(125,38,26,.72)); transition: opacity .12s linear; }
 
 .loadingScreen { position: absolute; inset: 0; z-index: 60; display: grid; place-content: center; gap: 18px; background: #0a1213; text-align: center; }
@@ -105,6 +105,24 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .storyCaption span { display: block; width: 36px; height: 1px; margin: 0 auto 10px; background: var(--amber); }
 .storyCaption p { margin: 0; color: #e5e3d5; font-size: clamp(14px, 1.8vw, 19px); line-height: 1.6; }
 
+.cinematicOverlay { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+.cinematicBar { position: absolute; left: 0; right: 0; display: block; height: clamp(42px, 8.5vh, 88px); background: #030707; box-shadow: 0 0 32px rgba(0,0,0,.7); transition: transform .55s cubic-bezier(.22,.75,.2,1); }
+.cinematicBarTop { top: 0; transform-origin: top; }
+.cinematicBarBottom { bottom: 0; transform-origin: bottom; }
+.cinematicCopy { position: absolute; left: 50%; bottom: clamp(54px, 10.5vh, 108px); width: min(760px, calc(100vw - 48px)); padding: 12px 28px 10px; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 12px #000; }
+.cinematicCopy > span { display: block; width: 42px; height: 1px; margin: 0 auto 11px; background: rgba(215,170,98,.82); }
+.cinematicCopy p { min-height: 1.6em; margin: 0; color: #ece8d8; font-size: clamp(15px, 1.7vw, 20px); line-height: 1.62; letter-spacing: .04em; }
+.cinematicCopy button { margin-top: 8px; padding: 5px 10px; border: 0; color: rgba(223,228,217,.54); background: transparent; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 9px; letter-spacing: .16em; cursor: pointer; pointer-events: auto; }
+.cinematicOverlay:not([hidden]) .cinematicBarTop { animation: CinematicBarTopIn .52s cubic-bezier(.2,.78,.18,1) both; }
+.cinematicOverlay:not([hidden]) .cinematicBarBottom { animation: CinematicBarBottomIn .52s cubic-bezier(.2,.78,.18,1) both; }
+.cinematicOverlay:not([hidden]) .cinematicCopy { animation: CinematicCopyIn .58s .12s ease-out both; }
+.cinematicOverlay.isShotCut .cinematicCopy p { animation: CinematicCaptionCut .42s cubic-bezier(.2,.72,.2,1) both; }
+@keyframes CinematicBarTopIn { from { transform: translateY(-105%); } to { transform: translateY(0); } }
+@keyframes CinematicBarBottomIn { from { transform: translateY(105%); } to { transform: translateY(0); } }
+@keyframes CinematicCopyIn { from { opacity: 0; transform: translate(-50%,12px); } to { opacity: 1; transform: translate(-50%,0); } }
+@keyframes CinematicCaptionCut { from { opacity: 0; transform: translateY(8px); filter: blur(2px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+.isCinematic .gameHeader, .isCinematic .objectiveCard, .isCinematic .windCard, .isCinematic .suspicionCard, .isCinematic .teamCard, .isCinematic .interactionPrompt, .isCinematic .controlGuide, .isCinematic .touchControls { opacity: 0; pointer-events: none; transition: opacity .28s ease; }
+
 .panelScreen { display: grid; place-items: center; padding: 28px; background: rgba(6,11,12,.86); backdrop-filter: blur(9px); }
 .panelScreen article { width: min(570px, 92vw); padding: 34px; border: 1px solid rgba(223,228,217,.16); background: #111d1e; box-shadow: 0 22px 80px #000; }
 .panelScreen h2 { margin: 0 0 22px; font-size: clamp(30px, 5vw, 54px); font-weight: 500; }
@@ -140,6 +158,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .rollCallList li { padding: 8px; color: transparent; border-bottom: 1px solid rgba(223,228,217,.1); transition: color .45s ease, border-color .45s ease; }
 .rollCallList li.isCalled { color: var(--paper); border-color: var(--amber); }
 .rollCallList li span { display: block; color: #9da8a0; font-size: 11px; }
+.rollCallList li[data-silent="true"].isCalled { color: #aeb7b0; border-color: rgba(223,228,217,.18); }
+.rollCallList li[data-silent="true"] span { color: #6f7a74; }
 .endingScreen blockquote { margin: 25px auto; padding: 22px; border-top: 1px solid rgba(215,170,98,.5); border-bottom: 1px solid rgba(215,170,98,.5); font-size: 19px; line-height: 1.8; }
 .endingScreen blockquote span, .endingScreen blockquote i, .endingScreen blockquote strong { display: block; }
 .endingScreen blockquote i { color: #8e9992; font-size: 14px; }
@@ -178,6 +198,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
   .titleCopy { width: min(480px, 88vw); }
   .titleCopy h1 { font-size: clamp(58px, 17vw, 112px); }
   .historyGrid { grid-template-columns: 1fr; }
+  .cinematicBar { height: clamp(34px, 7.5vh, 62px); }
+  .cinematicCopy { bottom: clamp(42px, 9vh, 76px); width: calc(100vw - 28px); padding-inline: 8px; }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -196,4 +218,5 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  .cinematicBar, .isCinematic .gameHeader, .isCinematic .objectiveCard, .isCinematic .windCard, .isCinematic .suspicionCard, .isCinematic .teamCard, .isCinematic .interactionPrompt, .isCinematic .controlGuide, .isCinematic .touchControls { transition: none !important; }
 }

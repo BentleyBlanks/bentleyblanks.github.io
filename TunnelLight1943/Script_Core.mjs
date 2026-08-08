@@ -205,7 +205,82 @@ function CanFreeDrop(state) {
 // ---------------------------------------------------------------------------
 const GROUND_PICK_R = 1.5;    // 拾取半径
 const GROUND_HINT_R = 5.0;    // 悬浮提示可见半径
-const KNOT_TURNS = 1.25;      // 接绳打结要绕的圈数（一圈多一点）
+// ---------------------------------------------------------------------------
+// 接绳（把断了的井绳和找来的麻绳接上）
+//
+// 这一拍改过一次，原因值得写死在这儿：**绕圈是缠辘轳轴的动作，不是接绳的动作**
+//（用户 2026-08-08：「链接麻绳为什么也是转圈圈？不太合理」）。真接两根绳是
+// 把一头**穿过**另一头挽出的圈，再顺着绳往外一拉，结自己收死——一个连贯动作，
+// 中间没有"绕"。
+//
+// 于是玩法＝攥住麻绳头，顺着绳自己能走的那条路拖：
+//   起手(左下) → 贴到圈边 → **从圈眼里穿过去** → 另一侧钻出来 → 一路往外拉勒紧
+// 路线坐标是相对断头挂点 (cx, cy) 的米数（x 右、y 上）。
+// **判定与作画共用这一份**，World 里绝不许另抄一套（同石笔/刨子那条规矩）。
+const KNOT_PATH = [
+  [-0.66, -0.30],   // 麻绳头起手：垂在断头左下
+  [-0.42, -0.16],
+  [-0.19, -0.03],   // 贴到圈边
+  [0.00, 0.06],     // 圈眼正中：穿过去
+  [0.18, -0.02],    // 从另一侧钻出来
+  [0.33, -0.20],
+  [0.52, -0.42],    // 往外拉，结开始收
+  [0.74, -0.63],    // 拉到底：勒死
+];
+// 整套结的尺寸系数。井架横杆上的辘轳（WINCH_HUB_Y 1.43）与井口台沿之间
+// 只有半米出头的空当，结得塞进这个空当里——大了就骑在辘轳上，两团木色
+// 叠在一起谁也看不清
+const KNOT_SCALE = 0.78;
+export const KNOT_EYE = { x: 0, y: 0.06 * KNOT_SCALE, r: 0.15 * KNOT_SCALE };   // 断头挽出的那个圈（作画用；导出是为了 World 不另抄一份）
+// 弧长参数化：拖动按**路径上的最近点**驱动，不是按位移量累加——
+// 位移量拖哪儿都涨，那就又变成一根看不见的 slider 了
+const KNOT_ARC = (() => {
+  const seg = [];
+  let total = 0;
+  for (let i = 0; i < KNOT_PATH.length - 1; i += 1) {
+    const d = Math.hypot(KNOT_PATH[i + 1][0] - KNOT_PATH[i][0], KNOT_PATH[i + 1][1] - KNOT_PATH[i][1]);
+    seg.push(d);
+    total += d;
+  }
+  const acc = [0];
+  for (let i = 0; i < seg.length; i += 1) acc.push(acc[i] + seg[i]);
+  return { seg, acc, total };
+})();
+// 绳头钻出圈眼那一刻的弧长比例：过了它才算"穿好了"，之后拉的都是在收紧
+export const KNOT_THREAD_U = KNOT_ARC.acc[4] / KNOT_ARC.total;
+const KNOT_GRAB_R = 0.22;     // 攥住绳头的判定半径（特写下约 60px，手指够得着）
+const KNOT_SLIP_R = 0.30;     // 手飘离绳子走向这么远就脱手
+const KNOT_SPEED = 1.05;      // 绳有分量：一秒最多走全程的这么多，甩不快
+
+/** 路径上 u(0..1) 处的点，相对断头挂点的米数 */
+export function KnotPointAt(u) {
+  const s = Math.max(0, Math.min(1, u)) * KNOT_ARC.total;
+  for (let i = 0; i < KNOT_ARC.seg.length; i += 1) {
+    if (s <= KNOT_ARC.acc[i + 1] || i === KNOT_ARC.seg.length - 1) {
+      const t = KNOT_ARC.seg[i] > 1e-6 ? (s - KNOT_ARC.acc[i]) / KNOT_ARC.seg[i] : 0;
+      const a = KNOT_PATH[i], bb = KNOT_PATH[i + 1];
+      return [(a[0] + (bb[0] - a[0]) * t) * KNOT_SCALE, (a[1] + (bb[1] - a[1]) * t) * KNOT_SCALE];
+    }
+  }
+  const last = KNOT_PATH[KNOT_PATH.length - 1];
+  return [last[0] * KNOT_SCALE, last[1] * KNOT_SCALE];
+}
+
+/** 指尖落点投到路径上：{ u, dist }。dist = 垂直偏离，用来判脱手 */
+function KnotProject(xM, yM) {
+  const x = xM / KNOT_SCALE, y = yM / KNOT_SCALE;
+  let best = { u: 0, dist: Infinity };
+  for (let i = 0; i < KNOT_ARC.seg.length; i += 1) {
+    const a = KNOT_PATH[i], bb = KNOT_PATH[i + 1];
+    const vx = bb[0] - a[0], vy = bb[1] - a[1];
+    const len2 = vx * vx + vy * vy;
+    const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / len2)) : 0;
+    const px = a[0] + vx * t, py = a[1] + vy * t;
+    const d = Math.hypot(x - px, y - py);
+    if (d < best.dist) best = { u: (KNOT_ARC.acc[i] + KNOT_ARC.seg[i] * t) / KNOT_ARC.total, dist: d * KNOT_SCALE };
+  }
+  return best;
+}
 
 // 辘轳转盘：鼠标绕轴心转圈驱动（顺时针放绳、逆时针摇起）。
 // HUB_Y = 摇把轴心离地高度（对齐 DrawWell 井架横杆的中线）；
@@ -901,9 +976,9 @@ function StepChain(state, def, input, dt) {
       };
       return;
     }
-    // 接绳打结：拿着麻绳站到断头前，鼠标沿引导圈把绳缠上去（一圈多一点），
-    // 缠满再往下一拽勒紧。键盘后备：按住 E 缠 / 收。这是「接上井绳」从一条
-    // 进度条变成一双手的地方。
+    // 接绳：攥住麻绳头，顺着绳自己能走的那条路拖过去——贴到圈边、**从圈眼里
+    // 穿过去**、另一侧钻出来、再一路往外拉，结自己收死。一个连贯动作。
+    // （老版是绕圈缠一圈多，被退回：绕圈是缠辘轳轴的动作，不是接绳的动作。）
     case "knot": {
       if (!InZone(p.x, lvl, st.zone)) return;
       const k = b.knotState;
@@ -911,64 +986,67 @@ function StepChain(state, def, input, dt) {
         state.prompt = st.missPrompt || `这儿缺${st.needsLabel || "样东西"}`;
         return;
       }
-      const kn = k || (b.knotState = { t: 0, cinch: 0, prevA: null });
+      const kn = k || (b.knotState = { u: 0, grab: false, threaded: false });
       const cx = st.zone.x;
       // 同辘轳：人站在断头正前方会把结挡住——钉到井口西侧，手够着断头打结
       if (!k) { p.x = cx - 0.9; p.heading = 1; }
       else if (p.x > cx - 0.72) { p.x = cx - 0.72; p.heading = 1; }
       const cyRel = st.knotY ?? 1.5;   // 断头挂在井架上的高度
-      // 特写：打结是指尖上的活，镜头推到断头跟前——引导圈、缠上去的绳、
-      // 收紧的结都要看得清；离开井台自动拉回
-      state.closeUp = { x: cx, y: cyRel - 0.25, hw: st.closeHw ?? 2.6 };
-      // 指针绕圈：真实位置驱动——手得真的在断头附近画圈。
-      // **方向是有意义的**：绳只能顺着一个方向往上缠（世界角度递增＝画面上
-      // 逆时针，与 World 里绳圈的画法同一个方向）。反着转就是在往下解，
-      // 圈会一圈圈退回来。老版取 Math.abs(d) 两头都算涨，于是转哪边都能过——
-      // 那就不是"缠绳"，是"在这儿画圈满一定角度"。
+      const cy = SURFACE_Y + cyRel;
+      // 特写：结只有巴掌大。景别照"手指按得着"倒推——1.5m 半宽在手机上
+      // 也有 280px/米，绳头那个点 30 来像素、攥住的判定 60 像素
+      state.closeUp = { x: cx + 0.04, y: cyRel - 0.14, hw: st.closeHw ?? 1.5 };
+
+      const tip = KnotPointAt(kn.u);
       const pw = input.pointerWorld;
       if (input.pointerHeld && pw) {
-        const dx = pw.x - cx, dy = pw.y - (SURFACE_Y + cyRel);
-        const r = Math.hypot(dx, dy);
-        if (r > 0.12 && r < 1.5) {
-          const a = Math.atan2(dy, dx);
-          if (kn.prevA !== null) {
-            let d = a - kn.prevA;
-            if (d > Math.PI) d -= Math.PI * 2;
-            if (d < -Math.PI) d += Math.PI * 2;
-            if (Math.abs(d) < 1.0) {
-              const turn = d / (Math.PI * 2 * KNOT_TURNS);
-              if (kn.t < 1) {
-                // 缠：正向涨；反向退（解开的手感，退得比缠快一点点）
-                kn.t = Math.max(0, Math.min(1, kn.t + (turn > 0 ? turn : turn * 1.25)));
-                if (turn > 0) FlashPose(state, "mark", 0.25);
-              } else if (turn < 0) {
-                // 已经缠满了还往回转＝把结解开，退回缠绳这一步
-                kn.t = Math.max(0, 1 + turn * 1.25);
-                kn.cinch = 0;
-              }
+        // ① 按下那一帧手必须落在**绳头**上才攥得住，在别处拖一律无效
+        if (!kn.grab && state.ptrPressed
+          && Math.hypot(pw.x - (cx + tip[0]), pw.y - (cy + tip[1])) < KNOT_GRAB_R) {
+          kn.grab = true;
+        }
+        if (kn.grab) {
+          const pr = KnotProject(pw.x - cx, pw.y - cy);
+          if (pr.dist > KNOT_SLIP_R) {
+            // ③ 手飘离绳子的走向＝脱手，绳头缩回去一截（进度当场断）
+            kn.grab = false;
+            kn.u = Math.max(0, kn.u - 0.14);
+            Cue(state, "drop", { gain: 0.5 });
+          } else {
+            // ② 绳有分量：跟着手走，但一秒最多走这么多，甩再快也只能一寸寸挪。
+            //    往回拖＝把绳头退出来（方向是有意义的，和缠/解同一个道理）
+            const d = pr.u - kn.u;
+            const stepU = Math.sign(d) * Math.min(Math.abs(d), KNOT_SPEED * dt);
+            if (Math.abs(stepU) > 1e-5) {
+              kn.u = Math.max(0, Math.min(1, kn.u + stepU));
+              if (stepU > 0) FlashPose(state, "mark", 0.25);
             }
           }
-          kn.prevA = a;
         }
-      } else kn.prevA = null;
-      // 缠上第一把，绳就离手挂在井架上了
-      if (kn.t > 0.03 && p.item?.id === st.needs) { p.item = null; FlashPose(state, "mark", 0.4); }
+      } else kn.grab = false;
+
+      // 攥住第一下，麻绳就离手了（接下来它长在井架上，不在物品栏里）
+      if (kn.u > 0.03 && p.item?.id === st.needs) { p.item = null; FlashPose(state, "mark", 0.4); }
+      // 穿出圈眼那一下要有回响：绳头从圈里钻出来，结算是搭上了
+      if (!kn.threaded && kn.u >= KNOT_THREAD_U) {
+        kn.threaded = true;
+        Cue(state, "pickup", { gain: 0.7 });
+      } else if (kn.threaded && kn.u < KNOT_THREAD_U - 0.02) {
+        kn.threaded = false;   // 又给拖回去了：结散开
+      }
       // **没有长按后备**（用户明令："为什么还支持长按交互按钮的模式？干掉"）。
-      // 打结是指尖上的活：手不落在绳头上、不真的绕圈，就一点进展都没有。
-      // 也**没有 HUD 手势图标**——招呼玩家上手的是绳头自己（它在断头上晃），
-      // 转对了绳圈一圈圈缠上去、转反了退回来，物体自己把方向教了。
-      if (kn.t >= 1) {
-        if (!kn.wound) { kn.wound = true; Cue(state, "pickup", { gain: 0.7 }); }
-        // 缠满了改竖拽勒紧（同样只认手上的动作，没有长按）
-        const pull2 = input.pullHeld ? Math.max(0, input.pull || 0) : 0;
-        if (pull2 > 0) { kn.cinch = Math.min(1, kn.cinch + Math.min(pull2 * 2.2, dt * 4)); FlashPose(state, "crank", 0.25); }
-      } else kn.wound = false;
-      // 还没上手时绳头自己晃两下——这是唯一的"招呼"，代替原来那个 HUD 图标
+      // 接绳是指尖上的活：手不落在绳头上、不顺着绳拖，就一点进展都没有。
+      // 也**没有 HUD 手势图标**——招呼玩家的是绳头自己（没上手时它顺着路
+      // 往前蹭两下，蹭的方向就是该拖的方向）。
       state.knot = {
-        x: cx, y: cyRel, t: kn.t, cinch: kn.cinch, turns: KNOT_TURNS,
-        idle: kn.prevA === null && kn.t < 0.02 ? state.time : 0,
+        x: cx, y: cyRel, u: kn.u, threadU: KNOT_THREAD_U,
+        grab: kn.grab, idle: !kn.grab && kn.u < 0.02 ? state.time : 0,
       };
-      if (kn.cinch >= 1) {
+      // 拉到底：留一点余量再判死。绳头是**渐近**地贴到路径终点的
+      //（每帧只补上剩余距离的一部分），死等 u === 1 会永远差最后一丝，
+      //   结永远勒不上——只有把终点吃掉才收得了尾
+      if (kn.u >= 0.995) {
+        kn.u = 1;
         Cue(state, "ladder", { gain: 0.75 });   // 麻绳勒紧时木架受力的吱嘎
         state.knot = null;
         finish();
@@ -1555,7 +1633,10 @@ export const SCRIPTS = {
             state.flags.ropeTaken = true;
           } },
         // 接绳从一条按住不放的进度条改成了真的打结：绕圈缠绳、下拽勒紧
-        { type: "knot", zone: V.well, needs: "rope", needsLabel: "麻绳",
+        // knotY 是结的挂点高度。1.18 是量出来的：辘轳滚筒的下沿在 1.25、
+        // 井口台沿在 0.85，结得塞进这半米的空当里——挂高了就骑在滚筒上，
+        // 两团木色叠一块儿谁也看不清（老版挂在 1.5，正压着滚筒）
+        { type: "knot", zone: V.well, needs: "rope", needsLabel: "麻绳", knotY: 1.18,
           note: "麻绳接上了。辘轳又能转了。",
           effect: (state) => { state.flags.wellRopeBroken = false; } },
         { type: "pickupGround", flagX: "bucketAt", item: { id: "bucket", label: "空水桶" },
@@ -1665,6 +1746,11 @@ export const SCRIPTS = {
         const sister = FindActor(state, "sister");
         if (b.warned || !sister?.following || state.player.x > 98) return;
         b.warned = true;
+        // 全村警讯。**背景层视差里干活的乡亲也照这面旗收工**（World 的
+        // StepBackdropFolk）——原先只收前景那四个，远处那一排照样在锄地扫院，
+        // "街上转眼就空了"这句字幕当场被画面拆穿。旗标不进 builtKey：
+        // 背景乡亲是逐帧步进的骨架，切显隐不用重建世界
+        state.flags.villageAlarm = true;
         const runner = MakeActor("runner", "militia", state.player.x + 13, { label: "报信的民兵" });
         runner.cineTarget = { x: 16 };
         runner.cineSpeed = 4.6;
@@ -1698,7 +1784,7 @@ export const SCRIPTS = {
         // 喊声这一镜给村口的**中景**（不是 52m 画宽的大远景——那种景别下
         // 一个人只有十几像素，"一支队伍"看着就是几粒沙子，玩家的原话是
         // "还是没看到鬼子的队伍"）。dist 13 ≈ 20m 画宽，正好装下车队头尾
-        { who: "村口喊声", say: "鬼子进村了——", d: 3.4, far: true, cam: { kind: "shot", x: 166, y: 1.9, dist: 13, pan: -6 },
+        { who: "村口喊声", say: "鬼子进村了——", d: 3.4, far: true, cam: { kind: "shot", x: 160.5, y: 1.9, dist: 10, pan: -7 },
           on: (state) => {
             // 喊声一起，街上还没进屋的乡亲直接收掉（正常流程里报信民兵那一环
             // 已经让他们走着进过门了，这里是调试跳幕的兜底）；raidStarted 旗标同时把鸡藏了
@@ -1706,31 +1792,24 @@ export const SCRIPTS = {
               const v = FindActor(state, vid);
               if (v) { v.visible = false; v.track = null; v.wander = null; v.cineTarget = null; }
             }
+            state.flags.villageAlarm = true;   // 背景层的乡亲也一并收工（跳幕兜底）
             // 和第二章一个规矩：说到谁，谁就得在画面里。原先兵是过场演完才生成的，
             // 于是"鬼子进村了"这一句对着的是一个空村口
             SpawnRaidSoldiers(state);
-            const r1 = FindActor(state, "raid1");
-            const r2 = FindActor(state, "raid2");
-            // 从村口往里走：镜头横摇跟着他们推进
-            if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
-            if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
-            // 整支队伍压进村：**全队一个速度**。速度一有差，队形当场散架——
-            // "十个伪军打头、日军两人并排殿后"这件事就白摆了。车比人快半拍，
-            // 也只快那半拍（村道上摩托本来就骑不起来）。
-            // 2.4 m/s 是急行军：镜头这两镜一共 7.6 秒往西摇 13 米，走慢了队伍
-            // 会被镜头甩在后面，车队镜里就只剩一条空街
-            const MARCH = 2.4;
-            const Go = (id, to, sp = MARCH) => {
-              const a = FindActor(state, id);
-              if (a) { a.heading = -1; a.cineTarget = { x: a.x - to }; a.cineSpeed = sp; }
-            };
-            // 往西推进 34m：过场演完前谁也走不到头（onDone 会把人摆到搜村位），
-            // 这里要的只是"一直在走"，以及走的过程中队形不变
-            const PUSH = 34;
-            Go("traitor", PUSH);
-            Go("bikeScout", PUSH, MARCH + 0.3);
-            Go("motoLead", PUSH, MARCH + 0.15);
-            for (const id of RaidColumnIds()) Go(id, PUSH);
+            // 整支队伍**按队序**（RAID_ORDER）一起往里开：起手位由队序给，
+            // 行进只是把整条队伍整体西移 26m——每个人走一样远，于是**谁也超不过谁**，
+            // 徒步的永远咬在车屁股后面。
+            //（更老的版本给每个人各写一套起点/终点/速度，两个步兵直接跑到车前头去了。）
+            // 速度的微差写在队序表的 sp 上：松散的伪军才有，**并排的一对必须同速**——
+            // 差 0.05 m/s 走上十二秒就是 0.6m，一对人当场被拉成一前一后
+            const MARCH = 26;
+            for (const e of RAID_ORDER) {
+              const a = FindActor(state, e.id);
+              if (!a) continue;
+              a.heading = -1;
+              a.cineTarget = { x: a.x - MARCH };
+              a.cineSpeed = e.sp ?? RAID_SPEED;
+            }
             Cue(state, "bikeBell");
             Cue(state, "motorPutt");
             // 镜头此刻在村东口，院子不在画框里——趁这三秒把娘和妹妹走位到位：
@@ -1743,11 +1822,15 @@ export const SCRIPTS = {
           } },
         // 车队从画框里压过去的一镜：无字幕——车铃、引擎和皮靴自己说。
         // 这一镜是用户拿景区实拍立的：日军进村不可能只有两个人。
-        // **构图卡在摩托与日军那一段**：上一镜（x166）给的是打头的十个伪军，
-        // 这一镜就该给挎斗摩托和紧跟在后头两人并排的日军。机位与摇幅是照着
-        // 队伍的行进速度（2.4 m/s）算的：4.2 秒里他们从 160 走到 152，
-        // 画框从 148…172 摇到 140…164，人始终在框里
-        { stage: "", d: 4.2, cam: { kind: "shot", x: 160, y: 1.7, dist: 12, pan: -8 },
+        //
+        // 两镜分工：上一镜给**队头**——打头的那十个伪军；这一镜跟着队伍摇下去，
+        // 给的是**挎斗摩托和紧跟在后头两人并排的日军**（用户点名要看的两样）。
+        // 一个画框塞不下四十多米长的队伍，硬塞的结果是每个人只有十几像素。
+        // pan 的速度跟队伍走速（2.1m/s）配平，队伍才是"从画框里压过去"，
+        // 不是被镜头甩在后头。
+        // dist ≤ 12：镜头规范只有一个景别档，"看得见队伍"要靠**两镜横摇串起来**，
+        // 不许把画框拉宽（拉宽了每个人只剩十几像素，还越过了 wide 的封顶）
+        { stage: "", d: 4.2, cam: { kind: "shot", x: 166, y: 1.75, dist: 10, pan: -8 },
           on: (state) => { Cue(state, "motorPutt"); Cue(state, "bikeBell", { delay: 1.4 }); } },
         // 藏家伙不是慌乱中的怪动作，是学来的规矩：上一回扫荡就有工匠
         // 连人带家伙被掳走。这句旁白说的是画面外的旧事，也是爹结局的伏笔
@@ -1798,27 +1881,36 @@ export const SCRIPTS = {
         // 翻译官在街东头站着对名单（decor，不参与视线判定）
         const tr = FindActor(state, "traitor");
         if (tr) { tr.cineTarget = null; tr.x = 55.5; tr.heading = 1; }
-        // 大队伍在东街散开挨家搜（全 decor）：车靠边停、兵三三两两踹门。
+        // 大队伍在东街散开挨家搜（全 decor）：车停在队头（最深入村的那一段），
+        // 徒步的散在车**后头**挨家踹门——队序在停下来之后也不许倒过来。
         // 全部撂在 x≥112——考场（撤退线 42→27、街上 49-57）一个不多占。
-        // **散开就不再是队列了**：rank 清掉，人各自朝各自的门。队形只属于行军，
-        // 搜村时还两人并排杵着，那是阅兵不是扫荡
+        // **散开就不再是队列了**：rank 清掉，人各自朝各自的门——搜村时还两人
+        // 并排杵着，那是阅兵不是扫荡
         const bike = FindActor(state, "bikeScout");
         if (bike) { bike.cineTarget = null; bike.x = 114; bike.heading = -1; }
         const moto = FindActor(state, "motoLead");
-        if (moto) { moto.cineTarget = null; moto.x = 124; moto.heading = -1; }
+        if (moto) { moto.cineTarget = null; moto.x = 120; moto.heading = -1; }
         RaidColumnIds().forEach((id, i) => {
           const a = FindActor(state, id);
           if (!a) return;
           a.cineTarget = null;
           a.rank = 0;
-          // 沿东街铺开：伪军铺在近处（挨家踹门的是他们），日军散在更东头
-          a.x = 130 + i * 2.6 + (i % 3) * 0.8;
+          a.x = 128 + i * 2.5 + (i % 3) * 0.7;
           a.heading = i % 2 ? 1 : -1;
-          // 几个来回走动的，街上才不是一排木桩
-          if (i === 2) { a.patrol = [130, 140]; a.speed = 1.0; }
-          if (i === 7) { a.patrol = [146, 156]; a.speed = 0.9; }
-          if (i === 14) { a.patrol = [162, 172]; a.speed = 1.1; }
+          // 三个来回走动的，街上才不是一排木桩
+          if (i === 2) { a.patrol = [128, 138]; a.speed = 1.0; }
+          if (i === 9) { a.patrol = [148, 158]; a.speed = 0.9; }
+          if (i === 16) { a.patrol = [166, 174]; a.speed = 1.05; }
         });
+        // 军官押着队站在东街：搜出人来才轮到他进院子（c1_father 里他才过来）
+        const off = FindActor(state, "officer");
+        if (off) { off.cineTarget = null; off.x = 131.5; off.heading = 1; }
+        // 被叫出来的邻居：跪在街边，边上有兵看着。玩家从墙缝往外看的那一眼
+        // （c1_hide 的 peek）看见的不只是刺刀——还有已经蹲在地上的乡亲
+        for (const t of ["taken0", "taken1", "taken2"]) {
+          const a = FindActor(state, t);
+          if (a) { a.visible = true; a.pose = "kneel"; a.heading = 1; a.cineTarget = null; }
+        }
         state.stealthActive = true;
       },
     },
@@ -1913,10 +2005,55 @@ export const SCRIPTS = {
             if (r1) r1.track = null;      // 按人的松开手，退半步
             if (r1) { r1.cineTarget = { x: 40.0 }; r1.cineSpeed = 1.2; }
           } },
+        // 军官这才踱进院子。审到这儿他一直没露面——问粮是底下人的活，
+        // 他是来点收"料"的。日语原声不加字幕（铁律），话由翻译官递过来；
+        // 傲慢不写在形容词里，写在他嫌麻烦的那个"够了"和那句"这是你的福气"上
+        { who: "日军军官", say: "もういい。手間を掛けさせるな。", noSub: true, d: 2.8,
+          cam: { kind: "shot", x: 43.2, y: 1.0, dist: 6.5, slit: true },
+          on: (state) => {
+            // 他背着手从院门口走进来，绕到爹跟前——手上空着（carry:""），
+            // 这是白盒里"这人不扛枪"的唯一标记
+            const off = FindActor(state, "officer");
+            if (off) { off.x = 47.4; off.heading = -1; off.cineTarget = { x: 43.4 }; off.cineSpeed = 1.15; }
+          } },
+        { who: "日军军官", say: "腕のいい大工だそうだな。砲楼の普請に使ってやる。光栄に思え。", noSub: true, d: 4.2,
+          cam: { kind: "shot", x: 42.6, y: 1.0, dist: 6, slit: true },
+          on: (state) => {
+            const off = FindActor(state, "officer");
+            if (off) { off.cineTarget = null; off.x = 43.4; off.heading = -1; }
+          } },
         // 抓他的理由压在拒绝之后：摇头先立住骨气，名单再落下来，
         // 「问粮原来只是过场」的凉意才出来。呼应 c1_raid 的铁匠旧事，
         // 也给第七章据点里找到爹埋因
-        { stage: "问不出粮，他们也不空手走。据点在修炮楼——名单上早写着：梁家村，木匠。", d: 5.0, cam: { kind: "shot", x: 41.6, y: 0.9, dist: 7, slit: true } },
+        { who: "翻译官", say: "太君说，粮不粮的，不打紧了——听说你手艺好？据点正修炮楼，抬举你去干活。这是你的福气。", d: 5.4,
+          cam: { kind: "shot", x: 43.6, y: 0.9, dist: 7, slit: true } },
+        // 抓走的不止一个：名单上要的是手艺人和壮劳力，街上早站了几个。
+        // 这一镜把"扫荡"落到实处——不是冲着一家来的
+        { stage: "院门外的街上蹲了一排：赵家的老三、碾房的王二、李婶家的男人。名单上要的是手艺人和壮劳力。", d: 5.2,
+          cam: { kind: "shot", x: 57.2, y: 1.15, dist: 8.4 },
+          on: (state) => {
+            // 被抓的邻居从东街押到院门外集合。**蹲着**不是站着——一排蹲在地上的人
+            // 加上站着端枪的兵，"这些人是被抓的"不用字幕说；间距收到 1.8m，
+            // 三个人才读成"一排"，不是散在街上的三个路人
+            const spots = [55.2, 57.0, 58.8];
+            ["taken0", "taken1", "taken2"].forEach((id, i) => {
+              const a = FindActor(state, id);
+              if (!a) return;
+              a.visible = true;
+              a.x = spots[i];
+              a.heading = 1;
+              a.pose = "kneel";
+              a.cineTarget = null;
+            });
+            // 押着他们的兵：从纵队里抽两个过来站在这一排的两头，脸对着人。
+            // 抽的是队尾那两个日军（伪军在前头挨家踹门，押人的是端着刺刀的那拨），
+            // 顺手把并排的排别清掉——押人不是行军
+            const guards = RaidColumnIds().slice(-2);
+            [{ id: guards[0], x: 53.3, h: 1 }, { id: guards[1], x: 60.7, h: -1 }].forEach((g) => {
+              const a = FindActor(state, g.id);
+              if (a) { a.patrol = null; a.cineTarget = null; a.rank = 0; a.x = g.x; a.heading = g.h; }
+            });
+          } },
         // 「妹妹想哭」由憋泣的呼吸声演（压低、闷），旁白只说画面外那半句
         { stage: "柱子把她的脸按进自己肩膀。", d: 3.8, cam: { kind: "close", on: "player", dist: 3.4 },
           on: (state) => {
@@ -1937,7 +2074,9 @@ export const SCRIPTS = {
               sister.track = null;
             }
           } },
-        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 45.6, y: 1.2, dist: 11, pan: 1.5 },
+        // 镜头往东多带 4 米：爹不是被两个人拎走的，是被**推进那一排人里**——
+        // 街上站着的邻居必须和他同框，"抓的不止木匠一个"才算落到画面上
+        { stage: "爹被拖出院门的时候，回头看了一眼门框。", d: 4.2, cam: { kind: "shot", x: 48, y: 1.2, dist: 12, pan: 4 },
           on: (state) => {
             const father = FindActor(state, "father");
             // 脸还朝着门框那边：cineKeepHeading 不让行走方向把头扳回去
@@ -1956,15 +2095,29 @@ export const SCRIPTS = {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 62 }; a.cineSpeed = 1.5; a.cineVanish = true; }
             }
+            // 被抓的邻居一起走：爹被推进的就是这一排人。他们比押人的小队
+            // 先动身，爹在后头被推着跟上——同一条路、同一个去处
+            ["taken0", "taken1", "taken2"].forEach((id, i) => {
+              const a = FindActor(state, id);
+              if (!a) return;
+              a.pose = "hauled";     // 被拽起来了，弓着背往前赶
+              a.heading = 1;
+              a.cineTarget = { x: 196 };
+              a.cineSpeed = 1.5;
+              a.cineVanish = true;
+              a.x = 53.4 + i * 1.9;   // 别压在井台（58）上，辘轳架子会盖住人
+            });
             // 整支队伍收队出村：摩托先响、纵队跟上——爹是被押进那支队伍里
-            // 带走的，不是被两个人拎走的。引擎声由远及无
+            // 带走的，不是被两个人拎走的。引擎声由远及无。
+            // **速度按队序发**：车比人快得有限（1.2 倍），够它们保持在队头，
+            // 又不会当着玩家的面从徒步队里穿过去（用户退回过"步兵跑到车前头"）
             Cue(state, "motorPutt", { gain: 0.7 });
             for (const a of state.actors) {
               // 翻译官走押人那一小队（上面已排）；挎斗里的兵钉在车上跟车走
               if (!a.decor || a.pinTo || a.id === "traitor") continue;
               a.patrol = null;
               a.cineTarget = { x: 196 };
-              a.cineSpeed = a.mount === "motorcycle" ? 2.8 : (a.mount === "bicycle" ? 3.2 : 1.6);
+              a.cineSpeed = a.mount ? 1.85 : 1.55;
               a.cineVanish = true;
               a.heading = 1;
             }
@@ -3048,53 +3201,109 @@ function MakeActor(id, kind, x, extra = {}) {
 // 其余全部 decor：他们负责让「鬼子进村」这四个字在画面上是真的。
 const RAID_PUPPETS = 10;      // 打头的伪军
 const RAID_JP_PAIRS = 5;      // 日军：五对，每对两人并排
-// 队形表：相对队头的米数（往东为正＝往队尾）。进村行军与散开搜村共用同一张表，
-// 改队形只改这里。摩托与日军之间只留 3.2m——用户："距离有点远了，拉得近一点"
-const RAID_FORM = {
-  bike: 0,
-  puppet: (i) => 3.0 + i * 1.45,
-  traitor: 17.4,
-  moto: 19.4,
-  jp: (i) => 22.6 + i * 2.2,
-};
+const RAID_SPEED = 2.1;       // 全队基准速度
 // 伪军里溜到后排去的那几个（松散的队形靠它，不是靠随机数）
 const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
 
+// 进村行军的**队序**（从队头/最深处往村口数，gap = 与前一个的米数）。
+// 这张表是唯一的真相：入场起手位、行进目标、搜村时的停车位都从它推，
+// 别在三处各写一套。
+//
+// 硬规矩一（用户 2026-08-08 退回过）：**徒步的大部队永远不许超过自行车和摩托**。
+// 更老的版本把 raid1/raid2 起手放在 152/160、车却在 166/170——两个步兵从第一帧
+// 起就走在车前头，整支队伍读出来是"步兵开路、车在后面追"。队序写死在这里，
+// 而且全队走一样远、速度差压到 0.1 以内：差一大，走上二十秒谁都能把谁套圈。
+//
+// 硬规矩二（用户 2026-08-08）：**打头的是十个伪军**，摩托紧贴在他们后脚跟，
+// 日军两人并排殿后，摩托与日军之间只留 3.2m（原来 12m，用户："有点远了"）。
+// 谁走在前头这件事本身就是史实：开道踹门的脏活派给伪军，日军押在后面。
+// 并排的一对**必须同速**（sp 不给微差）——差 0.05 m/s 走十二秒就是 0.6m，
+// 一对人当场被拉成一前一后，正是要改掉的那个毛病。
+function BuildRaidOrder() {
+  const out = [{ id: "bikeScout", gap: 0 }];     // 骑车的伪军探路，队头
+  for (let i = 0; i < RAID_PUPPETS; i += 1) {
+    out.push({
+      id: "c1pup" + i, gap: i === 0 ? 3.0 : 1.3,
+      rank: PUPPET_BACK_RANK.has(i) ? 1 : 0,
+      sp: RAID_SPEED + ((i % 3) - 1) * 0.05,     // 松散：走走停停的微差
+    });
+  }
+  out.push({ id: "traitor", gap: 1.9 });         // 带路递名单的翻译官走在伪军队尾
+  out.push({ id: "motoLead", gap: 2.0 });        // 挎斗摩托压着伪军的后脚跟
+  out.push({ id: "officer", gap: 3.2 });         // 军官走在日军队列的头里
+  for (let i = 0; i < RAID_JP_PAIRS; i += 1) {
+    out.push({ id: "c1jpF" + i, gap: i === 0 ? 1.6 : 2.0 });
+    // 后排那个只错开一掌：并排的两个人在侧视里几乎重叠，露出去的是后面那个的
+    // 头、肩和枪管（真正把"并排"演出来的是 rank，见 ACTOR_RANK_DZ）
+    out.push({ id: "c1jpB" + i, gap: 0.22, rank: 1 });
+  }
+  // 进院子的那两个（下一幕的考官）压在队尾。**别把他们塞进摩托和日军中间**：
+  // 那样摩托到日军队列头就隔了 9m，正是用户嫌远的那一段。他们俩反正在
+  // onDone 里会被摆到院门外的街上，在队里站哪儿只影响这一镜的构图
+  out.push({ id: "raid1", gap: 2.4 });
+  out.push({ id: "raid2", gap: 2.4 });
+  return out;
+}
+const RAID_ORDER = BuildRaidOrder();
+const RAID_LEAD_X = 148;            // 队头（自行车）入场时的位置（已进了村东口）
+const RAID_START_X = (() => {
+  const m = new Map();
+  let x = RAID_LEAD_X;
+  for (const e of RAID_ORDER) { x += e.gap; m.set(e.id, x); }
+  return m;
+})();
+/** 队序里每个人的入场 x（队头最靠西/最深入村） */
+function RaidStartX(id) { return RAID_START_X.get(id) ?? RAID_LEAD_X; }
+
 function SpawnRaidSoldiers(state) {
-  state.actors = state.actors.filter((a) => !IsEnemy(a));
-  // 队头摆在村东口外：整支队伍往东排开约 31m，尾巴刚好不出走行范围（186）
-  const H = 150;
+  // 军官（kind "officer"）与被抓的乡亲（kind "villager"）都不是 IsEnemy，
+  // 光按敌我过滤会在重复生成时叠出两份，得连 id 一起清
+  state.actors = state.actors.filter((a) => !IsEnemy(a)
+    && a.id !== "officer" && !a.id.startsWith("taken"));
   state.actors.push(
     MakeActor("raid1", "soldier", 120, { patrol: [58, 120], speed: 1.5 }),
     MakeActor("raid2", "soldier", 88, { patrol: [50, 90], speed: 1.35 }),
+    // 带队的军官：单独一种外观 kind（将校呢深一档 + 大檐帽 + 连鞘军刀），
+    // 三样加起来在 6m 的审问近景下一眼分得出他不是普通兵。
+    // 他不参与潜行判定——考场只准两个兵；kind 不是 soldier/puppet，
+    // 所以 SpawnRaidSoldiers 开头那道 IsEnemy 过滤扫不掉他，得点名清
+    MakeActor("officer", "officer", RaidStartX("officer"), {
+      label: "日军军官", decor: true, heading: -1, carry: "军刀",
+    }),
     // 据点的翻译官：带路的、递名单的。decor——他不参与潜行判定（两个兵
     // 已经把考场撑满了），但他得在场：第二章挑灯笼带路的、审问时递话的，
     // 都是这一个人。汉奸不是符号，是个有脸的邻人，才可恨。
     // 他走在伪军队尾、摩托前头——名单在他手上，两头都得照应
-    MakeActor("traitor", "puppet", H + RAID_FORM.traitor, { label: "翻译官", decor: true, heading: -1 }),
+    MakeActor("traitor", "puppet", RaidStartX("traitor"), { label: "翻译官", decor: true, heading: -1 }),
     // 骑车的伪军：车是他自己的，腿上的活也是他自己的（蹬踏跟着位移走）。
     // carry:"" 压掉兵默认的手持步枪——骑车的手在车把上，枪是背着的
     // lift = 座高 − 站立胯高(≈0.60m)。给多了人就浮在车上面，给少了像蹲在车边
-    MakeActor("bikeScout", "puppet", H + RAID_FORM.bike, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
+    MakeActor("bikeScout", "puppet", RaidStartX("bikeScout"), { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
     // 挎斗摩托：驾驶的兵 + 挎斗里的兵（钉在车侧，跟着车走）
-    MakeActor("motoLead", "soldier", H + RAID_FORM.moto, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
-    MakeActor("motoSide", "soldier", H + RAID_FORM.moto + 0.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
+    MakeActor("motoLead", "soldier", RaidStartX("motoLead"), { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
+    MakeActor("motoSide", "soldier", RaidStartX("motoLead") + 0.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
   );
-  // 打头的十个伪军
-  for (let i = 0; i < RAID_PUPPETS; i += 1) {
-    state.actors.push(MakeActor("c1pup" + i, "puppet", H + RAID_FORM.puppet(i), {
-      decor: true, heading: -1, rank: PUPPET_BACK_RANK.has(i) ? 1 : 0,
-    }));
+  // 徒步的两段（位置与排别全从队序表来）：
+  //   打头的十个伪军——松散，几个溜到后排去；
+  //   殿后的日军五对——两人并排，队形咬得死。
+  // 两支队伍的分别不靠文字说，靠走法说
+  for (const e of RAID_ORDER) {
+    if (!e.id.startsWith("c1pup") && !e.id.startsWith("c1jp")) continue;
+    state.actors.push(MakeActor(e.id, e.id.startsWith("c1pup") ? "puppet" : "soldier",
+      RaidStartX(e.id), { decor: true, heading: -1, rank: e.rank || 0 }));
   }
-  // 殿后的日军：五对，每对两人并排（后排那个 rank:1）
-  for (let i = 0; i < RAID_JP_PAIRS; i += 1) {
-    const x = H + RAID_FORM.jp(i);
-    state.actors.push(
-      MakeActor("c1jpF" + i, "soldier", x, { decor: true, heading: -1 }),
-      // 后排那个只错开一掌：并排的两个人在侧视里几乎重叠，露出去的是
-      // 后面那个的头、肩和枪管。错太开就读成"一前一后"，那正是要改掉的毛病
-      MakeActor("c1jpB" + i, "soldier", x + 0.22, { decor: true, heading: -1, rank: 1 }),
-    );
+  // 被叫出来的邻居。抓走的不止木匠一个——这一条是"扫荡"两个字的分量所在：
+  // 名单上写的是手艺人（爹是木匠、西头的铁匠上回就被掳走了），顺手还要壮劳力。
+  // 全 decor、全撂在东街（x≥110），一个不进考场
+  const TAKEN = [
+    { id: "taken0", label: "赵家的老三", x: 121.5 },
+    { id: "taken1", label: "碾房的王二", x: 124.6 },
+    { id: "taken2", label: "李婶家的男人", x: 127.4 },
+  ];
+  for (const t of TAKEN) {
+    state.actors.push(MakeActor(t.id, "villager", t.x, {
+      label: t.label, decor: true, heading: 1, pose: "kneel", visible: false,
+    }));
   }
   state.stealthActive = true;
 }
@@ -3372,7 +3581,7 @@ export function CreateGame(chapterIndex = 0) {
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
       clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
       barrowPlanks: 0, barrowHome: false, henFlew: false, wellRopeBroken: false, ropeTaken: false,
-      bucketAt: null, raidStarted: false, thimbleFound: false,
+      bucketAt: null, raidStarted: false, villageAlarm: false, thimbleFound: false,
     },
     caption: null,
     camHint: { kind: "follow" },
@@ -3474,6 +3683,7 @@ export function StartChapter(state, index) {
     state.flags.ropeTaken = false;
     state.flags.bucketAt = null;
     state.flags.raidStarted = false;
+    state.flags.villageAlarm = false;   // 重玩本章：背景乡亲回到地里接着干活
     state.flags.waterFilled = false;
     state.flags.planedOnce = false;
     state.flags.tenonDone = false;
@@ -5491,13 +5701,21 @@ export function GetBeatTarget(state) {
           return typeof gx === "number" ? { action: "interactAt", x: gx, level: "surface" } : null;
         }
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
-        // 打结：按住 E 的键盘后备路径就能缠满 + 勒紧
-        // 打结没有长按后备（用户明令删掉），驱动器只能真的绕圈——
-        // 所以给它一个专门的动作，把圆心与半径一并交出去
-        case "knot": return {
-          action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
-          cx: st.zone.x, cy: SURFACE_Y + (st.knotY ?? 1.5), r: 0.45,
-        };
+        // 接绳没有长按后备（用户明令删掉），驱动器只能**真的顺着绳拖**——
+        // 所以把绳子的那条路（世界坐标）整条交出去，自动通关照着走一遍。
+        // 删后备就必须同时给驱动器一条真输入的路，漏了这一步会当场卡死。
+        case "knot": {
+          const kx = st.zone.x, ky = SURFACE_Y + (st.knotY ?? 1.5);
+          const path = [];
+          for (let i = 0; i <= 24; i += 1) {
+            const q = KnotPointAt(i / 24);
+            path.push([kx + q[0], ky + q[1]]);
+          }
+          return {
+            action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
+            cx: kx, cy: ky, path,
+          };
+        }
         case "throwHit":
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
           return { action: "throwAt", x: st.target.x - 6, level: "surface", face: 1 };

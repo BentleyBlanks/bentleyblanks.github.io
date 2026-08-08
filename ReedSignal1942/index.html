@@ -9,7 +9,7 @@
   <meta property="og:description" content="没有攻击键。让风掩住脚步，让每个名字都得到回应。">
   <meta property="og:url" content="https://bentleyblanks.github.io/ReedSignal1942/">
   <title>苇声：1942 · 最后一次点名</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260808e">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260808z3">
 </head>
 <body>
   <main id="GameShell" aria-label="苇声1942横版叙事解谜游戏">
@@ -86,6 +86,16 @@
       <span></span><p id="StoryText"></p>
     </section>
 
+    <section id="CinematicOverlay" class="cinematicOverlay" aria-live="polite" hidden>
+      <i class="cinematicBar cinematicBarTop" aria-hidden="true"></i>
+      <div class="cinematicCopy">
+        <span aria-hidden="true"></span>
+        <p id="CinematicCaption"></p>
+        <button id="SkipCinematicButton" type="button" hidden>Esc / 点击略过</button>
+      </div>
+      <i class="cinematicBar cinematicBarBottom" aria-hidden="true"></i>
+    </section>
+
     <section id="ChapterCompleteScreen" class="panelScreen" hidden aria-live="polite">
       <article>
         <p class="eyebrow">这一段路接上了</p>
@@ -134,10 +144,10 @@
         <button id="RollCallButton" class="primaryButton" type="button">翻开点名簿</button>
         <blockquote id="EndingQuote" hidden>
           <span>“周禾老师——”</span>
-          <i>河面上没有回答。</i>
-          <strong>阿苇把她的名字写在了六个孩子后面。</strong>
+          <i>只有船桨碰水。阿苇等到最后，才把簿子合上。</i>
+          <strong>周禾添了第七行“阿苇”；阿苇添了第八行“周禾”。</strong>
         </blockquote>
-        <p id="EndingHistory" class="endingHistory" hidden>这一次虚构的转移结束了，真实的抗战仍将继续三年。无数没有留下姓名的人，共同保存了敌后的村庄、交通线与希望。</p>
+        <p id="EndingHistory" class="endingHistory" hidden>这一次虚构的转移结束了，真实的抗战仍将继续三年。无数留下或没有留下姓名的人，共同保存了敌后的村庄、交通线与希望。</p>
         <div id="EndingActions" class="endingActions" hidden>
           <button id="RestartStoryButton" class="secondaryButton" type="button">重新出发</button>
           <button id="EndingHistoryButton" class="textButton" type="button">重读史实边界</button>
@@ -170,6 +180,9 @@
   </main>
 
   <noscript>本游戏需要 JavaScript 才能运行。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=20260808e"></script>
+  <script type="importmap">
+    {"imports":{"three":"../TunnelBell1942/vendor/three/build/three.module.mjs"}}
+  </script>
+  <script type="module" src="./Script_Game.mjs?v=20260808z3"></script>
 </body>
 </html>

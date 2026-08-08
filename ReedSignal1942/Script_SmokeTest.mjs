@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -9,6 +9,14 @@ import {
   GetAllChildNames,
 } from "./Data_World.mjs";
 import { ChapterVisuals, RenderProfiles } from "./Data_Scene3D.mjs";
+import {
+  ActionCinematics,
+  ChapterOpeningCinematics,
+  CinematicSequences,
+  GetActionCinematic,
+  GetChapterOpeningCinematic,
+} from "./Data_Cinematics.mjs";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs";
 import {
   CreateGameState,
   CompleteAction,
@@ -39,6 +47,62 @@ const sceneDataSource = readFileSync(join(rootDirectory, "Data_Scene3D.mjs"), "u
 const actorSource = readFileSync(join(rootDirectory, "Script_Actor3D.mjs"), "utf8");
 const renderSource = readFileSync(join(rootDirectory, "Script_Render3D.mjs"), "utf8");
 const sceneSource = readFileSync(join(rootDirectory, "Script_Scene3D.mjs"), "utf8");
+const postFxSource = readFileSync(join(rootDirectory, "Script_PostFX3D.mjs"), "utf8");
+const assetSource = readFileSync(join(rootDirectory, "Script_Assets3D.mjs"), "utf8");
+const assetKitSize = statSync(join(rootDirectory, "Model_ReedSignalEnvironmentKit.glb")).size;
+
+assert.equal(Object.keys(CinematicSequences).length, 24, "four openings and every world action need an authored 3D cinematic");
+assert.equal(Object.keys(ChapterOpeningCinematics).length, Chapters.length, "every chapter needs a continuous-space opening shot");
+assert.equal(Object.keys(ActionCinematics).length, Chapters.flatMap((chapter) => chapter.actions).length, "all world actions need a visible 3D cinematic");
+for (const chapter of Chapters) assert.ok(GetChapterOpeningCinematic(chapter.id), `${chapter.id}: opening cinematic missing`);
+for (const action of Chapters.flatMap((chapter) => chapter.actions)) assert.ok(GetActionCinematic(action.id), `${action.id}: story action cinematic missing`);
+for (const sequence of Object.values(CinematicSequences)) {
+  assert.ok(sequence.duration > 0 && sequence.segments.length > 0, `${sequence.id}: cinematic timing missing`);
+  assert.equal(sequence.lockInput, "all", `${sequence.id}: a full cinematic must not leak movement input into the shot`);
+  assert.equal(sequence.segments[0].from, 0, `${sequence.id}: cinematic must start at zero`);
+  assert.equal(sequence.segments.at(-1).to, sequence.duration, `${sequence.id}: cinematic must end at its declared duration`);
+  sequence.segments.forEach((segment, index) => {
+    if (index) assert.equal(segment.from, sequence.segments[index - 1].to, `${sequence.id}: cinematic segments must be continuous`);
+    assert.ok(segment.camera && segment.caption, `${sequence.id}: every shot needs camera authorship and a human story beat`);
+  });
+}
+assert.equal(CinematicSequences.endingDeparture.blocksEnding, true, "the ferry must leave in 3D before the ending screen appears");
+assert.equal(CinematicSequences.endingDeparture.segments[1].effects.playerBoarding, 0, "all six children must board before Awei");
+assert.equal(CinematicSequences.endingDeparture.segments[2].actors.player, "writeKneel", "Awei must visibly add Zhou He's eighth line before boarding");
+assert.equal(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, 0, "Awei must finish the eighth line on shore");
+assert.deepEqual(CinematicSequences.endingDeparture.segments[3].effects.playerBoarding, [0, 1], "Awei must board only after writing Zhou He's name");
+assert.deepEqual(CinematicSequences.endingDeparture.segments[5].effects.motherDeparture, [0.72, 1], "Zhou He's southward lantern route must remain visible through the final wide shot");
+assert.equal(CinematicSequences.endingDeparture.segments.length, 6, "the finale needs boarding, the eighth line, both answers, and the departure wide shot");
+assert.match(CinematicSequences.endingDeparture.segments[5].caption, /周禾老师/);
+assert.equal(CinematicSequences.schoolOpening.segments.length, 4, "the school opening must establish village scale, empty shoes, register, and departure");
+assert.ok(CinematicSequences.schoolOpening.segments.some((segment) => segment.blocking), "school actors need authored blocking instead of static mannequin poses");
+assert.deepEqual(CinematicSequences.sluiceRise.segments[1].effects.bridgeRaise, [0.42, 1], "the bridge must visibly rise during its causal shot");
+assert.deepEqual(CinematicSequences.emptyBoatDiversion.segments[1].effects.emptyBoatRelease, [0.35, 1], "the empty boat must visibly drift during its diversion shot");
+
+const naturalDirector = CreateCinematicDirector();
+assert.equal(naturalDirector.Start("schoolOpening"), true);
+assert.equal(naturalDirector.GetFrame()?.id, "schoolOpening");
+for (let step = 0; step < 260 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
+assert.equal(naturalDirector.IsPlaying(), false, "opening cinematic must finish deterministically");
+assert.deepEqual(naturalDirector.ConsumeFinished(), {
+  id: "schoolOpening",
+  reason: "complete",
+  blocksCompletion: false,
+  blocksEnding: false,
+});
+
+const skipDirector = CreateCinematicDirector();
+skipDirector.Start("endingDeparture");
+for (let step = 0; step < 50; step += 1) skipDirector.Update(0.05);
+assert.equal(skipDirector.GetFrame()?.canSkip, true, "long ending shot must become skippable after its authored hold");
+skipDirector.Update(0.05, true);
+assert.equal(skipDirector.IsPlaying(), false, "skip input must finish the cinematic cleanly");
+assert.deepEqual(skipDirector.ConsumeFinished(), {
+  id: "endingDeparture",
+  reason: "skipped",
+  blocksCompletion: true,
+  blocksEnding: true,
+});
 
 const validation = ValidateCampaign();
 assert.equal(validation.valid, true, validation.errors.join("\n"));
@@ -200,7 +264,7 @@ assert.ok(restoredDistraction.distractionUntil > restoredDistraction.elapsed, "r
 
 const htmlIds = [...htmlSource.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
 assert.equal(new Set(htmlIds).size, htmlIds.length, "HTML ids must be unique");
-for (const id of ["GameCanvas", "StartButton", "HistoryScreen", "ObjectiveCard", "TouchControls", "EndingScreen", "RollCallList"]) {
+for (const id of ["GameCanvas", "StartButton", "HistoryScreen", "ObjectiveCard", "TouchControls", "CinematicOverlay", "EndingScreen", "RollCallList"]) {
   assert.ok(htmlIds.includes(id), `required interface id missing: ${id}`);
 }
 for (const control of ["left", "right", "crouch", "jump", "command", "interact"]) {
@@ -211,6 +275,9 @@ assert.match(styleSource, /@media \(pointer: coarse\)/, "touch layouts need a co
 assert.match(styleSource, /prefers-reduced-motion/, "motion-sensitive players need a reduced-motion mode");
 assert.match(styleSource, /orientation: portrait/, "portrait phones need a rotation notice");
 assert.match(gameSource, /window\.ReedSignal1942/, "browser QA needs a small public inspection surface");
+assert.match(gameSource, /Runtime\.state\.cinematicCue = null/, "director-owned story actions must not replay their short rule-layer cue after the shot");
+assert.doesNotMatch(gameSource, /IsPlaying\(\)\) InputState\.cinematicSkipPressed = true/, "ordinary movement or touch input must not silently skip cinematics");
+assert.match(gameSource, /code === "Escape" && !event\.repeat\) InputState\.cinematicSkipPressed = true/, "cinematics need one explicit keyboard skip command");
 assert.match(gameSource, /localStorage\.setItem\(GameMetadata\.saveKey/, "the runtime must persist authored checkpoints");
 assert.match(gameSource, /createBufferSource/, "ambient audio must be synthesized at runtime");
 assert.doesNotMatch(gameSource, /from\s+["']https?:\/\//, "runtime imports must remain local");
@@ -231,7 +298,25 @@ for (const builder of ["BuildSchool", "BuildBlockade", "BuildTunnel", "BuildFerr
 assert.match(sceneSource, /InstancedMesh/, "dense reeds and terrain detail must use instancing");
 assert.match(sceneSource, /CreateWaterRipples/, "water chapters need readable moving surface detail");
 assert.match(actorSource, /CreateActor3D/, "player and civilians need procedural 3D rigs");
-assert.doesNotMatch(`${renderSource}\n${sceneSource}\n${actorSource}\n${sceneDataSource}`, /from\s+["']https?:\/\//, "3D runtime imports must not use a CDN");
+assert.match(assetSource, /GLTFLoader/, "BlenderMCP-authored GLB assets need the repository-local glTF loader");
+assert.match(postFxSource, /DepthTexture/, "cinematic post-processing must use scene depth for restrained focus separation");
+assert.match(postFxSource, /uFocusDistance/, "cinematic focus must track the playable subject");
+assert.match(postFxSource, /uVignetteStrength/, "cinematic grading must keep a controlled vignette rather than CSS-only filtering");
+for (const assetName of [
+  "Asset_SchoolFacade",
+  "Asset_WaterSluice",
+  "Asset_CivilianSampan",
+  "Asset_TunnelInteriorKit",
+  "Asset_DistantVillageCluster",
+  "Asset_SchoolCourtyardVista",
+  "Asset_BlockadeVista",
+  "Asset_TunnelShaftVista",
+  "Asset_FerryRiverbankVista",
+]) {
+  assert.match(assetSource, new RegExp(assetName), `Blender asset library missing: ${assetName}`);
+}
+assert.ok(assetKitSize > 1_000_000 && assetKitSize < 8_000_000, `embedded GLB asset kit should stay web-sized (${assetKitSize} bytes)`);
+assert.doesNotMatch(`${renderSource}\n${sceneSource}\n${actorSource}\n${assetSource}\n${postFxSource}\n${sceneDataSource}`, /from\s+["']https?:\/\//, "3D runtime imports must not use a CDN");
 for (const [chapterId, profile] of Object.entries(ChapterVisuals)) {
   assert.ok(profile.camera.fov >= 22 && profile.camera.fov <= 28, `${chapterId}: long-lens FOV must stay between 22 and 28 degrees`);
   assert.ok(profile.camera.distance > 12, `${chapterId}: camera needs real stage depth`);

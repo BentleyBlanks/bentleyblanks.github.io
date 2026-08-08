@@ -1,4 +1,5 @@
-import { Chapters, GameMetadata, GetChapter } from "./Data_World.mjs";
+import { Chapters, GameMetadata, GetChapter } from "./Data_World.mjs?v=20260808z3";
+import { GetCinematicCue } from "./Data_Scene3D.mjs?v=20260808z3";
 
 export const RuleConstants = Object.freeze({
   walkSpeed: 178,
@@ -38,6 +39,7 @@ export function CreateGameState(chapterIndex = 0) {
     followersHolding: false,
     followers: [],
     eventQueue: [],
+    cinematicCue: null,
     objectivePulse: 0,
     chapterComplete: false,
     endingReady: false,
@@ -56,8 +58,10 @@ export function SetFollowerCount(state, count) {
     state.followers.push({
       x: Math.max(12, state.player.x - RuleConstants.followerSpacing * (index + 1)),
       y: state.player.y,
+      vx: 0,
       facing: 1,
       nameIndex: index,
+      responseDelay: 0.04 + index * 0.045,
     });
   }
 }
@@ -179,15 +183,24 @@ function IsUnderLowCeiling(chapter, x) {
 }
 
 function UpdateFollowers(state, chapter, deltaTime) {
-  if (state.followersHolding) return;
   let leaderX = state.player.x - state.player.facing * 28;
   for (let index = 0; index < state.followers.length; index += 1) {
     const follower = state.followers[index];
-    const desiredX = leaderX - state.player.facing * RuleConstants.followerSpacing;
+    const spacing = RuleConstants.followerSpacing + (index % 2) * 3;
+    const desiredX = leaderX - state.player.facing * spacing;
     const deltaX = desiredX - follower.x;
-    const maxStep = 142 * deltaTime;
-    follower.x += Math.max(-maxStep, Math.min(maxStep, deltaX));
-    follower.facing = deltaX === 0 ? follower.facing : Math.sign(deltaX);
+    follower.responseDelay = Math.max(0, (follower.responseDelay || 0) - deltaTime);
+    const response = Math.max(2.15, 3.65 - index * 0.16);
+    const maxSpeed = Math.max(116, 146 - index * 3.5);
+    let desiredVelocity = state.followersHolding || follower.responseDelay > 0
+      ? 0
+      : Math.max(-maxSpeed, Math.min(maxSpeed, deltaX * response));
+    if (Math.abs(deltaX) < 5.5) desiredVelocity = 0;
+    const acceleration = (state.followersHolding ? 420 : 335) * deltaTime;
+    const velocityDelta = Math.max(-acceleration, Math.min(acceleration, desiredVelocity - (follower.vx || 0)));
+    follower.vx = (follower.vx || 0) + velocityDelta;
+    follower.x += follower.vx * deltaTime;
+    if (Math.abs(follower.vx) > 7) follower.facing = Math.sign(follower.vx);
     follower.y = GetGroundY(chapter, follower.x, state, state.player.y) ?? state.player.y;
     leaderX = follower.x;
   }
@@ -267,6 +280,10 @@ export function CompleteAction(state, action) {
   state.actionProgress = 0;
   state.activeActionId = null;
   state.objectivePulse = 1;
+  const cinematicCue = GetCinematicCue(action.id);
+  state.cinematicCue = cinematicCue
+    ? { actionId: action.id, startedAt: state.elapsed, duration: cinematicCue.duration, pose: cinematicCue.pose, followerPose: cinematicCue.followerPose || null, camera: cinematicCue.camera }
+    : null;
   if (action.effect === "addMizi") SetFollowerCount(state, 1);
   if (action.effect === "distractLight") state.distractionUntil = state.elapsed + 12;
   if (action.effect === "raiseWater") state.waterLevel = 1;
@@ -279,13 +296,23 @@ export function CompleteAction(state, action) {
   }
   if (action.effect === "releaseShuan") state.player.carrying = null;
   if (action.effect === "distractFinal") state.distractionUntil = Number.POSITIVE_INFINITY;
-  if (action.story) state.eventQueue.push({ type: "story", text: action.story });
+  if (action.story) state.eventQueue.push({
+    type: "story",
+    text: action.story,
+    cue: cinematicCue ? action.id : null,
+    cameraCue: cinematicCue?.camera || null,
+    poseCue: cinematicCue?.pose || null,
+    duration: cinematicCue?.duration || 0,
+  });
   if (action.checkpoint) {
     state.checkpoint = { x: action.x, completed: [...state.completed] };
   }
   if (action.effect === "finishStory") {
     state.endingReady = true;
-    state.mode = "ending";
+    // Let the final boarding cue breathe for a couple of seconds before the
+    // roll-call panel appears.  The rules layer remains deterministic: this
+    // mode simply freezes gameplay while the renderer plays the authored cue.
+    state.mode = "endingCinematic";
   }
   return true;
 }

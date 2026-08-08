@@ -22,7 +22,7 @@ const INK_K = PART_PPM / 150;
 // 体型（相对成年男子）。柱子在第一章还是个半大孩子，后面才抽条；
 // 妹妹比他矮一头多。个头差本身就是叙事：门框上的刻痕量的就是这个。
 export const BODY_SCALE = {
-  father: 1.0, soldier: 0.99, puppet: 0.97, militia: 0.98,
+  father: 1.0, soldier: 0.99, officer: 0.98, puppet: 0.97, militia: 0.98,
   family: 0.90, villager: 0.95, player: 0.93, sister: 0.66,
 };
 
