@@ -469,7 +469,7 @@ try {
   });
   Assert(ventChildren.detailedActors === 1 && ventChildren.detailedBreathingActors === 1, "well vent cinematic: Mizi keeps her complete breathing rig while the camera cuts deeper");
   Assert(ventChildren.huddleVisible && ventChildren.nonZeroInstances === 4, "well vent cinematic: four still-missing children are present as realtime instanced 3D actors");
-  Assert(ventChildren.huddleDrawMeshes === 2, "well vent cinematic: the distant group is batched into body and head draw meshes");
+  Assert(ventChildren.huddleDrawMeshes === 3, "well vent cinematic: the distant group is batched into body, head and gesture-arm draw meshes");
   Assert(ventChildren.headHeightSpread > 0.008, "well vent cinematic: the children breathe and lift their heads out of sync");
   Assert(ventChildren.deeperActors === 4, "well vent cinematic: the missing children remain staged beyond the sealed gate");
   Assert(ventChildren.gameplayFollowers === 1, "well vent cinematic: temporary story actors do not rewrite the gameplay follower ledger");
@@ -557,7 +557,7 @@ try {
   if (motherEmbrace) Assert(motherEmbrace.separation < 0.4, `mother handoff: 两具身体真正接触而非隔空摆姿势（${motherEmbrace.separation.toFixed(2)}m）`);
   Assert(motherEmbrace?.visibleRegisters === 0, "mother handoff: 拥抱时点名簿退出两人身体之间");
   if (motherEmbrace) Assert(motherEmbrace.motherLeftElbow > 0.18 && motherEmbrace.motherRightElbow > -0.04, "mother handoff: 周禾双臂绕向肩背而非折过阿苇的脸");
-  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 3 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.45, null, { timeout: 10000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 4 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.45, null, { timeout: 10000 });
   const motherRelease = await page.evaluate(() => {
     const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
     const player = actors?.player;
@@ -672,7 +672,7 @@ try {
   });
   Assert(finaleLod.huddleVisible && finaleLod.detailedFollowers === 2, "ending cinematic: 远景使用四名实例群像与两名完整骨架");
   Assert(finaleLod.visibleLodInstances === 4, `ending cinematic: 四名实例孩子都具有非零姿态矩阵（${finaleLod.visibleLodInstances}）`);
-  Assert(finaleLod.huddleDrawMeshes === 2, `ending cinematic: 群像合批为衣装与头部两个 draw mesh（${finaleLod.huddleDrawMeshes}）`);
+  Assert(finaleLod.huddleDrawMeshes === 3, `ending cinematic: 群像合批为衣装、头部与动作手臂三个 draw mesh（${finaleLod.huddleDrawMeshes}）`);
   Assert(finaleLod.playerAction === "holdRegister" && finaleLod.registerVisible, "ending cinematic: 最终静默远景中阿苇仍把第八行抱在胸前");
   Assert(finaleLod.maximumCalls > 0 && finaleLod.maximumCalls < 260, `ending cinematic: 登船到离岸全程低于 260 calls（峰值 ${finaleLod.maximumCalls}）`);
   Assert(finaleLod.calls < 260 && finaleLod.triangles < 80000, `ending cinematic: 终章远景保持性能预算（${finaleLod.calls} calls / ${finaleLod.triangles} tris）`);

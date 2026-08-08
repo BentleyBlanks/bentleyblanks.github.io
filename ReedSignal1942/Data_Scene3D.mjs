@@ -10,13 +10,13 @@ export const ChapterVisuals = Object.freeze({
   school: Object.freeze({
     sky: 0x0d2024,
     fog: 0x263b37,
-    fogDensity: 0.012,
-    exposure: 1.28,
+    fogDensity: 0.016,
+    exposure: 1.34,
     moon: 0xc6d0c7,
-    moonIntensity: 3.15,
+    moonIntensity: 4.15,
     ambientSky: 0x8ba7a0,
     ambientGround: 0x3c3021,
-    ambientIntensity: 1.22,
+    ambientIntensity: 0.82,
     ground: 0x484a3d,
     earth: 0x665842,
     plaster: 0xaaa98f,
@@ -36,13 +36,13 @@ export const ChapterVisuals = Object.freeze({
   blockade: Object.freeze({
     sky: 0x09262c,
     fog: 0x244341,
-    fogDensity: 0.014,
-    exposure: 1.34,
+    fogDensity: 0.0165,
+    exposure: 1.4,
     moon: 0xb7cbc8,
-    moonIntensity: 3.25,
+    moonIntensity: 4.3,
     ambientSky: 0x7ba3a3,
     ambientGround: 0x283029,
-    ambientIntensity: 1.34,
+    ambientIntensity: 0.88,
     ground: 0x424b3f,
     earth: 0x5a543f,
     plaster: 0x879589,
@@ -68,7 +68,7 @@ export const ChapterVisuals = Object.freeze({
     moonIntensity: 1.55,
     ambientSky: 0x8b7052,
     ambientGround: 0x2b1b10,
-    ambientIntensity: 4.05,
+    ambientIntensity: 2.75,
     ground: 0x493424,
     earth: 0x6f5234,
     plaster: 0x887157,
@@ -88,13 +88,13 @@ export const ChapterVisuals = Object.freeze({
   ferry: Object.freeze({
     sky: 0x2a4550,
     fog: 0x415754,
-    fogDensity: 0.0075,
-    exposure: 1.2,
+    fogDensity: 0.011,
+    exposure: 1.3,
     moon: 0xd9d2ad,
-    moonIntensity: 3.0,
+    moonIntensity: 4.0,
     ambientSky: 0xb5c7bd,
     ambientGround: 0x44483a,
-    ambientIntensity: 1.16,
+    ambientIntensity: 0.8,
     ground: 0x535d4d,
     earth: 0x6f624c,
     plaster: 0x969d8e,
@@ -155,8 +155,14 @@ export function GetCameraShot(chapterId, playerX) {
   // Tunnel close shots use the same principle to keep the cutaway from being
   // squeezed between a heavy ceiling strip and a heavy floor strip.
   const establishingLookLift = { school: 3.68, blockade: 3.4, tunnel: 2.55, ferry: 3.8 };
-  const tunnelLookLift = { approach: 1.55, action: 1.72, release: 1.6 };
+  const outdoorLookLift = {
+    school: { approach: 3.15, action: 2.9, escape: 3.0 },
+    blockade: { approach: 3.2, action: 2.92, escape: 3.08 },
+    ferry: { approach: 3.22, action: 2.92, finale: 3.32 },
+  };
+  const tunnelLookLift = { approach: 2.92, action: 2.72, release: 2.88 };
   if (shot.kind === "establish") return { ...shot, lookLift: establishingLookLift[chapterId] ?? shot.lookLift };
   if (chapterId === "tunnel" && tunnelLookLift[shot.kind] !== undefined) return { ...shot, lookLift: tunnelLookLift[shot.kind] };
+  if (outdoorLookLift[chapterId]?.[shot.kind] !== undefined) return { ...shot, lookLift: outdoorLookLift[chapterId][shot.kind] };
   return shot;
 }

@@ -1,9 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z11";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z11";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z11";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z11";
-import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z11";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z24";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z24";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z24";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z24";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z24";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
@@ -418,6 +418,15 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     camera.position.z = directorCut ? finalCameraZ : Damp(camera.position.z, finalCameraZ, directorCamera ? 4.0 : 2.4, deltaTime);
     camera.fov = directorCut ? finalFov : Damp(camera.fov, finalFov, directorCamera ? 4.2 : 2.5, deltaTime);
     camera.updateProjectionMatrix();
+    // Shift the playable world upward so a complete body, its contact with
+    // the ground and the immediate puzzle space share the lower third.  The
+    // previous positive offset pushed feet below the viewport and made the
+    // environments read like empty architectural plates instead of a game.
+    // Authored cinematics retain their gentler framing because their camera
+    // tracks already compose actors explicitly.
+    handle.verticalSensorShift = directorCamera ? 0.12 : -0.42;
+    camera.projectionMatrix.elements[9] = handle.verticalSensorShift;
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
     handle.cameraTarget.x = directorCut ? finalTargetX : Damp(handle.cameraTarget.x, finalTargetX, directorCamera ? 4.8 : cueBlend > 0 ? 6.2 : 3.2, deltaTime);
     const baseLookLift = shot.lookLift ?? profile.camera.lookLift;
     const finalLookLift = directorCamera
@@ -471,7 +480,10 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     postFx.Render(scene, handle.time, focusDistance, state.suspicion);
     const info = renderer.info.render;
     handle.playerFeetProjection.set(0, 0, 0);
-    handle.playerHeadProjection.set(0, 1.58, 0);
+    // Adult player art reaches about 1.68m after the actor root scale.  This
+    // local height projects the visible hairline rather than an arbitrary
+    // point inside the torso.
+    handle.playerHeadProjection.set(0, 1.82, 0);
     handle.chapterScene.actors.player.localToWorld(handle.playerFeetProjection);
     handle.chapterScene.actors.player.localToWorld(handle.playerHeadProjection);
     handle.playerFeetProjection.project(camera);
