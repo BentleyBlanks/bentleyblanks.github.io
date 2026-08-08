@@ -1,8 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808j";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808j";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808j";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808j";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808n";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808n";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808n";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808n";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808n";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
@@ -29,8 +30,10 @@ function CreateConeMaterial(color) {
     vertexShader: `
       varying float vHeight;
       varying vec3 vWorldPosition;
+      varying float vLocalX;
       void main() {
         vHeight = position.y + 0.5;
+        vLocalX = position.x;
         vec4 worldPosition = modelMatrix * vec4(position, 1.0);
         vWorldPosition = worldPosition.xyz;
         gl_Position = projectionMatrix * viewMatrix * worldPosition;
@@ -41,13 +44,17 @@ function CreateConeMaterial(color) {
       uniform float uOpacity;
       varying float vHeight;
       varying vec3 vWorldPosition;
+      varying float vLocalX;
       float hash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
       }
       void main() {
-        float longitudinal = pow(clamp(1.0 - vHeight, 0.0, 1.0), 0.72);
+        float halfWidth = max(0.045, 1.0 - vHeight);
+        float lateral = 1.0 - smoothstep(0.3, 0.94, abs(vLocalX) / halfWidth);
+        float longitudinal = pow(clamp(1.0 - vHeight, 0.0, 1.0), 0.82);
         float noise = 0.82 + hash(floor(vWorldPosition.xy * 18.0)) * 0.18;
-        gl_FragColor = vec4(uColor, uOpacity * longitudinal * noise);
+        gl_FragColor = vec4(uColor, uOpacity * longitudinal * lateral * noise);
+        #include <colorspace_fragment>
       }
     `,
     transparent: true,
@@ -80,6 +87,7 @@ function CreateLightPoolMaterial(color) {
         vec2 p = (vUv - 0.5) * vec2(1.0, 2.4);
         float falloff = pow(clamp(1.0 - length(p) * 1.8, 0.0, 1.0), 1.7);
         gl_FragColor = vec4(uColor, falloff * uOpacity);
+        #include <colorspace_fragment>
       }
     `,
     transparent: true,
@@ -144,7 +152,8 @@ function CreateAtmosphere(profile, count) {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({ color: 0xc8c1a1, size: 0.026, transparent: true, opacity: 0.2, depthWrite: false, sizeAttenuation: true });
+  const particleColor = new THREE.Color(profile.fog).lerp(new THREE.Color(profile.accent), 0.22);
+  const material = new THREE.PointsMaterial({ color: particleColor, size: 0.018, transparent: true, opacity: 0.11, depthWrite: false, sizeAttenuation: true });
   const points = new THREE.Points(geometry, material);
   points.renderOrder = 3;
   return { points, geometry, material };
@@ -152,6 +161,35 @@ function CreateAtmosphere(profile, count) {
 
 function Damp(current, target, speed, deltaTime) {
   return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-speed * deltaTime));
+}
+
+function CreateEnvironmentSource(profile, chapterId) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  const sky = new THREE.Color(profile.sky);
+  const fog = new THREE.Color(profile.fog);
+  const ground = new THREE.Color(profile.ground);
+  const accent = new THREE.Color(profile.accent);
+  const css = (color) => `rgb(${Math.round(color.r * 255)},${Math.round(color.g * 255)},${Math.round(color.b * 255)})`;
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, css(sky.multiplyScalar(chapterId === "tunnel" ? 0.42 : 0.78)));
+  gradient.addColorStop(0.52, css(fog));
+  gradient.addColorStop(0.7, css(new THREE.Color(fog).lerp(accent, chapterId === "tunnel" ? 0.28 : 0.12)));
+  gradient.addColorStop(1, css(ground.multiplyScalar(0.5)));
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const horizon = context.createLinearGradient(0, 70, 0, 100);
+  horizon.addColorStop(0, "rgba(255,219,161,0)");
+  horizon.addColorStop(0.5, chapterId === "tunnel" ? "rgba(237,151,82,0.18)" : "rgba(237,202,143,0.11)");
+  horizon.addColorStop(1, "rgba(255,219,161,0)");
+  context.fillStyle = horizon;
+  context.fillRect(0, 62, canvas.width, 48);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  return texture;
 }
 
 export function CreateRender3D(canvas, initialChapter, initialState) {
@@ -162,9 +200,14 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
   renderer.shadowMap.enabled = renderProfile.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(renderProfile.pixelRatio, window.devicePixelRatio || 1));
+  renderer.autoClear = false;
+  renderer.info.autoReset = false;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(25, 16 / 9, 0.08, 120);
   camera.position.set(4.8, 2.7, 15.4);
+  const postFx = CreateCinematicPostFX3D(renderer, camera, renderProfile);
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
   const chapterRoot = new THREE.Group();
   const lightRoot = new THREE.Group();
   scene.add(chapterRoot, lightRoot);
@@ -181,10 +224,14 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     atmosphere: null,
     hemisphere: null,
     moonLight: null,
+    cinematicKey: null,
+    environmentTarget: null,
+    environmentSource: null,
     chapterRoot,
     lightRoot,
     time: 0,
     cameraTarget: new THREE.Vector3(),
+    focusWorld: new THREE.Vector3(),
     playerFeetProjection: new THREE.Vector3(),
     playerHeadProjection: new THREE.Vector3(),
     stats: { calls: 0, triangles: 0, points: 0, quality: renderProfile.id },
@@ -209,8 +256,18 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     }
     if (handle.hemisphere) lightRoot.remove(handle.hemisphere);
     if (handle.moonLight) lightRoot.remove(handle.moonLight);
+    if (handle.cinematicKey) {
+      lightRoot.remove(handle.cinematicKey, handle.cinematicKey.target);
+      handle.cinematicKey.dispose?.();
+    }
     handle.hemisphere = null;
     handle.moonLight = null;
+    handle.cinematicKey = null;
+    scene.environment = null;
+    handle.environmentTarget?.dispose?.();
+    handle.environmentSource?.dispose?.();
+    handle.environmentTarget = null;
+    handle.environmentSource = null;
   }
 
   function SetChapter(chapterIndex, chapter, state) {
@@ -219,9 +276,13 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     handle.chapterIndex = chapterIndex;
     handle.chapter = chapter;
     const profile = GetVisualProfile(chapter.id);
+    handle.environmentSource = CreateEnvironmentSource(profile, chapter.id);
+    handle.environmentTarget = pmremGenerator.fromEquirectangular(handle.environmentSource);
+    scene.environment = handle.environmentTarget.texture;
     scene.background = new THREE.Color(profile.sky);
     scene.fog = new THREE.FogExp2(profile.fog, profile.fogDensity);
     renderer.toneMappingExposure = profile.exposure;
+    postFx.SetChapter(chapter.id);
     handle.chapterScene = CreateChapterScene3D(chapter, renderProfile);
     chapterRoot.add(handle.chapterScene.root);
 
@@ -243,6 +304,11 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     moon.shadow.normalBias = 0.035;
     lightRoot.add(moon, moon.target);
     handle.moonLight = moon;
+
+    const cinematicKey = new THREE.SpotLight(profile.moon, chapter.id === "tunnel" ? 7.6 : 8.2, 15, 0.48, 1, 2);
+    cinematicKey.castShadow = false;
+    lightRoot.add(cinematicKey, cinematicKey.target);
+    handle.cinematicKey = cinematicKey;
 
     for (let index = 0; index < (chapter.hazards || []).length; index += 1) {
       const hazard = chapter.hazards[index];
@@ -276,17 +342,17 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       rig.light.position.copy(source);
       rig.target.position.copy(target);
       rig.light.distance = Math.max(7.5, distance + 1.2);
-      rig.light.angle = Math.atan2(radius * 1.15, Math.max(0.1, distance));
-      rig.light.intensity = 38 + state.suspicion * 19;
+      rig.light.angle = Math.atan2(radius * 0.62, Math.max(0.1, distance));
+      rig.light.intensity = 30 + state.suspicion * 12;
       rig.lamp.position.copy(source);
       rig.cone.position.copy(source).addScaledVector(direction, distance * 0.5);
       rig.cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), direction);
-      rig.cone.scale.set(radius, distance, 0.055);
-      rig.coneMaterial.uniforms.uOpacity.value = 0.105 + state.suspicion * 0.065;
+      rig.cone.scale.set(radius * 0.58, distance, 0.025);
+      rig.coneMaterial.uniforms.uOpacity.value = 0.032 + state.suspicion * 0.02;
       rig.pool.position.copy(target);
       rig.pool.position.y += 0.025;
-      rig.pool.scale.set(radius * 1.45, radius * 0.62, 1);
-      rig.poolMaterial.uniforms.uOpacity.value = 0.2 + state.suspicion * 0.12;
+      rig.pool.scale.set(radius * 0.88, radius * 0.38, 1);
+      rig.poolMaterial.uniforms.uOpacity.value = 0.07 + state.suspicion * 0.04;
     }
   }
 
@@ -309,9 +375,17 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     handle.cameraTarget.y = Damp(handle.cameraTarget.y, playerY + profile.camera.lookLift, 3.2, deltaTime);
     handle.cameraTarget.z = Damp(handle.cameraTarget.z, -0.45, 2, deltaTime);
     camera.lookAt(handle.cameraTarget);
+    camera.rotateZ(Math.sin(handle.time * 0.29) * 0.0012 + state.suspicion * 0.0018);
     if (handle.moonLight) {
+      handle.moonLight.position.x = camera.position.x + (chapter.id === "ferry" ? -9 : 11);
       handle.moonLight.target.position.x = camera.position.x;
       handle.moonLight.shadow.camera.updateProjectionMatrix();
+    }
+    if (handle.cinematicKey) {
+      const playerX = state.player.x * WorldScale;
+      handle.cinematicKey.position.set(playerX - state.player.facing * 1.2, playerY + 3.4, -2.55);
+      handle.cinematicKey.target.position.set(playerX, playerY + 0.82, 0.1);
+      handle.cinematicKey.intensity = (chapter.id === "tunnel" ? 7.6 : 8.2) * (1 + state.suspicion * 0.08);
     }
   }
 
@@ -321,6 +395,7 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     renderer.setSize(safeWidth, safeHeight, false);
     camera.aspect = safeWidth / safeHeight;
     camera.updateProjectionMatrix();
+    postFx.Resize(safeWidth, safeHeight, renderer.getPixelRatio());
   }
 
   function Render(state, chapter, deltaTime) {
@@ -334,9 +409,13 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     if (handle.atmosphere) {
       handle.atmosphere.points.position.x = camera.position.x;
       handle.atmosphere.points.rotation.y = handle.time * 0.006;
-      handle.atmosphere.material.opacity = 0.15 + wind * 0.08;
+      const baseOpacity = chapter.id === "tunnel" ? 0.045 : 0.07;
+      handle.atmosphere.material.opacity = baseOpacity + wind * (chapter.id === "tunnel" ? 0.018 : 0.03);
     }
-    renderer.render(scene, camera);
+    renderer.info.reset();
+    handle.chapterScene.actors.player.getWorldPosition(handle.focusWorld);
+    const focusDistance = camera.position.distanceTo(handle.focusWorld);
+    postFx.Render(scene, handle.time, focusDistance, state.suspicion);
     const info = renderer.info.render;
     handle.playerFeetProjection.set(0, 0, 0);
     handle.playerHeadProjection.set(0, 1.58, 0);
@@ -355,6 +434,8 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
       playerBottomNdcY: handle.playerFeetProjection.y,
       blenderAssets: handle.chapterScene.dynamic.blenderAssets.length,
       assetKitReady: GetSceneAssetStatus3D().ready,
+      postFxReady: postFx.enabled,
+      postFxQuality: postFx.quality,
     };
   }
 
@@ -371,6 +452,8 @@ export function CreateRender3D(canvas, initialChapter, initialState) {
     if (handle.disposed) return;
     handle.disposed = true;
     ClearChapter();
+    postFx.Dispose();
+    pmremGenerator.dispose();
     renderer.dispose();
   }
 

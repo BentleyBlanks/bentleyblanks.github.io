@@ -39,6 +39,7 @@ const sceneDataSource = readFileSync(join(rootDirectory, "Data_Scene3D.mjs"), "u
 const actorSource = readFileSync(join(rootDirectory, "Script_Actor3D.mjs"), "utf8");
 const renderSource = readFileSync(join(rootDirectory, "Script_Render3D.mjs"), "utf8");
 const sceneSource = readFileSync(join(rootDirectory, "Script_Scene3D.mjs"), "utf8");
+const postFxSource = readFileSync(join(rootDirectory, "Script_PostFX3D.mjs"), "utf8");
 const assetSource = readFileSync(join(rootDirectory, "Script_Assets3D.mjs"), "utf8");
 const assetKitSize = statSync(join(rootDirectory, "Model_ReedSignalEnvironmentKit.glb")).size;
 
@@ -234,11 +235,14 @@ assert.match(sceneSource, /InstancedMesh/, "dense reeds and terrain detail must 
 assert.match(sceneSource, /CreateWaterRipples/, "water chapters need readable moving surface detail");
 assert.match(actorSource, /CreateActor3D/, "player and civilians need procedural 3D rigs");
 assert.match(assetSource, /GLTFLoader/, "BlenderMCP-authored GLB assets need the repository-local glTF loader");
+assert.match(postFxSource, /DepthTexture/, "cinematic post-processing must use scene depth for restrained focus separation");
+assert.match(postFxSource, /uFocusDistance/, "cinematic focus must track the playable subject");
+assert.match(postFxSource, /uVignetteStrength/, "cinematic grading must keep a controlled vignette rather than CSS-only filtering");
 for (const assetName of ["Asset_SchoolFacade", "Asset_WaterSluice", "Asset_CivilianSampan", "Asset_TunnelInteriorKit", "Asset_DistantVillageCluster"]) {
   assert.match(assetSource, new RegExp(assetName), `Blender asset library missing: ${assetName}`);
 }
 assert.ok(assetKitSize > 1_000_000 && assetKitSize < 8_000_000, `embedded GLB asset kit should stay web-sized (${assetKitSize} bytes)`);
-assert.doesNotMatch(`${renderSource}\n${sceneSource}\n${actorSource}\n${assetSource}\n${sceneDataSource}`, /from\s+["']https?:\/\//, "3D runtime imports must not use a CDN");
+assert.doesNotMatch(`${renderSource}\n${sceneSource}\n${actorSource}\n${assetSource}\n${postFxSource}\n${sceneDataSource}`, /from\s+["']https?:\/\//, "3D runtime imports must not use a CDN");
 for (const [chapterId, profile] of Object.entries(ChapterVisuals)) {
   assert.ok(profile.camera.fov >= 22 && profile.camera.fov <= 28, `${chapterId}: long-lens FOV must stay between 22 and 28 degrees`);
   assert.ok(profile.camera.distance > 12, `${chapterId}: camera needs real stage depth`);

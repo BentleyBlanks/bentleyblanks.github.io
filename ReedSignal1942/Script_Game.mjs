@@ -14,8 +14,8 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808j";
-import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808j";
+} from "./Script_Rules.mjs?v=20260808n";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808n";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
@@ -513,6 +513,8 @@ function AnimationFrame(now) {
     Ui.canvas.dataset.renderChapter = stats.chapter || "school";
     Ui.canvas.dataset.blenderAssets = String(stats.blenderAssets || 0);
     Ui.canvas.dataset.assetKitReady = String(Boolean(stats.assetKitReady));
+    Ui.canvas.dataset.postFxReady = String(Boolean(stats.postFxReady));
+    Ui.canvas.dataset.postFxQuality = String(stats.postFxQuality ?? 0);
     Ui.canvas.dataset.playerScreenX = String((stats.playerNdcX * 0.5 + 0.5) * Ui.canvas.clientWidth);
     Ui.canvas.dataset.playerScreenTop = String((-stats.playerTopNdcY * 0.5 + 0.5) * Ui.canvas.clientHeight);
     Ui.canvas.dataset.playerScreenHeight = String((stats.playerTopNdcY - stats.playerBottomNdcY) * 0.5 * Ui.canvas.clientHeight);

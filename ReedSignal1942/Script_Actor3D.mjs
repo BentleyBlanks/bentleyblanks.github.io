@@ -16,16 +16,43 @@ const ActorGeometries = Object.freeze({
   belt: new THREE.BoxGeometry(0.48, 0.055, 0.28),
   satchel: new THREE.BoxGeometry(0.27, 0.32, 0.12),
   bundle: new THREE.SphereGeometry(0.17, 8, 6),
+  contactShadow: new THREE.PlaneGeometry(0.92, 0.52),
 });
 
 const RolePalettes = Object.freeze({
-  player: Object.freeze({ cloth: 0x3e5048, clothDark: 0x273630, skin: 0xb49a76, hair: 0x181813, scarf: 0x8b7150, satchel: 0x4d3826 }),
-  child: Object.freeze({ cloth: 0x6d6650, clothDark: 0x3f4235, skin: 0xb69b75, hair: 0x1a1914, scarf: 0x80704e, satchel: 0x4b3927 }),
-  mother: Object.freeze({ cloth: 0x4d5148, clothDark: 0x2b302b, skin: 0xb09670, hair: 0x171713, scarf: 0x725e42, satchel: 0x493421 }),
+  player: Object.freeze({ cloth: 0x2b3230, clothDark: 0x181f1d, skin: 0xa98f6d, hair: 0x11120f, scarf: 0x5d5140, satchel: 0x3e2f22 }),
+  child: Object.freeze({ cloth: 0x4c4b3e, clothDark: 0x292e28, skin: 0xaa906d, hair: 0x12120f, scarf: 0x665a43, satchel: 0x3d3024 }),
+  mother: Object.freeze({ cloth: 0x363d39, clothDark: 0x1d2420, skin: 0xa28868, hair: 0x11110f, scarf: 0x5d4e39, satchel: 0x392d21 }),
 });
 
 function CreateMaterial(color, roughness = 0.9) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, flatShading: false });
+}
+
+function CreateContactShadowMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uOpacity: { value: 0.28 } },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacity;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = (vUv - 0.5) * vec2(1.0, 1.65);
+        float falloff = smoothstep(0.5, 0.05, length(p));
+        gl_FragColor = vec4(vec3(0.015, 0.022, 0.019), falloff * uOpacity);
+        #include <colorspace_fragment>
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    fog: false,
+  });
 }
 
 function PrepareMesh(mesh, castShadow = true) {
@@ -63,6 +90,12 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   const palette = RolePalettes[role] || RolePalettes.player;
   const root = new THREE.Group();
   root.name = `Actor_${role}_${childIndex}`;
+  const contactShadow = PrepareMesh(new THREE.Mesh(ActorGeometries.contactShadow, CreateContactShadowMaterial()), false);
+  contactShadow.rotation.x = -Math.PI * 0.5;
+  contactShadow.position.set(0, 0.012, 0.015);
+  contactShadow.receiveShadow = false;
+  contactShadow.renderOrder = 1;
+  root.add(contactShadow);
   const rig = new THREE.Group();
   root.add(rig);
 
@@ -159,7 +192,7 @@ export function CreateActor3D(role = "player", childIndex = 0) {
 
   const roleScale = role === "child" ? 0.72 + (childIndex % 3) * 0.025 : role === "mother" ? 0.97 : 0.93;
   root.scale.setScalar(roleScale);
-  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale };
+  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, contactShadow, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale };
   return root;
 }
 
@@ -188,6 +221,9 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.coatBack.rotation.x = Damp(rig.coatBack.rotation.x, -0.04 - stride * 0.09 + speed * 0.05, 6, deltaTime);
   rig.scarfTail.rotation.z = Damp(rig.scarfTail.rotation.z, 0.08 - stride * 0.14, 5, deltaTime);
   rig.scarfTail.rotation.x = Damp(rig.scarfTail.rotation.x, speed * 0.16 + crouch * 0.08, 5, deltaTime);
+  rig.contactShadow.scale.x = Damp(rig.contactShadow.scale.x, 1 - crouch * 0.12 + speed * 0.08, 7, deltaTime);
+  rig.contactShadow.scale.y = Damp(rig.contactShadow.scale.y, 1 + crouch * 0.16, 7, deltaTime);
+  rig.contactShadow.material.uniforms.uOpacity.value = 0.24 + crouch * 0.08 + (pose.carrying ? 0.04 : 0);
 
   rig.leftLeg.root.rotation.x = Damp(rig.leftLeg.root.rotation.x, stride - crouch * 0.7, 13, deltaTime);
   rig.rightLeg.root.rotation.x = Damp(rig.rightLeg.root.rotation.x, -stride - crouch * 0.7, 13, deltaTime);

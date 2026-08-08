@@ -157,6 +157,8 @@ try {
         chapter: canvas.dataset.renderChapter,
         assetKitReady: canvas.dataset.assetKitReady === "true",
         blenderAssets: Number(canvas.dataset.blenderAssets),
+        postFxReady: canvas.dataset.postFxReady === "true",
+        postFxQuality: Number(canvas.dataset.postFxQuality),
         width: canvas.clientWidth,
         height: canvas.clientHeight,
         playerScreenX: Number(canvas.dataset.playerScreenX),
@@ -171,6 +173,8 @@ try {
     Assert(runtime.quality === "desktop", `${probe.id}: 桌面视觉档生效`);
     Assert(runtime.assetKitReady, `${probe.id}: BlenderMCP 原创 GLB 资产包已加载`);
     Assert(runtime.blenderAssets >= probe.minimumAssets, `${probe.id}: Blender 资产实例达到构图要求（${runtime.blenderAssets}）`);
+    Assert(runtime.postFxReady, `${probe.id}: 深度感知电影化后处理已启用`);
+    Assert(runtime.postFxQuality >= 0.95, `${probe.id}: 桌面后处理质量档生效（${runtime.postFxQuality.toFixed(2)}）`);
     Assert(runtime.glError === 0, `${probe.id}: WebGL 无错误（${runtime.glError}）`);
     Assert(runtime.calls > 25 && runtime.calls < 260, `${probe.id}: draw calls 受控（${runtime.calls}）`);
     Assert(runtime.triangles > 1000 && runtime.triangles < 150000, `${probe.id}: 三角形预算受控（${runtime.triangles}）`);

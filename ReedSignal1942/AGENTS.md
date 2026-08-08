@@ -45,6 +45,7 @@
 - `Script_Actor3D.mjs`：程序化角色、衣着层次与骨架动画；只读角色状态。
 - `Script_Scene3D.mjs`：程序化 3D 场景和动态布景；只读玩法状态。
 - `Script_Render3D.mjs`：Three.js 渲染器、相机、灯光、雾、色调映射与章节重建。
+- `Script_PostFX3D.mjs`：基于颜色与深度缓冲的克制景深、分离调色、微光、颗粒与暗角；焦点必须跟随玩家，移动端使用低质量档。
 - `Script_Game.mjs`：DOM、输入、程序化音频与流程集成；不得包含 Canvas 2D 绘制回退。
 - `Script_SmokeTest.mjs`：纯 Node 冒烟测试，含机器人通关与机制断言。
 - `Script_RenderHealthTest.mjs`：真实浏览器逐章渲染、像素、取景与性能检查。

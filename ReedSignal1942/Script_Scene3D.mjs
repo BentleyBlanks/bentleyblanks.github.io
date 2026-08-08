@@ -1,7 +1,7 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808j";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808j";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808j";
+import { GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808n";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808n";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808n";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -36,6 +36,38 @@ function CreateCanvasTexture(baseColor, fleckColor, seed = 1) {
   return texture;
 }
 
+function CreateWaterTexture(seed = 1) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  const random = CreateRandom(seed);
+  context.fillStyle = "#777777";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (let band = 0; band < 58; band += 1) {
+    const y = random() * canvas.height;
+    const amplitude = 1.5 + random() * 5.5;
+    const frequency = 0.012 + random() * 0.025;
+    context.beginPath();
+    for (let x = -8; x <= canvas.width + 8; x += 6) {
+      const waveY = y + Math.sin(x * frequency + random() * 0.7) * amplitude;
+      if (x < 0) context.moveTo(x, waveY);
+      else context.lineTo(x, waveY);
+    }
+    const lightness = Math.round(104 + random() * 68);
+    context.strokeStyle = `rgba(${lightness},${lightness},${lightness},${0.08 + random() * 0.2})`;
+    context.lineWidth = 0.5 + random() * 2.1;
+    context.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(7.5, 4.5);
+  texture.anisotropy = 4;
+  return texture;
+}
+
 function CreateSkyTexture(profile, chapterId) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -56,21 +88,34 @@ function CreateSkyTexture(profile, chapterId) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   const random = CreateRandom(3401 + chapterId.length * 71);
   context.globalCompositeOperation = "screen";
-  for (let index = 0; index < 34; index += 1) {
+  for (let index = 0; index < 18; index += 1) {
     const y = 54 + random() * 310;
-    const width = 90 + random() * 270;
-    const cloud = context.createLinearGradient(0, y, width, y);
-    cloud.addColorStop(0, "rgba(220,225,210,0)");
-    cloud.addColorStop(0.48, `rgba(210,219,205,${0.012 + random() * 0.035})`);
+    const x = random() * 512;
+    const width = 120 + random() * 260;
+    const cloud = context.createRadialGradient(x, y, 0, x, y, width * 0.52);
+    cloud.addColorStop(0, `rgba(210,219,205,${0.018 + random() * 0.04})`);
+    cloud.addColorStop(0.55, `rgba(190,203,192,${0.008 + random() * 0.018})`);
     cloud.addColorStop(1, "rgba(220,225,210,0)");
     context.fillStyle = cloud;
-    context.fillRect(random() * 512 - 70, y, width, 1 + random() * 4);
+    const stretch = 0.18 + random() * 0.18;
+    context.save();
+    context.scale(1, stretch);
+    context.fillRect(x - width, (y - width) / stretch, width * 2, width * 2 / stretch);
+    context.restore();
   }
   context.globalCompositeOperation = "source-over";
   context.globalAlpha = 0.035;
   context.fillStyle = `#${new THREE.Color(profile.fog).getHexString()}`;
   for (let index = 0; index < 1700; index += 1) context.fillRect(random() * 512, random() * 512, 1, 1);
   context.globalAlpha = 1;
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < image.data.length; index += 4) {
+    const dither = Math.floor(random() * 5) - 2;
+    image.data[index] = Math.max(0, Math.min(255, image.data[index] + dither));
+    image.data[index + 1] = Math.max(0, Math.min(255, image.data[index + 1] + dither));
+    image.data[index + 2] = Math.max(0, Math.min(255, image.data[index + 2] + dither));
+  }
+  context.putImageData(image, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -106,13 +151,16 @@ function CreateMaterial(color, options = {}) {
     color,
     roughness: options.roughness ?? 0.94,
     metalness: options.metalness ?? 0,
-    flatShading: options.flatShading ?? true,
+    flatShading: options.flatShading ?? false,
     transparent: Boolean(options.transparent),
     opacity: options.opacity ?? 1,
     side: options.side ?? THREE.FrontSide,
     emissive: options.emissive ?? 0x000000,
     emissiveIntensity: options.emissiveIntensity ?? 0,
     map: options.map || null,
+    bumpMap: options.bumpMap || null,
+    bumpScale: options.bumpScale ?? 0,
+    roughnessMap: options.roughnessMap || null,
     alphaTest: options.alphaTest ?? 0,
     depthWrite: options.depthWrite ?? true,
     vertexColors: Boolean(options.vertexColors),
@@ -391,18 +439,57 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic) {
 }
 
 function BuildTerrain(root, chapter, materials, dynamic) {
-  const terrainDepth = chapter.id === "tunnel" ? 5.4 : 4.75;
-  const terrainZ = chapter.id === "tunnel" ? -1.05 : -1.28;
+  const terrainDepth = chapter.id === "tunnel" ? 4.75 : 4.1;
+  const terrainZ = chapter.id === "tunnel" ? -1.88 : -1.65;
+  const terrainThickness = chapter.id === "tunnel" ? 0.22 : 0.3;
+  const terrainSkin = [materials.terrainSide, materials.terrainSide, materials.ground, materials.terrainSide, materials.terrainSide, materials.terrainSide];
   for (const segment of chapter.terrain) {
     const width = (segment.x1 - segment.x0) * WorldScale;
     const x = (segment.x0 + segment.x1) * 0.5 * WorldScale;
     const y = segment.y * WorldScale;
-    const mesh = AddBox(root, [width + 0.03, 0.72, terrainDepth], [x, y - 0.36, terrainZ], segment.dynamic ? materials.wood : materials.ground);
+    const mesh = AddBox(root, [width + 0.03, terrainThickness, terrainDepth], [x, y - terrainThickness * 0.5, terrainZ], segment.dynamic ? materials.wood : terrainSkin);
     if (segment.dynamic) {
       mesh.visible = false;
       dynamic.bridge = mesh;
     }
   }
+}
+
+function BuildForegroundFraming(root, chapter, materials, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const padding = 10;
+  const span = length + padding * 2;
+  const segments = Math.max(64, Math.ceil(span / 0.42));
+  const positions = [];
+  const indices = [];
+  for (let index = 0; index <= segments; index += 1) {
+    const x = -padding + span * index / segments;
+    const topY = GetTerrainY(chapter, x) - 0.92 + Math.sin(index * 1.71) * 0.025 + Math.sin(index * 0.37) * 0.035;
+    const z = 2.18 + Math.sin(index * 0.29) * 0.08;
+    positions.push(x, topY, z, x, topY - 1.9, z + 0.03);
+    if (index < segments) {
+      const base = index * 2;
+      indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.58),
+    transparent: true,
+    opacity: 0.74,
+    depthWrite: true,
+    fog: true,
+    side: THREE.DoubleSide,
+  });
+  const mesh = AddMesh(root, geometry, material, [0, 0, 0], null, null, false);
+  mesh.renderOrder = 4;
+  dynamic.ownedGeometries.push(geometry);
+  dynamic.ownedMaterials.push(material);
+  dynamic.foreground = mesh;
 }
 
 function BuildSchool(root, chapter, materials, dynamic, profile, density) {
@@ -533,8 +620,10 @@ function BuildBlockade(root, chapter, materials, dynamic, profile, density) {
   dynamic.emptyBoat = emptyBoat;
 
   const sluice = AddBlenderAsset(root, "Asset_WaterSluice", {
-    position: [17.35, -0.12, -0.1],
-    scale: 0.72,
+    position: [17.35, -0.12, -1.45],
+    scale: 0.63,
+    materialTint: profile.plasterDark,
+    tintAmount: 0.12,
   }) || new THREE.Group();
   if (sluice.userData.blenderAsset) dynamic.blenderAssets.push(sluice);
   else {
@@ -546,7 +635,7 @@ function BuildBlockade(root, chapter, materials, dynamic, profile, density) {
     root.add(sluice);
   }
   const leverPivot = new THREE.Group();
-  leverPivot.position.set(sluice.userData.blenderAsset ? 16.72 : -0.74, sluice.userData.blenderAsset ? 2.35 : 2.12, sluice.userData.blenderAsset ? 0.38 : 0.38);
+  leverPivot.position.set(sluice.userData.blenderAsset ? 16.72 : -0.74, sluice.userData.blenderAsset ? 2.12 : 2.12, sluice.userData.blenderAsset ? -0.72 : 0.38);
   AddBox(leverPivot, [2.55, 0.12, 0.12], [1.1, 0, 0], materials.wood, [0, 0, 0.2]);
   if (sluice.userData.blenderAsset) root.add(leverPivot);
   else sluice.add(leverPivot);
@@ -589,7 +678,7 @@ function BuildSmokeParticles(root, materials, dynamic, count = 100) {
         p.z += cos(uTime * 0.35 + position.x) * 0.22;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
-        gl_PointSize = clamp(210.0 / max(1.0, -mv.z), 5.0, 22.0);
+        gl_PointSize = clamp(150.0 / max(1.0, -mv.z), 3.5, 14.0);
         vFade = 0.45 + 0.55 * fract(position.x * 3.17 + position.y * 2.31);
       }
     `,
@@ -599,7 +688,8 @@ function BuildSmokeParticles(root, materials, dynamic, count = 100) {
       void main() {
         vec2 p = gl_PointCoord - 0.5;
         float soft = smoothstep(0.5, 0.06, length(p));
-        gl_FragColor = vec4(vec3(0.64, 0.63, 0.56), soft * uOpacity * vFade);
+        gl_FragColor = vec4(vec3(0.46, 0.44, 0.38), soft * uOpacity * vFade);
+        #include <colorspace_fragment>
       }
     `,
     transparent: true,
@@ -615,9 +705,10 @@ function BuildSmokeParticles(root, materials, dynamic, count = 100) {
 }
 
 function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCount) {
-  AddBox(root, [32, 0.85, 6.6], [15, 2.65, -0.55], materials.earth, null, false);
+  AddBox(root, [32, 0.65, 4.8], [15, 2.52, -2.0], materials.earth, null, false);
   AddBox(root, [32, 4.8, 0.75], [15, 0.35, -3.55], materials.earth, null, false);
-  AddBox(root, [32, 0.5, 0.5], [15, -0.36, 2.7], materials.earthDark, null, false);
+  AddBox(root, [32, 0.16, 0.42], [15, -0.18, 0.18], materials.earthDark, null, false);
+  AddBox(root, [32, 1.6, 0.12], [15, -1.3, 1.02], materials.terrainSide, null, false);
   for (const x of [8.0, 22.2]) {
     const tunnelKit = AddBlenderAsset(root, "Asset_TunnelInteriorKit", {
       position: [x, -0.12, -0.35],
@@ -664,7 +755,7 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
   for (const low of chapter.lowCeilings || []) {
     const x = (low.x0 + low.x1) * 0.5 * WorldScale;
     const width = (low.x1 - low.x0) * WorldScale;
-    AddBox(root, [width, 0.65, 3.4], [x, 2.05, -0.55], materials.earthDark, [0, 0, (low.x0 % 3 - 1) * 0.025]);
+    AddBox(root, [width, 0.55, 2.5], [x, 1.98, -1.05], materials.earthDark, [0, 0, (low.x0 % 3 - 1) * 0.025]);
   }
   for (const x of [5.9, 22.9]) {
     AddMesh(root, new THREE.TorusGeometry(0.58, 0.16, 7, 16), materials.earthDark, [x, 2.18, -0.18], [Math.PI * 0.5, 0, 0], null, false);
@@ -710,9 +801,9 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   const signal = new THREE.Group();
   signal.position.set(20.7, 0, -0.1);
   AddBox(signal, [0.09, 3.2, 0.09], [0, 1.6, 0], materials.wood);
-  const clothMaterial = new THREE.MeshStandardMaterial({ color: 0xd2ccb6, roughness: 1, side: THREE.DoubleSide });
+  const clothMaterial = new THREE.MeshStandardMaterial({ color: 0xa9a38e, roughness: 1, side: THREE.DoubleSide });
   dynamic.ownedMaterials.push(clothMaterial);
-  const cloth = AddMesh(signal, new THREE.PlaneGeometry(0.92, 0.58, 4, 2), clothMaterial, [0.5, 2.65, 0.05], [0, 0, -0.08], null, false);
+  const cloth = AddMesh(signal, new THREE.PlaneGeometry(0.82, 0.5, 4, 2), clothMaterial, [0.45, 2.58, 0.05], [0, 0, -0.08], null, false);
   cloth.visible = false;
   dynamic.signalCloth = cloth;
   root.add(signal);
@@ -738,7 +829,7 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   AddCylinder(motherLantern, 0.055, 0.08, 0.2, [0, 0, 0], materials.metal, 8, null, false);
   const motherFlame = AddMesh(motherLantern, new THREE.SphereGeometry(0.055, 9, 6), materials.lampGlow, [0, 0.15, 0], null, [0.8, 1.45, 0.8], false);
   motherFlame.renderOrder = 4;
-  const motherLight = new THREE.PointLight(profile.accent, 10, 4.2, 1.85);
+  const motherLight = new THREE.PointLight(profile.accent, 3.6, 2.8, 2);
   motherLight.position.set(0, 0.18, 0.12);
   motherLantern.add(motherLight);
   motherLantern.visible = false;
@@ -754,7 +845,7 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
 
 function BuildCoverProps(root, chapter, materials, dynamic) {
   for (const cover of chapter.covers || []) {
-    if (["schoolWall", "reedBlind", "collapsedWall", "underground", "tallReeds", "reedBank", "ferryShade", "reedScreen"].includes(cover.kind)) continue;
+    if (["schoolWall", "reedBlind", "collapsedWall", "underground", "tallReeds", "reedBank", "ferryShade", "reedScreen", "sluiceWall", "boatShed"].includes(cover.kind)) continue;
     const x = (cover.x0 + cover.x1) * 0.5 * WorldScale;
     const width = (cover.x1 - cover.x0) * WorldScale;
     const y = GetTerrainY(chapter, x);
@@ -775,8 +866,32 @@ function BuildCoverProps(root, chapter, materials, dynamic) {
       }
     } else if (["haystack", "reedStack"].includes(cover.kind)) {
       for (let index = 0; index < 8; index += 1) AddCylinder(group, width * (0.34 + index * 0.015), width * (0.38 + index * 0.012), 0.22, [(index % 2 - 0.5) * width * 0.18, 0.12 + index * 0.16, (index % 3 - 1) * 0.14], materials.reed, 9, [0, 0, Math.PI * 0.5]);
+    } else if (["bank", "dike"].includes(cover.kind)) {
+      const count = Math.max(5, Math.ceil(width / 0.48));
+      const geometry = new THREE.IcosahedronGeometry(0.52, 1);
+      const stones = new THREE.InstancedMesh(geometry, materials.earth, count);
+      const matrix = new THREE.Matrix4();
+      const position = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      for (let index = 0; index < count; index += 1) {
+        const t = count === 1 ? 0.5 : index / (count - 1);
+        position.set((t - 0.5) * width, 0.24 + Math.sin(index * 1.73) * 0.08, (index % 3 - 1) * 0.13);
+        quaternion.setFromEuler(new THREE.Euler(index * 0.31, index * 0.57, index * 0.19));
+        scale.set(0.68 + (index % 3) * 0.13, 0.5 + (index % 2) * 0.2, 0.8 + (index % 4) * 0.08);
+        matrix.compose(position, quaternion, scale);
+        stones.setMatrixAt(index, matrix);
+      }
+      stones.instanceMatrix.needsUpdate = true;
+      stones.castShadow = true;
+      stones.receiveShadow = true;
+      group.add(stones);
+    } else if (cover.kind === "ditch") {
+      const lipWidth = Math.min(0.48, width * 0.24);
+      AddBox(group, [lipWidth, 0.24, 1.15], [-width * 0.5 + lipWidth * 0.5, 0.05, 0], materials.earth, [0, 0, 0.08]);
+      AddBox(group, [lipWidth, 0.2, 1.05], [width * 0.5 - lipWidth * 0.5, 0.02, 0.04], materials.earthDark, [0, 0, -0.06]);
     } else {
-      const height = cover.kind === "boatShed" ? 1.55 : cover.kind === "sluiceWall" ? 1.2 : cover.kind === "dike" ? 0.78 : 0.68;
+      const height = 0.68;
       AddBox(group, [width, height, cover.kind === "ditch" ? 1.8 : 1.05], [0, height * 0.5, 0], cover.kind === "boatShed" ? materials.woodDark : materials.earth);
     }
     root.add(group);
@@ -803,14 +918,16 @@ function CreateActionCues(root, chapter, materials, dynamic) {
 function CreateMaterials(profile, dynamic, chapterId) {
   const earthTexture = CreateCanvasTexture("#5a4934", "#8b7655", 81);
   const plasterTexture = CreateCanvasTexture("#777665", "#a9a38b", 82);
-  dynamic.ownedTextures.push(earthTexture, plasterTexture);
+  const waterTexture = CreateWaterTexture(1942 + chapterId.length * 31);
+  dynamic.ownedTextures.push(earthTexture, plasterTexture, waterTexture);
   const tunnel = chapterId === "tunnel";
   const materials = {
-    ground: CreateMaterial(profile.ground, { map: earthTexture, emissive: tunnel ? 0x1b1008 : 0x000000, emissiveIntensity: tunnel ? 0.8 : 0 }),
-    earth: CreateMaterial(profile.earth, { map: earthTexture, emissive: tunnel ? 0x160d07 : 0x000000, emissiveIntensity: tunnel ? 0.4 : 0 }),
-    earthDark: CreateMaterial(new THREE.Color(profile.earth).multiplyScalar(0.55), { map: earthTexture, emissive: tunnel ? 0x120b06 : 0x000000, emissiveIntensity: tunnel ? 0.3 : 0 }),
-    plaster: CreateMaterial(profile.plaster, { map: plasterTexture }),
-    plasterDark: CreateMaterial(profile.plasterDark, { map: plasterTexture }),
+    ground: CreateMaterial(profile.ground, { map: earthTexture, bumpMap: earthTexture, bumpScale: 0.075, emissive: tunnel ? 0x1b1008 : 0x000000, emissiveIntensity: tunnel ? 0.8 : 0 }),
+    terrainSide: CreateMaterial(new THREE.Color(profile.ground).multiplyScalar(tunnel ? 0.5 : 0.42), { map: earthTexture, bumpMap: earthTexture, bumpScale: 0.055, emissive: tunnel ? 0x120a05 : 0x050706, emissiveIntensity: tunnel ? 0.42 : 0.16 }),
+    earth: CreateMaterial(profile.earth, { map: earthTexture, bumpMap: earthTexture, bumpScale: 0.09, emissive: tunnel ? 0x160d07 : 0x000000, emissiveIntensity: tunnel ? 0.4 : 0 }),
+    earthDark: CreateMaterial(new THREE.Color(profile.earth).multiplyScalar(0.55), { map: earthTexture, bumpMap: earthTexture, bumpScale: 0.065, emissive: tunnel ? 0x120b06 : 0x000000, emissiveIntensity: tunnel ? 0.3 : 0 }),
+    plaster: CreateMaterial(profile.plaster, { map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.035 }),
+    plasterDark: CreateMaterial(profile.plasterDark, { map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.025 }),
     wood: CreateMaterial(profile.wood, { emissive: tunnel ? 0x120a04 : 0x000000, emissiveIntensity: tunnel ? 0.22 : 0 }),
     woodDark: CreateMaterial(new THREE.Color(profile.wood).multiplyScalar(0.56)),
     roof: CreateMaterial(new THREE.Color(profile.plasterDark).multiplyScalar(0.62)),
@@ -825,8 +942,8 @@ function CreateMaterials(profile, dynamic, chapterId) {
     shaftGlow: new THREE.MeshBasicMaterial({ color: profile.moon, transparent: true, opacity: 0.065, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }),
     shaftPool: new THREE.MeshBasicMaterial({ color: profile.moon, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }),
     waterRipple: new THREE.MeshBasicMaterial({ color: profile.moon, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }),
-    water: new THREE.MeshPhysicalMaterial({ color: profile.water, roughness: 0.28, metalness: 0.02, transparent: true, opacity: 0.88, clearcoat: 0.32, clearcoatRoughness: 0.48, side: THREE.DoubleSide, emissive: new THREE.Color(profile.water).multiplyScalar(0.11), emissiveIntensity: 0.28 }),
-    waterFar: new THREE.MeshStandardMaterial({ color: new THREE.Color(profile.water).multiplyScalar(0.9), roughness: 0.34, metalness: 0, transparent: true, opacity: 0.82, side: THREE.DoubleSide, emissive: new THREE.Color(profile.water).multiplyScalar(0.08), emissiveIntensity: 0.22 }),
+    water: new THREE.MeshPhysicalMaterial({ color: profile.water, roughness: 0.24, metalness: 0.04, transparent: true, opacity: 0.9, clearcoat: 0.72, clearcoatRoughness: 0.3, bumpMap: waterTexture, bumpScale: 0.075, side: THREE.DoubleSide, emissive: new THREE.Color(profile.water).multiplyScalar(0.08), emissiveIntensity: 0.2 }),
+    waterFar: new THREE.MeshStandardMaterial({ color: new THREE.Color(profile.water).multiplyScalar(0.82), roughness: 0.28, metalness: 0.03, transparent: true, opacity: 0.86, bumpMap: waterTexture, bumpScale: 0.045, side: THREE.DoubleSide, emissive: new THREE.Color(profile.water).multiplyScalar(0.055), emissiveIntensity: 0.16 }),
     reedSway: CreateReedMaterial(profile.reed),
   };
   materials.water.onBeforeCompile = (shader) => {
@@ -853,6 +970,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     blenderAssets: [],
     shaftLights: [],
     mistLayers: [],
+    foreground: null,
     bridge: null,
     cart: null,
     water: null,
@@ -877,6 +995,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   if (chapter.id === "tunnel") BuildTunnel(root, chapter, materials, dynamic, profile, density, renderProfile.dustCount);
   if (chapter.id === "ferry") BuildFerry(root, chapter, materials, dynamic, profile, density);
   BuildCoverProps(root, chapter, materials, dynamic);
+  BuildForegroundFraming(root, chapter, materials, dynamic);
   CreateActionCues(root, chapter, materials, dynamic);
 
   const actors = {
@@ -937,7 +1056,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       if (dynamic.motherLantern) {
         dynamic.motherLantern.visible = state.completed.has("meetMother") && !state.endingReady;
         dynamic.motherLantern.position.set(dynamic.motherX - 0.22, 0.62 + Math.sin(time * 2.1) * 0.025, 0.44);
-        dynamic.motherLanternLight.intensity = signaled ? 16 : 10;
+        dynamic.motherLanternLight.intensity = signaled ? 5.2 : 3.6;
       }
     }
     for (const [requirement, object] of dynamic.requires) object.visible = state.completed.has(requirement);
@@ -978,7 +1097,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       dynamic.smoke.position.y = -0.1 + Math.sin(time * 0.45) * 0.08;
       dynamic.smoke.rotation.y = time * 0.025;
       dynamic.smoke.material.uniforms.uTime.value = time;
-      dynamic.smoke.material.uniforms.uOpacity.value = state.completed.has("openWellVent") ? 0.11 : 0.2;
+      dynamic.smoke.material.uniforms.uOpacity.value = state.completed.has("openWellVent") ? 0.075 : 0.13;
     }
     const reedShader = materials.reedSway.userData.shader;
     if (reedShader) {
@@ -987,6 +1106,10 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }
     const waterShader = materials.water.userData.shader;
     if (waterShader) waterShader.uniforms.uTime.value = time;
+    if (materials.water.bumpMap) {
+      materials.water.bumpMap.offset.x = (time * 0.006) % 1;
+      materials.water.bumpMap.offset.y = (time * -0.0035) % 1;
+    }
   }
 
   function Dispose() {
