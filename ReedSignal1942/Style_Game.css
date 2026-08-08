@@ -113,6 +113,14 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .cinematicCopy > span { display: block; width: 42px; height: 1px; margin: 0 auto 11px; background: rgba(215,170,98,.82); }
 .cinematicCopy p { min-height: 1.6em; margin: 0; color: #ece8d8; font-size: clamp(15px, 1.7vw, 20px); line-height: 1.62; letter-spacing: .04em; }
 .cinematicCopy button { margin-top: 8px; padding: 5px 10px; border: 0; color: rgba(223,228,217,.54); background: transparent; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 9px; letter-spacing: .16em; cursor: pointer; pointer-events: auto; }
+.cinematicOverlay:not([hidden]) .cinematicBarTop { animation: CinematicBarTopIn .52s cubic-bezier(.2,.78,.18,1) both; }
+.cinematicOverlay:not([hidden]) .cinematicBarBottom { animation: CinematicBarBottomIn .52s cubic-bezier(.2,.78,.18,1) both; }
+.cinematicOverlay:not([hidden]) .cinematicCopy { animation: CinematicCopyIn .58s .12s ease-out both; }
+.cinematicOverlay.isShotCut .cinematicCopy p { animation: CinematicCaptionCut .42s cubic-bezier(.2,.72,.2,1) both; }
+@keyframes CinematicBarTopIn { from { transform: translateY(-105%); } to { transform: translateY(0); } }
+@keyframes CinematicBarBottomIn { from { transform: translateY(105%); } to { transform: translateY(0); } }
+@keyframes CinematicCopyIn { from { opacity: 0; transform: translate(-50%,12px); } to { opacity: 1; transform: translate(-50%,0); } }
+@keyframes CinematicCaptionCut { from { opacity: 0; transform: translateY(8px); filter: blur(2px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
 .isCinematic .gameHeader, .isCinematic .objectiveCard, .isCinematic .windCard, .isCinematic .suspicionCard, .isCinematic .teamCard, .isCinematic .interactionPrompt, .isCinematic .controlGuide, .isCinematic .touchControls { opacity: 0; pointer-events: none; transition: opacity .28s ease; }
 
 .panelScreen { display: grid; place-items: center; padding: 28px; background: rgba(6,11,12,.86); backdrop-filter: blur(9px); }
@@ -150,6 +158,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--amber); ou
 .rollCallList li { padding: 8px; color: transparent; border-bottom: 1px solid rgba(223,228,217,.1); transition: color .45s ease, border-color .45s ease; }
 .rollCallList li.isCalled { color: var(--paper); border-color: var(--amber); }
 .rollCallList li span { display: block; color: #9da8a0; font-size: 11px; }
+.rollCallList li[data-silent="true"].isCalled { color: #aeb7b0; border-color: rgba(223,228,217,.18); }
+.rollCallList li[data-silent="true"] span { color: #6f7a74; }
 .endingScreen blockquote { margin: 25px auto; padding: 22px; border-top: 1px solid rgba(215,170,98,.5); border-bottom: 1px solid rgba(215,170,98,.5); font-size: 19px; line-height: 1.8; }
 .endingScreen blockquote span, .endingScreen blockquote i, .endingScreen blockquote strong { display: block; }
 .endingScreen blockquote i { color: #8e9992; font-size: 14px; }

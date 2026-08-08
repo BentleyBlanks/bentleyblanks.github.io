@@ -1,5 +1,5 @@
-import { Chapters, GameMetadata, GetChapter } from "./Data_World.mjs?v=20260808w";
-import { GetCinematicCue } from "./Data_Scene3D.mjs?v=20260808w";
+import { Chapters, GameMetadata, GetChapter } from "./Data_World.mjs?v=20260808y";
+import { GetCinematicCue } from "./Data_Scene3D.mjs?v=20260808y";
 
 export const RuleConstants = Object.freeze({
   walkSpeed: 178,

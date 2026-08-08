@@ -1,5 +1,5 @@
-import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808w";
-import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808w";
+import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808y";
+import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808y";
 import {
   CreateGameState,
   RestoreGameState,
@@ -15,9 +15,9 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808w";
-import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808w";
-import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808w";
+} from "./Script_Rules.mjs?v=20260808y";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808y";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808y";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
@@ -220,6 +220,9 @@ function UpdateCinematic(deltaTime) {
     Ui.cinematicSkip.hidden = !frame.canSkip;
     if (frame.eventKey !== Runtime.lastCinematicEvent) {
       Runtime.lastCinematicEvent = frame.eventKey;
+      Ui.cinematicOverlay.classList.remove("isShotCut");
+      void Ui.cinematicOverlay.offsetWidth;
+      Ui.cinematicOverlay.classList.add("isShotCut");
       if (frame.soundCue) PlayTone(frame.soundCue);
     }
     Ui.storyCaption.hidden = true;
@@ -436,11 +439,17 @@ function ShowEnding() {
   Ui.endingQuote.hidden = true;
   Ui.endingHistory.hidden = true;
   Ui.endingActions.hidden = true;
-  Ui.rollCallList.replaceChildren(...GetAllChildNames().map((name) => {
+  const rollCallEntries = [
+    ...GetAllChildNames().map((name) => ({ name, response: "到" })),
+    { name: "阿苇", response: "到" },
+    { name: "周禾老师", response: "没有回答", silent: true },
+  ];
+  Ui.rollCallList.replaceChildren(...rollCallEntries.map((entry) => {
     const item = document.createElement("li");
-    item.textContent = name;
+    item.textContent = entry.name;
+    if (entry.silent) item.dataset.silent = "true";
     const response = document.createElement("span");
-    response.textContent = "到";
+    response.textContent = entry.response;
     item.append(response);
     return item;
   }));
@@ -452,7 +461,10 @@ function BeginRollCall() {
   Ui.rollCallButton.hidden = true;
   const items = [...Ui.rollCallList.children];
   items.forEach((item, index) => {
-    window.setTimeout(() => { item.classList.add("isCalled"); PlayTone("soft"); }, 420 + index * 660);
+    window.setTimeout(() => {
+      item.classList.add("isCalled");
+      if (item.dataset.silent !== "true") PlayTone("soft");
+    }, 420 + index * 660);
   });
   window.setTimeout(() => { Ui.endingQuote.hidden = false; PlayTone("bell"); }, 650 + items.length * 660);
   window.setTimeout(() => {
@@ -619,9 +631,11 @@ function AnimationFrame(now) {
 function HandleKeyDown(event) {
   const code = event.code;
   if (["ArrowLeft", "ArrowRight", "ArrowDown", "Space", "KeyA", "KeyD", "KeyS", "KeyE", "KeyF"].includes(code)) event.preventDefault();
-  if (!event.repeat && Runtime.cinematics.IsPlaying()) InputState.cinematicSkipPressed = true;
+  if (Runtime.cinematics.IsPlaying()) {
+    if (code === "Escape" && !event.repeat) InputState.cinematicSkipPressed = true;
+    return;
+  }
   if (code === "Escape") {
-    if (Runtime.cinematics.IsPlaying()) return;
     if (!Ui.history.hidden) CloseHistory();
     else if (Runtime.state?.mode === "paused") ResumeGame();
     else PauseGame();
@@ -652,9 +666,9 @@ function BindTouchControls() {
     const press = (event) => {
       event.preventDefault();
       ResumeAudio();
+      if (Runtime.cinematics.IsPlaying()) return;
       button.setPointerCapture?.(event.pointerId);
       button.classList.add("isHeld");
-      if (Runtime.cinematics.IsPlaying()) InputState.cinematicSkipPressed = true;
       if (["left", "right", "crouch"].includes(name)) InputState[name] = true;
       if (name === "interact") { InputState.interact = true; InputState.interactPressed = true; }
       if (name === "jump") InputState.jumpPressed = true;

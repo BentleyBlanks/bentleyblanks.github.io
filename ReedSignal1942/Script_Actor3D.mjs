@@ -19,6 +19,10 @@ const ActorGeometries = Object.freeze({
   coatBack: new THREE.BoxGeometry(0.34, 0.58, 0.045),
   belt: new THREE.BoxGeometry(0.48, 0.055, 0.28),
   satchel: new THREE.BoxGeometry(0.27, 0.32, 0.12),
+  registerCover: new THREE.BoxGeometry(0.245, 0.31, 0.035),
+  registerPages: new THREE.BoxGeometry(0.218, 0.282, 0.026),
+  registerBinding: new THREE.BoxGeometry(0.032, 0.315, 0.048),
+  registerLine: new THREE.BoxGeometry(0.12, 0.009, 0.006),
   bundle: new THREE.SphereGeometry(0.17, 8, 6),
   contactShadow: new THREE.PlaneGeometry(0.92, 0.52),
 });
@@ -120,6 +124,7 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   const hair = CreateMaterial(palette.hair, 0.98);
   const scarfMaterial = CreateMaterial(palette.scarf, 0.94);
   const satchelMaterial = CreateMaterial(palette.satchel, 1);
+  const paperMaterial = CreateMaterial(0xb9aa86, 1);
 
   const pelvis = new THREE.Group();
   pelvis.position.y = 0.86;
@@ -186,10 +191,12 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   pelvis.add(leftArm.root, rightArm.root);
 
   const buttonMaterial = CreateMaterial(palette.clothDark, 1);
+  const buttons = [];
   for (let index = 0; index < 3; index += 1) {
     const button = PrepareMesh(new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), buttonMaterial), false);
     button.position.set(0, 0.43 - index * 0.16, 0.198);
     pelvis.add(button);
+    buttons.push(button);
   }
 
   const satchel = PrepareMesh(new THREE.Mesh(ActorGeometries.satchel, satchelMaterial));
@@ -201,6 +208,27 @@ export function CreateActor3D(role = "player", childIndex = 0) {
   strap.rotation.z = -0.5;
   pelvis.add(strap);
 
+  const registerBook = new THREE.Group();
+  registerBook.name = "Prop_RollCallRegister";
+  const registerCover = PrepareMesh(new THREE.Mesh(ActorGeometries.registerCover, satchelMaterial), false);
+  const registerPages = PrepareMesh(new THREE.Mesh(ActorGeometries.registerPages, paperMaterial), false);
+  const registerBinding = PrepareMesh(new THREE.Mesh(ActorGeometries.registerBinding, clothDark), false);
+  registerPages.position.z = 0.026;
+  registerBinding.position.set(-0.112, 0, 0.01);
+  registerBook.add(registerCover, registerPages, registerBinding);
+  const registerLines = PrepareMesh(new THREE.InstancedMesh(ActorGeometries.registerLine, clothDark, 3), false);
+  const registerLineMatrix = new THREE.Matrix4();
+  for (let index = 0; index < 3; index += 1) {
+    registerLineMatrix.makeTranslation(0.025, 0.062 - index * 0.062, 0.043);
+    registerLines.setMatrixAt(index, registerLineMatrix);
+  }
+  registerLines.instanceMatrix.needsUpdate = true;
+  registerBook.add(registerLines);
+  registerBook.position.set(0.04, 0.36, 0.3);
+  registerBook.rotation.set(-0.18, 0, -0.06);
+  registerBook.visible = false;
+  pelvis.add(registerBook);
+
   const carriedBundle = new THREE.Group();
   const blanket = PrepareMesh(new THREE.Mesh(ActorGeometries.bundle, scarfMaterial));
   blanket.scale.set(1.35, 1.65, 1.1);
@@ -211,13 +239,16 @@ export function CreateActor3D(role = "player", childIndex = 0) {
 
   const roleScale = role === "child" ? 0.72 + (childIndex % 3) * 0.025 : role === "mother" ? 0.97 : 0.93;
   root.scale.setScalar(roleScale);
-  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, contactShadow, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, carriedBundle, roleScale, role, childIndex };
+  root.userData.lodOptional = [contactShadow, coatBack, scarfTail, belt, satchel, strap, ...buttons];
+  root.userData.rig = { rig, pelvis, torso, shoulders, coatBack, scarfTail, contactShadow, headPivot, braid, leftLeg, rightLeg, leftArm, rightArm, satchel, registerBook, carriedBundle, roleScale, role, childIndex };
   root.userData.motion = {
     phase: childIndex * 0.73 + (role === "mother" ? 0.31 : 0),
     velocity: 0,
     acceleration: 0,
     turn: 0,
     fear: 0,
+    gaitBlend: 0,
+    action: "",
     initialized: false,
   };
   return root;
@@ -236,6 +267,23 @@ function Clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function SmoothStep(edge0, edge1, value) {
+  const t = Clamp((value - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function BackOut(value) {
+  const t = Clamp(value, 0, 1) - 1;
+  return 1 + 2.35 * t * t * t + 1.35 * t * t;
+}
+
+function Bell(value, center, width) {
+  const distance = Math.abs(value - center) / Math.max(0.0001, width);
+  if (distance >= 1) return 0;
+  const t = 1 - distance;
+  return t * t * (3 - 2 * t);
+}
+
 export function UpdateActor3D(actor, pose, deltaTime) {
   const rig = actor.userData.rig;
   const motion = actor.userData.motion;
@@ -248,11 +296,17 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   motion.acceleration = Damp(motion.acceleration, rawAcceleration, 7.5, safeDelta);
   const moving = Math.abs(motion.velocity) > 0.055;
   const speed = Math.min(1.25, Math.abs(motion.velocity) / 1.58);
-  motion.phase += safeDelta * (moving ? 3.1 + speed * 6.8 : 0.72);
+  motion.gaitBlend = Damp(motion.gaitBlend, moving ? 1 : 0, moving ? 8.5 : 5.2, safeDelta);
+  motion.phase += safeDelta * (moving ? 3.35 + speed * 7.4 : 0.54);
   const phase = motion.phase + (pose.phase || 0);
   const stepSin = Math.sin(phase);
   const stepCos = Math.cos(phase);
-  const stride = moving ? stepSin * (0.18 + speed * 0.46) : 0;
+  const gait = motion.gaitBlend;
+  const stride = stepSin * (0.16 + speed * 0.5) * gait;
+  const leftLift = Math.max(0, -stepCos) * gait;
+  const rightLift = Math.max(0, stepCos) * gait;
+  const plantedLeft = Math.max(0, stepCos) * gait;
+  const plantedRight = Math.max(0, -stepCos) * gait;
   const crouch = pose.crouching ? 1 : 0;
   const held = pose.holding ? 1 : 0;
   const time = pose.time || 0;
@@ -264,32 +318,53 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   const breathRate = 1.65 + motion.fear * 1.45 + (pose.carrying ? 0.32 : 0);
   const breath = Math.sin(time * breathRate + (pose.phase || 0)) * (0.011 + motion.fear * 0.007);
   const gesture = pose.action || "";
+  motion.action = gesture;
   const gestureDuration = Math.max(0.35, pose.actionDuration || 1.4);
   const gestureProgress = Clamp((pose.actionTime || 0) / gestureDuration, 0, 1);
-  const gestureBeat = Math.sin(gestureProgress * Math.PI) * Math.sin((pose.actionTime || 0) * 4.2 + (pose.phase || 0));
+  const gestureAttack = BackOut(SmoothStep(0, 0.24, gestureProgress));
+  const gestureArc = Math.sin(gestureProgress * Math.PI);
+  const gestureBeat = Math.sin(gestureProgress * Math.PI * 4.5 + (pose.phase || 0));
   const startStopLean = Clamp(motion.acceleration * 0.035, -0.16, 0.16);
   const idleWeight = Math.sin(time * 0.62 + rig.childIndex * 0.91) * (1 - Math.min(1, speed)) * 0.025;
   const airborne = pose.grounded === false ? 1 : 0;
 
-  // Gestures are intentionally made from the existing low-poly rig.  A clear
-  // silhouette (elbow, shoulder, head and weight shift) reads at the game's
-  // long-lens scale without adding another character model or animation file.
-  let rigY = -crouch * 0.36 + Math.max(0, Math.abs(stepSin) - 0.22) * 0.034 * speed + breath - motion.fear * 0.025;
-  let rigRotZ = -stride * 0.024 - startStopLean * (pose.facing >= 0 ? 1 : -1) + idleWeight;
+  // Locomotion starts at the planted foot: hips drop over contact, shoulders
+  // counter-rotate, and the head resists the body's acceleration.  This keeps
+  // the low-poly silhouette readable while giving every step visible weight.
+  let rigY = -crouch * 0.36 + (leftLift + rightLift) * 0.026 * speed + Math.abs(stepSin) * 0.018 * gait + breath - motion.fear * 0.025;
+  let rigRotX = startStopLean * 0.16;
+  let rigRotZ = -stride * 0.035 - startStopLean * (pose.facing >= 0 ? 1 : -1) + idleWeight;
   let pelvisRotX = crouch * 0.38 + (pose.carrying ? 0.12 : 0) + startStopLean * 0.72;
-  let pelvisRotZ = stepCos * 0.032 * speed + idleWeight * 0.42;
+  let pelvisRotY = -stepSin * 0.082 * speed * gait - motion.turn * 0.04;
+  let pelvisRotZ = (plantedLeft - plantedRight) * 0.052 * speed + idleWeight * 0.42;
+  let torsoRotX = -startStopLean * 0.24;
+  let torsoRotZ = -pelvisRotZ * 0.32;
+  let shouldersRotX = 0;
+  let shouldersRotY = stepSin * 0.105 * speed * gait + motion.turn * 0.07;
+  let shouldersRotZ = -motion.turn * 0.075 - pelvisRotZ * 0.5;
   let headRotX = crouch * -0.16 + motion.fear * 0.085 - startStopLean * 0.28;
   let headRotY = (pose.lookOffset || 0) - motion.turn * 0.26 + Math.sin(time * 3.7 + rig.childIndex) * motion.fear * 0.035;
+  let headRotZ = -rigRotZ * 0.28 + Math.sin(time * 0.43 + rig.childIndex) * 0.012;
   let leftArmX = -stride * 0.52 + (pose.carrying ? -0.78 : 0) + startStopLean * 0.28;
   let rightArmX = stride * 0.48 + (pose.carrying ? -0.78 : 0) + startStopLean * 0.24;
   let leftArmLowerX = pose.carrying ? -1.08 : -0.18;
   let rightArmLowerX = pose.carrying ? -1.08 : -0.18;
   let leftArmZ = held ? -0.55 : -0.08;
   let rightArmZ = held ? 0.12 : 0.08;
+  let leftArmY = -stepCos * 0.035 * gait;
+  let rightArmY = stepCos * 0.035 * gait;
+  let leftHandX = -0.08;
+  let rightHandX = -0.08;
   let leftLegX = stride - crouch * 0.7;
   let rightLegX = -stride - crouch * 0.7;
-  let leftLowerLegX = Math.max(0, -stepSin) * 0.62 * speed + crouch * 1.1;
-  let rightLowerLegX = Math.max(0, stepSin) * 0.62 * speed + crouch * 1.1;
+  let leftLowerLegX = leftLift * (0.34 + speed * 0.48) + crouch * 1.1;
+  let rightLowerLegX = rightLift * (0.34 + speed * 0.48) + crouch * 1.1;
+  let leftFootX = -leftLift * (0.18 + speed * 0.28) + plantedLeft * 0.08;
+  let rightFootX = -rightLift * (0.18 + speed * 0.28) + plantedRight * 0.08;
+  let bundleX = 0.23;
+  let bundleY = 0.36;
+  let bundleZ = 0.25;
+  let bundleScale = 1;
   if (airborne) {
     const rising = (pose.verticalVelocity || 0) > 0;
     leftLegX = rising ? -0.34 : -0.12;
@@ -298,128 +373,187 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightLowerLegX = rising ? 0.68 : 1.0;
     leftArmX -= 0.28;
     rightArmX -= 0.18;
+    rigRotX -= rising ? 0.08 : -0.05;
+    leftFootX += 0.14;
+    rightFootX += 0.14;
   }
 
   if (gesture === "write" || gesture === "count") {
-    pelvisRotX += 0.16;
-    headRotX -= gesture === "write" ? 0.22 : 0.1;
-    leftArmX = -0.46;
-    rightArmX = -0.62 + gestureBeat * 0.04;
-    leftArmLowerX = -0.82;
-    rightArmLowerX = -1.02;
-    leftArmZ = -0.22;
-    rightArmZ = 0.12;
+    const writing = gesture === "write";
+    const stroke = gestureBeat * gestureAttack;
+    const countBeat = writing ? 0 : Math.abs(Math.sin(gestureProgress * Math.PI * 3)) * gestureAttack;
+    pelvisRotX += (writing ? 0.2 : 0.1) * gestureAttack;
+    pelvisRotY += (writing ? -0.09 : 0.07) * gestureAttack;
+    shouldersRotY += (writing ? 0.18 : -0.12) * gestureAttack;
+    headRotX -= (writing ? 0.3 : 0.13) * gestureAttack;
+    headRotY += stroke * 0.018;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, writing ? -0.5 : -0.34, gestureAttack);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, writing ? -0.72 + stroke * 0.11 : -0.5 - countBeat * 0.32, gestureAttack);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, writing ? -0.86 : -0.62, gestureAttack);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, writing ? -1.08 + stroke * 0.18 : -1.18 + countBeat * 0.18, gestureAttack);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.24, gestureAttack);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.15 + stroke * 0.035, gestureAttack);
+    rightHandX = -0.2 + stroke * 0.22;
   } else if (gesture === "peek" || gesture === "shield") {
-    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (gesture === "shield" ? 0.16 : 0.1);
-    rigY -= gesture === "shield" ? 0.08 : 0.035;
-    headRotX -= 0.08;
-    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.2;
-    leftArmX = gesture === "shield" ? -0.62 : -0.28;
-    rightArmX = gesture === "shield" ? -0.7 : -0.16;
-    leftArmLowerX = gesture === "shield" ? -0.88 : -0.48;
-    rightArmLowerX = gesture === "shield" ? -0.96 : -0.38;
-    leftArmZ = gesture === "shield" ? -0.32 : -0.12;
-    rightArmZ = gesture === "shield" ? 0.3 : 0.12;
+    const shield = gesture === "shield";
+    const weight = gestureAttack;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (shield ? 0.18 : 0.11) * weight;
+    rigY -= (shield ? 0.1 : 0.04) * weight;
+    pelvisRotX += 0.08 * weight;
+    shouldersRotY += (pose.facing >= 0 ? -1 : 1) * 0.12 * weight;
+    headRotX -= 0.1 * weight;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * (0.22 + gestureArc * 0.07) * weight;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, shield ? -0.68 : -0.3, weight);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, shield ? -0.76 : -0.18, weight);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, shield ? -0.94 : -0.52, weight);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, shield ? -1.02 : -0.42, weight);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, shield ? -0.36 : -0.14, weight);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, shield ? 0.34 : 0.14, weight);
   } else if (gesture === "push" || gesture === "pull" || gesture === "brace") {
-    pelvisRotX += 0.2;
-    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (gesture === "pull" ? -0.08 : 0.07);
-    rigY -= 0.045;
-    leftLegX = -0.24 - crouch * 0.44;
-    rightLegX = 0.18 - crouch * 0.44;
-    leftLowerLegX = 0.55 + crouch * 0.55;
+    const pulling = gesture === "pull";
+    const drive = SmoothStep(0.08, 0.62, gestureProgress);
+    const settle = SmoothStep(0.7, 1, gestureProgress);
+    const effort = Math.sin(gestureProgress * Math.PI * 9) * (1 - gestureProgress) * 0.025;
+    pelvisRotX += (0.12 + drive * 0.18) * gestureAttack;
+    torsoRotX += (pulling ? -0.16 : 0.18) * drive;
+    shouldersRotX += (pulling ? -0.18 : 0.14) * drive;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (pulling ? -0.1 : 0.085) * drive;
+    rigY -= (0.035 + drive * 0.055 - settle * 0.018);
+    leftLegX = -0.3 - crouch * 0.44 - drive * 0.08;
+    rightLegX = 0.2 - crouch * 0.44 + drive * 0.05;
+    leftLowerLegX = 0.58 + crouch * 0.55;
     rightLowerLegX = 0.42 + crouch * 0.55;
-    leftArmX = gesture === "pull" ? -0.96 : -1.18;
-    rightArmX = gesture === "pull" ? -1.12 : -1.28;
-    leftArmLowerX = -1.28;
-    rightArmLowerX = -1.38;
-    leftArmZ = -0.64;
-    rightArmZ = 0.42;
+    leftFootX = 0.12;
+    rightFootX = -0.08;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, pulling ? -1.02 : -1.22, drive);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, pulling ? -1.16 : -1.34, drive);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.32 + effort, drive);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.44 - effort, drive);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.68, drive);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.46, drive);
   } else if (gesture === "listen") {
-    headRotX -= 0.12;
-    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.32;
-    leftArmX = -0.42;
-    rightArmX = -0.12;
-    leftArmLowerX = -1.18;
-    rightArmLowerX = -0.34;
-    leftArmZ = -0.16;
-    rightArmZ = 0.1;
+    const listen = gestureAttack;
+    rigY -= 0.025 * listen;
+    pelvisRotZ += (pose.facing >= 0 ? -1 : 1) * 0.035 * listen;
+    headRotX -= 0.14 * listen;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * (0.34 + Math.sin(time * 0.9) * 0.04) * listen;
+    headRotZ += (pose.facing >= 0 ? -1 : 1) * 0.08 * listen;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.46, listen);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.16, listen);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.24, listen);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.38, listen);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.18, listen);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.12, listen);
   } else if (gesture === "signal") {
-    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.28;
-    leftArmX = -2.18 + gestureBeat * 0.05;
-    rightArmX = -0.18;
-    leftArmLowerX = -0.32;
-    rightArmLowerX = -0.42;
-    leftArmZ = -0.22;
-    rightArmZ = 0.12;
+    const raise = BackOut(SmoothStep(0.04, 0.55, gestureProgress));
+    const windResistance = Math.sin(gestureProgress * Math.PI * 7) * gestureArc * 0.035;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.3 * raise;
+    headRotZ -= windResistance * 0.4;
+    shouldersRotZ += 0.08 * raise;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -2.22 + windResistance, raise);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.22, raise);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.34 + windResistance * 0.7, raise);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.46, raise);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.24, raise);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.14, raise);
+    leftHandX = -0.26 + windResistance;
   } else if (gesture === "lift") {
-    rigY -= 0.12;
-    pelvisRotX += 0.32;
-    headRotX -= 0.14;
-    leftArmX = -1.22;
-    rightArmX = -1.26;
-    leftArmLowerX = -1.42;
-    rightArmLowerX = -1.42;
-    leftArmZ = -0.52;
-    rightArmZ = 0.38;
-    leftLegX = -0.52;
-    rightLegX = -0.52;
-    leftLowerLegX = 1.18;
-    rightLowerLegX = 1.14;
+    const squat = Bell(gestureProgress, 0.28, 0.28);
+    const rise = SmoothStep(0.32, 0.78, gestureProgress);
+    rigY -= 0.18 * squat;
+    pelvisRotX += 0.38 * squat + 0.12 * rise;
+    torsoRotX += 0.16 * squat - 0.08 * rise;
+    headRotX -= 0.16 * gestureAttack;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.3 + rise * 0.16, gestureAttack);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.34 + rise * 0.18, gestureAttack);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.5 + rise * 0.24, gestureAttack);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.5 + rise * 0.24, gestureAttack);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.56, gestureAttack);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.42, gestureAttack);
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.58, squat);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, -0.58, squat);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 1.22, squat);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 1.18, squat);
+    bundleX = 0.15 + rise * 0.1;
+    bundleY = -0.32 + rise * 0.68;
+    bundleZ = 0.3;
+    bundleScale = 0.88 + rise * 0.12;
   } else if (gesture === "pass") {
-    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.06;
-    headRotX -= 0.08;
-    leftArmX = -1.3;
-    rightArmX = -0.98;
-    leftArmLowerX = -1.58;
-    rightArmLowerX = -1.42;
-    leftArmZ = -0.48;
-    rightArmZ = 0.36;
+    const reach = SmoothStep(0.06, 0.62, gestureProgress);
+    const release = SmoothStep(0.68, 0.9, gestureProgress);
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.075 * reach;
+    pelvisRotY += (pose.facing >= 0 ? -1 : 1) * 0.1 * reach;
+    shouldersRotY -= (pose.facing >= 0 ? -1 : 1) * 0.15 * reach;
+    headRotX -= 0.1 * reach;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.12 * release;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.36, reach);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.05, reach);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.64 + release * 0.12, reach);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.48 + release * 0.1, reach);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.52, reach);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.4, reach);
   } else if (gesture === "huddle") {
-    rigY -= 0.22;
-    pelvisRotX += 0.12;
-    headRotX += 0.08;
-    leftArmX = -0.3;
-    rightArmX = -0.36;
-    leftArmLowerX = -0.88;
-    rightArmLowerX = -0.82;
-    leftArmZ = -0.24;
-    rightArmZ = 0.22;
-    leftLegX = -0.68;
-    rightLegX = -0.72;
-    leftLowerLegX = 1.28;
-    rightLowerLegX = 1.34;
+    const huddle = gestureAttack;
+    const shiver = Math.sin(time * 7.2 + rig.childIndex * 1.7) * motion.fear * 0.012;
+    rigY -= 0.24 * huddle + shiver;
+    pelvisRotX += 0.14 * huddle;
+    shouldersRotZ += shiver * 1.5;
+    headRotX += 0.1 * huddle;
+    headRotZ -= shiver;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.34, huddle);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.4, huddle);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.94, huddle);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.88, huddle);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.28, huddle);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.26, huddle);
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.72, huddle);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, -0.76, huddle);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 1.32, huddle);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 1.38, huddle);
   } else if (gesture === "board") {
-    rigY -= 0.08;
-    pelvisRotX += 0.2;
-    headRotX -= 0.06;
-    leftArmX = -0.92;
-    rightArmX = -1.04;
-    leftArmLowerX = -1.28;
-    rightArmLowerX = -1.28;
-    leftArmZ = -0.4;
-    rightArmZ = 0.3;
-    leftLegX = -0.58;
-    rightLegX = -0.28;
-    leftLowerLegX = 1.02;
-    rightLowerLegX = 0.72;
+    const plant = SmoothStep(0.08, 0.56, gestureProgress);
+    const stepLift = Bell(gestureProgress, 0.38, 0.34);
+    const stepUp = SmoothStep(0.42, 0.86, gestureProgress);
+    rigY += stepUp * 0.12 - stepLift * 0.09;
+    rigRotX -= 0.08 * plant;
+    pelvisRotX += 0.22 * plant - 0.08 * stepUp;
+    pelvisRotZ += (pose.facing >= 0 ? -1 : 1) * 0.06 * stepLift;
+    headRotX -= 0.08 * plant;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.96, plant);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.08, plant);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -1.32, plant);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -1.32, plant);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.44, plant);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.34, plant);
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.64 + stepUp * 0.32, plant);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, -0.32 - stepLift * 0.18, plant);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 1.08 - stepUp * 0.28, plant);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 0.78 + stepLift * 0.26, plant);
+    leftFootX += stepLift * 0.2;
+    rightFootX += stepUp * 0.1;
   }
 
   rig.rig.position.y = Damp(rig.rig.position.y, rigY, 10, deltaTime);
+  rig.rig.rotation.x = Damp(rig.rig.rotation.x, rigRotX, 7, deltaTime);
   rig.rig.rotation.z = Damp(rig.rig.rotation.z, rigRotZ, 8, deltaTime);
   rig.pelvis.rotation.x = Damp(rig.pelvis.rotation.x, pelvisRotX, 10, deltaTime);
-  rig.pelvis.rotation.y = Damp(rig.pelvis.rotation.y, -stepSin * 0.055 * speed - motion.turn * 0.04, 8, deltaTime);
+  rig.pelvis.rotation.y = Damp(rig.pelvis.rotation.y, pelvisRotY, 8, deltaTime);
   rig.pelvis.rotation.z = Damp(rig.pelvis.rotation.z, pelvisRotZ, 8, deltaTime);
   rig.shoulders.position.y = Damp(rig.shoulders.position.y, 0.48 + motion.fear * 0.045 + Math.abs(startStopLean) * 0.025, 9, deltaTime);
-  rig.shoulders.rotation.z = Damp(rig.shoulders.rotation.z, -motion.turn * 0.06, 8, deltaTime);
-  rig.shoulders.rotation.y = Damp(rig.shoulders.rotation.y, stepSin * 0.07 * speed + motion.turn * 0.05, 8, deltaTime);
+  rig.shoulders.rotation.x = Damp(rig.shoulders.rotation.x, shouldersRotX, 8, deltaTime);
+  rig.shoulders.rotation.z = Damp(rig.shoulders.rotation.z, shouldersRotZ, 8, deltaTime);
+  rig.shoulders.rotation.y = Damp(rig.shoulders.rotation.y, shouldersRotY, 8, deltaTime);
+  rig.torso.rotation.x = Damp(rig.torso.rotation.x, torsoRotX, 8, deltaTime);
+  rig.torso.rotation.z = Damp(rig.torso.rotation.z, torsoRotZ, 8, deltaTime);
   rig.torso.scale.y = Damp(rig.torso.scale.y, 1 - crouch * 0.08, 9, deltaTime);
   rig.headPivot.rotation.x = Damp(rig.headPivot.rotation.x, headRotX, 7, deltaTime);
   rig.headPivot.rotation.y = Damp(rig.headPivot.rotation.y, headRotY, 5, deltaTime);
-  rig.braid.rotation.z = Damp(rig.braid.rotation.z, 0.22 - stride * 0.12 - startStopLean * 0.18, 5, deltaTime);
-  rig.coatBack.rotation.x = Damp(rig.coatBack.rotation.x, -0.04 - stride * 0.09 + speed * 0.05 - startStopLean * 0.22, 6, deltaTime);
-  rig.scarfTail.rotation.z = Damp(rig.scarfTail.rotation.z, 0.08 - stride * 0.14 - startStopLean * 0.25, 5, deltaTime);
-  rig.scarfTail.rotation.x = Damp(rig.scarfTail.rotation.x, speed * 0.16 + crouch * 0.08 + Math.abs(startStopLean) * 0.2, 5, deltaTime);
-  rig.satchel.rotation.z = Damp(rig.satchel.rotation.z, 0.12 + stride * 0.08 + startStopLean * 0.22, 5.5, deltaTime);
+  rig.headPivot.rotation.z = Damp(rig.headPivot.rotation.z, headRotZ, 5.5, deltaTime);
+  rig.braid.rotation.z = Damp(rig.braid.rotation.z, 0.22 - stride * 0.18 - startStopLean * 0.26 - headRotY * 0.08, 4.1, deltaTime);
+  rig.coatBack.rotation.x = Damp(rig.coatBack.rotation.x, -0.04 - stride * 0.13 + speed * 0.08 - startStopLean * 0.3, 4.8, deltaTime);
+  rig.scarfTail.rotation.z = Damp(rig.scarfTail.rotation.z, 0.08 - stride * 0.2 - startStopLean * 0.34 + pelvisRotZ * 0.22, 4.2, deltaTime);
+  rig.scarfTail.rotation.x = Damp(rig.scarfTail.rotation.x, speed * 0.2 + crouch * 0.08 + Math.abs(startStopLean) * 0.28, 4.2, deltaTime);
+  rig.satchel.rotation.z = Damp(rig.satchel.rotation.z, 0.12 + stride * 0.13 + startStopLean * 0.3 - pelvisRotZ * 0.2, 4.4, deltaTime);
   rig.contactShadow.scale.x = Damp(rig.contactShadow.scale.x, 1 - crouch * 0.12 + speed * 0.08, 7, deltaTime);
   rig.contactShadow.scale.y = Damp(rig.contactShadow.scale.y, 1 + crouch * 0.16, 7, deltaTime);
   rig.contactShadow.material.uniforms.uOpacity.value = 0.24 + crouch * 0.08 + (pose.carrying ? 0.04 : 0);
@@ -428,8 +562,8 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.rightLeg.root.rotation.x = Damp(rig.rightLeg.root.rotation.x, rightLegX, 13, deltaTime);
   rig.leftLeg.lower.rotation.x = Damp(rig.leftLeg.lower.rotation.x, leftLowerLegX, 13, deltaTime);
   rig.rightLeg.lower.rotation.x = Damp(rig.rightLeg.lower.rotation.x, rightLowerLegX, 13, deltaTime);
-  rig.leftLeg.endpoint.rotation.x = Damp(rig.leftLeg.endpoint.rotation.x, -Math.max(0, stepSin) * 0.34 * speed + airborne * 0.14, 14, deltaTime);
-  rig.rightLeg.endpoint.rotation.x = Damp(rig.rightLeg.endpoint.rotation.x, -Math.max(0, -stepSin) * 0.34 * speed + airborne * 0.14, 14, deltaTime);
+  rig.leftLeg.endpoint.rotation.x = Damp(rig.leftLeg.endpoint.rotation.x, leftFootX + airborne * 0.14, 14, deltaTime);
+  rig.rightLeg.endpoint.rotation.x = Damp(rig.rightLeg.endpoint.rotation.x, rightFootX + airborne * 0.14, 14, deltaTime);
 
   rig.leftArm.root.rotation.x = Damp(rig.leftArm.root.rotation.x, leftArmX, 11, deltaTime);
   rig.rightArm.root.rotation.x = Damp(rig.rightArm.root.rotation.x, rightArmX, 11, deltaTime);
@@ -437,7 +571,24 @@ export function UpdateActor3D(actor, pose, deltaTime) {
   rig.rightArm.lower.rotation.x = Damp(rig.rightArm.lower.rotation.x, rightArmLowerX, 11, deltaTime);
   rig.leftArm.root.rotation.z = Damp(rig.leftArm.root.rotation.z, leftArmZ, 9, deltaTime);
   rig.rightArm.root.rotation.z = Damp(rig.rightArm.root.rotation.z, rightArmZ, 9, deltaTime);
-  rig.carriedBundle.visible = Boolean(pose.carrying);
+  rig.leftArm.root.rotation.y = Damp(rig.leftArm.root.rotation.y, leftArmY, 8, deltaTime);
+  rig.rightArm.root.rotation.y = Damp(rig.rightArm.root.rotation.y, rightArmY, 8, deltaTime);
+  rig.leftArm.endpoint.rotation.x = Damp(rig.leftArm.endpoint.rotation.x, leftHandX, 9, deltaTime);
+  rig.rightArm.endpoint.rotation.x = Damp(rig.rightArm.endpoint.rotation.x, rightHandX, 9, deltaTime);
+  rig.carriedBundle.visible = Boolean(pose.carrying || gesture === "lift");
+  rig.carriedBundle.position.x = Damp(rig.carriedBundle.position.x, bundleX, 8, deltaTime);
+  rig.carriedBundle.position.y = Damp(rig.carriedBundle.position.y, bundleY, 8, deltaTime);
+  rig.carriedBundle.position.z = Damp(rig.carriedBundle.position.z, bundleZ, 8, deltaTime);
+  rig.carriedBundle.scale.setScalar(Damp(rig.carriedBundle.scale.x, bundleScale, 8, deltaTime));
+  const registerActive = Boolean(pose.registerBook);
+  const registerExtended = gesture === "pass" ? gestureArc : gesture === "write" || gesture === "count" ? 0.32 : 0;
+  rig.registerBook.visible = registerActive;
+  rig.registerBook.position.x = Damp(rig.registerBook.position.x, gesture === "write" ? -0.02 : 0.04, 10, deltaTime);
+  rig.registerBook.position.y = Damp(rig.registerBook.position.y, gesture === "write" ? 0.31 : 0.36 + registerExtended * 0.05, 10, deltaTime);
+  rig.registerBook.position.z = Damp(rig.registerBook.position.z, 0.28 + registerExtended * 0.2, 10, deltaTime);
+  rig.registerBook.rotation.x = Damp(rig.registerBook.rotation.x, gesture === "write" || gesture === "count" ? -0.72 : -0.18, 10, deltaTime);
+  rig.registerBook.rotation.y = DampAngle(rig.registerBook.rotation.y, -desiredFacing, 12, deltaTime);
+  rig.registerBook.rotation.z = Damp(rig.registerBook.rotation.z, gesture === "pass" ? -0.02 : -0.09, 10, deltaTime);
 
   actor.rotation.y = DampAngle(actor.rotation.y, desiredFacing, moving ? 8.2 : 6.4, safeDelta);
   const targetZ = pose.z || 0;

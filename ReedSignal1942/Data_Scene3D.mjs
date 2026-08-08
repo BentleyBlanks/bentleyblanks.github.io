@@ -27,7 +27,7 @@ export const ChapterVisuals = Object.freeze({
     water: 0x3c5c58,
     camera: Object.freeze({ fov: 23, distance: 15.2, lift: 2.52, lookLift: 1.08 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 620, kind: "establish", anchorX: 460, viewDistance: 20.8, lift: 3.08, lookLift: 1.28, reason: "从空教室、院门和远处岗楼建立整座村庄的尺度" }),
+      Object.freeze({ x0: 0, x1: 620, kind: "establish", anchorX: 460, viewDistance: 23.5, lift: 3.48, lookLift: 1.34, reason: "从空教室、院门和远处岗楼建立整座村庄的尺度" }),
       Object.freeze({ x0: 620, x1: 1120, kind: "approach", viewDistance: 15.1, lift: 2.48, lookLift: 1.06, reason: "苇帘与麦子进入人物尺度" }),
       Object.freeze({ x0: 1120, x1: 1840, kind: "action", anchorX: 1515, viewDistance: 12.7, lift: 2.2, lookLift: 0.96, reason: "推车、残墙和探照灯形成紧张的动作镜头" }),
       Object.freeze({ x0: 1840, x1: 2920, kind: "escape", viewDistance: 14.1, lift: 2.26, lookLift: 0.94, reason: "压低镜头进入排水洞，保留前景土坡遮挡" }),
@@ -53,7 +53,7 @@ export const ChapterVisuals = Object.freeze({
     water: 0x1c4650,
     camera: Object.freeze({ fov: 24, distance: 15.6, lift: 2.66, lookLift: 1.02 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 590, viewDistance: 22.2, lift: 3.45, lookLift: 1.34, reason: "长堤、封锁沟、岗楼与远村灯线同框" }),
+      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 590, viewDistance: 25.4, lift: 3.9, lookLift: 1.46, reason: "长堤、封锁沟、岗楼与远村灯线同框" }),
       Object.freeze({ x0: 720, x1: 1460, kind: "approach", viewDistance: 14.4, lift: 2.48, lookLift: 0.98, reason: "让苇梢和空船成为可读的风声机关" }),
       Object.freeze({ x0: 1460, x1: 2260, kind: "action", anchorX: 1750, viewDistance: 12.9, lift: 2.3, lookLift: 0.9, reason: "水闸、长杆、脚下门板和水纹进入动作近景" }),
       Object.freeze({ x0: 2260, x1: 3340, kind: "escape", viewDistance: 15.0, lift: 2.52, lookLift: 0.98, reason: "贴水穿过第二束灯，远岸仍作为目的地" }),
@@ -79,7 +79,7 @@ export const ChapterVisuals = Object.freeze({
     water: 0x243536,
     camera: Object.freeze({ fov: 24, distance: 13.4, lift: 1.9, lookLift: 1.04 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 560, viewDistance: 15.0, lift: 2.02, lookLift: 1.08, reason: "土层剖面、第一口枯井和远端烟路同时可读" }),
+      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 560, viewDistance: 17.6, lift: 2.5, lookLift: 1.16, reason: "土层剖面、第一口枯井和远端烟路同时可读" }),
       Object.freeze({ x0: 720, x1: 1540, kind: "approach", viewDistance: 12.3, lift: 1.76, lookLift: 0.96, reason: "低顶支架贴近前景，烟从深处压来" }),
       Object.freeze({ x0: 1540, x1: 2360, kind: "action", anchorX: 1980, viewDistance: 11.3, lift: 1.62, lookLift: 0.9, reason: "点名、抱起栓儿和递手发生在人物近景" }),
       Object.freeze({ x0: 2360, x1: 3020, kind: "release", viewDistance: 13.0, lift: 1.82, lookLift: 1.0, reason: "窄井之后重新看见出口的冷光" }),
@@ -87,8 +87,8 @@ export const ChapterVisuals = Object.freeze({
   }),
   ferry: Object.freeze({
     sky: 0x2a4550,
-    fog: 0x74867f,
-    fogDensity: 0.01,
+    fog: 0x415754,
+    fogDensity: 0.0075,
     exposure: 1.2,
     moon: 0xd9d2ad,
     moonIntensity: 3.0,
@@ -105,7 +105,7 @@ export const ChapterVisuals = Object.freeze({
     water: 0x3b656d,
     camera: Object.freeze({ fov: 23, distance: 16.2, lift: 2.62, lookLift: 1.06 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 820, kind: "establish", anchorX: 650, viewDistance: 22.8, lift: 3.5, lookLift: 1.34, reason: "六名孩子、长堤、远岸与渡船先建立空间关系" }),
+      Object.freeze({ x0: 0, x1: 820, kind: "establish", anchorX: 650, viewDistance: 26.4, lift: 4.05, lookLift: 1.5, reason: "六名孩子、长堤、远岸与渡船先建立空间关系" }),
       Object.freeze({ x0: 820, x1: 1580, kind: "approach", viewDistance: 15.0, lift: 2.52, lookLift: 1.02, reason: "苇障和队伍纪律进入可操作尺度" }),
       Object.freeze({ x0: 1580, x1: 2320, kind: "action", anchorX: 1960, viewDistance: 12.4, lift: 2.22, lookLift: 0.94, reason: "母女交接、点名簿与白布信号进入人物近景" }),
       Object.freeze({ x0: 2320, x1: 3660, kind: "finale", anchorX: 3070, viewDistance: 19.8, lift: 3.12, lookLift: 1.12, reason: "灯转南汊，船从北汊离岸并驶向远景" }),

@@ -1,7 +1,7 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808w";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808w";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808w";
+import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808y";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808y";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808y";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -406,56 +406,175 @@ function CreateWaterRipples(root, x0, x1, z0, z1, count, material, seed = 1, wat
   return mesh;
 }
 
-function BuildDistantVillage(root, profile, material, seed, length, dynamic) {
-  const random = CreateRandom(seed);
-  const villagePositions = [length * 0.24, length * 0.74];
-  let detailedVillageCount = 0;
-  for (let index = 0; index < villagePositions.length; index += 1) {
-    const village = AddBlenderAsset(root, "Asset_DistantVillageCluster", {
-      position: [villagePositions[index], -0.08, -8.2 - index * 1.4],
-      rotation: [0, index ? Math.PI : 0, 0],
-      scale: index ? 0.52 : 0.58,
-      castShadow: false,
-      materialTint: profile.fog,
-      tintAmount: 0.62 + index * 0.1,
-    });
-    if (!village) continue;
-    detailedVillageCount += 1;
-    dynamic.blenderAssets.push(village);
-  }
-  if (!detailedVillageCount) {
-    for (let x = -2; x < length + 4; x += 2.4 + random() * 2.6) {
-      const width = 1.2 + random() * 1.4;
-      const height = 0.8 + random() * 0.9;
-      const z = -6.5 - random() * 3.5;
-      AddBox(root, [width, height, 1.3], [x, height * 0.5 - 0.05, z], material, null, false);
-      AddGableRoof(root, width + 0.42, 1.72, 0.34 + random() * 0.16, [x, height - 0.02, z], material).castShadow = false;
-    }
-  }
-  const hillMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.fog).multiplyScalar(0.48), fog: true });
-  for (let index = 0; index < 7; index += 1) {
-    AddMesh(root, new THREE.SphereGeometry(4.8 + random() * 3.2, 12, 7), hillMaterial, [index * 6 - 5, -5.1 + random() * 0.25, -16 - random() * 7], null, [2.2, 0.13, 0.8], false);
-  }
+function SetInstance(mesh, index, position, rotation, scale, matrix) {
+  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation[0], rotation[1], rotation[2]));
+  matrix.compose(
+    new THREE.Vector3(position[0], position[1], position[2]),
+    quaternion,
+    new THREE.Vector3(scale[0], scale[1], scale[2]),
+  );
+  mesh.setMatrixAt(index, matrix);
+}
 
-  // A low middle-distance band gives the long lens something to slide past:
-  // the far village stays soft in the fog while these rooflines and poles move
-  // visibly against the playable path as the camera tracks the player.
-  const midMaterial = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(profile.fog).lerp(new THREE.Color(profile.plasterDark), 0.28),
+function CreateInstancedSilhouette(root, geometry, material, count) {
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.frustumCulled = true;
+  root.add(mesh);
+  return mesh;
+}
+
+function BuildDistantVillage(root, profile, material, seed, length, dynamic, chapterId) {
+  const random = CreateRandom(seed);
+  const matrix = new THREE.Matrix4();
+  const farColor = new THREE.Color(profile.fog).multiplyScalar(chapterId === "ferry" ? 0.34 : 0.27);
+  const middleColor = new THREE.Color(profile.plasterDark).multiplyScalar(0.42).lerp(new THREE.Color(profile.fog), 0.12);
+  const silhouetteMaterial = new THREE.MeshBasicMaterial({ color: farColor, fog: true });
+  const middleMaterial = new THREE.MeshBasicMaterial({ color: middleColor, fog: true, transparent: true, opacity: 0.82 });
+  dynamic.ownedMaterials.push(silhouetteMaterial, middleMaterial);
+
+  const landmarkVillage = AddBlenderAsset(root, "Asset_DistantVillageCluster", {
+    position: [length * 0.76, -0.16, -11.8],
+    rotation: [0, Math.PI, 0],
+    scale: chapterId === "ferry" ? 0.74 : 0.68,
+    castShadow: false,
+    materialTint: profile.fog,
+    tintAmount: 0.68,
+  });
+  if (landmarkVillage) dynamic.blenderAssets.push(landmarkVillage);
+
+  // A single massive horizon is more convincing than dozens of equally sized
+  // toy houses.  It also reduces the previous two draw calls per cottage to a
+  // handful of instanced calls, leaving budget for foreground parallax.
+  const hillGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const hills = CreateInstancedSilhouette(root, hillGeometry, silhouetteMaterial, 11);
+  for (let index = 0; index < 11; index += 1) {
+    const x = -12 + index * ((length + 24) / 10);
+    SetInstance(hills, index, [x, -4.7 - random() * 0.5, -20 - random() * 8], [0, random() * Math.PI, 0], [7.5 + random() * 4.5, 1.5 + random() * 1.5, 4.8 + random() * 3], matrix);
+  }
+  hills.instanceMatrix.needsUpdate = true;
+  dynamic.ownedGeometries.push(hillGeometry);
+
+  const buildingCount = Math.max(16, Math.ceil(length / 1.65));
+  const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const roofGeometry = new THREE.ConeGeometry(0.78, 0.62, 4);
+  const buildings = CreateInstancedSilhouette(root, buildingGeometry, middleMaterial, buildingCount);
+  const roofs = CreateInstancedSilhouette(root, roofGeometry, middleMaterial, buildingCount);
+  for (let index = 0; index < buildingCount; index += 1) {
+    const x = -5 + index * ((length + 10) / Math.max(1, buildingCount - 1)) + (random() - 0.5) * 1.2;
+    const z = -9.6 - random() * 5.8;
+    const width = 1.6 + random() * 3.2;
+    const height = 1.25 + random() * 2.7;
+    const depth = 1.25 + random() * 1.5;
+    SetInstance(buildings, index, [x, height * 0.5 - 0.18, z], [0, (random() - 0.5) * 0.12, 0], [width, height, depth], matrix);
+    SetInstance(roofs, index, [x, height + 0.08, z], [0, Math.PI * 0.25, 0], [width * 0.9, 0.62 + width * 0.12, depth * 0.92], matrix);
+  }
+  buildings.instanceMatrix.needsUpdate = true;
+  roofs.instanceMatrix.needsUpdate = true;
+  dynamic.ownedGeometries.push(buildingGeometry, roofGeometry);
+
+  const treeCount = Math.max(14, Math.ceil(length / 2.05));
+  const trunkGeometry = new THREE.CylinderGeometry(0.08, 0.13, 1, 5);
+  const crownGeometry = new THREE.DodecahedronGeometry(1, 0);
+  const trunks = CreateInstancedSilhouette(root, trunkGeometry, middleMaterial, treeCount);
+  const crowns = CreateInstancedSilhouette(root, crownGeometry, middleMaterial, treeCount * 2);
+  for (let index = 0; index < treeCount; index += 1) {
+    const x = -6 + index * ((length + 12) / Math.max(1, treeCount - 1)) + (random() - 0.5) * 1.5;
+    const z = -6.2 - random() * 4.6;
+    const height = 4.8 + random() * 4.6;
+    const crownWidth = 0.42 + random() * 0.58;
+    SetInstance(trunks, index, [x, height * 0.5 - 0.12, z], [0, random() * 0.15, (random() - 0.5) * 0.045], [1, height, 1], matrix);
+    const crownX = x + (random() - 0.5) * 0.2;
+    SetInstance(crowns, index * 2, [crownX, height - 0.72, z], [random() * 0.1, random() * Math.PI, 0], [crownWidth * 1.18, 0.92 + random() * 0.38, crownWidth * 0.86], matrix);
+    SetInstance(crowns, index * 2 + 1, [crownX + (random() - 0.5) * 0.18, height + 0.18, z], [random() * 0.1, random() * Math.PI, 0], [crownWidth * 0.82, 1.02 + random() * 0.48, crownWidth * 0.68], matrix);
+  }
+  trunks.instanceMatrix.needsUpdate = true;
+  crowns.instanceMatrix.needsUpdate = true;
+  dynamic.ownedGeometries.push(trunkGeometry, crownGeometry);
+
+  const infrastructureMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.plasterDark).multiplyScalar(0.3), fog: true });
+  dynamic.ownedMaterials.push(infrastructureMaterial);
+  const postGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const postCount = chapterId === "blockade" ? 8 : chapterId === "ferry" ? 5 : 4;
+  const posts = CreateInstancedSilhouette(root, postGeometry, infrastructureMaterial, postCount * 2);
+  for (let index = 0; index < postCount; index += 1) {
+    const x = length * ((index + 0.45) / postCount);
+    const height = chapterId === "blockade" ? 7.2 + (index % 3) * 1.6 : 4.8 + (index % 2) * 1.2;
+    SetInstance(posts, index * 2, [x, height * 0.5, -6.15 - (index % 2) * 0.8], [0, 0, 0], [0.12, height, 0.12], matrix);
+    SetInstance(posts, index * 2 + 1, [x, height - 0.55, -6.15 - (index % 2) * 0.8], [0, 0, 0], [chapterId === "blockade" ? 2.35 : 1.55, 0.13, 0.13], matrix);
+  }
+  posts.instanceMatrix.needsUpdate = true;
+  dynamic.ownedGeometries.push(postGeometry);
+
+  const horizonBand = AddBox(
+    root,
+    [length + 28, chapterId === "blockade" ? 1.25 : 0.72, 2.2],
+    [length * 0.5, chapterId === "blockade" ? 0.24 : -0.02, -6.7],
+    infrastructureMaterial,
+    null,
+    false,
+  );
+  horizonBand.receiveShadow = false;
+}
+
+function BuildNearScaleLayer(root, chapter, profile, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const random = CreateRandom(880 + chapter.id.length * 29);
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.ground).multiplyScalar(0.24),
     fog: true,
     transparent: true,
-    opacity: 0.58,
+    opacity: 0.66,
+    depthWrite: true,
   });
-  dynamic.ownedMaterials.push(midMaterial);
-  const midZ = -4.35;
-  for (let index = 0; index < Math.max(5, Math.ceil(length / 2.8)); index += 1) {
-    const x = -1.2 + index * 2.65 + (index % 2) * 0.42;
-    const width = 0.82 + (index % 3) * 0.22;
-    const height = 0.42 + (index % 4) * 0.1;
-    AddBox(root, [width, height, 0.36], [x, height * 0.5 - 0.03, midZ + (index % 3) * 0.16], midMaterial, null, false);
-    AddGableRoof(root, width + 0.16, 0.46, 0.14 + (index % 2) * 0.045, [x, height - 0.02, midZ + (index % 3) * 0.16], midMaterial).castShadow = false;
-    if (index % 3 === 1) AddCylinder(root, 0.018, 0.025, 0.9 + (index % 2) * 0.24, [x + width * 0.32, 0.47, midZ - 0.08], midMaterial, 6, null, false);
+  const stalkGeometry = new THREE.ConeGeometry(0.055, 1, 4);
+  const count = Math.max(12, Math.ceil((length + 12) / 3.25));
+  const stalks = CreateInstancedSilhouette(root, stalkGeometry, material, count);
+  const matrix = new THREE.Matrix4();
+  for (let index = 0; index < count; index += 1) {
+    const x = -6 + index * ((length + 12) / Math.max(1, count - 1)) + (random() - 0.5) * 0.7;
+    const z = 2.45 + random() * 1.75;
+    const height = 1.25 + random() * 2.65;
+    const sideBias = index % 5 === 0 ? 1.1 : 0.58;
+    SetInstance(stalks, index, [x, -0.25 + height * 0.5, z], [0, random() * Math.PI, (random() - 0.5) * 0.11], [sideBias, height, sideBias], matrix);
   }
+  stalks.instanceMatrix.needsUpdate = true;
+  stalks.renderOrder = 5;
+  dynamic.ownedMaterials.push(material);
+  dynamic.ownedGeometries.push(stalkGeometry);
+  dynamic.nearScaleLayer = stalks;
+}
+
+function BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile) {
+  const chamberMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.earth).multiplyScalar(0.28),
+    fog: true,
+    side: THREE.DoubleSide,
+  });
+  const coldMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.moon).multiplyScalar(0.42), fog: true });
+  dynamic.ownedMaterials.push(chamberMaterial, coldMaterial);
+  // A buried brick-kiln chamber and two shafts continue well above the
+  // playable crawlspace, making the children visibly small without changing
+  // collision or the historical role of the early shelter.
+  AddMesh(root, new THREE.TorusGeometry(4.8, 0.62, 10, 28, Math.PI), chamberMaterial, [16.4, 0.05, -5.8], [0, 0, 0], [1.38, 1.12, 1], false);
+  AddBox(root, [13.2, 0.5, 1.1], [16.4, 4.18, -5.65], chamberMaterial, null, false);
+  for (const shaftX of [5.9, 22.9]) {
+    AddBox(root, [1.65, 7.8, 1.5], [shaftX, 5.95, -4.9], chamberMaterial, null, false);
+    const shaftMouth = AddMesh(root, new THREE.CircleGeometry(0.72, 18), coldMaterial, [shaftX, 9.75, -4.12], [0, 0, 0], null, false);
+    shaftMouth.renderOrder = 0;
+  }
+  const layerGeometry = new THREE.PlaneGeometry(40, 9, 34, 8);
+  const layerVertices = layerGeometry.getAttribute("position");
+  for (let index = 0; index < layerVertices.count; index += 1) {
+    const x = layerVertices.getX(index);
+    const y = layerVertices.getY(index);
+    layerVertices.setZ(index, Math.sin(x * 0.31) * 0.24 + Math.cos(y * 0.76) * 0.16);
+  }
+  layerGeometry.computeVertexNormals();
+  AddMesh(root, layerGeometry, chamberMaterial, [chapter.width * WorldScale * 0.5, 5.0, -7.4], null, null, false);
+  dynamic.ownedGeometries.push(layerGeometry);
 }
 
 function BuildTerrain(root, chapter, materials, dynamic) {
@@ -498,9 +617,9 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   const material = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.58),
+    color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.72),
     transparent: true,
-    opacity: 0.74,
+    opacity: 0.58,
     depthWrite: true,
     fog: true,
     side: THREE.DoubleSide,
@@ -805,6 +924,7 @@ function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCo
     shaftLight.position.set(x, 2.3, -0.2);
     root.add(shaftLight);
     dynamic.shaftLights.push(shaftLight);
+    dynamic.shaftVolumes.push({ volume: shaftVolume, pool: shaftPool });
   }
   for (let x = 7.8; x < 26; x += 4.7) {
     const lamp = new THREE.PointLight(profile.accent, 14, 4.0, 1.8);
@@ -1067,6 +1187,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     ownedGeometries: [],
     blenderAssets: [],
     shaftLights: [],
+    shaftVolumes: [],
     mistLayers: [],
     foreground: null,
     bridge: null,
@@ -1089,14 +1210,16 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   BuildSkyBackdrop(root, profile, chapter, dynamic);
   BuildAtmosphericLayers(root, profile, chapter, dynamic);
   BuildTerrain(root, chapter, materials, dynamic);
-  if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic);
+  if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic, chapter.id);
   const density = renderProfile.reedDensity;
   if (chapter.id === "school") BuildSchool(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "blockade") BuildBlockade(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "tunnel") BuildTunnel(root, chapter, materials, dynamic, profile, density, renderProfile.dustCount);
   if (chapter.id === "ferry") BuildFerry(root, chapter, materials, dynamic, profile, density);
+  if (chapter.id === "tunnel") BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile);
   BuildCoverProps(root, chapter, materials, dynamic);
   BuildForegroundFraming(root, chapter, materials, dynamic);
+  BuildNearScaleLayer(root, chapter, profile, dynamic);
   CreateActionCues(root, chapter, materials, dynamic);
 
   const actors = {
@@ -1121,9 +1244,18 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     const followerActionId = cueLive ? cueState.actionId : state.activeActionId;
     const followerCue = followerActionId ? GetCinematicCue(followerActionId) : null;
     const directorActors = cinematicFrame?.actors;
+    const directorEffects = cinematicFrame?.effects || {};
     const playerAction = directorActors?.player || playerCue?.pose || null;
     const followerAction = directorActors?.followers || followerCue?.followerPose || null;
     const directorActionTime = cinematicFrame ? cinematicFrame.segmentProgress : null;
+    const registerSequence = cinematicFrame?.id || "";
+    const registerProgress = Number(cinematicFrame?.progress || 0);
+    const playerHasRegister = ["ferryOpening", "tunnelRollCall", "ferryRollCall", "endingDeparture"].includes(registerSequence)
+      || (registerSequence === "registerHandoff" && registerProgress >= 0.23)
+      || (registerSequence === "motherHandoff" && (registerProgress < 0.2 || registerProgress >= 0.72));
+    const motherHasRegister = registerSequence === "schoolOpening"
+      || (registerSequence === "registerHandoff" && registerProgress < 0.23)
+      || (registerSequence === "motherHandoff" && registerProgress >= 0.2 && registerProgress < 0.72);
     const boarding = Number(cinematicFrame?.effects?.boarding || 0);
     const playerBoarding = Number(cinematicFrame?.effects?.playerBoarding || 0);
     const ferryDeparture = Number(cinematicFrame?.effects?.ferryDeparture || 0);
@@ -1139,7 +1271,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       dynamic.ferry.rotation.y = -ferryDeparture * 0.055;
     }
     const playerBoardBlend = THREE.MathUtils.clamp(playerBoarding, 0, 1);
-    const useFerryHuddle = Boolean(dynamic.ferryHuddle && cinematicFrame?.id === "endingDeparture" && ferryDeparture >= 0.08 && boarding >= 1 && playerBoarding >= 1);
+    const useFerryHuddle = Boolean(dynamic.ferryHuddle && state.followers.length >= 4);
     if (dynamic.ferryHuddle) {
       const huddle = dynamic.ferryHuddle;
       huddle.group.visible = useFerryHuddle;
@@ -1147,26 +1279,38 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         for (let index = 0; index < 6; index += 1) {
           const row = Math.floor(index / 3);
           const column = index % 3;
+          const follower = state.followers[index];
+          const boardThreshold = (index + 1) / 7;
+          const followerBoardBlend = cinematicFrame?.id === "endingDeparture"
+            ? THREE.MathUtils.clamp((boarding - boardThreshold) * 7.5, 0, 1)
+            : 0;
           const detailedAnchor = index === 0 || index === 2;
           const lodScale = detailedAnchor ? 0 : 1;
-          const childX = ferryX - 0.88 + column * 0.62 + row * 0.28;
-          const childZ = ferryZ + 0.32 - row * 0.72;
-          huddle.position.set(childX, ferryY + 0.75 + row * 0.05, childZ);
+          const ferryChildX = ferryX - 0.88 + column * 0.62 + row * 0.28;
+          const ferryChildY = ferryY + 0.75 + row * 0.05;
+          const ferryChildZ = ferryZ + 0.32 - row * 0.72;
+          const shoreChildX = (follower?.x ?? state.player.x) * WorldScale;
+          const shoreChildY = (follower?.y ?? state.player.y) * WorldScale + 0.62;
+          const shoreChildZ = 0.2 - index * 0.035;
+          const childX = THREE.MathUtils.lerp(shoreChildX, ferryChildX, followerBoardBlend);
+          const childY = THREE.MathUtils.lerp(shoreChildY, ferryChildY, followerBoardBlend);
+          const childZ = THREE.MathUtils.lerp(shoreChildZ, ferryChildZ, followerBoardBlend);
+          huddle.position.set(childX, childY, childZ);
           huddle.quaternion.setFromEuler(new THREE.Euler(0, 0, -0.1 + column * 0.025));
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.bodies.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX + 0.13, ferryY + 0.38 + row * 0.05, childZ);
+          huddle.position.set(childX + 0.13, childY - 0.37, childZ);
           huddle.quaternion.identity();
           huddle.scale.set(1.38 * lodScale, 0.74 * lodScale, 1.05 * lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.knees.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX + 0.055, ferryY + 1.24 + row * 0.05, childZ);
+          huddle.position.set(childX + 0.055, childY + 0.49, childZ);
           huddle.quaternion.identity();
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.heads.setMatrixAt(index, huddle.matrix);
-          huddle.position.set(childX - 0.005, ferryY + 1.29 + row * 0.05, childZ - 0.008);
+          huddle.position.set(childX - 0.005, childY + 0.54, childZ - 0.008);
           huddle.scale.set(0.9 * lodScale, 0.88 * lodScale, 0.92 * lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.hair.setMatrixAt(index, huddle.matrix);
@@ -1192,6 +1336,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       verticalVelocity: state.player.vy * WorldScale,
       lookOffset: state.suspicion > 0.18 ? Math.sin(time * 2.1) * 0.055 : 0,
       action: playerAction,
+      registerBook: playerHasRegister,
       actionTime: directorActionTime ?? playerActionTime,
       actionDuration: cinematicFrame ? 1 : playerActionDuration,
       positionSnap: playerBoardBlend > 0,
@@ -1249,6 +1394,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         velocity: signaled ? 0.42 : 0,
         facing: signaled ? 1 : -1,
         action: directorActors?.mother || (cueLive && cueState.actionId === "motherSignal" ? "signal" : null),
+        registerBook: motherHasRegister,
         actionTime: directorActionTime ?? (cueLive ? cueAge : 0),
         actionDuration: cinematicFrame ? 1 : Math.max(0.35, playerCue?.duration || 1.65),
         time,
@@ -1270,11 +1416,40 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         dynamic.motherLantern.position.set(dynamic.motherX - 0.22, 0.62 + Math.sin(time * 2.1) * 0.025, 0.44);
         dynamic.motherLanternLight.intensity = signaled ? 5.2 : 3.6;
       }
+    } else if (chapter.id === "school") {
+      const teacherActive = Boolean(directorActors?.mother && ["schoolOpening", "registerHandoff"].includes(cinematicFrame?.id));
+      actors.mother.visible = teacherActive;
+      if (teacherActive) {
+        const registerHandoff = cinematicFrame?.id === "registerHandoff";
+        UpdateActor3D(actors.mother, {
+          x: registerHandoff ? 2.55 : 3.06,
+          y: 0,
+          z: -0.02,
+          velocity: 0,
+          facing: registerHandoff ? 1 : -1,
+          action: directorActors.mother,
+          registerBook: motherHasRegister,
+          actionTime: directorActionTime,
+          actionDuration: 1,
+          time,
+          alert: false,
+          fear: 0.08,
+          grounded: true,
+          lookOffset: directorActors.mother === "write" ? 0.08 : -0.1,
+          positionSnap: true,
+        }, deltaTime);
+      }
+    } else {
+      actors.mother.visible = false;
     }
     for (const [requirement, object] of dynamic.requires) {
       const complete = state.completed.has(requirement);
-      object.visible = complete;
-      if (complete && (requirement === "dropBlind" || requirement === "raiseScreen")) {
+      const effectKey = requirement === "dropBlind" ? "blindDrop" : requirement === "raiseScreen" ? "screenRaise" : "";
+      const authoredProgress = effectKey ? Number(directorEffects[effectKey]) : Number.NaN;
+      object.visible = complete || Number.isFinite(authoredProgress);
+      if (Number.isFinite(authoredProgress)) {
+        object.scale.y = Math.max(0.04, authoredProgress);
+      } else if (complete && (requirement === "dropBlind" || requirement === "raiseScreen")) {
         object.scale.y = THREE.MathUtils.lerp(object.scale.y, 1, 1 - Math.exp(-3.2 * deltaTime));
       } else if (!complete && (requirement === "dropBlind" || requirement === "raiseScreen")) object.scale.y = 0.04;
     }
@@ -1293,16 +1468,21 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }
     if (dynamic.bridge) {
       const raised = state.completed.has("raiseSluice");
-      dynamic.bridgeRaise = state.mode === "paused"
-        ? (raised ? 1 : 0)
-        : THREE.MathUtils.lerp(dynamic.bridgeRaise, raised ? 1 : 0, 1 - Math.exp(-1.45 * deltaTime));
+      const authoredBridgeRaise = Number(directorEffects.bridgeRaise);
+      dynamic.bridgeRaise = Number.isFinite(authoredBridgeRaise)
+        ? THREE.MathUtils.lerp(dynamic.bridgeRaise, authoredBridgeRaise, 1 - Math.exp(-4.8 * deltaTime))
+        : state.mode === "paused"
+          ? (raised ? 1 : 0)
+          : THREE.MathUtils.lerp(dynamic.bridgeRaise, raised ? 1 : 0, 1 - Math.exp(-1.45 * deltaTime));
       dynamic.bridge.visible = raised || dynamic.bridgeRaise > 0.02;
       dynamic.bridge.position.y = THREE.MathUtils.lerp(-0.52, -0.08, dynamic.bridgeRaise);
     }
     if (dynamic.sluiceLever) dynamic.sluiceLever.rotation.z = THREE.MathUtils.lerp(dynamic.sluiceLever.rotation.z, state.completed.has("raiseSluice") ? -0.78 : 0, 1 - Math.exp(-4 * deltaTime));
     if (dynamic.emptyBoat) {
       const released = state.completed.has("releaseBoat");
-      dynamic.emptyBoatRelease = THREE.MathUtils.lerp(dynamic.emptyBoatRelease, released ? 1 : 0, 1 - Math.exp(-0.72 * deltaTime));
+      const authoredBoatRelease = Number(directorEffects.emptyBoatRelease);
+      const releaseTarget = Number.isFinite(authoredBoatRelease) ? authoredBoatRelease : released ? 1 : 0;
+      dynamic.emptyBoatRelease = THREE.MathUtils.lerp(dynamic.emptyBoatRelease, releaseTarget, 1 - Math.exp(-(Number.isFinite(authoredBoatRelease) ? 3.2 : 0.72) * deltaTime));
       dynamic.emptyBoat.position.x = THREE.MathUtils.lerp(11.2, 8.4 + Math.sin(time * 0.32) * 0.25, dynamic.emptyBoatRelease);
       dynamic.emptyBoat.rotation.z = Math.sin(time * 0.7) * 0.04 * dynamic.emptyBoatRelease;
     }
@@ -1314,12 +1494,32 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     if (dynamic.waterRipples) dynamic.waterRipples.position.y = chapter.id === "blockade" ? state.waterLevel * 0.54 : 0;
     if (dynamic.farWater) dynamic.farWater.position.y = -0.46 + Math.sin(time * 0.18) * 0.012;
     if (dynamic.smoke) {
-      dynamic.smoke.visible = !state.completed.has("sealEastCrack");
-      dynamic.smoke.position.x = (state.smokeFrontX || chapter.smoke.startX) * WorldScale;
+      const authoredSmokeRetreat = Number(directorEffects.smokeRetreat);
+      const showingAuthoredRetreat = Number.isFinite(authoredSmokeRetreat);
+      dynamic.smoke.visible = showingAuthoredRetreat ? authoredSmokeRetreat < 0.985 : !state.completed.has("sealEastCrack");
+      dynamic.smoke.position.x = (state.smokeFrontX || chapter.smoke.startX) * WorldScale + (showingAuthoredRetreat ? authoredSmokeRetreat * 5.8 : 0);
       dynamic.smoke.position.y = -0.1 + Math.sin(time * 0.45) * 0.08;
       dynamic.smoke.rotation.y = time * 0.025;
       dynamic.smoke.material.uniforms.uTime.value = time;
-      dynamic.smoke.material.uniforms.uOpacity.value = state.completed.has("openWellVent") ? 0.075 : 0.13;
+      dynamic.smoke.material.uniforms.uOpacity.value = showingAuthoredRetreat
+        ? THREE.MathUtils.lerp(0.13, 0.018, authoredSmokeRetreat)
+        : state.completed.has("openWellVent") ? 0.075 : 0.13;
+    }
+    if (chapter.id === "tunnel" && dynamic.shaftLights.length) {
+      const authoredVentOpening = Number(directorEffects.ventOpening);
+      const ventOpen = Number.isFinite(authoredVentOpening) ? authoredVentOpening : state.completed.has("openWellVent") ? 1 : 0.18;
+      dynamic.shaftLights[0].intensity = THREE.MathUtils.lerp(3.6, 20, ventOpen);
+      const firstShaft = dynamic.shaftVolumes[0];
+      if (firstShaft) {
+        const openingWidth = THREE.MathUtils.lerp(0.32, 1, ventOpen);
+        const openingHeight = THREE.MathUtils.lerp(0.52, 1, ventOpen);
+        firstShaft.volume.scale.set(openingWidth, openingHeight, openingWidth);
+        firstShaft.pool.scale.set(1.2 * openingWidth, 0.56 * openingWidth, 1);
+      }
+    }
+    const trimOpeningActors = cinematicFrame?.id === "schoolOpening";
+    for (const actor of [actors.player, actors.mother]) {
+      for (const optionalMesh of actor.userData.lodOptional || []) optionalMesh.visible = !trimOpeningActors;
     }
     const reedShader = materials.reedSway.userData.shader;
     if (reedShader) {

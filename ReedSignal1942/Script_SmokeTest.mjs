@@ -51,15 +51,14 @@ const postFxSource = readFileSync(join(rootDirectory, "Script_PostFX3D.mjs"), "u
 const assetSource = readFileSync(join(rootDirectory, "Script_Assets3D.mjs"), "utf8");
 const assetKitSize = statSync(join(rootDirectory, "Model_ReedSignalEnvironmentKit.glb")).size;
 
-assert.equal(Object.keys(CinematicSequences).length, 9, "four openings and five story cinematics must remain authored");
+assert.equal(Object.keys(CinematicSequences).length, 24, "four openings and every world action need an authored 3D cinematic");
 assert.equal(Object.keys(ChapterOpeningCinematics).length, Chapters.length, "every chapter needs a continuous-space opening shot");
-assert.equal(Object.keys(ActionCinematics).length, 5, "all five emotional action beats need a 3D cinematic");
+assert.equal(Object.keys(ActionCinematics).length, Chapters.flatMap((chapter) => chapter.actions).length, "all world actions need a visible 3D cinematic");
 for (const chapter of Chapters) assert.ok(GetChapterOpeningCinematic(chapter.id), `${chapter.id}: opening cinematic missing`);
-for (const actionId of ["findChildren", "handShuanUp", "meetMother", "motherSignal", "boardFerry"]) {
-  assert.ok(GetActionCinematic(actionId), `${actionId}: story action cinematic missing`);
-}
+for (const action of Chapters.flatMap((chapter) => chapter.actions)) assert.ok(GetActionCinematic(action.id), `${action.id}: story action cinematic missing`);
 for (const sequence of Object.values(CinematicSequences)) {
   assert.ok(sequence.duration > 0 && sequence.segments.length > 0, `${sequence.id}: cinematic timing missing`);
+  assert.equal(sequence.lockInput, "all", `${sequence.id}: a full cinematic must not leak movement input into the shot`);
   assert.equal(sequence.segments[0].from, 0, `${sequence.id}: cinematic must start at zero`);
   assert.equal(sequence.segments.at(-1).to, sequence.duration, `${sequence.id}: cinematic must end at its declared duration`);
   sequence.segments.forEach((segment, index) => {
@@ -70,11 +69,14 @@ for (const sequence of Object.values(CinematicSequences)) {
 assert.equal(CinematicSequences.endingDeparture.blocksEnding, true, "the ferry must leave in 3D before the ending screen appears");
 assert.equal(CinematicSequences.endingDeparture.segments[1].effects.playerBoarding, 0, "all six children must board before Awei");
 assert.deepEqual(CinematicSequences.endingDeparture.segments[2].effects.playerBoarding, [0, 1], "Awei must board during the authored third shot");
+assert.equal(CinematicSequences.endingDeparture.segments.length, 5, "the finale needs boarding, Awei's answer, and the departure wide shot");
+assert.deepEqual(CinematicSequences.sluiceRise.segments[1].effects.bridgeRaise, [0.42, 1], "the bridge must visibly rise during its causal shot");
+assert.deepEqual(CinematicSequences.emptyBoatDiversion.segments[1].effects.emptyBoatRelease, [0.35, 1], "the empty boat must visibly drift during its diversion shot");
 
 const naturalDirector = CreateCinematicDirector();
 assert.equal(naturalDirector.Start("schoolOpening"), true);
 assert.equal(naturalDirector.GetFrame()?.id, "schoolOpening");
-for (let step = 0; step < 140 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
+for (let step = 0; step < 180 && naturalDirector.IsPlaying(); step += 1) naturalDirector.Update(0.05);
 assert.equal(naturalDirector.IsPlaying(), false, "opening cinematic must finish deterministically");
 assert.deepEqual(naturalDirector.ConsumeFinished(), {
   id: "schoolOpening",
@@ -268,6 +270,8 @@ assert.match(styleSource, /prefers-reduced-motion/, "motion-sensitive players ne
 assert.match(styleSource, /orientation: portrait/, "portrait phones need a rotation notice");
 assert.match(gameSource, /window\.ReedSignal1942/, "browser QA needs a small public inspection surface");
 assert.match(gameSource, /Runtime\.state\.cinematicCue = null/, "director-owned story actions must not replay their short rule-layer cue after the shot");
+assert.doesNotMatch(gameSource, /IsPlaying\(\)\) InputState\.cinematicSkipPressed = true/, "ordinary movement or touch input must not silently skip cinematics");
+assert.match(gameSource, /code === "Escape" && !event\.repeat\) InputState\.cinematicSkipPressed = true/, "cinematics need one explicit keyboard skip command");
 assert.match(gameSource, /localStorage\.setItem\(GameMetadata\.saveKey/, "the runtime must persist authored checkpoints");
 assert.match(gameSource, /createBufferSource/, "ambient audio must be synthesized at runtime");
 assert.doesNotMatch(gameSource, /from\s+["']https?:\/\//, "runtime imports must remain local");

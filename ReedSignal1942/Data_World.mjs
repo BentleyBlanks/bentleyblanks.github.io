@@ -77,8 +77,8 @@ export const Chapters = Object.freeze([
       Object.freeze({ x: 2640, requires: "openDrain", hint: "排水洞还压着石板。" }),
     ]),
     actions: Object.freeze([
-      Object.freeze({ id: "takeRegister", x: 330, label: "收起点名簿", seconds: 0.7, story: "周禾：纸会湿，名字要记在心里。", checkpoint: true }),
-      Object.freeze({ id: "findMizi", x: 620, label: "牵起麦子", seconds: 0.5, requires: Object.freeze(["takeRegister"]), story: "麦子没有哭，只把手攥得更紧。", effect: "addMizi" }),
+      Object.freeze({ id: "takeRegister", x: 330, label: "接过点名簿", seconds: 0.7, story: "周禾：见到一个，就应一个名字。", checkpoint: true }),
+      Object.freeze({ id: "findMizi", x: 620, label: "牵起麦子", seconds: 0.5, requires: Object.freeze(["takeRegister"]), story: "麦子丢了一只鞋，却一直守在老师让她等的地方。", effect: "addMizi" }),
       Object.freeze({ id: "dropBlind", x: 820, label: "放下苇帘", seconds: 1.1, requires: Object.freeze(["findMizi"]), story: "旧苇帘落下来，灯光第一次有了挡头。", checkpoint: true }),
       Object.freeze({ id: "cartPlaced", x: 1515, label: "把车抵住墙根", seconds: 0, requires: Object.freeze(["dropBlind"]), story: "车轮陷进土里，刚好够两双脚翻过残墙。", special: "cart" }),
       Object.freeze({ id: "openDrain", x: 2545, label: "抬开排水洞石板", seconds: 1.3, requires: Object.freeze(["cartPlaced"]), story: "阿苇先把麦子送进去，自己最后钻过。", checkpoint: true }),
@@ -200,7 +200,7 @@ export const Chapters = Object.freeze([
     intro: Object.freeze([
       "北汊的木船只能再撑一趟。",
       "周禾从另一条交通线赶来，身后也亮起了巡逻灯。",
-      "她没问阿苇怕不怕，只接过点名簿看了一眼。",
+      "她接过点名簿，在六个孩子后面又写了一行。",
     ]),
     width: 3660,
     startX: 120,
@@ -232,7 +232,7 @@ export const Chapters = Object.freeze([
     actions: Object.freeze([
       Object.freeze({ id: "countChildren", x: 360, label: "低声点一次名", seconds: 0.7, story: `${SharedNames.join("、")}。六个名字，六声回应。`, checkpoint: true }),
       Object.freeze({ id: "raiseScreen", x: 1040, label: "升起旧苇障", seconds: 1.7, requires: Object.freeze(["countChildren"]), condition: "followersWaiting", story: "阿苇独自穿过灯下，把旧苇障一寸寸拉起来。", checkpoint: true }),
-      Object.freeze({ id: "meetMother", x: 1840, label: "把点名簿交给周禾", seconds: 0.8, requires: Object.freeze(["raiseScreen"]), story: "周禾：你带他们走。过河以后，再点一次。" }),
+      Object.freeze({ id: "meetMother", x: 1840, label: "把点名簿交给周禾", seconds: 0.8, requires: Object.freeze(["raiseScreen"]), story: "周禾在第七行写下阿苇：你也还只是个孩子。" }),
       Object.freeze({ id: "motherSignal", x: 2070, label: "放下白布信号", seconds: 0.9, requires: Object.freeze(["meetMother"]), story: "周禾把白布挂上枯树，自己提着马灯走向南汊。巡逻灯跟着她转了过去。", effect: "distractFinal", checkpoint: true }),
       Object.freeze({ id: "boardFerry", x: 3260, label: "让六个孩子依次上船", seconds: 2.0, requires: Object.freeze(["motherSignal"]), condition: "followersTogether", story: "最后一个孩子上船后，阿苇才松开缆绳。", effect: "finishStory", checkpoint: true }),
     ]),
@@ -242,7 +242,7 @@ export const Chapters = Object.freeze([
       Object.freeze({ label: "接过周禾留下的时间", ids: Object.freeze(["meetMother", "motherSignal"]) }),
       Object.freeze({ label: "带所有孩子登船", ids: Object.freeze(["boardFerry"]) }),
     ]),
-    endingLine: "河面亮起来以前，阿苇翻开了那本已经湿透的点名簿。",
+    endingLine: "点名簿从六行变成八行；最后一行没有回应，也没有被划掉。",
   }),
 ]);
 
