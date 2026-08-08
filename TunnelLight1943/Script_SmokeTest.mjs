@@ -102,7 +102,9 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         if (target.action === "crouchAt" && Math.abs(dx) <= 1.35) { input.crouch = true; input.moveX = 0; }
         // 投掷：走到投掷位、面朝目标方向，然后 F
         if (target.action === "throwAt") {
-          if (Math.abs(dx) > 0.6) input.moveX = Math.sign(dx);
+          // 站位容差放宽到 1.2：转身那一步会顺带挪几厘米，容差太小会在
+          // "走回去/转身"之间来回震荡，永远出不了手（转身后下一帧就出手）
+          if (Math.abs(dx) > 1.2) input.moveX = Math.sign(dx);
           else if ((p.heading || 1) !== (target.face || 1)) input.moveX = target.face || 1;
           else if (!state.thrown) { input.throw = true; input.moveX = 0; }
           else input.moveX = 0;
@@ -125,7 +127,8 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         }
         // 刨料：驱动器只按键盘（CLAUDE.md 铁律），按住 E 就行——方向由节拍自己判。
         // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
-        if (target.action === "planeAt") input.interactHeld = true;
+        // 受伤版刨木（c1_repair）：手抖那口气没喘完就得松手，驱动器照着 rest 松
+        if (target.action === "planeAt") input.interactHeld = !state.planing?.rest;
         if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
@@ -235,7 +238,7 @@ function TestClimb() {
     StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
     if ((fwd += 1) > 10000) throw new Error("无法进入第一章玩法段");
   }
-  state.player.x = 27;
+  state.player.x = 37;
   state.player.level = "surface";
   // S 下地窖
   StepGame(state, { moveX: 0, climb: 1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
@@ -290,7 +293,6 @@ function TestDetectionReset() {
 // ② 一个不读视线、不蹲、不投石的「笨玩家」一路直走要能过去。
 function TestStealthEscapable() {
   const CASES = [
-    { chapter: 0, beat: "c1_hide", startX: 42.3, label: "C1 带妹妹躲进地窖" },
     { chapter: 1, beat: "c2_mother", startX: 50, label: "C2 掩体推进", budget: 120 },
     { chapter: 1, beat: "c2_escape1", label: "C2 东行第一段" },
     { chapter: 1, beat: "c2_escape2", label: "C2 东行第二段" },
@@ -448,15 +450,17 @@ function TestC2Evasion() {
 function TestVaultC1() {
   const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
   const list = ChapterBeatList(0);
+  // 新版第一章不教学翻越（关卡设计文档）：巷口那堵塌墙留给第二章正式复用，
+  // 这里只借 c1_well 的自由活动验"翻越机制本身没坏"
   const cases = [
-    { beat: "c1_cloth", from: 79, to: 92, top: 0.82, label: "塌进巷子的院墙（教学）" },
-    { beat: "c1_cloth", from: 92, to: 79, top: 0.82, label: "塌进巷子的院墙（回程复用）" },
-    { beat: "c1_hide", from: 42, to: 32, top: 0.72, label: "倒塌的柴垛（扫荡压力下）" },
+    { beat: "c1_well", from: 79, to: 92, top: 0.82, label: "塌进巷子的院墙（东行）" },
+    { beat: "c1_well", from: 92, to: 79, top: 0.82, label: "塌进巷子的院墙（西行）" },
   ];
   for (const c of cases) {
     const state = CreateGame(0);
     DebugJump(state, 0, list.findIndex((b) => b.id === c.beat));
     state.player.x = c.from;
+    state.player.item = null;   // 结算把水桶塞进手里：先撂下，翻越走标准档
     const dir = Math.sign(c.to - c.from);
     let peakLift = 0, sawPose = false, started = false, sawHint = false, blockedX = null;
     const cues = [];
@@ -548,7 +552,7 @@ function TestVaultC1() {
   // 扛着大件是另一档：更慢、另一套姿势（clamber）
   {
     const state = CreateGame(0);
-    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_cloth"));
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_well"));
     state.player.x = 79;
     state.player.item = { id: "plankA", label: "木料", big: true };
     let heavy = false, dur = 0;
@@ -566,7 +570,8 @@ function TestVaultC1() {
   // 推着车不翻：提示都不该出（车是从旁边推过去的，不是被抱过垛顶的）
   {
     const state = CreateGame(0);
-    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_cloth"));
+    DebugJump(state, 0, list.findIndex((b) => b.id === "c1_well"));
+    state.player.item = null;
     state.cart = { x: 84.4, kind: "barrow" };
     state.player.x = 82.6;
     let vaulted = false;
@@ -589,8 +594,8 @@ function TestVaultC1() {
 // 后面那截绳头捡不起来、按 E 毫无反应——玩家只会以为游戏坏了。
 function TestChainSurvivesEarlyDrop() {
   const state = CreateGame(0);
-  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
-  DebugJump(state, 0, water.index);
+  const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+  DebugJump(state, 0, well.index);
   const step = (input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
       StepGame(state, {
@@ -599,46 +604,35 @@ function TestChainSurvivesEarlyDrop() {
       }, DT);
     }
   };
-  // 开拍娘的派活 micro-cine 在第一帧起——先推完
   step({}, 1);
-  for (let i = 0; i < 300 && state.microCine; i += 1) step({ advance: true });
-  // 拎桶 → 挂井绳（发现绳断）
-  state.player.x = 31; state.player.level = "surface";
-  step({}, 3); step({ interact: true });
-  assert.equal(state.player.item?.id, "bucket", "先得拎起桶");
-  state.player.x = SCENES.village.zones.well.x; step({}, 3); step({ interact: true });
-  assert.equal(state.flags.wellRopeBroken, true, "挂桶必须发现绳断了");
-  // ★ 半路（不在木料堆）随手把桶撂下
-  state.player.x = 50; step({}, 24); step({ interact: true });
+  // 上一拍（刨盖板）的收尾把水桶塞进了手里
+  assert.equal(state.player.item?.id, "bucket", "跳幕结算后水桶必须在手里");
+  // ★ 半路（院墙外）随手把桶撂下
+  state.player.x = 45.6; state.player.level = "surface";
+  step({}, 20); step({ interact: true });
   assert.equal(state.player.item, null, "半路应该放得下");
   assert.equal(state.groundItems.length, 1, "桶该躺在半路上");
-  // 走到绳头：这一截必须捡得起来，不能没反应
-  state.player.x = 70; step({}, 6);
-  assert.ok(state.prompt && state.prompt.includes("绳"),
-    `站到绳头处必须给得出提示，实为 ${JSON.stringify(state.prompt)}`);
-  step({ interact: true });
-  assert.equal(state.player.item?.id, "rope", "半路撂过桶，也必须捡得起绳头");
-  // 接着把绳接上，链就走到「折回取桶」——这时撂在远处的桶必须被标出来，
-  // 否则玩家根本不知道自己把它扔哪儿了
-  state.player.x = SCENES.village.zones.well.x;
-  step({}, 3);
-  // 接绳没有长按后备了（见 TestKnotIsThreadingNotCircling）：这儿也得真顺着绳拖
-  DragKnotThrough(state, (inp) => step(inp));
-  assert.equal(state.flags.wellRopeBroken, false, "绳该接好了");
-  step({}, 3);
+  // 先把妹妹那步问完（talk 是链的第一步）
+  const sis = state.actors.find((a) => a.id === "sister");
+  state.player.x = sis.x; step({}, 3); step({ interact: true });
+  for (let i = 0; i < 400 && state.microCine; i += 1) step({ advance: true });
+  // 走到井台：这一步要桶——撂在半路的桶必须有气泡标着、提示也得说清缺什么
+  state.player.x = SCENES.village.zones.well.x - 0.5; step({}, 6);
+  assert.ok(state.prompt && /缺/.test(state.prompt),
+    `空着手站上井台必须说缺什么，实为 ${JSON.stringify(state.prompt)}`);
   const marked = state.bubbles.some((b) => b.icon === "item:空水桶");
-  assert.ok(marked, "折回取桶时，撂在远处的桶必须挂气泡");
-  // 走回去真的能捡起来
+  assert.ok(marked, "撂在半路的桶必须挂气泡标出来");
+  // 走回去真的能捡起来，链接着走
   const g = state.groundItems.find((it) => it.id === "bucket");
   state.player.x = g.x; step({}, 3); step({ interact: true });
   assert.equal(state.player.item?.id, "bucket", "撂在哪儿就该能从哪儿捡回来");
-  console.log("  ✓ 链不怕半路撂东西：绳头照样捡得起，撂下的桶有气泡标着、捡得回来");
+  console.log("  ✓ 链不怕半路撂东西：缺桶有提示、撂下的桶有气泡标着、捡得回来");
 }
 
 function TestGroundItems() {
   const state = CreateGame(0);
-  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
-  DebugJump(state, 0, water.index);
+  const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+  DebugJump(state, 0, well.index);
   const step = (input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
       StepGame(state, {
@@ -647,20 +641,11 @@ function TestGroundItems() {
       }, DT);
     }
   };
-  // 开拍娘先喊一嗓子派活（micro-cine 在第一帧起）——推完再开始拎桶
   step({}, 1);
-  for (let i = 0; i < 300 && state.microCine; i += 1) step({ advance: true });
-  // 链步骤一：拎起屋里的水桶
-  state.player.x = 31;
-  state.player.level = "surface";
-  step({}, 2);
-  step({ interact: true });
-  assert.equal(state.player.item?.id, "bucket", "链步骤一：要能拎起水桶");
-  // 拾取后的保护窗：紧接着的 E 不许顺手把它又扔了
-  step({ interact: true });
-  assert.equal(state.player.item?.id, "bucket", "刚拿起的东西不许被同一串 E 顺手放下");
+  assert.equal(state.player.item?.id, "bucket", "跳幕结算后水桶必须在手里");
   // 站进 hayB 草垛掩体（x=68, w=3.2）正中间放下：落点必须被推出掩体足迹
   state.player.x = 68;
+  state.player.level = "surface";
   step({}, 14);
   step({ interact: true });
   assert.equal(state.player.item, null, "空地上按 E 要能自由放下");
@@ -677,6 +662,9 @@ function TestGroundItems() {
   step({ interact: true });
   assert.equal(state.player.item?.id, "bucket", "走近按 E 要能拾回");
   assert.equal(state.groundItems.length, 0, "拾回后地上不该有残影");
+  // 拾取后的保护窗：紧接着的 E 不许顺手把它又扔了
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "bucket", "刚拿起的东西不许被同一串 E 顺手放下");
   console.log("  ✓ 落地道具：自由放下避开掩体足迹、悬浮气泡、拾回");
 }
 
@@ -703,14 +691,12 @@ function DragKnotThrough(state, drive) {
 function TestKnotIsThreadingNotCircling() {
   const Setup = () => {
     const state = CreateGame(0);
-    const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
-    DebugJump(state, 0, water.index);
-    // 直接把链推进到接绳那一步：桶已放下、绳已在手
-    state.beat.stepIndex = 4;
-    state.flags.wellRopeBroken = true;
-    state.flags.bucketAt = 70.1;
-    state.groundItems.push({ uid: "gT", id: "bucket", label: "空水桶", x: 70.1, level: "surface" });
-    state.player.item = { id: "rope", label: "麻绳" };
+    const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+    DebugJump(state, 0, well.index);
+    // 直接把链推进到缠绳那一步：桶已搁下、磨损处已折回（备用绳就在桶底）
+    state.beat.stepIndex = 3;
+    state.flags.wellRopeFixed = false;
+    state.player.item = null;
     state.player.x = SCENES.village.zones.well.x;
     state.player.level = "surface";
     return state;
@@ -731,7 +717,7 @@ function TestKnotIsThreadingNotCircling() {
     step(state, { interactHeld: true }, Math.ceil(6.0 / DT));
     assert.ok(!(state.beat.knotState?.u > 0.01),
       `长按 E 居然把绳穿过去了（u=${state.beat.knotState?.u}）——这条后备必须是死的`);
-    assert.equal(state.flags.wellRopeBroken, true, "长按不该把井绳接好");
+    assert.ok(!state.flags.wellRopeFixed, "长按不该把井绳缠好");
   }
 
   // ② 按下那一帧手没落在绳头上：攥不住，怎么拖都不动
@@ -756,8 +742,8 @@ function TestKnotIsThreadingNotCircling() {
     step(state, {}, 2);
     const u = DragKnotThrough(state, (inp) => step(state, inp));
     assert.ok(u >= 1, `顺着绳拖到底必须接得上（只走到 u=${u.toFixed(2)}）`);
-    assert.equal(state.player.item, null, "绳头一上手，麻绳就该离开物品栏");
-    assert.equal(state.flags.wellRopeBroken, false, "拖到底＝结勒死，井绳必须接好");
+    assert.equal(state.player.item, null, "缠绳全程两手都在绳上，物品栏得是空的");
+    assert.equal(state.flags.wellRopeFixed, true, "拖到底＝结勒死，井绳必须缠好");
   }
 
   // ④ 往回拖：绳头退出来，进度跟着退（方向是有意义的）
@@ -818,8 +804,8 @@ function TestKnotIsThreadingNotCircling() {
 // 脱手倒转；上手的同时镜头必须推成井口特写（不在大全景下摇转盘）。
 function TestWinchIsACrankNotALever() {
   const state = CreateGame(0);
-  const water = ChapterBeatList(0).find((b) => b.id === "c1_water");
-  DebugJump(state, 0, water.index);
+  const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+  DebugJump(state, 0, well.index);
   const step = (input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
       StepGame(state, {
@@ -828,9 +814,9 @@ function TestWinchIsACrankNotALever() {
       }, DT);
     }
   };
-  // 直接把链推进到辘轳那一步：绳已接好、桶在手里
+  // 直接把链推进到辘轳那一步：绳已缠好、桶拾回在手里
   state.beat.stepIndex = 6;
-  state.flags.wellRopeBroken = false;
+  state.flags.wellRopeFixed = true;
   state.player.item = { id: "bucket", label: "空水桶" };
   const wx = SCENES.village.zones.well.x;
   state.player.x = wx;
@@ -889,10 +875,12 @@ function TestWinchIsACrankNotALever() {
 // 的哪儿说了算（pointerCard，u 沿卡宽 / v 沿卡高的归一化坐标）。世界坐标那条
 // 老路子已经废了——世界里那支笔只有十来个像素，按不着。五条硬规矩各验一遍。
 function TestChalkIsAPencilNotASlider() {
-  const carve = ChapterBeatList(0).find((b) => b.id === "c1_carve");
+  // 新版第一章的量身只是三四秒的人物动作（不是玩法）；攥石笔划线的拟物
+  // 交互只剩第八章那道给妹妹刻的痕
+  const carve = ChapterBeatList(7).find((b) => b.id === "c8_carve");
   const mk = () => {
-    const state = CreateGame(0);
-    DebugJump(state, 0, carve.index);
+    const state = CreateGame(7);
+    DebugJump(state, 7, carve.index);
     state.player.x = 34;
     state.player.level = "surface";
     return state;
@@ -931,12 +919,12 @@ function TestChalkIsAPencilNotASlider() {
     step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } });
     assert.ok(s.beat.drawn > 0, "攥住往前拉，必须留下印子");
     assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
-    // 玩家要做的事，画面上事先不能已经做完了：门框此刻必须还是空的
-    assert.equal(s.flags.marked, false, "没划完之前，门框上不该已经有那道刻痕");
+    // 玩家要做的事，画面上事先不能已经做完了：第二道刻痕此刻必须还没有
+    assert.ok(!s.flags.carved, "没划完之前，门框上不该已经有第二道刻痕");
     // 一直拉到底
     step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } }, 240);
-    assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "拉满一道线，这一拍必须过");
-    assert.equal(s.flags.marked, true, "划完了，刻痕才长在门框上");
+    assert.notEqual(CurrentBeatDef(s)?.id, "c8_carve", "拉满一道线，这一拍必须过");
+    assert.equal(s.flags.carved, true, "划完了，第二道刻痕才长在门框上");
     assert.equal(s.scribeCard, null, "划完了，那张卡必须收走");
   }
 
@@ -958,7 +946,7 @@ function TestChalkIsAPencilNotASlider() {
     const s = mk();
     step(s, {}, 2);
     step(s, { interactHeld: true, moveX: 1 }, 200);
-    assert.notEqual(CurrentBeatDef(s)?.id, "c1_carve", "按住 E 往右推必须也能划完");
+    assert.notEqual(CurrentBeatDef(s)?.id, "c8_carve", "按住 E 往右推必须也能划完");
   }
 
   // ⑤ 这一拍不许出现任何 HUD 轨道：**用户反复要过的就是这一条**——
@@ -968,7 +956,7 @@ function TestChalkIsAPencilNotASlider() {
     step(s, {}, 2);
     assert.ok(s.scribeCard, "站定就该亮出那张特写卡");
     let moved = 0;
-    for (let i = 0; i < 60 && CurrentBeatDef(s)?.id === "c1_carve"; i += 1) {
+    for (let i = 0; i < 60 && CurrentBeatDef(s)?.id === "c8_carve"; i += 1) {
       step(s, { pointerHeld: true, pointerCard: { u: GRIP.u + i * 0.006, v: GRIP.v } });
       assert.ok(!s.dragTrack, "划线这一拍绝不许有拖动轨道（slider）");
       moved = Math.max(moved, s.scribeCard?.head || 0);
@@ -1023,49 +1011,33 @@ function TestWorkStations() {
   const beats = ChapterBeatList(0).map((b) => b.id);
   const state = CreateGame(0);
 
+  // 运木料时窖里的活不停：爹在地下掏土（人人手上有活，家里没人站着围观）
   DebugJump(state, 0, beats.indexOf("c1_barrow"));
-  StepGame(state, idle, DT);   // 第一帧跑 onStart：各就各位
+  StepGame(state, idle, DT);
   const father = state.actors.find((a) => a.id === "father");
-  const mother = state.actors.find((a) => a.id === "mother");
-  assert.equal(father?.track?.name, "sawing", "运木料时爹必须在拉锯");
-  assert.equal(father?.carry, "锯", "拉锯的爹手上必须有锯");
-  assert.ok(mother?.cineTarget || mother?.track, "运木料时娘必须动身去菜畦或已在干活");
-  // 差事的前因后果：爹开拍亲口派活（不能只有目标文本），
-  // 妹妹同一拍从家门跑向老槐树——她在哪，娘的喊话与这一路交代掉
-  assert.ok(state.microCine, "运木料开拍爹必须亲口派活");
+  assert.equal(father?.level, "under", "运木料时爹必须在窖里");
+  assert.equal(father?.track?.name, "hoeing", "窖里的爹必须在掏土（hoeing 动作）");
+  const xz = state.actors.find((a) => a.id === "xiaozhou");
+  assert.equal(xz?.track?.name, "hoeing", "小周也得在干活");
+
+  // 挖通道那一拍：妹妹只做安全小活（撒碎草），官道的岗是成年民兵的
+  DebugJump(state, 0, beats.indexOf("c1_dig"));
+  StepGame(state, idle, DT);
   const sis = state.actors.find((a) => a.id === "sister");
-  assert.ok(sis?.cineTarget && sis.cineTarget.x > 100, "开拍妹妹必须动身往老槐树跑");
+  assert.equal(sis?.track?.name, "scatterFeed", "妹妹的小活是撒碎草，不是望风");
+  const sentry = state.actors.find((a) => a.id === "sentry");
+  assert.ok(sentry?.visible && sentry?.wander, "官道上必须有成年民兵在放哨");
+  const dg = state.actors.find((a) => a.id === "diggerA");
+  assert.equal(dg?.track?.name, "hoeing", "帮工的乡亲得在地下轮换挖土");
 
-  DebugJump(state, 0, beats.indexOf("c1_water"));
-  // 跳过了刨料：完工旗必须结算——工作台边那扇半成的门扇（doorLeafWip）靠它现身
-  assert.equal(state.flags.tenonDone, true, "跳过刨料也得落 tenonDone（门扇雏形）");
-  StepGame(state, idle, DT);
-  // 开拍娘先直起腰喊人（micro-cine 派活），喊完 tick 会把她放回锄地——
-  // 先把这句喊话推完再验工位
-  const m2 = state.actors.find((a) => a.id === "mother");
-  assert.ok(state.microCine, "打水开拍娘必须喊一嗓子派活");
-  assert.equal(m2?.track, null, "喊话的娘得直起腰，不能一边锄地一边喊");
-  for (let i = 0; i < 300 && state.microCine; i += 1) StepGame(state, { ...idle, advance: true }, DT);
-  StepGame(state, idle, DT);
-  assert.equal(state.actors.find((a) => a.id === "father")?.track?.name, "sawing", "打水时爹必须在拉锯");
-  assert.equal(m2?.track?.name, "hoeing", "喊完话娘必须回去锄地");
-  assert.equal(m2?.carry, "锄头", "锄地的娘手上必须有锄头");
+  // 藏粮的催促：小窗看娘那一眼（pip 机制别悄悄死掉）
+  const grain = SCRIPTS.c1.find((b) => b.id === "c1_grain");
+  grain.pipIdle.on(state);
+  assert.ok(state.pip && state.pip.who === "mother", "藏粮拖久了必须开一扇看娘的后果小窗");
+  assert.equal(state.flags.pipShown, true, "pip 机制的旗标必须落");
 
-  // 桶触水：娘停锄、后果小窗开
-  const water = SCRIPTS.c1.find((b) => b.id === "c1_water");
-  const winch = water.steps.find((s) => s.type === "winch");
-  winch.onFilled(state);
-  assert.equal(state.flags.waterFilled, true);
-  assert.ok(state.pip && state.pip.who === "mother", "桶灌满必须开一扇看娘的后果小窗");
-  assert.equal(m2.track, null, "听见咕咚声，娘得停下锄头");
-  // 小窗到时自己收，onEnd 别把锄地误恢复（水已经打上来了）
-  StepGame(state, idle, state.pip.t + 0.1);
-  assert.equal(state.pip, null, "后果小窗必须到时收起");
-  assert.equal(m2.track, null, "水打上来之后娘不该再回去锄地");
   // 锯必须一直躺在锯口里：锯是 alongArm 挂件，贴图角度 = 前臂世界角 = armF+foreF。
-  // 老版本靠开合肘部做"一进一出"，这个和从 -72° 荡到 -132°，锯在空中划了个 60°
-  // 的钟摆。行程只许来自肩（armF），肘角跟着补偿。Rig 里带 THREE/document，
-  // node 侧进不来，就直接盯源码里那几个关键帧。
+  // sawing 轨道虽然暂时没人用，但它是 Rig 的公共资产，关键帧规矩照盯
   const rigSrc = fs.readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
   const sawBlock = rigSrc.slice(rigSrc.indexOf("  sawing: {"), rigSrc.indexOf("  hoeing: {"));
@@ -1077,7 +1049,7 @@ function TestWorkStations() {
   assert.ok(spread <= 6, `锯身角度全程必须锁死（前臂世界角摆动 ${spread.toFixed(1)}°>6°，锯会变成钟摆）`);
   const armFs = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+)/g)].map((m) => Number(m[1]));
   assert.ok(Math.max(...armFs) - Math.min(...armFs) >= 24, "肩的行程太小，锯推不出去");
-  console.log("  ✓ 干活的家人（爹拉锯/娘锄地）与后果小窗");
+  console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
 }
 
 // 刨料这一拍是"手上真有活"的教学，几条硬约束：镜头必须推到台面上
@@ -1089,9 +1061,9 @@ function TestPlaneBeat() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
   const state = CreateGame(0);
-  DebugJump(state, 0, beats.indexOf("c1_tenon"));
+  DebugJump(state, 0, beats.indexOf("c1_plane"));
   const def = CurrentBeatDef(state);
-  assert.equal(def.kind, "plane", "合榫那一拍已经换成刨料");
+  assert.equal(def.kind, "plane", "刨盖板必须是拟物刨料那一拍");
   assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
 
   // 刨子在**卡上**的位置（与 Core 同一套版面）：攥取判定的靶子。
@@ -1157,7 +1129,7 @@ function TestPlaneBeat() {
   // ⑥ 键盘后备（CLAUDE.md：指针玩法必须留等价按键路径，否则自动通关卡死）：
   // 光按住 E 就推得动，方向由这一趟的状态给。顿一下这一趟就不齐（刨花短一截）
   const s2 = CreateGame(0);
-  DebugJump(s2, 0, beats.indexOf("c1_tenon"));
+  DebugJump(s2, 0, beats.indexOf("c1_plane"));
   for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
   for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), interactHeld: true }, DT);
   assert.ok(s2.beat.u > 0, "按住 E 必须能把刨子推出去（键盘后备）");
@@ -1172,22 +1144,22 @@ function TestPlaneBeat() {
 
   // ⑦ 自动通关能过（驱动器只按键盘：按住 E，到头自动掉头拖回来）
   const s3 = CreateGame(0);
-  DebugJump(s3, 0, beats.indexOf("c1_tenon"));
+  DebugJump(s3, 0, beats.indexOf("c1_plane"));
   let g3 = 0;
-  while (CurrentBeatDef(s3)?.id === "c1_tenon" && g3 < 3000) {
+  while (CurrentBeatDef(s3)?.id === "c1_plane" && g3 < 3000) {
     g3 += 1;
     const t = GetBeatTarget(s3);
     const inp = idle();
     if (t?.action === "planeAt") inp.interactHeld = true;
     StepGame(s3, inp, DT);
   }
-  assert.notEqual(CurrentBeatDef(s3)?.id, "c1_tenon", "刨料必须能推完（驱动器不许卡死）");
+  assert.notEqual(CurrentBeatDef(s3)?.id, "c1_plane", "刨料必须能推完（驱动器不许卡死）");
   assert.equal(s3.planeCard, null, "推完了，那张卡必须收走");
 
   // ⑧ 推到头之后**画面自己得说"往回带"**：卡上那把刨子抬离料面（armed=false）。
   // 这是拿掉 HUD 轨道之后唯一的回程提示，丢了玩家就会卡在那头以为坏了。
   const s4 = CreateGame(0);
-  DebugJump(s4, 0, beats.indexOf("c1_tenon"));
+  DebugJump(s4, 0, beats.indexOf("c1_plane"));
   for (let i = 0; i < 200; i += 1) StepGame(s4, idle(), DT);
   let g4 = 0;
   while (s4.planeCard?.armed !== false && g4 < 600) { g4 += 1; StepGame(s4, { ...idle(), interactHeld: true }, DT); }
@@ -1390,19 +1362,17 @@ function TestStrokeWork() {
 function TestRaidColumn() {
   const state = CreateGame(0);
   const list = ChapterBeatList(0);
-  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_hide"));
+  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_roster"));
+  StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false }, DT);
   const enemies = state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet") && a.visible !== false);
   const active = enemies.filter((a) => !a.decor);
   assert.ok(enemies.length >= 10, `进村的得是一支队伍，现在只有 ${enemies.length} 个`);
-  assert.equal(active.length, 2, `参与潜行判定的必须恰好两个兵，现在 ${active.length} 个`);
+  assert.equal(active.length, 2, `进院搜查的必须恰好两个兵，现在 ${active.length} 个`);
   assert.ok(enemies.some((a) => a.mount === "bicycle"), "队伍里得有骑车的伪军");
   assert.ok(enemies.some((a) => a.mount === "motorcycle"), "队伍里得有挎斗摩托");
   const side = enemies.find((a) => a.pinTo);
   assert.ok(side, "挎斗里得坐着一个兵");
-  // 大队伍全部撂在东街（x≥110），撤退线 42→27 与街口 49-57 一个不多占
-  for (const a of enemies) {
-    if (a.decor && a.id !== "traitor") assert.ok(a.x >= 110, `decor 兵 ${a.id} 站到考场里来了（x=${a.x.toFixed(1)}）`);
-  }
+  assert.ok(state.actors.some((a) => a.id === "baozhang" && a.carry === "名册"), "伪保长得夹着保甲册带路");
   // 钉在车上的兵要真的跟着车走
   const moto = state.actors.find((a) => a.id === "motoLead");
   moto.cineTarget = { x: moto.x - 6 };
@@ -1410,7 +1380,7 @@ function TestRaidColumn() {
   const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
   for (let i = 0; i < 90; i += 1) StepGame(state, idle, DT);
   assert.ok(Math.abs(side.x - (moto.x + side.pinTo.dx)) < 0.05, "挎斗里的兵没跟住车");
-  console.log("  ✓ 进村车队：自行车/挎斗摩托/纵队在场，考场仍只有两个兵");
+  console.log("  ✓ 清查队：自行车/挎斗摩托/纵队/伪保长在场，进院的只有两个兵");
 }
 
 // 队序：**徒步的大部队永远不许超过自行车和摩托**（用户 2026-08-08 退回）。
@@ -1420,7 +1390,7 @@ function TestConvoyKeepsFormation() {
   const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
   const state = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
-  DebugJump(state, 0, beats.indexOf("c1_raid"));
+  DebugJump(state, 0, beats.indexOf("c1_roster"));
   StepGame(state, idle, DT);   // 第一帧跑 line0 的 on()：整支队伍生成并起步
 
   const At = (id) => state.actors.find((a) => a.id === id);
@@ -1463,70 +1433,46 @@ function TestConvoyKeepsFormation() {
   assert.ok(gapJp > 0 && gapJp < 8,
     `摩托到日军队头 ${gapJp.toFixed(1)}m——太远了（用户点名要"拉得近一点"）`);
 
-  // 搜村停下来之后，车仍停在队头（最深入村的那一段），徒步的散在车后头
-  const st2 = CreateGame(0);
-  DebugJump(st2, 0, beats.indexOf("c1_hide"));
-  const bike2 = st2.actors.find((a) => a.id === "bikeScout");
-  const moto2 = st2.actors.find((a) => a.id === "motoLead");
-  const feet = st2.actors.filter((a) => /^c1(pup|jp)/.test(a.id) && a.x > 100);
-  assert.ok(bike2.x < moto2.x, "搜村时自行车得停在摩托前头");
-  for (const c of feet) {
-    assert.ok(c.x > moto2.x, `搜村时徒步兵 ${c.id} 站到车前头去了（${c.x.toFixed(1)}）`);
-    // 散开就不再是队列：并排的排别必须清掉，否则搜村看着像阅兵
-    assert.ok(!c.rank, `搜村时 ${c.id} 还挂着行军的排别 rank=${c.rank}`);
-  }
-  console.log("  ✓ 队形：十个伪军打头 / 日军五对两人并排 / 队序全程不换位 / 搜村散开");
+    console.log("  ✓ 队形：十个伪军打头 / 日军五对两人并排 / 队序全程不换位");
 }
 
 // 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
 // 顺带盯背景层乡亲跟着警讯收工——街上空了字幕说过一次，画面得对上。
 function TestRaidTakesMoreThanFather() {
-  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
   const state = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
 
-  DebugJump(state, 0, beats.indexOf("c1_hide"));
-  const taken = state.actors.filter((a) => a.id.startsWith("taken"));
-  assert.equal(taken.length, 3, "被抓的邻居必须在场（只抓木匠一个说不过去）");
-  for (const t of taken) assert.ok(t.x >= 110, `被抓的乡亲 ${t.id} 站进考场了（x=${t.x.toFixed(1)}）`);
+  // 藏粮那一拍：清查队已在街上，伪保长在场，全村警讯落旗
+  DebugJump(state, 0, beats.indexOf("c1_grain"));
+  assert.ok(state.actors.some((a) => a.id === "baozhang"), "伪保长必须在场");
+  assert.equal(state.flags.villageAlarm, true, "清查开始了，全村警讯旗必须立起来");
   const officer = state.actors.find((a) => a.id === "officer");
-  assert.ok(officer, "带队的军官必须在场");
-  assert.equal(officer.kind, "officer", "军官得用自己那套外观，不能跟大头兵一个样");
-  assert.equal(officer.carry, "军刀", "军官的身份标记是那把连鞘军刀");
+  assert.ok(officer, "带队的军曹必须在场");
+  assert.equal(officer.kind, "officer", "军曹得用自己那套外观，不能跟大头兵一个样");
 
-  // 警讯一响，背景层的乡亲也得收工（World 的 StepBackdropFolk 盯这面旗）
-  assert.equal(state.flags.villageAlarm, true, "扫荡开始了，全村警讯旗必须立起来");
+  // 保甲点户：逐户念、由远及近（far 起手）；暴行段是纯过场，零可操作项
+  const roster = SCRIPTS.c1.find((b) => b.id === "c1_roster");
+  const calls = roster.lines.filter((l) => l.who === "伪保长");
+  assert.ok(calls.length >= 3, "保甲点户得逐户念出来");
+  assert.ok(roster.lines.some((l) => l.far), "点户声得从远处压过来");
+  assert.equal(roster.kind, "cinematic", "刘家的暴行必须是连续剧情演出");
+  assert.ok(!roster.steps && !roster.options, "暴行段不许挂任何可操作项（无 QTE/无选项）");
 
-  // 审问：军官有台词（日语无字幕），翻译官把话递成中文
-  const father = SCRIPTS.c1.find((b) => b.id === "c1_father");
-  const offLines = father.lines.filter((l) => l.who === "日军军官");
-  assert.ok(offLines.length >= 1, "军官必须有台词");
-  for (const l of offLines) assert.ok(l.noSub, "日军讲日语一律不给字幕（叙事铁律）");
-  assert.ok(father.lines.some((l) => l.who === "翻译官" && /炮楼/.test(l.say)),
-    "军官那句傲慢话得由翻译官递成中文，玩家才接得住");
+  // 搜家：军曹亲口问话（生硬中文）、爹的回答只有两个字、认人的是伪军头目
+  const search = SCRIPTS.c1.find((b) => b.id === "c1_search");
+  assert.ok(search.lines.some((l) => l.who === "日军军曹"), "军曹得亲口问话");
+  assert.ok(search.lines.some((l) => l.who === "爹" && l.say === "修门。"), "爹的第一个回答只有两个字");
+  assert.ok(search.lines.some((l) => l.who === "伪军头目"), "认出木匠的得是伪军头目");
+  assert.ok(!search.lines.some((l) => /门框|刻痕/.test(l.stage || "")),
+    "抓走爹的收尾不许回扣门框刻痕（新剧本明令）");
 
-  // 押走那一拍：被抓的邻居和爹同批出村。**按真实节奏演**（不猛按 advance）——
-  // 一帧一句地冲过去，最后一句的 on() 刚落地这一幕就结束了，
-  // AdvanceBeat 的 ClearPoses 会把姿势收掉，验的就成了散场之后的空壳。
-  DebugJump(state, 0, beats.indexOf("c1_father"));
-  const fatherIdx = beats.indexOf("c1_father");
-  const hauledLine = father.lines.findIndex((l) => /拖出院门/.test(l.stage || ""));
-  let guard = 0;
-  while (state.beat.lineIndex < hauledLine && state.beatIndex === fatherIdx && guard < 3000) {
-    guard += 1;
-    StepGame(state, idle, DT);
-  }
-  assert.equal(state.beat.lineIndex, hauledLine, "没演到押人出院门那一句");
-  for (let i = 0; i < 45; i += 1) StepGame(state, idle, DT);   // 让这一句演一秒半
-
-  const gone = state.actors.filter((a) => a.id.startsWith("taken"));
-  assert.ok(gone.length > 0, "被抓的邻居不该在散场时凭空消失");
-  for (const a of gone) {
-    assert.equal(a.pose, "hauled", `${a.id} 得是被拽着走的姿势`);
-    assert.equal(a.heading, 1, `${a.id} 得朝村口走`);
-    assert.ok((a.cineTarget?.x ?? 0) > 150, `${a.id} 没跟着队伍出村`);
-  }
-  console.log("  ✓ 扫荡：抓的不止木匠 / 军官有外观有台词 / 背景乡亲跟着收工");
+  // 结算过搜家：爹被带走；余波那一拍不再有任何敌人留在村里
+  DebugJump(state, 0, beats.indexOf("c1_after"));
+  assert.equal(state.flags.fatherTaken, true, "搜家结算后爹必须已被带走");
+  const father = state.actors.find((a) => a.id === "father");
+  // 结算里 cineTarget 已被清（防止接管下一拍），只验人真的在往村外走/已经出村
+  assert.ok(!father?.visible || father.x > 120, `爹得跟着劳役队出村（x=${father?.x?.toFixed(1)}）`);
+  console.log("  ✓ 保甲点户 / 暴行零操作 / 军曹问话 / 爹被抓不回扣门框");
 }
 
 // 过场的演出不许站在路障里。obstacle 带的东西（塌墙、撞倒的柴垛）比演员近，
@@ -1536,13 +1482,14 @@ function TestCineActorsClearOfObstacles() {
   const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
   const state = CreateGame(0);
   const list = ChapterBeatList(0);
-  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_father"));
+  DebugJump(state, 0, list.findIndex((b) => b.id === "c1_search"));
   const scene = SCENES.village;
   const bad = [];
   for (let i = 0; i < 3000; i += 1) {
     StepGame(state, { ...NONE, advance: false }, DT);
     for (const a of state.actors) {
-      if (a.visible === false || a.level !== "surface" || a.decor) continue;
+      // 赶路中的（cineTarget 悬着）只是路过，不算"站在路障里"
+      if (a.visible === false || a.level !== "surface" || a.decor || a.cineTarget) continue;
       for (const v of scene.vaults || []) {
         if (v.flag && !state.flags[v.flag]) continue;
         // 半宽 + 半个身位：贴着站没关系，压在正中间就是被吞
@@ -1563,11 +1510,12 @@ function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const st = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
-  DebugJump(st, 0, beats.indexOf("c1_cloth"));
+  DebugJump(st, 0, beats.indexOf("c1_well"));
   StepGame(st, idle(), DT);
-  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_cloth");
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
   const thr = cloth.steps.find((x) => x.type === "throwHit");
   st.beat.stepIndex = cloth.steps.indexOf(thr);
+  st.groundItems.length = 0;   // 结算搁在井台的桶别搅进投掷判定
   st.player.item = { id: "stone", label: "石子", throwable: true };
   st.player.x = thr.target.x - 6;
   st.player.heading = 1;
@@ -1599,7 +1547,7 @@ function TestSlingThrow() {
   let guard = 0;
   const idx0 = st.beat.stepIndex;
   while (st.thrown && guard < 200) { guard += 1; StepGame(st, idle(), DT); }
-  assert.equal(st.flags.clothDown, true, "照着靶心拽出去的弧必须打中布巾");
+  assert.equal(st.flags.elmDown, true, "照着靶心拽出去的弧必须打中榆钱枝");
   assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
   const sis = st.actors.find((a) => a.id === "sister");
   assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
@@ -1607,9 +1555,10 @@ function TestSlingThrow() {
 
   // ④ 键盘后备：站进射程按 F，照样命中（自动通关走的就是这条）
   const st2 = CreateGame(0);
-  DebugJump(st2, 0, beats.indexOf("c1_cloth"));
+  DebugJump(st2, 0, beats.indexOf("c1_well"));
   StepGame(st2, idle(), DT);
   st2.beat.stepIndex = cloth.steps.indexOf(thr);
+  st2.groundItems.length = 0;
   st2.player.item = { id: "stone", label: "石子", throwable: true };
   st2.player.x = thr.target.x - 6;
   st2.player.heading = 1;
@@ -1617,8 +1566,8 @@ function TestSlingThrow() {
   assert.ok(st2.thrown, "键盘 F 必须照常出手");
   guard = 0;
   while (st2.thrown && guard < 200) { guard += 1; StepGame(st2, idle(), DT); }
-  assert.equal(st2.flags.clothDown, true, "键盘后备在射程内必须命中");
-  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中 / 妹妹接着乐 / 键盘后备");
+  assert.equal(st2.flags.elmDown, true, "键盘后备在射程内必须命中");
+  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中榆钱枝 / 妹妹接着乐 / 键盘后备");
 }
 
 TestPromptsAreDeviceNeutral();
@@ -1654,13 +1603,20 @@ console.log("— 全流程自动通关（第六章走『地下进人』）—");
   // 谜题动词层的旗标：链走完了这些必须是真的。链的某一步悄悄断掉
   // （物品拿不到、投掷永远不中、狗喂不上）不会让通关测试变红——
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
-  assert.equal(state.flags.clothDown, true, "C1 投掷教学必须真的把布巾打下来");
-  assert.equal(state.flags.barrowHome, true, "C1 独轮车必须把木料推到爹跟前");
-  assert.equal(state.flags.henFlew, true, "C1 扛第二根木料必须惊走那只母鸡");
-  assert.equal(state.flags.wellRopeBroken, false, "C1 打水链走完，井绳必须是接好的");
-  assert.equal(state.flags.raidStarted, true, "C1 扫荡的考场布防必须落旗");
-  assert.equal(state.flags.waterFilled, true, "C1 打水链的桶必须真的触过水");
-  assert.equal(state.flags.pipShown, true, "C1 后果小窗（娘听见桶灌满）必须开过");
+  assert.equal(state.flags.doorFixed, true, "C1 修门那条链必须走完");
+  assert.equal(state.flags.marked, true, "C1 量身必须把那道浅痕补上");
+  assert.equal(state.flags.ropeStaked, true, "C1 拉绳定向必须把绳交到七叔手里");
+  assert.equal(state.flags.barrowHome, true, "C1 独轮车必须把木料推回家");
+  assert.equal(state.flags.henFlew, true, "C1 扛枣木杠必须惊走食槽上那只母鸡");
+  assert.equal(state.flags.coverPlaned, true, "C1 盖板必须真的刨过");
+  assert.equal(state.flags.wellRopeFixed, true, "C1 井绳必须缠好");
+  assert.equal(state.flags.elmDown, true, "C1 投石必须真的把榆钱震下来");
+  assert.equal(state.flags.waterFilled, true, "C1 打水的桶必须真的触过水");
+  assert.equal(state.flags.bracedA && state.flags.bracedB, true, "C1 两块旧门板都得支在松土上");
+  assert.equal(state.flags.raidStarted, true, "C1 保甲清查必须落旗");
+  assert.equal(state.flags.grainHidden && state.flags.nookClosed, true, "C1 种子粮必须藏好、覆土板必须拉严");
+  assert.equal(state.flags.fatherTaken, true, "C1 爹必须被带走（历史不因玩家操作改写）");
+  assert.equal(state.flags.coverFixed, true, "C1 收尾必须带伤把盖板修平");
   assert.equal(state.flags.dogFed, true, "C2 的狗必须喂得上");
   assert.equal(state.flags.lanternOut, true, "C2 的马灯必须打得灭");
   assert.equal(state.flags.trapBuilt, true, "C5 翻口链必须走得通");

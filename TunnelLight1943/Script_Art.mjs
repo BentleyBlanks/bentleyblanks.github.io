@@ -898,6 +898,46 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
         { amp: 0.3 * S, lw: 1.1 * S });
     }
     InkLine(ctx, 0, -10 * S, 0, 9 * S, "fcString", { lw: 1 * S, color: "#6b5a3f", amp: 1.6 });
+  } else if (label === "襁褓") {
+    // 裹着的婴儿：一小卷布，一头略鼓（头）。补丁色——刘家的日子写在布上
+    InkFill(ctx, [[-8 * S, 2 * S], [-9 * S, -2.6 * S], [-5 * S, -5 * S], [5 * S, -4.6 * S], [9 * S, -1 * S], [6 * S, 3.4 * S]],
+      "swaddle", "#9a8468", { amp: 0.9 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.16)" });
+    ctx.beginPath();
+    ctx.arc(-5.4 * S, -1.4 * S, 2.6 * S, 0, Math.PI * 2);
+    ctx.fillStyle = "#d8ab7c";
+    ctx.fill();
+    InkLine(ctx, -1 * S, -3.6 * S, 4 * S, 2 * S, "swBand", { lw: 1.1 * S, color: "rgba(90,70,50,0.7)", amp: 0.8 });
+    InkLine(ctx, -3 * S, 3 * S, 3 * S, -2.4 * S, "swPatch", { lw: 1 * S, color: "rgba(120,90,60,0.5)", amp: 0.8 });
+  } else if (label === "粮袋" || label === "种子粮") {
+    // 一小袋种子粮：口用麻绳扎死。不大——正因为只剩这一点，才非藏不可
+    InkFill(ctx, [[-6.6 * S, 8 * S], [-8 * S, -2 * S], [-4 * S, -8 * S], [4 * S, -8 * S], [8 * S, -2 * S], [6.6 * S, 8 * S]],
+      "grainBag", "#9a8560", { amp: 1 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.2)" });
+    InkLine(ctx, -4 * S, -8 * S, 4 * S, -8 * S, "bagTie", { lw: 1.6 * S, color: "#5c4530" });
+    InkLine(ctx, -1 * S, -8 * S, 1.6 * S, -11 * S, "bagEar", { lw: 1.4 * S, color: "#5c4530" });
+    InkLine(ctx, -4 * S, 1 * S, 4 * S, 2 * S, "bagFold", { lw: 0.9 * S, color: "rgba(90,70,45,0.5)", amp: 1 });
+  } else if (label === "名册" || label === "保甲册") {
+    // 伪保长夹着的保甲册：一摞纸夹在木板里
+    InkFill(ctx, Rect(-6.6 * S, -4.6 * S, 13.2 * S, 9.2 * S), "roster", "#c9b98f",
+      { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.12)" });
+    InkFill(ctx, Rect(-7.2 * S, -5.2 * S, 13.2 * S, 2 * S), "rosterLid", "#6b4d2e", { amp: 0.5 * S, lw: 1.4 * S });
+    for (let i = 0; i < 3; i += 1) {
+      InkLine(ctx, -4.6 * S, -1.4 * S + i * 2.2 * S, 4.6 * S, -1.2 * S + i * 2.2 * S, "rosterLn" + i,
+        { lw: 0.7 * S, color: "rgba(60,48,32,0.55)", amp: 0.6 });
+    }
+  } else if (label === "土筐") {
+    // 装土的荆条筐：口宽底窄，沿口露出一层新土
+    InkFill(ctx, [[-9 * S, -5 * S], [-6 * S, 8 * S], [6 * S, 8 * S], [9 * S, -5 * S]],
+      "dirtBask", "#9a7d4f", { amp: 1 * S, lw: 1.8 * S, shade: "rgba(0,0,0,0.18)" });
+    for (let i = 0; i < 2; i += 1) {
+      InkLine(ctx, -7.6 * S + i * 1.2 * S, -1 * S + i * 4 * S, 7.6 * S - i * 1.2 * S, -1 * S + i * 4 * S,
+        "baskWv" + i, { lw: 0.9 * S, color: "rgba(60,45,25,0.55)", amp: 1 });
+    }
+    InkFill(ctx, [[-8 * S, -5 * S], [-4 * S, -7.6 * S], [3 * S, -7.2 * S], [8 * S, -4.6 * S], [4 * S, -3.6 * S], [-4 * S, -3.8 * S]],
+      "baskDirt", "#6e5738", { amp: 1.2 * S, lw: 1.2 * S });
+  } else if (label === "木楔") {
+    // 一小块木楔：三角，掌心大
+    InkFill(ctx, [[-5 * S, 3 * S], [5.4 * S, 3 * S], [-3.4 * S, -4.6 * S]],
+      "wedge", "#a8794a", { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.14)" });
   } else if (label === "棉被" || label === "湿棉被") {
     const wet = label === "湿棉被";
     InkFill(ctx, [[-10 * S, 4 * S], [-9 * S, -4 * S], [-3 * S, -7 * S], [6 * S, -6 * S], [10 * S, 1 * S], [4 * S, 6 * S]],
@@ -2492,6 +2532,159 @@ export function DrawCellarShelf(ctx, x, groundY, id) {
     [x + 27, groundY - 58], [x + 25, groundY - 46]], id + "jar", "#6e5b44", { amp: 1, lw: 1.8, shade: "rgba(0,0,0,0.22)" });
   InkFill(ctx, [[x + 9, groundY - 64], [x + 17, groundY - 70], [x + 25, groundY - 64], [x + 17, groundY - 61]],
     id + "cloth", "#a8927a", { amp: 1.2, lw: 1.4 });
+}
+
+// 废牲口棚：两根歪柱撑半面草顶，里侧全黑——牲口被牵走后就空了。
+// 「空」是画出来的：食槽还在、拴缰绳的桩还在，就是没有牲口
+export function DrawShed(ctx, x, groundY, id) {
+  const W = 260, H = 128;
+  // 里侧的黑：先铺一片暗腔，门板等物件摆在它前面才读成"在棚里"
+  InkFill(ctx, [[x - W / 2 + 14, groundY], [x - W / 2 + 18, groundY - H + 34],
+    [x + W / 2 - 16, groundY - H + 20], [x + W / 2 - 10, groundY]],
+    id + "dark", "#241d15", { amp: 2, lw: 0, line: null });
+  // 两根歪柱（一根还算直，一根塌了肩）
+  InkFill(ctx, [[x - W / 2 + 8, groundY], [x - W / 2 + 12, groundY - H + 26],
+    [x - W / 2 + 20, groundY - H + 26], [x - W / 2 + 18, groundY]],
+    id + "postL", "#5c452f", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  InkFill(ctx, [[x + W / 2 - 22, groundY], [x + W / 2 - 22, groundY - H + 40],
+    [x + W / 2 - 12, groundY - H + 40], [x + W / 2 - 12, groundY]],
+    id + "postR", "#5c452f", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  // 半面草顶：西高东低斜下来，边缘垂着干草
+  InkFill(ctx, [[x - W / 2 - 6, groundY - H + 30], [x - W / 2 + 30, groundY - H],
+    [x + W / 2 + 4, groundY - H + 26], [x + W / 2 - 4, groundY - H + 44]],
+    id + "roof", "#a08a52", { amp: 2.4, lw: 2.4, shade: "rgba(80,55,20,0.22)" });
+  for (let i = 0; i < 9; i += 1) {
+    const rx = x - W / 2 + 16 + i * (W / 9);
+    InkLine(ctx, rx, groundY - H + 34 + i * 1.2, rx + 3, groundY - H + 46 + i * 1.2, id + "st" + i,
+      { lw: 1.2, color: "rgba(120,95,45,0.6)", amp: 1.2 });
+  }
+  // 食槽：一条挖空的木槽架在矮凳上——空的
+  InkFill(ctx, Rect(x - 30, groundY - 22, 74, 12), id + "trough", "#6b4d2e",
+    { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.22)" });
+  InkFill(ctx, Rect(x - 26, groundY - 20, 66, 6), id + "troughIn", "#241d15", { amp: 0.8, lw: 1.2 });
+  InkFill(ctx, Rect(x - 26, groundY - 10, 6, 10), id + "tlegL", "#5c452f", { amp: 0.8, lw: 1.6 });
+  InkFill(ctx, Rect(x + 34, groundY - 10, 6, 10), id + "tlegR", "#5c452f", { amp: 0.8, lw: 1.6 });
+  // 拴缰绳的桩，绳早收走了
+  InkFill(ctx, Rect(x + 52, groundY - 34, 7, 34), id + "stake", "#4a3826", { amp: 1, lw: 2 });
+}
+
+// 斜靠在棚里的旧木料：两块拆下来的旧门板 + 一根枣木杠。
+// 挖通道的全部家底，第一章独轮车来拉的就是它
+export function DrawOldDoors(ctx, x, groundY, id) {
+  // 后一块门板（靠得更斜）
+  ctx.save();
+  ctx.translate(x - 18, groundY);
+  ctx.rotate(-0.30);
+  InkFill(ctx, Rect(-14, -92, 30, 92), id + "dA", "#8a6f48", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.18)" });
+  InkLine(ctx, -8, -84, -8, -6, id + "gA1", { lw: 1, color: "rgba(90,60,35,0.55)", amp: 1.4 });
+  InkLine(ctx, 4, -86, 4, -4, id + "gA2", { lw: 1, color: "rgba(90,60,35,0.45)", amp: 1.4 });
+  ctx.restore();
+  // 前一块（矮一头，缺个角）
+  ctx.save();
+  ctx.translate(x + 8, groundY);
+  ctx.rotate(-0.22);
+  InkFill(ctx, [[-13, 0], [-13, -74], [8, -80], [14, -68], [14, 0]], id + "dB", "#7d5c38",
+    { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, -4, -70, -4, -6, id + "gB1", { lw: 1, color: "rgba(70,48,28,0.55)", amp: 1.4 });
+  ctx.restore();
+  // 枣木杠：斜搭在门板上
+  InkLine(ctx, x - 40, groundY - 4, x + 44, groundY - 58, id + "pole", { lw: 5, color: "#6b4a28", amp: 1 });
+  InkLine(ctx, x - 40, groundY - 4, x + 44, groundY - 58, id + "poleHi", { lw: 1.6, color: "rgba(190,150,95,0.5)", amp: 1 });
+}
+
+// 空车辕：牲口被牵走后剩下的一副辕，一头着地一头翘着。
+// 不画牲口，就是「被牵走」本身
+export function DrawCartShafts(ctx, x, groundY, id) {
+  // 车轴短桩 + 两根长辕
+  InkFill(ctx, Rect(x + 26, groundY - 18, 14, 18), id + "hub", "#5c452f", { amp: 1.2, lw: 2, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x + 30, groundY - 14, x - 52, groundY - 2, id + "shaftA", { lw: 4, color: "#6b4d2e", amp: 1 });
+  InkLine(ctx, x + 34, groundY - 16, x - 46, groundY - 30, id + "shaftB", { lw: 4, color: "#7d5c38", amp: 1 });
+  // 辕头的皮套环，空荡荡耷拉着
+  ctx.strokeStyle = "rgba(60,42,26,0.8)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x - 48, groundY - 24, 6, -0.6, Math.PI * 1.1); ctx.stroke();
+}
+
+// 贴告示的半截土墙：征粮征夫的告示一层压一层，新的盖着旧的
+export function DrawNoticeWall(ctx, x, groundY, w, id) {
+  DrawWall(ctx, x, groundY, w, 90, id);
+  // 三张告示：两张旧的发黄卷边，一张新的还白着。竖排墨字用短竖线示意
+  const posters = [
+    { px: x - w / 2 * 0.5, py: groundY - 62, pw: 22, ph: 30, c: "#c9b98f", torn: true },
+    { px: x + 2, py: groundY - 70, pw: 24, ph: 34, c: "#cec2a0", torn: false },
+    { px: x + w / 2 * 0.42, py: groundY - 56, pw: 20, ph: 28, c: "#ddd2b2", torn: false },
+  ];
+  for (let i = 0; i < posters.length; i += 1) {
+    const p = posters[i];
+    const pts = p.torn
+      ? [[p.px - p.pw / 2, p.py], [p.px + p.pw / 2, p.py + 2], [p.px + p.pw / 2 - 3, p.py + p.ph],
+        [p.px + 2, p.py + p.ph - 6], [p.px - p.pw / 2 + 2, p.py + p.ph - 2]]
+      : [[p.px - p.pw / 2, p.py], [p.px + p.pw / 2, p.py + 1], [p.px + p.pw / 2 - 1, p.py + p.ph],
+        [p.px - p.pw / 2 + 1, p.py + p.ph - 1]];
+    InkFill(ctx, pts, id + "pp" + i, p.c, { amp: 0.8, lw: 1.4, line: IN.inkSoft });
+    // 竖排"字"：几列短杠
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+    ctx.strokeStyle = "#3a2f22";
+    ctx.lineWidth = 1.1;
+    for (let c = 0; c < 3; c += 1) {
+      const cx = p.px - p.pw / 2 + 5 + c * 6;
+      for (let r = 0; r < 5; r += 1) {
+        const ry = p.py + 5 + r * 5;
+        if (Hash(id + i + c + "r" + r) > 0.25) {
+          ctx.beginPath(); ctx.moveTo(cx, ry); ctx.lineTo(cx + 3.4, ry); ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+}
+
+// 猪圈：半圈土坯矮墙 + 圈门豁口 + 食槽。猪早卖了换粮——空圈也是世道
+export function DrawPigpen(ctx, x, groundY, id) {
+  // 矮墙：两段，中间留豁口
+  InkFill(ctx, Rect(x - 58, groundY - 34, 44, 34), id + "wL", "#a8926c",
+    { amp: 1.6, lw: 2.2, shade: "rgba(74,56,42,0.2)" });
+  InkFill(ctx, Rect(x - 2, groundY - 30, 56, 30), id + "wR", "#a08a64",
+    { amp: 1.6, lw: 2.2, shade: "rgba(74,56,42,0.2)" });
+  for (const [wx0, wx1, wy] of [[-56, -16, 12], [0, 52, 11]]) {
+    InkLine(ctx, x + wx0, groundY - wy, x + wx1, groundY - wy, id + "ly" + wx0,
+      { lw: 1, color: "rgba(90,72,52,0.4)", amp: 1.2 });
+  }
+  // 圈里的暗（比院子低半头）
+  InkFill(ctx, [[x - 50, groundY - 34], [x + 48, groundY - 30], [x + 42, groundY - 40], [x - 44, groundY - 44]],
+    id + "in", "#4a3c2c", { amp: 1.6, lw: 0, line: null });
+  // 食槽扣在豁口边——空的，扣着
+  InkFill(ctx, [[x - 14, groundY - 6], [x - 10, groundY - 14], [x + 8, groundY - 14], [x + 12, groundY - 6]],
+    id + "trough", "#6b4d2e", { amp: 1, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+}
+
+// 窖壁上的藏口：挖出来的浅坑 + 一块靠着的覆土板。
+// closed=把板合上（从外面看只是一块颜色略深的土）；grain=坑里塞着种子粮袋
+export function DrawNook(ctx, x, groundY, id, { grain = false, closed = false } = {}) {
+  if (closed) {
+    // 合上的板抹了泥：一块比周围略深、边缘还算齐整的土色——搜家的兵没看出来
+    InkFill(ctx, [[x - 20, groundY - 8], [x - 18, groundY - 56], [x + 18, groundY - 58], [x + 20, groundY - 6]],
+      id + "shut", "#4e3f2c", { amp: 1.8, lw: 1.6, line: "rgba(30,22,14,0.5)" });
+    Speckle(ctx, x - 18, groundY - 54, 36, 46, id + "shutSp", { count: 12, alpha: 0.18, size: 1.8 });
+    return;
+  }
+  // 敞着的坑：一圈掏挖的土沿，里面黑
+  InkFill(ctx, [[x - 19, groundY - 4], [x - 22, groundY - 30], [x - 14, groundY - 54], [x + 12, groundY - 56],
+    [x + 20, groundY - 34], [x + 17, groundY - 4]],
+    id + "hole", "#241a10", { amp: 2.2, lw: 2.4, line: "rgba(30,22,14,0.7)" });
+  if (grain) {
+    // 塞进去的种子粮袋：口扎着，鼓鼓一小袋
+    InkFill(ctx, [[x - 12, groundY - 8], [x - 14, groundY - 30], [x - 4, groundY - 40], [x + 8, groundY - 36],
+      [x + 12, groundY - 10]], id + "bag", "#9a8560", { amp: 1.4, lw: 1.8, shade: "rgba(0,0,0,0.24)" });
+    InkLine(ctx, x - 5, groundY - 40, x + 2, groundY - 43, id + "tie", { lw: 1.6, color: "#5c4530" });
+  }
+  // 靠在坑边的覆土板
+  ctx.save();
+  ctx.translate(x + 24, groundY);
+  ctx.rotate(-0.24);
+  InkFill(ctx, Rect(-8, -46, 16, 46), id + "lid", "#5e4c34", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+  ctx.restore();
 }
 
 // 驴车：能推、能跟着走的那片影子。车板 + 两个大轮 + 半车干草

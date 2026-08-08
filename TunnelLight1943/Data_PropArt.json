@@ -317,27 +317,65 @@
       "note": "地道里的水瓮（level: under）。原先在代码里写死 z=0.2 绕开了深度带，externalize 时归入 loose"
     },
     "yardWall": {
-      "art": "DrawYardWall", "band": "building", "ss": "prop",
-      "sprite": { "w": { "pad": 30, "per": "w" }, "h": 110, "anchor": "center", "baseline": 8 },
+      "art": "DrawYardWall",
+      "band": "building",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      },
       "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人"
     },
     "henCoop": {
-      "art": "DrawHenCoop", "band": "yard", "ss": "prop",
-      "sprite": { "w": 84, "h": 48, "anchor": "center", "baseline": 6 },
+      "art": "DrawHenCoop",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 84,
+        "h": 48,
+        "anchor": "center",
+        "baseline": 6
+      },
       "note": "土坯垒的矮鸡窝，倚在背风墙根（houseB 的东山墙下）。窝身齐膝≈0.55m——上一版画成 1.4m 见方的对称人字顶小房子，那是西式狗窝；画幅跟着改宽改矮，右边要留出食槽、左边留出挪开的挡板石"
     },
     "clothesline": {
-      "art": "DrawClothesline", "band": "yard", "ss": "prop",
-      "sprite": { "w": 130, "h": 110, "anchor": "center", "baseline": 8 }
+      "art": "DrawClothesline",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      }
     },
     "tuberPile": {
-      "art": "DrawTuberPile", "band": "walk", "ss": "prop",
-      "sprite": { "w": 76, "h": 50, "anchor": "center", "baseline": 6 },
+      "art": "DrawTuberPile",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 50,
+        "anchor": "center",
+        "baseline": 6
+      },
       "note": "地窖里过冬的红薯堆，搭半领草苫（level: under 的陈设）"
     },
     "cellarShelf": {
-      "art": "DrawCellarShelf", "band": "walk", "ss": "prop",
-      "sprite": { "w": 96, "h": 90, "anchor": "center", "baseline": 8 },
+      "art": "DrawCellarShelf",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 96,
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      },
       "note": "地窖搁板：木桩架旧板，荆条筐+布盖坛（level: under 的陈设）"
     },
     "mapBoard": {
@@ -500,6 +538,85 @@
         "baseline": 8
       },
       "note": "塌进巷子的土坯墙残段（可翻越）。**band 必须是 obstacle**：挂在 walk 上演员永远画在它前面，那读起来就是「墙在路后头的景里」，看不出它拦路；挂到 clutter 又会被透视放大成齐胸的一堵大墙。顶沿磨圆+豁口=翻越轮廓语法；根脚散着掉下来的坯块"
+    },
+    "shed": {
+      "art": "DrawShed",
+      "band": "building",
+      "ss": "prop",
+      "shadow": 0.28,
+      "sprite": {
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": 150,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "废牲口棚：两根歪柱撑半面草顶，里侧全黑——牲口被牵走后就空了"
+    },
+    "oldDoors": {
+      "art": "DrawOldDoors",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 150,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "斜靠着的两块旧门板+一根枣木杠——第一章挖通道的全部木料"
+    },
+    "cartShafts": {
+      "art": "DrawCartShafts",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "空着的车辕斜搭在地上：牲口被日伪牵走了，车还在"
+    },
+    "wallNotice": {
+      "art": "DrawNoticeWall",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 120,
+        "anchor": "center",
+        "baseline": 10
+      },
+      "note": "半截土墙，征粮征夫的告示一层压一层"
+    },
+    "pigpen": {
+      "art": "DrawPigpen",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "低矮的猪圈：半圈土坯矮墙+食槽，猪早卖了换粮"
+    },
+    "nook": {
+      "art": "DrawNook",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 90,
+        "h": 100,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "窖壁上的藏口：浅坑+靠着的覆土板。grainHidden 画进粮袋、nookClosed 把板合上（World propRedraw）"
     }
   },
   "_coversNote": [

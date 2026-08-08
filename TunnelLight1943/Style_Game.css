@@ -477,6 +477,14 @@ body.touchDevice #touchControls.gone { display: none; }
 #controlsNote dd { font-size: 12.5px; color: var(--dim); }
 .titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
 
+/* 历史战争暴力内容提示（关卡设计文档要求）：小字，不抢标题 */
+#titleScreen .contentNote {
+  margin-top: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: rgba(196, 178, 138, 0.52);
+}
+
 @media (max-width: 700px) {
   #chapterList { grid-template-columns: repeat(2, 1fr); }
   #objectivePanel { max-width: 62vw; }

@@ -121,7 +121,9 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
-  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶"];
+  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
+  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
+// 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
 const HOLD_WEIGHT = {
@@ -129,6 +131,7 @@ const HOLD_WEIGHT = {
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
   "军刀": 0.25,
+  "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -378,6 +381,7 @@ export function CreateWorld(canvasEl) {
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
+  let ropeLineMesh = null;
   let homeFacade = null, homeRange = null;
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
@@ -449,6 +453,7 @@ export function CreateWorld(canvasEl) {
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
+    ropeLineMesh = null;
     homeFacade = null; homeRange = null;
     coneMeshes = [];
     shadeMeshes = [];
@@ -1345,6 +1350,26 @@ export function CreateWorld(canvasEl) {
       case "vat": mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id)); break;
       case "tuberPile": mk((ctx, ax, ay) => ART.DrawTuberPile(ctx, ax, ay, p.id)); break;
       case "cellarShelf": mk((ctx, ax, ay) => ART.DrawCellarShelf(ctx, ax, ay, p.id)); break;
+      case "shed": mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id)); break;
+      case "oldDoors": mk((ctx, ax, ay) => ART.DrawOldDoors(ctx, ax, ay, p.id)); break;
+      case "cartShafts": mk((ctx, ax, ay) => ART.DrawCartShafts(ctx, ax, ay, p.id)); break;
+      case "wallNotice": mk((ctx, ax, ay) => ART.DrawNoticeWall(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "pigpen": mk((ctx, ax, ay) => ART.DrawPigpen(ctx, ax, ay, p.id)); break;
+      case "nook": {
+        // 藏口的三态（敞着 / 塞了粮袋 / 上了覆土板）跟着旗标走，
+        // 单张重烘——藏粮那一拍不该触发整个场景重建
+        const Paint = (ctx, ax, ay, st) => ART.DrawNook(ctx, ax, ay, p.id, {
+          grain: !!st?.flags.grainHidden && !st?.flags.nookClosed,
+          closed: !!st?.flags.nookClosed,
+        });
+        const nookMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, state));
+        propRedraw.push({
+          read: (st) => `${!!st.flags.grainHidden}|${!!st.flags.nookClosed}`,
+          last: `${!!state?.flags.grainHidden}|${!!state?.flags.nookClosed}`,
+          run: (st) => RedrawProp(nookMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, st)),
+        });
+        break;
+      }
       case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false })); break;
       case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
       case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
@@ -2285,9 +2310,11 @@ export function CreateWorld(canvasEl) {
       // 坐骑（自行车/挎斗摩托）：车跟人走，人骑在车上（pose + lift 是 Core 给的）
       SyncMount(a, true);
       const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
-      // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰
+      // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰。
+      // 村里的地下（两窖之间那条新掏的短通道）同一套规矩——tight 段得爬
       const underTunnel = (a.level === "under")
-        && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort");
+        && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort"
+          || (ch.scene === "village" && sceneDef.tight?.length));
       // NPC 跟玩家走同一段净高：一群人猫着腰、里头一个直着腰，立刻出戏
       const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
       const bs = sisterScale || BODY_SCALE[a.kind] || 1;
@@ -2734,13 +2761,17 @@ export function CreateWorld(canvasEl) {
       // 所以留在 CART_COVER_Z——两种角色，两个深度。
       const pushed = cartKind === "barrow";
       const cz = pushed ? BAND.loose : CART_COVER_Z;
-      if (!cartMesh || cartMesh.userData.cartKind !== cartKind) {
+      // 新版第一章是空车推去、装上料再推回来——车上有几根料就画几根，
+      // 装载数进 key，变了才重烘
+      const planksNow = Math.min(2, state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0));
+      const cartKey = cartKind + ":" + (pushed ? planksNow : "");
+      if (!cartMesh || cartMesh.userData.cartKind !== cartKey) {
         if (cartMesh) layers.play.remove(cartMesh);
         if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
         cartMesh = pushed
-          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: 2 }), 0, PROP_SS)
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: planksNow }), 0, PROP_SS)
           : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
-        cartMesh.userData.cartKind = cartKind;
+        cartMesh.userData.cartKind = cartKey;
         layers.play.add(cartMesh);
         SetPlayOrder(cartMesh, cz, "cart(" + cartKind + ")");
         if (pushed) {
@@ -2789,11 +2820,12 @@ export function CreateWorld(canvasEl) {
         barrowMesh.visible = true;
         if (barrowWheel) {
           barrowWheel.visible = true;
-          barrowWheel.position.set(state.flags.barrowHome ? 42.6 : 50.5,
+          barrowWheel.position.set(state.flags.barrowHome ? 41.6 : 19.8,
             SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, BAND.walk);
         }
-        // 停在工作台东边一步：递完木料的车不挡合榫的戏
-        PlaceSprite(barrowMesh, state.flags.barrowHome ? 42.6 : 50.5, SURFACE_Y, BAND.walk);
+        // 平时停在西头磨盘旁（新剧本：村里几户合用的车就搁在磨盘边）；
+        // 拉完料停在工作台西边一步，别压着院里的水缸（43.4）
+        PlaceSprite(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y, BAND.walk);
       } else {
         if (barrowMesh) barrowMesh.visible = false;
         if (barrowWheel) barrowWheel.visible = false;
@@ -2914,7 +2946,7 @@ export function CreateWorld(canvasEl) {
     const CG = 100 + CRITTER_LIFT * PPM;      // 地平线在这块画布里的 y
     const AtY = (m) => CG - m * PPM;          // 离地 m 米 → 画布 y
     {
-      const fx = state.sparrowBurst || state.henFlee || state.mouseFlee;
+      const fx = state.sparrowBurst || state.henFlee || state.mouseFlee || state.elmRain;
       if (fx) {
         if (!critterMesh) {
           critterCanvas = MakeCanvas(320 * 2, 200 * 2);   // 小活物动得快，2x 就够
@@ -2958,11 +2990,34 @@ export function CreateWorld(canvasEl) {
           const t = state.mouseFlee.t;
           c.globalAlpha = Math.max(0, 1 - t / 1.1);
           ART.DrawMouse(c, 160 - t * 150, AtY(0.05) + Math.sin(t * 30) * 2, "fleeMouse");
+        } else if (state.elmRain) {
+          // 榆钱雨：一把青黄的小圆片从冠里簌簌往下飘，左摇右摆地落
+          const t = state.elmRain.t;
+          c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.6);
+          for (let i = 0; i < 14; i += 1) {
+            const h0 = 1.9 + ART.Hash("er" + i) * 0.5;                    // 各自的起飞高度
+            const fall = Math.max(0, t - ART.Hash("ed" + i) * 0.5);       // 错峰往下掉
+            const y = Math.max(0.05, h0 - fall * 1.1);
+            const sx = 160 + (ART.Hash("ex" + i) - 0.5) * 66
+              + Math.sin(fall * 5 + i) * 9;                               // 边落边打摆
+            const sy = AtY(y);
+            c.save();
+            c.translate(sx, sy);
+            c.rotate(Math.sin(fall * 6 + i * 2) * 0.9);
+            c.beginPath();
+            c.ellipse(0, 0, 3.4, 2.4, 0, 0, Math.PI * 2);
+            c.fillStyle = i % 2 ? "#aebf72" : "#c2cf8a";
+            c.fill();
+            c.strokeStyle = "rgba(90,110,50,0.7)";
+            c.lineWidth = 0.8;
+            c.stroke();
+            c.restore();
+          }
         }
         c.restore();
         critterMesh.material.map.needsUpdate = true;
         critterMesh.visible = true;
-        const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x;
+        const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x ?? state.elmRain?.x;
         critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, BAND.loose);
       } else if (critterMesh) critterMesh.visible = false;
     }
@@ -3369,6 +3424,39 @@ export function CreateWorld(canvasEl) {
       winchBucket.visible = false;
       winchCrank.visible = false;
       winchGuide.visible = false;
+    }
+
+    // 拉绳定向（c1_ropeline）：一根麻绳从梁家后墙的锚点一路拖到玩家手里。
+    // Core 写 state.ropeLine = {x0,y0}（锚点），绳的另一头钉在演员手上；
+    // 交给七叔后 Core 改写成 {x0,y0,x1,y1}（钉好的一整条），演完自己清。
+    // 画法同辘轳井绳：一根窄条拉伸旋转——绳类禁用 THREE.Line（linewidth 会被吃）
+    {
+      const rl = state.ropeLine;
+      if (rl) {
+        if (!ropeLineMesh) {
+          ropeLineMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 0.045),
+            new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
+          );
+          FixOrder(ropeLineMesh, DepthOrder("play", BAND.loose));
+          layers.play.add(ropeLineMesh);
+        }
+        let x1 = rl.x1, y1 = rl.y1;
+        if (x1 === undefined) {
+          // 另一头在玩家手上
+          const ps = actorSprites.get("player");
+          const hand = ps ? HandPoint(ps.rig) : null;
+          x1 = hand ? hand.x : state.player.x;
+          y1 = hand ? hand.y : SURFACE_Y + 0.9;
+        }
+        const dx = x1 - rl.x0, dy = y1 - rl.y0;
+        const len = Math.max(0.05, Math.hypot(dx, dy));
+        // 中段松松垂一点：绳不是钢丝
+        ropeLineMesh.visible = true;
+        ropeLineMesh.scale.set(len, 1, 1);
+        ropeLineMesh.position.set(rl.x0 + dx / 2, rl.y0 + dy / 2 - Math.min(0.3, len * 0.03), BAND.loose);
+        ropeLineMesh.rotation.z = Math.atan2(dy, dx);
+      } else if (ropeLineMesh) ropeLineMesh.visible = false;
     }
 
     // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，
