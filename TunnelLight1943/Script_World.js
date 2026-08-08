@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -410,7 +410,8 @@ export function CreateWorld(canvasEl) {
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
   let spotFlashMesh = null;
   // 接绳打结：引导圈（虚线）＋缠上去的绳（实线）＋跟手的绳头
-  let knotGuide = null, knotRope = null, knotTip = null;
+  // 接绳：井绳断头挽出的圈（后/前两段做压叠）、拖过去的麻绳、剩下的路、绳头
+  let knotMesh = null, knotCanvas = null, knotCtx = null;
   // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
   const CART_COVER_Z = 1.5;
 
@@ -457,7 +458,7 @@ export function CreateWorld(canvasEl) {
     barrowMesh = null; barrowWheel = null;
     mountMeshes.clear();
     groundItemMeshes.clear();
-    knotGuide = null; knotRope = null; knotTip = null;
+    knotMesh = null; knotCanvas = null; knotCtx = null;
     bubbleMeshes = [];
     bubbleTex.clear();
     throwAimLine = null;
@@ -3359,65 +3360,73 @@ export function CreateWorld(canvasEl) {
 
     // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，
     // 收紧（cinch）时圈半径缩成一个结。全程画在井架断绳处。
+    // 接绳：断头挽出一个圈，麻绳头顺着自己的路穿过去、再往外拉，结收死。
+    // 整套结走**逐帧重画的 canvas**（见 Art.DrawKnot 顶上的说明）——
+    // THREE.Line 的 linewidth 在多数平台被忽略，绳子只有一个像素，
+    // 贴在辘轳那堆木色上根本看不见。
+    // 几何一律用 Core 的 KnotPointAt / KNOT_EYE，World 不另抄一份。
     if (state.knot) {
       const kn = state.knot;
-      if (!knotGuide) {
-        const mkLine = (dashed, color, opacity, orderAdd) => {
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 72), 3));
-          const mat = dashed
-            ? new THREE.LineDashedMaterial({ color, transparent: true, opacity, dashSize: 0.11, gapSize: 0.09, depthWrite: false })
-            : new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
-          const line = new THREE.Line(geo, mat);
-          FixOrder(line, DepthOrder("play", BAND.loose) + orderAdd);
-          layers.play.add(line);
-          return line;
-        };
-        knotGuide = mkLine(true, 0xbfb49a, 0.55, 4);
-        knotRope = mkLine(false, 0xc9a86a, 0.95, 5);
-        knotTip = BakeSprite(18, 18, 9, 9, (ctx, ax, ay) => {
-          ctx.fillStyle = "#c9a86a";
-          ctx.strokeStyle = "rgba(43,31,22,0.8)";
-          ctx.lineWidth = 1.6;
-          ctx.beginPath(); ctx.arc(ax, ay, 5.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        }, 0, HINT_SS);
-        FixOrder(knotTip, DepthOrder("play", BAND.loose) + 6);
-        layers.play.add(knotTip);
+      const KW = 1.9, KH = 1.35, KPPM = 210;     // 画布罩住整个结的范围
+      if (!knotMesh) {
+        knotCanvas = MakeCanvas(KW * KPPM * 2, KH * KPPM * 2);
+        knotCtx = knotCanvas.getContext("2d");
+        knotCtx.scale(2, 2);                      // 结会被推到 3m 画宽，超采样一档
+        knotMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(KW, KH),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(knotCanvas), transparent: true, depthWrite: false }),
+        );
+        layers.play.add(knotMesh);
+        SetPlayOrder(knotMesh, BAND.loose, "knot");
+        knotMesh.userData.k = "";
       }
-      const cy = SURFACE_Y + kn.y;
-      const r = 0.55 * (1 - (kn.cinch || 0) * 0.62);
-      const turns = kn.turns || 1.25;
-      const a0 = -Math.PI / 2;
-      const put = (line, upto, radius) => {
-        const pos = line.geometry.attributes.position;
-        const n = 72;
-        for (let i = 0; i < n; i += 1) {
-          const tt = (i / (n - 1)) * upto;
-          const a = a0 + tt * turns * Math.PI * 2;
-          pos.setXYZ(i, kn.x + Math.cos(a) * radius, cy + Math.sin(a) * radius * 0.82, BAND.loose);
+      // 收紧量：穿出圈眼之后拉的每一寸都在勒结
+      const cinch = kn.u <= kn.threadU ? 0 : Math.min(1, (kn.u - kn.threadU) / (1 - kn.threadU));
+      const bucket = `${Math.round(kn.u * 60)}:${kn.grab ? 1 : 0}:${Math.round((kn.idle || 0) * 6)}`;
+      if (knotMesh.userData.k !== bucket) {
+        knotMesh.userData.k = bucket;
+        const eyeR = KNOT_EYE.r * (1 - cinch * 0.62);
+        // 勒紧＝圈越收越小，圈边上的绳也跟着被拽向圈心
+        const Warp = (q) => {
+          const dx = q[0] - KNOT_EYE.x, dy = q[1] - KNOT_EYE.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 0.28 || d < 1e-4) return q;
+          const pull = cinch * 0.45 * (1 - d / 0.28);
+          return [q[0] - dx * pull, q[1] - dy * pull];
+        };
+        const arc = (from, to, n) => {
+          const out = [];
+          for (let i = 0; i < n; i += 1) {
+            const a = from + (to - from) * (i / (n - 1));
+            out.push([KNOT_EYE.x + Math.cos(a) * eyeR, KNOT_EYE.y + Math.sin(a) * eyeR * 0.92]);
+          }
+          return out;
+        };
+        const ropePts = [], restPts = [];
+        for (let i = 0; i <= 30; i += 1) {
+          ropePts.push(Warp(KnotPointAt(kn.u * (i / 30))));
+          restPts.push(Warp(KnotPointAt(kn.u + (1 - kn.u) * (i / 30))));
         }
-        pos.needsUpdate = true;
-        line.computeLineDistances();
-      };
-      put(knotGuide, 1, 0.55);
-      knotGuide.visible = kn.t < 1;
-      knotGuide.material.opacity = 0.2 + 0.35 * (1 - kn.t);
-      put(knotRope, Math.max(0.02, kn.t), r);
-      knotRope.visible = true;
-      knotTip.visible = true;
-      const tipA = a0 + Math.max(0.02, kn.t) * turns * Math.PI * 2;
-      // 还没上手时绳头自己晃两下——HUD 那枚手势图标已经删掉（用户："不需要
-      // 这么简单的提示"），招呼玩家上手的只能是绳头本身。晃的方向就是该绕的
-      // 方向（沿引导圈往前蹭一点点），顺带把"往哪边转"也演了
-      const nudge = kn.idle ? Math.max(0, Math.sin(kn.idle * 2.2)) * 0.22 : 0;
-      const showA = tipA + nudge;
-      knotTip.position.set(kn.x + Math.cos(showA) * r, cy + Math.sin(showA) * r * 0.82, BAND.loose);
-      knotTip.scale.setScalar(1 + (kn.idle ? Math.sin(kn.idle * 4.4) * 0.10 : 0));
-    } else if (knotGuide) {
-      knotGuide.visible = false;
-      knotRope.visible = false;
-      knotTip.visible = false;
-    }
+        // 没上手时绳头顺着路往前蹭两下——唯一的"招呼"，代替 HUD 图标，
+        // 蹭的方向就是该拖的方向
+        const nudge = kn.idle ? Math.max(0, Math.sin(kn.idle * 2.2)) * 0.05 : 0;
+        knotCtx.clearRect(0, 0, KW * KPPM, KH * KPPM);
+        ART.DrawKnot(knotCtx, KW * KPPM * 0.42, KH * KPPM * 0.30, KPPM, {
+          stand: [[-0.05, 0.60], [-0.03, 0.36], [0.0, 0.22], [KNOT_EYE.x - eyeR * 0.2, KNOT_EYE.y + eyeR]],
+          eyeBack: arc(Math.PI * 0.5, Math.PI * 1.9, 22),
+          eyeFront: arc(Math.PI * 1.9, Math.PI * 2.5, 14),
+          rope: ropePts,
+          rest: restPts,
+          restAlpha: kn.u < 0.985 ? 0.18 + 0.30 * (1 - kn.u) : 0,
+          tip: Warp(KnotPointAt(Math.min(1, kn.u + nudge))),
+          grab: kn.grab,
+        });
+        knotMesh.material.map.needsUpdate = true;
+      }
+      knotMesh.visible = true;
+      // 画布锚点（0.42/0.30）对应挂点，摆位要把这个偏移抵回去
+      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), BAND.loose);
+    } else if (knotMesh) knotMesh.visible = false;
 
     // 飞出去的石子：一维横轴上的一道小弧线
     if (state.thrown) {

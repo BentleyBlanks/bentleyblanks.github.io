@@ -1608,6 +1608,79 @@ export function DrawHenCoop(ctx, x, groundY, id) {
 }
 
 // 晾衣绳：两根木杆绷一道绳，挂着打补丁的粗布衫和一条裤——风里鼓着
+// 接绳的结（逐帧重画）。
+//
+// **不能用 THREE.Line 画**：`linewidth` 在绝大多数平台上被忽略，绳子永远只有
+// 一个像素——贴在辘轳那堆木色上根本看不见，"穿过去"这个动作等于没演。
+// 所以整套结走 canvas：真笔画、真粗细、真墨线包边。
+//
+// 压叠关系是这一拍的题眼：圈的**远侧**画在麻绳之前、**近侧**画在麻绳之后，
+// 于是绳是"从圈里穿过去"的，不是"从圈上划过去"的。少了这一层，玩家看见的
+// 只是两条线交叉。
+//
+// spec 里的坐标都是**相对挂点的米数**（y 向上），几何一律由 Core 算好传进来
+// （判定与作画共用一份，同石笔/刨子那条规矩）。
+export function DrawKnot(ctx, ox, oy, ppm, spec) {
+  const P = (q) => [ox + q[0] * ppm, oy - q[1] * ppm];   // 米→画布（y 翻转）
+  const HEMP = "#c69a5c", HEMP_D = "#a97f45", NEWR = "#dcb877", INK = "rgba(46,33,20,0.85)";
+  const w = Math.max(2, ppm * 0.030);      // 绳粗 ≈3cm
+  const stroke = (pts, color, width, dash) => {
+    if (pts.length < 2) return;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    const a = P(pts[0]);
+    ctx.moveTo(a[0], a[1]);
+    for (let i = 1; i < pts.length; i += 1) { const b = P(pts[i]); ctx.lineTo(b[0], b[1]); }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    ctx.restore();
+  };
+  // 墨线包边＋绳身：先粗一圈深色，再压一道本色，麻绳就有了体积
+  const rope = (pts, color, k = 1) => {
+    stroke(pts, INK, w * k + Math.max(1.6, ppm * 0.010));
+    stroke(pts, color, w * k);
+  };
+  // ① 井绳断头：从辘轳上垂下来
+  rope(spec.stand, HEMP_D, 1.05);
+  // ② 圈的远侧（画在麻绳之前）
+  rope(spec.eyeBack, HEMP, 1.0);
+  // ③ 还没走到的那截路：细虚线，只是"绳还得往哪儿去"的暗示，拉到底就没了
+  if (spec.rest && spec.restAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = spec.restAlpha;
+    stroke(spec.rest, "rgba(120,102,74,0.9)", Math.max(1.4, ppm * 0.008), [ppm * 0.035, ppm * 0.03]);
+    ctx.restore();
+  }
+  // ④ 麻绳（新绳比旧井绳亮一档，两根分得开）
+  rope(spec.rope, NEWR, 1.0);
+  // ⑤ 圈的近侧（压住麻绳）——"穿过去"就是靠这一笔成立的
+  rope(spec.eyeFront, HEMP, 1.0);
+  // ⑥ 绳头：攥住的时候鼓一点，让玩家知道手上有东西
+  const tp = P(spec.tip);
+  const tr = w * (spec.grab ? 1.05 : 0.85);
+  ctx.beginPath();
+  ctx.arc(tp[0], tp[1], tr, 0, Math.PI * 2);
+  ctx.fillStyle = NEWR;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1.6, ppm * 0.009);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+  // 散开的麻头：绳头总是毛的
+  for (let i = 0; i < 3; i += 1) {
+    const a = -0.5 + i * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(tp[0], tp[1]);
+    ctx.lineTo(tp[0] + Math.cos(a) * tr * 2.1, tp[1] + Math.sin(a) * tr * 2.1);
+    ctx.strokeStyle = "rgba(169,127,69,0.75)";
+    ctx.lineWidth = Math.max(1, ppm * 0.005);
+    ctx.stroke();
+  }
+}
+
 export function DrawClothesline(ctx, x, groundY, id) {
   const span = 92;
   InkLine(ctx, x - span / 2, groundY, x - span / 2 - 4, groundY - 88, id + "pL", { lw: 4, color: "#6b5136", amp: 1.4 });

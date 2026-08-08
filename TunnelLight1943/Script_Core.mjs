@@ -205,7 +205,82 @@ function CanFreeDrop(state) {
 // ---------------------------------------------------------------------------
 const GROUND_PICK_R = 1.5;    // 拾取半径
 const GROUND_HINT_R = 5.0;    // 悬浮提示可见半径
-const KNOT_TURNS = 1.25;      // 接绳打结要绕的圈数（一圈多一点）
+// ---------------------------------------------------------------------------
+// 接绳（把断了的井绳和找来的麻绳接上）
+//
+// 这一拍改过一次，原因值得写死在这儿：**绕圈是缠辘轳轴的动作，不是接绳的动作**
+//（用户 2026-08-08：「链接麻绳为什么也是转圈圈？不太合理」）。真接两根绳是
+// 把一头**穿过**另一头挽出的圈，再顺着绳往外一拉，结自己收死——一个连贯动作，
+// 中间没有"绕"。
+//
+// 于是玩法＝攥住麻绳头，顺着绳自己能走的那条路拖：
+//   起手(左下) → 贴到圈边 → **从圈眼里穿过去** → 另一侧钻出来 → 一路往外拉勒紧
+// 路线坐标是相对断头挂点 (cx, cy) 的米数（x 右、y 上）。
+// **判定与作画共用这一份**，World 里绝不许另抄一套（同石笔/刨子那条规矩）。
+const KNOT_PATH = [
+  [-0.66, -0.30],   // 麻绳头起手：垂在断头左下
+  [-0.42, -0.16],
+  [-0.19, -0.03],   // 贴到圈边
+  [0.00, 0.06],     // 圈眼正中：穿过去
+  [0.18, -0.02],    // 从另一侧钻出来
+  [0.33, -0.20],
+  [0.52, -0.42],    // 往外拉，结开始收
+  [0.74, -0.63],    // 拉到底：勒死
+];
+// 整套结的尺寸系数。井架横杆上的辘轳（WINCH_HUB_Y 1.43）与井口台沿之间
+// 只有半米出头的空当，结得塞进这个空当里——大了就骑在辘轳上，两团木色
+// 叠在一起谁也看不清
+const KNOT_SCALE = 0.78;
+export const KNOT_EYE = { x: 0, y: 0.06 * KNOT_SCALE, r: 0.15 * KNOT_SCALE };   // 断头挽出的那个圈（作画用；导出是为了 World 不另抄一份）
+// 弧长参数化：拖动按**路径上的最近点**驱动，不是按位移量累加——
+// 位移量拖哪儿都涨，那就又变成一根看不见的 slider 了
+const KNOT_ARC = (() => {
+  const seg = [];
+  let total = 0;
+  for (let i = 0; i < KNOT_PATH.length - 1; i += 1) {
+    const d = Math.hypot(KNOT_PATH[i + 1][0] - KNOT_PATH[i][0], KNOT_PATH[i + 1][1] - KNOT_PATH[i][1]);
+    seg.push(d);
+    total += d;
+  }
+  const acc = [0];
+  for (let i = 0; i < seg.length; i += 1) acc.push(acc[i] + seg[i]);
+  return { seg, acc, total };
+})();
+// 绳头钻出圈眼那一刻的弧长比例：过了它才算"穿好了"，之后拉的都是在收紧
+export const KNOT_THREAD_U = KNOT_ARC.acc[4] / KNOT_ARC.total;
+const KNOT_GRAB_R = 0.22;     // 攥住绳头的判定半径（特写下约 60px，手指够得着）
+const KNOT_SLIP_R = 0.30;     // 手飘离绳子走向这么远就脱手
+const KNOT_SPEED = 1.05;      // 绳有分量：一秒最多走全程的这么多，甩不快
+
+/** 路径上 u(0..1) 处的点，相对断头挂点的米数 */
+export function KnotPointAt(u) {
+  const s = Math.max(0, Math.min(1, u)) * KNOT_ARC.total;
+  for (let i = 0; i < KNOT_ARC.seg.length; i += 1) {
+    if (s <= KNOT_ARC.acc[i + 1] || i === KNOT_ARC.seg.length - 1) {
+      const t = KNOT_ARC.seg[i] > 1e-6 ? (s - KNOT_ARC.acc[i]) / KNOT_ARC.seg[i] : 0;
+      const a = KNOT_PATH[i], bb = KNOT_PATH[i + 1];
+      return [(a[0] + (bb[0] - a[0]) * t) * KNOT_SCALE, (a[1] + (bb[1] - a[1]) * t) * KNOT_SCALE];
+    }
+  }
+  const last = KNOT_PATH[KNOT_PATH.length - 1];
+  return [last[0] * KNOT_SCALE, last[1] * KNOT_SCALE];
+}
+
+/** 指尖落点投到路径上：{ u, dist }。dist = 垂直偏离，用来判脱手 */
+function KnotProject(xM, yM) {
+  const x = xM / KNOT_SCALE, y = yM / KNOT_SCALE;
+  let best = { u: 0, dist: Infinity };
+  for (let i = 0; i < KNOT_ARC.seg.length; i += 1) {
+    const a = KNOT_PATH[i], bb = KNOT_PATH[i + 1];
+    const vx = bb[0] - a[0], vy = bb[1] - a[1];
+    const len2 = vx * vx + vy * vy;
+    const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / len2)) : 0;
+    const px = a[0] + vx * t, py = a[1] + vy * t;
+    const d = Math.hypot(x - px, y - py);
+    if (d < best.dist) best = { u: (KNOT_ARC.acc[i] + KNOT_ARC.seg[i] * t) / KNOT_ARC.total, dist: d * KNOT_SCALE };
+  }
+  return best;
+}
 
 // 辘轳转盘：鼠标绕轴心转圈驱动（顺时针放绳、逆时针摇起）。
 // HUB_Y = 摇把轴心离地高度（对齐 DrawWell 井架横杆的中线）；
@@ -901,9 +976,9 @@ function StepChain(state, def, input, dt) {
       };
       return;
     }
-    // 接绳打结：拿着麻绳站到断头前，鼠标沿引导圈把绳缠上去（一圈多一点），
-    // 缠满再往下一拽勒紧。键盘后备：按住 E 缠 / 收。这是「接上井绳」从一条
-    // 进度条变成一双手的地方。
+    // 接绳：攥住麻绳头，顺着绳自己能走的那条路拖过去——贴到圈边、**从圈眼里
+    // 穿过去**、另一侧钻出来、再一路往外拉，结自己收死。一个连贯动作。
+    // （老版是绕圈缠一圈多，被退回：绕圈是缠辘轳轴的动作，不是接绳的动作。）
     case "knot": {
       if (!InZone(p.x, lvl, st.zone)) return;
       const k = b.knotState;
@@ -911,64 +986,67 @@ function StepChain(state, def, input, dt) {
         state.prompt = st.missPrompt || `这儿缺${st.needsLabel || "样东西"}`;
         return;
       }
-      const kn = k || (b.knotState = { t: 0, cinch: 0, prevA: null });
+      const kn = k || (b.knotState = { u: 0, grab: false, threaded: false });
       const cx = st.zone.x;
       // 同辘轳：人站在断头正前方会把结挡住——钉到井口西侧，手够着断头打结
       if (!k) { p.x = cx - 0.9; p.heading = 1; }
       else if (p.x > cx - 0.72) { p.x = cx - 0.72; p.heading = 1; }
       const cyRel = st.knotY ?? 1.5;   // 断头挂在井架上的高度
-      // 特写：打结是指尖上的活，镜头推到断头跟前——引导圈、缠上去的绳、
-      // 收紧的结都要看得清；离开井台自动拉回
-      state.closeUp = { x: cx, y: cyRel - 0.25, hw: st.closeHw ?? 2.6 };
-      // 指针绕圈：真实位置驱动——手得真的在断头附近画圈。
-      // **方向是有意义的**：绳只能顺着一个方向往上缠（世界角度递增＝画面上
-      // 逆时针，与 World 里绳圈的画法同一个方向）。反着转就是在往下解，
-      // 圈会一圈圈退回来。老版取 Math.abs(d) 两头都算涨，于是转哪边都能过——
-      // 那就不是"缠绳"，是"在这儿画圈满一定角度"。
+      const cy = SURFACE_Y + cyRel;
+      // 特写：结只有巴掌大。景别照"手指按得着"倒推——1.5m 半宽在手机上
+      // 也有 280px/米，绳头那个点 30 来像素、攥住的判定 60 像素
+      state.closeUp = { x: cx + 0.04, y: cyRel - 0.14, hw: st.closeHw ?? 1.5 };
+
+      const tip = KnotPointAt(kn.u);
       const pw = input.pointerWorld;
       if (input.pointerHeld && pw) {
-        const dx = pw.x - cx, dy = pw.y - (SURFACE_Y + cyRel);
-        const r = Math.hypot(dx, dy);
-        if (r > 0.12 && r < 1.5) {
-          const a = Math.atan2(dy, dx);
-          if (kn.prevA !== null) {
-            let d = a - kn.prevA;
-            if (d > Math.PI) d -= Math.PI * 2;
-            if (d < -Math.PI) d += Math.PI * 2;
-            if (Math.abs(d) < 1.0) {
-              const turn = d / (Math.PI * 2 * KNOT_TURNS);
-              if (kn.t < 1) {
-                // 缠：正向涨；反向退（解开的手感，退得比缠快一点点）
-                kn.t = Math.max(0, Math.min(1, kn.t + (turn > 0 ? turn : turn * 1.25)));
-                if (turn > 0) FlashPose(state, "mark", 0.25);
-              } else if (turn < 0) {
-                // 已经缠满了还往回转＝把结解开，退回缠绳这一步
-                kn.t = Math.max(0, 1 + turn * 1.25);
-                kn.cinch = 0;
-              }
+        // ① 按下那一帧手必须落在**绳头**上才攥得住，在别处拖一律无效
+        if (!kn.grab && state.ptrPressed
+          && Math.hypot(pw.x - (cx + tip[0]), pw.y - (cy + tip[1])) < KNOT_GRAB_R) {
+          kn.grab = true;
+        }
+        if (kn.grab) {
+          const pr = KnotProject(pw.x - cx, pw.y - cy);
+          if (pr.dist > KNOT_SLIP_R) {
+            // ③ 手飘离绳子的走向＝脱手，绳头缩回去一截（进度当场断）
+            kn.grab = false;
+            kn.u = Math.max(0, kn.u - 0.14);
+            Cue(state, "drop", { gain: 0.5 });
+          } else {
+            // ② 绳有分量：跟着手走，但一秒最多走这么多，甩再快也只能一寸寸挪。
+            //    往回拖＝把绳头退出来（方向是有意义的，和缠/解同一个道理）
+            const d = pr.u - kn.u;
+            const stepU = Math.sign(d) * Math.min(Math.abs(d), KNOT_SPEED * dt);
+            if (Math.abs(stepU) > 1e-5) {
+              kn.u = Math.max(0, Math.min(1, kn.u + stepU));
+              if (stepU > 0) FlashPose(state, "mark", 0.25);
             }
           }
-          kn.prevA = a;
         }
-      } else kn.prevA = null;
-      // 缠上第一把，绳就离手挂在井架上了
-      if (kn.t > 0.03 && p.item?.id === st.needs) { p.item = null; FlashPose(state, "mark", 0.4); }
+      } else kn.grab = false;
+
+      // 攥住第一下，麻绳就离手了（接下来它长在井架上，不在物品栏里）
+      if (kn.u > 0.03 && p.item?.id === st.needs) { p.item = null; FlashPose(state, "mark", 0.4); }
+      // 穿出圈眼那一下要有回响：绳头从圈里钻出来，结算是搭上了
+      if (!kn.threaded && kn.u >= KNOT_THREAD_U) {
+        kn.threaded = true;
+        Cue(state, "pickup", { gain: 0.7 });
+      } else if (kn.threaded && kn.u < KNOT_THREAD_U - 0.02) {
+        kn.threaded = false;   // 又给拖回去了：结散开
+      }
       // **没有长按后备**（用户明令："为什么还支持长按交互按钮的模式？干掉"）。
-      // 打结是指尖上的活：手不落在绳头上、不真的绕圈，就一点进展都没有。
-      // 也**没有 HUD 手势图标**——招呼玩家上手的是绳头自己（它在断头上晃），
-      // 转对了绳圈一圈圈缠上去、转反了退回来，物体自己把方向教了。
-      if (kn.t >= 1) {
-        if (!kn.wound) { kn.wound = true; Cue(state, "pickup", { gain: 0.7 }); }
-        // 缠满了改竖拽勒紧（同样只认手上的动作，没有长按）
-        const pull2 = input.pullHeld ? Math.max(0, input.pull || 0) : 0;
-        if (pull2 > 0) { kn.cinch = Math.min(1, kn.cinch + Math.min(pull2 * 2.2, dt * 4)); FlashPose(state, "crank", 0.25); }
-      } else kn.wound = false;
-      // 还没上手时绳头自己晃两下——这是唯一的"招呼"，代替原来那个 HUD 图标
+      // 接绳是指尖上的活：手不落在绳头上、不顺着绳拖，就一点进展都没有。
+      // 也**没有 HUD 手势图标**——招呼玩家的是绳头自己（没上手时它顺着路
+      // 往前蹭两下，蹭的方向就是该拖的方向）。
       state.knot = {
-        x: cx, y: cyRel, t: kn.t, cinch: kn.cinch, turns: KNOT_TURNS,
-        idle: kn.prevA === null && kn.t < 0.02 ? state.time : 0,
+        x: cx, y: cyRel, u: kn.u, threadU: KNOT_THREAD_U,
+        grab: kn.grab, idle: !kn.grab && kn.u < 0.02 ? state.time : 0,
       };
-      if (kn.cinch >= 1) {
+      // 拉到底：留一点余量再判死。绳头是**渐近**地贴到路径终点的
+      //（每帧只补上剩余距离的一部分），死等 u === 1 会永远差最后一丝，
+      //   结永远勒不上——只有把终点吃掉才收得了尾
+      if (kn.u >= 0.995) {
+        kn.u = 1;
         Cue(state, "ladder", { gain: 0.75 });   // 麻绳勒紧时木架受力的吱嘎
         state.knot = null;
         finish();
@@ -1555,7 +1633,10 @@ export const SCRIPTS = {
             state.flags.ropeTaken = true;
           } },
         // 接绳从一条按住不放的进度条改成了真的打结：绕圈缠绳、下拽勒紧
-        { type: "knot", zone: V.well, needs: "rope", needsLabel: "麻绳",
+        // knotY 是结的挂点高度。1.18 是量出来的：辘轳滚筒的下沿在 1.25、
+        // 井口台沿在 0.85，结得塞进这半米的空当里——挂高了就骑在滚筒上，
+        // 两团木色叠一块儿谁也看不清（老版挂在 1.5，正压着滚筒）
+        { type: "knot", zone: V.well, needs: "rope", needsLabel: "麻绳", knotY: 1.18,
           note: "麻绳接上了。辘轳又能转了。",
           effect: (state) => { state.flags.wellRopeBroken = false; } },
         { type: "pickupGround", flagX: "bucketAt", item: { id: "bucket", label: "空水桶" },
@@ -5563,13 +5644,21 @@ export function GetBeatTarget(state) {
           return typeof gx === "number" ? { action: "interactAt", x: gx, level: "surface" } : null;
         }
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
-        // 打结：按住 E 的键盘后备路径就能缠满 + 勒紧
-        // 打结没有长按后备（用户明令删掉），驱动器只能真的绕圈——
-        // 所以给它一个专门的动作，把圆心与半径一并交出去
-        case "knot": return {
-          action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
-          cx: st.zone.x, cy: SURFACE_Y + (st.knotY ?? 1.5), r: 0.45,
-        };
+        // 接绳没有长按后备（用户明令删掉），驱动器只能**真的顺着绳拖**——
+        // 所以把绳子的那条路（世界坐标）整条交出去，自动通关照着走一遍。
+        // 删后备就必须同时给驱动器一条真输入的路，漏了这一步会当场卡死。
+        case "knot": {
+          const kx = st.zone.x, ky = SURFACE_Y + (st.knotY ?? 1.5);
+          const path = [];
+          for (let i = 0; i <= 24; i += 1) {
+            const q = KnotPointAt(i / 24);
+            path.push([kx + q[0], ky + q[1]]);
+          }
+          return {
+            action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
+            cx: kx, cy: ky, path,
+          };
+        }
         case "throwHit":
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
           return { action: "throwAt", x: st.target.x - 6, level: "surface", face: 1 };
