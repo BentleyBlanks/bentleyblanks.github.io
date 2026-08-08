@@ -13,7 +13,7 @@ import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } 
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import {
-  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER,
+  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, ACTOR_RANK_DZ,
   CheckBandZ, DepthViolations,
 } from "./Data_DepthSpec.mjs";
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
@@ -1941,7 +1941,17 @@ export function CreateWorld(canvasEl) {
       poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
 
-    s.mesh.position.set(x, y, ACTOR_Z);
+    // 队列的后一排整体后移一档（人/影子/家伙一起走，见 ACTOR_RANK_DZ）。
+    // 绘制顺序是 SetPlayOrder 钉死的，所以档位一变就得重新钉一次——
+    // 不重钉的话后排的人会画在前排之前，两个人叠成一个。
+    const dz = extra.rankDz || 0;
+    if (s.rankDz !== dz) {
+      s.rankDz = dz;
+      SetPlayOrder(s.rig.group, ACTOR_Z + dz);
+      if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow");
+      if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry");
+    }
+    s.mesh.position.set(x, y, ACTOR_Z + dz);
     const bs = extra.bodyScale || s.bodyScale || 1;
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (s.shadow) {
@@ -1954,7 +1964,7 @@ export function CreateWorld(canvasEl) {
       s.shadow.position.set(
         x + (under ? 0 : SUN.dx * 0.55) * bs,
         ground + 0.015,
-        ACTOR_Z - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
+        ACTOR_Z + dz - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
       s.shadow.material.opacity = (under ? 0.5 : 1) * (1 - air * 0.55);
     }
@@ -1970,7 +1980,7 @@ export function CreateWorld(canvasEl) {
         const wid = (0.85 + dist * 0.10) * bs;
         s.castShadow.visible = true;
         s.castShadow.scale.set(dir * len, wid, 1);
-        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, ACTOR_Z - 0.04);
+        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, ACTOR_Z + dz - 0.04);
         // 站在灯正下方没有影子可言；出了灯的照射范围也就没影子了
         const near = Math.min(1, dist / 0.75);
         const far = 1 - Math.min(1, Math.max(0, (dist - lit.r * 0.55) / (lit.r * 0.5)));
@@ -2027,7 +2037,8 @@ export function CreateWorld(canvasEl) {
       if (layerKey === "play") s.carryMesh.userData.persist = true;
       s.carryLabel = label;
       host.add(s.carryMesh);
-      SetLayerOrder(s.carryMesh, layerKey, CARRY_Z, "carry:" + layerKey);
+      // 后一排的人手里那把枪也得跟着退一档（rankDz 由 UpdateOne 先一步定好）
+      SetLayerOrder(s.carryMesh, layerKey, CARRY_Z + (s.rankDz || 0), "carry:" + layerKey);
     } else if (!label && s.carryMesh) {
       host.remove(s.carryMesh);
       s.carryMesh = null;
@@ -2051,7 +2062,7 @@ export function CreateWorld(canvasEl) {
     // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
     const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
     s.carryMesh.position.set(anchor.x + forward,
-      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z);
+      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z + (s.rankDz || 0));
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
@@ -2241,6 +2252,8 @@ export function CreateWorld(canvasEl) {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           lift: a.lift || 0, poseK: a.vaultK ?? a.poseU,
+          // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）
+          rankDz: a.rank ? ACTOR_RANK_DZ : 0,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });

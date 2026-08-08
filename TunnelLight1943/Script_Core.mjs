@@ -1714,20 +1714,23 @@ export const SCRIPTS = {
             // 从村口往里走：镜头横摇跟着他们推进
             if (r1) { r1.x = 152; r1.heading = -1; r1.cineTarget = { x: 132 }; r1.cineSpeed = 2.0; }
             if (r2) { r2.x = 160; r2.heading = -1; r2.cineTarget = { x: 143 }; r2.cineSpeed = 1.8; }
-            // 带路的翻译官走在兵后头——第二章夜里挑灯笼带路的就是他。
-            // 脸要在第一章就露过，"又来了"三个字在第二章才有分量
-            const tr = FindActor(state, "traitor");
-            if (tr) { tr.x = 168; tr.heading = -1; tr.cineTarget = { x: 150 }; tr.cineSpeed = 1.7; }
-            // 车队与纵队压进村：自行车稍快、摩托压着队走、徒步兵紧跟——
-            // 速度差压小，整支队伍才装得进车队镜的一个画框
-            const bike = FindActor(state, "bikeScout");
-            if (bike) { bike.cineTarget = { x: 116 }; bike.cineSpeed = 2.6; }
-            const moto = FindActor(state, "motoLead");
-            if (moto) { moto.cineTarget = { x: 126 }; moto.cineSpeed = 2.3; }
-            for (let i = 0; i < RAID_COLUMN; i += 1) {
-              const c = FindActor(state, "c1col" + i);
-              if (c) { c.cineTarget = { x: 138 + i * 1.9 }; c.cineSpeed = 1.9; }
-            }
+            // 整支队伍压进村：**全队一个速度**。速度一有差，队形当场散架——
+            // "十个伪军打头、日军两人并排殿后"这件事就白摆了。车比人快半拍，
+            // 也只快那半拍（村道上摩托本来就骑不起来）。
+            // 2.4 m/s 是急行军：镜头这两镜一共 7.6 秒往西摇 13 米，走慢了队伍
+            // 会被镜头甩在后面，车队镜里就只剩一条空街
+            const MARCH = 2.4;
+            const Go = (id, to, sp = MARCH) => {
+              const a = FindActor(state, id);
+              if (a) { a.heading = -1; a.cineTarget = { x: a.x - to }; a.cineSpeed = sp; }
+            };
+            // 往西推进 34m：过场演完前谁也走不到头（onDone 会把人摆到搜村位），
+            // 这里要的只是"一直在走"，以及走的过程中队形不变
+            const PUSH = 34;
+            Go("traitor", PUSH);
+            Go("bikeScout", PUSH, MARCH + 0.3);
+            Go("motoLead", PUSH, MARCH + 0.15);
+            for (const id of RaidColumnIds()) Go(id, PUSH);
             Cue(state, "bikeBell");
             Cue(state, "motorPutt");
             // 镜头此刻在村东口，院子不在画框里——趁这三秒把娘和妹妹走位到位：
@@ -1740,8 +1743,11 @@ export const SCRIPTS = {
           } },
         // 车队从画框里压过去的一镜：无字幕——车铃、引擎和皮靴自己说。
         // 这一镜是用户拿景区实拍立的：日军进村不可能只有两个人。
-        // 构图卡在自行车、摩托、纵队头都在框内的那一段街上
-        { stage: "", d: 4.2, cam: { kind: "shot", x: 150, y: 1.7, dist: 12, pan: -7 },
+        // **构图卡在摩托与日军那一段**：上一镜（x166）给的是打头的十个伪军，
+        // 这一镜就该给挎斗摩托和紧跟在后头两人并排的日军。机位与摇幅是照着
+        // 队伍的行进速度（2.4 m/s）算的：4.2 秒里他们从 160 走到 152，
+        // 画框从 148…172 摇到 140…164，人始终在框里
+        { stage: "", d: 4.2, cam: { kind: "shot", x: 160, y: 1.7, dist: 12, pan: -8 },
           on: (state) => { Cue(state, "motorPutt"); Cue(state, "bikeBell", { delay: 1.4 }); } },
         // 藏家伙不是慌乱中的怪动作，是学来的规矩：上一回扫荡就有工匠
         // 连人带家伙被掳走。这句旁白说的是画面外的旧事，也是爹结局的伏笔
@@ -1793,21 +1799,26 @@ export const SCRIPTS = {
         const tr = FindActor(state, "traitor");
         if (tr) { tr.cineTarget = null; tr.x = 55.5; tr.heading = 1; }
         // 大队伍在东街散开挨家搜（全 decor）：车靠边停、兵三三两两踹门。
-        // 全部撂在 x≥112——考场（撤退线 42→27、街上 49-57）一个不多占
+        // 全部撂在 x≥112——考场（撤退线 42→27、街上 49-57）一个不多占。
+        // **散开就不再是队列了**：rank 清掉，人各自朝各自的门。队形只属于行军，
+        // 搜村时还两人并排杵着，那是阅兵不是扫荡
         const bike = FindActor(state, "bikeScout");
         if (bike) { bike.cineTarget = null; bike.x = 114; bike.heading = -1; }
         const moto = FindActor(state, "motoLead");
         if (moto) { moto.cineTarget = null; moto.x = 124; moto.heading = -1; }
-        for (let i = 0; i < RAID_COLUMN; i += 1) {
-          const c = FindActor(state, "c1col" + i);
-          if (!c) continue;
-          c.cineTarget = null;
-          c.x = 132 + i * 3.4;
-          c.heading = i % 2 ? 1 : -1;
-          // 两个来回走动的，街上才不是一排木桩
-          if (i === 1) { c.patrol = [130, 140]; c.speed = 1.0; }
-          if (i === 4) { c.patrol = [144, 154]; c.speed = 0.9; }
-        }
+        RaidColumnIds().forEach((id, i) => {
+          const a = FindActor(state, id);
+          if (!a) return;
+          a.cineTarget = null;
+          a.rank = 0;
+          // 沿东街铺开：伪军铺在近处（挨家踹门的是他们），日军散在更东头
+          a.x = 130 + i * 2.6 + (i % 3) * 0.8;
+          a.heading = i % 2 ? 1 : -1;
+          // 几个来回走动的，街上才不是一排木桩
+          if (i === 2) { a.patrol = [130, 140]; a.speed = 1.0; }
+          if (i === 7) { a.patrol = [146, 156]; a.speed = 0.9; }
+          if (i === 14) { a.patrol = [162, 172]; a.speed = 1.1; }
+        });
         state.stealthActive = true;
       },
     },
@@ -3018,36 +3029,82 @@ function MakeActor(id, kind, x, extra = {}) {
   return { id, kind, x, level: "surface", heading: 1, visible: true, ...extra };
 }
 
-// 白天进村的不是两个兵，是一支队伍（用户拿景区实拍立的规矩）：
-// 伪军骑自行车在前头探路，挎斗摩托压在中间，后面一列扛枪的徒步兵。
-// 参与潜行判定的仍只有 raid1/raid2——十几个人一起判视线这段就没法玩了，
+// 白天进村的不是两个兵，是一支队伍（用户拿景区实拍立的规矩）。
+// 队形（2026-08-08 用户定，从队头往队尾数）：
+//   骑车的伪军探路 → **十个伪军打头** → 挎斗摩托紧贴着他们的后脚跟
+//   → **日军五对，两人并排**殿后
+// 「谁走在前头」这件事本身就是史实：扫荡的脏活累活（开道、踹门、喊话）
+// 派给伪军，日军押在后面。所以画面上先来的一定是本乡本土的那张脸。
+//
+// **横版里"两人并排"只能靠深度演**：一对人同一个 x，一个在行走线上、一个退后
+// 1.2m（`rank: 1` → World 按 ACTOR_RANK_DZ 整体后移人/影子/枪）。透视会把后排那个
+// 画小一圈、脚在画面上抬高一点——读出来就是肩并肩。原先六个兵一个个前后跟着，
+// 那是行军纵队不是队列。
+//
+// 伪军这十个**故意不排整齐**：三三两两、间距不匀、几个溜到后排去。
+// 队形松散是伪军，队形咬得死的是日军——两支队伍的分别不靠文字说，靠走法说。
+//
+// 参与潜行判定的仍只有 raid1/raid2——二十几个人一起判视线这段就没法玩了，
 // 其余全部 decor：他们负责让「鬼子进村」这四个字在画面上是真的。
-const RAID_COLUMN = 6;
+const RAID_PUPPETS = 10;      // 打头的伪军
+const RAID_JP_PAIRS = 5;      // 日军：五对，每对两人并排
+// 队形表：相对队头的米数（往东为正＝往队尾）。进村行军与散开搜村共用同一张表，
+// 改队形只改这里。摩托与日军之间只留 3.2m——用户："距离有点远了，拉得近一点"
+const RAID_FORM = {
+  bike: 0,
+  puppet: (i) => 3.0 + i * 1.45,
+  traitor: 17.4,
+  moto: 19.4,
+  jp: (i) => 22.6 + i * 2.2,
+};
+// 伪军里溜到后排去的那几个（松散的队形靠它，不是靠随机数）
+const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
+
 function SpawnRaidSoldiers(state) {
   state.actors = state.actors.filter((a) => !IsEnemy(a));
+  // 队头摆在村东口外：整支队伍往东排开约 31m，尾巴刚好不出走行范围（186）
+  const H = 150;
   state.actors.push(
     MakeActor("raid1", "soldier", 120, { patrol: [58, 120], speed: 1.5 }),
     MakeActor("raid2", "soldier", 88, { patrol: [50, 90], speed: 1.35 }),
     // 据点的翻译官：带路的、递名单的。decor——他不参与潜行判定（两个兵
     // 已经把考场撑满了），但他得在场：第二章挑灯笼带路的、审问时递话的，
-    // 都是这一个人。汉奸不是符号，是个有脸的邻人，才可恨
-    MakeActor("traitor", "puppet", 168, { label: "翻译官", decor: true }),
+    // 都是这一个人。汉奸不是符号，是个有脸的邻人，才可恨。
+    // 他走在伪军队尾、摩托前头——名单在他手上，两头都得照应
+    MakeActor("traitor", "puppet", H + RAID_FORM.traitor, { label: "翻译官", decor: true, heading: -1 }),
     // 骑车的伪军：车是他自己的，腿上的活也是他自己的（蹬踏跟着位移走）。
     // carry:"" 压掉兵默认的手持步枪——骑车的手在车把上，枪是背着的
     // lift = 座高 − 站立胯高(≈0.60m)。给多了人就浮在车上面，给少了像蹲在车边
-    MakeActor("bikeScout", "puppet", 166, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
+    MakeActor("bikeScout", "puppet", H + RAID_FORM.bike, { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
     // 挎斗摩托：驾驶的兵 + 挎斗里的兵（钉在车侧，跟着车走）
-    MakeActor("motoLead", "soldier", 170, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
-    MakeActor("motoSide", "soldier", 170.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
+    MakeActor("motoLead", "soldier", H + RAID_FORM.moto, { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
+    MakeActor("motoSide", "soldier", H + RAID_FORM.moto + 0.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
   );
-  // 徒步纵队：紧跟在车后（车在村道上也就比步行快半拍），间距刻意不匀——
-  // 队列走长路会散。整支队伍要能装进车队镜的一个画框里
-  for (let i = 0; i < RAID_COLUMN; i += 1) {
-    state.actors.push(MakeActor("c1col" + i, "soldier", 173.5 + i * 1.8 + (i % 2) * 0.5, {
-      decor: true, heading: -1,
+  // 打头的十个伪军
+  for (let i = 0; i < RAID_PUPPETS; i += 1) {
+    state.actors.push(MakeActor("c1pup" + i, "puppet", H + RAID_FORM.puppet(i), {
+      decor: true, heading: -1, rank: PUPPET_BACK_RANK.has(i) ? 1 : 0,
     }));
   }
+  // 殿后的日军：五对，每对两人并排（后排那个 rank:1）
+  for (let i = 0; i < RAID_JP_PAIRS; i += 1) {
+    const x = H + RAID_FORM.jp(i);
+    state.actors.push(
+      MakeActor("c1jpF" + i, "soldier", x, { decor: true, heading: -1 }),
+      // 后排那个只错开一掌：并排的两个人在侧视里几乎重叠，露出去的是
+      // 后面那个的头、肩和枪管。错太开就读成"一前一后"，那正是要改掉的毛病
+      MakeActor("c1jpB" + i, "soldier", x + 0.22, { decor: true, heading: -1, rank: 1 }),
+    );
+  }
   state.stealthActive = true;
+}
+
+/** 队列里每个 decor 兵的 id，从队头数到队尾（进村行军 / 散开搜村共用一份名单） */
+function RaidColumnIds() {
+  const out = [];
+  for (let i = 0; i < RAID_PUPPETS; i += 1) out.push("c1pup" + i);
+  for (let i = 0; i < RAID_JP_PAIRS; i += 1) out.push("c1jpF" + i, "c1jpB" + i);
+  return out;
 }
 
 // 1943 年春的一次夜间"清剿"，来的是据点一个小队加上伪军：进村就分头堵路、

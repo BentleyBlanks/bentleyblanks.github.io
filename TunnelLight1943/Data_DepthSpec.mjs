@@ -28,12 +28,22 @@ export const BAND = {
 export const ACTOR_Z = 0.6;          // 演员行走深度
 export const ACTOR_SHADOW_Z = 0.55;  // 演员脚下的投影（紧贴在演员之后）
 export const CARRY_Z = 0.8;          // 演员携带物（跟手走，压在人身前）
+
+// 队列的**后一排**。横版里"两人并排走"只能靠深度演：同一个 x 退后 1.2m，
+// 透视会把他画小一圈、脚在画面上抬高一点——读出来才是"肩并肩"，
+// 而不是"一前一后"。人、影子、手里的家伙整体后移，所以这里给的是**偏移量**。
+// 1.6m 是土路上行军两列的间距。**这个数是量着屏幕定的**：车队镜的机位在
+// 22m 开外，1.2m 只换来 5px 的抬高和 5% 的缩小——凑近看得出，正常景别下看不出。
+// 再大就不像一个队了。
+export const ACTOR_RANK_DZ = -1.6;
 // 允许挡人的矮物件区间（掩体走这个区间；AddCover 在其中插值）
 export const NEAR_CLUTTER = [1.25, 2.3];
 
 // 合法 z 值集合（校验用）：带表 + 演员三档。掩体区间单独按范围判。
 const ALLOWED = new Set([
   ...Object.values(BAND), ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z,
+  // 后一排的那三档（人/影子/家伙），由 ACTOR_RANK_DZ 整体平移而来
+  ACTOR_Z + ACTOR_RANK_DZ, ACTOR_SHADOW_Z + ACTOR_RANK_DZ, CARRY_Z + ACTOR_RANK_DZ,
 ]);
 
 // ---------------------------------------------------------------------------
