@@ -1,8 +1,8 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
 import { mergeGeometries } from "../TunnelBell1942/vendor/three/examples/jsm/utils/BufferGeometryUtils.mjs";
-import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z4";
-import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z4";
-import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z4";
+import { GetCinematicCue, GetVisualProfile, WorldScale } from "./Data_Scene3D.mjs?v=20260808z24";
+import { CreateActor3D, UpdateActor3D, DisposeActor3D } from "./Script_Actor3D.mjs?v=20260808z24";
+import { InstantiateSceneAsset3D } from "./Script_Assets3D.mjs?v=20260808z24";
 
 function CreateRandom(seed) {
   let value = seed >>> 0;
@@ -262,21 +262,44 @@ function CreateMistTexture(profile, seed) {
 
 function BuildAtmosphericLayers(root, profile, chapter, dynamic) {
   if (chapter.id === "tunnel") return;
-  const width = Math.max(108, chapter.width * WorldScale + 76);
+  const length = chapter.width * WorldScale;
   for (let index = 0; index < 2; index += 1) {
     const texture = CreateMistTexture(profile, 7100 + chapter.id.length * 17 + index * 101);
     texture.repeat.set(index ? 1.7 : 1.15, 1);
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
-      opacity: index ? 0.42 : 0.58,
+      opacity: index ? 0.11 : 0.17,
       depthWrite: false,
       fog: false,
       side: THREE.DoubleSide,
     });
-    const mesh = AddMesh(root, new THREE.PlaneGeometry(width, index ? 5.2 : 4.1), material, [chapter.width * WorldScale * 0.5, index ? 2.45 : 1.62, index ? -11.6 : -5.4], null, null, false);
+    // Mist is authored as separated low banks instead of one translucent
+    // wall across the whole county. The negative space between banks keeps
+    // roofs, trees and dikes readable as distinct depth layers.
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    const bankCount = index ? 5 : 6;
+    const mesh = new THREE.InstancedMesh(geometry, material, bankCount);
+    const matrix = new THREE.Matrix4();
+    const random = CreateRandom(7180 + chapter.id.length * 29 + index * 313);
+    for (let bankIndex = 0; bankIndex < bankCount; bankIndex += 1) {
+      const lane = bankCount === 1 ? 0.5 : bankIndex / (bankCount - 1);
+      const x = -14 + lane * (length + 28) + (random() - 0.5) * 5.5;
+      const width = (index ? 13 : 9.5) + random() * (index ? 11 : 8.5);
+      const height = (index ? 2.2 : 1.65) + random() * (index ? 1.1 : 0.8);
+      const y = (index ? 2.55 : 1.3) + (random() - 0.5) * 0.7;
+      const z = (index ? -16 : -8.4) + (random() - 0.5) * (index ? 3.2 : 1.7);
+      SetInstance(mesh, bankIndex, [x, y, z], [0, 0, (random() - 0.5) * 0.035], [width, height, 1], matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.userData.baseX = 0;
+    mesh.userData.baseOpacity = material.opacity;
     mesh.renderOrder = index ? -6 : 1;
+    root.add(mesh);
     dynamic.mistLayers.push(mesh);
+    dynamic.ownedGeometries.push(geometry);
     dynamic.ownedTextures.push(texture);
     dynamic.ownedMaterials.push(material);
   }
@@ -431,13 +454,13 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   const matrix = new THREE.Matrix4();
   const farColor = new THREE.Color(profile.fog).multiplyScalar(chapterId === "ferry" ? 0.34 : 0.27);
   const middleColor = new THREE.Color(profile.plasterDark).multiplyScalar(0.42).lerp(new THREE.Color(profile.fog), 0.12);
-  const silhouetteMaterial = new THREE.MeshBasicMaterial({ color: farColor, fog: true });
-  const middleMaterial = new THREE.MeshBasicMaterial({ color: middleColor, fog: true, transparent: true, opacity: 0.7 });
+  const silhouetteMaterial = new THREE.MeshBasicMaterial({ color: farColor, fog: true, transparent: true, opacity: 0.14, depthWrite: false });
+  const middleMaterial = new THREE.MeshBasicMaterial({ color: middleColor, fog: true, transparent: true, opacity: 0.24, depthWrite: false });
   const arborealMaterial = new THREE.MeshBasicMaterial({
     color: middleColor.clone().multiplyScalar(0.88),
     fog: true,
     transparent: true,
-    opacity: 0.64,
+    opacity: 0.2,
     depthWrite: false,
   });
   dynamic.ownedMaterials.push(silhouetteMaterial, middleMaterial, arborealMaterial);
@@ -452,28 +475,28 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   });
   if (landmarkVillage) dynamic.blenderAssets.push(landmarkVillage);
 
-  // A single massive horizon is more convincing than dozens of equally sized
-  // toy houses.  It also reduces the previous two draw calls per cottage to a
-  // handful of instanced calls, leaving budget for foreground parallax.
+  // The far county is a sparse rhythm of banks with broad gaps. Overlapping
+  // full-width hills used to flatten the entire background into one paper set.
   const hillGeometry = new THREE.IcosahedronGeometry(1, 1);
-  const hills = CreateInstancedSilhouette(root, hillGeometry, silhouetteMaterial, 11);
-  for (let index = 0; index < 11; index += 1) {
-    const x = -12 + index * ((length + 24) / 10);
-    SetInstance(hills, index, [x, -4.7 - random() * 0.5, -20 - random() * 8], [0, random() * Math.PI, 0], [7.5 + random() * 4.5, 1.5 + random() * 1.5, 4.8 + random() * 3], matrix);
+  const hillCount = 7;
+  const hills = CreateInstancedSilhouette(root, hillGeometry, silhouetteMaterial, hillCount);
+  for (let index = 0; index < hillCount; index += 1) {
+    const x = -10 + index * ((length + 20) / Math.max(1, hillCount - 1)) + (random() - 0.5) * 2.8;
+    SetInstance(hills, index, [x, -0.72 - random() * 0.25, -20 - random() * 8], [0, random() * Math.PI, (random() - 0.5) * 0.05], [3.2 + random() * 2.4, 0.65 + random() * 0.7, 2.8 + random() * 2.2], matrix);
   }
   hills.instanceMatrix.needsUpdate = true;
   dynamic.ownedGeometries.push(hillGeometry);
 
-  const buildingCount = Math.max(16, Math.ceil(length / 1.65));
+  const buildingCount = Math.max(7, Math.ceil(length / 5.4));
   const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
   const roofGeometry = new THREE.ConeGeometry(0.78, 0.62, 4);
   const buildings = CreateInstancedSilhouette(root, buildingGeometry, middleMaterial, buildingCount);
   const roofs = CreateInstancedSilhouette(root, roofGeometry, middleMaterial, buildingCount);
   for (let index = 0; index < buildingCount; index += 1) {
     const x = -5 + index * ((length + 10) / Math.max(1, buildingCount - 1)) + (random() - 0.5) * 1.2;
-    const z = -9.6 - random() * 5.8;
-    const width = 1.6 + random() * 3.2;
-    const height = 1.25 + random() * 2.7;
+    const z = -12 - random() * 6;
+    const width = 1.25 + random() * 2.0;
+    const height = 1.1 + random() * 1.75;
     const depth = 1.25 + random() * 1.5;
     SetInstance(buildings, index, [x, height * 0.5 - 0.18, z], [0, (random() - 0.5) * 0.12, 0], [width, height, depth], matrix);
     SetInstance(roofs, index, [x, height + 0.08, z], [0, Math.PI * 0.25, 0], [width * 0.9, 0.62 + width * 0.12, depth * 0.92], matrix);
@@ -486,7 +509,7 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   // than a row of poles carrying detached low-poly gems.  All foliage remains
   // three instanced draw calls so the extra silhouette detail is effectively
   // free at runtime.
-  const treeCount = Math.max(12, Math.ceil(length / 2.65));
+  const treeCount = Math.max(5, Math.ceil(length / 6.8));
   const trunkGeometry = new THREE.CylinderGeometry(0.075, 0.15, 1, 7);
   const crownGeometry = new THREE.SphereGeometry(1, 9, 7);
   const trunks = CreateInstancedSilhouette(root, trunkGeometry, arborealMaterial, treeCount);
@@ -494,7 +517,7 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   const crowns = CreateInstancedSilhouette(root, crownGeometry, arborealMaterial, treeCount * 5);
   for (let index = 0; index < treeCount; index += 1) {
     const x = -6 + index * ((length + 12) / Math.max(1, treeCount - 1)) + (random() - 0.5) * 1.5;
-    const z = -7.2 - random() * 5.8;
+    const z = -11 - random() * 6;
     const height = 3.15 + random() * 2.35;
     const crownWidth = 0.62 + random() * 0.52;
     const trunkLean = (random() - 0.5) * 0.08;
@@ -540,7 +563,7 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   const infrastructureMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.plasterDark).multiplyScalar(0.3), fog: true });
   dynamic.ownedMaterials.push(infrastructureMaterial);
   const postGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const postCount = chapterId === "blockade" ? 8 : chapterId === "ferry" ? 5 : chapterId === "school" ? 1 : 4;
+  const postCount = chapterId === "blockade" ? 4 : chapterId === "ferry" ? 3 : chapterId === "school" ? 1 : 3;
   const posts = CreateInstancedSilhouette(root, postGeometry, infrastructureMaterial, postCount * 2);
   for (let index = 0; index < postCount; index += 1) {
     const x = length * ((index + 0.45) / postCount);
@@ -551,15 +574,134 @@ function BuildDistantVillage(root, profile, material, seed, length, dynamic, cha
   posts.instanceMatrix.needsUpdate = true;
   dynamic.ownedGeometries.push(postGeometry);
 
-  const horizonBand = AddBox(
-    root,
-    [length + 80, chapterId === "blockade" ? 1.25 : 0.72, 2.2],
-    [length * 0.5, chapterId === "blockade" ? 0.24 : -0.02, -6.7],
-    infrastructureMaterial,
-    null,
-    false,
-  );
-  horizonBand.receiveShadow = false;
+  // The occupied countryside is a chain of broken dikes and compound walls,
+  // not a theatre cyclorama. Gaps expose the farther settlement and stop the
+  // middle distance becoming a single full-width stripe.
+  const dikeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const dikeCount = chapterId === "blockade" ? 5 : 4;
+  const dikes = CreateInstancedSilhouette(root, dikeGeometry, infrastructureMaterial, dikeCount);
+  for (let index = 0; index < dikeCount; index += 1) {
+    const lane = dikeCount === 1 ? 0.5 : index / (dikeCount - 1);
+    const x = -17 + lane * (length + 34) + (random() - 0.5) * 2.4;
+    const width = 2.2 + random() * 2.4;
+    const height = chapterId === "blockade" ? 0.76 + random() * 0.42 : 0.42 + random() * 0.28;
+    SetInstance(dikes, index, [x, -0.16 + height * 0.5, -6.7 - random() * 1.1], [0, (random() - 0.5) * 0.055, 0], [width, height, 1.5 + random() * 0.9], matrix);
+  }
+  dikes.instanceMatrix.needsUpdate = true;
+  dikes.renderOrder = -4;
+  dynamic.ownedGeometries.push(dikeGeometry);
+}
+
+function BuildRegionalWorldVolume(root, chapter, profile, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const random = CreateRandom(19420608 + chapter.id.length * 137);
+  const matrix = new THREE.Matrix4();
+  const farMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.fog).multiplyScalar(chapter.id === "ferry" ? 0.34 : 0.27),
+    fog: true,
+    transparent: true,
+    opacity: chapter.id === "ferry" ? 0.12 : 0.1,
+    depthWrite: false,
+  });
+  const middleMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.plasterDark).lerp(new THREE.Color(profile.fog), 0.55).multiplyScalar(0.4),
+    fog: true,
+    transparent: true,
+    opacity: chapter.id === "blockade" ? 0.26 : 0.22,
+    depthWrite: false,
+  });
+  const treeMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.ground).lerp(new THREE.Color(profile.fog), 0.42).multiplyScalar(0.34),
+    fog: true,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false,
+  });
+  dynamic.ownedMaterials.push(farMaterial, middleMaterial, treeMaterial);
+
+  // County-scale banks are short, staggered volumes with visible air between
+  // them. Long boxes merged into a theatrical rear wall in the orthographic
+  // side view, so no single bank now spans more than about eight metres.
+  const terraceGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const terraceCount = chapter.id === "blockade" ? 10 : 8;
+  const terraces = CreateInstancedSilhouette(root, terraceGeometry, farMaterial, terraceCount);
+  for (let index = 0; index < terraceCount; index += 1) {
+    const depthLane = index % 3;
+    const span = 4.2 + random() * 3.7;
+    const x = -20 + index * ((length + 40) / Math.max(1, terraceCount - 1)) + (random() - 0.5) * 3.4;
+    const z = -24 - depthLane * 7.2 - random() * 3.8;
+    const height = chapter.id === "blockade" ? 0.8 + random() * 1.5 : 0.5 + random() * 1.0;
+    SetInstance(terraces, index, [x, -0.5 + height * 0.45, z], [(random() - 0.5) * 0.06, (random() - 0.5) * 0.14, (random() - 0.5) * 0.04], [span, height, 2.4 + random() * 2.4], matrix);
+  }
+  terraces.instanceMatrix.needsUpdate = true;
+
+  // Compound walls, long dikes and watch structures establish human scale
+  // against the much larger landform.  Their spacing stays historically
+  // plausible for a composite north-China village rather than inventing an
+  // industrial skyline.
+  const structureCount = chapter.id === "blockade" ? 14 : chapter.id === "ferry" ? 12 : 13;
+  const structures = CreateInstancedSilhouette(root, terraceGeometry, middleMaterial, structureCount);
+  const roofGeometry = new THREE.ConeGeometry(0.72, 0.56, 4);
+  const roofCount = chapter.id === "blockade" ? 4 : 6;
+  const roofs = CreateInstancedSilhouette(root, roofGeometry, middleMaterial, roofCount);
+  for (let index = 0; index < structureCount; index += 1) {
+    const lane = index % 3;
+    const x = -24 + index * ((length + 54) / Math.max(1, structureCount - 1)) + (random() - 0.5) * 2.8;
+    const z = -14.5 - lane * 5.8 - random() * 3.2;
+    const isVertical = chapter.id === "blockade" && index % 5 === 0;
+    const width = isVertical ? 0.72 : 1.8 + random() * 3.2;
+    const height = isVertical ? 6.5 + random() * 4.5 : 0.85 + random() * 2.15;
+    const depth = isVertical ? 0.72 : 1.05 + random() * 1.35;
+    SetInstance(structures, index, [x, height * 0.5 - 0.18, z], [0, (random() - 0.5) * 0.08, 0], [width, height, depth], matrix);
+  }
+  for (let index = 0; index < roofCount; index += 1) {
+    const x = -15 + index * ((length + 34) / Math.max(1, roofCount - 1)) + (random() - 0.5) * 2.4;
+    const z = -18 - (index % 3) * 4.6;
+    const width = chapter.id === "ferry" ? 3.4 + random() * 3.7 : 2.7 + random() * 3.2;
+    const height = 1.8 + random() * 2.3;
+    SetInstance(roofs, index, [x, height + 0.18, z], [0, Math.PI * 0.25, 0], [width, 0.72 + width * 0.1, 1.8 + random() * 1.3], matrix);
+  }
+  structures.instanceMatrix.needsUpdate = true;
+  roofs.instanceMatrix.needsUpdate = true;
+
+  // A long windbreak continues tens of metres beyond the traversable strip.
+  // The alternating height and depth are vital: evenly spaced trees read as
+  // wallpaper, while this belt reads as a real landscape the player crosses.
+  const treeCount = chapter.id === "ferry" ? 8 : 7;
+  const trunkGeometry = new THREE.CylinderGeometry(0.085, 0.2, 1, 7);
+  const crownGeometry = new THREE.SphereGeometry(1, 8, 6);
+  const trunks = CreateInstancedSilhouette(root, trunkGeometry, treeMaterial, treeCount);
+  const crowns = CreateInstancedSilhouette(root, crownGeometry, treeMaterial, treeCount * 4);
+  for (let index = 0; index < treeCount; index += 1) {
+    const x = -31 + index * ((length + 66) / Math.max(1, treeCount - 1)) + (random() - 0.5) * 3.6;
+    const z = -19 - (index % 4) * 5.4 - random() * 4.8;
+    const height = 7.8 + random() * 6.8;
+    const lean = (random() - 0.5) * 0.055;
+    SetInstance(trunks, index, [x, height * 0.5 - 0.34, z], [0, random() * 0.16, lean], [0.86 + random() * 0.3, height, 0.86 + random() * 0.28], matrix);
+    const crownOffsets = [[-0.62, -0.12], [0.58, -0.08], [-0.18, 0.32], [0.12, -0.38]];
+    for (let crownIndex = 0; crownIndex < crownOffsets.length; crownIndex += 1) {
+      const [offsetX, offsetY] = crownOffsets[crownIndex];
+      const crownWidth = 0.9 + random() * 0.72;
+      SetInstance(
+        crowns,
+        index * crownOffsets.length + crownIndex,
+        [x + offsetX * crownWidth + (random() - 0.5) * 0.24, height * 0.78 + offsetY * crownWidth, z + (random() - 0.5) * 0.65],
+        [random() * 0.1, random() * Math.PI, (random() - 0.5) * 0.07],
+        [crownWidth * (0.92 + random() * 0.28), crownWidth * (0.58 + random() * 0.25), crownWidth * (0.68 + random() * 0.22)],
+        matrix,
+      );
+    }
+  }
+  trunks.instanceMatrix.needsUpdate = true;
+  crowns.instanceMatrix.needsUpdate = true;
+  terraces.renderOrder = -9;
+  structures.renderOrder = -7;
+  roofs.renderOrder = -7;
+  trunks.renderOrder = -6;
+  crowns.renderOrder = -6;
+  dynamic.ownedGeometries.push(terraceGeometry, roofGeometry, trunkGeometry, crownGeometry);
+  dynamic.regionalWorldVolume = { terraces, structures, roofs, trunks, crowns };
 }
 
 function BuildRegionalScaleMarkers(root, chapter, profile, dynamic) {
@@ -575,24 +717,25 @@ function BuildRegionalScaleMarkers(root, chapter, profile, dynamic) {
   });
   const trunkGeometry = new THREE.CylinderGeometry(0.11, 0.2, 1, 7);
   const canopyGeometry = new THREE.SphereGeometry(1, 10, 8);
-  const count = chapter.id === "blockade" ? 7 : 8;
+  const count = chapter.id === "blockade" ? 4 : 3;
   const trunks = CreateInstancedSilhouette(root, trunkGeometry, material, count);
-  const canopies = CreateInstancedSilhouette(root, canopyGeometry, material, count * 3);
+  const canopies = CreateInstancedSilhouette(root, canopyGeometry, material, count * 5);
   const matrix = new THREE.Matrix4();
   for (let index = 0; index < count; index += 1) {
     const x = -8 + index * ((length + 16) / Math.max(1, count - 1)) + (random() - 0.5) * 2.6;
     const z = -17.5 - random() * 7.5;
     const height = (chapter.id === "blockade" ? 7.8 : 7.0) + random() * 3.8;
     SetInstance(trunks, index, [x, height * 0.5 - 0.5, z], [0, random() * 0.18, (random() - 0.5) * 0.035], [0.9, height, 0.9], matrix);
-    for (let crownIndex = 0; crownIndex < 3; crownIndex += 1) {
-      const crownY = height * (0.67 + crownIndex * 0.1);
-      const crownWidth = 0.64 + random() * 0.36;
+    const canopyOffsets = [[-0.58, -0.08], [0.52, -0.06], [-0.22, 0.28], [0.32, 0.3], [0, -0.38]];
+    for (let crownIndex = 0; crownIndex < canopyOffsets.length; crownIndex += 1) {
+      const [offsetX, offsetY] = canopyOffsets[crownIndex];
+      const crownWidth = 0.72 + random() * 0.46;
       SetInstance(
         canopies,
-        index * 3 + crownIndex,
-        [x + (random() - 0.5) * 0.42, crownY, z + (random() - 0.5) * 0.55],
+        index * canopyOffsets.length + crownIndex,
+        [x + offsetX * crownWidth + (random() - 0.5) * 0.2, height * 0.78 + offsetY * crownWidth, z + (random() - 0.5) * 0.48],
         [0, random() * Math.PI, (random() - 0.5) * 0.08],
-        [crownWidth, 1.25 + random() * 0.64, crownWidth * 0.82],
+        [crownWidth * (0.95 + random() * 0.22), crownWidth * (0.62 + random() * 0.2), crownWidth * 0.8],
         matrix,
       );
     }
@@ -649,6 +792,114 @@ function BuildVanishingFieldLines(root, chapter, profile, dynamic) {
   dynamic.vanishingFieldLines = mesh;
 }
 
+function BuildRegionalHorizonContour(root, chapter, profile, dynamic) {
+  if (chapter.id === "tunnel") return;
+  const length = chapter.width * WorldScale;
+  const random = CreateRandom(194208 + chapter.id.length * 97);
+  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(profile.fog).multiplyScalar(chapter.id === "ferry" ? 0.3 : 0.25),
+    transparent: true,
+    opacity: chapter.id === "ferry" ? 0.12 : 0.1,
+    depthWrite: false,
+    fog: true,
+  });
+  const count = chapter.id === "blockade" ? 9 : 8;
+  const contour = CreateInstancedSilhouette(root, geometry, material, count);
+  const matrix = new THREE.Matrix4();
+  for (let index = 0; index < count; index += 1) {
+    const lane = index % 3;
+    const x = -17 + index * ((length + 34) / Math.max(1, count - 1)) + (random() - 0.5) * 2.2;
+    const width = 3.2 + random() * 3.4;
+    const height = chapter.id === "blockade" ? 0.75 + random() * 1.2 : 0.48 + random() * 0.82;
+    SetInstance(contour, index, [x, -0.44 + height * 0.42, -26.5 - lane * 4.8], [(random() - 0.5) * 0.08, random() * 0.18, (random() - 0.5) * 0.04], [width, height, 2.1 + random() * 1.9], matrix);
+  }
+  contour.instanceMatrix.needsUpdate = true;
+  contour.renderOrder = -8;
+  dynamic.ownedGeometries.push(geometry);
+  dynamic.ownedMaterials.push(material);
+  dynamic.regionalHorizonContour = contour;
+}
+
+function BuildMonumentalForegroundAnchors(root, chapter, profile, dynamic) {
+  const darkColor = chapter.id === "tunnel" ? profile.earth : profile.ground;
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(darkColor).multiplyScalar(chapter.id === "tunnel" ? 0.13 : 0.11),
+    fog: true,
+    transparent: true,
+    opacity: chapter.id === "tunnel" ? 0.32 : 0.16,
+    depthWrite: false,
+  });
+  const matrix = new THREE.Matrix4();
+  const random = CreateRandom(82041 + chapter.id.length * 113);
+  let meshes = [];
+  if (chapter.id === "school" || chapter.id === "ferry") {
+    const positions = chapter.id === "school" ? [-5.8, 47.2] : [-5.8, 43.0];
+    const trunkGeometry = new THREE.CylinderGeometry(0.09, 0.18, 1, 7);
+    const crownGeometry = new THREE.SphereGeometry(1, 9, 7);
+    const trunks = CreateInstancedSilhouette(root, trunkGeometry, material, positions.length);
+    const crowns = CreateInstancedSilhouette(root, crownGeometry, material, positions.length * 4);
+    positions.forEach((x, index) => {
+      const height = 4.4 + random() * 1.9;
+      const z = 4.25 + random() * 0.72;
+      const lean = (random() - 0.5) * 0.11;
+      SetInstance(trunks, index, [x, height * 0.5 - 0.42, z], [0, random() * 0.3, lean], [0.9 + random() * 0.28, height, 0.84 + random() * 0.24], matrix);
+      for (let crownIndex = 0; crownIndex < 4; crownIndex += 1) {
+        const side = crownIndex % 2 ? 1 : -1;
+        const crownWidth = 1.08 + random() * 0.64;
+        SetInstance(
+          crowns,
+          index * 4 + crownIndex,
+          [x + side * (0.42 + crownIndex * 0.16), height * (0.72 + crownIndex * 0.055), z + (random() - 0.5) * 0.36],
+          [random() * 0.18, random() * Math.PI, (random() - 0.5) * 0.12],
+          [crownWidth, 0.68 + random() * 0.48, 0.74 + random() * 0.34],
+          matrix,
+        );
+      }
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    crowns.instanceMatrix.needsUpdate = true;
+    trunks.renderOrder = 4;
+    crowns.renderOrder = 4;
+    dynamic.ownedGeometries.push(trunkGeometry, crownGeometry);
+    meshes = [trunks, crowns];
+  } else if (chapter.id === "blockade") {
+    const frames = [[-4.8, 2.5, 3.25], [39.0, 2.7, 3.5]];
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const piles = CreateInstancedSilhouette(root, geometry, material, frames.length * 3);
+    frames.forEach(([center, width, height], index) => {
+      const tilt = (index % 2 ? -1 : 1) * (0.055 + index * 0.012);
+      SetInstance(piles, index * 3, [center - width * 0.5, height * 0.5 - 0.5, 4.45], [0, 0, tilt], [0.22, height, 0.42], matrix);
+      SetInstance(piles, index * 3 + 1, [center + width * 0.5, height * 0.43 - 0.45, 4.5], [0, 0, -tilt * 0.8], [0.25, height * 0.86, 0.46], matrix);
+      SetInstance(piles, index * 3 + 2, [center, height - 0.82, 4.48], [0, 0, tilt * 1.5], [width + 0.25, 0.18, 0.48], matrix);
+    });
+    piles.instanceMatrix.needsUpdate = true;
+    piles.renderOrder = 4;
+    dynamic.ownedGeometries.push(geometry);
+    meshes = [piles];
+  } else {
+    const geometry = new THREE.CylinderGeometry(0.045, 0.12, 1, 6);
+    const roots = CreateInstancedSilhouette(root, geometry, material, 14);
+    for (let index = 0; index < 14; index += 1) {
+      const length = 1.25 + (index % 4) * 0.36 + random() * 0.4;
+      SetInstance(
+        roots,
+        index,
+        [0.8 + index * 2.3, 3.3 - length * 0.5, 3.05 + (index % 3) * 0.2],
+        [0.04, random() * 0.16, (index % 2 ? -1 : 1) * (0.07 + random() * 0.08)],
+        [0.8 + random() * 0.35, length, 0.8 + random() * 0.3],
+        matrix,
+      );
+    }
+    roots.instanceMatrix.needsUpdate = true;
+    roots.renderOrder = 4;
+    dynamic.ownedGeometries.push(geometry);
+    meshes = [roots];
+  }
+  dynamic.ownedMaterials.push(material);
+  dynamic.monumentalForegroundAnchors = meshes;
+}
+
 function BuildNearScaleLayer(root, chapter, profile, dynamic) {
   if (chapter.id === "tunnel") return;
   const length = chapter.width * WorldScale;
@@ -674,15 +925,20 @@ function BuildNearScaleLayer(root, chapter, profile, dynamic) {
   const stalkGeometry = new THREE.CylinderGeometry(0.018, 0.034, 1, 5);
   const leafGeometry = new THREE.DodecahedronGeometry(1, 0);
   const count = Math.max(20, Math.ceil((length + 12) / 1.75));
+  const heroAnchors = [chapter.startX, ...(chapter.actions || []).map((action) => action.x)]
+    .filter(Number.isFinite)
+    .map((x) => x * WorldScale);
   const stalks = CreateInstancedSilhouette(layer, stalkGeometry, stalkMaterial, count);
   const leaves = CreateInstancedSilhouette(layer, leafGeometry, leafMaterial, count * 2);
   const matrix = new THREE.Matrix4();
   for (let index = 0; index < count; index += 1) {
     const cluster = Math.floor(index / 4);
     const clusterCenter = -5.5 + cluster * ((length + 11) / Math.max(1, Math.ceil(count / 4) - 1));
-    const x = clusterCenter + (random() - 0.5) * 0.75;
+    let x = clusterCenter + (random() - 0.5) * 0.75;
+    const nearestHero = heroAnchors.reduce((nearest, anchor) => Math.abs(x - anchor) < Math.abs(x - nearest) ? anchor : nearest, Number.POSITIVE_INFINITY);
+    if (Number.isFinite(nearestHero) && Math.abs(x - nearestHero) < 1.2) x += x <= nearestHero ? -1.25 : 1.25;
     const z = 3.05 + random() * 1.0;
-    const height = 0.78 + random() * 1.48;
+    const height = 0.68 + random() * 1.12;
     const bend = (random() - 0.5) * 0.24;
     SetInstance(stalks, index, [x, -0.3 + height * 0.5, z], [0, random() * Math.PI, bend], [0.78 + random() * 0.34, height, 0.78 + random() * 0.34], matrix);
     const leafY = -0.32 + height * (0.68 + random() * 0.22);
@@ -704,38 +960,255 @@ function BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile) {
     color: new THREE.Color(profile.earth).multiplyScalar(0.28),
     fog: true,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.18,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const coldMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.moon).multiplyScalar(0.42), fog: true });
   dynamic.ownedMaterials.push(chamberMaterial, coldMaterial);
-  // A buried brick-kiln chamber and two shafts continue well above the
-  // playable crawlspace, making the children visibly small without changing
-  // collision or the historical role of the early shelter.
-  AddMesh(root, new THREE.TorusGeometry(4.8, 0.62, 10, 28, Math.PI), chamberMaterial, [16.4, 0.05, -5.8], [0, 0, 0], [1.38, 1.12, 1], false);
-  AddBox(root, [11.8, 0.22, 0.8], [16.4, 4.05, -5.65], chamberMaterial, null, false);
+  // Three offset chambers replace the former single monumental arch and lid.
+  // Their breaks read as turns in a hand-dug refuge instead of the ceiling of
+  // a rectangular display box.
+  [
+    [4.2, 2.7, 0.92, -7.0],
+    [15.9, 3.65, 1.08, -8.2],
+    [27.8, 2.9, 0.96, -7.35],
+  ].forEach(([x, radius, heightScale, z]) => {
+    AddMesh(root, new THREE.TorusGeometry(radius, 0.34, 9, 24, Math.PI), chamberMaterial, [x, 0.0, z], [0, 0, 0], [1, heightScale, 1], false);
+  });
   for (const shaftX of [5.9, 22.9]) {
-    AddCylinder(root, 0.72, 1.05, 7.8, [shaftX, 5.95, -4.9], chamberMaterial, 12, null, false);
-    const shaftMouth = AddMesh(root, new THREE.CircleGeometry(0.72, 18), coldMaterial, [shaftX, 9.75, -4.12], [0, 0, 0], null, false);
+    // A shaft is negative space: show its two eroded sides, never a solid
+    // cylinder plug hanging above the tunnel.
+    AddBox(root, [0.22, 7.2, 0.58], [shaftX - 0.86, 5.65, -7.2], chamberMaterial, [0, 0, 0.025], false);
+    AddBox(root, [0.22, 7.2, 0.58], [shaftX + 0.86, 5.65, -7.2], chamberMaterial, [0, 0, -0.025], false);
+    const shaftMouth = AddMesh(root, new THREE.CircleGeometry(0.72, 18), coldMaterial, [shaftX, 9.75, -6.4], [0, 0, 0], null, false);
     shaftMouth.renderOrder = 0;
   }
-  const layerGeometry = new THREE.PlaneGeometry(40, 9, 34, 8);
-  const layerVertices = layerGeometry.getAttribute("position");
-  for (let index = 0; index < layerVertices.count; index += 1) {
-    const x = layerVertices.getX(index);
-    const y = layerVertices.getY(index);
-    layerVertices.setZ(index, Math.sin(x * 0.31) * 0.24 + Math.cos(y * 0.76) * 0.16);
+  // Do not close the cutaway with a full-width rear plane. Three offset
+  // chamber backs leave dark turns between them and give the refuge a route
+  // that continues beyond the playable slice.
+  const chamberBackGeometry = new THREE.CircleGeometry(1, 28, 0, Math.PI);
+  const chamberBacks = CreateInstancedSilhouette(root, chamberBackGeometry, chamberMaterial, 3);
+  const chamberBackMatrix = new THREE.Matrix4();
+  [
+    [3.8, 3.1, 0.82, -10.4],
+    [16.2, 4.7, 1.02, -11.8],
+    [29.0, 3.45, 0.88, -10.9],
+  ].forEach(([x, radius, heightScale, z], index) => {
+    SetInstance(chamberBacks, index, [x, -0.18, z], [0, 0, 0], [radius, radius * heightScale, 1], chamberBackMatrix);
+  });
+  chamberBacks.instanceMatrix.needsUpdate = true;
+  chamberBacks.renderOrder = -8;
+  dynamic.ownedGeometries.push(chamberBackGeometry);
+
+  // The crawlspace is only the nearest slice of a much larger buried refuge.
+  // Repeated chambers, shafts and earth shelves continue beyond it so the
+  // cutaway keeps the oppressive mass of the village above the children.
+  const matrix = new THREE.Matrix4();
+  const shelfGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const shelves = CreateInstancedSilhouette(root, shelfGeometry, chamberMaterial, 8);
+  for (let index = 0; index < 8; index += 1) {
+    const x = -6.5 + index * 6.35;
+    const upper = index % 2 === 0;
+    SetInstance(
+      shelves,
+      index,
+      [x, upper ? 8.7 + (index % 3) * 1.0 : -2.55 - (index % 3) * 0.3, -11.5 - (index % 4) * 2.2],
+      [0, (index % 2 ? -1 : 1) * 0.035, (index % 3 - 1) * 0.025],
+      [2.0 + (index % 3) * 0.65, (upper ? 2.25 : 1.05) + (index % 2) * 0.3, 1.75 + (index % 2) * 0.7],
+      matrix,
+    );
   }
-  layerGeometry.computeVertexNormals();
-  AddMesh(root, layerGeometry, chamberMaterial, [chapter.width * WorldScale * 0.5, 5.0, -7.4], null, null, false);
-  dynamic.ownedGeometries.push(layerGeometry);
+  shelves.instanceMatrix.needsUpdate = true;
+  shelves.renderOrder = -7;
+  shelves.visible = false;
+
+  const archGeometry = new THREE.TorusGeometry(1, 0.17, 7, 20, Math.PI);
+  const arches = CreateInstancedSilhouette(root, archGeometry, chamberMaterial, 7);
+  for (let index = 0; index < 7; index += 1) {
+    const radius = 2.4 + (index % 3) * 0.72;
+    SetInstance(
+      arches,
+      index,
+      [1.8 + index * 4.45, 1.35 + (index % 2) * 0.4, -10.8 - (index % 3) * 1.7],
+      [0, 0, 0],
+      [radius, radius * (0.72 + (index % 2) * 0.08), 1],
+      matrix,
+    );
+  }
+  arches.instanceMatrix.needsUpdate = true;
+  arches.renderOrder = -6;
+  dynamic.ownedGeometries.push(shelfGeometry, archGeometry);
+  dynamic.tunnelWorldVolume = { shelves, arches };
+}
+
+function BuildChapterWorldAnchors(root, chapter, materials, dynamic, profile) {
+  const world = new THREE.Group();
+  world.name = `WorldAnchors_${chapter.id}`;
+  root.add(world);
+
+  const landmarkEarth = CreateMaterial(new THREE.Color(profile.earth).lerp(new THREE.Color(profile.fog), 0.18), {
+    roughness: 1,
+    map: materials.earth.map,
+    bumpMap: materials.earth.bumpMap,
+    bumpScale: 0.07,
+    emissive: chapter.id === "tunnel" ? 0x1b1009 : 0x000000,
+    emissiveIntensity: chapter.id === "tunnel" ? 0.48 : 0,
+  });
+  const landmarkDark = CreateMaterial(new THREE.Color(profile.plasterDark).multiplyScalar(chapter.id === "tunnel" ? 0.48 : 0.62), {
+    roughness: 1,
+    emissive: chapter.id === "tunnel" ? 0x120b07 : 0x000000,
+    emissiveIntensity: chapter.id === "tunnel" ? 0.32 : 0,
+  });
+  const landmarkFoliage = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.reed).multiplyScalar(0.18), fog: true, transparent: true, opacity: 0.42, depthWrite: false });
+  const landmarkTreeWood = new THREE.MeshBasicMaterial({ color: new THREE.Color(profile.wood).multiplyScalar(0.2), fog: true, transparent: true, opacity: 0.52, depthWrite: false });
+  dynamic.ownedMaterials.push(landmarkEarth, landmarkDark, landmarkFoliage, landmarkTreeWood);
+
+  const AddBatch = (items, material) => {
+    if (!items.length) return null;
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+    const matrix = new THREE.Matrix4();
+    items.forEach((item, index) => SetInstance(mesh, index, item.position, item.rotation || [0, 0, 0], item.scale, matrix));
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    world.add(mesh);
+    dynamic.ownedGeometries.push(geometry);
+    return mesh;
+  };
+
+  const AddEarthBatch = (items, material = landmarkEarth) => {
+    if (!items.length) return null;
+    const geometry = new THREE.IcosahedronGeometry(1, 2);
+    const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+    const matrix = new THREE.Matrix4();
+    items.forEach((item, index) => SetInstance(mesh, index, item.position, item.rotation || [0, 0, 0], item.scale, matrix));
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    world.add(mesh);
+    dynamic.ownedGeometries.push(geometry);
+    return mesh;
+  };
+
+  const AddLandmarkTrees = (trees) => {
+    if (!trees.length) return;
+    const trunkGeometry = new THREE.CylinderGeometry(0.12, 0.24, 1, 9);
+    const branchGeometry = new THREE.CylinderGeometry(0.055, 0.11, 1, 7);
+    const crownGeometry = new THREE.SphereGeometry(1, 14, 9);
+    const trunks = new THREE.InstancedMesh(trunkGeometry, landmarkTreeWood, trees.length);
+    const branches = new THREE.InstancedMesh(branchGeometry, landmarkTreeWood, trees.length * 9);
+    const crowns = new THREE.InstancedMesh(crownGeometry, landmarkFoliage, trees.length * 11);
+    const matrix = new THREE.Matrix4();
+    const crownOffsets = [
+      [-0.62, -0.12, 1.08, 0.72], [0.58, -0.1, 1.0, 0.76], [-0.28, 0.3, 0.94, 0.88],
+      [0.34, 0.34, 0.82, 0.82], [0.02, -0.43, 1.12, 0.66], [-0.82, 0.14, 0.76, 0.68],
+      [0.78, 0.12, 0.72, 0.7], [-0.1, 0.58, 0.68, 0.76], [0.16, 0.02, 1.04, 0.92],
+      [-0.46, -0.42, 0.72, 0.58], [0.5, -0.4, 0.7, 0.6],
+    ];
+    trees.forEach((tree, treeIndex) => {
+      const [x, z, height, width, lean = 0, baseY = 0] = tree;
+      SetInstance(trunks, treeIndex, [x, baseY + height * 0.5 - 0.28, z], [0, 0, lean], [1.45, height, 1.25], matrix);
+      for (let index = 0; index < 9; index += 1) {
+        const side = index % 2 ? 1 : -1;
+        const tier = Math.floor(index / 2) % 4;
+        const branchLength = width * (0.36 + (index % 3) * 0.08);
+        const branchY = height * (0.48 + tier * 0.105);
+        SetInstance(
+          branches,
+          treeIndex * 7 + index,
+          [x + side * width * 0.08, baseY + branchY, z + (index % 3 - 1) * 0.16],
+          [(index % 3 - 1) * 0.08, 0, side * (0.72 + tier * 0.075)],
+          [1.1, branchLength, 1.0],
+          matrix,
+        );
+      }
+      for (let index = 0; index < crownOffsets.length; index += 1) {
+        const [offsetX, offsetY, widthScale, heightScale] = crownOffsets[index];
+        SetInstance(
+          crowns,
+          treeIndex * crownOffsets.length + index,
+          [x + offsetX * width, baseY + height * 0.76 + offsetY * width, z + (index % 3 - 1) * width * 0.08],
+          [index * 0.055, index * 0.37, offsetX * 0.09],
+          [width * 0.31 * widthScale, width * 0.29 * heightScale, width * 0.23 * widthScale],
+          matrix,
+        );
+      }
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    branches.instanceMatrix.needsUpdate = true;
+    crowns.instanceMatrix.needsUpdate = true;
+    for (const mesh of [trunks, branches, crowns]) {
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      world.add(mesh);
+    }
+    dynamic.ownedGeometries.push(trunkGeometry, branchGeometry, crownGeometry);
+  };
+
+  if (chapter.id === "school") {
+    AddEarthBatch([
+      { position: [-8.0, 0.38, -5.0], scale: [4.8, 0.9, 1.5], rotation: [0, 0.035, -0.018] },
+      { position: [22.0, 0.46, -5.2], scale: [5.8, 1.0, 1.7], rotation: [0, -0.025, 0.012] },
+      { position: [32.0, 0.18, -7.6], scale: [6.8, 0.82, 2.7], rotation: [0, -0.065, 0] },
+    ]);
+    AddBatch([
+      { position: [9.72, 2.05, -4.25], scale: [0.86, 4.1, 1.35] },
+      { position: [12.75, 2.05, -4.25], scale: [0.86, 4.1, 1.35] },
+      { position: [11.23, 3.78, -4.2], scale: [4.05, 0.52, 1.55], rotation: [0, 0, -0.035] },
+    ], materials.plasterDark);
+    AddGableRoof(world, 4.75, 1.95, 0.72, [11.23, 4.03, -4.2], materials.roof);
+    AddBatch([
+      { position: [11.23, 4.15, -4.2], scale: [4.7, 0.32, 1.9], rotation: [0, 0, -0.04] },
+      { position: [-2.1, 3.25, -5.1], scale: [0.45, 6.5, 0.58], rotation: [0, 0, 0.07] },
+    ], landmarkDark);
+    AddLandmarkTrees([[-3.9, -3.1, 8.8, 3.9, -0.055], [23.6, -6.0, 7.6, 3.1, 0.04]]);
+  } else if (chapter.id === "blockade") {
+    AddEarthBatch([
+      { position: [-9.5, 0.12, -7.2], scale: [5.4, 0.86, 2.8], rotation: [0, 0.03, 0] },
+      { position: [9.0, 0.2, -7.4], scale: [5.0, 0.98, 2.7], rotation: [0, -0.025, 0] },
+      { position: [31.0, 0.22, -7.7], scale: [7.2, 1.08, 3.0], rotation: [0, 0.045, 0] },
+      { position: [3.1, 0.22, -1.7], scale: [3.2, 0.42, 1.4], rotation: [0, -0.045, 0.03] },
+      { position: [25.0, 0.26, -2.15], scale: [4.0, 0.5, 1.55], rotation: [0, 0.035, -0.025] },
+    ]);
+    AddBatch([
+      { position: [-2.0, 2.2, -5.8], scale: [0.52, 4.4, 0.72] },
+      { position: [7.5, 2.35, -5.95], scale: [0.56, 4.7, 0.76] },
+      { position: [17.0, 2.18, -6.1], scale: [0.52, 4.35, 0.72] },
+      { position: [2.72, 4.02, -5.98], scale: [8.75, 0.1, 0.26], rotation: [0, 0, -0.006] },
+      { position: [12.25, 4.0, -5.98], scale: [8.75, 0.1, 0.26], rotation: [0, 0, 0.006] },
+      { position: [2.6, 2.18, -5.78], scale: [0.08, 5.1, 0.18], rotation: [0, 0, -1.01] },
+      { position: [12.2, 2.32, -5.88], scale: [0.08, 5.25, 0.18], rotation: [0, 0, 1.02] },
+    ], landmarkDark);
+    AddLandmarkTrees([[-12.4, -7.2, 10.2, 3.8, 0.035], [34.0, -7.8, 9.4, 3.5, -0.03]]);
+  } else if (chapter.id === "tunnel") {
+    for (const [x, y, radius, z] of [[1.8, 0.2, 3.45, -3.02], [13.4, 0.45, 4.7, -3.04], [25.5, 0.15, 3.8, -3.03]]) {
+      AddMesh(world, new THREE.TorusGeometry(radius, 0.42, 10, 32, Math.PI), landmarkEarth, [x, y, z + 0.09], null, [1, 0.78, 1], false);
+    }
+  } else if (chapter.id === "ferry") {
+    AddEarthBatch([
+      { position: [-11.0, 0.0, -9.8], scale: [6.0, 1.0, 3.3], rotation: [0, 0.025, 0] },
+      { position: [11.0, 0.06, -10.0], scale: [7.0, 1.12, 3.5], rotation: [0, -0.018, 0] },
+      { position: [36.0, 0.08, -10.2], scale: [8.0, 1.18, 3.7], rotation: [0, 0.026, 0] },
+    ]);
+    const dockItems = [];
+    for (let index = 0; index < 8; index += 1) {
+      const x = 26.0 + index * 1.18;
+      dockItems.push({ position: [x, 0.72, -1.8], scale: [0.18, 2.85, 0.22], rotation: [0, 0, index % 2 ? -0.035 : 0.04] });
+    }
+    dockItems.push({ position: [30.15, 1.75, -1.8], scale: [10.0, 0.28, 1.8], rotation: [0, 0, -0.018] });
+    AddBatch(dockItems, landmarkDark);
+    AddLandmarkTrees([[-5.8, -3.9, 11.6, 5.2, 0.055], [14.8, -7.2, 8.7, 3.6, -0.025]]);
+  }
+
+  dynamic.chapterWorldAnchors = world;
 }
 
 function BuildTerrain(root, chapter, materials, dynamic) {
-  const terrainDepth = chapter.id === "tunnel" ? 4.75 : 4.1;
-  const terrainZ = chapter.id === "tunnel" ? -1.88 : -1.65;
-  const terrainThickness = chapter.id === "tunnel" ? 0.22 : 0.3;
+  const terrainDepth = chapter.id === "tunnel" ? 3.35 : 2.7;
+  const terrainZ = chapter.id === "tunnel" ? -1.62 : -1.32;
+  const terrainThickness = chapter.id === "tunnel" ? 0.18 : 0.2;
   const terrainSkin = [materials.terrainSide, materials.terrainSide, materials.ground, materials.terrainSide, materials.terrainSide, materials.terrainSide];
   for (const segment of chapter.terrain) {
     const width = (segment.x1 - segment.x0) * WorldScale;
@@ -752,37 +1225,27 @@ function BuildTerrain(root, chapter, materials, dynamic) {
 function BuildForegroundFraming(root, chapter, materials, dynamic) {
   if (chapter.id === "tunnel") return;
   const length = chapter.width * WorldScale;
-  const padding = 10;
-  const span = length + padding * 2;
-  const segments = Math.max(64, Math.ceil(span / 0.42));
-  const positions = [];
-  const indices = [];
-  for (let index = 0; index <= segments; index += 1) {
-    const x = -padding + span * index / segments;
-    const topY = GetTerrainY(chapter, x) - 1.1 + Math.sin(index * 1.71) * 0.04 + Math.sin(index * 0.37) * 0.055;
-    const z = 2.46 + Math.sin(index * 0.29) * 0.07;
-    positions.push(x, topY, z, x, topY - 1.5, z + 0.03);
-    if (index < segments) {
-      const base = index * 2;
-      indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
   const material = new THREE.MeshBasicMaterial({
     color: new THREE.Color(materials.terrainSide.color).multiplyScalar(0.72),
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.1,
     depthWrite: false,
     fog: true,
-    side: THREE.DoubleSide,
   });
-  const mesh = AddMesh(root, geometry, material, [0, 0, 0], null, null, false);
-  mesh.renderOrder = 4;
+  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  const patchCount = Math.max(5, Math.ceil(length / 8.5));
+  const patches = CreateInstancedSilhouette(root, geometry, material, patchCount);
+  const patchMatrix = new THREE.Matrix4();
+  for (let index = 0; index < patchCount; index += 1) {
+    const lane = patchCount === 1 ? 0.5 : index / (patchCount - 1);
+    const x = -3 + lane * (length + 6) + Math.sin(index * 3.17) * 0.72;
+    const width = 1.25 + (index % 3) * 0.55;
+    SetInstance(patches, index, [x, GetTerrainY(chapter, x) - 0.98, 2.65 + (index % 2) * 0.16], [0, index * 0.41, (index % 2 ? -1 : 1) * 0.08], [width, 0.12 + (index % 2) * 0.04, 0.42 + (index % 3) * 0.11], patchMatrix);
+  }
+  patches.instanceMatrix.needsUpdate = true;
+  patches.renderOrder = 4;
   const rockGeometry = new THREE.IcosahedronGeometry(1, 2);
-  const rockCount = Math.max(5, Math.ceil(length / 6.2));
+  const rockCount = Math.max(4, Math.ceil(length / 8.5));
   const rocks = CreateInstancedSilhouette(root, rockGeometry, material, rockCount);
   const rockMatrix = new THREE.Matrix4();
   for (let index = 0; index < rockCount; index += 1) {
@@ -795,7 +1258,7 @@ function BuildForegroundFraming(root, chapter, materials, dynamic) {
   dynamic.ownedGeometries.push(geometry);
   dynamic.ownedGeometries.push(rockGeometry);
   dynamic.ownedMaterials.push(material);
-  dynamic.foreground = mesh;
+  dynamic.foreground = patches;
   dynamic.foregroundRocks = rocks;
 }
 
@@ -842,6 +1305,7 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
   const shoePosition = new THREE.Vector3();
   const shoeQuaternion = new THREE.Quaternion();
   const shoeScale = new THREE.Vector3();
+  const shoeTransforms = [];
   for (let childIndex = 0; childIndex < 6; childIndex += 1) {
     const row = childIndex % 2;
     const deskIndex = Math.min(4, childIndex);
@@ -853,6 +1317,14 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
       shoeScale.set(0.9 + row * 0.05, 0.48, 0.92 + (childIndex % 3) * 0.035);
       shoeMatrix.compose(shoePosition, shoeQuaternion, shoeScale);
       shoes.setMatrixAt(childIndex * 2 + footIndex, shoeMatrix);
+      shoeTransforms.push({
+        position: shoePosition.clone(),
+        rotationY: (footIndex ? -1 : 1) * (0.08 + childIndex * 0.015),
+        rotationZ: (childIndex % 3 - 1) * 0.025,
+        scale: shoeScale.clone(),
+        childIndex,
+        footIndex,
+      });
     }
   }
   shoes.instanceMatrix.needsUpdate = true;
@@ -861,6 +1333,7 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
   shoes.name = "EmptySchoolShoes";
   building.add(shoes);
   dynamic.emptyShoes = shoes;
+  dynamic.emptyShoeTransforms = shoeTransforms;
   dynamic.ownedGeometries.push(shoeGeometry);
   dynamic.ownedMaterials.push(shoeMaterial);
   const papers = new THREE.MeshStandardMaterial({ color: 0xbeb79a, roughness: 1, side: THREE.DoubleSide });
@@ -900,7 +1373,22 @@ function BuildSchool(root, chapter, materials, dynamic, profile, density) {
 
   const wall = new THREE.Group();
   wall.position.set(20.0, 0, -0.05);
-  for (let index = 0; index < 10; index += 1) AddBox(wall, [0.42 + (index % 2) * 0.12, 0.52 + (index % 3) * 0.18, 0.82], [(index - 5) * 0.46, 0.3, (index % 2) * 0.08], materials.plasterDark, [0.03 * (index % 2), 0.04, (index - 4) * 0.02]);
+  const collapsedWallGeometry = new THREE.IcosahedronGeometry(0.5, 1);
+  const collapsedWallStones = new THREE.InstancedMesh(collapsedWallGeometry, materials.plasterDark, 13);
+  const collapsedWallMatrix = new THREE.Matrix4();
+  for (let index = 0; index < 13; index += 1) {
+    const row = index < 8 ? 0 : 1;
+    const rowIndex = row ? index - 8 : index;
+    const x = (rowIndex - (row ? 2 : 3.5)) * (row ? 0.56 : 0.5) + Math.sin(index * 1.7) * 0.08;
+    const y = row ? 0.72 + (index % 2) * 0.08 : 0.24 + (index % 3) * 0.035;
+    const z = (index % 3 - 1) * 0.18;
+    SetInstance(collapsedWallStones, index, [x, y, z], [index * 0.31, index * 0.47, (index % 2 ? -1 : 1) * (0.11 + index * 0.012)], [0.7 + (index % 3) * 0.14, 0.44 + (index % 4) * 0.1, 0.76 + (index % 2) * 0.16], collapsedWallMatrix);
+  }
+  collapsedWallStones.instanceMatrix.needsUpdate = true;
+  collapsedWallStones.castShadow = true;
+  collapsedWallStones.receiveShadow = true;
+  wall.add(collapsedWallStones);
+  dynamic.ownedGeometries.push(collapsedWallGeometry);
   root.add(wall);
 
   let cart = AddBlenderAsset(root, "Asset_WoodenHandcart", {
@@ -936,7 +1424,7 @@ function BuildBlockade(root, chapter, materials, dynamic, profile, density) {
   if (blockadeVista) dynamic.blenderAssets.push(blockadeVista);
   const water = AddMesh(root, new THREE.PlaneGeometry(10.6, 7.5, 18, 4), materials.water, [20.4, -0.62, -0.25], [-Math.PI * 0.5, 0, 0], null, false);
   dynamic.water = water;
-  const farWater = AddMesh(root, new THREE.PlaneGeometry(42, 12), materials.waterFar, [16.5, -0.43, -8], [-Math.PI * 0.5, 0, 0], null, false);
+  const farWater = AddMesh(root, new THREE.PlaneGeometry(54, 18, 22, 5), materials.waterFar, [16.5, -0.45, -5.6], [-Math.PI * 0.5, 0, 0], null, false);
   dynamic.farWater = farWater;
   dynamic.waterRipples = CreateWaterRipples(root, 15.2, 25.7, -3.5, 3.25, Math.round(34 * density), materials.waterRipple, 190, -0.59);
   const shed = new THREE.Group();
@@ -950,6 +1438,13 @@ function BuildBlockade(root, chapter, materials, dynamic, profile, density) {
   const shedLight = new THREE.PointLight(profile.accent, 12, 4.2, 1.8);
   shedLight.position.set(0.72, 1.12, 0.48);
   shed.add(shedLight);
+  // A soft camera-side moon bounce keeps facial planes, sleeves and trousers
+  // separately readable while the night palette remains genuinely dark.
+  const moonBounce = new THREE.PointLight(profile.moon, 24, 9.2, 1.65);
+  moonBounce.position.set(2.2, 2.7, 3.15);
+  moonBounce.castShadow = false;
+  root.add(moonBounce);
+  dynamic.blockadeFillLight = moonBounce;
 
   let emptyBoat = AddBlenderAsset(root, "Asset_CivilianSampan", {
     position: [11.2, -0.45, 0.25],
@@ -1052,168 +1547,7 @@ function BuildSmokeParticles(root, materials, dynamic, count = 100) {
   dynamic.smoke = points;
 }
 
-function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCount) {
-  const tunnelVista = AddBlenderAsset(root, "Asset_TunnelShaftVista", {
-    position: [15.0, -0.24, -3.7],
-    scale: 0.96,
-    castShadow: false,
-  });
-  if (tunnelVista) dynamic.blenderAssets.push(tunnelVista);
-  const ceilingEdgeGeometry = new THREE.BufferGeometry();
-  const ceilingEdgePositions = [];
-  const ceilingEdgeIndices = [];
-  const ceilingSegments = 48;
-  for (let index = 0; index <= ceilingSegments; index += 1) {
-    const x = -1 + index * (32 / ceilingSegments);
-    const lowerY = 2.42
-      + Math.sin(index * 0.73) * 0.09
-      + Math.sin(index * 0.21 + 1.3) * 0.075
-      - (index % 7 === 0 ? 0.07 : 0);
-    ceilingEdgePositions.push(x, 3.18, 0.22, x, lowerY, 0.18 + Math.sin(index * 0.37) * 0.035);
-    if (index < ceilingSegments) {
-      const base = index * 2;
-      ceilingEdgeIndices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
-    }
-  }
-  ceilingEdgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(ceilingEdgePositions, 3));
-  ceilingEdgeGeometry.setIndex(ceilingEdgeIndices);
-  ceilingEdgeGeometry.computeVertexNormals();
-  const ceilingEdge = AddMesh(root, ceilingEdgeGeometry, materials.earth, [0, 0, 0], null, null, false);
-  ceilingEdge.receiveShadow = true;
-  dynamic.ownedGeometries.push(ceilingEdgeGeometry);
-  AddBox(root, [32, 4.8, 0.75], [15, 0.35, -3.55], materials.earth, null, false);
-  AddBox(root, [32, 0.16, 0.42], [15, -0.18, 0.18], materials.earthDark, null, false);
-  AddBox(root, [32, 1.02, 0.12], [15, -1.22, 1.02], materials.terrainSide, null, false);
-  for (const x of [8.0, 22.2]) {
-    const tunnelKit = AddBlenderAsset(root, "Asset_TunnelInteriorKit", {
-      position: [x, -0.12, -0.35],
-      scale: 0.67,
-      castShadow: true,
-    });
-    if (tunnelKit) dynamic.blenderAssets.push(tunnelKit);
-  }
-  const wallRandom = CreateRandom(1942);
-  const wallGeometry = new THREE.PlaneGeometry(32, 4.4, 64, 12);
-  const wallVertices = wallGeometry.getAttribute("position");
-  for (let index = 0; index < wallVertices.count; index += 1) {
-    const x = wallVertices.getX(index);
-    const y = wallVertices.getY(index);
-    const relief = Math.sin(x * 1.13 + y * 2.7) * 0.055 + Math.cos(x * 0.43 - y * 4.1) * 0.035 + (wallRandom() - 0.5) * 0.055;
-    wallVertices.setZ(index, relief);
-  }
-  wallGeometry.computeVertexNormals();
-  const wallSurface = AddMesh(root, wallGeometry, materials.earthDark, [15, 0.35, -3.08], null, null, false);
-  wallSurface.receiveShadow = true;
-  const wallMatrix = new THREE.Matrix4();
-  const wallPosition = new THREE.Vector3();
-  const wallQuaternion = new THREE.Quaternion();
-  const wallScale = new THREE.Vector3();
-  const ceilingGeometry = new THREE.IcosahedronGeometry(0.72, 1);
-  const ceilingLumps = new THREE.InstancedMesh(ceilingGeometry, materials.earthDark, 18);
-  for (let index = 0; index < 18; index += 1) {
-    wallPosition.set(0.4 + wallRandom() * 29.2, 2.36 + wallRandom() * 0.22, -0.55 + (wallRandom() - 0.5) * 2.4);
-    wallQuaternion.setFromEuler(new THREE.Euler(wallRandom(), wallRandom(), wallRandom()));
-    wallScale.set(0.72 + wallRandom() * 1.08, 0.12 + wallRandom() * 0.16, 0.6 + wallRandom() * 0.92);
-    wallMatrix.compose(wallPosition, wallQuaternion, wallScale);
-    ceilingLumps.setMatrixAt(index, wallMatrix);
-  }
-  ceilingLumps.instanceMatrix.needsUpdate = true;
-  ceilingLumps.castShadow = false;
-  ceilingLumps.receiveShadow = true;
-  root.add(ceilingLumps);
-  for (let x = 2.4; x < 30; x += 3.1) AddCrossBeam(root, x, 0.82, -0.12, 2.35, materials.wood);
-  for (let index = 0; index < 32; index += 1) {
-    const x = 0.55 + index * 0.94;
-    const row = index % 3;
-    AddBox(root, [0.72 + (index % 2) * 0.11, 0.23, 0.09], [x, 0.18 + row * 0.29, -3.12], materials.plasterDark, [0, 0, (index % 5 - 2) * 0.018], false);
-  }
-  for (const low of chapter.lowCeilings || []) {
-    const x = (low.x0 + low.x1) * 0.5 * WorldScale;
-    const width = (low.x1 - low.x0) * WorldScale;
-    AddBox(root, [width, 0.55, 2.5], [x, 1.98, -1.05], materials.earthDark, [0, 0, (low.x0 % 3 - 1) * 0.025]);
-  }
-  for (const x of [5.9, 22.9]) {
-    AddMesh(root, new THREE.TorusGeometry(0.58, 0.16, 7, 16), materials.earthDark, [x, 2.18, -0.18], [Math.PI * 0.5, 0, 0], null, false);
-    const shaftVolume = AddMesh(root, new THREE.ConeGeometry(0.9, 3, 24, 1, true), materials.shaftGlow, [x, 0.8, -0.12], null, null, false);
-    shaftVolume.renderOrder = 3;
-    const shaftPool = AddMesh(root, new THREE.CircleGeometry(0.88, 28), materials.shaftPool, [x, GetTerrainY(chapter, x) + 0.015, -0.1], [-Math.PI * 0.5, 0, 0], [1.2, 0.56, 1], false);
-    shaftPool.renderOrder = 3;
-    const shaftLight = new THREE.PointLight(profile.moon, x < 10 ? 20 : 14, 5.8, 1.75);
-    shaftLight.position.set(x, 2.3, -0.2);
-    root.add(shaftLight);
-    dynamic.shaftLights.push(shaftLight);
-    dynamic.shaftVolumes.push({ volume: shaftVolume, pool: shaftPool });
-  }
-  for (let x = 7.8; x < 26; x += 4.7) {
-    const lamp = new THREE.PointLight(profile.accent, 14, 4.0, 1.8);
-    lamp.position.set(x, 0.82, -1.3);
-    root.add(lamp);
-    AddCylinder(root, 0.065, 0.085, 0.19, [x, 0.46, -1.25], materials.metal, 8);
-    const lampFlame = AddMesh(root, new THREE.SphereGeometry(0.045, 8, 6), materials.lampGlow, [x, 0.62, -1.22], null, [0.75, 1.5, 0.75], false);
-    lampFlame.renderOrder = 4;
-  }
-  for (let x = 3.1; x < 30; x += 5.4) {
-    AddCylinder(root, 0.018, 0.035, 0.65 + (x % 1.1), [x, 2.1, 0.7], materials.earthDark, 6, [0, 0, 0.08 + (x % 0.2)], false);
-  }
-  AddBox(root, [1.35, 0.08, 0.65], [16.2, 0.12, -0.9], materials.cloth, [0.03, 0.08, 0.05]);
-  AddBox(root, [0.7, 0.48, 0.55], [19.8, 0.18, -0.5], materials.reed);
-  BuildSmokeParticles(root, materials, dynamic, dustCount);
-}
-
-function BuildFerry(root, chapter, materials, dynamic, profile, density) {
-  const riverbankVista = AddBlenderAsset(root, "Asset_FerryRiverbankVista", {
-    position: [18.2, -0.62, -18.5],
-    scale: 0.46,
-    castShadow: false,
-    materialTint: new THREE.Color(profile.ground).multiplyScalar(0.42),
-    tintAmount: 0.64,
-  });
-  if (riverbankVista) dynamic.blenderAssets.push(riverbankVista);
-  const water = AddMesh(root, new THREE.PlaneGeometry(18, 13, 24, 6), materials.water, [32.3, -0.42, -0.8], [-Math.PI * 0.5, 0, 0], null, false);
-  dynamic.water = water;
-  const farWater = AddMesh(root, new THREE.PlaneGeometry(48, 13), materials.waterFar, [18, -0.48, -8.5], [-Math.PI * 0.5, 0, 0], null, false);
-  dynamic.farWater = farWater;
-  dynamic.waterRipples = CreateWaterRipples(root, 23.4, 40.8, -4.2, 3.9, Math.round(44 * density), materials.waterRipple, 291, -0.39);
-  const screen = new THREE.Group();
-  screen.position.set(13.45, 0, 0.28);
-  for (let index = 0; index < 32; index += 1) AddBox(screen, [0.032, 1.62, 0.03], [(index - 15.5) * 0.11, 0.81, 0], materials.reed, [0, 0, (index % 4 - 1.5) * 0.018], false);
-  AddBox(screen, [3.7, 0.06, 0.06], [0, 0.48, 0.03], materials.rope, null, false);
-  screen.visible = false;
-  root.add(screen);
-  dynamic.requires.set("raiseScreen", screen);
-
-  const signal = new THREE.Group();
-  signal.position.set(20.7, 0, -0.1);
-  AddBox(signal, [0.09, 3.2, 0.09], [0, 1.6, 0], materials.wood);
-  const clothMaterial = new THREE.MeshStandardMaterial({ color: 0xa9a38e, roughness: 1, side: THREE.DoubleSide });
-  dynamic.ownedMaterials.push(clothMaterial);
-  const cloth = AddMesh(signal, new THREE.PlaneGeometry(0.82, 0.5, 4, 2), clothMaterial, [0.45, 2.58, 0.05], [0, 0, -0.08], null, false);
-  cloth.visible = false;
-  dynamic.signalCloth = cloth;
-  root.add(signal);
-
-  let ferry = AddBlenderAsset(root, "Asset_CivilianSampan", {
-    position: [33.1, -0.38, 0.08],
-    scale: 0.62,
-  });
-  if (ferry) dynamic.blenderAssets.push(ferry);
-  else {
-    ferry = new THREE.Group();
-    ferry.position.set(33.1, -0.24, 0.08);
-    AddBox(ferry, [3.15, 0.22, 1.12], [0, 0.04, 0], materials.wood, [0, 0, 0.018]);
-    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, -0.54], materials.wood);
-    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, 0.54], materials.wood);
-    for (let x = -1.2; x <= 1.2; x += 0.6) AddBox(ferry, [0.08, 0.12, 1.0], [x, 0.19, 0], materials.woodDark);
-    AddBox(ferry, [0.08, 0.08, 3.6], [1.05, 0.52, 0.55], materials.wood, [0, 0.12, -0.18]);
-    root.add(ferry);
-  }
-  dynamic.ferry = ferry;
-  dynamic.ferryHome = ferry.position.clone();
-
-  // The finale pulls far enough back that six fully articulated child rigs
-  // would spend hundreds of draw calls on details smaller than a pixel.  A
-  // two-draw instanced huddle keeps the authored 2x3 silhouette while the
-  // close boarding shots continue to use the complete rigs.
+function CreateChildrenHuddleLod(root, dynamic, key, count = 6) {
   const huddleBodyPart = new THREE.CylinderGeometry(0.14, 0.2, 0.6, 8);
   huddleBodyPart.scale(1.04, 1.1, 1.04);
   const huddleKneePart = new THREE.SphereGeometry(0.12, 10, 7);
@@ -1249,6 +1583,7 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
   const huddleHeadGeometry = mergeGeometries([huddleHeadPart, huddleHairPart]);
   huddleHeadPart.dispose();
   huddleHairPart.dispose();
+  const huddleGestureArmGeometry = new THREE.CylinderGeometry(0.032, 0.042, 0.42, 7);
   const huddleBodyMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 1,
@@ -1265,36 +1600,298 @@ function BuildFerry(root, chapter, materials, dynamic, profile, density) {
     emissive: 0x241c14,
     emissiveIntensity: 0.36,
   });
-  const huddleCloth = new THREE.InstancedMesh(huddleClothGeometry, huddleBodyMaterial, 6);
-  const huddleHeads = new THREE.InstancedMesh(huddleHeadGeometry, huddleHeadMaterial, 6);
+  const huddleCloth = new THREE.InstancedMesh(huddleClothGeometry, huddleBodyMaterial, count);
+  const huddleHeads = new THREE.InstancedMesh(huddleHeadGeometry, huddleHeadMaterial, count);
+  const huddleGestureArms = new THREE.InstancedMesh(huddleGestureArmGeometry, huddleBodyMaterial, count);
   const huddleColors = [0x666452, 0x59675d, 0x6a5d50, 0x526460, 0x706657, 0x5d6154];
-  huddleColors.forEach((color, index) => {
-    huddleCloth.setColorAt(index, new THREE.Color(color));
-  });
+  for (let index = 0; index < count; index += 1) {
+    const color = new THREE.Color(huddleColors[index % huddleColors.length]);
+    huddleCloth.setColorAt(index, color);
+    huddleGestureArms.setColorAt(index, color);
+  }
   if (huddleCloth.instanceColor) huddleCloth.instanceColor.needsUpdate = true;
+  if (huddleGestureArms.instanceColor) huddleGestureArms.instanceColor.needsUpdate = true;
   huddleCloth.castShadow = false;
   huddleCloth.receiveShadow = true;
   huddleCloth.frustumCulled = false;
   huddleHeads.castShadow = false;
   huddleHeads.receiveShadow = true;
   huddleHeads.frustumCulled = false;
-  const ferryHuddle = new THREE.Group();
-  ferryHuddle.name = "FerryChildrenHuddleLod";
-  ferryHuddle.visible = false;
-  ferryHuddle.add(huddleCloth, huddleHeads);
-  root.add(ferryHuddle);
-  dynamic.ownedGeometries.push(huddleClothGeometry, huddleHeadGeometry);
+  huddleGestureArms.castShadow = false;
+  huddleGestureArms.receiveShadow = true;
+  huddleGestureArms.frustumCulled = false;
+  const huddleGroup = new THREE.Group();
+  huddleGroup.name = `${key}Lod`;
+  huddleGroup.visible = false;
+  huddleGroup.add(huddleCloth, huddleHeads, huddleGestureArms);
+  root.add(huddleGroup);
+  dynamic.ownedGeometries.push(huddleClothGeometry, huddleHeadGeometry, huddleGestureArmGeometry);
   dynamic.ownedMaterials.push(huddleBodyMaterial, huddleHeadMaterial);
-  dynamic.ferryHuddle = {
-    group: ferryHuddle,
+  dynamic[key] = {
+    group: huddleGroup,
     cloth: huddleCloth,
     bodies: huddleCloth,
     heads: huddleHeads,
+    gestureArms: huddleGestureArms,
     matrix: new THREE.Matrix4(),
     position: new THREE.Vector3(),
     quaternion: new THREE.Quaternion(),
     scale: new THREE.Vector3(1, 1, 1),
   };
+}
+
+function BuildTunnel(root, chapter, materials, dynamic, profile, density, dustCount) {
+  // A restrained camera-side bounce travels with Awei. It separates face,
+  // coat and legs in the earthen darkness without turning the tunnel into a
+  // uniformly lit set.
+  const tunnelActorFill = new THREE.PointLight(profile.moon, 48, 6.8, 1.62);
+  tunnelActorFill.position.set(0, 2.25, 2.55);
+  tunnelActorFill.castShadow = false;
+  root.add(tunnelActorFill);
+  dynamic.tunnelFillLight = tunnelActorFill;
+  const tunnelVista = AddBlenderAsset(root, "Asset_TunnelShaftVista", {
+    position: [15.0, -0.46, -5.15],
+    scale: [0.9, 0.72, 0.78],
+    castShadow: false,
+  });
+  if (tunnelVista) {
+    tunnelVista.visible = false;
+    dynamic.blenderAssets.push(tunnelVista);
+  }
+  const ceilingEdgeGeometry = new THREE.BufferGeometry();
+  const ceilingEdgePositions = [];
+  const ceilingEdgeIndices = [];
+  const ceilingSegments = 48;
+  for (let index = 0; index <= ceilingSegments; index += 1) {
+    const x = -1 + index * (32 / ceilingSegments);
+    const lowerY = 2.5
+      + Math.sin(index * 0.73) * 0.075
+      + Math.sin(index * 0.21 + 1.3) * 0.06
+      - (index % 7 === 0 ? 0.055 : 0);
+    const upperY = 2.88 + Math.sin(index * 0.41 + 0.6) * 0.085 + Math.sin(index * 0.16) * 0.045;
+    ceilingEdgePositions.push(x, upperY, 0.22, x, lowerY, 0.18 + Math.sin(index * 0.37) * 0.035);
+    if (index < ceilingSegments) {
+      const nextX = -1 + (index + 1) * (32 / ceilingSegments);
+      const centerX = (x + nextX) * 0.5;
+      const opensToShaft = (centerX > 4.95 && centerX < 6.9) || (centerX > 21.85 && centerX < 24.05);
+      const brokenRoof = (centerX > 9.15 && centerX < 10.15)
+        || (centerX > 13.6 && centerX < 15.25)
+        || (centerX > 18.25 && centerX < 19.1)
+        || (centerX > 27.0 && centerX < 28.0);
+      const base = index * 2;
+      if (!opensToShaft && !brokenRoof) ceilingEdgeIndices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+  }
+  ceilingEdgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(ceilingEdgePositions, 3));
+  ceilingEdgeGeometry.setIndex(ceilingEdgeIndices);
+  ceilingEdgeGeometry.computeVertexNormals();
+  const ceilingEdge = AddMesh(root, ceilingEdgeGeometry, materials.earth, [0, 0, 0], null, null, false);
+  ceilingEdge.receiveShadow = true;
+  dynamic.ownedGeometries.push(ceilingEdgeGeometry);
+  // Build the rear earth as interrupted masses. The former 32 m solid box
+  // made the cutaway read like a complete stage wall and erased every side
+  // chamber; these gaps now become shaft throats, storage niches and turns.
+  const rearMassGeometry = new THREE.IcosahedronGeometry(1, 2);
+  const rearMasses = new THREE.InstancedMesh(rearMassGeometry, materials.earth, 7);
+  const rearMassMatrix = new THREE.Matrix4();
+  const rearMassData = [
+    [-0.7, 4.65, 3.65, 0.54],
+    [6.85, 3.05, 3.15, 0.36],
+    [10.75, 3.85, 3.95, 0.72],
+    [15.25, 3.75, 3.35, 0.44],
+    [19.55, 3.55, 3.82, 0.66],
+    [24.25, 3.05, 3.18, 0.4],
+    [28.35, 4.95, 3.74, 0.58],
+  ];
+  rearMassData.forEach(([x, width, height, tilt], index) => {
+    SetInstance(rearMasses, index, [x + width * 0.5, -0.72 + height * 0.5, -3.62], [tilt * 0.08, tilt * 0.035, (index % 2 ? -1 : 1) * 0.045], [width * 0.58, height * 0.56, 0.72], rearMassMatrix);
+  });
+  rearMasses.instanceMatrix.needsUpdate = true;
+  rearMasses.castShadow = false;
+  rearMasses.receiveShadow = true;
+  root.add(rearMasses);
+  dynamic.ownedGeometries.push(rearMassGeometry);
+
+  const floorRubbleGeometry = new THREE.IcosahedronGeometry(0.22, 1);
+  const floorRubble = new THREE.InstancedMesh(floorRubbleGeometry, materials.earthDark, 18);
+  const floorRubbleMatrix = new THREE.Matrix4();
+  for (let index = 0; index < 18; index += 1) {
+    const x = 0.35 + index * 1.72 + Math.sin(index * 2.4) * 0.22;
+    SetInstance(floorRubble, index, [x, -0.21 + (index % 3) * 0.025, 0.12 + (index % 4) * 0.06], [index * 0.17, index * 0.31, index * 0.11], [0.72 + (index % 4) * 0.12, 0.28 + (index % 2) * 0.08, 0.58 + (index % 3) * 0.09], floorRubbleMatrix);
+  }
+  floorRubble.instanceMatrix.needsUpdate = true;
+  floorRubble.castShadow = false;
+  floorRubble.receiveShadow = true;
+  root.add(floorRubble);
+  dynamic.ownedGeometries.push(floorRubbleGeometry);
+  for (const x of [8.0, 22.2]) {
+    const tunnelKit = AddBlenderAsset(root, "Asset_TunnelInteriorKit", {
+      position: [x, -0.18, -0.62],
+      scale: 0.62,
+      castShadow: true,
+    });
+    if (tunnelKit) dynamic.blenderAssets.push(tunnelKit);
+  }
+  const wallRandom = CreateRandom(1942);
+  // The rear wall is four independent earth faces. Each is offset in depth
+  // and the 0.7-0.8 m black slots between them read as side chambers/turns.
+  const wallPanels = [];
+  const wallPanelRanges = [[0.0, 6.35], [7.1, 14.35], [15.15, 22.15], [22.95, 30.0]];
+  wallPanelRanges.forEach(([x0, x1], panelIndex) => {
+    const width = x1 - x0;
+    const wallGeometry = new THREE.PlaneGeometry(width, 3.02 + (panelIndex % 2) * 0.18, Math.max(8, Math.ceil(width * 2)), 8);
+    const wallVertices = wallGeometry.getAttribute("position");
+    for (let index = 0; index < wallVertices.count; index += 1) {
+      const x = wallVertices.getX(index);
+      const y = wallVertices.getY(index);
+      const relief = Math.sin(x * 1.13 + y * 2.7 + panelIndex) * 0.075 + Math.cos(x * 0.43 - y * 4.1) * 0.045 + (wallRandom() - 0.5) * 0.07;
+      wallVertices.setZ(index, relief);
+    }
+    wallGeometry.computeVertexNormals();
+    const wallSurface = AddMesh(root, wallGeometry, materials.earthDark, [(x0 + x1) * 0.5, 0.33 + (panelIndex % 2) * 0.12, -3.02 - (panelIndex % 3) * 0.16], [0, (panelIndex % 2 ? -1 : 1) * 0.018, 0], null, false);
+    wallSurface.receiveShadow = true;
+    wallPanels.push(wallSurface);
+    dynamic.ownedGeometries.push(wallGeometry);
+  });
+  const wallMatrix = new THREE.Matrix4();
+  const wallPosition = new THREE.Vector3();
+  const wallQuaternion = new THREE.Quaternion();
+  const wallScale = new THREE.Vector3();
+  const ceilingGeometry = new THREE.IcosahedronGeometry(0.46, 1);
+  const ceilingLumps = new THREE.InstancedMesh(ceilingGeometry, materials.earthDark, 14);
+  for (let index = 0; index < 14; index += 1) {
+    wallPosition.set(0.4 + wallRandom() * 29.2, 2.54 + wallRandom() * 0.18, -0.68 + (wallRandom() - 0.5) * 1.65);
+    wallQuaternion.setFromEuler(new THREE.Euler(wallRandom(), wallRandom(), wallRandom()));
+    wallScale.set(0.62 + wallRandom() * 0.76, 0.1 + wallRandom() * 0.11, 0.54 + wallRandom() * 0.58);
+    wallMatrix.compose(wallPosition, wallQuaternion, wallScale);
+    ceilingLumps.setMatrixAt(index, wallMatrix);
+  }
+  ceilingLumps.instanceMatrix.needsUpdate = true;
+  ceilingLumps.castShadow = false;
+  ceilingLumps.receiveShadow = true;
+  root.add(ceilingLumps);
+  for (let x = 2.4; x < 30; x += 3.1) AddCrossBeam(root, x, 0.82, -0.12, 2.35, materials.wood);
+  for (let index = 0; index < 24; index += 1) {
+    const x = 0.55 + index * 1.24;
+    if (wallPanelRanges.some(([x0, x1]) => x > x1 - 0.18 && x < x1 + 0.85)) continue;
+    const row = index % 3;
+    AddBox(root, [0.72 + (index % 2) * 0.11, 0.23, 0.09], [x, 0.18 + row * 0.29, -3.12], materials.plasterDark, [0, 0, (index % 5 - 2) * 0.018], false);
+  }
+  const lowCeilings = chapter.lowCeilings || [];
+  const lowCeilingGeometry = new THREE.IcosahedronGeometry(1, 2);
+  const lowCeilingLumps = new THREE.InstancedMesh(lowCeilingGeometry, materials.earthDark, lowCeilings.length * 3);
+  const lowCeilingMatrix = new THREE.Matrix4();
+  lowCeilings.forEach((low, lowIndex) => {
+    const x0 = low.x0 * WorldScale;
+    const width = (low.x1 - low.x0) * WorldScale;
+    const chunkWidth = width / 3;
+    for (let chunkIndex = 0; chunkIndex < 3; chunkIndex += 1) {
+      const x = x0 + chunkWidth * (chunkIndex + 0.5) + Math.sin((lowIndex + 1) * (chunkIndex + 2)) * 0.08;
+      SetInstance(
+        lowCeilingLumps,
+        lowIndex * 3 + chunkIndex,
+        [x, 2.08 + Math.sin(chunkIndex * 2.1 + lowIndex) * 0.08, -1.05 + (chunkIndex % 2) * 0.12],
+        [(chunkIndex - 1) * 0.09, lowIndex * 0.11, (chunkIndex % 2 ? -1 : 1) * 0.06],
+        [chunkWidth * 0.74, 0.35 + (chunkIndex % 2) * 0.07, 1.28],
+        lowCeilingMatrix,
+      );
+    }
+  });
+  lowCeilingLumps.instanceMatrix.needsUpdate = true;
+  lowCeilingLumps.castShadow = true;
+  lowCeilingLumps.receiveShadow = true;
+  root.add(lowCeilingLumps);
+  dynamic.ownedGeometries.push(lowCeilingGeometry);
+  for (const x of [5.9, 22.9]) {
+    AddMesh(root, new THREE.TorusGeometry(0.58, 0.16, 7, 16), materials.earthDark, [x, 2.18, -0.18], [Math.PI * 0.5, 0, 0], null, false);
+    const shaftVolume = AddMesh(root, new THREE.ConeGeometry(0.9, 3, 24, 1, true), materials.shaftGlow, [x, 0.8, -0.12], null, null, false);
+    shaftVolume.renderOrder = 3;
+    const shaftPool = AddMesh(root, new THREE.CircleGeometry(0.88, 28), materials.shaftPool, [x, GetTerrainY(chapter, x) + 0.015, -0.1], [-Math.PI * 0.5, 0, 0], [1.2, 0.56, 1], false);
+    shaftPool.renderOrder = 3;
+    const shaftLight = new THREE.PointLight(profile.moon, x < 10 ? 20 : 14, 5.8, 1.75);
+    shaftLight.position.set(x, 2.3, -0.2);
+    root.add(shaftLight);
+    dynamic.shaftLights.push(shaftLight);
+    dynamic.shaftVolumes.push({ volume: shaftVolume, pool: shaftPool });
+  }
+  for (let x = 7.8; x < 26; x += 4.7) {
+    const lamp = new THREE.PointLight(profile.accent, 14, 4.0, 1.8);
+    lamp.position.set(x, 0.82, -1.3);
+    root.add(lamp);
+    AddCylinder(root, 0.065, 0.085, 0.19, [x, 0.46, -1.25], materials.metal, 8);
+    const lampFlame = AddMesh(root, new THREE.SphereGeometry(0.045, 8, 6), materials.lampGlow, [x, 0.62, -1.22], null, [0.75, 1.5, 0.75], false);
+    lampFlame.renderOrder = 4;
+  }
+  for (let x = 3.1; x < 30; x += 5.4) {
+    AddCylinder(root, 0.018, 0.035, 0.65 + (x % 1.1), [x, 2.1, 0.7], materials.earthDark, 6, [0, 0, 0.08 + (x % 0.2)], false);
+  }
+  AddBox(root, [1.35, 0.08, 0.65], [16.2, 0.12, -0.9], materials.cloth, [0.03, 0.08, 0.05]);
+  AddBox(root, [0.7, 0.48, 0.55], [19.8, 0.18, -0.5], materials.reed);
+  CreateChildrenHuddleLod(root, dynamic, "wellVentHuddle", 4);
+  BuildSmokeParticles(root, materials, dynamic, dustCount);
+}
+
+function BuildFerry(root, chapter, materials, dynamic, profile, density) {
+  const riverbankVista = AddBlenderAsset(root, "Asset_FerryRiverbankVista", {
+    position: [18.2, -0.62, -18.5],
+    scale: 0.46,
+    castShadow: false,
+    materialTint: new THREE.Color(profile.ground).multiplyScalar(0.42),
+    tintAmount: 0.64,
+  });
+  if (riverbankVista) dynamic.blenderAssets.push(riverbankVista);
+  const water = AddMesh(root, new THREE.PlaneGeometry(25, 16, 28, 7), materials.water, [31.0, -0.42, -1.8], [-Math.PI * 0.5, 0, 0], null, false);
+  dynamic.water = water;
+  const farWater = AddMesh(root, new THREE.PlaneGeometry(64, 24, 28, 7), materials.waterFar, [20, -0.46, -5.4], [-Math.PI * 0.5, 0, 0], null, false);
+  dynamic.farWater = farWater;
+  dynamic.waterRipples = CreateWaterRipples(root, 23.4, 40.8, -4.2, 3.9, Math.round(44 * density), materials.waterRipple, 291, -0.39);
+  const screen = new THREE.Group();
+  screen.position.set(13.45, 0, 0.28);
+  for (let index = 0; index < 32; index += 1) AddBox(screen, [0.032, 1.62, 0.03], [(index - 15.5) * 0.11, 0.81, 0], materials.reed, [0, 0, (index % 4 - 1.5) * 0.018], false);
+  AddBox(screen, [3.7, 0.06, 0.06], [0, 0.48, 0.03], materials.rope, null, false);
+  screen.visible = false;
+  root.add(screen);
+  dynamic.requires.set("raiseScreen", screen);
+
+  const signal = new THREE.Group();
+  signal.position.set(20.7, 0, -0.1);
+  AddBox(signal, [0.09, 3.2, 0.09], [0, 1.6, 0], materials.wood);
+  const clothMaterial = new THREE.MeshStandardMaterial({
+    color: 0x797767,
+    roughness: 1,
+    side: THREE.DoubleSide,
+    emissive: 0x22241f,
+    emissiveIntensity: 0.24,
+  });
+  dynamic.ownedMaterials.push(clothMaterial);
+  const cloth = AddMesh(signal, new THREE.PlaneGeometry(0.82, 0.5, 6, 3), clothMaterial, [0.45, 2.58, 0.05], [0, 0, -0.08], null, false);
+  cloth.userData.signalBasePositions = new Float32Array(cloth.geometry.attributes.position.array);
+  cloth.visible = false;
+  dynamic.signalCloth = cloth;
+  root.add(signal);
+
+  let ferry = AddBlenderAsset(root, "Asset_CivilianSampan", {
+    position: [33.1, -0.38, 0.08],
+    scale: 0.62,
+  });
+  if (ferry) dynamic.blenderAssets.push(ferry);
+  else {
+    ferry = new THREE.Group();
+    ferry.position.set(33.1, -0.24, 0.08);
+    AddBox(ferry, [3.15, 0.22, 1.12], [0, 0.04, 0], materials.wood, [0, 0, 0.018]);
+    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, -0.54], materials.wood);
+    AddBox(ferry, [2.95, 0.42, 0.09], [0, 0.24, 0.54], materials.wood);
+    for (let x = -1.2; x <= 1.2; x += 0.6) AddBox(ferry, [0.08, 0.12, 1.0], [x, 0.19, 0], materials.woodDark);
+    AddBox(ferry, [0.08, 0.08, 3.6], [1.05, 0.52, 0.55], materials.wood, [0, 0.12, -0.18]);
+    root.add(ferry);
+  }
+  dynamic.ferry = ferry;
+  dynamic.ferryHome = ferry.position.clone();
+
+  // The finale pulls far enough back that six fully articulated child rigs
+  // would spend hundreds of draw calls on details smaller than a pixel. A
+  // two-draw instanced huddle preserves the authored silhouette and motion.
+  CreateChildrenHuddleLod(root, dynamic, "ferryHuddle", 6);
 
   const ferryFillLight = new THREE.PointLight(0xc6c9b2, 3.2, 6.6, 2.1);
   ferryFillLight.position.set(33.0, 2.15, 1.55);
@@ -1352,14 +1949,22 @@ function BuildCoverProps(root, chapter, materials, dynamic) {
     if (cover.kind === "willows") {
       for (let treeIndex = 0; treeIndex < 2; treeIndex += 1) {
         const treeX = (treeIndex - 0.5) * width * 0.42;
-        const height = 2.65 + treeIndex * 0.4;
+        const height = 3.0 + treeIndex * 0.34;
         AddCylinder(group, 0.1, 0.18, height, [treeX, height * 0.5, -0.25], materials.woodDark, 9, [0, 0, treeIndex ? -0.08 : 0.1]);
-        for (let crownIndex = 0; crownIndex < 5; crownIndex += 1) {
-          const crown = AddMesh(group, new THREE.IcosahedronGeometry(0.58 + (crownIndex % 2) * 0.15, 1), materials.foliage, [treeX + (crownIndex - 2) * 0.36, height - 0.25 + Math.sin(crownIndex) * 0.28, -0.32 + (crownIndex % 2) * 0.22], null, [1.15, 0.72, 0.9]);
-          crown.castShadow = true;
+        for (let crownIndex = 0; crownIndex < 4; crownIndex += 1) {
+          const crown = AddMesh(
+            group,
+            new THREE.IcosahedronGeometry(0.42 + (crownIndex % 2) * 0.1, 1),
+            materials.woodDark,
+            [treeX + (crownIndex - 1.5) * 0.27, height - 0.22 + Math.sin(crownIndex) * 0.2, -0.4 + (crownIndex % 2) * 0.16],
+            null,
+            [1.08, 0.62, 0.82],
+            false,
+          );
+          crown.castShadow = false;
         }
-        for (let branchIndex = 0; branchIndex < 4; branchIndex += 1) {
-          AddCylinder(group, 0.018, 0.035, 1.2 + branchIndex * 0.12, [treeX + (branchIndex - 1.5) * 0.28, height - 0.9, 0.05], materials.foliage, 6, [0, 0, (branchIndex - 1.5) * 0.11], false);
+        for (let branchIndex = 0; branchIndex < 5; branchIndex += 1) {
+          AddCylinder(group, 0.014, 0.03, 1.3 + branchIndex * 0.1, [treeX + (branchIndex - 2) * 0.19, height - 0.95, -0.02], materials.woodDark, 6, [0, 0, (branchIndex - 2) * 0.09], false);
         }
       }
     } else if (["haystack", "reedStack"].includes(cover.kind)) {
@@ -1412,6 +2017,26 @@ function CreateActionCues(root, chapter, materials, dynamic) {
     root.add(group);
     dynamic.actionCues.set(action.id, group);
   }
+}
+
+function GetDirectorAction(directive) {
+  if (typeof directive === "string") return directive;
+  return directive && typeof directive === "object" ? directive.action || null : null;
+}
+
+function GetDirectorValue(directive, key, fallback) {
+  return directive && typeof directive === "object" && directive[key] !== undefined
+    ? directive[key]
+    : fallback;
+}
+
+function GetDirectorProgress(directive, segmentProgress, stagger = 0) {
+  const raw = THREE.MathUtils.clamp(segmentProgress - stagger, 0, 1);
+  const window = directive && typeof directive === "object" && Array.isArray(directive.window)
+    ? directive.window
+    : null;
+  if (!window || window.length !== 2) return raw;
+  return THREE.MathUtils.clamp((raw - Number(window[0] || 0)) / Math.max(0.001, Number(window[1] || 1) - Number(window[0] || 0)), 0, 1);
 }
 
 function CreateMaterials(profile, dynamic, chapterId) {
@@ -1488,21 +2113,28 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     motherLanternLight: null,
     motherLanternTrail: null,
     ferryFillLight: null,
+    blockadeFillLight: null,
+    tunnelFillLight: null,
   };
   const materials = CreateMaterials(profile, dynamic, chapter.id);
   BuildSkyBackdrop(root, profile, chapter, dynamic);
   BuildAtmosphericLayers(root, profile, chapter, dynamic);
   BuildTerrain(root, chapter, materials, dynamic);
   if (chapter.id !== "tunnel") BuildDistantVillage(root, profile, materials.plasterDark, 7 + chapter.id.length, chapter.width * WorldScale, dynamic, chapter.id);
-  BuildRegionalScaleMarkers(root, chapter, profile, dynamic);
+  BuildRegionalWorldVolume(root, chapter, profile, dynamic);
+  BuildRegionalHorizonContour(root, chapter, profile, dynamic);
+  // Regional scale is already carried by village structures and authored
+  // landmark trees; the older extra marker belt duplicated them as lollipops.
   BuildVanishingFieldLines(root, chapter, profile, dynamic);
   const density = renderProfile.reedDensity;
   if (chapter.id === "school") BuildSchool(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "blockade") BuildBlockade(root, chapter, materials, dynamic, profile, density);
   if (chapter.id === "tunnel") BuildTunnel(root, chapter, materials, dynamic, profile, density, renderProfile.dustCount);
   if (chapter.id === "ferry") BuildFerry(root, chapter, materials, dynamic, profile, density);
+  BuildChapterWorldAnchors(root, chapter, materials, dynamic, profile);
   if (chapter.id === "tunnel") BuildTunnelScaleLayer(root, chapter, materials, dynamic, profile);
   BuildCoverProps(root, chapter, materials, dynamic);
+  if (chapter.id === "tunnel") BuildMonumentalForegroundAnchors(root, chapter, profile, dynamic);
   BuildForegroundFraming(root, chapter, materials, dynamic);
   BuildNearScaleLayer(root, chapter, profile, dynamic);
   CreateActionCues(root, chapter, materials, dynamic);
@@ -1514,6 +2146,19 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   };
   root.add(actors.player, actors.mother, ...actors.followers);
   actors.mother.visible = chapter.id === "ferry";
+  if (chapter.id === "tunnel") {
+    const tunedMaterials = new Set();
+    for (const actor of [actors.player, actors.mother, ...actors.followers]) {
+      actor.traverse((object) => {
+        const material = object.isMesh ? object.material : null;
+        if (!material?.isMeshStandardMaterial || tunedMaterials.has(material)) return;
+        material.color.multiplyScalar(1.45);
+        material.emissive.copy(material.color).multiplyScalar(0.55);
+        material.emissiveIntensity = 1.1;
+        tunedMaterials.add(material);
+      });
+    }
+  }
 
   function SetActorShadowCasting(actor, enabled) {
     actor.traverse((object) => {
@@ -1524,6 +2169,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
   }
 
   function Update(state, deltaTime, time, windStrength, cinematicFrame = null) {
+    if (dynamic.regionalWorldVolume) {
+      // The departure already adds the complete child group, ferry rig and
+      // mother performance.  The original horizon layers remain visible, so
+      // temporarily cull this supplementary five-draw county layer instead of
+      // sacrificing actor detail at the emotional climax.
+      const showRegionalVolume = cinematicFrame?.id !== "endingDeparture";
+      for (const mesh of Object.values(dynamic.regionalWorldVolume)) mesh.visible = showRegionalVolume;
+    }
     const cueState = state.cinematicCue;
     const cueAge = cueState && Number.isFinite(cueState.startedAt) ? state.elapsed - cueState.startedAt : Infinity;
     const cueLive = Boolean(cueState && cueAge >= 0 && cueAge <= (cueState.duration || 0));
@@ -1539,11 +2192,44 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     const directorActors = cinematicFrame?.actors;
     const directorEffects = cinematicFrame?.effects || {};
     const directorBlocking = cinematicFrame?.blocking || {};
-    const playerAction = directorActors?.player || playerCue?.pose || null;
-    const followerAction = directorActors?.followers || followerCue?.followerPose || null;
+    if (dynamic.emptyShoes && dynamic.emptyShoeTransforms) {
+      const orderedPairs = THREE.MathUtils.clamp(Number(directorEffects.shoeOrder || 0), 0, 1) * 6;
+      const shoeMatrix = new THREE.Matrix4();
+      const shoeQuaternion = new THREE.Quaternion();
+      const shoeEuler = new THREE.Euler();
+      for (let index = 0; index < dynamic.emptyShoeTransforms.length; index += 1) {
+        const shoe = dynamic.emptyShoeTransforms[index];
+        const pairProgress = THREE.MathUtils.smoothstep(orderedPairs - shoe.childIndex, 0, 1);
+        const pairedOffset = shoe.footIndex ? 0.082 : -0.082;
+        const orderedPosition = shoe.position.clone();
+        orderedPosition.x += THREE.MathUtils.lerp(0, pairedOffset - (shoe.footIndex ? 0.09 : -0.09), pairProgress);
+        shoeEuler.set(
+          0,
+          THREE.MathUtils.lerp(shoe.rotationY, shoe.footIndex ? -0.025 : 0.025, pairProgress),
+          THREE.MathUtils.lerp(shoe.rotationZ, 0, pairProgress),
+        );
+        shoeQuaternion.setFromEuler(shoeEuler);
+        shoeMatrix.compose(orderedPosition, shoeQuaternion, shoe.scale);
+        dynamic.emptyShoes.setMatrixAt(index, shoeMatrix);
+      }
+      dynamic.emptyShoes.instanceMatrix.needsUpdate = true;
+    }
+    const playerDirective = directorActors?.player;
+    const followerDirective = directorActors?.followers;
+    const motherDirective = directorActors?.mother;
+    const playerAction = GetDirectorAction(playerDirective) || playerCue?.pose || null;
+    const followerAction = GetDirectorAction(followerDirective) || followerCue?.followerPose || null;
+    const motherAction = GetDirectorAction(motherDirective);
     const followerFocusIndex = Number(directorActors?.followerFocusIndex);
-    const followerFocusAction = directorActors?.followerFocusAction || null;
+    const followerFocusDirective = directorActors?.followerFocusAction;
+    const followerFocusAction = GetDirectorAction(followerFocusDirective) || null;
+    const followerFocusFacing = Number(directorActors?.followerFocusFacing);
+    const followerFocusX = Number(directorActors?.followerFocusX);
+    const followerFocusZ = Number(directorActors?.followerFocusZ);
+    const followerStandIns = Array.isArray(directorActors?.followerStandIns) ? directorActors.followerStandIns : [];
     const directorActionTime = cinematicFrame ? cinematicFrame.segmentProgress : null;
+    const playerDirectedProgress = cinematicFrame ? GetDirectorProgress(playerDirective, cinematicFrame.segmentProgress) : null;
+    const motherDirectedProgress = cinematicFrame ? GetDirectorProgress(motherDirective, cinematicFrame.segmentProgress) : null;
     const registerSequence = cinematicFrame?.id || "";
     const registerProgress = Number(cinematicFrame?.progress || 0);
     const playerHasRegister = ["ferryOpening", "tunnelRollCall", "ferryRollCall", "endingDeparture"].includes(registerSequence)
@@ -1571,6 +2257,47 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       dynamic.ferryFillLight.intensity = cinematicFrame?.id === "endingDeparture" ? 3.8 : 2.7;
     }
     const playerBoardBlend = THREE.MathUtils.clamp(playerBoarding, 0, 1);
+    const useWellVentHuddle = Boolean(
+      dynamic.wellVentHuddle
+      && cinematicFrame?.id === "wellVent"
+      && cinematicFrame.segmentIndex === 2
+      && followerStandIns.length === 4,
+    );
+    if (dynamic.wellVentHuddle) {
+      const huddle = dynamic.wellVentHuddle;
+      huddle.group.visible = useWellVentHuddle;
+      if (useWellVentHuddle) {
+        for (let index = 0; index < 4; index += 1) {
+          const standIn = followerStandIns[index];
+          const rawProgress = THREE.MathUtils.clamp(cinematicFrame.segmentProgress - index * 0.075, 0, 1);
+          const release = rawProgress * rawProgress * (3 - 2 * rawProgress);
+          const inhale = Math.sin(rawProgress * Math.PI) * release;
+          const facing = Number(standIn?.facing || 1);
+          const childX = Number(standIn?.x || 1590) * WorldScale;
+          const groundVariation = [-0.025, 0.02, -0.012, 0.035][index];
+          const childY = Number(standIn?.y || 0) * WorldScale + 0.58 + groundVariation + release * 0.035 + inhale * 0.018;
+          const childZ = Number(standIn?.z ?? (-0.12 - index * 0.2));
+          const unevenWeight = (index % 2 ? -1 : 1) * (0.035 + release * 0.018);
+          huddle.position.set(childX, childY, childZ);
+          huddle.quaternion.setFromEuler(new THREE.Euler(-release * 0.055, facing < 0 ? Math.PI : 0, unevenWeight));
+          huddle.scale.set(0.93 + index * 0.025, 0.96 + (index % 3) * 0.025, 0.94 + (index % 2) * 0.035);
+          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
+          huddle.cloth.setMatrixAt(index, huddle.matrix);
+          huddle.position.set(childX + facing * release * 0.02, childY + 0.49 + release * 0.025, childZ);
+          huddle.quaternion.setFromEuler(new THREE.Euler(-release * 0.18, facing < 0 ? Math.PI : 0, unevenWeight * 0.45));
+          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
+          huddle.heads.setMatrixAt(index, huddle.matrix);
+          huddle.position.set(childX + facing * (0.15 + release * 0.035), childY + 0.25, childZ + 0.03);
+          huddle.quaternion.setFromEuler(new THREE.Euler(0, 0, facing * (-0.42 + release * 0.16)));
+          huddle.scale.set(0.86, 0.92, 0.86);
+          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
+          huddle.gestureArms.setMatrixAt(index, huddle.matrix);
+        }
+        huddle.cloth.instanceMatrix.needsUpdate = true;
+        huddle.heads.instanceMatrix.needsUpdate = true;
+        huddle.gestureArms.instanceMatrix.needsUpdate = true;
+      }
+    }
     const useFerryHuddle = Boolean(dynamic.ferryHuddle && state.followers.length >= 4);
     if (dynamic.ferryHuddle) {
       const huddle = dynamic.ferryHuddle;
@@ -1593,7 +2320,11 @@ export function CreateChapterScene3D(chapter, renderProfile) {
             ? THREE.MathUtils.clamp((cinematicFrame.segmentProgress - index * 0.07) * 4.2, 0, 1)
             : 0;
           const leanToAwei = attention * (0.026 + (index % 2) * 0.012);
-          const ferryChildY = ferryY + 0.98 + row * 0.035 + huddleBreath + attention * 0.018;
+          const boardArc = Math.sin(followerBoardBlend * Math.PI);
+          const catchBalance = index === 4 ? Math.sin(Math.min(1, followerBoardBlend * 1.35) * Math.PI) : 0;
+          const lookBack = index === 1 ? THREE.MathUtils.smoothstep(followerBoardBlend, 0.35, 0.82) : 0;
+          const gripRail = index === 3 || index === 5 ? THREE.MathUtils.smoothstep(followerBoardBlend, 0.18, 0.64) : 0;
+          const ferryChildY = ferryY + 0.98 + row * 0.035 + huddleBreath + attention * 0.018 + boardArc * (0.045 + (index % 3) * 0.012) - catchBalance * 0.025;
           const ferryChildZ = ferryZ + 0.22 - row * 0.43;
           const shoreChildX = (follower?.x ?? state.player.x) * WorldScale;
           const shoreChildY = (follower?.y ?? state.player.y) * WorldScale + 0.62;
@@ -1602,18 +2333,25 @@ export function CreateChapterScene3D(chapter, renderProfile) {
           const childY = THREE.MathUtils.lerp(shoreChildY, ferryChildY, followerBoardBlend);
           const childZ = THREE.MathUtils.lerp(shoreChildZ, ferryChildZ, followerBoardBlend);
           huddle.position.set(childX, childY, childZ);
-          huddle.quaternion.setFromEuler(new THREE.Euler(0, 0, -0.075 + column * 0.02 - leanToAwei));
+          huddle.quaternion.setFromEuler(new THREE.Euler(-boardArc * 0.08 + catchBalance * 0.1, lookBack * 0.3, -0.075 + column * 0.02 - leanToAwei + catchBalance * (index % 2 ? -0.11 : 0.11)));
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.cloth.setMatrixAt(index, huddle.matrix);
           huddle.position.set(childX + 0.055 + attention * 0.035, childY + 0.49 + attention * 0.025, childZ);
-          huddle.quaternion.setFromEuler(new THREE.Euler(0, attention * -0.28, -leanToAwei));
+          huddle.quaternion.setFromEuler(new THREE.Euler(-catchBalance * 0.06, attention * -0.28 + lookBack * 0.72, -leanToAwei + catchBalance * 0.045));
           huddle.scale.setScalar(lodScale);
           huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
           huddle.heads.setMatrixAt(index, huddle.matrix);
+          const armSide = index % 2 ? 1 : -1;
+          huddle.position.set(childX + armSide * 0.16 + gripRail * 0.055, childY + 0.26 + gripRail * 0.08, childZ + 0.02);
+          huddle.quaternion.setFromEuler(new THREE.Euler(gripRail * -0.22, lookBack * 0.25, armSide * (-0.42 - gripRail * 0.48) + catchBalance * 0.22));
+          huddle.scale.setScalar(lodScale);
+          huddle.matrix.compose(huddle.position, huddle.quaternion, huddle.scale);
+          huddle.gestureArms.setMatrixAt(index, huddle.matrix);
         }
         huddle.cloth.instanceMatrix.needsUpdate = true;
         huddle.heads.instanceMatrix.needsUpdate = true;
+        huddle.gestureArms.instanceMatrix.needsUpdate = true;
       }
     }
     const playerGround = state.player.y * WorldScale;
@@ -1633,16 +2371,16 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         ? blockedPlayerVelocity
         : playerBoardBlend > 0.8 ? ferryDeparture * 0.5 : state.player.vx * WorldScale,
       facing: Number.isFinite(blockedPlayerFacing) ? blockedPlayerFacing : schoolHandoffActive ? -1 : state.player.facing,
-      crouching: directorBlocking.playerCrouch ?? state.player.crouching,
+      crouching: GetDirectorValue(playerDirective, "crouching", directorBlocking.playerCrouch ?? state.player.crouching),
       carrying: state.player.carrying,
       alert: state.suspicion > 0.25,
-      fear: state.suspicion,
+      fear: GetDirectorValue(playerDirective, "fear", state.suspicion),
       grounded: state.player.grounded,
       verticalVelocity: state.player.vy * WorldScale,
-      lookOffset: state.suspicion > 0.18 ? Math.sin(time * 2.1) * 0.055 : 0,
+      lookOffset: GetDirectorValue(playerDirective, "lookOffset", state.suspicion > 0.18 ? Math.sin(time * 2.1) * 0.055 : 0),
       action: playerAction,
       registerBook: playerHasRegister,
-      actionTime: directorActionTime ?? playerActionTime,
+      actionTime: playerDirectedProgress ?? playerActionTime,
       actionDuration: cinematicFrame ? 1 : playerActionDuration,
       positionSnap: playerBoardBlend > 0 || motherHandoffActive || Number.isFinite(blockedPlayerX),
       time,
@@ -1650,13 +2388,14 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     for (let index = 0; index < actors.followers.length; index += 1) {
       const actor = actors.followers[index];
       const stateFollower = state.followers[index];
+      const authoredStandIn = followerStandIns.find((standIn) => Number(standIn?.index) === index) || null;
       // Shuaner has been found but is not a gameplay follower until the next
       // action lifts him. Keep that rules-layer distinction while staging his
       // silent raised-hand answer as a temporary cinematic actor.
       const isTunnelRollCallChild = !stateFollower
         && cinematicFrame?.id === "tunnelRollCall"
         && index === 5;
-      const follower = stateFollower || (isTunnelRollCallChild
+      const follower = stateFollower || authoredStandIn || (isTunnelRollCallChild
         ? { x: 1970, y: 0, vx: 0, facing: -1 }
         : null);
       if (!follower) {
@@ -1676,30 +2415,42 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       const followerTargetY = ferryY + 0.33 + ferryRow * 0.045;
       const followerTargetZ = ferryZ + 0.22 - ferryRow * 0.43;
       const finalRollCall = cinematicFrame?.id === "endingDeparture" && cinematicFrame.segmentIndex >= 4;
+      const isFocusedFollower = Number.isInteger(followerFocusIndex) && followerFocusIndex === index;
       const focusedFollowerAction = Number.isInteger(followerFocusIndex) && followerFocusIndex === index && followerFocusAction
         ? followerFocusAction
         : followerAction;
+      const focusedFollowerDirective = isFocusedFollower && followerFocusDirective ? followerFocusDirective : followerDirective;
+      const authoredFollowerX = isFocusedFollower && Number.isFinite(followerFocusX)
+        ? followerFocusX
+        : Number(follower.x) * WorldScale;
+      const authoredFollowerFacing = isFocusedFollower && Number.isFinite(followerFocusFacing)
+        ? followerFocusFacing
+        : Number(follower.facing || 1);
       UpdateActor3D(actor, {
-        x: THREE.MathUtils.lerp(follower.x * WorldScale, followerTargetX, followerBoardBlend),
-        y: THREE.MathUtils.lerp(follower.y * WorldScale, followerTargetY, followerBoardBlend),
-        z: THREE.MathUtils.lerp(0.2 - index * 0.035, followerTargetZ, followerBoardBlend),
+        x: THREE.MathUtils.lerp(authoredFollowerX, followerTargetX, followerBoardBlend),
+        y: THREE.MathUtils.lerp(Number(follower.y || 0) * WorldScale, followerTargetY, followerBoardBlend),
+        z: THREE.MathUtils.lerp(
+          isFocusedFollower && Number.isFinite(followerFocusZ) ? followerFocusZ : Number(authoredStandIn?.z ?? (0.2 - index * 0.035)),
+          followerTargetZ,
+          followerBoardBlend,
+        ),
         velocity: followerBoardBlend > 0.75 ? ferryDeparture * 0.5 : state.followersHolding ? 0 : (follower.vx ?? state.player.vx * 0.82) * WorldScale,
-        facing: finalRollCall ? 1 : follower.facing,
+        facing: finalRollCall ? 1 : authoredFollowerFacing,
         crouching: state.followersHolding || state.player.crouching,
         holding: state.followersHolding,
         alert: state.suspicion > 0.22,
-        fear: Math.min(1, state.suspicion + index * 0.025),
+        fear: GetDirectorValue(focusedFollowerDirective, "fear", Math.min(1, state.suspicion + index * 0.025)),
         grounded: true,
-        lookOffset: finalRollCall
+        lookOffset: GetDirectorValue(focusedFollowerDirective, "lookOffset", finalRollCall
           ? 0.08 + THREE.MathUtils.clamp((cinematicFrame.segmentProgress - index * 0.07) * 3.8, 0, 1) * 0.12
-          : state.followersHolding ? (index % 2 ? -0.12 : 0.1) : Math.sin(time * 0.72 + index * 1.31) * 0.06,
+          : state.followersHolding ? (index % 2 ? -0.12 : 0.1) : Math.sin(time * 0.72 + index * 1.31) * 0.06),
         action: focusedFollowerAction,
         actionTime: cinematicFrame
-          ? Math.max(0, cinematicFrame.segmentProgress - index * Number(directorActors?.followerStagger || 0))
+          ? GetDirectorProgress(focusedFollowerDirective, cinematicFrame.segmentProgress, index * Number(directorActors?.followerStagger || 0))
           : cueLive ? cueAge + index * 0.1 : state.actionProgress + index * 0.1,
         actionDuration: cinematicFrame ? 1 : Math.max(0.35, followerCue?.duration || activeAction?.seconds || 1.4),
-        positionSnap: followerBoardBlend > 0,
-        visible: !useFerryHuddle || detailedHuddleAnchor,
+        positionSnap: followerBoardBlend > 0 || isFocusedFollower || Boolean(authoredStandIn),
+        visible: (!useFerryHuddle || detailedHuddleAnchor) && !(useWellVentHuddle && authoredStandIn),
         time,
         phase: index * 0.61,
       }, deltaTime);
@@ -1721,15 +2472,15 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         z: motherTargetZ,
         velocity: Number.isFinite(blockedMotherVelocity) ? blockedMotherVelocity : motherHandoffActive ? 0 : motherDeparture > 0 ? -0.58 : signaled ? 0.42 : 0,
         facing: Number.isFinite(blockedMotherFacing) ? blockedMotherFacing : motherHandoffActive ? -1 : motherDeparture > 0 ? -1 : signaled ? 1 : -1,
-        action: directorActors?.mother || (cueLive && cueState.actionId === "motherSignal" ? "signal" : null),
+        action: motherAction || (cueLive && cueState.actionId === "motherSignal" ? "signal" : null),
         registerBook: motherHasRegister,
-        actionTime: directorActionTime ?? (cueLive ? cueAge : 0),
+        actionTime: motherDirectedProgress ?? (cueLive ? cueAge : 0),
         actionDuration: cinematicFrame ? 1 : Math.max(0.35, playerCue?.duration || 1.65),
         time,
         alert: signaled,
-        fear: signaled ? 0.52 : 0.12,
+        fear: GetDirectorValue(motherDirective, "fear", signaled ? 0.52 : 0.12),
         grounded: true,
-        lookOffset: signaled ? -0.2 : 0.08,
+        lookOffset: GetDirectorValue(motherDirective, "lookOffset", signaled ? -0.2 : 0.08),
         positionSnap: Number.isFinite(blockedMotherX),
       }, deltaTime);
       const finaleVisible = cinematicFrame?.id === "endingDeparture";
@@ -1739,6 +2490,19 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         const signalWind = Number(cinematicFrame?.effects?.signalWind ?? (signaled ? 0.65 : 0));
         dynamic.signalCloth.rotation.z = -0.08 + Math.sin(time * 3.1) * (0.025 + signalWind * 0.06);
         dynamic.signalCloth.scale.x = 1 + Math.sin(time * 4.3 + 0.7) * signalWind * 0.08;
+        const positions = dynamic.signalCloth.geometry.attributes.position;
+        const basePositions = dynamic.signalCloth.userData.signalBasePositions;
+        if (basePositions) {
+          for (let index = 0; index < positions.count; index += 1) {
+            const baseX = basePositions[index * 3];
+            const baseY = basePositions[index * 3 + 1];
+            const pin = THREE.MathUtils.clamp((baseX + 0.41) / 0.82, 0, 1);
+            positions.setY(index, baseY + Math.sin(time * 3.5 + baseX * 8.2) * signalWind * 0.024 * pin);
+            positions.setZ(index, Math.sin(time * 4.1 + baseX * 7.4 + baseY * 2.8) * signalWind * 0.085 * pin);
+          }
+          positions.needsUpdate = true;
+          dynamic.signalCloth.geometry.computeVertexNormals();
+        }
       }
       if (dynamic.motherLantern) {
         dynamic.motherLantern.visible = state.completed.has("meetMother") && (!state.endingReady || finaleVisible);
@@ -1762,7 +2526,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         positions.needsUpdate = true;
       }
     } else if (chapter.id === "school") {
-      const teacherActive = Boolean(directorActors?.mother && ["schoolOpening", "registerHandoff"].includes(cinematicFrame?.id));
+      const teacherActive = Boolean(motherAction && ["schoolOpening", "registerHandoff"].includes(cinematicFrame?.id));
       actors.mother.visible = teacherActive;
       if (teacherActive) {
         const registerHandoff = cinematicFrame?.id === "registerHandoff";
@@ -1775,15 +2539,15 @@ export function CreateChapterScene3D(chapter, renderProfile) {
           z: -0.02,
           velocity: Number.isFinite(blockedTeacherVelocity) ? blockedTeacherVelocity : 0,
           facing: Number.isFinite(blockedTeacherFacing) ? blockedTeacherFacing : 1,
-          action: directorActors.mother,
+          action: motherAction,
           registerBook: motherHasRegister,
-          actionTime: directorActionTime,
+          actionTime: motherDirectedProgress,
           actionDuration: 1,
           time,
           alert: false,
           fear: 0.08,
           grounded: true,
-          lookOffset: directorActors.mother === "write" ? 0.08 : -0.1,
+          lookOffset: GetDirectorValue(motherDirective, "lookOffset", motherAction === "write" ? 0.08 : -0.1),
           positionSnap: true,
         }, deltaTime);
       }
@@ -1810,9 +2574,39 @@ export function CreateChapterScene3D(chapter, renderProfile) {
       cue.position.y = GetTerrainY(chapter, action.x * WorldScale) + 0.52 + Math.sin(time * 2.2 + action.x) * 0.045;
       cue.rotation.y = time * 0.65;
     }
+    if (dynamic.blockadeFillLight) {
+      dynamic.blockadeFillLight.position.x = state.player.x * WorldScale - 0.55;
+      dynamic.blockadeFillLight.position.y = state.player.y * WorldScale + 2.7;
+    }
+    if (dynamic.tunnelFillLight) {
+      dynamic.tunnelFillLight.position.x = state.player.x * WorldScale - 0.42;
+      dynamic.tunnelFillLight.position.y = state.player.y * WorldScale + 2.2;
+    }
     if (dynamic.cart && state.cartX !== null) {
-      dynamic.cart.position.x = state.cartX * WorldScale;
-      dynamic.cart.rotation.z = Math.sin(state.cartX * 0.08) * 0.015;
+      const cartTime = cinematicFrame?.id === "cartBrace" ? cinematicFrame.time : -1;
+      const CartPulse = (center, width) => {
+        const distance = Math.abs(cartTime - center) / width;
+        if (distance >= 1) return 0;
+        const t = 1 - distance;
+        return t * t * (3 - 2 * t);
+      };
+      const firstRollback = CartPulse(0.92, 0.48);
+      const firstDrive = CartPulse(1.72, 0.54);
+      const secondRollback = CartPulse(2.58, 0.46);
+      const secondDrive = CartPulse(3.45, 0.58);
+      const catchWeight = CartPulse(4.06, 0.34);
+      const cartOffset = -firstRollback * 0.085 + firstDrive * 0.115 - secondRollback * 0.065 + secondDrive * 0.105;
+      dynamic.cart.position.x = state.cartX * WorldScale + cartOffset;
+      const cartImpact = Math.max(firstRollback, firstDrive, secondRollback, secondDrive, catchWeight);
+      const strainedTremor = cinematicFrame?.id === "cartBrace" && cinematicFrame.segmentIndex === 1
+        ? Math.sin(cinematicFrame.time * 17) * (1 - cinematicFrame.segmentProgress) * 0.006
+        : 0;
+      dynamic.cart.position.y = -cartImpact * 0.052 + (firstDrive + secondDrive) * 0.012;
+      dynamic.cart.rotation.z = Math.sin(state.cartX * 0.08) * 0.015
+        + (firstRollback + secondRollback) * -0.032
+        + (firstDrive + secondDrive) * 0.046
+        + catchWeight * -0.028
+        + strainedTremor;
     }
     if (dynamic.bridge) {
       const raised = state.completed.has("raiseSluice");
@@ -1841,6 +2635,12 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     }
     if (dynamic.waterRipples) dynamic.waterRipples.position.y = chapter.id === "blockade" ? state.waterLevel * 0.54 : 0;
     if (dynamic.farWater) dynamic.farWater.position.y = -0.46 + Math.sin(time * 0.18) * 0.012;
+    for (let index = 0; index < dynamic.mistLayers.length; index += 1) {
+      const mist = dynamic.mistLayers[index];
+      mist.position.x = mist.userData.baseX + Math.sin(time * (0.025 + index * 0.012) + index * 1.7) * (1.1 + index * 0.8);
+      mist.material.opacity = mist.userData.baseOpacity * (0.9 + Math.sin(time * 0.09 + index) * 0.1);
+      if (mist.material.map) mist.material.map.offset.x = (time * (index ? -0.0015 : 0.0009)) % 1;
+    }
     if (dynamic.smoke) {
       const authoredSmokeRetreat = Number(directorEffects.smokeRetreat);
       const showingAuthoredRetreat = Number.isFinite(authoredSmokeRetreat);
@@ -1865,9 +2665,17 @@ export function CreateChapterScene3D(chapter, renderProfile) {
         firstShaft.pool.scale.set(1.2 * openingWidth, 0.56 * openingWidth, 1);
       }
     }
-    const trimOpeningActors = cinematicFrame?.id === "schoolOpening" || cinematicFrame?.id === "endingDeparture";
-    for (const actor of [actors.player, actors.mother]) {
-      for (const optionalMesh of actor.userData.lodOptional || []) optionalMesh.visible = !trimOpeningActors;
+    const openingSequence = ["schoolOpening", "blockadeOpening", "tunnelOpening", "ferryOpening"].includes(cinematicFrame?.id);
+    const cinematicViewDistance = Number(cinematicFrame?.camera?.viewDistance || 0);
+    const trimOpeningActors = openingSequence || cinematicFrame?.id === "endingDeparture";
+    const distantOpeningActors = openingSequence && cinematicViewDistance >= 18;
+    for (const actor of [actors.player, actors.mother, ...actors.followers]) {
+      for (const optionalMesh of actor.userData.lodOptional || []) {
+        optionalMesh.visible = optionalMesh.userData.lodAuthoredVisible !== false && !trimOpeningActors;
+      }
+      for (const distantMesh of actor.userData.lodDistantOnly || []) {
+        distantMesh.visible = distantMesh.userData.lodAuthoredVisible !== false && !distantOpeningActors;
+      }
     }
     // Limb-by-limb shadow passes are sub-pixel in the large establishing
     // shots. Keep every actor's soft contact patch but spend the shadow budget
@@ -1878,7 +2686,7 @@ export function CreateChapterScene3D(chapter, renderProfile) {
     SetActorShadowCasting(actors.mother, !cinematicFrame);
     for (const actor of actors.followers) SetActorShadowCasting(actor, !wideCinematic);
     if (dynamic.foregroundRocks) {
-      dynamic.foregroundRocks.visible = !cinematicFrame?.camera || Number(cinematicFrame.camera.viewDistance || 99) >= 11;
+      dynamic.foregroundRocks.visible = Boolean(cinematicFrame?.camera && Number(cinematicFrame.camera.viewDistance || 0) >= 16);
     }
     const reedShader = materials.reedSway.userData.shader;
     if (reedShader) {

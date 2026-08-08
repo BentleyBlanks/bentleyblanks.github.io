@@ -1,4 +1,4 @@
-import { GetCinematicSequence } from "./Data_Cinematics.mjs?v=20260808z4";
+import { GetCinematicSequence } from "./Data_Cinematics.mjs?v=20260808z24";
 
 function Clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -29,6 +29,7 @@ function BuildFrame(active) {
   const segmentIndex = Math.max(0, sequence.segments.findIndex((segment) => sequenceTime < segment.to));
   const segment = sequence.segments[segmentIndex] || sequence.segments[sequence.segments.length - 1];
   const localProgress = Clamp01((sequenceTime - segment.from) / Math.max(0.001, segment.to - segment.from));
+  const camera = ResolveAuthoredMap(segment.camera, localProgress);
   const effects = ResolveAuthoredMap(segment.effects, localProgress);
   const blocking = ResolveAuthoredMap(segment.blocking, localProgress);
   const locksInput = sequence.lockInput === "all" || sequenceTime < Number(sequence.lockInput || 0);
@@ -40,7 +41,7 @@ function BuildFrame(active) {
     progress: Clamp01(sequenceTime / sequence.duration),
     segmentIndex,
     segmentProgress: localProgress,
-    camera: segment.camera || null,
+    camera: segment.camera ? camera : null,
     actors: segment.actors || null,
     effects,
     blocking,

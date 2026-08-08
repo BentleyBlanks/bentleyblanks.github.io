@@ -10,13 +10,13 @@ export const ChapterVisuals = Object.freeze({
   school: Object.freeze({
     sky: 0x0d2024,
     fog: 0x263b37,
-    fogDensity: 0.012,
-    exposure: 1.28,
+    fogDensity: 0.016,
+    exposure: 1.34,
     moon: 0xc6d0c7,
-    moonIntensity: 3.15,
+    moonIntensity: 4.15,
     ambientSky: 0x8ba7a0,
     ambientGround: 0x3c3021,
-    ambientIntensity: 1.22,
+    ambientIntensity: 0.82,
     ground: 0x484a3d,
     earth: 0x665842,
     plaster: 0xaaa98f,
@@ -25,24 +25,24 @@ export const ChapterVisuals = Object.freeze({
     reed: 0x6d7c64,
     accent: 0xe0a95f,
     water: 0x3c5c58,
-    camera: Object.freeze({ fov: 23, distance: 15.2, lift: 2.52, lookLift: 1.08 }),
+    camera: Object.freeze({ fov: 23, distance: 15.2, lift: 2.84, lookLift: 1.34 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 620, kind: "establish", anchorX: 460, viewDistance: 23.5, lift: 3.48, lookLift: 1.34, reason: "从空教室、院门和远处岗楼建立整座村庄的尺度" }),
-      Object.freeze({ x0: 620, x1: 1120, kind: "approach", viewDistance: 15.1, lift: 2.48, lookLift: 1.06, reason: "苇帘与麦子进入人物尺度" }),
-      Object.freeze({ x0: 1120, x1: 1840, kind: "action", anchorX: 1515, viewDistance: 12.7, lift: 2.2, lookLift: 0.96, reason: "推车、残墙和探照灯形成紧张的动作镜头" }),
-      Object.freeze({ x0: 1840, x1: 2920, kind: "escape", viewDistance: 14.1, lift: 2.26, lookLift: 0.94, reason: "压低镜头进入排水洞，保留前景土坡遮挡" }),
+      Object.freeze({ x0: 0, x1: 620, kind: "establish", anchorX: 460, viewDistance: 25.8, lift: 4.18, lookLift: 1.42, targetZ: -3.6, fov: 25.4, reason: "从空教室、院门和远处岗楼建立整座村庄的尺度" }),
+      Object.freeze({ x0: 620, x1: 1120, kind: "approach", viewDistance: 15.8, lift: 2.88, lookLift: 1.34, targetZ: -1.2, fov: 24.1, reason: "苇帘与麦子进入人物尺度" }),
+      Object.freeze({ x0: 1120, x1: 1840, kind: "action", anchorX: 1515, viewDistance: 12.4, lift: 2.56, lookLift: 1.4, targetZ: -0.74, fov: 24.5, reason: "推车、残墙和探照灯形成紧张的动作镜头" }),
+      Object.freeze({ x0: 1840, x1: 2920, kind: "escape", viewDistance: 15.2, lift: 2.76, lookLift: 1.3, targetZ: -1.55, fov: 24.0, reason: "压低镜头进入排水洞，保留前景土坡遮挡" }),
     ]),
   }),
   blockade: Object.freeze({
     sky: 0x09262c,
     fog: 0x244341,
-    fogDensity: 0.014,
-    exposure: 1.34,
+    fogDensity: 0.0165,
+    exposure: 1.4,
     moon: 0xb7cbc8,
-    moonIntensity: 3.25,
+    moonIntensity: 4.3,
     ambientSky: 0x7ba3a3,
     ambientGround: 0x283029,
-    ambientIntensity: 1.34,
+    ambientIntensity: 0.88,
     ground: 0x424b3f,
     earth: 0x5a543f,
     plaster: 0x879589,
@@ -51,12 +51,12 @@ export const ChapterVisuals = Object.freeze({
     reed: 0x58796a,
     accent: 0xe0bd70,
     water: 0x1c4650,
-    camera: Object.freeze({ fov: 24, distance: 15.6, lift: 2.66, lookLift: 1.02 }),
+    camera: Object.freeze({ fov: 24, distance: 15.6, lift: 2.98, lookLift: 1.34 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 590, viewDistance: 25.4, lift: 3.9, lookLift: 1.46, reason: "长堤、封锁沟、岗楼与远村灯线同框" }),
-      Object.freeze({ x0: 720, x1: 1460, kind: "approach", viewDistance: 14.4, lift: 2.48, lookLift: 0.98, reason: "让苇梢和空船成为可读的风声机关" }),
-      Object.freeze({ x0: 1460, x1: 2260, kind: "action", anchorX: 1750, viewDistance: 12.9, lift: 2.3, lookLift: 0.9, reason: "水闸、长杆、脚下门板和水纹进入动作近景" }),
-      Object.freeze({ x0: 2260, x1: 3340, kind: "escape", viewDistance: 15.0, lift: 2.52, lookLift: 0.98, reason: "贴水穿过第二束灯，远岸仍作为目的地" }),
+      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 590, viewDistance: 28.2, lift: 4.72, lookLift: 1.58, targetZ: -5.2, fov: 25.8, reason: "长堤、封锁沟、岗楼与远村灯线同框" }),
+      Object.freeze({ x0: 720, x1: 1460, kind: "approach", viewDistance: 15.6, lift: 2.88, lookLift: 1.34, targetZ: -1.65, fov: 24.1, reason: "让苇梢和空船成为可读的风声机关" }),
+      Object.freeze({ x0: 1460, x1: 2260, kind: "action", anchorX: 1750, viewDistance: 12.5, lift: 2.66, lookLift: 1.4, targetZ: -0.82, fov: 24.5, reason: "水闸、长杆、脚下门板和水纹进入动作近景" }),
+      Object.freeze({ x0: 2260, x1: 3340, kind: "escape", viewDistance: 16.8, lift: 3.04, lookLift: 1.34, targetZ: -2.35, fov: 24.2, reason: "贴水穿过第二束灯，远岸仍作为目的地" }),
     ]),
   }),
   tunnel: Object.freeze({
@@ -68,7 +68,7 @@ export const ChapterVisuals = Object.freeze({
     moonIntensity: 1.55,
     ambientSky: 0x8b7052,
     ambientGround: 0x2b1b10,
-    ambientIntensity: 4.05,
+    ambientIntensity: 2.75,
     ground: 0x493424,
     earth: 0x6f5234,
     plaster: 0x887157,
@@ -77,24 +77,24 @@ export const ChapterVisuals = Object.freeze({
     reed: 0x6e7158,
     accent: 0xe7a65b,
     water: 0x243536,
-    camera: Object.freeze({ fov: 24, distance: 13.4, lift: 1.9, lookLift: 1.04 }),
+    camera: Object.freeze({ fov: 24, distance: 13.4, lift: 2.22, lookLift: 1.3 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 560, viewDistance: 17.6, lift: 2.5, lookLift: 1.16, reason: "土层剖面、第一口枯井和远端烟路同时可读" }),
-      Object.freeze({ x0: 720, x1: 1540, kind: "approach", viewDistance: 12.3, lift: 1.76, lookLift: 0.96, reason: "低顶支架贴近前景，烟从深处压来" }),
-      Object.freeze({ x0: 1540, x1: 2360, kind: "action", anchorX: 1980, viewDistance: 11.3, lift: 1.62, lookLift: 0.9, reason: "点名、抱起栓儿和递手发生在人物近景" }),
-      Object.freeze({ x0: 2360, x1: 3020, kind: "release", viewDistance: 13.0, lift: 1.82, lookLift: 1.0, reason: "窄井之后重新看见出口的冷光" }),
+      Object.freeze({ x0: 0, x1: 720, kind: "establish", anchorX: 560, viewDistance: 22.8, lift: 3.58, lookLift: 1.3, targetZ: -4.9, fov: 25.2, reason: "土层剖面、第一口枯井和远端烟路同时可读" }),
+      Object.freeze({ x0: 720, x1: 1540, kind: "approach", viewDistance: 13.1, lift: 2.2, lookLift: 1.28, targetZ: -1.12, fov: 24.0, reason: "低顶支架贴近前景，烟从深处压来" }),
+      Object.freeze({ x0: 1540, x1: 2360, kind: "action", anchorX: 1980, viewDistance: 10.9, lift: 1.98, lookLift: 1.34, targetZ: -0.96, fov: 24.5, reason: "点名、抱起栓儿和递手发生在人物近景" }),
+      Object.freeze({ x0: 2360, x1: 3020, kind: "release", viewDistance: 14.6, lift: 2.44, lookLift: 1.34, targetZ: -1.82, fov: 24.1, reason: "窄井之后重新看见出口的冷光" }),
     ]),
   }),
   ferry: Object.freeze({
     sky: 0x2a4550,
     fog: 0x415754,
-    fogDensity: 0.0075,
-    exposure: 1.2,
+    fogDensity: 0.011,
+    exposure: 1.3,
     moon: 0xd9d2ad,
-    moonIntensity: 3.0,
+    moonIntensity: 4.0,
     ambientSky: 0xb5c7bd,
     ambientGround: 0x44483a,
-    ambientIntensity: 1.16,
+    ambientIntensity: 0.8,
     ground: 0x535d4d,
     earth: 0x6f624c,
     plaster: 0x969d8e,
@@ -103,12 +103,12 @@ export const ChapterVisuals = Object.freeze({
     reed: 0x72866f,
     accent: 0xe1b56b,
     water: 0x3b656d,
-    camera: Object.freeze({ fov: 23, distance: 16.2, lift: 2.62, lookLift: 1.06 }),
+    camera: Object.freeze({ fov: 23, distance: 16.2, lift: 2.94, lookLift: 1.34 }),
     shots: Object.freeze([
-      Object.freeze({ x0: 0, x1: 820, kind: "establish", anchorX: 650, viewDistance: 26.4, lift: 4.05, lookLift: 1.5, reason: "六名孩子、长堤、远岸与渡船先建立空间关系" }),
-      Object.freeze({ x0: 820, x1: 1580, kind: "approach", viewDistance: 15.0, lift: 2.52, lookLift: 1.02, reason: "苇障和队伍纪律进入可操作尺度" }),
-      Object.freeze({ x0: 1580, x1: 2320, kind: "action", anchorX: 1960, viewDistance: 12.4, lift: 2.22, lookLift: 0.94, reason: "母女交接、点名簿与白布信号进入人物近景" }),
-      Object.freeze({ x0: 2320, x1: 3660, kind: "finale", anchorX: 3070, viewDistance: 19.8, lift: 3.12, lookLift: 1.12, reason: "灯转南汊，船从北汊离岸并驶向远景" }),
+      Object.freeze({ x0: 0, x1: 820, kind: "establish", anchorX: 650, viewDistance: 30.4, lift: 5.18, lookLift: 1.72, targetZ: -7.2, fov: 26.2, reason: "六名孩子、长堤、远岸与渡船先建立空间关系" }),
+      Object.freeze({ x0: 820, x1: 1580, kind: "approach", viewDistance: 16.2, lift: 3.04, lookLift: 1.34, targetZ: -1.9, fov: 24.1, reason: "苇障和队伍纪律进入可操作尺度" }),
+      Object.freeze({ x0: 1580, x1: 2320, kind: "action", anchorX: 1960, viewDistance: 12.1, lift: 2.6, lookLift: 1.4, targetZ: -0.76, fov: 24.5, reason: "母女交接、点名簿与白布信号进入人物近景" }),
+      Object.freeze({ x0: 2320, x1: 3660, kind: "finale", anchorX: 3070, viewDistance: 22.6, lift: 4.04, lookLift: 1.46, targetZ: -4.6, fov: 24.8, reason: "灯转南汊，船从北汊离岸并驶向远景" }),
     ]),
   }),
 });
@@ -149,5 +149,20 @@ export function GetCinematicCue(actionId) {
 
 export function GetCameraShot(chapterId, playerX) {
   const profile = GetVisualProfile(chapterId);
-  return profile.shots.find((shot) => playerX >= shot.x0 && playerX <= shot.x1) || profile.shots[profile.shots.length - 1];
+  const shot = profile.shots.find((candidate) => playerX >= candidate.x0 && playerX <= candidate.x1) || profile.shots[profile.shots.length - 1];
+  // Wide shots keep the camera almost level, placing the playable ground in
+  // the lower quarter instead of exposing a large, empty foreground stage.
+  // Tunnel close shots use the same principle to keep the cutaway from being
+  // squeezed between a heavy ceiling strip and a heavy floor strip.
+  const establishingLookLift = { school: 3.68, blockade: 3.4, tunnel: 2.55, ferry: 3.8 };
+  const outdoorLookLift = {
+    school: { approach: 3.15, action: 2.9, escape: 3.0 },
+    blockade: { approach: 3.2, action: 2.92, escape: 3.08 },
+    ferry: { approach: 3.22, action: 2.92, finale: 3.32 },
+  };
+  const tunnelLookLift = { approach: 2.92, action: 2.72, release: 2.88 };
+  if (shot.kind === "establish") return { ...shot, lookLift: establishingLookLift[chapterId] ?? shot.lookLift };
+  if (chapterId === "tunnel" && tunnelLookLift[shot.kind] !== undefined) return { ...shot, lookLift: tunnelLookLift[shot.kind] };
+  if (outdoorLookLift[chapterId]?.[shot.kind] !== undefined) return { ...shot, lookLift: outdoorLookLift[chapterId][shot.kind] };
+  return shot;
 }
