@@ -1,5 +1,5 @@
-import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808z4";
-import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808z4";
+import { Chapters, GameMetadata, HistoricalSources, GetAllChildNames, GetChapter } from "./Data_World.mjs?v=20260808z8";
+import { GetActionCinematic, GetChapterOpeningCinematic } from "./Data_Cinematics.mjs?v=20260808z8";
 import {
   CreateGameState,
   RestoreGameState,
@@ -15,9 +15,9 @@ import {
   AdvanceChapter,
   CompleteAction,
   RequirementsMet,
-} from "./Script_Rules.mjs?v=20260808z4";
-import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808z4";
-import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808z4";
+} from "./Script_Rules.mjs?v=20260808z8";
+import { CreateCinematicDirector } from "./Script_Cinematics3D.mjs?v=20260808z8";
+import { CreateRender3D, PreloadRender3D } from "./Script_Render3D.mjs?v=20260808z8";
 
 const Ui = {
   shell: document.getElementById("GameShell"),
@@ -727,6 +727,7 @@ function StartQaChapter(chapterIndex, playerX = null, completedIds = []) {
   Runtime.state = CreateGameState(Math.max(0, Math.min(Chapters.length - 1, chapterIndex)));
   const chapter = GetChapter(Runtime.state.chapterIndex);
   for (const action of chapter.actions) if (completedIds.includes(action.id)) CompleteAction(Runtime.state, action);
+  if (chapter.cart && completedIds.includes("cartPlaced")) Runtime.state.cartX = chapter.cart.targetX;
   if (Number.isFinite(playerX)) {
     Runtime.state.player.x = playerX;
     Runtime.state.player.y = GetGroundY(GetChapter(Runtime.state.chapterIndex), playerX, Runtime.state, 0) ?? 0;

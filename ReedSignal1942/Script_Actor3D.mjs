@@ -464,6 +464,28 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightHandX = -0.28 + stroke * 0.13;
     leftHandZ = -0.05;
     rightHandZ = stroke * 0.055;
+  } else if (gesture === "kneelListen") {
+    const lower = SmoothStep(0.04, 0.4, gestureProgress);
+    const settle = SmoothStep(0.36, 0.78, gestureProgress);
+    rigY -= 0.25 * lower;
+    rigX += (pose.facing >= 0 ? 1 : -1) * 0.014 * lower;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.035 * settle;
+    pelvisRotX += 0.3 * lower;
+    torsoRotX += 0.08 * lower;
+    headRotX -= 0.18 * lower;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.13 * settle;
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.96, lower);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, 0.18, lower);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 1.12, lower);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 1.5, lower);
+    leftFootX = THREE.MathUtils.lerp(leftFootX, -0.12, lower);
+    rightFootX = THREE.MathUtils.lerp(rightFootX, -1.02, lower);
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.62, settle);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.5, settle);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.34, settle);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.2, settle);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.2, settle);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.18, settle);
   } else if (gesture === "write" || gesture === "count") {
     const writing = gesture === "write";
     const stroke = gestureBeat * gestureAttack;
@@ -516,6 +538,59 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, 0.12, raise);
     rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.08, raise);
     rightHandX = -0.08;
+  } else if (gesture === "gripSleeve") {
+    const reach = SmoothStep(0.05, 0.42, gestureProgress);
+    const hold = 1 - SmoothStep(0.86, 1, gestureProgress) * 0.12;
+    const contact = reach * hold;
+    rigY -= 0.05 * contact;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * 0.07 * contact;
+    pelvisRotX += 0.1 * contact;
+    torsoRotX += 0.08 * contact;
+    shouldersRotY += (pose.facing >= 0 ? -1 : 1) * 0.12 * contact;
+    headRotX -= 0.24 * contact;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.18 * contact;
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.55, contact);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.05, contact);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.12, contact);
+    rightHandX = -0.34;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.42, contact);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.12, contact);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.14, contact);
+    leftHandX = -0.24;
+  } else if (gesture === "shoulderBrace") {
+    const drive = SmoothStep(0.04, 0.48, gestureProgress);
+    const tremor = Math.sin(gestureProgress * Math.PI * 8) * (1 - gestureProgress) * 0.018;
+    rigY -= 0.17 * drive;
+    rigRotZ += (pose.facing >= 0 ? -1 : 1) * (0.13 + tremor) * drive;
+    pelvisRotX += 0.26 * drive;
+    torsoRotX += 0.22 * drive;
+    shouldersRotZ += (pose.facing >= 0 ? -1 : 1) * 0.1 * drive;
+    headRotX -= 0.12 * drive;
+    leftLegX = THREE.MathUtils.lerp(leftLegX, -0.58, drive);
+    rightLegX = THREE.MathUtils.lerp(rightLegX, 0.34, drive);
+    leftLowerLegX = THREE.MathUtils.lerp(leftLowerLegX, 0.92, drive);
+    rightLowerLegX = THREE.MathUtils.lerp(rightLowerLegX, 0.38, drive);
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -1.22, drive);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -1.3, drive);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.08, drive);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, 0.04, drive);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.32, drive);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.28, drive);
+  } else if (gesture === "breatheRelief") {
+    const release = SmoothStep(0.08, 0.62, gestureProgress);
+    const inhale = Math.sin(Math.min(1, gestureProgress) * Math.PI) * release;
+    rigY += 0.045 * release + inhale * 0.018;
+    pelvisRotX -= 0.05 * release;
+    torsoRotX -= 0.1 * release;
+    shouldersRotZ *= 1 - release * 0.7;
+    headRotX -= 0.24 * release;
+    headRotY += (pose.facing >= 0 ? 1 : -1) * 0.045 * release;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.28, release);
+    rightArmX = THREE.MathUtils.lerp(rightArmX, -0.18, release);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.38, release);
+    rightArmLowerX = THREE.MathUtils.lerp(rightArmLowerX, -0.32, release);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.12, release);
+    rightArmZ = THREE.MathUtils.lerp(rightArmZ, 0.1, release);
   } else if (gesture === "receiveComfort") {
     const notice = SmoothStep(0.04, 0.32, gestureProgress);
     const accept = SmoothStep(0.34, 0.76, gestureProgress);
@@ -667,6 +742,17 @@ export function UpdateActor3D(actor, pose, deltaTime) {
     leftArmX = THREE.MathUtils.lerp(leftArmX, -0.34, turnBack);
     leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.92, turnBack);
     leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.16, turnBack);
+  } else if (gesture === "lookBack") {
+    const turn = SmoothStep(0.08, 0.56, gestureProgress);
+    const returnWeight = SmoothStep(0.76, 1, gestureProgress);
+    rigRotZ += (pose.facing >= 0 ? 1 : -1) * 0.035 * turn;
+    pelvisRotY += (pose.facing >= 0 ? -1 : 1) * 0.08 * turn;
+    shouldersRotY += (pose.facing >= 0 ? -1 : 1) * (0.32 - returnWeight * 0.12) * turn;
+    headRotY += (pose.facing >= 0 ? -1 : 1) * (0.82 - returnWeight * 0.2) * turn;
+    headRotZ += (pose.facing >= 0 ? 1 : -1) * 0.055 * turn;
+    leftArmX = THREE.MathUtils.lerp(leftArmX, -0.48, turn);
+    leftArmLowerX = THREE.MathUtils.lerp(leftArmLowerX, -0.72, turn);
+    leftArmZ = THREE.MathUtils.lerp(leftArmZ, -0.18, turn);
   } else if (gesture === "signal") {
     const raise = BackOut(SmoothStep(0.04, 0.55, gestureProgress));
     const windResistance = Math.sin(gestureProgress * Math.PI * 7) * gestureArc * 0.035;

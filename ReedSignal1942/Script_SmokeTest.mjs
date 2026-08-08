@@ -82,6 +82,15 @@ assert.equal(CinematicSequences.tunnelRollCall.segments.length, 4, "the tunnel r
 assert.equal(CinematicSequences.tunnelRollCall.segments[0].actors.player, "tap", "Awei must physically knock before waiting for answers");
 assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusAction, "raiseHand", "Shuaner must answer with a hand rather than a generic group pose");
 assert.equal(CinematicSequences.tunnelRollCall.segments[2].actors.followerFocusIndex, 5, "only the sixth child may receive Shuaner's featured gesture");
+assert.equal(CinematicSequences.miziHandoff.segments.length, 3, "Mizi's first contact needs descent, sleeve grip, and mutual release");
+assert.equal(CinematicSequences.miziHandoff.segments[1].actors.player, "kneelListen", "Awei must lower herself to Mizi's eye line");
+assert.equal(CinematicSequences.miziHandoff.segments[1].actors.followerFocusAction, "gripSleeve", "Mizi must make physical contact instead of being described only by caption");
+assert.equal(CinematicSequences.cartBrace.segments.length, 3, "the handcart beat needs strain, shared weight, and release");
+assert.equal(CinematicSequences.cartBrace.segments[0].actors.followerFocusAction, "shoulderBrace", "Mizi must visibly put her shoulder into the handcart");
+assert.equal(CinematicSequences.drainPassage.segments[1].actors.followerFocusAction, "lookBack", "Mizi must look back before Awei follows into the drain");
+assert.equal(CinematicSequences.wellVent.segments.length, 3, "the well opening needs lift, Mizi's breath, and a causal cut to the missing children");
+assert.equal(CinematicSequences.wellVent.segments[2].actors.followerStandIns.length, 4, "the four still-missing children must enter the cinematic without becoming gameplay followers");
+assert.ok(CinematicSequences.wellVent.segments[2].actors.followerStandIns.every((standIn) => standIn.x > 1480), "the missing children must remain beyond the sealed gate, not teleport beside the well");
 assert.equal(CinematicSequences.motherHandoff.segments.length, 4, "the reunion needs the register, seventh line, embrace, and release");
 assert.equal(CinematicSequences.motherHandoff.segments[2].actors.player, "receiveComfort", "Awei must visibly react to being held");
 assert.equal(CinematicSequences.motherHandoff.segments[2].actors.mother, "embrace", "Zhou He must physically initiate the embrace");

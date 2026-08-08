@@ -267,6 +267,92 @@ try {
   await page.waitForFunction(() => !window.ReedSignal1942?.GetCinematic(), null, { timeout: 5000 });
   Assert(true, "cinematic input: Escape 在允许略过后才结束过场");
 
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=0&qaX=610&qaCompleted=findMizi&qaCinematic=miziHandoff`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.58, null, { timeout: 10000 });
+  const miziContact = await page.evaluate(() => {
+    const actors = window.ReedSignal1942?.render?.chapterScene?.actors;
+    const player = actors?.player;
+    const child = actors?.followers?.[0];
+    if (!player || !child) return null;
+    const playerRig = player.userData.rig;
+    const childRig = child.userData.rig;
+    const leftHand = child.position.clone().set(0, 0, 0);
+    const rightHand = child.position.clone().set(0, 0, 0);
+    const leftSleeve = player.position.clone().set(0, 0, 0);
+    const rightSleeve = player.position.clone().set(0, 0, 0);
+    childRig.leftArm.endpoint.getWorldPosition(leftHand);
+    childRig.rightArm.endpoint.getWorldPosition(rightHand);
+    playerRig.leftArm.lower.getWorldPosition(leftSleeve);
+    playerRig.rightArm.lower.getWorldPosition(rightSleeve);
+    return {
+      playerAction: player.userData.motion?.action || "",
+      childAction: child.userData.motion?.action || "",
+      actorSeparation: Math.abs(player.position.x - child.position.x),
+      depthSeparation: Math.abs(player.position.z - child.position.z),
+      handToSleeve: Math.min(
+        leftHand.distanceTo(leftSleeve),
+        leftHand.distanceTo(rightSleeve),
+        rightHand.distanceTo(leftSleeve),
+        rightHand.distanceTo(rightSleeve),
+      ),
+      playerRigY: playerRig.rig.position.y,
+    };
+  });
+  Assert(miziContact?.playerAction === "kneelListen", "Mizi handoff: Awei physically lowers herself to the child's eye line");
+  Assert(miziContact?.childAction === "gripSleeve", "Mizi handoff: Mizi reaches for Awei's sleeve instead of holding a generic pose");
+  if (miziContact) {
+    Assert(miziContact.actorSeparation > 0.5 && miziContact.actorSeparation < 0.72, `Mizi handoff: silhouettes separate while remaining within arm's reach (${miziContact.actorSeparation.toFixed(2)}m)`);
+    Assert(miziContact.handToSleeve < 0.48, `Mizi handoff: the reaching hand arrives at a sleeve (${miziContact.handToSleeve.toFixed(2)}m)`);
+    Assert(miziContact.depthSeparation > 0.1, `Mizi handoff: the grip is separated toward camera so the hands stay readable (${miziContact.depthSeparation.toFixed(2)}m)`);
+    Assert(miziContact.playerRigY < -0.16, `Mizi handoff: the adult rig visibly drops onto one knee (${miziContact.playerRigY.toFixed(2)}m)`);
+  }
+
+  await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=0&qaX=1515&qaCompleted=findMizi,dropBlind,cartPlaced&qaCinematic=cartBrace`, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 0 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.8, null, { timeout: 10000 });
+  const cartImpact = await page.evaluate(() => {
+    const cart = window.ReedSignal1942?.render?.chapterScene?.dynamic?.cart;
+    return cart ? { y: cart.position.y, tilt: cart.rotation.z } : null;
+  });
+  Assert(Boolean(cartImpact && cartImpact.y < -0.025), `handcart: the axle visibly settles into mud before rebounding (${cartImpact?.y?.toFixed(3) || "missing"}m)`);
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 1 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.56, null, { timeout: 10000 });
+  const cartContact = await page.evaluate(() => {
+    const scene = window.ReedSignal1942?.render?.chapterScene;
+    const player = scene?.actors?.player;
+    const followers = scene?.actors?.followers || [];
+    const child = followers[0];
+    const cart = scene?.dynamic?.cart;
+    if (!player || !child || !cart) return null;
+    const playerRig = player.userData.rig;
+    const leftHand = player.position.clone().set(0, 0, 0);
+    const rightHand = player.position.clone().set(0, 0, 0);
+    const nearHandle = player.position.clone().set(1.25, 0.83, -0.3);
+    const farHandle = player.position.clone().set(1.25, 0.83, 0.3);
+    playerRig.leftArm.endpoint.getWorldPosition(leftHand);
+    playerRig.rightArm.endpoint.getWorldPosition(rightHand);
+    cart.localToWorld(nearHandle);
+    cart.localToWorld(farHandle);
+    return {
+      playerAction: player.userData.motion?.action || "",
+      childAction: child.userData.motion?.action || "",
+      otherFeaturedChildren: followers.slice(1).filter((actor) => actor.visible && actor.userData.motion?.action === "shoulderBrace").length,
+      childToCart: Math.abs(child.position.x - cart.position.x),
+      childRigY: child.userData.rig.rig.position.y,
+      handToHandle: Math.min(
+        leftHand.distanceTo(nearHandle),
+        leftHand.distanceTo(farHandle),
+        rightHand.distanceTo(nearHandle),
+        rightHand.distanceTo(farHandle),
+      ),
+    };
+  });
+  Assert(cartContact?.playerAction === "brace" && cartContact?.childAction === "shoulderBrace", "handcart: Awei and Mizi carry distinct parts of the same strain");
+  Assert(cartContact?.otherFeaturedChildren === 0, "handcart: only Mizi receives the shoulder-brace performance");
+  if (cartContact) {
+    Assert(cartContact.childToCart < 0.42, `handcart: Mizi's body reaches the cart instead of pushing air (${cartContact.childToCart.toFixed(2)}m)`);
+    Assert(cartContact.childRigY < -0.1, `handcart: Mizi lowers her center of gravity under load (${cartContact.childRigY.toFixed(2)}m)`);
+    Assert(cartContact.handToHandle < 0.62, `handcart: Awei's hands remain on the lowered handles (${cartContact.handToHandle.toFixed(2)}m)`);
+  }
+
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=1&qaX=1735&qaCompleted=readWind,releaseBoat,raiseSluice&qaCinematic=sluiceRise`, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.id === "sluiceRise" && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.46, null, { timeout: 10000 });
   const sluiceMidShot = await page.evaluate(() => {
@@ -293,6 +379,46 @@ try {
     Assert(ventMidShot.shaftWidth > 0.4 && ventMidShot.shaftWidth < 0.9, `well vent cinematic: 光柱随井口渐宽（${ventMidShot.shaftWidth.toFixed(2)}）`);
     Assert(ventMidShot.smokeOpacity > 0.06 && ventMidShot.smokeOpacity < 0.13, `well vent cinematic: 烟雾在过程里逐步变薄（${ventMidShot.smokeOpacity.toFixed(3)}）`);
   }
+  await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 2 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.52, null, { timeout: 10000 });
+  const ventChildren = await page.evaluate(() => {
+    const scene = window.ReedSignal1942?.render?.chapterScene;
+    const followers = scene?.actors?.followers || [];
+    const visible = followers.filter((actor) => actor.visible);
+    const huddle = scene?.dynamic?.wellVentHuddle;
+    const headHeights = [];
+    const bodyPositions = [];
+    let nonZeroInstances = 0;
+    if (huddle?.bodies && huddle.matrix && huddle.position && huddle.scale) {
+      for (let index = 0; index < huddle.bodies.count; index += 1) {
+        huddle.bodies.getMatrixAt(index, huddle.matrix);
+        huddle.position.setFromMatrixPosition(huddle.matrix);
+        huddle.scale.setFromMatrixScale(huddle.matrix);
+        bodyPositions.push(huddle.position.x);
+        if (Math.max(huddle.scale.x, huddle.scale.y, huddle.scale.z) > 0.5) nonZeroInstances += 1;
+        huddle.heads.getMatrixAt(index, huddle.matrix);
+        huddle.position.setFromMatrixPosition(huddle.matrix);
+        headHeights.push(huddle.position.y);
+      }
+    }
+    return {
+      detailedActors: visible.length,
+      detailedBreathingActors: visible.filter((actor) => actor.userData.motion?.action === "breatheRelief").length,
+      huddleVisible: Boolean(huddle?.group?.visible),
+      huddleDrawMeshes: huddle?.group?.children?.filter((child) => child.visible).length || 0,
+      nonZeroInstances,
+      deeperActors: bodyPositions.filter((x) => x > 14.8).length,
+      headHeightSpread: headHeights.length ? Math.max(...headHeights) - Math.min(...headHeights) : 0,
+      gameplayFollowers: window.ReedSignal1942.GetState().followers.length,
+      calls: Number(document.getElementById("GameCanvas")?.dataset.renderCalls || 0),
+    };
+  });
+  Assert(ventChildren.detailedActors === 1 && ventChildren.detailedBreathingActors === 1, "well vent cinematic: Mizi keeps her complete breathing rig while the camera cuts deeper");
+  Assert(ventChildren.huddleVisible && ventChildren.nonZeroInstances === 4, "well vent cinematic: four still-missing children are present as realtime instanced 3D actors");
+  Assert(ventChildren.huddleDrawMeshes === 2, "well vent cinematic: the distant group is batched into body and head draw meshes");
+  Assert(ventChildren.headHeightSpread > 0.008, "well vent cinematic: the children breathe and lift their heads out of sync");
+  Assert(ventChildren.deeperActors === 4, "well vent cinematic: the missing children remain staged beyond the sealed gate");
+  Assert(ventChildren.gameplayFollowers === 1, "well vent cinematic: temporary story actors do not rewrite the gameplay follower ledger");
+  Assert(ventChildren.calls < 260, `well vent cinematic: five detailed child actors remain inside the desktop budget (${ventChildren.calls} calls)`);
 
   await page.goto(`http://127.0.0.1:${port}/ReedSignal1942/?quality=desktop&qaChapter=2&qaX=1620&qaCompleted=openWellVent,sealEastCrack,findChildren&qaCinematic=tunnelRollCall`, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => window.ReedSignal1942?.GetCinematic()?.segmentIndex === 0 && Number(window.ReedSignal1942.GetCinematic().segmentProgress) > 0.5, null, { timeout: 10000 });

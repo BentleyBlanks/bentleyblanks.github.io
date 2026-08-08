@@ -1,9 +1,9 @@
 import * as THREE from "../TunnelBell1942/vendor/three/build/three.module.mjs";
-import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z4";
-import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z4";
-import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z4";
-import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z4";
-import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z4";
+import { GetGroundY, GetLightTarget, GetWindStrength } from "./Script_Rules.mjs?v=20260808z8";
+import { GetCameraShot, GetVisualProfile, RenderProfiles, WorldScale } from "./Data_Scene3D.mjs?v=20260808z8";
+import { CreateChapterScene3D } from "./Script_Scene3D.mjs?v=20260808z8";
+import { GetSceneAssetStatus3D, LoadSceneAssetKit3D } from "./Script_Assets3D.mjs?v=20260808z8";
+import { CreateCinematicPostFX3D } from "./Script_PostFX3D.mjs?v=20260808z8";
 
 export async function PreloadRender3D() {
   await LoadSceneAssetKit3D();
