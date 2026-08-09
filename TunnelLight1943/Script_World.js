@@ -205,6 +205,11 @@ const BarrowLoad = (n) => ({ planks: Math.min(2, n), pole: n >= 3 });
 // ---------------------------------------------------------------------------
 export function CreateWorld(canvasEl) {
   const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+  // 浏览器直接播放的 MP4 是 BT.709/sRGB 显示内容。序章把同一帧上传成
+  // VideoTexture 时也必须显式声明 sRGB；否则 Three 会把它当线性数据再做一次
+  // 输出变换，网页里的对比度和独立播放原片就会明显不同。
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
   // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
@@ -3993,6 +3998,7 @@ export function CreateWorld(canvasEl) {
     el.playsInline = true;
     el.preload = "auto";
     const tex = new THREE.VideoTexture(el);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearFilter;   // 视频贴图不能开 mipmap
     tex.generateMipmaps = false;
@@ -4071,7 +4077,7 @@ export function CreateWorld(canvasEl) {
     if (!insertMesh) {
       insertMesh = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
-        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
       scene.add(insertMesh);
