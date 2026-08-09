@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -250,7 +250,45 @@ function TestClimb() {
   }
   StepGame(state, { moveX: 0, climb: -1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   assert.equal(state.player.level, "surface", "在梯口按 W 应回到地表");
-  console.log("  ✓ 爬梯口上下");
+
+  // 人不许瞬移：层数当帧就翻（碰撞按目的层算），但**渲染高度得一格一格挪下去**。
+  // 老版本 `p.level="under"; p.climbT=0.55` 就翻了个层数，渲染层照 level 取地平线，
+  // 人当场掉到井底、再在井底原地摆 0.55 秒爬梯姿势——玩家看见的就是"瞬移 + 没动作"。
+  // 这里盯三件事：起手的渲染高度还在原来那层、中途是连续下降的、到点归零。
+  {
+    const s2 = CreateGame(0);
+    let f2 = 0;
+    while (s2.phase !== "playing" || CurrentBeatDef(s2)?.kind === "cinematic") {
+      StepGame(s2, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
+      if ((f2 += 1) > 10000) throw new Error("无法进入第一章玩法段");
+    }
+    // 井口 x 从场景数据取，别写死——第一章改过一次布局，写死的 27 当场失效
+    const sc2 = SCENES[CHAPTERS[s2.chapterIndex].scene];
+    s2.player.x = sc2.shafts[0].x;
+    s2.player.level = "surface";
+    const idle2 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+    StepGame(s2, { ...idle2, climb: 1 }, DT);
+    assert.equal(s2.player.level, "under", "层数当帧就翻");
+    const RenderY = () => (s2.player.level === "under" ? UNDER_Y : SURFACE_Y) + (s2.player.lift || 0);
+    assert.ok(Math.abs(RenderY() - SURFACE_Y) < 0.35,
+      `刚下梯子那一下人还得在井口（现在渲染在 ${RenderY().toFixed(2)}，井口 ${SURFACE_Y}）`);
+    assert.ok(s2.player.climbT > 1.0, "3.6 米的井不该 0.55 秒就下完——那是瞬移的时长");
+    const ys = [RenderY()];
+    let g2 = 0;
+    while (s2.player.climbT > 0 && (g2 += 1) < 400) {
+      StepGame(s2, idle2, DT);
+      ys.push(RenderY());
+    }
+    // 一路只降不升，且真的走完了整口井
+    for (let i = 1; i < ys.length; i += 1) {
+      assert.ok(ys[i] <= ys[i - 1] + 1e-6, `下梯子的高度不许回弹（第 ${i} 帧 ${ys[i]} > ${ys[i - 1]}）`);
+    }
+    assert.ok(ys.filter((y, i) => i > 0 && y < ys[i - 1] - 1e-6).length > 20,
+      "中间得有几十帧真的在往下挪，不是跳一下就到底");
+    assert.ok(Math.abs(RenderY() - UNDER_Y) < 1e-6, "落地之后渲染高度要正好归到地道地平线");
+    assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
+  }
+  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位）");
 }
 
 function TestSmokeFront() {
@@ -875,8 +913,9 @@ function TestWinchIsACrankNotALever() {
 // 的哪儿说了算（pointerCard，u 沿卡宽 / v 沿卡高的归一化坐标）。世界坐标那条
 // 老路子已经废了——世界里那支笔只有十来个像素，按不着。五条硬规矩各验一遍。
 function TestChalkIsAPencilNotASlider() {
-  // 新版第一章的量身只是三四秒的人物动作（不是玩法）；攥石笔划线的拟物
-  // 交互只剩第八章那道给妹妹刻的痕
+  // 攥石笔划线的拟物交互一头一尾各一次：第一章量身（c1_carve，爹的手按着、
+  // 玩家攥笔）与第八章给妹妹刻痕（c8_carve）。机制细则在 c8 上验（selfMark 那
+  // 版旗标齐全）；c1 那道由整章自动通关盯 flags.marked 兜底
   const carve = ChapterBeatList(7).find((b) => b.id === "c8_carve");
   const mk = () => {
     const state = CreateGame(7);
@@ -965,6 +1004,73 @@ function TestChalkIsAPencilNotASlider() {
     assert.ok(!s.dragTrack, "划完之后也不许留下一根轨道");
   }
   console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
+}
+
+// 画框边缘的指路标（勇敢的心式）：目标出了画框且离得远 → 必须指、指对边；
+// 目标就在画框里或人已到近旁 → 不指；特写里不指；目标在另一层 → 先指梯口。
+function TestEdgeHintPointsOffscreenTargets() {
+  const VIEW = 12.3;   // 地表玩法景别的画框宽（hw 6.15 × 2）
+  // 第一章里找一幕带同层空间目标的玩法拍（剧本再改也不至于失效）
+  let s = null, tg = null;
+  const list = ChapterBeatList(0);
+  for (let i = 0; i < list.length; i += 1) {
+    const cand = CreateGame(0);
+    DebugJump(cand, 0, i);
+    if (cand.phase !== "playing") continue;
+    const def = CurrentBeatDef(cand);
+    if (!def || def.kind === "cinematic") continue;
+    const t = GetBeatTarget(cand);
+    if (t && typeof t.x === "number" && (t.level || "surface") === (cand.player.level || "surface")) {
+      s = cand; tg = t; break;
+    }
+  }
+  assert.ok(s, "第一章得有一幕带空间目标的玩法拍");
+  const scene = SCENES[CHAPTERS[s.chapterIndex].scene];
+  const rng = scene.walk[s.player.level] || scene.walk.surface;
+  // 站到离目标 12m 开外（往走得开的那头挪）
+  const dir = tg.x - rng[0] > rng[1] - tg.x ? -1 : 1;
+  s.player.x = Math.max(rng[0], Math.min(rng[1], tg.x + dir * 12));
+  const t2 = GetBeatTarget(s);   // 目标可能跟着演员挪，取此刻的
+  const eh = EdgeHint(s, s.player.x, VIEW);
+  assert.ok(eh, "目标出画框且远：必须给边缘指路标");
+  assert.equal(eh.side, Math.sign(t2.x - s.player.x), "指路标必须指向目标那一侧");
+  // 镜头对着目标：画框里的东西不用指
+  assert.equal(EdgeHint(s, t2.x, VIEW), null, "目标在画框里就不指");
+  // 特写里不指：手上的活正做到一半，别拿路标打岔
+  s.closeUp = { x: s.player.x, y: 1.2, hw: 3 };
+  assert.equal(EdgeHint(s, s.player.x, VIEW), null, "特写里不指");
+  s.closeUp = null;
+  // 人已经走到近旁：哪怕镜头甩开了也不指（免得边缘标来回闪）
+  s.player.x = Math.max(rng[0], Math.min(rng[1], t2.x + 2));
+  assert.equal(EdgeHint(s, t2.x + 40, VIEW), null, "人已到近旁就不指");
+
+  // 跨层：全八章里找一幕"目标在另一层、人又离梯口够远"的，验梯口重定向
+  let cross = null;
+  for (let c = 0; c < CHAPTERS.length && !cross; c += 1) {
+    const cl = ChapterBeatList(c);
+    for (let i = 0; i < cl.length; i += 1) {
+      const cand = CreateGame(0);
+      DebugJump(cand, c, i);
+      if (cand.phase !== "playing") continue;
+      const def = CurrentBeatDef(cand);
+      if (!def || def.kind === "cinematic") continue;
+      const t = GetBeatTarget(cand);
+      if (!t || typeof t.x !== "number") continue;
+      if ((t.level || "surface") === (cand.player.level || "surface")) continue;
+      const sc = SCENES[CHAPTERS[c].scene];
+      const usable = (sc.shafts || []).filter((sh) => !sh.builtFlag || cand.flags[sh.builtFlag]);
+      if (!usable.length) continue;
+      const near = usable.reduce((m, sh) => Math.min(m, Math.abs(cand.player.x - sh.x)), Infinity);
+      if (near < 6) continue;   // 站在梯口跟前轮不到边缘标，找个够远的
+      cross = cand;
+      break;
+    }
+  }
+  if (cross) {
+    const eh2 = EdgeHint(cross, cross.player.x, VIEW);
+    assert.ok(eh2 && eh2.climb, "目标在另一层：边缘标得带竖向记号（先去梯口）");
+  }
+  console.log("  ✓ 边缘指路标：出框才指 / 指对边 / 近旁与特写不指" + (cross ? " / 跨层先指梯口" : ""));
 }
 
 function TestInstrumentalBgmManifest() {
@@ -1078,6 +1184,9 @@ function TestPlaneBeat() {
   // "玩家怎么走到工位"这一整段；线上示范一完人站在判定圈外，屏幕上什么都不出，
   // 玩家只能干瞪眼。凡是"玩家自己要走到某处"的节拍，测试必须走真实路径。
   const workX = def.zone.x - 0.55;
+  // 第一帧才会跑 onStart（微过场从那儿起），所以先走一帧再点掉过渡台词
+  StepGame(state, idle(), DT);
+  for (let i = 0; i < 600 && state.microCine; i += 1) StepGame(state, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(state, idle(), DT);
   assert.ok(state.planing, "刨料期间台面上必须有那块料");
   assert.ok(Math.abs(state.player.x - workX) < 0.06,
@@ -1130,6 +1239,8 @@ function TestPlaneBeat() {
   // 光按住 E 就推得动，方向由这一趟的状态给。顿一下这一趟就不齐（刨花短一截）
   const s2 = CreateGame(0);
   DebugJump(s2, 0, beats.indexOf("c1_plane"));
+  StepGame(s2, idle(), DT);
+  for (let i = 0; i < 600 && s2.microCine; i += 1) StepGame(s2, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
   for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), interactHeld: true }, DT);
   assert.ok(s2.beat.u > 0, "按住 E 必须能把刨子推出去（键盘后备）");
@@ -1160,6 +1271,8 @@ function TestPlaneBeat() {
   // 这是拿掉 HUD 轨道之后唯一的回程提示，丢了玩家就会卡在那头以为坏了。
   const s4 = CreateGame(0);
   DebugJump(s4, 0, beats.indexOf("c1_plane"));
+  StepGame(s4, idle(), DT);
+  for (let i = 0; i < 600 && s4.microCine; i += 1) StepGame(s4, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(s4, idle(), DT);
   let g4 = 0;
   while (s4.planeCard?.armed !== false && g4 < 600) { g4 += 1; StepGame(s4, { ...idle(), interactHeld: true }, DT); }
@@ -1211,6 +1324,98 @@ function TestModuleGraphIsCacheBusted() {
     }
   }
   console.log(`  ✓ 缓存版本戳盖满整张模块图（v=${ver}，${browserModules.length} 个模块）`);
+}
+
+// 修门第一场：**门得是画面里那扇会坠的门**，不是一个按钮。
+// 用户原话：「现在就按个按钮就搞定了有点low」。另外「为什么要修门」必须在
+// 开场过场里演出来（门自己晃 + 爹一个人托不住），否则玩家不知道自己在干嘛。
+function TestDoorHoldIsPhysical() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const beats = ChapterBeatList(0).map((b) => b.id);
+
+  // ① 开场过场要真的把那扇门演出来：doorLeaf 亮过、而且是"松的"
+  {
+    const s0 = CreateGame(0);
+    DebugJump(s0, 0, beats.indexOf("c1_open"));
+    let seen = null, swung = false, lifted = false, g = 0;
+    while (CurrentBeatDef(s0)?.id === "c1_open" && g < 6000) {
+      g += 1;
+      StepGame(s0, { ...idle(), advance: g % 90 === 0 }, DT);
+      if (s0.doorLeaf) {
+        seen = s0.doorLeaf;
+        if (s0.doorLeaf.swing) swung = true;
+        if (s0.doorLeaf.tryLift) lifted = true;
+      }
+    }
+    assert.ok(seen, "开场必须把那扇门摆出来（doorLeaf），不能只靠爹一句台词");
+    assert.equal(seen.loose, true, "开场那扇门是松的（下轴脱了窝）——这就是要修的理由");
+    assert.ok(swung, "得演出它自己在晃");
+    assert.ok(lifted, "得演出爹一个人托不住（这才解释了为什么需要第二双手）");
+  }
+
+  // ② 玩法：扶门那一步不是按一下就过
+  const carve = beats.indexOf("c1_door");
+  const mk = () => {
+    const st = CreateGame(0);
+    DebugJump(st, 0, carve);
+    const def = CurrentBeatDef(st);
+    const step = def.steps.find((x) => x.type === "holdDoor");
+    assert.ok(step, "修门第一步必须是 holdDoor —— 单按一下的 use 已经被用户退回");
+    st.player.x = step.zone.x;
+    st.player.level = "surface";
+    for (let i = 0; i < 3; i += 1) StepGame(st, idle(), DT);
+    return { st, step };
+  };
+  const HingeY = (step) => SURFACE_Y + (step.hingeY ?? 1.95);
+
+  // 手没落在门板上：怎么拖都扶不动它
+  {
+    const { st, step } = mk();
+    const lean0 = st.beat.lean;
+    for (let i = 0; i < 30; i += 1) {
+      StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + 3.5 + i * 0.02, y: HingeY(step) } }, DT);
+    }
+    assert.ok(st.beat.lean >= lean0 - 1e-6, "手没抓着门，门只会自己往外坠，不该被扶正");
+    assert.ok(st.beat.work < 0.05, "没扶住，爹使不上劲，进度不该涨");
+  }
+
+  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去）
+  {
+    const { st, step } = mk();
+    const midY = HingeY(step) - 0.9;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
+    assert.ok(st.beat.grabbed, "手按在门板上必须攥得住");
+    const l1 = st.beat.lean;
+    // 门跟着手走：把手往里挪「一个力臂 × 当前倾角」，正好把门扶到正位
+    const plumbX = st.beat.refX - l1 * (st.beat.arm || 0.9);
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX - 1, y: midY } }, DT);
+    assert.ok(st.beat.lean < l1, "攥住往里推，门必须跟着走");
+    assert.ok(l1 - st.beat.lean < 0.2, `门有分量，一帧不该转到 ${st.beat.lean}`);
+    // 稳住 → 爹使得上劲；撒手 → 它自己坠回去、进度往回泄
+    let g2 = 0;
+    while (st.beat.work < 0.5 && g2 < 400) {
+      g2 += 1;
+      StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX, y: midY } }, DT);
+    }
+    assert.ok(st.beat.work >= 0.5, "稳在正位，礅轴的进度得涨起来");
+    assert.ok(Math.abs(st.beat.lean) < 0.12, "扶到正位时门该基本是竖直的");
+    const leanHeld = st.beat.lean, workHeld = st.beat.work;
+    for (let i = 0; i < 20; i += 1) StepGame(st, idle(), DT);       // 撒手
+    assert.ok(st.beat.lean > leanHeld + 0.02, "撒手之后门必须自己往外坠");
+    assert.ok(st.beat.work < workHeld, "歪出去之后进度要往回泄，不是原地等着");
+  }
+
+  // ③ 键盘后备（扶门是费力气的活，留了按住 E）：自动通关靠它，不许卡死
+  {
+    const { st } = mk();
+    let g3 = 0;
+    while (CurrentBeatDef(st)?.id === "c1_door" && st.beat.stepIndex === 0 && g3 < 2000) {
+      g3 += 1;
+      StepGame(st, { ...idle(), interactHeld: true }, DT);
+    }
+    assert.notEqual(st.beat.stepIndex, 0, "按住 E 必须也能把门扶正（键盘后备 / 驱动器走这条）");
+  }
+  console.log("  ✓ 修门：开场演清楚为什么修 / 扶的是那扇会坠的门 / 抓不住扶不动 / 撒手就坠 / 键盘后备可用");
 }
 
 function TestQuieterAudioMix() {
@@ -1679,7 +1884,9 @@ TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
+TestEdgeHintPointsOffscreenTargets();
 TestInstrumentalBgmManifest();
+TestDoorHoldIsPhysical();
 TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 

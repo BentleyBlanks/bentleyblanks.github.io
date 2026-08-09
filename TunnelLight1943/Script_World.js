@@ -7,9 +7,9 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import {
@@ -412,6 +412,7 @@ export function CreateWorld(canvasEl) {
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
+  let doorLeafPivot = null, doorLeafMesh = null, doorLeafLoose = null;
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
   let planeToolMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
@@ -475,6 +476,7 @@ export function CreateWorld(canvasEl) {
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
+    doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
     planeToolMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
@@ -1997,15 +1999,22 @@ export function CreateWorld(canvasEl) {
   // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
+    s.ground = ground;                   // 供 PlayerLimbTips 量"手脚离地多高"
     // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
     const lift = extra.lift || 0;
     const y = ground + lift;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
+    const movedY = s.prevY === null || s.prevY === undefined ? 0 : Math.abs(y - s.prevY);
     s.prevX = x;
+    s.prevY = y;
     // 步频跟着实际位移走（不是定速循环），停下就自然收回站姿
     const isMoving = moved > 0.006;
-    if (isMoving) s.phase += moved * 3.4;
-    else s.phase += dt * 2.2;      // 挖土/爬梯这类原地动作也要有相位
+    // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
+    // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
+    // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
+    if (extra.climbing) s.phase += movedY * 4.5;
+    else if (isMoving) s.phase += moved * 3.4;
+    else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
@@ -2328,7 +2337,8 @@ export function CreateWorld(canvasEl) {
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
-          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU,
+          // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
+          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
           // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）
           rankDz: a.rank ? ACTOR_RANK_DZ : 0,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
@@ -3062,6 +3072,34 @@ export function CreateWorld(canvasEl) {
 
     // 刨料：台面上那块毛料 + 骑在手上的刨子 + 打着卷落下来的刨花 + 地上那堆。
     // 这一拍镜头推到 2.9m，木头是主角——料的毛面要能看出一趟趟被削平。
+    // 那扇会晃的家门：整扇挂在**上门轴**上，转的是挂它的那个 Group——
+    // 于是"绕上轴摆"这件事由场景图负责，画笔（ART.DrawHungDoor）只管把门
+    // 从轴那一点往下画一扇，不必知道角度。
+    if (state.doorLeaf) {
+      const dl = state.doorLeaf;
+      if (!doorLeafPivot || doorLeafLoose !== !!dl.loose) {
+        if (doorLeafPivot) layers.play.remove(doorLeafPivot);
+        doorLeafLoose = !!dl.loose;
+        doorLeafPivot = new THREE.Group();
+        doorLeafMesh = BakeSprite(ART.HUNG_DOOR_W + 24, ART.HUNG_DOOR_H + 16, 20, 8,
+          (ctx, ax, ay) => ART.DrawHungDoor(ctx, ax, ay, "homeDoor", { loose: doorLeafLoose }),
+          0, PROP_SS);
+        // 贴图锚点＝上门轴：把网格按 BakeSprite 算好的锚点偏移摆进 Group，
+        // Group 的原点就落在门轴上，转 Group 就是绕轴摆。
+        //（偏移的 x 不能取负——PlaceSprite 用的就是 +offset.x，取负会让整扇门
+        //  往左错半个锚点差，门就挂到门框外面去了。）
+        doorLeafMesh.position.set(doorLeafMesh.userData.offset.x, doorLeafMesh.userData.offset.y, 0);
+        doorLeafPivot.add(doorLeafMesh);
+        // 门扇压在门框之前、演员之后：它是玩家要伸手按住的东西，不能被人挡住
+        SetPlayOrder(doorLeafPivot, BAND.loose, "doorLeaf");
+        layers.play.add(doorLeafPivot);
+      }
+      doorLeafPivot.visible = true;
+      doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转
+      doorLeafPivot.rotation.z = -(dl.lean || 0);
+    } else if (doorLeafPivot) doorLeafPivot.visible = false;
+
     if (state.planing) {
       const pl = state.planing;
       const boardW = pl.span + 0.26;
@@ -3717,10 +3755,20 @@ export function CreateWorld(canvasEl) {
       markerMesh.visible = true;
       markerCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
       markerCtx.clearRect(0, 0, 48, 48);
-      ART.DrawMarker(markerCtx, 24, 30, time);
+      // 目标出了画框：同一块路标滑到画框边缘、掉头指向框外（勇敢的心式）。
+      // 该不该指、指哪边由 Core.EdgeHint 判（跨层的先指梯口）；这里只管摆位。
+      // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
+      const eh = EdgeHint(state, camera.position.x, viewW);
+      if (eh) {
+        ART.DrawMarker(markerCtx, 24, 30, time, { dir: eh.side, climb: eh.climb });
+        const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(camera.position.x + eh.side * (viewW / 2 - 0.9), py + 2.35, 0.6);
+      } else {
+        ART.DrawMarker(markerCtx, 24, 30, time);
+        const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(target.x, by + 2.5, 0.6);
+      }
       markerMesh.material.map.needsUpdate = true;
-      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
-      markerMesh.position.set(target.x, by + 2.5, 0.6);
     } else if (markerMesh) {
       markerMesh.visible = false;
     }
@@ -4101,6 +4149,17 @@ export function CreateWorld(canvasEl) {
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),
     DepthViolations,
+    // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
+    // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
+    PlayerLimbTips: () => {
+      const ps = actorSprites.get("player");
+      if (!ps?.rig || ps.ground === undefined) return null;
+      const ground = ps.ground;
+      const tips = LimbTips(ps.rig);
+      const out = {};
+      for (const k of Object.keys(tips)) out[k] = +(tips[k].y - ground).toFixed(3);
+      return out;
+    },
     get viewSize() { return { w: viewW, h: viewH }; },
   };
 }
