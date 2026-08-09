@@ -1544,7 +1544,8 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 第二场：一个口出不来。七叔带区里的交通员小周、和从西庄逃出来的老田进院。
+      // 第二场：西庄的日伪搜村队堵死单口地窖。七叔带区里的交通员小周、
+      // 和从西庄逃出来的老田进院。
       // 地道战的口径（史实统一）：邻村百姓用代价换来教训，区里同志总结传播，
       // 本村人自己动手——不写成谁的凭空发明
       kind: "cinematic", id: "c1_visitors", timeOfDay: "day",
@@ -1564,7 +1565,9 @@ export const SCRIPTS = {
             const mother = FindActor(state, "mother");
             if (mother) mother.heading = 1;
           } },
-        { who: "老田", say: "他们把地窖口堵住了。一个口……里面的人，出不来。", d: 4.6,
+        { who: "七叔", say: "老田，西庄出什么事了？", d: 2.6,
+          cam: { kind: "shot", x: 44, y: 1.5, dist: 6.5 } },
+        { who: "老田", say: "鬼子和伪军到西庄扫荡，搜出了乡亲们藏身的地窖，又拿土堵死了唯一的窖口。乡亲们全困在里头，出不来。", d: 8.4,
           cam: { kind: "shot", x: 44.5, y: 1.5, dist: 6.5 } },
         { who: "七叔", say: "咱村这些地窖，也都是一个口。", d: 3.4,
           cam: { kind: "shot", x: 44, y: 1.5, dist: 6.5 },
