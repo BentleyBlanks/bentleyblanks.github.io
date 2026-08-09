@@ -407,6 +407,7 @@ export function CreateWorld(canvasEl) {
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
+  let doorLeafPivot = null, doorLeafMesh = null, doorLeafLoose = null;
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
   let planeToolMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
@@ -470,6 +471,7 @@ export function CreateWorld(canvasEl) {
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
+    doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
     planeToolMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
@@ -3065,6 +3067,34 @@ export function CreateWorld(canvasEl) {
 
     // 刨料：台面上那块毛料 + 骑在手上的刨子 + 打着卷落下来的刨花 + 地上那堆。
     // 这一拍镜头推到 2.9m，木头是主角——料的毛面要能看出一趟趟被削平。
+    // 那扇会晃的家门：整扇挂在**上门轴**上，转的是挂它的那个 Group——
+    // 于是"绕上轴摆"这件事由场景图负责，画笔（ART.DrawHungDoor）只管把门
+    // 从轴那一点往下画一扇，不必知道角度。
+    if (state.doorLeaf) {
+      const dl = state.doorLeaf;
+      if (!doorLeafPivot || doorLeafLoose !== !!dl.loose) {
+        if (doorLeafPivot) layers.play.remove(doorLeafPivot);
+        doorLeafLoose = !!dl.loose;
+        doorLeafPivot = new THREE.Group();
+        doorLeafMesh = BakeSprite(ART.HUNG_DOOR_W + 24, ART.HUNG_DOOR_H + 16, 20, 8,
+          (ctx, ax, ay) => ART.DrawHungDoor(ctx, ax, ay, "homeDoor", { loose: doorLeafLoose }),
+          0, PROP_SS);
+        // 贴图锚点＝上门轴：把网格按 BakeSprite 算好的锚点偏移摆进 Group，
+        // Group 的原点就落在门轴上，转 Group 就是绕轴摆。
+        //（偏移的 x 不能取负——PlaceSprite 用的就是 +offset.x，取负会让整扇门
+        //  往左错半个锚点差，门就挂到门框外面去了。）
+        doorLeafMesh.position.set(doorLeafMesh.userData.offset.x, doorLeafMesh.userData.offset.y, 0);
+        doorLeafPivot.add(doorLeafMesh);
+        // 门扇压在门框之前、演员之后：它是玩家要伸手按住的东西，不能被人挡住
+        SetPlayOrder(doorLeafPivot, BAND.loose, "doorLeaf");
+        layers.play.add(doorLeafPivot);
+      }
+      doorLeafPivot.visible = true;
+      doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转
+      doorLeafPivot.rotation.z = -(dl.lean || 0);
+    } else if (doorLeafPivot) doorLeafPivot.visible = false;
+
     if (state.planing) {
       const pl = state.planing;
       const boardW = pl.span + 0.26;
