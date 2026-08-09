@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -3668,10 +3668,20 @@ export function CreateWorld(canvasEl) {
       markerMesh.visible = true;
       markerCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
       markerCtx.clearRect(0, 0, 48, 48);
-      ART.DrawMarker(markerCtx, 24, 30, time);
+      // 目标出了画框：同一块路标滑到画框边缘、掉头指向框外（勇敢的心式）。
+      // 该不该指、指哪边由 Core.EdgeHint 判（跨层的先指梯口）；这里只管摆位。
+      // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
+      const eh = EdgeHint(state, camera.position.x, viewW);
+      if (eh) {
+        ART.DrawMarker(markerCtx, 24, 30, time, { dir: eh.side, climb: eh.climb });
+        const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(camera.position.x + eh.side * (viewW / 2 - 0.9), py + 2.35, 0.6);
+      } else {
+        ART.DrawMarker(markerCtx, 24, 30, time);
+        const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(target.x, by + 2.5, 0.6);
+      }
       markerMesh.material.map.needsUpdate = true;
-      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
-      markerMesh.position.set(target.x, by + 2.5, 0.6);
     } else if (markerMesh) {
       markerMesh.visible = false;
     }

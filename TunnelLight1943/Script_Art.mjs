@@ -3496,13 +3496,34 @@ export function DrawGlow(ctx, x, y, r, { core = "rgba(255,200,120,0.55)", edge =
   ctx.restore();
 }
 
-// 目标指示：手绘小箭头
-export function DrawMarker(ctx, x, y, t) {
-  const bob = Math.sin(t * 3.4) * 5;
+// 目标指示：手绘小箭头。
+// dir=±1 是「指路模式」——目标出了画框，路标钉在画框边缘掉头指向框外：
+// 箭头横过来、朝目标方向一探一探地怂，身后跟一枚淡一档的重影（»的读法）。
+// climb="down"/"up" 再补一枚竖向小三角：目标在另一层，先到梯口再下去/上来。
+export function DrawMarker(ctx, x, y, t, { dir = 0, climb = null } = {}) {
+  if (!dir) {
+    const bob = Math.sin(t * 3.4) * 5;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
+    ctx.restore();
+    return;
+  }
+  const nudge = Math.sin(t * 3.4) * 4 * dir;
   ctx.save();
-  ctx.translate(x, y + bob);
-  InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
+  ctx.translate(x + nudge, y - 6);
+  InkFill(ctx, [[-7 * dir, -10], [-7 * dir, 10], [10 * dir, 0]], "markerDir", "#f0c95c", { amp: 0.6, lw: 2.2 });
+  ctx.globalAlpha = 0.42;
+  ctx.translate(-12 * dir, 0);
+  InkFill(ctx, [[-5 * dir, -7], [-5 * dir, 7], [7 * dir, 0]], "markerDir2", "#f0c95c", { amp: 0.6, lw: 2 });
   ctx.restore();
+  if (climb) {
+    const s = climb === "down" ? 1 : -1;
+    ctx.save();
+    ctx.translate(x, y + 12);
+    InkFill(ctx, [[-6, -5 * s], [6, -5 * s], [0, 5 * s]], "markerClimb", "#f0c95c", { amp: 0.5, lw: 1.8 });
+    ctx.restore();
+  }
 }
 
 // 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。

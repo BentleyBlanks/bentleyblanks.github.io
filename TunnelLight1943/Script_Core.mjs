@@ -6109,6 +6109,42 @@ export function GetBeatTarget(state) {
   }
 }
 
+// 画框边缘的指路标（勇敢的心式）：目标出了画框、又离玩家真的远时，路标
+// 不该跟着目标一起消失在框外——它滑到画框边缘、掉个头指向框外，「下一步
+// 在这边」。目标在另一层的，先指向能用的爬梯口（横轴上路总要先经过它），
+// 并带上「下去/上来」的竖向记号；已经站在梯口的不指（上下怎么走交给爬梯提示）。
+// 纯函数：镜头在哪、画多宽由渲染层喂进来，这里只管"该不该指、指哪边"。
+export function EdgeHint(state, camX, viewW) {
+  if (state.phase !== "playing" || state.microCine) return null;
+  // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
+  if (state.closeUp || state.scribeCard || state.planeCard) return null;
+  const def = CurrentBeatDef(state);
+  if (!def || def.kind === "cinematic") return null;
+  const tg = GetBeatTarget(state);
+  if (!tg || typeof tg.x !== "number") return null;
+  const p = state.player;
+  let tx = tg.x;
+  let climb = null;
+  if ((tg.level || "surface") !== p.level) {
+    const scene = SceneOf(state);
+    const shafts = (scene.shafts || []).filter((s) =>
+      (!s.builtFlag || state.flags[s.builtFlag]) && !(state.flags.entWBlocked && s.id === "entW"));
+    let best = null, bd = Infinity;
+    for (const s of shafts) {
+      const d = Math.abs(p.x - s.x);
+      if (d < bd) { bd = d; best = s; }
+    }
+    if (!best) return null;
+    if (Math.abs(p.x - best.x) < 2.5) return null;
+    tx = best.x;
+    climb = (tg.level || "surface") === "under" ? "down" : "up";
+  }
+  const offscreen = Math.abs(tx - camX) > viewW / 2 - 1.2;
+  const far = Math.abs(tx - p.x) > 4.5;
+  if (!offscreen || !far) return null;
+  return { side: tx < camX ? -1 : 1, climb };
+}
+
 // ---------------------------------------------------------------------------
 // 调试跳转：直接落到任意一章的任意一幕
 //

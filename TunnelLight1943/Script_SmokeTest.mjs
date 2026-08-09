@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -1005,6 +1005,73 @@ function TestChalkIsAPencilNotASlider() {
   console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
 }
 
+// 画框边缘的指路标（勇敢的心式）：目标出了画框且离得远 → 必须指、指对边；
+// 目标就在画框里或人已到近旁 → 不指；特写里不指；目标在另一层 → 先指梯口。
+function TestEdgeHintPointsOffscreenTargets() {
+  const VIEW = 12.3;   // 地表玩法景别的画框宽（hw 6.15 × 2）
+  // 第一章里找一幕带同层空间目标的玩法拍（剧本再改也不至于失效）
+  let s = null, tg = null;
+  const list = ChapterBeatList(0);
+  for (let i = 0; i < list.length; i += 1) {
+    const cand = CreateGame(0);
+    DebugJump(cand, 0, i);
+    if (cand.phase !== "playing") continue;
+    const def = CurrentBeatDef(cand);
+    if (!def || def.kind === "cinematic") continue;
+    const t = GetBeatTarget(cand);
+    if (t && typeof t.x === "number" && (t.level || "surface") === (cand.player.level || "surface")) {
+      s = cand; tg = t; break;
+    }
+  }
+  assert.ok(s, "第一章得有一幕带空间目标的玩法拍");
+  const scene = SCENES[CHAPTERS[s.chapterIndex].scene];
+  const rng = scene.walk[s.player.level] || scene.walk.surface;
+  // 站到离目标 12m 开外（往走得开的那头挪）
+  const dir = tg.x - rng[0] > rng[1] - tg.x ? -1 : 1;
+  s.player.x = Math.max(rng[0], Math.min(rng[1], tg.x + dir * 12));
+  const t2 = GetBeatTarget(s);   // 目标可能跟着演员挪，取此刻的
+  const eh = EdgeHint(s, s.player.x, VIEW);
+  assert.ok(eh, "目标出画框且远：必须给边缘指路标");
+  assert.equal(eh.side, Math.sign(t2.x - s.player.x), "指路标必须指向目标那一侧");
+  // 镜头对着目标：画框里的东西不用指
+  assert.equal(EdgeHint(s, t2.x, VIEW), null, "目标在画框里就不指");
+  // 特写里不指：手上的活正做到一半，别拿路标打岔
+  s.closeUp = { x: s.player.x, y: 1.2, hw: 3 };
+  assert.equal(EdgeHint(s, s.player.x, VIEW), null, "特写里不指");
+  s.closeUp = null;
+  // 人已经走到近旁：哪怕镜头甩开了也不指（免得边缘标来回闪）
+  s.player.x = Math.max(rng[0], Math.min(rng[1], t2.x + 2));
+  assert.equal(EdgeHint(s, t2.x + 40, VIEW), null, "人已到近旁就不指");
+
+  // 跨层：全八章里找一幕"目标在另一层、人又离梯口够远"的，验梯口重定向
+  let cross = null;
+  for (let c = 0; c < CHAPTERS.length && !cross; c += 1) {
+    const cl = ChapterBeatList(c);
+    for (let i = 0; i < cl.length; i += 1) {
+      const cand = CreateGame(0);
+      DebugJump(cand, c, i);
+      if (cand.phase !== "playing") continue;
+      const def = CurrentBeatDef(cand);
+      if (!def || def.kind === "cinematic") continue;
+      const t = GetBeatTarget(cand);
+      if (!t || typeof t.x !== "number") continue;
+      if ((t.level || "surface") === (cand.player.level || "surface")) continue;
+      const sc = SCENES[CHAPTERS[c].scene];
+      const usable = (sc.shafts || []).filter((sh) => !sh.builtFlag || cand.flags[sh.builtFlag]);
+      if (!usable.length) continue;
+      const near = usable.reduce((m, sh) => Math.min(m, Math.abs(cand.player.x - sh.x)), Infinity);
+      if (near < 6) continue;   // 站在梯口跟前轮不到边缘标，找个够远的
+      cross = cand;
+      break;
+    }
+  }
+  if (cross) {
+    const eh2 = EdgeHint(cross, cross.player.x, VIEW);
+    assert.ok(eh2 && eh2.climb, "目标在另一层：边缘标得带竖向记号（先去梯口）");
+  }
+  console.log("  ✓ 边缘指路标：出框才指 / 指对边 / 近旁与特写不指" + (cross ? " / 跨层先指梯口" : ""));
+}
+
 function TestInstrumentalBgmManifest() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
@@ -1623,6 +1690,7 @@ TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
+TestEdgeHintPointsOffscreenTargets();
 TestInstrumentalBgmManifest();
 TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
