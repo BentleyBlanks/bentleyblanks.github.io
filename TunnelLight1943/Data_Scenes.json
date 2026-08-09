@@ -21,7 +21,7 @@
           186
         ],
         "under": [
-          34,
+          26.0,
           54.5
         ]
       },
@@ -29,8 +29,9 @@
       "shafts": [
         {
           "id": "cellarHatch",
-          "x": 37,
-          "name": "梁家地窖口"
+          "x": 29.0,
+          "name": "梁家地窖口（在屋里）",
+          "indoor": true
         },
         {
           "id": "qishuHatch",
@@ -132,27 +133,29 @@
         {
           "id": "cellarVat",
           "kind": "vat",
-          "x": 35.4,
+          "x": 27.4,
           "level": "under",
           "name": "腌菜缸"
         },
         {
           "id": "cellarVatB",
           "kind": "vat",
-          "x": 36.6,
+          "x": 28.6,
           "level": "under",
           "name": "腌菜缸"
         },
         {
           "id": "cellarMouth",
           "kind": "hatch",
-          "x": 37,
-          "name": "地窖口"
+          "x": 29.0,
+          "name": "地窖口",
+          "indoor": true,
+          "note": "**在屋里**（柱子家 25.25~34.75 的正中偏西），不是院子里。indoor 让它跟着屋子立面反向隐现：墙合着看不见，人进了屋才露出地上这个口子——2.5D 里玩家走的那条线永远在立面之前，不标 indoor 的话，屋里地面上的东西会画在合着的墙外面"
         },
         {
           "id": "cellarRoom",
           "kind": "chamber",
-          "x": 38.5,
+          "x": 30.5,
           "w": 8.4,
           "name": "地窖",
           "note": "自家地窖是**直得起腰**的：玩法侧早就按站立算（MovePlayer 的 inTunnel 不含 village），美术侧却拿地道的猫腰净高去掏土层剖面，于是近侧那张 z=2.2 的剖面把站在窖里的人整个盖住。登记成 chamber，TunnelPosture 与 AddUnderground 就都按站立掏了"
@@ -166,17 +169,17 @@
         {
           "id": "cellarTubers",
           "kind": "tuberPile",
-          "x": 40.6,
+          "x": 32.6,
           "level": "under",
           "name": "红薯堆"
         },
         {
           "id": "cellarShelf",
           "kind": "cellarShelf",
-          "x": 41.9,
+          "x": 33.9,
           "level": "under",
           "name": "搁板",
-          "note": "地窖陈设都靠西/东墙根摆，梯子口（27）留空——躲扫荡那一幕一家人要挤在这儿"
+          "note": "地窖陈设靠墙根摆，梯子口（29）脚下留空——躲扫荡那一幕一家人要挤在这儿"
         },
         {
           "id": "yardVat",
@@ -703,7 +706,7 @@
           "label": "院门口"
         },
         "cellar": {
-          "x": 38.5,
+          "x": 30.5,
           "w": 8,
           "level": "under",
           "label": "梁家地窖"

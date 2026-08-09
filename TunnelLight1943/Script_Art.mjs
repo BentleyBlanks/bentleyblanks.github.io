@@ -949,6 +949,30 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       ctx.arc(-2 * S, 0, (3 + i * 2.4) * S, Math.PI * 0.3, Math.PI * 1.4);
       ctx.stroke();
     }
+  } else if (label === "绳头") {
+    // 攥在手里的那截绳头（长绳本体由渲染层的 verlet 带子画）。
+    // 没有这一支的时候它落进最后那个兜底分支，被当成木料——玩家一路拽着
+    // 一块半米长的板子去量地。绳头就该是：手心里绕两道，剩一小截毛茬耷出来。
+    // 尺寸按拳头量：一截绳梢连着两道缠在手心的圈，通身不过十来厘米。
+    // 画大了（第一版外径给到 0.3 米）它会盖住柱子整个脑袋——他才一米出头
+    ctx.strokeStyle = "#9a7d4f";
+    ctx.lineCap = "round";
+    ctx.lineWidth = 1.5 * S;
+    for (let i = 0; i < 2; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(0, (-0.6 + i * 1.5) * S, 2.0 * S, 1.0 * S, 0.15, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // 耷出来的一小截，末端散成麻丝
+    InkLine(ctx, 1.4 * S, 1.4 * S, 3.4 * S, 3.2 * S, "ropeTail", { lw: 1.4 * S, color: "#9a7d4f", amp: 0.5 });
+    ctx.lineWidth = 0.6 * S;
+    ctx.strokeStyle = "rgba(150,124,80,0.9)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(3.4 * S, 3.2 * S);
+      ctx.lineTo((4.2 + i * 0.5) * S, (4.2 + i * 0.6) * S);
+      ctx.stroke();
+    }
   } else {
     InkFill(ctx, Rect(-26 * S, -3.2 * S, 52 * S, 6.4 * S), "plank", "#a8794a",
       { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.14)" });
@@ -1021,90 +1045,200 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
     InkLine(ctx, x - 10, groundY - 4, x + 26, groundY - 22, id + "beam", { lw: 5, color: "#241f1a", amp: 2 });
     return;
   }
-  // 墙体
-  InkFill(ctx, Rect(x - W / 2, groundY - H, W, H), id, PAL.wallWarm,
-    { amp: 1.6, lw: 2.6, shade: "rgba(74,56,42,0.18)", shadeAt: 0.62 });
-  Speckle(ctx, x - W / 2, groundY - H, W, H, id + "sp", { count: 30, alpha: 0.10, size: 1.8 });
-  // 夯土层理：一版一版夯上去的横线，华北土墙的标志
+  // ---------------------------------------------------------------------------
+  // 1942-43 年冀中平原贫农的住房（用户 2026-08-09 退回："大家实际上住的房子
+  // 根本没那么好 都是很破很穷的"）。老版画的是**瓦顶 + 抹平的墙 + 玻璃窗**，
+  // 那是地主或殷实人家的样子。真实的样子：
+  //   · 土坯（晒干的泥砖）垒墙，外面抹一层麦秸泥，抹层一块块掉、露出坯缝
+  //   · **平顶或极缓的泥顶**（要能上人晒粮食），不是瓦——瓦要烧要买，用不起
+  //   · 檩条椽头直接从檐下探出来；泥冲塌的地方露出下面的秫秸把
+  //   · 墙根泛碱（盐碱地的墙根是发白的，不是返潮的深色）、雨水冲出竖沟
+  //   · 窗是**木棂糊纸**，不是玻璃；纸发黄，破了两格露出屋里的黑
+  // ---------------------------------------------------------------------------
+  // 颜色一律按 ^2.2 反推压过两档：这套贴图上屏会被整体提亮
+  //（CanvasTexture 没声明 sRGB，见 Script_World 的 CanvasTexture 注释），
+  //   照直觉调出来的土墙上屏是一堵刷了白灰的墙——1943 年的贫农家没有白灰
+  const ADOBE = "#8d7a5c", RENDER = "#9d8f72";
+  const MUD_ROOF = "#665940", MUD_ROOF_D = "#4b4230";
+
+  // ① 土坯墙身（比老版的暖白压两档：抹的是麦秸泥，不是石灰）
+  InkFill(ctx, Rect(x - W / 2, groundY - H, W, H), id, ADOBE,
+    { amp: 2.2, lw: 2.6, shade: "rgba(74,56,42,0.20)", shadeAt: 0.62 });
+  Speckle(ctx, x - W / 2, groundY - H, W, H, id + "sp", { count: 54, alpha: 0.13, size: 2.2 });
+
+  // ② 还没掉的抹泥面：整墙不是一个颜色，是几块补丁拼起来的
   ctx.save();
-  ctx.globalAlpha = 0.20;
-  ctx.strokeStyle = "#6b5539";
-  for (let ly = 1; ly * (H * 0.16) < H; ly += 1) {
-    const yy = groundY - ly * H * 0.16;
-    ctx.lineWidth = 1.4 + (ly % 2) * 0.8;
+  for (let i = 0; i < 4; i += 1) {
+    const pw = W * (0.18 + Rnd(id + "rd", i) * 0.24);
+    const ph = H * (0.30 + Rnd(id + "rd2", i) * 0.34);
+    const px = x - W / 2 + Rnd(id + "rd3", i) * (W - pw);
+    const py = groundY - H + Rnd(id + "rd4", i) * (H - ph) * 0.8;
+    ctx.globalAlpha = 0.30 + Rnd(id + "rd5", i) * 0.22;
+    InkFill(ctx, [
+      [px, py + Sym(id + "e" + i, 0, 3)], [px + pw, py + Sym(id + "e" + i, 1, 3)],
+      [px + pw + Sym(id + "e" + i, 2, 3), py + ph], [px + Sym(id + "e" + i, 3, 3), py + ph],
+    ], id + "rend" + i, RENDER, { amp: 2.6, lw: 0, line: null });
+  }
+  ctx.restore();
+
+  // ③ 抹层掉了的地方露出**土坯缝**：一层层错缝码上去的泥砖
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = "#5e4c33";
+  const course = Math.max(13, H * 0.125);     // 一层坯约 40cm（土坯是大块）
+  for (let ly = 1; ly * course < H; ly += 1) {
+    const yy = groundY - ly * course;
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.moveTo(x - W / 2 + 2, yy);
-    for (let t = 0; t <= 10; t += 1) ctx.lineTo(x - W / 2 + (W * t) / 10, yy + Sym(id + "ly" + ly, t, 2.2));
+    for (let t = 0; t <= 12; t += 1) ctx.lineTo(x - W / 2 + (W * t) / 12, yy + Sym(id + "ly" + ly, t, 1.8));
     ctx.stroke();
+    // 竖缝错开半块，才像码起来的坯，而不是一道道划出来的横线
+    const off = (ly % 2) * course * 1.1;
+    for (let vx = x - W / 2 + off + 6; vx < x + W / 2 - 4; vx += course * 3.4) {
+      ctx.beginPath();
+      ctx.moveTo(vx, yy);
+      ctx.lineTo(vx + Sym(id + "v" + ly + vx, 0, 1.4), yy + course);
+      ctx.stroke();
+    }
   }
   ctx.restore();
-  // 墙根返潮：贴地一条深色，往上晕开
+
+  // ④ 墙根泛碱 + 雨水冲出来的竖沟
   ctx.save();
-  const damp = ctx.createLinearGradient(0, groundY - H * 0.30, 0, groundY);
-  damp.addColorStop(0, "rgba(70,54,36,0)");
-  damp.addColorStop(1, "rgba(70,54,36,0.42)");
-  ctx.fillStyle = damp;
-  ctx.fillRect(x - W / 2, groundY - H * 0.30, W, H * 0.30);
+  const alk = ctx.createLinearGradient(0, groundY - H * 0.26, 0, groundY);
+  alk.addColorStop(0, "rgba(188,180,158,0)");
+  alk.addColorStop(1, "rgba(188,180,158,0.40)");
+  ctx.fillStyle = alk;
+  ctx.fillRect(x - W / 2, groundY - H * 0.26, W, H * 0.26);
   ctx.restore();
-  // 屋檐投影：檐下一条压暗，墙才有厚度
+  for (let i = 0; i < 6; i += 1) {
+    const gx = x - W / 2 + 10 + Rnd(id + "gu", i) * (W - 20);
+    const gh = H * (0.16 + Rnd(id + "gu2", i) * 0.26);
+    InkLine(ctx, gx, groundY - gh, gx + Sym(id + "gu3", i, 3), groundY,
+      id + "gully" + i, { lw: 1.6 + Rnd(id + "gu4", i) * 1.4, color: "rgba(112,90,62,0.30)", amp: 1.6 });
+  }
+  // ⑤ 裂缝：斜着往下走，越往下越散
+  for (let i = 0; i < 3; i += 1) {
+    let cxk = x - W / 2 + W * (0.24 + i * 0.26);
+    let cyk = groundY - H * (0.52 + Rnd(id + "ck", i) * 0.22);
+    for (let seg = 0; seg < 4; seg += 1) {
+      const nx = cxk + (Rnd(id + "ck2", i * 4 + seg) - 0.45) * 12;
+      const ny = cyk + 10 + Rnd(id + "ck3", i * 4 + seg) * 10;
+      if (ny > groundY - 4) break;
+      InkLine(ctx, cxk, cyk, nx, ny, id + "crk" + i + seg,
+        { lw: 1.5, color: "rgba(78,60,40,0.42)", amp: 1.2 });
+      cxk = nx; cyk = ny;
+    }
+  }
+  // ⑥ 檐下压暗，墙才有厚度
   ctx.save();
-  const eave = ctx.createLinearGradient(0, groundY - H, 0, groundY - H * 0.74);
-  eave.addColorStop(0, "rgba(48,36,24,0.42)");
+  const eave = ctx.createLinearGradient(0, groundY - H, 0, groundY - H * 0.78);
+  eave.addColorStop(0, "rgba(48,36,24,0.40)");
   eave.addColorStop(1, "rgba(48,36,24,0)");
   ctx.fillStyle = eave;
-  ctx.fillRect(x - W / 2, groundY - H, W, H * 0.26);
+  ctx.fillRect(x - W / 2, groundY - H, W, H * 0.22);
   ctx.restore();
-  // 剥落与旧联的残纸：只贴墙上半段——落到门窗边上就成了一块悬空的方牌
-  for (let i = 0; i < 3; i += 1) {
-    const px = x - W / 2 + 14 + Rnd(id + "pl", i) * (W - 28);
-    const py = groundY - H * (0.56 + Rnd(id + "pl2", i) * 0.24);
-    InkFill(ctx, [[px, py], [px + 10, py - 4], [px + 13, py + 9], [px + 2, py + 11]],
-      id + "peel" + i, "#c3ae8a", { amp: 1.2, lw: 1.2, line: "rgba(43,31,22,0.18)" });
+
+  // ⑦ 墙基：不规则的乱石（垒的，不是砌的）——整齐的条石是有钱人家
+  for (let i = 0, sx = x - W / 2; sx < x + W / 2 - 2; i += 1) {
+    const sw = 12 + Rnd(id + "st", i) * 16;
+    const sh = H * (0.05 + Rnd(id + "st2", i) * 0.05);
+    InkFill(ctx, [
+      [sx, groundY - sh], [sx + sw, groundY - sh + Sym(id + "st3", i, 2.5)],
+      [sx + sw, groundY], [sx, groundY],
+    ], id + "base" + i, i % 2 ? "#6e6555" : "#635a4b", { amp: 1.6, lw: 1.6 });
+    sx += sw;
   }
-  // 墙基石
-  InkFill(ctx, Rect(x - W / 2, groundY - H * 0.16, W, H * 0.16), id + "base", PAL.wallShade, { amp: 1.2, lw: 2 });
-  for (let i = 0; i * 26 < W; i += 1) {
-    InkLine(ctx, x - W / 2 + i * 26, groundY - H * 0.16, x - W / 2 + i * 26, groundY,
-      id + "bs" + i, { lw: 1.2, color: "rgba(60,46,32,0.45)", amp: 1.2 });
-  }
-  // 瓦顶：略微外挑 + 一排瓦楞
-  const rw = W + 22, rh = H * 0.30;
+
+  // ⑧ 屋顶：**泥顶**，极缓的坡（要能上人晒粮食），檐口被雨啃得高低不平
+  const rw = W + 16, rh = H * 0.13;
+  const eaveY = groundY - H;
   InkFill(ctx, [
-    [x - rw / 2, groundY - H], [x - W * 0.34, groundY - H - rh],
-    [x + W * 0.34, groundY - H - rh], [x + rw / 2, groundY - H],
-  ], id + "roof", PAL.roofTile, { amp: 1.8, lw: 2.6, shade: "rgba(0,0,0,0.16)" });
+    [x - rw / 2, eaveY + 3], [x - W * 0.42, eaveY - rh],
+    [x + W * 0.40, eaveY - rh * 0.86], [x + rw / 2, eaveY + 2],
+  ], id + "roof", MUD_ROOF, { amp: 2.6, lw: 2.6, shade: "rgba(0,0,0,0.14)" });
   ctx.save();
-  ctx.globalAlpha = 0.5;
-  for (let i = -rw / 2 + 8; i < rw / 2 - 4; i += 9) {
-    const t = (i + rw / 2) / rw;
-    InkLine(ctx, x + i, groundY - H, x + (i * 0.68), groundY - H - rh + 2, id + "tile" + i,
-      { lw: 1.3, color: PAL.roofShade, amp: 0.8 });
+  ctx.globalAlpha = 0.30;
+  for (let i = -rw / 2 + 10; i < rw / 2 - 6; i += 13) {
+    InkLine(ctx, x + i, eaveY + 1, x + i * 0.8, eaveY - rh * 0.82, id + "rg" + i,
+      { lw: 1.4, color: MUD_ROOF_D, amp: 1.4 });
   }
   ctx.restore();
-  // 门与窗
-  // door=true 是可进入的家：门开在东头（对着院子），洞是敞的——
-  // 人从这儿走进去，立面就淡出让位给屋里
+  // 泥冲塌的一角：露出下面的秫秸把
+  {
+    const bx = x + W * (0.10 + Rnd(id + "bare", 0) * 0.2);
+    for (let i = 0; i < 7; i += 1) {
+      InkLine(ctx, bx + i * 3, eaveY - rh * 0.5, bx + i * 3 + 2, eaveY - rh * 0.05,
+        id + "stalk" + i, { lw: 1.2, color: "#7d6a41", amp: 1.2 });
+    }
+  }
+  // 檐口：椽头一排探出来——这是土屋最认得出的一条轮廓
+  for (let i = 0; i * 27 < rw - 16; i += 1) {
+    const jx = x - rw / 2 + 12 + i * 27 + Sym(id + "rj", i, 4);
+    InkFill(ctx, Rect(jx, eaveY + 1 + Sym(id + "rk", i, 1.2), 7, 6),
+      id + "raft" + i, i % 2 ? "#4f3d27" : "#5a462d", { amp: 1.2, lw: 1.5 });
+  }
+  // 顶上长的草：泥顶年年长草，没人去薅
+  for (let i = 0; i < 5; i += 1) {
+    const wx = x - W * 0.36 + Rnd(id + "wd", i) * W * 0.74;
+    const wy = eaveY - rh * (0.5 + Rnd(id + "wd2", i) * 0.4);
+    for (let b = 0; b < 3; b += 1) {
+      InkLine(ctx, wx, wy, wx + (b - 1) * 3, wy - 5 - Rnd(id + "wd3", i * 3 + b) * 4,
+        id + "weed" + i + b, { lw: 1, color: night ? "#333c31" : "#5d6440", amp: 1.1 });
+    }
+  }
+
+  // ⑨ 门
   if (door) {
-    const dw2 = 30, dh2 = H * 0.66;
+    // 可进入的家：门洞敞着（人从这儿进去，立面淡出让位给屋里）
+    const dw2 = 30, dh2 = H * 0.62;
     const dx2 = x + W / 2 - dw2 - 10;
-    InkFill(ctx, Rect(dx2, groundY - dh2, dw2, dh2), id + "doorway", "#241d15", { amp: 1.2, lw: 2.4 });
-    // 门洞里透出一线屋内的暖色
+    InkFill(ctx, Rect(dx2, groundY - dh2, dw2, dh2), id + "doorway", "#241d15", { amp: 1.6, lw: 2.4 });
     ctx.save();
-    ctx.globalAlpha = night ? 0.14 : 0.3;
+    ctx.globalAlpha = night ? 0.14 : 0.28;
     ctx.fillStyle = "#8a6f4c";
     ctx.fillRect(dx2 + 4, groundY - dh2 * 0.7, dw2 - 8, dh2 * 0.7);
     ctx.restore();
+    // 门槛：土屋的门下必有这一条，进门得抬脚跨
+    InkFill(ctx, Rect(dx2 - 3, groundY - 5, dw2 + 6, 5), id + "sill", "#635a4b", { amp: 1.2, lw: 1.6 });
   } else {
-    const dw = Math.min(20, W * 0.2), dh = H * 0.55;
-    InkFill(ctx, Rect(x - W * 0.28, groundY - dh, dw, dh), id + "door", "#5c452f", { amp: 1.2, lw: 2.2 });
+    // 邻家：薄木板拼的板门，板缝看得见
+    const dw = Math.min(22, W * 0.22), dh = H * 0.52;
+    const dx3 = x - W * 0.28;
+    InkFill(ctx, Rect(dx3, groundY - dh, dw, dh), id + "door", "#4a3925", { amp: 1.6, lw: 2.2 });
+    for (let i = 1; i < 3; i += 1) {
+      InkLine(ctx, dx3 + (dw * i) / 3, groundY - dh + 2, dx3 + (dw * i) / 3, groundY - 2,
+        id + "plank" + i, { lw: 1.2, color: "rgba(43,31,22,0.45)", amp: 1.0 });
+    }
+    InkFill(ctx, Rect(dx3 - 3, groundY - 4, dw + 6, 4), id + "sill2", "#635a4b", { amp: 1.0, lw: 1.4 });
   }
-  const ww = Math.min(17, W * 0.17);
-  InkFill(ctx, Rect(x + W * 0.14, groundY - H * 0.66, ww, ww * 0.85), id + "win",
-    night ? "#c99b4a" : "#4a3a2a", { amp: 1.2, lw: 2.2 });
-  InkLine(ctx, x + W * 0.14, groundY - H * 0.66 + ww * 0.42, x + W * 0.14 + ww, groundY - H * 0.66 + ww * 0.42,
-    id + "winBar", { lw: 1.4, color: IN.ink });
-  InkLine(ctx, x + W * 0.14 + ww / 2, groundY - H * 0.66, x + W * 0.14 + ww / 2, groundY - H * 0.66 + ww * 0.85,
-    id + "winBar2", { lw: 1.4, color: IN.ink });
+
+  // ⑩ 窗：木棂糊纸。玻璃 1942 年的冀中农家没有——老版那个带十字的小方块
+  //    正是玻璃窗的画法。纸发黄（夜里透灯光），破了两格露出屋里的黑
+  const ww = Math.min(30, W * 0.24), wh = ww * 0.78;
+  const wx0 = x + W * 0.08, wy0 = groundY - H * 0.60;
+  InkFill(ctx, Rect(wx0 - 2, wy0 - 2, ww + 4, wh + 4), id + "winFrame", "#54422b", { amp: 1.2, lw: 2.0 });
+  InkFill(ctx, Rect(wx0, wy0, ww, wh), id + "winPaper",
+    night ? "#a87f37" : "#968a6c", { amp: 0.9, lw: 0, line: null });
+  const cols = 4, rows = 3;
+  for (let i = 1; i < cols; i += 1) {
+    InkLine(ctx, wx0 + (ww * i) / cols, wy0, wx0 + (ww * i) / cols, wy0 + wh,
+      id + "mullV" + i, { lw: 1.3, color: "#4a3a25", amp: 0.7 });
+  }
+  for (let i = 1; i < rows; i += 1) {
+    InkLine(ctx, wx0, wy0 + (wh * i) / rows, wx0 + ww, wy0 + (wh * i) / rows,
+      id + "mullH" + i, { lw: 1.3, color: "#4a3a25", amp: 0.7 });
+  }
+  for (let i = 0; i < 2; i += 1) {
+    const cc = Math.floor(Rnd(id + "tornC", i) * cols);
+    const rr = Math.floor(Rnd(id + "tornR", i) * rows);
+    ctx.save();
+    ctx.globalAlpha = night ? 0.5 : 0.78;
+    ctx.fillStyle = "#2b2118";
+    ctx.fillRect(wx0 + (ww * cc) / cols + 1, wy0 + (wh * rr) / rows + 1, ww / cols - 2, wh / rows - 2);
+    ctx.restore();
+  }
 }
 
 export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false } = {}) {
@@ -1128,6 +1262,45 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   if (carved) {
     // 第八章给妹妹刻的：矮一头（1.08m）
     InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 1.8, color: "#fff0c8", amp: 0.4 });
+  }
+}
+
+// 门扇：三块竖板 + 两道横撑的木门，**从上轴那一点往下挂**。
+// 画笔按 (ax, ay) = 上门轴 摆，整扇往下画——渲染层把它塞进一个挂在上轴上的
+// Group 里，转 Group 就是转门（绕上轴摆），Art 这边不必知道角度。
+//
+// 为什么要单独有这么一扇：门框原来只有两根立柱加一根门楣，门扇根本没画。
+// 玩家被要求"扶稳门扇"，画面上却没有门扇——那一下当然只能是按个按钮。
+export const HUNG_DOOR_W = 24;    // px（≈0.50m）＝门框净空宽
+export const HUNG_DOOR_H = 72;    // px（≈1.50m）＝门楣下沿到地面
+export function DrawHungDoor(ctx, ax, ay, id, { loose = false } = {}) {
+  const W = HUNG_DOOR_W, H = HUNG_DOOR_H;
+  const x0 = ax - 3, y0 = ay;        // 上轴在门扇左上角往里一点
+  // 三块竖板：板缝是这扇门最像门的地方
+  for (let i = 0; i < 3; i += 1) {
+    const bw = W / 3;
+    InkFill(ctx, Rect(x0 + i * bw, y0, bw, H), id + "p" + i,
+      i === 1 ? PAL.wood : PAL.woodDark,
+      { amp: 1.0, lw: 2.0, shade: "rgba(0,0,0,0.16)" });
+    InkLine(ctx, x0 + i * bw + bw * 0.5, y0 + 8, x0 + i * bw + bw * 0.5, y0 + H - 8,
+      id + "pg" + i, { lw: 0.8, color: "rgba(80,52,30,0.4)", amp: 1.4 });
+  }
+  // 两道横撑
+  for (const ty of [y0 + H * 0.22, y0 + H * 0.72]) {
+    InkFill(ctx, Rect(x0 - 1, ty, W + 2, 7), id + "b" + Math.round(ty), "#8a6038",
+      { amp: 0.9, lw: 2.0, shade: "rgba(0,0,0,0.18)" });
+  }
+  // 上轴（还在窝里）：一小截露出来的木轴头
+  InkFill(ctx, Rect(x0 - 5, y0 - 2, 6, 7), id + "pivT", "#6b4a2c", { amp: 0.6, lw: 1.6 });
+  // 下轴：**跳出臼窝**的那一头。松着的时候画成脱开、底下露出空臼窝，
+  // "门为什么晃"就靠这一处说清楚，不用一行字
+  if (loose) {
+    InkFill(ctx, Rect(x0 - 6, y0 + H - 8, 7, 9), id + "pivB", "#6b4a2c", { amp: 0.7, lw: 1.7 });
+    // 空着的臼窝（画在门扇脚边的地上）
+    InkFill(ctx, [[x0 - 16, y0 + H + 3], [x0 - 4, y0 + H + 1], [x0 - 2, y0 + H + 7], [x0 - 18, y0 + H + 8]],
+      id + "socket", "#4a3626", { amp: 1.0, lw: 1.8 });
+  } else {
+    InkFill(ctx, Rect(x0 - 5, y0 + H - 6, 6, 7), id + "pivB2", "#6b4a2c", { amp: 0.6, lw: 1.6 });
   }
 }
 
@@ -1326,9 +1499,12 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   // 成了画面里最跳的一块。井是背景，不该抢主角的明度。
   // 注意这套贴图上屏时会被整体提亮（画布贴图没声明 sRGB，见 CanvasTexture），
   // 想要屏幕上一档灰，源色就得比直觉再压两档——#6f685c 上屏约莫是中灰
-  const stone = night ? "#41413f" : "#6f685c";
-  const stoneLit = night ? "#525250" : "#847b6c";
-  const stoneDark = night ? "#2c2c2b" : "#4c463d";
+  // 石头要**发土**，不是发灰：村里的井台是就地捡的料礓石垒的，年年泼水糊泥，
+  // 颜色跟脚下的土路是一路的。上一版调成中性灰，上屏读出来像一圈水泥管
+  //（用户 2026-08-09："井也太现代了"）
+  const stone = night ? "#3f3b33" : "#655a48";
+  const stoneLit = night ? "#4f4a41" : "#7a6d57";
+  const stoneDark = night ? "#2a2722" : "#453c2e";
   const wood = night ? "#6a4c30" : PAL.wood;
   const woodDark = night ? "#4c3722" : PAL.woodDark;
   // 井台要**高而窄**（0.73m 高、0.5m 半径）：矮而宽 + 一圈大椭圆台面，
@@ -1390,11 +1566,14 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   for (let r = 0; r < ROWS; r += 1) {
     const ry = groundY - 3 - r * rh;
     if (r > 0) InkLine(ctx, x - RX + 2, ry, x + RX - 2, ry, id + "j" + r, { lw: 2.2, color: stoneDark, amp: 1.2 });
+    // 一层里码几块**不一样大**的石头：整齐的三块一层是砌出来的，
+    // 村里的井台是垒出来的
     const n = 3;
     for (let c = 0; c < n; c += 1) {
-      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / n) * RX * 2;
+      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / n) * RX * 2
+        + (Rnd(id + "jw", r * 3 + c) - 0.5) * 7;
       if (jx > x - RX + 4 && jx < x + RX - 4) {
-        InkLine(ctx, jx, ry - 1.5, jx, ry - rh + 1.5, id + "v" + r + c, { lw: 2, color: stoneDark, amp: 0.9 });
+        InkLine(ctx, jx, ry - 1.5, jx, ry - rh + 1.5, id + "v" + r + c, { lw: 2, color: stoneDark, amp: 1.6 });
       }
     }
   }
@@ -3496,13 +3675,34 @@ export function DrawGlow(ctx, x, y, r, { core = "rgba(255,200,120,0.55)", edge =
   ctx.restore();
 }
 
-// 目标指示：手绘小箭头
-export function DrawMarker(ctx, x, y, t) {
-  const bob = Math.sin(t * 3.4) * 5;
+// 目标指示：手绘小箭头。
+// dir=±1 是「指路模式」——目标出了画框，路标钉在画框边缘掉头指向框外：
+// 箭头横过来、朝目标方向一探一探地怂，身后跟一枚淡一档的重影（»的读法）。
+// climb="down"/"up" 再补一枚竖向小三角：目标在另一层，先到梯口再下去/上来。
+export function DrawMarker(ctx, x, y, t, { dir = 0, climb = null } = {}) {
+  if (!dir) {
+    const bob = Math.sin(t * 3.4) * 5;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
+    ctx.restore();
+    return;
+  }
+  const nudge = Math.sin(t * 3.4) * 4 * dir;
   ctx.save();
-  ctx.translate(x, y + bob);
-  InkFill(ctx, [[-9, -12], [9, -12], [0, 4]], "marker", "#f0c95c", { amp: 0.6, lw: 2.2 });
+  ctx.translate(x + nudge, y - 6);
+  InkFill(ctx, [[-7 * dir, -10], [-7 * dir, 10], [10 * dir, 0]], "markerDir", "#f0c95c", { amp: 0.6, lw: 2.2 });
+  ctx.globalAlpha = 0.42;
+  ctx.translate(-12 * dir, 0);
+  InkFill(ctx, [[-5 * dir, -7], [-5 * dir, 7], [7 * dir, 0]], "markerDir2", "#f0c95c", { amp: 0.6, lw: 2 });
   ctx.restore();
+  if (climb) {
+    const s = climb === "down" ? 1 : -1;
+    ctx.save();
+    ctx.translate(x, y + 12);
+    InkFill(ctx, [[-6, -5 * s], [6, -5 * s], [0, 5 * s]], "markerClimb", "#f0c95c", { amp: 0.5, lw: 1.8 });
+    ctx.restore();
+  }
 }
 
 // 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。

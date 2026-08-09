@@ -370,8 +370,14 @@ function BaseShot(state) {
   if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.0 };
   if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.0 };
   // 地表：中近景，人物约占画高三分之一强；视平线略高于人头，地面向后退
-  const y = LevelY(p.level) + (p.level === "under" ? 1.25 : 1.85);
-  return { x: p.x + lookAhead, y, hw: ch.light === "night" ? 6.15 : 6.3 };
+  //
+  // 爬梯子那两秒镜头**跟着人往下走**：Core 一按下 S 就把 level 翻成 under
+  //（碰撞与玩法要按目的层算），但人还在梯子上，高度记在 p.lift 里。镜头不读
+  // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
+  const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
+  const y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  // 爬梯时不留提前量：人是竖着挪的，横向再往前探就成了甩镜头
+  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw: ch.light === "night" ? 6.15 : 6.3 };
 }
 
 function HintShot(state, hint) {
