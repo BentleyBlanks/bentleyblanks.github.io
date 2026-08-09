@@ -151,6 +151,31 @@ const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5, THROW_TIME = 0.55;
 const VAULT_DUR = 0.62;      // 齐胯高的墙一撑就过，拖长了就成了慢动作
 const VAULT_DUR_BIG = 1.05;
 
+// 上下梯子。井有 3.6 米深（SURFACE_Y→UNDER_Y），按人爬梯子的真速度给时长：
+// 下去顺着重力快些，上来是费力气的活。**这段时间里人是在梯子上的**，
+// 高度由 p.lift 插值（见 MovePlayer 里的爬梯分支），不是换个层数就完事。
+const CLIMB_DOWN = 1.5;
+const CLIMB_UP = 2.0;
+const LADDER_RUNG = 0.34;    // 横档间距：每挪过一档响一声，声音跟着人走
+
+// 层数当帧就翻（碰撞/视线/玩法一律按目的层算，不留半层的中间态），
+// 渲染高度另走 p.lift 从原来那层缓过去。两件事分开，玩法才不会出现"半层人"。
+function StartClimb(state, toLevel, dur) {
+  const p = state.player;
+  const fromY = p.level === "under" ? UNDER_Y : SURFACE_Y;
+  const destY = toLevel === "under" ? UNDER_Y : SURFACE_Y;
+  p.level = toLevel;
+  p.climbT = dur;
+  p.climbDur = dur;
+  p.climbFrom = fromY;
+  p.lift = fromY - destY;
+  p.rung = 0;
+  p.moving = false;
+  p.crouch = false;           // 梯子上不猫腰：进地道那一下的弓背等落地再说
+  p.pose = null;              // 手上的活到梯子这儿一律让位给爬的姿势
+  Cue(state, "ladder", { gain: 0.5 });
+}
+
 // 翻越的抬升曲线：人真的离地，不是换个姿势平移过去。
 // 峰值取障碍高度的七成左右——胯骨压过顶沿的那一下，脚正好在顶沿上方。
 // 扛着东西那一档在顶上多待一会儿（撂下、跨过、再拎起），所以是带平台的弧。
@@ -3713,7 +3738,32 @@ function MovePlayer(state, input, dt) {
     }
   }
 
-  if (p.climbT > 0) { p.climbT -= dt; return; } // 爬梯中锁操作
+  // 上下梯子：**人真的在梯子上挪**，不是换个层数。
+  //
+  // 上一版是 `p.level = "under"; p.climbT = 0.55`——层数当帧就翻了，渲染层照
+  // `level` 取地平线，人当场瞬移到井底，然后在井底原地摆 0.55 秒爬梯姿势。
+  // 玩家看见的就是"瞬移 + 没有攀爬动作"。
+  //
+  // 现在：层数照旧当帧翻（碰撞/视线/玩法都按目的层算，不留中间态），但渲染的
+  // 高度由 p.lift 从原来那层缓到目的层——World 的 UpdateOne 本来就画 ground+lift
+  // （翻越用的是同一条路）。3.6 米的井，下去 1.5 秒、上来 2.0 秒（上梯子费劲），
+  // 每挪过一档横档响一声，手上才有"在爬"的实感。
+  if (p.climbT > 0) {
+    p.climbT = Math.max(0, p.climbT - dt);
+    const destY = p.level === "under" ? UNDER_Y : SURFACE_Y;
+    const k = p.climbDur > 0 ? p.climbT / p.climbDur : 0;      // 1 → 0
+    const e = k * k * (3 - 2 * k);                             // 起步收势各缓一点
+    p.lift = (p.climbFrom - destY) * e;
+    // 一档一档地响：按真正挪过的距离发，不是定时循环——快慢都对得上
+    const gone = Math.abs(p.climbFrom - destY) * (1 - e);
+    const rung = Math.floor(gone / LADDER_RUNG);
+    if (rung !== p.rung) { p.rung = rung; Cue(state, "ladder", { gain: 0.42 }); }
+    if (p.climbT <= 0) { p.lift = 0; p.climbDur = 0; }
+    p.moving = false;
+    state.climbHint = "";
+    state.vaultHint = "";
+    return;                                                    // 爬梯中锁操作
+  }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
   // 横向用 smoothstep（起手几乎不动，手在撑；过顶沿最快；落地收住），
   // 纵向走 VaultArc —— 人是真的抬离地面的，渲染层读 p.lift。
@@ -3832,9 +3882,9 @@ function MovePlayer(state, input, dt) {
         }
         // 据点地道没有做地表：真让他爬上去会掉进一个空场景，提示全消失
         if (!scene.walk.surface) break;
-        p.level = "surface"; p.climbT = 0.55; p.x = shaft.x;
+        p.x = shaft.x; StartClimb(state, "surface", CLIMB_UP);
       } else if (input.climb > 0 && p.level === "surface" && scene.walk.under) {
-        p.level = "under"; p.climbT = 0.55; p.x = shaft.x;
+        p.x = shaft.x; StartClimb(state, "under", CLIMB_DOWN);
       }
       break;
     }
@@ -3879,6 +3929,22 @@ function StepFollowers(state, dt) {
     // 不跟着走的人一律落回地面：不清这一下，刚好在垛顶上停止跟随的人会一直悬着
     if (!a.following || !a.visible) { if (a.lift) a.lift = 0; continue; }
     a.level = p.level;
+    // 玩家在梯子上的时候，跟着走的人也得在梯子上——层数是跟着翻的，
+    // 高度不跟就成了"你一格一格爬，妹妹在井底等你"。她慢半拍（落后一档多），
+    // 一前一后下同一架梯子；等你落地她也就到了。
+    if (p.climbT > 0) {
+      const destY = p.level === "under" ? UNDER_Y : SURFACE_Y;
+      const span = p.climbFrom - destY;                     // 下井为正，上井为负
+      a.x = p.x;
+      a.heading = p.heading;
+      a.climbing = true;
+      a.crouch = false;
+      // 夹在两头之间：不许爬出井口，也不许穿到井底以下
+      const lag = Math.sign(span) * 0.55;
+      a.lift = span > 0 ? Math.min(span, p.lift + lag) : Math.max(span, p.lift + lag);
+      continue;
+    }
+    a.climbing = false;
     const targetX = p.x - p.heading * 1.3;
     const d = Math.abs(a.x - targetX);
     if (d > 0.25) {

@@ -234,7 +234,43 @@ function TestClimb() {
   }
   StepGame(state, { moveX: 0, climb: -1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   assert.equal(state.player.level, "surface", "在梯口按 W 应回到地表");
-  console.log("  ✓ 爬梯口上下");
+
+  // 人不许瞬移：层数当帧就翻（碰撞按目的层算），但**渲染高度得一格一格挪下去**。
+  // 老版本 `p.level="under"; p.climbT=0.55` 就翻了个层数，渲染层照 level 取地平线，
+  // 人当场掉到井底、再在井底原地摆 0.55 秒爬梯姿势——玩家看见的就是"瞬移 + 没动作"。
+  // 这里盯三件事：起手的渲染高度还在原来那层、中途是连续下降的、到点归零。
+  {
+    const s2 = CreateGame(0);
+    let f2 = 0;
+    while (s2.phase !== "playing" || CurrentBeatDef(s2)?.kind === "cinematic") {
+      StepGame(s2, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
+      if ((f2 += 1) > 10000) throw new Error("无法进入第一章玩法段");
+    }
+    s2.player.x = 27;
+    s2.player.level = "surface";
+    const idle2 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+    StepGame(s2, { ...idle2, climb: 1 }, DT);
+    assert.equal(s2.player.level, "under", "层数当帧就翻");
+    const RenderY = () => (s2.player.level === "under" ? UNDER_Y : SURFACE_Y) + (s2.player.lift || 0);
+    assert.ok(Math.abs(RenderY() - SURFACE_Y) < 0.35,
+      `刚下梯子那一下人还得在井口（现在渲染在 ${RenderY().toFixed(2)}，井口 ${SURFACE_Y}）`);
+    assert.ok(s2.player.climbT > 1.0, "3.6 米的井不该 0.55 秒就下完——那是瞬移的时长");
+    const ys = [RenderY()];
+    let g2 = 0;
+    while (s2.player.climbT > 0 && (g2 += 1) < 400) {
+      StepGame(s2, idle2, DT);
+      ys.push(RenderY());
+    }
+    // 一路只降不升，且真的走完了整口井
+    for (let i = 1; i < ys.length; i += 1) {
+      assert.ok(ys[i] <= ys[i - 1] + 1e-6, `下梯子的高度不许回弹（第 ${i} 帧 ${ys[i]} > ${ys[i - 1]}）`);
+    }
+    assert.ok(ys.filter((y, i) => i > 0 && y < ys[i - 1] - 1e-6).length > 20,
+      "中间得有几十帧真的在往下挪，不是跳一下就到底");
+    assert.ok(Math.abs(RenderY() - UNDER_Y) < 1e-6, "落地之后渲染高度要正好归到地道地平线");
+    assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
+  }
+  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位）");
 }
 
 function TestSmokeFront() {

@@ -1925,11 +1925,17 @@ export function CreateWorld(canvasEl) {
     const lift = extra.lift || 0;
     const y = ground + lift;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
+    const movedY = s.prevY === null || s.prevY === undefined ? 0 : Math.abs(y - s.prevY);
     s.prevX = x;
+    s.prevY = y;
     // 步频跟着实际位移走（不是定速循环），停下就自然收回站姿
     const isMoving = moved > 0.006;
-    if (isMoving) s.phase += moved * 3.4;
-    else s.phase += dt * 2.2;      // 挖土/爬梯这类原地动作也要有相位
+    // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
+    // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
+    // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
+    if (extra.climbing) s.phase += movedY * 4.5;
+    else if (isMoving) s.phase += moved * 3.4;
+    else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
@@ -2237,7 +2243,8 @@ export function CreateWorld(canvasEl) {
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
-          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU,
+          // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
+          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
