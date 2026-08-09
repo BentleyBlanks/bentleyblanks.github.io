@@ -1853,13 +1853,14 @@ function TestRopeLineIsRealRope() {
   assert.equal(state.player.level, "under", "按了 S 就该下去");
   assert.equal(state.player.item, null, "绳头不许跟着人钻进地道");
   assert.equal(state.beat.stepIndex, 0, "绳收回去了，链就该退回『抓住绳头』那一步");
-  step({}, 40);
+  // 等下梯子那 1.5 秒走完（上下梯子是真爬，climbT 没清之前不接第二次爬梯输入）
+  step({}, 60);
   const back = state.ropeLine;
   assert.ok(Math.abs(back.pts[back.pts.length - 1].x - back.x0) < 0.4,
     "回弹完绳头该缩回锚点（小周手里）");
 
   // ⑤ 不是死局：爬上来还能重拽一遍
-  step({ climb: -1 }, 1); step({}, 20);
+  step({ climb: -1 }, 1); step({}, 70);
   assert.equal(state.player.level, "surface", "该爬得回地面");
   state.player.x = 35.6; step({}, 3);
   assert.ok(/绳头/.test(state.prompt || ""), `上来必须还能重拽（提示实为 ${JSON.stringify(state.prompt)}）`);
