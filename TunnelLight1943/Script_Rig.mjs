@@ -37,11 +37,9 @@ export const BONE = {
   thigh: 0.31,
   shin: 0.31,
   foot: 0.19,
-  // 鞋帮高度。大腿+小腿正好 = hipY，所以**踝关节就落在 y=0**：鞋要是从踝
-  // 往下画，整个人就沉进地里 9 厘米——车轮压在路沿上、人的鞋却陷在路面
-  // 底下，一眼看出两个人不在一条水平线上（2026-08-09 用户截图）。
-  // 所以鞋一律**从踝往上**画：鞋底＝踝＝地平线，小腿最下面那一截藏在鞋帮里，
-  // 侧视看就是一只包住脚踝的布鞋。骨链一根没动，所有姿势的接地照旧。
+  // 鞋帮高度。鞋是从踝**往下**画的，而大腿+小腿正好等于 hipY——踝落在 y=0，
+  // 于是站着的人整个陷进地里一个鞋帮（2026-08-09 用户截图：车轮压在路沿上、
+  // 人的鞋却陷在路面底下）。补偿在 ApplyPose 的 SoleLift 里，见那儿的注释。
   sole: 0.09,
 };
 
@@ -137,15 +135,14 @@ function BuildParts(kind, haze = null) {
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#6b5540", kind + "shb", { k: INK_K })),
-    // 枢轴＝踝，鞋从枢轴**往上**长（见 BONE.sole）：鞋底正好踩在地平线上
-    footB: () => Bake(BONE.foot + 0.05, BONE.sole + 0.01, 0.16, 1,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py - BONE.sole * P, BONE.foot * P, BONE.sole * P, "#43331f", kind + "ftb", INK_K)),
+    footB: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P, "#43331f", kind + "ftb", INK_K)),
     thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
     shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#7d6349", kind + "shf", { k: INK_K })),
-    footF: () => Bake(BONE.foot + 0.05, BONE.sole + 0.01, 0.16, 1,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py - BONE.sole * P, BONE.foot * P, BONE.sole * P, "#4d3a28", kind + "ftf", INK_K)),
+    footF: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P, "#4d3a28", kind + "ftf", INK_K)),
   };
   const built = {};
   for (const k of Object.keys(parts)) built[k] = parts[k]();
@@ -165,7 +162,7 @@ export function CreateRig(kind, haze = null) {
   const proto = BuildParts(kind, haze);
   const group = new THREE.Group();          // 原点在脚底
   const root = new THREE.Group();           // 胯
-  root.position.y = BONE.hipY;
+  root.position.y = BONE.hipY + BONE.sole;  // 摆姿势前的静止值，与站姿一致
   group.add(root);
 
   const mk = (key, order) => {
@@ -898,12 +895,35 @@ export function PoseRig(rig, s, dt) {
   ApplyPose(rig, t, target, blend);
 }
 
+// 站姿抬升：**谁在承重，谁就该踩在地平线上**。
+//
+// 这具骨架的 foot 关节既是踝也是着地点（大腿+小腿正好等于 hipY，踝落在 y=0），
+// 而鞋是从踝往下画的。站着的时候承重的是鞋底，于是整个人陷进地里一个鞋帮——
+// 车轮压在路沿上、人的鞋却在路面底下（2026-08-09 用户截图）。站着就得整体抬
+// 起 BONE.sole，鞋底才踩在地平线上。
+//
+// **但跪、爬、趴这些姿势承重的是膝盖，不是鞋底**：爬行那一拍的脚是转过 180°
+// 反铺在地上的（鞋帮朝上，见 crawl 那段的注释），一抬膝盖就离地——上游刚把
+// 爬行的膝盖和手调到贴地，别再顶飞。
+//
+// 判据不能用胯高：猫腰走（胯 0.32）和爬行（胯 0.308~0.338）几乎一样低。
+// **膝盖高度才分得开**——猫腰的膝盖屈在半空（0.15 上下），爬行的膝盖跪在地上。
+// 膝盖相对胯的高度只由大腿的角度决定，跟胯自己在哪无关，所以能在抬升之前算。
+const KNEE_ON_GROUND = 0.05;   // 膝盖低到这儿就是跪着，体重不在脚上
+const KNEE_CLEAR = 0.13;       // 高过这儿体重全在脚上
+function SoleLift(t) {
+  // 膝点 = 绕胯转过大腿角之后的 (0,−thigh)；两条腿取更低的那个
+  const drop = BONE.thigh * Math.max(Math.cos(t.thighB), Math.cos(t.thighF));
+  const knee = BONE.hipY + t.hipY - drop;
+  return Math.max(0, Math.min(1, (knee - KNEE_ON_GROUND) / (KNEE_CLEAR - KNEE_ON_GROUND)));
+}
+
 // 混合进当前姿态并写到关节上。轨道采样和状态姿势都从这儿出去
 function ApplyPose(rig, t, target, blend) {
   const j = rig.joints;
   for (const k of Object.keys(target)) t[k] = Lerp(t[k], target[k], blend);
 
-  j.root.position.set(t.hipX, BONE.hipY + t.hipY, 0);
+  j.root.position.set(t.hipX, BONE.hipY + BONE.sole * SoleLift(t) + t.hipY, 0);
   j.torso.rotation.z = -t.torso;
   j.head.rotation.z = -t.head;
   j.legBack.rotation.z = -t.thighB;
