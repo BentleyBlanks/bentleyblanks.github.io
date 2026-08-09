@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  PLAYABLE_CHAPTERS,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
@@ -96,6 +96,8 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "endTitle", "endText",
+  "noticeOverlay", "noticeText", "noticeClose",
+  "contentNotice", "softenBox", "contentNoticeGo",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
@@ -806,6 +808,16 @@ function SyncHud(state, dt, shotFade) {
     }
   } else if (choiceBuilt) HideChoice();
 
+  // 征夫告示阅读层：跟 state.noticeOpen 走。开着时环境声收窄（Duck），
+  // 背景压暗由覆盖层自己的半透明底做——世界还在画框里，不切黑
+  if (ui.noticeOverlay) {
+    const open = !!state.noticeOpen;
+    if (ui.noticeOverlay.hidden !== !open) {
+      ui.noticeOverlay.hidden = !open;
+      audio.Duck(open);
+    }
+  }
+
   // 试玩收尾借的是通关那块牌子，但话得换——这不是"全篇完"，是"做到这儿"
   const showEnd = state.phase === "gameEnd" || demoEnd;
   ui.endScreen.hidden = !showEnd;
@@ -959,8 +971,22 @@ ui.btnDebug?.addEventListener("click", () => {
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
 
+// 历史内容提示（设计文档：游戏开始前明确提示；弱化选项只改暴行几拍的取景与
+// 时长）。提示每台设备给一次，弱化偏好单独记住、之后每次开局都生效
+const NOTICE_SEEN_KEY = "tunnelLight1943.contentNotice";
+const SOFTEN_KEY = "tunnelLight1943.soften";
+let pendingStart = null;
 function StartGame(chapterIndex) {
+  if (ui.contentNotice && !localStorage.getItem(NOTICE_SEEN_KEY)) {
+    pendingStart = chapterIndex;
+    if (ui.softenBox) ui.softenBox.checked = localStorage.getItem(SOFTEN_KEY) === "on";
+    ui.titleScreen.hidden = true;
+    ui.contentNotice.hidden = false;
+    return;
+  }
   state = CreateGame(chapterIndex);
+  // 弱化暴行镜头：Core 在刘家那几拍读它（dynamicLines 只动机位距离与时长）
+  state.softenViolence = localStorage.getItem(SOFTEN_KEY) === "on";
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
@@ -1042,6 +1068,25 @@ ui.btnSkipCine?.addEventListener("click", () => {
 });
 
 ui.startButton.addEventListener("click", () => StartGame(0));
+// 内容提示：确认后记住偏好、放行开局
+ui.contentNoticeGo?.addEventListener("click", () => {
+  localStorage.setItem(NOTICE_SEEN_KEY, "seen");
+  localStorage.setItem(SOFTEN_KEY, ui.softenBox?.checked ? "on" : "off");
+  ui.contentNotice.hidden = true;
+  if (pendingStart !== null) { const c = pendingStart; pendingStart = null; StartGame(c); }
+});
+// 征夫告示阅读层：右栏文字从 Core 注入（权威版本）；关闭钮直接清旗标。
+// hidden 切换与环境声收窄都在 UpdateHud 里跟 state.noticeOpen 走
+if (ui.noticeText) {
+  const N = ZHENGFU_NOTICE;
+  ui.noticeText.innerHTML =
+    `<h3>${N.title}</h3>`
+    + N.lines.map((l) => `<p>${l}</p>`).join("")
+    + `<p class="nDate">${N.date}</p>`
+    + N.signs.map((s) => `<p class="nSign">${s}</p>`).join("");
+}
+ui.noticeClose?.addEventListener("click", () => { if (state) state.noticeOpen = false; });
+
 ui.endRestart.addEventListener("click", () => {
   soundtrack.StopBgm();
   ui.endScreen.hidden = true;

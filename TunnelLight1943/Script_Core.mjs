@@ -58,6 +58,24 @@ export const CHAPTERS = [
 // 门槛只由外壳（Script_Main）把守——把这个数改成 CHAPTERS.length 就全开了。
 export const PLAYABLE_CHAPTERS = 1;
 
+// 征夫告示的逐字转录：阅读层右栏的权威版本——铅字排出来给玩家读，
+// 不指望生成图上的毛笔小字（关卡设计文档明令「右侧文字是权威版本」）。
+// 不配柱子朗读旁白：他识不识字是人物设定，不该由一块 UI 替他决定。
+export const ZHENGFU_NOTICE = {
+  title: "征　夫　告　示",
+  lines: [
+    "奉上级命令，修筑东路炮楼并开挖封锁沟。各保甲依册派夫，不得短少。",
+    "一、凡十六岁以上、五十岁以下壮丁，由各甲按册点派。本班限三月十二日卯时，在村东口听候点名。",
+    "二、每名自带铁锹或镐头一件、绳索一条、铺盖一卷、干粮七日。",
+    "三、服役七日，由下一班换替；未奉令不得擅自离工。",
+    "四、牲口、大车及木石草料，另照各甲所派数交齐。",
+    "五、无故不到、迟到、逃役、顶替或藏匿者，连保追究；扣粮封门，并拿送究办。",
+    "各户即刻知照，毋违。",
+  ],
+  date: "中华民国三十一年三月初十",
+  signs: ["本区公所", "梁家村保公所"],
+};
+
 // ---------------------------------------------------------------------------
 // 小工具
 // ---------------------------------------------------------------------------
@@ -2256,21 +2274,39 @@ export const SCRIPTS = {
           digB.wander = { x0: 37.5, x1: 41.7, speed: 0.95, haul: "土筐" };
         }
       },
+      // 出土处理（2026-08-10 史实校正，焦庄户资料）：不是把土倒进三个固定点——
+      // 猪圈只垫浅浅一层，院路洼处只使少量；院内消纳不下了，余土装上独轮车
+      // 由乡亲趁夜运往村外沟坎；收尾拿扫帚把出土口的筐印脚印扫散。
+      // 菜畦与柴堆不再当弃土点（深层黏土颜色深，倒进菜畦一眼就穿）。
       steps: [
         { type: "pickup", x: 37.6, item: { id: "dirtA", label: "土筐", big: true }, prompt: "E · 接过土筐" },
-        { type: "use", zone: { x: 44.9, w: 2.6 }, needs: "dirtA", prompt: "E · 把土倒进猪圈",
+        { type: "use", zone: { x: 44.9, w: 2.6 }, needs: "dirtA", prompt: "E · 往猪圈垫薄土",
+          note: "只垫浅浅一层——铺厚了，就是一堆显眼的新土。",
           effect: (state) => { Cue(state, "drop"); } },
         { type: "pickup", x: 37.6, item: { id: "dirtB", label: "土筐", big: true }, prompt: "E · 接过土筐" },
-        { type: "use", zone: { x: 13.6, w: 2.8 }, needs: "dirtB", prompt: "E · 把土撒进菜畦",
+        { type: "use", zone: { x: 47.2, w: 2.8 }, needs: "dirtB", prompt: "E · 垫进院路洼处",
+          note: "垫路也只使这么点。深层的黏土颜色深，撒进菜畦一眼就穿。",
           effect: (state) => { Cue(state, "drop"); } },
         { type: "pickup", x: 37.6, item: { id: "dirtC", label: "土筐", big: true }, prompt: "E · 接过土筐" },
-        { type: "use", zone: { x: 46.8, w: 2.6 }, needs: "dirtC", prompt: "E · 把土压进柴堆",
-          note: "新土都散净了。",
+        { type: "use", zone: { x: 43.0, w: 2.8 }, needs: "dirtC", prompt: "E · 把土筐装上车",
+          note: "院里搁不下了——剩下的土，得趁夜送出村去。",
           effect: (state) => {
-            // 成年民兵从沟沿绕回来，当面低声报告——不用来历不明的暗号
+            // 娘派车：担水的乡亲接过车把，趁夜把余土推去村外沟坎。
+            // 车从这儿起重新是活物（state.cart），乡亲推着它一路出画，tick 里走
+            state.cart = { x: 43.0, kind: "barrow" };
+            state.beat.cartAway = { phase: "come" };
+            const carrier = FindActor(state, "carrier");
+            if (carrier) {
+              carrier.visible = true; carrier.wander = null; carrier.carry = null;
+              carrier.cineTarget = { x: 44.2 }; carrier.cineSpeed = 1.6;
+            }
+            // 成年民兵从沟沿绕回来，当面低声报告——不用来历不明的暗号。
+            // 两句并一段微过场（StartMicroCine 后写的会覆盖先写的，不能拆两次调）
             const st = FindActor(state, "sentry");
             if (st) { st.wander = null; st.cineTarget = { x: 50 }; st.cineSpeed = 2.6; st.heading = -1; }
             StartMicroCine(state, [
+              { who: "娘", say: "院里使不下了。给他——趁黑送到村外沟坎去，别走官道。", d: 4.6,
+                cam: { kind: "shot", x: 43.5, y: 1.5, dist: 7 } },
               { who: "民兵", say: "官道上暂时没动静。", d: 3.0, cam: { kind: "shot", x: 48, y: 1.5, dist: 7 },
                 on: (state2) => {
                   const s2 = FindActor(state2, "sentry");
@@ -2291,7 +2327,43 @@ export const SCRIPTS = {
           prompt: "E · 把木板支上",
           note: "洞口和松土段都撑住了。",
           wrongNote: "爹把板子取了下来：这段是硬土，不用糟践木头。" },
+        // 收尾清痕：筐印、脚印、新土的边——扫散颜色和边界，痕迹本身就是暴露
+        //（物件痕迹系统的第一课；扫帚从娘手边接过来）
+        { type: "pickup", x: 37.2, item: { id: "broom", label: "扫帚" }, prompt: "E · 接过娘的扫帚" },
+        { type: "use", zone: { x: 37.8, w: 2.8 }, needs: "broom", hold: 2.4, stroke: "down", gestureY: 0.5,
+          prompt: "E · 扫净印子",
+          note: "筐印、脚印、新土的边，都扫散了。",
+          effect: (state) => {
+            // 扫帚搁回墙根（不是凭空消失）；扫帚声往下接的就是村外的脚步声
+            if (state.player.item?.id === "broom") {
+              AddGroundItem(state, state.player.item, 36.9, "surface");
+              state.player.item = null;
+            }
+            Cue(state, "flutter", { gain: 0.45 });
+          } },
       ],
+      // 乡亲推余土出村：微过场放完、人走到车边，就推着车一路向西出画。
+      // 走 tick 而不是 cineTarget——车（state.cart）得跟人同步挪
+      tick: (state, dt) => {
+        const away = state.beat.cartAway;
+        if (!away || !state.cart) return;
+        const carrier = FindActor(state, "carrier");
+        if (!carrier || carrier.visible === false) return;
+        if (away.phase === "come") {
+          if (!carrier.cineTarget) { away.phase = "push"; carrier.heading = -1; carrier.pose = "push"; }
+          return;
+        }
+        carrier.x -= 1.05 * dt;
+        carrier.heading = -1;
+        state.cart.x = carrier.x - 1.15;      // 车在人前面：往西推，人顶在车后
+        if (carrier.x < 7) {
+          // 出了村：车和人都下场（c1_break 的夜里清场还会兜一遍底）
+          state.cart = null;
+          carrier.visible = false;
+          carrier.pose = null;
+          state.beat.cartAway = null;
+        }
+      },
     },
     {
       // 第九场：两头通了。没有敲墙暗号也没有庆祝——七叔从那头扒开最后一层土
@@ -2313,6 +2385,8 @@ export const SCRIPTS = {
                 a.carry = null; a.digging = false; a.rank = 0;
               }
             }
+            // 运土的车要是还没推出画（玩家把链打得飞快），夜里也一并下场
+            state.cart = null;
             const q = FindActor(state, "qishu");
             if (q) { q.visible = true; q.level = "under"; q.x = 47.9; q.heading = -1; q.carry = "锄头"; q.track = { name: "hoeing", t: 0, ambient: true }; }
             const D = (id, x) => {
@@ -2397,7 +2471,14 @@ export const SCRIPTS = {
       // 不做 QTE、不成为任何玩法或奖励），士兵行凶后继续翻找——
       // 起因不是刘家做错了什么，而是日军抢不到粮时蓄意以杀害婴儿逼供恐吓
       kind: "cinematic", id: "c1_roster", timeOfDay: "dawn",
-      lines: [
+      // 弱化暴行镜头（开场内容提示里的选项）：只把暴行那几拍的机位退远两米六、
+      // 时长收三成——事件与后果一个字不改（设计文档：只改变取景与持续时间）。
+      // 台词行原样：文本一变 VoiceLineId 就变，配音全得重烘
+      dynamicLines: (state) => {
+      const SV = !!state.softenViolence;
+      const D = (d) => (SV ? Math.max(1.6, d * 0.72) : d);
+      const Z = (z) => (SV ? z + 2.6 : z);
+      return [
         { who: "伪保长", say: "赵家，三口。", far: true, d: 3.6,
           cam: { kind: "shot", x: 84, y: 1.8, dist: 10, pan: -5 },
           on: (state) => {
@@ -2462,14 +2543,14 @@ export const SCRIPTS = {
           } },
         { who: "刘嫂", say: "上回都交走了……孩子还没奶吃，真没有了。", d: 4.4,
           cam: { kind: "shot", x: 62.5, y: 1.4, dist: 7.5 } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
+        { stage: "", d: D(2.2), cam: { kind: "shot", x: 61.5, y: 1.4, dist: Z(8) },
           on: (state) => {
             const le = FindActor(state, "liuElder");
             if (le) le.track = { name: "struckFall", t: -0.95 };
             const r1 = FindActor(state, "raid1");
             if (r1) r1.track = { name: "buttStrike", t: 0 };
           } },
-        { stage: "", d: 2.4, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
+        { stage: "", d: D(2.4), cam: { kind: "shot", x: 61.5, y: 1.4, dist: Z(8) },
           on: (state) => {
             // 从刘嫂怀里强行夺走襁褓；刘嫂扑过去
             const ls = FindActor(state, "liusao");
@@ -2478,15 +2559,32 @@ export const SCRIPTS = {
             if (r2) { r2.carry = "襁褓"; r2.heading = -1; }
             Cue(state, "sobBreath", { gain: 0.8 });
           } },
-        { stage: "", d: 2.8, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8 },
+        { stage: "", d: D(2.8), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8) },
           on: (state) => {
             const ls = FindActor(state, "liusao");
             if (ls) ls.track = { name: "struckFall", t: -0.6 };
             const r2 = FindActor(state, "raid2");
             if (r2) r2.track = { name: "buttStrike", t: 0 };
           } },
-        { stage: "刘家院里的哭喊，半条街都听得见。", d: 3.6,
-          cam: { kind: "shot", x: 58, y: 1.5, dist: 8 },
+        // 刺刀（剧本§10 明令必须明确表现：刺刀动作、襁褓随枪身离地；
+        // 同时不做伤口特写、不慢镜、不煽情配乐——机位钉在院门外侧不推近）。
+        // 起因不是刘家做错了什么：抢不到粮，就以杀害婴儿逼供并恐吓全村
+        { stage: "", d: D(2.6), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8.5) },
+          on: (state) => {
+            const r2 = FindActor(state, "raid2");
+            if (r2) { r2.carry = "步枪"; r2.heading = -1; r2.track = { name: "bayonetThrust", t: 0 }; }
+            Cue(state, "whoosh", { gain: 0.5 });
+          } },
+        { stage: "", d: D(2.4), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8.5) },
+          on: (state) => {
+            // 襁褓随枪身离地：挑起的姿势停在高位，襁褓挂在手点上就在高处。
+            // 哭声到这儿断了——同期声自己说话，旁白闭嘴
+            const r2 = FindActor(state, "raid2");
+            if (r2) r2.carry = "襁褓";
+            Cue(state, "sobBreath", { gain: 1.0 });
+          } },
+        { stage: "刘家院里的哭喊，半条街都听得见。", d: D(3.6),
+          cam: { kind: "shot", x: 58, y: 1.5, dist: Z(8) },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
             if (r2) { r2.carry = "步枪"; r2.track = null; r2.heading = 1; }
@@ -2497,12 +2595,16 @@ export const SCRIPTS = {
         { who: "伪保长", say: "下一户——梁木匠家，四口。", d: 3.4,
           cam: { kind: "shot", x: 56, y: 1.4, dist: 7.5 },
           on: (state) => {
+            // 放下孩子、不迟疑不悔恨，翻粮继续——恶不给一个收场的姿势
+            const r2 = FindActor(state, "raid2");
+            if (r2) { r2.carry = "步枪"; r2.track = null; }
             for (const [id, tx] of [["baozhang", 48.4], ["puppetChief", 47.2], ["officer", 46.2], ["traitor", 49.4], ["raid1", 50.6], ["raid2", 52]]) {
               const a = FindActor(state, id);
               if (a) { a.track = null; a.cineTarget = { x: tx }; a.cineSpeed = 1.5; a.heading = -1; }
             }
           } },
-      ],
+      ];
+      },
     },
     {
       // 第十一场（玩法·全章唯一的高压段）：藏种子粮。没有倒计时——紧迫感全部
@@ -4715,6 +4817,16 @@ export function StepGame(state, input, dt) {
   state.beat.t += dt;
   state.prompt = null;
 
+  // 征夫告示的阅读层开着：世界冻结（独轮车的装载、朝向、位置分毫不动），
+  // 只听关闭——E / 点按 / 阅读层上的关闭钮（Main 直接清这个旗标）。
+  // 可反复看，不计收集、无奖励、无获得音效（关卡设计文档明令）
+  if (state.noticeOpen) {
+    state.prompt = null;
+    state.caption = null;
+    if (input.interact || input.tap) state.noticeOpen = false;
+    return;
+  }
+
   if (state.microCine) { StepMicroCine(state, input, dt); StepCineActors(state, dt); return; }
   if (def.kind === "cinematic") { StepCinematic(state, input, dt); return; }
   if (def.kind === "choice") { state.caption = null; return; }
@@ -4788,6 +4900,20 @@ export function StepGame(state, input, dt) {
       state.flags.thimbleFound = true;
       Cue(state, "pickup");
       state.toast = { text: "一枚铜顶针。娘纳鞋底时顶针眼用的，不知什么时候滚到了墙根。", t: 5 };
+    }
+  }
+  // 征夫告示（noticeWall）：一臂之内出「查看」，按 E 进左图右文的阅读层。
+  // 不抢镜、不自动弹窗、路过可以不停；推着车也能看——阅读层开着时世界是冻的
+  // （StepGame 顶部直接 return），关上后车的装载朝向位置原样。
+  // 与 lookables 的区别：可反复看（不记 lookSeen），打开的是阅读层不是一句手记
+  {
+    const ch = CHAPTERS[state.chapterIndex];
+    const wallN = SCENES[ch.scene]?.props?.find((pr) => pr.id === "noticeWall");
+    const daylight = !["night", "dark", "tunnel"].includes(ch.light || "day");
+    if (wallN && daylight && !state.stealthActive && !state.prompt && !state.microCine
+      && state.player.level === "surface" && Math.abs(state.player.x - wallN.x) <= 1.2) {
+      state.prompt = "E · 查看告示";
+      if (input.interact) state.noticeOpen = true;
     }
   }
   // 邻居家的细节（scene.lookables）：白天路过看一眼，出一条手记。

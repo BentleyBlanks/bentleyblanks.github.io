@@ -273,6 +273,19 @@ export const TRACKS = {
       { t: 2.2, hipY: -0.06, hipX: -0.02, torso: -4, head: -6, armB: -58, foreB: -44, armF: -46, foreF: -38 },      // 收回，枪垂在身前
     ],
   },
+  // 刺刀（不循环）：端枪、猛地送出去，随后把枪身挑起来停在高位。
+  // 「襁褓随枪身离地」那一拍靠停住的高位姿势读出来（下一行把 carry 换成襁褓，
+  // 挂点在手上，手停在哪儿襁褓就在哪儿）。机位钉在院门外侧、不推近不慢镜——
+  // 关卡设计文档明令必须明确表现，同时不许猎奇化
+  bayonetThrust: {
+    dur: 2.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.04, hipX: -0.02, torso: 8, head: -6, armF: -58, foreF: -22, armB: -46, foreB: -30, thighB: -18, shinB: 22, footB: -6, thighF: 12, shinF: 8, footF: -8 },
+      { t: 0.30, hipY: -0.10, hipX: 0.12, torso: 30, head: -12, armF: -84, foreF: -6, armB: -72, foreB: -10 },    // 送出去：全程最快的一下
+      { t: 0.85, hipY: -0.08, hipX: 0.06, torso: 22, head: -16, armF: -96, foreF: -14, armB: -84, foreB: -18 },   // 顿住
+      { t: 2.2, hipY: -0.05, hipX: 0.02, torso: 12, head: -18, armF: -124, foreF: -18, armB: -110, foreB: -22 },  // 挑起，停在高位
+    ],
+  },
   // 妹妹在树下仰头跳着够（循环）：蹲一下、蹦起来伸手、落地、望着喘口气——
   // 她的视线与够不着的那只手就是引导线（无文字引导三层配方之三）
   reachJump: {

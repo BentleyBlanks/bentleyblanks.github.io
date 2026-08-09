@@ -2817,6 +2817,21 @@ export function DrawNoticeWall(ctx, x, groundY, w, id) {
     }
     ctx.restore();
   }
+  // 最新那张是征夫告示：标题四个字真的写出来（设计文档：玩家先在实景里
+  // 看见「征夫告示」四个大字和暗红印章，才谈得上想不想停下看）。
+  // 竖排在纸右沿，字号顶着纸宽；左下一点暗红当印
+  {
+    const p = posters[1];
+    ctx.save();
+    ctx.fillStyle = "rgba(43, 31, 22, 0.88)";
+    ctx.font = "600 7px 'Noto Serif SC', serif";
+    ctx.textAlign = "center";
+    const tx = p.px + p.pw / 2 - 5.5;
+    for (let k = 0; k < 4; k += 1) ctx.fillText("征夫告示"[k], tx, p.py + 9.5 + k * 7.2);
+    ctx.fillStyle = "rgba(146, 44, 32, 0.55)";
+    ctx.fillRect(p.px - p.pw / 2 + 3.5, p.py + p.ph - 8.5, 5, 5);
+    ctx.restore();
+  }
 }
 
 // 猪圈：半圈土坯矮墙 + 圈门豁口 + 食槽。猪早卖了换粮——空圈也是世道

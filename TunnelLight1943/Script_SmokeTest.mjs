@@ -45,6 +45,14 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
 
     const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
 
+    // 征夫告示阅读层要是被误开了（路过 noticeWall 时恰好按了 E），按一下合上——
+    // 它会冻结全世界，不关的话超时的是整章
+    if (state.noticeOpen) {
+      input.interact = true;
+      StepGame(state, input, DT);
+      continue;
+    }
+
     if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
       input.advance = true;
       StepGame(state, input, DT);
@@ -1675,13 +1683,27 @@ function TestRaidTakesMoreThanFather() {
   assert.ok(officer, "带队的军曹必须在场");
   assert.equal(officer.kind, "officer", "军曹得用自己那套外观，不能跟大头兵一个样");
 
-  // 保甲点户：逐户念、由远及近（far 起手）；暴行段是纯过场，零可操作项
+  // 保甲点户：逐户念、由远及近（far 起手）；暴行段是纯过场，零可操作项。
+  // c1_roster 改成了 dynamicLines（弱化镜头选项只动机位与时长）——两档都验：
+  // 弱化档必须句句还在（事件与后果不改），只许更远、更短
   const roster = SCRIPTS.c1.find((b) => b.id === "c1_roster");
-  const calls = roster.lines.filter((l) => l.who === "伪保长");
+  const rosterLines = roster.dynamicLines({ softenViolence: false, actors: [], flags: {} });
+  const calls = rosterLines.filter((l) => l.who === "伪保长");
   assert.ok(calls.length >= 3, "保甲点户得逐户念出来");
-  assert.ok(roster.lines.some((l) => l.far), "点户声得从远处压过来");
+  assert.ok(rosterLines.some((l) => l.far), "点户声得从远处压过来");
   assert.equal(roster.kind, "cinematic", "刘家的暴行必须是连续剧情演出");
   assert.ok(!roster.steps && !roster.options, "暴行段不许挂任何可操作项（无 QTE/无选项）");
+  const rosterSoft = roster.dynamicLines({ softenViolence: true, actors: [], flags: {} });
+  assert.equal(rosterSoft.length, rosterLines.length, "弱化档一句都不许删——只改取景与时长");
+  for (let i = 0; i < rosterLines.length; i += 1) {
+    assert.equal(rosterSoft[i].say ?? rosterSoft[i].stage, rosterLines[i].say ?? rosterLines[i].stage,
+      "弱化档的台词/舞台文本必须与常规档逐句一致");
+    assert.ok(rosterSoft[i].d <= rosterLines[i].d + 1e-9, "弱化档时长只许更短");
+    assert.ok((rosterSoft[i].cam?.dist ?? 0) >= (rosterLines[i].cam?.dist ?? 0), "弱化档机位只许更远");
+  }
+  // 刺刀两拍（剧本§10 明令必须明确表现）：夺襁褓之后得有 bayonetThrust 那一拍
+  assert.ok(rosterLines.some((l) => String(l.on || "").includes("bayonetThrust")),
+    "刺刀动作那一拍必须在（襁褓随枪身离地靠它成立）");
 
   // 搜家：军曹亲口问话（生硬中文）、爹的回答只有两个字、认人的是伪军头目
   const search = SCRIPTS.c1.find((b) => b.id === "c1_search");

@@ -427,6 +427,68 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #endScreen button:hover { background: rgba(232, 193, 90, 0.12); }
 
+/* 征夫告示阅读层：背景压暗但透出场景（不切黑）；左图 42% / 右文 58%，
+   窄屏改上图下文。关闭键钉在面板右上角，文字自己滚 */
+#noticeOverlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 6, 4, 0.62); padding: 4vmin;
+}
+#noticePanel {
+  position: relative; display: flex; gap: 3.2%;
+  width: min(920px, 94%); max-height: 88%;
+  background: rgba(24, 20, 15, 0.94);
+  border: 1px solid rgba(154, 143, 122, 0.4);
+  padding: 22px;
+}
+#noticeImg {
+  width: 42%; align-self: flex-start;
+  max-height: 100%; object-fit: contain;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+#noticeText {
+  width: 58%; overflow-y: auto; padding-right: 6px;
+  color: var(--paper); font-size: 14.5px; line-height: 1.9;
+}
+#noticeText h3 { font-size: 19px; letter-spacing: 0.3em; margin-bottom: 10px; font-weight: 600; }
+#noticeText p { margin-bottom: 7px; }
+#noticeText .nDate { margin-top: 14px; color: var(--dim); }
+#noticeText .nSign { text-align: right; color: var(--dim); }
+#noticeClose {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 34px; height: 34px; cursor: pointer;
+  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  border: 1px solid rgba(154, 143, 122, 0.5);
+  font-family: inherit; font-size: 15px;
+}
+#noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
+@media (max-width: 700px), (orientation: portrait) {
+  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; }
+  #noticeImg { width: auto; max-width: 100%; max-height: 38%; align-self: center; }
+  #noticeText { width: auto; flex: 1; min-height: 0; }
+}
+
+/* 历史内容提示：开始前的一块静版，样式沿 endScreen */
+#contentNotice {
+  position: absolute; inset: 0; z-index: 70;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #050403; text-align: center; padding: 24px;
+}
+#contentNotice small { letter-spacing: 0.4em; color: var(--dim); }
+#contentNotice h2 { font-size: 24px; letter-spacing: 0.14em; font-weight: 600; }
+#contentNotice p { color: var(--dim); font-size: 14.5px; max-width: 560px; line-height: 1.9; }
+#softenRow {
+  display: flex; gap: 9px; align-items: center; cursor: pointer;
+  color: var(--paper); font-size: 13.5px; margin-top: 8px;
+}
+#softenRow input { accent-color: var(--lamp); width: 16px; height: 16px; }
+#contentNoticeGo {
+  margin-top: 22px; padding: 12px 34px; cursor: pointer;
+  background: none; color: var(--lamp); border: 1px solid rgba(232, 193, 90, 0.5);
+  font-family: inherit; font-size: 15px; letter-spacing: 0.2em;
+}
+#contentNoticeGo:hover { background: rgba(232, 193, 90, 0.12); }
+
 /* 标题 */
 #titleScreen {
   position: absolute; inset: 0; overflow-y: auto;
