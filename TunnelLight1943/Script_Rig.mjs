@@ -552,6 +552,19 @@ export function PoseRig(rig, s, dt) {
     target.armB = -22 * DEG; target.foreB = -10 * DEG;
     target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
     target.thighF = -22 * DEG; target.shinF = 30 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "ropeHaul") {
+    // 绳放到头了：他还想往前走，绳在后头拽住他。前手向后下方绷直（顺着绳的
+    // 走向），上身往前顶、后腿蹬住地。**这不是拔河**，是"再往前一寸也走不动"
+    // 的那一顿——所以劲不在胳膊上，在腰腿上。
+    // poseK = 这一帧被绳吃掉了多大一步：顶得越使劲，身子拧得越紧。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 1));
+    target.hipY = -0.05 - 0.05 * k; target.hipX = 0.05 + 0.10 * k;
+    target.torso = (12 + 15 * k) * DEG; target.head = (-6 - 8 * k) * DEG;
+    target.armF = (36 + 28 * k) * DEG;             // 正角=向后：手顺着绳伸回去
+    target.foreF = (-10 - 10 * k) * DEG;
+    target.armB = (-32 - 20 * k) * DEG; target.foreB = -20 * DEG;
+    target.thighB = (-10 - 16 * k) * DEG; target.shinB = (8 + 10 * k) * DEG; target.footB = -10 * DEG;
+    target.thighF = (14 + 12 * k) * DEG; target.shinF = (8 + 8 * k) * DEG; target.footF = -12 * DEG;
   } else if (s.pose === "throwArm") {
     // 投掷收势：石子刚出手，臂甩到前上方，上身跟着送出去
     target.hipY = -0.06; target.hipX = 0.16;

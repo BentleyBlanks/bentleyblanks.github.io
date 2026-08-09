@@ -33,6 +33,9 @@ const SCRIBE_SS = 3;
 // 石笔的世界尺寸：26×30 的贴图 ×0.22 ≈ 12×14cm 的画布，里面那支笔约 9cm 长——
 // 巴掌里攥得住的东西。别再让它长回 40cm。
 const CHALK_SCALE = 0.22;
+// 定向绳的半宽（米）：真麻绳才两三厘米，但那在屏幕上不到两个像素，趴在土路上
+// 根本看不见。7 厘米粗是"看得出是绳"的下限，同辘轳井绳一个量级
+const ROPE_HALF = 0.035;
 // 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
 
@@ -131,7 +134,7 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
-  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
+  "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
   "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
@@ -140,6 +143,7 @@ const HOLD_WEIGHT = {
   "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+  "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
   "军刀": 0.25,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
@@ -153,7 +157,7 @@ const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
 function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
-  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
   // 收窄后的画幅，别再给一根柱子留地方。
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
@@ -400,8 +404,14 @@ export function CreateWorld(canvasEl) {
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
-  let ropeLineMesh = null;
+  // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
+  let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
+  // 屋里的东西（地窖口、下窖的梯子）：从街上看不见，进了屋才露出来。
+  // 少了这一层，自家地窖口就成了「敞在门口大街上的一个洞」（用户 2026-08-09
+  // 退回：「主角家的地道/地窖怎么会在家门口外面」）——2.5D 里玩家走的那条线
+  // 永远在立面之前，所以屋内地面上的东西必须跟着立面一起淡
+  let indoorMeshes = [];
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
   // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
@@ -473,8 +483,9 @@ export function CreateWorld(canvasEl) {
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
-    ropeLineMesh = null;
+    ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
+    indoorMeshes = [];
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -605,6 +616,59 @@ export function CreateWorld(canvasEl) {
         }
       }
       ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+      // 土路的实况（用户 2026-08-09："地面太现代了"）：1943 年冀中的村道是
+      // 独轮车和大车碾出来的，没有路沿、没有铺装——只有两道深深的车辙、
+      // 旱得裂开的泥皮、被踩塌的坑，和一层碾碎的料礓石。
+      // 全部画在**近处这一带**（y 8..40px），远了就成了噪点。
+      ctx.save();
+      // ① 两道车辙：顺路方向的长条压暗，深浅不匀（走一段就浅一段）
+      for (const [ry, alpha] of [[13, 0.16], [21, 0.11]]) {
+        ctx.strokeStyle = `rgba(58,44,28,${alpha})`;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        let drawing = false;
+        for (let px = 0; px <= wPx; px += 12) {
+          const on = ART.Hash(id + "rut" + ry + Math.floor(px / 96)) > 0.22;
+          const yy = ry + (ART.Hash(id + "rw" + ry + px) - 0.5) * 2.2;
+          if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+          else if (on) ctx.lineTo(px, yy);
+          else drawing = false;
+        }
+        ctx.stroke();
+      }
+      // ② 旱裂的泥皮：短短的折线，横七竖八
+      ctx.strokeStyle = "rgba(70,54,34,0.16)";
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < wPx / 30; i += 1) {
+        const cx = ART.Hash(id + "ck" + i) * wPx;
+        const cy = 9 + ART.Hash(id + "cy" + i) * 26;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        for (let k = 1; k <= 3; k += 1) {
+          ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 16,
+            cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 9);
+        }
+        ctx.stroke();
+      }
+      // ③ 踩塌的浅坑：贴地的小椭圆，边上一圈亮、里头一层暗
+      for (let i = 0; i < wPx / 150; i += 1) {
+        const hx = ART.Hash(id + "ho" + i) * wPx;
+        const hy = 12 + ART.Hash(id + "hy" + i) * 16;
+        const hr = 7 + ART.Hash(id + "hr" + i) * 11;
+        ctx.fillStyle = "rgba(56,42,26,0.13)";
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, hr, hr * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // ④ 碾碎的料礓石子：一层细碎的亮点
+      for (let i = 0; i < wPx / 18; i += 1) {
+        const sx = ART.Hash(id + "gv" + i) * wPx;
+        const sy = 8 + ART.Hash(id + "gy" + i) * 24;
+        ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+          ? "rgba(154,140,112,0.30)" : "rgba(96,80,58,0.24)";
+        ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
+      }
+      ctx.restore();
     });
     PlaceSprite(mesh, xFrom, groundY, 0);
     group.add(mesh);
@@ -686,6 +750,69 @@ export function CreateWorld(canvasEl) {
     }
     ctx.restore();
     ART.Speckle(ctx, 0, 0, wPx, hPx, id + "sp", { count: 520, alpha: 0.10, size: 3, color: "#3d3020" });
+
+    // 村道本身（贴图最下面那一条＝玩家脚下这一带）。老版这儿是一块平涂的土色，
+    // 干干净净——1943 年冀中的村道是独轮车和大车碾出来的：没有铺装、没有路沿，
+    // 只有两道深车辙、旱裂的泥皮、踩塌的坑，和一层碾碎的料礓石子
+    //（用户 2026-08-09："地面之类的太现代了"）。
+    // 只画贴图下缘 22% —— 再往上就是纵深里的田，不是路。
+    ctx.save();
+    const roadTop = hPx * 0.78;
+    // ① 路面比田里的土再压一档：常年碾压，颜色比生土深
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#6b573a";
+    ctx.fillRect(0, roadTop, wPx, hPx - roadTop);
+    // ② 两道车辙：顺路方向的长条，走一段浅一段（车轮跳过去了）
+    ctx.globalAlpha = 1;
+    for (const [vy, alpha, lw] of [[0.30, 0.26, 9], [0.62, 0.20, 8]]) {
+      const ry = roadTop + (hPx - roadTop) * vy;
+      ctx.strokeStyle = `rgba(64,49,30,${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.lineCap = "round";
+      let drawing = false;
+      ctx.beginPath();
+      for (let px = 0; px <= wPx; px += 14) {
+        const on = ART.Hash(id + "rut" + vy + Math.floor(px / 120)) > 0.18;
+        const yy = ry + (ART.Hash(id + "rw" + vy + px) - 0.5) * 7;
+        if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+        else if (on) ctx.lineTo(px, yy);
+        else drawing = false;
+      }
+      ctx.stroke();
+    }
+    // ③ 旱裂的泥皮
+    ctx.strokeStyle = "rgba(74,57,35,0.24)";
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 130; i += 1) {
+      const cx = ART.Hash(id + "ck" + i) * wPx;
+      const cy = roadTop + ART.Hash(id + "cy" + i) * (hPx - roadTop);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 1; k <= 3; k += 1) {
+        ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 34,
+          cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 16);
+      }
+      ctx.stroke();
+    }
+    // ④ 踩塌的浅坑
+    for (let i = 0; i < 26; i += 1) {
+      const hx = ART.Hash(id + "ho" + i) * wPx;
+      const hy = roadTop + ART.Hash(id + "hy" + i) * (hPx - roadTop);
+      const hr = 14 + ART.Hash(id + "hr" + i) * 26;
+      ctx.fillStyle = "rgba(60,45,27,0.16)";
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, hr, hr * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ⑤ 碾碎的料礓石子
+    for (let i = 0; i < 420; i += 1) {
+      const sx = ART.Hash(id + "gv" + i) * wPx;
+      const sy = roadTop + ART.Hash(id + "gy" + i) * (hPx - roadTop);
+      ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+        ? "rgba(168,152,120,0.30)" : "rgba(92,74,50,0.26)";
+      ctx.fillRect(sx, sy, 2 + ART.Hash(id + "gs" + i) * 3, 1.8);
+    }
+    ctx.restore();
 
     const tex = CanvasTexture(canvas);
     const mesh = new THREE.Mesh(
@@ -1417,6 +1544,8 @@ export function CreateWorld(canvasEl) {
     }
     // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
     if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
+    // 屋里的东西跟着立面隐现（见 indoorMeshes 的说明）
+    if (p.indoor) indoorMeshes.push(...group.children.slice(meshFrom));
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -1684,6 +1813,7 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
       FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
+      if (shaft.indoor) indoorMeshes.push(sh);
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -3418,6 +3548,14 @@ export function CreateWorld(canvasEl) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
       }
+      // 屋里的东西跟立面**反着**来：墙合着就看不见地窖口，墙一淡它才露出来。
+      // 立面挡不住它们——它们画在行走线上，比立面还近
+      const shown = 1 - Math.min(1, (homeFacade.material.opacity ?? 1) * 1.08);
+      for (const m of indoorMeshes) {
+        m.material.transparent = true;
+        m.material.opacity = shown;
+        m.visible = shown > 0.02;
+      }
     }
 
     // 辘轳打水：井绳与桶跟着玩家的操作升降。绳从辘轳轴心垂到桶梁，
@@ -3507,37 +3645,88 @@ export function CreateWorld(canvasEl) {
       winchGuide.visible = false;
     }
 
-    // 拉绳定向（c1_ropeline）：一根麻绳从梁家后墙的锚点一路拖到玩家手里。
-    // Core 写 state.ropeLine = {x0,y0}（锚点），绳的另一头钉在演员手上；
-    // 交给七叔后 Core 改写成 {x0,y0,x1,y1}（钉好的一整条），演完自己清。
-    // 画法同辘轳井绳：一根窄条拉伸旋转——绳类禁用 THREE.Line（linewidth 会被吃）
+    // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的
+    // verlet 质点链给（ropeLine.pts），这里只把点串成一条有宽度的带子。
+    //
+    // 为什么是 ribbon 而不是别的两种画法：THREE.Line 的 linewidth 多数平台直接
+    // 吃掉，绳永远只有一个像素（CLAUDE.md 立过这条规矩）；逐帧重画的 canvas 那
+    // 套是给打结用的——18 米长的绳按 48px/米要三千多像素宽的画布，不可能。
+    // ribbon 有真几何宽度：垂、拖地、绷直、抽回去都画得出来。
     {
       const rl = state.ropeLine;
-      if (rl) {
-        if (!ropeLineMesh) {
-          ropeLineMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(1, 0.045),
-            new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
-          );
+      const pts = rl?.pts;
+      if (rl && pts && pts.length > 1) {
+        const n = pts.length;
+        if (!ropeLineMesh || ropeLineMesh.userData.n !== n) {
+          if (ropeLineMesh) layers.play.remove(ropeLineMesh);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
+          const idx = [];
+          for (let i = 0; i < n - 1; i += 1) {
+            const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+            idx.push(a, b, c, b, d, c);
+          }
+          geo.setIndex(idx);
+          ropeLineMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0x8a7350, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          ropeLineMesh.frustumCulled = false;   // 包围球不逐帧重算，剔除会把它整条抹掉
+          ropeLineMesh.userData.n = n;
           FixOrder(ropeLineMesh, DepthOrder("play", BAND.loose));
           layers.play.add(ropeLineMesh);
         }
-        let x1 = rl.x1, y1 = rl.y1;
-        if (x1 === undefined) {
-          // 另一头在玩家手上
-          const ps = actorSprites.get("player");
-          const hand = ps ? HandPoint(ps.rig) : null;
-          x1 = hand ? hand.x : state.player.x;
-          y1 = hand ? hand.y : SURFACE_Y + 0.9;
-        }
-        const dx = x1 - rl.x0, dy = y1 - rl.y0;
-        const len = Math.max(0.05, Math.hypot(dx, dy));
-        // 中段松松垂一点：绳不是钢丝
         ropeLineMesh.visible = true;
-        ropeLineMesh.scale.set(len, 1, 1);
-        ropeLineMesh.position.set(rl.x0 + dx / 2, rl.y0 + dy / 2 - Math.min(0.3, len * 0.03), PlaceZ(BAND.loose));
-        ropeLineMesh.rotation.z = Math.atan2(dy, dx);
-      } else if (ropeLineMesh) ropeLineMesh.visible = false;
+        // 绳梢接到**真拳头**上。Core 的解算只认身位（那边写了为什么：手心是姿势
+        // 的产物，拿它当绳端会绕成"绳→姿势→手心→绳"的闭环，人会被自己的胳膊
+        // 卡住），所以"长在手上"这件事在画面这一侧办：把末尾三个点朝手心挪，
+        // 越靠末端挪得越多，收出一个不打折的弯。
+        let tip = null;
+        if (rl.inHand) {
+          const ps = actorSprites.get("player");
+          if (ps) {
+            const hp = HandPoint(ps.rig);
+            const last = pts[n - 1];
+            tip = { dx: hp.x - last.x, dy: hp.y - last.y };
+          }
+        }
+        const TIP_W = [0.22, 0.55, 1];       // 末尾三点各吃多少修正
+        const draw = (i) => {
+          const q = pts[i];
+          const k = tip ? (TIP_W[i - (n - TIP_W.length)] ?? 0) : 0;
+          return k ? { x: q.x + tip.dx * k, y: q.y + tip.dy * k } : q;
+        };
+        const pos = ropeLineMesh.geometry.attributes.position;
+        for (let i = 0; i < n; i += 1) {
+          const q = draw(i);
+          const a = draw(Math.max(0, i - 1)), b = draw(Math.min(n - 1, i + 1));
+          let tx = b.x - a.x, ty = b.y - a.y;
+          const tl = Math.hypot(tx, ty) || 1e-6;
+          tx /= tl; ty /= tl;
+          // 绷直的时候略细一点：麻绳吃上劲会抻细，松着堆在地上显得粗
+          const half = ROPE_HALF * (1 - 0.18 * (rl.taut || 0));
+          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, PlaceZ(BAND.loose));
+          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, PlaceZ(BAND.loose));
+        }
+        pos.needsUpdate = true;
+        // 锚点那头的绳盘：放出去多少，盘就小多少——"绳是从这儿放出来的"
+        if (!ropeCoilMesh) {
+          ropeCoilMesh = MakeGroundItemMesh("麻绳");
+          layers.play.add(ropeCoilMesh);
+          SetPlayOrder(ropeCoilMesh, BAND.loose, "ropeCoil");
+        }
+        const remain = Math.max(0, 1 - (rl.pay || 0) / (rl.L || 1));
+        ropeCoilMesh.visible = remain > 0.06;
+        if (ropeCoilMesh.visible) {
+          const s = 0.4 + 0.6 * remain;
+          ropeCoilMesh.scale.set(s, s, 1);
+          // 贴地锚点得跟着缩：贴图绕中心缩，偏移量不缩的话盘子会浮起来
+          const off = ropeCoilMesh.userData.offset;
+          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, PlaceZ(BAND.loose));
+        }
+      } else {
+        if (ropeLineMesh) ropeLineMesh.visible = false;
+        if (ropeCoilMesh) ropeCoilMesh.visible = false;
+      }
     }
 
     // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，
