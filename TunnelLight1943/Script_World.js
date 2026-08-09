@@ -33,6 +33,9 @@ const SCRIBE_SS = 3;
 // 石笔的世界尺寸：26×30 的贴图 ×0.22 ≈ 12×14cm 的画布，里面那支笔约 9cm 长——
 // 巴掌里攥得住的东西。别再让它长回 40cm。
 const CHALK_SCALE = 0.22;
+// 定向绳的半宽（米）：真麻绳才两三厘米，但那在屏幕上不到两个像素，趴在土路上
+// 根本看不见。7 厘米粗是"看得出是绳"的下限，同辘轳井绳一个量级
+const ROPE_HALF = 0.035;
 // 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
 
@@ -121,7 +124,7 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
-  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
+  "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
   "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
@@ -130,6 +133,7 @@ const HOLD_WEIGHT = {
   "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+  "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
   "军刀": 0.25,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
@@ -143,7 +147,7 @@ const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
 function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
-  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
   // 收窄后的画幅，别再给一根柱子留地方。
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
@@ -381,7 +385,8 @@ export function CreateWorld(canvasEl) {
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
-  let ropeLineMesh = null;
+  // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
+  let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
@@ -453,7 +458,7 @@ export function CreateWorld(canvasEl) {
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
-    ropeLineMesh = null;
+    ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
     coneMeshes = [];
     shadeMeshes = [];
@@ -3426,37 +3431,88 @@ export function CreateWorld(canvasEl) {
       winchGuide.visible = false;
     }
 
-    // 拉绳定向（c1_ropeline）：一根麻绳从梁家后墙的锚点一路拖到玩家手里。
-    // Core 写 state.ropeLine = {x0,y0}（锚点），绳的另一头钉在演员手上；
-    // 交给七叔后 Core 改写成 {x0,y0,x1,y1}（钉好的一整条），演完自己清。
-    // 画法同辘轳井绳：一根窄条拉伸旋转——绳类禁用 THREE.Line（linewidth 会被吃）
+    // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的
+    // verlet 质点链给（ropeLine.pts），这里只把点串成一条有宽度的带子。
+    //
+    // 为什么是 ribbon 而不是别的两种画法：THREE.Line 的 linewidth 多数平台直接
+    // 吃掉，绳永远只有一个像素（CLAUDE.md 立过这条规矩）；逐帧重画的 canvas 那
+    // 套是给打结用的——18 米长的绳按 48px/米要三千多像素宽的画布，不可能。
+    // ribbon 有真几何宽度：垂、拖地、绷直、抽回去都画得出来。
     {
       const rl = state.ropeLine;
-      if (rl) {
-        if (!ropeLineMesh) {
-          ropeLineMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(1, 0.045),
-            new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
-          );
+      const pts = rl?.pts;
+      if (rl && pts && pts.length > 1) {
+        const n = pts.length;
+        if (!ropeLineMesh || ropeLineMesh.userData.n !== n) {
+          if (ropeLineMesh) layers.play.remove(ropeLineMesh);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
+          const idx = [];
+          for (let i = 0; i < n - 1; i += 1) {
+            const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+            idx.push(a, b, c, b, d, c);
+          }
+          geo.setIndex(idx);
+          ropeLineMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0x8a7350, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          ropeLineMesh.frustumCulled = false;   // 包围球不逐帧重算，剔除会把它整条抹掉
+          ropeLineMesh.userData.n = n;
           FixOrder(ropeLineMesh, DepthOrder("play", BAND.loose));
           layers.play.add(ropeLineMesh);
         }
-        let x1 = rl.x1, y1 = rl.y1;
-        if (x1 === undefined) {
-          // 另一头在玩家手上
-          const ps = actorSprites.get("player");
-          const hand = ps ? HandPoint(ps.rig) : null;
-          x1 = hand ? hand.x : state.player.x;
-          y1 = hand ? hand.y : SURFACE_Y + 0.9;
-        }
-        const dx = x1 - rl.x0, dy = y1 - rl.y0;
-        const len = Math.max(0.05, Math.hypot(dx, dy));
-        // 中段松松垂一点：绳不是钢丝
         ropeLineMesh.visible = true;
-        ropeLineMesh.scale.set(len, 1, 1);
-        ropeLineMesh.position.set(rl.x0 + dx / 2, rl.y0 + dy / 2 - Math.min(0.3, len * 0.03), BAND.loose);
-        ropeLineMesh.rotation.z = Math.atan2(dy, dx);
-      } else if (ropeLineMesh) ropeLineMesh.visible = false;
+        // 绳梢接到**真拳头**上。Core 的解算只认身位（那边写了为什么：手心是姿势
+        // 的产物，拿它当绳端会绕成"绳→姿势→手心→绳"的闭环，人会被自己的胳膊
+        // 卡住），所以"长在手上"这件事在画面这一侧办：把末尾三个点朝手心挪，
+        // 越靠末端挪得越多，收出一个不打折的弯。
+        let tip = null;
+        if (rl.inHand) {
+          const ps = actorSprites.get("player");
+          if (ps) {
+            const hp = HandPoint(ps.rig);
+            const last = pts[n - 1];
+            tip = { dx: hp.x - last.x, dy: hp.y - last.y };
+          }
+        }
+        const TIP_W = [0.22, 0.55, 1];       // 末尾三点各吃多少修正
+        const draw = (i) => {
+          const q = pts[i];
+          const k = tip ? (TIP_W[i - (n - TIP_W.length)] ?? 0) : 0;
+          return k ? { x: q.x + tip.dx * k, y: q.y + tip.dy * k } : q;
+        };
+        const pos = ropeLineMesh.geometry.attributes.position;
+        for (let i = 0; i < n; i += 1) {
+          const q = draw(i);
+          const a = draw(Math.max(0, i - 1)), b = draw(Math.min(n - 1, i + 1));
+          let tx = b.x - a.x, ty = b.y - a.y;
+          const tl = Math.hypot(tx, ty) || 1e-6;
+          tx /= tl; ty /= tl;
+          // 绷直的时候略细一点：麻绳吃上劲会抻细，松着堆在地上显得粗
+          const half = ROPE_HALF * (1 - 0.18 * (rl.taut || 0));
+          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, BAND.loose);
+          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, BAND.loose);
+        }
+        pos.needsUpdate = true;
+        // 锚点那头的绳盘：放出去多少，盘就小多少——"绳是从这儿放出来的"
+        if (!ropeCoilMesh) {
+          ropeCoilMesh = MakeGroundItemMesh("麻绳");
+          layers.play.add(ropeCoilMesh);
+          SetPlayOrder(ropeCoilMesh, BAND.loose, "ropeCoil");
+        }
+        const remain = Math.max(0, 1 - (rl.pay || 0) / (rl.L || 1));
+        ropeCoilMesh.visible = remain > 0.06;
+        if (ropeCoilMesh.visible) {
+          const s = 0.4 + 0.6 * remain;
+          ropeCoilMesh.scale.set(s, s, 1);
+          // 贴地锚点得跟着缩：贴图绕中心缩，偏移量不缩的话盘子会浮起来
+          const off = ropeCoilMesh.userData.offset;
+          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, BAND.loose);
+        }
+      } else {
+        if (ropeLineMesh) ropeLineMesh.visible = false;
+        if (ropeCoilMesh) ropeCoilMesh.visible = false;
+      }
     }
 
     // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，

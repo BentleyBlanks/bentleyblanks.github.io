@@ -1570,6 +1570,99 @@ function TestSlingThrow() {
   console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中榆钱枝 / 妹妹接着乐 / 键盘后备");
 }
 
+// 拉绳定向的那根绳必须是**真的一根绳**，不是两点之间一根棍。
+// 老版是一张拉伸旋转的窄条：走多远它就直多远，从来没垂过、没拖过地、
+// 也从不吃劲——量距那一拍于是只剩"走过去按个键"。用户 2026-08-09 退回：
+// 「拉绳子量距离的玩法 在绳子拉直之前应该都有一些物理的效果」。
+// 这条测试盯三件事：松着的时候真的趴在土上、放到头真的绷成一条线、
+// 绷到头真的拽得住人。任何一条悄悄退化，这里立刻红。
+function TestRopeLineIsRealRope() {
+  const state = CreateGame(0);
+  const beat = ChapterBeatList(0).find((b) => b.id === "c1_ropeline");
+  DebugJump(state, 0, beat.index);
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  step({}, 1);
+  for (let i = 0; i < 600 && state.microCine; i += 1) step({ advance: true });
+  // 绳形量具：相对两端连线的最大垂度 + 贴地的质点数
+  const shape = () => {
+    const r = state.ropeLine;
+    const pts = r?.pts || [];
+    const a = pts[0], b = pts[pts.length - 1];
+    let sag = 0, onDirt = 0, chainLen = 0;
+    for (let i = 0; i < pts.length; i += 1) {
+      const q = pts[i];
+      const t = (q.x - a.x) / ((b.x - a.x) || 1);
+      sag = Math.max(sag, (a.y + (b.y - a.y) * t) - q.y);
+      if (q.y <= 0.09) onDirt += 1;
+      if (i) chainLen += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y);
+    }
+    return { sag, onDirt, chainLen, span: Math.hypot(b.x - a.x, b.y - a.y), n: pts.length };
+  };
+
+  state.player.x = 35.6;
+  step({}, 3);
+  step({ interact: true });
+  assert.equal(state.player.item?.id, "ropeEnd", "站在绳头跟前必须抓得起来");
+  step({}, 2);
+  assert.ok(shape().n > 8, "绳必须是一串质点（verlet 链），不是两点一根棍");
+
+  // ① 半道上：绳松着，垂到土上被拖着走
+  step({ moveX: 1 }, 60);
+  const mid = shape();
+  assert.ok(mid.span > 6, `该走出去半条街了，实为跨度 ${mid.span.toFixed(1)}m`);
+  assert.ok(mid.sag > 0.6, `拉直之前绳必须垂下来（实测垂度 ${mid.sag.toFixed(2)}m）`);
+  assert.ok(mid.onDirt >= 5, `松着的那截必须躺在土上（实测贴地 ${mid.onDirt} 个质点）`);
+
+  // ② 走到头：绳放完了，离地绷成一条线
+  step({ moveX: 1 }, 260);
+  const taut = shape();
+  assert.ok(state.ropeLine.taut > 0.99, `到墙根绳该放到头（实测 ${state.ropeLine.taut.toFixed(3)}）`);
+  assert.equal(taut.onDirt, 0, `绷直的绳不许还赖在地上（实测贴地 ${taut.onDirt}）`);
+  assert.ok(taut.sag < 0.3, `绷直＝一条线（实测垂度 ${taut.sag.toFixed(2)}m）`);
+  // 绳不会凭空变长：链的实长约等于两端直线距离
+  assert.ok(Math.abs(taut.chainLen - taut.span) < 0.25,
+    `绷直时链实长该等于跨度（${taut.chainLen.toFixed(2)} vs ${taut.span.toFixed(2)}）`);
+
+  // ③ 放到头就走不动了——麻绳不会伸长，会把人拽住。
+  //    这是"量到头了"唯一诚实的表达：不弹字幕、不锁输入，就是走不动
+  const wall = state.player.x;
+  step({ moveX: 1 }, 90);
+  assert.ok(state.player.x - wall < 0.05,
+    `绳放到头人就该拽得住（还往前挪了 ${(state.player.x - wall).toFixed(2)}m）`);
+  assert.ok(state.prompt && /七叔/.test(state.prompt), "拽到头的地方必须正好够得着七叔");
+
+  // ④ 攥着绳下地道：绳跟着人钻不进剖面里——手一松，绳断回小周手里，
+  //    链退回"抓住绳头"那一步。（用户 2026-08-09：「如果玩家下了地道，
+  //    手里拿着的绳子也应该断回到npc手里」）
+  state.player.x = 37;             // 梁家地窖口
+  step({}, 4);
+  assert.equal(state.climbHint, "S · 下地道", "地窖口该给下去的提示");
+  step({ climb: 1 }, 1);
+  assert.equal(state.player.level, "under", "按了 S 就该下去");
+  assert.equal(state.player.item, null, "绳头不许跟着人钻进地道");
+  assert.equal(state.beat.stepIndex, 0, "绳收回去了，链就该退回『抓住绳头』那一步");
+  step({}, 40);
+  const back = state.ropeLine;
+  assert.ok(Math.abs(back.pts[back.pts.length - 1].x - back.x0) < 0.4,
+    "回弹完绳头该缩回锚点（小周手里）");
+
+  // ⑤ 不是死局：爬上来还能重拽一遍
+  step({ climb: -1 }, 1); step({}, 20);
+  assert.equal(state.player.level, "surface", "该爬得回地面");
+  state.player.x = 35.6; step({}, 3);
+  assert.ok(/绳头/.test(state.prompt || ""), `上来必须还能重拽（提示实为 ${JSON.stringify(state.prompt)}）`);
+  step({ interact: true }); step({}, 2);
+  assert.equal(state.player.item?.id, "ropeEnd", "重拽必须拽得起来");
+  console.log("  ✓ 定向绳是真绳：松着拖地 / 放到头绷成线 / 拽得住人 / 下地道断回小周手里");
+}
+
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestSlingThrow();
@@ -1581,6 +1674,7 @@ TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();

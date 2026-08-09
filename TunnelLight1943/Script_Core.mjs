@@ -405,6 +405,214 @@ function FlashPose(state, name, dur = 0.5) {
 }
 
 // ---------------------------------------------------------------------------
+// 拉绳定向的那根麻绳（c1_ropeline）：一根真的绳，不是两点之间一根棍。
+//
+// 这一拍的玩法是"量出两家之间有多远"。玩家记住"统共四五步"靠的不是那句台词，
+// 是手上这根绳一路的分量：从小周脚边的盘上一庹一庹放出来、松的那截拖在土上
+// 沙沙响、人一停它晃两下、最后几步猛地离地绷成一条直线，再往前一寸也走不动。
+// **绳拉直之前必须一直有物理**——不然量距就只是走过去按个键。
+//
+// 解算是最朴素的 verlet 质点链（存位置与上一帧位置，约束靠松弛迭代）：
+//   ① 放绳量 pay 每帧朝「当前跨度 + 一庹富余」收敛，封顶在绳全长 ROPE_LEN。
+//      **全部手感都从这一条来**：绳不是凭空变长的，是从盘上放出来的，放完就
+//      没了。放绳还有速度上限——猛跑会先绷一下、拽你一把，绳才跟上来。
+//   ② 质点吃重力；贴到地面那截有摩擦，会被土蹭住（没有这一条，松绳像丝绸
+//      一样滑，拖不出"绳躺在地上被人拖着走"的样子）。
+//   ③ 松弛把节间距拉回 pay/(N−1)，两头钉死。跨度超过 pay 时**让步的是人不是绳**
+//      ——麻绳不会伸长，会把人拽住。
+//
+// 另一头在谁手上由世界状态**每帧推**，不靠步骤记账：手里 → 撂在地上 → 钉在
+// 七叔家墙根，三种情况各自钉一个点。玩家有权随时撂下手里的东西，绳得跟着认。
+// ---------------------------------------------------------------------------
+const ROPE_N = 30;              // 质点数：18 米绳节间约 0.6 米，垂下来才有绳样
+const ROPE_LEN = 18.6;          // 绳全长（米）。梁家后墙 35.1 → 七叔家墙根，
+                                // 走到头正好只剩一点余量：绷直那一下就在门口发生
+const ROPE_G = 12;              // 重力：比真值大一点，麻绳垂得利落，不飘
+const ROPE_DAMP = 0.982;        // 空气阻尼（verlet 的速度保留系数）
+const ROPE_FRIC = 0.55;         // 贴地那截的摩擦：拖在土上会被蹭住
+// 约束松弛遍数。高斯-赛德尔一遍只把信息传一个节点，30 个质点要想让"绷直"从
+// 手上一路传回锚点，遍数不能小气——给 8 遍的那一版，绳明明拉到头了却还整条
+// 赖在地上（span 已等于 pay，几何上必须是直线，是解算没跟上）。**遍与遍之间
+// 换方向扫**，一来一回把两头的约束都推到底，收敛快一个数量级。
+const ROPE_RELAX = 24;
+// 张力承重：真绳绷紧时垂度 ≈ 自重×跨度²/(8×张力)，张力一上来重量就被绳自己
+// 吃住了。质点链里没有张力这个量，只好用绷紧度反推——不补这一项，绳明明
+// 拉到了头（span 等于 pay）却还整条趴在土里：18.6 米的跨度只要多出 27 厘米，
+// 中间就垂下去一米多，而松弛解算的残余正好是这个量级。指数取大是为了让它
+// **只在最后那一段**起作用，前面拖地的分量一点不减。
+const ROPE_TENSION_P = 24;
+const ROPE_SLACK = 1.25;        // 松着走时小周手上留的富余（米）——约一庹
+// 富余的收窄速度：绳快放完时，松的那截自己一点点被抻走。
+// 分母是量出来的——要的是"最后两米绳离地、绷成一条线"，早了绳一路飘着不落地
+// （拖地的沙沙劲就没了），晚了绷直只发生在最后一帧，玩家眼里就是"啪"地一跳。
+const ROPE_TIGHTEN = 25;
+const ROPE_PAY_OUT = 6.5;       // 放绳速度上限（米/秒）：跑得比它快就会先绷一下
+const ROPE_PAY_IN = 1.5;        // 收绳速度：往回走时松的那截收得慢，先堆在地上
+const ROPE_TAUT = 0.985;        // 跨度/放绳量过了它就算绷直
+const ROPE_HAND = { fwd: 0.28, y: 0.94 };   // 绳头攥在手里的位置（相对玩家）
+const ROPE_RECOIL = 0.55;       // 脱手回弹：绳缩回小周手里要这么久
+const ROPE_ITEM = "ropeEnd";
+
+// 绳头攥在手里时的世界坐标。**取身位，不取骨架手心**——这一条踩过坑：
+// 手心听起来更准，但它是姿势的产物，而姿势又被绳拽出来（ropeHaul 把胳膊
+// 收到身后半米）。拿它当绳的终点，就成了"绳→姿势→手心→绳"的闭环：人会
+// 在离七叔家还有两米多的地方被自己的胳膊卡死，而且 Node 里没有骨架，
+// 单测和实机还两个结果。物理只认身位；绳梢接到真拳头上是**画面**的活
+// （见 Script_World 里 inHand 那一段）。
+function RopeHandAt(state) {
+  const p = state.player;
+  return {
+    x: p.x + (p.heading || 1) * ROPE_HAND.fwd,
+    y: SURFACE_Y + ROPE_HAND.y - (p.crouch ? 0.28 : 0),
+  };
+}
+
+/** 质点沿两端连线铺开——省得第一帧从一个点炸开 */
+function RopeInitPts(rope, ex, ey) {
+  rope.pts = [];
+  for (let i = 0; i < ROPE_N; i += 1) {
+    const t = i / (ROPE_N - 1);
+    const x = rope.x0 + (ex - rope.x0) * t;
+    const y = rope.y0 + (ey - rope.y0) * t;
+    rope.pts.push({ x, y, px: x, py: y });
+  }
+  rope.pay = Math.max(0.5, Math.hypot(ex - rope.x0, ey - rope.y0));
+}
+
+// 绳头脱手：一头钉在小周手上的绳，跟着人钻不进地道。硬画的话它会从地面穿进
+// 地道剖面里——这套 2.5D 最不能出的错。现实里也一样：人往下一出溜，绳头就
+// 从手里出去了，另一头的人把绳收回去。所以链退回"抓住绳头"那一步，重来一遍。
+function RopeSlipAway(state, def, rope) {
+  const hand = RopeHandAt(state);
+  rope.recoil = 0;
+  rope.recoilFrom = { x: hand.x, y: SURFACE_Y + 0.25 };
+  state.player.item = null;
+  state.toast = { text: "绳头脱了手——小周把绳收了回去。上去重拽一遍。", t: 4.5 };
+  Cue(state, "drop", { gain: 0.7 });
+  Cue(state, "whoosh", { gain: 0.35, rate: 1.4 });
+  const i = def?.steps?.findIndex((s) => s.type === "pickup" && s.item?.id === ROPE_ITEM);
+  if (i !== undefined && i >= 0 && state.beat) state.beat.stepIndex = i;
+}
+
+/** 每帧解一次绳。state.ropeLine 由节拍立起来，渲染层照着 pts 画 */
+function StepRopeLine(state, def, dt) {
+  const rope = state.ropeLine;
+  if (!rope) return;
+  const p = state.player;
+  const h = Math.min(dt, 1 / 30);          // 掉帧时别让 g·dt² 把绳炸上天
+  rope.L = rope.L ?? ROPE_LEN;
+
+  // ── 另一头钉在哪儿 ──
+  let end = null, held = false;
+  if (rope.recoil !== undefined) {
+    // 回弹：绳头往锚点缩，缩完剩一盘绳躺在小周脚边
+    rope.recoil += dt;
+    const k = Math.min(1, rope.recoil / ROPE_RECOIL);
+    const e = 1 - (1 - k) * (1 - k);
+    end = {
+      x: rope.recoilFrom.x + (rope.x0 - rope.recoilFrom.x) * e,
+      y: rope.recoilFrom.y + (rope.y0 - rope.recoilFrom.y) * e,
+    };
+    if (k >= 1) { rope.recoil = undefined; rope.recoilFrom = null; }
+  } else if (rope.x1 !== undefined) {
+    end = { x: rope.x1, y: rope.y1 };      // 钉在七叔家墙根了
+  } else {
+    const g = state.groundItems.find((it) => it.id === ROPE_ITEM);
+    if (g) end = { x: g.x, y: SURFACE_Y + 0.10 };          // 玩家撂地上了
+    else if (p.item?.id === ROPE_ITEM) {
+      if ((p.level || "surface") !== "surface") { RopeSlipAway(state, def, rope); return; }
+      end = RopeHandAt(state);
+      held = true;
+    } else end = { x: rope.x0, y: rope.y0 };               // 谁都没拿：盘在原处
+  }
+
+  if (!rope.pts) RopeInitPts(rope, end.x, end.y);
+
+  // ── 放绳量：绳是从盘上放出来的，放完就没了 ──
+  const Anchor = (pt) => Math.hypot(pt.x - rope.x0, pt.y - rope.y0);
+  let span = Anchor(end);
+  rope.inHand = held;      // 渲染层据此把绳梢接到真拳头上
+  // 盘上还剩多少绳。剩得越少，小周越把绳拎紧——富余按剩量的平方收窄，
+  // 于是"一路拖在土上 → 最后两米离地 → 到墙根绷成一条线"是自己走出来的
+  const left = Math.max(0, rope.L - span);
+  const slack = Math.min(ROPE_SLACK, left * left / ROPE_TIGHTEN);
+  // 钉死两头之后绳是被抻紧的，不再留富余——留了就在两家之间挂出个弯月亮
+  const want = rope.recoil !== undefined ? 0.6
+    : rope.x1 !== undefined ? span * 1.004
+      : Math.min(rope.L, span + slack);
+  const rate = want > rope.pay ? ROPE_PAY_OUT : (rope.recoil !== undefined ? 14 : ROPE_PAY_IN);
+  rope.pay += Math.max(-rate * h, Math.min(rate * h, want - rope.pay));
+  rope.pay = Math.min(rope.L, rope.pay);
+
+  // 跨度超过放出去的量：麻绳不会伸长，会把人拽住。这是"量到头了"唯一诚实的
+  // 表达——不弹字幕、不锁输入，就是走不动了，绳在肩上拽着
+  if (held && span > rope.pay) {
+    const over = span - rope.pay;
+    const dir = Math.sign(end.x - rope.x0) || 1;
+    p.x -= dir * over;
+    end = RopeHandAt(state);
+    span = Anchor(end);
+    // 顶得越使劲身子拧得越紧：这一帧被绳吃掉多少步，就换算成多少劲
+    FlashPose(state, "ropeHaul", 0.22);
+    p.poseK = Math.min(1, over / Math.max(1e-4, 2.6 * h));
+    if (!rope.creakT || state.time - rope.creakT > 0.9) {
+      rope.creakT = state.time;
+      Cue(state, "ladder", { gain: 0.5, rate: 1.25 });
+    }
+  }
+  rope.pay = Math.max(span, rope.pay);
+  rope.taut = rope.pay > 1e-3 ? Math.min(1, span / rope.pay) : 0;
+  rope.straight = rope.taut >= ROPE_TAUT;
+
+  // ── verlet ──
+  const pts = rope.pts;
+  const groundY = SURFACE_Y + 0.035;
+  const gEff = ROPE_G * (1 - Math.pow(rope.taut, ROPE_TENSION_P));   // 绷紧的绳自己吃住重量
+  for (let i = 1; i < ROPE_N - 1; i += 1) {
+    const q = pts[i];
+    let vx = (q.x - q.px) * ROPE_DAMP;
+    let vy = (q.y - q.py) * ROPE_DAMP;
+    if (q.y <= groundY + 0.02) vx *= 1 - ROPE_FRIC;   // 躺在土上的那截被蹭住
+    q.px = q.x; q.py = q.y;
+    q.x += vx;
+    q.y += vy - gEff * h * h;
+  }
+  pts[0].x = rope.x0; pts[0].y = rope.y0;
+  pts[ROPE_N - 1].x = end.x; pts[ROPE_N - 1].y = end.y;
+  const rest = rope.pay / (ROPE_N - 1);
+  for (let k = 0; k < ROPE_RELAX; k += 1) {
+    const back = k % 2 === 1;                        // 一来一回：两头的约束都推得到底
+    for (let j = 0; j < ROPE_N - 1; j += 1) {
+      const i = back ? ROPE_N - 2 - j : j;
+      const a = pts[i], b = pts[i + 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1e-6;
+      const wa = i === 0 ? 0 : 1;
+      const wb = i + 1 === ROPE_N - 1 ? 0 : 1;
+      if (!wa && !wb) continue;
+      const f = (d - rest) / d / (wa + wb);
+      if (wa) { a.x += dx * f; a.y += dy * f; }
+      if (wb) { b.x -= dx * f; b.y -= dy * f; }
+    }
+    for (let i = 1; i < ROPE_N - 1; i += 1) if (pts[i].y < groundY) pts[i].y = groundY;
+  }
+
+  // 拖在土上的沙沙声：贴地的节点越多、人走得越快，蹭得越响
+  let onDirt = 0;
+  for (let i = 1; i < ROPE_N - 1; i += 1) if (pts[i].y <= groundY + 0.05) onDirt += 1;
+  rope.dragging = onDirt;
+  const walked = Math.abs(p.x - (rope.lastX ?? p.x)) / Math.max(1e-4, dt);
+  rope.lastX = p.x;
+  if (held && onDirt > 3 && walked > 0.6) {
+    rope.scrubT = (rope.scrubT || 0) + dt;
+    if (rope.scrubT > 0.34) {
+      rope.scrubT = 0;
+      Cue(state, "dig", { gain: 0.16, rate: 1.7 });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 投掷。飞行是真弹道（重力积分），不是两点插值——瞄准才有意义。
 //
 // 拟物路径（StepSlingAim）：攥住手里那颗石子（按下那一帧手要落在石子上），
@@ -1586,12 +1794,15 @@ export const SCRIPTS = {
         ]);
       },
       steps: [
+        // 绳按物理跑（StepRopeLine）：从小周脚边的盘上放出来，松的拖在土上，
+        // 走到七叔家墙根正好放到头——绷直那一下是绳自己演的，不是台词说的
         { type: "pickup", x: 35.6, item: { id: "ropeEnd", label: "绳头" }, prompt: "E · 抓住绳头",
-          effect: (state) => { state.ropeLine = { x0: 35.1, y0: SURFACE_Y + 1.02 }; } },
+          effect: (state) => { state.ropeLine = { x0: 35.1, y0: SURFACE_Y + 1.02, L: ROPE_LEN }; } },
         { type: "use", zone: { x: 53.2, w: 2.6 }, needs: "ropeEnd", prompt: "E · 交给七叔",
           note: "绳在两家之间绷直了——统共四五步远。",
           effect: (state) => {
-            state.ropeLine = { x0: 35.1, y0: SURFACE_Y + 1.02, x1: 52.9, y1: SURFACE_Y + 1.02 };
+            // 交出去＝这头钉死在七叔家墙根；绳还在解，只是两端都不动了
+            state.ropeLine = { ...(state.ropeLine || {}), x0: 35.1, y0: SURFACE_Y + 1.02, x1: 52.9, y1: SURFACE_Y + 1.02, L: ROPE_LEN };
             state.flags.ropeStaked = true;
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = null; q.heading = -1; }
@@ -3891,6 +4102,7 @@ export function StartChapter(state, index) {
     // 新版第一章的旗标（修门/定向/刨盖板/修井绳/榆钱/挖通道/藏粮/余波修复）
     state.flags.doorFixed = false;
     state.flags.ropeStaked = false;
+    state.ropeLine = null;             // 重玩本章：那根定向绳连同它的质点全部作废
     state.flags.coverPlaned = false;
     state.flags.wellRopeFixed = false;
     state.flags.elmDown = false;
@@ -4244,6 +4456,8 @@ export function StepGame(state, input, dt) {
     state.smoke.frontX = def.smokeFloor;
   }
   MovePlayer(state, input, dt);
+  // 绳解在走位之后：绳拽人这一下要盖住这一帧刚走出去的那一步
+  StepRopeLine(state, def, dt);
   StepFollowers(state, dt);
   StepSoldiers(state, dt);
   StepCineActors(state, dt);

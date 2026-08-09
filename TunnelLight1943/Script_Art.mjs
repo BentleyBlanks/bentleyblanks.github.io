@@ -949,6 +949,30 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       ctx.arc(-2 * S, 0, (3 + i * 2.4) * S, Math.PI * 0.3, Math.PI * 1.4);
       ctx.stroke();
     }
+  } else if (label === "绳头") {
+    // 攥在手里的那截绳头（长绳本体由渲染层的 verlet 带子画）。
+    // 没有这一支的时候它落进最后那个兜底分支，被当成木料——玩家一路拽着
+    // 一块半米长的板子去量地。绳头就该是：手心里绕两道，剩一小截毛茬耷出来。
+    // 尺寸按拳头量：一截绳梢连着两道缠在手心的圈，通身不过十来厘米。
+    // 画大了（第一版外径给到 0.3 米）它会盖住柱子整个脑袋——他才一米出头
+    ctx.strokeStyle = "#9a7d4f";
+    ctx.lineCap = "round";
+    ctx.lineWidth = 1.5 * S;
+    for (let i = 0; i < 2; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(0, (-0.6 + i * 1.5) * S, 2.0 * S, 1.0 * S, 0.15, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // 耷出来的一小截，末端散成麻丝
+    InkLine(ctx, 1.4 * S, 1.4 * S, 3.4 * S, 3.2 * S, "ropeTail", { lw: 1.4 * S, color: "#9a7d4f", amp: 0.5 });
+    ctx.lineWidth = 0.6 * S;
+    ctx.strokeStyle = "rgba(150,124,80,0.9)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(3.4 * S, 3.2 * S);
+      ctx.lineTo((4.2 + i * 0.5) * S, (4.2 + i * 0.6) * S);
+      ctx.stroke();
+    }
   } else {
     InkFill(ctx, Rect(-26 * S, -3.2 * S, 52 * S, 6.4 * S), "plank", "#a8794a",
       { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.14)" });
