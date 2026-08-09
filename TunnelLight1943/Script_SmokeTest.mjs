@@ -1318,6 +1318,98 @@ function TestModuleGraphIsCacheBusted() {
   console.log(`  ✓ 缓存版本戳盖满整张模块图（v=${ver}，${browserModules.length} 个模块）`);
 }
 
+// 修门第一场：**门得是画面里那扇会坠的门**，不是一个按钮。
+// 用户原话：「现在就按个按钮就搞定了有点low」。另外「为什么要修门」必须在
+// 开场过场里演出来（门自己晃 + 爹一个人托不住），否则玩家不知道自己在干嘛。
+function TestDoorHoldIsPhysical() {
+  const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
+  const beats = ChapterBeatList(0).map((b) => b.id);
+
+  // ① 开场过场要真的把那扇门演出来：doorLeaf 亮过、而且是"松的"
+  {
+    const s0 = CreateGame(0);
+    DebugJump(s0, 0, beats.indexOf("c1_open"));
+    let seen = null, swung = false, lifted = false, g = 0;
+    while (CurrentBeatDef(s0)?.id === "c1_open" && g < 6000) {
+      g += 1;
+      StepGame(s0, { ...idle(), advance: g % 90 === 0 }, DT);
+      if (s0.doorLeaf) {
+        seen = s0.doorLeaf;
+        if (s0.doorLeaf.swing) swung = true;
+        if (s0.doorLeaf.tryLift) lifted = true;
+      }
+    }
+    assert.ok(seen, "开场必须把那扇门摆出来（doorLeaf），不能只靠爹一句台词");
+    assert.equal(seen.loose, true, "开场那扇门是松的（下轴脱了窝）——这就是要修的理由");
+    assert.ok(swung, "得演出它自己在晃");
+    assert.ok(lifted, "得演出爹一个人托不住（这才解释了为什么需要第二双手）");
+  }
+
+  // ② 玩法：扶门那一步不是按一下就过
+  const carve = beats.indexOf("c1_door");
+  const mk = () => {
+    const st = CreateGame(0);
+    DebugJump(st, 0, carve);
+    const def = CurrentBeatDef(st);
+    const step = def.steps.find((x) => x.type === "holdDoor");
+    assert.ok(step, "修门第一步必须是 holdDoor —— 单按一下的 use 已经被用户退回");
+    st.player.x = step.zone.x;
+    st.player.level = "surface";
+    for (let i = 0; i < 3; i += 1) StepGame(st, idle(), DT);
+    return { st, step };
+  };
+  const HingeY = (step) => SURFACE_Y + (step.hingeY ?? 1.95);
+
+  // 手没落在门板上：怎么拖都扶不动它
+  {
+    const { st, step } = mk();
+    const lean0 = st.beat.lean;
+    for (let i = 0; i < 30; i += 1) {
+      StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + 3.5 + i * 0.02, y: HingeY(step) } }, DT);
+    }
+    assert.ok(st.beat.lean >= lean0 - 1e-6, "手没抓着门，门只会自己往外坠，不该被扶正");
+    assert.ok(st.beat.work < 0.05, "没扶住，爹使不上劲，进度不该涨");
+  }
+
+  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去）
+  {
+    const { st, step } = mk();
+    const midY = HingeY(step) - 0.9;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
+    assert.ok(st.beat.grabbed, "手按在门板上必须攥得住");
+    const l1 = st.beat.lean;
+    // 门跟着手走：把手往里挪「一个力臂 × 当前倾角」，正好把门扶到正位
+    const plumbX = st.beat.refX - l1 * (st.beat.arm || 0.9);
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX - 1, y: midY } }, DT);
+    assert.ok(st.beat.lean < l1, "攥住往里推，门必须跟着走");
+    assert.ok(l1 - st.beat.lean < 0.2, `门有分量，一帧不该转到 ${st.beat.lean}`);
+    // 稳住 → 爹使得上劲；撒手 → 它自己坠回去、进度往回泄
+    let g2 = 0;
+    while (st.beat.work < 0.5 && g2 < 400) {
+      g2 += 1;
+      StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX, y: midY } }, DT);
+    }
+    assert.ok(st.beat.work >= 0.5, "稳在正位，礅轴的进度得涨起来");
+    assert.ok(Math.abs(st.beat.lean) < 0.12, "扶到正位时门该基本是竖直的");
+    const leanHeld = st.beat.lean, workHeld = st.beat.work;
+    for (let i = 0; i < 20; i += 1) StepGame(st, idle(), DT);       // 撒手
+    assert.ok(st.beat.lean > leanHeld + 0.02, "撒手之后门必须自己往外坠");
+    assert.ok(st.beat.work < workHeld, "歪出去之后进度要往回泄，不是原地等着");
+  }
+
+  // ③ 键盘后备（扶门是费力气的活，留了按住 E）：自动通关靠它，不许卡死
+  {
+    const { st } = mk();
+    let g3 = 0;
+    while (CurrentBeatDef(st)?.id === "c1_door" && st.beat.stepIndex === 0 && g3 < 2000) {
+      g3 += 1;
+      StepGame(st, { ...idle(), interactHeld: true }, DT);
+    }
+    assert.notEqual(st.beat.stepIndex, 0, "按住 E 必须也能把门扶正（键盘后备 / 驱动器走这条）");
+  }
+  console.log("  ✓ 修门：开场演清楚为什么修 / 扶的是那扇会坠的门 / 抓不住扶不动 / 撒手就坠 / 键盘后备可用");
+}
+
 function TestQuieterAudioMix() {
   assert.ok(AUDIO_BUS_BASE.sfx <= 0.68, "音效总线必须保持在降低后的基准");
   // 环境声（风）是从头响到尾的底噪，玩家反馈「太吵」——基准压到 0.34 以下。
@@ -1692,6 +1784,7 @@ TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestEdgeHintPointsOffscreenTargets();
 TestInstrumentalBgmManifest();
+TestDoorHoldIsPhysical();
 TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 

@@ -1131,6 +1131,45 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   }
 }
 
+// 门扇：三块竖板 + 两道横撑的木门，**从上轴那一点往下挂**。
+// 画笔按 (ax, ay) = 上门轴 摆，整扇往下画——渲染层把它塞进一个挂在上轴上的
+// Group 里，转 Group 就是转门（绕上轴摆），Art 这边不必知道角度。
+//
+// 为什么要单独有这么一扇：门框原来只有两根立柱加一根门楣，门扇根本没画。
+// 玩家被要求"扶稳门扇"，画面上却没有门扇——那一下当然只能是按个按钮。
+export const HUNG_DOOR_W = 24;    // px（≈0.50m）＝门框净空宽
+export const HUNG_DOOR_H = 72;    // px（≈1.50m）＝门楣下沿到地面
+export function DrawHungDoor(ctx, ax, ay, id, { loose = false } = {}) {
+  const W = HUNG_DOOR_W, H = HUNG_DOOR_H;
+  const x0 = ax - 3, y0 = ay;        // 上轴在门扇左上角往里一点
+  // 三块竖板：板缝是这扇门最像门的地方
+  for (let i = 0; i < 3; i += 1) {
+    const bw = W / 3;
+    InkFill(ctx, Rect(x0 + i * bw, y0, bw, H), id + "p" + i,
+      i === 1 ? PAL.wood : PAL.woodDark,
+      { amp: 1.0, lw: 2.0, shade: "rgba(0,0,0,0.16)" });
+    InkLine(ctx, x0 + i * bw + bw * 0.5, y0 + 8, x0 + i * bw + bw * 0.5, y0 + H - 8,
+      id + "pg" + i, { lw: 0.8, color: "rgba(80,52,30,0.4)", amp: 1.4 });
+  }
+  // 两道横撑
+  for (const ty of [y0 + H * 0.22, y0 + H * 0.72]) {
+    InkFill(ctx, Rect(x0 - 1, ty, W + 2, 7), id + "b" + Math.round(ty), "#8a6038",
+      { amp: 0.9, lw: 2.0, shade: "rgba(0,0,0,0.18)" });
+  }
+  // 上轴（还在窝里）：一小截露出来的木轴头
+  InkFill(ctx, Rect(x0 - 5, y0 - 2, 6, 7), id + "pivT", "#6b4a2c", { amp: 0.6, lw: 1.6 });
+  // 下轴：**跳出臼窝**的那一头。松着的时候画成脱开、底下露出空臼窝，
+  // "门为什么晃"就靠这一处说清楚，不用一行字
+  if (loose) {
+    InkFill(ctx, Rect(x0 - 6, y0 + H - 8, 7, 9), id + "pivB", "#6b4a2c", { amp: 0.7, lw: 1.7 });
+    // 空着的臼窝（画在门扇脚边的地上）
+    InkFill(ctx, [[x0 - 16, y0 + H + 3], [x0 - 4, y0 + H + 1], [x0 - 2, y0 + H + 7], [x0 - 18, y0 + H + 8]],
+      id + "socket", "#4a3626", { amp: 1.0, lw: 1.8 });
+  } else {
+    InkFill(ctx, Rect(x0 - 5, y0 + H - 6, 6, 7), id + "pivB2", "#6b4a2c", { amp: 0.6, lw: 1.6 });
+  }
+}
+
 // 一根带锥度的枝：沿二次贝塞尔取样，两侧按半宽外扩成多边形。
 // 树之所以不像树，八成是因为枝是等宽的直棍——真的枝越往梢越细、还带一点弓。
 function Limb(ctx, x0, y0, x1, y1, w0, w1, id, fill, { bow = 0, lw = 2, shade = null, amp = 0.5 } = {}) {
