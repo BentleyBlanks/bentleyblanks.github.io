@@ -2322,6 +2322,9 @@ export function CreateWorld(canvasEl) {
         posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          // 干活的乡亲也用得上躬身施工那套（原来只有玩家能挖）——
+          // 掌子面上抡站姿锄头，在净高只够爬的新掏段里一眼就假
+          digging: !!a.digging,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           lift: a.lift || 0, poseK: a.vaultK ?? a.poseU,
           // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）

@@ -463,6 +463,9 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #chapterList button:hover:not(:disabled) { border-color: var(--lamp); }
 #chapterList button:disabled { opacity: 0.38; cursor: default; }
+/* 还没做完的章：比"没解锁"更暗一档，标题去掉衬线的分量，一眼看出是占位 */
+#chapterList button.coming { opacity: 0.24; border-style: dashed; }
+#chapterList button.coming b { font-weight: 400; letter-spacing: 0.08em; }
 #chapterList button small { display: block; font-size: 10.5px; letter-spacing: 0.2em; color: var(--dim); margin-bottom: 5px; }
 #chapterList button b { font-size: 13.5px; font-weight: 600; }
 #controlsNote {

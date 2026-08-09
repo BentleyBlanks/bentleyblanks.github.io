@@ -53,6 +53,11 @@ export const CHAPTERS = [
   { id: "c8", num: "第八章", title: "第二道刻痕", year: "一个月后 · 梁家村", scene: "village", light: "dawn" },
 ];
 
+// 对外开放到第几章为止（其余的还在做，标题页进不去，第一章打完直接收尾）。
+// 这是**发行口径**，不是玩法规则：八章的脚本、跳幕、自动通关测试仍然整份都在，
+// 门槛只由外壳（Script_Main）把守——把这个数改成 CHAPTERS.length 就全开了。
+export const PLAYABLE_CHAPTERS = 1;
+
 // ---------------------------------------------------------------------------
 // 小工具
 // ---------------------------------------------------------------------------
@@ -1810,11 +1815,33 @@ export const SCRIPTS = {
         // 官道的岗是成年民兵的（妹妹不望风）
         const st = FindActor(state, "sentry");
         if (st) { st.visible = true; st.x = 88; st.wander = { x0: 78, x1: 96, speed: 0.8 }; }
-        const D = (id, x) => {
-          const a = FindActor(state, id);
-          if (a) { a.visible = true; a.level = "under"; a.x = x; a.heading = 1; a.carry = "锄头"; a.track = { name: "hoeing", t: 0, ambient: true }; }
-        };
-        D("diggerA", 41.6); D("diggerB", 44.0);
+        // 掌子面只有一个。原来两个人并排抡锄，后面那个身前是实土、锄头刨的是空气，
+        // 而且 44.0 已经在净高只够爬的新掏段里，却做着站姿抡锄的动作——两头都假。
+        // 改成一挖一运，正好接上这一幕本来的活：土是从他手上到玩家手上的。
+        //   挖的 A 在掌子面（tight 段尽头 46.4 那一侧），躬身施工，不站直；
+        //   运的 B 端着土筐在掌子面和地窖竖井之间来回，空手进、满筐出。
+        // 两人都退到后排（rank）：玩家等下要在同一条地道里扛门板、支顶木，
+        // 同一条深度线上会糊成一个人（横版里"两人并排"只能靠深度演）。
+        // 位置是照着地道剖面量出来的，不是拍脑袋：38～42.3 是站得直的地窖，
+        // 42.3～46.4 是净高只够爬的新掏通道（tight），再往东是七叔家窖。
+        // 挖的人必须站在**通道口**——那儿土层正好收口，有东西可挖，人也直得起腰；
+        // 塞进爬行段里的话，1.4m 的躬身施工姿会被 0.75m 的洞顶埋掉大半个身子
+        // （试过 45.8，画面上只剩一条小臂和一条小腿）。
+        const digA = FindActor(state, "diggerA");
+        if (digA) {
+          digA.visible = true; digA.level = "under"; digA.x = 42.35; digA.heading = 1;
+          digA.carry = "锄头"; digA.track = null; digA.wander = null; digA.cineTarget = null;
+          digA.digging = true; digA.rank = 0;
+        }
+        const digB = FindActor(state, "diggerB");
+        if (digB) {
+          digB.visible = true; digB.level = "under"; digB.x = 40.6; digB.heading = -1;
+          digB.carry = null; digB.track = null; digB.cineTarget = null;
+          digB.digging = false; digB.rank = 0;
+          // x0 = 地窖竖井底（玩家在地面 37.6 接筐的正下方），x1 = 挖的人旁边。
+          // 土就是这么到玩家手上的：他端出来搁在井底，玩家在上头接走。
+          digB.wander = { x0: 37.5, x1: 41.7, speed: 0.95, haul: "土筐" };
+        }
       },
       steps: [
         { type: "pickup", x: 37.6, item: { id: "dirtA", label: "土筐", big: true }, prompt: "E · 接过土筐" },
@@ -1863,6 +1890,15 @@ export const SCRIPTS = {
             for (const id of ["auntFeed", "oldSweep", "carrier", "grindAunt", "liusao", "liuElder", "sentry"]) {
               const a = FindActor(state, id);
               if (a) { a.visible = false; a.track = null; a.wander = null; a.cineTarget = null; }
+            }
+            // 挖土的两个收工：wander/carry/digging/rank 都得撤，否则这一幕
+            // 摆好的机位里会有人端着土筐在后排继续来回走
+            for (const id of ["diggerA", "diggerB"]) {
+              const a = FindActor(state, id);
+              if (a) {
+                a.visible = false; a.track = null; a.wander = null; a.cineTarget = null;
+                a.carry = null; a.digging = false; a.rank = 0;
+              }
             }
             const q = FindActor(state, "qishu");
             if (q) { q.visible = true; q.level = "under"; q.x = 47.9; q.heading = -1; q.carry = "锄头"; q.track = { name: "hoeing", t: 0, ambient: true }; }
@@ -4098,11 +4134,17 @@ function StepCineActors(state, dt) {
   for (const a of state.actors) {
     const w = a.wander;
     if (!w || a.visible === false || a.cineTarget) continue;
-    if (w.tx === undefined) w.tx = w.x1;
+    if (w.tx === undefined) { w.tx = w.x1; if (w.haul) a.carry = null; }
     const d = w.tx - a.x;
     if (Math.abs(d) < 0.15) {
       w.dwell = (w.dwell ?? (1.4 + Math.random() * 1.8)) - dt;
-      if (w.dwell <= 0) { w.tx = w.tx === w.x1 ? w.x0 : w.x1; w.dwell = undefined; }
+      if (w.dwell <= 0) {
+        w.tx = w.tx === w.x1 ? w.x0 : w.x1;
+        w.dwell = undefined;
+        // haul：这一趟是运东西的（挖土的把筐递出来，运土的端到窖口）。
+        // 空手回去、装满出来——两头都端着筐的话，这人就是在遛筐
+        if (w.haul) a.carry = w.tx === w.x0 ? w.haul : null;
+      }
       continue;
     }
     a.x += Math.sign(d) * (w.speed || 1) * dt;
