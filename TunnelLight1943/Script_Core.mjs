@@ -1184,6 +1184,9 @@ function StepChain(state, def, input, dt) {
     case "push": {
       if (!state.cart) state.cart = { x: st.from, kind: st.obj || "cart", roll: 0 };
       const cart = state.cart;
+      // 车往哪边走：独轮车是有正反的东西，渲染层照这个把整张贴图掉个头
+      //（车把永远在推车人这一侧）。同一辆车两趟方向不同，所以每帧都写
+      cart.dir = st.dir;
       if (Math.abs(p.x - cart.x) > 2.6) return;
       state.prompt = st.prompt || "按住 E · 推车";
       state.promptFill = Math.abs(cart.x - st.from) / st.dist;

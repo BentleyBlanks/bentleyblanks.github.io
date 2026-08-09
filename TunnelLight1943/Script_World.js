@@ -14,7 +14,7 @@ import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Lig
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import {
   BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, ACTOR_RANK_DZ,
-  CheckBandZ, DepthViolations,
+  CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
 } from "./Data_DepthSpec.mjs";
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
 // 这里只负责"照着数据把它烘出来放好"，不再自己写死尺寸与 z
@@ -92,6 +92,16 @@ function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze
 
 function PlaceSprite(mesh, x, y, z) {
   mesh.position.set(x + mesh.userData.offset.x, y + mesh.userData.offset.y, z);
+  mesh.userData.anchor = { x, y, z };
+}
+
+// 会掉头的贴图（独轮车这类有正反的家伙）：dir<0 时整张左右翻。
+// 镜像是绕**网格中心**发生的，所以锚点相对中心的偏移也得跟着翻号，
+// 否则车把一翻面、车身就整体平移出去半米。
+function PlaceSpriteFlip(mesh, x, y, z, dir) {
+  const s = dir < 0 ? -1 : 1;
+  mesh.scale.x = s;
+  mesh.position.set(x + mesh.userData.offset.x * s, y + mesh.userData.offset.y, z);
   mesh.userData.anchor = { x, y, z };
 }
 
@@ -189,6 +199,9 @@ function MakeGroundItemMesh(label) {
   return mesh;
 }
 
+// 独轮车上的一车料怎么摆：前两件是旧门板（平摞），第三件是枣木杠（圆杠压顶）
+const BarrowLoad = (n) => ({ planks: Math.min(2, n), pole: n >= 3 });
+
 // ---------------------------------------------------------------------------
 export function CreateWorld(canvasEl) {
   const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
@@ -196,7 +209,7 @@ export function CreateWorld(canvasEl) {
   const scene = new THREE.Scene();
   // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
   // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
-  const FOV = 30;
+  const FOV = CAM_FOV;
   const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 400);
   // 参考机位距离：各层贴图按 (D_REF + z深度)/D_REF 预放大，保证默认景别下比例正确
   const D_REF = 24;
@@ -263,6 +276,12 @@ export function CreateWorld(canvasEl) {
   //                 进这一段，高过腰的东西（草垛/断墙/树丛）一律退到负值，
   //                 否则会把人整个吞掉。
   //   ≥ +3.4        fore 层：真前景，成片掠过镜头
+  //
+  // **带号是绘制顺序，不是位置。** 平视镜头下每一档 z 都有自己的地平线，
+  // 所以行走线上的一切（演员/影子/携带物/放下的东西/推的车/钉在地上的道具）
+  // 摆位时一律经 `PlaceZ()` 压回 z=0，只有真的站在别的纵深上的东西
+  //（负号的背景带、正号的前景掩体）才保留自己的 z。见 Data_DepthSpec 的
+  // 「地平线规范」——那里有各档地平线差多少像素的实测表。
   // ===========================================================================
   // 深度带的数值来自 Data_DepthSpec.mjs，物体用哪个带来自 Data_PropArt.json；
   // 这里只保留层间的绘制序表。
@@ -520,6 +539,10 @@ export function CreateWorld(canvasEl) {
   // y=UNDER_Y），y 永远不要为了"看起来贴地"而手动抬高**；纵深靠 z 表达，
   // 而每一条纵深带都由 AddBandEdge 画出一道实际躺在该深度地面上的沿线
   // （田埂 / 路沿 / 墙根），让眼睛读得出"它站在更靠后的地面上"。
+  //
+  // 反过来也成立：**没打算站在别的纵深上的东西，就不许用别的 z**。行走线上
+  // 的道具与演员之间那 0.6m 曾经是没人声明过的——结果人的脚比车轮低十来个
+  // 像素，读出来就是"车和人不在一条水平线上"。现在摆位统一走 PlaceZ()。
   //
   // 摆道具时从 Data_DepthSpec.mjs 的 BAND 表里挑 z，不要另取数值
   //（表已含 backdrop/building/yard/nearBack/walk/loose/facade/clutter 八档）。
@@ -1260,7 +1283,7 @@ export function CreateWorld(canvasEl) {
     const len = halfW * 3.0;
     const mesh = MakeFlatShadow(len, w, strength);
     // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
-    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, z + SUN.dz * len * 0.34);
+    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, PlaceZ(z) + SUN.dz * len * 0.34);
     group.add(mesh);
   }
 
@@ -1282,9 +1305,13 @@ export function CreateWorld(canvasEl) {
     // 落地：贴图底边踩在所在层的地平线上（yOffset 只给挂在树上的东西用）
     const gy = (p.level === "under" ? UNDER_Y : SURFACE_Y) + S.yOffset;
     const gx = S.placeAt === "left" ? p.x - (p.w || 0) / 2 : p.x;
+    // 摆位走 PlaceZ、排序走 DepthOrder：行走线上的道具（walk/loose/facade）
+    // 一律压回地平面 z=0，与演员踩同一条地平线；深度带只剩绘制顺序这一个职责
+    //（见 Data_DepthSpec 的「地平线规范」）。
     const mk = (fn, { z = S.z, x = gx, y = gy } = {}) => {
       const mesh = BakeSprite(S.w, S.h, S.ax, S.ay, fn, 0, S.ss);
-      PlaceSprite(mesh, x, y, z);
+      PlaceSprite(mesh, x, y, PlaceZ(z));
+      FixOrder(mesh, DepthOrder("play", z));
       mesh.userData.kind = p.kind;
       group.add(mesh);
       return mesh;
@@ -1780,9 +1807,11 @@ export function CreateWorld(canvasEl) {
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
           ART.DrawShaft(ctx, ax, 4, ay - 0.3 * PPM, shaft.id);
         }, 0, 2);
-      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。摆在行走线略前
-      // （仍在演员 ACTOR_Z 之后），免得被洞口、磨盘这些中景件压掉。
-      PlaceSprite(sh, shaft.x, UNDER_Y, 0.45);
+      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
+      // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
+      // 位置照旧压在地平面上（原来这里写的是裸 z=0.45，梯子因此比洞口高半拃）
+      PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
+      FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
       if (shaft.indoor) indoorMeshes.push(sh);
     }
@@ -2053,14 +2082,14 @@ export function CreateWorld(canvasEl) {
     for (const v of sceneDef.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
       const n = BakeSprite(50, 30, 25, 22, (ctx, ax, ay) => ART.DrawVaultNotch(ctx, ax, ay, "vn" + v.x), 0, DETAIL_SS);
-      PlaceSprite(n, v.x, SURFACE_Y + (v.top ?? 1.6), BAND.loose);
+      PlaceSprite(n, v.x, SURFACE_Y + (v.top ?? 1.6), PlaceZ(BAND.loose));
       layers.play.add(n);
     }
 
     // 第四章堵在东段卡口的湿棉被：堵上之后一直留在剖面里
     if (ch.scene === "tunnelVillage" && state.flags.quiltPlugged) {
       const m = BakeSprite(120, 130, 60, 118, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 3.6, 1, "湿棉被"), 0, DETAIL_SS);
-      PlaceSprite(m, 124, UNDER_Y + 0.6, BAND.loose);
+      PlaceSprite(m, 124, UNDER_Y + 0.6, PlaceZ(BAND.loose));
       layers.play.add(m);
     }
 
@@ -2160,7 +2189,10 @@ export function CreateWorld(canvasEl) {
       if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow");
       if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry");
     }
-    s.mesh.position.set(x, y, ACTOR_Z + dz);
+    // 位置压回地平面：演员脚下这条线必须与行走线道具（井台/磨盘/车）是同一条。
+    // 后一排（rankDz 是负的）是**有意**站在更靠后的地面上，PlaceZ 会原样放行——
+    // 那点抬高正是"两人并排"读得出来的原因。
+    s.mesh.position.set(x, y, PlaceZ(ACTOR_Z + dz));
     const bs = extra.bodyScale || s.bodyScale || 1;
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (s.shadow) {
@@ -2173,7 +2205,7 @@ export function CreateWorld(canvasEl) {
       s.shadow.position.set(
         x + (under ? 0 : SUN.dx * 0.55) * bs,
         ground + 0.015,
-        ACTOR_Z + dz - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
+        PlaceZ(ACTOR_Z + dz) - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
       s.shadow.material.opacity = (under ? 0.5 : 1) * (1 - air * 0.55);
     }
@@ -2189,7 +2221,7 @@ export function CreateWorld(canvasEl) {
         const wid = (0.85 + dist * 0.10) * bs;
         s.castShadow.visible = true;
         s.castShadow.scale.set(dir * len, wid, 1);
-        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, ACTOR_Z + dz - 0.04);
+        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, PlaceZ(ACTOR_Z + dz) - 0.04);
         // 站在灯正下方没有影子可言；出了灯的照射范围也就没影子了
         const near = Math.min(1, dist / 0.75);
         const far = 1 - Math.min(1, Math.max(0, (dist - lit.r * 0.55) / (lit.r * 0.5)));
@@ -2231,7 +2263,7 @@ export function CreateWorld(canvasEl) {
     // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
     const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
     const dir = a.heading > 0 ? -1 : 1;
-    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, PlaceZ(a.mount === "bicycle" ? BAND.loose : CARRY_Z));
     m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
   }
 
@@ -2271,7 +2303,7 @@ export function CreateWorld(canvasEl) {
     // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
     const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
     s.carryMesh.position.set(anchor.x + forward,
-      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z + (s.rankDz || 0));
+      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
@@ -2323,7 +2355,7 @@ export function CreateWorld(canvasEl) {
     s.lampMesh.position.set(
       hand.x + dir * s.lampMesh.userData.offset.x * bs,
       hand.y + s.lampMesh.userData.offset.y * bs,
-      CARRY_Z,
+      PlaceZ(CARRY_Z),
     );
     // 火心的世界坐标：光就从这儿发出去（画布 y 向下，世界 y 向上）
     const f = ART.HAND_LAMP_FLAME[kind] || ART.HAND_LAMP_FLAME.hurricane;
@@ -2625,11 +2657,11 @@ export function CreateWorld(canvasEl) {
           // 原来一交付就整个隐藏，玩家会觉得自己刚放下的木料凭空没了。
           //（y 的抬升是"摞"的表达，不是为了贴地——贴地由贴图锚点负责）
           m.position.set(def.deliver.x + (stacked % 2) * 0.5 - 0.25,
-            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, BAND.loose);
+            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, PlaceZ(BAND.loose));
           m.rotation.z = bucket ? 0 : (stacked % 2 ? 0.05 : -0.04);
           stacked += 1;
         } else {
-          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), BAND.loose);
+          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), PlaceZ(BAND.loose));
           m.rotation.z = 0;
         }
       });
@@ -2723,7 +2755,7 @@ export function CreateWorld(canvasEl) {
         scribeLastT = sc.t;
       }
       scribeMesh.visible = true;
-      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, BAND.loose);
+      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, PlaceZ(BAND.loose));
       if (scribeTip) {
         // 那支笔本身就是这一拍的全部 UI：攥住了就压进木头、随手劲倾斜；
         // 没攥住就浮起来轻轻晃——招呼玩家"来拿我"，不需要一行字
@@ -2734,7 +2766,7 @@ export function CreateWorld(canvasEl) {
           : 0;
         const lift = sc.gripped ? 0 : 0.022;          // 没压着木头就抬起来一点
         // 笔尖落在刻线上：贴图中心要抬起「半支笔」那么高
-        scribeTip.position.set(hx + wob, sc.y + 0.046 + lift, BAND.loose);
+        scribeTip.position.set(hx + wob, sc.y + 0.046 + lift, PlaceZ(BAND.loose));
         // 倾斜：压着走的时候笔杆往后倒（手在推），抬手就立回来
         const lean = sc.gripped ? -0.12 - Math.min(0.22, (sc.speed || 0) * 0.4) : 0.06;
         scribeTip.rotation.z += (lean - scribeTip.rotation.z) * Math.min(1, dt * 12);
@@ -2757,7 +2789,7 @@ export function CreateWorld(canvasEl) {
         scribeDust.material.opacity = (scribeDust.material.opacity ?? 0)
           + (dustWant - (scribeDust.material.opacity ?? 0)) * Math.min(1, dt * 9);
         scribeDust.visible = scribeDust.material.opacity > 0.02;
-        scribeDust.position.set(hx, sc.y - 0.03 + Math.sin(time * 9) * 0.008, BAND.loose);
+        scribeDust.position.set(hx, sc.y - 0.03 + Math.sin(time * 9) * 0.008, PlaceZ(BAND.loose));
       }
     } else {
       if (scribeMesh) scribeMesh.visible = false;
@@ -2871,7 +2903,7 @@ export function CreateWorld(canvasEl) {
       state.lamps.forEach((l, i) => {
         const m = lampMeshes[i];
         if (!m) return;
-        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, BAND.loose);
+        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, PlaceZ(BAND.loose));
         m.body.visible = true;
         m.glow.visible = l.lit;
         m.glow.userData.SetLight(l.x, UNDER_Y + 1.4);
@@ -2904,15 +2936,16 @@ export function CreateWorld(canvasEl) {
       // 所以留在 CART_COVER_Z——两种角色，两个深度。
       const pushed = cartKind === "barrow";
       const cz = pushed ? BAND.loose : CART_COVER_Z;
-      // 新版第一章是空车推去、装上料再推回来——车上有几根料就画几根，
-      // 装载数进 key，变了才重烘
-      const planksNow = Math.min(2, state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0));
-      const cartKey = cartKind + ":" + (pushed ? planksNow : "");
+      // 新版第一章是空车推去、装上料再推回来——车上装了几件就画几件，
+      // 装载数进 key，变了才重烘（三件是「两块门板 + 一根枣木杠」，
+      // 第三件必须画成杠：截成 min(2) 的话「放上车」那一下画面毫无变化）
+      const loadNow = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      const cartKey = cartKind + ":" + (pushed ? loadNow : "");
       if (!cartMesh || cartMesh.userData.cartKind !== cartKey) {
         if (cartMesh) layers.play.remove(cartMesh);
         if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
         cartMesh = pushed
-          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: planksNow }), 0, PROP_SS)
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", BarrowLoad(loadNow)), 0, PROP_SS)
           : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
         cartMesh.userData.cartKind = cartKey;
         layers.play.add(cartMesh);
@@ -2927,11 +2960,18 @@ export function CreateWorld(canvasEl) {
         }
       }
       cartMesh.visible = true;
-      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, cz);
+      // 独轮车有正反：画笔画的是**往左推**的姿态（轮在前、两根车把伸向右手边
+      // 的人）。往右推就得整张翻过来，否则人在车尾、手却够不着车把——
+      // 回程那一趟正是这么穿帮的。驴车是侧面对称的景，不翻。
+      if (pushed) {
+        const pushDir = state.cart.dir || -1;            // 车往哪边走
+        PlaceSpriteFlip(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz),
+          pushDir === ART.BARROW_ART_DIR ? 1 : -1);
+      } else PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz));
       if (cartWheel) {
         cartWheel.visible = true;
         const R = ART.BARROW_WHEEL_R / PPM;              // 轮半径（米）
-        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, cz);
+        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(cz));
         // 滚过的弧长 = 走过的路程：θ = -s/R（往前走轮子顺时针转）
         cartWheel.rotation.z = -((state.cart.roll || 0) / R);
       }
@@ -2943,13 +2983,13 @@ export function CreateWorld(canvasEl) {
     // 独轮车（不在推的时候是静物）：装了几根木料照几根；推到家就停在爹跟前
     {
       const wantBarrow = ch.scene === "village" && state.chapterIndex === 0 && !state.cart;
-      const planks = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      const load = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
       if (wantBarrow) {
-        const key = "b" + planks;
+        const key = "b" + load;
         if (!barrowMesh || barrowMesh.userData.k !== key) {
           if (barrowMesh) layers.play.remove(barrowMesh);
           if (barrowWheel) { layers.play.remove(barrowWheel); barrowWheel = null; }
-          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
+          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", BarrowLoad(load)), 0, PROP_SS);
           barrowMesh.userData.k = key;
           layers.play.add(barrowMesh);
           SetPlayOrder(barrowMesh, BAND.walk);
@@ -2964,11 +3004,14 @@ export function CreateWorld(canvasEl) {
         if (barrowWheel) {
           barrowWheel.visible = true;
           barrowWheel.position.set(state.flags.barrowHome ? 41.6 : 19.8,
-            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, BAND.walk);
+            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(BAND.walk));
         }
         // 平时停在西头磨盘旁（新剧本：村里几户合用的车就搁在磨盘边）；
         // 拉完料停在工作台西边一步，别压着院里的水缸（43.4）
-        PlaceSprite(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y, BAND.walk);
+        // 停着的车也有正反：西头那辆是等着人往左推走的（贴图原样）；
+        // 拉完料停在家门口的这辆是刚往右推回来的，车把自然朝西——翻过来
+        PlaceSpriteFlip(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y,
+          PlaceZ(BAND.walk), state.flags.barrowHome ? -1 : 1);
       } else {
         if (barrowMesh) barrowMesh.visible = false;
         if (barrowWheel) barrowWheel.visible = false;
@@ -2990,7 +3033,7 @@ export function CreateWorld(canvasEl) {
           groundItemMeshes.set(g.uid, m);
         }
         m.visible = true;
-        PlaceSprite(m, g.x, g.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+        PlaceSprite(m, g.x, g.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
       }
       for (const [uid, m] of groundItemMeshes) {
         if (!live.has(uid)) { layers.play.remove(m); groundItemMeshes.delete(uid); }
@@ -3161,7 +3204,7 @@ export function CreateWorld(canvasEl) {
         critterMesh.material.map.needsUpdate = true;
         critterMesh.visible = true;
         const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x ?? state.elmRain?.x;
-        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, BAND.loose);
+        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, PlaceZ(BAND.loose));
       } else if (critterMesh) critterMesh.visible = false;
     }
 
@@ -3274,7 +3317,7 @@ export function CreateWorld(canvasEl) {
       planeBoardMesh.visible = true;
       // 料的上沿画在画布 y=14，网格中心是 y=20。画布 y 向下、世界 y 向上，
       // 所以中心要落在上沿**之下** 6px——符号写反的话料就飘在台面上方
-      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, BAND.loose);
+      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, PlaceZ(BAND.loose));
 
       // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
       // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
@@ -3292,7 +3335,7 @@ export function CreateWorld(canvasEl) {
         planePileMesh.material.map.needsUpdate = true;
       }
       planePileMesh.visible = pl.pile > 0;
-      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, BAND.loose);
+      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, PlaceZ(BAND.loose));
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
@@ -3575,13 +3618,13 @@ export function CreateWorld(canvasEl) {
       const bucketY = SURFACE_Y + 1.05 - wv.depth * 1.5;   // 沉进井口
       winchRope.visible = true;
       winchRope.scale.set(1, Math.max(0.05, hubY - bucketY), 1);
-      winchRope.position.set(wv.x, (hubY + bucketY) / 2, BAND.loose);
+      winchRope.position.set(wv.x, (hubY + bucketY) / 2, PlaceZ(BAND.loose));
       winchBucket.visible = wv.hooked;
-      winchBucket.position.set(wv.x, bucketY, BAND.loose);
+      winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
       // 灌满了桶身压得低一点
       winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
       winchCrank.visible = wv.hooked;
-      winchCrank.position.set(wv.x, hubY, BAND.loose);
+      winchCrank.position.set(wv.x, hubY, PlaceZ(BAND.loose));
       // 歇息角 -0.6：静止时摇把斜垂着，别跟横杆平行混成一根木头
       winchCrank.rotation.z = (wv.crankA || 0) - 0.6;
       // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面
@@ -3592,7 +3635,7 @@ export function CreateWorld(canvasEl) {
         const R = 0.5;
         for (let i = 0; i < 48; i += 1) {
           const a = (i / 47) * Math.PI * 2;
-          pos.setXYZ(i, wv.x + Math.cos(a) * R, hubY + Math.sin(a) * R, BAND.loose);
+          pos.setXYZ(i, wv.x + Math.cos(a) * R, hubY + Math.sin(a) * R, PlaceZ(BAND.loose));
         }
         pos.needsUpdate = true;
         winchGuide.computeLineDistances();
@@ -3664,8 +3707,8 @@ export function CreateWorld(canvasEl) {
           tx /= tl; ty /= tl;
           // 绷直的时候略细一点：麻绳吃上劲会抻细，松着堆在地上显得粗
           const half = ROPE_HALF * (1 - 0.18 * (rl.taut || 0));
-          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, BAND.loose);
-          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, BAND.loose);
+          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, PlaceZ(BAND.loose));
+          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, PlaceZ(BAND.loose));
         }
         pos.needsUpdate = true;
         // 锚点那头的绳盘：放出去多少，盘就小多少——"绳是从这儿放出来的"
@@ -3681,7 +3724,7 @@ export function CreateWorld(canvasEl) {
           ropeCoilMesh.scale.set(s, s, 1);
           // 贴地锚点得跟着缩：贴图绕中心缩，偏移量不缩的话盘子会浮起来
           const off = ropeCoilMesh.userData.offset;
-          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, BAND.loose);
+          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, PlaceZ(BAND.loose));
         }
       } else {
         if (ropeLineMesh) ropeLineMesh.visible = false;
@@ -3756,7 +3799,7 @@ export function CreateWorld(canvasEl) {
       }
       knotMesh.visible = true;
       // 画布锚点（0.42/0.30）对应挂点，摆位要把这个偏移抵回去
-      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), BAND.loose);
+      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), PlaceZ(BAND.loose));
     } else if (knotMesh) knotMesh.visible = false;
 
     // 飞出去的石子：一维横轴上的一道小弧线
@@ -3868,7 +3911,7 @@ export function CreateWorld(canvasEl) {
         FixOrder(slot.mesh, DepthOrder("play", BAND.loose) + 1);
       }
       slot.mesh.visible = true;
-      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
     });
 
     // 目标指示
@@ -4283,7 +4326,7 @@ export function CreateWorld(canvasEl) {
     })),
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
-    debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),
+    debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
