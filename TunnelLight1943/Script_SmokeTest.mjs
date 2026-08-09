@@ -238,8 +238,12 @@ function TestClimb() {
     StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
     if ((fwd += 1) > 10000) throw new Error("无法进入第一章玩法段");
   }
-  state.player.x = 37;
+  // 梯子口的坐标从场景数据读，别写死——它挪过几回（27→37→29，最后挪进屋里）
+  state.player.x = SCENES.village.shafts[0].x;
   state.player.level = "surface";
+  // 开场那一拍给玩家挂了走位（c1_door 的过场），不清掉的话人会被一路拖离
+  // 梯口，等爬梯锁定走完就够不着梯子了——这条验的是梯子，不是过场
+  state.player.cineWalk = null;
   // S 下地窖
   StepGame(state, { moveX: 0, climb: 1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   assert.equal(state.player.level, "under", "在地窖口按 S 应下到地下");

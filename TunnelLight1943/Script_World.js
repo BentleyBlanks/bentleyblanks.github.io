@@ -388,6 +388,11 @@ export function CreateWorld(canvasEl) {
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
+  // 屋里的东西（地窖口、下窖的梯子）：从街上看不见，进了屋才露出来。
+  // 少了这一层，自家地窖口就成了「敞在门口大街上的一个洞」（用户 2026-08-09
+  // 退回：「主角家的地道/地窖怎么会在家门口外面」）——2.5D 里玩家走的那条线
+  // 永远在立面之前，所以屋内地面上的东西必须跟着立面一起淡
+  let indoorMeshes = [];
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
   // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
@@ -461,6 +466,7 @@ export function CreateWorld(canvasEl) {
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
+    indoorMeshes = [];
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -587,6 +593,59 @@ export function CreateWorld(canvasEl) {
         }
       }
       ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+      // 土路的实况（用户 2026-08-09："地面太现代了"）：1943 年冀中的村道是
+      // 独轮车和大车碾出来的，没有路沿、没有铺装——只有两道深深的车辙、
+      // 旱得裂开的泥皮、被踩塌的坑，和一层碾碎的料礓石。
+      // 全部画在**近处这一带**（y 8..40px），远了就成了噪点。
+      ctx.save();
+      // ① 两道车辙：顺路方向的长条压暗，深浅不匀（走一段就浅一段）
+      for (const [ry, alpha] of [[13, 0.16], [21, 0.11]]) {
+        ctx.strokeStyle = `rgba(58,44,28,${alpha})`;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        let drawing = false;
+        for (let px = 0; px <= wPx; px += 12) {
+          const on = ART.Hash(id + "rut" + ry + Math.floor(px / 96)) > 0.22;
+          const yy = ry + (ART.Hash(id + "rw" + ry + px) - 0.5) * 2.2;
+          if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+          else if (on) ctx.lineTo(px, yy);
+          else drawing = false;
+        }
+        ctx.stroke();
+      }
+      // ② 旱裂的泥皮：短短的折线，横七竖八
+      ctx.strokeStyle = "rgba(70,54,34,0.16)";
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < wPx / 30; i += 1) {
+        const cx = ART.Hash(id + "ck" + i) * wPx;
+        const cy = 9 + ART.Hash(id + "cy" + i) * 26;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        for (let k = 1; k <= 3; k += 1) {
+          ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 16,
+            cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 9);
+        }
+        ctx.stroke();
+      }
+      // ③ 踩塌的浅坑：贴地的小椭圆，边上一圈亮、里头一层暗
+      for (let i = 0; i < wPx / 150; i += 1) {
+        const hx = ART.Hash(id + "ho" + i) * wPx;
+        const hy = 12 + ART.Hash(id + "hy" + i) * 16;
+        const hr = 7 + ART.Hash(id + "hr" + i) * 11;
+        ctx.fillStyle = "rgba(56,42,26,0.13)";
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, hr, hr * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // ④ 碾碎的料礓石子：一层细碎的亮点
+      for (let i = 0; i < wPx / 18; i += 1) {
+        const sx = ART.Hash(id + "gv" + i) * wPx;
+        const sy = 8 + ART.Hash(id + "gy" + i) * 24;
+        ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+          ? "rgba(154,140,112,0.30)" : "rgba(96,80,58,0.24)";
+        ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
+      }
+      ctx.restore();
     });
     PlaceSprite(mesh, xFrom, groundY, 0);
     group.add(mesh);
@@ -668,6 +727,69 @@ export function CreateWorld(canvasEl) {
     }
     ctx.restore();
     ART.Speckle(ctx, 0, 0, wPx, hPx, id + "sp", { count: 520, alpha: 0.10, size: 3, color: "#3d3020" });
+
+    // 村道本身（贴图最下面那一条＝玩家脚下这一带）。老版这儿是一块平涂的土色，
+    // 干干净净——1943 年冀中的村道是独轮车和大车碾出来的：没有铺装、没有路沿，
+    // 只有两道深车辙、旱裂的泥皮、踩塌的坑，和一层碾碎的料礓石子
+    //（用户 2026-08-09："地面之类的太现代了"）。
+    // 只画贴图下缘 22% —— 再往上就是纵深里的田，不是路。
+    ctx.save();
+    const roadTop = hPx * 0.78;
+    // ① 路面比田里的土再压一档：常年碾压，颜色比生土深
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#6b573a";
+    ctx.fillRect(0, roadTop, wPx, hPx - roadTop);
+    // ② 两道车辙：顺路方向的长条，走一段浅一段（车轮跳过去了）
+    ctx.globalAlpha = 1;
+    for (const [vy, alpha, lw] of [[0.30, 0.26, 9], [0.62, 0.20, 8]]) {
+      const ry = roadTop + (hPx - roadTop) * vy;
+      ctx.strokeStyle = `rgba(64,49,30,${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.lineCap = "round";
+      let drawing = false;
+      ctx.beginPath();
+      for (let px = 0; px <= wPx; px += 14) {
+        const on = ART.Hash(id + "rut" + vy + Math.floor(px / 120)) > 0.18;
+        const yy = ry + (ART.Hash(id + "rw" + vy + px) - 0.5) * 7;
+        if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+        else if (on) ctx.lineTo(px, yy);
+        else drawing = false;
+      }
+      ctx.stroke();
+    }
+    // ③ 旱裂的泥皮
+    ctx.strokeStyle = "rgba(74,57,35,0.24)";
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 130; i += 1) {
+      const cx = ART.Hash(id + "ck" + i) * wPx;
+      const cy = roadTop + ART.Hash(id + "cy" + i) * (hPx - roadTop);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 1; k <= 3; k += 1) {
+        ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 34,
+          cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 16);
+      }
+      ctx.stroke();
+    }
+    // ④ 踩塌的浅坑
+    for (let i = 0; i < 26; i += 1) {
+      const hx = ART.Hash(id + "ho" + i) * wPx;
+      const hy = roadTop + ART.Hash(id + "hy" + i) * (hPx - roadTop);
+      const hr = 14 + ART.Hash(id + "hr" + i) * 26;
+      ctx.fillStyle = "rgba(60,45,27,0.16)";
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, hr, hr * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ⑤ 碾碎的料礓石子
+    for (let i = 0; i < 420; i += 1) {
+      const sx = ART.Hash(id + "gv" + i) * wPx;
+      const sy = roadTop + ART.Hash(id + "gy" + i) * (hPx - roadTop);
+      ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+        ? "rgba(168,152,120,0.30)" : "rgba(92,74,50,0.26)";
+      ctx.fillRect(sx, sy, 2 + ART.Hash(id + "gs" + i) * 3, 1.8);
+    }
+    ctx.restore();
 
     const tex = CanvasTexture(canvas);
     const mesh = new THREE.Mesh(
@@ -1395,6 +1517,8 @@ export function CreateWorld(canvasEl) {
     }
     // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
     if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
+    // 屋里的东西跟着立面隐现（见 indoorMeshes 的说明）
+    if (p.indoor) indoorMeshes.push(...group.children.slice(meshFrom));
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -1660,6 +1784,7 @@ export function CreateWorld(canvasEl) {
       // （仍在演员 ACTOR_Z 之后），免得被洞口、磨盘这些中景件压掉。
       PlaceSprite(sh, shaft.x, UNDER_Y, 0.45);
       group.add(sh);
+      if (shaft.indoor) indoorMeshes.push(sh);
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -3379,6 +3504,14 @@ export function CreateWorld(canvasEl) {
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
+      }
+      // 屋里的东西跟立面**反着**来：墙合着就看不见地窖口，墙一淡它才露出来。
+      // 立面挡不住它们——它们画在行走线上，比立面还近
+      const shown = 1 - Math.min(1, (homeFacade.material.opacity ?? 1) * 1.08);
+      for (const m of indoorMeshes) {
+        m.material.transparent = true;
+        m.material.opacity = shown;
+        m.visible = shown > 0.02;
       }
     }
 
