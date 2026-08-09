@@ -37,7 +37,14 @@
     "老人": "Elder",
     "村口喊声": "Militia",
     "日军": "Enemy",
-    "翻译官": "Traitor"
+    "翻译官": "Traitor",
+    "七叔": "Elder",
+    "老田": "Elder",
+    "小周": "Militia",
+    "刘嫂": "Mother",
+    "伪保长": "Traitor",
+    "伪军头目": "Traitor",
+    "日军军曹": "Enemy"
   },
   "roles": {
     "Narrator": {

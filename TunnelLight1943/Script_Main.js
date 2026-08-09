@@ -370,7 +370,16 @@ function BaseShot(state) {
 function HintShot(state, hint) {
   switch (hint.kind) {
     case "wide":
-      return { x: hint.x, y: hint.y ?? 2.4, hw: hint.hw ?? 26, pan: hint.pan || 0 };
+      // **全作没有俯瞰全村的机位**（用户 2026-08-08 定的，参考勇敢的心）：
+      // 镜头从头到尾都在玩法景别上，变化只来自镜头动画（横移 pan / 换机位），
+      // 不来自景别。原来 wide 的 hw 是 26——半径 26 米，整条村街连着地道剖面
+      // 一屏摆完，开场第一眼就等于把地图和"藏在地下"这个题眼一起剧透了。
+      // 现在 wide 的意思只剩「比玩法机位退一档」，并且封顶：写多大都不许越过 12
+      return {
+        x: hint.x, y: hint.y ?? 2.4,
+        hw: Math.min(hint.hw ?? 9.5, 12),
+        pan: hint.pan || 0,
+      };
     case "shot":
       return { x: hint.x, y: hint.y ?? 1.6, hw: hint.dist ?? 8, pan: hint.pan || 0 };
     case "insert":

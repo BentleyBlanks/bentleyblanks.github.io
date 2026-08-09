@@ -477,6 +477,14 @@ body.touchDevice #touchControls.gone { display: none; }
 #controlsNote dd { font-size: 12.5px; color: var(--dim); }
 .titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
 
+/* 历史战争暴力内容提示（关卡设计文档要求）：小字，不抢标题 */
+#titleScreen .contentNote {
+  margin-top: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: rgba(196, 178, 138, 0.52);
+}
+
 @media (max-width: 700px) {
   #chapterList { grid-template-columns: repeat(2, 1fr); }
   #objectivePanel { max-width: 62vw; }
@@ -566,7 +574,38 @@ body.touchDevice #touchControls.gone { display: none; }
   /* #hud 整层是 pointer-events:none，只给 button 开了例外——
      不在这儿显式开，面板里的滑块永远拖不动（触屏上尤其明显）。 */
   pointer-events: auto;
+  /* 面板比可视区高的时候要能滚。横屏手机上一定会高：三条滑块 + 署名 + 调试入口
+     加起来就超过 390px 的屏高，「调试 · 跳到第 N 幕」那一行永远够不着。
+     #hud 是 inset:0，所以百分比就是可视区高；减掉顶上那 60px 让位给齿轮，
+     底下留 16px 余地，安全区两头都扣掉。 */
+  max-height: calc(100% - 76px
+    - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  /* 滚到头别把滚动手势甩给外层（触屏上会连带把整页拽动） */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 190, 140, 0.34) transparent;
+  /* 底下还有内容，得看得出来——滚动条是 overlay 的，不滚就不露面，
+     于是面板看着像"到此为止"。经典的 scroll-shadow：跟着内容走的那层（local）
+     是块跟面板同色的盖板，钉在容器上的那层（scroll）是阴影；没滚到底时盖板
+     还在视野外，阴影就露出来，滚到底盖板正好压上去，阴影自己消失。 */
+  background-image:
+    linear-gradient(to top, rgba(16, 13, 10, 0.96), rgba(16, 13, 10, 0)),
+    linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size: 100% 20px, 100% 15px;
+  background-position: bottom, bottom;
+  background-attachment: local, scroll;
 }
+/* 滚动条也按面板的调子来：细、暗、不抢眼 */
+#settingsPanel::-webkit-scrollbar { width: 6px; }
+#settingsPanel::-webkit-scrollbar-track { background: transparent; }
+#settingsPanel::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(214, 190, 140, 0.3);
+}
+#settingsPanel::-webkit-scrollbar-thumb:hover { background: rgba(214, 190, 140, 0.5); }
 #settingsPanel[hidden] { display: none; }
 #settingsPanel h4 {
   margin: 0 0 10px;

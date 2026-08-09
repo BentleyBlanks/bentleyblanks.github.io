@@ -22,7 +22,7 @@ const INK_K = PART_PPM / 150;
 // 体型（相对成年男子）。柱子在第一章还是个半大孩子，后面才抽条；
 // 妹妹比他矮一头多。个头差本身就是叙事：门框上的刻痕量的就是这个。
 export const BODY_SCALE = {
-  father: 1.0, soldier: 0.99, puppet: 0.97, militia: 0.98,
+  father: 1.0, soldier: 0.99, officer: 0.98, puppet: 0.97, militia: 0.98,
   family: 0.90, villager: 0.95, player: 0.93, sister: 0.66,
 };
 
@@ -282,6 +282,20 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
+  // 欢呼（循环）：布巾打下来了，妹妹拍着手原地小跳——两下轻跳、一下拍手定住。
+  // 幅度照孩子来：蹦得高、胳膊抡得开，跟大人的克制拉开
+  cheerHop: {
+    dur: 1.6, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.06, hipX: 0.0, torso: -4, head: -8, armF: -136, foreF: -18, armB: -128, foreB: -14, thighB: -14, shinB: 18, footB: -5, thighF: -10, shinF: 14, footF: -5 },
+      { t: 0.22, hipY: 0.12, hipX: 0.02, torso: -8, head: -12, armF: -158, foreF: -8, armB: -150, foreB: -6, thighB: -22, shinB: 30, thighF: -18, shinF: 26 },   // 蹦起来，双臂抡过头
+      { t: 0.44, hipY: -0.08, hipX: 0.0, torso: -2, head: -6, armF: -120, foreF: -24, armB: -112, foreB: -20 },   // 落地缓一下
+      { t: 0.66, hipY: 0.10, hipX: 0.02, torso: -8, head: -12, armF: -152, foreF: -10, armB: -144, foreB: -8 },   // 再蹦一下
+      { t: 0.92, hipY: -0.05, hipX: 0.0, torso: -2, head: -8, armF: -96, foreF: -52, armB: -88, foreB: -48 },     // 拍手：两手收到胸前
+      { t: 1.14, hipY: -0.04, hipX: 0.0, torso: -3, head: -8, armF: -104, foreF: -44, armB: -96, foreB: -40 },
+      { t: 1.6, hipY: -0.06, hipX: 0.0, torso: -4, head: -8, armF: -136, foreF: -18, armB: -128, foreB: -14 },
+    ],
+  },
   // 拉锯（循环）。这一条改过一次，原因值得写下来：
   // 锯是 alongArm 挂件，**贴图方向 = 前臂的世界角 = armF + foreF**。老版本靠开合
   // 肘部来"一进一出"，前臂世界角从 -72° 荡到 -132°——锯在空中划了 60° 的钟摆，
@@ -332,17 +346,19 @@ export const TRACKS = {
       { t: 2.8, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armF: -30, foreF: -20 },
     ],
   },
-  // 扫院（循环）：扫帚在近侧手里顺前臂摆，一推一带、蹭着地走。
-  // 幅度比锄地小得多——扫地是胳膊的活，不是腰的活
+  // 扫院（循环）。老版本的错在把扫帚当"顺前臂垂下来的棍"：帚柄与前臂共线，
+  // 柄的上半截就叠在小臂上、直戳到脑袋边——看着是根倚在身上的杆子，不是握着的
+  // 扫帚。真拿扫帚，柄在手心里是**斜着**的（比前臂平一档）——这个偏角由 World
+  // 的 ARM_TOOL_TILT 给（绕握点转，握点还在手心里）。这里管的是身体：
+  // 弯下腰去（扫地的手位很低），前臂**伸直探到身前**（θ=armF+foreF 决定帚的
+  // 朝向），后手在腹前虚扶柄的上端。一推一带都从前肩出。
   sweeping: {
     dur: 1.9, loop: true,
     keys: [
-      // 胳膊只在垂线前后小幅摆：扫帚顺前臂挂着，臂一抬高帚就横过来端着了——
-      // 扫地的帚头得蹭着地走
-      { t: 0.0, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22, thighB: -10, shinB: 14, footB: -5, thighF: 6, shinF: 5, footF: -5 },
-      { t: 0.7, hipY: -0.07, hipX: 0.05, torso: 24, head: -16, armF: -30, foreF: -14, armB: -46, foreB: -28 },  // 往前推
-      { t: 1.2, hipY: -0.05, hipX: 0.03, torso: 21, head: -14, armF: -22, foreF: -11, armB: -40, foreB: -25 },  // 带回来
-      { t: 1.9, hipY: -0.05, hipX: 0.03, torso: 20, head: -14, armF: -14, foreF: -8, armB: -34, foreB: -22 },
+      { t: 0.0, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52, thighB: -12, shinB: 16, footB: -5, thighF: 7, shinF: 6, footF: -5 },
+      { t: 0.7, hipY: -0.11, hipX: 0.09, torso: 30, head: -18, armF: -38, foreF: -10, armB: -22, foreB: -56 },  // 往前推
+      { t: 1.2, hipY: -0.08, hipX: 0.06, torso: 24, head: -15, armF: -17, foreF: -8, armB: -10, foreB: -48 },   // 带回来
+      { t: 1.9, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52 },
     ],
   },
   // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
@@ -540,6 +556,18 @@ export function PoseRig(rig, s, dt) {
     target.armB = -6 * DEG; target.foreB = -22 * DEG;
     target.thighB = -42 * DEG; target.shinB = 30 * DEG; target.footB = -10 * DEG;
     target.thighF = 18 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
+  } else if (s.pose === "throwWind") {
+    // 投掷蓄力：**由拉弓量直接驱动**（poseK 0→1，玩家把石子往后拽多远，
+    // 身子就拧多紧）——臂向后下抡开、重心压到后腿、上身拧过去蓄住。
+    // 松手那一帧切 throwArm，甩出去的劲是这里攒的。
+    const k = s.poseK ?? 0.5;
+    target.hipY = -0.04 - 0.06 * k; target.hipX = -0.02 - 0.10 * k;
+    target.torso = (-4 - 18 * k) * DEG; target.head = (2 + 6 * k) * DEG;
+    target.armF = (30 + 64 * k) * DEG;     // 正角=向后抡（同 vault 的符号语义）
+    target.foreF = (-14 - 18 * k) * DEG;
+    target.armB = (-16 - 10 * k) * DEG; target.foreB = -26 * DEG;
+    target.thighB = (-10 - 18 * k) * DEG; target.shinB = (14 + 14 * k) * DEG; target.footB = -6 * DEG;
+    target.thighF = (4 + 12 * k) * DEG; target.shinF = (6 + 6 * k) * DEG; target.footF = -6 * DEG;
   } else if (s.pose === "planePush") {
     // 刨料：**姿势由推程直接驱动**（s.poseK 0→1），不是播一段循环给玩家看。
     // 他推多远，这具身子就送多远——手上的分量就是从这儿来的。
@@ -598,6 +626,15 @@ export function PoseRig(rig, s, dt) {
       thighB: -96, shinB: 104, footB: 14, thighF: -78, shinF: 92, footF: 12,
     };
     // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
+    // ②′ 还骑在顶沿上，但**腿已经从后面扫到了前面**——这一帧是"翻"和"跳"
+    //    的分水岭：高度不变（撑手是支点），变的是腿从墙这边扫到墙那边。
+    //    少了它，中段就成了一动不动的抱膝定格，读出来还是腾空
+    const B2 = {
+      hipY: 0.00, hipX: 0.22, torso: 30, head: -16,
+      armF: 44, foreF: -14, armB: 26, foreB: -10,
+      thighB: -46, shinB: 62, footB: 6, thighF: -70, shinF: 46, footF: -4,
+    };
+    // ③ 落地：腿先伸下去接地、屈膝卸力，撑手离墙甩到身后
     const C = {
       hipY: -0.24, hipX: 0.04, torso: 26, head: -12,
       armF: 22, foreF: -30, armB: 34, foreB: -22,
@@ -609,11 +646,17 @@ export function PoseRig(rig, s, dt) {
       A.armF = -46; A.torso = 50;
       B.armF = 14; B.foreF = -20; B.torso = 46; B.hipY = -0.06;
       B.thighB = -74; B.shinB = 86; B.thighF = -58; B.shinF = 78;
+      B2.armF = 20; B2.torso = 42; B2.hipY = -0.08;
+      B2.thighB = -40; B2.shinB = 56; B2.thighF = -60; B2.shinF = 44;
       C.armF = -14; C.foreF = -30;
     }
-    const mid = heavy ? 0.48 : 0.44;
-    let from = A, to = B, u = k / mid;
-    if (k >= mid) { from = B; to = C; u = (k - mid) / (1 - mid); }
+    // 姿势的三段必须和**抬升曲线**的三段对齐（Core.VaultArc 的 rise/fall）：
+    // 撑起来 → 骑在顶沿上腿扫过 → 松手落下。对不齐就会出现"人还在墙头上、
+    // 腿却已经摆出落地姿势"这种一眼假
+    const rise = 0.30, fall = heavy ? 0.72 : 0.64;
+    let from = A, to = B, u = k / rise;
+    if (k >= fall) { from = B2; to = C; u = (k - fall) / (1 - fall); }
+    else if (k >= rise) { from = B; to = B2; u = (k - rise) / (fall - rise); }
     u = u * u * (3 - 2 * u);                    // 段内也平滑，关键帧之间不会顿一下
     for (const key of Object.keys(A)) {
       const v = from[key] + (to[key] - from[key]) * u;
