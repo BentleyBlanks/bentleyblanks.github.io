@@ -1850,7 +1850,8 @@ function TestRopeLineIsRealRope() {
   // ④ 攥着绳下地道：绳跟着人钻不进剖面里——手一松，绳断回小周手里，
   //    链退回"抓住绳头"那一步。（用户 2026-08-09：「如果玩家下了地道，
   //    手里拿着的绳子也应该断回到npc手里」）
-  state.player.x = 37;             // 梁家地窖口
+  // 梁家地窖口的坐标从场景数据读，别写死——它挪进屋里了（37→29）
+  state.player.x = SCENES.village.shafts[0].x;
   step({}, 4);
   assert.equal(state.climbHint, "S · 下地道", "地窖口该给下去的提示");
   step({ climb: 1 }, 1);
