@@ -913,8 +913,9 @@ function TestWinchIsACrankNotALever() {
 // 的哪儿说了算（pointerCard，u 沿卡宽 / v 沿卡高的归一化坐标）。世界坐标那条
 // 老路子已经废了——世界里那支笔只有十来个像素，按不着。五条硬规矩各验一遍。
 function TestChalkIsAPencilNotASlider() {
-  // 新版第一章的量身只是三四秒的人物动作（不是玩法）；攥石笔划线的拟物
-  // 交互只剩第八章那道给妹妹刻的痕
+  // 攥石笔划线的拟物交互一头一尾各一次：第一章量身（c1_carve，爹的手按着、
+  // 玩家攥笔）与第八章给妹妹刻痕（c8_carve）。机制细则在 c8 上验（selfMark 那
+  // 版旗标齐全）；c1 那道由整章自动通关盯 flags.marked 兜底
   const carve = ChapterBeatList(7).find((b) => b.id === "c8_carve");
   const mk = () => {
     const state = CreateGame(7);
@@ -1183,6 +1184,9 @@ function TestPlaneBeat() {
   // "玩家怎么走到工位"这一整段；线上示范一完人站在判定圈外，屏幕上什么都不出，
   // 玩家只能干瞪眼。凡是"玩家自己要走到某处"的节拍，测试必须走真实路径。
   const workX = def.zone.x - 0.55;
+  // 第一帧才会跑 onStart（微过场从那儿起），所以先走一帧再点掉过渡台词
+  StepGame(state, idle(), DT);
+  for (let i = 0; i < 600 && state.microCine; i += 1) StepGame(state, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(state, idle(), DT);
   assert.ok(state.planing, "刨料期间台面上必须有那块料");
   assert.ok(Math.abs(state.player.x - workX) < 0.06,
@@ -1235,6 +1239,8 @@ function TestPlaneBeat() {
   // 光按住 E 就推得动，方向由这一趟的状态给。顿一下这一趟就不齐（刨花短一截）
   const s2 = CreateGame(0);
   DebugJump(s2, 0, beats.indexOf("c1_plane"));
+  StepGame(s2, idle(), DT);
+  for (let i = 0; i < 600 && s2.microCine; i += 1) StepGame(s2, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(s2, idle(), DT);
   for (let i = 0; i < 6; i += 1) StepGame(s2, { ...idle(), interactHeld: true }, DT);
   assert.ok(s2.beat.u > 0, "按住 E 必须能把刨子推出去（键盘后备）");
@@ -1265,6 +1271,8 @@ function TestPlaneBeat() {
   // 这是拿掉 HUD 轨道之后唯一的回程提示，丢了玩家就会卡在那头以为坏了。
   const s4 = CreateGame(0);
   DebugJump(s4, 0, beats.indexOf("c1_plane"));
+  StepGame(s4, idle(), DT);
+  for (let i = 0; i < 600 && s4.microCine; i += 1) StepGame(s4, { ...idle(), advance: true }, DT);
   for (let i = 0; i < 200; i += 1) StepGame(s4, idle(), DT);
   let g4 = 0;
   while (s4.planeCard?.armed !== false && g4 < 600) { g4 += 1; StepGame(s4, { ...idle(), interactHeld: true }, DT); }

@@ -1307,6 +1307,9 @@ function StepPlane(state, def, input, dt) {
   const need = def.passes ?? 3;
 
   if (b.u === undefined) {
+    // onStart 与 chain/scribe 同一条规矩：第一帧先走开场排布（c1_plane 的
+    // 过渡台词、c1_repair 的大婶跪位都挂在这上头——漏了它们就是死代码）
+    def.onStart?.(state);
     b.u = 0; b.passes = 0; b.stalls = 0; b.idleT = 0; b.armed = true;
     b.pile = 0; b.everMoved = false; b.grainD = 0;
     b.demoT = def.demoTime ?? 3.0; b.demoU = 0; b.demoCurl = false;
@@ -1646,8 +1649,9 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 量身：三四秒的人物动作，不是玩法，也不预告命运（"这个家就靠你了"删）。
-      // 台词全部来自新剧本第一场
+      // 量身。台词沿新剧本第一场（"这个家就靠你了"仍旧不要），但**划线本身是
+      // 玩家的手**（2026-08-09 用户明令保留上一版的石笔交互，不许退成三四秒的
+      // 过场动画）：门框上的刻痕是全篇的题眼，一头一尾都得亲手划。
       kind: "cinematic", id: "c1_measure", timeOfDay: "dawn",
       lines: [
         { who: "爹", say: "别动。", d: 2.2, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 },
@@ -1657,12 +1661,38 @@ export const SCRIPTS = {
             state.player.x = 34.0;
             state.player.heading = 1;
           } },
-        { stage: "", d: 3.0, cam: { kind: "insertCard", card: "carve" },
-          on: (state) => { state.flags.marked = true; Cue(state, "scribe"); } },
+      ],
+    },
+    {
+      // 镜头推到左立柱上（世界 33.60→33.75，正是 DrawDoorframe 画永久刻痕的
+      // 那 15 公分）：全景里划线只是一个像素在动，凑近了才是"爹在给我量身高"。
+      kind: "scribe", id: "c1_carve", timeOfDay: "dawn",
+      zone: V.doorframe, speed: 0.5, markY: 1.28,
+      markX0: 33.60, markX1: 33.75,
+      cam: { kind: "shot", x: 34.0, y: 1.34, dist: 1.9 },
+      objective: "爹比着你的头顶，在门框上划一道", hint: "攥住那支石笔，贴着木头拉过去",
+      note: "石笔蹭过木头，留下一道浅浅的印。",
+      onStart: (state) => {
+        // 爹得真的按着他站直（过场被跳掉时这里兜底），不能站在院子那头
+        const father = FindActor(state, "father");
+        if (father) { father.x = 35.1; father.heading = -1; father.pose = "mark"; }
+        state.player.x = 34.0;
+        state.player.heading = 1;
+      },
+      onDone: (state) => {
+        const father = FindActor(state, "father");
+        if (father) father.pose = null;
+        // 这道刻痕从现在起长在门框上（在此之前门框是空的——不能让玩家
+        // 攥着笔去划一条已经画好的线）
+        state.flags.marked = true;
+      },
+    },
+    {
+      kind: "cinematic", id: "c1_measured", timeOfDay: "dawn",
+      lines: [
+        { stage: "爹用凿子把那道印刻深了一点。", d: 3.4, cam: { kind: "insertCard", card: "carve" } },
         { who: "妹妹", say: "哥长了多少？", d: 2.8, cam: { kind: "shot", x: 33.8, y: 1.4, dist: 5.5 },
           on: (state) => {
-            const father = FindActor(state, "father");
-            if (father) father.pose = null;
             const sister = FindActor(state, "sister");
             if (sister) { sister.cineTarget = { x: 33.2 }; sister.cineSpeed = 2.8; }
           } },
@@ -1731,6 +1761,9 @@ export const SCRIPTS = {
       kind: "chain", id: "c1_ropeline", timeOfDay: "day",
       objective: "帮小周把方向量出来", hint: "抓住绳头，沿地面拽到七叔家墙根",
       onStart: (state) => {
+        // 客人的事谈完了，娘扛起锄头去西头菜畦——她的日子不围着玩家的差事转
+        const mother = FindActor(state, "mother");
+        if (mother) { mother.carry = "锄头"; mother.cineTarget = { x: V_PATCH_X }; mother.cineSpeed = 1.15; mother.heading = -1; }
         const xz = FindActor(state, "xiaozhou");
         if (xz) { xz.level = "surface"; xz.x = 35.8; xz.heading = 1; xz.cineTarget = null; }
         const q = FindActor(state, "qishu");
@@ -1780,6 +1813,8 @@ export const SCRIPTS = {
         D("father", 42.4); D("xiaozhou", 40.8);
         const q = FindActor(state, "qishu");
         if (q) { q.level = "surface"; q.x = 37.8; q.heading = -1; q.cineTarget = null; }
+        // 娘在西头菜畦锄地（推车正好从她跟前过）——没人傻站着看玩家干活
+        MotherHoe(state);
       },
       steps: [
         { type: "goto", zone: { x: 19.4, w: 3.6 } },
@@ -1805,7 +1840,7 @@ export const SCRIPTS = {
           note: "都装上了。抬起车把，往家走。",
           effect: (state) => { state.flags.barrowPlanks = 3; Cue(state, "drop"); } },
         { type: "push", from: 10.2, dist: 30.8, dir: 1, obj: "barrow", prompt: "按住 E · 推车回家",
-          note: "木料到了。七叔把料一块块递下窖去。",
+          note: "木料到了。枣木杠先递下窖去，一块旧门板留在了工作台上。",
           effect: (state) => {
             state.flags.barrowHome = true;
             state.cart = null;
@@ -1825,7 +1860,14 @@ export const SCRIPTS = {
       onStart: (state) => {
         const father = FindActor(state, "father");
         if (father) { father.level = "surface"; father.track = null; father.carry = null; father.cineTarget = null; }
+        // 娘从菜畦回来了，在窖口边扫院——推车、刨料这一路，家里没人闲站着
+        const mother = FindActor(state, "mother");
+        if (mother) { mother.x = 37.2; mother.heading = -1; mother.cineTarget = null; mother.carry = "扫帚"; mother.track = { name: "sweeping", t: 0, ambient: true }; }
         StartMicroCine(state, [
+          // 过渡：拉回来的料不是全下窖——这一块为什么留在上头、为什么要刨，
+          // 爹先说明白，玩家才不是"拿起板子就挫"（2026-08-09 用户）
+          { who: "爹", say: "这块门板不下窖——窖口得有个盖。板面糟了，先刨平，才嵌得严实。", d: 5.4,
+            cam: { kind: "shot", x: 40.5, y: 1.3, dist: 5.5 } },
           { who: "爹", say: "你来。一次别吃太深，刨薄点。", d: 3.2,
             cam: { kind: "shot", x: 40.5, y: 1.3, dist: 5.5 } },
         ]);
@@ -1833,7 +1875,7 @@ export const SCRIPTS = {
       onDone: (state) => {
         GiveItem(state, { id: "bucket", label: "空水桶", big: true });
         const mother = FindActor(state, "mother");
-        if (mother) { mother.cineTarget = { x: 38.8 }; mother.cineSpeed = 1.8; }
+        if (mother) { mother.track = null; mother.carry = null; mother.cineTarget = { x: 38.8 }; mother.cineSpeed = 1.8; }
         StartMicroCine(state, [
           { who: "娘", say: "干灰盖不住，得和点泥。井绳昨天又磨开了——顺道打桶水回来。", d: 5.4,
             cam: { kind: "shot", x: 39, y: 1.5, dist: 6 } },
@@ -1852,6 +1894,9 @@ export const SCRIPTS = {
       kind: "chain", id: "c1_well", timeOfDay: "day",
       objective: "去井台打水——妹妹在榆树底下", hint: "井在七叔家东边",
       onStart: (state) => {
+        // 等水的工夫娘也没闲着：在窖口边刨松干土备泥（她说的"和点泥"）
+        const mother = FindActor(state, "mother");
+        if (mother) { mother.x = 37.4; mother.heading = 1; mother.cineTarget = null; mother.carry = "锄头"; mother.track = { name: "hoeing", t: 0, ambient: true }; }
         const sis = FindActor(state, "sister");
         if (sis) { sis.x = 55.4; sis.heading = 1; sis.cineTarget = null; sis.track = { name: "reachJump", t: 0, ambient: true }; }
         const ls = FindActor(state, "liusao");
@@ -1933,7 +1978,7 @@ export const SCRIPTS = {
         { stage: "", d: 2.4, cam: { kind: "shot", x: 38, y: 1.5, dist: 5.4 },
           on: (state) => {
             const mother = FindActor(state, "mother");
-            if (mother) { mother.x = 38.6; mother.heading = -1; mother.carry = "桶"; mother.cineTarget = null; }
+            if (mother) { mother.x = 38.6; mother.heading = -1; mother.carry = "桶"; mother.track = null; mother.cineTarget = null; }
             state.player.item = null;
           } },
         { stage: "", d: 3.0, cam: { kind: "shot", x: 42.5, y: 1.3, dist: 5 },
