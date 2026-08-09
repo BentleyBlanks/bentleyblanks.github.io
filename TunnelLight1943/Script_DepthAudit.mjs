@@ -6,6 +6,11 @@
 //   那是地面透视收缩的正确结果，由真实地面几何体负责表现，不该靠挪 y 去凑。
 //   凡是底边不等于地平线的，就是悬空（>0）或陷进地里（<0）。
 //
+//   第二条（2026-08-09 加）：**行走线上的东西不许留在 0<z≤0.85 的带上**。
+//   平视镜头下每一档 z 有自己的地平线，演员（0.6）留在自己那档，脚就比
+//   井台车轮低十来像素，特写下低七十像素——"车和人不在一条水平线上"。
+//   摆位一律经 Data_DepthSpec 的 PlaceZ() 压回 z=0，深度带只管绘制顺序。
+//
 // 运行：node TunnelLight1943/Script_DepthAudit.mjs [章节...]
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +39,15 @@ for (const ch of chapters) {
     const out = [];
     const box = new THREE.Box3();
     layers.play.updateMatrixWorld(true);
+    // 地平面体检：0<z≤0.85 这一段是"行走线上的东西"，摆位必须已被 PlaceZ 压回 0。
+    // 躺平的投影不算——它沿光向往前趴出去一截，那个 z 是影子的形状不是站位
+    for (const o of layers.play.children) {
+      const z = o.position.z;
+      if (Math.abs(o.rotation.x) > 0.1) continue;
+      if (z > 0.001 && z <= 0.85) {
+        out.push({ kind: (o.userData.kind || "?") + " 没压回地平面", z: +z.toFixed(2), err: +z.toFixed(2) });
+      }
+    }
     for (const o of layers.play.children) {
       if (!o.isMesh || !o.geometry?.parameters?.height) continue;
       // 躺平的地面/投影不参与（它们本来就贴着地）

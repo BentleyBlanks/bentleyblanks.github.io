@@ -29,6 +29,56 @@ export const ACTOR_Z = 0.6;          // 演员行走深度
 export const ACTOR_SHADOW_Z = 0.55;  // 演员脚下的投影（紧贴在演员之后）
 export const CARRY_Z = 0.8;          // 演员携带物（跟手走，压在人身前）
 
+// ---------------------------------------------------------------------------
+// 地平线规范（2026-08-09 用户定，起因：「车和人都不在一个水平线」）
+//
+// 镜头永远平视（lookAt 与机位等高），于是**每一档深度 z 都有自己的地平线**：
+// 深度 z 处、世界 y=0 的那条线，在屏幕上的位置 ∝ −camY / (dist − z)。
+// z 越负（越远）画得越高，z 越正（越近）画得越低。这是正确的透视，不是 bug——
+// 但它意味着一条铁律：**两件东西只有 z 相同，才会踩在同一条线上。**
+//
+// 默认玩法机位实测（hw 6.3 → dist 13.2m，视平线离地 1.85m，1600×900），
+// 以行走线 walk(z=0) 的地平线为 0，正数＝画得更低：
+//
+//   backdrop −6.0 → −73px   building −3.4 → −48px   yard −1.6 → −25px
+//   nearBack −0.9 → −15px   walk 0 → 0px            loose 0.3 → +6px
+//   影子 0.55 → +10px       演员 0.6 → +11px         携带物 0.8 → +15px
+//   obstacle 0.95 → +18px   clutter 1.6 → +32px
+//
+// **一推特写，同一个 z 差就放大好几倍**：刨料那一拍（hw 2.9、视平线 0.95m）
+// 演员的 0.6 变成 +29px，插入特写（hw 2.2、视平线 1.4m）更是 +76px——
+// 人的脚整整沉进台面底下。所以「差一点点无所谓」在特写那一拍必定露馅，
+// 这条不能靠眼力逐场去凑。
+//
+// 规范：
+//  1. **行走线上的一切共用同一个位置 z＝0**：演员、演员的影子、手里拿的、
+//     放下的、玩家推的车、钉在地上的道具（walk / loose / facade 带）。
+//     深度带从此**只管绘制顺序**（renderOrder），不再兼职当位置。
+//  2. z<0 的带（backdrop / building / yard / nearBack）是**真的站在更靠后的
+//     地面上**，位置就用带的 z，各有各的地平线——但那条线必须由画面交代
+//     （AddBandEdge 的路沿田埂、墙根、垄沟），否则它读出来就是「浮在半空」。
+//  3. z>0 的前景带（obstacle / clutter / 掩体 NEAR_CLUTTER）同理保留自己的 z：
+//     它们**有意**站在行走线之前，地平线更低正是「它挡在你前面」的唯一线索。
+//  4. 摆位一律 `PlaceZ(band)`，排序一律 `SetPlayOrder/DepthOrder(band)`。
+//     两者传同一个 band，谁也别再手写数字。
+export const GROUND_PLANE_Z = 0;      // 行走线这条地面的深度
+export const GROUND_PLANE_TOP = 0.85; // 0<z≤此值的带都算「站在行走线上」
+/** 摆位用的 z：行走线上的带一律压回地平面，其余带保留自己的纵深 */
+export function PlaceZ(z) {
+  return z > 0 && z <= GROUND_PLANE_TOP ? GROUND_PLANE_Z : z;
+}
+
+// 透视相机的垂直视角（Script_World 的 PerspectiveCamera 用同一个数）
+export const CAM_FOV = 30;
+/**
+ * 深度 z 的地平线相对行走线差多少屏幕像素（正＝画得更低）。
+ * 体检与写文档时用它算实数，别再靠截图上量。
+ */
+export function GroundRisePx(z, { camY, dist, viewH, fov = CAM_FOV }) {
+  const tanHalf = Math.tan((fov * Math.PI / 180) / 2);
+  return (viewH / 2) * (camY / tanHalf) * (1 / (dist - z) - 1 / dist);
+}
+
 // 队列的**后一排**。横版里"两人并排走"只能靠深度演：同一个 x 退后 1.2m，
 // 透视会把他画小一圈、脚在画面上抬高一点——读出来才是"肩并肩"，
 // 而不是"一前一后"。人、影子、手里的家伙整体后移，所以这里给的是**偏移量**。

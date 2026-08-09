@@ -2819,6 +2819,10 @@ export function DrawMotorcycle(ctx, x, groundY, id) {
 export const BARROW_WHEEL_R = 13;      // 轮半径（像素/PPM=0.27m）
 export const BARROW_WHEEL_Y = 13;      // 轮心离地
 export const BARROW_GRIP = { x: 58, y: 34 };   // 车把末端（相对车轮中心的绘制坐标）
+// **这张贴图画的是往左推的车**：轮子在前（左），两根车把伸向右手边推车的人。
+// 独轮车是有正反的东西，往右推必须把整张翻过来（World 的 PlaceSpriteFlip），
+// 不翻的话人在车尾、手却伸向车头，一眼看穿。
+export const BARROW_ART_DIR = -1;
 export function DrawCartWheel(ctx, x, y, r, id) {
   InkFill(ctx, [
     [x - r, y], [x - r * 0.7, y - r * 0.7], [x, y - r], [x + r * 0.7, y - r * 0.7],
@@ -2846,7 +2850,7 @@ export function DrawCartWheel(ctx, x, y, r, id) {
 // 独轮车的车身（不含轮子）。整车约 1.6m 长——上一版画了两米多，加上它挂在
 // 近相机的深度带上被透视又放大四成，车比人还大一圈，车把根本伸不到人手里。
 // 姿态是**推着走的姿态**：车把抬到 0.7m 上下，正是柱子两手够得着的高度。
-export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
+export function DrawBarrow(ctx, x, groundY, id, { planks = 0, pole = false } = {}) {
   const g = BARROW_GRIP;
   // 车斗：轮子上方的浅斗
   InkFill(ctx, [
@@ -2862,10 +2866,28 @@ export function DrawBarrow(ctx, x, groundY, id, { planks = 0 } = {}) {
     { amp: 0.7, lw: 1.8 });
   // 支腿：停下来时撑住车斗
   InkLine(ctx, x - 22, groundY - 20, x - 20, groundY - 2, id + "legA", { lw: 2.6, color: "#6b4d2e" });
-  // 装上的木料
+  // 装上的木料：两块旧门板平摞在斗上
   for (let i = 0; i < planks; i += 1) {
     InkFill(ctx, Rect(x - 26, groundY - 34 - i * 7, 46, 7), id + "plank" + i, "#c09a62",
       { amp: 1.1, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
+  }
+  // 枣木杠：一根圆杠，比门板长得多，两头探出车斗压在门板上。
+  // 枣木深红发褐，跟门板的浅木色分得开——不然「装上第三件」画面上等于没变化
+  // 杠身压在门板摞的最上面一层上（板摞顶＝groundY-27-planks*7），不留缝
+  const poleY = groundY - 27 - planks * 7 - 5;
+  if (pole) {
+    InkFill(ctx, [
+      [x - 40, poleY + 1], [x - 38, poleY - 4], [x + 32, poleY - 5],
+      [x + 35, poleY], [x + 32, poleY + 4], [x - 38, poleY + 5],
+    ], id + "pole", "#6b4028", { amp: 0.9, lw: 2.0, shade: "rgba(0,0,0,0.26)" });
+    // 顺杠一道窄高光，读得出是圆的、不是又一块板
+    InkLine(ctx, x - 30, poleY - 2.6, x + 26, poleY - 3.2, id + "poleLit",
+      { lw: 1.0, color: "rgba(214,186,140,0.42)", amp: 0.3 });
+    // 两道捆绳：只在杠压住板的地方各绕一小截
+    for (const lx of [x - 18, x + 12]) {
+      InkLine(ctx, lx, poleY - 5.5, lx + 1.5, poleY + 6.5, id + "lash" + lx,
+        { lw: 1.5, color: "#7a6440", amp: 0.35 });
+    }
   }
 }
 

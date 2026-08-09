@@ -37,6 +37,12 @@ export const BONE = {
   thigh: 0.31,
   shin: 0.31,
   foot: 0.19,
+  // 鞋帮高度。大腿+小腿正好 = hipY，所以**踝关节就落在 y=0**：鞋要是从踝
+  // 往下画，整个人就沉进地里 9 厘米——车轮压在路沿上、人的鞋却陷在路面
+  // 底下，一眼看出两个人不在一条水平线上（2026-08-09 用户截图）。
+  // 所以鞋一律**从踝往上**画：鞋底＝踝＝地平线，小腿最下面那一截藏在鞋帮里，
+  // 侧视看就是一只包住脚踝的布鞋。骨链一根没动，所有姿势的接地照旧。
+  sole: 0.09,
 };
 
 function MakeCanvas(w, h) {
@@ -131,14 +137,15 @@ function BuildParts(kind, haze = null) {
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#6b5540", kind + "shb", { k: INK_K })),
-    footB: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb", INK_K)),
+    // 枢轴＝踝，鞋从枢轴**往上**长（见 BONE.sole）：鞋底正好踩在地平线上
+    footB: () => Bake(BONE.foot + 0.05, BONE.sole + 0.01, 0.16, 1,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py - BONE.sole * P, BONE.foot * P, BONE.sole * P, "#43331f", kind + "ftb", INK_K)),
     thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
     shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#7d6349", kind + "shf", { k: INK_K })),
-    footF: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf", INK_K)),
+    footF: () => Bake(BONE.foot + 0.05, BONE.sole + 0.01, 0.16, 1,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py - BONE.sole * P, BONE.foot * P, BONE.sole * P, "#4d3a28", kind + "ftf", INK_K)),
   };
   const built = {};
   for (const k of Object.keys(parts)) built[k] = parts[k]();
