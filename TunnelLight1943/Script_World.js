@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, BODY_SCALE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import {
@@ -1652,6 +1652,7 @@ export function CreateWorld(canvasEl) {
   // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
+    s.ground = ground;                   // 供 PlayerLimbTips 量"手脚离地多高"
     // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
     const lift = extra.lift || 0;
     const y = ground + lift;
@@ -3446,6 +3447,17 @@ export function CreateWorld(canvasEl) {
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),
     DepthViolations,
+    // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
+    // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
+    PlayerLimbTips: () => {
+      const ps = actorSprites.get("player");
+      if (!ps?.rig || ps.ground === undefined) return null;
+      const ground = ps.ground;
+      const tips = LimbTips(ps.rig);
+      const out = {};
+      for (const k of Object.keys(tips)) out[k] = +(tips[k].y - ground).toFixed(3);
+      return out;
+    },
     get viewSize() { return { w: viewW, h: viewH }; },
   };
 }

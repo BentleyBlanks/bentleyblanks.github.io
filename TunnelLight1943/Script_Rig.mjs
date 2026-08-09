@@ -606,23 +606,38 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -26 * DEG; target.shinB = 32 * DEG; target.footB = -6 * DEG;
     target.thighF = 16 * DEG; target.shinF = 12 * DEG; target.footF = -14 * DEG;
   } else if (s.posture === "crawl") {
-    // 爬行：手脚并用。躯干压到近水平，四肢交替往前够——地道最窄的那几段
-    // （卡口、连夜赶工掏出来的新口）只能这么过去。
+    // 爬行：手脚并用，地道最窄的那几段（卡口、连夜赶工掏出来的新口）只能这么过。
+    //
+    // 这一拍是照着骨长重新算过的，不是随手填的角度——**手必须落在地上、膝盖
+    // 必须跪在地上**，不然就是老版那个"人趴下去了、胳膊还悬在半空"的样子。
+    // 算法（骨长见 BONE）：膝盖跪地 → 胯高 = 大腿长 0.31；手撑地 → 肩高 = 两节
+    // 胳膊 0.49。所以后背是从胯往前上方斜着支起来的，不是趴平的：躯干折 68° 时
+    // 肩点正好落在 0.475 高、0.48 靠前，胳膊略前伸 14° 就够到地。头顶 0.73，
+    // 与 Core 的 POSTURE_HEAD.crawl(0.72) 对得上。
     const c = s.moving ? 1 : 0;
-    target.hipY = -0.66 + (c ? Math.abs(Math.sin(p)) * 0.02 : 0);
-    target.hipX = 0.10;
-    target.torso = 76 * DEG;
-    target.head = -62 * DEG;          // 躯干快趴平了，脖子得抬起来才看得见前面
-    target.armB = (-96 + (c ? swing * 30 : 0)) * DEG;
-    target.foreB = -18 * DEG;
-    target.armF = (-96 + (c ? swing2 * 30 : 0)) * DEG;
-    target.foreF = -18 * DEG;
-    target.thighB = (-88 + (c ? swing2 * 20 : 0)) * DEG;
-    target.shinB = 92 * DEG;
-    target.footB = -30 * DEG;
-    target.thighF = (-88 + (c ? swing * 20 : 0)) * DEG;
-    target.shinF = 92 * DEG;
-    target.footF = -30 * DEG;
+    // 爬起来是一耸一耸的：手一撑，胯就往上顶一下
+    target.hipY = -0.312 + (c ? Math.abs(Math.sin(p)) * 0.03 : 0);
+    target.hipX = 0.02;
+    target.torso = (68 - (c ? Math.sin(p) * 4 : 0)) * DEG;
+    target.head = -56 * DEG;          // 脖子抬起来才看得见前面（相对躯干，世界约前倾 12°）
+    // 对角步：一只手往前够的时候，对侧的腿跟着往前收（swing / swing2 相位相反）。
+    // 撑地那一侧接近伸直，往前够的那一侧抬起来——手离地是应该的，
+    // 那是"正在往前挪"，不是飞
+    target.armB = (-14 + (c ? swing * 22 : 0)) * DEG;
+    target.foreB = (6 + (c ? Math.max(0, -swing) * 14 : 0)) * DEG;
+    target.armF = (-14 + (c ? swing2 * 22 : 0)) * DEG;
+    target.foreF = (6 + (c ? Math.max(0, -swing2) * 14 : 0)) * DEG;
+    // 腿：大腿几乎垂直（膝盖跪在地上），小腿连着脚往后铺在地面上拖着走。
+    // 大腿与小腿由同一个 swing 驱动、方向相反，小腿的世界角就始终贴着地面
+    target.thighB = (-6 + (c ? swing2 * 16 : 0)) * DEG;
+    target.shinB = (92 - (c ? swing2 * 14 : 0)) * DEG;
+    // 脚这块贴图跟四肢不是一个朝向：肢体在 0° 时指向下，鞋子在 0° 时指向前，
+    // 所以让鞋底贴着地板往后铺，要的是「大腿+小腿+脚 ≈ 180°」而不是「≈0°」。
+    // 少了这一步，脚会以踝为轴垂到地板底下去（老版就是这么穿地的）
+    target.footB = (180 + 6 - 92) * DEG;
+    target.thighF = (-6 + (c ? swing * 16 : 0)) * DEG;
+    target.shinF = (92 - (c ? swing * 14 : 0)) * DEG;
+    target.footF = (180 + 6 - 92) * DEG;
   } else if (s.posture === "stoop") {
     // 猫腰：地道里的常态。不是蹲，是弓着背走——胯只略沉，腰折下去，
     // 头压在洞顶底下，手垂在身前随时撑一把。走得比站着慢，但还是在走。
@@ -755,9 +770,15 @@ function ApplyPose(rig, t, target, blend) {
   j.foreBack.rotation.z = -t.foreB;
   j.armFront.rotation.z = -t.armF;
   j.foreFront.rotation.z = -t.foreF;
-  // 躯干带着肩走
-  j.armBack.position.y = BONE.torso * 0.86;
-  j.armFront.position.y = BONE.torso * 0.86;
+  // **躯干带着肩走**——这行注释以前是句空话：两条胳膊挂在 root（胯）上而不是
+  // 躯干上，代码只写了个固定的 y，肩膀就永远钉在胯的正上方。站着走着看不出来
+  // （躯干才前倾几度），可一旦躯干折下去，肩就留在原地：爬行那一拍躯干压到 76°，
+  // 人趴下去了、两条胳膊还悬在胯上方半米，看着就是"手飞了"。
+  // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置，躯干折多少肩就跟多少。
+  const sh = BONE.torso * 0.86;
+  const sx = Math.sin(t.torso) * sh, sy = Math.cos(t.torso) * sh;
+  j.armBack.position.set(sx, sy, 0);
+  j.armFront.position.set(sx, sy, 0);
 }
 
 /** 前臂末端（手）的世界坐标 */
@@ -766,6 +787,27 @@ export function HandPoint(rig) {
   const v = new THREE.Vector3(0, -BONE.foreArm, 0);
   j.foreFront.updateWorldMatrix(true, false);
   return v.applyMatrix4(j.foreFront.matrixWorld);
+}
+
+/**
+ * 四肢末端（两只手、两个膝盖、两只脚尖）的世界坐标。
+ *
+ * 用来体检"这个姿势站没站在地上"——爬行那一拍手悬在半空半米、脚穿到地板底下
+ * 半年没人发现，就是因为没有任何一条断言量过肢体末端在哪儿。姿势看着像不像，
+ * 眼睛说了算；**触没触地是可以量的**，就该量。
+ */
+export function LimbTips(rig) {
+  const j = rig.joints;
+  const at = (node, y) => {
+    node.updateWorldMatrix(true, false);
+    return new THREE.Vector3(0, y, 0).applyMatrix4(node.matrixWorld);
+  };
+  return {
+    handF: at(j.foreFront, -BONE.foreArm), handB: at(j.foreBack, -BONE.foreArm),
+    kneeF: at(j.shinFront, 0), kneeB: at(j.shinBack, 0),
+    footF: at(j.footFront, 0), footB: at(j.footBack, 0),
+    head: at(j.head, BONE.headR * 2),
+  };
 }
 
 /** 肘点的世界坐标：手里的长家伙（锯/锄头）要顺着前臂的方向摆 */
