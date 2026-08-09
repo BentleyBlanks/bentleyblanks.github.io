@@ -18,7 +18,8 @@
       "娘": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "柱子": "MiniMax/speech-2.8-hd",
       "交通员": "MiniMax/speech-2.8-hd",
-      "日军": "MiniMax/speech-2.8-hd"
+      "日军": "MiniMax/speech-2.8-hd",
+      "翻译官": "MiniMax/speech-2.8-hd"
     }
   },
   "speakerMap": {
@@ -35,7 +36,15 @@
     "大娘": "Mother",
     "老人": "Elder",
     "村口喊声": "Militia",
-    "日军": "Enemy"
+    "日军": "Enemy",
+    "翻译官": "Traitor",
+    "七叔": "Elder",
+    "老田": "Elder",
+    "小周": "Militia",
+    "刘嫂": "Mother",
+    "伪保长": "Traitor",
+    "伪军头目": "Traitor",
+    "日军军曹": "Enemy"
   },
   "roles": {
     "Narrator": {
@@ -101,6 +110,15 @@
       "language": "Japanese",
       "referenceText": "言え！どこに隠した！早くしろ！",
       "instruction": "三十多岁的日军下级军官，粗粝紧绷的男中音，审问时的喝骂——短句、命令式、压迫感来自音量与顿挫，不是嘶吼到破音。标准日语，军队腔。干声近讲，无音乐、混响或环境声。"
+    },
+    "Traitor": {
+      "note": "据点的翻译官（汉奸）。不走 Qwen 克隆——线上路由是 MiniMax speech-2.8-hd（见 productionRouting），本机网关直接烘。",
+      "minimaxVoiceId": "Chinese_gravelly_storyteller_nv1",
+      "minimaxParams": {
+        "emotion": "angry",
+        "speed": 1.05
+      },
+      "instruction": "四十来岁的中国男性，替日军传话的翻译官。中低音偏粗，喝问时端着借来的威风——音量大、字咬得重，但底子里有一点讨好主子的急切。华北口音的普通话。"
     }
   }
 }

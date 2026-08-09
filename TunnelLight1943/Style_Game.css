@@ -297,6 +297,9 @@ body.touchDevice #touchControls {
   transition: opacity 0.3s;
 }
 body.touchDevice #touchControls.dimmed { opacity: 0.28; }
+/* 划线那一拍：整张特写卡就是操作面，摇杆和按钮全让开（那一拍走不动路，
+   留着只会把落在小臂上的手指截走） */
+body.touchDevice #touchControls.gone { display: none; }
 /* 摇杆：一个盘子 + 一个跟着手指走的钮。走路是横推，爬梯下地道是竖推——
    两个动作共用一根拇指，右手就只剩蹲和动手两个键。 */
 #stick {
@@ -474,6 +477,14 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 #controlsNote dd { font-size: 12.5px; color: var(--dim); }
 .titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
 
+/* 历史战争暴力内容提示（关卡设计文档要求）：小字，不抢标题 */
+#titleScreen .contentNote {
+  margin-top: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: rgba(196, 178, 138, 0.52);
+}
+
 @media (max-width: 700px) {
   #chapterList { grid-template-columns: repeat(2, 1fr); }
   #objectivePanel { max-width: 62vw; }
@@ -563,7 +574,38 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   /* #hud 整层是 pointer-events:none，只给 button 开了例外——
      不在这儿显式开，面板里的滑块永远拖不动（触屏上尤其明显）。 */
   pointer-events: auto;
+  /* 面板比可视区高的时候要能滚。横屏手机上一定会高：三条滑块 + 署名 + 调试入口
+     加起来就超过 390px 的屏高，「调试 · 跳到第 N 幕」那一行永远够不着。
+     #hud 是 inset:0，所以百分比就是可视区高；减掉顶上那 60px 让位给齿轮，
+     底下留 16px 余地，安全区两头都扣掉。 */
+  max-height: calc(100% - 76px
+    - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  /* 滚到头别把滚动手势甩给外层（触屏上会连带把整页拽动） */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 190, 140, 0.34) transparent;
+  /* 底下还有内容，得看得出来——滚动条是 overlay 的，不滚就不露面，
+     于是面板看着像"到此为止"。经典的 scroll-shadow：跟着内容走的那层（local）
+     是块跟面板同色的盖板，钉在容器上的那层（scroll）是阴影；没滚到底时盖板
+     还在视野外，阴影就露出来，滚到底盖板正好压上去，阴影自己消失。 */
+  background-image:
+    linear-gradient(to top, rgba(16, 13, 10, 0.96), rgba(16, 13, 10, 0)),
+    linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size: 100% 20px, 100% 15px;
+  background-position: bottom, bottom;
+  background-attachment: local, scroll;
 }
+/* 滚动条也按面板的调子来：细、暗、不抢眼 */
+#settingsPanel::-webkit-scrollbar { width: 6px; }
+#settingsPanel::-webkit-scrollbar-track { background: transparent; }
+#settingsPanel::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(214, 190, 140, 0.3);
+}
+#settingsPanel::-webkit-scrollbar-thumb:hover { background: rgba(214, 190, 140, 0.5); }
 #settingsPanel[hidden] { display: none; }
 #settingsPanel h4 {
   margin: 0 0 10px;
@@ -696,55 +738,8 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
   22% { transform: scale(1.9); opacity: 1; }
   40% { transform: scale(1); opacity: 0.85; }
 }
-/* ---------------------------------------------------------------------------
-   拖动 QTE 轨道（刨料用；划线已改成直接攥画面里那支笔，不走这条）。
-   旋钮跟着进度走，走到头这一趟就完了。桌面按住 E 左右推，触屏直接拖。
-   --------------------------------------------------------------------------- */
-#scribeGuide {
-  position: absolute; left: 0; right: 0; bottom: 16%;
-  margin-inline: auto;
-  width: min(340px, 62vw);
-  pointer-events: none;
-  text-align: center;
-}
-#scribeGuide .track {
-  position: relative; height: 10px;
-  border-radius: 999px;
-  background: rgba(10, 8, 6, 0.6);
-  border: 1px solid rgba(226, 196, 132, 0.42);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-}
-#scribeGuide .fill {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: var(--fill, 0%);
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(226, 196, 132, 0.5), rgba(247, 221, 154, 0.85));
-  transition: width 70ms linear;
-}
-#scribeGuide .knob {
-  position: absolute; top: 50%; left: var(--fill, 0%);
-  transform: translate(-50%, -55%);
-  font-size: 21px; line-height: 1; color: #f7dd9a;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
-  transition: left 70ms linear;
-}
-/* 还没动起来时轻轻晃一下，告诉玩家该拖它 */
-#scribeGuide.idle .knob { animation: scribeNudge 1.5s ease-in-out infinite; }
-@keyframes scribeNudge {
-  0%, 100% { transform: translate(-50%, -55%); }
-  50% { transform: translate(calc(-50% + 9px), -55%); }
-}
-/* 刨子推到头了：该往回拖。轨道退成暗的，旋钮反着晃——方向自己会说 */
-#scribeGuide.back .fill { background: rgba(226, 196, 132, 0.22); }
-#scribeGuide.back .knob { animation: scribeNudgeBack 1.1s ease-in-out infinite; }
-@keyframes scribeNudgeBack {
-  0%, 100% { transform: translate(-50%, -55%); }
-  50% { transform: translate(calc(-50% - 11px), -55%); }
-}
-#scribeGuide .tip {
-  margin-top: 9px; font-size: 13px; letter-spacing: 0.16em; color: #e8dcbc;
-  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
-}
+/* 做功的节拍没有 HUD 轨道（禁 slider）：这里曾有一块 #scribeGuide 拖动
+   QTE 轨道的样式（轨道+旋钮+提示行），随交互一并拆除，别加回来。 */
 
 /* ---------------------------------------------------------------------------
    调试面板：跳到任意一章的任意一幕。白盒期的开发工具，故意做成等宽字 + 冷灰，

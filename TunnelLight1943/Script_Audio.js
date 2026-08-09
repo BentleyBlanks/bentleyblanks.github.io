@@ -16,7 +16,9 @@
 // 可选 CreateAudio({ context }) 注入自带的 AudioContext —— 只给离线测试用，
 // 注入时不起 setInterval，排程完全由 Update() 驱动。
 
-import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs?v=026";
+// 版本戳由 index.html 的 import map 统一盖：这儿自己写一个 ?v= 会让同一个模块
+// 被两个 URL 各加载一份（实测过：Data_AudioMix 同时出现 v=042 和 v=026）
+import { AUDIO_BUS_BASE } from "./Data_AudioMix.mjs";
 
 const FADE = 2.5;          // mood 交叉淡入淡出时长（秒）
 const LOOKAHEAD = 0.4;     // 排程视野：足够盖住一次 tick，又不至于让 mood 切换迟钝
@@ -934,6 +936,39 @@ function Build(ac, options) {
     // 投掷破空：很短的一瞬风声
     whoosh(t, k, pan) {
       NoiseHit(t, { level: 0.07 * k, attack: 0.015, decay: 0.16, freq: 1300, sweep: 2800, q: 0.8, pan });
+    },
+    // 挎斗摩托的单缸引擎：低频锯齿被 8Hz 方波斩成"突突突"，一挂四秒——
+    // 不用几十个独立音头（会把 VOICE_CAP 吃光），三个节点搞定一整段
+    motorPutt(t, k, pan, r) {
+      if (Full()) return;
+      const dur = 4.2;
+      const o = ac.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(52 * r, t);
+      o.frequency.linearRampToValueAtTime(44 * r, t + dur);   // 减油门，转速掉一点
+      const chop = ac.createOscillator();
+      chop.type = "square";
+      chop.frequency.setValueAtTime(8.4 * r, t);
+      chop.frequency.linearRampToValueAtTime(7.2 * r, t + dur);
+      const chopAmt = ac.createGain();
+      chopAmt.gain.value = 0.5;
+      const g = ac.createGain();
+      AD(g.gain, t, 0.085 * k, 0.5, dur);
+      chop.connect(chopAmt); chopAmt.connect(g.gain);          // 斩波调幅
+      const lp = ac.createBiquadFilter();
+      lp.type = "lowpass"; lp.frequency.value = 420; lp.Q.value = 0.8;
+      o.connect(lp); lp.connect(g);
+      const tail = Out(g, sfxBus, pan);
+      o.start(t); chop.start(t);
+      Spawn([o, chop, chopAmt, lp, g, ...tail], [o, chop], t + dur + 0.3);
+    },
+    // 自行车铃：伪军拇指拨出来的两声脆响——基音+泛音各一，隔 0.18s 再来一遍
+    bikeBell(t, k, pan, r) {
+      for (const dt of [0, 0.18]) {
+        Tone(t + dt, { level: 0.06 * k, attack: 0.001, decay: 0.42, type: "sine", freq: 2350 * r, pan });
+        Tone(t + dt, { level: 0.028 * k, attack: 0.001, decay: 0.22, type: "sine", freq: 3540 * r, pan });
+        NoiseHit(t + dt, { level: 0.02 * k, attack: 0.001, decay: 0.03, type: "highpass", freq: 4200, q: 1, pan });
+      }
     },
     // 翻越起手：两只手掌拍在柴垛顶沿上，柴棍互相一错——落地是另一条 cue，
     // 因为脚落地比动作结束早，声音得跟着脚走

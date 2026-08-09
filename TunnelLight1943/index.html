@@ -14,12 +14,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=035">
+  <link rel="stylesheet" href="./Style_Game.css?v=052">
+  <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
+       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
+       它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
+       新 Main 不再发 dragX、旧 Core 只认 dragX，于是刨子怎么拖都不动；而旧 Core
+       写的 dragTrack 又没有元素接（新 index.html 已删），连那根轨道都不出来。
+       桌面一刷新就好，手机 Safari 的模块缓存黏得多——所以只在移动端复现。
+       修法：用 import map 把每一个第一方模块重映射到带版本的 URL。版本只写在
+       这一张表里（连同上面的 Style_Game.css 与下面的 Script_Main.js 一起改），
+       谁 import 谁都拿到同一个带戳的 URL，模块实例仍然只有一份。
+       **新增模块必须登记在这里**，否则它又会独自留在缓存里；源码里则一律不许
+       再自己写 ?v=（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
+       TestModuleGraphIsCacheBusted 盯着。 -->
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+
+        "./Script_Core.mjs": "./Script_Core.mjs?v=052",
+        "./Script_World.js": "./Script_World.js?v=052",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=052",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=052",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=052",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=052",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=052",
+        "./Script_Audio.js": "./Script_Audio.js?v=052",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=052",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=052",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=052",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=052"
       }
     }
   </script>
@@ -77,12 +102,8 @@
          照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
          （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
     <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
-    <!-- 划线那一拍没有 HUD：玩家攥的是画面里那支石笔本身。
-         刨料仍走这条拖动 QTE 轨道（state.dragTrack 驱动） -->
-    <div id="scribeGuide" hidden>
-      <div class="track"><i class="fill"></i><span class="knob">✎</span></div>
-      <p class="tip">顺着木纹，一推到底</p>
-    </div>
+    <!-- 做功的节拍没有 HUD 轨道（禁 slider）：划线攥特写卡上那支笔，
+         刨料攥世界里那把刨子。这里曾有一条 #scribeGuide 拖动轨道，已拆。 -->
     <!-- 手势提示：转辘轳（绕圈）/ 打结（绕圈）/ 勒紧（下拽）的动效小图标，
          纯 CSS 循环动画，data-kind 切换 -->
     <div id="gestureHint" hidden aria-hidden="true"><i class="gDot"></i></div>
@@ -187,9 +208,10 @@
         <div><dt>M</dt><dd>开关声音（旁白 / 音效 / 配乐）</dd></div>
       </dl>
       <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
+      <p class="contentNote">本作依据抗战史实创作，包含日军针对平民的战争暴行场景（不含血腥特写）。</p>
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=035"></script>
+<script type="module" src="./Script_Main.js?v=052"></script>
 </body>
 </html>

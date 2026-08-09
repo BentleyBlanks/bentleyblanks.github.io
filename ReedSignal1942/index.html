@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101a1b">
+  <meta name="description" content="《苇声：1942 · 最后一次点名》是一款原创的抗战敌后背景3D横版潜行解谜游戏。借光、声、队伍纪律与水利地形，护送六名孩子穿过封锁线。">
+  <meta property="og:title" content="苇声：1942 · 最后一次点名">
+  <meta property="og:description" content="没有攻击键。让风掩住脚步，让每个名字都得到回应。">
+  <meta property="og:url" content="https://bentleyblanks.github.io/ReedSignal1942/">
+  <title>苇声：1942 · 最后一次点名</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260808z24">
+</head>
+<body>
+  <main id="GameShell" aria-label="苇声1942横版叙事解谜游戏">
+    <canvas id="GameCanvas" tabindex="0" aria-label="横版游戏画面。A、D移动，S蹲伏，空格跳跃，E互动，F让队伍等待或跟随。"></canvas>
+    <div class="filmGrain" aria-hidden="true"></div>
+    <div id="DangerWash" class="dangerWash" aria-hidden="true"></div>
+
+    <section id="LoadingScreen" class="loadingScreen" aria-live="polite">
+      <div class="loadingMark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <p id="LoadingText">正在让雾、灯与芦苇落到这片土地上……</p>
+    </section>
+
+    <section id="TitleScreen" class="fullScreen titleScreen isVisible" aria-labelledby="GameTitle">
+      <article class="titleCopy">
+        <p class="eyebrow">原创 3D 横版潜行解谜 · 冀中敌后</p>
+        <h1 id="GameTitle"><span>苇声</span><small>1942</small></h1>
+        <p class="subtitle">最后一次点名</p>
+        <blockquote>“点名不是数数，<br>是确认每个人都还在。”</blockquote>
+        <div class="titleActions">
+          <button id="StartButton" class="primaryButton" type="button"><span>从空教室出发</span><small>约 18—25 分钟</small></button>
+          <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续上次的路</button>
+          <button id="HistoryButton" class="textButton" type="button">史实边界与创作说明</button>
+        </div>
+        <p class="titleNote">无攻击键 · 自动检查点 · 支持键盘与触屏</p>
+      </article>
+    </section>
+
+    <section id="IntroScreen" class="fullScreen introScreen" aria-live="polite" hidden>
+      <article>
+        <p id="IntroDate" class="eyebrow"></p>
+        <p id="IntroNumber" class="chapterNumber"></p>
+        <h2 id="IntroTitle"></h2>
+        <div id="IntroCopy" class="introCopy"></div>
+        <p id="IntroThesis" class="introThesis"></p>
+        <button id="EnterChapterButton" class="primaryButton" type="button">走进这一夜</button>
+      </article>
+    </section>
+
+    <header id="GameHeader" class="gameHeader" hidden>
+      <button id="PauseButton" class="iconButton" type="button" aria-label="暂停"><i></i><i></i></button>
+      <div class="chapterStamp"><small id="HudChapterNumber"></small><strong id="HudChapterTitle"></strong></div>
+      <button id="SoundButton" class="iconButton soundButton" type="button" aria-label="静音"><i></i><i></i><i></i></button>
+    </header>
+
+    <aside id="ObjectiveCard" class="objectiveCard" hidden>
+      <small>此刻要做的事</small>
+      <p id="ObjectiveText"></p>
+      <span id="ObjectiveCount"></span>
+    </aside>
+
+    <aside id="WindCard" class="windCard" hidden>
+      <small>苇梢</small>
+      <div><i id="WindNeedle"></i><span id="WindFill"></span></div>
+      <p id="WindText">风在积起来</p>
+    </aside>
+
+    <aside id="SuspicionCard" class="suspicionCard" hidden aria-label="巡逻警觉">
+      <small>巡逻在听</small>
+      <div><span id="SuspicionFill"></span></div>
+    </aside>
+
+    <aside id="TeamCard" class="teamCard" hidden>
+      <small>队伍</small>
+      <div id="TeamDots" aria-label="孩子人数"></div>
+      <p id="TeamState">跟紧</p>
+    </aside>
+
+    <div id="InteractionPrompt" class="interactionPrompt" hidden>
+      <kbd>E</kbd><p><strong id="InteractionLabel"></strong><small id="InteractionHint">按住完成</small></p>
+      <i><span id="InteractionProgress"></span></i>
+    </div>
+
+    <section id="StoryCaption" class="storyCaption" aria-live="polite" hidden>
+      <span></span><p id="StoryText"></p>
+    </section>
+
+    <section id="CinematicOverlay" class="cinematicOverlay" aria-live="polite" hidden>
+      <i class="cinematicBar cinematicBarTop" aria-hidden="true"></i>
+      <div class="cinematicCopy">
+        <span aria-hidden="true"></span>
+        <p id="CinematicCaption"></p>
+        <button id="SkipCinematicButton" type="button" hidden>Esc / 点击略过</button>
+      </div>
+      <i class="cinematicBar cinematicBarBottom" aria-hidden="true"></i>
+    </section>
+
+    <section id="ChapterCompleteScreen" class="panelScreen" hidden aria-live="polite">
+      <article>
+        <p class="eyebrow">这一段路接上了</p>
+        <h2 id="CompleteTitle"></h2>
+        <blockquote id="CompleteLine"></blockquote>
+        <p id="CompleteCost"></p>
+        <button id="NextChapterButton" class="primaryButton" type="button">继续向北</button>
+      </article>
+    </section>
+
+    <section id="PauseScreen" class="panelScreen pauseScreen" hidden role="dialog" aria-modal="true" aria-labelledby="PauseTitle">
+      <article>
+        <p class="eyebrow">故事停在苇梢上</p>
+        <h2 id="PauseTitle">暂停</h2>
+        <button id="ResumeButton" class="primaryButton" type="button">继续</button>
+        <button id="RestartChapterButton" class="secondaryButton" type="button">重走本章</button>
+        <button id="PauseHistoryButton" class="secondaryButton" type="button">史实说明</button>
+        <button id="ReturnTitleButton" class="textButton" type="button">回到题页</button>
+      </article>
+    </section>
+
+    <section id="HistoryScreen" class="historyScreen" hidden role="dialog" aria-modal="true" aria-labelledby="HistoryTitle">
+      <article>
+        <header><div><p class="eyebrow">HISTORICAL FRAME</p><h2 id="HistoryTitle">真实历史不由玩家改写</h2></div><button id="CloseHistoryButton" type="button" aria-label="关闭">×</button></header>
+        <div class="historyLead">
+          <p id="HistoryBoundary"></p>
+          <p id="HistoryResponsibility"></p>
+        </div>
+        <div class="historyGrid">
+          <section><h3>哪些来自历史</h3><p>1942年冀中“五一大扫荡”及其后的封锁环境、沟墙与据点网络、水路盘查、群众转移，以及早期隐蔽洞并非万能工事。</p></section>
+          <section><h3>哪些是虚构</h3><p>苇河县、石桥村、北汊渡口及阿苇、周禾和六名学童均为复合创作；故事不复刻任何一位真实受害者的具体遭遇。</p></section>
+          <section><h3>玩法怎样表达</h3><p>评价不统计击杀。光、声、风、水闸和队伍纪律构成谜题；平民受难不转化为奖励或资源。</p></section>
+        </div>
+        <div><p class="sourceHeading">公开参考</p><ul id="SourceList" class="sourceList"></ul></div>
+        <button id="HistoryBackButton" class="primaryButton" type="button">明白了</button>
+      </article>
+    </section>
+
+    <section id="EndingScreen" class="fullScreen endingScreen" hidden aria-labelledby="EndingTitle">
+      <div class="endingWater" aria-hidden="true"><span></span><span></span><span></span></div>
+      <article>
+        <p class="eyebrow">1942年6月8日 · 北汊外</p>
+        <h2 id="EndingTitle">最后一次点名</h2>
+        <p>船离开芦苇的阴影。天还没有全亮。</p>
+        <ol id="RollCallList" class="rollCallList"></ol>
+        <button id="RollCallButton" class="primaryButton" type="button">翻开点名簿</button>
+        <blockquote id="EndingQuote" hidden>
+          <span>“周禾老师——”</span>
+          <i>只有船桨碰水。阿苇等到最后，才把簿子合上。</i>
+          <strong>周禾添了第七行“阿苇”；阿苇添了第八行“周禾”。</strong>
+        </blockquote>
+        <p id="EndingHistory" class="endingHistory" hidden>这一次虚构的转移结束了，真实的抗战仍将继续三年。无数留下或没有留下姓名的人，共同保存了敌后的村庄、交通线与希望。</p>
+        <div id="EndingActions" class="endingActions" hidden>
+          <button id="RestartStoryButton" class="secondaryButton" type="button">重新出发</button>
+          <button id="EndingHistoryButton" class="textButton" type="button">重读史实边界</button>
+        </div>
+      </article>
+    </section>
+
+    <section id="ControlGuide" class="controlGuide" hidden>
+      <div><kbd>A</kbd><kbd>D</kbd><span>移动</span></div>
+      <div><kbd>S</kbd><span>蹲伏</span></div>
+      <div><kbd>Space</kbd><span>跃过矮障</span></div>
+      <div><kbd>E</kbd><span>行动 / 推</span></div>
+      <div><kbd>F</kbd><span>队伍等待 / 跟随</span></div>
+    </section>
+
+    <div id="TouchControls" class="touchControls" hidden>
+      <div class="touchMove">
+        <button type="button" data-input="left" aria-label="向左">‹</button>
+        <button type="button" data-input="right" aria-label="向右">›</button>
+      </div>
+      <div class="touchActions">
+        <button type="button" data-input="crouch">蹲伏</button>
+        <button type="button" data-input="jump">越</button>
+        <button type="button" data-input="command">停 / 跟</button>
+        <button type="button" data-input="interact" class="touchPrimary">行动</button>
+      </div>
+    </div>
+
+    <div id="RotateNotice" class="rotateNotice"><span>↻</span><p>横放屏幕，能更早看见巡逻灯与下一处遮蔽。</p></div>
+  </main>
+
+  <noscript>本游戏需要 JavaScript 才能运行。</noscript>
+  <script type="importmap">
+    {"imports":{"three":"../TunnelBell1942/vendor/three/build/three.module.mjs"}}
+  </script>
+  <script type="module" src="./Script_Game.mjs?v=20260808z24"></script>
+</body>
+</html>
