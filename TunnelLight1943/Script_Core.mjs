@@ -155,6 +155,22 @@ const VAULT_DUR_BIG = 1.05;
 // 上下梯子。井有 3.6 米深（SURFACE_Y→UNDER_Y），按人爬梯子的真速度给时长：
 // 下去顺着重力快些，上来是费力气的活。**这段时间里人是在梯子上的**，
 // 高度由 p.lift 插值（见 MovePlayer 里的爬梯分支），不是换个层数就完事。
+// 扶稳门扇（第一场"修门"）。下门轴跳出臼窝，整扇吊在上轴上自己往外坠；
+// 玩家的手真的按在门板上，把它顶回门框正位，爹才使得上劲礅轴。
+// 数值都按一扇 1.83m 高、0.83m 宽的木门给。
+const DOOR_H = 1.50;         // 门扇高（米）＝ 手能按到的那一片有多长（对齐门框净空）
+const DOOR_SAG = 0.26;       // 撒手之后它歪到哪儿（弧度，约 15°，下沿外坠 0.47m）
+// 容差按"门下沿允许晃多少"定：±0.10 弧度 ≈ 下沿 ±18cm。
+// 别定得比操作还细——上一版 0.055 配一个凭空的换算臂，等于要玩家按像素对准。
+const DOOR_TOL = 0.10;
+const DOOR_GRAB_R = 0.62;    // 手落在门板上的判定半宽（半扇门 + 一点富余）
+const DOOR_SPEED = 1.05;     // 门跟手走的角速度上限（弧度/秒）——一扇木门，甩不动
+const DOOR_FALL = 0.62;      // 撒手之后往外坠的角速度
+const DOOR_KEY = 0.42;       // 键盘后备：按住 E 把门扶正的角速度
+// 这一拍必须推特写：默认跟随景别 12.6m 宽，一扇 0.83m 的门在手机上才 55 像素，
+// 又是"要按住它、还要稳住"的活——按不着也稳不住（刨子那次就是这么被退回的）
+const DOOR_CAM = { y: 1.15, hw: 2.6 };
+
 const CLIMB_DOWN = 1.5;
 const CLIMB_UP = 2.0;
 const LADDER_RUNG = 0.34;    // 横档间距：每挪过一档响一声，声音跟着人走
@@ -830,6 +846,90 @@ function StepChain(state, def, input, dt) {
       }
       return;
     }
+    // 扶稳门扇：**手真的按在那扇门上**，把它顶在门框正位，别让它往外坠。
+    //
+    // 下门轴从臼窝里跳出来了，整扇吊在上轴上、自己往外坠。爹蹲着两只手都在
+    // 礅那根轴，腾不出手扶门——所以这一下非得有第二双手不可。这就是这个玩法
+    // 存在的理由，也是开场那几镜要先演给玩家看的东西。
+    //
+    // 四条规矩（与全作拟物标准同源，见 CLAUDE.md）：
+    //   ① 得先按住门扇本身——手落在门板上才算攥住，画面别处拖一律不动；
+    //   ② 门有分量：跟手走但有速度上限（DOOR_SPEED），甩不动；
+    //   ③ 松手它就往外坠回去（DOOR_FALL），进度当场停住往回泄；
+    //   ④ 只有稳在正位（|lean| < DOOR_TOL）爹才使得上劲，work 才涨；歪出去
+    //      门磕在框上"咚"一声——不是失败，是"这一下没稳住"。
+    // 键盘后备：这活儿是**费力气**不是指尖功夫，所以按住 E 慢慢把门扶正是合法的
+    //（CLAUDE.md 第 5 条的判据），自动通关也走这条。
+    case "holdDoor": {
+      const dx = st.hingeX ?? st.zone.x;                       // 上门轴的 x（门框净空左沿）
+      const hingeY = SURFACE_Y + (st.hingeY ?? 1.54);          // 门楣下沿
+      if (b.lean === undefined) { b.lean = DOOR_SAG; b.work = 0; }
+      const near = InZone(p.x, lvl, st.zone);
+      if (!near) { state.prompt = ""; state.doorLeaf = { x: dx, hingeY: st.hingeY ?? 1.54, lean: b.lean, work: b.work, loose: true }; return; }
+
+      const pw = input.pointerWorld;
+      const held = !!input.pointerHeld && !!pw;
+      // 门扇此刻占的那一片（从上轴挂下来，随倾角摆过去）
+      // 门扇从上轴挂下来，随倾角整扇摆过去：手按在门板上的哪一格都算攥住
+      const down = Math.max(0, Math.min(1.05, (hingeY - (pw ? pw.y : 0)) / DOOR_H));
+      const leafX = dx + Math.sin(b.lean) * down * DOOR_H;
+      const onLeaf = !!pw && pw.y < hingeY + 0.25 && pw.y > SURFACE_Y - 0.2
+        && Math.abs(pw.x - leafX) < DOOR_GRAB_R;
+      if (held && !b.wasHeld) {
+        b.grabbed = !!onLeaf;
+        if (b.grabbed) {
+          b.refX = pw.x; b.refLean = b.lean;
+          // 攥在门板的哪一格就按哪一格算力臂：门跟着手走，不是跟着一个换算系数走
+          b.arm = Math.max(0.55, down * DOOR_H);
+          Cue(state, "pickup", { gain: 0.3 });
+        }
+      }
+      if (!held) b.grabbed = false;
+      b.wasHeld = held;
+
+      const prevLean = b.lean;
+      if (b.grabbed) {
+        const want = (b.refLean || 0) + (pw.x - b.refX) / (b.arm || 0.9);
+        const cap = DOOR_SPEED * dt;
+        b.lean += Math.max(-cap, Math.min(cap, want - b.lean));
+      } else if (input.interactHeld) {
+        b.lean -= Math.sign(b.lean) * Math.min(Math.abs(b.lean), DOOR_KEY * dt);   // 键盘后备
+      } else {
+        b.lean += Math.min(DOOR_FALL * dt, DOOR_SAG - b.lean);                     // 松手就往外坠
+      }
+      b.lean = Math.max(-0.12, Math.min(DOOR_SAG, b.lean));
+
+      // 磕框：往外坠到底、或者被甩回内侧撞上门框，都"咚"一声
+      const atStop = b.lean >= DOOR_SAG - 1e-4 || b.lean <= -0.12 + 1e-4;
+      if (atStop && !b.knocked && Math.abs(b.lean - prevLean) > 1e-4) {
+        b.knocked = true; Cue(state, "tenon", { gain: 0.8 });
+      } else if (!atStop) b.knocked = false;
+
+      const steady = Math.abs(b.lean) < DOOR_TOL;
+      if (steady) b.work = Math.min(1, b.work + dt / (st.seat ?? 1.6));
+      else b.work = Math.max(0, b.work - dt * 0.55);
+      state.promptFill = b.work;
+      state.prompt = st.prompt || "扶住门扇 · 别让它往外坠";
+      state.closeUp = { x: dx, y: SURFACE_Y + DOOR_CAM.y, hw: DOOR_CAM.hw };
+      // 爹在礅轴：稳住他才使得上劲
+      // 爹的手上要看得出在使劲：稳住了他就抡下去礅轴（swing），
+      // 门一歪他只能撑着等（kneel）。"dig" 不是 Rig 里的姿势名，写了等于没写。
+      const father = FindActor(state, "father");
+      if (father) father.pose = steady ? "swing" : "kneel";
+      state.doorLeaf = {
+        x: dx, hingeY: st.hingeY ?? 1.54, lean: b.lean, work: b.work, loose: true,
+        grabbed: !!b.grabbed, steady, reaching: held && !b.grabbed,
+      };
+      if (b.work >= 1) {
+        if (father) father.pose = "kneel";
+        state.doorLeaf = { x: dx, hingeY: st.hingeY ?? 1.54, lean: 0, work: 1, loose: false };
+        Cue(state, "tenon", { gain: 0.9 });
+        if (st.note) state.toast = { text: st.note, t: 3.4 };
+        ApplyUse(state, st);
+        finish();
+      }
+      return;
+    }
     case "throwHit": {
       if (state.thrown) return;
       const nearPile = Math.abs(p.x - st.pickupX) < 1.7 && lvl === "surface";
@@ -1490,7 +1590,33 @@ export const SCRIPTS = {
             state.player.cineWalk = { x: 35.4, speed: 1.6 };
           } },
         { who: "娘", say: "回来才三天，手还没合口呢。", d: 3.4, cam: { kind: "shot", x: 32.5, y: 1.5, dist: 6 } },
-        { who: "爹", say: "再晃两夜，门就合不上了。", d: 3.4, cam: { kind: "shot", x: 33.5, y: 1.3, dist: 5.5 } },
+        // 「门为什么要修」得**演出来**，不能只靠爹那一句台词——玩家上一版
+        // 就是没看懂为什么要扶门，觉得那个互动是凭空冒出来的。
+        // 三镜：门自己在晃（下轴脱了窝）→ 爹一个人扶不住（它又坠回去）→
+        // 他抬头看柱子。到这儿"要第二双手"这件事已经立住了，玩法接得上。
+        { stage: "", d: 3.2, cam: { kind: "shot", x: 34.2, y: 1.35, dist: 2.6 },
+          on: (state) => {
+            // 推到门跟前：下轴跳出臼窝，整扇吊在上轴上晃
+            state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: DOOR_SAG, loose: true, swing: true };
+            Cue(state, "tenon", { gain: 0.6 });
+          } },
+        { stage: "门轴从臼窝里跳了出来。风一过，那扇门就磕在框上。", d: 4.0,
+          cam: { kind: "shot", x: 34.2, y: 1.35, dist: 2.8 } },
+        { stage: "", d: 3.6, cam: { kind: "shot", x: 33.8, y: 1.4, dist: 3.4 },
+          on: (state) => {
+            // 爹伸手把门托回正位——托到一半，手上没劲，门又坠回去
+            const father = FindActor(state, "father");
+            if (father) { father.x = 33.5; father.heading = 1; father.pose = "push"; }
+            state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: DOOR_SAG, loose: true, swing: false, tryLift: true };
+          } },
+        { who: "爹", say: "再晃两夜，门就合不上了。", d: 3.4, cam: { kind: "shot", x: 33.5, y: 1.3, dist: 5.5 },
+          on: (state) => {
+            const father = FindActor(state, "father");
+            if (father) father.pose = "kneel";
+            state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: DOOR_SAG, loose: true, swing: true };
+          } },
+        { who: "爹", say: "过来搭把手——你扶住，我把轴礅回去。", d: 3.6,
+          cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 } },
       ],
     },
     {
@@ -1504,8 +1630,11 @@ export const SCRIPTS = {
       },
       steps: [
         { type: "goto", zone: { x: 34.2, w: 2.2 } },
-        { type: "use", zone: { x: 34.2, w: 2.4 }, prompt: "E · 扶稳门扇",
-          effect: (state) => { Cue(state, "tenon", { gain: 0.7 }); } },
+        // 扶门不是按一下就完事：门自己往外坠，得攥着它顶住，爹才礅得进那根轴
+        { type: "holdDoor", zone: { x: 34.2, w: 2.6 }, hingeX: 33.75, hingeY: 1.54, seat: 1.7,
+          prompt: "扶住门扇 · 别让它往外坠",
+          note: "轴头咬进臼窝里了。爹松开手，门自己站住了。",
+          effect: (state) => { state.flags.doorSeated = true; } },
         { type: "pickup", x: 31.9, item: { id: "wedge", label: "木楔" }, prompt: "E · 拿起木楔" },
         { type: "use", zone: { x: 34.2, w: 2.4 }, needs: "wedge", prompt: "E · 递过木楔",
           effect: (state) => { Cue(state, "tenon"); } },
@@ -3788,6 +3917,7 @@ export function CreateGame(chapterIndex = 0) {
     // 铺满画框、每帧重画的手绘活卡：做功的那两拍都长在卡上
     scribeCard: null,      // 划线（见 StepScribe）
     planeCard: null,       // 刨料（见 StepPlane）
+    doorLeaf: null,        // 那扇会晃的家门（过场里演、玩法里扶）
     spotFlash: null,
     irisFocus: null,
     pip: null,
@@ -3915,6 +4045,7 @@ export function StartChapter(state, index) {
     state.flags.planedOnce = false;
     // 新版第一章的旗标（修门/定向/刨盖板/修井绳/榆钱/挖通道/藏粮/余波修复）
     state.flags.doorFixed = false;
+    state.flags.doorSeated = false;
     state.flags.ropeStaked = false;
     state.flags.coverPlaned = false;
     state.flags.wellRopeFixed = false;
@@ -4050,6 +4181,7 @@ function AdvanceBeat(state) {
   state.scribe = null;
   state.scribeCard = null;
   state.planeCard = null;
+  state.doorLeaf = null;
   state.throwAim = null;
   state.sling = null;
   if (state.beatIndex >= CurrentScript(state).length) EndChapter(state);
@@ -4235,6 +4367,29 @@ export function StepGame(state, input, dt) {
   if (state.spotFlash && (state.spotFlash.t -= dt) <= 0) state.spotFlash = null;
   // 飘落的刨花：渲染层拿它跑一段自由落体，落到地上就并进那堆里
   if (state.planeCurl && (state.planeCurl.t += dt) > 1.8) state.planeCurl = null;
+  // 过场里那扇门自己动：swing=风一过就磕框，tryLift=爹一个人往上托、托不住又坠回去。
+  // 玩法段的门由 holdDoor 每帧重写 doorLeaf，不走这儿。
+  if (state.doorLeaf && (state.doorLeaf.swing || state.doorLeaf.tryLift)) {
+    const d = state.doorLeaf;
+    d.t = (d.t || 0) + dt;
+    if (d.swing) {
+      // 越晃越小的摆，到底磕一下
+      const a = Math.exp(-d.t * 0.5) * 0.055;
+      const prev = d.lean;
+      d.lean = DOOR_SAG - Math.abs(Math.sin(d.t * 2.6)) * a * 2;
+      if (prev !== undefined && d.lean >= DOOR_SAG - 1e-3 && prev < DOOR_SAG - 1e-3) {
+        Cue(state, "tenon", { gain: 0.45 });
+      }
+    } else {
+      // 托起来（0→0.9 秒）→ 手上没劲，坠回去（0.9→1.8 秒），循环
+      const k = (d.t % 1.9) / 1.9;
+      const lift = k < 0.47 ? (k / 0.47) : Math.max(0, 1 - (k - 0.47) / 0.42);
+      const e = lift * lift * (3 - 2 * lift);
+      d.lean = DOOR_SAG * (1 - e * 0.82);
+      if (k > 0.9 && !d.thud) { d.thud = true; Cue(state, "tenon", { gain: 0.7 }); }
+      if (k < 0.1) d.thud = false;
+    }
+  }
   // 后果小窗到时收起；onEnd 给"看完这一眼之后"的收尾用（娘接着锄地）
   if (state.pip && (state.pip.t -= dt) <= 0) {
     const done = state.pip;
@@ -6023,6 +6178,8 @@ export function GetBeatTarget(state) {
           return typeof gx === "number" ? { action: "interactAt", x: gx, level: "surface" } : null;
         }
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
+        // 扶门是"费力气"的活，留了按住 E 的后备（CLAUDE.md 第 5 条），驱动器走它
+        case "holdDoor": return { action: "holdAt", x: st.zone.x, level: st.zone.level || "surface" };
         // 接绳没有长按后备（用户明令删掉），驱动器只能**真的顺着绳拖**——
         // 所以把绳子的那条路（世界坐标）整条交出去，自动通关照着走一遍。
         // 删后备就必须同时给驱动器一条真输入的路，漏了这一步会当场卡死。
