@@ -1075,6 +1075,56 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
         { amp: 0.3 * S, lw: 1.1 * S });
     }
     InkLine(ctx, 0, -10 * S, 0, 9 * S, "fcString", { lw: 1 * S, color: "#6b5a3f", amp: 1.6 });
+  } else if (label === "包袱布" || label === "榆钱包袱") {
+    // 妹妹那个包袱：**旧衣襟改的**，不是花头巾（历史口径——补丁衣裤的孩子
+    // 不会有装饰性的花布）。四角在上头挽一个结，兜底鼓着一小包榆钱。
+    // 这件东西第十一场要被兵一把夺走、抖空——所以它得先在画面上是个"东西"
+    const full = label === "包袱布";
+    // 尺寸按实物量：一个孩子抱得住的小包袱，兜口一拃出头——**约 0.26m**，
+    // 也就是半径 4.2 个绘制单位（S=1.5，PPM=48）。第一版按 8.5 画，上屏是
+    // 直径半米多的一坨，比妹妹的脑袋还大
+    const R = 4.2;
+    if (full) {
+      // 兜满榆钱：底下鼓成一个囊，四角在顶上挽成结
+      InkFill(ctx, [[-R * S, -0.5 * S], [-0.64 * R * S, -2.7 * S], [0, -3.3 * S], [0.64 * R * S, -2.7 * S], [R * S, -0.5 * S],
+        [0.82 * R * S, 2.7 * S], [0, 4.1 * S], [-0.82 * R * S, 2.7 * S]],
+        "bundleCloth", "#b0a084", { amp: 0.6 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.2)" });
+      // 榆钱把布顶出来的那几道起伏（不是圆点，是布面上的鼓包）
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, (-2.4 + i * 1.7) * S, (1.2 + (i % 2) * 0.7) * S, (-1.2 + i * 1.7) * S, (2.2 + (i % 2) * 0.6) * S,
+          "bundleBump" + i, { lw: 0.8 * S, color: "rgba(120,100,66,0.55)", amp: 1 });
+      }
+    } else {
+      // 抖空之后：软塌塌一片，没有了兜
+      InkFill(ctx, [[-R * S, -0.5 * S], [-0.6 * R * S, -2.3 * S], [0, -2.8 * S], [0.6 * R * S, -2.3 * S], [R * S, -0.5 * S],
+        [0.6 * R * S, 1.1 * S], [0, 1.5 * S], [-0.6 * R * S, 1.1 * S]],
+        "bundleLimp", "#b0a084", { amp: 0.8 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.16)" });
+    }
+    // 顶上挽的结：两个布角朝两边翘出去——这一笔是"包袱"与"一块布"的分界
+    InkFill(ctx, [[-0.9 * S, -2.8 * S], [-3.2 * S, -5.2 * S], [-1.1 * S, -4.2 * S], [0, -5.3 * S],
+      [1.1 * S, -4.2 * S], [3.2 * S, -5.2 * S], [0.9 * S, -2.8 * S]],
+      "bundleKnot", "#a08e70", { amp: 0.5 * S, lw: 1.1 * S, shade: "rgba(0,0,0,0.14)" });
+    // 旧衣襟的出身：一道原来的缝边 + 一块补丁
+    InkLine(ctx, -3 * S, -1.1 * S, 3 * S, -0.8 * S, "bundleSeam", { lw: 0.7 * S, color: "rgba(96,78,52,0.5)", amp: 0.8 });
+    InkFill(ctx, Rect(1.2 * S, -0.6 * S, 1.8 * S, 1.5 * S), "bundlePatch", "#98876a", { amp: 0.35 * S, lw: 0.8 * S });
+  } else if (label === "旧门板") {
+    // 拆下来的旧门板：一长条，带着横撑的榫痕和门轴那头的两个钉眼。
+    // 从通用兜底（一条光板子）里拎出来单画，是因为它在第八场要被扛进地道、
+    // 举起来顶住洞顶——观众得看得出那是**一扇门拆下来的**，不是一根方木
+    InkFill(ctx, Rect(-26 * S, -3.4 * S, 52 * S, 6.8 * S), "oldPlank", "#a8794a",
+      { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.16)" });
+    InkLine(ctx, -24 * S, 0.2 * S, 24 * S, -0.2 * S, "oldPlankGrain",
+      { lw: 0.9 * S, color: "rgba(90,60,35,0.7)", amp: 1.4 });
+    for (let i = 0; i < 2; i += 1) {
+      InkLine(ctx, (-14 + i * 28) * S, -3.4 * S, (-14 + i * 28) * S, 3.4 * S, "oldPlankTenon" + i,
+        { lw: 1.3 * S, color: "rgba(60,40,20,0.55)", amp: 0.8 });
+    }
+    for (let i = 0; i < 2; i += 1) {
+      ctx.beginPath();
+      ctx.arc((-21 + i * 5) * S, 0, 1.1 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(44,28,14,0.65)";
+      ctx.fill();
+    }
   } else if (label === "襁褓") {
     // 裹着的婴儿：一小卷布，一头略鼓（头）。补丁色——刘家的日子写在布上
     InkFill(ctx, [[-8 * S, 2 * S], [-9 * S, -2.6 * S], [-5 * S, -5 * S], [5 * S, -4.6 * S], [9 * S, -1 * S], [6 * S, 3.4 * S]],
@@ -3953,6 +4003,63 @@ export function DrawCrudeTimber(ctx, x, topY, botY, id, { scale = 1 } = {}) {
     InkFill(ctx, Rect(-4 * scale, -H * 0.5, 8 * scale, H * 0.52), id + "B", dark,
       { amp: 1.4 * scale, lw: 2 * scale });
     ctx.restore();
+  }
+}
+
+// 玩家亲手支上去的那一处：一块旧门板横顶在松土段的洞顶上，底下两根短立柱
+// 撑住，缝里塞了楔子。跟 DrawCrudeTimber（成气候的坑道支撑）分开画是因为
+// 这是**第一条短通道**：料只有两块拆下来的旧门板，撑的是刚掏开、净高不到
+// 一米的爬行段——柱子矮、板子带着门轴痕和钉眼，一眼看得出是从门上拆下来的。
+export function DrawTunnelBrace(ctx, ax, ay, w, h, id) {
+  // 配色比别的木件压两档：地道里本来就暗，而 CanvasTexture 这条管线还会把整张
+  // 贴图整体提亮（见项目记忆里那条"画面发白"）——按平常的木色画，顶木会和
+  // 土壁糊成一片，A/B 对比才看得出多了一根（第一版就是这么白瞎的）
+  const wood = "#6d4c26";
+  const post = "#59401f";
+  // 顶板：整块门板横着顶上去，右端略低（人是一头一头顶上去的，顶不平）
+  const tilt = (Hash(id + "tl") - 0.5) * 0.06;
+  ctx.save();
+  ctx.translate(ax, ay - h + 7);
+  ctx.rotate(tilt);
+  InkFill(ctx, Rect(-w / 2, -7, w, 13), id + "top", wood,
+    { amp: 1.3, lw: 2.6, shade: "rgba(0,0,0,0.3)" });
+  // 板底下压一道暗边：顶木的上沿正抵在洞顶那条墨线上，不给它一条自己的影子，
+  // 两条线并在一起，"多了一根木头"就读不出来
+  InkLine(ctx, -w / 2 + 2, 7, w / 2 - 2, 7, id + "sh", { lw: 3.2, color: "rgba(26,16,6,0.55)", amp: 1 });
+  // 板面上一道亮茬（新刨过的那一面朝下），跟发暗的土壁拉开一档
+  InkLine(ctx, -w / 2 + 5, -3.5, w / 2 - 5, -3.5, id + "hl", { lw: 2, color: "rgba(198,164,112,0.45)", amp: 1.2 });
+  // 门板的出身：一道横撑的榫痕 + 两个钉眼
+  InkLine(ctx, -w * 0.22, -3, -w * 0.22, 8, id + "ten", { lw: 1.5, color: "rgba(56,36,18,0.6)", amp: 1.2 });
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-w * 0.3 + i * w * 0.52, 1.5, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(44,28,14,0.7)";
+    ctx.fill();
+  }
+  ctx.restore();
+  // 两根短立柱：一根直一根歪（这活儿是跪在洞里干的，正不了）
+  for (let i = 0; i < 2; i += 1) {
+    const sx = ax + (i ? 1 : -1) * (w * 0.36);
+    const lean = (i ? -1 : 1) * (0.05 + Hash(id + "ln" + i) * 0.07);
+    ctx.save();
+    ctx.translate(sx, ay);
+    ctx.rotate(lean);
+    InkFill(ctx, Rect(-6, -(h - 6), 12, h - 6), id + "p" + i, post,
+      { amp: 1.2, lw: 2.6, shade: "rgba(0,0,0,0.34)" });
+    ctx.restore();
+    // 楔子：柱头和顶板之间打进去的那一小块（"顶实了"就在这一笔上）
+    ctx.save();
+    ctx.translate(sx, ay - h + 12);
+    InkFill(ctx, [[-6, 0], [6, -2], [4, -6], [-5, -5]], id + "w" + i, "#a07c4d", { amp: 0.7, lw: 1.7 });
+    ctx.restore();
+  }
+  // 板背后被压住的那片松土：撒下来的浮土堆在柱脚
+  for (let i = 0; i < 5; i += 1) {
+    const px = ax - w * 0.4 + Hash(id + "d" + i) * w * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(px, ay - 1, 4 + Hash(id + "dr" + i) * 5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(74,52,30,0.5)";
+    ctx.fill();
   }
 }
 

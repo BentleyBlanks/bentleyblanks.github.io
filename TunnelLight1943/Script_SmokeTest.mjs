@@ -1764,6 +1764,70 @@ function TestConvoyKeepsFormation() {
 
 // 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
 // 顺带盯背景层乡亲跟着警讯收工——街上空了字幕说过一次，画面得对上。
+// 接触戏：动手的和挨手的必须在**一臂之内**。
+//
+// 第十一场（搜家）第一版是"谁也没碰谁"：抡枪托的兵站在三米开外，妹妹在另一头
+// 自己倒下去；扇耳光借了抡枪托的轨道；夺包袱只有一行 carry = null。横版里
+// 接触全靠间距演——隔着三米抡得再狠，画面上也是两个人各做各的操。
+// 这条断言逐帧盯着：只要有人起了"动手"的轨道，一臂之内就必须有个正在挨的人。
+function TestContactStagingIsCloseEnough() {
+  const NONE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+  // 施 → 受：谁抡起来，就得有谁在挨
+  const HITTERS = ["slap", "kickGut", "buttStrike", "snatchGrab", "shovePush", "bayonetThrust"];
+  const TAKERS = ["slappedFall", "gutFold", "struckFall", "snatchLose", "shovedBack", "pressedStruggle", "clutchArm", "heldBack"];
+  const REACH = 1.15;    // 半个身位 + 一条胳膊；再远就该先走过去
+  const bad = [];
+  for (const id of ["c1_roster", "c1_search"]) {
+    const state = CreateGame(0);
+    const list = ChapterBeatList(0);
+    DebugJump(state, 0, list.findIndex((b) => b.id === id));
+    for (let i = 0; i < 4000; i += 1) {
+      StepGame(state, NONE, DT);
+      if (CurrentBeatDef(state)?.id !== id) break;
+      const actors = [...state.actors, { id: "player", ...state.player }];
+      for (const a of actors) {
+        if (!a.track || !HITTERS.includes(a.track.name)) continue;
+        // 刺刀那一拍打的是手上的襁褓，没有第二个演员——不在这条规矩里
+        if (a.track.name === "bayonetThrust") continue;
+        const near = actors.some((b) => b !== a && b.track && TAKERS.includes(b.track.name)
+          && Math.abs(b.x - a.x) <= REACH);
+        if (!near) {
+          const who = actors.filter((b) => b !== a && b.track && TAKERS.includes(b.track.name))
+            .map((b) => `${b.id}@${b.x.toFixed(1)}`).join(",") || "没人在挨";
+          bad.push(`${id}: ${a.id}@${a.x.toFixed(1)} 起了 ${a.track.name}，${who}`);
+        }
+      }
+      if (bad.length) break;
+    }
+  }
+  assert.deepEqual(bad.slice(0, 3), [], `接触戏必须站到一臂之内再动手：\n  ${bad.slice(0, 3).join("\n  ")}`);
+  console.log("  ✓ 接触戏一臂之内（扇耳光/踹/砸/夺 都真的够得着）");
+}
+
+// 支顶木：撑完了地道里必须**真的多出一根木头**。
+// 老版把 bracedA/bracedB 两个旗标立起来就完事，全仓库没有一处画它们——
+// 玩家"扛起旧木板、撑起来了"，画面上一根木头都不多（用户 2026-08-10 报的）。
+function TestBraceLeavesTimberBehind() {
+  const dig = SCRIPTS.c1.find((b) => b.id === "c1_dig");
+  const braces = dig.steps.filter((st) => st.type === "brace");
+  assert.ok(braces.length >= 2, "两块旧门板得有两处支撑步骤");
+  const spots = new Map();
+  for (const st of braces) for (const z of st.zones) if (z.ok) spots.set(z.flag, z.x);
+  assert.ok(spots.size >= 2, "松土段得有两个能支的位置");
+  // 每个旗标都要有一件跟着它现身的道具，且坐标对得上——支在哪儿，
+  // 画面上就得在哪儿多一根顶木
+  const props = SCENES.village.props.filter((p) => p.kind === "tunnelBrace");
+  for (const [flag, x] of spots) {
+    const p = props.find((q) => q.showFlag === flag);
+    assert.ok(p, `旗标 ${flag} 没有对应的顶木道具——撑完了什么也看不见`);
+    assert.equal(p.level, "under", `${flag} 的顶木得在地道那一层`);
+    assert.ok(Math.abs(p.x - x) < 0.01, `${flag} 顶木画在 ${p.x}，可玩家是在 ${x} 支的`);
+  }
+  // 这活儿是"往上顶"，不是按一下就完事：得声明笔画做功的时长
+  for (const st of braces) assert.ok(st.hold > 0, "支顶木必须是往上顶的一段功，不是按一下 E");
+  console.log("  ✓ 支顶木：旗标 / 顶木道具 / 支撑位坐标三处对齐，且是顶上去的");
+}
+
 function TestRaidTakesMoreThanFather() {
   const state = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
@@ -2002,6 +2066,8 @@ TestVaultC1();
 TestRaidColumn();
 TestConvoyKeepsFormation();
 TestRaidTakesMoreThanFather();
+TestContactStagingIsCloseEnough();
+TestBraceLeavesTimberBehind();
 TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
