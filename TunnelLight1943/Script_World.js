@@ -134,6 +134,15 @@ const HOLD_WEIGHT = {
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
+// 姿势进度（Rig 的 poseK）由**姿势名**挑驱动它的那个字段，不许拿 ?? 串下来：
+// vaultT/vaultK 一落地就停在 0，而 `0 ?? x` 取的正是 0——串起来的话，
+// 刨料的推程（poseU）和投石的拉弓量（poseK）永远传不到画面上，
+// 两个"由进度驱动"的姿势都被钉死在起手那一格。这条坑过一次，别再改回去。
+function PoseProgress(o) {
+  if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
+  if (o.pose === "planePush") return o.poseU;
+  return o.poseK;
+}
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
 
 // ---------------------------------------------------------------------------
@@ -2261,13 +2270,21 @@ export function CreateWorld(canvasEl) {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
         // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
-        // 翻越取 vaultK，刨料取 poseU（推程）。两者互斥，有哪个用哪个
-        lift: p.lift || 0, poseK: p.vaultK ?? p.poseU,
+        // 翻越取 vaultK、刨料取 poseU（推程）、投石取 poseK（拉弓量），见 PoseProgress
+        lift: p.lift || 0, poseK: PoseProgress(p),
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
         light: NearestLight(p.x, LevelYOf(p.level)),
       });
     ps.mesh.visible = otsHiddenId !== "player";
+    // 手在世界里的真位置，回填给玩法层。投石要求"按在手里那颗石子上"才攥得住，
+    // 判定圈就必须钉在**画出来的那只手**上——照 p.x + 朝向×0.24 估一个高度，
+    // 姿势一换（垂手 / 蓄力）手就差出大半米，玩家等于在空气里按。
+    // 同刨子那条：挂点由渲染层给，玩法层不自己猜。
+    {
+      const hp = HandPoint(ps.rig);
+      state.handAt = { x: hp.x, y: hp.y };
+    }
     if (p.pose === "planePush") planeHandRig = ps.rig;
     LiftActor(ps, ch.light, true);
 
@@ -2332,7 +2349,7 @@ export function CreateWorld(canvasEl) {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
-          lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
+          lift: a.lift || 0, poseK: PoseProgress(a), climbing: !!a.climbing,
           // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）
           rankDz: a.rank ? ACTOR_RANK_DZ : 0,
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
@@ -2908,7 +2925,10 @@ export function CreateWorld(canvasEl) {
       });
     }
 
-    // 投掷弧线预览：站位不够是灰虚线，走进射程变实线
+    // 投掷弧线预览：点列由 Core 用**和真石子同一套**弹道物理跑出来，预览即所得。
+    // 灰/亮只说"够不够劲出手"，打不打得中要玩家自己看那条弧穿没穿进冠里——
+    // 这里曾经还有一条"站位够了就画直线连到靶心"的分支，那是按键必中版的遗物，
+    // 已随 StartThrow 一起删掉：站位不是瞄准
     if (state.throwAim) {
       const ta = state.throwAim;
       if (!throwAimLine) {
@@ -2921,21 +2941,10 @@ export function CreateWorld(canvasEl) {
         layers.fx.add(throwAimLine);
       }
       const pos = throwAimLine.geometry.attributes.position;
-      if (ta.pts) {
-        // 拟物瞄准：预览点列由 Core 用同一套弹道物理模拟出来，预览即所得
-        for (let i = 0; i < 22; i += 1) {
-          const src = ta.pts[Math.min(ta.pts.length - 1, Math.round(i / 21 * (ta.pts.length - 1)))];
-          pos.setXYZ(i, src[0], SURFACE_Y + src[1], 0.55);
-        }
-      } else {
-        const y0 = SURFACE_Y + ta.y0, y1 = SURFACE_Y + ta.y1;
-        const apex = Math.max(y0, y1) + Math.min(2.2, Math.abs(ta.x1 - ta.x0) * 0.22);
-        for (let i = 0; i < 22; i += 1) {
-          const t = i / 21;
-          const x = ta.x0 + (ta.x1 - ta.x0) * t;
-          const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * apex + t * t * y1;
-          pos.setXYZ(i, x, y, 0.55);
-        }
+      // 点列是世界坐标（Core 从攥住那一刻手的绝对高度积出来的），别再加一次地面高
+      for (let i = 0; i < 22; i += 1) {
+        const src = ta.pts[Math.min(ta.pts.length - 1, Math.round(i / 21 * (ta.pts.length - 1)))];
+        pos.setXYZ(i, src[0], src[1], 0.55);
       }
       pos.needsUpdate = true;
       throwAimLine.computeLineDistances();

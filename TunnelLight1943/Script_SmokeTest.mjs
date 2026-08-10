@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, SLING, SlingSolve,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -100,14 +100,31 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
         if (target.action === "crouchAt" && Math.abs(dx) <= 1.35) { input.crouch = true; input.moveX = 0; }
-        // 投掷：走到投掷位、面朝目标方向，然后 F
-        if (target.action === "throwAt") {
-          // 站位容差放宽到 1.2：转身那一步会顺带挪几厘米，容差太小会在
-          // "走回去/转身"之间来回震荡，永远出不了手（转身后下一帧就出手）
-          if (Math.abs(dx) > 1.2) input.moveX = Math.sign(dx);
-          else if ((p.heading || 1) !== (target.face || 1)) input.moveX = target.face || 1;
-          else if (!state.thrown) { input.throw = true; input.moveX = 0; }
-          else input.moveX = 0;
+        // 投掷：走到投掷位、转过身，然后**真的把石子拽开再松手**。
+        // 这一步没有按键后备（按一下就必中的那版已删），所以驱动器也只能走
+        // 玩家那条路：按在手里那颗石子上攥住 → 把手拖到 SlingSolve 反推出来的
+        // 那个点 → 松开。三帧一趟，跟真人的手完全同一套输入。
+        if (target.action === "slingAt") {
+          // 攥住之后一切以攥住那一刻的手为原点（sl.hx/hy）——拽开的方向会把人
+          // 转过去，手却不会跟着换到另一侧，解弧线时不能用当帧朝向重算
+          const ax = state.sling ? state.sling.hx : p.x + (p.heading || 1) * 0.24;
+          const ay = state.sling ? state.sling.hy : SURFACE_Y + SLING.HAND_Y;
+          const sol = state.thrown ? null : SlingSolve(ax, ay, target.aim.x, target.aim.y);
+          // 站位容差 0.3：拽的向量是照着手的位置解的，站偏半米弧就带偏。
+          // **不为转身多走一步**——为了转身挪那几厘米会在容差边上来回震荡，
+          // 人永远出不了手（旧的按键版就为这个把容差放到 1.2）。朝向交给拽开的方向
+          if (state.thrown) input.moveX = 0;
+          else if (!state.sling && (Math.abs(dx) > 0.3 || !sol)) {
+            input.moveX = Math.abs(dx) > 0.3 ? Math.sign(dx) : Math.sign(target.aim.x - p.x);
+          } else {
+            input.moveX = 0;
+            if (!state.sling) { input.pointerHeld = true; input.pointerWorld = { x: ax, y: ay }; }
+            else if (Math.hypot(state.sling.vx - sol.vx, state.sling.vy - sol.vy) > 0.25) {
+              input.pointerHeld = true;
+              input.pointerWorld = { x: ax - sol.vx / SLING.K, y: ay - sol.vy / SLING.K };
+            }
+            // 拽到位了：这一帧不按 = 松手出手
+          }
         }
         // 推车：贴住车帮，按住 E 往推进方向使劲
         if (target.action === "pushAt") {
@@ -475,7 +492,20 @@ function TestC2Evasion() {
   assert.equal(st3.player.item?.id, "stone", "潜行段路边该有一堆石子捡得起来");
   assert.ok(seen(), "布置有误：扔石子之前玩家本该在灯里");
   for (let i = 0; i < 3; i += 1) StepGame(st3, { ...none(), moveX: 1 }, DT);   // 面朝东
-  StepGame(st3, { ...none(), throw: true }, DT);
+  // 潜行段的石子也只有拽弓一条路（F 键已随投掷后备一起删掉）：攥住 → 拽开 → 松手。
+  // 往东八米开外扔一颗，落地那一声把灯引过去
+  {
+    const hx = st3.player.x + st3.player.heading * 0.24;
+    const hy = SURFACE_Y + SLING.HAND_Y;
+    const sol = SlingSolve(hx, hy, hx + 8, SURFACE_Y + 0.12);
+    assert.ok(sol, "八米外的地面必须够得着");
+    StepGame(st3, { ...none(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+    assert.ok(st3.sling, "潜行段按在石子上也得攥得住");
+    const drag = { x: hx - sol.vx / SLING.K, y: hy - sol.vy / SLING.K };
+    for (let i = 0; i < 3; i += 1) StepGame(st3, { ...none(), pointerHeld: true, pointerWorld: drag }, DT);
+    StepGame(st3, none(), DT);   // 松手
+    assert.ok(st3.thrown, "潜行段松手必须出手");
+  }
   let freed = 0;
   for (let i = 0; i < 150; i += 1) { StepGame(st3, none(), DT); if (!seen()) freed += 1; }
   assert.ok(freed > 90, `石子该把灯引开三秒以上（实测 ${(freed * DT).toFixed(1)}s）——引不开就不算一条出路`);
@@ -1634,75 +1664,141 @@ function TestCineActorsClearOfObstacles() {
   console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
 }
 
-// 拟物投掷：攥住石子往后拽开瞄准，弹道是真物理；键盘 F 仍是完整后备。
+// 投掷：角度和劲都得自己调。这一步**没有**按键后备——曾经按 F 就照着靶心解一条
+// 必中的弧，站位落在 3~10.5m 里就赢，等于整个玩法是假的（用户明令删掉）。
+// 这条测试盯三件事：① 只有攥住手里那颗石子才起手；② 拽的方向和长短真的决定
+// 弧线（同一个站位，拽错了就打不中）；③ 按键路径彻底没了，按 F 一颗石子也飞不出去。
 // 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
 function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
-  const st = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
-  DebugJump(st, 0, beats.indexOf("c1_well"));
-  StepGame(st, idle(), DT);
   const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
   const thr = cloth.steps.find((x) => x.type === "throwHit");
-  st.beat.stepIndex = cloth.steps.indexOf(thr);
-  st.groundItems.length = 0;   // 结算搁在井台的桶别搅进投掷判定
-  st.player.item = { id: "stone", label: "石子", throwable: true };
-  st.player.x = thr.target.x - 6;
-  st.player.heading = 1;
-  StepGame(st, idle(), DT);
+  // 每次都从同一个站位重开：石子在手、面朝榆树、地上没别的东西搅判定
+  const Setup = (dist = 4.6) => {
+    const st = CreateGame(0);
+    DebugJump(st, 0, beats.indexOf("c1_well"));
+    StepGame(st, idle(), DT);
+    st.beat.stepIndex = cloth.steps.indexOf(thr);
+    st.groundItems.length = 0;
+    st.player.item = { id: "stone", label: "石子", throwable: true };
+    st.player.x = thr.target.x + dist;
+    st.player.heading = -1;
+    StepGame(st, idle(), DT);
+    return st;
+  };
+  const Fly = (st, n = 200) => { let g = 0; while (st.thrown && g < n) { g += 1; StepGame(st, idle(), DT); } };
 
   // ① 按下那一帧手必须落在石子上——在别处按一律攥不住
+  const st = Setup();
   StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: st.player.x - 3, y: SURFACE_Y + 1.1 } }, DT);
   assert.ok(!st.sling, "在别处按下不该攥住石子");
   StepGame(st, idle(), DT);   // 松开，重下
 
-  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列
+  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列。
+  //    往哪儿拽由 SlingSolve 现算——它就是这一步的「标准答案」，
+  //    自动通关走的也是它（删了按键后备就必须给驱动器一条真输入的路）
   const hx = st.player.x + st.player.heading * 0.24;
-  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: SURFACE_Y + 1.12 } }, DT);
+  const hy = SURFACE_Y + SLING.HAND_Y;
+  const sol = SlingSolve(hx, hy, thr.target.x, thr.target.y);
+  assert.ok(sol, "站在石子堆这一侧必须解得出一条够得着的弧");
+  assert.ok(sol.power > 0.55 && sol.power < 1,
+    `这一步必须真使劲才够得着（实测要拽满的 ${(sol.power * 100).toFixed(0)}%）——拽两下就中等于没调劲`);
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
   assert.ok(st.sling, "按在石子上必须攥得住");
-  // 反解一条正好穿过靶心的拽法：T=0.7s 的弹道，拽向 = -v/K
-  const T = 0.7;
-  const vx = (thr.target.x - hx) / T;
-  const vy = (thr.target.y - 1.12) / T + 0.5 * 12.5 * T;
-  const drag = { x: hx - vx / 7.4, y: SURFACE_Y + 1.12 - vy / 7.4 };
+  const drag = { x: hx - sol.vx / SLING.K, y: hy - sol.vy / SLING.K };
   for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: drag }, DT);
   assert.ok(st.throwAim?.pts?.length > 5, "拽开必须给出弹道预览点列");
+  assert.ok(!st.throwAim.x1 && !st.throwAim.y1,
+    "不许再画那条「站对位置就必中」的直线辅助——站位不是瞄准");
   assert.equal(st.player.pose, "throwWind", "拽着时必须是蓄力姿势");
   assert.ok(st.player.poseK > 0.4, "拉弓量必须驱动姿势");
 
   // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 妹妹欢呼夸人
   StepGame(st, idle(), DT);
   assert.ok(st.thrown, "松手必须出手");
-  assert.ok(st.thrown.vx > 0, "往后拽，石子必须朝前飞");
-  let guard = 0;
+  assert.ok(st.thrown.vx < 0, "往后拽，石子必须朝前（榆树那边）飞");
   const idx0 = st.beat.stepIndex;
-  while (st.thrown && guard < 200) { guard += 1; StepGame(st, idle(), DT); }
-  assert.equal(st.flags.elmDown, true, "照着靶心拽出去的弧必须打中榆钱枝");
+  Fly(st);
+  assert.equal(st.flags.elmDown, true, "照着标准答案拽出去的弧必须打中榆钱枝");
   assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
   const sis = st.actors.find((a) => a.id === "sister");
   assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
   assert.ok(st.microCine, "妹妹必须开口夸哥");
 
-  // ④ 键盘后备：站进射程按 F，照样命中（自动通关走的就是这条）
-  const st2 = CreateGame(0);
-  DebugJump(st2, 0, beats.indexOf("c1_well"));
-  StepGame(st2, idle(), DT);
-  st2.beat.stepIndex = cloth.steps.indexOf(thr);
-  st2.groundItems.length = 0;
-  st2.player.item = { id: "stone", label: "石子", throwable: true };
-  st2.player.x = thr.target.x - 6;
-  st2.player.heading = 1;
-  StepGame(st2, { ...idle(), throw: true }, DT);
-  assert.ok(st2.thrown, "键盘 F 必须照常出手");
-  guard = 0;
-  while (st2.thrown && guard < 200) { guard += 1; StepGame(st2, idle(), DT); }
-  assert.equal(st2.flags.elmDown, true, "键盘后备在射程内必须命中");
-  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中榆钱枝 / 妹妹接着乐 / 键盘后备");
+  // ④ 劲不够就够不着：同一个角度只拽六成，石子必须落在树跟前，
+  //    而且提示要说清楚差在哪一头（"再拽满些"），不能只说一句"擦着边过去了"
+  const stWeak = Setup();
+  StepGame(stWeak, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+  const weak = { x: hx - sol.vx / SLING.K * 0.6, y: hy - sol.vy / SLING.K * 0.6 };
+  for (let i = 0; i < 3; i += 1) StepGame(stWeak, { ...idle(), pointerHeld: true, pointerWorld: weak }, DT);
+  StepGame(stWeak, idle(), DT);
+  Fly(stWeak);
+  assert.ok(!stWeak.flags.elmDown, "只拽六成劲不该打中——劲不用调就不叫玩法");
+  assert.ok(/拽得再满/.test(stWeak.toast?.text || ""),
+    `没够着要说"再拽满些"，实测提示是：${stWeak.toast?.text}`);
+
+  // ⑤ 角度不对也不行：劲一样，但压成平抛，石子必须从树冠底下擦过去
+  const stFlat = Setup();
+  StepGame(stFlat, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+  const speed = Math.hypot(sol.vx, sol.vy);
+  const flat = { x: hx + speed * Math.cos(0.12) / SLING.K, y: hy - speed * Math.sin(0.12) / SLING.K };
+  for (let i = 0; i < 3; i += 1) StepGame(stFlat, { ...idle(), pointerHeld: true, pointerWorld: flat }, DT);
+  StepGame(stFlat, idle(), DT);
+  assert.ok(stFlat.thrown, "压平了照样得出手（只是打不中）");
+  Fly(stFlat);
+  assert.ok(!stFlat.flags.elmDown, "同样的劲、平着甩出去不该打中——角度不用调就不叫玩法");
+
+  // ⑥ 按键路径必须真的没了：手里攥着石子，按 F 按 E 都不许飞出去一颗
+  const stKey = Setup();
+  for (let i = 0; i < 6; i += 1) StepGame(stKey, { ...idle(), throw: true, interact: true }, DT);
+  assert.ok(!stKey.thrown && !stKey.flags.elmDown,
+    "投掷不许再有按键后备——按一下就必中的那版是被明令删掉的");
+  assert.ok(!/F\b/.test(stKey.prompt || ""), `提示里不许再出现 F 键：${stKey.prompt}`);
+  assert.equal(stKey.gesture?.kind, "slingBack", "手里攥着石子时得给出「往后拽」的手势提示");
+  assert.equal(stKey.player.pose, "throwWind", "手里攥着石子就该摆出架势——画面得先说他随时能扔");
+
+  // ⑦ 判定圈钉在**画出来的那只手**上：渲染层每帧回填 state.handAt（HandPoint），
+  //    Core 就得用它。第一章的柱子垂手拎石子的手在 0.47m，照写死的 1.1m 判定
+  //    等于让玩家在空气里按——这条是 2026-08-10 在真浏览器里量出来的
+  const stHand = Setup();
+  stHand.handAt = { x: stHand.player.x - 0.2, y: SURFACE_Y + 0.47 };
+  StepGame(stHand, { ...idle(), pointerHeld: true, pointerWorld: { x: stHand.player.x - 0.2, y: SURFACE_Y + 1.6 } }, DT);
+  assert.ok(!stHand.sling, "手在 0.47m 的时候，按在 1.6m 的空气里不该攥住");
+  StepGame(stHand, idle(), DT);
+  StepGame(stHand, { ...idle(), pointerHeld: true, pointerWorld: { ...stHand.handAt } }, DT);
+  assert.ok(stHand.sling, "按在渲染层回填的真挂点上必须攥得住");
+  assert.ok(Math.abs(stHand.sling.hy - stHand.handAt.y) < 1e-6,
+    "拽的原点就是那只手本身，不是写死的估算高度");
+  console.log("  ✓ 投石：判定钉在真手上 / 劲和角度都得自己调 / 失败说得清差在哪 / 没有按键后备 / 妹妹接着乐");
+}
+
+// 打榆钱这一步得先有由头，不能一上来就把靶子拍脸上：
+// 得先看见妹妹够不着（一个人干不成），再听见这一树榆钱顶什么用（分量），
+// 最后才是那句请求。缺哪一样，玩家都只是在给一个不认识的人做一道题。
+function TestElmSetupIsMotivated() {
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
+  const talk = cloth.steps[0];
+  assert.equal(talk.type, "talk", "打榆钱之前的第一步必须是妹妹开口");
+  assert.equal(talk.actor, "sister", "开口的得是妹妹本人");
+  const said = talk.lines.filter((l) => l.say);
+  assert.ok(said.length >= 3, "一句话交代不完「谁 + 为什么 + 求你」，至少三句");
+  const all = said.map((l) => `${l.who}:${l.say}`).join("|");
+  assert.ok(said.every((l) => l.who === "妹妹"), "这几句都该由妹妹说，不能变成旁白");
+  assert.ok(/哥/.test(all), "她得叫他一声哥——「这是妹妹」要靠戏里的人说出来");
+  assert.ok(/够不着|蹦/.test(all), "得先摆出「她一个人干不成」这件事");
+  assert.ok(/粮|糜子|顶/.test(all), "得交代这一树榆钱顶什么用，不然打它干什么");
+  assert.ok(/你打|我捡/.test(all), "最后才是那句请求");
+  const throwStep = cloth.steps.find((x) => x.type === "throwHit");
+  assert.ok(cloth.steps.indexOf(talk) < cloth.steps.indexOf(throwStep), "请求必须排在投石之前");
+  assert.ok(!/F/.test(throwStep.prompt || ""), "投石的提示里不许再有 F 键");
+  console.log("  ✓ 打榆钱先有由头：够不着 → 顶十天口粮 → 你打我捡，然后才轮到玩家动手");
 }
 
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestSlingThrow();
+TestElmSetupIsMotivated();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
