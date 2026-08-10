@@ -1149,6 +1149,12 @@ function TestWinchIsACrankNotALever() {
     // 这一道是四道手里唯一不靠转盘的动作，也是打水这件事真正的样子
     assert.equal(w.phase, "dunk", "桶碰着水不该直接满，得先墩");
     assert.equal(w.filled, false, "没墩过的空桶不许算满");
+    // 井底那扇小窗：主相机看不到井口以下，这一拍全靠第二台相机演。
+    // 它同时是"为什么要墩"唯一的说明——断了这条，二道手就成了没头没脑的
+    assert.equal(state.pip?.kind, "wellBottom", "桶沉进井里就该开井底那扇小窗");
+    assert.equal(state.pip.t, null, "这扇小窗由玩法自己收，不许几秒后自动关掉");
+    assert.ok(state.pip.at && state.pip.at.y < -0.5,
+      `小窗得真的架在井筒里（实际 y=${state.pip?.at?.y}）`);
     circle(-1, 30);
     assert.equal(w.filled, false, "墩桶这一道接着绕摇把是没用的——动作对不上事");
     // 攥住井绳往下拽：按下那一帧手得落在绳上（绳吊在井心，不是摇把那一侧）
@@ -1203,6 +1209,7 @@ function TestWinchIsACrankNotALever() {
     assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
       "键盘后备必须走得完四道手（力气见底只该变慢，不该卡死）");
     assert.equal(state.player.item?.id, "fullBucket", "四道手都走完，手里才是一桶水");
+    assert.equal(state.pip, null, "打完水那扇井底小窗得跟着收走");
   }
 
   // ── ④⑤ 桶吊着不放：手劲一路掉，掉光了辘轳自己往下溜 ──
@@ -2573,6 +2580,24 @@ function TestCineActorsClearOfObstacles() {
 // 这条测试盯三件事：① 只有攥住手里那颗石子才起手；② 拽的方向和长短真的决定
 // 弧线（同一个站位，拽错了就打不中）；③ 按键路径彻底没了，按 F 一颗石子也飞不出去。
 // 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
+// 剧本里写的每一个姿势名，Rig 里必须真的有那一支。
+//
+// 这条是补出来的：姿势名对不上不会报错，只会**静悄悄地不生效**——
+// 落到姿势链的末尾，人照常站着，字幕替他把活干了。本项目已经栽过两次
+// （`father.pose = "dig"` 根本不存在；地道里指洞顶差点又写成 "point"）。
+// 靠源码互查，不需要把 Script_Rig 拉进 node（它 import three，跑不起来）。
+function TestPoseNamesExist() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
+  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  const handled = new Set([...rig.matchAll(/s\.pose === "([A-Za-z]+)"/g)].map((m) => m[1]));
+  assert.ok(handled.size > 15, `Rig 里应当有一整套姿势，实测只认出 ${handled.size} 个`);
+  const used = new Set([...core.matchAll(/\.pose = "([A-Za-z]+)"/g)].map((m) => m[1]));
+  const bad = [...used].filter((n) => !handled.has(n));
+  assert.deepEqual(bad, [], `剧本里这些姿势 Rig 不认识，写了等于没写：${bad.join("、")}`);
+  console.log(`  ✓ 剧本用到的 ${used.size} 个姿势名 Rig 全都接得住（共 ${handled.size} 支）`);
+}
+
 function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
@@ -2725,15 +2750,18 @@ function TestRopeLineIsRealRope() {
     const r = state.ropeLine;
     const pts = r?.pts || [];
     const a = pts[0], b = pts[pts.length - 1];
-    let sag = 0, onDirt = 0, chainLen = 0;
+    let sag = 0, onDirt = 0, chainLen = 0, low = Infinity;
     for (let i = 0; i < pts.length; i += 1) {
       const q = pts[i];
       const t = (q.x - a.x) / ((b.x - a.x) || 1);
       sag = Math.max(sag, (a.y + (b.y - a.y) * t) - q.y);
-      if (q.y <= 0.09) onDirt += 1;
+      low = Math.min(low, q.y);
+      // 只数**绳身**（两端不算）：锚点那一头就是躺在地上那盘绳，它贴地是对的。
+      // 要问的是"绳身有没有赖在土里"——绷直的时候绳身必须整条离地
+      if (i > 0 && i < pts.length - 1 && q.y <= 0.09) onDirt += 1;
       if (i) chainLen += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y);
     }
-    return { sag, onDirt, chainLen, span: Math.hypot(b.x - a.x, b.y - a.y), n: pts.length };
+    return { sag, low, onDirt, chainLen, span: Math.hypot(b.x - a.x, b.y - a.y), n: pts.length };
   };
 
   state.player.x = 35.6;
@@ -2743,12 +2771,41 @@ function TestRopeLineIsRealRope() {
   step({}, 2);
   assert.ok(shape().n > 8, "绳必须是一串质点（verlet 链），不是两点一根棍");
 
+  // ⓿ **两头都得长在实处**（用户 2026-08-10：「这个虚空绳头是什么鬼」）。
+  // 老版把锚点写成硬编码的 (35.1, 离地 1.02m)：小周站在 35.8、手还垂着，
+  // 那一米高的点上什么也没有，绳就从空气里长出来；地上那盘绳又画在这一点的
+  // 正下方，绳的第一个质点离盘子整整一米，谁也不挨谁。
+  {
+    const r = state.ropeLine;
+    const xz = state.actors.find((a) => a.id === "xiaozhou");
+    assert.ok(xz, "放绳的小周得在场");
+    assert.ok(Math.abs(r.x0 - xz.x) < 1.2,
+      `绳盘那头必须挨着小周（他在 ${xz.x.toFixed(2)}，锚点在 ${r.x0.toFixed(2)}）`);
+    assert.ok(r.y0 < 0.2,
+      `绳盘那头得贴在地上（盘子就画在地上，实测 y=${r.y0.toFixed(2)}）——悬在半空就是"虚空绳头"`);
+    assert.ok(Math.abs(r.pts[0].y - r.y0) < 0.25,
+      "绳的第一个质点必须落在盘子上，不能隔着一截空气");
+    // 锚点是**跟着人**的，不是钉在坐标上：小周挪一步，盘子和绳一起挪
+    const was = r.x0;
+    xz.x += 1.4;
+    step({}, 2);
+    assert.ok(Math.abs(state.ropeLine.x0 - (was + 1.4)) < 0.05,
+      "小周挪了，他脚边那盘绳就得跟着挪（锚点不许写死成一个坐标）");
+    xz.x -= 1.4;
+    step({}, 2);
+  }
+
   // ① 半道上：绳松着，垂到土上被拖着走
   step({ moveX: 1 }, 60);
   const mid = shape();
   assert.ok(mid.span > 6, `该走出去半条街了，实为跨度 ${mid.span.toFixed(1)}m`);
-  assert.ok(mid.sag > 0.6, `拉直之前绳必须垂下来（实测垂度 ${mid.sag.toFixed(2)}m）`);
+  // 「垂下来」最诚实的判据是**最低点贴不贴土**，不是相对两端连线的垂度：
+  // 那条弦的两头一个在盘子上（贴地）、一个在人手里（0.94m），本来就是斜的，
+  // 绳整条趴在地上时相对它的"垂度"只有 0.5m 上下——2026-08-10 把锚点从
+  // 半空挪到地面之后，0.6m 那个阈值量的其实是旧几何，不是绳的形状
+  assert.ok(mid.low <= 0.09, `松着的绳最低点必须落在土上（实测 ${mid.low.toFixed(2)}m）`);
   assert.ok(mid.onDirt >= 5, `松着的那截必须躺在土上（实测贴地 ${mid.onDirt} 个质点）`);
+  assert.ok(mid.sag > 0.4, `拉直之前绳必须是垂着的（实测垂度 ${mid.sag.toFixed(2)}m）`);
 
   // ② 走到头：绳放完了，离地绷成一条线
   step({ moveX: 1 }, 260);
@@ -2797,6 +2854,7 @@ function TestRopeLineIsRealRope() {
 
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
+TestPoseNamesExist();
 TestSlingThrow();
 TestElmSetupIsMotivated();
 TestWorkStations();
