@@ -1668,6 +1668,15 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   // **必须等玩家真的划完才出现**（marked）——它以前是无条件画的，于是那一拍
   // 玩家攥着笔去划一条已经在木头上的线，整个交互当场失去意义。
   // 粗细跟玩家划出来的那道对齐（1.8px≈3.7cm），否则划完一瞬间线会突然变胖。
+  // 去年的刻痕：**无条件画**——量身高那场戏的铺垫全指着它（爹收完家伙
+  // 一抬眼撞见的就是这道）。风吹日晒一年，只剩一道发暗的凹槽；跟今年石笔
+  // 划出来的亮线一对比，「长了多少」不用一个字。57px≈1.19m，比今年矮 9cm
+  // 凿槽的画法：一道暗槽 + 槽下沿一线亮茬（新茬被晒旧后仍比木面浅）——
+  // 单画一根半透明细线在晨雾里读不出来（实测过）
+  InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
+    id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
+  InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
+    id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
   if (marked) {
     InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
@@ -3425,8 +3434,9 @@ export function DrawNoticeWall(ctx, x, groundY, w, id) {
     ctx.restore();
   }
   // 最新那张是征夫告示：标题四个字真的写出来（设计文档：玩家先在实景里
-  // 看见「征夫告示」四个大字和暗红印章，才谈得上想不想停下看）。
-  // 竖排在纸右沿，字号顶着纸宽；左下一点暗红当印
+  // 看见那四个大字和暗红印章，才谈得上想不想停下看）。
+  // **繁体**「徵夫告示」：1942 年的公文只可能是繁体，而且「征召」的征写作徵
+  //（简化字方案是 1956 年的事）。竖排在纸右沿——那时候没有横排左起。
   {
     const p = posters[1];
     ctx.save();
@@ -3434,7 +3444,7 @@ export function DrawNoticeWall(ctx, x, groundY, w, id) {
     ctx.font = "600 7px 'Noto Serif SC', serif";
     ctx.textAlign = "center";
     const tx = p.px + p.pw / 2 - 5.5;
-    for (let k = 0; k < 4; k += 1) ctx.fillText("征夫告示"[k], tx, p.py + 9.5 + k * 7.2);
+    for (let k = 0; k < 4; k += 1) ctx.fillText("徵夫告示"[k], tx, p.py + 9.5 + k * 7.2);
     ctx.fillStyle = "rgba(146, 44, 32, 0.55)";
     ctx.fillRect(p.px - p.pw / 2 + 3.5, p.py + p.ph - 8.5, 5, 5);
     ctx.restore();
@@ -4138,22 +4148,31 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
 }
 
 export function DrawShaft(ctx, x, topY, botY, id) {
-  // 竖井 + 一架看得清的木梯。
-  // 之前梯子只有半透明的一根杆和几道暗横档，玩家在画面上根本认不出"这儿能上下"，
-  // 所以改成两根立杆 + 高对比横档 + 井口一圈木沿，远看就是一架梯子。
-  InkFill(ctx, Rect(x - 17, topY, 34, botY - topY), id, PAL.tunnelAir, { amp: 1.4, lw: 2.4, line: "#3a2a1a" });
-  // 井口木沿：地面上认路的记号
-  InkFill(ctx, Rect(x - 21, topY - 5, 42, 7), id + "lip", "#8a6b45", { amp: 0.8, lw: 2 });
-  // 两根立杆
+  // 井口木沿 + 一架看得清的木梯。
+  //
+  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
+  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
+  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
+  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
+  //
+  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
+  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
+    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
+  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
+  const railTop = topY + 3;
   for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, topY + 2, 5.2, botY - topY - 4), id + "rail" + dx, "#9c7a4c",
+    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
       { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
   }
   // 横档：亮一档、暗一档，看着有厚度
-  for (let y = topY + 13; y < botY - 4; y += 15) {
+  for (let y = railTop + 11; y < botY - 3; y += 15) {
     InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
       { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
   }
+  // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
+  InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
 }
 
 export function DrawCollapsePile(ctx, x, botY, scale, id) {

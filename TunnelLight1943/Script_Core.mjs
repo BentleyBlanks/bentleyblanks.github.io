@@ -61,6 +61,11 @@ export const PLAYABLE_CHAPTERS = 1;
 // 征夫告示的逐字转录：阅读层右栏的权威版本——铅字排出来给玩家读，
 // 不指望生成图上的毛笔小字（关卡设计文档明令「右侧文字是权威版本」）。
 // 不配柱子朗读旁白：他识不识字是人物设定，不该由一块 UI 替他决定。
+//
+// **左图与右文故意不同形**：左边那张实物是 1942 年该有的样子——繁体、竖排、
+// 自右向左（横排左起是 1955-56 年以后的事；简化字方案是 1956 年）。右边这份
+// 是给今天玩家看的**转录**，照现代正字法排，不是摹本。博物馆的做法就是这样。
+// 实物由 Script_TypesetNotice.py 排版生成（生图模型排不了繁体竖排，只出白纸）。
 export const ZHENGFU_NOTICE = {
   title: "征　夫　告　示",
   lines: [
@@ -2008,12 +2013,49 @@ export const SCRIPTS = {
       // 量身。台词沿新剧本第一场（"这个家就靠你了"仍旧不要），但**划线本身是
       // 玩家的手**（2026-08-09 用户明令保留上一版的石笔交互，不许退成三四秒的
       // 过场动画）：门框上的刻痕是全篇的题眼，一头一尾都得亲手划。
+      // 量身高不能凭空开场（用户 2026-08-10：「怎么一点铺垫都没有就直接量
+      // 身高了」）。由头照「把毛病演出来→说一句→再动手」的配方铺三拍：
+      // 修完门收家伙的当口，爹一抬眼撞见**去年那道旧刻痕**（门框上无条件
+      // 画着，发暗的一道凹槽）→ 拇指按着旧痕说一句 → 叫柱子靠框站直——
+      // 到这儿「为什么忽然量身高」已经立住，「别动」才轮得到出口。
       kind: "cinematic", id: "c1_measure", timeOfDay: "dawn", indoorScene: true,
       lines: [
-        { who: "爹", say: "别动。", d: 2.2, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 },
+        // ① 无字：镜头推到左立柱上那道发暗的旧刻痕——爹收家伙的当口一抬眼
+        //    撞见它。这一眼就是整场戏的由头（画面自己说，旁白闭嘴）。
+        //    爹还蹲在门边收拾家伙（在画框左缘），柱子先退出画外——爷俩不许
+        //    叠在插入镜里
+        { stage: "", d: 2.6, cam: { kind: "insert", x: 33.62, y: 1.16, dist: 1.05 },
+          on: (state) => {
+            const father = FindActor(state, "father");
+            if (father) { father.carry = null; father.pose = "kneel"; father.x = 33.15; father.heading = 1; }
+            state.player.cineWalk = { x: 35.6, speed: 1.4 };
+            // 门往里敞开（侧视里等于退出画面）：量身要靠框站，门合着的话
+            // 柱子会整个站到门扇后面（真玩到这儿门刚礅好轴、是合着的）
+            state.doorLeaf = null;
+          } },
+        // ② 爹起身走到框边，对着旧痕看——道出那是什么、也道出这一年。
+        //    不用 mark 姿势：那个姿势手举在门楣底下，读出来是在摸门楣不是看刻痕
+        { who: "爹", say: "去年画的道道，才到这儿。", d: 3.2,
+          cam: { kind: "shot", x: 34.3, y: 1.3, dist: 4.4 },
+          on: (state) => {
+            const father = FindActor(state, "father");
+            if (father) { father.pose = null; father.x = 34.35; father.heading = -1; }
+          } },
+        // ③ 叫人：柱子自己走过去靠上门框（走位是演出来的，不是瞬移）
+        { who: "爹", say: "快一年没量了。来——靠框上，站直。", d: 3.2,
+          cam: { kind: "shot", x: 34.6, y: 1.3, dist: 5.0 },
+          on: (state) => {
+            state.player.cineWalk = { x: 34.0, speed: 1.5 };
+            const father = FindActor(state, "father");
+            if (father) { father.x = 35.1; father.heading = -1; }
+          } },
+        // 不用过肩：ots 会把柱子藏掉换成前景剪影，这个机位下剪影出画，
+        // 人就凭空消失。侧面双人镜正好看见爹的手比在柱子头顶
+        { who: "爹", say: "别动。", d: 2.2, cam: { kind: "shot", x: 34.55, y: 1.35, dist: 3.2 },
           on: (state) => {
             const father = FindActor(state, "father");
             if (father) { father.pose = "mark"; father.x = 35.1; father.heading = -1; father.carry = null; }
+            state.player.cineWalk = null;
             state.player.x = 34.0;
             state.player.heading = 1;
           } },
@@ -2034,6 +2076,7 @@ export const SCRIPTS = {
         if (father) { father.x = 35.1; father.heading = -1; father.pose = "mark"; }
         state.player.x = 34.0;
         state.player.heading = 1;
+        state.doorLeaf = null;   // 门敞着（跳幕兜底，同 c1_measure ①）
       },
       onDone: (state) => {
         const father = FindActor(state, "father");
