@@ -4207,20 +4207,42 @@ export function CreateWorld(canvasEl) {
         // 的产物，拿它当绳端会绕成"绳→姿势→手心→绳"的闭环，人会被自己的胳膊
         // 卡住），所以"长在手上"这件事在画面这一侧办：把末尾三个点朝手心挪，
         // 越靠末端挪得越多，收出一个不打折的弯。
+        // 攥在玩家手里、或者已经交到七叔手里——两种情况都要接到**那个人的**
+        // 真拳头上。少了后一种，绳交出去之后那一头就悬在他身前半米的空气里
+        //（2026-08-10 用户报的「虚空绳头」的另一半）
         let tip = null;
-        if (rl.inHand) {
-          const ps = actorSprites.get("player");
+        const tipWho = rl.inHand ? "player" : (rl.x1 !== undefined ? rl.stakeId : null);
+        if (tipWho) {
+          const ps = actorSprites.get(tipWho);
           if (ps) {
             const hp = HandPoint(ps.rig);
             const last = pts[n - 1];
             tip = { dx: hp.x - last.x, dy: hp.y - last.y };
           }
         }
+        // 锚点那一头同理：盘子被拎起来之后（coilLift→1）它就在小周手里了，
+        // 也得接到**他的**真拳头上——不接的话绳梢悬在他手边半米的空气里，
+        // 还是一个虚空绳头（2026-08-10 实拍抓出来的第二处）
+        let head = null;
+        const lift = rl.coilLift ?? 0;
+        if (lift > 0.02 && rl.anchorId) {
+          const as = actorSprites.get(rl.anchorId);
+          if (as) {
+            const hp = HandPoint(as.rig);
+            const first = pts[0];
+            head = { dx: (hp.x - first.x) * lift, dy: (hp.y - first.y) * lift };
+          }
+        }
         const TIP_W = [0.22, 0.55, 1];       // 末尾三点各吃多少修正
+        const HEAD_W = [1, 0.55, 0.22];      // 头三点同理（越靠头挪得越多）
         const draw = (i) => {
           const q = pts[i];
+          let x = q.x, y = q.y;
           const k = tip ? (TIP_W[i - (n - TIP_W.length)] ?? 0) : 0;
-          return k ? { x: q.x + tip.dx * k, y: q.y + tip.dy * k } : q;
+          if (k) { x += tip.dx * k; y += tip.dy * k; }
+          const hk = head ? (HEAD_W[i] ?? 0) : 0;
+          if (hk) { x += head.dx * hk; y += head.dy * hk; }
+          return { x, y };
         };
         const pos = ropeLineMesh.geometry.attributes.position;
         for (let i = 0; i < n; i += 1) {
@@ -4242,7 +4264,9 @@ export function CreateWorld(canvasEl) {
           SetPlayOrder(ropeCoilMesh, BAND.loose, "ropeCoil");
         }
         const remain = Math.max(0, 1 - (rl.pay || 0) / (rl.L || 1));
-        ropeCoilMesh.visible = remain > 0.06;
+        // 盘子被拎起来（coilLift→1）就不再画它：那一头此刻在小周手里，
+        // 地上不该还留着一盘绳。两处读同一个数，绳头永远有着落
+        ropeCoilMesh.visible = remain > 0.02 && (rl.coilLift ?? 0) < 0.92;
         if (ropeCoilMesh.visible) {
           const s = 0.4 + 0.6 * remain;
           ropeCoilMesh.scale.set(s, s, 1);
