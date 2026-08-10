@@ -4,7 +4,8 @@
     "instrumentalOnly": true,
     "allowSinging": false,
     "allowVocalTextures": false,
-    "notes": "正式项目只使用纯器乐；演唱、吟唱、合唱和人声氛围音色均淘汰。"
+    "notes": "正式项目只使用纯器乐；演唱、吟唱、合唱和人声氛围音色均淘汰。",
+    "loopNote": "每首都是完整成品曲，末尾是渐弱收尾。loopEnd = 尾奏开始之前的位置，播到这里就交叉淡回 cue；放进尾奏玩家会听成「音乐停了又重放」（2026-08-10）。数值由 ffmpeg 逐段量：正常段响度打底，从尾往前找第一个不低于它 4dB 的 4 秒窗口。"
   },
   "master": {
     "format": "MP3",
@@ -22,7 +23,9 @@
       "gain": 0.82,
       "hasVocals": false,
       "source": "https://www.scottbuckley.com.au/library/with-these-hands/",
-      "credit": "'With These Hands' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au"
+      "credit": "'With These Hands' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au",
+      "duration": 305.7,
+      "loopEnd": 285.7
     },
     {
       "chapter": 2,
@@ -33,7 +36,9 @@
       "gain": 0.7,
       "hasVocals": false,
       "source": "https://www.scottbuckley.com.au/library/the-long-dark/",
-      "credit": "'The Long Dark' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au"
+      "credit": "'The Long Dark' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au",
+      "duration": 439.8,
+      "loopEnd": 403.8
     },
     {
       "chapter": 3,
@@ -43,7 +48,9 @@
       "cue": 12,
       "gain": 0.68,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 175.8,
+      "loopEnd": 155.8
     },
     {
       "chapter": 4,
@@ -53,7 +60,9 @@
       "cue": 18,
       "gain": 0.7,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 240.0,
+      "loopEnd": 236.0
     },
     {
       "chapter": 5,
@@ -63,7 +72,9 @@
       "cue": 18,
       "gain": 0.76,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 218.5,
+      "loopEnd": 210.5
     },
     {
       "chapter": 6,
@@ -73,7 +84,9 @@
       "cue": 12,
       "gain": 0.67,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 87.2,
+      "loopEnd": 83.2
     },
     {
       "chapter": 7,
@@ -83,7 +96,9 @@
       "cue": 20,
       "gain": 0.75,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 166.0,
+      "loopEnd": 162.0
     },
     {
       "chapter": 8,
@@ -93,7 +108,9 @@
       "cue": 24,
       "gain": 0.72,
       "hasVocals": false,
-      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a"
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 202.0,
+      "loopEnd": 198.0
     }
   ],
   "rejectedCandidates": [
