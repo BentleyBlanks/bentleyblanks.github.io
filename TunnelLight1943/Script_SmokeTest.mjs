@@ -11,10 +11,11 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
+  HouseSpan, IndoorOpen, PushingCart,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
-import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ } from "./Data_DepthSpec.mjs";
 
 const DT = 1 / 30;
 
@@ -677,6 +678,52 @@ function TestChainSurvivesEarlyDrop() {
   state.player.x = g.x; step({}, 3); step({ interact: true });
   assert.equal(state.player.item?.id, "bucket", "撂在哪儿就该能从哪儿捡回来");
   console.log("  ✓ 链不怕半路撂东西：缺桶有提示、撂下的桶有气泡标着、捡得回来");
+}
+
+// 车进不了堂屋：推着独轮车经过自家屋前，走的是屋外那条街——立面不许淡出
+// （用户 2026-08-09：「我推车为什么能推到家里去？这明明应该走外面的小路的」）
+function TestCartStaysOutOfTheHouse() {
+  const house = SCENES.village.props.find((p) => p.interior && p.kind === "house");
+  assert.ok(house, "村里得有一间可进入的屋子");
+  const { x0, x1 } = HouseSpan(house);
+  const mid = (x0 + x1) / 2;
+
+  // 这条规矩得真的被用上：回程那趟推车必须从屋子这段街上经过，否则测了个寂寞
+  const barrow = SCRIPTS.c1.find((b) => b.id === "c1_barrow");
+  const home = barrow.steps.filter((s) => s.type === "push").pop();
+  const to = home.from + home.dir * home.dist;
+  assert.ok(Math.min(home.from, to) < x0 && Math.max(home.from, to) > x1,
+    `推车回家那趟得经过屋子（${x0.toFixed(1)}~${x1.toFixed(1)}），实际 ${home.from}→${to}`);
+
+  const s = CreateGame(0);
+  s.player.level = "surface";
+  s.player.x = mid;
+  // ① 空着手站在屋里：立面淡出，人在屋里
+  s.cart = null;
+  assert.equal(IndoorOpen(s, x0, x1), true, "空着手走进去就是进屋");
+  // ② 推着车走到同一个位置：走的是屋外那条道
+  s.cart = { x: mid + 1.1, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), false, "推着车不算进屋——车进不了堂屋");
+  // ③ 车停在屋前那段街上、人空手走进去：车还在墙外，立面同样合着
+  //（不然墙一淡，停在街上的车就出现在堂屋里）
+  s.cart = { x: mid, kind: "barrow" };
+  s.player.x = x1 - 0.3;
+  assert.equal(PushingCart(s), false, "隔着两米多不算推着");
+  assert.equal(IndoorOpen(s, x0, x1), false, "车停在屋前时立面也不开");
+  // ④ 车推开了、人在屋里：这才淡出
+  s.cart = { x: x0 - 6, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), true, "车挪走了才算进屋");
+  // ⑤ 人在地窖那一层：屋里的立面与他无关
+  s.cart = null;
+  s.player.level = "under";
+  assert.equal(IndoorOpen(s, x0, x1), false, "人在地下不开地面的立面");
+
+  // 深度：推着的车夹在立面与演员之间——被墙吃掉（<facade）和挡住人（>演员）
+  // 都是穿帮；位置仍要压回行走线，否则车和人不在一条水平线上
+  assert.ok(BAND.pushCart > BAND.facade, "推着的车必须画在立面之前，否则墙把车吃了");
+  assert.ok(BAND.pushCart < ACTOR_Z, "推着的车必须画在人之后，人得在近侧握车把");
+  assert.equal(PlaceZ(BAND.pushCart), 0, "车站在行走线上：位置压回 z=0");
+  console.log("  ✓ 车进不了堂屋：推着走屋外 / 停屋前也不开墙 / 车夹在立面与人之间");
 }
 
 function TestGroundItems() {
@@ -1360,24 +1407,33 @@ function TestModuleGraphIsCacheBusted() {
 function TestDoorHoldIsPhysical() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
+  const DOOR_TEST_SAG = 0.26;   // 与 Core 的 DOOR_SAG 同值：磕框的倾角
 
   // ① 开场过场要真的把那扇门演出来：doorLeaf 亮过、而且是"松的"
   {
     const s0 = CreateGame(0);
     DebugJump(s0, 0, beats.indexOf("c1_open"));
-    let seen = null, swung = false, lifted = false, g = 0;
+    let seen = null, intact = false, gusted = false, swung = false, lifted = false, sat = false, rose = false, g = 0;
     while (CurrentBeatDef(s0)?.id === "c1_open" && g < 6000) {
       g += 1;
       StepGame(s0, { ...idle(), advance: g % 90 === 0 }, DT);
+      const father = s0.actors.find((a) => a.id === "father");
+      if (father?.pose === "sitStool") sat = true;
+      if (sat && father?.cineTarget) rose = true;
       if (s0.doorLeaf) {
         seen = s0.doorLeaf;
+        if (!s0.doorLeaf.loose) intact = true;
+        if (s0.doorLeaf.gust) gusted = true;
         if (s0.doorLeaf.swing) swung = true;
         if (s0.doorLeaf.tryLift) lifted = true;
       }
     }
     assert.ok(seen, "开场必须把那扇门摆出来（doorLeaf），不能只靠爹一句台词");
-    assert.equal(seen.loose, true, "开场那扇门是松的（下轴脱了窝）——这就是要修的理由");
+    assert.ok(intact, "风来之前门得还挂在框上（毛病是当着玩家的面发作的，不是天生就坏）");
+    assert.ok(gusted, "得有风把门吹倒的那一镜（2026-08-09 用户点名）");
+    assert.equal(seen.loose, true, "吹倒之后那扇门是松的（下轴脱了窝）——这就是要修的理由");
     assert.ok(swung, "得演出它自己在晃");
+    assert.ok(sat && rose, "爹得先坐在凳上歇手，门倒了才起身去修——起身这一下就是事件感");
     assert.ok(lifted, "得演出爹一个人托不住（这才解释了为什么需要第二双手）");
   }
 
@@ -1407,11 +1463,12 @@ function TestDoorHoldIsPhysical() {
     assert.ok(st.beat.work < 0.05, "没扶住，爹使不上劲，进度不该涨");
   }
 
-  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去）
+  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去），推回正位得跟它较劲
   {
     const { st, step } = mk();
     const midY = HingeY(step) - 0.9;
-    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
+    const hx = step.hingeX ?? step.zone.x;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
     assert.ok(st.beat.grabbed, "手按在门板上必须攥得住");
     const l1 = st.beat.lean;
     // 门跟着手走：把手往里挪「一个力臂 × 当前倾角」，正好把门扶到正位
@@ -1419,18 +1476,54 @@ function TestDoorHoldIsPhysical() {
     StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX - 1, y: midY } }, DT);
     assert.ok(st.beat.lean < l1, "攥住往里推，门必须跟着走");
     assert.ok(l1 - st.beat.lean < 0.2, `门有分量，一帧不该转到 ${st.beat.lean}`);
-    // 稳住 → 爹使得上劲；撒手 → 它自己坠回去、进度往回泄
-    let g2 = 0;
-    while (st.beat.work < 0.5 && g2 < 400) {
+    // 稳住 → 爹一下一下礅轴（进度按"下"跳，不是秒表匀速涨）
+    let g2 = 0, workJumps = 0, prevWork = st.beat.work, kicked = false;
+    while (st.beat.work < 0.5 && g2 < 600) {
       g2 += 1;
       StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX, y: midY } }, DT);
+      if (st.beat.work > prevWork) {
+        workJumps += 1;
+        assert.ok(st.beat.work - prevWork > 0.2, "礅轴的进度必须一下一下跳，不许退回匀速条");
+        prevWork = st.beat.work;
+      }
+      // 礅那一下的震劲得传到门上：出现明显的往外角速度
+      if (st.beat.vel > 0.3) kicked = true;
     }
     assert.ok(st.beat.work >= 0.5, "稳在正位，礅轴的进度得涨起来");
+    assert.ok(workJumps >= 2, "涨到一半至少该挨过两记锤");
+    assert.ok(kicked, "每礅一下，震劲要把门往外弹——扶门的手上得一直有事");
     assert.ok(Math.abs(st.beat.lean) < 0.12, "扶到正位时门该基本是竖直的");
     const leanHeld = st.beat.lean, workHeld = st.beat.work;
-    for (let i = 0; i < 20; i += 1) StepGame(st, idle(), DT);       // 撒手
+    // 撒手：门是**越坠越快**地坠（重量），不是匀速滑走
+    const fallD = [];
+    let prevLean = st.beat.lean, hitStop = false;
+    for (let i = 0; i < 60; i += 1) {
+      StepGame(st, idle(), DT);
+      // 只记第一段自由下坠（磕框那一帧位移被截断、弹回后的余晃更不算数）
+      if (!hitStop && st.beat.lean < DOOR_TEST_SAG - 1e-4) {
+        fallD.push(st.beat.lean - prevLean);
+      }
+      if (st.beat.lean >= DOOR_TEST_SAG - 1e-4) hitStop = true;
+      prevLean = st.beat.lean;
+    }
     assert.ok(st.beat.lean > leanHeld + 0.02, "撒手之后门必须自己往外坠");
-    assert.ok(st.beat.work < workHeld, "歪出去之后进度要往回泄，不是原地等着");
+    assert.ok(st.beat.lean >= DOOR_TEST_SAG - 1e-4, "两秒没人扶，它就该磕回框上");
+    assert.ok(fallD.length >= 6 && fallD[fallD.length - 1] > fallD[1] + 1e-4,
+      "坠是加速的——头几帧慢、越到后头越快，这就是分量");
+    assert.ok(st.beat.work < workHeld, "磕回框上，刚礅进去的轴又震松一分——进度要掉");
+    // 接住一扇正在坠的门：它还带着动量，得吃一拍才停得住
+    st.beat.lean = 0.05; st.beat.vel = 0;
+    for (let i = 0; i < 14; i += 1) StepGame(st, idle(), DT);        // 让它坠出速度
+    const velFalling = st.beat.vel;
+    assert.ok(velFalling > 0.1, "先坠出点速度");
+    const catchX = (step.hingeX ?? step.zone.x) + Math.sin(st.beat.lean) * 0.9;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(st.beat.grabbed, "坠着也得接得住");
+    const leanCatch = st.beat.lean;
+    for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(st.beat.lean > leanCatch, "接住的头几帧它还往下沉——手要吃住那份动量");
+    for (let i = 0; i < 40; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(Math.abs(st.beat.vel) < 0.35, "吃住之后它就该停在手里");
   }
 
   // ③ 键盘后备（扶门是费力气的活，留了按住 E）：自动通关靠它，不许卡死
@@ -1443,7 +1536,7 @@ function TestDoorHoldIsPhysical() {
     }
     assert.notEqual(st.beat.stepIndex, 0, "按住 E 必须也能把门扶正（键盘后备 / 驱动器走这条）");
   }
-  console.log("  ✓ 修门：开场演清楚为什么修 / 扶的是那扇会坠的门 / 抓不住扶不动 / 撒手就坠 / 键盘后备可用");
+  console.log("  ✓ 修门：风吹倒门爹起身 / 坠是加速的 / 接得住动量 / 礅一下弹一下 / 磕框掉进度 / 键盘后备可用");
 }
 
 function TestQuieterAudioMix() {
@@ -1910,6 +2003,7 @@ TestRaidColumn();
 TestConvoyKeepsFormation();
 TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
+TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestRopeLineIsRealRope();

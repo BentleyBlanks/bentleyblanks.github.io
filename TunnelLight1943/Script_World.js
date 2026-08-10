@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -126,7 +126,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
-const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀"];
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀", "木槌"];
 // 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
 // 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
 // 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
@@ -144,7 +144,7 @@ const HOLD_WEIGHT = {
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
   "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
-  "军刀": 0.25,
+  "军刀": 0.25, "木槌": 0.3,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
@@ -163,7 +163,7 @@ function MakeCarryMesh(label) {
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
   // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
   // 刺刀尖离握点 1.18m＝56.6px，所以半高至少 57 → 120。
-  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72] };
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72], "木槌": [24, 60] };
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -673,9 +673,38 @@ export function CreateWorld(canvasEl) {
           ? "rgba(154,140,112,0.30)" : "rgba(96,80,58,0.24)";
         ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
       }
+      // ⑤ 糠秕与麦秸碎：碾道、场院、门口一层细碎亮屑，被风吹成条状积在
+      //    坑洼的背风侧。这一层是"农村"与"空地"的分界
+      for (let i = 0; i < wPx / 26; i += 1) {
+        const cx3 = ART.Hash(id + "cf" + i) * wPx;
+        const cy3 = 9 + ART.Hash(id + "cfy" + i) * 22;
+        ctx.strokeStyle = "rgba(176,158,112,0.34)";
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(cx3, cy3);
+        ctx.lineTo(cx3 + 2 + ART.Hash(id + "cfl" + i) * 5, cy3 + (ART.Hash(id + "cfa" + i) - 0.5) * 2);
+        ctx.stroke();
+      }
+      // ⑥ 粪蛋与扫街攒的粪土：**沿墙根一线**（路当中会被车碾平），
+      //    灰褐色小堆。一个没有粪的华北村子等于没有农业
+      for (let i = 0; i < wPx / 210; i += 1) {
+        const dx3 = ART.Hash(id + "dg" + i) * wPx;
+        const dy3 = 7 + ART.Hash(id + "dgy" + i) * 7;
+        ctx.fillStyle = "rgba(84,70,48,0.42)";
+        for (let k = 0; k < 4; k += 1) {
+          ctx.beginPath();
+          ctx.ellipse(dx3 + k * 3.4 + ART.Hash(id + "dk" + i + k) * 3, dy3 + ART.Hash(id + "dky" + i + k) * 3,
+            1.9, 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       ctx.restore();
     });
     PlaceSprite(mesh, xFrom, groundY, 0);
+    // 地表带钉在行走线**之下**：不钉的话它跟 walk 带道具同一个绘制序号，
+    // 房子的接地投影（AddGroundShadow）会被这张大贴图整个盖掉——
+    // 全画面一个暗部都没有，"干净得像小康村"有一半是这么来的
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 4);
     group.add(mesh);
   }
 
@@ -1289,6 +1318,7 @@ export function CreateWorld(canvasEl) {
     const mesh = MakeFlatShadow(len, w, strength);
     // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
     mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, PlaceZ(z) + SUN.dz * len * 0.34);
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 2);   // 压在地表带之上、道具之下
     group.add(mesh);
   }
 
@@ -1341,12 +1371,11 @@ export function CreateWorld(canvasEl) {
             { z: BAND[V2.innerBand] });
           homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
             { z: BAND[V2.facadeBand] });
+          // 屋子占的那段街由 Core 的 HouseSpan 给（判定与画面共用一份边界）。
           // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
-          // 洞宽 30px）。NPC 得走到门口才消失在屋里，不能一挨着东墙就没影
-          homeRange = {
-            x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2,
-            door: p.x + p.w / 2 - 25 / PPM,
-          };
+          // 洞宽 30px）——那是画笔的事，留在这儿。NPC 得走到门口才消失在
+          // 屋里，不能一挨着东墙就没影
+          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
@@ -1430,7 +1459,7 @@ export function CreateWorld(canvasEl) {
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
       case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
-      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, night, bare: ruined })); break;
+      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
@@ -1495,6 +1524,11 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "dog": mk((ctx, ax, ay) => ART.DrawDog(ctx, ax, ay, p.id)); break;
+      // 村里不许有狗：1939 年冀中区党委统一"打狗"（狗叫会暴露夜间行动，
+      // 回忆材料原话「出进村庄无犬吠声」）。DrawDog 只留给据点那一侧
+      case "emptyKennel": mk((ctx, ax, ay) => ART.DrawEmptyKennel(ctx, ax, ay, p.id)); break;
+      case "dungHeap": mk((ctx, ax, ay) => ART.DrawDungHeap(ctx, ax, ay, p.id, { street: !!p.street })); break;
+      case "stalkFence": mk((ctx, ax, ay) => ART.DrawStalkFence(ctx, ax, ay, (p.w || 5) * PPM, p.id)); break;
       case "stonePile": mk((ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
       case "hangLantern":
         mk((ctx, ax, ay) =>
@@ -1582,7 +1616,7 @@ export function CreateWorld(canvasEl) {
               ART.InkLine(ctx, ax - 20 + i * 10, ay - 8, ax - 26 + i * 12, ay - 34 - ART.Hash(c.id + i) * 18,
                 c.id + "st" + i, { lw: 2, color: "#241f18" });
             }
-          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night });
+          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night, raided: !!c.raided });
         }); break;
       case "firewood": mk((ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id)); break;
       case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, c.w * PPM, S.drawHeightPx, c.id, { burnt: false })); break;
@@ -2936,11 +2970,13 @@ export function CreateWorld(canvasEl) {
     // 车画在演员前面一点，贴着车走就是躲进车影
     if (state.cart) {
       const cartKind = state.cart.kind || "cart";
-      // 玩家**推着**的独轮车（第一章）要退到 loose 带：人在近侧握着车把，
-      // 身子和手得画在车前面。第三章那辆驴车是**移动掩体**，得挡住人，
-      // 所以留在 CART_COVER_Z——两种角色，两个深度。
+      // 玩家**推着**的独轮车（第一章）走 pushCart 带：人在近侧握着车把，
+      // 身子和手得画在车前面（所以在演员 0.6 之后）；但它是**街面上**的东西，
+      // 推着从自家屋前过的时候不能被立面(0.4)吃掉——夹在两者之间的 0.5 是
+      // 唯一同时成立的位置。第三章那辆驴车是**移动掩体**，得挡住人，留在
+      // CART_COVER_Z——两种角色，两个深度。
       const pushed = cartKind === "barrow";
-      const cz = pushed ? BAND.loose : CART_COVER_Z;
+      const cz = pushed ? BAND.pushCart : CART_COVER_Z;
       // 新版第一章是空车推去、装上料再推回来——车上装了几件就画几件，
       // 装载数进 key，变了才重烘（三件是「两块门板 + 一根枣木杠」，
       // 第三件必须画成杠：截成 min(2) 的话「放上车」那一下画面毫无变化）
@@ -3272,8 +3308,11 @@ export function CreateWorld(canvasEl) {
       }
       doorLeafPivot.visible = true;
       doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
-      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转
-      doorLeafPivot.rotation.z = -(dl.lean || 0);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转。
+      // strain（攥着它较劲时才有）在渲染层抖那一丝——两只手对着一扇门的分量，
+      // 谁也压不死谁。判定用的 lean 不掺这份演出（Core 只算物理）。
+      const trem = (dl.strain || 0) * 0.008 * Math.sin(time * 34);
+      doorLeafPivot.rotation.z = -((dl.lean || 0) + trem);
     } else if (doorLeafPivot) doorLeafPivot.visible = false;
 
     if (state.planing) {
@@ -3548,9 +3587,15 @@ export function CreateWorld(canvasEl) {
     // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
     // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
     if (homeFacade && homeRange) {
-      const pp = state.player;
-      const inside = pp.level === "surface" && pp.x > homeRange.x0 && pp.x < homeRange.x1;
-      const goal = inside ? 0.07 : 1;
+      // 进没进屋由 Core 判（IndoorOpen）：位置只是必要条件——推着独轮车的人
+      // 走的是屋外那条道，车进不了堂屋
+      const inside = IndoorOpen(state, homeRange.x0, homeRange.x1);
+      // 戏在屋里演（爹修门那一场）：玩家还在门外，可墙合着的话他连爹在哪
+      // 都看不见——只看得见一双脚从墙根底下漏出来（用户 2026-08-09 报的）。
+      // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
+      const def = CurrentBeatDef(state);
+      const staged = !!(def?.indoorScene || state.beat?.indoorScene);
+      const goal = inside ? 0.07 : (staged ? 0.16 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
@@ -4207,13 +4252,18 @@ export function CreateWorld(canvasEl) {
     const otsZ = layers.ots.position.z;
     // 该层比玩法层离相机近，投影会放大 M 倍；构图偏移与体量都要按 M 折算
     const M = dist / Math.max(0.5, dist - otsZ);
-    // 剪影在屏幕上应占约 55% 画宽：先除掉透视放大倍率，再反解缩放
+    // 剪影在屏幕上应占约 72% 画宽（实拍标定：层缩放 comp 又吃掉一档，
+    // 按 0.55 反解出来上屏只有三成半，小得读不出是个人）
     const spriteW = otsMesh.geometry.parameters.width;
-    const S = (viewW * 0.55) / (M * spriteW);
+    const S = (viewW * 0.72) / (M * spriteW);
     otsMesh.scale.set((spec.facing || 1) * S, S, 1);
-    // 头肩落在画框一侧、压住下缘，说话的人留在另一侧
+    // 头肩落在画框一侧、**肩膀压出画框下缘**，说话的人留在另一侧。
+    // 0.62 那一版把锚点摆在画框下缘之上半米——剪影整个浮在半空，脚下还露着
+    // 路面，于是它既不是前景也不是布景，读出来就是"右边一坨奇怪的椭球"
+    //（用户 2026-08-09 原话）。过肩前景的定义就是**被画框切掉**：切掉了，
+    // 大脑才把它读成"贴着镜头的那个人"。0.95 让肩线落到下缘略外侧。
     const worldX = camX + side * (viewW / 2) * 0.58 / M;
-    const worldY = camY - (viewH / 2) * 0.62 / M + otsMesh.userData.offset.y * S;
+    const worldY = camY - (viewH / 2) * 0.95 / M + otsMesh.userData.offset.y * S;
     otsMesh.position.set(worldX / comp, worldY / comp, 0);
   }
 

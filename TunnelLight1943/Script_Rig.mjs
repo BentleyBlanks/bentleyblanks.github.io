@@ -740,6 +740,25 @@ export function PoseRig(rig, s, dt) {
     target.armB = -58 * DEG; target.foreB = -12 * DEG;
     target.thighB = -74 * DEG; target.shinB = 70 * DEG; target.footB = 12 * DEG;
     target.thighF = -70 * DEG; target.shinF = 64 * DEG; target.footF = 10 * DEG;
+  } else if (s.pose === "braceDoor") {
+    // 扶门：整个人顶在门板上，两手推在胸口高的板面上。poseK=吃劲程度——
+    // 门压过来越多，腰塌得越深、后腿绷得越直（重量感一半长在这具身子上）
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.4));
+    target.hipY = -0.06 - 0.06 * k; target.hipX = 0.10 + 0.10 * k;
+    target.torso = (20 + 14 * k) * DEG; target.head = -16 * DEG;
+    target.armF = (-72 - 10 * k) * DEG; target.foreF = (-26 + 14 * k) * DEG;
+    target.armB = (-60 - 10 * k) * DEG; target.foreB = (-30 + 12 * k) * DEG;
+    target.thighB = (-34 - 8 * k) * DEG; target.shinB = (30 + 6 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (16 + 6 * k) * DEG; target.shinF = 14 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "sitStool") {
+    // 坐在矮凳上歇着：屁股落到凳面（约0.28m），小臂搭在膝上——
+    // 爹开场养那只没合口的手，坐的就是这一姿势
+    target.hipY = -0.34; target.hipX = 0.02;
+    target.torso = 14 * DEG; target.head = -6 * DEG;
+    target.armF = -44 * DEG; target.foreF = -58 * DEG;
+    target.armB = -38 * DEG; target.foreB = -52 * DEG;
+    target.thighB = -84 * DEG; target.shinB = 78 * DEG; target.footB = 6 * DEG;
+    target.thighF = -78 * DEG; target.shinF = 72 * DEG; target.footF = 4 * DEG;
   } else if (s.pose === "sitSide") {
     // 挎斗里的兵：整个人蜷进斗里，膝盖顶到胸口，枪抱在怀里（枪走 carry）
     target.hipY = -0.30; target.hipX = 0.04;

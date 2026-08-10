@@ -909,6 +909,19 @@ function Build(ac, options) {
       Tone(t, { level: 0.09 * k, attack: 0.002, decay: 0.12, type: "triangle", freq: 190 * r, to: 120 * r, pan });
       NoiseHit(t + 0.015, { level: 0.05 * k, attack: 0.001, decay: 0.03, freq: 2100, q: 1.6, pan });
     },
+    // 门轴在臼窝里拧：一声干涩的吱呀。Core 按转过的角度一粒一粒发——
+    // 门转得快就叫得密、叫得尖（rate 跟角速度走），门一停耳朵里就静
+    doorCreak(t, k, pan, r) {
+      Tone(t, { level: 0.026 * k, attack: 0.012, decay: 0.13, type: "sawtooth", freq: 620 * r, to: 430 * r, pan });
+      NoiseHit(t, { level: 0.018 * k, attack: 0.008, decay: 0.09, freq: 1900 * r, sweep: -500, q: 6, pan });
+      Tone(t + 0.05, { level: 0.013 * k, attack: 0.01, decay: 0.1, type: "triangle", freq: 210 * r, to: 150 * r, pan });
+    },
+    // 一阵风头：从远处滚过来、掠过院子又散掉——吹倒门扇的就是这一口
+    windGust(t, k, pan) {
+      NoiseHit(t, { level: 0.055 * k, attack: 0.5, decay: 1.3, freq: 460, sweep: 340, q: 0.5, brown: true, pan });
+      NoiseHit(t + 0.3, { level: 0.04 * k, attack: 0.3, decay: 1.0, freq: 1050, sweep: 520, q: 0.8, pan });
+      NoiseHit(t + 0.55, { level: 0.02 * k, attack: 0.12, decay: 0.5, freq: 2400, sweep: 400, q: 1.2, pan });
+    },
     // 石笔蹭木头：一粒沙沙。Core 按"蹭过多少距离"一粒一粒地发，不是定时循环——
     // 于是手快声音就密、手一停声音就断，耳朵跟着手走
     scribe(t, k, pan, r) {
