@@ -3585,7 +3585,12 @@ export function CreateWorld(canvasEl) {
     if (homeFacade && homeRange) {
       const pp = state.player;
       const inside = pp.level === "surface" && pp.x > homeRange.x0 && pp.x < homeRange.x1;
-      const goal = inside ? 0.07 : 1;
+      // 戏在屋里演（爹修门那一场）：玩家还在门外，可墙合着的话他连爹在哪
+      // 都看不见——只看得见一双脚从墙根底下漏出来（用户 2026-08-09 报的）。
+      // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
+      const def = CurrentBeatDef(state);
+      const staged = !!(def?.indoorScene || state.beat?.indoorScene);
+      const goal = inside ? 0.07 : (staged ? 0.16 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
@@ -4242,13 +4247,18 @@ export function CreateWorld(canvasEl) {
     const otsZ = layers.ots.position.z;
     // 该层比玩法层离相机近，投影会放大 M 倍；构图偏移与体量都要按 M 折算
     const M = dist / Math.max(0.5, dist - otsZ);
-    // 剪影在屏幕上应占约 55% 画宽：先除掉透视放大倍率，再反解缩放
+    // 剪影在屏幕上应占约 72% 画宽（实拍标定：层缩放 comp 又吃掉一档，
+    // 按 0.55 反解出来上屏只有三成半，小得读不出是个人）
     const spriteW = otsMesh.geometry.parameters.width;
-    const S = (viewW * 0.55) / (M * spriteW);
+    const S = (viewW * 0.72) / (M * spriteW);
     otsMesh.scale.set((spec.facing || 1) * S, S, 1);
-    // 头肩落在画框一侧、压住下缘，说话的人留在另一侧
+    // 头肩落在画框一侧、**肩膀压出画框下缘**，说话的人留在另一侧。
+    // 0.62 那一版把锚点摆在画框下缘之上半米——剪影整个浮在半空，脚下还露着
+    // 路面，于是它既不是前景也不是布景，读出来就是"右边一坨奇怪的椭球"
+    //（用户 2026-08-09 原话）。过肩前景的定义就是**被画框切掉**：切掉了，
+    // 大脑才把它读成"贴着镜头的那个人"。0.95 让肩线落到下缘略外侧。
     const worldX = camX + side * (viewW / 2) * 0.58 / M;
-    const worldY = camY - (viewH / 2) * 0.62 / M + otsMesh.userData.offset.y * S;
+    const worldY = camY - (viewH / 2) * 0.95 / M + otsMesh.userData.offset.y * S;
     otsMesh.position.set(worldX / comp, worldY / comp, 0);
   }
 

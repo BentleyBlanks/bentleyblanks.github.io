@@ -1835,6 +1835,7 @@ export const SCRIPTS = {
           on: (state) => {
             // 推到门跟前：下轴跳出臼窝，整扇吊在上轴上晃
             state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: DOOR_SAG, loose: true, swing: true };
+            state.beat.indoorScene = true;   // 从这一行起戏挪到门口，立面半隐
             Cue(state, "tenon", { gain: 0.6 });
           } },
         { stage: "门轴从臼窝里跳了出来。风一过，那扇门就磕在框上。", d: 4.0,
@@ -1852,14 +1853,20 @@ export const SCRIPTS = {
             if (father) father.pose = "kneel";
             state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: DOOR_SAG, loose: true, swing: true };
           } },
+        // 这一句原来走过肩（ots）。爹在屋里、墙又合着，过肩前景的那团肩膀
+        // 剪影旁边什么也没有，读出来就是"右边一坨奇怪的椭球"（用户 2026-08-09）。
+        // 现在立面已经半隐（indoorScene），父子本来就同框——用普通双人镜更清楚，
+        // 那团剪影也就不必存在了。过肩留给两个人都在屋外、面对面的场合。
         { who: "爹", say: "过来搭把手——你扶住，我把轴礅回去。", d: 3.6,
-          cam: { kind: "ots", subject: "father", other: "player", dist: 3.6 } },
+          cam: { kind: "shot", x: 34.6, y: 1.3, dist: 4.2 } },
       ],
     },
     {
       // 第一场（玩法）：修门。扶门→递楔→顶住——用一件家务教基础操作。
       // 量身不是小游戏：门修好了，爹一抬眼才看见刻痕落到了眼睛下面（下一拍）
-      kind: "chain", id: "c1_door", timeOfDay: "dawn",
+      // indoorScene：这一场整场在屋门口演，爹站在门里——立面得半隐，
+      // 不然玩家只看得见一双脚从墙根下漏出来
+      kind: "chain", id: "c1_door", timeOfDay: "dawn", indoorScene: true,
       objective: "帮爹把门扶正", hint: "先扶稳门扇",
       onStart: (state) => {
         const father = FindActor(state, "father");
@@ -1886,7 +1893,7 @@ export const SCRIPTS = {
       // 量身。台词沿新剧本第一场（"这个家就靠你了"仍旧不要），但**划线本身是
       // 玩家的手**（2026-08-09 用户明令保留上一版的石笔交互，不许退成三四秒的
       // 过场动画）：门框上的刻痕是全篇的题眼，一头一尾都得亲手划。
-      kind: "cinematic", id: "c1_measure", timeOfDay: "dawn",
+      kind: "cinematic", id: "c1_measure", timeOfDay: "dawn", indoorScene: true,
       lines: [
         { who: "爹", say: "别动。", d: 2.2, cam: { kind: "ots", subject: "father", other: "player", dist: 3.4 },
           on: (state) => {
