@@ -1568,66 +1568,60 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
     ctx.fillRect(spoutX - 1, eaveY + 2, 6, H * 0.8);
     ctx.restore();
   }
-  // 屋顶上放着的碌碡：雨后要拿它把泥重新碾实，冀中平顶房的标配
-  {
-    const lx = x + W * 0.22;
-    InkFill(ctx, Rect(lx - 8, eaveY - rh - 5, 16, 6), id + "lulu", "#6b6252", { amp: 1.2, lw: 1.6 });
-    InkLine(ctx, lx - 10, eaveY - rh - 5, lx + 10, eaveY - rh - 5, id + "luluF",
-      { lw: 1.4, color: "#5a4a33", amp: 0.8 });
-  }
-  // 右后角塌一块：屋面凹进去，露出秫秸把的断头和一个黑洞
-  {
-    const bx = x + W * 0.30;
-    InkFill(ctx, [[bx, eaveY - rh * 0.9], [bx + 16, eaveY - rh * 0.55],
-      [bx + 14, eaveY - 1], [bx - 2, eaveY - 2]], id + "cave", "#3a3226", { amp: 1.8, lw: 1.6 });
-    for (let i = 0; i < 5; i += 1) {
-      ctx.save();
-      ctx.fillStyle = PAL.stalk;
-      ctx.beginPath();
-      ctx.ellipse(bx + 3 + i * 3, eaveY - rh * 0.4 + Sym(id + "st", i, 3), 1.6, 1.1, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-  // 檐口椽头：树棍不是方料——椭圆截面、间距不匀、缺两根、一根只剩朽茬
-  for (let i = 0, jx = x - rw / 2 + 12; jx < x + rw / 2 - 8; i += 1) {
-    if (Rnd(id + "rmiss", i) > 0.86) { jx += 26; continue; }
-    const rr = 2.2 + Rnd(id + "rr", i) * 2.4;
-    const rot = Rnd(id + "rot", i) > 0.9;
-    ctx.save();
-    ctx.fillStyle = rot ? "#57503f" : (i % 2 ? "#3a2c1b" : "#463521");
-    ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.ellipse(jx, eaveY + 3 + Sym(id + "rk", i, 1.4), rr, rr * 0.78, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    jx += 22 + Rnd(id + "rgap", i) * 12;
-  }
+  // 2026-08-10 用户退回整个屋顶：「你的楼顶画的是什么鬼 看都看不懂是什么玩意儿
+  // 实在不行这类鬼东西删了得了」。屋顶原来堆了四样东西——放着碾泥的碌碡、
+  // 塌角的黑洞、檐口一排椽头、烟道——每一样单看都有出处，可它们在**屋檐这条
+  // 三四像素高的线上**各占一块，读出来是"一条深色带上摆着几个不明方块，
+  // 底下串了一排珠子"。
+  // 判据照旧：**这件东西在这个尺寸下认得出来吗？** 认不出来的一律删掉，
+  // 屋顶只留两样真能读出来的东西——**烟囱**（唯一说明"这里头住着人、烧着火"
+  // 的记号）和**顶上长的草**（说明这是抹泥的平顶）。
   // 顶上长的草：泥顶年年长草，没人去薅
-  for (let i = 0; i < 6; i += 1) {
-    const wx = x - W * 0.36 + Rnd(id + "wd", i) * W * 0.74;
-    const wy = eaveY - rh * (0.4 + Rnd(id + "wd2", i) * 0.4);
+  for (let i = 0; i < 5; i += 1) {
+    const wx = x - W * 0.34 + Rnd(id + "wd", i) * W * 0.70;
+    const wy = eaveY - rh * (0.45 + Rnd(id + "wd2", i) * 0.35);
     for (let b = 0; b < 3; b += 1) {
-      InkLine(ctx, wx, wy, wx + (b - 1) * 3, wy - 5 - Rnd(id + "wd3", i * 3 + b) * 5,
+      InkLine(ctx, wx, wy, wx + (b - 1) * 3, wy - 4 - Rnd(id + "wd3", i * 3 + b) * 4,
         id + "weed" + i + b, { lw: 1, color: night ? "#333c31" : "#5d6440", amp: 1.1 });
     }
   }
-  // 烟道：穿屋面露出一截泥抹小墩，扣半截破罐挡雨，出口熏一片黑
+  // 烟囱：泥抹的小墩坐在屋面上，上头扣半截破瓦罐挡雨，罐口熏黑。
+  // **必须坐在屋脊线上、并且够高**（原先只有 13px 高、又压在檐口的一堆杂物
+  // 中间，看着像屋顶上放了个盒子）。烟囱高一截，剪影上才是"烟囱"。
   {
     const cx2 = x - W * 0.30;
-    InkFill(ctx, Rect(cx2 - 5, eaveY - rh - 13, 10, 13), id + "flue", "#6e6047", { amp: 1.4, lw: 1.6 });
-    InkFill(ctx, [[cx2 - 7, eaveY - rh - 13], [cx2 + 7, eaveY - rh - 13],
-      [cx2 + 5, eaveY - rh - 18], [cx2 - 5, eaveY - rh - 18]], id + "crock", "#4a3f33", { amp: 1.2, lw: 1.4 });
+    // 高矮宽窄按真物件给：泥墩 0.4m 见方、连罐口一共 0.55m 上下。
+    // 细长一根就成了工厂烟囱（画过一版 26px 高、14px 宽的，正是那样）
+    const stackTop = eaveY - rh - 17;
+    // 墩身：上窄下宽，坐进屋面里一点（底边压在屋面下方，不留缝）
+    InkFill(ctx, [[cx2 - 10, eaveY - rh + 4], [cx2 + 10, eaveY - rh + 4],
+      [cx2 + 8, stackTop], [cx2 - 8, stackTop]], id + "flue", "#6e6047",
+    { amp: 1.3, lw: 2.0, shade: "rgba(0,0,0,0.18)" });
+    // 扣着的破罐：罐口朝上敞着，侧面豁一块
+    InkFill(ctx, [[cx2 - 10, stackTop + 1], [cx2 + 10, stackTop + 1],
+      [cx2 + 8.5, stackTop - 7], [cx2 + 1, stackTop - 9], [cx2 - 8, stackTop - 6]],
+    id + "crock", "#4a3f33", { amp: 1.4, lw: 1.8 });
+    // 熏黑：罐口一圈最黑，往上散
     ctx.save();
-    ctx.globalAlpha = 0.30;
+    ctx.globalAlpha = 0.34;
     ctx.fillStyle = "#2b241c";
     ctx.beginPath();
-    ctx.ellipse(cx2 + 4, eaveY - rh - 10, 11, 5, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(cx2 + 1, stackTop - 8, 7, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.16;
+    ctx.beginPath();
+    ctx.ellipse(cx2 + 4, stackTop - 15, 9, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
+  // 檐口：一道压在墙头上的暗边。原先这儿是一排画成椭圆的椽头，
+  // 三四像素的圆点排一长溜，读出来是一串珠子——现在只留檐影，
+  // "屋顶挑出墙面一截"这件事由这条影子交代
+  ctx.save();
+  ctx.globalAlpha = 0.30;
+  ctx.fillStyle = "#2b2118";
+  ctx.fillRect(x - rw / 2 + 4, eaveY + 2, rw - 8, 4);
+  ctx.restore();
 
   // ⑨ 门：**按米写死**，不跟着 H 缩放（房子一矮门就压成一米五的洞）
   const SILL = 7;                       // 门槛 0.15m：土屋的门下必有这一条
@@ -1862,42 +1856,61 @@ export function DrawTree(ctx, x, groundY, id,
   //  · **树皮被整圈刮去吃掉**，刮到人踮脚够得着的高度（约 1.9m）戛然而止——
   //    那条分界线的高度本身就是这一笔的全部意思（stripped，给榆树）
   //  · 离地两三米以内的枝条年年砍去当柴，主干上只留一排砍平的枝桩截面
+  // 2026-08-10 用户退回：「这个树上面是什么鬼」——干上那块**发白的板子**。
+  // 两处硬伤，都是坐标算错，不是配色问题：
+  //   ① 剥皮区是拿 ±1.1×trunkW 的方框裁的，而**主干半宽只有 0.62×trunkW**
+  //      （`Limb` 收的是全宽），于是那块浅色比树干宽出将近一倍，两边直上直下
+  //      地支出去——读出来就是一块钉在树上的白木板。
+  //   ② 剥到 1.9m（91px）是按真事写的，可小树的分叉才在 0.95m 上，那块浅色
+  //      整个盖过分叉爬进树冠里。剥皮只发生在**主干**上，到分叉就该停。
+  // 颜色也只许比树皮亮一档：贴图上屏会被整体提亮（见 CanvasTexture 那条），
+  // 亮两档的 #a89678 上屏就是纸白。
+  const trunkAt = (k) => {
+    const kk = Math.max(0, Math.min(1, k));
+    return [x + (forkX - x) * kk, (groundY - 9) + (forkY - (groundY - 9)) * kk,
+      (trunkW * 1.25 + (trunkW * 0.72 - trunkW * 1.25) * kk) / 2];
+  };
   if (stripped) {
-    const cut = groundY - 91;                       // 1.9m：踮脚够得着的高度
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x - trunkW * 1.1, groundY - 9);
-    ctx.lineTo(x - trunkW * 0.85, cut);
-    ctx.lineTo(x + trunkW * 0.85, cut);
-    ctx.lineTo(x + trunkW * 1.1, groundY - 9);
-    ctx.closePath();
-    ctx.clip();
-    ctx.fillStyle = night ? "#6b6352" : "#a89678";   // 裸干：比树皮亮两档、略发潮
-    ctx.fillRect(x - trunkW * 1.2, cut, trunkW * 2.4, 92);
-    ctx.restore();
+    const baseY = groundY - 9;
+    const cut = Math.max(groundY - 91, forkY + 7);   // 1.9m 或分叉，谁低取谁
+    const kCut = Math.max(0.25, Math.min(0.92, (baseY - cut) / (baseY - forkY)));
+    const L = [], R = [];
+    for (let i = 0; i <= 6; i += 1) {
+      const [px, py, hw] = trunkAt((i / 6) * kCut);
+      const w2 = hw - 0.9;                           // 比树皮窄一线：两侧还留着皮
+      L.push([px - w2, py]);
+      R.push([px + w2, py]);
+    }
+    InkFill(ctx, [...L, ...R.reverse()], id + "strip",
+      night ? "#544b3c" : "#7d6242", { amp: 1.0, lw: 0, line: null });
     // 剥口不是齐的，是啃剥出来的锯齿边
-    for (let i = 0; i < 7; i += 1) {
-      const jx = x - trunkW + (i / 6) * trunkW * 2;
-      InkLine(ctx, jx, cut + Sym(id + "pk", i, 5), jx + trunkW * 0.34, cut + Sym(id + "pk2", i, 5),
-        id + "peel" + i, { lw: 1.6, color: barkDark, amp: 1.4 });
+    const [cxT, cyT, hwT] = trunkAt(kCut);
+    for (let i = 0; i < 5; i += 1) {
+      const jx = cxT - hwT + (i / 4) * hwT * 2;
+      InkLine(ctx, jx, cyT + Sym(id + "pk", i, 3.5), jx + hwT * 0.5, cyT + Sym(id + "pk2", i, 3.5),
+        id + "peel" + i, { lw: 1.5, color: barkDark, amp: 1.3 });
     }
     // 裸干上的刀痕斧印
-    for (let i = 0; i < 4; i += 1) {
-      const hy = groundY - 20 - Rnd(id + "hk", i) * 62;
-      InkLine(ctx, x - trunkW * 0.7, hy, x + trunkW * 0.6, hy + Sym(id + "hk2", i, 3),
-        id + "hack" + i, { lw: 1.2, color: "rgba(70,56,38,0.55)", amp: 0.8 });
+    for (let i = 0; i < 3; i += 1) {
+      const k = 0.12 + Rnd(id + "hk", i) * (kCut - 0.2);
+      const [hx, hy, hw] = trunkAt(k);
+      InkLine(ctx, hx - hw * 0.7, hy, hx + hw * 0.6, hy + Sym(id + "hk2", i, 2.5),
+        id + "hack" + i, { lw: 1.2, color: "rgba(58,44,28,0.5)", amp: 0.8 });
     }
   }
-  // 砍平的枝桩：0.44H 以下一根活枝都不留，树成了"剃头树"
+  // 砍平的枝桩：0.44H 以下一根活枝都不留，树成了"剃头树"。
+  // **桩子要长在树皮上**——原先钉在 ±0.95×trunkW，那是主干半宽的一倍半，
+  // 四颗深色椭圆浮在树干外边，看着像钉在干上的一排扣子
   for (let i = 0; i < 4; i += 1) {
-    const sy = groundY - 24 - i * (H * 0.09) - Rnd(id + "sb", i) * 8;
+    const k = 0.14 + i * 0.17 + Rnd(id + "sb", i) * 0.08;
+    const [sx0, sy, hw] = trunkAt(k);
     const dir = i % 2 ? 1 : -1;
     ctx.save();
     ctx.fillStyle = barkDark;
     ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    ctx.ellipse(x + dir * trunkW * 0.95, sy, 2.6, 3.4, dir * 0.4, 0, Math.PI * 2);
+    ctx.ellipse(sx0 + dir * (hw - 0.6), sy, 2.0, 2.8, dir * 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -1976,11 +1989,19 @@ export function DrawTree(ctx, x, groundY, id,
     const [fx, fy, fr] = front[i];
     LeafClump(ctx, fx - fr * 0.26, fy - fr * 0.30, fr * 0.46, id + "hl" + i, litC);
   }
-  // 冠里透出去的两根枝梢：全是叶子就成了一坨绿
+  // 冠里透出去的枝梢：全是叶子就成了一坨绿。
+  // 但它以前是从枝头**往冠外**斜着甩出去 cr×(0.6~1.1)＝二三十像素的直棍，
+  // 而且是**最后画的**，压在整顶树冠上头——用户看到的就是"两根杆子插在树上"
+  //（2026-08-10：「这个树上面是什么鬼」）。枝梢要**留在冠里**：从枝头朝冠心
+  // 方向短短一截，长度封在叶团半径的一半以内，绝不越过树冠轮廓。
   for (let i = 0; i < tips.length; i += 2) {
     const [tx, ty] = tips[i];
-    InkLine(ctx, tx, ty, tx + Sym(id + "tw", i, cr * 0.6), ty - cr * (0.6 + Rnd(id + "tw2", i) * 0.5),
-      id + "twig" + i, { lw: 1.3, color: barkDark, amp: 1.6 });
+    const inx = (cx0 - tx), iny = (cy0 - ty);
+    const d = Math.hypot(inx, iny) || 1;
+    const len = Math.min(cr * 0.5, d * 0.5);
+    InkLine(ctx, tx - inx / d * len * 0.15, ty - iny / d * len * 0.15,
+      tx + inx / d * len, ty + iny / d * len,
+      id + "twig" + i, { lw: 1.2, color: barkDark, amp: 1.2 });
   }
   Speckle(ctx, cx0 - crownR, cy0 - crownR * 0.8, crownR * 2, crownR * 1.5, id + "leaf",
     { count: big ? 46 : 30, alpha: 0.12, size: 2.2, color: "#243018" });
@@ -2063,20 +2084,45 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
   ctx.fillStyle = night ? "#241f14" : "#4a3c24";
   ctx.fillRect(x - HW - 6, groundY - 8, W + 12, 10);
 
-  // 垛面上的秸秆：**顺着坡往外下方铺**（从垛心呈放射状）。这是"草"的全部读法，
-  // 也是上一版最缺的一笔——那版只有 22 根、透明度 0.44，远看就是一块纯色
-  ctx.lineWidth = 1.15;
-  for (let i = 0; i < 150; i += 1) {
+  // 垛面上的秸秆。
+  // 2026-08-10 用户退回：「这草垛子他妈的像个蠕虫一样」。病根是**那些长笔画**：
+  // 每隔十二根压一条 15~25px 的亮直线，方向、位置全是随机的，于是垛面上爬着
+  // 二十来条两头圆、比垛面亮一大截的粗白道子——那正是"蛆/蠕虫"的长相。
+  // 秸秆在这个景别下（一根秸秆 1~2 厘米＝不到一个像素）本来就**不该看得见
+  // 一根一根**，能看见的只有两样东西：
+  //   ① **一层层码上去压实的层理**——沿着垛面弧度走的横纹，这是"垛"的读法；
+  //   ② 层理之间细碎的短茬，只提供质感，不提供图形。
+  // 所以：长笔画整个删掉，短茬压到 1px 以下、透明度砍半、颜色贴着垛面走。
+  // ① 层理：七八道顺着剖面走的暗纹，越往上越密（垛是越码越收的）
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = "butt";
+  for (let c = 0; c < 8; c += 1) {
+    const t0 = 0.08 + (c / 8) * 0.84;
+    ctx.globalAlpha = 0.17 + Rnd(id + "ca", c) * 0.11;
+    ctx.strokeStyle = dark;
+    ctx.beginPath();
+    for (let i = 0; i <= 14; i += 1) {
+      const u = i / 14;
+      const side = u < 0.5 ? -1 : 1;
+      const t = t0 + Math.sin(u * Math.PI) * 0.035;          // 中间鼓一点：面是圆的
+      const px = x + (u * 2 - 1) * R(t, side) * 0.98;
+      const py = PY(t) + Sym(id + "cy" + c, i, 1.2);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  // ② 短茬：只做质感。长度 2~6px、线宽 0.8、跟着坡朝外下方，颜色贴着垛面
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 190; i += 1) {
     const t = Rnd(id + "st", i) ** 0.8;
     const side = i % 2 ? 1 : -1;
-    const rr = R(t, side) * (0.15 + Rnd(id + "sr", i) * 0.9);
+    const rr = R(t, side) * (0.10 + Rnd(id + "sr", i) * 0.92);
     const px = x + side * rr;
     const py = PY(t) + Sym(id + "sy", i, 3);
     const dx = side * (0.45 + t * 0.55);         // 越靠顶越横着铺
     const dy = 0.75 - t * 0.35;
-    const long = i % 12 === 0;                   // 隔十来根压一条长的，破掉"一块纯色"
-    const len = (long ? 15 : 5) + Rnd(id + "sl", i) * (long ? 10 : 9);
-    ctx.globalAlpha = 0.26 + Rnd(id + "sa", i) * 0.36;
+    const len = 2 + Rnd(id + "sl", i) * 4;
+    ctx.globalAlpha = 0.10 + Rnd(id + "sa", i) * 0.18;
     ctx.strokeStyle = i % 3 === 0 ? dark : straw;
     ctx.beginPath();
     ctx.moveTo(px, py);
@@ -2100,8 +2146,10 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
     const nxv = side * (0.55 + t * 0.45);
     const nyv = 0.62 - t * 1.35;
     const norm = Math.hypot(nxv, nyv) || 1;
-    const len = 2 + Rnd(id + "fl", i) ** 1.6 * 12;   // 长短拉开：等长＝毛刷
-    ctx.globalAlpha = 0.4 + Rnd(id + "fa", i) * 0.5;
+    // 长短拉开：等长＝毛刷。但**上限压到 8px**——十几像素的亮秸秆头支出去，
+    // 在轮廓外围又是一圈"蠕虫"，和垛面上那些长笔画是同一个病
+    const len = 1.5 + Rnd(id + "fl", i) ** 1.6 * 6.5;
+    ctx.globalAlpha = 0.3 + Rnd(id + "fa", i) * 0.4;
     ctx.strokeStyle = i % 4 === 0 ? dark : straw;
     ctx.beginPath();
     ctx.moveTo(px - (nxv / norm) * 3, py - (nyv / norm) * 3);
@@ -2489,18 +2537,63 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = nul
       { amp: 1.8, lw: 2.2, shade: "rgba(74,56,42,0.20)" });
     WeatherAdobe(ctx, x0, groundY - H, x1 - x0, H, id + "wa" + x0,
       { course: 12, gullies: 3, cracks: 2, patches: 2 });
-    // 墙头苫的谷草：锯齿轮廓 + 挑出来的单根草秆，中间断一处露出光墙头
-    for (let sx = x0; sx < x1; sx += 5) {
-      if (sx > (x0 + x1) / 2 - 8 && sx < (x0 + x1) / 2 + 8) continue;
-      const ch = 5 + Rnd(id + "cap" + x0, sx) * 7;
-      InkFill(ctx, [[sx, groundY - H + 2], [sx + 6, groundY - H + 2],
-        [sx + 5, groundY - H - ch], [sx + 1, groundY - H - ch * 0.8]],
-      id + "cp" + x0 + sx, "#7d6a3a", { amp: 1.4, lw: 1.2 });
-      if (Rnd(id + "cw" + x0, sx) > 0.6) {
-        InkLine(ctx, sx + 3, groundY - H - ch, sx + 3 + Sym(id + "cs" + x0, sx, 5),
-          groundY - H - ch - 4 - Rnd(id + "cl" + x0, sx) * 7, id + "cst" + x0 + sx,
-          { lw: 0.9, color: "#8a7a4e", amp: 1.0 });
-      }
+    // 墙头苫的谷草。
+    // 2026-08-10 用户退回：「这个顶上我都不知道是什么玩意儿 一块块的」。
+    // 老画法是**每 5px 描一个 6px 宽、5~12px 高的独立四边形**，每块自带墨线，
+    // 于是墙头上立着一排彼此分家的深色小板子——那不是苫草，那是一排牌位。
+    // 苫草是**一整领草压在墙头上**：轮廓连着走、只有厚薄起伏，草秆细而碎，
+    // 而且它得**贴着墙头这条不平的线**走（墙头本来就是中段下坠的）。
+    const capTopY = (px) => {                 // 墙头那条线在 px 处的高度
+      const t = Math.max(0, Math.min(1, (px - x0) / Math.max(1, x1 - x0)));
+      const f = t * (top.length - 1);
+      const i0 = Math.min(top.length - 2, Math.floor(f));
+      const k = f - i0;
+      return top[i0][1] + (top[i0 + 1][1] - top[i0][1]) * k;
+    };
+    // 中间薅薄一段（露出光墙头）——**用厚度收到零来做，不许真断开**：
+    // 断成两截，每截都自带一圈墨线，读出来就是墙头上扣着两顶帽子
+    const capL = x0 - 1, capR = x1 + 1;
+    const bald = (x0 + x1) / 2 + Sym(id + "bd" + x0, 0, 8);
+    const seed = Hash(id + "cph" + x0) * 6.28;
+    const Thick = (px) => {
+      const worn = Math.max(0, 1 - ((px - bald) / 13) ** 2);      // 薅薄的那一段
+      return Math.max(0, (5.4 + Math.sin(px * 0.07 + seed) * 1.8) * (1 - worn * 0.92));
+    };
+    const lower = [], upper = [];
+    const n2 = Math.max(10, Math.round((capR - capL) / 3.5));
+    for (let i = 0; i <= n2; i += 1) {
+      const px = capL + ((capR - capL) * i) / n2;
+      const base = capTopY(px);
+      // 上沿必须是**毛**的：隔一点扎出去一截，草与瓦的分界全在这条边上
+      const burr = (i % 2 ? 1.7 : 0) + Rnd(id + "cpt" + x0, i) * 2.0;
+      lower.push([px, base + 2.5]);
+      upper.push([px, base - Thick(px) - (Thick(px) > 1 ? burr : 0)]);
+    }
+    InkFill(ctx, lower.concat(upper.reverse()), id + "cap" + x0,
+      "#7a6738", { amp: 0.9, lw: 1.2, line: IN.inkSoft, shade: "rgba(50,38,18,0.22)" });
+    // 草茬：顺着苫的方向斜铺在草脊上，让那条带子里头有东西
+    ctx.save();
+    ctx.lineWidth = 0.9;
+    for (let i = 0; i < Math.round((capR - capL) / 3); i += 1) {
+      const px = capL + 2 + Rnd(id + "cw" + x0, i) * (capR - capL - 4);
+      const th = Thick(px);
+      if (th < 1.5) continue;
+      const py = capTopY(px) - th * (0.15 + Rnd(id + "cv" + x0, i) * 0.7);
+      ctx.globalAlpha = 0.25 + Rnd(id + "ca" + x0, i) * 0.3;
+      ctx.strokeStyle = i % 3 === 0 ? "#5c4d28" : "#95855a";
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + (i % 2 ? 4 : -4), py + 1.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 檐口垂下来的几绺：草是搭在墙头上的，两边总要耷拉下来一点
+    for (let i = 0; i < 4; i += 1) {
+      const px = capL + 4 + Rnd(id + "dg" + x0, i) * (capR - capL - 8);
+      if (Thick(px) < 2) continue;
+      const py = capTopY(px) + 2;
+      InkLine(ctx, px, py, px + Sym(id + "dg2" + x0, i, 2.5), py + 4 + Rnd(id + "dg3" + x0, i) * 7,
+        id + "drp" + x0 + i, { lw: 1.1, color: "#7d6c44", amp: 1.2 });
     }
     // 墙根壅土
     InkFill(ctx, [[x0 - 4, groundY], [x0 + 2, groundY - 5], [(x0 + x1) / 2, groundY - 7],
