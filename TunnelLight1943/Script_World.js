@@ -412,11 +412,7 @@ export function CreateWorld(canvasEl) {
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
-  // 屋里的东西（地窖口、下窖的梯子）：从街上看不见，进了屋才露出来。
-  // 少了这一层，自家地窖口就成了「敞在门口大街上的一个洞」（用户 2026-08-09
-  // 退回：「主角家的地道/地窖怎么会在家门口外面」）——2.5D 里玩家走的那条线
-  // 永远在立面之前，所以屋内地面上的东西必须跟着立面一起淡
-  let indoorMeshes = [];
+
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
   // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
@@ -490,7 +486,6 @@ export function CreateWorld(canvasEl) {
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
-    indoorMeshes = [];
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -1583,8 +1578,6 @@ export function CreateWorld(canvasEl) {
     }
     // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
     if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
-    // 屋里的东西跟着立面隐现（见 indoorMeshes 的说明）
-    if (p.indoor) indoorMeshes.push(...group.children.slice(meshFrom));
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -2001,7 +1994,6 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
       FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
-      if (shaft.indoor) indoorMeshes.push(sh);
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -3750,14 +3742,15 @@ export function CreateWorld(canvasEl) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
       }
-      // 屋里的东西跟立面**反着**来：墙合着就看不见地窖口，墙一淡它才露出来。
-      // 立面挡不住它们——它们画在行走线上，比立面还近
-      const shown = 1 - Math.min(1, (homeFacade.material.opacity ?? 1) * 1.08);
-      for (const m of indoorMeshes) {
-        m.material.transparent = true;
-        m.material.opacity = shown;
-        m.visible = shown > 0.02;
-      }
+      // 屋里的地窖口/梯子**不做隐现**：它们画在 loose(0.3) 带、立面在
+      // facade(0.4) 带——墙本来就排在它们前面，合着的时候地面以上那一截
+      // 自然被墙挡住，地面以下那一截照常露着。于是从院里看过去就是
+      // 「地窖在屋子底下」——位置对了，画面自己说清楚了。
+      // 2026-08-09 那次「地窖怎么在家门口外面」的根因是**位置**（窖口摆在
+      // 院子里 x=37、根本不在屋子足迹内），不是画法；当时补的那层
+      // 「跟立面反着隐现」是治错了症：它把地下那截也一起灭了，玩家在院里
+      // 完全看不到自家地窖口，非得走进屋一米半才冒出来
+      //（用户 2026-08-10：「家里的地道为什么我在攀爬之前都是隐藏状态」）。
     }
 
     // 辘轳打水：井绳与桶跟着玩家的操作升降。绳从辘轳轴心垂到桶梁，
