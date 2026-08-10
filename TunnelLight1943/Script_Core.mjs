@@ -107,6 +107,20 @@ function SceneOf(state) { return SCENES[CHAPTERS[state.chapterIndex].scene]; }
 // ---------------------------------------------------------------------------
 export const CART_REACH = 2.6;   // 手边有车 = 推着它（翻越判定用的是同一个数）
 
+// ---------------------------------------------------------------------------
+// 镜头会不会自己动：**总开关，默认关**
+// ---------------------------------------------------------------------------
+// 2026-08-10 用户定：「目前我看不需要这个自动摇动镜头的功能，把这个开关/功能
+// 默认关闭吧」。所以窖口探头（走到地窖口镜头自动下沉、把脚底下那间窖带进画框）
+// 整个停用——镜头**只跟着人走**，不自己找东西看。
+//
+// 机制照旧留在代码里（Core 算 cellarPeek、Main 的 BaseShot 用它压低 y、
+// state.steadyCam 那套让位判据都在），要回来只需把这一行改成 true。
+// 代价说在前头：关掉之后，站在窖口按 S 之前是看不见那间窖的——
+// 地表机位的下边沿只到 −1.7m，窖底在 −3.6m。真要让玩家"下去之前先看见"，
+// 下次换别的路子（一拍固定机位的插入镜、或者过场里交代），别再默认开自动摇镜。
+export const CAM_CELLAR_PEEK = false;
+
 export function PushingCart(state) {
   return !!state.cart && Math.abs(state.player.x - state.cart.x) < CART_REACH;
 }
@@ -5034,6 +5048,7 @@ export function StartChapter(state, index) {
   state.vaultDust = null;
   state.vaultHint = "";
   state.cellarPeek = 0;
+  state.steadyCam = false;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -5646,6 +5661,7 @@ function MovePlayer(state, input, dt) {
       state.vaultHint = "";
       state.climbHint = "";
       state.cellarPeek = 0;
+      state.steadyCam = true;   // 被按住不许动的时候，镜头也别自己晃
       return;
     }
   }
@@ -5675,6 +5691,7 @@ function MovePlayer(state, input, dt) {
     state.climbHint = "";
     state.vaultHint = "";
     state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
+    state.steadyCam = false;
     return;                                                    // 爬梯中锁操作
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
@@ -5779,10 +5796,8 @@ function MovePlayer(state, input, dt) {
   //
   // 顺带算一个 0..1 的**探头量**（cellarPeek）：人在地表越靠近井口，镜头就
   // 越往下沉一档，把脚底下那个窖的剖面带进画框（Main 的 BaseShot 用它）。
-  // 为什么要这一下：地窖一直是画好的，可地表机位的下边沿只到 −1.7m，而窖底
-  // 在 −3.6m——整间窖都在画外。于是玩家按 S 之前根本看不见有这么个地方，
-  // 读起来就是"下去才凭空长出来一间屋"（用户 2026-08-10 报的）。
-  // 这是纯粹的**升降**，景别（hw）一点没变，不违反"全作只有一个景别档"。
+  // **默认整个停用**——见文件顶部的 CAM_CELLAR_PEEK（2026-08-10 用户定：
+  // 不要自动摇镜头）。下面这段留着，把开关拨回 true 就能整套回来。
   state.climbHint = "";
   let peek = 0;
   for (const shaft of scene.shafts) {
@@ -5794,16 +5809,26 @@ function MovePlayer(state, input, dt) {
     }
     // 探头的范围比提示宽一截（4.2m）：镜头得**先**沉下去，玩家才是"走过来
     // 看见脚底下有东西"，而不是"站定了画面才动"
-    if (p.level === "surface" && scene.walk.under) {
+    if (CAM_CELLAR_PEEK && p.level === "surface" && scene.walk.under) {
       const k = 1 - Math.min(1, Math.max(0, (d - 1.0) / 3.2));
       peek = Math.max(peek, k * k * (3 - 2 * k));   // 缓入缓出，别一步跳下去
     }
   }
-  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），别再叠一层。
-  // 被盯上的时候也不沉：潜行段镜头一往下扎，正前方摸过来的那盏灯就出了画框——
-  // 探头是"让你看见脚底下"，不是"把眼前的危险挪走"（潜行规范第 2 条）。
-  const spotted = (state.detection?.level || 0) > 0.15;
-  state.cellarPeek = (p.climbT > 0 || spotted) ? 0 : peek;
+  // —— 镜头自作主张的总开关 ——
+  // `state.steadyCam` 为真的那一帧，镜头**只跟人走**，任何自动的升降/探头一律
+  // 让位。以后再加"镜头自己动"的花样（探头、抬头看炮楼、震镜），都挂到这一个
+  // 判据上，别各写各的——不然每加一样就要把所有玩法重新试一遍。
+  // 三个来源：
+  //   ① **推着车**：车是横着走的一条线，镜头一沉，车头和前面的路一起出画
+  //      （用户 2026-08-10：「推车推到地道口镜头会自动下摇，应该屏蔽」）；
+  //   ② 被盯上：往下扎会把摸过来的那盏灯挤出画框（潜行规范第 2 条）；
+  //   ③ 节拍自己声明 `steadyCam: true`——要钉住构图的新玩法用这一个开关。
+  const camDef = CurrentBeatDef(state);
+  state.steadyCam = PushingCart(state)
+    || (state.detection?.level || 0) > 0.15
+    || !!(camDef?.steadyCam || state.beat?.steadyCam);
+  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），也别再叠一层
+  state.cellarPeek = (p.climbT > 0 || state.steadyCam) ? 0 : peek;
 
   // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
   if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {

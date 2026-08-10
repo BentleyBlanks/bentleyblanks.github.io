@@ -13,7 +13,7 @@ import {
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
-  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
+  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK,
   UnderSegments,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
@@ -389,9 +389,11 @@ function TestClimb() {
     assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
   }
 
-  // 下去之前就得看得见脚底下那间窖（用户 2026-08-10：「地道为什么攀爬之前都是
-  // 隐藏状态」）。地窖一直画着，是地表机位的下边沿够不着它——所以这里量的是
-  // **镜头有没有沉下去**（Core 出 cellarPeek，Main 的 BaseShot 拿它压低 y）。
+  // 镜头不许自己动（用户 2026-08-10：「目前我看不需要这个自动摇动镜头的功能，
+  // 把这个开关/功能默认关闭吧」）。窖口探头的整套机制还在代码里，但总开关
+  // CAM_CELLAR_PEEK 默认 false——这里盯死两件事：①开关确实是关的、真跑起来
+  // 一帧都不沉；②让位判据 state.steadyCam 仍然成立（开关拨回来时才不会踩坑，
+  // 以后新加的"镜头自己动"也都挂这一个判据）。
   {
     const s3 = CreateGame(0);
     let f3 = 0;
@@ -401,26 +403,30 @@ function TestClimb() {
     }
     const sc3 = SCENES[CHAPTERS[s3.chapterIndex].scene];
     const idle3 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
-    const PeekAt = (x, mutate) => {
+    const At = (x, mutate) => {
       s3.player.x = x; s3.player.level = "surface"; s3.player.cineWalk = null;
       mutate?.(s3);
       StepGame(s3, idle3, DT);
-      return s3.cellarPeek || 0;
+      return s3;
     };
     const shaftX = sc3.shafts[0].x;
-    assert.ok(PeekAt(shaftX) > 0.99, "站在窖口上，镜头必须整档沉下去");
-    assert.ok(PeekAt(shaftX - 2.4) > 0.05, "走近的路上就该开始沉——不能站定了画面才动");
-    assert.ok(PeekAt(shaftX - 8) < 0.01, "离得远就不沉，玩法机位照旧");
-    // 被盯上时不许沉：镜头往下扎会把正前方摸过来的灯挪出画框（潜行规范第 2 条）
-    assert.equal(PeekAt(shaftX, (s) => { s.detection = { level: 0.9 }; }), 0,
-      "被盯上的时候不许探头——那会把眼前的危险挤出画框");
+    assert.equal(CAM_CELLAR_PEEK, false, "自动摇镜头默认必须是关的（用户 2026-08-10 定）");
+    for (const x of [shaftX, shaftX - 1.2, shaftX - 2.4, shaftX - 8]) {
+      assert.equal(At(x).cellarPeek || 0, 0, `关掉之后，走到哪儿镜头都不许自己沉（x=${x}）`);
+    }
+    // 让位判据：推着车、被盯上、节拍声明，三条都得把 steadyCam 立起来
+    assert.equal(At(shaftX).steadyCam, false, "平时不锁镜头");
+    assert.equal(At(shaftX, (s) => { s.cart = { x: shaftX + 1.2, kind: "barrow" }; }).steadyCam, true,
+      "推着车的时候必须锁住镜头——车是横着走的，镜头一沉车头和路一起出画");
+    s3.cart = null;
+    assert.equal(At(shaftX, (s) => { s.detection = { level: 0.9 }; }).steadyCam, true,
+      "被盯上的时候必须锁住镜头（潜行规范第 2 条）");
     s3.detection = null;
-    // 爬梯那一段镜头由 lift 带着走，探头得让位，否则两个来源叠着往下压
-    s3.player.x = shaftX;
-    StepGame(s3, { ...idle3, climb: 1 }, DT);
-    assert.ok(s3.player.climbT > 0 && (s3.cellarPeek || 0) === 0, "爬梯途中不叠探头（lift 已经在带镜头）");
+    assert.equal(At(shaftX, (s) => { s.beat.steadyCam = true; }).steadyCam, true,
+      "节拍声明 steadyCam 必须管用——这是给新玩法钉构图的那个开关");
+    s3.beat.steadyCam = false;
   }
-  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位 / 下去之前先看得见窖）");
+  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位 / 镜头不自己摇）");
 }
 
 function TestSmokeFront() {
