@@ -1813,17 +1813,22 @@ function Limb(ctx, x0, y0, x1, y1, w0, w1, id, fill, { bow = 0, lw = 2, shade = 
   InkFill(ctx, [...left, ...right.reverse()], id, fill, { amp, lw, shade });
 }
 
-// 一团树叶：不规则多边形。起伏要**浅**——隔一个点就往里收 1/4 的话，
-// 画出来是一片枫叶标本，不是一簇叶子（第一版就栽在这儿）
-function LeafClump(ctx, cx, cy, r, id, fill, { line = null, lw = 0, squash = 0.82 } = {}) {
-  const n = 16;
+// 一团树叶。两头都是坑：起伏太深＝一片枫叶标本；起伏太浅＝一个圆饼。
+// 上一版是后者——半径只在 0.90~1.06 之间抖，16 个点连出来就是正圆，
+// 几个正圆并排贴上去，远看是西兰花（2026-08-10 用户："树太丑了"）。
+// 现在起伏由 lobes 个真正的瓣决定（±20%），再叠一层小抖；墨线抖动量按团的
+// 大小走（写死 1.6 的话，大树的团照样光溜溜）。
+function LeafClump(ctx, cx, cy, r, id, fill, { line = null, lw = 0, squash = 0.82, lobes = 5 } = {}) {
+  const n = 22;
+  const ph = Hash(id + "ph") * Math.PI * 2;
   const pts = [];
   for (let a = 0; a < n; a += 1) {
     const ang = (a / n) * Math.PI * 2;
-    const rr = r * (a % 3 === 0 ? 0.9 : 1.0) * (0.9 + Rnd(id, a) * 0.16);
+    const lobe = 1 + Math.sin(ang * lobes + ph) * 0.20;
+    const rr = r * lobe * (0.92 + Rnd(id, a) * 0.15);
     pts.push([cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr * squash]);
   }
-  InkFill(ctx, pts, id + "f", fill, { amp: 1.6, lw, line });
+  InkFill(ctx, pts, id + "f", fill, { amp: Math.max(1.2, r * 0.075), lw, line });
 }
 
 // 树。**不许再画成棒棒糖**：一根等宽的棍上顶一个绿球，是这版被打回来的样子。
@@ -1913,18 +1918,28 @@ export function DrawTree(ctx, x, groundY, id,
   }
   // 砍平的枝桩：0.44H 以下一根活枝都不留，树成了"剃头树"。
   // **桩子要长在树皮上**——原先钉在 ±0.95×trunkW，那是主干半宽的一倍半，
-  // 四颗深色椭圆浮在树干外边，看着像钉在干上的一排扣子
+  // 四颗深色椭圆浮在树干外边，看着像钉在干上的一排扣子。
+  // 而且光有一枚椭圆还是读成铆钉：得是**探出干外的一小截桩子＋朝外的浅色断面**
+  //（2026-08-10 用户："树太丑了"）——年年砍、年年发白的那个砍口。
   for (let i = 0; i < 4; i += 1) {
     const k = 0.14 + i * 0.17 + Rnd(id + "sb", i) * 0.08;
     const [sx0, sy, hw] = trunkAt(k);
     const dir = i % 2 ? 1 : -1;
+    const sw = trunkW * (0.24 + Rnd(id + "sw", i) * 0.10);      // 桩子粗细
+    const out = trunkW * (0.38 + Rnd(id + "so", i) * 0.26);     // 探出多长
+    const bx = sx0 + dir * (hw - 0.6);                          // 桩根落在树皮上
+    InkFill(ctx, [
+      [bx, sy - sw], [bx + dir * out, sy - sw * 0.72 - 1.2],
+      [bx + dir * out, sy + sw * 0.72 - 1.2], [bx, sy + sw],
+    ], id + "stub" + i, barkDark, { amp: 0.5, lw: 1.4 });
+    // 断面：砍口朝外
     ctx.save();
-    ctx.fillStyle = barkDark;
+    ctx.beginPath();
+    ctx.ellipse(bx + dir * out, sy - 1.2, 1.5, sw * 0.72, 0, 0, Math.PI * 2);
+    ctx.fillStyle = night ? "#6b6252" : "#a8946f";
+    ctx.fill();
     ctx.strokeStyle = IN.ink;
     ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.ellipse(sx0 + dir * (hw - 0.6), sy, 2.0, 2.8, dir * 0.4, 0, Math.PI * 2);
-    ctx.fill();
     ctx.stroke();
     ctx.restore();
   }
@@ -1947,9 +1962,12 @@ export function DrawTree(ctx, x, groundY, id,
   const nB = big ? 5 : 4;
   const tips = [];
   for (let i = 0; i < nB; i += 1) {
-    const t = (i + 0.5) / nB;
-    const ang = -Math.PI / 2 + (t - 0.5) * 1.5 + Sym(id + "ba", i, 0.16);
-    const len = H * (0.34 + Rnd(id + "bl", i) * 0.14);
+    // 骨架先按位次定，随机只做微调——全交给随机的话四根枝一样长，
+    // 树冠就是一张平顶的饼（老版正是如此）。**中间的枝长、外侧的枝短**，
+    // 冠自然拱成圆的；张角也收窄一档，让冠高大于冠宽
+    const s = nB === 1 ? 0 : (i / (nB - 1)) * 2 - 1;            // −1..1
+    const ang = -Math.PI / 2 + s * 0.62 + Sym(id + "ba", i, 0.18);
+    const len = H * (0.40 + (1 - Math.abs(s)) * 0.24 + Rnd(id + "bl", i) * 0.10);
     const tx = forkX + Math.cos(ang) * len;
     const ty = forkY + Math.sin(ang) * len * 0.92;
     Limb(ctx, forkX + Math.cos(ang) * trunkW * 0.25, forkY + trunkW * 0.2, tx, ty,
@@ -1970,53 +1988,69 @@ export function DrawTree(ctx, x, groundY, id,
   const base = night ? PAL.treeDark : PAL.tree;
   const backC = night ? "#2b3826" : "#41542c";
   const litC = night ? "#4a5c3a" : "#78904a";
-  const cr = (big ? 31 : 21);
-  // 冠底：先把整顶铺成一团暗的，各枝的叶团才连得成一顶树冠；
-  // 少了这一层，画面上就是几片飘在空中互不相干的绿斑
-  let cx0 = 0, cy0 = 0, minX = 1e9, maxX = -1e9;
-  for (const [tx] of tips) { minX = Math.min(minX, tx); maxX = Math.max(maxX, tx); }
+  const cr = (big ? 26 : 18);
+  let cx0 = 0, cy0 = 0;
   for (const [tx, ty] of tips) { cx0 += tx; cy0 += ty; }
   cx0 /= tips.length; cy0 /= tips.length;
-  // 冠底比枝展略小：枝头那几团要能顶出轮廓去，树冠才不是一颗土豆
-  const crownR = (maxX - minX) * 0.5 + cr * 0.52;
-  LeafClump(ctx, cx0, cy0 - cr * 0.10, crownR, id + "mass", backC,
-    { line: IN.inkSoft, lw: 2.0, squash: 0.76 });
 
-  // 枝头的叶团：往冠心收一点（收得太散就散架），后层压暗、前层提亮
+  // **不铺整顶的大饼**。老版先画一个盖住全冠、还描了墨边的大椭圆当"冠底"，
+  // 那一笔就是"西兰花"的全部来源：轮廓成了一条光滑的圆弧，各枝的团再怎么
+  // 错位也只是在这张饼里面挪。现在树冠**由一簇一簇搭起来**——底下一层暗的
+  // 只在枝根附近垫着（背光面），轮廓完全交给外圈那几团自己的凹凸，
+  // 团与团之间留得出天空，枝梢从缝里穿出去。
   const back = [], front = [];
   for (let i = 0; i < tips.length; i += 1) {
     const [tx0, ty0] = tips[i];
-    const tx = tx0 + (cx0 - tx0) * 0.12;
-    const ty = ty0 + (cy0 - ty0) * 0.12;
-    const r = cr * (0.78 + Rnd(id + "cr", i) * 0.30);
-    back.push([tx + Sym(id + "cx", i, r * 0.3), ty + r * 0.26 + Sym(id + "cy", i, r * 0.18), r * 0.86]);
-    front.push([tx + Sym(id + "dx", i, r * 0.28), ty - r * 0.22 + Sym(id + "dy", i, r * 0.16), r * 0.80]);
+    const tx = tx0 + (cx0 - tx0) * 0.10;
+    const ty = ty0 + (cy0 - ty0) * 0.10;
+    const r = cr * (0.72 + Rnd(id + "cr", i) * 0.42);
+    back.push([tx + Sym(id + "cx", i, r * 0.34), ty + r * 0.34 + Sym(id + "cy", i, r * 0.2), r * 0.92]);
+    front.push([tx + Sym(id + "dx", i, r * 0.3), ty - r * 0.20 + Sym(id + "dy", i, r * 0.22), r * 0.84]);
   }
-  for (let i = 0; i < back.length; i += 1) LeafClump(ctx, back[i][0], back[i][1], back[i][2], id + "kb" + i, backC);
+  // 背光层：压在枝根与冠腹，冠有厚度靠它。再沿每根枝的中段补一团——
+  // 只在枝梢挂叶，冠底下就空一圈，读成"几团绿浮在树上头"
+  for (let i = 0; i < tips.length; i += 1) {
+    const [tx, ty] = tips[i];
+    const mx = forkX + (tx - forkX) * 0.62, my = forkY + (ty - forkY) * 0.62;
+    LeafClump(ctx, mx + Sym(id + "mx", i, cr * 0.3), my + cr * 0.22, cr * (0.52 + Rnd(id + "mr", i) * 0.24),
+      id + "km" + i, backC, { lobes: 4 });
+  }
+  for (let i = 0; i < back.length; i += 1) {
+    LeafClump(ctx, back[i][0], back[i][1], back[i][2], id + "kb" + i, backC, { lobes: 4 + (i % 3) });
+  }
+  // 冠里的枝：**画在两层叶子之间**——盖在暗层上、又被亮层压住，读成"从叶子缝里
+  // 透出来的枝"。它以前是最后画的、还朝冠外甩出去二三十像素，压在整顶树冠上头，
+  // 就成了"两根杆子插在树上"（2026-08-10：「这个树上面是什么鬼」）。
+  // 两条一起才治得住：**夹在两层之间画** ＋ **朝冠心走、长度封在叶团半径以内**
+  for (let i = 0; i < tips.length; i += 1) {
+    const [tx, ty] = tips[i];
+    const inx = cx0 - tx, iny = cy0 - ty;
+    const d = Math.hypot(inx, iny) || 1;
+    const len = Math.min(cr * 0.7, d * 0.6);
+    InkLine(ctx, tx - inx / d * len * 0.2, ty - iny / d * len * 0.2,
+      tx + inx / d * len, ty + iny / d * len,
+      id + "twig" + i, { lw: 1.2, color: barkDark, amp: 1.2 });
+  }
+  // 受光层：叶团亮暗交替，外圈那几团把轮廓顶出去
   for (let i = 0; i < front.length; i += 1) {
     LeafClump(ctx, front[i][0], front[i][1], front[i][2], id + "kf" + i, i % 2 ? base : litC,
-      { line: "rgba(43,31,22,0.45)", lw: 1.4 });
+      { line: "rgba(43,31,22,0.42)", lw: 1.5, lobes: 5 + (i % 2) });
+  }
+  // 破轮廓的几团小的：挂在冠外沿，专门把那条圆弧咬缺一块
+  for (let i = 0; i < tips.length; i += 1) {
+    const [tx, ty] = tips[i];
+    const a = Math.atan2(ty - cy0, tx - cx0) + Sym(id + "ea", i, 0.5);
+    const d = cr * (0.62 + Rnd(id + "ed", i) * 0.5);
+    LeafClump(ctx, tx + Math.cos(a) * d, ty + Math.sin(a) * d * 0.8, cr * (0.30 + Rnd(id + "er", i) * 0.22),
+      id + "ke" + i, i % 2 ? litC : base, { line: "rgba(43,31,22,0.36)", lw: 1.2, lobes: 4 });
   }
   // 受光的一侧：左上角一道亮边
   for (let i = 0; i < front.length; i += 2) {
     const [fx, fy, fr] = front[i];
-    LeafClump(ctx, fx - fr * 0.26, fy - fr * 0.30, fr * 0.46, id + "hl" + i, litC);
+    LeafClump(ctx, fx - fr * 0.28, fy - fr * 0.32, fr * 0.44, id + "hl" + i, litC, { lobes: 4 });
   }
-  // 冠里透出去的枝梢：全是叶子就成了一坨绿。
-  // 但它以前是从枝头**往冠外**斜着甩出去 cr×(0.6~1.1)＝二三十像素的直棍，
-  // 而且是**最后画的**，压在整顶树冠上头——用户看到的就是"两根杆子插在树上"
-  //（2026-08-10：「这个树上面是什么鬼」）。枝梢要**留在冠里**：从枝头朝冠心
-  // 方向短短一截，长度封在叶团半径的一半以内，绝不越过树冠轮廓。
-  for (let i = 0; i < tips.length; i += 2) {
-    const [tx, ty] = tips[i];
-    const inx = (cx0 - tx), iny = (cy0 - ty);
-    const d = Math.hypot(inx, iny) || 1;
-    const len = Math.min(cr * 0.5, d * 0.5);
-    InkLine(ctx, tx - inx / d * len * 0.15, ty - iny / d * len * 0.15,
-      tx + inx / d * len, ty + iny / d * len,
-      id + "twig" + i, { lw: 1.2, color: barkDark, amp: 1.2 });
-  }
-  Speckle(ctx, cx0 - crownR, cy0 - crownR * 0.8, crownR * 2, crownR * 1.5, id + "leaf",
+  const crownR = cr * 2.2;
+  Speckle(ctx, cx0 - crownR, cy0 - crownR * 0.9, crownR * 2, crownR * 1.6, id + "leaf",
     { count: big ? 46 : 30, alpha: 0.12, size: 2.2, color: "#243018" });
 }
 
@@ -2587,35 +2621,97 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
 //
 // ghost=true 是被白灰盖过的旧标语（抗日的口号被宣抚班刷掉）——只剩透出来的
 // 影子。这一笔比标语本身更说明问题：墙面上压着两层字，谁来过都写在上头。
-export function DrawWallSlogan(ctx, x, y, chars, size, id, { ghost = false, tone = "lime" } = {}) {
+// 画法见 DrawWashedSlogan：**顺序就是这件事本身**，先有字后有灰。
+// 被石灰水刷掉的旧标语。**画的顺序就是这件事本身**：先有字，后有人拿刷子盖。
+//
+// 老版是反的——先铺一块四边笔直的浅色方块，再把字画在方块上面。出来的东西
+// 是「一条白布横幅上印着字」，跟"被擦掉"半点关系没有（2026-08-10 用户：
+// 「这鬼设计一点都不像是被擦掉了」）。
+//
+// 现在四步，每一步对应现实里的一下动作：
+//   ① 旧字先写在墙上——锅烟灰调的黑，笔画是刷的、有飞白；
+//   ② 石灰水**一刷子一刷子横着扫过去**盖住它。每一刷两头收尖（刷子提起来）、
+//      上下沿发毛，几刷叠出来的外形四条边都不齐——这是"没有直边"的来源；
+//   ③ 刷得薄的地方旧字自己就透出来了，不用另画一层"影子"；
+//   ④ 石灰水调得稀，边上必淌。
+function DrawWashedSlogan(ctx, x, y, chars, size, gap, id) {
+  const n = chars.length;
+  const bw = gap * n + size * 0.5;
+  // ① 旧字：写在墙上的黑字
+  ctx.font = `700 ${size}px 'Noto Serif SC', serif`;
+  for (let i = 0; i < n; i += 1) {
+    const cx = x + (n - 1) / 2 * gap - i * gap;
+    const jx = Sym(id + "ox", i, size * 0.06);
+    const jy = Sym(id + "oy", i, size * 0.055);
+    // 字要压得够黑才盖得住：CanvasTexture 没声明 sRGB，全场上屏亮两档
+    //（见 CLAUDE.md 配色那条），按纸面挑的灰到了屏幕上就没了
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = "#3a2d21";
+    ctx.fillText(chars[i], cx + jx, y + jy + size * 0.05);   // 洇开的一层
+    ctx.globalAlpha = 0.86;
+    ctx.fillStyle = "#241b13";
+    ctx.fillText(chars[i], cx + jx, y + jy);
+  }
+  ctx.globalAlpha = 1;
+  // ② 石灰水：横着扫过去的几刷
+  const strokes = 6;
+  for (let s = 0; s < strokes; s += 1) {
+    const sy = y - size * 0.74 + (s / (strokes - 1)) * size * 1.48;
+    const h0 = size * (0.30 + Rnd(id + "sh", s) * 0.18);
+    // 每一刷的两头**只许往外探、探多远各不相同**：都停在同一条竖线上就又叠成
+    // 方块了；可要是允许往里缩，一边的字会整个露在灰外头，成了"刷歪了"
+    const x0 = x - bw / 2 - size * (0.1 + Rnd(id + "sa", s) * 1.1);
+    const x1 = x + bw / 2 + size * (0.1 + Rnd(id + "sb", s) * 1.1);
+    const N = 12;
+    const pts = [];
+    // 两头收尖：h 随位置从 0.22 涨到 1 再落回去，刷子起落的形状
+    const hAt = (t) => h0 * (0.22 + 0.78 * Math.sin(Math.PI * Math.min(1, Math.max(0, t))) ** 0.6);
+    for (let k = 0; k <= N; k += 1) {
+      const t = k / N;
+      pts.push([x0 + (x1 - x0) * t, sy - hAt(t) * 0.5 + Sym(id + "u" + s, k, h0 * 0.3)]);
+    }
+    for (let k = N; k >= 0; k -= 1) {
+      const t = k / N;
+      pts.push([x0 + (x1 - x0) * t, sy + hAt(t) * 0.5 + Sym(id + "d" + s, k, h0 * 0.3)]);
+    }
+    ctx.globalAlpha = 0.40 + Rnd(id + "sv", s) * 0.36;
+    InkFill(ctx, pts, id + "wash" + s, "#cbbc9e", { amp: 1.0, lw: 0, line: null });
+  }
+  // 补两下短的：刷子折回来盖没盖严的地方，轮廓再啃缺一块
+  for (let s = 0; s < 3; s += 1) {
+    const cxs = x + Sym(id + "px", s, bw * 0.34);
+    const w2 = bw * (0.16 + Rnd(id + "pw", s) * 0.2);
+    const sy = y + Sym(id + "py", s, size * 0.62);
+    const h2 = size * (0.22 + Rnd(id + "ph", s) * 0.14);
+    ctx.globalAlpha = 0.34 + Rnd(id + "pv", s) * 0.3;
+    InkFill(ctx, [
+      [cxs - w2, sy], [cxs - w2 * 0.5, sy - h2 * 0.6], [cxs + w2 * 0.6, sy - h2 * 0.5],
+      [cxs + w2, sy + h2 * 0.2], [cxs + w2 * 0.3, sy + h2 * 0.6], [cxs - w2 * 0.6, sy + h2 * 0.5],
+    ], id + "patch" + s, "#c6b697", { amp: 1.4, lw: 0, line: null });
+  }
+  ctx.globalAlpha = 1;
+  // ④ 往下淌的几道
+  for (let s = 0; s < 4; s += 1) {
+    const dx = x + Sym(id + "dx", s, bw * 0.42);
+    const dy0 = y + size * (0.62 + Rnd(id + "dy", s) * 0.2);
+    InkLine(ctx, dx, dy0, dx + Sym(id + "dw", s, size * 0.06), dy0 + size * (0.3 + Rnd(id + "dl", s) * 0.8),
+      id + "drip" + s, { lw: size * (0.04 + Rnd(id + "dt", s) * 0.05), color: "rgba(203,188,158,0.5)", amp: 0.5 });
+  }
+}
+
+export function DrawWallSlogan(ctx, x, y, chars, size, id, { ghost = false, tone = "lime", wall = PAL.adobe } = {}) {
   const n = chars.length;
   const gap = size * 1.22;
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  if (ghost) {
-    // 盖上去的白灰：一块刷得不匀的浅色斑，边缘是刷痕不是直边
-    const bw = gap * n + size * 0.7, bh = size * 1.5;
-    InkFill(ctx, RaggedTop(x - bw / 2, x + bw / 2, y - bh / 2, id + "wash", { sag: 3, n: 9 })
-      .concat([[x + bw / 2, y + bh / 2], [x - bw / 2, y + bh / 2]]),
-    id + "washF", "#c3b294", { amp: 2.0, lw: 0, line: null });
-  }
+  if (ghost) { DrawWashedSlogan(ctx, x, y, chars, size, gap, id); ctx.restore(); return; }
   for (let i = 0; i < n; i += 1) {
     // 倒着码：i=0 那个字落在最右边
     const cx = x + (n - 1) / 2 * gap - i * gap;
     const jx = Sym(id + "jx", i, size * 0.055);
     const jy = Sym(id + "jy", i, size * 0.05);
     ctx.font = `700 ${size}px 'Noto Serif SC', serif`;
-    if (ghost) {
-      // 透出来的旧字：比白灰略深一点点，糊，不成形
-      ctx.globalAlpha = 0.26;
-      ctx.fillStyle = "#6d5f4a";
-      ctx.filter = "blur(1.1px)";
-      ctx.fillText(chars[i], x + (n - 1) / 2 * gap - i * gap + jx, y + jy);
-      ctx.filter = "none";
-      ctx.globalAlpha = 1;
-      continue;
-    }
     // 石灰水：先一层稀的往下洇，再压一遍笔画
     ctx.globalAlpha = 0.22;
     ctx.fillStyle = tone === "ink" ? "#3a2f22" : "#d9cdb0";
@@ -2623,14 +2719,16 @@ export function DrawWallSlogan(ctx, x, y, chars, size, id, { ghost = false, tone
     ctx.globalAlpha = tone === "ink" ? 0.72 : 0.52;
     ctx.fillText(chars[i], cx + jx, y + jy);
     ctx.globalAlpha = 1;
-    // 墙面坑洼吃掉的缺口：抠掉两三小块，字才像刷在土墙上而不是贴上去的
+    // 墙面坑洼吃掉的缺口：拿墙色把两三小块笔画盖回去，字才像刷在土墙上而不是
+    // 贴上去的。**不许用 destination-out**——这张画布上除了字还有整面墙，
+    // 抠出来的是穿透墙体的洞，背后是天，白天看是几个亮点、夜里是几个黑点
     ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
     for (let k = 0; k < 5; k += 1) {
       const px = cx + Sym(id + "gx" + i, k, size * 0.36);
       const py = y + Sym(id + "gy" + i, k, size * 0.36);
       const r = size * (0.06 + Rnd(id + "gr" + i, k) * 0.13);
       ctx.globalAlpha = 0.5 + Rnd(id + "ga" + i, k) * 0.4;
+      ctx.fillStyle = wall;
       ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();

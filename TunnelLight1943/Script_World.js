@@ -478,6 +478,7 @@ export function CreateWorld(canvasEl) {
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
+  let facadeBehind = false;   // 立面淡下去之后有没有让到演员后头（见 UpdateProps）
 
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
@@ -562,7 +563,7 @@ export function CreateWorld(canvasEl) {
     winchGuide = null; winchCoil = null;
     wellShaft = null; wellDeepBucket = null; wellDeepFull = null; wellRipple = null; wellDeepRope = null;
     ropeLineMesh = null; ropeCoilMesh = null;
-    homeFacade = null; homeRange = null;
+    homeFacade = null; homeRange = null; facadeBehind = false;
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -4092,11 +4093,23 @@ export function CreateWorld(canvasEl) {
       // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
       const def = CurrentBeatDef(state);
       const staged = !!(def?.indoorScene || state.beat?.indoorScene);
-      const goal = inside ? 0.07 : (staged ? 0.16 : 1);
+      const goal = inside ? 0.07 : (staged ? 0.30 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
+      }
+      // **淡下去的立面不许再压在玩法层前面。** 一层 16% 的膜糊在人和道具上，
+      // 读出来不是"墙半透明"，而是"门板也半透明了"（2026-08-10 用户报的：
+      // 半隐那一场里连扶着的门扇都成了透的）。所以墙一旦淡到不再挡人
+      //（与 IndoorHidden 同一条 0.5 线），就把它的**绘制序**挪到演员之后——
+      // 位置不动（摆位归 PlaceZ，绘制序归 SetPlayOrder，两个职责分开），
+      // 于是墙还在、还看得出是一堵墙，而人、门扇、工作台全是实的。
+      // 不挡人了反而可以画得实一点：半隐从 0.16 提到 0.30。
+      const behind = (homeFacade.material.opacity ?? 1) < 0.5;
+      if (facadeBehind !== behind) {
+        facadeBehind = behind;
+        SetPlayOrder(homeFacade, behind ? BAND.nearBack : BAND.facade, "homeFacade");
       }
       // 屋里的地窖口/梯子**不做隐现**：它们画在 loose(0.3) 带、立面在
       // facade(0.4) 带——墙本来就排在它们前面，合着的时候地面以上那一截
