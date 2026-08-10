@@ -2686,8 +2686,12 @@ export const SCRIPTS = {
         MotherHoe(state);
       },
       steps: [
-        { type: "goto", zone: { x: 19.4, w: 3.6 } },
+        // 牌面画车不画手势：默认推导给「goto」画走路、给「use」画一只按横杠的手，
+        // 可这两步的正主都是那辆独轮车——手按木杠的通用图认不出是在干嘛
+        // （2026-08-10 用户：「这个提示是什么鬼……提示个车不好么」）
+        { type: "goto", zone: { x: 19.4, w: 3.6 }, hintIcon: "cart" },
         { type: "use", zone: { x: 19.8, w: 3.2 }, hold: 1.2, stroke: "down", gestureY: 1.05,
+          hintIcon: "cart",
           prompt: "晃车把 · 一下一下压",
           note: "车轮从干泥里松了出来。",
           effect: (state) => { Cue(state, "crank"); } },
