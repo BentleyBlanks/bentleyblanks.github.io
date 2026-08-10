@@ -119,7 +119,7 @@ const HandAt = (pose, k) => page.evaluate(({ pose, k }) => {
   }
   return st.handAt ? { x: +st.handAt.x.toFixed(3), y: +st.handAt.y.toFixed(3) } : null;
 }, { pose, k });
-for (const [pose, label] of [["throwWind", "投石蓄力"], ["planePush", "刨料推程"]]) {
+for (const [pose, label] of [["throwWind", "投石蓄力"], ["planePush", "刨料推程"], ["pourBasket", "倒土"]]) {
   const lo = await HandAt(pose, 0);
   const hi = await HandAt(pose, 1);
   if (!lo || !hi) {

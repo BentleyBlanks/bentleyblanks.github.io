@@ -1165,6 +1165,7 @@ function Build(ac, options) {
   }
 
   function Tick() {
+    PumpBgmLoop();
     if (disposed || !enabled) return;
     const now = ac.currentTime;
     // 页面被挂起很久后 currentTime 会跳一大截。不重新对齐的话，
@@ -1287,7 +1288,7 @@ function Build(ac, options) {
       gain.gain.value = 0;
       node.connect(gain);
       gain.connect(musicBus);
-      const slot = { el, node, gain, id: "", cue: 0, targetGain: 0, serial: 0, pauseTimer: null };
+      const slot = { el, node, gain, id: "", cue: 0, targetGain: 0, serial: 0, pauseTimer: null, loopEnd: 0, looping: false };
       el.addEventListener("ended", () => {
         if (disposed || slot !== activeBgm || !requestedBgm || slot.id !== requestedBgm.id) return;
         try {
@@ -1309,19 +1310,72 @@ function Build(ac, options) {
     RampParam(synthBus.gain, 1, 1.1);
   }
 
-  function ActivateBgm(slot, serial) {
+  function ActivateBgm(slot, serial, fade = 1.5) {
     if (disposed || serial !== bgmSerial || !requestedBgm || slot.id !== requestedBgm.id) return;
     const old = activeBgm;
     activeBgm = slot;
-    RampParam(slot.gain.gain, slot.targetGain, 1.5);
-    RampParam(synthBus.gain, 0, 1.5);
+    RampParam(slot.gain.gain, slot.targetGain, fade);
+    RampParam(synthBus.gain, 0, fade);
     if (old && old !== slot) {
-      RampParam(old.gain.gain, 0, 1.5);
+      RampParam(old.gain.gain, 0, fade);
       if (old.pauseTimer !== null) clearTimeout(old.pauseTimer);
+      // 绕圈时新旧是同一首：只停不清 src，元素里缓冲好的那一份留给下一圈用
+      const sameTrack = old.id === slot.id;
       old.pauseTimer = setTimeout(() => {
         old.pauseTimer = null;
-        if (old !== activeBgm) PauseBgmSlot(old, true);
-      }, 1650);
+        if (old !== activeBgm) PauseBgmSlot(old, !sameTrack);
+      }, fade * 1000 + 150);
+    }
+  }
+
+  // 绕圈：**放到 loopEnd 就交叉淡回 cue**，绝不放进尾奏。
+  //
+  // 这几首是完整成品曲，末尾是渐弱到静音的收尾（第一章那首最后 20 秒从 −27dB
+  // 淡到 −71dB）。老做法是一路放到 ended 再 seek 回 cue——技术上只断 0.01 秒，
+  // 可玩家听见的是"音乐渐渐没了 → 静了十几秒 → 忽然又从头响起来"，
+  // 也就是 2026-08-10 报的那个"隔一段时间停一下再重新播放"。
+  // 修法不是把 seek 变快（它本来就不慢），是**别让曲子走进尾奏**：
+  // 提前 BGM_XFADE 秒在另一个播放器上从 cue 起播，两边交叉淡化，接缝听不出来。
+  const BGM_XFADE = 3.2;
+  function PumpBgmLoop() {
+    const slot = activeBgm;
+    if (disposed || !enabled || !slot || !requestedBgm || slot.id !== requestedBgm.id) return;
+    const end = slot.loopEnd;
+    if (!(end > 0) || slot.el.paused) return;
+    const at = slot.el.currentTime;
+    if (!Number.isFinite(at)) return;
+    if (at < end - BGM_XFADE) { slot.looping = false; return; }
+    if (slot.looping) return;
+    slot.looping = true;
+    const other = bgmSlots.find((item) => item !== slot) || MakeBgmSlot();
+    if (!other) {                                   // 只有一个播放器：退回硬跳，至少别放进尾奏
+      try { slot.el.currentTime = slot.cue; } catch (ignored) { /* 稍后 ended 兜底 */ }
+      slot.looping = false;
+      return;
+    }
+    other.id = slot.id;
+    other.cue = slot.cue;
+    other.targetGain = slot.targetGain;
+    other.serial = slot.serial;
+    other.loopEnd = end;
+    other.looping = false;
+    other.gain.gain.value = 0;
+    if (other.pauseTimer !== null) { clearTimeout(other.pauseTimer); other.pauseTimer = null; }
+    const serial = slot.serial;
+    const Start = () => {
+      if (disposed || serial !== bgmSerial || !requestedBgm || other.id !== requestedBgm.id) return;
+      try { other.el.currentTime = other.cue; } catch (ignored) { /* canplay 之后还会再调一次 */ }
+      try {
+        const p = other.el.play();
+        if (p && typeof p.then === "function") p.then(() => ActivateBgm(other, serial, BGM_XFADE)).catch(() => {});
+        else ActivateBgm(other, serial, BGM_XFADE);
+      } catch (ignored) { /* 放不动就等 ended 兜底 */ }
+    };
+    // 同一首曲子：另一个播放器多半还留着这份缓冲，直接续上；否则重新加载
+    if (other.el.currentSrc && other.el.currentSrc === slot.el.currentSrc && other.el.readyState >= 2) Start();
+    else {
+      other.el.addEventListener("canplay", Start, { once: true });
+      try { other.el.src = requestedBgm.url; other.el.load(); } catch (ignored) { slot.looping = false; }
     }
   }
 
@@ -1340,8 +1394,13 @@ function Build(ac, options) {
 
   function ResumeBgm() {
     if (!enabled || !requestedBgm) return;
-    const slot = bgmSlots.find((item) => item.id === requestedBgm.id);
-    if (slot) TryPlayBgm(slot, slot.serial);
+    // 先认正在放的那一个：绕圈时两个播放器同 id，按 id 找会摸到正在淡出的那个，
+    // 于是 ActivateBgm 把它又拽回来当主音轨——听上去就是一顿一顿的
+    const slot = (activeBgm && activeBgm.id === requestedBgm.id)
+      ? activeBgm : bgmSlots.find((item) => item.id === requestedBgm.id);
+    // 已经在响就什么都不用做。Unlock 挂在每一次按键上，这里不挡的话
+    // 每按一下键都要重排一遍增益自动化
+    if (slot && slot.el.paused) TryPlayBgm(slot, slot.serial);
   }
 
   function ClearBgm() {
@@ -1417,6 +1476,7 @@ function Build(ac, options) {
         id: String(next.id), url: String(next.url),
         cue: Math.max(0, Number(next.cue) || 0),
         gain: Clamp(Number.isFinite(next.gain) ? next.gain : 0.72, 0, 1),
+        loopEnd: Math.max(0, Number(next.loopEnd) || 0),
       };
       const serial = ++bgmSerial;
       let slot = bgmSlots.find((item) => item !== activeBgm) || MakeBgmSlot();
@@ -1426,6 +1486,8 @@ function Build(ac, options) {
       slot.cue = requestedBgm.cue;
       slot.targetGain = requestedBgm.gain;
       slot.serial = serial;
+      slot.loopEnd = requestedBgm.loopEnd;
+      slot.looping = false;
       slot.gain.gain.value = 0;
       const fail = () => {
         if (serial !== bgmSerial || slot.id !== requestedBgm?.id) return;
@@ -1458,6 +1520,13 @@ function Build(ac, options) {
         paused: activeBgm ? activeBgm.el.paused : true,
         currentTime: activeBgm ? activeBgm.el.currentTime : 0,
         cue: activeBgm ? activeBgm.cue : 0,
+        loopEnd: activeBgm ? activeBgm.loopEnd : 0,
+        slots: bgmSlots.length,
+        playing: bgmSlots.filter((sl) => !sl.el.paused).length,
+        gain: activeBgm ? +activeBgm.gain.gain.value.toFixed(3) : 0,
+        // 两个播放器的增益之和＝此刻"有多少音乐在响"。绕圈交叉淡化时主音轨
+        // 会从 0 爬上来，只看 active 那一个会误判成"断了"
+        totalGain: +bgmSlots.reduce((sum, sl) => sum + (sl.el.paused ? 0 : sl.gain.gain.value), 0).toFixed(3),
         synthGain: synthBus.gain.value,
         musicLevel: busLevel.music,
       };

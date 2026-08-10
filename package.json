@@ -9,7 +9,7 @@
     "test:reedSignal1942:browser": "node ReedSignal1942/Script_RenderHealthTest.mjs",
     "test:tunnelLight1943": "node TunnelLight1943/Script_SmokeTest.mjs && node TunnelLight1943/Script_SceneAudit.mjs --quiet",
     "cli:tunnelLight1943": "node TunnelLight1943/Script_Cli.mjs",
-    "test:tunnelLight1943:browser": "node TunnelLight1943/Script_RenderHealthTest.mjs && node TunnelLight1943/Script_DebugJumpTest.mjs",
+    "test:tunnelLight1943:browser": "node TunnelLight1943/Script_RenderHealthTest.mjs && node TunnelLight1943/Script_DebugJumpTest.mjs && node TunnelLight1943/Script_BgmTest.mjs",
     "scene:tunnelLight1943": "node TunnelLight1943/Script_SceneAudit.mjs",
     "shots:tunnelLight1943": "node TunnelLight1943/Script_ShotTest.mjs",
     "bake:tunnelLight1943:sfx": "node TunnelLight1943/Script_SfxBake.mjs",

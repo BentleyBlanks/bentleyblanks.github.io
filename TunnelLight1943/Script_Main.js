@@ -4,8 +4,9 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
+  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
+import { DrawRelic } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
@@ -97,6 +98,7 @@ for (const id of [
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "endTitle", "endText",
   "noticeOverlay", "noticeText", "noticeClose",
+  "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
@@ -423,8 +425,9 @@ function HintShot(state, hint) {
     case "insert":
       return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
     case "insertCard":
-      // 专画的一张细节插画铺满画框；机位停在原地不动
-      return { ...BaseShot(state), card: hint.card };
+      // 专画的一张细节插画铺满画框；机位停在原地不动。
+      // seg：活动插卡（每帧重画）的段号，动画按 (seg, 本行时间) 走
+      return { ...BaseShot(state), card: hint.card, cardSeg: hint.seg ?? 0 };
     case "insertVideo":
       // 序章：一行旁白一段过场短片铺满画框。card 是兜底——片子没缓冲好就先上手绘卡
       return { ...BaseShot(state), card: hint.card, video: hint.clip };
@@ -480,7 +483,7 @@ function UpdateCamera(state, dt) {
       hw: framing.baseHw * (1 - 0.10 * framing.prog),
     };
     world.SetOverShoulder(state, shot.ots || null);
-    world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0);
+    world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0, shot.cardSeg || 0);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
@@ -613,7 +616,13 @@ function SyncPip(state, inCinematic) {
   if (!el) return;
   const spec = state.phase === "playing" && !inCinematic ? state.pip : null;
   let shot = null;
-  if (spec) {
+  if (spec?.at) {
+    // 钉在一个死点位上的小窗（打水时那扇「井底」）。**这是主相机去不了的
+    // 地方**：画面底下永远压着一条近景地面带，主相机看不到地平线以下，
+    // 第二台相机却可以架进井筒里——它在那条地面带**后面**（pip 机位 z 比
+    // 3.3 小），于是井底那点事有地方演了
+    shot = { x: spec.at.x, y: spec.at.y, hw: spec.hw ?? 1.2 };
+  } else if (spec) {
     const a = spec.who === "player"
       ? { x: state.player.x, level: state.player.level, visible: true }
       : state.actors.find((x) => x.id === spec.who);
@@ -1006,6 +1015,9 @@ ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
 
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);
+  // 包袱跨章跨会话：把存过的收藏灌回来
+  state.relicsGot = new Set(LoadBag());
+  RebuildBagStrip();
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
@@ -1081,6 +1093,106 @@ if (ui.btnSettings) {
   });
 }
 
+// ── 包袱（收藏品）──────────────────────────────────────────────
+// 跨章、跨会话持久：localStorage 存 id 列表；StartGame 每次灌回 state。
+// Core 只管拾取与冻结，条与卡全在这儿。
+const BAG_KEY = "tunnelLight1943.bag.v1";
+function LoadBag() {
+  try { return JSON.parse(localStorage.getItem(BAG_KEY) || "[]"); } catch { return []; }
+}
+function SaveBag() {
+  if (state?.relicsGot) localStorage.setItem(BAG_KEY, JSON.stringify([...state.relicsGot]));
+}
+const BAG_ALL = AllRelics();
+let bagSelected = null;
+let bagPeekTimer = 0;
+let bagLastCardSeq = 0;
+// 格子里的小图：同一支画笔，收到的画真身、没收到的画剪影（形状即提示）
+function PaintBagSlot(canvas, relic, got) {
+  const ss = 2, w = 46;
+  canvas.width = w * ss;
+  canvas.height = w * ss;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ss, ss);
+  DrawRelic(ctx, w / 2, w * 0.82, relic.art, "bag" + relic.id, { sil: !got, k: 1.35 });
+}
+function RebuildBagStrip(freshId = null) {
+  if (!ui.bagStrip) return;
+  ui.bagStrip.textContent = "";
+  const got = state?.relicsGot || new Set();
+  for (const r of BAG_ALL) {
+    const li = document.createElement("li");
+    const has = got.has(r.id);
+    li.className = (has ? "" : "miss") + (r.id === freshId ? " fresh" : "") + (r.id === bagSelected ? " sel" : "");
+    li.title = has ? r.name : "？？？";
+    const cv = document.createElement("canvas");
+    PaintBagSlot(cv, r, has);
+    li.appendChild(cv);
+    li.addEventListener("click", (e) => { e.stopPropagation(); SelectBagSlot(r.id); });
+    ui.bagStrip.appendChild(li);
+  }
+  if (ui.bagBadge) {
+    ui.bagBadge.hidden = got.size === 0;
+    ui.bagBadge.textContent = String(got.size);
+  }
+}
+function SelectBagSlot(id) {
+  bagSelected = id;
+  const r = BAG_ALL.find((x) => x.id === id);
+  const has = state?.relicsGot?.has(id);
+  if (ui.bagNote && r) {
+    ui.bagNote.hidden = false;
+    ui.bagNoteName.textContent = has ? r.name : "？？？";
+    ui.bagNoteText.textContent = has ? r.note : "还没找到。留意路边不起眼的角落——草丛后头常有东西。";
+    ui.bagNoteCount.textContent = `老物件 ${state?.relicsGot?.size || 0} / ${BAG_ALL.length}`;
+  }
+  RebuildBagStrip();
+}
+function OpenBag(open) {
+  if (!ui.bagPanel) return;
+  if (open) {
+    clearTimeout(bagPeekTimer);
+    RebuildBagStrip();
+    ui.bagPanel.hidden = false;
+    requestAnimationFrame(() => ui.bagPanel.classList.add("show"));
+    if (bagSelected) SelectBagSlot(bagSelected);
+    if (state) state.bagOpen = true;      // 世界冻结（Core 的闸）
+  } else {
+    ui.bagPanel.classList.remove("show");
+    ui.bagPanel.hidden = true;
+    ui.bagNote.hidden = true;
+    if (state) state.bagOpen = false;
+  }
+  ui.btnBag?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+// 收到新东西：条自己滑进来亮一下那格，几秒后退场（不冻结世界）
+function PeekBag(freshId) {
+  if (!ui.bagPanel || !ui.bagPanel.hidden) return;
+  RebuildBagStrip(freshId);
+  ui.bagNote.hidden = true;
+  ui.bagPanel.hidden = false;
+  requestAnimationFrame(() => ui.bagPanel.classList.add("show"));
+  clearTimeout(bagPeekTimer);
+  bagPeekTimer = setTimeout(() => {
+    if (state?.bagOpen) return;          // 其间被玩家点开了就别收
+    ui.bagPanel.classList.remove("show");
+    ui.bagPanel.hidden = true;
+  }, 3200);
+}
+// 开合看的是 bagOpen 不是面板可见性：拾取后的"探头"（peek）也可见但没打开，
+// 那时点按钮该是**打开**，按可见性判断会反手把它关了
+ui.btnBag?.addEventListener("click", () => OpenBag(!state?.bagOpen));
+document.addEventListener("pointerdown", (e) => {
+  if (!ui.bagPanel || ui.bagPanel.hidden || !state?.bagOpen) return;
+  if (ui.bagPanel.contains(e.target) || ui.btnBag.contains(e.target)) return;
+  OpenBag(false);
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "b" || e.key === "B") {
+    if (state && state.phase === "playing") OpenBag(!state.bagOpen);
+  }
+});
+
 // 序章跳过：整段结算掉直接进正戏；正在念的旁白同时收声
 ui.btnSkipCine?.addEventListener("click", () => {
   if (state && SkipPrologue(state)) audio.StopVoice();
@@ -1132,6 +1244,12 @@ function RunFrame(now, dt) {
     // 那个老毛病又回来了。快进与听旁白本来就是互斥的两件事。
     const stepDt = (fastCinematic && !soundOn && def?.kind === "cinematic") ? dt * 5 : dt;
     const prevChapter = state.chapterIndex;
+    // 收藏品拾取：Core 出一张卡（带递增 seq），这儿存档 + 让包袱条探头
+    if (state.relicCard && state.relicCard.seq !== bagLastCardSeq) {
+      bagLastCardSeq = state.relicCard.seq;
+      SaveBag();
+      PeekBag(state.relicCard.id);
+    }
     StepGame(state, {
       moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
