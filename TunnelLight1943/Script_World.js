@@ -668,9 +668,38 @@ export function CreateWorld(canvasEl) {
           ? "rgba(154,140,112,0.30)" : "rgba(96,80,58,0.24)";
         ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
       }
+      // ⑤ 糠秕与麦秸碎：碾道、场院、门口一层细碎亮屑，被风吹成条状积在
+      //    坑洼的背风侧。这一层是"农村"与"空地"的分界
+      for (let i = 0; i < wPx / 26; i += 1) {
+        const cx3 = ART.Hash(id + "cf" + i) * wPx;
+        const cy3 = 9 + ART.Hash(id + "cfy" + i) * 22;
+        ctx.strokeStyle = "rgba(176,158,112,0.34)";
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(cx3, cy3);
+        ctx.lineTo(cx3 + 2 + ART.Hash(id + "cfl" + i) * 5, cy3 + (ART.Hash(id + "cfa" + i) - 0.5) * 2);
+        ctx.stroke();
+      }
+      // ⑥ 粪蛋与扫街攒的粪土：**沿墙根一线**（路当中会被车碾平），
+      //    灰褐色小堆。一个没有粪的华北村子等于没有农业
+      for (let i = 0; i < wPx / 210; i += 1) {
+        const dx3 = ART.Hash(id + "dg" + i) * wPx;
+        const dy3 = 7 + ART.Hash(id + "dgy" + i) * 7;
+        ctx.fillStyle = "rgba(84,70,48,0.42)";
+        for (let k = 0; k < 4; k += 1) {
+          ctx.beginPath();
+          ctx.ellipse(dx3 + k * 3.4 + ART.Hash(id + "dk" + i + k) * 3, dy3 + ART.Hash(id + "dky" + i + k) * 3,
+            1.9, 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       ctx.restore();
     });
     PlaceSprite(mesh, xFrom, groundY, 0);
+    // 地表带钉在行走线**之下**：不钉的话它跟 walk 带道具同一个绘制序号，
+    // 房子的接地投影（AddGroundShadow）会被这张大贴图整个盖掉——
+    // 全画面一个暗部都没有，"干净得像小康村"有一半是这么来的
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 4);
     group.add(mesh);
   }
 
@@ -1284,6 +1313,7 @@ export function CreateWorld(canvasEl) {
     const mesh = MakeFlatShadow(len, w, strength);
     // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
     mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, PlaceZ(z) + SUN.dz * len * 0.34);
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 2);   // 压在地表带之上、道具之下
     group.add(mesh);
   }
 
@@ -1425,7 +1455,7 @@ export function CreateWorld(canvasEl) {
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
       case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
-      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, night, bare: ruined })); break;
+      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
@@ -1490,6 +1520,11 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "dog": mk((ctx, ax, ay) => ART.DrawDog(ctx, ax, ay, p.id)); break;
+      // 村里不许有狗：1939 年冀中区党委统一"打狗"（狗叫会暴露夜间行动，
+      // 回忆材料原话「出进村庄无犬吠声」）。DrawDog 只留给据点那一侧
+      case "emptyKennel": mk((ctx, ax, ay) => ART.DrawEmptyKennel(ctx, ax, ay, p.id)); break;
+      case "dungHeap": mk((ctx, ax, ay) => ART.DrawDungHeap(ctx, ax, ay, p.id, { street: !!p.street })); break;
+      case "stalkFence": mk((ctx, ax, ay) => ART.DrawStalkFence(ctx, ax, ay, (p.w || 5) * PPM, p.id)); break;
       case "stonePile": mk((ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
       case "hangLantern":
         mk((ctx, ax, ay) =>
@@ -1577,7 +1612,7 @@ export function CreateWorld(canvasEl) {
               ART.InkLine(ctx, ax - 20 + i * 10, ay - 8, ax - 26 + i * 12, ay - 34 - ART.Hash(c.id + i) * 18,
                 c.id + "st" + i, { lw: 2, color: "#241f18" });
             }
-          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night });
+          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night, raided: !!c.raided });
         }); break;
       case "firewood": mk((ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id)); break;
       case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, c.w * PPM, S.drawHeightPx, c.id, { burnt: false })); break;

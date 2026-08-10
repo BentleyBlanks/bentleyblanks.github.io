@@ -112,8 +112,8 @@
           "id": "homeHouse",
           "kind": "house",
           "x": 30,
-          "w": 9.5,
-          "h": 3.6,
+          "w": 8.0,
+          "h": 2.4,
           "name": "柱子家",
           "burnable": true,
           "interior": true
@@ -235,8 +235,8 @@
           "id": "qishuHouse",
           "kind": "house",
           "x": 51.5,
-          "w": 7,
-          "h": 3.2,
+          "w": 7.0,
+          "h": 2.3,
           "name": "七叔家"
         },
         {
@@ -251,7 +251,8 @@
           "kind": "tree",
           "x": 56.3,
           "name": "井边的榆树",
-          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_well 的 throwHit 指着它）"
+          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_well 的 throwHit 指着它）",
+          "stripped": true
         },
         {
           "id": "well",
@@ -270,7 +271,7 @@
           "kind": "house",
           "x": 64,
           "w": 8.5,
-          "h": 3.3,
+          "h": 2.45,
           "name": "刘家"
         },
         {
@@ -325,8 +326,8 @@
           "id": "houseC",
           "kind": "house",
           "x": 92,
-          "w": 9,
-          "h": 3.4,
+          "w": 9.0,
+          "h": 2.35,
           "burnable": true
         },
         {
@@ -355,7 +356,8 @@
           "id": "treeMid",
           "kind": "tree",
           "x": 104.5,
-          "name": "榆树"
+          "name": "榆树",
+          "stripped": true
         },
         {
           "id": "yardWallC",
@@ -387,21 +389,22 @@
         },
         {
           "id": "yardDog",
-          "kind": "dog",
+          "kind": "emptyKennel",
           "x": 138,
-          "name": "王家的狗"
+          "name": "王家的狗",
+          "label": "空了的狗窝"
         },
         {
           "id": "houseD",
           "kind": "house",
           "x": 148,
-          "w": 8,
-          "h": 3.2
+          "w": 8.0,
+          "h": 2.25
         },
         {
           "id": "stonesEast",
           "kind": "stonePile",
-          "x": 152,
+          "x": 154.8,
           "name": "石子堆"
         },
         {
@@ -418,17 +421,42 @@
         },
         {
           "id": "yardWallD",
-          "kind": "yardWall",
+          "kind": "stalkFence",
           "x": 168.5,
           "w": 5,
           "gate": false,
           "name": "村东头的院墙"
         },
         {
-          "id": "gatePost",
-          "kind": "lamppost",
-          "x": 174,
-          "name": "村东口"
+          "id": "dungHome",
+          "kind": "dungHeap",
+          "x": 38.2
+        },
+        {
+          "id": "dungStreet",
+          "kind": "dungHeap",
+          "x": 71.8,
+          "street": true
+        },
+        {
+          "id": "dungPen",
+          "kind": "dungHeap",
+          "x": 45.6
+        },
+        {
+          "id": "stalksB",
+          "kind": "woodpile",
+          "x": 71.0
+        },
+        {
+          "id": "oldDoorsD",
+          "kind": "oldDoors",
+          "x": 144.2
+        },
+        {
+          "id": "stalksE",
+          "kind": "woodpile",
+          "x": 133.5
         }
       ],
       "_vaultsNote": "可翻越物（挡路；贴上去出提示，按互动键才翻——不是走过去就自动翻）。轮廓语法=肩高、顶沿磨亮/有缺口。摆位铁律：一律不许压在跑腿路线上（院子 31~70 是打水/扛木料/推车的地方）——柴垛 84 在去老槐树那趟空手路上（教学+回程复用），倒塌柴垛 38 只在扫荡后出现（撤退也是空手）。top 必须与美术画出来的高度对齐，抬升弧按它算",
@@ -551,7 +579,8 @@
           "kind": "haystack",
           "x": 88,
           "w": 3.2,
-          "tall": true
+          "tall": true,
+          "raided": true
         },
         {
           "id": "ruinWall",
@@ -566,7 +595,8 @@
           "kind": "haystack",
           "x": 132,
           "w": 3.2,
-          "tall": true
+          "tall": true,
+          "raided": true
         },
         {
           "id": "wallB",
@@ -581,7 +611,8 @@
           "kind": "haystack",
           "x": 152,
           "w": 3.2,
-          "tall": true
+          "tall": true,
+          "raided": true
         },
         {
           "id": "wallC",
