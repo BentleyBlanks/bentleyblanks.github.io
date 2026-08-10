@@ -1223,6 +1223,10 @@ window.TunnelLight = {
       }, 1 / 30);
     }
   },
+  // 转场的圆形黑幕拉开了没有（0 全黑 → 1 全开）。跳幕之后要等它拉开再截图，
+  // 不然拍出来是个圆洞——Script_Cli 的 shot 靠轮询这个值定拍摄时机，
+  // 比"死等 0.6 秒"稳（等待时间随机器快慢变，猜不准）
+  get iris() { return irisLevel; },
   world,
   renderer: world.renderer,
 };

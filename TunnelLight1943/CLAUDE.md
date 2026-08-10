@@ -13,8 +13,8 @@ node TunnelLight1943/Script_Cli.mjs
 | `where <片段>` | **这东西在哪**：节拍 / 函数 / 画笔 / 道具登记 / 骨架轨道姿势 / 规范章节 → `文件:行` |
 | `beats [c1]` | 列出全部节拍（章 · 序号 · id · kind） |
 | `beat <id>` | 某一拍的全部：步骤/区域/needs/prompt/旗标/台词/源码位置 |
-| `state <id> [选项]` | **无头**跑到那一拍、喂真输入、把状态打出来（`--x --level --input --frames --trace --json`） |
-| `shot <id> [选项]` | 实拍（真浏览器真键盘）→ `_shots/`（`--pre --hold --dur --phases --actor --clip`） |
+| `state <id> [选项]` | **无头**跑到那一拍、喂真输入、把状态打出来（`--x --level --input --flag --frames --trace --json`） |
+| `shot <id ...> [选项]` | 实拍（真浏览器真键盘）→ `_shots/`（`--pre --hold --dur --phases --actor --clip --flag --probe`）。**可以一条命令拍好几拍** |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |
 
 **这是硬规矩，因为代价量过**：翻 12 天会话记录，改这个游戏的 token 七成花在
@@ -24,10 +24,28 @@ node TunnelLight1943/Script_Cli.mjs
 
 - **要问游戏状态，先跑 `state`，不许现写探针脚本**；缺子命令就往 `Script_Cli.mjs`
   里加，加完写回这张表。一次性脚本写完就扔，下一个 agent 还得重写一遍。
+- **要拨游戏里的开关，用 `--flag`**（`state` 和 `shot` 都吃）。地道挖通没有、
+  门修好没有、车上装了几件料——这些是/否的记号决定画面长什么样，要拍
+  「没挖通 / 挖了一半 / 挖通了」三张对比图就得能手拨：
+
+  ```bash
+  node TunnelLight1943/Script_Cli.mjs shot "c1_barrow@x=41,level=under,tunnelDug=0" "c1_barrow@x=41,level=under,digStarted=1,out=挖了一半" "c1_barrow@x=41,level=under,tunnelDug=1,out=通了"
+  ```
+
+  `@` 后面**认识的键是参数（x/level/hold/dur/pre/actor/cine/out/clip/phases），
+  不认识的一律当开关**——不用再记第二套语法。旗标在跳幕与微过场之后才写进去，
+  所以 beat 自己的 `onStart` 盖不掉它。
+- **一条命令拍好几拍**，共用一个浏览器；跨章也不用重开页面（`JumpToBeat` 吃章号）。
+  实测：6 拍跨 5 个章节 19 秒；一拍一条命令要 40 秒，而且每次都要重写引导代码。
+- **`--probe`**：截图同时报两件**有明确对错**的事——深度带用错没有
+  （`DepthViolations`）、手脚离地多少（`PlayerLimbTips`）。**好不好看得自己看图**，
+  这个开关不替你判断画面，只是把已有的两个体检数顺手打出来。
 - **要截图，跑 `shot`**。那套引导代码有三个必踩的坑，已经固化在里面：
   `ServeRoot` 的 rootDir 必须 `path.resolve`（正斜杠字符串会 403）、页面 load 完
   `tl.state` 还是 null 得先 `StartGame`、**拍姿势必须真按键**（`FlashPose` 只有
   0.2 秒，`StepFrames` 之后的等待里 rAF 还在跑无输入帧，截出来全是站姿）。
+  跳幕之后**等圆形黑幕拉开再拍**（轮询 `TunnelLight.iris`，Script_Main 挂的调试
+  钩子）——死等固定秒数会拍到一个圆洞，而且等多久随机器快慢变，猜不准。
 - `SmokeTest` 的 `TestCliAnswersQuestions` 盯着它——CLI 坏了不会有别的测试变红。
 
 ## 场景数据在哪（改东西之前先看这里）

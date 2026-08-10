@@ -14,6 +14,7 @@
 //   node TunnelLight1943/Script_Cli.mjs beat c1_ropeline
 //   node TunnelLight1943/Script_Cli.mjs state c1_ropeline --x 35.6 --input "e,d*90"
 //   node TunnelLight1943/Script_Cli.mjs shot c1_ropeline --hold d --dur 4 --phases 6
+//   node TunnelLight1943/Script_Cli.mjs shot "c1_barrow@tunnelDug=0" "c1_barrow@tunnelDug=1,out=通了"
 //   node TunnelLight1943/Script_Cli.mjs doctor
 //
 // 铁律：**要问游戏状态先跑这个，别再现写探针脚本**。缺什么子命令就往这儿加，
@@ -218,6 +219,26 @@ async function CmdBeat(o) {
 // 例：--input "e,d*90,e" = 按一下 E、往右走 90 帧、再按一下 E
 // ---------------------------------------------------------------------------
 const IDLE = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
+
+// 旗标覆盖（--flag digStarted=0,tunnelDug=1,barrowPlanks=3）。
+// 游戏里一堆"是/否"的记号决定画面长什么样：地道挖通没有、门修好没有、
+// 车上装了几件料。要拍"没挖通 / 挖了一半 / 挖通了"三张对比图，就得能手拨这些
+// 记号——以前只能现写脚本（2026-08-10 用户："开关这个你自己是可以解决的"）。
+// 值：1/0/true/false 当布尔，纯数字当数字，其余当字符串。
+function ParseFlags(str) {
+  const out = {};
+  for (const kv of String(str || "").split(",")) {
+    const t = kv.trim();
+    if (!t) continue;
+    const i = t.indexOf("=");
+    const k = i < 0 ? t : t.slice(0, i);
+    const raw = i < 0 ? "1" : t.slice(i + 1);
+    out[k] = raw === "1" || raw === "true" ? true
+      : raw === "0" || raw === "false" ? false
+        : /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
+  }
+  return out;
+}
 function InputOf(tok) {
   switch (tok) {
     case "d": return { moveX: 1 };
@@ -246,6 +267,8 @@ async function CmdState(o) {
   step({}, 1);
   // 跳进来先把 onStart 起的小过场演完——不然什么提示都还没出来
   if (o.cine !== "keep") for (let i = 0; i < 900 && state.microCine; i += 1) step({ advance: true });
+  // 旗标覆盖放在跳幕与微过场之后：beat 自己的 onStart 已经跑完，不会再盖掉
+  if (o.flag) Object.assign(state.flags, ParseFlags(o.flag));
   if (o.x !== undefined) state.player.x = Number(o.x);
   if (o.level) state.player.level = String(o.level);
   step({}, 2);
@@ -310,20 +333,65 @@ async function CmdState(o) {
 //   ② 页面 load 完 window.TunnelLight 有了但 tl.state 还是 null，得先 StartGame；
 //   ③ 要拍活姿势必须**真按键**——StepFrames 之后那几百毫秒里页面自己的 rAF
 //      还在跑无输入帧，FlashPose 的 0.2s 姿势早过期，截出来全是站姿。
+//
+// 一条命令可以拍**好几拍**，共用同一个浏览器和本地服务器（起浏览器 5 秒、
+// 拍一张不到 1 秒，13 拍分开拍是 78 秒，连着拍 ~20 秒）。跨章也不用重开页面：
+// JumpToBeat 本来就吃章号。
+//
+//   shot c1_barrow c1_dig c1_testGo
+//   shot "c1_barrow@x=41,level=under,digStarted=0" "c1_dig@x=44,level=under"
+//
+// 每一拍后面可以用 @ 挂自己的参数，逗号分隔。**认识的键是参数，不认识的一律
+// 当旗标**（x/level/hold/dur/pre/actor/cine/out 之外的都是旗标），省得再记一套语法。
+// 命令行上的 --x/--flag 这些是所有拍共用的默认值，@ 里写的盖过它。
 // ---------------------------------------------------------------------------
+const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip"]);
+
+// "c1_dig@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
+function ParseShotSpec(spec, base) {
+  const at = spec.indexOf("@");
+  const id = at < 0 ? spec : spec.slice(0, at);
+  const opts = { ...base.opts };
+  const flags = { ...base.flags };
+  if (at >= 0) {
+    for (const kv of spec.slice(at + 1).split(",")) {
+      const t = kv.trim();
+      if (!t) continue;
+      const i = t.indexOf("=");
+      const k = i < 0 ? t : t.slice(0, i);
+      const v = i < 0 ? "1" : t.slice(i + 1);
+      if (SHOT_KEYS.has(k)) opts[k] = v;
+      else Object.assign(flags, ParseFlags(`${k}=${v}`));
+    }
+  }
+  return { id, opts, flags };
+}
+
 async function CmdShot(o) {
-  const id = o._[0];
-  if (!id) { console.log("用法：shot <beatId> [--x N] [--hold d] [--dur 4] [--phases 6] [--actor father] [--out 名]"); return; }
-  const found = await FindBeat(id);
-  if (!found) { console.log(`没有叫「${id}」的节拍。`); return; }
-  const { ci, bi } = found;
+  const specs = o._.flatMap((s) => String(s).split(",").filter(Boolean).length && !s.includes("@")
+    ? String(s).split(/[，,]/).filter(Boolean) : [s]);
+  if (!specs.length) {
+    console.log("用法：shot <beatId>[@x=41,level=under,旗标=0] [更多 beatId...] [--x N] [--flag k=v] [--hold d] [--dur 4] [--phases 6] [--probe]");
+    return;
+  }
+  const base = {
+    opts: Object.fromEntries(Object.entries(o).filter(([k]) => SHOT_KEYS.has(k))),
+    flags: ParseFlags(o.flag),
+  };
+  const jobs = [];
+  for (const spec of specs) {
+    const job = ParseShotSpec(spec, base);
+    const found = await FindBeat(job.id);
+    if (!found) { console.log(`没有叫「${job.id}」的节拍，跳过。`); continue; }
+    job.ci = found.ci; job.bi = found.bi;
+    jobs.push(job);
+  }
+  if (!jobs.length) return;
+
   const { LaunchBrowser } = await import("../PrairieFire1937/Script_BrowserTestKit.mjs");
   const { ServeRoot } = await import("./Script_DevServer.mjs");
   const outDir = path.join(DIR, "_shots");
   fs.mkdirSync(outDir, { recursive: true });
-  const tag = String(o.out || id);
-  const phases = Math.max(1, Number(o.phases || 1));
-  const dur = Number(o.dur || 0.6);
 
   const server = await ServeRoot(ROOT, 0);          // ← rootDir 已经是 resolve 过的绝对路径
   const port = server.address().port;
@@ -332,49 +400,76 @@ async function CmdShot(o) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
+  const files = [];
   try {
-    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html?chapter=${ci}`, { waitUntil: "load", timeout: 60000 });
+    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html?chapter=${jobs[0].ci}`,
+      { waitUntil: "load", timeout: 60000 });
     await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
-    await page.evaluate((c) => window.TunnelLight.StartGame(c), ci);
+    await page.evaluate((c) => window.TunnelLight.StartGame(c), jobs[0].ci);
     await page.waitForFunction(() => !!window.TunnelLight.state, { timeout: 60000 });
-    // --pre 用的是 state 那套输入小语言，在**开拍之前**无头跑完：
-    // 「先按 E 把绳头拿起来，再按住 d 边走边拍」这种前置操作没它没法表达
-    const pre = String(o.pre || "").split(",").filter(Boolean).map((raw) => {
-      const [tok, mul] = raw.trim().split("*");
-      const inp = InputOf(tok);
-      if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
-      return [inp, Math.max(1, Number(mul || 1))];
-    });
-    await page.evaluate(({ c, b, x, level, actor, keepCine, pre: steps }) => {
-      const tl = window.TunnelLight;
-      tl.JumpToBeat(c, b);
-      tl.StepFrames(1, {});
-      if (!keepCine) for (let i = 0; i < 900 && tl.state.microCine; i += 1) tl.StepFrames(1, { advance: true });
-      if (x !== undefined) tl.state.player.x = x;
-      if (level) tl.state.player.level = level;
-      if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
-      tl.StepFrames(2, {});
-      for (const [inp, n] of steps) tl.StepFrames(n, inp);
-    }, { c: ci, b: bi, x: o.x === undefined ? undefined : Number(o.x), level: o.level || null,
-      actor: o.actor || null, keepCine: o.cine === "keep", pre });
 
-    const held = o.hold ? String(o.hold).split("") : [];
-    for (const k of held) await page.keyboard.down(k);
-    const clip = o.clip ? (() => { const [x, y, w, h] = String(o.clip).split(",").map(Number); return { x, y, width: w, height: h }; })() : undefined;
-    const shots = [];
-    for (let i = 0; i < phases; i += 1) {
-      await page.waitForTimeout((dur / phases) * 1000);
-      const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
-      await page.screenshot({ path: file, clip });
-      const s = await page.evaluate(() => {
-        const st = window.TunnelLight.state;
-        return { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex };
+    for (const job of jobs) {
+      const jo = job.opts;
+      const phases = Math.max(1, Number(jo.phases || 1));
+      const dur = Number(jo.dur || 0.6);
+      const tag = String(jo.out || job.id);
+      // --pre 用的是 state 那套输入小语言，在**开拍之前**无头跑完：
+      // 「先按 E 把绳头拿起来，再按住 d 边走边拍」这种前置操作没它没法表达
+      const pre = String(jo.pre || "").split(",").filter(Boolean).map((raw) => {
+        const [tok, mul] = raw.trim().split("*");
+        const inp = InputOf(tok);
+        if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
+        return [inp, Math.max(1, Number(mul || 1))];
       });
-      shots.push(file);
-      console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step} prompt=${JSON.stringify(s.prompt)}`);
+      await page.evaluate(({ c, b, x, level, actor, keepCine, pre: steps, flags }) => {
+        const tl = window.TunnelLight;
+        tl.JumpToBeat(c, b);                       // 吃章号，跨章不用重开页面
+        tl.StepFrames(1, {});
+        if (!keepCine) for (let i = 0; i < 900 && tl.state.microCine; i += 1) tl.StepFrames(1, { advance: true });
+        // 旗标覆盖放在跳幕与微过场之后：beat 的 onStart 已经跑完，不会再盖掉。
+        // 改完再走两帧，场景构建会自己比对出"要重建"（剖面几何、光照都吃旗标）
+        if (flags && Object.keys(flags).length) Object.assign(tl.state.flags, flags);
+        if (x !== undefined) tl.state.player.x = x;
+        if (level) tl.state.player.level = level;
+        if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
+        tl.StepFrames(2, {});
+        for (const [inp, n] of steps) tl.StepFrames(n, inp);
+      }, { c: job.ci, b: job.bi, x: jo.x === undefined ? undefined : Number(jo.x), level: jo.level || null,
+        actor: jo.actor || null, keepCine: jo.cine === "keep", pre, flags: job.flags });
+
+      // 等转场的圆形黑幕拉开再拍——死等固定秒数会拍到一个圆洞（等待时间随
+      // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子
+      await page.waitForFunction(() => (window.TunnelLight.iris ?? 1) > 0.995, { timeout: 8000 })
+        .catch(() => errors.push(`${job.id}: 黑幕没拉开（iris 超时）`));
+
+      const held = jo.hold ? String(jo.hold).split("") : [];
+      for (const k of held) await page.keyboard.down(k);
+      const clip = jo.clip ? (() => { const [x, y, w, h] = String(jo.clip).split(",").map(Number); return { x, y, width: w, height: h }; })() : undefined;
+      for (let i = 0; i < phases; i += 1) {
+        await page.waitForTimeout((dur / phases) * 1000);
+        const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
+        await page.screenshot({ path: file, clip });
+        const s = await page.evaluate((wantProbe) => {
+          const st = window.TunnelLight.state;
+          const out = { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex };
+          if (wantProbe) {
+            // 只报两件**有明确对错**的（好不好看得自己看图，这里不掺和）：
+            // 深度带用错了没有、人的手脚有没有悬空/陷地
+            out.depth = window.TunnelLight.world.DepthViolations?.() || [];
+            out.limbs = window.TunnelLight.world.PlayerLimbTips?.() || null;
+          }
+          return out;
+        }, !!o.probe);
+        files.push(file);
+        console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step} prompt=${JSON.stringify(s.prompt)}`);
+        if (o.probe) {
+          console.log(`      深度告警 ${s.depth.length ? s.depth.join(" / ") : "无"}`);
+          if (s.limbs) console.log(`      手脚离地 ${Object.entries(s.limbs).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+        }
+      }
+      for (const k of held) await page.keyboard.up(k);
     }
-    for (const k of held) await page.keyboard.up(k);
-    console.log(`\n${shots.length} 张 → TunnelLight1943/_shots/`);
+    console.log(`\n${files.length} 张 → TunnelLight1943/_shots/`);
   } finally {
     await browser.close();
     server.close();
@@ -423,11 +518,19 @@ const HELP = `《地道里的光》命令行工作台
   beat <beatId>           某一拍的全部：步骤/区域/需要什么/旗标/台词/源码位置
   state <beatId> [选项]   无头跑到那一拍，喂真输入，把状态打出来
       --x 35.6 --level under --input "e,d*90" --frames 30 --trace --json
+      --flag digStarted=0,tunnelDug=1   手拨游戏里的是/否开关（见下）
       输入 token：d右 a左 s下梯 w上梯 e按一下 E按住 c蹲 . 空转 adv推过场；token*N 重复
-  shot <beatId> [选项]    实拍（真浏览器、真键盘），存进 _shots/
+  shot <beatId ...> [选项] 实拍（真浏览器、真键盘），存进 _shots/
+      **一条命令可以拍好几拍**，共用一个浏览器（跨章也不用重开页面）：
+        shot c1_well c2_escape1 c8_wall
+      每一拍可以用 @ 挂自己的参数，逗号分隔；**不认识的键一律当开关**：
+        shot "c1_barrow@x=41,level=under,tunnelDug=0" "c1_barrow@x=41,tunnelDug=1,out=通了"
       --x N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
+      --flag k=v,k=v   所有拍共用的开关默认值（@ 里写的盖过它）
+      --probe          截图同时报两件有明确对错的事：深度带用错没有、手脚离地多少
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
+      转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
   doctor                  分支/上游/未提交/缓存戳/端口
 
 要问游戏状态先跑这个，别再现写一次性探针脚本。`;

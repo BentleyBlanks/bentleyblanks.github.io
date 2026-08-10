@@ -1609,7 +1609,18 @@ function TestCliAnswersQuestions() {
   const j1 = JSON.parse(run(["state", "c1_ropeline", "--x", "35.6", "--input", "e,d*300", "--json"]));
   assert.equal(j1.player.item, "ropeEnd", "输入小语言得真的驱动得动玩法");
   assert.ok(j1.live.ropeLine?.taut > 0.99, "走到头绳该绷直——state 得看得见玩法系统的活状态");
-  console.log("  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现");
+
+  // ④ --flag：手拨游戏里的是/否开关。没它就只能现写脚本——"拍没挖通/挖通了
+  //    两张对比图"这种最常见的需求，正是 2026-08-10 补上这个开关的由头。
+  //    顺带从第二个角度锁死地道那条：同一拍、同样往东走，开关一翻结果就得变。
+  const dug = (flag) => JSON.parse(run(["state", "c1_ropeline", "--level", "under", "--x", "38",
+    "--input", "d*300", ...(flag ? ["--flag", flag] : []), "--json"])).player.x;
+  const wall = dug(null);
+  const through = dug("tunnelDug=1");
+  assert.ok(wall < 43, `没挖通就该被自家窖东壁挡住，却走到了 ${wall}`);
+  assert.ok(through > 50, `--flag tunnelDug=1 应该让人走进七叔家窖，却停在 ${through}`);
+  assert.ok(through - wall > 8, "开关没起作用：翻不翻都走到同一个地方");
+  console.log(`  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现 / --flag 拨开关（${wall} → ${through}）`);
 }
 
 // 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
