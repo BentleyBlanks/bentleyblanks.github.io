@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_CRANK_R, WINCH_REST_A, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -29,6 +29,12 @@ const DETAIL_SS = SS.detail; // 塌方堆、油灯这类会被特写到的小件
 const HINT_SS = SS.hint;
 // 石笔那一拍是 2.9m 的特写（屏幕密度 ~330px/米，是 48px/米 标尺的七倍），
 // 笔与刻痕都得按这个密度烘，否则一放大就是两团糊的白斑
+// **只给小窗那台相机看的图层**。主相机的 layers 只开 0 号，pipCamera 额外开 1 号：
+// 井筒剖面就画在 1 号上。这条是绕开"地表看不到地平线以下"的唯一正路——
+// 主相机永远被那条近景地面带挡着，第二台相机却可以架进井筒里（用户 2026-08-10
+// 出的主意）。放在 1 号而不是靠位置藏，是因为主相机的画框在特写下会探到地面
+// 以下一点点，混在 0 号里迟早会露出一角黑方块。
+const PIP_LAYER = 1;
 const CHALK_SS = 8;
 const SCRIBE_SS = 3;
 // 石笔的世界尺寸：26×30 的贴图 ×0.22 ≈ 12×14cm 的画布，里面那支笔约 9cm 长——
@@ -240,6 +246,10 @@ export function CreateWorld(canvasEl) {
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
+  // 插入特写卡 / 活卡单独一个场景：它本来就是"画在所有东西之上的一张画"
+  //（depthTest 关、renderOrder 顶格）。分出来是为了背景能单独走一遍离屏虚化，
+  // 再把卡原样盖上去——见 Render 里的景深那一段
+  const overlayScene = new THREE.Scene();
   // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
   // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
   const FOV = CAM_FOV;
@@ -453,13 +463,15 @@ export function CreateWorld(canvasEl) {
   let otsMesh = null;
   let otsHiddenId = null;
   let vignetteAlpha = 0;
-  let dustMotes = [];
   let dirtGrains = [], dirtGrainTex = null;   // 倒土时从筐口落下来的土（见 UpdateDirtPour）
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
-  let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
+  let winchRope = null, winchBucket = null, winchBucketFull = null, winchCrank = null,
+    winchGuide = null, winchCoil = null;
+  // 井底那扇小窗要看的三样，全在 PIP_LAYER 上——**主相机看不见它们**
+  let wellShaft = null, wellDeepBucket = null, wellDeepFull = null, wellRipple = null, wellDeepRope = null;
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
@@ -535,7 +547,9 @@ export function CreateWorld(canvasEl) {
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
-    winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
+    winchRope = null; winchBucket = null; winchBucketFull = null; winchCrank = null;
+    winchGuide = null; winchCoil = null;
+    wellShaft = null; wellDeepBucket = null; wellDeepFull = null; wellRipple = null; wellDeepRope = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
     coneMeshes = [];
@@ -1008,37 +1022,10 @@ export function CreateWorld(canvasEl) {
   // 以后真要做勇敢的心式的框景，**摆位必须跟着镜头所在的那一层的地平线走**，
   // 而不是写死 SURFACE_Y；下面 ApplyCamera 里的可见性闸门已经把地下挡掉了。
 
-  // 空气里的浮尘：光束里看得见的那种
-  function AddDust(count, night) {
-    const dust = [];
-    const tex = (() => {
-      const c = MakeCanvas(32, 32);
-      const g = c.getContext("2d");
-      const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
-      grad.addColorStop(0, "rgba(255,236,196,0.9)");
-      grad.addColorStop(1, "rgba(255,220,160,0)");
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 32, 32);
-      return CanvasTexture(c);
-    })();
-    for (let i = 0; i < count; i += 1) {
-      const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.055, 0.055),
-        new THREE.MeshBasicMaterial({
-          map: tex, transparent: true, depthWrite: false,
-          blending: THREE.AdditiveBlending, opacity: night ? 0.22 : 0.09,
-        }),
-      );
-      m.userData = {
-        seed: Math.random() * 100,
-        vy: 0.05 + Math.random() * 0.12,
-        vx: (Math.random() - 0.5) * 0.14,
-      };
-      layers.fx.add(m);
-      dust.push(m);
-    }
-    return dust;
-  }
+  // 空气里的浮尘（`AddDust`）已整个删除（2026-08-10 用户："不喜欢游戏里的雪花
+  // 噪点粒子"）。那批 18~26 个加色小亮点是**按画框循环**的，不跟着世界走——
+  // 镜头一横移它们原地打转，读出来不是光束里的尘，是蒙在屏幕上的一层雪花噪点。
+  // 真要再做光柱里的尘，得钉在光源的世界坐标上、只在光锥里出现，别再铺满画框。
 
   // 倒土：从筐口真的落下来的那股土
   //
@@ -1463,6 +1450,10 @@ export function CreateWorld(canvasEl) {
           night,
           broken: sceneKey === "village" && !!st?.flags.wellRopeBroken,
           crank: !st?.winchView,
+          // **井绳也一样让位**：打水的时候绳是活的（跟着桶升降、跟着桶歪），
+          // 静态贴图上那根永远笔直垂进井口的绳得撤掉，不然桶都拽到井沿上了，
+          // 井口里还挂着另一根一动不动的绳
+          rope: !st?.winchView,
         });
         const wellMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, state));
         propRedraw.push({
@@ -1888,6 +1879,9 @@ export function CreateWorld(canvasEl) {
       }
     });
     PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
+    // 活卡的长焦背景板会把机位与主体之间的近景藏掉（Render 的 DOF_NEAR_CUT）——
+    // 唯独这刀剖面的土不能藏：藏了它，脚底下的地道就在背景板里剧透了
+    face.userData.dofKeep = true;
     group.add(face);
 
     // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它。
@@ -1908,6 +1902,7 @@ export function CreateWorld(canvasEl) {
         ctx.fillRect(0, 0, w, h);
       });
     PlaceSprite(vign, range[0] - 2, UNDER_Y, NEAR_Z - 0.4);
+    vign.userData.dofKeep = true;   // 跟着剖面的土一起留下（同上）
     vign.material.depthWrite = false;
     group.add(vign);
 
@@ -2195,7 +2190,6 @@ export function CreateWorld(canvasEl) {
     ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
     InvalidateSceneCaches();
-    dustMotes = [];
     for (const g of glows) scene.remove(g);
     glows.length = 0;
     sceneLights = [];
@@ -2399,10 +2393,6 @@ export function CreateWorld(canvasEl) {
       sceneLights.push(spot);
     }
 
-    // 浮尘
-    for (const d of dustMotes) layers.fx.remove(d);
-    dustMotes = AddDust(ch.scene === "tunnelFort" ? 26 : 18, night);
-
     // 最后统一派发绘制序号：层间靠基数、层内靠深度，先后关系从此确定，
     // 不再受 three.js 按中心点自动排序的影响（镜头推拉时不会前后翻面）
     ApplyDepthOrder();
@@ -2428,9 +2418,13 @@ export function CreateWorld(canvasEl) {
       const castShadow = MakeCastShadow(0.42);
       castShadow.visible = false;
       layers.play.add(castShadow);
+      // 步频相位/呼吸相位按 id 打散：都从 0 起步的话，一队人会踩着完全相同的
+      // 步子、同时喘同一口气——横版里那就是一排复制人。背景层的路人早就这么
+      // 打散了（见 AddParallaxTrees 那边的 Hash 播种），演员这边一直漏着
       s = {
-        rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null,
-        shadow, castShadow, idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+        rig, mesh: rig.group, prevX: null, phase: ART.Hash(id + "ph") * 6, kind,
+        carryMesh: null, glow: null,
+        shadow, castShadow, idleT: ART.Hash(id + "br") * 6, bodyScale: BODY_SCALE[kind] ?? 1,
       };
       actorSprites.set(id, s);
     }
@@ -2910,7 +2904,8 @@ export function CreateWorld(canvasEl) {
     // 近景里不要它：这枚标是给"夜里三个同样身高的短褂站在村道上"认人用的，
     // 镜头推到 5 米以内时画面上就那么一两个人，它只会盖住真正在演的东西
     //（划线那一拍它正好压在石笔上）
-    const closeUp = viewW < 5.0;
+    // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
+    const closeUp = viewW < 5.0 || liveCardOn;
     const want = inCine || closeUp || otsHiddenId === "player" ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
@@ -3905,9 +3900,55 @@ export function CreateWorld(canvasEl) {
         // 深度规范：绳与桶走 loose 带——压在井台（walk）之前、摇辘轳的人之后
         FixOrder(winchRope, DepthOrder("play", BAND.loose));
         layers.play.add(winchRope);
-        winchBucket = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶"), 0, DETAIL_SS);
-        FixOrder(winchBucket, DepthOrder("play", BAND.loose) + 1);
-        layers.play.add(winchBucket);
+        // 桶烘两只：空的、满的。**摇上来那一路得看得出桶里有东西**，
+        // 不然三道手摇完画面上什么也没变——满的那只桶口顶着一汪水、沿上挂着水痕
+        const BakeBucket = (full) => BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+          ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶");
+          if (!full) return;
+          // **只画桶口那一面水**：把整只桶涂成水色，上屏就是一只青塑料盒
+          ctx.save();
+          ctx.fillStyle = "#131a15";
+          ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.42;
+          ctx.fillStyle = "#6b7566";
+          ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = "rgba(58,72,62,0.55)";
+          ctx.lineWidth = 1.1;
+          ctx.beginPath(); ctx.moveTo(ax - 6.2, ay - 6); ctx.lineTo(ax - 6.6, ay + 1.5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ax + 4.4, ay - 6); ctx.lineTo(ax + 4.8, ay - 1.2); ctx.stroke();
+        }, 0, DETAIL_SS);
+        winchBucket = BakeBucket(false);
+        winchBucketFull = BakeBucket(true);
+        for (const m of [winchBucket, winchBucketFull]) {
+          FixOrder(m, DepthOrder("play", BAND.loose) + 1);
+          layers.play.add(m);
+        }
+        // **辘轳鼓上的那盘绳**：桶沉进井口的黑里之后就看不见了，绳盘是井下
+        // 那两道手唯一看得见的读数——放绳时一圈圈松出去、盘变窄，摇上来又缠回来。
+        // 真辘轳上你也就是这么看出"放了多少"的。比鼓身暗一档、两头压墨线，
+        // 眼睛跟的是那两条边线往里收（摇把的轴销还盖着中间）
+        winchCoil = BakeSprite(36, 16, 18, 8, (ctx, ax, ay) => {
+          ctx.fillStyle = "#54432a";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 11.6);
+          ctx.fillStyle = "rgba(255,240,205,0.18)";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 3.2);
+          ctx.fillStyle = "rgba(0,0,0,0.26)";
+          ctx.fillRect(ax - 15, ay + 2.6, 30, 3.2);
+          ctx.strokeStyle = "rgba(30,22,14,0.55)";
+          ctx.lineWidth = 1.0;
+          for (let i = 1; i < 8; i += 1) {
+            const cx0 = ax - 15 + (i / 8) * 30;
+            ctx.beginPath(); ctx.moveTo(cx0, ay - 5.6); ctx.lineTo(cx0, ay + 5.6); ctx.stroke();
+          }
+          ctx.strokeStyle = "rgba(24,17,10,0.9)";
+          ctx.lineWidth = 2.0;
+          for (const e of [-15, 15]) {
+            ctx.beginPath(); ctx.moveTo(ax + e, ay - 6.2); ctx.lineTo(ax + e, ay + 6.2); ctx.stroke();
+          }
+        }, 0, HINT_SS);
+        FixOrder(winchCoil, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(winchCoil);
         // 摇把：轴销在画布正中，柄伸向 +x、末端一枚握手——旋转轴就是轴销。
         // **柄长必须等于 Core 的 WINCH_CRANK_R**，画面里那个圈就是
         // 判定用的那个圈，也是 Rig 反解前手的那个圈；三处对不上，手就抓空了。
@@ -3955,23 +3996,144 @@ export function CreateWorld(canvasEl) {
       // 沉多深不要按"井有多深"给——按**看得见多久**给：桶在头一小半程里
       // 一直看得见，之后才淡进井筒的黑里（第一版 0.70−1.30d 走到两成深度
       // 桶就没影了，玩家会以为它掉了）
-      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25;
+      const phase = wv.phase || (wv.filled ? "raise" : "lower");
+      const sway = wv.sway || 0, swing = wv.swing || 0, jolt = wv.jolt || 0;
+      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25
+        + (jolt > 0 ? Math.sin(state.time * 46) * 0.018 * jolt : 0);
+      // 桶横着的位置：在绳上左右悠（sway），最后一道手被人横拽到井沿（swing）
+      const bucketX = wv.x - swing * WINCH_LAND_X + sway * 0.12;
       // 绳只画到井口沿为止：再往下它就该钻进井筒的黑里了。不夹的话，桶沉到
       // 底时会有一根木色的长条从辘轳一直拖到地面、还压在井台之前——读出来是
       // "绳挂在井外面"，不是"桶下到井里去了"
+      const inWell = bucketY < SURFACE_Y + 0.62;
       const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.62);
+      const ropeX = inWell ? wv.x : bucketX;
+      const rdx = ropeX - wv.x, rlen = Math.max(0.05, Math.hypot(rdx, hubY - ropeBottom));
       winchRope.visible = true;
-      winchRope.scale.set(1, Math.max(0.05, hubY - ropeBottom), 1);
-      winchRope.position.set(wv.x, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
+      winchRope.scale.set(1, rlen, 1);
+      // 绳跟着桶歪；桶在井里看不见的时候，每一墩还是得让绳抖一下——
+      // 那是井下那一道手在画面上唯一的动静
+      winchRope.rotation.z = Math.asin(Math.max(-1, Math.min(1, rdx / rlen)))
+        + (inWell ? Math.sin(state.time * 38) * 0.035 * jolt : 0);
+      winchRope.position.set((wv.x + ropeX) / 2, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
       // 桶沉到井台沿以下就淡进井口那团黑里——它画在井台**之前**（loose 带），
       // 不淡的话整只桶会浮在石头台面上往下滑，读出来是"桶在井外掉"
-      winchBucket.visible = wv.hooked && bucketY > 0.05;
-      winchBucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
-      winchBucket.material.transparent = true;
-      winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
-      // 灌满了桶身压得低一点
-      winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
+      const bucket = wv.filled ? winchBucketFull : winchBucket;
+      const spare = wv.filled ? winchBucket : winchBucketFull;
+      spare.visible = false;
+      bucket.visible = wv.hooked && bucketY > 0.05;
+      bucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
+      bucket.material.transparent = true;
+      bucket.position.set(bucketX, bucketY, PlaceZ(BAND.loose));
+      // 二道手的题眼：空桶是**浮着的**，一墩一墩才扣过去。tip 0→1 就是扣的过程
+      bucket.rotation.z = phase === "dunk"
+        ? (wv.tip || 0) * 2.1 + Math.sin(state.time * 3.4) * 0.10 * (1 - (wv.tip || 0))
+        : (phase === "lower" ? Math.sin(state.time * 2.1) * 0.08 : sway * 0.20);
+      // ── 井底：只画给小窗那台相机（PIP_LAYER） ──────────────────────
+      // 主相机看不到井口以下，所以桶一沉下去，四道手里有两道半在看不见的地方
+      // 发生。小窗是第二台相机，架在近景地面带**后头**、井筒**里头**——井底
+      // 那点事于是有地方演，而且顺带把「墩桶」教会了：玩家看见空桶口朝上浮着，
+      // 就知道为什么得墩（用户 2026-08-10 出的主意）。
+      if (!wellShaft) {
+        const topPx = 8;
+        const hPx = Math.ceil((WELL_MOUTH_Y - WELL_BOTTOM_Y) * PPM) + topPx * 2;
+        const wPx = 110;
+        const waterPx = topPx + (WELL_MOUTH_Y - WELL_WATER_Y) * PPM;
+        wellShaft = BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
+          const t = ay - hPx / 2 + topPx;
+          ART.DrawWellShaft(ctx, ax, t, ay - hPx / 2 + waterPx, hPx - topPx, "wellShaft");
+        }, 0, PROP_SS);
+        // **锚点取画布正中**：这只 mesh 手动摆位（不走 userData.offset）
+        wellShaft.userData.midY = WELL_MOUTH_Y - (hPx / 2 - topPx) / PPM;
+        wellShaft.layers.set(PIP_LAYER);
+        // 排在 loose 之前一位：**要压过那张土路贴图**（它在 walk−4，画得比
+        // 背景带晚），排到 nearBack 去的话小窗里只剩一片黄土，井筒看不见
+        FixOrder(wellShaft, DepthOrder("play", BAND.loose) - 1);
+        layers.play.add(wellShaft);
+        // 井筒里那一截绳（小窗里看得见它一路放下来）
+        wellDeepRope = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.045, 1),
+          new THREE.MeshBasicMaterial({ color: 0x6f5c3d, transparent: true, opacity: 0.95, depthWrite: false }),
+        );
+        wellDeepRope.layers.set(PIP_LAYER);
+        FixOrder(wellDeepRope, DepthOrder("play", BAND.loose));
+        layers.play.add(wellDeepRope);
+        // 井筒里那只桶：跟地面上那只是同一只，只是这一只画在真实的深度上
+        const DeepBucket = (full) => {
+          const m = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+            ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶");
+            if (!full) return;
+            ctx.save();
+            ctx.fillStyle = "#131a15";
+            ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.42;
+            ctx.fillStyle = "#6b7566";
+            ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }, 0, PROP_SS);
+          m.layers.set(PIP_LAYER);
+          FixOrder(m, DepthOrder("play", BAND.loose) + 1);
+          layers.play.add(m);
+          return m;
+        };
+        wellDeepBucket = DeepBucket(false);
+        wellDeepFull = DeepBucket(true);
+        // 水面上荡开的一圈：桶碰水、每一墩、灌满的那一下都要有
+        wellRipple = BakeSprite(72, 22, 36, 11, (ctx, ax, ay) => {
+          ctx.strokeStyle = "rgba(178,196,176,0.8)";
+          ctx.lineWidth = 1.8;
+          for (let i = 0; i < 2; i += 1) {
+            ctx.beginPath();
+            ctx.ellipse(ax, ay, 30 - i * 11, 7 - i * 2.6, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }, 0, PROP_SS);
+        wellRipple.layers.set(PIP_LAYER);
+        FixOrder(wellRipple, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(wellRipple);
+      }
+      {
+        const deepY = wv.deepY ?? WELL_MOUTH_Y;
+        const dx = sway * 0.10;
+        wellShaft.visible = true;
+        wellShaft.position.set(wv.x, wellShaft.userData.midY, PlaceZ(BAND.walk));
+        const deep = wv.filled ? wellDeepFull : wellDeepBucket;
+        const deepSpare = wv.filled ? wellDeepBucket : wellDeepFull;
+        deepSpare.visible = false;
+        deep.visible = true;
+        deep.position.set(wv.x + dx, deepY + (jolt > 0 ? Math.sin(state.time * 46) * 0.03 * jolt : 0),
+          PlaceZ(BAND.loose));
+        // 二道手的题眼：**空桶是浮着的**，一墩一墩才扣过去吃水。
+        // 小窗里看得见它口朝上晃、被拽得一头栽下去——这就是「为什么要墩」
+        deep.rotation.z = phase === "dunk"
+          ? (wv.tip || 0) * 2.2 + Math.sin(state.time * 2.6) * 0.13 * (1 - (wv.tip || 0))
+          : Math.sin(state.time * 2.1) * 0.07;
+        wellDeepRope.visible = true;
+        const ropeTopY = WELL_MOUTH_Y + 0.5;
+        wellDeepRope.scale.set(1, Math.max(0.05, ropeTopY - deepY), 1);
+        wellDeepRope.position.set(wv.x + dx * 0.5, (ropeTopY + deepY) / 2, PlaceZ(BAND.loose));
+        wellDeepRope.rotation.z = jolt > 0 ? Math.sin(state.time * 38) * 0.05 * jolt : 0;
+        const rippleOn = jolt > 0.02 && (phase === "dunk" || wv.depth > 0.9);
+        wellRipple.visible = rippleOn;
+        if (rippleOn) {
+          wellRipple.position.set(wv.x, WELL_WATER_Y + 0.02, PlaceZ(BAND.loose));
+          const k = 1 - jolt;
+          wellRipple.scale.set(0.45 + k * 1.2, 0.45 + k * 0.8, 1);
+          wellRipple.material.transparent = true;
+          wellRipple.material.opacity = jolt * 0.85;
+        }
+      }
+      // 鼓上的绳盘：放出去多少就窄多少
+      winchCoil.visible = wv.hooked;
+      winchCoil.position.set(wv.x, hubY, PlaceZ(BAND.loose));
+      winchCoil.scale.set(0.30 + 0.70 * (1 - wv.depth), 1, 1);
       winchCrank.visible = wv.hooked;
+      // 摇把排在人**之前**只在真摇的时候成立（手攥在握手上，握手压住手）。
+      // 墩桶和拽桶那两道手不碰摇把，它再挡在前头就成了一根横在戏前面的木头：
+      // 那两拍把它退回绳与桶的那一档
+      winchCrank.renderOrder = (phase === "lower" || phase === "raise")
+        ? DepthOrder("play", BAND.obstacle)
+        : DepthOrder("play", BAND.loose) + 3;
       // 手上吃劲，摇把也跟着抖一丝——判定的 crankA 不掺演出，抖只加在画面上
       const strain = wv.hooked ? Math.max(0, 1 - (wv.stam ?? 1) / 0.5) : 0;
       const shake = strain * 0.012 * Math.sin(state.time * 34);
@@ -3981,7 +4143,9 @@ export function CreateWorld(canvasEl) {
       winchCrank.rotation.z = (wv.crankA || 0) + WINCH_REST_A;
       // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面。
       // 半径贴着摇把画的那个圈——「手绕这儿转」得指的是真的那一圈
-      const showGuide = wv.hooked && !wv.engaged;
+      // 只在**要转转盘的那两道手**里挂：墩桶与拽桶不绕圈，那两下该看的是
+      // 绳和桶自己在晃，不是一个圈
+      const showGuide = wv.hooked && !wv.engaged && (phase === "lower" || phase === "raise");
       winchGuide.visible = showGuide;
       if (showGuide) {
         const pos = winchGuide.geometry.attributes.position;
@@ -3998,8 +4162,14 @@ export function CreateWorld(canvasEl) {
     } else if (winchRope) {
       winchRope.visible = false;
       winchBucket.visible = false;
+      winchBucketFull.visible = false;
       winchCrank.visible = false;
       winchGuide.visible = false;
+      winchCoil.visible = false;
+      if (wellShaft) {
+        wellShaft.visible = false; wellDeepBucket.visible = false;
+        wellDeepFull.visible = false; wellRipple.visible = false; wellDeepRope.visible = false;
+      }
     }
 
     // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的
@@ -4202,8 +4372,10 @@ export function CreateWorld(canvasEl) {
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
     // 指路的标记在特写里没有意义——你已经站在它跟前了
+    // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
+    // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
     const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
-      && !state.microCine && viewW >= 5.0;
+      && !state.microCine && !liveCardOn && viewW >= 5.0;
     // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
     // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
     // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
@@ -4425,7 +4597,7 @@ export function CreateWorld(canvasEl) {
         new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
-      scene.add(insertMesh);
+      overlayScene.add(insertMesh);
     }
     insertMesh.material.map = tex;
     insertMesh.material.needsUpdate = true;
@@ -4458,6 +4630,8 @@ export function CreateWorld(canvasEl) {
   // 复用 insertMesh 的摆位，所以"铺满画框"这件事只有一份实现。
   // -------------------------------------------------------------------------
   let liveCanvas = null, liveCtx = null, liveTex = null, liveCardOn = false, liveT = 0;
+  // 活卡在不在（Render 靠它决定走不走离屏虚化那条路）
+  let dofOn = false;
   const cardFrac = { w: 1, h: 1 };
 
   // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
@@ -4472,6 +4646,7 @@ export function CreateWorld(canvasEl) {
       // 只收自己那一张：同一帧里若已经换上了定格卡/过场片，别把人家关掉
       if (liveCardOn) {
         liveCardOn = false;
+        dofOn = false;
         liveT = 0;
         if (insertMesh && insertMesh.material.map === liveTex) insertMesh.visible = false;
       }
@@ -4487,6 +4662,9 @@ export function CreateWorld(canvasEl) {
     }
     liveT += Math.min(0.05, dt || 1 / 60);
     liveCardOn = true;
+    // 活卡的底板是透明的（做功的那一拍不许把村子换成一块色板）——
+    // 背后那层真景由 Render 的离屏虚化铺上去
+    dofOn = true;
     insertIsVideo = false;
     insertCardName = null;
     liveCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -4499,7 +4677,7 @@ export function CreateWorld(canvasEl) {
         new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
-      scene.add(insertMesh);
+      overlayScene.add(insertMesh);
     }
     insertMesh.material.map = liveTex;
     insertMesh.material.needsUpdate = true;
@@ -4595,18 +4773,6 @@ export function CreateWorld(canvasEl) {
     //    地道，那批贴图就正对着画框中央（2026-08-10 用户报的"两根白白的模糊
     //    一坨"）。地下不存在草丛篱笆，这一层在地下永远该是空的。
     layers.fore.visible = dist > 7 && camY > SURFACE_Y;
-    // 浮尘在画框内循环飘
-    for (const d of dustMotes) {
-      const u = d.userData;
-      u.seed += 0.0016;
-      const wrapW = viewW * 1.1, wrapH = viewH * 1.1;
-      const bx = ((u.seed * 37 + d.id) % 1);
-      d.position.set(
-        camX - wrapW / 2 + ((bx * wrapW + u.vx * u.seed * 260) % wrapW),
-        camY - wrapH / 2 + (((u.seed * 53) % 1) * wrapH + u.vy * u.seed * 180) % wrapH,
-        0.45,
-      );
-    }
     PlaceOverShoulder(camX, camY, viewW, viewH);
     PlaceInsertCard(camX, camY, viewW, viewH, dist);
     return { viewW, viewH, dist };
@@ -4620,7 +4786,169 @@ export function CreateWorld(canvasEl) {
     rendererCssH = height;
   }
 
-  function Render() { renderer.render(scene, camera); }
+  // -------------------------------------------------------------------------
+  // 特写卡背后的景深虚化
+  //
+  // 做功那几拍（刨料/划线/接绳）是一张铺满画框的活卡。老版这张卡自带一块
+  // 不透明底板（Art 的 CardBase），于是镜头一推近，整个村子就没了——
+  // 用户 2026-08-10 的原话：「搞的像在玩一个独立的游戏一样，为了沉浸感你
+  // 大可以远景做DOF嘛，但你搞了个纯色背景算什么」。
+  //
+  // 现在：世界照常渲，只是渲进一张离屏靶，糊开之后铺回画面当背景，
+  // 卡（底板已抠成透明）再画在上面。于是「推近」是真的推近——院子、房子、
+  // 手边干活的人还在那儿，只是散焦了。
+  //
+  // 便宜的散焦怎么来：先降采样到 ~30%（线性放大本身就是一层糊），再横竖
+  // 各来一遍 9 抽头高斯。两次全屏四边形，分辨率只有三成，代价可以忽略。
+  // -------------------------------------------------------------------------
+  const DOF_SCALE = 0.40;      // 离屏靶相对画布的边长比
+  const DOF_RADIUS = 1.8;      // 高斯抽头间距（离屏靶像素）
+  // 背景板**不是玩法机位的截图**（2026-08-10 用户：「你不能直接拍现成的游戏
+  // 截图……把当前物体之前的东西都隐藏吧，然后背景的FOV要搞大点，不然哪里像是
+  // 一个低FOV聚焦在前景上的样子」）。活卡是一颗怼在活儿跟前的长焦头，它背后
+  // 的世界就得按长焦的读法来，两件事各管一半：
+  //   · DOF_ZOOM——背景用收窄一档的相机重拍：远景放大、透视压缩，贴机头那半屏
+  //     地平线以下的土也顺势被推出画框。上限卡在 1.5：c1_plane 的机位（x40.2
+  //     hw4.6）是按"爹、扫院的娘、房子都在画里"选的，娘在 x37.2——再窄她就出画了。
+  //   · DOF_NEAR_CUT——机位与主体之间的近景整个藏掉（obstacle/clutter 那几档
+  //     矮掩体、过肩剪影）：特写是绕到活儿跟前拍的，镜头前不该还隔着半人高的
+  //     草垛。地道剖面近侧那刀土除外（userData.dofKeep）——藏了它，脚底下的
+  //     地道就在背景板里剧透了。
+  const DOF_ZOOM = 1.5;
+  const DOF_NEAR_CUT = 0.85;   // 演员(0.6)/loose(0.3)/walk(0) 留下，obstacle(0.95) 起藏
+  let dofCam = null;
+  let dofA = null, dofB = null, dofQuadScene = null, dofQuadCam = null, dofQuad = null;
+  let dofW = 0, dofH = 0;
+  const DOF_SHADER = {
+    uniforms: {
+      uTex: { value: null },
+      uStep: { value: new THREE.Vector2(0, 0) },
+      // 背景压一档、往暖里偏一点：清楚的活儿在前景，背景不跟它抢
+      uDim: { value: 1 },
+      uTint: { value: new THREE.Color(1, 1, 1) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: `
+      uniform sampler2D uTex;
+      uniform vec2 uStep;
+      uniform float uDim;
+      uniform vec3 uTint;
+      varying vec2 vUv;
+      void main() {
+        // 9 抽头高斯（权重和为 1）
+        float w[5];
+        w[0] = 0.2270; w[1] = 0.1945; w[2] = 0.1216; w[3] = 0.0540; w[4] = 0.0162;
+        vec3 c = texture2D(uTex, vUv).rgb * w[0];
+        for (int i = 1; i < 5; i++) {
+          vec2 o = uStep * float(i);
+          c += texture2D(uTex, vUv + o).rgb * w[i];
+          c += texture2D(uTex, vUv - o).rgb * w[i];
+        }
+        // 散焦的地方也该失一点色（镜头虚化本来就把细节连同饱和度一起抹平）；
+        // 但**对比要往回提一点**——这套画本来就淡，再糊一遍院子里那几样东西
+        // 就全化进天色里了，"后面还有个村子"就又说不出来
+        float g = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(c, vec3(g), 0.14);
+        c = (c - 0.5) * 1.16 + 0.5;
+        c = clamp(c, 0.0, 1.0) * uTint * uDim;
+        gl_FragColor = vec4(c, 1.0);
+      }
+    `,
+  };
+
+  function EnsureDof() {
+    const w = Math.max(8, Math.round(rendererCssW * renderer.getPixelRatio() * DOF_SCALE));
+    const h = Math.max(8, Math.round(rendererCssH * renderer.getPixelRatio() * DOF_SCALE));
+    if (dofA && w === dofW && h === dofH) return true;
+    dofW = w; dofH = h;
+    const mk = () => new THREE.WebGLRenderTarget(w, h, {
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      depthBuffer: true, stencilBuffer: false,
+      colorSpace: THREE.SRGBColorSpace,
+    });
+    if (dofA) dofA.dispose();
+    if (dofB) dofB.dispose();
+    dofA = mk();
+    dofB = mk();
+    if (!dofQuad) {
+      dofQuadScene = new THREE.Scene();
+      dofQuadCam = new THREE.Camera();
+      dofQuad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: THREE.UniformsUtils.clone(DOF_SHADER.uniforms),
+          vertexShader: DOF_SHADER.vertexShader,
+          fragmentShader: DOF_SHADER.fragmentShader,
+          depthTest: false, depthWrite: false,
+        }),
+      );
+      dofQuad.frustumCulled = false;
+      dofQuadScene.add(dofQuad);
+    }
+    return true;
+  }
+
+  // 卡永远画在世界之后（它本来就是 depthTest 关、renderOrder 顶格的一张覆盖画）
+  function RenderOverlay() {
+    if (!insertMesh?.visible) return;
+    const prev = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.render(overlayScene, camera);
+    renderer.autoClear = prev;
+  }
+
+  function Render() {
+    // 没有活卡：照老路一遍渲完，一分钱不多花
+    if (!dofOn || !insertMesh?.visible || !rendererCssW || !EnsureDof()) {
+      renderer.render(scene, camera);
+      RenderOverlay();
+      return;
+    }
+    const u = dofQuad.material.uniforms;
+    // ① 世界渲进离屏靶（卡自己先让开——它是要画在糊过的背景之上的）。
+    //    用长焦相机、藏掉主体跟前的近景重拍一遍：见 DOF_ZOOM / DOF_NEAR_CUT
+    insertMesh.visible = false;
+    if (!dofCam) dofCam = new THREE.PerspectiveCamera(FOV, camera.aspect, 0.5, 400);
+    dofCam.aspect = camera.aspect;
+    dofCam.zoom = DOF_ZOOM;
+    dofCam.position.copy(camera.position);
+    dofCam.quaternion.copy(camera.quaternion);
+    dofCam.updateProjectionMatrix();
+    const dofHidden = [];
+    for (const o of layers.play.children) {
+      if (o.visible && o.position.z > DOF_NEAR_CUT && !o.userData.dofKeep) {
+        o.visible = false;
+        dofHidden.push(o);
+      }
+    }
+    if (otsMesh?.visible) { otsMesh.visible = false; dofHidden.push(otsMesh); }
+    const prevTarget = renderer.getRenderTarget();
+    renderer.setRenderTarget(dofA);
+    renderer.clear();
+    renderer.render(scene, dofCam);
+    for (const o of dofHidden) o.visible = true;
+    // ② 横向糊一遍 A→B
+    u.uTex.value = dofA.texture;
+    u.uStep.value.set(DOF_RADIUS / dofW, 0);
+    u.uDim.value = 1;
+    u.uTint.value.setRGB(1, 1, 1);
+    renderer.setRenderTarget(dofB);
+    renderer.clear();
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ③ 竖向糊一遍 B→画面，顺手压暗压暖
+    u.uTex.value = dofB.texture;
+    u.uStep.value.set(0, DOF_RADIUS / dofH);
+    u.uDim.value = 0.86;
+    u.uTint.value.setRGB(1.04, 1.0, 0.94);
+    renderer.setRenderTarget(prevTarget);
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ④ 卡画在上面（autoClear 关掉，别把刚铺好的背景冲了）
+    insertMesh.visible = true;
+    RenderOverlay();
+  }
 
   // -------------------------------------------------------------------------
   // 后果小窗（勇敢的心式画中画）：主画面渲染完后，用第二台相机把同一个世界
@@ -4628,6 +4956,7 @@ export function CreateWorld(canvasEl) {
   // 看过去透视自然成立，不用为它做任何搬动。
   // -------------------------------------------------------------------------
   const pipCamera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 400);
+  pipCamera.layers.enable(PIP_LAYER);   // 小窗多看一层：井筒剖面只画给它
   let pipShot = null;
   function SetPip(spec) { pipShot = spec; }
 

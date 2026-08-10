@@ -269,6 +269,11 @@ async function CmdState(o) {
   if (o.cine !== "keep") for (let i = 0; i < 900 && state.microCine; i += 1) step({ advance: true });
   // 旗标覆盖放在跳幕与微过场之后：beat 自己的 onStart 已经跑完，不会再盖掉
   if (o.flag) Object.assign(state.flags, ParseFlags(o.flag));
+  // --step N：链式节拍直接落到第 N 步。**先空跑一帧再改**——链的初始化在第一帧，
+  // 提前改 stepIndex 会绕过它（holdP undefined → NaN）。
+  // 这是给"看某一步长什么样"用的，**不是**可达性验证：谁走得到那一步是
+  // SmokeTest 自动通关的活（CLAUDE.md「自测不许瞬移玩家」说的是那件事）。
+  if (o.step !== undefined) { state.beat.stepIndex = Number(o.step); step({}, 1); }
   if (o.x !== undefined) state.player.x = Number(o.x);
   if (o.level) state.player.level = String(o.level);
   step({}, 2);
@@ -276,7 +281,7 @@ async function CmdState(o) {
   const before = JSON.stringify(state.flags);
   const trace = [];
   if (o.input) {
-    for (const raw of String(o.input).split(",")) {
+    for (const raw of String(o.input).split(/[,;]/)) {
       const [tok, mul] = raw.trim().split("*");
       const inp = InputOf(tok);
       if (!inp) { console.log(`看不懂的输入 token：${tok}（d a s w e E c . adv）`); return; }
@@ -371,7 +376,7 @@ async function CmdShot(o) {
   const specs = o._.flatMap((s) => String(s).split(",").filter(Boolean).length && !s.includes("@")
     ? String(s).split(/[，,]/).filter(Boolean) : [s]);
   if (!specs.length) {
-    console.log("用法：shot <beatId>[@x=41,level=under,旗标=0] [更多 beatId...] [--x N] [--flag k=v] [--hold d] [--dur 4] [--phases 6] [--probe]");
+    console.log("用法：shot <beatId>[@x=41,level=under,旗标=0] [更多 beatId...] [--x N] [--step N] [--flag k=v] [--hold d] [--dur 4] [--phases 6] [--probe]");
     return;
   }
   const base = {
@@ -415,13 +420,13 @@ async function CmdShot(o) {
       const tag = String(jo.out || job.id);
       // --pre 用的是 state 那套输入小语言，在**开拍之前**无头跑完：
       // 「先按 E 把绳头拿起来，再按住 d 边走边拍」这种前置操作没它没法表达
-      const pre = String(jo.pre || "").split(",").filter(Boolean).map((raw) => {
+      const pre = String(jo.pre || "").split(/[,;]/).filter(Boolean).map((raw) => {
         const [tok, mul] = raw.trim().split("*");
         const inp = InputOf(tok);
         if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
         return [inp, Math.max(1, Number(mul || 1))];
       });
-      await page.evaluate(({ c, b, x, level, actor, keepCine, pre: steps, flags }) => {
+      await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps, flags }) => {
         const tl = window.TunnelLight;
         tl.JumpToBeat(c, b);                       // 吃章号，跨章不用重开页面
         tl.StepFrames(1, {});
@@ -429,13 +434,16 @@ async function CmdShot(o) {
         // 旗标覆盖放在跳幕与微过场之后：beat 的 onStart 已经跑完，不会再盖掉。
         // 改完再走两帧，场景构建会自己比对出"要重建"（剖面几何、光照都吃旗标）
         if (flags && Object.keys(flags).length) Object.assign(tl.state.flags, flags);
+        // --step N：链式节拍直接落到第 N 步（同 state 的那条，先空跑一帧再改）
+        if (stepIndex !== undefined) { tl.state.beat.stepIndex = stepIndex; tl.StepFrames(1, {}); }
         if (x !== undefined) tl.state.player.x = x;
         if (level) tl.state.player.level = level;
         if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
         tl.StepFrames(2, {});
         for (const [inp, n] of steps) tl.StepFrames(n, inp);
       }, { c: job.ci, b: job.bi, x: jo.x === undefined ? undefined : Number(jo.x), level: jo.level || null,
-        actor: jo.actor || null, keepCine: jo.cine === "keep", pre, flags: job.flags });
+        actor: jo.actor || null, keepCine: jo.cine === "keep",
+        stepIndex: jo.step === undefined ? undefined : Number(jo.step), pre, flags: job.flags });
 
       // 等转场的圆形黑幕拉开再拍——死等固定秒数会拍到一个圆洞（等待时间随
       // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子
@@ -519,13 +527,15 @@ const HELP = `《地道里的光》命令行工作台
   state <beatId> [选项]   无头跑到那一拍，喂真输入，把状态打出来
       --x 35.6 --level under --input "e,d*90" --frames 30 --trace --json
       --flag digStarted=0,tunnelDug=1   手拨游戏里的是/否开关（见下）
+      --step N   链式节拍直接落到第 N 步
       输入 token：d右 a左 s下梯 w上梯 e按一下 E按住 c蹲 . 空转 adv推过场；token*N 重复
   shot <beatId ...> [选项] 实拍（真浏览器、真键盘），存进 _shots/
       **一条命令可以拍好几拍**，共用一个浏览器（跨章也不用重开页面）：
         shot c1_well c2_escape1 c8_wall
       每一拍可以用 @ 挂自己的参数，逗号分隔；**不认识的键一律当开关**：
         shot "c1_barrow@x=41,level=under,tunnelDug=0" "c1_barrow@x=41,tunnelDug=1,out=通了"
-      --x N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
+      --x N --step N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
+      --step N         链式节拍直接落到第 N 步（看某一步长什么样；不是可达性验证）
       --flag k=v,k=v   所有拍共用的开关默认值（@ 里写的盖过它）
       --probe          截图同时报两件有明确对错的事：深度带用错没有、手脚离地多少
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键

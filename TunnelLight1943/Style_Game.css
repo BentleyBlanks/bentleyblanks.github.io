@@ -775,67 +775,12 @@ body.touchDevice #touchControls.gone { display: none; }
   50% { border-color: rgba(226, 130, 92, 0.85); }
 }
 
-#gestureHint {
-  position: absolute; left: 0; right: 0; bottom: calc(15% + 46px);
-  margin-inline: auto;
-  width: 54px; height: 54px;
-  pointer-events: none;
-  border: 1px solid rgba(226, 196, 132, 0.4);
-  border-radius: 50%;
-  background: rgba(8, 6, 4, 0.45);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
-}
-#gestureHint .gDot {
-  position: absolute; left: 50%; top: 50%;
-  width: 10px; height: 10px; margin: -5px 0 0 -5px;
-  border-radius: 50%;
-  background: #f7dd9a;
-  box-shadow: 0 0 8px rgba(247, 221, 154, 0.8);
-}
-#gestureHint[data-kind="dragDown"] .gDot { animation: gDragDown 1.3s ease-in-out infinite; }
-@keyframes gDragDown {
-  0% { transform: translateY(-13px); opacity: 0.2; }
-  18% { opacity: 1; }
-  70% { transform: translateY(13px); opacity: 1; }
-  100% { transform: translateY(13px); opacity: 0; }
-}
-#gestureHint[data-kind="pullUp"] .gDot { animation: gPullUp 1.1s ease-in-out infinite; }
-@keyframes gPullUp {
-  0% { transform: translateY(13px); opacity: 0.25; }
-  20% { opacity: 1; }
-  62% { transform: translateY(-11px); opacity: 1; }
-  /* 松手回落一点：辘轳会倒转这件事，图标自己就在演 */
-  100% { transform: translateY(-4px); opacity: 0; }
-}
-#gestureHint[data-kind="circle"] .gDot { animation: gCircle 1.6s linear infinite; }
-@keyframes gCircle {
-  0% { transform: rotate(0deg) translateX(14px); }
-  100% { transform: rotate(360deg) translateX(14px); }
-}
-/* 辘轳转盘：顺时针放绳、逆时针摇上来——图标转的方向就是手要转的方向 */
-#gestureHint[data-kind="crankDown"] .gDot { animation: gCircle 1.1s linear infinite; }
-#gestureHint[data-kind="crankUp"] .gDot { animation: gCircleCcw 1.5s linear infinite; }
-@keyframes gCircleCcw {
-  0% { transform: rotate(360deg) translateX(14px); }
-  100% { transform: rotate(0deg) translateX(14px); }
-}
-/* 投石：往后下方拽开蓄劲，松手弹回去——图标演的就是拇指要走的那一趟。
-   拽的方向定角度、拽的长短定劲，所以这枚图标是斜着走的，不是上下走的 */
-#gestureHint[data-kind="slingBack"] .gDot { animation: gSlingBack 1.6s ease-in-out infinite; }
-@keyframes gSlingBack {
-  0% { transform: translate(5px, -3px); opacity: 0.2; }
-  14% { opacity: 1; }
-  46% { transform: translate(-11px, 9px); opacity: 1; }
-  62% { transform: translate(-11px, 9px); opacity: 1; }
-  78% { transform: translate(13px, -9px); opacity: 0.95; }
-  100% { transform: translate(13px, -9px); opacity: 0; }
-}
-#gestureHint[data-kind="tap"] .gDot { animation: gTap 0.9s ease-in-out infinite; }
-@keyframes gTap {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  22% { transform: scale(1.9); opacity: 1; }
-  40% { transform: scale(1); opacity: 0.85; }
-}
+/* 手势提示的小黑饼（暗圆盘 + 一粒点按方向做动画的那个 HUD 元素）已整体拆除
+   （2026-08-10 用户：「明明是按键交互 非要装自己是个圈 还给个方向？」）。
+   抽象图形说不了任何事：方向写进提示文案，上手的交互由实物自己招呼
+   （辘轳的引导圈、卡上会蹭的绳头、拉弓预览弧）。那一族圆点动画随之埋在
+   这里，别刨。 */
+
 /* 做功的节拍没有 HUD 轨道（禁 slider）：这里曾有一块 #scribeGuide 拖动
    QTE 轨道的样式（轨道+旋钮+提示行），随交互一并拆除，别加回来。 */
 

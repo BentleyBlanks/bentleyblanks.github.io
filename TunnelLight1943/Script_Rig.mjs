@@ -808,6 +808,20 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-16 - 10 * k) * DEG; target.foreB = -26 * DEG;
     target.thighB = (-10 - 18 * k) * DEG; target.shinB = (14 + 14 * k) * DEG; target.footB = -6 * DEG;
     target.thighF = (4 + 12 * k) * DEG; target.shinF = (6 + 6 * k) * DEG; target.footF = -6 * DEG;
+  } else if (s.pose === "pointLow") {
+    // 指给人看（**地道专用**）：抬手指着要说的那处，另一只手垂着，眼睛跟着手走。
+    // 自带猫腰的腰身与胯高——和 stoop 同一套（头顶对得上 POSTURE_HEAD.stoop
+    // 1.45m），所以在净高一米五的洞里用它，脑袋不会捅穿洞顶。名字带 Low
+    // 就是这个意思：站在地面上要"指"，另写一个直腰的，别拿它凑合。
+    // 抬起来那只手的世界末端约在 0.68m 前、1.15m 高——正好够着洞顶那截松土。
+    target.hipY = -0.14; target.hipX = 0.05;
+    target.torso = 42 * DEG;
+    target.head = -50 * DEG;              // 顺着自己的手往上看
+    target.armF = -118 * DEG;             // 负角向前：抬到前上方 28°，从脑袋侧上方指出去
+    target.foreF = -6 * DEG;              // 胳膊几乎伸直，指出去
+    target.armB = -2 * DEG; target.foreB = 14 * DEG;   // 另一只顺着重力垂着
+    target.thighB = -36 * DEG; target.shinB = 46 * DEG; target.footB = -12 * DEG;
+    target.thighF = -24 * DEG; target.shinF = 34 * DEG; target.footF = -12 * DEG;
   } else if (s.pose === "planePush") {
     // 刨料：**姿势由推程直接驱动**（s.poseK 0→1），不是播一段循环给玩家看。
     // 他推多远，这具身子就送多远——手上的分量就是从这儿来的。
@@ -899,6 +913,30 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-58 - 6 * k) * DEG; target.foreB = (-64 + 8 * k) * DEG;
     target.thighB = (-18 - 12 * k) * DEG; target.shinB = (22 + 12 * k) * DEG; target.footB = -8 * DEG;
     target.thighF = (14 + 8 * k) * DEG; target.shinF = (10 + 6 * k) * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "dunkRope") {
+    // 墩桶：两只手探出去攥住井绳，整个人往下坐着一墩。**劲不在胳膊上，在体重上**
+    // ——胯要真的沉下去、膝盖跟着屈，不然就成了"挥手"。
+    // 姿势**由这一把拽了多远驱动**（poseK 0→1）：起手时两只手探出去攥住绳、
+    // 举得高；往下拽的过程里胳膊落下来、胯跟着坐下去、膝盖屈住。
+    // 负角=向前上方；两只手都在同一根绳上（够得着是前提：Core 会把人往前
+    // 挪到离绳半米，正好一臂）。劲在体重上，不在胳膊上
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.5));
+    target.hipY = -0.06 - 0.16 * k; target.hipX = 0.02 + 0.04 * k;
+    target.torso = (2 + 10 * k) * DEG; target.head = (4 - 8 * k) * DEG;
+    target.armF = (-104 + 34 * k) * DEG; target.foreF = (-6 - 8 * k) * DEG;
+    target.armB = (-88 + 32 * k) * DEG; target.foreB = (-10 - 10 * k) * DEG;
+    target.thighB = (-12 - 20 * k) * DEG; target.shinB = (14 + 22 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (10 + 14 * k) * DEG; target.shinF = (6 + 12 * k) * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "haulIn") {
+    // 把桶拽到井沿：**由横拽的行程驱动**（poseK 0→1）。起手探出去够桶帮，
+    // 拽的过程里胳膊往回收、上身往后仰着较劲、后腿蹬住台底
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.06 - 0.06 * k; target.hipX = 0.10 - 0.16 * k;
+    target.torso = (10 - 20 * k) * DEG; target.head = (-8 + 4 * k) * DEG;
+    target.armF = (-94 + 52 * k) * DEG; target.foreF = (-8 - 40 * k) * DEG;
+    target.armB = (-70 + 46 * k) * DEG; target.foreB = (-14 - 34 * k) * DEG;
+    target.thighB = (-14 - 16 * k) * DEG; target.shinB = (14 + 14 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (14 + 8 * k) * DEG; target.shinF = (8 + 6 * k) * DEG; target.footF = -10 * DEG;
   } else if (s.pose === "vault" || s.pose === "clamber") {
     // 翻越：三段——① 手够上顶沿、后腿蹬地；② 撑起来把腿收到胸前荡过去；
     // ③ 脚先落地、屈膝卸力。姿势按 poseK（Core 给的动作进度）在关键帧之间插，
@@ -1114,21 +1152,40 @@ export function PoseRig(rig, s, dt) {
     target.footF = (180 + 6 - 92) * DEG;
   } else if (s.posture === "stoop") {
     // 猫腰：地道里的常态。不是蹲，是弓着背走——胯只略沉，腰折下去，
-    // 头压在洞顶底下，手垂在身前随时撑一把。走得比站着慢，但还是在走。
+    // 头压在洞顶底下。走得比站着慢，但还是在走。
+    //
+    // **胳膊的角度是世界角**：armFront/armBack 挂在 root 上（见顶上那张骨架图），
+    // 不是躯干的子节点——0° 就是顺着重力吊下来，正角向后、负角向前。
+    // 老版写的是 armF -44 / foreF -36：加起来向前 80°，两条胳膊一起平端在胸前
+    // 直指正前方；两条腿又给了一模一样的角度，叠成一条。于是地道里站着的人
+    // 全成了排队的僵尸（2026-08-10 用户截图退回：三个乡亲在洞里平举双手）。
+    // 人弓着腰站住的时候，胳膊是**吊着**的（肩点已经被躯干带到胯前 0.32m，
+    // 手自然垂在小腿前头），两只手绝不同角度，两条腿也一前一后错开——
+    // 侧视里"两个人还是两条腿"全靠这点错位。
     const c = s.moving ? 1 : 0;
+    const br = Math.sin(s.breath || 0);
     target.hipY = -0.14 + (c ? Math.abs(Math.sin(p)) * 0.024 : 0);
     target.hipX = 0.05;
-    target.torso = 46 * DEG;
-    target.head = -34 * DEG;
-    target.armB = (-38 + (c ? swing * 18 : 0)) * DEG;
-    target.foreB = -40 * DEG;
-    target.armF = (-44 + (c ? swing2 * 18 : 0)) * DEG;
-    target.foreF = -36 * DEG;
-    target.thighB = (-30 + (c ? swing2 * 26 : 0)) * DEG;
-    target.shinB = (40 - (c ? swing2 * 18 : 0)) * DEG;
+    // 腰折 42°、脖子抬到 -54（世界角约 −12°，脸是朝前上方的）。
+    // 老版腰 46 配脖子 −34，世界角 +12——脸冲着自己的脚。在洞里走路的人
+    // 必须看得见前面，低头那副样子读出来是"弯腰干呕"，不是"猫腰走"
+    target.torso = (42 + (c ? 0 : br * 1.6)) * DEG;
+    target.head = (-54 - (c ? 0 : br * 1.8)) * DEG;
+    // 站住时两只手都**折着肘搭在大腿前头**，不是直直吊下来。
+    // 直吊的胳膊和小腿几乎平行，侧视里一个人就成了四根竖棍，读出来像只虫子；
+    // 肘一折，胳膊有了拐角，和腿分得开——这是"歇着的人"和"标本"的分界。
+    // 两只手还得差着十来度，不然左右手叠成一条粗胳膊。
+    target.armB = (c ? -6 + swing * 24 : -6) * DEG;
+    target.foreB = (c ? -16 + Math.max(0, swing) * 18 : 34) * DEG;
+    target.armF = (c ? -6 + swing2 * 24 : -16) * DEG;
+    target.foreF = (c ? -16 + Math.max(0, swing2) * 18 : 44) * DEG;
+    // 腿：猫腰折的是腰，膝盖只是略屈。站住时一前一后错开，
+    // 两条小腿的世界角仍然相同（同一个地面），错的是膝盖的前后
+    target.thighB = (c ? -30 + swing2 * 26 : -36) * DEG;
+    target.shinB = (c ? 40 - swing2 * 18 : 46) * DEG;
     target.footB = -12 * DEG;
-    target.thighF = (-30 + (c ? swing * 26 : 0)) * DEG;
-    target.shinF = (40 - (c ? swing * 18 : 0)) * DEG;
+    target.thighF = (c ? -30 + swing * 26 : -24) * DEG;
+    target.shinF = (c ? 40 - swing * 18 : 34) * DEG;
     target.footF = -12 * DEG;
   } else if (s.crouch) {
     // 半蹲：胯下沉、上身前倾、膝深弯；移动时小步挪
