@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
@@ -1233,6 +1234,38 @@ function TestWorkStations() {
   console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
 }
 
+// 命令行工作台自己也要有测试。它是给 agent 用的接口——**坏了不会有任何别的
+// 测试变红**，但下一个会话会立刻退回"现写探针脚本"那条老路（12 天里那 234 个
+// 一次性脚本就是这么来的）。这里只盯"问得出答案"，不盯具体文案。
+function TestCliAnswersQuestions() {
+  const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Cli.mjs");
+  const run = (args) => execFileSync(process.execPath, [cli, ...args], { encoding: "utf8", timeout: 60000 });
+
+  // ① where：索引里必须找得到各类东西，且答案带 文件:行
+  const w = run(["where", "ropeline"]);
+  assert.match(w, /c1_ropeline\s+节拍/, "where 得认得节拍 id");
+  assert.match(w, /Script_Core\.mjs:\d+/, "where 的答案必须带 文件:行，不然还得再 grep 一遍");
+  assert.match(run(["where", "DrawHenCoop"]), /画笔.*Script_Art\.mjs:\d+/, "where 得认得画笔");
+  assert.match(run(["where", "henCoop"]), /Data_PropArt\.json:\d+/, "where 得认得道具登记");
+
+  // ② beats/beat：不读 Core 就能拿到一拍的全部
+  assert.match(run(["beats", "c1"]), /c1_ropeline/, "beats 得列全第一章");
+  const b = run(["beat", "c1_ropeline"]);
+  assert.match(b, /步骤 3/, "beat 得把步骤数说清");
+  assert.match(b, /needs="ropeEnd"/, "beat 得说清这一步要什么");
+  assert.match(b, /旗标\s+ropeStaked/, "beat 得扫出这一拍碰的旗标（且不许把后面几拍的算进来）");
+
+  // ③ state：无头跑到任意一拍、喂真输入、把状态打出来——那 725 次探针脚本的替代品
+  const s0 = run(["state", "c1_ropeline", "--x", "35.6", "--json"]);
+  const j0 = JSON.parse(s0);
+  assert.equal(j0.beat.id, "c1_ropeline");
+  assert.match(j0.prompt || "", /绳头/, "站到绳头跟前必须给得出提示");
+  const j1 = JSON.parse(run(["state", "c1_ropeline", "--x", "35.6", "--input", "e,d*300", "--json"]));
+  assert.equal(j1.player.item, "ropeEnd", "输入小语言得真的驱动得动玩法");
+  assert.ok(j1.live.ropeLine?.taut > 0.99, "走到头绳该绷直——state 得看得见玩法系统的活状态");
+  console.log("  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现");
+}
+
 // 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
 // 「挥舞的时候为什么脚也会在y轴上漂移？」）。逐键盯死，退化立刻红：
 //   ① 脚钉在地上：每个键都得带全六个腿关节，且踝的垂距 L(cos a + cos(a−b))
@@ -2050,6 +2083,7 @@ TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestCliAnswersQuestions();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();

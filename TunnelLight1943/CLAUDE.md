@@ -2,6 +2,34 @@
 
 《地道里的光》2.5D 横版白盒。改这个目录前先读本文件；改完跑「验证」一节。
 
+## 先用命令行工作台，别一上来就读源码
+
+```bash
+node TunnelLight1943/Script_Cli.mjs
+```
+
+| 子命令 | 回答什么 |
+|---|---|
+| `where <片段>` | **这东西在哪**：节拍 / 函数 / 画笔 / 道具登记 / 骨架轨道姿势 / 规范章节 → `文件:行` |
+| `beats [c1]` | 列出全部节拍（章 · 序号 · id · kind） |
+| `beat <id>` | 某一拍的全部：步骤/区域/needs/prompt/旗标/台词/源码位置 |
+| `state <id> [选项]` | **无头**跑到那一拍、喂真输入、把状态打出来（`--x --level --input --frames --trace --json`） |
+| `shot <id> [选项]` | 实拍（真浏览器真键盘）→ `_shots/`（`--pre --hold --dur --phases --actor --clip`） |
+| `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |
+
+**这是硬规矩，因为代价量过**：翻 12 天会话记录，改这个游戏的 token 七成花在
+「定位」上（Read/Grep 打在源码上 ≈149 万），另有 ≈40 万花在**现写一次性探针**
+（234 个 scratchpad 脚本 + 319 次 `node -e`）——而跑测试只占 ≈23 万。7000 行的
+`Script_Core.mjs` 同一段 300 行被反复读了 19 次，每个新会话都在重新画同一张地图。
+
+- **要问游戏状态，先跑 `state`，不许现写探针脚本**；缺子命令就往 `Script_Cli.mjs`
+  里加，加完写回这张表。一次性脚本写完就扔，下一个 agent 还得重写一遍。
+- **要截图，跑 `shot`**。那套引导代码有三个必踩的坑，已经固化在里面：
+  `ServeRoot` 的 rootDir 必须 `path.resolve`（正斜杠字符串会 403）、页面 load 完
+  `tl.state` 还是 null 得先 `StartGame`、**拍姿势必须真按键**（`FlashPose` 只有
+  0.2 秒，`StepFrames` 之后的等待里 rAF 还在跑无输入帧，截出来全是站姿）。
+- `SmokeTest` 的 `TestCliAnswersQuestions` 盯着它——CLI 坏了不会有别的测试变红。
+
 ## 场景数据在哪（改东西之前先看这里）
 
 **场景物体不写在代码里**。要挪一个东西、换一张贴图、改一档深度，改 JSON 就够了：
@@ -368,6 +396,13 @@ npm run test:tunnelLight1943            # node：自动通关全 8 章双分支 
 npm run scene:tunnelLight1943           # 场景清单：谁在哪、埋多深、用哪支画笔
 npm run test:tunnelLight1943:browser    # 浏览器：逐章渲染健康 + 跳幕体检
 node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
+node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提交/缓存戳/端口
+```
+
+改完某一拍，最快的自检是把它单独跑一遍再看一眼：
+
+```bash
+node TunnelLight1943/Script_Cli.mjs state c1_ropeline --x 35.6 --input "e,d*300"
 ```
 
 改台词以代码为准，用 scratchpad 的 extract-script 流程回写 Notion（见项目记忆）。
