@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -1371,12 +1371,11 @@ export function CreateWorld(canvasEl) {
             { z: BAND[V2.innerBand] });
           homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
             { z: BAND[V2.facadeBand] });
+          // 屋子占的那段街由 Core 的 HouseSpan 给（判定与画面共用一份边界）。
           // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
-          // 洞宽 30px）。NPC 得走到门口才消失在屋里，不能一挨着东墙就没影
-          homeRange = {
-            x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2,
-            door: p.x + p.w / 2 - 25 / PPM,
-          };
+          // 洞宽 30px）——那是画笔的事，留在这儿。NPC 得走到门口才消失在
+          // 屋里，不能一挨着东墙就没影
+          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
@@ -2971,11 +2970,13 @@ export function CreateWorld(canvasEl) {
     // 车画在演员前面一点，贴着车走就是躲进车影
     if (state.cart) {
       const cartKind = state.cart.kind || "cart";
-      // 玩家**推着**的独轮车（第一章）要退到 loose 带：人在近侧握着车把，
-      // 身子和手得画在车前面。第三章那辆驴车是**移动掩体**，得挡住人，
-      // 所以留在 CART_COVER_Z——两种角色，两个深度。
+      // 玩家**推着**的独轮车（第一章）走 pushCart 带：人在近侧握着车把，
+      // 身子和手得画在车前面（所以在演员 0.6 之后）；但它是**街面上**的东西，
+      // 推着从自家屋前过的时候不能被立面(0.4)吃掉——夹在两者之间的 0.5 是
+      // 唯一同时成立的位置。第三章那辆驴车是**移动掩体**，得挡住人，留在
+      // CART_COVER_Z——两种角色，两个深度。
       const pushed = cartKind === "barrow";
-      const cz = pushed ? BAND.loose : CART_COVER_Z;
+      const cz = pushed ? BAND.pushCart : CART_COVER_Z;
       // 新版第一章是空车推去、装上料再推回来——车上装了几件就画几件，
       // 装载数进 key，变了才重烘（三件是「两块门板 + 一根枣木杠」，
       // 第三件必须画成杠：截成 min(2) 的话「放上车」那一下画面毫无变化）
@@ -3586,8 +3587,9 @@ export function CreateWorld(canvasEl) {
     // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
     // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
     if (homeFacade && homeRange) {
-      const pp = state.player;
-      const inside = pp.level === "surface" && pp.x > homeRange.x0 && pp.x < homeRange.x1;
+      // 进没进屋由 Core 判（IndoorOpen）：位置只是必要条件——推着独轮车的人
+      // 走的是屋外那条道，车进不了堂屋
+      const inside = IndoorOpen(state, homeRange.x0, homeRange.x1);
       // 戏在屋里演（爹修门那一场）：玩家还在门外，可墙合着的话他连爹在哪
       // 都看不见——只看得见一双脚从墙根底下漏出来（用户 2026-08-09 报的）。
       // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
