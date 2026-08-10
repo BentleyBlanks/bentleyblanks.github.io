@@ -7,14 +7,14 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import {
   BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, ACTOR_RANK_DZ,
-  CheckBandZ, DepthViolations,
+  CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
 } from "./Data_DepthSpec.mjs";
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
 // 这里只负责"照着数据把它烘出来放好"，不再自己写死尺寸与 z
@@ -33,6 +33,9 @@ const SCRIBE_SS = 3;
 // 石笔的世界尺寸：26×30 的贴图 ×0.22 ≈ 12×14cm 的画布，里面那支笔约 9cm 长——
 // 巴掌里攥得住的东西。别再让它长回 40cm。
 const CHALK_SCALE = 0.22;
+// 定向绳的半宽（米）：真麻绳才两三厘米，但那在屏幕上不到两个像素，趴在土路上
+// 根本看不见。7 厘米粗是"看得出是绳"的下限，同辘轳井绳一个量级
+const ROPE_HALF = 0.035;
 // 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
 
 
@@ -92,6 +95,16 @@ function PlaceSprite(mesh, x, y, z) {
   mesh.userData.anchor = { x, y, z };
 }
 
+// 会掉头的贴图（独轮车这类有正反的家伙）：dir<0 时整张左右翻。
+// 镜像是绕**网格中心**发生的，所以锚点相对中心的偏移也得跟着翻号，
+// 否则车把一翻面、车身就整体平移出去半米。
+function PlaceSpriteFlip(mesh, x, y, z, dir) {
+  const s = dir < 0 ? -1 : 1;
+  mesh.scale.x = s;
+  mesh.position.set(x + mesh.userData.offset.x * s, y + mesh.userData.offset.y, z);
+  mesh.userData.anchor = { x, y, z };
+}
+
 // 缩放时保持地面锚点不动（否则远景会整体浮起来）
 function ScaleKeepGround(mesh, sx, sy = sx) {
   mesh.scale.set(sx, sy, 1);
@@ -113,7 +126,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
-const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀"];
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀", "木槌"];
 // 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
 // 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
 // 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
@@ -121,7 +134,7 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
-  "麻绳", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
+  "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
   "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
@@ -130,7 +143,8 @@ const HOLD_WEIGHT = {
   "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
-  "军刀": 0.25,
+  "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
+  "军刀": 0.25, "木槌": 0.3,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
@@ -143,13 +157,13 @@ const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
 function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
-  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "花布巾", "鞭炮", "一挂鞭炮",
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
     ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
   // 收窄后的画幅，别再给一根柱子留地方。
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
   // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
   // 刺刀尖离握点 1.18m＝56.6px，所以半高至少 57 → 120。
-  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72] };
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72], "木槌": [24, 60] };
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -185,14 +199,22 @@ function MakeGroundItemMesh(label) {
   return mesh;
 }
 
+// 独轮车上的一车料怎么摆：前两件是旧门板（平摞），第三件是枣木杠（圆杠压顶）
+const BarrowLoad = (n) => ({ planks: Math.min(2, n), pole: n >= 3 });
+
 // ---------------------------------------------------------------------------
 export function CreateWorld(canvasEl) {
   const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+  // 浏览器直接播放的 MP4 是 BT.709/sRGB 显示内容。序章把同一帧上传成
+  // VideoTexture 时也必须显式声明 sRGB；否则 Three 会把它当线性数据再做一次
+  // 输出变换，网页里的对比度和独立播放原片就会明显不同。
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
   // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
   // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
-  const FOV = 30;
+  const FOV = CAM_FOV;
   const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 400);
   // 参考机位距离：各层贴图按 (D_REF + z深度)/D_REF 预放大，保证默认景别下比例正确
   const D_REF = 24;
@@ -259,6 +281,12 @@ export function CreateWorld(canvasEl) {
   //                 进这一段，高过腰的东西（草垛/断墙/树丛）一律退到负值，
   //                 否则会把人整个吞掉。
   //   ≥ +3.4        fore 层：真前景，成片掠过镜头
+  //
+  // **带号是绘制顺序，不是位置。** 平视镜头下每一档 z 都有自己的地平线，
+  // 所以行走线上的一切（演员/影子/携带物/放下的东西/推的车/钉在地上的道具）
+  // 摆位时一律经 `PlaceZ()` 压回 z=0，只有真的站在别的纵深上的东西
+  //（负号的背景带、正号的前景掩体）才保留自己的 z。见 Data_DepthSpec 的
+  // 「地平线规范」——那里有各档地平线差多少像素的实测表。
   // ===========================================================================
   // 深度带的数值来自 Data_DepthSpec.mjs，物体用哪个带来自 Data_PropArt.json；
   // 这里只保留层间的绘制序表。
@@ -381,8 +409,14 @@ export function CreateWorld(canvasEl) {
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
-  let ropeLineMesh = null;
+  // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
+  let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
+  // 屋里的东西（地窖口、下窖的梯子）：从街上看不见，进了屋才露出来。
+  // 少了这一层，自家地窖口就成了「敞在门口大街上的一个洞」（用户 2026-08-09
+  // 退回：「主角家的地道/地窖怎么会在家门口外面」）——2.5D 里玩家走的那条线
+  // 永远在立面之前，所以屋内地面上的东西必须跟着立面一起淡
+  let indoorMeshes = [];
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
   // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
@@ -454,8 +488,9 @@ export function CreateWorld(canvasEl) {
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
-    ropeLineMesh = null;
+    ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
+    indoorMeshes = [];
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -509,6 +544,10 @@ export function CreateWorld(canvasEl) {
   // y=UNDER_Y），y 永远不要为了"看起来贴地"而手动抬高**；纵深靠 z 表达，
   // 而每一条纵深带都由 AddBandEdge 画出一道实际躺在该深度地面上的沿线
   // （田埂 / 路沿 / 墙根），让眼睛读得出"它站在更靠后的地面上"。
+  //
+  // 反过来也成立：**没打算站在别的纵深上的东西，就不许用别的 z**。行走线上
+  // 的道具与演员之间那 0.6m 曾经是没人声明过的——结果人的脚比车轮低十来个
+  // 像素，读出来就是"车和人不在一条水平线上"。现在摆位统一走 PlaceZ()。
   //
   // 摆道具时从 Data_DepthSpec.mjs 的 BAND 表里挑 z，不要另取数值
   //（表已含 backdrop/building/yard/nearBack/walk/loose/facade/clutter 八档）。
@@ -582,8 +621,90 @@ export function CreateWorld(canvasEl) {
         }
       }
       ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+      // 土路的实况（用户 2026-08-09："地面太现代了"）：1943 年冀中的村道是
+      // 独轮车和大车碾出来的，没有路沿、没有铺装——只有两道深深的车辙、
+      // 旱得裂开的泥皮、被踩塌的坑，和一层碾碎的料礓石。
+      // 全部画在**近处这一带**（y 8..40px），远了就成了噪点。
+      ctx.save();
+      // ① 两道车辙：顺路方向的长条压暗，深浅不匀（走一段就浅一段）
+      for (const [ry, alpha] of [[13, 0.16], [21, 0.11]]) {
+        ctx.strokeStyle = `rgba(58,44,28,${alpha})`;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        let drawing = false;
+        for (let px = 0; px <= wPx; px += 12) {
+          const on = ART.Hash(id + "rut" + ry + Math.floor(px / 96)) > 0.22;
+          const yy = ry + (ART.Hash(id + "rw" + ry + px) - 0.5) * 2.2;
+          if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+          else if (on) ctx.lineTo(px, yy);
+          else drawing = false;
+        }
+        ctx.stroke();
+      }
+      // ② 旱裂的泥皮：短短的折线，横七竖八
+      ctx.strokeStyle = "rgba(70,54,34,0.16)";
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < wPx / 30; i += 1) {
+        const cx = ART.Hash(id + "ck" + i) * wPx;
+        const cy = 9 + ART.Hash(id + "cy" + i) * 26;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        for (let k = 1; k <= 3; k += 1) {
+          ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 16,
+            cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 9);
+        }
+        ctx.stroke();
+      }
+      // ③ 踩塌的浅坑：贴地的小椭圆，边上一圈亮、里头一层暗
+      for (let i = 0; i < wPx / 150; i += 1) {
+        const hx = ART.Hash(id + "ho" + i) * wPx;
+        const hy = 12 + ART.Hash(id + "hy" + i) * 16;
+        const hr = 7 + ART.Hash(id + "hr" + i) * 11;
+        ctx.fillStyle = "rgba(56,42,26,0.13)";
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, hr, hr * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // ④ 碾碎的料礓石子：一层细碎的亮点
+      for (let i = 0; i < wPx / 18; i += 1) {
+        const sx = ART.Hash(id + "gv" + i) * wPx;
+        const sy = 8 + ART.Hash(id + "gy" + i) * 24;
+        ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+          ? "rgba(154,140,112,0.30)" : "rgba(96,80,58,0.24)";
+        ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
+      }
+      // ⑤ 糠秕与麦秸碎：碾道、场院、门口一层细碎亮屑，被风吹成条状积在
+      //    坑洼的背风侧。这一层是"农村"与"空地"的分界
+      for (let i = 0; i < wPx / 26; i += 1) {
+        const cx3 = ART.Hash(id + "cf" + i) * wPx;
+        const cy3 = 9 + ART.Hash(id + "cfy" + i) * 22;
+        ctx.strokeStyle = "rgba(176,158,112,0.34)";
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(cx3, cy3);
+        ctx.lineTo(cx3 + 2 + ART.Hash(id + "cfl" + i) * 5, cy3 + (ART.Hash(id + "cfa" + i) - 0.5) * 2);
+        ctx.stroke();
+      }
+      // ⑥ 粪蛋与扫街攒的粪土：**沿墙根一线**（路当中会被车碾平），
+      //    灰褐色小堆。一个没有粪的华北村子等于没有农业
+      for (let i = 0; i < wPx / 210; i += 1) {
+        const dx3 = ART.Hash(id + "dg" + i) * wPx;
+        const dy3 = 7 + ART.Hash(id + "dgy" + i) * 7;
+        ctx.fillStyle = "rgba(84,70,48,0.42)";
+        for (let k = 0; k < 4; k += 1) {
+          ctx.beginPath();
+          ctx.ellipse(dx3 + k * 3.4 + ART.Hash(id + "dk" + i + k) * 3, dy3 + ART.Hash(id + "dky" + i + k) * 3,
+            1.9, 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
     });
     PlaceSprite(mesh, xFrom, groundY, 0);
+    // 地表带钉在行走线**之下**：不钉的话它跟 walk 带道具同一个绘制序号，
+    // 房子的接地投影（AddGroundShadow）会被这张大贴图整个盖掉——
+    // 全画面一个暗部都没有，"干净得像小康村"有一半是这么来的
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 4);
     group.add(mesh);
   }
 
@@ -663,6 +784,69 @@ export function CreateWorld(canvasEl) {
     }
     ctx.restore();
     ART.Speckle(ctx, 0, 0, wPx, hPx, id + "sp", { count: 520, alpha: 0.10, size: 3, color: "#3d3020" });
+
+    // 村道本身（贴图最下面那一条＝玩家脚下这一带）。老版这儿是一块平涂的土色，
+    // 干干净净——1943 年冀中的村道是独轮车和大车碾出来的：没有铺装、没有路沿，
+    // 只有两道深车辙、旱裂的泥皮、踩塌的坑，和一层碾碎的料礓石子
+    //（用户 2026-08-09："地面之类的太现代了"）。
+    // 只画贴图下缘 22% —— 再往上就是纵深里的田，不是路。
+    ctx.save();
+    const roadTop = hPx * 0.78;
+    // ① 路面比田里的土再压一档：常年碾压，颜色比生土深
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#6b573a";
+    ctx.fillRect(0, roadTop, wPx, hPx - roadTop);
+    // ② 两道车辙：顺路方向的长条，走一段浅一段（车轮跳过去了）
+    ctx.globalAlpha = 1;
+    for (const [vy, alpha, lw] of [[0.30, 0.26, 9], [0.62, 0.20, 8]]) {
+      const ry = roadTop + (hPx - roadTop) * vy;
+      ctx.strokeStyle = `rgba(64,49,30,${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.lineCap = "round";
+      let drawing = false;
+      ctx.beginPath();
+      for (let px = 0; px <= wPx; px += 14) {
+        const on = ART.Hash(id + "rut" + vy + Math.floor(px / 120)) > 0.18;
+        const yy = ry + (ART.Hash(id + "rw" + vy + px) - 0.5) * 7;
+        if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+        else if (on) ctx.lineTo(px, yy);
+        else drawing = false;
+      }
+      ctx.stroke();
+    }
+    // ③ 旱裂的泥皮
+    ctx.strokeStyle = "rgba(74,57,35,0.24)";
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 130; i += 1) {
+      const cx = ART.Hash(id + "ck" + i) * wPx;
+      const cy = roadTop + ART.Hash(id + "cy" + i) * (hPx - roadTop);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 1; k <= 3; k += 1) {
+        ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 34,
+          cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 16);
+      }
+      ctx.stroke();
+    }
+    // ④ 踩塌的浅坑
+    for (let i = 0; i < 26; i += 1) {
+      const hx = ART.Hash(id + "ho" + i) * wPx;
+      const hy = roadTop + ART.Hash(id + "hy" + i) * (hPx - roadTop);
+      const hr = 14 + ART.Hash(id + "hr" + i) * 26;
+      ctx.fillStyle = "rgba(60,45,27,0.16)";
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, hr, hr * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ⑤ 碾碎的料礓石子
+    for (let i = 0; i < 420; i += 1) {
+      const sx = ART.Hash(id + "gv" + i) * wPx;
+      const sy = roadTop + ART.Hash(id + "gy" + i) * (hPx - roadTop);
+      ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+        ? "rgba(168,152,120,0.30)" : "rgba(92,74,50,0.26)";
+      ctx.fillRect(sx, sy, 2 + ART.Hash(id + "gs" + i) * 3, 1.8);
+    }
+    ctx.restore();
 
     const tex = CanvasTexture(canvas);
     const mesh = new THREE.Mesh(
@@ -1133,7 +1317,8 @@ export function CreateWorld(canvasEl) {
     const len = halfW * 3.0;
     const mesh = MakeFlatShadow(len, w, strength);
     // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
-    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, z + SUN.dz * len * 0.34);
+    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, PlaceZ(z) + SUN.dz * len * 0.34);
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 2);   // 压在地表带之上、道具之下
     group.add(mesh);
   }
 
@@ -1155,9 +1340,13 @@ export function CreateWorld(canvasEl) {
     // 落地：贴图底边踩在所在层的地平线上（yOffset 只给挂在树上的东西用）
     const gy = (p.level === "under" ? UNDER_Y : SURFACE_Y) + S.yOffset;
     const gx = S.placeAt === "left" ? p.x - (p.w || 0) / 2 : p.x;
+    // 摆位走 PlaceZ、排序走 DepthOrder：行走线上的道具（walk/loose/facade）
+    // 一律压回地平面 z=0，与演员踩同一条地平线；深度带只剩绘制顺序这一个职责
+    //（见 Data_DepthSpec 的「地平线规范」）。
     const mk = (fn, { z = S.z, x = gx, y = gy } = {}) => {
       const mesh = BakeSprite(S.w, S.h, S.ax, S.ay, fn, 0, S.ss);
-      PlaceSprite(mesh, x, y, z);
+      PlaceSprite(mesh, x, y, PlaceZ(z));
+      FixOrder(mesh, DepthOrder("play", z));
       mesh.userData.kind = p.kind;
       group.add(mesh);
       return mesh;
@@ -1182,12 +1371,11 @@ export function CreateWorld(canvasEl) {
             { z: BAND[V2.innerBand] });
           homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
             { z: BAND[V2.facadeBand] });
+          // 屋子占的那段街由 Core 的 HouseSpan 给（判定与画面共用一份边界）。
           // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
-          // 洞宽 30px）。NPC 得走到门口才消失在屋里，不能一挨着东墙就没影
-          homeRange = {
-            x0: p.x - p.w / 2 + 0.4, x1: p.x + p.w / 2 + 0.2,
-            door: p.x + p.w / 2 - 25 / PPM,
-          };
+          // 洞宽 30px）——那是画笔的事，留在这儿。NPC 得走到门口才消失在
+          // 屋里，不能一挨着东墙就没影
+          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
@@ -1271,7 +1459,7 @@ export function CreateWorld(canvasEl) {
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
       case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
-      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, night, bare: ruined })); break;
+      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
@@ -1336,6 +1524,11 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "dog": mk((ctx, ax, ay) => ART.DrawDog(ctx, ax, ay, p.id)); break;
+      // 村里不许有狗：1939 年冀中区党委统一"打狗"（狗叫会暴露夜间行动，
+      // 回忆材料原话「出进村庄无犬吠声」）。DrawDog 只留给据点那一侧
+      case "emptyKennel": mk((ctx, ax, ay) => ART.DrawEmptyKennel(ctx, ax, ay, p.id)); break;
+      case "dungHeap": mk((ctx, ax, ay) => ART.DrawDungHeap(ctx, ax, ay, p.id, { street: !!p.street })); break;
+      case "stalkFence": mk((ctx, ax, ay) => ART.DrawStalkFence(ctx, ax, ay, (p.w || 5) * PPM, p.id)); break;
       case "stonePile": mk((ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
       case "hangLantern":
         mk((ctx, ax, ay) =>
@@ -1390,6 +1583,8 @@ export function CreateWorld(canvasEl) {
     }
     // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
     if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
+    // 屋里的东西跟着立面隐现（见 indoorMeshes 的说明）
+    if (p.indoor) indoorMeshes.push(...group.children.slice(meshFrom));
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -1421,7 +1616,7 @@ export function CreateWorld(canvasEl) {
               ART.InkLine(ctx, ax - 20 + i * 10, ay - 8, ax - 26 + i * 12, ay - 34 - ART.Hash(c.id + i) * 18,
                 c.id + "st" + i, { lw: 2, color: "#241f18" });
             }
-          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night });
+          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night, raided: !!c.raided });
         }); break;
       case "firewood": mk((ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id)); break;
       case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, c.w * PPM, S.drawHeightPx, c.id, { burnt: false })); break;
@@ -1798,10 +1993,13 @@ export function CreateWorld(canvasEl) {
           // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
           ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
         }, 0, 2);
-      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。摆在行走线略前
-      // （仍在演员 ACTOR_Z 之后），免得被洞口、磨盘这些中景件压掉。
-      PlaceSprite(sh, shaft.x, UNDER_Y, 0.45);
+      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
+      // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
+      // 位置照旧压在地平面上（原来这里写的是裸 z=0.45，梯子因此比洞口高半拃）
+      PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
+      FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
+      if (shaft.indoor) indoorMeshes.push(sh);
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -2070,14 +2268,14 @@ export function CreateWorld(canvasEl) {
     for (const v of sceneDef.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
       const n = BakeSprite(50, 30, 25, 22, (ctx, ax, ay) => ART.DrawVaultNotch(ctx, ax, ay, "vn" + v.x), 0, DETAIL_SS);
-      PlaceSprite(n, v.x, SURFACE_Y + (v.top ?? 1.6), BAND.loose);
+      PlaceSprite(n, v.x, SURFACE_Y + (v.top ?? 1.6), PlaceZ(BAND.loose));
       layers.play.add(n);
     }
 
     // 第四章堵在东段卡口的湿棉被：堵上之后一直留在剖面里
     if (ch.scene === "tunnelVillage" && state.flags.quiltPlugged) {
       const m = BakeSprite(120, 130, 60, 118, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 3.6, 1, "湿棉被"), 0, DETAIL_SS);
-      PlaceSprite(m, 124, UNDER_Y + 0.6, BAND.loose);
+      PlaceSprite(m, 124, UNDER_Y + 0.6, PlaceZ(BAND.loose));
       layers.play.add(m);
     }
 
@@ -2177,7 +2375,10 @@ export function CreateWorld(canvasEl) {
       if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow");
       if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry");
     }
-    s.mesh.position.set(x, y, ACTOR_Z + dz);
+    // 位置压回地平面：演员脚下这条线必须与行走线道具（井台/磨盘/车）是同一条。
+    // 后一排（rankDz 是负的）是**有意**站在更靠后的地面上，PlaceZ 会原样放行——
+    // 那点抬高正是"两人并排"读得出来的原因。
+    s.mesh.position.set(x, y, PlaceZ(ACTOR_Z + dz));
     const bs = extra.bodyScale || s.bodyScale || 1;
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (s.shadow) {
@@ -2190,7 +2391,7 @@ export function CreateWorld(canvasEl) {
       s.shadow.position.set(
         x + (under ? 0 : SUN.dx * 0.55) * bs,
         ground + 0.015,
-        ACTOR_Z + dz - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
+        PlaceZ(ACTOR_Z + dz) - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
       s.shadow.material.opacity = (under ? 0.5 : 1) * (1 - air * 0.55);
     }
@@ -2206,7 +2407,7 @@ export function CreateWorld(canvasEl) {
         const wid = (0.85 + dist * 0.10) * bs;
         s.castShadow.visible = true;
         s.castShadow.scale.set(dir * len, wid, 1);
-        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, ACTOR_Z + dz - 0.04);
+        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, PlaceZ(ACTOR_Z + dz) - 0.04);
         // 站在灯正下方没有影子可言；出了灯的照射范围也就没影子了
         const near = Math.min(1, dist / 0.75);
         const far = 1 - Math.min(1, Math.max(0, (dist - lit.r * 0.55) / (lit.r * 0.5)));
@@ -2248,7 +2449,7 @@ export function CreateWorld(canvasEl) {
     // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
     const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
     const dir = a.heading > 0 ? -1 : 1;
-    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, a.mount === "bicycle" ? BAND.loose : CARRY_Z);
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, PlaceZ(a.mount === "bicycle" ? BAND.loose : CARRY_Z));
     m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
   }
 
@@ -2288,7 +2489,7 @@ export function CreateWorld(canvasEl) {
     // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
     const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
     s.carryMesh.position.set(anchor.x + forward,
-      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), CARRY_Z + (s.rankDz || 0));
+      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
@@ -2340,7 +2541,7 @@ export function CreateWorld(canvasEl) {
     s.lampMesh.position.set(
       hand.x + dir * s.lampMesh.userData.offset.x * bs,
       hand.y + s.lampMesh.userData.offset.y * bs,
-      CARRY_Z,
+      PlaceZ(CARRY_Z),
     );
     // 火心的世界坐标：光就从这儿发出去（画布 y 向下，世界 y 向上）
     const f = ART.HAND_LAMP_FLAME[kind] || ART.HAND_LAMP_FLAME.hurricane;
@@ -2478,6 +2679,9 @@ export function CreateWorld(canvasEl) {
         posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          // 干活的乡亲也用得上躬身施工那套（原来只有玩家能挖）——
+          // 掌子面上抡站姿锄头，在净高只够爬的新掏段里一眼就假
+          digging: !!a.digging,
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
           lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
@@ -2639,11 +2843,11 @@ export function CreateWorld(canvasEl) {
           // 原来一交付就整个隐藏，玩家会觉得自己刚放下的木料凭空没了。
           //（y 的抬升是"摞"的表达，不是为了贴地——贴地由贴图锚点负责）
           m.position.set(def.deliver.x + (stacked % 2) * 0.5 - 0.25,
-            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, BAND.loose);
+            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, PlaceZ(BAND.loose));
           m.rotation.z = bucket ? 0 : (stacked % 2 ? 0.05 : -0.04);
           stacked += 1;
         } else {
-          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), BAND.loose);
+          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), PlaceZ(BAND.loose));
           m.rotation.z = 0;
         }
       });
@@ -2737,7 +2941,7 @@ export function CreateWorld(canvasEl) {
         scribeLastT = sc.t;
       }
       scribeMesh.visible = true;
-      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, BAND.loose);
+      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, PlaceZ(BAND.loose));
       if (scribeTip) {
         // 那支笔本身就是这一拍的全部 UI：攥住了就压进木头、随手劲倾斜；
         // 没攥住就浮起来轻轻晃——招呼玩家"来拿我"，不需要一行字
@@ -2748,7 +2952,7 @@ export function CreateWorld(canvasEl) {
           : 0;
         const lift = sc.gripped ? 0 : 0.022;          // 没压着木头就抬起来一点
         // 笔尖落在刻线上：贴图中心要抬起「半支笔」那么高
-        scribeTip.position.set(hx + wob, sc.y + 0.046 + lift, BAND.loose);
+        scribeTip.position.set(hx + wob, sc.y + 0.046 + lift, PlaceZ(BAND.loose));
         // 倾斜：压着走的时候笔杆往后倒（手在推），抬手就立回来
         const lean = sc.gripped ? -0.12 - Math.min(0.22, (sc.speed || 0) * 0.4) : 0.06;
         scribeTip.rotation.z += (lean - scribeTip.rotation.z) * Math.min(1, dt * 12);
@@ -2771,7 +2975,7 @@ export function CreateWorld(canvasEl) {
         scribeDust.material.opacity = (scribeDust.material.opacity ?? 0)
           + (dustWant - (scribeDust.material.opacity ?? 0)) * Math.min(1, dt * 9);
         scribeDust.visible = scribeDust.material.opacity > 0.02;
-        scribeDust.position.set(hx, sc.y - 0.03 + Math.sin(time * 9) * 0.008, BAND.loose);
+        scribeDust.position.set(hx, sc.y - 0.03 + Math.sin(time * 9) * 0.008, PlaceZ(BAND.loose));
       }
     } else {
       if (scribeMesh) scribeMesh.visible = false;
@@ -2885,7 +3089,7 @@ export function CreateWorld(canvasEl) {
       state.lamps.forEach((l, i) => {
         const m = lampMeshes[i];
         if (!m) return;
-        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, BAND.loose);
+        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, PlaceZ(BAND.loose));
         m.body.visible = true;
         m.glow.visible = l.lit;
         m.glow.userData.SetLight(l.x, UNDER_Y + 1.4);
@@ -2913,20 +3117,23 @@ export function CreateWorld(canvasEl) {
     // 车画在演员前面一点，贴着车走就是躲进车影
     if (state.cart) {
       const cartKind = state.cart.kind || "cart";
-      // 玩家**推着**的独轮车（第一章）要退到 loose 带：人在近侧握着车把，
-      // 身子和手得画在车前面。第三章那辆驴车是**移动掩体**，得挡住人，
-      // 所以留在 CART_COVER_Z——两种角色，两个深度。
+      // 玩家**推着**的独轮车（第一章）走 pushCart 带：人在近侧握着车把，
+      // 身子和手得画在车前面（所以在演员 0.6 之后）；但它是**街面上**的东西，
+      // 推着从自家屋前过的时候不能被立面(0.4)吃掉——夹在两者之间的 0.5 是
+      // 唯一同时成立的位置。第三章那辆驴车是**移动掩体**，得挡住人，留在
+      // CART_COVER_Z——两种角色，两个深度。
       const pushed = cartKind === "barrow";
-      const cz = pushed ? BAND.loose : CART_COVER_Z;
-      // 新版第一章是空车推去、装上料再推回来——车上有几根料就画几根，
-      // 装载数进 key，变了才重烘
-      const planksNow = Math.min(2, state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0));
-      const cartKey = cartKind + ":" + (pushed ? planksNow : "");
+      const cz = pushed ? BAND.pushCart : CART_COVER_Z;
+      // 新版第一章是空车推去、装上料再推回来——车上装了几件就画几件，
+      // 装载数进 key，变了才重烘（三件是「两块门板 + 一根枣木杠」，
+      // 第三件必须画成杠：截成 min(2) 的话「放上车」那一下画面毫无变化）
+      const loadNow = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      const cartKey = cartKind + ":" + (pushed ? loadNow : "");
       if (!cartMesh || cartMesh.userData.cartKind !== cartKey) {
         if (cartMesh) layers.play.remove(cartMesh);
         if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
         cartMesh = pushed
-          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", { planks: planksNow }), 0, PROP_SS)
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", BarrowLoad(loadNow)), 0, PROP_SS)
           : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
         cartMesh.userData.cartKind = cartKey;
         layers.play.add(cartMesh);
@@ -2941,11 +3148,18 @@ export function CreateWorld(canvasEl) {
         }
       }
       cartMesh.visible = true;
-      PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, cz);
+      // 独轮车有正反：画笔画的是**往左推**的姿态（轮在前、两根车把伸向右手边
+      // 的人）。往右推就得整张翻过来，否则人在车尾、手却够不着车把——
+      // 回程那一趟正是这么穿帮的。驴车是侧面对称的景，不翻。
+      if (pushed) {
+        const pushDir = state.cart.dir || -1;            // 车往哪边走
+        PlaceSpriteFlip(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz),
+          pushDir === ART.BARROW_ART_DIR ? 1 : -1);
+      } else PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz));
       if (cartWheel) {
         cartWheel.visible = true;
         const R = ART.BARROW_WHEEL_R / PPM;              // 轮半径（米）
-        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, cz);
+        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(cz));
         // 滚过的弧长 = 走过的路程：θ = -s/R（往前走轮子顺时针转）
         cartWheel.rotation.z = -((state.cart.roll || 0) / R);
       }
@@ -2957,13 +3171,13 @@ export function CreateWorld(canvasEl) {
     // 独轮车（不在推的时候是静物）：装了几根木料照几根；推到家就停在爹跟前
     {
       const wantBarrow = ch.scene === "village" && state.chapterIndex === 0 && !state.cart;
-      const planks = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      const load = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
       if (wantBarrow) {
-        const key = "b" + planks;
+        const key = "b" + load;
         if (!barrowMesh || barrowMesh.userData.k !== key) {
           if (barrowMesh) layers.play.remove(barrowMesh);
           if (barrowWheel) { layers.play.remove(barrowWheel); barrowWheel = null; }
-          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", { planks }), 0, PROP_SS);
+          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", BarrowLoad(load)), 0, PROP_SS);
           barrowMesh.userData.k = key;
           layers.play.add(barrowMesh);
           SetPlayOrder(barrowMesh, BAND.walk);
@@ -2978,11 +3192,14 @@ export function CreateWorld(canvasEl) {
         if (barrowWheel) {
           barrowWheel.visible = true;
           barrowWheel.position.set(state.flags.barrowHome ? 41.6 : 19.8,
-            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, BAND.walk);
+            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(BAND.walk));
         }
         // 平时停在西头磨盘旁（新剧本：村里几户合用的车就搁在磨盘边）；
         // 拉完料停在工作台西边一步，别压着院里的水缸（43.4）
-        PlaceSprite(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y, BAND.walk);
+        // 停着的车也有正反：西头那辆是等着人往左推走的（贴图原样）；
+        // 拉完料停在家门口的这辆是刚往右推回来的，车把自然朝西——翻过来
+        PlaceSpriteFlip(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y,
+          PlaceZ(BAND.walk), state.flags.barrowHome ? -1 : 1);
       } else {
         if (barrowMesh) barrowMesh.visible = false;
         if (barrowWheel) barrowWheel.visible = false;
@@ -3004,7 +3221,7 @@ export function CreateWorld(canvasEl) {
           groundItemMeshes.set(g.uid, m);
         }
         m.visible = true;
-        PlaceSprite(m, g.x, g.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+        PlaceSprite(m, g.x, g.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
       }
       for (const [uid, m] of groundItemMeshes) {
         if (!live.has(uid)) { layers.play.remove(m); groundItemMeshes.delete(uid); }
@@ -3175,7 +3392,7 @@ export function CreateWorld(canvasEl) {
         critterMesh.material.map.needsUpdate = true;
         critterMesh.visible = true;
         const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x ?? state.elmRain?.x;
-        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, BAND.loose);
+        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, PlaceZ(BAND.loose));
       } else if (critterMesh) critterMesh.visible = false;
     }
 
@@ -3238,8 +3455,11 @@ export function CreateWorld(canvasEl) {
       }
       doorLeafPivot.visible = true;
       doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
-      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转
-      doorLeafPivot.rotation.z = -(dl.lean || 0);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转。
+      // strain（攥着它较劲时才有）在渲染层抖那一丝——两只手对着一扇门的分量，
+      // 谁也压不死谁。判定用的 lean 不掺这份演出（Core 只算物理）。
+      const trem = (dl.strain || 0) * 0.008 * Math.sin(time * 34);
+      doorLeafPivot.rotation.z = -((dl.lean || 0) + trem);
     } else if (doorLeafPivot) doorLeafPivot.visible = false;
 
     if (state.planing) {
@@ -3288,7 +3508,7 @@ export function CreateWorld(canvasEl) {
       planeBoardMesh.visible = true;
       // 料的上沿画在画布 y=14，网格中心是 y=20。画布 y 向下、世界 y 向上，
       // 所以中心要落在上沿**之下** 6px——符号写反的话料就飘在台面上方
-      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, BAND.loose);
+      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, PlaceZ(BAND.loose));
 
       // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
       // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
@@ -3306,7 +3526,7 @@ export function CreateWorld(canvasEl) {
         planePileMesh.material.map.needsUpdate = true;
       }
       planePileMesh.visible = pl.pile > 0;
-      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, BAND.loose);
+      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, PlaceZ(BAND.loose));
     } else {
       if (planeBoardMesh) planeBoardMesh.visible = false;
       if (planeToolMesh) planeToolMesh.visible = false;
@@ -3514,13 +3734,27 @@ export function CreateWorld(canvasEl) {
     // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
     // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
     if (homeFacade && homeRange) {
-      const pp = state.player;
-      const inside = pp.level === "surface" && pp.x > homeRange.x0 && pp.x < homeRange.x1;
-      const goal = inside ? 0.07 : 1;
+      // 进没进屋由 Core 判（IndoorOpen）：位置只是必要条件——推着独轮车的人
+      // 走的是屋外那条道，车进不了堂屋
+      const inside = IndoorOpen(state, homeRange.x0, homeRange.x1);
+      // 戏在屋里演（爹修门那一场）：玩家还在门外，可墙合着的话他连爹在哪
+      // 都看不见——只看得见一双脚从墙根底下漏出来（用户 2026-08-09 报的）。
+      // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
+      const def = CurrentBeatDef(state);
+      const staged = !!(def?.indoorScene || state.beat?.indoorScene);
+      const goal = inside ? 0.07 : (staged ? 0.16 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
+      }
+      // 屋里的东西跟立面**反着**来：墙合着就看不见地窖口，墙一淡它才露出来。
+      // 立面挡不住它们——它们画在行走线上，比立面还近
+      const shown = 1 - Math.min(1, (homeFacade.material.opacity ?? 1) * 1.08);
+      for (const m of indoorMeshes) {
+        m.material.transparent = true;
+        m.material.opacity = shown;
+        m.visible = shown > 0.02;
       }
     }
 
@@ -3581,13 +3815,13 @@ export function CreateWorld(canvasEl) {
       const bucketY = SURFACE_Y + 1.05 - wv.depth * 1.5;   // 沉进井口
       winchRope.visible = true;
       winchRope.scale.set(1, Math.max(0.05, hubY - bucketY), 1);
-      winchRope.position.set(wv.x, (hubY + bucketY) / 2, BAND.loose);
+      winchRope.position.set(wv.x, (hubY + bucketY) / 2, PlaceZ(BAND.loose));
       winchBucket.visible = wv.hooked;
-      winchBucket.position.set(wv.x, bucketY, BAND.loose);
+      winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
       // 灌满了桶身压得低一点
       winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
       winchCrank.visible = wv.hooked;
-      winchCrank.position.set(wv.x, hubY, BAND.loose);
+      winchCrank.position.set(wv.x, hubY, PlaceZ(BAND.loose));
       // 歇息角 -0.6：静止时摇把斜垂着，别跟横杆平行混成一根木头
       winchCrank.rotation.z = (wv.crankA || 0) - 0.6;
       // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面
@@ -3598,7 +3832,7 @@ export function CreateWorld(canvasEl) {
         const R = 0.5;
         for (let i = 0; i < 48; i += 1) {
           const a = (i / 47) * Math.PI * 2;
-          pos.setXYZ(i, wv.x + Math.cos(a) * R, hubY + Math.sin(a) * R, BAND.loose);
+          pos.setXYZ(i, wv.x + Math.cos(a) * R, hubY + Math.sin(a) * R, PlaceZ(BAND.loose));
         }
         pos.needsUpdate = true;
         winchGuide.computeLineDistances();
@@ -3611,37 +3845,88 @@ export function CreateWorld(canvasEl) {
       winchGuide.visible = false;
     }
 
-    // 拉绳定向（c1_ropeline）：一根麻绳从梁家后墙的锚点一路拖到玩家手里。
-    // Core 写 state.ropeLine = {x0,y0}（锚点），绳的另一头钉在演员手上；
-    // 交给七叔后 Core 改写成 {x0,y0,x1,y1}（钉好的一整条），演完自己清。
-    // 画法同辘轳井绳：一根窄条拉伸旋转——绳类禁用 THREE.Line（linewidth 会被吃）
+    // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的
+    // verlet 质点链给（ropeLine.pts），这里只把点串成一条有宽度的带子。
+    //
+    // 为什么是 ribbon 而不是别的两种画法：THREE.Line 的 linewidth 多数平台直接
+    // 吃掉，绳永远只有一个像素（CLAUDE.md 立过这条规矩）；逐帧重画的 canvas 那
+    // 套是给打结用的——18 米长的绳按 48px/米要三千多像素宽的画布，不可能。
+    // ribbon 有真几何宽度：垂、拖地、绷直、抽回去都画得出来。
     {
       const rl = state.ropeLine;
-      if (rl) {
-        if (!ropeLineMesh) {
-          ropeLineMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(1, 0.045),
-            new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
-          );
+      const pts = rl?.pts;
+      if (rl && pts && pts.length > 1) {
+        const n = pts.length;
+        if (!ropeLineMesh || ropeLineMesh.userData.n !== n) {
+          if (ropeLineMesh) layers.play.remove(ropeLineMesh);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
+          const idx = [];
+          for (let i = 0; i < n - 1; i += 1) {
+            const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+            idx.push(a, b, c, b, d, c);
+          }
+          geo.setIndex(idx);
+          ropeLineMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0x8a7350, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          ropeLineMesh.frustumCulled = false;   // 包围球不逐帧重算，剔除会把它整条抹掉
+          ropeLineMesh.userData.n = n;
           FixOrder(ropeLineMesh, DepthOrder("play", BAND.loose));
           layers.play.add(ropeLineMesh);
         }
-        let x1 = rl.x1, y1 = rl.y1;
-        if (x1 === undefined) {
-          // 另一头在玩家手上
-          const ps = actorSprites.get("player");
-          const hand = ps ? HandPoint(ps.rig) : null;
-          x1 = hand ? hand.x : state.player.x;
-          y1 = hand ? hand.y : SURFACE_Y + 0.9;
-        }
-        const dx = x1 - rl.x0, dy = y1 - rl.y0;
-        const len = Math.max(0.05, Math.hypot(dx, dy));
-        // 中段松松垂一点：绳不是钢丝
         ropeLineMesh.visible = true;
-        ropeLineMesh.scale.set(len, 1, 1);
-        ropeLineMesh.position.set(rl.x0 + dx / 2, rl.y0 + dy / 2 - Math.min(0.3, len * 0.03), BAND.loose);
-        ropeLineMesh.rotation.z = Math.atan2(dy, dx);
-      } else if (ropeLineMesh) ropeLineMesh.visible = false;
+        // 绳梢接到**真拳头**上。Core 的解算只认身位（那边写了为什么：手心是姿势
+        // 的产物，拿它当绳端会绕成"绳→姿势→手心→绳"的闭环，人会被自己的胳膊
+        // 卡住），所以"长在手上"这件事在画面这一侧办：把末尾三个点朝手心挪，
+        // 越靠末端挪得越多，收出一个不打折的弯。
+        let tip = null;
+        if (rl.inHand) {
+          const ps = actorSprites.get("player");
+          if (ps) {
+            const hp = HandPoint(ps.rig);
+            const last = pts[n - 1];
+            tip = { dx: hp.x - last.x, dy: hp.y - last.y };
+          }
+        }
+        const TIP_W = [0.22, 0.55, 1];       // 末尾三点各吃多少修正
+        const draw = (i) => {
+          const q = pts[i];
+          const k = tip ? (TIP_W[i - (n - TIP_W.length)] ?? 0) : 0;
+          return k ? { x: q.x + tip.dx * k, y: q.y + tip.dy * k } : q;
+        };
+        const pos = ropeLineMesh.geometry.attributes.position;
+        for (let i = 0; i < n; i += 1) {
+          const q = draw(i);
+          const a = draw(Math.max(0, i - 1)), b = draw(Math.min(n - 1, i + 1));
+          let tx = b.x - a.x, ty = b.y - a.y;
+          const tl = Math.hypot(tx, ty) || 1e-6;
+          tx /= tl; ty /= tl;
+          // 绷直的时候略细一点：麻绳吃上劲会抻细，松着堆在地上显得粗
+          const half = ROPE_HALF * (1 - 0.18 * (rl.taut || 0));
+          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, PlaceZ(BAND.loose));
+          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, PlaceZ(BAND.loose));
+        }
+        pos.needsUpdate = true;
+        // 锚点那头的绳盘：放出去多少，盘就小多少——"绳是从这儿放出来的"
+        if (!ropeCoilMesh) {
+          ropeCoilMesh = MakeGroundItemMesh("麻绳");
+          layers.play.add(ropeCoilMesh);
+          SetPlayOrder(ropeCoilMesh, BAND.loose, "ropeCoil");
+        }
+        const remain = Math.max(0, 1 - (rl.pay || 0) / (rl.L || 1));
+        ropeCoilMesh.visible = remain > 0.06;
+        if (ropeCoilMesh.visible) {
+          const s = 0.4 + 0.6 * remain;
+          ropeCoilMesh.scale.set(s, s, 1);
+          // 贴地锚点得跟着缩：贴图绕中心缩，偏移量不缩的话盘子会浮起来
+          const off = ropeCoilMesh.userData.offset;
+          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, PlaceZ(BAND.loose));
+        }
+      } else {
+        if (ropeLineMesh) ropeLineMesh.visible = false;
+        if (ropeCoilMesh) ropeCoilMesh.visible = false;
+      }
     }
 
     // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，
@@ -3711,7 +3996,7 @@ export function CreateWorld(canvasEl) {
       }
       knotMesh.visible = true;
       // 画布锚点（0.42/0.30）对应挂点，摆位要把这个偏移抵回去
-      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), BAND.loose);
+      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), PlaceZ(BAND.loose));
     } else if (knotMesh) knotMesh.visible = false;
 
     // 飞出去的石子：一维横轴上的一道小弧线
@@ -3823,7 +4108,7 @@ export function CreateWorld(canvasEl) {
         FixOrder(slot.mesh, DepthOrder("play", BAND.loose) + 1);
       }
       slot.mesh.visible = true;
-      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, BAND.loose);
+      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
     });
 
     // 目标指示
@@ -3846,10 +4131,20 @@ export function CreateWorld(canvasEl) {
       markerMesh.visible = true;
       markerCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
       markerCtx.clearRect(0, 0, 48, 48);
-      ART.DrawMarker(markerCtx, 24, 30, time);
+      // 目标出了画框：同一块路标滑到画框边缘、掉头指向框外（勇敢的心式）。
+      // 该不该指、指哪边由 Core.EdgeHint 判（跨层的先指梯口）；这里只管摆位。
+      // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
+      const eh = EdgeHint(state, camera.position.x, viewW);
+      if (eh) {
+        ART.DrawMarker(markerCtx, 24, 30, time, { dir: eh.side, climb: eh.climb });
+        const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(camera.position.x + eh.side * (viewW / 2 - 0.9), py + 2.35, 0.6);
+      } else {
+        ART.DrawMarker(markerCtx, 24, 30, time);
+        const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+        markerMesh.position.set(target.x, by + 2.5, 0.6);
+      }
       markerMesh.material.map.needsUpdate = true;
-      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
-      markerMesh.position.set(target.x, by + 2.5, 0.6);
     } else if (markerMesh) {
       markerMesh.visible = false;
     }
@@ -3895,6 +4190,7 @@ export function CreateWorld(canvasEl) {
     el.playsInline = true;
     el.preload = "auto";
     const tex = new THREE.VideoTexture(el);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearFilter;   // 视频贴图不能开 mipmap
     tex.generateMipmaps = false;
@@ -3973,7 +4269,7 @@ export function CreateWorld(canvasEl) {
     if (!insertMesh) {
       insertMesh = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
-        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
       scene.add(insertMesh);
@@ -4103,13 +4399,18 @@ export function CreateWorld(canvasEl) {
     const otsZ = layers.ots.position.z;
     // 该层比玩法层离相机近，投影会放大 M 倍；构图偏移与体量都要按 M 折算
     const M = dist / Math.max(0.5, dist - otsZ);
-    // 剪影在屏幕上应占约 55% 画宽：先除掉透视放大倍率，再反解缩放
+    // 剪影在屏幕上应占约 72% 画宽（实拍标定：层缩放 comp 又吃掉一档，
+    // 按 0.55 反解出来上屏只有三成半，小得读不出是个人）
     const spriteW = otsMesh.geometry.parameters.width;
-    const S = (viewW * 0.55) / (M * spriteW);
+    const S = (viewW * 0.72) / (M * spriteW);
     otsMesh.scale.set((spec.facing || 1) * S, S, 1);
-    // 头肩落在画框一侧、压住下缘，说话的人留在另一侧
+    // 头肩落在画框一侧、**肩膀压出画框下缘**，说话的人留在另一侧。
+    // 0.62 那一版把锚点摆在画框下缘之上半米——剪影整个浮在半空，脚下还露着
+    // 路面，于是它既不是前景也不是布景，读出来就是"右边一坨奇怪的椭球"
+    //（用户 2026-08-09 原话）。过肩前景的定义就是**被画框切掉**：切掉了，
+    // 大脑才把它读成"贴着镜头的那个人"。0.95 让肩线落到下缘略外侧。
     const worldX = camX + side * (viewW / 2) * 0.58 / M;
-    const worldY = camY - (viewH / 2) * 0.62 / M + otsMesh.userData.offset.y * S;
+    const worldY = camY - (viewH / 2) * 0.95 / M + otsMesh.userData.offset.y * S;
     otsMesh.position.set(worldX / comp, worldY / comp, 0);
   }
 
@@ -4228,7 +4529,7 @@ export function CreateWorld(canvasEl) {
     })),
     get __fluid() { return fluid; },
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
-    debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE }),
+    debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的

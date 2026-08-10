@@ -78,7 +78,9 @@ export function ServeRoot(rootDir, port = 0) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const port = parseInt(process.argv[2] || "8146", 10);
+  // 端口优先级：显式参数 > PORT 环境变量（launch.json autoPort 用它派发）> 默认。
+  // 并行会话多的时候写死的端口总是撞——autoPort 让预览器自己找空位。
+  const port = parseInt(process.argv[2] || process.env.PORT || "8146", 10);
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   ServeRoot(root, port).then(() => {
     console.log(`TunnelLight1943 dev server: http://127.0.0.1:${port}/TunnelLight1943/`);

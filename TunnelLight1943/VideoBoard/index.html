@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171713">
+  <meta name="description" content="《地道里的光》章、场、镜头与图片、视频、旁白版本的剧情资产导演台">
+  <title>地道里的光 · 剧情资产导演台</title>
+  <link rel="stylesheet" href="./Style_VideoBoard.css?v=003">
+</head>
+<body>
+  <header class="topBar">
+    <div class="brandBlock">
+      <span class="eyebrow">TUNNEL LIGHT · STORY ASSET DIRECTOR</span>
+      <h1>剧情资产导演台</h1>
+    </div>
+    <div class="projectFacts" aria-label="项目状态">
+      <span><b id="sceneCount">11</b> 场</span>
+      <span><b id="nodeCount">26</b> 镜头</span>
+      <span><b id="assetCount">78</b> 项资产</span>
+      <span><b id="totalDuration">02:00.000</b></span>
+      <span>720p · 30fps</span>
+      <span class="colorBadge">BT.709 源片直出 · 无滤镜</span>
+    </div>
+    <div class="topActions">
+      <button id="buttonPlayAll" class="primaryButton" type="button">预览工作版</button>
+      <button id="buttonPublish" type="button">生成发布清单</button>
+      <button id="buttonExport" type="button">导出工程 JSON</button>
+      <a class="buttonLink" href="../Video/Pro_All.mp4?v=051" target="_blank" rel="noopener">2分钟审片备份</a>
+    </div>
+  </header>
+
+  <main class="editorShell">
+    <aside class="projectSidebar" aria-label="项目结构与资产入口">
+      <div class="sidebarTitle">
+        <span>当前项目</span>
+        <strong>《地道里的光》</strong>
+      </div>
+      <nav class="directorViews" aria-label="导演台视图">
+        <button id="buttonSequenceMode" class="isActive" type="button" aria-pressed="true">
+          <span>镜头编排</span><small>26</small>
+        </button>
+        <button id="buttonDependencyMode" type="button" aria-pressed="false">
+          <span>资产谱系</span><small>图片 · 提示词 · 视频 · 旁白</small>
+        </button>
+        <button id="buttonVersionMode" type="button" aria-pressed="false">
+          <span>候选与版本</span><small id="candidateCount">0</small>
+        </button>
+      </nav>
+
+      <section class="projectTree" aria-labelledby="projectTreeTitle">
+        <h2 id="projectTreeTitle">章 / 场 / 镜头</h2>
+        <button id="buttonAllGroups" class="treeRoot isActive" type="button">
+          <span>序章 · 地上的日子</span><small>02:00</small>
+        </button>
+        <div id="projectGroupList" class="projectGroupList"></div>
+      </section>
+
+      <section class="releaseCard" aria-labelledby="releaseTitle">
+        <h2 id="releaseTitle">工作版与发布版分离</h2>
+        <dl>
+          <div><dt>工作版</dt><dd id="workingVersionLabel">有未发布修改</dd></div>
+          <div><dt>发布清单</dt><dd id="releaseVersionLabel">尚未创建</dd></div>
+        </dl>
+        <p>生成候选不会改游戏；采用候选只改工作版；生成发布清单后才形成可交付快照。</p>
+      </section>
+    </aside>
+
+    <section class="boardPane" aria-label="剧情资产关系画布">
+      <nav class="canvasTools" aria-label="画布控制">
+        <span id="canvasModeLabel" class="canvasModeLabel">序章全镜头 · 播放顺序</span>
+        <button id="buttonFit" type="button">适合画布</button>
+        <button id="buttonZoomOut" type="button" aria-label="缩小">−</button>
+        <output id="zoomValue">60%</output>
+        <button id="buttonZoomIn" type="button" aria-label="放大">＋</button>
+        <button id="buttonResetLayout" type="button">恢复节点位置</button>
+        <span id="toolHint" class="toolHint">拖空白处平移 · 滚轮缩放 · 拖镜头排版</span>
+      </nav>
+
+      <div id="canvasViewport" class="canvasViewport">
+        <div id="canvasSurface" class="canvasSurface">
+          <svg id="edgeLayer" class="edgeLayer" width="6160" height="1040" viewBox="0 0 6160 1040" aria-label="节点之间的播放顺序与转场"></svg>
+          <div id="groupLayer" class="groupLayer"></div>
+          <div id="nodeLayer" class="nodeLayer"></div>
+        </div>
+      </div>
+
+      <section class="timelinePanel" aria-labelledby="timelineTitle">
+        <div class="timelineHeader">
+          <h2 id="timelineTitle">最终播放顺序</h2>
+          <p>转场时长包含在前一段尾部，净时长保持 120 秒。</p>
+        </div>
+        <div id="timelineTrack" class="timelineTrack"></div>
+      </section>
+    </section>
+
+    <aside class="inspector" aria-labelledby="inspectorTitle">
+      <div class="inspectorHead">
+        <div>
+          <span id="selectedOrder" class="nodeOrdinal">镜头 01 / 26</span>
+          <h2 id="inspectorTitle">选择一个节点</h2>
+        </div>
+        <span id="nodeStatus" class="statusPill">源片切片</span>
+      </div>
+
+      <nav class="assetFocusTabs" aria-label="当前镜头的资产类型">
+        <button id="buttonFocusShot" type="button" data-asset-focus="shot">镜头</button>
+        <button id="buttonFocusImage" type="button" data-asset-focus="image">图片</button>
+        <button id="buttonFocusPrompt" type="button" data-asset-focus="prompt">提示词</button>
+        <button id="buttonFocusVideo" class="isActive" type="button" data-asset-focus="video">视频</button>
+        <button id="buttonFocusAudio" type="button" data-asset-focus="audio">旁白</button>
+      </nav>
+
+      <dl class="assetIdentity">
+        <div><dt>稳定资产 ID</dt><dd id="assetStableId">VID.PRO.01A</dd></div>
+        <div><dt>当前采用</dt><dd id="assetCurrentVersion">v1</dd></div>
+        <div><dt>下游使用</dt><dd id="assetConsumers">序章工作时间线</dd></div>
+      </dl>
+
+      <div class="previewFrame">
+        <video id="selectedVideo" controls muted playsinline preload="metadata"></video>
+        <img id="selectedImage" alt="" hidden>
+        <div id="selectedAudioPanel" class="selectedAudioPanel" hidden>
+          <strong id="selectedAudioTitle">序章旁白</strong>
+          <audio id="selectedAudio" controls preload="metadata"></audio>
+          <p id="selectedAudioText"></p>
+        </div>
+        <div id="selectedPromptPanel" class="selectedPromptPanel" hidden>
+          <strong id="selectedPromptTitle">视频生成配方</strong>
+          <code id="selectedPromptIdentity"></code>
+          <p id="selectedPromptText"></p>
+        </div>
+        <span id="previewTimecode" class="previewTimecode">00:00.000 — 00:00.000</span>
+      </div>
+
+      <section id="assetOverviewSection" class="inspectorSection assetOverviewSection" hidden>
+        <h3 id="assetOverviewTitle">资产说明</h3>
+        <p id="assetOverviewText"></p>
+        <dl class="outputFacts">
+          <div><dt>生成工程</dt><dd id="assetRecipeEngine"></dd></div>
+          <div><dt>配方 / 任务</dt><dd id="assetRecipeId"></dd></div>
+          <div><dt>状态</dt><dd id="assetRecipeStatus"></dd></div>
+        </dl>
+      </section>
+
+      <div id="videoGenerationFields" class="fieldGrid compactGrid">
+        <label>时间线时长
+          <input id="fieldDuration" type="number" min="0.5" max="15" step="0.5">
+        </label>
+        <label>生成时长
+          <input id="fieldGenerationDuration" type="number" min="4" max="15" step="1">
+        </label>
+        <label>模型
+          <select id="fieldModel">
+            <option value="seedance2.0_vip">Seedance 2.0 VIP</option>
+            <option value="seedance2.0fast_vip">Seedance 2.0 Fast VIP</option>
+            <option value="seedance2.0">Seedance 2.0</option>
+          </select>
+        </label>
+        <label>分辨率
+          <select id="fieldResolution">
+            <option value="720p">720p</option>
+          </select>
+        </label>
+      </div>
+      <p id="assetCapabilityNote" class="fieldNote">当前 CLI 未提供 Seedance 2.5；按你的后备要求使用 2.0 VIP。短于 4 秒的节点先生成 4 秒，再按时间线时长裁切。</p>
+
+      <section id="promptSection" class="inspectorSection">
+        <div class="sectionTitleRow">
+          <h3>本节点工作提示词</h3>
+          <span id="promptDirtyState">已保存</span>
+        </div>
+        <textarea id="fieldWorkingPrompt" rows="12" spellcheck="false"></textarea>
+        <div class="inlineActions">
+          <button id="buttonSavePrompt" class="primaryButton" type="button">保存修改</button>
+          <button id="buttonRestorePrompt" type="button">恢复节点默认</button>
+          <button id="buttonCopyCommand" type="button">复制 CLI 命令</button>
+        </div>
+      </section>
+
+      <details id="sourcePromptSection" class="inspectorSection sourcePromptBlock" open>
+        <summary>原始生成任务提示词（只读历史，逐字保留；当前生成不使用）</summary>
+        <div class="sourceMeta">
+          <code id="sourceTaskId"></code>
+          <span id="sourceTaskKind"></span>
+        </div>
+        <pre id="sourcePrompt"></pre>
+      </details>
+
+      <section id="referenceSection" class="inspectorSection">
+        <h3>参考帧与输出</h3>
+        <div id="referenceStrip" class="referenceStrip"></div>
+        <dl class="outputFacts">
+          <div><dt>当前文件</dt><dd id="currentClip"></dd></div>
+          <div><dt>新输出</dt><dd id="plannedOutput"></dd></div>
+          <div><dt>色彩</dt><dd>BT.709 / limited range / 页面无 CSS 滤镜</dd></div>
+        </dl>
+      </section>
+
+      <section id="transitionSection" class="inspectorSection">
+        <h3>转场与顺序</h3>
+        <div class="fieldGrid">
+          <label>转到下一节点
+            <select id="fieldTransitionType">
+              <option value="cut">硬切</option>
+              <option value="dissolve">交叉溶解</option>
+              <option value="fade-black">淡黑</option>
+              <option value="vertical-down">纵向下移</option>
+              <option value="match-cut">动作匹配切</option>
+            </select>
+          </label>
+          <label>转场时长（秒）
+            <input id="fieldTransitionDuration" type="number" min="0" max="2" step="0.05">
+          </label>
+        </div>
+        <div class="inlineActions">
+          <button id="buttonMoveEarlier" type="button">前移一位</button>
+          <button id="buttonMoveLater" type="button">后移一位</button>
+          <button id="buttonPlayFromNode" type="button">从此节点预览</button>
+        </div>
+      </section>
+
+      <section id="generationSection" class="inspectorSection generationSection">
+        <div class="bridgeHeader">
+          <h3>生成候选版本</h3>
+          <span id="bridgeStatus" class="bridgeStatus offline">本机生成器未连接</span>
+        </div>
+        <p id="bridgeHelp">线上页面可编辑、保存和导出。要直接提交即梦，请在本机运行页面目录里的生成桥接服务；页面不会假装已经生成。</p>
+        <button id="buttonRegenerate" class="dangerButton" type="button" disabled>生成视频候选版</button>
+        <div id="generationProgress" class="generationProgress" hidden></div>
+      </section>
+
+      <section class="inspectorSection versionSection" aria-labelledby="versionSectionTitle">
+        <div class="sectionTitleRow">
+          <h3 id="versionSectionTitle">版本与候选</h3>
+          <span>候选不影响当前剪辑</span>
+        </div>
+        <div id="versionRail" class="versionRail"></div>
+        <p id="versionImpact" class="versionImpact">重新生成只会增加候选版本；必须手动采用后，工作时间线才会引用它。</p>
+      </section>
+
+      <details class="inspectorSection">
+        <summary>提示词修改历史</summary>
+        <ol id="promptHistory" class="promptHistory"></ol>
+      </details>
+    </aside>
+  </main>
+
+  <dialog id="creditDialog" class="modalDialog">
+    <form method="dialog">
+      <h2>即将消耗即梦积分</h2>
+      <p>只会为当前视频资产生成一个候选版本，不会批量提交，也不会自动覆盖当前采用版。</p>
+      <dl class="confirmFacts">
+        <div><dt>节点</dt><dd id="confirmNode"></dd></div>
+        <div><dt>模型</dt><dd id="confirmModel"></dd></div>
+        <div><dt>生成时长</dt><dd id="confirmDuration"></dd></div>
+      </dl>
+      <div class="dialogActions">
+        <button value="cancel" type="submit">取消</button>
+        <button id="buttonConfirmGenerate" class="dangerButton" value="default" type="button">确认生成候选</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sequenceDialog" class="sequenceDialog">
+    <div class="sequencePlayer">
+      <div class="sequenceScreen">
+        <video id="sequenceVideoA" muted playsinline preload="auto"></video>
+        <video id="sequenceVideoB" muted playsinline preload="auto"></video>
+        <div id="sequenceBlack" class="sequenceBlack"></div>
+      </div>
+      <div class="sequenceInfo">
+        <div>
+          <span id="sequenceCounter"></span>
+          <strong id="sequenceTitle"></strong>
+        </div>
+        <span id="sequenceTransition"></span>
+      </div>
+      <div class="sequenceControls">
+        <button id="buttonSequencePause" type="button">暂停</button>
+        <button id="buttonSequenceNext" type="button">下一段</button>
+        <button id="buttonSequenceClose" type="button">关闭预览</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./Script_VideoBoard.mjs?v=003"></script>
+</body>
+</html>

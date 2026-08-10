@@ -4,6 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
@@ -94,6 +95,8 @@ for (const id of [
   "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
+  "endTitle", "endText",
+  "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
@@ -106,13 +109,24 @@ const fastCinematic = params.get("fast") === "1";
 // 进度
 // ---------------------------------------------------------------------------
 const STORE_KEY = "TunnelLight1943.unlocked";
+// 开放到第几章为止。已经打到第五章的老存档也照这个数收口——
+// 否则换成试玩版之后，那些人的标题页上还挂着能点进去的第二到第八章。
+const LAST_OPEN = Math.min(CHAPTERS.length, PLAYABLE_CHAPTERS) - 1;
 function GetUnlocked() {
   const v = parseInt(localStorage.getItem(STORE_KEY) || "0", 10);
-  return Number.isFinite(v) ? Math.max(0, Math.min(CHAPTERS.length - 1, v)) : 0;
+  return Number.isFinite(v) ? Math.max(0, Math.min(LAST_OPEN, v)) : 0;
 }
 function Unlock(index) {
-  if (index > GetUnlocked()) localStorage.setItem(STORE_KEY, String(index));
+  const capped = Math.min(index, LAST_OPEN);
+  if (capped > GetUnlocked()) localStorage.setItem(STORE_KEY, String(capped));
 }
+// 打完最后一个开放章：Core 那边照常进 chapterEnd（它手里还是完整的八章），
+// 外壳在这儿把它接住——不给"下一章"的牌子，也不让 advance 传下去，
+// 于是 ConfirmChapterCard 永远不会去 StartChapter(下一章)。
+function DemoEnd(state) {
+  return state.phase === "chapterEnd" && state.chapterIndex + 1 > LAST_OPEN;
+}
+let endScreenMode = null;
 
 // ---------------------------------------------------------------------------
 // 输入：键盘 + 触屏
@@ -762,7 +776,8 @@ function SyncHud(state, dt, shotFade) {
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
     ? Math.min(0.85, state.detection.level) : 0;
 
-  if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
+  const demoEnd = DemoEnd(state);
+  if (!demoEnd && (state.phase === "chapterCard" || state.phase === "chapterEnd")) {
     const showNext = state.phase === "chapterEnd";
     const ch = CHAPTERS[state.chapterIndex + (showNext ? 1 : 0)];
     ui.chapterCard.hidden = false;
@@ -792,7 +807,31 @@ function SyncHud(state, dt, shotFade) {
     }
   } else if (choiceBuilt) HideChoice();
 
-  ui.endScreen.hidden = state.phase !== "gameEnd";
+  // 征夫告示阅读层：跟 state.noticeOpen 走。开着时环境声收窄（Duck），
+  // 背景压暗由覆盖层自己的半透明底做——世界还在画框里，不切黑
+  if (ui.noticeOverlay) {
+    const open = !!state.noticeOpen;
+    if (ui.noticeOverlay.hidden !== !open) {
+      ui.noticeOverlay.hidden = !open;
+      audio.Duck(open);
+    }
+  }
+
+  // 试玩收尾借的是通关那块牌子，但话得换——这不是"全篇完"，是"做到这儿"
+  const showEnd = state.phase === "gameEnd" || demoEnd;
+  ui.endScreen.hidden = !showEnd;
+  if (showEnd && endScreenMode !== (demoEnd ? "demo" : "full")) {
+    endScreenMode = demoEnd ? "demo" : "full";
+    if (ui.endTitle) {
+      ui.endTitle.textContent = demoEnd
+        ? "第一章完" : "门框上的两道刻痕，留在了身后";
+    }
+    if (ui.endText) {
+      ui.endText.textContent = demoEnd
+        ? "后面的章节还在做。地道才挖到七叔家那头。"
+        : "地道还在。人还在。日子还要往下过。";
+    }
+  }
 
   if (dipLevel > 0) dipLevel = Math.max(0, dipLevel - dt * 3.2);
   const targetFade = state.phase === "gameEnd" ? 0.75 : shotFade;
@@ -809,9 +848,14 @@ function BuildTitle() {
   CHAPTERS.forEach((ch, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.disabled = i > unlocked;
-    btn.innerHTML = `<small>${ch.num}</small><b>${i <= unlocked ? ch.title : "？？？"}</b>`;
-    btn.addEventListener("click", () => StartGame(i));
+    // 没做完的章跟"还没解锁的章"是两回事：后者写「？？？」是在说"接着打就有"，
+    // 挂在永远打不开的东西上就成了骗人。这些直接写明还没做。
+    const coming = i > LAST_OPEN;
+    btn.disabled = coming || i > unlocked;
+    btn.classList.toggle("coming", coming);
+    const label = coming ? "尚未开放" : (i <= unlocked ? ch.title : "？？？");
+    btn.innerHTML = `<small>${ch.num}</small><b>${label}</b>`;
+    if (!coming) btn.addEventListener("click", () => StartGame(i));
     ui.chapterList.appendChild(btn);
   });
 }
@@ -1009,6 +1053,18 @@ ui.btnSkipCine?.addEventListener("click", () => {
 });
 
 ui.startButton.addEventListener("click", () => StartGame(0));
+// 征夫告示阅读层：右栏文字从 Core 注入（权威版本）；关闭钮直接清旗标。
+// hidden 切换与环境声收窄都在 UpdateHud 里跟 state.noticeOpen 走
+if (ui.noticeText) {
+  const N = ZHENGFU_NOTICE;
+  ui.noticeText.innerHTML =
+    `<h3>${N.title}</h3>`
+    + N.lines.map((l) => `<p>${l}</p>`).join("")
+    + `<p class="nDate">${N.date}</p>`
+    + N.signs.map((s) => `<p class="nSign">${s}</p>`).join("");
+}
+ui.noticeClose?.addEventListener("click", () => { if (state) state.noticeOpen = false; });
+
 ui.endRestart.addEventListener("click", () => {
   soundtrack.StopBgm();
   ui.endScreen.hidden = true;
@@ -1058,7 +1114,8 @@ function RunFrame(now, dt) {
       pointerWorld: gest.world,
       pointerCard: gest.card,
       tap: tapEdge,
-      advance: advanceEdge,
+      // 试玩收尾那块牌子上点一下不能把人送进第二章（见 DemoEnd）
+      advance: advanceEdge && !DemoEnd(state),
     }, stepDt);
     gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {

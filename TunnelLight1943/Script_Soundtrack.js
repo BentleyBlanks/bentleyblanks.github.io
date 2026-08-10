@@ -9,7 +9,7 @@
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 
-const VOICE_RELEASE = "20260809Dialogue052";
+const VOICE_RELEASE = "20260809Carve053";
 
 // 每章的底色。第 7 章在据点地道底下，是全剧最暗的一段；第 8 章天亮回家，
 // 是唯一允许暖起来的一章。
