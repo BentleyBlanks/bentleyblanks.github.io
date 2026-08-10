@@ -45,6 +45,14 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
 
     const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
 
+    // 征夫告示阅读层要是被误开了（路过 noticeWall 时恰好按了 E），按一下合上——
+    // 它会冻结全世界，不关的话超时的是整章
+    if (state.noticeOpen) {
+      input.interact = true;
+      StepGame(state, input, DT);
+      continue;
+    }
+
     if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
       input.advance = true;
       StepGame(state, input, DT);
@@ -1137,8 +1145,24 @@ function TestWorkStations() {
   assert.equal(sis?.track?.name, "scatterFeed", "妹妹的小活是撒碎草，不是望风");
   const sentry = state.actors.find((a) => a.id === "sentry");
   assert.ok(sentry?.visible && sentry?.wander, "官道上必须有成年民兵在放哨");
-  const dg = state.actors.find((a) => a.id === "diggerA");
-  assert.equal(dg?.track?.name, "hoeing", "帮工的乡亲得在地下轮换挖土");
+  // 帮工的两个乡亲：一个在掌子面挖，一个把土运到窖口——不是并排抡两把锄头。
+  // （旧写法两人同做站姿 hoeing，后面那个身前是实土在刨空气，而且站在净高
+  //   只够爬的新掏段里。玩家原话：「一个人在后面虚空挖土，太假了」。）
+  const digA = state.actors.find((a) => a.id === "diggerA");
+  const digB = state.actors.find((a) => a.id === "diggerB");
+  assert.equal(digA?.level, "under", "挖土的必须在地下");
+  assert.ok(digA?.digging, "掌子面那个得是躬身施工的动作，不是站姿抡锄");
+  assert.ok(!digA?.track, "掌子面那个不能再挂 hoeing 轨道（轨道会压过净高姿态）");
+  // 挖的人必须站在新掏通道的口子上（那儿土层收口、人也直得起腰），
+  // 不许塞进 tight 段里——那儿净高 0.75m，1.4m 的躬身施工姿会被洞顶埋掉大半个人
+  const tight = SCENES.village.tight[0];
+  assert.ok(Math.abs(digA.x - tight.x0) < 0.6,
+    `挖的人得在新掏那段的口子上（tight.x0=${tight.x0}），实际 x=${digA?.x}`);
+  assert.ok(digA.x <= tight.x0 + 0.1,
+    "挖的人不许站进爬行段：那儿的净高会把躬身施工姿埋掉大半个身子");
+  assert.ok(digB?.wander?.haul, "另一个得是运土的（wander 带 haul）");
+  assert.ok(digB.wander.x0 < 38 && digB.wander.x1 < tight.x0,
+    "运土的在竖井底和挖土的之间来回：土是这么到玩家手上的");
 
   // 藏粮的催促：小窗看娘那一眼（pip 机制别悄悄死掉）
   const grain = SCRIPTS.c1.find((b) => b.id === "c1_grain");
@@ -1666,6 +1690,9 @@ function TestRaidTakesMoreThanFather() {
   assert.ok(roster.lines.some((l) => l.far), "点户声得从远处压过来");
   assert.equal(roster.kind, "cinematic", "刘家的暴行必须是连续剧情演出");
   assert.ok(!roster.steps && !roster.options, "暴行段不许挂任何可操作项（无 QTE/无选项）");
+  // 刺刀两拍（剧本§10 明令必须明确表现）：夺襁褓之后得有 bayonetThrust 那一拍
+  assert.ok(roster.lines.some((l) => String(l.on || "").includes("bayonetThrust")),
+    "刺刀动作那一拍必须在（襁褓随枪身离地靠它成立）");
 
   // 搜家：军曹亲口问话（生硬中文）、爹的回答只有两个字、认人的是伪军头目
   const search = SCRIPTS.c1.find((b) => b.id === "c1_search");
