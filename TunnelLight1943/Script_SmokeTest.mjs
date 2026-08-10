@@ -10,12 +10,13 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
-  UnderSegments,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, SLING, SlingSolve,
+  EdgeHint, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, UnderSegments,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
-import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ, RankDz } from "./Data_DepthSpec.mjs";
+import { LightPath, MoodAt, DipAt, LIGHT_MOOD, LIGHT_DIP } from "./Data_DayCycle.mjs";
 
 const DT = 1 / 30;
 
@@ -118,14 +119,31 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
         if (target.action === "crouchAt" && Math.abs(dx) <= 1.35) { input.crouch = true; input.moveX = 0; }
-        // 投掷：走到投掷位、面朝目标方向，然后 F
-        if (target.action === "throwAt") {
-          // 站位容差放宽到 1.2：转身那一步会顺带挪几厘米，容差太小会在
-          // "走回去/转身"之间来回震荡，永远出不了手（转身后下一帧就出手）
-          if (Math.abs(dx) > 1.2) input.moveX = Math.sign(dx);
-          else if ((p.heading || 1) !== (target.face || 1)) input.moveX = target.face || 1;
-          else if (!state.thrown) { input.throw = true; input.moveX = 0; }
-          else input.moveX = 0;
+        // 投掷：走到投掷位、转过身，然后**真的把石子拽开再松手**。
+        // 这一步没有按键后备（按一下就必中的那版已删），所以驱动器也只能走
+        // 玩家那条路：按在手里那颗石子上攥住 → 把手拖到 SlingSolve 反推出来的
+        // 那个点 → 松开。三帧一趟，跟真人的手完全同一套输入。
+        if (target.action === "slingAt") {
+          // 攥住之后一切以攥住那一刻的手为原点（sl.hx/hy）——拽开的方向会把人
+          // 转过去，手却不会跟着换到另一侧，解弧线时不能用当帧朝向重算
+          const ax = state.sling ? state.sling.hx : p.x + (p.heading || 1) * 0.24;
+          const ay = state.sling ? state.sling.hy : SURFACE_Y + SLING.HAND_Y;
+          const sol = state.thrown ? null : SlingSolve(ax, ay, target.aim.x, target.aim.y);
+          // 站位容差 0.3：拽的向量是照着手的位置解的，站偏半米弧就带偏。
+          // **不为转身多走一步**——为了转身挪那几厘米会在容差边上来回震荡，
+          // 人永远出不了手（旧的按键版就为这个把容差放到 1.2）。朝向交给拽开的方向
+          if (state.thrown) input.moveX = 0;
+          else if (!state.sling && (Math.abs(dx) > 0.3 || !sol)) {
+            input.moveX = Math.abs(dx) > 0.3 ? Math.sign(dx) : Math.sign(target.aim.x - p.x);
+          } else {
+            input.moveX = 0;
+            if (!state.sling) { input.pointerHeld = true; input.pointerWorld = { x: ax, y: ay }; }
+            else if (Math.hypot(state.sling.vx - sol.vx, state.sling.vy - sol.vy) > 0.25) {
+              input.pointerHeld = true;
+              input.pointerWorld = { x: ax - sol.vx / SLING.K, y: ay - sol.vy / SLING.K };
+            }
+            // 拽到位了：这一帧不按 = 松手出手
+          }
         }
         // 推车：贴住车帮，按住 E 往推进方向使劲
         if (target.action === "pushAt") {
@@ -550,7 +568,20 @@ function TestC2Evasion() {
   assert.equal(st3.player.item?.id, "stone", "潜行段路边该有一堆石子捡得起来");
   assert.ok(seen(), "布置有误：扔石子之前玩家本该在灯里");
   for (let i = 0; i < 3; i += 1) StepGame(st3, { ...none(), moveX: 1 }, DT);   // 面朝东
-  StepGame(st3, { ...none(), throw: true }, DT);
+  // 潜行段的石子也只有拽弓一条路（F 键已随投掷后备一起删掉）：攥住 → 拽开 → 松手。
+  // 往东八米开外扔一颗，落地那一声把灯引过去
+  {
+    const hx = st3.player.x + st3.player.heading * 0.24;
+    const hy = SURFACE_Y + SLING.HAND_Y;
+    const sol = SlingSolve(hx, hy, hx + 8, SURFACE_Y + 0.12);
+    assert.ok(sol, "八米外的地面必须够得着");
+    StepGame(st3, { ...none(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+    assert.ok(st3.sling, "潜行段按在石子上也得攥得住");
+    const drag = { x: hx - sol.vx / SLING.K, y: hy - sol.vy / SLING.K };
+    for (let i = 0; i < 3; i += 1) StepGame(st3, { ...none(), pointerHeld: true, pointerWorld: drag }, DT);
+    StepGame(st3, none(), DT);   // 松手
+    assert.ok(st3.thrown, "潜行段松手必须出手");
+  }
   let freed = 0;
   for (let i = 0; i < 150; i += 1) { StepGame(st3, none(), DT); if (!seen()) freed += 1; }
   assert.ok(freed > 90, `石子该把灯引开三秒以上（实测 ${(freed * DT).toFixed(1)}s）——引不开就不算一条出路`);
@@ -740,6 +771,52 @@ function TestChainSurvivesEarlyDrop() {
   state.player.x = g.x; step({}, 3); step({ interact: true });
   assert.equal(state.player.item?.id, "bucket", "撂在哪儿就该能从哪儿捡回来");
   console.log("  ✓ 链不怕半路撂东西：缺桶有提示、撂下的桶有气泡标着、捡得回来");
+}
+
+// 车进不了堂屋：推着独轮车经过自家屋前，走的是屋外那条街——立面不许淡出
+// （用户 2026-08-09：「我推车为什么能推到家里去？这明明应该走外面的小路的」）
+function TestCartStaysOutOfTheHouse() {
+  const house = SCENES.village.props.find((p) => p.interior && p.kind === "house");
+  assert.ok(house, "村里得有一间可进入的屋子");
+  const { x0, x1 } = HouseSpan(house);
+  const mid = (x0 + x1) / 2;
+
+  // 这条规矩得真的被用上：回程那趟推车必须从屋子这段街上经过，否则测了个寂寞
+  const barrow = SCRIPTS.c1.find((b) => b.id === "c1_barrow");
+  const home = barrow.steps.filter((s) => s.type === "push").pop();
+  const to = home.from + home.dir * home.dist;
+  assert.ok(Math.min(home.from, to) < x0 && Math.max(home.from, to) > x1,
+    `推车回家那趟得经过屋子（${x0.toFixed(1)}~${x1.toFixed(1)}），实际 ${home.from}→${to}`);
+
+  const s = CreateGame(0);
+  s.player.level = "surface";
+  s.player.x = mid;
+  // ① 空着手站在屋里：立面淡出，人在屋里
+  s.cart = null;
+  assert.equal(IndoorOpen(s, x0, x1), true, "空着手走进去就是进屋");
+  // ② 推着车走到同一个位置：走的是屋外那条道
+  s.cart = { x: mid + 1.1, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), false, "推着车不算进屋——车进不了堂屋");
+  // ③ 车停在屋前那段街上、人空手走进去：车还在墙外，立面同样合着
+  //（不然墙一淡，停在街上的车就出现在堂屋里）
+  s.cart = { x: mid, kind: "barrow" };
+  s.player.x = x1 - 0.3;
+  assert.equal(PushingCart(s), false, "隔着两米多不算推着");
+  assert.equal(IndoorOpen(s, x0, x1), false, "车停在屋前时立面也不开");
+  // ④ 车推开了、人在屋里：这才淡出
+  s.cart = { x: x0 - 6, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), true, "车挪走了才算进屋");
+  // ⑤ 人在地窖那一层：屋里的立面与他无关
+  s.cart = null;
+  s.player.level = "under";
+  assert.equal(IndoorOpen(s, x0, x1), false, "人在地下不开地面的立面");
+
+  // 深度：推着的车夹在立面与演员之间——被墙吃掉（<facade）和挡住人（>演员）
+  // 都是穿帮；位置仍要压回行走线，否则车和人不在一条水平线上
+  assert.ok(BAND.pushCart > BAND.facade, "推着的车必须画在立面之前，否则墙把车吃了");
+  assert.ok(BAND.pushCart < ACTOR_Z, "推着的车必须画在人之后，人得在近侧握车把");
+  assert.equal(PlaceZ(BAND.pushCart), 0, "车站在行走线上：位置压回 z=0");
+  console.log("  ✓ 车进不了堂屋：推着走屋外 / 停屋前也不开墙 / 车夹在立面与人之间");
 }
 
 function TestGroundItems() {
@@ -1081,6 +1158,48 @@ function TestChalkIsAPencilNotASlider() {
   console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
 }
 
+// 昼夜过渡得是**一条连续的曲线**，不是进拍即换（用户 2026-08-09：
+// "24h切换现在太生硬，我需要你做的更自然一些"）。三条判据：
+// ①白天奔夜里必须**经过黄昏**（中途是暖的），夜里奔白天经过拂晓；
+// ②整条曲线上不许有跳变（相邻采样的浓淡与色相都得是小步）；
+// ③重烘该藏在最暗那一刻（鼓包的顶点在中途，不在两头）。
+function TestDayNightIsContinuous() {
+  const warm = (hex) => ((hex >> 16) & 255) > (hex & 255);   // 红多于蓝＝暖
+  // ① 路径：隔着一整个白天/黑夜的要插一档过渡
+  assert.deepEqual(LightPath("day", "night"), ["day", "dusk", "night"], "白天奔夜里要经过黄昏");
+  assert.deepEqual(LightPath("night", "day"), ["night", "dawn", "day"], "夜里奔白天要经过拂晓");
+  assert.deepEqual(LightPath("dawn", "day"), ["dawn", "day"], "相邻两档直接过");
+  assert.deepEqual(LightPath("night", "dawn"), ["night", "dawn"], "目标本身就是过渡档，不再插");
+  assert.ok(warm(MoodAt("day", "night", 0.5).tint), "白天奔夜里，中途那一下必须是暖的（日头落下去）");
+  assert.ok(!warm(MoodAt("day", "night", 1).tint), "落到夜里必须是冷的");
+
+  // ② 连续性：整条曲线逐点比，一步都不许跳。0.02 的步长换到 2.6 秒的过渡
+  // 里就是一帧多一点，跳变一眼看得出来的量级是 0.1 往上
+  for (const [from, to] of [["day", "night"], ["night", "day"], ["dawn", "night"], ["day", "tunnel"]]) {
+    let prev = MoodAt(from, to, 0);
+    for (let t = 0.02; t <= 1.0001; t += 0.02) {
+      const now = MoodAt(from, to, t);
+      assert.ok(Math.abs(now.dark - prev.dark) < 0.05,
+        `${from}→${to} 的浓淡在 t=${t.toFixed(2)} 跳了 ${(now.dark - prev.dark).toFixed(3)}`);
+      for (const sh of [16, 8, 0]) {
+        const d = Math.abs(((now.tint >> sh) & 255) - ((prev.tint >> sh) & 255));
+        assert.ok(d < 24, `${from}→${to} 的色相在 t=${t.toFixed(2)} 跳了 ${d}`);
+      }
+      prev = now;
+    }
+    // 两头必须**正好**落在那一档上（过渡完还差一点点就是"永远不到位"）
+    assert.equal(MoodAt(from, to, 1).dark, LIGHT_MOOD[to].dark, `${from}→${to} 走完得正好是 ${to}`);
+    assert.equal(MoodAt(from, to, 0).dark, LIGHT_MOOD[from].dark, `${from}→${to} 起点得正好是 ${from}`);
+  }
+
+  // ③ 鼓包（重烘藏身处）：顶点在中途，两头归零
+  assert.equal(DipAt(0), 0, "过渡起点不该额外压暗");
+  assert.equal(DipAt(1), 0, "过渡走完必须把额外那层撤干净");
+  assert.ok(DipAt(0.5) > DipAt(0.2) && DipAt(0.5) > DipAt(0.8), "最暗的那一刻该在中途");
+  assert.ok(Math.abs(DipAt(0.5) - LIGHT_DIP) < 1e-6, "顶点就是 LIGHT_DIP");
+  console.log("  ✓ 昼夜过渡：白天经黄昏落夜 / 曲线无跳变 / 重烘藏在最暗那一刻");
+}
+
 // 画框边缘的指路标（勇敢的心式）：目标出了画框且离得远 → 必须指、指对边；
 // 目标就在画框里或人已到近旁 → 不指；特写里不指；目标在另一层 → 先指梯口。
 function TestEdgeHintPointsOffscreenTargets() {
@@ -1249,6 +1368,50 @@ function TestWorkStations() {
   console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
 }
 
+// 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
+// 「挥舞的时候为什么脚也会在y轴上漂移？」）。逐键盯死，退化立刻红：
+//   ① 脚钉在地上：每个键都得带全六个腿关节，且踝的垂距 L(cos a + cos(a−b))
+//      必须等于 BONE.hipY + hipY——胯沉腿不跟着解，脚就跟着胯在 y 轴上漂；
+//   ② 脚也不许横滑：踝的水平位置逐键恒定；
+//   ③ 锄板要真的够到土、扬要真的过肩：θ=armF+foreF 低点 ≤ −180（板到头后），
+//      高点 ≥ −45（板咬进土），而且从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——
+//      没有这一下快慢对比，锄地就成了匀速划水。
+function TestHoeingIsARealSwing() {
+  const rigSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
+  const block = rigSrc.slice(rigSrc.indexOf("  hoeing: {"), rigSrc.indexOf("  scatterFeed: {"));
+  assert.ok(block.length > 100, "找不到 hoeing 轨道");
+  const keys = [...block.matchAll(/\{ t: [^}]*\}/g)].map((m) => new Function(`return (${m[0]})`)());
+  assert.ok(keys.length >= 5, "hoeing 关键帧太少");
+  const L = 0.31, HIP = 0.62;   // BONE.thigh / BONE.hipY（Rig 在 node 下拖不动 three，抄数值）
+  const rad = (d) => (d * Math.PI) / 180;
+  const ankles = { F: [], B: [] };
+  for (const k of keys) {
+    for (const leg of ["F", "B"]) {
+      for (const j of [`thigh${leg}`, `shin${leg}`, `foot${leg}`]) {
+        assert.ok(k[j] !== undefined, `t=${k.t} 的键缺 ${j}——腿不逐键解，脚就会跟着胯漂`);
+      }
+      const a = -k[`thigh${leg}`], b = k[`shin${leg}`];
+      const drop = L * (Math.cos(rad(a)) + Math.cos(rad(a - b)));
+      const need = HIP + k.hipY;
+      assert.ok(Math.abs(drop - need) < 0.02,
+        `t=${k.t} ${leg}腿踝距地 ${drop.toFixed(3)} ≠ 胯高 ${need.toFixed(3)}——脚要么悬空要么陷地`);
+      ankles[leg].push(L * (Math.sin(rad(a)) + Math.sin(rad(a - b))) + k.hipX);
+    }
+  }
+  for (const leg of ["F", "B"]) {
+    const spread = Math.max(...ankles[leg]) - Math.min(...ankles[leg]);
+    assert.ok(spread < 0.025, `${leg}脚在地上横滑了 ${(spread * 100).toFixed(1)}cm`);
+  }
+  const thetas = keys.map((k) => k.armF + k.foreF);
+  assert.ok(Math.min(...thetas) <= -180, `扬锄必须过肩（θ 低点 ${Math.min(...thetas)} > -180，还是在身前举旗）`);
+  assert.ok(Math.max(...thetas) >= -45, `落锄必须够到土（θ 高点 ${Math.max(...thetas)} < -45，锄板悬在半空）`);
+  const whip = keys.some((k, i) => i > 0
+    && Math.abs(thetas[i] - thetas[i - 1]) >= 120 && (k.t - keys[i - 1].t) <= 0.4);
+  assert.ok(whip, "从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——匀速划水不算锄地");
+  console.log("  ✓ 锄地是一记真抡劈：脚钉在地上不漂不滑、扬过肩、锄板咬进土");
+}
+
 // 刨料这一拍是"手上真有活"的教学，几条硬约束：镜头必须推到台面上
 // （老版是十几米外按 E 敲木楔，木楔只有几个像素）；**玩家攥的是那把刨子**，
 // 不是一根滑块（用户明令禁止 slider——手得真落在刨子上才拖得动，dragTrack
@@ -1393,12 +1556,23 @@ function TestModuleGraphIsCacheBusted() {
   assert.ok(entry, "index.html 的入口 Script_Main.js 必须带 ?v= 版本戳");
   const ver = entry[1];
 
-  // 浏览器真正跑的那些第一方模块，逐个查表
-  const browserModules = [
-    "Script_Core.mjs", "Script_World.js", "Script_Art.mjs", "Script_Rig.mjs",
-    "Script_Light.mjs", "Script_Fluid.mjs", "Script_Soundtrack.js", "Script_Audio.js",
-    "Data_Scenes.mjs", "Data_DepthSpec.mjs", "Data_BgmConfig.mjs", "Data_AudioMix.mjs",
-  ];
+  // 浏览器真正跑的那些第一方模块：**从入口把模块图走一遍**自己数出来。
+  // 原来这儿是一张手写的清单，于是它和 import map 是两份要同步的名单——
+  // 2026-08-09 新增 Data_DayCycle 时就漏了：import map 加了、这张单子没加，
+  // 测试照样绿。清单只该有一份（index.html 那张），这里负责去对它。
+  const browserModules = (() => {
+    const seen = new Set();
+    const walk = (file) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const src = fs.readFileSync(path.join(here, file), "utf8");
+      for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z_]+\.m?js)["']/g)) walk(m[1]);
+    };
+    walk("Script_Main.js");
+    seen.delete("Script_Main.js");            // 入口自己走 <script src>
+    return [...seen].sort();
+  })();
+  assert.ok(browserModules.length >= 12, `模块图只走出 ${browserModules.length} 个，正则怕是失灵了`);
   for (const m of browserModules) {
     assert.equal(imports[`./${m}`], `./${m}?v=${ver}`,
       `${m} 必须登记在 index.html 的 import map 里并盖上 ?v=${ver}——`
@@ -1423,24 +1597,33 @@ function TestModuleGraphIsCacheBusted() {
 function TestDoorHoldIsPhysical() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
+  const DOOR_TEST_SAG = 0.26;   // 与 Core 的 DOOR_SAG 同值：磕框的倾角
 
   // ① 开场过场要真的把那扇门演出来：doorLeaf 亮过、而且是"松的"
   {
     const s0 = CreateGame(0);
     DebugJump(s0, 0, beats.indexOf("c1_open"));
-    let seen = null, swung = false, lifted = false, g = 0;
+    let seen = null, intact = false, gusted = false, swung = false, lifted = false, sat = false, rose = false, g = 0;
     while (CurrentBeatDef(s0)?.id === "c1_open" && g < 6000) {
       g += 1;
       StepGame(s0, { ...idle(), advance: g % 90 === 0 }, DT);
+      const father = s0.actors.find((a) => a.id === "father");
+      if (father?.pose === "sitStool") sat = true;
+      if (sat && father?.cineTarget) rose = true;
       if (s0.doorLeaf) {
         seen = s0.doorLeaf;
+        if (!s0.doorLeaf.loose) intact = true;
+        if (s0.doorLeaf.gust) gusted = true;
         if (s0.doorLeaf.swing) swung = true;
         if (s0.doorLeaf.tryLift) lifted = true;
       }
     }
     assert.ok(seen, "开场必须把那扇门摆出来（doorLeaf），不能只靠爹一句台词");
-    assert.equal(seen.loose, true, "开场那扇门是松的（下轴脱了窝）——这就是要修的理由");
+    assert.ok(intact, "风来之前门得还挂在框上（毛病是当着玩家的面发作的，不是天生就坏）");
+    assert.ok(gusted, "得有风把门吹倒的那一镜（2026-08-09 用户点名）");
+    assert.equal(seen.loose, true, "吹倒之后那扇门是松的（下轴脱了窝）——这就是要修的理由");
     assert.ok(swung, "得演出它自己在晃");
+    assert.ok(sat && rose, "爹得先坐在凳上歇手，门倒了才起身去修——起身这一下就是事件感");
     assert.ok(lifted, "得演出爹一个人托不住（这才解释了为什么需要第二双手）");
   }
 
@@ -1470,11 +1653,12 @@ function TestDoorHoldIsPhysical() {
     assert.ok(st.beat.work < 0.05, "没扶住，爹使不上劲，进度不该涨");
   }
 
-  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去）
+  // 攥住门板往里推：门跟着走，但有分量（一帧转不过去），推回正位得跟它较劲
   {
     const { st, step } = mk();
     const midY = HingeY(step) - 0.9;
-    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: step.zone.x + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
+    const hx = step.hingeX ?? step.zone.x;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx + Math.sin(st.beat.lean) * 0.9, y: midY } }, DT);
     assert.ok(st.beat.grabbed, "手按在门板上必须攥得住");
     const l1 = st.beat.lean;
     // 门跟着手走：把手往里挪「一个力臂 × 当前倾角」，正好把门扶到正位
@@ -1482,18 +1666,54 @@ function TestDoorHoldIsPhysical() {
     StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX - 1, y: midY } }, DT);
     assert.ok(st.beat.lean < l1, "攥住往里推，门必须跟着走");
     assert.ok(l1 - st.beat.lean < 0.2, `门有分量，一帧不该转到 ${st.beat.lean}`);
-    // 稳住 → 爹使得上劲；撒手 → 它自己坠回去、进度往回泄
-    let g2 = 0;
-    while (st.beat.work < 0.5 && g2 < 400) {
+    // 稳住 → 爹一下一下礅轴（进度按"下"跳，不是秒表匀速涨）
+    let g2 = 0, workJumps = 0, prevWork = st.beat.work, kicked = false;
+    while (st.beat.work < 0.5 && g2 < 600) {
       g2 += 1;
       StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: plumbX, y: midY } }, DT);
+      if (st.beat.work > prevWork) {
+        workJumps += 1;
+        assert.ok(st.beat.work - prevWork > 0.2, "礅轴的进度必须一下一下跳，不许退回匀速条");
+        prevWork = st.beat.work;
+      }
+      // 礅那一下的震劲得传到门上：出现明显的往外角速度
+      if (st.beat.vel > 0.3) kicked = true;
     }
     assert.ok(st.beat.work >= 0.5, "稳在正位，礅轴的进度得涨起来");
+    assert.ok(workJumps >= 2, "涨到一半至少该挨过两记锤");
+    assert.ok(kicked, "每礅一下，震劲要把门往外弹——扶门的手上得一直有事");
     assert.ok(Math.abs(st.beat.lean) < 0.12, "扶到正位时门该基本是竖直的");
     const leanHeld = st.beat.lean, workHeld = st.beat.work;
-    for (let i = 0; i < 20; i += 1) StepGame(st, idle(), DT);       // 撒手
+    // 撒手：门是**越坠越快**地坠（重量），不是匀速滑走
+    const fallD = [];
+    let prevLean = st.beat.lean, hitStop = false;
+    for (let i = 0; i < 60; i += 1) {
+      StepGame(st, idle(), DT);
+      // 只记第一段自由下坠（磕框那一帧位移被截断、弹回后的余晃更不算数）
+      if (!hitStop && st.beat.lean < DOOR_TEST_SAG - 1e-4) {
+        fallD.push(st.beat.lean - prevLean);
+      }
+      if (st.beat.lean >= DOOR_TEST_SAG - 1e-4) hitStop = true;
+      prevLean = st.beat.lean;
+    }
     assert.ok(st.beat.lean > leanHeld + 0.02, "撒手之后门必须自己往外坠");
-    assert.ok(st.beat.work < workHeld, "歪出去之后进度要往回泄，不是原地等着");
+    assert.ok(st.beat.lean >= DOOR_TEST_SAG - 1e-4, "两秒没人扶，它就该磕回框上");
+    assert.ok(fallD.length >= 6 && fallD[fallD.length - 1] > fallD[1] + 1e-4,
+      "坠是加速的——头几帧慢、越到后头越快，这就是分量");
+    assert.ok(st.beat.work < workHeld, "磕回框上，刚礅进去的轴又震松一分——进度要掉");
+    // 接住一扇正在坠的门：它还带着动量，得吃一拍才停得住
+    st.beat.lean = 0.05; st.beat.vel = 0;
+    for (let i = 0; i < 14; i += 1) StepGame(st, idle(), DT);        // 让它坠出速度
+    const velFalling = st.beat.vel;
+    assert.ok(velFalling > 0.1, "先坠出点速度");
+    const catchX = (step.hingeX ?? step.zone.x) + Math.sin(st.beat.lean) * 0.9;
+    StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(st.beat.grabbed, "坠着也得接得住");
+    const leanCatch = st.beat.lean;
+    for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(st.beat.lean > leanCatch, "接住的头几帧它还往下沉——手要吃住那份动量");
+    for (let i = 0; i < 40; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: catchX, y: midY } }, DT);
+    assert.ok(Math.abs(st.beat.vel) < 0.35, "吃住之后它就该停在手里");
   }
 
   // ③ 键盘后备（扶门是费力气的活，留了按住 E）：自动通关靠它，不许卡死
@@ -1506,7 +1726,7 @@ function TestDoorHoldIsPhysical() {
     }
     assert.notEqual(st.beat.stepIndex, 0, "按住 E 必须也能把门扶正（键盘后备 / 驱动器走这条）");
   }
-  console.log("  ✓ 修门：开场演清楚为什么修 / 扶的是那扇会坠的门 / 抓不住扶不动 / 撒手就坠 / 键盘后备可用");
+  console.log("  ✓ 修门：风吹倒门爹起身 / 坠是加速的 / 接得住动量 / 礅一下弹一下 / 磕框掉进度 / 键盘后备可用");
 }
 
 function TestQuieterAudioMix() {
@@ -1692,16 +1912,32 @@ function TestConvoyKeepsFormation() {
 
   const At = (id) => state.actors.find((a) => a.id === id);
   const pups = state.actors.filter((a) => a.id.startsWith("c1pup")).map((a) => a.id);
-  const jpF = state.actors.filter((a) => a.id.startsWith("c1jpF")).map((a) => a.id);
-  // 用户 2026-08-08 定的队形：**十个伪军打头**，日军**五对两人并排**殿后
+  // 日军按「排」编队：id 是 c1jp{排}x{排内第几个}
+  const rows = RAID_FORMATION.rows.map((n, r) =>
+    Array.from({ length: n }, (_, c) => `c1jp${r}x${c}`));
+  const jpAll = rows.flat();
+  // 用户定的队形：**十个伪军打头**（2026-08-08），日军**2-3 人一排**殿后（2026-08-09）
   assert.equal(pups.length, 10, `打头的伪军该有十个，现在 ${pups.length} 个`);
-  assert.equal(jpF.length, 5, `日军该有五对，现在 ${jpF.length} 对`);
+  for (const row of rows) {
+    assert.ok(row.length >= 2 && row.length <= 3,
+      `一排该是 2-3 个人（用户原话），现在 ${row.length} 个`);
+  }
   for (const id of pups) assert.equal(At(id).kind, "puppet", `${id} 该是伪军（打头的是他们）`);
-  for (const id of jpF) assert.equal(At(id).kind, "soldier", `${id} 该是日军`);
+  for (const id of jpAll) {
+    assert.ok(At(id), `队形里的 ${id} 没被生成出来`);
+    assert.equal(At(id).kind, "soldier", `${id} 该是日军`);
+  }
+  // 伪军也不许排成一条等距的线：十个人得挤成几堆（堆内并排、堆间松散）
+  {
+    const xs = pups.map((id) => At(id).x).sort((a, b) => a - b);
+    const gaps = xs.slice(1).map((x, i) => x - xs[i]);
+    assert.ok(gaps.some((g) => g < 0.8), "伪军里得有挤在同一堆并排走的（间距 <0.8m）");
+    assert.ok(gaps.some((g) => g > 1.6), "伪军的堆与堆之间得松开（间距 >1.6m）");
+  }
 
-  // 队伍朝 -x 开进村：队头 x 最小。队序 = 自行车 → 十个伪军 → 摩托 → 日军五对。
+  // 队伍朝 -x 开进村：队头 x 最小。队序 = 自行车 → 十个伪军 → 摩托 → 日军各排。
   // 逐帧验整条队序不许换位——速度差一大，走上二十秒谁都能把谁套圈
-  const order = ["bikeScout", ...pups, "motoLead", ...jpF];
+  const order = ["bikeScout", ...pups, "motoLead", ...jpAll];
   for (let f = 0; f < 240; f += 1) {
     StepGame(state, idle, DT);
     const bike = At("bikeScout");
@@ -1713,24 +1949,36 @@ function TestConvoyKeepsFormation() {
       assert.ok(a.x < b.x,
         `第 ${f} 帧：${order[i]} 超到 ${order[i - 1]} 前头了（${b.x.toFixed(1)} ≤ ${a.x.toFixed(1)}）`);
     }
-    // **并排的一对不许被拉开**：这正是"日军两人并排走、不是一个个前后跟着"
-    // 那条要求的判据。横版里"并排"靠的是后排那个的 rank（深度档），不是 x
-    for (let i = 0; i < jpF.length; i += 1) {
-      const F = At("c1jpF" + i);
-      const B = At("c1jpB" + i);
-      if (!F || !B) continue;
-      assert.ok(Math.abs((B.x - F.x) - 0.22) < 0.05,
-        `第 ${f} 帧：第 ${i} 对日军被拉开了（相距 ${(B.x - F.x).toFixed(2)}m，该是 0.22m）`);
-      assert.equal(B.rank, 1, `第 ${i} 对的后排必须声明 rank:1——横版里"并排"全靠它`);
-    }
+    // **一排人不许被拉开**：这正是"2-3 人一排、不是一人一排线性移动"那条
+    // 要求的判据。一排里的人错开半个身位（x）＋后排退一档深度（rank），
+    // 两样缺一不可——只给深度在三十米开外等于完全重合，那就退回长蛇了
+    rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c += 1) {
+        const a = At(row[c]);
+        if (!a) continue;
+        assert.equal(a.rank, c, `${row[c]} 该是这一排的第 ${c} 排（深度档靠它）`);
+        if (c === 0) continue;
+        const prev = At(row[c - 1]);
+        const d = a.x - prev.x;
+        assert.ok(Math.abs(d - RAID_FORMATION.stagger) < 0.06,
+          `第 ${f} 帧：第 ${r} 排里 ${row[c]} 掉队了（错位 ${d.toFixed(2)}m，该是 ${RAID_FORMATION.stagger}m）`);
+      }
+      // 排与排之间必须明显比排内的错位大，"排"的边界才读得出来
+      if (r === 0) return;
+      const gap = At(row[0]).x - At(rows[r - 1][rows[r - 1].length - 1]).x;
+      assert.ok(gap > RAID_FORMATION.stagger * 2.5,
+        `第 ${f} 帧：第 ${r} 排贴上前一排了（间距 ${gap.toFixed(2)}m），排与排要分得开`);
+    });
   }
   // 摩托紧贴着伪军队尾、又贴着日军队头：用户嫌"摩托和日军距离有点远"，
   // 这一档间距别再被人调回去
-  const gapJp = At("c1jpF0").x - At("motoLead").x;
+  const gapJp = At("c1jp0x0").x - At("motoLead").x;
   assert.ok(gapJp > 0 && gapJp < 8,
     `摩托到日军队头 ${gapJp.toFixed(1)}m——太远了（用户点名要"拉得近一点"）`);
 
-    console.log("  ✓ 队形：十个伪军打头 / 日军五对两人并排 / 队序全程不换位");
+  assert.ok(RankDz(1) < RankDz(0) && RankDz(2) < RankDz(1),
+    "排与排的深度必须一档比一档远，后排才画得小一圈");
+    console.log("  ✓ 队形：十个伪军三三两两打头 / 日军三人一排共三排 / 排内不掉队 / 队序全程不换位");
 }
 
 // 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
@@ -1804,70 +2052,135 @@ function TestCineActorsClearOfObstacles() {
   console.log("  ✓ 过场演出不与路障同坐标（obstacle 带会把演员整个盖住）");
 }
 
-// 拟物投掷：攥住石子往后拽开瞄准，弹道是真物理；键盘 F 仍是完整后备。
+// 投掷：角度和劲都得自己调。这一步**没有**按键后备——曾经按 F 就照着靶心解一条
+// 必中的弧，站位落在 3~10.5m 里就赢，等于整个玩法是假的（用户明令删掉）。
+// 这条测试盯三件事：① 只有攥住手里那颗石子才起手；② 拽的方向和长短真的决定
+// 弧线（同一个站位，拽错了就打不中）；③ 按键路径彻底没了，按 F 一颗石子也飞不出去。
 // 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
 function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
-  const st = CreateGame(0);
   const beats = ChapterBeatList(0).map((b) => b.id);
-  DebugJump(st, 0, beats.indexOf("c1_well"));
-  StepGame(st, idle(), DT);
   const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
   const thr = cloth.steps.find((x) => x.type === "throwHit");
-  st.beat.stepIndex = cloth.steps.indexOf(thr);
-  st.groundItems.length = 0;   // 结算搁在井台的桶别搅进投掷判定
-  st.player.item = { id: "stone", label: "石子", throwable: true };
-  st.player.x = thr.target.x - 6;
-  st.player.heading = 1;
-  StepGame(st, idle(), DT);
+  // 每次都从同一个站位重开：石子在手、面朝榆树、地上没别的东西搅判定
+  const Setup = (dist = 4.6) => {
+    const st = CreateGame(0);
+    DebugJump(st, 0, beats.indexOf("c1_well"));
+    StepGame(st, idle(), DT);
+    st.beat.stepIndex = cloth.steps.indexOf(thr);
+    st.groundItems.length = 0;
+    st.player.item = { id: "stone", label: "石子", throwable: true };
+    st.player.x = thr.target.x + dist;
+    st.player.heading = -1;
+    StepGame(st, idle(), DT);
+    return st;
+  };
+  const Fly = (st, n = 200) => { let g = 0; while (st.thrown && g < n) { g += 1; StepGame(st, idle(), DT); } };
 
   // ① 按下那一帧手必须落在石子上——在别处按一律攥不住
+  const st = Setup();
   StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: st.player.x - 3, y: SURFACE_Y + 1.1 } }, DT);
   assert.ok(!st.sling, "在别处按下不该攥住石子");
   StepGame(st, idle(), DT);   // 松开，重下
 
-  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列
+  // ② 攥住 + 往后下拽：蓄力姿势由拉弓量驱动，预览弧是同一套物理点列。
+  //    往哪儿拽由 SlingSolve 现算——它就是这一步的「标准答案」，
+  //    自动通关走的也是它（删了按键后备就必须给驱动器一条真输入的路）
   const hx = st.player.x + st.player.heading * 0.24;
-  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: SURFACE_Y + 1.12 } }, DT);
+  const hy = SURFACE_Y + SLING.HAND_Y;
+  const sol = SlingSolve(hx, hy, thr.target.x, thr.target.y);
+  assert.ok(sol, "站在石子堆这一侧必须解得出一条够得着的弧");
+  assert.ok(sol.power > 0.55 && sol.power < 1,
+    `这一步必须真使劲才够得着（实测要拽满的 ${(sol.power * 100).toFixed(0)}%）——拽两下就中等于没调劲`);
+  StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
   assert.ok(st.sling, "按在石子上必须攥得住");
-  // 反解一条正好穿过靶心的拽法：T=0.7s 的弹道，拽向 = -v/K
-  const T = 0.7;
-  const vx = (thr.target.x - hx) / T;
-  const vy = (thr.target.y - 1.12) / T + 0.5 * 12.5 * T;
-  const drag = { x: hx - vx / 7.4, y: SURFACE_Y + 1.12 - vy / 7.4 };
+  const drag = { x: hx - sol.vx / SLING.K, y: hy - sol.vy / SLING.K };
   for (let i = 0; i < 3; i += 1) StepGame(st, { ...idle(), pointerHeld: true, pointerWorld: drag }, DT);
   assert.ok(st.throwAim?.pts?.length > 5, "拽开必须给出弹道预览点列");
+  assert.ok(!st.throwAim.x1 && !st.throwAim.y1,
+    "不许再画那条「站对位置就必中」的直线辅助——站位不是瞄准");
   assert.equal(st.player.pose, "throwWind", "拽着时必须是蓄力姿势");
   assert.ok(st.player.poseK > 0.4, "拉弓量必须驱动姿势");
 
   // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 妹妹欢呼夸人
   StepGame(st, idle(), DT);
   assert.ok(st.thrown, "松手必须出手");
-  assert.ok(st.thrown.vx > 0, "往后拽，石子必须朝前飞");
-  let guard = 0;
+  assert.ok(st.thrown.vx < 0, "往后拽，石子必须朝前（榆树那边）飞");
   const idx0 = st.beat.stepIndex;
-  while (st.thrown && guard < 200) { guard += 1; StepGame(st, idle(), DT); }
-  assert.equal(st.flags.elmDown, true, "照着靶心拽出去的弧必须打中榆钱枝");
+  Fly(st);
+  assert.equal(st.flags.elmDown, true, "照着标准答案拽出去的弧必须打中榆钱枝");
   assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
   const sis = st.actors.find((a) => a.id === "sister");
   assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
   assert.ok(st.microCine, "妹妹必须开口夸哥");
 
-  // ④ 键盘后备：站进射程按 F，照样命中（自动通关走的就是这条）
-  const st2 = CreateGame(0);
-  DebugJump(st2, 0, beats.indexOf("c1_well"));
-  StepGame(st2, idle(), DT);
-  st2.beat.stepIndex = cloth.steps.indexOf(thr);
-  st2.groundItems.length = 0;
-  st2.player.item = { id: "stone", label: "石子", throwable: true };
-  st2.player.x = thr.target.x - 6;
-  st2.player.heading = 1;
-  StepGame(st2, { ...idle(), throw: true }, DT);
-  assert.ok(st2.thrown, "键盘 F 必须照常出手");
-  guard = 0;
-  while (st2.thrown && guard < 200) { guard += 1; StepGame(st2, idle(), DT); }
-  assert.equal(st2.flags.elmDown, true, "键盘后备在射程内必须命中");
-  console.log("  ✓ 拟物投掷：攥住才算 / 拉弓驱动姿势 / 真弹道命中榆钱枝 / 妹妹接着乐 / 键盘后备");
+  // ④ 劲不够就够不着：同一个角度只拽六成，石子必须落在树跟前，
+  //    而且提示要说清楚差在哪一头（"再拽满些"），不能只说一句"擦着边过去了"
+  const stWeak = Setup();
+  StepGame(stWeak, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+  const weak = { x: hx - sol.vx / SLING.K * 0.6, y: hy - sol.vy / SLING.K * 0.6 };
+  for (let i = 0; i < 3; i += 1) StepGame(stWeak, { ...idle(), pointerHeld: true, pointerWorld: weak }, DT);
+  StepGame(stWeak, idle(), DT);
+  Fly(stWeak);
+  assert.ok(!stWeak.flags.elmDown, "只拽六成劲不该打中——劲不用调就不叫玩法");
+  assert.ok(/拽得再满/.test(stWeak.toast?.text || ""),
+    `没够着要说"再拽满些"，实测提示是：${stWeak.toast?.text}`);
+
+  // ⑤ 角度不对也不行：劲一样，但压成平抛，石子必须从树冠底下擦过去
+  const stFlat = Setup();
+  StepGame(stFlat, { ...idle(), pointerHeld: true, pointerWorld: { x: hx, y: hy } }, DT);
+  const speed = Math.hypot(sol.vx, sol.vy);
+  const flat = { x: hx + speed * Math.cos(0.12) / SLING.K, y: hy - speed * Math.sin(0.12) / SLING.K };
+  for (let i = 0; i < 3; i += 1) StepGame(stFlat, { ...idle(), pointerHeld: true, pointerWorld: flat }, DT);
+  StepGame(stFlat, idle(), DT);
+  assert.ok(stFlat.thrown, "压平了照样得出手（只是打不中）");
+  Fly(stFlat);
+  assert.ok(!stFlat.flags.elmDown, "同样的劲、平着甩出去不该打中——角度不用调就不叫玩法");
+
+  // ⑥ 按键路径必须真的没了：手里攥着石子，按 F 按 E 都不许飞出去一颗
+  const stKey = Setup();
+  for (let i = 0; i < 6; i += 1) StepGame(stKey, { ...idle(), throw: true, interact: true }, DT);
+  assert.ok(!stKey.thrown && !stKey.flags.elmDown,
+    "投掷不许再有按键后备——按一下就必中的那版是被明令删掉的");
+  assert.ok(!/F\b/.test(stKey.prompt || ""), `提示里不许再出现 F 键：${stKey.prompt}`);
+  assert.equal(stKey.gesture?.kind, "slingBack", "手里攥着石子时得给出「往后拽」的手势提示");
+  assert.equal(stKey.player.pose, "throwWind", "手里攥着石子就该摆出架势——画面得先说他随时能扔");
+
+  // ⑦ 判定圈钉在**画出来的那只手**上：渲染层每帧回填 state.handAt（HandPoint），
+  //    Core 就得用它。第一章的柱子垂手拎石子的手在 0.47m，照写死的 1.1m 判定
+  //    等于让玩家在空气里按——这条是 2026-08-10 在真浏览器里量出来的
+  const stHand = Setup();
+  stHand.handAt = { x: stHand.player.x - 0.2, y: SURFACE_Y + 0.47 };
+  StepGame(stHand, { ...idle(), pointerHeld: true, pointerWorld: { x: stHand.player.x - 0.2, y: SURFACE_Y + 1.6 } }, DT);
+  assert.ok(!stHand.sling, "手在 0.47m 的时候，按在 1.6m 的空气里不该攥住");
+  StepGame(stHand, idle(), DT);
+  StepGame(stHand, { ...idle(), pointerHeld: true, pointerWorld: { ...stHand.handAt } }, DT);
+  assert.ok(stHand.sling, "按在渲染层回填的真挂点上必须攥得住");
+  assert.ok(Math.abs(stHand.sling.hy - stHand.handAt.y) < 1e-6,
+    "拽的原点就是那只手本身，不是写死的估算高度");
+  console.log("  ✓ 投石：判定钉在真手上 / 劲和角度都得自己调 / 失败说得清差在哪 / 没有按键后备 / 妹妹接着乐");
+}
+
+// 打榆钱这一步得先有由头，不能一上来就把靶子拍脸上：
+// 得先看见妹妹够不着（一个人干不成），再听见这一树榆钱顶什么用（分量），
+// 最后才是那句请求。缺哪一样，玩家都只是在给一个不认识的人做一道题。
+function TestElmSetupIsMotivated() {
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
+  const talk = cloth.steps[0];
+  assert.equal(talk.type, "talk", "打榆钱之前的第一步必须是妹妹开口");
+  assert.equal(talk.actor, "sister", "开口的得是妹妹本人");
+  const said = talk.lines.filter((l) => l.say);
+  assert.ok(said.length >= 3, "一句话交代不完「谁 + 为什么 + 求你」，至少三句");
+  const all = said.map((l) => `${l.who}:${l.say}`).join("|");
+  assert.ok(said.every((l) => l.who === "妹妹"), "这几句都该由妹妹说，不能变成旁白");
+  assert.ok(/哥/.test(all), "她得叫他一声哥——「这是妹妹」要靠戏里的人说出来");
+  assert.ok(/够不着|蹦/.test(all), "得先摆出「她一个人干不成」这件事");
+  assert.ok(/粮|糜子|顶/.test(all), "得交代这一树榆钱顶什么用，不然打它干什么");
+  assert.ok(/你打|我捡/.test(all), "最后才是那句请求");
+  const throwStep = cloth.steps.find((x) => x.type === "throwHit");
+  assert.ok(cloth.steps.indexOf(talk) < cloth.steps.indexOf(throwStep), "请求必须排在投石之前");
+  assert.ok(!/F/.test(throwStep.prompt || ""), "投石的提示里不许再有 F 键");
+  console.log("  ✓ 打榆钱先有由头：够不着 → 顶十天口粮 → 你打我捡，然后才轮到玩家动手");
 }
 
 // 拉绳定向的那根绳必须是**真的一根绳**，不是两点之间一根棍。
@@ -1968,19 +2281,23 @@ function TestRopeLineIsRealRope() {
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
 TestSlingThrow();
+TestElmSetupIsMotivated();
 TestWorkStations();
 TestVaultC1();
 TestRaidColumn();
 TestConvoyKeepsFormation();
 TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
+TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
+TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();
 TestInstrumentalBgmManifest();
 TestDoorHoldIsPhysical();

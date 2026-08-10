@@ -345,7 +345,6 @@ body.touchDevice #touchControls.gone { display: none; }
 #touchControls #btnAct { width: 76px; height: 76px; font-size: 24px; background: rgba(232, 193, 90, 0.24); }
 #touchControls #btnCrouch { font-size: 17px; }
 /* 投掷键只在手里真有能扔的东西时冒出来——平时右手就两个键 */
-#touchControls #btnThrow { font-size: 19px; letter-spacing: 0.05em; }
 #touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
 /* 操作键图标与右上角设置钮同一套线描：stroke 走 currentColor，
    按下时随按钮的 color 一起翻成墨色，不用再滤镜换色 */
@@ -441,10 +440,13 @@ body.touchDevice #touchControls.gone { display: none; }
   border: 1px solid rgba(154, 143, 122, 0.4);
   padding: 22px;
 }
+/* 告示是**抠掉白底**的一张纸（不是一块图版）：所以没有边框——给纸加边框，
+   等于把撕出来的毛边又装回一个方框里。落影贴着纸的真实轮廓走，靠的是
+   drop-shadow（读 alpha）而不是 box-shadow（只认盒子） */
 #noticeImg {
   width: 42%; align-self: flex-start;
   max-height: 100%; object-fit: contain;
-  border: 1px solid rgba(0, 0, 0, 0.45);
+  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.55));
 }
 #noticeText {
   width: 58%; overflow-y: auto; padding-right: 6px;
@@ -463,7 +465,11 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
 @media (max-width: 700px), (orientation: portrait) {
-  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; }
+  /* 竖屏是上图下文，图必须让出下半屏给正文。height 是**必须**的：
+     子元素的 max-height:38% 要有一个确定的父高度才解析得出来，只写
+     max-height:88% 的话父高是 auto，那 38% 等于没写——图照旧长到自然高度，
+     正文被挤到只剩两三行（抠图后纸不再有白边，长得更满，这条就更明显了） */
+  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; height: 88%; }
   #noticeImg { width: auto; max-width: 100%; max-height: 38%; align-self: center; }
   #noticeText { width: auto; flex: 1; min-height: 0; }
 }
@@ -776,6 +782,17 @@ body.touchDevice #touchControls.gone { display: none; }
 @keyframes gCircleCcw {
   0% { transform: rotate(360deg) translateX(14px); }
   100% { transform: rotate(0deg) translateX(14px); }
+}
+/* 投石：往后下方拽开蓄劲，松手弹回去——图标演的就是拇指要走的那一趟。
+   拽的方向定角度、拽的长短定劲，所以这枚图标是斜着走的，不是上下走的 */
+#gestureHint[data-kind="slingBack"] .gDot { animation: gSlingBack 1.6s ease-in-out infinite; }
+@keyframes gSlingBack {
+  0% { transform: translate(5px, -3px); opacity: 0.2; }
+  14% { opacity: 1; }
+  46% { transform: translate(-11px, 9px); opacity: 1; }
+  62% { transform: translate(-11px, 9px); opacity: 1; }
+  78% { transform: translate(13px, -9px); opacity: 0.95; }
+  100% { transform: translate(13px, -9px); opacity: 0; }
 }
 #gestureHint[data-kind="tap"] .gDot { animation: gTap 0.9s ease-in-out infinite; }
 @keyframes gTap {
