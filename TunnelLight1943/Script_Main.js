@@ -98,7 +98,7 @@ for (const id of [
   "endTitle", "endText",
   "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
+  "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
@@ -139,7 +139,7 @@ let inputMode = (window.matchMedia?.("(pointer: coarse)").matches || "ontouchsta
   ? "touch" : "key";
 // 摇杆状态：moveX/climb 是给玩法层的数字量（Core 只取符号），nx/ny 供旋钮显示
 const stick = { active: false, id: null, moveX: 0, climb: 0, cx: 0, cy: 0, r: 60 };
-let interactEdge = false, advanceEdge = false, crouchToggle = false, throwEdge = false;
+let interactEdge = false, advanceEdge = false, crouchToggle = false;
 
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
@@ -147,7 +147,9 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys.add(k);
   if (k === "e") { interactEdge = true; advanceEdge = true; }
-  if (k === "f") { throwEdge = true; advanceEdge = true; }   // F 专职投掷（手里有石子才有用）
+  // F 曾经专职投掷。投掷改成了「攥住石子往后拽」，没有按键路径了——键留着推台词，
+  // 但绝不能再让 HUD 上出现一颗 F：按了没反应的键比没有更糟
+  if (k === "f") advanceEdge = true;
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
@@ -234,7 +236,6 @@ function BindTouchButton(el, prop, { edge = false } = {}) {
     if (edge) {
       if (prop === "act") { interactEdge = true; advanceEdge = true; touch.act = true; }
       else if (prop === "crouch") crouchToggle = !crouchToggle;
-      else if (prop === "throw") throwEdge = true;
     } else touch[prop] = true;
     el.classList.add("pressed");
   };
@@ -320,7 +321,7 @@ function SetupTouch() {
   SetupStick();
   BindTouchButton(document.getElementById("btnAct"), "act", { edge: true });
   BindTouchButton(document.getElementById("btnCrouch"), "crouch", { edge: true });
-  BindTouchButton(document.getElementById("btnThrow"), "throw", { edge: true });
+  // 这儿曾经有一颗投掷钮。扔石子改成了直接在屏幕上拖，钮和 F 键一起撤了
   const isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
   if (isTouch) document.body.classList.add("touchDevice");
 }
@@ -492,7 +493,7 @@ function UpdateCamera(state, dt) {
     cam.hw += (shot.hw - cam.hw) * k;
   }
   const view = world.ApplyCamera(cam.x, cam.y, cam.hw);
-  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist);
+  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist, dt);
   return shot.fade || 0;
 }
 
@@ -555,14 +556,12 @@ function HideChoice() {
 // 键盘玩家看到键帽，手指玩家看到的就是右下角那几个钮的同一套线描图形。
 // 徽章浮在柱子头顶上，而不是钉在屏幕底边——按哪个键、对着什么按，一眼都在。
 // ---------------------------------------------------------------------------
-const KEY_GLYPH = { interact: "E", throw: "F", crouch: "C", up: "W", down: "S" };
+const KEY_GLYPH = { interact: "E", crouch: "C", up: "W", down: "S" };
 // 触屏图形与 index.html 里那三个钮逐笔一致，玩家不用在两套语汇之间翻译；
 // 爬梯的上下是摇杆——画成盘子里的一支箭
 const TOUCH_GLYPH = {
   interact: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 12.2V7.4M11.4 11.6V6.2M14.6 12.2V7.4"/>'
     + '<path d="M8.2 12.2v1.5c0 3 1.8 5 4.3 5s4.3-2 4.3-5V9.6"/><path d="M8.2 13.4l-2.4-2.2"/></svg>',
-  throw: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle class="solid" cx="5.2" cy="16.4" r="1.5"/>'
-    + '<path d="M6.8 14.6C9.4 8.6 14 6.4 19 8.8"/><path d="M19 8.8l-3.2-.2M19 8.8l-1-3"/></svg>',
   crouch: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6.6" r="2.2"/>'
     + '<path d="M10.6 8.9c2.6 1 4.1 2.6 4.3 5.2l-3.5 3.3.4 3.2"/><path d="M12.4 11.6l-3.4 2.6 1 3.4"/></svg>',
   up: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
@@ -737,8 +736,9 @@ function SyncHud(state, dt, shotFade) {
       itemTagShown = tagFp;
       ui.itemName.textContent = item ? item.label : "";
       if (ui.itemThrow) {
+        // 能扔的东西不再挂键帽：扔是「攥住往后拽」，提示在中央那条 prompt
+        // 和 gestureHint 的小图标里（KeyChipHtml("throw") 已随 F 键一起删掉）
         const chips = [];
-        if (item?.throwable) chips.push(KeyChipHtml("throw"));
         if (state.canDrop) chips.push(KeyChipHtml("interact"));
         ui.itemThrow.hidden = chips.length === 0;
         ui.itemThrow.innerHTML = chips.join("");
@@ -763,8 +763,6 @@ function SyncHud(state, dt, shotFade) {
       ui.staminaBar.classList.toggle("out", !!sm.out);
     }
   }
-  // 触屏的投掷键：手里真有能扔的东西才冒出来
-  if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
   // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider，两次退回）：
   // 划线攥的是特写卡上那支笔，刨料攥的是世界里那把刨子——进度长在木头上
@@ -1117,7 +1115,6 @@ function RunFrame(now, dt) {
       crouch: crouchToggle,
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
-      throw: throwEdge,
       // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
       // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
       // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
@@ -1150,7 +1147,6 @@ function RunFrame(now, dt) {
   world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
   interactEdge = false;
   advanceEdge = false;
-  throwEdge = false;
   tapEdge = false;
 }
 

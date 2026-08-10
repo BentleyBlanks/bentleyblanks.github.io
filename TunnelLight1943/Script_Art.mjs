@@ -483,6 +483,15 @@ export function DrawCharacter(ctx, spec) {
 
   // 头饰
   if (kind === "soldier" || kind === "officer") {
+    // 日军兵的帽垂（军官戴大盖帽，没有这片布）——与骨架头部同一个语汇
+    if (kind === "soldier") {
+      InkFill(ctx, [
+        [-6.4 * S, headY - 5.0 * S], [-1.6 * S, headY - 4.6 * S],
+        [-2.0 * S, headY - 0.4 * S], [-3.0 * S, headY + 1.5 * S],
+        [-4.4 * S, headY - 0.2 * S], [-5.8 * S, headY + 1.7 * S],
+        [-7.0 * S, headY + 0.1 * S], [-7.8 * S, headY - 3.8 * S],
+      ], id + "flap", "#494327", { amp: 0.5 * S, lw: lw * 0.85, shade: "rgba(0,0,0,0.2)", shadeAt: 0.5 });
+    }
     InkFill(ctx, [
       [-6.4 * S, headY - 5.6 * S], [4.2 * S, headY - 8.2 * S], [7.4 * S, headY - 5.2 * S], [-6.0 * S, headY - 3.4 * S],
     ], id + "cap", "#5f5a30", { amp: 0.5 * S, lw: lw * 0.9 });
@@ -541,6 +550,138 @@ export const RIG_COLOR = (kind) => (kind === "father"
   ? [PAL.father, "#54402f"]
   : (KIND_COLOR[kind] || KIND_COLOR.villager));
 
+// ---------------------------------------------------------------------------
+// 军装（1942-43 华北）：三种兵的**剪影**必须一眼分得开
+//
+// 这套语汇沿用 TunnelBell1942 立过的人物规范（那边是 3D，这边是侧视手绘，
+// 标志物一一对应）——用户的原话是「完全看不出来是日军」，根因就是三种人
+// 只差一顶帽子的形状，衣服一个色系、腿脚一模一样：
+//   日军  战斗帽 + **帽垂**（脑后垂布。侧视里最硬的一个标志，中国观众一眼认得）
+//         立领 + 武装带 + 前腰两个弹药盒、**绑腿** + 短军靴
+//   军官  大盖帽（硬檐）+ 深墨绿将校呢 + **马靴**（不打绑腿）+ 胯后挑一柄军刀
+//   伪军  软布帽（既不是战斗帽也不是大盖帽）、**没有帽垂**、胯后一只挎包，
+//         裤脚布鞋跟村民一样——剪影**卡在日军与村民中间**，这是他的人物设定，
+//         不是偷懒（同 TunnelBell：他是本乡人，不做丑角）
+// ---------------------------------------------------------------------------
+export const UNIFORM = {
+  soldier: { capFlap: true, puttee: true, pouches: true, collar: true },
+  officer: { ridingBoot: true, sabre: true, collar: true, sam: true },
+  puppet: { satchel: true },
+};
+
+// 小腿与脚：原来全场写死一副农民的土布裤脚 + 黑布鞋，当兵的也穿着它——
+// 「看不出是日军」有一半出在这儿。按兵种分开取
+const LEG = {
+  soldier: { shinB: "#7b7346", shinF: "#8c8353", footB: "#332c1c", footF: "#3d3524" },
+  officer: { shinB: "#2c2b1f", shinF: "#363426", footB: "#221f16", footF: "#2b2820" },
+  puppet: { shinB: "#6a5a44", shinF: "#7b6a50", footB: "#3a2f22", footF: "#463829" },
+};
+export function RIG_LEG(kind) {
+  return LEG[kind] || { shinB: "#6b5540", shinF: "#7d6349", footB: "#43331f", footF: "#4d3a28" };
+}
+
+// 小腿：农民是土布裤脚，日军是绑腿（一圈圈缠到膝下），军官是马靴
+export function DrawShinPart(ctx, px, py, len, w0, w1, kind, id, { k = 1, back = false } = {}) {
+  const leg = RIG_LEG(kind);
+  DrawLimb(ctx, px, py, len, w0, w1, back ? leg.shinB : leg.shinF, id, { k });
+  const u = UNIFORM[kind];
+  if (u?.puttee) {
+    for (let i = 0; i < 5; i += 1) {
+      const t = 0.08 + i * 0.19;
+      const w = w0 + (w1 - w0) * t;
+      // 缠的方向是斜的：一圈压着一圈往上走，平行横线看着像穿了条袜子
+      InkLine(ctx, px - w * 0.54, py + len * t, px + w * 0.54, py + len * (t - 0.055),
+        id + "wrap" + i, { lw: 2.1 * k, color: "rgba(40,32,18,0.40)", amp: 0.7 * k });
+    }
+  } else if (u?.ridingBoot) {
+    // 靴口那道折边：马靴与绑腿的分界就靠它（军官不打绑腿）
+    InkLine(ctx, px - w0 * 0.58, py + len * 0.05, px + w0 * 0.58, py + len * 0.01,
+      id + "cuff", { lw: 3 * k, color: "rgba(18,16,10,0.6)", amp: 0.8 * k });
+  }
+}
+
+// 军装的零碎：武装带、弹药盒、立领、挎包、军刀。躯干贴图上这几笔小东西
+// 才是三米外读得出"当兵的"的地方——衣服颜色在雾里全都差不多
+function DrawUniformKit(ctx, px, py, w, h, kind, id, k) {
+  const u = UNIFORM[kind];
+  if (!u) return;
+  const ink = (a) => `rgba(28,22,12,${a})`;
+  if (u.collar) {
+    // 立领：军装竖着的那圈硬领，配一小片领章（农民的对襟褂没有领子）
+    InkFill(ctx, [
+      [px - w * 0.26, py - h * 1.02], [px + w * 0.22, py - h * 1.02],
+      [px + w * 0.26, py - h * 0.86], [px - w * 0.28, py - h * 0.86],
+    ], id + "collar", "#4e4a2b", { amp: 1 * k, lw: 3 * k });
+    InkFill(ctx, [
+      [px + w * 0.04, py - h * 1.00], [px + w * 0.24, py - h * 0.98],
+      [px + w * 0.24, py - h * 0.90], [px + w * 0.04, py - h * 0.90],
+    ], id + "tab", "#8f3b2e", { amp: 0.6 * k, lw: 2 * k });
+  }
+  if (u.pouches || u.sam) {
+    // 武装带：比农民那根布腰带宽一倍、深一档，还有个铜扣
+    InkFill(ctx, [
+      [px - w * 0.40, py - h * 0.30], [px + w * 0.38, py - h * 0.32],
+      [px + w * 0.38, py - h * 0.18], [px - w * 0.40, py - h * 0.16],
+    ], id + "belt", "#3d3020", { amp: 0.9 * k, lw: 2.6 * k });
+    InkFill(ctx, [
+      [px + w * 0.24, py - h * 0.31], [px + w * 0.38, py - h * 0.32],
+      [px + w * 0.38, py - h * 0.19], [px + w * 0.24, py - h * 0.18],
+    ], id + "buckle", "#9c8c5a", { amp: 0.5 * k, lw: 1.8 * k });
+  }
+  if (u.pouches) {
+    // 前腰两个弹药盒（侧视只露得出靠镜头这一只半）+ 背带斜挂上肩
+    InkFill(ctx, [
+      [px + w * 0.10, py - h * 0.30], [px + w * 0.36, py - h * 0.31],
+      [px + w * 0.36, py - h * 0.06], [px + w * 0.10, py - h * 0.05],
+    ], id + "pouch", "#514027", { amp: 0.8 * k, lw: 2.4 * k, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px + w * 0.30, py - h * 0.32, px - w * 0.10, py - h * 0.96,
+      id + "strap", { lw: 3.4 * k, color: ink(0.55), amp: 1.2 * k });
+  }
+  if (u.sam) {
+    // 军官是斜挎的武装带（Sam Browne），肩上那条从右肩斜到左胯
+    InkLine(ctx, px + w * 0.26, py - h * 0.30, px - w * 0.16, py - h * 0.94,
+      id + "sam", { lw: 3.6 * k, color: ink(0.6), amp: 1.1 * k });
+  }
+  if (u.sabre) {
+    // 胯后挑着的军刀：刀鞘斜指后下方。侧视里它是军官唯一一个"带兵器"的记号
+    InkLine(ctx, px - w * 0.30, py - h * 0.26, px - w * 0.86, py + h * 0.06,
+      id + "sabre", { lw: 4.2 * k, color: "#2a2820", amp: 0.8 * k });
+    InkLine(ctx, px - w * 0.78, py + h * 0.02, px - w * 0.92, py + h * 0.09,
+      id + "sabreTip", { lw: 3 * k, color: "#8d8a7a", amp: 0.6 * k });
+  }
+  if (u.satchel) {
+    // 伪军：胯后一只挎包（他没有长枪，靠这只包和软帽跟日军分开）
+    InkFill(ctx, [
+      [px - w * 0.62, py - h * 0.34], [px - w * 0.28, py - h * 0.32],
+      [px - w * 0.26, py - h * 0.02], [px - w * 0.64, py - h * 0.04],
+    ], id + "satchel", "#5d5442", { amp: 1 * k, lw: 2.6 * k, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px - w * 0.44, py - h * 0.34, px + w * 0.06, py - h * 0.94,
+      id + "satStrap", { lw: 3 * k, color: ink(0.5), amp: 1.2 * k });
+  }
+}
+
+// 帽垂（军帽垂布）：脑后垂下的三片布，盖住后颈。**侧视里认日军最硬的一个
+// 标志**——伪军和村民都没有这东西。画在帽子之前，让帽檐压住它的上沿。
+// r 是头半径；ax 朝 -x 是脑后（贴图一律朝 +x 画，翻面由渲染层负责）
+function DrawCapFlap(ctx, px, py, r, id, k) {
+  // 布色要**比帽子深一档**。走过两次弯路：先用军帽同色（帽子、垂布、肩膀
+  // 糊成一坨），改成晒白的浅布又更糟——这套白盒的 CanvasTexture 没声明 sRGB，
+  // 全场颜色被提亮两档，浅布渲出来跟土墙一个亮度，照样等于没画。
+  // 所以按仓库那条老规矩：配色往下压两档，深的才立得住（两版都是页内实拍看出来的）。
+  // 下沿是**三片布尖**（缺口咬进去）——「屁帘」的形状全在这条锯齿上
+  InkFill(ctx, [
+    [px - r * 1.12, py - r * 1.06],   // 后上角（压在帽墙下）
+    [px - r * 0.30, py - r * 1.00],   // 前上角（耳后）
+    [px - r * 0.38, py - r * 0.22],   // 前缘垂到耳下
+    [px - r * 0.52, py + r * 0.06],   // 第一片布尖（垂过后颈，盖到领子上）
+    [px - r * 0.70, py - r * 0.18],   // 缺口
+    [px - r * 0.90, py + r * 0.10],   // 第二片布尖
+    [px - r * 1.08, py - r * 0.16],   // 缺口
+    [px - r * 1.28, py + r * 0.12],   // 第三片布尖
+    [px - r * 1.36, py - r * 0.82],   // 后缘收回帽墙
+  ], id + "flap", "#494327", { amp: 1 * k, lw: 3.2 * k, shade: "rgba(0,0,0,0.22)", shadeAt: 0.5 });
+}
+
 // 锥形肢体：从枢轴向下延伸 len，上宽 w0 下宽 w1
 export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4, k = 1 } = {}) {
   InkFill(ctx, [
@@ -588,6 +729,8 @@ export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
     InkLine(ctx, px - w * 0.22 + i * w * 0.16, py - h * 0.60, px - w * 0.18 + i * w * 0.16, py - h * 0.22,
       id + "fold" + i, { lw: 2 * k, color: "rgba(43,31,22,0.3)", amp: 2 * k });
   }
+  // 当兵的还要挂一身零碎（武装带/弹药盒/立领/挎包/军刀）
+  DrawUniformKit(ctx, px, py, w, h, kind, id, k);
 }
 
 // 头：枢轴在脖根（底边中点）
@@ -621,6 +764,8 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
 
   // 头饰
   if (kind === "soldier") {
+    // 先画帽垂，帽子压住它的上沿——这一片布是"日军"两个字在侧视里的全部
+    DrawCapFlap(ctx, px, py, r, id, k);
     InkFill(ctx, [
       [px - r * 1.02, py - r * 1.18], [px + r * 0.56, py - r * 1.82],
       [px + r * 1.06, py - r * 1.16], [px - r * 0.98, py - r * 0.82],
@@ -829,7 +974,7 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
       [-R * 1.02, -R * 1.02], [-R * 1.46, -R * 0.52], [-R * 1.18, -R * 0.34], [-R * 0.94, -R * 0.78],
     ], id + "towelTail", "#6e6759", { amp: 2.0 * S, lw: 0, line: null });
   } else if (kind === "sister") {
-    for (let k = 0; k < 3; k += 1) {
+    for (let k = 0; k < 5; k += 1) {
       ctx.beginPath();
       ctx.arc(-R * 1.02 - k * R * 0.04, -R * 0.30 + k * R * 0.40, R * 0.22, 0, Math.PI * 2);
       ctx.fillStyle = hair;
@@ -1202,7 +1347,8 @@ export function DrawHomeInterior(ctx, x, groundY, w, h, id, { night = false } = 
     { lw: 1.2, color: "rgba(70,50,30,0.7)" });
 }
 
-export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = false, door = false } = {}) {
+export function DrawHouse(ctx, x, groundY, w, h, id,
+  { burnt = false, night = false, door = false, slogan = null } = {}) {
   const W = w, H = h;
   if (burnt) {
     // 烧过的土坯房：**土坯不燃，火只吃木头和草**——所以四堵墙基本还立着、
@@ -1506,6 +1652,11 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
   ctx.fillStyle = wStain;
   ctx.fillRect(wx0 + 4, wy0 + wh, ww - 8, 26);
   ctx.restore();
+  // 石灰标语：刷在檐下那一片整墙上（门窗以上，人够得着的最高一带）
+  if (slogan) {
+    const size = Math.min(30, W * 0.60 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, x, groundY - H * 0.72, slogan.text, size, id + "sl", slogan);
+  }
 }
 
 export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false } = {}) {
@@ -1523,6 +1674,15 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   // **必须等玩家真的划完才出现**（marked）——它以前是无条件画的，于是那一拍
   // 玩家攥着笔去划一条已经在木头上的线，整个交互当场失去意义。
   // 粗细跟玩家划出来的那道对齐（1.8px≈3.7cm），否则划完一瞬间线会突然变胖。
+  // 去年的刻痕：**无条件画**——量身高那场戏的铺垫全指着它（爹收完家伙
+  // 一抬眼撞见的就是这道）。风吹日晒一年，只剩一道发暗的凹槽；跟今年石笔
+  // 划出来的亮线一对比，「长了多少」不用一个字。57px≈1.19m，比今年矮 9cm
+  // 凿槽的画法：一道暗槽 + 槽下沿一线亮茬（新茬被晒旧后仍比木面浅）——
+  // 单画一根半透明细线在晨雾里读不出来（实测过）
+  InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
+    id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
+  InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
+    id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
   if (marked) {
     InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
@@ -2098,7 +2258,75 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
 // **两段墙不许一样高、顶边不许在同一条水平线上**——1943 年冀中的院墙很多
 // 已经拆了半截或塌了口；压顶草是一根根的草秆不是一根深色横条；柴门要透光
 //（实心填充读成木板门，那是像样人家）。
-export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
+// 墙上的标语：宣抚班拿石灰水刷的大字。
+//
+// 三条史实规矩，配错就是年代穿帮：
+//   ① **横写自右向左**——1942 年没有横排左起（那是 1955-56 年以后的事）。
+//      所以字要倒着码：第一个字在最右边。
+//   ② **繁体**。简化字方案是 1956 年的。
+//   ③ **是刷的不是印的**：石灰水调得稀，笔画边缘发毛、往下淌，刷子提按不匀，
+//      墙面的坑洼会吃掉一块笔画。所以不能用整齐的 fillText 了事。
+//
+// ghost=true 是被白灰盖过的旧标语（抗日的口号被宣抚班刷掉）——只剩透出来的
+// 影子。这一笔比标语本身更说明问题：墙面上压着两层字，谁来过都写在上头。
+export function DrawWallSlogan(ctx, x, y, chars, size, id, { ghost = false, tone = "lime" } = {}) {
+  const n = chars.length;
+  const gap = size * 1.22;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (ghost) {
+    // 盖上去的白灰：一块刷得不匀的浅色斑，边缘是刷痕不是直边
+    const bw = gap * n + size * 0.7, bh = size * 1.5;
+    InkFill(ctx, RaggedTop(x - bw / 2, x + bw / 2, y - bh / 2, id + "wash", { sag: 3, n: 9 })
+      .concat([[x + bw / 2, y + bh / 2], [x - bw / 2, y + bh / 2]]),
+    id + "washF", "#c3b294", { amp: 2.0, lw: 0, line: null });
+  }
+  for (let i = 0; i < n; i += 1) {
+    // 倒着码：i=0 那个字落在最右边
+    const cx = x + (n - 1) / 2 * gap - i * gap;
+    const jx = Sym(id + "jx", i, size * 0.055);
+    const jy = Sym(id + "jy", i, size * 0.05);
+    ctx.font = `700 ${size}px 'Noto Serif SC', serif`;
+    if (ghost) {
+      // 透出来的旧字：比白灰略深一点点，糊，不成形
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = "#6d5f4a";
+      ctx.filter = "blur(1.1px)";
+      ctx.fillText(chars[i], x + (n - 1) / 2 * gap - i * gap + jx, y + jy);
+      ctx.filter = "none";
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    // 石灰水：先一层稀的往下洇，再压一遍笔画
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = tone === "ink" ? "#3a2f22" : "#d9cdb0";
+    ctx.fillText(chars[i], cx + jx, y + jy + size * 0.07);
+    ctx.globalAlpha = tone === "ink" ? 0.72 : 0.52;
+    ctx.fillText(chars[i], cx + jx, y + jy);
+    ctx.globalAlpha = 1;
+    // 墙面坑洼吃掉的缺口：抠掉两三小块，字才像刷在土墙上而不是贴上去的
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    for (let k = 0; k < 5; k += 1) {
+      const px = cx + Sym(id + "gx" + i, k, size * 0.36);
+      const py = y + Sym(id + "gy" + i, k, size * 0.36);
+      const r = size * (0.06 + Rnd(id + "gr" + i, k) * 0.13);
+      ctx.globalAlpha = 0.5 + Rnd(id + "ga" + i, k) * 0.4;
+      ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // 往下淌的两道流痕（石灰水调稀了必淌）
+    if (Rnd(id + "drip", i) > 0.45) {
+      InkLine(ctx, cx + jx - size * 0.16, y + size * 0.34,
+        cx + jx - size * 0.16, y + size * (0.5 + Rnd(id + "dl", i) * 0.55),
+        id + "dp" + i, { lw: size * 0.045, color: "rgba(239,230,210,0.45)", amp: 0.6 });
+    }
+  }
+  ctx.restore();
+}
+
+export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = null } = {}) {
   const gw = gate ? 34 : 0;
   const seg = (x0, x1, H, notch) => {
     const top = RaggedTop(x0, x1, groundY - H, id + "t" + x0, { sag: 4, n: 8 });
@@ -2143,6 +2371,13 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
         id + "gh" + i, { lw: 1.6, color: "#5c4830", amp: 1.4 });
     }
     InkLine(ctx, x - gw / 2 + 2, groundY - 56, x - gw / 2 + 2, groundY, id + "hinge", { lw: 2.2, color: IN.ink });
+  }
+  // 石灰标语刷在门那一侧的整墙上（有门的话左半堵最长，字才排得开）
+  if (slogan) {
+    const segX = gate ? (x - w / 2 + (x - gw / 2)) / 2 : x;
+    const segW = gate ? (x - gw / 2) - (x - w / 2) : w;
+    const size = Math.min(26, segW * 0.72 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, segX, groundY - 40, slogan.text, size, id + "sl", slogan);
   }
 }
 
@@ -3509,8 +3744,9 @@ export function DrawNoticeWall(ctx, x, groundY, w, id) {
     ctx.restore();
   }
   // 最新那张是征夫告示：标题四个字真的写出来（设计文档：玩家先在实景里
-  // 看见「征夫告示」四个大字和暗红印章，才谈得上想不想停下看）。
-  // 竖排在纸右沿，字号顶着纸宽；左下一点暗红当印
+  // 看见那四个大字和暗红印章，才谈得上想不想停下看）。
+  // **繁体**「徵夫告示」：1942 年的公文只可能是繁体，而且「征召」的征写作徵
+  //（简化字方案是 1956 年的事）。竖排在纸右沿——那时候没有横排左起。
   {
     const p = posters[1];
     ctx.save();
@@ -3518,7 +3754,7 @@ export function DrawNoticeWall(ctx, x, groundY, w, id) {
     ctx.font = "600 7px 'Noto Serif SC', serif";
     ctx.textAlign = "center";
     const tx = p.px + p.pw / 2 - 5.5;
-    for (let k = 0; k < 4; k += 1) ctx.fillText("征夫告示"[k], tx, p.py + 9.5 + k * 7.2);
+    for (let k = 0; k < 4; k += 1) ctx.fillText("徵夫告示"[k], tx, p.py + 9.5 + k * 7.2);
     ctx.fillStyle = "rgba(146, 44, 32, 0.55)";
     ctx.fillRect(p.px - p.pw / 2 + 3.5, p.py + p.ph - 8.5, 5, 5);
     ctx.restore();
@@ -4222,22 +4458,31 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
 }
 
 export function DrawShaft(ctx, x, topY, botY, id) {
-  // 竖井 + 一架看得清的木梯。
-  // 之前梯子只有半透明的一根杆和几道暗横档，玩家在画面上根本认不出"这儿能上下"，
-  // 所以改成两根立杆 + 高对比横档 + 井口一圈木沿，远看就是一架梯子。
-  InkFill(ctx, Rect(x - 17, topY, 34, botY - topY), id, PAL.tunnelAir, { amp: 1.4, lw: 2.4, line: "#3a2a1a" });
-  // 井口木沿：地面上认路的记号
-  InkFill(ctx, Rect(x - 21, topY - 5, 42, 7), id + "lip", "#8a6b45", { amp: 0.8, lw: 2 });
-  // 两根立杆
+  // 井口木沿 + 一架看得清的木梯。
+  //
+  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
+  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
+  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
+  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
+  //
+  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
+  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
+    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
+  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
+  const railTop = topY + 3;
   for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, topY + 2, 5.2, botY - topY - 4), id + "rail" + dx, "#9c7a4c",
+    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
       { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
   }
   // 横档：亮一档、暗一档，看着有厚度
-  for (let y = topY + 13; y < botY - 4; y += 15) {
+  for (let y = railTop + 11; y < botY - 3; y += 15) {
     InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
       { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
   }
+  // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
+  InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
 }
 
 export function DrawCollapsePile(ctx, x, botY, scale, id) {

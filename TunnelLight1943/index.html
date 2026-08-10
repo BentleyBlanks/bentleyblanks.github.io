@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=066">
+  <link rel="stylesheet" href="./Style_Game.css?v=075">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,18 +33,19 @@
         "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=066",
-        "./Script_World.js": "./Script_World.js?v=066",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=066",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=066",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=066",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=066",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=066",
-        "./Script_Audio.js": "./Script_Audio.js?v=066",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=066",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=066",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=066",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=066"
+        "./Script_Core.mjs": "./Script_Core.mjs?v=075",
+        "./Script_World.js": "./Script_World.js?v=075",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=075",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=075",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=075",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=075",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=075",
+        "./Script_Audio.js": "./Script_Audio.js?v=075",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=075",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=075",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=075",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=075",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=075"
       }
     }
   </script>
@@ -149,7 +150,9 @@
     <section id="noticeOverlay" hidden aria-label="征夫告示">
       <div id="noticePanel">
         <button id="noticeClose" type="button" aria-label="关闭">✕</button>
-        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.jpg" alt="贴在土墙上的征夫告示">
+        <!-- 抠好背景的成品（Script_TextureKey.py 从 Texture/Source/ 的白底原图生成）：
+             带 alpha 的 WebP，撕口的纸形直接落在面板上。别改回 Source 里那张白底 JPG -->
+        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=075" alt="贴在土墙上的征夫告示">
         <div id="noticeText"></div>
       </div>
     </section>
@@ -172,13 +175,9 @@
             <path d="M12.4 11.6l-3.4 2.6 1 3.4"/>
           </svg>
         </button>
-        <button id="btnThrow" type="button" aria-label="投掷" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="5.2" cy="16.4" r="1.5"/>
-            <path d="M6.8 14.6C9.4 8.6 14 6.4 19 8.8"/>
-            <path d="M19 8.8l-3.2-.2M19 8.8l-1-3"/>
-          </svg>
-        </button>
+        <!-- 投掷键已撤：扔石子是「攥住手里那颗往后拽开、松手出手」，
+             屏幕上直接拖就行，没有按一下就飞出去的路。留一颗按了没反应的钮
+             比没有更糟（同 F 键，见 Script_Main.js 的键盘分支） -->
         <button id="btnAct" type="button" aria-label="互动">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M8.2 12.2V7.4M11.4 11.6V6.2M14.6 12.2V7.4"/>
@@ -227,6 +226,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=066"></script>
+<script type="module" src="./Script_Main.js?v=075"></script>
 </body>
 </html>
