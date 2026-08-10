@@ -778,6 +778,12 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],
     ], id + "brim", "#4a461f", { amp: 1, lw: lw * 0.8 });
   } else if (kind === "officer") {
+    // 唇上的卫生胡（方块胡）：电视剧里的太君脸就靠这一撮认——画在帽子之前，
+    // 位置钉在鼻底与嘴线之间。色取深墨，别用纯黑（会读成嘴张着）
+    InkFill(ctx, [
+      [px + r * 0.60, py - r * 0.52], [px + r * 0.90, py - r * 0.50],
+      [px + r * 0.90, py - r * 0.40], [px + r * 0.60, py - r * 0.42],
+    ], id + "stache", "#241a12", { amp: 0.5 * k, lw: 1.6 * k });
     // 大檐帽：圆顶更高更方，帽墙一道深色，帽檐长而硬——士兵那顶软战斗帽
     // 是塌下去的斜面，两者的剪影在 6m 近景下一眼分得开
     InkFill(ctx, [
@@ -785,10 +791,17 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 0.62, py - r * 1.92], [px + r * 1.02, py - r * 1.30],
       [px + r * 1.06, py - r * 1.02], [px - r * 1.02, py - r * 0.96],
     ], id + "cap", "#4a4f34", { amp: 1.1 * k, lw: lw * 0.9 });
+    // 帽墙是**绯红**的（日军军帽的红帽墙，1938 年式以来的定色）。
+    // 按 sRGB 坑的老规矩把红压两档——上屏后正好是暗红一道，不跳
     InkFill(ctx, [
       [px - r * 1.04, py - r * 1.10], [px + r * 1.06, py - r * 1.14],
       [px + r * 1.06, py - r * 0.96], [px - r * 1.02, py - r * 0.92],
-    ], id + "band", "#2f3320", { amp: 0.8 * k, lw: lw * 0.7 });
+    ], id + "band", "#4e2018", { amp: 0.8 * k, lw: lw * 0.7 });
+    // 帽墙正面一粒星徽（哑金，别亮）
+    ctx.beginPath();
+    ctx.arc(px + r * 0.72, py - r * 1.02, r * 0.09, 0, Math.PI * 2);
+    ctx.fillStyle = "#8a7a3a";
+    ctx.fill();
     InkFill(ctx, [
       [px + r * 0.86, py - r * 1.06], [px + r * 1.92, py - r * 0.94],
       [px + r * 1.88, py - r * 0.66], [px + r * 0.86, py - r * 0.80],
@@ -1568,66 +1581,60 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
     ctx.fillRect(spoutX - 1, eaveY + 2, 6, H * 0.8);
     ctx.restore();
   }
-  // 屋顶上放着的碌碡：雨后要拿它把泥重新碾实，冀中平顶房的标配
-  {
-    const lx = x + W * 0.22;
-    InkFill(ctx, Rect(lx - 8, eaveY - rh - 5, 16, 6), id + "lulu", "#6b6252", { amp: 1.2, lw: 1.6 });
-    InkLine(ctx, lx - 10, eaveY - rh - 5, lx + 10, eaveY - rh - 5, id + "luluF",
-      { lw: 1.4, color: "#5a4a33", amp: 0.8 });
-  }
-  // 右后角塌一块：屋面凹进去，露出秫秸把的断头和一个黑洞
-  {
-    const bx = x + W * 0.30;
-    InkFill(ctx, [[bx, eaveY - rh * 0.9], [bx + 16, eaveY - rh * 0.55],
-      [bx + 14, eaveY - 1], [bx - 2, eaveY - 2]], id + "cave", "#3a3226", { amp: 1.8, lw: 1.6 });
-    for (let i = 0; i < 5; i += 1) {
-      ctx.save();
-      ctx.fillStyle = PAL.stalk;
-      ctx.beginPath();
-      ctx.ellipse(bx + 3 + i * 3, eaveY - rh * 0.4 + Sym(id + "st", i, 3), 1.6, 1.1, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-  // 檐口椽头：树棍不是方料——椭圆截面、间距不匀、缺两根、一根只剩朽茬
-  for (let i = 0, jx = x - rw / 2 + 12; jx < x + rw / 2 - 8; i += 1) {
-    if (Rnd(id + "rmiss", i) > 0.86) { jx += 26; continue; }
-    const rr = 2.2 + Rnd(id + "rr", i) * 2.4;
-    const rot = Rnd(id + "rot", i) > 0.9;
-    ctx.save();
-    ctx.fillStyle = rot ? "#57503f" : (i % 2 ? "#3a2c1b" : "#463521");
-    ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.ellipse(jx, eaveY + 3 + Sym(id + "rk", i, 1.4), rr, rr * 0.78, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    jx += 22 + Rnd(id + "rgap", i) * 12;
-  }
+  // 2026-08-10 用户退回整个屋顶：「你的楼顶画的是什么鬼 看都看不懂是什么玩意儿
+  // 实在不行这类鬼东西删了得了」。屋顶原来堆了四样东西——放着碾泥的碌碡、
+  // 塌角的黑洞、檐口一排椽头、烟道——每一样单看都有出处，可它们在**屋檐这条
+  // 三四像素高的线上**各占一块，读出来是"一条深色带上摆着几个不明方块，
+  // 底下串了一排珠子"。
+  // 判据照旧：**这件东西在这个尺寸下认得出来吗？** 认不出来的一律删掉，
+  // 屋顶只留两样真能读出来的东西——**烟囱**（唯一说明"这里头住着人、烧着火"
+  // 的记号）和**顶上长的草**（说明这是抹泥的平顶）。
   // 顶上长的草：泥顶年年长草，没人去薅
-  for (let i = 0; i < 6; i += 1) {
-    const wx = x - W * 0.36 + Rnd(id + "wd", i) * W * 0.74;
-    const wy = eaveY - rh * (0.4 + Rnd(id + "wd2", i) * 0.4);
+  for (let i = 0; i < 5; i += 1) {
+    const wx = x - W * 0.34 + Rnd(id + "wd", i) * W * 0.70;
+    const wy = eaveY - rh * (0.45 + Rnd(id + "wd2", i) * 0.35);
     for (let b = 0; b < 3; b += 1) {
-      InkLine(ctx, wx, wy, wx + (b - 1) * 3, wy - 5 - Rnd(id + "wd3", i * 3 + b) * 5,
+      InkLine(ctx, wx, wy, wx + (b - 1) * 3, wy - 4 - Rnd(id + "wd3", i * 3 + b) * 4,
         id + "weed" + i + b, { lw: 1, color: night ? "#333c31" : "#5d6440", amp: 1.1 });
     }
   }
-  // 烟道：穿屋面露出一截泥抹小墩，扣半截破罐挡雨，出口熏一片黑
+  // 烟囱：泥抹的小墩坐在屋面上，上头扣半截破瓦罐挡雨，罐口熏黑。
+  // **必须坐在屋脊线上、并且够高**（原先只有 13px 高、又压在檐口的一堆杂物
+  // 中间，看着像屋顶上放了个盒子）。烟囱高一截，剪影上才是"烟囱"。
   {
     const cx2 = x - W * 0.30;
-    InkFill(ctx, Rect(cx2 - 5, eaveY - rh - 13, 10, 13), id + "flue", "#6e6047", { amp: 1.4, lw: 1.6 });
-    InkFill(ctx, [[cx2 - 7, eaveY - rh - 13], [cx2 + 7, eaveY - rh - 13],
-      [cx2 + 5, eaveY - rh - 18], [cx2 - 5, eaveY - rh - 18]], id + "crock", "#4a3f33", { amp: 1.2, lw: 1.4 });
+    // 高矮宽窄按真物件给：泥墩 0.4m 见方、连罐口一共 0.55m 上下。
+    // 细长一根就成了工厂烟囱（画过一版 26px 高、14px 宽的，正是那样）
+    const stackTop = eaveY - rh - 17;
+    // 墩身：上窄下宽，坐进屋面里一点（底边压在屋面下方，不留缝）
+    InkFill(ctx, [[cx2 - 10, eaveY - rh + 4], [cx2 + 10, eaveY - rh + 4],
+      [cx2 + 8, stackTop], [cx2 - 8, stackTop]], id + "flue", "#6e6047",
+    { amp: 1.3, lw: 2.0, shade: "rgba(0,0,0,0.18)" });
+    // 扣着的破罐：罐口朝上敞着，侧面豁一块
+    InkFill(ctx, [[cx2 - 10, stackTop + 1], [cx2 + 10, stackTop + 1],
+      [cx2 + 8.5, stackTop - 7], [cx2 + 1, stackTop - 9], [cx2 - 8, stackTop - 6]],
+    id + "crock", "#4a3f33", { amp: 1.4, lw: 1.8 });
+    // 熏黑：罐口一圈最黑，往上散
     ctx.save();
-    ctx.globalAlpha = 0.30;
+    ctx.globalAlpha = 0.34;
     ctx.fillStyle = "#2b241c";
     ctx.beginPath();
-    ctx.ellipse(cx2 + 4, eaveY - rh - 10, 11, 5, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(cx2 + 1, stackTop - 8, 7, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.16;
+    ctx.beginPath();
+    ctx.ellipse(cx2 + 4, stackTop - 15, 9, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
+  // 檐口：一道压在墙头上的暗边。原先这儿是一排画成椭圆的椽头，
+  // 三四像素的圆点排一长溜，读出来是一串珠子——现在只留檐影，
+  // "屋顶挑出墙面一截"这件事由这条影子交代
+  ctx.save();
+  ctx.globalAlpha = 0.30;
+  ctx.fillStyle = "#2b2118";
+  ctx.fillRect(x - rw / 2 + 4, eaveY + 2, rw - 8, 4);
+  ctx.restore();
 
   // ⑨ 门：**按米写死**，不跟着 H 缩放（房子一矮门就压成一米五的洞）
   const SILL = 7;                       // 门槛 0.15m：土屋的门下必有这一条
@@ -1862,42 +1869,61 @@ export function DrawTree(ctx, x, groundY, id,
   //  · **树皮被整圈刮去吃掉**，刮到人踮脚够得着的高度（约 1.9m）戛然而止——
   //    那条分界线的高度本身就是这一笔的全部意思（stripped，给榆树）
   //  · 离地两三米以内的枝条年年砍去当柴，主干上只留一排砍平的枝桩截面
+  // 2026-08-10 用户退回：「这个树上面是什么鬼」——干上那块**发白的板子**。
+  // 两处硬伤，都是坐标算错，不是配色问题：
+  //   ① 剥皮区是拿 ±1.1×trunkW 的方框裁的，而**主干半宽只有 0.62×trunkW**
+  //      （`Limb` 收的是全宽），于是那块浅色比树干宽出将近一倍，两边直上直下
+  //      地支出去——读出来就是一块钉在树上的白木板。
+  //   ② 剥到 1.9m（91px）是按真事写的，可小树的分叉才在 0.95m 上，那块浅色
+  //      整个盖过分叉爬进树冠里。剥皮只发生在**主干**上，到分叉就该停。
+  // 颜色也只许比树皮亮一档：贴图上屏会被整体提亮（见 CanvasTexture 那条），
+  // 亮两档的 #a89678 上屏就是纸白。
+  const trunkAt = (k) => {
+    const kk = Math.max(0, Math.min(1, k));
+    return [x + (forkX - x) * kk, (groundY - 9) + (forkY - (groundY - 9)) * kk,
+      (trunkW * 1.25 + (trunkW * 0.72 - trunkW * 1.25) * kk) / 2];
+  };
   if (stripped) {
-    const cut = groundY - 91;                       // 1.9m：踮脚够得着的高度
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x - trunkW * 1.1, groundY - 9);
-    ctx.lineTo(x - trunkW * 0.85, cut);
-    ctx.lineTo(x + trunkW * 0.85, cut);
-    ctx.lineTo(x + trunkW * 1.1, groundY - 9);
-    ctx.closePath();
-    ctx.clip();
-    ctx.fillStyle = night ? "#6b6352" : "#a89678";   // 裸干：比树皮亮两档、略发潮
-    ctx.fillRect(x - trunkW * 1.2, cut, trunkW * 2.4, 92);
-    ctx.restore();
+    const baseY = groundY - 9;
+    const cut = Math.max(groundY - 91, forkY + 7);   // 1.9m 或分叉，谁低取谁
+    const kCut = Math.max(0.25, Math.min(0.92, (baseY - cut) / (baseY - forkY)));
+    const L = [], R = [];
+    for (let i = 0; i <= 6; i += 1) {
+      const [px, py, hw] = trunkAt((i / 6) * kCut);
+      const w2 = hw - 0.9;                           // 比树皮窄一线：两侧还留着皮
+      L.push([px - w2, py]);
+      R.push([px + w2, py]);
+    }
+    InkFill(ctx, [...L, ...R.reverse()], id + "strip",
+      night ? "#544b3c" : "#7d6242", { amp: 1.0, lw: 0, line: null });
     // 剥口不是齐的，是啃剥出来的锯齿边
-    for (let i = 0; i < 7; i += 1) {
-      const jx = x - trunkW + (i / 6) * trunkW * 2;
-      InkLine(ctx, jx, cut + Sym(id + "pk", i, 5), jx + trunkW * 0.34, cut + Sym(id + "pk2", i, 5),
-        id + "peel" + i, { lw: 1.6, color: barkDark, amp: 1.4 });
+    const [cxT, cyT, hwT] = trunkAt(kCut);
+    for (let i = 0; i < 5; i += 1) {
+      const jx = cxT - hwT + (i / 4) * hwT * 2;
+      InkLine(ctx, jx, cyT + Sym(id + "pk", i, 3.5), jx + hwT * 0.5, cyT + Sym(id + "pk2", i, 3.5),
+        id + "peel" + i, { lw: 1.5, color: barkDark, amp: 1.3 });
     }
     // 裸干上的刀痕斧印
-    for (let i = 0; i < 4; i += 1) {
-      const hy = groundY - 20 - Rnd(id + "hk", i) * 62;
-      InkLine(ctx, x - trunkW * 0.7, hy, x + trunkW * 0.6, hy + Sym(id + "hk2", i, 3),
-        id + "hack" + i, { lw: 1.2, color: "rgba(70,56,38,0.55)", amp: 0.8 });
+    for (let i = 0; i < 3; i += 1) {
+      const k = 0.12 + Rnd(id + "hk", i) * (kCut - 0.2);
+      const [hx, hy, hw] = trunkAt(k);
+      InkLine(ctx, hx - hw * 0.7, hy, hx + hw * 0.6, hy + Sym(id + "hk2", i, 2.5),
+        id + "hack" + i, { lw: 1.2, color: "rgba(58,44,28,0.5)", amp: 0.8 });
     }
   }
-  // 砍平的枝桩：0.44H 以下一根活枝都不留，树成了"剃头树"
+  // 砍平的枝桩：0.44H 以下一根活枝都不留，树成了"剃头树"。
+  // **桩子要长在树皮上**——原先钉在 ±0.95×trunkW，那是主干半宽的一倍半，
+  // 四颗深色椭圆浮在树干外边，看着像钉在干上的一排扣子
   for (let i = 0; i < 4; i += 1) {
-    const sy = groundY - 24 - i * (H * 0.09) - Rnd(id + "sb", i) * 8;
+    const k = 0.14 + i * 0.17 + Rnd(id + "sb", i) * 0.08;
+    const [sx0, sy, hw] = trunkAt(k);
     const dir = i % 2 ? 1 : -1;
     ctx.save();
     ctx.fillStyle = barkDark;
     ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    ctx.ellipse(x + dir * trunkW * 0.95, sy, 2.6, 3.4, dir * 0.4, 0, Math.PI * 2);
+    ctx.ellipse(sx0 + dir * (hw - 0.6), sy, 2.0, 2.8, dir * 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -1976,11 +2002,19 @@ export function DrawTree(ctx, x, groundY, id,
     const [fx, fy, fr] = front[i];
     LeafClump(ctx, fx - fr * 0.26, fy - fr * 0.30, fr * 0.46, id + "hl" + i, litC);
   }
-  // 冠里透出去的两根枝梢：全是叶子就成了一坨绿
+  // 冠里透出去的枝梢：全是叶子就成了一坨绿。
+  // 但它以前是从枝头**往冠外**斜着甩出去 cr×(0.6~1.1)＝二三十像素的直棍，
+  // 而且是**最后画的**，压在整顶树冠上头——用户看到的就是"两根杆子插在树上"
+  //（2026-08-10：「这个树上面是什么鬼」）。枝梢要**留在冠里**：从枝头朝冠心
+  // 方向短短一截，长度封在叶团半径的一半以内，绝不越过树冠轮廓。
   for (let i = 0; i < tips.length; i += 2) {
     const [tx, ty] = tips[i];
-    InkLine(ctx, tx, ty, tx + Sym(id + "tw", i, cr * 0.6), ty - cr * (0.6 + Rnd(id + "tw2", i) * 0.5),
-      id + "twig" + i, { lw: 1.3, color: barkDark, amp: 1.6 });
+    const inx = (cx0 - tx), iny = (cy0 - ty);
+    const d = Math.hypot(inx, iny) || 1;
+    const len = Math.min(cr * 0.5, d * 0.5);
+    InkLine(ctx, tx - inx / d * len * 0.15, ty - iny / d * len * 0.15,
+      tx + inx / d * len, ty + iny / d * len,
+      id + "twig" + i, { lw: 1.2, color: barkDark, amp: 1.2 });
   }
   Speckle(ctx, cx0 - crownR, cy0 - crownR * 0.8, crownR * 2, crownR * 1.5, id + "leaf",
     { count: big ? 46 : 30, alpha: 0.12, size: 2.2, color: "#243018" });
@@ -2063,20 +2097,45 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
   ctx.fillStyle = night ? "#241f14" : "#4a3c24";
   ctx.fillRect(x - HW - 6, groundY - 8, W + 12, 10);
 
-  // 垛面上的秸秆：**顺着坡往外下方铺**（从垛心呈放射状）。这是"草"的全部读法，
-  // 也是上一版最缺的一笔——那版只有 22 根、透明度 0.44，远看就是一块纯色
-  ctx.lineWidth = 1.15;
-  for (let i = 0; i < 150; i += 1) {
+  // 垛面上的秸秆。
+  // 2026-08-10 用户退回：「这草垛子他妈的像个蠕虫一样」。病根是**那些长笔画**：
+  // 每隔十二根压一条 15~25px 的亮直线，方向、位置全是随机的，于是垛面上爬着
+  // 二十来条两头圆、比垛面亮一大截的粗白道子——那正是"蛆/蠕虫"的长相。
+  // 秸秆在这个景别下（一根秸秆 1~2 厘米＝不到一个像素）本来就**不该看得见
+  // 一根一根**，能看见的只有两样东西：
+  //   ① **一层层码上去压实的层理**——沿着垛面弧度走的横纹，这是"垛"的读法；
+  //   ② 层理之间细碎的短茬，只提供质感，不提供图形。
+  // 所以：长笔画整个删掉，短茬压到 1px 以下、透明度砍半、颜色贴着垛面走。
+  // ① 层理：七八道顺着剖面走的暗纹，越往上越密（垛是越码越收的）
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = "butt";
+  for (let c = 0; c < 8; c += 1) {
+    const t0 = 0.08 + (c / 8) * 0.84;
+    ctx.globalAlpha = 0.17 + Rnd(id + "ca", c) * 0.11;
+    ctx.strokeStyle = dark;
+    ctx.beginPath();
+    for (let i = 0; i <= 14; i += 1) {
+      const u = i / 14;
+      const side = u < 0.5 ? -1 : 1;
+      const t = t0 + Math.sin(u * Math.PI) * 0.035;          // 中间鼓一点：面是圆的
+      const px = x + (u * 2 - 1) * R(t, side) * 0.98;
+      const py = PY(t) + Sym(id + "cy" + c, i, 1.2);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  // ② 短茬：只做质感。长度 2~6px、线宽 0.8、跟着坡朝外下方，颜色贴着垛面
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 190; i += 1) {
     const t = Rnd(id + "st", i) ** 0.8;
     const side = i % 2 ? 1 : -1;
-    const rr = R(t, side) * (0.15 + Rnd(id + "sr", i) * 0.9);
+    const rr = R(t, side) * (0.10 + Rnd(id + "sr", i) * 0.92);
     const px = x + side * rr;
     const py = PY(t) + Sym(id + "sy", i, 3);
     const dx = side * (0.45 + t * 0.55);         // 越靠顶越横着铺
     const dy = 0.75 - t * 0.35;
-    const long = i % 12 === 0;                   // 隔十来根压一条长的，破掉"一块纯色"
-    const len = (long ? 15 : 5) + Rnd(id + "sl", i) * (long ? 10 : 9);
-    ctx.globalAlpha = 0.26 + Rnd(id + "sa", i) * 0.36;
+    const len = 2 + Rnd(id + "sl", i) * 4;
+    ctx.globalAlpha = 0.10 + Rnd(id + "sa", i) * 0.18;
     ctx.strokeStyle = i % 3 === 0 ? dark : straw;
     ctx.beginPath();
     ctx.moveTo(px, py);
@@ -2100,8 +2159,10 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
     const nxv = side * (0.55 + t * 0.45);
     const nyv = 0.62 - t * 1.35;
     const norm = Math.hypot(nxv, nyv) || 1;
-    const len = 2 + Rnd(id + "fl", i) ** 1.6 * 12;   // 长短拉开：等长＝毛刷
-    ctx.globalAlpha = 0.4 + Rnd(id + "fa", i) * 0.5;
+    // 长短拉开：等长＝毛刷。但**上限压到 8px**——十几像素的亮秸秆头支出去，
+    // 在轮廓外围又是一圈"蠕虫"，和垛面上那些长笔画是同一个病
+    const len = 1.5 + Rnd(id + "fl", i) ** 1.6 * 6.5;
+    ctx.globalAlpha = 0.3 + Rnd(id + "fa", i) * 0.4;
     ctx.strokeStyle = i % 4 === 0 ? dark : straw;
     ctx.beginPath();
     ctx.moveTo(px - (nxv / norm) * 3, py - (nyv / norm) * 3);
@@ -2332,13 +2393,119 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   }
 }
 
-// 【为什么没有「井筒剖面」这支画笔】2026-08-10 打水加长时画过一版 DrawWellShaft
-// （把井的近侧剖开，让玩家看着桶沉下去、浮在水面上、墩下去吃水），实拍之后拆掉了：
-// 地表场景的画面底下永远压着一条**近景地面带**（z=3.3，renderOrder 8500），
-// 它就是「镜头正前方三米的地面」——物理上就该把地平线以下的一切挡住。镜头一往下
-// 降去追那只桶，它跟着涨上来，把剖面连同桶一起吃掉。地表场景**看不到地平线以下**，
-// 这是这套渲染的硬性前提，不是可以绕的 bug。井下的反馈因此改走三条看得见/听得见的路：
-// 摇把在转、辘轳鼓上的绳盘变粗变细（World 的 winchCoil）、带井筒回音的三记声音。
+// 井筒剖面——**只有小窗那台相机看得见它**（World 把它单独放在 PIP_LAYER 上）。
+//
+// 来历值得写死：主相机看不到地平线以下（画面底下永远压着一条近景地面带，
+// 见 CLAUDE.md），所以桶一沉过井口沿就没影了，四道手里有两道半在看不见的地方
+// 发生。用户 2026-08-10 出的主意：「你可以用边上的特殊照片模式去渲染呀 /
+// 顺便也作为一个提示不是蛮好的」——小窗是**第二台相机**，它架在那条地面带
+// 后头、井筒里头，于是井底那点事有地方演，而且顺带把「墩桶」教会了：
+// 玩家看见空桶口朝上浮着，就明白为什么得墩，一句说明都不用。
+//
+// 画法照「剖面上掏出来的洞」那三条（同 CLAUDE.md）：
+//   ① 形状要像人挖的——两壁一层层起伏，不是 fillRect 的笔直两条边；
+//   ② 洞沿的墨线一处不能少，缺了就读成"贴图破了"；
+//   ③ 掏开之后后面得有东西填着——湿料礓石砌的井壁，越往下越黑，底下一汪水。
+// 水面上那道亮是全作的题眼：日头从井口漏下去，只在最深处剩这么一条。
+//
+// **颜色要压到近乎全黑**：画布贴图没声明 sRGB，上屏会被整体提亮一大截，
+// 源色 #2f 读出来是 #78 的中灰——一口"灰扑扑的水泥管"。下面这几个数看着
+// 几乎全黑，上屏才刚好是井筒该有的暗。
+//
+// 传进来的是画布像素：x=井心，topY=井口沿，waterY=水面，botY=画到多深为止。
+export function DrawWellShaft(ctx, x, topY, waterY, botY, id, { night = false } = {}) {
+  const RX = 26;              // 井筒内壁半宽
+  const dark = night ? "#020202" : "#040302";
+  const stone = night ? "#080706" : "#0c0a07";
+  const stoneLit = night ? "#131009" : "#1c170f";
+
+  // 两壁：一层层往里外错——井是一镐一镐掏出来的，不是钻出来的
+  const ROWS = Math.max(8, Math.round((botY - topY) / 16));
+  const wall = (s) => {
+    const pts = [];
+    for (let i = 0; i <= ROWS; i += 1) {
+      const y = topY + ((botY - topY) * i) / ROWS;
+      pts.push([x + s * (RX + Sym(id + "w" + s, i, 3.4)), y]);
+    }
+    return pts;
+  };
+  const left = wall(-1), right = wall(1);
+
+  // 洞外那圈土（小窗里能瞥见一点边）：不留白边，也别抢井筒
+  ctx.save();
+  ctx.fillStyle = night ? "#080604" : "#0d0a06";
+  ctx.fillRect(x - RX * 3, topY - 20, RX * 6, botY - topY + 60);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (const p of left) ctx.lineTo(p[0], p[1]);
+  for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.closePath();
+  ctx.clip();
+  // 后壁：砌石。日头只照得进井口那一截，往下一层比一层黑
+  ctx.fillStyle = dark;
+  ctx.fillRect(x - RX - 6, topY, RX * 2 + 12, botY - topY);
+  for (let r = 0; r < ROWS; r += 1) {
+    const y0 = topY + ((botY - topY) * r) / ROWS;
+    const y1 = topY + ((botY - topY) * (r + 1)) / ROWS;
+    if (y0 > waterY) break;
+    const k = Math.exp(-(y0 - topY) / Math.max(1, (waterY - topY) * 0.45));   // 光衰
+    ctx.globalAlpha = 0.28 + 0.72 * k;
+    ctx.fillStyle = r % 2 ? stone : stoneLit;
+    ctx.fillRect(x - RX - 6, y0, RX * 2 + 12, y1 - y0 + 0.6);
+    ctx.globalAlpha = 0.35 + 0.4 * k;
+    InkLine(ctx, x - RX - 5, y1, x + RX + 5, y1, id + "course" + r,
+      { lw: 1.6, color: "rgba(10,8,5,0.95)", amp: 1.3 });
+    for (let c = 0; c < 2; c += 1) {
+      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / 2) * RX * 2 + Sym(id + "jx", r * 2 + c, 6);
+      InkLine(ctx, jx, y0 + 1, jx, y1 - 1, id + "jv" + r + c,
+        { lw: 1.3, color: "rgba(10,8,5,0.8)", amp: 1.4 });
+    }
+  }
+  ctx.globalAlpha = 1;
+  // 贴近水面的一段常年是湿的：发黑、挂青苔
+  const wetTop = waterY - 34;
+  const wet = ctx.createLinearGradient(0, wetTop, 0, waterY);
+  wet.addColorStop(0, "rgba(2,4,3,0)");
+  wet.addColorStop(1, "rgba(2,4,3,0.92)");
+  ctx.fillStyle = wet;
+  ctx.fillRect(x - RX - 6, wetTop, RX * 2 + 12, waterY - wetTop);
+
+  // 水。井水是黑的，只有正对井口那一条被日头点亮——这一笔是这口井的题眼
+  ctx.fillStyle = night ? "#010202" : "#020403";
+  ctx.fillRect(x - RX - 6, waterY, RX * 2 + 12, botY - waterY + 6);
+  ctx.save();
+  ctx.globalAlpha = night ? 0.26 : 0.52;
+  ctx.fillStyle = night ? "#39424b" : "#7e8a74";
+  ctx.beginPath();
+  ctx.ellipse(x, waterY + 1.5, RX - 3, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - RX + 4, waterY + 7 + i * 6, x + RX - 4, waterY + 7 + i * 6,
+      id + "ripple" + i, { lw: 1.1, color: `rgba(150,168,150,${0.15 - i * 0.04})`, amp: 1 });
+  }
+  ctx.restore();
+
+  // 洞沿的墨线：两壁各一条，缺了就读成贴图被裁掉的直边
+  for (const side of [left, right]) {
+    for (let i = 0; i < side.length - 1; i += 1) {
+      InkLine(ctx, side[i][0], side[i][1], side[i + 1][0], side[i + 1][1],
+        id + "edge" + (side === left ? "L" : "R") + i,
+        { lw: 2.3, color: "rgba(18,13,8,0.92)", amp: 0.6 });
+    }
+  }
+  // 从井口漏进来的那点天光
+  ctx.save();
+  const lit = ctx.createLinearGradient(0, topY, 0, topY + 46);
+  lit.addColorStop(0, night ? "rgba(150,168,190,0.13)" : "rgba(240,232,200,0.17)");
+  lit.addColorStop(1, "rgba(240,232,200,0)");
+  ctx.fillStyle = lit;
+  ctx.fillRect(x - RX + 2, topY, RX * 2 - 4, 46);
+  ctx.restore();
+}
 
 // 碾盘：石头**要发土不要发灰**（跟井台一个规矩）。台面是手錾出来的多边形，
 // 不是 ctx.ellipse 的完美圆；磨齿是四组平行的剔沟，不是六根从圆心均分的
@@ -2489,18 +2656,63 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = nul
       { amp: 1.8, lw: 2.2, shade: "rgba(74,56,42,0.20)" });
     WeatherAdobe(ctx, x0, groundY - H, x1 - x0, H, id + "wa" + x0,
       { course: 12, gullies: 3, cracks: 2, patches: 2 });
-    // 墙头苫的谷草：锯齿轮廓 + 挑出来的单根草秆，中间断一处露出光墙头
-    for (let sx = x0; sx < x1; sx += 5) {
-      if (sx > (x0 + x1) / 2 - 8 && sx < (x0 + x1) / 2 + 8) continue;
-      const ch = 5 + Rnd(id + "cap" + x0, sx) * 7;
-      InkFill(ctx, [[sx, groundY - H + 2], [sx + 6, groundY - H + 2],
-        [sx + 5, groundY - H - ch], [sx + 1, groundY - H - ch * 0.8]],
-      id + "cp" + x0 + sx, "#7d6a3a", { amp: 1.4, lw: 1.2 });
-      if (Rnd(id + "cw" + x0, sx) > 0.6) {
-        InkLine(ctx, sx + 3, groundY - H - ch, sx + 3 + Sym(id + "cs" + x0, sx, 5),
-          groundY - H - ch - 4 - Rnd(id + "cl" + x0, sx) * 7, id + "cst" + x0 + sx,
-          { lw: 0.9, color: "#8a7a4e", amp: 1.0 });
-      }
+    // 墙头苫的谷草。
+    // 2026-08-10 用户退回：「这个顶上我都不知道是什么玩意儿 一块块的」。
+    // 老画法是**每 5px 描一个 6px 宽、5~12px 高的独立四边形**，每块自带墨线，
+    // 于是墙头上立着一排彼此分家的深色小板子——那不是苫草，那是一排牌位。
+    // 苫草是**一整领草压在墙头上**：轮廓连着走、只有厚薄起伏，草秆细而碎，
+    // 而且它得**贴着墙头这条不平的线**走（墙头本来就是中段下坠的）。
+    const capTopY = (px) => {                 // 墙头那条线在 px 处的高度
+      const t = Math.max(0, Math.min(1, (px - x0) / Math.max(1, x1 - x0)));
+      const f = t * (top.length - 1);
+      const i0 = Math.min(top.length - 2, Math.floor(f));
+      const k = f - i0;
+      return top[i0][1] + (top[i0 + 1][1] - top[i0][1]) * k;
+    };
+    // 中间薅薄一段（露出光墙头）——**用厚度收到零来做，不许真断开**：
+    // 断成两截，每截都自带一圈墨线，读出来就是墙头上扣着两顶帽子
+    const capL = x0 - 1, capR = x1 + 1;
+    const bald = (x0 + x1) / 2 + Sym(id + "bd" + x0, 0, 8);
+    const seed = Hash(id + "cph" + x0) * 6.28;
+    const Thick = (px) => {
+      const worn = Math.max(0, 1 - ((px - bald) / 13) ** 2);      // 薅薄的那一段
+      return Math.max(0, (5.4 + Math.sin(px * 0.07 + seed) * 1.8) * (1 - worn * 0.92));
+    };
+    const lower = [], upper = [];
+    const n2 = Math.max(10, Math.round((capR - capL) / 3.5));
+    for (let i = 0; i <= n2; i += 1) {
+      const px = capL + ((capR - capL) * i) / n2;
+      const base = capTopY(px);
+      // 上沿必须是**毛**的：隔一点扎出去一截，草与瓦的分界全在这条边上
+      const burr = (i % 2 ? 1.7 : 0) + Rnd(id + "cpt" + x0, i) * 2.0;
+      lower.push([px, base + 2.5]);
+      upper.push([px, base - Thick(px) - (Thick(px) > 1 ? burr : 0)]);
+    }
+    InkFill(ctx, lower.concat(upper.reverse()), id + "cap" + x0,
+      "#7a6738", { amp: 0.9, lw: 1.2, line: IN.inkSoft, shade: "rgba(50,38,18,0.22)" });
+    // 草茬：顺着苫的方向斜铺在草脊上，让那条带子里头有东西
+    ctx.save();
+    ctx.lineWidth = 0.9;
+    for (let i = 0; i < Math.round((capR - capL) / 3); i += 1) {
+      const px = capL + 2 + Rnd(id + "cw" + x0, i) * (capR - capL - 4);
+      const th = Thick(px);
+      if (th < 1.5) continue;
+      const py = capTopY(px) - th * (0.15 + Rnd(id + "cv" + x0, i) * 0.7);
+      ctx.globalAlpha = 0.25 + Rnd(id + "ca" + x0, i) * 0.3;
+      ctx.strokeStyle = i % 3 === 0 ? "#5c4d28" : "#95855a";
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + (i % 2 ? 4 : -4), py + 1.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 檐口垂下来的几绺：草是搭在墙头上的，两边总要耷拉下来一点
+    for (let i = 0; i < 4; i += 1) {
+      const px = capL + 4 + Rnd(id + "dg" + x0, i) * (capR - capL - 8);
+      if (Thick(px) < 2) continue;
+      const py = capTopY(px) + 2;
+      InkLine(ctx, px, py, px + Sym(id + "dg2" + x0, i, 2.5), py + 4 + Rnd(id + "dg3" + x0, i) * 7,
+        id + "drp" + x0 + i, { lw: 1.1, color: "#7d6c44", amp: 1.2 });
     }
     // 墙根壅土
     InkFill(ctx, [[x0 - 4, groundY], [x0 + 2, groundY - 5], [(x0 + x1) / 2, groundY - 7],
@@ -3281,6 +3493,45 @@ export function DrawWoodStack(ctx, x, groundY, w, h, id) {
     InkLine(ctx, x - w / 2 - 6 + i * 5, groundY - 2, x - w / 2 + 9 + i * 6, groundY - 5 - i * 2,
       id + "sp" + i, { lw: 1.8, color: "#5c4328" });
   }
+}
+
+// 窖口盖板：c1_plane 刨出来的那块旧门板，抹了泥灰做旧。
+// 侧视里它是一块**有厚度的板**——平放时只看得见板厚那一条，掀起来才露出板面。
+// 所以贴图按「立起来的样子」画（宽=洞口，高=板厚+一点板面），
+// 摆位时绕铰链边旋转，平放/立起共用同一张图。
+// 画的是**底面**：盖着的时候朝下、掀起来朝向玩家的正是这一面，所以没有泥灰，
+// 只有木纹、拼缝和两道背带（泥灰在另一面，压在洞口上看不见）。
+export function DrawCellarLid(ctx, w, t, id) {
+  // 板身：三块旧门板拼的，边不齐
+  InkFill(ctx, [[0, 0], [w, Sym(id + "e", 0, 1.6)], [w, t], [0, t - Sym(id + "e", 1, 1.4)]],
+    id + "body", "#7d5f3c", { amp: 1.6, lw: 2.2, shade: "rgba(48,34,20,0.26)" });
+  // 拼缝：两道，缝里嵌着灰
+  for (let i = 1; i <= 2; i += 1) {
+    const px = w * (i / 3);
+    InkLine(ctx, px, 1.5, px + Sym(id + "s", i, 1.8), t - 1.5, id + "seam" + i,
+      { lw: 2.0, color: "rgba(38,26,15,0.62)", amp: 1.2 });
+  }
+  // 背带：两根横木条钉在底面上（门板拆下来改的盖子必有这个，不然一踩就散）
+  for (let i = 0; i < 2; i += 1) {
+    const by = t * (0.28 + i * 0.42);
+    InkFill(ctx, [[w * 0.06, by], [w * 0.94, by - Sym(id + "b", i, 1.2)],
+      [w * 0.94, by + t * 0.13], [w * 0.06, by + t * 0.13 + 0.8]],
+    id + "batten" + i, "#6b5133", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+    for (let k = 0; k < 3; k += 1) {          // 钉头
+      const nx = w * (0.18 + k * 0.32);
+      InkFill(ctx, [[nx - 1.2, by + t * 0.04], [nx + 1.2, by + t * 0.03],
+        [nx + 1, by + t * 0.10], [nx - 1, by + t * 0.11]],
+      id + "nail" + i + k, "#3f3a34", { amp: 0.6, lw: 0.9 });
+    }
+  }
+  // 木纹
+  for (let i = 0; i < 5; i += 1) {
+    const gy = t * (0.12 + Rnd(id + "g", i) * 0.76);
+    InkLine(ctx, w * 0.05, gy, w * 0.95, gy + Sym(id + "gw", i, 1.4), id + "grain" + i,
+      { lw: 0.9, color: "rgba(58,40,22,0.34)", amp: 1.0 });
+  }
+  // 边上蹭掉泥灰的地方：常年掀，边沿最先磨白
+  Speckle(ctx, 0, 0, w, t * 0.22, id + "wear", { count: 18, alpha: 0.22, size: 1.4, color: "#c9b48c" });
 }
 
 export function DrawHatch(ctx, x, groundY, id, { open = false } = {}) {
@@ -5500,6 +5751,564 @@ export function DrawInsertCard(ctx, W, H, kind) {
 }
 
 // ---------------------------------------------------------------------------
+// 过场活动插卡：日军进村那一镜（c1_roster）。
+//
+// 为什么要单独画一张：全作是侧视骨架，**正脸给不出来**——而"太君坐在挎斗里
+// 冲你打手势"这一镜要的恰恰是正面。所以走定格插卡的画框，但每帧重画
+//（World.SetInsertCard 见到 INSERT_LIVE 里登记的名字就走这条路），
+// seg 由剧本行上的 cam.seg 给，t 是本行已经走过的秒数——动画完全由
+// 游戏时钟驱动，无头实拍（StepFrames）也能逐帧对上。
+//
+//   seg 0  镜头从开道伪军的脸上一路横摇到挎斗摩托（正面）
+//   seg 1  太君原地打手势：两记朝前的劈手（分头、围村）→ 绕一个圈（合拢）→ 收手
+//   seg 2  伪军头目凑到斗沿交头接耳；太君点头，白手套朝村里一挥；头目回身派活
+//
+// 形象按 1942-43 华北的史实与荧幕定式配齐（配色全按 sRGB 坑压两档）：
+//   太君    大盖帽（茶褐帽体 + **绯红帽墙** + 星徽）、圆框眼镜、**卫生胡**、
+//           九八式立领 + 红领章、斜挎武装带（Sam Browne）、白手套、
+//           军刀立在斗里手扶着刀柄——马靴被斗沿挡住，不必画
+//   驾驶兵  战斗帽 + **帽垂**（正面看是垂在两颊边的两片布）、土黄军装、胸前交叉背带
+//   伪军    软布帽（没有帽垂）、灰土布军装、胯上挎包、布鞋——本乡人的脸，不做丑角
+//   队列    摩托背后雾里两排日军剪影，肩上一排刺刀尖——"大部队"三个字全靠这排尖
+// ---------------------------------------------------------------------------
+export function DrawRaidMotoCard(ctx, W, H, seg, t) {
+  const S = H / 420;                 // 构图单位：1u = H/420 像素（与定格卡同标尺）
+  const C01 = (x) => Math.max(0, Math.min(1, x));
+  const Sm = (x) => { const k = C01(x); return k * k * (3 - 2 * k); };
+  const GY = 358, HY = 205;          // 地脚线 / 地平线（单位 u）
+  // 卡内配色：整卡就是"阴下来"的那一刻，比村里的日常配色再冷再沉一档
+  const RC = {
+    ground: "#4e4636", wall: "#544d3c", wallDark: "#423c2f",
+    puppetCoat: "#5d5744", puppetTrouser: "#4a443a", puppetCap: "#36322a",
+    jpCoat: "#4c482c", jpDark: "#34321f",
+    moto: "#514729", motoDark: "#383120", tire: "#22221e",
+    officerCoat: "#2b2f1f", officerDark: "#1d2016",
+    capBody: "#3e422c", capBand: "#4e2018", star: "#8a7a3a",
+    tab: "#5e241c", glove: "#a39c8c", sabre: "#26241c", sabreFit: "#7a7050",
+    skin: "#bb9066", skinDark: "#8f6c4c", ink: IN.ink,
+  };
+
+  // ---- 天与街（屏幕空间，慢视差）：铅灰的天压着土街，雾把街尾吃掉 ----
+  const sky = ctx.createLinearGradient(0, 0, 0, HY * S * 1.16);
+  sky.addColorStop(0, "#2e323c");
+  sky.addColorStop(0.7, "#4a4840");
+  sky.addColorStop(1, "#5c564a");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, HY * S * 1.18);
+  ctx.fillStyle = RC.ground;
+  ctx.fillRect(0, HY * S, W, H - HY * S);
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(0, GY * S * 0.994, W, H);      // 脚下再沉一线
+
+  // 镜头看哪儿：seg0 从伪军(+640u)一路摇到摩托(0)，先在脸上停 1.4 秒
+  const look = seg === 0 ? 640 * (1 - Sm((t - 1.4) / 2.65)) : 0;
+  const PX = (u) => W / 2 + (u - look) * S;          // 场景 u → 屏幕 px
+  const PXf = (u) => W / 2 + (u - look * 0.45) * S;  // 背景层视差（挪得慢一半）
+
+  // 街墙：土坯院墙顺着队伍来的方向退进雾里（往左收向灭点）
+  InkFill(ctx, [
+    [PXf(-820), (HY + 16) * S], [PXf(920), (HY - 128) * S],
+    [PXf(920), (GY - 4) * S], [PXf(-820), (HY + 30) * S],
+  ], "rmWallN", RC.wall, { amp: 2.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.22)", shadeAt: 0.35 });
+  // 墙上几个黑窗洞与一个门洞（关着的），读出"家家闭户"
+  for (let i = 0; i < 4; i += 1) {
+    const wx = 690 - i * 300;
+    const k = 1 - i * 0.18;
+    InkFill(ctx, [
+      [PXf(wx), (HY + 4 - 62 * k) * S], [PXf(wx + 40 * k), (HY + 2 - 64 * k) * S],
+      [PXf(wx + 42 * k), (HY + 8 - 20 * k) * S], [PXf(wx + 2), (HY + 10 - 18 * k) * S],
+    ], "rmWin" + i, RC.wallDark, { amp: 1.4 * S, lw: 2 * S });
+  }
+  // 街尾的歪脖树：一团黑剪影，枝子抓着天
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  InkFill(ctx, [
+    [PXf(-700), (HY + 12) * S], [PXf(-688), (HY - 60) * S], [PXf(-716), (HY - 96) * S],
+    [PXf(-668), (HY - 74) * S], [PXf(-620), (HY - 104) * S], [PXf(-648), (HY - 56) * S],
+    [PXf(-628), (HY + 10) * S],
+  ], "rmTree", "#23211a", { amp: 2.4 * S, lw: 0, line: null });
+  ctx.restore();
+  // 贴地的灰雾：越往街尾越浓
+  const fog = ctx.createLinearGradient(PXf(-820), 0, PXf(240), 0);
+  fog.addColorStop(0, "rgba(74,74,68,0.62)");
+  fog.addColorStop(1, "rgba(74,74,68,0)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, (HY - 70) * S, W, (GY - HY + 76) * S);
+
+  // 惊起的乌鸦（seg0 / seg2 各放一拨）：两三个黑点扇着翅膀斜着飞走
+  if (seg !== 1) {
+    for (let i = 0; i < 3; i += 1) {
+      const ph = t * 0.16 + i * 0.09;
+      if (ph > 0.9) continue;
+      const bx = W * (0.66 - ph * 0.5 - i * 0.05);
+      const by = H * (0.30 - ph * 0.16 + i * 0.05);
+      const flap = Math.sin(t * 9 + i * 2.1) * 8 * S;
+      ctx.strokeStyle = "#1d1b16";
+      ctx.lineWidth = 2.6 * S;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(bx - 9 * S, by - flap);
+      ctx.quadraticCurveTo(bx, by + 3 * S, bx + 9 * S, by - flap);
+      ctx.stroke();
+    }
+  }
+
+  // ---- 正面人物零件 ----------------------------------------------------------
+  // 正面行走/站立的伪军。x 是脚中点（场景 u），hgt 是全高（u）
+  const FrontPuppet = (x, gy, hgt, id, { walk = 0, drift = 0 } = {}) => {
+    const px = PX(x + drift);
+    const bob = walk ? Math.sin(walk) * 0.014 * hgt : 0;
+    const gyS = (gy - bob) * S;
+    const hu = hgt / 190;                       // 以 190u 为基准的比例
+    const hr = 17 * hu;                         // 头半径（u）
+    const shoulderY = gyS - hgt * 0.78 * S;
+    const headC = gyS - hgt * 0.88 * S;
+    const wS = 30 * hu * S;                     // 半肩宽 px
+    // 腿（正面两条，走路小幅错开）
+    const step = walk ? Math.sin(walk) * 7 * hu : 0;
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [px + s * 11 * hu * S - 6 * hu * S, gyS - hgt * 0.42 * S],
+        [px + s * 11 * hu * S + 6 * hu * S, gyS - hgt * 0.42 * S],
+        [px + s * (11 + 1.5) * hu * S + 5 * hu * S + s * step * S * 0.3, gyS - 3 * S],
+        [px + s * (11 + 1.5) * hu * S - 6 * hu * S + s * step * S * 0.3, gyS - 2 * S],
+      ], id + "leg" + s, RC.puppetTrouser, { amp: 1.6 * S, lw: 2.6 * S });
+      // 布鞋
+      InkFill(ctx, [
+        [px + s * 12 * hu * S - 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
+        [px + s * 12 * hu * S + 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
+        [px + s * 12 * hu * S + 8 * hu * S + s * step * S * 0.3, gyS],
+        [px + s * 12 * hu * S - 8 * hu * S + s * step * S * 0.3, gyS],
+      ], id + "shoe" + s, "#2e2721", { amp: 1 * S, lw: 2 * S });
+    }
+    // 躯干：灰土布军装，正面对襟一道扣线
+    InkFill(ctx, [
+      [px - wS, shoulderY], [px + wS, shoulderY],
+      [px + wS * 0.92, gyS - hgt * 0.40 * S], [px - wS * 0.92, gyS - hgt * 0.40 * S],
+    ], id + "coat", RC.puppetCoat, { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px, shoulderY + 4 * S, px, gyS - hgt * 0.42 * S, id + "btn",
+      { lw: 1.8 * S, color: "rgba(30,24,16,0.55)", amp: 1 * S });
+    // 挎包带（斜挂）——伪军在本作的记号
+    InkLine(ctx, px - wS * 0.6, shoulderY + 2 * S, px + wS * 0.72, gyS - hgt * 0.44 * S,
+      id + "sat", { lw: 3 * hu * S, color: "rgba(30,24,16,0.5)", amp: 1.2 * S });
+    // 两臂垂在身侧（走路小幅摆）
+    for (const s of [-1, 1]) {
+      const sw = walk ? Math.sin(walk + (s > 0 ? Math.PI : 0)) * 5 * hu : 0;
+      InkLine(ctx, px + s * wS * 0.9, shoulderY + 4 * S,
+        px + s * (wS * 0.98) + sw * S, gyS - hgt * 0.40 * S, id + "arm" + s,
+        { lw: 7 * hu * S, color: RC.puppetCoat, amp: 1.4 * S });
+    }
+    // 头与脸：帽檐的影子压住眉眼——脸沉着，不是丑角
+    InkFill(ctx, [
+      [px - hr * S, headC + hr * 0.7 * S], [px - hr * 0.86 * S, headC - hr * 0.7 * S],
+      [px, headC - hr * S], [px + hr * 0.86 * S, headC - hr * 0.7 * S],
+      [px + hr * S, headC + hr * 0.7 * S], [px + hr * 0.4 * S, headC + hr * 1.06 * S],
+      [px - hr * 0.4 * S, headC + hr * 1.06 * S],
+    ], id + "face", RC.skin, { amp: 1.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.12)" });
+    // 软布帽（没有帽垂）：一顶塌塌的圆帽
+    InkFill(ctx, [
+      [px - hr * 1.12 * S, headC - hr * 0.44 * S], [px - hr * 0.7 * S, headC - hr * 1.2 * S],
+      [px + hr * 0.7 * S, headC - hr * 1.24 * S], [px + hr * 1.12 * S, headC - hr * 0.4 * S],
+      [px + hr * 0.9 * S, headC - hr * 0.2 * S], [px - hr * 0.9 * S, headC - hr * 0.22 * S],
+    ], id + "cap", RC.puppetCap, { amp: 1.6 * S, lw: 2.6 * S });
+    // 帽影里的眉眼：两道短墨 + 抿住的嘴
+    ctx.fillStyle = "rgba(20,16,10,0.6)";
+    ctx.fillRect(px - hr * 0.72 * S, headC - hr * 0.28 * S, hr * 1.44 * S, hr * 0.34 * S);
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(px - hr * 0.5 * S, headC - hr * 0.1 * S, hr * 0.32 * S, hr * 0.13 * S);
+    ctx.fillRect(px + hr * 0.2 * S, headC - hr * 0.1 * S, hr * 0.32 * S, hr * 0.13 * S);
+    // 嘴抿成一道向下的弧（∩）——抖动画笔的随机弯有一半概率把嘴画成微笑，
+    // 这张脸不许笑，所以这一笔不走 InkLine
+    ctx.strokeStyle = IN.inkSoft;
+    ctx.lineWidth = 1.8 * S;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px - hr * 0.26 * S, headC + hr * 0.68 * S);
+    ctx.quadraticCurveTo(px, headC + hr * 0.55 * S, px + hr * 0.26 * S, headC + hr * 0.68 * S);
+    ctx.stroke();
+  };
+
+  // 雾里的日军队列剪影：一排三个兵。两条腿必须分开画——身子连成一片就读成
+  // "披袍的"（第一版就是这么栽的，画面上一排像举长矛的袍子）。
+  // 步枪是**斜背**的一道短线 + 一点刺刀尖，别画成竖着的长矛
+  const JpRank = (x, gy, hgt, id) => {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    for (let i = 0; i < 3; i += 1) {
+      const px = PX(x + (i - 1) * hgt * 0.52);
+      const gyS = gy * S, hS = hgt * S;
+      const bob = Math.sin(t * 5.2 + i * 1.7 + x * 0.1) * hS * 0.012;
+      // 斜背的步枪：枪身越过肩，头上只冒一小截刺刀
+      InkLine(ctx, px - hS * 0.16, gyS - hS * 0.5 + bob, px + hS * 0.2, gyS - hS * 1.1 + bob,
+        id + "g" + i, { lw: 1.8 * S, color: "#1f1d14", amp: 0.4 * S });
+      InkLine(ctx, px + hS * 0.2, gyS - hS * 1.1 + bob, px + hS * 0.26, gyS - hS * 1.24 + bob,
+        id + "gt" + i, { lw: 1.4 * S, color: "#565244", amp: 0.3 * S });
+      // 两条腿
+      for (const s of [-1, 1]) {
+        InkLine(ctx, px + s * hS * 0.05, gyS - hS * 0.4 + bob, px + s * hS * 0.1, gyS,
+          id + "l" + i + s, { lw: 3 * S, color: "#26241a", amp: 0.5 * S });
+      }
+      // 躯干 + 头（战斗帽的小轮廓）
+      InkFill(ctx, [
+        [px - hS * 0.14, gyS - hS * 0.36 + bob], [px - hS * 0.12, gyS - hS * 0.72 + bob],
+        [px + hS * 0.12, gyS - hS * 0.72 + bob], [px + hS * 0.15, gyS - hS * 0.36 + bob],
+      ], id + "s" + i, "#2c2a1c", { amp: 1 * S, lw: 0, line: null });
+      InkFill(ctx, [
+        [px - hS * 0.085, gyS - hS * 0.7 + bob], [px - hS * 0.08, gyS - hS * 0.94 + bob],
+        [px + hS * 0.08, gyS - hS * 0.94 + bob], [px + hS * 0.09, gyS - hS * 0.7 + bob],
+      ], id + "h" + i, "#33301e", { amp: 0.8 * S, lw: 0, line: null });
+    }
+    ctx.restore();
+  };
+  // ---- 挎斗摩托 + 太君 + 驾驶兵（场景原点） --------------------------------
+  // OfficerArm：右臂两节的世界角（0 = 垂直向下，负 = 朝画面左抬），返回手心落点
+  const OfficerArm = (sx, sy, aU, aF, id) => {
+    const L1 = 34 * S, L2 = 30 * S;
+    const ex = sx + Math.sin(aU) * L1, ey = sy + Math.cos(aU) * L1;
+    const hx = ex + Math.sin(aU + aF) * L2, hy = ey + Math.cos(aU + aF) * L2;
+    InkLine(ctx, sx, sy, ex, ey, id + "u", { lw: 10 * S, color: RC.officerCoat, amp: 1 * S });
+    InkLine(ctx, ex, ey, hx, hy, id + "f", { lw: 8.6 * S, color: RC.officerCoat, amp: 1 * S });
+    // 白手套：认"军官在指挥"的那一点白
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, 6.4 * S, 5.2 * S, aU + aF, 0, Math.PI * 2);
+    ctx.fillStyle = RC.glove;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 1.8 * S;
+    ctx.stroke();
+    return { hx, hy };
+  };
+
+  const Moto = () => {
+    const jit = Math.sin(t * 57) * 1.1 * S;     // 引擎怠速的那点哆嗦
+    const cx0 = PX(0), gyS = GY * S + jit * 0.4;
+    // 排气：一口一口的灰
+    for (let i = 0; i < 5; i += 1) {
+      const ph = (t * 0.5 + i * 0.21) % 1;
+      const ex = cx0 - 96 * S - ph * 34 * S - i * 3 * S;
+      const ey = gyS - 16 * S - ph * 52 * S;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, (6 + ph * 17) * S, (4.6 + ph * 13) * S, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(138,134,122,${(1 - ph) * 0.2})`;
+      ctx.fill();
+    }
+    // 地上的一摊影子
+    ctx.beginPath();
+    ctx.ellipse(cx0 + 10 * S, gyS - 2 * S, 150 * S, 13 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(18,14,8,0.28)";
+    ctx.fill();
+
+    // —— 驾驶兵（在车把后面，先画）
+    const dx = cx0 - 34 * S, dHead = gyS - 152 * S + jit;
+    InkFill(ctx, [
+      [dx - 30 * S, gyS - 58 * S], [dx - 26 * S, dHead + 34 * S], [dx + 26 * S, dHead + 34 * S],
+      [dx + 30 * S, gyS - 58 * S],
+    ], "rmDrvBody", RC.jpCoat, { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.2)" });
+    // 胸前交叉背带
+    InkLine(ctx, dx - 20 * S, dHead + 40 * S, dx + 16 * S, gyS - 62 * S, "rmDrvX1", { lw: 3 * S, color: "rgba(30,24,14,0.55)", amp: 1 * S });
+    InkLine(ctx, dx + 20 * S, dHead + 40 * S, dx - 16 * S, gyS - 62 * S, "rmDrvX2", { lw: 3 * S, color: "rgba(30,24,14,0.55)", amp: 1 * S });
+    // 头 + 战斗帽 + 两颊边的帽垂（正面识别日军的第一眼）
+    InkFill(ctx, [
+      [dx - 15 * S, dHead + 18 * S], [dx - 14 * S, dHead - 8 * S], [dx, dHead - 14 * S],
+      [dx + 14 * S, dHead - 8 * S], [dx + 15 * S, dHead + 18 * S], [dx + 6 * S, dHead + 26 * S],
+      [dx - 6 * S, dHead + 26 * S],
+    ], "rmDrvFace", RC.skin, { amp: 1.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.14)" });
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [dx + s * 11 * S, dHead - 4 * S], [dx + s * 19 * S, dHead - 2 * S],
+        [dx + s * 18 * S, dHead + 26 * S], [dx + s * 10 * S, dHead + 22 * S],
+      ], "rmDrvFlap" + s, "#41401f", { amp: 1.2 * S, lw: 2 * S });
+    }
+    InkFill(ctx, [
+      [dx - 17 * S, dHead - 2 * S], [dx - 12 * S, dHead - 20 * S], [dx + 12 * S, dHead - 20 * S],
+      [dx + 17 * S, dHead - 2 * S], [dx + 13 * S, dHead + 3 * S], [dx - 13 * S, dHead + 3 * S],
+    ], "rmDrvCap", "#4c4a26", { amp: 1.4 * S, lw: 2.4 * S });
+    ctx.fillStyle = "rgba(20,16,10,0.55)";
+    ctx.fillRect(dx - 12 * S, dHead + 1 * S, 24 * S, 6 * S);   // 帽檐影
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(dx - 9 * S, dHead + 8 * S, 6 * S, 2.6 * S);
+    ctx.fillRect(dx + 3 * S, dHead + 8 * S, 6 * S, 2.6 * S);
+    // 两臂伸向车把
+    InkLine(ctx, dx - 24 * S, dHead + 44 * S, dx - 52 * S, gyS - 92 * S + jit, "rmDrvArmL", { lw: 9 * S, color: RC.jpCoat, amp: 1.2 * S });
+    InkLine(ctx, dx + 24 * S, dHead + 44 * S, dx + 4 * S, gyS - 92 * S + jit, "rmDrvArmR", { lw: 9 * S, color: RC.jpCoat, amp: 1.2 * S });
+
+    // —— 太君（斗里，先画人再画斗鼻子盖住下半身）。
+    // 斗必须贴着车：第一版摆在 +96，斗跟车中间空出一条街，读成"军官坐在一辆
+    // 单独的推车里"——挎斗跟车之间还要再补两根连杆（见下）
+    const ox = cx0 + 66 * S;
+    // 头基准。seg2 里跟头目交头接耳时头往右倾一点，点头再压一点
+    let tilt = 0, nod = 0;
+    if (seg === 2) {
+      tilt = 0.10 * Sm((t - 1.9) / 0.5) * (1 - Sm((t - 3.5) / 0.5));
+      nod = (Math.sin(C01((t - 2.5) / 0.9) * Math.PI * 2) + Math.sin(C01((t - 3.1) / 0.7) * Math.PI * 2)) * 0.05;
+    }
+    const oHead = gyS - 178 * S + jit;
+    // 躯干（立领将校呢）
+    InkFill(ctx, [
+      [ox - 34 * S, gyS - 66 * S], [ox - 30 * S, oHead + 36 * S], [ox + 30 * S, oHead + 36 * S],
+      [ox + 34 * S, gyS - 66 * S],
+    ], "rmOffBody", RC.officerCoat, { amp: 1.8 * S, lw: 3 * S, shade: "rgba(0,0,0,0.22)" });
+    // 斜挎武装带 + 略章（左胸一小条）
+    InkLine(ctx, ox + 22 * S, oHead + 42 * S, ox - 26 * S, gyS - 74 * S, "rmOffSam", { lw: 4 * S, color: "rgba(24,20,12,0.6)", amp: 1 * S });
+    InkFill(ctx, Rect(ox - 20 * S, oHead + 52 * S, 14 * S, 5 * S), "rmOffRib", "#6e4a2c", { amp: 0.4 * S, lw: 1.2 * S });
+    // 立领 + 两片红领章
+    InkFill(ctx, Rect(ox - 15 * S, oHead + 28 * S, 30 * S, 10 * S), "rmOffCollar", RC.officerDark, { amp: 0.8 * S, lw: 2 * S });
+    for (const s of [-1, 1]) {
+      InkFill(ctx, Rect(ox + s * 13 * S - 6 * S, oHead + 30 * S, 9 * S, 6 * S), "rmOffTab" + s, RC.tab, { amp: 0.4 * S, lw: 1.2 * S });
+    }
+    // 军刀立在斗里：缠柄露在斗沿上，护手一小圈，左手（白手套）搭在柄头
+    InkLine(ctx, ox - 26 * S, gyS - 70 * S, ox - 30 * S, oHead + 60 * S, "rmSabre", { lw: 5 * S, color: RC.sabre, amp: 0.8 * S });
+    ctx.beginPath();
+    ctx.ellipse(ox - 29 * S, oHead + 63 * S, 5 * S, 2.4 * S, 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#5c5440";
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.4 * S; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(ox - 30 * S, oHead + 55 * S, 5.6 * S, 4.6 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.glove;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6 * S; ctx.stroke();
+
+    // 右臂：seg1 打手势；seg2 收在刀柄上、末了朝村里一挥；seg0 按着斗沿
+    let arm = { aU: -0.5, aF: -0.25 };          // 默认：手搭斗沿
+    if (seg === 1) {
+      // 关键帧：抬起 → 劈一 → 回 → 劈二 → 指住村口 → 绕圈（合拢）→ 收手
+      const K = [
+        [0.0, -0.5, -0.25], [0.7, -2.3, -0.5], [1.1, -1.5, -0.35], [1.5, -2.3, -0.5],
+        [1.9, -1.5, -0.35], [2.3, -1.95, -0.6], [2.6, -1.95, -0.6], [3.6, -1.95, -0.6], [4.2, -0.5, -0.25],
+      ];
+      let a = K[0], b = K[K.length - 1];
+      for (let i = 0; i < K.length - 1; i += 1) {
+        if (t >= K[i][0] && t <= K[i + 1][0]) { a = K[i]; b = K[i + 1]; break; }
+        if (t > K[i + 1][0]) { a = K[i + 1]; b = K[i + 1]; }
+      }
+      const k = b[0] > a[0] ? Sm((t - a[0]) / (b[0] - a[0])) : 0;
+      arm = { aU: a[1] + (b[1] - a[1]) * k, aF: a[2] + (b[2] - a[2]) * k };
+      // 2.6~3.6 那一秒：手腕绕圈——"把村子围起来"
+      if (t > 2.6 && t < 3.6) {
+        const w = (t - 2.6) / 1.0 * Math.PI * 2 * 1.5;
+        arm.aU += Math.sin(w) * 0.22;
+        arm.aF += Math.cos(w) * 0.3;
+      }
+    } else if (seg === 2) {
+      // 交头接耳时手按着刀柄不动；3.5s 起白手套朝村里（画面左）连挥两下
+      const flick = Math.sin(C01((t - 3.5) / 0.8) * Math.PI * 2) * Sm((t - 3.5) / 0.15) * (1 - Sm((t - 4.4) / 0.2));
+      arm = { aU: -0.5 - Sm((t - 3.4) / 0.4) * 1.3, aF: -0.25 - flick * 0.55 };
+    }
+    OfficerArm(ox + 24 * S, oHead + 46 * S, arm.aU, arm.aF, "rmOffArm");
+
+    // 头（正面，含倾斜/点头）
+    ctx.save();
+    ctx.translate(ox, oHead + 8 * S);
+    ctx.rotate(tilt + nod * 0.4);
+    ctx.translate(0, nod * 5 * S);
+    // 脸
+    InkFill(ctx, [
+      [-16 * S, 14 * S], [-15 * S, -10 * S], [0, -16 * S], [15 * S, -10 * S],
+      [16 * S, 14 * S], [8 * S, 24 * S], [-8 * S, 24 * S],
+    ], "rmOffFace", RC.skin, { amp: 1.2 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.14)" });
+    // 大盖帽：帽檐影先把眉眼压进去
+    ctx.fillStyle = "rgba(16,12,8,0.5)";
+    ctx.fillRect(-14 * S, -4 * S, 28 * S, 7 * S);
+    // 圆框眼镜：两个细圈 + 中梁，镜片一线冷光
+    ctx.strokeStyle = "#1f1c14";
+    ctx.lineWidth = 1.6 * S;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(s * 7.4 * S, 2.4 * S, 5.6 * S, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-2 * S, 2 * S); ctx.lineTo(2 * S, 2 * S); ctx.stroke();
+    ctx.strokeStyle = "rgba(200,204,196,0.4)";
+    ctx.lineWidth = 1.2 * S;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(s * 7.4 * S, 2.4 * S, 4.2 * S, -1.9, -1.1);
+      ctx.stroke();
+    }
+    // 卫生胡：鼻下一小方块——荧幕上认太君的那一撮
+    InkFill(ctx, Rect(-4.6 * S, 9.6 * S, 9.2 * S, 4.4 * S), "rmStache", "#241a12", { amp: 0.4 * S, lw: 1.2 * S });
+    InkLine(ctx, -5 * S, 18.6 * S, 5 * S, 18.6 * S, "rmOffMouth", { lw: 1.8 * S, color: IN.inkSoft, amp: 0.5 * S });
+    // 大盖帽本体：帽墙绯红一整圈 + 星徽 + 黑檐
+    InkFill(ctx, [
+      [-19 * S, -6 * S], [-17 * S, -24 * S], [-6 * S, -30 * S], [6 * S, -30 * S],
+      [17 * S, -24 * S], [19 * S, -6 * S],
+    ], "rmOffCap", RC.capBody, { amp: 1.2 * S, lw: 2.6 * S });
+    InkFill(ctx, Rect(-19 * S, -10 * S, 38 * S, 7.4 * S), "rmOffBand", RC.capBand, { amp: 0.7 * S, lw: 2 * S });
+    ctx.beginPath();
+    ctx.arc(0, -6.4 * S, 2.6 * S, 0, Math.PI * 2);
+    ctx.fillStyle = RC.star;
+    ctx.fill();
+    InkFill(ctx, [
+      [-15 * S, -3.4 * S], [15 * S, -3.4 * S], [11 * S, 3.4 * S], [-11 * S, 3.4 * S],
+    ], "rmOffVisor", "#1c1a12", { amp: 0.6 * S, lw: 1.8 * S });
+    ctx.restore();
+
+    // —— 挎斗（车斗鼻子朝镜头，盖住太君腰以下）。
+    // 先画两根连杆把斗跟车焊在一起，斗身随后压住接头
+    for (const [y1, y2] of [[34, 32], [54, 52]]) {
+      InkLine(ctx, cx0 - 8 * S, gyS - y1 * S, ox - 40 * S, gyS - y2 * S, "rmStrut" + y1,
+        { lw: 3.4 * S, color: RC.motoDark, amp: 0.5 * S });
+    }
+    InkFill(ctx, [
+      [ox - 52 * S, gyS - 70 * S], [ox + 52 * S, gyS - 70 * S], [ox + 44 * S, gyS - 6 * S],
+      [ox - 44 * S, gyS - 6 * S],
+    ], "rmTub", RC.moto, { amp: 2 * S, lw: 3 * S, shade: "rgba(0,0,0,0.24)" });
+    InkLine(ctx, ox - 52 * S, gyS - 68 * S, ox + 52 * S, gyS - 68 * S, "rmTubRim",
+      { lw: 2.6 * S, color: "rgba(220,205,160,0.35)", amp: 0.8 * S });
+    // 斗鼻上一只备胎
+    ctx.beginPath();
+    ctx.ellipse(ox, gyS - 34 * S, 21 * S, 21 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.4 * S; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(ox, gyS - 34 * S, 9 * S, 9 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.motoDark;
+    ctx.fill();
+    ctx.stroke();
+    // 斗轮（右侧露半个）
+    ctx.beginPath();
+    ctx.ellipse(ox + 50 * S, gyS - 18 * S, 7 * S, 17 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.stroke();
+
+    // —— 车头（前轮/前叉/车把/大灯，最后画，压住驾驶兵的手）
+    const fx = cx0 - 40 * S;
+    // 先给车一个"身子"：发动机的黑铁块从驾驶兵身下一直落到轮后——没有这一块，
+    // 兵的躯干悬在半空，整个人读成飘着的（第一版就是）
+    InkFill(ctx, [
+      [dx - 22 * S, gyS - 60 * S], [dx + 24 * S, gyS - 60 * S],
+      [dx + 20 * S, gyS - 10 * S], [dx - 18 * S, gyS - 10 * S],
+    ], "rmEngine", RC.motoDark, { amp: 1.6 * S, lw: 2.4 * S, shade: "rgba(0,0,0,0.3)" });
+    // 骑手的两只马靴踩在踏板上，露在车身两侧
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [dx + s * 24 * S - 6 * S, gyS - 30 * S], [dx + s * 24 * S + 7 * S, gyS - 30 * S],
+        [dx + s * 26 * S + 8 * S, gyS - 12 * S], [dx + s * 26 * S - 7 * S, gyS - 12 * S],
+      ], "rmBoot" + s, "#1f1c14", { amp: 1 * S, lw: 2 * S });
+    }
+    ctx.beginPath();
+    ctx.ellipse(fx, gyS - 26 * S, 10 * S, 26 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.6 * S; ctx.stroke();
+    // 前挡泥板
+    InkFill(ctx, [
+      [fx - 13 * S, gyS - 48 * S], [fx + 13 * S, gyS - 48 * S],
+      [fx + 15 * S, gyS - 38 * S], [fx - 15 * S, gyS - 38 * S],
+    ], "rmFender", RC.moto, { amp: 1.2 * S, lw: 2.2 * S });
+    // 前叉两根到车把
+    for (const s of [-1, 1]) {
+      InkLine(ctx, fx + s * 7 * S, gyS - 46 * S, fx + s * 9 * S, gyS - 92 * S + jit, "rmFork" + s,
+        { lw: 3 * S, color: RC.motoDark, amp: 0.6 * S });
+    }
+    // 车把一横，两端握把
+    InkLine(ctx, fx - 56 * S, gyS - 94 * S + jit, fx + 52 * S, gyS - 92 * S + jit, "rmBar",
+      { lw: 4.4 * S, color: RC.motoDark, amp: 0.8 * S });
+    // 大灯：一只圆灯 + 冷白的一圈弱光（灯是亮的——阴天里这点光反而瘆人）
+    const lyS = gyS - 72 * S + jit;
+    const glow = ctx.createRadialGradient(fx, lyS, 2 * S, fx, lyS, 60 * S);
+    const gk = 0.3 + Math.sin(t * 13) * 0.04;
+    glow.addColorStop(0, `rgba(216,210,176,${gk})`);
+    glow.addColorStop(1, "rgba(216,210,176,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(fx - 64 * S, lyS - 64 * S, 128 * S, 128 * S);
+    ctx.beginPath();
+    ctx.ellipse(fx, lyS, 12 * S, 12 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#b3ad8e";
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.4 * S; ctx.stroke();
+  };
+
+  // ---- 伪军头目（seg2 走进来交头接耳；侧脸朝左） ----------------------------
+  const Chief = () => {
+    if (seg !== 2) return;
+    const walkIn = Sm(t / 1.6);
+    const x0 = 500 - (500 - 138) * walkIn;      // 从画右走到斗沿
+    const lean = Sm((t - 1.7) / 0.5) * (1 - Sm((t - 3.6) / 0.5));   // 凑过去
+    const turn = Sm((t - 3.9) / 0.5);           // 回身派活
+    const px = PX(x0), gyS = GY * S;
+    const hgt = 182;
+    const walk = (t < 1.6 || turn > 0.6) ? t * 7.5 : 0;
+    const step = walk ? Math.sin(walk) * 8 : 0;
+    // 腿（侧视两条）——比伪军的灰土布再深一档：他站在近景，浅了就发飘
+    InkLine(ctx, px - step * S * 0.4, gyS - hgt * 0.44 * S, px - (13 + step) * S, gyS - 2 * S, "rmChLegB", { lw: 8 * S, color: "#3a352c", amp: 1.2 * S });
+    InkLine(ctx, px + step * S * 0.4, gyS - hgt * 0.44 * S, px + (6 + step) * S, gyS - 2 * S, "rmChLegF", { lw: 8.6 * S, color: "#443e33", amp: 1.2 * S });
+    // 躯干：凑过去时朝左折
+    const bend = lean * 0.34 - turn * 0.2;
+    const sx = px - Math.sin(bend) * hgt * 0.36 * S;
+    const sy = gyS - hgt * (0.44 + 0.34 * Math.cos(bend)) * S;
+    InkFill(ctx, [
+      [px - 15 * S, gyS - hgt * 0.42 * S], [sx - 16 * S, sy], [sx + 14 * S, sy + 6 * S],
+      [px + 17 * S, gyS - hgt * 0.42 * S],
+    ], "rmChBody", "#4a4436", { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.24)" });
+    // 挎包
+    InkFill(ctx, Rect(px + 6 * S, gyS - hgt * 0.40 * S, 14 * S, 17 * S), "rmChSat", "#3f382c", { amp: 1.2 * S, lw: 2 * S });
+    // 头（侧脸朝左）＋软帽；回身时翻朝右
+    const hx = sx + (turn > 0.5 ? 8 : -4) * S, hy = sy - 20 * S + lean * 6 * S;
+    const fdir = turn > 0.5 ? 1 : -1;
+    InkFill(ctx, [
+      [hx - fdir * 14 * S, hy + 12 * S], [hx - fdir * 13 * S, hy - 10 * S], [hx, hy - 14 * S],
+      [hx + fdir * 13 * S, hy - 8 * S], [hx + fdir * 15 * S, hy + 4 * S], [hx + fdir * 10 * S, hy + 13 * S],
+    ], "rmChHead", RC.skin, { amp: 1.2 * S, lw: 2.6 * S });
+    InkFill(ctx, [
+      [hx - fdir * 16 * S, hy - 6 * S], [hx - fdir * 10 * S, hy - 17 * S], [hx + fdir * 10 * S, hy - 17 * S],
+      [hx + fdir * 15 * S, hy - 4 * S], [hx + fdir * 10 * S, hy - 1 * S], [hx - fdir * 12 * S, hy - 1 * S],
+    ], "rmChCap", RC.puppetCap, { amp: 1.4 * S, lw: 2.2 * S });
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(hx + fdir * 6 * S - 2 * S, hy + 1 * S, 4.4 * S, 2.4 * S);   // 眼
+    // 胳膊：凑着说话时一只手拢在嘴边；回身时手朝村里一指
+    if (turn > 0.4) {
+      const k = Sm((t - 4.0) / 0.5);
+      InkLine(ctx, sx, sy + 8 * S, sx - 30 * S * (1 - k) - 4 * S, sy + 30 * S - 44 * S * k, "rmChPoint",
+        { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+    } else if (lean > 0.3) {
+      // 拢在嘴边的那只手——"交头接耳"的画面记号
+      InkLine(ctx, sx + 6 * S, sy + 10 * S, hx - 10 * S, hy + 8 * S, "rmChCup", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+      ctx.beginPath();
+      ctx.ellipse(hx - 12 * S, hy + 7 * S, 5.4 * S, 4.4 * S, -0.5, 0, Math.PI * 2);
+      ctx.fillStyle = RC.skinDark;
+      ctx.fill();
+      ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6 * S; ctx.stroke();
+    } else {
+      InkLine(ctx, sx, sy + 8 * S, px - 6 * S + step * S * 0.5, gyS - hgt * 0.42 * S, "rmChArm", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+    }
+  };
+
+  // ---- 组装（后景先画） ------------------------------------------------------
+  JpRank(-430, 302, 58, "rmJp2");
+  JpRank(-322, 308, 70, "rmJp1");
+  JpRank(-212, 316, 84, "rmJp0");
+  Moto();
+  Chief();
+  // 开道的伪军：两个近景大脸（seg0 的起手画面）+ 两个押在半道的
+  FrontPuppet(258, 332, 116, "rmPupD");
+  FrontPuppet(334, 336, 124, "rmPupE");
+  FrontPuppet(575, 366, 214, "rmPupA", { walk: t * 6.4, drift: t * 13 });
+  FrontPuppet(668, 352, 186, "rmPupB", { walk: t * 6.4 + 2.2, drift: t * 13 });
+
+  // 脚下的浮尘
+  Speckle(ctx, 0, (GY - 10) * S, W, H - (GY - 12) * S, "rmDust", { count: 46, alpha: 0.12, size: 3 * S, color: "#2e2820" });
+
+  // ---- 冷罩 + 重角晕：这一镜就是"天阴下来"本身 ------------------------------
+  ctx.fillStyle = "rgba(13,17,30,0.19)";
+  ctx.fillRect(0, 0, W, H);
+  const v = ctx.createRadialGradient(W / 2, H * 0.52, H * 0.24, W / 2, H * 0.52, H * 0.86);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(8,9,14,0.72)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "rmGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
+}
+
+// 过场活动插卡的登记表：World.SetInsertCard 见到这里的名字就走每帧重画那条路。
+// 新加一张卡＝这里登记 + 剧本行 cam: { kind: "insertCard", card: 名字, seg: n }
+export const INSERT_LIVE = { raidMoto: DrawRaidMotoCard };
+
+// ---------------------------------------------------------------------------
 // 刨料特写卡（会动的那一张，和下面的划线卡同一套路数）。
 //
 // 为什么也得单独画一张：世界里那把刨子只有 0.34m，2.05m 的特写下在 844×390 的
@@ -6486,6 +7295,45 @@ export function DrawPrologueCard(ctx, W, H, kind) {
 // 拍出来的），插一把三齿粪叉、边上倒扣一只荆条粪筐；街边公共粪堆踩得半塌、
 // 顶上撒一层灰白草木灰、插一根秫秸秆做记号（各家的粪不能混）。
 // 颜色是干透的灰褐带草茬，**不是黑泥**。
+// 摊开的新土：挖通道倒出来那一薄层
+//
+// 这东西的**要害是"薄"**。倒土那一拍的台词一直在讲「只垫浅浅一层——铺厚了，
+// 就是一堆显眼的新土」，所以它绝不能画成一个土堆：堆起来就等于把这句话演反了。
+// 高度按真尺寸给（15cm 上下，PPM 48 ≈ 7px），宽度反倒要拉开——摊得越开越不显眼，
+// 这正是"分散消纳"这件事本身。
+// 颜色比表土深一档：深层黏土见了光就是这个色，也正因为深，撒进菜畦一眼就穿。
+export function DrawFreshDirt(ctx, x, groundY, w, id) {
+  const W = w, H = 7;
+  const top = [];
+  for (let i = 0; i <= 9; i += 1) {
+    const t = i / 9;
+    // 中间略厚两头收薄——是倒下去再耙开的形状，不是拍出来的棱堆
+    const swell = Math.sin(t * Math.PI) * H * 0.72;
+    top.push([x - W / 2 + W * t, groundY - swell + Sym(id + "t", i, 1.1)]);
+  }
+  // 颜色按 sRGB 那条老账压两档：浅色摊在土地上等于没画（同 UpdateDirtPour 的土粒）
+  InkFill(ctx, top.concat([[x + W / 2, groundY], [x - W / 2, groundY]]), id,
+    "#3d3021", { amp: 1.4, lw: 1.3, shade: "rgba(24,18,10,0.3)" });
+  // 没耙散的土疙瘩：新土的记号就在这儿——耙得再匀，黏土也会结块
+  for (let i = 0; i < 7; i += 1) {
+    const cx = x - W / 2 + 5 + Rnd(id + "c", i) * (W - 10);
+    const r = 1.4 + Rnd(id + "cr", i) * 1.6;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#2e2417";
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY - 1.4 - Rnd(id + "cy", i) * 3, r, r * 0.7, Rnd(id + "ca", i) * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 耙痕：横着一道道，说明有人把它摊开过（不是倒完就走）
+  for (let i = 0; i < 3; i += 1) {
+    const ly = groundY - 1.6 - i * 1.8;
+    InkLine(ctx, x - W / 2 + 4, ly, x + W / 2 - 4, ly + Sym(id + "r", i, 1),
+      id + "rake" + i, { lw: 0.9, color: "rgba(40,31,20,0.34)", amp: 0.8 });
+  }
+}
+
 export function DrawDungHeap(ctx, x, groundY, id, { street = false } = {}) {
   const W = street ? 46 : 38, H = street ? 15 : 20;
   const top = [];
