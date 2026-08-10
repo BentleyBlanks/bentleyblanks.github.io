@@ -625,6 +625,18 @@
       },
       "note": "窖壁上的藏口：浅坑+靠着的覆土板。grainHidden 画进粮袋、nookClosed 把板合上（World propRedraw）"
     },
+    "tunnelBrace": {
+      "art": "DrawTunnelBrace",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 44,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "玩家亲手支上去的顶木（bracedA/bracedB 两处松土段）。level: under；band 走 loose——它在爬行段的行走线上，必须压在近侧土层剖面之前，否则支完了什么也看不见。爬行段净高 0.72m，所以贴图只有 44px 高（≈0.9m 含楔子）"
+    },
     "dungHeap": {
       "art": "DrawDungHeap",
       "band": "walk",

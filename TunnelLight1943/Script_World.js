@@ -150,7 +150,8 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
   "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
-  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
+  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔",
+  "包袱布", "榆钱包袱"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
@@ -161,6 +162,7 @@ const HOLD_WEIGHT = {
   "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
   "军刀": 0.25, "木槌": 0.3,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
+  "包袱布": 0.12, "榆钱包袱": 0.06,   // 一包榆钱：孩子抱得动，也正因为轻，抢它才更难看
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 // 姿势进度（Rig 的 poseK）由**姿势名**挑驱动它的那个字段，不许拿 ?? 串下来：
@@ -170,7 +172,8 @@ const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 function PoseProgress(o) {
   if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
   // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲，都走 poseU
-  if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull") return o.poseU;
+  if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
+    || o.pose === "braceUp") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -183,7 +186,7 @@ function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
-    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
+    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子", "包袱布", "榆钱包袱"];
   // 收窄后的画幅，别再给一根柱子留地方。
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
   // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
@@ -1607,6 +1610,11 @@ export function CreateWorld(canvasEl) {
         });
         break;
       }
+      case "tunnelBrace":
+        // 玩家支上去的顶木：高度按爬行段的净高来（0.74m ≈ 36px），板面正好抵在
+        // 洞顶那条线上——比洞顶矮一截就成了"戳在半空的棍子"
+        mk((ctx, ax, ay) => ART.DrawTunnelBrace(ctx, ax, ay, S.w - 14, 0.74 * PPM, p.id));
+        break;
       case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false, slogan: p.slogan })); break;
       case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
       case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
@@ -2449,6 +2457,9 @@ export function CreateWorld(canvasEl) {
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
+    // 姿势名要留给 SyncCarry：有几个姿势会改变"东西挂在哪儿"（顶撑木那一拍
+    // 板子在**两只手上**，不在肩上），挂点必须跟着姿势走
+    s.poseName = extra.pose || null;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
@@ -2569,7 +2580,11 @@ export function CreateWorld(canvasEl) {
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = ALONG_ARM.includes(label);
-    const inHand = IsHandHeld(label);
+    // 顶撑木那一拍：板子离开肩膀，横在**两只手上**往洞顶推。挂点改走 HandPoint，
+    // 板面保持水平（顶木是横着抵住土的，歪着就成了戳）——不改这一处，
+    // 玩家举了半天手，板子还老老实实趴在肩上（"撑起来了却看不见"就是这么来的）
+    const overhead = s.poseName === "braceUp";
+    const inHand = overhead || IsHandHeld(label);
     // HandPoint/ShoulderPoint 给的是**世界**坐标；背景层带着自己的缩放与 z 偏移，
     // 直接拿去当局部坐标，锄头会飞到十几米外。换算回本层的局部系再摆
     const ToLocal = (v) => (layerKey === "play" ? v : host.worldToLocal(v));
@@ -2579,9 +2594,9 @@ export function CreateWorld(canvasEl) {
     // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
     // 柱子（才一米出头）手里的桶就杵在地上了。
     // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
-    const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
+    const forward = inHand && !alongArm && !overhead ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
     s.carryMesh.position.set(anchor.x + forward,
-      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
+      anchor.y + (alongArm ? 0 : overhead ? 0.05 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
@@ -2702,7 +2717,7 @@ export function CreateWorld(canvasEl) {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
         // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
-        // 翻越取 vaultK、刨料取 poseU（推程）、投石取 poseK（拉弓量），见 PoseProgress
+        // 翻越取 vaultK、刨料/顶撑木取 poseU、投石取 poseK（拉弓量），见 PoseProgress
         lift: p.lift || 0, poseK: PoseProgress(p),
         // 摇辘轳：把摇把握手的世界坐标换算成骨架局部坐标交给 Rig 反解——
         // 手是真的攥在那根把手上，不是照着一条相位在半空画圈
@@ -3464,8 +3479,12 @@ export function CreateWorld(canvasEl) {
           // 榆钱雨：一把青黄的小圆片从冠里簌簌往下飘，左摇右摆地落
           const t = state.elmRain.t;
           c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.6);
+          // 起落高度由发起处给：树上抖下来是 1.9m（井台那棵老榆），
+          // 从被扯开的包袱里洒出来只有 0.75m——不写这一档，院子里没有树，
+          // 榆钱就是从半空凭空落下来的（实拍逮到的）
+          const H0 = state.elmRain.from ?? 1.9;
           for (let i = 0; i < 14; i += 1) {
-            const h0 = 1.9 + ART.Hash("er" + i) * 0.5;                    // 各自的起飞高度
+            const h0 = H0 + ART.Hash("er" + i) * (H0 > 1.2 ? 0.5 : 0.18);   // 各自的起飞高度
             const fall = Math.max(0, t - ART.Hash("ed" + i) * 0.5);       // 错峰往下掉
             const y = Math.max(0.05, h0 - fall * 1.1);
             const sx = 160 + (ART.Hash("ex" + i) - 0.5) * 66
@@ -3521,7 +3540,8 @@ export function CreateWorld(canvasEl) {
         }
         dustMesh.material.map.needsUpdate = true;
         dustMesh.visible = true;
-        dustMesh.position.set(vd.x, SURFACE_Y + 0.42, 0.52);
+        // 顶撑木也用它（顶实那一下洞顶簌簌落土），所以这团土得认得出自己在哪一层
+        dustMesh.position.set(vd.x, (vd.level === "under" ? UNDER_Y : SURFACE_Y) + 0.42, 0.52);
       } else if (dustMesh) dustMesh.visible = false;
     }
 

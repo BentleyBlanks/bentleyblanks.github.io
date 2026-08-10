@@ -107,6 +107,20 @@ function SceneOf(state) { return SCENES[CHAPTERS[state.chapterIndex].scene]; }
 // ---------------------------------------------------------------------------
 export const CART_REACH = 2.6;   // 手边有车 = 推着它（翻越判定用的是同一个数）
 
+// ---------------------------------------------------------------------------
+// 镜头会不会自己动：**总开关，默认关**
+// ---------------------------------------------------------------------------
+// 2026-08-10 用户定：「目前我看不需要这个自动摇动镜头的功能，把这个开关/功能
+// 默认关闭吧」。所以窖口探头（走到地窖口镜头自动下沉、把脚底下那间窖带进画框）
+// 整个停用——镜头**只跟着人走**，不自己找东西看。
+//
+// 机制照旧留在代码里（Core 算 cellarPeek、Main 的 BaseShot 用它压低 y、
+// state.steadyCam 那套让位判据都在），要回来只需把这一行改成 true。
+// 代价说在前头：关掉之后，站在窖口按 S 之前是看不见那间窖的——
+// 地表机位的下边沿只到 −1.7m，窖底在 −3.6m。真要让玩家"下去之前先看见"，
+// 下次换别的路子（一拍固定机位的插入镜、或者过场里交代），别再默认开自动摇镜。
+export const CAM_CELLAR_PEEK = false;
+
 export function PushingCart(state) {
   return !!state.cart && Math.abs(state.player.x - state.cart.x) < CART_REACH;
 }
@@ -1448,23 +1462,72 @@ function StepChain(state, def, input, dt) {
           }
         }
       }
+      // 走开了就把顶木的姿势收回去（脚本设的 pose 没有 poseT，不会自己到期——
+      // 不收的话人会一路跪着爬出地道）
+      if (!z || (st.needs && p.item?.id !== st.needs)) {
+        if (p.pose === "braceUp") { p.pose = null; p.poseU = undefined; }
+        if (b.holdP) b.holdP = Math.max(0, b.holdP - dt * 1.2);
+      }
       if (!z) return;
       if (st.needs && p.item?.id !== st.needs) {
         state.prompt = st.missPrompt || `这儿缺${st.needsLabel || "木板"}`;
         return;
       }
-      state.prompt = z.ok ? (st.prompt || "E · 把木板支上") : (st.wrongPrompt || st.prompt || "E · 把木板支上");
-      if (input.interact) {
-        if (z.ok) {
-          p.item = null;
-          if (z.flag) state.flags[z.flag] = true;
-          FlashPose(state, "push", 0.6);
-          Cue(state, "tenon");
-          finish();
-        } else {
-          st.wrong?.(state);
-          state.toast = { text: st.wrongNote || "硬土不用糟践木头。", t: 3.5 };
+      // 支顶木是**往上顶**：跪在爬行段里，两只手把板一寸一寸推到洞顶。
+      // 老版是按一下 E + 0.6 秒的 push 姿势闪，画面上"扛起来"和"撑起来"
+      // 一样什么都没有（用户 2026-08-10：「我在画面上完全看不到」）。
+      // 现在走全作通用的笔画做功（stroke:"up"，与撑木/顶棉被同一套账本），
+      // 手往上抹一下顶进去一分，松手泄掉——姿势由进度驱动（braceUp 的 poseK）。
+      // 换了一处支撑位就重新起算（顶了一半挪窝，不该把力气带过去）
+      if (b.braceAt !== z.x) { b.braceAt = z.x; b.holdP = 0; b.strokeMem = null; }
+      if (b.holdP === undefined) b.holdP = 0;
+      const need = st.hold || 1.0;
+      p.pose = "braceUp";
+      p.poseU = Math.min(1, b.holdP / need);
+      // 顶木要顶在**松土那一段**上，人就得跪在那儿——手上使着劲还能一边往前爬，
+      // 板子就顶到别处去了。跟辘轳挂桶同一条规矩：**动手之后**才把人钉在工位上
+      //（一上来就钉会把只是路过、要去支另一头的玩家一把揪住）
+      if (b.holdP > 0) {
+        const side = p.x <= z.x ? -1 : 1;
+        p.x = z.x + side * 0.45;
+        p.heading = -side;
+      } else {
+        p.heading = z.x >= p.x ? 1 : -1;
+      }
+      // 这是指尖够不着、抡不开膀子的活，机位得推进来才看得见板顶到了哪儿。
+      // 画框以**人和支撑位的中点**为心（只对着支撑位的话人会挂在画框边上）
+      // 画框以人为主、支撑位为辅（六四开）：只对着中点的话，人被挤到画框边上，
+      // 而这一拍要看的正是他把板举上去这件事
+      state.closeUp = { x: p.x * 0.62 + z.x * 0.38, y: UNDER_Y + 0.40, hw: 1.9 };
+      state.prompt = z.ok ? (st.prompt || "把木板顶上去 · 往上使劲")
+        : (st.wrongPrompt || st.prompt || "把木板顶上去 · 往上使劲");
+      state.promptFill = b.holdP / need;
+      const g = StrokeWork(state, b.strokeMem || (b.strokeMem = {}), input, dt, {
+        hold: need, stroke: "up", at: { x: z.x, y: 0.55, baseY: UNDER_Y },
+      });
+      if (g > 0) {
+        b.holdP += g;
+        // 每顶实一截"咯"一声：木头咬进土里，不是一路无声推到头
+        if (Math.floor(b.holdP / need * 4) > Math.floor((b.holdP - g) / need * 4)) {
+          Cue(state, "tenon", { gain: 0.55 + (b.holdP / need) * 0.45 });
         }
+        if (b.holdP >= need) {
+          b.strokeMem = null; b.holdP = 0;
+          p.pose = null; p.poseU = undefined;
+          if (z.ok) {
+            p.item = null;
+            if (z.flag) state.flags[z.flag] = true;
+            Cue(state, "tenon", { gain: 1.0 });
+            state.vaultDust = { x: z.x, t: 0, level: "under" };   // 顶实那一下，洞顶簌簌掉一层土
+            finish();
+          } else {
+            // 支在硬土上：爹当场把板取下来还给你（东西不丢，只是白费一趟力气）
+            st.wrong?.(state);
+            state.toast = { text: st.wrongNote || "硬土不用糟践木头。", t: 3.5 };
+          }
+        }
+      } else if (!input.interactHeld) {
+        b.holdP = Math.max(0, b.holdP - dt * 1.2);
       }
       return;
     }
@@ -2603,7 +2666,10 @@ export const SCRIPTS = {
           onFilled: (state) => { state.flags.waterFilled = true; },
           effect: (state) => {
             const sis = FindActor(state, "sister");
-            if (sis) { sis.track = null; sis.carry = "包袱"; sis.following = true; sis.cineTarget = null; }
+            // 「包袱」不是登记过的携带物标签——DrawCarry 认不出它，就掉进兜底那一支
+            // 画成一根一米六的板子，妹妹从井台起一路扛着块门板回家。标签必须写全
+            //（第十一场那一拍要夺的就是它，认不出来这戏也没法演）
+            if (sis) { sis.track = null; sis.carry = "包袱布"; sis.following = true; sis.cineTarget = null; }
           } },
         { type: "goto", zone: { x: 38.5, w: 3 },
           effect: (state) => {
@@ -2731,14 +2797,15 @@ export const SCRIPTS = {
         { type: "pickup", x: 39.2, level: "under", item: { id: "plankOldA", label: "旧门板", big: true },
           prompt: "E · 扛起旧门板" },
         { type: "brace", level: "under", needs: "plankOldA",
-          zones: [{ x: 43.0, ok: true, flag: "bracedA" }, { x: 44.5, ok: false }, { x: 45.3, ok: true, flag: "bracedB" }],
-          prompt: "E · 把木板支上",
+          zones: [{ x: 43.5, ok: true, flag: "bracedA" }, { x: 44.5, ok: false }, { x: 45.3, ok: true, flag: "bracedB" }],
+          hold: 1.0, prompt: "把木板顶上去 · 往上使劲",
+          note: "顶实了。板子上头压着的那截松土，不再往下掉渣。",
           wrongNote: "爹把板子取了下来：这段是硬土，不用糟践木头。" },
         { type: "pickup", x: 39.2, level: "under", item: { id: "plankOldB", label: "旧门板", big: true },
           prompt: "E · 扛起旧门板" },
         { type: "brace", level: "under", needs: "plankOldB",
-          zones: [{ x: 43.0, ok: true, flag: "bracedA" }, { x: 44.5, ok: false }, { x: 45.3, ok: true, flag: "bracedB" }],
-          prompt: "E · 把木板支上",
+          zones: [{ x: 43.5, ok: true, flag: "bracedA" }, { x: 44.5, ok: false }, { x: 45.3, ok: true, flag: "bracedB" }],
+          hold: 1.0, prompt: "把木板顶上去 · 往上使劲",
           note: "洞口和松土段都撑住了。",
           wrongNote: "爹把板子取了下来：这段是硬土，不用糟践木头。" },
         // 收尾清痕：筐印、脚印、新土的边——扫散颜色和边界，痕迹本身就是暴露
@@ -2950,39 +3017,48 @@ export const SCRIPTS = {
           } },
         { who: "刘嫂", say: "上回都交走了……孩子还没奶吃，真没有了。", d: 4.4,
           cam: { kind: "shot", x: 62.5, y: 1.4, dist: 7.5 } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
+        // 打倒刘家老人。**先站到一臂之内再抡**（同第十一场那条：接触戏靠间距演，
+        // 隔着两三米抡得再狠也是各做各的操）——老人 65.4，抡的兵挪到 64.7
+        { stage: "", d: 2.4, cam: { kind: "shot", x: 65.0, y: 1.4, dist: 3.6 },
           on: (state) => {
             const le = FindActor(state, "liuElder");
-            if (le) le.track = { name: "struckFall", t: -0.95 };
+            if (le) { le.x = 65.4; le.heading = -1; le.track = { name: "struckFall", t: -0.95 }; }
             const r1 = FindActor(state, "raid1");
-            if (r1) r1.track = { name: "buttStrike", t: 0 };
+            if (r1) { r1.cineTarget = null; r1.x = 64.7; r1.heading = 1; r1.track = { name: "buttStrike", t: 0 }; }
+            Cue(state, "drop", { gain: 1.1, rate: 0.8, delay: 0.95 });
           } },
-        { stage: "", d: 2.4, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
+        // 从刘嫂怀里强行夺走襁褓。这一下过去只有一行 carry 换手，谁也没伸手——
+        // 现在走跟妹妹那个包袱同一对轨道（夺 / 被夺），孩子是被**扯**过去的
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 63.8, y: 1.3, dist: 3.0 },
           on: (state) => {
-            // 从刘嫂怀里强行夺走襁褓；刘嫂扑过去
             const ls = FindActor(state, "liusao");
             const r2 = FindActor(state, "raid2");
-            if (ls) { ls.carry = null; ls.track = { name: "pressedStruggle", t: 0 }; }
-            if (r2) { r2.carry = "襁褓"; r2.heading = -1; }
-            Cue(state, "sobBreath", { gain: 0.8 });
+            if (r2) {
+              r2.cineTarget = null; r2.x = 64.2; r2.heading = -1;
+              r2.carry = "襁褓"; r2.track = { name: "snatchGrab", t: 0 };
+            }
+            if (ls) { ls.x = 63.4; ls.heading = 1; ls.carry = null; ls.track = { name: "snatchLose", t: -0.45 }; }
+            Cue(state, "sobBreath", { gain: 0.8, delay: 0.5 });
           } },
-        { stage: "", d: 2.8, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8 },
+        // 刘嫂跪着扑过去，被枪托砸倒
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 63.9, y: 1.3, dist: 3.4 },
           on: (state) => {
             const ls = FindActor(state, "liusao");
-            if (ls) ls.track = { name: "struckFall", t: -0.6 };
+            if (ls) ls.track = { name: "struckFall", t: -0.95 };
             const r2 = FindActor(state, "raid2");
             if (r2) r2.track = { name: "buttStrike", t: 0 };
+            Cue(state, "drop", { gain: 1.0, rate: 0.85, delay: 0.95 });
           } },
         // 刺刀（剧本§10 明令必须明确表现：刺刀动作、襁褓随枪身离地；
         // 同时不做伤口特写、不慢镜、不煽情配乐——机位钉在院门外侧不推近）。
         // 起因不是刘家做错了什么：抢不到粮，就以杀害婴儿逼供并恐吓全村
-        { stage: "", d: 2.6, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8.5 },
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 62.0, y: 1.5, dist: 8.5 },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
             if (r2) { r2.carry = "步枪"; r2.heading = -1; r2.track = { name: "bayonetThrust", t: 0 }; }
             Cue(state, "whoosh", { gain: 0.5 });
           } },
-        { stage: "", d: 2.4, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8.5 },
+        { stage: "", d: 2.4, cam: { kind: "shot", x: 62.0, y: 1.5, dist: 8.5 },
           on: (state) => {
             // 襁褓随枪身离地：挑起的姿势停在高位，襁褓挂在手点上就在高处。
             // 哭声到这儿断了——同期声自己说话，旁白闭嘴
@@ -3051,116 +3127,236 @@ export const SCRIPTS = {
       ],
     },
     {
-      // 梁家搜查：门被踹开就收回控制——不给玩家留一个只能被空气墙挡回来的
-      // 假自由。无力感来自事件本身，不来自按住一个"忍耐键"（文档明令，无 QTE）
+      // 第十一场后半（梁家搜查）：门被踹开就收回控制——不给玩家留一个只能被
+      // 空气墙挡回来的假自由。无力感来自事件本身，不来自按住一个"忍耐键"
+      //（文档明令，无 QTE）。
+      //
+      // 2026-08-10 重做。用户原话：「这他妈扇耳光，夺走布什么的一个动画都没做啊」
+      // ——实拍逐行核过，属实。旧版三处全是假的：
+      //   ① 夺包袱只有一行 `sis.carry = null`，兵既没伸手也没拿到东西；
+      //   ② "一记耳光"借了抡枪托的 buttStrike，而且兵站在三米开外抡空气；
+      //   ③ 踹柱子只有一个静止的 kneel。
+      // 重做的两条原则，往后这类戏照这个来：
+      //   **A. 动手的和挨手的必须先站到一臂之内。**接触戏在横版里全靠间距演——
+      //      隔着三米抡得再狠也是两个人各做各的操。每一拍先把两个人摆到
+      //      0.5~0.8m（半个身位＋一条胳膊），再起轨道。
+      //   **B. 每个动作有自己的轨道，受方的轨道从负数起。**负的那一段是"等"，
+      //      让挨的那一下正好落在施的那一下上（见 Rig 的 TRACKS：slap /
+      //      slappedFall / kickGut / gutFold / snatchGrab / snatchLose / clutchArm /
+      //      heldBack / shakeOut / shovePush / shovedBack）。
+      // 机位也一并重排：旧版十八行全是 dist 6.5~9 的同一个双人中景，
+      // 一个景别演到底。现在按内容分档——接触戏推到 2.6~3.4，问话走过肩，
+      // 收队才退回 8.5（全作只有一个景别档，所以只许往里推，不许拉全景）。
       kind: "cinematic", id: "c1_search", timeOfDay: "dawn",
       lines: [
-        { stage: "", d: 2.0, cam: { kind: "shot", x: 40, y: 1.5, dist: 7 },
+        // ① 门被踹开，一家四口被赶到院里。站位从这儿定死，后面每一拍都按它挪：
+        //    妹妹 36.9 ｜ 娘 38.6 ｜ 柱子 39.4 ｜ 爹 40.0（工作台 40.5 就在他手边，
+        //    军曹等下看见的新刨花就在那儿）
+        { stage: "", d: 2.4, cam: { kind: "shot", x: 39.6, y: 1.5, dist: 5.8 },
           on: (state) => {
             Cue(state, "knock", { gain: 1.4 });
-            state.player.cineWalk = { x: 38.6, speed: 2.6 };
+            state.player.cineWalk = { x: 39.4, speed: 2.6 };
             const father = FindActor(state, "father");
-            if (father) { father.x = 39.8; father.heading = 1; }
+            if (father) { father.x = 40.0; father.heading = 1; }
             const mother = FindActor(state, "mother");
-            if (mother) { mother.x = 38; mother.heading = 1; }
+            if (mother) { mother.x = 38.0; mother.heading = 1; }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.x = 37.2; sis.heading = 1; sis.cineTarget = null; }
-            for (const [id, tx] of [["raid1", 43.4], ["raid2", 41.6], ["baozhang", 46.4], ["puppetChief", 45.2], ["officer", 44.4]]) {
+            if (sis) { sis.x = 36.9; sis.heading = 1; sis.cineTarget = null; sis.carry = "包袱布"; }
+            for (const [id, tx] of [["raid1", 41.6], ["raid2", 41.0], ["baozhang", 43.4], ["puppetChief", 42.4], ["officer", 43.0]]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: tx }; a.cineSpeed = 2.6; a.heading = -1; }
             }
           } },
-        { who: "伪保长", say: "梁木匠——两口大人，两个孩子。", d: 3.8,
-          cam: { kind: "shot", x: 42, y: 1.4, dist: 7 } },
-        { stage: "", d: 2.8, cam: { kind: "shot", x: 39.5, y: 1.4, dist: 6.5 },
+        // ② 点名。册子那一头才是这场戏真正的主人——先给伪保长和他手里那本册
+        { who: "伪保长", say: "梁木匠——两口大人，两个孩子。", d: 3.6,
+          cam: { kind: "shot", x: 42.2, y: 1.4, dist: 4.2 } },
+        // ③ 翻家：水瓢、被褥、然后跳进旧地窖
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 39.4, y: 1.4, dist: 5.2 },
           on: (state) => {
-            // 翻水瓢、踢被褥、跳进旧地窖翻找
             Cue(state, "drop", { gain: 1.1 });
             const r2 = FindActor(state, "raid2");
             if (r2) { r2.cineTarget = null; r2.level = "under"; r2.x = 38.8; r2.heading = 1; }
           } },
-        // 侧口的覆土板：黑黢黢一块，什么也看不出来——种子粮就在它后面
-        { stage: "", d: 2.6, cam: { kind: "insert", x: 47.6, y: -2.4, dist: 3.8 } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 39.5, y: 1.4, dist: 6.5 },
+        // ④ 侧口的覆土板：黑黢黢一块，什么也看不出来——种子粮就在它后面。
+        //    这一镜是玩家上一拍亲手盖的那块板，插入特写收到 2.6
+        { stage: "", d: 2.4, cam: { kind: "insert", x: 47.6, y: -2.5, dist: 2.6 } },
+        // ⑤ 夺包袱：兵从窖里上来，**走到妹妹跟前**（37.7，隔她 0.8m）一把攥过去。
+        //    包袱真的换手——他手里从此有一件东西，她手里空了
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 37.4, y: 1.15, dist: 2.9 },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
-            if (r2) { r2.level = "surface"; r2.x = 40.4; r2.heading = -1; }
-            // 夺走妹妹的包袱：榆钱洒了一地
+            if (r2) {
+              r2.level = "surface"; r2.x = 37.7; r2.heading = -1;
+              r2.carry = "包袱布"; r2.track = { name: "snatchGrab", t: 0 };
+            }
             const sis = FindActor(state, "sister");
-            if (sis) sis.carry = null;
-            state.elmRain = { x: 37.4, t: 0.6 };
-            Cue(state, "flutter", { gain: 0.7 });
+            if (sis) { sis.carry = null; sis.heading = 1; sis.track = { name: "snatchLose", t: -0.45 }; }
+            Cue(state, "pickup", { gain: 0.9, rate: 0.8 });
           } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 38.5, y: 1.3, dist: 6.5 },
+        // ⑥ 抖开：里面只有刚捡回来的榆钱，洒了一地。包袱抖空了（换成空包袱的画法），
+        //    妹妹下意识蹲下去捡——她够的是地上的榆钱，不是兵
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 37.5, y: 1.1, dist: 2.8 },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
-            if (r2) r2.track = { name: "buttStrike", t: 0 };
+            if (r2) { r2.track = { name: "shakeOut", t: 0 }; r2.carry = "榆钱包袱"; }
             const sis = FindActor(state, "sister");
-            if (sis) sis.track = { name: "struckFall", t: -0.95 };
-            Cue(state, "sobBreath", { gain: 0.7 });
+            if (sis) { sis.track = null; sis.pose = "bow"; }
+            // 从他手上那个被扯开的包袱里洒下来（0.72m），不是从树上落下来
+            state.elmRain = { x: 37.3, t: 0, from: 0.72 };
+            Cue(state, "flutter", { gain: 0.8 });
           } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 39, y: 1.3, dist: 6.5 },
+        // ⑦ 一记耳光。**是耳光不是枪托**：横着抡过来的一只手，落在孩子脸的高度上。
+        //    机位压到 1.05m——跟妹妹一边高，看的是她的高度不是大人的高度
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 37.35, y: 1.05, dist: 2.6 },
           on: (state) => {
-            // 柱子猛地上前一步；爹一把攥住他的胳膊
-            state.player.cineWalk = { x: state.player.x + 0.7, speed: 3.0 };
+            const r2 = FindActor(state, "raid2");
+            // 空包袱随手撇了，**手里什么也不拿**（carry:"" 压掉兵默认那支步枪——
+            // `a.carry ?? 默认` 对空串不生效，专门用这一点）。留着枪的话，
+            // 枪是顺前臂挂的，抡手那一下整支枪横扫到孩子头上，成了拿枪捅人
+            if (r2) { r2.carry = ""; r2.track = { name: "slap", t: 0 }; }
+            const sis = FindActor(state, "sister");
+            // -0.52：正好等到 slap 甩出去的那一帧，她的头才被打偏
+            if (sis) { sis.pose = null; sis.track = { name: "slappedFall", t: -0.52 }; }
+            Cue(state, "drop", { gain: 0.7, rate: 1.5, delay: 0.52 });
+            Cue(state, "sobBreath", { gain: 0.8, delay: 0.9 });
+          } },
+        // ⑧ 柱子猛地上前一步，爹一把攥住他的胳膊。两个人先靠到 0.8m 之内，
+        //    "攥住"才有得可攥
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 38.9, y: 1.35, dist: 3.2 },
+          on: (state) => {
+            state.player.cineWalk = null;
+            state.player.x = 38.7; state.player.heading = -1;
+            state.player.track = { name: "heldBack", t: -0.22 };
             const father = FindActor(state, "father");
-            if (father) { father.cineTarget = { x: 39.4 }; father.cineSpeed = 2.6; }
+            if (father) { father.cineTarget = null; father.x = 39.5; father.heading = -1; father.track = { name: "clutchArm", t: 0 }; }
+            // 扇完了，枪回到手上（后面收队、押人都还得有枪）
+            const r2 = FindActor(state, "raid2");
+            if (r2) { r2.track = null; r2.carry = "步枪"; }
           } },
-        { stage: "", d: 2.6, cam: { kind: "shot", x: 39.5, y: 1.3, dist: 6.5 },
+        // ⑨ 枪托砸在爹肩上。抡的那个先走到 0.7m 外（40.2），砸的方向朝西
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 39.7, y: 1.35, dist: 3.4 },
           on: (state) => {
             const r1 = FindActor(state, "raid1");
-            if (r1) { r1.cineTarget = null; r1.x = 41.2; r1.heading = -1; r1.track = { name: "buttStrike", t: 0 }; }
+            if (r1) { r1.cineTarget = null; r1.x = 40.2; r1.heading = -1; r1.track = { name: "buttStrike", t: 0 }; }
             const father = FindActor(state, "father");
-            if (father) { father.cineTarget = null; father.track = { name: "struckFall", t: -0.95 }; }
-            state.player.pose = "kneel";
-            const mother = FindActor(state, "mother");
-            if (mother) { mother.cineTarget = { x: 37.4 }; mother.cineSpeed = 2.8; mother.pose = "shelter"; }
-            Cue(state, "sobBreath", { gain: 0.8 });
+            // buttStrike 在 0.95s 砸下，所以受方等 0.95。倒下之后退一档深度
+            //（rank）：下一拍抡腿的兵要站到这个位置上来，一维线上两个人挨着
+            // 只能靠深度分开——不退档就是一个兵踩在爹身上
+            // 倒的位置**要让开下一拍**：抡完这一下的兵马上要跨过来踹柱子。
+            // 让他趴在兵的脚跟后半步（39.95）+ 退一档深度（rank），才既不被
+            // 站着的人整个盖住，又读得出"兵从他身上跨过去"
+            if (father) { father.track = { name: "struckFall", t: -0.95 }; father.x = 39.95; father.rank = 1; }
+            // 柱子这会儿还没挨打——他被爹攥着，绷在半路上。heldBack 是不循环的，
+            // 停在最后一格正好是"还在往前挣、又挣不动"。别拿 struck 顶替：
+            // 那是挨了一下的姿势，人当场趴平，跟"被拉住"完全是两回事
+            state.player.pose = null;
+            state.player.track = { name: "heldBack", t: 1.2 };
+            Cue(state, "drop", { gain: 1.2, rate: 0.8, delay: 0.95 });
           } },
-        { who: "伪军头目", say: "太君，这个木匠在炮楼工地干过，会做木活。", d: 4.4,
-          cam: { kind: "shot", x: 43.5, y: 1.4, dist: 7 } },
-        { who: "日军军曹", say: "木头——做什么？", d: 2.8,
-          cam: { kind: "shot", x: 42, y: 1.3, dist: 6.5 },
+        // ⑩ 又朝柱子腹部踹一脚。同一个兵转过来，踹之前先挪到柱子跟前
+        { stage: "", d: 3.0, cam: { kind: "shot", x: 38.9, y: 1.25, dist: 3.0 },
           on: (state) => {
-            const off = FindActor(state, "officer");
-            if (off) { off.cineTarget = { x: 41.8 }; off.cineSpeed = 1.2; }
-            const father = FindActor(state, "father");
-            if (father) { father.track = null; father.pose = "kneel"; father.heading = 1; }
+            const r1 = FindActor(state, "raid1");
+            if (r1) { r1.x = 39.5; r1.heading = -1; r1.track = { name: "kickGut", t: 0 }; }
+            // kickGut 在 0.46s 蹬出去
+            state.player.pose = null;
+            state.player.track = { name: "gutFold", t: -0.46 };
+            Cue(state, "drop", { gain: 0.9, rate: 1.1, delay: 0.46 });
           } },
-        { who: "爹", say: "修门。", d: 2.2, cam: { kind: "shot", x: 40.5, y: 1.2, dist: 6 } },
-        { who: "日军军曹", say: "给八路，做什么？", d: 2.8, cam: { kind: "shot", x: 41.5, y: 1.3, dist: 6.5 } },
-        { who: "爹", say: "没做。", d: 2.2, cam: { kind: "shot", x: 40.5, y: 1.2, dist: 6 } },
-        { stage: "他们不需要证据。", d: 2.8, cam: { kind: "shot", x: 41, y: 1.4, dist: 7 },
+        // ⑪ 娘扑过去抱住妹妹，把两个孩子压在自己身后。她挡的是下一下，不是这一下
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 37.8, y: 1.2, dist: 3.4 },
+          on: (state) => {
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.x = 37.4; mother.heading = -1; mother.pose = "shelter"; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.track = null; sis.x = 36.9; sis.heading = 1; sis.pose = "leanIn"; }
+            Cue(state, "sobBreath", { gain: 0.9 });
+          } },
+        // ⑫ 认出木匠的是伪军头目——不是日军自己看出来的，这一点是史实口径
+        { who: "伪军头目", say: "太君，这个木匠在炮楼工地干过，会做木活。", d: 4.2,
+          cam: { kind: "shot", x: 42.0, y: 1.45, dist: 3.6 },
+          on: (state) => {
+            const pc = FindActor(state, "puppetChief");
+            if (pc) { pc.cineTarget = null; pc.x = 41.6; pc.heading = 1; }
+            const off = FindActor(state, "officer");
+            if (off) { off.cineTarget = null; off.x = 42.5; off.heading = -1; }
+            // 抡完的兵让开，军曹才走得到爹跟前
+            const r1b = FindActor(state, "raid1");
+            if (r1b) { r1b.track = null; r1b.x = 40.7; r1b.heading = -1; }
+          } },
+        // ⑬~⑯ 问话四句，正反打。**这儿不能用过肩**：爹是跪着的，被越过的那个
+        // 前景剪影就是一坨没形状的暗块（用户 2026-08-09 报过的"右边那坨椭球"，
+        // CLAUDE.md 已立规矩——过肩只用在两个人都站着、都露脸、面对面的场合）。
+        // 正反打改用两个机位差：问的一镜稍退、抬到大人的眼高；答的一镜推近、
+        // 压到跪着的人的眼高。同一场戏里高度一换，谁在上谁在下就自己说清楚了
+        { who: "日军军曹", say: "木头——做什么？", d: 2.8,
+          cam: { kind: "shot", x: 40.1, y: 1.15, dist: 2.2 },
+          on: (state) => {
+            // **直接落位，不用 cineTarget**：走位到点会在 0.4m 外就停，
+            // 军曹会隔着一米三问话，两个人各占画框一边、中间一片空
+            const off = FindActor(state, "officer");
+            if (off) { off.cineTarget = null; off.x = 40.5; off.heading = -1; }
+            const father = FindActor(state, "father");
+            // **退档到此为止**：RANK_DZ 的第二档是 −1.6，退了档的人绘制序号
+            // 掉到 walk 带底下——他会被自己那张工作台连同台上的料一起盖住
+            //（这一镜第一版就是"爹只剩一个脑袋顶在台面上"）。抡腿的兵已经让开，
+            // 档收回来，人也往西挪半步、离开台面的正前方
+            if (father) { father.track = null; father.pose = "kneel"; father.heading = 1; father.rank = 0; father.x = 39.6; }
+            // 边上那两个让开：正反打里一次只该有两个人
+            const r1 = FindActor(state, "raid1");
+            if (r1) { r1.cineTarget = { x: 42.0 }; r1.cineSpeed = 1.4; }
+            const pc = FindActor(state, "puppetChief");
+            if (pc) { pc.cineTarget = { x: 42.6 }; pc.cineSpeed = 1.4; }
+          } },
+        { who: "爹", say: "修门。", d: 2.2,
+          cam: { kind: "shot", x: 39.8, y: 0.85, dist: 1.8 } },
+        { who: "日军军曹", say: "给八路，做什么？", d: 2.8,
+          cam: { kind: "shot", x: 40.1, y: 1.15, dist: 2.2 } },
+        { who: "爹", say: "没做。", d: 2.2,
+          cam: { kind: "shot", x: 39.8, y: 0.85, dist: 1.8 } },
+        // ⑰ 捆人。这一句是全场唯一的旁白，画面同时交代"抓的不止木匠一个"
+        { stage: "他们不需要证据。", d: 3.0, cam: { kind: "shot", x: 41.2, y: 1.4, dist: 4.6 },
           on: (state) => {
             state.flags.fatherTaken = true;
             const father = FindActor(state, "father");
-            if (father) { father.pose = "hauled"; }
+            // 被提起来押走：退档的那一步收回来（rank 是给"倒在别人脚边"用的）
+            if (father) { father.pose = "hauled"; father.track = null; father.rank = 0; father.x = 40.0; }
+            const r1 = FindActor(state, "raid1");
+            if (r1) { r1.track = null; r1.x = 40.6; r1.heading = -1; }
+            Cue(state, "drop", { gain: 0.6, rate: 0.7 });
             // 附近另外几名壮劳力也被押了出来——抓的不止木匠一个
             ["taken0", "taken1", "taken2"].forEach((id, i) => {
               const a = FindActor(state, id);
               if (a) { a.visible = true; a.x = 52 + i * 2.1; a.heading = 1; a.pose = "hauled"; a.cineTarget = null; }
             });
           } },
-        { who: "妹妹", say: "爹——！", d: 2.6, cam: { kind: "shot", x: 44, y: 1.3, dist: 7 },
+        // ⑱ 妹妹挣开娘追到院门
+        { who: "妹妹", say: "爹——！", d: 2.6, cam: { kind: "shot", x: 41.0, y: 1.25, dist: 4.4 },
           on: (state) => {
             const sis = FindActor(state, "sister");
-            if (sis) { sis.track = null; sis.cineTarget = { x: 45.4 }; sis.cineSpeed = 3.2; }
-          } },
-        { stage: "", d: 2.2, cam: { kind: "shot", x: 44, y: 1.3, dist: 7 },
-          on: (state) => {
-            // 一名伪军用枪身把她推回门里
-            const pc = FindActor(state, "puppetChief");
-            if (pc) { pc.cineTarget = { x: 45.8 }; pc.cineSpeed = 2.8; }
-            const sis = FindActor(state, "sister");
-            if (sis) { sis.cineTarget = { x: 42.4 }; sis.cineSpeed = 2.6; }
+            if (sis) { sis.pose = null; sis.track = null; sis.cineTarget = { x: 42.6 }; sis.cineSpeed = 3.2; }
             const mother = FindActor(state, "mother");
-            if (mother) { mother.pose = null; mother.cineTarget = { x: 42 }; mother.cineSpeed = 2.4; }
+            if (mother) { mother.pose = null; mother.cineTarget = { x: 39.6 }; mother.cineSpeed = 2.4; }
           } },
+        // ⑲ 一名伪军用枪身把她推回门里。推的人先站到她跟前，推完她倒着退回去
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 42.6, y: 1.2, dist: 3.2 },
+          on: (state) => {
+            const pc = FindActor(state, "puppetChief");
+            if (pc) { pc.cineTarget = null; pc.x = 43.4; pc.heading = -1; pc.track = { name: "shovePush", t: 0 }; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.cineTarget = null; sis.x = 42.6; sis.heading = 1; sis.track = { name: "shovedBack", t: -0.44 }; }
+            Cue(state, "drop", { gain: 0.7, rate: 1.3, delay: 0.44 });
+          } },
+        // ⑳ 收队。全场唯一一次退档——队伍要看得出是一串人，不是一个人
         { stage: "爹被绳子和别人串在一起，只来得及回头看了一眼。", d: 4.2,
-          cam: { kind: "shot", x: 50, y: 1.3, dist: 9, pan: 4 },
+          cam: { kind: "shot", x: 48, y: 1.3, dist: 8.5, pan: 4 },
           on: (state) => {
             const father = FindActor(state, "father");
             if (father) { father.heading = -1; father.cineKeepHeading = true; }
+            const pc0 = FindActor(state, "puppetChief");
+            if (pc0) pc0.track = null;
+            const sis0 = FindActor(state, "sister");
+            if (sis0) sis0.track = null;
             for (const id of ["father", "raid1", "raid2", "officer", "baozhang", "puppetChief", "traitor", "taken0", "taken1", "taken2"]) {
               const a = FindActor(state, id);
               if (a) { a.cineTarget = { x: 196 }; a.cineSpeed = 1.5; a.cineVanish = true; if (id !== "father") a.heading = 1; }
@@ -3176,8 +3372,17 @@ export const SCRIPTS = {
               a.heading = 1;
             }
           } },
-        { stage: "", d: 3.0, cam: { kind: "shot", x: 39, y: 1.4, dist: 6.5 },
-          on: (state) => { state.player.pose = null; } },
+        // 收尾：院里剩下的四个人少了一个。柱子从地上爬起来（gutFold 停在
+        // 捂着肚子那一格，这儿才放开），娘还护着两个孩子
+        { stage: "", d: 3.2, cam: { kind: "shot", x: 38.4, y: 1.25, dist: 4.2 },
+          on: (state) => {
+            state.player.track = null;
+            state.player.pose = "kneel";
+            const mother = FindActor(state, "mother");
+            if (mother) { mother.cineTarget = null; mother.x = 37.4; mother.heading = -1; mother.pose = "shelter"; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.track = null; sis.cineTarget = { x: 36.9 }; sis.cineSpeed = 2.0; }
+          } },
       ],
     },
     {
@@ -4843,6 +5048,7 @@ export function StartChapter(state, index) {
   state.vaultDust = null;
   state.vaultHint = "";
   state.cellarPeek = 0;
+  state.steadyCam = false;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -5455,6 +5661,7 @@ function MovePlayer(state, input, dt) {
       state.vaultHint = "";
       state.climbHint = "";
       state.cellarPeek = 0;
+      state.steadyCam = true;   // 被按住不许动的时候，镜头也别自己晃
       return;
     }
   }
@@ -5484,6 +5691,7 @@ function MovePlayer(state, input, dt) {
     state.climbHint = "";
     state.vaultHint = "";
     state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
+    state.steadyCam = false;
     return;                                                    // 爬梯中锁操作
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
@@ -5588,10 +5796,8 @@ function MovePlayer(state, input, dt) {
   //
   // 顺带算一个 0..1 的**探头量**（cellarPeek）：人在地表越靠近井口，镜头就
   // 越往下沉一档，把脚底下那个窖的剖面带进画框（Main 的 BaseShot 用它）。
-  // 为什么要这一下：地窖一直是画好的，可地表机位的下边沿只到 −1.7m，而窖底
-  // 在 −3.6m——整间窖都在画外。于是玩家按 S 之前根本看不见有这么个地方，
-  // 读起来就是"下去才凭空长出来一间屋"（用户 2026-08-10 报的）。
-  // 这是纯粹的**升降**，景别（hw）一点没变，不违反"全作只有一个景别档"。
+  // **默认整个停用**——见文件顶部的 CAM_CELLAR_PEEK（2026-08-10 用户定：
+  // 不要自动摇镜头）。下面这段留着，把开关拨回 true 就能整套回来。
   state.climbHint = "";
   let peek = 0;
   for (const shaft of scene.shafts) {
@@ -5603,16 +5809,26 @@ function MovePlayer(state, input, dt) {
     }
     // 探头的范围比提示宽一截（4.2m）：镜头得**先**沉下去，玩家才是"走过来
     // 看见脚底下有东西"，而不是"站定了画面才动"
-    if (p.level === "surface" && scene.walk.under) {
+    if (CAM_CELLAR_PEEK && p.level === "surface" && scene.walk.under) {
       const k = 1 - Math.min(1, Math.max(0, (d - 1.0) / 3.2));
       peek = Math.max(peek, k * k * (3 - 2 * k));   // 缓入缓出，别一步跳下去
     }
   }
-  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），别再叠一层。
-  // 被盯上的时候也不沉：潜行段镜头一往下扎，正前方摸过来的那盏灯就出了画框——
-  // 探头是"让你看见脚底下"，不是"把眼前的危险挪走"（潜行规范第 2 条）。
-  const spotted = (state.detection?.level || 0) > 0.15;
-  state.cellarPeek = (p.climbT > 0 || spotted) ? 0 : peek;
+  // —— 镜头自作主张的总开关 ——
+  // `state.steadyCam` 为真的那一帧，镜头**只跟人走**，任何自动的升降/探头一律
+  // 让位。以后再加"镜头自己动"的花样（探头、抬头看炮楼、震镜），都挂到这一个
+  // 判据上，别各写各的——不然每加一样就要把所有玩法重新试一遍。
+  // 三个来源：
+  //   ① **推着车**：车是横着走的一条线，镜头一沉，车头和前面的路一起出画
+  //      （用户 2026-08-10：「推车推到地道口镜头会自动下摇，应该屏蔽」）；
+  //   ② 被盯上：往下扎会把摸过来的那盏灯挤出画框（潜行规范第 2 条）；
+  //   ③ 节拍自己声明 `steadyCam: true`——要钉住构图的新玩法用这一个开关。
+  const camDef = CurrentBeatDef(state);
+  state.steadyCam = PushingCart(state)
+    || (state.detection?.level || 0) > 0.15
+    || !!(camDef?.steadyCam || state.beat?.steadyCam);
+  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），也别再叠一层
+  state.cellarPeek = (p.climbT > 0 || state.steadyCam) ? 0 : peek;
 
   // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
   if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {
@@ -7125,8 +7341,11 @@ export function GetBeatTarget(state) {
         case "push": return { action: "pushAt", x: state.cart ? state.cart.x : st.from, dir: st.dir };
         case "goto": return { action: "walk", x: st.zone.x, level: st.zone.level || "surface" };
         case "brace": {
+          // 支顶木改成了往上顶的笔画做功（顶木＝费力气的活，按住 E 是合法后备，
+          // CLAUDE.md 第 5 条），所以驱动器从"按一下"改成"按住"——
+          // 忘了改这一处，自动通关会站在支撑位前面按一辈子 E
           const z = (st.zones || []).find((zz) => zz.ok && !state.flags[zz.flag]);
-          return z ? { action: "interactAt", x: z.x, level: st.level || "under" } : null;
+          return z ? { action: "holdAt", x: z.x, level: st.level || "under" } : null;
         }
         case "winch": {
           const w = state.beat.winch;
