@@ -1453,6 +1453,33 @@ export function CreateWorld(canvasEl) {
     const tunTop = toPy(TUN_TOP);
     const tunBot = toPy(UNDER_Y);
 
+    // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照都从
+    // TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
+    const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
+      + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
+
+    // 井筒的形状只算一次：掏土、描洞沿、井壁贴片三处都得用同一条轮廓，
+    // 各画各的就又会出现"三个宽度不一样的矩形套在一起"
+    const SHAFT_R = 0.86;                    // 井筒半径（米）：够一个人带着筐上下
+    const shaftGeom = (sceneDef.shafts || [])
+      .filter((s) => !s.builtFlag || state.flags[s.builtFlag])
+      .map((s) => {
+        const yTop = toPy(SURFACE_Y) - 0.10 * PPM;             // 井口啃掉地面一线
+        const yBot = Math.max(tunTop, CeilY(s.x)) + 0.12 * PPM; // 一直掏进走廊顶
+        const span = Math.max(1, yBot - yTop);
+        const half = (y) => {
+          const u = Math.max(0, Math.min(1, (y - yTop) / span));
+          // 井口塌出一圈、井底张成喇叭并进洞顶；中段两壁只有手挖的起伏
+          const flare = 1
+            + 0.55 * (u > 0.78 ? ((u - 0.78) / 0.22) ** 2 : 0)
+            + 0.34 * (u < 0.14 ? ((0.14 - u) / 0.14) ** 2 : 0);
+          const wob = Math.sin(y * 0.05 + ART.Hash(s.id) * 9) * 0.055
+            + Math.sin(y * 0.017 + ART.Hash(s.id + "b") * 6) * 0.045;
+          return (SHAFT_R + wob) * flare * PPM;
+        };
+        return { id: s.id, wx: s.x, x: toPx(s.x), yTop, yBot, half };
+      });
+
     // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
     const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
@@ -1469,10 +1496,6 @@ export function CreateWorld(canvasEl) {
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
-      // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照
-      // 都从 TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
-      const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
-        + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
       ctx.beginPath();
       ctx.moveTo(toPx(range[0]), CeilY(range[0]));
       for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
@@ -1507,10 +1530,20 @@ export function CreateWorld(canvasEl) {
         ctx.closePath();
         ctx.fill();
       }
-      // 竖井
-      for (const shaft of sceneDef.shafts) {
-        if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-        ctx.fillRect(toPx(shaft.x) - 0.85 * PPM, toPy(SURFACE_Y), 1.7 * PPM, tunTop - toPy(SURFACE_Y));
+      // 竖井：一条**掏出来**的井筒，不是拿方框抠的洞。
+      // 老写法是一句 fillRect——笔直两壁、方角、井底与走廊硬碰硬地对接，
+      // 再加上 DrawShaft 里那根比洞还窄的浅色"井筒"贴片，三个宽度不一样的
+      // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。
+      // 现在：两壁带起伏、井口啃出一圈、井底张成喇叭口并进走廊顶，
+      // 而且**掏到本段走廊真正的洞顶**——窄段的顶比 TUN_TOP 低一米，
+      // 按 TUN_TOP 截会在井底与走廊之间留一块没挖通的土。
+      for (const g of shaftGeom) {
+        ctx.beginPath();
+        ctx.moveTo(g.x - g.half(g.yTop), g.yTop);
+        for (let y = g.yTop; y <= g.yBot; y += 5) ctx.lineTo(g.x - g.half(y), y);
+        for (let y = g.yBot; y >= g.yTop; y -= 5) ctx.lineTo(g.x + g.half(y), y);
+        ctx.closePath();
+        ctx.fill();
       }
       ctx.restore();
       // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
@@ -1538,6 +1571,30 @@ export function CreateWorld(canvasEl) {
         ctx.strokeStyle = "rgba(24,17,10,0.7)";
         ctx.lineWidth = 6;
         ctx.stroke();
+      }
+      // 井壁也要洞沿：走廊、洞室都描了，唯独竖井没有，于是井口那一圈成了
+      // 土层贴图被裁掉的直边——"像 bug"最直接的一笔就是这里。
+      // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
+      for (const g of shaftGeom) {
+        const stopY = g.yBot - 0.42 * PPM;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
+          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.strokeStyle = "rgba(24,17,10,0.62)";
+          ctx.lineWidth = 5.5;
+          ctx.stroke();
+        }
+        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        for (let i = 0; i < 9; i += 1) {
+          const t = i / 8;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
+          ctx.beginPath();
+          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
+          ctx.fill();
+        }
       }
     });
     PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
@@ -1644,12 +1701,102 @@ export function CreateWorld(canvasEl) {
       group.add(beam);
     }
 
+    // —— 4.5) 井筒内壁：**掏开的洞得看得见里面**。
+    // 原先近侧剖面一挖穿，井口那一截就直接露出后面的背景，一片平色，
+    // 所以那个洞读起来是"贴图漏了"。这里在演员之后补一张井筒的后壁：
+    // 竖着的镐痕、越深越黑，井口再落一线天光下来——这作品叫《地道里的光》，
+    // 从井口漏下来的那一道就该是它最认得出的一张脸。
+    // **摆在哪一层是有讲究的**：近侧剖面在 NEAR_Z=2.2，比玩家近两米多，
+    // 所以透过它看出去的那个"窗口"被透视放大了一截。井壁要是跟地道后壁一样
+    // 摆到 BACK_Z 附近，它被缩得比窗口还小，四周就漏出后面的浅色——那正是
+    // 这个洞看着像"贴图漏了"的原因。井壁贴到玩家背后一点点（SHAFT_BACK_Z），
+    // 再按玩法机位的视差比放大，才刚好把窗口填满。
+    const SHAFT_BACK_Z = -0.9;
+    // ≈ (机位距 + 0.9) / (机位距 − NEAR_Z)。玩法机位画宽 12.3~16m 时是 1.21~1.29，
+    // 取 1.40 留点余量——多出来的部分被不透明的近侧剖面挡着，不露；少了才会漏白边
+    const SHAFT_FILL = 1.40;
+    for (const g of shaftGeom) {
+      // 井壁只画到走廊洞顶为止，不跟着喇叭口一起张开——张开了就会在地道里
+      // 糊出一块带硬边的黑斑（走廊自己的后壁从那儿接手）
+      const yWallBot = g.yBot - 0.34 * PPM;
+      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.16 * PPM) * SHAFT_FILL;
+      const hM = ((yWallBot - g.yTop) / PPM) * SHAFT_FILL;
+      const wM = (halfW(g.yTop) * 2.5) / PPM;
+      const wp = Math.ceil(wM * PPM), hp = Math.ceil(hM * PPM);
+      // 井壁按井筒的轮廓剪出来（不是一块方贴片）：外面透明，
+      // 所以就算画大了也只在洞口里露出来，不会在地道里糊成一个黑方块
+      const Silhouette = (ctx) => {
+        const k = hp / Math.max(1, yWallBot - g.yTop);
+        ctx.beginPath();
+        ctx.moveTo(wp / 2 - halfW(g.yTop), 0);
+        for (let y = g.yTop; y <= yWallBot; y += 5) ctx.lineTo(wp / 2 - halfW(y), (y - g.yTop) * k);
+        for (let y = yWallBot; y >= g.yTop; y -= 5) ctx.lineTo(wp / 2 + halfW(y), (y - g.yTop) * k);
+        ctx.closePath();
+      };
+      const wall = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+        const grd = ctx.createLinearGradient(0, 0, 0, hp);
+        grd.addColorStop(0, "#6b5236");        // 井口：还沾着点天光
+        grd.addColorStop(0.38, "#33271a");
+        grd.addColorStop(1, "#170f09");        // 井底最黑
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, wp, hp);
+        // 竖着一道道的镐痕：井是往下掏的，痕迹就该是竖的（走廊那面是横的）
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = "#120d08";
+        for (let i = 0; i < 11; i += 1) {
+          const px = 6 + ART.Hash(g.id + "pk" + i) * (wp - 12);
+          const py = 8 + ART.Hash(g.id + "py" + i) * hp * 0.72;
+          ctx.lineWidth = 2 + ART.Hash(g.id + "pw" + i) * 3;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + (ART.Hash(g.id + "pd" + i) - 0.5) * 9, py + 24 + ART.Hash(g.id + "pl" + i) * 46);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
+        ctx.restore();
+      });
+      PlaceSprite(wall, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z);
+      group.add(wall);
+
+      // 井口漏下来的一线光：上宽下窄，落到地道口就散了。
+      // 这作品叫《地道里的光》——从井口斜下来的那一道，就该是它最认得出的一张脸
+      const beam = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+        const grd = ctx.createLinearGradient(0, 0, 0, hp);
+        grd.addColorStop(0, "rgba(255,236,186,0.50)");
+        grd.addColorStop(0.5, "rgba(255,228,170,0.16)");
+        grd.addColorStop(1, "rgba(255,220,160,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.moveTo(wp * 0.30, 0);
+        ctx.lineTo(wp * 0.72, 0);
+        ctx.lineTo(wp * 0.62, hp);
+        ctx.lineTo(wp * 0.40, hp);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+      PlaceSprite(beam, g.wx, UNDER_Y, SHAFT_BACK_Z + 0.05);
+      beam.material.blending = THREE.AdditiveBlending;
+      beam.material.depthWrite = false;
+      // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的
+      beam.material.opacity = (CHAPTERS[state.chapterIndex].light === "day" ? 1 : 0.3);
+      group.add(beam);
+    }
+
     // —— 5) 竖井与洞里的零件（贴在中景，人可以从它前后经过）
     for (const shaft of sceneDef.shafts) {
       if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
       const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
-          ART.DrawShaft(ctx, ax, 4, ay - 0.3 * PPM, shaft.id);
+          // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
+          ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
         }, 0, 2);
       // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。摆在行走线略前
       // （仍在演员 ACTOR_Z 之后），免得被洞口、磨盘这些中景件压掉。

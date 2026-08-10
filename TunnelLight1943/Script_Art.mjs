@@ -3331,22 +3331,31 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
 }
 
 export function DrawShaft(ctx, x, topY, botY, id) {
-  // 竖井 + 一架看得清的木梯。
-  // 之前梯子只有半透明的一根杆和几道暗横档，玩家在画面上根本认不出"这儿能上下"，
-  // 所以改成两根立杆 + 高对比横档 + 井口一圈木沿，远看就是一架梯子。
-  InkFill(ctx, Rect(x - 17, topY, 34, botY - topY), id, PAL.tunnelAir, { amp: 1.4, lw: 2.4, line: "#3a2a1a" });
-  // 井口木沿：地面上认路的记号
-  InkFill(ctx, Rect(x - 21, topY - 5, 42, 7), id + "lip", "#8a6b45", { amp: 0.8, lw: 2 });
-  // 两根立杆
+  // 井口木沿 + 一架看得清的木梯。
+  //
+  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
+  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
+  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
+  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
+  //
+  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
+  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
+    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
+  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
+  const railTop = topY + 3;
   for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, topY + 2, 5.2, botY - topY - 4), id + "rail" + dx, "#9c7a4c",
+    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
       { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
   }
   // 横档：亮一档、暗一档，看着有厚度
-  for (let y = topY + 13; y < botY - 4; y += 15) {
+  for (let y = railTop + 11; y < botY - 3; y += 15) {
     InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
       { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
   }
+  // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
+  InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
 }
 
 export function DrawCollapsePile(ctx, x, botY, scale, id) {
