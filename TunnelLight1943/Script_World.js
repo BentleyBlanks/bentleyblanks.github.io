@@ -1833,6 +1833,9 @@ export function CreateWorld(canvasEl) {
       }
     });
     PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
+    // 活卡的长焦背景板会把机位与主体之间的近景藏掉（Render 的 DOF_NEAR_CUT）——
+    // 唯独这刀剖面的土不能藏：藏了它，脚底下的地道就在背景板里剧透了
+    face.userData.dofKeep = true;
     group.add(face);
 
     // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它。
@@ -1853,6 +1856,7 @@ export function CreateWorld(canvasEl) {
         ctx.fillRect(0, 0, w, h);
       });
     PlaceSprite(vign, range[0] - 2, UNDER_Y, NEAR_Z - 0.4);
+    vign.userData.dofKeep = true;   // 跟着剖面的土一起留下（同上）
     vign.material.depthWrite = false;
     group.add(vign);
 
@@ -4655,6 +4659,20 @@ export function CreateWorld(canvasEl) {
   // -------------------------------------------------------------------------
   const DOF_SCALE = 0.40;      // 离屏靶相对画布的边长比
   const DOF_RADIUS = 1.8;      // 高斯抽头间距（离屏靶像素）
+  // 背景板**不是玩法机位的截图**（2026-08-10 用户：「你不能直接拍现成的游戏
+  // 截图……把当前物体之前的东西都隐藏吧，然后背景的FOV要搞大点，不然哪里像是
+  // 一个低FOV聚焦在前景上的样子」）。活卡是一颗怼在活儿跟前的长焦头，它背后
+  // 的世界就得按长焦的读法来，两件事各管一半：
+  //   · DOF_ZOOM——背景用收窄一档的相机重拍：远景放大、透视压缩，贴机头那半屏
+  //     地平线以下的土也顺势被推出画框。上限卡在 1.5：c1_plane 的机位（x40.2
+  //     hw4.6）是按"爹、扫院的娘、房子都在画里"选的，娘在 x37.2——再窄她就出画了。
+  //   · DOF_NEAR_CUT——机位与主体之间的近景整个藏掉（obstacle/clutter 那几档
+  //     矮掩体、过肩剪影）：特写是绕到活儿跟前拍的，镜头前不该还隔着半人高的
+  //     草垛。地道剖面近侧那刀土除外（userData.dofKeep）——藏了它，脚底下的
+  //     地道就在背景板里剧透了。
+  const DOF_ZOOM = 1.5;
+  const DOF_NEAR_CUT = 0.85;   // 演员(0.6)/loose(0.3)/walk(0) 留下，obstacle(0.95) 起藏
+  let dofCam = null;
   let dofA = null, dofB = null, dofQuadScene = null, dofQuadCam = null, dofQuad = null;
   let dofW = 0, dofH = 0;
   const DOF_SHADER = {
@@ -4746,12 +4764,28 @@ export function CreateWorld(canvasEl) {
       return;
     }
     const u = dofQuad.material.uniforms;
-    // ① 世界渲进离屏靶（卡自己先让开——它是要画在糊过的背景之上的）
+    // ① 世界渲进离屏靶（卡自己先让开——它是要画在糊过的背景之上的）。
+    //    用长焦相机、藏掉主体跟前的近景重拍一遍：见 DOF_ZOOM / DOF_NEAR_CUT
     insertMesh.visible = false;
+    if (!dofCam) dofCam = new THREE.PerspectiveCamera(FOV, camera.aspect, 0.5, 400);
+    dofCam.aspect = camera.aspect;
+    dofCam.zoom = DOF_ZOOM;
+    dofCam.position.copy(camera.position);
+    dofCam.quaternion.copy(camera.quaternion);
+    dofCam.updateProjectionMatrix();
+    const dofHidden = [];
+    for (const o of layers.play.children) {
+      if (o.visible && o.position.z > DOF_NEAR_CUT && !o.userData.dofKeep) {
+        o.visible = false;
+        dofHidden.push(o);
+      }
+    }
+    if (otsMesh?.visible) { otsMesh.visible = false; dofHidden.push(otsMesh); }
     const prevTarget = renderer.getRenderTarget();
     renderer.setRenderTarget(dofA);
     renderer.clear();
-    renderer.render(scene, camera);
+    renderer.render(scene, dofCam);
+    for (const o of dofHidden) o.visible = true;
     // ② 横向糊一遍 A→B
     u.uTex.value = dofA.texture;
     u.uStep.value.set(DOF_RADIUS / dofW, 0);
