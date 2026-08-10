@@ -778,6 +778,12 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 1.54, py - r * 0.70], [px + r * 0.70, py - r * 0.90],
     ], id + "brim", "#4a461f", { amp: 1, lw: lw * 0.8 });
   } else if (kind === "officer") {
+    // 唇上的卫生胡（方块胡）：电视剧里的太君脸就靠这一撮认——画在帽子之前，
+    // 位置钉在鼻底与嘴线之间。色取深墨，别用纯黑（会读成嘴张着）
+    InkFill(ctx, [
+      [px + r * 0.60, py - r * 0.52], [px + r * 0.90, py - r * 0.50],
+      [px + r * 0.90, py - r * 0.40], [px + r * 0.60, py - r * 0.42],
+    ], id + "stache", "#241a12", { amp: 0.5 * k, lw: 1.6 * k });
     // 大檐帽：圆顶更高更方，帽墙一道深色，帽檐长而硬——士兵那顶软战斗帽
     // 是塌下去的斜面，两者的剪影在 6m 近景下一眼分得开
     InkFill(ctx, [
@@ -785,10 +791,17 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px + r * 0.62, py - r * 1.92], [px + r * 1.02, py - r * 1.30],
       [px + r * 1.06, py - r * 1.02], [px - r * 1.02, py - r * 0.96],
     ], id + "cap", "#4a4f34", { amp: 1.1 * k, lw: lw * 0.9 });
+    // 帽墙是**绯红**的（日军军帽的红帽墙，1938 年式以来的定色）。
+    // 按 sRGB 坑的老规矩把红压两档——上屏后正好是暗红一道，不跳
     InkFill(ctx, [
       [px - r * 1.04, py - r * 1.10], [px + r * 1.06, py - r * 1.14],
       [px + r * 1.06, py - r * 0.96], [px - r * 1.02, py - r * 0.92],
-    ], id + "band", "#2f3320", { amp: 0.8 * k, lw: lw * 0.7 });
+    ], id + "band", "#4e2018", { amp: 0.8 * k, lw: lw * 0.7 });
+    // 帽墙正面一粒星徽（哑金，别亮）
+    ctx.beginPath();
+    ctx.arc(px + r * 0.72, py - r * 1.02, r * 0.09, 0, Math.PI * 2);
+    ctx.fillStyle = "#8a7a3a";
+    ctx.fill();
     InkFill(ctx, [
       [px + r * 0.86, py - r * 1.06], [px + r * 1.92, py - r * 0.94],
       [px + r * 1.88, py - r * 0.66], [px + r * 0.86, py - r * 0.80],
@@ -5518,6 +5531,564 @@ export function DrawInsertCard(ctx, W, H, kind) {
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, W, H);
 }
+
+// ---------------------------------------------------------------------------
+// 过场活动插卡：日军进村那一镜（c1_roster）。
+//
+// 为什么要单独画一张：全作是侧视骨架，**正脸给不出来**——而"太君坐在挎斗里
+// 冲你打手势"这一镜要的恰恰是正面。所以走定格插卡的画框，但每帧重画
+//（World.SetInsertCard 见到 INSERT_LIVE 里登记的名字就走这条路），
+// seg 由剧本行上的 cam.seg 给，t 是本行已经走过的秒数——动画完全由
+// 游戏时钟驱动，无头实拍（StepFrames）也能逐帧对上。
+//
+//   seg 0  镜头从开道伪军的脸上一路横摇到挎斗摩托（正面）
+//   seg 1  太君原地打手势：两记朝前的劈手（分头、围村）→ 绕一个圈（合拢）→ 收手
+//   seg 2  伪军头目凑到斗沿交头接耳；太君点头，白手套朝村里一挥；头目回身派活
+//
+// 形象按 1942-43 华北的史实与荧幕定式配齐（配色全按 sRGB 坑压两档）：
+//   太君    大盖帽（茶褐帽体 + **绯红帽墙** + 星徽）、圆框眼镜、**卫生胡**、
+//           九八式立领 + 红领章、斜挎武装带（Sam Browne）、白手套、
+//           军刀立在斗里手扶着刀柄——马靴被斗沿挡住，不必画
+//   驾驶兵  战斗帽 + **帽垂**（正面看是垂在两颊边的两片布）、土黄军装、胸前交叉背带
+//   伪军    软布帽（没有帽垂）、灰土布军装、胯上挎包、布鞋——本乡人的脸，不做丑角
+//   队列    摩托背后雾里两排日军剪影，肩上一排刺刀尖——"大部队"三个字全靠这排尖
+// ---------------------------------------------------------------------------
+export function DrawRaidMotoCard(ctx, W, H, seg, t) {
+  const S = H / 420;                 // 构图单位：1u = H/420 像素（与定格卡同标尺）
+  const C01 = (x) => Math.max(0, Math.min(1, x));
+  const Sm = (x) => { const k = C01(x); return k * k * (3 - 2 * k); };
+  const GY = 358, HY = 205;          // 地脚线 / 地平线（单位 u）
+  // 卡内配色：整卡就是"阴下来"的那一刻，比村里的日常配色再冷再沉一档
+  const RC = {
+    ground: "#4e4636", wall: "#544d3c", wallDark: "#423c2f",
+    puppetCoat: "#5d5744", puppetTrouser: "#4a443a", puppetCap: "#36322a",
+    jpCoat: "#4c482c", jpDark: "#34321f",
+    moto: "#514729", motoDark: "#383120", tire: "#22221e",
+    officerCoat: "#2b2f1f", officerDark: "#1d2016",
+    capBody: "#3e422c", capBand: "#4e2018", star: "#8a7a3a",
+    tab: "#5e241c", glove: "#a39c8c", sabre: "#26241c", sabreFit: "#7a7050",
+    skin: "#bb9066", skinDark: "#8f6c4c", ink: IN.ink,
+  };
+
+  // ---- 天与街（屏幕空间，慢视差）：铅灰的天压着土街，雾把街尾吃掉 ----
+  const sky = ctx.createLinearGradient(0, 0, 0, HY * S * 1.16);
+  sky.addColorStop(0, "#2e323c");
+  sky.addColorStop(0.7, "#4a4840");
+  sky.addColorStop(1, "#5c564a");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, HY * S * 1.18);
+  ctx.fillStyle = RC.ground;
+  ctx.fillRect(0, HY * S, W, H - HY * S);
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(0, GY * S * 0.994, W, H);      // 脚下再沉一线
+
+  // 镜头看哪儿：seg0 从伪军(+640u)一路摇到摩托(0)，先在脸上停 1.4 秒
+  const look = seg === 0 ? 640 * (1 - Sm((t - 1.4) / 2.65)) : 0;
+  const PX = (u) => W / 2 + (u - look) * S;          // 场景 u → 屏幕 px
+  const PXf = (u) => W / 2 + (u - look * 0.45) * S;  // 背景层视差（挪得慢一半）
+
+  // 街墙：土坯院墙顺着队伍来的方向退进雾里（往左收向灭点）
+  InkFill(ctx, [
+    [PXf(-820), (HY + 16) * S], [PXf(920), (HY - 128) * S],
+    [PXf(920), (GY - 4) * S], [PXf(-820), (HY + 30) * S],
+  ], "rmWallN", RC.wall, { amp: 2.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.22)", shadeAt: 0.35 });
+  // 墙上几个黑窗洞与一个门洞（关着的），读出"家家闭户"
+  for (let i = 0; i < 4; i += 1) {
+    const wx = 690 - i * 300;
+    const k = 1 - i * 0.18;
+    InkFill(ctx, [
+      [PXf(wx), (HY + 4 - 62 * k) * S], [PXf(wx + 40 * k), (HY + 2 - 64 * k) * S],
+      [PXf(wx + 42 * k), (HY + 8 - 20 * k) * S], [PXf(wx + 2), (HY + 10 - 18 * k) * S],
+    ], "rmWin" + i, RC.wallDark, { amp: 1.4 * S, lw: 2 * S });
+  }
+  // 街尾的歪脖树：一团黑剪影，枝子抓着天
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  InkFill(ctx, [
+    [PXf(-700), (HY + 12) * S], [PXf(-688), (HY - 60) * S], [PXf(-716), (HY - 96) * S],
+    [PXf(-668), (HY - 74) * S], [PXf(-620), (HY - 104) * S], [PXf(-648), (HY - 56) * S],
+    [PXf(-628), (HY + 10) * S],
+  ], "rmTree", "#23211a", { amp: 2.4 * S, lw: 0, line: null });
+  ctx.restore();
+  // 贴地的灰雾：越往街尾越浓
+  const fog = ctx.createLinearGradient(PXf(-820), 0, PXf(240), 0);
+  fog.addColorStop(0, "rgba(74,74,68,0.62)");
+  fog.addColorStop(1, "rgba(74,74,68,0)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, (HY - 70) * S, W, (GY - HY + 76) * S);
+
+  // 惊起的乌鸦（seg0 / seg2 各放一拨）：两三个黑点扇着翅膀斜着飞走
+  if (seg !== 1) {
+    for (let i = 0; i < 3; i += 1) {
+      const ph = t * 0.16 + i * 0.09;
+      if (ph > 0.9) continue;
+      const bx = W * (0.66 - ph * 0.5 - i * 0.05);
+      const by = H * (0.30 - ph * 0.16 + i * 0.05);
+      const flap = Math.sin(t * 9 + i * 2.1) * 8 * S;
+      ctx.strokeStyle = "#1d1b16";
+      ctx.lineWidth = 2.6 * S;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(bx - 9 * S, by - flap);
+      ctx.quadraticCurveTo(bx, by + 3 * S, bx + 9 * S, by - flap);
+      ctx.stroke();
+    }
+  }
+
+  // ---- 正面人物零件 ----------------------------------------------------------
+  // 正面行走/站立的伪军。x 是脚中点（场景 u），hgt 是全高（u）
+  const FrontPuppet = (x, gy, hgt, id, { walk = 0, drift = 0 } = {}) => {
+    const px = PX(x + drift);
+    const bob = walk ? Math.sin(walk) * 0.014 * hgt : 0;
+    const gyS = (gy - bob) * S;
+    const hu = hgt / 190;                       // 以 190u 为基准的比例
+    const hr = 17 * hu;                         // 头半径（u）
+    const shoulderY = gyS - hgt * 0.78 * S;
+    const headC = gyS - hgt * 0.88 * S;
+    const wS = 30 * hu * S;                     // 半肩宽 px
+    // 腿（正面两条，走路小幅错开）
+    const step = walk ? Math.sin(walk) * 7 * hu : 0;
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [px + s * 11 * hu * S - 6 * hu * S, gyS - hgt * 0.42 * S],
+        [px + s * 11 * hu * S + 6 * hu * S, gyS - hgt * 0.42 * S],
+        [px + s * (11 + 1.5) * hu * S + 5 * hu * S + s * step * S * 0.3, gyS - 3 * S],
+        [px + s * (11 + 1.5) * hu * S - 6 * hu * S + s * step * S * 0.3, gyS - 2 * S],
+      ], id + "leg" + s, RC.puppetTrouser, { amp: 1.6 * S, lw: 2.6 * S });
+      // 布鞋
+      InkFill(ctx, [
+        [px + s * 12 * hu * S - 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
+        [px + s * 12 * hu * S + 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
+        [px + s * 12 * hu * S + 8 * hu * S + s * step * S * 0.3, gyS],
+        [px + s * 12 * hu * S - 8 * hu * S + s * step * S * 0.3, gyS],
+      ], id + "shoe" + s, "#2e2721", { amp: 1 * S, lw: 2 * S });
+    }
+    // 躯干：灰土布军装，正面对襟一道扣线
+    InkFill(ctx, [
+      [px - wS, shoulderY], [px + wS, shoulderY],
+      [px + wS * 0.92, gyS - hgt * 0.40 * S], [px - wS * 0.92, gyS - hgt * 0.40 * S],
+    ], id + "coat", RC.puppetCoat, { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px, shoulderY + 4 * S, px, gyS - hgt * 0.42 * S, id + "btn",
+      { lw: 1.8 * S, color: "rgba(30,24,16,0.55)", amp: 1 * S });
+    // 挎包带（斜挂）——伪军在本作的记号
+    InkLine(ctx, px - wS * 0.6, shoulderY + 2 * S, px + wS * 0.72, gyS - hgt * 0.44 * S,
+      id + "sat", { lw: 3 * hu * S, color: "rgba(30,24,16,0.5)", amp: 1.2 * S });
+    // 两臂垂在身侧（走路小幅摆）
+    for (const s of [-1, 1]) {
+      const sw = walk ? Math.sin(walk + (s > 0 ? Math.PI : 0)) * 5 * hu : 0;
+      InkLine(ctx, px + s * wS * 0.9, shoulderY + 4 * S,
+        px + s * (wS * 0.98) + sw * S, gyS - hgt * 0.40 * S, id + "arm" + s,
+        { lw: 7 * hu * S, color: RC.puppetCoat, amp: 1.4 * S });
+    }
+    // 头与脸：帽檐的影子压住眉眼——脸沉着，不是丑角
+    InkFill(ctx, [
+      [px - hr * S, headC + hr * 0.7 * S], [px - hr * 0.86 * S, headC - hr * 0.7 * S],
+      [px, headC - hr * S], [px + hr * 0.86 * S, headC - hr * 0.7 * S],
+      [px + hr * S, headC + hr * 0.7 * S], [px + hr * 0.4 * S, headC + hr * 1.06 * S],
+      [px - hr * 0.4 * S, headC + hr * 1.06 * S],
+    ], id + "face", RC.skin, { amp: 1.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.12)" });
+    // 软布帽（没有帽垂）：一顶塌塌的圆帽
+    InkFill(ctx, [
+      [px - hr * 1.12 * S, headC - hr * 0.44 * S], [px - hr * 0.7 * S, headC - hr * 1.2 * S],
+      [px + hr * 0.7 * S, headC - hr * 1.24 * S], [px + hr * 1.12 * S, headC - hr * 0.4 * S],
+      [px + hr * 0.9 * S, headC - hr * 0.2 * S], [px - hr * 0.9 * S, headC - hr * 0.22 * S],
+    ], id + "cap", RC.puppetCap, { amp: 1.6 * S, lw: 2.6 * S });
+    // 帽影里的眉眼：两道短墨 + 抿住的嘴
+    ctx.fillStyle = "rgba(20,16,10,0.6)";
+    ctx.fillRect(px - hr * 0.72 * S, headC - hr * 0.28 * S, hr * 1.44 * S, hr * 0.34 * S);
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(px - hr * 0.5 * S, headC - hr * 0.1 * S, hr * 0.32 * S, hr * 0.13 * S);
+    ctx.fillRect(px + hr * 0.2 * S, headC - hr * 0.1 * S, hr * 0.32 * S, hr * 0.13 * S);
+    // 嘴抿成一道向下的弧（∩）——抖动画笔的随机弯有一半概率把嘴画成微笑，
+    // 这张脸不许笑，所以这一笔不走 InkLine
+    ctx.strokeStyle = IN.inkSoft;
+    ctx.lineWidth = 1.8 * S;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px - hr * 0.26 * S, headC + hr * 0.68 * S);
+    ctx.quadraticCurveTo(px, headC + hr * 0.55 * S, px + hr * 0.26 * S, headC + hr * 0.68 * S);
+    ctx.stroke();
+  };
+
+  // 雾里的日军队列剪影：一排三个兵。两条腿必须分开画——身子连成一片就读成
+  // "披袍的"（第一版就是这么栽的，画面上一排像举长矛的袍子）。
+  // 步枪是**斜背**的一道短线 + 一点刺刀尖，别画成竖着的长矛
+  const JpRank = (x, gy, hgt, id) => {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    for (let i = 0; i < 3; i += 1) {
+      const px = PX(x + (i - 1) * hgt * 0.52);
+      const gyS = gy * S, hS = hgt * S;
+      const bob = Math.sin(t * 5.2 + i * 1.7 + x * 0.1) * hS * 0.012;
+      // 斜背的步枪：枪身越过肩，头上只冒一小截刺刀
+      InkLine(ctx, px - hS * 0.16, gyS - hS * 0.5 + bob, px + hS * 0.2, gyS - hS * 1.1 + bob,
+        id + "g" + i, { lw: 1.8 * S, color: "#1f1d14", amp: 0.4 * S });
+      InkLine(ctx, px + hS * 0.2, gyS - hS * 1.1 + bob, px + hS * 0.26, gyS - hS * 1.24 + bob,
+        id + "gt" + i, { lw: 1.4 * S, color: "#565244", amp: 0.3 * S });
+      // 两条腿
+      for (const s of [-1, 1]) {
+        InkLine(ctx, px + s * hS * 0.05, gyS - hS * 0.4 + bob, px + s * hS * 0.1, gyS,
+          id + "l" + i + s, { lw: 3 * S, color: "#26241a", amp: 0.5 * S });
+      }
+      // 躯干 + 头（战斗帽的小轮廓）
+      InkFill(ctx, [
+        [px - hS * 0.14, gyS - hS * 0.36 + bob], [px - hS * 0.12, gyS - hS * 0.72 + bob],
+        [px + hS * 0.12, gyS - hS * 0.72 + bob], [px + hS * 0.15, gyS - hS * 0.36 + bob],
+      ], id + "s" + i, "#2c2a1c", { amp: 1 * S, lw: 0, line: null });
+      InkFill(ctx, [
+        [px - hS * 0.085, gyS - hS * 0.7 + bob], [px - hS * 0.08, gyS - hS * 0.94 + bob],
+        [px + hS * 0.08, gyS - hS * 0.94 + bob], [px + hS * 0.09, gyS - hS * 0.7 + bob],
+      ], id + "h" + i, "#33301e", { amp: 0.8 * S, lw: 0, line: null });
+    }
+    ctx.restore();
+  };
+  // ---- 挎斗摩托 + 太君 + 驾驶兵（场景原点） --------------------------------
+  // OfficerArm：右臂两节的世界角（0 = 垂直向下，负 = 朝画面左抬），返回手心落点
+  const OfficerArm = (sx, sy, aU, aF, id) => {
+    const L1 = 34 * S, L2 = 30 * S;
+    const ex = sx + Math.sin(aU) * L1, ey = sy + Math.cos(aU) * L1;
+    const hx = ex + Math.sin(aU + aF) * L2, hy = ey + Math.cos(aU + aF) * L2;
+    InkLine(ctx, sx, sy, ex, ey, id + "u", { lw: 10 * S, color: RC.officerCoat, amp: 1 * S });
+    InkLine(ctx, ex, ey, hx, hy, id + "f", { lw: 8.6 * S, color: RC.officerCoat, amp: 1 * S });
+    // 白手套：认"军官在指挥"的那一点白
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, 6.4 * S, 5.2 * S, aU + aF, 0, Math.PI * 2);
+    ctx.fillStyle = RC.glove;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink;
+    ctx.lineWidth = 1.8 * S;
+    ctx.stroke();
+    return { hx, hy };
+  };
+
+  const Moto = () => {
+    const jit = Math.sin(t * 57) * 1.1 * S;     // 引擎怠速的那点哆嗦
+    const cx0 = PX(0), gyS = GY * S + jit * 0.4;
+    // 排气：一口一口的灰
+    for (let i = 0; i < 5; i += 1) {
+      const ph = (t * 0.5 + i * 0.21) % 1;
+      const ex = cx0 - 96 * S - ph * 34 * S - i * 3 * S;
+      const ey = gyS - 16 * S - ph * 52 * S;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, (6 + ph * 17) * S, (4.6 + ph * 13) * S, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(138,134,122,${(1 - ph) * 0.2})`;
+      ctx.fill();
+    }
+    // 地上的一摊影子
+    ctx.beginPath();
+    ctx.ellipse(cx0 + 10 * S, gyS - 2 * S, 150 * S, 13 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(18,14,8,0.28)";
+    ctx.fill();
+
+    // —— 驾驶兵（在车把后面，先画）
+    const dx = cx0 - 34 * S, dHead = gyS - 152 * S + jit;
+    InkFill(ctx, [
+      [dx - 30 * S, gyS - 58 * S], [dx - 26 * S, dHead + 34 * S], [dx + 26 * S, dHead + 34 * S],
+      [dx + 30 * S, gyS - 58 * S],
+    ], "rmDrvBody", RC.jpCoat, { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.2)" });
+    // 胸前交叉背带
+    InkLine(ctx, dx - 20 * S, dHead + 40 * S, dx + 16 * S, gyS - 62 * S, "rmDrvX1", { lw: 3 * S, color: "rgba(30,24,14,0.55)", amp: 1 * S });
+    InkLine(ctx, dx + 20 * S, dHead + 40 * S, dx - 16 * S, gyS - 62 * S, "rmDrvX2", { lw: 3 * S, color: "rgba(30,24,14,0.55)", amp: 1 * S });
+    // 头 + 战斗帽 + 两颊边的帽垂（正面识别日军的第一眼）
+    InkFill(ctx, [
+      [dx - 15 * S, dHead + 18 * S], [dx - 14 * S, dHead - 8 * S], [dx, dHead - 14 * S],
+      [dx + 14 * S, dHead - 8 * S], [dx + 15 * S, dHead + 18 * S], [dx + 6 * S, dHead + 26 * S],
+      [dx - 6 * S, dHead + 26 * S],
+    ], "rmDrvFace", RC.skin, { amp: 1.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.14)" });
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [dx + s * 11 * S, dHead - 4 * S], [dx + s * 19 * S, dHead - 2 * S],
+        [dx + s * 18 * S, dHead + 26 * S], [dx + s * 10 * S, dHead + 22 * S],
+      ], "rmDrvFlap" + s, "#41401f", { amp: 1.2 * S, lw: 2 * S });
+    }
+    InkFill(ctx, [
+      [dx - 17 * S, dHead - 2 * S], [dx - 12 * S, dHead - 20 * S], [dx + 12 * S, dHead - 20 * S],
+      [dx + 17 * S, dHead - 2 * S], [dx + 13 * S, dHead + 3 * S], [dx - 13 * S, dHead + 3 * S],
+    ], "rmDrvCap", "#4c4a26", { amp: 1.4 * S, lw: 2.4 * S });
+    ctx.fillStyle = "rgba(20,16,10,0.55)";
+    ctx.fillRect(dx - 12 * S, dHead + 1 * S, 24 * S, 6 * S);   // 帽檐影
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(dx - 9 * S, dHead + 8 * S, 6 * S, 2.6 * S);
+    ctx.fillRect(dx + 3 * S, dHead + 8 * S, 6 * S, 2.6 * S);
+    // 两臂伸向车把
+    InkLine(ctx, dx - 24 * S, dHead + 44 * S, dx - 52 * S, gyS - 92 * S + jit, "rmDrvArmL", { lw: 9 * S, color: RC.jpCoat, amp: 1.2 * S });
+    InkLine(ctx, dx + 24 * S, dHead + 44 * S, dx + 4 * S, gyS - 92 * S + jit, "rmDrvArmR", { lw: 9 * S, color: RC.jpCoat, amp: 1.2 * S });
+
+    // —— 太君（斗里，先画人再画斗鼻子盖住下半身）。
+    // 斗必须贴着车：第一版摆在 +96，斗跟车中间空出一条街，读成"军官坐在一辆
+    // 单独的推车里"——挎斗跟车之间还要再补两根连杆（见下）
+    const ox = cx0 + 66 * S;
+    // 头基准。seg2 里跟头目交头接耳时头往右倾一点，点头再压一点
+    let tilt = 0, nod = 0;
+    if (seg === 2) {
+      tilt = 0.10 * Sm((t - 1.9) / 0.5) * (1 - Sm((t - 3.5) / 0.5));
+      nod = (Math.sin(C01((t - 2.5) / 0.9) * Math.PI * 2) + Math.sin(C01((t - 3.1) / 0.7) * Math.PI * 2)) * 0.05;
+    }
+    const oHead = gyS - 178 * S + jit;
+    // 躯干（立领将校呢）
+    InkFill(ctx, [
+      [ox - 34 * S, gyS - 66 * S], [ox - 30 * S, oHead + 36 * S], [ox + 30 * S, oHead + 36 * S],
+      [ox + 34 * S, gyS - 66 * S],
+    ], "rmOffBody", RC.officerCoat, { amp: 1.8 * S, lw: 3 * S, shade: "rgba(0,0,0,0.22)" });
+    // 斜挎武装带 + 略章（左胸一小条）
+    InkLine(ctx, ox + 22 * S, oHead + 42 * S, ox - 26 * S, gyS - 74 * S, "rmOffSam", { lw: 4 * S, color: "rgba(24,20,12,0.6)", amp: 1 * S });
+    InkFill(ctx, Rect(ox - 20 * S, oHead + 52 * S, 14 * S, 5 * S), "rmOffRib", "#6e4a2c", { amp: 0.4 * S, lw: 1.2 * S });
+    // 立领 + 两片红领章
+    InkFill(ctx, Rect(ox - 15 * S, oHead + 28 * S, 30 * S, 10 * S), "rmOffCollar", RC.officerDark, { amp: 0.8 * S, lw: 2 * S });
+    for (const s of [-1, 1]) {
+      InkFill(ctx, Rect(ox + s * 13 * S - 6 * S, oHead + 30 * S, 9 * S, 6 * S), "rmOffTab" + s, RC.tab, { amp: 0.4 * S, lw: 1.2 * S });
+    }
+    // 军刀立在斗里：缠柄露在斗沿上，护手一小圈，左手（白手套）搭在柄头
+    InkLine(ctx, ox - 26 * S, gyS - 70 * S, ox - 30 * S, oHead + 60 * S, "rmSabre", { lw: 5 * S, color: RC.sabre, amp: 0.8 * S });
+    ctx.beginPath();
+    ctx.ellipse(ox - 29 * S, oHead + 63 * S, 5 * S, 2.4 * S, 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#5c5440";
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.4 * S; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(ox - 30 * S, oHead + 55 * S, 5.6 * S, 4.6 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.glove;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6 * S; ctx.stroke();
+
+    // 右臂：seg1 打手势；seg2 收在刀柄上、末了朝村里一挥；seg0 按着斗沿
+    let arm = { aU: -0.5, aF: -0.25 };          // 默认：手搭斗沿
+    if (seg === 1) {
+      // 关键帧：抬起 → 劈一 → 回 → 劈二 → 指住村口 → 绕圈（合拢）→ 收手
+      const K = [
+        [0.0, -0.5, -0.25], [0.7, -2.3, -0.5], [1.1, -1.5, -0.35], [1.5, -2.3, -0.5],
+        [1.9, -1.5, -0.35], [2.3, -1.95, -0.6], [2.6, -1.95, -0.6], [3.6, -1.95, -0.6], [4.2, -0.5, -0.25],
+      ];
+      let a = K[0], b = K[K.length - 1];
+      for (let i = 0; i < K.length - 1; i += 1) {
+        if (t >= K[i][0] && t <= K[i + 1][0]) { a = K[i]; b = K[i + 1]; break; }
+        if (t > K[i + 1][0]) { a = K[i + 1]; b = K[i + 1]; }
+      }
+      const k = b[0] > a[0] ? Sm((t - a[0]) / (b[0] - a[0])) : 0;
+      arm = { aU: a[1] + (b[1] - a[1]) * k, aF: a[2] + (b[2] - a[2]) * k };
+      // 2.6~3.6 那一秒：手腕绕圈——"把村子围起来"
+      if (t > 2.6 && t < 3.6) {
+        const w = (t - 2.6) / 1.0 * Math.PI * 2 * 1.5;
+        arm.aU += Math.sin(w) * 0.22;
+        arm.aF += Math.cos(w) * 0.3;
+      }
+    } else if (seg === 2) {
+      // 交头接耳时手按着刀柄不动；3.5s 起白手套朝村里（画面左）连挥两下
+      const flick = Math.sin(C01((t - 3.5) / 0.8) * Math.PI * 2) * Sm((t - 3.5) / 0.15) * (1 - Sm((t - 4.4) / 0.2));
+      arm = { aU: -0.5 - Sm((t - 3.4) / 0.4) * 1.3, aF: -0.25 - flick * 0.55 };
+    }
+    OfficerArm(ox + 24 * S, oHead + 46 * S, arm.aU, arm.aF, "rmOffArm");
+
+    // 头（正面，含倾斜/点头）
+    ctx.save();
+    ctx.translate(ox, oHead + 8 * S);
+    ctx.rotate(tilt + nod * 0.4);
+    ctx.translate(0, nod * 5 * S);
+    // 脸
+    InkFill(ctx, [
+      [-16 * S, 14 * S], [-15 * S, -10 * S], [0, -16 * S], [15 * S, -10 * S],
+      [16 * S, 14 * S], [8 * S, 24 * S], [-8 * S, 24 * S],
+    ], "rmOffFace", RC.skin, { amp: 1.2 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.14)" });
+    // 大盖帽：帽檐影先把眉眼压进去
+    ctx.fillStyle = "rgba(16,12,8,0.5)";
+    ctx.fillRect(-14 * S, -4 * S, 28 * S, 7 * S);
+    // 圆框眼镜：两个细圈 + 中梁，镜片一线冷光
+    ctx.strokeStyle = "#1f1c14";
+    ctx.lineWidth = 1.6 * S;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(s * 7.4 * S, 2.4 * S, 5.6 * S, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-2 * S, 2 * S); ctx.lineTo(2 * S, 2 * S); ctx.stroke();
+    ctx.strokeStyle = "rgba(200,204,196,0.4)";
+    ctx.lineWidth = 1.2 * S;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(s * 7.4 * S, 2.4 * S, 4.2 * S, -1.9, -1.1);
+      ctx.stroke();
+    }
+    // 卫生胡：鼻下一小方块——荧幕上认太君的那一撮
+    InkFill(ctx, Rect(-4.6 * S, 9.6 * S, 9.2 * S, 4.4 * S), "rmStache", "#241a12", { amp: 0.4 * S, lw: 1.2 * S });
+    InkLine(ctx, -5 * S, 18.6 * S, 5 * S, 18.6 * S, "rmOffMouth", { lw: 1.8 * S, color: IN.inkSoft, amp: 0.5 * S });
+    // 大盖帽本体：帽墙绯红一整圈 + 星徽 + 黑檐
+    InkFill(ctx, [
+      [-19 * S, -6 * S], [-17 * S, -24 * S], [-6 * S, -30 * S], [6 * S, -30 * S],
+      [17 * S, -24 * S], [19 * S, -6 * S],
+    ], "rmOffCap", RC.capBody, { amp: 1.2 * S, lw: 2.6 * S });
+    InkFill(ctx, Rect(-19 * S, -10 * S, 38 * S, 7.4 * S), "rmOffBand", RC.capBand, { amp: 0.7 * S, lw: 2 * S });
+    ctx.beginPath();
+    ctx.arc(0, -6.4 * S, 2.6 * S, 0, Math.PI * 2);
+    ctx.fillStyle = RC.star;
+    ctx.fill();
+    InkFill(ctx, [
+      [-15 * S, -3.4 * S], [15 * S, -3.4 * S], [11 * S, 3.4 * S], [-11 * S, 3.4 * S],
+    ], "rmOffVisor", "#1c1a12", { amp: 0.6 * S, lw: 1.8 * S });
+    ctx.restore();
+
+    // —— 挎斗（车斗鼻子朝镜头，盖住太君腰以下）。
+    // 先画两根连杆把斗跟车焊在一起，斗身随后压住接头
+    for (const [y1, y2] of [[34, 32], [54, 52]]) {
+      InkLine(ctx, cx0 - 8 * S, gyS - y1 * S, ox - 40 * S, gyS - y2 * S, "rmStrut" + y1,
+        { lw: 3.4 * S, color: RC.motoDark, amp: 0.5 * S });
+    }
+    InkFill(ctx, [
+      [ox - 52 * S, gyS - 70 * S], [ox + 52 * S, gyS - 70 * S], [ox + 44 * S, gyS - 6 * S],
+      [ox - 44 * S, gyS - 6 * S],
+    ], "rmTub", RC.moto, { amp: 2 * S, lw: 3 * S, shade: "rgba(0,0,0,0.24)" });
+    InkLine(ctx, ox - 52 * S, gyS - 68 * S, ox + 52 * S, gyS - 68 * S, "rmTubRim",
+      { lw: 2.6 * S, color: "rgba(220,205,160,0.35)", amp: 0.8 * S });
+    // 斗鼻上一只备胎
+    ctx.beginPath();
+    ctx.ellipse(ox, gyS - 34 * S, 21 * S, 21 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.4 * S; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(ox, gyS - 34 * S, 9 * S, 9 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.motoDark;
+    ctx.fill();
+    ctx.stroke();
+    // 斗轮（右侧露半个）
+    ctx.beginPath();
+    ctx.ellipse(ox + 50 * S, gyS - 18 * S, 7 * S, 17 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.stroke();
+
+    // —— 车头（前轮/前叉/车把/大灯，最后画，压住驾驶兵的手）
+    const fx = cx0 - 40 * S;
+    // 先给车一个"身子"：发动机的黑铁块从驾驶兵身下一直落到轮后——没有这一块，
+    // 兵的躯干悬在半空，整个人读成飘着的（第一版就是）
+    InkFill(ctx, [
+      [dx - 22 * S, gyS - 60 * S], [dx + 24 * S, gyS - 60 * S],
+      [dx + 20 * S, gyS - 10 * S], [dx - 18 * S, gyS - 10 * S],
+    ], "rmEngine", RC.motoDark, { amp: 1.6 * S, lw: 2.4 * S, shade: "rgba(0,0,0,0.3)" });
+    // 骑手的两只马靴踩在踏板上，露在车身两侧
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [dx + s * 24 * S - 6 * S, gyS - 30 * S], [dx + s * 24 * S + 7 * S, gyS - 30 * S],
+        [dx + s * 26 * S + 8 * S, gyS - 12 * S], [dx + s * 26 * S - 7 * S, gyS - 12 * S],
+      ], "rmBoot" + s, "#1f1c14", { amp: 1 * S, lw: 2 * S });
+    }
+    ctx.beginPath();
+    ctx.ellipse(fx, gyS - 26 * S, 10 * S, 26 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = RC.tire;
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.6 * S; ctx.stroke();
+    // 前挡泥板
+    InkFill(ctx, [
+      [fx - 13 * S, gyS - 48 * S], [fx + 13 * S, gyS - 48 * S],
+      [fx + 15 * S, gyS - 38 * S], [fx - 15 * S, gyS - 38 * S],
+    ], "rmFender", RC.moto, { amp: 1.2 * S, lw: 2.2 * S });
+    // 前叉两根到车把
+    for (const s of [-1, 1]) {
+      InkLine(ctx, fx + s * 7 * S, gyS - 46 * S, fx + s * 9 * S, gyS - 92 * S + jit, "rmFork" + s,
+        { lw: 3 * S, color: RC.motoDark, amp: 0.6 * S });
+    }
+    // 车把一横，两端握把
+    InkLine(ctx, fx - 56 * S, gyS - 94 * S + jit, fx + 52 * S, gyS - 92 * S + jit, "rmBar",
+      { lw: 4.4 * S, color: RC.motoDark, amp: 0.8 * S });
+    // 大灯：一只圆灯 + 冷白的一圈弱光（灯是亮的——阴天里这点光反而瘆人）
+    const lyS = gyS - 72 * S + jit;
+    const glow = ctx.createRadialGradient(fx, lyS, 2 * S, fx, lyS, 60 * S);
+    const gk = 0.3 + Math.sin(t * 13) * 0.04;
+    glow.addColorStop(0, `rgba(216,210,176,${gk})`);
+    glow.addColorStop(1, "rgba(216,210,176,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(fx - 64 * S, lyS - 64 * S, 128 * S, 128 * S);
+    ctx.beginPath();
+    ctx.ellipse(fx, lyS, 12 * S, 12 * S, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#b3ad8e";
+    ctx.fill();
+    ctx.strokeStyle = IN.ink; ctx.lineWidth = 2.4 * S; ctx.stroke();
+  };
+
+  // ---- 伪军头目（seg2 走进来交头接耳；侧脸朝左） ----------------------------
+  const Chief = () => {
+    if (seg !== 2) return;
+    const walkIn = Sm(t / 1.6);
+    const x0 = 500 - (500 - 138) * walkIn;      // 从画右走到斗沿
+    const lean = Sm((t - 1.7) / 0.5) * (1 - Sm((t - 3.6) / 0.5));   // 凑过去
+    const turn = Sm((t - 3.9) / 0.5);           // 回身派活
+    const px = PX(x0), gyS = GY * S;
+    const hgt = 182;
+    const walk = (t < 1.6 || turn > 0.6) ? t * 7.5 : 0;
+    const step = walk ? Math.sin(walk) * 8 : 0;
+    // 腿（侧视两条）——比伪军的灰土布再深一档：他站在近景，浅了就发飘
+    InkLine(ctx, px - step * S * 0.4, gyS - hgt * 0.44 * S, px - (13 + step) * S, gyS - 2 * S, "rmChLegB", { lw: 8 * S, color: "#3a352c", amp: 1.2 * S });
+    InkLine(ctx, px + step * S * 0.4, gyS - hgt * 0.44 * S, px + (6 + step) * S, gyS - 2 * S, "rmChLegF", { lw: 8.6 * S, color: "#443e33", amp: 1.2 * S });
+    // 躯干：凑过去时朝左折
+    const bend = lean * 0.34 - turn * 0.2;
+    const sx = px - Math.sin(bend) * hgt * 0.36 * S;
+    const sy = gyS - hgt * (0.44 + 0.34 * Math.cos(bend)) * S;
+    InkFill(ctx, [
+      [px - 15 * S, gyS - hgt * 0.42 * S], [sx - 16 * S, sy], [sx + 14 * S, sy + 6 * S],
+      [px + 17 * S, gyS - hgt * 0.42 * S],
+    ], "rmChBody", "#4a4436", { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.24)" });
+    // 挎包
+    InkFill(ctx, Rect(px + 6 * S, gyS - hgt * 0.40 * S, 14 * S, 17 * S), "rmChSat", "#3f382c", { amp: 1.2 * S, lw: 2 * S });
+    // 头（侧脸朝左）＋软帽；回身时翻朝右
+    const hx = sx + (turn > 0.5 ? 8 : -4) * S, hy = sy - 20 * S + lean * 6 * S;
+    const fdir = turn > 0.5 ? 1 : -1;
+    InkFill(ctx, [
+      [hx - fdir * 14 * S, hy + 12 * S], [hx - fdir * 13 * S, hy - 10 * S], [hx, hy - 14 * S],
+      [hx + fdir * 13 * S, hy - 8 * S], [hx + fdir * 15 * S, hy + 4 * S], [hx + fdir * 10 * S, hy + 13 * S],
+    ], "rmChHead", RC.skin, { amp: 1.2 * S, lw: 2.6 * S });
+    InkFill(ctx, [
+      [hx - fdir * 16 * S, hy - 6 * S], [hx - fdir * 10 * S, hy - 17 * S], [hx + fdir * 10 * S, hy - 17 * S],
+      [hx + fdir * 15 * S, hy - 4 * S], [hx + fdir * 10 * S, hy - 1 * S], [hx - fdir * 12 * S, hy - 1 * S],
+    ], "rmChCap", RC.puppetCap, { amp: 1.4 * S, lw: 2.2 * S });
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(hx + fdir * 6 * S - 2 * S, hy + 1 * S, 4.4 * S, 2.4 * S);   // 眼
+    // 胳膊：凑着说话时一只手拢在嘴边；回身时手朝村里一指
+    if (turn > 0.4) {
+      const k = Sm((t - 4.0) / 0.5);
+      InkLine(ctx, sx, sy + 8 * S, sx - 30 * S * (1 - k) - 4 * S, sy + 30 * S - 44 * S * k, "rmChPoint",
+        { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+    } else if (lean > 0.3) {
+      // 拢在嘴边的那只手——"交头接耳"的画面记号
+      InkLine(ctx, sx + 6 * S, sy + 10 * S, hx - 10 * S, hy + 8 * S, "rmChCup", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+      ctx.beginPath();
+      ctx.ellipse(hx - 12 * S, hy + 7 * S, 5.4 * S, 4.4 * S, -0.5, 0, Math.PI * 2);
+      ctx.fillStyle = RC.skinDark;
+      ctx.fill();
+      ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6 * S; ctx.stroke();
+    } else {
+      InkLine(ctx, sx, sy + 8 * S, px - 6 * S + step * S * 0.5, gyS - hgt * 0.42 * S, "rmChArm", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+    }
+  };
+
+  // ---- 组装（后景先画） ------------------------------------------------------
+  JpRank(-430, 302, 58, "rmJp2");
+  JpRank(-322, 308, 70, "rmJp1");
+  JpRank(-212, 316, 84, "rmJp0");
+  Moto();
+  Chief();
+  // 开道的伪军：两个近景大脸（seg0 的起手画面）+ 两个押在半道的
+  FrontPuppet(258, 332, 116, "rmPupD");
+  FrontPuppet(334, 336, 124, "rmPupE");
+  FrontPuppet(575, 366, 214, "rmPupA", { walk: t * 6.4, drift: t * 13 });
+  FrontPuppet(668, 352, 186, "rmPupB", { walk: t * 6.4 + 2.2, drift: t * 13 });
+
+  // 脚下的浮尘
+  Speckle(ctx, 0, (GY - 10) * S, W, H - (GY - 12) * S, "rmDust", { count: 46, alpha: 0.12, size: 3 * S, color: "#2e2820" });
+
+  // ---- 冷罩 + 重角晕：这一镜就是"天阴下来"本身 ------------------------------
+  ctx.fillStyle = "rgba(13,17,30,0.19)";
+  ctx.fillRect(0, 0, W, H);
+  const v = ctx.createRadialGradient(W / 2, H * 0.52, H * 0.24, W / 2, H * 0.52, H * 0.86);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(8,9,14,0.72)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "rmGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
+}
+
+// 过场活动插卡的登记表：World.SetInsertCard 见到这里的名字就走每帧重画那条路。
+// 新加一张卡＝这里登记 + 剧本行 cam: { kind: "insertCard", card: 名字, seg: n }
+export const INSERT_LIVE = { raidMoto: DrawRaidMotoCard };
 
 // ---------------------------------------------------------------------------
 // 刨料特写卡（会动的那一张，和下面的划线卡同一套路数）。

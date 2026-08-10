@@ -423,8 +423,9 @@ function HintShot(state, hint) {
     case "insert":
       return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
     case "insertCard":
-      // 专画的一张细节插画铺满画框；机位停在原地不动
-      return { ...BaseShot(state), card: hint.card };
+      // 专画的一张细节插画铺满画框；机位停在原地不动。
+      // seg：活动插卡（每帧重画）的段号，动画按 (seg, 本行时间) 走
+      return { ...BaseShot(state), card: hint.card, cardSeg: hint.seg ?? 0 };
     case "insertVideo":
       // 序章：一行旁白一段过场短片铺满画框。card 是兜底——片子没缓冲好就先上手绘卡
       return { ...BaseShot(state), card: hint.card, video: hint.clip };
@@ -480,7 +481,7 @@ function UpdateCamera(state, dt) {
       hw: framing.baseHw * (1 - 0.10 * framing.prog),
     };
     world.SetOverShoulder(state, shot.ots || null);
-    world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0);
+    world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0, shot.cardSeg || 0);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。

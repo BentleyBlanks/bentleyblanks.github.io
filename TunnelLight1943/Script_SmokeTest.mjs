@@ -2312,8 +2312,12 @@ function TestRaidColumn() {
   assert.equal(active.length, 2, `进院搜查的必须恰好两个兵，现在 ${active.length} 个`);
   assert.ok(enemies.some((a) => a.mount === "bicycle"), "队伍里得有骑车的伪军");
   assert.ok(enemies.some((a) => a.mount === "motorcycle"), "队伍里得有挎斗摩托");
-  const side = enemies.find((a) => a.pinTo);
-  assert.ok(side, "挎斗里得坐着一个兵");
+  // 斗里坐的是**军官本人**（2026-08-10 用户定：太君坐斗、兵开车），
+  // 交头接耳那一镜之后他才下车——进村这一拍必须还钉在车上
+  const side = state.actors.find((a) => a.pinTo);
+  assert.ok(side, "挎斗里得坐着人");
+  assert.equal(side.id, "officer", "斗里坐的得是军官（太君坐斗、兵开车）");
+  assert.equal(side.pose, "sitSide", "军官进村时得是坐在斗里的姿势");
   assert.ok(state.actors.some((a) => a.id === "baozhang" && a.carry === "名册"), "伪保长得夹着保甲册带路");
   // 钉在车上的兵要真的跟着车走
   const moto = state.actors.find((a) => a.id === "motoLead");

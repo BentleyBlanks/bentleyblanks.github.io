@@ -3143,8 +3143,10 @@ export const SCRIPTS = {
       // 起因不是刘家做错了什么，而是日军抢不到粮时蓄意以杀害婴儿逼供恐吓
       kind: "cinematic", id: "c1_roster", timeOfDay: "dawn",
       lines: [
-        { who: "伪保长", say: "赵家，三口。", far: true, d: 3.6,
-          cam: { kind: "shot", x: 84, y: 1.8, dist: 10, pan: -5 },
+        // 日军进村的第一眼：远远一支队伍压进东街。先只给队伍的剪影和引擎声——
+        // 特写在下面三行的插卡里（旁白闭嘴，同期声自己说话）
+        { stage: "", d: 3.0,
+          cam: { kind: "shot", x: 84, y: 1.8, dist: 10, pan: -3 },
           on: (state) => {
             state.flags.raidStarted = true;
             state.flags.villageAlarm = true;
@@ -3155,18 +3157,16 @@ export const SCRIPTS = {
               a.patrol = null;
               a.x -= 66;
               a.heading = -1;
-              // 挎斗里的兵钉在车上（pinTo 每帧跟车）：给他自己的走位反而会拆下来
+              // 斗里的军官钉在车上（pinTo 每帧跟车）：给他自己的走位反而会拆下来
               if (a.pinTo) continue;
               a.cineTarget = { x: a.x - 15 };
               a.cineSpeed = RAID_SPEED;
             }
-            // 点户的一小队走在队伍前头：伪保长夹着册、伪军头目跟着
+            // 点户的伪保长走在队伍前头；伪军头目押着队尾——摩托一停他要过去领令
             state.actors.push(
               MakeActor("baozhang", "puppet", 70, { label: "伪保长", decor: true, carry: "名册", heading: -1, cineTarget: { x: 61.4 }, cineSpeed: 2.2 }),
-              MakeActor("puppetChief", "puppet", 72, { label: "伪军头目", decor: true, heading: -1, cineTarget: { x: 63 }, cineSpeed: 2.2 }),
+              MakeActor("puppetChief", "puppet", 99, { label: "伪军头目", decor: true, heading: -1, cineTarget: { x: 86.5 }, cineSpeed: RAID_SPEED }),
             );
-            const off = FindActor(state, "officer");
-            if (off) { off.x = 68.5; off.cineTarget = { x: 59.9 }; off.cineSpeed = 2.2; }
             const tr = FindActor(state, "traitor");
             if (tr) { tr.x = 70.8; tr.cineTarget = { x: 62 }; tr.cineSpeed = 2.2; }
             // 两个进院搜刘家的兵
@@ -3188,7 +3188,43 @@ export const SCRIPTS = {
             if (sis) { sis.x = 37; sis.heading = 1; sis.cineTarget = null; }
             state.player.x = 37.8;
             Cue(state, "motorPutt", { gain: 0.5 });
+            Cue(state, "windGust", { gain: 0.4, delay: 1.2 });
           } },
+        // 特写插卡（每帧重画的正面镜头，侧视骨架给不出正脸）：
+        // 镜头从开道伪军的脸上一路横摇到挎斗摩托上的军官。
+        // 日军讲日语无字幕——这一段只有引擎怠速、风和乌鸦
+        { stage: "", d: 4.2, cam: { kind: "insertCard", card: "raidMoto", seg: 0 },
+          on: (state) => {
+            Cue(state, "motorPutt", { gain: 0.55 });
+            Cue(state, "step", { gain: 0.5, delay: 0.7 });
+            Cue(state, "step", { gain: 0.55, delay: 1.5 });
+            Cue(state, "windGust", { gain: 0.35, delay: 2.2 });
+          } },
+        // 太君在斗里原地打手势：两记朝前的劈手（分头、围村），再一个绕圈（合拢）
+        { stage: "", d: 4.6, cam: { kind: "insertCard", card: "raidMoto", seg: 1 },
+          on: (state) => {
+            Cue(state, "motorPutt", { gain: 0.45, delay: 0.4 });
+            Cue(state, "motorPutt", { gain: 0.4, delay: 2.6 });
+          } },
+        // 伪军头目凑到斗沿，交头接耳几句——军官点了点头，白手套朝村里一挥。
+        // 点下来的户口册就是这几句定的。世界里同一时刻军官下车、头目领令西去，
+        // 卡一落画面里两人已经各就各位
+        { stage: "", d: 4.6, cam: { kind: "insertCard", card: "raidMoto", seg: 2 },
+          on: (state) => {
+            const off = FindActor(state, "officer");
+            const moto = FindActor(state, "motoLead");
+            if (off) {
+              off.pinTo = null; off.pose = null; off.lift = 0;
+              off.x = (moto ? moto.x : 85.7) - 1;
+              off.heading = -1; off.cineTarget = { x: 59.9 }; off.cineSpeed = 2.2;
+            }
+            const pc = FindActor(state, "puppetChief");
+            if (pc) { pc.cineTarget = { x: 63 }; pc.cineSpeed = 2.4; }
+            Cue(state, "motorPutt", { gain: 0.4, delay: 0.6 });
+            Cue(state, "windGust", { gain: 0.3, delay: 3.0 });
+          } },
+        { who: "伪保长", say: "赵家，三口。", far: true, d: 3.6,
+          cam: { kind: "shot", x: 84, y: 1.8, dist: 10, pan: -5 } },
         { stage: "撞门声、喝骂声，一户比一户近。", d: 3.0,
           cam: { kind: "shot", x: 72, y: 1.7, dist: 9, pan: -4 },
           on: (state) => { Cue(state, "knock"); Cue(state, "knock", { delay: 1.3, gain: 1.2 }); } },
@@ -4803,16 +4839,18 @@ function BuildRaidOrder() {
   });
   out.push({ id: "traitor", gap: 1.9 });         // 带路递名单的翻译官走在伪军队尾
   out.push({ id: "motoLead", gap: 2.0 });        // 挎斗摩托压着伪军的后脚跟
-  out.push({ id: "officer", gap: 3.2 });         // 军官走在日军队列的头里
+  // 军官不再徒步——他坐在挎斗里（太君坐斗、兵开车，见 SpawnRaidSoldiers），
+  // 所以队序里没有他：斗里的人跟着 motoLead 的 gap 走
   // 日军：一排三个，三排。**一排里错开半个身位**——原来后排只错开 0.22m，
   // 在三十多米开外的车队机位上跟前排完全重合，十个兵看着就是一人一排的长蛇
   //（2026-08-09 用户退回的正是这个）。半个身位错开 + 后排画小一圈，
   // 三个人才读成"一排三个"；排与排之间空 2.5m，"排"的边界才立得住。
+  // 队头那排离摩托 3.4m——军官下了徒步队列之后把他原先占的那一档补给车距
   RAID_JP_ROWS.forEach((n, r) => {
     for (let c = 0; c < n; c += 1) {
       out.push({
         id: `c1jp${r}x${c}`,
-        gap: c === 0 ? (r === 0 ? 1.6 : ROW_GAP) : ROW_STAGGER,
+        gap: c === 0 ? (r === 0 ? 3.4 : ROW_GAP) : ROW_STAGGER,
         rank: c,
       });
     }
@@ -4846,9 +4884,13 @@ function SpawnRaidSoldiers(state) {
     // 带队的军官：单独一种外观 kind（将校呢深一档 + 大檐帽 + 连鞘军刀），
     // 三样加起来在 6m 的审问近景下一眼分得出他不是普通兵。
     // 他不参与潜行判定——考场只准两个兵；kind 不是 soldier/puppet，
-    // 所以 SpawnRaidSoldiers 开头那道 IsEnemy 过滤扫不掉他，得点名清
-    MakeActor("officer", "officer", RaidStartX("officer"), {
+    // 所以 SpawnRaidSoldiers 开头那道 IsEnemy 过滤扫不掉他，得点名清。
+    // **进村时他坐在挎斗里**（2026-08-10 用户定：太君坐斗、兵开车——电视剧里
+    // 那个经典构图，史实里军官下乡也确实这么代步）。交头接耳那一镜之后
+    // 才下车徒步（c1_roster 里解 pinTo）
+    MakeActor("officer", "officer", RaidStartX("motoLead") + 0.5, {
       label: "日军军官", decor: true, heading: -1, carry: "军刀",
+      pose: "sitSide", lift: 0.22, pinTo: { id: "motoLead", dx: 0.5 },
     }),
     // 据点的翻译官：带路的、递名单的。decor——他不参与潜行判定（两个兵
     // 已经把考场撑满了），但他得在场：第二章挑灯笼带路的、审问时递话的，
@@ -4859,9 +4901,8 @@ function SpawnRaidSoldiers(state) {
     // carry:"" 压掉兵默认的手持步枪——骑车的手在车把上，枪是背着的
     // lift = 座高 − 站立胯高(≈0.60m)。给多了人就浮在车上面，给少了像蹲在车边
     MakeActor("bikeScout", "puppet", RaidStartX("bikeScout"), { label: "骑车的伪军", decor: true, mount: "bicycle", pose: "rideBike", lift: 0.17, heading: -1, carry: "" }),
-    // 挎斗摩托：驾驶的兵 + 挎斗里的兵（钉在车侧，跟着车走）
+    // 挎斗摩托：驾驶的兵。斗里坐的不再是普通兵——是上面那位军官
     MakeActor("motoLead", "soldier", RaidStartX("motoLead"), { label: "摩托驾驶", decor: true, mount: "motorcycle", pose: "rideMoto", lift: 0.32, heading: -1, carry: "" }),
-    MakeActor("motoSide", "soldier", RaidStartX("motoLead") + 0.5, { label: "挎斗里的兵", decor: true, pose: "sitSide", lift: 0.22, heading: -1, carry: "", pinTo: { id: "motoLead", dx: 0.5 } }),
   );
   // 徒步的两段（位置与排别全从队序表来）：
   //   打头的十个伪军——松散，几个溜到后排去；

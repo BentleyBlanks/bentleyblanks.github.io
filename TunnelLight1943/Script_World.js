@@ -12,7 +12,7 @@ import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
-import { MoodAt, DipAt, LIGHT_FADE } from "./Data_DayCycle.mjs";
+import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
 import {
   BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, RankDz,
   CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
@@ -457,6 +457,7 @@ export function CreateWorld(canvasEl) {
   let otsMesh = null;
   let otsHiddenId = null;
   let vignetteAlpha = 0;
+  let raidGloom = 0;      // 日伪在村时压上来的那层铅灰蓝（0→1 平滑吸附）
   let dustMotes = [];
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
@@ -4318,12 +4319,19 @@ export function CreateWorld(canvasEl) {
     const dip = DipAt(lightMix);
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
-    const base = mood.dark + dip;
+    // 日伪在村的那段（2026-08-10 用户："日军的出现 帮我氛围也改的昏暗 阴森一些"）：
+    // 罩子加一档、颜色朝铅灰蓝拧过去。判据是**画面里有没有敌人**，不是旗标——
+    // 队伍撤了颜色自己还回来；夜/地道那几档本来就沉，不再叠。
+    // 渐变走 1.6 秒的指数吸附，跟昼夜那条连续曲线一个脾气：进拍不跳变
+    const enemyOut = state.actors.some((a) => (a.kind === "soldier" || a.kind === "officer" || a.kind === "puppet") && a.visible !== false);
+    const gloomDay = lightShown === "dawn" || lightShown === "day" || lightShown === "dusk";
+    raidGloom += (((enemyOut && gloomDay) ? 1 : 0) - raidGloom) * Math.min(1, dt / 1.6);
+    const base = mood.dark + dip + raidGloom * 0.15;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
     darkMat.opacity = vignetteAlpha;
     // 罩子是**有颜色的**：夜里泛蓝、黄昏泛橙、地道泛土黑。纯黑罩子压出来的
-    // "夜"只是把白天调暗，看着像蒙了层灰
-    darkMat.color.setHex(mood.tint);
+    // "夜"只是把白天调暗，看着像蒙了层灰。扫荡的阴森是铅灰蓝，不是黑
+    darkMat.color.setHex(raidGloom > 0.01 ? MixHex(mood.tint, 0x1c2334, raidGloom * 0.7) : mood.tint);
     // 暗场贴在相机前 3m，按该距离处的视口尺寸铺满
     const planeZ = dist - 3;
     const k = 3 / dist;
@@ -4335,6 +4343,8 @@ export function CreateWorld(canvasEl) {
   const insertCards = new Map();
   let insertMesh = null;
   let insertCardName = null, insertCardT = 0;
+  // 活动插卡（每帧重画的过场卡，如太君那一镜）
+  let insertAnimCanvas = null, insertAnimTex = null, insertAnimOn = false;
 
   // 序章的插卡改成了即梦生成的过场短片（Video/Pro_NN.mp4，一行旁白一段）。
   // 手绘卡没删——片子还没缓冲好就先顶上去，画面永远不会空一拍。
@@ -4370,14 +4380,17 @@ export function CreateWorld(canvasEl) {
     if (insertVideoList.length) GetInsertVideo(insertVideoList[0]);
   }
 
-  // name=手绘卡名（兜底），video=片名，lineT=这一行已经走了多久
-  function SetInsertCard(name, video, lineT) {
+  // name=手绘卡名（兜底），video=片名，lineT=这一行已经走了多久，
+  // seg=活动插卡的段号（剧本行 cam.seg，动画按 (seg, lineT) 走——完全由游戏
+  // 时钟驱动，无头实拍逐帧对得上）
+  function SetInsertCard(name, video, lineT, seg) {
     if (!name && !video) {
       if (insertMesh) insertMesh.visible = false;
       if (insertVideoName) { insertVideos.get(insertVideoName)?.el.pause(); insertVideoName = null; }
       insertCardName = null;
       insertVideoLive = false;
       insertIsVideo = false;
+      insertAnimOn = false;
       return;
     }
     // 定格画片的慢推（Ken Burns）：换一张卡从头推，同一张卡持续累积
@@ -4421,6 +4434,24 @@ export function CreateWorld(canvasEl) {
       insertVideoName = null;
     }
 
+    // 活动插卡（INSERT_LIVE 里登记过的）：跟定格卡同一块画框，但每帧重画。
+    // 太君那一镜要的是正脸和手势——侧视骨架给不出来，只能整张卡自己动
+    insertAnimOn = false;
+    if (!tex && name && ART.INSERT_LIVE?.[name]) {
+      if (!insertAnimCanvas) {
+        insertAnimCanvas = MakeCanvas(1280, 720);
+        insertAnimTex = CanvasTexture(insertAnimCanvas);
+        insertAnimTex.generateMipmaps = false;
+        insertAnimTex.minFilter = THREE.LinearFilter;
+      }
+      const c2 = insertAnimCanvas.getContext("2d");
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, insertAnimCanvas.width, insertAnimCanvas.height);
+      ART.INSERT_LIVE[name](c2, insertAnimCanvas.width, insertAnimCanvas.height, seg || 0, lineT || 0);
+      insertAnimTex.needsUpdate = true;
+      tex = insertAnimTex;
+      insertAnimOn = true;
+    }
     if (!tex) {
       if (!name) { if (insertMesh) insertMesh.visible = false; return; }
       if (!insertCards.has(name)) {
@@ -4454,7 +4485,8 @@ export function CreateWorld(canvasEl) {
     // 慢推：十秒推 6%——定格画片不是幻灯片，镜头永远在呼吸。
     // 但片子自己已经在推/横移了，再叠一层就是两个镜头打架，只留一点点安全溢出。
     // 活卡（划线）不推：玩家的手正按在上面，画面一动手就跟着偏。
-    const kb = (insertIsVideo || liveCardOn) ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
+    // 活动插卡也不推：卡自己在横摇，再叠一层就是两个镜头打架。
+    const kb = (insertIsVideo || liveCardOn || insertAnimOn) ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
     const w = Math.max(cw, chh * aspect) * kb;
     insertMesh.scale.set(w, w / aspect, 1);
     insertMesh.position.set(camX, camY, z);
