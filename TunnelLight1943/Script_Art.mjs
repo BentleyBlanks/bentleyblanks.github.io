@@ -1003,6 +1003,12 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     InkLine(ctx, 0, -12 * S, 0, 25 * S, "hoeShaft", { lw: 1.15 * S, color: "#8d6236" });
     InkFill(ctx, [[-1.2 * S, 23.5 * S], [5.2 * S, 26.5 * S], [6.6 * S, 30.5 * S], [1.2 * S, 28 * S]],
       "hoeBlade", "#6b6f76", { amp: 0.4 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.25)" });
+  } else if (label === "木槌") {
+    // 短柄木槌：礅门轴用的。握点（原点）在柄中下段，槌头在柄梢——
+    // 抡起来（swing 姿势）头朝上扬，落下去正砸在轴头上
+    InkLine(ctx, 0, -4 * S, 0, 12 * S, "malletShaft", { lw: 1.3 * S, color: "#8d6236" });
+    InkFill(ctx, Rect(-3.4 * S, 12 * S, 6.8 * S, 5.2 * S), "malletHead", "#6b4a2c",
+      { amp: 0.5 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.25)" });
   } else if (label === "扫帚") {
     // 大扫帚：竹柄扎一蓬糜子苗，柄顺前臂、苗蹭着地。握点在柄上三分之一
     InkLine(ctx, 0, -10 * S, 0, 22 * S, "broomShaft", { lw: 1.7 * S, color: "#7a5433" });

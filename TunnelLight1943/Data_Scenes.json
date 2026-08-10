@@ -125,6 +125,12 @@
           "name": "旧木凳"
         },
         {
+          "id": "yardStool",
+          "kind": "stool",
+          "x": 35.9,
+          "name": "院里的小板凳"
+        },
+        {
           "id": "doorframe",
           "kind": "doorframe",
           "x": 34,

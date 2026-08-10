@@ -126,7 +126,7 @@ function ScaleKeepGround(mesh, sx, sy = sx) {
 const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
 
 // 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
-const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀"];
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀", "木槌"];
 // 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
 // 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
 // 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
@@ -144,7 +144,7 @@ const HOLD_WEIGHT = {
   "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
   "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
   "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
-  "军刀": 0.25,
+  "军刀": 0.25, "木槌": 0.3,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
@@ -163,7 +163,7 @@ function MakeCarryMesh(label) {
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
   // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
   // 刺刀尖离握点 1.18m＝56.6px，所以半高至少 57 → 120。
-  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72] };
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72], "木槌": [24, 60] };
   const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
   const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
   return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
@@ -3307,8 +3307,11 @@ export function CreateWorld(canvasEl) {
       }
       doorLeafPivot.visible = true;
       doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
-      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转
-      doorLeafPivot.rotation.z = -(dl.lean || 0);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转。
+      // strain（攥着它较劲时才有）在渲染层抖那一丝——两只手对着一扇门的分量，
+      // 谁也压不死谁。判定用的 lean 不掺这份演出（Core 只算物理）。
+      const trem = (dl.strain || 0) * 0.008 * Math.sin(time * 34);
+      doorLeafPivot.rotation.z = -((dl.lean || 0) + trem);
     } else if (doorLeafPivot) doorLeafPivot.visible = false;
 
     if (state.planing) {
