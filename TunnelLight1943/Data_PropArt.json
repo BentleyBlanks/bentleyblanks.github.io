@@ -133,7 +133,7 @@
         "anchor": "center",
         "baseline": 12
       },
-      "note": "圆井台(0.73m 高、0.52m 半径——矮而宽会读成洗脸盆)+两根立柱+辘轳鼓，鼓心钉死在 groundY-69px（=Core 的 WINCH_HUB_Y 1.43m×48），会转的摇把就贴在这一点上——改画高就要改 WINCH_HUB_Y。两处条件绘制都在 DrawWell 里：绳断（flags.wellRopeBroken）换成一截毛茬朝下的断头；摇辘轳那一拍（state.winchView）静态摇把让位给会转的那只，由 World 的 propRedraw 单张重烘"
+      "note": "圆井台(0.73m 高、0.52m 半径，画法见画笔顶上的说明)+辘轳架+鼓。轴心定在 groundY-45px（＝Core 的 WINCH_HUB_Y 0.9375m，48像素/米），摇把钉在**西端面**（＝WINCH_CRANK_DX -0.44m，摇的人站在西边才够得着），柄长 5.8px＝WINCH_CRANK_R 0.12m。改画法或改高度就要连 Core 那三个常量一起动——判定、Rig 反解前手、画面用的是同一份数。flags.wellRopeBroken：井绳只剩一截毛茬朝下的断头。摇起来那一刻（state.winchView）静态摇把让位给会转的那只，只走 World 的 propRedraw，不重载盒"
     },
     "millstone": {
       "art": "DrawMillstone",
@@ -624,6 +624,18 @@
         "baseline": 6
       },
       "note": "窖壁上的藏口：浅坑+靠着的覆土板。grainHidden 画进粮袋、nookClosed 把板合上（World propRedraw）"
+    },
+    "tunnelBrace": {
+      "art": "DrawTunnelBrace",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 44,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "玩家亲手支上去的顶木（bracedA/bracedB 两处松土段）。level: under；band 走 loose——它在爬行段的行走线上，必须压在近侧土层剖面之前，否则支完了什么也看不见。爬行段净高 0.72m，所以贴图只有 44px 高（≈0.9m 含楔子）"
     },
     "dungHeap": {
       "art": "DrawDungHeap",
