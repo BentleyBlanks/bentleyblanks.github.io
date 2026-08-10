@@ -483,6 +483,15 @@ export function DrawCharacter(ctx, spec) {
 
   // 头饰
   if (kind === "soldier" || kind === "officer") {
+    // 日军兵的帽垂（军官戴大盖帽，没有这片布）——与骨架头部同一个语汇
+    if (kind === "soldier") {
+      InkFill(ctx, [
+        [-6.4 * S, headY - 5.0 * S], [-1.6 * S, headY - 4.6 * S],
+        [-2.0 * S, headY - 0.4 * S], [-3.0 * S, headY + 1.5 * S],
+        [-4.4 * S, headY - 0.2 * S], [-5.8 * S, headY + 1.7 * S],
+        [-7.0 * S, headY + 0.1 * S], [-7.8 * S, headY - 3.8 * S],
+      ], id + "flap", "#494327", { amp: 0.5 * S, lw: lw * 0.85, shade: "rgba(0,0,0,0.2)", shadeAt: 0.5 });
+    }
     InkFill(ctx, [
       [-6.4 * S, headY - 5.6 * S], [4.2 * S, headY - 8.2 * S], [7.4 * S, headY - 5.2 * S], [-6.0 * S, headY - 3.4 * S],
     ], id + "cap", "#5f5a30", { amp: 0.5 * S, lw: lw * 0.9 });
@@ -541,6 +550,138 @@ export const RIG_COLOR = (kind) => (kind === "father"
   ? [PAL.father, "#54402f"]
   : (KIND_COLOR[kind] || KIND_COLOR.villager));
 
+// ---------------------------------------------------------------------------
+// 军装（1942-43 华北）：三种兵的**剪影**必须一眼分得开
+//
+// 这套语汇沿用 TunnelBell1942 立过的人物规范（那边是 3D，这边是侧视手绘，
+// 标志物一一对应）——用户的原话是「完全看不出来是日军」，根因就是三种人
+// 只差一顶帽子的形状，衣服一个色系、腿脚一模一样：
+//   日军  战斗帽 + **帽垂**（脑后垂布。侧视里最硬的一个标志，中国观众一眼认得）
+//         立领 + 武装带 + 前腰两个弹药盒、**绑腿** + 短军靴
+//   军官  大盖帽（硬檐）+ 深墨绿将校呢 + **马靴**（不打绑腿）+ 胯后挑一柄军刀
+//   伪军  软布帽（既不是战斗帽也不是大盖帽）、**没有帽垂**、胯后一只挎包，
+//         裤脚布鞋跟村民一样——剪影**卡在日军与村民中间**，这是他的人物设定，
+//         不是偷懒（同 TunnelBell：他是本乡人，不做丑角）
+// ---------------------------------------------------------------------------
+export const UNIFORM = {
+  soldier: { capFlap: true, puttee: true, pouches: true, collar: true },
+  officer: { ridingBoot: true, sabre: true, collar: true, sam: true },
+  puppet: { satchel: true },
+};
+
+// 小腿与脚：原来全场写死一副农民的土布裤脚 + 黑布鞋，当兵的也穿着它——
+// 「看不出是日军」有一半出在这儿。按兵种分开取
+const LEG = {
+  soldier: { shinB: "#7b7346", shinF: "#8c8353", footB: "#332c1c", footF: "#3d3524" },
+  officer: { shinB: "#2c2b1f", shinF: "#363426", footB: "#221f16", footF: "#2b2820" },
+  puppet: { shinB: "#6a5a44", shinF: "#7b6a50", footB: "#3a2f22", footF: "#463829" },
+};
+export function RIG_LEG(kind) {
+  return LEG[kind] || { shinB: "#6b5540", shinF: "#7d6349", footB: "#43331f", footF: "#4d3a28" };
+}
+
+// 小腿：农民是土布裤脚，日军是绑腿（一圈圈缠到膝下），军官是马靴
+export function DrawShinPart(ctx, px, py, len, w0, w1, kind, id, { k = 1, back = false } = {}) {
+  const leg = RIG_LEG(kind);
+  DrawLimb(ctx, px, py, len, w0, w1, back ? leg.shinB : leg.shinF, id, { k });
+  const u = UNIFORM[kind];
+  if (u?.puttee) {
+    for (let i = 0; i < 5; i += 1) {
+      const t = 0.08 + i * 0.19;
+      const w = w0 + (w1 - w0) * t;
+      // 缠的方向是斜的：一圈压着一圈往上走，平行横线看着像穿了条袜子
+      InkLine(ctx, px - w * 0.54, py + len * t, px + w * 0.54, py + len * (t - 0.055),
+        id + "wrap" + i, { lw: 2.1 * k, color: "rgba(40,32,18,0.40)", amp: 0.7 * k });
+    }
+  } else if (u?.ridingBoot) {
+    // 靴口那道折边：马靴与绑腿的分界就靠它（军官不打绑腿）
+    InkLine(ctx, px - w0 * 0.58, py + len * 0.05, px + w0 * 0.58, py + len * 0.01,
+      id + "cuff", { lw: 3 * k, color: "rgba(18,16,10,0.6)", amp: 0.8 * k });
+  }
+}
+
+// 军装的零碎：武装带、弹药盒、立领、挎包、军刀。躯干贴图上这几笔小东西
+// 才是三米外读得出"当兵的"的地方——衣服颜色在雾里全都差不多
+function DrawUniformKit(ctx, px, py, w, h, kind, id, k) {
+  const u = UNIFORM[kind];
+  if (!u) return;
+  const ink = (a) => `rgba(28,22,12,${a})`;
+  if (u.collar) {
+    // 立领：军装竖着的那圈硬领，配一小片领章（农民的对襟褂没有领子）
+    InkFill(ctx, [
+      [px - w * 0.26, py - h * 1.02], [px + w * 0.22, py - h * 1.02],
+      [px + w * 0.26, py - h * 0.86], [px - w * 0.28, py - h * 0.86],
+    ], id + "collar", "#4e4a2b", { amp: 1 * k, lw: 3 * k });
+    InkFill(ctx, [
+      [px + w * 0.04, py - h * 1.00], [px + w * 0.24, py - h * 0.98],
+      [px + w * 0.24, py - h * 0.90], [px + w * 0.04, py - h * 0.90],
+    ], id + "tab", "#8f3b2e", { amp: 0.6 * k, lw: 2 * k });
+  }
+  if (u.pouches || u.sam) {
+    // 武装带：比农民那根布腰带宽一倍、深一档，还有个铜扣
+    InkFill(ctx, [
+      [px - w * 0.40, py - h * 0.30], [px + w * 0.38, py - h * 0.32],
+      [px + w * 0.38, py - h * 0.18], [px - w * 0.40, py - h * 0.16],
+    ], id + "belt", "#3d3020", { amp: 0.9 * k, lw: 2.6 * k });
+    InkFill(ctx, [
+      [px + w * 0.24, py - h * 0.31], [px + w * 0.38, py - h * 0.32],
+      [px + w * 0.38, py - h * 0.19], [px + w * 0.24, py - h * 0.18],
+    ], id + "buckle", "#9c8c5a", { amp: 0.5 * k, lw: 1.8 * k });
+  }
+  if (u.pouches) {
+    // 前腰两个弹药盒（侧视只露得出靠镜头这一只半）+ 背带斜挂上肩
+    InkFill(ctx, [
+      [px + w * 0.10, py - h * 0.30], [px + w * 0.36, py - h * 0.31],
+      [px + w * 0.36, py - h * 0.06], [px + w * 0.10, py - h * 0.05],
+    ], id + "pouch", "#514027", { amp: 0.8 * k, lw: 2.4 * k, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px + w * 0.30, py - h * 0.32, px - w * 0.10, py - h * 0.96,
+      id + "strap", { lw: 3.4 * k, color: ink(0.55), amp: 1.2 * k });
+  }
+  if (u.sam) {
+    // 军官是斜挎的武装带（Sam Browne），肩上那条从右肩斜到左胯
+    InkLine(ctx, px + w * 0.26, py - h * 0.30, px - w * 0.16, py - h * 0.94,
+      id + "sam", { lw: 3.6 * k, color: ink(0.6), amp: 1.1 * k });
+  }
+  if (u.sabre) {
+    // 胯后挑着的军刀：刀鞘斜指后下方。侧视里它是军官唯一一个"带兵器"的记号
+    InkLine(ctx, px - w * 0.30, py - h * 0.26, px - w * 0.86, py + h * 0.06,
+      id + "sabre", { lw: 4.2 * k, color: "#2a2820", amp: 0.8 * k });
+    InkLine(ctx, px - w * 0.78, py + h * 0.02, px - w * 0.92, py + h * 0.09,
+      id + "sabreTip", { lw: 3 * k, color: "#8d8a7a", amp: 0.6 * k });
+  }
+  if (u.satchel) {
+    // 伪军：胯后一只挎包（他没有长枪，靠这只包和软帽跟日军分开）
+    InkFill(ctx, [
+      [px - w * 0.62, py - h * 0.34], [px - w * 0.28, py - h * 0.32],
+      [px - w * 0.26, py - h * 0.02], [px - w * 0.64, py - h * 0.04],
+    ], id + "satchel", "#5d5442", { amp: 1 * k, lw: 2.6 * k, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, px - w * 0.44, py - h * 0.34, px + w * 0.06, py - h * 0.94,
+      id + "satStrap", { lw: 3 * k, color: ink(0.5), amp: 1.2 * k });
+  }
+}
+
+// 帽垂（军帽垂布）：脑后垂下的三片布，盖住后颈。**侧视里认日军最硬的一个
+// 标志**——伪军和村民都没有这东西。画在帽子之前，让帽檐压住它的上沿。
+// r 是头半径；ax 朝 -x 是脑后（贴图一律朝 +x 画，翻面由渲染层负责）
+function DrawCapFlap(ctx, px, py, r, id, k) {
+  // 布色要**比帽子深一档**。走过两次弯路：先用军帽同色（帽子、垂布、肩膀
+  // 糊成一坨），改成晒白的浅布又更糟——这套白盒的 CanvasTexture 没声明 sRGB，
+  // 全场颜色被提亮两档，浅布渲出来跟土墙一个亮度，照样等于没画。
+  // 所以按仓库那条老规矩：配色往下压两档，深的才立得住（两版都是页内实拍看出来的）。
+  // 下沿是**三片布尖**（缺口咬进去）——「屁帘」的形状全在这条锯齿上
+  InkFill(ctx, [
+    [px - r * 1.12, py - r * 1.06],   // 后上角（压在帽墙下）
+    [px - r * 0.30, py - r * 1.00],   // 前上角（耳后）
+    [px - r * 0.38, py - r * 0.22],   // 前缘垂到耳下
+    [px - r * 0.52, py + r * 0.06],   // 第一片布尖（垂过后颈，盖到领子上）
+    [px - r * 0.70, py - r * 0.18],   // 缺口
+    [px - r * 0.90, py + r * 0.10],   // 第二片布尖
+    [px - r * 1.08, py - r * 0.16],   // 缺口
+    [px - r * 1.28, py + r * 0.12],   // 第三片布尖
+    [px - r * 1.36, py - r * 0.82],   // 后缘收回帽墙
+  ], id + "flap", "#494327", { amp: 1 * k, lw: 3.2 * k, shade: "rgba(0,0,0,0.22)", shadeAt: 0.5 });
+}
+
 // 锥形肢体：从枢轴向下延伸 len，上宽 w0 下宽 w1
 export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4, k = 1 } = {}) {
   InkFill(ctx, [
@@ -588,6 +729,8 @@ export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
     InkLine(ctx, px - w * 0.22 + i * w * 0.16, py - h * 0.60, px - w * 0.18 + i * w * 0.16, py - h * 0.22,
       id + "fold" + i, { lw: 2 * k, color: "rgba(43,31,22,0.3)", amp: 2 * k });
   }
+  // 当兵的还要挂一身零碎（武装带/弹药盒/立领/挎包/军刀）
+  DrawUniformKit(ctx, px, py, w, h, kind, id, k);
 }
 
 // 头：枢轴在脖根（底边中点）
@@ -621,6 +764,8 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
 
   // 头饰
   if (kind === "soldier") {
+    // 先画帽垂，帽子压住它的上沿——这一片布是"日军"两个字在侧视里的全部
+    DrawCapFlap(ctx, px, py, r, id, k);
     InkFill(ctx, [
       [px - r * 1.02, py - r * 1.18], [px + r * 0.56, py - r * 1.82],
       [px + r * 1.06, py - r * 1.16], [px - r * 0.98, py - r * 0.82],
@@ -4084,22 +4229,31 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
 }
 
 export function DrawShaft(ctx, x, topY, botY, id) {
-  // 竖井 + 一架看得清的木梯。
-  // 之前梯子只有半透明的一根杆和几道暗横档，玩家在画面上根本认不出"这儿能上下"，
-  // 所以改成两根立杆 + 高对比横档 + 井口一圈木沿，远看就是一架梯子。
-  InkFill(ctx, Rect(x - 17, topY, 34, botY - topY), id, PAL.tunnelAir, { amp: 1.4, lw: 2.4, line: "#3a2a1a" });
-  // 井口木沿：地面上认路的记号
-  InkFill(ctx, Rect(x - 21, topY - 5, 42, 7), id + "lip", "#8a6b45", { amp: 0.8, lw: 2 });
-  // 两根立杆
+  // 井口木沿 + 一架看得清的木梯。
+  //
+  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
+  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
+  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
+  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
+  //
+  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
+  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
+    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
+  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
+  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
+  const railTop = topY + 3;
   for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, topY + 2, 5.2, botY - topY - 4), id + "rail" + dx, "#9c7a4c",
+    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
       { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
   }
   // 横档：亮一档、暗一档，看着有厚度
-  for (let y = topY + 13; y < botY - 4; y += 15) {
+  for (let y = railTop + 11; y < botY - 3; y += 15) {
     InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
       { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
   }
+  // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
+  InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
 }
 
 export function DrawCollapsePile(ctx, x, botY, scale, id) {

@@ -491,7 +491,7 @@ function UpdateCamera(state, dt) {
     cam.hw += (shot.hw - cam.hw) * k;
   }
   const view = world.ApplyCamera(cam.x, cam.y, cam.hw);
-  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist);
+  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist, dt);
   return shot.fade || 0;
 }
 

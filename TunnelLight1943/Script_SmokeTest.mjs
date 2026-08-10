@@ -10,12 +10,13 @@ import { fileURLToPath } from "node:url";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
-  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
+  WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint, RAID_FORMATION,
   HouseSpan, IndoorOpen, PushingCart,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
-import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ } from "./Data_DepthSpec.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ, RankDz } from "./Data_DepthSpec.mjs";
+import { LightPath, MoodAt, DipAt, LIGHT_MOOD, LIGHT_DIP } from "./Data_DayCycle.mjs";
 
 const DT = 1 / 30;
 
@@ -1065,6 +1066,48 @@ function TestChalkIsAPencilNotASlider() {
   console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
 }
 
+// 昼夜过渡得是**一条连续的曲线**，不是进拍即换（用户 2026-08-09：
+// "24h切换现在太生硬，我需要你做的更自然一些"）。三条判据：
+// ①白天奔夜里必须**经过黄昏**（中途是暖的），夜里奔白天经过拂晓；
+// ②整条曲线上不许有跳变（相邻采样的浓淡与色相都得是小步）；
+// ③重烘该藏在最暗那一刻（鼓包的顶点在中途，不在两头）。
+function TestDayNightIsContinuous() {
+  const warm = (hex) => ((hex >> 16) & 255) > (hex & 255);   // 红多于蓝＝暖
+  // ① 路径：隔着一整个白天/黑夜的要插一档过渡
+  assert.deepEqual(LightPath("day", "night"), ["day", "dusk", "night"], "白天奔夜里要经过黄昏");
+  assert.deepEqual(LightPath("night", "day"), ["night", "dawn", "day"], "夜里奔白天要经过拂晓");
+  assert.deepEqual(LightPath("dawn", "day"), ["dawn", "day"], "相邻两档直接过");
+  assert.deepEqual(LightPath("night", "dawn"), ["night", "dawn"], "目标本身就是过渡档，不再插");
+  assert.ok(warm(MoodAt("day", "night", 0.5).tint), "白天奔夜里，中途那一下必须是暖的（日头落下去）");
+  assert.ok(!warm(MoodAt("day", "night", 1).tint), "落到夜里必须是冷的");
+
+  // ② 连续性：整条曲线逐点比，一步都不许跳。0.02 的步长换到 2.6 秒的过渡
+  // 里就是一帧多一点，跳变一眼看得出来的量级是 0.1 往上
+  for (const [from, to] of [["day", "night"], ["night", "day"], ["dawn", "night"], ["day", "tunnel"]]) {
+    let prev = MoodAt(from, to, 0);
+    for (let t = 0.02; t <= 1.0001; t += 0.02) {
+      const now = MoodAt(from, to, t);
+      assert.ok(Math.abs(now.dark - prev.dark) < 0.05,
+        `${from}→${to} 的浓淡在 t=${t.toFixed(2)} 跳了 ${(now.dark - prev.dark).toFixed(3)}`);
+      for (const sh of [16, 8, 0]) {
+        const d = Math.abs(((now.tint >> sh) & 255) - ((prev.tint >> sh) & 255));
+        assert.ok(d < 24, `${from}→${to} 的色相在 t=${t.toFixed(2)} 跳了 ${d}`);
+      }
+      prev = now;
+    }
+    // 两头必须**正好**落在那一档上（过渡完还差一点点就是"永远不到位"）
+    assert.equal(MoodAt(from, to, 1).dark, LIGHT_MOOD[to].dark, `${from}→${to} 走完得正好是 ${to}`);
+    assert.equal(MoodAt(from, to, 0).dark, LIGHT_MOOD[from].dark, `${from}→${to} 起点得正好是 ${from}`);
+  }
+
+  // ③ 鼓包（重烘藏身处）：顶点在中途，两头归零
+  assert.equal(DipAt(0), 0, "过渡起点不该额外压暗");
+  assert.equal(DipAt(1), 0, "过渡走完必须把额外那层撤干净");
+  assert.ok(DipAt(0.5) > DipAt(0.2) && DipAt(0.5) > DipAt(0.8), "最暗的那一刻该在中途");
+  assert.ok(Math.abs(DipAt(0.5) - LIGHT_DIP) < 1e-6, "顶点就是 LIGHT_DIP");
+  console.log("  ✓ 昼夜过渡：白天经黄昏落夜 / 曲线无跳变 / 重烘藏在最暗那一刻");
+}
+
 // 画框边缘的指路标（勇敢的心式）：目标出了画框且离得远 → 必须指、指对边；
 // 目标就在画框里或人已到近旁 → 不指；特写里不指；目标在另一层 → 先指梯口。
 function TestEdgeHintPointsOffscreenTargets() {
@@ -1233,6 +1276,50 @@ function TestWorkStations() {
   console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
 }
 
+// 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
+// 「挥舞的时候为什么脚也会在y轴上漂移？」）。逐键盯死，退化立刻红：
+//   ① 脚钉在地上：每个键都得带全六个腿关节，且踝的垂距 L(cos a + cos(a−b))
+//      必须等于 BONE.hipY + hipY——胯沉腿不跟着解，脚就跟着胯在 y 轴上漂；
+//   ② 脚也不许横滑：踝的水平位置逐键恒定；
+//   ③ 锄板要真的够到土、扬要真的过肩：θ=armF+foreF 低点 ≤ −180（板到头后），
+//      高点 ≥ −45（板咬进土），而且从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——
+//      没有这一下快慢对比，锄地就成了匀速划水。
+function TestHoeingIsARealSwing() {
+  const rigSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
+  const block = rigSrc.slice(rigSrc.indexOf("  hoeing: {"), rigSrc.indexOf("  scatterFeed: {"));
+  assert.ok(block.length > 100, "找不到 hoeing 轨道");
+  const keys = [...block.matchAll(/\{ t: [^}]*\}/g)].map((m) => new Function(`return (${m[0]})`)());
+  assert.ok(keys.length >= 5, "hoeing 关键帧太少");
+  const L = 0.31, HIP = 0.62;   // BONE.thigh / BONE.hipY（Rig 在 node 下拖不动 three，抄数值）
+  const rad = (d) => (d * Math.PI) / 180;
+  const ankles = { F: [], B: [] };
+  for (const k of keys) {
+    for (const leg of ["F", "B"]) {
+      for (const j of [`thigh${leg}`, `shin${leg}`, `foot${leg}`]) {
+        assert.ok(k[j] !== undefined, `t=${k.t} 的键缺 ${j}——腿不逐键解，脚就会跟着胯漂`);
+      }
+      const a = -k[`thigh${leg}`], b = k[`shin${leg}`];
+      const drop = L * (Math.cos(rad(a)) + Math.cos(rad(a - b)));
+      const need = HIP + k.hipY;
+      assert.ok(Math.abs(drop - need) < 0.02,
+        `t=${k.t} ${leg}腿踝距地 ${drop.toFixed(3)} ≠ 胯高 ${need.toFixed(3)}——脚要么悬空要么陷地`);
+      ankles[leg].push(L * (Math.sin(rad(a)) + Math.sin(rad(a - b))) + k.hipX);
+    }
+  }
+  for (const leg of ["F", "B"]) {
+    const spread = Math.max(...ankles[leg]) - Math.min(...ankles[leg]);
+    assert.ok(spread < 0.025, `${leg}脚在地上横滑了 ${(spread * 100).toFixed(1)}cm`);
+  }
+  const thetas = keys.map((k) => k.armF + k.foreF);
+  assert.ok(Math.min(...thetas) <= -180, `扬锄必须过肩（θ 低点 ${Math.min(...thetas)} > -180，还是在身前举旗）`);
+  assert.ok(Math.max(...thetas) >= -45, `落锄必须够到土（θ 高点 ${Math.max(...thetas)} < -45，锄板悬在半空）`);
+  const whip = keys.some((k, i) => i > 0
+    && Math.abs(thetas[i] - thetas[i - 1]) >= 120 && (k.t - keys[i - 1].t) <= 0.4);
+  assert.ok(whip, "从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——匀速划水不算锄地");
+  console.log("  ✓ 锄地是一记真抡劈：脚钉在地上不漂不滑、扬过肩、锄板咬进土");
+}
+
 // 刨料这一拍是"手上真有活"的教学，几条硬约束：镜头必须推到台面上
 // （老版是十几米外按 E 敲木楔，木楔只有几个像素）；**玩家攥的是那把刨子**，
 // 不是一根滑块（用户明令禁止 slider——手得真落在刨子上才拖得动，dragTrack
@@ -1377,12 +1464,23 @@ function TestModuleGraphIsCacheBusted() {
   assert.ok(entry, "index.html 的入口 Script_Main.js 必须带 ?v= 版本戳");
   const ver = entry[1];
 
-  // 浏览器真正跑的那些第一方模块，逐个查表
-  const browserModules = [
-    "Script_Core.mjs", "Script_World.js", "Script_Art.mjs", "Script_Rig.mjs",
-    "Script_Light.mjs", "Script_Fluid.mjs", "Script_Soundtrack.js", "Script_Audio.js",
-    "Data_Scenes.mjs", "Data_DepthSpec.mjs", "Data_BgmConfig.mjs", "Data_AudioMix.mjs",
-  ];
+  // 浏览器真正跑的那些第一方模块：**从入口把模块图走一遍**自己数出来。
+  // 原来这儿是一张手写的清单，于是它和 import map 是两份要同步的名单——
+  // 2026-08-09 新增 Data_DayCycle 时就漏了：import map 加了、这张单子没加，
+  // 测试照样绿。清单只该有一份（index.html 那张），这里负责去对它。
+  const browserModules = (() => {
+    const seen = new Set();
+    const walk = (file) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const src = fs.readFileSync(path.join(here, file), "utf8");
+      for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z_]+\.m?js)["']/g)) walk(m[1]);
+    };
+    walk("Script_Main.js");
+    seen.delete("Script_Main.js");            // 入口自己走 <script src>
+    return [...seen].sort();
+  })();
+  assert.ok(browserModules.length >= 12, `模块图只走出 ${browserModules.length} 个，正则怕是失灵了`);
   for (const m of browserModules) {
     assert.equal(imports[`./${m}`], `./${m}?v=${ver}`,
       `${m} 必须登记在 index.html 的 import map 里并盖上 ?v=${ver}——`
@@ -1721,16 +1819,32 @@ function TestConvoyKeepsFormation() {
 
   const At = (id) => state.actors.find((a) => a.id === id);
   const pups = state.actors.filter((a) => a.id.startsWith("c1pup")).map((a) => a.id);
-  const jpF = state.actors.filter((a) => a.id.startsWith("c1jpF")).map((a) => a.id);
-  // 用户 2026-08-08 定的队形：**十个伪军打头**，日军**五对两人并排**殿后
+  // 日军按「排」编队：id 是 c1jp{排}x{排内第几个}
+  const rows = RAID_FORMATION.rows.map((n, r) =>
+    Array.from({ length: n }, (_, c) => `c1jp${r}x${c}`));
+  const jpAll = rows.flat();
+  // 用户定的队形：**十个伪军打头**（2026-08-08），日军**2-3 人一排**殿后（2026-08-09）
   assert.equal(pups.length, 10, `打头的伪军该有十个，现在 ${pups.length} 个`);
-  assert.equal(jpF.length, 5, `日军该有五对，现在 ${jpF.length} 对`);
+  for (const row of rows) {
+    assert.ok(row.length >= 2 && row.length <= 3,
+      `一排该是 2-3 个人（用户原话），现在 ${row.length} 个`);
+  }
   for (const id of pups) assert.equal(At(id).kind, "puppet", `${id} 该是伪军（打头的是他们）`);
-  for (const id of jpF) assert.equal(At(id).kind, "soldier", `${id} 该是日军`);
+  for (const id of jpAll) {
+    assert.ok(At(id), `队形里的 ${id} 没被生成出来`);
+    assert.equal(At(id).kind, "soldier", `${id} 该是日军`);
+  }
+  // 伪军也不许排成一条等距的线：十个人得挤成几堆（堆内并排、堆间松散）
+  {
+    const xs = pups.map((id) => At(id).x).sort((a, b) => a - b);
+    const gaps = xs.slice(1).map((x, i) => x - xs[i]);
+    assert.ok(gaps.some((g) => g < 0.8), "伪军里得有挤在同一堆并排走的（间距 <0.8m）");
+    assert.ok(gaps.some((g) => g > 1.6), "伪军的堆与堆之间得松开（间距 >1.6m）");
+  }
 
-  // 队伍朝 -x 开进村：队头 x 最小。队序 = 自行车 → 十个伪军 → 摩托 → 日军五对。
+  // 队伍朝 -x 开进村：队头 x 最小。队序 = 自行车 → 十个伪军 → 摩托 → 日军各排。
   // 逐帧验整条队序不许换位——速度差一大，走上二十秒谁都能把谁套圈
-  const order = ["bikeScout", ...pups, "motoLead", ...jpF];
+  const order = ["bikeScout", ...pups, "motoLead", ...jpAll];
   for (let f = 0; f < 240; f += 1) {
     StepGame(state, idle, DT);
     const bike = At("bikeScout");
@@ -1742,24 +1856,36 @@ function TestConvoyKeepsFormation() {
       assert.ok(a.x < b.x,
         `第 ${f} 帧：${order[i]} 超到 ${order[i - 1]} 前头了（${b.x.toFixed(1)} ≤ ${a.x.toFixed(1)}）`);
     }
-    // **并排的一对不许被拉开**：这正是"日军两人并排走、不是一个个前后跟着"
-    // 那条要求的判据。横版里"并排"靠的是后排那个的 rank（深度档），不是 x
-    for (let i = 0; i < jpF.length; i += 1) {
-      const F = At("c1jpF" + i);
-      const B = At("c1jpB" + i);
-      if (!F || !B) continue;
-      assert.ok(Math.abs((B.x - F.x) - 0.22) < 0.05,
-        `第 ${f} 帧：第 ${i} 对日军被拉开了（相距 ${(B.x - F.x).toFixed(2)}m，该是 0.22m）`);
-      assert.equal(B.rank, 1, `第 ${i} 对的后排必须声明 rank:1——横版里"并排"全靠它`);
-    }
+    // **一排人不许被拉开**：这正是"2-3 人一排、不是一人一排线性移动"那条
+    // 要求的判据。一排里的人错开半个身位（x）＋后排退一档深度（rank），
+    // 两样缺一不可——只给深度在三十米开外等于完全重合，那就退回长蛇了
+    rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c += 1) {
+        const a = At(row[c]);
+        if (!a) continue;
+        assert.equal(a.rank, c, `${row[c]} 该是这一排的第 ${c} 排（深度档靠它）`);
+        if (c === 0) continue;
+        const prev = At(row[c - 1]);
+        const d = a.x - prev.x;
+        assert.ok(Math.abs(d - RAID_FORMATION.stagger) < 0.06,
+          `第 ${f} 帧：第 ${r} 排里 ${row[c]} 掉队了（错位 ${d.toFixed(2)}m，该是 ${RAID_FORMATION.stagger}m）`);
+      }
+      // 排与排之间必须明显比排内的错位大，"排"的边界才读得出来
+      if (r === 0) return;
+      const gap = At(row[0]).x - At(rows[r - 1][rows[r - 1].length - 1]).x;
+      assert.ok(gap > RAID_FORMATION.stagger * 2.5,
+        `第 ${f} 帧：第 ${r} 排贴上前一排了（间距 ${gap.toFixed(2)}m），排与排要分得开`);
+    });
   }
   // 摩托紧贴着伪军队尾、又贴着日军队头：用户嫌"摩托和日军距离有点远"，
   // 这一档间距别再被人调回去
-  const gapJp = At("c1jpF0").x - At("motoLead").x;
+  const gapJp = At("c1jp0x0").x - At("motoLead").x;
   assert.ok(gapJp > 0 && gapJp < 8,
     `摩托到日军队头 ${gapJp.toFixed(1)}m——太远了（用户点名要"拉得近一点"）`);
 
-    console.log("  ✓ 队形：十个伪军打头 / 日军五对两人并排 / 队序全程不换位");
+  assert.ok(RankDz(1) < RankDz(0) && RankDz(2) < RankDz(1),
+    "排与排的深度必须一档比一档远，后排才画得小一圈");
+    console.log("  ✓ 队形：十个伪军三三两两打头 / 日军三人一排共三排 / 排内不掉队 / 队序全程不换位");
 }
 
 // 抓走的不止木匠一个，而且军官得在场说话：这两条是"扫荡"的分量。
@@ -2006,11 +2132,13 @@ TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
+TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();
 TestInstrumentalBgmManifest();
 TestDoorHoldIsPhysical();

@@ -12,8 +12,9 @@ import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
+import { MoodAt, DipAt, LIGHT_FADE } from "./Data_DayCycle.mjs";
 import {
-  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, ACTOR_RANK_DZ,
+  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, RankDz,
   CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
 } from "./Data_DepthSpec.mjs";
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
@@ -337,6 +338,23 @@ export function CreateWorld(canvasEl) {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // 昼夜过渡：曲线本身（每档的浓淡与色相、白天奔夜里怎么经过黄昏、重烘该藏在
+  // 哪一帧）全在 Data_DayCycle——那是纯数据纯函数，好进 node 冒烟测试。
+  // 这儿只剩"眼下按哪一档烘环境"这个渲染层自己的状态机。
+  // -------------------------------------------------------------------------
+  let lightShown = null;         // 画面上正用着的档（＝已经烘出来的那一档）
+  let lightFrom = null, lightTo = null;
+  let lightMix = 1, lightSwapped = true;
+
+  /** 眼下该按哪一档烘环境（＝过渡里已经切过去的那一档） */
+  function ShownLight(state) {
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    return lightShown;
+  }
+
   // 暗场遮罩（乘算）与光晕（加色）
   // 全屏压暗罩：绝不能参与深度，否则会把后画的灯光晕整片剔掉
   const darkMat = new THREE.MeshBasicMaterial({
@@ -412,11 +430,7 @@ export function CreateWorld(canvasEl) {
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
-  // 屋里的东西（地窖口、下窖的梯子）：从街上看不见，进了屋才露出来。
-  // 少了这一层，自家地窖口就成了「敞在门口大街上的一个洞」（用户 2026-08-09
-  // 退回：「主角家的地道/地窖怎么会在家门口外面」）——2.5D 里玩家走的那条线
-  // 永远在立面之前，所以屋内地面上的东西必须跟着立面一起淡
-  let indoorMeshes = [];
+
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
   // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
@@ -490,7 +504,6 @@ export function CreateWorld(canvasEl) {
     winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
-    indoorMeshes = [];
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -590,7 +603,7 @@ export function CreateWorld(canvasEl) {
     const wPx = Math.ceil((xTo - xFrom) * PPM);
     const hPx = Math.round(depthM * PPM);
     const colors = light === "day" ? ART.PAL.earthDay
-      : light === "dawn" ? ART.PAL.earthDawn
+      : light === "dawn" || light === "dusk" ? ART.PAL.earthDawn
         : light === "night" ? ART.PAL.earthNight : ["#5a4a34", "#3d3123"];
     const grassColor = light === "night" ? ART.PAL.grassNight : ART.PAL.grass;
     const mesh = BakeSprite(wPx, hPx, 0, 6, (ctx) => {
@@ -1583,8 +1596,6 @@ export function CreateWorld(canvasEl) {
     }
     // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
     if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
-    // 屋里的东西跟着立面隐现（见 indoorMeshes 的说明）
-    if (p.indoor) indoorMeshes.push(...group.children.slice(meshFrom));
   }
 
   function AddCover(group, c, light, ruinedScene = false) {
@@ -1648,6 +1659,33 @@ export function CreateWorld(canvasEl) {
     const tunTop = toPy(TUN_TOP);
     const tunBot = toPy(UNDER_Y);
 
+    // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照都从
+    // TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
+    const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
+      + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
+
+    // 井筒的形状只算一次：掏土、描洞沿、井壁贴片三处都得用同一条轮廓，
+    // 各画各的就又会出现"三个宽度不一样的矩形套在一起"
+    const SHAFT_R = 0.86;                    // 井筒半径（米）：够一个人带着筐上下
+    const shaftGeom = (sceneDef.shafts || [])
+      .filter((s) => !s.builtFlag || state.flags[s.builtFlag])
+      .map((s) => {
+        const yTop = toPy(SURFACE_Y) - 0.10 * PPM;             // 井口啃掉地面一线
+        const yBot = Math.max(tunTop, CeilY(s.x)) + 0.12 * PPM; // 一直掏进走廊顶
+        const span = Math.max(1, yBot - yTop);
+        const half = (y) => {
+          const u = Math.max(0, Math.min(1, (y - yTop) / span));
+          // 井口塌出一圈、井底张成喇叭并进洞顶；中段两壁只有手挖的起伏
+          const flare = 1
+            + 0.55 * (u > 0.78 ? ((u - 0.78) / 0.22) ** 2 : 0)
+            + 0.34 * (u < 0.14 ? ((0.14 - u) / 0.14) ** 2 : 0);
+          const wob = Math.sin(y * 0.05 + ART.Hash(s.id) * 9) * 0.055
+            + Math.sin(y * 0.017 + ART.Hash(s.id + "b") * 6) * 0.045;
+          return (SHAFT_R + wob) * flare * PPM;
+        };
+        return { id: s.id, wx: s.x, x: toPx(s.x), yTop, yBot, half };
+      });
+
     // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
     const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
@@ -1664,10 +1702,6 @@ export function CreateWorld(canvasEl) {
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
-      // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照
-      // 都从 TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
-      const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
-        + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
       ctx.beginPath();
       ctx.moveTo(toPx(range[0]), CeilY(range[0]));
       for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
@@ -1702,10 +1736,20 @@ export function CreateWorld(canvasEl) {
         ctx.closePath();
         ctx.fill();
       }
-      // 竖井
-      for (const shaft of sceneDef.shafts) {
-        if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-        ctx.fillRect(toPx(shaft.x) - 0.85 * PPM, toPy(SURFACE_Y), 1.7 * PPM, tunTop - toPy(SURFACE_Y));
+      // 竖井：一条**掏出来**的井筒，不是拿方框抠的洞。
+      // 老写法是一句 fillRect——笔直两壁、方角、井底与走廊硬碰硬地对接，
+      // 再加上 DrawShaft 里那根比洞还窄的浅色"井筒"贴片，三个宽度不一样的
+      // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。
+      // 现在：两壁带起伏、井口啃出一圈、井底张成喇叭口并进走廊顶，
+      // 而且**掏到本段走廊真正的洞顶**——窄段的顶比 TUN_TOP 低一米，
+      // 按 TUN_TOP 截会在井底与走廊之间留一块没挖通的土。
+      for (const g of shaftGeom) {
+        ctx.beginPath();
+        ctx.moveTo(g.x - g.half(g.yTop), g.yTop);
+        for (let y = g.yTop; y <= g.yBot; y += 5) ctx.lineTo(g.x - g.half(y), y);
+        for (let y = g.yBot; y >= g.yTop; y -= 5) ctx.lineTo(g.x + g.half(y), y);
+        ctx.closePath();
+        ctx.fill();
       }
       ctx.restore();
       // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
@@ -1733,6 +1777,30 @@ export function CreateWorld(canvasEl) {
         ctx.strokeStyle = "rgba(24,17,10,0.7)";
         ctx.lineWidth = 6;
         ctx.stroke();
+      }
+      // 井壁也要洞沿：走廊、洞室都描了，唯独竖井没有，于是井口那一圈成了
+      // 土层贴图被裁掉的直边——"像 bug"最直接的一笔就是这里。
+      // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
+      for (const g of shaftGeom) {
+        const stopY = g.yBot - 0.42 * PPM;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
+          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.strokeStyle = "rgba(24,17,10,0.62)";
+          ctx.lineWidth = 5.5;
+          ctx.stroke();
+        }
+        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        for (let i = 0; i < 9; i += 1) {
+          const t = i / 8;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
+          ctx.beginPath();
+          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
+          ctx.fill();
+        }
       }
     });
     PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
@@ -1839,12 +1907,104 @@ export function CreateWorld(canvasEl) {
       group.add(beam);
     }
 
+    // —— 4.5) 井筒内壁：**掏开的洞得看得见里面**。
+    // 原先近侧剖面一挖穿，井口那一截就直接露出后面的背景，一片平色，
+    // 所以那个洞读起来是"贴图漏了"。这里在演员之后补一张井筒的后壁：
+    // 竖着的镐痕、越深越黑，井口再落一线天光下来——这作品叫《地道里的光》，
+    // 从井口漏下来的那一道就该是它最认得出的一张脸。
+    // **摆在哪一层是有讲究的**：近侧剖面在 NEAR_Z=2.2，比玩家近两米多，
+    // 所以透过它看出去的那个"窗口"被透视放大了一截。井壁要是跟地道后壁一样
+    // 摆到 BACK_Z 附近，它被缩得比窗口还小，四周就漏出后面的浅色——那正是
+    // 这个洞看着像"贴图漏了"的原因。井壁贴到玩家背后一点点（SHAFT_BACK_Z），
+    // 再按玩法机位的视差比放大，才刚好把窗口填满。
+    const SHAFT_BACK_Z = BAND.nearBack;   // 紧贴行走线之后那一档（不许写裸 z）
+    // ≈ (机位距 + 0.9) / (机位距 − NEAR_Z)。玩法机位画宽 12.3~16m 时是 1.21~1.29，
+    // 取 1.40 留点余量——多出来的部分被不透明的近侧剖面挡着，不露；少了才会漏白边
+    const SHAFT_FILL = 1.40;
+    for (const g of shaftGeom) {
+      // 井壁只画到走廊洞顶为止，不跟着喇叭口一起张开——张开了就会在地道里
+      // 糊出一块带硬边的黑斑（走廊自己的后壁从那儿接手）
+      const yWallBot = g.yBot - 0.34 * PPM;
+      // 只夹住井底那个喇叭口（1.36 比井口的张度 1.34 略大，所以井口不被夹——
+      // 夹到井口，两边就会漏出一条亮土的窄缝，看着又像贴图没对齐）
+      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.36 * PPM) * SHAFT_FILL;
+      const hM = ((yWallBot - g.yTop) / PPM) * SHAFT_FILL;
+      const wM = (halfW(g.yTop) * 2.5) / PPM;
+      const wp = Math.ceil(wM * PPM), hp = Math.ceil(hM * PPM);
+      // 井壁按井筒的轮廓剪出来（不是一块方贴片）：外面透明，
+      // 所以就算画大了也只在洞口里露出来，不会在地道里糊成一个黑方块
+      const Silhouette = (ctx) => {
+        const k = hp / Math.max(1, yWallBot - g.yTop);
+        ctx.beginPath();
+        ctx.moveTo(wp / 2 - halfW(g.yTop), 0);
+        for (let y = g.yTop; y <= yWallBot; y += 5) ctx.lineTo(wp / 2 - halfW(y), (y - g.yTop) * k);
+        for (let y = yWallBot; y >= g.yTop; y -= 5) ctx.lineTo(wp / 2 + halfW(y), (y - g.yTop) * k);
+        ctx.closePath();
+      };
+      const wall = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+        const grd = ctx.createLinearGradient(0, 0, 0, hp);
+        grd.addColorStop(0, "#6b5236");        // 井口：还沾着点天光
+        grd.addColorStop(0.38, "#33271a");
+        grd.addColorStop(1, "#170f09");        // 井底最黑
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, wp, hp);
+        // 竖着一道道的镐痕：井是往下掏的，痕迹就该是竖的（走廊那面是横的）
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = "#120d08";
+        for (let i = 0; i < 11; i += 1) {
+          const px = 6 + ART.Hash(g.id + "pk" + i) * (wp - 12);
+          const py = 8 + ART.Hash(g.id + "py" + i) * hp * 0.72;
+          ctx.lineWidth = 2 + ART.Hash(g.id + "pw" + i) * 3;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + (ART.Hash(g.id + "pd" + i) - 0.5) * 9, py + 24 + ART.Hash(g.id + "pl" + i) * 46);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
+        ctx.restore();
+      });
+      PlaceSprite(wall, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z);
+      group.add(wall);
+
+      // 井口漏下来的一线光：上宽下窄，落到地道口就散了。
+      // 这作品叫《地道里的光》——从井口斜下来的那一道，就该是它最认得出的一张脸
+      const beam = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+        const grd = ctx.createLinearGradient(0, 0, 0, hp);
+        grd.addColorStop(0, "rgba(255,236,186,0.50)");
+        grd.addColorStop(0.5, "rgba(255,228,170,0.16)");
+        grd.addColorStop(1, "rgba(255,220,160,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.moveTo(wp * 0.30, 0);
+        ctx.lineTo(wp * 0.72, 0);
+        ctx.lineTo(wp * 0.62, hp);
+        ctx.lineTo(wp * 0.40, hp);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+      PlaceSprite(beam, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z + 0.05);
+      beam.material.blending = THREE.AdditiveBlending;
+      beam.material.depthWrite = false;
+      // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的
+      beam.material.opacity = (CHAPTERS[state.chapterIndex].light === "day" ? 1 : 0.3);
+      group.add(beam);
+    }
+
     // —— 5) 竖井与洞里的零件（贴在中景，人可以从它前后经过）
     for (const shaft of sceneDef.shafts) {
       if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
       const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
-          ART.DrawShaft(ctx, ax, 4, ay - 0.3 * PPM, shaft.id);
+          // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
+          ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
         }, 0, 2);
       // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
       // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
@@ -1852,7 +2012,6 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
       FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
-      if (shaft.indoor) indoorMeshes.push(sh);
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -1928,7 +2087,9 @@ export function CreateWorld(canvasEl) {
     const pins = state.beat?.pinned || 0;
     if (pins !== pinnedNotes) { pinnedNotes = pins; builtKey = ""; }
     const ch0 = CHAPTERS[state.chapterIndex];
-    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
+    // 光照档取**画面上正用着的那一档**（ShownLight），不是 beat 想要的那一档：
+    // 换挡时整村要重烘一遍，那一下推迟到过渡最暗处再做（见 LIGHT_MOOD 那一段）
+    const ch = { ...ch0, light: ShownLight(state) };
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
       + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
@@ -1954,7 +2115,7 @@ export function CreateWorld(canvasEl) {
     const L = sceneDef.length;
     const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
     hazeColor = {
-      day: "#e2d8bc", dawn: "#d8c6a8", night: "#2a3752", tunnel: "#2c2318", dark: "#171310",
+      day: "#e2d8bc", dawn: "#d8c6a8", dusk: "#c9a077", night: "#2a3752", tunnel: "#2c2318", dark: "#171310",
     }[ch.light] || "#e2d8bc";
 
     // 遮挡掩码：土是实心的，地道/洞室/竖井是掏出来的空气
@@ -1964,7 +2125,7 @@ export function CreateWorld(canvasEl) {
     // 天空
     const skyColors = {
       day: ["#cfd8dc", "#e6dcc0"], night: ["#0e1424", "#1e2740"],
-      dawn: ["#8f8fa6", "#e0bc92"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
+      dawn: ["#8f8fa6", "#e0bc92"], dusk: ["#6b5f78", "#dfa671"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
     }[ch.light] || ["#cfd8dc", "#e6dcc0"];
     {
       const skyW = Math.ceil((L + 160) * PPM * 0.14);
@@ -2218,7 +2379,7 @@ export function CreateWorld(canvasEl) {
       poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
 
-    // 队列的后一排整体后移一档（人/影子/家伙一起走，见 ACTOR_RANK_DZ）。
+    // 队列的后几排整体后移（人/影子/家伙一起走，见 Data_DepthSpec 的 RankDz）。
     // 绘制顺序是 SetPlayOrder 钉死的，所以档位一变就得重新钉一次——
     // 不重钉的话后排的人会画在前排之前，两个人叠成一个。
     const dz = extra.rankDz || 0;
@@ -2538,8 +2699,8 @@ export function CreateWorld(canvasEl) {
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
           lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
-          // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）
-          rankDz: a.rank ? ACTOR_RANK_DZ : 0,
+          // 队列里的第几排：横版里"并排"只能靠深度演（见 RankDz 的注释）
+          rankDz: RankDz(a.rank || 0),
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
@@ -3601,14 +3762,15 @@ export function CreateWorld(canvasEl) {
         homeFacade.material.transparent = true;
         homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
       }
-      // 屋里的东西跟立面**反着**来：墙合着就看不见地窖口，墙一淡它才露出来。
-      // 立面挡不住它们——它们画在行走线上，比立面还近
-      const shown = 1 - Math.min(1, (homeFacade.material.opacity ?? 1) * 1.08);
-      for (const m of indoorMeshes) {
-        m.material.transparent = true;
-        m.material.opacity = shown;
-        m.visible = shown > 0.02;
-      }
+      // 屋里的地窖口/梯子**不做隐现**：它们画在 loose(0.3) 带、立面在
+      // facade(0.4) 带——墙本来就排在它们前面，合着的时候地面以上那一截
+      // 自然被墙挡住，地面以下那一截照常露着。于是从院里看过去就是
+      // 「地窖在屋子底下」——位置对了，画面自己说清楚了。
+      // 2026-08-09 那次「地窖怎么在家门口外面」的根因是**位置**（窖口摆在
+      // 院子里 x=37、根本不在屋子足迹内），不是画法；当时补的那层
+      // 「跟立面反着隐现」是治错了症：它把地下那截也一起灭了，玩家在院里
+      // 完全看不到自家地窖口，非得走进屋一米半才冒出来
+      //（用户 2026-08-10：「家里的地道为什么我在攀爬之前都是隐藏状态」）。
     }
 
     // 辘轳打水：井绳与桶跟着玩家的操作升降。绳从辘轳轴心垂到桶梁，
@@ -4003,15 +4165,34 @@ export function CreateWorld(canvasEl) {
     }
   }
 
-  // 暗场：地道章节压暗，灯光晕负责照明
-  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
+  // 暗场：地道章节压暗，灯光晕负责照明；昼夜换挡在这儿连续推进
+  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist, dt = 1 / 60) {
     const ch0 = CHAPTERS[state.chapterIndex];
-    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
-    const base = { day: 0, dawn: 0.05, night: 0.28, tunnel: 0.42, dark: 0.52 }[ch.light] ?? 0;
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    if (want !== lightTo) {
+      // 新目标：从**画面现在的样子**出发（半路又换目标也接得上）
+      lightFrom = lightShown === lightTo ? lightShown : lightFrom;
+      lightTo = want;
+      lightMix = 0;
+      lightSwapped = false;
+    }
+    if (lightMix < 1) {
+      lightMix = Math.min(1, lightMix + dt / LIGHT_FADE);
+      // 走到一半（罩子最浓的那一刻）才把整村换成新档：接缝藏在这一帧里
+      if (!lightSwapped && lightMix >= 0.5) { lightShown = lightTo; lightSwapped = true; }
+    }
+    const mood = MoodAt(lightFrom, lightTo, lightMix);
+    // 换挡途中多压一档（正弦鼓包）：重烘那一帧的调色板跳变被它盖住
+    const dip = DipAt(lightMix);
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
+    const base = mood.dark + dip;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
     darkMat.opacity = vignetteAlpha;
+    // 罩子是**有颜色的**：夜里泛蓝、黄昏泛橙、地道泛土黑。纯黑罩子压出来的
+    // "夜"只是把白天调暗，看着像蒙了层灰
+    darkMat.color.setHex(mood.tint);
     // 暗场贴在相机前 3m，按该距离处的视口尺寸铺满
     const planeZ = dist - 3;
     const k = 3 / dist;
