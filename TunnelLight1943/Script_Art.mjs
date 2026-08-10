@@ -2380,13 +2380,119 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   }
 }
 
-// 【为什么没有「井筒剖面」这支画笔】2026-08-10 打水加长时画过一版 DrawWellShaft
-// （把井的近侧剖开，让玩家看着桶沉下去、浮在水面上、墩下去吃水），实拍之后拆掉了：
-// 地表场景的画面底下永远压着一条**近景地面带**（z=3.3，renderOrder 8500），
-// 它就是「镜头正前方三米的地面」——物理上就该把地平线以下的一切挡住。镜头一往下
-// 降去追那只桶，它跟着涨上来，把剖面连同桶一起吃掉。地表场景**看不到地平线以下**，
-// 这是这套渲染的硬性前提，不是可以绕的 bug。井下的反馈因此改走三条看得见/听得见的路：
-// 摇把在转、辘轳鼓上的绳盘变粗变细（World 的 winchCoil）、带井筒回音的三记声音。
+// 井筒剖面——**只有小窗那台相机看得见它**（World 把它单独放在 PIP_LAYER 上）。
+//
+// 来历值得写死：主相机看不到地平线以下（画面底下永远压着一条近景地面带，
+// 见 CLAUDE.md），所以桶一沉过井口沿就没影了，四道手里有两道半在看不见的地方
+// 发生。用户 2026-08-10 出的主意：「你可以用边上的特殊照片模式去渲染呀 /
+// 顺便也作为一个提示不是蛮好的」——小窗是**第二台相机**，它架在那条地面带
+// 后头、井筒里头，于是井底那点事有地方演，而且顺带把「墩桶」教会了：
+// 玩家看见空桶口朝上浮着，就明白为什么得墩，一句说明都不用。
+//
+// 画法照「剖面上掏出来的洞」那三条（同 CLAUDE.md）：
+//   ① 形状要像人挖的——两壁一层层起伏，不是 fillRect 的笔直两条边；
+//   ② 洞沿的墨线一处不能少，缺了就读成"贴图破了"；
+//   ③ 掏开之后后面得有东西填着——湿料礓石砌的井壁，越往下越黑，底下一汪水。
+// 水面上那道亮是全作的题眼：日头从井口漏下去，只在最深处剩这么一条。
+//
+// **颜色要压到近乎全黑**：画布贴图没声明 sRGB，上屏会被整体提亮一大截，
+// 源色 #2f 读出来是 #78 的中灰——一口"灰扑扑的水泥管"。下面这几个数看着
+// 几乎全黑，上屏才刚好是井筒该有的暗。
+//
+// 传进来的是画布像素：x=井心，topY=井口沿，waterY=水面，botY=画到多深为止。
+export function DrawWellShaft(ctx, x, topY, waterY, botY, id, { night = false } = {}) {
+  const RX = 26;              // 井筒内壁半宽
+  const dark = night ? "#020202" : "#040302";
+  const stone = night ? "#080706" : "#0c0a07";
+  const stoneLit = night ? "#131009" : "#1c170f";
+
+  // 两壁：一层层往里外错——井是一镐一镐掏出来的，不是钻出来的
+  const ROWS = Math.max(8, Math.round((botY - topY) / 16));
+  const wall = (s) => {
+    const pts = [];
+    for (let i = 0; i <= ROWS; i += 1) {
+      const y = topY + ((botY - topY) * i) / ROWS;
+      pts.push([x + s * (RX + Sym(id + "w" + s, i, 3.4)), y]);
+    }
+    return pts;
+  };
+  const left = wall(-1), right = wall(1);
+
+  // 洞外那圈土（小窗里能瞥见一点边）：不留白边，也别抢井筒
+  ctx.save();
+  ctx.fillStyle = night ? "#080604" : "#0d0a06";
+  ctx.fillRect(x - RX * 3, topY - 20, RX * 6, botY - topY + 60);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (const p of left) ctx.lineTo(p[0], p[1]);
+  for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.closePath();
+  ctx.clip();
+  // 后壁：砌石。日头只照得进井口那一截，往下一层比一层黑
+  ctx.fillStyle = dark;
+  ctx.fillRect(x - RX - 6, topY, RX * 2 + 12, botY - topY);
+  for (let r = 0; r < ROWS; r += 1) {
+    const y0 = topY + ((botY - topY) * r) / ROWS;
+    const y1 = topY + ((botY - topY) * (r + 1)) / ROWS;
+    if (y0 > waterY) break;
+    const k = Math.exp(-(y0 - topY) / Math.max(1, (waterY - topY) * 0.45));   // 光衰
+    ctx.globalAlpha = 0.28 + 0.72 * k;
+    ctx.fillStyle = r % 2 ? stone : stoneLit;
+    ctx.fillRect(x - RX - 6, y0, RX * 2 + 12, y1 - y0 + 0.6);
+    ctx.globalAlpha = 0.35 + 0.4 * k;
+    InkLine(ctx, x - RX - 5, y1, x + RX + 5, y1, id + "course" + r,
+      { lw: 1.6, color: "rgba(10,8,5,0.95)", amp: 1.3 });
+    for (let c = 0; c < 2; c += 1) {
+      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / 2) * RX * 2 + Sym(id + "jx", r * 2 + c, 6);
+      InkLine(ctx, jx, y0 + 1, jx, y1 - 1, id + "jv" + r + c,
+        { lw: 1.3, color: "rgba(10,8,5,0.8)", amp: 1.4 });
+    }
+  }
+  ctx.globalAlpha = 1;
+  // 贴近水面的一段常年是湿的：发黑、挂青苔
+  const wetTop = waterY - 34;
+  const wet = ctx.createLinearGradient(0, wetTop, 0, waterY);
+  wet.addColorStop(0, "rgba(2,4,3,0)");
+  wet.addColorStop(1, "rgba(2,4,3,0.92)");
+  ctx.fillStyle = wet;
+  ctx.fillRect(x - RX - 6, wetTop, RX * 2 + 12, waterY - wetTop);
+
+  // 水。井水是黑的，只有正对井口那一条被日头点亮——这一笔是这口井的题眼
+  ctx.fillStyle = night ? "#010202" : "#020403";
+  ctx.fillRect(x - RX - 6, waterY, RX * 2 + 12, botY - waterY + 6);
+  ctx.save();
+  ctx.globalAlpha = night ? 0.26 : 0.52;
+  ctx.fillStyle = night ? "#39424b" : "#7e8a74";
+  ctx.beginPath();
+  ctx.ellipse(x, waterY + 1.5, RX - 3, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - RX + 4, waterY + 7 + i * 6, x + RX - 4, waterY + 7 + i * 6,
+      id + "ripple" + i, { lw: 1.1, color: `rgba(150,168,150,${0.15 - i * 0.04})`, amp: 1 });
+  }
+  ctx.restore();
+
+  // 洞沿的墨线：两壁各一条，缺了就读成贴图被裁掉的直边
+  for (const side of [left, right]) {
+    for (let i = 0; i < side.length - 1; i += 1) {
+      InkLine(ctx, side[i][0], side[i][1], side[i + 1][0], side[i + 1][1],
+        id + "edge" + (side === left ? "L" : "R") + i,
+        { lw: 2.3, color: "rgba(18,13,8,0.92)", amp: 0.6 });
+    }
+  }
+  // 从井口漏进来的那点天光
+  ctx.save();
+  const lit = ctx.createLinearGradient(0, topY, 0, topY + 46);
+  lit.addColorStop(0, night ? "rgba(150,168,190,0.13)" : "rgba(240,232,200,0.17)");
+  lit.addColorStop(1, "rgba(240,232,200,0)");
+  ctx.fillStyle = lit;
+  ctx.fillRect(x - RX + 2, topY, RX * 2 - 4, 46);
+  ctx.restore();
+}
 
 // 碾盘：石头**要发土不要发灰**（跟井台一个规矩）。台面是手錾出来的多边形，
 // 不是 ctx.ellipse 的完美圆；磨齿是四组平行的剔沟，不是六根从圆心均分的

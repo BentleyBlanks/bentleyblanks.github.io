@@ -1149,6 +1149,12 @@ function TestWinchIsACrankNotALever() {
     // 这一道是四道手里唯一不靠转盘的动作，也是打水这件事真正的样子
     assert.equal(w.phase, "dunk", "桶碰着水不该直接满，得先墩");
     assert.equal(w.filled, false, "没墩过的空桶不许算满");
+    // 井底那扇小窗：主相机看不到井口以下，这一拍全靠第二台相机演。
+    // 它同时是"为什么要墩"唯一的说明——断了这条，二道手就成了没头没脑的
+    assert.equal(state.pip?.kind, "wellBottom", "桶沉进井里就该开井底那扇小窗");
+    assert.equal(state.pip.t, null, "这扇小窗由玩法自己收，不许几秒后自动关掉");
+    assert.ok(state.pip.at && state.pip.at.y < -0.5,
+      `小窗得真的架在井筒里（实际 y=${state.pip?.at?.y}）`);
     circle(-1, 30);
     assert.equal(w.filled, false, "墩桶这一道接着绕摇把是没用的——动作对不上事");
     // 攥住井绳往下拽：按下那一帧手得落在绳上（绳吊在井心，不是摇把那一侧）
@@ -1203,6 +1209,7 @@ function TestWinchIsACrankNotALever() {
     assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
       "键盘后备必须走得完四道手（力气见底只该变慢，不该卡死）");
     assert.equal(state.player.item?.id, "fullBucket", "四道手都走完，手里才是一桶水");
+    assert.equal(state.pip, null, "打完水那扇井底小窗得跟着收走");
   }
 
   // ── ④⑤ 桶吊着不放：手劲一路掉，掉光了辘轳自己往下溜 ──
