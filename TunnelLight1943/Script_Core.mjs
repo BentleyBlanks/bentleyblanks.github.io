@@ -2518,6 +2518,11 @@ export const SCRIPTS = {
             // 用户点名要这一镜）。gust 用的是玩法同一套重力积分，磕框那下带扬土
             state.beat.indoorScene = true;   // 从这一行起戏挪到门口，立面半隐（并行分支引入的机制，合着的墙只留一层影）
             Cue(state, "windGust", { gain: 0.9 });
+            // 风得看得见（2026-08-10 用户：「风一吹过 你至少把风的动效做出来」）。
+            // 光有一声呼和门一荡，画面上什么都没刮过——尘土流线和打滚的草屑
+            // 由渲染层照着这个通道画（见 World 的 wind 块），方向与门坠的方向
+            // 一致（+x），时长盖过门磕框那一下
+            state.wind = { t: 0, dur: 2.8, x: 34.2, dir: 1 };
             state.doorLeaf = { x: 33.75, hingeY: 1.54, lean: 0.02, loose: true, gust: true };
           } },
         { stage: "门轴从臼窝里跳了出来。风一过，那扇门就磕在框上。", d: 4.0,
@@ -5313,6 +5318,7 @@ export function CreateGame(chapterIndex = 0) {
     henFlee: null,
     mouseFlee: null,
     elmRain: null,
+    wind: null,      // 一阵看得见的风：{t,dur,x,dir}，渲染层画尘土流线与草屑
     planing: null,
     planeCurl: null,
     scribe: null,
@@ -5834,6 +5840,9 @@ export function StepGame(state, input, dt) {
     const fx = state[key];
     if (fx && (fx.t += dt) > 2.2) state[key] = null;
   }
+  // 一阵看得见的风（开场吹倒门那一镜等）：时长自带，吹完就散。
+  // 摆在这一段是有讲究的——它要在**过场里**也走表（下面 cinematic 分支会早退）
+  if (state.wind && (state.wind.t += dt) > state.wind.dur) state.wind = null;
 
   if (state.phase === "chapterCard" || state.phase === "chapterEnd") {
     state.cardTimer += dt;
