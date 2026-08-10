@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
+  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
@@ -99,7 +99,7 @@ for (const id of [
   "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
-  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
+  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -377,9 +377,32 @@ function BaseShot(state) {
   //（碰撞与玩法要按目的层算），但人还在梯子上，高度记在 p.lift 里。镜头不读
   // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
   const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
-  const y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  let y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  const hw = ch.light === "night" ? 6.15 : 6.3;
+  // 走到窖口上头，镜头沉一档，把脚底下那间窖带进画框（Core 的 cellarPeek）。
+  //
+  // 地窖一直是画好的，可地表机位的下边沿只到 −1.7m、窖底在 −3.6m，整间窖
+  // 都在画外——按 S 之前玩家根本看不见它，读起来就是"下去才凭空长出一间屋"。
+  // 这是**升降**不是拉远：hw 一动不动，景别还是那一档。
+  //
+  // 沉多少不能写死一个米数：宽屏手机（2.16:1）的画高只有 16:9 的八成，
+  // 同样沉 2 米就把柱子的脑袋切出画外了。所以按**画高**反算——
+  // 留 HEAD_ROOM 给地面上的人和屋子，剩下的都让给底下。
+  const peek = p.climbT > 0 ? 0 : (state.cellarPeek || 0);
+  if (peek > 0.001 && p.level === "surface") {
+    const halfH = (world.viewSize.h || hw) / 2;
+    // 想沉多少：让下边沿落到窖底再往下 0.3m（`y − 沉 − 半高 = UNDER_Y − 0.3`）
+    const want = y - halfH - (UNDER_Y - 0.3);
+    // 能沉多少：上边沿不许低过 HEAD_ROOM——它量的是**画框顶离站立视平线**
+    // 多高（顶沿 = 1.85 + HEAD_ROOM），0.8 正好把一间 2.4m 的土屋留在画里。
+    // 这条上限是给宽屏手机的：2.16:1 的画高只有 16:9 的八成，不设限就把
+    // 屋顶连人一起切出去；设太松（试过 1.7）又等于没沉，手机上还是看不见窖。
+    const HEAD_ROOM = 0.8;
+    const room = Math.max(0, halfH - HEAD_ROOM);
+    y -= Math.max(0, Math.min(want, room)) * peek;
+  }
   // 爬梯时不留提前量：人是竖着挪的，横向再往前探就成了甩镜头
-  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw: ch.light === "night" ? 6.15 : 6.3 };
+  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw };
 }
 
 function HintShot(state, hint) {
@@ -471,14 +494,15 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
   }
-  // 划线的活卡：铺满画框、每帧重画，玩家的手就按在上面。必须排在
-  // SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera 之前
-  //（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
+  // 做功那几拍的活卡（划线 / 刨料 / 接绳）：铺满画框、每帧重画，玩家的手就按
+  // 在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera
+  // 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
   const playing = state.phase === "playing";
   world.SetLiveCard(
     playing && state.scribeCard ? { kind: "scribe", view: state.scribeCard, layout: SCRIBE_CARD }
       : playing && state.planeCard ? { kind: "plane", view: state.planeCard, layout: PLANE_CARD }
-        : null,
+        : playing && state.knotCard ? { kind: "knot", view: state.knotCard, layout: KNOT_CARD }
+          : null,
     dt,
   );
 
@@ -750,6 +774,18 @@ function SyncHud(state, dt, shotFade) {
     ui.gestureHint.hidden = !g;
     if (g && ui.gestureHint.dataset.kind !== g.kind) ui.gestureHint.dataset.kind = g.kind;
   }
+  // 手劲条：辘轳吊着一桶水的时候，这条一直在掉——它是**读数**不是做功进度
+  //（做功仍然只认手上那圈绕/那下按键）。用户 2026-08-10 点名要的那一条：
+  // "放下水桶这个过程角色一点力好像都不需要用……加一个体力条"。
+  if (ui.staminaBar) {
+    const sm = !inCinematic && state.phase === "playing" ? state.stamina : null;
+    ui.staminaBar.hidden = !sm;
+    if (sm) {
+      ui.staminaBar.style.setProperty("--fill", (sm.v * 100).toFixed(1) + "%");
+      ui.staminaBar.classList.toggle("low", !!sm.low);
+      ui.staminaBar.classList.toggle("out", !!sm.out);
+    }
+  }
 
   // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider，两次退回）：
   // 划线攥的是特写卡上那支笔，刨料攥的是世界里那把刨子——进度长在木头上
@@ -760,7 +796,8 @@ function SyncHud(state, dt, shotFade) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    ui.touchControls.classList.toggle("gone", !!(state.scribeCard || state.planeCard) && state.phase === "playing");
+    ui.touchControls.classList.toggle("gone",
+      !!(state.scribeCard || state.planeCard || state.knotCard) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {
