@@ -974,7 +974,7 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
       [-R * 1.02, -R * 1.02], [-R * 1.46, -R * 0.52], [-R * 1.18, -R * 0.34], [-R * 0.94, -R * 0.78],
     ], id + "towelTail", "#6e6759", { amp: 2.0 * S, lw: 0, line: null });
   } else if (kind === "sister") {
-    for (let k = 0; k < 3; k += 1) {
+    for (let k = 0; k < 5; k += 1) {
       ctx.beginPath();
       ctx.arc(-R * 1.02 - k * R * 0.04, -R * 0.30 + k * R * 0.40, R * 0.22, 0, Math.PI * 2);
       ctx.fillStyle = hair;
@@ -1347,7 +1347,8 @@ export function DrawHomeInterior(ctx, x, groundY, w, h, id, { night = false } = 
     { lw: 1.2, color: "rgba(70,50,30,0.7)" });
 }
 
-export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = false, door = false } = {}) {
+export function DrawHouse(ctx, x, groundY, w, h, id,
+  { burnt = false, night = false, door = false, slogan = null } = {}) {
   const W = w, H = h;
   if (burnt) {
     // 烧过的土坯房：**土坯不燃，火只吃木头和草**——所以四堵墙基本还立着、
@@ -1651,6 +1652,11 @@ export function DrawHouse(ctx, x, groundY, w, h, id, { burnt = false, night = fa
   ctx.fillStyle = wStain;
   ctx.fillRect(wx0 + 4, wy0 + wh, ww - 8, 26);
   ctx.restore();
+  // 石灰标语：刷在檐下那一片整墙上（门窗以上，人够得着的最高一带）
+  if (slogan) {
+    const size = Math.min(30, W * 0.60 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, x, groundY - H * 0.72, slogan.text, size, id + "sl", slogan);
+  }
 }
 
 export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false } = {}) {
@@ -2244,7 +2250,75 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
 // **两段墙不许一样高、顶边不许在同一条水平线上**——1943 年冀中的院墙很多
 // 已经拆了半截或塌了口；压顶草是一根根的草秆不是一根深色横条；柴门要透光
 //（实心填充读成木板门，那是像样人家）。
-export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
+// 墙上的标语：宣抚班拿石灰水刷的大字。
+//
+// 三条史实规矩，配错就是年代穿帮：
+//   ① **横写自右向左**——1942 年没有横排左起（那是 1955-56 年以后的事）。
+//      所以字要倒着码：第一个字在最右边。
+//   ② **繁体**。简化字方案是 1956 年的。
+//   ③ **是刷的不是印的**：石灰水调得稀，笔画边缘发毛、往下淌，刷子提按不匀，
+//      墙面的坑洼会吃掉一块笔画。所以不能用整齐的 fillText 了事。
+//
+// ghost=true 是被白灰盖过的旧标语（抗日的口号被宣抚班刷掉）——只剩透出来的
+// 影子。这一笔比标语本身更说明问题：墙面上压着两层字，谁来过都写在上头。
+export function DrawWallSlogan(ctx, x, y, chars, size, id, { ghost = false, tone = "lime" } = {}) {
+  const n = chars.length;
+  const gap = size * 1.22;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (ghost) {
+    // 盖上去的白灰：一块刷得不匀的浅色斑，边缘是刷痕不是直边
+    const bw = gap * n + size * 0.7, bh = size * 1.5;
+    InkFill(ctx, RaggedTop(x - bw / 2, x + bw / 2, y - bh / 2, id + "wash", { sag: 3, n: 9 })
+      .concat([[x + bw / 2, y + bh / 2], [x - bw / 2, y + bh / 2]]),
+    id + "washF", "#c3b294", { amp: 2.0, lw: 0, line: null });
+  }
+  for (let i = 0; i < n; i += 1) {
+    // 倒着码：i=0 那个字落在最右边
+    const cx = x + (n - 1) / 2 * gap - i * gap;
+    const jx = Sym(id + "jx", i, size * 0.055);
+    const jy = Sym(id + "jy", i, size * 0.05);
+    ctx.font = `700 ${size}px 'Noto Serif SC', serif`;
+    if (ghost) {
+      // 透出来的旧字：比白灰略深一点点，糊，不成形
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = "#6d5f4a";
+      ctx.filter = "blur(1.1px)";
+      ctx.fillText(chars[i], x + (n - 1) / 2 * gap - i * gap + jx, y + jy);
+      ctx.filter = "none";
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    // 石灰水：先一层稀的往下洇，再压一遍笔画
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = tone === "ink" ? "#3a2f22" : "#d9cdb0";
+    ctx.fillText(chars[i], cx + jx, y + jy + size * 0.07);
+    ctx.globalAlpha = tone === "ink" ? 0.72 : 0.52;
+    ctx.fillText(chars[i], cx + jx, y + jy);
+    ctx.globalAlpha = 1;
+    // 墙面坑洼吃掉的缺口：抠掉两三小块，字才像刷在土墙上而不是贴上去的
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    for (let k = 0; k < 5; k += 1) {
+      const px = cx + Sym(id + "gx" + i, k, size * 0.36);
+      const py = y + Sym(id + "gy" + i, k, size * 0.36);
+      const r = size * (0.06 + Rnd(id + "gr" + i, k) * 0.13);
+      ctx.globalAlpha = 0.5 + Rnd(id + "ga" + i, k) * 0.4;
+      ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // 往下淌的两道流痕（石灰水调稀了必淌）
+    if (Rnd(id + "drip", i) > 0.45) {
+      InkLine(ctx, cx + jx - size * 0.16, y + size * 0.34,
+        cx + jx - size * 0.16, y + size * (0.5 + Rnd(id + "dl", i) * 0.55),
+        id + "dp" + i, { lw: size * 0.045, color: "rgba(239,230,210,0.45)", amp: 0.6 });
+    }
+  }
+  ctx.restore();
+}
+
+export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = null } = {}) {
   const gw = gate ? 34 : 0;
   const seg = (x0, x1, H, notch) => {
     const top = RaggedTop(x0, x1, groundY - H, id + "t" + x0, { sag: 4, n: 8 });
@@ -2289,6 +2363,13 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true } = {}) {
         id + "gh" + i, { lw: 1.6, color: "#5c4830", amp: 1.4 });
     }
     InkLine(ctx, x - gw / 2 + 2, groundY - 56, x - gw / 2 + 2, groundY, id + "hinge", { lw: 2.2, color: IN.ink });
+  }
+  // 石灰标语刷在门那一侧的整墙上（有门的话左半堵最长，字才排得开）
+  if (slogan) {
+    const segX = gate ? (x - w / 2 + (x - gw / 2)) / 2 : x;
+    const segW = gate ? (x - gw / 2) - (x - w / 2) : w;
+    const size = Math.min(26, segW * 0.72 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, segX, groundY - 40, slogan.text, size, id + "sl", slogan);
   }
 }
 
