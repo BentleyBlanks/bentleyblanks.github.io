@@ -246,6 +246,11 @@ async function CmdState(o) {
   step({}, 1);
   // 跳进来先把 onStart 起的小过场演完——不然什么提示都还没出来
   if (o.cine !== "keep") for (let i = 0; i < 900 && state.microCine; i += 1) step({ advance: true });
+  // --step N：链式节拍直接落到第 N 步。**先空跑一帧再改**——链的初始化在第一帧，
+  // 提前改 stepIndex 会绕过它（holdP undefined → NaN）。
+  // 这是给"看某一步长什么样"用的，**不是**可达性验证：谁走得到那一步是
+  // SmokeTest 自动通关的活（CLAUDE.md「自测不许瞬移玩家」说的是那件事）。
+  if (o.step !== undefined) { state.beat.stepIndex = Number(o.step); step({}, 1); }
   if (o.x !== undefined) state.player.x = Number(o.x);
   if (o.level) state.player.level = String(o.level);
   step({}, 2);
@@ -313,7 +318,7 @@ async function CmdState(o) {
 // ---------------------------------------------------------------------------
 async function CmdShot(o) {
   const id = o._[0];
-  if (!id) { console.log("用法：shot <beatId> [--x N] [--hold d] [--dur 4] [--phases 6] [--actor father] [--out 名]"); return; }
+  if (!id) { console.log("用法：shot <beatId> [--x N] [--step N] [--hold d] [--dur 4] [--phases 6] [--actor father] [--out 名]"); return; }
   const found = await FindBeat(id);
   if (!found) { console.log(`没有叫「${id}」的节拍。`); return; }
   const { ci, bi } = found;
@@ -345,18 +350,20 @@ async function CmdShot(o) {
       if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
       return [inp, Math.max(1, Number(mul || 1))];
     });
-    await page.evaluate(({ c, b, x, level, actor, keepCine, pre: steps }) => {
+    await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps }) => {
       const tl = window.TunnelLight;
       tl.JumpToBeat(c, b);
       tl.StepFrames(1, {});
       if (!keepCine) for (let i = 0; i < 900 && tl.state.microCine; i += 1) tl.StepFrames(1, { advance: true });
+      if (stepIndex !== undefined) { tl.state.beat.stepIndex = stepIndex; tl.StepFrames(1, {}); }
       if (x !== undefined) tl.state.player.x = x;
       if (level) tl.state.player.level = level;
       if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
       tl.StepFrames(2, {});
       for (const [inp, n] of steps) tl.StepFrames(n, inp);
     }, { c: ci, b: bi, x: o.x === undefined ? undefined : Number(o.x), level: o.level || null,
-      actor: o.actor || null, keepCine: o.cine === "keep", pre });
+      actor: o.actor || null, keepCine: o.cine === "keep",
+      stepIndex: o.step === undefined ? undefined : Number(o.step), pre });
 
     const held = o.hold ? String(o.hold).split("") : [];
     for (const k of held) await page.keyboard.down(k);
@@ -425,7 +432,7 @@ const HELP = `《地道里的光》命令行工作台
       --x 35.6 --level under --input "e,d*90" --frames 30 --trace --json
       输入 token：d右 a左 s下梯 w上梯 e按一下 E按住 c蹲 . 空转 adv推过场；token*N 重复
   shot <beatId> [选项]    实拍（真浏览器、真键盘），存进 _shots/
-      --x N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
+      --x N --step N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
   doctor                  分支/上游/未提交/缓存戳/端口

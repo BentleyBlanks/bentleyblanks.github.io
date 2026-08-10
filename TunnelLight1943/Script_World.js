@@ -240,6 +240,10 @@ export function CreateWorld(canvasEl) {
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
+  // 插入特写卡 / 活卡单独一个场景：它本来就是"画在所有东西之上的一张画"
+  //（depthTest 关、renderOrder 顶格）。分出来是为了背景能单独走一遍离屏虚化，
+  // 再把卡原样盖上去——见 Render 里的景深那一段
+  const overlayScene = new THREE.Scene();
   // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
   // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
   const FOV = CAM_FOV;
@@ -2894,7 +2898,8 @@ export function CreateWorld(canvasEl) {
     // 近景里不要它：这枚标是给"夜里三个同样身高的短褂站在村道上"认人用的，
     // 镜头推到 5 米以内时画面上就那么一两个人，它只会盖住真正在演的东西
     //（划线那一拍它正好压在石笔上）
-    const closeUp = viewW < 5.0;
+    // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
+    const closeUp = viewW < 5.0 || liveCardOn;
     const want = inCine || closeUp || otsHiddenId === "player" ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
@@ -4186,8 +4191,10 @@ export function CreateWorld(canvasEl) {
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
     // 指路的标记在特写里没有意义——你已经站在它跟前了
+    // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
+    // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
     const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
-      && !state.microCine && viewW >= 5.0;
+      && !state.microCine && !liveCardOn && viewW >= 5.0;
     // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
     // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
     // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
@@ -4409,7 +4416,7 @@ export function CreateWorld(canvasEl) {
         new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
-      scene.add(insertMesh);
+      overlayScene.add(insertMesh);
     }
     insertMesh.material.map = tex;
     insertMesh.material.needsUpdate = true;
@@ -4442,6 +4449,8 @@ export function CreateWorld(canvasEl) {
   // 复用 insertMesh 的摆位，所以"铺满画框"这件事只有一份实现。
   // -------------------------------------------------------------------------
   let liveCanvas = null, liveCtx = null, liveTex = null, liveCardOn = false, liveT = 0;
+  // 活卡在不在（Render 靠它决定走不走离屏虚化那条路）
+  let dofOn = false;
   const cardFrac = { w: 1, h: 1 };
 
   // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
@@ -4456,6 +4465,7 @@ export function CreateWorld(canvasEl) {
       // 只收自己那一张：同一帧里若已经换上了定格卡/过场片，别把人家关掉
       if (liveCardOn) {
         liveCardOn = false;
+        dofOn = false;
         liveT = 0;
         if (insertMesh && insertMesh.material.map === liveTex) insertMesh.visible = false;
       }
@@ -4471,6 +4481,9 @@ export function CreateWorld(canvasEl) {
     }
     liveT += Math.min(0.05, dt || 1 / 60);
     liveCardOn = true;
+    // 活卡的底板是透明的（做功的那一拍不许把村子换成一块色板）——
+    // 背后那层真景由 Render 的离屏虚化铺上去
+    dofOn = true;
     insertIsVideo = false;
     insertCardName = null;
     liveCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -4483,7 +4496,7 @@ export function CreateWorld(canvasEl) {
         new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
       );
       insertMesh.renderOrder = ORDER_INSERT;
-      scene.add(insertMesh);
+      overlayScene.add(insertMesh);
     }
     insertMesh.material.map = liveTex;
     insertMesh.material.needsUpdate = true;
@@ -4600,7 +4613,139 @@ export function CreateWorld(canvasEl) {
     rendererCssH = height;
   }
 
-  function Render() { renderer.render(scene, camera); }
+  // -------------------------------------------------------------------------
+  // 特写卡背后的景深虚化
+  //
+  // 做功那几拍（刨料/划线/接绳）是一张铺满画框的活卡。老版这张卡自带一块
+  // 不透明底板（Art 的 CardBase），于是镜头一推近，整个村子就没了——
+  // 用户 2026-08-10 的原话：「搞的像在玩一个独立的游戏一样，为了沉浸感你
+  // 大可以远景做DOF嘛，但你搞了个纯色背景算什么」。
+  //
+  // 现在：世界照常渲，只是渲进一张离屏靶，糊开之后铺回画面当背景，
+  // 卡（底板已抠成透明）再画在上面。于是「推近」是真的推近——院子、房子、
+  // 手边干活的人还在那儿，只是散焦了。
+  //
+  // 便宜的散焦怎么来：先降采样到 ~30%（线性放大本身就是一层糊），再横竖
+  // 各来一遍 9 抽头高斯。两次全屏四边形，分辨率只有三成，代价可以忽略。
+  // -------------------------------------------------------------------------
+  const DOF_SCALE = 0.40;      // 离屏靶相对画布的边长比
+  const DOF_RADIUS = 1.8;      // 高斯抽头间距（离屏靶像素）
+  let dofA = null, dofB = null, dofQuadScene = null, dofQuadCam = null, dofQuad = null;
+  let dofW = 0, dofH = 0;
+  const DOF_SHADER = {
+    uniforms: {
+      uTex: { value: null },
+      uStep: { value: new THREE.Vector2(0, 0) },
+      // 背景压一档、往暖里偏一点：清楚的活儿在前景，背景不跟它抢
+      uDim: { value: 1 },
+      uTint: { value: new THREE.Color(1, 1, 1) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: `
+      uniform sampler2D uTex;
+      uniform vec2 uStep;
+      uniform float uDim;
+      uniform vec3 uTint;
+      varying vec2 vUv;
+      void main() {
+        // 9 抽头高斯（权重和为 1）
+        float w[5];
+        w[0] = 0.2270; w[1] = 0.1945; w[2] = 0.1216; w[3] = 0.0540; w[4] = 0.0162;
+        vec3 c = texture2D(uTex, vUv).rgb * w[0];
+        for (int i = 1; i < 5; i++) {
+          vec2 o = uStep * float(i);
+          c += texture2D(uTex, vUv + o).rgb * w[i];
+          c += texture2D(uTex, vUv - o).rgb * w[i];
+        }
+        // 散焦的地方也该失一点色（镜头虚化本来就把细节连同饱和度一起抹平）；
+        // 但**对比要往回提一点**——这套画本来就淡，再糊一遍院子里那几样东西
+        // 就全化进天色里了，"后面还有个村子"就又说不出来
+        float g = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(c, vec3(g), 0.14);
+        c = (c - 0.5) * 1.16 + 0.5;
+        c = clamp(c, 0.0, 1.0) * uTint * uDim;
+        gl_FragColor = vec4(c, 1.0);
+      }
+    `,
+  };
+
+  function EnsureDof() {
+    const w = Math.max(8, Math.round(rendererCssW * renderer.getPixelRatio() * DOF_SCALE));
+    const h = Math.max(8, Math.round(rendererCssH * renderer.getPixelRatio() * DOF_SCALE));
+    if (dofA && w === dofW && h === dofH) return true;
+    dofW = w; dofH = h;
+    const mk = () => new THREE.WebGLRenderTarget(w, h, {
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      depthBuffer: true, stencilBuffer: false,
+      colorSpace: THREE.SRGBColorSpace,
+    });
+    if (dofA) dofA.dispose();
+    if (dofB) dofB.dispose();
+    dofA = mk();
+    dofB = mk();
+    if (!dofQuad) {
+      dofQuadScene = new THREE.Scene();
+      dofQuadCam = new THREE.Camera();
+      dofQuad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: THREE.UniformsUtils.clone(DOF_SHADER.uniforms),
+          vertexShader: DOF_SHADER.vertexShader,
+          fragmentShader: DOF_SHADER.fragmentShader,
+          depthTest: false, depthWrite: false,
+        }),
+      );
+      dofQuad.frustumCulled = false;
+      dofQuadScene.add(dofQuad);
+    }
+    return true;
+  }
+
+  // 卡永远画在世界之后（它本来就是 depthTest 关、renderOrder 顶格的一张覆盖画）
+  function RenderOverlay() {
+    if (!insertMesh?.visible) return;
+    const prev = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.render(overlayScene, camera);
+    renderer.autoClear = prev;
+  }
+
+  function Render() {
+    // 没有活卡：照老路一遍渲完，一分钱不多花
+    if (!dofOn || !insertMesh?.visible || !rendererCssW || !EnsureDof()) {
+      renderer.render(scene, camera);
+      RenderOverlay();
+      return;
+    }
+    const u = dofQuad.material.uniforms;
+    // ① 世界渲进离屏靶（卡自己先让开——它是要画在糊过的背景之上的）
+    insertMesh.visible = false;
+    const prevTarget = renderer.getRenderTarget();
+    renderer.setRenderTarget(dofA);
+    renderer.clear();
+    renderer.render(scene, camera);
+    // ② 横向糊一遍 A→B
+    u.uTex.value = dofA.texture;
+    u.uStep.value.set(DOF_RADIUS / dofW, 0);
+    u.uDim.value = 1;
+    u.uTint.value.setRGB(1, 1, 1);
+    renderer.setRenderTarget(dofB);
+    renderer.clear();
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ③ 竖向糊一遍 B→画面，顺手压暗压暖
+    u.uTex.value = dofB.texture;
+    u.uStep.value.set(0, DOF_RADIUS / dofH);
+    u.uDim.value = 0.86;
+    u.uTint.value.setRGB(1.04, 1.0, 0.94);
+    renderer.setRenderTarget(prevTarget);
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ④ 卡画在上面（autoClear 关掉，别把刚铺好的背景冲了）
+    insertMesh.visible = true;
+    RenderOverlay();
+  }
 
   // -------------------------------------------------------------------------
   // 后果小窗（勇敢的心式画中画）：主画面渲染完后，用第二台相机把同一个世界

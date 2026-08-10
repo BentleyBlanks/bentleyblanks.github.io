@@ -1661,6 +1661,34 @@ function TestHoeingIsARealSwing() {
 // 不是一根滑块（用户明令禁止 slider——手得真落在刨子上才拖得动，dragTrack
 // 已整根拆掉）；顺纹才吃木头、倒着拖不算；中间顿一下这一趟就不齐（刨花
 // 短一截），但**永远不会卡死**——推够趟数就过。
+// 做功那几拍的活卡**不许自带不透明底板**。
+//
+// 老版三张活卡都调 CardBase（一整块渐变色铺满画框），于是镜头一推近整个村子
+// 就没了——用户 2026-08-10 的原话：「镜头在打刨花的时候 为什么后面的场景不
+// 拍出来？搞的像在玩一个独立的游戏一样……你搞了个纯色背景算什么」。
+// 现在底透明，背后那层真景由 World 的离屏虚化铺上去（Render 里的景深那一段）。
+// 定格插卡（过场里那几张画）不在此列：它们本来就是一张画，铺满底板是对的。
+function TestLiveCardsKeepTheWorldBehind() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const art = fs.readFileSync(path.join(here, "Script_Art.mjs"), "utf8");
+  const LIVE = ["DrawPlaneCard", "DrawScribeCard", "DrawKnotCard"];
+  for (const fn of LIVE) {
+    const at = art.indexOf(`export function ${fn}(`);
+    assert.ok(at > 0, `找不到活卡画笔 ${fn}`);
+    // 取到下一个 export 为止，就是这支画笔的函数体
+    const end = art.indexOf("\nexport ", at + 10);
+    const body = art.slice(at, end < 0 ? art.length : end);
+    assert.ok(/\bLiveCardBase\(/.test(body), `${fn} 必须走 LiveCardBase（透明底）`);
+    assert.ok(!/\bCardBase\(/.test(body.replace(/LiveCardBase\(/g, "")),
+      `${fn} 不许再铺 CardBase 那块不透明底板——那会把背后的村子整个盖掉`);
+  }
+  // 世界那边也得认得出"活卡在时要走虚化那条路"
+  const world = fs.readFileSync(path.join(here, "Script_World.js"), "utf8");
+  assert.ok(/dofOn\s*=\s*true/.test(world), "活卡挂上时必须打开离屏虚化那条路");
+  assert.ok(/DOF_SCALE/.test(world) && /uStep/.test(world), "背景虚化的那两遍高斯不许拆掉");
+  console.log("  ✓ 活卡的底是透明的：做功那几拍背后还是那个村子（散焦，不是色板）");
+}
+
 function TestPlaneBeat() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
@@ -1668,7 +1696,13 @@ function TestPlaneBeat() {
   DebugJump(state, 0, beats.indexOf("c1_plane"));
   const def = CurrentBeatDef(state);
   assert.equal(def.kind, "plane", "刨盖板必须是拟物刨料那一拍");
-  assert.ok(def.cam && def.cam.dist <= 3.2, "刨料必须把镜头推到台面上（≤3.2m 半宽）");
+  // 特写归**卡**管，机位归背景管（2026-08-10 改的）：这一拍画面上的主体是那张
+  // 铺满画框的活卡（手、刨子、料），世界只是它背后那层散焦的景。所以机位不该
+  // 再贴着台面 2.9m——那样背后只剩一片天，玩家读不出"村子还在那儿"
+  //（用户原话：「搞的像在玩一个独立的游戏一样……你搞了个纯色背景算什么」）。
+  // 也不许退成大远景：全作只有一个景别档。
+  assert.ok(def.cam && def.cam.dist >= 3.6 && def.cam.dist <= 6.5,
+    `刨料的机位给的是卡背后那层景，要装得下院子又不许拉成远景（实为 ${def.cam?.dist}）`);
 
   // 刨子在**卡上**的位置（与 Core 同一套版面）：攥取判定的靶子。
   // 这一拍长在铺满画框的刨料卡上——世界里那把刨子在手机上只有 90×45 像素，
@@ -2607,6 +2641,7 @@ TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
 TestChalkIsAPencilNotASlider();
+TestLiveCardsKeepTheWorldBehind();
 TestPlaneBeat();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();

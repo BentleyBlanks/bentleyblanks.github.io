@@ -2337,7 +2337,8 @@ export const SCRIPTS = {
       kind: "scribe", id: "c1_carve", timeOfDay: "dawn",
       zone: V.doorframe, speed: 0.5, markY: 1.28,
       markX0: 33.60, markX1: 33.75,
-      cam: { kind: "shot", x: 34.0, y: 1.34, dist: 1.9 },
+      // 同 c1_plane：活卡是主体，这个机位给的是它背后那层散焦的院子
+      cam: { kind: "shot", x: 34.3, y: 1.4, dist: 3.8 },
       objective: "爹比着你的头顶，在门框上划一道", hint: "攥住那支石笔，贴着木头拉过去",
       note: "石笔蹭过木头，留下一道浅浅的印。",
       onStart: (state) => {
@@ -2523,7 +2524,11 @@ export const SCRIPTS = {
       // StepPlane 的示范段演的就是这一幕。同一套手感在第十二场以受伤版重现
       kind: "plane", id: "c1_plane", timeOfDay: "day",
       zone: V.workbench, passes: 3, doneFlag: "coverPlaned",
-      cam: { kind: "shot", x: 40.5, y: 0.95, dist: 2.9 },
+      // 这一拍画面上的主体是那张铺满画框的活卡（手、刨子、料），**世界只是它
+      // 背后那层散焦的景**（World 的 Render 会把世界糊开铺上去）。所以这个机位
+      // 不该再贴着台面 2.9m——那样背后只剩一片天。退到院子的景别，爹、扫院的娘、
+      // 窖口、房子才都在画里：镜头是推近了，村子并没有消失
+      cam: { kind: "shot", x: 40.2, y: 1.35, dist: 4.6 },
       objective: "把旧门板刨成窖口的盖板", hint: "顺着木纹一推到底，中间别停",
       note: "盖板能嵌进洞口了——边上还差一道缝，得拿泥抿上。",
       onStart: (state) => {

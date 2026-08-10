@@ -2627,7 +2627,7 @@ export function DrawKnotCard(ctx, W, H, view, L, t) {
   const tuck = view.phase !== "cinch";
   const RW = W * 0.034;                          // 绳粗：3.4% 卡宽（这是一张特写）
 
-  CardBase(ctx, W, H, "#7e6a48");
+  LiveCardBase(ctx, W, H, "#7e6a48");
 
   // ── 背景：井架的横杆压在画框顶上，身后是井筒那团黑，底下一道石沿 ──
   // 三笔交代"这是蹲在井架下干活"；那团黑同时是这张卡的**底**，浅色的麻绳
@@ -5232,6 +5232,31 @@ export function DrawPlayerTag(ctx, x, y, t) {
 // 勇敢的心就是这么处理特写的——不去放大世界里的精灵，另画一张。
 // 画布约定：以 (0,0)-(W,H) 为画框，构图自带留白。
 // ---------------------------------------------------------------------------
+// 活卡（做功那几拍）的底：**什么也不铺**。
+//
+// 定格插卡是一张画，铺满底板是对的；但活卡是玩家正在玩的那一拍，镜头只是
+// 推近了，村子并没有消失。老版这儿也调 CardBase，于是一推近整个世界被一块
+// 色板盖掉——用户 2026-08-10 的原话：「搞的像在玩一个独立的游戏一样……
+// 你搞了个纯色背景算什么」。现在底留透明，背后那层真景由 World 的离屏虚化
+// 铺上去（见 Script_World 的 Render）。
+//
+// 这里只留一层很淡的暖雾：让前景那件活和虚化的背景之间有一点空气，
+// 不至于像贴纸糊在照片上。alpha 压到 0.12 以下，别把背景又盖回去。
+function LiveCardBase(ctx, W, H, tint = "#d8c8a4") {
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.62, H * 0.05, W * 0.5, H * 0.62, H * 0.95);
+  g.addColorStop(0, Tint(tint, 0.11));
+  g.addColorStop(0.6, Tint(tint, 0.05));
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// "#rrggbb" + alpha → rgba()
+function Tint(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 function CardBase(ctx, W, H, tint = "#d8c8a4") {
   const g = ctx.createRadialGradient(W * 0.5, H * 0.46, H * 0.1, W * 0.5, H * 0.5, H * 0.86);
   g.addColorStop(0, tint);
@@ -5517,7 +5542,7 @@ export function DrawPlaneCard(ctx, W, H, view, L, t) {
   const headX = W * (L.u0 + head * (L.u1 - L.u0));
   const baseY = H * L.v;
 
-  CardBase(ctx, W, H, "#dcc79e");
+  LiveCardBase(ctx, W, H, "#dcc79e");
   // 台面：料下面那块大板
   InkFill(ctx, [[-40 * S, H * (L.v + 0.18)], [W + 40 * S, H * (L.v + 0.18)],
     [W + 40 * S, H + 40 * S], [-40 * S, H + 40 * S]], "pcBench", "#7c5a37",
@@ -5667,7 +5692,7 @@ export function DrawScribeCard(ctx, W, H, view, L, t) {
   const drawn = Math.max(0, Math.min(1, view.drawn || 0));
   const headX = x0 + head * (x1 - x0);
 
-  CardBase(ctx, W, H, "#c9b48c");
+  LiveCardBase(ctx, W, H, "#c9b48c");
 
   // 立柱：右边大半个画框都是这根木头。左缘那道亮边把"正面"读出来
   const postX = uX(0.435);
