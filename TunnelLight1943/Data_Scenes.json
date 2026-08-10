@@ -199,6 +199,24 @@
           "note": "猪早卖了换粮，圈还在——挖通道的新土分散到这儿"
         },
         {
+          "id": "dirtPigpen",
+          "kind": "freshDirt",
+          "x": 44.9,
+          "w": 3.1,
+          "showFlag": "dirtPigpen",
+          "name": "猪圈里垫的新土",
+          "note": "倒完那一筐才出现（c1_dig）。土真的落到了地上，这一层是它的去处"
+        },
+        {
+          "id": "dirtRoad",
+          "kind": "freshDirt",
+          "x": 48.0,
+          "w": 2.0,
+          "showFlag": "dirtRoad",
+          "name": "院路洼处垫的新土",
+          "note": "同上第二筐。两处都只敢薄薄一层——摊得开才不显眼。x 从 47.2 挪到 48.0 是为了让开 46.8 的柴堆（体检报过穿插），洼处本来就在柴堆过去一点"
+        },
+        {
           "id": "courtWall",
           "kind": "yardWall",
           "x": 45.9,

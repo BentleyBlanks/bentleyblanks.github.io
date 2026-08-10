@@ -755,6 +755,26 @@ export function PoseRig(rig, s, dt) {
     target.armB = -22 * DEG; target.foreB = -10 * DEG;
     target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
     target.thighF = -22 * DEG; target.shinF = 30 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "pourBasket") {
+    // 倒土：**由倒的进度直接驱动**（poseK 0→1，World 的 PoseProgress 从 poseU 取）。
+    // 真动作是"两只手都在筐上"——一只手托筐底、一只手扣筐沿，弓着腰把筐口
+    // 送到身前下方，越往后越要往下扣，最后那点土是抖出来的。
+    // 单手拎着按一下不算：这筐装满土有二三十斤（HOLD_WEIGHT 0.8），
+    // 一只手拎不平，也倒不干净。
+    // 腰只折到 42°：再深脑袋就埋进筐里，侧视下人和筐糊成一坨。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    const e = k * k * (3 - 2 * k);                    // 缓入缓出，起手与收势都不生硬
+    const shake = k > 0.55 ? Math.sin(k * Math.PI * 9) * 2.6 * DEG : 0;  // 末了抖两下筐
+    // 胯只敢往下坐这么点：压到 -0.18 时后脚就陷进地里 3.8cm（PlayerLimbTips 量的，
+    // 规范要求 ±0.02）。倒土是往前送不是往下蹲，重心该往后不该往下
+    target.hipY = -0.07 - 0.055 * e; target.hipX = 0.05 + 0.13 * e;
+    target.torso = (13 + 29 * e) * DEG; target.head = (-6 - 16 * e) * DEG;
+    // 两条胳膊一起往前下方送，行程差一档：前手扣沿走得远，后手托底跟在后面
+    target.armF = (-38 - 48 * e) * DEG + shake; target.foreF = (-30 + 24 * e) * DEG;
+    target.armB = (-24 - 38 * e) * DEG + shake; target.foreB = (-34 + 20 * e) * DEG;
+    // 土往前泼，重心得往后坐一点，不然人跟着栽出去
+    target.thighB = (-14 - 16 * e) * DEG; target.shinB = (12 + 14 * e) * DEG; target.footB = -8 * DEG;
+    target.thighF = (10 + 12 * e) * DEG; target.shinF = (8 + 8 * e) * DEG; target.footF = -10 * DEG;
   } else if (s.pose === "ropeHaul") {
     // 绳放到头了：他还想往前走，绳在后头拽住他。前手向后下方绷直（顺着绳的
     // 走向），上身往前顶、后腿蹬住地。**这不是拔河**，是"再往前一寸也走不动"
