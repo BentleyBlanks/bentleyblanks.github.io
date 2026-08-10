@@ -4065,11 +4065,27 @@ function MakeActor(id, kind, x, extra = {}) {
 //
 // 参与潜行判定的仍只有 raid1/raid2——二十几个人一起判视线这段就没法玩了，
 // 其余全部 decor：他们负责让「鬼子进村」这四个字在画面上是真的。
-const RAID_PUPPETS = 10;      // 打头的伪军
-const RAID_JP_PAIRS = 5;      // 日军：五对，每对两人并排
 const RAID_SPEED = 2.1;       // 全队基准速度
-// 伪军里溜到后排去的那几个（松散的队形靠它，不是靠随机数）
-const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
+
+// 一排站几个人（2026-08-09 用户退回："他们一般2-3人一排 而不是和现在这样
+// 一人一排直接线性的移动"）。**一排里的人挤在半个身位内，排与排之间空一大截**——
+// 十个兵等距排成一条直线，读出来就是一条长蛇，不是队伍。
+// 日军：三排，每排三人，咬得死；伪军：三三两两几堆，堆内也是并排的。
+const RAID_JP_ROWS = [3, 3, 3];
+const ROW_STAGGER = 0.55;     // 同一排里，越靠后的人越往队尾错半个身位
+const ROW_GAP = 2.5;          // 排与排之间（比排内的错位大四五倍才读得出"排"）
+// 伪军十个：gap 小＝跟前一个挤在同一堆，rank 是他在这一堆里的第几排。
+// 堆的大小刻意不匀（2/3/1/2/2），间距也不匀——松散是他们的人物设定
+const PUPPET_FILE = [
+  { gap: 3.0, rank: 0 }, { gap: 0.52, rank: 1 },
+  { gap: 2.2, rank: 0 }, { gap: 0.58, rank: 1 }, { gap: 0.5, rank: 2 },
+  { gap: 2.7, rank: 0 },
+  { gap: 1.9, rank: 1 }, { gap: 0.5, rank: 0 },
+  { gap: 2.3, rank: 0 }, { gap: 0.62, rank: 1 },
+];
+const RAID_PUPPETS = PUPPET_FILE.length;   // 打头的伪军
+/** 队形的三个数（冒烟测试照这张表验，别在测试里另抄一份） */
+export const RAID_FORMATION = { rows: RAID_JP_ROWS, stagger: ROW_STAGGER, rowGap: ROW_GAP };
 
 // 进村行军的**队序**（从队头/最深处往村口数，gap = 与前一个的米数）。
 // 这张表是唯一的真相：入场起手位、行进目标、搜村时的停车位都从它推，
@@ -4087,22 +4103,30 @@ const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
 // 一对人当场被拉成一前一后，正是要改掉的那个毛病。
 function BuildRaidOrder() {
   const out = [{ id: "bikeScout", gap: 0 }];     // 骑车的伪军探路，队头
-  for (let i = 0; i < RAID_PUPPETS; i += 1) {
+  PUPPET_FILE.forEach((e, i) => {
     out.push({
-      id: "c1pup" + i, gap: i === 0 ? 3.0 : 1.3,
-      rank: PUPPET_BACK_RANK.has(i) ? 1 : 0,
-      sp: RAID_SPEED + ((i % 3) - 1) * 0.05,     // 松散：走走停停的微差
+      id: "c1pup" + i, gap: e.gap, rank: e.rank,
+      // 松散：走走停停的微差。但**同一堆里的人不给微差**（gap 小的那些），
+      // 否则并排的两个走上十几秒就被拉成一前一后，正是要改掉的毛病
+      sp: e.gap > 1 ? RAID_SPEED + ((i % 3) - 1) * 0.05 : undefined,
     });
-  }
+  });
   out.push({ id: "traitor", gap: 1.9 });         // 带路递名单的翻译官走在伪军队尾
   out.push({ id: "motoLead", gap: 2.0 });        // 挎斗摩托压着伪军的后脚跟
   out.push({ id: "officer", gap: 3.2 });         // 军官走在日军队列的头里
-  for (let i = 0; i < RAID_JP_PAIRS; i += 1) {
-    out.push({ id: "c1jpF" + i, gap: i === 0 ? 1.6 : 2.0 });
-    // 后排那个只错开一掌：并排的两个人在侧视里几乎重叠，露出去的是后面那个的
-    // 头、肩和枪管（真正把"并排"演出来的是 rank，见 ACTOR_RANK_DZ）
-    out.push({ id: "c1jpB" + i, gap: 0.22, rank: 1 });
-  }
+  // 日军：一排三个，三排。**一排里错开半个身位**——原来后排只错开 0.22m，
+  // 在三十多米开外的车队机位上跟前排完全重合，十个兵看着就是一人一排的长蛇
+  //（2026-08-09 用户退回的正是这个）。半个身位错开 + 后排画小一圈，
+  // 三个人才读成"一排三个"；排与排之间空 2.5m，"排"的边界才立得住。
+  RAID_JP_ROWS.forEach((n, r) => {
+    for (let c = 0; c < n; c += 1) {
+      out.push({
+        id: `c1jp${r}x${c}`,
+        gap: c === 0 ? (r === 0 ? 1.6 : ROW_GAP) : ROW_STAGGER,
+        rank: c,
+      });
+    }
+  });
   // 进院子的那两个（下一幕的考官）压在队尾。**别把他们塞进摩托和日军中间**：
   // 那样摩托到日军队列头就隔了 9m，正是用户嫌远的那一段。他们俩反正在
   // onDone 里会被摆到院门外的街上，在队里站哪儿只影响这一镜的构图
@@ -4176,10 +4200,10 @@ function SpawnRaidSoldiers(state) {
 
 /** 队列里每个 decor 兵的 id，从队头数到队尾（进村行军 / 散开搜村共用一份名单） */
 function RaidColumnIds() {
-  const out = [];
-  for (let i = 0; i < RAID_PUPPETS; i += 1) out.push("c1pup" + i);
-  for (let i = 0; i < RAID_JP_PAIRS; i += 1) out.push("c1jpF" + i, "c1jpB" + i);
-  return out;
+  // 从队序表里取，不再另抄一份名单——两处各写一套，改了队形就会漏人
+  return RAID_ORDER
+    .filter((e) => e.id.startsWith("c1pup") || e.id.startsWith("c1jp"))
+    .map((e) => e.id);
 }
 
 // 1943 年春的一次夜间"清剿"，来的是据点一个小队加上伪军：进村就分头堵路、

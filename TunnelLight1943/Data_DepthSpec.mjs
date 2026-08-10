@@ -90,6 +90,14 @@ export function GroundRisePx(z, { camY, dist, viewH, fov = CAM_FOV }) {
 // 22m 开外，1.2m 只换来 5px 的抬高和 5% 的缩小——凑近看得出，正常景别下看不出。
 // 再大就不像一个队了。
 export const ACTOR_RANK_DZ = -1.6;
+// 一排站几个人，就有第几排。**不是等差**：第二排退 1.6m 已经读得出前后，
+// 第三排再退一米就压到院里的树（yard −1.6）那一档去了，所以往后收着加。
+// 光靠深度是演不出"并排"的（22m 开外 1.6m 只换来几个像素），真正让一排人
+// 读得出来的是**队序表里那半个身位的 x 错开**——深度只负责把后排画小一圈。
+export const RANK_DZ = [0, -1.6, -2.5];
+export function RankDz(rank) {
+  return RANK_DZ[Math.min(Math.max(0, rank | 0), RANK_DZ.length - 1)];
+}
 // 允许挡人的矮物件区间（掩体走这个区间；AddCover 在其中插值）
 export const NEAR_CLUTTER = [1.25, 2.3];
 

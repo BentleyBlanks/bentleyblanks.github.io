@@ -12,8 +12,9 @@ import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
+import { MoodAt, DipAt, LIGHT_FADE } from "./Data_DayCycle.mjs";
 import {
-  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, ACTOR_RANK_DZ,
+  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, RankDz,
   CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
 } from "./Data_DepthSpec.mjs";
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
@@ -337,6 +338,23 @@ export function CreateWorld(canvasEl) {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // 昼夜过渡：曲线本身（每档的浓淡与色相、白天奔夜里怎么经过黄昏、重烘该藏在
+  // 哪一帧）全在 Data_DayCycle——那是纯数据纯函数，好进 node 冒烟测试。
+  // 这儿只剩"眼下按哪一档烘环境"这个渲染层自己的状态机。
+  // -------------------------------------------------------------------------
+  let lightShown = null;         // 画面上正用着的档（＝已经烘出来的那一档）
+  let lightFrom = null, lightTo = null;
+  let lightMix = 1, lightSwapped = true;
+
+  /** 眼下该按哪一档烘环境（＝过渡里已经切过去的那一档） */
+  function ShownLight(state) {
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    return lightShown;
+  }
+
   // 暗场遮罩（乘算）与光晕（加色）
   // 全屏压暗罩：绝不能参与深度，否则会把后画的灯光晕整片剔掉
   const darkMat = new THREE.MeshBasicMaterial({
@@ -590,7 +608,7 @@ export function CreateWorld(canvasEl) {
     const wPx = Math.ceil((xTo - xFrom) * PPM);
     const hPx = Math.round(depthM * PPM);
     const colors = light === "day" ? ART.PAL.earthDay
-      : light === "dawn" ? ART.PAL.earthDawn
+      : light === "dawn" || light === "dusk" ? ART.PAL.earthDawn
         : light === "night" ? ART.PAL.earthNight : ["#5a4a34", "#3d3123"];
     const grassColor = light === "night" ? ART.PAL.grassNight : ART.PAL.grass;
     const mesh = BakeSprite(wPx, hPx, 0, 6, (ctx) => {
@@ -1928,7 +1946,9 @@ export function CreateWorld(canvasEl) {
     const pins = state.beat?.pinned || 0;
     if (pins !== pinnedNotes) { pinnedNotes = pins; builtKey = ""; }
     const ch0 = CHAPTERS[state.chapterIndex];
-    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
+    // 光照档取**画面上正用着的那一档**（ShownLight），不是 beat 想要的那一档：
+    // 换挡时整村要重烘一遍，那一下推迟到过渡最暗处再做（见 LIGHT_MOOD 那一段）
+    const ch = { ...ch0, light: ShownLight(state) };
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
       + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
@@ -1954,7 +1974,7 @@ export function CreateWorld(canvasEl) {
     const L = sceneDef.length;
     const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
     hazeColor = {
-      day: "#e2d8bc", dawn: "#d8c6a8", night: "#2a3752", tunnel: "#2c2318", dark: "#171310",
+      day: "#e2d8bc", dawn: "#d8c6a8", dusk: "#c9a077", night: "#2a3752", tunnel: "#2c2318", dark: "#171310",
     }[ch.light] || "#e2d8bc";
 
     // 遮挡掩码：土是实心的，地道/洞室/竖井是掏出来的空气
@@ -1964,7 +1984,7 @@ export function CreateWorld(canvasEl) {
     // 天空
     const skyColors = {
       day: ["#cfd8dc", "#e6dcc0"], night: ["#0e1424", "#1e2740"],
-      dawn: ["#8f8fa6", "#e0bc92"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
+      dawn: ["#8f8fa6", "#e0bc92"], dusk: ["#6b5f78", "#dfa671"], tunnel: ["#141a26", "#2a2418"], dark: ["#0a0d14", "#181410"],
     }[ch.light] || ["#cfd8dc", "#e6dcc0"];
     {
       const skyW = Math.ceil((L + 160) * PPM * 0.14);
@@ -2538,8 +2558,8 @@ export function CreateWorld(canvasEl) {
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
           lift: a.lift || 0, poseK: a.vaultK ?? a.poseU, climbing: !!a.climbing,
-          // 队列的后一排：横版里"两人并排"只能靠深度演（见 ACTOR_RANK_DZ）
-          rankDz: a.rank ? ACTOR_RANK_DZ : 0,
+          // 队列里的第几排：横版里"并排"只能靠深度演（见 RankDz 的注释）
+          rankDz: RankDz(a.rank || 0),
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });
@@ -4003,15 +4023,34 @@ export function CreateWorld(canvasEl) {
     }
   }
 
-  // 暗场：地道章节压暗，灯光晕负责照明
-  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist) {
+  // 暗场：地道章节压暗，灯光晕负责照明；昼夜换挡在这儿连续推进
+  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist, dt = 1 / 60) {
     const ch0 = CHAPTERS[state.chapterIndex];
-    const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
-    const base = { day: 0, dawn: 0.05, night: 0.28, tunnel: 0.42, dark: 0.52 }[ch.light] ?? 0;
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    if (want !== lightTo) {
+      // 新目标：从**画面现在的样子**出发（半路又换目标也接得上）
+      lightFrom = lightShown === lightTo ? lightShown : lightFrom;
+      lightTo = want;
+      lightMix = 0;
+      lightSwapped = false;
+    }
+    if (lightMix < 1) {
+      lightMix = Math.min(1, lightMix + dt / LIGHT_FADE);
+      // 走到一半（罩子最浓的那一刻）才把整村换成新档：接缝藏在这一帧里
+      if (!lightSwapped && lightMix >= 0.5) { lightShown = lightTo; lightSwapped = true; }
+    }
+    const mood = MoodAt(lightFrom, lightTo, lightMix);
+    // 换挡途中多压一档（正弦鼓包）：重烘那一帧的调色板跳变被它盖住
+    const dip = DipAt(lightMix);
     // 呛烟时压得更暗一点
     const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
+    const base = mood.dark + dip;
     vignetteAlpha += ((base + choke) - vignetteAlpha) * 0.08;
     darkMat.opacity = vignetteAlpha;
+    // 罩子是**有颜色的**：夜里泛蓝、黄昏泛橙、地道泛土黑。纯黑罩子压出来的
+    // "夜"只是把白天调暗，看着像蒙了层灰
+    darkMat.color.setHex(mood.tint);
     // 暗场贴在相机前 3m，按该距离处的视口尺寸铺满
     const planeZ = dist - 3;
     const k = 3 / dist;
