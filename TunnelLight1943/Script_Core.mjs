@@ -648,6 +648,21 @@ const ROPE_PAY_OUT = 6.5;       // 放绳速度上限（米/秒）：跑得比�
 const ROPE_PAY_IN = 1.5;        // 收绳速度：往回走时松的那截收得慢，先堆在地上
 const ROPE_TAUT = 0.985;        // 跨度/放绳量过了它就算绷直
 const ROPE_HAND = { fwd: 0.28, y: 0.94 };   // 绳头攥在手里的位置（相对玩家）
+// 绳的**另外那两头也必须长在人身上**（2026-08-10 用户报的「虚空绳头」）。
+// 老版把它们写成两个硬编码的点：锚点 (35.1, 离地 1.02m)、钉死点 (52.9, 同高)。
+// 可小周站在 35.8、手还垂着，那一米高的点上什么也没有——绳就从空气里长出来；
+// 更糟的是地上那盘绳画在这一点的**正下方**，绳的第一个质点离盘子一米远，
+// 玩家看见的是"一坨绳盘 + 一根从虚空里伸出来的绳"，两样谁也不挨谁。
+// 现在两头都按**身位**从演员身上取（取身位不取骨架手心，理由同 RopeHandAt；
+// 接到真拳头上是画面的活）。偏移量取的正是老版那两个数：小周朝东站在 35.8，
+// 盘子在他脚后 0.7m＝35.1；七叔转身朝西站在 53.2，手在 52.92——绳全长
+// ROPE_LEN 与"走到七叔家墙根正好绷直"这套调好的手感因此一分没动。
+const ROPE_COIL_BACK = 0.7;   // 绳盘躺在放绳那人的脚后（他朝着放绳的方向站）
+const ROPE_COIL_Y = 0.08;     // 盘在地上：绳是从盘里出来的，不是从半空
+// 放到最后这么多米，绳盘就被他**拎起来**：盘子空了，这一头自然该在手里。
+// 不做这一档的话，绳全放出去之后盘子一消失，绳的这一头就只是躺在他脚后的
+// 土上——又是一个不接在任何东西上的绳头（只是没那么显眼）。
+const ROPE_COIL_LIFT = 1.2;
 const ROPE_RECOIL = 0.55;       // 脱手回弹：绳缩回小周手里要这么久
 const ROPE_ITEM = "ropeEnd";
 
@@ -663,6 +678,23 @@ function RopeHandAt(state) {
     x: p.x + (p.heading || 1) * ROPE_HAND.fwd,
     y: SURFACE_Y + ROPE_HAND.y - (p.crouch ? 0.28 : 0),
   };
+}
+
+/**
+ * 绳的一头长在某个演员身上：`coil` = 他脚后那盘绳（贴地），`hand` = 他手里。
+ * 演员不在场（跳幕结算、被抓走）就返回 null，让调用处退回步骤给的初值。
+ */
+function RopeEndOnActor(state, id, mode, lift = 0) {
+  if (!id) return null;
+  const a = FindActor(state, id);
+  if (!a || a.visible === false) return null;
+  const face = a.heading || 1;
+  const hand = { x: a.x + face * ROPE_HAND.fwd, y: SURFACE_Y + ROPE_HAND.y };
+  if (mode !== "coil") return hand;
+  // lift：0＝还盘在脚边，1＝最后那截被他拎在手里。中间是插值，抬起来的过程
+  // 是连续的（一档一档跳会看见绳头"弹"上去）
+  const coil = { x: a.x - face * ROPE_COIL_BACK, y: SURFACE_Y + ROPE_COIL_Y };
+  return { x: coil.x + (hand.x - coil.x) * lift, y: coil.y + (hand.y - coil.y) * lift };
 }
 
 /** 质点沿两端连线铺开——省得第一帧从一个点炸开 */
@@ -699,6 +731,17 @@ function StepRopeLine(state, def, dt) {
   const p = state.player;
   const h = Math.min(dt, 1 / 30);          // 掉帧时别让 g·dt² 把绳炸上天
   rope.L = rope.L ?? ROPE_LEN;
+  // 两头跟着人走：放绳那人脚后的绳盘、接绳那人手里的那一头。人不在场就退回
+  // 步骤里给的初值（跳幕结算时演员可能还没摆上台）
+  // coilLift：盘子快空了就把最后那截拎到手里（渲染层照它决定盘子还画不画）
+  rope.coilLift = Math.max(0, Math.min(1,
+    ((rope.pay || 0) - (rope.L - ROPE_COIL_LIFT)) / ROPE_COIL_LIFT));
+  const coil = RopeEndOnActor(state, rope.anchorId, "coil", rope.coilLift);
+  if (coil) { rope.x0 = coil.x; rope.y0 = coil.y; }
+  if (rope.x1 !== undefined) {
+    const staked = RopeEndOnActor(state, rope.stakeId, "hand");
+    if (staked) { rope.x1 = staked.x; rope.y1 = staked.y; }
+  }
 
   // ── 另一头钉在哪儿 ──
   let end = null, held = false;
@@ -2645,12 +2688,20 @@ export const SCRIPTS = {
         // 绳按物理跑（StepRopeLine）：从小周脚边的盘上放出来，松的拖在土上，
         // 走到七叔家墙根正好放到头——绷直那一下是绳自己演的，不是台词说的
         { type: "pickup", x: 35.6, item: { id: "ropeEnd", label: "绳头" }, prompt: "E · 抓住绳头",
-          effect: (state) => { state.ropeLine = { x0: 35.1, y0: SURFACE_Y + 1.02, L: ROPE_LEN }; } },
+          // anchorId：绳盘长在小周脚后，跟着他走（x0/y0 只是他不在场时的初值）
+          effect: (state) => {
+            state.ropeLine = { anchorId: "xiaozhou", x0: 35.1, y0: SURFACE_Y + ROPE_COIL_Y, L: ROPE_LEN };
+          } },
         { type: "use", zone: { x: 53.2, w: 2.6 }, needs: "ropeEnd", prompt: "E · 交给七叔",
           note: "绳在两家之间绷直了——统共四五步远。",
           effect: (state) => {
             // 交出去＝这头钉死在七叔家墙根；绳还在解，只是两端都不动了
-            state.ropeLine = { ...(state.ropeLine || {}), x0: 35.1, y0: SURFACE_Y + 1.02, x1: 52.9, y1: SURFACE_Y + 1.02, L: ROPE_LEN };
+            // stakeId：交出去那一头从此长在七叔手里（他转身朝西，手正好在 52.92）
+            state.ropeLine = {
+              ...(state.ropeLine || {}), anchorId: "xiaozhou", stakeId: "qishu",
+              x0: 35.1, y0: SURFACE_Y + ROPE_COIL_Y,
+              x1: 52.9, y1: SURFACE_Y + ROPE_HAND.y, L: ROPE_LEN,
+            };
             state.flags.ropeStaked = true;
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = null; q.heading = -1; }
