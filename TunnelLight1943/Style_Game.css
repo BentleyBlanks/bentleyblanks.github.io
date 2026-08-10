@@ -426,6 +426,55 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #endScreen button:hover { background: rgba(232, 193, 90, 0.12); }
 
+/* 征夫告示阅读层：背景压暗但透出场景（不切黑）；左图 42% / 右文 58%，
+   窄屏改上图下文。关闭键钉在面板右上角，文字自己滚 */
+#noticeOverlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 6, 4, 0.62); padding: 4vmin;
+}
+#noticePanel {
+  position: relative; display: flex; gap: 3.2%;
+  width: min(920px, 94%); max-height: 88%;
+  background: rgba(24, 20, 15, 0.94);
+  border: 1px solid rgba(154, 143, 122, 0.4);
+  padding: 22px;
+}
+/* 告示是**抠掉白底**的一张纸（不是一块图版）：所以没有边框——给纸加边框，
+   等于把撕出来的毛边又装回一个方框里。落影贴着纸的真实轮廓走，靠的是
+   drop-shadow（读 alpha）而不是 box-shadow（只认盒子） */
+#noticeImg {
+  width: 42%; align-self: flex-start;
+  max-height: 100%; object-fit: contain;
+  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.55));
+}
+#noticeText {
+  width: 58%; overflow-y: auto; padding-right: 6px;
+  color: var(--paper); font-size: 14.5px; line-height: 1.9;
+}
+#noticeText h3 { font-size: 19px; letter-spacing: 0.3em; margin-bottom: 10px; font-weight: 600; }
+#noticeText p { margin-bottom: 7px; }
+#noticeText .nDate { margin-top: 14px; color: var(--dim); }
+#noticeText .nSign { text-align: right; color: var(--dim); }
+#noticeClose {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 34px; height: 34px; cursor: pointer;
+  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  border: 1px solid rgba(154, 143, 122, 0.5);
+  font-family: inherit; font-size: 15px;
+}
+#noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
+@media (max-width: 700px), (orientation: portrait) {
+  /* 竖屏是上图下文，图必须让出下半屏给正文。height 是**必须**的：
+     子元素的 max-height:38% 要有一个确定的父高度才解析得出来，只写
+     max-height:88% 的话父高是 auto，那 38% 等于没写——图照旧长到自然高度，
+     正文被挤到只剩两三行（抠图后纸不再有白边，长得更满，这条就更明显了） */
+  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; height: 88%; }
+  #noticeImg { width: auto; max-width: 100%; max-height: 38%; align-self: center; }
+  #noticeText { width: auto; flex: 1; min-height: 0; }
+}
+
+
 /* 标题 */
 #titleScreen {
   position: absolute; inset: 0; overflow-y: auto;
@@ -462,6 +511,9 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #chapterList button:hover:not(:disabled) { border-color: var(--lamp); }
 #chapterList button:disabled { opacity: 0.38; cursor: default; }
+/* 还没做完的章：比"没解锁"更暗一档，标题去掉衬线的分量，一眼看出是占位 */
+#chapterList button.coming { opacity: 0.24; border-style: dashed; }
+#chapterList button.coming b { font-weight: 400; letter-spacing: 0.08em; }
 #chapterList button small { display: block; font-size: 10.5px; letter-spacing: 0.2em; color: var(--dim); margin-bottom: 5px; }
 #chapterList button b { font-size: 13.5px; font-weight: 600; }
 #controlsNote {

@@ -22,7 +22,7 @@
       "art": "DrawHouse",
       "band": "building",
       "ss": "prop",
-      "shadow": 0.34,
+      "shadow": 0.42,
       "sprite": {
         "w": {
           "pad": 90,
@@ -108,7 +108,8 @@
         },
         "anchor": "center",
         "baseline": 10
-      }
+      },
+      "shadow": 0.26
     },
     "hatch": {
       "art": "DrawHatch",
@@ -329,7 +330,8 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人"
+      "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人",
+      "shadow": 0.3
     },
     "henCoop": {
       "art": "DrawHenCoop",
@@ -341,7 +343,8 @@
         "anchor": "center",
         "baseline": 6
       },
-      "note": "土坯垒的矮鸡窝，倚在背风墙根（houseB 的东山墙下）。窝身齐膝≈0.55m——上一版画成 1.4m 见方的对称人字顶小房子，那是西式狗窝；画幅跟着改宽改矮，右边要留出食槽、左边留出挪开的挡板石"
+      "note": "土坯垒的矮鸡窝，倚在背风墙根（houseB 的东山墙下）。窝身齐膝≈0.55m——上一版画成 1.4m 见方的对称人字顶小房子，那是西式狗窝；画幅跟着改宽改矮，右边要留出食槽、左边留出挪开的挡板石",
+      "shadow": 0.24
     },
     "clothesline": {
       "art": "DrawClothesline",
@@ -565,7 +568,8 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "斜靠着的两块旧门板+一根枣木杠——第一章挖通道的全部木料"
+      "note": "斜靠着的两块旧门板+一根枣木杠——第一章挖通道的全部木料",
+      "shadow": 0.24
     },
     "cartShafts": {
       "art": "DrawCartShafts",
@@ -577,7 +581,8 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "空着的车辕斜搭在地上：牲口被日伪牵走了，车还在"
+      "note": "空着的车辕斜搭在地上：牲口被日伪牵走了，车还在",
+      "shadow": 0.2
     },
     "wallNotice": {
       "art": "DrawNoticeWall",
@@ -592,7 +597,8 @@
         "anchor": "center",
         "baseline": 10
       },
-      "note": "半截土墙，征粮征夫的告示一层压一层"
+      "note": "半截土墙，征粮征夫的告示一层压一层",
+      "shadow": 0.26
     },
     "pigpen": {
       "art": "DrawPigpen",
@@ -604,7 +610,8 @@
         "anchor": "center",
         "baseline": 8
       },
-      "note": "低矮的猪圈：半圈土坯矮墙+食槽，猪早卖了换粮"
+      "note": "低矮的猪圈：半圈土坯矮墙+食槽，猪早卖了换粮",
+      "shadow": 0.26
     },
     "nook": {
       "art": "DrawNook",
@@ -617,6 +624,48 @@
         "baseline": 6
       },
       "note": "窖壁上的藏口：浅坑+靠着的覆土板。grainHidden 画进粮袋、nookClosed 把板合上（World propRedraw）"
+    },
+    "dungHeap": {
+      "art": "DrawDungHeap",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 110,
+        "h": 70,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "粪堆：自家院内墙根拍实的方堆（带粪叉粪筐）/ 街边公共堆（顶上撒草木灰、插秫秸做记号）。street 旗标切两种",
+      "shadow": 0.26
+    },
+    "stalkFence": {
+      "art": "DrawStalkFence",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "秫秸障子：透光透风、歪斜缺牙。比满高土坯院墙穷得多，1943 冀中很多院子只有这个",
+      "shadow": 0.22
+    },
+    "emptyKennel": {
+      "art": "DrawEmptyKennel",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 96,
+        "h": 56,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "空狗窝：村里的狗 1939 年就统一打光了（狗叫暴露夜间行动）。要画出\"狗不在了的位置\"",
+      "shadow": 0.24
     }
   },
   "_coversNote": [

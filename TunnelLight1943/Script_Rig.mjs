@@ -37,6 +37,10 @@ export const BONE = {
   thigh: 0.31,
   shin: 0.31,
   foot: 0.19,
+  // 鞋帮高度。鞋是从踝**往下**画的，而大腿+小腿正好等于 hipY——踝落在 y=0，
+  // 于是站着的人整个陷进地里一个鞋帮（2026-08-09 用户截图：车轮压在路沿上、
+  // 人的鞋却陷在路面底下）。补偿在 ApplyPose 的 SoleLift 里，见那儿的注释。
+  sole: 0.09,
 };
 
 function MakeCanvas(w, h) {
@@ -102,8 +106,13 @@ function BuildParts(kind, haze = null) {
       // 枢轴（胯）在画布下沿往上留出下摆的位置
       LONG_COAT ? 0.72 : 0.88,
       (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K)),
-    head: () => Bake(0.46, 0.46, 0.42, 1,
-      (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K)),
+    // 戴帽垂的（日军）得给脑后那片布留出画布：它垂过后颈，比头本身低一截。
+    // 枢轴（脖根）在画布里的高度不变，只在下面多加一段——不然布会被裁平
+    head: () => {
+      const hM = ART.UNIFORM[kind]?.capFlap ? 0.54 : 0.46;
+      return Bake(0.46, hM, 0.42, 0.46 / hM,
+        (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K));
+    },
     upperArmB: () => Bake(0.115, BONE.upperArm, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coatDark, kind + "uab", { k: INK_K })),
     foreArmB: () => Bake(0.105, BONE.foreArm + 0.05, 0.5, 0,
@@ -129,16 +138,22 @@ function BuildParts(kind, haze = null) {
       }),
     thighB: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
+    // 小腿与脚按兵种取（绑腿 / 马靴 / 土布裤脚 + 布鞋）：原来这四个颜色是
+    // 全场写死的农民褐，日军穿着一双农民的腿——「看不出是日军」有一半在这儿
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#6b5540", kind + "shb", { k: INK_K })),
+      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
+        kind, kind + "shb", { k: INK_K, back: true })),
     footB: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#43331f", kind + "ftb", INK_K)),
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
+        ART.RIG_LEG(kind).footB, kind + "ftb", INK_K)),
     thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
     shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P, "#7d6349", kind + "shf", { k: INK_K })),
+      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
+        kind, kind + "shf", { k: INK_K })),
     footF: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, 0.09 * P, "#4d3a28", kind + "ftf", INK_K)),
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
+        ART.RIG_LEG(kind).footF, kind + "ftf", INK_K)),
   };
   const built = {};
   for (const k of Object.keys(parts)) built[k] = parts[k]();
@@ -158,7 +173,7 @@ export function CreateRig(kind, haze = null) {
   const proto = BuildParts(kind, haze);
   const group = new THREE.Group();          // 原点在脚底
   const root = new THREE.Group();           // 胯
-  root.position.y = BONE.hipY;
+  root.position.y = BONE.hipY + BONE.sole;  // 摆姿势前的静止值，与站姿一致
   group.add(root);
 
   const mk = (key, order) => {
@@ -269,6 +284,19 @@ export const TRACKS = {
       { t: 2.2, hipY: -0.06, hipX: -0.02, torso: -4, head: -6, armB: -58, foreB: -44, armF: -46, foreF: -38 },      // 收回，枪垂在身前
     ],
   },
+  // 刺刀（不循环）：端枪、猛地送出去，随后把枪身挑起来停在高位。
+  // 「襁褓随枪身离地」那一拍靠停住的高位姿势读出来（下一行把 carry 换成襁褓，
+  // 挂点在手上，手停在哪儿襁褓就在哪儿）。机位钉在院门外侧、不推近不慢镜——
+  // 关卡设计文档明令必须明确表现，同时不许猎奇化
+  bayonetThrust: {
+    dur: 2.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.04, hipX: -0.02, torso: 8, head: -6, armF: -58, foreF: -22, armB: -46, foreB: -30, thighB: -18, shinB: 22, footB: -6, thighF: 12, shinF: 8, footF: -8 },
+      { t: 0.30, hipY: -0.10, hipX: 0.12, torso: 30, head: -12, armF: -84, foreF: -6, armB: -72, foreB: -10 },    // 送出去：全程最快的一下
+      { t: 0.85, hipY: -0.08, hipX: 0.06, torso: 22, head: -16, armF: -96, foreF: -14, armB: -84, foreB: -18 },   // 顿住
+      { t: 2.2, hipY: -0.05, hipX: 0.02, torso: 12, head: -18, armF: -124, foreF: -18, armB: -110, foreB: -22 },  // 挑起，停在高位
+    ],
+  },
   // 妹妹在树下仰头跳着够（循环）：蹲一下、蹦起来伸手、落地、望着喘口气——
   // 她的视线与够不着的那只手就是引导线（无文字引导三层配方之三）
   reachJump: {
@@ -321,17 +349,34 @@ export const TRACKS = {
       { t: 1.5, hipY: -0.09, hipX: 0.09, torso: 27, head: -21, armF: -9, foreF: -72, armB: -30, foreB: -62 },
     ],
   },
-  // 锄地（循环）：扬起来慢、落下去快，落了还要往回带一下松土。
-  // 双手都在把上（前后臂同相位），锄（DrawCarry「锄头」）随前臂转——
-  // 扬过肩、砸进土、拖回来，一整套都在手上。
+  // 锄地（循环）。这一条整个重 K 过一次（2026-08-10 用户：「挥舞锄头的动作还是
+  // 太蠢了」「挥舞的时候为什么脚也会在y轴上漂移？」），三个教训写死在这儿：
+  //
+  // ① **胯一动，腿就得跟着解**。老版腿的角度只在第一帧 K 了一次（后面的键缺省
+  //    沿用），而 hipY 从 -0.02 砸到 -0.22——腿挂在胯上，角度不变胯沉 20cm，
+  //    两只脚就跟着整个沉进地里再浮出来，这就是"脚在 y 轴上漂"。
+  //    现在每个键都带全六个腿关节，角度由 IK 解出（脚钉死在前 +0.14 / 后 -0.16）：
+  //    踝的垂距 L·(cos a + cos(a−b)) 必须等于 BONE.hipY + hipY——**脚不漂全靠
+  //    这条恒等式**，SmokeTest 逐键验它（TestHoeingFeetPlanted）。
+  // ② **锄板要真的够到土**。锄是 alongArm 挂件，板在前臂方向 0.78m 开外；
+  //    老版落锄 θ=armF+foreF=-56°，板悬在膝盖高的空气里，"松土"整段是端着锄
+  //    在半空扫。现在落锄 θ=-44（板咬进身前 1.2m 的土里）、拉回 θ=-35（板贴着
+  //    土被拖回脚前，肘弯着往怀里带）。
+  // ③ **扬锄是扬过肩，不是举旗**——但手收在肩侧、肘大弯（θ=-186，板到头后
+  //    上方 ≈2.0m），不是直臂朝前上方捧着。压着 2m 是有意的：爹和七叔在**窖里**
+  //    （净高两米出头）也抡这条，抡高了锄板穿顶。
+  //
+  // 节奏：扬到头(0) →0.3s 抡下去（全程最快，148°）→ 咬住一顿 → 拉回松土 →
+  // 慢慢提起来再扬上去（重的是锄，抬得慢）。
   hoeing: {
-    dur: 2.3, loop: true,
+    dur: 2.6, loop: true,
     keys: [
-      { t: 0.0, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36, thighB: -16, shinB: 20, footB: -6, thighF: 10, shinF: 6, footF: -8 },
-      { t: 0.45, hipY: -0.22, hipX: 0.12, torso: 44, head: -26, armF: -46, foreF: -10, armB: -38, foreB: -14 },  // 落锄：全程最快的一下
-      { t: 0.9, hipY: -0.18, hipX: 0.08, torso: 38, head: -22, armF: -56, foreF: -24, armB: -46, foreB: -26 },   // 往回带，松土
-      { t: 1.55, hipY: -0.07, hipX: 0.00, torso: 8, head: -12, armF: -94, foreF: -28, armB: -82, foreB: -32 },   // 慢慢扬起来
-      { t: 2.3, hipY: -0.02, hipX: -0.04, torso: -6, head: -10, armF: -118, foreF: -30, armB: -104, foreB: -36 },
+      { t: 0.0, hipY: -0.055, hipX: -0.03, torso: -10, head: -4, armF: -80, foreF: -106, armB: -70, foreB: -108, thighF: -34.6, shinF: 35.8, footF: -5.1, thighB: -7.8, shinB: 41.5, footB: -37.7 },
+      { t: 0.3, hipY: -0.115, hipX: 0.08, torso: 44, head: -26, armF: -30, foreF: -14, armB: -22, foreB: -14, thighF: -41.7, shinF: 69.8, footF: -32.1, thighB: -0.2, shinB: 51.2, footB: -55.0 },   // 落锄：全程最快的一下，板咬进土
+      { t: 0.48, hipY: -0.11, hipX: 0.07, torso: 42, head: -24, armF: -26, foreF: -12, armB: -18, foreB: -12, thighF: -41.7, shinF: 67.7, footF: -30.1, thighB: -1.3, shinB: 51.1, footB: -53.8 },   // 咬住，顿一下
+      { t: 1.05, hipY: -0.095, hipX: -0.01, torso: 20, head: -14, armF: 7, foreF: -42, armB: 12, foreB: -42, thighF: -44.2, shinF: 56.6, footF: -16.3, thighB: -12.3, shinB: 56.6, footB: -48.2 },   // 拉回：板贴着土拖到脚前，肘往怀里带
+      { t: 1.8, hipY: -0.06, hipX: -0.03, torso: 2, head: -8, armF: -60, foreF: -70, armB: -50, foreB: -72, thighF: -36.2, shinF: 38.6, footF: -6.4, thighB: -8.9, shinB: 44.0, footB: -39.1 },      // 提起来，板扫过头前
+      { t: 2.6, hipY: -0.055, hipX: -0.03, torso: -10, head: -4, armF: -80, foreF: -106, armB: -70, foreB: -108, thighF: -34.6, shinF: 35.8, footF: -5.1, thighB: -7.8, shinB: 41.5, footB: -37.7 },
     ],
   },
   // 撒食喂鸡（循环）：胳膊肘挎着笸箩，另一只手抓一把、扬出去，
@@ -548,6 +593,19 @@ export function PoseRig(rig, s, dt) {
     target.armB = -22 * DEG; target.foreB = -10 * DEG;
     target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
     target.thighF = -22 * DEG; target.shinF = 30 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "ropeHaul") {
+    // 绳放到头了：他还想往前走，绳在后头拽住他。前手向后下方绷直（顺着绳的
+    // 走向），上身往前顶、后腿蹬住地。**这不是拔河**，是"再往前一寸也走不动"
+    // 的那一顿——所以劲不在胳膊上，在腰腿上。
+    // poseK = 这一帧被绳吃掉了多大一步：顶得越使劲，身子拧得越紧。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 1));
+    target.hipY = -0.05 - 0.05 * k; target.hipX = 0.05 + 0.10 * k;
+    target.torso = (12 + 15 * k) * DEG; target.head = (-6 - 8 * k) * DEG;
+    target.armF = (36 + 28 * k) * DEG;             // 正角=向后：手顺着绳伸回去
+    target.foreF = (-10 - 10 * k) * DEG;
+    target.armB = (-32 - 20 * k) * DEG; target.foreB = -20 * DEG;
+    target.thighB = (-10 - 16 * k) * DEG; target.shinB = (8 + 10 * k) * DEG; target.footB = -10 * DEG;
+    target.thighF = (14 + 12 * k) * DEG; target.shinF = (8 + 8 * k) * DEG; target.footF = -12 * DEG;
   } else if (s.pose === "throwArm") {
     // 投掷收势：石子刚出手，臂甩到前上方，上身跟着送出去
     target.hipY = -0.06; target.hipX = 0.16;
@@ -710,6 +768,25 @@ export function PoseRig(rig, s, dt) {
     target.armB = -58 * DEG; target.foreB = -12 * DEG;
     target.thighB = -74 * DEG; target.shinB = 70 * DEG; target.footB = 12 * DEG;
     target.thighF = -70 * DEG; target.shinF = 64 * DEG; target.footF = 10 * DEG;
+  } else if (s.pose === "braceDoor") {
+    // 扶门：整个人顶在门板上，两手推在胸口高的板面上。poseK=吃劲程度——
+    // 门压过来越多，腰塌得越深、后腿绷得越直（重量感一半长在这具身子上）
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.4));
+    target.hipY = -0.06 - 0.06 * k; target.hipX = 0.10 + 0.10 * k;
+    target.torso = (20 + 14 * k) * DEG; target.head = -16 * DEG;
+    target.armF = (-72 - 10 * k) * DEG; target.foreF = (-26 + 14 * k) * DEG;
+    target.armB = (-60 - 10 * k) * DEG; target.foreB = (-30 + 12 * k) * DEG;
+    target.thighB = (-34 - 8 * k) * DEG; target.shinB = (30 + 6 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (16 + 6 * k) * DEG; target.shinF = 14 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "sitStool") {
+    // 坐在矮凳上歇着：屁股落到凳面（约0.28m），小臂搭在膝上——
+    // 爹开场养那只没合口的手，坐的就是这一姿势
+    target.hipY = -0.34; target.hipX = 0.02;
+    target.torso = 14 * DEG; target.head = -6 * DEG;
+    target.armF = -44 * DEG; target.foreF = -58 * DEG;
+    target.armB = -38 * DEG; target.foreB = -52 * DEG;
+    target.thighB = -84 * DEG; target.shinB = 78 * DEG; target.footB = 6 * DEG;
+    target.thighF = -78 * DEG; target.shinF = 72 * DEG; target.footF = 4 * DEG;
   } else if (s.pose === "sitSide") {
     // 挎斗里的兵：整个人蜷进斗里，膝盖顶到胸口，枪抱在怀里（枪走 carry）
     target.hipY = -0.30; target.hipX = 0.04;
@@ -745,23 +822,38 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -26 * DEG; target.shinB = 32 * DEG; target.footB = -6 * DEG;
     target.thighF = 16 * DEG; target.shinF = 12 * DEG; target.footF = -14 * DEG;
   } else if (s.posture === "crawl") {
-    // 爬行：手脚并用。躯干压到近水平，四肢交替往前够——地道最窄的那几段
-    // （卡口、连夜赶工掏出来的新口）只能这么过去。
+    // 爬行：手脚并用，地道最窄的那几段（卡口、连夜赶工掏出来的新口）只能这么过。
+    //
+    // 这一拍是照着骨长重新算过的，不是随手填的角度——**手必须落在地上、膝盖
+    // 必须跪在地上**，不然就是老版那个"人趴下去了、胳膊还悬在半空"的样子。
+    // 算法（骨长见 BONE）：膝盖跪地 → 胯高 = 大腿长 0.31；手撑地 → 肩高 = 两节
+    // 胳膊 0.49。所以后背是从胯往前上方斜着支起来的，不是趴平的：躯干折 68° 时
+    // 肩点正好落在 0.475 高、0.48 靠前，胳膊略前伸 14° 就够到地。头顶 0.73，
+    // 与 Core 的 POSTURE_HEAD.crawl(0.72) 对得上。
     const c = s.moving ? 1 : 0;
-    target.hipY = -0.66 + (c ? Math.abs(Math.sin(p)) * 0.02 : 0);
-    target.hipX = 0.10;
-    target.torso = 76 * DEG;
-    target.head = -62 * DEG;          // 躯干快趴平了，脖子得抬起来才看得见前面
-    target.armB = (-96 + (c ? swing * 30 : 0)) * DEG;
-    target.foreB = -18 * DEG;
-    target.armF = (-96 + (c ? swing2 * 30 : 0)) * DEG;
-    target.foreF = -18 * DEG;
-    target.thighB = (-88 + (c ? swing2 * 20 : 0)) * DEG;
-    target.shinB = 92 * DEG;
-    target.footB = -30 * DEG;
-    target.thighF = (-88 + (c ? swing * 20 : 0)) * DEG;
-    target.shinF = 92 * DEG;
-    target.footF = -30 * DEG;
+    // 爬起来是一耸一耸的：手一撑，胯就往上顶一下
+    target.hipY = -0.312 + (c ? Math.abs(Math.sin(p)) * 0.03 : 0);
+    target.hipX = 0.02;
+    target.torso = (68 - (c ? Math.sin(p) * 4 : 0)) * DEG;
+    target.head = -56 * DEG;          // 脖子抬起来才看得见前面（相对躯干，世界约前倾 12°）
+    // 对角步：一只手往前够的时候，对侧的腿跟着往前收（swing / swing2 相位相反）。
+    // 撑地那一侧接近伸直，往前够的那一侧抬起来——手离地是应该的，
+    // 那是"正在往前挪"，不是飞
+    target.armB = (-14 + (c ? swing * 22 : 0)) * DEG;
+    target.foreB = (6 + (c ? Math.max(0, -swing) * 14 : 0)) * DEG;
+    target.armF = (-14 + (c ? swing2 * 22 : 0)) * DEG;
+    target.foreF = (6 + (c ? Math.max(0, -swing2) * 14 : 0)) * DEG;
+    // 腿：大腿几乎垂直（膝盖跪在地上），小腿连着脚往后铺在地面上拖着走。
+    // 大腿与小腿由同一个 swing 驱动、方向相反，小腿的世界角就始终贴着地面
+    target.thighB = (-6 + (c ? swing2 * 16 : 0)) * DEG;
+    target.shinB = (92 - (c ? swing2 * 14 : 0)) * DEG;
+    // 脚这块贴图跟四肢不是一个朝向：肢体在 0° 时指向下，鞋子在 0° 时指向前，
+    // 所以让鞋底贴着地板往后铺，要的是「大腿+小腿+脚 ≈ 180°」而不是「≈0°」。
+    // 少了这一步，脚会以踝为轴垂到地板底下去（老版就是这么穿地的）
+    target.footB = (180 + 6 - 92) * DEG;
+    target.thighF = (-6 + (c ? swing * 16 : 0)) * DEG;
+    target.shinF = (92 - (c ? swing * 14 : 0)) * DEG;
+    target.footF = (180 + 6 - 92) * DEG;
   } else if (s.posture === "stoop") {
     // 猫腰：地道里的常态。不是蹲，是弓着背走——胯只略沉，腰折下去，
     // 头压在洞顶底下，手垂在身前随时撑一把。走得比站着慢，但还是在走。
@@ -876,12 +968,35 @@ export function PoseRig(rig, s, dt) {
   ApplyPose(rig, t, target, blend);
 }
 
+// 站姿抬升：**谁在承重，谁就该踩在地平线上**。
+//
+// 这具骨架的 foot 关节既是踝也是着地点（大腿+小腿正好等于 hipY，踝落在 y=0），
+// 而鞋是从踝往下画的。站着的时候承重的是鞋底，于是整个人陷进地里一个鞋帮——
+// 车轮压在路沿上、人的鞋却在路面底下（2026-08-09 用户截图）。站着就得整体抬
+// 起 BONE.sole，鞋底才踩在地平线上。
+//
+// **但跪、爬、趴这些姿势承重的是膝盖，不是鞋底**：爬行那一拍的脚是转过 180°
+// 反铺在地上的（鞋帮朝上，见 crawl 那段的注释），一抬膝盖就离地——上游刚把
+// 爬行的膝盖和手调到贴地，别再顶飞。
+//
+// 判据不能用胯高：猫腰走（胯 0.32）和爬行（胯 0.308~0.338）几乎一样低。
+// **膝盖高度才分得开**——猫腰的膝盖屈在半空（0.15 上下），爬行的膝盖跪在地上。
+// 膝盖相对胯的高度只由大腿的角度决定，跟胯自己在哪无关，所以能在抬升之前算。
+const KNEE_ON_GROUND = 0.05;   // 膝盖低到这儿就是跪着，体重不在脚上
+const KNEE_CLEAR = 0.13;       // 高过这儿体重全在脚上
+function SoleLift(t) {
+  // 膝点 = 绕胯转过大腿角之后的 (0,−thigh)；两条腿取更低的那个
+  const drop = BONE.thigh * Math.max(Math.cos(t.thighB), Math.cos(t.thighF));
+  const knee = BONE.hipY + t.hipY - drop;
+  return Math.max(0, Math.min(1, (knee - KNEE_ON_GROUND) / (KNEE_CLEAR - KNEE_ON_GROUND)));
+}
+
 // 混合进当前姿态并写到关节上。轨道采样和状态姿势都从这儿出去
 function ApplyPose(rig, t, target, blend) {
   const j = rig.joints;
   for (const k of Object.keys(target)) t[k] = Lerp(t[k], target[k], blend);
 
-  j.root.position.set(t.hipX, BONE.hipY + t.hipY, 0);
+  j.root.position.set(t.hipX, BONE.hipY + BONE.sole * SoleLift(t) + t.hipY, 0);
   j.torso.rotation.z = -t.torso;
   j.head.rotation.z = -t.head;
   j.legBack.rotation.z = -t.thighB;
@@ -894,9 +1009,15 @@ function ApplyPose(rig, t, target, blend) {
   j.foreBack.rotation.z = -t.foreB;
   j.armFront.rotation.z = -t.armF;
   j.foreFront.rotation.z = -t.foreF;
-  // 躯干带着肩走
-  j.armBack.position.y = BONE.torso * 0.86;
-  j.armFront.position.y = BONE.torso * 0.86;
+  // **躯干带着肩走**——这行注释以前是句空话：两条胳膊挂在 root（胯）上而不是
+  // 躯干上，代码只写了个固定的 y，肩膀就永远钉在胯的正上方。站着走着看不出来
+  // （躯干才前倾几度），可一旦躯干折下去，肩就留在原地：爬行那一拍躯干压到 76°，
+  // 人趴下去了、两条胳膊还悬在胯上方半米，看着就是"手飞了"。
+  // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置，躯干折多少肩就跟多少。
+  const sh = BONE.torso * 0.86;
+  const sx = Math.sin(t.torso) * sh, sy = Math.cos(t.torso) * sh;
+  j.armBack.position.set(sx, sy, 0);
+  j.armFront.position.set(sx, sy, 0);
 }
 
 /** 前臂末端（手）的世界坐标 */
@@ -905,6 +1026,27 @@ export function HandPoint(rig) {
   const v = new THREE.Vector3(0, -BONE.foreArm, 0);
   j.foreFront.updateWorldMatrix(true, false);
   return v.applyMatrix4(j.foreFront.matrixWorld);
+}
+
+/**
+ * 四肢末端（两只手、两个膝盖、两只脚尖）的世界坐标。
+ *
+ * 用来体检"这个姿势站没站在地上"——爬行那一拍手悬在半空半米、脚穿到地板底下
+ * 半年没人发现，就是因为没有任何一条断言量过肢体末端在哪儿。姿势看着像不像，
+ * 眼睛说了算；**触没触地是可以量的**，就该量。
+ */
+export function LimbTips(rig) {
+  const j = rig.joints;
+  const at = (node, y) => {
+    node.updateWorldMatrix(true, false);
+    return new THREE.Vector3(0, y, 0).applyMatrix4(node.matrixWorld);
+  };
+  return {
+    handF: at(j.foreFront, -BONE.foreArm), handB: at(j.foreBack, -BONE.foreArm),
+    kneeF: at(j.shinFront, 0), kneeB: at(j.shinBack, 0),
+    footF: at(j.footFront, 0), footB: at(j.footBack, 0),
+    head: at(j.head, BONE.headR * 2),
+  };
 }
 
 /** 肘点的世界坐标：手里的长家伙（锯/锄头）要顺着前臂的方向摆 */
