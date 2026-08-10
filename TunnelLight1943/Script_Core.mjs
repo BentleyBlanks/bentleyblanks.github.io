@@ -408,8 +408,25 @@ export const WINCH_CRANK_DX = -0.44;   // 摇把轴销相对井心的偏移（�
 export const WINCH_CRANK_R = 0.12;     // 柄长：握手绕轴心画的那个圈的半径（5.8px）
 export const WINCH_STAND_DX = -0.76;   // 摇辘轳的站位（相对井心）
 export const WINCH_REST_A = -0.6;      // 摇把的歇息角：静止时斜垂着，别跟横杆混成一根木头
-const WINCH_TURNS_DOWN = Math.PI * 2 * 1.6;
-const WINCH_TURNS_UP = Math.PI * 2 * 2.6;
+// 一井绳要摇多少圈。2026-08-10 用户退回过一次：老版 1.6/2.6 圈、键盘全速
+// 4.5 秒就拎着水走了——「太短了 一点仪式感也没有 ... 3x 差不多」。
+// 加长**不是**只把这两个数乘三（同一个转盘拧更多圈只是变闷），是加道数；
+// 这两个数跟着往上抬一档，四道手加起来才有分量。时长有单测钉着
+//（Script_SmokeTest 的 TestWinchIsLongEnough）。
+const WINCH_TURNS_DOWN = Math.PI * 2 * 3.2;
+const WINCH_TURNS_UP = Math.PI * 2 * 4.6;
+// ── 四道手里那两道不摇转盘的 ──
+const WINCH_DUNKS = 3;            // 墩几下桶才肯扣过去吃水
+const WINCH_DUNK_PULL = 0.16;     // 一墩要往下拽多少米才算数（拽得慢只是蹭水面）
+const WINCH_ROPE_R = 0.16;        // 攥井绳的走廊半宽：手飘出这条线就脱手
+const WINCH_STAM_DUNK = 0.07;     // 一墩额外掉的手劲
+const WINCH_KNOCKS = [0.34, 0.68];// 桶磕井壁的深度：井口一黑就到底，深浅靠这两声
+const WINCH_DUNK_DX = -0.42;      // 墩桶的站位：胳膊半米长，得往前挪一步才够得着绳（实拍量的：−0.52 时手还差 11 厘米）
+const WINCH_BUCKET_TOP = 0.66;    // 桶提到顶时的高度（＝World 画桶那条线，别另抄）
+export const WINCH_LAND_X = 0.62; // 拽到井沿要横着拉多远（World 画桶也读它）
+const WINCH_LAND_R = 0.42;        // 按下那一帧手要落在桶多近才攥得住
+const WINCH_LAND_KEY = 0.55;      // 键盘后备把桶拉过来的速度
+const WINCH_HASTE = 0.42;         // 赶时间的那口井（c5 头顶上有伪军）按这个系数缩
 // ── 体力 ──
 // 一桶水吊在辘轳上，撑住它是要使劲的。2026-08-10 用户：「放下水桶这个过程
 // 角色一点力好像都不需要用，还可以坚持着不放下去」。三种状态三本账：
@@ -423,10 +440,11 @@ const WINCH_STAM_SLIDE = 0.30;  // 撑不住、任它往下溜的时候每秒回
 const WINCH_TIRED = 0.34;       // 低于这条线就开始"没劲"
 const WINCH_TIRED_K = 0.22;     // 力气见底时还剩几成（不是零——不许把人卡死）
 const WINCH_GRIP_BACK = 0.22;   // 缓过这么多力气才重新扶得住
-const WINCH_UP_KEY = 0.42;      // 满体力时键盘摇起的速度（深度/秒）
-const WINCH_DOWN_KEY = 0.62;    // 键盘放绳的速度
+const WINCH_UP_KEY = 0.28;      // 满体力时键盘摇起的速度（深度/秒）
+const WINCH_DOWN_KEY = 0.34;    // 键盘放绳的速度
 const WINCH_SLIP_UP = 0.16;     // 满桶脱手：辘轳倒转，桶往下坠
 const WINCH_SLIP_DOWN = 0.13;   // 空桶撑不住：一顿一顿自己往下溜
+const WINCH_GRACE = 0.5;        // 棘齿宽限：换个手不至于当场坠下去
 
 
 // ---------------------------------------------------------------------------
@@ -576,9 +594,12 @@ function Cue(state, name, opts) {
 
 // 规范：每个玩法动词都要有对应的角色动画。瞬时动作（拾、投）打一个
 // 带时限的姿势，持续动作（摇辘轳、划线）每帧续期——到时自动收回常态。
-function FlashPose(state, name, dur = 0.5) {
+function FlashPose(state, name, dur = 0.5, k = null) {
   state.player.pose = name;
   state.player.poseT = dur;
+  // 由玩家的操作直接驱动的姿势（拽弓、刨料、把桶横拽上井沿）把行程一并递进来，
+  // 骨架照着它插值——不传就沿用上一帧的，循环类姿势本来也不看这个
+  if (k !== null) state.player.poseK = k;
 }
 
 // ---------------------------------------------------------------------------
@@ -1528,26 +1549,44 @@ function StepChain(state, def, input, dt) {
       return;
     }
     case "winch": {
-      // 辘轳打水：真的摇转盘——按住鼠标绕摇把轴心转圈，顺时针放绳把桶送下去，
-      // 逆时针一把一把摇上来。键盘 S/W 是完整后备（这是**费力气**的活，不是
-      // 指尖功夫，按 CLAUDE.md 第 5 条可以留；自动通关驱动器也走这条）。
+      // 辘轳打水：**四道手**，不是"放下去、摇上来"两下就完事。
+      //   一道 放绳    顺时针摇转盘，桶顺着井筒往下沉，中途磕两回井壁
+      //   二道 墩桶    空木桶口朝上浮在水面，不墩不吃水——攥住井绳一下一下往下墩
+      //   三道 摇上来  满桶沉，同样一圈绳上得少；脱手辘轳呼噜噜倒转
+      //   四道 拽到井沿 桶悬在井口正当中够不着，得攥住桶帮横拽到台沿上
+      // 老版只有一、三两道、拢共四圈半、键盘全速 4.5 秒就完（2026-08-10 用户
+      // 退回：「打水放水桶这个玩法也太短了 一点仪式感也没有 稍微长一点嘛
+      // 是现在的 3x 差不多了」）。加长不是把同一个转盘拧更多圈——那只是变闷；
+      // 是**加道数**，而且四道手四个不重样的动作，一根进度条也没有。
       //
-      // **手上得有分量**：桶一挂上，它的重量就一直吊在摇把上，于是有一条体力。
+      // **手上还得有分量**：桶一挂上，它的重量就一直吊在摇把上，于是有一条体力。
       //   · 顺着重量放绳 → 几乎不费劲（顺势而为）；
       //   · 想让它停在半空、撑住不放 → 最费手劲，撑光了手一软，桶自己**一顿
       //     一顿往下溜**（用户点名要的那个设计）；
       //   · 满桶往上摇 → 最费力气，力气见底就摇不快了；撒开手能喘一口，
       //     但辘轳会倒转，这口气是拿深度换的。
+      //
+      // 键盘 S/W 是完整后备（这是**费力气**的活，不是指尖功夫，按 CLAUDE.md
+      // 第 5 条可以留；自动通关驱动器也走这条）。墩桶那一道的后备是**一下一下
+      // 敲 S**——墩是"一下"，不是"一直"，按住不放不算。
       const w = b.winch || (b.winch = {
-        depth: 0, filled: false, hooked: !st.needs, slipT: 0, prevA: null, crankA: 0,
+        phase: "lower", depth: 0, tip: 0, dunks: 0, swing: 0, sway: 0, swayV: 0,
+        filled: false, hooked: !st.needs, slipT: 0, prevA: null, crankA: 0,
         stam: 1, giveOut: false, tiredShown: false, slipShown: false, creakT: 0,
+        knocks: 0, jolt: 0, hand: null, stroke: 0, wasHeld: false, keyEdge: false,
+        hold: false, dripT: 0, dunkTired: false,
       });
+      // 赶时间的那口井（c5 头顶上有伪军在转）：同样四道手，每一道都短
+      const S = st.haste ? WINCH_HASTE : 1;
       if (!InZone(p.x, lvl, st.zone)) return;
       state.winchLock = true;   // 井口的竖推交给辘轳，不再当爬梯（c5 井台正压在竖井口上）
       const cx = st.zone.x;
       const crankX = cx + WINCH_CRANK_DX;
       const hubY = SURFACE_Y + WINCH_HUB_Y;
-      const standX = cx + WINCH_STAND_DX;
+      // 站位随这一道手走：摇转盘站 −0.76（摇把在那儿），**墩桶得往前挪一步**
+      // ——绳吊在井心，胳膊统共半米长，站在 0.76 米开外根本够不着那根绳，
+      // 姿势画得再对，画面上也是"对着井台比划"
+      const standX = cx + (w.phase === "dunk" ? WINCH_DUNK_DX : WINCH_STAND_DX);
       const PublishView = (extra) => {
         const ga = w.crankA + WINCH_REST_A;
         state.winchView = {
@@ -1557,6 +1596,8 @@ function StepChain(state, def, input, dt) {
           gripX: crankX + Math.cos(ga) * WINCH_CRANK_R,
           gripY: hubY + Math.sin(ga) * WINCH_CRANK_R,
           stam: w.stam, tired: w.stam < WINCH_TIRED, giveOut: !!w.giveOut,
+          // 四道手要画的那几样：桶扣过去多少、横拽了多少、在绳上悠多少、抖多凶
+          phase: w.phase, tip: w.tip, swing: w.swing, sway: w.sway, jolt: w.jolt,
           ...extra,
         };
       };
@@ -1575,7 +1616,7 @@ function StepChain(state, def, input, dt) {
         PublishView({ engaged: false });
         return;
       }
-      // 站定了就钉在摇把跟前：这一拍人不走路（同刨料）。走开半米手就够不着
+      // 站定了就钉在该站的地方：这一拍人不走路（同刨料）。走开半米手就够不着
       // 摇把，画面立刻退回"人在旁边空划拉"——那正是这一拍被退回的样子。
       if (Math.abs(p.x - standX) > 0.02) {
         p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.8 * dt);
@@ -1615,14 +1656,22 @@ function StepChain(state, def, input, dt) {
       const power = WINCH_TIRED_K + (1 - WINCH_TIRED_K) * Math.min(1, w.stam / WINCH_TIRED);
       const depthWas = w.depth;
       let stamDelta = 0;
-      if (!w.filled) {
+      // 绳上挂着的东西不会僵着：磕一下井壁、墩一下桶，绳和桶都得抖一抖
+      w.jolt = Math.max(0, (w.jolt || 0) - dt * 2.6);
+      // 桶在绳上左右悠（单摆）：拽到井沿那一道得靠它才读得出「够不着」
+      w.swayV += (-w.sway * 9.0) * dt;
+      w.swayV *= Math.pow(0.22, dt);
+      w.sway += w.swayV * dt;
+
+      // ── 一道：放绳下去 ──────────────────────────────────────────────
+      if (w.phase === "lower") {
         const gd = Math.max(0, -spin);   // 屏幕上顺时针=放绳
         const paying = climb > 0.05 || gd > 0;
         if (paying) {
           // 顺着桶的重量往下放：省力，绳走得快
           w.depth = Math.min(1, w.depth
-            + (climb > 0.05 ? dt * WINCH_DOWN_KEY : 0)
-            + gd / WINCH_TURNS_DOWN);
+            + (climb > 0.05 ? dt * WINCH_DOWN_KEY / S : 0)
+            + gd / (WINCH_TURNS_DOWN * S));
           stamDelta = -WINCH_STAM_PAY * dt;
           Creak(0.62);
         } else if (w.giveOut) {
@@ -1640,31 +1689,123 @@ function StepChain(state, def, input, dt) {
           // 手攥着摇把把桶吊在半空：什么也没发生，力气却在一直掉
           stamDelta = -WINCH_STAM_HOLD * dt;
         }
+        // 磕井壁：井口一黑就到底，下面那一截看不见——井有多深，是**磕出来**的
+        //（两声一声比一声闷、一声比一声远，见 Audio 的 bucketKnock）
+        while (w.knocks < WINCH_KNOCKS.length && w.depth >= WINCH_KNOCKS[w.knocks]) {
+          w.knocks += 1;
+          w.jolt = 1;
+          w.swayV += 1.6;
+          Cue(state, "bucketKnock", { gain: 0.8, rate: 1.1 - w.knocks * 0.16 });
+        }
         state.prompt = "S · 放绳下去";
         state.promptFill = w.depth;
         if (w.depth >= 1) {
+          w.phase = "dunk";
+          w.prevA = null;
+          w.swayV += 1.1;
+          w.tiredShown = false;
+          Cue(state, "bucketBob", { gain: 0.9 });
+          state.toast = { text: "桶碰着水了——可空桶是浮着的。攥住井绳，往下墩。", t: 3.6 };
+        }
+
+      // ── 二道：墩桶 ────────────────────────────────────────────────
+      } else if (w.phase === "dunk") {
+        // 空木桶口朝上浮在水面，不墩就永远打不着水——这是真事儿，也是这一场
+        // 唯一一个不靠转盘的动作。攥的是**井绳本身**：按下那一帧手得真落在
+        // 绳上，之后按指尖的世界坐标走，一把够猛才算一墩。
+        const nDunk = Math.max(1, Math.round(WINCH_DUNKS * S));
+        const Dunk = () => {
+          if (w.giveOut) {
+            // 手上没劲了，拽不动它——喘一口再来
+            if (!w.dunkTired) {
+              w.dunkTired = true;
+              state.toast = { text: "手上没劲，绳拽不沉——松开歇一口。", t: 3.0 };
+            }
+            return;
+          }
+          w.dunks += 1;
+          w.tip = Math.min(1, w.dunks / nDunk);
+          w.jolt = 1;
+          w.swayV += 2.2;
+          w.stam = Math.max(0, w.stam - WINCH_STAM_DUNK);
+          Cue(state, "bucketDunk", { gain: 0.85, rate: 0.94 + w.tip * 0.16 });
+        };
+        const ropeTop = SURFACE_Y + WINCH_HUB_Y;
+        let onRope = false;
+        if (input.pointerHeld && input.pointerWorld) {
+          const q = input.pointerWorld;
+          // 绳是一条**窄**的竖线，攥住它就得把手落在它上头。这道窄走廊同时
+          // 把「绕圈」挡在门外：绕摇把画的那个圈根本不在这条线上，
+          // 上一道手的手法糊弄不了这一道（CLAUDE.md：别让相邻两道手同一个动词）
+          const inLine = Math.abs(q.x - cx) < WINCH_ROPE_R;
+          const inReach = q.y > SURFACE_Y + 0.45 && q.y < ropeTop + 0.35;
+          if (w.hand === null) {
+            if (!w.wasHeld && inLine && inReach) { w.hand = { x: q.x, y: q.y }; w.stroke = 0; }
+          } else if (!inLine) {
+            w.hand = null; w.stroke = 0;         // 手飘出绳外 = 脱手（同接绳）
+          } else {
+            onRope = true;
+            const dy = w.hand.y - q.y;           // 往下拖 = dy>0
+            const dxa = Math.abs(q.x - w.hand.x);
+            // **必须是往下的一把**：手划得横，那是在绕圈（缠辘轳轴的动作），
+            // 不是墩桶。动作要对得上被做的那件事
+            if (dxa > Math.abs(dy) * 0.7) w.stroke = 0;
+            else if (dy > 0) w.stroke += dy;
+            else if (dy < -0.03) w.stroke = 0;   // 手往回抬，这一墩重新算
+            w.hand = { x: q.x, y: q.y };
+            // 姿势**由这一把拽了多远直接驱动**（同拉弓、同刨料）
+            p.pose = "dunkRope";
+            p.poseK = Math.min(1, w.stroke / WINCH_DUNK_PULL);
+            p.poseT = undefined;
+            p.poseU = undefined;
+            p.poseStrain = 0;
+            if (w.stroke >= WINCH_DUNK_PULL) { w.stroke = 0; Dunk(); }
+          }
+        } else { w.hand = null; w.stroke = 0; }
+        w.wasHeld = !!input.pointerHeld;
+        // 键盘后备：一下一下地敲 S。**按住不放不算**——墩是"一下"，不是"一直"
+        if (climb > 0.05 && !w.keyEdge) {
+          w.keyEdge = true;
+          p.pose = "dunkRope"; p.poseK = 1; p.poseT = 0.3; p.poseU = undefined; p.poseStrain = 0;
+          Dunk();
+        }
+        if (climb <= 0.05) w.keyEdge = false;
+        // 攥着绳较劲费手劲，撒开手回得快
+        stamDelta = onRope ? -WINCH_STAM_HOLD * dt : WINCH_STAM_REST * dt;
+        state.prompt = "攥住井绳，往下墩";
+        state.promptFill = w.tip;
+        if (w.tip >= 1) {
+          w.phase = "raise";
           w.filled = true;
           w.giveOut = false;
-          Cue(state, "waterSplash", { gain: 0.8 });
-          state.toast = { text: "桶触到水面，咕咚一声灌满了——沉得手腕一坠。", t: 2.6 };
+          w.slipT = WINCH_GRACE;
+          w.prevA = null;
+          w.tiredShown = false;
+          Cue(state, "waterSplash", { gain: 0.9 });
+          state.toast = { text: "桶一扣，咕咚一声吃满了水——沉得手腕一坠。", t: 2.8 };
           st.onFilled?.(state);   // 咕咚声传出去：后果小窗等钩子在这儿挂
         }
-      } else {
+
+      // ── 三道：摇上来 ──────────────────────────────────────────────
+      } else if (w.phase === "raise") {
         const gu = Math.max(0, spin);    // 逆时针=往上摇
         if (climb < -0.05 || gu > 0) {
           // 满桶沉：同样一圈，绳上得更少；力气不济，上得更慢
           w.depth = Math.max(0, w.depth - power * (
-            (climb < -0.05 ? dt * WINCH_UP_KEY : 0)
-            + gu / WINCH_TURNS_UP));
-          w.slipT = 0.3;
+            (climb < -0.05 ? dt * WINCH_UP_KEY / S : 0)
+            + gu / (WINCH_TURNS_UP * S)));
+          w.slipT = WINCH_GRACE;
           stamDelta = -WINCH_STAM_HAUL * dt;
           Creak(0.5);
+          // 满桶一路往上滴水：这一道摇得久，声音得跟着走
+          w.dripT = (w.dripT ?? 0) + dt;
+          if (w.dripT > 0.85) { w.dripT = 0; Cue(state, "waterDrip", { gain: 0.5 }); }
           if (w.stam < WINCH_TIRED && !w.tiredShown) {
             w.tiredShown = true;
             state.toast = { text: "胳膊酸了，摇不快——松开手喘一口，桶会往下坠一点。", t: 3.6 };
           }
         } else {
-          // 松手：辘轳倒转。留 0.3s 的棘齿宽限，换手不至于立刻坠；
+          // 松手：辘轳倒转。留半秒棘齿宽限，换手不至于立刻坠；
           // 撒开手的这一会儿力气回得最快——这就是那口气
           w.slipT = Math.max(0, w.slipT - dt);
           stamDelta = WINCH_STAM_REST * dt;
@@ -1679,11 +1820,60 @@ function StepChain(state, def, input, dt) {
         state.prompt = "W · 摇上来";
         state.promptFill = 1 - w.depth;
         if (w.depth <= 0) {
+          w.phase = "land";
+          w.prevA = null;
+          w.swayV += 1.4;
+          Cue(state, "crank", { gain: 0.6 });
+          state.toast = { text: "桶提到井口了。它悬在正当中——横着拽过来，搁到台沿上。", t: 3.6 };
+        }
+
+      // ── 四道：拽到井沿 ────────────────────────────────────────────
+      } else {
+        // 桶吊在井口正当中，人在西边够不着——得探身攥住桶帮把它横拽过来。
+        // 满桶有分量：跟手走但有速度上限；撒手它自己荡回井口正中。
+        const bx = cx - w.swing * WINCH_LAND_X + w.sway * 0.14;
+        const by = SURFACE_Y + WINCH_BUCKET_TOP;
+        let held = false;
+        if (input.pointerHeld && input.pointerWorld) {
+          const q = input.pointerWorld;
+          // 按下那一帧手得落在桶上（探身够得着，所以这个半径比指尖活儿大一档）
+          if (!w.wasHeld) w.hold = Math.hypot(q.x - bx, q.y - by) < WINCH_LAND_R;
+          if (w.hold) {
+            held = true;
+            const want = Math.max(0, Math.min(1, (cx - q.x) / WINCH_LAND_X));
+            // 有分量：跟手走但有速度上限，甩再快也只能一寸寸挪
+            w.swing += Math.max(-2.4 * dt, Math.min(0.8 * dt, want - w.swing));
+            w.sway += (-w.sway) * Math.min(1, dt * 6);
+            p.pose = "haulIn";
+            p.poseK = w.swing;
+            p.poseT = undefined;
+            p.poseU = undefined;
+            p.poseStrain = 0;
+          }
+        } else { w.hold = false; }
+        w.wasHeld = !!input.pointerHeld;
+        // 键盘后备：接着按 W 把它拉过来
+        if (climb < -0.05) {
+          held = true;
+          w.swing = Math.min(1, w.swing + dt * WINCH_LAND_KEY / S);
+          p.pose = "haulIn"; p.poseK = w.swing; p.poseT = undefined; p.poseU = undefined; p.poseStrain = 0;
+        }
+        if (!held) w.swing = Math.max(0, w.swing - dt * 0.9);
+        // **这一道不吃体力**：横着把桶带过来是一下轻活，不是吊着它对抗重力。
+        // 而且它接在最费力气的三道手后头——再拿手劲卡一道，力气见底的玩家
+        // 会被卡死在最后一步（撑不住→桶荡回井心→更没劲，是个死循环）。
+        // 它是这一场的收势，得让人喘上来
+        stamDelta = WINCH_STAM_REST * 0.5 * dt;
+        state.prompt = "把桶拽到井沿上";
+        state.promptFill = w.swing;
+        if (w.swing >= 0.995) {
+          Cue(state, "drop", { gain: 0.8 });
+          Cue(state, "waterSplash", { gain: 0.35 });
           if (st.gives) GiveItem(state, st.gives);
           if (st.transform) state.player.item = { ...st.transform };
           state.winchView = null;
           state.stamina = null;
-          p.pose = null; p.poseU = undefined; p.poseStrain = undefined;
+          p.pose = null; p.poseU = undefined; p.poseK = undefined; p.poseStrain = undefined;
           finish();
           return;
         }
@@ -1695,21 +1885,23 @@ function StepChain(state, def, input, dt) {
         v: w.stam,
         low: w.stam < WINCH_TIRED,
         out: !!w.giveOut,
-        label: w.filled ? "手劲" : "手劲",
+        label: "手劲",
       };
       // 摇把的角度直接从绳的行程反推：键盘、鼠标、倒转三条路自然同源——
       // 桶自己往下坠时，摇把就在屏幕上呼噜噜倒着抡
       w.crankA -= (w.depth - depthWas) * WINCH_TURNS_DOWN;
-      // 动词动画：**手就攥在摇把上**。姿势相位直接取摇把角度（不是一条自转的
-      // 定速循环——老版两只手在半空画圈，跟屏幕上那根摇把根本没关系），
-      // 累了身子跟着塌下去。World 按 winchView.gripX/Y 把前手 IK 到握手上。
-      const TAU = Math.PI * 2;
-      p.pose = "crank";
-      p.poseU = (((w.crankA + WINCH_REST_A) % TAU) + TAU) % TAU / TAU;
-      p.poseT = undefined;
-      p.poseStrain = Math.min(1, Math.max(0, 1 - w.stam / 0.62) * (w.filled ? 1 : 0.75)
-        + (w.giveOut ? 0.3 : 0));
-      PublishView({ engaged: w.prevA !== null });
+      // 动词动画：转转盘那两道手**手就攥在摇把上**（相位直接取摇把角度，不是
+      // 一条自转的定速循环；World 按 winchView.gripX/Y 把前手 IK 到握手上）。
+      // 墩桶与拽桶不是绕圈，各有各的姿势——那两道在上头自己设，这儿别覆盖回去。
+      if (w.phase === "lower" || w.phase === "raise") {
+        const TAU = Math.PI * 2;
+        p.pose = "crank";
+        p.poseU = (((w.crankA + WINCH_REST_A) % TAU) + TAU) % TAU / TAU;
+        p.poseT = undefined;
+        p.poseStrain = Math.min(1, Math.max(0, 1 - w.stam / 0.62) * (w.filled ? 1 : 0.75)
+          + (w.giveOut ? 0.3 : 0));
+      }
+      PublishView({ engaged: w.prevA !== null || !!w.hand || w.hold });
       return;
     }
     // 接绳：**长在一张铺满画框的活卡上**（state.knotCard → Art.DrawKnotCard）。
@@ -4093,7 +4285,10 @@ export const SCRIPTS = {
         { type: "use", zone: TV.trapSpot, hold: 3, stroke: "down", prompt: "按住 E · 挖翻口",
           note: "弯挖出来了。可干弯挡不住烟——得灌上水。" },
         { type: "pickup", x: 30, level: "under", item: { id: "bucket2", label: "空桶" }, prompt: "E · 拎起空桶" },
-        { type: "winch", zone: TV.wellTop, needs: "bucket2", needsLabel: "空桶",
+        // 头顶上有伪军在转：**同样四道手，但每一道都短**（haste）。这一口井的
+        // 戏在"什么时候敢露头"，不在打水本身；照 c1 的分量摇，等于逼玩家在
+        // 巡逻的眼皮底下站两分钟
+        { type: "winch", zone: TV.wellTop, needs: "bucket2", needsLabel: "空桶", haste: true,
           transform: { id: "fullBucket2", label: "满桶水", big: true },
           note: "桶沉了。上面还有人在转——挑好下去的时候。" },
         { type: "use", zone: TV.trapSpot, needs: "fullBucket2", hold: 1, stroke: "down", prompt: "按住 E · 灌水",

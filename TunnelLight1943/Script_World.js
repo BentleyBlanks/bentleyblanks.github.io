@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_CRANK_R, WINCH_REST_A, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -462,7 +462,8 @@ export function CreateWorld(canvasEl) {
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null, cartWheel = null;
   let thrownMesh = null;
-  let winchRope = null, winchBucket = null, winchCrank = null, winchGuide = null;
+  let winchRope = null, winchBucket = null, winchBucketFull = null, winchCrank = null,
+    winchGuide = null, winchCoil = null;
   // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
@@ -538,7 +539,8 @@ export function CreateWorld(canvasEl) {
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
     cartMesh = null; cartWheel = null;
     thrownMesh = null;
-    winchRope = null; winchBucket = null; winchCrank = null; winchGuide = null;
+    winchRope = null; winchBucket = null; winchBucketFull = null; winchCrank = null;
+    winchGuide = null; winchCoil = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null;
     coneMeshes = [];
@@ -1403,6 +1405,10 @@ export function CreateWorld(canvasEl) {
           night,
           broken: sceneKey === "village" && !!st?.flags.wellRopeBroken,
           crank: !st?.winchView,
+          // **井绳也一样让位**：打水的时候绳是活的（跟着桶升降、跟着桶歪），
+          // 静态贴图上那根永远笔直垂进井口的绳得撤掉，不然桶都拽到井沿上了，
+          // 井口里还挂着另一根一动不动的绳
+          rope: !st?.winchView,
         });
         const wellMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, state));
         propRedraw.push({
@@ -3832,9 +3838,55 @@ export function CreateWorld(canvasEl) {
         // 深度规范：绳与桶走 loose 带——压在井台（walk）之前、摇辘轳的人之后
         FixOrder(winchRope, DepthOrder("play", BAND.loose));
         layers.play.add(winchRope);
-        winchBucket = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶"), 0, DETAIL_SS);
-        FixOrder(winchBucket, DepthOrder("play", BAND.loose) + 1);
-        layers.play.add(winchBucket);
+        // 桶烘两只：空的、满的。**摇上来那一路得看得出桶里有东西**，
+        // 不然三道手摇完画面上什么也没变——满的那只桶口顶着一汪水、沿上挂着水痕
+        const BakeBucket = (full) => BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+          ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶");
+          if (!full) return;
+          // **只画桶口那一面水**：把整只桶涂成水色，上屏就是一只青塑料盒
+          ctx.save();
+          ctx.fillStyle = "#131a15";
+          ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.42;
+          ctx.fillStyle = "#6b7566";
+          ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = "rgba(58,72,62,0.55)";
+          ctx.lineWidth = 1.1;
+          ctx.beginPath(); ctx.moveTo(ax - 6.2, ay - 6); ctx.lineTo(ax - 6.6, ay + 1.5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ax + 4.4, ay - 6); ctx.lineTo(ax + 4.8, ay - 1.2); ctx.stroke();
+        }, 0, DETAIL_SS);
+        winchBucket = BakeBucket(false);
+        winchBucketFull = BakeBucket(true);
+        for (const m of [winchBucket, winchBucketFull]) {
+          FixOrder(m, DepthOrder("play", BAND.loose) + 1);
+          layers.play.add(m);
+        }
+        // **辘轳鼓上的那盘绳**：桶沉进井口的黑里之后就看不见了，绳盘是井下
+        // 那两道手唯一看得见的读数——放绳时一圈圈松出去、盘变窄，摇上来又缠回来。
+        // 真辘轳上你也就是这么看出"放了多少"的。比鼓身暗一档、两头压墨线，
+        // 眼睛跟的是那两条边线往里收（摇把的轴销还盖着中间）
+        winchCoil = BakeSprite(36, 16, 18, 8, (ctx, ax, ay) => {
+          ctx.fillStyle = "#54432a";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 11.6);
+          ctx.fillStyle = "rgba(255,240,205,0.18)";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 3.2);
+          ctx.fillStyle = "rgba(0,0,0,0.26)";
+          ctx.fillRect(ax - 15, ay + 2.6, 30, 3.2);
+          ctx.strokeStyle = "rgba(30,22,14,0.55)";
+          ctx.lineWidth = 1.0;
+          for (let i = 1; i < 8; i += 1) {
+            const cx0 = ax - 15 + (i / 8) * 30;
+            ctx.beginPath(); ctx.moveTo(cx0, ay - 5.6); ctx.lineTo(cx0, ay + 5.6); ctx.stroke();
+          }
+          ctx.strokeStyle = "rgba(24,17,10,0.9)";
+          ctx.lineWidth = 2.0;
+          for (const e of [-15, 15]) {
+            ctx.beginPath(); ctx.moveTo(ax + e, ay - 6.2); ctx.lineTo(ax + e, ay + 6.2); ctx.stroke();
+          }
+        }, 0, HINT_SS);
+        FixOrder(winchCoil, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(winchCoil);
         // 摇把：轴销在画布正中，柄伸向 +x、末端一枚握手——旋转轴就是轴销。
         // **柄长必须等于 Core 的 WINCH_CRANK_R**，画面里那个圈就是
         // 判定用的那个圈，也是 Rig 反解前手的那个圈；三处对不上，手就抓空了。
@@ -3882,23 +3934,50 @@ export function CreateWorld(canvasEl) {
       // 沉多深不要按"井有多深"给——按**看得见多久**给：桶在头一小半程里
       // 一直看得见，之后才淡进井筒的黑里（第一版 0.70−1.30d 走到两成深度
       // 桶就没影了，玩家会以为它掉了）
-      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25;
+      const phase = wv.phase || (wv.filled ? "raise" : "lower");
+      const sway = wv.sway || 0, swing = wv.swing || 0, jolt = wv.jolt || 0;
+      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25
+        + (jolt > 0 ? Math.sin(state.time * 46) * 0.018 * jolt : 0);
+      // 桶横着的位置：在绳上左右悠（sway），最后一道手被人横拽到井沿（swing）
+      const bucketX = wv.x - swing * WINCH_LAND_X + sway * 0.12;
       // 绳只画到井口沿为止：再往下它就该钻进井筒的黑里了。不夹的话，桶沉到
       // 底时会有一根木色的长条从辘轳一直拖到地面、还压在井台之前——读出来是
       // "绳挂在井外面"，不是"桶下到井里去了"
+      const inWell = bucketY < SURFACE_Y + 0.62;
       const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.62);
+      const ropeX = inWell ? wv.x : bucketX;
+      const rdx = ropeX - wv.x, rlen = Math.max(0.05, Math.hypot(rdx, hubY - ropeBottom));
       winchRope.visible = true;
-      winchRope.scale.set(1, Math.max(0.05, hubY - ropeBottom), 1);
-      winchRope.position.set(wv.x, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
+      winchRope.scale.set(1, rlen, 1);
+      // 绳跟着桶歪；桶在井里看不见的时候，每一墩还是得让绳抖一下——
+      // 那是井下那一道手在画面上唯一的动静
+      winchRope.rotation.z = Math.asin(Math.max(-1, Math.min(1, rdx / rlen)))
+        + (inWell ? Math.sin(state.time * 38) * 0.035 * jolt : 0);
+      winchRope.position.set((wv.x + ropeX) / 2, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
       // 桶沉到井台沿以下就淡进井口那团黑里——它画在井台**之前**（loose 带），
       // 不淡的话整只桶会浮在石头台面上往下滑，读出来是"桶在井外掉"
-      winchBucket.visible = wv.hooked && bucketY > 0.05;
-      winchBucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
-      winchBucket.material.transparent = true;
-      winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
-      // 灌满了桶身压得低一点
-      winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
+      const bucket = wv.filled ? winchBucketFull : winchBucket;
+      const spare = wv.filled ? winchBucket : winchBucketFull;
+      spare.visible = false;
+      bucket.visible = wv.hooked && bucketY > 0.05;
+      bucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
+      bucket.material.transparent = true;
+      bucket.position.set(bucketX, bucketY, PlaceZ(BAND.loose));
+      // 二道手的题眼：空桶是**浮着的**，一墩一墩才扣过去。tip 0→1 就是扣的过程
+      bucket.rotation.z = phase === "dunk"
+        ? (wv.tip || 0) * 2.1 + Math.sin(state.time * 3.4) * 0.10 * (1 - (wv.tip || 0))
+        : (phase === "lower" ? Math.sin(state.time * 2.1) * 0.08 : sway * 0.20);
+      // 鼓上的绳盘：放出去多少就窄多少
+      winchCoil.visible = wv.hooked;
+      winchCoil.position.set(wv.x, hubY, PlaceZ(BAND.loose));
+      winchCoil.scale.set(0.30 + 0.70 * (1 - wv.depth), 1, 1);
       winchCrank.visible = wv.hooked;
+      // 摇把排在人**之前**只在真摇的时候成立（手攥在握手上，握手压住手）。
+      // 墩桶和拽桶那两道手不碰摇把，它再挡在前头就成了一根横在戏前面的木头：
+      // 那两拍把它退回绳与桶的那一档
+      winchCrank.renderOrder = (phase === "lower" || phase === "raise")
+        ? DepthOrder("play", BAND.obstacle)
+        : DepthOrder("play", BAND.loose) + 3;
       // 手上吃劲，摇把也跟着抖一丝——判定的 crankA 不掺演出，抖只加在画面上
       const strain = wv.hooked ? Math.max(0, 1 - (wv.stam ?? 1) / 0.5) : 0;
       const shake = strain * 0.012 * Math.sin(state.time * 34);
@@ -3908,7 +3987,9 @@ export function CreateWorld(canvasEl) {
       winchCrank.rotation.z = (wv.crankA || 0) + WINCH_REST_A;
       // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面。
       // 半径贴着摇把画的那个圈——「手绕这儿转」得指的是真的那一圈
-      const showGuide = wv.hooked && !wv.engaged;
+      // 只在**要转转盘的那两道手**里挂：墩桶与拽桶不绕圈，那两下该看的是
+      // 绳和桶自己在晃，不是一个圈
+      const showGuide = wv.hooked && !wv.engaged && (phase === "lower" || phase === "raise");
       winchGuide.visible = showGuide;
       if (showGuide) {
         const pos = winchGuide.geometry.attributes.position;
@@ -3925,8 +4006,10 @@ export function CreateWorld(canvasEl) {
     } else if (winchRope) {
       winchRope.visible = false;
       winchBucket.visible = false;
+      winchBucketFull.visible = false;
       winchCrank.visible = false;
       winchGuide.visible = false;
+      winchCoil.visible = false;
     }
 
     // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的

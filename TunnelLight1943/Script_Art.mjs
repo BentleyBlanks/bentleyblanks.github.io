@@ -2157,7 +2157,7 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
 // 脚下也没有一点湿泥，于是它既不像井，又像被路截了一半。这一版按真物件重排：
 // 圆井台（正面砌石 + 椭圆台面 + 黑井口）、两根埋进土里的立柱、柱间一只辘轳鼓、
 // 鼓上缠绳、绳垂进井口，脚下压一圈常年泼出来的湿地。
-export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, crank = true } = {}) {
+export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, crank = true, rope = true } = {}) {
   // 石头是**暖灰**，不是白瓷：上一版调到 #a8a094，画出来整口井比黄土路还亮，
   // 成了画面里最跳的一块。井是背景，不该抢主角的明度。
   // 注意这套贴图上屏时会被整体提亮（画布贴图没声明 sRGB，见 CanvasTexture），
@@ -2324,11 +2324,21 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
       InkLine(ctx, x - 3, groundY - CURB - 16, x - 6 + i * 3.2, groundY - CURB - 9 - (i % 2) * 2,
         id + "fray" + i, { lw: 1.4, color: "#8a6a45" });
     }
-  } else {
+  } else if (rope) {
+    // 打水那一拍 World 会挂一根**活的**井绳（跟着桶升降、跟着桶歪），
+    // 这根静态的就得让位（rope:false）——否则井口里会多出一根不动的绳
     InkLine(ctx, x - 2, HUB + 6, x - 2, groundY - CURB + 1, id + "rope",
       { lw: 1.7, color: "#6f5c3d", amp: 1 });
   }
 }
+
+// 【为什么没有「井筒剖面」这支画笔】2026-08-10 打水加长时画过一版 DrawWellShaft
+// （把井的近侧剖开，让玩家看着桶沉下去、浮在水面上、墩下去吃水），实拍之后拆掉了：
+// 地表场景的画面底下永远压着一条**近景地面带**（z=3.3，renderOrder 8500），
+// 它就是「镜头正前方三米的地面」——物理上就该把地平线以下的一切挡住。镜头一往下
+// 降去追那只桶，它跟着涨上来，把剖面连同桶一起吃掉。地表场景**看不到地平线以下**，
+// 这是这套渲染的硬性前提，不是可以绕的 bug。井下的反馈因此改走三条看得见/听得见的路：
+// 摇把在转、辘轳鼓上的绳盘变粗变细（World 的 winchCoil）、带井筒回音的三记声音。
 
 // 碾盘：石头**要发土不要发灰**（跟井台一个规矩）。台面是手錾出来的多边形，
 // 不是 ctx.ellipse 的完美圆；磨齿是四组平行的剔沟，不是六根从圆心均分的

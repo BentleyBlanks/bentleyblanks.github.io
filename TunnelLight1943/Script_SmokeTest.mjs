@@ -34,7 +34,9 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
   let winchRest = false;    // 满桶摇不动了就撒手喘一口（最优解，也免得在慢档上磨）
 
   const started = Date.now();
+  let frame = 0;
   while (!state.done) {
+    frame += 1;
     if (Date.now() - started > 120000) throw new Error("AutoPlay 真实耗时超过 120s，疑似死循环");
     chapterT += DT;
     if (state.chapterIndex !== lastChapter) { chapterT = 0; lastChapter = state.chapterIndex; }
@@ -155,16 +157,20 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
           if (Math.abs(dx) <= 2.2) { input.interactHeld = true; input.moveX = target.dir; }
           else input.moveX = Math.sign(dx);
         }
-        // 辘轳：没灌满一直往下放（S），灌满了一直往上摇（W）。
+        // 辘轳打水的四道手，键盘各有各的开法：放绳按住 S；**墩桶得一下一下
+        // 地敲 S**（按住不放不算——墩是"一下"，不是"一直"）；摇上来和最后
+        // 把桶横拽到井沿都按住 W。
         // 满桶是力气活——手劲见底就撒开手喘一口（辘轳会往下坠一点，但缓过来
         // 之后摇得快得多，净赚）。这既是最优解，也免得驱动器在慢档上磨半天。
         if (target.action === "winchAt" && Math.abs(dx) <= 1.35) {
           const w = state.beat?.winch;
+          const ph = w?.phase || (w?.filled ? "raise" : "lower");
           const stam = w?.stam ?? 1;
-          if (!w?.filled) winchRest = false;
+          if (ph === "lower") winchRest = false;
           else if (stam <= 0.04) winchRest = true;
           else if (stam >= 0.8) winchRest = false;
-          input.climb = winchRest ? 0 : (w?.filled ? -1 : 1);
+          if (ph === "dunk") input.climb = (frame % 6 < 3) ? 1 : 0;
+          else input.climb = winchRest ? 0 : (ph === "lower" ? 1 : -1);
           input.moveX = 0;
         }
         // 划线：按住 E 的同时还得左右推，粉笔才走
@@ -1102,6 +1108,13 @@ function TestWinchIsACrankNotALever() {
     step({}, 2);
     return state.beat.winch;
   };
+  // 二道手：**一下一下地敲 S** 把桶墩下去（按住不放不算）
+  const KeyDunk = (state, step, n = 40) => {
+    for (let i = 0; i < n && state.beat.winch?.phase === "dunk"; i += 1) {
+      step({ climb: 1 });
+      step({}, 4);
+    }
+  };
 
   // ── ①②③ 转盘本身：顺放逆收、特写、脱手倒转、键盘后备 ──
   {
@@ -1129,14 +1142,42 @@ function TestWinchIsACrankNotALever() {
     const d1 = w.depth;
     circle(1, 6);
     assert.ok(w.depth <= d1 + 1e-9, "空桶阶段逆时针转不该把绳送下去");
-    // 一路顺时针到触水
-    circle(-1, 60);
-    assert.ok(w.filled, "转到底桶必须触水灌满");
+    // 一路顺时针到底
+    for (let i = 0; i < 90 && w.phase === "lower"; i += 1) circle(-1, 8);
+    // ── 二道：墩桶 ──
+    // 老版转到底就"咕咚一声灌满了"。**空木桶是浮着的**，不墩不吃水——
+    // 这一道是四道手里唯一不靠转盘的动作，也是打水这件事真正的样子
+    assert.equal(w.phase, "dunk", "桶碰着水不该直接满，得先墩");
+    assert.equal(w.filled, false, "没墩过的空桶不许算满");
+    circle(-1, 30);
+    assert.equal(w.filled, false, "墩桶这一道接着绕摇把是没用的——动作对不上事");
+    // 攥住井绳往下拽：按下那一帧手得落在绳上（绳吊在井心，不是摇把那一侧）
+    const DragRope = (fromY, toY, n = 10) => {
+      step({ pointerHeld: true, pointerWorld: { x: wx, y: fromY } });
+      for (let i = 1; i <= n; i += 1) {
+        step({ pointerHeld: true, pointerWorld: { x: wx, y: fromY + (toY - fromY) * (i / n) } });
+      }
+      step({});
+    };
+    const dunks0 = w.dunks;
+    step({ pointerHeld: true, pointerWorld: { x: wx + 1.4, y: 0.9 } });
+    for (let i = 1; i <= 8; i += 1) step({ pointerHeld: true, pointerWorld: { x: wx + 1.4, y: 0.9 - i * 0.05 } });
+    step({});
+    assert.equal(w.dunks, dunks0, "手没落在井绳上，往下拽不算一墩");
+    const tip0 = w.tip;
+    DragRope(1.1, 0.75);
+    assert.ok(w.tip > tip0, `攥住井绳往下墩，桶得往下扣（${tip0}→${w.tip}）`);
+    let guard = 0;
+    while (!w.filled && guard < 14) { step({}, 6); DragRope(1.1, 0.75); guard += 1; }
+    assert.ok(w.filled, "墩够了桶必须吃满水");
+    assert.equal(w.phase, "raise", "吃满水就该进摇上来那一道");
     // 逆时针往上摇
     const d2 = w.depth;
     circle(1, 10);
-    assert.ok(w.depth < d2 - 0.08, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
+    assert.ok(w.depth < d2 - 0.02, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
     assert.equal(state.gesture, undefined, "手势小黑饼已拆，摇起的方向由摇把与引导圈自己演");
+    // 再摇上来一截，好让下面那一坠有地方可坠（一井绳现在长得多）
+    circle(1, 60);
     const crankMid = w.crankA;
     // 脱手：过了棘齿宽限辘轳倒转，桶自己往下坠，摇把跟着倒着抡
     const d3 = w.depth;
@@ -1145,10 +1186,23 @@ function TestWinchIsACrankNotALever() {
     assert.ok(w.crankA < crankMid, "倒转时摇把必须真的倒着转（crankA 回退）");
     // 键盘 W 仍是完整后备（费力气的活，不是指尖功夫）：一路摇到顶。
     // 力气见底也只是慢一档，绝不许把人卡死——自动通关全靠这条
-    step({ climb: -1 }, Math.ceil(9.0 / DT));
+    for (let i = 0; i < 40 && w.phase === "raise"; i += 1) {
+      step({ climb: -1 }, Math.ceil(0.8 / DT));
+      step({}, Math.ceil(0.5 / DT));   // 喘一口（撒手会坠一点，但缓过来摇得快）
+    }
+    // ── 四道：拽到井沿 ──
+    // 摇到顶不等于到手：桶还悬在井口正当中，得横着拽过来搁到台沿上
+    assert.equal(w.phase, "land", "摇到顶不算完——桶还吊在井口正当中");
+    assert.equal(state.player.item?.id, undefined, "还没搁上井沿就不算到手");
+    const by = 0.66;   // SURFACE_Y = 0；桶提到顶时的高度
+    step({ pointerHeld: true, pointerWorld: { x: wx - 2.4, y: by } });
+    step({ pointerHeld: true, pointerWorld: { x: wx - 0.7, y: by } }, 6);
+    assert.ok(w.swing < 0.02, `没攥住桶就拖，桶不该动（swing=${w.swing}）`);
+    step({});
+    step({ climb: -1 }, Math.ceil(6.0 / DT));
     assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
-      "键盘 W 摇到顶必须能收完这一步（力气见底只该变慢，不该卡死）");
-    assert.equal(state.player.item?.id, "fullBucket", "摇上来手里必须是一桶水");
+      "键盘后备必须走得完四道手（力气见底只该变慢，不该卡死）");
+    assert.equal(state.player.item?.id, "fullBucket", "四道手都走完，手里才是一桶水");
   }
 
   // ── ④⑤ 桶吊着不放：手劲一路掉，掉光了辘轳自己往下溜 ──
@@ -1174,11 +1228,13 @@ function TestWinchIsACrankNotALever() {
     const state = mk();
     const step = stepOn(state);
     const w = Hook(state, step);
-    step({ climb: 1 }, Math.ceil(2.2 / DT));     // 放到底
-    assert.ok(w.filled, "键盘 S 放到底也该触水灌满");
+    step({ climb: 1 }, Math.ceil(5.0 / DT));     // 放到底
+    KeyDunk(state, step);                        // 一下一下墩，桶才吃水
+    assert.ok(w.filled, "键盘放到底再墩几下，桶该吃满水");
     const stamFull = w.stam;
     step({ climb: -1 }, Math.ceil(1.2 / DT));
-    assert.ok(w.stam < stamFull - 0.4, `满桶往上摇最费力气（${stamFull}→${w.stam}）`);
+    assert.ok(w.stam < stamFull - 0.3, `满桶往上摇最费力气（${stamFull}→${w.stam}）`);
+
     assert.ok(state.stamina.low || w.stam < 0.5, "摇一阵之后手劲读数该报警了");
     const tired = w.stam;
     step({}, Math.ceil(0.6 / DT));
@@ -1219,7 +1275,53 @@ function TestWinchIsACrankNotALever() {
       `摇把画的圈最左沿在 ${(crankX - WINCH_CRANK_R).toFixed(2)}，脑袋右缘在 `
       + `${(sx + HEAD_HW).toFixed(2)}——圈扫过脸，胳膊就会横在自己面前`);
   }
-  console.log("  ✓ 辘轳转盘：顺放逆收 / 特写推近 / 脱手倒转 / 键盘后备 / 手劲会耗尽 / 摇把够得着");
+  console.log("  ✓ 辘轳四道手：顺放逆收 / 墩桶 / 拽到井沿 / 脱手倒转 / 手劲会耗尽 / 摇把够得着");
+}
+
+// 打水得**够长**。这一场老版拢共四圈半、键盘全速 4.5 秒就完（用户 2026-08-10
+// 退回：「打水放水桶这个玩法也太短了 一点仪式感也没有 稍微长一点嘛 是现在的
+// 3x 差不多了」）。长度是设计的一部分，不是可以随手调回去的手感参数——
+// 所以钉一个下限在这儿，顺带钉住"四道手一道都不能少"。
+function TestWinchIsLongEnough() {
+  const state = CreateGame(0);
+  DebugJump(state, 0, ChapterBeatList(0).find((b) => b.id === "c1_well").index);
+  state.beat.stepIndex = 6;
+  state.flags.wellRopeFixed = true;
+  state.player.item = { id: "bucket", label: "空水桶" };
+  state.player.x = SCENES.village.zones.well.x;
+  state.player.level = "surface";
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  step({}, 2);
+  step({ interact: true });
+  const w = state.beat.winch;
+  const seen = new Set();
+  let frames = 0, rest = false;
+  while (state.player.item?.id !== "fullBucket" && frames < 90 / DT) {
+    const ph = w.phase;
+    seen.add(ph);
+    // 跟自动通关驱动器同一套开法：累了就撒手喘一口（那是最优解）
+    if (ph === "lower") rest = false;
+    else if (w.stam <= 0.04) rest = true;
+    else if (w.stam >= 0.8) rest = false;
+    if (ph === "dunk") step({ climb: (frames % 6 < 3) ? 1 : 0 });
+    else step({ climb: rest ? 0 : (ph === "lower" ? 1 : -1) });
+    frames += 1;
+  }
+  assert.equal(state.player.item?.id, "fullBucket", "键盘后备必须打得上水");
+  const secs = frames * DT;
+  // 老版键盘全速 4.5 秒（放 1.6s + 摇 2.9s）。3x 就是 13.5s 起
+  assert.ok(secs >= 13.5, `打水得有仪式感：键盘全速也该 13.5 秒起（实际 ${secs.toFixed(1)}s）`);
+  for (const ph of ["lower", "dunk", "raise", "land"]) {
+    assert.ok(seen.has(ph), `四道手一道都不能少，缺了 ${ph}`);
+  }
+  console.log(`  ✓ 打水四道手全走一遍：键盘 ${secs.toFixed(1)}s（老版 4.5s）`);
 }
 
 // 石笔：玩家攥的是一支笔，不是一根滑块。
@@ -2687,6 +2789,7 @@ TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
+TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();
 TestLiveCardsKeepTheWorldBehind();
 TestPlaneBeat();

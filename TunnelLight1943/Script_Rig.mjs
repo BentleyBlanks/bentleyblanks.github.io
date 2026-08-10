@@ -879,6 +879,30 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-58 - 6 * k) * DEG; target.foreB = (-64 + 8 * k) * DEG;
     target.thighB = (-18 - 12 * k) * DEG; target.shinB = (22 + 12 * k) * DEG; target.footB = -8 * DEG;
     target.thighF = (14 + 8 * k) * DEG; target.shinF = (10 + 6 * k) * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "dunkRope") {
+    // 墩桶：两只手探出去攥住井绳，整个人往下坐着一墩。**劲不在胳膊上，在体重上**
+    // ——胯要真的沉下去、膝盖跟着屈，不然就成了"挥手"。
+    // 姿势**由这一把拽了多远驱动**（poseK 0→1）：起手时两只手探出去攥住绳、
+    // 举得高；往下拽的过程里胳膊落下来、胯跟着坐下去、膝盖屈住。
+    // 负角=向前上方；两只手都在同一根绳上（够得着是前提：Core 会把人往前
+    // 挪到离绳半米，正好一臂）。劲在体重上，不在胳膊上
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0.5));
+    target.hipY = -0.06 - 0.16 * k; target.hipX = 0.02 + 0.04 * k;
+    target.torso = (2 + 10 * k) * DEG; target.head = (4 - 8 * k) * DEG;
+    target.armF = (-104 + 34 * k) * DEG; target.foreF = (-6 - 8 * k) * DEG;
+    target.armB = (-88 + 32 * k) * DEG; target.foreB = (-10 - 10 * k) * DEG;
+    target.thighB = (-12 - 20 * k) * DEG; target.shinB = (14 + 22 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (10 + 14 * k) * DEG; target.shinF = (6 + 12 * k) * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "haulIn") {
+    // 把桶拽到井沿：**由横拽的行程驱动**（poseK 0→1）。起手探出去够桶帮，
+    // 拽的过程里胳膊往回收、上身往后仰着较劲、后腿蹬住台底
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.06 - 0.06 * k; target.hipX = 0.10 - 0.16 * k;
+    target.torso = (10 - 20 * k) * DEG; target.head = (-8 + 4 * k) * DEG;
+    target.armF = (-94 + 52 * k) * DEG; target.foreF = (-8 - 40 * k) * DEG;
+    target.armB = (-70 + 46 * k) * DEG; target.foreB = (-14 - 34 * k) * DEG;
+    target.thighB = (-14 - 16 * k) * DEG; target.shinB = (14 + 14 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (14 + 8 * k) * DEG; target.shinF = (8 + 6 * k) * DEG; target.footF = -10 * DEG;
   } else if (s.pose === "vault" || s.pose === "clamber") {
     // 翻越：三段——① 手够上顶沿、后腿蹬地；② 撑起来把腿收到胸前荡过去；
     // ③ 脚先落地、屈膝卸力。姿势按 poseK（Core 给的动作进度）在关键帧之间插，

@@ -1021,6 +1021,39 @@ function Build(ac, options) {
       Tone(t, { level: 0.045 * k, attack: 0.05, decay: 0.30, type: "sawtooth", freq: 210 * r, to: 168 * r, pan });
       NoiseHit(t + 0.02, { level: 0.03 * k, attack: 0.06, decay: 0.26, freq: 900, sweep: 520, q: 2.6, pan });
     },
+    // 打水那三声。玩家看不见井筒里的桶（口一黑就到底了），井有多深、桶在干嘛，
+    // 全靠这三声交代——所以每一声都得**带井筒的回音**：一次短延时的复述，
+    // 音越低、复述越晚，读出来就是"更深"。
+    //
+    // 桶磕井壁：一记空木桶的闷响，然后石头井壁把它送回来
+    bucketKnock(t, k, pan, r) {
+      Tone(t, { level: 0.085 * k, attack: 0.003, decay: 0.16, type: "triangle", freq: 210 * r, to: 118 * r, pan });
+      NoiseHit(t, { level: 0.045 * k, attack: 0.002, decay: 0.09, freq: 700 * r, sweep: 260, q: 1.6, pan });
+      // 井筒回音：同一记，弱一半、晚 0.13 秒、闷一档
+      Tone(t + 0.13, { level: 0.035 * k, attack: 0.008, decay: 0.34, type: "sine", freq: 150 * r, to: 92 * r, pan });
+      NoiseHit(t + 0.15, { level: 0.016 * k, attack: 0.03, decay: 0.40, freq: 320, q: 3.2, brown: true, pan });
+    },
+    // 空桶碰到水面：木头拍在水上是"啵"的一声，跟着桶自己在水面上晃两下
+    bucketBob(t, k, pan) {
+      NoiseHit(t, { level: 0.075 * k, attack: 0.003, decay: 0.10, freq: 520, sweep: 1400, q: 0.9, pan });
+      Tone(t, { level: 0.055 * k, attack: 0.004, decay: 0.20, type: "sine", freq: 168, to: 108, pan });
+      for (let i = 0; i < 2; i += 1) {
+        NoiseHit(t + 0.22 + i * 0.26, { level: (0.030 - i * 0.010) * k, attack: 0.01, decay: 0.16, freq: 420, sweep: 900, q: 1.1, pan });
+      }
+      for (let i = 0; i < 3; i += 1) Drip(t + Rand(0.3, 1.0), 0.4 * k, sfxBus);
+    },
+    // 墩桶：往下猛一拽——绳绷紧的一记"嘣"，桶扣进水里哗一声，井筒把它送回来
+    bucketDunk(t, k, pan, r) {
+      NoiseHit(t, { level: 0.055 * k, attack: 0.002, decay: 0.06, freq: 1300 * r, sweep: 380, q: 2.2, pan });
+      NoiseHit(t + 0.03, { level: 0.11 * k, attack: 0.006, decay: 0.26, freq: 620 * r, sweep: 2200, q: 0.7, pan });
+      Tone(t + 0.03, { level: 0.06 * k, attack: 0.004, decay: 0.22, type: "sine", freq: 140 * r, to: 78 * r, pan });
+      NoiseHit(t + 0.17, { level: 0.030 * k, attack: 0.04, decay: 0.44, freq: 380, q: 2.4, brown: true, pan });
+    },
+    // 满桶往上摇的一路：桶底挂的水一颗一颗掉回井里，落点越来越远
+    waterDrip(t, k, pan) {
+      Drip(t, 0.9 * k, sfxBus);
+      Drip(t + Rand(0.18, 0.4), 0.5 * k, sfxBus);
+    },
     // 石笔划木头：一段砂砂的蹭，不是"叮"一声
     scribe(t, k, pan) {
       NoiseHit(t, { level: 0.05 * k, attack: 0.05, decay: 0.42, freq: 2400, sweep: 1500, q: 1.1, pan });
