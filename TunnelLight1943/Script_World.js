@@ -491,6 +491,8 @@ export function CreateWorld(canvasEl) {
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
+  // 一阵看得见的风：逐帧重画的尘土流线与草屑画布（state.wind 活着才画）
+  let windMesh = null, windCanvas = null, windCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
   let doorLeafPivot = null, doorLeafMesh = null, doorLeafLoose = null;
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
@@ -556,6 +558,7 @@ export function CreateWorld(canvasEl) {
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
+    windMesh = null; windCanvas = null; windCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
     doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
     planeToolMesh = null; planeHandRig = null;
@@ -3458,6 +3461,106 @@ export function CreateWorld(canvasEl) {
         const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x ?? state.elmRain?.x;
         critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, PlaceZ(BAND.loose));
       } else if (critterMesh) critterMesh.visible = false;
+    }
+
+    // 一阵看得见的风（Core 写 state.wind = {t,dur,x,dir}；开场吹倒门那一镜等）。
+    // 2026-08-10 用户：「风一吹过 你至少把风的动效做出来」——原来只有一声呼
+    // 和门一荡，画面上什么都没刮过。风本身没形状，能画的是它**卷起来的东西**：
+    // 一把斜着掠过画面的尘土流线（快、直、淡）+ 几粒贴地打滚蹦跳的草屑枯叶
+    // （慢、弹、转）。快慢两层速度差就是"风"这个读法的全部来源。
+    // 挂 obstacle 带＝从人脸前扫过去——尘土在人和镜头之间，风才罩得住整个画面。
+    {
+      const wd = state.wind;
+      if (wd) {
+        if (!windMesh) {
+          windCanvas = MakeCanvas(480 * 2, 220 * 2);
+          windCtx = windCanvas.getContext("2d");
+          windMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(480 / PPM, 220 / PPM),
+            new THREE.MeshBasicMaterial({ map: CanvasTexture(windCanvas), transparent: true, depthWrite: false }),
+          );
+          layers.play.add(windMesh);
+          SetPlayOrder(windMesh, BAND.obstacle, "wind");
+        }
+        const c = windCtx;
+        c.setTransform(2, 0, 0, 2, 0, 0);
+        c.clearRect(0, 0, 480, 220);
+        const t = wd.t, dir = wd.dir || 1;
+        const GY = (m) => 214 - m * PPM;                       // 离地 m 米 → 画布 y
+        // 起得猛、收得缓：风头 0.2s 就到，尾巴拖 0.8s 散掉
+        const env = Math.min(1, t / 0.2) * Math.min(1, Math.max(0, (wd.dur - t) / 0.8));
+        // 力度全程有起伏：风不是恒速的，一阵紧一阵松
+        const surge = 0.75 + 0.25 * Math.sin(t * 2.3 + 1);
+        // ── 贴地的土雾：一条被风押着跑的软带子，给整阵风打底 ──
+        // 第一版没有它，只有细流线，实拍在昏黄雾底上几乎隐形
+        for (let i = 0; i < 3; i += 1) {
+          const h = ART.Hash("wfog" + i);
+          const fx = ((h * 11 + t * (5.5 + h * 2)) % 11) * PPM;
+          const fy = GY(0.22 + h * 0.35);
+          const grad = c.createRadialGradient(fx, fy, 4, fx, fy, 60 + h * 30);
+          grad.addColorStop(0, "rgba(168,140,96,0.34)");
+          grad.addColorStop(1, "rgba(168,140,96,0)");
+          c.globalAlpha = env * surge;
+          c.fillStyle = grad;
+          c.save();
+          c.translate(fx, fy); c.scale(2.6, 1); c.translate(-fx, -fy);   // 压扁：是掠地的土，不是烟团
+          c.beginPath(); c.arc(fx, fy, 60 + h * 30, 0, Math.PI * 2); c.fill();
+          c.restore();
+        }
+        // ── 尘土流线：一把快而斜的划痕，各自循环着掠过画布 ──
+        c.lineCap = "round";
+        for (let i = 0; i < 22; i += 1) {
+          const h1 = ART.Hash("wnA" + i), h2 = ART.Hash("wnB" + i), h3 = ART.Hash("wnC" + i);
+          const speed = 7.5 + h2 * 6;                          // 米/秒：比草屑快一倍多
+          // lane 分层铺、相位掺序号：纯 Hash 会聚簇（同 coverBands 那次），
+          // 实拍抓到过五六根挤在同一高度读成一抹烟
+          const lane = 0.2 + (i / 21) * 1.85 + (h1 - 0.5) * 0.22;
+          const len = (0.9 + h3 * 1.3) * PPM;
+          const x = ((h2 * 11 + i * 0.83 + t * speed) % 11) * PPM * dir - (dir > 0 ? len : -len);
+          const y = GY(lane) + Math.sin(t * 3.1 + i * 1.7) * 3;
+          const bright = i % 4 === 0;                          // 亮的留少数（宽亮线堆一起=烟）
+          c.globalAlpha = env * surge * (bright ? 0.22 : 0.3 + h3 * 0.25);
+          c.strokeStyle = bright ? "#e8d5a8" : "#7a6238";
+          c.lineWidth = bright ? 1.6 : 2 + h1 * 1.6;
+          c.beginPath();
+          c.moveTo(dir > 0 ? x : 480 - x, y);
+          // 略微下垂的肚子：直线是激光，带一点弧才是被风拖着的土
+          c.quadraticCurveTo((dir > 0 ? x : 480 - x) + dir * len * 0.5, y + 3,
+            (dir > 0 ? x : 480 - x) + dir * len, y - len * 0.05);
+          c.stroke();
+        }
+        // ── 草屑与枯叶：贴地蹦跳着往前打滚，越滚越低 ──
+        for (let i = 0; i < 6; i += 1) {
+          const h1 = ART.Hash("wlA" + i), h2 = ART.Hash("wlB" + i);
+          const speed = 4.8 + h1 * 2.6;
+          // 相位掺进 i×1.8m：光靠 Hash 会有几粒挤在同一处，实拍抓到过一堆"抓子"
+          const px = (((h2 * 11 + i * 1.8 + t * speed) % 11) * PPM) * dir + (dir > 0 ? 0 : 480);
+          const hop = Math.abs(Math.sin(t * (5 + h1 * 3) + i * 2.1));
+          const py = GY(0.06 + hop * (0.5 - Math.min(0.32, t * 0.14)));
+          c.save();
+          c.translate(dir > 0 ? px : 480 - px, py);
+          c.rotate(t * (7 + h2 * 5) * dir);
+          c.globalAlpha = env * (0.7 + h1 * 0.25);
+          if (i % 2) {
+            // 枯叶：小椭圆带一条中脉
+            c.fillStyle = "#5c4a26";
+            c.beginPath(); c.ellipse(0, 0, 5, 2.7, 0, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = "#3e321b"; c.lineWidth = 1;
+            c.beginPath(); c.moveTo(-4.2, 0); c.lineTo(4.2, 0); c.stroke();
+          } else {
+            // 草秸：一长一短两根平行的干草——交叉画会读成"抓子"，实拍退回过
+            c.strokeStyle = "#8d7442"; c.lineWidth = 1.6;
+            c.beginPath(); c.moveTo(-4.5, -0.8); c.lineTo(4.5, 0.8); c.stroke();
+            c.lineWidth = 1.2;
+            c.beginPath(); c.moveTo(-2.2, 1.8); c.lineTo(2.6, 2.6); c.stroke();
+          }
+          c.restore();
+        }
+        c.globalAlpha = 1;
+        windMesh.material.map.needsUpdate = true;
+        windMesh.visible = true;
+        windMesh.position.set(wd.x + dir * 0.6, SURFACE_Y + 220 / 2 / PPM - 0.12, PlaceZ(BAND.obstacle));
+      } else if (windMesh) windMesh.visible = false;
     }
 
     // 翻越落地扬起的干土：半秒就散，但没有它落地就是"啪"一声没有画面

@@ -1739,6 +1739,33 @@ function TestCliAnswersQuestions() {
   console.log(`  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现 / --flag 拨开关（${wall} → ${through}）`);
 }
 
+// 开场那阵风必须看得见（2026-08-10 用户：「风一吹过 你至少把风的动效做出来」）。
+// 原来只有一声呼和门一荡，画面上什么都没刮过。吹倒门那一镜要立 state.wind
+// （渲染层照着画尘土流线与打滚的草屑），风声与画面同帧起，吹完自己散。
+function TestOpeningWindIsVisible() {
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0);
+  DebugJump(state, 0, beats.findIndex((b) => b.id === "c1_open"));
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  step({}, 2);
+  let guard = 0;
+  while (!state.wind && guard < 400) { guard += 1; step({ advance: true }); step({}, 2); }
+  assert.ok(state.wind, "吹倒门那一镜必须立起看得见的风（state.wind）");
+  assert.ok(state.wind.dur >= 2, "风要盖过门磕框那一下，别一闪就没");
+  assert.equal(state.wind.dir, 1, "风向得和门坠的方向一致（+x）");
+  assert.ok(state.cues.some((q) => q.name === "windGust"), "风声与风的画面要同一帧起");
+  step({}, Math.ceil((state.wind.dur + 0.4) * 30));
+  assert.equal(state.wind, null, "风吹完必须自己散掉");
+  console.log("  ✓ 开场那阵风看得见：尘土通道立起、与风声同帧、吹完自散");
+}
+
 // 手势小黑饼（#gestureHint：暗圆盘+一粒点按方向做动画）已整体拆除。
 // 2026-08-10 用户看到扶门那拍的圈：「明明是按键交互 非要装自己是个圈
 // 还给个方向？你这叫提示？」——抽象图形说不了任何事。方向写进提示文案
@@ -2785,6 +2812,7 @@ TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
+TestOpeningWindIsVisible();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
