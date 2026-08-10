@@ -13,7 +13,7 @@ import {
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
-  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK,
+  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
@@ -249,21 +249,27 @@ function TestCoverIsDirectional() {
   const wood = scene.covers.find((c) => c.id === "woodB");   // 矮掩体：柴堆 x=78
   assert.ok(hay?.tall && !wood?.tall, "断言依赖 hayB 是高掩体、woodB 是矮掩体");
 
-  const west = { x: 62, heading: 1, level: "surface" };      // 灯在草垛西边，朝东照
-  const behind = { x: 70.2, level: "surface", hidden: false, crouch: false };
-  const front = { x: 66.2, level: "surface", hidden: false, crouch: false };
+  // 站位按掩体自己的宽度算，别写死坐标：草垛收窄过一次（3.2→2.6m），
+  // 写死的 70.2 当场落到掩体范围外，测试红了却跟"正反面"这条规矩毫无关系
+  const hideAt = (c, side) => ({
+    x: c.x + side * (c.w / 2 + COVER_PAD * 0.5), level: "surface", hidden: false, crouch: false,
+  });
+  const west = { x: hay.x - hay.w / 2 - 4.7, heading: 1, level: "surface" };   // 灯在草垛西边，朝东照
+  const behind = hideAt(hay, 1);
+  const front = hideAt(hay, -1);
   assert.ok(!SoldierSeesPlayer(scene, west, behind, 1), "站在草垛背光那一面应藏得住");
   assert.ok(SoldierSeesPlayer(scene, west, front, 1), "站在草垛迎光那一面应露馅——不然掩体就没有正反面");
 
   // 灯绕到东边：刚才安全的那一侧当场易手，这就是"跟着绕"
-  const east = { x: 76, heading: -1, level: "surface" };
+  const east = { x: hay.x + hay.w / 2 + 6.7, heading: -1, level: "surface" };
   assert.ok(SoldierSeesPlayer(scene, east, behind, 1), "灯绕到东边后，草垛东侧不再安全");
   assert.ok(!SoldierSeesPlayer(scene, east, front, 1), "灯绕到东边后，草垛西侧才是影子");
 
   // 矮掩体仍旧要蹲：站着挡不住
-  const nearWood = { x: 79.6, level: "surface", hidden: false, crouch: false };
-  assert.ok(SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, nearWood, 1), "矮柴堆后面站着应被看见");
-  assert.ok(!SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, { ...nearWood, crouch: true }, 1), "蹲在矮柴堆后面应藏得住");
+  const nearWood = hideAt(wood, 1);
+  const woodLamp = { x: wood.x - wood.w / 2 - 3.1, heading: 1, level: "surface" };
+  assert.ok(SoldierSeesPlayer(scene, woodLamp, nearWood, 1), "矮柴堆后面站着应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, woodLamp, { ...nearWood, crouch: true }, 1), "蹲在矮柴堆后面应藏得住");
 
   // 钻得进去的掩体（沟/庄稼地/灌木）没有正反面
   const fields = SCENES.fields;
@@ -878,16 +884,18 @@ function TestGroundItems() {
   };
   step({}, 1);
   assert.equal(state.player.item?.id, "bucket", "跳幕结算后水桶必须在手里");
-  // 站进 hayB 草垛掩体（x=68, w=3.2）正中间放下：落点必须被推出掩体足迹
-  state.player.x = 68;
+  // 站进 hayB 草垛掩体正中间放下：落点必须被推出掩体足迹。
+  // 边界从场景数据取——草垛的宽度调过一次，写死的 65.9/70.1 会跟着失效
+  const hayB = SCENES.village.covers.find((c) => c.id === "hayB");
+  state.player.x = hayB.x;
   state.player.level = "surface";
   step({}, 14);
   step({ interact: true });
   assert.equal(state.player.item, null, "空地上按 E 要能自由放下");
   assert.equal(state.groundItems.length, 1, "放下后地上要有一件落地道具");
   const g = state.groundItems[0];
-  assert.ok(g.x <= 65.9 + 1e-6 || g.x >= 70.1 - 1e-6,
-    `落点必须避开 hayB 掩体足迹（实际 x=${g.x}）`);
+  assert.ok(Math.abs(g.x - hayB.x) >= hayB.w / 2 - 1e-6,
+    `落点必须避开 hayB 掩体足迹（实际 x=${g.x}，垛 ${hayB.x}±${hayB.w / 2}）`);
   // 悬浮提示：附近要有它自己的小样气泡
   state.player.x = g.x - 1.2;
   step({});
