@@ -11,10 +11,11 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
+  HouseSpan, IndoorOpen, PushingCart,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
-import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP } from "./Data_DepthSpec.mjs";
+import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ } from "./Data_DepthSpec.mjs";
 
 const DT = 1 / 30;
 
@@ -677,6 +678,52 @@ function TestChainSurvivesEarlyDrop() {
   state.player.x = g.x; step({}, 3); step({ interact: true });
   assert.equal(state.player.item?.id, "bucket", "撂在哪儿就该能从哪儿捡回来");
   console.log("  ✓ 链不怕半路撂东西：缺桶有提示、撂下的桶有气泡标着、捡得回来");
+}
+
+// 车进不了堂屋：推着独轮车经过自家屋前，走的是屋外那条街——立面不许淡出
+// （用户 2026-08-09：「我推车为什么能推到家里去？这明明应该走外面的小路的」）
+function TestCartStaysOutOfTheHouse() {
+  const house = SCENES.village.props.find((p) => p.interior && p.kind === "house");
+  assert.ok(house, "村里得有一间可进入的屋子");
+  const { x0, x1 } = HouseSpan(house);
+  const mid = (x0 + x1) / 2;
+
+  // 这条规矩得真的被用上：回程那趟推车必须从屋子这段街上经过，否则测了个寂寞
+  const barrow = SCRIPTS.c1.find((b) => b.id === "c1_barrow");
+  const home = barrow.steps.filter((s) => s.type === "push").pop();
+  const to = home.from + home.dir * home.dist;
+  assert.ok(Math.min(home.from, to) < x0 && Math.max(home.from, to) > x1,
+    `推车回家那趟得经过屋子（${x0.toFixed(1)}~${x1.toFixed(1)}），实际 ${home.from}→${to}`);
+
+  const s = CreateGame(0);
+  s.player.level = "surface";
+  s.player.x = mid;
+  // ① 空着手站在屋里：立面淡出，人在屋里
+  s.cart = null;
+  assert.equal(IndoorOpen(s, x0, x1), true, "空着手走进去就是进屋");
+  // ② 推着车走到同一个位置：走的是屋外那条道
+  s.cart = { x: mid + 1.1, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), false, "推着车不算进屋——车进不了堂屋");
+  // ③ 车停在屋前那段街上、人空手走进去：车还在墙外，立面同样合着
+  //（不然墙一淡，停在街上的车就出现在堂屋里）
+  s.cart = { x: mid, kind: "barrow" };
+  s.player.x = x1 - 0.3;
+  assert.equal(PushingCart(s), false, "隔着两米多不算推着");
+  assert.equal(IndoorOpen(s, x0, x1), false, "车停在屋前时立面也不开");
+  // ④ 车推开了、人在屋里：这才淡出
+  s.cart = { x: x0 - 6, kind: "barrow" };
+  assert.equal(IndoorOpen(s, x0, x1), true, "车挪走了才算进屋");
+  // ⑤ 人在地窖那一层：屋里的立面与他无关
+  s.cart = null;
+  s.player.level = "under";
+  assert.equal(IndoorOpen(s, x0, x1), false, "人在地下不开地面的立面");
+
+  // 深度：推着的车夹在立面与演员之间——被墙吃掉（<facade）和挡住人（>演员）
+  // 都是穿帮；位置仍要压回行走线，否则车和人不在一条水平线上
+  assert.ok(BAND.pushCart > BAND.facade, "推着的车必须画在立面之前，否则墙把车吃了");
+  assert.ok(BAND.pushCart < ACTOR_Z, "推着的车必须画在人之后，人得在近侧握车把");
+  assert.equal(PlaceZ(BAND.pushCart), 0, "车站在行走线上：位置压回 z=0");
+  console.log("  ✓ 车进不了堂屋：推着走屋外 / 停屋前也不开墙 / 车夹在立面与人之间");
 }
 
 function TestGroundItems() {
@@ -1956,6 +2003,7 @@ TestRaidColumn();
 TestConvoyKeepsFormation();
 TestRaidTakesMoreThanFather();
 TestCineActorsClearOfObstacles();
+TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestRopeLineIsRealRope();

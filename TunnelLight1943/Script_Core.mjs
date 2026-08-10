@@ -87,6 +87,40 @@ function InZone(px, level, zone) {
 function SceneOf(state) { return SCENES[CHAPTERS[state.chapterIndex].scene]; }
 
 // ---------------------------------------------------------------------------
+// 屋里 / 屋外（可进入的屋子只有柱子家一处，规则却是全作的）
+//
+// 2.5D 横版里，玩家走的那条线是**村街**，屋子立在街后面。走进屋子那一段路
+// 就把立面淡出——这是勇敢的心的里外切换，走路时没毛病；可它只看 x，于是
+// **推着独轮车也能"进屋"**：从西边推过来，等于推着一车木料穿过自家后墙，
+// 从堂屋里碾过去（用户 2026-08-09：「我推车为什么能推到家里去？这明明应该
+// 走外面的小路的」）。
+//
+// 规矩：**车进不了屋**。手边有车（推着走）或车就停在屋前那段街上时，人走的
+// 是屋外那条道——立面合着，人和车从屋子前面过去。空着手才是进屋。
+// 配套的深度在 Data_DepthSpec：推着的车走 pushCart 带（压在立面之前），
+// 否则立面会把整辆车吃掉，"从屋前过"就成了"车凭空消失"。
+// ---------------------------------------------------------------------------
+export const CART_REACH = 2.6;   // 手边有车 = 推着它（翻越判定用的是同一个数）
+
+export function PushingCart(state) {
+  return !!state.cart && Math.abs(state.player.x - state.cart.x) < CART_REACH;
+}
+
+// 屋子占的那一段街。判定与画面共用一份边界——分开写迟早对不上
+// （西头留 0.4 是山墙的厚度，东头多给 0.2 是门洞外那半步）
+export function HouseSpan(prop) {
+  return { x0: prop.x - prop.w / 2 + 0.4, x1: prop.x + prop.w / 2 + 0.2 };
+}
+
+// 立面该不该淡出（渲染层与冒烟测试同一个判据）
+export function IndoorOpen(state, x0, x1) {
+  const p = state.player;
+  if (p.level !== "surface" || !(p.x > x0 && p.x < x1)) return false;
+  if (state.cart && (PushingCart(state) || (state.cart.x > x0 && state.cart.x < x1))) return false;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // 剧本：八个章节的 beat 序列（叙事文本沿用三轮迭代验证过的版本）
 // cam hint 语法（勇敢的心式）：只允许 横移/升降/推拉，镜头切换=硬切+慢推
 //   {kind:"follow"} 跟随 | {kind:"wide", x} 全景 | {kind:"shot", x, y, dist, pan?} 固定构图
@@ -5190,7 +5224,7 @@ function MovePlayer(state, input, dt) {
   // 一个会打断走路的动作必须由玩家自己按下去，否则那就不是他的动作。
   // 过场走位（cineWalk / microCine）与推着车走不参与。
   state.vaultHint = "";
-  const pushingCart = !!state.cart && Math.abs(p.x - state.cart.x) < 2.6;
+  const pushingCart = PushingCart(state);
   if (p.level === "surface" && !state.microCine && !p.cineWalk && !pushingCart) {
     for (const v of scene.vaults || []) {
       if (v.flag && !state.flags[v.flag]) continue;
