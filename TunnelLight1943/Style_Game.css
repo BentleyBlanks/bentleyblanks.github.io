@@ -345,7 +345,6 @@ body.touchDevice #touchControls.gone { display: none; }
 #touchControls #btnAct { width: 76px; height: 76px; font-size: 24px; background: rgba(232, 193, 90, 0.24); }
 #touchControls #btnCrouch { font-size: 17px; }
 /* 投掷键只在手里真有能扔的东西时冒出来——平时右手就两个键 */
-#touchControls #btnThrow { font-size: 19px; letter-spacing: 0.05em; }
 #touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
 /* 操作键图标与右上角设置钮同一套线描：stroke 走 currentColor，
    按下时随按钮的 color 一起翻成墨色，不用再滤镜换色 */
@@ -740,6 +739,42 @@ body.touchDevice #touchControls.gone { display: none; }
 /* 手势提示：一枚会动的小圆点，演示当前节拍要的那只手——
    dragDown 往下拖 / pullUp 一把一把上拉 / circle 绕圈 / tap 点按。
    纯 CSS 动画，无文字（提示语在中央那条 prompt 里）。 */
+/* 手劲条：辘轳吊着一桶水的那一拍。**读数，不是做功进度条**——做功仍然只认
+   手上那圈绕/那下按键（CLAUDE.md 禁 slider 那条没破）。压在画面下沿、窄、暗，
+   不抢那口井；见底了才跳出来喊一声（out 那一档在闪）。
+   居中一律走布局（left/right + margin-inline），不用 transform —— 半像素上的
+   边框就是"HUD 有点糊"的老根。 */
+#staminaBar {
+  position: absolute; left: 0; right: 0; bottom: calc(15% + 6px);
+  margin-inline: auto;
+  width: 148px; height: 9px;
+  pointer-events: none;
+  border: 1px solid rgba(226, 196, 132, 0.34);
+  border-radius: 5px;
+  background: rgba(8, 6, 4, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+#staminaBar > b {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: var(--fill, 100%);
+  background: linear-gradient(90deg, #b98d4a, #e8c887);
+  transition: background 220ms linear;
+}
+#staminaBar > i {
+  /* 手劲那一格的刻度：三道，读得出"还剩几成"而不用写字 */
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg,
+    rgba(0, 0, 0, 0) 0 calc(25% - 1px), rgba(20, 14, 8, 0.55) calc(25% - 1px) 25%);
+}
+#staminaBar.low > b { background: linear-gradient(90deg, #a8552e, #d98a4a); }
+#staminaBar.out { animation: stamOut 0.5s ease-in-out infinite; }
+#staminaBar.out > b { background: #8e3b22; }
+@keyframes stamOut {
+  0%, 100% { border-color: rgba(226, 196, 132, 0.34); }
+  50% { border-color: rgba(226, 130, 92, 0.85); }
+}
+
 #gestureHint {
   position: absolute; left: 0; right: 0; bottom: calc(15% + 46px);
   margin-inline: auto;
@@ -783,6 +818,17 @@ body.touchDevice #touchControls.gone { display: none; }
 @keyframes gCircleCcw {
   0% { transform: rotate(360deg) translateX(14px); }
   100% { transform: rotate(0deg) translateX(14px); }
+}
+/* 投石：往后下方拽开蓄劲，松手弹回去——图标演的就是拇指要走的那一趟。
+   拽的方向定角度、拽的长短定劲，所以这枚图标是斜着走的，不是上下走的 */
+#gestureHint[data-kind="slingBack"] .gDot { animation: gSlingBack 1.6s ease-in-out infinite; }
+@keyframes gSlingBack {
+  0% { transform: translate(5px, -3px); opacity: 0.2; }
+  14% { opacity: 1; }
+  46% { transform: translate(-11px, 9px); opacity: 1; }
+  62% { transform: translate(-11px, 9px); opacity: 1; }
+  78% { transform: translate(13px, -9px); opacity: 0.95; }
+  100% { transform: translate(13px, -9px); opacity: 0; }
 }
 #gestureHint[data-kind="tap"] .gDot { animation: gTap 0.9s ease-in-out infinite; }
 @keyframes gTap {

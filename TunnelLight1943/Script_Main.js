@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
+  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
@@ -98,8 +98,8 @@ for (const id of [
   "endTitle", "endText",
   "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
-  "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
-  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
+  "stick", "stickBase", "stickKnob", "btnSkipCine",
+  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -139,7 +139,7 @@ let inputMode = (window.matchMedia?.("(pointer: coarse)").matches || "ontouchsta
   ? "touch" : "key";
 // 摇杆状态：moveX/climb 是给玩法层的数字量（Core 只取符号），nx/ny 供旋钮显示
 const stick = { active: false, id: null, moveX: 0, climb: 0, cx: 0, cy: 0, r: 60 };
-let interactEdge = false, advanceEdge = false, crouchToggle = false, throwEdge = false;
+let interactEdge = false, advanceEdge = false, crouchToggle = false;
 
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
@@ -147,7 +147,9 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys.add(k);
   if (k === "e") { interactEdge = true; advanceEdge = true; }
-  if (k === "f") { throwEdge = true; advanceEdge = true; }   // F 专职投掷（手里有石子才有用）
+  // F 曾经专职投掷。投掷改成了「攥住石子往后拽」，没有按键路径了——键留着推台词，
+  // 但绝不能再让 HUD 上出现一颗 F：按了没反应的键比没有更糟
+  if (k === "f") advanceEdge = true;
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
@@ -234,7 +236,6 @@ function BindTouchButton(el, prop, { edge = false } = {}) {
     if (edge) {
       if (prop === "act") { interactEdge = true; advanceEdge = true; touch.act = true; }
       else if (prop === "crouch") crouchToggle = !crouchToggle;
-      else if (prop === "throw") throwEdge = true;
     } else touch[prop] = true;
     el.classList.add("pressed");
   };
@@ -320,7 +321,7 @@ function SetupTouch() {
   SetupStick();
   BindTouchButton(document.getElementById("btnAct"), "act", { edge: true });
   BindTouchButton(document.getElementById("btnCrouch"), "crouch", { edge: true });
-  BindTouchButton(document.getElementById("btnThrow"), "throw", { edge: true });
+  // 这儿曾经有一颗投掷钮。扔石子改成了直接在屏幕上拖，钮和 F 键一起撤了
   const isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
   if (isTouch) document.body.classList.add("touchDevice");
 }
@@ -376,9 +377,32 @@ function BaseShot(state) {
   //（碰撞与玩法要按目的层算），但人还在梯子上，高度记在 p.lift 里。镜头不读
   // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
   const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
-  const y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  let y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  const hw = ch.light === "night" ? 6.15 : 6.3;
+  // 走到窖口上头，镜头沉一档，把脚底下那间窖带进画框（Core 的 cellarPeek）。
+  //
+  // 地窖一直是画好的，可地表机位的下边沿只到 −1.7m、窖底在 −3.6m，整间窖
+  // 都在画外——按 S 之前玩家根本看不见它，读起来就是"下去才凭空长出一间屋"。
+  // 这是**升降**不是拉远：hw 一动不动，景别还是那一档。
+  //
+  // 沉多少不能写死一个米数：宽屏手机（2.16:1）的画高只有 16:9 的八成，
+  // 同样沉 2 米就把柱子的脑袋切出画外了。所以按**画高**反算——
+  // 留 HEAD_ROOM 给地面上的人和屋子，剩下的都让给底下。
+  const peek = p.climbT > 0 ? 0 : (state.cellarPeek || 0);
+  if (peek > 0.001 && p.level === "surface") {
+    const halfH = (world.viewSize.h || hw) / 2;
+    // 想沉多少：让下边沿落到窖底再往下 0.3m（`y − 沉 − 半高 = UNDER_Y − 0.3`）
+    const want = y - halfH - (UNDER_Y - 0.3);
+    // 能沉多少：上边沿不许低过 HEAD_ROOM——它量的是**画框顶离站立视平线**
+    // 多高（顶沿 = 1.85 + HEAD_ROOM），0.8 正好把一间 2.4m 的土屋留在画里。
+    // 这条上限是给宽屏手机的：2.16:1 的画高只有 16:9 的八成，不设限就把
+    // 屋顶连人一起切出去；设太松（试过 1.7）又等于没沉，手机上还是看不见窖。
+    const HEAD_ROOM = 0.8;
+    const room = Math.max(0, halfH - HEAD_ROOM);
+    y -= Math.max(0, Math.min(want, room)) * peek;
+  }
   // 爬梯时不留提前量：人是竖着挪的，横向再往前探就成了甩镜头
-  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw: ch.light === "night" ? 6.15 : 6.3 };
+  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw };
 }
 
 function HintShot(state, hint) {
@@ -470,14 +494,15 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
   }
-  // 划线的活卡：铺满画框、每帧重画，玩家的手就按在上面。必须排在
-  // SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera 之前
-  //（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
+  // 做功那几拍的活卡（划线 / 刨料 / 接绳）：铺满画框、每帧重画，玩家的手就按
+  // 在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera
+  // 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
   const playing = state.phase === "playing";
   world.SetLiveCard(
     playing && state.scribeCard ? { kind: "scribe", view: state.scribeCard, layout: SCRIBE_CARD }
       : playing && state.planeCard ? { kind: "plane", view: state.planeCard, layout: PLANE_CARD }
-        : null,
+        : playing && state.knotCard ? { kind: "knot", view: state.knotCard, layout: KNOT_CARD }
+          : null,
     dt,
   );
 
@@ -491,7 +516,7 @@ function UpdateCamera(state, dt) {
     cam.hw += (shot.hw - cam.hw) * k;
   }
   const view = world.ApplyCamera(cam.x, cam.y, cam.hw);
-  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist);
+  world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist, dt);
   return shot.fade || 0;
 }
 
@@ -554,14 +579,12 @@ function HideChoice() {
 // 键盘玩家看到键帽，手指玩家看到的就是右下角那几个钮的同一套线描图形。
 // 徽章浮在柱子头顶上，而不是钉在屏幕底边——按哪个键、对着什么按，一眼都在。
 // ---------------------------------------------------------------------------
-const KEY_GLYPH = { interact: "E", throw: "F", crouch: "C", up: "W", down: "S" };
+const KEY_GLYPH = { interact: "E", crouch: "C", up: "W", down: "S" };
 // 触屏图形与 index.html 里那三个钮逐笔一致，玩家不用在两套语汇之间翻译；
 // 爬梯的上下是摇杆——画成盘子里的一支箭
 const TOUCH_GLYPH = {
   interact: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 12.2V7.4M11.4 11.6V6.2M14.6 12.2V7.4"/>'
     + '<path d="M8.2 12.2v1.5c0 3 1.8 5 4.3 5s4.3-2 4.3-5V9.6"/><path d="M8.2 13.4l-2.4-2.2"/></svg>',
-  throw: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle class="solid" cx="5.2" cy="16.4" r="1.5"/>'
-    + '<path d="M6.8 14.6C9.4 8.6 14 6.4 19 8.8"/><path d="M19 8.8l-3.2-.2M19 8.8l-1-3"/></svg>',
   crouch: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6.6" r="2.2"/>'
     + '<path d="M10.6 8.9c2.6 1 4.1 2.6 4.3 5.2l-3.5 3.3.4 3.2"/><path d="M12.4 11.6l-3.4 2.6 1 3.4"/></svg>',
   up: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
@@ -736,8 +759,9 @@ function SyncHud(state, dt, shotFade) {
       itemTagShown = tagFp;
       ui.itemName.textContent = item ? item.label : "";
       if (ui.itemThrow) {
+        // 能扔的东西不再挂键帽：扔是「攥住往后拽」，提示在中央那条 prompt
+        // 和 gestureHint 的小图标里（KeyChipHtml("throw") 已随 F 键一起删掉）
         const chips = [];
-        if (item?.throwable) chips.push(KeyChipHtml("throw"));
         if (state.canDrop) chips.push(KeyChipHtml("interact"));
         ui.itemThrow.hidden = chips.length === 0;
         ui.itemThrow.innerHTML = chips.join("");
@@ -750,8 +774,18 @@ function SyncHud(state, dt, shotFade) {
     ui.gestureHint.hidden = !g;
     if (g && ui.gestureHint.dataset.kind !== g.kind) ui.gestureHint.dataset.kind = g.kind;
   }
-  // 触屏的投掷键：手里真有能扔的东西才冒出来
-  if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
+  // 手劲条：辘轳吊着一桶水的时候，这条一直在掉——它是**读数**不是做功进度
+  //（做功仍然只认手上那圈绕/那下按键）。用户 2026-08-10 点名要的那一条：
+  // "放下水桶这个过程角色一点力好像都不需要用……加一个体力条"。
+  if (ui.staminaBar) {
+    const sm = !inCinematic && state.phase === "playing" ? state.stamina : null;
+    ui.staminaBar.hidden = !sm;
+    if (sm) {
+      ui.staminaBar.style.setProperty("--fill", (sm.v * 100).toFixed(1) + "%");
+      ui.staminaBar.classList.toggle("low", !!sm.low);
+      ui.staminaBar.classList.toggle("out", !!sm.out);
+    }
+  }
 
   // 做功的节拍**没有任何 HUD 轨道**（用户明令禁止 slider，两次退回）：
   // 划线攥的是特写卡上那支笔，刨料攥的是世界里那把刨子——进度长在木头上
@@ -762,7 +796,8 @@ function SyncHud(state, dt, shotFade) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    ui.touchControls.classList.toggle("gone", !!(state.scribeCard || state.planeCard) && state.phase === "playing");
+    ui.touchControls.classList.toggle("gone",
+      !!(state.scribeCard || state.planeCard || state.knotCard) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {
@@ -1103,7 +1138,6 @@ function RunFrame(now, dt) {
       crouch: crouchToggle,
       interact: interactEdge,
       interactHeld: keys.has("e") || touch.act,
-      throw: throwEdge,
       // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
       // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
       // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
@@ -1136,7 +1170,6 @@ function RunFrame(now, dt) {
   world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
   interactEdge = false;
   advanceEdge = false;
-  throwEdge = false;
   tapEdge = false;
 }
 
