@@ -1293,15 +1293,35 @@ function StepChain(state, def, input, dt) {
         if (b.holdP === undefined) b.holdP = 0;   // 调试跳幕可能绕过链的初始化
         state.prompt = st.prompt;          // 百分比不进文案，promptFill 画成进度环
         state.promptFill = b.holdP / st.hold;
+        // 动词姿势（规范：每个玩法动词必须配角色动画，不许「人站着不动、
+        // 字幕替他做」）。步骤上写 pose，进度就直接驱动它——倒土那三下以前
+        // 是按一下 E 就完事，人杵在原地空手，土也不知道去哪儿了。
+        // 姿势里的进度一律走 poseU（World 的 PoseProgress 按姿势名挑字段；
+        // **别用 poseK 串**，0 会把后面的分支全吃掉，见 CLAUDE.md）。
+        // **动手之后**才摆姿势、才转身——跟支顶木同一条规矩。一进判定区就把人
+        // 钉成倒土的架势，等于把只是路过（要去下一个点、或还没想好倒哪儿）的玩家
+        // 一把揪住；自动通关更直接卡死：驱动器还在往区中心走，人已经不能动了。
+        if (st.pose && b.holdP > 0) {
+          p.pose = st.pose;
+          p.poseU = Math.min(1, b.holdP / st.hold);
+          p.heading = st.zone.x >= p.x ? 1 : -1;
+        }
         const g = StrokeWork(state, b.strokeMem || (b.strokeMem = {}), input, dt, {
-          hold: st.hold, stroke: st.stroke,
+          // pose 也交给 StrokeWork：每攒满一"下"它要闪一次姿势，缺省闪的是 bow，
+          // 会把上面按进度摆好的 pourBasket 一巴掌打回弯腰拾东西
+          hold: st.hold, stroke: st.stroke, cue: st.cue, pose: st.pose,
           at: { x: st.zone.x, y: st.gestureY, baseY: (st.zone.level === "under" || lvl === "under") ? UNDER_Y : SURFACE_Y },
         });
         if (g > 0) {
           b.holdP += g;
-          if (b.holdP >= st.hold) { b.strokeMem = null; ApplyUse(state, st); finish(); }
+          if (b.holdP >= st.hold) {
+            b.strokeMem = null;
+            if (st.pose) { p.pose = null; p.poseU = undefined; }
+            ApplyUse(state, st); finish();
+          }
         } else if (!input.interactHeld) {
           b.holdP = Math.max(0, b.holdP - dt * 1.2);
+          if (st.pose && b.holdP <= 0) { p.pose = null; p.poseU = undefined; }
         }
       } else {
         state.prompt = st.prompt;
@@ -3061,15 +3081,25 @@ export const SCRIPTS = {
         { type: "pickup", x: 37.6, item: { id: "dirtA", label: "土筐", big: true }, prompt: "E · 接过土筐",
           // 跳幕结算走的是 steps 的 effect，不走 onStart——开工旗两头都要落
           effect: (state) => { state.flags.digStarted = true; } },
-        { type: "use", zone: { x: 44.9, w: 2.6 }, needs: "dirtA", prompt: "E · 往猪圈垫薄土",
+        // 倒土是**做功**，不是按一下 E（2026-08-10 用户退回：「倒土的话好歹有个
+        // 配套的动作啊」）。一筐土二三十斤，得弓着腰把筐口往前下方扣，一下一下
+        // 抖出来——走全作通用的笔画账本（stroke:"down"，同挖土/扫印子），
+        // 姿势 pourBasket 由进度驱动，土从筐口真的落到地上，倒完地上留一片新土。
+        // 这活是费力气不是指尖功夫，所以按住 E 的慢速档合法（CLAUDE.md 第 5 条）。
+        { type: "use", zone: { x: 44.9, w: 2.6 }, needs: "dirtA", prompt: "E · 往猪圈扣土",
+          hold: 1.1, stroke: "down", gestureY: 0.62, pose: "pourBasket", cue: "drop",
           note: "只垫浅浅一层——铺厚了，就是一堆显眼的新土。",
-          effect: (state) => { Cue(state, "drop"); } },
+          effect: (state) => { state.flags.dirtPigpen = true; Cue(state, "drop"); } },
         { type: "pickup", x: 37.6, item: { id: "dirtB", label: "土筐", big: true }, prompt: "E · 接过土筐" },
-        { type: "use", zone: { x: 47.2, w: 2.8 }, needs: "dirtB", prompt: "E · 垫进院路洼处",
+        { type: "use", zone: { x: 47.2, w: 2.8 }, needs: "dirtB", prompt: "E · 往洼处扣土",
+          hold: 1.1, stroke: "down", gestureY: 0.62, pose: "pourBasket", cue: "drop",
           note: "垫路也只使这么点。深层的黏土颜色深，撒进菜畦一眼就穿。",
-          effect: (state) => { Cue(state, "drop"); } },
+          effect: (state) => { state.flags.dirtRoad = true; Cue(state, "drop"); } },
         { type: "pickup", x: 37.6, item: { id: "dirtC", label: "土筐", big: true }, prompt: "E · 接过土筐" },
-        { type: "use", zone: { x: 43.0, w: 2.8 }, needs: "dirtC", prompt: "E · 把土筐装上车",
+        // 这一筐不是倒在地上，是**扣进车斗**——同一个动作，落点不同，所以
+        // 地上不留新土（车推走了，土就跟着出村了）
+        { type: "use", zone: { x: 43.0, w: 2.8 }, needs: "dirtC", prompt: "E · 把土扣进车斗",
+          hold: 1.1, stroke: "down", gestureY: 0.72, pose: "pourBasket", cue: "drop",
           note: "院里搁不下了——剩下的土，得趁夜送出村去。",
           effect: (state) => {
             // 娘派车：担水的乡亲接过车把，趁夜把余土推去村外沟坎。
@@ -7607,7 +7637,9 @@ export function GetBeatTarget(state) {
           const gx = g ? g.x : state.flags[st.flagX];
           return typeof gx === "number" ? { action: "interactAt", x: gx, level: "surface" } : null;
         }
-        case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
+        // reach = 判定区半宽：驱动器得走进区里才按得响（写死的容差会卡在窄区外边）
+        case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x,
+          level: st.zone.level || "surface", reach: st.zone.w / 2 };
         // 扶门是"费力气"的活，留了按住 E 的后备（CLAUDE.md 第 5 条），驱动器走它
         case "holdDoor": return { action: "holdAt", x: st.zone.x, level: st.zone.level || "surface" };
         // 接绳没有长按后备（用户明令删掉），驱动器只能**真的在卡上拖那根绳头**——
