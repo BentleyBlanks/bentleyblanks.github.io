@@ -1378,7 +1378,7 @@ export function CreateWorld(canvasEl) {
           homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
           break;
         }
-        mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night }));
+        mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night, slogan: p.slogan }));
         break;
       }
       case "doorframe": {
@@ -1565,7 +1565,7 @@ export function CreateWorld(canvasEl) {
         });
         break;
       }
-      case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false })); break;
+      case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false, slogan: p.slogan })); break;
       case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
       case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
       case "pump": {
