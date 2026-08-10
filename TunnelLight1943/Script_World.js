@@ -457,7 +457,6 @@ export function CreateWorld(canvasEl) {
   let otsMesh = null;
   let otsHiddenId = null;
   let vignetteAlpha = 0;
-  let dustMotes = [];
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null, cartWheel = null;
@@ -1013,37 +1012,10 @@ export function CreateWorld(canvasEl) {
   // 以后真要做勇敢的心式的框景，**摆位必须跟着镜头所在的那一层的地平线走**，
   // 而不是写死 SURFACE_Y；下面 ApplyCamera 里的可见性闸门已经把地下挡掉了。
 
-  // 空气里的浮尘：光束里看得见的那种
-  function AddDust(count, night) {
-    const dust = [];
-    const tex = (() => {
-      const c = MakeCanvas(32, 32);
-      const g = c.getContext("2d");
-      const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
-      grad.addColorStop(0, "rgba(255,236,196,0.9)");
-      grad.addColorStop(1, "rgba(255,220,160,0)");
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 32, 32);
-      return CanvasTexture(c);
-    })();
-    for (let i = 0; i < count; i += 1) {
-      const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.055, 0.055),
-        new THREE.MeshBasicMaterial({
-          map: tex, transparent: true, depthWrite: false,
-          blending: THREE.AdditiveBlending, opacity: night ? 0.22 : 0.09,
-        }),
-      );
-      m.userData = {
-        seed: Math.random() * 100,
-        vy: 0.05 + Math.random() * 0.12,
-        vx: (Math.random() - 0.5) * 0.14,
-      };
-      layers.fx.add(m);
-      dust.push(m);
-    }
-    return dust;
-  }
+  // 空气里的浮尘（`AddDust`）已整个删除（2026-08-10 用户："不喜欢游戏里的雪花
+  // 噪点粒子"）。那批 18~26 个加色小亮点是**按画框循环**的，不跟着世界走——
+  // 镜头一横移它们原地打转，读出来不是光束里的尘，是蒙在屏幕上的一层雪花噪点。
+  // 真要再做光柱里的尘，得钉在光源的世界坐标上、只在光锥里出现，别再铺满画框。
 
   function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1, opacity = 0.62 } = {}) {
     for (let x = xFrom; x < xTo; x += 9 + ART.Hash(id + x) * 9) {
@@ -2140,7 +2112,6 @@ export function CreateWorld(canvasEl) {
     ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
     InvalidateSceneCaches();
-    dustMotes = [];
     for (const g of glows) scene.remove(g);
     glows.length = 0;
     sceneLights = [];
@@ -2343,10 +2314,6 @@ export function CreateWorld(canvasEl) {
       glows.push(g);
       sceneLights.push(spot);
     }
-
-    // 浮尘
-    for (const d of dustMotes) layers.fx.remove(d);
-    dustMotes = AddDust(ch.scene === "tunnelFort" ? 26 : 18, night);
 
     // 最后统一派发绘制序号：层间靠基数、层内靠深度，先后关系从此确定，
     // 不再受 three.js 按中心点自动排序的影响（镜头推拉时不会前后翻面）
@@ -4613,18 +4580,6 @@ export function CreateWorld(canvasEl) {
     //    地道，那批贴图就正对着画框中央（2026-08-10 用户报的"两根白白的模糊
     //    一坨"）。地下不存在草丛篱笆，这一层在地下永远该是空的。
     layers.fore.visible = dist > 7 && camY > SURFACE_Y;
-    // 浮尘在画框内循环飘
-    for (const d of dustMotes) {
-      const u = d.userData;
-      u.seed += 0.0016;
-      const wrapW = viewW * 1.1, wrapH = viewH * 1.1;
-      const bx = ((u.seed * 37 + d.id) % 1);
-      d.position.set(
-        camX - wrapW / 2 + ((bx * wrapW + u.vx * u.seed * 260) % wrapW),
-        camY - wrapH / 2 + (((u.seed * 53) % 1) * wrapH + u.vy * u.seed * 180) % wrapH,
-        0.45,
-      );
-    }
     PlaceOverShoulder(camX, camY, viewW, viewH);
     PlaceInsertCard(camX, camY, viewW, viewH, dist);
     return { viewW, viewH, dist };
