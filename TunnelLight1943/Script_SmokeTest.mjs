@@ -1629,6 +1629,13 @@ function TestInstrumentalBgmManifest() {
     assert.equal(code.id, item.id, `第 ${i + 1} 章曲目 ID 不一致`);
     assert.equal(code.cue, item.cue, `${item.id} cue 不一致`);
     assert.equal(code.gain, item.gain, `${item.id} gain 不一致`);
+    // 绕圈点：放到这儿就交叉淡回 cue。缺了它就会一路放进渐弱的尾奏，
+    // 玩家听成"音乐停了半天又重新播放"（2026-08-10 用户报的那个 bug）
+    assert.equal(code.loopEnd, item.loopEnd, `${item.id} loopEnd 不一致`);
+    assert.ok(code.loopEnd > code.cue + 20,
+      `${item.id} 的 loopEnd(${code.loopEnd}) 必须在 cue(${code.cue}) 之后足够远，不然一圈太短`);
+    assert.ok(code.loopEnd <= item.duration - 3,
+      `${item.id} 的 loopEnd(${code.loopEnd}) 必须早于曲尾(${item.duration})——尾奏是渐弱到静音的，放进去就等于音乐断了`);
     assert.equal(path.basename(code.file), item.file, `${item.id} 文件名不一致`);
     const audioPath = path.join(here, "Audio", "Bgm", item.file);
     assert.ok(fs.existsSync(audioPath), `${item.file} 必须存在`);
