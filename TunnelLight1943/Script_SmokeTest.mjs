@@ -11,7 +11,7 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, SLING, SlingSolve,
-  EdgeHint, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
+  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -1237,6 +1237,69 @@ function TestEdgeHintPointsOffscreenTargets() {
   console.log("  ✓ 边缘指路标：出框才指 / 指对边 / 近旁与特写不指" + (cross ? " / 跨层先指梯口" : ""));
 }
 
+// 边缘 HUD 的牌面（勇敢的心式）：方向归箭头，"接下来干嘛"归图。
+// 硬门槛是**每一拍都推得出一张牌**，而且牌面跟着活儿变——全场只有一枚箭头，
+// 那就退回成了"往这边走"，等于没说。
+function TestEdgeHintIconTellsWhatsNext() {
+  const KINDS = new Set([
+    "person", "item", "hand", "listen", "crouch", "walk", "dig", "timber",
+    "door", "knot", "winch", "cart", "throw", "map", "scribe", "lamp",
+  ]);
+  const seen = new Map();     // 牌面 → 头一次见到它的那一拍（顺带当去重清单）
+  let beats = 0;
+  for (let c = 0; c < CHAPTERS.length; c += 1) {
+    const list = ChapterBeatList(c);
+    for (let i = 0; i < list.length; i += 1) {
+      const s = CreateGame(0);
+      DebugJump(s, c, i);
+      if (s.phase !== "playing") continue;
+      const def = CurrentBeatDef(s);
+      if (!def || def.kind === "cinematic" || def.kind === "choice") continue;
+      const tg = GetBeatTarget(s);
+      if (!tg || typeof tg.x !== "number") continue;
+      beats += 1;
+      const icon = BeatHintIcon(s);
+      assert.ok(icon, `第${c + 1}章第${i}拍（${def.kind}）推不出牌面`);
+      assert.ok(KINDS.has(icon.kind), `牌面种类 ${icon.kind} 没有画法（第${c + 1}章第${i}拍）`);
+      // 找人得说清是谁、拿东西得说清是什么——空着的话渲染层只能画个默认，
+      // 那就又回到"所有拍长一个样"
+      if (icon.kind === "person") assert.ok(icon.who, `找人的牌面得带上是谁（第${c + 1}章第${i}拍）`);
+      if (icon.kind === "item") assert.ok(icon.item, `拿东西的牌面得带上是什么（第${c + 1}章第${i}拍）`);
+      const key = icon.kind + "|" + (icon.who || icon.item || icon.gesture || "");
+      if (!seen.has(key)) seen.set(key, `${c + 1}-${i}`);
+    }
+  }
+  assert.ok(beats > 20, `可指路的玩法拍太少（只找到 ${beats} 拍），这条测试没扫到东西`);
+  assert.ok(seen.size >= 8, `牌面只有 ${seen.size} 种，太少了——不同的活儿该长得不一样`);
+  // 全场不许退化成一枚"走过去"
+  const walkOnly = [...seen.keys()].every((k) => k.startsWith("walk"));
+  assert.ok(!walkOnly, "所有拍都推成了「走过去」，等于没给提示");
+  // 定点：第一章那几件事各是各的牌面
+  const c1 = SCRIPTS[CHAPTERS[0].id];
+  const escortIdx = c1.findIndex((d) => d.kind === "escort" && d.follower === "sister");
+  if (escortIdx >= 0) {
+    const s = CreateGame(0);
+    DebugJump(s, 0, escortIdx);
+    const sister = s.actors.find((a) => a.id === "sister");
+    if (sister && sister.visible && !sister.following) {
+      const icon = BeatHintIcon(s);
+      assert.equal(icon.kind, "person", "去带妹妹那一拍：牌上该是个人");
+      assert.equal(icon.who, sister.kind, "牌上那个人得就是妹妹（衣色/侧脸按她的来）");
+    }
+  }
+  const pickIdx = c1.findIndex((d) => d.kind === "chain" && d.steps?.[0]?.type === "pickup");
+  if (pickIdx >= 0) {
+    const s = CreateGame(0);
+    DebugJump(s, 0, pickIdx);
+    if ((s.beat.stepIndex || 0) === 0) {
+      const icon = BeatHintIcon(s);
+      assert.equal(icon.kind, "item", "去捡东西那一步：牌上该是那件东西");
+      assert.equal(icon.item, c1[pickIdx].steps[0].item.label, "牌上得是这一步真要捡的那件");
+    }
+  }
+  console.log(`  ✓ 边缘 HUD 牌面：${beats} 拍全推得出 / ${seen.size} 种图 / 找人认得出是谁、拿东西认得出是什么`);
+}
+
 function TestInstrumentalBgmManifest() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
@@ -2268,6 +2331,7 @@ TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();
+TestEdgeHintIconTellsWhatsNext();
 TestInstrumentalBgmManifest();
 TestDoorHoldIsPhysical();
 TestModuleGraphIsCacheBusted();

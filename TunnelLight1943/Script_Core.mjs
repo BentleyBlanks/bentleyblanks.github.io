@@ -6990,11 +6990,152 @@ export function GetBeatTarget(state) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 边缘 HUD 的牌面：「接下来这一步要干的那件事」
+//
+// 勇敢的心的画框边提示不是一个方向键，是一枚带图的牌：方向由箭头说，**要去
+// 干嘛由图说**，两件事各说各的一句。所以每一种活儿、每一个要找的人都得长得
+// 不一样——找人画那个人（衣色＋侧脸，本作认人本来就靠这两样），捡东西画那件
+// 东西的小样，上手的活画手势。
+//
+// 推导跟着 GetBeatTarget 那张表走：目标是谁/是什么，这一步就画谁/画什么。
+// 剧本可以在节拍或链上的某一步写 `hintIcon` 覆盖——剧本比推导更清楚玩家这会儿
+// 在干嘛（写字符串就是只给种类，写对象可以连 who/item 一起给）。
+//
+// 种类（渲染层 Art.DrawEdgeHud 逐个有画法，别在这儿新造词而不去画）：
+//   person 找人/带人 | item 捡东西/送东西 | hand 上手使劲 | listen 贴着听
+//   crouch 蹲着看 | walk 走过去 | dig 挖 | timber 撑木 | door 扶门 | knot 打结
+//   winch 摇辘轳 | cart 推车 | throw 投石 | map 钉图 | scribe 划线 | lamp 灯
+// ---------------------------------------------------------------------------
+const HINT_ICON_KINDS = new Set([
+  "person", "item", "hand", "listen", "crouch", "walk", "dig", "timber",
+  "door", "knot", "winch", "cart", "throw", "map", "scribe", "lamp",
+]);
+
+function NormHintIcon(v) {
+  const icon = typeof v === "string" ? { kind: v } : v;
+  return icon && HINT_ICON_KINDS.has(icon.kind) ? icon : null;
+}
+
+// 链上某件东西的名字：`needs` 给的是 id，牌面要画的是那件东西本身
+function ChainItemLabel(def, itemId) {
+  for (const st of def.steps || []) if (st.item?.id === itemId) return st.item.label;
+  return null;
+}
+
+export function BeatHintIcon(state) {
+  const def = CurrentBeatDef(state);
+  if (!def) return null;
+  const p = state.player;
+  const Person = (id) => {
+    const a = FindActor(state, id);
+    return a ? { kind: "person", who: a.kind || "villager", id } : { kind: "walk" };
+  };
+  const Item = (label) => (label ? { kind: "item", item: label } : { kind: "hand" });
+  const Held = () => Item(p.item?.label || p.carry);
+  // 使劲的手：往哪儿使由笔画方向说（铲土往下、顶撑木往上）
+  const Hand = (stroke) => ({ kind: "hand", gesture: stroke === "up" || stroke === "down" ? stroke : null });
+  if (def.hintIcon) return NormHintIcon(def.hintIcon);
+  switch (def.kind) {
+    case "goto": case "gotoSeq": case "linger": case "coverRun": case "cartRide":
+      return { kind: "walk" };
+    case "collect": {
+      if (p.carry || p.item) return Held();
+      const it = state.beat.itemStates?.find((x) => !x.carried && !x.delivered);
+      return Item(it?.label);
+    }
+    case "escort": {
+      const f = FindActor(state, def.follower);
+      // 还没招呼上：画她本人（"去找妹妹"）；已经跟上了：画路（"带她过去"）
+      return f && !f.following && f.visible ? Person(def.follower) : { kind: "walk" };
+    }
+    case "leadFollow": return Person(def.leader);
+    case "lead": {
+      const loose = state.actors.find((a) => a.group === def.group && a.visible && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "observe": return { kind: "crouch" };
+    // 听是"憋住别动"那一类，跟使劲的手不是一回事
+    case "hold": return def.sustain ? { kind: "listen" } : Hand(def.stroke);
+    case "doomedHold": return Hand(null);
+    case "mapBoard": return { kind: "map" };
+    case "scribe": return { kind: "scribe" };
+    case "plane": return Item("刨子");
+    case "douseLamps": {
+      // 最后一盏在顺子手里：那一步是去找人，不是去吹灯
+      const lit = (state.lamps || []).filter((l) => l.lit);
+      return lit.length <= 1 ? Person("shunzi") : { kind: "lamp" };
+    }
+    case "actSeq": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      if (st.hintIcon) return NormHintIcon(st.hintIcon);
+      return st.walk ? { kind: "walk" } : Hand(st.stroke);
+    }
+    case "buildSpots": {
+      const i = state.beat.spotDone.findIndex((d) => !d);
+      if (i < 0) return null;
+      const spot = def.spots[i];
+      if (spot.pickup && !state.beat.pickedUp?.[i]) return Item(spot.pickup.label || spot.pickup);
+      return Hand(def.stroke);
+    }
+    case "digSeq": {
+      const key = ["collapse1", "collapse2"][state.beat.digIndex];
+      if (!key) return null;
+      if (def.shore && !state.collapses[key].shored) {
+        // 撑木还没扛来就先画那根木头（去取它），扛在肩上了就画"顶上去"
+        return p.item?.id === "beam" ? { kind: "timber" } : Item("撑木");
+      }
+      return { kind: "dig" };
+    }
+    case "chain": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      if (st.hintIcon) return NormHintIcon(st.hintIcon);
+      switch (st.type) {
+        case "pickup": case "pickupGround": return Item(st.item?.label);
+        case "drop": return Held();
+        case "use": return st.needs
+          ? Item(p.item?.id === st.needs ? p.item.label : ChainItemLabel(def, st.needs))
+          : Hand(st.stroke);
+        case "holdDoor": return { kind: "door" };
+        case "knot": return { kind: "knot" };
+        case "winch": return { kind: "winch" };
+        case "brace": return { kind: "timber" };
+        case "push": return { kind: "cart" };
+        case "goto": return { kind: "walk" };
+        case "talk": return Person(st.actor);
+        // 手里没石子先去捡（画石子本身），攥上了再画"投"
+        case "throwHit": return p.item ? { kind: "throw" } : Item("石子");
+        default: return { kind: "walk" };
+      }
+    }
+    // 救人的那几拍：还有人没招呼到就画那个人，都跟上了就画路。
+    // 挑人的条件必须跟 GetBeatTarget 一模一样，否则牌上是甲、路却通往乙
+    case "floodRescue": {
+      const loose = state.actors.find((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "smokeEscape": {
+      const loose = state.actors.find((a) => a.kind === "villager" && a.visible && !a.evacuated
+        && !a.scripted && !(def.lossScript && a.id === "shunzi") && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "rescueLoop": {
+      if (state.actors.some((a) => a.pocket && a.visible && !a.evacuated && a.following)) return { kind: "walk" };
+      const loose = state.actors.find((a) => a.pocket && a.visible && !a.evacuated && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    default: return { kind: "walk" };
+  }
+}
+
 // 画框边缘的指路标（勇敢的心式）：目标出了画框、又离玩家真的远时，路标
-// 不该跟着目标一起消失在框外——它滑到画框边缘、掉个头指向框外，「下一步
-// 在这边」。目标在另一层的，先指向能用的爬梯口（横轴上路总要先经过它），
+// 不该跟着目标一起消失在框外——它滑到画框边缘，变成一枚**带图的牌**：箭头
+// 指出框外，牌面画着接下来要干的那件事（见 BeatHintIcon）。
+// 目标在另一层的，先指向能用的爬梯口（横轴上路总要先经过它），
 // 并带上「下去/上来」的竖向记号；已经站在梯口的不指（上下怎么走交给爬梯提示）。
-// 纯函数：镜头在哪、画多宽由渲染层喂进来，这里只管"该不该指、指哪边"。
+// 纯函数：镜头在哪、画多宽由渲染层喂进来，这里只管"该不该指、指哪边、画什么"。
 export function EdgeHint(state, camX, viewW) {
   if (state.phase !== "playing" || state.microCine) return null;
   // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
@@ -7023,7 +7164,8 @@ export function EdgeHint(state, camX, viewW) {
   const offscreen = Math.abs(tx - camX) > viewW / 2 - 1.2;
   const far = Math.abs(tx - p.x) > 4.5;
   if (!offscreen || !far) return null;
-  return { side: tx < camX ? -1 : 1, climb };
+  // 牌面推不出来的时候退回一枚"走过去"——宁可少说一句，不许空着一张牌
+  return { side: tx < camX ? -1 : 1, climb, icon: BeatHintIcon(state) || { kind: "walk" } };
 }
 
 // ---------------------------------------------------------------------------
