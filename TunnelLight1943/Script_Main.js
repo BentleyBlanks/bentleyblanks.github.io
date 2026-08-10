@@ -99,7 +99,7 @@ for (const id of [
   "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
-  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint", "staminaBar",
+  "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -759,8 +759,8 @@ function SyncHud(state, dt, shotFade) {
       itemTagShown = tagFp;
       ui.itemName.textContent = item ? item.label : "";
       if (ui.itemThrow) {
-        // 能扔的东西不再挂键帽：扔是「攥住往后拽」，提示在中央那条 prompt
-        // 和 gestureHint 的小图标里（KeyChipHtml("throw") 已随 F 键一起删掉）
+        // 能扔的东西不再挂键帽：扔是「攥住往后拽」，提示在中央那条 prompt 里
+        //（KeyChipHtml("throw") 已随 F 键一起删掉）
         const chips = [];
         if (state.canDrop) chips.push(KeyChipHtml("interact"));
         ui.itemThrow.hidden = chips.length === 0;
@@ -768,12 +768,11 @@ function SyncHud(state, dt, shotFade) {
       }
     }
   }
-  // 手势提示：用手的节拍（放绳/拽桶/绕圈打结/敲楔）给一枚会动的小图标
-  if (ui.gestureHint) {
-    const g = !inCinematic && state.phase === "playing" ? state.gesture : null;
-    ui.gestureHint.hidden = !g;
-    if (g && ui.gestureHint.dataset.kind !== g.kind) ui.gestureHint.dataset.kind = g.kind;
-  }
+  // 手势提示的小黑饼（#gestureHint）已整体拆除（2026-08-10 用户：暗圆盘里
+  // 一粒点按方向做动画，"明明是按键交互 非要装自己是个圈 还给个方向？"）。
+  // 方向写进提示文案（"往上使劲"），上手的交互由实物自己招呼（辘轳的引导圈、
+  // 卡上会蹭的绳头、攥住石子时的拉弓预览弧）。state.gesture 通道已随之拆掉，
+  // 别再造——SmokeTest 的 TestGestureBlobStaysDead 盯着。
   // 手劲条：辘轳吊着一桶水的时候，这条一直在掉——它是**读数**不是做功进度
   //（做功仍然只认手上那圈绕/那下按键）。用户 2026-08-10 点名要的那一条：
   // "放下水桶这个过程角色一点力好像都不需要用……加一个体力条"。

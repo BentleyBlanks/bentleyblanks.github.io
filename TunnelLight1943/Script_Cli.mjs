@@ -276,7 +276,7 @@ async function CmdState(o) {
   const before = JSON.stringify(state.flags);
   const trace = [];
   if (o.input) {
-    for (const raw of String(o.input).split(",")) {
+    for (const raw of String(o.input).split(/[,;]/)) {
       const [tok, mul] = raw.trim().split("*");
       const inp = InputOf(tok);
       if (!inp) { console.log(`看不懂的输入 token：${tok}（d a s w e E c . adv）`); return; }
@@ -415,7 +415,7 @@ async function CmdShot(o) {
       const tag = String(jo.out || job.id);
       // --pre 用的是 state 那套输入小语言，在**开拍之前**无头跑完：
       // 「先按 E 把绳头拿起来，再按住 d 边走边拍」这种前置操作没它没法表达
-      const pre = String(jo.pre || "").split(",").filter(Boolean).map((raw) => {
+      const pre = String(jo.pre || "").split(/[,;]/).filter(Boolean).map((raw) => {
         const [tok, mul] = raw.trim().split("*");
         const inp = InputOf(tok);
         if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);

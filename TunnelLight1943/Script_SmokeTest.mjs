@@ -1116,7 +1116,7 @@ function TestWinchIsACrankNotALever() {
     const d0 = w.depth;
     circle(-1, 8);
     assert.ok(w.depth > d0 + 0.1, `顺时针转了两圈半，桶得实实在在往下走（${d0}→${w.depth}）`);
-    assert.equal(state.gesture?.kind, "crankDown", "放绳阶段的手势提示是顺时针转圈");
+    assert.equal(state.gesture, undefined, "手势小黑饼已拆（2026-08-10 用户），方向由辘轳的引导圈说");
     // 逆时针倒着转不放绳
     const d1 = w.depth;
     circle(1, 6);
@@ -1128,7 +1128,7 @@ function TestWinchIsACrankNotALever() {
     const d2 = w.depth;
     circle(1, 10);
     assert.ok(w.depth < d2 - 0.08, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
-    assert.equal(state.gesture?.kind, "crankUp", "摇起阶段的手势提示是逆时针转圈");
+    assert.equal(state.gesture, undefined, "手势小黑饼已拆，摇起的方向由摇把与引导圈自己演");
     const crankMid = w.crankA;
     // 脱手：过了棘齿宽限辘轳倒转，桶自己往下坠，摇把跟着倒着抡
     const d3 = w.depth;
@@ -1629,6 +1629,23 @@ function TestCliAnswersQuestions() {
   console.log(`  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现 / --flag 拨开关（${wall} → ${through}）`);
 }
 
+// 手势小黑饼（#gestureHint：暗圆盘+一粒点按方向做动画）已整体拆除。
+// 2026-08-10 用户看到扶门那拍的圈：「明明是按键交互 非要装自己是个圈
+// 还给个方向？你这叫提示？」——抽象图形说不了任何事。方向写进提示文案
+//（"往上使劲"），上手的交互由实物自己招呼（辘轳引导圈、卡上会蹭的绳头、
+// 拉弓预览弧）。这条测试扫源码盯死它不复活——和 dragTrack 同一个待遇。
+function TestGestureBlobStaysDead() {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const read = (f) => fs.readFileSync(path.join(dir, f), "utf8");
+  assert.ok(!/state\.gesture\s*=/.test(read("Script_Core.mjs")),
+    "state.gesture 通道已拆，Core 里不许再写它");
+  assert.ok(!read("index.html").includes("gestureHint"), "index.html 里不许再有 #gestureHint 元素");
+  const css = read("Style_Game.css");
+  assert.ok(!/#gestureHint\s*\{/.test(css) && !/\.gDot/.test(css), "小黑饼的样式与圆点动画不许回来");
+  assert.ok(!/ui\.gestureHint/.test(read("Script_Main.js")), "Main 里不许再同步小黑饼");
+  console.log("  ✓ 手势小黑饼保持死亡：方向在文案里，招呼在实物上");
+}
+
 // 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
 // 「挥舞的时候为什么脚也会在y轴上漂移？」）。逐键盯死，退化立刻红：
 //   ① 脚钉在地上：每个键都得带全六个腿关节，且踝的垂距 L(cos a + cos(a−b))
@@ -2081,7 +2098,10 @@ function TestStrokeWork() {
   // 往上顶：涨
   for (let i = 0; i < 12; i += 1) StepGame(st, { ...idle(), pullHeld: true, pull: -0.05 }, DT);
   assert.ok(st.beat.holdP > 0, "往上顶必须做得上功");
-  assert.equal(st.gesture?.kind, "pullUp", "HUD 得提示往上顶");
+  // 小黑饼已拆：方向必须写在提示文案里，抽象图形替不了字
+  assert.equal(st.gesture, undefined, "手势小黑饼已拆（2026-08-10 用户）");
+  // 「顶」这个动词自带方向（顶=向上使劲）；写成别的动词就得把「往上」补进文案
+  assert.match(st.prompt || "", /往上|顶/, `方向得写进提示文案（实为 ${JSON.stringify(st.prompt)}）`);
   // 松手泄劲
   const was = st.beat.holdP;
   for (let i = 0; i < 10; i += 1) StepGame(st, idle(), DT);
@@ -2468,7 +2488,8 @@ function TestSlingThrow() {
   assert.ok(!stKey.thrown && !stKey.flags.elmDown,
     "投掷不许再有按键后备——按一下就必中的那版是被明令删掉的");
   assert.ok(!/F\b/.test(stKey.prompt || ""), `提示里不许再出现 F 键：${stKey.prompt}`);
-  assert.equal(stKey.gesture?.kind, "slingBack", "手里攥着石子时得给出「往后拽」的手势提示");
+  assert.equal(stKey.gesture, undefined, "手势小黑饼已拆，「往后拽」写在提示文案里");
+  assert.match(stKey.prompt || "", /拽/, `拽开的招呼得在提示文案里（实为 ${JSON.stringify(stKey.prompt)}）`);
   assert.equal(stKey.player.pose, "throwWind", "手里攥着石子就该摆出架势——画面得先说他随时能扔");
 
   // ⑦ 判定圈钉在**画出来的那只手**上：渲染层每帧回填 state.handAt（HandPoint），
@@ -2619,6 +2640,7 @@ TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestCliAnswersQuestions();
+TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();

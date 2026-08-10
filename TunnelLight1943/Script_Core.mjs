@@ -905,7 +905,6 @@ function StepSlingAim(state, input, st) {
     p.pose = "throwWind";
     p.poseK = sl.power;
     p.poseT = 0.25;
-    state.gesture = { kind: "slingBack" };
     return true;
   }
   // 松手：够劲出手，不够收回手心
@@ -1038,13 +1037,11 @@ function StrokeWork(state, mem, input, dt, opts) {
         mem.prevA = a;
       } else mem.prevA = null;
     } else mem.prevA = null;
-    state.gesture = { kind: "circle" };
   } else {
     // 竖向笔画：只认对的方向（铲子不往上抡，撑木不往下砸）
     const dir = kind === "up" ? -1 : 1;
     const pull = input.pullHeld ? Math.max(0, (input.pull || 0) * dir) : 0;
     gain = pull / (STROKE_LEN * strokesN) * hold;
-    state.gesture = { kind: kind === "up" ? "pullUp" : "dragDown" };
   }
 
   // 键盘后备走同一个账本：手感稍慢，但一样能干完
@@ -1396,7 +1393,6 @@ function StepChain(state, def, input, dt) {
       // 攥着的时候不画任何"站对位置就中"的辅助线：站位不是瞄准，拽出来的弧才是。
       // 手里攥着还没按上去，就只告诉他手在哪儿、往哪儿拽
       state.prompt = st.prompt || "攥住手里的石子 · 往后下方拽开，松手出手";
-      state.gesture = { kind: "slingBack" };
       ReadyToSling(state);
       return;
     }
@@ -1645,7 +1641,6 @@ function StepChain(state, def, input, dt) {
           stamDelta = -WINCH_STAM_HOLD * dt;
         }
         state.prompt = "S · 放绳下去";
-        state.gesture = { kind: "crankDown" };
         state.promptFill = w.depth;
         if (w.depth >= 1) {
           w.filled = true;
@@ -1682,7 +1677,6 @@ function StepChain(state, def, input, dt) {
           }
         }
         state.prompt = "W · 摇上来";
-        state.gesture = { kind: "crankUp" };
         state.promptFill = 1 - w.depth;
         if (w.depth <= 0) {
           if (st.gives) GiveItem(state, st.gives);
@@ -1826,7 +1820,6 @@ function StepChain(state, def, input, dt) {
       // 进展都没有。也**没有 HUD 手势图标与按键提示**——招呼玩家的是卡上那根
       // 绳头自己（没上手时它朝该去的方向蹭两下，蹭的方向就是该拖的方向）。
       state.prompt = null;
-      state.gesture = null;
       state.knotCard = {
         tip: { x: kn.tip.x, y: kn.tip.y },
         phase: kn.threaded ? "cinch" : "tuck",
@@ -4931,7 +4924,6 @@ export function CreateGame(chapterIndex = 0) {
     groundSeq: 0,
     knotCard: null,        // 接绳（见 case "knot"：铺满画框的活卡）
     stamina: null,         // 手劲读数（辘轳吊着桶时才有）
-    gesture: null,   // 当前节拍期望的手势提示（HUD 的动效小图标）
     thrown: null,
     noiseAt: null,
     searchlight: null,
@@ -5033,7 +5025,6 @@ export function StartChapter(state, index) {
   state.groundItems = [];
   state.knotCard = null;
   state.stamina = null;
-  state.gesture = null;
   state.closeUp = null;
   state.thrown = null;
   state.noiseAt = null;
@@ -5513,7 +5504,6 @@ export function StepGame(state, input, dt) {
   state.winchView = null;
   state.knotCard = null;  // 同 winchView：接绳那张活卡由 beat 每帧重立
   state.stamina = null;   // 手劲读数同理：吊着桶的那一帧自己立
-  state.gesture = null;   // 手势提示同理
   state.closeUp = null;   // 玩法特写（辘轳/打结）同理：活着的那一帧自己立
   state.canDrop = false;
 
@@ -5530,7 +5520,7 @@ export function StepGame(state, input, dt) {
     StepThrown(state, dt);
     if (state.player.item?.throwable && !state.thrown) {
       const aiming = StepSlingAim(state, input, null);   // 拽着瞄：落点自己定
-      if (!aiming) { state.gesture = state.gesture || { kind: "slingBack" }; ReadyToSling(state); }
+      if (!aiming) ReadyToSling(state);
     }
   }
   // 路边的石子堆（潜行段的软性窗口）：捡一颗在手，第一次靠近给个一次性提示
@@ -6566,7 +6556,6 @@ function StepDigSeq(state, def, input, dt) {
   if (ZoneReached(state, zone)) {
     if (state.beat.quakeActive) {
       state.prompt = "！头顶有动静——停下，别出声";
-      state.gesture = null;
       c.progress = Math.max(0, c.progress - dt * 0.3);
     } else {
       // 清土是一铲一铲挖出来的：往下拽一下=挖一铲（键盘按住 E 是后备）
@@ -7748,7 +7737,6 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.scribeCard = null;
   state.planeCard = null;
   state.knotCard = null;
-  state.gesture = null;
   state.closeUp = null;
   state.canDrop = false;
   state.bubbleFlash = null;
