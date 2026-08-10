@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_CRANK_R, WINCH_REST_A, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -91,6 +91,20 @@ function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze
   return mesh;
 }
 
+// 摇辘轳那一拍：摇把握手的**世界坐标** → 骨架**局部坐标**（Rig 拿它反解前手）。
+// 骨架挂在 (p.x, 地平线+lift) 上、整体缩放 bodyScale、朝向 −1 时整组镜像，
+// 所以换算要除以缩放、再按朝向翻 x。三条输入路（鼠标绕圈/键盘/脱手倒转）
+// 共用 Core 算好的那一份 gripX/gripY，World 绝不另算一遍摇把在哪儿。
+function CrankAimLocal(state, p, bs) {
+  const wv = state.winchView;
+  if (!wv || !wv.hooked || p.pose !== "crank" || !bs) return null;
+  const groundY = (p.level === "under" ? UNDER_Y : SURFACE_Y) + (p.lift || 0);
+  return {
+    x: ((wv.gripX - p.x) / bs) * (p.heading >= 0 ? 1 : -1),
+    y: (wv.gripY - groundY) / bs,
+  };
+}
+
 function PlaceSprite(mesh, x, y, z) {
   mesh.position.set(x + mesh.userData.offset.x, y + mesh.userData.offset.y, z);
   mesh.userData.anchor = { x, y, z };
@@ -136,7 +150,8 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 // hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
   "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
-  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔"];
+  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔",
+  "包袱布", "榆钱包袱"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
@@ -147,6 +162,7 @@ const HOLD_WEIGHT = {
   "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
   "军刀": 0.25, "木槌": 0.3,
   "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
+  "包袱布": 0.12, "榆钱包袱": 0.06,   // 一包榆钱：孩子抱得动，也正因为轻，抢它才更难看
 };
 const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 // 姿势进度（Rig 的 poseK）由**姿势名**挑驱动它的那个字段，不许拿 ?? 串下来：
@@ -155,7 +171,9 @@ const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 // 两个"由进度驱动"的姿势都被钉死在起手那一格。这条坑过一次，别再改回去。
 function PoseProgress(o) {
   if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
-  if (o.pose === "planePush") return o.poseU;
+  // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲，都走 poseU
+  if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
+    || o.pose === "braceUp") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -168,7 +186,7 @@ function MakeCarryMesh(label) {
   // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
   // 其余小件给一块方画布免得圆形图案被裁
   const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
-    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子"];
+    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子", "包袱布", "榆钱包袱"];
   // 收窄后的画幅，别再给一根柱子留地方。
   // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
   // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
@@ -476,9 +494,6 @@ export function CreateWorld(canvasEl) {
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
   let spotFlashMesh = null;
-  // 接绳打结：引导圈（虚线）＋缠上去的绳（实线）＋跟手的绳头
-  // 接绳：井绳断头挽出的圈（后/前两段做压叠）、拖过去的麻绳、剩下的路、绳头
-  let knotMesh = null, knotCanvas = null, knotCtx = null;
   // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
   const CART_COVER_Z = 1.5;
 
@@ -530,7 +545,6 @@ export function CreateWorld(canvasEl) {
     barrowMesh = null; barrowWheel = null;
     mountMeshes.clear();
     groundItemMeshes.clear();
-    knotMesh = null; knotCanvas = null; knotCtx = null;
     bubbleMeshes = [];
     bubbleTex.clear();
     throwAimLine = null;
@@ -1535,6 +1549,11 @@ export function CreateWorld(canvasEl) {
         });
         break;
       }
+      case "tunnelBrace":
+        // 玩家支上去的顶木：高度按爬行段的净高来（0.74m ≈ 36px），板面正好抵在
+        // 洞顶那条线上——比洞顶矮一截就成了"戳在半空的棍子"
+        mk((ctx, ax, ay) => ART.DrawTunnelBrace(ctx, ax, ay, S.w - 14, 0.74 * PPM, p.id));
+        break;
       case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false, slogan: p.slogan })); break;
       case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
       case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
@@ -1599,6 +1618,12 @@ export function CreateWorld(canvasEl) {
   function AddUnderground(group, sceneDef, state, sceneKey) {
     const range = sceneDef.walk.under;
     if (!range) return;
+    // **地下按段存在**：没挖通之前，自家窖与七叔家窖是两个互不相通的腔，
+    // 中间是实土（见 Core 的 UnderSegments / Data_Scenes 的 underDig）。
+    // 老版把整条 walk.under 一口气掏空，于是第一次下窖就能走到七叔家——
+    // 第七场"挖通道"因此在演一件已经完成的事（2026-08-10 用户退回）
+    const segs = UnderSegments(sceneDef, state.flags);
+    const headX = segs.length > 1 ? segs[0][1] : null;   // 掌子面（还没挖通的那一头）
     // 地道不是一张平贴图：近侧土层剖面掏空 → 看进去是后退的地面 →
     // 尽头是后壁；支撑木分布在不同 z 上，人从木柱之间穿过去。
     const NEAR_Z = 2.2;     // 近侧剖面（被切开的那一刀）
@@ -1659,14 +1684,17 @@ export function CreateWorld(canvasEl) {
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
-      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
-      for (let wx = range[1]; wx >= range[0]; wx -= 1.2) {
-        ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+      // **逐段**掏：没挖通之前自家窖与七叔家窖是两个腔，中间是实土
+      for (const [sa, sb] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), CeilY(sa));
+        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
+        for (let wx = sb; wx >= sa; wx -= 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.closePath();
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fill();
       // 洞室 / 旁洞：直得起腰的地方。顶要拱起来，不能是个平顶方盒——
       // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位
       const Dome = (cx, halfW, topY) => {
@@ -1711,20 +1739,54 @@ export function CreateWorld(canvasEl) {
       ctx.restore();
       // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
       ctx.globalCompositeOperation = "source-over";
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
-      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
-      ctx.strokeStyle = "rgba(24,17,10,0.75)";
-      ctx.lineWidth = 7;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), tunBot);
-      for (let wx = range[0]; wx <= range[1]; wx += 1.2) {
-        ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+      for (const [sa, sb] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), CeilY(sa));
+        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
+        ctx.strokeStyle = "rgba(24,17,10,0.75)";
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), tunBot);
+        for (let wx = sa; wx <= sb; wx += 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.strokeStyle = "rgba(24,17,10,0.6)";
+        ctx.lineWidth = 5;
+        ctx.stroke();
       }
-      ctx.strokeStyle = "rgba(24,17,10,0.6)";
-      ctx.lineWidth = 5;
-      ctx.stroke();
+      // 掌子面：挖到这儿为止的那一堵新土。要让玩家一眼看出"还没通"——
+      //   · 新土比周围的老土层浅一档（还没被烟熏、没被手摸黑）
+      //   · 一道道横的镢头印，越往下越密（人是弯着腰往下刨的）
+      //   · 脚下堆着刚刨下来还没运走的虚土
+      if (headX !== null) {
+        const fx = toPx(headX);
+        const ceil = CeilY(headX);
+        ctx.save();
+        const fresh = ctx.createLinearGradient(fx - 4, 0, fx + 26, 0);
+        fresh.addColorStop(0, "rgba(150,116,74,0.62)");
+        fresh.addColorStop(1, "rgba(150,116,74,0)");
+        ctx.fillStyle = fresh;
+        ctx.fillRect(fx - 4, ceil, 30, tunBot - ceil + 6);
+        // 镢头印
+        ctx.strokeStyle = "rgba(52,38,22,0.44)";
+        for (let k = 0; k < 9; k += 1) {
+          const gy = ceil + 4 + k * ((tunBot - ceil) / 9);
+          ctx.lineWidth = 1.4 + (k / 9) * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(fx - 2, gy);
+          ctx.lineTo(fx - 2 + 6 + ART.Hash(sceneKey + "hoe" + k) * 12, gy + 2.4);
+          ctx.stroke();
+        }
+        // 脚下的虚土
+        ctx.fillStyle = "rgba(118,90,56,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(fx - 30, tunBot + 2);
+        ctx.quadraticCurveTo(fx - 12, tunBot - 13, fx + 2, tunBot + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
       // 洞室的穹顶也要有洞沿：走廊的墨线只描到 CeilY，洞室那一段是
       // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块
       for (const [cx, halfW, topY] of domes) {
@@ -1848,7 +1910,9 @@ export function CreateWorld(canvasEl) {
     // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去
     const beamZ = [BACK_Z + 1.2, -2.4, -0.3, 1.6];
     let bi = 0;
+    const inSeg = (wx) => segs.some(([a, b]) => wx >= a + 0.5 && wx <= b - 0.5);
     for (let x = range[0] + 3; x < range[1] - 2; x += 2.8 + ART.Hash(sceneKey + "gap" + Math.round(x)) * 3.4) {
+      if (!inSeg(x)) continue;
       const z = beamZ[bi % beamZ.length];
       bi += 1;
       const beamH = Math.ceil((TUN_TOP - UNDER_Y) * PPM);
@@ -2049,7 +2113,10 @@ export function CreateWorld(canvasEl) {
     const ch = { ...ch0, light: ShownLight(state) };
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
-      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
+      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`
+      // 地道挖到哪儿了：这两个旗标改的是**剖面几何**（掏开哪几段土），
+      // 只能整场重建。一章里只翻两次，卡这两下值得
+      + `:${f.digStarted ? 1 : 0}:${f.tunnelDug ? 1 : 0}`;
     // henFlew / thimbleFound / raidStarted / clothDown 只决定某个道具在不在
     //（flagProps 切 visible），ropeTaken / wellRopeBroken 只改一张贴图的画法
     //（propRedraw 单张重烘）——一个都不进 builtKey。进了就是"捡个顶针卡一下"
@@ -2328,11 +2395,15 @@ export function CreateWorld(canvasEl) {
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
+    // 姿势名要留给 SyncCarry：有几个姿势会改变"东西挂在哪儿"（顶撑木那一拍
+    // 板子在**两只手上**，不在肩上），挂点必须跟着姿势走
+    s.poseName = extra.pose || null;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
-      poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
+      poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
+      track: extra.track, trackT: extra.trackT,
     }, dt);
 
     // 队列的后几排整体后移（人/影子/家伙一起走，见 Data_DepthSpec 的 RankDz）。
@@ -2447,7 +2518,11 @@ export function CreateWorld(canvasEl) {
     // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
     // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
     const alongArm = ALONG_ARM.includes(label);
-    const inHand = IsHandHeld(label);
+    // 顶撑木那一拍：板子离开肩膀，横在**两只手上**往洞顶推。挂点改走 HandPoint，
+    // 板面保持水平（顶木是横着抵住土的，歪着就成了戳）——不改这一处，
+    // 玩家举了半天手，板子还老老实实趴在肩上（"撑起来了却看不见"就是这么来的）
+    const overhead = s.poseName === "braceUp";
+    const inHand = overhead || IsHandHeld(label);
     // HandPoint/ShoulderPoint 给的是**世界**坐标；背景层带着自己的缩放与 z 偏移，
     // 直接拿去当局部坐标，锄头会飞到十几米外。换算回本层的局部系再摆
     const ToLocal = (v) => (layerKey === "play" ? v : host.worldToLocal(v));
@@ -2457,9 +2532,9 @@ export function CreateWorld(canvasEl) {
     // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
     // 柱子（才一米出头）手里的桶就杵在地上了。
     // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
-    const forward = inHand && !alongArm ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
+    const forward = inHand && !alongArm && !overhead ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
     s.carryMesh.position.set(anchor.x + forward,
-      anchor.y + (alongArm ? 0 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
+      anchor.y + (alongArm ? 0 : overhead ? 0.05 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
@@ -2580,8 +2655,12 @@ export function CreateWorld(canvasEl) {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
         // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
-        // 翻越取 vaultK、刨料取 poseU（推程）、投石取 poseK（拉弓量），见 PoseProgress
+        // 翻越取 vaultK、刨料/顶撑木取 poseU、投石取 poseK（拉弓量），见 PoseProgress
         lift: p.lift || 0, poseK: PoseProgress(p),
+        // 摇辘轳：把摇把握手的世界坐标换算成骨架局部坐标交给 Rig 反解——
+        // 手是真的攥在那根把手上，不是照着一条相位在半空画圈
+        poseStrain: p.poseStrain,
+        aimHand: CrankAimLocal(state, p, boyScale),
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
         light: NearestLight(p.x, LevelYOf(p.level)),
@@ -3338,8 +3417,12 @@ export function CreateWorld(canvasEl) {
           // 榆钱雨：一把青黄的小圆片从冠里簌簌往下飘，左摇右摆地落
           const t = state.elmRain.t;
           c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.6);
+          // 起落高度由发起处给：树上抖下来是 1.9m（井台那棵老榆），
+          // 从被扯开的包袱里洒出来只有 0.75m——不写这一档，院子里没有树，
+          // 榆钱就是从半空凭空落下来的（实拍逮到的）
+          const H0 = state.elmRain.from ?? 1.9;
           for (let i = 0; i < 14; i += 1) {
-            const h0 = 1.9 + ART.Hash("er" + i) * 0.5;                    // 各自的起飞高度
+            const h0 = H0 + ART.Hash("er" + i) * (H0 > 1.2 ? 0.5 : 0.18);   // 各自的起飞高度
             const fall = Math.max(0, t - ART.Hash("ed" + i) * 0.5);       // 错峰往下掉
             const y = Math.max(0.05, h0 - fall * 1.1);
             const sx = 160 + (ART.Hash("ex" + i) - 0.5) * 66
@@ -3395,7 +3478,8 @@ export function CreateWorld(canvasEl) {
         }
         dustMesh.material.map.needsUpdate = true;
         dustMesh.visible = true;
-        dustMesh.position.set(vd.x, SURFACE_Y + 0.42, 0.52);
+        // 顶撑木也用它（顶实那一下洞顶簌簌落土），所以这团土得认得出自己在哪一层
+        dustMesh.position.set(vd.x, (vd.level === "under" ? UNDER_Y : SURFACE_Y) + 0.42, 0.52);
       } else if (dustMesh) dustMesh.visible = false;
     }
 
@@ -3746,32 +3830,38 @@ export function CreateWorld(canvasEl) {
         winchBucket = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶"), 0, DETAIL_SS);
         FixOrder(winchBucket, DepthOrder("play", BAND.loose) + 1);
         layers.play.add(winchBucket);
-        // 摇把：轴销在画布正中，柄伸向一侧、末端一枚握手——旋转轴就是轴销。
-        // 特写里它是主角，按 HINT_SS 烘
-        winchCrank = BakeSprite(56, 56, 28, 28, (ctx, ax, ay) => {
-          const cx0 = ax, cy0 = ay - 28 + 28;   // 画布中心
+        // 摇把：轴销在画布正中，柄伸向 +x、末端一枚握手——旋转轴就是轴销。
+        // **柄长必须等于 Core 的 WINCH_CRANK_R**，画面里那个圈就是
+        // 判定用的那个圈，也是 Rig 反解前手的那个圈；三处对不上，手就抓空了。
+        const armPx = WINCH_CRANK_R * PPM;
+        winchCrank = BakeSprite(34, 34, 17, 17, (ctx, ax, ay) => {
           ctx.strokeStyle = "rgba(43,31,22,0.9)";
           ctx.lineCap = "round";
           // 柄臂
-          ctx.lineWidth = 7;
-          ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(cx0 + 19, cy0); ctx.stroke();
-          ctx.strokeStyle = "#8a6a45";
-          ctx.lineWidth = 4.2;
-          ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(cx0 + 19, cy0); ctx.stroke();
-          // 握手（垂直于柄臂的一小节木柄）
-          ctx.strokeStyle = "rgba(43,31,22,0.9)";
-          ctx.lineWidth = 9;
-          ctx.beginPath(); ctx.moveTo(cx0 + 19, cy0 - 6); ctx.lineTo(cx0 + 19, cy0 + 6); ctx.stroke();
-          ctx.strokeStyle = "#a8794a";
-          ctx.lineWidth = 5.5;
-          ctx.beginPath(); ctx.moveTo(cx0 + 19, cy0 - 6); ctx.lineTo(cx0 + 19, cy0 + 6); ctx.stroke();
-          // 轴销
-          ctx.fillStyle = "#5c4a35";
-          ctx.strokeStyle = "rgba(30,22,14,0.9)";
-          ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(cx0, cy0, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.lineWidth = 6.2;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + armPx, ay); ctx.stroke();
+          ctx.strokeStyle = "#7a5a33";
+          ctx.lineWidth = 4.0;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + armPx, ay); ctx.stroke();
+          // 握手：一节磨亮的木柄。**它要比周围亮一档**——整根摇把上只有它绕着
+          // 圈跑，玩家的眼睛盯的就是这一点（手攥在这儿，手也压在它后头）
+          ctx.strokeStyle = "rgba(38,26,14,0.95)";
+          ctx.lineWidth = 9.2;
+          ctx.beginPath(); ctx.moveTo(ax + armPx, ay - 5.6); ctx.lineTo(ax + armPx, ay + 5.6); ctx.stroke();
+          ctx.strokeStyle = "#c79a5c";
+          ctx.lineWidth = 6.0;
+          ctx.beginPath(); ctx.moveTo(ax + armPx, ay - 4.8); ctx.lineTo(ax + armPx, ay + 4.8); ctx.stroke();
+          // 轴销：**一枚铁销子，3 厘米**。第一版画了 3.4px＝7 厘米半径，排到人
+          // 之前以后就是一枚糊在脸上的大灰垫圈（实拍抓出来的）
+          ctx.fillStyle = "#4a3b2a";
+          ctx.strokeStyle = "rgba(26,18,10,0.9)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(ax, ay, 1.7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         }, 0, HINT_SS);
-        FixOrder(winchCrank, DepthOrder("play", BAND.loose) + 2);
+        // 摇把**排在人之前**（位置仍在井那条线上，只有绘制顺序往前提）：
+        // 排在人之后的话，他一伸手就把整根摇把盖住了——屏幕上又成了"空划拉"。
+        // 手落在握手上、握手压住手，读出来正好是"攥着把手"。
+        FixOrder(winchCrank, DepthOrder("play", BAND.obstacle));
         layers.play.add(winchCrank);
         // 引导圈：没上手时绕轴心一圈虚线——「转这里」。同打结的引导圈一种语汇
         const geo = new THREE.BufferGeometry();
@@ -3783,27 +3873,45 @@ export function CreateWorld(canvasEl) {
         layers.play.add(winchGuide);
       }
       const hubY = SURFACE_Y + WINCH_HUB_Y;                // 辘轳轴心（井架横杆中线）
-      const bucketY = SURFACE_Y + 1.05 - wv.depth * 1.5;   // 沉进井口
+      // 摇到顶＝桶提到井口沿上（伸手就够得着），往下一路沉进井里。
+      // 沉多深不要按"井有多深"给——按**看得见多久**给：桶在头一小半程里
+      // 一直看得见，之后才淡进井筒的黑里（第一版 0.70−1.30d 走到两成深度
+      // 桶就没影了，玩家会以为它掉了）
+      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25;
+      // 绳只画到井口沿为止：再往下它就该钻进井筒的黑里了。不夹的话，桶沉到
+      // 底时会有一根木色的长条从辘轳一直拖到地面、还压在井台之前——读出来是
+      // "绳挂在井外面"，不是"桶下到井里去了"
+      const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.62);
       winchRope.visible = true;
-      winchRope.scale.set(1, Math.max(0.05, hubY - bucketY), 1);
-      winchRope.position.set(wv.x, (hubY + bucketY) / 2, PlaceZ(BAND.loose));
-      winchBucket.visible = wv.hooked;
+      winchRope.scale.set(1, Math.max(0.05, hubY - ropeBottom), 1);
+      winchRope.position.set(wv.x, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
+      // 桶沉到井台沿以下就淡进井口那团黑里——它画在井台**之前**（loose 带），
+      // 不淡的话整只桶会浮在石头台面上往下滑，读出来是"桶在井外掉"
+      winchBucket.visible = wv.hooked && bucketY > 0.05;
+      winchBucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
+      winchBucket.material.transparent = true;
       winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
       // 灌满了桶身压得低一点
       winchBucket.rotation.z = wv.filled ? 0 : Math.sin(state.time * 2.1) * 0.08;
       winchCrank.visible = wv.hooked;
-      winchCrank.position.set(wv.x, hubY, PlaceZ(BAND.loose));
-      // 歇息角 -0.6：静止时摇把斜垂着，别跟横杆平行混成一根木头
-      winchCrank.rotation.z = (wv.crankA || 0) - 0.6;
-      // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面
+      // 手上吃劲，摇把也跟着抖一丝——判定的 crankA 不掺演出，抖只加在画面上
+      const strain = wv.hooked ? Math.max(0, 1 - (wv.stam ?? 1) / 0.5) : 0;
+      const shake = strain * 0.012 * Math.sin(state.time * 34);
+      winchCrank.position.set(wv.crankX ?? wv.x, hubY + shake, PlaceZ(BAND.loose));
+      // 歇息角：静止时摇把斜垂着，别跟横杆平行混成一根木头（角度由 Core 定，
+      // 因为 gripX/gripY 与 Rig 的反解都照着同一个数算）
+      winchCrank.rotation.z = (wv.crankA || 0) + WINCH_REST_A;
+      // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面。
+      // 半径贴着摇把画的那个圈——「手绕这儿转」得指的是真的那一圈
       const showGuide = wv.hooked && !wv.engaged;
       winchGuide.visible = showGuide;
       if (showGuide) {
         const pos = winchGuide.geometry.attributes.position;
-        const R = 0.5;
+        const R = WINCH_CRANK_R * 1.25;
+        const gx = wv.crankX ?? wv.x;
         for (let i = 0; i < 48; i += 1) {
           const a = (i / 47) * Math.PI * 2;
-          pos.setXYZ(i, wv.x + Math.cos(a) * R, hubY + Math.sin(a) * R, PlaceZ(BAND.loose));
+          pos.setXYZ(i, gx + Math.cos(a) * R, hubY + Math.sin(a) * R, PlaceZ(BAND.loose));
         }
         pos.needsUpdate = true;
         winchGuide.computeLineDistances();
@@ -3900,75 +4008,6 @@ export function CreateWorld(canvasEl) {
       }
     }
 
-    // 接绳打结：一圈虚线引导 + 玩家真的绕上去的绳。t 走完引导圈淡出，
-    // 收紧（cinch）时圈半径缩成一个结。全程画在井架断绳处。
-    // 接绳：断头挽出一个圈，麻绳头顺着自己的路穿过去、再往外拉，结收死。
-    // 整套结走**逐帧重画的 canvas**（见 Art.DrawKnot 顶上的说明）——
-    // THREE.Line 的 linewidth 在多数平台被忽略，绳子只有一个像素，
-    // 贴在辘轳那堆木色上根本看不见。
-    // 几何一律用 Core 的 KnotPointAt / KNOT_EYE，World 不另抄一份。
-    if (state.knot) {
-      const kn = state.knot;
-      const KW = 1.9, KH = 1.35, KPPM = 210;     // 画布罩住整个结的范围
-      if (!knotMesh) {
-        knotCanvas = MakeCanvas(KW * KPPM * 2, KH * KPPM * 2);
-        knotCtx = knotCanvas.getContext("2d");
-        knotCtx.scale(2, 2);                      // 结会被推到 3m 画宽，超采样一档
-        knotMesh = new THREE.Mesh(
-          new THREE.PlaneGeometry(KW, KH),
-          new THREE.MeshBasicMaterial({ map: CanvasTexture(knotCanvas), transparent: true, depthWrite: false }),
-        );
-        layers.play.add(knotMesh);
-        SetPlayOrder(knotMesh, BAND.loose, "knot");
-        knotMesh.userData.k = "";
-      }
-      // 收紧量：穿出圈眼之后拉的每一寸都在勒结
-      const cinch = kn.u <= kn.threadU ? 0 : Math.min(1, (kn.u - kn.threadU) / (1 - kn.threadU));
-      const bucket = `${Math.round(kn.u * 60)}:${kn.grab ? 1 : 0}:${Math.round((kn.idle || 0) * 6)}`;
-      if (knotMesh.userData.k !== bucket) {
-        knotMesh.userData.k = bucket;
-        const eyeR = KNOT_EYE.r * (1 - cinch * 0.62);
-        // 勒紧＝圈越收越小，圈边上的绳也跟着被拽向圈心
-        const Warp = (q) => {
-          const dx = q[0] - KNOT_EYE.x, dy = q[1] - KNOT_EYE.y;
-          const d = Math.hypot(dx, dy);
-          if (d > 0.28 || d < 1e-4) return q;
-          const pull = cinch * 0.45 * (1 - d / 0.28);
-          return [q[0] - dx * pull, q[1] - dy * pull];
-        };
-        const arc = (from, to, n) => {
-          const out = [];
-          for (let i = 0; i < n; i += 1) {
-            const a = from + (to - from) * (i / (n - 1));
-            out.push([KNOT_EYE.x + Math.cos(a) * eyeR, KNOT_EYE.y + Math.sin(a) * eyeR * 0.92]);
-          }
-          return out;
-        };
-        const ropePts = [], restPts = [];
-        for (let i = 0; i <= 30; i += 1) {
-          ropePts.push(Warp(KnotPointAt(kn.u * (i / 30))));
-          restPts.push(Warp(KnotPointAt(kn.u + (1 - kn.u) * (i / 30))));
-        }
-        // 没上手时绳头顺着路往前蹭两下——唯一的"招呼"，代替 HUD 图标，
-        // 蹭的方向就是该拖的方向
-        const nudge = kn.idle ? Math.max(0, Math.sin(kn.idle * 2.2)) * 0.05 : 0;
-        knotCtx.clearRect(0, 0, KW * KPPM, KH * KPPM);
-        ART.DrawKnot(knotCtx, KW * KPPM * 0.42, KH * KPPM * 0.30, KPPM, {
-          stand: [[-0.05, 0.60], [-0.03, 0.36], [0.0, 0.22], [KNOT_EYE.x - eyeR * 0.2, KNOT_EYE.y + eyeR]],
-          eyeBack: arc(Math.PI * 0.5, Math.PI * 1.9, 22),
-          eyeFront: arc(Math.PI * 1.9, Math.PI * 2.5, 14),
-          rope: ropePts,
-          rest: restPts,
-          restAlpha: kn.u < 0.985 ? 0.18 + 0.30 * (1 - kn.u) : 0,
-          tip: Warp(KnotPointAt(Math.min(1, kn.u + nudge))),
-          grab: kn.grab,
-        });
-        knotMesh.material.map.needsUpdate = true;
-      }
-      knotMesh.visible = true;
-      // 画布锚点（0.42/0.30）对应挂点，摆位要把这个偏移抵回去
-      knotMesh.position.set(kn.x + KW * (0.5 - 0.42), SURFACE_Y + kn.y - KH * (0.5 - 0.30), PlaceZ(BAND.loose));
-    } else if (knotMesh) knotMesh.visible = false;
 
     // 飞出去的石子：一维横轴上的一道小弧线
     if (state.thrown) {
@@ -4345,7 +4384,7 @@ export function CreateWorld(canvasEl) {
 
   // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
   // 铺满画框的活卡上，画笔按 kind 分派。
-  const LIVE_CARD_ART = { scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard };
+  const LIVE_CARD_ART = { scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard, knot: ART.DrawKnotCard };
 
   function SetLiveCard(spec, dt) {
     const view = spec?.view;

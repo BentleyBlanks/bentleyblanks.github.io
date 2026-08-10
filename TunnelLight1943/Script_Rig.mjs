@@ -406,18 +406,172 @@ export const TRACKS = {
       { t: 1.9, hipY: -0.09, hipX: 0.07, torso: 27, head: -16, armF: -26, foreF: -9, armB: -14, foreB: -52 },
     ],
   },
-  // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来
+  // 挨砸（单次）：整个人向前砸出去，双手撑地，很慢地摇着头抬起来。
+  // **第一帧必须是站着的**——这条轨道三处用户（刘家老人、刘嫂、爹）挨砸时
+  // 都还站着，而受方的 t 是从负数起的（等到枪托落下那一帧才动）。老版第一帧
+  // 就是跪姿（hipY −0.44、小腿折在身后），于是"等"的那一段里人先自己跪下去，
+  // 枪托才不紧不慢地抡下来——挨打的比打人的先倒
   struckFall: {
-    dur: 3.4, loop: false,
+    dur: 3.6, loop: false,
     keys: [
-      { t: 0.0, hipY: -0.44, hipX: 0.02, torso: 26, head: -12, thighB: -10, shinB: 98, footB: 26, thighF: -4, shinF: 94, footF: 26, armB: -14, foreB: -18, armF: -18, foreF: -14 },
-      { t: 0.18, hipY: -0.50, hipX: 0.24, torso: 74, head: -40, armB: -96, foreB: -14, armF: -104, foreF: -10 },  // 被砸得扑出去：0.18s
+      { t: 0.0, hipY: -0.03, hipX: 0.01, torso: 12, head: -14, thighB: -12, shinB: 16, footB: -5, thighF: 8, shinF: 6, footF: -7, armB: -30, foreB: -34, armF: -34, foreF: -30 },
+      { t: 0.12, hipY: -0.22, hipX: 0.16, torso: 52, head: -26, armB: -66, foreB: -22, armF: -74, foreF: -18, thighB: -40, shinB: 44, thighF: -16, shinF: 22 },  // 打中：膝先软
+      { t: 0.34, hipY: -0.50, hipX: 0.24, torso: 74, head: -40, armB: -96, foreB: -14, armF: -104, foreF: -10, thighB: -10, shinB: 98, footB: 26, thighF: -4, shinF: 94, footF: 26 },  // 扑出去、手撑地
       { t: 0.55, hipY: -0.52, hipX: 0.22, torso: 78, head: -34, armB: -90, foreB: -12, armF: -98, foreF: -8 },    // 撑住，沉底
       { t: 1.6, hipY: -0.50, hipX: 0.18, torso: 66, head: -50 },                                                  // 半天不动
       { t: 2.3, hipY: -0.48, hipX: 0.13, torso: 54, head: -30 },                                                  // 慢慢起来一点
       { t: 2.7, hipY: -0.48, hipX: 0.13, torso: 56, head: -42 },                                                  // 摇头：一边
       { t: 3.05, hipY: -0.47, hipX: 0.12, torso: 52, head: -22 },                                                 // 另一边
-      { t: 3.4, hipY: -0.46, hipX: 0.09, torso: 44, head: -28 },
+      { t: 3.6, hipY: -0.46, hipX: 0.09, torso: 44, head: -28 },
+    ],
+  },
+
+  // ── 第十一场（搜家）的接触动作 ──────────────────────────────────────────
+  // 这一场以前是「谁也没碰谁」：夺包袱布只有一行 sis.carry = null，扇耳光借了
+  // 抡枪托的 buttStrike，踹柱子干脆只有一个 kneel 静姿。剧本里写明的三个动作
+  // （夺、扇、踹）因此在画面上一个都不成立。下面四对轨道各自成对——**动手的
+  // 和挨手的必须同时起，落点对在同一帧上**（受方 t 起负数＝等到那一下才动）。
+
+  // 夺（单次）：探身、一把攥住对方手里的东西、往自己怀里一扯。
+  // 攥住那一下 0.15s 是全程最快的；扯回来带着对方的身子一起晃
+  snatchGrab: {
+    dur: 1.5, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.02, torso: 4, head: -8, armF: -34, foreF: -30, armB: -28, foreB: -34, thighB: -14, shinB: 18, footB: -6, thighF: 10, shinF: 8, footF: -8 },
+      { t: 0.35, hipY: -0.10, hipX: 0.16, torso: 34, head: -22, armF: -104, foreF: -6, armB: -74, foreB: -18 },   // 探身够过去
+      { t: 0.50, hipY: -0.11, hipX: 0.18, torso: 36, head: -24, armF: -112, foreF: 0, armB: -80, foreB: -14 },    // 攥住：顿一下
+      { t: 0.72, hipY: -0.04, hipX: -0.10, torso: -10, head: -6, armF: -46, foreF: -62, armB: -38, foreB: -58 },  // 往回一扯：0.22s，最快的一下
+      { t: 1.5, hipY: -0.02, hipX: -0.04, torso: -2, head: -10, armF: -40, foreF: -54, armB: -34, foreB: -50 },   // 东西收在怀里
+    ],
+  },
+  // 被夺（单次，从 t<0 起等）：手被扯得往前带了半步，人跟着趔趄，
+  // 再空着两只手追出去够——够不着，手停在半空
+  snatchLose: {
+    dur: 1.8, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.03, hipX: 0.04, torso: 10, head: -14, armF: -52, foreF: -46, armB: -44, foreB: -42, thighB: -12, shinB: 16, footB: -5, thighF: 8, shinF: 6, footF: -6 },
+      { t: 0.22, hipY: -0.06, hipX: 0.20, torso: 30, head: -26, armF: -96, foreF: -8, armB: -70, foreB: -20, thighB: -24, shinB: 26, thighF: 16, shinF: 10 },  // 被扯得往前带
+      { t: 0.55, hipY: -0.05, hipX: 0.12, torso: 22, head: -30, armF: -108, foreF: -12, armB: -84, foreB: -22 },  // 追着够
+      { t: 1.0, hipY: -0.04, hipX: 0.06, torso: 14, head: -24, armF: -92, foreF: -22, armB: -72, foreB: -30 },    // 停在半空
+      { t: 1.8, hipY: -0.03, hipX: 0.02, torso: 8, head: -18, armF: -70, foreF: -34, armB: -56, foreB: -38 },
+    ],
+  },
+  // 扇耳光（单次）。**跟抡枪托是两回事**：枪托要举过头顶蓄力、砸的是竖直向下的
+  // 一记；耳光是横的——手抬到自己肩外侧，肘先松着，甩出去时小臂才抽直，
+  // 打完手停在对方脸的高度上（armF≈-78° 时手心大约在 1.05m，正好是孩子的脸）。
+  // 挥出去那一下 0.12s，是全作最快的一帧
+  slap: {
+    dur: 1.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.02, torso: 2, head: -6, armF: -26, foreF: -30, armB: -14, foreB: -30, thighB: -12, shinB: 16, footB: -6, thighF: 8, shinF: 6, footF: -8 },
+      // 另一只手要**反着走**，不然两条胳膊平行伸出去，读出来是"双手去够"不是抡
+      { t: 0.40, hipY: -0.03, hipX: -0.12, torso: -16, head: 8, armF: 34, foreF: -62, armB: -6, foreB: -40 },     // 抬到肩外侧、肘松着
+      // 落点是**量出来的**：兵的肩在 1.22m，孩子的脸在 0.91m、身前约 0.4m，
+      // 两节胳膊合起来 0.5m —— 手要停在那儿，胳膊的世界角就得是 −52°。
+      // 第一版按 −82° 抡（照抡枪托的幅度写的），手从她头顶上方半尺扫过去，
+      // 打的是空气。**接触动作的角度按落点反算，别照感觉写。**
+      { t: 0.52, hipY: -0.05, hipX: 0.14, torso: 22, head: -14, armF: -52, foreF: -2, armB: 10, foreB: -52 },     // 甩出去：0.12s（另一只手甩到身后配平）
+      { t: 0.72, hipY: -0.04, hipX: 0.08, torso: 14, head: -10, armF: -44, foreF: -14, armB: 2, foreB: -46 },     // 收住
+      { t: 1.6, hipY: -0.02, hipX: -0.02, torso: 2, head: -8, armF: -28, foreF: -30, armB: -14, foreB: -30 },     // 手垂回去
+    ],
+  },
+  // 挨耳光倒地（单次，孩子的量级）。跟 struckFall 分开是因为分量不同：
+  // 枪托砸的是整个人向前砸出去、双手撑地；耳光是**头先被打偏**，人才跟着侧倒，
+  // 而且爬起来的第一件事是一只手捂住那半边脸（第十二场的"湿布贴脸"接在这儿）
+  slappedFall: {
+    dur: 3.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.03, hipX: 0.02, torso: 8, head: -14, armF: -46, foreF: -40, armB: -40, foreB: -36, thighB: -12, shinB: 16, footB: -5, thighF: 8, shinF: 6, footF: -6 },
+      { t: 0.10, hipY: -0.05, hipX: 0.06, torso: 14, head: 38, armF: -40, foreF: -46 },                            // 头被打偏：0.1s，先动的是脑袋
+      { t: 0.38, hipY: -0.42, hipX: 0.22, torso: 58, head: 20, armF: -96, foreF: -16, armB: -88, foreB: -20, thighB: -66, shinB: 84, footB: 14, thighF: -40, shinF: 62, footF: 10 },  // 人才跟着摔下去
+      { t: 0.70, hipY: -0.48, hipX: 0.18, torso: 66, head: -8, armF: -92, foreF: -14, armB: -84, foreB: -18 },      // 一只手撑住，沉底
+      { t: 1.35, hipY: -0.46, hipX: 0.14, torso: 58, head: -34, armF: -58, foreF: -104, armB: -80, foreB: -22 },    // 手抬起来捂脸
+      { t: 2.10, hipY: -0.45, hipX: 0.12, torso: 52, head: -40, armF: -54, foreF: -110 },                          // 捂着不动
+      { t: 3.2, hipY: -0.44, hipX: 0.10, torso: 48, head: -36, armF: -52, foreF: -108 },
+    ],
+  },
+  // 踹（单次）：重心先坐到后腿上，前腿曲起、蹬出去，收腿。踹的是腹部，
+  // 所以腿抬到 thighF≈-70° 就够（再高成了正踢腿，那是踢门不是踹人）
+  kickGut: {
+    dur: 1.5, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.02, torso: 4, head: -8, armF: -34, foreF: -34, armB: -30, foreB: -30, thighB: -14, shinB: 18, footB: -6, thighF: 10, shinF: 8, footF: -8 },
+      { t: 0.32, hipY: -0.06, hipX: -0.12, torso: -14, head: -4, thighF: -62, shinF: 74, footF: 6, thighB: -18, shinB: 24, armF: -18, armB: -46, foreB: -20 },  // 曲腿收上来
+      { t: 0.46, hipY: -0.04, hipX: 0.10, torso: 16, head: -12, thighF: -74, shinF: 12, footF: -14, armF: -50, armB: -62 },   // 蹬出去：0.14s
+      { t: 0.72, hipY: -0.03, hipX: 0.02, torso: 8, head: -10, thighF: -34, shinF: 34, footF: -6 },                          // 收腿
+      { t: 1.5, hipY: -0.02, hipX: -0.02, torso: 4, head: -8, thighF: 10, shinF: 8, footF: -8, armF: -34, foreF: -34 },
+    ],
+  },
+  // 挨踹（单次，从 t<0 起等）：腹部先折起来（人整个弯成一团），
+  // 才是往后坐倒；很久之后手才从肚子上松开一点。这一拍不许有"撑起来还手"的相位
+  gutFold: {
+    dur: 3.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.04, hipX: 0.06, torso: 16, head: -18, armF: -56, foreF: -34, armB: -48, foreB: -32, thighB: -14, shinB: 18, footB: -5, thighF: 10, shinF: 8, footF: -6 },
+      { t: 0.14, hipY: -0.14, hipX: -0.10, torso: 62, head: -34, armF: -34, foreF: -104, armB: -30, foreB: -100, thighB: -30, shinB: 34, thighF: -22, shinF: 28 },  // 折起来：0.14s
+      { t: 0.50, hipY: -0.48, hipX: -0.18, torso: 70, head: -28, armF: -30, foreF: -112, armB: -26, foreB: -106, thighB: -92, shinB: 100, footB: 10, thighF: -84, shinF: 96, footF: 8 },  // 跪坐下去
+      { t: 1.40, hipY: -0.52, hipX: -0.14, torso: 74, head: -20, armF: -28, foreF: -116, armB: -24, foreB: -110 },   // 捂着肚子不动
+      { t: 2.40, hipY: -0.50, hipX: -0.12, torso: 66, head: -34, armF: -30, foreF: -108 },                          // 抬了一下头
+      { t: 3.4, hipY: -0.50, hipX: -0.12, torso: 62, head: -30, armF: -32, foreF: -104 },
+    ],
+  },
+  // 一把攥住别人的胳膊往回带（单次）：爹拦柱子那一下。手要真的够到对方
+  // （armF -100° 时手心在身前 0.5m 上下），攥住之后整个人往后坐着往回拽
+  clutchArm: {
+    dur: 1.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.03, hipX: 0.02, torso: 8, head: -12, armF: -40, foreF: -30, armB: -34, foreB: -28, thighB: -14, shinB: 18, footB: -6, thighF: 10, shinF: 8, footF: -8 },
+      { t: 0.22, hipY: -0.06, hipX: 0.20, torso: 32, head: -26, armF: -102, foreF: -8, armB: -56, foreB: -24, thighB: -26, shinB: 30, thighF: 18, shinF: 12 },  // 伸手够到：0.22s
+      { t: 0.40, hipY: -0.08, hipX: 0.14, torso: 26, head: -24, armF: -96, foreF: -18, armB: -50, foreB: -28 },     // 攥住
+      { t: 0.72, hipY: -0.10, hipX: -0.08, torso: -12, head: -18, armF: -70, foreF: -44, armB: -44, foreB: -34, thighB: -34, shinB: 38, thighF: 6, shinF: 10 },  // 往回拽
+      { t: 1.6, hipY: -0.06, hipX: -0.02, torso: -4, head: -16, armF: -62, foreF: -40, armB: -40, foreB: -32 },
+    ],
+  },
+  // 被攥住往回带（单次）：已经冲出去半步，胳膊被从后面拽住，身子还朝前、
+  // 脚却被带得往回蹭——挣了一下，没挣开
+  heldBack: {
+    dur: 1.8, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.06, hipX: 0.18, torso: 34, head: -28, armF: -96, foreF: -12, armB: -60, foreB: -18, thighB: -34, shinB: 36, footB: -8, thighF: 20, shinF: 12, footF: -10 },
+      { t: 0.30, hipY: -0.08, hipX: 0.10, torso: 26, head: -30, armB: -128, foreB: -6, armF: -84, foreF: -20, thighB: -20, shinB: 26, thighF: 8, shinF: 10 },   // 胳膊被拽住、往后带
+      { t: 0.62, hipY: -0.07, hipX: 0.16, torso: 32, head: -34, armB: -136, foreB: -4, armF: -92, foreF: -14 },      // 又挣了一下
+      { t: 1.0, hipY: -0.09, hipX: 0.04, torso: 20, head: -26, armB: -124, foreB: -10, armF: -74, foreF: -28 },      // 没挣开
+      { t: 1.8, hipY: -0.08, hipX: 0.02, torso: 16, head: -24, armB: -112, foreB: -16, armF: -66, foreF: -32 },
+    ],
+  },
+  // 抖开包袱、把里面的东西倒空（单次）：两手拎着两角一抖，再随手撇开。
+  // 榆钱洒一地那一下由 Core 的 elmRain 接住，动作只管"是谁把它抖空的"
+  shakeOut: {
+    dur: 1.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.04, torso: -2, head: -10, armF: -40, foreF: -54, armB: -34, foreB: -50, thighB: -12, shinB: 16, footB: -6, thighF: 8, shinF: 6, footF: -8 },
+      { t: 0.26, hipY: -0.03, hipX: 0.02, torso: 8, head: -16, armF: -86, foreF: -22, armB: -78, foreB: -26 },      // 拎起来
+      { t: 0.40, hipY: -0.02, hipX: -0.02, torso: -4, head: -12, armF: -70, foreF: -8, armB: -64, foreB: -12 },     // 一抖
+      { t: 0.54, hipY: -0.03, hipX: 0.02, torso: 6, head: -16, armF: -88, foreF: -20, armB: -80, foreB: -24 },      // 再一抖
+      { t: 0.90, hipY: -0.02, hipX: -0.06, torso: -8, head: -8, armF: -28, foreF: -18, armB: -26, foreB: -20 },     // 撇开
+      { t: 1.6, hipY: -0.02, hipX: -0.02, torso: 0, head: -10, armF: -32, foreF: -30, armB: -28, foreB: -28 },
+    ],
+  },
+  // 用枪身把人往回推（单次）：双手横端着枪，平推出去，人往前跨半步压过去
+  shovePush: {
+    dur: 1.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: -0.02, torso: 4, head: -8, armF: -56, foreF: -30, armB: -50, foreB: -34, thighB: -14, shinB: 18, footB: -6, thighF: 10, shinF: 8, footF: -8 },
+      { t: 0.28, hipY: -0.04, hipX: -0.10, torso: -8, head: -6, armF: -66, foreF: -46, armB: -60, foreB: -50 },     // 收回来蓄一下
+      { t: 0.44, hipY: -0.06, hipX: 0.18, torso: 28, head: -14, armF: -92, foreF: -4, armB: -84, foreB: -8, thighB: -30, shinB: 34, thighF: 20, shinF: 12 },  // 平推出去
+      { t: 0.75, hipY: -0.04, hipX: 0.08, torso: 16, head: -10, armF: -78, foreF: -18, armB: -70, foreB: -22 },
+      { t: 1.4, hipY: -0.02, hipX: -0.02, torso: 4, head: -8, armF: -56, foreF: -30, armB: -50, foreB: -34 },
+    ],
+  },
+  // 被推得倒退（单次）：胸口挨了一下，脚跟着往后倒腾两步，手在身前挡着
+  shovedBack: {
+    dur: 1.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.03, hipX: 0.08, torso: 16, head: -22, armF: -64, foreF: -30, armB: -56, foreB: -28, thighB: -14, shinB: 18, footB: -6, thighF: 10, shinF: 8, footF: -8 },
+      { t: 0.16, hipY: -0.06, hipX: -0.14, torso: -18, head: -6, armF: -80, foreF: -40, armB: -72, foreB: -38, thighB: -36, shinB: 30, thighF: 22, shinF: 16 },  // 胸口挨了一下：0.16s
+      { t: 0.42, hipY: -0.05, hipX: -0.08, torso: -10, head: -14, thighB: 18, shinB: 14, thighF: -30, shinF: 26 },   // 倒腾一步
+      { t: 0.68, hipY: -0.04, hipX: -0.10, torso: -12, head: -18, thighB: -28, shinB: 24, thighF: 16, shinF: 12 },   // 再一步
+      { t: 1.6, hipY: -0.03, hipX: -0.04, torso: -4, head: -24, armF: -58, foreF: -34, armB: -52, foreB: -32 },
     ],
   },
 };
@@ -531,10 +685,16 @@ export function PoseRig(rig, s, dt) {
     // 特写下读出来是「举手挥舞」而不是「搂着」——手根本没落到妹妹身上。
     // 现在：上臂垂到体侧偏前、**前臂横过身前兜住她的背**，手落在她另一侧的肩，
     // 头压低偏向她那边；另一只手护在她后脑。这是一对姿势，配 leanIn 一起看。
+    // 2026-08-10 又修一次：**上臂角 + 前臂角相加超过 90° 就转到"往上"去了**
+    // （0° 指向下，两节相加 −154° 的意思是前臂朝斜上方竖起来）。上一版正是这个
+    // 数，实拍下读出来是娘举着一只手，手心离孩子半米——"抱住"从来没抱上。
+    // 现在按落点反算：娘的肩 ≈1.15m，孩子的背在她身前 0.35m、低 0.2m，
+    // 两节合起来 0.49m，所以**世界角必须落在 −55° 上下**（肘弯一点，
+    // 上臂 −80 + 前臂 +26 = −54）。
     target.hipY = -0.08; target.hipX = 0.03;
     target.torso = 16 * DEG; target.head = -30 * DEG;
-    target.armF = -58 * DEG; target.foreF = -96 * DEG;   // 前臂横过来兜背
-    target.armB = -42 * DEG; target.foreB = -78 * DEG;   // 另一只手护后脑
+    target.armF = -80 * DEG; target.foreF = 26 * DEG;    // 前臂横过来兜背（世界角 −54°）
+    target.armB = -70 * DEG; target.foreB = 12 * DEG;    // 另一只手护后脑（世界角 −58°）
     target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
     target.thighF = 10 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
   } else if (s.pose === "pressed") {
@@ -562,10 +722,12 @@ export function PoseRig(rig, s, dt) {
   } else if (s.pose === "leanIn") {
     // 把额头抵在别人肩上：整个人往对方那边倒过去（不只是脖子前伸），
     // 两只小手蜷在自己胸口——不是垂着，那是站军姿。配 shelter 一起看
+    // 手同样别越过 90°（见 shelter 那条）：−118° 是"两只手举在脸前面"，
+    // 不是"蜷在胸口"。肘要折死（foreF 正值＝小臂折回来），手才落到自己胸前
     target.hipY = -0.05; target.hipX = 0.10;
     target.torso = 26 * DEG; target.head = -40 * DEG;
-    target.armB = -34 * DEG; target.foreB = -84 * DEG;
-    target.armF = -30 * DEG; target.foreF = -88 * DEG;
+    target.armB = -64 * DEG; target.foreB = 120 * DEG;
+    target.armF = -70 * DEG; target.foreF = 128 * DEG;
     target.thighB = -10 * DEG; target.shinB = 12 * DEG; target.footB = -4 * DEG;
     target.thighF = 8 * DEG; target.shinF = 6 * DEG; target.footF = -6 * DEG;
   } else if (s.pose === "mark") {
@@ -651,15 +813,72 @@ export function PoseRig(rig, s, dt) {
     target.shinF = (10 + e * 8) * DEG;
     target.footF = -10 * DEG;
   } else if (s.pose === "crank") {
-    // 摇辘轳：两手一前一后画圈，脚步扎稳
-    const ph = p * 2.4;
-    const ca = Math.sin(ph), cb = Math.cos(ph);
-    target.hipY = -0.10; target.hipX = 0.08;
-    target.torso = 18 * DEG; target.head = -10 * DEG;
-    target.armF = (-96 + ca * 26) * DEG; target.foreF = (-30 + cb * 20) * DEG;
-    target.armB = (-82 - ca * 26) * DEG; target.foreB = (-36 - cb * 20) * DEG;
-    target.thighB = -18 * DEG; target.shinB = 20 * DEG; target.footB = -6 * DEG;
-    target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+    // 摇辘轳：**手真的攥在那根摇把上**。前手由 `s.aimHand`（World 按
+    // `winchView.gripX/gripY` 换算出来的骨架局部坐标）两骨反解，所以屏幕上
+    // 摇把转到哪儿手就在哪儿——鼠标绕圈、键盘、脱手倒转三条路同一只手。
+    //
+    // 上一版是两条胳膊按一条**自转的定速相位**在半空画圈，跟画面里那根摇把
+    // 毫无关系；更要命的是轴心定在 1.43m，比这孩子的头顶还高 30 厘米，他一辈子
+    // 也够不着（2026-08-10 用户：「角色的动作也太蠢了」）。尺度已经在
+    // `Core.WINCH_HUB_Y` 那儿按"够得着"重排过了，这里只管把手送上去。
+    //
+    // s.poseK = 摇把此刻的相位（0..1，直接来自绳的行程）；
+    // s.poseStrain = 手上有多吃力（体力越低越沉）。
+    const ph = (s.poseK ?? 0) * Math.PI * 2;
+    const strain = Math.max(0, Math.min(1, s.poseStrain ?? 0));
+    // 摇把此刻在圈上的位置：cx>0 = 转到远端（要够出去），sy>0 = 转到高处。
+    // **身子跟着摇把前后送**（±0.06m）——这不是装饰：这一档身位正是"胳膊只有
+    // 0.39m 却够得到 0.43m"那笔账里的最后一项（见 Core.WINCH_HUB_Y 的注释）。
+    const cx = Math.cos(ph), sy = Math.sin(ph);
+    // **站直了摇**。这一条是实拍逼出来的：摇把对这个半大孩子来说已经在下巴
+    // 那么高（辘轳是照大人做的），腰再往前一折，脑袋就顶到摇把跟前去了——
+    // 屏幕上是"一枚大铁销糊在脸上"，胳膊还横着从脸前穿过去。人真在下巴高度
+    // 摇东西的时候本来就是直着腰、把手往前送，不是弓着背。
+    // 顺带：蹲深了鞋会陷进地里（站姿脚该在 +0.078，用 world.PlayerLimbTips()
+    // 对一遍再改）。
+    target.hipY = -0.03 - 0.03 * strain - 0.02 * sy;
+    target.hipX = -0.01 + 0.05 * cx + 0.02 * strain;
+    target.torso = (2 + 4 * cx + 8 * strain) * DEG;
+    // 眼睛看着摇把：头不许往下埋（−2 是"平着看手"，−30 那种是弯腰拾东西）
+    target.head = (-2 - 6 * strain) * DEG;
+    // 后手扶在井架柱子上稳住身子；累了整个人往那边压
+    target.armB = (-26 - 16 * strain) * DEG; target.foreB = (-52 + 10 * strain) * DEG;
+    // 脚一前一后扎稳，把手抡到高处那半圈后腿蹬直
+    target.thighB = (-20 - 6 * sy) * DEG; target.shinB = (24 + 6 * sy) * DEG; target.footB = -8 * DEG;
+    target.thighF = (14 + 4 * sy) * DEG; target.shinF = 10 * DEG; target.footF = -10 * DEG;
+    const aim = s.aimHand;
+    if (aim) {
+      // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置（同 ApplyPose 里那段）
+      const sh = BONE.torso * 0.86;
+      const sx = Math.sin(target.torso) * sh, sy = Math.cos(target.torso) * sh;
+      const rootY = BONE.hipY + BONE.sole * SoleLift(target) + target.hipY;
+      // 两组解里挑**肘朝下**的那一组：肘翘到肩膀上头是"举着手腕吊在把手上"，
+      // 不是摇辘轳（实拍抓出来的——那条胳膊读成一根横在井上的大香肠）
+      const tx = aim.x - (target.hipX + sx), ty = aim.y - (rootY + sy);
+      const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
+      const elbowY = (k) => -BONE.upperArm * Math.cos(k.arm);
+      const ik = elbowY(a1) <= elbowY(a2) ? a1 : a2;
+      target.armF = ik.arm; target.foreF = ik.fore;
+    } else {
+      // 没人告诉我摇把在哪儿（过场里摆姿势）：退回一条按相位画圈的胳膊
+      target.armF = (-96 + Math.sin(ph) * 26) * DEG;
+      target.foreF = (-30 + Math.cos(ph) * 20) * DEG;
+    }
+    // 手要跟得住摇把：默认 12/秒的混合会让手落后二三十度，读出来是
+    // "手在追那根把手"。同翻越，硬动作给足混合
+    ApplyPose(rig, t, target, Math.min(1, (dt || 0.016) * 30));
+    return;
+  } else if (s.pose === "knotPull") {
+    // 接绳勒紧：两手在胸前较劲——一只攥着井绳，一只把麻绳头往外拽。
+    // poseK = 这一把拽了多深（0..1）：拽得越狠，身子越往后坐、腰越往回收。
+    // （这一拍画面上铺着那张活卡，看不见他；卡收走的那一帧看得见。）
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.10 - 0.06 * k; target.hipX = 0.04 - 0.10 * k;
+    target.torso = (16 - 10 * k) * DEG; target.head = (-22 - 6 * k) * DEG;
+    target.armF = (-72 + 34 * k) * DEG; target.foreF = (-56 - 18 * k) * DEG;
+    target.armB = (-58 - 6 * k) * DEG; target.foreB = (-64 + 8 * k) * DEG;
+    target.thighB = (-18 - 12 * k) * DEG; target.shinB = (22 + 12 * k) * DEG; target.footB = -8 * DEG;
+    target.thighF = (14 + 8 * k) * DEG; target.shinF = (10 + 6 * k) * DEG; target.footF = -10 * DEG;
   } else if (s.pose === "vault" || s.pose === "clamber") {
     // 翻越：三段——① 手够上顶沿、后腿蹬地；② 撑起来把腿收到胸前荡过去；
     // ③ 脚先落地、屈膝卸力。姿势按 poseK（Core 给的动作进度）在关键帧之间插，
@@ -778,6 +997,25 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-60 - 10 * k) * DEG; target.foreB = (-30 + 12 * k) * DEG;
     target.thighB = (-34 - 8 * k) * DEG; target.shinB = (30 + 6 * k) * DEG; target.footB = -8 * DEG;
     target.thighF = (16 + 6 * k) * DEG; target.shinF = 14 * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "braceUp") {
+    // 在爬行段里支顶木：那截新掏的通道净高只有 0.72m（POSTURE_HEAD.crawl），
+    // 站不起来也蹲不住——只能**跪着往上顶**。poseK = 顶上去的进度：
+    // 0 = 跪坐着，板横抱在胸前；1 = 双手把板举到洞顶、胳膊撑直、腰跟着顶上去。
+    // 手的落点是照骨长算的：跪姿胯 0.308、肩 ≈0.73（躯干折 22°），
+    // 胳膊两节 0.49——armF 收到 -128° 前后时手心正好停在 0.90 上下，
+    // 乘体型 0.80 就是世界里的 0.72m，也就是洞顶那条线。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    const push = k > 0.12 ? Math.sin(k * Math.PI * 4) * 0.9 * DEG : 0;   // 一下一下往上顶的余劲
+    target.hipY = -0.312; target.hipX = 0.03 - 0.02 * k;
+    target.torso = (44 - 22 * k) * DEG;       // 从伏着到把腰顶起来
+    target.head = (-30 - 18 * k) * DEG;       // 眼睛跟着板往上看
+    // 行程全长在**小臂**上（前臂从折在胸前一路推直）——这就是"往上顶"的读法。
+    // k=1 时手心停在 0.885（体型 0.80 折世界 0.71m），正好抵住洞顶那条线
+    target.armF = (-95 - 5 * k) * DEG + push; target.foreF = (95 - 115 * k) * DEG;
+    target.armB = (-88 - 6 * k) * DEG + push; target.foreB = (92 - 114 * k) * DEG;
+    // 双膝跪在地上、小腿折向身后（爬行段里没有别的姿势可选）
+    target.thighB = -8 * DEG; target.shinB = 96 * DEG; target.footB = 16 * DEG;
+    target.thighF = -6 * DEG; target.shinF = 92 * DEG; target.footF = 14 * DEG;
   } else if (s.pose === "sitStool") {
     // 坐在矮凳上歇着：屁股落到凳面（约0.28m），小臂搭在膝上——
     // 爹开场养那只没合口的手，坐的就是这一姿势
@@ -984,6 +1222,29 @@ export function PoseRig(rig, s, dt) {
 // 膝盖相对胯的高度只由大腿的角度决定，跟胯自己在哪无关，所以能在抬升之前算。
 const KNEE_ON_GROUND = 0.05;   // 膝盖低到这儿就是跪着，体重不在脚上
 const KNEE_CLEAR = 0.13;       // 高过这儿体重全在脚上
+/**
+ * 两骨反解：把前臂末端（手）送到 (tx, ty)——**相对肩点**的骨架局部坐标（米）。
+ *
+ * 四肢角度的语义见文件头：0° = 指向下，正角 = 向后。于是"肩指向手"的方向角
+ * φ = atan2(−tx, −ty)，大臂再绕着它偏开一个由余弦定理算出来的夹角。
+ * 够不着就把距离夹到臂长（胳膊伸直去够），永远给得出一组角度——手到不了
+ * 是**摆位的错**，不该让反解在这儿抛。
+ */
+export function ArmIK(tx, ty, elbow = 1) {
+  const La = BONE.upperArm, Lf = BONE.foreArm;
+  const raw = Math.hypot(tx, ty);
+  const d = Math.max(Math.abs(La - Lf) + 1e-3, Math.min(La + Lf - 1e-3, raw));
+  const phi = Math.atan2(-tx, -ty);
+  const cosA = (d * d + La * La - Lf * Lf) / (2 * La * d);
+  const a = Math.acos(Math.max(-1, Math.min(1, cosA)));
+  const arm = phi + elbow * a;
+  const ex = -La * Math.sin(arm), ey = -La * Math.cos(arm);
+  // 手按夹过的 d 摆（够不着时就是伸直的那一点），不是按原始目标
+  const hx = -d * Math.sin(phi), hy = -d * Math.cos(phi);
+  const fore = Math.atan2(-(hx - ex), -(hy - ey));
+  return { arm, fore: fore - arm };
+}
+
 function SoleLift(t) {
   // 膝点 = 绕胯转过大腿角之后的 (0,−thigh)；两条腿取更低的那个
   const drop = BONE.thigh * Math.max(Math.cos(t.thighB), Math.cos(t.thighF));

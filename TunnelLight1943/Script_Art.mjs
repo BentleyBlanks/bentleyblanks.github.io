@@ -1220,6 +1220,56 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
         { amp: 0.3 * S, lw: 1.1 * S });
     }
     InkLine(ctx, 0, -10 * S, 0, 9 * S, "fcString", { lw: 1 * S, color: "#6b5a3f", amp: 1.6 });
+  } else if (label === "包袱布" || label === "榆钱包袱") {
+    // 妹妹那个包袱：**旧衣襟改的**，不是花头巾（历史口径——补丁衣裤的孩子
+    // 不会有装饰性的花布）。四角在上头挽一个结，兜底鼓着一小包榆钱。
+    // 这件东西第十一场要被兵一把夺走、抖空——所以它得先在画面上是个"东西"
+    const full = label === "包袱布";
+    // 尺寸按实物量：一个孩子抱得住的小包袱，兜口一拃出头——**约 0.26m**，
+    // 也就是半径 4.2 个绘制单位（S=1.5，PPM=48）。第一版按 8.5 画，上屏是
+    // 直径半米多的一坨，比妹妹的脑袋还大
+    const R = 4.2;
+    if (full) {
+      // 兜满榆钱：底下鼓成一个囊，四角在顶上挽成结
+      InkFill(ctx, [[-R * S, -0.5 * S], [-0.64 * R * S, -2.7 * S], [0, -3.3 * S], [0.64 * R * S, -2.7 * S], [R * S, -0.5 * S],
+        [0.82 * R * S, 2.7 * S], [0, 4.1 * S], [-0.82 * R * S, 2.7 * S]],
+        "bundleCloth", "#b0a084", { amp: 0.6 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.2)" });
+      // 榆钱把布顶出来的那几道起伏（不是圆点，是布面上的鼓包）
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, (-2.4 + i * 1.7) * S, (1.2 + (i % 2) * 0.7) * S, (-1.2 + i * 1.7) * S, (2.2 + (i % 2) * 0.6) * S,
+          "bundleBump" + i, { lw: 0.8 * S, color: "rgba(120,100,66,0.55)", amp: 1 });
+      }
+    } else {
+      // 抖空之后：软塌塌一片，没有了兜
+      InkFill(ctx, [[-R * S, -0.5 * S], [-0.6 * R * S, -2.3 * S], [0, -2.8 * S], [0.6 * R * S, -2.3 * S], [R * S, -0.5 * S],
+        [0.6 * R * S, 1.1 * S], [0, 1.5 * S], [-0.6 * R * S, 1.1 * S]],
+        "bundleLimp", "#b0a084", { amp: 0.8 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.16)" });
+    }
+    // 顶上挽的结：两个布角朝两边翘出去——这一笔是"包袱"与"一块布"的分界
+    InkFill(ctx, [[-0.9 * S, -2.8 * S], [-3.2 * S, -5.2 * S], [-1.1 * S, -4.2 * S], [0, -5.3 * S],
+      [1.1 * S, -4.2 * S], [3.2 * S, -5.2 * S], [0.9 * S, -2.8 * S]],
+      "bundleKnot", "#a08e70", { amp: 0.5 * S, lw: 1.1 * S, shade: "rgba(0,0,0,0.14)" });
+    // 旧衣襟的出身：一道原来的缝边 + 一块补丁
+    InkLine(ctx, -3 * S, -1.1 * S, 3 * S, -0.8 * S, "bundleSeam", { lw: 0.7 * S, color: "rgba(96,78,52,0.5)", amp: 0.8 });
+    InkFill(ctx, Rect(1.2 * S, -0.6 * S, 1.8 * S, 1.5 * S), "bundlePatch", "#98876a", { amp: 0.35 * S, lw: 0.8 * S });
+  } else if (label === "旧门板") {
+    // 拆下来的旧门板：一长条，带着横撑的榫痕和门轴那头的两个钉眼。
+    // 从通用兜底（一条光板子）里拎出来单画，是因为它在第八场要被扛进地道、
+    // 举起来顶住洞顶——观众得看得出那是**一扇门拆下来的**，不是一根方木
+    InkFill(ctx, Rect(-26 * S, -3.4 * S, 52 * S, 6.8 * S), "oldPlank", "#a8794a",
+      { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.16)" });
+    InkLine(ctx, -24 * S, 0.2 * S, 24 * S, -0.2 * S, "oldPlankGrain",
+      { lw: 0.9 * S, color: "rgba(90,60,35,0.7)", amp: 1.4 });
+    for (let i = 0; i < 2; i += 1) {
+      InkLine(ctx, (-14 + i * 28) * S, -3.4 * S, (-14 + i * 28) * S, 3.4 * S, "oldPlankTenon" + i,
+        { lw: 1.3 * S, color: "rgba(60,40,20,0.55)", amp: 0.8 });
+    }
+    for (let i = 0; i < 2; i += 1) {
+      ctx.beginPath();
+      ctx.arc((-21 + i * 5) * S, 0, 1.1 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(44,28,14,0.65)";
+      ctx.fill();
+    }
   } else if (label === "襁褓") {
     // 裹着的婴儿：一小卷布，一头略鼓（头）。补丁色——刘家的日子写在布上
     InkFill(ctx, [[-8 * S, 2 * S], [-9 * S, -2.6 * S], [-5 * S, -5 * S], [5 * S, -4.6 * S], [9 * S, -1 * S], [6 * S, 3.4 * S]],
@@ -2033,7 +2083,12 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   // 画出来是一只洗脸盆，不是一口井
   const CURB = 35;        // 井台高（px）：0.73m，蹲下去打水刚好搭得上手
   const RX = 25;          // 井台半径
-  const HUB = groundY - 69;
+  // 辘轳轴心（px，48px/米）。**这个数由"够不着"倒推**：老版 69px（1.43m）比
+  // 第一章那个孩子的头顶（1.13m）还高 30 厘米，摇把画的那个圈他一辈子也够不着，
+  // 画面上就是"人在旁边空划拉、辘轳自己在转"。45px = 0.9375m，与 Core 的
+  // WINCH_HUB_Y 一个数——改这儿必须同时改那儿（还有 WINCH_CRANK_DX/_R）。
+  // 这一档同时也是**放得下绳**的下限：井台沿 35px + 鼓半径 6.8px ≈ 42px。
+  const HUB = groundY - 45;
 
   // 常年泼出来的那一圈湿地：井脚有水痕，才不像一块摆在路当中的石头
   ctx.save();
@@ -2154,15 +2209,18 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   }
   ctx.restore();
 
-  // 摇把：轴销 + 一段柄臂 + 一节握手，钉在右端面上。摇辘轳那一拍由 World
-  // 换上会转的那只，这里就不画了（两只摇把会叉在同一根轴上）
+  // 摇把：轴销 + 一段柄臂 + 一节握手，钉在**西端面**上——摇的人站在井台西侧，
+  // 摇把长在他够得着的那一头（老版钉在东端，人在西边够不着）。柄长 5.8px＝
+  // Core 的 WINCH_CRANK_R 0.12m；轴销偏移 −21px ＝ WINCH_CRANK_DX −0.44m。
+  // 摇辘轳那一拍由 World 换上会转的那只，这里就不画了（两只摇把会叉在同一根轴上）
   if (crank) {
-    InkLine(ctx, x + DL + 2, HUB, x + DL + 14, HUB + 7, id + "arm", { lw: 5.2, color: IN.ink, amp: 0.2 });
-    InkLine(ctx, x + DL + 2, HUB, x + DL + 14, HUB + 7, id + "arm2", { lw: 3.2, color: woodDark, amp: 0.2 });
-    InkLine(ctx, x + DL + 14, HUB + 2, x + DL + 14, HUB + 13, id + "grip0", { lw: 6.4, color: IN.ink, amp: 0.2 });
-    InkLine(ctx, x + DL + 14, HUB + 2, x + DL + 14, HUB + 13, id + "grip", { lw: 4.2, color: wood, amp: 0.2 });
+    const px = x - DL - 3;          // 轴销 −21px ≈ WINCH_CRANK_DX
+    InkLine(ctx, px, HUB, px - 4.5, HUB + 3.6, id + "arm", { lw: 5.2, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, px, HUB, px - 4.5, HUB + 3.6, id + "arm2", { lw: 3.2, color: woodDark, amp: 0.2 });
+    InkLine(ctx, px - 4.5, HUB + 0.6, px - 4.5, HUB + 8, id + "grip0", { lw: 6.4, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, px - 4.5, HUB + 0.6, px - 4.5, HUB + 8, id + "grip", { lw: 4.2, color: wood, amp: 0.2 });
     ctx.beginPath();
-    ctx.arc(x + DL + 2, HUB, 2.6, 0, Math.PI * 2);
+    ctx.arc(px, HUB, 2.6, 0, Math.PI * 2);
     ctx.fillStyle = night ? "#3a3a3c" : "#5c5a56";
     ctx.fill();
   }
@@ -2453,78 +2511,299 @@ export function DrawHenCoop(ctx, x, groundY, id) {
   InkLine(ctx, L - 3, groundY - 1, L + 1, groundY - 5, id + "feather", { lw: 1, color: "rgba(210,196,160,0.8)", amp: 1.4 });
 }
 
-// 晾衣绳：两根木杆绷一道绳，挂着打补丁的粗布衫和一条裤——风里鼓着
-// 接绳的结（逐帧重画）。
+// ---------------------------------------------------------------------------
+// 接绳特写卡（**会动的那一张**）：和划线/刨料同一套活卡机制——铺满画框、
+// 每帧重画、玩家的手就按在上面。
 //
-// **不能用 THREE.Line 画**：`linewidth` 在绝大多数平台上被忽略，绳子永远只有
-// 一个像素——贴在辘轳那堆木色上根本看不见，"穿过去"这个动作等于没演。
-// 所以整套结走 canvas：真笔画、真粗细、真墨线包边。
+// 为什么这一拍要单独画一张、而不是把世界里的镜头再推近：量过。世界里那个结
+// 横过来才 0.23m，1.5m 半宽的井口特写下也只占八分之一个画宽，读出来是"一枚
+// 圆环挂在一根线上"（用户 2026-08-10：「谁看得出来这是打结」）。这张卡上，
+// 井绳挽的那个圈**占三分之一个画宽**，圈眼是个真看得见的洞。
 //
-// 压叠关系是这一拍的题眼：圈的**远侧**画在麻绳之前、**近侧**画在麻绳之后，
-// 于是绳是"从圈里穿过去"的，不是"从圈上划过去"的。少了这一层，玩家看见的
-// 只是两条线交叉。
+// 压叠关系是这一拍的题眼，和老版同一条规矩：麻绳从右下进画，**从圈的右缘
+// 底下钻进去**（右半圈画在麻绳之后）、**从左缘上头钻出来**（左半圈画在麻绳
+// 之前）。少了这一层，画面上只是两条线交叉。
 //
-// spec 里的坐标都是**相对挂点的米数**（y 向上），几何一律由 Core 算好传进来
-// （判定与作画共用一份，同石笔/刨子那条规矩）。
-export function DrawKnot(ctx, ox, oy, ppm, spec) {
-  const P = (q) => [ox + q[0] * ppm, oy - q[1] * ppm];   // 米→画布（y 翻转）
-  const HEMP = "#c69a5c", HEMP_D = "#a97f45", NEWR = "#dcb877", INK = "rgba(46,33,20,0.85)";
-  const w = Math.max(2, ppm * 0.030);      // 绳粗 ≈3cm
-  const stroke = (pts, color, width, dash) => {
-    if (pts.length < 2) return;
-    ctx.save();
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    if (dash) ctx.setLineDash(dash);
+// 版面（卡宽单位：x∈0..1，y∈0..1/aspect）由 Core 的 KNOT_CARD 定，判定与
+// 作画共用同一套数——绝不许在这儿另写一份坐标。
+// ---------------------------------------------------------------------------
+// 明度关系是这张卡的命根子，两条都是实拍量出来的：
+// ① **绳压在井口那团黑上**，不压在卡的底色上。第一版让浅色的绳压在浅色的
+//    亮底上（CardBase 的径向渐变最亮的那一块正好在结的位置），加上画布贴图
+//    没声明 sRGB、上屏整体提亮一大截，整张卡读出来是"一枚浅圈挂在浅线上"。
+// ② 两根绳自己也要分得开：井绳旧一档、麻绳新一档，差半个明度。
+const KNOT_OLD = "#7d5a24";      // 井绳：用了几十年，粗、发暗
+const KNOT_OLD_D = "#614318";
+const KNOT_NEW = "#dcb470";      // 麻绳：新的，亮一档，两根一眼分得开
+const KNOT_INK = "rgba(26,17,8,0.95)";
+
+/** 一段麻绳：墨线包边＋绳身＋捻纹。pts 是画布像素点串 */
+function KnotRope(ctx, pts, color, w, ink = KNOT_INK, cap = "round") {
+  if (!pts || pts.length < 2) return;
+  ctx.save();
+  ctx.lineCap = cap;
+  ctx.lineJoin = "round";
+  const path = () => {
     ctx.beginPath();
-    const a = P(pts[0]);
-    ctx.moveTo(a[0], a[1]);
-    for (let i = 1; i < pts.length; i += 1) { const b = P(pts[i]); ctx.lineTo(b[0], b[1]); }
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.stroke();
-    ctx.restore();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1]);
   };
-  // 墨线包边＋绳身：先粗一圈深色，再压一道本色，麻绳就有了体积
-  const rope = (pts, color, k = 1) => {
-    stroke(pts, INK, w * k + Math.max(1.6, ppm * 0.010));
-    stroke(pts, color, w * k);
-  };
-  // ① 井绳断头：从辘轳上垂下来
-  rope(spec.stand, HEMP_D, 1.05);
-  // ② 圈的远侧（画在麻绳之前）
-  rope(spec.eyeBack, HEMP, 1.0);
-  // ③ 还没走到的那截路：细虚线，只是"绳还得往哪儿去"的暗示，拉到底就没了
-  if (spec.rest && spec.restAlpha > 0.01) {
-    ctx.save();
-    ctx.globalAlpha = spec.restAlpha;
-    stroke(spec.rest, "rgba(120,102,74,0.9)", Math.max(1.4, ppm * 0.008), [ppm * 0.035, ppm * 0.03]);
-    ctx.restore();
+  path(); ctx.strokeStyle = ink; ctx.lineWidth = w + Math.max(3, w * 0.34); ctx.stroke();
+  path(); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke();
+  // 捻纹：麻绳是三股拧出来的，斜纹一道一道。没有它这就是一根塑料管
+  ctx.strokeStyle = "rgba(70,48,24,0.30)";
+  ctx.lineWidth = Math.max(1.4, w * 0.14);
+  let acc = 0;
+  for (let i = 1; i < pts.length; i += 1) {
+    const ax = pts[i - 1][0], ay = pts[i - 1][1];
+    let dx = pts[i][0] - ax, dy = pts[i][1] - ay;
+    const seg = Math.hypot(dx, dy);
+    if (seg < 1e-3) continue;
+    dx /= seg; dy /= seg;
+    for (acc += seg; acc > w * 0.62; acc -= w * 0.62) {
+      const q = seg - (acc - w * 0.62);
+      const cx = ax + dx * q, cy = ay + dy * q;
+      ctx.beginPath();
+      ctx.moveTo(cx - dy * w * 0.46 - dx * w * 0.24, cy + dx * w * 0.46 - dy * w * 0.24);
+      ctx.lineTo(cx + dy * w * 0.46 + dx * w * 0.24, cy - dx * w * 0.46 + dy * w * 0.24);
+      ctx.stroke();
+    }
   }
-  // ④ 麻绳（新绳比旧井绳亮一档，两根分得开）
-  rope(spec.rope, NEWR, 1.0);
-  // ⑤ 圈的近侧（压住麻绳）——"穿过去"就是靠这一笔成立的
-  rope(spec.eyeFront, HEMP, 1.0);
-  // ⑥ 绳头：攥住的时候鼓一点，让玩家知道手上有东西
-  const tp = P(spec.tip);
-  const tr = w * (spec.grab ? 1.05 : 0.85);
+  ctx.restore();
+}
+
+/** 毛茬的绳头：一个鼓包 + 几根散开的麻。grab=攥住了（鼓一点，麻炸开） */
+function KnotTip(ctx, x, y, w, grab, id, color = KNOT_NEW) {
+  const r = w * (grab ? 0.72 : 0.6);
+  ctx.save();
+  for (let i = 0; i < 7; i += 1) {
+    const a = -2.35 + i * 0.42 + Hash(id + "f" + i) * 0.3;
+    const len = w * (1.1 + Hash(id + "l" + i) * 1.5) * (grab ? 1.15 : 1);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + Math.cos(a) * len * 0.6, y + Math.sin(a) * len * 0.6 - w * 0.3,
+      x + Math.cos(a) * len, y + Math.sin(a) * len);
+    ctx.strokeStyle = "rgba(196,150,88,0.8)";
+    ctx.lineWidth = Math.max(1.6, w * 0.16);
+    ctx.stroke();
+  }
   ctx.beginPath();
-  ctx.arc(tp[0], tp[1], tr, 0, Math.PI * 2);
-  ctx.fillStyle = NEWR;
+  ctx.arc(x, y, r + Math.max(2.4, w * 0.2), 0, Math.PI * 2);
+  ctx.fillStyle = KNOT_INK;
   ctx.fill();
-  ctx.lineWidth = Math.max(1.6, ppm * 0.009);
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-  // 散开的麻头：绳头总是毛的
-  for (let i = 0; i < 3; i += 1) {
-    const a = -0.5 + i * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(tp[0], tp[1]);
-    ctx.lineTo(tp[0] + Math.cos(a) * tr * 2.1, tp[1] + Math.sin(a) * tr * 2.1);
-    ctx.strokeStyle = "rgba(169,127,69,0.75)";
-    ctx.lineWidth = Math.max(1, ppm * 0.005);
-    ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** 会呼吸的一团光：「按这儿」由物件自己说，不占中央那条提示，也不挂图标 */
+function KnotGlow(ctx, x, y, r, k) {
+  if (k <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = k;
+  const g = ctx.createRadialGradient(x, y, r * 0.12, x, y, r);
+  g.addColorStop(0, "rgba(255,242,200,0.95)");
+  g.addColorStop(0.55, "rgba(255,232,172,0.32)");
+  g.addColorStop(1, "rgba(255,232,172,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * 每帧重画的接绳卡。
+ * view = Core 的 state.knotCard，L = KNOT_CARD，t = 秒。
+ */
+export function DrawKnotCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  const P = (x, y) => [x * W, y * W];            // 卡宽单位 → 画布像素（y 同尺）
+  const cinch = Math.max(0, Math.min(1, view.cinch || 0));
+  const pullK = Math.max(0, Math.min(1, view.pullK || 0));
+  const grab = !!view.grab;
+  const tuck = view.phase !== "cinch";
+  const RW = W * 0.034;                          // 绳粗：3.4% 卡宽（这是一张特写）
+
+  CardBase(ctx, W, H, "#7e6a48");
+
+  // ── 背景：井架的横杆压在画框顶上，身后是井筒那团黑，底下一道石沿 ──
+  // 三笔交代"这是蹲在井架下干活"；那团黑同时是这张卡的**底**，浅色的麻绳
+  // 压在它上头才看得见（见上面配色那段注释）。
+  InkFill(ctx, [[-40 * S, -30 * S], [W + 40 * S, -30 * S], [W + 40 * S, H * 0.10], [-40 * S, H * 0.13]],
+    "knBeam", "#3e2c19", { amp: 5 * S, lw: 7 * S, shade: "rgba(0,0,0,0.34)" });
+  ctx.save();
+  const shaft = ctx.createRadialGradient(W * 0.42, H * 0.46, H * 0.06, W * 0.42, H * 0.5, H * 0.86);
+  shaft.addColorStop(0, "rgba(14,10,6,0.94)");
+  shaft.addColorStop(0.52, "rgba(16,11,6,0.80)");
+  shaft.addColorStop(1, "rgba(16,11,6,0)");
+  ctx.fillStyle = shaft;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  // 井台石沿：压住下画框，画面才有个"底"
+  InkFill(ctx, [[-40 * S, H * 0.93], [W * 0.5, H * 0.885], [W + 40 * S, H * 0.915],
+    [W + 40 * S, H + 40 * S], [-40 * S, H + 40 * S]],
+  "knCurb", "#4c4335", { amp: 5 * S, lw: 6 * S, shade: "rgba(0,0,0,0.30)" });
+
+  // ── 井绳（旧、粗、暗）：从横杆垂下来，末端**折回来挽成一个圈** ──
+  // 画法就是实物的做法：主绳垂下来 → 绕一圈 → 短头折回去贴着主绳 → 拿麻
+  // 缠住那两股（junction 那三道箍）。第一版把主绳直接插进圈心，读出来是
+  // "一枚圈挂在一根线上"，看不出那是**断了的绳自己挽的扣**。
+  // 勒紧一把，圈就收一档、两股被拽得并拢——进度全长在这个结上，不在任何条上
+  const eyeR = L.eye.r * (1 - cinch * 0.62);
+  const eye = P(L.eye.x, L.eye.y);
+  const OW = RW * 1.3;
+  const jx = L.eye.x + eyeR * 0.62;                  // 两股并拢、被缠住的那一处
+  const jy = L.eye.y - eyeR * 1.02;
+  // 主绳：从横杆垂下来，到 junction 收进圈里
+  const stand = [];
+  for (let i = 0; i <= 8; i += 1) {
+    const k = i / 8;
+    const sway = (1 - cinch) * Math.sin(k * 2.1 + t * 0.7) * 0.007;
+    stand.push(P(L.eye.x + 0.055 + (jx - L.eye.x - 0.055) * k * k + sway * (1 - k),
+      -0.07 + (jy + eyeR * 0.5 + 0.07) * k));
   }
+  KnotRope(ctx, stand, KNOT_OLD_D, OW);
+  // 折回来的短头：从圈的左上角翘出来，末端一撮毛茬（这是**断口**）
+  const tail = [
+    P(L.eye.x - eyeR * 0.50, L.eye.y - eyeR * 0.82),   // 圈的左上角
+    P(jx - eyeR * 0.62, jy - eyeR * 0.22),
+    P(jx - eyeR * 0.34, jy - eyeR * 0.62),             // 顺着主绳往上翘一小截
+  ];
+  KnotRope(ctx, tail, KNOT_OLD_D, OW * 0.92);
+
+  // 圈：分左右两半画，中间夹着麻绳——"穿过去"就是靠这一笔成立的。
+  // 圈不是个正圆（那是自行车胎）：半径带一点手绘的不匀，收紧时压扁成疙瘩
+  const arc = (a0, a1, n) => {
+    const out = [];
+    for (let i = 0; i < n; i += 1) {
+      const a = a0 + (a1 - a0) * (i / (n - 1));
+      const wob = 1 + Math.sin(a * 2.7 + 0.8) * 0.05;
+      out.push(P(L.eye.x + Math.cos(a) * eyeR * (1 - cinch * 0.18) * wob,
+        L.eye.y - Math.sin(a) * eyeR * 0.94 * wob));
+    }
+    return out;
+  };
+  const HALF = Math.PI / 2;
+  KnotRope(ctx, arc(HALF * 0.78, HALF * 3.22, 22), KNOT_OLD, OW, KNOT_INK, "butt");   // 左半圈：画在麻绳之前
+
+  // ── 麻绳（新、亮一档）：从画框右下角进画，一路到绳头 ──
+  const tip = view.tip || L.start;
+  const hemp = [];
+  {
+    // 一条带垂感的二次曲线：锚点 → 中间松垮地垂一点 → 绳头。
+    // **穿好之后要绕着圈眼走**（锚点 → 圈眼 → 绳头两段）——直接连过去会在结
+    // 那儿拐一个硬角，看着像绳被折断了，而不是从洞里穿过去的
+    const a = L.anchor, b = tip;
+    const slackY = (1 - cinch) * 0.055 + (grab ? -0.012 : 0.006 * Math.sin(t * 1.9));
+    const via = view.phase === "cinch" ? { x: L.eye.x + 0.012, y: L.eye.y + 0.01 } : null;
+    const quad = (p0, p1, p2, n) => {
+      for (let i = 0; i <= n; i += 1) {
+        const k = i / n;
+        hemp.push(P((1 - k) * (1 - k) * p0.x + 2 * (1 - k) * k * p1.x + k * k * p2.x,
+          (1 - k) * (1 - k) * p0.y + 2 * (1 - k) * k * p1.y + k * k * p2.y));
+      }
+    };
+    if (via) {
+      quad(a, { x: (a.x + via.x) / 2, y: (a.y + via.y) / 2 + slackY * 0.5 }, via, 14);
+      quad(via, { x: (via.x + b.x) / 2, y: (via.y + b.y) / 2 + 0.012 }, b, 10);
+    } else {
+      quad(a, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + slackY }, b, 22);
+    }
+  }
+  // 吃上劲的绳抻细一点（勒紧那一把最明显）
+  KnotRope(ctx, hemp, KNOT_NEW, RW * (1 - 0.12 * pullK));
+
+  KnotRope(ctx, arc(-HALF * 1.12, HALF * 0.98, 18), KNOT_OLD, OW, KNOT_INK, "butt");   // 右半圈：压住麻绳
+
+  // 断口的毛茬：井绳是**断**在这儿的，短头末端一撮散开的麻
+  KnotTip(ctx, tail[2][0], tail[2][1], OW * 0.8, false, "knOldFray", KNOT_OLD_D);
+  // 缠住两股的那三道箍：没有它，"折回来挽的扣"就散了
+  {
+    const j = P(jx - eyeR * 0.30, jy - eyeR * 0.05);   // 两股之间
+    for (let i = 0; i < 3; i += 1) {
+      const y0 = j[1] - i * OW * 0.56 + OW * 0.28;
+      InkLine(ctx, j[0] - OW * 1.05, y0 + OW * 0.16, j[0] + OW * 1.05, y0 - OW * 0.16,
+        "knWhip" + i, { lw: OW * 0.28, color: "#5c4119", amp: 2 * S });
+    }
+  }
+
+  // 勒成的疙瘩：拽一把长一圈。到第三把，圈已经收成一个实心的结
+  if (cinch > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, cinch * 1.2);
+    const lump = [];
+    for (let i = 0; i < 11; i += 1) {
+      const a = (i / 11) * Math.PI * 2;
+      const rr = eyeR * (0.62 + 0.26 * Hash("knLump" + i)) * (0.55 + cinch * 0.7);
+      lump.push([eye[0] + Math.cos(a) * rr * W, eye[1] - Math.sin(a) * rr * 0.88 * W]);
+    }
+    InkFill(ctx, lump.map((q) => [q[0], q[1]]), "knLumpF", KNOT_OLD,
+      { amp: 3 * S, lw: 6 * S, shade: "rgba(0,0,0,0.26)" });
+    // 疙瘩上的两道勒痕：绳互相咬住的那两处
+    for (let i = 0; i < 2; i += 1) {
+      InkLine(ctx, eye[0] - eyeR * W * 0.5, eye[1] + (i - 0.5) * eyeR * W * 0.5,
+        eye[0] + eyeR * W * 0.5, eye[1] + (i - 0.5) * eyeR * W * 0.5 - eyeR * W * 0.12,
+        "knBite" + i, { lw: 4 * S, color: "rgba(62,42,22,0.5)", amp: 3 * S });
+    }
+    ctx.restore();
+  }
+
+  // ── 绳头 ──
+  const tp = P(tip.x, tip.y);
+  KnotTip(ctx, tp[0], tp[1], RW, grab, "knTip");
+
+  // ── 引导：全长在物件上，没有 HUD 图标、没有按键提示、更没有轨道 ──
+  if (!grab) {
+    // 没上手：绳头透一圈会呼吸的光（按错地方闪快些催一下）
+    const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.42 + 0.34 * Math.sin(t * 3.0);
+    KnotGlow(ctx, tp[0], tp[1], L.grabR * W * 1.35, 0.14 + pulse * 0.20);
+    // 还没穿过去：圈眼里也透一点光——"往这个洞里塞"由那个洞自己说
+    if (tuck && !view.inEye) {
+      KnotGlow(ctx, eye[0], eye[1], eyeR * W * 1.05, 0.10 + 0.12 * (0.5 + 0.5 * Math.sin(t * 2.4)));
+    }
+  }
+  // 绳头自己朝该去的方向蹭两下：蹭的方向就是该拖的方向（代替 HUD 手势图标）
+  if (!grab) {
+    const aimX = tuck ? L.eye.x : L.pullTo.x;
+    const aimY = tuck ? L.eye.y : L.pullTo.y;
+    let vx = aimX - tip.x, vy = aimY - tip.y;
+    const vl = Math.hypot(vx, vy) || 1;
+    vx /= vl; vy /= vl;
+    const k = Math.max(0, Math.sin(t * 2.2)) * 0.055;
+    ctx.save();
+    ctx.globalAlpha = 0.34 * Math.max(0, Math.sin(t * 2.2));
+    const g0 = P(tip.x + vx * 0.03, tip.y + vy * 0.03);
+    const g1 = P(tip.x + vx * (0.03 + k), tip.y + vy * (0.03 + k));
+    ctx.beginPath();
+    ctx.moveTo(g0[0], g0[1]);
+    ctx.lineTo(g1[0], g1[1]);
+    ctx.strokeStyle = "rgba(255,240,196,0.9)";
+    ctx.lineWidth = RW * 0.34;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.restore();
+  }
+  // 脱手那一下：绳头周围炸一小圈灰——手上一空，看得见
+  if (view.slip) {
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = "rgba(214,196,158,0.8)";
+    ctx.lineWidth = 3 * S;
+    ctx.beginPath();
+    ctx.arc(tp[0], tp[1], RW * 2.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 四角压暗，和别的插卡一个调子
+  const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.32, W * 0.5, H * 0.5, H * 0.9);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(16,11,6,0.62)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
 }
 
 // 晾衣绳。土布只有两个颜色：**靛蓝**和本色的土黄白，冷灰一律不要（那是
@@ -4180,6 +4459,63 @@ export function DrawCrudeTimber(ctx, x, topY, botY, id, { scale = 1 } = {}) {
     InkFill(ctx, Rect(-4 * scale, -H * 0.5, 8 * scale, H * 0.52), id + "B", dark,
       { amp: 1.4 * scale, lw: 2 * scale });
     ctx.restore();
+  }
+}
+
+// 玩家亲手支上去的那一处：一块旧门板横顶在松土段的洞顶上，底下两根短立柱
+// 撑住，缝里塞了楔子。跟 DrawCrudeTimber（成气候的坑道支撑）分开画是因为
+// 这是**第一条短通道**：料只有两块拆下来的旧门板，撑的是刚掏开、净高不到
+// 一米的爬行段——柱子矮、板子带着门轴痕和钉眼，一眼看得出是从门上拆下来的。
+export function DrawTunnelBrace(ctx, ax, ay, w, h, id) {
+  // 配色比别的木件压两档：地道里本来就暗，而 CanvasTexture 这条管线还会把整张
+  // 贴图整体提亮（见项目记忆里那条"画面发白"）——按平常的木色画，顶木会和
+  // 土壁糊成一片，A/B 对比才看得出多了一根（第一版就是这么白瞎的）
+  const wood = "#6d4c26";
+  const post = "#59401f";
+  // 顶板：整块门板横着顶上去，右端略低（人是一头一头顶上去的，顶不平）
+  const tilt = (Hash(id + "tl") - 0.5) * 0.06;
+  ctx.save();
+  ctx.translate(ax, ay - h + 7);
+  ctx.rotate(tilt);
+  InkFill(ctx, Rect(-w / 2, -7, w, 13), id + "top", wood,
+    { amp: 1.3, lw: 2.6, shade: "rgba(0,0,0,0.3)" });
+  // 板底下压一道暗边：顶木的上沿正抵在洞顶那条墨线上，不给它一条自己的影子，
+  // 两条线并在一起，"多了一根木头"就读不出来
+  InkLine(ctx, -w / 2 + 2, 7, w / 2 - 2, 7, id + "sh", { lw: 3.2, color: "rgba(26,16,6,0.55)", amp: 1 });
+  // 板面上一道亮茬（新刨过的那一面朝下），跟发暗的土壁拉开一档
+  InkLine(ctx, -w / 2 + 5, -3.5, w / 2 - 5, -3.5, id + "hl", { lw: 2, color: "rgba(198,164,112,0.45)", amp: 1.2 });
+  // 门板的出身：一道横撑的榫痕 + 两个钉眼
+  InkLine(ctx, -w * 0.22, -3, -w * 0.22, 8, id + "ten", { lw: 1.5, color: "rgba(56,36,18,0.6)", amp: 1.2 });
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-w * 0.3 + i * w * 0.52, 1.5, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(44,28,14,0.7)";
+    ctx.fill();
+  }
+  ctx.restore();
+  // 两根短立柱：一根直一根歪（这活儿是跪在洞里干的，正不了）
+  for (let i = 0; i < 2; i += 1) {
+    const sx = ax + (i ? 1 : -1) * (w * 0.36);
+    const lean = (i ? -1 : 1) * (0.05 + Hash(id + "ln" + i) * 0.07);
+    ctx.save();
+    ctx.translate(sx, ay);
+    ctx.rotate(lean);
+    InkFill(ctx, Rect(-6, -(h - 6), 12, h - 6), id + "p" + i, post,
+      { amp: 1.2, lw: 2.6, shade: "rgba(0,0,0,0.34)" });
+    ctx.restore();
+    // 楔子：柱头和顶板之间打进去的那一小块（"顶实了"就在这一笔上）
+    ctx.save();
+    ctx.translate(sx, ay - h + 12);
+    InkFill(ctx, [[-6, 0], [6, -2], [4, -6], [-5, -5]], id + "w" + i, "#a07c4d", { amp: 0.7, lw: 1.7 });
+    ctx.restore();
+  }
+  // 板背后被压住的那片松土：撒下来的浮土堆在柱脚
+  for (let i = 0; i < 5; i += 1) {
+    const px = ax - w * 0.4 + Hash(id + "d" + i) * w * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(px, ay - 1, 4 + Hash(id + "dr" + i) * 5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(74,52,30,0.5)";
+    ctx.fill();
   }
 }
 
