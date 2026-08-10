@@ -93,6 +93,47 @@ for (let chapter = 1; chapter <= 8; chapter += 1) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 「由进度驱动的姿势」真的被进度驱动了吗
+//
+// 这条是补出来的。Rig 里刨料/投石都写着"姿势由进度直接驱动"，渲染层却把三个
+// 进度字段用 ?? 串了起来：`p.vaultK ?? p.poseU ?? p.poseK`。而 vaultK 从建档
+// 那一刻就是 0，`0 ?? x` 取的正是 0——于是玩法层算得再准，画面上永远停在起手
+// 那一格。纯逻辑测试看不出这个：Core 侧的 poseK 一直是对的。
+// 判据用手的世界坐标（state.handAt，渲染层从骨架上取的真挂点）：
+// 同一个姿势、不同的进度，手必须真的挪地方。
+await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/?chapter=1&fast=1`, { waitUntil: "load", timeout: 60000 });
+await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+await page.evaluate(() => {
+  for (let i = 0; i < 400; i += 1) {
+    if (window.TunnelLight.state?.phase === "playing") break;
+    window.TunnelLight.StepFrames(1, { advance: true });
+  }
+});
+const HandAt = (pose, k) => page.evaluate(({ pose, k }) => {
+  const st = window.TunnelLight.state;
+  for (let i = 0; i < 40; i += 1) {
+    st.player.pose = pose; st.player.poseT = 9;
+    st.player.poseK = k; st.player.poseU = k;
+    window.TunnelLight.Tick(1, 1 / 30);
+  }
+  return st.handAt ? { x: +st.handAt.x.toFixed(3), y: +st.handAt.y.toFixed(3) } : null;
+}, { pose, k });
+for (const [pose, label] of [["throwWind", "投石蓄力"], ["planePush", "刨料推程"]]) {
+  const lo = await HandAt(pose, 0);
+  const hi = await HandAt(pose, 1);
+  if (!lo || !hi) {
+    failed += 1;
+    console.error(`✗ ${label}：渲染层没有回填 state.handAt，姿势对不对无从验证`);
+  } else if (Math.hypot(hi.x - lo.x, hi.y - lo.y) < 0.12) {
+    failed += 1;
+    console.error(`✗ ${label}：进度 0→1 手只挪了 ${Math.hypot(hi.x - lo.x, hi.y - lo.y).toFixed(3)}m`
+      + "——姿势没有被进度驱动（多半又把 vaultK/poseU/poseK 用 ?? 串起来了）");
+  } else {
+    console.log(`✓ ${label} 由进度驱动（手从 ${lo.y.toFixed(2)}m 走到 ${hi.y.toFixed(2)}m）`);
+  }
+}
+
 await browser.close();
 server.close();
 if (failed) {

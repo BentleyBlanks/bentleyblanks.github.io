@@ -208,7 +208,6 @@ function LineDuration(line) {
 // 《勇敢的心》的关卡语法：每个障碍缺一样东西，东西在别处；石子落地出声；
 // 狗认吃不认人；灯有周期。动词凑齐了，关卡才有"想一下"的时刻。
 // ---------------------------------------------------------------------------
-const THROW_MIN = 3.0, THROW_MAX = 10.5, THROW_FLAT = 7.5;
 // 翻越：撑上顶沿 → 收腿荡过去 → 落地缓冲。比一步慢，慢到看得清是"手脚并用"，
 // 又不至于打断走路的节奏。手里拎着东西得先把东西撂上顶沿，所以更慢一档。
 const VAULT_DUR = 0.62;      // 齐胯高的墙一撑就过，拖长了就成了慢动作
@@ -261,6 +260,9 @@ function StartClimb(state, toLevel, dur) {
   p.moving = false;
   p.crouch = false;           // 梯子上不猫腰：进地道那一下的弓背等落地再说
   p.pose = null;              // 手上的活到梯子这儿一律让位给爬的姿势
+  // 从这一帧起镜头交给 lift（BaseShot 读它一档档跟着人下去）：窖口探头当场让位，
+  // 不然这一帧两个来源叠着压，画面会先多沉一下再弹回来
+  state.cellarPeek = 0;
   Cue(state, "ladder", { gain: 0.5 });
 }
 
@@ -727,18 +729,70 @@ function StepRopeLine(state, def, dt) {
 // ---------------------------------------------------------------------------
 // 投掷。飞行是真弹道（重力积分），不是两点插值——瞄准才有意义。
 //
-// 拟物路径（StepSlingAim）：攥住手里那颗石子（按下那一帧手要落在石子上），
-// 往后下方拽开——拽多远劲多大，出手方向是拽开方向的反向；弧线预览由**同一套
-// 物理**模拟出来，预览即所得。松手出手，拽得太少算把石子收回手心。
-// 蓄力姿势（throwWind）由拉弓量直接驱动：拽多远身子拧多紧。
+// **只有一条路**：攥住手里那颗石子（按下那一帧手要落在石子上），往后下方拽开。
+// 拽的**方向**定角度，拽的**长短**定劲，出手速度是拽开向量的反向。弧线预览由
+// 同一套物理跑出来，预览即所得——看着那条弧穿进树冠里再松手。拽得太少算把
+// 石子收回手心。蓄力姿势（throwWind）由拉弓量直接驱动：拽多远身子拧多紧。
 //
-// 键盘后备（StartThrow，F）：站位就是瞄准——面朝方向 3~10.5m 内有本步目标
-// 就照着它解一条正好穿过的弧；否则落在 7.5m 外，白出一声响。
+// 这儿曾经还挂着一条键盘后备（StartThrow / F）：只要站位落在 3~10.5m 里，
+// 就照着靶心**解**一条必中的弧。那等于角度不用调、劲不用调，按一下就赢——
+// 玩法整个是假的，前面那套拽弓的物理白写了。已整条删除，连 HUD 上那颗 F 键
+// 和触屏的投掷键一起撤掉：留着一个按了没反应的键比没有更糟。
+// 投掷是**指尖上的活**，按 CLAUDE.md 第 5 条不给按键后备；删后备就必须同时
+// 给驱动器一条真输入的路——那条路是 SlingSolve（见 GetBeatTarget 的 slingAt）。
 // ---------------------------------------------------------------------------
-const THROW_G = 12.5;        // 石子的重力。略沉于真实——弧线利落，不拖泥带水
-const SLING_MAX = 1.6;       // 拽满的长度（米）
-const SLING_K = 7.4;         // 拽开 1m ≈ 7.4m/s 出手速；拽满约 12m/s，射程 ≈ THROW_MAX
-const SLING_HAND_Y = 1.12;   // 攥石子的手离地高
+const THROW_G = 12.5;         // 石子的重力。略沉于真实——弧线利落，不拖泥带水
+const SLING_MAX = 1.6;        // 拽满的长度（米）
+const SLING_K = 7.4;          // 拽开 1m ≈ 7.4m/s 出手速；拽满约 11.8m/s
+// 攥石子那只手在哪儿：**优先用渲染层回填的真挂点**（state.handAt，由 HandPoint
+// 从骨架上取，姿势一换它就跟着走）。拿 p.x + 朝向×0.24 估一个固定高度是不行的——
+// 垂着手拎石子的时候手在 0.48m，蓄上力抬到 1.0m，差出大半米，玩家会在空气里按。
+// 下面这个常量只是无渲染时（单测/驱动器/首帧）的兜底。0.62 是实测值：第一章的
+// 柱子按 0.80 身量，垂手拎石子的手在 0.47m，带出蓄力架势后升到 0.6m 上下。
+// 想当然写 1.1（"手在胸口"）的话，判定圈会整整浮在石子上方半米。
+const SLING_HAND_Y = 0.62;
+function HandOf(state) {
+  const p = state.player;
+  const h = state.handAt;
+  if (h && Number.isFinite(h.x) && Math.abs(h.x - p.x) < 1.2) return { x: h.x, y: h.y };
+  return { x: p.x + p.heading * 0.24, y: SURFACE_Y + SLING_HAND_Y };
+}
+// 攥住的判定半径。手机上地表景别半宽 6.3m ≈ 31px/米，0.85m 就是 53px 直径——
+// 刚过拇指的最小可点尺寸。判定圈小于这个数，玩法就只剩"点不着"
+const SLING_GRAB_R = 0.85;
+const SLING_MIN = 0.22;       // 拽这么点不算使劲，石子收回手心
+// 驱动器/单测要用到的常数（自动通关得**真的**拽一次）——别在别处复制字面量
+export const SLING = { K: SLING_K, MAX: SLING_MAX, HAND_Y: SLING_HAND_Y, G: THROW_G, GRAB_R: SLING_GRAB_R };
+
+// 打中 (tx,ty) 最省劲的那条弧——仰角 45°+φ/2，速度刚好够到，也就是这一步的
+// 「标准答案」。自动通关照它反推出该往哪个方向拽多远，单测拿它当"这一步真解得开"
+// 的证据。拽满也够不着就返回 null（意思是：得走近些，站位仍然有分量）。
+export function SlingSolve(x0, y0, tx, ty) {
+  const d = tx - x0, h = ty - y0;
+  const r = Math.hypot(d, h);
+  const v2 = THROW_G * (h + r);
+  if (!(v2 > 0)) return null;
+  const v = Math.sqrt(v2);
+  if (v > SLING_K * SLING_MAX) return null;
+  const a = Math.atan2(h, Math.abs(d)) * 0.5 + Math.PI / 4;
+  return {
+    vx: (d >= 0 ? 1 : -1) * v * Math.cos(a),
+    vy: v * Math.sin(a),
+    power: v / (SLING_K * SLING_MAX),
+  };
+}
+
+// 手里攥着能扔的东西，就把架势摆出来：胳膊向后带一点，石子端在手里。
+// 「他随时能扔」这件事得由画面说——判定圈钉在这只手上（HandOf 取的是渲染层
+// 回填的真挂点），玩家看见石子在哪儿，就知道该按哪儿。
+// 一次性姿势（捡起来那一下的 bow）先演完，不抢。
+function ReadyToSling(state) {
+  const p = state.player;
+  if (p.pose && p.pose !== "throwWind") return;
+  p.pose = "throwWind";
+  p.poseK = 0.12;
+  p.poseT = 0.2;
+}
 
 function LaunchStone(state, x0, y0, vx, vy, target) {
   state.thrown = { x: x0, y: y0, vx, vy, target: target || null, hit: false };
@@ -748,40 +802,26 @@ function LaunchStone(state, x0, y0, vx, vy, target) {
   Cue(state, "whoosh");
 }
 
-function StartThrow(state, st) {
-  const p = state.player;
-  let tx = p.x + p.heading * THROW_FLAT;
-  let ty = 0.15;
-  let hit = false;
-  if (st?.target) {
-    const dx = (st.target.x - p.x) * p.heading;
-    if (dx >= THROW_MIN && dx <= THROW_MAX) { tx = st.target.x; ty = st.target.y ?? 1.6; hit = true; }
-  }
-  // 解一条 T 秒后正好路过 (tx,ty) 的弧：vy 里补上重力欠的那一截
-  const y0 = 1.25;
-  const T = 0.42 + Math.abs(tx - p.x) * 0.05;
-  LaunchStone(state, p.x + p.heading * 0.3, y0,
-    (tx - p.x) / T, (ty - y0) / T + 0.5 * THROW_G * T, hit ? st.target : null);
-}
-
-// 每帧的拟物瞄准。返回"正攥着"——攥着时按键路径让位。
+// 每帧的拟物瞄准。返回"正攥着"。
 // st 只为出手时把命中目标带上；链外自由投掷传 null。
 function StepSlingAim(state, input, st) {
   if (state.slingTicked) return !!state.sling;   // 链内已代管，链外别再步进一遍
   state.slingTicked = true;
   const p = state.player;
   const gy = SURFACE_Y;   // 拟物投掷只在地表玩法里出现
-  const hx = p.x + p.heading * 0.24;
   const pw = input.pointerWorld;
+  const hand = HandOf(state);
   if (!state.sling && state.ptrPressed && pw
-    && Math.hypot(pw.x - hx, pw.y - (gy + SLING_HAND_Y)) < 0.7) {
-    state.sling = { power: 0, vx: 0, vy: 0 };
+    && Math.hypot(pw.x - hand.x, pw.y - hand.y) < SLING_GRAB_R) {
+    // 攥住那一刻手在哪儿，整趟拽就以它为原点。拽到一半身子转过去、姿势抬起来，
+    // 原点都不动——不然预览的弧和真出手的弧差半米，看着中了却打空
+    state.sling = { power: 0, vx: 0, vy: 0, hx: hand.x, hy: hand.y };
   }
   const sl = state.sling;
   if (!sl) return false;
   if (input.pointerHeld && pw) {
     // 拽开的向量（手→指尖），出手是它的反向；拽过头按拽满算
-    let dx = pw.x - hx, dy = pw.y - (gy + SLING_HAND_Y);
+    let dx = pw.x - sl.hx, dy = pw.y - sl.hy;
     const len = Math.hypot(dx, dy);
     if (len > SLING_MAX) { dx *= SLING_MAX / len; dy *= SLING_MAX / len; }
     sl.power = Math.min(1, Math.hypot(dx, dy) / SLING_MAX);
@@ -789,25 +829,25 @@ function StepSlingAim(state, input, st) {
     sl.vy = -dy * SLING_K;
     // 预览弧 = 同一套物理跑出来的点列；灰/亮只说"够不够劲"，打不打得中看你瞄
     const pts = [];
-    let x = hx, y = SLING_HAND_Y, vx = sl.vx, vy = sl.vy;
-    for (let i = 0; i < 26 && y > 0.08; i += 1) {
+    let x = sl.hx, y = sl.hy, vx = sl.vx, vy = sl.vy;
+    for (let i = 0; i < 26 && y > gy + 0.08; i += 1) {
       pts.push([x, y]);
       vy -= THROW_G * 0.055;
       x += vx * 0.055;
       y += vy * 0.055;
     }
-    state.throwAim = { pts, ok: sl.power > 0.22 };
+    state.throwAim = { pts, ok: sl.power > SLING_MIN };
     // 蓄力：拽多远，身子拧多紧；往哪边拽，人反着转身瞄
     if (Math.abs(sl.vx) > 0.4) p.heading = sl.vx >= 0 ? 1 : -1;
     p.pose = "throwWind";
     p.poseK = sl.power;
     p.poseT = 0.25;
-    state.gesture = { kind: "dragDown" };
+    state.gesture = { kind: "slingBack" };
     return true;
   }
   // 松手：够劲出手，不够收回手心
   state.sling = null;
-  if (sl.power > 0.22) LaunchStone(state, hx, 1.25, sl.vx, sl.vy, st?.target || null);
+  if (sl.power > SLING_MIN) LaunchStone(state, sl.hx, sl.hy, sl.vx, sl.vy, st?.target || null);
   else { p.pose = null; p.poseK = undefined; }
   return false;
 }
@@ -1011,7 +1051,16 @@ function StepChain(state, def, input, dt) {
     if (st.type === "throwHit") {
       // 投空不白投：miss 回调让失败自己变成演示（惊飞麻雀=石子落地会出声）
       st.miss?.(state, th.x);
-      state.toast = { text: st.missNote || "石子擦着边飞过去了。再捡一颗。", t: 3 };
+      // 差在哪一头就说哪一头。只说一句"擦着边飞过去了"等于没说——玩家不知道
+      // 下一次该拽狠点还是把手压低，那这一步就成了乱试。归因清楚才叫可练
+      const what = st.targetLabel || "靶子";
+      const over = (th.x - st.target.x) * (Math.sign(st.target.x - p.x) || 1);
+      state.toast = {
+        text: over < -0.6 ? `石子没够着${what}，半路就落了地。手往后拽得再满些。`
+          : over > 0.6 ? `石子从${what}上头飞过去了。别拽那么足，手压低一点。`
+            : `石子擦着${what}底下过去了。弧再吊高些。`,
+        t: 3.2,
+      };
     }
   }
 
@@ -1278,21 +1327,14 @@ function StepChain(state, def, input, dt) {
         return;
       }
       if (p.item.id !== "stone") return;
-      // 拟物路径：攥住石子往后拽开瞄准（预览弧即弹道）。攥着时按键路径让位
+      // 只有这一条路：攥住手里那颗石子往后拽开（预览弧即弹道）。
+      // 没有按键后备——按一下就必中的那版等于没有玩法，见投掷段顶上的说明
       if (StepSlingAim(state, input, st)) return;
-      // 键盘后备自动面向靶子：投掷这一步教的是瞄准与时机，不是原地转身
-      //（驱动器也靠这条——转身和走位在阈值边上会来回震荡）
-      const faceAim = Math.sign(st.target.x - p.x) || 1;
-      if (p.heading !== faceAim && Math.abs(st.target.x - p.x) > 1.6) p.heading = faceAim;
-      // 键盘后备的弧线预览：站位不够是灰虚线，走进射程变实线——归因清楚
-      const dxAim = (st.target.x - p.x) * p.heading;
-      state.throwAim = {
-        x0: p.x + p.heading * 0.4, y0: 1.35,
-        x1: st.target.x, y1: st.target.y ?? 1.6,
-        ok: dxAim >= THROW_MIN && dxAim <= THROW_MAX,
-      };
-      state.prompt = st.prompt || "F · 投";
-      if (input.throw || (input.interact && !nearPile)) StartThrow(state, st);
+      // 攥着的时候不画任何"站对位置就中"的辅助线：站位不是瞄准，拽出来的弧才是。
+      // 手里攥着还没按上去，就只告诉他手在哪儿、往哪儿拽
+      state.prompt = st.prompt || "攥住手里的石子 · 往后下方拽开，松手出手";
+      state.gesture = { kind: "slingBack" };
+      ReadyToSling(state);
       return;
     }
     case "talk": {
@@ -2304,12 +2346,32 @@ export const SCRIPTS = {
         if (le) { le.visible = true; le.x = 60.6; le.heading = -1; }
       },
       steps: [
+        // 由头（CLAUDE.md 第 5.5 条）：先看见毛病 → 再看见一个人干不成 →
+        // 最后才是那句请求。上一版开口就是"哥——够不着"然后立刻开打，
+        // 玩家既不知道那是妹妹、也不知道一树榆钱值什么，等于直接把靶子拍脸上
         { type: "talk", actor: "sister", prompt: "E · 问妹妹",
           lines: [
-            { who: "妹妹", say: "哥——上头的榆钱够不着。", d: 3.0, cam: { kind: "shot", x: 56, y: 1.6, dist: 5.5 } },
+            // ① 毛病：树底下摊着块粗布，冠里那层青黄全是榆钱——她一个人在这儿够了半天
+            { stage: "", d: 2.6, cam: { kind: "shot", x: 56.0, y: 1.9, dist: 6.2 } },
+            // ② 一个人干不成：蹦了两下，指尖离最低那根枝还差着一截。
+            //    景别按"她的脚和她够的那根枝要同时在画里"倒推：手机 16:9 下
+            //    半高＝dist×0.462，3.0 正好框住 0~2.7m。钉在冠上（y 1.85）的话
+            //    她整个人掉到画框底下去了，这一拍就白拍
+            { stage: "", d: 2.2, cam: { kind: "insert", x: 55.8, y: 1.30, dist: 3.0 } },
+            { who: "妹妹", say: "哥——够不着。我蹦了半天了。", d: 2.8,
+              cam: { kind: "shot", x: 55.9, y: 1.6, dist: 5.5 },
+              on: (state) => {
+                const sis = FindActor(state, "sister");
+                if (sis) sis.track = null;
+              } },
+            // ③ 分量：一句话交代春荒——为什么非打这一树不可，不解释第二遍
+            { who: "妹妹", say: "娘说掺上榆钱，缸里那点糜子能多顶十天。", d: 3.2,
+              cam: { kind: "ots", subject: "sister", other: "player", dist: 3.4 } },
             // 刘嫂与襁褓：两三秒，不交互不解释——第十场认的就是这个襁褓
             { stage: "", d: 2.4, cam: { kind: "insert", x: 62.8, y: 1.35, dist: 4.4 } },
-            { stage: "", d: 2.2, cam: { kind: "shot", x: 57.5, y: 1.5, dist: 6 },
+            // ④ 最后才是那句请求：她退到一边等着捡，把树底下让出来
+            { who: "妹妹", say: "你打得着。你打，我捡。", d: 2.6,
+              cam: { kind: "shot", x: 57.5, y: 1.5, dist: 6 },
               on: (state) => {
                 const sis = FindActor(state, "sister");
                 if (sis) { sis.track = null; sis.cineTarget = { x: 59.6 }; sis.cineSpeed = 2.2; }
@@ -2328,9 +2390,12 @@ export const SCRIPTS = {
         { type: "knot", zone: V.well, knotY: 1.18,
           note: "麻绳缠紧，两头一拽——又能吃上劲了。",
           effect: (state) => { state.flags.wellRopeFixed = true; } },
-        { type: "throwHit", pickupX: 61.2, target: { x: 56.3, y: 2.2, r: 1.25 },
-          prompt: "F · 投",
-          missNote: "石子擦着枝子飞过去了。妹妹指了指最高那根细枝。",
+        // 靶心钉在树冠那团青黄里（DrawTree 的小树冠约在离地 1.5~2.4m），
+        // 判定半径 r*0.55 ≈ 0.55m：够宽到能用拇指打中，窄到必须真瞄。
+        // 从石子堆（61.2）打过去最省劲的那条弧要拽七成多，走近些能省点劲——
+        // 站位仍然有分量，只是站位不再等于命中
+        { type: "throwHit", pickupX: 61.2, target: { x: 56.3, y: 2.05, r: 1.0 },
+          targetLabel: "榆钱枝",
           miss: (state, land) => {
             state.sparrowBurst = { x: land, t: 0 };
             Cue(state, "flutter");
@@ -3287,9 +3352,9 @@ export const SCRIPTS = {
       light: { zone: [156, 164], cycle: 1, lit: 1, offFlag: "lanternOut", src: { x: 160, y: 2.4 } },
       resetHint: "灯光里晃过人影，巡逻的喝了一声。退回草垛后面，重新想辙。",
       steps: [
-        { type: "throwHit", pickupX: 152, target: { x: 160, y: 2.3, r: 2 },
-          prompt: "F · 把马灯打灭",
-          missNote: "石子磕在墙上，弹进了黑影里。再捡一颗。",
+        { type: "throwHit", pickupX: 152, target: { x: 160, y: 2.3, r: 1.3 },
+          targetLabel: "马灯",
+          prompt: "攥住手里的石子 · 往后下方拽开，瞄那盏灯",
           note: "灯罩一声脆响，火苗灭了。影子一直接到了村东口。",
           effect: (state) => { state.flags.lanternOut = true; } },
       ],
@@ -4099,7 +4164,7 @@ function MakeActor(id, kind, x, extra = {}) {
 // 派给伪军，日军押在后面。所以画面上先来的一定是本乡本土的那张脸。
 //
 // **横版里"两人并排"只能靠深度演**：一对人同一个 x，一个在行走线上、一个退后
-// 1.2m（`rank: 1` → World 按 ACTOR_RANK_DZ 整体后移人/影子/枪）。透视会把后排那个
+// 一档（`rank: n` → World 按 RankDz(n) 整体后移人/影子/枪）。透视会把后排那个
 // 画小一圈、脚在画面上抬高一点——读出来就是肩并肩。原先六个兵一个个前后跟着，
 // 那是行军纵队不是队列。
 //
@@ -4108,11 +4173,27 @@ function MakeActor(id, kind, x, extra = {}) {
 //
 // 参与潜行判定的仍只有 raid1/raid2——二十几个人一起判视线这段就没法玩了，
 // 其余全部 decor：他们负责让「鬼子进村」这四个字在画面上是真的。
-const RAID_PUPPETS = 10;      // 打头的伪军
-const RAID_JP_PAIRS = 5;      // 日军：五对，每对两人并排
 const RAID_SPEED = 2.1;       // 全队基准速度
-// 伪军里溜到后排去的那几个（松散的队形靠它，不是靠随机数）
-const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
+
+// 一排站几个人（2026-08-09 用户退回："他们一般2-3人一排 而不是和现在这样
+// 一人一排直接线性的移动"）。**一排里的人挤在半个身位内，排与排之间空一大截**——
+// 十个兵等距排成一条直线，读出来就是一条长蛇，不是队伍。
+// 日军：三排，每排三人，咬得死；伪军：三三两两几堆，堆内也是并排的。
+const RAID_JP_ROWS = [3, 3, 3];
+const ROW_STAGGER = 0.55;     // 同一排里，越靠后的人越往队尾错半个身位
+const ROW_GAP = 2.5;          // 排与排之间（比排内的错位大四五倍才读得出"排"）
+// 伪军十个：gap 小＝跟前一个挤在同一堆，rank 是他在这一堆里的第几排。
+// 堆的大小刻意不匀（2/3/1/2/2），间距也不匀——松散是他们的人物设定
+const PUPPET_FILE = [
+  { gap: 3.0, rank: 0 }, { gap: 0.52, rank: 1 },
+  { gap: 2.2, rank: 0 }, { gap: 0.58, rank: 1 }, { gap: 0.5, rank: 2 },
+  { gap: 2.7, rank: 0 },
+  { gap: 1.9, rank: 1 }, { gap: 0.5, rank: 0 },
+  { gap: 2.3, rank: 0 }, { gap: 0.62, rank: 1 },
+];
+const RAID_PUPPETS = PUPPET_FILE.length;   // 打头的伪军
+/** 队形的三个数（冒烟测试照这张表验，别在测试里另抄一份） */
+export const RAID_FORMATION = { rows: RAID_JP_ROWS, stagger: ROW_STAGGER, rowGap: ROW_GAP };
 
 // 进村行军的**队序**（从队头/最深处往村口数，gap = 与前一个的米数）。
 // 这张表是唯一的真相：入场起手位、行进目标、搜村时的停车位都从它推，
@@ -4130,22 +4211,30 @@ const PUPPET_BACK_RANK = new Set([2, 3, 6, 9]);
 // 一对人当场被拉成一前一后，正是要改掉的那个毛病。
 function BuildRaidOrder() {
   const out = [{ id: "bikeScout", gap: 0 }];     // 骑车的伪军探路，队头
-  for (let i = 0; i < RAID_PUPPETS; i += 1) {
+  PUPPET_FILE.forEach((e, i) => {
     out.push({
-      id: "c1pup" + i, gap: i === 0 ? 3.0 : 1.3,
-      rank: PUPPET_BACK_RANK.has(i) ? 1 : 0,
-      sp: RAID_SPEED + ((i % 3) - 1) * 0.05,     // 松散：走走停停的微差
+      id: "c1pup" + i, gap: e.gap, rank: e.rank,
+      // 松散：走走停停的微差。但**同一堆里的人不给微差**（gap 小的那些），
+      // 否则并排的两个走上十几秒就被拉成一前一后，正是要改掉的毛病
+      sp: e.gap > 1 ? RAID_SPEED + ((i % 3) - 1) * 0.05 : undefined,
     });
-  }
+  });
   out.push({ id: "traitor", gap: 1.9 });         // 带路递名单的翻译官走在伪军队尾
   out.push({ id: "motoLead", gap: 2.0 });        // 挎斗摩托压着伪军的后脚跟
   out.push({ id: "officer", gap: 3.2 });         // 军官走在日军队列的头里
-  for (let i = 0; i < RAID_JP_PAIRS; i += 1) {
-    out.push({ id: "c1jpF" + i, gap: i === 0 ? 1.6 : 2.0 });
-    // 后排那个只错开一掌：并排的两个人在侧视里几乎重叠，露出去的是后面那个的
-    // 头、肩和枪管（真正把"并排"演出来的是 rank，见 ACTOR_RANK_DZ）
-    out.push({ id: "c1jpB" + i, gap: 0.22, rank: 1 });
-  }
+  // 日军：一排三个，三排。**一排里错开半个身位**——原来后排只错开 0.22m，
+  // 在三十多米开外的车队机位上跟前排完全重合，十个兵看着就是一人一排的长蛇
+  //（2026-08-09 用户退回的正是这个）。半个身位错开 + 后排画小一圈，
+  // 三个人才读成"一排三个"；排与排之间空 2.5m，"排"的边界才立得住。
+  RAID_JP_ROWS.forEach((n, r) => {
+    for (let c = 0; c < n; c += 1) {
+      out.push({
+        id: `c1jp${r}x${c}`,
+        gap: c === 0 ? (r === 0 ? 1.6 : ROW_GAP) : ROW_STAGGER,
+        rank: c,
+      });
+    }
+  });
   // 进院子的那两个（下一幕的考官）压在队尾。**别把他们塞进摩托和日军中间**：
   // 那样摩托到日军队列头就隔了 9m，正是用户嫌远的那一段。他们俩反正在
   // onDone 里会被摆到院门外的街上，在队里站哪儿只影响这一镜的构图
@@ -4219,10 +4308,10 @@ function SpawnRaidSoldiers(state) {
 
 /** 队列里每个 decor 兵的 id，从队头数到队尾（进村行军 / 散开搜村共用一份名单） */
 function RaidColumnIds() {
-  const out = [];
-  for (let i = 0; i < RAID_PUPPETS; i += 1) out.push("c1pup" + i);
-  for (let i = 0; i < RAID_JP_PAIRS; i += 1) out.push("c1jpF" + i, "c1jpB" + i);
-  return out;
+  // 从队序表里取，不再另抄一份名单——两处各写一套，改了队形就会漏人
+  return RAID_ORDER
+    .filter((e) => e.id.startsWith("c1pup") || e.id.startsWith("c1jp"))
+    .map((e) => e.id);
 }
 
 // 1943 年春的一次夜间"清剿"，来的是据点一个小队加上伪军：进村就分头堵路、
@@ -4567,6 +4656,7 @@ export function StartChapter(state, index) {
   state.player.vaultBig = false;
   state.vaultDust = null;
   state.vaultHint = "";
+  state.cellarPeek = 0;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -5039,12 +5129,14 @@ export function StepGame(state, input, dt) {
   def.tick?.(state, dt);
 
   // 链外的通用投掷：手里有能扔的就能扔（软性窗口靠它——石子落地出声引开人）。
-  // 链内的投掷仍由 StepChain 自己管（要判命中）
+  // 链内的投掷仍由 StepChain 自己管（要判命中）。
+  // 这里同样只有拽弓一条路：F 键在潜行段能扔、在榆钱那步不能扔，是最坏的一种
+  // 不一致——玩家学会的东西过一场就失效。要删就整个游戏一起删
   if (def.kind !== "chain") {
     StepThrown(state, dt);
     if (state.player.item?.throwable && !state.thrown) {
       const aiming = StepSlingAim(state, input, null);   // 拽着瞄：落点自己定
-      if (!aiming && input.throw) StartThrow(state, null);
+      if (!aiming) { state.gesture = state.gesture || { kind: "slingBack" }; ReadyToSling(state); }
     }
   }
   // 路边的石子堆（潜行段的软性窗口）：捡一颗在手，第一次靠近给个一次性提示
@@ -5174,6 +5266,7 @@ function MovePlayer(state, input, dt) {
       p.moving = false;
       state.vaultHint = "";
       state.climbHint = "";
+      state.cellarPeek = 0;
       return;
     }
   }
@@ -5202,6 +5295,7 @@ function MovePlayer(state, input, dt) {
     p.moving = false;
     state.climbHint = "";
     state.vaultHint = "";
+    state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
     return;                                                    // 爬梯中锁操作
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
@@ -5303,14 +5397,34 @@ function MovePlayer(state, input, dt) {
 
   // 站在竖井口要给提示。原先这里一个字都没有，玩家根本不知道脚下能上能下——
   // 单独存一个字段，免得跟节拍自己的 prompt 抢。
+  //
+  // 顺带算一个 0..1 的**探头量**（cellarPeek）：人在地表越靠近井口，镜头就
+  // 越往下沉一档，把脚底下那个窖的剖面带进画框（Main 的 BaseShot 用它）。
+  // 为什么要这一下：地窖一直是画好的，可地表机位的下边沿只到 −1.7m，而窖底
+  // 在 −3.6m——整间窖都在画外。于是玩家按 S 之前根本看不见有这么个地方，
+  // 读起来就是"下去才凭空长出来一间屋"（用户 2026-08-10 报的）。
+  // 这是纯粹的**升降**，景别（hw）一点没变，不违反"全作只有一个景别档"。
   state.climbHint = "";
+  let peek = 0;
   for (const shaft of scene.shafts) {
-    if (Math.abs(p.x - shaft.x) > 1.4) continue;
     if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-    if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 上梯子";
-    else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
-    break;
+    const d = Math.abs(p.x - shaft.x);
+    if (d <= 1.4) {
+      if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 上梯子";
+      else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
+    }
+    // 探头的范围比提示宽一截（4.2m）：镜头得**先**沉下去，玩家才是"走过来
+    // 看见脚底下有东西"，而不是"站定了画面才动"
+    if (p.level === "surface" && scene.walk.under) {
+      const k = 1 - Math.min(1, Math.max(0, (d - 1.0) / 3.2));
+      peek = Math.max(peek, k * k * (3 - 2 * k));   // 缓入缓出，别一步跳下去
+    }
   }
+  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），别再叠一层。
+  // 被盯上的时候也不沉：潜行段镜头一往下扎，正前方摸过来的那盏灯就出了画框——
+  // 探头是"让你看见脚底下"，不是"把眼前的危险挪走"（潜行规范第 2 条）。
+  const spotted = (state.detection?.level || 0) > 0.15;
+  state.cellarPeek = (p.climbT > 0 || spotted) ? 0 : peek;
 
   // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
   if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {
@@ -6803,10 +6917,17 @@ export function GetBeatTarget(state) {
         }
         case "throwHit": {
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
-          // 站位选在捡石子那一侧：从东边捡来就站东边朝西投（免得驱动器
-          // 绕到目标另一头，半路还得掉头）
+          // 投石的按键后备已按明令删掉，驱动器只能**真的把石子拽开再松手**：
+          // 按住手里那颗石子 → 把手拖到 SlingSolve 反推出来的那个点 → 松手。
+          // 拽多远由驱动器拿玩家当帧的位置现算（站位有几厘米偏差都会带偏弧线），
+          // 所以这里只交出站位、朝向和靶心。删后备就得给驱动器一条真输入的路，
+          // 漏了这一步自动通关会当场卡死——和接绳那一步同一个道理。
           const side = st.pickupX >= st.target.x ? 1 : -1;
-          return { action: "throwAt", x: st.target.x + side * 6, level: "surface", face: -side };
+          // 4.6m：最省劲的那条弧只要拽七成多，离拽满还留着余量
+          return {
+            action: "slingAt", x: st.target.x + side * 4.6, level: "surface", face: -side,
+            aim: { x: st.target.x, y: st.target.y ?? 1.6 },
+          };
         }
         case "talk": {
           const a = FindActor(state, st.actor);
@@ -6869,11 +6990,152 @@ export function GetBeatTarget(state) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 边缘 HUD 的牌面：「接下来这一步要干的那件事」
+//
+// 勇敢的心的画框边提示不是一个方向键，是一枚带图的牌：方向由箭头说，**要去
+// 干嘛由图说**，两件事各说各的一句。所以每一种活儿、每一个要找的人都得长得
+// 不一样——找人画那个人（衣色＋侧脸，本作认人本来就靠这两样），捡东西画那件
+// 东西的小样，上手的活画手势。
+//
+// 推导跟着 GetBeatTarget 那张表走：目标是谁/是什么，这一步就画谁/画什么。
+// 剧本可以在节拍或链上的某一步写 `hintIcon` 覆盖——剧本比推导更清楚玩家这会儿
+// 在干嘛（写字符串就是只给种类，写对象可以连 who/item 一起给）。
+//
+// 种类（渲染层 Art.DrawEdgeHud 逐个有画法，别在这儿新造词而不去画）：
+//   person 找人/带人 | item 捡东西/送东西 | hand 上手使劲 | listen 贴着听
+//   crouch 蹲着看 | walk 走过去 | dig 挖 | timber 撑木 | door 扶门 | knot 打结
+//   winch 摇辘轳 | cart 推车 | throw 投石 | map 钉图 | scribe 划线 | lamp 灯
+// ---------------------------------------------------------------------------
+const HINT_ICON_KINDS = new Set([
+  "person", "item", "hand", "listen", "crouch", "walk", "dig", "timber",
+  "door", "knot", "winch", "cart", "throw", "map", "scribe", "lamp",
+]);
+
+function NormHintIcon(v) {
+  const icon = typeof v === "string" ? { kind: v } : v;
+  return icon && HINT_ICON_KINDS.has(icon.kind) ? icon : null;
+}
+
+// 链上某件东西的名字：`needs` 给的是 id，牌面要画的是那件东西本身
+function ChainItemLabel(def, itemId) {
+  for (const st of def.steps || []) if (st.item?.id === itemId) return st.item.label;
+  return null;
+}
+
+export function BeatHintIcon(state) {
+  const def = CurrentBeatDef(state);
+  if (!def) return null;
+  const p = state.player;
+  const Person = (id) => {
+    const a = FindActor(state, id);
+    return a ? { kind: "person", who: a.kind || "villager", id } : { kind: "walk" };
+  };
+  const Item = (label) => (label ? { kind: "item", item: label } : { kind: "hand" });
+  const Held = () => Item(p.item?.label || p.carry);
+  // 使劲的手：往哪儿使由笔画方向说（铲土往下、顶撑木往上）
+  const Hand = (stroke) => ({ kind: "hand", gesture: stroke === "up" || stroke === "down" ? stroke : null });
+  if (def.hintIcon) return NormHintIcon(def.hintIcon);
+  switch (def.kind) {
+    case "goto": case "gotoSeq": case "linger": case "coverRun": case "cartRide":
+      return { kind: "walk" };
+    case "collect": {
+      if (p.carry || p.item) return Held();
+      const it = state.beat.itemStates?.find((x) => !x.carried && !x.delivered);
+      return Item(it?.label);
+    }
+    case "escort": {
+      const f = FindActor(state, def.follower);
+      // 还没招呼上：画她本人（"去找妹妹"）；已经跟上了：画路（"带她过去"）
+      return f && !f.following && f.visible ? Person(def.follower) : { kind: "walk" };
+    }
+    case "leadFollow": return Person(def.leader);
+    case "lead": {
+      const loose = state.actors.find((a) => a.group === def.group && a.visible && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "observe": return { kind: "crouch" };
+    // 听是"憋住别动"那一类，跟使劲的手不是一回事
+    case "hold": return def.sustain ? { kind: "listen" } : Hand(def.stroke);
+    case "doomedHold": return Hand(null);
+    case "mapBoard": return { kind: "map" };
+    case "scribe": return { kind: "scribe" };
+    case "plane": return Item("刨子");
+    case "douseLamps": {
+      // 最后一盏在顺子手里：那一步是去找人，不是去吹灯
+      const lit = (state.lamps || []).filter((l) => l.lit);
+      return lit.length <= 1 ? Person("shunzi") : { kind: "lamp" };
+    }
+    case "actSeq": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      if (st.hintIcon) return NormHintIcon(st.hintIcon);
+      return st.walk ? { kind: "walk" } : Hand(st.stroke);
+    }
+    case "buildSpots": {
+      const i = state.beat.spotDone.findIndex((d) => !d);
+      if (i < 0) return null;
+      const spot = def.spots[i];
+      if (spot.pickup && !state.beat.pickedUp?.[i]) return Item(spot.pickup.label || spot.pickup);
+      return Hand(def.stroke);
+    }
+    case "digSeq": {
+      const key = ["collapse1", "collapse2"][state.beat.digIndex];
+      if (!key) return null;
+      if (def.shore && !state.collapses[key].shored) {
+        // 撑木还没扛来就先画那根木头（去取它），扛在肩上了就画"顶上去"
+        return p.item?.id === "beam" ? { kind: "timber" } : Item("撑木");
+      }
+      return { kind: "dig" };
+    }
+    case "chain": {
+      const st = def.steps[state.beat.stepIndex || 0];
+      if (!st) return null;
+      if (st.hintIcon) return NormHintIcon(st.hintIcon);
+      switch (st.type) {
+        case "pickup": case "pickupGround": return Item(st.item?.label);
+        case "drop": return Held();
+        case "use": return st.needs
+          ? Item(p.item?.id === st.needs ? p.item.label : ChainItemLabel(def, st.needs))
+          : Hand(st.stroke);
+        case "holdDoor": return { kind: "door" };
+        case "knot": return { kind: "knot" };
+        case "winch": return { kind: "winch" };
+        case "brace": return { kind: "timber" };
+        case "push": return { kind: "cart" };
+        case "goto": return { kind: "walk" };
+        case "talk": return Person(st.actor);
+        // 手里没石子先去捡（画石子本身），攥上了再画"投"
+        case "throwHit": return p.item ? { kind: "throw" } : Item("石子");
+        default: return { kind: "walk" };
+      }
+    }
+    // 救人的那几拍：还有人没招呼到就画那个人，都跟上了就画路。
+    // 挑人的条件必须跟 GetBeatTarget 一模一样，否则牌上是甲、路却通往乙
+    case "floodRescue": {
+      const loose = state.actors.find((a) => a.kind === "villager" && a.visible && !a.evacuated && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "smokeEscape": {
+      const loose = state.actors.find((a) => a.kind === "villager" && a.visible && !a.evacuated
+        && !a.scripted && !(def.lossScript && a.id === "shunzi") && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    case "rescueLoop": {
+      if (state.actors.some((a) => a.pocket && a.visible && !a.evacuated && a.following)) return { kind: "walk" };
+      const loose = state.actors.find((a) => a.pocket && a.visible && !a.evacuated && !a.following);
+      return loose ? Person(loose.id) : { kind: "walk" };
+    }
+    default: return { kind: "walk" };
+  }
+}
+
 // 画框边缘的指路标（勇敢的心式）：目标出了画框、又离玩家真的远时，路标
-// 不该跟着目标一起消失在框外——它滑到画框边缘、掉个头指向框外，「下一步
-// 在这边」。目标在另一层的，先指向能用的爬梯口（横轴上路总要先经过它），
+// 不该跟着目标一起消失在框外——它滑到画框边缘，变成一枚**带图的牌**：箭头
+// 指出框外，牌面画着接下来要干的那件事（见 BeatHintIcon）。
+// 目标在另一层的，先指向能用的爬梯口（横轴上路总要先经过它），
 // 并带上「下去/上来」的竖向记号；已经站在梯口的不指（上下怎么走交给爬梯提示）。
-// 纯函数：镜头在哪、画多宽由渲染层喂进来，这里只管"该不该指、指哪边"。
+// 纯函数：镜头在哪、画多宽由渲染层喂进来，这里只管"该不该指、指哪边、画什么"。
 export function EdgeHint(state, camX, viewW) {
   if (state.phase !== "playing" || state.microCine) return null;
   // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
@@ -6902,7 +7164,8 @@ export function EdgeHint(state, camX, viewW) {
   const offscreen = Math.abs(tx - camX) > viewW / 2 - 1.2;
   const far = Math.abs(tx - p.x) > 4.5;
   if (!offscreen || !far) return null;
-  return { side: tx < camX ? -1 : 1, climb };
+  // 牌面推不出来的时候退回一枚"走过去"——宁可少说一句，不许空着一张牌
+  return { side: tx < camX ? -1 : 1, climb, icon: BeatHintIcon(state) || { kind: "walk" } };
 }
 
 // ---------------------------------------------------------------------------
