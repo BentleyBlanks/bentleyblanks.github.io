@@ -50,7 +50,7 @@ export function LightPath(from, to) {
   return before === from ? [from, to] : [from, before, to];
 }
 
-function MixHex(c0, c1, k) {
+export function MixHex(c0, c1, k) {
   const r = Math.round(((c0 >> 16) & 255) + (((c1 >> 16) & 255) - ((c0 >> 16) & 255)) * k);
   const g = Math.round(((c0 >> 8) & 255) + (((c1 >> 8) & 255) - ((c0 >> 8) & 255)) * k);
   const b = Math.round((c0 & 255) + ((c1 & 255) - (c0 & 255)) * k);

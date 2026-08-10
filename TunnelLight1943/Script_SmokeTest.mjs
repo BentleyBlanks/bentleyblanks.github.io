@@ -121,7 +121,13 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
       } else {
         const dx = target.x - p.x;
         const laggard = state.actors.some((a) => a.following && a.visible && Math.abs(a.x - p.x) > 4.6);
-        if ((target.action === "walk" || Math.abs(dx) > 1.15) && !laggard) {
+        // 「走到多近算到了」不能写死。判定区是 `|dx| <= zone.w/2`，可驱动器一律
+        // 走到 1.15 就撒腿——半宽比 1.15 还窄的区，人就停在区外，按住 E 也按不响。
+        // 倒土那个 w:2.6 的猪圈（半宽 1.3）差一点点就栽在这上头，而它旁边
+        // w:2.8 的扫帚步一直是过的，所以这坑埋了很久没响过。
+        // reach 由 GetBeatTarget 从 zone 自己推出来；留 0.2 的余量踩稳在区里。
+        const near = target.reach ? Math.min(1.15, Math.max(0.35, target.reach - 0.2)) : 1.15;
+        if ((target.action === "walk" || Math.abs(dx) > near) && !laggard) {
           input.moveX = Math.sign(dx);
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
@@ -182,7 +188,10 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
         // 受伤版刨木（c1_repair）：手抖那口气没喘完就得松手，驱动器照着 rest 松
         if (target.action === "planeAt") input.interactHeld = !state.planing?.rest;
-        if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
+        // 按 E 的距离与上面「走到多近」用同一个数：两个门槛不一致，中间那条缝里
+        // 驱动器既不再往前走、也还没开始按，就是死等（这次倒土栽的正是这条缝）
+        const holdNear = target.reach ? near : 1.35;
+        if (target.action === "holdAt" && Math.abs(dx) <= holdNear) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
         }
@@ -1149,6 +1158,12 @@ function TestWinchIsACrankNotALever() {
     // 这一道是四道手里唯一不靠转盘的动作，也是打水这件事真正的样子
     assert.equal(w.phase, "dunk", "桶碰着水不该直接满，得先墩");
     assert.equal(w.filled, false, "没墩过的空桶不许算满");
+    // 井底那扇小窗：主相机看不到井口以下，这一拍全靠第二台相机演。
+    // 它同时是"为什么要墩"唯一的说明——断了这条，二道手就成了没头没脑的
+    assert.equal(state.pip?.kind, "wellBottom", "桶沉进井里就该开井底那扇小窗");
+    assert.equal(state.pip.t, null, "这扇小窗由玩法自己收，不许几秒后自动关掉");
+    assert.ok(state.pip.at && state.pip.at.y < -0.5,
+      `小窗得真的架在井筒里（实际 y=${state.pip?.at?.y}）`);
     circle(-1, 30);
     assert.equal(w.filled, false, "墩桶这一道接着绕摇把是没用的——动作对不上事");
     // 攥住井绳往下拽：按下那一帧手得落在绳上（绳吊在井心，不是摇把那一侧）
@@ -1203,6 +1218,7 @@ function TestWinchIsACrankNotALever() {
     assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
       "键盘后备必须走得完四道手（力气见底只该变慢，不该卡死）");
     assert.equal(state.player.item?.id, "fullBucket", "四道手都走完，手里才是一桶水");
+    assert.equal(state.pip, null, "打完水那扇井底小窗得跟着收走");
   }
 
   // ── ④⑤ 桶吊着不放：手劲一路掉，掉光了辘轳自己往下溜 ──
@@ -1737,6 +1753,33 @@ function TestCliAnswersQuestions() {
   assert.ok(through > 50, `--flag tunnelDug=1 应该让人走进七叔家窖，却停在 ${through}`);
   assert.ok(through - wall > 8, "开关没起作用：翻不翻都走到同一个地方");
   console.log(`  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现 / --flag 拨开关（${wall} → ${through}）`);
+}
+
+// 开场那阵风必须看得见（2026-08-10 用户：「风一吹过 你至少把风的动效做出来」）。
+// 原来只有一声呼和门一荡，画面上什么都没刮过。吹倒门那一镜要立 state.wind
+// （渲染层照着画尘土流线与打滚的草屑），风声与画面同帧起，吹完自己散。
+function TestOpeningWindIsVisible() {
+  const state = CreateGame(0);
+  const beats = ChapterBeatList(0);
+  DebugJump(state, 0, beats.findIndex((b) => b.id === "c1_open"));
+  const step = (input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  step({}, 2);
+  let guard = 0;
+  while (!state.wind && guard < 400) { guard += 1; step({ advance: true }); step({}, 2); }
+  assert.ok(state.wind, "吹倒门那一镜必须立起看得见的风（state.wind）");
+  assert.ok(state.wind.dur >= 2, "风要盖过门磕框那一下，别一闪就没");
+  assert.equal(state.wind.dir, 1, "风向得和门坠的方向一致（+x）");
+  assert.ok(state.cues.some((q) => q.name === "windGust"), "风声与风的画面要同一帧起");
+  step({}, Math.ceil((state.wind.dur + 0.4) * 30));
+  assert.equal(state.wind, null, "风吹完必须自己散掉");
+  console.log("  ✓ 开场那阵风看得见：尘土通道立起、与风声同帧、吹完自散");
 }
 
 // 手势小黑饼（#gestureHint：暗圆盘+一粒点按方向做动画）已整体拆除。
@@ -2312,8 +2355,12 @@ function TestRaidColumn() {
   assert.equal(active.length, 2, `进院搜查的必须恰好两个兵，现在 ${active.length} 个`);
   assert.ok(enemies.some((a) => a.mount === "bicycle"), "队伍里得有骑车的伪军");
   assert.ok(enemies.some((a) => a.mount === "motorcycle"), "队伍里得有挎斗摩托");
-  const side = enemies.find((a) => a.pinTo);
-  assert.ok(side, "挎斗里得坐着一个兵");
+  // 斗里坐的是**军官本人**（2026-08-10 用户定：太君坐斗、兵开车），
+  // 交头接耳那一镜之后他才下车——进村这一拍必须还钉在车上
+  const side = state.actors.find((a) => a.pinTo);
+  assert.ok(side, "挎斗里得坐着人");
+  assert.equal(side.id, "officer", "斗里坐的得是军官（太君坐斗、兵开车）");
+  assert.equal(side.pose, "sitSide", "军官进村时得是坐在斗里的姿势");
   assert.ok(state.actors.some((a) => a.id === "baozhang" && a.carry === "名册"), "伪保长得夹着保甲册带路");
   // 钉在车上的兵要真的跟着车走
   const moto = state.actors.find((a) => a.id === "motoLead");
@@ -2546,6 +2593,24 @@ function TestCineActorsClearOfObstacles() {
 // 这条测试盯三件事：① 只有攥住手里那颗石子才起手；② 拽的方向和长短真的决定
 // 弧线（同一个站位，拽错了就打不中）；③ 按键路径彻底没了，按 F 一颗石子也飞不出去。
 // 命中后妹妹必须乐（cheerHop + 夸一句）——玩家的成功要有人接着。
+// 剧本里写的每一个姿势名，Rig 里必须真的有那一支。
+//
+// 这条是补出来的：姿势名对不上不会报错，只会**静悄悄地不生效**——
+// 落到姿势链的末尾，人照常站着，字幕替他把活干了。本项目已经栽过两次
+// （`father.pose = "dig"` 根本不存在；地道里指洞顶差点又写成 "point"）。
+// 靠源码互查，不需要把 Script_Rig 拉进 node（它 import three，跑不起来）。
+function TestPoseNamesExist() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
+  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  const handled = new Set([...rig.matchAll(/s\.pose === "([A-Za-z]+)"/g)].map((m) => m[1]));
+  assert.ok(handled.size > 15, `Rig 里应当有一整套姿势，实测只认出 ${handled.size} 个`);
+  const used = new Set([...core.matchAll(/\.pose = "([A-Za-z]+)"/g)].map((m) => m[1]));
+  const bad = [...used].filter((n) => !handled.has(n));
+  assert.deepEqual(bad, [], `剧本里这些姿势 Rig 不认识，写了等于没写：${bad.join("、")}`);
+  console.log(`  ✓ 剧本用到的 ${used.size} 个姿势名 Rig 全都接得住（共 ${handled.size} 支）`);
+}
+
 function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
@@ -2698,15 +2763,18 @@ function TestRopeLineIsRealRope() {
     const r = state.ropeLine;
     const pts = r?.pts || [];
     const a = pts[0], b = pts[pts.length - 1];
-    let sag = 0, onDirt = 0, chainLen = 0;
+    let sag = 0, onDirt = 0, chainLen = 0, low = Infinity;
     for (let i = 0; i < pts.length; i += 1) {
       const q = pts[i];
       const t = (q.x - a.x) / ((b.x - a.x) || 1);
       sag = Math.max(sag, (a.y + (b.y - a.y) * t) - q.y);
-      if (q.y <= 0.09) onDirt += 1;
+      low = Math.min(low, q.y);
+      // 只数**绳身**（两端不算）：锚点那一头就是躺在地上那盘绳，它贴地是对的。
+      // 要问的是"绳身有没有赖在土里"——绷直的时候绳身必须整条离地
+      if (i > 0 && i < pts.length - 1 && q.y <= 0.09) onDirt += 1;
       if (i) chainLen += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y);
     }
-    return { sag, onDirt, chainLen, span: Math.hypot(b.x - a.x, b.y - a.y), n: pts.length };
+    return { sag, low, onDirt, chainLen, span: Math.hypot(b.x - a.x, b.y - a.y), n: pts.length };
   };
 
   state.player.x = 35.6;
@@ -2716,12 +2784,41 @@ function TestRopeLineIsRealRope() {
   step({}, 2);
   assert.ok(shape().n > 8, "绳必须是一串质点（verlet 链），不是两点一根棍");
 
+  // ⓿ **两头都得长在实处**（用户 2026-08-10：「这个虚空绳头是什么鬼」）。
+  // 老版把锚点写成硬编码的 (35.1, 离地 1.02m)：小周站在 35.8、手还垂着，
+  // 那一米高的点上什么也没有，绳就从空气里长出来；地上那盘绳又画在这一点的
+  // 正下方，绳的第一个质点离盘子整整一米，谁也不挨谁。
+  {
+    const r = state.ropeLine;
+    const xz = state.actors.find((a) => a.id === "xiaozhou");
+    assert.ok(xz, "放绳的小周得在场");
+    assert.ok(Math.abs(r.x0 - xz.x) < 1.2,
+      `绳盘那头必须挨着小周（他在 ${xz.x.toFixed(2)}，锚点在 ${r.x0.toFixed(2)}）`);
+    assert.ok(r.y0 < 0.2,
+      `绳盘那头得贴在地上（盘子就画在地上，实测 y=${r.y0.toFixed(2)}）——悬在半空就是"虚空绳头"`);
+    assert.ok(Math.abs(r.pts[0].y - r.y0) < 0.25,
+      "绳的第一个质点必须落在盘子上，不能隔着一截空气");
+    // 锚点是**跟着人**的，不是钉在坐标上：小周挪一步，盘子和绳一起挪
+    const was = r.x0;
+    xz.x += 1.4;
+    step({}, 2);
+    assert.ok(Math.abs(state.ropeLine.x0 - (was + 1.4)) < 0.05,
+      "小周挪了，他脚边那盘绳就得跟着挪（锚点不许写死成一个坐标）");
+    xz.x -= 1.4;
+    step({}, 2);
+  }
+
   // ① 半道上：绳松着，垂到土上被拖着走
   step({ moveX: 1 }, 60);
   const mid = shape();
   assert.ok(mid.span > 6, `该走出去半条街了，实为跨度 ${mid.span.toFixed(1)}m`);
-  assert.ok(mid.sag > 0.6, `拉直之前绳必须垂下来（实测垂度 ${mid.sag.toFixed(2)}m）`);
+  // 「垂下来」最诚实的判据是**最低点贴不贴土**，不是相对两端连线的垂度：
+  // 那条弦的两头一个在盘子上（贴地）、一个在人手里（0.94m），本来就是斜的，
+  // 绳整条趴在地上时相对它的"垂度"只有 0.5m 上下——2026-08-10 把锚点从
+  // 半空挪到地面之后，0.6m 那个阈值量的其实是旧几何，不是绳的形状
+  assert.ok(mid.low <= 0.09, `松着的绳最低点必须落在土上（实测 ${mid.low.toFixed(2)}m）`);
   assert.ok(mid.onDirt >= 5, `松着的那截必须躺在土上（实测贴地 ${mid.onDirt} 个质点）`);
+  assert.ok(mid.sag > 0.4, `拉直之前绳必须是垂着的（实测垂度 ${mid.sag.toFixed(2)}m）`);
 
   // ② 走到头：绳放完了，离地绷成一条线
   step({ moveX: 1 }, 260);
@@ -2773,6 +2870,7 @@ function TestRopeLineIsRealRope() {
 
 TestPromptsAreDeviceNeutral();
 TestStrokeWork();
+TestPoseNamesExist();
 TestSlingThrow();
 TestElmSetupIsMotivated();
 TestWorkStations();
@@ -2788,6 +2886,7 @@ TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
+TestOpeningWindIsVisible();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
