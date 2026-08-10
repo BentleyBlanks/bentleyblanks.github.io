@@ -2752,14 +2752,17 @@ function TestRopeLineIsRealRope() {
   assert.equal(state.player.level, "under", "按了 S 就该下去");
   assert.equal(state.player.item, null, "绳头不许跟着人钻进地道");
   assert.equal(state.beat.stepIndex, 0, "绳收回去了，链就该退回『抓住绳头』那一步");
-  // 等下梯子那 1.5 秒走完（上下梯子是真爬，climbT 没清之前不接第二次爬梯输入）
-  step({}, 60);
+  // 等这一趟爬梯整个走完再说。**别写死帧数**：一趟不只是爬的那 1.5 秒，
+  // 前后还各有掀盖板和盖回去的一段（Core 的 LID_OPEN / LID_SHUT）。
+  // 写死 60 帧的那一版在加盖板动画之后当场挂了——等到 climbT 归零才靠谱。
+  const waitClimb = () => { let g = 0; while (state.player.climbT > 0 && g++ < 400) step({}, 1); };
+  waitClimb();
   const back = state.ropeLine;
   assert.ok(Math.abs(back.pts[back.pts.length - 1].x - back.x0) < 0.4,
     "回弹完绳头该缩回锚点（小周手里）");
 
   // ⑤ 不是死局：爬上来还能重拽一遍
-  step({ climb: -1 }, 1); step({}, 70);
+  step({ climb: -1 }, 1); waitClimb();
   assert.equal(state.player.level, "surface", "该爬得回地面");
   state.player.x = 35.6; step({}, 3);
   assert.ok(/绳头/.test(state.prompt || ""), `上来必须还能重拽（提示实为 ${JSON.stringify(state.prompt)}）`);

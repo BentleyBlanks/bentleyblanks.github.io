@@ -261,13 +261,23 @@ const LADDER_RUNG = 0.34;    // 横档间距：每挪过一档响一声，声音
 
 // 层数当帧就翻（碰撞/视线/玩法一律按目的层算，不留半层的中间态），
 // 渲染高度另走 p.lift 从原来那层缓过去。两件事分开，玩法才不会出现"半层人"。
-function StartClimb(state, toLevel, dur) {
+// 窖口上有盖板：一块抹了泥灰做旧的旧门板（正是 c1_plane 刨出来的那块）。
+// 上下地道不是"人从地面沉下去"，是**掀开盖板 → 爬 → 把盖板拉回来盖上**。
+// 三段共用一个计时器（`p.climbT`）：
+//   掀盖 LID_OPEN → 爬 travelDur → 盖回 LID_SHUT
+// 分三段而不是三个状态机，是因为「落地归零」那套断言盯的是 lift 的单调性——
+// 掀盖那段 lift 停在起点、盖回那段停在终点，只降不升仍然成立。
+const LID_OPEN = 0.45;       // 掀开：土封的边先崩开，板子立起来
+const LID_SHUT = 0.50;       // 盖回：从底下伸手够着拉，比掀开慢一点
+
+function StartClimb(state, toLevel, dur, shaftId) {
   const p = state.player;
   const fromY = p.level === "under" ? UNDER_Y : SURFACE_Y;
   const destY = toLevel === "under" ? UNDER_Y : SURFACE_Y;
   p.level = toLevel;
-  p.climbT = dur;
-  p.climbDur = dur;
+  p.travelDur = dur;
+  p.climbDur = LID_OPEN + dur + LID_SHUT;
+  p.climbT = p.climbDur;
   p.climbFrom = fromY;
   p.lift = fromY - destY;
   p.rung = 0;
@@ -277,7 +287,9 @@ function StartClimb(state, toLevel, dur) {
   // 从这一帧起镜头交给 lift（BaseShot 读它一档档跟着人下去）：窖口探头当场让位，
   // 不然这一帧两个来源叠着压，画面会先多沉一下再弹回来
   state.cellarPeek = 0;
-  Cue(state, "ladder", { gain: 0.5 });
+  // 盖板归渲染层读：id 说是哪个窖口，open 是 0..1 的掀开量
+  state.lid = { id: shaftId || null, open: 0 };
+  Cue(state, "dig", { gain: 0.34 });        // 土封的边崩开，先是一下刮土
 }
 
 // 翻越的抬升曲线：人真的离地，不是换个姿势平移过去。
@@ -5869,14 +5881,31 @@ function MovePlayer(state, input, dt) {
   if (p.climbT > 0) {
     p.climbT = Math.max(0, p.climbT - dt);
     const destY = p.level === "under" ? UNDER_Y : SURFACE_Y;
-    const k = p.climbDur > 0 ? p.climbT / p.climbDur : 0;      // 1 → 0
-    const e = k * k * (3 - 2 * k);                             // 起步收势各缓一点
+    const travel = p.travelDur || Math.max(0.1, p.climbDur - LID_OPEN - LID_SHUT);
+    const gone2 = p.climbDur - p.climbT;                       // 已经走了多久 0 → climbDur
+    // 三段：掀盖（人还在口上）→ 爬（lift 走完全程）→ 盖回（人已到位，伸手拉回来）
+    let travelK;                                               // 0 → 1
+    let lidOpen;                                               // 0 → 1 → 0
+    if (gone2 < LID_OPEN) {
+      travelK = 0;
+      lidOpen = gone2 / LID_OPEN;
+    } else if (gone2 < LID_OPEN + travel) {
+      travelK = (gone2 - LID_OPEN) / travel;
+      lidOpen = 1;
+    } else {
+      travelK = 1;
+      lidOpen = Math.max(0, 1 - (gone2 - LID_OPEN - travel) / LID_SHUT);
+      // 板子落回洞口那一下闷响（只发一次）
+      if (!p.lidShut && lidOpen <= 0.02) { p.lidShut = true; Cue(state, "drop", { gain: 0.55 }); }
+    }
+    const e = 1 - travelK * travelK * (3 - 2 * travelK);        // 1 → 0，起步收势各缓一点
     p.lift = (p.climbFrom - destY) * e;
+    if (state.lid) state.lid.open = lidOpen;
     // 一档一档地响：按真正挪过的距离发，不是定时循环——快慢都对得上
     const gone = Math.abs(p.climbFrom - destY) * (1 - e);
     const rung = Math.floor(gone / LADDER_RUNG);
     if (rung !== p.rung) { p.rung = rung; Cue(state, "ladder", { gain: 0.42 }); }
-    if (p.climbT <= 0) { p.lift = 0; p.climbDur = 0; }
+    if (p.climbT <= 0) { p.lift = 0; p.climbDur = 0; p.lidShut = false; state.lid = null; }
     p.moving = false;
     state.climbHint = "";
     state.vaultHint = "";
@@ -6032,9 +6061,9 @@ function MovePlayer(state, input, dt) {
         }
         // 据点地道没有做地表：真让他爬上去会掉进一个空场景，提示全消失
         if (!scene.walk.surface) break;
-        p.x = shaft.x; StartClimb(state, "surface", CLIMB_UP);
+        p.x = shaft.x; StartClimb(state, "surface", CLIMB_UP, shaft.id);
       } else if (input.climb > 0 && p.level === "surface" && scene.walk.under) {
-        p.x = shaft.x; StartClimb(state, "under", CLIMB_DOWN);
+        p.x = shaft.x; StartClimb(state, "under", CLIMB_DOWN, shaft.id);
       }
       break;
     }

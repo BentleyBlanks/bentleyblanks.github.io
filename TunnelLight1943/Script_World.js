@@ -461,6 +461,8 @@ export function CreateWorld(canvasEl) {
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null, cartWheel = null;
+  // 窖口盖板：每个竖井一块，绕铰链掀开（UpdateProps 每帧读 state.lid 转角度）
+  let lidMeshes = [];
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchBucketFull = null, winchCrank = null,
     winchGuide = null, winchCoil = null;
@@ -538,6 +540,7 @@ export function CreateWorld(canvasEl) {
     fluid = null; fluidKey = ""; fluidMesh = null;
     fluidCanvas = null; fluidCtx = null; fluidImage = null;
     cartMesh = null; cartWheel = null;
+    lidMeshes = [];
     thrownMesh = null;
     winchRope = null; winchBucket = null; winchBucketFull = null; winchCrank = null;
     winchGuide = null; winchCoil = null;
@@ -2043,6 +2046,31 @@ export function CreateWorld(canvasEl) {
       PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
       FixOrder(sh, DepthOrder("play", BAND.loose));
       group.add(sh);
+
+      // 窖口的盖板：平时盖着（侧视里只看得见板厚那一条），上下地道时绕铰链
+      // 掀起来。**几何锚点在铰链边**（洞口左沿），这样转起来那一边不动，
+      // 板子是"掀"开的不是原地转的——锚在中心的话看着像块浮在洞上的板在翻跟头。
+      //
+      // 每个暗口默认都有一块板。个别口子自己另有伪装（第四章东口在磨盘底下、
+      // 第七章地里那个是覆土的），那种在 Data_Scenes 上写 "lid": false 关掉，
+      // 别在这儿写 id 白名单——摆位是数据的事。
+      if (shaft.lid !== false) {
+        // 尺寸按**真实的窖盖**给，不按画出来的洞口给：剖面上的井筒为了在地道视图里
+        // 读得清，半径画到了 0.86m（口沿还张开一圈），照那个尺寸配盖板就是一块
+        // 1.85m 的门板——立起来比人还高，看着像块靠在墙上的板，不像盖子。
+        const lidW = 1.24;                           // 一块旧门板改的，正常人抱得动
+        const lidT = 0.20;                           // 板厚：薄了平放时只剩一条线，读不出来
+        const wPxL = Math.ceil(lidW * PPM), hPxL = Math.ceil(lidT * PPM);
+        const lid = BakeSprite(wPxL, hPxL, 0, hPxL,
+          (ctx) => ART.DrawCellarLid(ctx, wPxL, hPxL, shaft.id + "lid"), 0, 3);
+        // 把几何整体右移半个板宽：mesh 原点＝铰链边，绕原点转就是绕铰链转
+        lid.geometry.translate(lidW / 2, 0, 0);
+        lid.position.set(shaft.x - lidW / 2, SURFACE_Y, PlaceZ(BAND.loose));
+        FixOrder(lid, DepthOrder("play", BAND.loose) + 1);   // 压在梯头之上
+        lid.userData.lidId = shaft.id;
+        lidMeshes.push(lid);
+        group.add(lid);
+      }
     }
     for (const p of sceneDef.props) {
       if (p.kind === "waterTrap") {
@@ -2874,6 +2902,16 @@ export function CreateWorld(canvasEl) {
       const on = (!fp.p.showFlag || !!state.flags[fp.p.showFlag])
         && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
       for (const m of fp.meshes) m.visible = on;
+    }
+    // 窖口盖板：平时躺在洞口上，上下地道那一下绕铰链掀起来再盖回去。
+    // 掀到 78°——立到 90° 侧视里就成了一条竖线，反而看不出是块板；
+    // 78° 还能看见一点板面（背带和拼缝就在那一面）。
+    for (const lid of lidMeshes) {
+      const open = state.lid && state.lid.id === lid.userData.lidId ? (state.lid.open || 0) : 0;
+      // 掀起来快、盖回去也快，中间那段"敞着"是平的：用 smoothstep 收两头
+      const k = open * open * (3 - 2 * open);
+      // 开到 62° 就够：竖到 78° 那块板在侧视里几乎成一条竖线，还压过人头顶
+      lid.rotation.z = k * (62 * Math.PI / 180);
     }
     StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：

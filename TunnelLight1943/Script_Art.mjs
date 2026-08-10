@@ -3283,6 +3283,45 @@ export function DrawWoodStack(ctx, x, groundY, w, h, id) {
   }
 }
 
+// 窖口盖板：c1_plane 刨出来的那块旧门板，抹了泥灰做旧。
+// 侧视里它是一块**有厚度的板**——平放时只看得见板厚那一条，掀起来才露出板面。
+// 所以贴图按「立起来的样子」画（宽=洞口，高=板厚+一点板面），
+// 摆位时绕铰链边旋转，平放/立起共用同一张图。
+// 画的是**底面**：盖着的时候朝下、掀起来朝向玩家的正是这一面，所以没有泥灰，
+// 只有木纹、拼缝和两道背带（泥灰在另一面，压在洞口上看不见）。
+export function DrawCellarLid(ctx, w, t, id) {
+  // 板身：三块旧门板拼的，边不齐
+  InkFill(ctx, [[0, 0], [w, Sym(id + "e", 0, 1.6)], [w, t], [0, t - Sym(id + "e", 1, 1.4)]],
+    id + "body", "#7d5f3c", { amp: 1.6, lw: 2.2, shade: "rgba(48,34,20,0.26)" });
+  // 拼缝：两道，缝里嵌着灰
+  for (let i = 1; i <= 2; i += 1) {
+    const px = w * (i / 3);
+    InkLine(ctx, px, 1.5, px + Sym(id + "s", i, 1.8), t - 1.5, id + "seam" + i,
+      { lw: 2.0, color: "rgba(38,26,15,0.62)", amp: 1.2 });
+  }
+  // 背带：两根横木条钉在底面上（门板拆下来改的盖子必有这个，不然一踩就散）
+  for (let i = 0; i < 2; i += 1) {
+    const by = t * (0.28 + i * 0.42);
+    InkFill(ctx, [[w * 0.06, by], [w * 0.94, by - Sym(id + "b", i, 1.2)],
+      [w * 0.94, by + t * 0.13], [w * 0.06, by + t * 0.13 + 0.8]],
+    id + "batten" + i, "#6b5133", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+    for (let k = 0; k < 3; k += 1) {          // 钉头
+      const nx = w * (0.18 + k * 0.32);
+      InkFill(ctx, [[nx - 1.2, by + t * 0.04], [nx + 1.2, by + t * 0.03],
+        [nx + 1, by + t * 0.10], [nx - 1, by + t * 0.11]],
+      id + "nail" + i + k, "#3f3a34", { amp: 0.6, lw: 0.9 });
+    }
+  }
+  // 木纹
+  for (let i = 0; i < 5; i += 1) {
+    const gy = t * (0.12 + Rnd(id + "g", i) * 0.76);
+    InkLine(ctx, w * 0.05, gy, w * 0.95, gy + Sym(id + "gw", i, 1.4), id + "grain" + i,
+      { lw: 0.9, color: "rgba(58,40,22,0.34)", amp: 1.0 });
+  }
+  // 边上蹭掉泥灰的地方：常年掀，边沿最先磨白
+  Speckle(ctx, 0, 0, w, t * 0.22, id + "wear", { count: 18, alpha: 0.22, size: 1.4, color: "#c9b48c" });
+}
+
 export function DrawHatch(ctx, x, groundY, id, { open = false } = {}) {
   InkFill(ctx, [[x - 22, groundY], [x + 22, groundY], [x + 19, groundY - 7], [x - 19, groundY - 7]],
     id, "#6b5236", { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.2)" });
