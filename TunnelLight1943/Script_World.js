@@ -1906,7 +1906,7 @@ export function CreateWorld(canvasEl) {
     // 摆到 BACK_Z 附近，它被缩得比窗口还小，四周就漏出后面的浅色——那正是
     // 这个洞看着像"贴图漏了"的原因。井壁贴到玩家背后一点点（SHAFT_BACK_Z），
     // 再按玩法机位的视差比放大，才刚好把窗口填满。
-    const SHAFT_BACK_Z = -0.9;
+    const SHAFT_BACK_Z = BAND.nearBack;   // 紧贴行走线之后那一档（不许写裸 z）
     // ≈ (机位距 + 0.9) / (机位距 − NEAR_Z)。玩法机位画宽 12.3~16m 时是 1.21~1.29，
     // 取 1.40 留点余量——多出来的部分被不透明的近侧剖面挡着，不露；少了才会漏白边
     const SHAFT_FILL = 1.40;
@@ -1914,7 +1914,9 @@ export function CreateWorld(canvasEl) {
       // 井壁只画到走廊洞顶为止，不跟着喇叭口一起张开——张开了就会在地道里
       // 糊出一块带硬边的黑斑（走廊自己的后壁从那儿接手）
       const yWallBot = g.yBot - 0.34 * PPM;
-      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.16 * PPM) * SHAFT_FILL;
+      // 只夹住井底那个喇叭口（1.36 比井口的张度 1.34 略大，所以井口不被夹——
+      // 夹到井口，两边就会漏出一条亮土的窄缝，看着又像贴图没对齐）
+      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.36 * PPM) * SHAFT_FILL;
       const hM = ((yWallBot - g.yTop) / PPM) * SHAFT_FILL;
       const wM = (halfW(g.yTop) * 2.5) / PPM;
       const wp = Math.ceil(wM * PPM), hp = Math.ceil(hM * PPM);
@@ -1977,7 +1979,7 @@ export function CreateWorld(canvasEl) {
         ctx.fill();
         ctx.restore();
       });
-      PlaceSprite(beam, g.wx, UNDER_Y, SHAFT_BACK_Z + 0.05);
+      PlaceSprite(beam, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z + 0.05);
       beam.material.blending = THREE.AdditiveBlending;
       beam.material.depthWrite = false;
       // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的
