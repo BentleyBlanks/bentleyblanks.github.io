@@ -1233,6 +1233,50 @@ function TestWorkStations() {
   console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
 }
 
+// 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
+// 「挥舞的时候为什么脚也会在y轴上漂移？」）。逐键盯死，退化立刻红：
+//   ① 脚钉在地上：每个键都得带全六个腿关节，且踝的垂距 L(cos a + cos(a−b))
+//      必须等于 BONE.hipY + hipY——胯沉腿不跟着解，脚就跟着胯在 y 轴上漂；
+//   ② 脚也不许横滑：踝的水平位置逐键恒定；
+//   ③ 锄板要真的够到土、扬要真的过肩：θ=armF+foreF 低点 ≤ −180（板到头后），
+//      高点 ≥ −45（板咬进土），而且从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——
+//      没有这一下快慢对比，锄地就成了匀速划水。
+function TestHoeingIsARealSwing() {
+  const rigSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Rig.mjs"), "utf8");
+  const block = rigSrc.slice(rigSrc.indexOf("  hoeing: {"), rigSrc.indexOf("  scatterFeed: {"));
+  assert.ok(block.length > 100, "找不到 hoeing 轨道");
+  const keys = [...block.matchAll(/\{ t: [^}]*\}/g)].map((m) => new Function(`return (${m[0]})`)());
+  assert.ok(keys.length >= 5, "hoeing 关键帧太少");
+  const L = 0.31, HIP = 0.62;   // BONE.thigh / BONE.hipY（Rig 在 node 下拖不动 three，抄数值）
+  const rad = (d) => (d * Math.PI) / 180;
+  const ankles = { F: [], B: [] };
+  for (const k of keys) {
+    for (const leg of ["F", "B"]) {
+      for (const j of [`thigh${leg}`, `shin${leg}`, `foot${leg}`]) {
+        assert.ok(k[j] !== undefined, `t=${k.t} 的键缺 ${j}——腿不逐键解，脚就会跟着胯漂`);
+      }
+      const a = -k[`thigh${leg}`], b = k[`shin${leg}`];
+      const drop = L * (Math.cos(rad(a)) + Math.cos(rad(a - b)));
+      const need = HIP + k.hipY;
+      assert.ok(Math.abs(drop - need) < 0.02,
+        `t=${k.t} ${leg}腿踝距地 ${drop.toFixed(3)} ≠ 胯高 ${need.toFixed(3)}——脚要么悬空要么陷地`);
+      ankles[leg].push(L * (Math.sin(rad(a)) + Math.sin(rad(a - b))) + k.hipX);
+    }
+  }
+  for (const leg of ["F", "B"]) {
+    const spread = Math.max(...ankles[leg]) - Math.min(...ankles[leg]);
+    assert.ok(spread < 0.025, `${leg}脚在地上横滑了 ${(spread * 100).toFixed(1)}cm`);
+  }
+  const thetas = keys.map((k) => k.armF + k.foreF);
+  assert.ok(Math.min(...thetas) <= -180, `扬锄必须过肩（θ 低点 ${Math.min(...thetas)} > -180，还是在身前举旗）`);
+  assert.ok(Math.max(...thetas) >= -45, `落锄必须够到土（θ 高点 ${Math.max(...thetas)} < -45，锄板悬在半空）`);
+  const whip = keys.some((k, i) => i > 0
+    && Math.abs(thetas[i] - thetas[i - 1]) >= 120 && (k.t - keys[i - 1].t) <= 0.4);
+  assert.ok(whip, "从扬到落必须是一记 0.4s 内 ≥120° 的抡劈——匀速划水不算锄地");
+  console.log("  ✓ 锄地是一记真抡劈：脚钉在地上不漂不滑、扬过肩、锄板咬进土");
+}
+
 // 刨料这一拍是"手上真有活"的教学，几条硬约束：镜头必须推到台面上
 // （老版是十几米外按 E 敲木楔，木楔只有几个像素）；**玩家攥的是那把刨子**，
 // 不是一根滑块（用户明令禁止 slider——手得真落在刨子上才拖得动，dragTrack
@@ -2006,6 +2050,7 @@ TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
 TestWinchIsACrankNotALever();
