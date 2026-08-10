@@ -1615,7 +1615,10 @@ export function CreateWorld(canvasEl) {
     const x0 = Math.min(range[0] - 6, -20);
     const x1 = Math.max(range[1] + 6, sceneDef.length + 20);
     const wPx = Math.ceil((x1 - x0) * PPM);
-    const topWorld = SURFACE_Y;
+    // 画布往地平线**以上**多留一指：这一刀的上沿要长出草茬、翻出土坷垃，
+    // 光靠地平线那条直边收口，画面上就是两块土色硬碰硬地拼在一起
+    const TURF_RISE = 0.3;
+    const topWorld = SURFACE_Y + TURF_RISE;
     const botWorld = UNDER_Y - 2.6;
     const hPx = Math.ceil((topWorld - botWorld) * PPM);
     const toPx = (wx) => (wx - x0) * PPM;
@@ -1663,6 +1666,72 @@ export function CreateWorld(canvasEl) {
       ctx.fillStyle = dk;
       ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
       ctx.restore();
+
+      // —— 地平线那一刀：这是**地表被切开的断口**，不是两张贴图的接缝
+      //（2026-08-11 用户：「地道口那里为什么有一条分割线一样的，上面下面
+      // 有点土一样的颜色」）。老版上沿就是 fillRect 的直边：上头是地表的土色、
+      // 下头是剖面的土色，两块平色贴着一条razor直线，读出来只能是"贴图裁齐了"。
+      // 断口该有三样东西：翻耕过的表土比生土浅一档、一条起伏的墨线、
+      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）
+      {
+        const gy = toPy(SURFACE_Y);
+        const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
+          + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5;
+        const night = CHAPTERS[state.chapterIndex].light === "night"
+          || CHAPTERS[state.chapterIndex].light === "dark";
+        // ① 耕作层：常年翻的那 30 公分，比底下的生土松、浅。
+        //    **下缘要化开，不能又是一条边**——不然只是把一道接缝换成两道
+        const tilth = 0.34 * PPM;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, gy + Wob(0));
+        for (let px = 0; px <= wPx; px += 14) ctx.lineTo(px, gy + Wob(px));
+        ctx.lineTo(wPx, gy + tilth);
+        ctx.lineTo(0, gy + tilth);
+        ctx.closePath();
+        const til = ctx.createLinearGradient(0, gy, 0, gy + tilth);
+        til.addColorStop(0, night ? "rgba(104,86,60,0.5)" : "rgba(154,128,88,0.46)");
+        til.addColorStop(1, night ? "rgba(104,86,60,0)" : "rgba(154,128,88,0)");
+        ctx.fillStyle = til;
+        ctx.fill();
+        // ② 断口的墨线：跟着起伏走，不是一条直边
+        ctx.beginPath();
+        ctx.moveTo(0, gy + Wob(0));
+        for (let px = 0; px <= wPx; px += 20) ctx.lineTo(px, gy + Wob(px));
+        ctx.strokeStyle = "rgba(36,26,16,0.62)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // ③ 草茬与翻出来的土坷垃：长在沿上，把那条直线彻底啃断。
+        //    竖井口那一圈自己有碎土（见下面 shaftGeom 那段），这儿让开它
+        const nearShaft = (wx) => shaftGeom.some((g) => Math.abs(wx - g.wx) < SHAFT_R + 0.3);
+        const grass = night ? ART.PAL.grassNight : ART.PAL.grass;
+        for (let px = 0; px <= wPx; px += 17) {
+          const wx = x0 + px / PPM;
+          if (nearShaft(wx)) continue;
+          const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
+          const base = gy + Wob(px);
+          if (r > 0.42) {
+            ctx.strokeStyle = r > 0.72 ? grass : (night ? "rgba(120,104,72,0.7)" : "rgba(168,148,102,0.75)");
+            ctx.lineWidth = 1.6;
+            for (let b = 0; b < 3; b += 1) {
+              const bx = px + (b - 1) * 2.4;
+              ctx.beginPath();
+              ctx.moveTo(bx, base + 1);
+              ctx.lineTo(bx + (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 6,
+                base - 3 - ART.Hash(sceneKey + "th" + px + b) * 7);
+              ctx.stroke();
+            }
+          } else if (r < 0.14) {
+            // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
+            ctx.fillStyle = night ? "rgba(78,64,44,0.9)" : "rgba(112,90,60,0.9)";
+            ctx.beginPath();
+            ctx.ellipse(px, base + 1, 2.6 + r * 12, 2 + r * 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
@@ -1678,18 +1747,45 @@ export function CreateWorld(canvasEl) {
         ctx.fill();
       }
       // 洞室 / 旁洞：直得起腰的地方。顶要拱起来，不能是个平顶方盒——
-      // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位
-      const Dome = (cx, halfW, topY) => {
+      // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位。
+      //
+      // **但也不能是一道从地面划到地面的大圆弧**（2026-08-11 用户：「这个傻逼
+      // 一样的拱形是什么东西」）。老版一条三次贝塞尔，两个控制点都摁在洞顶：
+      // 画出来是个横跨全屋、两条腿一直扫到地面的券顶——那是砖砌的拱，不是
+      // 一镐一镐刨出来的窖。真的地窖是**近乎直上直下的两面墙 + 圆角 + 一顶
+      // 略鼓的土顶**，而且土顶不平不匀。
+      // 侧壁用超椭圆立起来（u 两端趋近竖直、中段平缓），再叠两道手挖的起伏。
+      const DomePts = (cx, halfW, hM, id) => {
+        const pts = [];
+        const N = 44;
+        for (let i = 0; i <= N; i += 1) {
+          const u = i / N;
+          const s = Math.abs(2 * u - 1);
+          // (1-s⁴)^0.4：肩以下几乎是竖墙，肩以上是一顶平缓的土顶
+          const shape = (1 - s ** 4) ** 0.4;
+          const wob = (Math.sin(u * 7.3 + ART.Hash(id) * 9) * 0.05
+            + Math.sin(u * 17.1 + ART.Hash(id + "b") * 6) * 0.028) * (1 - s);
+          const wx = cx - halfW + 2 * halfW * u;
+          pts.push({ wx, py: tunBot - Math.max(0, hM * shape + wob) * PPM });
+        }
+        return pts;
+      };
+      const DomePath = (pts) => {
         ctx.beginPath();
-        ctx.moveTo(toPx(cx - halfW), tunBot);
-        ctx.bezierCurveTo(toPx(cx - halfW * 0.72), topY, toPx(cx + halfW * 0.72), topY, toPx(cx + halfW), tunBot);
+        ctx.moveTo(toPx(pts[0].wx), tunBot);
+        for (const p of pts) ctx.lineTo(toPx(p.wx), p.py);
+        ctx.lineTo(toPx(pts[pts.length - 1].wx), tunBot);
         ctx.closePath();
-        ctx.fill();
       };
       const domes = [];
       for (const p of sceneDef.props) {
-        if (p.kind === "chamber") { Dome(p.x, p.w / 2, toPy(UNDER_Y + 2.5)); domes.push([p.x, p.w / 2, toPy(UNDER_Y + 2.5)]); }
-        else if (p.kind === "pocket") { Dome(p.x, 2.8, toPy(UNDER_Y + 2.2)); domes.push([p.x, 2.8, toPy(UNDER_Y + 2.2)]); }
+        let pts = null;
+        if (p.kind === "chamber") pts = DomePts(p.x, p.w / 2, 2.5, sceneKey + p.id);
+        else if (p.kind === "pocket") pts = DomePts(p.x, 2.8, 2.2, sceneKey + p.id);
+        if (!pts) continue;
+        DomePath(pts);
+        ctx.fill();
+        domes.push(pts);
       }
       // 翻口：地道在这一段往下沉一个 U 形弯，得跟走廊一样从土里掏出来
       for (const p of sceneDef.props) {
@@ -1719,15 +1815,30 @@ export function CreateWorld(canvasEl) {
         ctx.fill();
       }
       ctx.restore();
-      // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
+      // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来。
+      // 走廊的顶沿**走到洞室就得断**：那一段的土早被穹顶掏到更高处，照着走廊
+      // 高度接着描，就是在窖子当中凭空拉一条横线（和穹顶那道大弧是同一个病）
       ctx.globalCompositeOperation = "source-over";
+      const DomePyAt = (pts, wx) => {
+        if (wx < pts[0].wx || wx > pts[pts.length - 1].wx) return null;
+        const t = (wx - pts[0].wx) / (pts[pts.length - 1].wx - pts[0].wx) * (pts.length - 1);
+        const i = Math.max(0, Math.min(pts.length - 2, Math.floor(t)));
+        return pts[i].py + (pts[i + 1].py - pts[i].py) * (t - i);
+      };
+      const RoofOpen = (wx) => domes.some((pts) => {
+        const py = DomePyAt(pts, wx);
+        return py !== null && py < CeilY(wx) - 1;
+      });
       for (const [sa, sb] of segs) {
-        ctx.beginPath();
-        ctx.moveTo(toPx(sa), CeilY(sa));
-        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
         ctx.strokeStyle = "rgba(24,17,10,0.75)";
         ctx.lineWidth = 7;
-        ctx.stroke();
+        let run = 0;
+        for (let wx = sa; wx <= sb; wx += 0.8) {
+          if (RoofOpen(wx)) { if (run > 1) ctx.stroke(); run = 0; continue; }
+          if (!run) { ctx.beginPath(); ctx.moveTo(toPx(wx), CeilY(wx)); run = 1; }
+          else { ctx.lineTo(toPx(wx), CeilY(wx)); run += 1; }
+        }
+        if (run > 1) ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(toPx(sa), tunBot);
         for (let wx = sa; wx <= sb; wx += 1.2) {
@@ -1770,14 +1881,25 @@ export function CreateWorld(canvasEl) {
         ctx.restore();
       }
       // 洞室的穹顶也要有洞沿：走廊的墨线只描到 CeilY，洞室那一段是
-      // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块
-      for (const [cx, halfW, topY] of domes) {
-        ctx.beginPath();
-        ctx.moveTo(toPx(cx - halfW), tunBot);
-        ctx.bezierCurveTo(toPx(cx - halfW * 0.72), topY, toPx(cx + halfW * 0.72), topY, toPx(cx + halfW), tunBot);
+      // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块。
+      // **只描还挨着土的那一段**：洞室与走廊连通的地方本来就没有边，照着整条
+      // 轮廓描下去，等于在通着的空腔里凭空画一道线——那正是"一个大拱形横在
+      // 屋里、两条腿插进地道"的来历。
+      const InCorridor = (wx, py) => segs.some(([sa, sb]) => wx >= sa && wx <= sb && py >= CeilY(wx) - 1);
+      for (const pts of domes) {
         ctx.strokeStyle = "rgba(24,17,10,0.7)";
         ctx.lineWidth = 6;
-        ctx.stroke();
+        let run = null;
+        for (const p of pts) {
+          if (InCorridor(p.wx, p.py)) {
+            if (run && run > 1) ctx.stroke();
+            run = null;
+            continue;
+          }
+          if (!run) { ctx.beginPath(); ctx.moveTo(toPx(p.wx), p.py); run = 1; }
+          else { ctx.lineTo(toPx(p.wx), p.py); run += 1; }
+        }
+        if (run && run > 1) ctx.stroke();
       }
       // 井壁也要洞沿：走廊、洞室都描了，唯独竖井没有，于是井口那一圈成了
       // 土层贴图被裁掉的直边——"像 bug"最直接的一笔就是这里。
@@ -1924,30 +2046,41 @@ export function CreateWorld(canvasEl) {
     // 摆到 BACK_Z 附近，它被缩得比窗口还小，四周就漏出后面的浅色——那正是
     // 这个洞看着像"贴图漏了"的原因。井壁贴到玩家背后一点点（SHAFT_BACK_Z），
     // 再按玩法机位的视差比放大，才刚好把窗口填满。
-    const SHAFT_BACK_Z = BAND.nearBack;   // 紧贴行走线之后那一档（不许写裸 z）
-    // ≈ (机位距 + 0.9) / (机位距 − NEAR_Z)。玩法机位画宽 12.3~16m 时是 1.21~1.29，
-    // 取 1.40 留点余量——多出来的部分被不透明的近侧剖面挡着，不露；少了才会漏白边
-    const SHAFT_FILL = 1.40;
+    // 井壁**就画在剖面这一刀上**（同一个 z、同一套 toPx/toPy），洞口与内壁
+    // 因此一一对齐，镜头怎么摇都错不开。
+    // 老版把它摆在玩家背后（nearBack）再按视差比放大 1.4 倍去"填窗口"——两个
+    // 平面各走各的透视，比例只在一个机位上对得上：机位一低（下到地道里往上看），
+    // 井筒上半截当场漏出天光，一条水平的硬边横在井里（2026-08-11 用户报的
+    // 「井有点小渲染bug」）。放大到多少都治不好，因为错的是平面，不是尺寸。
+    // 纵深改由**绘制顺序**交代：压在近处那条地表断面带（walk−4）之后、梯子
+    // (loose)与演员之前——人还是从井筒前面爬过去。
+    // 排在断面带**之前**是不行的：那条带子从地平线往下铺 3.2 米、横贯全场，
+    // 正好糊在洞口上（老井壁排在 nearBack，于是从来没在画面上出现过，井里那片
+    // 灰蓝其实是这条带子，顶上那道亮边是带子顶沿与洞口顶沿的视差缝漏出来的天）。
+    const SHAFT_WALL_ORDER = DepthOrder("play", BAND.walk) - 2;
     for (const g of shaftGeom) {
       // 井壁只画到走廊洞顶为止，不跟着喇叭口一起张开——张开了就会在地道里
       // 糊出一块带硬边的黑斑（走廊自己的后壁从那儿接手）
       const yWallBot = g.yBot - 0.34 * PPM;
       // 只夹住井底那个喇叭口（1.36 比井口的张度 1.34 略大，所以井口不被夹——
       // 夹到井口，两边就会漏出一条亮土的窄缝，看着又像贴图没对齐）
-      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.36 * PPM) * SHAFT_FILL;
-      const hM = ((yWallBot - g.yTop) / PPM) * SHAFT_FILL;
-      const wM = (halfW(g.yTop) * 2.5) / PPM;
-      const wp = Math.ceil(wM * PPM), hp = Math.ceil(hM * PPM);
+      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.36 * PPM);
+      // 贴片就按井筒的实际尺寸烘：宽取最胖那一段（井底喇叭口），高就是井筒本身。
+      // 多留两像素给洞沿的墨线压边
+      let maxHalf = 0;
+      for (let y = g.yTop; y <= yWallBot; y += 5) maxHalf = Math.max(maxHalf, halfW(y));
+      const wp = Math.ceil(maxHalf * 2 + 4), hp = Math.ceil(yWallBot - g.yTop);
       // 井壁按井筒的轮廓剪出来（不是一块方贴片）：外面透明，
-      // 所以就算画大了也只在洞口里露出来，不会在地道里糊成一个黑方块
+      // 洞口那一圈碎土啃出来的缺口也就跟着透出土色，不会糊成一块黑方块
       const Silhouette = (ctx) => {
-        const k = hp / Math.max(1, yWallBot - g.yTop);
         ctx.beginPath();
         ctx.moveTo(wp / 2 - halfW(g.yTop), 0);
-        for (let y = g.yTop; y <= yWallBot; y += 5) ctx.lineTo(wp / 2 - halfW(y), (y - g.yTop) * k);
-        for (let y = yWallBot; y >= g.yTop; y -= 5) ctx.lineTo(wp / 2 + halfW(y), (y - g.yTop) * k);
+        for (let y = g.yTop; y <= yWallBot; y += 5) ctx.lineTo(wp / 2 - halfW(y), y - g.yTop);
+        for (let y = yWallBot; y >= g.yTop; y -= 5) ctx.lineTo(wp / 2 + halfW(y), y - g.yTop);
         ctx.closePath();
       };
+      // 井筒底在世界里的高度：井壁贴片与剖面共用 toPy，所以直接反算回去
+      const wallBotY = SURFACE_Y - yWallBot / PPM;
       const wall = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
         ctx.save();
         Silhouette(ctx);
@@ -1974,7 +2107,10 @@ export function CreateWorld(canvasEl) {
         ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
         ctx.restore();
       });
-      PlaceSprite(wall, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z);
+      PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
+      FixOrder(wall, SHAFT_WALL_ORDER);   // 位置在剖面这一刀上，前后关系另排
+      wall.userData.shaftWall = true;     // 渲染健康测试按它认人
+      wall.userData.dofKeep = true;       // 跟着剖面的土一起留在长焦背景板里
       group.add(wall);
 
       // 井口漏下来的一线光：上宽下窄，落到地道口就散了。
@@ -1997,7 +2133,9 @@ export function CreateWorld(canvasEl) {
         ctx.fill();
         ctx.restore();
       });
-      PlaceSprite(beam, g.wx, UNDER_Y + (g.yBot - yWallBot) / PPM, SHAFT_BACK_Z + 0.05);
+      PlaceSprite(beam, g.wx, wallBotY, NEAR_Z);
+      FixOrder(beam, SHAFT_WALL_ORDER + 1);   // 紧跟在井壁后头，仍在梯子与人之前
+      beam.userData.dofKeep = true;
       beam.material.blending = THREE.AdditiveBlending;
       beam.material.depthWrite = false;
       // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的

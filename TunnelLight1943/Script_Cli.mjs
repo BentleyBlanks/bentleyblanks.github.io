@@ -350,7 +350,9 @@ async function CmdState(o) {
 // 当旗标**（x/level/hold/dur/pre/actor/cine/out 之外的都是旗标），省得再记一套语法。
 // 命令行上的 --x/--flag 这些是所有拍共用的默认值，@ 里写的盖过它。
 // ---------------------------------------------------------------------------
-const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip"]);
+// step 也在表里：CmdShot 里读的是 jo.step，漏登记的话 --step / @step= 会被
+// 当成旗标吃掉，链式节拍永远停在第 0 步（用法里写着、实际从来没生效）
+const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "step"]);
 
 // "c1_dig@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
@@ -449,6 +451,27 @@ async function CmdShot(o) {
       // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子
       await page.waitForFunction(() => (window.TunnelLight.iris ?? 1) > 0.995, { timeout: 8000 })
         .catch(() => errors.push(`${job.id}: 黑幕没拉开（iris 超时）`));
+
+      // --eval "<js>"：在**这一拍已经摆好的页面里**跑一段 JS 并把结果打出来。
+      // 截图只能告诉你"看着不对"，问不出"是哪张网格摆歪了"——而这类问题过去
+      // 全靠现写一次性探针脚本。页面里能拿到 TunnelLight.{state,world,...}，
+      // 表达式或函数体都行（`world.debugLayers().layers.play.children.length`）。
+      // 页面渲染只在浏览器窗口真的合成时才跑，所以只有这条实拍路子问得到渲染层。
+      if (o.eval) {
+        const r = await page.evaluate((src) => {
+          const tl = window.TunnelLight;
+          // eslint-disable-next-line no-new-func
+          const fn = new Function("tl", "state", "world", `return (${src})`);
+          try { return { ok: fn(tl, tl.state, tl.world) }; }
+          catch (e) {
+            try {
+              // eslint-disable-next-line no-new-func
+              return { ok: new Function("tl", "state", "world", src)(tl, tl.state, tl.world) };
+            } catch (e2) { return { err: String(e2) }; }
+          }
+        }, String(o.eval));
+        console.log(`  eval[${job.id}] ${JSON.stringify(r.err ?? r.ok, null, 1)}`);
+      }
 
       const held = jo.hold ? String(jo.hold).split("") : [];
       for (const k of held) await page.keyboard.down(k);

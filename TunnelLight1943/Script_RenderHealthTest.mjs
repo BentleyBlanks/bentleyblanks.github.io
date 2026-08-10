@@ -162,6 +162,47 @@ for (const r of foreCheck) {
 }
 console.log(`✓ 地下机位无前景层（fore 存量 ${foreCheck[0].count} 张，地下可见=${foreCheck[0].visible}）`);
 
+// ---------------------------------------------------------------------------
+// 井筒内壁必须跟剖面同一个平面、并且压在地表断面带之后
+//
+// 2026-08-11 用户报的「井有点小渲染bug」：井筒里横着一条硬边，上半截是天色。
+// 两处原因，都不是尺寸问题：
+//   ① 井壁原来摆在玩家背后（nearBack），洞口却开在 z=2.2 的剖面上——两个平面
+//      各走各的透视，只有一个机位对得上，镜头一低就错开、漏出洞口上沿；
+//   ② 就算不错开也看不见：近处那条地表断面带（walk−4）横贯全场、从地平线往下
+//      铺 3.2 米，正好糊在洞口上，绘制序比井壁还晚。
+// 所以这条同时钉住"同平面"和"压在断面带之后"。
+const shaftCheck = await page.evaluate(() => {
+  const w = window.TunnelLight.world;
+  const { layers, THREE } = w.debugLayers();
+  let band = -1;                       // 地表断面带（最宽的那张立面贴图）
+  const walls = [];
+  layers.play.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry.parameters || {};
+    const p = new THREE.Vector3();
+    o.getWorldPosition(p);
+    if (o.userData.shaftWall) walls.push({ z: +p.z.toFixed(2), ord: o.renderOrder });
+    else if ((g.width || 0) > 100 && Math.abs(p.z) < 0.01) band = Math.max(band, o.renderOrder);
+  });
+  return { walls, band, faceZ: 2.2 };
+});
+if (!shaftCheck.walls.length) {
+  failed += 1;
+  console.error("✗ 井筒内壁：一张都没建出来（第一章那口窖井该有）");
+} else {
+  const bad = shaftCheck.walls.filter((v) => Math.abs(v.z - shaftCheck.faceZ) > 0.01
+    || (shaftCheck.band >= 0 && v.ord <= shaftCheck.band));
+  if (bad.length) {
+    failed += 1;
+    console.error(`✗ 井筒内壁摆错：${JSON.stringify(bad)}（应 z=${shaftCheck.faceZ}、`
+      + `绘制序 > 地表断面带 ${shaftCheck.band}）`);
+  } else {
+    console.log(`✓ 井筒内壁与剖面同平面（z=${shaftCheck.walls[0].z}）且压在断面带之后`
+      + `（${shaftCheck.walls[0].ord} > ${shaftCheck.band}）`);
+  }
+}
+
 await browser.close();
 server.close();
 if (failed) {
