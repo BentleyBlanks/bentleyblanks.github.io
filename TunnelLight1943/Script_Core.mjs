@@ -2177,17 +2177,27 @@ export const SCRIPTS = {
               if (a) { a.cineTarget = { x: 37.4 }; a.cineSpeed = 2.0; a.heading = -1; }
             }
           } },
-        // 跟着下窖，不切场：镜头直接落到地下（人在剖面里）
+        // 跟着下窖，不切场：镜头直接落到地下（人在剖面里）。
+        // **三个人不许朝同一边等距站开**：那在侧视里就是一排复制人，
+        // 何况谁在跟谁说话完全读不出来（2026-08-10 用户截图退回：
+        // 「这三个傻逼在干什么？」）。爹站一头朝里，另两个转过来朝他，
+        // 间距也错开——三个人围成一堆才读得出"他在讲，那俩在听"。
         { stage: "", d: 2.8, cam: { kind: "shot", x: 39.5, y: -2.3, dist: 6.5 },
           on: (state) => {
-            const D = (id, x) => {
+            const D = (id, x, h) => {
               const a = FindActor(state, id);
-              if (a) { a.level = "under"; a.x = x; a.cineTarget = null; a.heading = 1; }
+              if (a) { a.level = "under"; a.x = x; a.cineTarget = null; a.heading = h; }
             };
-            D("father", 37.6); D("xiaozhou", 39.2); D("qishu", 40.6);
+            D("father", 37.6, 1); D("xiaozhou", 39.4, -1); D("qishu", 40.3, -1);
           } },
         { who: "爹", say: "这边土硬，不用处处架木头。洞口和中间那段松土压住就行——不然一碰就塌。", d: 5.4,
-          cam: { kind: "shot", x: 40.5, y: -2.3, dist: 6.5 } },
+          cam: { kind: "shot", x: 39.2, y: -2.3, dist: 6.2 },
+          on: (state) => {
+            // 说到"这段松土"就抬手指洞顶——话里指的地方，画面上得有人指出来。
+            // pointLow 自带猫腰（见 Rig），在净高一米五的洞里用不会捅穿洞顶
+            const f = FindActor(state, "father");
+            if (f) f.pose = "pointLow";
+          } },
       ],
     },
     {
@@ -2199,6 +2209,8 @@ export const SCRIPTS = {
         // 客人的事谈完了，娘扛起锄头去西头菜畦——她的日子不围着玩家的差事转
         const mother = FindActor(state, "mother");
         if (mother) { mother.carry = "锄头"; mother.cineTarget = { x: V_PATCH_X }; mother.cineSpeed = 1.15; mother.heading = -1; }
+        const fa = FindActor(state, "father");
+        if (fa) fa.pose = null;          // 指洞顶那一下收回去，别带进下一场
         const xz = FindActor(state, "xiaozhou");
         if (xz) { xz.level = "surface"; xz.x = 35.8; xz.heading = 1; xz.cineTarget = null; }
         const q = FindActor(state, "qishu");
