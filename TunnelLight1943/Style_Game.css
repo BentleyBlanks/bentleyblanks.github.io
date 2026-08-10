@@ -468,26 +468,6 @@ body.touchDevice #touchControls.gone { display: none; }
   #noticeText { width: auto; flex: 1; min-height: 0; }
 }
 
-/* 历史内容提示：开始前的一块静版，样式沿 endScreen */
-#contentNotice {
-  position: absolute; inset: 0; z-index: 70;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-  background: #050403; text-align: center; padding: 24px;
-}
-#contentNotice small { letter-spacing: 0.4em; color: var(--dim); }
-#contentNotice h2 { font-size: 24px; letter-spacing: 0.14em; font-weight: 600; }
-#contentNotice p { color: var(--dim); font-size: 14.5px; max-width: 560px; line-height: 1.9; }
-#softenRow {
-  display: flex; gap: 9px; align-items: center; cursor: pointer;
-  color: var(--paper); font-size: 13.5px; margin-top: 8px;
-}
-#softenRow input { accent-color: var(--lamp); width: 16px; height: 16px; }
-#contentNoticeGo {
-  margin-top: 22px; padding: 12px 34px; cursor: pointer;
-  background: none; color: var(--lamp); border: 1px solid rgba(232, 193, 90, 0.5);
-  font-family: inherit; font-size: 15px; letter-spacing: 0.2em;
-}
-#contentNoticeGo:hover { background: rgba(232, 193, 90, 0.12); }
 
 /* 标题 */
 #titleScreen {

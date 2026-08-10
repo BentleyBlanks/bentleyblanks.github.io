@@ -97,7 +97,6 @@ for (const id of [
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "endTitle", "endText",
   "noticeOverlay", "noticeText", "noticeClose",
-  "contentNotice", "softenBox", "contentNoticeGo",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
@@ -971,22 +970,8 @@ ui.btnDebug?.addEventListener("click", () => {
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
 
-// 历史内容提示（设计文档：游戏开始前明确提示；弱化选项只改暴行几拍的取景与
-// 时长）。提示每台设备给一次，弱化偏好单独记住、之后每次开局都生效
-const NOTICE_SEEN_KEY = "tunnelLight1943.contentNotice";
-const SOFTEN_KEY = "tunnelLight1943.soften";
-let pendingStart = null;
 function StartGame(chapterIndex) {
-  if (ui.contentNotice && !localStorage.getItem(NOTICE_SEEN_KEY)) {
-    pendingStart = chapterIndex;
-    if (ui.softenBox) ui.softenBox.checked = localStorage.getItem(SOFTEN_KEY) === "on";
-    ui.titleScreen.hidden = true;
-    ui.contentNotice.hidden = false;
-    return;
-  }
   state = CreateGame(chapterIndex);
-  // 弱化暴行镜头：Core 在刘家那几拍读它（dynamicLines 只动机位距离与时长）
-  state.softenViolence = localStorage.getItem(SOFTEN_KEY) === "on";
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
@@ -1068,13 +1053,6 @@ ui.btnSkipCine?.addEventListener("click", () => {
 });
 
 ui.startButton.addEventListener("click", () => StartGame(0));
-// 内容提示：确认后记住偏好、放行开局
-ui.contentNoticeGo?.addEventListener("click", () => {
-  localStorage.setItem(NOTICE_SEEN_KEY, "seen");
-  localStorage.setItem(SOFTEN_KEY, ui.softenBox?.checked ? "on" : "off");
-  ui.contentNotice.hidden = true;
-  if (pendingStart !== null) { const c = pendingStart; pendingStart = null; StartGame(c); }
-});
 // 征夫告示阅读层：右栏文字从 Core 注入（权威版本）；关闭钮直接清旗标。
 // hidden 切换与环境声收窄都在 UpdateHud 里跟 state.noticeOpen 走
 if (ui.noticeText) {

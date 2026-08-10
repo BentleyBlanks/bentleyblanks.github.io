@@ -2471,14 +2471,7 @@ export const SCRIPTS = {
       // 不做 QTE、不成为任何玩法或奖励），士兵行凶后继续翻找——
       // 起因不是刘家做错了什么，而是日军抢不到粮时蓄意以杀害婴儿逼供恐吓
       kind: "cinematic", id: "c1_roster", timeOfDay: "dawn",
-      // 弱化暴行镜头（开场内容提示里的选项）：只把暴行那几拍的机位退远两米六、
-      // 时长收三成——事件与后果一个字不改（设计文档：只改变取景与持续时间）。
-      // 台词行原样：文本一变 VoiceLineId 就变，配音全得重烘
-      dynamicLines: (state) => {
-      const SV = !!state.softenViolence;
-      const D = (d) => (SV ? Math.max(1.6, d * 0.72) : d);
-      const Z = (z) => (SV ? z + 2.6 : z);
-      return [
+      lines: [
         { who: "伪保长", say: "赵家，三口。", far: true, d: 3.6,
           cam: { kind: "shot", x: 84, y: 1.8, dist: 10, pan: -5 },
           on: (state) => {
@@ -2543,14 +2536,14 @@ export const SCRIPTS = {
           } },
         { who: "刘嫂", say: "上回都交走了……孩子还没奶吃，真没有了。", d: 4.4,
           cam: { kind: "shot", x: 62.5, y: 1.4, dist: 7.5 } },
-        { stage: "", d: D(2.2), cam: { kind: "shot", x: 61.5, y: 1.4, dist: Z(8) },
+        { stage: "", d: 2.2, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
           on: (state) => {
             const le = FindActor(state, "liuElder");
             if (le) le.track = { name: "struckFall", t: -0.95 };
             const r1 = FindActor(state, "raid1");
             if (r1) r1.track = { name: "buttStrike", t: 0 };
           } },
-        { stage: "", d: D(2.4), cam: { kind: "shot", x: 61.5, y: 1.4, dist: Z(8) },
+        { stage: "", d: 2.4, cam: { kind: "shot", x: 61.5, y: 1.4, dist: 8 },
           on: (state) => {
             // 从刘嫂怀里强行夺走襁褓；刘嫂扑过去
             const ls = FindActor(state, "liusao");
@@ -2559,7 +2552,7 @@ export const SCRIPTS = {
             if (r2) { r2.carry = "襁褓"; r2.heading = -1; }
             Cue(state, "sobBreath", { gain: 0.8 });
           } },
-        { stage: "", d: D(2.8), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8) },
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8 },
           on: (state) => {
             const ls = FindActor(state, "liusao");
             if (ls) ls.track = { name: "struckFall", t: -0.6 };
@@ -2569,13 +2562,13 @@ export const SCRIPTS = {
         // 刺刀（剧本§10 明令必须明确表现：刺刀动作、襁褓随枪身离地；
         // 同时不做伤口特写、不慢镜、不煽情配乐——机位钉在院门外侧不推近）。
         // 起因不是刘家做错了什么：抢不到粮，就以杀害婴儿逼供并恐吓全村
-        { stage: "", d: D(2.6), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8.5) },
+        { stage: "", d: 2.6, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8.5 },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
             if (r2) { r2.carry = "步枪"; r2.heading = -1; r2.track = { name: "bayonetThrust", t: 0 }; }
             Cue(state, "whoosh", { gain: 0.5 });
           } },
-        { stage: "", d: D(2.4), cam: { kind: "shot", x: 60.5, y: 1.5, dist: Z(8.5) },
+        { stage: "", d: 2.4, cam: { kind: "shot", x: 60.5, y: 1.5, dist: 8.5 },
           on: (state) => {
             // 襁褓随枪身离地：挑起的姿势停在高位，襁褓挂在手点上就在高处。
             // 哭声到这儿断了——同期声自己说话，旁白闭嘴
@@ -2583,8 +2576,8 @@ export const SCRIPTS = {
             if (r2) r2.carry = "襁褓";
             Cue(state, "sobBreath", { gain: 1.0 });
           } },
-        { stage: "刘家院里的哭喊，半条街都听得见。", d: D(3.6),
-          cam: { kind: "shot", x: 58, y: 1.5, dist: Z(8) },
+        { stage: "刘家院里的哭喊，半条街都听得见。", d: 3.6,
+          cam: { kind: "shot", x: 58, y: 1.5, dist: 8 },
           on: (state) => {
             const r2 = FindActor(state, "raid2");
             if (r2) { r2.carry = "步枪"; r2.track = null; r2.heading = 1; }
@@ -2603,8 +2596,7 @@ export const SCRIPTS = {
               if (a) { a.track = null; a.cineTarget = { x: tx }; a.cineSpeed = 1.5; a.heading = -1; }
             }
           } },
-      ];
-      },
+      ],
     },
     {
       // 第十一场（玩法·全章唯一的高压段）：藏种子粮。没有倒计时——紧迫感全部

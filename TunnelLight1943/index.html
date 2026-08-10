@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=060">
+  <link rel="stylesheet" href="./Style_Game.css?v=061">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,18 +33,18 @@
         "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=060",
-        "./Script_World.js": "./Script_World.js?v=060",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=060",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=060",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=060",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=060",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=060",
-        "./Script_Audio.js": "./Script_Audio.js?v=060",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=060",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=060",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=060",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=060"
+        "./Script_Core.mjs": "./Script_Core.mjs?v=061",
+        "./Script_World.js": "./Script_World.js?v=061",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=061",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=061",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=061",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=061",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=061",
+        "./Script_Audio.js": "./Script_Audio.js?v=061",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=061",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=061",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=061",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=061"
       }
     }
   </script>
@@ -150,15 +150,6 @@
       </div>
     </section>
 
-    <!-- 历史内容提示：开始前给一次，弱化选项只改暴行几拍的取景与时长 -->
-    <section id="contentNotice" hidden>
-      <small>开始之前</small>
-      <h2>历史内容提示</h2>
-      <p>本作依据史实创作，包含日军在华北敌后犯下的战争暴行情节：杀害婴儿、殴打儿童与老人、强征平民劳役。这些事件是固定剧情，不与操作水平挂钩，也不构成任何玩法、奖励或收集。</p>
-      <label id="softenRow"><input type="checkbox" id="softenBox"><span>弱化暴行镜头（只改变取景与时长，不改变事件与后果）</span></label>
-      <button id="contentNoticeGo" type="button">我已知晓 · 开始</button>
-    </section>
-
     <div id="touchControls" aria-label="触屏操作">
       <!-- 一个摇杆管走路和上下梯：横推走，竖推爬（竖直分量明显压过水平才算，
            免得走着走着手指一飘就被送上梯子） -->
@@ -232,6 +223,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=060"></script>
+<script type="module" src="./Script_Main.js?v=061"></script>
 </body>
 </html>
