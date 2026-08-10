@@ -313,6 +313,13 @@ async function CmdState(o) {
       item: p.item?.id || null, climbT: +(p.climbT || 0).toFixed(2) },
     prompt: state.prompt, climbHint: state.climbHint || "", objective: def?.objective || "",
     groundItems: state.groundItems.map((g) => `${g.id}@${g.x.toFixed(1)}${g.level === "under" ? "(下)" : ""}`),
+    // 在场的人：谁站在哪、摆什么姿势/跑哪条轨道、手里拿什么。
+    // 「爹的动作不对」这类问题十次有九次是问这个，以前只能现写探针脚本
+    actors: state.actors.filter((a) => a.visible !== false && Math.abs(a.x - p.x) < 14)
+      .map((a) => `${a.id}@${a.x.toFixed(2)}${a.level === "under" ? "(下)" : ""}`
+        + `${a.pose ? "/" + a.pose : ""}`
+        + `${a.track ? "/轨:" + a.track.name + "@" + (a.track.t ?? 0).toFixed(2) : ""}`
+        + `${a.carry ? "/持:" + a.carry : ""}${a.rank ? "/排" + a.rank : ""}`),
     bubbles: state.bubbles.map((b) => b.icon),
     flagsChanged: changed,
     live,
@@ -324,6 +331,7 @@ async function CmdState(o) {
     `${dump.player.item ? " 手里=" + dump.player.item : " 空手"}`);
   console.log(`提示  ${JSON.stringify(dump.prompt)}${dump.climbHint ? "   梯子：" + dump.climbHint : ""}`);
   if (dump.objective) console.log(`目标  ${dump.objective}`);
+  if (dump.actors.length) console.log(`在场  ${dump.actors.join("  ")}`);
   if (dump.groundItems.length) console.log(`地上  ${dump.groundItems.join("  ")}`);
   if (dump.bubbles.length) console.log(`气泡  ${dump.bubbles.join("  ")}`);
   if (Object.keys(changed).length) console.log(`旗标变化  ${Brief(changed)}`);

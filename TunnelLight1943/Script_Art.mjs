@@ -1772,15 +1772,68 @@ export function DrawHungDoor(ctx, ax, ay, id, { loose = false } = {}) {
   }
   // 上轴（还在窝里）：一小截露出来的木轴头
   InkFill(ctx, Rect(x0 - 5, y0 - 2, 6, 7), id + "pivT", "#6b4a2c", { amp: 0.6, lw: 1.6 });
-  // 下轴：**跳出臼窝**的那一头。松着的时候画成脱开、底下露出空臼窝，
-  // "门为什么晃"就靠这一处说清楚，不用一行字
-  if (loose) {
-    InkFill(ctx, Rect(x0 - 6, y0 + H - 8, 7, 9), id + "pivB", "#6b4a2c", { amp: 0.7, lw: 1.7 });
-    // 空着的臼窝（画在门扇脚边的地上）
-    InkFill(ctx, [[x0 - 16, y0 + H + 3], [x0 - 4, y0 + H + 1], [x0 - 2, y0 + H + 7], [x0 - 18, y0 + H + 8]],
-      id + "socket", "#4a3626", { amp: 1.0, lw: 1.8 });
-  } else {
-    InkFill(ctx, Rect(x0 - 5, y0 + H - 6, 6, 7), id + "pivB2", "#6b4a2c", { amp: 0.6, lw: 1.6 });
+  // 下轴：门扇脚上那根要礅进臼窝的木轴头。**只画轴，不画臼窝**——
+  // 臼窝（门枕石）是钉在地上的东西，画进这张贴图就会跟着门扇一起摆
+  //（门歪 15° 时地上那块石头也跟着歪 15°，读出来就是"地面在晃"）。
+  // 它现在自己一张静态贴图，见 DrawDoorSocket / World 的 doorSocketMesh。
+  // 尺寸也放大了一档：原来 6×7px（≈0.13m）在 2.6m 的特写里也只有二十来个像素，
+  // 「他在敲什么」全靠这一处说，太小就等于没画（用户 2026-08-10）。
+  const pw = 9, ph = 15;
+  InkFill(ctx, Rect(x0 - pw + 1, y0 + H - ph + 4, pw, ph), id + "pivB", "#5d3f22",
+    { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.28)" });
+  // 轴头磨出来的亮茬（转了几十年的那一圈）
+  InkLine(ctx, x0 - pw + 2.5, y0 + H - 3, x0 - 1.5, y0 + H - 3, id + "pivWear",
+    { lw: 1.6, color: "rgba(206,176,122,0.5)", amp: 0.6 });
+  void loose;
+}
+
+// 门枕石与臼窝：**钉在地上的东西**，单独一张贴图，绝不跟着门扇摆。
+//
+// 这一拍要玩家看懂的就一件事：那根轴要礅进这个窝里。老版把空臼窝画进了门扇
+// 的贴图里（跟着门一起转），下轴只有 6×7 像素，于是"爹在修什么"画面上从来
+// 没说过（用户 2026-08-10：「我也看不出他是在修什么东西」）。
+// seat = 0..1：礅进去多少。0 = 窝是空的、黑洞洞一个口；1 = 轴头填满、
+// 石面上撒着刚礅出来的木屑。进度长在这块石头上，不在任何一根条上。
+export function DrawDoorSocket(ctx, ax, ay, id, { seat = 0 } = {}) {
+  const k = Math.max(0, Math.min(1, seat));
+  // 石头本体：一块半埋在门槛里的方石，上面凿了个圆窝。
+  // 尺寸按实物：门枕石一尺见方，≈0.42m 宽、0.19m 露在外头（20×9 绘制单位，
+  // 48px/米）。第一版按 0.67m 画，摆到 obstacle 带上被近景透视再放大一档，
+  // 成了一块挡住半个人的大石板
+  InkFill(ctx, [[ax - 10, ay], [ax + 9, ay - 1], [ax + 10, ay - 6], [ax + 7, ay - 9],
+    [ax - 8, ay - 8.4], [ax - 11, ay - 5]], id + "stone", "#6a604d",
+  { amp: 0.9, lw: 1.9, shade: "rgba(0,0,0,0.3)" });
+  // 石面的凿痕
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, ax - 7 + i * 5.5, ay - 7.6, ax - 5 + i * 5.5, ay - 6.2, id + "chis" + i,
+      { lw: 0.8, color: "rgba(38,34,26,0.42)", amp: 0.8 });
+  }
+  // 臼窝：凿在石面上的圆坑。没礅到底之前是个黑口子
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(ax - 0.5, ay - 7.6, 4.4, 2.1, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#1f1810";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(26,20,12,0.8)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.restore();
+  // 礅进去的那截轴：越敲填得越满（k=1 时口子被木头塞死）
+  if (k > 0.02) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(ax - 0.5, ay - 7.9, 3.7 * (0.45 + 0.55 * k), 1.7 * (0.45 + 0.55 * k), 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#5d3f22";
+    ctx.fill();
+    ctx.restore();
+  }
+  // 敲出来的木屑：一记一记攒在石面上（做功的痕迹留在物件上，不留在 HUD 上）
+  const chips = Math.round(k * 5);
+  for (let i = 0; i < chips; i += 1) {
+    const cx = ax - 8 + Hash(id + "cp" + i) * 16;
+    const cy = ay - 4.5 + Hash(id + "cq" + i) * 3.5;
+    InkLine(ctx, cx, cy, cx + 1.8 + Hash(id + "cl" + i) * 1.6, cy - 1, id + "chip" + i,
+      { lw: 1.2, color: "rgba(196,158,102,0.85)", amp: 0.4 });
   }
 }
 

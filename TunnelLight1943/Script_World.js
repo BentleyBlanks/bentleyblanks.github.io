@@ -493,6 +493,8 @@ export function CreateWorld(canvasEl) {
   let dustMesh = null, dustCanvas = null, dustCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
   let doorLeafPivot = null, doorLeafMesh = null, doorLeafLoose = null;
+  // 门枕石（臼窝）：钉在地上的那一件，与门扇分开（门扇会绕上轴摆，石头不会）
+  let doorSocketMesh = null, doorSocketSeat = -1;
   let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
   let planeToolMesh = null;
   let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
@@ -558,6 +560,7 @@ export function CreateWorld(canvasEl) {
     dustMesh = null; dustCanvas = null; dustCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
     doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
+    doorSocketMesh = null; doorSocketSeat = -1;
     planeToolMesh = null; planeHandRig = null;
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
@@ -3525,7 +3528,33 @@ export function CreateWorld(canvasEl) {
       // 谁也压不死谁。判定用的 lean 不掺这份演出（Core 只算物理）。
       const trem = (dl.strain || 0) * 0.008 * Math.sin(time * 34);
       doorLeafPivot.rotation.z = -((dl.lean || 0) + trem);
-    } else if (doorLeafPivot) doorLeafPivot.visible = false;
+
+      // 门枕石与臼窝：**钉在地上**，所以是独立一张贴图，不进 doorLeafPivot。
+      // 进去就会跟着门扇一起摆——门歪 15°，地上那块石头也歪 15°。
+      // 礅进去多少（work）画在石头上：窝里的轴头一点点填满、石面上木屑一记一记
+      // 攒起来。这一拍"爹在修什么"全靠这一处说（用户 2026-08-10 看不出来）。
+      // 礅进去多少：玩法里由 work 给；没有 work 的场合（开场那扇好好挂着的门、
+      // 修完之后）按"轴在不在窝里"给——不给默认值的话，门明明是好的，
+      // 窝里却空着一个黑口子
+      const seat = dl.work !== undefined ? Math.max(0, Math.min(1, dl.work)) : (dl.loose ? 0 : 1);
+      const seatBucket = Math.round(seat * 4);
+      if (!doorSocketMesh) {
+        doorSocketMesh = BakeSprite(34, 20, 17, 18,
+          (ctx, ax, ay) => ART.DrawDoorSocket(ctx, ax, ay, "homeSocket", { seat }), 0, PROP_SS);
+        doorSocketSeat = seatBucket;
+        SetPlayOrder(doorSocketMesh, BAND.obstacle, "doorSocket");
+        layers.play.add(doorSocketMesh);
+      } else if (doorSocketSeat !== seatBucket) {
+        doorSocketSeat = seatBucket;
+        RedrawProp(doorSocketMesh, { w: 34, h: 20, ax: 17, ay: 18, ss: PROP_SS },
+          (ctx, ax, ay) => ART.DrawDoorSocket(ctx, ax, ay, "homeSocket", { seat }));
+      }
+      doorSocketMesh.visible = true;
+      PlaceSprite(doorSocketMesh, dl.x, SURFACE_Y, PlaceZ(BAND.obstacle));
+    } else if (doorLeafPivot) {
+      doorLeafPivot.visible = false;
+      if (doorSocketMesh) doorSocketMesh.visible = false;
+    }
 
     if (state.planing) {
       const pl = state.planing;

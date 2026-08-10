@@ -1833,6 +1833,41 @@ function TestLiveCardsKeepTheWorldBehind() {
   console.log("  ✓ 活卡的底是透明的：做功那几拍背后还是那个村子（散焦，不是色板）");
 }
 
+// 礅门轴那条轨道：**下半身在每一帧都必须是同一组数**，脚才不会在地上滑。
+//
+// 老版拿两个静态姿势来回切（kneel ⇄ swing，一个跪一个站，胯高差 44 厘米、
+// hipX 差 0.12m），于是每 0.85 秒爹就从跪着弹起来再蹲回去，脚跟着横移——
+// 用户 2026-08-10 的原话：「脚会位移」。这条断言按源码扫：malletTap 除了
+// 第一帧，任何一帧都不许再声明胯与两条腿；位置也必须由 Core 每帧钉死。
+// Script_Rig 依赖 three，node 里 import 不进来，所以只能这么扫源码。
+function TestMalletTapDoesNotSlide() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
+  const at = rig.indexOf("malletTap: {");
+  assert.ok(at > 0, "礅门轴的轨道 malletTap 必须在（爹的动作不许再借别处的静态姿势）");
+  const body = rig.slice(at, rig.indexOf("\n  },", at));
+  const keys = body.split(/\{\s*t:/).slice(1);
+  assert.ok(keys.length >= 4, `malletTap 至少要有起手/举起/顿住/砸下四帧（实为 ${keys.length}）`);
+  const LOWER = ["hipY", "hipX", "thighB", "shinB", "footB", "thighF", "shinF", "footF"];
+  for (const j of LOWER) assert.ok(new RegExp(`\\b${j}:`).test(keys[0]), `第一帧得把 ${j} 定下来`);
+  keys.slice(1).forEach((k, i) => {
+    for (const j of LOWER) {
+      assert.ok(!new RegExp(`\\b${j}:`).test(k),
+        `malletTap 第 ${i + 2} 帧动了 ${j}——下半身一动脚就在地上滑（这条轨道的全部意义就是不滑）`);
+    }
+  });
+  // 首尾必须是同一格：knockT 归零那一帧接得上，不然每敲一下闪一下
+  const arm = (k) => (k.match(/armF:\s*(-?\d+)/) || [])[1];
+  assert.equal(arm(keys[0]), arm(keys[keys.length - 1]), "malletTap 的首尾两帧必须重合（相位是循环的）");
+  // Core 那边：相位由 knockT 喂，人钉在轴边不许挪
+  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  const hd = core.slice(core.indexOf('case "holdDoor"'), core.indexOf('case "throwHit"'));
+  assert.ok(/name:\s*"malletTap",\s*t:\s*b\.knockT/.test(hd),
+    "槌子的相位必须直接由 knockT 喂——声音、进度、落槌那一帧才对得上");
+  assert.ok(/father\.x\s*=\s*dx\s*-/.test(hd), "爹要钉在门轴边上，不许在这一拍里挪位置");
+  console.log("  ✓ 礅门轴：下半身钉死不滑脚 / 相位跟着 knockT / 人钉在轴边");
+}
+
 function TestPlaneBeat() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
@@ -2792,6 +2827,7 @@ TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();
 TestLiveCardsKeepTheWorldBehind();
+TestMalletTapDoesNotSlide();
 TestPlaneBeat();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();

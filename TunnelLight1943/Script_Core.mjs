@@ -253,7 +253,10 @@ const DOOR_SEAT_N = 4;       // 礅几下轴才咬进臼窝（进度按下数走
 const DOOR_KEY = 0.42;       // 键盘后备：按住 E 把门扶正的角速度
 // 这一拍必须推特写：默认跟随景别 12.6m 宽，一扇 0.83m 的门在手机上才 55 像素，
 // 又是"要按住它、还要稳住"的活——按不着也稳不住（刨子那次就是这么被退回的）
-const DOOR_CAM = { y: 1.15, hw: 2.6 };
+// 这一拍的主体是**门脚下那根轴和它要礅进去的臼窝**，不是整扇门：机位钉在
+// 膝盖那么高（0.72m）而不是胸口——1.15m 那一版把轴正好压在屏幕底部那条提示条
+// 底下，玩家一整拍都没看见自己在修什么（用户 2026-08-10）
+const DOOR_CAM = { y: 0.72, hw: 2.45 };
 
 const CLIMB_DOWN = 1.5;
 const CLIMB_UP = 2.0;
@@ -1361,6 +1364,8 @@ function StepChain(state, def, input, dt) {
           b.knockT = 0;
           b.work = Math.min(1, b.work + 1 / DOOR_SEAT_N);
           Cue(state, "tenon", { gain: 0.85 });
+          // 每一记都在门枕石那儿扬起一小撮土：这一下砸在哪儿，画面自己说
+          state.vaultDust = { x: dx, t: 0.28 };
           if (b.work < 1) {
             if (keyOnly) b.lean = Math.min(DOOR_SAG, b.lean + 0.07);   // 键盘路：弹一格，按住 E 会自己怼回来
             else b.vel += DOOR_KICK * (0.85 + Math.random() * 0.3);    // 指针路：真震劲，靠手接住
@@ -1372,8 +1377,17 @@ function StepChain(state, def, input, dt) {
       state.promptFill = b.work;
       state.prompt = st.prompt || "扶住门扇 · 别让它往外坠";
       state.closeUp = { x: dx, y: SURFACE_Y + DOOR_CAM.y, hw: DOOR_CAM.hw };
-      // 爹的手上要看得出在使劲：抡锤前半拍举着（swing），其余时候蹲着对轴（kneel）
-      if (father) father.pose = steady && b.knockT > 0.38 ? "swing" : "kneel";
+      // 爹礅轴：一条**轨道**，相位直接由 knockT 喂（见 Rig 的 malletTap）。
+      // 不能再拿两个静态姿势来回切——kneel(跪) 与 swing(站着抡枪托) 差 44 厘米胯高，
+      // 每 0.85 秒他就弹起来蹲回去一次，脚在地上滑（用户 2026-08-10 报的）。
+      // 位置也钉死：他跪在轴西边一臂之内，手正按在那根轴上，全程不许挪。
+      if (father) {
+        father.pose = null;
+        father.cineTarget = null;
+        father.x = dx - 0.50;
+        father.heading = 1;
+        father.track = { name: "malletTap", t: b.knockT };
+      }
       // 玩家不能站着不动"意念扶门"（拟物规则 8：每个玩法动词配角色动画）：
       // 攥住/按住 E 就顶上去，吃劲多深姿势就压多深
       const bracing = b.grabbed || input.interactHeld;
@@ -1387,7 +1401,9 @@ function StepChain(state, def, input, dt) {
         strain: b.grabbed ? strain : 0,          // 渲染层拿它抖那一丝——判定的 lean 不掺演出
       };
       if (b.work >= 1) {
-        if (father) father.pose = "kneel";
+        // 礅完了：槌子收住，人还蹲在那儿——轨道停在最后一格（砸下那一帧）
+        // 会读成"永远举着"，所以显式换成收工的蹲姿
+        if (father) { father.track = null; father.pose = "bow"; }
         p.pose = null; p.poseU = undefined;
         state.doorLeaf = { x: dx, hingeY: st.hingeY ?? 1.54, lean: 0, work: 1, loose: false };
         Cue(state, "tenon", { gain: 0.9 });
