@@ -1523,6 +1523,15 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   // **必须等玩家真的划完才出现**（marked）——它以前是无条件画的，于是那一拍
   // 玩家攥着笔去划一条已经在木头上的线，整个交互当场失去意义。
   // 粗细跟玩家划出来的那道对齐（1.8px≈3.7cm），否则划完一瞬间线会突然变胖。
+  // 去年的刻痕：**无条件画**——量身高那场戏的铺垫全指着它（爹收完家伙
+  // 一抬眼撞见的就是这道）。风吹日晒一年，只剩一道发暗的凹槽；跟今年石笔
+  // 划出来的亮线一对比，「长了多少」不用一个字。57px≈1.19m，比今年矮 9cm
+  // 凿槽的画法：一道暗槽 + 槽下沿一线亮茬（新茬被晒旧后仍比木面浅）——
+  // 单画一根半透明细线在晨雾里读不出来（实测过）
+  InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
+    id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
+  InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
+    id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
   if (marked) {
     InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
