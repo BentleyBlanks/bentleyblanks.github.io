@@ -3858,18 +3858,22 @@ export function CreateWorld(canvasEl) {
         layers.play.add(winchGuide);
       }
       const hubY = SURFACE_Y + WINCH_HUB_Y;                // 辘轳轴心（井架横杆中线）
-      const bucketY = SURFACE_Y + 0.70 - wv.depth * 1.30;  // 摇到顶就搁在井口沿上，往下一路沉进井里
+      // 摇到顶＝桶提到井口沿上（伸手就够得着），往下一路沉进井里。
+      // 沉多深不要按"井有多深"给——按**看得见多久**给：桶在头一小半程里
+      // 一直看得见，之后才淡进井筒的黑里（第一版 0.70−1.30d 走到两成深度
+      // 桶就没影了，玩家会以为它掉了）
+      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25;
       // 绳只画到井口沿为止：再往下它就该钻进井筒的黑里了。不夹的话，桶沉到
       // 底时会有一根木色的长条从辘轳一直拖到地面、还压在井台之前——读出来是
       // "绳挂在井外面"，不是"桶下到井里去了"
-      const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.66);
+      const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.62);
       winchRope.visible = true;
       winchRope.scale.set(1, Math.max(0.05, hubY - ropeBottom), 1);
       winchRope.position.set(wv.x, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
       // 桶沉到井台沿以下就淡进井口那团黑里——它画在井台**之前**（loose 带），
       // 不淡的话整只桶会浮在石头台面上往下滑，读出来是"桶在井外掉"
-      winchBucket.visible = wv.hooked && bucketY > 0.42;
-      winchBucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.44) / 0.20));
+      winchBucket.visible = wv.hooked && bucketY > 0.05;
+      winchBucket.material.opacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
       winchBucket.material.transparent = true;
       winchBucket.position.set(wv.x, bucketY, PlaceZ(BAND.loose));
       // 灌满了桶身压得低一点
