@@ -14,7 +14,7 @@ import {
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
-  UnderSegments,
+  UnderSegments, AllRelics,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -1699,6 +1699,58 @@ function TestWorkStations() {
 // 命令行工作台自己也要有测试。它是给 agent 用的接口——**坏了不会有任何别的
 // 测试变红**，但下一个会话会立刻退回"现写探针脚本"那条老路（12 天里那 234 个
 // 一次性脚本就是这么来的）。这里只盯"问得出答案"，不盯具体文案。
+// 收藏品（老物件）+ 包袱：勇敢的心式的隐藏历史小物（2026-08-10 用户定，
+// 替掉那枚没头没脑的铜顶针）。四件事盯死：
+//   ① 数据齐全：id 唯一、有注解（史实卡是意义所在）、落点在走行范围内
+//   ② 每件的 art 在 DrawRelic 里真有一个 case（漏了会画成问号方块）
+//   ③ 前景草（fore）也一样有画法，且不许只长在收藏品跟前（那就成藏宝标记了）
+//   ④ 无头拾取真的走得通：走近出提示、按 E 进包袱、场上旗标记好
+function TestRelicsBag() {
+  const all = AllRelics();
+  assert.ok(all.length >= 9, `收藏品至少 9 件，现在 ${all.length}`);
+  const ids = new Set(all.map((r) => r.id));
+  assert.equal(ids.size, all.length, "收藏品 id 撞了");
+  const artSrc = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Art.mjs"), "utf8");
+  for (const r of all) {
+    assert.ok(r.note.length >= 20, `${r.id} 的注解太短`);
+    assert.ok(artSrc.includes(`case "${r.art}"`), `DrawRelic 缺 ${r.art} 的画法`);
+  }
+  // 前景草：art 覆盖 + 疑兵位（远离一切收藏品 3m 以上的草丛至少两处）
+  let decoys = 0;
+  for (const [key, sc] of Object.entries(SCENES)) {
+    for (const f of sc.fore || []) {
+      assert.ok(["grass", "stalks", "weeds"].includes(f.art), `fore 草 ${key}@${f.x} 的 art 没画法`);
+      const nearRelic = (sc.relics || []).some((r) => Math.abs(r.x - f.x) < 3);
+      if (!nearRelic) decoys += 1;
+    }
+  }
+  assert.ok(decoys >= 3, "前景草全长在收藏品跟前——那就成了藏宝标记，要掺疑兵位");
+
+  // 无头拾取：跳到第一章玩法拍，走到鸡窝那件跟前按 E
+  const st = CreateGame(0);
+  DebugJump(st, 0, ChapterBeatList(0).find((b) => b.id === "c1_barrow").index);
+  const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+  StepGame(st, idle, DT);
+  st.player.x = 66.3;
+  st.player.level = "surface";
+  st.player.cineWalk = null;
+  StepGame(st, idle, DT);
+  assert.equal(st.prompt, "E · 收进包袱", `站到收藏品跟前该出拾取提示，实际 ${JSON.stringify(st.prompt)}`);
+  StepGame(st, { ...idle, interact: true }, DT);
+  assert.ok(st.relicsGot.has("newsSheet"), "按 E 没收进包袱");
+  assert.ok(st.relicCard && st.relicCard.id === "newsSheet", "拾取后要出包袱卡（Main 靠它存档+滑条）");
+  StepGame(st, idle, DT);
+  assert.notEqual(st.prompt, "E · 收进包袱", "收走了还出提示");
+  // 包袱开着世界要冻住
+  st.bagOpen = true;
+  const beforeX = st.player.x;
+  StepGame(st, { ...idle, moveX: 1 }, DT);
+  assert.equal(st.player.x, beforeX, "包袱开着人还能走——世界没冻住");
+  st.bagOpen = false;
+  console.log(`  ✓ 收藏品：${all.length} 件老物件 / 注解齐 / 画法齐 / 疑兵草 ${decoys} 处 / 无头拾取通`);
+}
+
 function TestCliAnswersQuestions() {
   const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Cli.mjs");
   const run = (args) => execFileSync(process.execPath, [cli, ...args], { encoding: "utf8", timeout: 60000 });
@@ -2783,6 +2835,7 @@ TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestRelicsBag();
 TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();

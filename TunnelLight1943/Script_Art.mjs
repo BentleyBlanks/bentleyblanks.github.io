@@ -4268,26 +4268,6 @@ export function DrawVaultNotch(ctx, x, topY, id) {
   InkFill(ctx, [[x - 4, topY - 1], [x + 1, topY - 5], [x + 5, topY - 1]], id + "chip", "rgba(240,225,180,0.55)", { lw: 0, line: null });
 }
 
-// 院墙角的顶针：铜色的小圈，反着一点光——可选探索物
-export function DrawThimble(ctx, x, groundY, id) {
-  ctx.beginPath();
-  ctx.arc(x, groundY - 3, 3.4, 0, Math.PI * 2);
-  ctx.fillStyle = "#c8963c";
-  ctx.fill();
-  ctx.strokeStyle = IN.ink;
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(x, groundY - 3, 1.5, 0, Math.PI * 2);
-  ctx.fillStyle = "#5c4328";
-  ctx.fill();
-  // 一点反光
-  ctx.beginPath();
-  ctx.arc(x - 1.2, groundY - 4.4, 0.8, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,240,200,0.9)";
-  ctx.fill();
-}
-
 // 一只麻雀：v 形的翅、团起的身——供惊飞的炸窝动画用（phase 0..1 扑翅）
 export function DrawSparrow(ctx, x, y, id, phase = 0) {
   const flap = Math.sin(phase * Math.PI * 2) * 6;
@@ -6615,4 +6595,234 @@ export function DrawEmptyKennel(ctx, x, groundY, id) {
   InkFill(ctx, [[x + 12, groundY], [x + 13, groundY - 6], [x + 26, groundY - 5], [x + 27, groundY]],
     id + "bowl", "#4a3f33", { amp: 1.4, lw: 1.6 });
   InkLine(ctx, x + 18, groundY - 6, x + 22, groundY - 2, id + "chip", { lw: 1.2, color: "#2b241c", amp: 0.8 });
+}
+
+// 收藏品（老物件）画笔。一支笔九个变体，场上与包袱条共用——
+// 场上画在地上（小、半掩），包袱条里放大两档画在格子里。
+// sil: 剪影模式（包袱里还没找到的那格：只给一个深色的形，勇敢的心的做法——
+// 形状本身就是唯一的提示，别给颜色细节）。
+// 颜色照全局规矩按 ^2.2 预压过（CanvasTexture 洗白问题）。
+export function DrawRelic(ctx, x, groundY, art, id, { sil = false, k = 1, dim = false } = {}) {
+  ctx.save();
+  ctx.translate(x, groundY);
+  ctx.scale(k, k);
+  ctx.translate(-x, -groundY);
+  const S = "#3f3831";                          // 剪影色
+  // dim：世界贴图走 CanvasTexture 会被整体提亮（老坑），源色预压一档；
+  // 包袱条是 DOM canvas，不洗白，照原色画——同一支笔两个去处两套色
+  const C = (real) => (sil ? S : dim ? Dim(real, 0.55) : real);
+  const L = sil ? { line: null, lw: 0 } : {};   // 剪影不描边
+  const y = groundY;
+  switch (art) {
+    case "borderNote": {
+      // 边区票：一张小纸票，边角卷起，票面两道墨框
+      InkFill(ctx, [[x - 13, y - 1], [x + 12, y - 3], [x + 14, y - 12], [x - 11, y - 10]],
+        id + "p", C("#9a8f74"), { amp: 0.8, lw: 1.4, shade: "rgba(0,0,0,0.12)", ...L });
+      if (!sil) {
+        InkLine(ctx, x - 9, y - 8, x + 10, y - 9.6, id + "f1", { lw: 1, color: "#4e4638", amp: 0.4 });
+        InkLine(ctx, x - 8, y - 4.6, x + 9, y - 6, id + "f2", { lw: 1.6, color: "#5c4a3a", amp: 0.4 });
+        InkLine(ctx, x + 12, y - 3, x + 14, y - 12, id + "curl", { lw: 1.2, color: "#7a7058", amp: 0.6 });
+      }
+      break;
+    }
+    case "shoeSole": {
+      // 千层底 + 铜顶针：鞋底立着靠在墙根，顶针搁在旁边
+      InkFill(ctx, [[x - 10, y], [x - 12, y - 16], [x - 8, y - 24], [x - 2, y - 25], [x + 2, y - 16], [x + 1, y]],
+        id + "sole", C("#a89a80"), { amp: 1.0, lw: 1.6, shade: "rgba(0,0,0,0.14)", ...L });
+      if (!sil) {
+        for (let r = 0; r < 4; r += 1) {
+          InkLine(ctx, x - 9 + Math.max(0, r - 1), y - 4 - r * 5, x + 0.5, y - 5 - r * 5,
+            id + "st" + r, { lw: 0.8, color: "rgba(74,60,44,0.55)", amp: 0.5 });
+        }
+        InkLine(ctx, x - 4, y - 20, x - 3, y - 8, id + "thr", { lw: 0.8, color: "#8f8168", amp: 1.2 });
+      }
+      InkFill(ctx, [[x + 6, y], [x + 6, y - 6], [x + 12, y - 6], [x + 12, y]],
+        id + "th", C("#8a6a3c"), { amp: 0.7, lw: 1.3, ...L });
+      if (!sil) {
+        ctx.save();
+        ctx.fillStyle = "#5c4626";
+        for (let i = 0; i < 5; i += 1) ctx.fillRect(x + 7 + i, y - 5 + (i % 2), 0.8, 0.8);
+        ctx.restore();
+      }
+      break;
+    }
+    case "newsSheet": {
+      // 报纸残页：折过的半张，一角撕口；版面是墨迹节奏块（白盒不写可读字）
+      InkFill(ctx, [[x - 14, y], [x - 12, y - 15], [x + 4, y - 17], [x + 13, y - 13], [x + 11, y - 2], [x + 2, y - 4]],
+        id + "sheet", C("#a09781"), { amp: 0.9, lw: 1.4, shade: "rgba(0,0,0,0.10)", ...L });
+      if (!sil) {
+        InkLine(ctx, x - 6, y - 15.5, x - 4, y - 3.5, id + "fold", { lw: 0.9, color: "rgba(60,52,40,0.4)", amp: 0.5 });
+        for (let r = 0; r < 4; r += 1) {
+          InkLine(ctx, x - 10, y - 12.5 + r * 2.6, x - 10 + 5 + Hash(id + "l" + r) * 4, y - 12.7 + r * 2.6,
+            id + "tx" + r, { lw: 1.1, color: "rgba(52,44,34,0.6)", amp: 0.2 });
+          InkLine(ctx, x + 1, y - 13.5 + r * 2.8, x + 1 + 6 + Hash(id + "r" + r) * 4, y - 13.2 + r * 2.8,
+            id + "tx2" + r, { lw: 1.1, color: "rgba(52,44,34,0.5)", amp: 0.2 });
+        }
+      }
+      break;
+    }
+    case "featherLetter": {
+      // 鸡毛信：折成方胜的信 + 三根鸡毛斜插在角上
+      InkFill(ctx, [[x - 11, y], [x - 9, y - 10], [x + 9, y - 12], [x + 11, y - 2]],
+        id + "env", C("#a89c80"), { amp: 0.8, lw: 1.4, shade: "rgba(0,0,0,0.12)", ...L });
+      if (!sil) {
+        InkLine(ctx, x - 9, y - 10, x + 1, y - 5, id + "fa", { lw: 0.9, color: "rgba(70,58,44,0.5)", amp: 0.3 });
+        InkLine(ctx, x + 9, y - 12, x + 1, y - 5, id + "fb", { lw: 0.9, color: "rgba(70,58,44,0.5)", amp: 0.3 });
+      }
+      for (let i = 0; i < 3; i += 1) {
+        const fx = x + 6 + i * 2.4, a = -0.9 - i * 0.14;
+        InkLine(ctx, fx, y - 10, fx + Math.cos(a) * 12, y - 10 + Math.sin(a) * 12,
+          id + "q" + i, { lw: 1.2, color: C("#7d6a4e"), amp: 0.6 });
+        if (!sil) {
+          InkFill(ctx, [[fx + Math.cos(a) * 9 - 2.4, y - 10 + Math.sin(a) * 9],
+            [fx + Math.cos(a) * 13, y - 10 + Math.sin(a) * 13 - 1],
+            [fx + Math.cos(a) * 9 + 2.2, y - 10 + Math.sin(a) * 9 + 1.6]],
+          id + "fe" + i, "#8f8266", { amp: 0.8, lw: 0, line: null });
+        }
+      }
+      break;
+    }
+    case "cartridgeWhistle": {
+      // 弹壳哨子：两枚弹壳拴在一截麻绳上
+      if (!sil) InkLine(ctx, x - 12, y - 14, x + 12, y - 10, id + "str", { lw: 1.1, color: "#6d5a3a", amp: 1.6 });
+      for (let i = 0; i < 2; i += 1) {
+        const cx2 = x - 5 + i * 9, tilt = (i ? 1 : -1) * 0.22;
+        ctx.save();
+        ctx.translate(cx2, y - 6);
+        ctx.rotate(tilt);
+        InkFill(ctx, [[-2.2, 6], [-2.2, -4], [-1.4, -6], [1.4, -6], [2.2, -4], [2.2, 6]],
+          id + "sh" + i, C("#8a744a"), { amp: 0.5, lw: 1.2, shade: "rgba(0,0,0,0.18)", ...L });
+        if (!sil) {
+          ctx.fillStyle = "#5c4c30";
+          ctx.fillRect(-2.2, -0.6, 4.4, 1.1);
+        }
+        ctx.restore();
+      }
+      break;
+    }
+    case "mineFuse": {
+      // 石雷拉火管：小铜管 + 圈起来的拉火绳
+      ctx.save();
+      ctx.translate(x, y - 4);
+      ctx.rotate(-0.28);
+      InkFill(ctx, [[-9, -2.4], [9, -2.0], [9.6, 0], [9, 2.0], [-9, 2.4]],
+        id + "tube", C("#7d6438"), { amp: 0.5, lw: 1.3, shade: "rgba(0,0,0,0.2)", ...L });
+      if (!sil) InkLine(ctx, -6, -1.6, -6, 1.8, id + "band", { lw: 1, color: "#4e3e22", amp: 0.2 });
+      ctx.restore();
+      if (!sil) {
+        ctx.save();
+        ctx.strokeStyle = "#6d5a3a";
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.arc(x + 11, y - 5, 4.2, -0.6, 4.6);
+        ctx.stroke();
+        ctx.restore();
+      }
+      break;
+    }
+    case "spearHead": {
+      // 红缨枪头：矛头 + 一束红缨（全画面唯一敢用的一点暗红，收藏品该跳一下）
+      InkFill(ctx, [[x - 2, y], [x - 3.6, y - 7], [x, y - 20], [x + 3.6, y - 7], [x + 2, y]],
+        id + "blade", C("#8a8578"), { amp: 0.6, lw: 1.4, shade: "rgba(0,0,0,0.16)", ...L });
+      if (!sil) {
+        InkLine(ctx, x, y - 18, x, y - 3, id + "ridge", { lw: 0.8, color: "rgba(60,56,48,0.5)", amp: 0.2 });
+        for (let i = 0; i < 6; i += 1) {
+          InkLine(ctx, x + Sym(id + "t" + i, 0, 2.2), y - 1,
+            x + Sym(id + "t2" + i, 0, 7) , y + 6 + Hash(id + "t3" + i) * 3,
+            id + "tas" + i, { lw: 1.1, color: "#6e3428", amp: 0.8 });
+        }
+      }
+      break;
+    }
+    case "grenadeHandle": {
+      // 边区造手榴弹柄：木旋的短柄，一头有拧盖的箍
+      ctx.save();
+      ctx.translate(x, y - 3);
+      ctx.rotate(0.34);
+      InkFill(ctx, [[-11, -2.8], [8, -3.4], [11, -2.2], [11, 2.2], [8, 3.4], [-11, 2.8]],
+        id + "wood", C("#8a6a42"), { amp: 0.7, lw: 1.4, shade: "rgba(0,0,0,0.18)", ...L });
+      if (!sil) {
+        InkLine(ctx, -8, -2.2, -8, 2.4, id + "cap", { lw: 1.2, color: "#4e3a20", amp: 0.3 });
+        InkLine(ctx, -10, 0, 9, 0.4, id + "grain", { lw: 0.7, color: "rgba(74,54,30,0.45)", amp: 0.6 });
+      }
+      ctx.restore();
+      break;
+    }
+    case "slateBoard": {
+      // 识字班石板：巴掌大的石板，木框缺一边，搭一截石笔
+      InkFill(ctx, [[x - 12, y], [x - 11, y - 15], [x + 11, y - 16], [x + 12, y - 1]],
+        id + "frame", C("#6b5b42"), { amp: 0.8, lw: 1.4, ...L });
+      InkFill(ctx, [[x - 9, y - 2], [x - 8.4, y - 13], [x + 8.6, y - 13.6], [x + 9.4, y - 3]],
+        id + "slate", C("#55534c"), { amp: 0.6, lw: 1.1, shade: "rgba(0,0,0,0.14)", ...L });
+      if (!sil) {
+        // 板上一个歪歪扭扭的名字的节奏（两团浅道道，不写真字）
+        InkLine(ctx, x - 5, y - 9, x - 1, y - 8, id + "w1", { lw: 1.2, color: "rgba(200,192,172,0.6)", amp: 0.8 });
+        InkLine(ctx, x + 1, y - 10, x + 5, y - 7.4, id + "w2", { lw: 1.2, color: "rgba(200,192,172,0.5)", amp: 0.8 });
+        InkLine(ctx, x + 4, y - 2.4, x + 12, y - 4.4, id + "pen", { lw: 1.6, color: "#9a9488", amp: 0.3 });
+      }
+      break;
+    }
+    default: {
+      InkFill(ctx, Rect(x - 8, y - 10, 16, 10), id + "q", C("#8a7a5c"), { amp: 0.8, lw: 1.4, ...L });
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// 前景草丛（layers.fore 专用，z=+3.4 掠过镜头那一层）：三种形，近剪影的暗色。
+// 它的职责是**半遮**收藏品——玩家靠走动的视差从草后瞟见东西，这正是勇敢的心
+// 藏收藏品的手法。别画太密：挡个六七成，留缝。
+export function DrawForeTuft(ctx, x, groundY, id, kind = "grass") {
+  const H = 76 + Hash(id + "h") * 22;
+  // 上屏要落在 #4a4434 那一档，源色就得压到 #16140c（CanvasTexture 洗白）
+  const ink = "#16140c", ink2 = "#100e08";
+  // 根部先铺一团实心的草墩：光是几根线遮不住东西，也不像一丛
+  ctx.save();
+  ctx.fillStyle = ink2;
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 6, 20 + Hash(id + "bw") * 8, 13 + Hash(id + "bh") * 5, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.restore();
+  if (kind === "stalks") {
+    // 斜插的几根秫秸，梢头带枯叶
+    for (let i = 0; i < 8; i += 1) {
+      const bx = x - 17 + i * 5 + Sym(id + "sx" + i, 0, 3);
+      const lean = Sym(id + "sl" + i, 0, 10);
+      InkLine(ctx, bx, groundY, bx + lean, groundY - H * (0.7 + Hash(id + "sh" + i) * 0.3),
+        id + "st" + i, { lw: 2.4 + Hash(id + "sw" + i) * 1.2, color: i % 2 ? ink : ink2, amp: 1.6 });
+      InkLine(ctx, bx + lean, groundY - H * 0.72, bx + lean + Sym(id + "lf" + i, 0, 12), groundY - H * 0.62,
+        id + "leaf" + i, { lw: 1.6, color: ink2, amp: 2.2 });
+    }
+  } else if (kind === "weeds") {
+    // 蒿草：一蓬带籽穗的硬杆草
+    for (let i = 0; i < 12; i += 1) {
+      const bx = x - 15 + i * 2.8 + Sym(id + "wx" + i, 0, 2);
+      const tipX = bx + Sym(id + "wt" + i, 0, 9);
+      const tipY = groundY - H * (0.5 + Hash(id + "wh" + i) * 0.45);
+      InkLine(ctx, bx, groundY, tipX, tipY, id + "wd" + i,
+        { lw: 1.4 + Hash(id + "ww" + i), color: i % 3 ? ink : ink2, amp: 1.8 });
+      ctx.save();
+      ctx.fillStyle = ink2;
+      ctx.beginPath();
+      ctx.ellipse(tipX, tipY - 2, 1.6, 3.4, Sym(id + "wa" + i, 0, 0.4), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  } else {
+    // 乱草：宽的一丛，叶片往两边披
+    for (let i = 0; i < 16; i += 1) {
+      const bx = x - 18 + i * 2.4 + Sym(id + "gx" + i, 0, 2);
+      const dir = i < 5 ? -1 : i > 6 ? 1 : 0;
+      ctx.save();
+      ctx.strokeStyle = i % 2 ? ink : ink2;
+      ctx.lineWidth = 1.8 + Hash(id + "gw" + i) * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(bx, groundY);
+      ctx.quadraticCurveTo(bx + dir * 4, groundY - H * 0.55,
+        bx + dir * (10 + Hash(id + "gr" + i) * 10), groundY - H * (0.42 + Hash(id + "gh" + i) * 0.4));
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 }

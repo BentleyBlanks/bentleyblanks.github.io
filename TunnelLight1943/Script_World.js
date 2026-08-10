@@ -481,6 +481,11 @@ export function CreateWorld(canvasEl) {
   let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
   // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
   let barrowMesh = null, barrowWheel = null;
+  // 收藏品：id → mesh（收走切 visible）；一枚共享的微光引导（走近了才闪）
+  const relicMeshes = new Map();
+  let relicGlow = null;
+  // 前景草丛（layers.fore）：本场景加的那几丛，重建时自己收
+  let foreTufts = [];
   // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
   // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
   const mountMeshes = new Map();
@@ -549,6 +554,11 @@ export function CreateWorld(canvasEl) {
     barkMesh = null;
     chainItemMeshes = [];
     barrowMesh = null; barrowWheel = null;
+    relicMeshes.clear();
+    if (relicGlow) layers.play.remove(relicGlow);
+    relicGlow = null;
+    for (const m of foreTufts) layers.fore.remove(m);
+    foreTufts = [];
     mountMeshes.clear();
     groundItemMeshes.clear();
     bubbleMeshes = [];
@@ -1452,7 +1462,6 @@ export function CreateWorld(canvasEl) {
       }
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
-      case "thimble": mk((ctx, ax, ay) => ART.DrawThimble(ctx, ax, ay, p.id)); break;
       case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
@@ -2310,6 +2319,32 @@ export function CreateWorld(canvasEl) {
     }
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
 
+    // 收藏品（scene.relics）：小件、贴地、半掩在现有物件脚下。loose 序号——
+    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧
+    for (const r of sceneDef.relics || []) {
+      const m = BakeSprite(64, 60, 32, 52, (ctx, ax, ay) => ART.DrawRelic(ctx, ax, ay, r.art, r.id, { dim: true }), 0, DETAIL_SS);
+      PlaceSprite(m, r.x, r.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
+      SetPlayOrder(m, BAND.loose, "relic");
+      m.userData.kind = "relic:" + r.id;
+      layers.play.add(m);
+      relicMeshes.set(r.id, { mesh: m, r });
+    }
+
+    // 前景草丛（scene.fore）：layers.fore 是掠过镜头的那一层（z=+3.4，微糊、
+    // 特写与地下机位自动隐藏）。它的地平线比行走线低一截——草从画框下沿探
+    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头
+    for (const f of sceneDef.fore || []) {
+      const m = BakeSprite(120, 110, 60, 104,
+        (ctx, ax, ay) => ART.DrawForeTuft(ctx, ax, ay, "ft" + f.x, f.art), 1.1, 2, HazeFor("fore"));
+      // fore 组整层按 (D_REF-z)/D_REF 预缩过，作者坐标要除回去——不除的话
+      // x=125 的草被缩到世界 107，相机一到 125 它早滑出画框了（前景的视差
+      // 比玩法层快，锚点必须补偿）
+      PlaceSprite(m, f.x / LAYER_COMP.fore, SURFACE_Y, 0);
+      FixOrder(m, LAYER_ORDER.fore + 40);
+      layers.fore.add(m);
+      foreTufts.push(m);
+    }
+
     // 可翻越物的顶沿缺口：统一轮廓语法的记号——肩高、顶沿磨亮/有缺口。
     // 无按键交互的可读性全靠这一笔
     for (const v of sceneDef.vaults || []) {
@@ -2869,7 +2904,53 @@ export function CreateWorld(canvasEl) {
     const sceneDef = SCENES[ch.scene];
     const def = CurrentBeatDef(state);
 
-    // 旗标门的道具：只切显隐，不重建世界（顶针、母鸡、扫荡后的柴垛石堆）
+    // 收藏品：收走的隐掉；离得近的那件闪一点微光（勇敢的心的引导手法——
+    // 光比东西先被看见）。只闪最近的一件，别一屏好几处都在眨
+    {
+      let glowAt = null;
+      for (const [id, rec] of relicMeshes) {
+        const got = state.relicsGot?.has(id);
+        rec.mesh.visible = !got;
+        if (got) continue;
+        const sameLevel = (rec.r.level || "surface") === state.player.level;
+        const d = Math.abs(state.player.x - rec.r.x);
+        if (sameLevel && d < 4.5 && (!glowAt || d < glowAt.d)) glowAt = { rec, d };
+      }
+      if (glowAt) {
+        if (!relicGlow) {
+          // 闪星不是灯：白天的加色晕淹在土黄底里根本看不见（试过 0.4+ 的
+          // 强度照旧糊）。勇敢的心用的是一粒白闪——四芒星小贴图、普通混合、
+          // 缩放和透明度一起呼吸，日夜都读得出
+          relicGlow = BakeSprite(36, 36, 18, 18, (ctx, ax, ay) => {
+            const ray = (a, len, w) => {
+              ctx.save();
+              ctx.translate(ax, ay);
+              ctx.rotate(a);
+              ctx.beginPath();
+              ctx.moveTo(-w, 0); ctx.lineTo(0, -len); ctx.lineTo(w, 0); ctx.lineTo(0, len);
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+            };
+            ctx.fillStyle = "rgba(43,31,22,0.8)";
+            ray(0, 15, 3.4); ray(Math.PI / 2, 15, 3.4);
+            ctx.fillStyle = "#fff6da";
+            ray(0, 13, 2.3); ray(Math.PI / 2, 13, 2.3);
+            ray(Math.PI / 4, 6.5, 1.5); ray(-Math.PI / 4, 6.5, 1.5);
+          }, 0, DETAIL_SS);
+          SetPlayOrder(relicGlow, BAND.loose, "relicStar");
+          layers.play.add(relicGlow);
+        }
+        relicGlow.visible = true;
+        const gy = (glowAt.rec.r.level === "under" ? UNDER_Y : SURFACE_Y) + 0.58;
+        PlaceSprite(relicGlow, glowAt.rec.r.x + 0.16, gy, PlaceZ(BAND.loose));
+        const tw = 0.62 + 0.38 * Math.abs(Math.sin(time * 2.4));
+        relicGlow.scale.set(tw, tw, 1);
+        relicGlow.material.opacity = 0.45 + 0.5 * Math.abs(Math.sin(time * 2.4));
+      } else if (relicGlow) relicGlow.visible = false;
+    }
+
+    // 旗标门的道具：只切显隐，不重建世界（母鸡、扫荡后的柴垛石堆）
     for (const fp of flagProps) {
       const on = (!fp.p.showFlag || !!state.flags[fp.p.showFlag])
         && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);

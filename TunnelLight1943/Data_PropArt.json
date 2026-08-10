@@ -218,17 +218,6 @@
       },
       "note": "扫荡中撞塌的柴垛：塌下来就是矮矮摊一片（0.72m＝柱子的胯高），跨得过去。同 brokenWall 走 obstacle 带——横在路上的东西得挡得住小腿"
     },
-    "thimble": {
-      "art": "DrawThimble",
-      "band": "clutter",
-      "ss": "prop",
-      "sprite": {
-        "w": 30,
-        "h": 24,
-        "anchor": "center",
-        "baseline": 6
-      }
-    },
     "tree": {
       "art": "DrawTree",
       "band": "yard",

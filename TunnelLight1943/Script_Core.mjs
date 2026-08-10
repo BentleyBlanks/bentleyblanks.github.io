@@ -5163,7 +5163,7 @@ export function CreateGame(chapterIndex = 0) {
       hiddenBuilt: false, trapBuilt: false, entWBlocked: false, deduced: false, notesSeen: [],
       clothDown: false, dogFed: false, dogFed2: false, lanternOut: false, quiltPlugged: false, bellBuilt: false,
       barrowPlanks: 0, barrowHome: false, henFlew: false, wellRopeBroken: false, ropeTaken: false,
-      bucketAt: null, raidStarted: false, villageAlarm: false, thimbleFound: false,
+      bucketAt: null, raidStarted: false, villageAlarm: false,
     },
     caption: null,
     camHint: { kind: "follow" },
@@ -5223,6 +5223,9 @@ export function StartChapter(state, index) {
   state.player.level = "surface";
   state.cart = null;
   state.groundItems = [];
+  // 收藏品：跨章持久（Main 从 localStorage 灌进来；无头测试里就是空集）
+  state.relicsGot = state.relicsGot instanceof Set ? state.relicsGot : new Set();
+  state.relicCard = null;
   state.knotCard = null;
   state.stamina = null;
   state.closeUp = null;
@@ -5676,6 +5679,12 @@ export function StepGame(state, input, dt) {
     if (input.interact || input.tap) state.noticeOpen = false;
     return;
   }
+  // 包袱开着同样冻结世界（Main 开合并清这个旗标；E/点按也能合上）
+  if (state.bagOpen) {
+    state.prompt = null;
+    if (input.interact || input.tap) state.bagOpen = false;
+    return;
+  }
 
   if (state.microCine) { StepMicroCine(state, input, dt); StepCineActors(state, dt); return; }
   if (def.kind === "cinematic") { StepCinematic(state, input, dt); return; }
@@ -5743,15 +5752,27 @@ export function StepGame(state, input, dt) {
       if (input.interact) { state.beat.peeked = true; StartMicroCine(state, def.peek.lines); }
     }
   }
-  // 可选探索：院墙角那枚顶针（历史小卡的雏形——训练「离开主路径看一眼」）
-  if (CHAPTERS[state.chapterIndex].id === "c1" && !state.flags.thimbleFound
-    && !state.prompt && !state.player.item && state.player.level === "surface"
-    && Math.abs(state.player.x - 48.8) < 1.2) {
-    state.prompt = "E · 看看";
-    if (input.interact) {
-      state.flags.thimbleFound = true;
-      Cue(state, "pickup");
-      state.toast = { text: "一枚铜顶针。娘纳鞋底时顶针眼用的，不知什么时候滚到了墙根。", t: 5 };
+  // 收藏品（老物件）：勇敢的心式的隐藏历史小物（scene.relics，数据在 Data_Scenes）。
+  // 前身是院墙角那枚孤零零的顶针（用户 2026-08-10 退回：「铜顶针是什么鬼」）——
+  // 现在每件都是查过史料的实物，收进包袱给一段注解；顶针并进了「军鞋底」那件。
+  // 不抢任务提示（!state.prompt）、潜行中不出；收走就从场上消失（World 切 visible）。
+  {
+    const relics = SCENES[CHAPTERS[state.chapterIndex].scene].relics;
+    if (relics && !state.prompt && !state.microCine && !state.stealthActive) {
+      for (const r of relics) {
+        if (state.relicsGot.has(r.id)) continue;
+        if ((r.level || "surface") !== state.player.level) continue;
+        if (Math.abs(state.player.x - r.x) > 1.1) continue;
+        state.prompt = "E · 收进包袱";
+        if (input.interact) {
+          state.relicsGot.add(r.id);
+          // 包袱条（Main）看这张卡：滑入、亮格、存档
+          state.relicCard = { id: r.id, name: r.name, note: r.note, seq: (state.relicSeq = (state.relicSeq || 0) + 1) };
+          Cue(state, "pickup");
+          state.toast = { text: `收进包袱——${r.name}`, t: 3.5 };
+        }
+        break;
+      }
     }
   }
   // 征夫告示（noticeWall）：一臂之内出「查看」，按 E 进左图右文的阅读层。
@@ -7948,4 +7969,13 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.player.cineWalk = null;
   ClearPoses(state);
   return CurrentBeatDef(state)?.id || null;
+}
+
+/** 全部收藏品（按场景数据的顺序展平，带 scene 字段）——包袱条按它排格子 */
+export function AllRelics() {
+  const out = [];
+  for (const [key, sc] of Object.entries(SCENES)) {
+    for (const r of sc.relics || []) out.push({ ...r, scene: key });
+  }
+  return out;
 }
