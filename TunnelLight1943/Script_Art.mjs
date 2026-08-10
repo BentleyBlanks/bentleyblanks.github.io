@@ -7276,6 +7276,45 @@ export function DrawPrologueCard(ctx, W, H, kind) {
 // 拍出来的），插一把三齿粪叉、边上倒扣一只荆条粪筐；街边公共粪堆踩得半塌、
 // 顶上撒一层灰白草木灰、插一根秫秸秆做记号（各家的粪不能混）。
 // 颜色是干透的灰褐带草茬，**不是黑泥**。
+// 摊开的新土：挖通道倒出来那一薄层
+//
+// 这东西的**要害是"薄"**。倒土那一拍的台词一直在讲「只垫浅浅一层——铺厚了，
+// 就是一堆显眼的新土」，所以它绝不能画成一个土堆：堆起来就等于把这句话演反了。
+// 高度按真尺寸给（15cm 上下，PPM 48 ≈ 7px），宽度反倒要拉开——摊得越开越不显眼，
+// 这正是"分散消纳"这件事本身。
+// 颜色比表土深一档：深层黏土见了光就是这个色，也正因为深，撒进菜畦一眼就穿。
+export function DrawFreshDirt(ctx, x, groundY, w, id) {
+  const W = w, H = 7;
+  const top = [];
+  for (let i = 0; i <= 9; i += 1) {
+    const t = i / 9;
+    // 中间略厚两头收薄——是倒下去再耙开的形状，不是拍出来的棱堆
+    const swell = Math.sin(t * Math.PI) * H * 0.72;
+    top.push([x - W / 2 + W * t, groundY - swell + Sym(id + "t", i, 1.1)]);
+  }
+  // 颜色按 sRGB 那条老账压两档：浅色摊在土地上等于没画（同 UpdateDirtPour 的土粒）
+  InkFill(ctx, top.concat([[x + W / 2, groundY], [x - W / 2, groundY]]), id,
+    "#3d3021", { amp: 1.4, lw: 1.3, shade: "rgba(24,18,10,0.3)" });
+  // 没耙散的土疙瘩：新土的记号就在这儿——耙得再匀，黏土也会结块
+  for (let i = 0; i < 7; i += 1) {
+    const cx = x - W / 2 + 5 + Rnd(id + "c", i) * (W - 10);
+    const r = 1.4 + Rnd(id + "cr", i) * 1.6;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#2e2417";
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY - 1.4 - Rnd(id + "cy", i) * 3, r, r * 0.7, Rnd(id + "ca", i) * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 耙痕：横着一道道，说明有人把它摊开过（不是倒完就走）
+  for (let i = 0; i < 3; i += 1) {
+    const ly = groundY - 1.6 - i * 1.8;
+    InkLine(ctx, x - W / 2 + 4, ly, x + W / 2 - 4, ly + Sym(id + "r", i, 1),
+      id + "rake" + i, { lw: 0.9, color: "rgba(40,31,20,0.34)", amp: 0.8 });
+  }
+}
+
 export function DrawDungHeap(ctx, x, groundY, id, { street = false } = {}) {
   const W = street ? 46 : 38, H = street ? 15 : 20;
   const top = [];

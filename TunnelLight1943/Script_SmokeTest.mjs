@@ -121,7 +121,13 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
       } else {
         const dx = target.x - p.x;
         const laggard = state.actors.some((a) => a.following && a.visible && Math.abs(a.x - p.x) > 4.6);
-        if ((target.action === "walk" || Math.abs(dx) > 1.15) && !laggard) {
+        // 「走到多近算到了」不能写死。判定区是 `|dx| <= zone.w/2`，可驱动器一律
+        // 走到 1.15 就撒腿——半宽比 1.15 还窄的区，人就停在区外，按住 E 也按不响。
+        // 倒土那个 w:2.6 的猪圈（半宽 1.3）差一点点就栽在这上头，而它旁边
+        // w:2.8 的扫帚步一直是过的，所以这坑埋了很久没响过。
+        // reach 由 GetBeatTarget 从 zone 自己推出来；留 0.2 的余量踩稳在区里。
+        const near = target.reach ? Math.min(1.15, Math.max(0.35, target.reach - 0.2)) : 1.15;
+        if ((target.action === "walk" || Math.abs(dx) > near) && !laggard) {
           input.moveX = Math.sign(dx);
         }
         if (target.action === "interactAt" && Math.abs(dx) <= 1.35) input.interact = true;
@@ -182,7 +188,10 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
         // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
         // 受伤版刨木（c1_repair）：手抖那口气没喘完就得松手，驱动器照着 rest 松
         if (target.action === "planeAt") input.interactHeld = !state.planing?.rest;
-        if (target.action === "holdAt" && Math.abs(dx) <= 1.35) {
+        // 按 E 的距离与上面「走到多近」用同一个数：两个门槛不一致，中间那条缝里
+        // 驱动器既不再往前走、也还没开始按，就是死等（这次倒土栽的正是这条缝）
+        const holdNear = target.reach ? near : 1.35;
+        if (target.action === "holdAt" && Math.abs(dx) <= holdNear) {
           if (!(target.pauseOnQuake && state.beat.quakeActive)) input.interactHeld = true;
           input.moveX = 0;
         }

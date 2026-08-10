@@ -179,7 +179,7 @@ function PoseProgress(o) {
   if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
   // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲，都走 poseU
   if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
-    || o.pose === "braceUp") return o.poseU;
+    || o.pose === "braceUp" || o.pose === "pourBasket") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -464,6 +464,7 @@ export function CreateWorld(canvasEl) {
   let otsHiddenId = null;
   let vignetteAlpha = 0;
   let raidGloom = 0;      // 日伪在村时压上来的那层铅灰蓝（0→1 平滑吸附）
+  let dirtGrains = [], dirtGrainTex = null;   // 倒土时从筐口落下来的土（见 UpdateDirtPour）
   let lampMeshes = [];
   // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
   let cartMesh = null, cartWheel = null;
@@ -1027,6 +1028,69 @@ export function CreateWorld(canvasEl) {
   // 镜头一横移它们原地打转，读出来不是光束里的尘，是蒙在屏幕上的一层雪花噪点。
   // 真要再做光柱里的尘，得钉在光源的世界坐标上、只在光锥里出现，别再铺满画框。
 
+  // 倒土：从筐口真的落下来的那股土
+  //
+  // 姿势和筐都翻过去了，可要是筐口什么都不出来，玩家看到的还是"弯个腰"——
+  // 做功要看得着（CLAUDE.md 拟物交互第 1 条：物体要答话）。土是**成股**落的，
+  // 所以每帧撒几粒、各带一点横向散开，落到本层的地平线上就没。
+  // 挂 fx 层 +180（比刨花低一档，两者不会同时出现，留出次序好读）。
+  function UpdateDirtPour(state, p, dt) {
+    const pouring = p.pose === "pourBasket" && (p.poseU || 0) > 0.06;
+    const ground = p.level === "under" ? UNDER_Y : SURFACE_Y;
+    if (pouring && state.handAt) {
+      if (!dirtGrainTex) {
+        const c = MakeCanvas(16, 16);
+        const g = c.getContext("2d");
+        // 深层黏土：比表土深一档（这正是"撒进菜畦一眼就穿"的道理）。
+        // **颜色按 sRGB 没声明那条老账往下压两档**——第一版用 #5b4a33，
+        // 实拍出来是几粒发白的小点，跟土墙一个亮度，等于没画。
+        g.fillStyle = "#33281a";
+        g.beginPath(); g.ellipse(8, 8, 7, 5.6, 0.4, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(0,0,0,0.34)";
+        g.beginPath(); g.ellipse(9.4, 9.6, 3.4, 2.6, 0.4, 0, Math.PI * 2); g.fill();
+        dirtGrainTex = CanvasTexture(c);
+      }
+      // 倒得越狠出得越急；一筐土是有数的，末了自然稀下来
+      const rate = 34 * Math.min(1, (p.poseU || 0) * 1.6) * (1 - 0.45 * (p.poseU || 0));
+      let n = rate * dt;
+      while (n > 0) {
+        if (n < 1 && Math.random() > n) break;
+        n -= 1;
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.07 + Math.random() * 0.07, 0.06 + Math.random() * 0.06),
+          new THREE.MeshBasicMaterial({ map: dirtGrainTex, transparent: true, depthWrite: false }),
+        );
+        // 从**筐口**出，不是从手心出：筐扣下去之后口沿在手的前下方，
+        // 土要是从手心冒出来，看着就是"手在漏土"
+        const dir = p.heading >= 0 ? 1 : -1;
+        const lip = 0.16 + 0.14 * (p.poseU || 0);
+        m.position.set(state.handAt.x + dir * (lip + Math.random() * 0.12),
+          state.handAt.y - 0.10 - Math.random() * 0.08, PlaceZ(BAND.loose));
+        m.userData = {
+          vx: dir * (0.25 + Math.random() * 0.5), vy: -0.15 - Math.random() * 0.3,
+          spin: (Math.random() - 0.5) * 7,
+        };
+        FixOrder(m, LAYER_ORDER.fx + 180);
+        layers.fx.add(m);
+        dirtGrains.push(m);
+      }
+    }
+    for (let i = dirtGrains.length - 1; i >= 0; i -= 1) {
+      const m = dirtGrains[i];
+      const u = m.userData;
+      u.vy -= 9.0 * dt;                 // 土块不飘，落得干脆
+      m.position.x += u.vx * dt;
+      m.position.y += u.vy * dt;
+      m.rotation.z += u.spin * dt;
+      // 落到地平线就没了——地上那薄薄一层由 freshDirt 那件道具接着演（showFlag）
+      if (m.position.y <= ground + 0.02) {
+        layers.fx.remove(m);
+        m.geometry.dispose(); m.material.dispose();
+        dirtGrains.splice(i, 1);
+      }
+    }
+  }
+
   function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1, opacity = 0.62 } = {}) {
     for (let x = xFrom; x < xTo; x += 9 + ART.Hash(id + x) * 9) {
       const w = 9 + ART.Hash(id + "w" + x) * 7;
@@ -1503,6 +1567,7 @@ export function CreateWorld(canvasEl) {
       // 村里不许有狗：1939 年冀中区党委统一"打狗"（狗叫会暴露夜间行动，
       // 回忆材料原话「出进村庄无犬吠声」）。DrawDog 只留给据点那一侧
       case "emptyKennel": mk((ctx, ax, ay) => ART.DrawEmptyKennel(ctx, ax, ay, p.id)); break;
+      case "freshDirt": mk((ctx, ax, ay) => ART.DrawFreshDirt(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "dungHeap": mk((ctx, ax, ay) => ART.DrawDungHeap(ctx, ax, ay, p.id, { street: !!p.street })); break;
       case "stalkFence": mk((ctx, ax, ay) => ART.DrawStalkFence(ctx, ax, ay, (p.w || 5) * PPM, p.id)); break;
       case "stonePile": mk((ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
@@ -2391,8 +2456,11 @@ export function CreateWorld(canvasEl) {
 
     const holding = IsHandHeld(held);
     // 姿势名要留给 SyncCarry：有几个姿势会改变"东西挂在哪儿"（顶撑木那一拍
-    // 板子在**两只手上**，不在肩上），挂点必须跟着姿势走
+    // 板子在**两只手上**，不在肩上），挂点必须跟着姿势走。
+    // 进度也一起留下：有的姿势还要让手里那件东西**跟着进度转**（倒土那一下
+    // 筐得一路扣到口朝下），SyncCarry 拿不到 extra 就只能端着个永远平的筐。
     s.poseName = extra.pose || null;
+    s.poseProgress = extra.poseK;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
@@ -2540,6 +2608,15 @@ export function CreateWorld(canvasEl) {
       const elbow = ToLocal(ElbowPoint(s.rig));
       s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y))
         + (ARM_TOOL_TILT[label] || 0) * (heading >= 0 ? 1 : -1);
+    } else if (s.poseName === "pourBasket") {
+      // 倒土：**筐得真的翻过来**。土筐不在 ALONG_ARM 里，平时 rotation 恒为 0
+      // （拎着走本来就该是平的），可倒土那一下要是还端得四平八稳，画面上就只是
+      //「人弯了下腰」——土从哪儿出来的没人看得懂。
+      // 扣到 82° 就够，**不许过 90°**：土筐是个口宽底窄的梯形，翻过 90° 之后
+      // 它在侧视里只剩一条边，读出来是"手里举着块板子"（实拍验过 118° 就是这样）。
+      // 停在 82°：筐口朝着前下方、梯形还看得出来，"正在往下扣"这件事才成立。
+      const k = Math.max(0, Math.min(1, s.poseProgress ?? 0));
+      s.carryMesh.rotation.z = (heading >= 0 ? -1 : 1) * k * 82 * Math.PI / 180;
     } else {
       s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
     }
@@ -2673,6 +2750,7 @@ export function CreateWorld(canvasEl) {
     LiftActor(ps, ch.light, true);
 
     SyncCarry(ps, held, p.heading);
+    UpdateDirtPour(state, p, dt);
     UpdatePlayerTag(state, ps, p, boyScale, time, dt);
 
     // 煤油灯
