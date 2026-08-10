@@ -2340,9 +2340,13 @@ export function CreateWorld(canvasEl) {
       const castShadow = MakeCastShadow(0.42);
       castShadow.visible = false;
       layers.play.add(castShadow);
+      // 步频相位/呼吸相位按 id 打散：都从 0 起步的话，一队人会踩着完全相同的
+      // 步子、同时喘同一口气——横版里那就是一排复制人。背景层的路人早就这么
+      // 打散了（见 AddParallaxTrees 那边的 Hash 播种），演员这边一直漏着
       s = {
-        rig, mesh: rig.group, prevX: null, phase: 0, kind, carryMesh: null, glow: null,
-        shadow, castShadow, idleT: Math.random() * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+        rig, mesh: rig.group, prevX: null, phase: ART.Hash(id + "ph") * 6, kind,
+        carryMesh: null, glow: null,
+        shadow, castShadow, idleT: ART.Hash(id + "br") * 6, bodyScale: BODY_SCALE[kind] ?? 1,
       };
       actorSprites.set(id, s);
     }
