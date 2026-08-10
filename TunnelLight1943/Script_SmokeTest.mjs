@@ -13,7 +13,7 @@ import {
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
-  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
+  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
@@ -249,21 +249,27 @@ function TestCoverIsDirectional() {
   const wood = scene.covers.find((c) => c.id === "woodB");   // 矮掩体：柴堆 x=78
   assert.ok(hay?.tall && !wood?.tall, "断言依赖 hayB 是高掩体、woodB 是矮掩体");
 
-  const west = { x: 62, heading: 1, level: "surface" };      // 灯在草垛西边，朝东照
-  const behind = { x: 70.2, level: "surface", hidden: false, crouch: false };
-  const front = { x: 66.2, level: "surface", hidden: false, crouch: false };
+  // 站位按掩体自己的宽度算，别写死坐标：草垛收窄过一次（3.2→2.6m），
+  // 写死的 70.2 当场落到掩体范围外，测试红了却跟"正反面"这条规矩毫无关系
+  const hideAt = (c, side) => ({
+    x: c.x + side * (c.w / 2 + COVER_PAD * 0.5), level: "surface", hidden: false, crouch: false,
+  });
+  const west = { x: hay.x - hay.w / 2 - 4.7, heading: 1, level: "surface" };   // 灯在草垛西边，朝东照
+  const behind = hideAt(hay, 1);
+  const front = hideAt(hay, -1);
   assert.ok(!SoldierSeesPlayer(scene, west, behind, 1), "站在草垛背光那一面应藏得住");
   assert.ok(SoldierSeesPlayer(scene, west, front, 1), "站在草垛迎光那一面应露馅——不然掩体就没有正反面");
 
   // 灯绕到东边：刚才安全的那一侧当场易手，这就是"跟着绕"
-  const east = { x: 76, heading: -1, level: "surface" };
+  const east = { x: hay.x + hay.w / 2 + 6.7, heading: -1, level: "surface" };
   assert.ok(SoldierSeesPlayer(scene, east, behind, 1), "灯绕到东边后，草垛东侧不再安全");
   assert.ok(!SoldierSeesPlayer(scene, east, front, 1), "灯绕到东边后，草垛西侧才是影子");
 
   // 矮掩体仍旧要蹲：站着挡不住
-  const nearWood = { x: 79.6, level: "surface", hidden: false, crouch: false };
-  assert.ok(SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, nearWood, 1), "矮柴堆后面站着应被看见");
-  assert.ok(!SoldierSeesPlayer(scene, { x: 74, heading: 1, level: "surface" }, { ...nearWood, crouch: true }, 1), "蹲在矮柴堆后面应藏得住");
+  const nearWood = hideAt(wood, 1);
+  const woodLamp = { x: wood.x - wood.w / 2 - 3.1, heading: 1, level: "surface" };
+  assert.ok(SoldierSeesPlayer(scene, woodLamp, nearWood, 1), "矮柴堆后面站着应被看见");
+  assert.ok(!SoldierSeesPlayer(scene, woodLamp, { ...nearWood, crouch: true }, 1), "蹲在矮柴堆后面应藏得住");
 
   // 钻得进去的掩体（沟/庄稼地/灌木）没有正反面
   const fields = SCENES.fields;
@@ -389,9 +395,11 @@ function TestClimb() {
     assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
   }
 
-  // 下去之前就得看得见脚底下那间窖（用户 2026-08-10：「地道为什么攀爬之前都是
-  // 隐藏状态」）。地窖一直画着，是地表机位的下边沿够不着它——所以这里量的是
-  // **镜头有没有沉下去**（Core 出 cellarPeek，Main 的 BaseShot 拿它压低 y）。
+  // 镜头不许自己动（用户 2026-08-10：「目前我看不需要这个自动摇动镜头的功能，
+  // 把这个开关/功能默认关闭吧」）。窖口探头的整套机制还在代码里，但总开关
+  // CAM_CELLAR_PEEK 默认 false——这里盯死两件事：①开关确实是关的、真跑起来
+  // 一帧都不沉；②让位判据 state.steadyCam 仍然成立（开关拨回来时才不会踩坑，
+  // 以后新加的"镜头自己动"也都挂这一个判据）。
   {
     const s3 = CreateGame(0);
     let f3 = 0;
@@ -401,26 +409,30 @@ function TestClimb() {
     }
     const sc3 = SCENES[CHAPTERS[s3.chapterIndex].scene];
     const idle3 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
-    const PeekAt = (x, mutate) => {
+    const At = (x, mutate) => {
       s3.player.x = x; s3.player.level = "surface"; s3.player.cineWalk = null;
       mutate?.(s3);
       StepGame(s3, idle3, DT);
-      return s3.cellarPeek || 0;
+      return s3;
     };
     const shaftX = sc3.shafts[0].x;
-    assert.ok(PeekAt(shaftX) > 0.99, "站在窖口上，镜头必须整档沉下去");
-    assert.ok(PeekAt(shaftX - 2.4) > 0.05, "走近的路上就该开始沉——不能站定了画面才动");
-    assert.ok(PeekAt(shaftX - 8) < 0.01, "离得远就不沉，玩法机位照旧");
-    // 被盯上时不许沉：镜头往下扎会把正前方摸过来的灯挪出画框（潜行规范第 2 条）
-    assert.equal(PeekAt(shaftX, (s) => { s.detection = { level: 0.9 }; }), 0,
-      "被盯上的时候不许探头——那会把眼前的危险挤出画框");
+    assert.equal(CAM_CELLAR_PEEK, false, "自动摇镜头默认必须是关的（用户 2026-08-10 定）");
+    for (const x of [shaftX, shaftX - 1.2, shaftX - 2.4, shaftX - 8]) {
+      assert.equal(At(x).cellarPeek || 0, 0, `关掉之后，走到哪儿镜头都不许自己沉（x=${x}）`);
+    }
+    // 让位判据：推着车、被盯上、节拍声明，三条都得把 steadyCam 立起来
+    assert.equal(At(shaftX).steadyCam, false, "平时不锁镜头");
+    assert.equal(At(shaftX, (s) => { s.cart = { x: shaftX + 1.2, kind: "barrow" }; }).steadyCam, true,
+      "推着车的时候必须锁住镜头——车是横着走的，镜头一沉车头和路一起出画");
+    s3.cart = null;
+    assert.equal(At(shaftX, (s) => { s.detection = { level: 0.9 }; }).steadyCam, true,
+      "被盯上的时候必须锁住镜头（潜行规范第 2 条）");
     s3.detection = null;
-    // 爬梯那一段镜头由 lift 带着走，探头得让位，否则两个来源叠着往下压
-    s3.player.x = shaftX;
-    StepGame(s3, { ...idle3, climb: 1 }, DT);
-    assert.ok(s3.player.climbT > 0 && (s3.cellarPeek || 0) === 0, "爬梯途中不叠探头（lift 已经在带镜头）");
+    assert.equal(At(shaftX, (s) => { s.beat.steadyCam = true; }).steadyCam, true,
+      "节拍声明 steadyCam 必须管用——这是给新玩法钉构图的那个开关");
+    s3.beat.steadyCam = false;
   }
-  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位 / 下去之前先看得见窖）");
+  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位 / 镜头不自己摇）");
 }
 
 function TestSmokeFront() {
@@ -872,16 +884,18 @@ function TestGroundItems() {
   };
   step({}, 1);
   assert.equal(state.player.item?.id, "bucket", "跳幕结算后水桶必须在手里");
-  // 站进 hayB 草垛掩体（x=68, w=3.2）正中间放下：落点必须被推出掩体足迹
-  state.player.x = 68;
+  // 站进 hayB 草垛掩体正中间放下：落点必须被推出掩体足迹。
+  // 边界从场景数据取——草垛的宽度调过一次，写死的 65.9/70.1 会跟着失效
+  const hayB = SCENES.village.covers.find((c) => c.id === "hayB");
+  state.player.x = hayB.x;
   state.player.level = "surface";
   step({}, 14);
   step({ interact: true });
   assert.equal(state.player.item, null, "空地上按 E 要能自由放下");
   assert.equal(state.groundItems.length, 1, "放下后地上要有一件落地道具");
   const g = state.groundItems[0];
-  assert.ok(g.x <= 65.9 + 1e-6 || g.x >= 70.1 - 1e-6,
-    `落点必须避开 hayB 掩体足迹（实际 x=${g.x}）`);
+  assert.ok(Math.abs(g.x - hayB.x) >= hayB.w / 2 - 1e-6,
+    `落点必须避开 hayB 掩体足迹（实际 x=${g.x}，垛 ${hayB.x}±${hayB.w / 2}）`);
   // 悬浮提示：附近要有它自己的小样气泡
   state.player.x = g.x - 1.2;
   step({});
@@ -1110,7 +1124,7 @@ function TestWinchIsACrankNotALever() {
     const d0 = w.depth;
     circle(-1, 8);
     assert.ok(w.depth > d0 + 0.1, `顺时针转了两圈半，桶得实实在在往下走（${d0}→${w.depth}）`);
-    assert.equal(state.gesture?.kind, "crankDown", "放绳阶段的手势提示是顺时针转圈");
+    assert.equal(state.gesture, undefined, "手势小黑饼已拆（2026-08-10 用户），方向由辘轳的引导圈说");
     // 逆时针倒着转不放绳
     const d1 = w.depth;
     circle(1, 6);
@@ -1122,7 +1136,7 @@ function TestWinchIsACrankNotALever() {
     const d2 = w.depth;
     circle(1, 10);
     assert.ok(w.depth < d2 - 0.08, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
-    assert.equal(state.gesture?.kind, "crankUp", "摇起阶段的手势提示是逆时针转圈");
+    assert.equal(state.gesture, undefined, "手势小黑饼已拆，摇起的方向由摇把与引导圈自己演");
     const crankMid = w.crankA;
     // 脱手：过了棘齿宽限辘轳倒转，桶自己往下坠，摇把跟着倒着抡
     const d3 = w.depth;
@@ -1609,7 +1623,35 @@ function TestCliAnswersQuestions() {
   const j1 = JSON.parse(run(["state", "c1_ropeline", "--x", "35.6", "--input", "e,d*300", "--json"]));
   assert.equal(j1.player.item, "ropeEnd", "输入小语言得真的驱动得动玩法");
   assert.ok(j1.live.ropeLine?.taut > 0.99, "走到头绳该绷直——state 得看得见玩法系统的活状态");
-  console.log("  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现");
+
+  // ④ --flag：手拨游戏里的是/否开关。没它就只能现写脚本——"拍没挖通/挖通了
+  //    两张对比图"这种最常见的需求，正是 2026-08-10 补上这个开关的由头。
+  //    顺带从第二个角度锁死地道那条：同一拍、同样往东走，开关一翻结果就得变。
+  const dug = (flag) => JSON.parse(run(["state", "c1_ropeline", "--level", "under", "--x", "38",
+    "--input", "d*300", ...(flag ? ["--flag", flag] : []), "--json"])).player.x;
+  const wall = dug(null);
+  const through = dug("tunnelDug=1");
+  assert.ok(wall < 43, `没挖通就该被自家窖东壁挡住，却走到了 ${wall}`);
+  assert.ok(through > 50, `--flag tunnelDug=1 应该让人走进七叔家窖，却停在 ${through}`);
+  assert.ok(through - wall > 8, "开关没起作用：翻不翻都走到同一个地方");
+  console.log(`  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现 / --flag 拨开关（${wall} → ${through}）`);
+}
+
+// 手势小黑饼（#gestureHint：暗圆盘+一粒点按方向做动画）已整体拆除。
+// 2026-08-10 用户看到扶门那拍的圈：「明明是按键交互 非要装自己是个圈
+// 还给个方向？你这叫提示？」——抽象图形说不了任何事。方向写进提示文案
+//（"往上使劲"），上手的交互由实物自己招呼（辘轳引导圈、卡上会蹭的绳头、
+// 拉弓预览弧）。这条测试扫源码盯死它不复活——和 dragTrack 同一个待遇。
+function TestGestureBlobStaysDead() {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const read = (f) => fs.readFileSync(path.join(dir, f), "utf8");
+  assert.ok(!/state\.gesture\s*=/.test(read("Script_Core.mjs")),
+    "state.gesture 通道已拆，Core 里不许再写它");
+  assert.ok(!read("index.html").includes("gestureHint"), "index.html 里不许再有 #gestureHint 元素");
+  const css = read("Style_Game.css");
+  assert.ok(!/#gestureHint\s*\{/.test(css) && !/\.gDot/.test(css), "小黑饼的样式与圆点动画不许回来");
+  assert.ok(!/ui\.gestureHint/.test(read("Script_Main.js")), "Main 里不许再同步小黑饼");
+  console.log("  ✓ 手势小黑饼保持死亡：方向在文案里，招呼在实物上");
 }
 
 // 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
@@ -2098,7 +2140,10 @@ function TestStrokeWork() {
   // 往上顶：涨
   for (let i = 0; i < 12; i += 1) StepGame(st, { ...idle(), pullHeld: true, pull: -0.05 }, DT);
   assert.ok(st.beat.holdP > 0, "往上顶必须做得上功");
-  assert.equal(st.gesture?.kind, "pullUp", "HUD 得提示往上顶");
+  // 小黑饼已拆：方向必须写在提示文案里，抽象图形替不了字
+  assert.equal(st.gesture, undefined, "手势小黑饼已拆（2026-08-10 用户）");
+  // 「顶」这个动词自带方向（顶=向上使劲）；写成别的动词就得把「往上」补进文案
+  assert.match(st.prompt || "", /往上|顶/, `方向得写进提示文案（实为 ${JSON.stringify(st.prompt)}）`);
   // 松手泄劲
   const was = st.beat.holdP;
   for (let i = 0; i < 10; i += 1) StepGame(st, idle(), DT);
@@ -2485,7 +2530,8 @@ function TestSlingThrow() {
   assert.ok(!stKey.thrown && !stKey.flags.elmDown,
     "投掷不许再有按键后备——按一下就必中的那版是被明令删掉的");
   assert.ok(!/F\b/.test(stKey.prompt || ""), `提示里不许再出现 F 键：${stKey.prompt}`);
-  assert.equal(stKey.gesture?.kind, "slingBack", "手里攥着石子时得给出「往后拽」的手势提示");
+  assert.equal(stKey.gesture, undefined, "手势小黑饼已拆，「往后拽」写在提示文案里");
+  assert.match(stKey.prompt || "", /拽/, `拽开的招呼得在提示文案里（实为 ${JSON.stringify(stKey.prompt)}）`);
   assert.equal(stKey.player.pose, "throwWind", "手里攥着石子就该摆出架势——画面得先说他随时能扔");
 
   // ⑦ 判定圈钉在**画出来的那只手**上：渲染层每帧回填 state.handAt（HandPoint），
@@ -2636,6 +2682,7 @@ TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
 TestCliAnswersQuestions();
+TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();

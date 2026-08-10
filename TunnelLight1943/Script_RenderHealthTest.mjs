@@ -134,6 +134,34 @@ for (const [pose, label] of [["throwWind", "投石蓄力"], ["planePush", "刨�
   }
 }
 
+// ---------------------------------------------------------------------------
+// 地下机位不许有前景层
+//
+// 2026-08-10 用户报的「镜头前面两根白白的模糊一坨」：fore 层的草丛/篱笆按
+// SURFACE_Y-4.4 摆位，覆盖 y −4.40→+1.06，而地道内部是 −3.60→−1.55——地表机位
+// 下它压在画框外，镜头一沉进地窖就正对着画面中央。这作品地表与地下在同一个场景
+// 里，所以"摆到画框下缘之外"这个前提只在地表成立。内容已整个删掉，这条守的是
+// 闸门：以后谁再往 fore 层里塞东西，地下机位必须仍然是空的。
+const foreCheck = await page.evaluate(() => {
+  const w = window.TunnelLight.world;
+  const { layers, SURFACE_Y, UNDER_Y } = w.debugLayers();
+  const out = [];
+  for (const [label, camY] of [["地下", UNDER_Y + 1.3], ["地表", SURFACE_Y + 1.5]]) {
+    w.ApplyCamera(42.5, camY, 8.0);
+    out.push({ label, camY, visible: layers.fore.visible, count: layers.fore.children.length });
+  }
+  return out;
+});
+for (const r of foreCheck) {
+  const 有内容 = r.visible && r.count > 0;
+  if (r.label === "地下" && 有内容) {
+    failed += 1;
+    console.error(`✗ 地下机位（camY ${r.camY.toFixed(2)}）画着 ${r.count} 张前景贴图`
+      + "——fore 层按地表地平线摆位，沉到地道里就糊在画框中央");
+  }
+}
+console.log(`✓ 地下机位无前景层（fore 存量 ${foreCheck[0].count} 张，地下可见=${foreCheck[0].visible}）`);
+
 await browser.close();
 server.close();
 if (failed) {

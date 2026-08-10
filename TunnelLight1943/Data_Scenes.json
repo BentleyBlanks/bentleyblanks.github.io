@@ -589,8 +589,9 @@
         {
           "id": "hayA",
           "kind": "haystack",
-          "x": 52,
-          "w": 3.2,
+          "x": 54.6,
+          "w": 2.6,
+          "note": "原来在 52，正压着七叔家窖口(52.6)，一垛草把玩家要下的那个口子盖住了；挪到房子东头、榆树底下",
           "tall": true
         },
         {
@@ -604,7 +605,7 @@
           "id": "hayB",
           "kind": "haystack",
           "x": 68,
-          "w": 3.2,
+          "w": 2.6,
           "tall": true
         },
         {
@@ -617,7 +618,7 @@
           "id": "hayC",
           "kind": "haystack",
           "x": 88,
-          "w": 3.2,
+          "w": 2.6,
           "tall": true,
           "raided": true
         },
@@ -633,7 +634,7 @@
           "id": "hayD",
           "kind": "haystack",
           "x": 132,
-          "w": 3.2,
+          "w": 2.6,
           "tall": true,
           "raided": true
         },
@@ -649,7 +650,7 @@
           "id": "hayE",
           "kind": "haystack",
           "x": 152,
-          "w": 3.2,
+          "w": 2.6,
           "tall": true,
           "raided": true
         },
@@ -993,7 +994,7 @@
           "id": "hayS",
           "kind": "haystack",
           "x": 104,
-          "w": 3.2
+          "w": 2.6
         },
         {
           "id": "ridge",

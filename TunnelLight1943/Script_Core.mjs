@@ -107,6 +107,20 @@ function SceneOf(state) { return SCENES[CHAPTERS[state.chapterIndex].scene]; }
 // ---------------------------------------------------------------------------
 export const CART_REACH = 2.6;   // 手边有车 = 推着它（翻越判定用的是同一个数）
 
+// ---------------------------------------------------------------------------
+// 镜头会不会自己动：**总开关，默认关**
+// ---------------------------------------------------------------------------
+// 2026-08-10 用户定：「目前我看不需要这个自动摇动镜头的功能，把这个开关/功能
+// 默认关闭吧」。所以窖口探头（走到地窖口镜头自动下沉、把脚底下那间窖带进画框）
+// 整个停用——镜头**只跟着人走**，不自己找东西看。
+//
+// 机制照旧留在代码里（Core 算 cellarPeek、Main 的 BaseShot 用它压低 y、
+// state.steadyCam 那套让位判据都在），要回来只需把这一行改成 true。
+// 代价说在前头：关掉之后，站在窖口按 S 之前是看不见那间窖的——
+// 地表机位的下边沿只到 −1.7m，窖底在 −3.6m。真要让玩家"下去之前先看见"，
+// 下次换别的路子（一拍固定机位的插入镜、或者过场里交代），别再默认开自动摇镜。
+export const CAM_CELLAR_PEEK = false;
+
 export function PushingCart(state) {
   return !!state.cart && Math.abs(state.player.x - state.cart.x) < CART_REACH;
 }
@@ -891,7 +905,6 @@ function StepSlingAim(state, input, st) {
     p.pose = "throwWind";
     p.poseK = sl.power;
     p.poseT = 0.25;
-    state.gesture = { kind: "slingBack" };
     return true;
   }
   // 松手：够劲出手，不够收回手心
@@ -1024,13 +1037,11 @@ function StrokeWork(state, mem, input, dt, opts) {
         mem.prevA = a;
       } else mem.prevA = null;
     } else mem.prevA = null;
-    state.gesture = { kind: "circle" };
   } else {
     // 竖向笔画：只认对的方向（铲子不往上抡，撑木不往下砸）
     const dir = kind === "up" ? -1 : 1;
     const pull = input.pullHeld ? Math.max(0, (input.pull || 0) * dir) : 0;
     gain = pull / (STROKE_LEN * strokesN) * hold;
-    state.gesture = { kind: kind === "up" ? "pullUp" : "dragDown" };
   }
 
   // 键盘后备走同一个账本：手感稍慢，但一样能干完
@@ -1382,7 +1393,6 @@ function StepChain(state, def, input, dt) {
       // 攥着的时候不画任何"站对位置就中"的辅助线：站位不是瞄准，拽出来的弧才是。
       // 手里攥着还没按上去，就只告诉他手在哪儿、往哪儿拽
       state.prompt = st.prompt || "攥住手里的石子 · 往后下方拽开，松手出手";
-      state.gesture = { kind: "slingBack" };
       ReadyToSling(state);
       return;
     }
@@ -1631,7 +1641,6 @@ function StepChain(state, def, input, dt) {
           stamDelta = -WINCH_STAM_HOLD * dt;
         }
         state.prompt = "S · 放绳下去";
-        state.gesture = { kind: "crankDown" };
         state.promptFill = w.depth;
         if (w.depth >= 1) {
           w.filled = true;
@@ -1668,7 +1677,6 @@ function StepChain(state, def, input, dt) {
           }
         }
         state.prompt = "W · 摇上来";
-        state.gesture = { kind: "crankUp" };
         state.promptFill = 1 - w.depth;
         if (w.depth <= 0) {
           if (st.gives) GiveItem(state, st.gives);
@@ -1812,7 +1820,6 @@ function StepChain(state, def, input, dt) {
       // 进展都没有。也**没有 HUD 手势图标与按键提示**——招呼玩家的是卡上那根
       // 绳头自己（没上手时它朝该去的方向蹭两下，蹭的方向就是该拖的方向）。
       state.prompt = null;
-      state.gesture = null;
       state.knotCard = {
         tip: { x: kn.tip.x, y: kn.tip.y },
         phase: kn.threaded ? "cinch" : "tuck",
@@ -4922,7 +4929,6 @@ export function CreateGame(chapterIndex = 0) {
     groundSeq: 0,
     knotCard: null,        // 接绳（见 case "knot"：铺满画框的活卡）
     stamina: null,         // 手劲读数（辘轳吊着桶时才有）
-    gesture: null,   // 当前节拍期望的手势提示（HUD 的动效小图标）
     thrown: null,
     noiseAt: null,
     searchlight: null,
@@ -5024,7 +5030,6 @@ export function StartChapter(state, index) {
   state.groundItems = [];
   state.knotCard = null;
   state.stamina = null;
-  state.gesture = null;
   state.closeUp = null;
   state.thrown = null;
   state.noiseAt = null;
@@ -5039,6 +5044,7 @@ export function StartChapter(state, index) {
   state.vaultDust = null;
   state.vaultHint = "";
   state.cellarPeek = 0;
+  state.steadyCam = false;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -5503,7 +5509,6 @@ export function StepGame(state, input, dt) {
   state.winchView = null;
   state.knotCard = null;  // 同 winchView：接绳那张活卡由 beat 每帧重立
   state.stamina = null;   // 手劲读数同理：吊着桶的那一帧自己立
-  state.gesture = null;   // 手势提示同理
   state.closeUp = null;   // 玩法特写（辘轳/打结）同理：活着的那一帧自己立
   state.canDrop = false;
 
@@ -5520,7 +5525,7 @@ export function StepGame(state, input, dt) {
     StepThrown(state, dt);
     if (state.player.item?.throwable && !state.thrown) {
       const aiming = StepSlingAim(state, input, null);   // 拽着瞄：落点自己定
-      if (!aiming) { state.gesture = state.gesture || { kind: "slingBack" }; ReadyToSling(state); }
+      if (!aiming) ReadyToSling(state);
     }
   }
   // 路边的石子堆（潜行段的软性窗口）：捡一颗在手，第一次靠近给个一次性提示
@@ -5651,6 +5656,7 @@ function MovePlayer(state, input, dt) {
       state.vaultHint = "";
       state.climbHint = "";
       state.cellarPeek = 0;
+      state.steadyCam = true;   // 被按住不许动的时候，镜头也别自己晃
       return;
     }
   }
@@ -5680,6 +5686,7 @@ function MovePlayer(state, input, dt) {
     state.climbHint = "";
     state.vaultHint = "";
     state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
+    state.steadyCam = false;
     return;                                                    // 爬梯中锁操作
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
@@ -5784,10 +5791,8 @@ function MovePlayer(state, input, dt) {
   //
   // 顺带算一个 0..1 的**探头量**（cellarPeek）：人在地表越靠近井口，镜头就
   // 越往下沉一档，把脚底下那个窖的剖面带进画框（Main 的 BaseShot 用它）。
-  // 为什么要这一下：地窖一直是画好的，可地表机位的下边沿只到 −1.7m，而窖底
-  // 在 −3.6m——整间窖都在画外。于是玩家按 S 之前根本看不见有这么个地方，
-  // 读起来就是"下去才凭空长出来一间屋"（用户 2026-08-10 报的）。
-  // 这是纯粹的**升降**，景别（hw）一点没变，不违反"全作只有一个景别档"。
+  // **默认整个停用**——见文件顶部的 CAM_CELLAR_PEEK（2026-08-10 用户定：
+  // 不要自动摇镜头）。下面这段留着，把开关拨回 true 就能整套回来。
   state.climbHint = "";
   let peek = 0;
   for (const shaft of scene.shafts) {
@@ -5799,16 +5804,26 @@ function MovePlayer(state, input, dt) {
     }
     // 探头的范围比提示宽一截（4.2m）：镜头得**先**沉下去，玩家才是"走过来
     // 看见脚底下有东西"，而不是"站定了画面才动"
-    if (p.level === "surface" && scene.walk.under) {
+    if (CAM_CELLAR_PEEK && p.level === "surface" && scene.walk.under) {
       const k = 1 - Math.min(1, Math.max(0, (d - 1.0) / 3.2));
       peek = Math.max(peek, k * k * (3 - 2 * k));   // 缓入缓出，别一步跳下去
     }
   }
-  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），别再叠一层。
-  // 被盯上的时候也不沉：潜行段镜头一往下扎，正前方摸过来的那盏灯就出了画框——
-  // 探头是"让你看见脚底下"，不是"把眼前的危险挪走"（潜行规范第 2 条）。
-  const spotted = (state.detection?.level || 0) > 0.15;
-  state.cellarPeek = (p.climbT > 0 || spotted) ? 0 : peek;
+  // —— 镜头自作主张的总开关 ——
+  // `state.steadyCam` 为真的那一帧，镜头**只跟人走**，任何自动的升降/探头一律
+  // 让位。以后再加"镜头自己动"的花样（探头、抬头看炮楼、震镜），都挂到这一个
+  // 判据上，别各写各的——不然每加一样就要把所有玩法重新试一遍。
+  // 三个来源：
+  //   ① **推着车**：车是横着走的一条线，镜头一沉，车头和前面的路一起出画
+  //      （用户 2026-08-10：「推车推到地道口镜头会自动下摇，应该屏蔽」）；
+  //   ② 被盯上：往下扎会把摸过来的那盏灯挤出画框（潜行规范第 2 条）；
+  //   ③ 节拍自己声明 `steadyCam: true`——要钉住构图的新玩法用这一个开关。
+  const camDef = CurrentBeatDef(state);
+  state.steadyCam = PushingCart(state)
+    || (state.detection?.level || 0) > 0.15
+    || !!(camDef?.steadyCam || state.beat?.steadyCam);
+  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），也别再叠一层
+  state.cellarPeek = (p.climbT > 0 || state.steadyCam) ? 0 : peek;
 
   // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
   if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {
@@ -6546,7 +6561,6 @@ function StepDigSeq(state, def, input, dt) {
   if (ZoneReached(state, zone)) {
     if (state.beat.quakeActive) {
       state.prompt = "！头顶有动静——停下，别出声";
-      state.gesture = null;
       c.progress = Math.max(0, c.progress - dt * 0.3);
     } else {
       // 清土是一铲一铲挖出来的：往下拽一下=挖一铲（键盘按住 E 是后备）
@@ -7728,7 +7742,6 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.scribeCard = null;
   state.planeCard = null;
   state.knotCard = null;
-  state.gesture = null;
   state.closeUp = null;
   state.canDrop = false;
   state.bubbleFlash = null;

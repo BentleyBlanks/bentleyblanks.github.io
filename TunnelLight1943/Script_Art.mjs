@@ -34,8 +34,11 @@ export const PAL = {
   // 自然
   tree: "#4e6038", treeDark: "#39482a",
   // 草垛分两面：迎风面被日晒风吹褪成灰白，背风面才留一点黄。
-  // 一整垛同一个金色 = 刚打下来的新草，那是丰年
-  hay: "#a8904f", hayWind: "#8f7c45", hayDark: "#7d6a3a",
+  // 一整垛同一个金色 = 刚打下来的新草，那是丰年。
+  // **整体压了两档**（2026-08-10）：#a8904f 上屏比黄土路还亮，一垛草成了
+  // 画面里最跳的一块（画布贴图没声明 sRGB 会被整体提亮，见 CanvasTexture）。
+  // 这三个色只有 DrawHaystack 在用，调它不影响别处。
+  hay: "#8a7440", hayWind: "#9a8550", hayDark: "#5f4f2c",
   crop: "#8a9a52",
   // 地下土层（从上到下的层理）
   soil: ["#8a6b45", "#7d5f3c", "#9a7850", "#6b4f33", "#5a4129"],
@@ -1983,76 +1986,164 @@ export function DrawTree(ctx, x, groundY, id,
     { count: big ? 46 : 30, alpha: 0.12, size: 2.2, color: "#243018" });
 }
 
-// 柴草垛。春天的垛是**被扒剩下的**：底下一层层薅走喂牲口引火，垛身在离地
-// 半尺处往里收，形成掏空外挑；顶上苫一层压得更紧的草、交叉两根杆、杆头吊石头。
-// 颜色分两面——迎风面被日晒风吹褪成灰白，背风面才留一点黄。一整垛同一个金色
-// 是刚打下来的新草，那是丰年（2026-08-10 用户退回："一点都不像敌后照片"）。
-// raided: 朝路那面被一层层扒出台阶状的大豁口、垛顶塌成坑、脚下散一圈碎秸。
+// 麦秸垛。打完场的麦秸就地堆成垛：烧火、喂牲口、垫圈全指着它，也是村里
+// 最好的掩体（第二章躲探照灯就躲在这后头）。春天的垛是**被扒剩下的**——
+// 底下一层层薅走引火，所以侧面一定有个掏空的豁口。
+//
+// 2026-08-10 用户退回上一版：「这一坨黄黄的是什么玩意儿？又丑又不知道是
+// 什么用的」。三处病根，逐条治：
+//   ① **轮廓像口麻袋**——光溜的直筒身配圆肩，边线干干净净。一垛麦秸的边
+//      永远是毛的：现在沿整条轮廓扎出秸秆头（`fringe`），这是"草垛"和
+//      "布口袋"最直接、也最便宜的分界线。
+//   ② **身上没有层**——垛是一层层码上去再拍实的，横向压层纹是它的纹理。
+//      上一版只有 22 根随机小草、透明度还压到 0.44，远看就是一块纯色；
+//      而"迎风面"是拿一个矩形硬切出来的，那条笔直的竖边正是麻袋的中缝。
+//      现在层纹沿着垛面弧度走，明暗改用横向渐变，没有一条直边。
+//   ③ **那个悬在肚子中间的小方块**是压顶杆头吊的石头，可它既没绳也不在
+//      垛沿上，读出来就是一块不明所以的补丁。现在石头拴在绳上、垂在垛肩
+//      外侧——一眼看得出是"压住不让风掀顶"。
+// 另：高度从 1.05×宽 收到 0.70×宽。3.2m 宽的垛原先有 3.4m 高，比 2.3m 的
+// 房檐还高一截，一垛草把整面山墙连窗户一起吞掉——用户截图里那"一坨"就是它。
+//
+// 垛形只有一个来源：半宽剖面 `R(t)`（t=0 贴地、t=1 到顶）。轮廓、层纹、
+// 毛边、苫顶、掏口全从它取，改一处形状五处一起跟着走，绝不各画各的。
+// raided: 朝路那面被扒开一个大豁口、垛顶塌下去，脚下散一圈碎秸。
 export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = false } = {}) {
-  const W = w, H = w * (raided ? 0.78 : 1.05);
-  const lee = night ? "#6f6238" : PAL.hay;        // 背风面
-  const wind = night ? "#5e5430" : PAL.hayWind;   // 迎风面
-  const UNDER = 15;                               // 掏空的高度
-  // 垛身：底部往里收（掏空外挑），顶上塌一个坑
-  const body = [
-    [x - W / 2 + 5, groundY], [x - W / 2 + 9, groundY - UNDER],
-    [x - W * 0.44, groundY - H * 0.46], [x - W * 0.30, groundY - H * 0.86],
-    [x - W * 0.04, groundY - H], [x + W * 0.16, groundY - H * (raided ? 0.72 : 0.94)],
-    [x + W * 0.36, groundY - H * 0.60], [x + W / 2 - 8, groundY - UNDER],
-    [x + W / 2 - 4, groundY],
-  ];
-  InkFill(ctx, body, id, lee, { amp: 2.6, lw: 2.5, shade: "rgba(60,42,16,0.22)" });
-  // 迎风面（左半）压成灰白：一垛草不许是一个颜色
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(body[0][0], body[0][1]);
-  for (let i = 1; i < body.length; i += 1) ctx.lineTo(body[i][0], body[i][1]);
-  ctx.closePath();
-  ctx.clip();
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = wind;
-  ctx.fillRect(x - W / 2, groundY - H - 4, W * 0.52, H + 8);
-  // 贴地那层泡过雨，发黑发霉
-  ctx.globalAlpha = 0.34;
-  ctx.fillStyle = "#4e4028";
-  ctx.fillRect(x - W / 2, groundY - 9, W, 10);
-  if (raided) {
-    // 扒出来的台阶状大豁口
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = "#5c4e2e";
-    for (let i = 0; i < 3; i += 1) {
-      ctx.fillRect(x + W * (0.02 + i * 0.10), groundY - H * (0.62 - i * 0.16), W * 0.3, H * 0.18);
+  const W = w, HW = W / 2;
+  const H = W * (raided ? 0.62 : 0.86);
+  const lee = night ? "#4b4128" : PAL.hay;         // 主色
+  const sun = night ? "#574c32" : PAL.hayWind;     // 受光那半边（顶上、朝阳一侧）
+  const dark = night ? "#2f2818" : PAL.hayDark;    // 暗部
+  const straw = night ? "#6b5f3a" : "#b39c5f";     // 一根根的秸秆（比垛面亮一档）
+
+  // 垛形＝**钟形**：底盘外撇、腰身外鼓、顶上收成圆锥。
+  // 上一版做成了直筒加屋檐，于是读成了小屋（门＋屋顶都齐了）。垛没有直边。
+  // 被薅过的那一侧底下要**啃进去一块**（`bite`）——真的垛都是从底下抽秸秆
+  // 引火的，底盘小、上头外挑，这个内凹本身就说明了"它是干什么用的"。
+  const biteSide = Rnd(id + "b", 0) < 0.5 ? -1 : 1;
+  const biteDeep = raided ? 0.52 : 0.30;
+  const R = (t, side) => {
+    const u = Math.max(0, Math.min(1, t));
+    const bell = Math.cos(u * Math.PI * 0.5) ** 0.58;          // 钟形剖面
+    const crown = 0.10 * Math.max(0, 1 - u * 6);               // 顶不收成针尖
+    let r = HW * (bell + crown);
+    if (side === biteSide && u < 0.34) {                       // 底下被薅走的那口
+      r *= 1 - biteDeep * (1 - u / 0.34) ** 1.4;
     }
-  }
-  ctx.restore();
-  // 草秆：跟着垛面倒，长短拉开（左侧向左倒、右侧向右倒）
+    return Math.max(HW * 0.05, r);
+  };
+  const PY = (t) => groundY - t * H;
+
+  // 轮廓：不规则**不是**交替锯齿（那读成齿轮），而是低频起伏叠一点高频毛刺
+  const N = 30;
+  const Edge = (i, side) => {
+    const t = i / N;
+    const wob = Math.sin(t * 7.3 + Hash(id + side) * 6.28) * 0.028 + Sym(id + "e" + side, i, 0.03);
+    return [x + side * R(t, side) * (1 + wob), PY(t) + Sym(id + "y" + side, i, 1.1)];
+  };
+  const lefts = [], rights = [];
+  for (let i = 0; i <= N; i += 1) { lefts.push(Edge(i, -1)); rights.push(Edge(i, 1)); }
+  const body = [...lefts, ...rights.reverse()];
+
+  InkFill(ctx, body, id, lee, { amp: 1.1, lw: 2, shade: "rgba(58,44,18,0.18)" });
+
   ctx.save();
-  ctx.globalAlpha = 0.44;
-  ctx.strokeStyle = night ? "#5c4f2c" : PAL.hayDark;
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i < 22; i += 1) {
-    const px = x - W * 0.44 + Rnd(id, i) * W * 0.88;
-    const py = groundY - UNDER - Rnd(id, i + 30) * (H - UNDER) * 0.86;
-    const dir = px < x ? -1 : 1;
+  WobblyPath(ctx, body, id, 1.1, true);
+  ctx.clip();
+  // 明暗：顶上被太阳晒白、根上发暗发霉。用**径向**渐变，横平竖直的分界都会
+  // 读成布面的接缝
+  const rg = ctx.createRadialGradient(x - HW * 0.3, PY(0.92), HW * 0.12, x, PY(0.2), H * 1.15);
+  rg.addColorStop(0, sun);
+  rg.addColorStop(0.45, lee);
+  rg.addColorStop(1, dark);
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = rg;
+  ctx.fillRect(x - HW - 6, PY(1) - 10, W + 12, H + 14);
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = night ? "#241f14" : "#4a3c24";
+  ctx.fillRect(x - HW - 6, groundY - 8, W + 12, 10);
+
+  // 垛面上的秸秆：**顺着坡往外下方铺**（从垛心呈放射状）。这是"草"的全部读法，
+  // 也是上一版最缺的一笔——那版只有 22 根、透明度 0.44，远看就是一块纯色
+  ctx.lineWidth = 1.15;
+  for (let i = 0; i < 150; i += 1) {
+    const t = Rnd(id + "st", i) ** 0.8;
+    const side = i % 2 ? 1 : -1;
+    const rr = R(t, side) * (0.15 + Rnd(id + "sr", i) * 0.9);
+    const px = x + side * rr;
+    const py = PY(t) + Sym(id + "sy", i, 3);
+    const dx = side * (0.45 + t * 0.55);         // 越靠顶越横着铺
+    const dy = 0.75 - t * 0.35;
+    const long = i % 12 === 0;                   // 隔十来根压一条长的，破掉"一块纯色"
+    const len = (long ? 15 : 5) + Rnd(id + "sl", i) * (long ? 10 : 9);
+    ctx.globalAlpha = 0.26 + Rnd(id + "sa", i) * 0.36;
+    ctx.strokeStyle = i % 3 === 0 ? dark : straw;
     ctx.beginPath();
     ctx.moveTo(px, py);
-    ctx.lineTo(px + dir * (2 + Rnd(id, i + 60) * 6), py - 5 - Rnd(id, i + 90) * 13);
+    ctx.lineTo(px + dx * len, py + dy * len);
     ctx.stroke();
   }
   ctx.restore();
-  // 苫顶：压得更紧的一层草（暗一档）+ 交叉两根杆 + 杆头吊石头
-  InkFill(ctx, [[x - W * 0.30, groundY - H * 0.84], [x - W * 0.04, groundY - H - 2],
-    [x + W * 0.18, groundY - H * (raided ? 0.70 : 0.92)], [x + W * 0.10, groundY - H * 0.70],
-    [x - W * 0.20, groundY - H * 0.72]], id + "cap", night ? "#4e4429" : "#7d6a3a",
-  { amp: 2.2, lw: 1.8 });
-  InkLine(ctx, x - W * 0.26, groundY - H * 0.66, x + W * 0.10, groundY - H - 6, id + "poleA",
-    { lw: 2.2, color: "#5c4a30", amp: 1.2 });
-  InkLine(ctx, x + W * 0.16, groundY - H * 0.62, x - W * 0.14, groundY - H - 4, id + "poleB",
-    { lw: 2.0, color: "#6b5433", amp: 1.2 });
-  InkFill(ctx, Rect(x - W * 0.18, groundY - H * 0.62, 7, 6), id + "wt", "#6b6252", { amp: 1.1, lw: 1.4 });
-  // 脚下散的碎秸与麦糠
-  for (let i = 0; i < (raided ? 9 : 5); i += 1) {
-    const sx = x - W * 0.6 + Rnd(id + "sc", i) * W * 1.2;
+
+  // ── 毛边：秸秆头从轮廓上支棱出去。草垛与麻袋的分界，一半在这一笔上 ──
+  ctx.save();
+  ctx.lineWidth = 1.1;
+  const FZ = 150;
+  for (let i = 0; i < FZ; i += 1) {
+    // 分层取样：每一档高度上左右各来一根。纯随机会扎堆，留下大段光溜的边
+    if (Rnd(id + "fk", i) < 0.22) continue;      // 随机漏掉一些：铺太满就成了梳子
+    const t = 0.03 + ((i >> 1) + Rnd(id + "fj", i)) / (FZ / 2) * 0.95;
+    const side = i % 2 ? 1 : -1;
+    const px = x + side * R(t, side);
+    const py = PY(t);
+    // 法向：沿坡朝外下方（顶上朝外上方一点），跟垛面上的草同一个走向
+    const nxv = side * (0.55 + t * 0.45);
+    const nyv = 0.62 - t * 1.35;
+    const norm = Math.hypot(nxv, nyv) || 1;
+    const len = 2 + Rnd(id + "fl", i) ** 1.6 * 12;   // 长短拉开：等长＝毛刷
+    ctx.globalAlpha = 0.4 + Rnd(id + "fa", i) * 0.5;
+    ctx.strokeStyle = i % 4 === 0 ? dark : straw;
+    ctx.beginPath();
+    ctx.moveTo(px - (nxv / norm) * 3, py - (nyv / norm) * 3);
+    ctx.lineTo(px + (nxv / norm) * len + Sym(id + "fw", i, 1.6),
+      py + (nyv / norm) * len + Sym(id + "fh", i, 1.6));
+    ctx.stroke();
+  }
+  // 被薅过那一侧：上头外挑的一撮垂下来，把"底下被掏空"讲清楚
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = straw;
+  for (let i = 0; i < 10; i += 1) {
+    const t = 0.30 + Rnd(id + "ov", i) * 0.1;
+    const px = x + biteSide * R(t, biteSide) * (0.92 + Rnd(id + "ox", i) * 0.12);
+    const py = PY(t);
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + biteSide * Rnd(id + "oa", i) * 3, py + 6 + Rnd(id + "ob", i) * 11);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── 垛顶：拧紧扎住的一撮（防雨），不是屋顶 ──
+  const topY = PY(1);
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 11; i += 1) {
+    // 乱翘的一撮，长短角度都拉开。整齐的扇形会读成一头竖起来的头发
+    const a = Sym(id + "ta", i, 1.15);
+    const len = 3.5 + Rnd(id + "tl", i) * 5.5;
+    const bx = x + Sym(id + "tb", i, HW * 0.2);
+    ctx.globalAlpha = 0.5 + Rnd(id + "tc", i) * 0.4;
+    ctx.strokeStyle = i % 3 === 0 ? dark : straw;
+    ctx.beginPath();
+    ctx.moveTo(bx, topY + 4 + Rnd(id + "td", i) * 3);
+    ctx.lineTo(bx + Math.sin(a) * len, topY + 3 - Math.cos(a) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 脚下散的碎秸与麦糠——薅下来的那些
+  for (let i = 0; i < (raided ? 12 : 7); i += 1) {
+    const sx = x - W * 0.62 + Rnd(id + "sc", i) * W * 1.24;
     InkLine(ctx, sx, groundY - 1, sx + Sym(id + "sc2", i, 5), groundY - 2.5,
       id + "chaff" + i, { lw: 1.1, color: "rgba(122,104,60,0.55)", amp: 0.6 });
   }

@@ -260,7 +260,7 @@ export function CreateWorld(canvasEl) {
     midTrees: new THREE.Group(),   // 中景树列
     nearTrees: new THREE.Group(),  // 近景树
     play: new THREE.Group(),       // 玩法层（清晰）
-    fore: new THREE.Group(),       // 前景（掠过镜头，微糊）
+    fore: new THREE.Group(),       // 前景（掠过镜头，微糊）——**目前是空的**，见 AddForeground 那处的说明
     fx: new THREE.Group(),
     ots: new THREE.Group(),        // 过肩前景
   };
@@ -999,78 +999,17 @@ export function CreateWorld(canvasEl) {
     }
   }
 
-  // 前景：掠过镜头的草丛与枝条，微糊，压暗——一点点就够
-  function AddForeground(group, length, night, id) {
-    for (let x = 6; x < length; x += 15 + ART.Hash(id + x) * 14) {
-      // 前景：镜头推近之后画框空，需要有东西从边缘掠过带出纵深。
-      // 上缘垂枝、下缘草丛、偶尔一段篱笆——都压暗微糊，只当框景用。
-      const h0 = ART.Hash(id + "k" + x);
-      const kind = h0 > 0.62 ? "branch" : (h0 > 0.3 ? "grass" : "fence");
-      const wPx = kind === "branch" ? 340 : 220;
-      const hPx = kind === "branch" ? 200 : 150;
-      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
-        const tint = night ? "#0f1218" : "#3d3524";
-        if (kind === "grass") {
-          for (let i = 0; i < 22; i += 1) {
-            const gx = ax - 90 + ART.Hash(id + x + i) * 180;
-            const gh = 40 + ART.Hash(id + "h" + x + i) * 78;
-            ctx.beginPath();
-            ctx.moveTo(gx, ay);
-            ctx.quadraticCurveTo(gx + (ART.Hash(id + "c" + i) - 0.5) * 26, ay - gh * 0.6,
-              gx + (ART.Hash(id + "t" + i) - 0.5) * 52, ay - gh);
-            ctx.strokeStyle = tint;
-            ctx.lineWidth = 3.4;
-            ctx.lineCap = "round";
-            ctx.stroke();
-          }
-        } else if (kind === "fence") {
-          // 一段矮篱笆横在镜头前
-          for (let i = 0; i < 7; i += 1) {
-            const fx = ax - 140 + i * 46;
-            ctx.beginPath();
-            ctx.moveTo(fx, ay);
-            ctx.lineTo(fx + (ART.Hash(id + "f" + i) - 0.5) * 12, ay - 60 - ART.Hash(id + "fh" + i) * 26);
-            ctx.strokeStyle = tint;
-            ctx.lineWidth = 9;
-            ctx.lineCap = "round";
-            ctx.stroke();
-          }
-          for (let r = 0; r < 2; r += 1) {
-            ctx.beginPath();
-            ctx.moveTo(ax - 150, ay - 26 - r * 26);
-            for (let t = 0; t <= 8; t += 1) {
-              ctx.lineTo(ax - 150 + t * 40, ay - 26 - r * 26 + (ART.Hash(id + "r" + r + t) - 0.5) * 9);
-            }
-            ctx.strokeStyle = tint;
-            ctx.lineWidth = 7;
-            ctx.stroke();
-          }
-        } else {
-          // 从画框上缘垂下来的一枝
-          ctx.beginPath();
-          ctx.moveTo(ax - 150, 6);
-          ctx.quadraticCurveTo(ax, 40, ax + 150, 16);
-          ctx.strokeStyle = tint;
-          ctx.lineWidth = 7;
-          ctx.stroke();
-          for (let i = 0; i < 12; i += 1) {
-            const t = i / 12;
-            const lx = ax - 150 + t * 300;
-            const ly = 12 + Math.sin(t * Math.PI) * 26;
-            ctx.beginPath();
-            ctx.ellipse(lx, ly + 12, 13, 7, ART.Hash(id + i) * 2, 0, Math.PI * 2);
-            ctx.fillStyle = tint;
-            ctx.fill();
-          }
-        }
-      }, LAYER_BLUR.fore, 1, HazeFor("fore"));
-      // 压到画框下缘/上缘之外，只让边角掠过——一点点就够
-      PlaceSprite(mesh, x, kind === "branch" ? SURFACE_Y + 6.6 : SURFACE_Y - 4.4, 0);
-      ScaleKeepGround(mesh, 1.5 / LAYER_COMP.fore);
-      mesh.material.opacity = night ? 0.34 : 0.2;
-      group.add(mesh);
-    }
-  }
+  // 前景框景（草丛/垂枝/篱笆）已整个撤掉，2026-08-10 用户报的：
+  // 「镜头前面两根白白的模糊一坨的这个鬼东西」。查出来是两头都不成立：
+  //  · 它按 SURFACE_Y 摆位（草丛/篱笆锚在 SURFACE_Y-4.4，连缩放算下来覆盖
+  //    y −4.40→+1.06），而地道内部是 −3.60(地面)→−1.55(洞顶)——**整条地道
+  //    被它糊满**。这作品地表和地下在同一个场景里，"压到画框下缘之外"
+  //    这个前提只在地表机位成立，镜头一沉下去它就正对着画面中央。
+  //  · 而在它本该干活的地表中远景上，实拍逐像素比对只改动了 0.25% 的像素
+  //    （平均色差 0.07）——等于没画。地下反倒是 2.51%。
+  // 结论：不是调参能救的，删。fore 层本身留着（层表/绘制序不动），
+  // 以后真要做勇敢的心式的框景，**摆位必须跟着镜头所在的那一层的地平线走**，
+  // 而不是写死 SURFACE_Y；下面 ApplyCamera 里的可见性闸门已经把地下挡掉了。
 
   // 空气里的浮尘：光束里看得见的那种
   function AddDust(count, night) {
@@ -2329,7 +2268,6 @@ export function CreateWorld(canvasEl) {
       AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
         { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees,
           ...(dense ? { step: 14 } : {}), hazeOpt: HazeSolid("nearTrees", 0.96) });
-      AddForeground(layers.fore, L, night, ch.scene + "fg");
     }
     // 背景层的乡亲最后放：他们要挂在已经建好的树列之间
     AddBackdropFolk(sceneDef, ch, night);
@@ -4586,8 +4524,12 @@ export function CreateWorld(canvasEl) {
     LAYER_COMP.ots = (D_REF - otsZ) / D_REF;
     layers.ots.position.z = otsZ;
     layers.ots.scale.setScalar(LAYER_COMP.ots);
-    // 前景只服务于中远景；特写/插入/过肩本来就不该有枝叶糊在镜头前
-    layers.fore.visible = dist > 7;
+    // 前景只服务于**地表**中远景。两个条件缺一不可：
+    //  · dist > 7：特写/插入/过肩本来就不该有枝叶糊在镜头前；
+    //  · camY > SURFACE_Y：fore 层的东西都按地表地平线摆位，镜头一沉进地窖/
+    //    地道，那批贴图就正对着画框中央（2026-08-10 用户报的"两根白白的模糊
+    //    一坨"）。地下不存在草丛篱笆，这一层在地下永远该是空的。
+    layers.fore.visible = dist > 7 && camY > SURFACE_Y;
     // 浮尘在画框内循环飘
     for (const d of dustMotes) {
       const u = d.userData;
