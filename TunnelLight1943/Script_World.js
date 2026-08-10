@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, KnotPointAt, KNOT_EYE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -1632,6 +1632,12 @@ export function CreateWorld(canvasEl) {
   function AddUnderground(group, sceneDef, state, sceneKey) {
     const range = sceneDef.walk.under;
     if (!range) return;
+    // **地下按段存在**：没挖通之前，自家窖与七叔家窖是两个互不相通的腔，
+    // 中间是实土（见 Core 的 UnderSegments / Data_Scenes 的 underDig）。
+    // 老版把整条 walk.under 一口气掏空，于是第一次下窖就能走到七叔家——
+    // 第七场"挖通道"因此在演一件已经完成的事（2026-08-10 用户退回）
+    const segs = UnderSegments(sceneDef, state.flags);
+    const headX = segs.length > 1 ? segs[0][1] : null;   // 掌子面（还没挖通的那一头）
     // 地道不是一张平贴图：近侧土层剖面掏空 → 看进去是后退的地面 →
     // 尽头是后壁；支撑木分布在不同 z 上，人从木柱之间穿过去。
     const NEAR_Z = 2.2;     // 近侧剖面（被切开的那一刀）
@@ -1669,14 +1675,16 @@ export function CreateWorld(canvasEl) {
       // 都从 TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
       const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
         + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
-      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
-      for (let wx = range[1]; wx >= range[0]; wx -= 1.2) {
-        ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+      for (const [sa, sb] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), CeilY(sa));
+        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
+        for (let wx = sb; wx >= sa; wx -= 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.closePath();
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fill();
       // 洞室 / 旁洞：直得起腰的地方。顶要拱起来，不能是个平顶方盒——
       // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位
       const Dome = (cx, halfW, topY) => {
@@ -1711,20 +1719,54 @@ export function CreateWorld(canvasEl) {
       ctx.restore();
       // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来
       ctx.globalCompositeOperation = "source-over";
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), CeilY(range[0]));
-      for (let wx = range[0]; wx <= range[1]; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
-      ctx.strokeStyle = "rgba(24,17,10,0.75)";
-      ctx.lineWidth = 7;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(toPx(range[0]), tunBot);
-      for (let wx = range[0]; wx <= range[1]; wx += 1.2) {
-        ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+      for (const [sa, sb] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), CeilY(sa));
+        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
+        ctx.strokeStyle = "rgba(24,17,10,0.75)";
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), tunBot);
+        for (let wx = sa; wx <= sb; wx += 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.strokeStyle = "rgba(24,17,10,0.6)";
+        ctx.lineWidth = 5;
+        ctx.stroke();
       }
-      ctx.strokeStyle = "rgba(24,17,10,0.6)";
-      ctx.lineWidth = 5;
-      ctx.stroke();
+      // 掌子面：挖到这儿为止的那一堵新土。要让玩家一眼看出"还没通"——
+      //   · 新土比周围的老土层浅一档（还没被烟熏、没被手摸黑）
+      //   · 一道道横的镢头印，越往下越密（人是弯着腰往下刨的）
+      //   · 脚下堆着刚刨下来还没运走的虚土
+      if (headX !== null) {
+        const fx = toPx(headX);
+        const ceil = CeilY(headX);
+        ctx.save();
+        const fresh = ctx.createLinearGradient(fx - 4, 0, fx + 26, 0);
+        fresh.addColorStop(0, "rgba(150,116,74,0.62)");
+        fresh.addColorStop(1, "rgba(150,116,74,0)");
+        ctx.fillStyle = fresh;
+        ctx.fillRect(fx - 4, ceil, 30, tunBot - ceil + 6);
+        // 镢头印
+        ctx.strokeStyle = "rgba(52,38,22,0.44)";
+        for (let k = 0; k < 9; k += 1) {
+          const gy = ceil + 4 + k * ((tunBot - ceil) / 9);
+          ctx.lineWidth = 1.4 + (k / 9) * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(fx - 2, gy);
+          ctx.lineTo(fx - 2 + 6 + ART.Hash(sceneKey + "hoe" + k) * 12, gy + 2.4);
+          ctx.stroke();
+        }
+        // 脚下的虚土
+        ctx.fillStyle = "rgba(118,90,56,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(fx - 30, tunBot + 2);
+        ctx.quadraticCurveTo(fx - 12, tunBot - 13, fx + 2, tunBot + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
       // 洞室的穹顶也要有洞沿：走廊的墨线只描到 CeilY，洞室那一段是
       // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块
       for (const [cx, halfW, topY] of domes) {
@@ -1824,7 +1866,9 @@ export function CreateWorld(canvasEl) {
     // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去
     const beamZ = [BACK_Z + 1.2, -2.4, -0.3, 1.6];
     let bi = 0;
+    const inSeg = (wx) => segs.some(([a, b]) => wx >= a + 0.5 && wx <= b - 0.5);
     for (let x = range[0] + 3; x < range[1] - 2; x += 2.8 + ART.Hash(sceneKey + "gap" + Math.round(x)) * 3.4) {
+      if (!inSeg(x)) continue;
       const z = beamZ[bi % beamZ.length];
       bi += 1;
       const beamH = Math.ceil((TUN_TOP - UNDER_Y) * PPM);
@@ -1932,7 +1976,10 @@ export function CreateWorld(canvasEl) {
     const ch = state.lightOverride ? { ...ch0, light: state.lightOverride } : ch0;
     const f = state.flags;
     const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
-      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`;
+      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`
+      // 地道挖到哪儿了：这两个旗标改的是**剖面几何**（掏开哪几段土），
+      // 只能整场重建。一章里只翻两次，卡这两下值得
+      + `:${f.digStarted ? 1 : 0}:${f.tunnelDug ? 1 : 0}`;
     // henFlew / thimbleFound / raidStarted / clothDown 只决定某个道具在不在
     //（flagProps 切 visible），ropeTaken / wellRopeBroken 只改一张贴图的画法
     //（propRedraw 单张重烘）——一个都不进 builtKey。进了就是"捡个顶针卡一下"

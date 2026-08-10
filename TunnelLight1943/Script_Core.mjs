@@ -353,11 +353,49 @@ export const WINCH_HUB_Y = 1.43;
 const WINCH_TURNS_DOWN = Math.PI * 2 * 1.6;
 const WINCH_TURNS_UP = Math.PI * 2 * 2.6;
 
+
+// ---------------------------------------------------------------------------
+// 地道的"还没挖通"（2026-08-10 用户退回："地洞从一开始就是通的七叔家，
+// 那还挖个几把？"）。
+//
+// 老版把 walk.under 当成一条从头通到尾的走廊：剖面在开局就整条掏空，
+// 玩家第一次下窖就能一路走到七叔家——第七场"挖通道"因此是**假的**，
+// 送土、支木板、七叔从那头扒开最后一层土，全都在演一件已经完成的事。
+//
+// 现在地下按**段**存在，段由旗标推进（数据写在 Data_Scenes 的 underDig）：
+//   ① 开局：只有自家地窖，东壁到此为止（wall）
+//   ② digStarted（第七场开工）：掌子面推进到离对面还差最后一层土（face）
+//   ③ tunnelDug（第九场两头通了）：整条连成一条
+// 七叔家那头的窖（far）一直画着——看得见目标，才知道自己在挖什么。
+export function UnderSegments(scene, flags) {
+  const r = scene?.walk?.under;
+  if (!r) return [];
+  const g = scene.underDig;
+  if (!g || (g.doneFlag && flags?.[g.doneFlag])) return [[r[0], r[1]]];
+  const east = (g.startFlag && flags?.[g.startFlag]) ? g.face : g.wall;
+  const segs = [[r[0], east]];
+  if (g.far) segs.push([g.far[0], g.far[1] ?? r[1]]);
+  return segs;
+}
+
+/** 某个 x 所在的那一段地下走行范围（不在任何段里就退回最近的一段） */
+export function UnderWalkRange(scene, flags, x) {
+  const segs = UnderSegments(scene, flags);
+  if (!segs.length) return scene?.walk?.under;
+  for (const s of segs) if (x >= s[0] - 0.5 && x <= s[1] + 0.5) return s;
+  let best = segs[0], bd = Infinity;
+  for (const s of segs) {
+    const d = Math.min(Math.abs(x - s[0]), Math.abs(x - s[1]));
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
+}
+
 // 落点整形：不许落进掩体的足迹（掩体带 z 专职挡人，桶放进草垛=凭空消失，
 // 2026-08-06 的水桶事故就是这么来的），也不许出行走范围/压在翻越物里。
 function DropSpot(state, x, level) {
   const scene = SceneOf(state);
-  const range = scene.walk[level];
+  const range = level === "under" ? UnderWalkRange(scene, state.flags, x) : scene.walk[level];
   let best = x;
   if (range) best = Math.max(range[0] + 0.4, Math.min(range[1] - 0.4, best));
   const blockers = [];
@@ -2258,6 +2296,9 @@ export const SCRIPTS = {
         // 挖的人必须站在**通道口**——那儿土层正好收口，有东西可挖，人也直得起腰；
         // 塞进爬行段里的话，1.4m 的躬身施工姿会被 0.75m 的洞顶埋掉大半个身子
         // （试过 45.8，画面上只剩一条小臂和一条小腿）。
+        // 开工旗：掌子面从自家窖东壁（42.6）推到离对面还差一层土（46.0）。
+        // 剖面按它掏土（Data_Scenes 的 underDig / Core 的 UnderSegments）
+        state.flags.digStarted = true;
         const digA = FindActor(state, "diggerA");
         if (digA) {
           digA.visible = true; digA.level = "under"; digA.x = 42.35; digA.heading = 1;
@@ -2279,7 +2320,9 @@ export const SCRIPTS = {
       // 由乡亲趁夜运往村外沟坎；收尾拿扫帚把出土口的筐印脚印扫散。
       // 菜畦与柴堆不再当弃土点（深层黏土颜色深，倒进菜畦一眼就穿）。
       steps: [
-        { type: "pickup", x: 37.6, item: { id: "dirtA", label: "土筐", big: true }, prompt: "E · 接过土筐" },
+        { type: "pickup", x: 37.6, item: { id: "dirtA", label: "土筐", big: true }, prompt: "E · 接过土筐",
+          // 跳幕结算走的是 steps 的 effect，不走 onStart——开工旗两头都要落
+          effect: (state) => { state.flags.digStarted = true; } },
         { type: "use", zone: { x: 44.9, w: 2.6 }, needs: "dirtA", prompt: "E · 往猪圈垫薄土",
           note: "只垫浅浅一层——铺厚了，就是一堆显眼的新土。",
           effect: (state) => { Cue(state, "drop"); } },
@@ -4442,6 +4485,7 @@ export function StartChapter(state, index) {
     state.flags.elmDown = false;
     state.flags.bracedA = false;
     state.flags.bracedB = false;
+    state.flags.digStarted = false;
     state.flags.tunnelDug = false;
     state.flags.grainHidden = false;
     state.flags.nookClosed = false;
@@ -5148,8 +5192,8 @@ function MovePlayer(state, input, dt) {
     }
   }
 
-  // 行走范围（塌方未清开时挡路）
-  const range = scene.walk[p.level];
+  // 行走范围（没挖通的地道段挡路 / 塌方未清开时挡路）
+  const range = p.level === "under" ? UnderWalkRange(scene, state.flags, p.x) : scene.walk[p.level];
   if (range) p.x = Math.max(range[0], Math.min(range[1], p.x));
   if (state.collapses && p.level === "under") {
     for (const key of Object.keys(state.collapses)) {

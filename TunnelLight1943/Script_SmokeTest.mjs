@@ -11,6 +11,7 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, EdgeHint,
+  UnderSegments,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -87,9 +88,18 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false } =
       if (p.level !== targetLevel && p.climbT <= 0) {
         // 找可用爬梯口，走过去按 W/S
         const shafts = scene.shafts.filter((s) => !s.builtFlag || state.flags[s.builtFlag]);
+        // 下窖要挑**通向目标那一段**的井口。地道没挖通之前自家窖和七叔家窖
+        // 是两个腔：从七叔家窖口下去，到不了自家窖（真人也一样，得走回去）
+        const segs = UnderSegments(scene, state.flags);
+        const segOf = (wx) => segs.find(([a, b]) => wx >= a - 0.6 && wx <= b + 0.6);
+        // 下去要挑通向目标那一段的井口；上来只能走**自己这一段**里的井口
+        const want = segs.length > 1
+          ? (targetLevel === "under" ? segOf(target.x) : segOf(p.x))
+          : null;
         let best = null, bestD = Infinity;
         for (const s of shafts) {
           if (state.flags.entWBlocked && s.id === "entW") continue;
+          if (want) { const sg = segOf(s.x); if (!sg || sg[0] !== want[0]) continue; }
           const d = Math.abs(p.x - s.x);
           if (d < bestD) { bestD = d; best = s; }
         }
@@ -236,6 +246,59 @@ function TestCoverIsDirectional() {
   assert.ok(!SoldierSeesPlayer(fields, { x: 2, heading: 1, level: "surface" }, inDitch, 1), "沟里从西边看不见");
   assert.ok(!SoldierSeesPlayer(fields, { x: 12, heading: -1, level: "surface" }, inDitch, 1), "沟里从东边也看不见");
   console.log("  ✓ 掩体有正反面（高/矮 · 易手 · 钻进去的除外）");
+}
+
+// 地道不是一开局就通的（2026-08-10 用户退回："地洞从一开始就是通的七叔家，
+// 那还挖个几把？"）。这条盯死三件事，别让它悄悄回去：
+//   ① 开局：自家窖东壁到此为止，走不到七叔家
+//   ② 第七场开工（digStarted）：掌子面推进，但仍然**不通**
+//   ③ 第九场（tunnelDug）：连成一条，能一路走到七叔家窖口
+function TestTunnelNotDugYet() {
+  const v = SCENES.village;
+  const g = v.underDig;
+  assert.ok(g, "村子必须声明 underDig——没有它地下就是一条从头通到尾的走廊");
+
+  const at = (flags) => UnderSegments(v, flags);
+  const closed = at({});
+  assert.equal(closed.length, 2, "没开挖之前地下是两个互不相通的腔");
+  assert.ok(closed[0][1] <= g.wall + 0.01, `开局自家窖到 ${g.wall} 为止`);
+  assert.ok(closed[1][0] >= g.far[0] - 0.01, "七叔家那头的窖是另一段");
+
+  const digging = at({ digStarted: true });
+  assert.equal(digging.length, 2, "开工只是掌子面推进，两头**还没通**");
+  assert.ok(digging[0][1] > closed[0][1], "开工之后掌子面要往前推");
+  assert.ok(digging[0][1] < digging[1][0], "还差最后一层土");
+
+  const done = at({ digStarted: true, tunnelDug: true });
+  assert.equal(done.length, 1, "挖通之后是一条");
+  assert.ok(done[0][1] >= v.walk.under[1] - 0.01, "通了就能走到七叔家窖口");
+
+  // 真按方向键走一遍：没挖通时人被实土挡住
+  const state = CreateGame(0);
+  let fwd = 0;
+  while (state.phase !== "playing" || CurrentBeatDef(state)?.kind === "cinematic") {
+    StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
+    if ((fwd += 1) > 10000) throw new Error("无法进入第一章玩法段");
+  }
+  const Walk = (steps) => {
+    for (let i = 0; i < steps; i += 1) {
+      state.player.cineWalk = null;
+      StepGame(state, { moveX: 1, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
+    }
+  };
+  state.player.level = "under";
+  state.player.x = 40;
+  Walk(400);
+  assert.ok(state.player.x <= g.wall + 0.05,
+    `没开挖就往东走，应该被自家窖东壁挡住（到了 ${state.player.x.toFixed(2)}）`);
+  state.flags.digStarted = true;
+  Walk(400);
+  assert.ok(state.player.x > g.wall && state.player.x <= g.face + 0.05,
+    `开工之后走到掌子面为止（到了 ${state.player.x.toFixed(2)}）`);
+  state.flags.tunnelDug = true;
+  Walk(600);
+  assert.ok(state.player.x > g.far[0], `挖通之后能走进七叔家窖（到了 ${state.player.x.toFixed(2)}）`);
+  console.log("  ✓ 挖通之前地道不通：自家窖 →", g.wall, "掌子面 →", g.face, "通了 →", v.walk.under[1]);
 }
 
 function TestClimb() {
@@ -1508,6 +1571,7 @@ TestSingleChapterEntry();
 TestVision();
 TestCoverIsDirectional();
 TestClimb();
+TestTunnelNotDugYet();
 TestSmokeFront();
 TestDetectionReset();
 TestStealthEscapable();
