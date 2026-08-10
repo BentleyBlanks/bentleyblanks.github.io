@@ -614,7 +614,13 @@ function SyncPip(state, inCinematic) {
   if (!el) return;
   const spec = state.phase === "playing" && !inCinematic ? state.pip : null;
   let shot = null;
-  if (spec) {
+  if (spec?.at) {
+    // 钉在一个死点位上的小窗（打水时那扇「井底」）。**这是主相机去不了的
+    // 地方**：画面底下永远压着一条近景地面带，主相机看不到地平线以下，
+    // 第二台相机却可以架进井筒里——它在那条地面带**后面**（pip 机位 z 比
+    // 3.3 小），于是井底那点事有地方演了
+    shot = { x: spec.at.x, y: spec.at.y, hw: spec.hw ?? 1.2 };
+  } else if (spec) {
     const a = spec.who === "player"
       ? { x: state.player.x, level: state.player.level, visible: true }
       : state.actors.find((x) => x.id === spec.who);
