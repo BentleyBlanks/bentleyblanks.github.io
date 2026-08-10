@@ -424,6 +424,17 @@ const WINCH_KNOCKS = [0.34, 0.68];// 桶磕井壁的深度：井口一黑就到�
 const WINCH_DUNK_DX = -0.42;      // 墩桶的站位：胳膊半米长，得往前挪一步才够得着绳（实拍量的：−0.52 时手还差 11 厘米）
 const WINCH_BUCKET_TOP = 0.66;    // 桶提到顶时的高度（＝World 画桶那条线，别另抄）
 export const WINCH_LAND_X = 0.62; // 拽到井沿要横着拉多远（World 画桶也读它）
+// ── 井底那扇小窗 ──
+// 主相机看不到井口以下（画面底下压着一条近景地面带，见 CLAUDE.md），可
+// **小窗是第二台相机**——它架进井筒里，就在那条地面带**后面**，井底那点事
+// 于是有地方演了：桶一路沉下去、口朝上浮在水面、一墩一墩扣过去吃水、
+// 再滴着水升上来。它同时是这一拍的提示：不用一句话，玩家看见浮着的空桶
+// 就知道为什么得墩（用户 2026-08-10 出的主意）。
+// 这几个 y 只有小窗看得见，所以尽管按"一口井该有多深"给。
+export const WELL_MOUTH_Y = 0.73;    // 井口沿（＝Art.DrawWell 的 CURB 35px）
+export const WELL_WATER_Y = -1.55;   // 井里的水面
+export const WELL_BOTTOM_Y = -1.95;  // 井筒剖面画到多深为止
+const WELL_PIP_HW = 0.60;            // 小窗的取景半宽：桶占大半个窗，看得清它在翻
 const WINCH_LAND_R = 0.42;        // 按下那一帧手要落在桶多近才攥得住
 const WINCH_LAND_KEY = 0.55;      // 键盘后备把桶拉过来的速度
 const WINCH_HASTE = 0.42;         // 赶时间的那口井（c5 头顶上有伪军）按这个系数缩
@@ -1621,7 +1632,11 @@ function StepChain(state, def, input, dt) {
       });
       // 赶时间的那口井（c5 头顶上有伪军在转）：同样四道手，每一道都短
       const S = st.haste ? WINCH_HASTE : 1;
-      if (!InZone(p.x, lvl, st.zone)) return;
+      // 走开井台就把井底那扇小窗带走（不然它会一直挂在角上）
+      if (!InZone(p.x, lvl, st.zone)) {
+        if (state.pip?.kind === "wellBottom") state.pip = null;
+        return;
+      }
       state.winchLock = true;   // 井口的竖推交给辘轳，不再当爬梯（c5 井台正压在竖井口上）
       const cx = st.zone.x;
       const crankX = cx + WINCH_CRANK_DX;
@@ -1641,6 +1656,8 @@ function StepChain(state, def, input, dt) {
           stam: w.stam, tired: w.stam < WINCH_TIRED, giveOut: !!w.giveOut,
           // 四道手要画的那几样：桶扣过去多少、横拽了多少、在绳上悠多少、抖多凶
           phase: w.phase, tip: w.tip, swing: w.swing, sway: w.sway, jolt: w.jolt,
+          // 井筒里那只桶的真实高度（只有小窗那台相机看得见它）
+          deepY: WELL_MOUTH_Y - w.depth * (WELL_MOUTH_Y - (WELL_WATER_Y + 0.13)),
           ...extra,
         };
       };
@@ -1916,11 +1933,22 @@ function StepChain(state, def, input, dt) {
           if (st.transform) state.player.item = { ...st.transform };
           state.winchView = null;
           state.stamina = null;
+          if (state.pip?.kind === "wellBottom") state.pip = null;
           p.pose = null; p.poseU = undefined; p.poseK = undefined; p.poseStrain = undefined;
           finish();
           return;
         }
       }
+      // 井底小窗：桶一沉过井口沿就开，一直开到它重新露头为止。
+      // 取景跟着桶走，快到水面就停在水面上——那一格里演的正是玩家看不见、
+      // 却正在做的那件事（也是"为什么要墩"唯一的说明）
+      const deepY = WELL_MOUTH_Y - w.depth * (WELL_MOUTH_Y - (WELL_WATER_Y + 0.13));
+      if (w.depth > 0.06 && w.phase !== "land") {
+        PinPip(state, {
+          at: { x: cx, y: Math.max(deepY, WELL_WATER_Y + WELL_PIP_HW * 0.42) },
+          hw: WELL_PIP_HW, kind: "wellBottom",
+        });
+      } else if (state.pip?.kind === "wellBottom") state.pip = null;
       w.stam = Math.max(0, Math.min(1, w.stam + stamDelta));
       // 体力条：这是**读数**不是做功进度（做功仍然只认手上的绕圈/按键）。
       // 用户点名要的那一条：「加一个体力条/体力倒计时条」。
@@ -2374,6 +2402,17 @@ function ShowPip(state, spec) {
   state.flags.pipShown = true;   // 冒烟测试盯这面旗：小窗机制断了不会有别的测试变红
 }
 
+// 小窗的第二种用法：**盯住一个死点位**（不跟人），而且由玩法每帧立、每帧撤。
+// 起因是打水（2026-08-10 用户："地表场景看不到地平线以下 但是你可以用边上的
+// 特殊照片模式去渲染呀 / 顺便也作为一个提示不是蛮好的"）——主相机确实看不到
+// 井口以下（画面底下永远压着一条近景地面带），但**小窗是第二台相机**，它可以
+// 架进井筒里、架在那条地面带的后面，于是井底那点事就有地方演了。
+// 而且它顺带把「墩桶」教会了：玩家看见空桶口朝上浮着，就明白为什么要墩。
+function PinPip(state, spec) {
+  state.pip = { t: null, ...spec };
+  state.flags.pipShown = true;
+}
+
 // 干活的人（无文字引导的一部分：家里没人站着围观）。
 // 爹在工作台前拉锯，娘在菜畦锄地——谁被叫去做别的事，谁再放下手里的活。
 const V_PATCH_X = 13.4;   // 菜畦（veggieWest prop）里娘锄地的站位（菜畦已西移给磨盘/独轮车让位）
@@ -2651,17 +2690,27 @@ export const SCRIPTS = {
               if (a) { a.cineTarget = { x: 37.4 }; a.cineSpeed = 2.0; a.heading = -1; }
             }
           } },
-        // 跟着下窖，不切场：镜头直接落到地下（人在剖面里）
+        // 跟着下窖，不切场：镜头直接落到地下（人在剖面里）。
+        // **三个人不许朝同一边等距站开**：那在侧视里就是一排复制人，
+        // 何况谁在跟谁说话完全读不出来（2026-08-10 用户截图退回：
+        // 「这三个傻逼在干什么？」）。爹站一头朝里，另两个转过来朝他，
+        // 间距也错开——三个人围成一堆才读得出"他在讲，那俩在听"。
         { stage: "", d: 2.8, cam: { kind: "shot", x: 39.5, y: -2.3, dist: 6.5 },
           on: (state) => {
-            const D = (id, x) => {
+            const D = (id, x, h) => {
               const a = FindActor(state, id);
-              if (a) { a.level = "under"; a.x = x; a.cineTarget = null; a.heading = 1; }
+              if (a) { a.level = "under"; a.x = x; a.cineTarget = null; a.heading = h; }
             };
-            D("father", 37.6); D("xiaozhou", 39.2); D("qishu", 40.6);
+            D("father", 37.6, 1); D("xiaozhou", 39.4, -1); D("qishu", 40.3, -1);
           } },
         { who: "爹", say: "这边土硬，不用处处架木头。洞口和中间那段松土压住就行——不然一碰就塌。", d: 5.4,
-          cam: { kind: "shot", x: 40.5, y: -2.3, dist: 6.5 } },
+          cam: { kind: "shot", x: 39.2, y: -2.3, dist: 6.2 },
+          on: (state) => {
+            // 说到"这段松土"就抬手指洞顶——话里指的地方，画面上得有人指出来。
+            // pointLow 自带猫腰（见 Rig），在净高一米五的洞里用不会捅穿洞顶
+            const f = FindActor(state, "father");
+            if (f) f.pose = "pointLow";
+          } },
       ],
     },
     {
@@ -2673,6 +2722,8 @@ export const SCRIPTS = {
         // 客人的事谈完了，娘扛起锄头去西头菜畦——她的日子不围着玩家的差事转
         const mother = FindActor(state, "mother");
         if (mother) { mother.carry = "锄头"; mother.cineTarget = { x: V_PATCH_X }; mother.cineSpeed = 1.15; mother.heading = -1; }
+        const fa = FindActor(state, "father");
+        if (fa) fa.pose = null;          // 指洞顶那一下收回去，别带进下一场
         const xz = FindActor(state, "xiaozhou");
         if (xz) { xz.level = "surface"; xz.x = 35.8; xz.heading = 1; xz.cineTarget = null; }
         const q = FindActor(state, "qishu");
@@ -2737,8 +2788,12 @@ export const SCRIPTS = {
         MotherHoe(state);
       },
       steps: [
-        { type: "goto", zone: { x: 19.4, w: 3.6 } },
+        // 牌面画车不画手势：默认推导给「goto」画走路、给「use」画一只按横杠的手，
+        // 可这两步的正主都是那辆独轮车——手按木杠的通用图认不出是在干嘛
+        // （2026-08-10 用户：「这个提示是什么鬼……提示个车不好么」）
+        { type: "goto", zone: { x: 19.4, w: 3.6 }, hintIcon: "cart" },
         { type: "use", zone: { x: 19.8, w: 3.2 }, hold: 1.2, stroke: "down", gestureY: 1.05,
+          hintIcon: "cart",
           prompt: "晃车把 · 一下一下压",
           note: "车轮从干泥里松了出来。",
           effect: (state) => { Cue(state, "crank"); } },
@@ -5695,8 +5750,10 @@ export function StepGame(state, input, dt) {
       if (k < 0.1) d.thud = false;
     }
   }
-  // 后果小窗到时收起；onEnd 给"看完这一眼之后"的收尾用（娘接着锄地）
-  if (state.pip && (state.pip.t -= dt) <= 0) {
+  // 后果小窗到时收起；onEnd 给"看完这一眼之后"的收尾用（娘接着锄地）。
+  // **t 为 null = 不自动收**：那种小窗由玩法自己每帧立、每帧撤（打水时那扇
+  // 「井底」就是——它不是看一眼的后果，是这一拍一直得看着的东西）
+  if (state.pip && state.pip.t != null && (state.pip.t -= dt) <= 0) {
     const done = state.pip;
     state.pip = null;
     done.onEnd?.(state);
