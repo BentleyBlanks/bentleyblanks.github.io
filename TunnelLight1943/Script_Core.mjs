@@ -260,6 +260,9 @@ function StartClimb(state, toLevel, dur) {
   p.moving = false;
   p.crouch = false;           // 梯子上不猫腰：进地道那一下的弓背等落地再说
   p.pose = null;              // 手上的活到梯子这儿一律让位给爬的姿势
+  // 从这一帧起镜头交给 lift（BaseShot 读它一档档跟着人下去）：窖口探头当场让位，
+  // 不然这一帧两个来源叠着压，画面会先多沉一下再弹回来
+  state.cellarPeek = 0;
   Cue(state, "ladder", { gain: 0.5 });
 }
 
@@ -4653,6 +4656,7 @@ export function StartChapter(state, index) {
   state.player.vaultBig = false;
   state.vaultDust = null;
   state.vaultHint = "";
+  state.cellarPeek = 0;
   state.cues = [];
   state.bubbles = [];
   state.bubbleFlash = null;
@@ -5262,6 +5266,7 @@ function MovePlayer(state, input, dt) {
       p.moving = false;
       state.vaultHint = "";
       state.climbHint = "";
+      state.cellarPeek = 0;
       return;
     }
   }
@@ -5290,6 +5295,7 @@ function MovePlayer(state, input, dt) {
     p.moving = false;
     state.climbHint = "";
     state.vaultHint = "";
+    state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
     return;                                                    // 爬梯中锁操作
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
@@ -5391,14 +5397,34 @@ function MovePlayer(state, input, dt) {
 
   // 站在竖井口要给提示。原先这里一个字都没有，玩家根本不知道脚下能上能下——
   // 单独存一个字段，免得跟节拍自己的 prompt 抢。
+  //
+  // 顺带算一个 0..1 的**探头量**（cellarPeek）：人在地表越靠近井口，镜头就
+  // 越往下沉一档，把脚底下那个窖的剖面带进画框（Main 的 BaseShot 用它）。
+  // 为什么要这一下：地窖一直是画好的，可地表机位的下边沿只到 −1.7m，而窖底
+  // 在 −3.6m——整间窖都在画外。于是玩家按 S 之前根本看不见有这么个地方，
+  // 读起来就是"下去才凭空长出来一间屋"（用户 2026-08-10 报的）。
+  // 这是纯粹的**升降**，景别（hw）一点没变，不违反"全作只有一个景别档"。
   state.climbHint = "";
+  let peek = 0;
   for (const shaft of scene.shafts) {
-    if (Math.abs(p.x - shaft.x) > 1.4) continue;
     if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
-    if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 上梯子";
-    else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
-    break;
+    const d = Math.abs(p.x - shaft.x);
+    if (d <= 1.4) {
+      if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 上梯子";
+      else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
+    }
+    // 探头的范围比提示宽一截（4.2m）：镜头得**先**沉下去，玩家才是"走过来
+    // 看见脚底下有东西"，而不是"站定了画面才动"
+    if (p.level === "surface" && scene.walk.under) {
+      const k = 1 - Math.min(1, Math.max(0, (d - 1.0) / 3.2));
+      peek = Math.max(peek, k * k * (3 - 2 * k));   // 缓入缓出，别一步跳下去
+    }
   }
+  // 爬梯那一段自己会带着镜头走（BaseShot 读 lift），别再叠一层。
+  // 被盯上的时候也不沉：潜行段镜头一往下扎，正前方摸过来的那盏灯就出了画框——
+  // 探头是"让你看见脚底下"，不是"把眼前的危险挪走"（潜行规范第 2 条）。
+  const spotted = (state.detection?.level || 0) > 0.15;
+  state.cellarPeek = (p.climbT > 0 || spotted) ? 0 : peek;
 
   // 爬梯口：W 上 / S 下（辘轳接管竖推时不当爬梯——c5 井台正压在竖井口上）
   if (Math.abs(input.climb || 0) > 0.05 && !state.winchLock) {
