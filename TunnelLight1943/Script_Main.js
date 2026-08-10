@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
+  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE,
 } from "./Script_Core.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
@@ -99,7 +99,7 @@ for (const id of [
   "noticeOverlay", "noticeText", "noticeClose",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnThrow", "btnSkipCine",
-  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint",
+  "actPrompt", "itemThrow", "pipFrame", "pipView", "gestureHint", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
@@ -470,14 +470,15 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
   }
-  // 划线的活卡：铺满画框、每帧重画，玩家的手就按在上面。必须排在
-  // SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera 之前
-  //（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
+  // 做功那几拍的活卡（划线 / 刨料 / 接绳）：铺满画框、每帧重画，玩家的手就按
+  // 在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera
+  // 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
   const playing = state.phase === "playing";
   world.SetLiveCard(
     playing && state.scribeCard ? { kind: "scribe", view: state.scribeCard, layout: SCRIBE_CARD }
       : playing && state.planeCard ? { kind: "plane", view: state.planeCard, layout: PLANE_CARD }
-        : null,
+        : playing && state.knotCard ? { kind: "knot", view: state.knotCard, layout: KNOT_CARD }
+          : null,
     dt,
   );
 
@@ -750,6 +751,18 @@ function SyncHud(state, dt, shotFade) {
     ui.gestureHint.hidden = !g;
     if (g && ui.gestureHint.dataset.kind !== g.kind) ui.gestureHint.dataset.kind = g.kind;
   }
+  // 手劲条：辘轳吊着一桶水的时候，这条一直在掉——它是**读数**不是做功进度
+  //（做功仍然只认手上那圈绕/那下按键）。用户 2026-08-10 点名要的那一条：
+  // "放下水桶这个过程角色一点力好像都不需要用……加一个体力条"。
+  if (ui.staminaBar) {
+    const sm = !inCinematic && state.phase === "playing" ? state.stamina : null;
+    ui.staminaBar.hidden = !sm;
+    if (sm) {
+      ui.staminaBar.style.setProperty("--fill", (sm.v * 100).toFixed(1) + "%");
+      ui.staminaBar.classList.toggle("low", !!sm.low);
+      ui.staminaBar.classList.toggle("out", !!sm.out);
+    }
+  }
   // 触屏的投掷键：手里真有能扔的东西才冒出来
   if (ui.btnThrow) ui.btnThrow.hidden = !(showItem && item.throwable);
 
@@ -762,7 +775,8 @@ function SyncHud(state, dt, shotFade) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    ui.touchControls.classList.toggle("gone", !!(state.scribeCard || state.planeCard) && state.phase === "playing");
+    ui.touchControls.classList.toggle("gone",
+      !!(state.scribeCard || state.planeCard || state.knotCard) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {
