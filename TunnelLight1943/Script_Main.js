@@ -377,9 +377,32 @@ function BaseShot(state) {
   //（碰撞与玩法要按目的层算），但人还在梯子上，高度记在 p.lift 里。镜头不读
   // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
   const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
-  const y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  let y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
+  const hw = ch.light === "night" ? 6.15 : 6.3;
+  // 走到窖口上头，镜头沉一档，把脚底下那间窖带进画框（Core 的 cellarPeek）。
+  //
+  // 地窖一直是画好的，可地表机位的下边沿只到 −1.7m、窖底在 −3.6m，整间窖
+  // 都在画外——按 S 之前玩家根本看不见它，读起来就是"下去才凭空长出一间屋"。
+  // 这是**升降**不是拉远：hw 一动不动，景别还是那一档。
+  //
+  // 沉多少不能写死一个米数：宽屏手机（2.16:1）的画高只有 16:9 的八成，
+  // 同样沉 2 米就把柱子的脑袋切出画外了。所以按**画高**反算——
+  // 留 HEAD_ROOM 给地面上的人和屋子，剩下的都让给底下。
+  const peek = p.climbT > 0 ? 0 : (state.cellarPeek || 0);
+  if (peek > 0.001 && p.level === "surface") {
+    const halfH = (world.viewSize.h || hw) / 2;
+    // 想沉多少：让下边沿落到窖底再往下 0.3m（`y − 沉 − 半高 = UNDER_Y − 0.3`）
+    const want = y - halfH - (UNDER_Y - 0.3);
+    // 能沉多少：上边沿不许低过 HEAD_ROOM——它量的是**画框顶离站立视平线**
+    // 多高（顶沿 = 1.85 + HEAD_ROOM），0.8 正好把一间 2.4m 的土屋留在画里。
+    // 这条上限是给宽屏手机的：2.16:1 的画高只有 16:9 的八成，不设限就把
+    // 屋顶连人一起切出去；设太松（试过 1.7）又等于没沉，手机上还是看不见窖。
+    const HEAD_ROOM = 0.8;
+    const room = Math.max(0, halfH - HEAD_ROOM);
+    y -= Math.max(0, Math.min(want, room)) * peek;
+  }
   // 爬梯时不留提前量：人是竖着挪的，横向再往前探就成了甩镜头
-  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw: ch.light === "night" ? 6.15 : 6.3 };
+  return { x: p.x + (p.climbT > 0 ? 0 : lookAhead), y, hw };
 }
 
 function HintShot(state, hint) {

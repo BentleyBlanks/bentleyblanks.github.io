@@ -2,6 +2,34 @@
 
 《地道里的光》2.5D 横版白盒。改这个目录前先读本文件；改完跑「验证」一节。
 
+## 先用命令行工作台，别一上来就读源码
+
+```bash
+node TunnelLight1943/Script_Cli.mjs
+```
+
+| 子命令 | 回答什么 |
+|---|---|
+| `where <片段>` | **这东西在哪**：节拍 / 函数 / 画笔 / 道具登记 / 骨架轨道姿势 / 规范章节 → `文件:行` |
+| `beats [c1]` | 列出全部节拍（章 · 序号 · id · kind） |
+| `beat <id>` | 某一拍的全部：步骤/区域/needs/prompt/旗标/台词/源码位置 |
+| `state <id> [选项]` | **无头**跑到那一拍、喂真输入、把状态打出来（`--x --level --input --frames --trace --json`） |
+| `shot <id> [选项]` | 实拍（真浏览器真键盘）→ `_shots/`（`--pre --hold --dur --phases --actor --clip`） |
+| `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |
+
+**这是硬规矩，因为代价量过**：翻 12 天会话记录，改这个游戏的 token 七成花在
+「定位」上（Read/Grep 打在源码上 ≈149 万），另有 ≈40 万花在**现写一次性探针**
+（234 个 scratchpad 脚本 + 319 次 `node -e`）——而跑测试只占 ≈23 万。7000 行的
+`Script_Core.mjs` 同一段 300 行被反复读了 19 次，每个新会话都在重新画同一张地图。
+
+- **要问游戏状态，先跑 `state`，不许现写探针脚本**；缺子命令就往 `Script_Cli.mjs`
+  里加，加完写回这张表。一次性脚本写完就扔，下一个 agent 还得重写一遍。
+- **要截图，跑 `shot`**。那套引导代码有三个必踩的坑，已经固化在里面：
+  `ServeRoot` 的 rootDir 必须 `path.resolve`（正斜杠字符串会 403）、页面 load 完
+  `tl.state` 还是 null 得先 `StartGame`、**拍姿势必须真按键**（`FlashPose` 只有
+  0.2 秒，`StepFrames` 之后的等待里 rAF 还在跑无输入帧，截出来全是站姿）。
+- `SmokeTest` 的 `TestCliAnswersQuestions` 盯着它——CLI 坏了不会有别的测试变红。
+
 ## 场景数据在哪（改东西之前先看这里）
 
 **场景物体不写在代码里**。要挪一个东西、换一张贴图、改一档深度，改 JSON 就够了：
@@ -137,6 +165,28 @@ npm run scene:tunnelLight1943
   `PROP_SS`，小件用 `DETAIL_SS`。逐帧重画的 canvas 用 `setTransform(SS,…)`。
 - DOM HUD 的字体规矩见 `Style_Game.css` 顶部注释：居中走布局不走 transform、
   text-shadow 收贴身、字体必须真的加载（index.html 的 Google Fonts 四档字重）。
+
+### 画框边缘的「下一件事」（2026-08-10 用户定，参考勇敢的心）
+
+目标出了画框时，边上立的**不是一个方向键**，是一枚带图的牌（`Art.DrawEdgeHud`）：
+**箭头说往哪走，图说去干嘛**，一支箭头说不了两件事。用户原话：「应该是一个 hud
+带个 icon 的，表达你接下来要做的事情，不同任务不同人可能都有不一样的提示」。
+
+- 牌面由 `Core.BeatHintIcon` 推出来，跟着 `GetBeatTarget` 那张表走：目标是谁就画谁
+  （侧脸＋衣色——本作认人本来就靠这两样），是什么东西就画那件东西的小样，
+  上手的活画手势。**挑人的条件必须和 `GetBeatTarget` 一模一样**，否则牌上是甲、
+  路却通往乙。剧本可在节拍或链上某一步写 `hintIcon` 覆盖推导。
+- 种类是封闭的一张表（`HINT_ICON_KINDS` ↔ `Art.HudGlyph` 的 switch）：新加一种词
+  就得同时给一张画法，SmokeTest 的「边缘 HUD 牌面」会扫全八章逐拍验：每拍都推得
+  出、种类都有画法、找人带得上 who、拿东西带得上 item，而且全场不许退化成一种图。
+- 借世界里的画笔时**照实际尺寸倒推缩放**：`DrawCarry` 是按真家伙画的（长柄锄
+  42 单位长、柄才 1.15 粗），原样缩到牌上是一根牙签；`DrawCharacter` 从脚到发顶是
+  64×S 而不是 bodyH 的 62×S，照 bodyH 给会把脑袋切在裁剪圈外。牌面一律加圆形裁剪
+  兜底，但裁剪是保险不是版面。
+- 摆位在 `Script_World.js` 的 `UpdateEdgeHud`：牌贴在 z=0.6，**那一层的画框比
+  `viewW` 窄一档**（×(dist−z)/dist），不折算箭头尖就被画框切掉。牌面按 icon 烘一次
+  存进 `edgeHudTex`（每帧重画一张 HINT_SS 的大图太贵），一探一探的怂靠挪网格。
+- 目标还在画框里时仍是原来那枚小人字标（`DrawMarker`），两者互斥。
 
 ## 镜头规范（2026-08-08 用户定，参考勇敢的心）
 
@@ -505,6 +555,13 @@ npm run test:tunnelLight1943            # node：自动通关全 8 章双分支 
 npm run scene:tunnelLight1943           # 场景清单：谁在哪、埋多深、用哪支画笔
 npm run test:tunnelLight1943:browser    # 浏览器：逐章渲染健康 + 跳幕体检
 node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
+node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提交/缓存戳/端口
+```
+
+改完某一拍，最快的自检是把它单独跑一遍再看一眼：
+
+```bash
+node TunnelLight1943/Script_Cli.mjs state c1_ropeline --x 35.6 --input "e,d*300"
 ```
 
 改台词以代码为准，用 scratchpad 的 extract-script 流程回写 Notion（见项目记忆）。

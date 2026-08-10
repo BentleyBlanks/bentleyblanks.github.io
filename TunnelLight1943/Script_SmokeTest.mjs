@@ -7,12 +7,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
-  EdgeHint, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
+  EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -324,7 +325,39 @@ function TestClimb() {
     assert.ok(Math.abs(RenderY() - UNDER_Y) < 1e-6, "落地之后渲染高度要正好归到地道地平线");
     assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
   }
-  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位）");
+
+  // 下去之前就得看得见脚底下那间窖（用户 2026-08-10：「地道为什么攀爬之前都是
+  // 隐藏状态」）。地窖一直画着，是地表机位的下边沿够不着它——所以这里量的是
+  // **镜头有没有沉下去**（Core 出 cellarPeek，Main 的 BaseShot 拿它压低 y）。
+  {
+    const s3 = CreateGame(0);
+    let f3 = 0;
+    while (s3.phase !== "playing" || CurrentBeatDef(s3)?.kind === "cinematic") {
+      StepGame(s3, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: true }, DT);
+      if ((f3 += 1) > 10000) throw new Error("无法进入第一章玩法段");
+    }
+    const sc3 = SCENES[CHAPTERS[s3.chapterIndex].scene];
+    const idle3 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
+    const PeekAt = (x, mutate) => {
+      s3.player.x = x; s3.player.level = "surface"; s3.player.cineWalk = null;
+      mutate?.(s3);
+      StepGame(s3, idle3, DT);
+      return s3.cellarPeek || 0;
+    };
+    const shaftX = sc3.shafts[0].x;
+    assert.ok(PeekAt(shaftX) > 0.99, "站在窖口上，镜头必须整档沉下去");
+    assert.ok(PeekAt(shaftX - 2.4) > 0.05, "走近的路上就该开始沉——不能站定了画面才动");
+    assert.ok(PeekAt(shaftX - 8) < 0.01, "离得远就不沉，玩法机位照旧");
+    // 被盯上时不许沉：镜头往下扎会把正前方摸过来的灯挪出画框（潜行规范第 2 条）
+    assert.equal(PeekAt(shaftX, (s) => { s.detection = { level: 0.9 }; }), 0,
+      "被盯上的时候不许探头——那会把眼前的危险挤出画框");
+    s3.detection = null;
+    // 爬梯那一段镜头由 lift 带着走，探头得让位，否则两个来源叠着往下压
+    s3.player.x = shaftX;
+    StepGame(s3, { ...idle3, climb: 1 }, DT);
+    assert.ok(s3.player.climbT > 0 && (s3.cellarPeek || 0) === 0, "爬梯途中不叠探头（lift 已经在带镜头）");
+  }
+  console.log("  ✓ 爬梯口上下（层数当帧翻 / 人贴着梯子挪下去 / 落地归位 / 下去之前先看得见窖）");
 }
 
 function TestSmokeFront() {
@@ -1320,6 +1353,69 @@ function TestEdgeHintPointsOffscreenTargets() {
   console.log("  ✓ 边缘指路标：出框才指 / 指对边 / 近旁与特写不指" + (cross ? " / 跨层先指梯口" : ""));
 }
 
+// 边缘 HUD 的牌面（勇敢的心式）：方向归箭头，"接下来干嘛"归图。
+// 硬门槛是**每一拍都推得出一张牌**，而且牌面跟着活儿变——全场只有一枚箭头，
+// 那就退回成了"往这边走"，等于没说。
+function TestEdgeHintIconTellsWhatsNext() {
+  const KINDS = new Set([
+    "person", "item", "hand", "listen", "crouch", "walk", "dig", "timber",
+    "door", "knot", "winch", "cart", "throw", "map", "scribe", "lamp",
+  ]);
+  const seen = new Map();     // 牌面 → 头一次见到它的那一拍（顺带当去重清单）
+  let beats = 0;
+  for (let c = 0; c < CHAPTERS.length; c += 1) {
+    const list = ChapterBeatList(c);
+    for (let i = 0; i < list.length; i += 1) {
+      const s = CreateGame(0);
+      DebugJump(s, c, i);
+      if (s.phase !== "playing") continue;
+      const def = CurrentBeatDef(s);
+      if (!def || def.kind === "cinematic" || def.kind === "choice") continue;
+      const tg = GetBeatTarget(s);
+      if (!tg || typeof tg.x !== "number") continue;
+      beats += 1;
+      const icon = BeatHintIcon(s);
+      assert.ok(icon, `第${c + 1}章第${i}拍（${def.kind}）推不出牌面`);
+      assert.ok(KINDS.has(icon.kind), `牌面种类 ${icon.kind} 没有画法（第${c + 1}章第${i}拍）`);
+      // 找人得说清是谁、拿东西得说清是什么——空着的话渲染层只能画个默认，
+      // 那就又回到"所有拍长一个样"
+      if (icon.kind === "person") assert.ok(icon.who, `找人的牌面得带上是谁（第${c + 1}章第${i}拍）`);
+      if (icon.kind === "item") assert.ok(icon.item, `拿东西的牌面得带上是什么（第${c + 1}章第${i}拍）`);
+      const key = icon.kind + "|" + (icon.who || icon.item || icon.gesture || "");
+      if (!seen.has(key)) seen.set(key, `${c + 1}-${i}`);
+    }
+  }
+  assert.ok(beats > 20, `可指路的玩法拍太少（只找到 ${beats} 拍），这条测试没扫到东西`);
+  assert.ok(seen.size >= 8, `牌面只有 ${seen.size} 种，太少了——不同的活儿该长得不一样`);
+  // 全场不许退化成一枚"走过去"
+  const walkOnly = [...seen.keys()].every((k) => k.startsWith("walk"));
+  assert.ok(!walkOnly, "所有拍都推成了「走过去」，等于没给提示");
+  // 定点：第一章那几件事各是各的牌面
+  const c1 = SCRIPTS[CHAPTERS[0].id];
+  const escortIdx = c1.findIndex((d) => d.kind === "escort" && d.follower === "sister");
+  if (escortIdx >= 0) {
+    const s = CreateGame(0);
+    DebugJump(s, 0, escortIdx);
+    const sister = s.actors.find((a) => a.id === "sister");
+    if (sister && sister.visible && !sister.following) {
+      const icon = BeatHintIcon(s);
+      assert.equal(icon.kind, "person", "去带妹妹那一拍：牌上该是个人");
+      assert.equal(icon.who, sister.kind, "牌上那个人得就是妹妹（衣色/侧脸按她的来）");
+    }
+  }
+  const pickIdx = c1.findIndex((d) => d.kind === "chain" && d.steps?.[0]?.type === "pickup");
+  if (pickIdx >= 0) {
+    const s = CreateGame(0);
+    DebugJump(s, 0, pickIdx);
+    if ((s.beat.stepIndex || 0) === 0) {
+      const icon = BeatHintIcon(s);
+      assert.equal(icon.kind, "item", "去捡东西那一步：牌上该是那件东西");
+      assert.equal(icon.item, c1[pickIdx].steps[0].item.label, "牌上得是这一步真要捡的那件");
+    }
+  }
+  console.log(`  ✓ 边缘 HUD 牌面：${beats} 拍全推得出 / ${seen.size} 种图 / 找人认得出是谁、拿东西认得出是什么`);
+}
+
 function TestInstrumentalBgmManifest() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const manifestPath = path.join(here, "Audio", "Bgm", "Data_BgmManifest.json");
@@ -1419,6 +1515,38 @@ function TestWorkStations() {
   const armFs = [...sawBlock.matchAll(/armF:\s*(-?[\d.]+)/g)].map((m) => Number(m[1]));
   assert.ok(Math.max(...armFs) - Math.min(...armFs) >= 24, "肩的行程太小，锯推不出去");
   console.log("  ✓ 干活的军民（窖里掏土/妹妹撒草/民兵放哨）与后果小窗");
+}
+
+// 命令行工作台自己也要有测试。它是给 agent 用的接口——**坏了不会有任何别的
+// 测试变红**，但下一个会话会立刻退回"现写探针脚本"那条老路（12 天里那 234 个
+// 一次性脚本就是这么来的）。这里只盯"问得出答案"，不盯具体文案。
+function TestCliAnswersQuestions() {
+  const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Cli.mjs");
+  const run = (args) => execFileSync(process.execPath, [cli, ...args], { encoding: "utf8", timeout: 60000 });
+
+  // ① where：索引里必须找得到各类东西，且答案带 文件:行
+  const w = run(["where", "ropeline"]);
+  assert.match(w, /c1_ropeline\s+节拍/, "where 得认得节拍 id");
+  assert.match(w, /Script_Core\.mjs:\d+/, "where 的答案必须带 文件:行，不然还得再 grep 一遍");
+  assert.match(run(["where", "DrawHenCoop"]), /画笔.*Script_Art\.mjs:\d+/, "where 得认得画笔");
+  assert.match(run(["where", "henCoop"]), /Data_PropArt\.json:\d+/, "where 得认得道具登记");
+
+  // ② beats/beat：不读 Core 就能拿到一拍的全部
+  assert.match(run(["beats", "c1"]), /c1_ropeline/, "beats 得列全第一章");
+  const b = run(["beat", "c1_ropeline"]);
+  assert.match(b, /步骤 3/, "beat 得把步骤数说清");
+  assert.match(b, /needs="ropeEnd"/, "beat 得说清这一步要什么");
+  assert.match(b, /旗标\s+ropeStaked/, "beat 得扫出这一拍碰的旗标（且不许把后面几拍的算进来）");
+
+  // ③ state：无头跑到任意一拍、喂真输入、把状态打出来——那 725 次探针脚本的替代品
+  const s0 = run(["state", "c1_ropeline", "--x", "35.6", "--json"]);
+  const j0 = JSON.parse(s0);
+  assert.equal(j0.beat.id, "c1_ropeline");
+  assert.match(j0.prompt || "", /绳头/, "站到绳头跟前必须给得出提示");
+  const j1 = JSON.parse(run(["state", "c1_ropeline", "--x", "35.6", "--input", "e,d*300", "--json"]));
+  assert.equal(j1.player.item, "ropeEnd", "输入小语言得真的驱动得动玩法");
+  assert.ok(j1.live.ropeLine?.taut > 0.99, "走到头绳该绷直——state 得看得见玩法系统的活状态");
+  console.log("  ✓ 命令行工作台：where 定位 / beat 拆解 / state 无头复现");
 }
 
 // 锄地轨道的三条铁律（2026-08-10 用户退回：「挥舞锄头的动作还是太蠢了」
@@ -2343,6 +2471,7 @@ TestCineActorsClearOfObstacles();
 TestCartStaysOutOfTheHouse();
 TestGroundItems();
 TestChainSurvivesEarlyDrop();
+TestCliAnswersQuestions();
 TestHoeingIsARealSwing();
 TestRopeLineIsRealRope();
 TestKnotIsThreadingNotCircling();
@@ -2351,6 +2480,7 @@ TestChalkIsAPencilNotASlider();
 TestPlaneBeat();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();
+TestEdgeHintIconTellsWhatsNext();
 TestInstrumentalBgmManifest();
 TestDoorHoldIsPhysical();
 TestModuleGraphIsCacheBusted();

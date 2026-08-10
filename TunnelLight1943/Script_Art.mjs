@@ -4701,6 +4701,403 @@ export function DrawMarker(ctx, x, y, t, { dir = 0, climb = null } = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 画框边缘的「下一件事」HUD（勇敢的心式）
+//
+// 一枚纸圆牌 ＋ 一支指向框外的箭头。牌面上画的**不是方向，是那件事本身**：
+// 要找的人画那个人（衣色＋侧脸，本作认人本来就靠这两样），要捡的东西画那件
+// 东西的小样，上手的活画手势。方向由箭头单独交代——一支箭头说不了两件事，
+// "往哪走"和"去干嘛"得各说各的一句。
+// 跨层的再挂一枚小牌：梯子＋上下箭头（意思是先到梯口，下去/上来）。
+//
+// 画布约定：以 (0,0)-(W,H) 为画框，牌在里侧、箭头在外侧；**dir=-1 时整幅镜像**
+// ——侧脸、脚步、动线也就跟着朝要去的那一头，不必另画一套左向的图。
+// 牌面不随时间变（一探一探的怂由渲染层挪网格做），所以整张图按 icon 烘一次存着。
+// ---------------------------------------------------------------------------
+
+// 手绘的圆：取点成多边形再交给 InkFill 抖——圆规画出来的正圆跟这套笔法不搭
+function DiskPts(cx, cy, r, n = 22) {
+  const pts = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+  }
+  return pts;
+}
+
+// 牌面上那件东西画多大：DrawCarry 的原点是"握点"，各件长短差着一个数量级——
+// 长家伙（枪、锄、扫帚）不压小就是一根戳出圈的杆子，攥在手心的小件（石子、
+// 绳头）不放大就是一个认不出的小点。[缩放（以 R/11 为基准）, 自身中心的 y]
+const HUD_ITEM = {
+  步枪: [0.32, -12], 锄头: [0.42, 9], 扫帚: [0.42, 10], 锯: [0.58, 8], 军刀: [0.60, -2],
+  刨子: [0.92, -2], 铁皮桶: [0.90, -1], 棉被: [0.95, 0], 湿棉被: [0.95, 0],
+  石子: [1.80, 0], 木楔: [1.50, -1], 绳头: [1.30, 1], 窝头: [1.50, -1], 铃铛: [1.50, -1],
+  柴刀: [1.10, 0], 木槌: [1.00, 5], 麻绳: [1.05, 0], 土筐: [1.00, 2],
+  水桶: [1.00, 5], 空水桶: [1.00, 5], 桶: [1.00, 5], 空桶: [1.00, 5],
+  满桶水: [1.00, 5], 一桶水: [1.00, 5],
+  粮袋: [1.05, 0], 种子粮: [1.05, 0], 名册: [1.10, 0], 保甲册: [1.10, 0],
+  花布巾: [1.20, 0], 襁褓: [1.05, 0], 鞭炮: [1.00, 0], 一挂鞭炮: [1.00, 0],
+};
+const HUD_ITEM_FALLBACK = [0.42, 0];   // 兜底那块木板足有 52 单位宽
+
+function HudItem(ctx, label, R) {
+  // 撑木/顶木在 DrawCarry 里没有专门的一支，会掉进兜底那块**横**木板——
+  // 一根顶在头上的立木画成横板，意思就反了。这一族直接借顶木那张图
+  if (label === "撑木" || label === "顶木") { HudGlyph(ctx, { kind: "timber" }, R); return; }
+  // 绳头：DrawCarry 那支是按拳头量画的，线宽占了短半径的四分之三——放到牌面
+  // 尺度上两道圈直接糊成一块饼（"棒棒糖"）。牌上另画一盘线细一点的
+  if (label === "绳头" || label === "麻绳") {
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#9a7d4f";
+    ctx.lineWidth = R * 0.13;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(-R * 0.10, -R * 0.12, R * (0.20 + i * 0.22), R * (0.13 + i * 0.15), 0.2,
+        0.3 + i * 0.4, Math.PI * 1.85 + i * 0.3);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(R * 0.34, R * 0.22);
+    ctx.quadraticCurveTo(R * 0.60, R * 0.46, R * 0.72, R * 0.84);
+    ctx.stroke();
+    ctx.lineWidth = R * 0.05;
+    ctx.strokeStyle = "rgba(150,124,80,0.95)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(R * 0.72, R * 0.84);
+      ctx.lineTo(R * 0.72 + (i - 1) * R * 0.17, R * 1.06);
+      ctx.stroke();
+    }
+    return;
+  }
+  const [k, cy] = HUD_ITEM[label] || HUD_ITEM_FALLBACK;
+  const S = (R / 11) * k;
+  DrawCarry(ctx, 0, -cy * S, S, 1, label);
+}
+
+// 牌面。以 (0,0) 为牌心，内切半径 R；一律画在裁剪圈里，探出去的自己被切掉
+function HudGlyph(ctx, icon, R) {
+  switch (icon.kind) {
+    case "person": {
+      // 半身像：肩在下（衣色是本作认人的第一眼），侧脸压在肩上（头饰是第二眼）
+      const kind = icon.who || "villager";
+      const [coat] = RIG_COLOR(kind);
+      InkFill(ctx, [
+        [-R * 0.68, R * 1.00], [-R * 0.46, R * 0.32], [R * 0.34, R * 0.30], [R * 0.64, R * 1.00],
+      ], "hudBust" + kind, coat, { amp: R * 0.03, lw: R * 0.085, shade: "rgba(0,0,0,0.14)" });
+      DrawHeadPart(ctx, -R * 0.08, R * 0.34, R * 0.50, kind, "hudHead" + kind, R * 0.029);
+      break;
+    }
+    case "item": HudItem(ctx, icon.item, R); break;
+    case "hand": {
+      // 上手使劲。往哪儿使由笔画方向说（顶撑木往上、按棉被往下）；
+      // 没方向的就只画一只手——"这一步得你亲手来"
+      const dir = icon.gesture === "up" ? -1 : 1;
+      const pressing = icon.gesture === "up" || icon.gesture === "down";
+      if (pressing) {
+        // 受力的那一面：一道横杠（门框、土、被子……牌上只说"有个面在那儿"）
+        InkFill(ctx, Rect(-R * 0.66, dir * R * 0.58, R * 1.32, R * 0.22), "hudBar", PAL.wood,
+          { amp: R * 0.025, lw: R * 0.075 });
+      }
+      ctx.save();
+      ctx.scale(1, dir);
+      ctx.translate(0, pressing ? -R * 0.18 : 0);
+      InkFill(ctx, [
+        [-R * 0.42, -R * 0.44], [R * 0.34, -R * 0.46], [R * 0.46, R * 0.08],
+        [R * 0.22, R * 0.40], [-R * 0.30, R * 0.38], [-R * 0.48, -R * 0.08],
+      ], "hudPalm", PAL.skin, { amp: R * 0.03, lw: R * 0.08, shade: "rgba(0,0,0,0.12)" });
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, -R * 0.20 + i * R * 0.22, R * 0.04, -R * 0.22 + i * R * 0.22, R * 0.34,
+          "hudFinger" + i, { lw: R * 0.05, color: IN.inkSoft, amp: R * 0.015 });
+      }
+      InkFill(ctx, [[-R * 0.48, -R * 0.10], [-R * 0.68, R * 0.08], [-R * 0.52, R * 0.28], [-R * 0.34, R * 0.14]],
+        "hudThumb", PAL.skin, { amp: R * 0.025, lw: R * 0.07 });
+      ctx.restore();
+      if (pressing) {
+        for (let i = 0; i < 3; i += 1) {
+          const lx = -R * 0.34 + i * R * 0.34;
+          InkLine(ctx, lx, dir * R * 0.28, lx, dir * R * 0.50, "hudPush" + i,
+            { lw: R * 0.06, color: IN.ink, amp: R * 0.015 });
+        }
+      }
+      break;
+    }
+    case "listen": {
+      // 贴着听：一只耳朵，左边两道声弧。这一类量的是时间，不是功——
+      // 跟"使劲的手"必须一眼分得开
+      InkFill(ctx, [
+        [R * 0.10, -R * 0.62], [R * 0.36, -R * 0.32], [R * 0.32, R * 0.18], [R * 0.06, R * 0.58],
+        [-R * 0.20, R * 0.46], [-R * 0.10, R * 0.06], [-R * 0.28, -R * 0.30], [-R * 0.10, -R * 0.60],
+      ], "hudEar", PAL.skin, { amp: R * 0.03, lw: R * 0.085, shade: "rgba(0,0,0,0.12)" });
+      ctx.lineCap = "round";
+      ctx.strokeStyle = IN.inkSoft;
+      ctx.lineWidth = R * 0.07;
+      ctx.beginPath();
+      ctx.arc(R * 0.02, -R * 0.06, R * 0.20, -Math.PI * 0.5, Math.PI * 0.75);
+      ctx.stroke();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = R * 0.065;
+      for (let i = 0; i < 2; i += 1) {
+        ctx.beginPath();
+        ctx.arc(-R * 0.30, 0, R * (0.34 + i * 0.26), Math.PI * 0.72, Math.PI * 1.28);
+        ctx.stroke();
+      }
+      break;
+    }
+    // 蹲着看 / 走过去：直接画那个人在干这件事——牌面语汇和世界里的人是同一套。
+    // 尺度按 DrawCharacter 的**实际**高度倒推：立姿从脚到发顶是 64×S（不是 62×S 的
+    // bodyH），照 bodyH 给会把脑袋切在圈外——牌上就是一个无头的人。
+    case "crouch":
+      DrawCharacter(ctx, { x: R * 0.12, y: R * 0.58, scale: R / 34, kind: "player", crouch: true, id: "hudCrouch" });
+      // 身前一丛矮掩体：光画一个蹲着的人跟"走过去"分不开，蹲的意思是**蹲在什么后头**
+      InkFill(ctx, [
+        [-R * 0.92, R * 0.68], [-R * 0.74, R * 0.10], [-R * 0.40, R * 0.30],
+        [-R * 0.12, -R * 0.06], [R * 0.10, R * 0.34], [R * 0.16, R * 0.68],
+      ], "hudBush", PAL.crop, { amp: R * 0.05, lw: R * 0.08, shade: "rgba(0,0,0,0.16)" });
+      break;
+    case "walk":
+      DrawCharacter(ctx, { x: -R * 0.04, y: R * 0.62, scale: R / 48, kind: "player", moving: true, phase: 1.15, id: "hudWalk" });
+      break;
+    case "dig": {
+      // 掌子面：一堆虚土 + 一把啃进土里的锄。
+      // **不能借 DrawCarry 那支长柄锄**：它是按真尺寸画的（42 单位长、柄才 1.15 粗），
+      // 缩到牌面上柄只剩一根头发丝，牌上就是一根斜着的牙签。牌面另画一把短粗的
+      InkFill(ctx, [[-R * 0.94, R * 0.92], [-R * 0.40, R * 0.24], [R * 0.20, R * 0.50], [R * 0.94, R * 0.92]],
+        "hudSoil", "#6e5738", { amp: R * 0.05, lw: R * 0.08, shade: "rgba(0,0,0,0.16)" });
+      InkFill(ctx, [[R * 0.60, -R * 0.88], [R * 0.88, -R * 0.66], [-R * 0.16, R * 0.40], [-R * 0.40, R * 0.20]],
+        "hudHoeShaft", PAL.wood, { amp: R * 0.03, lw: R * 0.08, shade: "rgba(0,0,0,0.16)" });
+      InkFill(ctx, [[-R * 0.28, R * 0.14], [-R * 0.02, R * 0.36], [-R * 0.32, R * 0.74], [-R * 0.64, R * 0.50]],
+        "hudHoeBlade", "#6b6f76", { amp: R * 0.03, lw: R * 0.085, shade: "rgba(0,0,0,0.22)" });
+      break;
+    }
+    case "timber": {
+      // 撑木顶上去：顶板、一根立木、两支往上的小箭头
+      InkFill(ctx, Rect(-R * 0.74, -R * 0.88, R * 1.48, R * 0.24), "hudRoof", PAL.woodOld,
+        { amp: R * 0.03, lw: R * 0.08 });
+      InkFill(ctx, Rect(-R * 0.17, -R * 0.64, R * 0.34, R * 1.42), "hudProp", PAL.wood,
+        { amp: R * 0.03, lw: R * 0.085, shade: "rgba(0,0,0,0.16)" });
+      for (const s of [-1, 1]) {
+        InkFill(ctx, [[s * R * 0.46, -R * 0.14], [s * R * 0.30, R * 0.14], [s * R * 0.62, R * 0.14]],
+          "hudUp" + s, "#f0c95c", { amp: R * 0.025, lw: R * 0.065 });
+      }
+      break;
+    }
+    case "door": {
+      // 扶门：一扇歪着的门扇（门色要亮，暗一档就成了一块没有信息的黑板），
+      // 底下那道门槛上的臼眼空着——下轴脱了窝，这场戏的毛病就长这样
+      InkLine(ctx, -R * 0.88, R * 0.82, R * 0.88, R * 0.82, "hudSill", { lw: R * 0.10, color: "#5c4530" });
+      ctx.beginPath();
+      ctx.arc(-R * 0.46, R * 0.80, R * 0.15, Math.PI, 0);
+      ctx.fillStyle = "#2f2a22";
+      ctx.fill();
+      ctx.save();
+      ctx.translate(R * 0.10, -R * 0.06);
+      ctx.rotate(0.19);
+      InkFill(ctx, Rect(-R * 0.46, -R * 0.78, R * 0.92, R * 1.50), "hudDoor", PAL.wood,
+        { amp: R * 0.03, lw: R * 0.09, shade: "rgba(0,0,0,0.18)" });
+      // 抹头（横）＋门心板（竖）：两笔就把"木门"和"一块板"分开了
+      for (let i = 0; i < 2; i += 1) {
+        InkLine(ctx, -R * 0.46, -R * 0.34 + i * R * 0.64, R * 0.46, -R * 0.34 + i * R * 0.64,
+          "hudDoorRail" + i, { lw: R * 0.08, color: PAL.woodDark, amp: R * 0.02 });
+      }
+      InkLine(ctx, 0, -R * 0.34, 0, R * 0.30, "hudDoorStile", { lw: R * 0.06, color: "rgba(90,60,35,0.7)", amp: R * 0.02 });
+      // 门脚的圆轴：落在臼眼外头
+      ctx.beginPath();
+      ctx.arc(-R * 0.30, R * 0.70, R * 0.13, 0, Math.PI * 2);
+      ctx.fillStyle = "#4a4238";
+      ctx.fill();
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = R * 0.05;
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "knot": {
+      // 接绳：两根绳头**互相穿过对方挽的圈**。上一版是一个圈加一根笔直穿过去的
+      // 绳——画出来是个 "Ø"，读成"禁止"。所以圈要小、要偏，两头都得看得见毛茬，
+      // 压叠也得一上一下（"穿过去"这三个字全靠压叠成立）
+      ctx.lineCap = "round";
+      const rope = (pts, id) => {
+        ctx.strokeStyle = "#9a7d4f";
+        ctx.lineWidth = R * 0.17;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.quadraticCurveTo(pts[1][0], pts[1][1], pts[2][0], pts[2][1]);
+        ctx.stroke();
+      };
+      // 左边那根：从画外进来，绕成一个偏心的小圈
+      rope([[-R * 0.94, R * 0.62], [-R * 0.60, R * 0.34], [-R * 0.26, R * 0.06]], "kA");
+      ctx.strokeStyle = "#9a7d4f";
+      ctx.lineWidth = R * 0.17;
+      ctx.beginPath();
+      ctx.ellipse(-R * 0.06, -R * 0.10, R * 0.30, R * 0.24, 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      // 右边那根：压在圈上穿出去，再朝画外走
+      rope([[-R * 0.30, -R * 0.34], [R * 0.10, R * 0.06], [R * 0.56, R * 0.16]], "kB");
+      rope([[R * 0.56, R * 0.16], [R * 0.78, R * 0.20], [R * 0.92, R * 0.02]], "kC");
+      // 两头的毛茬：绳是散的，才不是一根铁丝
+      ctx.strokeStyle = "rgba(150,124,80,0.95)";
+      ctx.lineWidth = R * 0.05;
+      for (let i = 0; i < 3; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.94, R * 0.62);
+        ctx.lineTo(-R * 1.10, R * 0.60 + (i - 1) * R * 0.14);
+        ctx.moveTo(R * 0.92, R * 0.02);
+        ctx.lineTo(R * 1.08, R * 0.02 + (i - 1) * R * 0.14);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "winch": {
+      // 辘轳：木轱辘 + 拐出去的曲柄，轱辘上缠着绳（不缠绳就是一只平底锅）。
+      // **不画转向箭头**——顺放逆收得看这一拍是放是收，牌上乱指一个方向
+      // 就跟绳和判定打架（见 CLAUDE.md 绕圈那一条）
+      InkFill(ctx, DiskPts(0, R * 0.02, R * 0.48, 16), "hudDrum", PAL.wood,
+        { amp: R * 0.03, lw: R * 0.09, shade: "rgba(0,0,0,0.16)" });
+      ctx.strokeStyle = "#9a7d4f";
+      ctx.lineWidth = R * 0.09;
+      ctx.lineCap = "round";
+      for (let i = 0; i < 3; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(0, R * 0.02, R * (0.44 - i * 0.11), R * 0.46, 0, Math.PI * 0.62, Math.PI * 1.38);
+        ctx.stroke();
+      }
+      InkLine(ctx, 0, R * 0.02, R * 0.64, -R * 0.46, "hudCrankArm", { lw: R * 0.12, color: PAL.woodDark, amp: R * 0.02 });
+      InkFill(ctx, Rect(R * 0.54, -R * 0.80, R * 0.22, R * 0.36), "hudCrankGrip", PAL.woodOld,
+        { amp: R * 0.02, lw: R * 0.07 });
+      InkLine(ctx, -R * 0.44, R * 0.34, -R * 0.46, R * 0.94, "hudWinchRope", { lw: R * 0.08, color: "#9a7d4f", amp: R * 0.03 });
+      break;
+    }
+    case "cart": {
+      // 独轮车：车斗 + 一根车把 + 一只轮子（辐条自己画，DrawCartWheel 的线宽
+      // 是按世界尺寸写死的，缩到牌面上会糊成一坨）
+      InkFill(ctx, [[-R * 0.72, -R * 0.34], [R * 0.28, -R * 0.40], [R * 0.16, R * 0.06], [-R * 0.58, R * 0.02]],
+        "hudCartBed", PAL.wood, { amp: R * 0.03, lw: R * 0.085, shade: "rgba(0,0,0,0.16)" });
+      InkLine(ctx, R * 0.20, -R * 0.36, R * 0.88, -R * 0.60, "hudCartHandle", { lw: R * 0.09, color: PAL.woodDark, amp: R * 0.02 });
+      InkFill(ctx, DiskPts(-R * 0.24, R * 0.44, R * 0.38, 14), "hudCartWheel", "#8a6a45",
+        { amp: R * 0.025, lw: R * 0.085, shade: "rgba(0,0,0,0.18)" });
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = R * 0.05;
+      for (let i = 0; i < 3; i += 1) {
+        const a = i * (Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.24 - Math.cos(a) * R * 0.30, R * 0.44 - Math.sin(a) * R * 0.30);
+        ctx.lineTo(-R * 0.24 + Math.cos(a) * R * 0.30, R * 0.44 + Math.sin(a) * R * 0.30);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "throw": {
+      // 投石：石子在前，动线拖在后（跟引导气泡里那枚同一套读法）
+      DrawCarry(ctx, R * 0.14, R * 0.04, R / 7.5, 1, "石子");
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, -R * 0.26, -R * 0.34 + i * R * 0.32, -R * 0.80, -R * 0.44 + i * R * 0.32,
+          "hudFly" + i, { lw: R * 0.07, color: "rgba(43,31,22,0.6)", amp: R * 0.02 });
+      }
+      break;
+    }
+    case "map": {
+      // 钉在门板上的据点图：一块板、一条路、一座炮楼、两枚钉
+      InkFill(ctx, Rect(-R * 0.74, -R * 0.58, R * 1.48, R * 1.16), "hudBoard", "#c8b58a",
+        { amp: R * 0.03, lw: R * 0.09, shade: "rgba(0,0,0,0.12)" });
+      InkLine(ctx, -R * 0.54, R * 0.26, R * 0.56, R * 0.08, "hudMapRoad",
+        { lw: R * 0.07, color: IN.inkSoft, amp: R * 0.04 });
+      InkFill(ctx, Rect(-R * 0.36, -R * 0.34, R * 0.32, R * 0.30), "hudMapFort", "#8d7a5c",
+        { amp: R * 0.02, lw: R * 0.06 });
+      ctx.fillStyle = "#6b6f76";
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(s * R * 0.56, -R * 0.42, R * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "scribe": {
+      // 划线：石笔按在料上，笔尖后头留一道白痕
+      InkFill(ctx, Rect(-R * 0.82, R * 0.30, R * 1.64, R * 0.36), "hudStock", PAL.wood,
+        { amp: R * 0.03, lw: R * 0.08, shade: "rgba(0,0,0,0.14)" });
+      InkLine(ctx, -R * 0.66, R * 0.42, R * 0.08, R * 0.42, "hudScribeMark",
+        { lw: R * 0.07, color: "rgba(246,241,226,0.92)", amp: R * 0.012 });
+      ctx.save();
+      ctx.translate(R * 0.22, R * 0.26);
+      ctx.rotate(-0.55);
+      InkFill(ctx, Rect(-R * 0.10, -R * 0.72, R * 0.20, R * 0.72), "hudScribePen", "#cfc8b4",
+        { amp: R * 0.02, lw: R * 0.07 });
+      ctx.restore();
+      break;
+    }
+    case "lamp": {
+      // 吹灭：一盏马灯，左边一口气
+      DrawHandLamp(ctx, 0, -R * 0.56, R / 16, "hurricane");
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, -R * 0.94, -R * 0.06 + i * R * 0.24, -R * 0.44, R * 0.02 + i * R * 0.24,
+          "hudPuff" + i, { lw: R * 0.06, color: "rgba(43,31,22,0.5)", amp: R * 0.03 });
+      }
+      break;
+    }
+    default: break;
+  }
+}
+
+// 版面（都以牌径 R 为单位，R 又以画布高为准）。渲染层要照它算"箭头尖在哪儿"
+// 才摆得进画框——版面改了，摆位跟着这三个数走，别在两边各写一份
+export const EDGE_HUD = { rOfH: 0.40, cxOfR: 1.08, tipOfR: 1.70 };
+
+export function DrawEdgeHud(ctx, W, H, icon, { dir = 1, climb = null } = {}) {
+  const R = H * EDGE_HUD.rOfH;
+  const cx = R * EDGE_HUD.cxOfR, cy = H * 0.5;
+  ctx.save();
+  ctx.lineJoin = "round";
+  if (dir < 0) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+
+  // 牌：一片压得发毛的旧纸，墨圈勾边（跟引导气泡同一张纸）。
+  // 不给 shade——InkFill 的暗部是一刀切的直边，落在圆牌上是一道纵贯的硬缝
+  InkFill(ctx, DiskPts(cx, cy, R), "hudDisk", "rgba(236,223,188,0.95)",
+    { amp: R * 0.045, lw: R * 0.10 });
+
+  // 牌面：裁在圈里画——长家伙的梢、军官的帽檐都不许探出牌外
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.90, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  HudGlyph(ctx, icon || { kind: "walk" }, R);
+  ctx.restore();
+
+  // 箭头：指着框外的双人字，后面跟一枚淡一档的重影（» 的读法，同世界里那枚路标）
+  const Chevron = (x0, k, alpha, id) => {
+    ctx.globalAlpha = alpha;
+    InkFill(ctx, [
+      [x0 - R * 0.18 * k, cy - R * 0.46 * k], [x0 + R * 0.26 * k, cy],
+      [x0 - R * 0.18 * k, cy + R * 0.46 * k], [x0 - R * 0.02 * k, cy],
+    ], id, "#f0c95c", { amp: R * 0.03, lw: R * 0.08 });
+    ctx.globalAlpha = 1;
+  };
+  Chevron(cx + R * 1.16, 0.78, 0.45, "hudArrowB");
+  Chevron(cx + R * 1.44, 1, 1, "hudArrowA");
+
+  // 跨层：牌角上再挂一枚小牌——梯子＋上下箭头，「先到梯口，下去/上来」
+  if (climb) {
+    const s = climb === "down" ? 1 : -1;
+    const kx = cx + R * 0.62, ky = cy + R * 0.72, kr = R * 0.36;
+    InkFill(ctx, DiskPts(kx, ky, kr, 16), "hudClimbDisk", "rgba(236,223,188,0.96)",
+      { amp: kr * 0.05, lw: kr * 0.16 });
+    // 梯子：两根边梃 + 三道横档
+    for (const e of [-1, 1]) {
+      InkLine(ctx, kx + e * kr * 0.30, ky - kr * 0.58, kx + e * kr * 0.30, ky + kr * 0.58,
+        "hudLadder" + e, { lw: kr * 0.14, color: PAL.woodDark, amp: kr * 0.03 });
+    }
+    for (let i = 0; i < 3; i += 1) {
+      InkLine(ctx, kx - kr * 0.32, ky - kr * 0.40 + i * kr * 0.40, kx + kr * 0.32, ky - kr * 0.40 + i * kr * 0.40,
+        "hudRung" + i, { lw: kr * 0.12, color: PAL.woodDark, amp: kr * 0.03 });
+    }
+    InkFill(ctx, [
+      [kx + kr * 0.52, ky - s * kr * 0.38], [kx + kr * 1.02, ky - s * kr * 0.38], [kx + kr * 0.77, ky + s * kr * 0.44],
+    ], "hudClimbArrow", "#f0c95c", { amp: kr * 0.04, lw: kr * 0.14 });
+  }
+  ctx.restore();
+}
+
 // 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。
 // 目标标记是黄色实心三角（指路），玩家标记就得长得完全不一样——
 // 一枚空心的细线人字标，只有轮廓，不抢画面。

@@ -439,6 +439,11 @@ export function CreateWorld(canvasEl) {
   let scribeMesh = null, scribeCanvas = null, scribeCtx = null, scribeLastT = 0, scribeTip = null;
   let scribeDust = null;   // 笔尖扬起的粉末（只有真在蹭木头才有）
   let markerMesh = null, markerCanvas = null, markerCtx = null;
+  // 画框边缘的「下一件事」HUD：一枚圆牌 + 指向框外的箭头。牌面按 icon 烘一次
+  // 存着——每帧重画一张 HINT_SS 的大图太贵，而牌面本来就不动（一探一探的怂
+  // 由网格位置做）。key 见 EdgeHudKey。
+  let edgeHudMesh = null;
+  const edgeHudTex = new Map();
   let collapseMeshes = {};
   let itemMeshes = [];
   let carveState = { marked: false, carved: false }, carveRebuild = null;
@@ -515,6 +520,10 @@ export function CreateWorld(canvasEl) {
     itemMeshes = [];
     itemLabel = null;
     markerMesh = null; markerCanvas = null; markerCtx = null;
+    // 牌面缓存里只有当前挂着的那张被 ClearGroup 收掉了，其余几张得自己收
+    edgeHudMesh = null;
+    for (const t of edgeHudTex.values()) t.dispose?.();
+    edgeHudTex.clear();
     scribeMesh = null; scribeCanvas = null; scribeCtx = null; scribeLastT = 0; scribeTip = null;
     scribeDust = null;
     collapseMeshes = {};
@@ -4108,10 +4117,14 @@ export function CreateWorld(canvasEl) {
 
     // 目标指示
     const target = state.phase === "playing" ? GetBeatTarget(state) : null;
-    // 同人字标：指路的箭头在特写里没有意义——你已经站在它跟前了
-    const showMarker = target && target.x !== undefined && def?.kind !== "cinematic"
+    // 指路的标记在特写里没有意义——你已经站在它跟前了
+    const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
       && !state.microCine && viewW >= 5.0;
-    if (showMarker) {
+    // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
+    // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
+    // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
+    const eh = canPoint ? EdgeHint(state, camera.position.x, viewW) : null;
+    if (canPoint && !eh) {
       if (!markerMesh) {
         markerCanvas = MakeCanvas(48 * HINT_SS, 48 * HINT_SS);
         markerCtx = markerCanvas.getContext("2d");
@@ -4126,23 +4139,65 @@ export function CreateWorld(canvasEl) {
       markerMesh.visible = true;
       markerCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
       markerCtx.clearRect(0, 0, 48, 48);
-      // 目标出了画框：同一块路标滑到画框边缘、掉头指向框外（勇敢的心式）。
-      // 该不该指、指哪边由 Core.EdgeHint 判（跨层的先指梯口）；这里只管摆位。
-      // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
-      const eh = EdgeHint(state, camera.position.x, viewW);
-      if (eh) {
-        ART.DrawMarker(markerCtx, 24, 30, time, { dir: eh.side, climb: eh.climb });
-        const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
-        markerMesh.position.set(camera.position.x + eh.side * (viewW / 2 - 0.9), py + 2.35, 0.6);
-      } else {
-        ART.DrawMarker(markerCtx, 24, 30, time);
-        const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
-        markerMesh.position.set(target.x, by + 2.5, 0.6);
-      }
+      ART.DrawMarker(markerCtx, 24, 30, time);
+      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+      markerMesh.position.set(target.x, by + 2.5, 0.6);
       markerMesh.material.map.needsUpdate = true;
     } else if (markerMesh) {
       markerMesh.visible = false;
     }
+    UpdateEdgeHud(state, eh, viewW, time);
+  }
+
+  // 画框边缘的「下一件事」HUD（勇敢的心式）。
+  // 目标出了画框，一枚方向键说不清楚"你接下来要干嘛"——所以边上立一枚牌：
+  // 图说事（要找的人／要拿的东西／要上的手），箭头说方向。
+  const EDGE_HUD_W = 58, EDGE_HUD_H = 48;    // 牌径 = 0.8×H = 0.8m，默认机位下约一百像素
+  const EDGE_HUD_Z = 0.6;                    // 跟原来那枚人字标同一层（挡在玩法层之前）
+  function EdgeHudKey(eh) {
+    const ic = eh.icon || {};
+    return [ic.kind, ic.who || ic.item || ic.gesture || "", eh.climb || "", eh.side].join("|");
+  }
+
+  function UpdateEdgeHud(state, eh, viewW, time) {
+    if (!eh) { if (edgeHudMesh) edgeHudMesh.visible = false; return; }
+    if (!edgeHudMesh) {
+      edgeHudMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(EDGE_HUD_W / PPM, EDGE_HUD_H / PPM),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
+      );
+      FixOrder(edgeHudMesh, LAYER_ORDER.fx + 300);
+      layers.fx.add(edgeHudMesh);
+    }
+    const key = EdgeHudKey(eh);
+    if (!edgeHudTex.has(key)) {
+      const c = MakeCanvas(EDGE_HUD_W * HINT_SS, EDGE_HUD_H * HINT_SS);
+      const g = c.getContext("2d");
+      g.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
+      ART.DrawEdgeHud(g, EDGE_HUD_W, EDGE_HUD_H, eh.icon, { dir: eh.side, climb: eh.climb });
+      edgeHudTex.set(key, CanvasTexture(c));
+    }
+    const tex = edgeHudTex.get(key);
+    if (edgeHudMesh.material.map !== tex) {
+      edgeHudMesh.material.map = tex;
+      edgeHudMesh.material.needsUpdate = true;
+    }
+    edgeHudMesh.visible = true;
+    // 一探一探地怂：牌整个朝框外挪一点点（牌面是烘死的，动的只有网格）
+    const nudge = Math.sin(time * 3.4) * 0.055 * eh.side;
+    const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
+    // 牌贴在 z=EDGE_HUD_Z（比玩法层更靠近镜头），**那一层的画框比 viewW 窄一档**。
+    // 不折算的话箭头尖正好探出画框被切掉（第一版就是这么切的）。
+    const dist = camera.userData.dist || 13.2;
+    const edge = (viewW / 2) * Math.max(0.1, (dist - EDGE_HUD_Z) / dist);
+    // 箭头尖离牌心多远（版面在 ART.EDGE_HUD 里，两边不许各写一份）
+    const R = EDGE_HUD_H * ART.EDGE_HUD.rOfH;
+    const tipOut = ((ART.EDGE_HUD.cxOfR + ART.EDGE_HUD.tipOfR) * R - EDGE_HUD_W / 2) / PPM;
+    edgeHudMesh.position.set(
+      camera.position.x + eh.side * (edge - 0.25 - tipOut) + nudge,
+      py + 2.30 + Math.sin(time * 2.2) * 0.03,
+      EDGE_HUD_Z,
+    );
   }
 
   // 暗场：地道章节压暗，灯光晕负责照明；昼夜换挡在这儿连续推进
