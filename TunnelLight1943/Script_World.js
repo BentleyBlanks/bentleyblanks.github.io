@@ -2379,7 +2379,7 @@ export function CreateWorld(canvasEl) {
       poseK: extra.poseK, track: extra.track, trackT: extra.trackT,
     }, dt);
 
-    // 队列的后一排整体后移一档（人/影子/家伙一起走，见 ACTOR_RANK_DZ）。
+    // 队列的后几排整体后移（人/影子/家伙一起走，见 Data_DepthSpec 的 RankDz）。
     // 绘制顺序是 SetPlayOrder 钉死的，所以档位一变就得重新钉一次——
     // 不重钉的话后排的人会画在前排之前，两个人叠成一个。
     const dz = extra.rankDz || 0;
