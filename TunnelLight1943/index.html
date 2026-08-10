@@ -145,7 +145,9 @@
     <section id="noticeOverlay" hidden aria-label="征夫告示">
       <div id="noticePanel">
         <button id="noticeClose" type="button" aria-label="关闭">✕</button>
-        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.jpg" alt="贴在土墙上的征夫告示">
+        <!-- 抠好背景的成品（Script_TextureKey.py 从 Texture/Source/ 的白底原图生成）：
+             带 alpha 的 WebP，撕口的纸形直接落在面板上。别改回 Source 里那张白底 JPG -->
+        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=069" alt="贴在土墙上的征夫告示">
         <div id="noticeText"></div>
       </div>
     </section>
