@@ -92,6 +92,15 @@ for (const [key, scene] of Object.entries(SCENES)) {
   for (const c of scene.covers || []) {
     if (!COVER_ART[c.kind]) throw new Error(`场景 ${key} 的掩体 ${c.id} 用了没登记的 kind "${c.kind}"（补进 Data_PropArt.json 的 covers）`);
   }
+  // 收藏品：id 全局唯一、注解非空、落点在走行范围里——摆出界的收藏品永远
+  // 走不到，等于静默丢了一件（包袱条会永远缺一格）
+  for (const r of scene.relics || []) {
+    if (!r.id || !r.name || !r.art) throw new Error(`场景 ${key} 的收藏品缺 id/name/art：${JSON.stringify(r)}`);
+    if (!r.note || r.note.length < 20) throw new Error(`场景 ${key} 的收藏品 ${r.id} 注解太短——史实卡是这套系统的意义所在`);
+    const range = scene.walk?.[r.level || "surface"];
+    if (!range) throw new Error(`场景 ${key} 的收藏品 ${r.id} 摆在没有走行线的层 ${r.level}`);
+    if (r.x < range[0] || r.x > range[1]) throw new Error(`场景 ${key} 的收藏品 ${r.id} 落点 ${r.x} 出了走行范围 [${range[0]}, ${range[1]}]`);
+  }
   // 翻越尺度规范：顶沿高过撑手的人的胯，「翻」就成了「攀」——那是另一套
   // 动作。上限见 Data_DepthSpec 的 VAULT_MAX_TOP（以第一章那堵塌墙 0.82m 为基准）。
   // 这里抛而不是告警：配了一堵一米二的墙，翻越动画会当场穿帮，不该静默上线。

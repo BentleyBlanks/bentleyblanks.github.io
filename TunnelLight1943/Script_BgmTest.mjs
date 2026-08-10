@@ -11,6 +11,18 @@ const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+// BGM 用的是 new Audio()（不在 DOM 上），测试要把播放头推到绕圈点，
+// 得在页面脚本跑起来之前把构造器钩住
+await page.addInitScript(() => {
+  window.__bgmEls = [];
+  const OrigAudio = window.Audio;
+  window.Audio = function PatchedAudio(...args) {
+    const el = new OrigAudio(...args);
+    window.__bgmEls.push(el);
+    return el;
+  };
+  window.Audio.prototype = OrigAudio.prototype;
+});
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
@@ -42,8 +54,56 @@ try {
   await page.click("#btnSound");
   await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.paused === false, null, { timeout: 10000 });
 
+  // —— 绕圈不许放进尾奏（2026-08-10 用户报「隔一段时间就停下来然后重新播放」）——
+  //
+  // 这几首是完整成品曲，末尾渐弱到静音：第一章那首最后 20 秒从 −27dB 淡到 −71dB。
+  // 老做法一路放到 ended 再 seek 回 cue，技术上只断 0.01 秒，可耳朵听见的是
+  // "音乐没了 → 静十几秒 → 又从头响"。所以这里量的不是"断没断"，是
+  // **有没有走进尾奏**、以及**接缝处音乐有没有掉下去**。
+  await page.evaluate(() => window.TunnelLight.JumpToChapter(0));
+  await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.active === "withTheseHands", null, { timeout: 30000 });
+  await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.paused === false, null, { timeout: 30000 });
+  const loopEnd = CHAPTER_BGM[0].loopEnd;
+  assert.ok(loopEnd > 0 && loopEnd < 305, "第一章必须声明 loopEnd（放到这儿就绕回去，别进尾奏）");
+
+  // 把正在响的那个播放头推到绕圈点前 5 秒
+  const jumped = await page.evaluate((end) => {
+    const el = window.__bgmEls.find((e) => !e.paused);
+    if (!el) return false;
+    el.currentTime = Math.max(0, end - 5);
+    return true;
+  }, loopEnd);
+  assert.ok(jumped, "得能拿到正在放的那个 <audio>");
+
+  // 过接缝：每 200ms 采一次，记最低的"总音乐量"和最远走到过哪儿
+  const seam = await page.evaluate(async (end) => {
+    const out = { minTotal: Infinity, maxTime: 0, swapped: false, first: null, samples: 0 };
+    const started = window.TunnelLight.GetBgmState().currentTime;
+    out.first = started;
+    for (let i = 0; i < 60; i += 1) {
+      const st = window.TunnelLight.GetBgmState();
+      out.samples += 1;
+      out.maxTime = Math.max(out.maxTime, st.currentTime);
+      // 起播头两秒本来就在爬升，不算进最低值
+      if (i > 6) out.minTotal = Math.min(out.minTotal, st.totalGain);
+      if (st.currentTime < end - 10) out.swapped = true;      // 已经绕回 cue 那一带
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return out;
+  }, loopEnd);
+
+  assert.ok(seam.swapped, `放到 loopEnd 必须绕回 cue（最远只走到 ${seam.maxTime.toFixed(1)}s）`);
+  assert.ok(seam.maxTime <= loopEnd + 1.5,
+    `绝不许走进尾奏：loopEnd=${loopEnd}s，实际放到了 ${seam.maxTime.toFixed(1)}s`);
+  assert.ok(seam.minTotal >= CHAPTER_BGM[0].gain * 0.55,
+    `接缝处音乐不许掉下去（目标 ${CHAPTER_BGM[0].gain}，最低只剩 ${seam.minTotal}）`);
+  const after = await page.evaluate(() => window.TunnelLight.GetBgmState());
+  assert.equal(after.paused, false, "绕完圈还得在响");
+  assert.ok(after.currentTime >= CHAPTER_BGM[0].cue - 1, "绕回去的落点应是 cue，不是片头");
+
   assert.deepEqual(errors, [], `页面不应有异常：${errors.join(" | ")}`);
   console.log("✓ BGM 用户手势起播 / 章节换曲 / cue / 音量 / 总开关");
+  console.log(`✓ BGM 绕圈不进尾奏（最远 ${seam.maxTime.toFixed(1)}s ≤ loopEnd ${loopEnd}s，接缝最低 ${seam.minTotal}）`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

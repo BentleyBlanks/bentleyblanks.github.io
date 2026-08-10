@@ -218,17 +218,6 @@
       },
       "note": "扫荡中撞塌的柴垛：塌下来就是矮矮摊一片（0.72m＝柱子的胯高），跨得过去。同 brokenWall 走 obstacle 带——横在路上的东西得挡得住小腿"
     },
-    "thimble": {
-      "art": "DrawThimble",
-      "band": "clutter",
-      "ss": "prop",
-      "sprite": {
-        "w": 30,
-        "h": 24,
-        "anchor": "center",
-        "baseline": 6
-      }
-    },
     "tree": {
       "art": "DrawTree",
       "band": "yard",
@@ -636,6 +625,18 @@
         "baseline": 4
       },
       "note": "玩家亲手支上去的顶木（bracedA/bracedB 两处松土段）。level: under；band 走 loose——它在爬行段的行走线上，必须压在近侧土层剖面之前，否则支完了什么也看不见。爬行段净高 0.72m，所以贴图只有 44px 高（≈0.9m 含楔子）"
+    },
+    "freshDirt": {
+      "art": "DrawFreshDirt",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 150,
+        "h": 20,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "摊开的新土：倒土那一拍留在地上的薄薄一层（showFlag 切出没）。画布只有 20px 高是故意的——它必须薄，铺厚了就是台词里说的「一堆显眼的新土」"
     },
     "dungHeap": {
       "art": "DrawDungHeap",

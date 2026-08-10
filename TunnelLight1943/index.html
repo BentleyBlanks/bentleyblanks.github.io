@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=085">
+  <link rel="stylesheet" href="./Style_Game.css?v=094">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,19 +33,19 @@
         "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=085",
-        "./Script_World.js": "./Script_World.js?v=085",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=085",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=085",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=085",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=085",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=085",
-        "./Script_Audio.js": "./Script_Audio.js?v=085",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=085",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=085",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=085",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=085",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=085"
+        "./Script_Core.mjs": "./Script_Core.mjs?v=094",
+        "./Script_World.js": "./Script_World.js?v=094",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=094",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=094",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=094",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=094",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=094",
+        "./Script_Audio.js": "./Script_Audio.js?v=094",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=094",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=094",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=094",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=094",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=094"
       }
     }
   </script>
@@ -62,6 +62,15 @@
     <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
     <div id="itemTag" hidden><small>手里</small><b id="itemName"></b><i id="itemThrow" class="pKey" hidden></i></div>
     <div id="topRight">
+      <!-- 包袱（收藏品）：布包的线描。角标 = 已收 / 总数 -->
+      <button id="btnBag" type="button" aria-label="包袱" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M5.2 10.6 L12 7.2 L18.8 10.6 L17.6 19.2 L6.4 19.2 Z"/>
+          <path d="M9.6 7.9 C9.6 5.4 14.4 5.4 14.4 7.9"/>
+          <path d="M10.4 6.8 L12 4.6 L13.6 6.8"/>
+        </svg>
+        <b id="bagBadge" hidden>0</b>
+      </button>
       <!-- 三道滑轨：比齿轮省事，也正好是面板里的东西 -->
       <button id="btnSettings" type="button" aria-label="设置" aria-expanded="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -91,6 +100,18 @@
         — Scott Buckley（CC BY 4.0）</p>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+    </section>
+    <!-- 包袱条（勇敢的心式收藏品栏）：右缘一条纸底竖条，一格一件老物件。
+         收到新东西时整条滑进来亮一下那格（peek），平时按 B 或点包袱钮打开。
+         打开时左侧出注解卡：名目 + 一段史实。还没找到的格子只给深色剪影——
+         形状本身就是唯一的提示。 -->
+    <section id="bagPanel" hidden aria-label="包袱">
+      <ul id="bagStrip"></ul>
+      <aside id="bagNote" hidden>
+        <h4 id="bagNoteName"></h4>
+        <p id="bagNoteText"></p>
+        <small id="bagNoteCount"></small>
+      </aside>
     </section>
     <div id="toast"></div>
     <!-- 交互徽章（勇敢的心式）：一枚按钮 + 一个短动词，浮在柱子头顶上。
@@ -151,7 +172,7 @@
         <button id="noticeClose" type="button" aria-label="关闭">✕</button>
         <!-- 抠好背景的成品（Script_TextureKey.py 从 Texture/Source/ 的白底原图生成）：
              带 alpha 的 WebP，撕口的纸形直接落在面板上。别改回 Source 里那张白底 JPG -->
-        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=085" alt="贴在土墙上的征夫告示">
+        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=094" alt="贴在土墙上的征夫告示">
         <div id="noticeText"></div>
       </div>
     </section>
@@ -225,6 +246,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=085"></script>
+<script type="module" src="./Script_Main.js?v=094"></script>
 </body>
 </html>

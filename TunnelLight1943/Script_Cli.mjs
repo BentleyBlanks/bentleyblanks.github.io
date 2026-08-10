@@ -274,8 +274,14 @@ async function CmdState(o) {
   // 这是给"看某一步长什么样"用的，**不是**可达性验证：谁走得到那一步是
   // SmokeTest 自动通关的活（CLAUDE.md「自测不许瞬移玩家」说的是那件事）。
   if (o.step !== undefined) { state.beat.stepIndex = Number(o.step); step({}, 1); }
-  if (o.x !== undefined) state.player.x = Number(o.x);
-  if (o.level) state.player.level = String(o.level);
+  // 摆位跟 zone 一个语义：给了 x 没给 level 就是地表。上一拍常把人留在地下
+  //（DebugJump 逐拍结算），不清 level 的话 x 会被地下走行范围夹走；cineWalk
+  // 同理——过场挂的走位会把人一路拖离摆好的位置
+  if (o.x !== undefined) {
+    state.player.x = Number(o.x);
+    state.player.level = o.level ? String(o.level) : "surface";
+    state.player.cineWalk = null;
+  } else if (o.level) state.player.level = String(o.level);
   step({}, 2);
 
   const before = JSON.stringify(state.flags);
@@ -358,7 +364,7 @@ async function CmdState(o) {
 // 当旗标**（x/level/hold/dur/pre/actor/cine/out 之外的都是旗标），省得再记一套语法。
 // 命令行上的 --x/--flag 这些是所有拍共用的默认值，@ 里写的盖过它。
 // ---------------------------------------------------------------------------
-const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip"]);
+const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step"]);
 
 // "c1_dig@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
@@ -444,8 +450,12 @@ async function CmdShot(o) {
         if (flags && Object.keys(flags).length) Object.assign(tl.state.flags, flags);
         // --step N：链式节拍直接落到第 N 步（同 state 的那条，先空跑一帧再改）
         if (stepIndex !== undefined) { tl.state.beat.stepIndex = stepIndex; tl.StepFrames(1, {}); }
-        if (x !== undefined) tl.state.player.x = x;
-        if (level) tl.state.player.level = level;
+        // 同 state：给了 x 没给 level 就是地表，并清掉过场走位
+        if (x !== undefined) {
+          tl.state.player.x = x;
+          tl.state.player.level = level || "surface";
+          tl.state.player.cineWalk = null;
+        } else if (level) tl.state.player.level = level;
         if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
         tl.StepFrames(2, {});
         for (const [inp, n] of steps) tl.StepFrames(n, inp);
@@ -457,6 +467,20 @@ async function CmdShot(o) {
       // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子
       await page.waitForFunction(() => (window.TunnelLight.iris ?? 1) > 0.995, { timeout: 8000 })
         .catch(() => errors.push(`${job.id}: 黑幕没拉开（iris 超时）`));
+      // --ui bag：点开包袱（收藏品面板）再拍；bag+<id> 顺带选中那件出注解卡
+      const uiWant = jo.ui || o.ui;
+      if (uiWant && String(uiWant).startsWith("bag")) {
+        const sel = String(uiWant).includes("+") ? String(uiWant).split("+")[1] : null;
+        await page.evaluate((want) => {
+          document.getElementById("btnBag")?.click();
+          if (want) {
+            const all = [...document.querySelectorAll("#bagStrip li")];
+            const hit = all.find((li) => li.title !== "？？？" && li.title) || all[0];
+            hit?.click();
+          }
+        }, sel);
+        await page.waitForTimeout(450);
+      }
 
       const held = jo.hold ? String(jo.hold).split("") : [];
       for (const k of held) await page.keyboard.down(k);
@@ -545,6 +569,7 @@ const HELP = `《地道里的光》命令行工作台
       --x N --step N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
       --step N         链式节拍直接落到第 N 步（看某一步长什么样；不是可达性验证）
       --flag k=v,k=v   所有拍共用的开关默认值（@ 里写的盖过它）
+      --ui bag         拍之前点开包袱面板（bag+x 顺带选中第一件出注解卡）
       --probe          截图同时报两件有明确对错的事：深度带用错没有、手脚离地多少
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
