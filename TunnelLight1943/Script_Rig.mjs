@@ -725,12 +725,15 @@ export function PoseRig(rig, s, dt) {
     // 现在按落点反算：娘的肩 ≈1.15m，孩子的背在她身前 0.35m、低 0.2m，
     // 两节合起来 0.49m，所以**世界角必须落在 −55° 上下**（肘弯一点，
     // 上臂 −80 + 前臂 +26 = −54）。
-    target.hipY = -0.08; target.hipX = 0.03;
-    target.torso = 16 * DEG; target.head = -30 * DEG;
-    target.armF = -80 * DEG; target.foreF = 26 * DEG;    // 前臂横过来兜背（世界角 −54°）
-    target.armB = -70 * DEG; target.foreB = 12 * DEG;    // 另一只手护后脑（世界角 −58°）
-    target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
-    target.thighF = 10 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+    // 2026-08-11 再收一档：搂的是个六岁孩子（头顶才到他大腿），直着腰搂，
+    // 手悬在半空、孩子抱着他的腿——两个人各演各的。整个人**蹲下去围住她**：
+    // 胯沉、腰弯，手正好落在她头肩那一带，"捂住"才读得出来
+    target.hipY = -0.24; target.hipX = 0.05;
+    target.torso = 24 * DEG; target.head = -34 * DEG;
+    target.armF = -84 * DEG; target.foreF = 30 * DEG;    // 前臂横过来兜背（世界角 −54°）
+    target.armB = -72 * DEG; target.foreB = 14 * DEG;    // 另一只手护后脑（世界角 −58°）
+    target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
+    target.thighF = -34 * DEG; target.shinF = 38 * DEG; target.footF = -8 * DEG;
   } else if (s.pose === "pressed") {
     // 被按下去的那一下：不是自己蹲的——膝盖是被压弯的，肩往下沉、脖子缩起来。
     // 比常规半蹲低一大截，娘的手才落得到肩上（两个姿势是一对，一起改）
@@ -1108,6 +1111,29 @@ export function PoseRig(rig, s, dt) {
     // 双膝跪在地上、小腿折向身后（爬行段里没有别的姿势可选）
     target.thighB = -8 * DEG; target.shinB = 96 * DEG; target.footB = 16 * DEG;
     target.thighF = -6 * DEG; target.shinF = 92 * DEG; target.footF = 14 * DEG;
+  } else if (s.pose === "sleep") {
+    // 睡着：侧躺蜷着（1942 的孩子睡铺盖卷，不是四仰八叉）。
+    // 胯沉到 0.12（侧躺的胯宽），躯干放平到 86°，腿蜷成一团；
+    // 两只手收在胸前。膝、脚、头都压着算过：全落在 0.08~0.20，
+    // 贴着铺盖不悬空也不陷地（SoleLift 按膝高判、躺着自然不抬）
+    target.hipY = -0.50; target.hipX = 0.05;
+    target.torso = 86 * DEG; target.head = -64 * DEG;
+    target.armF = -58 * DEG; target.foreF = 118 * DEG;
+    target.armB = -48 * DEG; target.foreB = 106 * DEG;
+    target.thighF = -76 * DEG; target.shinF = 84 * DEG; target.footF = 10 * DEG;
+    target.thighB = -58 * DEG; target.shinB = 66 * DEG; target.footB = 8 * DEG;
+  } else if (s.pose === "clothMouth") {
+    // 跪坐着把布巾咬在嘴上压咳：kneel 的下盘，近侧手把布**举到嘴边**——
+    // 布巾走 carry（HandPoint 挂点），手到哪儿布就到哪儿，
+    // 所以这只手的落点必须真在嘴上：肩 ≈0.41、嘴 ≈0.48，
+    // 上臂 −50°、前臂 −130°（合世界角 −180°＝小臂竖直朝上），
+    // 手心停在肩上方 0.07、身前 0.15——正是嘴的位置
+    target.hipY = -0.52; target.hipX = 0.02;
+    target.torso = 26 * DEG; target.head = -14 * DEG;
+    target.thighB = -96 * DEG; target.shinB = 96 * DEG; target.footB = 8 * DEG;
+    target.thighF = -92 * DEG; target.shinF = 100 * DEG; target.footF = 8 * DEG;
+    target.armF = -50 * DEG; target.foreF = -130 * DEG;
+    target.armB = -22 * DEG; target.foreB = -16 * DEG;
   } else if (s.pose === "sitStool") {
     // 坐在矮凳上歇着：屁股落到凳面（约0.28m），小臂搭在膝上——
     // 爹开场养那只没合口的手，坐的就是这一姿势

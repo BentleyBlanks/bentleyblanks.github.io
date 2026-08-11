@@ -867,7 +867,7 @@ function SyncHud(state, dt, shotFade) {
     endScreenMode = demoEnd ? "demo" : "full";
     if (ui.endTitle) {
       ui.endTitle.textContent = demoEnd
-        ? "第一章完" : "门框上的两道刻痕，留在了身后";
+        ? `第${"一二三四五六七八"[LAST_OPEN] || "一"}章完` : "门框上的两道刻痕，留在了身后";
     }
     if (ui.endText) {
       ui.endText.textContent = demoEnd

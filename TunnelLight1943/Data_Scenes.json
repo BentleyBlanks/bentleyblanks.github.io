@@ -132,6 +132,13 @@
           "name": "旧木凳"
         },
         {
+          "id": "beddingMat",
+          "kind": "beddingMat",
+          "x": 31.15,
+          "name": "妹妹的铺盖",
+          "note": "屋里靠西：开场「还睡着」、黄昏「放平掖好被角」两镜都睡在这上头（interior 陈设）"
+        },
+        {
           "id": "yardStool",
           "kind": "stool",
           "x": 35.9,

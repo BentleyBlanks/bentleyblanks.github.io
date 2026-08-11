@@ -2538,11 +2538,13 @@ export const SCRIPTS = {
         { stage: "牲口棚塌了半边。院里的鸡，一只也没剩下。", d: 3.8,
           cam: { kind: "shot", x: 10.4, y: 1.1, dist: 4.6 } },
         { stage: "屋里，妹妹还睡着。", d: 3.0,
-          cam: { kind: "shot", x: 31.4, y: 1.15, dist: 4.2 },
+          cam: { kind: "shot", x: 31.4, y: 1.05, dist: 3.8 },
           on: (state) => {
             state.beat.indoorScene = true;
+            // 说睡着就得真躺着：铺盖（beddingMat, 31.15）上侧躺蜷着。
+            // leanIn 是站姿——上一版她站在屋当间"伸懒腰"，字幕当场穿帮
             const sis = FindActor(state, "sister");
-            if (sis) { sis.x = 31.2; sis.heading = 1; sis.pose = "leanIn"; }
+            if (sis) { sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.2;
             state.player.heading = -1;
           } },
@@ -2559,9 +2561,9 @@ export const SCRIPTS = {
       kind: "chain", id: "c1_forage", timeOfDay: "day",
       objective: "给妹妹找吃的", hint: "西头牲口棚烧塌了——翻翻看，兴许有埋下的东西",
       onStart: (state) => {
-        // 妹妹还在屋里睡（立面合着自然看不见她）
+        // 妹妹还在铺盖上睡（立面合着自然看不见她）
         const sis = FindActor(state, "sister");
-        if (sis) { sis.pose = "leanIn"; sis.x = 31.2; }
+        if (sis) { sis.pose = "sleep"; sis.x = 31.15; sis.heading = -1; }
       },
       steps: [
         // 路过纺车：无言的注视（镜头停两秒四，一个字也不说）
@@ -2617,7 +2619,7 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 34.6, y: 1.15, dist: 3.8 },
           on: (state) => { state.player.cineWalk = null; state.player.x = 35.2; state.player.heading = -1; } },
         { stage: "柱子把红薯干泡进温水里。泡软了，大的那半掰给她。", d: 4.4,
-          cam: { kind: "insert", x: 34.8, y: 0.95, dist: 2.7 },
+          cam: { kind: "insert", x: 34.9, y: 0.95, dist: 3.1 },
           on: (state) => {
             state.player.item = null;
             const sis = FindActor(state, "sister");
@@ -2726,6 +2728,17 @@ export const SCRIPTS = {
           sis.x = 35.0; sis.cineTarget = { x: 55.4 }; sis.cineSpeed = 2.4;
         }
       },
+      tick: (state) => {
+        // 文案钉死「妹妹先跑去了榆树底下」——打榆钱、捡榆钱那两步（5、6）她必须
+        // 真在树下。跳幕/--step 直落不会重放 talk 的 effect，这里兜底（榆树 56.3）。
+        // **只管这两步**：之后她跟着回家，再抓回树下就跟 following 打架了
+        if (state.beat.stepIndex >= 5 && state.beat.stepIndex <= 6) {
+          const sis = FindActor(state, "sister");
+          if (sis && !sis.cineTarget && !sis.following && Math.abs(sis.x - 57.5) > 4) {
+            sis.x = 57.5; sis.heading = -1;
+          }
+        }
+      },
       steps: [
         { type: "pickup", x: 43.0, item: { id: "bucket", label: "空水桶", big: true }, prompt: "E · 拎起空桶" },
         // 由头三拍（CLAUDE.md 5.5 条）：先看见毛病（够不着）→ 再看见一个人
@@ -2829,21 +2842,28 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 33.6, y: 1.2, dist: 4.6 },
           on: (state) => {
             state.beat.indoorScene = true;
+            // 坐就得坐在凳子上：旧木凳在 32.0（Data_Scenes），人钉在凳上——
+            // 上一版她坐在 32.6 的空气里，凳子空在旁边（视觉审查退回）
             const sis = FindActor(state, "sister");
-            if (sis) { sis.cineTarget = null; sis.x = 32.6; sis.heading = 1; sis.pose = "sitStool"; sis.carry = null; }
+            if (sis) { sis.cineTarget = null; sis.x = 32.0; sis.heading = 1; sis.pose = "sitStool"; sis.carry = null; }
             state.player.cineWalk = null;
-            state.player.x = 33.8;
+            state.player.x = 33.4;
             state.player.heading = -1;
           } },
         { who: "妹妹", say: "哥，正字画满了，是不是就……", d: 3.2,
-          cam: { kind: "insert", x: 32.6, y: 1.05, dist: 2.8 } },
+          cam: { kind: "insert", x: 32.0, y: 1.05, dist: 2.8 } },
         { stage: "话没说完，她自己先打了个哈欠。", d: 2.8,
-          cam: { kind: "shot", x: 33.2, y: 1.15, dist: 4.0 } },
-        { stage: "柱子把她放平在炕上，掖好被角，把灯芯捻小了。", d: 4.0,
-          cam: { kind: "shot", x: 32.4, y: 1.1, dist: 4.4, trans: "dip" },
+          cam: { kind: "shot", x: 32.8, y: 1.15, dist: 4.0 } },
+        { stage: "柱子把她放平在铺盖上，掖好了被角。", d: 4.0,
+          cam: { kind: "shot", x: 31.8, y: 0.95, dist: 3.6, trans: "dip" },
           on: (state) => {
+            // 字幕说的三件事画面都得有：她躺在铺盖上（睡姿），他跪在铺盖边
+            // 掖被角（跪姿贴着人）。老版是她凭空消失、他站在门口看正字
             const sis = FindActor(state, "sister");
-            if (sis) sis.visible = false;
+            if (sis) { sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            state.player.x = 31.9;
+            state.player.heading = -1;
+            FlashPose(state, "kneel", 3.8);
           } },
       ],
     },
@@ -2873,11 +2893,12 @@ export const SCRIPTS = {
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, hold: 2.4, stroke: "down", gestureY: 0.5,
           prompt: "把窖底的土刨开",
           effect: (state) => { state.flags.pitDug = true; Cue(state, "dig", { gain: 0.7 }); } },
+        // 放进坑里是跪着放的（视觉审查：埋衣全程只有弯腰站姿，"跪"只闪过一下）
         { type: "pickup", x: 27.0, level: "under", item: { id: "bloodClothes", label: "那件衣裳", big: true },
           prompt: "E · 抱起来" },
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, needs: "bloodClothes",
-          prompt: "E · 放下去",
-          effect: (state) => { Cue(state, "drop", { gain: 0.35, rate: 0.7 }); } },
+          prompt: "E · 放下去", pose: "kneel",
+          effect: (state) => { FlashPose(state, "kneel", 2.2); Cue(state, "drop", { gain: 0.35, rate: 0.7 }); } },
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, hold: 2.2, stroke: "down", gestureY: 0.5,
           prompt: "把土填回去 · 拍实",
           effect: (state) => {
@@ -2932,7 +2953,7 @@ export const SCRIPTS = {
         // 正字特写照旧刻痕那一镜的配方（c1_measure ①）：贴着左立柱、
         // 打门洞里看——立面在画框外，柱面上的道道占满画
         { stage: "谷雨过了。门框上的正字，添到了第十三道。", d: 3.6,
-          cam: { kind: "insert", x: 33.62, y: 0.86, dist: 0.95 },
+          cam: { kind: "insert", x: 33.62, y: 0.76, dist: 0.95 },
           on: (state) => { state.beat.indoorScene = true; state.doorLeaf = null; } },
         { stage: "这天晌午，村东头的乌鸦轰的一声全飞起来了。", d: 3.2,
           cam: { kind: "shot", x: 120, y: 2.2, dist: 9 },
@@ -3070,12 +3091,27 @@ export const SCRIPTS = {
         }
         state.player.x = 31.6;
         state.player.heading = -1;
-        // 头顶的搜查队：剖面招牌构图——上面在翻，下面在屏息
+        // 头顶的搜查队：剖面招牌构图——上面在翻，下面在屏息。
+        // 巡逻带收窄到窖口正上方那一片：默认那套带子太长，搜到两端时
+        // 画框顶上那条地面里一个兵都没有，「头顶有动静」只剩音效
         SpawnSurfaceSearch(state, 31);
+        const W = (id, x, p0, p1, sp) => {
+          const a = FindActor(state, id);
+          if (a) { a.x = x; a.patrol = [p0, p1]; a.speed = sp; }
+        };
+        W("srch1", 33, 27.5, 36, 0.9);
+        W("srch2", 26, 24, 32.5, 1.15);
+        W("srch3", 38, 33, 43, 1.0);
       },
       tick: (state, dt) => {
         const b = state.beat;
         b.hushT = (b.hushT || 0) + 1 / 60;
+        // 捂着的那只手要一直落在妹妹身上：shelter 的搂臂顺着朝向伸，
+        // 玩家从东边走进判定区时朝向还朝西——按住 E 的每一帧都把脸转向她
+        if (state.player.pose === "shelter") {
+          const sis = FindActor(state, "sister");
+          if (sis) state.player.heading = sis.x <= state.player.x ? -1 : 1;
+        }
         // 声音脚本：一段一段压过去（不循环，照 holdProgress 走到哪响到哪）
         const CUES = [
           [1.0, "step", 0.7, 1.0], [2.1, "step", 0.8, 0.95],
@@ -3116,21 +3152,39 @@ export const SCRIPTS = {
         { stage: "田大爷胸口拉风箱似的响。他把咳压在嗓子眼里，压一下，抖一下。", d: 4.4,
           cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.75, dist: 2.6 },
           on: (state) => {
-            // 压咳要演出来：从跪坐弓下去，咳一下弓一下（画面在动，不是字幕在咳）
-            const ty = FindActor(state, "tianYe");
-            if (ty) { ty.pose = "bow"; ty.heading = 1; }
+            // 换拍时 ClearPoses 把捂嘴那拍的姿势全抹了——整窖人重新钉一遍，
+            // 不然除了田大爷全员站军姿。压咳要演出来：从跪坐弓下去
+            const P = (id, pose, h) => {
+              const a = FindActor(state, id);
+              if (a) { a.pose = pose; if (h) a.heading = h; }
+            };
+            P("tianYe", "bow", 1);
+            P("qishu", "bow", -1);
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.x = 31.15; sis.heading = 1; sis.pose = "leanIn"; }
+            state.player.heading = -1;
             Cue(state, "sobBreath", { gain: 0.5, rate: 1.5 });
             Cue(state, "sobBreath", { gain: 0.4, rate: 1.4, delay: 1.6 });
           } },
         { stage: "刘嫂把水葫芦倒过来。空的。", d: 3.0,
           cam: { kind: "insert", x: 30.9, y: UNDER_Y + 0.75, dist: 2.6 },
           on: (state) => {
-            // 说到谁谁就得在画里：刘嫂挪到田大爷跟前倒水葫芦
+            // 说到谁谁就得在画里：刘嫂挪到田大爷跟前，**手里得真有那只水葫芦**
+            //（视觉审查退回过：说倒葫芦、演的是空手搀扶）。倒过来的动作
+            // 由弓身+葫芦一起读——她俯身把葫芦口冲下比给大家看
             const ls = FindActor(state, "liusao");
-            if (ls) { ls.pose = null; ls.x = 31.2; ls.heading = -1; ls.pose = "bow"; }
+            if (ls) { ls.x = 31.2; ls.heading = -1; ls.pose = "bow"; ls.carry = "水葫芦"; }
           } },
         { stage: "头顶的脚步还没走利索。可这咳，也压不了几响了。", d: 3.8,
-          cam: { kind: "shot", x: 31.5, y: UNDER_Y + 1.3, dist: 5 } },
+          cam: { kind: "shot", x: 31.5, y: UNDER_Y + 1.3, dist: 5 },
+          on: (state) => {
+            // 收葫芦；全景里柱子与七叔别站成一对复制人——七叔转身望向窖口
+            const ls = FindActor(state, "liusao");
+            if (ls) { ls.carry = null; ls.pose = "kneel"; }
+            const q = FindActor(state, "qishu");
+            if (q) { q.pose = null; q.heading = -1; q.x = 32.8; }
+            state.player.heading = 1;   // 柱子看着田大爷那头，与七叔一朝东一朝西
+          } },
       ],
     },
     {
@@ -3163,7 +3217,9 @@ export const SCRIPTS = {
         // 头铁直走的也能撞上他背身的那一程（可完成性铁律）
         const r2 = FindActor(state, "raid2");
         if (r2) {
-          r2.cineTarget = null; r2.x = 56; r2.patrol = [50, 64]; r2.speed = 0.95;
+          // 西端 48：舀水那一下他在画框里踱着（离缸 4.6m）——危险要看得见，
+          // 只写在提示文案里等于没有（视觉审查退回过"空院舀水"）
+          r2.cineTarget = null; r2.x = 54; r2.patrol = [48, 61]; r2.speed = 0.95;
           r2.scanEvery = 4.0; r2.scanHold = 2.4;
         }
         const r1 = FindActor(state, "raid1");
@@ -3182,11 +3238,20 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 30.4, w: 2.8, level: "under" } },
         { type: "use", zone: { x: 30.6, w: 2.9, level: "under" }, needs: "ladleWater", prompt: "E · 递过去",
           effect: (state) => {
+            // 递过去＝瓢真的换手：柱子俯身递，田大爷捧着瓢喝（clothMouth 的
+            // 手在嘴边，瓢跟着手——正是"一口一口顺下去"的读法）
+            const ty = FindActor(state, "tianYe");
+            if (ty) { ty.carry = "半瓢水"; ty.pose = "clothMouth"; ty.heading = 1; }
+            FlashPose(state, "bow", 2.6);
             StartMicroCine(state, [
               { stage: "水一口一口顺下去。咳，压住了。", d: 3.0,
                 cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.75, dist: 2.6 } },
               { stage: "田大爷抬起眼皮看了看他，没说话。", d: 2.8,
-                cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.85, dist: 2.4 } },
+                cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.85, dist: 2.4 },
+                on: (st) => {
+                  const t2 = FindActor(st, "tianYe");
+                  if (t2) { t2.carry = null; t2.pose = "kneel"; }
+                } },
             ]);
           } },
       ],
@@ -3212,14 +3277,25 @@ export const SCRIPTS = {
             state.player.x = 30.6;
             state.player.heading = -1;
             state.player.item = null;
+            // 「咬住」要发生在画面里：clothMouth 把布巾举到嘴上（布走 carry 的
+            // 手挂点，手到嘴边布就到嘴边）。老版 bow+布在垂着的手里，
+            // 布离嘴一条小臂远——视觉审查退回过
             const ty = FindActor(state, "tianYe");
-            if (ty) { ty.carry = "花布巾"; ty.pose = "bow"; }
+            if (ty) { ty.carry = "花布巾"; ty.pose = "clothMouth"; ty.heading = 1; }
             Cue(state, "sobBreath", { gain: 0.4, rate: 1.5 });
             Cue(state, "sobBreath", { gain: 0.35, rate: 1.45, delay: 1.4 });
             Cue(state, "sobBreath", { gain: 0.3, rate: 1.5, delay: 2.7 });
           } },
         { stage: "妹妹把脸埋进柱子怀里。谁也没看谁。", d: 3.6,
-          cam: { kind: "shot", x: 31.3, y: UNDER_Y + 1.1, dist: 3.6 } },
+          cam: { kind: "shot", x: 30.9, y: UNDER_Y + 1.05, dist: 3.2 },
+          on: (state) => {
+            // 埋进怀里＝一对姿势：她贴上来 leanIn，他蹲下去 shelter 兜住——
+            // 老版她抱着刘嫂的腿、柱子空手站在一米外，字幕画面各说各的
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.x = state.player.x + 0.32; sis.heading = -1; sis.pose = "leanIn"; }
+            state.player.heading = 1;
+            FlashPose(state, "shelter", 3.4);
+          } },
       ],
     },
     {
@@ -3247,9 +3323,12 @@ export const SCRIPTS = {
             Cue(state, "knock", { gain: 1.2, rate: 0.8 });
             Cue(state, "knock", { gain: 1.3, rate: 0.7, delay: 1.0 });
           } },
-        { stage: "上面静了静。跟着，铳条顺着盖板的缝插了进来，一别——土面子簌簌往下掉。", d: 4.6,
+        { stage: "上面静了静。跟着，有什么顺着盖板缝别了进来——盖板让它撬得翘起一条缝。", d: 4.6,
           cam: { kind: "insert", x: 29, y: UNDER_Y + 1.5, dist: 2.4 },
           on: (state) => {
+            // 撬要看得见：盖板真的翘开一条缝（state.lid 常立着，World 按它转角）。
+            // open 走 smoothstep，0.3 折出来约 13°——一条明晃晃的缝，天光漏进来
+            state.lid = { id: "cellarHatch", open: 0.3 };
             Cue(state, "tenon", { gain: 0.7, rate: 0.8 });
             Cue(state, "dig", { gain: 0.4, rate: 1.3, delay: 1.2 });
           } },
@@ -3271,7 +3350,10 @@ export const SCRIPTS = {
       objective: "墙角的土是松的——挖！", hint: "一下接一下，别停",
       onStart: (state) => {
         state.player.cineWalk = null;
-        state.player.x = 42.2;
+        // 站 41.7：没挖开之前近侧剖面的洞腔在 42.6 的墙前就开始收口，
+        // 42.2 那一步人已经埋进收口的土里（实拍：整个人只剩一条黑边）。
+        // 挖第一下之后 digStarted 把腔体往前放开，人再往前跟就看得见了
+        state.player.x = 41.7;
         // 大家往窖底聚拢，让开挖土的人（level/visible 兜底同 c2_hush——
         // 跳幕结算不重放微过场的走位）
         const S = (id, x, h) => {
@@ -3296,7 +3378,8 @@ export const SCRIPTS = {
         }
       },
       steps: [
-        { type: "use", zone: { x: 42.3, w: 2.2, level: "under" }, hold: 2.4, stroke: "down", gestureY: 0.6,
+        // 判定区中心退到 41.8：区就是人站的地方，站在剖面收口里挖＝画面上没人在挖
+        { type: "use", zone: { x: 41.8, w: 2.2, level: "under" }, hold: 2.4, stroke: "down", gestureY: 0.6,
           prompt: "刨开松土",
           note: "土往里塌了一块——后头是空的！",
           effect: (state) => { state.flags.digStarted = true; Cue(state, "dig", { gain: 0.9 }); } },
@@ -3351,7 +3434,9 @@ export const SCRIPTS = {
         b.crashT = (b.crashT || 0) + 1 / 60;
         if (b.crashT > 5 && !b.crashed) {
           b.crashed = true;
-          // 身后：盖板被砸开了。脚步灌进窖里——都在声音里，画面不回头
+          // 身后：盖板被砸开了。脚步灌进窖里——声音在先，谁要是回头看，
+          // 老窖口那块板也真是四敞大开的
+          state.lid = { id: "cellarHatch", open: 1 };
           Cue(state, "drop", { gain: 1.3, rate: 0.6 });
           Cue(state, "step", { gain: 0.8, delay: 0.9 });
           Cue(state, "step", { gain: 0.7, rate: 0.9, delay: 1.5 });
@@ -4723,6 +4808,7 @@ export function StartChapter(state, index) {
     state.flags.tallied = true;         // 第二章开场：正字已经添到十几道
     state.flags.tallyMany = true;
     state.flags.clothesBuried = true;   // 第一章夜里埋下的，永远埋在那儿
+    state.flags.vatFilled = true;       // 第一章打满的那缸水——舀水支线舀的就是它
     state.flags.lidShut = false;
     state.flags.coughChoice = null;
   }

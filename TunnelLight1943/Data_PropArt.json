@@ -693,6 +693,19 @@
       },
       "note": "土坯灶：新剧本第一章开场那眼冷灶（柱子家 interior 陈设，立面半隐才看得见）"
     },
+    "beddingMat": {
+      "art": "DrawBeddingMat",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.14,
+      "sprite": {
+        "w": 84,
+        "h": 26,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "屋里的铺盖（苇席+被卷）：妹妹睡觉那几镜躺在这上头，与冷灶同属 interior 陈设"
+    },
     "spinWheelBroken": {
       "art": "DrawSpinWheelBroken",
       "band": "walk",

@@ -1211,6 +1211,15 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       "ladle", "#a08a52", { amp: 0.5 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.18)" });
     InkLine(ctx, 5.6 * S, -0.4 * S, 9.6 * S, -2.4 * S, "ladleGrip", { lw: 2.0 * S, color: "#8a6f42", amp: 0.4 * S });
     InkFill(ctx, Rect(-4.2 * S, 0.2 * S, 8.4 * S, 1.6 * S), "ladleWater", "#4d6a78", { amp: 0.3 * S, lw: 0.8 * S });
+  } else if (label === "水葫芦") {
+    // 亚腰水葫芦：上小下大两个肚、腰上勒一圈绳、口上一截木塞。
+    // 「倒过来——空的」那一下全指着它先被认出是水葫芦
+    InkFill(ctx, [[-2.0 * S, -7.2 * S], [2.0 * S, -7.2 * S], [3.0 * S, -4.4 * S], [1.7 * S, -2.2 * S],
+      [4.1 * S, 1.0 * S], [2.8 * S, 4.4 * S], [-2.8 * S, 4.4 * S], [-4.1 * S, 1.0 * S],
+      [-1.7 * S, -2.2 * S], [-3.0 * S, -4.4 * S]],
+      "gourd", "#8a6a3a", { amp: 0.6 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.2)" });
+    InkLine(ctx, -1.9 * S, -2.2 * S, 1.9 * S, -2.2 * S, "gourdTie", { lw: 1.2 * S, color: "#4e4234", amp: 0.3 * S });
+    InkFill(ctx, Rect(-0.9 * S, -9.0 * S, 1.8 * S, 2.0 * S), "gourdCork", "#6b5638", { amp: 0.3 * S, lw: 1.0 * S });
   } else if (label === "那件衣裳") {
     // 叠得整整齐齐抱在怀里的深色衣裳。渍色按 sRGB 老账压两档——
     // 是一角发暗的印子，不是清晰的血污（历史与叙事铁律：不做伤口特写）
@@ -4175,13 +4184,15 @@ export function DrawStonePile(ctx, x, groundY, id) {
 }
 
 // 洞室里的水瓮
-export function DrawVat(ctx, x, groundY, id) {
+export function DrawVat(ctx, x, groundY, id, { filled = true } = {}) {
   InkFill(ctx, [[x - 12, groundY], [x - 15, groundY - 18], [x - 10, groundY - 30], [x + 10, groundY - 30],
     [x + 15, groundY - 18], [x + 12, groundY]],
     id + "body", "#6e5b44", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
-  // 口沿与水面
+  // 口沿。水面只在真有水的时候画（「见了底」的缸口亮着一条水色，
+  // 空缸就读成满缸——视觉审查退回过）；空缸口里是一圈往下看不到底的暗影
   InkLine(ctx, x - 10, groundY - 30, x + 10, groundY - 30, id + "rim", { lw: 2.4, color: IN.ink });
-  InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "water", "#4d6a78", { amp: 0.5, lw: 1 });
+  if (filled) InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "water", "#4d6a78", { amp: 0.5, lw: 1 });
+  else InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "dry", "#241c12", { amp: 0.5, lw: 1 });
 }
 
 // 地窖里的红薯堆：过冬的口粮码在窖底，上面搭半领草苫
@@ -4199,13 +4210,18 @@ export function DrawTuberPile(ctx, x, groundY, id) {
     ctx.stroke();
     ctx.restore();
   }
-  // 草苫搭在堆顶一角
-  InkFill(ctx, [[x - 26, groundY - 20], [x - 4, groundY - 30], [x + 20, groundY - 26], [x + 8, groundY - 17]],
-    id + "mat", "#a08a52", { amp: 1.8, lw: 1.6, shade: "rgba(0,0,0,0.14)" });
-  for (let i = 0; i < 4; i += 1) {
-    InkLine(ctx, x - 20 + i * 11, groundY - 21 - i * 2, x - 14 + i * 11, groundY - 27 - i * 1.5,
-      id + "straw" + i, { lw: 1.1, color: "rgba(70,55,28,0.6)" });
+  // 草苫搭在堆顶一角。色压两档、四边发毛：地窖暗底上一块又平又亮的浅色斜面
+  // 读出来是"斜搭了块玻璃板"（视觉审查原话）——苇席要靠织纹和毛边立住
+  InkFill(ctx, [[x - 26, groundY - 20], [x - 22, groundY - 24], [x - 4, groundY - 30], [x + 10, groundY - 29],
+    [x + 20, groundY - 26], [x + 15, groundY - 21], [x + 8, groundY - 17], [x - 10, groundY - 17]],
+    id + "mat", "#7d6a3e", { amp: 2.2, lw: 1.6, shade: "rgba(30,22,10,0.22)" });
+  for (let i = 0; i < 7; i += 1) {
+    InkLine(ctx, x - 22 + i * 6.4, groundY - 20 - i * 1.4, x - 17 + i * 6.4, groundY - 26 - i * 1.0,
+      id + "straw" + i, { lw: 1.0, color: "rgba(52,40,20,0.55)", amp: 0.8 });
   }
+  // 席沿的横篾压一道，斜面才有"编出来"的方向感
+  InkLine(ctx, x - 24, groundY - 21.5, x + 17, groundY - 24.5, id + "weft",
+    { lw: 0.9, color: "rgba(46,36,18,0.5)", amp: 1.0 });
 }
 
 // 地窖搁板：两根木桩架一块旧板，板上一只荆条筐、一只盖着布的坛子
@@ -4452,6 +4468,35 @@ export function DrawClothBundle(ctx, x, groundY, id) {
     InkLine(ctx, x - 14 + i * 6, groundY - 7 - i * 2.4, x - 9 + i * 6, groundY - 13 - i * 1.2,
       id + "straw" + i, { lw: 1, color: "rgba(70,55,28,0.55)", amp: 0.8 });
   }
+  // 一只袖子从草苫底下耷拉出来。没有它，夜里这卷布读成一块深色木箱——
+  // "是衣裳"这件事全靠袖口这一截说（视觉审查退回过）
+  InkFill(ctx, [[x + 7, groundY - 9], [x + 16, groundY - 6], [x + 19, groundY - 2], [x + 13, groundY], [x + 6, groundY - 4]],
+    id + "sleeve", "#524639", { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x + 9, groundY - 6.5, x + 16.5, groundY - 3, id + "sleeveFold",
+    { lw: 0.8, color: "rgba(24,19,15,0.55)", amp: 0.7 });
+  // 袖口一线浅衬里：布不是铁板一块
+  InkLine(ctx, x + 16.5, groundY - 5.5, x + 18.5, groundY - 2.5, id + "cuff",
+    { lw: 1.0, color: "rgba(150,132,104,0.5)", amp: 0.4 });
+}
+
+// 屋里的铺盖：半领苇席，薄被卷在东头。妹妹「还睡着」「放平掖好被角」
+// 那几镜都躺在这上头——人不能睡在光地上（视觉审查退回过"坐在空气上"，
+// 睡更是）。席子给织纹，被卷给折痕，都是压过两档的沉色
+export function DrawBeddingMat(ctx, x, groundY, id) {
+  InkFill(ctx, [[x - 34, groundY], [x - 31, groundY - 4], [x + 28, groundY - 5], [x + 34, groundY]],
+    id + "mat", "#8b7649", { amp: 1.0, lw: 1.6, shade: "rgba(0,0,0,0.16)" });
+  for (let i = 0; i < 5; i += 1) {
+    InkLine(ctx, x - 30 + i * 13, groundY - 0.6, x - 27 + i * 13, groundY - 4.2,
+      id + "weave" + i, { lw: 0.8, color: "rgba(70,55,28,0.5)", amp: 0.5 });
+  }
+  InkLine(ctx, x - 31, groundY - 4.4, x + 29, groundY - 5.0, id + "hem",
+    { lw: 1.0, color: "rgba(52,40,22,0.55)", amp: 0.8 });
+  // 薄被卷在东头（睡的人头朝西）
+  InkFill(ctx, [[x + 20, groundY], [x + 19, groundY - 8], [x + 24, groundY - 12], [x + 31, groundY - 10],
+    [x + 33, groundY - 3], [x + 32, groundY]],
+    id + "quilt", "#6a5560", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x + 21, groundY - 7, x + 30, groundY - 8.5, id + "quiltFold",
+    { lw: 0.9, color: "rgba(30,24,26,0.5)", amp: 0.8 });
 }
 
 // 斜靠在棚里的旧木料：两块拆下来的旧门板 + 一根枣木杠。
@@ -5588,7 +5633,7 @@ const HUD_ITEM = {
   满桶水: [1.00, 5], 一桶水: [1.00, 5],
   粮袋: [1.05, 0], 种子粮: [1.05, 0], 名册: [1.10, 0], 保甲册: [1.10, 0],
   花布巾: [1.20, 0], 襁褓: [1.05, 0], 鞭炮: [1.00, 0], 一挂鞭炮: [1.00, 0],
-  红薯干: [1.35, 0], 半瓢水: [1.20, 0], 那件衣裳: [0.95, 0],
+  红薯干: [1.35, 0], 半瓢水: [1.20, 0], 那件衣裳: [0.95, 0], 水葫芦: [1.25, 0],
 };
 const HUD_ITEM_FALLBACK = [0.42, 0];   // 兜底那块木板足有 52 单位宽
 

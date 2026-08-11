@@ -157,7 +157,10 @@ const ARM_TOOL_TILT = { "扫帚": 0.42 };
 const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
   "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
   "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔",
-  "包袱布", "榆钱包袱"];
+  "包袱布", "榆钱包袱",
+  // 一碗红薯干、半瓢水、水葫芦都是**捧在手里**的：走肩挂那档会贴在肩窝，
+  // 妹妹那么小的个子，碗就正糊在脸上（视觉审查退回过「头是一只碗」）
+  "红薯干", "半瓢水", "水葫芦"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
@@ -1614,7 +1617,23 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "doorLeaf": mk((ctx, ax, ay) => ART.DrawDoorLeaf(ctx, ax, ay, p.id)); break;
-      case "vat": mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id)); break;
+      case "vat": {
+        // 缸里有水没水是戏：开场空镜「水缸见了底」、打满水之后「照得见人影」，
+        // 缸口那条水色亮带不能两头都画（视觉审查退回过：空缸亮着水面；
+        // 夜里地窖两口封着的腌菜缸泛蓝光）。院里那口跟 vatFilled 旗走，
+        // 七叔家那口一直有水，腌菜缸永远是干口
+        const Wet = (st) => (p.id === "yardVat" ? !!st?.flags.vatFilled : p.id === "qishuVat");
+        const vatMesh = mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id, { filled: Wet(state) }));
+        if (p.id === "yardVat") {
+          propRedraw.push({
+            flag: "vatFilled",
+            last: !!state?.flags.vatFilled,
+            run: (st) => RedrawProp(vatMesh, S, (ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id, { filled: Wet(st) })),
+          });
+        }
+        break;
+      }
+      case "beddingMat": mk((ctx, ax, ay) => ART.DrawBeddingMat(ctx, ax, ay, p.id)); break;
       case "tuberPile": mk((ctx, ax, ay) => ART.DrawTuberPile(ctx, ax, ay, p.id)); break;
       case "cellarShelf": mk((ctx, ax, ay) => ART.DrawCellarShelf(ctx, ax, ay, p.id)); break;
       case "shed": mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id)); break;
@@ -2835,7 +2854,10 @@ export function CreateWorld(canvasEl) {
     // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
     // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
     // （锯和锄本来就绕柄对称，不镜像也看不出来。）
-    s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs, bs, 1);
+    // 咬布压咳：布举到嘴边时收小半档——整块布巾原尺寸糊在脸上，
+    // 读出来是"咬着一床被子"，头都看不见了（视觉审查退回过）
+    const shrink = s.poseName === "clothMouth" ? 0.5 : 1;
+    s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs * shrink, bs * shrink, 1);
     if (alongArm) {
       // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上，
       // 再加上这件工具在手心里的固有偏角（扫帚不与前臂共线，见 ARM_TOOL_TILT）
