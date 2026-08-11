@@ -1119,14 +1119,16 @@ export function PoseRig(rig, s, dt) {
     // 胯沉到 0.12（侧躺的胯宽），躯干放平到 86°，腿蜷成一团；
     // 两只手收在胸前。膝、脚、头都压着算过：全落在 0.08~0.20，
     // 贴着铺盖不悬空也不陷地（SoleLift 按膝高判、躺着自然不抬）
-    // 再放平一档（2026-08-11 复审：手肘撑起+腿蜷太紧，特写下读成"手膝撑地
-    // 正要爬起"）：躯干放到 88°，胳膊收贴身子，腿只微曲——侧躺的长剪影
+    // 第三次放平（复审仍读"蜷跪/爬起"，且脚穿到铺盖线下）：病根是腿——
+    // 大腿放平了但小腿又折下去，脚戳进地面。侧躺的腿要**顺着躺的方向伸直**
+    // 只留一点膝弯：小腿世界角 ≈ −80°（大腿 −88 + 小腿 +8），脚背贴着铺盖，
+    // 整个人是一条低平的长剪影，臀不再拱起来
     target.hipY = -0.50; target.hipX = 0.05;
-    target.torso = 88 * DEG; target.head = -70 * DEG;
+    target.torso = 88 * DEG; target.head = -78 * DEG;
     target.armF = -70 * DEG; target.foreF = 130 * DEG;
     target.armB = -56 * DEG; target.foreB = 112 * DEG;
-    target.thighF = -84 * DEG; target.shinF = 58 * DEG; target.footF = 8 * DEG;
-    target.thighB = -68 * DEG; target.shinB = 44 * DEG; target.footB = 6 * DEG;
+    target.thighF = -88 * DEG; target.shinF = 8 * DEG; target.footF = 4 * DEG;
+    target.thighB = -74 * DEG; target.shinB = 6 * DEG; target.footB = 4 * DEG;
   } else if (s.pose === "clothMouth") {
     // 跪坐着把布巾咬在嘴上压咳：kneel 的下盘（真跪版：膝着地小腿后铺），
     // 近侧手把布**举到嘴边**——布巾走 carry（HandPoint 挂点），手到哪儿布

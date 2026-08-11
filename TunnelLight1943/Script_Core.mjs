@@ -2875,6 +2875,8 @@ export const SCRIPTS = {
             state.player.x = 30.5;
             state.player.heading = 1;
             FlashPose(state, "kneel", 3.8);
+            // 收幕的光圈套在兄妹身上（不给的话圆心落在空墙上，人整个出画）
+            state.irisFocus = { x: 31.0, y: 0.5 };
           } },
       ],
     },
@@ -2884,6 +2886,12 @@ export const SCRIPTS = {
       // 放下去、填上土。埋的动作与本作所有挖掘同一套笔画。
       kind: "chain", id: "c1_cellar", timeOfDay: "night",
       objective: "下到窖里，把爹娘的东西归置了", hint: "东西还照三天前那样，摊着",
+      onStart: (state) => {
+        // 妹妹在铺盖上睡着（黄昏那拍哄睡的延续；换拍的 ClearPoses 会把睡姿
+        // 抹掉，收幕光圈里她就站起来了——夜里他下窖，她得一直睡着）
+        const sis = FindActor(state, "sister");
+        if (sis) { sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+      },
       steps: [
         { type: "goto", zone: { x: 30.5, w: 3.2, level: "under" } },
         { type: "use", zone: { x: 33.9, w: 2.2, level: "under" }, hold: 1.4, stroke: "down", gestureY: 0.9,
@@ -3219,6 +3227,11 @@ export const SCRIPTS = {
       debugForce: (state) => { state.flags.coughChoice = "water"; },
       objective: "上去舀半瓢水，就回来", hint: "蹲着走。灯扫过来就贴住柴堆",
       resetHint: "灯扫着院子了。柱子缩回窖里，等脚步走远。",
+      onDone: (state) => {
+        // 瓢喝完收走（姿势由换拍的 ClearPoses 统一收）
+        const ty = FindActor(state, "tianYe");
+        if (ty) ty.carry = null;
+      },
       onStart: (state) => {
         const sis = FindActor(state, "sister");
         if (sis) { sis.following = false; sis.pose = "leanIn"; }
@@ -3249,27 +3262,26 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 30.4, w: 2.8, level: "under" } },
         { type: "use", zone: { x: 30.6, w: 2.9, level: "under" }, needs: "ladleWater", prompt: "E · 递过去",
           effect: (state) => {
-            // 递过去＝瓢真的换手：柱子俯身递，田大爷捧着瓢喝（clothMouth 的
-            // 手在嘴边，瓢跟着手——正是"一口一口顺下去"的读法）。
-            // 姿势写在微过场第一行的 on() 里：effect 里闪的 bow 到截帧时早过期
+            // 递过去＝瓢真的换手：柱子俯身递（闪姿盖满第一行），田大爷跪着
+            // 捧瓢就嘴（clothMouth 的手在嘴边，瓢跟着手——"一口一口顺下去"）。
+            // **姿势必须写在 effect 里**：微过场的行不执行 on()（引擎语义，
+            // 上一版挂在行上等于没写，四个人站着干念字幕）
+            const ty = FindActor(state, "tianYe");
+            if (ty) { ty.carry = "半瓢水"; ty.pose = "clothMouth"; ty.heading = 1; }
+            state.player.x = Math.min(state.player.x, 30.5);
+            state.player.heading = -1;
+            FlashPose(state, "bow", 3.2);
             StartMicroCine(state, [
               { stage: "水一口一口顺下去。咳，压住了。", d: 3.0,
-                cam: { kind: "insert", x: 30.3, y: UNDER_Y + 0.75, dist: 2.6 },
-                on: (st) => {
-                  const ty = FindActor(st, "tianYe");
-                  if (ty) { ty.carry = "半瓢水"; ty.pose = "clothMouth"; ty.heading = 1; }
-                  st.player.x = Math.min(st.player.x, 30.5);
-                  st.player.heading = -1;
-                  FlashPose(st, "bow", 3.0);
-                } },
+                cam: { kind: "insert", x: 30.3, y: UNDER_Y + 0.75, dist: 2.6 } },
               { stage: "田大爷抬起眼皮看了看他，没说话。", d: 2.8,
-                cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.85, dist: 2.4 },
-                on: (st) => {
-                  const t2 = FindActor(st, "tianYe");
-                  if (t2) { t2.carry = null; t2.pose = "kneel"; }
-                } },
+                cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.85, dist: 2.4 } },
             ]);
           } },
+        // 垫一步再收束：递水若是最后一步，AdvanceBeat 的 ClearPoses 会在
+        // effect 摆完姿势的同一帧把它抹掉——微过场里四个人站着干念字幕
+        //（实拍两轮都栽在这儿）。人本来就站在区里，微过场一完这步自动过
+        { type: "goto", zone: { x: 30.4, w: 2.9, level: "under" } },
       ],
     },
     {
@@ -3337,13 +3349,13 @@ export const SCRIPTS = {
             Cue(state, "step", { gain: 0.8 });
           } },
         { stage: "枪托笃、笃地砸着地。砸到窖口那一下——声音是空的。", d: 3.8,
-          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.9, dist: 3.0 },
+          cam: { kind: "insert", x: 29, y: UNDER_Y + 2.1, dist: 3.4 },
           on: (state) => {
             Cue(state, "knock", { gain: 1.2, rate: 0.8 });
             Cue(state, "knock", { gain: 1.3, rate: 0.7, delay: 1.0 });
           } },
         { stage: "上面静了静。跟着，有什么顺着盖板缝别了进来——盖板让它撬得翘起一条缝。", d: 4.6,
-          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.9, dist: 3.2 },
+          cam: { kind: "insert", x: 29, y: UNDER_Y + 2.2, dist: 3.6 },
           on: (state) => {
             // 撬要看得见：盖板真的翘开一条缝（state.lid 常立着，World 按它转角）。
             // open 走 smoothstep，0.3 折出来约 13°——一条明晃晃的缝，天光漏进来。
