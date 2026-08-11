@@ -11,10 +11,10 @@
 // 跑到任意一拍并把状态打出来（state）、把实拍那套固化成一条命令（shot）。
 //
 //   node TunnelLight1943/Script_Cli.mjs where 锄头
-//   node TunnelLight1943/Script_Cli.mjs beat c1_ropeline
-//   node TunnelLight1943/Script_Cli.mjs state c1_ropeline --x 35.6 --input "e,d*90"
-//   node TunnelLight1943/Script_Cli.mjs shot c1_ropeline --hold d --dur 4 --phases 6
-//   node TunnelLight1943/Script_Cli.mjs shot "c1_barrow@tunnelDug=0" "c1_barrow@tunnelDug=1,out=通了"
+//   node TunnelLight1943/Script_Cli.mjs beat c1_well
+//   node TunnelLight1943/Script_Cli.mjs state c1_well --x 43.0 --input "e,d*90"
+//   node TunnelLight1943/Script_Cli.mjs shot c1_well --hold d --dur 4 --phases 6
+//   node TunnelLight1943/Script_Cli.mjs shot "c2_digout@x=42.3,level=under,digStarted=0" "c2_digout@x=43,level=under,tunnelDug=1,out=通了"
 //   node TunnelLight1943/Script_Cli.mjs doctor
 //
 // 铁律：**要问游戏状态先跑这个，别再现写探针脚本**。缺什么子命令就往这儿加，
@@ -185,9 +185,15 @@ async function CmdBeat(o) {
     });
   }
   if (Array.isArray(def.lines)) {
-    console.log(`台词 ${def.lines.length} 句：`);
+    // 每句标出时长与累计起点：给 shot 的 --dur/--phases 对时用
+    //（phases 是在 --dur 里均匀采样，dur 不给够就只拍得到前几句）
+    const total = def.lines.reduce((s, l) => s + (l.d || 0), 0);
+    console.log(`台词 ${def.lines.length} 句（共 ${total.toFixed(1)}s）：`);
+    let acc = 0;
     def.lines.slice(0, Number(o.lines || 6)).forEach((l, i) => {
-      console.log(`  ${i}. ${l.who ? l.who + "：" : l.stage ? "（场）" : ""}${(l.say || l.stage || "").slice(0, 60)}`);
+      const tag = `[${acc.toFixed(1)}s +${(l.d || 0).toFixed(1)}]`;
+      acc += l.d || 0;
+      console.log(`  ${i}. ${tag} ${l.who ? l.who + "：" : l.stage ? "（场）" : ""}${(l.say || l.stage || "").slice(0, 60)}`);
     });
     if (def.lines.length > (Number(o.lines || 6))) console.log(`  …（--lines 调）`);
   }
@@ -357,8 +363,8 @@ async function CmdState(o) {
 // 拍一张不到 1 秒，13 拍分开拍是 78 秒，连着拍 ~20 秒）。跨章也不用重开页面：
 // JumpToBeat 本来就吃章号。
 //
-//   shot c1_barrow c1_dig c1_testGo
-//   shot "c1_barrow@x=41,level=under,digStarted=0" "c1_dig@x=44,level=under"
+//   shot c1_forage c1_cellar c2_digout
+//   shot "c2_digout@x=42.3,level=under,digStarted=0" "c2_crawl@x=44,level=under"
 //
 // 每一拍后面可以用 @ 挂自己的参数，逗号分隔。**认识的键是参数，不认识的一律
 // 当旗标**（x/level/hold/dur/pre/actor/cine/out 之外的都是旗标），省得再记一套语法。
@@ -368,7 +374,7 @@ async function CmdState(o) {
 // 当成旗标吃掉，链式节拍永远停在第 0 步（用法里写着、实际从来没生效）
 const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step"]);
 
-// "c1_dig@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
+// "c2_digout@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
   const at = spec.indexOf("@");
   const id = at < 0 ? spec : spec.slice(0, at);
@@ -509,12 +515,33 @@ async function CmdShot(o) {
       for (const k of held) await page.keyboard.down(k);
       const clip = jo.clip ? (() => { const [x, y, w, h] = String(jo.clip).split(",").map(Number); return { x, y, width: w, height: h }; })() : undefined;
       for (let i = 0; i < phases; i += 1) {
-        await page.waitForTimeout((dur / phases) * 1000);
+        // **--dur 量的是游戏钟，不是墙钟。** 无头合成器一忙 rAF 掉到十几帧、
+        // dt 每帧又有钳制，按墙钟等 dur 秒实际只走了三分之一的戏——
+        // c2_endure 四张相位全拍在第 0 句上就是这么来的。没按键的拍，相位间
+        // 直接用 StepFrames 把游戏时间推够数（眨眼到位，长过场也不用干等）；
+        // 真按着键的拍必须让 rAF 真跑（StepFrames 喂的是空输入，会把按住的键
+        // 冲掉），就盯着 state.time 等游戏钟走满，墙钟慢多少都不怕
+        const slice = dur / phases;
+        if (held.length) {
+          await page.evaluate(async (want) => {
+            const tl = window.TunnelLight;
+            const t0 = tl.state.time;
+            const cap = Date.now() + want * 6000 + 4000;
+            await new Promise((res) => {
+              const poll = () => ((tl.state.time - t0 >= want) || Date.now() > cap ? res() : setTimeout(poll, 60));
+              poll();
+            });
+          }, slice);
+        } else if (slice > 0.01) {
+          await page.evaluate((n) => window.TunnelLight.StepFrames(n, {}), Math.max(1, Math.round(slice * 30)));
+          await page.waitForTimeout(420);   // 等镜头缓动与下一次真合成追上推完的状态
+        }
         const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
         await page.screenshot({ path: file, clip });
         const s = await page.evaluate((wantProbe) => {
           const st = window.TunnelLight.state;
-          const out = { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex };
+          const out = { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex, line: st.beat?.lineIndex,
+            lineT: st.beat?.lineT === undefined ? undefined : +st.beat.lineT.toFixed(1), micro: !!st.microCine };
           if (wantProbe) {
             // 只报两件**有明确对错**的（好不好看得自己看图，这里不掺和）：
             // 深度带用错了没有、人的手脚有没有悬空/陷地
@@ -524,7 +551,7 @@ async function CmdShot(o) {
           return out;
         }, !!o.probe);
         files.push(file);
-        console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step} prompt=${JSON.stringify(s.prompt)}`);
+        console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step}${s.line !== undefined ? ` line=${s.line} lineT=${s.lineT}` : ""}${s.micro ? " micro!" : ""} prompt=${JSON.stringify(s.prompt)}`);
         if (o.probe) {
           console.log(`      深度告警 ${s.depth.length ? s.depth.join(" / ") : "无"}`);
           if (s.limbs) console.log(`      手脚离地 ${Object.entries(s.limbs).map(([k, v]) => `${k}=${v}`).join(" ")}`);
@@ -586,9 +613,9 @@ const HELP = `《地道里的光》命令行工作台
       输入 token：d右 a左 s下梯 w上梯 e按一下 E按住 c蹲 . 空转 adv推过场；token*N 重复
   shot <beatId ...> [选项] 实拍（真浏览器、真键盘），存进 _shots/
       **一条命令可以拍好几拍**，共用一个浏览器（跨章也不用重开页面）：
-        shot c1_well c2_escape1 c8_wall
+        shot c1_well c2_crawl c8_wall
       每一拍可以用 @ 挂自己的参数，逗号分隔；**不认识的键一律当开关**：
-        shot "c1_barrow@x=41,level=under,tunnelDug=0" "c1_barrow@x=41,tunnelDug=1,out=通了"
+        shot "c2_digout@x=42.3,level=under,tunnelDug=0" "c2_digout@x=43,level=under,tunnelDug=1,out=通了"
       --x N --step N --pre "e" --hold d --dur 4 --phases 6 --actor father --clip x,y,w,h --out 名
       --step N         链式节拍直接落到第 N 步（看某一步长什么样；不是可达性验证）
       --flag k=v,k=v   所有拍共用的开关默认值（@ 里写的盖过它）

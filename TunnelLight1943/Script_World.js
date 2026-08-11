@@ -459,7 +459,15 @@ export function CreateWorld(canvasEl) {
   const edgeHudTex = new Map();
   let collapseMeshes = {};
   let itemMeshes = [];
-  let carveState = { marked: false, carved: false }, carveRebuild = null;
+  let carveState = { marked: false, carved: false, tally: 0 }, carveRebuild = null;
+  // 妹妹的正字画到第几道（剧本新生第一章）：开局门框上已有两道，
+  // 玩家添完第三道（tallied）；第二章跳到十三道（tallyMany）
+  const TallyCount = (state) => {
+    const f = state?.flags || {};
+    if (!f.tallyBase) return 0;
+    if (f.tallyMany) return 13;
+    return f.tallied ? 3 : 2;
+  };
   let otsMesh = null;
   let otsHiddenId = null;
   let vignetteAlpha = 0;
@@ -470,6 +478,9 @@ export function CreateWorld(canvasEl) {
   let cartMesh = null, cartWheel = null;
   // 窖口盖板：每个竖井一块，绕铰链掀开（UpdateProps 每帧读 state.lid 转角度）
   let lidMeshes = [];
+  // 村口窖井的天光贴片（光要跟着盖板走——盖严了还往下泼光，「捂住别出声」的
+  // 黑就没了）。只登记村子这两口窖；c3 起地道群像的光照不在本次翻新范围
+  let shaftBeamMeshes = [];
   let thrownMesh = null;
   let winchRope = null, winchBucket = null, winchBucketFull = null, winchCrank = null,
     winchGuide = null, winchCoil = null;
@@ -575,6 +586,7 @@ export function CreateWorld(canvasEl) {
     relicMeshes.clear();
     if (relicGlow) layers.play.remove(relicGlow);
     relicGlow = null;
+    shaftBeamMeshes = [];
     for (const m of foreTufts) layers.fore.remove(m);
     foreTufts = [];
     mountMeshes.clear();
@@ -1608,7 +1620,10 @@ export function CreateWorld(canvasEl) {
       case "shed": mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id)); break;
       case "oldDoors": mk((ctx, ax, ay) => ART.DrawOldDoors(ctx, ax, ay, p.id)); break;
       case "cartShafts": mk((ctx, ax, ay) => ART.DrawCartShafts(ctx, ax, ay, p.id)); break;
-      case "wallNotice": mk((ctx, ax, ay) => ART.DrawNoticeWall(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "wallNotice": mk((ctx, ax, ay) => ART.DrawNoticeWall(ctx, ax, ay, p.w * PPM, p.id, { scars: !!p.scars })); break;
+      case "stove": mk((ctx, ax, ay) => ART.DrawStove(ctx, ax, ay, p.id)); break;
+      case "spinWheelBroken": mk((ctx, ax, ay) => ART.DrawSpinWheelBroken(ctx, ax, ay, p.id)); break;
+      case "clothBundle": mk((ctx, ax, ay) => ART.DrawClothBundle(ctx, ax, ay, p.id)); break;
       case "pigpen": mk((ctx, ax, ay) => ART.DrawPigpen(ctx, ax, ay, p.id)); break;
       case "nook": {
         // 藏口的三态（敞着 / 塞了粮袋 / 上了覆土板）跟着旗标走，
@@ -2109,12 +2124,16 @@ export function CreateWorld(canvasEl) {
     PlaceSprite(back, range[0] - 2, UNDER_Y, BACK_Z);
     group.add(back);
 
-    // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去
+    // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去。
+    // **爬行段不栽**：柱子是按走廊净高（2m）烘的，插进 0.72m 的窄爬段就是
+    // 一块顶天立地的门板，z=1.6 那批还站在演员前面——第二章防兵洞里爬行的
+    // 玩家整个被它罩住（2026-08-11 染红排查出来的）。现实里窄爬段也立不起顶木
     const beamZ = [BACK_Z + 1.2, -2.4, -0.3, 1.6];
     let bi = 0;
     const inSeg = (wx) => segs.some(([a, b]) => wx >= a + 0.5 && wx <= b - 0.5);
     for (let x = range[0] + 3; x < range[1] - 2; x += 2.8 + ART.Hash(sceneKey + "gap" + Math.round(x)) * 3.4) {
       if (!inSeg(x)) continue;
+      if (TunnelPosture(sceneDef, x) === "crawl") continue;
       const z = beamZ[bi % beamZ.length];
       bi += 1;
       const beamH = Math.ceil((TUN_TOP - UNDER_Y) * PPM);
@@ -2234,6 +2253,13 @@ export function CreateWorld(canvasEl) {
       beam.material.depthWrite = false;
       // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的
       beam.material.opacity = (CHAPTERS[state.chapterIndex].light === "day" ? 1 : 0.3);
+      // 村里的窖口有盖板，光得跟盖板走（UpdateProps 的盖板循环里驱动）：
+      // 拉严了还往下泼整道天光，第二章「捂住别出声」的黑就不成立了
+      if (CHAPTERS[state.chapterIndex].scene === "village") {
+        beam.userData.beamShaftId = g.id;
+        beam.userData.beamBase = beam.material.opacity;
+        shaftBeamMeshes.push(beam);
+      }
       group.add(beam);
     }
 
@@ -2368,7 +2394,7 @@ export function CreateWorld(canvasEl) {
     builtKey = key;
     flagProps = [];
     propRedraw = [];
-    carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved };
+    carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
     carveRebuild = null;
     ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
     for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
@@ -3141,13 +3167,17 @@ export function CreateWorld(canvasEl) {
     const def = CurrentBeatDef(state);
 
     // 收藏品：收走的隐掉；离得近的那件闪一点微光（勇敢的心的引导手法——
-    // 光比东西先被看见）。只闪最近的一件，别一屏好几处都在眨
+    // 光比东西先被看见）。只闪最近的一件，别一屏好几处都在眨。
+    // 过场/微过场/憋气的 hold 里不闪：那会儿玩家不掌镜也捡不了，一粒眨个
+    // 不停的白星挂在戏正中（c2 出洞那一镜的鞋底、捂嘴那拍的边区票都赶上过）
+    // 只会把眼睛从戏上拽走
     {
+      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine;
       let glowAt = null;
       for (const [id, rec] of relicMeshes) {
         const got = state.relicsGot?.has(id);
         rec.mesh.visible = !got;
-        if (got) continue;
+        if (got || !glowOk) continue;
         const sameLevel = (rec.r.level || "surface") === state.player.level;
         const d = Math.abs(state.player.x - rec.r.x);
         if (sameLevel && d < 4.5 && (!glowAt || d < glowAt.d)) glowAt = { rec, d };
@@ -3201,6 +3231,15 @@ export function CreateWorld(canvasEl) {
       const k = open * open * (3 - 2 * open);
       // 开到 62° 就够：竖到 78° 那块板在侧视里几乎成一条竖线，还压过人头顶
       lid.rotation.z = k * (62 * Math.PI / 180);
+      // 光跟着盖板走（只有村口的窖登记在册）。爬梯的瞬时开合（state.lid）与
+      // 剧情的开合取更亮的那个：自家窖口在「拉严」旗标落下之前默认敞着
+      //（c1/c8 的老观感不动），拉严那一下光当场收死——那声闷响就该带走光；
+      // 七叔家的窖口默认盖着（柴禾还堵着），章末掀开才放光下来
+      const bm = shaftBeamMeshes.find((b) => b.userData.beamShaftId === lid.userData.lidId);
+      if (bm) {
+        const story = lid.userData.lidId === "cellarHatch" ? (state.flags.lidShut ? 0 : 1) : 0;
+        bm.material.opacity = bm.userData.beamBase * (0.12 + 0.88 * Math.max(k, story));
+      }
     }
     StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：
@@ -3498,10 +3537,11 @@ export function CreateWorld(canvasEl) {
       for (const m of lampMeshes) { m.body.visible = false; m.glow.visible = false; }
     }
 
-    // 刻痕
+    // 刻痕与正字（妹妹的正字跟刻痕同一张贴图：划完那一笔当帧长出来）
     {
-      const marks = { marked: !!state.flags.marked, carved: !!state.flags.carved };
-      if (marks.marked !== carveState.marked || marks.carved !== carveState.carved) {
+      const marks = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
+      if (marks.marked !== carveState.marked || marks.carved !== carveState.carved
+        || marks.tally !== carveState.tally) {
         carveState = marks;
         carveRebuild?.(marks);
       }

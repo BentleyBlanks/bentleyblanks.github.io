@@ -679,6 +679,44 @@
       },
       "note": "空狗窝：村里的狗 1939 年就统一打光了（狗叫暴露夜间行动）。要画出\"狗不在了的位置\"",
       "shadow": 0.24
+    },
+    "stove": {
+      "art": "DrawStove",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.22,
+      "sprite": {
+        "w": 96,
+        "h": 84,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "土坯灶：新剧本第一章开场那眼冷灶（柱子家 interior 陈设，立面半隐才看得见）"
+    },
+    "spinWheelBroken": {
+      "art": "DrawSpinWheelBroken",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.2,
+      "sprite": {
+        "w": 96,
+        "h": 64,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "踩碎的纺车：娘的纺车倒在屋山墙外，扫荡的痕迹——无交互，镜头看一眼就走（剧本新生§1）"
+    },
+    "clothBundle": {
+      "art": "DrawClothBundle",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 64,
+        "h": 40,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "窖角草苫下的深色包袱（带血的衣裳）：第一章夜里唯一的特写；埋掉后 hideFlag 收走。渍色按 sRGB 老账压两档，不做清晰血污"
     }
   },
   "_coversNote": [

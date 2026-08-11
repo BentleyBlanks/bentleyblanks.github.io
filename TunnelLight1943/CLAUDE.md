@@ -2,6 +2,20 @@
 
 《地道里的光》2.5D 横版白盒。改这个目录前先读本文件；改完跑「验证」一节。
 
+## 剧本口径（2026-08-11 起）
+
+- **一二章按 Notion「剧本新生」重写**：c1「善意的谎言」（扫荡后第三天，兄妹
+  相依：找吃的/正字对话选择/井台打水/夜埋血衣）、c2「地洞里的眼睛」（梳篦
+  扫荡：下窖/捂嘴听声/伤员两难抉择/挖开祖辈防兵洞爬出去）。爹娘在开场前的
+  扫荡中遇难——序章 9-11 镜的文案交代，短片沿用。
+- **c3 起仍是旧线**（救妹妹/沙河庄地道），与新一二章的叙事**尚未接上**，
+  待按剧本新生逐章翻新；`PLAYABLE_CHAPTERS = 2`，玩家只见前两章。
+- 抉择节拍支持 `flagKey`（落进哪面旗）与 `when`（分支拍整拍跳过），
+  第二章舀水/忍着两支就是样板。
+- three.js 已收进 `vendor/three/`（不再吃 jsdelivr CDN——断网/被墙就是黑屏）。
+- 新台词的配音还没烘（Voice_Manifest 里没有的行静默出字幕）；
+  在有 TTS 环境的机器上跑 `Script_VoiceExtract` + Qwen 烘焙流程补齐。
+
 ## 先用命令行工作台，别一上来就读源码
 
 ```bash
@@ -29,7 +43,7 @@ node TunnelLight1943/Script_Cli.mjs
   「没挖通 / 挖了一半 / 挖通了」三张对比图就得能手拨：
 
   ```bash
-  node TunnelLight1943/Script_Cli.mjs shot "c1_barrow@x=41,level=under,tunnelDug=0" "c1_barrow@x=41,level=under,digStarted=1,out=挖了一半" "c1_barrow@x=41,level=under,tunnelDug=1,out=通了"
+  node TunnelLight1943/Script_Cli.mjs shot "c2_digout@x=42.3,level=under,tunnelDug=0" "c2_digout@x=42.5,level=under,digStarted=1,out=挖了一半" "c2_digout@x=43,level=under,tunnelDug=1,out=通了"
   ```
 
   `@` 后面**认识的键是参数（x/level/hold/dur/pre/actor/cine/out/clip/phases），
@@ -333,8 +347,11 @@ npm run scene:tunnelLight1943
   动画完全由 `(seg, 本行已走秒数)` 驱动——游戏时钟给的，无头实拍逐帧对得上。
 - 一段连续演出拆成几个 seg 挂在相邻几行上，行的 `d` 就是该段时长；音效照旧
   在行的 `on()` 里 Cue。日军讲日语无字幕，这类段落只给同期声（引擎/风/乌鸦）。
-- 实拍时注意：`shot --dur --phases` 的墙钟比游戏时钟慢 3~4 秒（跳拍预滚 +
-  等 iris），对时要靠画面内容不是靠算。
+- 实拍对时：`shot --dur --phases` 的 **dur 量的是游戏钟**——没按键的拍相位间
+  用 StepFrames 把游戏时间推够数（长过场秒拍完），按着键的拍盯着 `state.time`
+  等游戏钟走满。别再按墙钟折算（无头合成器上墙钟慢 3~4 倍，按墙钟等只会把
+  相位全拍在第一句上）。`beat <id>` 会逐句打出 `[起点s +时长]`，dur 照它给：
+  给到总时长再留半秒余量，最后一相位才不会滚进下一拍。
 - 画里的经验：正面剪影的兵**两条腿必须分开画**（连成一片读成披袍的）；
   斜背的步枪是一道短斜线加一点刺刀尖，竖着画就成了长矛；骑车的人身下要有
   发动机的黑铁块和踩踏板的脚，否则人浮在半空；挎斗必须贴着车再加两根连杆。
@@ -884,7 +901,7 @@ node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提�
 改完某一拍，最快的自检是把它单独跑一遍再看一眼：
 
 ```bash
-node TunnelLight1943/Script_Cli.mjs state c1_ropeline --x 35.6 --input "e,d*300"
+node TunnelLight1943/Script_Cli.mjs state c1_well --x 43.0 --input "e,d*300"
 ```
 
 改台词以代码为准，用 scratchpad 的 extract-script 流程回写 Notion（见项目记忆）。

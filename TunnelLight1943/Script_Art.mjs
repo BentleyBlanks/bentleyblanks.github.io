@@ -1196,6 +1196,34 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
   } else if (label === "窝头") {
     InkFill(ctx, [[-5.5 * S, 3 * S], [-4 * S, -3.5 * S], [0, -6 * S], [4 * S, -3.5 * S], [5.5 * S, 3 * S]],
       "bun", "#c8a35c", { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.16)" });
+  } else if (label === "红薯干") {
+    // 油布包着的一把红薯干：布角挽着，两三片干条从口上露出来
+    InkFill(ctx, [[-5.5 * S, 3.5 * S], [-5 * S, -2.5 * S], [0, -4.5 * S], [5 * S, -2.5 * S], [5.5 * S, 3.5 * S]],
+      "yamWrap", "#7a6a4c", { amp: 0.7 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.18)" });
+    for (let i = 0; i < 3; i += 1) {
+      InkLine(ctx, (-2.4 + i * 2.2) * S, -3.6 * S, (-1.6 + i * 2.4) * S, -6.4 * S,
+        "yamStrip" + i, { lw: 1.6 * S, color: "#9a6a3c", amp: 0.5 * S });
+    }
+    InkLine(ctx, -3.4 * S, -2.6 * S, 3.4 * S, -2.8 * S, "yamTie", { lw: 1.0 * S, color: "#4e4234", amp: 0.4 * S });
+  } else if (label === "半瓢水") {
+    // 一只葫芦瓢：柄短口浅，水面一线亮
+    InkFill(ctx, [[-6 * S, 0], [-4.5 * S, 3.5 * S], [4.5 * S, 3.5 * S], [6 * S, 0]],
+      "ladle", "#a08a52", { amp: 0.5 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.18)" });
+    InkLine(ctx, 5.6 * S, -0.4 * S, 9.6 * S, -2.4 * S, "ladleGrip", { lw: 2.0 * S, color: "#8a6f42", amp: 0.4 * S });
+    InkFill(ctx, Rect(-4.2 * S, 0.2 * S, 8.4 * S, 1.6 * S), "ladleWater", "#4d6a78", { amp: 0.3 * S, lw: 0.8 * S });
+  } else if (label === "那件衣裳") {
+    // 叠得整整齐齐抱在怀里的深色衣裳。渍色按 sRGB 老账压两档——
+    // 是一角发暗的印子，不是清晰的血污（历史与叙事铁律：不做伤口特写）
+    InkFill(ctx, [[-8 * S, 4 * S], [-7.5 * S, -3 * S], [7.5 * S, -3 * S], [8 * S, 4 * S]],
+      "grief", "#4a4038", { amp: 0.8 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.22)" });
+    InkLine(ctx, -6.5 * S, -0.5 * S, 6.5 * S, -0.2 * S, "griefFold", { lw: 0.9 * S, color: "rgba(28,22,18,0.6)", amp: 0.8 });
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#38201c";
+    ctx.beginPath();
+    ctx.ellipse(3.4 * S, 1.8 * S, 2.6 * S, 1.7 * S, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   } else if (label === "麻绳") {
     // 一盘草绳：圈要小（真绳盘也就半尺），留一截绳头耷拉出来才读得出是绳。
     // 原先半径给到 (4+2×2.2)×S，落地物又按 S=2 画——地上躺一个磨盘大的甜甜圈
@@ -1614,16 +1642,14 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
     InkFill(ctx, [[cx2 - 10, stackTop + 1], [cx2 + 10, stackTop + 1],
       [cx2 + 8.5, stackTop - 7], [cx2 + 1, stackTop - 9], [cx2 - 8, stackTop - 6]],
     id + "crock", "#4a3f33", { amp: 1.4, lw: 1.8 });
-    // 熏黑：罐口一圈最黑，往上散
+    // 熏黑：只熏罐口一圈。上方那团悬空的淡晕已删——它飘在罐口上头半尺，
+    // 远看就是一缕炊烟，把「家家烟囱都没冒烟」那句开场白当场拆台
+    //（新剧本第一章的安静全指着这类"没有"）。烟真要冒，另走动效，不烙在贴图上
     ctx.save();
     ctx.globalAlpha = 0.34;
     ctx.fillStyle = "#2b241c";
     ctx.beginPath();
     ctx.ellipse(cx2 + 1, stackTop - 8, 7, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 0.16;
-    ctx.beginPath();
-    ctx.ellipse(cx2 + 4, stackTop - 15, 9, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -1719,7 +1745,7 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
   }
 }
 
-export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false } = {}) {
+export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false, tally = 0 } = {}) {
   const H = 74, W = 40;
   InkFill(ctx, Rect(x - W / 2, groundY - H, 8, H), id + "l", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
   InkFill(ctx, Rect(x + W / 2 - 8, groundY - H, 8, H), id + "r", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
@@ -1739,16 +1765,54 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   // 划出来的亮线一对比，「长了多少」不用一个字。57px≈1.19m，比今年矮 9cm
   // 凿槽的画法：一道暗槽 + 槽下沿一线亮茬（新茬被晒旧后仍比木面浅）——
   // 单画一根半透明细线在晨雾里读不出来（实测过）
-  InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
-    id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
-  InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
-    id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
+  // 正字模式下（tally>0，剧本新生一二章）这道旧凹槽要收掉：它没了下文
+  //（量身那场戏已不存在），挂在道道正上方就会被玩家数进正字里
+  if (!tally) {
+    InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
+      id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
+    InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
+      id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
+  }
   if (marked) {
     InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
   if (carved) {
     // 第八章给妹妹刻的：矮一头（1.08m）
     InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 1.8, color: "#fff0c8", amp: 0.4 });
+  }
+  // 妹妹的正字（剧本新生第一章）：爹娘走后一天一道，五道一个"正"。
+  // 画在左立柱孩子够得着的高度（第一个字的中横 = 0.98m，与划线玩法的 markY
+  // 对齐——玩家亲手划的就是这一笔，划完消失，这里长出永久的那道）。
+  // 笔顺：横、竖、横、竖、横。当天新添的那道比前几天的亮一档。
+  if (tally > 0) {
+    // 道道收在柱面里侧（探到柱边就读成缠在柱子上的布条），笔画要细——
+    // 特写下 1.7px 的白线已经是一根白鞋带了
+    const jx0 = x - W / 2 + 1.8, jx1 = x - W / 2 + 6.9;
+    const cxm = (jx0 + jx1) / 2;
+    // 每一道都是「暗底线 + 亮痕」两笔：石笔的白痕淡，单画在浅木色上就是隐形
+    //（c2 开场那一镜实拍过一版，一道都看不见）。暗线垫底，亮痕才立得住
+    const strokeTwice = (x0, y0, x1, y1, s, fresh) => {
+      InkLine(ctx, x0, y0 + 0.6, x1, y1 + 0.6, id + "tyd" + s,
+        { lw: fresh ? 1.6 : 1.4, color: "rgba(52,38,22,0.5)", amp: 0.3 });
+      InkLine(ctx, x0, y0, x1, y1, id + "ty" + s,
+        { lw: fresh ? 1.15 : 0.95, color: fresh ? "#f6ead0" : "#e2d2ac", amp: 0.3 });
+    };
+    for (let s = 0; s < tally; s += 1) {
+      const char = Math.floor(s / 5), st = s % 5;
+      // 字距 13px：字身 7.6px 高，隔出多半道的空，两个字才数得开
+      //（11px 时上下字只差 3px，十三道糊成一条梯子）；每个字整体
+      // 歪那么一小下——孩子一天写一笔，三个字不会排成印刷体
+      const jit = (Hash(id + "tj" + char) - 0.5) * 1.6;
+      const cy = groundY - 47 + char * 13;
+      const top = cy - 4, mid = cy, bot = cy + 3.6;
+      const fresh = s === tally - 1;
+      const a0 = jx0 + jit, a1 = jx1 + jit, cm = cxm + jit;
+      if (st === 0) strokeTwice(a0, top, a1, top + 0.3, s, fresh);
+      else if (st === 1) strokeTwice(cm, top, cm + 0.3, bot - 1, s, fresh);
+      else if (st === 2) strokeTwice(a0, mid, a1, mid - 0.3, s, fresh);
+      else if (st === 3) strokeTwice(a0 + 1.4, mid, a0 + 1.2, bot, s, fresh);
+      else strokeTwice(a0, bot, a1, bot - 0.2, s, fresh);
+    }
   }
 }
 
@@ -4163,19 +4227,51 @@ export function DrawCellarShelf(ctx, x, groundY, id) {
     id + "cloth", "#a8927a", { amp: 1.2, lw: 1.4 });
 }
 
-// 空牲口棚。柱子要**真的歪**（注释说歪、几何是直的等于没歪），一根还接过一段；
-// 草顶中段压塌、开一个洞、檐口垂下乱草；食槽是掏空的整根圆木，槽沿留着
-// 牲口啃出来的月牙凹痕——**那道凹痕比槽里有草更能说明"原来有牲口"**。
+// 牲口棚——扫荡那天烧塌了半边（剧本新生第一章）。
+// 西半边：顶子整个落了架，两三根椽子烧成黑茬斜插着，墙根堆着灰；
+// 东半边还立着：歪柱、草顶、食槽都在。**槽沿牲口啃出来的月牙凹痕保留**——
+// 那道凹痕比槽里有草更能说明"原来有牲口"；如今连牲口带棚，都只剩一半。
 export function DrawShed(ctx, x, groundY, id) {
   const W = 210, H = 105;
-  // 棚下的暗腔：全画面最黑的一块之一
-  InkFill(ctx, [[x - W / 2 + 12, groundY], [x - W / 2 + 16, groundY - H * 0.72],
+  // 棚下的暗腔：只剩东半边还有"里头"
+  InkFill(ctx, [[x - 14, groundY], [x - 10, groundY - H * 0.66],
     [x + W / 2 - 10, groundY - H * 0.62], [x + W / 2 - 6, groundY]],
   id + "void", "#241d16", { amp: 2.0, lw: 2.0 });
-  // 两根歪柱：左柱上端往右挪、柱脚塞楔石；右柱 2/3 高处接过一段，缠三道草绳
-  InkLine(ctx, x - W / 2 + 10, groundY, x - W / 2 + 19, groundY - H * 0.74, id + "postL",
-    { lw: 5, color: PAL.woodOld, amp: 1.6 });
-  InkFill(ctx, Rect(x - W / 2 + 6, groundY - 5, 10, 5), id + "wedge", "#6b6252", { amp: 1.2, lw: 1.4 });
+  // —— 西半边：烧塌的那半 ——
+  // 塌下来的顶：一大片焦草歪斜地搭到地上（压得低、颜色沉——烧过的草不发黄）
+  InkFill(ctx, [[x - W / 2 + 2, groundY], [x - W / 2 + 8, groundY - H * 0.34],
+    [x - 26, groundY - H * 0.50], [x - 10, groundY - H * 0.18], [x - 14, groundY]],
+  id + "fallRoof", "#3d3220", { amp: 2.6, lw: 2.2, shade: "rgba(20,14,8,0.34)" });
+  // 烧断的椽子：黑茬。**至少一根要探过屋面的剪影**——"塌了"这件事远看
+  // 全靠天际线上那一道斜茬说，埋在墙色里等于没画
+  InkLine(ctx, x - W / 2 + 16, groundY, x - W / 2 + 34, groundY - H * 0.86, id + "charA",
+    { lw: 4.6, color: "#2b211a", amp: 1.2 });
+  InkLine(ctx, x - W / 2 + 40, groundY - 4, x - W / 2 + 50, groundY - H * 0.62, id + "charB",
+    { lw: 3.8, color: "#332619", amp: 1.4 });
+  InkLine(ctx, x - 30, groundY - H * 0.10, x - 50, groundY - H * 0.46, id + "charC",
+    { lw: 3.2, color: "#2b211a", amp: 1.2 });
+  // 椽头的焦白（烧透的木头茬发灰白，不是纯黑）
+  for (const [tx, ty] of [[x - W / 2 + 34, groundY - H * 0.86], [x - W / 2 + 50, groundY - H * 0.62]]) {
+    ctx.save();
+    ctx.fillStyle = "rgba(150,138,120,0.5)";
+    ctx.beginPath(); ctx.ellipse(tx, ty, 2.6, 1.6, 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // 墙根的灰堆：埋着瓦罐的那片烧土（第一章"找吃的"翻的就是这儿）
+  InkFill(ctx, [[x - W / 2 + 8, groundY], [x - W / 2 + 16, groundY - 9],
+    [x - W / 2 + 36, groundY - 11], [x - W / 2 + 52, groundY - 6], [x - W / 2 + 58, groundY]],
+  id + "ash", "#4e463c", { amp: 1.8, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "#8a8074";
+  for (let i = 0; i < 4; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(x - W / 2 + 18 + i * 10, groundY - 4 - Hash(id + "af" + i) * 5, 4.5, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // —— 东半边：还立着的那半 ——
+  // 右柱 2/3 高处接过一段，缠三道草绳
   InkLine(ctx, x + W / 2 - 12, groundY, x + W / 2 - 14, groundY - H * 0.42, id + "postRa",
     { lw: 5, color: PAL.woodOldDark, amp: 1.4 });
   InkLine(ctx, x + W / 2 - 14, groundY - H * 0.40, x + W / 2 - 9, groundY - H * 0.66, id + "postRb",
@@ -4184,21 +4280,29 @@ export function DrawShed(ctx, x, groundY, id) {
     InkLine(ctx, x + W / 2 - 18, groundY - H * 0.40 - i * 3, x + W / 2 - 8, groundY - H * 0.41 - i * 3,
       id + "lash" + i, { lw: 1.4, color: "#6d5a3a", amp: 0.6 });
   }
-  // 草顶：中段压塌，屋面下沿凹进去
+  // 中柱：断口在半腰——西半边塌的时候拽折的
+  InkLine(ctx, x - 10, groundY, x - 6, groundY - H * 0.68, id + "postM",
+    { lw: 5, color: PAL.woodOld, amp: 1.6 });
+  // 草顶只剩东半：断口那头发毛、掉着草
   const roof = [];
-  for (let i = 0; i <= 8; i += 1) {
-    const t = i / 8;
-    roof.push([x - W / 2 - 6 + (W + 12) * t,
-      groundY - H - 6 + Math.sin(t * Math.PI) * 10 + t * 8 + Sym(id + "rf", i, 2)]);
+  for (let i = 0; i <= 5; i += 1) {
+    const t = i / 5;
+    roof.push([x - 16 + (W / 2 + 10) * t,
+      groundY - H - 2 + Math.sin(t * Math.PI) * 7 + t * 9 + Sym(id + "rf", i, 2)]);
   }
-  InkFill(ctx, roof.concat([[x + W / 2 - 6, groundY - H * 0.60], [x - W / 2 + 14, groundY - H * 0.70]]),
+  InkFill(ctx, roof.concat([[x + W / 2 - 6, groundY - H * 0.60], [x - 10, groundY - H * 0.66]]),
     id + "roof", "#7d6a3a", { amp: 2.4, lw: 2.4, shade: "rgba(50,38,18,0.24)" });
-  // 顶上开的洞：里头是天光
-  InkFill(ctx, [[x + 6, groundY - H + 6], [x + 24, groundY - H + 4], [x + 22, groundY - H + 16],
-    [x + 4, groundY - H + 17]], id + "hole", "#b8b0a0", { amp: 1.8, lw: 1.6 });
-  // 檐口垂下的乱草
-  for (let i = 0; i < 6; i += 1) {
-    const gx = x - W / 2 + 12 + Rnd(id + "gx", i) * (W - 24);
+  // 断口边烟熏的黑晕
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = "#241c12";
+  ctx.beginPath();
+  ctx.ellipse(x - 10, groundY - H * 0.78, 16, 9, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 檐口垂下的乱草（只剩东半有檐）
+  for (let i = 0; i < 4; i += 1) {
+    const gx = x - 4 + Rnd(id + "gx", i) * (W / 2 - 12);
     const gy = groundY - H * (0.62 + Rnd(id + "gy", i) * 0.06);
     for (let b = 0; b < 3; b += 1) {
       InkLine(ctx, gx + b * 2, gy, gx + b * 2 + Sym(id + "gb", i * 3 + b, 3), gy + 6 + Rnd(id + "gl", i * 3 + b) * 10,
@@ -4224,6 +4328,130 @@ export function DrawShed(ctx, x, groundY, id) {
   InkLine(ctx, x - W / 2 + 30, groundY, x - W / 2 + 31, groundY - 16, id + "peg", { lw: 3.4, color: PAL.woodOldDark, amp: 1.0 });
   InkLine(ctx, x - W / 2 + 31, groundY - 15, x - W / 2 + 38, groundY - 6, id + "rope",
     { lw: 1.6, color: "#7a6a48", amp: 1.6 });
+}
+
+// 土坯灶（剧本新生第一章开场那眼冷灶）：方墩灶台、一口铁锅坐在灶眼上、
+// 灶口一个黑洞、贴墙一截烟道。冷灶的画法就在"没有"里——灶口只有冷灰，
+// 没有一点火色；锅沿也不冒气。
+export function DrawStove(ctx, x, groundY, id) {
+  // 灶体：土坯抹泥，边角剥落
+  InkFill(ctx, [[x - 22, groundY], [x - 21, groundY - 26], [x + 21, groundY - 27], [x + 22, groundY]],
+    id + "body", "#8a7458", { amp: 1.6, lw: 2.2, shade: "rgba(60,44,28,0.22)" });
+  // 抹泥剥落的两块（露出里头的坯色）
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#6e5b44";
+  ctx.beginPath(); ctx.ellipse(x - 12, groundY - 8, 4.6, 3, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 14, groundY - 18, 3.6, 2.4, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // 灶口：黑洞，口沿熏黑，底下一撮冷灰（发灰白，不发红——冷灶的全部）
+  InkFill(ctx, [[x - 8, groundY - 2], [x - 7, groundY - 12], [x, groundY - 15], [x + 7, groundY - 12], [x + 8, groundY - 2]],
+    id + "mouth", "#1c1712", { amp: 1.0, lw: 1.8 });
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = "#8a8478";
+  ctx.beginPath(); ctx.ellipse(x, groundY - 2.4, 5.5, 1.8, 0, 0, Math.PI); ctx.fill();
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = "rgba(28,22,16,0.8)";
+  ctx.beginPath(); ctx.ellipse(x, groundY - 14.5, 8.5, 3, 0, Math.PI, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // 铁锅：坐进灶眼，只露锅沿和一段弧
+  ctx.save();
+  ctx.fillStyle = "#3a3f44";
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 27.5, 15, 4.4, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.restore();
+  InkLine(ctx, x - 15, groundY - 27.5, x + 15, groundY - 27.5, id + "rim", { lw: 2.0, color: "#565c62", amp: 0.5 });
+  // 贴墙的烟道：一根土坯方柱往上收
+  InkFill(ctx, [[x + 15, groundY - 24], [x + 16, groundY - 44], [x + 22, groundY - 44], [x + 23, groundY - 24]],
+    id + "flue", "#7a6650", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
+  // 烟道口熏黑
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = "#241c12";
+  ctx.beginPath(); ctx.ellipse(x + 19, groundY - 44, 4, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// 踩碎的纺车（剧本新生第一章：看到，但你什么都没说）。
+// 手摇纺车侧视：大轮倒在地上，轮圈被踩断成两段、错开一个茬口；三两根辐条
+// 支棱出来；矮机架翻着，锭杆折了，一缕断线还挂在辐条上。
+// 全部要害在"断口错位"——圈要是还连着，就只是一辆放倒的纺车。
+export function DrawSpinWheelBroken(ctx, x, groundY, id) {
+  // 翻倒的机架：一条矮凳腿朝天
+  InkFill(ctx, [[x + 8, groundY], [x + 10, groundY - 7], [x + 40, groundY - 9], [x + 42, groundY - 2], [x + 40, groundY]],
+    id + "bench", PAL.woodOld, { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x + 16, groundY - 8, x + 14, groundY - 20, id + "legA", { lw: 3, color: PAL.woodOldDark, amp: 0.8 });
+  InkLine(ctx, x + 34, groundY - 8, x + 36, groundY - 18, id + "legB", { lw: 3, color: PAL.woodOldDark, amp: 0.8 });
+  // 大轮：斜倚着地，轮圈断成两段——上段还撑着弧，下段塌平、错开一个茬
+  const cx = x - 12, cy = groundY - 15, R = 17;
+  ctx.save();
+  ctx.strokeStyle = "#6b5138";
+  ctx.lineWidth = 3.2;
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI * 1.06, Math.PI * 2.28); ctx.stroke();  // 上段弧
+  ctx.lineWidth = 2.8;
+  ctx.beginPath(); ctx.arc(cx + 4, cy + 9, R * 0.9, Math.PI * 0.34, Math.PI * 0.94); ctx.stroke(); // 塌下去的下段
+  ctx.restore();
+  // 断口的毛茬：两三根短刺
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, cx + R * 0.9 + Sym(id + "sp" + i, i, 2), cy + 6 + i * 2,
+      cx + R * 0.9 + 4 + Sym(id + "sq" + i, i, 3), cy + 3 + i * 2,
+      id + "splint" + i, { lw: 1.2, color: "#4e4234", amp: 0.6 });
+  }
+  // 轮毂 + 支棱的辐条（有的还连着圈，有的折了半截）
+  ctx.save();
+  ctx.fillStyle = "#4e4234";
+  ctx.beginPath(); ctx.arc(cx, cy, 2.8, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  const SPOKES = [[1.25, 1.0], [1.75, 1.0], [2.15, 0.95], [0.55, 0.55], [2.8, 0.5]];
+  for (let i = 0; i < SPOKES.length; i += 1) {
+    const [a, k] = SPOKES[i];
+    InkLine(ctx, cx, cy, cx + Math.cos(a) * R * k, cy + Math.sin(a) * R * k,
+      id + "spoke" + i, { lw: 1.6, color: "#6b5138", amp: 0.5 });
+  }
+  // 折断的锭杆：一头在架上，一头戳在地上
+  InkLine(ctx, x + 24, groundY - 9, x + 18, groundY - 15, id + "spindleA", { lw: 1.8, color: PAL.woodOldDark, amp: 0.5 });
+  InkLine(ctx, x + 16, groundY - 4, x + 20, groundY - 1, id + "spindleB", { lw: 1.8, color: PAL.woodOldDark, amp: 0.5 });
+  // 断线：一缕棉线从辐条飘到机架，还打着卷
+  ctx.save();
+  ctx.strokeStyle = "rgba(214,202,178,0.75)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx + 8, cy - 6);
+  ctx.bezierCurveTo(x + 2, cy - 14, x + 12, groundY - 6, x + 22, groundY - 8);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 窖角草苫下的深色包袱（带血的衣裳）。整件事的分寸：草苫盖着大半，
+// 只露一角深色的布和两块发暗的渍——不清晰、不血腥，镜头看三秒就走
+//（历史与叙事铁律：不做伤口特写；渍色按 sRGB 老账压两档）。
+export function DrawClothBundle(ctx, x, groundY, id) {
+  // 布卷：低低的一卷，塞在墙根
+  InkFill(ctx, [[x - 15, groundY], [x - 14, groundY - 9], [x - 4, groundY - 13], [x + 10, groundY - 11], [x + 14, groundY - 4], [x + 13, groundY]],
+    id + "roll", "#463c33", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.24)" });
+  // 布的折痕
+  InkLine(ctx, x - 10, groundY - 6, x + 8, groundY - 7, id + "foldA", { lw: 0.9, color: "rgba(24,19,15,0.6)", amp: 0.9 });
+  InkLine(ctx, x - 6, groundY - 10, x + 4, groundY - 10.5, id + "foldB", { lw: 0.8, color: "rgba(24,19,15,0.5)", amp: 0.8 });
+  // 发暗的渍：两小块，压得很沉
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#38201c";
+  ctx.beginPath(); ctx.ellipse(x + 4, groundY - 8, 3.4, 2.2, 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath(); ctx.ellipse(x - 3, groundY - 4, 2.4, 1.6, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // 草苫搭在上头：盖住大半（画在布之后——先有布，草苫才盖得住它）
+  InkFill(ctx, [[x - 18, groundY - 6], [x - 8, groundY - 15], [x + 6, groundY - 14], [x - 2, groundY - 5]],
+    id + "mat", "#8a7648", { amp: 1.6, lw: 1.4, shade: "rgba(50,38,18,0.18)" });
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - 14 + i * 6, groundY - 7 - i * 2.4, x - 9 + i * 6, groundY - 13 - i * 1.2,
+      id + "straw" + i, { lw: 1, color: "rgba(70,55,28,0.55)", amp: 0.8 });
+  }
 }
 
 // 斜靠在棚里的旧木料：两块拆下来的旧门板 + 一根枣木杠。
@@ -4263,9 +4491,42 @@ export function DrawCartShafts(ctx, x, groundY, id) {
   ctx.beginPath(); ctx.arc(x - 48, groundY - 24, 6, -0.6, Math.PI * 1.1); ctx.stroke();
 }
 
-// 贴告示的半截土墙：征粮征夫的告示一层压一层，新的盖着旧的
-export function DrawNoticeWall(ctx, x, groundY, w, id) {
+// 贴告示的半截土墙：征粮征夫的告示一层压一层，新的盖着旧的。
+// scars=扫荡留下的一排弹孔（剧本新生第一章）：孔是砸进土坯的黑点，
+// 四周崩出一圈浅色的掉皮——顺序对（先有墙皮再崩掉）才读得出是打上去的
+export function DrawNoticeWall(ctx, x, groundY, w, id, { scars = false } = {}) {
   DrawWall(ctx, x, groundY, w, 90, id);
+  if (scars) {
+    for (let i = 0; i < 6; i += 1) {
+      const sx = x - w / 2 * 0.7 + (i / 5) * w * 0.66 + Sym(id + "bhx", i, 4);
+      // 压在告示下沿以下那条带里（-26～-46）：告示别把弹孔盖掉
+      const sy = groundY - 26 - Hash(id + "bhy" + i) * 20;
+      const r = 1.6 + Hash(id + "bhr" + i) * 1.1;
+      // 崩掉的墙皮（浅一档，形状发毛）
+      ctx.save();
+      ctx.fillStyle = "rgba(196,178,142,0.55)";
+      ctx.beginPath();
+      ctx.ellipse(sx + 0.6, sy + 0.4, r * 2.4, r * 1.9, Hash(id + "bha" + i) * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      // 孔本体
+      ctx.fillStyle = "rgba(30,23,16,0.88)";
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r, r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 崩纹两三道：**短**茬（长了会读成挂在墙上的电线），走上半圈——
+      // 弹孔崩皮朝外上方翻，不往下淌
+      ctx.strokeStyle = "rgba(70,55,36,0.42)";
+      ctx.lineWidth = 0.8;
+      for (let c = 0; c < 2; c += 1) {
+        const a = Math.PI * (1.05 + Hash(id + "bhc" + i + c) * 0.9);   // 只在上半圈
+        ctx.beginPath();
+        ctx.moveTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r * 0.85);
+        ctx.lineTo(sx + Math.cos(a) * r * 1.8, sy + Math.sin(a) * r * 1.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
   // 三张告示：两张旧的发黄卷边，一张新的还白着。竖排墨字用短竖线示意
   const posters = [
     { px: x - w / 2 * 0.5, py: groundY - 62, pw: 22, ph: 30, c: "#a89268", torn: true },
@@ -5327,6 +5588,7 @@ const HUD_ITEM = {
   满桶水: [1.00, 5], 一桶水: [1.00, 5],
   粮袋: [1.05, 0], 种子粮: [1.05, 0], 名册: [1.10, 0], 保甲册: [1.10, 0],
   花布巾: [1.20, 0], 襁褓: [1.05, 0], 鞭炮: [1.00, 0], 一挂鞭炮: [1.00, 0],
+  红薯干: [1.35, 0], 半瓢水: [1.20, 0], 那件衣裳: [0.95, 0],
 };
 const HUD_ITEM_FALLBACK = [0.42, 0];   // 兜底那块木板足有 52 单位宽
 
@@ -6752,29 +7014,58 @@ export function DrawScribeCard(ctx, W, H, view, L, t) {
       "cardGrainL" + i, { lw: 3 * S, color: "rgba(92,60,34,0.34)", amp: 26 * S });
   }
 
+  // 卡面变奏（Core 的 def.cardStyle）：正字那拍没人靠框站着、木头上已有前几天的道道
+  const style = view.style || {};
+
   // 被量的那个人：柱子背靠木头站直了，**头顶正好顶在这条线上**——
   // 这道线量的是什么，画面自己说，不用旁白讲。侧影，不抢前景那只手。
-  ctx.save();
-  ctx.globalAlpha = 0.46;
-  const kx = uX(0.735);
-  const kTop = lineY + 6 * S;                 // 头顶，就压在线下面
-  InkFill(ctx, [                              // 肩与身子，出下画框
-    [kx - 128 * S, H + 30 * S], [kx - 112 * S, kTop + 218 * S], [kx - 58 * S, kTop + 172 * S],
-    [kx + 56 * S, kTop + 176 * S], [kx + 116 * S, kTop + 224 * S], [kx + 132 * S, H + 30 * S],
-  ], "cardKidBody", "#584330", { amp: 5 * S, lw: 0, line: null });
-  InkFill(ctx, [                              // 脖子
-    [kx - 30 * S, kTop + 128 * S], [kx + 30 * S, kTop + 128 * S],
-    [kx + 32 * S, kTop + 182 * S], [kx - 32 * S, kTop + 182 * S],
-  ], "cardKidNeck", "#584330", { amp: 3 * S, lw: 0, line: null });
-  InkFill(ctx, [                              // 侧脸：额头、鼻梁、下巴朝左
-    [kx - 62 * S, kTop + 60 * S], [kx - 52 * S, kTop + 20 * S], [kx - 8 * S, kTop],
-    [kx + 44 * S, kTop + 10 * S], [kx + 68 * S, kTop + 56 * S], [kx + 62 * S, kTop + 112 * S],
-    [kx + 20 * S, kTop + 140 * S], [kx - 36 * S, kTop + 130 * S], [kx - 70 * S, kTop + 96 * S],
-  ], "cardKidHead", "#584330", { amp: 3.6 * S, lw: 0, line: null });
-  InkFill(ctx, [                              // 鼻尖那一点，侧影才不是个罐子
-    [kx - 66 * S, kTop + 76 * S], [kx - 88 * S, kTop + 90 * S], [kx - 64 * S, kTop + 100 * S],
-  ], "cardKidNose", "#584330", { amp: 2 * S, lw: 0, line: null });
-  ctx.restore();
+  // （量身变奏才有；正字那拍谁也没靠着框，画个人影就成了闹鬼）
+  if (style.silhouette !== false) {
+    ctx.save();
+    ctx.globalAlpha = 0.46;
+    const kx = uX(0.735);
+    const kTop = lineY + 6 * S;                 // 头顶，就压在线下面
+    InkFill(ctx, [                              // 肩与身子，出下画框
+      [kx - 128 * S, H + 30 * S], [kx - 112 * S, kTop + 218 * S], [kx - 58 * S, kTop + 172 * S],
+      [kx + 56 * S, kTop + 176 * S], [kx + 116 * S, kTop + 224 * S], [kx + 132 * S, H + 30 * S],
+    ], "cardKidBody", "#584330", { amp: 5 * S, lw: 0, line: null });
+    InkFill(ctx, [                              // 脖子
+      [kx - 30 * S, kTop + 128 * S], [kx + 30 * S, kTop + 128 * S],
+      [kx + 32 * S, kTop + 182 * S], [kx - 32 * S, kTop + 182 * S],
+    ], "cardKidNeck", "#584330", { amp: 3 * S, lw: 0, line: null });
+    InkFill(ctx, [                              // 侧脸：额头、鼻梁、下巴朝左
+      [kx - 62 * S, kTop + 60 * S], [kx - 52 * S, kTop + 20 * S], [kx - 8 * S, kTop],
+      [kx + 44 * S, kTop + 10 * S], [kx + 68 * S, kTop + 56 * S], [kx + 62 * S, kTop + 112 * S],
+      [kx + 20 * S, kTop + 140 * S], [kx - 36 * S, kTop + 130 * S], [kx - 70 * S, kTop + 96 * S],
+    ], "cardKidHead", "#584330", { amp: 3.6 * S, lw: 0, line: null });
+    InkFill(ctx, [                              // 鼻尖那一点，侧影才不是个罐子
+      [kx - 66 * S, kTop + 76 * S], [kx - 88 * S, kTop + 90 * S], [kx - 64 * S, kTop + 100 * S],
+    ], "cardKidNose", "#584330", { amp: 2 * S, lw: 0, line: null });
+    ctx.restore();
+  }
+
+  // 正字变奏：前两天画的两笔已经在木头上——横、竖（笔顺就是这么排的），
+  // 玩家手里的引导线正是第三笔（当中那道横）。几何与 DrawDoorframe 里那个
+  // 简化的"正"同一套：上横满宽、中竖从上横当中垂到底。旧粉痕画法也照抄
+  // 世界里的两笔：暗底垫一道，淡白痕才立得住
+  const tallyDone = style.tallyDone || 0;
+  if (tallyDone > 0) {
+    const cw = x1 - x0;
+    const topY = lineY - cw * 0.42;
+    const botY = lineY + cw * 0.36;
+    const cx = (x0 + x1) / 2;
+    const seg = [
+      [x0 - 6 * S, topY, x1 + 4 * S, topY + 3 * S],   // 第一天：上横
+      [cx, topY + 2 * S, cx + 4 * S, botY],            // 第二天：中竖（穿过今天要画的这条线）
+    ];
+    for (let i = 0; i < Math.min(tallyDone, seg.length); i += 1) {
+      const [ax, ay, bx, by] = seg[i];
+      InkLine(ctx, ax, ay + 2.5 * S, bx, by + 2.5 * S, "cardTyD" + i,
+        { lw: 7 * S, color: "rgba(52,38,22,0.42)", amp: 2.2 * S });
+      InkLine(ctx, ax, ay, bx, by, "cardTy" + i,
+        { lw: 5 * S, color: "rgba(236,222,188,0.78)", amp: 2.2 * S });
+    }
+  }
 
   // 第八章：爹当年给柱子刻的那道旧痕早就在木头上了。它在**新线上头**——
   // 那年的柱子（1.28m）比今天的妹妹（1.08m）高，两个数在 Data 里摆着，

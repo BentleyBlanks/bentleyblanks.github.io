@@ -13,7 +13,12 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e).slice(0, 300)));
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
+page.on("console", (m) => {
+  if (m.type() !== "error") return;
+  // 外部字体源拉不下来不算页面事故（断网/代理环境必失败，字体有系统回退）
+  if (/^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(m.location()?.url || "")) return;
+  errors.push(m.text().slice(0, 200));
+});
 
 await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
 await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });

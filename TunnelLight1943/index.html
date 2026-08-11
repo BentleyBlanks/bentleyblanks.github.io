@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=094">
+  <link rel="stylesheet" href="./Style_Game.css?v=095">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -27,25 +27,28 @@
        **新增模块必须登记在这里**，否则它又会独自留在缓存里；源码里则一律不许
        再自己写 ?v=（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
        TestModuleGraphIsCacheBusted 盯着。 -->
+  <!-- three.js 收进仓库 vendor（同 TunnelBell1942 的做法）：不再吃 CDN——
+       jsdelivr 在部分网络（国内、离线、代理环境）连不上时整个模块图会挂，
+       页面就是一张黑屏。0.185.1 原版文件，见 vendor/three/LICENSE。 -->
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+        "three": "./vendor/three/build/three.module.js?v=095",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=095",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=094",
-        "./Script_World.js": "./Script_World.js?v=094",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=094",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=094",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=094",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=094",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=094",
-        "./Script_Audio.js": "./Script_Audio.js?v=094",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=094",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=094",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=094",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=094",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=094"
+        "./Script_Core.mjs": "./Script_Core.mjs?v=095",
+        "./Script_World.js": "./Script_World.js?v=095",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=095",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=095",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=095",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=095",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=095",
+        "./Script_Audio.js": "./Script_Audio.js?v=095",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=095",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=095",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=095",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=095",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=095"
       }
     }
   </script>
@@ -172,7 +175,7 @@
         <button id="noticeClose" type="button" aria-label="关闭">✕</button>
         <!-- 抠好背景的成品（Script_TextureKey.py 从 Texture/Source/ 的白底原图生成）：
              带 alpha 的 WebP，撕口的纸形直接落在面板上。别改回 Source 里那张白底 JPG -->
-        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=094" alt="贴在土墙上的征夫告示">
+        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=095" alt="贴在土墙上的征夫告示">
         <div id="noticeText"></div>
       </div>
     </section>
@@ -246,6 +249,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=094"></script>
+<script type="module" src="./Script_Main.js?v=095"></script>
 </body>
 </html>

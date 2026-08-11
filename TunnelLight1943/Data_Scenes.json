@@ -43,17 +43,17 @@
         {
           "id": "oldDoors",
           "kind": "oldDoors",
-          "x": 8.6,
+          "x": 10.7,
           "name": "旧门板",
-          "note": "拆下来的两块旧门板斜靠在棚里——挖通道用的木料就这点家底"
+          "note": "拆下来的两块旧门板斜靠在棚里还立着的东半边——烧塌的西半边（焦椽、灰堆、埋瓦罐的烧土）得露出来给人看"
         },
         {
           "id": "shed",
           "kind": "shed",
           "x": 9,
           "w": 6,
-          "name": "废牲口棚",
-          "note": "牲口早被牵走了，棚里只剩旧门板和一根枣木杠"
+          "name": "自家牲口棚",
+          "note": "扫荡那天烧塌了半边。牲口早被牵走，红薯干的瓦罐埋在墙根烧土底下——第一章「找吃的」翻的就是它"
         },
         {
           "id": "henProp",
@@ -62,7 +62,7 @@
           "perch": true,
           "name": "母鸡",
           "hideFlag": "henFlew",
-          "note": "蹲在牲口棚食槽上，扛枣木杠时惊飞"
+          "note": "蹲在牲口棚食槽上的母鸡——扫荡那天就没了（henFlew 常立，只在旧存档兜底）"
         },
         {
           "id": "veggieWest",
@@ -100,12 +100,20 @@
           "name": "枣树"
         },
         {
+          "id": "spinWheel",
+          "kind": "spinWheelBroken",
+          "x": 24.9,
+          "name": "踩碎的纺车",
+          "note": "娘的纺车，扫荡那天被踩碎在屋山墙外。第一章去牲口棚的路上镜头看它一眼——不出字。观察点(c1_forage 第一步 26.3)在东边一步半，人不压在道具上"
+        },
+        {
           "id": "noticeWall",
           "kind": "wallNotice",
           "x": 23.3,
           "w": 2.6,
           "name": "贴告示的土墙",
-          "note": "征粮征夫的告示一层压一层"
+          "note": "征粮征夫的告示一层压一层；扫荡留下的一排弹孔也在这面墙上（scars，剧本新生§1：看到，但什么都没说）",
+          "scars": true
         },
         {
           "id": "homeHouse",
@@ -150,6 +158,13 @@
           "name": "腌菜缸"
         },
         {
+          "id": "stoveHome",
+          "kind": "stove",
+          "x": 27.4,
+          "name": "灶台",
+          "note": "开场第一眼：灶是冷的。摆屋里西墙根（interior 区），与窖口(29)、木凳(32)错开"
+        },
+        {
           "id": "cellarMouth",
           "kind": "hatch",
           "x": 29.0,
@@ -176,6 +191,25 @@
           "x": 32.6,
           "level": "under",
           "name": "红薯堆"
+        },
+        {
+          "id": "graveDirt",
+          "kind": "freshDirt",
+          "x": 27.1,
+          "w": 1.6,
+          "level": "under",
+          "showFlag": "clothesBuried",
+          "name": "窖底新填的土",
+          "note": "埋下那件衣裳之后才有——第一章夜里的活，留在地上的样子"
+        },
+        {
+          "id": "clothBundle",
+          "kind": "clothBundle",
+          "x": 27.0,
+          "level": "under",
+          "hideFlag": "clothesBuried",
+          "name": "角落里的包袱",
+          "note": "草草塞在窖角草苫下的带血衣裳，挨着西头的腌菜缸——第一章夜里的特写；埋进窖底后由新土(graveDirt)接替。**窖腔画出来的内壁到 27.2 才展开**，再往西就埋进剖面的墙弧里"
         },
         {
           "id": "cellarShelf",
@@ -879,7 +913,7 @@
       "relics": [
         {
           "id": "borderNote",
-          "x": 33.4,
+          "x": 28.2,
           "level": "under",
           "art": "borderNote",
           "name": "边区票",

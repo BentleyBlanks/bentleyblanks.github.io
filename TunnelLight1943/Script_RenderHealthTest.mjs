@@ -19,7 +19,13 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 200)}`));
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(`CONSOLE ${message.text().slice(0, 200)}`);
+  if (message.type() !== "error") return;
+  // 外部字体源（Google Fonts）拉不下来不算渲染事故：字体有系统回退，
+  // 断网/代理环境里它必然失败，会把八章全刷红、真问题反而看不见。
+  // 只豁免这一类资源加载失败——页面自己的 404/JS 异常照抓。
+  const url = message.location()?.url || "";
+  if (/^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url)) return;
+  errors.push(`CONSOLE ${message.text().slice(0, 200)}`);
 });
 
 let failed = 0;
