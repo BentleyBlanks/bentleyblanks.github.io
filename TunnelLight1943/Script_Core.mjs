@@ -2629,7 +2629,15 @@ export const SCRIPTS = {
             Cue(state, "waterSplash", { gain: 0.3 });
           } },
         { who: "妹妹", say: "哥你也吃。", d: 2.2,
-          cam: { kind: "ots", subject: "sister", other: "player", dist: 3.2 } },
+          cam: { kind: "shot", x: 34.8, y: 1.0, dist: 3.4 },
+          on: (state) => {
+            // 递碗要两个人同框：她站起来把碗举向哥（碗在手挂点上，站姿才举
+            // 得到胸口）。过肩机位里柱子只剩画框边一条剪影，复审读成
+            // "对着空画框递碗"——改双人镜
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.pose = null; sis.heading = 1; }
+            state.player.heading = -1;
+          } },
         { stage: "他说他不饿。", d: 3.0,
           cam: { kind: "shot", x: 34.7, y: 1.2, dist: 4.2 } },
         { stage: "妹妹吃完，舔了舔手指头。然后她拽着柱子的袖子，走到门框跟前。", d: 4.2,
@@ -2734,8 +2742,10 @@ export const SCRIPTS = {
         // **只管这两步**：之后她跟着回家，再抓回树下就跟 following 打架了
         if (state.beat.stepIndex >= 5 && state.beat.stepIndex <= 6) {
           const sis = FindActor(state, "sister");
-          if (sis && !sis.cineTarget && !sis.following && Math.abs(sis.x - 57.5) > 4) {
-            sis.x = 57.5; sis.heading = -1;
+          // 还在半路的 cineTarget 也一并收掉直接落位——跳拍/--step 直落时她
+          // 才起步两秒，等她走到树下截图早拍完了（复审第三轮抓的正是这个）
+          if (sis && !sis.following && Math.abs(sis.x - 57.5) > 4) {
+            sis.cineTarget = null; sis.x = 57.5; sis.heading = -1;
           }
         }
       },
@@ -2854,15 +2864,16 @@ export const SCRIPTS = {
           cam: { kind: "insert", x: 32.0, y: 1.05, dist: 2.8 } },
         { stage: "话没说完，她自己先打了个哈欠。", d: 2.8,
           cam: { kind: "shot", x: 32.8, y: 1.15, dist: 4.0 } },
-        { stage: "柱子把她放平在铺盖上，掖好了被角。", d: 4.0,
-          cam: { kind: "shot", x: 31.8, y: 0.95, dist: 3.6, trans: "dip" },
+        { stage: "柱子把她放平在铺盖上，跪在旁边，看她睡熟了。", d: 4.0,
+          cam: { kind: "shot", x: 31.4, y: 0.95, dist: 3.6, trans: "dip" },
           on: (state) => {
-            // 字幕说的三件事画面都得有：她躺在铺盖上（睡姿），他跪在铺盖边
-            // 掖被角（跪姿贴着人）。老版是她凭空消失、他站在门口看正字
+            // 字幕说什么画面就有什么：她平躺在铺盖上（睡姿），他跪在铺盖
+            // **西头**——站过去 32 那边正压着旧木凳，跪姿会读成"坐在凳上"
+            //（复审第三轮抓的）。被角画不出来（被子盖不到演员身上），文案不提
             const sis = FindActor(state, "sister");
             if (sis) { sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
-            state.player.x = 31.9;
-            state.player.heading = -1;
+            state.player.x = 30.5;
+            state.player.heading = 1;
             FlashPose(state, "kneel", 3.8);
           } },
       ],
@@ -3239,13 +3250,18 @@ export const SCRIPTS = {
         { type: "use", zone: { x: 30.6, w: 2.9, level: "under" }, needs: "ladleWater", prompt: "E · 递过去",
           effect: (state) => {
             // 递过去＝瓢真的换手：柱子俯身递，田大爷捧着瓢喝（clothMouth 的
-            // 手在嘴边，瓢跟着手——正是"一口一口顺下去"的读法）
-            const ty = FindActor(state, "tianYe");
-            if (ty) { ty.carry = "半瓢水"; ty.pose = "clothMouth"; ty.heading = 1; }
-            FlashPose(state, "bow", 2.6);
+            // 手在嘴边，瓢跟着手——正是"一口一口顺下去"的读法）。
+            // 姿势写在微过场第一行的 on() 里：effect 里闪的 bow 到截帧时早过期
             StartMicroCine(state, [
               { stage: "水一口一口顺下去。咳，压住了。", d: 3.0,
-                cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.75, dist: 2.6 } },
+                cam: { kind: "insert", x: 30.3, y: UNDER_Y + 0.75, dist: 2.6 },
+                on: (st) => {
+                  const ty = FindActor(st, "tianYe");
+                  if (ty) { ty.carry = "半瓢水"; ty.pose = "clothMouth"; ty.heading = 1; }
+                  st.player.x = Math.min(st.player.x, 30.5);
+                  st.player.heading = -1;
+                  FlashPose(st, "bow", 3.0);
+                } },
               { stage: "田大爷抬起眼皮看了看他，没说话。", d: 2.8,
                 cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.85, dist: 2.4 },
                 on: (st) => {
@@ -3269,6 +3285,9 @@ export const SCRIPTS = {
             // 布巾要真的在手上，人站到一臂之内（穿模与空手递被视觉审查退回过）
             state.player.item = { id: "cloth", label: "花布巾" };
             state.player.cineWalk = { x: 30.6, speed: 1.2 };
+            // 妹妹让开刘嫂那条身位：叠在她正后方只露一条粉边，构图上等于没有
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.x = 31.7; sis.heading = -1; sis.pose = "leanIn"; }
           } },
         { stage: "田大爷咬住。咳声闷在布里，一声，一声。", d: 4.0,
           cam: { kind: "insert", x: 30.0, y: UNDER_Y + 0.85, dist: 2.4 },
@@ -3318,16 +3337,19 @@ export const SCRIPTS = {
             Cue(state, "step", { gain: 0.8 });
           } },
         { stage: "枪托笃、笃地砸着地。砸到窖口那一下——声音是空的。", d: 3.8,
-          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.6, dist: 2.7 },
+          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.9, dist: 3.0 },
           on: (state) => {
             Cue(state, "knock", { gain: 1.2, rate: 0.8 });
             Cue(state, "knock", { gain: 1.3, rate: 0.7, delay: 1.0 });
           } },
         { stage: "上面静了静。跟着，有什么顺着盖板缝别了进来——盖板让它撬得翘起一条缝。", d: 4.6,
-          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.5, dist: 2.4 },
+          cam: { kind: "insert", x: 29, y: UNDER_Y + 1.9, dist: 3.2 },
           on: (state) => {
             // 撬要看得见：盖板真的翘开一条缝（state.lid 常立着，World 按它转角）。
-            // open 走 smoothstep，0.3 折出来约 13°——一条明晃晃的缝，天光漏进来
+            // open 走 smoothstep，0.3 折出来约 13°——一条明晃晃的缝，天光漏进来。
+            // **机位得抬到画框上沿过地平线**：盖板躺在地面那条线上，
+            // 低机位（+1.5）的画框顶只到 −0.75，说破天玩家也看不见板
+            //（复审第三轮抓的正是"盖板整个在画框外"）
             state.lid = { id: "cellarHatch", open: 0.3 };
             Cue(state, "tenon", { gain: 0.7, rate: 0.8 });
             Cue(state, "dig", { gain: 0.4, rate: 1.3, delay: 1.2 });
