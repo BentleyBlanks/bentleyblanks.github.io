@@ -4530,7 +4530,9 @@ export function DrawSplitCard(ctx, W, H, view, L, t) {
       ctx.restore();
     }
     if (view.grab) {
-      SplitHand(ctx, gx, gy - 4 * S, S, 1, true);
+      // 捏着的手挪到捏点右侧一点：弯处那道发白的中缝是全部进度，
+      // 拳头压在它上头就又看不见功了（构图铁律：手不压刚做出来的功）
+      SplitHand(ctx, gx + 34 * S, gy + 6 * S, S, 1, true);
     } else {
       // 没上手：条自己招呼——捏点那一段透出一圈会呼吸的光
       SplitHand(ctx, x1 - 14 * S, cyW + 10 * S, S, 1, false);
@@ -8824,9 +8826,759 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
   Speckle(ctx, 0, 0, W, H, "rmGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
 }
 
+// ---------------------------------------------------------------------------
+// 序·那天：镜头贴着娘身侧扫过的那一眼（c1_thatday，seg 0，3.4s）。
+// 画面主体是**蓝底白花短褂的衣身侧面**——布占满画框三分之二，左侧留一线
+// 暗背景（土墙+门洞的模糊剪影）。这一眼是全章那块布的第一面：
+// 坛口的垫圈、窖里的整布、袖口那截接布，认的都是它。
+// 衣角被风掀起又落下（0.8Hz），除此之外什么都不动——它就是一眼。
+// ---------------------------------------------------------------------------
+export function DrawMotherJacketCard(ctx, W, H, seg, t) {
+  void seg;
+  const S = H / 420;
+  // 底：屋里的昏暗（她是冲进屋来的）
+  const bg = ctx.createLinearGradient(0, 0, W, 0);
+  bg.addColorStop(0, "#12100b");
+  bg.addColorStop(0.4, "#1a1610");
+  bg.addColorStop(1, "#0d0b08");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  // 左侧一线暗背景：土墙 + 门洞的模糊剪影（门洞外亮那么一点——外面是白天）
+  InkFill(ctx, [[-20 * S, -20 * S], [W * 0.30, -20 * S], [W * 0.27, H + 20 * S], [-20 * S, H + 20 * S]],
+    "mjWall", "#231e14", { amp: 6 * S, lw: 0, line: null });
+  // 门洞：几层错位的低透明矩形叠出"糊掉的焦外"（不用 ctx.filter——无头烘卡
+  // 的 canvas 不认它）
+  ctx.save();
+  for (let i = 0; i < 4; i += 1) {
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#3a3626";
+    ctx.fillRect(W * (0.042 - i * 0.004), H * 0.10, W * (0.10 + i * 0.008), H * 0.86);
+    ctx.fillStyle = "#4c4632";
+    ctx.fillRect(W * (0.060 - i * 0.003), H * 0.16, W * (0.066 + i * 0.006), H * 0.80);
+  }
+  ctx.restore();
+  // 镜头扫过的那点动感：两三道横向的虚痕
+  ctx.save();
+  ctx.globalAlpha = 0.10;
+  ctx.strokeStyle = "#8a8474";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.lineWidth = (3 + i * 2) * S;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.02, H * (0.24 + i * 0.26));
+    ctx.lineTo(W * 0.30, H * (0.235 + i * 0.26));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── 衣身侧面：从右侧压满画框三分之二。靛蓝土布，压两档 ──
+  const sway = Math.sin(t * Math.PI * 2 * 0.8);            // 0.8Hz：掀起又落下
+  const flut = Math.sin(t * Math.PI * 2 * 0.8 * 2.7 + 1.2); // 布自己的碎颤
+  const hemY = H * 0.845 - sway * 14 * S - flut * 4 * S;
+  const hemY2 = H * 0.80 - sway * 26 * S - flut * 7 * S;   // 衣角那一片掀得更高
+  const bodyPts = [
+    [W * 0.335, -24 * S], [W + 30 * S, -24 * S], [W + 30 * S, H * 0.72],
+    [W * 0.96, hemY - 8 * S], [W * 0.82, hemY + 10 * S], [W * 0.70, hemY - 4 * S],
+    [W * 0.565, hemY2 + 16 * S], [W * 0.475, hemY2],        // 掀起的衣角
+    [W * 0.40, hemY2 + 30 * S], [W * 0.345, H * 0.60],
+  ];
+  InkFill(ctx, bodyPts, "mjBody", "#232c38",
+    { amp: 5 * S, lw: 7 * S, shade: "rgba(6,9,14,0.4)", shadeAt: 0.7 });
+  // 布身的大褶：顺着身侧往下走的几道长弧（衣角那两道跟着风摆）
+  ctx.save();
+  ctx.strokeStyle = "rgba(10,14,20,0.55)";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 5; i += 1) {
+    const fx = W * (0.43 + i * 0.115);
+    const swayK = i < 2 ? sway * (18 - i * 7) * S : sway * 3 * S;
+    ctx.lineWidth = (4.5 - i * 0.5) * S;
+    ctx.beginPath();
+    ctx.moveTo(fx + 14 * S, -10 * S);
+    ctx.quadraticCurveTo(fx - 10 * S + Sym("mjFold", i, 12 * S), H * 0.46,
+      fx + swayK, hemY - (i % 2) * 30 * S);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 受光的那道侧棱：门洞方向来的一线冷光
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.strokeStyle = "#5a6a80";
+  ctx.lineWidth = 5 * S;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.355, 0);
+  ctx.quadraticCurveTo(W * 0.335, H * 0.44, W * 0.40, hemY2 + 26 * S);
+  ctx.stroke();
+  ctx.restore();
+
+  // ── 补丁摞补丁：三块，一块压着一块的边（粗针脚绕一圈） ──
+  const Patch = (px, py, pw, ph, col, id2, ang = 0) => {
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(ang);
+    InkFill(ctx, [[-pw / 2, -ph / 2], [pw / 2, -ph / 2 + 3 * S], [pw / 2 - 2 * S, ph / 2],
+      [-pw / 2 + 3 * S, ph / 2 - 2 * S]],
+    id2, col, { amp: 3 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.2)" });
+    // 粗针脚：一针大一针小的虚线绕边
+    ctx.strokeStyle = "rgba(178,170,150,0.6)";
+    ctx.lineWidth = 2.2 * S;
+    let acc = 0;
+    const per = [[-pw / 2, -ph / 2], [pw / 2, -ph / 2], [pw / 2, ph / 2], [-pw / 2, ph / 2], [-pw / 2, -ph / 2]];
+    for (let e = 0; e < 4; e += 1) {
+      const [ax, ay] = per[e], [bx, by] = per[e + 1];
+      const eLen = Math.hypot(bx - ax, by - ay);
+      let d = 4 * S;
+      while (d < eLen - 4 * S) {
+        const st = 4 * S + Hash(id2 + "st" + e + Math.round(acc + d)) * 7 * S;
+        const k0 = d / eLen, k1 = Math.min(1, (d + st * 0.55) / eLen);
+        ctx.beginPath();
+        ctx.moveTo(ax + (bx - ax) * k0 + 4 * S, ay + (by - ay) * k0 + 3 * S);
+        ctx.lineTo(ax + (bx - ax) * k1 + 4 * S, ay + (by - ay) * k1 + 3 * S);
+        ctx.stroke();
+        d += st * 1.7;
+      }
+      acc += eLen;
+    }
+    ctx.restore();
+  };
+  Patch(W * 0.60, H * 0.40, W * 0.145, H * 0.20, "#2b3542", "mjPatchA", 0.05);
+  Patch(W * 0.645, H * 0.475, W * 0.105, H * 0.15, "#1c232d", "mjPatchB", -0.08);
+  Patch(W * 0.795, H * 0.62, W * 0.12, H * 0.16, "#3b3a2e", "mjPatchC", 0.10);
+
+  // ── 白花：米白的小碎花，稀一点、暗一点——认布靠它，不是装饰 ──
+  ctx.save();
+  for (let i = 0; i < 16; i += 1) {
+    const bx = W * (0.38 + Hash("mjBloomX" + i) * 0.58);
+    const by = H * (0.04 + Hash("mjBloomY" + i) * 0.82)
+      + (bx < W * 0.6 ? sway * 6 * S : 0);
+    ctx.fillStyle = "rgba(186,194,206,0.45)";
+    for (let p2 = 0; p2 < 4; p2 += 1) {
+      const pa = (p2 / 4) * Math.PI * 2 + Hash("mjBloomP" + i) * 2;
+      ctx.beginPath();
+      ctx.ellipse(bx + Math.cos(pa) * 4.6 * S, by + Math.sin(pa) * 3.4 * S,
+        2.8 * S, 2.0 * S, pa, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(140,150,164,0.4)";
+    ctx.beginPath();
+    ctx.arc(bx, by, 1.6 * S, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // 衣角底下透出的一线里子（掀起来那一下才看得见）
+  if (sway > 0.2) {
+    ctx.save();
+    ctx.globalAlpha = (sway - 0.2) * 0.8;
+    InkFill(ctx, [[W * 0.475, hemY2], [W * 0.565, hemY2 + 16 * S],
+      [W * 0.545, hemY2 + 34 * S], [W * 0.465, hemY2 + 22 * S]],
+    "mjLining", "#171d26", { amp: 3 * S, lw: 0, line: null });
+    ctx.restore();
+  }
+
+  // 冷罩 + 角晕 + 颗粒（同定格卡一族的收尾）
+  ctx.fillStyle = "rgba(13,17,30,0.14)";
+  ctx.fillRect(0, 0, W, H);
+  const v = ctx.createRadialGradient(W * 0.56, H * 0.5, H * 0.26, W * 0.56, H * 0.5, H * 0.9);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(8,9,14,0.68)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "mjGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
+}
+
+// ---------------------------------------------------------------------------
+// 回程·两个骑车的（c1_riders，三段）。参照 DrawRaidMotoCard 的构图：
+// S=H/420、地平线、村口土路、冷罩+角晕+颗粒。侧视——两个伪军（软布帽、
+// 无帽垂、胯后挎包、土布裤脚布鞋，见 UNIFORM）骑自行车。
+//   seg 0  从右（北）骑进画面：前车捏闸停住、一只脚点地；后车跟着停
+//   seg 1  支着腿不下车，朝村里（画面左）望；远景左侧两三间塌了房顶的房
+//   seg 2  调头骑远（往右出画）。车铃那一声是音效的事，画面不管
+// 骑车的人身下要有车、踩踏板的脚（CLAUDE.md 过场插卡那条）：屁股在鞍上、
+// 腿在踏板上（膝盖随踏板转）、手在把上，人绝不许浮在车上。
+// ---------------------------------------------------------------------------
+export function DrawVillageRidersCard(ctx, W, H, seg, t) {
+  const S = H / 420;
+  const C01 = (x) => Math.max(0, Math.min(1, x));
+  const Sm = (x) => { const k = C01(x); return k * k * (3 - 2 * k); };
+  const GY = 356, HY = 208;
+  const PX = (u) => W / 2 + u * S;
+  const RC = {
+    ground: "#57503c", road: "#6b6148", rut: "#4a4434",
+    coat: "#5d5744", trouser: "#4a443a", cap: "#36322a", shoe: "#2e2721",
+    skin: "#bb9066", bike: "#232a30", bikeDark: "#1c2126",
+  };
+
+  // 天：阴而不压（他们没进村——这一镜是"望了一眼就走"）
+  const sky = ctx.createLinearGradient(0, 0, 0, HY * S * 1.14);
+  sky.addColorStop(0, "#3a4048");
+  sky.addColorStop(0.7, "#565448");
+  sky.addColorStop(1, "#66604e");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, HY * S * 1.16);
+  ctx.fillStyle = RC.ground;
+  ctx.fillRect(0, HY * S, W, H - HY * S);
+  // 村口土路：从右边（北）拐进来的一条浅色带
+  InkFill(ctx, [[W + 30 * S, (GY - 40) * S], [PX(-160), (HY + 26) * S], [PX(-330), (HY + 30) * S],
+    [PX(-100), (GY + 10) * S], [W + 30 * S, (GY + 26) * S]],
+  "vrRoad", RC.road, { amp: 3 * S, lw: 0, line: null });
+  // 车辙两道
+  for (let i = 0; i < 2; i += 1) {
+    ctx.save();
+    ctx.strokeStyle = RC.rut;
+    ctx.lineWidth = (3.4 - i) * S;
+    ctx.beginPath();
+    ctx.moveTo(W + 20 * S, (GY - 16 + i * 14) * S);
+    ctx.quadraticCurveTo(PX(120), (GY - 44 + i * 10) * S, PX(-230), (HY + 30 + i * 4) * S);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // 远景左侧：村东头两三间**塌了房顶**的房剪影（望的就是它们）
+  ctx.save();
+  ctx.globalAlpha = 0.82;
+  const Ruin = (u, w2, h2, id2) => {
+    const bx = PX(u), by = (HY + 12) * S;
+    // 山墙还立着，房顶塌成一个往里凹的口，一两根焦椽戳出来
+    InkFill(ctx, [
+      [bx - w2 * S, by], [bx - w2 * S, by - h2 * S],
+      [bx - w2 * 0.55 * S, by - (h2 + 9) * S],
+      [bx - w2 * 0.2 * S, by - h2 * 0.52 * S],       // 塌进去的口
+      [bx + w2 * 0.3 * S, by - h2 * 0.72 * S],
+      [bx + w2 * 0.62 * S, by - (h2 + 5) * S],
+      [bx + w2 * S, by - h2 * 0.7 * S], [bx + w2 * S, by],
+    ], id2, "#28251c", { amp: 2 * S, lw: 0, line: null });
+    InkLine(ctx, bx - w2 * 0.3 * S, by - h2 * 0.5 * S, bx - w2 * 0.05 * S, by - (h2 + 13) * S,
+      id2 + "beam", { lw: 2 * S, color: "#1d1b14", amp: 1 * S });
+  };
+  // 可见半宽只有 ±373u（W/2 ÷ S）——房子要真在画框左缘里，别按写着痛快的
+  // 大数摆到画外（raidMoto 那张有横摇兜底，这张没有）
+  Ruin(-330, 42, 40, "vrRuinA");
+  Ruin(-240, 34, 32, "vrRuinB");
+  Ruin(-170, 26, 36, "vrRuinC");
+  ctx.restore();
+  // 贴地的灰雾把村子那头虚掉
+  const fog = ctx.createLinearGradient(PX(-420), 0, PX(-80), 0);
+  fog.addColorStop(0, "rgba(88,86,76,0.55)");
+  fog.addColorStop(1, "rgba(88,86,76,0)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, (HY - 50) * S, W, (GY - HY + 60) * S);
+
+  // ── 一人一车（侧视）。u=后轮触地点的场景坐标；dir=+1 车头朝左（朝村） ──
+  // wheelA 驱动辐条转、pedK 驱动踏板与膝盖；footDown 前脚落地撑着
+  const Rider = (u, gy, id2, { dir = 1, wheelA = 0, footDown = 0, lookBack = 0, shrug = 0 }) => {
+    ctx.save();
+    ctx.translate(PX(u), gy * S);
+    // 画笔按"车头朝 -x"画（同 DrawBicycle）：dir=+1 车头朝画面左（朝村），
+    // dir=-1 整组镜像、车头朝右（调头骑远）
+    ctx.scale(dir, 1);
+    const K = 1.35 * S;                  // 卡内尺度：车轮半径 ≈0.31m → 20u
+    const r = 15 * K, y = -r;
+    const fx = -25 * K, bx = 25 * K;
+    const Wheel = (wx) => {
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 3 * K;
+      ctx.beginPath(); ctx.arc(wx, y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1 * K;
+      ctx.strokeStyle = "rgba(40,40,40,0.7)";
+      for (let s2 = 0; s2 < 6; s2 += 1) {
+        const a = s2 * 0.52 + wheelA;
+        ctx.beginPath();
+        ctx.moveTo(wx - Math.cos(a) * (r - 2 * K), y - Math.sin(a) * (r - 2 * K));
+        ctx.lineTo(wx + Math.cos(a) * (r - 2 * K), y + Math.sin(a) * (r - 2 * K));
+        ctx.stroke();
+      }
+      ctx.strokeStyle = IN.ink;
+      ctx.lineWidth = 2 * K;
+      ctx.beginPath(); ctx.arc(wx, y, 2.4 * K, 0, Math.PI * 2); ctx.stroke();
+    };
+    Wheel(fx); Wheel(bx);
+    // 挡泥板
+    ctx.strokeStyle = "#39424a";
+    ctx.lineWidth = 3.4 * K;
+    ctx.beginPath(); ctx.arc(fx, y, r + 2.6 * K, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, y, r + 2.6 * K, Math.PI * 1.2, Math.PI * 1.95); ctx.stroke();
+    // 车架
+    const seatX = 9 * K, seatY = y - 22 * K;
+    const headX = -19 * K, headY = y - 21 * K;
+    const crankX = 2 * K, crankY = y - 2 * K;
+    for (const [x1, y1, x2, y2] of [
+      [headX, headY, fx, y], [headX, headY, crankX, crankY],
+      [headX, headY - 1 * K, seatX, seatY + 3 * K], [seatX, seatY, crankX, crankY],
+      [seatX, seatY + 2 * K, bx, y], [crankX, crankY, bx, y],
+    ]) {
+      InkLine(ctx, x1, y1, x2, y2, id2 + "f" + Math.round(x1 + y2), { lw: 2.8 * K, color: RC.bike, amp: 0.4 * K });
+    }
+    // 车把与座
+    InkLine(ctx, headX, headY, headX - 6 * K, headY - 7 * K, id2 + "stem", { lw: 2.6 * K, color: RC.bike, amp: 0.3 * K });
+    InkLine(ctx, headX - 6 * K, headY - 7 * K, headX - 12 * K, headY - 4 * K, id2 + "bar", { lw: 3 * K, color: RC.bikeDark, amp: 0.3 * K });
+    InkFill(ctx, [[seatX - 6 * K, seatY - 3 * K], [seatX + 6 * K, seatY - 3 * K], [seatX + 4 * K, seatY], [seatX - 4 * K, seatY]],
+      id2 + "saddle", "#3a2e22", { lw: 1.6 * K, amp: 0.4 * K });
+    // 后货架 + 胯后那只挎包（伪军的记号）
+    InkFill(ctx, Rect(bx - 12 * K, y - r - 4 * K, 22 * K, 3.4 * K), id2 + "rack", "#4a4038", { lw: 1.6 * K, amp: 0.5 * K });
+    InkFill(ctx, [[seatX + 7 * K, seatY + 6 * K], [seatX + 18 * K, seatY + 7 * K],
+      [seatX + 17 * K, seatY + 19 * K], [seatX + 6 * K, seatY + 17 * K]],
+    id2 + "satchel", "#3f382c", { amp: 1.2 * K, lw: 2 * K, shade: "rgba(0,0,0,0.24)" });
+    // 踏板曲柄：随 wheelA 转（同一根链条，不另立相位）
+    const pedA = wheelA * 0.5;
+    const pedR = 6.5 * K;
+    const pedal = (s2) => [crankX + Math.cos(pedA + s2 * Math.PI) * pedR,
+      crankY + Math.sin(pedA + s2 * Math.PI) * pedR];
+    const [pAx, pAy] = pedal(0);          // 近侧踏板
+    const [pBx, pBy] = pedal(1);          // 远侧
+    InkLine(ctx, crankX, crankY, pBx, pBy, id2 + "crankB", { lw: 2 * K, color: "rgba(28,33,38,0.5)", amp: 0.3 * K });
+    // ── 人（先远侧腿，再车身侧的近侧腿压上来） ──
+    const hipX = seatX - 1 * K, hipY = seatY - 2 * K;
+    const shoY = hipY - 26 * K + shrug * -3.5 * K;
+    const shoX = hipX - 14 * K;
+    const Leg = (px2, py2, col, lw2, ground2) => {
+      // 两节腿：髋→膝→踏板（膝盖角度随踏板走）；ground2=这只脚点地撑着
+      const tx2 = ground2 ? fx + 6 * K : px2;
+      const ty2 = ground2 ? -1 * K : py2;
+      const mx2 = (hipX + tx2) / 2 - 7 * K, my2 = (hipY + ty2) / 2 - 3 * K;
+      InkLine(ctx, hipX, hipY, mx2, my2, id2 + "thigh" + col, { lw: lw2, color: col, amp: 0.6 * K });
+      InkLine(ctx, mx2, my2, tx2, ty2, id2 + "shin" + col, { lw: lw2 * 0.85, color: col, amp: 0.6 * K });
+      // 布鞋踩在踏板/地上
+      InkFill(ctx, [[tx2 - 4.5 * K, ty2 - 2.4 * K], [tx2 + 4 * K, ty2 - 2.6 * K],
+        [tx2 + 5 * K, ty2 + 0.6 * K], [tx2 - 4 * K, ty2 + 0.8 * K]],
+      id2 + "shoe" + col + Math.round(tx2), RC.shoe, { amp: 0.6 * K, lw: 1.4 * K });
+    };
+    Leg(pBx, pBy, "#3e3930", 6 * K, false);
+    // 躯干：微微前倾压着车把
+    InkFill(ctx, [
+      [hipX - 8 * K, hipY + 4 * K], [hipX + 8 * K, hipY + 2 * K],
+      [shoX + 10 * K, shoY], [shoX - 8 * K, shoY + 3 * K],
+    ], id2 + "torso", RC.coat, { amp: 1.6 * K, lw: 2.6 * K, shade: "rgba(0,0,0,0.2)" });
+    // 近侧腿（压在车架上）：footDown 时伸直点地
+    Leg(pAx, pAy, RC.trouser, 7 * K, footDown > 0.5);
+    // 裤脚一圈土布色的亮边（土布裤脚——伪军穿的是村民的腿）
+    InkLine(ctx, hipX - 2 * K, hipY + 14 * K, hipX + 3 * K, hipY + 15 * K, id2 + "cuff",
+      { lw: 2 * K, color: "rgba(120,110,86,0.5)", amp: 0.4 * K });
+    // 两臂伸向车把
+    InkLine(ctx, shoX + 2 * K, shoY + 4 * K, headX - 8 * K, headY - 5 * K, id2 + "armF",
+      { lw: 5.5 * K, color: RC.coat, amp: 0.8 * K });
+    // 头：软布帽、没有帽垂。lookBack>0 时扭头朝后（跟后车说话）
+    const hx = shoX + lookBack * 10 * K, hy = shoY - 11 * K;
+    const fdir2 = 1 - lookBack * 2;       // 1=朝前（车头方向），-1=扭向后
+    InkFill(ctx, [
+      [hx - fdir2 * 8 * K, hy + 7 * K], [hx - fdir2 * 7.5 * K, hy - 5 * K], [hx, hy - 8 * K],
+      [hx + fdir2 * 7.5 * K, hy - 4.6 * K], [hx + fdir2 * 8.6 * K, hy + 2 * K], [hx + fdir2 * 5.6 * K, hy + 7.6 * K],
+    ], id2 + "head", RC.skin, { amp: 0.9 * K, lw: 2 * K });
+    InkFill(ctx, [
+      [hx - fdir2 * 9.2 * K, hy - 3.4 * K], [hx - fdir2 * 6 * K, hy - 9.6 * K], [hx + fdir2 * 6 * K, hy - 9.8 * K],
+      [hx + fdir2 * 8.6 * K, hy - 2.4 * K], [hx + fdir2 * 5.6 * K, hy - 0.6 * K], [hx - fdir2 * 7 * K, hy - 0.6 * K],
+    ], id2 + "cap", RC.cap, { amp: 1 * K, lw: 1.8 * K });
+    ctx.fillStyle = IN.ink;
+    ctx.fillRect(hx + fdir2 * 3 * K - 1.4 * K, hy - 0.2 * K, 2.8 * K, 1.6 * K);   // 眼
+    ctx.restore();
+  };
+
+  // ── 三段的走位 ──
+  let uF = 40, uB = 190, wA = 0, wB = 0, fdF = 1, fdB = 1, look = 0, shr = 0, dir = 1;
+  if (seg === 0) {
+    // 从右骑进来：前车先到村口捏闸，后车跟着停
+    const kF = Sm((t - 0.1) / 3.3), kB = Sm((t - 0.45) / 3.5);
+    uF = 620 - 580 * kF;
+    uB = 830 - 640 * kB;
+    wA = (620 - uF) / 20;                 // 轮转随路走（半径 20u）
+    wB = (830 - uB) / 20;
+    fdF = Sm((t - 3.3) / 0.5);
+    fdB = Sm((t - 3.9) / 0.5);
+  } else if (seg === 1) {
+    // 支着腿望村里；前车那人扭头跟后车说话，后车那人肩一耸（笑）
+    look = Sm((t - 1.5) / 0.5) * (1 - Sm((t - 3.4) / 0.6));
+    shr = Math.sin(C01((t - 2.3) / 0.8) * Math.PI);
+  } else {
+    // 调头骑远：往右出画。调头本身在两行之间完成——这一段起手就已朝北
+    dir = -1;
+    const k = Sm(t / 3.6);
+    uF = 60 + k * 820;
+    uB = 190 + Sm((t - 0.4) / 3.6) * 900;
+    wA = (uF - 60) / 20;
+    wB = (uB - 190) / 20;
+    fdF = 1 - Sm(t / 0.4);
+    fdB = 1 - Sm((t - 0.3) / 0.4);
+  }
+  // 后车画在前（略远），前车压上来
+  Rider(uB, GY - 2, "vrB", { dir, wheelA: wB * (dir > 0 ? 1 : -1), footDown: fdB, lookBack: 0, shrug: shr });
+  Rider(uF, GY + 4, "vrF", { dir, wheelA: wA * (dir > 0 ? 1 : -1), footDown: fdF, lookBack: look, shrug: 0 });
+
+  // 影子两摊
+  for (const [uu, sw2] of [[uB, 44], [uF, 50]]) {
+    ctx.save();
+    ctx.fillStyle = "rgba(18,14,8,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(PX(uu), (GY + 6) * S, sw2 * S, 7 * S, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 脚下浮尘
+  Speckle(ctx, 0, (GY - 8) * S, W, H - (GY - 10) * S, "vrDust", { count: 36, alpha: 0.10, size: 3 * S, color: "#2e2820" });
+
+  // 冷罩 + 角晕 + 颗粒（同 raidMoto 一族，浅一档——他们只是路过）
+  ctx.fillStyle = "rgba(13,17,30,0.12)";
+  ctx.fillRect(0, 0, W, H);
+  const v = ctx.createRadialGradient(W / 2, H * 0.52, H * 0.26, W / 2, H * 0.52, H * 0.88);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(8,9,14,0.6)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "vrGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
+}
+
+// ---------------------------------------------------------------------------
+// 夜窖·整布（c1 夜里下窖那一眼，seg 0，4.2s）：一双少年的手捧着**对折的
+// 整幅蓝底白花布**——没下过剪子（布边是织边，没有裁口）。三四条从窖口板缝
+// 漏下的斜月光条打在布面上：光条里布纹与小白花清清楚楚，光条外几乎沉进黑里。
+// 夜里色全体压得极暗（参照 FOLD 那组的账：看着像纯黑的源色才是对的）。
+// ---------------------------------------------------------------------------
+export function DrawWholeClothCard(ctx, W, H, seg, t) {
+  void seg;
+  const S = H / 420;
+  const br = Math.sin(t * Math.PI * 2 * 0.22) * 2.4 * S;   // 极轻的呼吸浮动
+  // 底：窖的黑
+  const bg = ctx.createRadialGradient(W * 0.5, H * 0.42, H * 0.1, W * 0.5, H * 0.55, H * 1.0);
+  bg.addColorStop(0, "#0a0b0e");
+  bg.addColorStop(1, "#040405");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 布与手整组画两遍：一遍暗的（夜里的本色），再按光条裁着画亮的那一遍。
+  // bright=false 只给形；bright=true 给布纹、白花、织边——细节只活在光里
+  const Cloth = (bright) => {
+    const cy = H * 0.52 + br;
+    // 对折的整幅布：一大片横着的厚布，垂在两手之间微微下坠
+    const pts = [
+      [W * 0.20, cy - H * 0.19], [W * 0.42, cy - H * 0.235], [W * 0.62, cy - H * 0.225],
+      [W * 0.80, cy - H * 0.18], [W * 0.84, cy + H * 0.06], [W * 0.72, cy + H * 0.20],
+      [W * 0.50, cy + H * 0.255], [W * 0.28, cy + H * 0.21], [W * 0.165, cy + H * 0.05],
+    ];
+    InkFill(ctx, pts, "wcBody" + (bright ? 1 : 0), bright ? "#1e2837" : "#0c1017",
+      { amp: 4 * S, lw: bright ? 4 * S : 5 * S, line: "rgba(2,3,5,0.9)", shade: "rgba(0,0,0,0.3)" });
+    // 对折那道口：上沿里侧一线（布是双层的）
+    ctx.save();
+    ctx.strokeStyle = bright ? "rgba(96,110,132,0.55)" : "rgba(30,36,46,0.6)";
+    ctx.lineWidth = 3 * S;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.22, cy - H * 0.155);
+    ctx.quadraticCurveTo(W * 0.52, cy - H * 0.205, W * 0.79, cy - H * 0.15);
+    ctx.stroke();
+    // 垂坠的两道大褶
+    ctx.strokeStyle = bright ? "rgba(10,14,20,0.7)" : "rgba(3,4,6,0.7)";
+    ctx.lineWidth = 4 * S;
+    for (let i = 0; i < 3; i += 1) {
+      const fx = W * (0.36 + i * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(fx, cy - H * 0.19);
+      ctx.quadraticCurveTo(fx - 12 * S + Sym("wcFold", i, 10 * S), cy, fx + 6 * S, cy + H * 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+    if (bright) {
+      // 织边：下沿那条布自己织出来的边——**没有裁口**，"整幅"两个字全在这条边上
+      ctx.save();
+      ctx.strokeStyle = "rgba(150,160,178,0.6)";
+      ctx.lineWidth = 2.6 * S;
+      ctx.beginPath();
+      ctx.moveTo(W * 0.19, cy + H * 0.10);
+      ctx.quadraticCurveTo(W * 0.50, cy + H * 0.245, W * 0.80, cy + H * 0.12);
+      ctx.stroke();
+      // 织边上的小横痕：一梭一梭收的边
+      ctx.lineWidth = 1.6 * S;
+      ctx.strokeStyle = "rgba(150,160,178,0.4)";
+      for (let i = 0; i < 15; i += 1) {
+        const k = 0.21 + i * 0.04;
+        const ex = W * k;
+        const ey = cy + H * (0.10 + Math.sin((k - 0.19) / 0.61 * Math.PI) * 0.135);
+        ctx.beginPath();
+        ctx.moveTo(ex, ey - 3 * S);
+        ctx.lineTo(ex + 1.5 * S, ey + 3.4 * S);
+        ctx.stroke();
+      }
+      // 布纹：细密的横纹几道
+      ctx.strokeStyle = "rgba(80,94,114,0.30)";
+      ctx.lineWidth = 1.2 * S;
+      for (let i = 0; i < 6; i += 1) {
+        const gy2 = cy - H * 0.14 + i * H * 0.062;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.23, gy2);
+        ctx.quadraticCurveTo(W * 0.5, gy2 - 6 * S + Sym("wcWeave", i, 5 * S), W * 0.78, gy2 + 3 * S);
+        ctx.stroke();
+      }
+      // 小白花：光条里才认得出的那一撮撮米白
+      for (let i = 0; i < 14; i += 1) {
+        const bx = W * (0.24 + Hash("wcBloomX" + i) * 0.52);
+        const by = cy - H * 0.16 + Hash("wcBloomY" + i) * H * 0.36;
+        ctx.fillStyle = "rgba(196,204,218,0.6)";
+        for (let p2 = 0; p2 < 4; p2 += 1) {
+          const pa = (p2 / 4) * Math.PI * 2 + Hash("wcBloomP" + i) * 2;
+          ctx.beginPath();
+          ctx.ellipse(bx + Math.cos(pa) * 3.4 * S, by + Math.sin(pa) * 2.6 * S,
+            2.0 * S, 1.5 * S, pa, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    // 两只捧着的手：少年的手，从下画框伸上来兜着布的两角
+    for (const sd of [-1, 1]) {
+      const hx = W * (0.5 + sd * 0.30), hy = cy + H * (0.02 + 0.06 * (sd > 0 ? 1 : 0.6));
+      InkFill(ctx, [
+        [hx - sd * 20 * S, hy + 40 * S], [hx - sd * 34 * S, hy + 200 * S],
+        [hx + sd * 26 * S, hy + 210 * S], [hx + sd * 30 * S, hy + 60 * S],
+      ], "wcArm" + sd + (bright ? 1 : 0), bright ? "#2e2317" : "#120d08",
+      { amp: 3 * S, lw: 4 * S, shade: "rgba(0,0,0,0.3)" });
+      InkFill(ctx, [
+        [hx - sd * 16 * S, hy + 16 * S], [hx + sd * 2 * S, hy - 8 * S], [hx + sd * 22 * S, hy - 2 * S],
+        [hx + sd * 28 * S, hy + 30 * S], [hx + sd * 4 * S, hy + 46 * S], [hx - sd * 14 * S, hy + 40 * S],
+      ], "wcHand" + sd + (bright ? 1 : 0), bright ? "#4e3826" : "#1a130c",
+      { amp: 2.6 * S, lw: 3.6 * S, shade: "rgba(0,0,0,0.24)" });
+      // 扣在布上的指头
+      for (let i = 0; i < 3; i += 1) {
+        InkLine(ctx, hx + sd * (2 + i * 8) * S, hy - 2 * S, hx + sd * (5 + i * 8) * S, hy - 16 * S,
+          "wcFing" + sd + i + (bright ? 1 : 0),
+          { lw: 4.6 * S, color: bright ? "#4e3826" : "#1a130c", amp: 0.8 * S });
+      }
+    }
+  };
+  Cloth(false);
+
+  // ── 板缝漏下来的斜月光条：三四条，窄的宽的。条里重画一遍亮的 ──
+  const beams = [
+    [0.255, 0.052], [0.415, 0.030], [0.575, 0.062], [0.76, 0.026],
+  ];
+  const ba = -0.42;                       // 斜率：从右上漏向左下
+  for (let i = 0; i < beams.length; i += 1) {
+    const [bu, bw] = beams[i];
+    const x0 = W * bu, w2 = W * bw;
+    const dx = Math.tan(ba) * H;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x0, -10 * S);
+    ctx.lineTo(x0 + w2, -10 * S);
+    ctx.lineTo(x0 + w2 + dx, H + 10 * S);
+    ctx.lineTo(x0 + dx, H + 10 * S);
+    ctx.closePath();
+    ctx.clip();
+    Cloth(true);
+    // 光条自己的那口冷气（加色）
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = "rgba(96,116,150,0.10)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // 角晕：夜的黑往里收
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.24, W * 0.5, H * 0.5, H * 0.88);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(1,1,2,0.8)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "wcGrain", { count: Math.round(W / 7), alpha: 0.05, size: 2.2 });
+}
+
+// ---------------------------------------------------------------------------
+// 缝·改（c1 天蒙蒙亮，两段）：一双手把小褂子提起来对着天光看。
+//   seg 0  看整件：暗红小褂逆着晨光，一只袖口接了一截蓝底白花，
+//          两只袖子明显不一样长
+//   seg 1  推近那只接了蓝布的袖口（同一件东西的近景）
+// 晨光青灰（dawn 那族再压两档），布全是逆光的剪影，细节靠轮廓与那截蓝布说。
+// ---------------------------------------------------------------------------
+export function DrawMendedSleeveCard(ctx, W, H, seg, t) {
+  const S = H / 420;
+  const br = Math.sin(t * Math.PI * 2 * 0.2) * 1.8 * S;    // 手提着，有一点点晃
+  // 底：蒙蒙亮的天——青灰里透一点将亮未亮的暖
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#232038");
+  bg.addColorStop(0.55, "#332e4a");
+  bg.addColorStop(1, "#211d30");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  // 天光最亮那一块：画框上中——衣裳就是对着它看的
+  const glow = ctx.createRadialGradient(W * 0.5, H * 0.34, H * 0.04, W * 0.5, H * 0.38, H * 0.62);
+  glow.addColorStop(0, "rgba(120,116,150,0.5)");
+  glow.addColorStop(0.5, "rgba(90,86,118,0.22)");
+  glow.addColorStop(1, "rgba(60,56,84,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  const RIM = "rgba(146,140,178,0.6)";      // 逆光的轮廓亮边
+  const STITCH = "rgba(172,164,148,0.75)";  // 针脚：大的大小的小
+
+  if (seg === 0) {
+    // ── 整件：两只手提着肩缝，袖子垂下来——左袖原装、右袖接过 ──
+    const cx = W * 0.5, topY = H * 0.30 + br;
+    // 衣身
+    InkFill(ctx, [
+      [cx - W * 0.155, topY], [cx - W * 0.04, topY - H * 0.045], [cx + W * 0.05, topY - H * 0.04],
+      [cx + W * 0.16, topY + H * 0.01], [cx + W * 0.135, topY + H * 0.36],
+      [cx - W * 0.13, topY + H * 0.375],
+    ], "msBody", "#3a1e25", { amp: 4 * S, lw: 5 * S, line: "rgba(8,5,7,0.9)", shade: "rgba(0,0,0,0.3)" });
+    // 领口
+    InkFill(ctx, [[cx - W * 0.028, topY - H * 0.05], [cx + W * 0.03, topY - H * 0.048],
+      [cx + W * 0.02, topY - H * 0.012], [cx - W * 0.02, topY - H * 0.014]],
+    "msCollar", "#2b161c", { amp: 2 * S, lw: 3 * S });
+    // 左袖（原装的，短）：垂到 0.52H
+    InkFill(ctx, [
+      [cx - W * 0.155, topY + H * 0.008], [cx - W * 0.205, topY + H * 0.03],
+      [cx - W * 0.215, topY + H * 0.215], [cx - W * 0.155, topY + H * 0.225],
+      [cx - W * 0.13, topY + H * 0.05],
+    ], "msSleeveL", "#341b21", { amp: 3.4 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.28)" });
+    // 右袖（接过的，明显长一截）：本袖到 0.2H，接上的蓝布再往下 0.1H
+    InkFill(ctx, [
+      [cx + W * 0.16, topY + H * 0.02], [cx + W * 0.21, topY + H * 0.045],
+      [cx + W * 0.222, topY + H * 0.20], [cx + W * 0.163, topY + H * 0.208],
+      [cx + W * 0.14, topY + H * 0.06],
+    ], "msSleeveR", "#341b21", { amp: 3.4 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.28)" });
+    // 接上去的那截蓝底白花
+    InkFill(ctx, [
+      [cx + W * 0.163, topY + H * 0.205], [cx + W * 0.222, topY + H * 0.198],
+      [cx + W * 0.23, topY + H * 0.315], [cx + W * 0.168, topY + H * 0.322],
+    ], "msPatch", "#232c38", { amp: 2.6 * S, lw: 4 * S, shade: "rgba(0,0,0,0.24)" });
+    // 蓝布上的白花两三点
+    ctx.save();
+    ctx.fillStyle = "rgba(170,180,196,0.5)";
+    for (let i = 0; i < 4; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(cx + W * (0.178 + Hash("msB" + i) * 0.04), topY + H * (0.225 + Hash("msBy" + i) * 0.08),
+        2.4 * S, 1.8 * S, i, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // 接口那圈针脚：不匀的虚线（一针大一针小）
+    ctx.save();
+    ctx.strokeStyle = STITCH;
+    ctx.lineWidth = 2 * S;
+    let sx2 = cx + W * 0.166;
+    for (let i = 0; i < 6; i += 1) {
+      const seg2 = (3 + Hash("msSt" + i) * 6) * S;
+      ctx.beginPath();
+      ctx.moveTo(sx2, topY + H * 0.205 + Sym("msStY", i, 2.4 * S));
+      ctx.lineTo(sx2 + seg2 * 0.6, topY + H * 0.203 + Sym("msStY", i + 6, 2.4 * S));
+      ctx.stroke();
+      sx2 += seg2;
+      if (sx2 > cx + W * 0.222) break;
+    }
+    ctx.restore();
+    // 逆光的轮廓亮边：肩线与两袖外沿
+    ctx.save();
+    ctx.strokeStyle = RIM;
+    ctx.lineWidth = 2.4 * S;
+    ctx.beginPath();
+    ctx.moveTo(cx - W * 0.15, topY + 2 * S);
+    ctx.quadraticCurveTo(cx, topY - H * 0.052, cx + W * 0.155, topY + H * 0.008);
+    ctx.stroke();
+    ctx.lineWidth = 1.8 * S;
+    ctx.beginPath();
+    ctx.moveTo(cx - W * 0.203, topY + H * 0.035);
+    ctx.lineTo(cx - W * 0.214, topY + H * 0.213);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + W * 0.209, topY + H * 0.05);
+    ctx.lineTo(cx + W * 0.228, topY + H * 0.313);
+    ctx.stroke();
+    ctx.restore();
+    // 两只提着的手（从下画框伸上来，捏着两肩）
+    for (const sd of [-1, 1]) {
+      const hx = cx + sd * W * 0.10, hy = topY - H * 0.03 + (sd > 0 ? 4 * S : 0);
+      InkFill(ctx, [
+        [hx - 12 * S, hy + 6 * S], [hx - 4 * S, hy - 10 * S], [hx + 12 * S, hy - 6 * S],
+        [hx + 15 * S, hy + 10 * S], [hx + 2 * S, hy + 16 * S],
+      ], "msHand" + sd, "#5a4028", { amp: 2.4 * S, lw: 3.4 * S, shade: "rgba(0,0,0,0.24)" });
+      InkLine(ctx, hx + sd * 4 * S, hy + 14 * S, hx + sd * 26 * S, hy + H * 0.5,
+        "msArm" + sd, { lw: 12 * S, color: "#3f301e", amp: 2 * S });
+    }
+  } else {
+    // ── 近景：那只接了蓝布的袖口横过画框（同一件东西，推近了看） ──
+    const cy = H * 0.52 + br;
+    // 本袖：从左上斜进来，暗红
+    InkFill(ctx, [
+      [-30 * S, cy - H * 0.30], [W * 0.46, cy - H * 0.235], [W * 0.50, cy + H * 0.06],
+      [-30 * S, cy + H * 0.16],
+    ], "msNearSleeve", "#3a1e25", { amp: 5 * S, lw: 6 * S, shade: "rgba(0,0,0,0.3)" });
+    // 接上的蓝布：占画框右半
+    InkFill(ctx, [
+      [W * 0.455, cy - H * 0.24], [W * 0.92, cy - H * 0.175], [W * 0.965, cy + H * 0.115],
+      [W * 0.49, cy + H * 0.065],
+    ], "msNearPatch", "#232c38", { amp: 4.5 * S, lw: 6 * S, shade: "rgba(0,0,0,0.26)" });
+    // 袖口的织口：右端一道收边
+    InkLine(ctx, W * 0.925, cy - H * 0.17, W * 0.962, cy + H * 0.108, "msNearHem",
+      { lw: 4 * S, color: "rgba(120,132,150,0.5)", amp: 3 * S });
+    // 白花：近景里花看得真了
+    ctx.save();
+    for (let i = 0; i < 8; i += 1) {
+      const bx = W * (0.52 + Hash("msNB" + i) * 0.38);
+      const by = cy - H * 0.15 + Hash("msNBy" + i) * H * 0.24;
+      ctx.fillStyle = "rgba(178,188,202,0.55)";
+      for (let p2 = 0; p2 < 4; p2 += 1) {
+        const pa = (p2 / 4) * Math.PI * 2 + Hash("msNBp" + i) * 2;
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(pa) * 5 * S, by + Math.sin(pa) * 3.8 * S,
+          3 * S, 2.2 * S, pa, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    // 接口那道缝：针脚大的大小的小、歪的歪斜的斜——近景里这就是主角
+    ctx.save();
+    ctx.strokeStyle = STITCH;
+    let sy2 = cy - H * 0.235;
+    for (let i = 0; i < 9; i += 1) {
+      const seg2 = (8 + Hash("msNSt" + i) * 15) * S;
+      ctx.lineWidth = (2.4 + Hash("msNSw" + i) * 2.2) * S;
+      ctx.beginPath();
+      ctx.moveTo(W * 0.468 + Sym("msNSx", i, 7 * S), sy2);
+      ctx.lineTo(W * 0.474 + Sym("msNSx", i + 9, 7 * S), sy2 + seg2 * 0.6);
+      ctx.stroke();
+      sy2 += seg2;
+      if (sy2 > cy + H * 0.06) break;
+    }
+    // 缝线拽出的两处小皱
+    ctx.strokeStyle = "rgba(10,8,10,0.5)";
+    ctx.lineWidth = 2.6 * S;
+    for (let i = 0; i < 2; i += 1) {
+      const py2 = cy - H * 0.1 + i * H * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(W * 0.43, py2);
+      ctx.quadraticCurveTo(W * 0.465, py2 + 4 * S, W * 0.52, py2 - 3 * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 布上沿的逆光亮边
+    ctx.save();
+    ctx.strokeStyle = RIM;
+    ctx.lineWidth = 2.6 * S;
+    ctx.beginPath();
+    ctx.moveTo(-20 * S, cy - H * 0.295);
+    ctx.quadraticCurveTo(W * 0.46, cy - H * 0.245, W * 0.92, cy - H * 0.178);
+    ctx.stroke();
+    ctx.restore();
+    // 捏着袖口的两根手指（右下角，把布绷平的那只手）
+    InkFill(ctx, [
+      [W * 0.88, cy + H * 0.10], [W * 0.97, cy + H * 0.075], [W + 20 * S, cy + H * 0.16],
+      [W + 20 * S, H + 20 * S], [W * 0.84, H + 20 * S],
+    ], "msNearHand", "#5a4028", { amp: 3.4 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.26)" });
+    InkLine(ctx, W * 0.90, cy + H * 0.105, W * 0.955, cy + H * 0.085, "msNearThumb",
+      { lw: 7 * S, color: "#6a4c30", amp: 1 * S });
+  }
+
+  // 晨雾的青：整卡罩一层将亮未亮
+  ctx.fillStyle = "rgba(46,42,72,0.14)";
+  ctx.fillRect(0, 0, W, H);
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.46, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(10,9,16,0.66)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "msGrain", { count: Math.round(W / 7), alpha: 0.05, size: 2.2 });
+}
+
 // 过场活动插卡的登记表：World.SetInsertCard 见到这里的名字就走每帧重画那条路。
 // 新加一张卡＝这里登记 + 剧本行 cam: { kind: "insertCard", card: 名字, seg: n }
-export const INSERT_LIVE = { raidMoto: DrawRaidMotoCard };
+export const INSERT_LIVE = {
+  raidMoto: DrawRaidMotoCard,
+  motherJacket: DrawMotherJacketCard,
+  villageRiders: DrawVillageRidersCard,
+  wholeCloth: DrawWholeClothCard,
+  mendedSleeve: DrawMendedSleeveCard,
+};
 
 // ---------------------------------------------------------------------------
 // 刨料特写卡（会动的那一张，和下面的划线卡同一套路数）。
@@ -9046,19 +9798,55 @@ function ChalkStroke(ctx, x0, x1, y, S, drawn, press) {
 //
 // 比例是这张卡的命根子：笔杆必须**露出来一大截**（拳头只攥后半段），
 // 玩家一眼看见的得是"一支笔"，不是"一只拳头前面有个白点"。
-function ChalkInHand(ctx, tx, ty, S, lean, skin, sleeve, cuff) {
+function ChalkInHand(ctx, tx, ty, S, lean, skin, sleeve, cuff, { kid = false } = {}) {
   ctx.save();
   ctx.translate(tx, ty);
   ctx.rotate(lean);
   // 小臂先画（压在最底下）：一截出画的胳膊 + 袖口。
   // 手是同一双（都是庄稼人的手），认得出是谁靠这身短褂的颜色——
   // 第一章那只袖子是爹的土褐，第八章是柱子自己的那身。
+  // kid 变奏（sisterTally）：妹妹的小手——胳膊细一圈、拳头小一号也圆一号，
+  // 笔换成**磨秃的滑石片**（灰白、短粗，露在拳头外的只有一小截）
+  const AW = kid ? 0.66 : 1;               // 胳膊的细
   InkFill(ctx, [
-    [-330 * S, -52 * S], [-820 * S, 10 * S], [-820 * S, 190 * S], [-336 * S, 88 * S],
+    [-330 * S, -52 * S * AW], [-820 * S, (10 - (kid ? 26 : 0)) * S], [-820 * S, (190 - (kid ? 46 : 0)) * S], [-336 * S, 88 * S * AW],
   ], "cardArm", sleeve, { amp: 4 * S, lw: 6.5 * S, shade: "rgba(0,0,0,0.20)" });
   InkFill(ctx, [
-    [-260 * S, -62 * S], [-340 * S, -46 * S], [-348 * S, 86 * S], [-266 * S, 92 * S],
+    [-260 * S, -62 * S * AW], [-340 * S, -46 * S * AW], [-348 * S, 86 * S * AW], [-266 * S, 92 * S * AW],
   ], "cardCuff", cuff, { amp: 3.4 * S, lw: 6 * S, shade: "rgba(0,0,0,0.18)" });
+  if (kid) {
+    // 磨秃的滑石片：短、粗、灰白。尖是磨圆的，不是削出来的
+    InkFill(ctx, [
+      [-8 * S, -30 * S], [-90 * S, -44 * S], [-170 * S, -40 * S],
+      [-174 * S, 38 * S], [-92 * S, 40 * S], [-6 * S, 22 * S],
+    ], "cardSoapBody", "#cfc9ba", { amp: 3 * S, lw: 5.5 * S, shade: "rgba(70,66,56,0.26)" });
+    InkLine(ctx, -22 * S, -14 * S, -150 * S, -26 * S, "cardSoapEdge",
+      { lw: 3.4 * S, color: "rgba(108,102,88,0.4)", amp: 3.4 * S });
+    // 磨圆的秃尖
+    InkFill(ctx, [[-12 * S, -26 * S], [8 * S, -8 * S], [7 * S, 12 * S], [-12 * S, 18 * S]],
+      "cardSoapTip", "#e2ddd0", { amp: 2 * S, lw: 4.5 * S });
+    // 石片上两道磨痕（它是使秃的，不是新的）
+    for (let i = 0; i < 2; i += 1) {
+      InkLine(ctx, (-30 - i * 40) * S, (6 + i * 8) * S, (-70 - i * 40) * S, (2 + i * 10) * S,
+        "cardSoapWear" + i, { lw: 2 * S, color: "rgba(96,90,76,0.35)", amp: 2 * S });
+    }
+    // 小拳头：圆乎乎的一团，攥着石片的后半截
+    InkFill(ctx, [
+      [-112 * S, -62 * S], [-172 * S, -78 * S], [-224 * S, -40 * S], [-228 * S, 42 * S],
+      [-176 * S, 76 * S], [-112 * S, 56 * S], [-98 * S, -4 * S],
+    ], "cardFist", skin, { amp: 3.2 * S, lw: 6 * S, shade: "rgba(70,40,22,0.16)" });
+    // 三道小指节（孩子的手，节短）
+    for (let i = 0; i < 3; i += 1) {
+      InkLine(ctx, -128 * S - i * 30 * S, -52 * S, -124 * S - i * 30 * S, -12 * S,
+        "cardKnuck" + i, { lw: 3 * S, color: "rgba(118,74,44,0.45)", amp: 2.4 * S });
+    }
+    // 小拇指压在石片上
+    InkFill(ctx, [
+      [-128 * S, -56 * S], [-80 * S, -38 * S], [-70 * S, -6 * S], [-118 * S, -12 * S],
+    ], "cardThumb", skin, { amp: 2.4 * S, lw: 5 * S, shade: "rgba(70,40,22,0.14)" });
+    ctx.restore();
+    return;
+  }
   // 笔杆：后粗前细，磨秃的尖朝右下（本地坐标里朝 +x）。
   // 从笔尖一路伸到拳头里，露在外面的是 -12 → -175 这一大截。
   InkFill(ctx, [
@@ -9121,13 +9909,17 @@ export function DrawScribeCard(ctx, W, H, view, L, t) {
       "cardGrainL" + i, { lw: 3 * S, color: "rgba(92,60,34,0.34)", amp: 26 * S });
   }
 
-  // 卡面变奏（Core 的 def.cardStyle）：正字那拍没人靠框站着、木头上已有前几天的道道
+  // 卡面变奏（Core 的 def.cardStyle）：可以是一张配置对象，也可以是一个名字。
+  // "sisterTally"（第七稿 c1_draw）＝妹妹画正字那拍：握笔的是**小孩的小手**
+  // （袖口暗红——妹妹那身）、笔是磨秃的滑石片、左边已有前两天歪歪扭扭的
+  // 旧道道；没人靠着框（画个人影就成了闹鬼）。木面仍是门框立柱。
   const style = view.style || {};
+  const sisterTally = style === "sisterTally";
 
   // 被量的那个人：柱子背靠木头站直了，**头顶正好顶在这条线上**——
   // 这道线量的是什么，画面自己说，不用旁白讲。侧影，不抢前景那只手。
   // （量身变奏才有；正字那拍谁也没靠着框，画个人影就成了闹鬼）
-  if (style.silhouette !== false) {
+  if (!sisterTally && style.silhouette !== false) {
     ctx.save();
     ctx.globalAlpha = 0.46;
     const kx = uX(0.735);
@@ -9171,6 +9963,26 @@ export function DrawScribeCard(ctx, W, H, view, L, t) {
         { lw: 7 * S, color: "rgba(52,38,22,0.42)", amp: 2.2 * S });
       InkLine(ctx, ax, ay, bx, by, "cardTy" + i,
         { lw: 5 * S, color: "rgba(236,222,188,0.78)", amp: 2.2 * S });
+    }
+  }
+
+  // sisterTally：前两天她自己画的两道，就在刻线区**左边**——歪歪扭扭的
+  // 石笔浅痕，一天一道。今天这道（玩家手里的）画完，那儿就是三道。
+  // 画法同世界里的道道：暗底垫一道，淡白痕才立得住；孩子的手劲不匀，
+  // 每道的深浅、斜度、长短都不一样
+  if (sisterTally) {
+    const cw = x1 - x0;
+    // 立柱西缘到刻线起点只有 0.07 个画宽——两道旧痕收在这条窄边里，
+    // 短短的、一道压着一道的斜，长短还不一样（孩子一天一道画出来的）
+    for (let i = 0; i < 2; i += 1) {
+      const mx1 = x0 - cw * (0.045 + i * 0.02);
+      const mx0 = Math.max(postX + 8 * S, mx1 - cw * (0.13 + Hash("cardSisLen" + i) * 0.05));
+      const my = lineY + (i ? 26 : -20) * S + Sym("cardSisY", i, 6 * S);
+      const tiltDy = Sym("cardSisT", i, 8 * S);
+      InkLine(ctx, mx0, my + 2.5 * S, mx1, my + tiltDy + 2.5 * S, "cardSisD" + i,
+        { lw: 6 * S, color: "rgba(52,38,22,0.42)", amp: 4 * S });
+      InkLine(ctx, mx0, my, mx1, my + tiltDy, "cardSis" + i,
+        { lw: 4.4 * S, color: "rgba(230,216,182,0.66)", amp: 4 * S });
     }
   }
 
@@ -9241,8 +10053,11 @@ export function DrawScribeCard(ctx, W, H, view, L, t) {
     ctx.restore();
   }
 
+  // sisterTally：小孩的小手 + 磨秃的滑石片，袖口是妹妹那身的暗红（压两档）
   ChalkInHand(ctx, tipX, tipY, S, lean, PAL.skin,
-    view.selfMark ? PAL.zhuzi : "#6d5340", view.selfMark ? PAL.zhuziDark : "#7b6448");
+    sisterTally ? "#5e3038" : view.selfMark ? PAL.zhuzi : "#6d5340",
+    sisterTally ? "#4a262d" : view.selfMark ? PAL.zhuziDark : "#7b6448",
+    { kid: sisterTally });
 
   // 笔尖的粉尘：只有真在蹭木头才扬起来
   const dust = gripped ? Math.min(1, 0.35 + (view.speed || 0) * 2.4) : 0;
