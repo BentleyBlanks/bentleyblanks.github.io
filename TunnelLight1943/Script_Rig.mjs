@@ -324,6 +324,37 @@ export const TRACKS = {
       { t: 1.6, hipY: -0.06, hipX: 0.0, torso: -4, head: -8, armF: -136, foreF: -18, armB: -128, foreB: -14 },
     ],
   },
+  // 妹妹在怀里抖（序·那天，循环）：缩成一小团，两臂抱在胸前，肩背一颤一颤。
+  // 幅度给小——「你能数出来她抖了多少下」靠的是频率不是大动作；
+  // 头是埋着的（head 正值＝低头），跟挣扎/欢呼那种抬头的动势拉开
+  tremble: {
+    dur: 0.46, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.07, hipX: 0.01, torso: 20, head: 8, armF: -64, foreF: -92, armB: -58, foreB: -86, thighB: -16, shinB: 22, footB: -4, thighF: -10, shinF: 16, footF: -4 },
+      { t: 0.12, hipY: -0.085, torso: 23, head: 10 },
+      { t: 0.24, hipY: -0.065, torso: 19, head: 7 },
+      { t: 0.35, hipY: -0.08, torso: 22, head: 9 },
+      { t: 0.46, hipY: -0.07, torso: 20, head: 8 },
+    ],
+  },
+  // 坐着打盹（黄昏·匀稠的，循环 6.2s＝Core 的打盹钟同一个周期）：
+  // 底子是 sitStool 的坐姿；低头 3.4s（点两下）→ 动一下 0.7s（预告，
+  // Core 在这一段出衣角窸窣的 cue）→ 抬头 2.1s 看他 → 猛地又耷拉下去。
+  // **key 的时刻必须跟 Core 的 D = {down:3.4, stir:0.7, up:2.1} 对齐**——
+  // 她的头就是这道玩法门的读数，头抬到哪儿手就得停到哪儿
+  dozeNod: {
+    dur: 6.2, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.34, hipX: 0.02, torso: 22, head: 22, armF: -44, foreF: -58, armB: -38, foreB: -52, thighB: -84, shinB: 78, footB: 6, thighF: -78, shinF: 72, footF: 4 },
+      { t: 1.0, torso: 25, head: 32 },      // 点下去
+      { t: 1.7, torso: 23, head: 26 },      // 悬着
+      { t: 2.6, torso: 26, head: 34 },      // 又点一下
+      { t: 3.4, torso: 24, head: 28 },      // 动一下：预告开始
+      { t: 4.1, torso: 12, head: -12 },     // 头抬起来，看他
+      { t: 5.9, torso: 13, head: -8 },      // 望着
+      { t: 6.2, torso: 22, head: 22 },      // 猛地又耷拉下去
+    ],
+  },
   // 拉锯（循环）。这一条改过一次，原因值得写下来：
   // 锯是 alongArm 挂件，**贴图方向 = 前臂的世界角 = armF + foreF**。老版本靠开合
   // 肘部来"一进一出"，前臂世界角从 -72° 荡到 -132°——锯在空中划了 60° 的钟摆，
