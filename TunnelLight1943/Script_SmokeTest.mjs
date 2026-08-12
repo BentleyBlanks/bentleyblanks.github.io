@@ -12,7 +12,8 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
-  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, FOLD_CARD, SLING, SlingSolve,
+  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, FOLD_CARD,
+  WRAP_CARD, SLING, SlingSolve, FORAGE, ForageMatEdge, ForageScoopDir,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments, AllRelics,
 } from "./Script_Core.mjs";
@@ -213,6 +214,19 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
         if (target.action === "foldAt" && Math.abs(dx) <= near && target.card) {
           input.moveX = 0;
           FoldDrive(state, input, target, tick);
+        }
+        // 找吃的那四道手：一个长按后备都没有（2026-08-12 用户退回「居然是长按
+        // 一个按钮」），所以驱动器只能**真的去拖那三样东西 / 那张卡**——攥住、
+        // 往该去的方向一点点挪，跟真人同一套输入。走位容差比别处紧
+        // （0.45）：这几步的站位是节拍自己钉的，走过头会掉出判定区。
+        if ((target.action === "heaveAt" || target.action === "plankAt" || target.action === "scoopAt")
+          && Math.abs(dx) <= 0.45) {
+          input.moveX = 0;
+          ForageDrive(state, input, target, tick);
+        }
+        if (target.action === "unwrapAt" && Math.abs(dx) <= 0.45 && target.card) {
+          input.moveX = 0;
+          WrapDrive(state, input, target, tick);
         }
       }
     }
@@ -873,6 +887,46 @@ function FoldDrive(state, input, target, tick) {
 }
 
 /** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒紧到了几成 */
+// 找吃的那三样在世界里的东西（苫子/门板/土堆）：攥住 → 往 target.to 挪。
+// 两个点都是 Core 每帧现算的（GetBeatTarget），驱动器不自己推几何。
+function ForageDrive(state, input, target, tick) {
+  const Put = (pt) => { input.pointerHeld = true; input.pointerWorld = { x: pt.x, y: pt.y }; };
+  const f = target.action === "heaveAt" ? state.forage?.mat
+    : target.action === "plankAt" ? state.forage?.plank : state.forage?.ash;
+  if (!f) return;
+  if (!f.grab) {
+    // 松一帧 → 按一帧：这一下必须按在那件东西上才攥得住（state.ptrPressed）
+    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerWorld = null; return; }
+    Put(target.grab);
+    return;
+  }
+  // 攥住了：手只许比那件东西领先一点点——领先过头，苫子会撕、板子会顶住，
+  // 那两条规矩这里不许绕开
+  Put(target.to);
+}
+
+// 解扎口那张活卡：先逆着缠的方向把绳绕完三道，再捏住布角掀开
+function WrapDrive(state, input, target, tick) {
+  const A = target.aspect || 16 / 9;
+  const Put = (x, y) => { input.pointerHeld = true; input.pointerCard = { u: x, v: y * A }; };
+  const wc = state.wrapCard;
+  const c = target.neck;
+  if (!wc) { Put(c.x + target.ring, c.y); return; }
+  if (wc.phase !== "peel") {
+    const a = (wc.a === null || wc.a === undefined) ? -0.5 : wc.a + target.spin;
+    Put(c.x + Math.cos(a) * target.ring, c.y + Math.sin(a) * target.ring * 0.9);
+    return;
+  }
+  const cor = wc.corner;
+  if (!wc.grab) {
+    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerCard = null; return; }
+    Put(cor.x, cor.y);
+    return;
+  }
+  Put(cor.x + target.peel.x * target.reachStep, cor.y + target.peel.y * target.reachStep);
+}
+
+/** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒了几把 */
 function DragKnotThrough(state, drive) {
   const t = GetBeatTarget(state);
   assert.equal(t?.action, "knotAt", "接绳那一步的驱动目标应该是拖绳头，不是长按");
@@ -1183,6 +1237,171 @@ function TestFoldIsHandsOnCloth() {
   }
 
   console.log("  ✓ 叠衣裳：长按无效 / 按不准拈不起 / 布有分量 / 甩快了弹回原处 / 揭苫要再抻一把 / HUD 无条");
+}
+
+// 找吃的（c1_forage）：**四道手，四个不重样的动词，一个长按都没有**。
+// 2026-08-12 用户退回老版三步一模一样的 `use+hold`：「居然是长按一个按钮？
+// 一点都不拟物，交互程度好低一点也不沉浸」。这条盯着重做之后的六件事：
+// ①四道手真是四个动词、链上一个 hold 都不剩 ②长按 E 一点用没有
+// ③按下那一帧手不在实物上就攥不住 ④掀猛了焦草会撕 ⑤门板的卡口硬拖过不去
+// ⑥扒土是一下一下的（按住不放只算一下）⑦解扎口转反了是往紧里缠。
+function TestForageIsHandsOn() {
+  const beat = SCRIPTS.c1.find((b) => b.id === "c1_forage");
+  const Setup = (stepIndex) => {
+    const state = CreateGame(0);
+    const idx = ChapterBeatList(0).find((b) => b.id === "c1_forage").index;
+    DebugJump(state, 0, idx);
+    state.beat.stepIndex = stepIndex;
+    state.player.level = "surface";
+    state.player.x = beat.steps[stepIndex].zone.x + 1.2;
+    return state;
+  };
+  const step = (state, input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        advance: false, ...input,
+      }, DT);
+    }
+  };
+  const world = (x, y) => ({ pointerHeld: true, pointerWorld: { x, y: SURFACE_Y + y } });
+  const IDX = {};
+  beat.steps.forEach((s, i) => { IDX[s.type] = i; });
+
+  // ① 四道手是四个不重样的动词，而且这条链上**一个 hold 都不剩**
+  {
+    const verbs = beat.steps.map((s) => s.type).filter((t) => t !== "goto" && t !== "pickup");
+    assert.deepEqual(verbs, ["heaveMat", "shiftPlank", "scoopAsh", "unwrapJar"],
+      "找吃的必须是掀/拖/扒/解四道手——相邻两道用同一个动词，玩家会拿上一道的手法糊弄下一道");
+    assert.equal(new Set(verbs).size, verbs.length, "四道手不许重样");
+    for (const s of beat.steps) {
+      assert.ok(!s.hold, `「${s.prompt || s.type}」还挂着 hold＝又变回长按进度环了`);
+    }
+    assert.ok(beat.forage, "三样东西的摆位要声明在 forage 上，渲染层照它画");
+  }
+
+  // ② 长按互动键：三道手一点用都没有（后备是死的）
+  for (const key of ["heaveMat", "shiftPlank", "scoopAsh"]) {
+    const state = Setup(IDX[key]);
+    step(state, {}, 2);
+    const before = state.beat.stepIndex;
+    step(state, { interactHeld: true, interact: true }, Math.ceil(8.0 / DT));
+    assert.equal(state.beat.stepIndex, before, `长按 E 居然把「${key}」做完了——这条后备必须是死的`);
+    assert.ok(!state.promptFill, `「${key}」不该再画长按进度环`);
+    assert.ok(!state.dragTrack, "做功那一拍画面上不许有可拖的 HUD 轨道");
+  }
+
+  // ③ 按下那一帧手不落在那件东西上：攥不住，怎么拖都不动
+  {
+    const state = Setup(IDX.heaveMat);
+    step(state, {}, 2);
+    // 在苫子外沿以外一米半的地方按下去，再一路往上拖
+    step(state, world(beat.forage.mat + 3.2, 1.4), 2);
+    for (let i = 0; i < 60; i += 1) step(state, world(beat.forage.mat + 3.2, 1.4 + i * 0.01));
+    assert.ok(!state.forage.mat.grab, "手没落在苫子上就按下去，不该攥得住");
+    assert.ok(state.forage.mat.ang < 0.02, "在别处按下再拖，苫子一动都不该动（这正是「不是 slider」）");
+  }
+
+  // ④ 掀：手甩得比苫子快 = 焦草撕开，进度倒退
+  {
+    const state = Setup(IDX.heaveMat);
+    step(state, {}, 2);
+    const L = FORAGE.mat;
+    const e0 = ForageMatEdge(beat.forage.mat, SURFACE_Y, 0);
+    step(state, world(e0.x, e0.y - SURFACE_Y), 2);
+    assert.ok(state.forage.mat.grab, "按在苫子外沿上要攥得住");
+    // 慢慢掀：跟着它走，角度真的涨（掀到一半就停手——过了重心它自己就翻过去了）
+    for (let i = 0; i < 60 && state.forage.mat.ang < L.tipAt * 0.6; i += 1) {
+      const e = ForageMatEdge(beat.forage.mat, SURFACE_Y, state.forage.mat.ang + L.slipA * 0.4);
+      step(state, world(e.x, e.y - SURFACE_Y));
+    }
+    const lifted = state.forage.mat.ang;
+    assert.ok(lifted > 0.5, `跟着苫子走应该真掀起来（只到 ${lifted.toFixed(2)} 弧度）`);
+    // 猛地一扯：手蹿到远远超前的角上
+    const far = ForageMatEdge(beat.forage.mat, SURFACE_Y, lifted + L.slipA + 0.5);
+    step(state, world(far.x, far.y - SURFACE_Y), 2);
+    assert.ok(!state.forage.mat.grab, "手甩得比苫子快必须脱手");
+    assert.ok(state.forage.mat.torn > 0, "烧脆的草被这么一扯就得撕掉一口");
+    assert.ok(state.forage.mat.ang < lifted, "撕掉那一下，掀起来的高度要往回掉");
+  }
+
+  // ⑤ 门板：卡口硬拖过不去，往回让一寸才让开
+  {
+    const state = Setup(IDX.shiftPlank);
+    step(state, {}, 2);
+    const L = FORAGE.plank;
+    const f = state.forage.plank;
+    const east = () => f.x0 + L.len + f.dx;
+    step(state, world(east(), 0.18), 2);
+    assert.ok(f.grab, "按在板头上要攥得住");
+    const ref = east();
+    for (let i = 0; i < 240; i += 1) step(state, world(ref + L.need + 0.5, 0.18));
+    assert.ok(Math.abs(f.dx - L.snagAt) < 0.02,
+      `硬拖过不去卡口（拖到了 ${f.dx.toFixed(2)}，卡口在 ${L.snagAt}）`);
+    assert.ok(f.snagHit && !f.cleared, "顶在卡口上要有「卡住了」这个状态");
+    // 往回让一寸
+    for (let i = 0; i < 60; i += 1) step(state, world(ref - L.snagBack - 0.1, 0.18));
+    assert.ok(f.cleared, "往回让一寸，板头就该让过去");
+    for (let i = 0; i < 240 && state.beat.stepIndex === IDX.shiftPlank; i += 1) {
+      step(state, world(ref + L.need + 0.5, 0.18));
+    }
+    assert.ok(state.beat.stepIndex > IDX.shiftPlank, "让过卡口再拖到头，这一步该过了");
+  }
+
+  // ⑥ 扒土：一下一下的——按住不放拖到底，只算一下
+  {
+    const state = Setup(IDX.scoopAsh);
+    step(state, {}, 2);
+    const L = FORAGE.ash;
+    const u = ForageScoopDir(1);
+    const m = { x: beat.forage.ash, y: 0.5 * L.top * 0.55 };
+    step(state, world(m.x, m.y), 2);
+    assert.ok(state.forage.ash.grab, "手落在土堆上要抓得住");
+    for (let i = 1; i <= 60; i += 1) {
+      const d = Math.min(i * 0.02, L.keepR * 0.9);
+      step(state, world(m.x + u.x * d, m.y + u.y * d));
+    }
+    assert.equal(state.forage.ash.done, 1, "按住不放一路拖到底，只能算一下——扒是一把一把的");
+    // 划横的不算扒（那是抹，不是往怀里扒）
+    const before = state.forage.ash.done;
+    step(state, {}, 2);
+    step(state, world(m.x, m.y), 2);
+    for (let i = 1; i <= 40; i += 1) step(state, world(m.x, m.y - i * 0.01));
+    assert.equal(state.forage.ash.done, before, "手往下抹不算扒——方向不对就不涨");
+  }
+
+  // ⑦ 解扎口：转反了是往紧里缠，进度不涨
+  {
+    const state = Setup(IDX.unwrapJar);
+    step(state, {}, 3);
+    assert.ok(state.wrapCard, "站到罐跟前就该亮出那张扎口活卡");
+    assert.ok(!state.prompt, "活卡这一拍不留按键提示（招呼长在绳头上）");
+    assert.ok(!state.closeUp, "有活卡就不该再推世界里的特写");
+    const L = WRAP_CARD;
+    const card = (x, y) => ({ pointerHeld: true, pointerCard: { u: x, v: y * L.aspect } });
+    const at = (a) => card(L.neck.x + Math.cos(a) * L.neck.r * 1.35,
+      L.neck.y + Math.sin(a) * L.neck.r * 1.35);
+    // 顺时针（卡坐标里角度递增）＝往紧里缠
+    for (let i = 0; i < 60; i += 1) step(state, at(-0.5 + i * 0.24));
+    assert.equal(state.wrapCard.laps, 0, "往紧里缠居然把绳褪下来了——方向必须是有意义的");
+    assert.ok(state.beat.wrap.wrongTold, "转反了要说清楚该往哪边转");
+    // 逆时针：一道一道褪
+    for (let i = 0; i < 400 && state.wrapCard?.phase !== "peel"; i += 1) {
+      step(state, at(state.beat.wrap.a - 0.22));
+    }
+    assert.equal(state.wrapCard?.phase, "peel", `三道绳褪完才轮到掀布（laps=${state.beat.wrap.laps}）`);
+    // 掀布：捏住布角往外拖
+    const t = GetBeatTarget(state);
+    assert.equal(t.action, "unwrapAt", "扎口那一步的驱动目标是拖卡上的东西，不是长按");
+    for (let i = 0; i < 400 && state.beat.stepIndex === IDX.unwrapJar; i += 1) {
+      const inp = {};
+      WrapDrive(state, inp, GetBeatTarget(state), i);
+      step(state, inp);
+    }
+    assert.ok(state.beat.stepIndex > IDX.unwrapJar, "布掀开了这一步就该过");
+    assert.equal(state.wrapCard, null, "做完了活卡要收走");
+  }
+  console.log("  ✓ 找吃的四道手：掀/拖/扒/解 各不重样 / 长按无效 / 攥不住不动 / 掀猛了撕 / 卡口 / 一把一把 / 方向有意义");
 }
 
 // 辘轳是个转盘，不是一根拉杆：鼠标绕**摇把轴销**转圈才走绳——顺时针放、
@@ -2479,6 +2698,7 @@ TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 TestKnotIsASheetBend();
 TestFoldIsHandsOnCloth();
+TestForageIsHandsOn();
 TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();

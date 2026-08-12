@@ -312,7 +312,8 @@ async function CmdState(o) {
   for (const k of Object.keys(now)) if (JSON.stringify(now[k]) !== JSON.stringify(old[k])) changed[k] = now[k];
 
   const live = {};
-  for (const k of ["ropeLine", "knot", "winchView", "scribe", "scribeCard", "planeCard", "closeUp", "gesture",
+  for (const k of ["ropeLine", "knot", "winchView", "scribe", "scribeCard", "planeCard", "knotCard",
+    "wrapCard", "forage", "closeUp", "gesture",
     "thrown", "smoke", "pip", "toast", "detection"]) {
     if (k === "detection" && !(state.detection?.level > 0)) continue;   // 没被盯上就别刷屏
     if (state[k]) live[k] = k === "ropeLine"

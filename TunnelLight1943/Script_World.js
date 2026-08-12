@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
@@ -101,14 +101,24 @@ function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze
 // 骨架挂在 (p.x, 地平线+lift) 上、整体缩放 bodyScale、朝向 −1 时整组镜像，
 // 所以换算要除以缩放、再按朝向翻 x。三条输入路（鼠标绕圈/键盘/脱手倒转）
 // 共用 Core 算好的那一份 gripX/gripY，World 绝不另算一遍摇把在哪儿。
+// 找吃的那三道手也走这条：Core 每帧把"手此刻该落在哪"发布成 forage.<件>.grip
+const FORAGE_GRIP = { heaveMat: "mat", dragPlank: "plank", scoopAsh: "ash" };
+
 function CrankAimLocal(state, p, bs) {
-  const wv = state.winchView;
-  if (!wv || !wv.hooked || p.pose !== "crank" || !bs) return null;
+  if (!bs) return null;
   const groundY = (p.level === "under" ? UNDER_Y : SURFACE_Y) + (p.lift || 0);
-  return {
-    x: ((wv.gripX - p.x) / bs) * (p.heading >= 0 ? 1 : -1),
-    y: (wv.gripY - groundY) / bs,
-  };
+  const Local = (wx, wy) => ({
+    x: ((wx - p.x) / bs) * (p.heading >= 0 ? 1 : -1),
+    y: (wy - groundY) / bs,
+  });
+  const fg = FORAGE_GRIP[p.pose];
+  if (fg) {
+    const g = state.forage?.[fg]?.grip;
+    return g ? Local(g.x, g.y) : null;
+  }
+  const wv = state.winchView;
+  if (!wv || !wv.hooked || p.pose !== "crank") return null;
+  return Local(wv.gripX, wv.gripY);
 }
 
 function PlaceSprite(mesh, x, y, z) {
@@ -184,7 +194,10 @@ function PoseProgress(o) {
   // 都走 poseU
   if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
     || o.pose === "braceUp" || o.pose === "pourBasket"
-    || o.pose === "foldCloth" || o.pose === "layDown") return o.poseU;
+    || o.pose === "foldCloth" || o.pose === "layDown"
+    // 找吃的那四道手：掀苫草/拖门板/扒烧土/解扎口，全由进度驱动
+    || o.pose === "heaveMat" || o.pose === "dragPlank" || o.pose === "scoopAsh"
+    || o.pose === "unwrapJar") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -536,6 +549,9 @@ export function CreateWorld(canvasEl) {
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
   let spotFlashMesh = null;
+  // 找吃的那三样能上手的东西（苫子折过来的那半幅 + 压在底下那半幅 / 门板 / 土堆）
+  let matPivot = null, matMesh = null, matBaseMesh = null, matTorn = -1;
+  let plankMesh = null, ashMesh = null, ashKey = "";
   // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
   const CART_COVER_Z = 1.5;
 
@@ -609,6 +625,8 @@ export function CreateWorld(canvasEl) {
     planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
     planePileMesh = null; planePileCanvas = null; planePileCtx = null;
     spotFlashMesh = null;
+    matPivot = null; matMesh = null; matBaseMesh = null; matTorn = -1;
+    plankMesh = null; ashMesh = null; ashKey = "";
   }
 
   // -------------------------------------------------------------------------
@@ -4044,6 +4062,88 @@ export function CreateWorld(canvasEl) {
       if (doorSocketMesh) doorSocketMesh.visible = false;
     }
 
+    // 找吃的（第一章第一场）那三样能上手的东西：焦草苫子 / 半扇烧塌的门板 /
+    // 墙根那片烧土。位置与形状全由玩法状态驱动（Core 的 state.forage），跟那扇
+    // 会晃的门同一类，所以长在这儿、不进 Data_PropArt。
+    // 三样都排 **loose 带**：玩家要伸手去够的东西，得压在地面道具之前、演员
+    // 之后——永远看得见，又不会把人挡住。
+    if (state.forage) {
+      const fg = state.forage;
+      const MAT_PX = Math.round(FORAGE.mat.half * PPM);
+      const MAT_BOX = { w: MAT_PX + 30, h: 44, ax: 12, ay: 34, ss: PROP_SS };
+      const PLANK_PX = Math.round(FORAGE.plank.len * PPM);
+      // 三样东西都挂在自己的 Group 上转：苫子绕折痕折过去、门板绕西头（架在
+      // 食槽上那一头落下来）。转 Group ＝ 绕那个点转，画笔只管"平着长什么样"
+      const Pivot = (mesh) => {
+        const g = new THREE.Group();
+        mesh.position.set(mesh.userData.offset.x, mesh.userData.offset.y, 0);
+        g.add(mesh);
+        return g;
+      };
+      if (!matPivot) {
+        matMesh = BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+            { len: MAT_PX, torn: fg.mat.torn }), 0, PROP_SS);
+        matPivot = Pivot(matMesh);
+        SetPlayOrder(matPivot, BAND.loose, "forageMat");
+        layers.play.add(matPivot);
+        matTorn = fg.mat.torn;
+
+        // 压在底下那半幅：同一片苫子对折过去的另一半，落在西边地上
+        matBaseMesh = Pivot(BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatB", { len: MAT_PX }),
+          0, PROP_SS));
+        matBaseMesh.rotation.z = FORAGE.mat.westA;
+        SetPlayOrder(matBaseMesh, BAND.loose, "forageMatBase");
+        layers.play.add(matBaseMesh);
+
+        plankMesh = Pivot(BakeSprite(PLANK_PX + 30, 40, 8, 30,
+          (ctx, ax, ay) => ART.DrawCharredPlank(ctx, ax, ay, "foragePlank", { len: PLANK_PX }),
+          0, PROP_SS));
+        SetPlayOrder(plankMesh, BAND.loose, "foragePlank");
+        layers.play.add(plankMesh);
+
+        ashMesh = BakeSprite(76, 46, 38, 40,
+          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash), 0, DETAIL_SS);
+        SetPlayOrder(ashMesh, BAND.loose, "forageAsh");
+        layers.play.add(ashMesh);
+        ashKey = "";
+      }
+      // 撕掉一口就重烘一次苫子（进度长在实物上：撕过几次，外沿就缺几口）
+      if (matTorn !== fg.mat.torn) {
+        matTorn = fg.mat.torn;
+        RedrawProp(matMesh, MAT_BOX,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+            { len: MAT_PX, torn: fg.mat.torn }));
+      }
+      matPivot.visible = true;
+      matBaseMesh.visible = true;
+      // 折痕架在瓦砾上：整片苫子绕它转。世界里 +ang 是"外沿抬起来"，
+      // 屏幕上就是逆时针 → 绕 z 正向转
+      matPivot.position.set(fg.mat.x, SURFACE_Y + FORAGE.mat.pivotY, PlaceZ(BAND.loose));
+      matPivot.rotation.z = fg.mat.ang ?? FORAGE.mat.restA;
+      matBaseMesh.position.copy(matPivot.position);
+
+      plankMesh.visible = true;
+      plankMesh.position.set(fg.plank.x0 + (fg.plank.dx || 0), SURFACE_Y, PlaceZ(BAND.loose));
+      plankMesh.rotation.z = fg.plank.tilt ?? FORAGE.plank.tilt;
+
+      // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）
+      const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`;
+      if (key !== ashKey) {
+        ashKey = key;
+        RedrawProp(ashMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
+          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash));
+      }
+      ashMesh.visible = true;
+      PlaceSprite(ashMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+    } else if (matPivot) {
+      matPivot.visible = false;
+      matBaseMesh.visible = false;
+      plankMesh.visible = false;
+      ashMesh.visible = false;
+    }
+
     if (state.planing) {
       const pl = state.planing;
       const boardW = pl.span + 0.26;
@@ -5160,7 +5260,7 @@ export function CreateWorld(canvasEl) {
   // 铺满画框的活卡上，画笔按 kind 分派。
   const LIVE_CARD_ART = {
     scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard,
-    knot: ART.DrawKnotCard, fold: ART.DrawFoldCard,
+    knot: ART.DrawKnotCard, fold: ART.DrawFoldCard, wrap: ART.DrawWrapCard,
   };
 
   function SetLiveCard(spec, dt) {

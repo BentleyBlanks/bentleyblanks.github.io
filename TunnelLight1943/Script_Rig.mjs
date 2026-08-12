@@ -646,6 +646,33 @@ function SampleTrack(name, time) {
  * poseK: 0..1 的动作进度，驱动 planePush（推程）/ vault（翻越）这类姿势——不是时间
  * 所有角度用弧度，正值 = 顺时针（面朝 +x 时向前）
  */
+/**
+ * 把**前手**两骨反解到 aim（骨架局部坐标）上——"手真的落在那件东西上"。
+ * 摇辘轳立的规矩，找吃的那三道手（掀苫草/拖门板/扒烧土）照抄：手上有活的
+ * 姿势，胳膊不许照角度表摆在半空，否则画面上就是"对着东西空划拉"。
+ * 两组解里挑**肘朝下**的那一组（肘翘到肩膀上头读成"吊在把手上"）。
+ * both=true 时后手也搭上去（两手抓同一件东西，稍稍错开一点，别叠成一条）。
+ */
+function AimFrontHand(target, aim, both = false) {
+  if (!aim) return;
+  // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置（同 ApplyPose 里那段）
+  const sh = BONE.torso * 0.86;
+  const sx = Math.sin(target.torso) * sh, sy = Math.cos(target.torso) * sh;
+  const rootY = BONE.hipY + BONE.sole * SoleLift(target) + target.hipY;
+  const elbowY = (k) => -BONE.upperArm * Math.cos(k.arm);
+  const solve = (px, py) => {
+    const tx = px - (target.hipX + sx), ty = py - (rootY + sy);
+    const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
+    return elbowY(a1) <= elbowY(a2) ? a1 : a2;
+  };
+  const f = solve(aim.x, aim.y);
+  target.armF = f.arm; target.foreF = f.fore;
+  if (both) {
+    const b = solve(aim.x - 0.09, aim.y + 0.05);
+    target.armB = b.arm; target.foreB = b.fore;
+  }
+}
+
 export function PoseRig(rig, s, dt) {
   const j = rig.joints;
   const p = s.phase || 0;
@@ -922,17 +949,7 @@ export function PoseRig(rig, s, dt) {
     target.thighF = (14 + 4 * sy) * DEG; target.shinF = 10 * DEG; target.footF = -10 * DEG;
     const aim = s.aimHand;
     if (aim) {
-      // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置（同 ApplyPose 里那段）
-      const sh = BONE.torso * 0.86;
-      const sx = Math.sin(target.torso) * sh, sy = Math.cos(target.torso) * sh;
-      const rootY = BONE.hipY + BONE.sole * SoleLift(target) + target.hipY;
-      // 两组解里挑**肘朝下**的那一组：肘翘到肩膀上头是"举着手腕吊在把手上"，
-      // 不是摇辘轳（实拍抓出来的——那条胳膊读成一根横在井上的大香肠）
-      const tx = aim.x - (target.hipX + sx), ty = aim.y - (rootY + sy);
-      const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
-      const elbowY = (k) => -BONE.upperArm * Math.cos(k.arm);
-      const ik = elbowY(a1) <= elbowY(a2) ? a1 : a2;
-      target.armF = ik.arm; target.foreF = ik.fore;
+      AimFrontHand(target, aim);
     } else {
       // 没人告诉我摇把在哪儿（过场里摆姿势）：退回一条按相位画圈的胳膊
       target.armF = (-96 + Math.sin(ph) * 26) * DEG;
@@ -982,6 +999,69 @@ export function PoseRig(rig, s, dt) {
     // 起手抱在胸前（肘折死、世界角 −16°），按下去的过程里胳膊伸开往下压
     target.armF = (-74 + 46 * k) * DEG; target.foreF = (58 - 76 * k) * DEG;
     target.armB = (-66 + 40 * k) * DEG; target.foreB = (52 - 68 * k) * DEG;
+  } else if (s.pose === "heaveMat") {
+    // 掀苫草（找吃的第一道手）：**姿势由掀到哪个角直接驱动**（poseK 0→1＝
+    // 苫子从平铺到过重心），不是播一段循环。起手蹲着弓腰、两手探到脚前的地面
+    // 上抠住苫子边；掀起来的过程里腰一节节直起来、两手跟着抬到胸前、重心往
+    // 后坐——掀一片湿透的焦草苫子，劲是这么使的。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    const e = k * k * (3 - 2 * k);
+    target.hipY = -0.17 + 0.13 * e; target.hipX = 0.03 - 0.09 * e;
+    // 腰从 40° 直到 14°；头跟着抬（世界角 = torso + head，全程压在 −6°~−12°，
+    // 脸朝前上方——低头低过头就读成干呕，见 CLAUDE.md）
+    target.torso = (40 - 26 * e) * DEG;
+    target.head = (-46 + 20 * e) * DEG;
+    // 两手一起抠住外沿往上抬：负角向前上方，抬到 −80° 就到胸口了
+    target.armF = (-46 - 34 * e) * DEG; target.foreF = (-18 + 6 * e) * DEG;
+    target.armB = (-38 - 30 * e) * DEG; target.foreB = (-24 + 10 * e) * DEG;
+    // 前腿蹬住把身子撑起来，后腿收
+    target.thighB = (-26 + 12 * e) * DEG; target.shinB = (34 - 16 * e) * DEG; target.footB = -10 * DEG;
+    target.thighF = (22 - 10 * e) * DEG; target.shinF = (16 - 6 * e) * DEG; target.footF = -10 * DEG;
+    // 两只手**真的抠在苫子外沿上**（World 按 forage.grip 换算成局部坐标）
+    AimFrontHand(target, s.aimHand, true);
+  } else if (s.pose === "dragPlank") {
+    // 拖门板（第二道手）：**由拖出去的行程驱动**（poseK 0→1）。两手攥着板头
+    // 在体侧偏低处，人往后坐着退——拖的劲在腰腿上，不在胳膊上，所以胯要真的
+    // 往后移、前腿蹬直。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.12 - 0.02 * k; target.hipX = 0.05 - 0.13 * k;
+    target.torso = (28 - 14 * k) * DEG;
+    target.head = (-42 + 16 * k) * DEG;
+    // 探出去攥住 → 一点点收回体侧（角度往 0 收＝手落回胯边）
+    target.armF = (-58 + 30 * k) * DEG; target.foreF = (-26 - 12 * k) * DEG;
+    target.armB = (-46 + 26 * k) * DEG; target.foreB = (-22 - 10 * k) * DEG;
+    target.thighB = (-30 + 8 * k) * DEG; target.shinB = (36 - 10 * k) * DEG; target.footB = -10 * DEG;
+    target.thighF = (24 - 8 * k) * DEG; target.shinF = (14 + 6 * k) * DEG; target.footF = -10 * DEG;
+    // 两只手**真的攥在板头上**：板子架在食槽上，拖出去时那一头一路落下来，
+    // 手跟着它落——不反解的话，手在半空、板子在脚底下，两不相干
+    AimFrontHand(target, s.aimHand, true);
+  } else if (s.pose === "scoopAsh") {
+    // 扒烧土（第三道手）：蹲着，两手交替往怀里扒。**由这一把扒了多远驱动**
+    // （poseK 0→1）：前手从探到土堆上收回胯前，后手同时探出去——一把接一把
+    // 才有"扒"的样子，两只手同相位的话就是"拜了一下"。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.24 - 0.03 * k; target.hipX = 0.02 - 0.03 * k;
+    target.torso = (34 - 8 * k) * DEG;
+    target.head = (-44 + 10 * k) * DEG;
+    target.armF = (-64 + 40 * k) * DEG; target.foreF = (-40 + 24 * k) * DEG;
+    target.armB = (-24 - 40 * k) * DEG; target.foreB = (-38 + 20 * k) * DEG;
+    // 深蹲：膝盖屈住、脚掌整个踩在地上
+    target.thighB = (-40 + 8 * k) * DEG; target.shinB = (58 - 8 * k) * DEG; target.footB = -14 * DEG;
+    target.thighF = (26 - 6 * k) * DEG; target.shinF = (34 + 6 * k) * DEG; target.footF = -14 * DEG;
+    // 前手**真的插在土里**，扒到哪儿手就在哪儿；后手照姿势表交替（两只手同时
+    // 反解到一个点就成了"捧"，扒是一把接一把）
+    AimFrontHand(target, s.aimHand, false);
+  } else if (s.pose === "unwrapJar") {
+    // 解扎口（第四道手）：蹲在罐跟前，两手都在身前罐口那么高的地方。
+    // 这一拍画面上铺着那张活卡，看不见他；卡收走的那一帧看得见（同接绳）。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.26; target.hipX = 0.02;
+    target.torso = (30 - 4 * k) * DEG;
+    target.head = (-42 + 6 * k) * DEG;
+    target.armF = (-72 + 18 * k) * DEG; target.foreF = (-46 + 12 * k) * DEG;
+    target.armB = (-60 + 14 * k) * DEG; target.foreB = (-40 + 10 * k) * DEG;
+    target.thighB = -38 * DEG; target.shinB = 56 * DEG; target.footB = -14 * DEG;
+    target.thighF = 24 * DEG; target.shinF = 34 * DEG; target.footF = -14 * DEG;
   } else if (s.pose === "dunkRope") {
     // 墩桶：两只手探出去攥住井绳，整个人往下坐着一墩。**劲不在胳膊上，在体重上**
     // ——胯要真的沉下去、膝盖跟着屈，不然就成了"挥手"。

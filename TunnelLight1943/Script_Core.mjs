@@ -495,6 +495,141 @@ export const FOLD_CARD = {
 const CardD = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 // ---------------------------------------------------------------------------
+// 找吃的：翻烧塌的牲口棚（第一章第一场玩法，2026-08-12 重做）
+//
+// 老版是三步一模一样的 `use + hold`：站在那儿按住 E，外面套一圈进度环，
+// 三处的分别只有提示上那四个字（翻开苫草／挪开门板／刨开烧土）。用户原话：
+// 「找吃的这里的动画以及交互方式居然是长按一个按钮？一点都不拟物，交互程度
+// 低，一点也不沉浸」——说得对，而且它正撞在 CLAUDE.md「拟物交互」第 0 条上。
+//
+// 现在是**四道手，四个不重样的动词**（长度与打水那一场同源：加长靠加道数，
+// 不靠把一道拉长）：
+//   ① **掀**苫草——攥住焦草苫子的外沿，绕当中那条折痕把它折过去。苫子有分量
+//      （跟手走但有角速度上限），撒手它自己坠回来；烧脆的草**手甩得比它快就撕**。
+//   ② **拖**门板——攥住露在外头的那一头往回拖。板子沉、跟地蹭出吱嘎；拖到
+//      半道**板头卡在焦椽茬上**，得往回让一寸再拖，它才让过去。人一边退一边拖。
+//   ③ **扒**烧土——手落在土堆上，一把一把往自己怀里扒。一把够长够斜才算一下，
+//      每一下土堆真矮一截；扒到第三下指头碰着硬的——罐肩露出来了。
+//   ④ **解**扎口——罐口拿油布蒙着、麻绳绕了三道。指尖上的活，长在一张铺满
+//      画框的活卡上（同石笔/刨子/接绳）：捏住绳头**逆着缠的方向**一道一道褪，
+//      再捏住油布角掀开。娘扎的口，玩家亲手拆开——这一章的题眼落在这一下。
+//
+// 四道手**都没有长按后备**（CLAUDE.md 第 5 条：乐趣就在手上的动作只认手）。
+// 按明令，删后备就必须同时给自动通关一条真输入的路：见 GetBeatTarget 的
+// heaveAt / plankAt / scoopAt / unwrapAt，四个都把落点交给驱动器。
+//
+// 尺寸都是按"认得出"倒推的（CLAUDE.md 第 4 条：实际尺寸 ÷ 画宽 < 1/10 就别指望
+// 玩家认得出）。玩法景别画宽 12.3m：苫子 1.6m＝13%、门板 1.5m＝12%、
+// 土堆 1.2m＝10%——三样都在线上，所以它们留在世界里，只有罐口那道扎口（0.2m
+// 出头，2%）非推特写不可，于是它是唯一一张活卡。
+// ---------------------------------------------------------------------------
+export const FORAGE = {
+  // ① 苫草：**搭在塌下来的椽子上、当中折着**的一片焦草苫子，绕折痕折过去。
+  // 两条都是实拍逼出来的：
+  //   · 折痕要**架起来**（pivotY 0.5m）。平摊在地上的一片苫子在侧视里只有
+  //     十来个像素高，跟地上的影子分不开——实拍第一版就是"人对着一摊黑影
+  //     伸手"。架起来之后剪影 1.14×0.50m（屏幕上 148×65px），一眼是块东西。
+  //   · 外沿的起手位置抬到 0.23m（restA −0.40），别贴着地。贴地的话孩子
+  //     那条 0.39m 的胳膊够不着（CLAUDE.md 第 10 条那笔账），手会停在半空。
+  mat: {
+    half: 0.70,        // 半幅：折痕到外沿。整片 1.4m
+    pivotY: 0.50,      // 折痕架在瓦砾上的高度
+    restA: -0.40,      // 歇息角（外沿斜搭下来，离地 0.23m）
+    westA: -2.35,      // 压在底下那半幅的角度（西边，落到地上）
+    grabR: 0.44,       // 攥住外沿的判定半径
+    slipA: 0.55,       // 手比苫子超前这么多弧度 = 焦草撕开、这一把作废
+    speed: 2.0,        // 苫子有分量：一秒最多跟着手转这么多弧度
+    fall: 2.2,         // 撒手它自己坠回去（重力力矩 ∝ cos）
+    tipAt: 1.30,       // 过了这个角就过了重心，自己翻到西边去
+    standGap: 0.42,    // 手在外沿上，人就站在外沿外头这么远（一臂之内）
+  },
+  // ② 门板：横着拖，摩擦 + 一处卡口。**东头架在食槽上**（tilt），所以它在
+  // 侧视里是一块斜着的板，不是地上一条线；拖出去的过程中那一头慢慢落下来，
+  // 拖到头"咚"地拍在地上——"板子底下是半截食槽"这句话由画面自己说
+  plank: {
+    len: 1.50,
+    westDx: -1.00,     // 板子西头相对判定区中心
+    tilt: 0.22,        // 架在食槽上的仰角（东头离地 0.33m，正好一伸手）
+    grabR: 0.44,
+    need: 1.00,        // 拖出这么远才算挪开
+    speed: 0.85,       // 板子沉：一秒最多蹭这么远
+    snagAt: 0.42,      // 拖到这儿板头卡在焦椽茬上
+    snagBack: 0.16,    // 往回让这么多，才让得过去
+    standGap: 0.55,
+  },
+  // ③ 烧土：一把一把往怀里扒
+  ash: {
+    half: 0.60, top: 0.50,
+    grabR: 0.80,       // 手要落在土堆上
+    keepR: 1.25,       // 扒的当中手飘出这么远 = 这一把作废
+    strokes: 5,
+    len: 0.26,         // 一把至少扒这么远才算一下
+    skew: 0.80,        // 横向偏出这个比例 = 划歪了，不算扒
+    jarAt: 3,          // 第几下碰着罐肩
+    standGap: 0.90,
+  },
+};
+
+/** 苫草外沿此刻在哪（判定、作画、驱动器共用这一份） */
+export function ForageMatEdge(zoneX, groundY, ang) {
+  const L = FORAGE.mat;
+  return {
+    x: zoneX + Math.cos(ang) * L.half,
+    y: groundY + L.pivotY + Math.sin(ang) * L.half,
+  };
+}
+
+/** 门板东头（玩家攥的那一头）此刻在哪：架在食槽上，拖出去的过程里慢慢落下 */
+export function ForagePlankEnd(x0, groundY, dx) {
+  const L = FORAGE.plank;
+  const tilt = L.tilt * Math.max(0, 1 - dx / L.need);
+  return {
+    x: x0 + L.len * Math.cos(tilt) + dx,
+    y: groundY + L.len * Math.sin(tilt),
+    tilt,
+  };
+}
+
+/** 扒土的方向：朝自己、往斜下（dirX = 人在土堆的哪一边） */
+export function ForageScoopDir(dirX) {
+  const d = Math.hypot(0.86, 0.50);
+  return { x: (dirX || 1) * 0.86 / d, y: -0.50 / d };
+}
+
+// ---------------------------------------------------------------------------
+// 罐口那道扎口（活卡版面）。坐标同 KNOT_CARD：卡宽单位 x∈0..1、y∈0..1/aspect，
+// 指针落点 (pointerCard.u,.v) 换算成 { x: u, y: v/aspect }。**判定与作画共用
+// 这一份**，Art 里绝不许另抄一套。
+//
+// 两段动作，都是人人做过的：
+//   ① **褪绳**：捏住绳头，绕着罐口**逆着缠的方向**转——屏幕上是逆时针。
+//      转反了不是没反应，是**越缠越紧**（进度往回走）：方向在这儿是有意义的，
+//      跟辘轳/打结同一条规矩（CLAUDE.md 第 7 条：判定、画、招呼三处同向）。
+//   ② **掀布**：绳落了，捏住油布角往外下方掀开。布有分量、手甩快了会脱手。
+// ---------------------------------------------------------------------------
+export const WRAP_CARD = {
+  aspect: 16 / 9,
+  neck: { x: 0.50, y: 0.300, r: 0.168 },   // 罐口（扎着油布的那一圈）
+  laps: 3,                                  // 绳绕了三道
+  ringIn: 0.62, ringOut: 2.30,              // 手要落在罐口这圈环带里（相对 r）
+  tip: { x: 0.735, y: 0.250 },              // 绳头的起手位置
+  grabR: 0.105,                             // 捏得住绳头 / 布角的判定半径
+  cloth: { x: 0.352, y: 0.214 },            // 油布掀开时捏的那个角（罐口西北）
+  peelTo: { x: 0.06, y: 0.47 },             // 往这边掀（左下，顺着布的走向）
+  peelLen: 0.30,                            // 掀过这么远，整块布就翻过去了
+  speed: 0.90,                              // 布角有分量：一秒最多跟手走这么多
+  slipR: 0.175,                             // 手甩得比布快这么多就脱手
+};
+
+/** 掀油布的单位方向（布角 → peelTo）。判定与作画共用 */
+export function WrapPeelDir() {
+  const L = WRAP_CARD;
+  const dx = L.peelTo.x - L.cloth.x, dy = L.peelTo.y - L.cloth.y;
+  const d = Math.hypot(dx, dy) || 1;
+  return { x: dx / d, y: dy / d };
+}
+
+// ---------------------------------------------------------------------------
 // 辘轳转盘：鼠标绕摇把轴心转圈驱动（顺时针放绳、逆时针摇起）。
 //
 // **轴心高度按"够得着"倒推，不按"井架好看"倒推**（2026-08-10）。量过才知道
@@ -1256,6 +1391,27 @@ function StepChain(state, def, input, dt) {
   const p = state.player;
   const lvl = p.level || "surface";
 
+  // 翻找那一场（找吃的）的三样东西：苫子、门板、土堆。**整拍都在画面上**——
+  // 掀开的苫子在玩家走去拖门板的路上得还翻着，所以状态挂在 beat 上（换拍自动
+  // 作废）、每帧发布给渲染层，不跟着某一步走。
+  if (def.forage) {
+    if (!b.forage) {
+      b.forage = {
+        mat: {
+          x: def.forage.mat, ang: FORAGE.mat.restA,
+          grab: false, torn: 0, tip: 0, started: false, done: false,
+        },
+        plank: {
+          x: def.forage.plank, x0: def.forage.plank + FORAGE.plank.westDx,
+          dx: 0, tilt: FORAGE.plank.tilt,
+          grab: false, snag: false, snagHit: false, cleared: false, started: false, done: false,
+        },
+        ash: { x: def.forage.ash, k: 0, done: 0, grab: false, acc: 0, jar: false, open: false },
+      };
+    }
+    state.forage = b.forage;
+  }
+
   // 这一步在等某件东西，而它正躺在地上（玩家半路撂下的、或上一步放下的）：
   // 给它挂一枚气泡。手里能随时放下，就一定会有人撂下东西再走开——不标出来的话，
   // 玩家站在原地按 E 没反应，只会以为游戏坏了（无文字引导三层配方之一）。
@@ -1437,6 +1593,360 @@ function StepChain(state, def, input, dt) {
       } else {
         state.prompt = st.prompt;
         if (input.interact) { ApplyUse(state, st); finish(); }
+      }
+      return;
+    }
+    // ── 找吃的：四道手（规则与尺寸推导见 FORAGE 那一段） ──
+    // ① 掀苫草：攥住焦草苫子的外沿，绕当中那条折痕折过去。
+    // 苫子有分量（角速度有上限）、撒手自己坠回来、手甩快了焦草就撕。
+    case "heaveMat": {
+      const L = FORAGE.mat;
+      const f = state.forage?.mat;
+      if (!f) return;
+      const gy = lvl === "under" ? UNDER_Y : SURFACE_Y;
+      const MatU = (a) => Math.max(0, Math.min(1, (a - L.restA) / (L.tipAt - L.restA)));
+      // 过了重心：剩下的它自己翻，人撒手看着（这一下不归玩家管）
+      if (f.tip > 0) {
+        f.tip -= dt;
+        f.ang = Math.min(Math.PI - L.restA, f.ang + dt * 3.6);
+        p.pose = "heaveMat"; p.poseU = 1; p.poseT = undefined;
+        if (f.tip <= 0) {
+          f.done = true; f.grab = false;
+          Cue(state, "drop", { gain: 0.55, rate: 0.85 });
+          state.vaultDust = { x: f.x - L.half * 0.6, t: 0 };
+          p.pose = null; p.poseU = undefined;
+          finish();
+        }
+        return;
+      }
+      if (!InZone(p.x, lvl, st.zone)) { f.grab = false; return; }
+      const edge = ForageMatEdge(f.x, gy, f.ang);
+      const pw = input.pointerWorld;
+      const held = !!input.pointerHeld && !!pw;
+      // ① 按下那一帧手必须落在苫子外沿上，画面别处拖一律无效
+      if (held && state.ptrPressed && !f.grab
+        && Math.hypot(pw.x - edge.x, pw.y - edge.y) < L.grabR) {
+        f.grab = true; f.started = true;
+        Cue(state, "flutter", { gain: 0.32, rate: 1.25 });
+      }
+      if (!held) f.grab = false;
+      f.reaching = held && !f.grab;
+
+      if (f.grab) {
+        const want = Math.max(L.restA, Math.min(Math.PI * 0.92,
+          Math.atan2(pw.y - gy - L.pivotY, pw.x - f.x)));
+        if (want - f.ang > L.slipA) {
+          // ③ 手甩得比苫子快太多：烧脆的草一扯就碎，撕下一块，这一把作废
+          f.grab = false;
+          f.torn = Math.min(3, f.torn + 1);
+          f.ang = Math.max(L.restA, f.ang - 0.32);
+          Cue(state, "crackle", { gain: 0.6, rate: 1.1 });
+          state.toast = { text: "烧脆的草，一扯就碎——手跟着它走，慢慢掀。", t: 3.4 };
+        } else {
+          // ② 苫子有分量：跟手走，但一秒最多转这么多，甩再快也只能一寸寸抬
+          const d = want - f.ang;
+          const step = Math.sign(d) * Math.min(Math.abs(d), L.speed * dt);
+          f.ang = Math.max(L.restA, f.ang + step);
+          f.rustle = (f.rustle || 0) + Math.abs(step);
+          if (f.rustle > 0.30) { f.rustle = 0; Cue(state, "flutter", { gain: 0.22, rate: 1.4 }); }
+        }
+      } else if (f.ang > L.restA) {
+        // 撒手：整片苫子自己坠回去（重力力矩 ∝ cos，越平越沉）
+        const before = f.ang;
+        f.ang = Math.max(L.restA, f.ang - dt * L.fall * Math.max(0.3, Math.cos(f.ang)));
+        if (before > L.restA + 0.12 && f.ang <= L.restA) {
+          Cue(state, "drop", { gain: 0.4, rate: 1.05 });
+          state.vaultDust = { x: f.x + L.half * 0.5, t: 0.3 };
+        }
+      }
+      if (f.ang >= L.tipAt && f.tip <= 0) {
+        f.tip = 0.42; f.grab = false;
+        Cue(state, "whoosh", { gain: 0.4 });
+      }
+      // **动手之后**才钉住走位（同支顶木/倒土：一进区就揪住人，路过的玩家会被
+      // 一把按住，自动通关更是当场卡死）。手在外沿上，外沿越抬越靠里，人也就
+      // 一步步跟过去——不跟的话抬到半空那只手离肩一米开外，孩子够不着
+      if (f.started) {
+        const standX = Math.max(f.x + 0.52, edge.x + L.standGap);
+        p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 2.2 * dt);
+        p.heading = -1;
+        p.pose = "heaveMat";
+        p.poseU = MatU(f.ang);
+        p.poseT = undefined;
+        // 手真的攥在苫子外沿上（渲染层拿它两骨反解前手，同摇辘轳那条）——
+        // 不给挂点的话，胳膊按姿势表摆在半空，画面上是"对着一片草空划拉"
+        f.grip = { x: edge.x, y: edge.y };
+      } else f.grip = null;
+      // 招呼玩家的是苫子自己（没上手时外沿翘两下，见 World 的 forage 那段），
+      // 方向写进这句话里——这一拍没有按键，也没有抽象手势图标
+      state.prompt = f.started ? null : "攥住苫草外沿 · 往上掀开";
+      return;
+    }
+    // ② 挪门板：攥住露在外头的那一头往回拖。板子沉、跟地蹭出吱嘎；拖到半道
+    // 板头卡在焦椽茬上，硬拖过不去——得往回让一寸，它才让开。人退着拖。
+    case "shiftPlank": {
+      const L = FORAGE.plank;
+      const f = state.forage?.plank;
+      if (!f) return;
+      if (!InZone(p.x, lvl, st.zone)) { f.grab = false; return; }
+      const gy = lvl === "under" ? UNDER_Y : SURFACE_Y;
+      const end = ForagePlankEnd(f.x0, gy, f.dx);
+      const east = end.x;
+      f.tilt = end.tilt;
+      const pw = input.pointerWorld;
+      const held = !!input.pointerHeld && !!pw;
+      if (held && state.ptrPressed && !f.grab
+        && Math.abs(pw.x - east) < L.grabR && Math.abs(pw.y - end.y) < 0.42) {
+        f.grab = true; f.started = true;
+        f.ref = pw.x - f.dx;
+        Cue(state, "pickup", { gain: 0.3 });
+      }
+      if (!held) { f.grab = false; f.snag = false; }
+      f.reaching = held && !f.grab;
+
+      if (f.grab) {
+        const reach = pw.x - f.ref;
+        let want = Math.max(0, Math.min(L.need, reach));
+        // 卡口：没让过去之前，拖到这儿就是一堵墙
+        if (!f.cleared && want > L.snagAt) want = L.snagAt;
+        const d = want - f.dx;
+        const step = Math.sign(d) * Math.min(Math.abs(d), L.speed * dt);
+        if (Math.abs(step) > 1e-5) {
+          f.dx = Math.max(0, Math.min(L.need, f.dx + step));
+          f.creak = (f.creak || 0) + Math.abs(step);
+          if (f.creak > 0.15) { f.creak = 0; Cue(state, "doorCreak", { gain: 0.4, rate: 1.15 }); }
+        }
+        if (!f.cleared && f.dx >= L.snagAt - 1e-3) {
+          f.snagHit = true;
+          // 还在使劲往前拖：板头一记一记磕在焦椽上（不是失败，是"这么拖过不去"）
+          if (reach > L.snagAt + 0.04) {
+            f.snag = true;
+            f.knock = (f.knock || 0) + dt;
+            if (f.knock > 0.42) {
+              f.knock = 0;
+              Cue(state, "knock", { gain: 0.5, rate: 0.9 });
+              if (!f.snagTold) {
+                f.snagTold = true;
+                state.toast = { text: "板头卡在焦椽茬上了——往回让一让，再拖。", t: 3.8 };
+              }
+            }
+          } else f.snag = false;
+        }
+        if (f.snagHit && !f.cleared && f.dx <= L.snagAt - L.snagBack) {
+          f.cleared = true; f.snag = false;
+          Cue(state, "doorCreak", { gain: 0.52, rate: 0.82 });
+        }
+      }
+      // 板子躺在地上，撒手它不回弹（跟苫子正相反）——摩擦把它留在原处
+      if (f.started) {
+        const now = ForagePlankEnd(f.x0, gy, f.dx);
+        const standX = now.x + L.standGap;
+        p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 2.2 * dt);
+        p.heading = -1;
+        p.pose = "dragPlank";
+        p.poseU = Math.max(0, Math.min(1, f.dx / L.need));
+        p.poseT = undefined;
+        f.grip = { x: now.x, y: now.y };     // 两只手真的攥在板头上
+      } else f.grip = null;
+      state.prompt = f.started ? null : "攥住门板这头 · 往回拖开";
+      if (f.dx >= L.need - 1e-3) {
+        f.done = true; f.grab = false;
+        p.pose = null; p.poseU = undefined;
+        Cue(state, "drop", { gain: 0.5, rate: 0.9 });
+        state.vaultDust = { x: f.x0 + L.len, t: 0.3 };
+        finish();
+      }
+      return;
+    }
+    // ③ 扒烧土：手落在土堆上，一把一把往自己怀里扒。一把够长够斜才算一下，
+    // 每一下土堆真矮一截；扒到第三下指头碰着硬的——罐肩露出来了。
+    case "scoopAsh": {
+      const L = FORAGE.ash;
+      const f = state.forage?.ash;
+      if (!f) return;
+      if (!InZone(p.x, lvl, st.zone)) { f.grab = false; return; }
+      const gy = lvl === "under" ? UNDER_Y : SURFACE_Y;
+      const dirX = Math.sign(p.x - f.x) || 1;
+      const u = ForageScoopDir(dirX);
+      // 土堆越扒越矮，手要落的地方跟着往下走
+      const mound = { x: f.x, y: gy + L.top * (1 - 0.55 * f.k) * 0.55 };
+      const pw = input.pointerWorld;
+      const held = !!input.pointerHeld && !!pw;
+      if (held && state.ptrPressed && !f.grab
+        && Math.hypot(pw.x - mound.x, pw.y - mound.y) < L.grabR) {
+        f.grab = true; f.from = { x: pw.x, y: pw.y }; f.acc = 0;
+      }
+      if (!held) { f.grab = false; f.acc = 0; }
+      if (f.grab) {
+        if (Math.hypot(pw.x - mound.x, pw.y - mound.y) > L.keepR) {
+          f.grab = false; f.acc = 0;                       // 手飘出土堆＝这一把作废
+        } else {
+          const vx = pw.x - f.from.x, vy = pw.y - f.from.y;
+          const along = vx * u.x + vy * u.y;
+          const side = Math.abs(vx * -u.y + vy * u.x);
+          if (along < -0.02 || side > Math.abs(along) * L.skew + 0.05) {
+            // 划歪了、或者往回推：这一把重新算（扒是朝自己斜下，不是抹来抹去）
+            f.from = { x: pw.x, y: pw.y }; f.acc = 0;
+          } else {
+            f.acc = Math.max(0, along);
+            if (f.acc >= L.len) {
+              f.done += 1;
+              f.k = Math.min(1, f.done / L.strokes);
+              f.grab = false; f.acc = 0;                   // 一下一下：手得重新按下去
+              Cue(state, "dig", { gain: 0.72, rate: 0.88 + f.done * 0.05 });
+              state.vaultDust = { x: f.x + dirX * 0.22, t: 0.42 };
+              if (f.done === L.jarAt) {
+                f.jar = true;
+                Cue(state, "stoneLand", { gain: 0.5 });
+                state.toast = { text: "指头碰着个硬的——是个罐肩。", t: 3.4 };
+              }
+            }
+          }
+        }
+      }
+      if (f.done > 0 || f.grab) {
+        const standX = f.x + dirX * L.standGap;
+        p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 2.0 * dt);
+        p.heading = dirX > 0 ? -1 : 1;
+        p.pose = "scoopAsh";
+        p.poseU = Math.max(0, Math.min(1, f.acc / L.len));
+        p.poseT = undefined;
+        // 手真的插在土里：扒到哪儿手就在哪儿（没扒的时候搭在堆顶上）
+        const k = Math.min(1, f.acc / L.len);
+        f.grip = { x: mound.x + u.x * L.len * k, y: mound.y + u.y * L.len * k };
+      } else f.grip = null;
+      state.prompt = f.done > 0 ? null : "手插进烧土里 · 一把一把往回扒";
+      if (f.done >= L.strokes) {
+        p.pose = null; p.poseU = undefined;
+        finish();
+      }
+      return;
+    }
+    // ④ 解扎口：**长在一张铺满画框的活卡上**（state.wrapCard → Art.DrawWrapCard）。
+    // 罐口 0.2m 出头，在玩法景别里只有 2% 画宽——推镜头治不好，同石笔/刨子/接绳
+    // （CLAUDE.md 拟物交互第 4 条）。两段动作：逆着缠的方向把绳一道道褪下来，
+    // 再捏住油布角掀开。版面与判据全在 WRAP_CARD。
+    case "unwrapJar": {
+      if (!InZone(p.x, lvl, st.zone)) return;
+      const L = WRAP_CARD;
+      const w = b.wrap || (b.wrap = {
+        phase: "unwind", turn: 0, laps: 0, a: null, grab: false,
+        corner: { ...L.cloth }, peel: 0, open: 0, wrongTold: false,
+      });
+      // 站定就钉在罐跟前：画面整个交给那张卡了，A/D 还能把人走开的话，
+      // 回来时卡还在、人却在半条街外（同接绳/刨料）
+      const standX = st.zone.x + 0.62;
+      if (Math.abs(p.x - standX) > 0.02) {
+        p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.8 * dt);
+      }
+      p.heading = -1;
+
+      const pc = input.pointerCard;
+      const held = !!input.pointerHeld && !!pc;
+      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
+      const c = L.neck;
+
+      if (w.phase === "unwind") {
+        const d = hand ? Math.hypot(hand.x - c.x, hand.y - c.y) : 0;
+        const inRing = !!hand && d > c.r * L.ringIn && d < c.r * L.ringOut;
+        if (inRing) {
+          // 卡坐标 y 朝下：atan2 递增＝屏幕**顺时针**。绳是顺时针缠上去的，
+          // 所以**解开＝屏幕逆时针＝这里的 a 递减**。三处同向（判定/作画/绳头
+          // 自己蹭的方向），CLAUDE.md 第 7 条
+          const a = Math.atan2(hand.y - c.y, hand.x - c.x);
+          if (w.a !== null) {
+            let da = a - w.a;
+            if (da > Math.PI) da -= Math.PI * 2;
+            if (da < -Math.PI) da += Math.PI * 2;
+            if (Math.abs(da) < 1.0) {
+              if (da < 0) {
+                w.turn += -da;
+                w.rasp = (w.rasp || 0) + -da;
+                if (w.rasp > 0.9) { w.rasp = 0; Cue(state, "crank", { gain: 0.3, rate: 1.35 }); }
+              } else {
+                // 转反了不是没反应——那是往紧里缠，绳吃回去一截
+                w.turn = Math.max(0, w.turn - da * 0.8);
+                w.tight = (w.tight || 0) + da;
+                if (w.tight > 0.5) {
+                  w.tight = 0;
+                  Cue(state, "ladder", { gain: 0.35, rate: 1.2 });
+                  if (!w.wrongTold) {
+                    w.wrongTold = true;
+                    state.toast = { text: "这么转是往紧里缠——反过来，顺着松的那头褪。", t: 3.8 };
+                  }
+                }
+              }
+            }
+          }
+          w.a = a;
+          w.grab = true;
+        } else { w.a = null; w.grab = false; }
+        const laps = Math.floor(w.turn / (Math.PI * 2));
+        if (laps > w.laps) {
+          w.laps = laps;
+          Cue(state, "pickup", { gain: 0.4, rate: 1.1 + laps * 0.08 });
+        }
+        if (w.laps >= L.laps) {
+          w.phase = "peel";
+          w.grab = false;
+          Cue(state, "drop", { gain: 0.45, rate: 1.2 });
+          state.toast = { text: "绳褪下来了。捏住油布那个角，掀开。", t: 3.6 };
+        }
+      } else {
+        // ── 掀布 ──
+        if (held && state.ptrPressed && !w.grab
+          && Math.hypot(hand.x - w.corner.x, hand.y - w.corner.y) < L.grabR) {
+          w.grab = true;
+          Cue(state, "pickup", { gain: 0.3 });
+        }
+        if (!held) w.grab = false;
+        w.reaching = held && !w.grab;
+        if (w.grab) {
+          if (Math.hypot(hand.x - w.corner.x, hand.y - w.corner.y) > L.slipR) {
+            w.grab = false;                                  // 手甩得比布快：脱手
+            Cue(state, "drop", { gain: 0.35 });
+          } else {
+            const dx = hand.x - w.corner.x, dy = hand.y - w.corner.y;
+            const dd = Math.hypot(dx, dy);
+            if (dd > 1e-6) {
+              const stepD = Math.min(dd, L.speed * dt);
+              const nx = w.corner.x + (dx / dd) * stepD;
+              const ny = w.corner.y + (dy / dd) * stepD;
+              const uu = WrapPeelDir();
+              w.peel = Math.max(0, w.peel
+                + (nx - w.corner.x) * uu.x + (ny - w.corner.y) * uu.y);
+              w.corner.x = nx; w.corner.y = ny;
+              w.rasp = (w.rasp || 0) + stepD;
+              if (w.rasp > 0.09) { w.rasp = 0; Cue(state, "flutter", { gain: 0.24, rate: 1.3 }); }
+            }
+          }
+        }
+        w.open = Math.max(0, Math.min(1, w.peel / L.peelLen));
+      }
+
+      // **没有长按后备**（同接绳：这活儿的乐趣就在指尖上），也没有按键提示——
+      // 招呼玩家的是卡上那根绳头 / 那个布角自己
+      state.prompt = null;
+      state.wrapCard = {
+        phase: w.phase,
+        turn: w.turn, laps: w.laps, lapsLeft: Math.max(0, L.laps - w.laps),
+        lapK: Math.min(1, (w.turn % (Math.PI * 2)) / (Math.PI * 2)),
+        a: w.a, grab: !!w.grab, reaching: !!w.reaching,
+        corner: { x: w.corner.x, y: w.corner.y },
+        open: w.open || 0,
+      };
+      // 动词动画（铁律：不许「人站着不动、字幕替他做」）。卡铺满画框时看不见他，
+      // 收走那一帧看得见——蹲着，两只手在罐口上
+      p.pose = "unwrapJar";
+      p.poseU = w.phase === "peel" ? 0.55 + 0.45 * (w.open || 0) : 0.1 + 0.4 * (w.laps / L.laps);
+      p.poseT = undefined;
+
+      if (w.phase === "peel" && (w.open || 0) >= 1) {
+        Cue(state, "flutter", { gain: 0.5, rate: 0.9 });
+        state.wrapCard = null;
+        p.pose = null; p.poseU = undefined;
+        if (state.forage?.ash) state.forage.ash.open = true;
+        finish();
       }
       return;
     }
@@ -2795,8 +3305,14 @@ export const SCRIPTS = {
       // 踩碎的纺车、墙上的弹孔，各给一个无言的注视（新剧本明令：看到，
       // 但你什么都没说——所以是镜头看，不是字幕说）。
       // 挖到的是娘埋下的瓦罐：红薯干拿油布扎着口。搜寻教学在这条链上。
+      //
+      // 2026-08-12 重做交互（用户："居然是长按一个按钮？一点都不拟物"）：
+      // 掀苫草／拖门板／扒烧土／解扎口——**四道手，四个不重样的动词，
+      // 一个长按都没有**。玩法规则、尺寸推导与三样东西的摆位见 FORAGE 那一段；
+      // forage 声明的三个 x 同时是渲染层画它们的位置（World 的 forage 那段）。
       kind: "chain", id: "c1_forage", timeOfDay: "day",
       objective: "给妹妹找吃的", hint: "西头牲口棚烧塌了——翻翻看，兴许有埋下的东西",
+      forage: { mat: 11.2, plank: 8.9, ash: 7.6 },
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）
         const sis = FindActor(state, "sister");
@@ -2818,26 +3334,31 @@ export const SCRIPTS = {
               { stage: "", d: 2.6, cam: { kind: "insert", x: 23.1, y: 1.35, dist: 2.9 } },
             ]);
           } },
-        { type: "goto", zone: { x: 12.6, w: 2.6 } },
-        { type: "use", zone: { x: 11.2, w: 2.4 }, hold: 1.2, stroke: "down", gestureY: 0.7,
-          prompt: "E · 翻开苫草",
+        { type: "goto", zone: { x: 13.0, w: 2.6 } },
+        // ① 掀：焦草苫子压在塌下来的那半边上
+        { type: "heaveMat", zone: { x: 11.2, w: 3.4 },
           note: "苫草底下只有烧过的木头茬。",
           effect: (state) => { Cue(state, "flutter", { gain: 0.5 }); } },
-        { type: "use", zone: { x: 9.8, w: 2.2 }, hold: 1.2, stroke: "down", gestureY: 0.6,
-          prompt: "E · 挪开门板",
-          note: "板子底下是半截食槽，落满了灰。",
-          effect: (state) => { Cue(state, "drop", { gain: 0.6, rate: 0.9 }); } },
-        { type: "use", zone: { x: 8.6, w: 2.2 }, hold: 1.8, stroke: "down", gestureY: 0.55,
-          prompt: "E · 刨开烧土",
+        // ② 拖：半扇烧塌的门板压在食槽上。判定区给得宽（5m）是有原因的：
+        // 拖的时候人是**退着走**的，一米板子拖完他要退出去一米，区窄了会在最后
+        // 一寸掉出判定区，链当场卡死（自动通关先撞上的正是这条）
+        { type: "shiftPlank", zone: { x: 8.9, w: 5.0 },
+          note: "板子底下是半截食槽，落满了灰。" },
+        // ③ 扒：墙根那片烧土
+        { type: "scoopAsh", zone: { x: 7.6, w: 3.0 },
           note: "土里埋着一个瓦罐——罐口拿油布扎着，扎得严严实实。",
-          effect: (state) => { state.flags.jarDug = true; Cue(state, "dig", { gain: 0.8 }); } },
-        { type: "pickup", x: 8.6, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 掏出红薯干",
+          effect: (state) => { state.flags.jarDug = true; } },
+        // ④ 解：娘扎的那道口（活卡）。这一章的题眼落在这一下——她扎的，
+        // 玩家亲手拆开，一个字都不用说
+        { type: "unwrapJar", zone: { x: 7.6, w: 3.0 },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "小半罐红薯干。这样扎口的手法，是娘的。", d: 3.6,
-                cam: { kind: "insert", x: 8.6, y: 0.75, dist: 2.2 } },
+              { stage: "扎口的绳绕三道、压一个死扣。这样扎口的手法，是娘的。", d: 3.8,
+                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
             ]);
           } },
+        { type: "pickup", x: 7.6, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 掏出红薯干",
+          note: "小半罐红薯干。省着吃，能撑三四天。" },
         { type: "goto", zone: { x: 33.6, w: 2.6 } },
       ],
     },
@@ -5504,6 +6025,8 @@ export function StepGame(state, input, dt) {
   state.winchView = null;
   state.knotCard = null;  // 同 winchView：接绳那张活卡由 beat 每帧重立
   state.foldCard = null;  // 叠衣裳那张同理
+  state.wrapCard = null;  // 解扎口那张活卡同理
+  state.forage = null;    // 翻找那一场的三样东西：由链每帧重新发布（换拍就没了）
   state.stamina = null;   // 手劲读数同理：吊着桶的那一帧自己立
   state.closeUp = null;   // 玩法特写（辘轳/打结）同理：活着的那一帧自己立
   state.canDrop = false;
@@ -7372,6 +7895,67 @@ export function GetBeatTarget(state) {
             reachStep: Math.min(L.slipR, L.grabR + 0.02) * 0.8,     // 一帧最多把手挪这么远（免得脱手）
           };
         }
+        // 找吃的那四道手：**一个都没有长按后备**（CLAUDE.md 第 5 条：乐趣就在
+        // 手上的活只认手）。删后备就必须同时给驱动器一条真输入的路——所以这里
+        // 每帧把「手该按在哪、该往哪儿拖」算成两个点交出去，自动通关照着做一遍。
+        // 漏了这一步会当场卡死（接绳、投石两次都是这么处理的）。
+        case "heaveMat": {
+          const gy = st.zone.level === "under" ? UNDER_Y : SURFACE_Y;
+          const L = FORAGE.mat;
+          const ang = state.forage?.mat?.ang ?? L.restA;
+          const edge = ForageMatEdge(st.zone.x, gy, ang);
+          return {
+            action: "heaveAt",
+            x: Math.max(st.zone.x + 0.52, edge.x + L.standGap),
+            level: st.zone.level || "surface", reach: 0.55,
+            grab: edge,                                        // 攥这儿（苫子外沿）
+            to: ForageMatEdge(st.zone.x, gy, Math.min(L.tipAt + 0.1, ang + L.slipA * 0.5)),
+          };
+        }
+        case "shiftPlank": {
+          const gy = st.zone.level === "under" ? UNDER_Y : SURFACE_Y;
+          const L = FORAGE.plank;
+          const f = state.forage?.plank;
+          const end = ForagePlankEnd(f ? f.x0 : st.zone.x + L.westDx, gy, f?.dx || 0);
+          // 卡住了就一直往回让，**让到真让开为止**——只要还没 cleared 就接着退。
+          // 写成"退出卡口那一档就掉头"的话，板子会在卡口上前后来回颤，
+          // 永远退不到那 16 厘米（自动通关当场卡死在这一步）
+          const stuck = f && f.snagHit && !f.cleared;
+          return {
+            action: "plankAt",
+            x: end.x + L.standGap, level: st.zone.level || "surface", reach: 0.55,
+            grab: { x: end.x, y: end.y },
+            to: { x: end.x + (stuck ? -(L.snagBack + 0.08) : 0.30), y: end.y },
+          };
+        }
+        case "scoopAsh": {
+          const gy = st.zone.level === "under" ? UNDER_Y : SURFACE_Y;
+          const L = FORAGE.ash;
+          const f = state.forage?.ash;
+          const dirX = Math.sign((p.x || 0) - st.zone.x) || 1;
+          const u = ForageScoopDir(dirX);
+          const mound = { x: st.zone.x, y: gy + L.top * (1 - 0.55 * (f?.k || 0)) * 0.55 };
+          const span = L.len + 0.07;
+          return {
+            action: "scoopAt",
+            x: st.zone.x + dirX * L.standGap, level: st.zone.level || "surface", reach: 0.55,
+            grab: mound,
+            to: { x: mound.x + u.x * span, y: mound.y + u.y * span },
+          };
+        }
+        case "unwrapJar": {
+          const L = WRAP_CARD;
+          const w = state.beat.wrap;
+          return {
+            action: "unwrapAt", x: st.zone.x + 0.62, level: st.zone.level || "surface", reach: 0.55,
+            card: true, aspect: L.aspect,
+            neck: { ...L.neck }, ring: L.neck.r * 1.35,
+            spin: -0.24,                                    // 解开＝卡坐标里角度递减（屏幕逆时针）
+            corner: { ...(w?.corner || L.cloth) },
+            peel: WrapPeelDir(),
+            reachStep: Math.min(L.slipR, L.grabR + 0.02),   // 一帧最多把手挪这么远（免得脱手）
+          };
+        }
         case "throwHit": {
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
           // 投石的按键后备已按明令删掉，驱动器只能**真的把石子拽开再松手**：
@@ -7559,6 +8143,11 @@ export function BeatHintIcon(state) {
           ? Item(p.item?.id === st.needs ? p.item.label : ChainItemLabel(def, st.needs))
           : Hand(st.stroke);
         case "holdDoor": return { kind: "door" };
+        // 找吃的四道手：牌面画的是那件东西/那个动作本身
+        case "heaveMat": return { kind: "hand", gesture: "up" };
+        case "shiftPlank": return { kind: "door" };        // 拖的就是半扇烧塌的门板
+        case "scoopAsh": return { kind: "dig" };
+        case "unwrapJar": return { kind: "knot" };         // 解的是娘扎的那个结
         case "knot": return { kind: "knot" };
         case "fold": return { kind: "fold" };
         case "winch": return { kind: "winch" };
@@ -7600,7 +8189,8 @@ export function BeatHintIcon(state) {
 export function EdgeHint(state, camX, viewW) {
   if (state.phase !== "playing" || state.microCine) return null;
   // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
-  if (state.closeUp || state.scribeCard || state.planeCard || state.knotCard || state.foldCard) return null;
+  if (state.closeUp || state.scribeCard || state.planeCard || state.knotCard
+    || state.foldCard || state.wrapCard) return null;
   const def = CurrentBeatDef(state);
   if (!def || def.kind === "cinematic") return null;
   const tg = GetBeatTarget(state);
