@@ -14,7 +14,7 @@ import {
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
-  UnderSegments, AllRelics,
+  UnderSegments, AllRelics, PROLOGUE_SCRIPT, PROLOGUE_CLIPS, SkipPrologue,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -238,10 +238,44 @@ function TestSingleChapterEntry() {
   for (let i = 0; i < CHAPTERS.length; i += 1) {
     const state = CreateGame(i);
     assert.equal(state.chapterIndex, i);
-    assert.equal(state.phase, "chapterCard");
+    // 从头开局先播序章（它不属于任何一章，见 PROLOGUE_SCRIPT）：直接进 playing，
+    // 放完才亮「第一章」那张卡。跳幕/从别的章进来一律不放，一进来就是章节卡。
+    if (i === 0) {
+      assert.ok(state.inPrologue, "从头开局应当先进序章");
+      assert.equal(state.phase, "playing");
+      assert.equal(CurrentBeatDef(state).id, "prologue");
+    } else {
+      assert.ok(!state.inPrologue, `第 ${i + 1} 章不该放序章`);
+      assert.equal(state.phase, "chapterCard");
+    }
     StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   }
-  console.log("  ✓ 八个章节均可独立启动");
+  console.log("  ✓ 八个章节均可独立启动（第一章之前先放序章）");
+}
+
+// 序章是**独立于八章之外**的一段（2026-08-12 从 SCRIPTS.c1 拆出）。拆之前它是
+// c1 第 0 拍，玩家先看见「第一章」的卡、再看两分钟跟这一章无关的家史。
+// 这条钉住三件事：c1 里不许再有它、放完要落到「第一章」的卡上、跳过也一样。
+function TestPrologueStandsOutsideChapters() {
+  assert.equal(PROLOGUE_SCRIPT.length, 1, "序章就一拍");
+  assert.equal(PROLOGUE_SCRIPT[0].lines.length, 11, "序章 11 镜");
+  assert.equal(PROLOGUE_CLIPS.length, 11, "11 镜各有一段短片");
+  for (const [id, beats] of Object.entries(SCRIPTS)) {
+    for (const def of beats) {
+      assert.ok(!def.prologue, `${id} 里不该再有序章那一拍（${def.id}）`);
+    }
+  }
+  // 跳过：整段结算掉，落到「第一章」的章节卡，当前拍变成 c1 的第 0 拍
+  const skipped = CreateGame(0);
+  assert.ok(SkipPrologue(skipped), "序章应当可跳过");
+  assert.ok(!skipped.inPrologue, "跳完就不在序章里了");
+  assert.equal(skipped.phase, "chapterCard", "跳完亮「第一章」的卡");
+  assert.equal(skipped.chapterIndex, 0);
+  assert.equal(CurrentBeatDef(skipped).id, "c1_open", "卡之后接的是第一章开场");
+  // 正片的过场不给整段跳
+  skipped.phase = "playing";
+  assert.ok(!SkipPrologue(skipped), "正片的过场不许整段跳");
+  console.log("  ✓ 序章独立于八章之外（c1 无序章拍 · 跳过落回第一章卡）");
 }
 
 function TestVision() {
@@ -1846,6 +1880,7 @@ console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
 TestChapterMeta();
 TestSingleChapterEntry();
+TestPrologueStandsOutsideChapters();
 TestVision();
 TestCoverIsDirectional();
 TestClimb();

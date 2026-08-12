@@ -152,12 +152,24 @@ async function CmdExport(o) {
   const C = await Core();
   const want = o._[0];
   const out = [];
-  for (let ci = 0; ci < C.CHAPTERS.length; ci += 1) {
-    const ch = C.CHAPTERS[ci];
-    if (want && want !== ch.id && want !== String(ci + 1)) continue;
-    const beats = C.SCRIPTS[ch.id] || [];
-    out.push(`# ${ch.title}（${ch.id}）  ${ch.year || ""}  场景=${ch.scene} 光=${ch.light}  共 ${beats.length} 拍`);
-    beats.forEach((def, bi) => {
+  // 序章**不属于任何一章**（见 Script_Core 的 PROLOGUE_SCRIPT），所以它不在
+  // CHAPTERS 里——单排一节挂在八章前头，否则回写文档时它会整段丢掉。
+  const sections = [
+    {
+      head: `# 序章 · 开场动画（prologue）  独立于八章之外  共 ${C.PROLOGUE_SCRIPT.length} 拍`,
+      beats: C.PROLOGUE_SCRIPT,
+      keys: ["prologue", "序章", "0"],
+    },
+    ...C.CHAPTERS.map((ch, ci) => ({
+      head: `# ${ch.title}（${ch.id}）  ${ch.year || ""}  场景=${ch.scene} 光=${ch.light}  共 ${(C.SCRIPTS[ch.id] || []).length} 拍`,
+      beats: C.SCRIPTS[ch.id] || [],
+      keys: [ch.id, String(ci + 1)],
+    })),
+  ];
+  for (const sec of sections) {
+    if (want && !sec.keys.includes(want)) continue;
+    out.push(sec.head);
+    sec.beats.forEach((def, bi) => {
       out.push(`\n## ${bi}. ${def.id}  · ${def.kind}${def.when ? "（分支拍）" : ""}`);
       if (def.objective) out.push(`- 目标：${def.objective}`);
       if (def.hint) out.push(`- 提示：${def.hint}`);
@@ -202,6 +214,10 @@ async function CmdExport(o) {
 /** 在全部章节里找一拍 → {chapterIndex, beatIndex, def} */
 async function FindBeat(id) {
   const C = await Core();
+  // 序章不属于任何一章（PROLOGUE_SCRIPT）。章号仍报 0：`CreateGame(0)` 本来就是
+  // 从序章开演的，所以 state 子命令照这个章号跑进去正好落在序章上。
+  const pi = C.PROLOGUE_SCRIPT.findIndex((b) => b.id === id);
+  if (pi >= 0) return { C, ci: 0, bi: pi, def: C.PROLOGUE_SCRIPT[pi], prologue: true };
   for (let ci = 0; ci < C.CHAPTERS.length; ci += 1) {
     const list = C.ChapterBeatList(ci);
     const hit = list.find((b) => b.id === id);
@@ -228,8 +244,13 @@ async function CmdBeat(o) {
   const found = await FindBeat(id);
   if (!found) { console.log(`没有叫「${id}」的节拍。跑 beats 看全表。`); return; }
   const { C, ci, bi, def } = found;
-  const ch = C.CHAPTERS[ci];
-  console.log(`${id}   ${ch.id} ${ch.title}   第 ${bi} 拍 / 共 ${C.ChapterBeatList(ci).length}   kind=${def.kind}`);
+  // 序章不在 CHAPTERS 里（PROLOGUE_SCRIPT），给它一个同形的壳，下面照旧打印
+  const ch = found.prologue
+    ? { id: "prologue", title: "序章 · 开场动画", scene: C.CHAPTERS[0].scene }
+    : C.CHAPTERS[ci];
+  const total = found.prologue ? C.PROLOGUE_SCRIPT.length : C.ChapterBeatList(ci).length;
+  const where = found.prologue ? "序章 · 开场动画（独立于八章之外）" : `${ch.id} ${ch.title}`;
+  console.log(`${id}   ${where}   第 ${bi} 拍 / 共 ${total}   kind=${def.kind}`);
   console.log(`场景 ${ch.scene}${def.timeOfDay ? " · " + def.timeOfDay : ""}`);
   if (def.objective) console.log(`目标  ${def.objective}`);
   if (def.hint) console.log(`提示  ${def.hint}`);
@@ -330,7 +351,8 @@ async function CmdState(o) {
   const { C, ci, bi } = found;
   const DT = 1 / 30;
   const state = C.CreateGame(ci);
-  C.DebugJump(state, ci, bi);
+  // 序章：CreateGame(0) 本来就从序章开演，再跳一次会把它顶掉、落到 c1_open 去
+  if (!found.prologue) C.DebugJump(state, ci, bi);
   const step = (inp = {}, n = 1) => { for (let i = 0; i < n; i += 1) C.StepGame(state, { ...IDLE, ...inp }, DT); };
   step({}, 1);
   // 跳进来先把 onStart 起的小过场演完——不然什么提示都还没出来
@@ -686,8 +708,9 @@ const HELP = `《地道里的光》命令行工作台
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
       转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
-  export [c1|1]           把一章**以代码为准**导成 Markdown（台词逐句＋关卡骨架），
+  export [c1|1|prologue]  把一章**以代码为准**导成 Markdown（台词逐句＋关卡骨架），
                           用来回写 Notion 的剧本/关卡页。别人工誊抄台词
+                          不给参数＝全导；序章不属于任何一章，单用 prologue 取
   doctor                  分支/上游/未提交/缓存戳/端口
 
 要问游戏状态先跑这个，别再现写一次性探针脚本。`;

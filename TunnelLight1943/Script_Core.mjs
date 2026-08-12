@@ -2496,29 +2496,10 @@ export const SCRIPTS = {
   // 全章无敌人、无失败；「维持日常」的徒劳与温柔是唯一的题眼。
   // 玩法承接（剧本新生§1）：搜寻（翻找笔画）、对话选择（正字）、挖掘（埋衣）、
   // 菜窖=初始安全区第一次出现。
-  // 序章 1-8 镜连同配音、短片全部保留（都是扫荡之前的家史，仍然成立）；
-  // 9-11 镜换文案（同一批短片）：扫荡、爹娘没回来、只剩兄妹俩。
+  // 序章**不在这一章里**：它交代的是开场之前的家史，不是第一章这一天的戏，
+  // 所以单独立成 PROLOGUE_SCRIPT（见本文件下方），播完才出「第一章」那张卡。
   // =========================================================================
   c1: [
-    {
-      // 序章：11 镜、总长 120 秒；每镜一段静音短片。
-      kind: "cinematic", id: "c1_prologue", prologue: true, timeOfDay: "dawn",
-      lines: [
-        { stage: "九一八事变后，日本占领东北，又不断把侵略推进华北。", d: 7, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro2" } },
-        { stage: "1937年7月，日军在卢沟桥挑起战事，随后进攻北平、天津，全面侵华战争爆发。", d: 8, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro1" } },
-        { stage: "此后一年，华北多数县城和铁路沿线相继沦陷，部分正规军向南、向西转进。", d: 8, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
-        { stage: "在许多失去常驻守军的乡村，八路军深入敌后，发动群众，坚持抗战。", d: 7, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
-        { stage: "梁家村就在这样的敌占区。村外有据点、卡口和封锁沟；日伪强征粮食、摊派民夫，扫荡时还直接进村抢粮。", d: 13, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
-        { stage: "柱子家四口，靠三四亩薄田、换工和农闲杂活过日子。家里没有牲口和车，耕牛、农具都得向邻里借。", d: 13, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro9" } },
-        { stage: "乡亲叫柱子爹“梁木匠”，可地里的活才是他的本分。农闲时，他背着锯刨给人换犁把、修门轴，收几把粮。", d: 14, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro11" } },
-        { stage: "娘把已经不能穿的旧褂拆开，挑尚结实的布补裤膝和袖肘。能下锅的粮已经见底，留种的小布包却单独封在瓦罐里，谁也不能动。", d: 14, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
-        // 9-11 镜：新剧本的转折。短片沿用（劳役/押人、少年当家、地窖口），
-        // 文案换成扫荡与失怙——爹娘的结局不明说，只说"没有回来"
-        { stage: "开春，据点又一次进村扫荡。粮食、牲口、人——他们要什么，就拿什么。那一回，爹和娘没有回来。", d: 18, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro6" } },
-        { stage: "柱子十五岁。从那天起，烧火、找粮、照看妹妹，都是他一个人的事了。", d: 8, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro12" } },
-        { stage: "妹妹六岁。她只知道爹娘出了远门。屋底下的旧菜窖还在——如今，那是兄妹俩最后能躲的地方。", d: 10, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro7" } },
-      ],
-    },
     {
       // 开场：扫荡后的第三天清晨。四个空镜把"安静"说完——空街、冷灶、
       // 见底的水缸、塌了半边的牲口棚；最后落回屋里睡着的妹妹。
@@ -4269,11 +4250,44 @@ export const SCRIPTS = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// 序章 · 开场动画——**独立于八章之外的一段**（2026-08-12 从 SCRIPTS.c1 拆出）。
+// 它讲的是开场之前的家史（九一八→卢沟桥→敌后→梁家村→柱子家→爹娘没回来），
+// 不是第一章那一天的戏；搁在 c1 第 0 拍里，玩家会先看见「第一章」的卡、再看
+// 两分钟跟这一章无关的历史。拆出来之后的顺序是：序章 → 「第一章」卡 → c1_open。
+//
+// 不进 CHAPTERS：那张表是**章号**（c1…c8），序章没有章号，塞进去会把八章的
+// 下标整体挪一位——存档旗标、PLAYABLE_CHAPTERS、DebugJump 的章号全要跟着改。
+// 走 state.inPrologue 这条独立的路，章号一个都不动。
+//
+// 11 镜、总长 120 秒；每镜一段静音短片。1-8 镜连同配音全部沿用（都是扫荡
+// 之前的家史，仍然成立）；9-11 镜按新剧本换了文案，短片沿用。
+// ---------------------------------------------------------------------------
+export const PROLOGUE_SCRIPT = [
+  {
+    kind: "cinematic", id: "prologue", prologue: true, timeOfDay: "dawn",
+    lines: [
+      { stage: "九一八事变后，日本占领东北，又不断把侵略推进华北。", d: 7, cam: { kind: "insertVideo", clip: "Pro_01", card: "pro2" } },
+      { stage: "1937年7月，日军在卢沟桥挑起战事，随后进攻北平、天津，全面侵华战争爆发。", d: 8, cam: { kind: "insertVideo", clip: "Pro_02", card: "pro1" } },
+      { stage: "此后一年，华北多数县城和铁路沿线相继沦陷，部分正规军向南、向西转进。", d: 8, cam: { kind: "insertVideo", clip: "Pro_03", card: "pro3" } },
+      { stage: "在许多失去常驻守军的乡村，八路军深入敌后，发动群众，坚持抗战。", d: 7, cam: { kind: "insertVideo", clip: "Pro_04", card: "pro4" } },
+      { stage: "梁家村就在这样的敌占区。村外有据点、卡口和封锁沟；日伪强征粮食、摊派民夫，扫荡时还直接进村抢粮。", d: 13, cam: { kind: "insertVideo", clip: "Pro_05", card: "pro5" } },
+      { stage: "柱子家四口，靠三四亩薄田、换工和农闲杂活过日子。家里没有牲口和车，耕牛、农具都得向邻里借。", d: 13, cam: { kind: "insertVideo", clip: "Pro_06", card: "pro9" } },
+      { stage: "乡亲叫柱子爹“梁木匠”，可地里的活才是他的本分。农闲时，他背着锯刨给人换犁把、修门轴，收几把粮。", d: 14, cam: { kind: "insertVideo", clip: "Pro_07", card: "pro11" } },
+      { stage: "娘把已经不能穿的旧褂拆开，挑尚结实的布补裤膝和袖肘。能下锅的粮已经见底，留种的小布包却单独封在瓦罐里，谁也不能动。", d: 14, cam: { kind: "insertVideo", clip: "Pro_08", card: "pro13" } },
+      // 9-11 镜：新剧本的转折。短片沿用（劳役/押人、少年当家、地窖口），
+      // 文案换成扫荡与失怙——爹娘的结局不明说，只说"没有回来"
+      { stage: "开春，据点又一次进村扫荡。粮食、牲口、人——他们要什么，就拿什么。那一回，爹和娘没有回来。", d: 18, cam: { kind: "insertVideo", clip: "Pro_09", card: "pro6" } },
+      { stage: "柱子十五岁。从那天起，烧火、找粮、照看妹妹，都是他一个人的事了。", d: 8, cam: { kind: "insertVideo", clip: "Pro_10", card: "pro12" } },
+      { stage: "妹妹六岁。她只知道爹娘出了远门。屋底下的旧菜窖还在——如今，那是兄妹俩最后能躲的地方。", d: 10, cam: { kind: "insertVideo", clip: "Pro_11", card: "pro7" } },
+    ],
+  },
+];
+
 // 序章过场短片的片单，顺序就是播放顺序——渲染层拿它做"下一段提前拉"。
 // 从脚本里读而不是另抄一份：改了哪一行的 clip，这里自动跟着变。
-export const PROLOGUE_CLIPS = SCRIPTS.c1
-  .find((b) => b.id === "c1_prologue")
-  .lines.map((l) => l.cam?.clip)
+export const PROLOGUE_CLIPS = PROLOGUE_SCRIPT[0].lines
+  .map((l) => l.cam?.clip)
   .filter(Boolean);
 
 // ---------------------------------------------------------------------------
@@ -4662,6 +4676,7 @@ export function CreateGame(chapterIndex = 0) {
   const state = {
     version: GAME_VERSION,
     phase: "chapterCard",
+    inPrologue: false,     // 序章那段在不在放（它不属于任何一章，见 PROLOGUE_SCRIPT）
     chapterIndex,
     beatIndex: 0,
     time: 0,
@@ -4724,6 +4739,10 @@ export function CreateGame(chapterIndex = 0) {
     done: false,
   };
   StartChapter(state, chapterIndex);
+  // 从头开局先播序章。放完 EndChapter 会回头 StartChapter(0)，「第一章」那张卡
+  // 到那时才亮——玩家看见章名时，序章已经把家史交代完了。跳幕或从别的章进来
+  // 一律不放：它讲的是开场之前的事，从中途看没有意义。
+  if (chapterIndex === 0) EnterPrologue(state);
   return state;
 }
 
@@ -4748,6 +4767,8 @@ function ClearPoses(state) {
 export function StartChapter(state, index) {
   const ch = CHAPTERS[index];
   state.chapterIndex = index;
+  // 进正片就一定不在序章里了（序章放完由 EndChapter 调回这儿，跳幕也走这条）。
+  state.inPrologue = false;
   state.beatIndex = 0;
   state.phase = "chapterCard";
   state.cardTimer = 0;
@@ -4889,7 +4910,12 @@ export function StartChapter(state, index) {
   EnterBeat(state);
 }
 
-function CurrentScript(state) { return SCRIPTS[CHAPTERS[state.chapterIndex].id]; }
+// 序章不属于任何一章，所以它不从 CHAPTERS 里取——inPrologue 立着的时候，
+// 当前脚本就是 PROLOGUE_SCRIPT。章号（chapterIndex）在序章期间仍指向第一章，
+// 这样序章一放完，StartChapter(0) 直接接得上。
+function CurrentScript(state) {
+  return state.inPrologue ? PROLOGUE_SCRIPT : SCRIPTS[CHAPTERS[state.chapterIndex].id];
+}
 export function CurrentBeatDef(state) { return CurrentScript(state)[state.beatIndex] || null; }
 
 function EnterBeat(state) {
@@ -4966,16 +4992,29 @@ function AdvanceBeat(state) {
   else EnterBeat(state);
 }
 
+// 进序章：换到序章那份脚本、直接开演（不出章节卡——它没有章号）。
+function EnterPrologue(state) {
+  state.inPrologue = true;
+  state.beatIndex = 0;
+  state.phase = "playing";
+  state.cardTimer = 0;
+  EnterBeat(state);
+}
+
 // 跳过序章：整段一次性结算掉（序章的行没有走位副作用，直接翻页即可）。
-// 只对 c1_prologue 生效——正片的过场不给整段跳，逐行点按仍是唯一的快进。
+// 只对序章那一拍生效——正片的过场不给整段跳，逐行点按仍是唯一的快进。
+// 跳完 AdvanceBeat 走到脚本尽头 → EndChapter → StartChapter(0)，「第一章」的卡照常亮。
 export function SkipPrologue(state) {
   const def = CurrentBeatDef(state);
-  if (!def || def.id !== "c1_prologue") return false;
+  if (!def || def.id !== "prologue") return false;
   AdvanceBeat(state);
   return true;
 }
 
 function EndChapter(state) {
+  // 序章放完不算"一章结束"：它没有章号，也不该出结算卡。收起序章、正式开第一章
+  // ——「第一章 · 善意的谎言」那张卡在这时候才亮，玩家看卡时序章已经交代完了。
+  if (state.inPrologue) { StartChapter(state, 0); return; }
   if (state.chapterIndex >= CHAPTERS.length - 1) {
     state.phase = "gameEnd";
     state.done = true;
