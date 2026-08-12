@@ -3814,30 +3814,97 @@ export function CreateWorld(canvasEl) {
           c.globalAlpha = Math.max(0, 1 - t / 1.1);
           ART.DrawMouse(c, 160 - t * 150, AtY(0.05) + Math.sin(t * 30) * 2, "fleeMouse");
         } else if (state.elmRain) {
-          // 榆钱雨：一把青黄的小圆片从冠里簌簌往下飘，左摇右摆地落
+          // 榆钱雨。2026-08-12 用户退回：「榆钱掉落的动画有点太弱智了」。
+          // 老版十四片同样大小的椭圆，同一个速度直直下坠，全程 sin 摆一摆，
+          // 落到 0.05m 就贴着地不动了——读出来是"一串绿点在滑轨上往下溜"。
+          // 真榆钱是**薄翅果**，它下落的样子由三件事决定，缺一件就假：
+          //   ① 翻面。片子在空中不停侧过去又转回来，侧到极处几乎看不见——
+          //      这是"薄"的唯一视觉证据，也是整段动画最要紧的一笔。
+          //   ② 各飘各的。起飞高度、脱枝的先后、下落快慢、摆幅摆频、自转方向
+          //      全都得散开；十四片齐步走就是"一挂帘子"。
+          //   ③ 落地要停、要摊平。飘的时候立着转，躺下就该是平摊的一小片，
+          //      而且从此不再动——底下那块布上"铺了一层绿"就是这么攒出来的。
           const t = state.elmRain.t;
-          c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.6);
+          const life = state.elmRain.life ?? 2.2;
+          const alpha = Math.max(0, Math.min(1, (life - t) / 0.9));   // 末尾九分之一秒才淡
           // 起落高度由发起处给：树上抖下来是 1.9m（井台那棵老榆），
           // 从被扯开的包袱里洒出来只有 0.75m——不写这一档，院子里没有树，
           // 榆钱就是从半空凭空落下来的（实拍逮到的）
           const H0 = state.elmRain.from ?? 1.9;
-          for (let i = 0; i < 14; i += 1) {
-            const h0 = H0 + ART.Hash("er" + i) * (H0 > 1.2 ? 0.5 : 0.18);   // 各自的起飞高度
-            const fall = Math.max(0, t - ART.Hash("ed" + i) * 0.5);       // 错峰往下掉
-            const y = Math.max(0.05, h0 - fall * 1.1);
-            const sx = 160 + (ART.Hash("ex" + i) - 0.5) * 66
-              + Math.sin(fall * 5 + i) * 9;                               // 边落边打摆
+          const HI = H0 > 1.2;                       // 树上抖 / 包袱里洒，两套散布
+          const GY = 0.03;                           // 落到这个高度算躺下了
+          // 石子砸中那一下：枝头先崩一小蓬碎屑出去，再轮到榆钱往下飘。
+          // 没有这一下，榆钱就是"自己开始掉的"，跟那颗石子没关系
+          if (HI && t < 0.5) {
+            const k = t / 0.5;
+            c.globalAlpha = alpha * (1 - k) * 0.75;
+            c.fillStyle = "#77883f";
+            for (let i = 0; i < 8; i += 1) {
+              const a = -2.6 + ART.Hash("ip" + i) * 2.0;             // 朝斜下方扇开
+              const d = k * (14 + ART.Hash("id" + i) * 30);
+              c.beginPath();
+              c.arc(160 + Math.cos(a) * d, AtY(H0 + 0.12) - Math.sin(a) * d * 0.7,
+                1.1 + ART.Hash("is" + i) * 0.9, 0, Math.PI * 2);
+              c.fill();
+            }
+          }
+          c.globalAlpha = alpha;
+          for (let i = 0; i < 38; i += 1) {
+            const h0 = H0 + ART.Hash("er" + i) * (HI ? 0.42 : 0.16);
+            // 脱枝先后：取平方压到前段——砸中那一下崩下来大半，剩下的零零星星
+            const rel = ART.Hash("ed" + i) ** 2 * (HI ? 0.62 : 0.35);
+            const fall = Math.max(0, t - rel);
+            if (fall <= 0) continue;
+            // 下落：薄片没有自由落体，一脱枝就到终速，各片终速还不一样
+            const vT = 0.58 + ART.Hash("ev" + i) * 0.46;
+            // 起步那一下软一点（exp 那项让 fall 很小时几乎不动），免得整齐划一地弹出去
+            const Drop = (f) => vT * (f - 0.16 * (1 - Math.exp(-f / 0.16)));
+            const tLand = (h0 - GY) / vT + 0.16;                     // 大致落地时刻
+            const fEff = Math.min(fall, tLand);                      // 躺下之后一切定格
+            const y = Math.max(GY, h0 - Drop(fall));
+            // 横向：各自的散布 + 一点点侧漂 + 边落边打摆
+            const x0 = (ART.Hash("ex" + i) - 0.5) * (HI ? 108 : 46);
+            const drift = (ART.Hash("ew" + i) - 0.5) * 13;
+            const amp = 4.5 + ART.Hash("ea" + i) * 11;
+            const frq = 3.0 + ART.Hash("eq" + i) * 3.2;
+            const sx = 160 + x0 + drift * fEff + Math.sin(fEff * frq + i * 1.7) * amp;
             const sy = AtY(y);
+            // 躺下：0.3 秒里把翻面收平、把自转停成一个随机的躺角
+            const settle = Math.max(0, Math.min(1, (fall - tLand) / 0.3));
+            const spin = (ART.Hash("es" + i) - 0.5) * 5.4;
+            const flipW = 3.6 + ART.Hash("ef" + i) * 4.4;
+            // ① 翻面：宽度按 |cos| 收，侧到极处只剩一条线（留 0.12 免得整片消失）
+            const flip = Math.max(0.12, Math.abs(Math.cos(fEff * flipW + i * 0.9)));
+            const rot = i * 1.1 + fEff * spin;
+            const rotD = rot * (1 - settle) + (ART.Hash("el" + i) - 0.5) * 1.3 * settle;
+            const flipD = flip * (1 - settle) + settle;              // 躺平＝整片朝上
+            // 大小各不同。**别画大**：真榆钱才一指甲盖，按 PPM 折下来不到一像素，
+            // 放大是必要的假，放过头就成了满天绿铜钱（第一版 2.9~5.2 就是这样）
+            const r = 2.2 + ART.Hash("ez" + i) * 1.5;
+            // 配色照 sRGB 那条老账**压两档**（见 CLAUDE.md 人物配色一节）：
+            // CanvasTexture 没声明 sRGB，上屏整体提亮。第一版给的 #c6d192 一族
+            // 渲出来是发白的浅绿圈，深色描边反倒成了唯一看得清的笔——一圈圈甜甜圈
+            const tint = ["#8a9d54", "#798d46", "#94a660"][i % 3];
             c.save();
             c.translate(sx, sy);
-            c.rotate(Math.sin(fall * 6 + i * 2) * 0.9);
+            c.rotate(rotD);
+            // 翅：薄薄一圈膜。翻面走半径不走 scale——scale 会把描边也压扁成粗细不匀
             c.beginPath();
-            c.ellipse(0, 0, 3.4, 2.4, 0, 0, Math.PI * 2);
-            c.fillStyle = i % 2 ? "#aebf72" : "#c2cf8a";
+            c.ellipse(0, 0, r * flipD, r * 0.84, 0, 0, Math.PI * 2);
+            c.fillStyle = tint;
             c.fill();
-            c.strokeStyle = "rgba(90,110,50,0.7)";
-            c.lineWidth = 0.8;
+            // 描边只留一线：这么小的片子上，边一重就把整片吃成一个圈
+            c.strokeStyle = "rgba(52,64,24,0.45)";
+            c.lineWidth = 0.5;
             c.stroke();
+            // 籽：翅当中那一粒，深两档。它是"榆钱"和"绿纸屑"的分界，
+            // 所以宁可画大一点（0.42R）——小到看不见就等于没画
+            if (flipD > 0.28) {
+              c.beginPath();
+              c.ellipse(0, 0, r * 0.42 * flipD, r * 0.34, 0, 0, Math.PI * 2);
+              c.fillStyle = "#4c5a26";
+              c.fill();
+            }
             c.restore();
           }
         }

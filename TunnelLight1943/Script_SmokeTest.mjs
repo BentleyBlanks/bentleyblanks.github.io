@@ -2314,7 +2314,8 @@ console.log("— 全流程自动通关（第六章走『地下进人』，第二
   // （物品拿不到、投掷永远不中、正字划不上）不会让通关测试变红——
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
   // ——第一章（善意的谎言）——
-  assert.equal(state.flags.jarDug, true, "C1 翻牲口棚必须刨出那个瓦罐");
+  assert.equal(state.flags.shedSearched, true, "C1 西头那个牲口棚必须真翻过一遍（翻空是这一段的结果）");
+  assert.equal(state.flags.jarDug, true, "C1 那个瓦罐必须在窖里的搁板上摸出来——不在院子的烧土里");
   assert.equal(state.flags.tallied, true, "C1 正字那一道必须亲手划上");
   assert.ok(state.flags.tallyAnswer, "C1 妹妹那一问必须选过答案");
   assert.equal(state.flags.wellRopeFixed, true, "C1 井绳必须缠好");

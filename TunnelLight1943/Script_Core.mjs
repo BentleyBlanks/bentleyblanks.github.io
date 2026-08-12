@@ -1502,11 +1502,18 @@ function StepChain(state, def, input, dt) {
     }
     case "throwHit": {
       if (state.thrown) return;
-      const nearPile = Math.abs(p.x - st.pickupX) < 1.7 && lvl === "surface";
+      const nearPile = Math.abs(p.x - st.pickupX) < 2.2 && lvl === "surface";
       if (!p.item) {
         if (nearPile) {
           state.prompt = "E · 捡石子";
           if (input.interact) { GiveItem(state, { id: "stone", label: "石子", throwable: true }); FlashPose(state, "bow", 0.45); }
+        } else {
+          // 手里没石子、人又不在堆边：给石子堆挂一枚气泡。跟"要用的东西撂在
+          // 地上了"是同一套无文字引导——不标出来，玩家根本不知道有石子这回事
+          //（2026-08-12 用户：「一开始我都不知道可以这样扔石头」）。
+          // 判定半径也从 1.7 放到 2.2：石子堆是趴在地上的一小摊，
+          // 走过它身边半米不出提示，读出来就是"这堆石头不能动"
+          state.bubbles.push({ x: st.pickupX, y: SURFACE_Y + 0.95, icon: "item:石子" });
         }
         return;
       }
@@ -2538,9 +2545,18 @@ export const SCRIPTS = {
       // 第一场（玩法）：给妹妹找吃的。往西头翻烧塌的自家牲口棚——路上经过
       // 踩碎的纺车、墙上的弹孔，各给一个无言的注视（新剧本明令：看到，
       // 但你什么都没说——所以是镜头看，不是字幕说）。
-      // 挖到的是娘埋下的瓦罐：红薯干拿油布扎着口。搜寻教学在这条链上。
+      // 2026-08-12 用户退回：「红薯干怎么可能放在室外啊 放在地窖才差不多吧」。
+      // 说得对，而且**场景数据早就是这么摆的**：地窖里本来就登记着一堆红薯
+      //（cellarTubers, 32.6）和一张搁板（cellarShelf, 33.9）——美术把粮食画在
+      // 窖里，脚本却让他去院子西头的烧土里刨，两边打架了三天。
+      // 改法不是把这条链搬走，是把它的**结果**从"刨到了"翻成"什么也没有"：
+      // 棚子照翻（无言的注视、搜寻教学都在这条路上，一步不减），但三处全空，
+      // 空手回来才下窖——红薯堆早扒拉净了，粮食在搁板最里头、腌菜坛子后面，
+      // 是娘另存的一罐。棚子给的是徒劳，窖给的是娘。
+      // 顺带补上了原设计稿那句「菜窖作为初始安全区第一次出现」：原先窖要到
+      // 夜里第八拍才第一次下，现在早晨就下过一趟——夜里那趟是**再**下去。
       kind: "chain", id: "c1_forage", timeOfDay: "day",
-      objective: "给妹妹找吃的", hint: "西头牲口棚烧塌了——翻翻看，兴许有埋下的东西",
+      objective: "给妹妹找吃的", hint: "先去西头翻翻烧塌的牲口棚",
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）
         const sis = FindActor(state, "sister");
@@ -2569,20 +2585,53 @@ export const SCRIPTS = {
           effect: (state) => { Cue(state, "flutter", { gain: 0.5 }); } },
         { type: "use", zone: { x: 9.8, w: 2.2 }, hold: 1.2, stroke: "down", gestureY: 0.6,
           prompt: "E · 挪开门板",
-          note: "板子底下是半截食槽，落满了灰。",
+          note: "板子底下是半截食槽。槽底那点秕谷壳，抓一把全是灰。",
           effect: (state) => { Cue(state, "drop", { gain: 0.6, rate: 0.9 }); } },
+        // 棚子这一头到此为止：三处全空。翻遍了才想起窖——由头三拍的路子，
+        // 先看见白翻一趟，再看见还有一处没翻，最后才动身
         { type: "use", zone: { x: 8.6, w: 2.2 }, hold: 1.8, stroke: "down", gestureY: 0.55,
           prompt: "E · 刨开烧土",
-          note: "土里埋着一个瓦罐——罐口拿油布扎着，扎得严严实实。",
-          effect: (state) => { state.flags.jarDug = true; Cue(state, "dig", { gain: 0.8 }); } },
-        { type: "pickup", x: 8.6, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 掏出红薯干",
+          note: "刨到底是烧塌的檩子。这儿什么也没有。",
+          effect: (state) => {
+            state.flags.shedSearched = true;
+            Cue(state, "dig", { gain: 0.8 });
+            StartMicroCine(state, [
+              { stage: "", d: 2.4, cam: { kind: "insert", x: 9.0, y: 0.6, dist: 2.4 } },
+              { stage: "棚子翻遍了。手上一层黑。", d: 3.0,
+                cam: { kind: "shot", x: 10.0, y: 1.2, dist: 4.4 } },
+              { stage: "还有一处没看——窖里。", d: 2.8,
+                cam: { kind: "shot", x: 14.0, y: 1.35, dist: 5.6, pan: 6 } },
+            ]);
+          } },
+        // 下窖。窖口(29)在自家屋子足迹里，梯子口脚下留着空
+        { type: "goto", zone: { x: 30.5, w: 3.2, level: "under" },
+          hint: "窖口在屋里，灶台东边。掀开下去",
+          effect: (state) => { Cue(state, "doorCreak", { gain: 0.6 }); } },
+        // 红薯堆（场景里本来就摆着的那堆）先给个交代：早扒拉净了。
+        // 不先掏空它，玩家会问"窖里明明堆着红薯，还翻什么棚子"
+        { type: "use", zone: { x: 32.6, w: 2.4, level: "under" }, hold: 1.2, stroke: "down", gestureY: 0.5,
+          prompt: "E · 扒拉红薯堆",
+          hint: "先看看那堆红薯还剩下什么",
+          note: "红薯堆早扒拉到底了。剩下几块冻烂的，捏一手水。",
+          effect: (state) => { Cue(state, "drop", { gain: 0.5, rate: 1.1 }); } },
+        { type: "use", zone: { x: 33.9, w: 2.2, level: "under" }, hold: 1.6, stroke: "down", gestureY: 0.85,
+          prompt: "E · 摸搁板最里头",
+          hint: "东墙根那张搁板，往最里头摸",
+          note: "腌菜坛子后头塞着个瓦罐——罐口拿油布扎着，扎得严严实实。",
+          effect: (state) => { state.flags.jarDug = true; Cue(state, "tenon", { gain: 0.7 }); } },
+        { type: "pickup", x: 33.9, level: "under",
+          item: { id: "driedYams", label: "红薯干" }, prompt: "E · 掏出红薯干",
+          hint: "解开那个扣，看看里头是什么",
           effect: (state) => {
             StartMicroCine(state, [
               { stage: "小半罐红薯干。这样扎口的手法，是娘的。", d: 3.6,
-                cam: { kind: "insert", x: 8.6, y: 0.75, dist: 2.2 } },
+                cam: { kind: "insert", x: 33.9, y: UNDER_Y + 0.78, dist: 2.2 } },
+              // 她把这罐塞在坛子后头，是留着的。留给谁，不用说
+              { stage: "藏在这儿，是留着的。", d: 3.0,
+                cam: { kind: "insert", x: 33.7, y: UNDER_Y + 0.9, dist: 2.4 } },
             ]);
           } },
-        { type: "goto", zone: { x: 33.6, w: 2.6 } },
+        { type: "goto", zone: { x: 33.6, w: 2.6 }, hint: "上去。妹妹还在屋里睡着" },
       ],
     },
     {
@@ -2708,6 +2757,23 @@ export const SCRIPTS = {
       // 台词里没有娘了——"娘说掺上榆钱"从叮嘱变成了转述，一个字没改。
       kind: "chain", id: "c1_well", timeOfDay: "day",
       objective: "缸里没水了——去井台打一桶回来", hint: "水桶在缸边上；妹妹先跑去了榆树底下",
+      // 投石这一步卡住的人最多（2026-08-12 用户退回）。妹妹的台词和石子堆的
+      // 空镜是"第一次告诉"，气泡是"东西在哪"，这一条是最后一层：**真卡住了
+      // 才说**，二十秒没动静才出一句，说的还只是手怎么使——不替玩家瞄准。
+      // pipIdle 这套机制在本作里一直没人用过，第一个用它的就是这儿
+      pipIdle: {
+        after: 20, cooldown: 25,
+        on: (state) => {
+          const st = state.beat.stepIndex;
+          if (st !== 5) return;                      // 只管投石那一步
+          state.toast = {
+            text: state.player.item?.id === "stone"
+              ? "攥住手里那颗石子，往后下方拽开——拽得越满，甩得越远。松手出手。"
+              : "井台东边有一堆石子。捡一颗，砸树冠上挂榆钱那几枝。",
+            t: 4.2,
+          };
+        },
+      },
       onStart: (state) => {
         // 妹妹撒腿先跑去榆树底下：她惦记那树榆钱不是一天了。
         // 不挂 following——投石那一步她得站在自己的位置上接戏
@@ -2751,7 +2817,20 @@ export const SCRIPTS = {
             // 这句一个字没改。说的人不在了，话还在当家。
             { who: "妹妹", say: "娘说掺上榆钱，缸里那点糜子能多顶十天。", d: 3.2,
               cam: { kind: "ots", subject: "sister", other: "player", dist: 3.4 } },
-            { who: "妹妹", say: "你打得着。你打，我捡。", d: 2.6,
+            // 2026-08-12 用户退回：「扔石头的交互不是很直观，一开始我都不知道
+            // 可以这样扔石头」。病根在这儿：全场没有一个人、一个镜头说过"拿石头
+            // 打"——石子堆在井东边 61.2，玩家走不到 1.7m 内就连提示都不出，
+            // 那颗石子等于藏起来的。**说出那个动词，再给那堆石子一个空镜**：
+            // 谁来打、拿什么打、东西在哪，三样在这两句半里交代完
+            { who: "妹妹", say: "你拿石头打呀。井那头就有一堆。", d: 3.0,
+              cam: { kind: "shot", x: 57.5, y: 1.5, dist: 6 },
+              on: (state) => {
+                const sis = FindActor(state, "sister");
+                if (sis) { sis.track = null; sis.heading = 1; }
+              } },
+            // 她说的那一堆，给一个空镜——本作指路一律走镜头，不走箭头
+            { stage: "", d: 2.4, cam: { kind: "insert", x: 61.2, y: 0.55, dist: 2.6 } },
+            { who: "妹妹", say: "你打，我捡。", d: 2.4,
               cam: { kind: "shot", x: 57.5, y: 1.5, dist: 6 },
               on: (state) => {
                 const sis = FindActor(state, "sister");
@@ -2785,7 +2864,9 @@ export const SCRIPTS = {
           note: "榆钱簌簌落下来，铺了布上一层。",
           effect: (state) => {
             state.flags.elmDown = true;
-            state.elmRain = { x: 56.3, t: 0 };
+            // life 4.2：够一把榆钱从 1.9m 飘到地上，再在布上躺一会儿。
+            // 老的 2.2s 是所有小活物共用的时长，榆钱还没落地就整体淡没了
+            state.elmRain = { x: 56.3, t: 0, life: 4.2 };
             const sis = FindActor(state, "sister");
             if (sis) {
               sis.cineTarget = { x: 56.2 };
@@ -4841,6 +4922,7 @@ export function StartChapter(state, index) {
     state.flags.waterFilled = false;
     // 新剧本第一章的旗标（找吃的/正字/井台/埋衣）
     state.flags.jarDug = false;
+    state.flags.shedSearched = false;
     state.flags.tallied = false;
     state.flags.tallyAnswer = null;
     state.flags.wellRopeFixed = false;
@@ -5244,7 +5326,8 @@ export function StepGame(state, input, dt) {
   // 小活物的一次性动画：麻雀炸窝、母鸡扑棱、田鼠蹿走——各自跑完就清
   for (const key of ["sparrowBurst", "henFlee", "mouseFlee", "vaultDust", "elmRain"]) {
     const fx = state[key];
-    if (fx && (fx.t += dt) > 2.2) state[key] = null;
+    // 各自的时长：麻雀炸窝两秒二就散干净了，榆钱要飘、要落地、要在布上留一会儿
+    if (fx && (fx.t += dt) > (fx.life ?? 2.2)) state[key] = null;
   }
   // 一阵看得见的风（开场吹倒门那一镜等）：时长自带，吹完就散。
   // 摆在这一段是有讲究的——它要在**过场里**也走表（下面 cinematic 分支会早退）
@@ -7027,7 +7110,17 @@ export function GetObjective(state) {
 
 export function GetHint(state) {
   if (state.phase !== "playing") return null;
-  return CurrentBeatDef(state)?.hint || null;
+  const def = CurrentBeatDef(state);
+  if (!def) return null;
+  // 链式节拍：走到哪一步，提示就说哪一步的话。一条链横跨两个地方时
+  //（找吃的：西头烧塌的牲口棚 → 回家下窖），钉死一句提示到后半程就是错的——
+  //  人已经在窖里摸搁板，HUD 还写着"先去西头翻翻牲口棚"。
+  //  步骤不写 hint 就照旧用节拍那句，老节拍一个字都不用改
+  if (def.kind === "chain") {
+    const st = def.steps?.[state.beat.stepIndex];
+    if (st?.hint) return st.hint;
+  }
+  return def.hint || null;
 }
 
 export function GetBeatTarget(state) {

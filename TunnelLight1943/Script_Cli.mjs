@@ -582,10 +582,14 @@ async function CmdShot(o) {
       if (o.eval) {
         const r = await page.evaluate((src) => {
           const tl = window.TunnelLight;
-          // eslint-disable-next-line no-new-func
-          const fn = new Function("tl", "state", "world", `return (${src})`);
-          try { return { ok: fn(tl, tl.state, tl.world) }; }
-          catch (e) {
+          // 先当表达式试，不成再当函数体。**两次 new Function 都得包在 try 里**：
+          // 它是在构造那一刻就抛 SyntaxError 的，摆在 try 外面等于"函数体那条路
+          // 从来没走通过"——整个 evaluate 当场炸掉，报的还是一串没头没脑的
+          // new Function 栈（2026-08-12 拿它设 state.elmRain 时撞上的）
+          try {
+            // eslint-disable-next-line no-new-func
+            return { ok: new Function("tl", "state", "world", `return (${src})`)(tl, tl.state, tl.world) };
+          } catch (e) {
             try {
               // eslint-disable-next-line no-new-func
               return { ok: new Function("tl", "state", "world", src)(tl, tl.state, tl.world) };
