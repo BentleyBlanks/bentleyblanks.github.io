@@ -1,5 +1,7 @@
 # Tunnel Light 1943 — Heavy Mood Concept Shots
 
+> Historical concept-batch record. The corresponding permanent gameplay screenshots and the legacy batch-capture script were removed on 2026-08-12. Future existing-scene art must capture the current deployed game during that production batch; use these heavy images only as style and mood references.
+
 ## Output
 
 - Generator: built-in ImageGen (`image_gen`), one independent edit call per image

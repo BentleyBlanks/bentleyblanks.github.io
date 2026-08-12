@@ -1,5 +1,7 @@
 # Tunnel Light 1943 Style Concept Shots
 
+> Historical concept-batch record. The corresponding permanent gameplay screenshots and the legacy batch-capture script were removed on 2026-08-12. Future existing-scene art must capture the current deployed game during that production batch; do not treat this document or the concept images as evidence of the latest gameplay state.
+
 ## Output
 
 - Generator: built-in ImageGen (`image_gen`), one independent call per image
