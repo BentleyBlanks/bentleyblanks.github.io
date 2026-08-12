@@ -3821,7 +3821,7 @@ export const SCRIPTS = {
             if (sis) { sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 30.5;
             state.player.heading = 1;
-            FlashPose(state, "kneel", 3.8);
+            FlashPose(state, "kneel", 4.6);   // 比这句台词（4.4s）长一点：短了他会在句末自己站起来
             // 收幕的光圈套在兄妹身上（不给的话圆心落在空墙上，人整个出画）
             state.irisFocus = { x: 31.0, y: 0.5 };
           } },

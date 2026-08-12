@@ -1224,20 +1224,33 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -8 * DEG; target.shinB = 96 * DEG; target.footB = 16 * DEG;
     target.thighF = -6 * DEG; target.shinF = 92 * DEG; target.footF = 14 * DEG;
   } else if (s.pose === "sleep") {
-    // 睡着：侧躺蜷着（1942 的孩子睡铺盖卷，不是四仰八叉）。
-    // 胯沉到 0.12（侧躺的胯宽），躯干放平到 86°，腿蜷成一团；
-    // 两只手收在胸前。膝、脚、头都压着算过：全落在 0.08~0.20，
-    // 贴着铺盖不悬空也不陷地（SoleLift 按膝高判、躺着自然不抬）
-    // 第三次放平（复审仍读"蜷跪/爬起"，且脚穿到铺盖线下）：病根是腿——
-    // 大腿放平了但小腿又折下去，脚戳进地面。侧躺的腿要**顺着躺的方向伸直**
-    // 只留一点膝弯：小腿世界角 ≈ −80°（大腿 −88 + 小腿 +8），脚背贴着铺盖，
-    // 整个人是一条低平的长剪影，臀不再拱起来
-    target.hipY = -0.50; target.hipX = 0.05;
-    target.torso = 88 * DEG; target.head = -78 * DEG;
-    target.armF = -70 * DEG; target.foreF = 130 * DEG;
-    target.armB = -56 * DEG; target.foreB = 112 * DEG;
-    target.thighF = -88 * DEG; target.shinF = 8 * DEG; target.footF = 4 * DEG;
-    target.thighB = -74 * DEG; target.shinB = 6 * DEG; target.footB = 4 * DEG;
+    // 睡着：**这一支只管"蜷成一团"，躺不躺是渲染层的事**——World 见到 sleep
+    // 就把整具骨架转 90°（LIE_POSES）。
+    //
+    // 2026-08-12 用户退回（「妹妹这样的动作睡觉的？」）：老版是把站姿的关节
+    // 一根一根硬掰到接近水平（躯干 88°、大腿 −88°…），实拍出来是一堆散落的
+    // 方块——袄子的下摆横着支出去、脑袋斜插在一边、小腿戳出画。这条路走了
+    // 三轮都没走通，病根不在角度：**侧视骨架的每一块都是照"竖着的人"画的**，
+    // 把关节掰平只会让贴图各躺各的。整具转过去就没这个问题——转的是同一个人，
+    // 每一块的相对关系一点没变。
+    //
+    // 所以这儿写的是"站着的时候蜷成这样"：腰含着、下巴收向胸口、膝盖提到
+    // 肚子跟前、两只手掖在下巴底下。转过 90° 之后，"朝前"就成了"朝上"，
+    // 于是膝盖朝上拱、手掖在脸前——正是孩子睡觉那个团。
+    // 角度都是**在躺下之后那个画面里**反算的（转 90° 会把"朝前"变成"朝上"，
+    // 照站姿的手感写，胳膊会直挺挺地举向天——实拍第一版正是这样）：
+    //   · 胳膊：躺下后要顺着身子朝头那边收、手停在下巴跟前
+    //     ⇒ 站姿里上臂几乎垂着（−14°）、前臂几乎折回贴着上臂（−150°）；
+    //   · 腿：躺下后膝盖朝上拱 45°、小腿再落回铺盖
+    //     ⇒ 站姿里大腿 −45°、小腿 +111°。
+    const br = Math.sin((s.breath || 0) * 0.9) * 1.2;   // 呼吸：肩背轻轻起伏
+    target.hipY = -0.02; target.hipX = 0.0;
+    target.torso = (14 + br) * DEG;
+    target.head = 14 * DEG;                 // 世界角 +28°＝下巴微收（睡着的人不仰脖）
+    target.armF = -14 * DEG; target.foreF = -150 * DEG;
+    target.armB = -6 * DEG; target.foreB = -138 * DEG;
+    target.thighF = -45 * DEG; target.shinF = 111 * DEG; target.footF = -10 * DEG;
+    target.thighB = -34 * DEG; target.shinB = 100 * DEG; target.footB = -8 * DEG;
   } else if (s.pose === "clothMouth") {
     // 跪坐着把布巾咬在嘴上压咳：kneel 的下盘（真跪版：膝着地小腿后铺），
     // 近侧手把布**举到嘴边**——布巾走 carry（HandPoint 挂点），手到哪儿布

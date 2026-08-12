@@ -21,6 +21,12 @@ import {
 // 这里只负责"照着数据把它烘出来放好"，不再自己写死尺寸与 z
 import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
 
+// 躺着的姿势：整具骨架转 90°（见 UpdateOne 里那段与 Rig 的 sleep）。
+// 新加一支"躺"的姿势时登记到这儿，别在别处另写一套旋转。
+const LIE_POSES = { sleep: true };
+const LIE_LEN = 0.90;        // 一个人躺下有多长（身长，骨架单位）
+const LIE_RISE = 0.15;       // 躺着垫起多高（半个身厚，免得半边陷进地里）
+
 const PROP_SS = SS.prop;     // 道具/遮蔽物的贴图超采样倍率（特写不糊）
 const DETAIL_SS = SS.detail; // 塌方堆、油灯这类会被特写到的小件
 // 世界内提示（气泡/目标标 / 人字标 / 楔子特写）：它们巴掌大，却总在过肩特写
@@ -2766,8 +2772,19 @@ export function CreateWorld(canvasEl) {
     // 位置压回地平面：演员脚下这条线必须与行走线道具（井台/磨盘/车）是同一条。
     // 后一排（rankDz 是负的）是**有意**站在更靠后的地面上，PlaceZ 会原样放行——
     // 那点抬高正是"两人并排"读得出来的原因。
-    s.mesh.position.set(x, y, PlaceZ(ACTOR_Z + dz));
     const bs = extra.bodyScale || s.bodyScale || 1;
+    // 躺着：**整具骨架转 90°**，不是把关节一根根掰平（那条路走了三轮都没走通，
+    // 出来是一堆散落的方块——见 Rig 的 sleep 那一段）。转整具的好处是每一块的
+    // 相对关系一点没变：躺下的还是那个人。
+    // 方向：站着朝哪边，就往**背后**倒下去（人躺下是仰面朝天，不是脸埋进被窝），
+    // 所以头落在朝向的反侧、肚子朝上。
+    const lie = LIE_POSES[extra.pose] ? (heading >= 0 ? 1 : -1) : 0;
+    s.mesh.rotation.z = lie * Math.PI / 2;
+    // 转完之后原点还在脚底下、脊梁正压在地平线上：往躺倒的方向挪半个身长把人
+    // 摆正（锚点落在腰上），再垫起半个身厚，免得半个人陷进铺盖里
+    const lieDx = lie * LIE_LEN * 0.5 * bs;
+    const lieDy = lie ? LIE_RISE * bs : 0;
+    s.mesh.position.set(x + lieDx, y + lieDy, PlaceZ(ACTOR_Z + dz));
     s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
     if (s.shadow) {
       // 地下没有太阳，脚下这团只负责"他确实站在地上"
@@ -2775,9 +2792,11 @@ export function CreateWorld(canvasEl) {
       // 人离地了影子就该缩、该淡——这是"他真的上去了"最便宜也最有效的一笔
       const air = Math.min(1, lift / 1.1);
       s.shadow.visible = true;
-      s.shadow.scale.set(bs * (1 - air * 0.42), bs * (under ? 0.55 : 1) * (1 - air * 0.42), 1);
+      // 躺着的人影子摊在整个身长下面（脚底下那一小团会读成"人浮在铺盖上"）
+      s.shadow.scale.set(bs * (1 - air * 0.42) * (lie ? 2.2 : 1),
+        bs * (under ? 0.55 : 1) * (1 - air * 0.42) * (lie ? 0.6 : 1), 1);
       s.shadow.position.set(
-        x + (under ? 0 : SUN.dx * 0.55) * bs,
+        x + lieDx + (under ? 0 : SUN.dx * 0.55) * bs,
         ground + 0.015,
         PlaceZ(ACTOR_Z + dz) - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
       );
