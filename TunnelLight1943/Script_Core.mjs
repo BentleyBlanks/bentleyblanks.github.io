@@ -59,6 +59,13 @@ export const CHAPTERS = [
 // 门槛只由外壳（Script_Main）把守——把这个数改成 CHAPTERS.length 就全开了。
 export const PLAYABLE_CHAPTERS = 2;
 
+// 开局放不放序章那两分钟历史短片。2026-08-12 用户：「关闭序章的过场动画
+// （暂不需要显示）」。**关的只是自动播这一下**：PROLOGUE_SCRIPT、11 段短片、
+// 已烘的配音、SkipPrologue 那条路全都原样留着——想开回来把这行改成 true 即可，
+// 别去删脚本。关着的时候 CreateGame(0) 直接落在「第一章」那张卡上，
+// Script_Main 也不再预拉那 11 段片子（省一整轮下载）。
+export const PLAY_PROLOGUE = false;
+
 // 征夫告示的逐字转录：阅读层右栏的权威版本——铅字排出来给玩家读，
 // 不指望生成图上的毛笔小字（关卡设计文档明令「右侧文字是权威版本」）。
 // 不配柱子朗读旁白：他识不识字是人物设定，不该由一块 UI 替他决定。
@@ -4825,7 +4832,7 @@ export function CreateGame(chapterIndex = 0) {
   // 从头开局先播序章。放完 EndChapter 会回头 StartChapter(0)，「第一章」那张卡
   // 到那时才亮——玩家看见章名时，序章已经把家史交代完了。跳幕或从别的章进来
   // 一律不放：它讲的是开场之前的事，从中途看没有意义。
-  if (chapterIndex === 0) EnterPrologue(state);
+  if (chapterIndex === 0 && PLAY_PROLOGUE) EnterPrologue(state);
   return state;
 }
 
@@ -5077,7 +5084,9 @@ function AdvanceBeat(state) {
 }
 
 // 进序章：换到序章那份脚本、直接开演（不出章节卡——它没有章号）。
-function EnterPrologue(state) {
+// 导出是给测试用的：PLAY_PROLOGUE 关着的时候开局不再自动进来，但这套机制
+// 仍要有人盯着（跳过、放完落回第一章卡），否则开回来那天就是一片废墟。
+export function EnterPrologue(state) {
   state.inPrologue = true;
   state.beatIndex = 0;
   state.phase = "playing";

@@ -4,4 +4,10 @@
 // 环境声跟着「音效」那根滑杆走，所以只能从基准上压——压滑杆会把刚做的
 // 动作音一起带下去。music 一并收一档：BGM 是底色，不该压住旁白。
 export const AUDIO_BUS_BASE = Object.freeze({ music: 0.42, amb: 0.34, sfx: 0.68, voice: 1 });
-export const AUDIO_DEFAULT_LEVELS = Object.freeze({ voice: 100, sfx: 80, music: 60 });
+// 2026-08-12 用户：「先把音乐、音效默认关闭」。两路默认电平归零——
+// 环境声（风那条底噪）跟着「音效」这根滑杆走，所以一并静了。
+// **旁白不动**：关的是背景声，不是叙事本身。
+// 提醒：这里改的是**默认值，只对没动过滑杆的玩家生效**（动过的存在
+// localStorage 的 tunnelLight1943.vol 里，那是玩家自己的选择，不该覆盖）。
+// 要连已有设置一起压，得动上面那条 AUDIO_BUS_BASE。
+export const AUDIO_DEFAULT_LEVELS = Object.freeze({ voice: 100, sfx: 0, music: 0 });

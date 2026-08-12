@@ -15,6 +15,7 @@ import {
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments, AllRelics, PROLOGUE_SCRIPT, PROLOGUE_CLIPS, SkipPrologue,
+  EnterPrologue, PLAY_PROLOGUE,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -238,10 +239,12 @@ function TestSingleChapterEntry() {
   for (let i = 0; i < CHAPTERS.length; i += 1) {
     const state = CreateGame(i);
     assert.equal(state.chapterIndex, i);
-    // 从头开局先播序章（它不属于任何一章，见 PROLOGUE_SCRIPT）：直接进 playing，
-    // 放完才亮「第一章」那张卡。跳幕/从别的章进来一律不放，一进来就是章节卡。
-    if (i === 0) {
-      assert.ok(state.inPrologue, "从头开局应当先进序章");
+    // 序章不属于任何一章（见 PROLOGUE_SCRIPT），开局放不放由 PLAY_PROLOGUE 定：
+    // 开着＝第一章之前直接进 playing 放序章，放完才亮「第一章」那张卡；
+    // 关着＝一进来就是章节卡（2026-08-12 用户要求暂时关掉）。
+    // 无论开关，**跳幕/从别的章进来一律不放**——它讲的是开场之前的事。
+    if (i === 0 && PLAY_PROLOGUE) {
+      assert.ok(state.inPrologue, "序章开着时，从头开局应当先进序章");
       assert.equal(state.phase, "playing");
       assert.equal(CurrentBeatDef(state).id, "prologue");
     } else {
@@ -250,7 +253,7 @@ function TestSingleChapterEntry() {
     }
     StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   }
-  console.log("  ✓ 八个章节均可独立启动（第一章之前先放序章）");
+  console.log(`  ✓ 八个章节均可独立启动（序章${PLAY_PROLOGUE ? "开着：第一章之前先放" : "关着：开局直接上第一章的卡"}）`);
 }
 
 // 序章是**独立于八章之外**的一段（2026-08-12 从 SCRIPTS.c1 拆出）。拆之前它是
@@ -265,8 +268,11 @@ function TestPrologueStandsOutsideChapters() {
       assert.ok(!def.prologue, `${id} 里不该再有序章那一拍（${def.id}）`);
     }
   }
-  // 跳过：整段结算掉，落到「第一章」的章节卡，当前拍变成 c1 的第 0 拍
+  // 跳过：整段结算掉，落到「第一章」的章节卡，当前拍变成 c1 的第 0 拍。
+  // **手动进序章**再跳——PLAY_PROLOGUE 关着时开局不会自动进来，但这套机制
+  // 仍要有人盯着：等哪天开回来，跳过与落点得还是好的
   const skipped = CreateGame(0);
+  EnterPrologue(skipped);
   assert.ok(SkipPrologue(skipped), "序章应当可跳过");
   assert.ok(!skipped.inPrologue, "跳完就不在序章里了");
   assert.equal(skipped.phase, "chapterCard", "跳完亮「第一章」的卡");
@@ -1827,10 +1833,12 @@ function TestQuieterAudioMix() {
   // 它跟「音效」滑杆共用一个电平，所以只能从基准压：压滑杆会把动作音一起带走
   assert.ok(AUDIO_BUS_BASE.amb <= 0.34, "环境声总线必须保持在降低后的基准");
   assert.ok(AUDIO_BUS_BASE.music <= 0.42, "配乐总线必须保持在降低后的基准");
-  assert.equal(AUDIO_DEFAULT_LEVELS.sfx, 80, "新玩家的默认音效应为 80%");
-  assert.equal(AUDIO_DEFAULT_LEVELS.voice, 100, "降低背景声不应压低旁白");
-  assert.ok(AUDIO_DEFAULT_LEVELS.music <= 60, "新玩家的默认配乐不应高于 60%");
-  console.log("  ✓ 音效与环境声降噪混音契约");
+  // 2026-08-12 用户：「先把音乐、音效默认关闭」——两路默认电平归零。
+  // 环境声跟着「音效」滑杆走，所以风那条底噪也一并静了
+  assert.equal(AUDIO_DEFAULT_LEVELS.sfx, 0, "音效默认关闭");
+  assert.equal(AUDIO_DEFAULT_LEVELS.music, 0, "配乐默认关闭");
+  assert.equal(AUDIO_DEFAULT_LEVELS.voice, 100, "关的是背景声，不是旁白");
+  console.log("  ✓ 音效与环境声降噪混音契约（音乐/音效默认关闭）");
 }
 
 // 提示的写法：键名只许出现在 `E · ` 这个前缀里，由 HUD 按输入设备翻成

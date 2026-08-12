@@ -3,7 +3,7 @@
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
-  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
+  ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, PLAY_PROLOGUE, SCRIBE_CARD, PLANE_CARD,
   KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
 import { DrawRelic } from "./Script_Art.mjs";
@@ -15,8 +15,9 @@ import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
-// 序章过场短片：登记片单，开局先把第一段拉下来，正片一开口就有画面
-world.SetInsertVideoList(PROLOGUE_CLIPS);
+// 序章过场短片：登记片单，开局先把第一段拉下来，正片一开口就有画面。
+// 序章关着的时候交一张空单——那 11 段片子一段也不会放，没必要开局就去拉
+world.SetInsertVideoList(PLAY_PROLOGUE ? PROLOGUE_CLIPS : []);
 // 声音是增强项，不是依赖：合成器加载失败（旧浏览器、被拦的 WebAudio、
 // 资源没部署上去）时游戏必须照常能玩，所以走动态 import + 静音替身。
 const SILENT = {
