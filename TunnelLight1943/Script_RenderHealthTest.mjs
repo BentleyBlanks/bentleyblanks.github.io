@@ -142,6 +142,53 @@ for (const [pose, label] of [["throwWind", "投石蓄力"], ["planePush", "刨�
 }
 
 // ---------------------------------------------------------------------------
+// 「手真的落在那件东西上」——挂点姿势的自动验
+//
+// 2026-08-12 换来的：找吃的那三道手第一版胳膊按角度表摆在半空，画面上是"对着
+// 一片草空划拉"；睡姿第一版手直挺挺举向天。这类错**眼睛要盯着截图才看得出**，
+// 可它其实是可算的：Core 每帧发布挂点（forage.<件>.grip），渲染层把手 IK 上去，
+// 那就该有 |handAt − grip| ≈ 0。差得远＝这一支姿势忘了 AimFrontHand。
+//
+// 冻帧是这条测试的前提：StepGame 每帧会把 state.forage 清成 null（由链重新发布），
+// 不冻的话刚塞进去的挂点下一帧就没了。
+// ---------------------------------------------------------------------------
+const GripHit = (pose, part, gx, gy) => page.evaluate(({ p, k, x, y }) => {
+  const tl = window.TunnelLight;
+  const st = tl.state;
+  tl.Freeze(true);
+  st.player.level = "surface";
+  st.player.x = x + 0.42;
+  st.player.heading = -1;
+  for (let i = 0; i < 40; i += 1) {
+    st.player.pose = p; st.player.poseT = 9; st.player.poseU = 0.5; st.player.poseK = 0.5;
+    st.forage = { mat: {}, plank: {}, ash: {} };
+    st.forage[k] = { grip: { x, y } };
+    tl.Tick(1, 1 / 30);
+  }
+  const h = st.handAt ? { x: +st.handAt.x.toFixed(3), y: +st.handAt.y.toFixed(3) } : null;
+  tl.Freeze(false);
+  st.player.pose = null; st.player.poseT = undefined;
+  return h;
+}, { p: pose, k: part, x: gx, y: gy });
+
+for (const [pose, part, label] of [["heaveMat", "mat", "掀苫草"], ["dragPlank", "plank", "拖门板"],
+  ["scoopAsh", "ash", "扒烧土"]]) {
+  const gx = 20, gy = 0.42;
+  const h = await GripHit(pose, part, gx, gy);
+  const d = h ? Math.hypot(h.x - gx, h.y - gy) : Infinity;
+  if (!h) {
+    failed += 1;
+    console.error(`✗ ${label}：渲染层没有回填 state.handAt`);
+  } else if (d > 0.18) {
+    failed += 1;
+    console.error(`✗ ${label}：手离挂点 ${d.toFixed(2)}m——这一支姿势没把手 IK 到那件东西上`
+      + "（Rig 里补 AimFrontHand，World 的 FORAGE_GRIP 里登记）");
+  } else {
+    console.log(`✓ ${label} 手真落在挂点上（差 ${d.toFixed(2)}m）`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 地下机位不许有前景层
 //
 // 2026-08-10 用户报的「镜头前面两根白白的模糊一坨」：fore 层的草丛/篱笆按

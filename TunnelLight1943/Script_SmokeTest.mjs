@@ -1248,6 +1248,35 @@ function TestFoldIsHandsOnCloth() {
 // ①四道手真是四个动词、链上一个 hold 都不剩 ②长按 E 一点用没有
 // ③按下那一帧手不在实物上就攥不住 ④掀猛了焦草会撕 ⑤门板的卡口硬拖过不去
 // ⑥扒土是一下一下的（按住不放只算一下）⑦解扎口转反了是往紧里缠。
+// 「玩家要伸手去够的东西，得先认得出它是件东西」——这条一直只写在 CLAUDE.md 里
+// 靠人记，2026-08-12 又栽了一次（苫子第一版平摊在地上，屏幕上十来个像素高，
+// 跟脚底下的影子分不开，实拍三轮才发现）。它其实是**一道算术**：
+//   屏幕像素 = 实际尺寸 ÷ 画宽 × 1600。玩法景别画宽 12.3m ⇒ 130px/米。
+// 低于 130px（＝1 米，约十分之一个画宽）就别指望玩家认得出——所以这类东西的
+// 尺寸必须在写代码时就过一遍，不是等实拍。新加"能上手的大件"就往这张表里添。
+function TestGrabbablesAreBigEnoughToRead() {
+  const VIEW_W = 12.3;          // 玩法景别画宽（BaseShot 的 hw 6.15 ×2）
+  const PX = 1600 / VIEW_W;     // 130 px/米
+  const MIN_PX = 128;
+  const items = [
+    ["苫草（整片）", FORAGE.mat.half * 2],
+    ["苫草（架起来的高度）", (FORAGE.mat.pivotY + Math.abs(Math.sin(FORAGE.mat.restA)) * FORAGE.mat.half) * 2.4],
+    ["门板", FORAGE.plank.len],
+    ["烧土堆", FORAGE.ash.half * 2],
+  ];
+  for (const [name, m] of items) {
+    const px = m * PX;
+    assert.ok(px >= MIN_PX,
+      `「${name}」在玩法景别里只有 ${px.toFixed(0)}px（${m.toFixed(2)}m）——`
+      + `低于 ${MIN_PX}px 玩家认不出这是能上手的东西，推镜头也治不好（CLAUDE.md 拟物交互第 4 条）`);
+  }
+  // 攥得住的判定圈也要够手指点：手机上 130px/米，0.44m ≈ 57px 直径，刚过拇指下限
+  for (const [name, r] of [["苫草外沿", FORAGE.mat.grabR], ["门板头", FORAGE.plank.grabR], ["土堆", FORAGE.ash.grabR]]) {
+    assert.ok(r * PX * 2 >= 44, `「${name}」的攥取判定圈只有 ${(r * PX * 2).toFixed(0)}px，手指点不着`);
+  }
+  console.log(`  ✓ 能上手的大件都认得出（最小 ${Math.min(...items.map(([, m]) => m * PX)).toFixed(0)}px ≥ ${MIN_PX}px）`);
+}
+
 function TestForageIsHandsOn() {
   const beat = SCRIPTS.c1.find((b) => b.id === "c1_forage");
   const Setup = (stepIndex) => {
@@ -2712,6 +2741,7 @@ TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 TestKnotIsASheetBend();
 TestFoldIsHandsOnCloth();
+TestGrabbablesAreBigEnoughToRead();
 TestForageIsHandsOn();
 TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
