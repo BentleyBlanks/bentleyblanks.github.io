@@ -137,6 +137,68 @@ async function CmdBeats(o) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// export：把某一章**以代码为准**导成 Markdown，用来回写 Notion 的剧本/关卡页。
+// 台词的唯一真相在 SCRIPTS 里，人工誊抄必错（而且每次回写都要重抄一遍）。
+// 输出两段：台词逐句（含时长/说话人/镜头）、关卡骨架（每拍的玩法与判定区）。
+// ---------------------------------------------------------------------------
+function ZoneBrief(z) {
+  if (!z) return "";
+  const lv = z.level === "under" ? "地下" : "地表";
+  return `x=${z.x}${z.w ? ` 宽${z.w}` : ""} ${lv}${z.label ? ` 「${z.label}」` : ""}`;
+}
+
+async function CmdExport(o) {
+  const C = await Core();
+  const want = o._[0];
+  const out = [];
+  for (let ci = 0; ci < C.CHAPTERS.length; ci += 1) {
+    const ch = C.CHAPTERS[ci];
+    if (want && want !== ch.id && want !== String(ci + 1)) continue;
+    const beats = C.SCRIPTS[ch.id] || [];
+    out.push(`# ${ch.title}（${ch.id}）  ${ch.year || ""}  场景=${ch.scene} 光=${ch.light}  共 ${beats.length} 拍`);
+    beats.forEach((def, bi) => {
+      out.push(`\n## ${bi}. ${def.id}  · ${def.kind}${def.when ? "（分支拍）" : ""}`);
+      if (def.objective) out.push(`- 目标：${def.objective}`);
+      if (def.hint) out.push(`- 提示：${def.hint}`);
+      if (def.zone) out.push(`- 判定区：${ZoneBrief(def.zone)}`);
+      if (def.dest) out.push(`- 终点：${ZoneBrief(def.dest)}`);
+      if (def.holdTime) out.push(`- 按住 ${def.holdTime}s${def.sustain ? "（维持型，量的是时间不是功）" : ""}；提示语「${def.holdPrompt || ""}」`);
+      if (def.flagKey) out.push(`- 抉择写进旗标：${def.flagKey}`);
+      for (const op of def.options || []) out.push(`  - 〔${op.key}〕${op.label}——${op.detail || ""}`);
+      (def.steps || []).forEach((st, si) => {
+        const bits = [`${si}. ${st.type}`];
+        if (st.zone) bits.push(ZoneBrief(st.zone));
+        if (st.x !== undefined) bits.push(`x=${st.x}`);
+        if (st.item?.label) bits.push(`得「${st.item.label}」`);
+        if (st.needs) bits.push(`需要 ${st.needs}`);
+        if (st.stroke) bits.push(`笔画朝${st.stroke === "down" ? "下" : "上"}`);
+        if (st.hold) bits.push(`${st.hold}s`);
+        if (st.prompt) bits.push(`提示「${st.prompt}」`);
+        if (st.note) bits.push(`手记「${st.note}」`);
+        out.push(`- ${bits.join(" · ")}`);
+      });
+      const lines = def.lines || [];
+      if (lines.length) {
+        const tot = lines.reduce((s, l) => s + (l.d || 0), 0);
+        out.push(`- 台词 ${lines.length} 句 / ${tot.toFixed(1)}s：`);
+        for (const l of lines) {
+          const cam = l.cam ? `〔${l.cam.kind}${l.cam.x !== undefined ? ` x=${l.cam.x}` : ""}〕` : "";
+          const body = l.who ? `**${l.who}**：「${l.say}」` : (l.stage ? `*${l.stage}*` : "（空镜）");
+          out.push(`  - ${cam} ${body}  ${(l.d || 0).toFixed(1)}s`);
+        }
+      }
+      for (const st of def.steps || []) {
+        for (const l of st.lines || []) {
+          const body = l.who ? `**${l.who}**：「${l.say}」` : (l.stage ? `*${l.stage}*` : "（空镜）");
+          out.push(`  - （步骤内）${body}`);
+        }
+      }
+    });
+  }
+  console.log(out.join("\n"));
+}
+
 /** 在全部章节里找一拍 → {chapterIndex, beatIndex, def} */
 async function FindBeat(id) {
   const C = await Core();
@@ -624,11 +686,13 @@ const HELP = `《地道里的光》命令行工作台
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
       转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
+  export [c1|1]           把一章**以代码为准**导成 Markdown（台词逐句＋关卡骨架），
+                          用来回写 Notion 的剧本/关卡页。别人工誊抄台词
   doctor                  分支/上游/未提交/缓存戳/端口
 
 要问游戏状态先跑这个，别再现写一次性探针脚本。`;
 
-const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, doctor: CmdDoctor };
+const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, export: CmdExport, doctor: CmdDoctor };
 const fn = TABLE[cmd];
 if (!fn) { console.log(HELP); process.exit(cmd ? 1 : 0); }
 await fn(Opts(rest));
