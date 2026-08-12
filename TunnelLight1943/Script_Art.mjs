@@ -1468,7 +1468,9 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
   } else if (label === "小褂子") {
     // 缝好的小褂子抱在臂弯里（缝·改抱去枕边那一程）：暗红一小卷，
     // 一只袖口露出一截蓝底白花——色照 DrawMendedJacket 那族压暗。
-    // 往手下方挂（+y），别对称压在挂点上（破袄子的老账：压住半张脸）
+    // 整卷再往手下方沉 4.5：坐着缝那几镜挂点高，不压住脸（二轮视觉审查）
+    ctx.save();
+    ctx.translate(0, 4.5 * S);
     InkFill(ctx, [[-7 * S, 6.5 * S], [-7.5 * S, 1.2 * S], [-4.5 * S, -1 * S], [3.5 * S, -0.8 * S],
       [6.8 * S, 1 * S], [7.2 * S, 6.2 * S], [0, 7.6 * S]],
     "mjkBody", "#4a262d", { amp: 0.8 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.24)" });
@@ -1490,6 +1492,7 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     // 接口的针脚一两针
     InkLine(ctx, 5.2 * S, 3.8 * S, 5.6 * S, 5.8 * S, "mjkStitch",
       { lw: 0.7 * S, color: "rgba(196,186,160,0.7)", amp: 0.4 });
+    ctx.restore();
   } else {
     InkFill(ctx, Rect(-26 * S, -3.2 * S, 52 * S, 6.4 * S), "plank", "#a8794a",
       { amp: 0.6 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.14)" });

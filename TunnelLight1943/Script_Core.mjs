@@ -4744,10 +4744,12 @@ export const SCRIPTS = {
           on: (state) => {
             const q = FindActor(state, "qishu");
             // 拍那一下要有抬臂（mark=抬臂点着，落在孩子后脑勺的高度上）；
-            // 站进一臂之内（0.8m），隔远了抡就是各做各的操（接触戏第 1 条）
-            if (q) { q.pose = "mark"; q.x = 46.85; q.heading = -1; }
+            // 一臂出头（1.1m）——再近两个人在侧视里叠成一个人形（二轮审查）
+            if (q) { q.pose = "mark"; q.x = 47.2; q.heading = -1; }
             state.player.x = 46.1;
             state.player.heading = 1;
+            // 挨那一下：脑袋跟着缩一下，拍没拍上画面自己说
+            FlashPose(state, "bow", 2.2);
             Cue(state, "pickup", { gain: 0.3, rate: 0.7, delay: 1.2 });
           } },
         { who: "七叔", say: "铃一响就躲，好小子。……吓死个人。", d: 4.2,
@@ -4791,27 +4793,27 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 47.8, y: 1.25, dist: 4.2 },
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.cineTarget = { x: 49.2 }; q.cineSpeed = 1.8; q.heading = 1; }
+            if (q) { q.cineTarget = { x: 47.6 }; q.cineSpeed = 1.8; q.heading = 1; }
           } },
         { who: "七叔", say: "你家那二亩地，明儿我把牲口牵过来。", d: 3.8,
-          cam: { kind: "shot", x: 48.6, y: 1.2, dist: 3.8 },
+          cam: { kind: "shot", x: 47.4, y: 1.2, dist: 3.6 },
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.cineTarget = null; q.x = 49.2; q.heading = -1; }
+            if (q) { q.cineTarget = null; q.x = 47.6; q.heading = -1; }
           } },
         { who: "柱子", say: "七叔——", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         { who: "七叔", say: "你爹那年借我三斗谷子。还没还。", d: 3.4,
-          cam: { kind: "insert", x: 49.2, y: 1.15, dist: 2.6 },
+          cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 },
           on: (state) => {
             // 插入镜里必须有他本人（首轮视觉审查抓过空墙）：钉死站位朝向
             const q = FindActor(state, "qishu");
-            if (q) { q.visible = true; q.cineTarget = null; q.x = 49.2; q.heading = -1; }
+            if (q) { q.visible = true; q.cineTarget = null; q.x = 47.6; q.heading = -1; }
           } },
         { who: "柱子", say: "俺爹没……", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         { who: "七叔", say: "我说有。就有。", d: 2.8,
-          cam: { kind: "insert", x: 49.2, y: 1.15, dist: 2.4 } },
+          cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
         { stage: "他说完就走了。没等柱子再张嘴。", d: 3.2,
           cam: { kind: "shot", x: 50.5, y: 1.25, dist: 4.4 },
           on: (state) => {
@@ -5102,12 +5104,13 @@ export const SCRIPTS = {
         // 很快，就一下。
         { type: "use", zone: { x: 27.6, w: 2.2, level: "under" }, prompt: "E · 掀开草苫",
           effect: (state) => {
+            // 旗标落 effect；carry 是画面，只在微过场行里挂/收——落在 effect 里
+            // 的话跳幕结算会把一块"整布"永远糊在手上（二轮视觉审查的悬空蓝板）
             state.flags.clothOut = true;
-            state.player.carry = "整布";
             Cue(state, "clothLift", { gain: 0.5, rate: 0.8 });
             StartMicroCine(state, [
               { stage: "", d: 2.6, cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.0 },
-                on: (s) => { FlashPose(s, "kneel", 2.4); } },
+                on: (s) => { s.player.carry = "整布"; FlashPose(s, "kneel", 2.4); } },
               // 拖到光条底下（窖口那格月光）
               { stage: "", d: 2.8, cam: { kind: "shot", x: 29.4, y: UNDER_Y + 1.05, dist: 3.2 },
                 on: (s) => { s.player.cineWalk = { x: 29.7, speed: 1.1 }; } },
@@ -5181,12 +5184,14 @@ export const SCRIPTS = {
           cam: { kind: "close", on: "player", dist: 3.2 } },
         { who: "妹妹", say: "我喊你了。可大声了。", d: 3.2,
           cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
-        // 景别退到 2.6：骨架的鞋画不出赤脚，推太近字幕当场穿帮——
-        // 这一镜给她整个小身量，「光着脚」交给句子（首轮视觉审查抓的矛盾）
+        // 机位抬到上身：骨架的鞋画不出赤脚，脚入画就跟字幕打架——
+        // 「光着脚」交给句子，镜头看她抱着袄子的小身量（两轮视觉审查定的）
         { stage: "她光着脚，就站在那儿，脚趾头在土里一下一下地抓。", d: 3.8,
-          cam: { kind: "insert", x: 27.9, y: 0.6, dist: 2.6 } },
+          cam: { kind: "insert", x: 27.9, y: 1.05, dist: 2.2 } },
+        // 双人镜别用过肩：窖口这一对离得近、又一高一矮，过肩的前景剪影
+        // 立不住（二轮审查：柱子整个不在框里）——平拍双人，两人都在画里
         { who: "妹妹", say: "我当你也走了。", d: 3.2,
-          cam: { kind: "ots", subject: "sister", other: "player", dist: 3.0 } },
+          cam: { kind: "shot", x: 28.6, y: 1.05, dist: 2.9 } },
         { stage: "柱子张了张嘴。", d: 2.0,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         { who: "柱子", say: "……没走。", d: 2.6,
@@ -7754,6 +7759,7 @@ export function StepGame(state, input, dt) {
   state.knotCard = null;  // 同 winchView：接绳那张活卡由 beat 每帧重立
   state.foldCard = null;  // 叠衣裳那张同理
   state.wrapCard = null;  // 解扎口那张活卡同理
+  state.splitCard = null; // 掰红薯干那张同理（漏了这行换拍不撤卡——二轮视觉审查连坐六图）
   state.forage = null;    // 翻找那一场的三样东西：由链每帧重新发布（换拍就没了）
   state.stamina = null;   // 手劲读数同理：吊着桶的那一帧自己立
   state.closeUp = null;   // 玩法特写（辘轳/打结）同理：活着的那一帧自己立
@@ -10178,6 +10184,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.planeCard = null;
   state.knotCard = null;
   state.foldCard = null;
+  state.splitCard = null;
   state.closeUp = null;
   state.canDrop = false;
   state.bubbleFlash = null;
