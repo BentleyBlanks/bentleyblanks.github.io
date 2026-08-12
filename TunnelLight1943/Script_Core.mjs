@@ -7340,6 +7340,10 @@ export function StartChapter(state, index) {
       MakeActor("sister", "sister", 31.2, { label: "妹妹", heading: 1 }),
       MakeActor("mother", "family", 38.5, { label: "娘", visible: false }),
       MakeActor("wounded", "villager", 27.1, { label: "伤员", level: "under", heading: -1, visible: false }),
+      // 七叔在回程一场登场（他也蹲在墙根后）。**必须建在这儿**：
+      // FindActor 找不到人时所有走位静默空转——三轮视觉审查里"七叔缺席"
+      // 查到最后，是这一行从来没写（前两轮画面里那个"七叔"其实是柱子）
+      MakeActor("qishu", "villager", 52.2, { label: "七叔", visible: false }),
       MakeActor("farmerEast", "villager", 184.0, {
         label: "东邻", heading: 1, carry: "锄头",
         track: { name: "hoeing", t: 0, ambient: true },
