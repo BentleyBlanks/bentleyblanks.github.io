@@ -1520,6 +1520,17 @@ export function CreateWorld(canvasEl) {
         break;
       }
       case "millstone": mk((ctx, ax, ay) => ART.DrawMillstone(ctx, ax, ay, p.id)); break;
+      case "spreadCoat": {
+        // 铺在榆树下接榆钱的褂子：砸下第二把（flags.elmDown）布面铺一层绿。
+        // 出没走 showFlag/hideFlag（flagProps），绿那一层走 propRedraw 单张重烘
+        const Paint = (ctx, ax, ay, green) => ART.DrawSpreadCoat(ctx, ax, ay, p.id, { green });
+        const coatMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.elmDown));
+        propRedraw.push({
+          flag: "elmDown", last: !!state?.flags.elmDown,
+          run: (st) => RedrawProp(coatMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.elmDown)),
+        });
+        break;
+      }
       case "woodpile": {
         // 第一章打水链：麻绳绳头从堆里露出一截（目标同屏露一角），拿走就没了
         const Paint = (ctx, ax, ay, taken) => {

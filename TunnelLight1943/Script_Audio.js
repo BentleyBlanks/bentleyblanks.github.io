@@ -897,6 +897,18 @@ function Build(ac, options) {
       }
       Tone(t + 0.1, { level: 0.03 * k, attack: 0.01, decay: 0.12, type: "sine", freq: 3400, to: 4200, pan });
     },
+    // 空肚子叫：小孩那种咕噜噜的空响——三两声软的、滚下去的低音，
+    // 不是大人的闷雷（第一章开场黑屏里的那一声）
+    bellyGrowl(t, k, pan) {
+      for (let i = 0; i < 3; i += 1) {
+        const at = t + i * 0.24 + Rand(0, 0.05);
+        Tone(at, {
+          level: (0.055 - i * 0.009) * k, attack: 0.06, decay: 0.26,
+          type: "sine", freq: 205 - i * 36 + Rand(-10, 10), to: 84, pan,
+        });
+      }
+      NoiseHit(t + 0.12, { level: 0.012 * k, attack: 0.09, decay: 0.34, freq: 320, sweep: 130, q: 3, pan });
+    },
     // 憋着的哭：压低的两下抽气——不是哭声，是不许自己哭出声的呼吸
     sobBreath(t, k, pan) {
       NoiseHit(t, { level: 0.05 * k, attack: 0.09, decay: 0.16, freq: 700, sweep: 380, q: 2.4, pan });

@@ -730,6 +730,18 @@
         "baseline": 5
       },
       "note": "窖角草苫下的深色包袱（带血的衣裳）：第一章夜里唯一的特写；埋掉后 hideFlag 收走。渍色按 sRGB 老账压两档，不做清晰血污"
+    },
+    "spreadCoat": {
+      "art": "DrawSpreadCoat",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 22,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "铺在榆树底下接榆钱的破褂子（2026-08-12 打榆钱拆场）：showFlag=coatSpread 出、hideFlag=elmBagged 收；砸下第二把后 propRedraw 铺一层绿（flags.elmDown）"
     }
   },
   "_coversNote": [

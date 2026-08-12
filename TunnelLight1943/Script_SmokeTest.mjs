@@ -743,7 +743,8 @@ function TestVaultC1() {
 // 后面那截绳头捡不起来、按 E 毫无反应——玩家只会以为游戏坏了。
 function TestChainSurvivesEarlyDrop() {
   const state = CreateGame(0);
-  const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+  // 拎桶那一步 2026-08-12 挪进了打榆钱那一拍（c1_elm）
+  const well = ChapterBeatList(0).find((b) => b.id === "c1_elm");
   DebugJump(state, 0, well.index);
   const step = (input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
@@ -768,10 +769,11 @@ function TestChainSurvivesEarlyDrop() {
   sis.cineTarget = null; sis.x = 55.4;
   state.player.x = sis.x; step({}, 3); step({ interact: true });
   for (let i = 0; i < 400 && state.microCine; i += 1) step({ advance: true });
-  // 走到井台：这一步要桶——撂在半路的桶必须有气泡标着、提示也得说清缺什么
-  state.player.x = SCENES.village.zones.well.x - 0.5; step({}, 6);
+  // 站到榆树底下：下一步（搁下桶）要桶——撂在半路的桶必须有气泡标着、
+  // 提示也得说清缺什么
+  state.player.x = SCENES.village.zones.wellElm.x; step({}, 6);
   assert.ok(state.prompt && /缺/.test(state.prompt),
-    `空着手站上井台必须说缺什么，实为 ${JSON.stringify(state.prompt)}`);
+    `空着手站到榆树底下必须说缺什么，实为 ${JSON.stringify(state.prompt)}`);
   const marked = state.bubbles.some((b) => b.icon === "item:空水桶");
   assert.ok(marked, "撂在半路的桶必须挂气泡标出来");
   // 走回去真的能捡起来，链接着走
@@ -783,7 +785,8 @@ function TestChainSurvivesEarlyDrop() {
 
 function TestGroundItems() {
   const state = CreateGame(0);
-  const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
+  // 拎桶那一步 2026-08-12 挪进了打榆钱那一拍（c1_elm）
+  const well = ChapterBeatList(0).find((b) => b.id === "c1_elm");
   DebugJump(state, 0, well.index);
   const step = (input = {}, n = 1) => {
     for (let i = 0; i < n; i += 1) {
@@ -950,8 +953,8 @@ function TestKnotIsASheetBend() {
     const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
     DebugJump(state, 0, well.index);
     // 直接把链推进到接绳那一步：桶已搁下、磨损处已折回（备用绳就在桶底）。
-    // 新链在头里多了「拎起空桶」，接绳从第 3 步挪到第 4 步
-    state.beat.stepIndex = 4;
+    // 2026-08-12 打榆钱拆去了 c1_elm，井台这条链从查井绳起——接绳是第 2 步
+    state.beat.stepIndex = 2;
     state.flags.wellRopeFixed = false;
     state.player.item = null;
     state.player.x = SCENES.village.zones.well.x;
@@ -1233,7 +1236,7 @@ function TestFoldIsHandsOnCloth() {
     assert.equal(state.beat.foldState.n, L.folds.length, "四下手一下都不能少");
     assert.ok(lingerSeen * DT >= L.linger - 0.2,
       `翻出印子之后卡只停了 ${(lingerSeen * DT).toFixed(2)}s，不够那一镜的 ${L.linger}s`);
-    assert.equal(state.beat.stepIndex, 2, "停够了，链才往下走（下一步是刨坑）");
+    assert.equal(state.beat.stepIndex, 2, "停够了，链才往下走（下一步是捡豁口碗）");
   }
 
   console.log("  ✓ 叠衣裳：长按无效 / 按不准拈不起 / 布有分量 / 甩快了弹回原处 / 揭苫要再抻一把 / HUD 无条");
@@ -1415,8 +1418,9 @@ function TestWinchIsACrankNotALever() {
     const state = CreateGame(0);
     const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
     DebugJump(state, 0, well.index);
-    // 直接把链推进到辘轳那一步：绳已接好、桶拾回在手里（新链整体 +1）
-    state.beat.stepIndex = 7;
+    // 直接把链推进到辘轳那一步：绳已接好、桶拾回在手里
+    //（2026-08-12 打榆钱拆去 c1_elm 之后，辘轳是第 4 步）
+    state.beat.stepIndex = 4;
     state.flags.wellRopeFixed = true;
     state.player.item = { id: "bucket", label: "空水桶" };
     state.player.x = SCENES.village.zones.well.x;
@@ -1624,7 +1628,7 @@ function TestWinchIsACrankNotALever() {
 function TestWinchIsLongEnough() {
   const state = CreateGame(0);
   DebugJump(state, 0, ChapterBeatList(0).find((b) => b.id === "c1_well").index);
-  state.beat.stepIndex = 7;
+  state.beat.stepIndex = 4;
   state.flags.wellRopeFixed = true;
   state.player.item = { id: "bucket", label: "空水桶" };
   state.player.x = SCENES.village.zones.well.x;
@@ -2037,16 +2041,17 @@ function TestCliAnswersQuestions() {
   // ② beats/beat：不读 Core 就能拿到一拍的全部
   assert.match(run(["beats", "c1"]), /c1_well/, "beats 得列全第一章");
   const b = run(["beat", "c1_well"]);
-  assert.match(b, /步骤 9/, "beat 得把步骤数说清");
+  assert.match(b, /步骤 6/, "beat 得把步骤数说清（2026-08-12 打榆钱拆去 c1_elm 后剩 6 步）");
   assert.match(b, /needs="bucket"/, "beat 得说清这一步要什么");
   assert.match(b, /旗标\s+.*wellRopeFixed/, "beat 得扫出这一拍碰的旗标（且不许把后面几拍的算进来）");
 
   // ③ state：无头跑到任意一拍、喂真输入、把状态打出来——那 725 次探针脚本的替代品
-  const s0 = run(["state", "c1_well", "--x", "43.0", "--json"]);
+  //（拎桶那一步在 c1_elm 的头里）
+  const s0 = run(["state", "c1_elm", "--x", "43.0", "--json"]);
   const j0 = JSON.parse(s0);
-  assert.equal(j0.beat.id, "c1_well");
+  assert.equal(j0.beat.id, "c1_elm");
   assert.match(j0.prompt || "", /空桶|拎/, "站到缸边必须给得出拎桶的提示");
-  const j1 = JSON.parse(run(["state", "c1_well", "--x", "43.0", "--input", "e", "--json"]));
+  const j1 = JSON.parse(run(["state", "c1_elm", "--x", "43.0", "--input", "e", "--json"]));
   assert.equal(j1.player.item, "bucket", "输入小语言得真的驱动得动玩法");
 
   // ④ --flag：手拨游戏里的是/否开关。没它就只能现写脚本——"拍没挖通/挖通了
@@ -2556,12 +2561,13 @@ function TestPoseNamesExist() {
 function TestSlingThrow() {
   const idle = () => ({ moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false });
   const beats = ChapterBeatList(0).map((b) => b.id);
-  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
+  // 2026-08-12 打榆钱拆成了自己的一拍（c1_elm），投石长在它身上
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_elm");
   const thr = cloth.steps.find((x) => x.type === "throwHit");
   // 每次都从同一个站位重开：石子在手、面朝榆树、地上没别的东西搅判定
   const Setup = (dist = 4.6) => {
     const st = CreateGame(0);
-    DebugJump(st, 0, beats.indexOf("c1_well"));
+    DebugJump(st, 0, beats.indexOf("c1_elm"));
     StepGame(st, idle(), DT);
     st.beat.stepIndex = cloth.steps.indexOf(thr);
     st.groundItems.length = 0;
@@ -2598,17 +2604,19 @@ function TestSlingThrow() {
   assert.equal(st.player.pose, "throwWind", "拽着时必须是蓄力姿势");
   assert.ok(st.player.poseK > 0.4, "拉弓量必须驱动姿势");
 
-  // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 妹妹欢呼夸人
+  // ③ 松手出手 → 真弹道飞到命中；命中即链步推进 + 榆钱雨 + 妹妹的反应镜
+  //（2026-08-12 新稿：第一把砸下来落她一头，她摘下来搁进嘴里——无言的注视；
+  //  flags.elmDown 落在第二把上，这里只验第一把的命中反馈）
   StepGame(st, idle(), DT);
   assert.ok(st.thrown, "松手必须出手");
   assert.ok(st.thrown.vx < 0, "往后拽，石子必须朝前（榆树那边）飞");
   const idx0 = st.beat.stepIndex;
   Fly(st);
-  assert.equal(st.flags.elmDown, true, "照着标准答案拽出去的弧必须打中榆钱枝");
   assert.ok(st.beat.stepIndex > idx0, "命中必须推进链步");
+  assert.ok(st.elmRain, "打中了必须落一阵榆钱雨");
   const sis = st.actors.find((a) => a.id === "sister");
   assert.equal(sis?.track?.name, "cheerHop", "打中了妹妹必须拍手蹦");
-  assert.ok(st.microCine, "妹妹必须开口夸哥");
+  assert.ok(st.microCine, "打中了得给她一个反应镜（摘头上的榆钱那一下）");
 
   // ④ 劲不够就够不着：同一个角度只拽六成，石子必须落在树跟前，
   //    而且提示要说清楚差在哪一头（"再拽满些"），不能只说一句"擦着边过去了"
@@ -2658,27 +2666,33 @@ function TestSlingThrow() {
   console.log("  ✓ 投石：判定钉在真手上 / 劲和角度都得自己调 / 失败说得清差在哪 / 没有按键后备 / 妹妹接着乐");
 }
 
-// 打榆钱这一步得先有由头，不能一上来就把靶子拍脸上：
-// 得先看见妹妹够不着（一个人干不成），再听见这一树榆钱顶什么用（分量），
-// 最后才是那句请求。缺哪一样，玩家都只是在给一个不认识的人做一道题。
+// 打榆钱这一步得先有由头，不能一上来就把靶子拍脸上（2026-08-12 按用户改稿
+// 换了顺序）：先看见妹妹够不着（蹦了半天，手上只有风）→ 柱子让她站远点、
+// 自己动手 → 拢榆钱的时候她才转述那句「娘说掺上这个，糜子能多顶十天」——
+// 分量这回是**打完才落地**的（说的人不在了，话还在当家）。这条盯三件事：
+// 开口在动手之前、动手前她已经交代了「一个人干不成」、那句转述还在这一拍里。
 function TestElmSetupIsMotivated() {
-  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_well");
-  // 新链第一步是拎桶；妹妹开口是紧随其后的 talk
+  const cloth = SCRIPTS.c1.find((b) => b.id === "c1_elm");
+  assert.ok(cloth, "打榆钱得有自己的一拍（c1_elm）");
   const talk = cloth.steps.find((s) => s.type === "talk");
   assert.ok(talk, "打榆钱之前必须有妹妹开口那一步");
   assert.equal(talk.actor, "sister", "开口的得是妹妹本人");
   const said = talk.lines.filter((l) => l.say);
-  assert.ok(said.length >= 3, "一句话交代不完「谁 + 为什么 + 求你」，至少三句");
   const all = said.map((l) => `${l.who}:${l.say}`).join("|");
   assert.ok(said.every((l) => l.who === "妹妹"), "这几句都该由妹妹说，不能变成旁白");
   assert.ok(/哥/.test(all), "她得叫他一声哥——「这是妹妹」要靠戏里的人说出来");
   assert.ok(/够不着|蹦/.test(all), "得先摆出「她一个人干不成」这件事");
-  assert.ok(/粮|糜子|顶/.test(all), "得交代这一树榆钱顶什么用，不然打它干什么");
-  assert.ok(/你打|我捡/.test(all), "最后才是那句请求");
   const throwStep = cloth.steps.find((x) => x.type === "throwHit");
-  assert.ok(cloth.steps.indexOf(talk) < cloth.steps.indexOf(throwStep), "请求必须排在投石之前");
+  assert.ok(cloth.steps.indexOf(talk) < cloth.steps.indexOf(throwStep), "开口必须排在投石之前");
   assert.ok(!/F/.test(throwStep.prompt || ""), "投石的提示里不许再有 F 键");
-  console.log("  ✓ 打榆钱先有由头：够不着 → 顶十天口粮 → 你打我捡，然后才轮到玩家动手");
+  // 「娘说掺上这个」那句挪到了拢榆钱的反应镜里（第二把的 effect 里起 micro-cine）
+  //——effect 是闭包扫不着，从源码上钉：这一拍的正文里必须还留着这句话
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  const elmSrc = core.slice(core.indexOf('id: "c1_elm"'), core.indexOf('id: "c1_well"'));
+  assert.ok(/娘说/.test(elmSrc) && /糜子能多顶十天/.test(elmSrc),
+    "「娘说掺上这个，糜子能多顶十天」必须还在打榆钱这一拍里——它是这一场的分量");
+  console.log("  ✓ 打榆钱先有由头：够不着 → 柱子动手 → 拢榆钱时那句「娘说」才落地");
 }
 
 TestPromptsAreDeviceNeutral();
@@ -2727,10 +2741,12 @@ console.log("— 全流程自动通关（第六章走『地下进人』，第二
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
   // ——第一章（善意的谎言）——
   assert.equal(state.flags.jarDug, true, "C1 翻牲口棚必须刨出那个瓦罐");
-  assert.equal(state.flags.tallied, true, "C1 正字那一道必须亲手划上");
+  assert.equal(state.flags.tallied, true, "C1 正字那一道必须真的画上（抱起妹妹那一下）");
   assert.ok(state.flags.tallyAnswer, "C1 妹妹那一问必须选过答案");
-  assert.equal(state.flags.wellRopeFixed, true, "C1 井绳必须缠好");
+  assert.equal(state.flags.coatSpread, true, "C1 褂子必须铺在榆树底下");
   assert.equal(state.flags.elmDown, true, "C1 投石必须真的把榆钱震下来");
+  assert.equal(state.flags.elmBagged, true, "C1 榆钱必须兜成包袱带回家");
+  assert.equal(state.flags.wellRopeFixed, true, "C1 井绳必须缠好");
   assert.equal(state.flags.waterFilled, true, "C1 打水的桶必须真的触过水");
   assert.equal(state.flags.vatFilled, true, "C1 打回来的水必须倒进缸里");
   assert.equal(state.flags.pitDug && state.flags.clothesBuried, true,

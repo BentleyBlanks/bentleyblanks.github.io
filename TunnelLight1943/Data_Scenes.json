@@ -324,8 +324,17 @@
           "kind": "tree",
           "x": 56.3,
           "name": "井边的榆树",
-          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_well 的 throwHit 指着它）",
+          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_elm 的 throwHit 指着它）",
           "stripped": true
+        },
+        {
+          "id": "elmCoat",
+          "kind": "spreadCoat",
+          "x": 55.9,
+          "showFlag": "coatSpread",
+          "hideFlag": "elmBagged",
+          "name": "铺在树下的破褂子",
+          "note": "打榆钱那场（c1_elm）柱子脱下来接榆钱的褂子：铺开出现、兜成包袱就收走；砸下第二把后布面铺一层绿（propRedraw 看 flags.elmDown）"
         },
         {
           "id": "well",

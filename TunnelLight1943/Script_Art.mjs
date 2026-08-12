@@ -1197,7 +1197,7 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     InkFill(ctx, [[-5.5 * S, 3 * S], [-4 * S, -3.5 * S], [0, -6 * S], [4 * S, -3.5 * S], [5.5 * S, 3 * S]],
       "bun", "#c8a35c", { amp: 0.5 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.16)" });
   } else if (label === "红薯干") {
-    // 油布包着的一把红薯干：布角挽着，两三片干条从口上露出来
+    // 粗布包着的一把红薯干：布角挽着，两三片干条从口上露出来
     InkFill(ctx, [[-5.5 * S, 3.5 * S], [-5 * S, -2.5 * S], [0, -4.5 * S], [5 * S, -2.5 * S], [5.5 * S, 3.5 * S]],
       "yamWrap", "#7a6a4c", { amp: 0.7 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.18)" });
     for (let i = 0; i < 3; i += 1) {
@@ -1231,6 +1231,33 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     ctx.fillStyle = "#38201c";
     ctx.beginPath();
     ctx.ellipse(3.4 * S, 1.8 * S, 2.6 * S, 1.7 * S, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (label === "豁口碗") {
+    // 窖里摞着的那只豁口粗陶碗（第一章夜里拿它刨坑）。碗口一拃（约 15cm），
+    // 口沿缺一口——「豁口」就靠这一笔认
+    InkFill(ctx, [[-3.6 * S, -0.6 * S], [-2.6 * S, 2.4 * S], [2.6 * S, 2.4 * S], [3.6 * S, -0.6 * S],
+      [1.6 * S, -0.6 * S], [0.9 * S, 0.4 * S], [0.2 * S, -0.6 * S]],
+      "chipBowl", "#57534a", { amp: 0.4 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.24)" });
+    InkLine(ctx, -2.2 * S, 2.4 * S, 2.2 * S, 2.4 * S, "chipBowlFoot",
+      { lw: 1.0 * S, color: "rgba(30,26,20,0.7)", amp: 0.3 });
+  } else if (label === "破袄子") {
+    // 妹妹递过来的那件破袄子（章末他抱着它站了很久）：叠成一卷抱在怀里，
+    // 絮着棉——比"那件衣裳"厚一圈；一块补丁、一处开线露絮。
+    // 整卷往手下方挂（+y），别对称压在挂点上——压在挂点上会把抱着它的人
+    // 半张脸盖掉（实拍抓的）
+    InkFill(ctx, [[-6.8 * S, 7.5 * S], [-6.4 * S, 1.0 * S], [-3.2 * S, -0.4 * S], [3.2 * S, -0.4 * S],
+      [6.4 * S, 1.0 * S], [6.8 * S, 7.5 * S]],
+      "wornCoat", "#4e4436", { amp: 0.9 * S, lw: 1.5 * S, shade: "rgba(0,0,0,0.22)" });
+    InkLine(ctx, -5.2 * S, 3.4 * S, 5.2 * S, 3.7 * S, "wornCoatFold",
+      { lw: 0.9 * S, color: "rgba(28,22,18,0.6)", amp: 0.9 });
+    InkFill(ctx, Rect(1.4 * S, 4.4 * S, 2.2 * S, 1.9 * S), "wornCoatPatch", "#5c523f",
+      { amp: 0.4 * S, lw: 0.9 * S });
+    // 开线的那一口：露出一点发白的棉絮
+    ctx.save();
+    ctx.fillStyle = "rgba(190,182,164,0.7)";
+    ctx.beginPath();
+    ctx.ellipse(-3.8 * S, 6.2 * S, 1.1 * S, 0.7 * S, 0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   } else if (label === "麻绳") {
@@ -3375,8 +3402,12 @@ const FOLD_MAT = "#100b05";        // 草苫（编席）
 const FOLD_MAT_HI = "#1a1207";     // 灯照着的那半边苫子
 const FOLD_COVER = "#0c0a06";      // 盖在上头那领破麻苫（比苫子还暗：它压在上头）
 const FOLD_COVER_HI = "#181309";   // 麻苫被灯照亮的那几缕
-const FOLD_CLOTH = "#0a0b0e";      // 爹的褂子：靛蓝土布洗到发暗
+const FOLD_CLOTH = "#0a0b0e";      // 娘的短褂：蓝底白花的靛蓝土布，洗到发暗
 const FOLD_CLOTH_IN = "#090a0c";   // 里子（没晒过，只比正面浅一线——差半档就白了）
+// 白花：跟瓦罐扎口那块碎布同一种印花（2026-08-12 用户改稿钉死的暗线）。
+// 这张卡只点着一盏豆油灯，花要压得很暗——它是认出来的记号，不是装饰
+const FOLD_BLOOM = "rgba(120,130,148,0.30)";
+const FOLD_HAIR = "rgba(214,210,200,0.78)"; // 领口那根白头发（全卡最细的一笔）
 const FOLD_STAIN = "#0e0503";      // 那片印子（同抱在怀里那张小图的渍色，再压一档）
 const FOLD_INK = "#040302";
 
@@ -3522,13 +3553,34 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
     if (idx <= 1) {
       const y0 = top + 0.028, y1 = top + 0.122;
       for (const [cx, inner, id] of [[cuffL, bodyL + 0.02, "foldSlvL"], [cuffR, bodyR - 0.02, "foldSlvR"]]) {
-        FoldQuad(ctx, [
+        const tornR = id === "foldSlvR";
+        // 右袖撕了半边（新剧本 §10）：袖口那条边不走直线，缺进去一口
+        FoldQuad(ctx, tornR ? [
+          P(cx - 0.012, y0 + 0.008 + sy), P(inner, y0 + sy), P(inner, y1 + sy),
+          P(cx - 0.030, y1 - 0.004 + sy), P(cx + 0.004, y1 - 0.036 + sy),
+          P(cx - 0.024, y0 + 0.052 + sy),
+        ] : [
           P(cx, y0 + 0.008 + sy), P(inner, y0 + sy), P(inner, y1 + sy), P(cx, y1 - 0.005 + sy),
         ], id, FOLD_CLOTH, S, { lw: 4, shade: "rgba(0,0,0,0.24)" });
         // 袖口那一圈磨白的边：一件穿了十年的褂子，磨损在袖口和肘上
-        InkLine(ctx, ...P(cx + (cx < 0.5 ? 0.004 : -0.004), y0 + 0.012 + sy),
-          ...P(cx + (cx < 0.5 ? 0.004 : -0.004), y1 - 0.010 + sy),
+        InkLine(ctx, ...P(cx + (cx < 0.5 ? 0.004 : -0.010), y0 + 0.012 + sy),
+          ...P(cx + (cx < 0.5 ? 0.004 : -0.014), y1 - (tornR ? 0.040 : 0.010) + sy),
           `${id}Cuff`, { lw: 3 * S, color: "rgba(96,88,74,0.5)", amp: 2 * S });
+        // 袖面上两簇白花（跟着 sy 抖）
+        ctx.save();
+        ctx.fillStyle = FOLD_BLOOM;
+        for (let i = 0; i < 2; i += 1) {
+          const fx = cx + (cx < 0.5 ? 1 : -1) * (0.030 + i * 0.052);
+          const fy = y0 + 0.030 + Hash(id + "bl" + i) * 0.05 + sy;
+          for (let p2 = 0; p2 < 4; p2 += 1) {
+            const pa = (p2 / 4) * Math.PI * 2 + Hash(id + "blp" + i) * 2;
+            const q = P(fx + Math.cos(pa) * 0.008, fy + Math.sin(pa) * 0.006);
+            ctx.beginPath();
+            ctx.ellipse(q[0], q[1], 0.0048 * W, 0.0036 * W, pa, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
       }
     }
     // 身子
@@ -3536,22 +3588,74 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
       P(bodyL, top + sy), P(bodyR, top - 0.005 + sy),
       P(bodyR + 0.006, bodyB + sy), P(bodyL - 0.004, bodyB + 0.006 + sy),
     ], "foldBody", FOLD_CLOTH, S, { lw: 5, shade: "rgba(0,0,0,0.32)" });
-    // 领口那道豁 + 对襟那条缝 + 三颗布纽襻：不给这几笔，褂子就是一块方布
+    // 白花：稀稀拉拉几簇，灯那一侧的亮一线。折过之后压在双层暗罩底下，
+    // 自己会跟着沉下去（画在身面上、罩子之前）
+    {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(...P(bodyL, top), (bodyR - bodyL) * W, (bodyB - top) * W);
+      ctx.clip();
+      for (let i = 0; i < 8; i += 1) {
+        const fx = SH.x0 + 0.04 + Hash("foldBloomX" + i) * (SH.x1 - SH.x0 - 0.08);
+        const fy = top + 0.030 + Hash("foldBloomY" + i) * (SH.hemY - top - 0.06) + sy;
+        ctx.fillStyle = FOLD_BLOOM;
+        for (let p2 = 0; p2 < 4; p2 += 1) {
+          const pa = (p2 / 4) * Math.PI * 2 + Hash("foldBloomP" + i) * 2;
+          const q = P(fx + Math.cos(pa) * 0.009, fy + Math.sin(pa) * 0.007);
+          ctx.beginPath();
+          ctx.ellipse(q[0], q[1], 0.0052 * W, 0.0038 * W, pa, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    // 领口那道豁 + **大襟**那条弧（从领口斜着掖到右腋下）+ 布纽襻：
+    // 娘的短褂是大襟，不是爹那种对襟——缝走哪边，这件衣裳是谁的就定在哪笔
     if (idx < 2) {
       const cx0 = (SH.x0 + SH.x1) / 2;
       FoldQuad(ctx, [
         P(cx0 - 0.050, top + sy), P(cx0 + 0.050, top + sy),
         P(cx0 + 0.031, top + 0.054 + sy), P(cx0 - 0.031, top + 0.054 + sy),
       ], "foldCollar", "#0f1013", S, { lw: 3, shade: null, amp: 2 });
-      InkLine(ctx, ...P(cx0 + 0.004, top + 0.052 + sy), ...P(cx0 - 0.002, bodyB - 0.012 + sy),
-        "foldPlacket", { lw: 2.8 * S, color: "rgba(6,5,4,0.7)", amp: 2.5 * S });
-      for (let i = 0; i < 3; i += 1) {
-        const q = P(cx0 + 0.004, top + 0.104 + i * 0.078 + sy);
+      // 大襟：领口右缘起，一道弧掖向右腋（袖根下），再顺着右侧缝下去
+      {
+        const a0 = P(cx0 + 0.028, top + 0.050 + sy);
+        const a1 = P(SH.x1 - 0.020, top + 0.112 + sy);
+        const a2 = P(SH.x1 - 0.016, bodyB - 0.014 + sy);
+        ctx.save();
+        ctx.strokeStyle = "rgba(6,5,4,0.7)";
+        ctx.lineWidth = 2.8 * S;
+        ctx.beginPath();
+        ctx.moveTo(a0[0], a0[1]);
+        ctx.quadraticCurveTo(a0[0] + (a1[0] - a0[0]) * 0.62, a0[1] + 4 * S, a1[0], a1[1]);
+        ctx.lineTo(a2[0], a2[1]);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 布纽襻沿着大襟那道弧排：领口一颗、弧腰一颗、腋下一颗
+      for (const [bx, by] of [[cx0 + 0.052, top + 0.060], [cx0 + 0.108, top + 0.086],
+        [SH.x1 - 0.024, top + 0.118]]) {
+        const q = P(bx, by + sy);
         ctx.save();
         ctx.fillStyle = "#3b352b";
         ctx.beginPath();
         ctx.ellipse(q[0], q[1], 5.5 * S, 4.2 * S, 0.3, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+      }
+      // 领口上那根白头发（新剧本 §10：他看了两眼，把它捋下来）。
+      // 苫子一揭开就在领口上；两袖交叠一折完（idx 到 2）就没了——
+      // 那一下算他捋掉的
+      if (idx === 1) {
+        const h0 = P(cx0 - 0.036, top + 0.020 + sy);
+        ctx.save();
+        ctx.strokeStyle = FOLD_HAIR;
+        ctx.lineWidth = 1.3 * S;
+        ctx.beginPath();
+        ctx.moveTo(h0[0], h0[1]);
+        ctx.bezierCurveTo(h0[0] + 0.030 * W, h0[1] + 0.010 * W,
+          h0[0] + 0.052 * W, h0[1] - 0.006 * W, h0[0] + 0.078 * W, h0[1] + 0.014 * W);
+        ctx.stroke();
         ctx.restore();
       }
     }
@@ -3817,8 +3921,8 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
 // 解扎口的活卡（找吃的第四道手）。每帧重画，view = Core 的 state.wrapCard，
 // L = WRAP_CARD，t = 秒。版面坐标全在 L 里（卡宽单位），**这儿绝不另抄一套**。
 //
-// 为什么非得是一张卡：罐口连油布拢共 0.22m，玩法景别的画宽 12.3m——不到 2%，
-// 屏幕上是一粒扣子。同石笔/刨子/接绳（CLAUDE.md 拟物交互第 4 条）。
+// 为什么非得是一张卡：罐口连扎口的碎布拢共 0.22m，玩法景别的画宽 12.3m——
+// 不到 2%，屏幕上是一粒扣子。同石笔/刨子/接绳（CLAUDE.md 拟物交互第 4 条）。
 //
 // 画的顺序＝这活儿的先后（画笔通病第 1 条）：先有罐、再蒙布、再一道道缠上去，
 // 所以绳压在布上、布压在罐口上。玩家褪掉一道，就真少画一道。
@@ -3829,8 +3933,11 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
 // 压了多少不是拍脑袋：实拍量过一版——源色 #9c7434 上屏是 #e8d3a8，
 // 亮度从 0.46 抬到 0.83。所以这几个数看着"黑得离谱"才是对的。
 const WRAP_ROPE = "#5e4318";        // 扎口的细麻绳（三样里最亮的一档）
-const WRAP_CLOTH = "#3c3719";       // 油布：桐油浸过的土布，偏黄绿
-const WRAP_CLOTH_D = "#2a2711";
+// 碎布：蓝底白花的土布——娘那件短褂上剪下来的（2026-08-12 用户改稿钉死的
+// 暗线：跟夜里窖角那件短褂同一块布，FOLD_CLOTH 那头是同一个色系）
+const WRAP_CLOTH = "#1d2534";       // 靛蓝土布（按 sRGB 老账压两档）
+const WRAP_CLOTH_D = "#141a25";
+const WRAP_BLOOM = "rgba(188,196,208,0.55)";   // 白花：洗褪了的印花点子
 const WRAP_JAR = "#22201b";         // 灰陶：整张卡里最沉的一块，绳与布压在它上头
 
 export function DrawWrapCard(ctx, W, H, view, L, t) {
@@ -3960,8 +4067,23 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
         cx + Math.cos(a) * cr * 1.12, cyc + Math.sin(a) * cr * 0.70);
       ctx.stroke();
     }
-    // 桐油浸过的布有点反光：只在鼓起来那道脊上一条
-    ctx.strokeStyle = "rgba(190,176,128,0.20)";
+    // 白花：洗褪了的印花点子，三五瓣一簇，稀稀拉拉——布跟着掀，花也得跟着
+    // （画在旋转块里）。这几点白就是暗线的记号：窖里那件短褂上是同一种花
+    for (let i = 0; i < 7; i += 1) {
+      const a = Hash("wrBloomA" + i) * Math.PI * 2;
+      const rr = Math.sqrt(Hash("wrBloomR" + i)) * cr * 0.92;
+      const bx = cx + Math.cos(a) * rr, by = cyc + Math.sin(a) * rr * 0.62;
+      ctx.fillStyle = WRAP_BLOOM;
+      for (let p2 = 0; p2 < 4; p2 += 1) {
+        const pa = (p2 / 4) * Math.PI * 2 + Hash("wrBloomP" + i) * 2;
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(pa) * cr * 0.045, by + Math.sin(pa) * cr * 0.032,
+          cr * 0.026, cr * 0.018, pa, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // 布面鼓起来那道脊上一线微光（旧布的磨亮，比桐油那版收着）
+    ctx.strokeStyle = "rgba(150,160,178,0.16)";
     ctx.lineWidth = 3.4 * S;
     ctx.beginPath();
     ctx.moveTo(cx - cr * 0.86, cyc - cr * 0.16);
@@ -5242,7 +5364,7 @@ export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false
     [ax + 8, jy - 3], [ax + 12, jy + 4], [ax + 11, ay]],
   id + "jar", "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
   if (open) {
-    // 扎口解开了：罐口张着，油布垂在罐肩上
+    // 扎口解开了：罐口张着，那块蓝底白花的碎布垂在罐肩上
     ctx.save();
     ctx.fillStyle = "#1a150f";
     ctx.beginPath();
@@ -5250,12 +5372,25 @@ export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false
     ctx.fill();
     ctx.restore();
     InkFill(ctx, [[ax + 4, jy - 4], [ax + 13, jy - 6], [ax + 15, jy + 3], [ax + 6, jy + 2]],
-      id + "cloth", "#8f8468", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+      id + "cloth", "#2a3448", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+    ctx.save();
+    ctx.fillStyle = "rgba(196,204,214,0.6)";
+    ctx.beginPath(); ctx.ellipse(ax + 9, jy - 2, 0.9, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(ax + 12, jy + 0.6, 0.8, 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   } else {
-    // 罐口拿油布扎着：一顶浅色的布帽，腰上缠三道细绳
+    // 罐口拿碎布扎着：蓝底白花的一顶布帽（娘那件短褂上的），腰上缠三道细绳
     InkFill(ctx, [[ax - 9, jy - 2], [ax - 7, jy - 8], [ax, jy - 10], [ax + 7, jy - 8],
-      [ax + 9, jy - 2], [ax, jy + 1]], id + "wrap", "#9a8e70",
+      [ax + 9, jy - 2], [ax, jy + 1]], id + "wrap", "#2a3448",
     { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+    ctx.save();
+    ctx.fillStyle = "rgba(196,204,214,0.6)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(ax - 4 + i * 4, jy - 8 + Hash(id + "bd" + i) * 3, 0.9, 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
     for (let i = 0; i < 3; i += 1) {
       InkLine(ctx, ax - 8.5, jy - 2.4 - i * 1.7, ax + 8.5, jy - 2.6 - i * 1.7,
         id + "lash" + i, { lw: 1.1, color: "#6d5a3a", amp: 0.5 });
@@ -5394,6 +5529,47 @@ export function DrawClothBundle(ctx, x, groundY, id) {
   // 袖口一线浅衬里：布不是铁板一块
   InkLine(ctx, x + 16.5, groundY - 5.5, x + 18.5, groundY - 2.5, id + "cuff",
     { lw: 1.0, color: "rgba(150,132,104,0.5)", amp: 0.4 });
+}
+
+// 铺在榆树底下接榆钱的破褂子（第一章打榆钱那场，2026-08-12 用户改稿）。
+// 平摊的布在侧视里只有几个像素——所以四角故意没抻死：两个角拢着土坷垃
+// 撑起一拳高（竖向有东西才认得出，找吃的那场的教训），布身给两道褶。
+// green = 砸下第二把之后：布面铺了一层榆钱的绿（走 propRedraw 单张重烘）
+export function DrawSpreadCoat(ctx, x, groundY, id, { green = false } = {}) {
+  // 布身：靛蓝土布，摊开约 1.3m
+  InkFill(ctx, [[x - 31, groundY], [x - 29, groundY - 4], [x - 22, groundY - 2],
+    [x - 6, groundY - 3.5], [x + 12, groundY - 2.4], [x + 24, groundY - 4.6],
+    [x + 30, groundY - 1], [x + 31, groundY]],
+    id + "cloth", "#232c3d", { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+  // 两个角拢起来（压着土坷垃）：左右各一个小鼓包
+  InkFill(ctx, [[x - 31, groundY], [x - 30, groundY - 7], [x - 24, groundY - 9], [x - 20, groundY - 3], [x - 21, groundY]],
+    id + "cornerW", "#1d2534", { amp: 1.0, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
+  InkFill(ctx, [[x + 21, groundY], [x + 22, groundY - 4], [x + 27, groundY - 8.6], [x + 31, groundY - 6], [x + 31, groundY]],
+    id + "cornerE", "#1d2534", { amp: 1.0, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
+  // 两道褶 + 几点白花（这件就是他身上那件破褂子，花色不用跟娘的短褂一样，
+  // 素一点：只给一两点洗白的补丁色）
+  InkLine(ctx, x - 18, groundY - 2.2, x + 6, groundY - 2.8, id + "foldA",
+    { lw: 0.8, color: "rgba(12,14,20,0.6)", amp: 0.9 });
+  InkLine(ctx, x - 4, groundY - 1.2, x + 18, groundY - 1.8, id + "foldB",
+    { lw: 0.7, color: "rgba(12,14,20,0.5)", amp: 0.8 });
+  ctx.save();
+  ctx.fillStyle = "rgba(168,160,140,0.45)";
+  ctx.beginPath(); ctx.ellipse(x - 12, groundY - 2.4, 2.2, 1.2, 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  if (!green) return;
+  // 铺了一层绿：榆钱是一小片一小片的圆钱，颜色压两档（sRGB 老账），
+  // 中间厚、边上薄
+  ctx.save();
+  for (let i = 0; i < 26; i += 1) {
+    const t = Hash(id + "elmT" + i);
+    const ex = x + (t - 0.5) * 46 * (0.6 + 0.4 * Hash(id + "elmS" + i));
+    const ey = groundY - 2 - Hash(id + "elmY" + i) * 3.2;
+    ctx.fillStyle = i % 3 ? "rgba(86,110,54,0.85)" : "rgba(104,128,62,0.85)";
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, 1.5 + Hash(id + "elmR" + i) * 0.9, 1.1, Hash(id + "elmA" + i) * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // 屋里的铺盖：半领苇席，薄被卷在东头。妹妹「还睡着」「放平掖好被角」
@@ -6551,6 +6727,7 @@ const HUD_ITEM = {
   粮袋: [1.05, 0], 种子粮: [1.05, 0], 名册: [1.10, 0], 保甲册: [1.10, 0],
   花布巾: [1.20, 0], 襁褓: [1.05, 0], 鞭炮: [1.00, 0], 一挂鞭炮: [1.00, 0],
   红薯干: [1.35, 0], 半瓢水: [1.20, 0], 那件衣裳: [0.95, 0], 水葫芦: [1.25, 0],
+  豁口碗: [1.55, 1], 破袄子: [0.95, 0],
 };
 const HUD_ITEM_FALLBACK = [0.42, 0];   // 兜底那块木板足有 52 单位宽
 
