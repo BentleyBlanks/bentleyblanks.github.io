@@ -941,6 +941,23 @@ function Build(ac, options) {
       Tone(t + 0.02, { level: 0.032 * k, attack: 0.006, decay: 0.26 * r, type: "triangle", freq: 340 * r, to: 220 * r, pan });
       NoiseHit(t + 0.16 * r, { level: 0.022 * k, attack: 0.01, decay: 0.12, freq: 900, sweep: -300, q: 1.4, pan });
     },
+    // 拈起一角布：极轻的一抖，纯高频的沙。不许有低频——粗布抖起来没有"咚"
+    clothLift(t, k, pan, r = 1) {
+      NoiseHit(t, { level: 0.026 * k, attack: 0.004, decay: 0.09, type: "highpass", freq: 2100 * r, q: 0.7, pan });
+      NoiseHit(t + 0.05, { level: 0.014 * k, attack: 0.006, decay: 0.13, type: "highpass", freq: 1500 * r, q: 0.6, pan });
+    },
+    // 一折落定：布面互相蹭出来的一声"簌"，尾巴上带一点压实的闷。
+    // 一折比一折小，所以 rate 越往后越高、gain 越往后越轻（Core 那边给）
+    clothFold(t, k, pan, r = 1) {
+      NoiseHit(t, { level: 0.042 * k, attack: 0.003, decay: 0.13 / r, type: "highpass", freq: 1700 * r, q: 0.8, pan });
+      NoiseHit(t + 0.03, { level: 0.020 * k, attack: 0.004, decay: 0.10, freq: 900 * r, sweep: -260, q: 1.2, pan });
+      Tone(t + 0.02, { level: 0.012 * k, attack: 0.008, decay: 0.12, type: "sine", freq: 128 * r, to: 96 * r, pan });
+    },
+    // 手甩离了布：整幅塌回去，一声散乱的落布。比 clothFold 长、比它散
+    clothDrop(t, k, pan, r = 1) {
+      NoiseHit(t, { level: 0.030 * k, attack: 0.006, decay: 0.20, type: "highpass", freq: 1250 * r, q: 0.5, pan });
+      NoiseHit(t + 0.09, { level: 0.020 * k, attack: 0.008, decay: 0.16, freq: 620 * r, sweep: -180, q: 1.0, pan });
+    },
     // 推到半道停住：刨刃啃进木头，一声闷顿。不是失败音，是"手上不对"
     planeStall(t, k, pan) {
       NoiseHit(t, { level: 0.07 * k, attack: 0.002, decay: 0.07, freq: 380, q: 4.5, pan });

@@ -12,7 +12,7 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
-  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, SLING, SlingSolve,
+  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, FOLD_CARD, SLING, SlingSolve,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments, AllRelics,
 } from "./Script_Core.mjs";
@@ -206,6 +206,13 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
         if (target.action === "knotAt" && Math.abs(dx) <= 1.35 && target.card) {
           input.moveX = 0;
           KnotDrive(state, input, target, tick);
+        }
+        // 叠衣裳同理：也没有长按后备，驱动器得真的把那个角一下一下拖过去。
+        // **门槛用 near 不用 1.35**：卡只在判定区里立得起来（这一步的区半宽只有
+        // 1.0），拿 1.35 当门槛人就停在区外拖一张不存在的卡，报出来是章节超时
+        if (target.action === "foldAt" && Math.abs(dx) <= near && target.card) {
+          input.moveX = 0;
+          FoldDrive(state, input, target, tick);
         }
       }
     }
@@ -838,6 +845,33 @@ function KnotDrive(state, input, target, tick) {
   Put(kc.tip.x + (vx / d) * step, kc.tip.y + (vy / d) * step);
 }
 
+// 揭草苫 · 叠衣裳（第一章夜里下窖）：同接绳，**没有长按后备**——乐趣就在手上
+// 的活不给按键档（CLAUDE.md 拟物交互第 5 条）。所以驱动器只能真的在卡上把那个
+// 角拈起来拖过去，一下一下做完四下手。删了后备就必须给驱动器这条路，漏了这
+// 一步自动通关会当场卡死（接绳、投石都是这么栽过的）。
+//
+// tick 同 KnotDrive：没攥住的时候**先松一帧再按下去**，不然 state.ptrPressed
+// 永远是假的（攥住只认按下那一帧），驱动器一直空转。
+function FoldDrive(state, input, target, tick) {
+  const A = target.aspect || 16 / 9;
+  const Put = (x, y) => { input.pointerHeld = true; input.pointerCard = { u: x, v: y * A }; };
+  const fc = state.foldCard;
+  const seq = target.seq || [];
+  // seq 空＝四下手做完了，卡正停在那两秒半的印子上：这时候手要撒开
+  if (!fc || !seq.length) return;
+  if (!fc.grab) {
+    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerCard = null; return; }
+    Put(fc.tip.x, fc.tip.y);       // 按在那个角上才拈得起来
+    return;
+  }
+  // 攥住了：朝这一下的落点挪，一帧只许领先布角这么一点（领先过头就是甩脱了）
+  const leg = seq[0];
+  const vx = leg.to.x - fc.tip.x, vy = leg.to.y - fc.tip.y;
+  const d = Math.hypot(vx, vy) || 1;
+  const step = Math.min(d, target.reachStep);
+  Put(fc.tip.x + (vx / d) * step, fc.tip.y + (vy / d) * step);
+}
+
 /** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒紧到了几成 */
 function DragKnotThrough(state, drive) {
   const t = GetBeatTarget(state);
@@ -1005,6 +1039,152 @@ function TestKnotIsASheetBend() {
   }
   console.log("  ✓ 接绳＝单编结：五道关口按顺序过 / 跳着走不算 / 一把勒到底 / 撒手会松 / 长按无效");
 }
+
+// 揭草苫 · 叠衣裳（c1_cellar）：第一章情绪最重的一场，2026-08-12 之前却是全章
+// 唯一一场手上没有活的——「E · 归置家什」「E · 摆正笸箩」两句长按，人杵在窖里。
+// 现在四下手长在一张铺满画框的活卡上（state.foldCard）。
+//
+// 这条盯七件事，逐条对着全作拟物标准：①长按无效（第 5 条：乐趣在手上的活不给
+// 按键档）②按下那一帧手必须落在那个角上（第 0 条①）③布有分量，甩再快也只能
+// 一寸寸挪（第 0 条②）④手甩离布角就脱手、这一下**弹回原处**（第 0 条③）
+// ⑤揭苫到位还不算完，得再抻一把（第 1 条：停在半道要有代价）⑥HUD 上不留任何
+// 进度指示（第 0 条④、第 2 条）⑦四下做完＋那两秒半的印子，链才往下走。
+function TestFoldIsHandsOnCloth() {
+  const Setup = () => {
+    const state = CreateGame(0);
+    const cellar = ChapterBeatList(0).find((b) => b.id === "c1_cellar");
+    DebugJump(state, 0, cellar.index);
+    state.beat.stepIndex = 1;          // 第 0 步是下窖走位，直接站到草苫跟前
+    state.player.x = 27.9;
+    state.player.level = "under";
+    state.player.item = null;
+    return state;
+  };
+  const step = (state, input = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false,
+        throw: false, advance: false, ...input,
+      }, DT);
+    }
+  };
+  const L = FOLD_CARD;
+  const card = (x, y) => ({ u: x, v: y * L.aspect });
+
+  // ① 长按互动键：一点用都没有
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    step(state, { interactHeld: true }, Math.ceil(8.0 / DT));
+    assert.equal(state.beat.foldState?.n ?? 0, 0,
+      "长按 E 居然把衣裳叠了——这条后备必须是死的");
+    assert.equal(state.beat.stepIndex, 1, "长按不该把这一步推过去");
+  }
+
+  // ② 按下那一帧手没落在那个角上：拈不起来，怎么拖布都不动
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const start = { ...state.foldCard.tip };
+    step(state, { pointerHeld: true, pointerCard: card(0.08, 0.10) }, 4);
+    for (let i = 0; i < 60; i += 1) {
+      step(state, { pointerHeld: true, pointerCard: card(0.08 + i * 0.012, 0.10 + i * 0.004) });
+    }
+    assert.ok(!state.foldCard.grab, "手没落在苫角上就按下去，不该拈得起来");
+    assert.ok(Math.hypot(state.foldCard.tip.x - start.x, state.foldCard.tip.y - start.y) < 0.02,
+      "在卡上别处按下再拖，布不该动（这正是「不是 slider」的意思）");
+  }
+
+  // ③ 布有分量：一帧就把手甩到落点，布也只能按 speed 一寸寸跟
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const f0 = L.folds[0];
+    step(state, { pointerHeld: true, pointerCard: card(f0.from.x, f0.from.y) }, 2);
+    assert.ok(state.foldCard.grab, "按在苫角上要拈得起来");
+    const before = { ...state.foldCard.tip };
+    // 手就在容差里（不脱手），但方向上一步到位——布只许挪 speed × dt
+    step(state, { pointerHeld: true, pointerCard: card(before.x - L.slipR * 0.9, before.y) }, 1);
+    const movedOne = Math.hypot(state.foldCard.tip.x - before.x, state.foldCard.tip.y - before.y);
+    assert.ok(movedOne <= L.speed * DT + 1e-6,
+      `布一帧挪了 ${movedOne.toFixed(4)} 卡宽，超过了 speed×dt——那是没有分量的贴纸`);
+    assert.ok(movedOne > 0, "手在动，布也得跟着动");
+  }
+
+  // ④ 手甩得比布快：脱手，而且这一下**整个弹回原处**
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const f0 = L.folds[0];
+    step(state, { pointerHeld: true, pointerCard: card(f0.from.x, f0.from.y) }, 2);
+    // 先老老实实拖一段（别拖到头，不然这一下就做完了、进度归了下一折）
+    for (let i = 0; i < 12; i += 1) {
+      const tip = state.foldCard.tip;
+      step(state, { pointerHeld: true, pointerCard: card(tip.x - 0.02, tip.y + 0.001) });
+    }
+    assert.equal(state.foldCard.idx, 0, "这一下还没做完");
+    assert.ok(state.foldCard.k > 0.05, "拖了一段，这一下总该有点进度");
+    const tip = state.foldCard.tip;
+    step(state, { pointerHeld: true, pointerCard: card(tip.x - L.slipR - 0.10, tip.y + 0.10) }, 2);
+    assert.ok(!state.foldCard.grab, "手甩出布角够得着的范围必须脱手");
+    assert.ok(Math.hypot(state.foldCard.tip.x - f0.from.x, state.foldCard.tip.y - f0.from.y) < 0.02,
+      "脱手之后这一下要弹回原处——布没有骨头，撑不住半道");
+  }
+
+  // ⑤ 揭苫：拖到落点还不算完，东西压着，得顺着劲再抻一把
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const f0 = L.folds[0];
+    assert.ok(f0.cinch > 0, "揭苫那一下得是「抻」，不是「放到位」");
+    step(state, { pointerHeld: true, pointerCard: card(f0.from.x, f0.from.y) }, 2);
+    for (let i = 0; i < 400 && !state.foldCard.homed; i += 1) {
+      const tip = state.foldCard.tip;
+      const vx = f0.to.x - tip.x, vy = f0.to.y - tip.y;
+      const d = Math.hypot(vx, vy) || 1;
+      const s = Math.min(d, L.slipR * 0.6);
+      step(state, { pointerHeld: true, pointerCard: card(tip.x + (vx / d) * s, tip.y + (vy / d) * s) });
+    }
+    assert.ok(state.foldCard.homed, "拖到落点，这一下该记成「到位了」");
+    assert.equal(state.beat.foldState.n, 0, "光到位不算完——苫子还压在东西底下");
+    assert.ok(state.foldCard.cinch < 1, "还没抻，勒紧的读数不该满");
+  }
+
+  // ⑥ HUD 上一根条都没有：招呼玩家的是卡上那个角自己
+  {
+    const state = Setup();
+    step(state, {}, 3);
+    assert.ok(state.foldCard, "站定就该亮出那张活卡");
+    assert.ok(!state.dragTrack, "做功那一拍不许有可拖的 HUD 轨道（这条通道早已整个删掉）");
+    assert.ok(!state.gesture, "抽象手势图标已整体拆除，别再造");
+    assert.ok(!state.prompt, `叠衣裳那一拍不该出提示文案，实为「${state.prompt}」`);
+    assert.ok(!state.promptFill, "进度环只许当读数用，这一拍连读数都不给");
+    assert.equal(state.player.pose, "foldCloth", "每个玩法动词必须配角色动画");
+    assert.equal(EdgeHint(state, state.player.x, 12), null, "活卡上不该再挂画框边缘的路标");
+  }
+
+  // ⑦ 四下手真的做得完，而且做完还得停够那两秒半（那片印子的一镜）
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    let lingerSeen = 0;
+    for (let i = 0; i < 3000 && state.beat.stepIndex === 1; i += 1) {
+      const t = GetBeatTarget(state);
+      assert.equal(t?.action, "foldAt", "叠衣裳那一步的驱动目标应该是拖布角，不是长按");
+      const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false };
+      FoldDrive(state, input, t, i);
+      step(state, input);
+      if (state.foldCard?.blood) lingerSeen += 1;
+    }
+    assert.equal(state.beat.foldState.n, L.folds.length, "四下手一下都不能少");
+    assert.ok(lingerSeen * DT >= L.linger - 0.2,
+      `翻出印子之后卡只停了 ${(lingerSeen * DT).toFixed(2)}s，不够那一镜的 ${L.linger}s`);
+    assert.equal(state.beat.stepIndex, 2, "停够了，链才往下走（下一步是刨坑）");
+  }
+
+  console.log("  ✓ 叠衣裳：长按无效 / 按不准拈不起 / 布有分量 / 甩快了弹回原处 / 揭苫要再抻一把 / HUD 无条");
+}
+
 // 辘轳是个转盘，不是一根拉杆：鼠标绕**摇把轴销**转圈才走绳——顺时针放、
 // 逆时针收、脱手倒转；上手的同时镜头必须推成井口特写。
 //
@@ -1734,7 +1914,7 @@ function TestHoeingIsARealSwing() {
 function TestLiveCardsKeepTheWorldBehind() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const art = fs.readFileSync(path.join(here, "Script_Art.mjs"), "utf8");
-  const LIVE = ["DrawPlaneCard", "DrawScribeCard", "DrawKnotCard"];
+  const LIVE = ["DrawPlaneCard", "DrawScribeCard", "DrawKnotCard", "DrawFoldCard"];
   for (const fn of LIVE) {
     const at = art.indexOf(`export function ${fn}(`);
     assert.ok(at > 0, `找不到活卡画笔 ${fn}`);
@@ -2298,6 +2478,7 @@ TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 TestKnotIsASheetBend();
+TestFoldIsHandsOnCloth();
 TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();

@@ -429,6 +429,72 @@ export function KnotWaypoint(i) {
 }
 
 // ---------------------------------------------------------------------------
+// 叠衣裳 · 裹包袱（第一章夜里下窖，归置爹娘的东西）
+//
+// 这一拍原来是两句「E · 归置家什」「E · 摆正笸箩」——长按 E 等它走完，人杵在
+// 窖里，画面上什么都没发生。全作拟物标准第 0 条禁的正是这个，第 7.5 条禁的
+// 是紧跟着那句「E · 放下去」。这是第一章情绪最重的一场（全程没有一句台词、
+// 一条手记），却是唯一一场手上没有活的。
+//
+// 尺度量过，结论和石笔/刨子/接绳同源（CLAUDE.md 拟物交互第 4 条）：地窖的
+// 玩法机位半宽 8.0m，一件褂子摊开才 0.55m ——十四分之一个画宽，比接绳那个结
+// 还小。**手指按不着、认不出的东西，推镜头治不好**，所以这一拍长在一张铺满
+// 画框的手绘活卡上（`state.foldCard` → `Art.DrawFoldCard`）。
+//
+// 四下手，一件一件来，全是人人做过的动作：
+//   ① 揭草苫——爹娘的东西打扫荡那天起就盖在苫子底下没人动。攥住苫角往怀里
+//      掀；东西压在上头，掀到位还得**再抻一把**才整个揭得下来（cinch）。
+//      这一下最沉、行程最长，后面三下一下比一下轻——手感自己会说话。
+//   ② 两袖交叠（短横）③ 顺肩线对折（长横）④ 拦腰折上来（竖）。
+//      **折到最后一下，襟里子翻出来，那片干成褐色的印子正冲着油灯**——
+//      这一镜不是走到某个点触发的，是玩家自己的手翻出来的。手撒开，卡停住
+//      两秒半（第 2 条：那量的是时间，不是功，所以它是演出不是进度）。
+//
+// 判据四条，缺一不可（第 0 条）：①按下那一帧手必须落在**那个角**上；②布有
+// 分量（跟手走但有速度上限）；③手甩离布角就脱手，那一折**弹回原处**重来；
+// ④反馈全长在布上（折痕、越叠越小、印子翻出来），HUD 上一根条都没有。
+//
+// 坐标同接绳，一律用「卡宽」单位：x ∈ 0..1，y ∈ 0..1/aspect。指针落点
+// (pointerCard.u, .v) 换算成这套坐标是 { x: u, y: v / aspect }。
+// **判定与作画共用这一份**，Art 里绝不许另抄一套。
+// 卡高＝1/aspect＝0.5625 卡宽。版面自上而下：窖壁一条（0~0.118）、窖底、
+// 一领草苫摆在当中、油灯在左前角。**苫子不许铺满画框**——铺满了它就成了背景，
+// 玩家看不出那是一件盖在东西上的物件（刨子那次的教训：认不出＝没做）。
+export const FOLD_CARD = {
+  aspect: 16 / 9,
+  wall: 0.118,       // 窖壁与窖底的交界（作画用）
+  lamp: { x: 0.108, y: 0.208 },   // 豆油灯搁在左前角的地上：这张卡唯一的光源
+  // 草苫（东西摊在上头）：卡宽单位的矩形
+  mat: { x0: 0.150, y0: 0.148, x1: 0.858, y1: 0.500 },
+  // 摊开的褂子：肩线、下摆、两袖袖口，作画按这几个数长出来。
+  // **身子要比袖展窄、比它自己高**——第一版身子 0.444 宽只有 0.256 高，摊出来
+  // 是一床褥单不是一件褂子
+  shirt: { x0: 0.330, x1: 0.670, shoulderY: 0.176, hemY: 0.464, cuffL: 0.238, cuffR: 0.762 },
+  // 盖在上头那领破麻苫：**比褂子窄一圈**，好让右边一只袖口、底下一截下摆
+  // 露在外面——"底下压着东西"这件事得看得见，不能光靠玩家猜
+  cover: { x0: 0.286, y0: 0.150, x1: 0.700, y1: 0.436 },
+  grabR: 0.082,      // 攥得住那个角的判定半径（1600px 宽的卡上＝131px）
+  slipR: 0.152,      // 手甩离布角这么远就脱手，那一下弹回原处
+  speed: 0.74,       // 布有分量：一秒最多跟着手走这么多卡宽
+  tol: 0.058,        // 落点容差：进了这个圈这一下就成了
+  linger: 2.5,       // 最后一折之后卡停在那儿的秒数（那片印子的一镜）
+  // 四下手。from＝拈起来的那个角，to＝该把它放到哪儿；cinch＝到位之后还得
+  // 顺着这股劲再抻这么长（只有揭苫那一下有）。
+  folds: [
+    { id: "mat", from: { x: 0.692, y: 0.428 }, to: { x: 0.226, y: 0.462 }, cinch: 0.072,
+      say: "攥住苫角，往回掀——东西压着，得再抻一把" },
+    { id: "sleeves", from: { x: 0.244, y: 0.250 }, to: { x: 0.478, y: 0.284 },
+      say: "两只袖子交叠着掖到身前" },
+    { id: "half", from: { x: 0.338, y: 0.428 }, to: { x: 0.596, y: 0.408 },
+      say: "顺着肩线，把左半幅盖过右半幅" },
+    { id: "hem", from: { x: 0.560, y: 0.462 }, to: { x: 0.564, y: 0.258 },
+      say: "拦腰对折，下摆翻上来" },
+  ],
+};
+
+const CardD = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// ---------------------------------------------------------------------------
 // 辘轳转盘：鼠标绕摇把轴心转圈驱动（顺时针放绳、逆时针摇起）。
 //
 // **轴心高度按"够得着"倒推，不按"井架好看"倒推**（2026-08-10）。量过才知道
@@ -2186,6 +2252,145 @@ function StepChain(state, def, input, dt) {
       }
       return;
     }
+    // 揭草苫 · 叠衣裳：**长在一张铺满画框的活卡上**（state.foldCard →
+    // Art.DrawFoldCard）。四下手，末了停两秒半给那片印子。
+    // 版面、落点、为什么非得是活卡，全写在 FOLD_CARD 那儿。
+    case "fold": {
+      if (!InZone(p.x, lvl, st.zone)) return;
+      const L = FOLD_CARD;
+      const fs = b.foldState || (b.foldState = {
+        n: 0, at: -1, tip: { x: 0, y: 0 }, grab: false, reaching: false,
+        homed: false, cinchAcc: 0, slipT: 0, k: 0, lingerT: 0,
+      });
+      const cur = L.folds[fs.n];
+      if (!cur) {
+        // 四下手都做完了：手撒开，卡停在那儿——那片印子正冲着油灯。
+        // 这一段量的是**时间**不是功（第 2 条），所以它是一镜演出，不是进度条
+        fs.lingerT += dt;
+        state.prompt = null;
+        state.foldCard = {
+          idx: L.folds.length, done: L.folds.length, tip: { ...fs.tip }, k: 1,
+          grab: false, reaching: false, slip: false, homed: true, cinch: 0,
+          blood: true, linger: Math.min(1, fs.lingerT / L.linger),
+        };
+        p.pose = "foldCloth"; p.poseU = 1; p.poseT = undefined;
+        if (fs.lingerT >= L.linger) {
+          state.foldCard = null;
+          p.pose = null; p.poseU = undefined;
+          finish();
+        }
+        return;
+      }
+      // 换到下一折：布角回到它自己的起手位置，招呼也换一句
+      if (fs.at !== fs.n) {
+        fs.at = fs.n; fs.tip = { ...cur.from };
+        fs.grab = false; fs.homed = false; fs.cinchAcc = 0; fs.k = 0;
+        if (cur.say) state.toast = { text: cur.say, t: 3.4 };
+      }
+      // 站定就跪在草苫跟前，这一拍人不走路（同刨料/接绳：画面已经整个交给那
+      // 张卡了，A/D 还能把人走开的话，卡收走那一帧他人在半个窖以外）
+      const standX = st.zone.x;
+      if (Math.abs(p.x - standX) > 0.02) {
+        p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.8 * dt);
+      }
+      p.heading = st.face ?? -1;
+
+      const pc = input.pointerCard;
+      const held = !!input.pointerHeld && !!pc;
+      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
+      fs.slipT = Math.max(0, fs.slipT - dt);
+
+      // ① 按下那一帧手必须落在**那个角**上才拈得起来，卡上别处拖一律无效
+      if (held && state.ptrPressed && !fs.grab && CardD(hand, fs.tip) < L.grabR) {
+        fs.grab = true;
+        Cue(state, "clothLift", { gain: 0.42 });
+      }
+      if (!held) fs.grab = false;
+      fs.reaching = held && !fs.grab;
+
+      const dx0 = cur.to.x - cur.from.x, dy0 = cur.to.y - cur.from.y;
+      const span = Math.hypot(dx0, dy0) || 1;
+      const u = { x: dx0 / span, y: dy0 / span };
+      let moved = { x: 0, y: 0 };
+      if (fs.grab) {
+        if (CardD(hand, fs.tip) > L.slipR) {
+          // ③ 手甩得比布快太多＝脱手。**这一折整个弹回原处**——布没有骨头，
+          // 撑不住半道；停在半道的代价就是从头拈一次
+          fs.grab = false; fs.homed = false; fs.cinchAcc = 0;
+          fs.tip = { ...cur.from };
+          fs.slipT = 0.7;
+          Cue(state, "clothDrop", { gain: 0.5 });
+        } else {
+          // ② 布有分量：跟着手走，一秒最多走这么多卡宽，甩再快也只能一寸寸挪
+          const dx = hand.x - fs.tip.x, dy = hand.y - fs.tip.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 1e-6) {
+            const stepD = Math.min(d, L.speed * dt);
+            const nx = fs.tip.x + (dx / d) * stepD;
+            const ny = fs.tip.y + (dy / d) * stepD;
+            moved = { x: nx - fs.tip.x, y: ny - fs.tip.y };
+            fs.tip = { x: nx, y: ny };
+          }
+        }
+      } else if (!fs.homed) {
+        // 撒开手：折了一半的布自己塌回去（比脱手慢，还够得着追回来）
+        const bx = cur.from.x - fs.tip.x, by = cur.from.y - fs.tip.y;
+        const bd = Math.hypot(bx, by);
+        if (bd > 1e-4) {
+          const back = Math.min(bd, 0.30 * dt);
+          fs.tip = { x: fs.tip.x + (bx / bd) * back, y: fs.tip.y + (by / bd) * back };
+        }
+      } else {
+        // 勒到一半松了手：布自己松回落点，勒进去那一截跟着吐出来
+        const bx = cur.to.x - fs.tip.x, by = cur.to.y - fs.tip.y;
+        const bd = Math.hypot(bx, by);
+        if (bd > 1e-4) {
+          const back = Math.min(bd, 0.24 * dt);
+          fs.tip = { x: fs.tip.x + (bx / bd) * back, y: fs.tip.y + (by / bd) * back };
+        }
+      }
+      // 走了多少：沿 from→to 的投影。这是**读数**，不是输入——输入只有手上那一拖
+      const proj = (fs.tip.x - cur.from.x) * u.x + (fs.tip.y - cur.from.y) * u.y;
+      fs.k = Math.max(0, Math.min(1, proj / span));
+
+      let landed = false;
+      if (!fs.homed && CardD(fs.tip, cur.to) < L.tol) {
+        fs.homed = true;
+        if (cur.cinch) Cue(state, "clothFold", { gain: 0.4, rate: 1.15 });
+      }
+      if (cur.cinch) {
+        // 最后一下是"勒"不是"放到位"：到了地方还得顺着这股劲再拽一截。
+        // 松手就松回去（上面那条回弹把 proj 一起吐回来），勒紧全靠手上不松
+        fs.cinchAcc = Math.max(0, Math.min(cur.cinch, proj - span));
+        landed = fs.homed && fs.cinchAcc >= cur.cinch - 1e-6;
+      } else {
+        landed = fs.homed;
+      }
+
+      // **没有长按后备**（CLAUDE.md 第 5 条：乐趣就在手上的活不给按键档）。
+      // 也没有 HUD 进度指示——一折比一折小的那件衣裳自己就是进度。
+      state.prompt = null;
+      state.foldCard = {
+        idx: fs.n, done: fs.n,
+        tip: { x: fs.tip.x, y: fs.tip.y }, k: fs.k,
+        grab: !!fs.grab, reaching: !!fs.reaching, slip: fs.slipT > 0,
+        homed: !!fs.homed, cinch: cur.cinch ? fs.cinchAcc / cur.cinch : 0,
+        blood: false, linger: 0,
+      };
+      // 动词动画（铁律：不许「人站着不动、字幕替他做」）。卡铺满画框的时候
+      // 看不见他，卡收走的那一帧看得见——两只手跟着这一折的行程走
+      p.pose = "foldCloth";
+      p.poseU = fs.k;
+      p.poseT = undefined;
+
+      if (landed) {
+        fs.n += 1;
+        fs.homed = false; fs.grab = false; fs.cinchAcc = 0;
+        // 一折比一折小，响也一声比一声轻、一声比一声高
+        Cue(state, "clothFold", { gain: 0.66 - fs.n * 0.07, rate: 0.94 + fs.n * 0.07 });
+      }
+      return;
+    }
     default: return;
   }
 }
@@ -2914,10 +3119,18 @@ export const SCRIPTS = {
     },
     {
       // 第七场（玩法）：夜里下窖，整理爹娘的遗物。全程没有一句台词、一条手记
-      // ——新剧本明令。特写只给一个：草苫底下那件带血的衣服。然后刨坑、
-      // 放下去、填上土。埋的动作与本作所有挖掘同一套笔画。
+      // ——新剧本明令。
+      //
+      // **2026-08-12 重做**：老版这一场是「E · 归置家什」「E · 摆正笸箩」两句
+      // 长按，加一句「E · 放下去」——按住键等它走完，人杵在窖里，画面上什么都
+      // 没发生。全作拟物标准第 0 条禁的正是这个，7.5 条禁的是那句「放下去」；
+      // 而这是第一章情绪最重的一场，偏偏是唯一一场手上没有活的。
+      // 现在四下手长在一张铺满画框的活卡上（见 case "fold" 与 FOLD_CARD）：
+      // 揭草苫 → 两袖交叠 → 顺肩线对折 → 拦腰折上来。**那片印子是玩家自己
+      // 的手翻出来的**，所以老版那一镜"走到窖角触发特写"整个撤掉——由头长在
+      // 玩法里，比走过去触发强。埋的两下仍走本作所有挖掘同一套笔画。
       kind: "chain", id: "c1_cellar", timeOfDay: "night",
-      objective: "下到窖里，把爹娘的东西归置了", hint: "东西还照三天前那样，摊着",
+      objective: "下到窖里，把爹娘的东西归置了", hint: "东西还照三天前那样，盖在草苫底下",
       onStart: (state) => {
         // 妹妹在铺盖上睡着（黄昏那拍哄睡的延续；换拍的 ClearPoses 会把睡姿
         // 抹掉，收幕光圈里她就站起来了——夜里他下窖，她得一直睡着）
@@ -2926,29 +3139,21 @@ export const SCRIPTS = {
       },
       steps: [
         { type: "goto", zone: { x: 30.5, w: 3.2, level: "under" } },
-        { type: "use", zone: { x: 33.9, w: 2.2, level: "under" }, hold: 1.4, stroke: "down", gestureY: 0.9,
-          prompt: "E · 归置家什",
-          effect: (state) => { Cue(state, "drop", { gain: 0.45, rate: 0.9 }); } },
-        { type: "use", zone: { x: 27.8, w: 2.2, level: "under" }, hold: 1.4, stroke: "down", gestureY: 0.8,
-          prompt: "E · 摆正笸箩",
-          effect: (state) => { Cue(state, "pickup", { gain: 0.4 }); } },
-        { type: "goto", zone: { x: 27.9, w: 1.6, level: "under" },
-          effect: (state) => {
-            // 唯一的特写：草苫底下的那件衣服。镜头看三秒，谁也不说话。
-            // 人停在角落东边一步、跪下来——脚不能踩在那件衣裳上
-            FlashPose(state, "kneel", 3.4);
-            StartMicroCine(state, [
-              { stage: "", d: 3.2, cam: { kind: "insert", x: 27.0, y: UNDER_Y + 0.55, dist: 2.2 } },
-            ]);
-          } },
+        // 跪在草苫跟前朝西（那堆东西在窖角 27.0），四下手都在卡上。
+        // cam 给的是**背景的景别**不是特写——特写归卡管（CLAUDE.md 第 4 条①）
+        { type: "fold", zone: { x: 27.9, w: 2.0, level: "under" }, face: -1,
+          effect: (state) => { Cue(state, "drop", { gain: 0.3, rate: 0.75 }); } },
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, hold: 2.4, stroke: "down", gestureY: 0.5,
           prompt: "把窖底的土刨开",
           effect: (state) => { state.flags.pitDug = true; Cue(state, "dig", { gain: 0.7 }); } },
-        // 放进坑里是跪着放的（视觉审查：埋衣全程只有弯腰站姿，"跪"只闪过一下）
+        // 放进坑里是跪着放的（视觉审查：埋衣全程只有弯腰站姿，"跪"只闪过一下）。
+        // 这一步原来是裸的一按 E（7.5 条：「按一下 E 就完」不算交互）——现在是
+        // 跪下去、两只手把那摞衣裳按进坑里掖平，姿势由做功进度驱动
         { type: "pickup", x: 27.0, level: "under", item: { id: "bloodClothes", label: "那件衣裳", big: true },
           prompt: "E · 抱起来" },
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, needs: "bloodClothes",
-          prompt: "E · 放下去", pose: "kneel",
+          hold: 1.3, stroke: "down", gestureY: 0.28, pose: "layDown",
+          prompt: "跪下去 · 把它按进坑里",
           effect: (state) => { FlashPose(state, "kneel", 2.2); Cue(state, "drop", { gain: 0.35, rate: 0.7 }); } },
         { type: "use", zone: { x: 27.1, w: 2.0, level: "under" }, hold: 2.2, stroke: "down", gestureY: 0.5,
           prompt: "把土填回去 · 拍实",
@@ -4705,6 +4910,7 @@ export function CreateGame(chapterIndex = 0) {
     groundItems: [],
     groundSeq: 0,
     knotCard: null,        // 接绳（见 case "knot"：铺满画框的活卡）
+    foldCard: null,        // 叠衣裳/裹包袱（见 case "fold"：同一套活卡）
     stamina: null,         // 手劲读数（辘轳吊着桶时才有）
     thrown: null,
     noiseAt: null,
@@ -4810,6 +5016,7 @@ export function StartChapter(state, index) {
   state.relicsGot = state.relicsGot instanceof Set ? state.relicsGot : new Set();
   state.relicCard = null;
   state.knotCard = null;
+  state.foldCard = null;
   state.stamina = null;
   state.closeUp = null;
   state.thrown = null;
@@ -5296,6 +5503,7 @@ export function StepGame(state, input, dt) {
   state.winchLock = false;
   state.winchView = null;
   state.knotCard = null;  // 同 winchView：接绳那张活卡由 beat 每帧重立
+  state.foldCard = null;  // 叠衣裳那张同理
   state.stamina = null;   // 手劲读数同理：吊着桶的那一帧自己立
   state.closeUp = null;   // 玩法特写（辘轳/打结）同理：活着的那一帧自己立
   state.canDrop = false;
@@ -5611,11 +5819,16 @@ function MovePlayer(state, input, dt) {
   // **默认整个停用**——见文件顶部的 CAM_CELLAR_PEEK（2026-08-10 用户定：
   // 不要自动摇镜头）。下面这段留着，把开关拨回 true 就能整套回来。
   state.climbHint = "";
+  // 活卡那一拍**世界里的找路 UI 要收掉**（CLAUDE.md 拟物交互第 4 条②）：
+  // 手上的活正做到一半，脚底下那句「W · 上梯子」只会糊在卡当中打岔。
+  // 判据用活卡在不在，不用景别。MovePlayer 跑在 beat 执行器之前，读的是上一
+  // 帧的值——和辘轳锁同一条时序，卡活着的那几十帧一直是真的
+  const onLiveCard = !!(state.scribeCard || state.planeCard || state.knotCard || state.foldCard);
   let peek = 0;
   for (const shaft of scene.shafts) {
     if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
     const d = Math.abs(p.x - shaft.x);
-    if (d <= 1.4) {
+    if (d <= 1.4 && !onLiveCard) {
       if (p.level === "under" && scene.walk.surface) state.climbHint = "W · 上梯子";
       else if (p.level === "surface" && scene.walk.under) state.climbHint = "S · 下地道";
     }
@@ -7136,6 +7349,29 @@ export function GetBeatTarget(state) {
             reachStep: Math.min(L.slipR, L.grabR + 0.02),           // 一帧最多把手挪这么远（免得脱手）
           };
         }
+        // 叠衣裳同接绳：没有长按后备，驱动器只能**真的在卡上把那个角拖过去**。
+        // 把还剩哪几下手、每下手从哪儿拈到哪儿整个交出去（揭苫那一下要抻的
+        // 那一截也算进 to 里），自动通关照着拖一遍。漏了这一步会当场卡死。
+        case "fold": {
+          const L = FOLD_CARD;
+          const done = state.beat?.foldState?.n ?? 0;
+          const seq = L.folds.slice(done).map((f) => {
+            const dx = f.to.x - f.from.x, dy = f.to.y - f.from.y;
+            const d = Math.hypot(dx, dy) || 1;
+            // 抻那一下的落点要越过 to 再走 cinch 那么长，不然驱动器停在"到位"
+            // 上，苫子永远揭不下来
+            const over = f.cinch ? f.cinch + 0.014 : 0;
+            return { from: { ...f.from }, to: { x: f.to.x + (dx / d) * over, y: f.to.y + (dy / d) * over } };
+          });
+          return {
+            action: "foldAt", x: st.zone.x, level: st.zone.level || "under",
+            // reach 一定要给：卡只在判定区里才立得起来，驱动器不按它收紧走位
+            // 就停在区外一直拖一张不存在的卡（报出来是"章节超时"）
+            reach: st.zone.w / 2,
+            card: true, aspect: L.aspect, seq,
+            reachStep: Math.min(L.slipR, L.grabR + 0.02) * 0.8,     // 一帧最多把手挪这么远（免得脱手）
+          };
+        }
         case "throwHit": {
           if (!p.item) return { action: "interactAt", x: st.pickupX, level: "surface" };
           // 投石的按键后备已按明令删掉，驱动器只能**真的把石子拽开再松手**：
@@ -7233,7 +7469,7 @@ export function GetBeatTarget(state) {
 // ---------------------------------------------------------------------------
 const HINT_ICON_KINDS = new Set([
   "person", "item", "hand", "listen", "crouch", "walk", "dig", "timber",
-  "door", "knot", "winch", "cart", "throw", "map", "scribe", "lamp",
+  "door", "knot", "fold", "winch", "cart", "throw", "map", "scribe", "lamp",
 ]);
 
 function NormHintIcon(v) {
@@ -7324,6 +7560,7 @@ export function BeatHintIcon(state) {
           : Hand(st.stroke);
         case "holdDoor": return { kind: "door" };
         case "knot": return { kind: "knot" };
+        case "fold": return { kind: "fold" };
         case "winch": return { kind: "winch" };
         case "brace": return { kind: "timber" };
         case "push": return { kind: "cart" };
@@ -7363,7 +7600,7 @@ export function BeatHintIcon(state) {
 export function EdgeHint(state, camX, viewW) {
   if (state.phase !== "playing" || state.microCine) return null;
   // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
-  if (state.closeUp || state.scribeCard || state.planeCard || state.knotCard) return null;
+  if (state.closeUp || state.scribeCard || state.planeCard || state.knotCard || state.foldCard) return null;
   const def = CurrentBeatDef(state);
   if (!def || def.kind === "cinematic") return null;
   const tg = GetBeatTarget(state);
@@ -7573,6 +7810,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.scribeCard = null;
   state.planeCard = null;
   state.knotCard = null;
+  state.foldCard = null;
   state.closeUp = null;
   state.canDrop = false;
   state.bubbleFlash = null;

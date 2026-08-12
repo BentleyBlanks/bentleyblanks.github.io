@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  KNOT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
+  KNOT_CARD, FOLD_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
 import { DrawRelic } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
@@ -497,15 +497,16 @@ function UpdateCamera(state, dt) {
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
   }
-  // 做功那几拍的活卡（划线 / 刨料 / 接绳）：铺满画框、每帧重画，玩家的手就按
-  // 在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、ApplyCamera
-  // 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
+  // 做功那几拍的活卡（划线 / 刨料 / 接绳 / 叠衣裳）：铺满画框、每帧重画，玩家
+  // 的手就按在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、
+  // ApplyCamera 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
   const playing = state.phase === "playing";
   world.SetLiveCard(
     playing && state.scribeCard ? { kind: "scribe", view: state.scribeCard, layout: SCRIBE_CARD }
       : playing && state.planeCard ? { kind: "plane", view: state.planeCard, layout: PLANE_CARD }
         : playing && state.knotCard ? { kind: "knot", view: state.knotCard, layout: KNOT_CARD }
-          : null,
+          : playing && state.foldCard ? { kind: "fold", view: state.foldCard, layout: FOLD_CARD }
+            : null,
     dt,
   );
 
@@ -805,7 +806,7 @@ function SyncHud(state, dt, shotFade) {
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
     ui.touchControls.classList.toggle("gone",
-      !!(state.scribeCard || state.planeCard || state.knotCard) && state.phase === "playing");
+      !!(state.scribeCard || state.planeCard || state.knotCard || state.foldCard) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {

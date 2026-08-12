@@ -953,6 +953,35 @@ export function PoseRig(rig, s, dt) {
     target.armB = (-58 - 6 * k) * DEG; target.foreB = (-64 + 8 * k) * DEG;
     target.thighB = (-18 - 12 * k) * DEG; target.shinB = (22 + 12 * k) * DEG; target.footB = -8 * DEG;
     target.thighF = (14 + 8 * k) * DEG; target.shinF = (10 + 6 * k) * DEG; target.footF = -10 * DEG;
+  } else if (s.pose === "foldCloth") {
+    // 揭草苫 / 叠衣裳：跪在窖底，上身俯下去，两只手在身前的草苫上做活。
+    // poseK = 这一下走了多远（0..1）：起手时手探出去够那个角（胳膊伸开、
+    // 世界角压到 −66°），把布拖过来的过程里肘折回来、手收到身前（−14°）。
+    // 下半身钉死在跪姿上不许动——周期动作最容易在这儿露馅（脚一滑就穿帮）。
+    // （这一拍画面上铺着那张活卡，看不见他；卡收走的那一帧看得见。）
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.36; target.hipX = 0.03 + 0.03 * k;
+    // 腰折下去多少，脖子就抬回来多少：头的世界角 (torso+head) 稳在 −8°~−6°，
+    // 脸朝前下方看着手底下的活，不是"干呕"
+    target.torso = (52 + 6 * k) * DEG; target.head = (-60 - 5 * k) * DEG;
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+    // 两只手都在活儿上，但一前一后错开（同一角度侧视里只剩一条胳膊）。
+    // 前臂写正值＝把肘折回来，别再往负数加（那是继续抬手）
+    target.armF = (-52 + 22 * k) * DEG; target.foreF = (-14 + 30 * k) * DEG;
+    target.armB = (-44 + 18 * k) * DEG; target.foreB = (-8 + 24 * k) * DEG;
+  } else if (s.pose === "layDown") {
+    // 把那件衣裳按进坑里：跪着，两只手捧着往下按、按到底再掖平。
+    // poseK = 按下去的进度：0 = 还抱在胸前；1 = 两手压在坑底。
+    // 这一步原来是裸的一按 E（拟物标准 7.5 条），现在人真的在干这件事。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.36; target.hipX = 0.02 + 0.04 * k;
+    target.torso = (28 + 26 * k) * DEG; target.head = (-34 - 28 * k) * DEG;
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+    // 起手抱在胸前（肘折死、世界角 −16°），按下去的过程里胳膊伸开往下压
+    target.armF = (-74 + 46 * k) * DEG; target.foreF = (58 - 76 * k) * DEG;
+    target.armB = (-66 + 40 * k) * DEG; target.foreB = (52 - 68 * k) * DEG;
   } else if (s.pose === "dunkRope") {
     // 墩桶：两只手探出去攥住井绳，整个人往下坐着一墩。**劲不在胳膊上，在体重上**
     // ——胯要真的沉下去、膝盖跟着屈，不然就成了"挥手"。

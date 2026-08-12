@@ -180,9 +180,11 @@ const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
 // 两个"由进度驱动"的姿势都被钉死在起手那一格。这条坑过一次，别再改回去。
 function PoseProgress(o) {
   if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
-  // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲，都走 poseU
+  // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲 / 叠衣裳这一折走了多远，
+  // 都走 poseU
   if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
-    || o.pose === "braceUp" || o.pose === "pourBasket") return o.poseU;
+    || o.pose === "braceUp" || o.pose === "pourBasket"
+    || o.pose === "foldCloth" || o.pose === "layDown") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -5156,7 +5158,10 @@ export function CreateWorld(canvasEl) {
 
   // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
   // 铺满画框的活卡上，画笔按 kind 分派。
-  const LIVE_CARD_ART = { scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard, knot: ART.DrawKnotCard };
+  const LIVE_CARD_ART = {
+    scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard,
+    knot: ART.DrawKnotCard, fold: ART.DrawFoldCard,
+  };
 
   function SetLiveCard(spec, dt) {
     const view = spec?.view;

@@ -3345,6 +3345,475 @@ export function DrawKnotCard(ctx, W, H, view, L, t) {
   ctx.fillRect(0, 0, W, H);
 }
 
+// ---------------------------------------------------------------------------
+// 揭草苫 · 叠衣裳的活卡（第一章夜里下窖，归置爹娘的东西）
+//
+// 版面全在 Core 的 FOLD_CARD，这儿只作画，一个坐标都不许另立。
+// 卡宽单位 → 像素：P(x,y) = [x*W, y*W]（y 与 x 同尺，见 DrawKnotCard）。
+//
+// 五条画法上的账，都是这作品里交过学费的：
+// ① **底必须是透明的**（LiveCardBase 不是 CardBase）——活卡是玩家正在玩的
+//    那一拍，镜头只是推近了，窖并没有消失。背后那层真景散焦由 Render 铺。
+// ② **颜色按 ^2.2 反推压两档**（CanvasTexture 没声明 sRGB，全场被提亮两档）。
+//    第一版实拍出来是一整片发白的米色：`#4a3c24` 的草苫渲出来到了 190 上下，
+//    比土墙还亮。反推的算法是 `想要的亮度^2.2`——要一片 90 的暗褐，源色就得
+//    写到 26 左右。这张卡最亮的只有灯焰，别的一律在 #2e2418 以下。
+// ③ **一件东西要认得出，就得有别的东西衬着它**。第一版苫子铺满画框，读出来
+//    是"一张纸"；现在窖壁一条、窖底一片、灯一盏，苫子只占中间那块，
+//    右边一只袖口、底下一截下摆压在苫子外头——"底下盖着东西"一眼就看得见。
+// ④ **折痕不是画上去的装饰，是折出来的**：一道折痕永远落在"原来的边"与
+//    "手把它放到哪儿"的正中间——现实里就是这么来的，所以判定与画面天然一致，
+//    玩家看得见自己刚才那一下的结果（这正是拿掉进度条要换来的东西）。
+// ⑤ **印子不是伤口特写**（历史与叙事铁律）：拦腰折上来，襟里子翻出来，那是
+//    一片干成褐色的印子，压得很暗，不描边、不给红。
+// 实拍标定过两轮：`#241a0e` 的苫子渲出来还有 150 上下，`#2a2418` 的盖布到了
+// 200——这条曲线在暗部**极陡**，越往下压，两块颜色分得越开。所以这一组全部
+// 落在 8~26 之间；看着像纯黑的源色，渲出来才是"夜里一盏油灯照着的土窖"。
+const FOLD_FLOOR = "#0a0704";      // 窖底夯土
+const FOLD_WALL = "#060403";       // 窖壁（比地面还沉，东西在它前面才立得住）
+const FOLD_MAT = "#100b05";        // 草苫（编席）
+const FOLD_MAT_HI = "#1a1207";     // 灯照着的那半边苫子
+const FOLD_COVER = "#0c0a06";      // 盖在上头那领破麻苫（比苫子还暗：它压在上头）
+const FOLD_COVER_HI = "#181309";   // 麻苫被灯照亮的那几缕
+const FOLD_CLOTH = "#0a0b0e";      // 爹的褂子：靛蓝土布洗到发暗
+const FOLD_CLOTH_IN = "#090a0c";   // 里子（没晒过，只比正面浅一线——差半档就白了）
+const FOLD_STAIN = "#0e0503";      // 那片印子（同抱在怀里那张小图的渍色，再压一档）
+const FOLD_INK = "#040302";
+
+/** 一块布：带手绘毛边的四边形。布的边不许笔直（"四边笔直＝没有手"） */
+function FoldQuad(ctx, pts, id, fill, S, { lw = 5, shade = "rgba(0,0,0,0.30)", amp = 4 } = {}) {
+  InkFill(ctx, pts, id, fill, { amp: amp * S, lw: lw * S, line: FOLD_INK, shade });
+}
+
+export function DrawFoldCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  const P = (x, y) => [x * W, y * W];
+  const clamp01 = (v) => Math.max(0, Math.min(1, v || 0));
+  const idx = Math.max(0, Math.min(L.folds.length, view.idx | 0));
+  const cur = L.folds[idx] || null;
+  const linger = clamp01(view.linger);
+  const F = L.folds, M = L.mat, SH = L.shirt, CV = L.cover;
+  const tip = view.tip || (cur ? cur.from : F[F.length - 1].to);
+  // 脱手那一下整幅抖一抖（抖的是布，不是画面）
+  const sy = view.slip ? Math.sin(t * 42) * 0.004 : 0;
+
+  LiveCardBase(ctx, W, H, "#1a1109");
+
+  // ── 窖壁与窖底 ──
+  // 三笔交代"跪在自家地窖里"：上头一条挖出来的土壁（带镐痕），底下一片夯土，
+  // 交界处一道墨线。没有它们，苫子就是一张浮在空中的纸。
+  ctx.save();
+  ctx.fillStyle = FOLD_WALL;
+  ctx.fillRect(0, 0, W, L.wall * W + 4 * S);
+  ctx.fillStyle = FOLD_FLOOR;
+  ctx.fillRect(0, L.wall * W, W, H - L.wall * W);
+  ctx.restore();
+  // 窖壁上一道道镐痕：这窖是一镐一镐掏出来的
+  ctx.save();
+  ctx.strokeStyle = "rgba(52,38,20,0.55)";
+  ctx.lineWidth = 3.2 * S;
+  for (let i = 0; i < 14; i += 1) {
+    const x = (W * (i + 0.4)) / 14 + 12 * S * (Hash(`foldPick${i}`) - 0.5);
+    const h = L.wall * W * (0.35 + 0.5 * Hash(`foldPickH${i}`));
+    ctx.beginPath();
+    ctx.moveTo(x, L.wall * W - h);
+    ctx.quadraticCurveTo(x + 9 * S, L.wall * W - h * 0.4, x + 3 * S, L.wall * W - 2 * S);
+    ctx.stroke();
+  }
+  ctx.restore();
+  InkLine(ctx, -20 * S, L.wall * W, W + 20 * S, L.wall * W - 5 * S, "foldWallEdge",
+    { lw: 5 * S, color: "rgba(6,4,2,0.9)", amp: 5 * S });
+  Speckle(ctx, 0, L.wall * W, W, H - L.wall * W, "foldGrit",
+    { count: Math.round(W / 10), alpha: 0.06, size: 2.4 });
+
+  // ── 一盏豆油灯：这张卡唯一的光源，也是"夜里"三个字唯一的说明 ──
+  // 灯先画在地上（人和苫子都比它近），光在最后一步铺；焰心是全卡最亮的一点
+  {
+    const lp = P(L.lamp.x, L.lamp.y);
+    const r = 0.030 * W;
+    // 浅碟：一只粗陶灯盏，底下一圈影
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(lp[0] + r * 0.2, lp[1] + r * 0.5, r * 1.6, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    InkFill(ctx, [
+      [lp[0] - r * 1.25, lp[1] - r * 0.20], [lp[0] + r * 1.25, lp[1] - r * 0.26],
+      [lp[0] + r * 0.80, lp[1] + r * 0.40], [lp[0] - r * 0.82, lp[1] + r * 0.42],
+    ], "foldLampDish", "#2c2116", { amp: 2 * S, lw: 4 * S, line: FOLD_INK, shade: "rgba(0,0,0,0.3)" });
+    // 灯捻子从盏沿探出来，焰是一小簇（抖，但别抖成火把）
+    const flick = 1 + Math.sin(t * 7.3) * 0.10 + Math.sin(t * 3.1) * 0.06;
+    const fx = lp[0] + r * 0.86, fy = lp[1] - r * 0.24;
+    InkLine(ctx, fx - r * 0.5, fy + r * 0.12, fx, fy, "foldWick",
+      { lw: 3 * S, color: "#3a2b16", amp: 1.4 * S });
+    ctx.save();
+    const fg = ctx.createRadialGradient(fx, fy - r * 0.42 * flick, r * 0.03,
+      fx, fy - r * 0.3 * flick, r * 0.72 * flick);
+    fg.addColorStop(0, "#ffeec4");
+    fg.addColorStop(0.34, "#e0a63c");
+    fg.addColorStop(1, "rgba(148,86,20,0)");
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.ellipse(fx, fy - r * 0.36 * flick, r * 0.34 * flick, r * 0.62 * flick, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── 草苫：编席。东西摊在上头 ──
+  {
+    const a = P(M.x0, M.y0), b = P(M.x1, M.y1);
+    // 近的一边（下沿）比远的一边（上沿）宽一点：一张平铺的席子在低机位下就是
+    // 这个样子，两条边一样长会读成一张贴在墙上的纸
+    const inset = 0.020 * W;
+    FoldQuad(ctx, [
+      [a[0] + inset, a[1] + 5 * S], [b[0] - inset - 8 * S, a[1]],
+      [b[0], b[1]], [a[0], b[1] - 4 * S],
+    ], "foldMat", FOLD_MAT, S, { lw: 6, shade: "rgba(0,0,0,0.34)" });
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
+    ctx.clip();
+    // 灯那一侧的苫子亮一档（光是从左前来的）
+    const mg = ctx.createLinearGradient(a[0], 0, b[0], 0);
+    mg.addColorStop(0, FOLD_MAT_HI);
+    mg.addColorStop(0.55, "rgba(0,0,0,0)");
+    ctx.fillStyle = mg;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
+    ctx.globalAlpha = 1;
+    // 编纹：竖的篾条密、横的篾条疏（席子就是这么编的，别画成格子布）
+    ctx.strokeStyle = "rgba(6,4,2,0.42)";
+    ctx.lineWidth = 2.4 * S;
+    for (let i = 1; i < 30; i += 1) {
+      const x = a[0] + ((b[0] - a[0]) * i) / 30;
+      ctx.beginPath();
+      ctx.moveTo(x, a[1]);
+      ctx.lineTo(x + 5 * S * (Hash(`foldWarp${i}`) - 0.5), b[1]);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(52,38,16,0.20)";
+    ctx.lineWidth = 3 * S;
+    for (let i = 1; i < 8; i += 1) {
+      const y = a[1] + ((b[1] - a[1]) * i) / 8;
+      ctx.beginPath();
+      ctx.moveTo(a[0], y);
+      ctx.lineTo(b[0], y + 4 * S * (Hash(`foldWeft${i}`) - 0.5));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 褂子 ──
+  // 每一折都由"原来的边"和"手把它放到哪儿"两个数长出来，折痕落在正中间。
+  const At = (i) => (idx === i ? tip : (idx > i ? F[i].to : F[i].from));
+  const cuffPull = At(1).x - F[1].from.x;                   // 两袖交叠：袖口收进来多少
+  const cuffL = idx >= 1 ? SH.cuffL + cuffPull : SH.cuffL;
+  const cuffR = idx >= 1 ? SH.cuffR - cuffPull * 0.86 : SH.cuffR;
+  const halfEdge = idx >= 2 ? At(2).x : SH.x0;
+  const bodyL = idx >= 2 ? (SH.x0 + halfEdge) / 2 : SH.x0;  // 折痕＝原边与落点的正中
+  const bodyR = SH.x1;
+  const hemEdge = idx >= 3 ? At(3).y : SH.hemY;
+  const bodyB = idx >= 3 ? (SH.hemY + hemEdge) / 2 : SH.hemY;
+  const top = SH.shoulderY;
+  {
+    // 两只袖子（还没折进去的时候探在外头）
+    if (idx <= 1) {
+      const y0 = top + 0.028, y1 = top + 0.122;
+      for (const [cx, inner, id] of [[cuffL, bodyL + 0.02, "foldSlvL"], [cuffR, bodyR - 0.02, "foldSlvR"]]) {
+        FoldQuad(ctx, [
+          P(cx, y0 + 0.008 + sy), P(inner, y0 + sy), P(inner, y1 + sy), P(cx, y1 - 0.005 + sy),
+        ], id, FOLD_CLOTH, S, { lw: 4, shade: "rgba(0,0,0,0.24)" });
+        // 袖口那一圈磨白的边：一件穿了十年的褂子，磨损在袖口和肘上
+        InkLine(ctx, ...P(cx + (cx < 0.5 ? 0.004 : -0.004), y0 + 0.012 + sy),
+          ...P(cx + (cx < 0.5 ? 0.004 : -0.004), y1 - 0.010 + sy),
+          `${id}Cuff`, { lw: 3 * S, color: "rgba(96,88,74,0.5)", amp: 2 * S });
+      }
+    }
+    // 身子
+    FoldQuad(ctx, [
+      P(bodyL, top + sy), P(bodyR, top - 0.005 + sy),
+      P(bodyR + 0.006, bodyB + sy), P(bodyL - 0.004, bodyB + 0.006 + sy),
+    ], "foldBody", FOLD_CLOTH, S, { lw: 5, shade: "rgba(0,0,0,0.32)" });
+    // 领口那道豁 + 对襟那条缝 + 三颗布纽襻：不给这几笔，褂子就是一块方布
+    if (idx < 2) {
+      const cx0 = (SH.x0 + SH.x1) / 2;
+      FoldQuad(ctx, [
+        P(cx0 - 0.050, top + sy), P(cx0 + 0.050, top + sy),
+        P(cx0 + 0.031, top + 0.054 + sy), P(cx0 - 0.031, top + 0.054 + sy),
+      ], "foldCollar", "#0f1013", S, { lw: 3, shade: null, amp: 2 });
+      InkLine(ctx, ...P(cx0 + 0.004, top + 0.052 + sy), ...P(cx0 - 0.002, bodyB - 0.012 + sy),
+        "foldPlacket", { lw: 2.8 * S, color: "rgba(6,5,4,0.7)", amp: 2.5 * S });
+      for (let i = 0; i < 3; i += 1) {
+        const q = P(cx0 + 0.004, top + 0.104 + i * 0.078 + sy);
+        ctx.save();
+        ctx.fillStyle = "#3b352b";
+        ctx.beginPath();
+        ctx.ellipse(q[0], q[1], 5.5 * S, 4.2 * S, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  // ── 折过的地方是**两层布**，不是一条线 ──
+  // 折痕一律画成"暗芯 + 迎着灯那侧一线亮"：单画一条亮线，在这套暗调色板上会
+  // 亮成一道刀口，整件读成一张对折的纸。叠上去的那一幅还要压暗一档——
+  // 两层布本来就比一层沉，这一档就是"我刚才折过了"的全部证据。
+  if (idx >= 2) {
+    const x0 = bodyL, x1 = Math.min(bodyR, bodyL + (halfEdge - bodyL));
+    if (x1 - x0 > 0.004) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#000";
+      ctx.fillRect(...P(x0, top), (x1 - x0) * W, (bodyB - top) * W);
+      ctx.restore();
+    }
+    InkLine(ctx, ...P(bodyL + 0.003, top + 0.014), ...P(bodyL, bodyB - 0.014),
+      "foldCrease1", { lw: 4.6 * S, color: "rgba(2,2,2,0.8)", amp: 3 * S });
+    InkLine(ctx, ...P(bodyL + 0.008, top + 0.016), ...P(bodyL + 0.005, bodyB - 0.016),
+      "foldCrease1b", { lw: 2 * S, color: "rgba(28,27,24,0.45)", amp: 3 * S });
+  }
+  if (idx >= 3) {
+    InkLine(ctx, ...P(bodyL + 0.008, bodyB), ...P(bodyR - 0.006, bodyB - 0.004),
+      "foldCrease2", { lw: 4.6 * S, color: "rgba(2,2,2,0.75)", amp: 3 * S });
+    InkLine(ctx, ...P(bodyL + 0.010, bodyB - 0.006), ...P(bodyR - 0.008, bodyB - 0.010),
+      "foldCrease2b", { lw: 2 * S, color: "rgba(46,44,38,0.5)", amp: 3 * S });
+  }
+
+  // ── 翻上来的那一幅：里子朝天，那片印子就在这儿 ──
+  // 拦腰折上来的时候襟里子转到上面来——"印子是玩家自己翻出来的"就是这一笔。
+  if (idx >= 3 && bodyB - hemEdge > 0.004) {
+    FoldQuad(ctx, [
+      P(bodyL + 0.004, bodyB), P(bodyR - 0.004, bodyB - 0.004),
+      P(bodyR - 0.011, hemEdge), P(bodyL + 0.011, hemEdge + 0.005),
+    ], "foldInner", FOLD_CLOTH_IN, S, { lw: 4, shade: "rgba(0,0,0,0.34)" });
+    // 印子：**渍是把布染暗的，不是往布上涂一块颜色**。第一版用普通混合画
+    // 深红，渲出来是布面上一枚发亮的锈红饼——正是「历史与叙事铁律」里说的
+    // 「伤口特写」。改成 multiply：它只能把底下的布压暗、稍微带一点土褐，
+    // 边缘自然渗开，怎么调都亮不起来。
+    ctx.save();
+    // 渍只在**这幅布上**：不夹的话几团影会漫到苫子上去，读成"地上有一摊"
+    ctx.beginPath();
+    ctx.rect(bodyL * W, hemEdge * W, (bodyR - bodyL) * W, (bodyB - hemEdge) * W);
+    ctx.clip();
+    ctx.globalCompositeOperation = "multiply";
+    // 一片渍是**摊开的、边上深中间淡**（血是从外缘往里干的），不是一个圆点。
+    // 所以：几团错得很开的淡影叠出不规则的一片，外缘再压两笔深的
+    ctx.globalAlpha = 0.16 + 0.16 * clamp01(view.blood ? 1 : view.k);
+    const cx = P(bodyL + (bodyR - bodyL) * 0.56, (hemEdge + bodyB) / 2 + 0.002);
+    const rr = Math.min(bodyB - hemEdge, 0.088) * W;
+    for (let i = 0; i < 7; i += 1) {
+      const a = Hash(`foldStain${i}`) * Math.PI * 2;
+      const dx = Math.cos(a) * rr * (0.40 + 0.80 * Hash(`foldStainD${i}`));
+      const dy = Math.sin(a) * rr * (0.16 + 0.34 * Hash(`foldStainD${i}`));
+      const g = ctx.createRadialGradient(cx[0] + dx, cx[1] + dy, rr * 0.04,
+        cx[0] + dx, cx[1] + dy, rr * (0.62 + 0.42 * Hash(`foldStainR${i}`)));
+      g.addColorStop(0, "#9c8878");
+      g.addColorStop(0.55, "#b4a496");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(cx[0] + dx, cx[1] + dy, rr * (0.60 + 0.34 * Hash(`foldStainW${i}`)),
+        rr * (0.34 + 0.22 * Hash(`foldStainH${i}`)), a * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 干透的外缘：一圈深一档的边（这一笔才让它读成"渗进去又干了"）
+    ctx.globalAlpha = 0.20 + 0.18 * clamp01(view.blood ? 1 : view.k);
+    ctx.strokeStyle = "#8c7a6c";
+    ctx.lineWidth = 5 * S;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(cx[0] + (Hash(`foldRim${i}`) - 0.5) * rr * 0.5,
+        cx[1] + (Hash(`foldRimY${i}`) - 0.5) * rr * 0.3,
+        rr * (0.72 + 0.24 * Hash(`foldRimR${i}`)), rr * (0.40 + 0.16 * Hash(`foldRimR2${i}`)),
+        Hash(`foldRimA${i}`) * 1.4, 0.4 + i * 1.8, 2.4 + i * 1.8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 盖在上头那领破麻苫（第一下手：把它拖开） ──
+  // 苫角就是玩家攥着的那个点——**手拖的就是画面里这块布本身**，不是一根量。
+  // 拖走的时候整幅跟着走，左边越堆越皱；右边一只袖口、底下一截下摆先露出来。
+  if (idx === 0) {
+    const d = Math.min(0, tip.x - F[0].from.x);
+    const dy = tip.y - F[0].from.y;
+    // 四个角：右下角＝手；其余按"整幅被拖走"的比例跟，左边跟得慢＝堆起来
+    const c = [
+      P(CV.x0 + d * 0.34, CV.y0 + dy * 0.30 + 0.004),      // 左上
+      P(CV.x1 + d * 0.62, CV.y0 + dy * 0.46),              // 右上
+      [tip.x * W, tip.y * W],                              // 右下＝手上那个角
+      P(CV.x0 + d * 0.40, CV.y1 + dy * 0.66),              // 左下
+    ];
+    // 盖着东西的布是鼓的：上下两条边往外拱一点
+    const mid = (p0, p1, k) => [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2 + k * W];
+    const quad = [c[0], mid(c[0], c[1], -0.016), c[1], c[2], mid(c[2], c[3], 0.014), c[3]];
+    FoldQuad(ctx, quad, "foldCover", FOLD_COVER, S, { lw: 6, shade: "rgba(0,0,0,0.40)", amp: 5 });
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(quad[0][0], quad[0][1]);
+    for (const q of quad.slice(1)) ctx.lineTo(q[0], q[1]);
+    ctx.closePath();
+    ctx.clip();
+    // 麻苫是**编出来的**，不是一块板：一层粗麻的斜纹，灯那一侧亮几缕。
+    // 没有这层纹，多暗都还是"一张纸"（第一版实拍就栽在这上头）
+    ctx.strokeStyle = FOLD_COVER_HI;
+    ctx.lineWidth = 3 * S;
+    ctx.globalAlpha = 0.55;
+    for (let i = -14; i < 34; i += 1) {
+      const x0 = c[0][0] + i * 26 * S;
+      ctx.beginPath();
+      ctx.moveTo(x0, c[0][1] - 20 * S);
+      ctx.lineTo(x0 + 46 * S, c[3][1] + 20 * S);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.30;
+    ctx.strokeStyle = "rgba(4,3,2,0.9)";
+    for (let i = 0; i < 9; i += 1) {
+      const y = c[0][1] + ((c[3][1] - c[0][1]) * i) / 9;
+      ctx.beginPath();
+      ctx.moveTo(c[0][0] - 20 * S, y);
+      ctx.lineTo(c[1][0] + 20 * S, y + 6 * S);
+      ctx.stroke();
+    }
+    // **褶子从手上那个角放射出来**——这是一块布被人攥住一角拖着走时唯一诚实的
+    // 样子。拖得越远褶越深，左边越堆越紧（"东西压着，得再抻一把"就长在这儿）
+    const heap = Math.min(1, -d / 0.42);
+    ctx.globalAlpha = 0.42 + 0.34 * heap;
+    ctx.strokeStyle = "rgba(3,2,1,0.95)";
+    ctx.lineWidth = (3 + 2.4 * heap) * S;
+    for (let i = 0; i < 9; i += 1) {
+      const u = (i + 0.5) / 9;
+      const far = [c[0][0] + (c[3][0] - c[0][0]) * u, c[0][1] + (c[3][1] - c[0][1]) * u];
+      ctx.beginPath();
+      ctx.moveTo(c[2][0], c[2][1]);
+      ctx.quadraticCurveTo((c[2][0] + far[0]) / 2, (c[2][1] + far[1]) / 2 + (u - 0.5) * 70 * S,
+        far[0], far[1]);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 麻苫的毛边：底下一排散出来的草茬
+    ctx.save();
+    ctx.strokeStyle = "rgba(58,44,22,0.65)";
+    ctx.lineWidth = 2.4 * S;
+    for (let i = 0; i < 22; i += 1) {
+      const u = i / 22;
+      const x0 = c[3][0] + (c[2][0] - c[3][0]) * u;
+      const y0 = c[3][1] + (c[2][1] - c[3][1]) * u;
+      const len = (5 + 9 * Hash(`foldFray${i}`)) * S;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 + 3 * S * (Hash(`foldFrayX${i}`) - 0.5), y0 + len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    // 揭下来之后：堆在左边画框外，只露一角
+    FoldQuad(ctx, [
+      P(-0.09, M.y0 + 0.03), P(M.x0 + 0.052, M.y0 + 0.085),
+      P(M.x0 + 0.030, M.y1 - 0.01), P(-0.09, M.y1 - 0.05),
+    ], "foldCoverHeap", "#0d0b06", S, { lw: 5, shade: "rgba(0,0,0,0.38)" });
+  }
+
+  // ── 手上正攥着的那个角 ──
+  // 招呼**长在实物上**（悬空的抽象图形一律不许有）：没上手的时候那个角自己
+  // 翘起来、朝该去的方向蹭两下；攥住了就翻起来，底下露出一小片影。
+  // 揭苫那一下的角已经是苫子自己的角（上面画过了），只补一道翘起来的高光。
+  if (cur) {
+    const tp = P(tip.x, tip.y);
+    const dx = cur.to.x - cur.from.x, dy = cur.to.y - cur.from.y;
+    const dd = Math.hypot(dx, dy) || 1;
+    const ux = dx / dd, uy = dy / dd;
+    const nudge = view.grab ? 0 : (Math.sin(t * 2.2) * 0.5 + 0.5) * 0.024;
+    const ax = tp[0] + ux * nudge * W, ay = tp[1] + uy * nudge * W;
+    const lift = (view.grab ? 34 : 18) * S;
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(ax + 5 * S, ay + 9 * S, 30 * S, 12 * S, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (idx === 0) {
+      // 苫子那一下：整个角真的翻起来了，画成一小片翻过来的布。
+      // **颜色只比苫子亮一线**（那是布的背面）——第一版给了 #39311f，实拍出来
+      // 是压在暗苫子上的一块浅色饼，读成"另有一件东西"，不是"角被拈起来了"
+      FoldQuad(ctx, [
+        [ax - 26 * S, ay + 9 * S], [ax + 24 * S, ay + 6 * S],
+        [ax + 16 * S - ux * lift, ay - 17 * S - lift * 0.7],
+        [ax - 18 * S - ux * lift, ay - 12 * S - lift * 0.7],
+      ], "foldGrip", "#15110a", S, { lw: 3.4, shade: "rgba(0,0,0,0.30)", amp: 2.4 });
+    } else {
+      // 衣裳那三下：捏住的是布边，**不许再画一块新的布**盖上去（画了就是
+      // "衣裳上趴着一块小方片"）。只给一撮拎起来的褶：暗芯一道、迎光一线亮
+      const w = 26 * S, h = 13 * S + lift * 0.5;
+      InkLine(ctx, ax - w, ay + 6 * S, ax - w * 0.2 - ux * lift * 0.5, ay - h,
+        "foldPinchA", { lw: 4 * S, color: "rgba(2,2,2,0.85)", amp: 2 * S });
+      InkLine(ctx, ax + w, ay + 4 * S, ax + w * 0.2 - ux * lift * 0.5, ay - h,
+        "foldPinchB", { lw: 4 * S, color: "rgba(2,2,2,0.85)", amp: 2 * S });
+      InkLine(ctx, ax - w * 0.15 - ux * lift * 0.5, ay - h, ax + w * 0.15 - ux * lift * 0.5, ay - h * 0.86,
+        "foldPinchTip", { lw: 3 * S, color: "rgba(58,56,48,0.7)", amp: 1.6 * S });
+    }
+
+    // 落点画成**那道将要折出来的折痕**，不是一个悬空的记号（第 8 条：招呼长在
+    // 实物上）。折痕当然是横在折的方向上的——所以这条线垂直于该拖的方向，
+    // 一并就把"往哪儿拖"说清楚了，一个字都不用写
+    if (!view.grab) {
+      const to = P(cur.to.x, cur.to.y);
+      const half = 0.075 * W;
+      ctx.save();
+      ctx.setLineDash([10 * S, 12 * S]);
+      ctx.strokeStyle = "rgba(174,146,92,0.40)";
+      ctx.lineWidth = 3 * S;
+      ctx.beginPath();
+      ctx.moveTo(to[0] + uy * half, to[1] - ux * half);
+      ctx.lineTo(to[0] - uy * half, to[1] + ux * half);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ── 抻那一下（揭苫）：吃上劲的时候苫子绷出几道纵向的纹 ──
+  if (cur?.cinch && view.homed) {
+    const c = clamp01(view.cinch);
+    ctx.save();
+    ctx.globalAlpha = 0.20 + 0.40 * c;
+    ctx.strokeStyle = "#8a7442";
+    ctx.lineWidth = 2.6 * S;
+    for (let i = 0; i < 5; i += 1) {
+      const y = tip.y - 0.09 + i * 0.045;
+      ctx.beginPath();
+      ctx.moveTo(...P(tip.x + 0.025, y));
+      ctx.lineTo(...P(tip.x + 0.15 + 0.05 * c, y + 0.006));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 灯光：最后铺，压在所有东西上（光是照在它们身上的，不是它们身后的） ──
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const lp = P(L.lamp.x, L.lamp.y);
+  const pool = ctx.createRadialGradient(lp[0], lp[1], 0.02 * W, lp[0] + 0.09 * W, lp[1] + 0.02 * W, 0.66 * W);
+  pool.addColorStop(0, "rgba(84,56,20,0.42)");
+  pool.addColorStop(0.30, "rgba(58,38,14,0.18)");
+  pool.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = pool;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  // 四角压暗，和别的活卡一个调子；停在最后那两秒半时再压一档，
+  // 光只剩衣裳上那一点——那一镜要的就是"别的都退出去"
+  const vg = ctx.createRadialGradient(W * 0.52, H * 0.50, H * (0.36 - 0.14 * linger),
+    W * 0.52, H * 0.52, H * 0.94);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, `rgba(4,3,2,${0.66 + 0.22 * linger})`);
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
 // 晾衣绳。土布只有两个颜色：**靛蓝**和本色的土黄白，冷灰一律不要（那是
 // 现代机织棉布）。补丁大小不一、颜色各不相同，补在肘和膝——那是真磨破的地方。
 export function DrawClothesline(ctx, x, groundY, id) {
@@ -5845,6 +6314,23 @@ function HudGlyph(ctx, icon, R) {
         ctx.lineTo(R * 1.08, R * 0.02 + (i - 1) * R * 0.14);
         ctx.stroke();
       }
+      break;
+    }
+    case "fold": {
+      // 叠衣裳：一摞叠好的布，一角掀起来。三条横边＝三道折痕（一条不够，
+      // 读成一块板子），掀起的那一角是"手上正在干这件事"的记号
+      const w = R * 0.72, y0 = -R * 0.30;
+      for (let i = 0; i < 3; i += 1) {
+        const yy = y0 + i * R * 0.26;
+        const ww = w * (1 - i * 0.10);
+        InkFill(ctx, [[-ww, yy], [ww, yy - R * 0.03], [ww, yy + R * 0.20], [-ww, yy + R * 0.23]],
+          `hudFold${i}`, i === 0 ? "#5a5048" : "#4a4038",
+          { amp: R * 0.02, lw: R * 0.045, shade: "rgba(0,0,0,0.24)" });
+      }
+      // 掀起来的那一角：从最上一层的右角翻出来，露出里子（浅一档）
+      InkFill(ctx, [[w * 0.36, y0 - R * 0.01], [w * 1.00, y0 - R * 0.03],
+        [w * 0.86, -R * 0.44], [w * 0.30, -R * 0.30]],
+      "hudFoldTip", "#6b6055", { amp: R * 0.02, lw: R * 0.045, shade: "rgba(0,0,0,0.20)" });
       break;
     }
     case "winch": {
