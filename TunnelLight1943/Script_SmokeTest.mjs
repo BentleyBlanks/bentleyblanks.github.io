@@ -12,7 +12,7 @@ import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
   SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
-  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, SLING, SlingSolve,
+  SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, SLING, SlingSolve,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments, AllRelics,
 } from "./Script_Core.mjs";
@@ -827,9 +827,10 @@ function KnotDrive(state, input, target, tick) {
     Put(kc.tip.x, kc.tip.y);
     return;
   }
+  // 打结那一路：按顺序奔下一道关口；挽完了就顺着 pull 一把拽到底
   const aim = kc.phase === "cinch"
     ? { x: kc.tip.x + target.pull.x, y: kc.tip.y + target.pull.y }
-    : (kc.inEye ? target.out : target.eye);
+    : target.gates[Math.min(kc.gate, target.gates.length - 1)];
   const vx = aim.x - kc.tip.x, vy = aim.y - kc.tip.y;
   const d = Math.hypot(vx, vy) || 1;
   // 手只许比绳头领先这么一点：领先过头就是"甩脱了"，那条规矩这里不许绕开
@@ -837,20 +838,25 @@ function KnotDrive(state, input, target, tick) {
   Put(kc.tip.x + (vx / d) * step, kc.tip.y + (vy / d) * step);
 }
 
-/** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒了几把 */
+/** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒紧到了几成 */
 function DragKnotThrough(state, drive) {
   const t = GetBeatTarget(state);
   assert.equal(t?.action, "knotAt", "接绳那一步的驱动目标应该是拖绳头，不是长按");
-  assert.ok(t.card && t.eye && t.pull, "驱动目标得把卡上的落点（圈眼/勒紧方向）交出来");
+  assert.ok(t.card && t.gates?.length && t.pull, "驱动目标得把卡上的落点（五道关口/勒紧方向）交出来");
   for (let i = 0; i < 900 && state.knotCard; i += 1) {
     const input = {};
     KnotDrive(state, input, t, i);
     drive(input);
   }
-  return state.beat.knotState?.pulls ?? 0;
+  return state.beat.knotState?.cinch ?? 0;
 }
 
-function TestKnotIsThreadingNotCircling() {
+// 接绳打的是**单编结**，不是"把绳头塞进一个圈里再拽"。
+// 用户 2026-08-10 退回过第三版：「井里绳子打结的打结玩法一点都不符合直觉
+// 哪有打结是这样的」——说得对：穿一下再拽，一拉就出来了，什么也没打上。
+// 现在五道关口按顺序过（塞进弯口 → 从两股中间钻出来 → 绕到背后 → 从底下
+// 兜回来 → 从自己那股底下掖出去），再一把勒到底。这几条守着它别退化。
+function TestKnotIsASheetBend() {
   const Setup = () => {
     const state = CreateGame(0);
     const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
@@ -874,15 +880,30 @@ function TestKnotIsThreadingNotCircling() {
   };
   const L = KNOT_CARD;
   const card = (x, y) => ({ u: x, v: y * L.aspect });
+  // 攥住绳头，再一小步一小步把它拖到 (x,y)——手不许比绳头领先太多（会脱手）
+  const dragTo = (state, q, maxFrames = 90) => {
+    for (let i = 0; i < maxFrames; i += 1) {
+      const tip = state.knotCard?.tip;
+      if (!tip) return;
+      const vx = q.x - tip.x, vy = q.y - tip.y;
+      const d = Math.hypot(vx, vy);
+      if (d < 0.02) return;
+      const s2 = Math.min(d, L.grabR);
+      step(state, { pointerHeld: true, pointerCard: card(tip.x + (vx / d) * s2, tip.y + (vy / d) * s2) });
+    }
+  };
+  const grabTip = (state) => {
+    step(state, {});
+    step(state, { pointerHeld: true, pointerCard: card(state.knotCard.tip.x, state.knotCard.tip.y) }, 2);
+  };
 
   // ① 长按互动键：一点用都没有
   {
     const state = Setup();
     step(state, {}, 2);
     step(state, { interactHeld: true }, Math.ceil(6.0 / DT));
-    assert.equal(state.beat.knotState?.pulls ?? 0, 0,
-      "长按 E 居然把结勒上了——这条后备必须是死的");
-    assert.ok(!state.beat.knotState?.threaded, "长按不该把绳头穿过圈眼");
+    assert.equal(state.beat.knotState?.gate ?? 0, 0, "长按 E 居然把结挽上了——这条后备必须是死的");
+    assert.equal(state.beat.knotState?.cinch ?? 0, 0, "长按 E 不该把结勒紧");
     assert.ok(!state.flags.wellRopeFixed, "长按不该把井绳接好");
   }
 
@@ -900,53 +921,71 @@ function TestKnotIsThreadingNotCircling() {
       "在卡上别处按下再拖，绳头不该动（这正是「不是 slider」的意思）");
   }
 
-  // ③ 得**真的从圈眼里穿**：绕着圈的外面划到左边不算数
+  // ③ **跳着走不算数**。这一条是这次重做的题眼：绕过"背后"和"底下"两道，
+  //    直接从弯口奔最后那道掖，那打出来的根本不是结——绳头虚搭在弯里，一拽就出来
   {
     const state = Setup();
     step(state, {}, 2);
-    // 攥住绳头，然后从圈的**上方**绕过去，一路划到圈心以西
-    step(state, { pointerHeld: true, pointerCard: card(state.knotCard.tip.x, state.knotCard.tip.y) }, 2);
+    grabTip(state);
     assert.ok(state.knotCard.grab, "按在绳头上要攥得住");
-    const way = [
-      { x: 0.62, y: 0.06 }, { x: 0.46, y: 0.02 }, { x: 0.30, y: 0.03 }, { x: 0.18, y: 0.10 },
-    ];
-    for (const q of way) {
-      for (let i = 0; i < 40; i += 1) {
-        const tip = state.knotCard.tip;
-        const vx = q.x - tip.x, vy = q.y - tip.y;
-        const d = Math.hypot(vx, vy);
-        if (d < 0.02) break;
-        const s = Math.min(d, 0.1);
-        step(state, { pointerHeld: true, pointerCard: card(tip.x + (vx / d) * s, tip.y + (vy / d) * s) });
-      }
+    dragTo(state, L.gates[0]);                 // 第一道：塞进弯口
+    assert.equal(state.beat.knotState.gate, 1, "塞进弯口该过第一道");
+    dragTo(state, L.gates[4]);                 // 直奔最后一道
+    assert.equal(state.beat.knotState.gate, 1,
+      "跳过「绕背后」「兜底下」直接去掖——不该算数，那不是单编结");
+    assert.ok(state.knotCard.wrong || state.beat.knotState.wrongT >= 0,
+      "凑到还没轮到的那道关口上，卡上得有一下回话");
+    assert.equal(state.beat.knotState.cinch, 0, "结都没挽上，勒紧无从谈起");
+  }
+
+  // ④ 五道关口按顺序走完，再一把勒到底：井绳接好
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    grabTip(state);
+    for (const g of L.gates) dragTo(state, g);
+    assert.equal(state.beat.knotState.gate, L.gates.length, "顺着走完五道关口，结就挽上了");
+    assert.equal(state.knotCard.phase, "cinch", "挽上了就该进勒紧那一下");
+    // 勒紧是**一把拽到底**（不是倒手三次）：顺着 cinch 方向一路拖
+    const u = KnotCinchDir();
+    for (let i = 0; i < 200 && state.knotCard; i += 1) {
+      const tip = state.knotCard.tip;
+      step(state, { pointerHeld: true, pointerCard: card(tip.x + u.x * L.grabR, tip.y + u.y * L.grabR) });
     }
-    assert.ok(state.knotCard.tip.x < L.outX + 0.06, "绕上去这一路得真把绳头带到了圈西边");
-    assert.equal(state.knotCard.phase, "tuck",
-      "从圈**外面**绕过去不算穿过去——不进那个洞就不该算数");
-  }
-
-  // ④ 攥住绳头掖进圈眼、再倒手拽三把：井绳接好
-  {
-    const state = Setup();
-    step(state, {}, 2);
-    const pulls = DragKnotThrough(state, (inp) => step(state, inp));
-    assert.ok(pulls >= L.pulls, `一把一把勒到底才算接上（只勒了 ${pulls} 把）`);
-    assert.equal(state.player.item, null, "接绳全程两手都在绳上，物品栏得是空的");
     assert.equal(state.flags.wellRopeFixed, true, "勒死了＝井绳必须接好");
+    assert.equal(state.player.item, null, "接绳全程两手都在绳上，物品栏得是空的");
   }
 
-  // ⑤ 手甩得比绳快：脱手，这一把当场作废
+  // ⑤ 勒到一半撒手：半截的结自己会松（进度往回泄）
   {
     const state = Setup();
     step(state, {}, 2);
-    step(state, { pointerHeld: true, pointerCard: card(state.knotCard.tip.x, state.knotCard.tip.y) }, 2);
+    grabTip(state);
+    for (const g of L.gates) dragTo(state, g);
+    const u = KnotCinchDir();
+    for (let i = 0; i < 24; i += 1) {
+      const tip = state.knotCard.tip;
+      step(state, { pointerHeld: true, pointerCard: card(tip.x + u.x * L.grabR, tip.y + u.y * L.grabR) });
+    }
+    const half = state.beat.knotState.cinch;
+    assert.ok(half > 0.05 && half < 1, `这会儿该勒到一半（实际 ${half}）`);
+    step(state, {}, Math.ceil(1.2 / DT));
+    assert.ok(state.beat.knotState.cinch < half - 0.02,
+      "撒手之后半截的结必须自己松回去一点");
+  }
+
+  // ⑥ 手甩得比绳快：脱手
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    grabTip(state);
     assert.ok(state.knotCard.grab, "这会儿手上还攥着绳头");
     const tip = state.knotCard.tip;
     step(state, { pointerHeld: true, pointerCard: card(tip.x - L.slipR - 0.12, tip.y + 0.10) }, 2);
     assert.ok(!state.knotCard.grab, "手甩出绳头够得着的范围必须脱手");
   }
 
-  // ⑥ 不留 HUD 手势图标 / 按键提示：招呼玩家的是卡上那根绳头自己
+  // ⑦ 不留 HUD 手势图标 / 按键提示：招呼玩家的是卡上那根绳头自己
   {
     const state = Setup();
     step(state, {}, 3);
@@ -956,9 +995,16 @@ function TestKnotIsThreadingNotCircling() {
     assert.ok(!state.closeUp, "有活卡就不该再推世界里的特写（两个镜头打架）");
     assert.equal(EdgeHint(state, state.player.x, 12), null, "活卡上不该再挂画框边缘的路标");
   }
-  console.log("  ✓ 接绳：穿过圈眼不是绕圈 / 长按无效 / 按不准攥不住 / 绕外面不算 / 甩快了脱手");
-}
 
+  // ⑧ 自动通关那条路（驱动器照着五道关口真拖）也得走得通
+  {
+    const state = Setup();
+    step(state, {}, 2);
+    const cinch = DragKnotThrough(state, (inp) => step(state, inp));
+    assert.ok(cinch >= 1 || state.flags.wellRopeFixed, `驱动器得把结挽上并勒死（cinch=${cinch}）`);
+  }
+  console.log("  ✓ 接绳＝单编结：五道关口按顺序过 / 跳着走不算 / 一把勒到底 / 撒手会松 / 长按无效");
+}
 // 辘轳是个转盘，不是一根拉杆：鼠标绕**摇把轴销**转圈才走绳——顺时针放、
 // 逆时针收、脱手倒转；上手的同时镜头必须推成井口特写。
 //
@@ -2251,7 +2297,7 @@ TestRelicsBag();
 TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
-TestKnotIsThreadingNotCircling();
+TestKnotIsASheetBend();
 TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();

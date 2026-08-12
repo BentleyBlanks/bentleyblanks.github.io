@@ -350,53 +350,82 @@ function CanFreeDrop(state) {
 const GROUND_PICK_R = 1.5;    // 拾取半径
 const GROUND_HINT_R = 5.0;    // 悬浮提示可见半径
 // ---------------------------------------------------------------------------
-// 接绳（把断了的井绳和找来的麻绳接上）
+// 接绳（把断了的井绳和找来的麻绳接上）——打的是**单编结**（水手结）
 //
-// 这一拍被退回过两次，两条理由都写死在这儿：
-// ① **绕圈是缠辘轳轴的动作，不是接绳的动作**（2026-08-08 用户：「链接麻绳
-//    为什么也是转圈圈？不太合理」）。真接两根绳是把一头**穿过**另一头挽出的
-//    圈，再一把一把把结勒死，中间没有"绕"。
-// ② **在世界里做，谁也看不出那是在打结**（2026-08-10 用户：「谁看得出来这是
-//    打结」）。量过就明白：1.5m 半宽的井口特写下，整个结横过来才 0.23m，
-//    屏幕上八分之一个画宽——读出来是"一枚圆环挂在一根线上"。石笔和刨子早
-//    为同一个理由改成了铺满画框的手绘活卡（CLAUDE.md 拟物交互第 4 条），
-//    接绳是同一类活：手指按不着、认不出的东西，推镜头治不好。
+// 这一拍被退回过三次，三条理由都写死在这儿：
+// ① **绕圈是缠辘轳轴的动作，不是接绳的动作**（2026-08-08）。
+// ② **在世界里做，谁也看不出那是在打结**（2026-08-10）——1.5m 半宽的井口特写
+//    下整个结才 0.23m，八分之一个画宽。所以搬上了铺满画框的活卡。
+// ③ **穿一下、再拽三下，那压根不是个结**（2026-08-10 用户：「井里绳子打结的
+//    打结玩法一点都不符合直觉 哪有打结是这样的」）。说得对：绳头从一个圈里
+//    穿过去再拽，一拉就出来了，什么也没打上。老版还把"勒紧"拆成倒手拽三把
+//    ——现实里勒紧是**一把连着拽到底**，倒手三次是游戏味儿，不是绳的味儿。
 //
-// 现在这一拍长在 `state.knotCard` 那张活卡上，两段动作，都是人人做过的：
-//   ① **掖过去**：攥住麻绳头，塞进井绳挽出的那个圈眼，从另一侧钻出来。
-//      圈眼画得比拳头还大，绳头穿的时候从圈的前面转到圈的后面——"穿过去"
-//      这件事就是靠这一笔压叠成立的（同旧版 DrawKnot 那条规矩）。
-//   ② **勒紧**：攥住穿出来的绳头往外拽，一把收一档。每拽紧一把，结就把绳
-//      吃进去一截、绳头缩回结跟前——所以**得倒手再抓一次**，三把才勒死。
-//      这是所有人捆过行李的动作，方向、代价、进度全长在那个结上。
+// 现在打的是真结。两根粗细不一样的绳要接，庄稼人打的就是**单编结**
+// （sheet bend／水手结）：粗绳折个弯，细绳从弯里穿上来、绕过两股的背面、
+// 再从自己那一股底下掖出去，最后一把勒死。粗细不同也咬得住，正是这儿的情形
+// （井绳粗、找来的麻绳细）。全过程是**一条连贯的路**，手不用倒，
+// 五个关口都是"这一下手往哪儿走"，没有一处是抽象的量：
+//
+//   ①口   从下面塞进弯口          ②上   从两股中间钻出来
+//   ③背   绕到两股背后（左边）     ④底   从底下兜回右边
+//   ⑤掖   从自己那一股底下掖出来   → 一把勒到底
+//
+// 顺带一条真事儿：单编结打完，**两个绳头得在同一侧**——不在同侧那是"左手
+// 单编结"，吃劲就松。所以麻绳从右下角进画，掖完绳头也甩在右上，和井绳
+// 那个断头一边儿。
 //
 // 坐标一律用「卡宽」单位：x ∈ 0..1，y ∈ 0..1/aspect（＝卡高）。指针落点
 // (pointerCard.u, .v) 换算成这套坐标是 { x: u, y: v / aspect }。
 // **判定与作画共用这一份**，Art 里绝不许另抄一套。
 export const KNOT_CARD = {
   aspect: 16 / 9,
-  eye: { x: 0.40, y: 0.235, r: 0.105 },   // 井绳断头挽出来的圈（圈眼＝要塞进去的那个洞）
-  anchor: { x: 1.04, y: 0.50 },           // 麻绳从画框右下角进画的那一点
-  start: { x: 0.72, y: 0.40 },            // 麻绳头的起手位置
-  grabR: 0.105,                           // 攥得住绳头的判定半径
-  slipR: 0.185,                           // 手飘离绳头这么远就脱手
-  speed: 0.82,                            // 绳有分量：一秒最多跟着手走这么多卡宽
-  reach: 1.02,                            // 绳头离锚点最远到这儿（绳就这么长）
-  outX: 0.255,                            // 绳头走到圈心以西这儿才算"穿出来了"
-  backX: 0.60,                            // 又被拖回它以东＝绳头整根抽出来了
-  pulls: 3,                               // 勒紧要拽几把
-  pullLen: 0.135,                         // 一把至少要拽走这么远才算数
-  pullTo: { x: 0.055, y: 0.46 },          // 每一把往这个方向拽（左下，顺着绳的走向）
+  // 井绳：折回来的那个弯（U 的闭口端在左，开口朝右），两股往右岔开
+  bend: { x: 0.215, y: 0.290, r: 0.074 },
+  legUp: [{ x: 0.215, y: 0.216 }, { x: 0.44, y: 0.172 }, { x: 0.66, y: 0.112 }, { x: 0.80, y: -0.08 }],
+  legLow: [{ x: 0.215, y: 0.364 }, { x: 0.44, y: 0.392 }, { x: 0.645, y: 0.402 }],
+  anchor: { x: 1.06, y: 0.505 },          // 麻绳从画框右下角进画的那一点
+  start: { x: 0.82, y: 0.440 },           // 麻绳头的起手位置
+  // 五个关口，**必须按顺序过**：跳着走不算数（那就不是这个结了）。
+  // 关键的是三、四两道：**绕的是那两股，不是那个弯**。绕着弯的闭口兜一圈，
+  // 绳圈会顺着弯滑到开口那头脱出去——那不叫结，叫套着。绕住两股再掖住自己，
+  // 一吃劲两股就把麻绳咬死，这才是单编结管用的地方
+  gates: [
+    { id: "mouth", x: 0.335, y: 0.294, r: 0.086, hint: "从下面塞进弯口" },
+    { id: "up", x: 0.302, y: 0.120, r: 0.080, hint: "从两股中间钻上来" },
+    { id: "over", x: 0.585, y: 0.130, r: 0.084, hint: "贴着上股往右挪" },
+    { id: "back", x: 0.560, y: 0.470, r: 0.090, hint: "绕到两股背后兜下来" },
+    { id: "tuck", x: 0.175, y: 0.212, r: 0.080, hint: "从自己那股底下掖出去" },
+  ],
+  grabR: 0.088,                           // 攥得住绳头的判定半径
+  slipR: 0.170,                           // 手飘离绳头这么远就脱手
+  speed: 0.95,                            // 绳有分量：一秒最多跟着手走这么多卡宽
+  cinchSpeed: 0.13,                       // 勒紧那一把慢得多——**结在咬**，绳一寸一寸地走
+  // 绳就这么长（绳头离锚点最远到这儿）。**这个数要留得住勒紧那一把的行程**：
+  // 从最后一道关口沿 cinch 方向还得走得完 cinchLen，不然绳头会先被绳长卡住，
+  // 剩下那点进度全靠贴着圆弧蹭——实测过一次，一把变成了四秒半的磨。
+  reach: 1.18,
+  // 勒紧往左上拽：麻绳的另一头在右下角，**两头一拽**结才咬死
+  cinchTo: { x: 0.060, y: 0.118 },
+  cinchLen: 0.17,                         // 一把要拽走这么多卡宽，结才勒死
+  cinchBack: 0.34,                        // 撒手就往回泄（半截的结自己会松）
 };
 
 const KnotD = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-/** 勒紧的单位方向（圈心 → pullTo）。判定与作画共用 */
-export function KnotPullDir() {
+/** 勒紧的单位方向（结心 → cinchTo）。判定与作画共用 */
+export function KnotCinchDir() {
   const L = KNOT_CARD;
-  const dx = L.pullTo.x - L.eye.x, dy = L.pullTo.y - L.eye.y;
+  const dx = L.cinchTo.x - L.bend.x, dy = L.cinchTo.y - L.bend.y;
   const d = Math.hypot(dx, dy) || 1;
   return { x: dx / d, y: dy / d };
+}
+
+/** 走到第 i 关时绳头该在哪儿（作画的折线、驱动器的落点共用） */
+export function KnotWaypoint(i) {
+  const L = KNOT_CARD;
+  const g = L.gates[Math.max(0, Math.min(L.gates.length - 1, i))];
+  return { x: g.x, y: g.y };
 }
 
 // ---------------------------------------------------------------------------
@@ -2037,8 +2066,7 @@ function StepChain(state, def, input, dt) {
         return;
       }
       const kn = k0 || (b.knotState = {
-        tip: { ...L.start }, grab: false, inEye: false, threaded: false,
-        pulls: 0, pullAcc: 0, slipT: 0,
+        tip: { ...L.start }, grab: false, gate: 0, cinch: 0, slipT: 0, wrongT: 0,
       });
       const cx = st.zone.x;
       const standX = cx - 0.74;
@@ -2050,12 +2078,13 @@ function StepChain(state, def, input, dt) {
       }
       p.heading = 1;
       // 攥住第一下，麻绳就离手了（接下来它长在井架上，不在物品栏里）
-      if ((kn.grab || kn.pulls > 0 || kn.inEye) && st.needs && p.item?.id === st.needs) p.item = null;
+      if ((kn.grab || kn.gate > 0) && st.needs && p.item?.id === st.needs) p.item = null;
 
       const pc = input.pointerCard;
       const held = !!input.pointerHeld && !!pc;
       const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
       kn.slipT = Math.max(0, kn.slipT - dt);
+      kn.wrongT = Math.max(0, kn.wrongT - dt);
 
       // ① 按下那一帧手必须落在**绳头**上才攥得住，卡上别处拖一律无效
       if (held && state.ptrPressed && !kn.grab && KnotD(hand, kn.tip) < L.grabR) {
@@ -2068,10 +2097,9 @@ function StepChain(state, def, input, dt) {
       let moved = { x: 0, y: 0 };
       if (kn.grab) {
         if (KnotD(hand, kn.tip) > L.slipR) {
-          // ③ 手甩得比绳快太多＝脱手。绳缩回去一截，这一把当场作废
-          const back = KnotPullDir();
+          // ③ 手甩得比绳快太多＝脱手。绳缩回去一截，手上一空
+          const back = KnotCinchDir();
           kn.grab = false;
-          kn.pullAcc = 0;
           kn.slipT = 0.6;
           kn.tip.x -= back.x * 0.05; kn.tip.y -= back.y * 0.05;
           Cue(state, "drop", { gain: 0.45 });
@@ -2080,7 +2108,12 @@ function StepChain(state, def, input, dt) {
           const dx = hand.x - kn.tip.x, dy = hand.y - kn.tip.y;
           const d = Math.hypot(dx, dy);
           if (d > 1e-6) {
-            const stepD = Math.min(d, L.speed * dt);
+            // 勒紧那一把**吃劲**：绳走得比挽结时慢得多，而且越勒越紧越难拽。
+            // 这一档是这一下手感的全部——一把抻到底得费一秒半的劲，
+            // 不是"顺手一划就完"（老版倒手拽三把是拿次数凑分量，那是游戏味儿）
+            const tight = kn.gate >= L.gates.length
+              ? L.cinchSpeed * (1 - 0.5 * kn.cinch) : L.speed;
+            const stepD = Math.min(d, tight * dt);
             let nx = kn.tip.x + (dx / d) * stepD;
             let ny = kn.tip.y + (dy / d) * stepD;
             // 绳就这么长：离进画那一点太远就拽不动了
@@ -2093,61 +2126,60 @@ function StepChain(state, def, input, dt) {
         }
       }
 
-      if (!kn.threaded) {
-        // ── 第一段：掖过去 ──
-        // 必须**真的从圈眼里穿**：进过那个洞、再从西边出来才算数。绕着圈的
-        // 外面划到左边不作数——方向与路径都是有意义的（同缠/解那条规矩）
-        if (KnotD(kn.tip, L.eye) < L.eye.r * 0.95 && !kn.inEye) {
-          kn.inEye = true;
-          Cue(state, "crank", { gain: 0.45, rate: 1.3 });
-        }
-        if (kn.tip.x > L.backX) kn.inEye = false;   // 整根又抽回东边去了
-        if (kn.inEye && kn.tip.x < L.outX) {
-          kn.threaded = true;
-          kn.pullAcc = 0;
-          Cue(state, "pickup", { gain: 0.75 });
-          state.toast = { text: "绳头从圈里钻出来了——攥住它往外拽，一把一把把结勒死。", t: 3.6 };
+      if (kn.gate < L.gates.length) {
+        // ── 打结：一条连贯的路，五个关口按顺序过 ──
+        // **只认下一个关口**。跳着走一律不算——跳过"绕到背后"直接去掖，
+        // 那打出来的不是单编结，是绳头虚搭在弯里，一拽就出来。
+        const g = L.gates[kn.gate];
+        if (KnotD(kn.tip, g) < g.r) {
+          kn.gate += 1;
+          Cue(state, "crank", { gain: 0.34 + kn.gate * 0.06, rate: 1.15 + kn.gate * 0.08 });
+          if (kn.gate === L.gates.length) {
+            Cue(state, "pickup", { gain: 0.7 });
+            state.toast = { text: "结挽上了——攥住绳头，一把勒到底。", t: 3.4 };
+          }
+        } else if (kn.grab && kn.gate + 1 < L.gates.length) {
+          // 跑到后面那些关口上去了：绳头蹭一下、卡上闪一下"这道还没过"
+          for (let i = kn.gate + 1; i < L.gates.length; i += 1) {
+            if (KnotD(kn.tip, L.gates[i]) < L.gates[i].r * 0.8) { kn.wrongT = 0.5; break; }
+          }
         }
       } else {
-        // ── 第二段：勒紧 ──
-        // 一把一把往外拽。每勒紧一把，结就把绳吃进去一截、绳头缩回结跟前，
-        // 手上一空——**得倒手再抓一次**。三把，结才勒死。
-        const u = KnotPullDir();
+        // ── 勒紧：**一把拽到底**，不倒手 ──
+        // 老版是"倒手拽三把"，那是游戏味儿。现实里勒一个单编结就是攥住绳头
+        // 一把抻到底，手上能觉出结在咬紧。撒手它自己往回泄——半截的结会松。
+        const u = KnotCinchDir();
         const adv = moved.x * u.x + moved.y * u.y;
-        kn.pullAcc = Math.max(0, kn.pullAcc + adv);
-        if (kn.pullAcc >= L.pullLen) {
-          kn.pulls += 1;
-          kn.pullAcc = 0;
-          kn.grab = false;
-          const tail = 0.135 - kn.pulls * 0.022;   // 越勒越短：绳被结吃进去了
-          kn.tip.x = L.eye.x + u.x * tail;
-          kn.tip.y = L.eye.y + u.y * tail;
-          Cue(state, "ladder", { gain: 0.55 + kn.pulls * 0.14, rate: 0.85 + kn.pulls * 0.12 });
-          if (kn.pulls < L.pulls) Cue(state, "crank", { gain: 0.4, rate: 1.2 });
+        const before = kn.cinch;
+        kn.cinch = Math.max(0, Math.min(1, kn.cinch
+          + (kn.grab ? adv / L.cinchLen : -L.cinchBack * dt / L.cinchLen * 0.5)));
+        // 每咬紧一档响一声：绳吃劲的吱嘎越来越紧
+        if (Math.floor(kn.cinch * 4) > Math.floor(before * 4)) {
+          Cue(state, "ladder", { gain: 0.5 + kn.cinch * 0.4, rate: 0.85 + kn.cinch * 0.35 });
         }
       }
 
       // **没有长按后备**（用户明令："为什么还支持长按交互按钮的模式？干掉"）。
-      // 接绳是指尖上的活：手不落在绳头上、不把它塞进圈眼、不往外拽，就一点
-      // 进展都没有。也**没有 HUD 手势图标与按键提示**——招呼玩家的是卡上那根
-      // 绳头自己（没上手时它朝该去的方向蹭两下，蹭的方向就是该拖的方向）。
+      // 接绳是指尖上的活：手不落在绳头上、不顺着那条路把结挽出来，就一点进展
+      // 都没有。也**没有 HUD 手势图标与按键提示**——招呼玩家的是卡上那根绳头
+      // 自己（没上手时它朝下一道关口蹭两下，蹭的方向就是该拖的方向）。
       state.prompt = null;
       state.knotCard = {
         tip: { x: kn.tip.x, y: kn.tip.y },
-        phase: kn.threaded ? "cinch" : "tuck",
-        grab: !!kn.grab, reaching: !!kn.reaching, inEye: !!kn.inEye,
-        pulls: kn.pulls, cinch: kn.pulls / L.pulls,
-        pullK: Math.min(1, kn.pullAcc / L.pullLen),
-        slip: kn.slipT > 0,
+        gate: kn.gate,
+        phase: kn.gate < L.gates.length ? "tie" : "cinch",
+        grab: !!kn.grab, reaching: !!kn.reaching,
+        cinch: kn.cinch,
+        slip: kn.slipT > 0, wrong: kn.wrongT > 0,
       };
       // 动词动画（铁律：不许「人站着不动、字幕替他做」）。这张卡铺满画框的
       // 时候看不见他，但卡收走的那一帧看得见——姿势由勒紧的力道驱动
       p.pose = "knotPull";
-      p.poseU = kn.threaded ? 0.35 + 0.65 * Math.min(1, kn.pullAcc / L.pullLen) : 0.12;
+      p.poseU = kn.gate < L.gates.length ? 0.10 + 0.04 * kn.gate : 0.35 + 0.65 * kn.cinch;
       p.poseT = undefined;
 
-      if (kn.pulls >= L.pulls) {
-        Cue(state, "ladder", { gain: 0.85 });   // 麻绳勒紧时木架受力的吱嘎
+      if (kn.cinch >= 1) {
+        Cue(state, "ladder", { gain: 0.9 });   // 麻绳勒紧时木架受力的吱嘎
         state.knotCard = null;
         p.pose = null; p.poseU = undefined;
         finish();
@@ -7089,9 +7121,9 @@ export function GetBeatTarget(state) {
           level: st.zone.level || "surface", reach: st.zone.w / 2 };
         // 扶门是"费力气"的活，留了按住 E 的后备（CLAUDE.md 第 5 条），驱动器走它
         case "holdDoor": return { action: "holdAt", x: st.zone.x, level: st.zone.level || "surface" };
-        // 接绳没有长按后备（用户明令删掉），驱动器只能**真的在卡上拖那根绳头**——
-        // 所以把卡的版面与两段动作的落点整个交出去，自动通关照着做一遍：
-        // 攥住绳头 → 塞进圈眼 → 从西边拽出来 → 倒手拽三把勒死。
+        // 接绳没有长按后备（用户明令删掉），驱动器只能**真的在卡上把结挽出来**——
+        // 所以把卡的版面整个交出去：五个关口的落点 + 勒紧的方向。自动通关照着
+        // 走一遍单编结（塞进弯口 → 钻出来 → 绕背后 → 兜底下 → 掖自己底下 → 勒死）。
         // 删后备就必须同时给驱动器一条真输入的路，漏了这一步会当场卡死。
         case "knot": {
           const L = KNOT_CARD;
@@ -7099,9 +7131,8 @@ export function GetBeatTarget(state) {
             action: "knotAt", x: st.zone.x, level: st.zone.level || "surface",
             card: true, aspect: L.aspect,
             start: { ...L.start },                                  // 没上手时按这儿
-            eye: { x: L.eye.x, y: L.eye.y },                        // 掖过去：先塞进圈眼
-            out: { x: L.outX - 0.05, y: L.eye.y - 0.01 },           // 再从西边钻出来
-            pull: KnotPullDir(),                                    // 勒紧：往这个方向一把一把拽
+            gates: L.gates.map((g) => ({ x: g.x, y: g.y })),        // 按顺序过的五道关口
+            pull: KnotCinchDir(),                                   // 勒紧：往这个方向一把拽到底
             reachStep: Math.min(L.slipR, L.grabR + 0.02),           // 一帧最多把手挪这么远（免得脱手）
           };
         }

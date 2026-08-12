@@ -3072,6 +3072,7 @@ export function DrawHenCoop(ctx, x, groundY, id) {
 const KNOT_OLD = "#7d5a24";      // 井绳：用了几十年，粗、发暗
 const KNOT_OLD_D = "#614318";
 const KNOT_NEW = "#dcb470";      // 麻绳：新的，亮一档，两根一眼分得开
+const KNOT_NEW_D = "#8e6d3a";    // 绕到两股背后那一段：压暗两档，"在后面"才读得出来
 const KNOT_INK = "rgba(26,17,8,0.95)";
 
 /** 一段麻绳：墨线包边＋绳身＋捻纹。pts 是画布像素点串 */
@@ -3152,139 +3153,129 @@ function KnotGlow(ctx, x, y, r, k) {
 }
 
 /**
- * 每帧重画的接绳卡。
+ * 每帧重画的接绳卡：**打的是单编结**（水手结），画的就是实物的做法。
  * view = Core 的 state.knotCard，L = KNOT_CARD，t = 秒。
+ *
+ * 画面上必须成立的三件事（少一件玩家就不知道自己在干嘛）：
+ * ① **那两根得看着像绳**。上一版把绳画成 3.4% 卡宽的大扁带子、圈画成正圆，
+ *    读出来是一只救生圈中间嵌了颗石头（用户 2026-08-10 退回：「哪有打结是
+ *    这样的」）。绳要细（2%）、有斜捻纹，弯要是**手挽出来的**不是圆规画的。
+ * ② **压叠关系就是这个结本身**。单编结的三处叠压缺一不可：麻绳从弯口穿上来
+ *    时**压在两股之上**、绕背后那一段**藏在两股之后**、最后掖进去那一截
+ *    **从自己那股底下钻出来**。所以绘制顺序钉死成五层：
+ *      绕背后的那段 → 井绳（弯＋两股） → 掖出来那段 → 穿上来那段 → 进画那段
+ *    颠倒任何一层，画面上就不再是个结，只是几根绳搭在一起。
+ * ③ **进度长在结上**：走过几道关口，麻绳就画到哪儿；勒紧那一把把弯收窄、
+ *    两股并拢、绳头缩短——不许有任何条、环、百分比。
  */
 export function DrawKnotCard(ctx, W, H, view, L, t) {
   const S = H / 720;
   const P = (x, y) => [x * W, y * W];            // 卡宽单位 → 画布像素（y 同尺）
   const cinch = Math.max(0, Math.min(1, view.cinch || 0));
-  const pullK = Math.max(0, Math.min(1, view.pullK || 0));
   const grab = !!view.grab;
-  const tuck = view.phase !== "cinch";
-  const RW = W * 0.034;                          // 绳粗：3.4% 卡宽（这是一张特写）
+  const gate = view.gate | 0;
+  const NG = L.gates.length;
+  const RW = W * 0.020;                          // 麻绳（细）
+  const OW = W * 0.027;                          // 井绳（粗一档——粗细不同正是单编结的用处）
 
   LiveCardBase(ctx, W, H, "#7e6a48");
 
   // ── 背景：井架的横杆压在画框顶上，身后是井筒那团黑，底下一道石沿 ──
-  // 三笔交代"这是蹲在井架下干活"；那团黑同时是这张卡的**底**，浅色的麻绳
-  // 压在它上头才看得见（见上面配色那段注释）。
   InkFill(ctx, [[-40 * S, -30 * S], [W + 40 * S, -30 * S], [W + 40 * S, H * 0.10], [-40 * S, H * 0.13]],
     "knBeam", "#3e2c19", { amp: 5 * S, lw: 7 * S, shade: "rgba(0,0,0,0.34)" });
   ctx.save();
-  const shaft = ctx.createRadialGradient(W * 0.42, H * 0.46, H * 0.06, W * 0.42, H * 0.5, H * 0.86);
+  const shaft = ctx.createRadialGradient(W * 0.40, H * 0.46, H * 0.06, W * 0.40, H * 0.5, H * 0.86);
   shaft.addColorStop(0, "rgba(14,10,6,0.94)");
   shaft.addColorStop(0.52, "rgba(16,11,6,0.80)");
   shaft.addColorStop(1, "rgba(16,11,6,0)");
   ctx.fillStyle = shaft;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
-  // 井台石沿：压住下画框，画面才有个"底"
   InkFill(ctx, [[-40 * S, H * 0.93], [W * 0.5, H * 0.885], [W + 40 * S, H * 0.915],
     [W + 40 * S, H + 40 * S], [-40 * S, H + 40 * S]],
   "knCurb", "#4c4335", { amp: 5 * S, lw: 6 * S, shade: "rgba(0,0,0,0.30)" });
 
-  // ── 井绳（旧、粗、暗）：从横杆垂下来，末端**折回来挽成一个圈** ──
-  // 画法就是实物的做法：主绳垂下来 → 绕一圈 → 短头折回去贴着主绳 → 拿麻
-  // 缠住那两股（junction 那三道箍）。第一版把主绳直接插进圈心，读出来是
-  // "一枚圈挂在一根线上"，看不出那是**断了的绳自己挽的扣**。
-  // 勒紧一把，圈就收一档、两股被拽得并拢——进度全长在这个结上，不在任何条上
-  const eyeR = L.eye.r * (1 - cinch * 0.62);
-  const eye = P(L.eye.x, L.eye.y);
-  const OW = RW * 1.3;
-  const jx = L.eye.x + eyeR * 0.62;                  // 两股并拢、被缠住的那一处
-  const jy = L.eye.y - eyeR * 1.02;
-  // 主绳：从横杆垂下来，到 junction 收进圈里
-  const stand = [];
-  for (let i = 0; i <= 8; i += 1) {
-    const k = i / 8;
-    const sway = (1 - cinch) * Math.sin(k * 2.1 + t * 0.7) * 0.007;
-    stand.push(P(L.eye.x + 0.055 + (jx - L.eye.x - 0.055) * k * k + sway * (1 - k),
-      -0.07 + (jy + eyeR * 0.5 + 0.07) * k));
+  // ── 井绳：折回来挽的那个弯（U 的闭口在左、开口朝右） ──
+  // 勒紧一把，弯就收窄、两股并拢——进度全长在这上头
+  // **勒紧＝整个结往里缩**。上一版只收井绳那个弯、麻绳那几圈原样不动，
+  // 拽到底反而更松散了——两根都得跟着收，而且要朝**同一个结心**收
+  const K = { x: L.bend.x + 0.09, y: L.bend.y - 0.005 };   // 结心：弯口偏右一点
+  const Tight = (p) => ({
+    x: K.x + (p.x - K.x) * (1 - cinch * 0.44),
+    y: K.y + (p.y - K.y) * (1 - cinch * 0.50),
+  });
+  const legPts = (arr) => arr.map((p) => { const q = Tight(p); return P(q.x, q.y); });
+  const up = legPts(L.legUp), low = legPts(L.legLow);
+  const bendPts = [];
+  for (let i = 0; i <= 16; i += 1) {
+    const a = Math.PI / 2 + (i / 16) * Math.PI;   // 上 → 左 → 下
+    const wob = 1 + Math.sin(a * 3.1 + 0.7) * 0.07;
+    const q = Tight({
+      x: L.bend.x + Math.cos(a) * L.bend.r * wob,
+      y: L.bend.y - Math.sin(a) * L.bend.r * 0.98 * wob,
+    });
+    bendPts.push(P(q.x, q.y));
   }
-  KnotRope(ctx, stand, KNOT_OLD_D, OW);
-  // 折回来的短头：从圈的左上角翘出来，末端一撮毛茬（这是**断口**）
-  const tail = [
-    P(L.eye.x - eyeR * 0.50, L.eye.y - eyeR * 0.82),   // 圈的左上角
-    P(jx - eyeR * 0.62, jy - eyeR * 0.22),
-    P(jx - eyeR * 0.34, jy - eyeR * 0.62),             // 顺着主绳往上翘一小截
-  ];
-  KnotRope(ctx, tail, KNOT_OLD_D, OW * 0.92);
 
-  // 圈：分左右两半画，中间夹着麻绳——"穿过去"就是靠这一笔成立的。
-  // 圈不是个正圆（那是自行车胎）：半径带一点手绘的不匀，收紧时压扁成疙瘩
-  const arc = (a0, a1, n) => {
-    const out = [];
-    for (let i = 0; i < n; i += 1) {
-      const a = a0 + (a1 - a0) * (i / (n - 1));
-      const wob = 1 + Math.sin(a * 2.7 + 0.8) * 0.05;
-      out.push(P(L.eye.x + Math.cos(a) * eyeR * (1 - cinch * 0.18) * wob,
-        L.eye.y - Math.sin(a) * eyeR * 0.94 * wob));
-    }
-    return out;
-  };
-  const HALF = Math.PI / 2;
-  KnotRope(ctx, arc(HALF * 0.78, HALF * 3.22, 22), KNOT_OLD, OW, KNOT_INK, "butt");   // 左半圈：画在麻绳之前
-
-  // ── 麻绳（新、亮一档）：从画框右下角进画，一路到绳头 ──
+  // ── 麻绳：锚点 → 已经过了的关口 → 手上那一头 ──
+  // 走过几关就画到哪儿：**画面上的结就是玩家真挽出来的那一部分**
   const tip = view.tip || L.start;
+  const way = [{ x: L.anchor.x, y: L.anchor.y }];
+  // 挽好的那几圈跟井绳一起往结心收（手上那一头不收——它正被人往外拽）
+  for (let i = 0; i < Math.min(gate, NG); i += 1) way.push(Tight(L.gates[i]));
+  way.push({ x: tip.x, y: tip.y });
+  const PER = 8;                                   // 每两个 waypoint 之间的采样数
   const hemp = [];
   {
-    // 一条带垂感的二次曲线：锚点 → 中间松垮地垂一点 → 绳头。
-    // **穿好之后要绕着圈眼走**（锚点 → 圈眼 → 绳头两段）——直接连过去会在结
-    // 那儿拐一个硬角，看着像绳被折断了，而不是从洞里穿过去的
-    const a = L.anchor, b = tip;
-    const slackY = (1 - cinch) * 0.055 + (grab ? -0.012 : 0.006 * Math.sin(t * 1.9));
-    const via = view.phase === "cinch" ? { x: L.eye.x + 0.012, y: L.eye.y + 0.01 } : null;
-    const quad = (p0, p1, p2, n) => {
-      for (let i = 0; i <= n; i += 1) {
-        const k = i / n;
-        hemp.push(P((1 - k) * (1 - k) * p0.x + 2 * (1 - k) * k * p1.x + k * k * p2.x,
-          (1 - k) * (1 - k) * p0.y + 2 * (1 - k) * k * p1.y + k * k * p2.y));
+    const pt = (i) => way[Math.max(0, Math.min(way.length - 1, i))];
+    for (let i = 0; i < way.length - 1; i += 1) {
+      const p0 = pt(i - 1), p1 = pt(i), p2 = pt(i + 1), p3 = pt(i + 2);
+      for (let k = 0; k < PER; k += 1) {
+        const u = k / PER, u2 = u * u, u3 = u2 * u;
+        hemp.push(P(
+          0.5 * ((2 * p1.x) + (-p0.x + p2.x) * u + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2
+            + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3),
+          0.5 * ((2 * p1.y) + (-p0.y + p2.y) * u + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2
+            + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3),
+        ));
       }
-    };
-    if (via) {
-      quad(a, { x: (a.x + via.x) / 2, y: (a.y + via.y) / 2 + slackY * 0.5 }, via, 14);
-      quad(via, { x: (via.x + b.x) / 2, y: (via.y + b.y) / 2 + 0.012 }, b, 10);
-    } else {
-      quad(a, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + slackY }, b, 22);
     }
+    hemp.push(P(way[way.length - 1].x, way[way.length - 1].y));
   }
-  // 吃上劲的绳抻细一点（勒紧那一把最明显）
-  KnotRope(ctx, hemp, KNOT_NEW, RW * (1 - 0.12 * pullK));
+  // 按关口把麻绳切成四段——**压叠关系就靠这几段的绘制顺序**
+  const cut = (a, b) => hemp.slice(Math.max(0, a * PER), Math.min(hemp.length, b * PER + 1));
+  // 关口在 way 里的下标：0=锚点 1=①口 2=②上 3=③越 4=④背 5=⑤掖 6=手上。
+  // **压叠关系全在这四刀上**：只有 ③越→④背 那一段在两股后面，别的都在前面；
+  // ④背→⑤掖 要被 ①口→③越 压住（那就是"从自己那股底下掖出去"）
+  const segEnter = cut(0, 1);                      // 锚点 → ①口（离镜头最近的一段）
+  const segThru = cut(1, 3);                       // ①口 → ②上 → ③越：穿上来再贴着上股往右
+  const segBack = cut(3, 4);                       // ③越 → ④背：绕到两股**背后**兜下来
+  const segTuck = cut(4, 99);                      // ④背 → ⑤掖 → 手上：回到前面，从自己那股底下钻出去
 
-  KnotRope(ctx, arc(-HALF * 1.12, HALF * 0.98, 18), KNOT_OLD, OW, KNOT_INK, "butt");   // 右半圈：压住麻绳
-
-  // 断口的毛茬：井绳是**断**在这儿的，短头末端一撮散开的麻
-  KnotTip(ctx, tail[2][0], tail[2][1], OW * 0.8, false, "knOldFray", KNOT_OLD_D);
-  // 缠住两股的那三道箍：没有它，"折回来挽的扣"就散了
-  {
-    const j = P(jx - eyeR * 0.30, jy - eyeR * 0.05);   // 两股之间
-    for (let i = 0; i < 3; i += 1) {
-      const y0 = j[1] - i * OW * 0.56 + OW * 0.28;
-      InkLine(ctx, j[0] - OW * 1.05, y0 + OW * 0.16, j[0] + OW * 1.05, y0 - OW * 0.16,
-        "knWhip" + i, { lw: OW * 0.28, color: "#5c4119", amp: 2 * S });
-    }
+  KnotRope(ctx, segBack, KNOT_NEW_D, RW);                        // 最底下：在两股后面
+  KnotRope(ctx, bendPts, KNOT_OLD, OW, KNOT_INK, "butt");        // 井绳的弯
+  KnotRope(ctx, up, KNOT_OLD, OW, KNOT_INK, "butt");             // 上股（连着横杆）
+  KnotRope(ctx, low, KNOT_OLD_D, OW, KNOT_INK, "butt");          // 下股（断头那一股）
+  if (low.length) {
+    KnotTip(ctx, low[low.length - 1][0], low[low.length - 1][1], OW * 0.8, false, "knOldFray", KNOT_OLD_D);
   }
+  KnotRope(ctx, segTuck, KNOT_NEW, RW * (1 - 0.10 * cinch));     // 掖出来：在井绳之上
+  KnotRope(ctx, segThru, KNOT_NEW, RW * (1 - 0.10 * cinch));     // 穿上来：压住掖出来那一段
+  KnotRope(ctx, segEnter, KNOT_NEW, RW * (1 - 0.10 * cinch));    // 进画的一段：离镜头最近
 
-  // 勒成的疙瘩：拽一把长一圈。到第三把，圈已经收成一个实心的结
-  if (cinch > 0.02) {
+  // 勒紧之后：结心压出一小片阴影——绳互相咬住的那一处。
+  // （老版在这儿横着划两道"勒痕"，收紧之后成了两根飘在结外面的灰棍子）
+  if (cinch > 0.2) {
     ctx.save();
-    ctx.globalAlpha = Math.min(1, cinch * 1.2);
-    const lump = [];
-    for (let i = 0; i < 11; i += 1) {
-      const a = (i / 11) * Math.PI * 2;
-      const rr = eyeR * (0.62 + 0.26 * Hash("knLump" + i)) * (0.55 + cinch * 0.7);
-      lump.push([eye[0] + Math.cos(a) * rr * W, eye[1] - Math.sin(a) * rr * 0.88 * W]);
-    }
-    InkFill(ctx, lump.map((q) => [q[0], q[1]]), "knLumpF", KNOT_OLD,
-      { amp: 3 * S, lw: 6 * S, shade: "rgba(0,0,0,0.26)" });
-    // 疙瘩上的两道勒痕：绳互相咬住的那两处
-    for (let i = 0; i < 2; i += 1) {
-      InkLine(ctx, eye[0] - eyeR * W * 0.5, eye[1] + (i - 0.5) * eyeR * W * 0.5,
-        eye[0] + eyeR * W * 0.5, eye[1] + (i - 0.5) * eyeR * W * 0.5 - eyeR * W * 0.12,
-        "knBite" + i, { lw: 4 * S, color: "rgba(62,42,22,0.5)", amp: 3 * S });
-    }
+    ctx.globalAlpha = Math.min(0.5, (cinch - 0.2) * 0.9);
+    const c = P(K.x, K.y);
+    const g = ctx.createRadialGradient(c[0], c[1], OW * 0.4, c[0], c[1], OW * 3.4);
+    g.addColorStop(0, "rgba(38,24,10,0.85)");
+    g.addColorStop(1, "rgba(38,24,10,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(c[0], c[1], OW * 3.4, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -3294,32 +3285,43 @@ export function DrawKnotCard(ctx, W, H, view, L, t) {
 
   // ── 引导：全长在物件上，没有 HUD 图标、没有按键提示、更没有轨道 ──
   if (!grab) {
-    // 没上手：绳头透一圈会呼吸的光（按错地方闪快些催一下）
     const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.42 + 0.34 * Math.sin(t * 3.0);
-    KnotGlow(ctx, tp[0], tp[1], L.grabR * W * 1.35, 0.14 + pulse * 0.20);
-    // 还没穿过去：圈眼里也透一点光——"往这个洞里塞"由那个洞自己说
-    if (tuck && !view.inEye) {
-      KnotGlow(ctx, eye[0], eye[1], eyeR * W * 1.05, 0.10 + 0.12 * (0.5 + 0.5 * Math.sin(t * 2.4)));
-    }
+    KnotGlow(ctx, tp[0], tp[1], L.grabR * W * 1.25, 0.14 + pulse * 0.20);
   }
-  // 绳头自己朝该去的方向蹭两下：蹭的方向就是该拖的方向（代替 HUD 手势图标）
+  // 下一道关口在结上透一点光：**"下一手往哪儿走"由那个地方自己说**
+  if (gate < NG) {
+    const g = L.gates[gate];
+    const gp = P(g.x, g.y);
+    KnotGlow(ctx, gp[0], gp[1], g.r * W * 0.82, 0.09 + 0.11 * (0.5 + 0.5 * Math.sin(t * 2.4)));
+  }
+  // 绳头自己朝下一道关口蹭两下：蹭的方向就是该拖的方向（代替 HUD 手势图标）
   if (!grab) {
-    const aimX = tuck ? L.eye.x : L.pullTo.x;
-    const aimY = tuck ? L.eye.y : L.pullTo.y;
-    let vx = aimX - tip.x, vy = aimY - tip.y;
+    const aim = gate < NG ? L.gates[gate] : L.cinchTo;
+    let vx = aim.x - tip.x, vy = aim.y - tip.y;
     const vl = Math.hypot(vx, vy) || 1;
     vx /= vl; vy /= vl;
     const k = Math.max(0, Math.sin(t * 2.2)) * 0.055;
     ctx.save();
     ctx.globalAlpha = 0.34 * Math.max(0, Math.sin(t * 2.2));
-    const g0 = P(tip.x + vx * 0.03, tip.y + vy * 0.03);
-    const g1 = P(tip.x + vx * (0.03 + k), tip.y + vy * (0.03 + k));
+    const g0 = P(tip.x + vx * 0.026, tip.y + vy * 0.026);
+    const g1 = P(tip.x + vx * (0.026 + k), tip.y + vy * (0.026 + k));
     ctx.beginPath();
     ctx.moveTo(g0[0], g0[1]);
     ctx.lineTo(g1[0], g1[1]);
     ctx.strokeStyle = "rgba(255,240,196,0.9)";
-    ctx.lineWidth = RW * 0.34;
+    ctx.lineWidth = RW * 0.38;
     ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.restore();
+  }
+  // 跳着走：往还没轮到的那道关口上凑，绳头周围闪一圈——"这道还没过"
+  if (view.wrong) {
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.strokeStyle = "rgba(196,108,64,0.9)";
+    ctx.lineWidth = 3.4 * S;
+    ctx.beginPath();
+    ctx.arc(tp[0], tp[1], RW * 2.6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -3330,7 +3332,7 @@ export function DrawKnotCard(ctx, W, H, view, L, t) {
     ctx.strokeStyle = "rgba(214,196,158,0.8)";
     ctx.lineWidth = 3 * S;
     ctx.beginPath();
-    ctx.arc(tp[0], tp[1], RW * 2.2, 0, Math.PI * 2);
+    ctx.arc(tp[0], tp[1], RW * 2.4, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
