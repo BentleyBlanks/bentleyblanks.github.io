@@ -1694,6 +1694,19 @@ export function CreateWorld(canvasEl) {
       case "stove": mk((ctx, ax, ay) => ART.DrawStove(ctx, ax, ay, p.id)); break;
       case "spinWheelBroken": mk((ctx, ax, ay) => ART.DrawSpinWheelBroken(ctx, ax, ay, p.id)); break;
       case "clothBundle": mk((ctx, ax, ay) => ART.DrawClothBundle(ctx, ax, ay, p.id)); break;
+      // ── 第七稿第一章的新道具（2026-08-13）。教训入册：这张 switch 的 default
+      // 是 break——kind 在 Data 里登记全了、这儿漏一行照样**静默不画**
+      //（第一轮视觉审查抓的：耧/谷茬/草苫/笸箩九种全没上画面）──
+      case "louDrill": mk((ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, p.id)); break;
+      case "stubbleField": mk((ctx, ax, ay) => ART.DrawStubbleField(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "sownField": mk((ctx, ax, ay) => ART.DrawSownField(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "strawMat": mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id)); break;
+      case "strawArm": mk((ctx, ax, ay) => ART.DrawStrawArm(ctx, ax, ay, p.id)); break;
+      case "cellarSundries": mk((ctx, ax, ay) => ART.DrawCellarSundries(ctx, ax, ay, p.id)); break;
+      case "cellarSundriesTidy": mk((ctx, ax, ay) => ART.DrawCellarSundriesTidy(ctx, ax, ay, p.id)); break;
+      case "sewBasket": mk((ctx, ax, ay) => ART.DrawSewBasket(ctx, ax, ay, p.id)); break;
+      case "mendedJacket": mk((ctx, ax, ay) => ART.DrawMendedJacket(ctx, ax, ay, p.id)); break;
+      case "mealBowls": mk((ctx, ax, ay) => ART.DrawMealBowls(ctx, ax, ay, p.id)); break;
       case "pigpen": mk((ctx, ax, ay) => ART.DrawPigpen(ctx, ax, ay, p.id)); break;
       case "nook": {
         // 藏口的三态（敞着 / 塞了粮袋 / 上了覆土板）跟着旗标走，
@@ -2343,11 +2356,13 @@ export function CreateWorld(canvasEl) {
             Silhouette(ctx);
             ctx.clip();
             const drop = slant * hp * 0.55;   // 斜：光条落到墙上的那头往东偏
-            for (const [x0, wTop] of [[wp * 0.33, 5], [wp * 0.47, 4], [wp * 0.59, 6]]) {
+            for (const [x0, wTop] of [[wp * 0.33, 6], [wp * 0.47, 5], [wp * 0.59, 7]]) {
               const grd = ctx.createLinearGradient(0, 0, drop, hp);
-              grd.addColorStop(0, "rgba(224,212,176,0.55)");
-              grd.addColorStop(0.55, "rgba(224,212,176,0.16)");
-              grd.addColorStop(1, "rgba(224,212,176,0)");
+              // 亮度给足：加色混合下 0.5 档在土壁上读不出「几条光」（首轮视觉
+              // 审查退回），顶亮 0.9、中段 0.3 才立得住
+              grd.addColorStop(0, "rgba(232,220,182,0.9)");
+              grd.addColorStop(0.55, "rgba(232,220,182,0.3)");
+              grd.addColorStop(1, "rgba(232,220,182,0)");
               ctx.fillStyle = grd;
               ctx.beginPath();
               ctx.moveTo(x0, 0);
@@ -3372,12 +3387,12 @@ export function CreateWorld(canvasEl) {
     // 白天亮、拂晓次之、夜里只剩月色——跟井口那道 beam 同一条昼夜账
     if (hatchBeamMesh) {
       const mood = ShownLight(state);
-      const dayK = mood === "day" ? 1 : mood === "dawn" ? 0.5 : 0.3;
+      const dayK = mood === "day" ? 1 : mood === "dawn" ? 0.6 : 0.45;
       const on = !!state.flags.lidShut || !!state.hatchMoon;
       const slanted = (state.beamSlant || 0) > 0.2;
-      hatchBeamMesh.material.opacity = on && !slanted ? 0.85 * dayK : 0;
+      hatchBeamMesh.material.opacity = on && !slanted ? dayK : 0;
       const alt = hatchBeamMesh.userData.alt;
-      if (alt) alt.material.opacity = on && slanted ? 0.85 * dayK : 0;
+      if (alt) alt.material.opacity = on && slanted ? dayK : 0;
     }
     StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：

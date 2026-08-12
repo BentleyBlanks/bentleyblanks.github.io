@@ -330,11 +330,13 @@ export const TRACKS = {
   tremble: {
     dur: 0.46, loop: true,
     keys: [
-      { t: 0.0, hipY: -0.07, hipX: 0.01, torso: 20, head: 8, armF: -64, foreF: -92, armB: -58, foreB: -86, thighB: -16, shinB: 22, footB: -4, thighF: -10, shinF: 16, footF: -4 },
-      { t: 0.12, hipY: -0.085, torso: 23, head: 10 },
-      { t: 0.24, hipY: -0.065, torso: 19, head: 7 },
-      { t: 0.35, hipY: -0.08, torso: 22, head: 9 },
-      { t: 0.46, hipY: -0.07, torso: 20, head: 8 },
+      // 蹲窝成一小团（在哥哥怀里）：胯落低、腿深屈、两臂抱胸——
+      // 站着抖读不出「被搂在怀里」（首轮视觉审查退回）
+      { t: 0.0, hipY: -0.30, hipX: 0.02, torso: 24, head: 10, armF: -64, foreF: -92, armB: -58, foreB: -86, thighB: -62, shinB: 74, footB: 2, thighF: -54, shinF: 66, footF: 0 },
+      { t: 0.12, hipY: -0.315, torso: 27, head: 12 },
+      { t: 0.24, hipY: -0.295, torso: 23, head: 9 },
+      { t: 0.35, hipY: -0.31, torso: 26, head: 11 },
+      { t: 0.46, hipY: -0.30, torso: 24, head: 10 },
     ],
   },
   // 坐着打盹（黄昏·匀稠的，循环 6.2s＝Core 的打盹钟同一个周期）：

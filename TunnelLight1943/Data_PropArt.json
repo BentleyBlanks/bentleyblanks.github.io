@@ -857,6 +857,18 @@
         "baseline": 4
       },
       "note": "缝好的小褂子（袖口接蓝底白花）：mended 立旗后出现在枕头边。loose 带——放下的东西永远看得见"
+    },
+    "mealBowls": {
+      "art": "DrawMealBowls",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 34,
+        "h": 14,
+        "anchor": "center",
+        "baseline": 3
+      },
+      "note": "屋里那两只粗瓷碗（黄昏·匀稠的对着它们做）：一只漂着榆钱、一只喝空斜倚。loose 带——匀稠那拍它们是主角，不许被地面道具盖掉"
     }
   },
   "_coversNote": [

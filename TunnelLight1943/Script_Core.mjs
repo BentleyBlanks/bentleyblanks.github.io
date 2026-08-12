@@ -3656,7 +3656,7 @@ export const SCRIPTS = {
             state.beat.indoorScene = true;
             // 屋里：妹妹在铺盖上，柱子在屋当间。外面的动静一声近过一声
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.0;
             state.player.heading = -1;
             Cue(state, "knock", { gain: 0.7, rate: 0.9, delay: 0.8 });
@@ -3765,14 +3765,14 @@ export const SCRIPTS = {
         const sis = FindActor(state, "sister");
         if (sis) {
           sis.visible = true; sis.level = "under"; sis.following = false;
-          sis.cineTarget = null; sis.x = 30.9; sis.heading = 1; sis.pose = "leanIn";
+          sis.cineTarget = null; sis.x = 30.8; sis.heading = 1; sis.pose = "leanIn";
           sis.track = { name: "tremble", t: 0, ambient: true };
         }
         // 跳幕直落这一拍时，娘的走位过场没演——她这会儿已经出院了
         const m = FindActor(state, "mother");
         if (m) { m.cineTarget = null; m.visible = false; }
         state.flags.lidShut = true;
-        state.player.x = 31.3;
+        state.player.x = 31.45;
         state.player.heading = -1;
       },
       tick: (state, dt) => {
@@ -3847,7 +3847,7 @@ export const SCRIPTS = {
             const m = FindActor(state, "mother");
             if (m) { m.visible = false; m.cineTarget = null; }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.level = "surface"; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            if (sis) { sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.level = "surface";
             state.player.x = 33.2;
           } },
@@ -3865,6 +3865,10 @@ export const SCRIPTS = {
         { stage: "水缸见了底。瓢探下去，刮着缸底响。提上来，小半瓢——凑着瓢沿抿了一口，剩下的倒进锅里。", d: 5.6,
           cam: { kind: "insert", x: 43.4, y: 0.95, dist: 3.0 },
           on: (state) => {
+            // 字幕在摸瓢，画面里就得有人在缸边摸（首轮视觉审查退回的空缸镜）
+            state.player.x = 42.7;
+            state.player.heading = 1;
+            FlashPose(state, "kneel", 5.2);
             Cue(state, "bucketKnock", { gain: 0.4, rate: 0.8 });
             Cue(state, "waterDrip", { gain: 0.4, delay: 2.6 });
           } },
@@ -3878,14 +3882,14 @@ export const SCRIPTS = {
             state.beat.indoorScene = true;
             // 说睡着就得真躺着：铺盖（beddingMat, 31.15）上侧躺蜷着
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.2;
             state.player.heading = -1;
           } },
         // 镜头钉两秒：她那件褂子。袖子短了一截，手腕露在外面。
         // ——章末那一针一针，就是缝给这截手腕的
         { stage: "她那件褂子，袖子短了一截。手腕露在外面。", d: 3.6,
-          cam: { kind: "insert", x: 31.0, y: 0.62, dist: 1.9 },
+          cam: { kind: "insert", x: 31.35, y: 0.62, dist: 1.9 },
           on: (state) => { state.beat.indoorScene = true; } },
         // 他蹲下去，扯过被角把她露出来的脚盖上，带上屋门
         { stage: "", d: 2.8,
@@ -4198,14 +4202,15 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 },
           on: (state) => {
             const sis = FindActor(state, "sister");
-            if (sis) { sis.lift = 0; sis.pose = null; sis.x = 33.0; sis.heading = -1; }
+            if (sis) { sis.lift = 0; sis.pose = null; sis.x = 32.5; sis.heading = -1; }
             state.player.pose = null;
           } },
         // 门框再往上：两道凿子刻的深痕，边上留着毛茬。去年一道，前年一道。
+        // 特写推到 1.1：刻痕 6px 一道，1.7 的景别里读不出深浅（首轮视觉审查）
         { stage: "门框再往上，比她头顶还高一点，另有两道刻痕。凿子刻的，深。爹给她量身高刻的——去年一道，前年一道。", d: 6.2,
-          cam: { kind: "insert", x: 33.68, y: 1.38, dist: 1.7 } },
+          cam: { kind: "insert", x: 33.68, y: 1.38, dist: 1.1 } },
         { stage: "今年的还没刻。", d: 2.8,
-          cam: { kind: "insert", x: 33.68, y: 1.38, dist: 1.7 } },
+          cam: { kind: "insert", x: 33.68, y: 1.38, dist: 1.1 } },
         { stage: "她退后两步，看着那三道。", d: 2.8,
           cam: { kind: "shot", x: 33.4, y: 1.1, dist: 3.6 },
           on: (state) => {
@@ -4738,13 +4743,19 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 46.0, y: 1.25, dist: 3.4 },
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.pose = null; q.x = 46.9; q.heading = -1; }
+            // 拍那一下要有抬臂（mark=抬臂点着，落在孩子后脑勺的高度上）；
+            // 站进一臂之内（0.8m），隔远了抡就是各做各的操（接触戏第 1 条）
+            if (q) { q.pose = "mark"; q.x = 46.85; q.heading = -1; }
             state.player.x = 46.1;
             state.player.heading = 1;
             Cue(state, "pickup", { gain: 0.3, rate: 0.7, delay: 1.2 });
           } },
         { who: "七叔", say: "铃一响就躲，好小子。……吓死个人。", d: 4.2,
-          cam: { kind: "ots", subject: "qishu", other: "player", dist: 3.0 } },
+          cam: { kind: "ots", subject: "qishu", other: "player", dist: 3.0 },
+          on: (state) => {
+            const q = FindActor(state, "qishu");
+            if (q) q.pose = null;
+          } },
         { stage: "他喘匀一口气，声音才压下来。", d: 2.6,
           cam: { kind: "shot", x: 46.4, y: 1.2, dist: 3.4 } },
         { who: "七叔", say: "这两天，甭往北头去。啊？", d: 3.4,
@@ -4791,7 +4802,12 @@ export const SCRIPTS = {
         { who: "柱子", say: "七叔——", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         { who: "七叔", say: "你爹那年借我三斗谷子。还没还。", d: 3.4,
-          cam: { kind: "insert", x: 49.2, y: 1.15, dist: 2.6 } },
+          cam: { kind: "insert", x: 49.2, y: 1.15, dist: 2.6 },
+          on: (state) => {
+            // 插入镜里必须有他本人（首轮视觉审查抓过空墙）：钉死站位朝向
+            const q = FindActor(state, "qishu");
+            if (q) { q.visible = true; q.cineTarget = null; q.x = 49.2; q.heading = -1; }
+          } },
         { who: "柱子", say: "俺爹没……", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         { who: "七叔", say: "我说有。就有。", d: 2.8,
@@ -4975,7 +4991,7 @@ export const SCRIPTS = {
                 cam: { kind: "shot", x: 31.4, y: 0.95, dist: 3.6 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
-                  if (k) { k.x = 31.15; k.heading = -1; k.pose = "sleep"; k.track = null; }
+                  if (k) { k.x = 30.75; k.heading = -1; k.pose = "sleep"; k.track = null; }
                   s.player.x = 30.5;
                   s.player.heading = 1;
                   FlashPose(s, "kneel", 4.0);
@@ -4989,7 +5005,7 @@ export const SCRIPTS = {
                 on: (s) => { s.player.cineWalk = { x: 32.8, speed: 1.2 }; } },
               // 把她露在破袄子外面的那只手，轻轻往回收了收
               { stage: "他弯下腰，把她露在破袄子外面的那只手，轻轻往回收了收。", d: 4.2,
-                cam: { kind: "insert", x: 31.0, y: 0.62, dist: 1.9 },
+                cam: { kind: "insert", x: 31.35, y: 0.62, dist: 1.9 },
                 on: (s) => {
                   s.player.cineWalk = null;
                   s.player.x = 31.9;
@@ -4999,7 +5015,7 @@ export const SCRIPTS = {
                 } },
               // 同一个机位：开场看过的那截手腕（首尾同框，接袖那一针的由头）
               { stage: "袖子短，手脖子凉着。他盯着那截露出来的手腕，看了一会儿。", d: 4.4,
-                cam: { kind: "insert", x: 31.0, y: 0.62, dist: 1.9 } },
+                cam: { kind: "insert", x: 31.35, y: 0.62, dist: 1.9 } },
               { stage: "然后才直起身，走出去。", d: 2.8,
                 cam: { kind: "shot", x: 32.4, y: 1.15, dist: 4.0 },
                 on: (s) => { s.player.cineWalk = { x: 34.6, speed: 1.3 }; } },
@@ -5029,7 +5045,7 @@ export const SCRIPTS = {
       onStart: (state) => {
         // 妹妹在铺盖上（黄昏那拍哄睡的延续——她翻过一次身，没睡实）
         const sis = FindActor(state, "sister");
-        if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; sis.following = false; sis.x = 31.15; sis.heading = 1; sis.pose = "sleep"; }
+        if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; sis.following = false; sis.x = 30.75; sis.heading = 1; sis.pose = "sleep"; }
         state.player.pose = null;
         // 夜里窖口那几条月光（World 认这面旗；lidShut 的板缝光同一支画笔）
         state.hatchMoon = true;
@@ -5165,8 +5181,10 @@ export const SCRIPTS = {
           cam: { kind: "close", on: "player", dist: 3.2 } },
         { who: "妹妹", say: "我喊你了。可大声了。", d: 3.2,
           cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
+        // 景别退到 2.6：骨架的鞋画不出赤脚，推太近字幕当场穿帮——
+        // 这一镜给她整个小身量，「光着脚」交给句子（首轮视觉审查抓的矛盾）
         { stage: "她光着脚，就站在那儿，脚趾头在土里一下一下地抓。", d: 3.8,
-          cam: { kind: "insert", x: 27.9, y: 0.32, dist: 1.7 } },
+          cam: { kind: "insert", x: 27.9, y: 0.6, dist: 2.6 } },
         { who: "妹妹", say: "我当你也走了。", d: 3.2,
           cam: { kind: "ots", subject: "sister", other: "player", dist: 3.0 } },
         { stage: "柱子张了张嘴。", d: 2.0,
@@ -5199,7 +5217,7 @@ export const SCRIPTS = {
       objective: "去拿水", hint: "翻板先虚掩上，只留半尺",
       onStart: (state) => {
         const sis = FindActor(state, "sister");
-        if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; sis.following = false; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+        if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; sis.following = false; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
         state.player.level = "surface";
         state.hatchMoon = true;
       },
@@ -5231,9 +5249,11 @@ export const SCRIPTS = {
             // 伤员现出来（草苫底下那只手的主人），妹妹在楼上睡
             state.flags.manGrab = false;
             const w = FindActor(state, "wounded");
-            if (w) { w.visible = true; w.level = "under"; w.x = 27.0; w.heading = 1; w.pose = "sleep"; }
+            // heading -1：躺倒往背后（东）倒，头/肩落在 27.5 一侧——
+            // 柱子跪在 28.0 摸得着肩（27.4 的腌菜缸已挪去 28.3 让位）
+            if (w) { w.visible = true; w.level = "under"; w.x = 27.1; w.heading = -1; w.pose = "sleep"; }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.level = "under";
             state.player.cineWalk = { x: 28.0, speed: 1.0 };
           } },
@@ -5316,9 +5336,9 @@ export const SCRIPTS = {
             // 布景（cinematic 不跑 onStart）：伤员裹着布条睡在草苫上，
             // 妹妹在楼上睡；晨光走 hatchMoon 那几条
             const w = FindActor(state, "wounded");
-            if (w) { w.visible = true; w.level = "under"; w.x = 27.0; w.heading = 1; w.pose = "sleep"; }
+            if (w) { w.visible = true; w.level = "under"; w.x = 27.1; w.heading = -1; w.pose = "sleep"; }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.15; sis.heading = -1; sis.pose = "sleep"; }
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.hatchMoon = true;
             state.player.level = "under";
             state.player.x = 29.4;
@@ -5330,12 +5350,13 @@ export const SCRIPTS = {
         { stage: "不够给妹妹裁一件整衣裳。", d: 2.8,
           cam: { kind: "insert", x: 29.3, y: UNDER_Y + 0.6, dist: 1.7 } },
         { stage: "他想起她露出来的手腕。", d: 3.0,
-          cam: { kind: "insert", x: 31.0, y: 0.62, dist: 1.9 } },
+          cam: { kind: "insert", x: 31.35, y: 0.62, dist: 1.9 } },
         { stage: "他从梯子底下那只笸箩里翻了半天，翻出一件妹妹去年的小褂子。袖口磨飞了边，短。", d: 5.2,
           cam: { kind: "insert", x: 29.8, y: UNDER_Y + 0.55, dist: 2.0 },
           on: (state) => {
             state.player.pose = null;
             state.player.x = 29.8;
+            state.player.carry = "小褂子";   // 手上得真有那件褂子（首轮抓过两手捧空）
             FlashPose(state, "kneel", 5.0);
             Cue(state, "clothLift", { gain: 0.4, rate: 0.9, delay: 1.0 });
           } },
@@ -5366,11 +5387,13 @@ export const SCRIPTS = {
         { stage: "可手腕能盖住了。", d: 3.4,
           cam: { kind: "insertCard", card: "mendedSleeve", seg: 1 } },
         { stage: "他站起来，把衣裳放进屋里，放在妹妹枕头边。", d: 4.4,
-          cam: { kind: "shot", x: 31.2, y: 0.95, dist: 3.4 },
+          cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.4 },
           on: (state) => {
             state.flags.mended = true;
             state.player.pose = null;
-            state.player.x = 31.9;
+            state.player.carry = null;       // 褂子搁下了（mendedJacket 道具接棒）
+            // 枕头在她头那侧（东，≈31.65）——站 32.5 跪下去放，脚别踩着她的头
+            state.player.x = 32.5;
             state.player.heading = -1;
             FlashPose(state, "kneel", 3.2);
             Cue(state, "clothDrop", { gain: 0.35, delay: 1.4 });
@@ -7311,7 +7334,7 @@ export function StartChapter(state, index) {
     state.actors.push(
       MakeActor("sister", "sister", 31.2, { label: "妹妹", heading: 1 }),
       MakeActor("mother", "family", 38.5, { label: "娘", visible: false }),
-      MakeActor("wounded", "villager", 27.0, { label: "伤员", level: "under", visible: false }),
+      MakeActor("wounded", "villager", 27.1, { label: "伤员", level: "under", heading: -1, visible: false }),
       MakeActor("farmerEast", "villager", 184.0, {
         label: "东邻", heading: 1, carry: "锄头",
         track: { name: "hoeing", t: 0, ambient: true },
