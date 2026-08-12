@@ -15,6 +15,7 @@
 //   node TunnelLight1943/Script_Cli.mjs state c1_well --x 43.0 --input "e,d*90"
 //   node TunnelLight1943/Script_Cli.mjs shot c1_well --hold d --dur 4 --phases 6
 //   node TunnelLight1943/Script_Cli.mjs shot "c2_digout@x=42.3,level=under,digStarted=0" "c2_digout@x=43,level=under,tunnelDug=1,out=通了"
+//   node TunnelLight1943/Script_Cli.mjs shot "c1_dusk@line=9,at=2.6,zoom=sister"   ← 钉到某句台词某一秒 + 裁近景
 //   node TunnelLight1943/Script_Cli.mjs doctor
 //
 // 铁律：**要问游戏状态先跑这个，别再现写探针脚本**。缺什么子命令就往这儿加，
@@ -373,7 +374,10 @@ async function CmdState(o) {
 // ---------------------------------------------------------------------------
 // step 也在表里：CmdShot 里读的是 jo.step，漏登记的话 --step / @step= 会被
 // 当成旗标吃掉，链式节拍永远停在第 0 步（用法里写着、实际从来没生效）
-const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step"]);
+const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step",
+  // line/at：钉到"第几句台词的第几秒"；zoom：截图之后再裁一张近景（认不认得出
+  // 那件东西，只能靠近看）。三个都是 2026-08-12 睡姿那次白跑十几轮换来的
+  "line", "at", "zoom"]);
 
 // "c2_digout@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
@@ -399,7 +403,7 @@ async function CmdShot(o) {
   const specs = o._.flatMap((s) => String(s).split(",").filter(Boolean).length && !s.includes("@")
     ? String(s).split(/[，,]/).filter(Boolean) : [s]);
   if (!specs.length) {
-    console.log("用法：shot <beatId>[@x=41,level=under,旗标=0] [更多 beatId...] [--x N] [--step N] [--flag k=v] [--hold d] [--dur 4] [--phases 6] [--probe]");
+    console.log("用法：shot <beatId>[@x=41,level=under,line=9,at=2.6,zoom=sister,旗标=0] [更多 beatId...] [--x N] [--step N] [--flag k=v] [--hold d] [--dur 4] [--phases 6] [--probe]");
     return;
   }
   const base = {
@@ -439,7 +443,8 @@ async function CmdShot(o) {
     for (const job of jobs) {
       const jo = job.opts;
       const phases = Math.max(1, Number(jo.phases || 1));
-      const dur = Number(jo.dur || 0.6);
+      // 给了 line/at 就已经钉死了时刻，别再往前推 dur（推了 at 就不准）
+      const dur = jo.dur !== undefined ? Number(jo.dur) : (jo.line !== undefined ? 0 : 0.6);
       const tag = String(jo.out || job.id);
       // --pre 用的是 state 那套输入小语言，在**开拍之前**无头跑完：
       // 「先按 E 把绳头拿起来，再按住 d 边走边拍」这种前置操作没它没法表达
@@ -449,7 +454,7 @@ async function CmdShot(o) {
         if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
         return [inp, Math.max(1, Number(mul || 1))];
       });
-      await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps, flags }) => {
+      await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps, flags, line, at }) => {
         const tl = window.TunnelLight;
         tl.JumpToBeat(c, b);                       // 吃章号，跨章不用重开页面
         tl.StepFrames(1, {});
@@ -468,9 +473,14 @@ async function CmdShot(o) {
         if (actor) { const a = tl.state.actors.find((z) => z.id === actor); if (a?.track) a.track.t = 0; }
         tl.StepFrames(2, {});
         for (const [inp, n] of steps) tl.StepFrames(n, inp);
+        // @line=9,at=2.6：钉到"第 9 句台词的第 2.6 秒"。别再拿 --dur 猜——
+        // dur 是从整拍开头算的，改一句台词的时长后面全错位；而且推完之后要等
+        // 渲染追上（镜头缓动/立面淡出/光照换挡），那半秒里游戏又往前走了
+        if (line !== undefined) tl.SeekLine(line, at || 0);
       }, { c: job.ci, b: job.bi, x: jo.x === undefined ? undefined : Number(jo.x), level: jo.level || null,
         actor: jo.actor || null, keepCine: jo.cine === "keep",
-        stepIndex: jo.step === undefined ? undefined : Number(jo.step), pre, flags: job.flags });
+        stepIndex: jo.step === undefined ? undefined : Number(jo.step), pre, flags: job.flags,
+        line: jo.line === undefined ? undefined : Number(jo.line), at: Number(jo.at || 0) });
 
       // 等转场的圆形黑幕拉开再拍——死等固定秒数会拍到一个圆洞（等待时间随
       // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子
@@ -514,6 +524,10 @@ async function CmdShot(o) {
 
       const held = jo.hold ? String(jo.hold).split("") : [];
       for (const k of held) await page.keyboard.down(k);
+      // **冻帧再拍**（没按着键的拍才冻）：游戏钟停住、渲染照跑。镜头缓动、
+      // 立面淡出、光照换挡都得真渲染几帧才追得上，不冻帧的话等它追上的那半秒
+      // 里游戏又往前走了——截出来的不是你要的那一格
+      if (!held.length) await page.evaluate(() => window.TunnelLight.Freeze(true));
       const clip = jo.clip ? (() => { const [x, y, w, h] = String(jo.clip).split(",").map(Number); return { x, y, width: w, height: h }; })() : undefined;
       for (let i = 0; i < phases; i += 1) {
         // **--dur 量的是游戏钟，不是墙钟。** 无头合成器一忙 rAF 掉到十几帧、
@@ -539,6 +553,33 @@ async function CmdShot(o) {
         }
         const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
         await page.screenshot({ path: file, clip });
+        // @zoom=sister / @zoom=player / @zoom=31.15[:0.6]：顺手再裁一张近景。
+        // "认不认得出这是件能抓的东西"只能靠近看，而靠猜裁剪框是纯浪费
+        if (jo.zoom) {
+          const rect = await page.evaluate((want) => {
+            const tl = window.TunnelLight;
+            let wx = Number(want.split(":")[0]);
+            let wy = Number(want.split(":")[1]);
+            if (!Number.isFinite(wx)) {
+              const a2 = want === "player" ? tl.state.player : tl.state.actors.find((z) => z.id === want);
+              if (!a2) return null;
+              wx = a2.x;
+              if (!Number.isFinite(wy)) wy = (a2.level === "under" ? -3.6 : 0) + 0.6;
+            }
+            if (!Number.isFinite(wy)) wy = 0.6;
+            const p2 = tl.ScreenXY(wx, wy);
+            return p2 && { x: p2.x, y: p2.y };
+          }, String(jo.zoom));
+          if (rect) {
+            const W = 520, H = 300;
+            const zf = path.join(outDir, phases > 1 ? `cli_${tag}_${i}_zoom.png` : `cli_${tag}_zoom.png`);
+            await page.screenshot({ path: zf,
+              clip: { x: Math.max(0, Math.min(1600 - W, rect.x - W / 2)),
+                y: Math.max(0, Math.min(900 - H, rect.y - H * 0.55)), width: W, height: H } });
+            files.push(zf);
+            console.log(`  ${path.basename(zf)}  近景 @屏幕(${Math.round(rect.x)},${Math.round(rect.y)})`);
+          } else console.log(`  zoom：找不到「${jo.zoom}」`);
+        }
         const s = await page.evaluate((wantProbe) => {
           const st = window.TunnelLight.state;
           const out = { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex, line: st.beat?.lineIndex,
@@ -559,6 +600,7 @@ async function CmdShot(o) {
         }
       }
       for (const k of held) await page.keyboard.up(k);
+      await page.evaluate(() => window.TunnelLight.Freeze(false));
     }
     console.log(`\n${files.length} 张 → TunnelLight1943/_shots/`);
   } finally {

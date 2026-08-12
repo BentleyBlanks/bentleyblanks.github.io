@@ -355,6 +355,8 @@ function ReadInput() {
 // ---------------------------------------------------------------------------
 const cam = { x: 60, y: 2.0, hw: 7.2 };
 let camSnap = true;
+// 冻帧开关：只给实拍/调试用（TunnelLight.Freeze）。见 RunFrame 里那段注释
+let frozen = false;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
 
 function ActorAt(state, id) {
@@ -1253,7 +1255,11 @@ function RunFrame(now, dt) {
       SaveBag();
       PeekBag(state.relicCard.id);
     }
-    StepGame(state, {
+    // 冻帧（只给实拍用，见 TunnelLight.Freeze）：**游戏钟停住、渲染照跑**。
+    // 截图要的是"某一拍第几秒"那一格，可镜头缓动、立面淡出、光照换挡都得真的
+    // 渲染几帧才追得上——不冻帧的话，等渲染追上的那半秒里游戏又往前走了，
+    // 截出来的根本不是那一格（妹妹睡姿那次为此白跑了十几轮）。
+    if (!frozen) StepGame(state, {
       moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
       interact: interactEdge,
@@ -1335,6 +1341,28 @@ window.TunnelLight = {
   // 采样音效包装了几个（0 = 全靠合成器兜底）
   SfxPackSize: () => audio.SfxPackSize(),
   Sfx: (name, opts) => audio.Sfx(name, opts),
+  // 冻帧：游戏钟停住、渲染照跑。实拍要"某一拍第几秒"那一格时，先把游戏推到位
+  // （StepFrames），再 Freeze(true) 让镜头/立面/光照渲染追上来，然后截图。
+  Freeze: (v = true) => { frozen = !!v; return frozen; },
+  // 把游戏推到"第 line 句台词的第 at 秒"。实拍最常要的就是这个，别再拿 --dur
+  // 一秒一秒地猜（猜出来的还随机器快慢漂）。返回真正落在哪儿。
+  SeekLine: (line, at = 0) => {
+    if (!state) return null;
+    for (let i = 0; i < 20000 && (state.beat?.lineIndex ?? 0) < line; i += 1) {
+      StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+    }
+    for (let i = 0; i < Math.round(at * 30); i += 1) {
+      StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+    }
+    return { line: state.beat?.lineIndex, lineT: state.beat?.lineT };
+  },
+  // 世界坐标 → 屏幕像素（实拍要裁一块近景看清楚时用）。ScreenToWorld 的逆。
+  ScreenXY: (wx, wy) => {
+    const a = world.ScreenToWorld(200, 300), b = world.ScreenToWorld(1400, 800);
+    if (!a || !b) return null;
+    const kx = (b.x - a.x) / 1200, ky = (b.y - a.y) / 500;
+    return { x: 200 + (wx - a.x) / kx, y: 300 + (wy - a.y) / ky };
+  },
   StepFrames: (n, input = {}) => {
     if (!state) return;
     for (let i = 0; i < n; i += 1) {

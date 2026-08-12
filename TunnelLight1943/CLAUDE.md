@@ -41,6 +41,8 @@ node TunnelLight1943/Script_Cli.mjs
 | `beat <id>` | 某一拍的全部：步骤/区域/needs/prompt/旗标/台词/源码位置 |
 | `state <id> [选项]` | **无头**跑到那一拍、喂真输入、把状态打出来（`--x --level --step --input --flag --frames --trace --json`） |
 | `shot <id ...> [选项]` | 实拍（真浏览器真键盘）→ `_shots/`（`--pre --step --hold --dur --phases --actor --clip --flag --probe --eval`）。**可以一条命令拍好几拍** |
+| `shot <id>@line=N,at=T` | **钉到"第 N 句台词的第 T 秒"**那一格（拍过场用这个，别拿 `--dur` 猜） |
+| `shot <id>@zoom=<谁>` | 顺手再裁一张近景（`zoom=sister` / `zoom=player` / `zoom=31.15:0.2`） |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |
 
 **这是硬规矩，因为代价量过**：翻 12 天会话记录，改这个游戏的 token 七成花在
@@ -73,6 +75,12 @@ node TunnelLight1943/Script_Cli.mjs
 - **`--probe`**：截图同时报两件**有明确对错**的事——深度带用错没有
   （`DepthViolations`）、手脚离地多少（`PlayerLimbTips`）。**好不好看得自己看图**，
   这个开关不替你判断画面，只是把已有的两个体检数顺手打出来。
+- **拍过场里的某一格，用 `@line=N,at=T`，别用 `--dur`**（2026-08-12 睡姿那次为此
+  白跑了十几轮）。`--dur` 是从整拍开头算的：改一句台词的时长，后面全错位；而且
+  推完之后还要等渲染追上（镜头缓动、立面淡出、光照换挡都要真渲染几帧），
+  那半秒里游戏又往前走了——截出来的根本不是你要的那一格。现在 `shot` 在拍之前
+  **冻帧**（`TunnelLight.Freeze`：游戏钟停住、渲染照跑），所以 `at` 说几秒就是几秒。
+  **"这东西在画面上哪儿"也别再靠猜裁剪框**：`@zoom=sister` 直接给一张近景。
 - **要截图，跑 `shot`**。那套引导代码有三个必踩的坑，已经固化在里面：
   `ServeRoot` 的 rootDir 必须 `path.resolve`（正斜杠字符串会 403）、页面 load 完
   `tl.state` 还是 null 得先 `StartGame`、**拍姿势必须真按键**（`FlashPose` 只有
