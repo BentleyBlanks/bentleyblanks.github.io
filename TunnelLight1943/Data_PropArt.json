@@ -742,6 +742,121 @@
         "baseline": 4
       },
       "note": "铺在榆树底下接榆钱的破褂子（2026-08-12 打榆钱拆场）：showFlag=coatSpread 出、hideFlag=elmBagged 收；砸下第二把后 propRedraw 铺一层绿（flags.elmDown）"
+    },
+    "louDrill": {
+      "art": "DrawLou",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.2,
+      "sprite": {
+        "w": 72,
+        "h": 60,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "地头那架耧（第七稿 5a）：拉耧那拍 louPlay 藏静态、state.lou 的动态网格接管；收耧交还——两份同位同角，换手不露痕"
+    },
+    "stubbleField": {
+      "art": "DrawStubbleField",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 30,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "去年的谷茬地：割剩的短茬一排一排齐刷刷指着天。贴地矮物，退到 yard 带当景"
+    },
+    "sownField": {
+      "art": "DrawSownField",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 22,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "东邻新耩的湿垄：一趟一趟直得像用线量过。贴地，yard 带"
+    },
+    "strawMat": {
+      "art": "DrawStrawMat",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 56,
+        "h": 30,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "窖角的草苫堆（第七稿）：整布抽出来的地方、伤员藏身的地方。低矮一垛，边缘发毛"
+    },
+    "strawArm": {
+      "art": "DrawStrawArm",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 38,
+        "h": 20,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "草堆底下伸出来的前臂和手（manGrab 那一镜的静帧）：loose 带压在草堆之前，插入镜里才看得清"
+    },
+    "cellarSundries": {
+      "art": "DrawCellarSundries",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 68,
+        "h": 32,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "摸黑归置前：破笸箩歪着、豁口碗倒扣、纺锭拖线（cellarTidy 收走）"
+    },
+    "cellarSundriesTidy": {
+      "art": "DrawCellarSundriesTidy",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 62,
+        "h": 30,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "摸黑归置后：笸箩摆正、碗摞成摞、纺锭线绕紧（cellarTidy 立起才现）"
+    },
+    "sewBasket": {
+      "art": "DrawSewBasket",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 40,
+        "h": 24,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "针线笸箩：叠得整整齐齐的旧小褂 + 领口那根针。窖角/梯子底下两个摆位共用这一份"
+    },
+    "mendedJacket": {
+      "art": "DrawMendedJacket",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 32,
+        "h": 18,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "缝好的小褂子（袖口接蓝底白花）：mended 立旗后出现在枕头边。loose 带——放下的东西永远看得见"
     }
   },
   "_coversNote": [

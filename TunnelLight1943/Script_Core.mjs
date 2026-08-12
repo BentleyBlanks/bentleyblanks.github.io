@@ -889,7 +889,10 @@ function StepGroundItems(state, def, input) {
     if (g.level !== lvl || Math.abs(g.x - p.x) > GROUND_HINT_R) continue;
     state.bubbles.push({ x: g.x, y: (lvl === "under" ? UNDER_Y : SURFACE_Y) + 1.15, icon: "item:" + g.label });
   }
-  if (state.prompt || state.microCine || def?.kind === "cinematic") return;
+  // 翻越提示亮着时这颗 E 是"翻过去"，不是"放下"——不拦的话，扛着桶走到
+  // 塌墙跟前一按 E，桶先被撂在墙根（第七稿的下地往返头一回带着东西过这堵墙，
+  // 自动通关当场抓出来的）
+  if (state.prompt || state.microCine || def?.kind === "cinematic" || state.vaultHint) return;
   if (p.climbT > 0 || p.vaultT > 0 || p.cineWalk) return;
 
   const near = NearestGroundItem(state);
@@ -1538,6 +1541,10 @@ function StepChain(state, def, input, dt) {
     b.stepIndex += 1;
     b.holdP = 0;
     b.pipIdleT = 0;                // 链动了一步，"没动静"从头计
+    // 完成这一步的那颗 E 当帧作废：这一步的提示已经收了，同一帧再让
+    // StepGroundItems 拿它当"自由放下"，手里拎着的桶就被撂在原地
+    //（收耧那一下把桶丢在地头——2026-08-13 自动通关抓的）
+    input.interact = false;
     if (b.stepIndex >= def.steps.length) AdvanceBeat(state);
   };
 
@@ -1727,6 +1734,7 @@ function StepChain(state, def, input, dt) {
         p.pose = "heaveMat"; p.poseU = 1; p.poseT = undefined;
         if (f.tip <= 0) {
           f.done = true; f.grab = false;
+          f.grip = null;   // 收尾清挂点：同姿势的另一件（苇席）才接得上手
           Cue(state, "drop", { gain: 0.55, rate: 0.85 });
           state.vaultDust = { x: f.x - L.half * 0.6, t: 0 };
           p.pose = null; p.poseU = undefined;
@@ -1936,6 +1944,7 @@ function StepChain(state, def, input, dt) {
         : part === "trough" ? "手伸进槽底 · 把秕谷壳扫进兜里" : "手插进灰堆 · 一把一把往回刨";
       if (f.done >= L.strokes) {
         p.pose = null; p.poseU = undefined;
+        f.grip = null;   // 收尾清挂点：同姿势的另一件（灰堆/食槽）才接得上手
         finish();
       }
       return;
@@ -2255,7 +2264,7 @@ function StepChain(state, def, input, dt) {
       if (f.blocked) {
         // 歪在垄沟里：得先扶起来
         f.tilt = Math.min(LOU.tiltA, f.tilt + dt * 1.8);
-        state.prompt = "E · 把耧扶起来，再试一回";
+        state.prompt = "E · 扶起耧";
         if (Math.abs(p.x - drillX) < 2.6 && input.interact) {
           f.blocked = false;
           f.tilt = 0;
@@ -9604,7 +9613,7 @@ export function GetBeatTarget(state) {
           const ang = state.forage?.[part]?.ang ?? L.restA;
           const edge = ForageMatEdge(st.zone.x, gy, ang, part);
           return {
-            action: "heaveAt",
+            action: "heaveAt", part,
             x: Math.max(st.zone.x + 0.52, edge.x + L.standGap),
             level: st.zone.level || "surface", reach: 0.55,
             grab: edge,                                        // 攥这儿（苫子/苇席外沿）
@@ -9638,7 +9647,7 @@ export function GetBeatTarget(state) {
           const mound = { x: st.zone.x, y: gy + L.top * (1 - 0.55 * (f?.k || 0)) * 0.55 };
           const span = L.len + 0.07;
           return {
-            action: "scoopAt",
+            action: "scoopAt", part,
             x: st.zone.x + dirX * L.standGap, level: st.zone.level || "surface", reach: 0.55,
             grab: mound,
             to: { x: mound.x + u.x * span, y: mound.y + u.y * span },

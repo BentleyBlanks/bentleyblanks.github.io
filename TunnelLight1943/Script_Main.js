@@ -4,7 +4,7 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  KNOT_CARD, FOLD_CARD, WRAP_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
+  KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
 import { DrawRelic } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
@@ -509,6 +509,7 @@ function UpdateCamera(state, dt) {
         : playing && state.knotCard ? { kind: "knot", view: state.knotCard, layout: KNOT_CARD }
           : playing && state.foldCard ? { kind: "fold", view: state.foldCard, layout: FOLD_CARD }
             : playing && state.wrapCard ? { kind: "wrap", view: state.wrapCard, layout: WRAP_CARD }
+            : playing && state.splitCard ? { kind: "split", view: state.splitCard, layout: SPLIT_CARD }
             : null,
     dt,
   );

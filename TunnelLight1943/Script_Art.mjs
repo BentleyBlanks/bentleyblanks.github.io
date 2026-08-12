@@ -1185,6 +1185,46 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
       InkFill(ctx, [[-5 * S, 1.6 * S], [5 * S, 1.6 * S], [4.6 * S, 3.4 * S], [-4.6 * S, 3.4 * S]],
         "bucketWater", "#5a7a8c", { amp: 0.4 * S, lw: 1.2 * S });
     }
+  } else if (label === "挂着包袱的空桶") {
+    // 借还乡帮送东西那趟：空木桶照旧（复用"水桶"那支笔），桶沿上挂一坨
+    // 扎起来的小包袱——土布色、结头在上。包袱贴着桶帮垂在外侧，
+    // 桶还是那只桶，多出来的只有这一坨
+    DrawCarry(ctx, 0, 0, S, 1, "水桶");
+    InkFill(ctx, [[3.4 * S, 0.6 * S], [8.6 * S, 0.2 * S], [9.6 * S, 4.2 * S],
+      [7.4 * S, 6.6 * S], [4.0 * S, 5.8 * S]],
+      "bkBundle", "#6d5f45", { amp: 0.7 * S, lw: 1.4 * S, shade: "rgba(0,0,0,0.2)" });
+    // 结头：两只布角在包袱顶上挽出来，朝两边翘
+    InkFill(ctx, [[5.2 * S, 0.8 * S], [4.0 * S, -1.8 * S], [5.8 * S, -0.8 * S], [6.6 * S, -2.2 * S],
+      [7.8 * S, -0.6 * S], [6.6 * S, 1.0 * S]],
+      "bkBundleKnot", "#5e5138", { amp: 0.5 * S, lw: 1.1 * S });
+    // 兜底那道被里头东西顶出来的痕
+    InkLine(ctx, 4.6 * S, 3.8 * S, 8.6 * S, 3.4 * S, "bkBundleSag",
+      { lw: 0.8 * S, color: "rgba(52,42,26,0.55)", amp: 0.8 });
+  } else if (label === "整布") {
+    // 娘那块没下过剪子的整布：对折又对折，方方正正抱在怀里，可布有分量——
+    // 两侧边缘往下垂。靛蓝压暗（sRGB 老账），白花只隐约几点
+    InkFill(ctx, [[-8.5 * S, -3.6 * S], [8.5 * S, -3.8 * S], [9.0 * S, 3.0 * S],
+      [7.6 * S, 5.2 * S], [-7.4 * S, 5.4 * S], [-9.0 * S, 3.2 * S]],
+      "wholeCloth", "#252c37", { amp: 0.8 * S, lw: 1.6 * S, shade: "rgba(0,0,0,0.24)" });
+    // 对折的那道口：布边（织边）在上，一线略浅
+    InkLine(ctx, -7.6 * S, -1.2 * S, 7.8 * S, -1.4 * S, "wholeClothFold",
+      { lw: 0.9 * S, color: "rgba(120,130,146,0.4)", amp: 0.7 });
+    InkLine(ctx, -7.2 * S, 1.6 * S, 7.4 * S, 1.4 * S, "wholeClothFold2",
+      { lw: 0.8 * S, color: "rgba(10,12,16,0.5)", amp: 0.7 });
+    // 隐约的白花点：三五簇，别亮——它是记号，不是装饰
+    ctx.save();
+    ctx.fillStyle = "rgba(150,158,172,0.34)";
+    for (let i = 0; i < 5; i += 1) {
+      const bx = (-6 + Hash("wcB" + i) * 12) * S;
+      const by = (-2.6 + Hash("wcBy" + i) * 6.5) * S;
+      for (let p2 = 0; p2 < 3; p2 += 1) {
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(p2 * 2.1) * 0.8 * S, by + Math.sin(p2 * 2.1) * 0.6 * S,
+          0.55 * S, 0.4 * S, p2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
   } else if (label === "铁皮桶") {
     InkFill(ctx, [[-8 * S, -12 * S], [8 * S, -12 * S], [7 * S, 10 * S], [-7 * S, 10 * S]], "tin", "#7d8188",
       { amp: 0.5 * S, lw: 1.9 * S, shade: "rgba(0,0,0,0.2)" });
@@ -1809,6 +1849,27 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
     InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
       id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
   }
+  // 齐膝那些石笔道道再往上——**两道凿子刻的深痕**（第七稿：爹给她量身高刻的，
+  // 去年一道、前年一道，今年的还没刻）。无条件画：它们是历史，早就在木头上。
+  // 换算照本画笔的老账（48px/米，1.28m≈61px）：去年 68px≈1.42m、前年 62px≈1.29m，
+  // 间距 6px——一年长半拃。凿痕跟石笔道道两个物种：深、粗、两端有崩出来的毛茬，
+  // 石笔那种"暗底线+淡亮痕"的浅法在它旁边就读成小孩的涂道道
+  for (const [dy2, tag] of [[68, "Y1"], [62, "Y2"]]) {
+    const mx0 = x - W / 2 + 0.6, mx1 = x - W / 2 + 7.6;
+    // 凿槽本体：一道压得很深的暗槽
+    InkLine(ctx, mx0, groundY - dy2, mx1, groundY - dy2 + 0.5, id + "chis" + tag,
+      { lw: 2.8, color: "#241809", amp: 0.5 });
+    // 槽下沿的亮茬：凿出来的口子，晒旧了仍比木面浅
+    InkLine(ctx, mx0 + 0.6, groundY - dy2 + 1.9, mx1 - 0.4, groundY - dy2 + 2.3, id + "chisLip" + tag,
+      { lw: 1.2, color: "rgba(226,206,158,0.55)", amp: 0.4 });
+    // 两端的毛茬：凿子起落时崩出来的一两个小刺
+    InkLine(ctx, mx0, groundY - dy2, mx0 - 1.4, groundY - dy2 - 1.6, id + "chisBurrA" + tag,
+      { lw: 1.1, color: "#241809", amp: 0.3 });
+    InkLine(ctx, mx1, groundY - dy2 + 0.5, mx1 + 1.2, groundY - dy2 - 1.2, id + "chisBurrB" + tag,
+      { lw: 1.1, color: "#241809", amp: 0.3 });
+    InkLine(ctx, mx1 - 0.4, groundY - dy2 + 0.4, mx1 + 1.0, groundY - dy2 + 1.8, id + "chisBurrC" + tag,
+      { lw: 0.9, color: "#241809", amp: 0.3 });
+  }
   if (marked) {
     InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
@@ -2053,7 +2114,30 @@ export function DrawTree(ctx, x, groundY, id,
       R.push([px + w2, py]);
     }
     InkFill(ctx, [...L, ...R.reverse()], id + "strip",
-      night ? "#544b3c" : "#7d6242", { amp: 1.0, lw: 0, line: null });
+      night ? "#5c5240" : "#87693f", { amp: 1.0, lw: 0, line: null });
+    // 白茬中间那道露得最狠的芯：树皮是被一条条啃下去的，最当中啃得最深、
+    // 露的木头最白。整块只亮一档会被 sRGB 提亮吃平（CanvasTexture 老账），
+    // 一整块亮两档又成白木板——所以只给当中一条窄芯提亮，两边留着过渡，
+    // "皮被吃掉了"这句话靠这道芯说
+    ctx.save();
+    ctx.strokeStyle = night ? "rgba(148,136,108,0.40)" : "rgba(196,168,120,0.46)";
+    ctx.lineCap = "round";
+    for (let i = 0; i <= 4; i += 1) {
+      const [p0x, p0y, p0w] = trunkAt((i / 5) * kCut);
+      const [p1x, p1y] = trunkAt(((i + 0.8) / 5) * kCut);
+      ctx.lineWidth = Math.max(1.6, p0w * 0.66);
+      ctx.beginPath();
+      ctx.moveTo(p0x + Sym(id + "core" + i, 0, p0w * 0.3), p0y);
+      ctx.lineTo(p1x + Sym(id + "core" + i, 1, p0w * 0.3), p1y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 两侧留皮的那条界：一道暗棱把"皮/茬"分开，白茬才不糊回树干里
+    for (const sd of [-1, 1]) {
+      const q0 = trunkAt(0.06), q1 = trunkAt(kCut * 0.94);
+      InkLine(ctx, q0[0] + sd * (q0[2] - 0.9), q0[1], q1[0] + sd * (q1[2] - 0.9), q1[1],
+        id + "stripEdge" + sd, { lw: 1.3, color: barkDark, amp: 1.6 });
+    }
     // 剥口不是齐的，是啃剥出来的锯齿边
     const [cxT, cyT, hwT] = trunkAt(kCut);
     for (let i = 0; i < 5; i += 1) {
@@ -3918,37 +4002,47 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
   ctx.fillRect(0, 0, W, H);
 }
 
-// 解扎口的活卡（找吃的第四道手）。每帧重画，view = Core 的 state.wrapCard，
-// L = WRAP_CARD，t = 秒。版面坐标全在 L 里（卡宽单位），**这儿绝不另抄一套**。
+// 开坛口的活卡（找吃的第四道手，第七稿）。每帧重画，view = Core 的
+// state.wrapCard，L = WRAP_CARD，t = 秒。版面坐标全在 L 里（卡宽单位），
+// **这儿绝不另抄一套**。
 //
-// 为什么非得是一张卡：罐口连扎口的碎布拢共 0.22m，玩法景别的画宽 12.3m——
-// 不到 2%，屏幕上是一粒扣子。同石笔/刨子/接绳（CLAUDE.md 拟物交互第 4 条）。
+// 为什么非得是一张卡：坛口拢共 0.22m，玩法景别的画宽 12.3m——不到 2%，
+// 屏幕上是一粒扣子。同石笔/刨子/接绳（CLAUDE.md 拟物交互第 4 条）。
 //
-// 画的顺序＝这活儿的先后（画笔通病第 1 条）：先有罐、再蒙布、再一道道缠上去，
-// 所以绳压在布上、布压在罐口上。玩家褪掉一道，就真少画一道。
-// 明度：罐口那团黑是这张卡的底，浅色的绳与布压在它上头才看得见。
+// 第七稿的封法：**坛口糊着一圈干泥，泥上盖半块碗底**（豁口碗的底，圈足朝上），
+// 碗片底下垫着一圈蓝底白花的碎布——暗线的第二面。两段动作：
+//   unwind＝抠泥（顺着一个方向一段一段啃，泥真的一块一块掉）；
+//   peel＝揭碗片（捏住边往左下揭，底下的碎布垫圈和红薯干露出来）。
+// 画的顺序＝封坛那天的先后（画笔通病第 1 条）：先有坛、再垫布、再扣碗底、
+// 最后糊泥——所以泥压在碗片边上、碗片压在布上、布压在坛口上。
+// 玩家抠掉一段，就真少画一段。
 // ---------------------------------------------------------------------------
 // 配色一律**按 sRGB 那条老账压两档**（CanvasTexture 没声明色彩空间，上屏整体
-// 提亮一大截）。实拍第一版三样全糊成一片米白，谁是绳谁是布分不出来。
-// 压了多少不是拍脑袋：实拍量过一版——源色 #9c7434 上屏是 #e8d3a8，
-// 亮度从 0.46 抬到 0.83。所以这几个数看着"黑得离谱"才是对的。
-const WRAP_ROPE = "#5e4318";        // 扎口的细麻绳（三样里最亮的一档）
-// 碎布：蓝底白花的土布——娘那件短褂上剪下来的（2026-08-12 用户改稿钉死的
+// 提亮一大截）。实拍量过一版——源色 #9c7434 上屏是 #e8d3a8，亮度从 0.46 抬到
+// 0.83。所以这几个数看着"黑得离谱"才是对的。
+const WRAP_MUD = "#4c4130";         // 干泥圈（发灰的干黄泥，三样里最亮的一档）
+const WRAP_MUD_D = "#352d1f";       // 泥的背光块与裂缝
+const WRAP_SHARD = "#45423a";       // 半块粗瓷碗底：糙瓷，比坛身亮半档才立得住
+const WRAP_SHARD_D = "#302e27";
+const WRAP_FOOT = "#585349";        // 圈足：磨得发白的一圈
+// 碎布垫圈：蓝底白花的土布——娘那件短褂上剪下来的（2026-08-12 用户改稿钉死的
 // 暗线：跟夜里窖角那件短褂同一块布，FOLD_CLOTH 那头是同一个色系）
 const WRAP_CLOTH = "#1d2534";       // 靛蓝土布（按 sRGB 老账压两档）
-const WRAP_CLOTH_D = "#141a25";
 const WRAP_BLOOM = "rgba(188,196,208,0.55)";   // 白花：洗褪了的印花点子
-const WRAP_JAR = "#22201b";         // 灰陶：整张卡里最沉的一块，绳与布压在它上头
+const WRAP_JAR = "#22201b";         // 灰陶：整张卡里最沉的一块，泥与碗片压在它上头
 
 export function DrawWrapCard(ctx, W, H, view, L, t) {
   const S = H / 720;
   const P = (x, y) => [x * W, y * W];
   const c = L.neck;
   const cx = c.x * W, cy = c.y * W, cr = c.r * W;
-  // 细麻绳：扎口用的细绳，比井绳细一半还多。粗了那几道捻纹会读成一架梯子
-  const RW = W * 0.0155;
   const peel = Math.max(0, Math.min(1, view.open || 0));
-  const lapsLeft = view.phase === "peel" ? 0 : Math.max(0, view.lapsLeft ?? L.laps);
+  // 抠泥的进度：抠完第几圈（laps）、这一圈抠到哪（lapK）。泥圈分三箍
+  //（外→内一圈一圈啃），已抠掉的地方露出坛口沿——进度长在泥上，不在环上
+  const laps = view.phase === "peel" ? L.laps : Math.min(L.laps, view.laps || 0);
+  const lapK = view.phase === "peel" ? 1 : Math.max(0, Math.min(1, view.lapK || 0));
+  // 起手豁口的方位（L.tip 相对坛心）：抠是从这儿起的手，屏幕逆时针一路啃过去
+  const tipA = Math.atan2((L.tip.y - c.y) / 0.42, L.tip.x - c.x);
 
   LiveCardBase(ctx, W, H, "#6b5a3c");
 
@@ -4022,180 +4116,484 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
     ctx.restore();
   }
 
-  // ── 油布：蒙在口上、垂过罐肩。掀开＝整块布绕着对角那条边翻过去 ──
-  const corner = view.corner || L.cloth;
-  const cpx = P(corner.x, corner.y);
+  // ── 碎布垫圈：封坛那天垫在碗底下的那一圈蓝底白花（暗线的第二面）。
+  // 它压在坛口沿上、中间留着口（口那团黑与红薯干在它底下露着）。
+  // 画成一圈厚布箍，不是一块盖布——盖口的是碗片，布只是垫
+  const cyRim = cy - cr * 0.04;
   {
-    // 布是**蒙在罐口上、四边垂过罐肩**的一块方布（不是插在口上的一张纸片——
-    // 实拍第一版是个带放射折线的硬楔子，读出来像只风筝）。所以：
-    //   · 形状是一块**鼓着的圆布**，边是波的（垂下来的褶就在这条边上）；
-    //   · 掀开不是把它拉长，是**整块绕东边那条压在罐沿下的边翻过去**
-    //     （掀被子就是这么掀的），所以这儿只画"一块布"，翻多少交给一个旋转。
     ctx.save();
-    const hinge = [cx + cr * 1.00, cy + cr * 0.18];
-    ctx.translate(hinge[0], hinge[1]);
-    ctx.rotate(-peel * 2.05);
-    ctx.translate(-hinge[0], -hinge[1]);
-    const cyc = cy - cr * 0.05;
-    const ring = [];
-    for (let i = 0; i < 15; i += 1) {
-      const a = (i / 15) * Math.PI * 2;
-      const wob = 1 + 0.11 * Math.sin(a * 3 + 0.8) + 0.05 * Math.sin(a * 5 - 1.3);
-      ring.push([cx + Math.cos(a) * cr * 1.18 * wob, cyc + Math.sin(a) * cr * 0.74 * wob]);
-    }
-    InkFill(ctx, ring, "wrCloth", peel > 0.5 ? WRAP_CLOTH_D : WRAP_CLOTH,
-      { amp: 3.6 * S, lw: 5 * S, shade: "rgba(10,8,3,0.36)" });
-    // 方布蒙在圆口上，四个角就翘在外头——这是"这是块布"最硬的一个记号
-    for (const a of [-2.42, -0.62, 0.78, 2.5]) {
-      const bx = cx + Math.cos(a) * cr * 1.10, by = cyc + Math.sin(a) * cr * 0.70;
-      InkFill(ctx, [
-        [bx - Math.sin(a) * cr * 0.20, by + Math.cos(a) * cr * 0.14],
-        [bx + Math.cos(a) * cr * 0.34, by + Math.sin(a) * cr * 0.30],
-        [bx + Math.sin(a) * cr * 0.20, by - Math.cos(a) * cr * 0.14],
-      ], "wrTip" + a.toFixed(1), peel > 0.5 ? WRAP_CLOTH_D : WRAP_CLOTH,
-      { amp: 2.6 * S, lw: 4 * S });
-    }
-    // 垂下来的那几道褶：从布心往边上走（布是被罐口顶起来的，褶从中间散开）
-    ctx.strokeStyle = "rgba(14,12,5,0.34)";
-    ctx.lineWidth = 2.6 * S;
-    for (let i = 0; i < 5; i += 1) {
-      const a = -2.1 + i * 0.92;
+    ctx.lineCap = "round";
+    // 布箍：两道错位的粗弧叠出厚度，边缘自己就毛了
+    for (const [rk, wk, col] of [[1.00, 0.30, WRAP_CLOTH], [0.94, 0.20, "#232c3d"]]) {
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * cr * 0.12, cyc + Math.sin(a) * cr * 0.10);
-      ctx.quadraticCurveTo(cx + Math.cos(a) * cr * 0.70 + Sym("wrFold", i, 8 * S),
-        cyc + Math.sin(a) * cr * 0.40,
-        cx + Math.cos(a) * cr * 1.12, cyc + Math.sin(a) * cr * 0.70);
+      ctx.ellipse(cx, cyRim, cr * rk, cr * rk * 0.42, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(8,10,14,0.9)";
+      ctx.lineWidth = cr * wk + 4 * S;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(cx, cyRim, cr * rk, cr * rk * 0.42, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = cr * wk;
       ctx.stroke();
     }
-    // 白花：洗褪了的印花点子，三五瓣一簇，稀稀拉拉——布跟着掀，花也得跟着
-    // （画在旋转块里）。这几点白就是暗线的记号：窖里那件短褂上是同一种花
-    for (let i = 0; i < 7; i += 1) {
-      const a = Hash("wrBloomA" + i) * Math.PI * 2;
-      const rr = Math.sqrt(Hash("wrBloomR" + i)) * cr * 0.92;
-      const bx = cx + Math.cos(a) * rr, by = cyc + Math.sin(a) * rr * 0.62;
+    ctx.restore();
+    // 方布垫在圆口上：几个布角从箍底下探出来
+    for (const a of [-2.3, -0.6, 0.9, 2.55]) {
+      const bx = cx + Math.cos(a) * cr * 1.06, by = cyRim + Math.sin(a) * cr * 0.44;
+      InkFill(ctx, [
+        [bx - Math.sin(a) * cr * 0.15, by + Math.cos(a) * cr * 0.09],
+        [bx + Math.cos(a) * cr * 0.24, by + Math.sin(a) * cr * 0.16],
+        [bx + Math.sin(a) * cr * 0.15, by - Math.cos(a) * cr * 0.09],
+      ], "wrGaskTip" + a.toFixed(1), WRAP_CLOTH, { amp: 2 * S, lw: 3.5 * S });
+    }
+    // 白花：稀稀拉拉几簇。这几点白就是暗线的记号：窖里那件短褂上是同一种花
+    for (let i = 0; i < 6; i += 1) {
+      const a = Hash("wrGBloomA" + i) * Math.PI * 2;
+      const bx = cx + Math.cos(a) * cr * (0.88 + Hash("wrGBloomR" + i) * 0.14);
+      const by = cyRim + Math.sin(a) * cr * 0.40;
       ctx.fillStyle = WRAP_BLOOM;
-      for (let p2 = 0; p2 < 4; p2 += 1) {
-        const pa = (p2 / 4) * Math.PI * 2 + Hash("wrBloomP" + i) * 2;
+      for (let p2 = 0; p2 < 3; p2 += 1) {
+        const pa = (p2 / 3) * Math.PI * 2 + Hash("wrGBloomP" + i) * 2;
         ctx.beginPath();
-        ctx.ellipse(bx + Math.cos(pa) * cr * 0.045, by + Math.sin(pa) * cr * 0.032,
-          cr * 0.026, cr * 0.018, pa, 0, Math.PI * 2);
+        ctx.ellipse(bx + Math.cos(pa) * cr * 0.038, by + Math.sin(pa) * cr * 0.026,
+          cr * 0.023, cr * 0.016, pa, 0, Math.PI * 2);
         ctx.fill();
       }
     }
-    // 布面鼓起来那道脊上一线微光（旧布的磨亮，比桐油那版收着）
-    ctx.strokeStyle = "rgba(150,160,178,0.16)";
-    ctx.lineWidth = 3.4 * S;
+  }
+
+  // ── 半块碗底：豁口碗的底，圈足朝上扣在口当中。揭开＝捏住边往左下起 ──
+  // 判定与作画共用 view.corner / view.open 这两个数，Art 里不另算一份
+  const corner = view.corner || L.cloth;
+  const cpx = P(corner.x, corner.y);
+  {
+    const dragX = (corner.x - L.cloth.x) * W;
+    const dragY = (corner.y - L.cloth.y) * W;
+    ctx.save();
+    ctx.translate(cx + dragX, cyRim + dragY);
+    ctx.rotate(-peel * 0.85);           // 起开的那一下：整片朝左下翻着走
+    const er = cr * 0.80;
+    // 片身：多半个碗底的弧 + 掰断那条茬口（锯齿的弦）
+    const pts = [];
+    for (let i = 0; i <= 10; i += 1) {
+      const a = -2.95 + (i / 10) * 3.45;
+      const wob = 1 + 0.05 * Math.sin(a * 4 + 0.7);
+      pts.push([Math.cos(a) * er * wob, Math.sin(a) * er * 0.42 * wob]);
+    }
+    // 茬口：从弧尾折回弧头，两个尖
+    pts.push([er * 0.30, er * 0.20], [er * 0.02, er * 0.05], [-er * 0.34, er * 0.16]);
+    InkFill(ctx, pts, "wrShard", WRAP_SHARD,
+      { amp: 2.6 * S, lw: 5 * S, shade: "rgba(0,0,0,0.3)", shadeAt: 0.6 });
+    // 圈足朝上：当中一圈磨白的足，足里的底洼下去一线
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(cx - cr * 0.86, cyc - cr * 0.16);
-    ctx.quadraticCurveTo(cx, cyc - cr * 0.62, cx + cr * 0.86, cyc - cr * 0.10);
+    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.42, er * 0.19, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(20,18,12,0.9)";
+    ctx.lineWidth = 6 * S;
     ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.42, er * 0.19, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = WRAP_FOOT;
+    ctx.lineWidth = 4 * S;
+    ctx.stroke();
+    ctx.fillStyle = WRAP_SHARD_D;
+    ctx.beginPath();
+    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.30, er * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
-    // 被捏住的那个角单画在手底下：它连着布，但跟着手走（判定与作画共用
-    // view.corner 这一个点，Art 里不另算一份）
+    // 掰断的瓷茬发白：茬口那条边一线亮
+    ctx.save();
+    ctx.strokeStyle = "rgba(178,182,170,0.5)";
+    ctx.lineWidth = 2.2 * S;
+    ctx.beginPath();
+    ctx.moveTo(pts[10][0], pts[10][1]);
+    ctx.lineTo(er * 0.30, er * 0.20);
+    ctx.lineTo(er * 0.02, er * 0.05);
+    ctx.lineTo(-er * 0.34, er * 0.16);
+    ctx.lineTo(pts[0][0], pts[0][1]);
+    ctx.stroke();
+    // 那只碗本来的豁口：弧沿上啃缺的一小口
+    ctx.fillStyle = "rgba(14,12,8,0.85)";
+    ctx.beginPath();
+    ctx.ellipse(er * 0.62, -er * 0.26, er * 0.10, er * 0.05, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+    // 被捏住的那道边单画在手底下：翘起来的一小片瓷沿，跟着 view.corner 走
     if (view.phase === "peel" && peel < 1) {
-      const from = [cx - cr * 0.62, cy - cr * 0.42];
+      const from = [cx - cr * 0.56, cyRim - cr * 0.20];
       InkFill(ctx, [
         [from[0], from[1]],
-        [cpx[0] + cr * 0.10, cpx[1] - cr * 0.06],
-        [cpx[0] - cr * 0.06, cpx[1] + cr * 0.12],
-        [from[0] + cr * 0.24, from[1] + cr * 0.26],
-      ], "wrGrabTip", WRAP_CLOTH, { amp: 3 * S, lw: 4.4 * S, shade: "rgba(10,8,3,0.3)" });
+        [cpx[0] + cr * 0.10, cpx[1] - cr * 0.04],
+        [cpx[0] - cr * 0.05, cpx[1] + cr * 0.10],
+        [from[0] + cr * 0.20, from[1] + cr * 0.18],
+      ], "wrGrabLip", WRAP_SHARD, { amp: 2 * S, lw: 4 * S, shade: "rgba(0,0,0,0.26)" });
+      InkLine(ctx, cpx[0] - cr * 0.04, cpx[1] - cr * 0.02, cpx[0] + cr * 0.08, cpx[1] + cr * 0.02,
+        "wrGrabChip", { lw: 2 * S, color: "rgba(178,182,170,0.55)", amp: 1 * S });
     }
   }
 
-  // ── 麻绳：绕罐颈三道。褪掉一道就真少画一道（进度长在实物上，不在环上） ──
-  for (let i = 0; i < lapsLeft; i += 1) {
-    const y = cy + cr * (0.30 + i * 0.20);
-    const rx = cr * (1.02 + i * 0.03);
-    ctx.save();
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.ellipse(cx, y, rx, cr * 0.30, 0, 0.06, Math.PI - 0.06);
-    ctx.strokeStyle = "rgba(26,17,8,0.95)";
-    ctx.lineWidth = RW + 4 * S;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(cx, y, rx, cr * 0.30, 0, 0.06, Math.PI - 0.06);
-    ctx.strokeStyle = i === lapsLeft - 1 ? WRAP_ROPE : "#4c3712";
-    ctx.lineWidth = RW;
-    ctx.stroke();
-    ctx.restore();
+  // ── 干泥圈：三箍，外→内一圈一圈啃。抠掉一段就真少画一段（进度长在泥上，
+  // 不在环上）；泥压在碗片边与布箍上——封坛最后一道手就是它 ──
+  const GAP = 0.42;                        // 起手位那个豁口（tip 处，本来就缺一块）
+  for (let ring = 0; ring < L.laps; ring += 1) {
+    if (ring < laps) continue;             // 这一箍整圈抠完了：露出底下的坛口沿
+    const eaten = ring === laps ? lapK * (Math.PI * 2 - GAP) : 0;
+    const rr = cr * (1.36 - ring * 0.17);
+    const n = 15;
+    for (let i = 0; i < n; i += 1) {
+      // 泥块沿圆周排，从豁口起往屏幕逆时针（角度递减）方向数
+      const d0 = GAP + (i / n) * (Math.PI * 2 - GAP);
+      if (d0 < eaten + 0.001) continue;    // 啃过的地方没有泥了
+      const a = tipA - d0;
+      const bx = cx + Math.cos(a) * rr, by = cyRim + Math.sin(a) * rr * 0.42;
+      const bw = cr * (0.16 + Hash("wrMudW" + ring + i) * 0.09);
+      const bh = cr * (0.10 + Hash("wrMudH" + ring + i) * 0.05);
+      const rot = a + Sym("wrMudA" + ring, i, 0.5);
+      // 一块干泥：歪的、鼓的，绝不是一段圆弧（"四边笔直＝没有手"，圆弧也一样）
+      InkFill(ctx, [
+        [bx - Math.cos(rot) * bw, by - Math.sin(rot) * bw * 0.5 - bh * 0.5],
+        [bx + Math.cos(rot) * bw * 0.9, by + Math.sin(rot) * bw * 0.4 - bh * 0.7],
+        [bx + Math.cos(rot) * bw * 1.05, by + Math.sin(rot) * bw * 0.5 + bh * 0.5],
+        [bx - Math.cos(rot) * bw * 0.85, by - Math.sin(rot) * bw * 0.4 + bh * 0.6],
+      ], "wrMud" + ring + i, i % 3 ? WRAP_MUD : WRAP_MUD_D,
+      { amp: 2 * S, lw: 3.5 * S, shade: "rgba(0,0,0,0.26)" });
+      // 干透的裂缝：两三块上一道
+      if (i % 4 === 1) {
+        InkLine(ctx, bx - bw * 0.4, by - bh * 0.3, bx + bw * 0.3, by + bh * 0.4,
+          "wrMudCk" + ring + i, { lw: 1.6 * S, color: "rgba(16,12,6,0.6)", amp: 1.2 * S });
+      }
+    }
+    // 正在啃的那道口子：抠开的边上一线毛碴
+    if (ring === laps && view.phase === "unwind") {
+      const aEdge = tipA - GAP - eaten;
+      const ex = cx + Math.cos(aEdge) * rr, ey = cyRim + Math.sin(aEdge) * rr * 0.42;
+      InkLine(ctx, ex - cr * 0.06, ey - cr * 0.04, ex + cr * 0.05, ey + cr * 0.05,
+        "wrMudEdge" + ring, { lw: 2 * S, color: "rgba(120,104,74,0.6)", amp: 1.4 * S });
+    }
   }
-  // 已经褪下来的绳：一圈圈松松地堆在罐肩上（褪掉的没有消失，它掉在那儿）
-  const off = L.laps - lapsLeft;
-  for (let i = 0; i < off && view.phase !== "start"; i += 1) {
-    const y = cy + cr * (1.35 + i * 0.22);
-    ctx.save();
-    ctx.lineCap = "round";
+  // 抠下来的泥渣：一段一段攒在坛肩上（掉了的没有消失，它落在那儿）
+  const doneK = Math.min(1, (laps + lapK) / L.laps);
+  const crumbs = Math.round(doneK * 16);
+  ctx.save();
+  for (let i = 0; i < crumbs; i += 1) {
+    const t2 = Hash("wrCrX" + i);
+    const px2 = cx + (t2 - 0.5) * cr * 2.6;
+    const py2 = cy + cr * (1.30 + Hash("wrCrY" + i) * 0.55);
+    ctx.fillStyle = i % 3 ? WRAP_MUD : WRAP_MUD_D;
     ctx.beginPath();
-    ctx.ellipse(cx + cr * (0.1 - 0.06 * i), y, cr * (1.16 + 0.05 * i), cr * 0.22,
-      0.06 * (i % 2 ? 1 : -1), 0.1, Math.PI - 0.1);
-    ctx.strokeStyle = "rgba(26,17,8,0.9)";
-    ctx.lineWidth = RW + 3.4 * S;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(cx + cr * (0.1 - 0.06 * i), y, cr * (1.16 + 0.05 * i), cr * 0.22,
-      0.06 * (i % 2 ? 1 : -1), 0.1, Math.PI - 0.1);
-    ctx.strokeStyle = "#6b5527";
-    ctx.lineWidth = RW * 0.9;
-    ctx.stroke();
-    ctx.restore();
+    ctx.ellipse(px2, py2, cr * (0.05 + Hash("wrCrR" + i) * 0.05), cr * 0.035,
+      Hash("wrCrA" + i) * 2, 0, Math.PI * 2);
+    ctx.fill();
   }
+  ctx.restore();
 
-  // ── 绳头 / 布角：玩家手底下的那一点 ──
+  // ── 玩家手底下的那一点 ──
   if (view.phase !== "peel") {
-    // 绳头挂在最上面那道绳上，跟着手的角度走；没上手时自己朝**该转的方向**
-    // 蹭两下（屏幕逆时针＝解开的方向。三处同向：判定、画、招呼）
+    // 手指抵着泥圈：跟着手的角度走；没上手时自己朝**该抠的方向**蹭两下
+    // （屏幕逆时针＝角度递减。三处同向：判定、画、招呼）
     const swing = view.a !== null && view.a !== undefined
       ? view.a
-      : -0.5 - 0.28 * Math.max(0, Math.sin(t * 2.0));
-    // 已经褪出来的那一截**顺着罐颈绕过来**（不是从布上横着插过去）：解到哪儿，
-    // 这一截就从哪儿绕出来——手在前头，绳在后头跟着
-    const rr = cr * 1.30;
-    const a0 = swing + 1.5;
-    const pts = [];
-    for (let i = 0; i <= 8; i += 1) {
-      const a = a0 + (swing - a0) * (i / 8);
-      pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.62]);
-    }
-    KnotRope(ctx, pts, WRAP_ROPE, RW * 0.92);
-    const tx = pts[8][0], ty = pts[8][1];
-    KnotTip(ctx, tx, ty, RW, !!view.grab, "wrTip", WRAP_ROPE);
-    if (!view.grab) {
+      : tipA - GAP - 0.28 * Math.max(0, Math.sin(t * 2.0));
+    const rr = cr * (1.36 - Math.min(laps, L.laps - 1) * 0.17);
+    const tx = cx + Math.cos(swing) * rr, ty = cyRim + Math.sin(swing) * rr * 0.42;
+    if (view.grab) {
+      // 手指经过处掉泥渣：两三粒从指下簌簌往下掉
+      ctx.save();
+      for (let i = 0; i < 3; i += 1) {
+        const ph = (t * 2.2 + i * 0.37) % 1;
+        ctx.globalAlpha = (1 - ph) * 0.8;
+        ctx.fillStyle = i % 2 ? WRAP_MUD : WRAP_MUD_D;
+        ctx.beginPath();
+        ctx.ellipse(tx + Sym("wrFall" + i, 0, cr * 0.1), ty + cr * 0.1 + ph * cr * 0.9,
+          2.6 * S, 1.8 * S, ph * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else {
       const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.42 + 0.34 * Math.sin(t * 3.0);
       KnotGlow(ctx, tx, ty, L.grabR * W * 1.35, 0.14 + pulse * 0.20);
-      // 蹭的那一小道：顺着圆周往逆时针方向（＝该拖的方向）
+      // 蹭的那一小道：顺着泥圈往该抠的方向
       ctx.save();
       ctx.globalAlpha = 0.32 * Math.max(0, Math.sin(t * 2.0));
       ctx.strokeStyle = "rgba(255,240,196,0.9)";
-      ctx.lineWidth = RW * 0.34;
+      ctx.lineWidth = 3.4 * S;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.ellipse(cx, cy, rr, rr * 0.62, 0, swing - 0.42, swing - 0.06);
+      ctx.ellipse(cx, cyRim, rr, rr * 0.42, 0, swing - 0.42, swing - 0.06);
       ctx.stroke();
       ctx.restore();
     }
   } else if (peel < 1) {
     KnotGlow(ctx, cpx[0], cpx[1], L.grabR * W * 1.5,
       view.grab ? 0.10 : 0.20 + 0.16 * Math.sin(t * 3.0));
-    // 布角上那一撮线头：捏得住的地方长着毛（同绳头，招呼在实物上）
-    ctx.save();
-    ctx.strokeStyle = "rgba(214,200,150,0.8)";
-    ctx.lineWidth = 2.2 * S;
-    for (let i = 0; i < 5; i += 1) {
-      const a = -2.4 + i * 0.36 + Hash("wrHem" + i) * 0.26;
-      ctx.beginPath();
-      ctx.moveTo(cpx[0], cpx[1]);
-      ctx.lineTo(cpx[0] + Math.cos(a) * cr * 0.22, cpx[1] + Math.sin(a) * cr * 0.22);
-      ctx.stroke();
-    }
-    ctx.restore();
   }
 
   // 四角压暗，和别的插卡一个调子
   const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.32, W * 0.5, H * 0.5, H * 0.9);
   vg.addColorStop(0, "rgba(0,0,0,0)");
   vg.addColorStop(1, "rgba(16,11,6,0.62)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------------------
+// 掰红薯干的活卡（分食，第七稿第一章第二场）。每帧重画，view = Core 的
+// state.splitCard，L = SPLIT_CARD，t = 秒。版面坐标全在 L 里（卡宽单位），
+// **这儿绝不另抄一套**。三段：break（掰）→ sort（分）→ swap（换回去）。
+// 反馈全长在那截红薯干上：弯到哪儿、断在哪儿、滴了几滴，画面自己说——
+// 没有一根条、一个环、一个百分比。
+// ---------------------------------------------------------------------------
+// 配色按 sRGB 老账压两档（同 WRAP 那组的注释：源色"黑得离谱"才对）
+const SPLIT_WOOD = "#241a10";       // 炕沿/矮桌的暗木
+const SPLIT_BOWL = "#3f3c34";       // 粗瓷碗：糙釉发灰
+const SPLIT_BOWL_D = "#2b2922";
+const SPLIT_WATER = "#1c2622";      // 碗里温水的暗反光
+const SPLIT_YAM = "#4a2d16";        // 泡软的红薯干（同坛里那把的色系）
+const SPLIT_YAM_HI = "rgba(150,110,66,0.5)";   // 泡胀发亮的那层水光
+const SPLIT_YAM_FIB = "#8a6a44";    // 掰弯处拉出来的纤维（弯处变浅）
+
+/** 一只捏着东西的小手：孩子的手，偏瘦小。小臂从画框下缘伸上来 */
+function SplitHand(ctx, x, y, S, side, pinch) {
+  const d = side;                     // -1 左手 / +1 右手
+  ctx.save();
+  // 小臂 + 袖口（柱子那身土黄，压两档）
+  InkFill(ctx, [
+    [x + d * 30 * S, y + 60 * S], [x + d * 150 * S, y + 130 * S],
+    [x + d * 210 * S, y + 620 * S], [x - d * 40 * S, y + 640 * S],
+  ], "spArm" + d, "#6b4017", { amp: 4 * S, lw: 6 * S, shade: "rgba(0,0,0,0.24)" });
+  InkFill(ctx, [
+    [x + d * 16 * S, y + 52 * S], [x + d * 108 * S, y + 96 * S],
+    [x + d * 88 * S, y + 168 * S], [x - d * 14 * S, y + 118 * S],
+  ], "spCuff" + d, "#57340f", { amp: 3 * S, lw: 5 * S, shade: "rgba(0,0,0,0.2)" });
+  // 手背：小而圆
+  InkFill(ctx, [
+    [x - d * 26 * S, y + 8 * S], [x + d * 20 * S, y - 2 * S], [x + d * 52 * S, y + 26 * S],
+    [x + d * 46 * S, y + 74 * S], [x - d * 8 * S, y + 86 * S], [x - d * 38 * S, y + 46 * S],
+  ], "spFist" + d, "#a87c52", { amp: 3 * S, lw: 5.5 * S, shade: "rgba(70,40,22,0.16)" });
+  // 捏着的拇指与食指（pinch）或扶着的指头
+  if (pinch) {
+    InkFill(ctx, [
+      [x - d * 20 * S, y + 10 * S], [x - d * 2 * S, y - 12 * S], [x + d * 10 * S, y - 6 * S],
+      [x - d * 4 * S, y + 16 * S],
+    ], "spThumb" + d, "#b28457", { amp: 2 * S, lw: 4.5 * S });
+  }
+  // 两道小指节
+  for (let i = 0; i < 2; i += 1) {
+    InkLine(ctx, x + d * (6 + i * 18) * S, y + 18 * S, x + d * (10 + i * 18) * S, y + 52 * S,
+      "spKn" + d + i, { lw: 2.6 * S, color: "rgba(118,74,44,0.4)", amp: 2 * S });
+  }
+  ctx.restore();
+}
+
+/** 一截泡软的红薯干：两端点之间的一条厚条，wet=表面水光 */
+function SplitPiece(ctx, x0, y0, x1, y1, wS, id, { fiberEnd = 0 } = {}) {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+  };
+  path(); ctx.strokeStyle = "rgba(16,10,5,0.95)"; ctx.lineWidth = wS + 5; ctx.stroke();
+  path(); ctx.strokeStyle = SPLIT_YAM; ctx.lineWidth = wS; ctx.stroke();
+  // 泡胀发亮：上沿一线水光
+  ctx.strokeStyle = SPLIT_YAM_HI;
+  ctx.lineWidth = wS * 0.28;
+  ctx.beginPath();
+  ctx.moveTo(x0 + (x1 - x0) * 0.08, y0 + (y1 - y0) * 0.08 - wS * 0.26);
+  ctx.lineTo(x0 + (x1 - x0) * 0.9, y0 + (y1 - y0) * 0.9 - wS * 0.26);
+  ctx.stroke();
+  // 断口那头的纤维毛（fiberEnd: -1 朝 x0 那头 / +1 朝 x1 那头）
+  if (fiberEnd) {
+    const ex = fiberEnd > 0 ? x1 : x0, ey = fiberEnd > 0 ? y1 : y0;
+    const dx = fiberEnd > 0 ? x1 - x0 : x0 - x1;
+    const dy = fiberEnd > 0 ? y1 - y0 : y0 - y1;
+    const dd = Math.hypot(dx, dy) || 1;
+    ctx.strokeStyle = SPLIT_YAM_FIB;
+    ctx.lineWidth = Math.max(1.4, wS * 0.12);
+    for (let i = 0; i < 4; i += 1) {
+      const sp = (i - 1.5) * wS * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(ex - (dx / dd) * wS * 0.2, ey - (dy / dd) * wS * 0.2 + sp * 0.4);
+      ctx.lineTo(ex + (dx / dd) * wS * (0.34 + Hash(id + "fb" + i) * 0.3),
+        ey + (dy / dd) * wS * 0.3 + sp);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+export function DrawSplitCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  const P = (x, y) => [x * W, y * W];
+  const phase = view.phase || "break";
+  const stripW = W * 0.026;                 // 条的粗细（0.026 卡宽 ≈ 一指）
+
+  LiveCardBase(ctx, W, H, "#3a2c1a");
+
+  // ── 案：炕沿/矮桌一条暗木沿，碗坐在它上面。上头留给虚化的窖 ──
+  const surfY = (L.bowlL.y - L.bowlL.r * 0.55) * W;
+  ctx.save();
+  ctx.fillStyle = SPLIT_WOOD;
+  ctx.fillRect(-8 * S, surfY, W + 16 * S, H - surfY + 8 * S);
+  ctx.restore();
+  InkLine(ctx, -10 * S, surfY, W + 10 * S, surfY - 4 * S, "spEdge",
+    { lw: 5 * S, color: "rgba(8,5,2,0.9)", amp: 4 * S });
+  InkLine(ctx, 6 * S, surfY + 9 * S, W - 6 * S, surfY + 7 * S, "spEdgeHi",
+    { lw: 2.6 * S, color: "rgba(96,70,40,0.35)", amp: 3 * S });
+  // 木纹两道
+  for (let i = 0; i < 2; i += 1) {
+    InkLine(ctx, W * 0.1, surfY + (40 + i * 44) * S, W * 0.92, surfY + (36 + i * 48) * S,
+      "spGrain" + i, { lw: 2.2 * S, color: "rgba(52,36,20,0.4)", amp: 8 * S });
+  }
+
+  // ── 两只豁口碗：左她的、右他的。碗里一汪温水的暗反光 ──
+  const Bowl = (bx0, by0, br, id, chipA) => {
+    const bx = bx0 * W, by = by0 * W, r = br * W;
+    // 碗身（碗帮往下收成圈足）
+    InkFill(ctx, [
+      [bx - r, by], [bx - r * 0.58, by + r * 0.60], [bx - r * 0.34, by + r * 0.70],
+      [bx + r * 0.34, by + r * 0.70], [bx + r * 0.58, by + r * 0.60], [bx + r, by],
+    ], id + "body", SPLIT_BOWL, { amp: 2.6 * S, lw: 5 * S, shade: "rgba(0,0,0,0.3)", shadeAt: 0.5 });
+    InkLine(ctx, bx - r * 0.36, by + r * 0.72, bx + r * 0.36, by + r * 0.72, id + "foot",
+      { lw: 3.4 * S, color: "rgba(14,12,8,0.8)", amp: 1.4 * S });
+    // 口沿
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(bx, by, r, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = SPLIT_BOWL_D;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(16,14,10,0.95)";
+    ctx.lineWidth = 4 * S;
+    ctx.stroke();
+    // 温水：暗的一汪，一线冷光——夜窖里唯一发亮的东西之一
+    ctx.beginPath();
+    ctx.ellipse(bx, by + r * 0.02, r * 0.82, r * 0.24, 0, 0, Math.PI * 2);
+    ctx.fillStyle = SPLIT_WATER;
+    ctx.fill();
+    ctx.globalAlpha = 0.24;
+    ctx.strokeStyle = "#9ab0a4";
+    ctx.lineWidth = 2.4 * S;
+    ctx.beginPath();
+    ctx.ellipse(bx - r * 0.14, by - r * 0.02, r * 0.5, r * 0.13, -0.12, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // 豁口：口沿上啃缺的一小口（认"豁口碗"就靠它）
+    ctx.fillStyle = "rgba(10,8,5,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(bx + Math.cos(chipA) * r * 0.94, by + Math.sin(chipA) * r * 0.30,
+      r * 0.10, r * 0.05, chipA, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  Bowl(L.bowlL.x, L.bowlL.y, L.bowlL.r, "spBowlL", -2.5);
+  Bowl(L.bowlR.x, L.bowlR.y, L.bowlR.r, "spBowlR", -0.6);
+
+  // ── 那截红薯干（按段） ──
+  if (phase === "break") {
+    const x0 = (L.strip.cx - L.strip.len / 2) * W;
+    const x1 = (L.strip.cx + L.strip.len / 2) * W;
+    const cyW = L.strip.cy * W;
+    const gx = x0 + Math.max(L.grabMin, Math.min(L.grabMax, view.grabU || 0.5)) * (x1 - x0);
+    const bend = Math.max(0, view.bend || 0) * W;
+    const gy = cyW + bend;
+    // 左手托着左头（不动），右手捏在 grabU、往下掰
+    SplitHand(ctx, x0 + 14 * S, cyW + 10 * S, S, -1, true);
+    // 条：左头到捏点、捏点到右头——弯就弯在捏点上
+    SplitPiece(ctx, x0, cyW, gx, gy, stripW, "spStA");
+    SplitPiece(ctx, gx, gy, x1, cyW + bend * 0.55, stripW, "spStB");
+    // 弯处的纤维感：颜色变浅、几道竖丝；临断时中缝发白
+    const k = Math.min(1, (view.bend || 0) / L.bendNeed);
+    if (k > 0.12) {
+      ctx.save();
+      ctx.strokeStyle = SPLIT_YAM_FIB;
+      ctx.globalAlpha = 0.4 + k * 0.5;
+      ctx.lineWidth = 2 * S;
+      for (let i = 0; i < 4; i += 1) {
+        const fx = gx + (i - 1.5) * stripW * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(fx, gy - stripW * 0.5);
+        ctx.lineTo(fx + Sym("spFib", i, 2 * S), gy + stripW * 0.5);
+        ctx.stroke();
+      }
+      if (k > 0.62) {
+        ctx.globalAlpha = (k - 0.62) * 2.4;
+        ctx.strokeStyle = "rgba(214,206,184,0.9)";
+        ctx.lineWidth = 2.6 * S;
+        ctx.beginPath();
+        ctx.moveTo(gx, gy - stripW * 0.55);
+        ctx.lineTo(gx + Sym("spSeam", 0, 1.6 * S), gy + stripW * 0.55);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (view.grab) {
+      SplitHand(ctx, gx, gy - 4 * S, S, 1, true);
+    } else {
+      // 没上手：条自己招呼——捏点那一段透出一圈会呼吸的光
+      SplitHand(ctx, x1 - 14 * S, cyW + 10 * S, S, 1, false);
+      const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.4 + 0.3 * Math.sin(t * 3.0);
+      KnotGlow(ctx, (x0 + x1) / 2, cyW, L.grabR * W * 1.4, 0.12 + pulse * 0.2);
+    }
+  } else if (view.pieces) {
+    // sort / swap：断开的两截（长短按 pieces[].len），在案上/碗里/手底下
+    for (let i = 0; i < view.pieces.length; i += 1) {
+      const pe = view.pieces[i];
+      if (!pe) continue;
+      const heldNow = view.held === i;
+      const px = pe.x * W, py = pe.y * W;
+      const half = (pe.len * L.strip.len * 0.5) * W;
+      const ang = Sym("spPcA" + i, 0, 0.16) + (heldNow ? Math.sin(t * 2.2) * 0.05 : 0);
+      const dx = Math.cos(ang) * half, dy = Math.sin(ang) * half;
+      // 碗里的那截：先画条，再拿水色罩下半——"躺在水里"
+      SplitPiece(ctx, px - dx, py - dy, px + dx, py + dy, stripW, "spPc" + i,
+        { fiberEnd: i === 0 ? 1 : -1 });
+      if (pe.bowl && !heldNow) {
+        const bowl = pe.bowl === 1 ? L.bowlL : L.bowlR;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = SPLIT_WATER;
+        ctx.beginPath();
+        ctx.ellipse(bowl.x * W, bowl.y * W + bowl.r * W * 0.06,
+          bowl.r * W * 0.8, bowl.r * W * 0.22, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.restore();
+      }
+      if (heldNow) {
+        // 提在手里：滴水。滴珠从条底一路坠进碗里（phase=swap 才沥）
+        SplitHand(ctx, px, py - 6 * S, S, 1, true);
+        if (py < L.liftY * W) {
+          const ph = (t % L.dripEvery) / L.dripEvery;
+          const dropY = py + stripW * 0.6 + ph * (L.bowlR.y * W - py) * 0.9;
+          ctx.save();
+          ctx.globalAlpha = 0.7 * (1 - ph * 0.4);
+          ctx.fillStyle = "#7d95a0";
+          ctx.beginPath();
+          ctx.ellipse(px + Sym("spDrip", 0, 3 * S), dropY, 2.6 * S, 3.6 * S, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          // 条底挂着的那颗将落未落的水珠
+          ctx.save();
+          ctx.fillStyle = "rgba(140,165,175,0.55)";
+          ctx.beginPath();
+          ctx.ellipse(px + 2 * S, py + stripW * 0.55, 2.2 * S, 2.8 * S, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      } else if (!pe.bowl || phase === "swap") {
+        // 还没归置/该捞出来的那截：自己透光招呼
+        const pulse = view.reaching ? 0.5 + 0.4 * Math.sin(t * 13) : 0.34 + 0.28 * Math.sin(t * 3.0 + i);
+        KnotGlow(ctx, px, py, L.grabR * W * 1.3, 0.10 + pulse * 0.18);
+      }
+    }
+  }
+
+  // 四角压暗，和别的活卡一个调子（夜窖里再沉一档）
+  const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.30, W * 0.5, H * 0.5, H * 0.9);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(8,6,4,0.7)");
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
 }
@@ -5396,6 +5794,559 @@ export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false
         id + "lash" + i, { lw: 1.1, color: "#6d5a3a", amp: 0.5 });
     }
   }
+}
+
+/**
+ * 苇席（第七稿 forage 段）：编织的横纹席面。签名照 DrawThatchMat 的约定
+ * （World 烘半幅：ax/ay = 折痕那头，往 dir 方向铺 len 像素）。
+ * 苇子比焦苫草亮一档、也齐整一档——它没烧过；但边上还是要散几根苇条，
+ * 齐得像机器轧的就不是村里的席了。torn 收下不用（苇席不撕，见 FORAGE.reed）。
+ */
+export function DrawReedMat(ctx, ax, ay, id, { len = 30, dir = 1, torn = 0, grab = false } = {}) {
+  void torn;
+  const L = len * dir;
+  const th = 11;
+  const N = 8;
+  const top = [], bot = [];
+  for (let i = 0; i <= N; i += 1) {
+    const t = i / N;
+    // 席是压出来的，比苫子平——鼓包小一号，但仍不许是直线
+    const bulge = Math.sin(t * Math.PI) * 1.2 + Math.sin(t * 8.3) * 0.7;
+    top.push([ax + L * t, ay - th - bulge - Sym(id + "t", i, 1.0)]);
+    bot.push([ax + L * t, ay - Sym(id + "b", i, 0.8)]);
+  }
+  InkFill(ctx, top.concat(bot.slice().reverse()), id + "body", "#7e6f45",
+    { amp: 1.2, lw: 2.0, shade: "rgba(16,11,6,0.3)" });
+  // 编织的横纹：一道压一道的苇条，隔一根深一根浅
+  for (let i = 0; i < 5; i += 1) {
+    const y = ay - 1.6 - i * (th - 2.4) / 4;
+    InkLine(ctx, ax + L * 0.03, y, ax + L * 0.97, y - 0.4 + Sym(id + "wv", i, 0.9),
+      id + "weft" + i, { lw: 1.3, color: i % 2 ? "#8a7a4e" : "#5f5432", amp: 0.6 });
+  }
+  // 压席的经绳：竖着三道，错开的短痕——"编起来的"靠这几笔
+  for (let i = 0; i < 4; i += 1) {
+    const t = 0.14 + i * 0.24;
+    InkLine(ctx, ax + L * t, ay - 0.6, ax + L * t + dir * 1.0, ay - th - 0.6,
+      id + "warp" + i, { lw: 1.2, color: "#55482a", amp: 0.7 });
+    // 经纬的叠压点：一格一格的小暗块（隔行错半格）
+    for (let j = 0; j < 3; j += 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = "#3f3620";
+      ctx.fillRect(ax + L * t + dir * ((j % 2) * 2 - 1), ay - 2.6 - j * 3.1, 2 * dir, 1.4);
+      ctx.restore();
+    }
+  }
+  // 外沿散开的几根苇条（也是"这儿抓得住"的招呼）
+  for (let i = 0; i < 4; i += 1) {
+    const y = ay - 1 - Hash(id + "fy" + i) * th;
+    const out = (2.6 + Hash(id + "fo" + i) * 4.2) * (grab ? 1.4 : 1) * dir;
+    InkLine(ctx, ax + L, y, ax + L + out, y - 1 + Sym(id + "fd", i, 2.0),
+      id + "fray" + i, { lw: 1.1, color: "#8a7a4e", amp: 0.9 });
+  }
+}
+
+/**
+ * 半截木食槽（挖空的原木槽）。ax/ay = 槽中心与地平线（照 DrawAshMound 在
+ * forage 里的烘法：World 的 BakeSprite(70,26,35,22)）。
+ * k ∈ 0..1 = 槽底那层秕谷壳被刮走的比例：壳真的一把把变少，露出槽底的木色。
+ */
+export function DrawFeedTrough(ctx, ax, ay, id, { k = 0 } = {}) {
+  const hw = 33, h = 18;
+  const kk = Math.max(0, Math.min(1, k));
+  // 槽身：一根原木对剖，外帮风化成灰木色。两头是锯出来的端面
+  InkFill(ctx, [[ax - hw, ay - h + 2], [ax - hw + 3, ay - 3], [ax - hw + 9, ay],
+    [ax + hw - 9, ay], [ax + hw - 3, ay - 3], [ax + hw, ay - h + 2],
+    [ax + hw - 4, ay - h], [ax - hw + 4, ay - h]],
+  id + "body", "#5d5648", { amp: 1.4, lw: 2.2, shade: "rgba(0,0,0,0.28)" });
+  // 外帮的风化裂纹：顺着木理的两三道
+  for (let i = 0; i < 3; i += 1) {
+    const y = ay - 3 - i * 4;
+    InkLine(ctx, ax - hw + 6 + i * 5, y, ax + hw - 10 - i * 7, y - 1 + Sym(id + "ck", i, 1.6),
+      id + "crack" + i, { lw: 1.0, color: "rgba(38,33,26,0.5)", amp: 1.4 });
+  }
+  // 槽膛：挖空的那一条，口沿一圈厚唇
+  InkFill(ctx, [[ax - hw + 6, ay - h + 3], [ax + hw - 6, ay - h + 3],
+    [ax + hw - 10, ay - h + 8], [ax - hw + 10, ay - h + 8]],
+  id + "hollow", "#2e2921", { amp: 1.0, lw: 1.8 });
+  // 槽底：露出来的木色（刮走多少露多少——k 越大这条越宽越亮）
+  if (kk > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = 0.5 + kk * 0.4;
+    ctx.fillStyle = "#4a4234";
+    ctx.fillRect(ax - (hw - 12) * kk, ay - h + 4.5, (hw - 12) * 2 * kk, 2.6);
+    ctx.restore();
+  }
+  // 秕谷壳：干黄的碎点，越刮越少（从当中往两头留）
+  const husks = Math.round(26 * (1 - kk * 0.9));
+  ctx.save();
+  for (let i = 0; i < husks; i += 1) {
+    const t = Hash(id + "hx" + i);
+    // 刮是从当中刮起的：剩下的壳越来越靠两头
+    const off = (0.5 + (t - 0.5) * (0.6 + 0.4 * (1 - kk))) * 2 - 1;
+    const px = ax + off * (hw - 11);
+    if (kk > 0.15 && Math.abs(off) < kk * 0.55) continue;
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = i % 3 ? "#6f6240" : "#57503a";
+    ctx.fillRect(px, ay - h + 4 + Hash(id + "hy" + i) * 3.2, 1.8, 1.1);
+  }
+  ctx.restore();
+  // 端面：年轮两圈
+  ctx.save();
+  ctx.strokeStyle = "rgba(40,35,26,0.6)";
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.ellipse(ax - hw + 3.4, ay - h / 2 - 1, 2.6, h / 2 - 2, 0.1, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 半袋谷种：矮胖的粗布口袋，下半瘫坐变形；扎着口，口上压半块青砖 */
+export function DrawSeedBag(ctx, ax, ay, id) {
+  // 袋身：只剩半袋，下半摊开、上半空瘪往一边歪
+  InkFill(ctx, [[ax - 13, ay], [ax - 12.4, ay - 6], [ax - 9, ay - 12], [ax - 5, ay - 15],
+    [ax + 3, ay - 15.5], [ax + 8, ay - 12.5], [ax + 11.6, ay - 6], [ax + 13, ay]],
+  id + "body", "#6d5f45", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.24)" });
+  // 布纹与一道原来的缝线
+  InkLine(ctx, ax - 9, ay - 4, ax + 9.4, ay - 4.6, id + "seam",
+    { lw: 0.8, color: "rgba(70,58,38,0.55)", amp: 0.9 });
+  InkLine(ctx, ax - 10.6, ay - 8.4, ax + 10, ay - 9, id + "fold",
+    { lw: 0.9, color: "rgba(40,32,20,0.45)", amp: 1.1 });
+  // 扎口：绳勒出一圈脖子，布耳朵翘出来
+  InkLine(ctx, ax - 4.6, ay - 14.2, ax + 3.8, ay - 14.6, id + "tie", { lw: 1.4, color: "#4e4234", amp: 0.4 });
+  InkFill(ctx, [[ax - 2.4, ay - 15], [ax - 4.2, ay - 18], [ax - 0.8, ay - 16.4],
+    [ax + 1.4, ay - 18.4], [ax + 2.2, ay - 15.2]],
+  id + "ear", "#5e5138", { amp: 0.7, lw: 1.2 });
+  // 口上压的半块青砖：断口朝外，压着才踏实
+  InkFill(ctx, [[ax - 1, ay - 16.6], [ax + 9.6, ay - 17.4], [ax + 10.4, ay - 13.6], [ax - 0.2, ay - 13]],
+    id + "brick", "#4a4740", { amp: 0.7, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
+  InkLine(ctx, ax + 9.6, ay - 17, ax + 10.2, ay - 13.8, id + "brickBrk",
+    { lw: 1.0, color: "rgba(28,26,22,0.7)", amp: 0.8 });
+}
+
+// ---------------------------------------------------------------------------
+// 第七稿第一章的场景道具（地头 / 窖里 / 屋里）
+// ---------------------------------------------------------------------------
+
+/**
+ * 华北木耧（人力播种耧车），侧视朝东（往 +x 耩）。约 60×52px（1.25×1.08m）。
+ * 手工木器：没有一条线是笔直的（"四边笔直＝没有手"）。
+ * 认它靠四样：往后上方翘的两根扶手柄、梯形楼斗、底下两三条带铁脚的耧腿、横撑。
+ */
+export function DrawLou(ctx, x, groundY, id) {
+  const W1 = "#54432f", W2 = "#3f3222";     // 耧木：使旧的枣木色再压两档
+  // 耧腿：从斗底奓开往下，腿端是开沟的铁脚（后腿被前腿挡去一半）
+  const legs = [[-7, -1.5], [1, 0.8], [8, 2.6]];
+  for (let i = 0; i < legs.length; i += 1) {
+    const [dx, splay] = legs[i];
+    InkLine(ctx, x + dx * 0.55, groundY - 26, x + dx + splay, groundY - 2,
+      id + "leg" + i, { lw: i === 1 ? 3.2 : 2.6, color: i === 1 ? W1 : W2, amp: 0.9 });
+    // 铁脚：一小片下宽上窄的铧尖，吃进土里那头发暗
+    InkFill(ctx, [[x + dx + splay - 1.6, groundY - 3], [x + dx + splay + 1.4, groundY - 3.4],
+      [x + dx + splay + 2.2, groundY + 1], [x + dx + splay - 1, groundY + 1]],
+    id + "foot" + i, "#3a3a38", { amp: 0.5, lw: 1.4, shade: "rgba(0,0,0,0.3)" });
+  }
+  // 横撑：两道，把腿别在一起（一道在腿腰、一道在斗底下）
+  InkLine(ctx, x - 8, groundY - 14, x + 10.5, groundY - 12.4, id + "brace1",
+    { lw: 2.2, color: W2, amp: 0.8 });
+  InkLine(ctx, x - 6.5, groundY - 23, x + 9, groundY - 22, id + "brace2",
+    { lw: 2.0, color: W1, amp: 0.7 });
+  // 楼斗：梯形的种子斗（上宽下窄），斗口敞着；斗身一道箍
+  InkFill(ctx, [[x - 12, groundY - 44], [x + 12.5, groundY - 45.5], [x + 7, groundY - 26.5],
+    [x - 6.5, groundY - 26]],
+  id + "hopper", W1, { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.26)", shadeAt: 0.5 });
+  InkLine(ctx, x - 9.6, groundY - 36, x + 10, groundY - 36.8, id + "hoop",
+    { lw: 1.2, color: "rgba(30,24,16,0.55)", amp: 0.8 });
+  // 斗口那道黑：斗是空的还是有种，一眼看斗口
+  ctx.save();
+  ctx.fillStyle = "#241c12";
+  ctx.beginPath();
+  ctx.ellipse(x + 0.4, groundY - 44.6, 11.2, 2.2, -0.03, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 两根扶手柄：从斗后腰往后上方翘（扶耧的人在西头）；柄梢磨得发亮
+  for (const [oy, tag] of [[0, "A"], [3.4, "B"]]) {
+    InkLine(ctx, x - 5, groundY - 30 - oy * 0.4, x - 27, groundY - 44 - oy,
+      id + "handle" + tag, { lw: 2.4, color: W1, amp: 1.1 });
+    InkLine(ctx, x - 24.5, groundY - 43 - oy, x - 27, groundY - 44.2 - oy,
+      id + "handleTip" + tag, { lw: 2.6, color: "#6a563e", amp: 0.4 });
+  }
+  // 柄间的短撑（手握的那道横木）
+  InkLine(ctx, x - 22, groundY - 41.5, x - 22.8, groundY - 46.2, id + "grip",
+    { lw: 1.8, color: W2, amp: 0.5 });
+  // 往前的拉杆：套绳的那一小截（拉耧的人在东头）
+  InkLine(ctx, x + 9, groundY - 28, x + 26, groundY - 31, id + "pole",
+    { lw: 2.2, color: W2, amp: 0.9 });
+  InkLine(ctx, x + 24.4, groundY - 32.8, x + 26.4, groundY - 29.2, id + "polePin",
+    { lw: 1.4, color: "#3a3a38", amp: 0.3 });
+}
+
+/**
+ * 去年的谷茬地：割剩的短茬一排一排「齐刷刷指着天」。x = 中心，宽 w。
+ * 贴地矮物（茬高 8~12px ≈ 一拃多），行距规整、每根有自己那点歪。
+ */
+export function DrawStubbleField(ctx, x, groundY, w, id) {
+  const x0 = x - w / 2;
+  // 干土打底：微微翻起的一层，颜色发灰的旱土
+  InkFill(ctx, [[x0 - 3, groundY], [x0 + 2, groundY - 3.4], [x0 + w * 0.3, groundY - 2.4],
+    [x0 + w * 0.62, groundY - 3.8], [x0 + w - 2, groundY - 2.8], [x0 + w + 3, groundY]],
+  id + "soil", "#55462f", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+  // 后排：矮半截、暗一档（隔着一垄）
+  for (let row = 1; row >= 0; row -= 1) {
+    const step = 7.2;
+    const yBase = groundY - 2 - row * 3.6;
+    const n = Math.floor((w - 8 - row * step * 0.5) / step);
+    for (let i = 0; i <= n; i += 1) {
+      const px = x0 + 4 + row * step * 0.5 + i * step + Sym(id + "jx" + row, i, 0.9);
+      const h = (8 + Hash(id + "h" + row + i) * 4) * (row ? 0.7 : 1);
+      const lean = Sym(id + "ln" + row, i, 1.8);
+      const col = row ? "#4a4230" : (i % 3 ? "#6d6040" : "#57503a");
+      // 一根茬：底粗梢平（割的），一两根裂开的皮
+      InkLine(ctx, px, yBase, px + lean, yBase - h, id + "st" + row + i,
+        { lw: row ? 1.2 : 1.8, color: col, amp: 0.5 });
+      if (!row && i % 2) {
+        InkLine(ctx, px + 0.8, yBase - 1, px + lean + 2.2, yBase - h * 0.72,
+          id + "st2" + row + i, { lw: 1.0, color: "#7a6f4c", amp: 0.5 });
+      }
+      // 根部的土坷垃
+      if (!row && i % 3 === 0) {
+        ctx.save();
+        ctx.fillStyle = "#463a26";
+        ctx.beginPath();
+        ctx.ellipse(px + 1.2, yBase - 0.4, 2.0 + Hash(id + "cl" + i) * 1.2, 1.1,
+          Hash(id + "ca" + i), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+}
+
+/**
+ * 新耩上的湿垄（东邻家的）：一趟一趟平行的低垄，「直得像用线量过」。
+ * 侧视里垄是顺着地排开的几条低棱；土色深（湿）。高度贴地（≤14px）。
+ */
+export function DrawSownField(ctx, x, groundY, w, id) {
+  const x0 = x - w / 2;
+  // 湿土整片：比旁边的旱地深两档
+  InkFill(ctx, [[x0 - 3, groundY], [x0 + 2, groundY - 4.6], [x0 + w * 0.36, groundY - 3.6],
+    [x0 + w * 0.7, groundY - 4.8], [x0 + w - 2, groundY - 3.4], [x0 + w + 3, groundY]],
+  id + "wet", "#3a2e21", { amp: 1.1, lw: 1.8, shade: "rgba(0,0,0,0.22)" });
+  // 三道垄：每道＝垄身一条微鼓的暗棱 + 垄顶一线略浅的棱线。
+  // 垄线要直（量过线的直），毛边只许在棱线的颗粒里，不许在走向里
+  for (let i = 0; i < 3; i += 1) {
+    const y = groundY - 3.2 - i * 3.4;
+    const inset = 3 + i * 5;
+    InkLine(ctx, x0 + inset, y, x0 + w - inset, y - 0.3, id + "ridge" + i,
+      { lw: 2.6, color: "#31261a", amp: 0.35 });
+    InkLine(ctx, x0 + inset + 2, y - 1.3, x0 + w - inset - 2, y - 1.5, id + "crest" + i,
+      { lw: 1.1, color: "#4d3d2a", amp: 0.3 });
+    // 棱线上手指感的毛边：一粒一粒的湿土疙瘩，不匀
+    ctx.save();
+    ctx.fillStyle = "#443627";
+    for (let j = 0; j < 9; j += 1) {
+      const px = x0 + inset + 3 + Hash(id + "gx" + i + j) * (w - inset * 2 - 6);
+      ctx.globalAlpha = 0.5 + Hash(id + "ga" + i + j) * 0.4;
+      ctx.fillRect(px, y - 2 + Hash(id + "gy" + i + j) * 1.6, 1.6, 1.1);
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * 菜窖角落那堆草苫/干草（夜里底下藏着人）。低矮一垛约 46×22px，
+ * 草茎深浅两色、边缘发毛、一角微微翘起——翘起的那角是后面那一镜的伏笔。
+ */
+export function DrawStrawMat(ctx, x, groundY, id) {
+  const hw = 23, h = 20;
+  // 垛身：几团搭起来的（不是一个大椭圆，画笔通病那条）
+  const pts = [[x - hw, groundY]];
+  const lumps = 6;
+  for (let i = 0; i <= lumps; i += 1) {
+    const t = i / lumps;
+    const bump = Math.sin(t * Math.PI) * h * (0.8 + 0.25 * Math.sin(t * 8.7 + 1))
+      + Sym(id + "top", i, 2.2);
+    pts.push([x - hw + hw * 2 * t, groundY - Math.max(2, bump)]);
+  }
+  pts.push([x + hw, groundY]);
+  InkFill(ctx, pts, id + "heap", "#5e5033", { amp: 1.8, lw: 2.0, shade: "rgba(10,7,4,0.3)" });
+  // 草茎：深浅两色的短线，顺着各自的铺向
+  for (let i = 0; i < 16; i += 1) {
+    const t = 0.06 + Hash(id + "sx" + i) * 0.86;
+    const px = x - hw + hw * 2 * t;
+    const py = groundY - 2 - Hash(id + "sy" + i) * (h - 5) * Math.sin(t * Math.PI);
+    const ln = 4 + Hash(id + "sl" + i) * 6;
+    const a = Sym(id + "sa", i, 0.5) + (t - 0.5) * 0.7;
+    InkLine(ctx, px, py, px + Math.cos(a) * ln, py - Math.abs(Math.sin(a)) * ln * 0.4,
+      id + "stem" + i, { lw: 1.1, color: i % 3 ? "#6d5c3a" : "#443a22", amp: 0.6 });
+  }
+  // 边缘的毛：往外探的碎草，探多远各不相同
+  for (let i = 0; i < 6; i += 1) {
+    const side = i % 2 ? 1 : -1;
+    const py = groundY - 1.5 - Hash(id + "fy" + i) * h * 0.5;
+    InkLine(ctx, x + side * (hw - 3), py, x + side * (hw + 1.5 + Hash(id + "fo" + i) * 3.6),
+      py - 1 + Sym(id + "fd", i, 2.2), id + "fray" + i,
+      { lw: 1.0, color: "#6a5a36", amp: 0.8 });
+  }
+  // 微微翘起的那一角（东南角）：一小片离了地，底下一道黑缝
+  InkFill(ctx, [[x + hw - 9, groundY - 1], [x + hw - 2, groundY - 7.5], [x + hw + 3, groundY - 5],
+    [x + hw + 1, groundY - 0.5]],
+  id + "lift", "#6a5a36", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
+  ctx.save();
+  ctx.fillStyle = "rgba(6,4,2,0.8)";
+  ctx.beginPath();
+  ctx.ellipse(x + hw - 3.4, groundY - 1.2, 4.6, 1.4, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * 从草堆底下伸出来的一条前臂和手（抓住手腕那一镜的静帧）。
+ * 横着，约 30×14px。粗布袖子破着口，手指张开半攥；皮肤压得很暗——是夜里。
+ */
+export function DrawStrawArm(ctx, x, groundY, id) {
+  // 前臂：从西头（草堆那边）伸出来，微微离地
+  InkFill(ctx, [[x - 15, groundY - 8.5], [x - 2, groundY - 7.8], [x + 1, groundY - 6.8],
+    [x + 0.5, groundY - 2.6], [x - 3, groundY - 2], [x - 15, groundY - 2.8]],
+  id + "sleeve", "#3f382e", { amp: 1.0, lw: 1.8, shade: "rgba(0,0,0,0.3)" });
+  // 袖口破着口：豁开的两个尖，里子更暗
+  InkFill(ctx, [[x - 1, groundY - 7.6], [x + 2.4, groundY - 8.6], [x + 1.6, groundY - 5.6],
+    [x + 3, groundY - 4], [x + 0.4, groundY - 2.4]],
+  id + "cuffTear", "#2b261e", { amp: 0.8, lw: 1.2 });
+  // 手：手背拱着，四根手指张开半攥（扣向地），拇指在近侧
+  InkFill(ctx, [[x + 1, groundY - 6.6], [x + 6.5, groundY - 7.4], [x + 10, groundY - 5.6],
+    [x + 10.5, groundY - 3.4], [x + 7, groundY - 2], [x + 2, groundY - 2.2]],
+  id + "hand", "#5c3f2b", { amp: 0.8, lw: 1.6, shade: "rgba(0,0,0,0.24)" });
+  // 半攥的手指：一根根扣下去，指节发白一点
+  for (let i = 0; i < 4; i += 1) {
+    const fx = x + 6.8 + i * 1.9;
+    InkLine(ctx, fx, groundY - 5.6 + i * 0.3, fx + 1.8, groundY - 2.2 + Sym(id + "fg", i, 0.7),
+      id + "finger" + i, { lw: 1.5, color: "#4e3524", amp: 0.4 });
+  }
+  InkLine(ctx, x + 3, groundY - 6.8, x + 5.6, groundY - 7.2, id + "thumb",
+    { lw: 1.6, color: "#5c3f2b", amp: 0.3 });
+  // 压在袖子上的两三根草：他是从草堆底下伸出来的
+  for (let i = 0; i < 3; i += 1) {
+    InkLine(ctx, x - 14 + i * 3, groundY - 9 - Hash(id + "hy" + i) * 2,
+      x - 8 + i * 3.4, groundY - 3 - Hash(id + "hy2" + i) * 3,
+      id + "straw" + i, { lw: 1.0, color: i % 2 ? "#6a5a36" : "#443a22", amp: 0.7 });
+  }
+}
+
+/**
+ * 窖里散乱的一小片家什（摸黑归置之前）：歪着的破笸箩、两只豁口碗
+ * （一只倒扣）、一枚纺锭拖着线头。约 60×26px。
+ */
+export function DrawCellarSundries(ctx, x, groundY, id) {
+  // 破笸箩：浅帮的圆笸箩侧倒着歪在西头，帮上豁一块
+  InkFill(ctx, [[x - 28, groundY - 2], [x - 26, groundY - 12], [x - 20, groundY - 15.5],
+    [x - 12.5, groundY - 13], [x - 10.5, groundY - 4], [x - 14, groundY - 0.5]],
+  id + "basket", "#66562f", { amp: 1.3, lw: 1.9, shade: "rgba(0,0,0,0.24)" });
+  // 笸箩的圈条：两道弧（编条一圈圈）
+  for (let i = 0; i < 2; i += 1) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(46,37,20,0.6)";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.ellipse(x - 19.5, groundY - 8 + i * 2.4, 7 - i * 1.6, 4.6 - i * 1.2, 0.35, 0.4, Math.PI * 1.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // 帮上豁的那一口
+  ctx.save();
+  ctx.fillStyle = "#241e12";
+  ctx.beginPath();
+  ctx.ellipse(x - 24.6, groundY - 12.6, 2.4, 1.3, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 两只豁口碗：一只口朝上，一只倒扣（同"豁口碗"那支小笔的画法，落地尺寸）
+  InkFill(ctx, [[x - 4.5, groundY - 6.5], [x - 3, groundY - 1], [x + 3, groundY - 1],
+    [x + 4.5, groundY - 6.5], [x + 1.8, groundY - 6.5], [x + 1, groundY - 5.2], [x + 0.2, groundY - 6.5]],
+  id + "bowlUp", "#57534a", { amp: 0.7, lw: 1.5, shade: "rgba(0,0,0,0.24)" });
+  InkFill(ctx, [[x + 8, groundY - 1], [x + 9.5, groundY - 5.5], [x + 15.5, groundY - 5.5],
+    [x + 17, groundY - 1]],
+  id + "bowlDown", "#4c4840", { amp: 0.7, lw: 1.5, shade: "rgba(0,0,0,0.2)" });
+  InkLine(ctx, x + 10.6, groundY - 5.9, x + 14.4, groundY - 5.9, id + "bowlFoot",
+    { lw: 1.2, color: "#5f5b52", amp: 0.3 });
+  // 纺锭：一根小木杆穿着圆盘锭轮，倒在东头，线头拖出去
+  InkLine(ctx, x + 20, groundY - 6.5, x + 27, groundY - 1.5, id + "spindle",
+    { lw: 1.4, color: "#7a5433", amp: 0.4 });
+  ctx.save();
+  ctx.fillStyle = "#5c4530";
+  ctx.beginPath();
+  ctx.ellipse(x + 23.2, groundY - 4.2, 2.8, 1.8, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+  ctx.restore();
+  // 拖着的线头：弯弯地拖到碗边
+  ctx.save();
+  ctx.strokeStyle = "rgba(150,138,112,0.7)";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x + 21, groundY - 5.4);
+  ctx.quadraticCurveTo(x + 14, groundY - 2, x + 7.5, groundY - 3.5);
+  ctx.quadraticCurveTo(x + 4, groundY - 4.4, x + 3.2, groundY - 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * 同一批家什归置好的样子（摸黑归置之后）：笸箩靠墙摆正、碗摞成一摞、
+ * 纺锭线绕紧搁在碗旁。约 54×24px。
+ */
+export function DrawCellarSundriesTidy(ctx, x, groundY, id) {
+  // 笸箩：立着靠墙（正面一个椭圆盘），帮上那一豁还在——还是那只
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x - 16, groundY - 9, 9.5, 8.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#66562f";
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(46,37,20,0.6)";
+  ctx.lineWidth = 1.1;
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(x - 16, groundY - 9, 6.6 - i * 2.6, 5.6 - i * 2.2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#241e12";
+  ctx.beginPath();
+  ctx.ellipse(x - 9.5, groundY - 13.6, 2.0, 1.1, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 碗摞成一摞：豁口的那只在最上（豁口冲着看的人——归置的人手黑里摸得出）
+  InkFill(ctx, [[x - 0.5, groundY - 1], [x + 0.8, groundY - 4.6], [x + 9.2, groundY - 4.6],
+    [x + 10.5, groundY - 1]],
+  id + "bowlBase", "#4c4840", { amp: 0.6, lw: 1.5, shade: "rgba(0,0,0,0.22)" });
+  InkFill(ctx, [[x + 0.6, groundY - 4.6], [x + 1.8, groundY - 8.2], [x + 8.4, groundY - 8.2],
+    [x + 9.4, groundY - 4.6], [x + 6.4, groundY - 4.6], [x + 5.6, groundY - 5.8], [x + 4.8, groundY - 4.6]],
+  id + "bowlTop", "#57534a", { amp: 0.6, lw: 1.5, shade: "rgba(0,0,0,0.2)" });
+  // 纺锭：线绕得紧紧的一个梭形，搁在碗旁
+  ctx.save();
+  ctx.fillStyle = "#8a7d62";
+  ctx.beginPath();
+  ctx.ellipse(x + 17.5, groundY - 2.8, 4.0, 2.0, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  // 绕紧的线：两三道缠痕
+  ctx.strokeStyle = "rgba(70,60,44,0.65)";
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(x + 17.5, groundY - 2.8, 3.2 - i * 0.9, 1.7 - i * 0.4, -0.15, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  InkLine(ctx, x + 21, groundY - 3.4, x + 24.5, groundY - 2.6, id + "spTip",
+    { lw: 1.2, color: "#7a5433", amp: 0.3 });
+}
+
+/**
+ * 针线笸箩：浅圆笸箩里一叠叠得整整齐齐的小孩旧褂子（两三件、深浅错开），
+ * 最上面那件领口别着一根针（一点冷光）+ 一截线。约 34×20px。
+ */
+export function DrawSewBasket(ctx, x, groundY, id) {
+  // 浅笸箩：口沿一圈、帮矮
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 4, 16.5, 4.6, 0, 0, Math.PI);
+  ctx.fillStyle = "#75633f";
+  ctx.fill();
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 1.7;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 4.4, 16.5, 3.4, 0, Math.PI, Math.PI * 2);
+  ctx.strokeStyle = "rgba(46,37,20,0.7)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.restore();
+  // 叠好的旧褂子：三层，深浅错开（暗红/靛蓝/本白），层与层错半指
+  const stack = [
+    ["#6d5f45", 0, -6.2],
+    ["#262e38", 0.8, -9.4],
+    ["#5e2f37", -0.6, -12.4],
+  ];
+  for (let i = 0; i < stack.length; i += 1) {
+    const [col, dx, dy] = stack[i];
+    InkFill(ctx, [[x - 10.5 + dx, groundY + dy + 3], [x - 10 + dx, groundY + dy],
+      [x + 10 + dx, groundY + dy - 0.4], [x + 10.6 + dx, groundY + dy + 3]],
+    id + "shirt" + i, col, { amp: 0.7, lw: 1.4, shade: "rgba(0,0,0,0.18)" });
+    // 叠出来的袖折：一道竖痕
+    InkLine(ctx, x - 3 + dx, groundY + dy - 0.2, x - 2.6 + dx, groundY + dy + 2.6,
+      id + "fold" + i, { lw: 0.8, color: "rgba(20,16,12,0.4)", amp: 0.4 });
+  }
+  // 最上面那件的领口：一道领边 + 别着的针（冷光高光）+ 一截线
+  InkLine(ctx, x - 4.5, groundY - 12.6, x + 3.5, groundY - 13, id + "collar",
+    { lw: 1.0, color: "rgba(24,18,14,0.6)", amp: 0.4 });
+  ctx.save();
+  ctx.strokeStyle = "#b9c2c8";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x - 1.6, groundY - 14.2);
+  ctx.lineTo(x + 4.2, groundY - 12.2);
+  ctx.stroke();
+  // 针鼻上那一点最亮的冷光
+  ctx.fillStyle = "#dde4e8";
+  ctx.fillRect(x + 3.6, groundY - 12.8, 1.1, 1.1);
+  // 线：从针鼻垂下来搭在褂子上
+  ctx.strokeStyle = "rgba(150,138,112,0.75)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x + 4.2, groundY - 12.2);
+  ctx.quadraticCurveTo(x + 7, groundY - 9.6, x + 5, groundY - 7.4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * 缝好的小褂子叠在枕边：暗红（妹妹衣色再压暗），**一只袖口接了一截
+ * 蓝底白花**，针脚歪歪扭扭（虚线不匀）。约 26×14px。
+ */
+export function DrawMendedJacket(ctx, x, groundY, id) {
+  // 叠好的衣身
+  InkFill(ctx, [[x - 12, groundY - 1], [x - 11.4, groundY - 9], [x - 6, groundY - 11],
+    [x + 8, groundY - 10.6], [x + 11.6, groundY - 8], [x + 12, groundY - 1]],
+  id + "body", "#5e2f37", { amp: 0.9, lw: 1.6, shade: "rgba(0,0,0,0.22)" });
+  // 叠痕一道
+  InkLine(ctx, x - 9.6, groundY - 5.6, x + 9.8, groundY - 5.2, id + "fold",
+    { lw: 0.8, color: "rgba(26,14,16,0.55)", amp: 0.8 });
+  // 露在外面的那只袖子：袖口接了一截蓝底白花（靛蓝底 + 米白小花点）
+  InkFill(ctx, [[x + 4, groundY - 4.6], [x + 14, groundY - 5.4], [x + 15.5, groundY - 1.4],
+    [x + 5, groundY - 0.8]],
+  id + "sleeve", "#552a31", { amp: 0.8, lw: 1.4, shade: "rgba(0,0,0,0.2)" });
+  InkFill(ctx, [[x + 11.2, groundY - 5.2], [x + 15.8, groundY - 5.6], [x + 17, groundY - 1.2],
+    [x + 12.4, groundY - 1]],
+  id + "patch", "#262e38", { amp: 0.7, lw: 1.3, shade: "rgba(0,0,0,0.18)" });
+  // 白花：两三点
+  ctx.save();
+  ctx.fillStyle = "rgba(158,166,180,0.5)";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(x + 12.6 + i * 1.5, groundY - 4.2 + (i % 2) * 1.6, 0.7, 0.5, i, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // 接口的针脚：歪歪扭扭的虚线，大的大小的小
+  ctx.save();
+  ctx.strokeStyle = "rgba(196,186,160,0.8)";
+  ctx.lineWidth = 0.8;
+  let sy = groundY - 5.0;
+  for (let i = 0; i < 4; i += 1) {
+    const seg = 0.7 + Hash(id + "st" + i) * 1.1;
+    ctx.beginPath();
+    ctx.moveTo(x + 11.4 + Sym(id + "sx", i, 0.7), sy);
+    ctx.lineTo(x + 11.9 + Sym(id + "sx", i, 0.7), sy + seg);
+    ctx.stroke();
+    sy += seg + 0.6 + Hash(id + "sg" + i) * 0.5;
+  }
+  ctx.restore();
 }
 
 // 土坯灶（剧本新生第一章开场那眼冷灶）：方墩灶台、一口铁锅坐在灶眼上、

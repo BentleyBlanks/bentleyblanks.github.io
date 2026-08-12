@@ -108,7 +108,9 @@ function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze
 // 所以换算要除以缩放、再按朝向翻 x。三条输入路（鼠标绕圈/键盘/脱手倒转）
 // 共用 Core 算好的那一份 gripX/gripY，World 绝不另算一遍摇把在哪儿。
 // 找吃的那三道手也走这条：Core 每帧把"手此刻该落在哪"发布成 forage.<件>.grip
-const FORAGE_GRIP = { heaveMat: "mat", dragPlank: "plank", scoopAsh: "ash" };
+// 同一个姿势可能对应两件东西（苫草/苇席同走 heaveMat、灰堆/食槽同走 scoopAsh）：
+// 谁的 grip 立着就跟谁（Core 在各件收尾时会把 grip 置空，不会两头都亮）
+const FORAGE_GRIP = { heaveMat: ["reed", "mat"], dragPlank: ["plank"], scoopAsh: ["trough", "ash"] };
 
 function CrankAimLocal(state, p, bs) {
   if (!bs) return null;
@@ -117,10 +119,13 @@ function CrankAimLocal(state, p, bs) {
     x: ((wx - p.x) / bs) * (p.heading >= 0 ? 1 : -1),
     y: (wy - groundY) / bs,
   });
-  const fg = FORAGE_GRIP[p.pose];
-  if (fg) {
-    const g = state.forage?.[fg]?.grip;
-    return g ? Local(g.x, g.y) : null;
+  const fgList = FORAGE_GRIP[p.pose];
+  if (fgList) {
+    for (const key of fgList) {
+      const g = state.forage?.[key]?.grip;
+      if (g) return Local(g.x, g.y);
+    }
+    return null;
   }
   const wv = state.winchView;
   if (!wv || !wv.hooked || p.pose !== "crank") return null;
@@ -555,9 +560,15 @@ export function CreateWorld(canvasEl) {
   let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
   let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
   let spotFlashMesh = null;
-  // 找吃的那三样能上手的东西（苫子折过来的那半幅 + 压在底下那半幅 / 门板 / 土堆）
+  // 找吃的那几样能上手的东西（苫子折过来的那半幅 + 压在底下那半幅 / 门板 / 土堆
+  // / 苇席 / 食槽——后两样是第七稿加的，声明了坐标才建）
   let matPivot = null, matMesh = null, matBaseMesh = null, matTorn = -1;
   let plankMesh = null, ashMesh = null, ashKey = "";
+  let reedPivot = null, reedBaseMesh = null, troughMesh = null, troughKey = "", seedBagMesh = null;
+  // 拉耧那一拍的动态耧（state.lou 驱动：位置随拖、耧腿歪进垄沟的角度）
+  let louMesh = null;
+  // 窖口板缝漏下来的那几条光（lidShut 的板缝光 / 夜里的月光同一支）
+  let hatchBeamMesh = null, hatchBeamKey = "";
   // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
   const CART_COVER_Z = 1.5;
 
@@ -633,6 +644,9 @@ export function CreateWorld(canvasEl) {
     spotFlashMesh = null;
     matPivot = null; matMesh = null; matBaseMesh = null; matTorn = -1;
     plankMesh = null; ashMesh = null; ashKey = "";
+    reedPivot = null; reedBaseMesh = null; troughMesh = null; troughKey = ""; seedBagMesh = null;
+    louMesh = null;
+    hatchBeamMesh = null; hatchBeamKey = "";
   }
 
   // -------------------------------------------------------------------------
@@ -1570,7 +1584,7 @@ export function CreateWorld(canvasEl) {
       }
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
-      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined })); break;
+      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined || !!p.bare })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
@@ -2317,6 +2331,47 @@ export function CreateWorld(canvasEl) {
         shaftBeamMeshes.push(beam);
       }
       group.add(beam);
+
+      // 板缝光条（第七稿·序与夜窖）：盖板**合上**之后从板缝漏下来的三条细光
+      //（flags.lidShut），夜里翻板敞着给月色版（state.hatchMoon）。
+      // 「光从直的变成斜的」是序的收尾一镜——直/斜两份都烘好，
+      // 按 state.beamSlant 切换，别为一次切换造重烘机制
+      if (g.id === "cellarHatch") {
+        const MakeSlats = (slant, tag) => {
+          const slats = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+            ctx.save();
+            Silhouette(ctx);
+            ctx.clip();
+            const drop = slant * hp * 0.55;   // 斜：光条落到墙上的那头往东偏
+            for (const [x0, wTop] of [[wp * 0.33, 5], [wp * 0.47, 4], [wp * 0.59, 6]]) {
+              const grd = ctx.createLinearGradient(0, 0, drop, hp);
+              grd.addColorStop(0, "rgba(224,212,176,0.55)");
+              grd.addColorStop(0.55, "rgba(224,212,176,0.16)");
+              grd.addColorStop(1, "rgba(224,212,176,0)");
+              ctx.fillStyle = grd;
+              ctx.beginPath();
+              ctx.moveTo(x0, 0);
+              ctx.lineTo(x0 + wTop, 0);
+              ctx.lineTo(x0 + wTop - 3 + drop, hp * 0.97);
+              ctx.lineTo(x0 - 3 + drop, hp * 0.97);
+              ctx.closePath();
+              ctx.fill();
+            }
+            ctx.restore();
+          });
+          PlaceSprite(slats, g.wx, wallBotY, NEAR_Z);
+          FixOrder(slats, SHAFT_WALL_ORDER + 1);
+          slats.userData.dofKeep = true;
+          slats.userData.slatTag = tag;
+          slats.material.blending = THREE.AdditiveBlending;
+          slats.material.depthWrite = false;
+          slats.material.opacity = 0;
+          group.add(slats);
+          return slats;
+        };
+        hatchBeamMesh = MakeSlats(0, "straight");
+        hatchBeamMesh.userData.alt = MakeSlats(0.4, "slanted");
+      }
     }
 
     // —— 5) 竖井与洞里的零件（贴在中景，人可以从它前后经过）
@@ -3313,6 +3368,17 @@ export function CreateWorld(canvasEl) {
         bm.material.opacity = bm.userData.beamBase * (0.12 + 0.88 * Math.max(k, story));
       }
     }
+    // 板缝光条：盖板合上（lidShut）才漏那几条；夜里翻板敞着给月色（hatchMoon）。
+    // 白天亮、拂晓次之、夜里只剩月色——跟井口那道 beam 同一条昼夜账
+    if (hatchBeamMesh) {
+      const mood = ShownLight(state);
+      const dayK = mood === "day" ? 1 : mood === "dawn" ? 0.5 : 0.3;
+      const on = !!state.flags.lidShut || !!state.hatchMoon;
+      const slanted = (state.beamSlant || 0) > 0.2;
+      hatchBeamMesh.material.opacity = on && !slanted ? 0.85 * dayK : 0;
+      const alt = hatchBeamMesh.userData.alt;
+      if (alt) alt.material.opacity = on && slanted ? 0.85 * dayK : 0;
+    }
     StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：
     // 只重烘自己那一张。r.flag 是单个旗标的简写，r.read 是任意状态摘要
@@ -4167,11 +4233,90 @@ export function CreateWorld(canvasEl) {
       }
       ashMesh.visible = true;
       PlaceSprite(ashMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+
+      // ── 苇席（第七稿新增，机制同苫子：绕折痕折过去）＋席底下那半袋谷种 ──
+      if (fg.reed) {
+        const REED_PX = Math.round(FORAGE.reed.half * PPM);
+        const REED_BOX = { w: REED_PX + 26, h: 40, ax: 10, ay: 30, ss: PROP_SS };
+        if (!reedPivot) {
+          reedPivot = Pivot(BakeSprite(REED_BOX.w, REED_BOX.h, REED_BOX.ax, REED_BOX.ay,
+            (ctx, ax, ay) => ART.DrawReedMat(ctx, ax, ay, "forageReedA", { len: REED_PX }),
+            0, PROP_SS));
+          SetPlayOrder(reedPivot, BAND.loose, "forageReed");
+          layers.play.add(reedPivot);
+          reedBaseMesh = Pivot(BakeSprite(REED_BOX.w, REED_BOX.h, REED_BOX.ax, REED_BOX.ay,
+            (ctx, ax, ay) => ART.DrawReedMat(ctx, ax, ay, "forageReedB", { len: REED_PX }),
+            0, PROP_SS));
+          reedBaseMesh.rotation.z = FORAGE.reed.westA;
+          SetPlayOrder(reedBaseMesh, BAND.loose, "forageReedBase");
+          layers.play.add(reedBaseMesh);
+          seedBagMesh = BakeSprite(34, 26, 17, 22,
+            (ctx, ax, ay) => ART.DrawSeedBag(ctx, ax, ay, "forageSeedBag"), 0, DETAIL_SS);
+          // 谷种袋在苇席**底下**：排得比苇席浅一档，掀开才见着
+          SetPlayOrder(seedBagMesh, BAND.walk, "forageSeedBag");
+          layers.play.add(seedBagMesh);
+        }
+        reedPivot.visible = true;
+        reedBaseMesh.visible = true;
+        reedPivot.position.set(fg.reed.x, SURFACE_Y + FORAGE.reed.pivotY, PlaceZ(BAND.loose));
+        reedPivot.rotation.z = fg.reed.ang ?? FORAGE.reed.restA;
+        reedBaseMesh.position.copy(reedPivot.position);
+        // 席掀过 0.5rad 才看得见底下的袋子（贴着歇息角时它整个被席盖着）
+        seedBagMesh.visible = (fg.reed.ang ?? FORAGE.reed.restA) > FORAGE.reed.restA + 0.5
+          || !!fg.reed.done;
+        PlaceSprite(seedBagMesh, fg.reed.x - 0.25, SURFACE_Y, PlaceZ(BAND.walk));
+      }
+
+      // ── 食槽（门板拖开才露出来）：槽底秕谷壳随刮走的把数变少 ──
+      if (fg.trough) {
+        const tKey = `${Math.round((fg.trough.k || 0) * 4)}`;
+        if (!troughMesh) {
+          troughMesh = BakeSprite(70, 26, 35, 22,
+            (ctx, ax, ay) => ART.DrawFeedTrough(ctx, ax, ay, "forageTrough", { k: fg.trough.k || 0 }),
+            0, DETAIL_SS);
+          SetPlayOrder(troughMesh, BAND.walk, "forageTrough");
+          layers.play.add(troughMesh);
+          troughKey = tKey;
+        }
+        if (tKey !== troughKey) {
+          troughKey = tKey;
+          RedrawProp(troughMesh, { w: 70, h: 26, ax: 35, ay: 22, ss: DETAIL_SS },
+            (ctx, ax, ay) => ART.DrawFeedTrough(ctx, ax, ay, "forageTrough", { k: fg.trough.k || 0 }));
+        }
+        // 门板还压着的时候只露一个角（题眼是"板子底下压着食槽的角"）
+        troughMesh.visible = !!fg.plank.done || (fg.plank.dx || 0) > 0.3;
+        PlaceSprite(troughMesh, fg.trough.x, SURFACE_Y, PlaceZ(BAND.walk));
+      }
     } else if (matPivot) {
       matPivot.visible = false;
       matBaseMesh.visible = false;
       plankMesh.visible = false;
       ashMesh.visible = false;
+      if (reedPivot) { reedPivot.visible = false; reedBaseMesh.visible = false; seedBagMesh.visible = false; }
+      if (troughMesh) troughMesh.visible = false;
+    }
+
+    // ── 拉耧（state.lou 驱动的动态耧）：位置随拖、歪进垄沟的角度随 tilt。
+    // 静态那份 louDrill 由 louPlay 旗标藏起，这里接管；收耧时 Core 清 state.lou、
+    // 撤旗标，静态的原位接回——同位同角，换手不露痕 ──
+    if (state.lou) {
+      const lo = state.lou;
+      if (!louMesh) {
+        louMesh = BakeSprite(72, 60, 36, 54,
+          (ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, "louPlayMesh"), 0, PROP_SS);
+        const g = new THREE.Group();
+        louMesh.position.set(louMesh.userData.offset.x, louMesh.userData.offset.y, 0);
+        g.add(louMesh);
+        louMesh = g;
+        SetPlayOrder(louMesh, BAND.walk, "louPlay");
+        layers.play.add(louMesh);
+      }
+      louMesh.visible = true;
+      louMesh.position.set(lo.x + (lo.dx || 0), SURFACE_Y, PlaceZ(BAND.walk));
+      // 歪进垄沟：往前（东）栽，屏幕上是顺时针 → 绕 z 负向转
+      louMesh.rotation.z = -(lo.tilt || 0);
+    } else if (louMesh) {
+      louMesh.visible = false;
     }
 
     if (state.planing) {
@@ -5291,6 +5436,7 @@ export function CreateWorld(canvasEl) {
   const LIVE_CARD_ART = {
     scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard,
     knot: ART.DrawKnotCard, fold: ART.DrawFoldCard, wrap: ART.DrawWrapCard,
+    split: ART.DrawSplitCard,
   };
 
   function SetLiveCard(spec, dt) {

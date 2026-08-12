@@ -139,6 +139,14 @@
           "note": "屋里靠西：开场「还睡着」、黄昏「放平掖好被角」两镜都睡在这上头（interior 陈设）"
         },
         {
+          "id": "mendedJacket",
+          "kind": "mendedJacket",
+          "x": 30.55,
+          "showFlag": "mended",
+          "name": "枕头边的小褂子",
+          "note": "缝·改的收梢：袖口接了一截蓝底白花的小褂子，天亮前放在妹妹枕头边（mended 立旗才现）"
+        },
+        {
           "id": "yardStool",
           "kind": "stool",
           "x": 35.9,
@@ -200,23 +208,57 @@
           "name": "红薯堆"
         },
         {
-          "id": "graveDirt",
-          "kind": "freshDirt",
-          "x": 27.1,
-          "w": 1.6,
+          "id": "strawMat",
+          "kind": "strawMat",
+          "x": 27.3,
           "level": "under",
-          "showFlag": "clothesBuried",
-          "name": "窖底新填的土",
-          "note": "埋下那件衣裳之后才有——第一章夜里的活，留在地上的样子"
+          "name": "窖角的草苫堆",
+          "note": "第七稿：夜里那块整布抽出来的地方，也是伤员藏身的地方——那只手就从这堆草底下伸出来。**窖腔画出来的内壁到 27.2 才展开**，再往西就埋进剖面的墙弧里"
         },
         {
-          "id": "clothBundle",
-          "kind": "clothBundle",
-          "x": 27.0,
+          "id": "strawArm",
+          "kind": "strawArm",
+          "x": 27.7,
           "level": "under",
-          "hideFlag": "clothesBuried",
-          "name": "角落里的包袱",
-          "note": "草草塞在窖角草苫下的带血衣裳，挨着西头的腌菜缸——第一章夜里的特写；埋进窖底后由新土(graveDirt)接替。**窖腔画出来的内壁到 27.2 才展开**，再往西就埋进剖面的墙弧里"
+          "showFlag": "manGrab",
+          "name": "草堆底下伸出来的手",
+          "note": "抓住手腕那一镜的静帧：manGrab 立起才现（c1_cellar 抓腕效果落旗），c1_rescue 第一行收走（换成真演员躺着）"
+        },
+        {
+          "id": "cellarSundries",
+          "kind": "cellarSundries",
+          "x": 33.3,
+          "level": "under",
+          "hideFlag": "cellarTidy",
+          "name": "散着的家什",
+          "note": "破笸箩歪着、豁口碗一只倒扣、纺锭拖着线头——摸黑归置前的样子（三下手做完由 cellarTidy 换成摆正的那份）"
+        },
+        {
+          "id": "cellarSundriesTidy",
+          "kind": "cellarSundriesTidy",
+          "x": 33.3,
+          "level": "under",
+          "showFlag": "cellarTidy",
+          "name": "归置好的家什",
+          "note": "笸箩靠墙摆正、碗摞成摞、纺锭线绕紧搁在碗旁——玩家亲手归置出来的样子"
+        },
+        {
+          "id": "sewBasket",
+          "kind": "sewBasket",
+          "x": 32.2,
+          "level": "under",
+          "hideFlag": "basketMoved",
+          "name": "针线笸箩",
+          "note": "妹妹穿小了的旧褂子一件摞一件叠得整整齐齐，针别在最上面那件的领口上——缝·改要用的针线都在这儿"
+        },
+        {
+          "id": "sewBasketLadder",
+          "kind": "sewBasket",
+          "x": 29.8,
+          "level": "under",
+          "showFlag": "basketMoved",
+          "name": "梯子底下的针线笸箩",
+          "note": "他把手在那叠衣裳上放了一会，然后把笸箩拎起来搁到梯子底下（basketMoved）——天亮缝袖口时伸手就够得着"
         },
         {
           "id": "cellarShelf",
@@ -510,7 +552,19 @@
           "id": "treeEast",
           "kind": "tree",
           "x": 158.5,
-          "name": "枣树"
+          "stripped": true,
+          "bare": true,
+          "name": "场院边的秃榆",
+          "note": "第七稿 5b：回来的路上第一棵——秃的，一片叶子也没有，下半截树皮被人一圈一圈刮走了，露着白茬。她头都没抬"
+        },
+        {
+          "id": "elmBareB",
+          "kind": "tree",
+          "x": 143.0,
+          "stripped": true,
+          "bare": true,
+          "name": "又一棵秃榆",
+          "note": "第七稿 5b：又路过一棵。也秃着。她也没停"
         },
         {
           "id": "hangLantern",
@@ -525,6 +579,30 @@
           "w": 5,
           "gate": false,
           "name": "村东头的院墙"
+        },
+        {
+          "id": "stubbleField",
+          "kind": "stubbleField",
+          "x": 176.8,
+          "w": 7.4,
+          "name": "自家那二亩地",
+          "note": "第七稿 5a：去年的谷茬子还立在垄上，一排一排，齐刷刷指着天。地没翻"
+        },
+        {
+          "id": "sownField",
+          "kind": "sownField",
+          "x": 183.8,
+          "w": 4.6,
+          "name": "东邻耩好的地",
+          "note": "隔着一条垄沟，东边那块已经耩上了：垄是新的，土是湿的，一趟一趟直得像用线量过"
+        },
+        {
+          "id": "louDrill",
+          "kind": "louDrill",
+          "x": 174.3,
+          "hideFlag": "louPlay",
+          "name": "耧",
+          "note": "拉耧那一拍由 state.lou 的动态网格接管（louPlay 藏掉这份静态的）；收耧把它交还回来——位置角度都对得上，换手不露痕"
         },
         {
           "id": "dungHome",
