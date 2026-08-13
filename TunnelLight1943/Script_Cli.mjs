@@ -333,8 +333,11 @@ async function CmdState(o) {
   for (const k of Object.keys(now)) if (JSON.stringify(now[k]) !== JSON.stringify(old[k])) changed[k] = now[k];
 
   const live = {};
-  for (const k of ["ropeLine", "knot", "winchView", "scribe", "scribeCard", "planeCard", "knotCard",
-    "wrapCard", "forage", "closeUp", "gesture",
+  // 活卡那八张走 Core 的 LIVE_CARD_FIELDS（唯一一份名单）——这儿原先手抄了
+  // 四张，撕布那张不在里头，`state c1_rescue --step 2 --json` 报出来的 live
+  // 是空的，看着像"卡根本没立起来"（其实立了）
+  for (const k of ["ropeLine", "knot", "winchView", "scribe", ...C.LIVE_CARD_FIELDS,
+    "forage", "closeUp", "gesture",
     "thrown", "smoke", "pip", "toast", "detection"]) {
     if (k === "detection" && !(state.detection?.level > 0)) continue;   // 没被盯上就别刷屏
     if (state[k]) live[k] = k === "ropeLine"
