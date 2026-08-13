@@ -3927,7 +3927,7 @@ export const SCRIPTS = {
       // 外面那团动静交给调度器（SetDin）：由远及近是一条连着的曲线。
       kind: "cinematic", id: "c1_thatday", timeOfDay: "day",
       lines: [
-        { stage: "", d: 3.4, cam: { kind: "dark" },
+        { act: "", d: 3.4, cam: { kind: "dark" },
           on: (state) => {
             // 黑屏里先响起来：还在村外，狗先知道。爬到 0.55 用掉这一句
             SetDin(state, 0.06, 0.55, 0.17);
@@ -3944,7 +3944,7 @@ export const SCRIPTS = {
         // 带出来。**门始终留在画框边上不给正脸**——门是画在立面上的，过场里
         // 第四堵墙不画（见 World 的 filmic），真给门个特写就穿帮成一个空门洞；
         // 撞门全靠声音演，比看见更瘆人
-        { stage: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。", d: 4.0,
+        { act: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。", d: 4.0,
           cam: { kind: "free", from: [33.0, 0.9, 4.3], to: [32.5, 1.15, 5.7], at: [31.9, 0.95], atTo: [31.9, 0.9] },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -3960,7 +3960,7 @@ export const SCRIPTS = {
         // 蓝底白花那一眼：不切特写，跟着她冲进来这一下说完
         // 孩子视线的低机位：贴着妹妹的高度看门被撞开，注视点跟着娘冲进来
         // 的路线从门口摇回屋当间——镜头追人，不是人走进画框
-        { stage: "一阵急促脚步冲进院子。门板猛地向里打开，撞在墙上——娘冲进来。蓝底白花的短褂被树枝扯开一道口，袖口沾着土。", d: 4.6,
+        { act: "一阵急促脚步冲进院子。门板猛地向里打开，撞在墙上——娘冲进来。蓝底白花的短褂被树枝扯开一道口，袖口沾着土。", d: 4.6,
           cam: { kind: "free", from: [31.6, 0.85, 4.6], to: [31.8, 0.85, 4.3], at: [34.0, 1.1], atTo: [32.3, 0.98] },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -3974,7 +3974,7 @@ export const SCRIPTS = {
         // 接触戏的老规矩：先站到一臂之内（上臂+小臂 ≈ 0.49m）。娘 31.45、
         // 妹妹 31.0 差 0.45m，手才够得着
         // 这一场最重的一下给一个不停的缓推：从半间屋慢慢压到怀抱上
-        { stage: "院外又响一枪。娘猛地回头，把门推回去，却没顾上关严——转身冲到妹妹面前，一把将她拉进怀里，上下摸了一遍。", d: 5.2,
+        { act: "院外又响一枪。娘猛地回头，把门推回去，却没顾上关严——转身冲到妹妹面前，一把将她拉进怀里，上下摸了一遍。", d: 5.2,
           cam: { kind: "free", from: [31.35, 1.1, 5.2], to: [31.2, 0.98, 3.6], at: [31.15, 0.92], atTo: [31.15, 0.88] },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4016,7 +4016,7 @@ export const SCRIPTS = {
         // 不在这一句里演走位——走位只留给"冲进屋"那一下，那是要看的
         // 俯角看翻板（滑开/蹭汗/再攥住/掀开都在手上），镜头缓缓沉下去凑近——
         // 俯的是这一小块窖口，不是全村（那条禁令管的是景别，不是角度）
-        { stage: "娘去拉菜窖翻板。手指第一次从铁环上滑开。她在衣襟上蹭了一把汗，第二次攥住铁环，将翻板猛地掀开。", d: 5.4,
+        { act: "娘去拉菜窖翻板。手指第一次从铁环上滑开。她在衣襟上蹭了一把汗，第二次攥住铁环，将翻板猛地掀开。", d: 5.4,
           cam: { kind: "free", from: [30.6, 2.3, 6.4], to: [30.25, 2.0, 5.5], at: [29.55, 0.55], atTo: [29.6, 0.45] },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4122,7 +4122,7 @@ export const SCRIPTS = {
           b.blockCd = 6;
           state.player.x = 33.1;
           StartMicroCine(state, [
-            { stage: "娘挡在门前，朝菜窖指。", d: 1.8,
+            { act: "娘挡在门前，朝菜窖指。", d: 1.8,
               cam: { kind: "shot", x: 33.6, y: 1.15, dist: 3.4 },
               on: (s) => {
                 const m = FindActor(s, "mother");
@@ -4154,7 +4154,7 @@ export const SCRIPTS = {
             const sis = FindActor(state, "sister");
             if (sis) { sis.lift = 0; sis.level = "under"; sis.x = 30.7; sis.heading = 1; sis.pose = "leanIn"; sis.cineTarget = null; }
             StartMicroCine(state, [
-              { stage: "柱子先坐到窖沿，把妹妹放上梯子。妹妹抓着他的衣襟不肯松手。", d: 3.4,
+              { act: "柱子先坐到窖沿，把妹妹放上梯子。妹妹抓着他的衣襟不肯松手。", d: 3.4,
                 cam: { kind: "shot", x: 29.6, y: 1.0, dist: 3.2 },
                 on: (s) => {
                   // 坐下去→往下送→她不撒手→一根根掰开（老版：跪姿定格挂 3 秒）
@@ -4173,7 +4173,7 @@ export const SCRIPTS = {
             const sis = FindActor(state, "sister");
             if (sis) { sis.following = false; sis.level = "under"; sis.x = 30.9; sis.heading = 1; sis.pose = "leanIn"; sis.lift = 0; }
             StartMicroCine(state, [
-              { stage: "娘跪在窖口，一只手压着翻板。外面的脚步已经到了院门口。", d: 3.2,
+              { act: "娘跪在窖口，一只手压着翻板。外面的脚步已经到了院门口。", d: 3.2,
                 cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
                 on: (s) => {
                   const m = FindActor(s, "mother");
@@ -4187,7 +4187,7 @@ export const SCRIPTS = {
               // 翻板合上。最后消失在板缝里的是娘那截蓝底白花的袖子——
               // **同一个仰角机位演完**（不切特写：那条规矩这一场通用），
               // 盖板真的绕铰链落回去，落到底才是那声闷响
-              { stage: "翻板合上。最后消失在板缝里的，是娘那截蓝底白花的袖子。", d: 4.0,
+              { act: "翻板合上。最后消失在板缝里的，是娘那截蓝底白花的袖子。", d: 4.0,
                 cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
                 on: (s) => {
                   // rate 1.8 ＝ 0.56 秒就扣死，而 lidLower 那只手 t=0.9 才够到
@@ -4207,7 +4207,7 @@ export const SCRIPTS = {
                   const m = FindActor(s, "mother");
                   if (m) { m.pose = null; m.cineTarget = null; m.x = 29.95; m.heading = -1; m.track = { name: "lidLower", t: 0 }; }
                 } },
-              { stage: "头顶传来娘急促的脚步。她从后门跑出去了。", d: 4.4,
+              { act: "头顶传来娘急促的脚步。她从后门跑出去了。", d: 4.4,
                 cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 },
                 on: (s) => {
                   const m = FindActor(s, "mother");
@@ -4327,7 +4327,7 @@ export const SCRIPTS = {
       lines: [
         // 序的收尾：柱子仍然搂着妹妹。板缝里的光从直的变成斜的（beamSlant
         // 已由 c1_hide 落下），又一点点暗下去
-        { stage: "柱子仍然搂着妹妹。板缝里的光从直的变成斜的，又一点点暗下去。", d: 4.2,
+        { act: "柱子仍然搂着妹妹。板缝里的光从直的变成斜的，又一点点暗下去。", d: 4.2,
           cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.8 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4345,10 +4345,13 @@ export const SCRIPTS = {
         { stage: "没人来叫。", d: 2.8, cam: { kind: "dark" } },
         // 章名卡：第一章 · 蓝底白花（八稿明令——章名出现在序的末尾，
         // 不在开局；state.titleCard 由 Main 画成居中的章名字样）
-        { stage: "", d: 3.6, cam: { kind: "dark" },
+        { act: "", d: 3.6, cam: { kind: "dark" },
           on: (state) => { state.titleCard = { num: "第一章", title: "蓝底白花", t: 0, dur: 3.4 }; } },
-        { stage: "三天后。", d: 3.0, cam: { kind: "dark" },
+        // 「三天后」是**字卡**不是旁白（剧本：〔字卡〕随后出现：三天后），
+        // 所以跟章名卡、章末字样同一支笔走 titleCard，不走字幕通道
+        { act: "", d: 3.0, cam: { kind: "dark" },
           on: (state) => {
+            state.titleCard = { num: "", title: "三天后", t: 0, dur: 2.8 };
             // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来
             state.flags.lidShut = false;
             state.beamSlant = 0;
@@ -4361,9 +4364,9 @@ export const SCRIPTS = {
             state.player.x = 33.2;
           } },
         // 黑屏一声肚子叫——不是大人的，是小孩那种咕噜噜的空响
-        { stage: "", d: 2.6, cam: { kind: "dark" },
+        { act: "", d: 2.6, cam: { kind: "dark" },
           on: (state) => { Cue(state, "bellyGrowl", { gain: 0.9, delay: 0.6 }); } },
-        { stage: "灶是冷的。柱子蹲在灶前，摸了一把锅底——干的。", d: 4.0,
+        { act: "灶是冷的。柱子蹲在灶前，摸了一把锅底——干的。", d: 4.0,
           cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.8 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4372,7 +4375,7 @@ export const SCRIPTS = {
             FlashTrack(state, "panBottom", 3.2);
           } },
         // 粮瓮（八稿新增）：掀开，瓮底只剩薄薄一层糜子
-        { stage: "他掀开粮瓮。瓮底只剩薄薄一层糜子。", d: 3.8,
+        { act: "他掀开粮瓮。瓮底只剩薄薄一层糜子。", d: 3.8,
           cam: { kind: "insert", x: 26.8, y: 0.85, dist: 2.4 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4381,7 +4384,7 @@ export const SCRIPTS = {
             FlashTrack(state, "liftJarLid", 3.4);
             Cue(state, "stoneLand", { gain: 0.3, rate: 0.7, delay: 1.55 });   // 盖子落到一边
           } },
-        { stage: "水缸见了底。瓢探下去，刮着缸底响。提上来，小半瓢——凑着瓢沿抿了一口，剩下的倒进锅里。", d: 5.6,
+        { act: "水缸见了底。瓢探下去，刮着缸底响。提上来，小半瓢——凑着瓢沿抿了一口，剩下的倒进锅里。", d: 5.6,
           cam: { kind: "insert", x: 43.4, y: 0.95, dist: 3.0 },
           on: (state) => {
             // 字幕在摸瓢，画面里就得有人在缸边摸（首轮视觉审查退回的空缸镜）
@@ -4391,12 +4394,12 @@ export const SCRIPTS = {
             Cue(state, "bucketKnock", { gain: 0.4, rate: 0.8, delay: 1.2 });   // 瓢刮着缸底
             Cue(state, "waterDrip", { gain: 0.4, delay: 3.0 });
           } },
-        { stage: "牲口棚塌了半边，棚里空着。拴牲口的橛子还钉在地上，缰绳没了——木桩上没有断口。不是断的，是解走的。", d: 5.6,
+        { act: "牲口棚塌了半边，棚里空着。拴牲口的橛子还钉在地上，缰绳没了——木桩上没有断口。不是断的，是解走的。", d: 5.6,
           cam: { kind: "shot", x: 10.4, y: 1.6, dist: 5.2 } },
         // 鸡笼（八稿新增）：倒在墙边。里面是空的
-        { stage: "鸡笼倒在墙边。里面是空的。", d: 3.0,
+        { act: "鸡笼倒在墙边。里面是空的。", d: 3.0,
           cam: { kind: "insert", x: 36.6, y: 0.7, dist: 2.6 } },
-        { stage: "柱子回到屋里。妹妹蜷在炕上，头发贴着脸。破袄只盖住肚子，一只脚露在外面。", d: 4.6,
+        { act: "柱子回到屋里。妹妹蜷在炕上，头发贴着脸。破袄只盖住肚子，一只脚露在外面。", d: 4.6,
           cam: { kind: "shot", x: 31.4, y: 1.05, dist: 3.8 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4407,7 +4410,7 @@ export const SCRIPTS = {
             state.player.heading = -1;
           } },
         // 他蹲下去，替她把脚盖好
-        { stage: "柱子替她把脚盖好。", d: 2.8,
+        { act: "柱子替她把脚盖好。", d: 2.8,
           cam: { kind: "shot", x: 31.8, y: 0.95, dist: 3.4 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4418,7 +4421,7 @@ export const SCRIPTS = {
           } },
         // 镜头停在她的手腕上：去年的褂子短了一截，袖口遮不住手腕。
         // ——章末那一针一针，就是缝给这截手腕的
-        { stage: "去年的褂子已经短了一截，袖口遮不住手腕。", d: 3.8,
+        { act: "去年的褂子已经短了一截，袖口遮不住手腕。", d: 3.8,
           cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
           on: (state) => { state.beat.indoorScene = true; } },
         { stage: "第三天。还是没人来叫。", d: 3.2,
@@ -4470,12 +4473,12 @@ export const SCRIPTS = {
           effect: (state) => {
             Cue(state, "clothLift", { gain: 0.5 });
             StartMicroCine(state, [
-              { stage: "柱子解开袋口。袋里全是谷种。", d: 3.2,
+              { act: "柱子解开袋口。袋里全是谷种。", d: 3.2,
                 cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.3 },
                 on: (s) => { FlashPose(s, "kneel", 3.0); } },
               { who: "娘的声音", say: "留种。谁也不能动。", d: 3.0,
                 cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 } },
-              { stage: "柱子捻起几粒谷种，看了一会。", d: 3.0,
+              { act: "柱子捻起几粒谷种，看了一会。", d: 3.0,
                 cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 },
                 on: (s) => { FlashPose(s, "kneel", 2.8); } },
             ]);
@@ -4488,13 +4491,13 @@ export const SCRIPTS = {
           effect: (state) => {
             state.flags.seedKept = true;
             StartMicroCine(state, [
-              { stage: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
+              { act: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
                 cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.2 },
                 on: (s) => {
                   FlashPose(s, "kneel", 2.8);
                   Cue(s, "stoneLand", { gain: 0.35, delay: 1.6 });
                 } },
-              { stage: "柱子把苇席重新盖在粮种上。", d: 2.8,
+              { act: "柱子把苇席重新盖在粮种上。", d: 2.8,
                 cam: { kind: "shot", x: 11.4, y: 1.0, dist: 3.2 },
                 on: (s) => {
                   FlashPose(s, "bow", 2.2);
@@ -4512,26 +4515,26 @@ export const SCRIPTS = {
         { type: "unwrapJar", zone: { x: 7.6, w: 3.0 },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
+              { act: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
                 cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
               // 闪回：娘跪在窖口的手臂（一秒出头，硬切）
-              { stage: "", d: 1.3,
+              { act: "", d: 1.3,
                 cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.visible = true; m.level = "surface"; m.x = 29.95; m.heading = -1; m.pose = null; m.track = { name: "lidLower", t: 1.0 }; }
                 } },
               // 再切回坛子
-              { stage: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
+              { act: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
                 cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.visible = false; m.pose = null; }
                 } },
-              { stage: "他将碎布叠好，揣进怀里。", d: 2.6,
+              { act: "他将碎布叠好，揣进怀里。", d: 2.6,
                 cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
                 on: (s) => { FlashPose(s, "bow", 1.4); } },
-              { stage: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
+              { act: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
                 cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
             ]);
           } },
@@ -4562,7 +4565,7 @@ export const SCRIPTS = {
           effect: (state) => {
             state.player.item = null;
             StartMicroCine(state, [
-              { stage: "柱子把两片红薯干泡进碗里。温水。泡了一会，软了点。", d: 4.0,
+              { act: "柱子把两片红薯干泡进碗里。温水。泡了一会，软了点。", d: 4.0,
                 cam: { kind: "insert", x: 34.9, y: 0.95, dist: 3.0 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -4575,7 +4578,7 @@ export const SCRIPTS = {
         { type: "split", zone: { x: 34.6, w: 2.6 },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "身后传来被褥摩擦声。", d: 2.0,
+              { act: "身后传来被褥摩擦声。", d: 2.0,
                 cam: { kind: "shot", x: 33.4, y: 1.1, dist: 3.8 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -4588,27 +4591,27 @@ export const SCRIPTS = {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.pose = "kneel"; sis.x = 31.6; sis.heading = 1; }
                 } },
-              { stage: "柱子回头。妹妹坐在炕上，头发还贴着脸。", d: 2.8,
+              { act: "柱子回头。妹妹坐在炕上，头发还贴着脸。", d: 2.8,
                 cam: { kind: "shot", x: 32.4, y: 1.05, dist: 3.6 } },
               { who: "妹妹", say: "你上哪了？", d: 2.2,
                 cam: { kind: "insert", x: 31.8, y: 0.95, dist: 2.8 } },
               { who: "柱子", say: "没上哪。", d: 2.0,
                 cam: { kind: "shot", x: 33.6, y: 1.1, dist: 3.6 } },
-              { stage: "妹妹从炕上下来，走到桌边。她先看自己的碗，又看柱子的碗。", d: 3.8,
+              { act: "妹妹从炕上下来，走到桌边。她先看自己的碗，又看柱子的碗。", d: 3.8,
                 cam: { kind: "insert", x: 34.4, y: 0.9, dist: 2.9 },
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.pose = null; sis.cineTarget = { x: 34.0 }; sis.cineSpeed = 1.8; }
                 } },
               // 不管长的那截在谁碗里，她都做同一件事
-              { stage: "她伸手，把长的那截推到柱子面前。", d: 3.0,
+              { act: "她伸手，把长的那截推到柱子面前。", d: 3.0,
                 cam: { kind: "insert", x: 34.5, y: 0.85, dist: 2.7 },
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.cineTarget = null; sis.x = 34.0; sis.heading = 1; sis.pose = "bow"; }
                   Cue(s, "pickup", { gain: 0.5, rate: 0.8 });
                 } },
-              { stage: "她低下头，不再看他。", d: 2.4,
+              { act: "她低下头，不再看他。", d: 2.4,
                 cam: { kind: "insert", x: 34.0, y: 0.9, dist: 2.5 } },
             ]);
           } },
@@ -4624,12 +4627,12 @@ export const SCRIPTS = {
                   if (sis) { sis.pose = "kneel"; sis.heading = 1; sis.carry = "红薯干"; }
                   FlashPose(s, "bow", 1.6);
                 } },
-              { stage: "妹妹没再推。拿起来咬了一口。还是有些硬。", d: 3.2,
+              { act: "妹妹没再推。拿起来咬了一口。还是有些硬。", d: 3.2,
                 cam: { kind: "insert", x: 34.1, y: 0.9, dist: 2.8 } },
-              { stage: "她把红薯干重新泡回水里，等了一会，再拿起来咬。", d: 3.8,
+              { act: "她把红薯干重新泡回水里，等了一会，再拿起来咬。", d: 3.8,
                 cam: { kind: "insert", x: 34.1, y: 0.9, dist: 2.8 },
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.3, rate: 1.2, delay: 0.6 }); } },
-              { stage: "柱子端起自己的碗，把带甜味的水喝下去。", d: 3.6,
+              { act: "柱子端起自己的碗，把带甜味的水喝下去。", d: 3.6,
                 cam: { kind: "shot", x: 34.7, y: 1.2, dist: 4.2 },
                 on: (s) => {
                   const sis = FindActor(s, "sister");
@@ -4655,7 +4658,7 @@ export const SCRIPTS = {
         // 开场问答（chain 的 onStart 可以直接起微过场；跳幕不结算 onStart，
         // 但这段只有走位和台词，没有旗标）
         StartMicroCine(state, [
-          { stage: "妹妹吃完，舔了舔手指。她走到门框边，仰头看着门框低处的两道横线。", d: 4.4,
+          { act: "妹妹吃完，舔了舔手指。她走到门框边，仰头看着门框低处的两道横线。", d: 4.4,
             cam: { kind: "shot", x: 33.4, y: 1.1, dist: 3.6 },
             on: (s) => {
               s.beat.indoorScene = true;
@@ -4668,18 +4671,18 @@ export const SCRIPTS = {
               const k = FindActor(s, "sister");
               if (k) { k.cineTarget = null; k.x = 33.4; k.heading = -1; k.pose = "mark"; }
             } },
-          { stage: "柱子把碗放下。", d: 1.8,
+          { act: "柱子把碗放下。", d: 1.8,
             cam: { kind: "shot", x: 34.3, y: 1.05, dist: 3.2 },
             on: (s) => { Cue(s, "drop", { gain: 0.3, rate: 1.1 }); } },
           { who: "柱子", say: "画。", d: 1.6,
             cam: { kind: "close", on: "player", dist: 3.0 } },
-          { stage: "妹妹踮脚去够窗台上的石笔。她够不到。", d: 3.2,
+          { act: "妹妹踮脚去够窗台上的石笔。她够不到。", d: 3.2,
             cam: { kind: "shot", x: 34.0, y: 1.1, dist: 3.2 },
             on: (s) => {
               const k = FindActor(s, "sister");
               if (k) { k.x = 34.3; k.heading = 1; k.pose = null; k.track = { name: "reachJump", t: 0, ambient: true }; }
             } },
-          { stage: "", d: 1.2, cam: { kind: "shot", x: 34.0, y: 1.1, dist: 3.2 },
+          { act: "", d: 1.2, cam: { kind: "shot", x: 34.0, y: 1.1, dist: 3.2 },
             on: (s) => {
               const k = FindActor(s, "sister");
               if (k) { k.track = null; k.x = 33.9; k.heading = 1; }
@@ -4696,7 +4699,7 @@ export const SCRIPTS = {
               // 抱起来：她离地半米，前两天那两道的上头正好够得着。
               // 站位钉在**左立柱**（刻痕在 33.6-33.75）前——33.85 会把她按进
               // 黑门洞里，暗红衣裳当场隐形（实拍抓的）
-              { stage: "柱子蹲下，把妹妹抱起来，一只手托住她，另一只手从窗台拿过石笔。", d: 3.4,
+              { act: "柱子蹲下，把妹妹抱起来，一只手托住她，另一只手从窗台拿过石笔。", d: 3.4,
                 cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -4710,7 +4713,7 @@ export const SCRIPTS = {
                   // 轨道跑完（1.1s）自动收回，落到这个姿势上继续托着
                   s.player.pose = "liftChild";
                 } },
-              { stage: "石笔是一截磨秃了的滑石。爹划线用的——木匠家里，比锥子还常使的东西。他把它塞进她手里。", d: 4.4,
+              { act: "石笔是一截磨秃了的滑石。爹划线用的——木匠家里，比锥子还常使的东西。他把它塞进她手里。", d: 4.4,
                 cam: { kind: "shot", x: 33.9, y: 1.35, dist: 3.0 } },
             ]);
           } },
@@ -4745,7 +4748,7 @@ export const SCRIPTS = {
       // 磕在缸底。答那一个字是玩家自己按出来的（下一拍 c1_say1）。
       kind: "cinematic", id: "c1_count", timeOfDay: "day",
       lines: [
-        { stage: "妹妹吹掉石粉。她伸出手指，一道一道点。", d: 3.0,
+        { act: "妹妹吹掉石粉。她伸出手指，一道一道点。", d: 3.0,
           cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -4769,21 +4772,21 @@ export const SCRIPTS = {
         { who: "妹妹", say: "三。", d: 1.5,
           cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
           on: (state) => { Cue(state, "pickup", { gain: 0.25, rate: 1.4 }); } },
-        { stage: "她看了一会第三道线。", d: 2.6,
+        { act: "她看了一会第三道线。", d: 2.6,
           cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 } },
         { who: "妹妹", say: "爹上回出门，画到第四道就回来了。", d: 3.8,
           cam: { kind: "shot", x: 33.9, y: 1.3, dist: 3.2 } },
-        { stage: "她回头看柱子。", d: 2.2,
+        { act: "她回头看柱子。", d: 2.2,
           cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 } },
         { who: "妹妹", say: "他们啥时候回来？", d: 2.8,
           cam: { kind: "insert", x: 33.66, y: 1.05, dist: 2.2 } },
-        { stage: "柱子没有回答。", d: 2.4,
+        { act: "柱子没有回答。", d: 2.4,
           cam: { kind: "close", on: "player", dist: 3.0 } },
         // 玩家控制还锁在过场里：房间只剩风吹窗纸的声音
-        { stage: "房间里只剩风吹窗纸的声音。", d: 3.0,
+        { act: "房间里只剩风吹窗纸的声音。", d: 3.0,
           cam: { kind: "shot", x: 33.6, y: 1.15, dist: 3.8 },
           on: (state) => { Cue(state, "windGust", { gain: 0.3, rate: 1.2, delay: 0.5 }); } },
-        { stage: "水缸边的瓢轻轻滑了一下，磕在缸底。", d: 3.2,
+        { act: "水缸边的瓢轻轻滑了一下，磕在缸底。", d: 3.2,
           cam: { kind: "insert", x: 43.4, y: 0.95, dist: 2.8 },
           on: (state) => { Cue(state, "bucketKnock", { gain: 0.4, rate: 0.85, delay: 1.0 }); } },
       ],
@@ -4808,14 +4811,14 @@ export const SCRIPTS = {
             StartMicroCine(state, [
               { who: "柱子", say: "快了。", d: 2.2,
                 cam: { kind: "close", on: "player", dist: 3.0 } },
-              { stage: "柱子把妹妹放到地上。", d: 2.4,
+              { act: "柱子把妹妹放到地上。", d: 2.4,
                 cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.lift = 0; k.pose = null; k.x = 32.9; k.heading = -1; }
                   s.player.pose = null;
                 } },
-              { stage: "他走到水缸边，把瓢往下压。瓢再次碰到缸底。", d: 4.0,
+              { act: "他走到水缸边，把瓢往下压。瓢再次碰到缸底。", d: 4.0,
                 cam: { kind: "shot", x: 42.6, y: 1.1, dist: 4.2 },
                 on: (s) => {
                   s.player.cineWalk = { x: 42.8, speed: 2.0 };
@@ -4824,7 +4827,7 @@ export const SCRIPTS = {
               { who: "柱子", say: "俺去打水。", d: 2.2,
                 cam: { kind: "close", on: "player", dist: 3.0 },
                 on: (s) => { s.player.cineWalk = null; s.player.x = 42.8; s.player.heading = -1; } },
-              { stage: "他看向妹妹。", d: 1.6,
+              { act: "他看向妹妹。", d: 1.6,
                 cam: { kind: "shot", x: 42.4, y: 1.2, dist: 3.8 },
                 on: (s) => { s.player.heading = -1; } },
               { who: "柱子", say: "你跟紧。", d: 2.0,
@@ -4855,9 +4858,9 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 50.2, w: 2.6 },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "路边有两棵榆树。树皮已经被一圈圈刮掉，只剩发白的树干。", d: 4.2,
+              { act: "路边有两棵榆树。树皮已经被一圈圈刮掉，只剩发白的树干。", d: 4.2,
                 cam: { kind: "shot", x: 50.1, y: 1.5, dist: 5.4 } },
-              { stage: "妹妹没有停。", d: 2.2,
+              { act: "妹妹没有停。", d: 2.2,
                 cam: { kind: "shot", x: 51.0, y: 1.2, dist: 4.0 } },
             ]);
           } },
@@ -4870,25 +4873,25 @@ export const SCRIPTS = {
             const g = state.groundItems.find((it) => it.id === "bucket");
             if (g) g.label = "挂着布兜的空桶";
             StartMicroCine(state, [
-              { stage: "走到田埂边，妹妹忽然蹲下，用小棍刨土。", d: 3.2,
+              { act: "走到田埂边，妹妹忽然蹲下，用小棍刨土。", d: 3.2,
                 cam: { kind: "shot", x: 54.4, y: 1.05, dist: 3.6 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.following = false; k.cineTarget = null; k.x = 54.2; k.heading = -1; k.pose = "kneel"; }
                   Cue(s, "dig", { gain: 0.3, rate: 1.3, delay: 1.2 });
                 } },
-              { stage: "她挖出一棵苦菜，抓着根抖掉泥。", d: 3.0,
+              { act: "她挖出一棵苦菜，抓着根抖掉泥。", d: 3.0,
                 cam: { kind: "insert", x: 54.3, y: 0.85, dist: 2.6 },
                 on: (s) => { Cue(s, "flutter", { gain: 0.25, rate: 1.4, delay: 0.8 }); } },
               { who: "妹妹", say: "哥，大的。", d: 2.2,
                 cam: { kind: "insert", x: 54.3, y: 0.9, dist: 2.4 } },
-              { stage: "柱子回头看一眼。", d: 1.6,
+              { act: "柱子回头看一眼。", d: 1.6,
                 cam: { kind: "close", on: "player", dist: 3.2 } },
               { who: "柱子", say: "嗯。", d: 1.4,
                 cam: { kind: "close", on: "player", dist: 3.2 } },
               { who: "柱子", say: "搁兜里。", d: 1.8,
                 cam: { kind: "close", on: "player", dist: 3.2 } },
-              { stage: "妹妹把苦菜放进桶边挂着的小布兜，追上柱子。", d: 3.2,
+              { act: "妹妹把苦菜放进桶边挂着的小布兜，追上柱子。", d: 3.2,
                 cam: { kind: "shot", x: 55.0, y: 1.1, dist: 3.8 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -4945,7 +4948,7 @@ export const SCRIPTS = {
             const sis = FindActor(state, "sister");
             if (sis) { sis.track = null; sis.following = true; sis.cineTarget = null; }
             StartMicroCine(state, [
-              { stage: "柱子抓住桶梁，把满桶提到地面。他掂了一下重量。沉。", d: 3.8,
+              { act: "柱子抓住桶梁，把满桶提到地面。他掂了一下重量。沉。", d: 3.8,
                 cam: { kind: "insert", x: 58.0, y: 0.95, dist: 2.7 },
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.5, delay: 0.6 }); } },
               { who: "柱子", say: "走了。", d: 2.0,
@@ -4969,19 +4972,19 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 48.6, w: 2.6 },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "妹妹忽然站住。她抬起头。", d: 2.4,
+              { act: "妹妹忽然站住。她抬起头。", d: 2.4,
                 cam: { kind: "shot", x: 48.0, y: 1.15, dist: 3.8 },
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.following = false; sis.cineTarget = null; sis.x = s.player.x + 1.4; sis.heading = -1; }
                 } },
-              { stage: "远处传来自行车链条声。一下车铃。", d: 2.8,
+              { act: "远处传来自行车链条声。一下车铃。", d: 2.8,
                 cam: { kind: "insert", x: 48.6, y: 0.95, dist: 2.5 },
                 on: (s) => {
                   Cue(s, "crank", { gain: 0.16, rate: 2.4, delay: 0.3 });
                   Cue(s, "bikeBell", { gain: 0.4, rate: 0.98, delay: 1.2 });
                 } },
-              { stage: "声音从北边土路接近。", d: 2.4,
+              { act: "声音从北边土路接近。", d: 2.4,
                 cam: { kind: "shot", x: 49.5, y: 1.3, dist: 4.6 },
                 on: (s) => { Cue(s, "crank", { gain: 0.2, rate: 2.5, delay: 0.9 }); } },
             ]);
@@ -5005,7 +5008,7 @@ export const SCRIPTS = {
             Cue(state, "drop", { gain: 0.3, rate: 0.9 });
             Cue(state, "waterDrip", { gain: 0.4, delay: 0.5 });
             StartMicroCine(state, [
-              { stage: "到了阴影里，柱子把水桶轻轻放在地上。水面仍在晃。", d: 2.8,
+              { act: "到了阴影里，柱子把水桶轻轻放在地上。水面仍在晃。", d: 2.8,
                 cam: { kind: "insert", x: 46.6, y: 0.7, dist: 2.3 } },
             ]);
           } },
@@ -5122,16 +5125,16 @@ export const SCRIPTS = {
         if ((b.relT || 0) > 0.55) {
           b.failing = true;
           StartMicroCine(state, [
-            { stage: "前面的自行车捏了闸。", d: 1.6,
+            { act: "前面的自行车捏了闸。", d: 1.6,
               cam: { kind: "shot", x: 49.8, y: 1.3, dist: 4.6 },
               on: (s) => { Cue(s, "crank", { gain: 0.4, rate: 1.2 }); } },
             { who: "伪军", say: "谁在那儿？", d: 2.0,
               cam: { kind: "shot", x: 49.8, y: 1.3, dist: 4.2 } },
-            { stage: "一个人影从墙外转向巷口。", d: 1.8,
+            { act: "一个人影从墙外转向巷口。", d: 1.8,
               cam: { kind: "shot", x: 48.6, y: 1.25, dist: 4.0 },
               on: (s) => { Cue(s, "step", { gain: 0.5, rate: 1.1 }); } },
             // 画面迅速收黑，回到车铃第一次响起时
-            { stage: "", d: 1.8, cam: { kind: "dark" },
+            { act: "", d: 1.8, cam: { kind: "dark" },
               on: (s) => { RewindBeat(s); } },
           ]);
         }
@@ -5149,7 +5152,7 @@ export const SCRIPTS = {
       // 台词按八稿切成短句；两个骑车的这回演在世界里（上一拍），不再走插卡。
       kind: "cinematic", id: "c1_uncle", timeOfDay: "day",
       lines: [
-        { stage: "链条声逐渐远去。柱子仍然没有松手。", d: 3.4,
+        { act: "链条声逐渐远去。柱子仍然没有松手。", d: 3.4,
           cam: { kind: "shot", x: 46.4, y: 1.2, dist: 4.0 },
           on: (state) => {
             for (const id of ["rider1", "rider2"]) {
@@ -5163,17 +5166,17 @@ export const SCRIPTS = {
             FlashPose(state, "shelter", 3.2);
             Cue(state, "crank", { gain: 0.08, rate: 2.3, delay: 0.4 });
           } },
-        { stage: "等声音完全消失，柱子放开妹妹。", d: 2.8,
+        { act: "等声音完全消失，柱子放开妹妹。", d: 2.8,
           cam: { kind: "shot", x: 46.2, y: 1.15, dist: 3.6 },
           on: (state) => {
             state.player.pose = null;
             const sis = FindActor(state, "sister");
             if (sis) sis.pose = null;
           } },
-        { stage: "他第一眼看向水桶。水还在。", d: 3.0,
+        { act: "他第一眼看向水桶。水还在。", d: 3.0,
           cam: { kind: "insert", x: 46.6, y: 0.7, dist: 2.2 } },
         // 七叔登场：他也蹲着的
-        { stage: "墙的另一头传来衣服摩擦声。七叔扶着墙站起来——他也蹲着的。一条腿蹲麻了，迈第一步时晃了一下。", d: 5.4,
+        { act: "墙的另一头传来衣服摩擦声。七叔扶着墙站起来——他也蹲着的。一条腿蹲麻了，迈第一步时晃了一下。", d: 5.4,
           cam: { kind: "shot", x: 51.6, y: 1.25, dist: 4.4 },
           on: (state) => {
             Cue(state, "clothLift", { gain: 0.4, rate: 0.8 });
@@ -5181,13 +5184,13 @@ export const SCRIPTS = {
             if (q) { q.visible = true; q.level = "surface"; q.x = 52.2; q.heading = -1; q.pose = "kneel"; q.cineTarget = null; }
             state.player.pose = null;
           } },
-        { stage: "他快步走过来，先蹲下，捏捏妹妹的胳膊，又看看她的脸和脚。", d: 4.6,
+        { act: "他快步走过来，先蹲下，捏捏妹妹的胳膊，又看看她的脸和脚。", d: 4.6,
           cam: { kind: "shot", x: 46.4, y: 1.05, dist: 3.8 },
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.pose = null; q.cineTarget = { x: 45.1 }; q.cineSpeed = 2.6; }
           } },
-        { stage: "", d: 2.4, cam: { kind: "insert", x: 45.3, y: 0.9, dist: 2.6 },
+        { act: "", d: 2.4, cam: { kind: "insert", x: 45.3, y: 0.9, dist: 2.6 },
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = null; q.x = 45.1; q.heading = 1; q.pose = "kneel"; }
@@ -5195,7 +5198,7 @@ export const SCRIPTS = {
             if (sis) { sis.pose = null; sis.heading = -1; }
           } },
         // 确认妹妹没事，站起来，照柱子后脑勺轻轻拍了一巴掌
-        { stage: "确认妹妹没事，他站起来，轻轻拍了一下柱子的后脑勺。", d: 3.0,
+        { act: "确认妹妹没事，他站起来，轻轻拍了一下柱子的后脑勺。", d: 3.0,
           cam: { kind: "shot", x: 46.0, y: 1.25, dist: 3.4 },
           on: (state) => {
             const q = FindActor(state, "qishu");
@@ -5216,24 +5219,24 @@ export const SCRIPTS = {
           } },
         { who: "七叔", say: "好小子。", d: 2.0,
           cam: { kind: "ots", subject: "qishu", other: "player", dist: 3.0 } },
-        { stage: "他喘匀一口气，压低声音。", d: 2.4,
+        { act: "他喘匀一口气，压低声音。", d: 2.4,
           cam: { kind: "shot", x: 46.4, y: 1.2, dist: 3.4 } },
         { who: "七叔", say: "这两天甭往北头去。听见没？", d: 3.2,
           cam: { kind: "insert", x: 46.9, y: 1.15, dist: 2.6 } },
-        { stage: "柱子点头。七叔看见水桶，又看见妹妹布兜里的苦菜。", d: 4.2,
+        { act: "柱子点头。七叔看见水桶，又看见妹妹布兜里的苦菜。", d: 4.2,
           cam: { kind: "shot", x: 47.5, y: 1.25, dist: 4.4 },
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 52.6 }; q.cineSpeed = 2.2; q.heading = 1; }
           } },
-        { stage: "他转身进屋，很快又出来，手里攥着一把黑豆，往柱子怀里塞。喂牲口的那种。", d: 4.8,
+        { act: "他转身进屋，很快又出来，手里攥着一把黑豆，往柱子怀里塞。喂牲口的那种。", d: 4.8,
           cam: { kind: "shot", x: 46.6, y: 1.15, dist: 3.6 },
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 46.9 }; q.cineSpeed = 2.4; q.heading = -1; }
             Cue(state, "drop", { gain: 0.3, rate: 1.2, delay: 2.2 });
           } },
-        { stage: "柱子往回推。七叔按住他的手，没松。", d: 3.2,
+        { act: "柱子往回推。七叔按住他的手，没松。", d: 3.2,
           cam: { kind: "insert", x: 46.5, y: 1.0, dist: 2.4 },
           on: (state) => {
             const q = FindActor(state, "qishu");
@@ -5249,7 +5252,7 @@ export const SCRIPTS = {
           cam: { kind: "shot", x: 46.6, y: 1.2, dist: 3.4 } },
         { who: "柱子", say: "不了。", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
-        { stage: "七叔看了柱子一会，没有再劝。他转身走出两步，又站住。", d: 4.0,
+        { act: "七叔看了柱子一会，没有再劝。他转身走出两步，又站住。", d: 4.0,
           cam: { kind: "shot", x: 47.8, y: 1.25, dist: 4.2 },
           on: (state) => {
             const q = FindActor(state, "qishu");
@@ -5272,7 +5275,7 @@ export const SCRIPTS = {
           } },
         { who: "柱子", say: "俺爹没——", d: 1.8,
           cam: { kind: "close", on: "player", dist: 3.0 } },
-        { stage: "七叔再次按住他的手。", d: 2.2,
+        { act: "七叔再次按住他的手。", d: 2.2,
           cam: { kind: "insert", x: 46.9, y: 1.0, dist: 2.3 },
           on: (state) => {
             const q = FindActor(state, "qishu");
@@ -5284,16 +5287,16 @@ export const SCRIPTS = {
             const q = FindActor(state, "qishu");
             if (q) q.pose = null;
           } },
-        { stage: "", d: 1.4, cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
+        { act: "", d: 1.4, cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
         { who: "七叔", say: "就有。", d: 2.2,
           cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
-        { stage: "他说完就走了。没等柱子再张嘴。", d: 3.2,
+        { act: "他说完就走了。没等柱子再张嘴。", d: 3.2,
           cam: { kind: "shot", x: 50.5, y: 1.25, dist: 4.4 },
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 53.0 }; q.cineSpeed = 2.2; q.heading = 1; }
           } },
-        { stage: "柱子把黑豆揣好。妹妹重新抓住他的褂子角。", d: 3.6,
+        { act: "柱子把黑豆揣好。妹妹重新抓住他的褂子角。", d: 3.6,
           cam: { kind: "shot", x: 46.4, y: 1.2, dist: 3.6 },
           on: (state) => {
             state.flags.beansGiven = true;
@@ -5332,12 +5335,12 @@ export const SCRIPTS = {
             Cue(state, "waterSplash", { gain: 0.9 });
             FlashPose(state, "bow", 2.2);
             StartMicroCine(state, [
-              { stage: "柱子把满桶放到水缸边，提起桶底。水冲进缸里，咕咚咕咚砸在缸底。", d: 3.8,
+              { act: "柱子把满桶放到水缸边，提起桶底。水冲进缸里，咕咚咕咚砸在缸底。", d: 3.8,
                 cam: { kind: "insert", x: 43.4, y: 1.0, dist: 2.8 },
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.6, delay: 1.2 }); } },
-              { stage: "水声停下来，缸里留下浅浅一层水线。", d: 2.8,
+              { act: "水声停下来，缸里留下浅浅一层水线。", d: 2.8,
                 cam: { kind: "insert", x: 43.4, y: 1.0, dist: 2.6 } },
-              { stage: "柱子舀一瓢水倒进锅里。", d: 2.8,
+              { act: "柱子舀一瓢水倒进锅里。", d: 2.8,
                 cam: { kind: "shot", x: 28.4, y: 1.05, dist: 3.4 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -5369,7 +5372,7 @@ export const SCRIPTS = {
             state.flags.mealCooked = true;
             state.stoveFire = true;   // 旗标在 effect 里落：跳幕过去灶也得是着过火的
             StartMicroCine(state, [
-              { stage: "柱子把最后一把糜子倒进锅里。", d: 3.0,
+              { act: "柱子把最后一把糜子倒进锅里。", d: 3.0,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.6 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -5377,14 +5380,14 @@ export const SCRIPTS = {
                   s.player.track = { name: "cookDrop", t: 0 };
                   Cue(s, "flutter", { gain: 0.3, rate: 1.2, delay: 0.7 });
                 } },
-              { stage: "剩下的红薯干被掰成小块，落进水中。", d: 3.2,
+              { act: "剩下的红薯干被掰成小块，落进水中。", d: 3.2,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.4 },
                 on: (s) => {
                   s.player.track = { name: "cookDrop", t: 0.9 };   // 错开相位，别跟上一行同步
                   Cue(s, "tenon", { gain: 0.3, rate: 1.6, delay: 0.5 });
                   Cue(s, "waterSplash", { gain: 0.25, rate: 1.4, delay: 1.4 });
                 } },
-              { stage: "妹妹把苦菜递过来。柱子摘掉根，撕成几段，放进锅里。", d: 4.0,
+              { act: "妹妹把苦菜递过来。柱子摘掉根，撕成几段，放进锅里。", d: 4.0,
                 cam: { kind: "shot", x: 28.6, y: 1.05, dist: 3.2 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -5392,7 +5395,7 @@ export const SCRIPTS = {
                   s.player.track = { name: "tearHerb", t: 0 };
                   Cue(s, "clothLift", { gain: 0.3, rate: 1.2, delay: 1.6 });
                 } },
-              { stage: "七叔给的黑豆最后落进去。", d: 2.6,
+              { act: "七叔给的黑豆最后落进去。", d: 2.6,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.4 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -5400,7 +5403,7 @@ export const SCRIPTS = {
                   s.player.track = { name: "cookDrop", t: 1.7 };
                   Cue(s, "drop", { gain: 0.3, rate: 1.4, delay: 0.6 });
                 } },
-              { stage: "柱子将最后两把谷秸塞入灶膛，用火镰点着草绒。火苗从灶口亮起。", d: 4.4,
+              { act: "柱子将最后两把谷秸塞入灶膛，用火镰点着草绒。火苗从灶口亮起。", d: 4.4,
                 cam: { kind: "insert", x: 27.5, y: 0.6, dist: 2.2 },
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 0 };   // 塞谷秸、擦火镰：手上一直有活
@@ -5408,27 +5411,27 @@ export const SCRIPTS = {
                   Cue(s, "crackle", { gain: 0.5, delay: 2.0 });
                   s.stoveFire = true;
                 } },
-              { stage: "柱子蹲下吹气。火苗先缩了一下，再沿着谷秸爬开。", d: 3.8,
+              { act: "柱子蹲下吹气。火苗先缩了一下，再沿着谷秸爬开。", d: 3.8,
                 cam: { kind: "insert", x: 27.5, y: 0.6, dist: 2.2 },
                 on: (s) => {
                   s.player.track = { name: "blowFire", t: 0 };
                   Cue(s, "windGust", { gain: 0.2, rate: 1.6, delay: 1.4 });   // 对齐轨道 t=1.5 那一口
                   Cue(s, "crackle", { gain: 0.55, delay: 1.9 });
                 } },
-              { stage: "锅底逐渐传来细小的水响。画面外的天色从灰白变成暗黄。", d: 4.6,
+              { act: "锅底逐渐传来细小的水响。画面外的天色从灰白变成暗黄。", d: 4.6,
                 cam: { kind: "shot", x: 30.5, y: 1.6, dist: 5.6 },
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 0 };
                   Cue(s, "waterDrip", { gain: 0.3, rate: 1.5, delay: 1.2 });
                 } },
-              { stage: "锅盖边冒出第一缕热气。", d: 3.2,
+              { act: "锅盖边冒出第一缕热气。", d: 3.2,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.3 },
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 1.4 };
                   Cue(s, "crackle", { gain: 0.35, delay: 0.8 });
                 } },
               // 屋内：饭桌。妹妹两碗，锅就见了底
-              { stage: "妹妹捧着碗喝完第一碗。柱子又给她盛了一碗。", d: 4.0,
+              { act: "妹妹捧着碗喝完第一碗。柱子又给她盛了一碗。", d: 4.0,
                 cam: { kind: "shot", x: 32.8, y: 1.15, dist: 4.0 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -5438,15 +5441,15 @@ export const SCRIPTS = {
                   s.player.x = 33.4;
                   s.player.heading = -1;
                 } },
-              { stage: "第二碗喝完，锅底已经露出来。", d: 3.2,
+              { act: "第二碗喝完，锅底已经露出来。", d: 3.2,
                 cam: { kind: "insert", x: 32.2, y: 1.0, dist: 2.8 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) k.carry = null;
                 } },
-              { stage: "妹妹舔掉嘴角的一粒糜子，坐在炕边打盹。", d: 3.6,
+              { act: "妹妹舔掉嘴角的一粒糜子，坐在炕边打盹。", d: 3.6,
                 cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.7 } },
-              { stage: "柱子自己的碗里还剩一点稠渣。", d: 3.0,
+              { act: "柱子自己的碗里还剩一点稠渣。", d: 3.0,
                 cam: { kind: "insert", x: 33.2, y: 0.95, dist: 2.7 } },
             ]);
           } },
@@ -5522,7 +5525,7 @@ export const SCRIPTS = {
             if (!state.beat.caughtOnce) {
               state.beat.caughtOnce = true;
               StartMicroCine(state, [
-                { stage: "妹妹按住两只碗，把柱子的碗推回来。", d: 2.8,
+                { act: "妹妹按住两只碗，把柱子的碗推回来。", d: 2.8,
                   cam: { kind: "insert", x: 32.6, y: 0.95, dist: 2.6 },
                   on: (s) => {
                     const k = FindActor(s, "sister");
@@ -5551,7 +5554,7 @@ export const SCRIPTS = {
             if (sis) sis.track = null;
             state.doze = null;
             StartMicroCine(state, [
-              { stage: "柱子舀一点水倒进碗里，轻轻晃匀。", d: 3.0,
+              { act: "柱子舀一点水倒进碗里，轻轻晃匀。", d: 3.0,
                 cam: { kind: "insert", x: 33.1, y: 0.95, dist: 2.6 },
                 on: (s) => {
                   FlashPose(s, "bow", 2.8);
@@ -5566,7 +5569,7 @@ export const SCRIPTS = {
                 } },
               { who: "柱子", say: "别糟践了。", d: 2.2,
                 cam: { kind: "shot", x: 32.8, y: 1.05, dist: 3.2 } },
-              { stage: "妹妹接过去，喝完。她把碗放下，眼皮已经睁不开。", d: 4.0,
+              { act: "妹妹接过去，喝完。她把碗放下，眼皮已经睁不开。", d: 4.0,
                 cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.6 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -5576,7 +5579,7 @@ export const SCRIPTS = {
                 } },
               // 这一行原来连 on() 都没有：字幕在演"缩肩膀、拽袖子"，人坐着一动
               // 不动 3.8 秒——而这截袖口正是全章的题眼（章末缝的就是它）
-              { stage: "她缩了缩肩膀，往下拉自己的袖子。袖口仍停在手腕上面。", d: 3.8,
+              { act: "她缩了缩肩膀，往下拉自己的袖子。袖口仍停在手腕上面。", d: 3.8,
                 cam: { kind: "insert", x: 31.9, y: 0.85, dist: 2.2 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -5588,7 +5591,7 @@ export const SCRIPTS = {
                 cam: { kind: "insert", x: 32.0, y: 1.0, dist: 2.5 } },
               { who: "妹妹", say: "冷。", d: 2.0,
                 cam: { kind: "insert", x: 32.0, y: 1.0, dist: 2.5 } },
-              { stage: "柱子将破袄向上拉，盖住她的肩膀。妹妹躺下，很快睡着。", d: 4.4,
+              { act: "柱子将破袄向上拉，盖住她的肩膀。妹妹躺下，很快睡着。", d: 4.4,
                 cam: { kind: "shot", x: 31.4, y: 0.95, dist: 3.6 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -5599,7 +5602,7 @@ export const SCRIPTS = {
                   Cue(s, "clothDrop", { gain: 0.4, delay: 1.6 });
                 } },
               // 碎布贴上手腕：只够盖住一小块（这一下是下窖找布的全部理由）
-              { stage: "柱子从怀里取出坛口那块蓝底白花碎布。", d: 3.0,
+              { act: "柱子从怀里取出坛口那块蓝底白花碎布。", d: 3.0,
                 cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
                 on: (s) => {
                   s.player.x = 31.9;
@@ -5608,21 +5611,21 @@ export const SCRIPTS = {
                   FlashPose(s, "kneel", 2.8);
                 } },
               // 同一个机位：开场看过的那截手腕（首尾同框，接袖那一针的由头）
-              { stage: "他把碎布贴到妹妹露出的手腕旁。", d: 3.4,
+              { act: "他把碎布贴到妹妹露出的手腕旁。", d: 3.4,
                 cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
                 on: (s) => {
                   FlashPose(s, "kneel", 3.2);
                   Cue(s, "clothLift", { gain: 0.35, delay: 0.8 });
                 } },
-              { stage: "碎布只够盖住一小块。", d: 3.0,
+              { act: "碎布只够盖住一小块。", d: 3.0,
                 cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 } },
-              { stage: "他把碎布收回怀里。", d: 2.4,
+              { act: "他把碎布收回怀里。", d: 2.4,
                 cam: { kind: "shot", x: 31.8, y: 1.0, dist: 3.2 },
                 on: (s) => {
                   s.player.carry = null;
                   FlashPose(s, "kneel", 2.2);
                 } },
-              { stage: "柱子看向院中的菜窖。", d: 3.0,
+              { act: "柱子看向院中的菜窖。", d: 3.0,
                 cam: { kind: "shot", x: 30.4, y: 1.15, dist: 4.0 },
                 on: (s) => {
                   s.player.pose = null;
@@ -5658,10 +5661,10 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 30.5, w: 3.0, level: "under" },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "柱子掀开菜窖翻板。月光落进窖口——板缝里的光，与三天前一样。", d: 3.6,
+              { act: "柱子掀开菜窖翻板。月光落进窖口——板缝里的光，与三天前一样。", d: 3.6,
                 cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
                 on: (s) => { Cue(s, "doorCreak", { gain: 0.4, rate: 0.75 }); } },
-              { stage: "", d: 2.4, cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 } },
+              { act: "", d: 2.4, cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 } },
             ]);
           } },
         // 笸箩：妹妹穿小了的旧褂子，一件摞一件，叠得整整齐齐。
@@ -5671,12 +5674,12 @@ export const SCRIPTS = {
             state.flags.basketMoved = true;
             Cue(state, "clothLift", { gain: 0.4, rate: 0.9 });
             StartMicroCine(state, [
-              { stage: "笸箩里叠着妹妹穿小的旧褂子。最上面一件袖口磨飞了边，也短了一截。", d: 4.2,
+              { act: "笸箩里叠着妹妹穿小的旧褂子。最上面一件袖口磨飞了边，也短了一截。", d: 4.2,
                 cam: { kind: "insert", x: 32.4, y: UNDER_Y + 0.55, dist: 1.9 },
                 on: (s) => { FlashPose(s, "kneel", 4.0); } },
-              { stage: "针别在衣领上，线还留着一段。", d: 3.0,
+              { act: "针别在衣领上，线还留着一段。", d: 3.0,
                 cam: { kind: "insert", x: 32.4, y: UNDER_Y + 0.5, dist: 1.5 } },
-              { stage: "柱子把旧褂和针线笸箩一起放到梯子旁。", d: 3.2,
+              { act: "柱子把旧褂和针线笸箩一起放到梯子旁。", d: 3.2,
                 cam: { kind: "shot", x: 31.0, y: UNDER_Y + 1.0, dist: 3.2 },
                 on: (s) => {
                   FlashPose(s, "bow", 2.8);
@@ -5696,23 +5699,23 @@ export const SCRIPTS = {
             state.flags.manGrab = true;
             Cue(state, "clothLift", { gain: 0.5, rate: 0.8 });
             StartMicroCine(state, [
-              { stage: "草苫底下，露出一块对折的布。", d: 2.8,
+              { act: "草苫底下，露出一块对折的布。", d: 2.8,
                 cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.0 },
                 on: (s) => { FlashPose(s, "kneel", 2.6); } },
               // 光底下看清了：蓝底白花，整块，没下过剪子（活动插卡）
-              { stage: "蓝底白花。整块布还没有下过剪子。", d: 3.8,
+              { act: "蓝底白花。整块布还没有下过剪子。", d: 3.8,
                 cam: { kind: "insertCard", card: "wholeCloth", seg: 0 } },
               // 花纹比对（八稿新增）：碎布放在整布上，两块布的花纹接在一起
-              { stage: "柱子从怀里取出坛口的碎布，展开，放在整布上。", d: 3.4,
+              { act: "柱子从怀里取出坛口的碎布，展开，放在整布上。", d: 3.4,
                 cam: { kind: "insertCard", card: "wholeCloth", seg: 1 },
                 on: (s) => { Cue(s, "clothLift", { gain: 0.3, rate: 1.1 }); } },
-              { stage: "两块布的花纹接在一起。", d: 3.4,
+              { act: "两块布的花纹接在一起。", d: 3.4,
                 cam: { kind: "insertCard", card: "wholeCloth", seg: 1 } },
-              { stage: "柱子把碎布收回怀里。", d: 2.4,
+              { act: "柱子把碎布收回怀里。", d: 2.4,
                 cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.0 },
                 on: (s) => { Cue(s, "clothFold", { gain: 0.35, delay: 0.5 }); } },
               // 贴了一下。很快，就一下
-              { stage: "他抱起整布，低下头，将脸贴上去。只贴了一下。", d: 3.8,
+              { act: "他抱起整布，低下头，将脸贴上去。只贴了一下。", d: 3.8,
                 cam: { kind: "insert", x: 27.7, y: UNDER_Y + 0.95, dist: 1.9 },
                 on: (s) => {
                   s.player.carry = "整布";
@@ -5722,10 +5725,10 @@ export const SCRIPTS = {
                   Cue(s, "sobBreath", { gain: 0.18, rate: 0.7, delay: 1.6 });
                 } },
               // 抱着布走向梯子
-              { stage: "他将布抱在胸前，转身走向梯子。", d: 2.8,
+              { act: "他将布抱在胸前，转身走向梯子。", d: 2.8,
                 cam: { kind: "shot", x: 28.6, y: UNDER_Y + 1.05, dist: 3.2 },
                 on: (s) => { s.player.cineWalk = { x: 28.6, speed: 1.0 }; } },
-              { stage: "草苫下面忽然动了一下。", d: 2.2,
+              { act: "草苫下面忽然动了一下。", d: 2.2,
                 cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.5, dist: 2.0 },
                 on: (s) => {
                   s.player.cineWalk = null;
@@ -5733,19 +5736,19 @@ export const SCRIPTS = {
                   Cue(s, "flutter", { gain: 0.25, rate: 0.7 });
                 } },
               // 一只手从黑暗里伸出来，抓住手腕。抓得很紧
-              { stage: "一只手从黑暗里伸出来，抓住柱子的手腕。柱子猛地停住。", d: 3.0,
+              { act: "一只手从黑暗里伸出来，抓住柱子的手腕。柱子猛地停住。", d: 3.0,
                 cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 },
                 on: (s) => {
                   s.player.track = { name: "heldBack", t: 0 };
                   Cue(s, "pickup", { gain: 0.6, rate: 0.5 });
                 } },
-              { stage: "那只手抓得很紧。黑暗里传来一口短促的喘息。", d: 3.0,
+              { act: "那只手抓得很紧。黑暗里传来一口短促的喘息。", d: 3.0,
                 cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 },
                 on: (s) => { Cue(s, "sobBreath", { gain: 0.3, rate: 0.6, delay: 0.8 }); } },
               { who: "陌生人", say: "水。", d: 3.0,
                 cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 } },
               // 慢慢抽回手。整块蓝布留在草苫旁
-              { stage: "柱子慢慢抽回手。整块蓝布留在草苫旁。", d: 3.4,
+              { act: "柱子慢慢抽回手。整块蓝布留在草苫旁。", d: 3.4,
                 cam: { kind: "shot", x: 28.6, y: UNDER_Y + 1.0, dist: 3.0 },
                 on: (s) => {
                   s.player.track = null;
@@ -5766,7 +5769,7 @@ export const SCRIPTS = {
       // 柱子张了张嘴，没有立刻出声——那两个字是玩家自己按出来的（c1_say2）。
       kind: "cinematic", id: "c1_knows", timeOfDay: "night", indoorScene: true,
       lines: [
-        { stage: "柱子爬出菜窖，没有盖翻板。三步外站着妹妹。", d: 3.6,
+        { act: "柱子爬出菜窖，没有盖翻板。三步外站着妹妹。", d: 3.6,
           cam: { kind: "shot", x: 29.6, y: 1.15, dist: 3.8 },
           on: (state) => {
             const sis = FindActor(state, "sister");
@@ -5777,7 +5780,7 @@ export const SCRIPTS = {
           } },
         // 机位抬到上身：骨架的鞋画不出赤脚，脚入画就跟字幕打架——
         // 「光着脚」交给句子，镜头看她抱着袄子的小身量（两轮视觉审查定的）
-        { stage: "她赤着脚，怀里抱着破袄。头发乱着，眼睛还没有完全睁开。", d: 4.0,
+        { act: "她赤着脚，怀里抱着破袄。头发乱着，眼睛还没有完全睁开。", d: 4.0,
           cam: { kind: "insert", x: 27.9, y: 1.05, dist: 2.2 },
           on: (state) => {
             const sis = FindActor(state, "sister");
@@ -5785,20 +5788,20 @@ export const SCRIPTS = {
           } },
         { who: "妹妹", say: "哥。", d: 2.0,
           cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.6 } },
-        { stage: "柱子停住。", d: 2.0,
+        { act: "柱子停住。", d: 2.0,
           cam: { kind: "close", on: "player", dist: 3.2 } },
         { who: "妹妹", say: "我喊你了。", d: 2.4,
           cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
-        { stage: "", d: 1.4, cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
+        { act: "", d: 1.4, cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
         { who: "妹妹", say: "可大声了。", d: 2.4,
           cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
-        { stage: "她的脚趾在冷土里一下下抓紧。", d: 3.0,
+        { act: "她的脚趾在冷土里一下下抓紧。", d: 3.0,
           cam: { kind: "insert", x: 27.9, y: 1.05, dist: 2.2 } },
         // 双人镜别用过肩：窖口这一对离得近、又一高一矮，过肩的前景剪影
         // 立不住（二轮审查：柱子整个不在框里）——平拍双人，两人都在画里
         { who: "妹妹", say: "我当你也走了。", d: 3.2,
           cam: { kind: "shot", x: 28.6, y: 1.05, dist: 2.9 } },
-        { stage: "柱子张了张嘴，没有立刻出声。", d: 2.6,
+        { act: "柱子张了张嘴，没有立刻出声。", d: 2.6,
           cam: { kind: "close", on: "player", dist: 3.0 } },
       ],
     },
@@ -5820,7 +5823,7 @@ export const SCRIPTS = {
             StartMicroCine(state, [
               { who: "柱子", say: "没走。", d: 2.2,
                 cam: { kind: "close", on: "player", dist: 3.0 } },
-              { stage: "柱子向妹妹走近一步。", d: 2.2,
+              { act: "柱子向妹妹走近一步。", d: 2.2,
                 cam: { kind: "shot", x: 29.0, y: 1.1, dist: 3.4 },
                 on: (s) => { s.player.cineWalk = { x: 29.0, speed: 1.2 }; } },
               { who: "柱子", say: "我去拿水。", d: 2.2,
@@ -5828,23 +5831,23 @@ export const SCRIPTS = {
                 on: (s) => { s.player.cineWalk = null; s.player.x = 29.0; s.player.heading = -1; } },
               { who: "柱子", say: "你回屋。", d: 2.0,
                 cam: { kind: "shot", x: 28.8, y: 1.1, dist: 3.2 } },
-              { stage: "妹妹看着他。", d: 2.2,
+              { act: "妹妹看着他。", d: 2.2,
                 cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.5 } },
               // 八稿新增的一下：柱子替她把破袄向上拉了拉
-              { stage: "柱子替她把破袄向上拉了拉。", d: 3.0,
+              { act: "柱子替她把破袄向上拉了拉。", d: 3.0,
                 cam: { kind: "shot", x: 28.5, y: 1.0, dist: 2.9 },
                 on: (s) => {
                   s.player.x = 28.6;
                   FlashPose(s, "kneel", 2.8);
                   Cue(s, "clothLift", { gain: 0.35, delay: 0.6 });
                 } },
-              { stage: "妹妹转身进屋。走到门口时，她回头看了一眼。", d: 4.2,
+              { act: "妹妹转身进屋。走到门口时，她回头看了一眼。", d: 4.2,
                 cam: { kind: "shot", x: 29.6, y: 1.15, dist: 3.8 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = null; k.carry = null; k.cineTarget = { x: 31.4 }; k.cineSpeed = 1.3; k.heading = 1; }
                 } },
-              { stage: "她没有把门关严，留下了一条缝。", d: 3.2,
+              { act: "她没有把门关严，留下了一条缝。", d: 3.2,
                 cam: { kind: "shot", x: 31.8, y: 1.1, dist: 3.6 },
                 on: (s) => { Cue(s, "doorCreak", { gain: 0.3, rate: 0.85, delay: 1.4 }); } },
             ]);
@@ -5925,7 +5928,7 @@ export const SCRIPTS = {
         { type: "goto", zone: { x: 28.3, w: 1.8, level: "under" },
           effect: (state) => {
             StartMicroCine(state, [
-              { stage: "柱子端着瓢摸到墙边。他蹲下，顺着墙根摸到那个人的肩膀。", d: 4.0,
+              { act: "柱子端着瓢摸到墙边。他蹲下，顺着墙根摸到那个人的肩膀。", d: 4.0,
                 cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.6, dist: 2.2 },
                 on: (s) => {
                   s.player.cineWalk = null;
@@ -5948,32 +5951,32 @@ export const SCRIPTS = {
           effect: (state) => {
             state.player.item = null;
             StartMicroCine(state, [
-              { stage: "瓢里的水喝完了，那只手仍抓着瓢沿。柱子慢慢把瓢抽出来。", d: 3.8,
+              { act: "瓢里的水喝完了，那只手仍抓着瓢沿。柱子慢慢把瓢抽出来。", d: 3.8,
                 cam: { kind: "insert", x: 27.7, y: UNDER_Y + 0.55, dist: 1.9 },
                 on: (s) => {
                   FlashPose(s, "kneel", 3.6);
                   Cue(s, "drop", { gain: 0.25, rate: 0.8, delay: 1.8 });
                 } },
-              { stage: "伤员倒回草苫上。他的呼吸又快又浅。", d: 3.4,
+              { act: "伤员倒回草苫上。他的呼吸又快又浅。", d: 3.4,
                 cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.1 },
                 on: (s) => { Cue(s, "sobBreath", { gain: 0.4, rate: 1.3, delay: 0.8 }); } },
-              { stage: "柱子伸手摸向他的肩膀。手指碰到一片湿黏。", d: 3.8,
+              { act: "柱子伸手摸向他的肩膀。手指碰到一片湿黏。", d: 3.8,
                 cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.55, dist: 1.8 },
                 on: (s) => { FlashPose(s, "kneel", 3.6); } },
-              { stage: "他抬起手。月光从板缝照下来——指尖是一片暗色。", d: 4.0,
+              { act: "他抬起手。月光从板缝照下来——指尖是一片暗色。", d: 4.0,
                 cam: { kind: "insert", x: 27.9, y: UNDER_Y + 0.85, dist: 1.6 } },
-              { stage: "柱子取出怀里的蓝花碎布，按在伤口上。", d: 3.4,
+              { act: "柱子取出怀里的蓝花碎布，按在伤口上。", d: 3.4,
                 cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.9 },
                 on: (s) => {
                   FlashPose(s, "kneel", 3.2);
                   Cue(s, "clothLift", { gain: 0.4, rate: 0.9, delay: 0.6 });
                 } },
-              { stage: "暗色很快浸透碎布，沿着指缝继续渗出来。", d: 3.6,
+              { act: "暗色很快浸透碎布，沿着指缝继续渗出来。", d: 3.6,
                 cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.7 } },
-              { stage: "柱子加重力气。仍然压不住。", d: 3.0,
+              { act: "柱子加重力气。仍然压不住。", d: 3.0,
                 cam: { kind: "shot", x: 27.9, y: UNDER_Y + 0.85, dist: 2.7 },
                 on: (s) => { FlashPose(s, "kneel", 2.8); } },
-              { stage: "草苫旁放着那块完整的蓝底白花布。", d: 3.0,
+              { act: "草苫旁放着那块完整的蓝底白花布。", d: 3.0,
                 cam: { kind: "insert", x: 27.9, y: UNDER_Y + 0.5, dist: 2.0 } },
             ]);
           } },
@@ -5983,7 +5986,7 @@ export const SCRIPTS = {
           effect: (state) => {
             state.flags.clothTorn = true;
             StartMicroCine(state, [
-              { stage: "撕裂声在菜窖里响开。一条长布从整块布上分离下来。", d: 3.2,
+              { act: "撕裂声在菜窖里响开。一条长布从整块布上分离下来。", d: 3.2,
                 cam: { kind: "insert", x: 28.0, y: UNDER_Y + 0.7, dist: 2.0 },
                 on: (s) => { FlashPose(s, "bow", 3.0); } },
             ]);
@@ -6002,7 +6005,7 @@ export const SCRIPTS = {
             const w = FindActor(state, "wounded");
             if (w) w.bandage = true;   // 肩上那圈蓝花布（渲染层认这面小旗）
             StartMicroCine(state, [
-              { stage: "伤员突然疼醒，肩膀猛地抬起，喉咙里挤出一声闷哼。", d: 3.2,
+              { act: "伤员突然疼醒，肩膀猛地抬起，喉咙里挤出一声闷哼。", d: 3.2,
                 cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.9 },
                 on: (s) => {
                   Cue(s, "sobBreath", { gain: 0.55, rate: 0.7, delay: 0.4 });
@@ -6024,19 +6027,19 @@ export const SCRIPTS = {
             const w = FindActor(state, "wounded");
             if (w) { w.track = null; w.trembleK = 0; }
             StartMicroCine(state, [
-              { stage: "伤员的力气逐渐松下来。呼吸慢了一些。柱子没有立刻松手。", d: 4.4,
+              { act: "伤员的力气逐渐松下来。呼吸慢了一些。柱子没有立刻松手。", d: 4.4,
                 cam: { kind: "shot", x: 27.9, y: UNDER_Y + 0.85, dist: 2.7 },
                 on: (s) => { FlashPose(s, "shelter", 4.2); } },
-              { stage: "等伤员彻底不再挣动，柱子靠墙坐下。", d: 3.6,
+              { act: "等伤员彻底不再挣动，柱子靠墙坐下。", d: 3.6,
                 cam: { kind: "shot", x: 28.8, y: UNDER_Y + 0.95, dist: 3.2 },
                 on: (s) => {
                   s.player.x = 29.4;
                   s.player.heading = -1;
                   s.player.pose = "sitSide";
                 } },
-              { stage: "他手里仍攥着撕剩的一小条蓝布。", d: 3.2,
+              { act: "他手里仍攥着撕剩的一小条蓝布。", d: 3.2,
                 cam: { kind: "insert", x: 29.3, y: UNDER_Y + 0.6, dist: 1.7 } },
-              { stage: "菜窖里只剩两个人的呼吸声。", d: 3.6,
+              { act: "菜窖里只剩两个人的呼吸声。", d: 3.6,
                 cam: { kind: "shot", x: 28.6, y: UNDER_Y + 0.95, dist: 3.4 },
                 on: (s) => {
                   Cue(s, "sobBreath", { gain: 0.16, rate: 0.65, delay: 1.2 });
@@ -6053,7 +6056,7 @@ export const SCRIPTS = {
       // 爬到窖口，坐在最上一级梯子上。
       kind: "cinematic", id: "c1_mend", timeOfDay: "dawn",
       lines: [
-        { stage: "板缝里的光从黑变成青灰。柱子睁开眼。", d: 4.6,
+        { act: "板缝里的光从黑变成青灰。柱子睁开眼。", d: 4.6,
           cam: { kind: "shot", x: 29.2, y: UNDER_Y + 1.0, dist: 3.6 },
           on: (state) => {
             // 布景（cinematic 不跑 onStart）：伤员裹着蓝花布睡在草苫上，
@@ -6068,11 +6071,11 @@ export const SCRIPTS = {
             state.player.heading = -1;
             state.player.pose = "sitSide";
           } },
-        { stage: "伤员躺在草苫上，肩上的蓝花布仍然扎着。胸口缓慢起伏。", d: 4.2,
+        { act: "伤员躺在草苫上，肩上的蓝花布仍然扎着。胸口缓慢起伏。", d: 4.2,
           cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.55, dist: 2.1 } },
-        { stage: "柱子低头看向自己的手。手里还攥着最后一条蓝布。", d: 3.8,
+        { act: "柱子低头看向自己的手。手里还攥着最后一条蓝布。", d: 3.8,
           cam: { kind: "insert", x: 29.3, y: UNDER_Y + 0.6, dist: 1.7 } },
-        { stage: "他拿起梯子旁妹妹去年的旧褂子和针线。", d: 3.6,
+        { act: "他拿起梯子旁妹妹去年的旧褂子和针线。", d: 3.6,
           cam: { kind: "insert", x: 29.8, y: UNDER_Y + 0.55, dist: 2.0 },
           on: (state) => {
             state.player.pose = null;
@@ -6081,7 +6084,7 @@ export const SCRIPTS = {
             FlashPose(state, "kneel", 3.4);
             Cue(state, "clothLift", { gain: 0.4, rate: 0.9, delay: 1.0 });
           } },
-        { stage: "柱子爬到窖口，坐在最上一级梯子上。", d: 3.6,
+        { act: "柱子爬到窖口，坐在最上一级梯子上。", d: 3.6,
           cam: { kind: "shot", x: 29.4, y: 1.05, dist: 3.2 },
           on: (state) => {
             state.player.level = "surface";
@@ -6117,14 +6120,14 @@ export const SCRIPTS = {
             state.flags.mended = true;
             state.player.carry = null;
             StartMicroCine(state, [
-              { stage: "柱子把衣裳提起来。", d: 2.6,
+              { act: "柱子把衣裳提起来。", d: 2.6,
                 cam: { kind: "shot", x: 29.4, y: 1.1, dist: 3.0 },
                 on: (s) => { s.player.carry = "小褂子"; } },
               // 接得歪。两只袖子不一样长。（活动插卡：举起来对着晨光看的
               // 那件小褂子——袖口接着一截蓝底白花）
-              { stage: "新接的袖口有些歪。两只袖子也不一样长。", d: 4.0,
+              { act: "新接的袖口有些歪。两只袖子也不一样长。", d: 4.0,
                 cam: { kind: "insertCard", card: "mendedSleeve", seg: 0 } },
-              { stage: "蓝花布已经盖过原来的袖口。", d: 3.4,
+              { act: "蓝花布已经盖过原来的袖口。", d: 3.4,
                 cam: { kind: "insertCard", card: "mendedSleeve", seg: 1 } },
             ]);
           } },
@@ -6136,7 +6139,7 @@ export const SCRIPTS = {
       // 妹妹睁开眼：「哥？」
       kind: "cinematic", id: "c1_home", timeOfDay: "dawn",
       lines: [
-        { stage: "柱子走进屋。妹妹仍缩在炕上。", d: 3.6,
+        { act: "柱子走进屋。妹妹仍缩在炕上。", d: 3.6,
           cam: { kind: "shot", x: 32.0, y: 1.05, dist: 3.8 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -6148,7 +6151,7 @@ export const SCRIPTS = {
             state.player.cineWalk = { x: 32.2, speed: 1.2 };
             Cue(state, "doorCreak", { gain: 0.3, rate: 0.9 });
           } },
-        { stage: "柱子坐到炕边，轻轻扶起她的胳膊，将旧褂套在她身上。", d: 4.4,
+        { act: "柱子坐到炕边，轻轻扶起她的胳膊，将旧褂套在她身上。", d: 4.4,
           cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
           on: (state) => {
             state.player.cineWalk = null;
@@ -6157,13 +6160,13 @@ export const SCRIPTS = {
             FlashPose(state, "kneel", 4.2);
             Cue(state, "clothLift", { gain: 0.4, delay: 1.2 });
           } },
-        { stage: "妹妹迷迷糊糊地伸进一只手。", d: 3.0,
+        { act: "妹妹迷迷糊糊地伸进一只手。", d: 3.0,
           cam: { kind: "insert", x: 30.78, y: 0.75, dist: 2.2 },
           on: (state) => { FlashPose(state, "kneel", 3.0); } },
         // 同一个机位第三次：那截手腕——这回被蓝花袖口盖住了。
         // jacketOn 落在这一行：袖口那块蓝花（World 的 cuffMesh）就是这句话的
         // 画面，落到下一拍才立的话，这一镜里手腕还是光的
-        { stage: "蓝花袖口滑下来，盖住她的手腕。", d: 3.8,
+        { act: "蓝花袖口滑下来，盖住她的手腕。", d: 3.8,
           cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
           on: (state) => {
             state.flags.jacketOn = true;
@@ -6171,13 +6174,13 @@ export const SCRIPTS = {
             FlashPose(state, "kneel", 3.6);
             Cue(state, "clothDrop", { gain: 0.3, rate: 1.1, delay: 0.8 });
           } },
-        { stage: "柱子又替她穿上另一边，把衣襟掖好。", d: 3.8,
+        { act: "柱子又替她穿上另一边，把衣襟掖好。", d: 3.8,
           cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
           on: (state) => {
             state.player.carry = null;
             FlashPose(state, "kneel", 3.6);
           } },
-        { stage: "妹妹睁开眼。", d: 2.4,
+        { act: "妹妹睁开眼。", d: 2.4,
           cam: { kind: "insert", x: 31.2, y: 0.8, dist: 2.2 },
           on: (state) => {
             const sis = FindActor(state, "sister");
@@ -6207,10 +6210,10 @@ export const SCRIPTS = {
             StartMicroCine(state, [
               { who: "柱子", say: "我在。", d: 2.4,
                 cam: { kind: "close", on: "player", dist: 3.0 } },
-              { stage: "妹妹的手从被子里伸出来，攥住新接的蓝花袖口。", d: 4.0,
+              { act: "妹妹的手从被子里伸出来，攥住新接的蓝花袖口。", d: 4.0,
                 cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
                 on: (s) => { Cue(s, "clothLift", { gain: 0.3, rate: 1.05, delay: 1.0 }); } },
-              { stage: "柱子替她盖好破袄，起身走出屋门。", d: 3.8,
+              { act: "柱子替她盖好破袄，起身走出屋门。", d: 3.8,
                 cam: { kind: "shot", x: 32.2, y: 1.05, dist: 3.6 },
                 on: (s) => {
                   const k = FindActor(s, "sister");
@@ -6231,7 +6234,7 @@ export const SCRIPTS = {
       // 吹过。黑屏——第一章结束。
       kind: "cinematic", id: "c1_end", timeOfDay: "dawn",
       lines: [
-        { stage: "妹妹侧过脸。从没有关严的屋门，可以看见柱子走到菜窖旁。", d: 4.4,
+        { act: "妹妹侧过脸。从没有关严的屋门，可以看见柱子走到菜窖旁。", d: 4.4,
           cam: { kind: "shot", x: 30.8, y: 1.1, dist: 4.2 },
           on: (state) => {
             const sis = FindActor(state, "sister");
@@ -6242,7 +6245,7 @@ export const SCRIPTS = {
             state.player.pose = null;
             state.player.cineWalk = { x: 29.4, speed: 1.1 };
           } },
-        { stage: "柱子掀开翻板。他没有将翻板完全打开，只留下半尺宽的缝。", d: 4.2,
+        { act: "柱子掀开翻板。他没有将翻板完全打开，只留下半尺宽的缝。", d: 4.2,
           cam: { kind: "shot", x: 29.4, y: 1.05, dist: 3.4 },
           on: (state) => {
             state.player.cineWalk = null;
@@ -6253,7 +6256,7 @@ export const SCRIPTS = {
             FlashPose(state, "kneel", 2.6);
             Cue(state, "doorCreak", { gain: 0.4, rate: 0.75, delay: 1.0 });
           } },
-        { stage: "柱子重新下到菜窖里，坐到伤员旁边。", d: 3.8,
+        { act: "柱子重新下到菜窖里，坐到伤员旁边。", d: 3.8,
           cam: { kind: "shot", x: 28.8, y: UNDER_Y + 1.0, dist: 3.2 },
           on: (state) => {
             state.player.level = "under";
@@ -6265,16 +6268,16 @@ export const SCRIPTS = {
         // 拉远镜：上下两层同框——地上妹妹、地下伤员，两截同一块布。
         // **indoorScene 必须开着**：不开的话立面盖着屋里，炕上那个人整个看不见
         // （八稿这一镜的题眼正是"同框"）
-        { stage: "地面上，妹妹的手腕被蓝花袖口盖住。", d: 3.4,
+        { act: "地面上，妹妹的手腕被蓝花袖口盖住。", d: 3.4,
           cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
           on: (state) => { state.beat.indoorScene = true; } },
-        { stage: "地下，伤员肩上缠着同样的蓝花布。胸口仍在起伏。", d: 3.6,
+        { act: "地下，伤员肩上缠着同样的蓝花布。胸口仍在起伏。", d: 3.6,
           cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.55, dist: 2.1 },
           on: (state) => { state.beat.indoorScene = true; } },
-        { stage: "屋门和菜窖翻板，都留着一道缝。", d: 4.4,
+        { act: "屋门和菜窖翻板，都留着一道缝。", d: 4.4,
           cam: { kind: "shot", x: 30.2, y: 0.55, dist: 7.6 },
           on: (state) => { state.beat.indoorScene = true; } },
-        { stage: "没有音乐。风从村街上吹过。", d: 4.0,
+        { act: "没有音乐。风从村街上吹过。", d: 4.0,
           cam: { kind: "shot", x: 30.2, y: 0.55, dist: 8.4 },
           on: (state) => {
             state.beat.indoorScene = true;
@@ -6282,7 +6285,7 @@ export const SCRIPTS = {
             Cue(state, "windGust", { gain: 0.45, rate: 0.85, delay: 0.5 });
           } },
         // 黑屏：第一章结束（章末字样走 titleCard，同章名卡一支笔）
-        { stage: "", d: 3.6, cam: { kind: "dark" },
+        { act: "", d: 3.6, cam: { kind: "dark" },
           on: (state) => { state.titleCard = { num: "", title: "第一章结束", t: 0, dur: 3.2 }; } },
       ],
     },
@@ -8580,6 +8583,15 @@ function StepDin(state, dt) {
   }
 }
 
+// 过场行的三种文本字段（2026-08-14 用户退回换来的，务必分清）：
+//   `say` + `who` ＝ 角色对白      → 上字幕、配音
+//   `stage`       ＝ **真旁白**    → 上字幕、配音（`Script_VoiceExtract` 只抽这两种）
+//   `act`         ＝ **演出说明**  → 镜头／无声动作／音效，**屏幕上一个字都没有**
+// 剧本里的斜体（〔镜〕〔演〕〔音〕）一律是 `act`，它只管这一行演什么、占多久，
+// 不进文本层。第一章（含序）28 拍已按 Notion 剧本逐行分好：164 行 `act`，
+// 真旁白只有两句（「没人来叫。」「第三天。还是没人来叫。」）。屏幕上的字卡
+// （章名／三天后／第一章结束）走 `state.titleCard`，也不是旁白。
+// c2 起还是老样子（描述仍写在 `stage` 里），翻新时照第一章的口径改。
 function StepCinematic(state, input, dt) {
   const lines = state.beatLines;
   const line = lines[state.beat.lineIndex];
@@ -11073,8 +11085,9 @@ export function EdgeHint(state, camX, viewW) {
 function BeatLabel(def) {
   if (def.objective) return def.objective;
   if (def.kind === "cinematic") {
-    const first = (def.lines || []).find((l) => l.stage || l.say);
-    if (first) return first.stage || `${first.who || ""}：${first.say}`;
+    // act（演出说明）也拿来当标签用——它不上字幕，但认拍最方便的就是它
+    const first = (def.lines || []).find((l) => l.stage || l.say || l.act);
+    if (first) return first.stage || first.act || `${first.who || ""}：${first.say}`;
     return "过场";
   }
   if (def.kind === "choice") return def.prompt || "抉择";

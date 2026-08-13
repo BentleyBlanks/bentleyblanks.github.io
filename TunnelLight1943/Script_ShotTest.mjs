@@ -41,7 +41,7 @@ for (const ch of chapters) {
         isCine: !!(def && s.beat && s.camHint),
         camKind: s?.camHint?.kind,
         ots: s?.camHint?.subject ? `${s.camHint.subject}-${s.camHint.other}` : "",
-        caption: (s?.caption?.stage || s?.caption?.say || "").slice(0, 14),
+        caption: (s?.caption?.stage || s?.caption?.say || s?.caption?.act || "").slice(0, 14),
       };
     });
     if (info.phase !== "playing" || !info.isCine) break;

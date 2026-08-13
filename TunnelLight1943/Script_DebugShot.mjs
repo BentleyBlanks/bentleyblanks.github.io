@@ -47,7 +47,7 @@ const info = await page.evaluate(async () => {
   const st = window.TunnelLight.state;
   return {
     beat: core.CurrentBeatDef(st)?.id, line: st.beat?.lineIndex,
-    caption: (st.caption?.stage || st.caption?.say || "").slice(0, 24),
+    caption: (st.caption?.stage || st.caption?.say || st.caption?.act || "").slice(0, 24),
     px: Math.round(st.player.x * 10) / 10,
     enemies: st.actors.filter((a) => a.kind === "soldier" || a.kind === "puppet").length,
   };
