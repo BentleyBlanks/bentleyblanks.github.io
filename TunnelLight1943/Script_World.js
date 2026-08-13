@@ -181,7 +181,11 @@ const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃�
   "包袱布", "榆钱包袱",
   // 一碗红薯干、半瓢水、水葫芦都是**捧在手里**的：走肩挂那档会贴在肩窝，
   // 妹妹那么小的个子，碗就正糊在脸上（视觉审查退回过「头是一只碗」）
-  "红薯干", "半瓢水", "水葫芦"];
+  "红薯干", "半瓢水", "水葫芦",
+  // 布类同理（2026-08-13）：整布/碎布/破袄子/苦菜都是捧着抱着的，
+  // 走肩挂那档就成了"一卷布搭在肩膀上"——「他抱起整布，把脸贴上去」那一镜
+  // 于是既没贴脸也没抱住
+  "整布", "碎布", "布条", "苦菜"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
@@ -208,7 +212,11 @@ function PoseProgress(o) {
     || o.pose === "foldCloth" || o.pose === "layDown"
     // 找吃的那四道手：掀苫草/拖门板/扒烧土/解扎口，全由进度驱动
     || o.pose === "heaveMat" || o.pose === "dragPlank" || o.pose === "scoopAsh"
-    || o.pose === "unwrapJar") return o.poseU;
+    || o.pose === "unwrapJar"
+    // 扎回袋口（绕圈）、喂水与按住伤员（长按的行程）——2026-08-13 新增。
+    // **漏登记＝冻在第一帧**，这是 CLAUDE.md 点名的老坑
+    || o.pose === "twistTie" || o.pose === "bandageWrap"
+    || o.pose === "ladleSteady" || o.pose === "pinDown") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -1332,7 +1340,7 @@ export function CreateWorld(canvasEl) {
         f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
         f.heading = f.fleeDir;
         f.rig.group.position.x = f.x;
-        f.phase += FOLK_FLEE_SPEED * dt * 3.4;
+        f.phase += FOLK_FLEE_SPEED * dt * 3.4 / (f.scale || 1);
         f.idleT += dt * 1.4;
         PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
         f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
@@ -1349,7 +1357,7 @@ export function CreateWorld(canvasEl) {
         f.rig.group.position.x = f.x;
       }
       const moving = moved > 1e-4;
-      f.phase += moving ? moved * 3.4 : dt * 2.2;
+      f.phase += moving ? moved * 3.4 / (f.scale || 1) : dt * 2.2;
       f.idleT += dt * 1.4;
       if (f.track) f.trackT += dt;
       PoseRig(f.rig, {
@@ -2814,8 +2822,15 @@ export function CreateWorld(canvasEl) {
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
     s.ground = ground;                   // 供 PlayerLimbTips 量"手脚离地多高"
-    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
-    const lift = extra.lift || 0;
+    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡。
+    // **抬升要走一小段缓动**（2026-08-13）：剧本里「把妹妹抱起来」「把她放下」
+    // 都是直接写 `lift = 0.52` / `lift = 0`，孩子当帧凭空升高半米又当帧落地。
+    // 翻越那条本来就是逐帧算好的弧线（每帧变化很小），缓动不会把它糊掉；
+    // 阈值兜住"换层/跳幕"那种一米以上的大跳，让它照旧瞬时到位。
+    const liftWant = extra.lift || 0;
+    if (s.liftNow === undefined || Math.abs(liftWant - s.liftNow) > 1.0) s.liftNow = liftWant;
+    else s.liftNow += (liftWant - s.liftNow) * Math.min(1, (dt || 0.016) * 6);
+    const lift = s.liftNow;
     const y = ground + lift;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
     const movedY = s.prevY === null || s.prevY === undefined ? 0 : Math.abs(y - s.prevY);
@@ -2826,8 +2841,11 @@ export function CreateWorld(canvasEl) {
     // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
     // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
     // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
+    // 步频要按**体型**折算：妹妹比柱子矮一头多，可她的步频原来和他一模一样，
+    // 于是她像踩着风火轮飘着跟，而不是小孩迈小碎步追（去井台那一路占屏最久）
+    const bsPh = extra.bodyScale || s.bodyScale || 1;
     if (extra.climbing) s.phase += movedY * 4.5;
-    else if (isMoving) s.phase += moved * 3.4;
+    else if (isMoving) s.phase += moved * 3.4 / bsPh;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
@@ -2838,11 +2856,20 @@ export function CreateWorld(canvasEl) {
     // 筐得一路扣到口朝下），SyncCarry 拿不到 extra 就只能端着个永远平的筐。
     s.poseName = extra.pose || null;
     s.poseProgress = extra.poseK;
+    // 走还是跑：**跑不是"把走路放快"**。老版走路循环的幅度是写死的，谁跑起来
+     // 都还是那副散步的架势——序章里娘"冲进来"是 3.4m/s 的冲刺，画面上只是
+    // 一个人快速平移过去（用户说的"生硬"有一半在这儿）。gait 0..1 按实测速度
+    // 给（1.5m/s 起、3.2m/s 满），Rig 拿它加大步幅、把躯干压前、手臂抡开。
+    const speed = dt > 0 ? moved / dt : 0;
+    const gait = Math.max(0, Math.min(1, (speed - 1.5) / 1.7));
+    // 跑起来步频也要跟上（同一段路迈的步子更少、每步更大）
+    if (isMoving && !extra.climbing) s.phase += moved * gait * 0.7;
     PoseRig(s.rig, {
-      phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch, gait,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
+      childArms: extra.childArms,
       track: extra.track, trackT: extra.trackT,
     }, dt);
 
@@ -3125,6 +3152,9 @@ export function CreateWorld(canvasEl) {
         // 摇辘轳：把摇把握手的世界坐标换算成骨架局部坐标交给 Rig 反解——
         // 手是真的攥在那根把手上，不是照着一条相位在半空画圈
         poseStrain: p.poseStrain,
+        // 怀里抱着个孩子：不是姿势是**走姿**（腿照走、两臂兜住她、后仰配重）。
+        // 挂在这儿而不是 pose 上，是因为 pose 会把走路整个顶掉
+        childArms: !!p.childArms,
         aimHand: CrankAimLocal(state, p, boyScale),
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
@@ -3202,6 +3232,7 @@ export function CreateWorld(canvasEl) {
         posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          childArms: !!a.childArms,
           // 干活的乡亲也用得上躬身施工那套（原来只有玩家能挖）——
           // 掌子面上抡站姿锄头，在净高只够爬的新掏段里一眼就假
           digging: !!a.digging,

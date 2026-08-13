@@ -339,6 +339,477 @@ export const TRACKS = {
       { t: 0.46, hipY: -0.30, torso: 24, head: 10 },
     ],
   },
+  // ── 序·那天：娘的四条轨道（2026-08-13 重做）────────────────────────────
+  // 退回的原话是「娘的过场动画很生硬」。逐帧实拍核过，属实而且比想的更糟：
+  // 这一整场她只有**三个钉死的静态姿势**——「一把将她拉进怀里、上下摸了一遍」
+  // 借的是**拽水桶**那个 haulIn（poseK 钉在 0.55），于是画面上她伸着两条胳膊
+  // 横在半空，隔着半个身位对着孩子发呆，一连 9 秒一格没变；「手指第一次从
+  // 铁环上滑开、蹭一把汗、第二次攥住、猛地掀开」这四件事全靠三声音效交代，
+  // 人从头到尾保持同一个前倾造型 5.4 秒。**台词里写了动作，画面上什么都没发生**
+  // ——就是 CLAUDE.md 那条老账（「这他妈扇耳光…一个动画都没做」）的重演。
+  //
+  // 四条轨道对应四件事：拉进怀里上下摸一遍 / 搂着喘着说话 / 两次才掀开翻板 /
+  // 掀着板守在窖口。写法上守两条规矩：**循环轨道的下半身在每个关键帧上钉成
+  // 同一组数**（否则脚必滑，礅门轴那次的教训），**手的落点先算再拆角**
+  // （上臂角＋前臂角＝世界角，0° 朝下）。
+
+  // ① 一把将她拉进怀里，上下摸了一遍（单次 5.2s，接 c1_thatday 第 5 行）。
+  // 分四段：探手够到 → 攥住往回带、人跟着蹲下去 → 搂紧一下 →
+  // **两遍从肩到腿的上下摸**（这是这一句的题眼：她在确认孩子身上有没有伤）→
+  // 抬头找柱子（下一句「柱子。」就从这个头位起）。
+  // **肘必须吊下来**（首轮实拍退回换来的）：上臂给到 −80° 就是"把肘平端到
+  // 身前"，肘先占掉 0.25m，手再往外 0.24m ⇒ 手落在身前 0.58m，而孩子的身子
+  // 中心只在 0.31m——两条胳膊从她身上直穿过去、指着她背后的空气，读出来是
+  // 「举着两条胳膊僵在那儿」。抱人的几何是**上臂几乎垂着（−10~−40）、
+  // 前臂横过来兜住她**，行程全长在前臂上。这条同样是 CLAUDE.md「闲着的手
+  // 要顺着重力吊下来、肘要折一下」那一条的正面用法。
+  pullClose: {
+    dur: 5.2, loop: false,
+    keys: [
+      // 刚转过身，重心还在后脚，近侧手已经探出去够她
+      { t: 0.0, hipY: -0.04, hipX: 0.02, torso: 18, head: -24, armF: -60, foreF: -34, armB: -20, foreB: -26, thighB: -18, shinB: 22, footB: -8, thighF: 14, shinF: 10, footF: -10 },
+      // 攥住她胳膊，开始往回带；身子跟着沉
+      { t: 0.45, hipY: -0.13, hipX: 0.06, torso: 26, head: -30, armF: -40, foreF: -50, armB: -34, foreB: -34, thighB: -28, shinB: 34, thighF: 4, shinF: 16 },
+      // 拽进怀里：整个人蹲下去围住她（这一帧起下半身钉死，不再动）。
+      // 肘吊在体侧、前臂横过去兜住她的背，另一只手绕高一档护住肩胛
+      { t: 0.95, hipY: -0.28, hipX: 0.05, torso: 26, head: -36, armF: -16, foreF: -74, armB: -24, foreB: -80, thighB: -48, shinB: 54, footB: -6, thighF: -36, shinF: 40, footF: -8 },
+      // 搂紧一下（前臂再收进来一点，埋头）
+      { t: 1.5, torso: 31, head: -40, armF: -12, foreF: -70, armB: -20, foreB: -76 },
+      // 上下摸第一遍：手先托到她肩、脸那一带（前臂转到前上方）
+      { t: 2.1, torso: 24, head: -44, armF: -34, foreF: -86, armB: -40, foreB: -88 },
+      // …一路抹到腿上（前臂转到前下方）
+      { t: 2.75, torso: 32, head: -30, armF: -6, foreF: -44, armB: -10, foreB: -40 },
+      // 第二遍：又捧回她脸上
+      { t: 3.3, torso: 22, head: -46, armF: -38, foreF: -90, armB: -42, foreB: -92 },
+      // 手停在她两肩上
+      { t: 3.9, torso: 27, head: -38, armF: -20, foreF: -74, armB: -26, foreB: -78 },
+      // 抬头找柱子——下一句台词从这个头位起
+      { t: 4.5, torso: 22, head: -48 },
+      { t: 5.2, torso: 24, head: -44 },
+    ],
+  },
+  // ② 蹲着搂住孩子，喘着抬头说话（循环 3.4s）。接在 pullClose 的末帧上，
+  // 「柱子。」「抱她。」两句都挂它——她刚从村外跑回来，气还没喘匀，
+  // 所以幅度全在肩背与头上，下半身一格不动。
+  huddleBreath: {
+    dur: 3.4, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.28, hipX: 0.05, torso: 24, head: -44, armF: -20, foreF: -74, armB: -26, foreB: -78, thighB: -48, shinB: 54, footB: -6, thighF: -36, shinF: 40, footF: -8 },
+      { t: 0.8, hipY: -0.265, torso: 20, head: -47, armF: -23, foreF: -77, armB: -29, foreB: -81 },   // 吸气：肩背起来
+      { t: 1.5, hipY: -0.285, torso: 27, head: -42, armF: -18, foreF: -71, armB: -24, foreB: -75 },   // 呼气
+      { t: 2.3, hipY: -0.27, torso: 22, head: -46, armF: -22, foreF: -76, armB: -28, foreB: -80 },
+      { t: 3.4, hipY: -0.28, torso: 24, head: -44, armF: -20, foreF: -74, armB: -26, foreB: -78 },
+    ],
+  },
+  // ③ 两次才掀开翻板（单次 5.4s）。字幕点了四件事，四件事就得各占一段：
+  // 够到铁环(0~0.7) → **滑开**：手脱手往后甩、身子后仰一顿(1.15) →
+  // 直起来在衣襟上蹭汗(2.0) → 再蹲下去两只手都攥住(2.5) →
+  // 腰一节节直起来发力(3.2) → 掀过竖直(3.9) → 撒手，板落到另一边(4.4)。
+  // **盖板的开合要跟这条对上**：Core 那边给 state.lid 带了 delay，
+  // 板在 2.6s 才开始转（在她第二次攥住之后），不然板早开了她还在够。
+  // 几何：铁环在地面上、她身前约 0.35m。深蹲 hipY −0.42 + 腰折 60° 时
+  // 肩点落在 (0.39, 0.42)，到环的距离 0.37m < 臂长 0.49m——够得着才敢这么摆。
+  hatchHeave: {
+    dur: 5.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.40, hipX: 0.06, torso: 58, head: -46, armF: -30, foreF: -22, armB: -22, foreB: -18, thighB: -84, shinB: 92, footB: -8, thighF: -72, shinF: 84, footF: -10 },
+      // 扣住环往上拽，腰开始直
+      { t: 0.7, hipY: -0.34, hipX: 0.04, torso: 48, head: -40, armF: -44, foreF: -16, armB: -34, foreB: -14, thighB: -74, shinB: 84, thighF: -64, shinF: 76 },
+      // 滑开：手猛地脱手甩到身后，重心往后一顿
+      { t: 1.15, hipY: -0.30, hipX: -0.07, torso: 24, head: -26, armF: -12, foreF: -40, armB: -6, foreB: -34, thighB: -64, shinB: 76, thighF: -54, shinF: 66 },
+      // 顿住，喘一口
+      { t: 1.5, hipY: -0.33, hipX: -0.02, torso: 34, head: -34, armF: -30, foreF: -34, armB: -18, foreB: -30 },
+      // 在衣襟上蹭一把汗（手收到胸腹前，肘折死）
+      { t: 2.0, hipY: -0.31, hipX: 0.00, torso: 30, head: -32, armF: -66, foreF: 74, armB: -20, foreB: -30 },
+      // 再探下去，两只手都攥住铁环
+      { t: 2.5, hipY: -0.42, hipX: 0.06, torso: 60, head: -48, armF: -32, foreF: -20, armB: -28, foreB: -18, thighB: -88, shinB: 96, thighF: -76, shinF: 88 },
+      // 发力：腰一节节直起来，重心后压（板从这儿开始转）
+      { t: 3.2, hipY: -0.28, hipX: 0.00, torso: 34, head: -34, armF: -58, foreF: -26, armB: -52, foreB: -22, thighB: -66, shinB: 74, thighF: -56, shinF: 64 },
+      // 掀过竖直：人几乎站直，两手抬到胸前
+      { t: 3.9, hipY: -0.12, hipX: -0.06, torso: 12, head: -22, armF: -92, foreF: -30, armB: -84, foreB: -26, thighB: -32, shinB: 38, thighF: -20, shinF: 24 },
+      // 撒手，板落到另一边
+      { t: 4.4, hipY: -0.16, hipX: 0.02, torso: 22, head: -28, armF: -40, foreF: -30, armB: -34, foreB: -26, thighB: -38, shinB: 44, thighF: -26, shinF: 30 },
+      // 收势：跪回窖口边（末帧对齐 hatchGuard 的首帧，切过去人不跳）
+      { t: 5.4, hipY: -0.36, hipX: 0.02, torso: 26, head: -22, armF: -44, foreF: -30, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+    ],
+  },
+  // ④ 掀着板守在窖口（循环 4.2s）。跪着、一只手压着翻板冲底下说话，
+  // 中间**回头瞟一眼院门**——外面的脚步已经到院门口了，这一眼比任何字幕都说事。
+  // 底子是 kneel（跪的几何见那一支的注释：膝着地、小腿平铺在身后）。
+  hatchGuard: {
+    dur: 4.2, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -22, armF: -44, foreF: -30, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.9, hipY: -0.345, torso: 21, head: -28, armF: -48, armB: -18 },   // 催：探身冲窖口
+      { t: 1.6, hipY: -0.365, torso: 29, head: -18, armF: -41, armB: -11 },
+      { t: 2.4, hipY: -0.35, torso: 27, head: -4, armF: -44, armB: -14 },     // 回头瞟一眼院门
+      { t: 3.0, hipY: -0.36, torso: 23, head: -26, armF: -46, armB: -16 },
+      { t: 4.2, hipY: -0.36, torso: 26, head: -22, armF: -44, armB: -14 },
+    ],
+  },
+  // ⑤ 妹妹这一边（成对轨道，与 pullClose 同长）：接触戏的老规矩——**受方
+  // 前面那一段是"等"**，等施方的手真够到她身上，她才动。原来这一句她的
+  // pose 是 null，也就是**笔直站着让娘对着空气摸**。
+  // 0~0.45 两只小手还捂在耳朵上 → 0.45 被拽得往娘那边一趔趄 →
+  // 0.95 撞进怀里、埋头（leanIn 的落点）→ 之后一直小幅打颤
+  pulledClose: {
+    dur: 5.2, loop: false,
+    keys: [
+      // 两只小手蜷在胸口（＝上一行 leanIn 的落点，切过来不跳）：肘朝前折死，
+      // 前臂折回来，手落在自己胸前——这套数是 leanIn 验过的，照抄别改
+      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 8, head: -10, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+      // 被拽得一趔趄：重心往娘那边倒，一只手被拉开
+      { t: 0.45, hipY: -0.04, hipX: 0.07, torso: 16, head: -18, armF: -52, foreF: 60, armB: -66, foreB: 118, thighB: -16, shinB: 20, thighF: 12, shinF: 10 },
+      // 撞进怀里、埋头（leanIn 的落点：整个人往对方那边倒，两只小手蜷在胸口）
+      { t: 0.95, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
+      // 被摸的时候一颤一颤（幅度小、频率高——「你能数出来她抖了多少下」）
+      { t: 1.6, torso: 29, head: -37 },
+      { t: 2.2, torso: 25, head: -41 },
+      { t: 2.9, torso: 28, head: -38 },
+      { t: 3.6, torso: 25, head: -41 },
+      { t: 4.3, torso: 28, head: -38 },
+      { t: 5.2, torso: 26, head: -40 },
+    ],
+  },
+  // ⑦ 蹲下去把妹妹抱起来（单次 1.1s，玩家操作①）。老版是 FlashPose("shelter",
+  // 0.8)——只有"抱住了"这个造型，没有"怎么抱起来的"：人当帧从站姿弹进搂抱姿，
+  // 0.8 秒后又弹回走路。末帧刻意对齐 childArms 的静止帧，接过去不跳。
+  scoopChild: {
+    dur: 1.1, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: 0.02, torso: 12, head: -14, armF: -46, foreF: -30, armB: -34, foreB: -26, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -4 },
+      // 蹲到她的高度，两手兜到她腋下
+      { t: 0.35, hipY: -0.30, hipX: 0.06, torso: 32, head: -26, armF: -76, foreF: -6, armB: -70, foreB: -4, thighB: -54, shinB: 60, footB: -6, thighF: -42, shinF: 48, footF: -8 },
+      // 发力起身，她离地
+      { t: 0.7, hipY: -0.14, hipX: 0.0, torso: -2, head: 2, armF: -96, foreF: 26, armB: -104, foreB: 26, thighB: -30, shinB: 34, thighF: -20, shinF: 22 },
+      // 站直兜稳（＝childArms 的静止帧）
+      { t: 1.1, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -96, foreF: 38, armB: -104, foreB: 38, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+    ],
+  },
+  // ⑧ 坐到窖沿把妹妹放上梯子（单次 3.0s，玩家操作②）。字幕点了两件事：
+  // "先坐到窖沿"和"妹妹抓着他的衣襟不肯松手"——老版这两件事合起来是一个
+  // FlashPose("kneel", 3.0)，也就是一张跪姿定格挂三秒。
+  lowerChild: {
+    dur: 3.0, loop: false,
+    keys: [
+      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -96, foreF: 38, armB: -104, foreB: 38, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+      // 坐到窖沿（这一帧起下半身钉死，剩下的全长在腰和胳膊上）
+      { t: 0.55, hipY: -0.40, hipX: -0.06, torso: 14, head: -10, armF: -88, foreF: 30, armB: -96, foreB: 30, thighB: -84, shinB: 92, footB: -6, thighF: -76, shinF: 84, footF: -8 },
+      // 弯下腰把她往下送
+      { t: 1.2, hipY: -0.40, hipX: -0.04, torso: 42, head: -34, armF: -52, foreF: -6, armB: -60, foreB: -4 },
+      // 松开一只手——她还抓着衣襟，手停在半空
+      { t: 1.9, torso: 38, head: -30, armF: -34, foreF: -18, armB: -48, foreB: -8 },
+      // 把她的手指一根根掰开
+      { t: 2.4, torso: 34, head: -32, armF: -44, foreF: -26, armB: -30, foreB: -22 },
+      // 直起一点，看着她下梯子
+      { t: 3.0, hipY: -0.36, torso: 26, head: -36, armF: -24, foreF: -22, armB: -18, foreB: -18 },
+    ],
+  },
+  // ⑨ 把翻板压回去（单次 4.0s）：跪着，一只手扶着板一路跟到底——
+  // 「最后消失在板缝里的，是娘那截蓝底白花的袖子」，所以这条轨道全部的活
+  // 就是**那条胳膊跟着板缝一起下去**：手从抬起（板还立着）一点点落到地面，
+  // 缝合上前最后一下才抽回来。lid 那边 rate 1.8＝0.56 秒落到底，
+  // 手的行程压在 0~0.9 上，抽手在 1.2。剩下的时间她伏在板上没动——
+  // 那是听外面脚步的三秒
+  lidLower: {
+    dur: 4.0, loop: false,
+    keys: [
+      // 扶着立着的板（手抬到胸口高）
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 22, head: -26, armF: -96, foreF: -22, armB: -20, foreB: -20, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      // 板往下压，手跟着落
+      { t: 0.5, torso: 30, head: -20, armF: -58, foreF: -26, armB: -22, foreB: -20 },
+      // 板快合上：手已经贴到地面那条缝上
+      { t: 0.9, torso: 38, head: -14, armF: -28, foreF: -30, armB: -24, foreB: -18 },
+      // 手掌整个平贴板面、只剩小臂压在缝上——0.9→1.2 两帧之间没有这一格，
+      // smoothstep 插不出「一点点退出去」，袖子就是"闪没了"
+      { t: 1.05, torso: 37, head: -15, armF: -32, foreF: -8 },
+      // 抽回来——袖子从缝里退出去的那一下
+      { t: 1.2, torso: 34, head: -18, armF: -46, foreF: 26, armB: -22, foreB: -20 },
+      // 伏在板上听外面的脚步（肩背微微起伏）
+      { t: 2.0, torso: 40, head: -12, armF: -34, foreF: 10, armB: -18, foreB: -22 },
+      { t: 3.0, torso: 36, head: -16, armF: -36, foreF: 12 },
+      { t: 4.0, torso: 40, head: -12, armF: -34, foreF: 10 },
+    ],
+  },
+  // ── §1 冷灶那一场（柱子的四件事，2026-08-13）─────────────────────────
+  // 这一拍原来是六行字幕配三个 `FlashPose("kneel"/"bow")`：摸锅底、掀粮瓮、
+  // 刮缸底、给妹妹盖脚——四件手上的事，画面上是同一个人蹲在四个地方不动。
+  // 下半身一律沿用 kneel 的几何（膝着地、小腿平铺在身后），动作全长在腰和手上。
+
+  // 摸一把锅底——干的（3.2s）
+  panBottom: {
+    dur: 3.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -18, foreF: -14, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.7, torso: 40, head: -24, armF: -52, foreF: -26, armB: -18, foreB: -16 },   // 探手进锅
+      { t: 1.3, torso: 44, head: -26, armF: -44, foreF: -36 },                          // 摸一圈
+      { t: 1.7, torso: 43, head: -25, armF: -56, foreF: -22 },
+      { t: 2.2, torso: 34, head: -30, armF: -70, foreF: 34 },                           // 手抽出来，捻捻手指
+      { t: 2.7, torso: 30, head: -28, armF: -66, foreF: 44 },
+      { t: 3.2, torso: 27, head: -14, armF: -22, foreF: -16 },
+    ],
+  },
+  // 掀开粮瓮：瓮底只剩薄薄一层糜子（3.4s）
+  liftJarLid: {
+    dur: 3.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -18, foreF: -14, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.6, torso: 38, head: -22, armF: -46, foreF: -30, armB: -42, foreB: -26 },   // 两手抠住盖沿
+      { t: 1.1, torso: 26, head: -18, armF: -72, foreF: -22, armB: -68, foreB: -18 },   // 掀起来
+      { t: 1.6, torso: 30, head: -14, armF: -40, foreF: -44, armB: -36, foreB: -40 },   // 挪到一边放下
+      { t: 2.2, torso: 48, head: -30, armF: -30, foreF: -22, armB: -20, foreB: -16 },   // 探头看瓮底
+      { t: 2.8, torso: 46, head: -28, armF: -50, foreF: -30 },                          // 手伸进去捻一撮
+      { t: 3.4, torso: 34, head: -26, armF: -66, foreF: 30 },
+    ],
+  },
+  // 瓢探下去刮缸底，小半瓢——抿一口，剩下的倒进锅里（5.2s）
+  scoopVat: {
+    dur: 5.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -18, foreF: -14, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.7, torso: 44, head: -28, armF: -40, foreF: -34, armB: -18, foreB: -16 },   // 瓢探下去
+      { t: 1.2, torso: 50, head: -32, armF: -28, foreF: -40 },                          // 够到缸底
+      { t: 1.7, torso: 49, head: -31, armF: -36, foreF: -32 },                          // 刮着缸底转半圈
+      { t: 2.2, torso: 50, head: -32, armF: -26, foreF: -42 },
+      { t: 2.9, torso: 32, head: -24, armF: -64, foreF: -24 },                          // 提上来
+      { t: 3.6, torso: 18, head: -30, armF: -82, foreF: 52 },                           // 凑到瓢沿抿一口
+      { t: 4.1, torso: 16, head: -34, armF: -86, foreF: 58 },
+      { t: 4.7, torso: 36, head: -22, armF: -54, foreF: -14 },                          // 剩下的倒进锅里
+      { t: 5.2, torso: 40, head: -20, armF: -46, foreF: -6 },
+    ],
+  },
+  // 替她把脚盖好（2.4s）：抓住袄角往下拉，再顺一把
+  tuckQuilt: {
+    dur: 2.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -18, foreF: -14, armB: -14, foreB: -18, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.6, torso: 44, head: -30, armF: -58, foreF: -22, armB: -20, foreB: -16 },   // 抓住袄角
+      { t: 1.2, torso: 48, head: -32, armF: -34, foreF: -34 },                          // 往下拉，盖住脚
+      { t: 1.7, torso: 46, head: -31, armF: -42, foreF: -28 },                          // 顺一把
+      { t: 2.4, torso: 30, head: -20, armF: -22, foreF: -16 },
+    ],
+  },
+  // ⑬ 长按搂紧（循环 4.2s，序·那天窖底那一拍）。这一拍要按住 15 秒，
+  // 老版每帧续期一个静态的 `shelter`——十五秒一格没变的定格，而这正是
+  // 序章的题眼镜头。现在：肩背随呼吸起伏，每一轮**收紧一下**（头顶有动静
+  // 的时候人会不自觉地把孩子往怀里再搂一把）。松手就整个撤掉轨道，
+  // 人当场松开——「松手她的呼吸立刻变响」那条玩法在画面上也就成立了。
+  hugTight: {
+    dur: 4.2, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.26, hipX: 0.05, torso: 26, head: -34, armF: -18, foreF: -70, armB: -24, foreB: -76, thighB: -48, shinB: 54, footB: -6, thighF: -36, shinF: 40, footF: -8 },
+      { t: 1.1, hipY: -0.248, torso: 22, head: -37, armF: -21, foreF: -73, armB: -27, foreB: -79 },   // 吸
+      { t: 2.0, hipY: -0.268, torso: 29, head: -31, armF: -16, foreF: -67, armB: -22, foreB: -73 },   // 呼
+      { t: 2.6, hipY: -0.275, torso: 32, head: -40, armF: -12, foreF: -62, armB: -18, foreB: -68 },   // 收紧一下
+      { t: 3.2, hipY: -0.258, torso: 25, head: -35, armF: -19, foreF: -71, armB: -25, foreB: -77 },
+      { t: 4.2, hipY: -0.26, torso: 26, head: -34, armF: -18, foreF: -70, armB: -24, foreB: -76 },
+    ],
+  },
+  // 数正字（单次 7.2s，c1_count）。这一拍 11 行台词、24 秒，妹妹**一帧没动**
+  // ——吹石粉时嘴肩头都不动，「一。」「二。」「三。」三声音效响过去手臂钉在
+  // 同一个角度上，「她回头看柱子」时脸仍朝着门框。全拍就是一张贴纸。
+  // 一条轨道演完四件事：吹掉石粉(0~1.2) → 一道一道点三下(1.65/2.95/4.25)
+  // → 看着第三道(5.2) → 转过脸来找哥哥(6.2~7.2)。
+  // 底子是 heldUp（被托在半空：腿垂着屈、一只手扒着哥哥的肩）。
+  // **不许改 heading**：World 按 heading 整张镜像，她按在门框上的手会当帧
+  // 弹过去 0.36m；「回头」转的是脖子。
+  tallyCount: {
+    dur: 7.2, loop: false,
+    keys: [
+      { t: 0.0, hipY: 0.0, hipX: 0.02, torso: 8, head: -22, armF: -132, foreF: -22, armB: -46, foreB: 96, thighB: -18, shinB: 46, footB: -14, thighF: -34, shinF: 58, footF: -16 },
+      // 吹石粉：脸凑过去，撅起来吹一口（头的世界角压到 +6 ＝ 真的朝着门框吹）
+      { t: 0.5, torso: 14, head: -8, armF: -126, foreF: -28 },
+      { t: 0.9, torso: 16, head: -4, armF: -124, foreF: -30 },
+      { t: 1.2, torso: 11, head: -14, armF: -130, foreF: -24 },
+      // 「一。」——指头戳到最上那道
+      { t: 1.65, torso: 9, head: -20, armF: -142, foreF: -14 },
+      { t: 2.1, torso: 9, head: -20, armF: -136, foreF: -20 },
+      // 「二。」——往下挪一道
+      { t: 2.95, torso: 10, head: -17, armF: -130, foreF: -16 },
+      { t: 3.4, torso: 10, head: -17, armF: -125, foreF: -22 },
+      // 「三。」——再往下一道
+      { t: 4.25, torso: 12, head: -13, armF: -118, foreF: -18 },
+      { t: 4.7, torso: 12, head: -13, armF: -113, foreF: -24 },
+      // 看着第三道线（手落下来一点，停住）
+      { t: 5.2, torso: 11, head: -15, armF: -104, foreF: -30 },
+      { t: 6.0, torso: 11, head: -15, armF: -102, foreF: -32 },
+      // 回头找哥哥：手从门框上收下来，脖子转过去（heading 一格不动）
+      { t: 6.6, torso: 6, head: -34, armF: -70, foreF: -38 },
+      { t: 7.2, torso: 4, head: -38, armF: -58, foreF: -40 },
+    ],
+  },
+  // 把脸贴到布上（单次 3.6s，c1_cellar「他抱起整布，低下头，将脸贴上去」）。
+  // 老版借的是 leanIn——那是给妹妹写的「把额头抵在别人肩上」，torso+head 加起来
+  // 是 −14°，也就是**下巴抬着**；两只手还蜷在身后。三行 8 秒里没有一帧是"贴脸"。
+  // 这里手要真举到脸那么高（相对肩点是**往上** 0.13m），所以前臂不给正值。
+  pressFace: {
+    dur: 3.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 8, head: -4, armF: -60, foreF: -30, armB: -54, foreB: -32, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+      // 把布捧到下巴前，头真的低下去（torso+head = +38 ＝ 低头）
+      { t: 0.8, torso: 12, head: 26, armF: -100, foreF: -33, armB: -94, foreB: -35 },
+      { t: 1.6, torso: 12, head: 27, armF: -101, foreF: -33 },   // 贴住，只剩呼吸
+      { t: 2.4, torso: 11, head: 25, armF: -99, foreF: -32 },
+      // 慢慢放下来
+      { t: 3.6, torso: 9, head: 8, armF: -70, foreF: -30, armB: -64, foreB: -32 },
+    ],
+  },
+  // ── 做饭蒙太奇（c1_cook，2026-08-13）───────────────────────────────
+  // 12 行、约 42 秒，老版全程只有一个静态 kneel 被 FlashPose 闪了四次，
+  // 另外六行连 on() 都没有（poseT 一到期人就站回默认站姿）。字幕在说
+  // 「掰成小块」「摘掉根撕成几段」「蹲下吹气」，画面上是同一个跪着不动的剪影。
+  // 三条轨道的下半身**逐帧原样重复 kneel 那一组**，动作全长在腰和前臂上。
+
+  // 往锅里下料（循环 2.6s）：抓一把 → 送到锅口 → 撒进去 → 收回来
+  cookDrop: {
+    dur: 2.6, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 30, head: -18, armF: -96, foreF: -34, armB: -26, foreB: -20, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.7, torso: 36, head: -22, armF: -84, foreF: -18, armB: -24, foreB: -18 },   // 送到锅口
+      { t: 1.2, torso: 38, head: -24, armF: -78, foreF: -6, armB: -22, foreB: -16 },    // 撒进去（手腕一抖）
+      { t: 1.5, torso: 37, head: -23, armF: -82, foreF: -14 },
+      { t: 2.0, torso: 32, head: -19, armF: -94, foreF: -30 },                          // 收回来再抓一把
+      { t: 2.6, torso: 30, head: -18, armF: -96, foreF: -34 },
+    ],
+  },
+  // 摘根、撕成几段（循环 1.4s）：两只手**反相对拉**——同相位就是拜佛
+  tearHerb: {
+    dur: 1.4, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.35, torso: 30, head: -28, armF: -80, foreF: -18, armB: -48, foreB: 4 },     // 一撕
+      { t: 0.7, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14 },
+      { t: 1.05, torso: 31, head: -29, armF: -82, foreF: -16, armB: -46, foreB: 2 },     // 再撕
+      { t: 1.4, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14 },
+    ],
+  },
+  // 蹲下吹气（单次 3.6s）：伏到灶口 → 一口一口吹 → 直起来
+  blowFire: {
+    dur: 3.6, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -30, foreF: 18, armB: -26, foreB: 14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.9, hipY: -0.36, hipX: 0.08, torso: 48, head: -40, armF: -30, foreF: 18 },   // 伏到灶口（两手撑膝）
+      { t: 1.5, torso: 52, head: -44 },                                                  // 吹第一口
+      { t: 1.9, torso: 49, head: -41 },
+      { t: 2.4, torso: 53, head: -45 },                                                  // 第二口
+      { t: 3.0, hipX: 0.05, torso: 40, head: -30 },
+      { t: 3.6, hipX: 0.02, torso: 28, head: -16 },                                      // 直起来
+    ],
+  },
+  // 搅锅（循环 2.8s）：一只手扶锅沿，另一只手拿棍慢慢搅
+  stirPot: {
+    dur: 2.8, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 32, head: -20, armF: -86, foreF: -22, armB: -62, foreB: -6, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.7, torso: 34, head: -21, armF: -94, foreF: -12 },
+      { t: 1.4, torso: 32, head: -20, armF: -86, foreF: -22 },
+      { t: 2.1, torso: 31, head: -19, armF: -78, foreF: -32 },
+      { t: 2.8, torso: 32, head: -20, armF: -86, foreF: -22 },
+    ],
+  },
+  // ⑮ 按住妹妹蹲在墙根（循环 4.2s，c1_bell 那 13 秒）。与 hugTight 同一路，
+  // 但底子是 shelter 的新几何（脚不再陷地）。**下半身每个关键帧写同一组数**，
+  // 一格不许动——否则蹲着的人脚会来回蹭。
+  shelterHold: {
+    dur: 4.2, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.185, hipX: 0.05, torso: 22, head: -34, armF: -20, foreF: -70, armB: -26, foreB: -76, thighB: -46, shinB: 91, footB: -45, thighF: -34, shinF: 89, footF: -55 },
+      { t: 1.2, hipY: -0.175, torso: 26, head: -38, armF: -23, foreF: -73, armB: -29, foreB: -79 },
+      { t: 2.6, hipY: -0.195, torso: 28, head: -40, armF: -14, foreF: -64, armB: -20, foreB: -70 },   // 把她再往里收一下
+      { t: 3.3, hipY: -0.180, torso: 24, head: -32, armF: -21, foreF: -71, armB: -27, foreB: -77 },
+      { t: 4.2, hipY: -0.185, torso: 22, head: -34, armF: -20, foreF: -70, armB: -26, foreB: -76 },
+    ],
+  },
+  // ── 妹妹的三条（黄昏那几拍，2026-08-13）─────────────────────────────
+  // 底子都是 sitStool（坐在矮凳上，屁股 −0.34、小臂搭膝），下半身逐帧钉死。
+  // 这三处原来都是「字幕在演、人坐着不动」：推碗给的是 bow（弯腰拾东西那个
+  // 姿势）挂 2.8 秒，拽袖子那一行干脆连 on() 都没有，喝水只是把 carry 换掉。
+
+  // ⑩ 按住两只碗，把哥哥那只推回来（单次 2.8s）。
+  // 「哥，你也吃。」——推这一下是她全章唯一一次跟哥哥较劲，得看得见。
+  pushBowlBack: {
+    dur: 2.8, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.34, hipX: 0.02, torso: 14, head: -6, armF: -44, foreF: -58, armB: -38, foreB: -52, thighB: -84, shinB: 78, footB: 6, thighF: -78, shinF: 72, footF: 4 },
+      // 两只手一起按到碗上（探到身前偏下）
+      { t: 0.5, torso: 30, head: -22, armF: -54, foreF: -34, armB: -50, foreB: -30 },
+      // 推出去：腰跟着送，胳膊伸开
+      { t: 1.0, torso: 38, head: -18, armF: -66, foreF: -12, armB: -62, foreB: -10 },
+      { t: 1.35, torso: 40, head: -16, armF: -70, foreF: -6, armB: -66, foreB: -4 },   // 到头，顿一下
+      // 收回来，抬头看他（「哥，你也吃。」就落在这儿）
+      { t: 1.9, torso: 22, head: -30, armF: -46, foreF: -50, armB: -42, foreB: -44 },
+      { t: 2.8, torso: 16, head: -12, armF: -44, foreF: -58, armB: -38, foreB: -52 },
+    ],
+  },
+  // ⑪ 缩了缩肩膀，往下拉自己的袖子（单次 3.8s）——**全章的题眼**：
+  // 章末那一针一针缝的就是这截袖口，而这一行原来一个动作都没有。
+  // 拽两下（第二下更用力），松手，袖口还停在手腕上面。
+  tugSleeve: {
+    dur: 3.8, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.34, hipX: 0.02, torso: 14, head: -6, armF: -44, foreF: -58, armB: -38, foreB: -52, thighB: -84, shinB: 78, footB: 6, thighF: -78, shinF: 72, footF: 4 },
+      // 缩肩膀：整个人往里收一档，脖子缩起来
+      { t: 0.6, hipY: -0.35, torso: 22, head: 8, armF: -34, foreF: -74, armB: -30, foreB: -68 },
+      // 一只手抓住另一只的袖口
+      { t: 1.2, torso: 26, head: -4, armF: -58, foreF: -46, armB: -44, foreB: -60 },
+      { t: 1.6, torso: 28, head: -8, armF: -40, foreF: -62, armB: -44, foreB: -60 },   // 拽第一下
+      { t: 2.1, torso: 26, head: -4, armF: -58, foreF: -46 },
+      { t: 2.5, torso: 30, head: -10, armF: -34, foreF: -68 },                         // 第二下，更用力
+      // 松手——袖口仍停在手腕上面
+      { t: 3.1, torso: 20, head: 4, armF: -40, foreF: -66, armB: -36, foreB: -58 },
+      { t: 3.8, torso: 16, head: 2, armF: -42, foreF: -60, armB: -38, foreB: -54 },
+    ],
+  },
+  // ⑫ 捧着碗喝完（单次 3.4s）：两手捧起来 → 仰头 → 一口一口 → 放下，
+  // 眼皮已经睁不开。
+  sipBowl: {
+    dur: 3.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.34, hipX: 0.02, torso: 14, head: -6, armF: -44, foreF: -58, armB: -38, foreB: -52, thighB: -84, shinB: 78, footB: 6, thighF: -78, shinF: 72, footF: 4 },
+      // 捧到嘴边（前臂折死，手停在脸前）
+      { t: 0.7, torso: 8, head: -14, armF: -52, foreF: -84, armB: -46, foreB: -78 },
+      { t: 1.2, torso: 2, head: -26, armF: -56, foreF: -92, armB: -50, foreB: -86 },   // 仰头，第一口
+      { t: 1.8, torso: 5, head: -18, armF: -54, foreF: -88, armB: -48, foreB: -82 },
+      { t: 2.3, torso: 1, head: -28, armF: -57, foreF: -94, armB: -51, foreB: -88 },   // 第二口，仰到底
+      // 放下碗，头垂下来
+      { t: 2.9, torso: 18, head: 6, armF: -46, foreF: -56, armB: -40, foreB: -50 },
+      { t: 3.4, torso: 20, head: 14, armF: -44, foreF: -58, armB: -38, foreB: -52 },
+    ],
+  },
+  // ⑭ 在娘怀里打颤（循环 0.46s）。**不能拿 tremble 凑合**：那一条的底子是
+  // 「蹲窝成一小团（在哥哥怀里）」，hipY −0.30、两条腿深屈；而这会儿她是
+  // 站着被娘搂住的（pulledClose 末帧 hipY −0.05、腿几乎直）。直接切过去，
+  // 0.08 秒之内她在娘怀里往下矮 15 厘米、两条腿凭空折起来——而这是全场最近
+  // 的一个 insert（dist 2.6），躲不掉。下半身逐个数字照抄 pulledClose 的末帧，
+  // 四个关键帧一格不许动（周期动作下半身必须钉死）。
+  heldTremble: {
+    dur: 0.46, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
+      { t: 0.12, hipY: -0.062, torso: 29, head: -37 },
+      { t: 0.24, hipY: -0.048, torso: 25, head: -41 },
+      { t: 0.35, hipY: -0.058, torso: 28, head: -38 },
+      { t: 0.46, hipY: -0.05, torso: 26, head: -40 },
+    ],
+  },
+  // ⑥ 挡在门前朝菜窖指（循环 1.6s）：抬手指过去，**一顿一顿地戳两下**——
+  // 静态的 mark 挂 1.8 秒读成"举着手站着"，指人是要戳的。
+  pointHard: {
+    dur: 1.6, loop: true,
+    keys: [
+      // **角度是世界角**（上臂+前臂，0° 朝下）：首版写成 −144，比水平线还高
+      // 54°，也就是抬手指着房梁在喊「下去！」——和当年 pointLow 被退回的毛病
+      // 一模一样。菜窖口在地面上、离她五米开外，从她的肩指过去是**水平往下**
+      // 那一档，所以世界角落在 −80 上下；头也得跟着手走（torso+head 压进
+      // −20°~0°，脸朝斜前下方而不是仰着）
+      { t: 0.0, hipY: -0.05, hipX: 0.04, torso: 14, head: -26, armF: -62, foreF: -18, armB: -30, foreB: -44, thighB: -16, shinB: 20, footB: -6, thighF: 14, shinF: 10, footF: -8 },
+      { t: 0.24, hipY: -0.07, hipX: 0.09, torso: 20, head: -30, armF: -70, foreF: -12, armB: -24, foreB: -40 },   // 戳出去
+      { t: 0.5, hipY: -0.05, hipX: 0.04, torso: 15, head: -26, armF: -62, foreF: -18, armB: -30, foreB: -44 },
+      { t: 0.74, hipY: -0.07, hipX: 0.09, torso: 20, head: -30, armF: -71, foreF: -11, armB: -24, foreB: -40 },   // 再戳一下
+      { t: 1.0, hipY: -0.05, hipX: 0.04, torso: 14, head: -26, armF: -62, foreF: -18, armB: -30, foreB: -44 },
+      { t: 1.6, hipY: -0.05, hipX: 0.04, torso: 14, head: -26, armF: -62, foreF: -18, armB: -30, foreB: -44 },
+    ],
+  },
   // 坐着打盹（黄昏·匀稠的，循环 6.2s＝Core 的打盹钟同一个周期）：
   // 底子是 sitStool 的坐姿；低头 3.4s（点两下）→ 动一下 0.7s（预告，
   // Core 在这一段出衣角窸窣的 cue）→ 抬头 2.1s 看他 → 猛地又耷拉下去。
@@ -596,14 +1067,24 @@ export const TRACKS = {
   },
   // 被攥住往回带（单次）：已经冲出去半步，胳膊被从后面拽住，身子还朝前、
   // 脚却被带得往回蹭——挣了一下，没挣开
+  // dur 从 1.8 拉到 9.0（2026-08-13）：这一拍三行台词共 9 秒，老版演完 1.8 秒
+  // 就在末帧上冻住 7.2 秒——「那只手抓得很紧」「水。」两行整整六秒是一具雕像，
+  // 而且走轨道的人绕开了会呼吸的那几支。改 loop:true 更糟（每 4.6 秒把那下
+  // 猛挣重放一遍），所以是**把关键帧铺满这 9 秒**：后半段只留很慢的起伏，
+  // 下半身沿用 t=1.8 那一组数一个不改（攥着不放的余韵，不是又挣一次）。
   heldBack: {
-    dur: 1.8, loop: false,
+    dur: 9.0, loop: false,
     keys: [
       { t: 0.0, hipY: -0.06, hipX: 0.18, torso: 34, head: -28, armF: -96, foreF: -12, armB: -60, foreB: -18, thighB: -34, shinB: 36, footB: -8, thighF: 20, shinF: 12, footF: -10 },
       { t: 0.30, hipY: -0.08, hipX: 0.10, torso: 26, head: -30, armB: -128, foreB: -6, armF: -84, foreF: -20, thighB: -20, shinB: 26, thighF: 8, shinF: 10 },   // 胳膊被拽住、往后带
       { t: 0.62, hipY: -0.07, hipX: 0.16, torso: 32, head: -34, armB: -136, foreB: -4, armF: -92, foreF: -14 },      // 又挣了一下
       { t: 1.0, hipY: -0.09, hipX: 0.04, torso: 20, head: -26, armB: -124, foreB: -10, armF: -74, foreF: -28 },      // 没挣开
       { t: 1.8, hipY: -0.08, hipX: 0.02, torso: 16, head: -24, armB: -112, foreB: -16, armF: -66, foreF: -32 },
+      { t: 3.2, hipY: -0.075, torso: 14, head: -28, armB: -108, foreB: -20 },
+      { t: 4.6, hipY: -0.085, torso: 17, head: -22, armB: -116, foreB: -14 },
+      { t: 6.0, hipY: -0.075, torso: 14, head: -27, armB: -110, foreB: -18 },
+      { t: 7.4, hipY: -0.086, torso: 17, head: -21, armB: -118, foreB: -13 },
+      { t: 9.0, hipY: -0.078, torso: 15, head: -25, armB: -112, foreB: -16 },
     ],
   },
   // 抖开包袱、把里面的东西倒空（单次）：两手拎着两角一抖，再随手撇开。
@@ -791,12 +1272,19 @@ export function PoseRig(rig, s, dt) {
     // 2026-08-11 再收一档：搂的是个六岁孩子（头顶才到他大腿），直着腰搂，
     // 手悬在半空、孩子抱着他的腿——两个人各演各的。整个人**蹲下去围住她**：
     // 胯沉、腰弯，手正好落在她头肩那一带，"捂住"才读得出来
-    target.hipY = -0.24; target.hipX = 0.05;
+    // 2026-08-13 第三次修：**这个姿势的脚一直埋在土里**（实测 footF −0.083 /
+    // footB −0.049，而站姿该是 +0.078）。它是前半章占屏最久的姿势（抱妹妹→
+    // 划正字→数正字→答「快了」→车铃 13 秒五拍连着），十几厘米的陷地一直在。
+    // 腿长必须闭合：0.31·cos(大腿) + 0.31·cos(大腿+小腿) = 0.62 + hipY。
+    // 顺手把胳膊也改成"肘吊下来、前臂横过去兜住"（老版 armF −84 是把肘平端
+    // 到身前，手于是伸到孩子身后的空气里，见 pullClose 那条注释）
+    target.hipY = -0.185; target.hipX = 0.05;
     target.torso = 24 * DEG; target.head = -34 * DEG;
-    target.armF = -84 * DEG; target.foreF = 30 * DEG;    // 前臂横过来兜背（世界角 −54°）
-    target.armB = -72 * DEG; target.foreB = 14 * DEG;    // 另一只手护后脑（世界角 −58°）
-    target.thighB = -46 * DEG; target.shinB = 52 * DEG; target.footB = -6 * DEG;
-    target.thighF = -34 * DEG; target.shinF = 38 * DEG; target.footF = -8 * DEG;
+    target.armF = -20 * DEG; target.foreF = -70 * DEG;   // 前臂横过来兜背（世界角 −90°）
+    target.armB = -26 * DEG; target.foreB = -76 * DEG;   // 另一只手护后脑（世界角 −102°）
+    // foot 取负是为了让 大腿+小腿+脚 ≈ 0，鞋底才平铺朝前（脚贴图 0° 指向前）
+    target.thighB = -46 * DEG; target.shinB = 91 * DEG; target.footB = -45 * DEG;
+    target.thighF = -34 * DEG; target.shinF = 89 * DEG; target.footF = -55 * DEG;
   } else if (s.pose === "pressed") {
     // 被按下去的那一下：不是自己蹲的——膝盖是被压弯的，肩往下沉、脖子缩起来。
     // 比常规半蹲低一大截，娘的手才落得到肩上（两个姿势是一对，一起改）
@@ -838,6 +1326,105 @@ export function PoseRig(rig, s, dt) {
     target.armB = -46 * DEG; target.foreB = -54 * DEG;
     target.thighB = -12 * DEG; target.shinB = 14 * DEG; target.footB = -6 * DEG;
     target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "liftChild") {
+    // 站着把孩子托起来（第三道线那一拍：抱着妹妹够门框上的刻痕，要托住她
+    // 整整两拍）。老版这两拍柱子摆的是 `shelter`——那是**蹲下去围住她**的
+    // 姿势（hipY −0.24），可她此刻被抬到 0.52m 高、正在够 0.98m 的门框：
+    // 一个蹲着的人托着一个悬在半空的孩子，两个人各演各的。
+    // 落点是**照她实际吊在哪儿反算的**：她站在他身前 0.43m、被抬起 0.52m，
+    // 屁股（连着 lift）落在 0.88m 高。所以手必须停在身前 0.35m、离地 0.88m
+    // ⇒ 相对肩点 (0.438, −0.119)、长 0.454 < 臂长 0.49 ⇒ 上臂 −53、前臂 −44
+    // （两节相加 −97 ＝ 前臂朝前偏上，正是"兜着往上托"那个形）。
+    // 首轮实拍就是栽在没反算上：手停在 0.62m，离她屁股还有 0.3m，
+    // 一个举着空气、一个浮在半空。
+    const br = Math.sin(s.breath || 0);
+    target.hipY = -0.03 + br * 0.008; target.hipX = -0.02;
+    target.torso = (-8 + br * 1.2) * DEG;      // 后仰配重：怀里那点分量全压在腰上
+    target.head = (2 - br * 1.4) * DEG;
+    target.armF = (-53 + br * 1.5) * DEG; target.foreF = -44 * DEG;   // 兜在她屁股底下
+    target.armB = (-47 + br * 1.5) * DEG; target.foreB = -38 * DEG;   // 另一只手扶着她的背
+    // 托着人站不成立正：一脚在前撑住
+    target.thighB = -14 * DEG; target.shinB = 16 * DEG; target.footB = -6 * DEG;
+    target.thighF = 12 * DEG; target.shinF = 8 * DEG; target.footF = -8 * DEG;
+  } else if (s.pose === "pinDown") {
+    // 按住躺着的伤员（c1_rescue 末段，长按 5 秒）。老版用的是 shelter——那是
+    // 「蹲下去围住一个六岁孩子」，手落在离地 0.94m、身前 0.50m，而躺着的人
+    // 肩膀离地才 0.25m：画面上是一个孩子蹲在旁边、两只手悬在空中大半米按着
+    // 空气（历史上被退回过的「哪里按住了？」）。
+    // 几何：跪姿 + **腰折到 46°** 把肩带到身前 —— 肩点落在世界 (身前 0.257,
+    // 离地 0.456)，压肩的手要去 (0.35, 0.25)，相对量只有 0.226m，够得着。
+    // 长按的行程喂进 poseK（越按越沉），所以它登记在 World 的 poseU 名单里。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.36; target.hipX = 0.04;
+    target.torso = (46 + 3 * k) * DEG; target.head = -16 * DEG;
+    target.armF = (-60 - 6 * k) * DEG; target.foreF = (36 + 4 * k) * DEG;   // 压住肩（世界角 ≈ −24）
+    target.armB = 10 * DEG; target.foreB = 30 * DEG;                        // 另一只手托后颈（正值＝往身后够）
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+  } else if (s.pose === "ladleSteady") {
+    // 托着瓢喂水（c1_rescue 第一段，长按 3.4 秒）。同上：跪姿 + 腰折 40°，
+    // 手落在伤员的嘴那一带（离地 ≈0.22m、身前 ≈0.30m）。
+    // 「越托越沉」由长按的行程驱动（poseK ← poseU）——老版这 3.4 秒是一帧死值。
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    target.hipY = -0.36; target.hipX = 0.03;
+    target.torso = (40 + 4 * k) * DEG; target.head = -18 * DEG;
+    target.armF = -48 * DEG; target.foreF = (31 - 4 * k) * DEG;
+    target.armB = -30 * DEG; target.foreB = 22 * DEG;
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+  } else if (s.pose === "twistTie") {
+    // 拧紧袋口、绕绳扎回去（c1_forage 第四道手）。玩家真的在拿鼠标绕圈，
+    // 老版画面上却是"跪着、两条胳膊直直垂在身侧"——手在离地 17 厘米处，
+    // 离袋口 38 厘米，整个"拧绕扎"没有一帧动画。
+    // **后手攥住袋颈基本不动，只前手绕**（两只手同相位就成了拜佛）。
+    const a = (s.poseK ?? 0) * Math.PI * 4;      // 两圈
+    target.hipY = -0.34; target.hipX = 0.04;
+    target.torso = 34 * DEG; target.head = -44 * DEG;
+    target.armB = (-58 + Math.sin(a) * 3) * DEG; target.foreB = -24 * DEG;
+    target.armF = (-62 + 14 * Math.sin(a)) * DEG; target.foreF = (-30 + 16 * Math.cos(a)) * DEG;
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+  } else if (s.pose === "bandageWrap") {
+    // 布条穿过肩下、绕到背后、再拉回胸前（c1_rescue 两道包扎）。玩家在绕圈，
+    // 老版这两步也是 `pose:"kneel"`＝一帧死值。跟 twistTie 同一路，
+    // 但圆心低得多——绕的是躺着的人的肩（离地 0.25m 上下）。
+    // **两只手反相**：一只手把布条送到肩下，另一只手在背后接住，一送一接
+    // 才是"绕"；同相位就成了拍手。
+    const a = (s.poseK ?? 0) * Math.PI * 4;
+    target.hipY = -0.36; target.hipX = 0.05;
+    target.torso = 44 * DEG; target.head = -20 * DEG;
+    target.armF = (-52 + 16 * Math.sin(a)) * DEG; target.foreF = (26 + 18 * Math.cos(a)) * DEG;
+    target.armB = (-40 + 16 * Math.sin(a + Math.PI)) * DEG; target.foreB = (20 + 18 * Math.cos(a + Math.PI)) * DEG;
+    target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
+    target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
+  } else if (s.pose === "heldChild") {
+    // 被抱在怀里的孩子（与 childArms 走姿成对）。老版给的是 leanIn——那是
+    // **站姿**（hipY −0.05、大腿 −10°、小腿 12°，腿几乎是直的），于是被抱起来
+    // 的妹妹笔直地垂着两条腿浮在他身前。真被抱着的孩子：腿折起来搭在他小臂上，
+    // 两只手往上够、搂住他的脖子（他的脖根在 0.98m，她坐在 0.82m ⇒ 手往上
+    // 够 0.16m ⇒ 前臂世界角落在 −140 上下）。
+    const br = Math.sin(s.breath || 0);
+    target.hipY = -0.05; target.hipX = 0.06;
+    target.torso = (10 + br * 1.4) * DEG; target.head = (-22 - br * 1.6) * DEG;
+    // 两条胳膊往上够着搂脖子：肘吊在体侧，前臂折上去（错开 6° 免得叠成一条）
+    target.armF = -46 * DEG; target.foreF = -94 * DEG;
+    target.armB = -40 * DEG; target.foreB = -100 * DEG;
+    // 腿折起来（大腿收到身前、小腿垂下去），一前一后错开
+    target.thighF = -70 * DEG; target.shinF = 80 * DEG; target.footF = -6 * DEG;
+    target.thighB = -62 * DEG; target.shinB = 72 * DEG; target.footB = -4 * DEG;
+  } else if (s.pose === "heldUp") {
+    // 被托在半空的孩子（与 liftChild 成对）。老版她用的是 `mark`——那是
+    // **站在地上**伸手比划的姿势，两条腿笔直踩着空气，人就这么浮在门框前。
+    // 被抱起来的孩子：腿是垂着且屈的（没处使劲）、一只手够着要画的地方、
+    // 另一只手扒着哥哥的肩借力。
+    const br = Math.sin(s.breath || 0);
+    target.hipY = 0; target.hipX = 0.02;
+    target.torso = (8 + br * 1.5) * DEG; target.head = -22 * DEG;
+    target.armF = -150 * DEG; target.foreF = -14 * DEG;   // 够门框（同 mark 那只手）
+    target.armB = -46 * DEG; target.foreB = 96 * DEG;     // 扒着他的肩
+    // 两条腿垂着、膝盖松松地屈——错开一前一后，不然侧视里只剩一条
+    target.thighB = -18 * DEG; target.shinB = 46 * DEG; target.footB = -14 * DEG;
+    target.thighF = -34 * DEG; target.shinF = 58 * DEG; target.footF = -16 * DEG;
   } else if (s.pose === "swing") {
     // 抡枪托：胳膊举到头顶后方，整个人拧过去
     target.hipY = -0.08; target.hipX = -0.10;
@@ -848,8 +1435,12 @@ export function PoseRig(rig, s, dt) {
     target.thighF = 20 * DEG; target.shinF = 10 * DEG; target.footF = -12 * DEG;
   } else if (s.pose === "bow") {
     // ── 动词姿势（规范：每个玩法动词都要有对应动画）──
-    // 弯腰拾东西：塌腰探手，另一只手向后压着找平衡
-    target.hipY = -0.30; target.hipX = 0.10;
+    // 弯腰拾东西：塌腰探手，另一只手向后压着找平衡。
+    // **胯不许压到 −0.30**：脚整个陷进地里（挨巴掌那一镜里柱子成了"半截人"）。
+    // 闭合式：踝落在鞋底高度 ⇒ hipY = 两节腿的竖直投影 − 0.62。
+    // 这两条腿投影 0.31·cos46 + 0.31·cos(46−52) = 0.524 ⇒ hipY = −0.096。
+    // 弯腰弯的是腰不是腿，胯本来就只该沉一点点
+    target.hipY = -0.096; target.hipX = 0.10;
     target.torso = 58 * DEG; target.head = -30 * DEG;
     target.armF = -78 * DEG; target.foreF = -18 * DEG;
     target.armB = -22 * DEG; target.foreB = -10 * DEG;
@@ -1453,6 +2044,35 @@ export function PoseRig(rig, s, dt) {
     // 近侧提东西那只：摆幅按分量收掉，肘按分量伸开（w=1 时几乎是一根直杆）
     target.armF = ((c ? swing2 * (26 - 20 * w) : -4 - br * 2) + 6 * w) * DEG;
     target.foreF = ((c ? -16 + Math.max(0, swing2) * 20 : -14 - br * 3) * (1 - w) - 4 * w) * DEG;
+  } else if (s.childArms) {
+    // 抱着一个孩子走（序·那天：抱起妹妹下窖）。**这是个走姿，不是定格姿势**
+    // ——老版只在按下那一帧闪 0.8 秒 shelter，之后柱子甩着两条空胳膊照常走，
+    // 妹妹浮在他胸口跟着飘（"抱"字一点证据都没有）。
+    //
+    // 三笔就够：**两臂都抬到胸前兜住她**（前臂折回来托在她屁股底下，
+    // 世界角落在 −60° 上下＝手停在自己身前 0.3m、离地 0.75m，正是她坐着的
+    // 那个高度）、**身子往后仰配重**（怀里那点分量全压在腰上）、
+    // **步幅收掉一档**（抱着人迈不开步，也不敢颠）。
+    const c = s.moving ? 1 : 0;
+    const br = Math.sin(s.breath || 0);
+    // 起伏比空手小得多：颠孩子的人会自己把步子放软
+    target.hipY = c ? Math.abs(Math.sin(p)) * 0.018 : br * 0.010;
+    target.hipX = -0.03;
+    target.torso = (c ? -7 : -6 + br * 1.0) * DEG;      // 后仰配重
+    target.head = (c ? 4 : 3 - br * 1.2) * DEG;
+    // 腿：步幅 30→20、小腿折度 52→36
+    target.thighB = (c ? swing2 * 20 : -3) * DEG;
+    target.shinB = (c ? Math.max(0, -swing2) * 36 : 4) * DEG;
+    target.footB = (c ? -swing2 * 8 - 4 : -3) * DEG;
+    target.thighF = (c ? swing * 20 : 3) * DEG;
+    target.shinF = (c ? Math.max(0, -swing) * 36 : 2) * DEG;
+    target.footF = (c ? -swing * 8 - 4 : -3) * DEG;
+    // 两条胳膊都不摆——它们正兜着人。近侧托屁股（世界角 −58），
+    // 远侧扶后背略高一点（−66），错开一档才不叠成一条
+    target.armF = (-96 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
+    target.foreF = (38 - (c ? Math.sin(p) * 2 : 0)) * DEG;
+    target.armB = (-104 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
+    target.foreB = (38 - (c ? Math.sin(p) * 2 : 0)) * DEG;
   } else if (s.carry) {
     // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
     // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。
@@ -1474,21 +2094,29 @@ export function PoseRig(rig, s, dt) {
     target.shinF = Math.max(0, -swing) * 34 * st * DEG;
     target.footF = -swing * 8 * st * DEG;
   } else if (s.moving) {
-    // 走：大腿摆、小腿在后摆时折起、手臂反向摆、躯干微前倾、上下起伏
-    target.hipY = Math.abs(Math.sin(p)) * 0.035;
-    target.hipX = 0;
-    target.torso = 5 * DEG;
-    target.head = -2 * DEG;
-    target.thighB = swing2 * 30 * DEG;
-    target.shinB = Math.max(0, -swing2) * 52 * DEG;
+    // 走/跑：大腿摆、小腿在后摆时折起、手臂反向摆、躯干微前倾、上下起伏。
+    // **跑不是把走路放快**（2026-08-13）：老版这一支的幅度写死，于是娘 3.4m/s
+    // 冲进屋、妹妹追出去、谁被追着跑，画面上都是同一副散步的架势，只是位移快。
+    // g = 0 走 / 1 跑，由 World 按实测速度给（1.5→3.2m/s）。跑起来四件事一起变：
+    // 步幅张开、小腿在后摆时收得更狠（后跟踢屁股）、躯干压到前面去、
+    // 手臂抡起来并把肘折死（跑的人不会甩着两条直胳膊）
+    const g = Math.max(0, Math.min(1, s.gait || 0));
+    target.hipY = Math.abs(Math.sin(p)) * (0.035 + 0.030 * g);
+    target.hipX = 0.03 * g;
+    target.torso = (5 + 13 * g) * DEG;
+    target.head = (-2 - 9 * g) * DEG;      // 躯干压前，脖子抬回来（脸不许冲着自己的脚）
+    const legAmp = 30 + 18 * g, shinAmp = 52 + 34 * g;
+    target.thighB = swing2 * legAmp * DEG;
+    target.shinB = Math.max(0, -swing2) * shinAmp * DEG;
     target.footB = (-swing2 * 12 - 4) * DEG;
-    target.thighF = swing * 30 * DEG;
-    target.shinF = Math.max(0, -swing) * 52 * DEG;
+    target.thighF = swing * legAmp * DEG;
+    target.shinF = Math.max(0, -swing) * shinAmp * DEG;
     target.footF = (-swing * 12 - 4) * DEG;
-    target.armB = swing * 26 * DEG;
-    target.foreB = (-16 + Math.max(0, swing) * 20) * DEG;
-    target.armF = swing2 * 26 * DEG;
-    target.foreF = (-16 + Math.max(0, swing2) * 20) * DEG;
+    const armAmp = 26 + 24 * g;
+    target.armB = swing * armAmp * DEG;
+    target.foreB = (-16 - 30 * g + Math.max(0, swing) * (20 + 14 * g)) * DEG;
+    target.armF = swing2 * armAmp * DEG;
+    target.foreF = (-16 - 30 * g + Math.max(0, swing2) * (20 + 14 * g)) * DEG;
   } else {
     // 站立：呼吸带动肩与头，重心轻微前后
     const br = Math.sin(s.breath || 0);
@@ -1500,6 +2128,30 @@ export function PoseRig(rig, s, dt) {
     target.thighF = 3 * DEG; target.shinF = 2 * DEG; target.footF = -3 * DEG;
     target.armB = (4 + br * 2) * DEG; target.foreB = (-12 - br * 3) * DEG;
     target.armF = (-4 - br * 2) * DEG; target.foreF = (-14 - br * 3) * DEG;
+  }
+
+  // ── 生命体征：戏剧姿势也得喘气（2026-08-13）──────────────────────────
+  // 只有"站着"那一支有呼吸，**所有一次性戏剧姿势都是死值**——按住搂紧 15 秒、
+  // 坐着吃饭一整拍、靠墙坐着两拍、跪在灶前……画面上是一张完全不变的贴图。
+  // 用户说的"生硬"，最长的几处就在这儿。
+  //
+  // 但**不许一刀切**，两条红线：
+  // ① 手上有活、靠 AimFrontHand 两骨反解落在挂点上的那几支（crank/heaveMat/
+  //    dragPlank/scoopAsh/unwrapJar/planePush…）不许再叠角度——叠了手就从
+  //    把手上被推开，RenderHealthTest 的「手真落在挂点上」当场红。
+  // ② 跪/按/咬布这几支的膝与手是贴着地的，hipY 一起伏就有一半时间陷进地里。
+  // 所以走白名单，且 hipY 只给站/坐/搂那几支。
+  const CALM_BREATH = new Set(["kneel", "bow", "leanIn", "shelter", "mark", "sitStool",
+    "sitSide", "clothMouth", "press", "pressed", "puzzled", "sleep", "liftChild", "heldUp"]);
+  const NO_HIP = new Set(["kneel", "press", "pressed", "clothMouth", "sleep"]);
+  if (!tracked && !s.moving && s.pose && CALM_BREATH.has(s.pose)) {
+    const br = Math.sin(s.breath || 0);
+    const b2 = Math.sin((s.breath || 0) * 0.83);      // 手上那一路错开相位，别跟着胸口一起点头
+    target.torso += br * 1.6 * DEG;
+    target.head -= br * 1.9 * DEG;
+    target.armF += b2 * 1.4 * DEG;
+    target.armB -= b2 * 1.2 * DEG;
+    if (!NO_HIP.has(s.pose)) target.hipY += br * 0.020;
   }
 
   ApplyPose(rig, t, target, blend);
