@@ -3187,6 +3187,125 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = nul
   }
 }
 
+/**
+ * 院墙的**东山头**：墙到这儿到头，拐个直角往院里去。
+ *
+ * 这一件是为「躲在墙后头」画的（车铃那一拍）。横版里"藏"只有一条读法：
+ * **有一坨挡得住人的东西，横在你和危险中间**。原来那儿只有一堵 building 带
+ * 的背景院墙（z=−3.4，画得又小又淡，还在人**背后**），于是两个孩子看着就是
+ * 大白天杵在伪军跟前——用户退回的正是这个。
+ *
+ * 所以这件东西有三条硬指标，改画法时一条都不能丢：
+ *  ① **高过人**：柱子 1.38m，墙头 2.0m 上下——站着也挡得住，不是"蹲下才行"；
+ *  ② **拐角要看得出来**：正面（朝街那面）是墙头，西边接着往院里去的那一段
+ *     **短、暗、往回收**——这道暗面就是墙根阴影的由头，两个孩子贴的就是它；
+ *  ③ **实**：色号往下压两档（CanvasTexture 上屏提亮），淡了就又成了一张纸片。
+ *
+ * @param w 朝街那面的宽（画布像素），@param h 墙头高（画布像素）
+ */
+export function DrawYardWallEnd(ctx, x, groundY, w, h, id, { slogan = null } = {}) {
+  const x0 = x - w / 2, x1 = x + w / 2;
+  // 东头那截**门垛**（土坯垒的方墩子，比墙身厚也高）与它西边接着的**墙身**。
+  // 第一版把整件画成等高的一堵、西边再糊一块暗面，实拍读出来是"一间带门的
+  // 小房子"——因为「一块暗板 + 一条亮边 + 一顶苫草」正好是门洞的语汇。
+  // 现在靠**高低差**说话：墙身矮一截、门垛拔起来，剪影自己就是个拐角。
+  const pierW = Math.min(w * 0.48, 1.9 * 48);
+  const xp = x1 - pierW;                    // 墙身与门垛的分界
+  const runH = h * 0.70;
+
+  const seg = (a, b, hh, fill, shade, seed) => {
+    const top = RaggedTop(a, b, groundY - hh, id + seed, { sag: 3.2, n: Math.max(5, Math.round((b - a) / 9)) });
+    InkFill(ctx, top.concat([[b, groundY], [a, groundY]]), id + "f" + seed,
+      fill, { amp: 1.8, lw: 2.3, shade });
+    WeatherAdobe(ctx, a, groundY - hh, b - a, hh, id + "wa" + seed,
+      { course: 13, gullies: 3, cracks: 2, patches: 2 });
+    return top;
+  };
+
+  // ① 墙身（西，矮一截）：往西一直接到背景那堵自家院墙上去
+  seg(x0, xp + 3, runH, "#4b4029", "rgba(28,20,11,0.30)", "run");
+  // ② 门垛（东，拔起来）
+  const pierTop = seg(xp, x1, h, "#453a26", "rgba(28,20,11,0.32)", "pier");
+  Speckle(ctx, xp, groundY - h, pierW, h, id + "sp", { count: 16, alpha: 0.10 });
+
+  // ③ 门垛朝西那面是背光的：一层化开的暗，**不许是一块方板**
+  //（方板＝门洞。第一版就栽在这儿）
+  ctx.save();
+  const g = ctx.createLinearGradient(xp - pierW * 0.35, 0, xp + pierW * 0.55, 0);
+  g.addColorStop(0, "rgba(14,10,6,0)");
+  g.addColorStop(0.55, "rgba(14,10,6,0.34)");
+  g.addColorStop(1, "rgba(14,10,6,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(xp - pierW * 0.35, groundY - h - 6, pierW * 0.9, h + 8);
+  ctx.restore();
+  // 阳角那道棱：拐角之所以读得出是拐角，全靠这一条竖线 + 上头的高低差
+  InkLine(ctx, xp + Sym(id + "cn", 0, 1.4), groundY - runH + 2, xp + Sym(id + "cn", 1, 1.4), groundY,
+    id + "corner", { lw: 2.0, color: IN.inkSoft, amp: 0.7 });
+
+  // ④ 墙头苫的谷草（照 DrawYardWall 那条：一整领压上去，不是一排牌位）。
+  //   两截各苫各的，门垛那顶厚一档——高低差在草上也要看得出来
+  const cap = (a, b, topPts, thick, seed) => {
+    const capTopY = (px) => {
+      const t = Math.max(0, Math.min(1, (px - a) / Math.max(1, b - a)));
+      const f = t * (topPts.length - 1);
+      const i0 = Math.min(topPts.length - 2, Math.floor(f));
+      return topPts[i0][1] + (topPts[i0 + 1][1] - topPts[i0][1]) * (f - i0);
+    };
+    const sd = Hash(id + seed) * 6.28;
+    const bald = (a + b) / 2 + Sym(id + "bd" + seed, 0, (b - a) * 0.25);
+    const Thick = (px) => {
+      const worn = Math.max(0, 1 - ((px - bald) / Math.max(8, (b - a) * 0.28)) ** 2);
+      return Math.max(0, (thick + Math.sin(px * 0.07 + sd) * 1.7) * (1 - worn * 0.85));
+    };
+    const lower = [], upper = [];
+    const n2 = Math.max(8, Math.round((b - a) / 3.5));
+    for (let i = 0; i <= n2; i += 1) {
+      const px = a + ((b - a) * i) / n2;
+      const base = capTopY(px);
+      const burr = (i % 2 ? 1.7 : 0) + Rnd(id + "cpt" + seed, i) * 2.0;
+      lower.push([px, base + 2.5]);
+      upper.push([px, base - Thick(px) - (Thick(px) > 1 ? burr : 0)]);
+    }
+    InkFill(ctx, lower.concat(upper.reverse()), id + "cap" + seed,
+      "#443919", { amp: 0.9, lw: 1.2, line: IN.inkSoft, shade: "rgba(22,16,6,0.32)" });
+    ctx.save();
+    ctx.lineWidth = 0.9;
+    for (let i = 0; i < Math.round((b - a) / 3); i += 1) {
+      const px = a + 2 + Rnd(id + "cw" + seed, i) * (b - a - 4);
+      const th = Thick(px);
+      if (th < 1.5) continue;
+      const py = capTopY(px) - th * (0.15 + Rnd(id + "cv" + seed, i) * 0.7);
+      ctx.globalAlpha = 0.26 + Rnd(id + "ca" + seed, i) * 0.3;
+      ctx.strokeStyle = i % 3 === 0 ? "#413516" : "#7b6b42";
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + (i % 2 ? 4 : -4), py + 1.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+    for (let i = 0; i < 4; i += 1) {
+      const px = a + 4 + Rnd(id + "dg" + seed, i) * (b - a - 8);
+      if (Thick(px) < 2) continue;
+      InkLine(ctx, px, capTopY(px) + 2, px + Sym(id + "dg2" + seed, i, 2.4),
+        capTopY(px) + 6 + Rnd(id + "dg3" + seed, i) * 7,
+        id + "drp" + seed + i, { lw: 1.1, color: "#5f5233", amp: 1.2 });
+    }
+  };
+  cap(xp - 2, x1 + 2, pierTop, 6.2, "pier");
+  cap(x0 - 2, xp - 1, RaggedTop(x0, xp + 3, groundY - runH, id + "run", { sag: 3.2, n: Math.max(5, Math.round((xp + 3 - x0) / 9)) }), 4.6, "run");
+
+  // ⑤ 墙根壅土：一坨堆上去的东西，四边不许直
+  InkFill(ctx, [[x0 - 5, groundY], [x0 + 4, groundY - 6], [(x0 + xp) / 2, groundY - 8],
+    [xp, groundY - 7], [(xp + x1) / 2, groundY - 9], [x1 - 3, groundY - 6], [x1 + 6, groundY]],
+    id + "ft", "#3e3423", { amp: 1.5, lw: 1.5, shade: "rgba(17,12,7,0.30)" });
+
+  // ⑥ 石灰刷的日伪口号刷在墙身上（这年月的村墙本来就压着两层字）
+  if (slogan) {
+    const size = Math.min(22, (xp - x0) * 0.72 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, (x0 + xp) / 2, groundY - runH * 0.55, slogan.text, size, id + "sl", slogan);
+  }
+}
+
 // 鸡窝：半人高的土坯拱洞，顶上苫草，洞口垫一块踏脚石
 // 鸡窝。上一版画成了对称人字顶 + 拱门 + 门前一块台阶石——那是**西式狗窝**，
 // 1942 年冀中农家不会有这东西。按华北旱作区的实物重画：
@@ -12237,12 +12356,22 @@ export function DrawTearCard(ctx, W, H, view, L, t) {
 
   // ── 裂口之后：撕下来的那条（rip 前锋 → 手上的角），毛边发白 ──
   if (nicked) {
-    const sag = 14 * S + Math.sin(t * 2.2) * 3 * S;
+    // 撕下来的那条**是挂着的，不是一块板**：撕口那头还连在布上、手那头被
+    // 提着，中间必然坠下去一截。老版只有四个角、四条直边，加上 InkFill 默认那支
+    // 暖墨线（布身用的是近黑的 rgba(3,4,6)），读出来是"半空里横着一块牌子"。
+    // 中间补一个坠点、墨线换成跟布同一支，它才挂得住
+    const rx = Math.max(x0, ripX);
+    const sag = 16 * S + Math.sin(t * 2.2) * 4 * S;
+    const mx = (rx + cor.x) / 2, my = (y0 + cor.y) / 2 + sag;
     InkFill(ctx, [
-      [Math.max(x0, ripX), y0], [cor.x - 6 * S, cor.y - stripH * 0.5],
+      [rx, y0],
+      [mx, my - stripH * 0.42],
+      [cor.x - 6 * S, cor.y - stripH * 0.5],
       [cor.x + 6 * S, cor.y + stripH * 0.45],
-      [Math.max(x0, ripX) + 8 * S, y0 + stripH + sag * 0.2],
-    ], "trStrip", "#26303f", { amp: 3.4 * S, lw: 4 * S, shade: "rgba(0,0,0,0.24)" });
+      [mx, my + stripH * 0.5],
+      [rx + 8 * S, y0 + stripH + sag * 0.2],
+    ], "trStrip", "#26303f",
+    { amp: 4.2 * S, lw: 4 * S, line: "rgba(3,4,6,0.9)", shade: "rgba(0,0,0,0.24)" });
     // rip 前锋：一撮发白的毛边线头
     ctx.save();
     ctx.strokeStyle = "rgba(190,198,212,0.75)";
@@ -12257,6 +12386,80 @@ export function DrawTearCard(ctx, W, H, view, L, t) {
     ctx.restore();
   }
 
+  // ── 按空的那一下：手落在布面上、没揪住角 ──
+  // 平摊的布被按住只会陷个窝，抻痕顺着布纹朝那个角跑——**布在指路，不是画箭头**
+  //（第 8 条：图形提示必须钉在被操作的东西上）。老版这一下画面上一点动静都
+  // 没有，读出来就是"这玩意儿坏了"（2026-08-14 用户：「拖什么都没反应」）
+  if (view.press) {
+    const px = view.press.x * W, py = view.press.y * W, k = view.press.k;
+    ctx.save();
+    ctx.globalAlpha = k * 0.55;
+    const dg = ctx.createRadialGradient(px, py, 2 * S, px, py, 34 * S);
+    dg.addColorStop(0, "rgba(6,9,14,0.75)");
+    dg.addColorStop(1, "rgba(6,9,14,0)");
+    ctx.fillStyle = dg;
+    ctx.beginPath();
+    ctx.ellipse(px, py, 34 * S, 20 * S, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 抻痕：从按住的地方一道道扯向布角。**长度按到角的距离给**——写死几十像素
+    // 的话它只在指头边上戳出三根短毛，指不到任何地方；扯过半程才读得出
+    // "这块布是被那个角牵着的"
+    // cor 在函数开头就已经乘过 W 了（是像素，不是卡宽）——再乘一次，抻痕会
+    // 一律指向右下 45° 冲出画布
+    const dx2 = cor.x - px, dy2 = cor.y - py;
+    const reach = Math.max(120 * S, Math.hypot(dx2, dy2) * 0.55);
+    const ang = Math.atan2(dy2, dx2);
+    ctx.strokeStyle = "rgba(158,176,204,0.9)";
+    ctx.lineCap = "round";
+    for (let i = 0; i < 3; i += 1) {
+      const a2 = ang + (i - 1) * 0.13;
+      ctx.globalAlpha = k * (0.55 - i * 0.09);
+      ctx.lineWidth = (3 - i * 0.6) * S;
+      ctx.beginPath();
+      ctx.moveTo(px + Math.cos(a2) * 24 * S, py + Math.sin(a2) * 24 * S);
+      ctx.quadraticCurveTo(
+        px + Math.cos(a2) * reach * 0.5 + Sym("trPull", i, 10 * S),
+        py + Math.sin(a2) * reach * 0.5 + Sym("trPullY", i, 8 * S),
+        px + Math.cos(a2) * reach * (1 - i * 0.08), py + Math.sin(a2) * reach * (1 - i * 0.08),
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 那个**翘起来的角**：平摊的一大片布上唯一立着的一块 ──
+  // 「摆在地上的东西认不出来是能抓的」那一条：侧看没厚度就等于没画，所以这一角
+  // 要有翻起来的里子、一道折棱、一撮线头——玩家凭形就知道这儿能捏
+  if (!nicked) {
+    const fx = cor.x, fy = cor.y, lift = 30 * S;
+    InkFill(ctx, [
+      [fx - 52 * S, fy + 10 * S],
+      [fx - 20 * S, fy - lift],
+      [fx + 30 * S, fy - lift * 0.5],
+      [fx + 14 * S, fy + 18 * S],
+    ], "trFlap", "#3b4a63", { amp: 3 * S, lw: 4.5 * S, line: "rgba(3,4,6,0.92)", shade: "rgba(0,0,0,0.2)" });
+    ctx.save();
+    // 折棱：布翻过来的那道脊
+    ctx.strokeStyle = "rgba(140,158,188,0.5)";
+    ctx.lineWidth = 2.4 * S;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(fx - 48 * S, fy + 8 * S);
+    ctx.quadraticCurveTo(fx - 18 * S, fy - lift * 0.5, fx + 26 * S, fy - lift * 0.42);
+    ctx.stroke();
+    // 角尖上翘起的几根线头
+    ctx.strokeStyle = "rgba(186,196,212,0.6)";
+    ctx.lineWidth = 1.4 * S;
+    for (let i = 0; i < 4; i += 1) {
+      const sx2 = fx + (18 + i * 4) * S, sy2 = fy - lift * (0.5 + i * 0.02);
+      ctx.beginPath();
+      ctx.moveTo(sx2, sy2);
+      ctx.lineTo(sx2 + Sym("trFlapFray", i, 7 * S) + 5 * S, sy2 - (6 + i * 2) * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ── 手：抓着布角（grab）或伸过去（reaching）；没上手时布角自己招呼 ──
   if (view.grab) {
     SplitHand(ctx, cor.x + 8 * S, cor.y + 4 * S, S, 1, true);
@@ -12265,6 +12468,28 @@ export function DrawTearCard(ctx, W, H, view, L, t) {
     SplitHand(ctx, x0 + 40 * S, y0 + h * 0.6, S, -1, false);
     const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.4 + 0.3 * Math.sin(t * 3.0);
     KnotGlow(ctx, cor.x, cor.y, L.grabR * W * 1.3, 0.12 + pulse * 0.22);
+    // **往哪儿拽**：一道浅光顺着布面从角往西跑，一下一下地重复。方向这件事
+    // 光靠一团呼吸的光说不出来（第 8 条只许两条路：写进文案 / 长在实物上——
+    // 这是后一条，它跑在布纹上，不是一支悬空的箭头）。
+    // 裂口一开就撤：那之后这条线正压在撕开的那道口上，读成布面上的划痕，
+    // 而"顺着裂口拽到头"那句话已经把方向说了
+    if (!nicked) {
+      const ph = (t * 0.62) % 1;
+      const sxA = cor.x - ph * 0.20 * W, sxB = sxA - 0.075 * W;
+      ctx.save();
+      ctx.globalAlpha = 0.34 * Math.sin(Math.PI * ph);
+      ctx.strokeStyle = "rgba(255,240,200,0.9)";
+      ctx.lineCap = "round";
+      for (let i = 0; i < 2; i += 1) {
+        ctx.lineWidth = (3.2 - i * 1.2) * S;
+        const sy3 = y0 + stripH * (0.45 + i * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(Math.max(x0 + 12 * S, sxA), sy3);
+        ctx.lineTo(Math.max(x0 + 12 * S, sxB), sy3 + Sym("trGuide", i, 3 * S));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   // ── 板缝漏下来的月光条：两条，斜着（加色） ──

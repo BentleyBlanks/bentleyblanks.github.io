@@ -1453,6 +1453,84 @@ export function CreateWorld(canvasEl) {
     group.add(mesh);
   }
 
+  /**
+   * 墙根的阴影（scene.shades）：**有墙就有的那一条**，不是潜行段那种会走的灯影。
+   *
+   * 为什么非画不可：车铃那一拍的失败判据是「走出阴影」，可画面上从来没有一片
+   * 阴影——玩家读到的是"大白天站在伪军跟前"（2026-08-14 用户退回）。
+   * 判定说得出的东西，画面上就得看得见，两边还得是同一个 x 区间。
+   *
+   * 两张：**地上一摊**（躺平，压在地表贴图上）＋ **空气里一片**（立着，排在
+   * 演员之前）。缺后者的话，人站进去还是原来那个亮度——"他在影子里"就没了。
+   * 后者是"该让开还是该更透"那条的**例外**：影子本来就该盖在人身上，
+   * 所以它薄（0.30 上下）、四边化开、东边那道稍硬——那道边就是"别过线"。
+   */
+  function AddWallShade(s) {
+    const deep = s.deep ?? 0.62;
+    const h = s.h ?? 1.6;
+    const mkTex = (vertical) => {
+      const W = 256, H = 128;
+      const c = MakeCanvas(W, H);
+      const cc = c.getContext("2d");
+      // 色号要**黑得离谱**才对：CanvasTexture 没声明 colorSpace，上屏被当成
+      // 线性值提亮一大截（同全场那笔老账）。第一版 rgba(9,13,23,0.5) 渲出来
+      // 几乎看不出人站进去暗了——实拍量的，别信色值
+      cc.fillStyle = `rgba(6,6,10,${deep})`;
+      cc.fillRect(0, 0, W, H);
+      cc.globalCompositeOperation = "destination-in";
+      // 横向：西边化开得慢（墙根一路铺过去），东边收得紧——那是日头那条边
+      const gh = cc.createLinearGradient(0, 0, W, 0);
+      gh.addColorStop(0, "rgba(0,0,0,0)");
+      gh.addColorStop(0.17, "rgba(0,0,0,1)");
+      gh.addColorStop(0.90, "rgba(0,0,0,1)");
+      gh.addColorStop(1, "rgba(0,0,0,0)");
+      cc.fillStyle = gh;
+      cc.fillRect(0, 0, W, H);
+      // 纵向：立着的那张贴地最浓、往上化开；躺着的那张离墙最浓、往镜头化开。
+      // **立着那张的上沿必须化到零**：留 0.10 的底就是在天上横一条笔直的暗边，
+      // 整片当场读成"贴了块灰玻璃"，不是影子（第一版实拍就是这么露的馅）
+      const gv = cc.createLinearGradient(0, 0, 0, H);
+      if (vertical) {
+        gv.addColorStop(0, "rgba(0,0,0,0)");
+        gv.addColorStop(0.34, "rgba(0,0,0,0.30)");
+        gv.addColorStop(0.70, "rgba(0,0,0,0.82)");
+        gv.addColorStop(1, "rgba(0,0,0,1)");
+      } else {
+        // 躺着那张**两头都要化开**：只化远端的话，近端在地上留一条笔直的暗边，
+        // 走路那一镜里读成"路上挖了个坑"（实拍抓的）
+        gv.addColorStop(0, "rgba(0,0,0,0)");
+        gv.addColorStop(0.30, "rgba(0,0,0,1)");
+        gv.addColorStop(0.62, "rgba(0,0,0,0.66)");
+        gv.addColorStop(1, "rgba(0,0,0,0)");
+      }
+      cc.fillStyle = gv;
+      cc.fillRect(0, 0, W, H);
+      const t = CanvasTexture(c);
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      return t;
+    };
+    // ① 地上那一摊：躺平，压在地表之上、道具之下（同 AddGroundShadow 那一档）
+    const pool = new THREE.Mesh(
+      new THREE.PlaneGeometry(s.w, 3.0),
+      new THREE.MeshBasicMaterial({ map: mkTex(false), transparent: true, depthWrite: false, opacity: 0.62 }),
+    );
+    pool.rotation.x = -Math.PI / 2;
+    // 往镜头这边压一点：躺平的东西在平视机位下压缩得厉害，摆在地平线上
+    // 只剩一条线（"平摊在地上的东西等于没画"那条）
+    pool.position.set(s.x, SURFACE_Y + 0.02, PlaceZ(BAND.walk) + 0.35);
+    FixOrder(pool, DepthOrder("play", BAND.walk) - 3);
+    layers.play.add(pool);
+    // ② 空气里那一片：立着，排在演员之前（fx 层），把站进来的人一起压暗
+    const air = new THREE.Mesh(
+      new THREE.PlaneGeometry(s.w, h),
+      new THREE.MeshBasicMaterial({ map: mkTex(true), transparent: true, depthWrite: false }),
+    );
+    air.position.set(s.x, SURFACE_Y + h / 2, PlaceZ(BAND.walk));
+    FixOrder(air, LAYER_ORDER.fx + 120);      // 压在潜行灯影（+205）之下
+    layers.fx.add(air);
+  }
+
   // 摆一件场景物体。**尺寸、锚点、深度带、投影强度全部来自数据**
   //（Data_Scenes.json 说它在哪，Data_PropArt.json 说它长什么样、埋多深）；
   // 这里只剩"怎么画"那几笔——条件绘制的部分（断了的井绳、露出的绳头、
@@ -1755,6 +1833,9 @@ export function CreateWorld(canvasEl) {
         mk((ctx, ax, ay) => ART.DrawTunnelBrace(ctx, ax, ay, S.w - 14, 0.74 * PPM, p.id));
         break;
       case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false, slogan: p.slogan })); break;
+      case "yardWallEnd":
+        mk((ctx, ax, ay) => ART.DrawYardWallEnd(ctx, ax, ay, p.w * PPM, (p.h || 2) * PPM, p.id, { slogan: p.slogan }));
+        break;
       case "henCoop": {
         // tipped（八稿冷灶那一镜）：鸡笼倒在墙边——整只笼子撂倒，口朝着街
         const coopMesh = mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id));
@@ -2730,6 +2811,11 @@ export function CreateWorld(canvasEl) {
       AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene, state);
     }
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
+
+    // 墙根的阴影：日头底下才有（夜/地道那几档天上没有太阳，画了就是一块脏）
+    if (!["night", "dark", "tunnel"].includes(ch.light)) {
+      for (const s of sceneDef.shades || []) AddWallShade(s);
+    }
 
     // 收藏品（scene.relics）：小件、贴地、半掩在现有物件脚下。loose 序号——
     // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧

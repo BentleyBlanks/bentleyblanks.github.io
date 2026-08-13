@@ -14,6 +14,7 @@ import {
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, FOLD_CARD,
   WRAP_CARD, SLING, SlingSolve, FORAGE, ForageMatEdge, ForageScoopDir,
+  TEAR_CARD, SEW_CARD, SPLIT_CARD, LIVE_CARD_FIELDS, LiveCardOn,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
   UnderSegments, AllRelics,
 } from "./Script_Core.mjs";
@@ -2090,6 +2091,106 @@ function TestHoeingIsARealSwing() {
 // 拍出来？搞的像在玩一个独立的游戏一样……你搞了个纯色背景算什么」。
 // 现在底透明，背后那层真景由 World 的离屏虚化铺上去（Render 里的景深那一段）。
 // 定格插卡（过场里那几张画）不在此列：它们本来就是一张画，铺满底板是对的。
+// 活卡上那个「能抓的点」必须**落在被抓的那件东西身上**，而且活卡亮着的时候
+// 世界里的找路 UI 必须让位。
+//
+// 2026-08-14 用户在撕布那一拍报的原话：「到底怎么操作啊？完全不会 拖什么都
+// 没反应」。查出来是两件事叠在一起，两件都是"名单没跟上"这一类：
+//   ① `TEAR_CARD.corner` 的 y 是 0.19，而布的上沿在 0.205 ——**招呼玩家上手的
+//      那团光整个浮在布外头的黑地上**。玩家去揪的自然是那一大片布，而按在布
+//      身上原来一点回音都没有（没声音、没画面、没有一个字），读出来就是坏的。
+//   ② `onLiveCard` 与 Main 的摇杆开关各自手抄了一份活卡名单，后加的
+//      wrap/split/tear/sew 四张一张都没补上——于是整幅卡当中常驻着一句
+//      「W · 上梯子」，玩家看见的唯一一句指示指的是另一件事。
+// 这条断言把两样都钉住：抓取点在物体里、名单只有 LIVE_CARD_FIELDS 这一份。
+function TestLiveCardGrabPointsSitOnTheThing() {
+  // ① 抓取点必须在那件东西的轮廓里（外扩半个抓取半径都算不上"在上面"）
+  const InRect = (p, r, pad = 0) => p.x > r.x0 - pad && p.x < r.x1 + pad
+    && p.y > r.y - pad && p.y < r.y + r.h + pad;
+  assert.ok(InRect(TEAR_CARD.corner, TEAR_CARD.cloth),
+    `撕布的抓取点必须落在布身上（布 y ${TEAR_CARD.cloth.y}~${(TEAR_CARD.cloth.y + TEAR_CARD.cloth.h).toFixed(3)}，`
+    + `角在 ${TEAR_CARD.corner.y}）——浮在布外头就是"招呼画在空气里"`);
+  assert.ok(InRect(SEW_CARD.needle0, SEW_CARD.patch, SEW_CARD.grabR),
+    "缝三针的针必须搁在布上（够得着的地方），不许浮在画框空处");
+
+  // ② 名单只有一份，而且八张全在
+  for (const k of ["scribeCard", "planeCard", "knotCard", "foldCard",
+    "wrapCard", "splitCard", "tearCard", "sewCard"]) {
+    assert.ok(LIVE_CARD_FIELDS.includes(k), `LIVE_CARD_FIELDS 漏了 ${k}`);
+  }
+  const st = CreateGame(0);
+  assert.equal(LiveCardOn(st), false, "没卡的时候 LiveCardOn 必须是假");
+  for (const k of LIVE_CARD_FIELDS) {
+    st[k] = { any: 1 };
+    assert.equal(LiveCardOn(st), true, `${k} 立起来时 LiveCardOn 必须为真`);
+    st[k] = null;
+  }
+  // 别处不许再手抄名单：抄一份就漏一份（这个 bug 出过两回）
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const f of ["Script_Core.mjs", "Script_Main.js", "Script_Cli.mjs"]) {
+    // 名单自己那份声明当然要跳过（它就是那唯一一份）
+    const src = fs.readFileSync(path.join(here, f), "utf8")
+      .replace(/export const LIVE_CARD_FIELDS = \[[\s\S]*?\];/, "");
+    for (const line of src.split("\n")) {
+      if (line.includes("LIVE_CARD_FIELDS")) continue;
+      const n = ["scribeCard", "planeCard", "knotCard", "foldCard",
+        "wrapCard", "splitCard", "tearCard", "sewCard"].filter((k) => line.includes(k)).length;
+      assert.ok(n < 3,
+        `${f} 里又手抄了一份活卡名单（一行点了 ${n} 张）——走 LiveCardOn / LIVE_CARD_FIELDS：\n    ${line.trim()}`);
+    }
+  }
+  console.log("  ✓ 活卡的抓取点长在实物上；活卡名单只有 LIVE_CARD_FIELDS 一份");
+}
+
+// 撕布：手落在布上就得有回音。**"按了没反应"比难更劝退**——玩家不会怀疑
+// 自己按错了地方，只会认定这玩法是坏的（同"留一颗按了没反应的键比从来没有
+// 更糟"那一条）。三样一起验：开场那句话、按空的窝、揪住角真的能拽动。
+function TestTearClothAnswersTheHand() {
+  const state = CreateGame(0);
+  const rescue = ChapterBeatList(0).find((b) => b.id === "c1_rescue");
+  DebugJump(state, 0, rescue.index);
+  const L = TEAR_CARD, A = L.aspect;
+  const Step = (inp = {}) => StepGame(state, {
+    moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...inp,
+  }, DT);
+  const At = (x, y) => ({ pointerHeld: true, pointerCard: { u: x, v: y * A } });
+  Step();
+  for (let i = 0; i < 900 && state.microCine; i += 1) Step({ advance: true });
+  state.beat.stepIndex = 2;                // 撕布那一步（喂水/摸血跳过）
+  Step();
+  const zone = CurrentBeatDef(state).steps[2].zone;
+  state.player.x = zone.x;
+  state.player.level = zone.level;
+  state.player.cineWalk = null;
+  for (let i = 0; i < 8; i += 1) Step();   // 站定、把卡摆上来
+  assert.ok(state.tearCard, "撕布那一步必须把活卡摆上来");
+  assert.equal(state.climbHint, "", "活卡亮着时脚底下那句「W · 上梯子」必须收掉");
+  assert.ok(/角/.test(state.toast?.text || ""), "卡一摆上来就得说清这一下要揪哪儿");
+
+  // ① 按在布正中（玩家最自然的一下）：抓不住是对的，但**必须有回音**
+  const mid = { x: (L.cloth.x0 + L.cloth.x1) / 2, y: L.cloth.y + L.cloth.h * 0.5 };
+  Step();                                   // 先松一帧，ptrPressed 才认得出按下
+  Step(At(mid.x, mid.y));
+  assert.equal(state.tearCard.grab, false, "按在布面上不该攥住（攥的是那个角）");
+  assert.ok(state.tearCard.press, "按在布面上必须按出一个窝——这一下原来什么都不发生");
+  assert.ok(/角/.test(state.toast?.text || ""), "按空了要说清该往哪儿落手");
+
+  // ② 揪住那个角横着拽：三把之内必须真的撕开
+  for (let pass = 0; pass < 8 && state.tearCard; pass += 1) {
+    const c = { ...state.tearCard.corner };
+    Step();                                 // 松一帧再按（一把一把地拽）
+    Step(At(c.x, c.y));
+    assert.ok(state.tearCard?.grab || !state.tearCard,
+      `第 ${pass + 1} 把没攥住布角——抓取半径 ${L.grabR} 覆不住画面上那个角`);
+    // 手比布快就脱手，所以一寸一寸挪（同驱动器）
+    for (let i = 0; i < 40 && state.tearCard?.grab; i += 1) {
+      Step(At(state.tearCard.corner.x - L.speed * DT * 0.9, c.y));
+    }
+  }
+  assert.equal(state.flags.clothTorn, true, "揪着角一把一把拽，三把之内必须撕下来");
+  console.log("  ✓ 撕布：按在布上有回音、揪住角拽得动（不再「拖什么都没反应」）");
+}
+
 function TestLiveCardsKeepTheWorldBehind() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const art = fs.readFileSync(path.join(here, "Script_Art.mjs"), "utf8");
@@ -2245,6 +2346,38 @@ function TestPromptsAreDeviceNeutral() {
   assert.deepEqual(SplitPrompt("F · 投"), { act: "throw", hold: false, text: "投" });
   assert.deepEqual(SplitPrompt("跟上娘"), { act: null, hold: false, text: "跟上娘" });
   console.log("  ✓ 提示文案与设备无关（键名只在前缀里）");
+}
+
+// 第一章（含序）的字幕只许是真旁白（2026-08-14 用户退回换来的）
+// ——「很多我剧本里单纯是用来描述场景、描述镜头动画的，结果做成旁白直接在
+// 游戏里显示了」。剧本里的斜体（镜头／无声动作／音效）一律走 `act:`，它不上
+// 字幕也不配音；`stage:` 从此专指真旁白。整章只有两句，就是这张白名单。
+// c2 起还没按这个口径翻过，所以只钉 c1。
+function TestChapterOneShowsOnlyRealNarration() {
+  const VO = ["没人来叫。", "第三天。还是没人来叫。"];
+  // 微过场的行是 `StartMicroCine(state, [...])` 里现写的，挂不到 def 上——
+  // 所以这一条扫源码，玩法段插的那几镜才盖得住
+  const here2 = path.dirname(fileURLToPath(import.meta.url));
+  const src2 = fs.readFileSync(path.join(here2, "Script_Core.mjs"), "utf8");
+  const from = src2.indexOf('id: "c1_thatday"');
+  const to = src2.indexOf('id: "c2_');
+  assert.ok(from > 0 && to > from, "找不到第一章的源码范围");
+  const chunk = src2.slice(from, to);
+  const shown = [...chunk.matchAll(/\bstage: "([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(shown, VO,
+    "第一章的字幕只许是那两句真旁白；描述请写成 act:\n  " + shown.join("\n  "));
+
+  // 反过来也得成立：描述行确实还在，只是不进字幕通道了
+  const acts = [...chunk.matchAll(/\bact: "([^"]*)"/g)].length;
+  assert.ok(acts > 150, `第一章的演出说明不该凭空少掉（现在 ${acts} 行）`);
+  // 运行期再确认一遍：这些行确实不带任何会上字幕的字段
+  for (const def of SCRIPTS.c1 || []) {
+    for (const l of def.lines || []) {
+      if (typeof l.act !== "string") continue;
+      assert.ok(!l.stage && !l.say, `${def.id} 的演出说明行不许同时带 stage/say：${l.act}`);
+    }
+  }
+  console.log(`  ✓ 第一章只有 2 句真旁白上字幕（${acts} 行演出说明不出字幕）`);
 }
 
 // ---------------------------------------------------------------------------
@@ -2520,6 +2653,7 @@ function TestPoseNamesExist() {
 // 暂无节拍使用——哪天再有"砸中什么"的戏，把这两条从 git 历史里捞回来改。
 
 TestPromptsAreDeviceNeutral();
+TestChapterOneShowsOnlyRealNarration();
 TestStrokeWork();
 TestPoseNamesExist();
 TestVaultC1();
@@ -2539,6 +2673,8 @@ TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
 TestChalkIsAPencilNotASlider();
 TestLiveCardsKeepTheWorldBehind();
+TestLiveCardGrabPointsSitOnTheThing();
+TestTearClothAnswersTheHand();
 TestMalletTapDoesNotSlide();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();

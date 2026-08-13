@@ -306,7 +306,9 @@ body {
    旁白与对白分成两种字体色阶，任何画面亮度下都读得清 */
 #captionScrim {
   position: absolute; left: 0; right: 0; bottom: 0; height: 42vh;
-  background: linear-gradient(180deg, rgba(6, 5, 4, 0) 0%, rgba(6, 5, 4, 0.55) 55%, rgba(6, 5, 4, 0.86) 100%);
+  /* 纯黑，不带那点暖调：这层现在压在收黑罩**之上**（字幕要看得见），
+     `rgba(6,5,4,…)` 会在全黑的画面下缘留下一条比黑更亮的带子 */
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0.86) 100%);
   opacity: 0; transition: opacity 0.45s ease; pointer-events: none;
 }
 #captionScrim.active { opacity: 1; }
@@ -339,10 +341,21 @@ body {
   color: #e6dcc6; font-size: 17.5px; font-weight: 400; letter-spacing: 0.02em;
 }
 
+/* 收黑罩：**纯黑、压到底**。
+   z-index 是这层唯一的关键——它在 DOM 里排在字幕后面，谁也没给它编号的时候
+   就压在字幕**上头**，于是"黑到底"和"看得见台词"只能二选一，老版为此把
+   不透明度封在 0.94（屏幕上是一层洗白的深灰，用户报的正是这个）。现在把它
+   沉到 26：世界、HUD、小窗（pipFrame 24）全在下面被压死；字幕、章名字样、
+   跳过键（30）在上面。黑归黑，字归字，两件事不再抢同一层。 */
 #fadeOverlay {
-  position: absolute; inset: 0; background: #030202;
-  opacity: 1; pointer-events: none;
+  position: absolute; inset: 0; background: #000;
+  opacity: 1; pointer-events: none; z-index: 26;
 }
+/* 压在收黑罩之上的那几层：字幕与它的托底、戏里的章名字样、章节卡/抉择/结束屏 */
+#captionScrim { z-index: 27; }
+#caption { z-index: 28; }
+#sceneTitle { z-index: 28; }
+#chapterCard, #choiceOverlay, #endScreen { z-index: 32; }
 
 /* 圆形收光转场（勇敢的心式 iris）：圆内透明、圆外黑，半径由 JS 控制 */
 #irisOverlay {
@@ -352,7 +365,7 @@ body {
 
 /* 地窖板缝 matte：从缝里往外看 */
 #slitMatte i {
-  position: absolute; left: 0; right: 0; height: 0; background: #050403;
+  position: absolute; left: 0; right: 0; height: 0; background: #000;
   transition: height 0.5s ease;
 }
 #slitMatte i:first-child { top: 0; }
@@ -449,7 +462,7 @@ body.touchDevice #touchControls.gone { display: none; }
 #chapterCard {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; background: #050403; text-align: center;
+  gap: 10px; background: #000; text-align: center;
 }
 #cardLamp {
   width: 92px; margin-bottom: 18px; opacity: 0.92;
@@ -501,7 +514,7 @@ body.touchDevice #touchControls.gone { display: none; }
 #endScreen {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-  background: #050403; text-align: center; padding: 20px;
+  background: #000; text-align: center; padding: 20px;
 }
 #endScreen small { letter-spacing: 0.4em; color: var(--dim); }
 #endScreen h2 { font-size: 27px; letter-spacing: 0.14em; font-weight: 600; }

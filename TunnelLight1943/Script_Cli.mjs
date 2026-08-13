@@ -194,7 +194,9 @@ async function CmdBeat(o) {
     def.lines.slice(0, Number(o.lines || 6)).forEach((l, i) => {
       const tag = `[${acc.toFixed(1)}s +${(l.d || 0).toFixed(1)}]`;
       acc += l.d || 0;
-      console.log(`  ${i}. ${tag} ${l.who ? l.who + "：" : l.stage ? "（场）" : ""}${(l.say || l.stage || "").slice(0, 60)}`);
+      // （旁白）＝真上字幕的；（演出）＝只是演出说明，屏幕上一个字都没有
+      const mark = l.who ? l.who + "：" : l.stage ? "（旁白）" : l.act ? "（演出）" : "";
+      console.log(`  ${i}. ${tag} ${mark}${(l.say || l.stage || l.act || "").slice(0, 60)}`);
     });
     if (def.lines.length > (Number(o.lines || 6))) console.log(`  …（--lines 调）`);
   }
@@ -331,8 +333,11 @@ async function CmdState(o) {
   for (const k of Object.keys(now)) if (JSON.stringify(now[k]) !== JSON.stringify(old[k])) changed[k] = now[k];
 
   const live = {};
-  for (const k of ["ropeLine", "knot", "winchView", "scribe", "scribeCard", "planeCard", "knotCard",
-    "wrapCard", "forage", "closeUp", "gesture",
+  // 活卡那八张走 Core 的 LIVE_CARD_FIELDS（唯一一份名单）——这儿原先手抄了
+  // 四张，撕布那张不在里头，`state c1_rescue --step 2 --json` 报出来的 live
+  // 是空的，看着像"卡根本没立起来"（其实立了）
+  for (const k of ["ropeLine", "knot", "winchView", "scribe", ...C.LIVE_CARD_FIELDS,
+    "forage", "closeUp", "gesture",
     "thrown", "smoke", "pip", "toast", "detection"]) {
     if (k === "detection" && !(state.detection?.level > 0)) continue;   // 没被盯上就别刷屏
     if (state[k]) live[k] = k === "ropeLine"
