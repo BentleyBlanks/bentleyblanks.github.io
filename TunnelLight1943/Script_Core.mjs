@@ -3939,8 +3939,13 @@ export const SCRIPTS = {
             SetDin(state, null, 0.72, 0.22);
             Cue(state, "shout", { gain: 0.7, rate: 0.98, delay: 0.1 });
           } },
+        // 运镜（2026-08-13 用户定：序章要勇敢的心过场那种连续运动的镜头，
+        // 不拘泥玩法段的 2D 视角）：显影先落在两个孩子身上，缓缓后拉把整间屋
+        // 带出来。**门始终留在画框边上不给正脸**——门是画在立面上的，过场里
+        // 第四堵墙不画（见 World 的 filmic），真给门个特写就穿帮成一个空门洞；
+        // 撞门全靠声音演，比看见更瘆人
         { stage: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。", d: 4.0,
-          cam: { kind: "shot", x: 32.2, y: 1.15, dist: 3.8 },
+          cam: { kind: "free", from: [33.0, 0.9, 4.3], to: [32.5, 1.15, 5.7], at: [31.9, 0.95], atTo: [31.9, 0.9] },
           on: (state) => {
             state.beat.indoorScene = true;
             // 屋里：柱子在屋当间，妹妹缩在炕沿下，两只手捂着耳朵
@@ -3953,8 +3958,10 @@ export const SCRIPTS = {
             Cue(state, "doorCreak", { gain: 0.25, rate: 1.45, delay: 2.8 });
           } },
         // 蓝底白花那一眼：不切特写，跟着她冲进来这一下说完
+        // 孩子视线的低机位：贴着妹妹的高度看门被撞开，注视点跟着娘冲进来
+        // 的路线从门口摇回屋当间——镜头追人，不是人走进画框
         { stage: "一阵急促脚步冲进院子。门板猛地向里打开，撞在墙上——娘冲进来。蓝底白花的短褂被树枝扯开一道口，袖口沾着土。", d: 4.6,
-          cam: { kind: "shot", x: 34.2, y: 1.2, dist: 4.4 },
+          cam: { kind: "free", from: [31.6, 0.85, 4.6], to: [31.8, 0.85, 4.3], at: [34.0, 1.1], atTo: [32.3, 0.98] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
@@ -3966,8 +3973,9 @@ export const SCRIPTS = {
           } },
         // 接触戏的老规矩：先站到一臂之内（上臂+小臂 ≈ 0.49m）。娘 31.45、
         // 妹妹 31.0 差 0.45m，手才够得着
+        // 这一场最重的一下给一个不停的缓推：从半间屋慢慢压到怀抱上
         { stage: "院外又响一枪。娘猛地回头，把门推回去，却没顾上关严——转身冲到妹妹面前，一把将她拉进怀里，上下摸了一遍。", d: 5.2,
-          cam: { kind: "shot", x: 31.2, y: 1.15, dist: 3.4 },
+          cam: { kind: "free", from: [31.35, 1.1, 5.2], to: [31.2, 0.98, 3.6], at: [31.15, 0.92], atTo: [31.15, 0.88] },
           on: (state) => {
             state.beat.indoorScene = true;
             Cue(state, "gunshot", { gain: 0.3, rate: 0.8, delay: 0.2 });
@@ -3989,8 +3997,10 @@ export const SCRIPTS = {
           } },
         // 她抬头找柱子。气还没有喘匀——所以这两句挂的是会喘的循环轨道，
         // 不是"pullClose 播完停在末帧"（停住就又是一张定格）
+        // 正反打盖在她脸朝的那一侧（她 heading -1，机位在西），带一点偏航——
+        // 纸戏台斜着看有厚度，正打永远是一张平贴
         { who: "娘", say: "柱子。", d: 1.8,
-          cam: { kind: "insert", x: 31.4, y: 1.0, dist: 2.6 },
+          cam: { kind: "free", from: [30.5, 1.02, 4.6], to: [30.6, 1.0, 4.3], at: [31.45, 1.0] },
           on: (state) => {
             const m = FindActor(state, "mother");
             if (m) m.track = { name: "huddleBreath", t: 0 };
@@ -3999,12 +4009,15 @@ export const SCRIPTS = {
             // tremble 的底子是蹲成一团（那是窖底在哥哥怀里那一拍）
             if (sis) { sis.track = { name: "heldTremble", t: 0 }; sis.trembleK = 1; }
           } },
+        // 「抱她」是说给柱子的——他得完整站在画框右侧接这句话，不许裁半个
         { who: "娘", say: "抱她。", d: 2.0,
-          cam: { kind: "insert", x: 31.4, y: 1.0, dist: 2.4 } },
+          cam: { kind: "free", from: [30.75, 0.85, 4.3], to: [30.7, 0.87, 4.1], at: [31.6, 0.95] } },
         // 换机位＝换一镜（每一行本来就是一个镜头），所以人直接摆到窖口，
         // 不在这一句里演走位——走位只留给"冲进屋"那一下，那是要看的
+        // 俯角看翻板（滑开/蹭汗/再攥住/掀开都在手上），镜头缓缓沉下去凑近——
+        // 俯的是这一小块窖口，不是全村（那条禁令管的是景别，不是角度）
         { stage: "娘去拉菜窖翻板。手指第一次从铁环上滑开。她在衣襟上蹭了一把汗，第二次攥住铁环，将翻板猛地掀开。", d: 5.4,
-          cam: { kind: "shot", x: 29.8, y: 1.0, dist: 3.4 },
+          cam: { kind: "free", from: [30.6, 2.3, 6.4], to: [30.25, 2.0, 5.5], at: [29.55, 0.55], atTo: [29.6, 0.45] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
@@ -4031,8 +4044,10 @@ export const SCRIPTS = {
             Cue(state, "vault", { gain: 0.5, rate: 0.8, delay: 2.6 });
             Cue(state, "drop", { gain: 0.7, rate: 0.62, delay: 4.4 });
           } },
+        // 收尾反打：贴着孩子那头的低机位仰看跪在窖口的娘，掀开的洞口
+        // 黑在画框下沿——「快」字说给谁、往哪儿快，一目了然
         { who: "娘", say: "快。", d: 2.2,
-          cam: { kind: "shot", x: 29.9, y: 1.05, dist: 3.4 },
+          cam: { kind: "free", from: [31.35, 0.6, 4.4], to: [31.15, 0.62, 4.1], at: [30.1, 0.88] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");

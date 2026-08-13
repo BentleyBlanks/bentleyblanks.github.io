@@ -4837,7 +4837,11 @@ export function CreateWorld(canvasEl) {
       // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
       const def = CurrentBeatDef(state);
       const staged = !!(def?.indoorScene || state.beat?.indoorScene);
-      const goal = inside ? 0.07 : (staged ? 0.30 : 1);
+      // 过场（cinematic）里的室内戏：第四堵墙整个不画。0.30 的纱在玩法景别下
+      // 读得出"这儿有堵墙"，可过场机位贴得近，它就是糊在整间屋上的一层白蒙蒙
+      //（2026-08-13 序章重运镜实拍抓的）。玩法段照旧半隐——玩家得知道墙在。
+      const filmic = staged && def?.kind === "cinematic";
+      const goal = filmic ? 0 : inside ? 0.07 : (staged ? 0.30 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
         homeFacade.material.transparent = true;
@@ -5831,6 +5835,34 @@ export function CreateWorld(canvasEl) {
     return { viewW, viewH, dist };
   }
 
+  // 过场自由相机（勇敢的心式运镜）：机位与注视点都是世界坐标，允许俯仰和
+  // 小幅横滚。只给 cinematic 行上的 `cam:{kind:"free"}` 用——玩法段的
+  // 「镜头永不旋转」照旧归 ApplyCamera 管，这里不碰它的任何账。
+  // 层闸门沿用同一套判据：fore 只在中远景+地表；ots 层随距离浮动免得
+  // 特写机位把它甩到身后。世界全是面朝 +z 的立牌，所以偏航/俯仰都得是
+  // 小角度（≲25°）——纸戏台可以斜着看，不能绕到侧面去。
+  function ApplyCineCamera(px, py, pz, tx, ty, tz, roll) {
+    const aspect = camera.userData.aspect || 16 / 9;
+    camera.aspect = aspect;
+    camera.position.set(px, py, pz);
+    camera.lookAt(tx, ty, tz || 0);
+    if (roll) camera.rotateZ(roll);
+    camera.updateProjectionMatrix();
+    const dist = Math.hypot(tx - px, ty - py, (tz || 0) - pz);
+    camera.userData.dist = dist;
+    // 画幅取注视点所在平面上的（HUD 的世界→屏幕换算、雾色更新都读 viewSize）
+    viewH = 2 * dist * Math.tan((FOV * Math.PI / 180) / 2);
+    viewW = viewH * aspect;
+    const otsZ = Math.min(12, Math.max(0.6, pz * 0.5));
+    LAYER_COMP.ots = (D_REF - otsZ) / D_REF;
+    layers.ots.position.z = otsZ;
+    layers.ots.scale.setScalar(LAYER_COMP.ots);
+    layers.fore.visible = pz > 7 && py > SURFACE_Y;
+    PlaceOverShoulder(tx, ty, viewW, viewH);
+    PlaceInsertCard(tx, ty, viewW, viewH, dist);
+    return { viewW, viewH, dist };
+  }
+
   let rendererCssW = 0, rendererCssH = 0;
   function Resize(width, height) {
     // **缓冲的比例必须等于 CSS 盒的比例**，否则整幅画横着抻开（Main 的
@@ -6054,7 +6086,7 @@ export function CreateWorld(canvasEl) {
   return {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
-    SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, Resize, Render,
+    SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, ApplyCineCamera, Resize, Render,
     SetPip, RenderPip, ScreenToWorld, ScreenToCard,
     // 卡面↔画框的尺寸比（测试要把卡上的坐标换回屏幕像素去点）
     __cardFrac: () => ({ ...cardFrac }),

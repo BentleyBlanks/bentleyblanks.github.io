@@ -455,6 +455,30 @@ function HintShot(state, hint) {
     }
     case "dark":
       return { ...BaseShot(state), fade: 0.94 };
+    case "free": {
+      // 过场自由相机（勇敢的心式运镜，仅 cinematic 行）：from→to 机位、
+      // at→atTo 注视点按本行时长插值（smoothstep），roll 单位是度。
+      // 数值口径：FOV 30° 下画宽 ≈ 机位到注视点的距离（16:9），
+      // 也就是旧 hint 的 dist（半宽）× 2。VO 拖长行时插值钉在终点不再动。
+      const d = Math.max(0.6, state.camLineD || 3.4);
+      const k = Math.min(1, (state.camLineT || 0) / d);
+      const e = hint.ease === "linear" ? k : k * k * (3 - 2 * k);
+      const L = (a, b) => a + (b - a) * e;
+      const f = hint.from, t = hint.to || hint.from;
+      const a = hint.at, a2 = hint.atTo || hint.at;
+      const r0 = hint.roll || 0, r1 = hint.rollTo ?? r0;
+      return {
+        free: {
+          px: L(f[0], t[0]), py: L(f[1], t[1]), pz: L(f[2], t[2]),
+          tx: L(a[0], a2[0]), ty: L(a[1], a2[1]), tz: L(a[2] || 0, a2[2] || 0),
+          roll: (r0 + (r1 - r0) * e) * Math.PI / 180,
+        },
+        // 指纹必须取自 hint 本身：插值出来的位置每帧都变，拿它当指纹
+        // 等于每帧都在"换镜头"
+        freeKey: `${f}|${t}|${a}|${a2}`,
+        x: L(a[0], a2[0]), y: L(a[1], a2[1]), hw: 6,
+      };
+    }
     default:
       return BaseShot(state);
   }
@@ -468,8 +492,10 @@ function UpdateCamera(state, dt) {
   if (inCinematic) {
     const hint = state.camHint || { kind: "follow" };
     shot = HintShot(state, hint);
-    // 构图指纹：位置/高度/景别有实质变化才算换镜头
-    const fp = `${Math.round(shot.x * 2)}|${Math.round(shot.y * 3)}|${Math.round(shot.hw * 3)}|${shot.ots ? shot.ots.id + shot.ots.side : ""}`;
+    // 构图指纹：位置/高度/景别有实质变化才算换镜头。
+    // 自由镜头拿 hint 本身当指纹——插值出来的位置每帧都在变
+    const fp = shot.freeKey ? "F" + shot.freeKey
+      : `${Math.round(shot.x * 2)}|${Math.round(shot.y * 3)}|${Math.round(shot.hw * 3)}|${shot.ots ? shot.ots.id + shot.ots.side : ""}`;
     if (fp !== framing.key) {
       const first = framing.key === "";
       framing = { key: fp, prog: 0, baseHw: shot.hw };
@@ -479,14 +505,17 @@ function UpdateCamera(state, dt) {
       if (trans === "dip") dipLevel = 1;
       else if (trans === "iris") irisClosing = true;
     }
-    // 行内慢推/横移：按本行时长归一化，一行之内正好走完 pan，肉眼才看得见
+    // 行内慢推/横移：按本行时长归一化，一行之内正好走完 pan，肉眼才看得见。
+    // 自由镜头的运动全在 HintShot 里插值完了，这套通用慢推别再叠上去
     const lineD = Math.max(1.2, state.camLineD || 3.4);
     framing.prog = Math.min(1, framing.prog + dt / lineD);
-    shot = {
-      ...shot,
-      x: shot.x + (shot.pan || 0) * framing.prog,
-      hw: framing.baseHw * (1 - 0.10 * framing.prog),
-    };
+    if (!shot.free) {
+      shot = {
+        ...shot,
+        x: shot.x + (shot.pan || 0) * framing.prog,
+        hw: framing.baseHw * (1 - 0.10 * framing.prog),
+      };
+    }
     world.SetOverShoulder(state, shot.ots || null);
     world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0, shot.cardSeg || 0);
   } else {
@@ -519,16 +548,26 @@ function UpdateCamera(state, dt) {
     dt,
   );
 
-  if (camSnap) {
-    cam.x = shot.x; cam.y = shot.y; cam.hw = shot.hw;
+  let view;
+  if (shot.free) {
+    // 自由镜头每帧直设（运动已在 HintShot 插值），不走平滑；平滑基线跟着
+    // 注视点走，切回常规镜头那一下有 camSnap/iris 兜着，不会甩
+    const F = shot.free;
+    view = world.ApplyCineCamera(F.px, F.py, F.pz, F.tx, F.ty, F.tz, F.roll);
+    cam.x = F.tx; cam.y = F.ty; cam.hw = view.viewW / 2;
     camSnap = false;
   } else {
-    const k = Math.min(1, dt * (inCinematic ? 2.4 : 5.2));
-    cam.x += (shot.x - cam.x) * k;
-    cam.y += (shot.y - cam.y) * k;
-    cam.hw += (shot.hw - cam.hw) * k;
+    if (camSnap) {
+      cam.x = shot.x; cam.y = shot.y; cam.hw = shot.hw;
+      camSnap = false;
+    } else {
+      const k = Math.min(1, dt * (inCinematic ? 2.4 : 5.2));
+      cam.x += (shot.x - cam.x) * k;
+      cam.y += (shot.y - cam.y) * k;
+      cam.hw += (shot.hw - cam.hw) * k;
+    }
+    view = world.ApplyCamera(cam.x, cam.y, cam.hw);
   }
-  const view = world.ApplyCamera(cam.x, cam.y, cam.hw);
   world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist, dt);
   return shot.fade || 0;
 }
