@@ -705,7 +705,8 @@ function SyncHud(state, dt, shotFade) {
   const slit = inCinematic && state.camHint?.slit;
   if (ui.slitMatte) ui.slitMatte.classList.toggle("active", !!slit);
 
-  // 序章可跳过：只在 c1_prologue 这一段亮出跳过键
+  // 声明了 prologue 的整段可跳过（2026-08-13 视频序章删掉后暂时没有这样的拍，
+  // 钮就一直不亮——机制留着，再加不可玩的长段落时写 `prologue: true` 即可）
   if (ui.btnSkipCine) ui.btnSkipCine.hidden = !(def?.prologue && state.phase === "playing");
 
   if (hasCaption) {
