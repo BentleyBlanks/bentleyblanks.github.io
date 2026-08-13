@@ -939,9 +939,15 @@ function StepGroundItems(state, def, input) {
   const p = state.player;
   // 悬浮提示：附近的落地道具头顶挂它自己的小样气泡（无文字三层配方）
   const lvl = p.level || "surface";
-  for (const g of state.groundItems) {
-    if (g.level !== lvl || Math.abs(g.x - p.x) > GROUND_HINT_R) continue;
-    state.bubbles.push({ x: g.x, y: (lvl === "under" ? UNDER_Y : SURFACE_Y) + 1.15, icon: "item:" + g.label });
+  // **憋住别动的那几拍不挂气泡**（sustain hold：搂紧她、按住妹妹、按住他）。
+  // 那是一颗亮白的"这儿有件东西可以捡"，正好悬在藏身处上方——玩家蹲在墙根
+  // 阴影里屏着气，画面上却顶着一张招牌。这一拍的 E 已经是"按住"，
+  // 捡东西本来也按不出来
+  if (!def?.sustain) {
+    for (const g of state.groundItems) {
+      if (g.level !== lvl || Math.abs(g.x - p.x) > GROUND_HINT_R) continue;
+      state.bubbles.push({ x: g.x, y: (lvl === "under" ? UNDER_Y : SURFACE_Y) + 1.15, icon: "item:" + g.label });
+    }
   }
   // 翻越提示亮着时这颗 E 是"翻过去"，不是"放下"——不拦的话，扛着桶走到
   // 塌墙跟前一按 E，桶先被撂在墙根（第七稿的下地往返头一回带着东西过这堵墙，
@@ -4986,27 +4992,30 @@ export const SCRIPTS = {
                 on: (s) => { Cue(s, "crank", { gain: 0.2, rate: 2.5, delay: 0.9 }); } },
             ]);
           } },
-        // 走进墙根后的阴影：到达就自动把水桶轻轻放在地上（水面仍在晃）
-        { type: "goto", zone: { x: 46.2, w: 2.0 },
+        // 走进墙根后的阴影：到达就自动把水桶轻轻放在地上（水面仍在晃）。
+        // 落点贴着院墙东山头（courtWallEnd 47.3~49.2）的西面——两个人得在
+        // **墙和村口之间**，不是在街当中；那条阴影（scene.shades 的 courtShade）
+        // 也正铺在这一段上
+        { type: "goto", zone: { x: 46.15, w: 2.0 },
           effect: (state) => {
             if (state.player.item?.id === "fullBucket") {
-              const g = AddGroundItem(state, state.player.item, 46.6, "surface");
-              state.flags.bucketAt = g ? g.x : 46.6;
+              const g = AddGroundItem(state, state.player.item, 46.75, "surface");
+              state.flags.bucketAt = g ? g.x : 46.75;
               state.player.item = null;
             } else if (!state.groundItems.some((it) => it.id === "fullBucket")) {
-              AddGroundItem(state, { id: "fullBucket", label: "一桶水", big: true }, 46.6, "surface");
-              state.flags.bucketAt = 46.6;
+              AddGroundItem(state, { id: "fullBucket", label: "一桶水", big: true }, 46.75, "surface");
+              state.flags.bucketAt = 46.75;
             }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.following = false; sis.cineTarget = null; sis.x = 45.6; sis.heading = 1; sis.pose = "leanIn"; }
-            state.player.x = 46.2;
+            if (sis) { sis.following = false; sis.cineTarget = null; sis.x = 45.85; sis.heading = 1; sis.pose = "leanIn"; }
+            state.player.x = 46.45;
             state.player.heading = -1;
             FlashPose(state, "bow", 0.8);
             Cue(state, "drop", { gain: 0.3, rate: 0.9 });
             Cue(state, "waterDrip", { gain: 0.4, delay: 0.5 });
             StartMicroCine(state, [
-              { stage: "到了阴影里，柱子把水桶轻轻放在地上。水面仍在晃。", d: 2.8,
-                cam: { kind: "insert", x: 46.6, y: 0.7, dist: 2.3 } },
+              { stage: "拐到院墙山头后头，阴影里。柱子把水桶轻轻放在地上。水面仍在晃。", d: 2.8,
+                cam: { kind: "insert", x: 46.7, y: 0.7, dist: 2.3 } },
             ]);
           } },
       ],
@@ -5020,7 +5029,13 @@ export const SCRIPTS = {
       // tick 驱动走位）：到了村口捏闸支腿，朝村东塌房张望，调头，
       // 车铃被土坑颠响一下。
       kind: "hold", id: "c1_bell", timeOfDay: "day",
-      zone: { x: 46.2, w: 3.0 }, holdTime: 13, sustain: true,
+      // 判定区 = 画面上那条阴影（scene.shades 的 courtShade，44.9~47.35）。
+      // 2026-08-14 用户退回：「哥哥和妹妹哪里有躲在墙/阴影的后面？这不就是站在
+      // 伪军面前吗」——当时确实是：那儿只有一堵 building 带的背景院墙（画在
+      // 人**背后**、又小又淡），阴影一笔没画，判定区还比任何遮蔽物都宽。
+      // 现在三样对齐：藏身处（courtWallEnd 那堵 2.05m 的东山头，横在人与村口
+      // 之间）、阴影（画出来的那一条）、判定区（下面 tick 里的 |x−46.15|≤1.2）
+      zone: { x: 46.15, w: 2.4 }, holdTime: 13, sustain: true,
       // 按住的 13 秒是全章唯一会失败的一段，固定机位把两个人和村口的车框在
       // 一起——老版这 13 秒里两个人都是同一帧定格（序里同一场戏 c1_hide 给了
       // 妹妹 tremble，这儿一条都没抄）。holdPose 留着给失败判定读，
@@ -5028,17 +5043,23 @@ export const SCRIPTS = {
       holdPose: "shelter", holdTrack: "shelterHold",
       holdPrompt: "按住 E · 按住妹妹",
       objective: "蹲住。等它过去", hint: "别出阴影。别松手",
-      // 固定机位：墙根的两个人在左、村口的自行车在右，一个画框装下
-      cam: { kind: "shot", x: 47.9, y: 1.3, dist: 5.4 },
+      // 固定机位：**左边墙根的两个人、当中那堵墙、右边村口的自行车**——
+      // 一个画框里三样都在，"隔着一堵墙"才是看出来的，不是读出来的。
+      // 机位往西挪半米（老版 47.9 正对着山头，两个孩子被推到画框最左缘）
+      cam: { kind: "shot", x: 47.4, y: 1.25, dist: 5.1 },
       onEnter: (state) => {
         const sis = FindActor(state, "sister");
         if (sis) {
           sis.visible = true; sis.level = "surface"; sis.following = false; sis.cineTarget = null;
           sis.x = 45.85; sis.heading = 1; sis.pose = "leanIn";
-          // 她也得抖——序里那一场就是这么演的（c1_hide）
-          sis.track = { name: "heldTremble", t: 0, ambient: true }; sis.trembleK = 0.45;
+          // 她也得抖——序里那一场就是这么演的（c1_hide）。**用 tremble 不是
+          // heldTremble**：后者是"站着被娘搂住"（hipY −0.05，腿几乎是直的），
+          // 挂在这儿画面上就是妹妹**站得笔直**杵在街边，哥哥一个人蹲着。
+          // tremble 才是"蹲窝成一小团、在哥哥怀里"那条（hipY −0.30）
+          sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.45;
         }
-        state.player.x = 46.2;
+        // 贴着院墙东山头（47.3~49.2）的西面蹲下：墙在他和村口之间
+        state.player.x = 46.45;
         state.player.heading = -1;
         // 回卷/直落都从头来：两辆车回到画外
         for (const id of ["rider1", "rider2"]) {
@@ -5047,12 +5068,12 @@ export const SCRIPTS = {
         }
         // 跳幕直落这一拍：脚边得有那桶水
         if (state.player.item?.id === "fullBucket") {
-          AddGroundItem(state, state.player.item, 46.6, "surface");
+          AddGroundItem(state, state.player.item, 46.75, "surface");
           state.player.item = null;
-          state.flags.bucketAt = 46.6;
+          state.flags.bucketAt = 46.75;
         } else if (!state.groundItems.some((it) => it.id === "fullBucket")) {
-          AddGroundItem(state, { id: "fullBucket", label: "一桶水", big: true }, 46.6, "surface");
-          state.flags.bucketAt = 46.6;
+          AddGroundItem(state, { id: "fullBucket", label: "一桶水", big: true }, 46.75, "surface");
+          state.flags.bucketAt = 46.75;
         }
       },
       tick: (state, dt) => {
@@ -5061,7 +5082,7 @@ export const SCRIPTS = {
         // 车在跟前那一段她抖得厉害，车走远了就轻下来
         {
           const k = FindActor(state, "sister");
-          if (k && k.track?.name === "heldTremble") k.trembleK = (b.bellT > 1.0 && b.bellT < 9.0) ? 1 : 0.45;
+          if (k && k.track?.name === "tremble") k.trembleK = (b.bellT > 1.0 && b.bellT < 9.0) ? 1 : 0.45;
         }
         // 两辆自行车：进画（1.2s 起）→ 村口捏闸支腿张望 → 调头 → 出画。
         // 走位直接写 x（decor 演员没有别的驱动源）；后车吊在前车后头 1.4m
@@ -5115,7 +5136,11 @@ export const SCRIPTS = {
         // 超过半秒多——被看见了。宽限那半秒是给"手指刚换个姿势"留的
         if (b.failing) return;
         const holding = state.player.pose === "shelter";
-        const inZone = state.player.level === "surface" && Math.abs(state.player.x - 46.2) <= 1.6;
+        // 「出阴影」这三个字必须能在画面上指出来：这条线就是 courtShade 那片
+        // 阴影的东西两边（46.15 ± 1.2 → 44.95~47.35），东边那头顶着院墙山头。
+        // 老版给的是 ±1.6，往东能走到 47.8——已经绕过墙角、站到日头底下了，
+        // 判定却还说"你还藏着呢"
+        const inZone = state.player.level === "surface" && Math.abs(state.player.x - 46.15) <= 1.2;
         if (b.bellT > 1.0 && b.bellT < 11.5 && (!holding || !inZone)) {
           b.relT = (b.relT || 0) + dt;
         } else b.relT = 0;
@@ -5150,28 +5175,28 @@ export const SCRIPTS = {
       kind: "cinematic", id: "c1_uncle", timeOfDay: "day",
       lines: [
         { stage: "链条声逐渐远去。柱子仍然没有松手。", d: 3.4,
-          cam: { kind: "shot", x: 46.4, y: 1.2, dist: 4.0 },
+          cam: { kind: "shot", x: 46.6, y: 1.2, dist: 4.0 },
           on: (state) => {
             for (const id of ["rider1", "rider2"]) {
               const r = FindActor(state, id);
               if (r) r.visible = false;
             }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 45.6; sis.heading = 1; sis.pose = "leanIn"; }
-            state.player.x = 46.2;
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 45.85; sis.heading = 1; sis.pose = "leanIn"; }
+            state.player.x = 46.45;
             state.player.heading = -1;
             FlashPose(state, "shelter", 3.2);
             Cue(state, "crank", { gain: 0.08, rate: 2.3, delay: 0.4 });
           } },
         { stage: "等声音完全消失，柱子放开妹妹。", d: 2.8,
-          cam: { kind: "shot", x: 46.2, y: 1.15, dist: 3.6 },
+          cam: { kind: "shot", x: 46.45, y: 1.15, dist: 3.6 },
           on: (state) => {
             state.player.pose = null;
             const sis = FindActor(state, "sister");
             if (sis) sis.pose = null;
           } },
         { stage: "他第一眼看向水桶。水还在。", d: 3.0,
-          cam: { kind: "insert", x: 46.6, y: 0.7, dist: 2.2 } },
+          cam: { kind: "insert", x: 46.75, y: 0.7, dist: 2.2 } },
         // 七叔登场：他也蹲着的
         { stage: "墙的另一头传来衣服摩擦声。七叔扶着墙站起来——他也蹲着的。一条腿蹲麻了，迈第一步时晃了一下。", d: 5.4,
           cam: { kind: "shot", x: 51.6, y: 1.25, dist: 4.4 },

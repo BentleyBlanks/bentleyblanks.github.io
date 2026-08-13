@@ -322,6 +322,25 @@
       "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人",
       "shadow": 0.3
     },
+    "yardWallEnd": {
+      "art": "DrawYardWallEnd",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 46,
+          "per": "w"
+        },
+        "h": {
+          "pad": 44,
+          "per": "h"
+        },
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "院墙的东山头（墙到这儿拐进院里）。**yard 带不是随手挑的**：它高过人头，进 clutter 会把人整个吞掉（见 Data_DepthSpec 的 1.2m 上限）；可它又必须比背景院墙(building)近一档、大一圈，横在人与街之间才挡得住——车铃那一拍「躲在墙后头」全靠这一件",
+      "shadow": 0.4
+    },
     "henCoop": {
       "art": "DrawHenCoop",
       "band": "yard",
