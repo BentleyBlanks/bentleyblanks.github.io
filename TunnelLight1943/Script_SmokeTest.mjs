@@ -2247,6 +2247,38 @@ function TestPromptsAreDeviceNeutral() {
   console.log("  ✓ 提示文案与设备无关（键名只在前缀里）");
 }
 
+// 第一章（含序）的字幕只许是真旁白（2026-08-14 用户退回换来的）
+// ——「很多我剧本里单纯是用来描述场景、描述镜头动画的，结果做成旁白直接在
+// 游戏里显示了」。剧本里的斜体（镜头／无声动作／音效）一律走 `act:`，它不上
+// 字幕也不配音；`stage:` 从此专指真旁白。整章只有两句，就是这张白名单。
+// c2 起还没按这个口径翻过，所以只钉 c1。
+function TestChapterOneShowsOnlyRealNarration() {
+  const VO = ["没人来叫。", "第三天。还是没人来叫。"];
+  // 微过场的行是 `StartMicroCine(state, [...])` 里现写的，挂不到 def 上——
+  // 所以这一条扫源码，玩法段插的那几镜才盖得住
+  const here2 = path.dirname(fileURLToPath(import.meta.url));
+  const src2 = fs.readFileSync(path.join(here2, "Script_Core.mjs"), "utf8");
+  const from = src2.indexOf('id: "c1_thatday"');
+  const to = src2.indexOf('id: "c2_');
+  assert.ok(from > 0 && to > from, "找不到第一章的源码范围");
+  const chunk = src2.slice(from, to);
+  const shown = [...chunk.matchAll(/\bstage: "([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(shown, VO,
+    "第一章的字幕只许是那两句真旁白；描述请写成 act:\n  " + shown.join("\n  "));
+
+  // 反过来也得成立：描述行确实还在，只是不进字幕通道了
+  const acts = [...chunk.matchAll(/\bact: "([^"]*)"/g)].length;
+  assert.ok(acts > 150, `第一章的演出说明不该凭空少掉（现在 ${acts} 行）`);
+  // 运行期再确认一遍：这些行确实不带任何会上字幕的字段
+  for (const def of SCRIPTS.c1 || []) {
+    for (const l of def.lines || []) {
+      if (typeof l.act !== "string") continue;
+      assert.ok(!l.stage && !l.say, `${def.id} 的演出说明行不许同时带 stage/say：${l.act}`);
+    }
+  }
+  console.log(`  ✓ 第一章只有 2 句真旁白上字幕（${acts} 行演出说明不出字幕）`);
+}
+
 // ---------------------------------------------------------------------------
 console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
@@ -2520,6 +2552,7 @@ function TestPoseNamesExist() {
 // 暂无节拍使用——哪天再有"砸中什么"的戏，把这两条从 git 历史里捞回来改。
 
 TestPromptsAreDeviceNeutral();
+TestChapterOneShowsOnlyRealNarration();
 TestStrokeWork();
 TestPoseNamesExist();
 TestVaultC1();

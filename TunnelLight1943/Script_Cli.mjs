@@ -194,7 +194,9 @@ async function CmdBeat(o) {
     def.lines.slice(0, Number(o.lines || 6)).forEach((l, i) => {
       const tag = `[${acc.toFixed(1)}s +${(l.d || 0).toFixed(1)}]`;
       acc += l.d || 0;
-      console.log(`  ${i}. ${tag} ${l.who ? l.who + "：" : l.stage ? "（场）" : ""}${(l.say || l.stage || "").slice(0, 60)}`);
+      // （旁白）＝真上字幕的；（演出）＝只是演出说明，屏幕上一个字都没有
+      const mark = l.who ? l.who + "：" : l.stage ? "（旁白）" : l.act ? "（演出）" : "";
+      console.log(`  ${i}. ${tag} ${mark}${(l.say || l.stage || l.act || "").slice(0, 60)}`);
     });
     if (def.lines.length > (Number(o.lines || 6))) console.log(`  …（--lines 调）`);
   }

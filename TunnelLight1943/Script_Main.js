@@ -454,7 +454,10 @@ function HintShot(state, hint) {
       };
     }
     case "dark":
-      return { ...BaseShot(state), fade: 0.94 };
+      // 黑就是黑：`1` 不是 0.94。老版留那 6% 不是为了"有点透"，是因为
+      // #fadeOverlay 排在字幕**上面**——压到 1 就把台词一起盖掉了。现在
+      // 罩子的 z-index 沉到字幕之下（Style_Game.css），黑得到底，字照旧在上头。
+      return { ...BaseShot(state), fade: 1 };
     case "free": {
       // 过场自由相机（勇敢的心式运镜，仅 cinematic 行）：from→to 机位、
       // at→atTo 注视点按本行时长插值（smoothstep），roll 单位是度。
@@ -1028,9 +1031,14 @@ function SyncHud(state, dt, shotFade) {
     }
   }
 
-  if (dipLevel > 0) dipLevel = Math.max(0, dipLevel - dt * 3.2);
+  if (dipLevel > 0) dipLevel = Math.max(0, dipLevel - dt * 4.6);
   const targetFade = state.phase === "gameEnd" ? 0.75 : shotFade;
-  fadeLevel += (targetFade - fadeLevel) * Math.min(1, dt * 2.4);
+  // 指数吸附**永远到不了终点**：2.4/s 的老速度要 1.2 秒才走到九成，收黑那一下
+  // 慢吞吞、亮回来更慢（一句台词都念完了画面还挂着一层灰）。提速到 6.5/s
+  // （≈0.45 秒走完），并且贴近终点就吸住——不吸住的话"全黑"永远差着最后
+  // 那几个千分点，屏幕上是深灰不是黑。
+  fadeLevel += (targetFade - fadeLevel) * Math.min(1, dt * 6.5);
+  if (Math.abs(targetFade - fadeLevel) < 0.01) fadeLevel = targetFade;
   ui.fadeOverlay.style.opacity = Math.max(fadeLevel, dipLevel).toFixed(3);
 }
 
@@ -1562,7 +1570,10 @@ window.TunnelLight = {
       world.BuildEnvironment(state);
       world.UpdateActors(state, now, dt);
       world.UpdateProps(state, now, dt);
-      UpdateCamera(state, dt);
+      // HUD 这一层同样只在 rAF 里走：收黑罩的不透明度就长在 SyncHud 里，
+      // 不推它的话实拍永远拍到"正在收黑"那一格（量出来 0.96，看图的人会
+      // 判成"黑屏不黑到底"——2026-08-14 差点又照着这张图去改数值）
+      SyncHud(state, dt, UpdateCamera(state, dt));
       StepIris(state, dt);
     }
   },
