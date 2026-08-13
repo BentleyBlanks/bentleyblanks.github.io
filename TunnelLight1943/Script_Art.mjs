@@ -4079,14 +4079,19 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
 // 配色一律**按 sRGB 那条老账压两档**（CanvasTexture 没声明色彩空间，上屏整体
 // 提亮一大截）。实拍量过一版——源色 #9c7434 上屏是 #e8d3a8，亮度从 0.46 抬到
 // 0.83。所以这几个数看着"黑得离谱"才是对的。
-const WRAP_MUD = "#4c4130";         // 干泥圈（发灰的干黄泥，三样里最亮的一档）
-const WRAP_MUD_D = "#352d1f";       // 泥的背光块与裂缝
+// 干泥箍。**按 sRGB 那笔老账压两档**：CanvasTexture 没声明色彩空间，全场提亮
+// 两档，原来的 #4c4130 在画面上是一坨发白的米色（实测亮度 131），比坛子(99)
+// 亮出一大截、离碗片(141)只差十来级——两样贴在一起就糊成一坨（2026-08-13
+// 实拍退回两轮）。**别再靠估**：拿 `shot --eval` 采一遍渲染后的像素再定值。
+// 目标是把这张卡的明度拉开：碗片 ~140（要抓的那件）> 泥 ~110 > 布 ~82
+const WRAP_MUD = "#2a2318";
+const WRAP_MUD_D = "#1b160e";       // 泥的背光块与裂缝
 const WRAP_SHARD = "#45423a";       // 半块粗瓷碗底：糙瓷，比坛身亮半档才立得住
 const WRAP_SHARD_D = "#302e27";
 const WRAP_FOOT = "#585349";        // 圈足：磨得发白的一圈
 // 碎布垫圈：蓝底白花的土布——娘那件短褂上剪下来的（2026-08-12 用户改稿钉死的
 // 暗线：跟夜里窖角那件短褂同一块布，FOLD_CLOTH 那头是同一个色系）
-const WRAP_CLOTH = "#1d2534";       // 靛蓝土布（按 sRGB 老账压两档）
+const WRAP_CLOTH = "#151b26";       // 靛蓝土布（按 sRGB 老账压两档）
 const WRAP_BLOOM = "rgba(188,196,208,0.55)";   // 白花：洗褪了的印花点子
 const WRAP_JAR = "#22201b";         // 灰陶：整张卡里最沉的一块，泥与碗片压在它上头
 
@@ -4110,10 +4115,17 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
     [W + 40 * S, H * 0.83], [W + 40 * S, H + 40 * S], [-40 * S, H + 40 * S]],
   "wrPit", "#4a4034", { amp: 6 * S, lw: 6 * S, shade: "rgba(0,0,0,0.34)" });
   ctx.save();
-  const pit = ctx.createRadialGradient(cx, cy + cr * 0.6, cr * 0.3, cx, cy + cr * 0.8, cr * 4.2);
-  pit.addColorStop(0, "rgba(12,9,5,0.86)");
-  pit.addColorStop(0.55, "rgba(14,10,6,0.66)");
-  pit.addColorStop(1, "rgba(14,10,6,0)");
+  // 坑里的暗。**收得紧一点**：这一拍的散焦背景是大白天的院子，亮得发白，
+  // 罐子、泥、碗片全是中间调，摊在那片白上就是一团糊（实拍量过：整张卡的
+  // 明度全挤在 78~141 之间）。把坑的暗收到罐子跟前，主体才从背景里立出来
+  // 收窄半径是**反的**（试过一版 2.7）：外圈一没了，白花花的散焦背景反而
+  // 露出更多。要的是罩得更广、压得更狠，连画框角上也留一点，才不至于
+  // 中间一坨暗、四角一片白
+  const pit = ctx.createRadialGradient(cx, cy + cr * 0.6, cr * 0.3, cx, cy + cr * 0.8, cr * 4.8);
+  pit.addColorStop(0, "rgba(12,9,5,0.92)");
+  pit.addColorStop(0.35, "rgba(14,10,6,0.86)");
+  pit.addColorStop(0.70, "rgba(14,10,6,0.60)");
+  pit.addColorStop(1, "rgba(14,10,6,0.20)");
   ctx.fillStyle = pit;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
@@ -4175,51 +4187,12 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
     ctx.restore();
   }
 
-  // ── 碎布垫圈：封坛那天垫在碗底下的那一圈蓝底白花（暗线的第二面）。
-  // 它压在坛口沿上、中间留着口（口那团黑与红薯干在它底下露着）。
-  // 画成一圈厚布箍，不是一块盖布——盖口的是碗片，布只是垫
+  // 碎布垫圈（蓝底白花，暗线的第二面）**画在碗片那一组里**——见下面。
+  // 原来它是独立的一圈布箍，中间留着口：可**半块碗底盖不住一个圆口**
+  //（2026-08-13 实拍：碗片改成规规矩矩的半圆之后，坛口当中张着一个大黑洞）。
+  // 现实里的次序本来就是「口上先蒙布、布上压碗片、再糊泥」，所以盖住口的是
+  // 那块**布**，碗片只是压在布上的一块重家伙。布跟着碗片一起被揭走。
   const cyRim = cy - cr * 0.04;
-  {
-    ctx.save();
-    ctx.lineCap = "round";
-    // 布箍：两道错位的粗弧叠出厚度，边缘自己就毛了
-    for (const [rk, wk, col] of [[1.00, 0.30, WRAP_CLOTH], [0.94, 0.20, "#232c3d"]]) {
-      ctx.beginPath();
-      ctx.ellipse(cx, cyRim, cr * rk, cr * rk * 0.42, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(8,10,14,0.9)";
-      ctx.lineWidth = cr * wk + 4 * S;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(cx, cyRim, cr * rk, cr * rk * 0.42, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = col;
-      ctx.lineWidth = cr * wk;
-      ctx.stroke();
-    }
-    ctx.restore();
-    // 方布垫在圆口上：几个布角从箍底下探出来
-    for (const a of [-2.3, -0.6, 0.9, 2.55]) {
-      const bx = cx + Math.cos(a) * cr * 1.06, by = cyRim + Math.sin(a) * cr * 0.44;
-      InkFill(ctx, [
-        [bx - Math.sin(a) * cr * 0.15, by + Math.cos(a) * cr * 0.09],
-        [bx + Math.cos(a) * cr * 0.24, by + Math.sin(a) * cr * 0.16],
-        [bx + Math.sin(a) * cr * 0.15, by - Math.cos(a) * cr * 0.09],
-      ], "wrGaskTip" + a.toFixed(1), WRAP_CLOTH, { amp: 2 * S, lw: 3.5 * S });
-    }
-    // 白花：稀稀拉拉几簇。这几点白就是暗线的记号：窖里那件短褂上是同一种花
-    for (let i = 0; i < 6; i += 1) {
-      const a = Hash("wrGBloomA" + i) * Math.PI * 2;
-      const bx = cx + Math.cos(a) * cr * (0.88 + Hash("wrGBloomR" + i) * 0.14);
-      const by = cyRim + Math.sin(a) * cr * 0.40;
-      ctx.fillStyle = WRAP_BLOOM;
-      for (let p2 = 0; p2 < 3; p2 += 1) {
-        const pa = (p2 / 3) * Math.PI * 2 + Hash("wrGBloomP" + i) * 2;
-        ctx.beginPath();
-        ctx.ellipse(bx + Math.cos(pa) * cr * 0.038, by + Math.sin(pa) * cr * 0.026,
-          cr * 0.023, cr * 0.016, pa, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
 
   // ── 半块碗底：豁口碗的底，圈足朝上扣在口当中。揭开＝捏住边往左下起 ──
   // 判定与作画共用 view.corner / view.open 这两个数，Art 里不另算一份
@@ -4230,51 +4203,172 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
     const dragY = (corner.y - L.cloth.y) * W;
     ctx.save();
     ctx.translate(cx + dragX, cyRim + dragY);
-    ctx.rotate(-peel * 0.85);           // 起开的那一下：整片朝左下翻着走
-    const er = cr * 0.80;
-    // 片身：多半个碗底的弧 + 掰断那条茬口（锯齿的弦）
-    const pts = [];
-    for (let i = 0; i <= 10; i += 1) {
-      const a = -2.95 + (i / 10) * 3.45;
-      const wob = 1 + 0.05 * Math.sin(a * 4 + 0.7);
-      pts.push([Math.cos(a) * er * wob, Math.sin(a) * er * 0.42 * wob]);
+    // **盖子得比口大**，不然它掉得进去。坛口那团黑是 0.88cr、厚唇口沿 1.06cr，
+    // 老版碗片才 0.80cr——比洞还小，中间那团黑于是从"盖着的"碗片当中透出来
+    const er = cr * 1.00;
+    // **躺着的东西要在自己的平面里转，不能把压扁了的形状整个去转。**
+    // 老版把点按 `sin(a)*er*0.42` 先压好，再 `ctx.rotate(-peel*0.85)` 转整片——
+    // 压缩轴跟着一起转，于是碗越揭越被拉成一条斜的长片（用户 2026-08-13：
+    //「那个傻逼一样的碗的面还会被莫名其妙拉长」）。
+    // 正确的分解：**先在正圆里转，再压纵轴**；而"揭起来"本身是压缩量变小
+    //（碗从躺着转向正对镜头，短轴长回来）。这两件事分开，形状就永远是只碗。
+    // 不用 ctx.scale 是因为它连墨线宽度一起压——只在点上做。
+    const spin = -peel * 0.55;                 // 起开那一下，在自己平面里带一点转
+    const tilt = 0.42 + 0.46 * peel;           // 躺着 0.42 → 立起来快正对镜头
+    const Pt = (a, r, dy = 0) => {
+      const x = Math.cos(a + spin) * r;
+      const y = Math.sin(a + spin) * r;
+      return [x, y * tilt + dy];
+    };
+
+    // ── 先画布：蒙在口上的那块蓝底白花，**整幅盖住坛口**（半块碗底盖不住圆口）。
+    // 它跟碗片同一组变换，所以揭碗片的时候布是跟着一起走的——底下的坛口与
+    // 红薯干这才露出来。四个布角从碗片底下探出去，一眼看得出底下垫着东西
+    {
+      const gr = cr * 1.16;
+      for (const a of [-2.35, -0.62, 0.92, 2.58]) {
+        const bx = Math.cos(a + spin) * gr * 1.02, by = Math.sin(a + spin) * gr * 1.02 * tilt;
+        InkFill(ctx, [
+          [bx - Math.sin(a) * cr * 0.16, by + Math.cos(a) * cr * 0.10 * tilt],
+          [bx + Math.cos(a) * cr * 0.30, by + Math.sin(a) * cr * 0.22 * tilt],
+          [bx + Math.sin(a) * cr * 0.16, by - Math.cos(a) * cr * 0.10 * tilt],
+        ], "wrGaskTip" + a.toFixed(1), WRAP_CLOTH, { amp: 2 * S, lw: 3.5 * S });
+      }
+      const gp = [];
+      for (let i = 0; i <= 26; i += 1) {
+        const a = (i / 26) * Math.PI * 2;
+        gp.push(Pt(a, gr * (1 + 0.045 * Math.sin(a * 4 + 0.9) + 0.025 * Math.sin(a * 9))));
+      }
+      InkFill(ctx, gp, "wrGask", WRAP_CLOTH,
+        { amp: 2 * S, lw: 4.5 * S, shade: "rgba(0,0,0,0.30)", shadeAt: 0.55 });
+      // 白花：稀稀拉拉几簇。这几点白就是暗线的记号——窖里那件短褂上是同一种花
+      for (let i = 0; i < 7; i += 1) {
+        const a = Hash("wrGBloomA" + i) * Math.PI * 2;
+        const b = Pt(a, gr * (0.34 + Hash("wrGBloomR" + i) * 0.58));
+        ctx.fillStyle = WRAP_BLOOM;
+        for (let p2 = 0; p2 < 3; p2 += 1) {
+          const pa = (p2 / 3) * Math.PI * 2 + Hash("wrGBloomP" + i) * 2;
+          ctx.beginPath();
+          ctx.ellipse(b[0] + Math.cos(pa) * cr * 0.038, b[1] + Math.sin(pa) * cr * 0.026 * tilt,
+            cr * 0.023, cr * 0.016, pa, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
-    // 茬口：从弧尾折回弧头，两个尖
-    pts.push([er * 0.30, er * 0.20], [er * 0.02, er * 0.05], [-er * 0.34, er * 0.16]);
-    InkFill(ctx, pts, "wrShard", WRAP_SHARD,
-      { amp: 2.6 * S, lw: 5 * S, shade: "rgba(0,0,0,0.3)", shadeAt: 0.6 });
-    // 圈足朝上：当中一圈磨白的足，足里的底洼下去一线
+    // 半块碗底：从掰断那条弦的一头，绕半圈到另一头。
+    // **必须一眼看出是"半块"**——老版弧扫了 198°、茬口又折回当中，
+    // 读出来是一整张缺了个角的圆盘（"鬼看得出来是碗"）。现在正正一个半圆，
+    // 弦上是掰断的茬，弧上是碗沿。
+    // 断口这条弦**要斜着横过去**。BRK 决定弦的方向：0.30 那档压扁之后几乎是
+    // 水平的，画面上就成了"上半蓝、下半灰"两块拼色，读不出"一块瓷片压在布上"。
+    // −0.55 让弦斜着走，碗片这才像**搁**在那儿的一块东西
+    const BRK = -0.55;
+    // 碗片压在布上的影子：没有它，瓷片和布是同一个平面上的两块颜色
     ctx.save();
+    ctx.fillStyle = "rgba(8,6,3,0.34)";
     ctx.beginPath();
-    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.42, er * 0.19, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(20,18,12,0.9)";
-    ctx.lineWidth = 6 * S;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.42, er * 0.19, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = WRAP_FOOT;
-    ctx.lineWidth = 4 * S;
-    ctx.stroke();
-    ctx.fillStyle = WRAP_SHARD_D;
-    ctx.beginPath();
-    ctx.ellipse(-er * 0.10, -er * 0.06, er * 0.30, er * 0.13, 0, 0, Math.PI * 2);
+    for (let i = 0; i <= 18; i += 1) {
+      const a = BRK + (i / 18) * Math.PI;
+      const p = Pt(a, er * 0.99, cr * 0.045);
+      if (i === 0) ctx.moveTo(p[0] + cr * 0.02, p[1]); else ctx.lineTo(p[0] + cr * 0.02, p[1]);
+    }
+    ctx.closePath();
     ctx.fill();
     ctx.restore();
-    // 掰断的瓷茬发白：茬口那条边一线亮
+    const pts = [];
+    for (let i = 0; i <= 16; i += 1) {
+      const a = BRK + (i / 16) * Math.PI;
+      // 碗沿不是正圆：粗瓷碗本来就歪，边上还啃过
+      const wob = 1 + 0.035 * Math.sin(a * 5 + 1.1) + 0.02 * Math.sin(a * 11);
+      pts.push(Pt(a, er * wob));
+    }
+    // 断口：一条**锯齿的弦**（瓷是崩断的，不是切开的），三进三出
+    for (let i = 1; i < 6; i += 1) {
+      const s2 = i / 6;
+      const a0 = BRK + Math.PI, a1 = BRK;
+      const bx = Math.cos(a0 + spin) * er + (Math.cos(a1 + spin) * er - Math.cos(a0 + spin) * er) * s2;
+      const by = (Math.sin(a0 + spin) * er + (Math.sin(a1 + spin) * er - Math.sin(a0 + spin) * er) * s2) * tilt;
+      const jag = (i % 2 ? 1 : -1) * er * (0.028 + Hash("wrBrk" + i) * 0.032);
+      pts.push([bx - Math.sin(BRK + spin) * jag, by + Math.cos(BRK + spin) * jag * tilt]);
+    }
+    InkFill(ctx, pts, "wrShard", WRAP_SHARD,
+      { amp: 2.2 * S, lw: 5 * S, shade: "rgba(0,0,0,0.3)", shadeAt: 0.6 });
+
+    // **碗要仰着放，让人看得见碗窝。**
+    // 老版是照现实那样底朝上扣着（圈足朝天）——现实是对的，可一只碗的**底**
+    // 从上面看就是一条圆弧加一个圈，谁也认不出那是碗（用户：「这他妈鬼看得
+    // 出来是碗」）。仰过来只多一个前提（碎瓷片随手一撂），却把碗最认得出的
+    // 两样东西一起给出来了：**一圈碗沿，和沿里头凹下去的那个窝**。
+    //
+    // 窝＝内壁一圈渐变（远壁受光、近壁在暗处）+ 当中一小片平底。
+    // 内壁那圈**要压暗**，凹进去这件事全靠它
     ctx.save();
-    ctx.strokeStyle = "rgba(178,182,170,0.5)";
-    ctx.lineWidth = 2.2 * S;
     ctx.beginPath();
-    ctx.moveTo(pts[10][0], pts[10][1]);
-    ctx.lineTo(er * 0.30, er * 0.20);
-    ctx.lineTo(er * 0.02, er * 0.05);
-    ctx.lineTo(-er * 0.34, er * 0.16);
-    ctx.lineTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i <= 20; i += 1) {
+      const a = BRK + 0.06 + (i / 20) * (Math.PI - 0.12);
+      const p = Pt(a, er * 0.90);
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+    ctx.clip();
+    const bowlG = ctx.createLinearGradient(0, -er * tilt, 0, er * tilt);
+    bowlG.addColorStop(0, "rgba(232,228,214,0.30)");     // 对面那道内壁：迎着光
+    bowlG.addColorStop(0.42, "rgba(0,0,0,0.10)");
+    bowlG.addColorStop(1, "rgba(0,0,0,0.46)");           // 近处内壁：整个沉在暗里
+    ctx.fillStyle = bowlG;
+    ctx.fillRect(-er * 1.2, -er * 1.2, er * 2.4, er * 2.4);
+    ctx.restore();
+    // 碗窝当中那一小片平底：比内壁再暗半档，边上一圈涩的（没上釉的那圈）
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i += 1) {
+      const a = BRK + 0.20 + (i / 16) * (Math.PI - 0.40);
+      const p = Pt(a, er * 0.34, er * 0.10 * tilt);
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = WRAP_SHARD_D;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(20,18,12,0.5)";
+    ctx.lineWidth = 2.4 * S;
     ctx.stroke();
-    // 那只碗本来的豁口：弧沿上啃缺的一小口
-    ctx.fillStyle = "rgba(14,12,8,0.85)";
+    ctx.restore();
+    // 碗沿：釉面在沿上磨得发亮的一道，**这道亮边是"这是只碗"最硬的记号**
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const [col, lw, dy] of [["rgba(24,21,14,0.55)", 6 * S, 1.6 * S],
+      [WRAP_FOOT, 3.4 * S, 0], ["rgba(226,226,214,0.5)", 1.6 * S, -1.4 * S]]) {
+      ctx.beginPath();
+      for (let i = 0; i <= 20; i += 1) {
+        const a = BRK + 0.04 + (i / 20) * (Math.PI - 0.08);
+        const p = Pt(a, er * 0.955, dy);
+        if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+      }
+      ctx.strokeStyle = col;
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 断口的**厚度**：碗壁就那么几毫米，可这几毫米是"这是块瓷片"的全部证据。
+    // 沿着弦铺一条窄带，用没上釉的生瓷色——比釉面白得多
+    ctx.save();
+    ctx.strokeStyle = "rgba(196,196,184,0.42)";
+    ctx.lineWidth = 3.4 * S;
+    ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.ellipse(er * 0.62, -er * 0.26, er * 0.10, er * 0.05, -0.5, 0, Math.PI * 2);
+    for (let i = 0; i < 6; i += 1) {
+      const p = pts[pts.length - 6 + i];
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // 那只碗本来就有的豁口：碗沿上啃缺的一小口（"豁口碗"这个名字的由来）
+    ctx.save();
+    ctx.fillStyle = "rgba(14,12,8,0.85)";
+    const nick = Pt(BRK + Math.PI * 0.34, er * 0.99);
+    ctx.beginPath();
+    ctx.ellipse(nick[0], nick[1], er * 0.09, er * 0.05 * (0.4 + tilt * 0.6), 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     ctx.restore();
@@ -4292,43 +4386,153 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
     }
   }
 
-  // ── 干泥圈：三箍，外→内一圈一圈啃。抠掉一段就真少画一段（进度长在泥上，
-  // 不在环上）；泥压在碗片边与布箍上——封坛最后一道手就是它 ──
+  // ── 糊在坛口上的那圈泥（2026-08-13 整个重画）──
+  //
+  // 用户原话：「坛口糊着泥 哪里糊着了？画成这个样子是糊着泥？鬼看得出来？」
+  // 老版是**45 个各自描边的小方块**（三箍 × 15 块）排在 r=1.36cr 上——
+  // 两个致命处：
+  //   ① 1.36cr 在坛口沿（1.06cr）**外面**，泥悬在坛肩的空气里，什么都没糊住。
+  //      封坛的泥是抹在"碗片压着坛口"这道缝上的，它必须同时骑在碗片和口沿上。
+  //   ② 一块一块各描各的边＝读出来是四十五个小物件绕成一圈（画面上那圈
+  //      炸开的木片/花瓣），不是一坨抹上去的泥。**糊上去的东西只有一个轮廓。**
+  //
+  // 现在：**一条连续的泥箍**——一个 path、一次填充、一条外轮廓。
+  // 内沿咬住碗片（0.62cr），外沿盖过口沿垂下来（最厚 1.24cr），两条沿都是
+  // 手抹出来的起伏（"四边笔直＝没有手"，光滑圆弧也一样）。抠的进度长在泥上：
+  // 外沿一层层往里退，本圈啃过的那一段先薄一档——绕到哪儿一眼看得见。
   const GAP = 0.42;                        // 起手位那个豁口（tip 处，本来就缺一块）
-  for (let ring = 0; ring < L.laps; ring += 1) {
-    if (ring < laps) continue;             // 这一箍整圈抠完了：露出底下的坛口沿
-    const eaten = ring === laps ? lapK * (Math.PI * 2 - GAP) : 0;
-    const rr = cr * (1.36 - ring * 0.17);
-    const n = 15;
-    for (let i = 0; i < n; i += 1) {
-      // 泥块沿圆周排，从豁口起往屏幕逆时针（角度递减）方向数
-      const d0 = GAP + (i / n) * (Math.PI * 2 - GAP);
-      if (d0 < eaten + 0.001) continue;    // 啃过的地方没有泥了
+  if (laps < L.laps) {
+    const eaten = lapK * (Math.PI * 2 - GAP);
+    // **泥是骑在缝上的一道箍，不是一块盖布。** 碗片外沿 1.00cr、口沿 1.06cr，
+    // 所以泥从 0.90 起（咬住碗片一圈）到 1.26（垂过口沿挂在坛肩上）。
+    // 内沿再往里就把碗整个埋了——玩家得看得见自己在揭的是块碗底
+    // **箍要窄。** 封坛抹的是一道两三指宽的泥，箍着口沿；摊到口径的一倍半
+    // 就不是封口泥了，是一张摊在坛子上的面饼（实拍退回两轮的另一半原因）
+    const R_IN = 0.92;
+    const rOutAt = (n) => 1.17 - n * 0.085;                   // 剩几层就有多厚
+    const rFull = rOutAt(laps), rThin = rOutAt(laps + 1);
+    // 外沿：从豁口起，屏幕逆时针一路数过去。本圈已经啃过的那段用薄的那一档
+    // **外沿是一指一指按出来的。** 先画个圈再加抖动，出来的永远是个胶圈——
+    // 抖大了成一朵花、抖小了成一只贝果，两版都实拍退回过。封坛的泥是拿拇指
+    // 一按一按赶着走的：**每按一下是一个鼓包，鼓包彼此叠着，边自然成扇贝形**。
+    // 让轮廓从动作里长出来——这正是全作画笔的第一条（画的顺序＝事情发生的顺序）。
+    const PRESS = 14;
+    const pressAt = [];
+    for (let i = 0; i < PRESS; i += 1) {
+      const dp = GAP + ((i + 0.5) / PRESS) * (Math.PI * 2 - GAP);
+      const wornK = dp < eaten ? Math.max(0.18, (rThin - R_IN) / Math.max(1e-3, rFull - R_IN)) : 1;
+      pressAt.push({
+        a: tipA - dp,
+        r: cr * (R_IN + (rFull - R_IN) * 0.52),
+        rad: cr * (rFull - R_IN) * (0.70 + Hash("wrPrs" + i) * 0.48) * wornK,
+      });
+    }
+    // 从坛心射出去的一条线撞到哪个鼓包最远，外沿就在那儿（射线—圆求交）
+    const OuterAt = (a) => {
+      let best = cr * R_IN * 1.03;
+      for (const p of pressAt) {
+        let d = a - p.a;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        const perp = p.r * Math.sin(d);
+        if (Math.abs(perp) >= p.rad) continue;
+        const reach = p.r * Math.cos(d) + Math.sqrt(p.rad * p.rad - perp * perp);
+        if (reach > best) best = reach;
+      }
+      return best;
+    };
+    const N = 132;
+    const outer = [], inner = [];
+    for (let i = 0; i <= N; i += 1) {
+      const d0 = GAP + (i / N) * (Math.PI * 2 - GAP);
       const a = tipA - d0;
-      const bx = cx + Math.cos(a) * rr, by = cyRim + Math.sin(a) * rr * 0.42;
-      const bw = cr * (0.16 + Hash("wrMudW" + ring + i) * 0.09);
-      const bh = cr * (0.10 + Hash("wrMudH" + ring + i) * 0.05);
-      const rot = a + Sym("wrMudA" + ring, i, 0.5);
-      // 一块干泥：歪的、鼓的，绝不是一段圆弧（"四边笔直＝没有手"，圆弧也一样）
-      InkFill(ctx, [
-        [bx - Math.cos(rot) * bw, by - Math.sin(rot) * bw * 0.5 - bh * 0.5],
-        [bx + Math.cos(rot) * bw * 0.9, by + Math.sin(rot) * bw * 0.4 - bh * 0.7],
-        [bx + Math.cos(rot) * bw * 1.05, by + Math.sin(rot) * bw * 0.5 + bh * 0.5],
-        [bx - Math.cos(rot) * bw * 0.85, by - Math.sin(rot) * bw * 0.4 + bh * 0.6],
-      ], "wrMud" + ring + i, i % 3 ? WRAP_MUD : WRAP_MUD_D,
-      { amp: 2 * S, lw: 3.5 * S, shade: "rgba(0,0,0,0.26)" });
-      // 干透的裂缝：两三块上一道
-      if (i % 4 === 1) {
-        InkLine(ctx, bx - bw * 0.4, by - bh * 0.3, bx + bw * 0.3, by + bh * 0.4,
-          "wrMudCk" + ring + i, { lw: 1.6 * S, color: "rgba(16,12,6,0.6)", amp: 1.2 * S });
+      // 手抹的起伏。**不许是周期性的**：三个正弦叠出来的边缘匀得像齿轮，
+      // 一眼就是"生成的"。拿 Hash 按段落给不同的胖瘦，再叠一点高频毛边，
+      // 外沿另挂两处往下坠的厚块——泥是稠的，抹到边上会自己坠一坨
+      // 起伏要**小**：抹上去的泥边是毛的，不是花瓣。0.86~1.16 那一档
+      // 把箍啃成了一朵花（实拍退回）
+      const rO = OuterAt(a) * (1 + 0.012 * Math.sin(d0 * 17.3));    // 一点毛边
+      const rI = cr * R_IN * (1 + 0.05 * Math.sin(d0 * 6.3 + 2.2)
+        + 0.035 * (Hash("wrMudIn" + Math.floor(d0 * 2.6)) - 0.5));
+      outer.push([cx + Math.cos(a) * rO, cyRim + Math.sin(a) * rO * 0.42]);
+      inner.push([cx + Math.cos(a) * rI, cyRim + Math.sin(a) * rI * 0.42]);
+    }
+    // 一条闭合路径：外沿去、内沿回。整坨泥就这一个轮廓
+    const band = outer.concat(inner.reverse());
+    InkFill(ctx, band, "wrMudBand", WRAP_MUD,
+      { amp: 1.6 * S, lw: 4 * S, shade: "rgba(0,0,0,0.30)", shadeAt: 0.55 });
+    // 一坨泥得有背光面，不然它是块平的面片。整条箍按光从左上来分明暗：
+    // 右下沉下去、左上抬起来，内沿再压一道（它是叠在碗片上的，有个台阶）
+    ctx.save();
+    ctx.beginPath();
+    band.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    ctx.closePath();
+    ctx.clip();
+    const lg = ctx.createLinearGradient(cx - cr, cyRim - cr * 0.6, cx + cr, cyRim + cr * 0.7);
+    lg.addColorStop(0, "rgba(214,196,150,0.10)");
+    lg.addColorStop(0.45, "rgba(0,0,0,0)");
+    lg.addColorStop(1, "rgba(0,0,0,0.34)");
+    ctx.fillStyle = lg;
+    ctx.fillRect(cx - cr * 2, cyRim - cr * 2, cr * 4, cr * 4);
+    // 内沿的台阶影：泥爬上碗片那一下
+    ctx.strokeStyle = "rgba(12,9,4,0.40)";
+    ctx.lineWidth = 7 * S;
+    ctx.beginPath();
+    ctx.ellipse(cx, cyRim, cr * R_IN, cr * R_IN * 0.42, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 抹的手印：一道道**顺着圈**的短弧，压在泥面上——泥是拿拇指一路赶过去的
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = 0; i < 11; i += 1) {
+      const d0 = GAP + Hash("wrThumbD" + i) * (Math.PI * 2 - GAP);
+      if (d0 < eaten) continue;
+      const rk = R_IN + 0.05 + Hash("wrThumbR" + i) * Math.max(0.06, rFull - R_IN - 0.12);
+      const span = 0.22 + Hash("wrThumbS" + i) * 0.20;
+      // 手印要真看得见：淡到 0.26 等于没画（实拍看过去是一坨没有手的面团）
+      for (const [col, lw, off] of [["rgba(18,13,6,0.55)", 3.6 * S, 0],
+        ["rgba(196,176,132,0.42)", 2.0 * S, -2.8 * S]]) {
+        ctx.beginPath();
+        for (let j = 0; j <= 5; j += 1) {
+          const a = tipA - (d0 + (j / 5) * span);
+          const rr2 = cr * rk;
+          const px3 = cx + Math.cos(a) * rr2;
+          const py3 = cyRim + Math.sin(a) * rr2 * 0.42 + off;
+          if (j === 0) ctx.moveTo(px3, py3); else ctx.lineTo(px3, py3);
+        }
+        ctx.strokeStyle = col;
+        ctx.lineWidth = lw;
+        ctx.stroke();
       }
     }
-    // 正在啃的那道口子：抠开的边上一线毛碴
-    if (ring === laps && view.phase === "unwind") {
+    ctx.restore();
+    // 干透裂开的缝：**横着切过泥箍**（泥收缩就是这么裂的），不是一块一道
+    for (let i = 0; i < 9; i += 1) {
+      const d0 = GAP + Hash("wrCrackD" + i) * (Math.PI * 2 - GAP);
+      if (d0 < eaten) continue;
+      const a = tipA - d0;
+      const r0 = cr * (R_IN + 0.03), r1 = cr * (rFull - 0.04);
+      InkLine(ctx,
+        cx + Math.cos(a) * r0, cyRim + Math.sin(a) * r0 * 0.42,
+        cx + Math.cos(a) * r1, cyRim + Math.sin(a) * r1 * 0.42,
+        "wrCrack" + i, { lw: 2.2 * S, color: "rgba(12,9,4,0.72)", amp: 1.8 * S });
+    }
+    // 泥压在坛口沿上的那道接触暗线：没有它，泥看着还是"浮"在坛上
+    ctx.save();
+    ctx.strokeStyle = "rgba(10,8,4,0.34)";
+    ctx.lineWidth = 3 * S;
+    ctx.beginPath();
+    ctx.ellipse(cx, cyRim, cr * R_IN, cr * R_IN * 0.42, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // 正在抠的那道断茬：新掰开的泥口，比泥面亮一档（里头还没干透）
+    if (view.phase === "unwind") {
       const aEdge = tipA - GAP - eaten;
-      const ex = cx + Math.cos(aEdge) * rr, ey = cyRim + Math.sin(aEdge) * rr * 0.42;
-      InkLine(ctx, ex - cr * 0.06, ey - cr * 0.04, ex + cr * 0.05, ey + cr * 0.05,
-        "wrMudEdge" + ring, { lw: 2 * S, color: "rgba(120,104,74,0.6)", amp: 1.4 * S });
+      InkLine(ctx,
+        cx + Math.cos(aEdge) * cr * R_IN, cyRim + Math.sin(aEdge) * cr * R_IN * 0.42,
+        cx + Math.cos(aEdge) * cr * rFull, cyRim + Math.sin(aEdge) * cr * rFull * 0.42,
+        "wrMudEdge", { lw: 2.6 * S, color: "rgba(138,120,86,0.75)", amp: 1.4 * S });
     }
   }
   // 抠下来的泥渣：一段一段攒在坛肩上（掉了的没有消失，它落在那儿）
