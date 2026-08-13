@@ -2,11 +2,12 @@
 // 镜头语法（硬切 / 慢推 / 横移 / 过肩正反打 / 插入特写）、HUD。
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
-  CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
+  CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt, BeatHintIcon,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
+  KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
-import { DrawRelic } from "./Script_Art.mjs";
+import { DrawRelic, DrawHudBadge } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
@@ -89,9 +90,11 @@ const ui = {};
 for (const id of [
   "titleScreen", "startButton", "chapterList",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
+  "objectiveTab", "objectiveTabIcon", "objectiveTabText", "objectiveTabHint",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
+  "sceneTitle", "sceneTitleNum", "sceneTitleText",
   "choiceOverlay", "choicePrompt", "choiceList",
   "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
@@ -510,6 +513,8 @@ function UpdateCamera(state, dt) {
           : playing && state.foldCard ? { kind: "fold", view: state.foldCard, layout: FOLD_CARD }
             : playing && state.wrapCard ? { kind: "wrap", view: state.wrapCard, layout: WRAP_CARD }
             : playing && state.splitCard ? { kind: "split", view: state.splitCard, layout: SPLIT_CARD }
+            : playing && state.tearCard ? { kind: "tear", view: state.tearCard, layout: TEAR_CARD }
+            : playing && state.sewCard ? { kind: "sew", view: state.sewCard, layout: SEW_CARD }
             : null,
     dt,
   );
@@ -692,6 +697,90 @@ function SyncActPrompt(state, pr, fill) {
   el.style.top = Math.round(Math.max(10, Math.min(chh - actBox.h - 10, sy - actBox.h - 6))) + "px";
 }
 
+// ---------------------------------------------------------------------------
+// 角上那枚「下一件事」（勇敢的心式）
+//
+// 中间那条目标只在变化时闪 6.5 秒，闪完玩家再想问"我这会儿到底要干嘛"就没处查
+// 了；可常驻一行字又会把画面读成任务列表。所以常驻的只有**一枚图**——画框边那张
+// 提示牌的同一支画笔、同一套推导（Core.BeatHintIcon → Art.DrawHudBadge），角上
+// 认得的图走到框边还是同一张。字要看的时候才给：鼠标悬停（CSS 管）/ 点一下。
+// 换了图只顶一下，不展开字——那会儿中间的目标条正把全文说着，两处同时说同一句
+// 就是重复。
+// ---------------------------------------------------------------------------
+let objIconFp = "";
+let objTextFp = "";
+let objTabT = 0;          // 点开之后自己收回去的倒计时（悬停那条归 CSS，不进这儿）
+
+function PaintObjectiveIcon(icon) {
+  const cv = ui.objectiveTabIcon;
+  if (!cv) return;
+  // 牌在 DOM 上只有 44px，按最高的 DPR 顶到 4 倍就够看（World 那边 HINT_SS=12
+  // 是给过肩特写量的，这里照那个倍率烘纯属白扔内存）
+  const ss = 4, w = 48;
+  cv.width = w * ss;
+  cv.height = w * ss;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(ss, 0, 0, ss, 0, 0);
+  DrawHudBadge(ctx, w, w, icon);
+}
+
+function SetObjTabOpen(open) {
+  const el = ui.objectiveTab;
+  if (!el) return;
+  el.classList.toggle("open", open);
+  el.setAttribute("aria-expanded", open ? "true" : "false");
+  objTabT = open ? 7 : 0;
+}
+
+function SyncObjectiveTab(state, inCinematic, objective, dt) {
+  const el = ui.objectiveTab;
+  if (!el) return;
+  const show = state.phase === "playing" && !inCinematic && !!objective;
+  if (!show) {
+    if (!el.hidden) { el.hidden = true; SetObjTabOpen(false); }
+    return;
+  }
+  el.hidden = false;
+  // 跳过序章那颗钮也占着左上角：它亮着的时候牌让到它底下去
+  el.classList.toggle("lower", !ui.btnSkipCine?.hidden);
+
+  const icon = BeatHintIcon(state) || { kind: "walk" };
+  const fp = [icon.kind, icon.who || icon.item || icon.gesture || "", icon.id || ""].join("|");
+  if (fp !== objIconFp) {
+    objIconFp = fp;
+    PaintObjectiveIcon(icon);
+    // 顶一下。先摘 class 再回流一次，同一枚图连着换两回也还能重新触发
+    el.classList.remove("bump");
+    void el.offsetWidth;
+    el.classList.add("bump");
+  }
+
+  const hint = GetHint(state) || "";
+  const tfp = `${objective}|${hint}`;
+  if (tfp !== objTextFp) {
+    objTextFp = tfp;
+    ui.objectiveTabText.textContent = objective;
+    ui.objectiveTabHint.textContent = hint;
+    el.classList.toggle("noHint", !hint);
+    el.setAttribute("aria-label", hint ? `${objective}。${hint}` : objective);
+  }
+
+  if (objTabT > 0) {
+    objTabT -= dt;
+    if (objTabT <= 0) SetObjTabOpen(false);
+  }
+}
+
+if (ui.objectiveTab) {
+  ui.objectiveTab.addEventListener("click", (e) => {
+    e.stopPropagation();
+    SetObjTabOpen(!ui.objectiveTab.classList.contains("open"));
+    // 鼠标/手指点的那一下别把键盘焦点扣在这枚牌上——玩家接着还要按 E
+    //（e.detail 为 0 的是键盘敲出来的，那种就该留着焦点）
+    if (e.detail) ui.objectiveTab.blur();
+  });
+}
+
 function SyncHud(state, dt, shotFade) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
@@ -736,6 +825,8 @@ function SyncHud(state, dt, shotFade) {
   if (objectiveT > 0) objectiveT -= dt;
   const objVisible = objectiveT > 0 && !inCinematic;
   ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
+  // 那一闪过去之后，「下一件事」仍旧挂在左上角那枚牌上
+  SyncObjectiveTab(state, inCinematic, objective, dt);
 
   // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来。
   // 带按键的走头顶那枚徽章，没按键的状态行（"跟上娘""！探杆就在头顶"）
@@ -825,6 +916,21 @@ function SyncHud(state, dt, shotFade) {
 
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
     ? Math.min(0.85, state.detection.level) : 0;
+
+  // 戏里的章名字样（八稿：序末的「第一章 · 蓝底白花」、章末的「第一章结束」）
+  // ——不是章节卡，不挡操作；淡入淡出交给 CSS 的过渡
+  if (state.titleCard) {
+    ui.sceneTitle.hidden = false;
+    ui.sceneTitleNum.textContent = state.titleCard.num || "";
+    ui.sceneTitleText.textContent = state.titleCard.title || "";
+    const tc = state.titleCard;
+    const fadeIn = tc.t > 0.05;
+    const fadeOut = tc.t > (tc.dur || 3.2) - 0.6;
+    ui.sceneTitle.classList.toggle("show", fadeIn && !fadeOut);
+  } else if (!ui.sceneTitle.hidden) {
+    ui.sceneTitle.classList.remove("show");
+    ui.sceneTitle.hidden = true;
+  }
 
   const demoEnd = DemoEnd(state);
   if (!demoEnd && (state.phase === "chapterCard" || state.phase === "chapterEnd")) {
@@ -1304,14 +1410,40 @@ function RunFrame(now, dt) {
   tapEdge = false;
 }
 
+// 画面被拉伸，十有八九是**画布缓冲的长宽比跟 CSS 盒对不上**：WebGL 的
+// drawing buffer 是一张固定尺寸的图，浏览器把它拉满 `width:100%;height:100%`
+// 的盒子——盒子的比例一变而缓冲没跟着改，整幅画就横着抻开（或竖着压扁）。
+//
+// 手机上这件事**不只在 `resize` 时发生**（2026-08-13 用户报「移动端横屏会被
+// 拉伸」）：iOS/Android 的地址栏收起、系统手势条让位、旋转后的两段式布局、
+// 分屏与画中画，都会改这个盒子，而 `window.resize` 要么不发、要么发得比布局早
+// 一拍（老版为此在 orientationchange 上挂了 200ms 的 setTimeout——那是在赌）。
+//
+// 所以改成**盯着画布这个元素本身**：ResizeObserver 在盒子真的变了之后才回调，
+// 谁改的、为什么改一概不用管；visualViewport 那两条补上 iOS 收/放地址栏时
+// 盒子没变、但可视区变了的那一档。尺寸取 `getBoundingClientRect()` 的**分数**
+// 值——`clientWidth` 是取整过的，2.17:1 这种比例上取整会引进零点几个百分点的
+// 偏差，正是"看着有点不对劲又说不上哪儿不对"。
+let lastCssW = 0, lastCssH = 0;
 function Resize() {
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
+  const r = canvas.getBoundingClientRect();
+  const w = r.width || canvas.clientWidth || window.innerWidth;
+  const h = r.height || canvas.clientHeight || window.innerHeight;
+  if (!(w > 0 && h > 0)) return;              // 布局还没落地：这一次不算数
+  if (Math.abs(w - lastCssW) < 0.5 && Math.abs(h - lastCssH) < 0.5) return;
+  lastCssW = w; lastCssH = h;
   world.Resize(w, h);
   CheckOrientation();
 }
 window.addEventListener("resize", Resize);
 window.addEventListener("orientationchange", () => setTimeout(Resize, 200));
+if (typeof ResizeObserver === "function") {
+  new ResizeObserver(Resize).observe(canvas);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", Resize);
+  window.visualViewport.addEventListener("scroll", Resize);
+}
 SetupTouch();
 Resize();
 BuildTitle();

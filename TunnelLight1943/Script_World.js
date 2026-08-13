@@ -181,7 +181,11 @@ const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃�
   "包袱布", "榆钱包袱",
   // 一碗红薯干、半瓢水、水葫芦都是**捧在手里**的：走肩挂那档会贴在肩窝，
   // 妹妹那么小的个子，碗就正糊在脸上（视觉审查退回过「头是一只碗」）
-  "红薯干", "半瓢水", "水葫芦"];
+  "红薯干", "半瓢水", "水葫芦",
+  // 布类同理（2026-08-13）：整布/碎布/破袄子/苦菜都是捧着抱着的，
+  // 走肩挂那档就成了"一卷布搭在肩膀上"——「他抱起整布，把脸贴上去」那一镜
+  // 于是既没贴脸也没抱住
+  "整布", "碎布", "布条", "苦菜"];
 // 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
 // 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
 // Rig 的 hold 姿势按它插值——不列的按小件算。
@@ -208,7 +212,11 @@ function PoseProgress(o) {
     || o.pose === "foldCloth" || o.pose === "layDown"
     // 找吃的那四道手：掀苫草/拖门板/扒烧土/解扎口，全由进度驱动
     || o.pose === "heaveMat" || o.pose === "dragPlank" || o.pose === "scoopAsh"
-    || o.pose === "unwrapJar") return o.poseU;
+    || o.pose === "unwrapJar"
+    // 扎回袋口（绕圈）、喂水与按住伤员（长按的行程）——2026-08-13 新增。
+    // **漏登记＝冻在第一帧**，这是 CLAUDE.md 点名的老坑
+    || o.pose === "twistTie" || o.pose === "bandageWrap"
+    || o.pose === "ladleSteady" || o.pose === "pinDown") return o.poseU;
   return o.poseK;
 }
 const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
@@ -567,6 +575,14 @@ export function CreateWorld(canvasEl) {
   let reedPivot = null, reedBaseMesh = null, troughMesh = null, troughKey = "", seedBagMesh = null;
   // 拉耧那一拍的动态耧（state.lou 驱动：位置随拖、耧腿歪进垄沟的角度）
   let louMesh = null;
+  // 做饭那一拍的灶火与热气（state.stoveFire）
+  let stoveFireMesh = null, stoveFireT = 0;
+  // 靴子踩上翻板那一段：板缝里落下来的灰（state.slatDust）
+  let slatDustMesh = null;
+  // 舀水那一下的水圈（state.vatScoop）
+  let vatScoopMesh = null;
+  // 伤员肩上的蓝花布 / 妹妹袖口那截蓝花（八稿两处特写认它们）
+  let bandageMesh = null, cuffMesh = null;
   // 窖口板缝打进来的那几束光（lidShut 的板缝光 / 夜里的月光同一支）。
   // hatchBeamK 是它当前的亮度，跨帧吸附——盖板合上那一下光要收得像光，不像拉闸
   let hatchBeamMesh = null, hatchBeamKey = "", hatchBeamK = 0;
@@ -1324,7 +1340,7 @@ export function CreateWorld(canvasEl) {
         f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
         f.heading = f.fleeDir;
         f.rig.group.position.x = f.x;
-        f.phase += FOLK_FLEE_SPEED * dt * 3.4;
+        f.phase += FOLK_FLEE_SPEED * dt * 3.4 / (f.scale || 1);
         f.idleT += dt * 1.4;
         PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
         f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
@@ -1341,7 +1357,7 @@ export function CreateWorld(canvasEl) {
         f.rig.group.position.x = f.x;
       }
       const moving = moved > 1e-4;
-      f.phase += moving ? moved * 3.4 : dt * 2.2;
+      f.phase += moving ? moved * 3.4 / (f.scale || 1) : dt * 2.2;
       f.idleT += dt * 1.4;
       if (f.track) f.trackT += dt;
       PoseRig(f.rig, {
@@ -1730,7 +1746,23 @@ export function CreateWorld(canvasEl) {
         mk((ctx, ax, ay) => ART.DrawTunnelBrace(ctx, ax, ay, S.w - 14, 0.74 * PPM, p.id));
         break;
       case "yardWall": mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, { gate: p.gate !== false, slogan: p.slogan })); break;
-      case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
+      case "henCoop": {
+        // tipped（八稿冷灶那一镜）：鸡笼倒在墙边——整只笼子撂倒，口朝着街
+        const coopMesh = mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id));
+        if (p.tipped && coopMesh) { coopMesh.rotation.z = 0.9; coopMesh.position.y -= 0.06; }
+        break;
+      }
+      // 草苫旁留下的那块整布（八稿 §9 末）：撕布之后（clothTorn）重烘成
+      // 撕剩的半块——布留在原地，少了一条
+      case "wholeClothRest": {
+        const Paint = (ctx, ax, ay, torn) => ART.DrawClothRest(ctx, ax, ay, p.id, { torn });
+        const clothMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.clothTorn));
+        propRedraw.push({
+          flag: "clothTorn", last: !!state?.flags.clothTorn,
+          run: (st) => RedrawProp(clothMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.clothTorn)),
+        });
+        break;
+      }
       case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
       case "pump": {
         mk((ctx, ax, ay) => {
@@ -2790,8 +2822,15 @@ export function CreateWorld(canvasEl) {
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
     s.ground = ground;                   // 供 PlayerLimbTips 量"手脚离地多高"
-    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
-    const lift = extra.lift || 0;
+    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡。
+    // **抬升要走一小段缓动**（2026-08-13）：剧本里「把妹妹抱起来」「把她放下」
+    // 都是直接写 `lift = 0.52` / `lift = 0`，孩子当帧凭空升高半米又当帧落地。
+    // 翻越那条本来就是逐帧算好的弧线（每帧变化很小），缓动不会把它糊掉；
+    // 阈值兜住"换层/跳幕"那种一米以上的大跳，让它照旧瞬时到位。
+    const liftWant = extra.lift || 0;
+    if (s.liftNow === undefined || Math.abs(liftWant - s.liftNow) > 1.0) s.liftNow = liftWant;
+    else s.liftNow += (liftWant - s.liftNow) * Math.min(1, (dt || 0.016) * 6);
+    const lift = s.liftNow;
     const y = ground + lift;
     const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
     const movedY = s.prevY === null || s.prevY === undefined ? 0 : Math.abs(y - s.prevY);
@@ -2802,8 +2841,11 @@ export function CreateWorld(canvasEl) {
     // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
     // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
     // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
+    // 步频要按**体型**折算：妹妹比柱子矮一头多，可她的步频原来和他一模一样，
+    // 于是她像踩着风火轮飘着跟，而不是小孩迈小碎步追（去井台那一路占屏最久）
+    const bsPh = extra.bodyScale || s.bodyScale || 1;
     if (extra.climbing) s.phase += movedY * 4.5;
-    else if (isMoving) s.phase += moved * 3.4;
+    else if (isMoving) s.phase += moved * 3.4 / bsPh;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     s.idleT += dt * 1.4;
 
@@ -2814,11 +2856,20 @@ export function CreateWorld(canvasEl) {
     // 筐得一路扣到口朝下），SyncCarry 拿不到 extra 就只能端着个永远平的筐。
     s.poseName = extra.pose || null;
     s.poseProgress = extra.poseK;
+    // 走还是跑：**跑不是"把走路放快"**。老版走路循环的幅度是写死的，谁跑起来
+     // 都还是那副散步的架势——序章里娘"冲进来"是 3.4m/s 的冲刺，画面上只是
+    // 一个人快速平移过去（用户说的"生硬"有一半在这儿）。gait 0..1 按实测速度
+    // 给（1.5m/s 起、3.2m/s 满），Rig 拿它加大步幅、把躯干压前、手臂抡开。
+    const speed = dt > 0 ? moved / dt : 0;
+    const gait = Math.max(0, Math.min(1, (speed - 1.5) / 1.7));
+    // 跑起来步频也要跟上（同一段路迈的步子更少、每步更大）
+    if (isMoving && !extra.climbing) s.phase += moved * gait * 0.7;
     PoseRig(s.rig, {
-      phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch, gait,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
+      childArms: extra.childArms,
       track: extra.track, trackT: extra.trackT,
     }, dt);
 
@@ -3101,6 +3152,9 @@ export function CreateWorld(canvasEl) {
         // 摇辘轳：把摇把握手的世界坐标换算成骨架局部坐标交给 Rig 反解——
         // 手是真的攥在那根把手上，不是照着一条相位在半空画圈
         poseStrain: p.poseStrain,
+        // 怀里抱着个孩子：不是姿势是**走姿**（腿照走、两臂兜住她、后仰配重）。
+        // 挂在这儿而不是 pose 上，是因为 pose 会把走路整个顶掉
+        childArms: !!p.childArms,
         aimHand: CrankAimLocal(state, p, boyScale),
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
@@ -3178,6 +3232,7 @@ export function CreateWorld(canvasEl) {
         posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
         {
           posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          childArms: !!a.childArms,
           // 干活的乡亲也用得上躬身施工那套（原来只有玩家能挖）——
           // 掌子面上抡站姿锄头，在净高只够爬的新掏段里一眼就假
           digging: !!a.digging,
@@ -4187,74 +4242,118 @@ export function CreateWorld(canvasEl) {
     // 之后——永远看得见，又不会把人挡住。
     if (state.forage) {
       const fg = state.forage;
+      // 八稿收档：声明了坐标才有档（Core 的 StepChain 同一条规矩）——
+      // 每一样都要先问 fg 里有没有，别对着 undefined 画
       const MAT_PX = Math.round(FORAGE.mat.half * PPM);
       const MAT_BOX = { w: MAT_PX + 30, h: 44, ax: 12, ay: 34, ss: PROP_SS };
       const PLANK_PX = Math.round(FORAGE.plank.len * PPM);
-      // 三样东西都挂在自己的 Group 上转：苫子绕折痕折过去、门板绕西头（架在
-      // 食槽上那一头落下来）。转 Group ＝ 绕那个点转，画笔只管"平着长什么样"
+      // 东西都挂在自己的 Group 上转：苫子绕折痕折过去、门板/焦木绕西头。
+      // 转 Group ＝ 绕那个点转，画笔只管"平着长什么样"
       const Pivot = (mesh) => {
         const g = new THREE.Group();
         mesh.position.set(mesh.userData.offset.x, mesh.userData.offset.y, 0);
         g.add(mesh);
         return g;
       };
-      if (!matPivot) {
-        matMesh = BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
-          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
-            { len: MAT_PX, torn: fg.mat.torn }), 0, PROP_SS);
-        matPivot = Pivot(matMesh);
-        SetPlayOrder(matPivot, BAND.loose, "forageMat");
-        layers.play.add(matPivot);
-        matTorn = fg.mat.torn;
+      if (fg.mat) {
+        if (!matPivot) {
+          matMesh = BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+            (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+              { len: MAT_PX, torn: fg.mat.torn }), 0, PROP_SS);
+          matPivot = Pivot(matMesh);
+          SetPlayOrder(matPivot, BAND.loose, "forageMat");
+          layers.play.add(matPivot);
+          matTorn = fg.mat.torn;
 
-        // 压在底下那半幅：同一片苫子对折过去的另一半，落在西边地上
-        matBaseMesh = Pivot(BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
-          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatB", { len: MAT_PX }),
-          0, PROP_SS));
-        matBaseMesh.rotation.z = FORAGE.mat.westA;
-        SetPlayOrder(matBaseMesh, BAND.loose, "forageMatBase");
-        layers.play.add(matBaseMesh);
-
-        plankMesh = Pivot(BakeSprite(PLANK_PX + 30, 40, 8, 30,
-          (ctx, ax, ay) => ART.DrawCharredPlank(ctx, ax, ay, "foragePlank", { len: PLANK_PX }),
-          0, PROP_SS));
-        SetPlayOrder(plankMesh, BAND.loose, "foragePlank");
-        layers.play.add(plankMesh);
-
-        ashMesh = BakeSprite(76, 46, 38, 40,
-          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash), 0, DETAIL_SS);
-        SetPlayOrder(ashMesh, BAND.loose, "forageAsh");
-        layers.play.add(ashMesh);
-        ashKey = "";
+          // 压在底下那半幅：同一片苫子对折过去的另一半，落在西边地上
+          matBaseMesh = Pivot(BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+            (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatB", { len: MAT_PX }),
+            0, PROP_SS));
+          matBaseMesh.rotation.z = FORAGE.mat.westA;
+          SetPlayOrder(matBaseMesh, BAND.loose, "forageMatBase");
+          layers.play.add(matBaseMesh);
+        }
+        // 撕掉一口就重烘一次苫子（进度长在实物上：撕过几次，外沿就缺几口）
+        if (matTorn !== fg.mat.torn) {
+          matTorn = fg.mat.torn;
+          RedrawProp(matMesh, MAT_BOX,
+            (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+              { len: MAT_PX, torn: fg.mat.torn }));
+        }
+        matPivot.visible = true;
+        matBaseMesh.visible = true;
+        // 折痕架在瓦砾上：整片苫子绕它转。世界里 +ang 是"外沿抬起来"，
+        // 屏幕上就是逆时针 → 绕 z 正向转
+        matPivot.position.set(fg.mat.x, SURFACE_Y + FORAGE.mat.pivotY, PlaceZ(BAND.loose));
+        matPivot.rotation.z = fg.mat.ang ?? FORAGE.mat.restA;
+        matBaseMesh.position.copy(matPivot.position);
+      } else if (matPivot) {
+        matPivot.visible = false;
+        matBaseMesh.visible = false;
       }
-      // 撕掉一口就重烘一次苫子（进度长在实物上：撕过几次，外沿就缺几口）
-      if (matTorn !== fg.mat.torn) {
-        matTorn = fg.mat.torn;
-        RedrawProp(matMesh, MAT_BOX,
-          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
-            { len: MAT_PX, torn: fg.mat.torn }));
-      }
-      matPivot.visible = true;
-      matBaseMesh.visible = true;
-      // 折痕架在瓦砾上：整片苫子绕它转。世界里 +ang 是"外沿抬起来"，
-      // 屏幕上就是逆时针 → 绕 z 正向转
-      matPivot.position.set(fg.mat.x, SURFACE_Y + FORAGE.mat.pivotY, PlaceZ(BAND.loose));
-      matPivot.rotation.z = fg.mat.ang ?? FORAGE.mat.restA;
-      matBaseMesh.position.copy(matPivot.position);
 
-      plankMesh.visible = true;
-      plankMesh.position.set(fg.plank.x0 + (fg.plank.dx || 0), SURFACE_Y, PlaceZ(BAND.loose));
-      plankMesh.rotation.z = fg.plank.tilt ?? FORAGE.plank.tilt;
+      if (fg.plank) {
+        if (!plankMesh) {
+          // style "beam"（八稿推焦木）：同一套拖拽机制，画的是烧焦的木檩
+          plankMesh = Pivot(BakeSprite(PLANK_PX + 30, 40, 8, 30,
+            (ctx, ax, ay) => (fg.plank.style === "beam"
+              ? ART.DrawCharredBeam(ctx, ax, ay, "forageBeam", { len: PLANK_PX })
+              : ART.DrawCharredPlank(ctx, ax, ay, "foragePlank", { len: PLANK_PX })),
+            0, PROP_SS));
+          SetPlayOrder(plankMesh, BAND.loose, "foragePlank");
+          layers.play.add(plankMesh);
+        }
+        plankMesh.visible = true;
+        plankMesh.position.set(fg.plank.x0 + (fg.plank.dx || 0), SURFACE_Y, PlaceZ(BAND.loose));
+        plankMesh.rotation.z = fg.plank.tilt ?? FORAGE.plank.tilt;
 
-      // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）
-      const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`;
-      if (key !== ashKey) {
-        ashKey = key;
-        RedrawProp(ashMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
-          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash));
+        // 焦木底下那半袋粮食（八稿）：木头拖开一截才露出来；
+        // 扎回袋口（flags.seedKept）之后再盖一领苇席
+        if (fg.plank.style === "beam") {
+          if (!seedBagMesh) {
+            seedBagMesh = BakeSprite(34, 26, 17, 22,
+              (ctx, ax, ay) => ART.DrawSeedBag(ctx, ax, ay, "forageSeedBag"), 0, DETAIL_SS);
+            SetPlayOrder(seedBagMesh, BAND.walk, "forageSeedBag");
+            layers.play.add(seedBagMesh);
+            const REED_PX = Math.round(FORAGE.reed.half * PPM);
+            reedBaseMesh = BakeSprite(REED_PX + 26, 40, 10, 30,
+              (ctx, ax, ay) => ART.DrawReedMat(ctx, ax, ay, "forageReedB", { len: REED_PX }),
+              0, PROP_SS);
+            // 盖在袋子上：比袋子深一档，才是"盖"
+            SetPlayOrder(reedBaseMesh, BAND.loose, "forageReedCover");
+            layers.play.add(reedBaseMesh);
+          }
+          const bagX = fg.plank.x0 + 0.55;
+          seedBagMesh.visible = !!fg.plank.done || (fg.plank.dx || 0) > 0.35;
+          PlaceSprite(seedBagMesh, bagX, SURFACE_Y, PlaceZ(BAND.walk));
+          reedBaseMesh.visible = !!state.flags?.seedKept;
+          PlaceSprite(reedBaseMesh, bagX - 0.28, SURFACE_Y + 0.16, PlaceZ(BAND.loose));
+          reedBaseMesh.rotation.z = -0.10;   // 苇席斜搭着盖，不是钉死的板
+        }
+      } else if (plankMesh) {
+        plankMesh.visible = false;
       }
-      ashMesh.visible = true;
-      PlaceSprite(ashMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+
+      if (fg.ash) {
+        if (!ashMesh) {
+          ashMesh = BakeSprite(76, 46, 38, 40,
+            (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash), 0, DETAIL_SS);
+          SetPlayOrder(ashMesh, BAND.loose, "forageAsh");
+          layers.play.add(ashMesh);
+          ashKey = "";
+        }
+        // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）
+        const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`;
+        if (key !== ashKey) {
+          ashKey = key;
+          RedrawProp(ashMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
+            (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash));
+        }
+        ashMesh.visible = true;
+        PlaceSprite(ashMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+      } else if (ashMesh) {
+        ashMesh.visible = false;
+      }
 
       // ── 苇席（第七稿新增，机制同苫子：绕折痕折过去）＋席底下那半袋谷种 ──
       if (fg.reed) {
@@ -4309,12 +4408,15 @@ export function CreateWorld(canvasEl) {
         troughMesh.visible = !!fg.plank.done || (fg.plank.dx || 0) > 0.3;
         PlaceSprite(troughMesh, fg.trough.x, SURFACE_Y, PlaceZ(BAND.walk));
       }
-    } else if (matPivot) {
-      matPivot.visible = false;
-      matBaseMesh.visible = false;
-      plankMesh.visible = false;
-      ashMesh.visible = false;
-      if (reedPivot) { reedPivot.visible = false; reedBaseMesh.visible = false; seedBagMesh.visible = false; }
+    } else {
+      // 换拍收摊：**逐件问**——八稿的翻找档是按需建的，苫子可能压根没建过，
+      // 只认 matPivot 的话焦木和袋子会赖在画面上不走
+      if (matPivot) { matPivot.visible = false; matBaseMesh.visible = false; }
+      if (plankMesh) plankMesh.visible = false;
+      if (ashMesh) ashMesh.visible = false;
+      if (reedPivot) reedPivot.visible = false;
+      if (reedBaseMesh) reedBaseMesh.visible = false;
+      if (seedBagMesh) seedBagMesh.visible = false;
       if (troughMesh) troughMesh.visible = false;
     }
 
@@ -4339,6 +4441,120 @@ export function CreateWorld(canvasEl) {
       louMesh.rotation.z = -(lo.tilt || 0);
     } else if (louMesh) {
       louMesh.visible = false;
+    }
+
+    // （车铃那一拍的两辆自行车走**演员**：mount:"bicycle" + pose:"rideBike"，
+    // 同第二章的 bikeScout——不在这儿另画一份）
+
+    // ── 做饭那一拍的灶火与热气（state.stoveFire）：火苗在灶口舔，
+    // 热气从锅盖边一缕一缕。小画布每帧重画（火不重画就是死的） ──
+    if (state.stoveFire) {
+      if (!stoveFireMesh) {
+        const c = MakeCanvas(56 * DETAIL_SS, 84 * DETAIL_SS);
+        const cx = c.getContext("2d");
+        cx.scale(DETAIL_SS, DETAIL_SS);
+        stoveFireMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(56 / PPM, 84 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(c), transparent: true, depthWrite: false }),
+        );
+        stoveFireMesh.userData.cx = cx;
+        stoveFireMesh.userData.c = c;
+        SetPlayOrder(stoveFireMesh, BAND.loose, "stoveFire");
+        layers.play.add(stoveFireMesh);
+      }
+      stoveFireT += 1 / 60;
+      const cx = stoveFireMesh.userData.cx;
+      cx.setTransform(DETAIL_SS, 0, 0, DETAIL_SS, 0, 0);
+      cx.clearRect(0, 0, 56, 84);
+      ART.DrawStoveFire(cx, 28, 80, stoveFireT);
+      stoveFireMesh.material.map.needsUpdate = true;
+      stoveFireMesh.visible = true;
+      // 灶口在灶台（27.4）西侧脚下，热气从锅沿（上方）出
+      stoveFireMesh.position.set(27.42, SURFACE_Y + 84 / 2 / PPM - 0.06, PlaceZ(BAND.loose));
+    } else if (stoveFireMesh) {
+      stoveFireMesh.visible = false;
+    }
+
+    // ── 靴子踩上翻板那一段：板缝里落下来的灰（state.slatDust，2.2s 自灭）──
+    if (state.slatDust) {
+      if (!slatDustMesh) {
+        slatDustMesh = BakeSprite(46, 60, 23, 56,
+          (ctx, ax, ay) => ART.DrawSlatDust(ctx, ax, ay, "slatDust"), 0, DETAIL_SS);
+        SetPlayOrder(slatDustMesh, BAND.loose, "slatDust");
+        layers.play.add(slatDustMesh);
+      }
+      const k = Math.min(1, (state.slatDust.t || 0) / 1.6);
+      slatDustMesh.visible = true;
+      slatDustMesh.material.opacity = 0.85 * (1 - k * 0.8);
+      slatDustMesh.material.transparent = true;
+      // 从翻板底面（洞口）往下落
+      slatDustMesh.position.set(29.5, UNDER_Y + 2.1 - k * 1.1, PlaceZ(BAND.loose));
+    } else if (slatDustMesh) {
+      slatDustMesh.visible = false;
+    }
+
+    // ── 舀水那一下（state.vatScoop）：缸口的水圈随瓢抬起往下沉、两道滴水。
+    // 水线下降那句话（八稿 §11）由这 1.6 秒演 ──
+    if (state.vatScoop) {
+      if (!vatScoopMesh) {
+        vatScoopMesh = BakeSprite(44, 30, 22, 24,
+          (ctx, ax, ay) => ART.DrawScoopRing(ctx, ax, ay, "vatScoop"), 0, DETAIL_SS);
+        SetPlayOrder(vatScoopMesh, BAND.loose, "vatScoop");
+        layers.play.add(vatScoopMesh);
+      }
+      const k = Math.min(1, (state.vatScoop.t || 0) / 1.6);
+      vatScoopMesh.visible = true;
+      vatScoopMesh.material.opacity = 0.9 * (1 - k);
+      vatScoopMesh.material.transparent = true;
+      vatScoopMesh.position.set(43.4, SURFACE_Y + 0.98 - k * 0.12, PlaceZ(BAND.loose));
+    } else if (vatScoopMesh) {
+      vatScoopMesh.visible = false;
+    }
+
+    // ── 伤员肩上的蓝花布（actor.bandage）：躺在草苫上的那个人，肩头缠着
+    // 从整布上撕下来的那条。骨架不管衣饰，这一小块钉在世界里跟人走 ──
+    {
+      const wd = state.actors?.find((a) => a.id === "wounded");
+      const show = !!(wd && wd.visible && wd.bandage && wd.level === "under");
+      if (show) {
+        if (!bandageMesh) {
+          bandageMesh = BakeSprite(14, 10, 7, 6,
+            (ctx, ax, ay) => ART.DrawBandage(ctx, ax, ay, "wBandage"), 0, DETAIL_SS * 3);
+          SetPlayOrder(bandageMesh, CARRY_Z, "wBandage");
+          layers.play.add(bandageMesh);
+        }
+        bandageMesh.visible = true;
+        // 躺姿（heading -1 往东倒，头落在东侧）：肩窝在身位东侧 0.46m、
+        // 离地 0.32m。**别再画大**——这块布只有巴掌宽，画大了就是悬空的蓝板
+        bandageMesh.position.set(wd.x + 0.46, UNDER_Y + 0.32, PlaceZ(CARRY_Z));
+        bandageMesh.rotation.z = -0.35;
+      } else if (bandageMesh) {
+        bandageMesh.visible = false;
+      }
+    }
+
+    // ── 接了袖的蓝花袖口（flags.jacketOn）：妹妹睡着时露在被外的那截手腕，
+    // 从这一夜起被蓝花布盖住（§14 的落点；机位 31.35 的那三次特写认它）──
+    {
+      const sis = state.actors?.find((a) => a.id === "sister");
+      const show = !!(state.flags?.jacketOn && sis && sis.visible
+        && sis.level === "surface" && sis.pose === "sleep" && Math.abs(sis.x - 30.75) < 0.8);
+      if (show) {
+        if (!cuffMesh) {
+          cuffMesh = BakeSprite(10, 7, 5, 4,
+            (ctx, ax, ay) => ART.DrawCuff(ctx, ax, ay, "sisCuff"), 0, DETAIL_SS * 3);
+          SetPlayOrder(cuffMesh, CARRY_Z, "sisCuff");
+          layers.play.add(cuffMesh);
+        }
+        cuffMesh.visible = true;
+        // 贴着她那只露在被外的手放（别搁在身外的空地上——那就成了一块悬空的
+        // 蓝板）。睡姿 heading -1：整具骨架转 90°、头落在东侧，**伸出来的那条
+        // 胳膊朝西**——所以袖口在身位西边一点点、炕面往上 0.66m（实拍量的）
+        cuffMesh.position.set(sis.x - 0.06, SURFACE_Y + 0.66, PlaceZ(CARRY_Z));
+        cuffMesh.rotation.z = 0.35;
+      } else if (cuffMesh) {
+        cuffMesh.visible = false;
+      }
     }
 
     if (state.planing) {
@@ -5459,6 +5675,7 @@ export function CreateWorld(canvasEl) {
     scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard,
     knot: ART.DrawKnotCard, fold: ART.DrawFoldCard, wrap: ART.DrawWrapCard,
     split: ART.DrawSplitCard,
+    tear: ART.DrawTearCard, sew: ART.DrawSewCard,
   };
 
   function SetLiveCard(spec, dt) {
@@ -5573,9 +5790,22 @@ export function CreateWorld(canvasEl) {
 
   function ApplyCamera(camX, camY, halfWidth) {
     const aspect = camera.userData.aspect || 16 / 9;
+    // 景别（halfWidth）是**按 16:9 的画框调的**：人占画高多少、头顶留多少、
+    // 地面退多远，全是在那个比例上定的数。
+    //
+    // 屏幕比它更宽时（横屏手机常见 2.16:1、折叠屏还要宽），照着画宽走就等于
+    // **把上下裁掉近两成**——天和地各少一截，人贴着画框底边，读起来就是
+    // "画面被拉扁了"（2026-08-13 用户报的移动端横屏）。所以超宽的那一档
+    // **改成保画高**：竖直方向仍是 16:9 那么多米，多出来的比例往两边加宽。
+    // 人在屏幕上的大小于是跟桌面一模一样，多出来的只有左右两侧的村子。
+    //
+    // 比 16:9 窄的（iPad 4:3、竖屏）不动：那一头保画宽、画面往上下长，
+    // 多出来的是天和地，什么也不会被切掉。
+    const REF_ASPECT = 16 / 9;
+    const hw = aspect > REF_ASPECT ? halfWidth * (aspect / REF_ASPECT) : halfWidth;
     // 由目标景别反推机位距离：视差与地面退缩随之自然发生
-    const dist = halfWidth / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
-    viewW = halfWidth * 2;
+    const dist = hw / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
+    viewW = hw * 2;
     viewH = viewW / aspect;
     camera.aspect = aspect;
     camera.position.set(camX, camY, dist);
@@ -5603,6 +5833,12 @@ export function CreateWorld(canvasEl) {
 
   let rendererCssW = 0, rendererCssH = 0;
   function Resize(width, height) {
+    // **缓冲的比例必须等于 CSS 盒的比例**，否则整幅画横着抻开（Main 的
+    // Resize 那段有账）。setSize 的第三个参数是 false＝不许 three 去改
+    // canvas 的行内样式：尺寸由 CSS（100%/100%）说了算，这里只管缓冲。
+    // 像素比每次都重设一遍：手机在不同显示模式间切换时 devicePixelRatio 会变，
+    // 只在启动时设一次的话，缓冲会按老的 dpr 算，同样是拉伸
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
     camera.userData.aspect = width / height;
     rendererCssW = width;

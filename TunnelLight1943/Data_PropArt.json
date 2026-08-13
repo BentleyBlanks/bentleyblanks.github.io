@@ -741,7 +741,7 @@
         "anchor": "center",
         "baseline": 4
       },
-      "note": "铺在榆树底下接榆钱的破褂子（2026-08-12 打榆钱拆场）：showFlag=coatSpread 出、hideFlag=elmBagged 收；砸下第二把后 propRedraw 铺一层绿（flags.elmDown）"
+      "note": "打榆钱拆场的褂子——八稿把打榆钱整场删了，村里已无实例；画笔留档"
     },
     "louDrill": {
       "art": "DrawLou",
@@ -810,6 +810,18 @@
       },
       "note": "草堆底下伸出来的前臂和手（manGrab 那一镜的静帧）：loose 带压在草堆之前，插入镜里才看得清"
     },
+    "wholeClothRest": {
+      "art": "DrawClothRest",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 44,
+        "h": 26,
+        "anchor": "center",
+        "baseline": 3
+      },
+      "note": "八稿 §9 末留在草苫旁的整布（manFound 现身）；撕布后 propRedraw（clothTorn）换成撕剩的半块"
+    },
     "cellarSundries": {
       "art": "DrawCellarSundries",
       "band": "walk",
@@ -820,19 +832,7 @@
         "anchor": "center",
         "baseline": 5
       },
-      "note": "摸黑归置前：破笸箩歪着、豁口碗倒扣、纺锭拖线（cellarTidy 收走）"
-    },
-    "cellarSundriesTidy": {
-      "art": "DrawCellarSundriesTidy",
-      "band": "walk",
-      "ss": "prop",
-      "sprite": {
-        "w": 62,
-        "h": 30,
-        "anchor": "center",
-        "baseline": 5
-      },
-      "note": "摸黑归置后：笸箩摆正、碗摞成摞、纺锭线绕紧（cellarTidy 立起才现）"
+      "note": "破笸箩歪着、豁口碗倒扣、纺锭拖线——八稿删了摸黑归置，它们一直这么散着"
     },
     "sewBasket": {
       "art": "DrawSewBasket",

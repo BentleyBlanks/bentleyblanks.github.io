@@ -377,6 +377,27 @@ for (const size of TOUCH_SIZES) {
     document.getElementById("btnBag").click();          // 真打开
     await new Promise((r) => setTimeout(r, 380));
     out.包袱打开 = Sweep();
+    document.getElementById("btnBag").click();          // 关回去，别影响下面那段
+    await new Promise((r) => setTimeout(r, 380));
+
+    // 角上那枚「下一件事」：它自己也是个按得着的钮，同样不许被谁盖住；
+    // 而左上角还住着跳过序章那颗钮（现在没有 prologue 拍，但机制留着），
+    // 两枚一旦同时亮就得错开——这条是摆位对错，跟画高无关，所以在这儿一起验
+    const tab = document.getElementById("objectiveTab");
+    out.目标牌 = [];
+    for (let i = 0; i < 600 && tab.hidden; i += 1) window.TunnelLight.StepFrames(2, { advance: true });
+    if (!tab.hidden) {
+      out.目标牌 = [Free("objectiveTab")].filter((r) => r.bad > 0);
+      // 下面几行中间不许 await：SyncHud 每帧都会把这两个开关拨回去
+      const skip = document.getElementById("btnSkipCine");
+      skip.hidden = false;
+      tab.classList.add("lower");
+      const a = tab.getBoundingClientRect(), b = skip.getBoundingClientRect();
+      const 错开 = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      if (!错开) out.目标牌.push({ id: "objectiveTab", bad: 1, total: 1, thief: "btnSkipCine" });
+      skip.hidden = true;
+      tab.classList.remove("lower");
+    }
     return out;
   });
   await mob.close();
@@ -390,8 +411,86 @@ for (const size of TOUCH_SIZES) {
       }
     }
   } else {
-    console.log(`✓ ${size.name} 拇指控件三态无遮挡（摇杆 / 互动 / 蹲）`);
+    console.log(`✓ ${size.name} 拇指控件三态无遮挡（摇杆 / 互动 / 蹲）＋ 角上目标牌不被压、不跟跳过键叠`);
   }
+}
+
+// 画面不许被拉伸（横屏手机）
+//
+// 2026-08-13 用户报「移动端横屏会被拉伸」。两件事分开钉：
+//   ① **真拉伸**＝一米见方的东西投到屏幕上不是正方。来源只有一个：画布缓冲的
+//      长宽比跟 CSS 盒对不上（或相机 aspect 跟盒对不上）。逐比例量 pxPerM 的
+//      横竖两个数，差一个千分之三都算红。**改了尺寸之后还要再量一遍**——
+//      手机上盒子会自己变（地址栏、手势条、旋转），Main 那边靠 ResizeObserver
+//      跟住，这里就照着模拟一次。
+//   ② **被裁扁**＝屏幕比 16:9 宽时，照画宽走会把上下裁掉近两成，人贴着画框
+//      底边，读起来同样是"拉伸了"。所以超宽的那一档改成保画高：**竖直方向
+//      的米数必须与 16:9 相等**，多出来的比例往两边加宽。
+// 基准画高由第一行（桌面 16:9）自己量出来，后面几行都跟它比
+let REF_VIEW_H = 0;
+const ASPECT_SIZES = [
+  { name: "桌面 16:9", w: 1600, h: 900, dpr: 1 },
+  { name: "iPhoneSE 横屏", w: 667, h: 375, dpr: 2 },
+  { name: "iPhone15PM 横屏 2.17:1", w: 932, h: 430, dpr: 3 },
+  { name: "折叠屏 21:9", w: 1050, h: 450, dpr: 2.5 },
+  { name: "iPad 横屏 1.44:1", w: 1180, h: 820, dpr: 2 },
+];
+const Metrics = (page) => page.evaluate(() => {
+  const { THREE, camera } = window.TunnelLight.world.debugLayers();
+  const c = document.getElementById("gameCanvas");
+  const r = c.getBoundingClientRect();
+  const P = (x, y) => {
+    const v = new THREE.Vector3(x, y, 0).project(camera);
+    return [(v.x * 0.5 + 0.5) * r.width, (-v.y * 0.5 + 0.5) * r.height];
+  };
+  const o = P(30, 0), px = P(31, 0), py = P(30, 1);
+  return {
+    boxW: r.width, boxH: r.height, bufW: c.width, bufH: c.height,
+    camAspect: camera.aspect,
+    pxPerM_x: px[0] - o[0], pxPerM_y: o[1] - py[1],
+  };
+});
+{
+  let aspectBad = 0;
+  for (const s of ASPECT_SIZES) {
+    const page = await browser.newPage({
+      viewport: { width: s.w, height: s.h },
+      deviceScaleFactor: s.dpr, isMobile: s.w < 1200, hasTouch: s.w < 1200,
+    });
+    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/?chapter=1&fast=1`, { waitUntil: "load", timeout: 60000 });
+    await page.waitForFunction(() => window.TunnelLight?.world?.debugLayers, { timeout: 60000 });
+    await page.waitForTimeout(400);
+    // 中途再改一次尺寸：手机上盒子本来就会自己变，改完必须还是不拉伸
+    await page.setViewportSize({ width: s.w, height: Math.round(s.h * 0.86) });
+    await page.waitForTimeout(400);
+    await page.setViewportSize({ width: s.w, height: s.h });
+    await page.waitForTimeout(400);
+    const m = await Metrics(page);
+    await page.close();
+
+    const boxA = m.boxW / m.boxH;
+    const bufA = m.bufW / m.bufH;
+    const sq = m.pxPerM_x / m.pxPerM_y;          // 1＝一米见方投出来还是正方
+    const viewH = m.boxH / m.pxPerM_y;           // 画框里装得下几米高
+    const okSquare = Math.abs(sq - 1) < 0.003;
+    const okBuf = Math.abs(bufA / boxA - 1) < 0.005;
+    const okCam = Math.abs(m.camAspect / boxA - 1) < 0.005;
+    // 超宽的那一档保画高：与 16:9 的画高相等（±1%）；不超宽的只要不比它矮
+    const okH = boxA > 16 / 9 ? Math.abs(viewH / REF_VIEW_H - 1) < 0.01 : viewH >= REF_VIEW_H - 1e-3;
+    if (!(okSquare && okBuf && okCam && okH)) {
+      aspectBad += 1;
+      failed += 1;
+      console.error(`✗ ${s.name}：一米见方投出来是 ${sq.toFixed(4)}（要 1）、`
+        + `缓冲比/盒比 ${(bufA / boxA).toFixed(4)}、相机比/盒比 ${(m.camAspect / boxA).toFixed(4)}、`
+        + `画高 ${viewH.toFixed(2)}m（16:9 是 ${REF_VIEW_H.toFixed(2)}m）`);
+    } else if (s.name === "桌面 16:9") {
+      REF_VIEW_H = viewH;
+      console.log(`✓ ${s.name} 不拉伸（基准画高 ${viewH.toFixed(2)}m）`);
+    } else {
+      console.log(`✓ ${s.name} 不拉伸（一米见方 ${sq.toFixed(4)} / 画高 ${viewH.toFixed(2)}m 与 16:9 齐平）`);
+    }
+  }
+  if (!aspectBad) console.log("✓ 各比例画面不拉伸、超宽不裁画高（改尺寸之后仍成立）");
 }
 
 await browser.close();

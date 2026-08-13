@@ -62,6 +62,17 @@
       <b id="objectiveText"></b>
       <span id="hintText"></span>
     </section>
+    <!-- 角上那枚「下一件事」：常驻的只有一枚图，字要看的时候才给（勇敢的心式）。
+         图与画框边那张提示牌同源（Core.BeatHintIcon → Art.DrawHudBadge），
+         所以角上认得的图走到框边还是同一张，玩家只用学一套。
+         鼠标悬停 / 点一下（手机）展开这一拍的目标与那句提示。 -->
+    <button id="objectiveTab" type="button" hidden aria-expanded="false">
+      <canvas id="objectiveTabIcon" aria-hidden="true"></canvas>
+      <span id="objectiveTabBody"><span class="clip"><span id="objectiveTabCard">
+        <b id="objectiveTabText"></b>
+        <i id="objectiveTabHint"></i>
+      </span></span></span>
+    </button>
     <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
     <div id="itemTag" hidden><small>手里</small><b id="itemName"></b><i id="itemThrow" class="pKey" hidden></i></div>
     <div id="topRight">
@@ -153,6 +164,13 @@
       <h2 id="cardTitle"></h2>
       <p id="cardYear"></p>
       <span id="cardContinue">按 E 继续</span>
+    </section>
+
+    <!-- 戏里的章名字样（八稿：章名出现在序的末尾、章末的「第一章结束」）——
+         不是章节卡：不挡操作、自己淡入淡出，由 state.titleCard 驱动 -->
+    <section id="sceneTitle" aria-hidden="true" hidden>
+      <small id="sceneTitleNum"></small>
+      <h2 id="sceneTitleText"></h2>
     </section>
 
     <section id="choiceOverlay" hidden>

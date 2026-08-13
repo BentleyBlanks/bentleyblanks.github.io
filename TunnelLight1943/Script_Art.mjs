@@ -1200,6 +1200,55 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
     // 兜底那道被里头东西顶出来的痕
     InkLine(ctx, 4.6 * S, 3.8 * S, 8.6 * S, 3.4 * S, "bkBundleSag",
       { lw: 0.8 * S, color: "rgba(52,42,26,0.55)", amp: 0.8 });
+  } else if (label === "挂着布兜的空桶") {
+    // 八稿去井台那趟：空木桶照旧，桶沿上挂一只小布兜（妹妹的苦菜进的
+    // 就是它）。兜比包袱小一号、口敞着，一两片叶子探出头
+    DrawCarry(ctx, 0, 0, S, 1, "水桶");
+    InkFill(ctx, [[3.8 * S, 0.8 * S], [8.2 * S, 0.4 * S], [8.8 * S, 5.0 * S],
+      [6.4 * S, 6.8 * S], [4.2 * S, 5.6 * S]],
+      "hbPouch", "#75664a", { amp: 0.6 * S, lw: 1.3 * S, shade: "rgba(0,0,0,0.2)" });
+    // 挂绳：兜口两根小绳拴在桶沿上
+    InkLine(ctx, 4.6 * S, 1.0 * S, 5.4 * S, -0.6 * S, "hbPouchStrA",
+      { lw: 0.7 * S, color: "rgba(52,42,26,0.7)", amp: 0.4 });
+    InkLine(ctx, 7.4 * S, 0.8 * S, 6.6 * S, -0.6 * S, "hbPouchStrB",
+      { lw: 0.7 * S, color: "rgba(52,42,26,0.7)", amp: 0.4 });
+    // 兜口探出来的苦菜叶（有了它才读得出"挖的野菜都搁这儿"）
+    ctx.save();
+    ctx.strokeStyle = "#5d7042";
+    ctx.lineWidth = 0.9 * S;
+    ctx.beginPath();
+    ctx.moveTo(5.4 * S, 1.2 * S);
+    ctx.quadraticCurveTo(5.0 * S, -0.8 * S, 6.0 * S, -1.6 * S);
+    ctx.moveTo(6.6 * S, 1.2 * S);
+    ctx.quadraticCurveTo(7.2 * S, -0.4 * S, 6.8 * S, -1.2 * S);
+    ctx.stroke();
+    ctx.restore();
+  } else if (label === "碎布") {
+    // 坛口那圈蓝底白花碎布：磨毛了边、只剩巴掌大的一小片，捏在手里
+    InkFill(ctx, [[-3.4 * S, -1.8 * S], [3.2 * S, -2.2 * S], [4.0 * S, 1.2 * S],
+      [1.8 * S, 2.8 * S], [-2.6 * S, 2.4 * S], [-4.0 * S, 0.6 * S]],
+      "scrapCloth", "#2a3240", { amp: 0.9 * S, lw: 1.2 * S, shade: "rgba(0,0,0,0.22)" });
+    // 磨毛的边：几根脱出来的线头
+    ctx.save();
+    ctx.strokeStyle = "rgba(120,130,146,0.5)";
+    ctx.lineWidth = 0.5 * S;
+    for (let i = 0; i < 4; i += 1) {
+      const ex = (-3 + i * 2.2) * S;
+      ctx.beginPath();
+      ctx.moveTo(ex, 2.3 * S);
+      ctx.lineTo(ex + 0.6 * S, 3.4 * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 两三点白花
+    ctx.save();
+    ctx.fillStyle = "rgba(160,168,182,0.4)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc((-2 + i * 2.1) * S, (-0.6 + (i % 2) * 1.4) * S, 0.55 * S, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   } else if (label === "整布") {
     // 娘那块没下过剪子的整布：对折又对折，方方正正抱在怀里，可布有分量——
     // 两侧边缘往下垂。靛蓝压暗（sRGB 老账），白花只隐约几点
@@ -8378,6 +8427,27 @@ export function DrawEdgeHud(ctx, W, H, icon, { dir = 1, climb = null } = {}) {
   ctx.restore();
 }
 
+// 角上那枚常驻的「下一件事」：跟画框边那张牌同一张纸、同一套图，只是**不带箭头**
+// ——角上的牌不指方向（方向仍旧归画框边那一枚，目标出框时才有方向可指）。
+// 画在 DOM 的一小块 canvas 上（Script_Main 的 PaintObjectiveIcon），所以牌心
+// 就是画布正中，不像 DrawEdgeHud 那样要给箭头让出半边。
+export function DrawHudBadge(ctx, W, H, icon) {
+  const R = Math.min(W, H) * 0.46;
+  const cx = W / 2, cy = H / 2;
+  ctx.save();
+  ctx.lineJoin = "round";
+  InkFill(ctx, DiskPts(cx, cy, R), "hudDisk", "rgba(236,223,188,0.95)",
+    { amp: R * 0.045, lw: R * 0.10 });
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.90, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  HudGlyph(ctx, icon || { kind: "walk" }, R);
+  ctx.restore();
+  ctx.restore();
+}
+
 // 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。
 // 目标标记是黄色实心三角（指路），玩家标记就得长得完全不一样——
 // 一枚空心的细线人字标，只有轮廓，不抢画面。
@@ -9153,8 +9223,79 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
 // 衣角被风掀起又落下（0.8Hz），除此之外什么都不动——它就是一眼。
 // ---------------------------------------------------------------------------
 export function DrawMotherJacketCard(ctx, W, H, seg, t) {
-  void seg;
   const S = H / 420;
+  // ── seg 1（八稿）：从窖底仰看翻板——板缝里最后消失的是娘那截蓝底白花的
+  // 袖子。三根板条压着画框，缝里透一点天光；袖子在缝后头往东抽走，抽尽了
+  // 只剩缝里的光 ──
+  if (seg === 1) {
+    ctx.fillStyle = "#050607";
+    ctx.fillRect(0, 0, W, H);
+    const gaps = [H * 0.30, H * 0.52, H * 0.74];
+    const gapH = H * 0.055;
+    const slide = Math.min(1, t / 2.6);                     // 袖子抽走的进度
+    // 缝里的天光（袖子走过的地方才透出来）
+    for (const gy of gaps) {
+      const lg = ctx.createLinearGradient(0, gy, 0, gy + gapH);
+      lg.addColorStop(0, "rgba(150,158,148,0.30)");
+      lg.addColorStop(0.5, "rgba(196,200,186,0.44)");
+      lg.addColorStop(1, "rgba(120,126,118,0.26)");
+      ctx.fillStyle = lg;
+      ctx.fillRect(0, gy, W, gapH);
+    }
+    // 袖子：蓝底白花的一截，在中缝后头，往画右（娘起身的方向）抽走
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, gaps[1] - H * 0.02, W, gapH + H * 0.04);
+    ctx.clip();
+    const sx = W * (0.30 + slide * 0.85);
+    InkFill(ctx, [
+      [sx - W * 0.26, gaps[1] + gapH * 1.1], [sx + W * 0.06, gaps[1] - gapH * 0.4],
+      [sx + W * 0.15, gaps[1] + gapH * 0.2], [sx - W * 0.16, gaps[1] + gapH * 1.7],
+    ], "mjSlv", "#232c38", { amp: 3 * S, lw: 3.4 * S, shade: "rgba(0,0,0,0.3)" });
+    ctx.fillStyle = "rgba(186,194,206,0.5)";
+    for (let i = 0; i < 5; i += 1) {
+      const bx = sx - W * 0.2 + Hash("mjSlvB" + i) * W * 0.3;
+      const by = gaps[1] + gapH * (0.1 + Hash("mjSlvBy" + i) * 0.9);
+      for (let p2 = 0; p2 < 3; p2 += 1) {
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(p2 * 2.1) * 3 * S, by + Math.sin(p2 * 2.1) * 2.2 * S,
+          1.8 * S, 1.3 * S, p2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    // 板条：缝之外全是木板的黑，几道木纹
+    ctx.fillStyle = "#0d0a07";
+    let prev = 0;
+    for (const gy of gaps) {
+      ctx.fillRect(0, prev, W, gy - prev);
+      prev = gy + gapH;
+    }
+    ctx.fillRect(0, prev, W, H - prev);
+    ctx.save();
+    ctx.strokeStyle = "rgba(70,56,38,0.35)";
+    ctx.lineWidth = 2 * S;
+    for (let i = 0; i < 6; i += 1) {
+      const wy = H * (0.06 + i * 0.16) + Sym("mjSlat", i, 6 * S);
+      ctx.beginPath();
+      ctx.moveTo(-10 * S, wy);
+      ctx.quadraticCurveTo(W * 0.5, wy + Sym("mjSlatQ", i, 5 * S), W + 10 * S, wy - 2 * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 落灰：翻板刚合上，缝里簌簌掉一点
+    ctx.save();
+    ctx.fillStyle = "rgba(168,152,128,0.4)";
+    for (let i = 0; i < 6; i += 1) {
+      const dx = W * Hash("mjDustX" + i);
+      const dy = gaps[i % 3] + gapH + ((t * 40 * S + i * 30 * S) % (H * 0.16));
+      ctx.beginPath();
+      ctx.arc(dx, dy, 1.4 * S, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
   // 底：屋里的昏暗（她是冲进屋来的）
   const bg = ctx.createLinearGradient(0, 0, W, 0);
   bg.addColorStop(0, "#12100b");
@@ -9640,7 +9781,6 @@ export function DrawVillageRidersCard(ctx, W, H, seg, t) {
 // 夜里色全体压得极暗（参照 FOLD 那组的账：看着像纯黑的源色才是对的）。
 // ---------------------------------------------------------------------------
 export function DrawWholeClothCard(ctx, W, H, seg, t) {
-  void seg;
   const S = H / 420;
   const br = Math.sin(t * Math.PI * 2 * 0.22) * 2.4 * S;   // 极轻的呼吸浮动
   // 底：窖的黑
@@ -9773,6 +9913,54 @@ export function DrawWholeClothCard(ctx, W, H, seg, t) {
     ctx.fillStyle = "rgba(96,116,150,0.10)";
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
+  }
+
+  // ── seg 1（八稿）：坛口那块碎布展开放在整布上——两块布的花纹接在一起。
+  // 碎布磨得发浅、边上翻毛；贴着光条那一段摆，接缝两侧的花簇对上 ──
+  if (seg === 1) {
+    const cy = H * 0.52 + br;
+    const px2 = W * 0.505, py2 = cy - H * 0.075;   // 碎布的中心（落在中间那条光里）
+    const scr = [
+      [px2 - W * 0.085, py2 - H * 0.055], [px2 + W * 0.075, py2 - H * 0.068],
+      [px2 + W * 0.098, py2 + H * 0.028], [px2 + W * 0.03, py2 + H * 0.062],
+      [px2 - W * 0.072, py2 + H * 0.05], [px2 - W * 0.1, py2 - H * 0.006],
+    ];
+    InkFill(ctx, scr, "wcScrap", "#2c3644",
+      { amp: 3 * S, lw: 3.4 * S, line: "rgba(4,5,8,0.9)", shade: "rgba(0,0,0,0.2)" });
+    // 磨毛的边：几根翻出来的线头
+    ctx.save();
+    ctx.strokeStyle = "rgba(150,160,176,0.6)";
+    ctx.lineWidth = 1.4 * S;
+    for (let i = 0; i < 6; i += 1) {
+      const ex = px2 - W * 0.08 + i * W * 0.032;
+      ctx.beginPath();
+      ctx.moveTo(ex, py2 + H * 0.05 + Sym("wcScrF", i, 3 * S));
+      ctx.lineTo(ex + 3 * S, py2 + H * 0.072);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 碎布上的白花：跟底下整布同一簇画法——两簇骑在碎布边上，
+    // 半朵在碎布、半朵在整布：花纹接在一起靠的就是这两簇
+    ctx.save();
+    ctx.fillStyle = "rgba(196,204,218,0.62)";
+    const blooms = [
+      [px2 - W * 0.04, py2 - H * 0.01], [px2 + W * 0.035, py2 + H * 0.012],
+      [px2 - W * 0.093, py2 + H * 0.006],   // 骑边那一簇（西沿）
+      [px2 + W * 0.093, py2 - H * 0.02],    // 骑边那一簇（东沿）
+    ];
+    for (let i = 0; i < blooms.length; i += 1) {
+      const [bx, by] = blooms[i];
+      for (let p2 = 0; p2 < 4; p2 += 1) {
+        const pa = (p2 / 4) * Math.PI * 2 + Hash("wcScrB" + i) * 2;
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(pa) * 3.2 * S, by + Math.sin(pa) * 2.4 * S,
+          1.9 * S, 1.4 * S, pa, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    // 指着接缝的那只手（把碎布抚平在整布上）
+    SplitHand(ctx, px2 + W * 0.065, py2 + H * 0.05, S * 1.7, 1, true);
   }
 
   // 角晕：夜的黑往里收
@@ -11461,4 +11649,587 @@ export function DrawForeTuft(ctx, x, groundY, id, kind = "grass") {
       ctx.restore();
     }
   }
+}
+
+// ===========================================================================
+// 八稿（2026-08-13）新增画笔：焦木、灶火、板缝灰、水圈、蓝花布的几个落点、
+// 撕布卡、缝三针卡。判定版面一律来自 Core 的 TEAR_CARD / SEW_CARD——
+// **判定与作画共用同一份坐标**，这儿绝不许另抄一套。
+// ===========================================================================
+
+// 烧塌棚顶掉下来的那根焦木檩（八稿推焦木——拖拽机制同门板，画的是圆木）。
+// 长边是一根烧过的圆木：中段碳化得最黑、两头还剩点木色，几道纵向的炸纹。
+export function DrawCharredBeam(ctx, ax, ay, id, { len = 72 } = {}) {
+  const th = 9;
+  // 木身：一根微弯的圆木（上沿略拱）
+  InkFill(ctx, [[ax, ay - 1], [ax + 3, ay - th], [ax + len * 0.3, ay - th - 2.2],
+    [ax + len * 0.62, ay - th - 1.6], [ax + len, ay - th + 1.5], [ax + len, ay - 0.5],
+    [ax + len * 0.5, ay + 1.2]],
+  id + "body", "#3a2e20", { amp: 1.4, lw: 2.2, shade: "rgba(8,5,3,0.35)" });
+  // 中段碳化：黑得发亮的一段，边缘皴出鳄皮纹
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = "#171009";
+  ctx.beginPath();
+  ctx.moveTo(ax + len * 0.22, ay);
+  ctx.lineTo(ax + len * 0.24, ay - th - 1);
+  ctx.lineTo(ax + len * 0.68, ay - th - 0.6);
+  ctx.lineTo(ax + len * 0.64, ay + 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  // 炸纹：碳化段上几道横短竖长的裂口（鳄皮格）
+  ctx.save();
+  ctx.strokeStyle = "rgba(90,78,60,0.5)";
+  ctx.lineWidth = 0.9;
+  for (let i = 0; i < 5; i += 1) {
+    const cx2 = ax + len * (0.26 + i * 0.09) + Sym(id + "ckx", i, 1.6);
+    ctx.beginPath();
+    ctx.moveTo(cx2, ay - th + 0.6);
+    ctx.lineTo(cx2 + Sym(id + "ck", i, 1.4), ay - 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 两头断口：一头劈茬、一头锯口
+  InkLine(ctx, ax + 1, ay - th + 1, ax + 4, ay - 1, id + "endW",
+    { lw: 1.2, color: "rgba(120,96,64,0.6)", amp: 1.0 });
+  InkFill(ctx, [[ax + len - 2, ay - th + 2], [ax + len + 3, ay - th + 3.5],
+    [ax + len + 3, ay - 2], [ax + len - 2, ay - 1.4]], id + "endE", "#57432c",
+  { amp: 0.8, lw: 1.4, shade: "rgba(0,0,0,0.2)" });
+}
+
+// 草苫旁留着的那块整布（八稿 §9 末柱子放下的；§12 撕过之后 torn=true——
+// 少了一条，边上翻着毛口）。夜窖里只求读得出"叠着的蓝布"。
+export function DrawClothRest(ctx, ax, ay, id, { torn = false } = {}) {
+  const w = torn ? 15 : 18, h = torn ? 6.5 : 8;
+  InkFill(ctx, [[ax - w, ay - 1], [ax + w * 0.9, ay - 1.6], [ax + w, ay - h],
+    [ax + w * 0.5, ay - h - 1.6], [ax - w * 0.8, ay - h + 0.6]],
+  id + "pile" + (torn ? "T" : ""), "#232b37",
+  { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.3)" });
+  // 叠层的口：两道浅线
+  InkLine(ctx, ax - w * 0.8, ay - h * 0.55, ax + w * 0.85, ay - h * 0.62, id + "fold1",
+    { lw: 0.9, color: "rgba(110,122,140,0.4)", amp: 0.8 });
+  // 撕过：东侧翻起一片毛口，几根线头
+  if (torn) {
+    InkFill(ctx, [[ax + w * 0.55, ay - h - 1], [ax + w, ay - h], [ax + w * 0.9, ay - h + 2.4],
+      [ax + w * 0.5, ay - h + 1.6]], id + "rag", "#2e3644", { amp: 1.2, lw: 1.1 });
+    ctx.save();
+    ctx.strokeStyle = "rgba(140,150,166,0.55)";
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(ax + w * (0.6 + i * 0.14), ay - h + 0.6);
+      ctx.lineTo(ax + w * (0.64 + i * 0.14), ay - h - 1.8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // 白花两三点
+  ctx.save();
+  ctx.fillStyle = "rgba(150,158,172,0.35)";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.arc(ax - w * 0.5 + i * w * 0.45, ay - h * 0.45 - (i % 2) * 2, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 灶火与热气（World 的 stoveFire 小画布每帧调）。cx=灶口中线，gy=画布地线。
+export function DrawStoveFire(ctx, cx, gy, t) {
+  // 灶口的暖光晕
+  ctx.save();
+  const glow = ctx.createRadialGradient(cx, gy - 8, 2, cx, gy - 8, 22);
+  glow.addColorStop(0, "rgba(255,170,70,0.5)");
+  glow.addColorStop(1, "rgba(255,140,40,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(cx - 24, gy - 32, 48, 34);
+  // 火苗：三条舔上来的舌头，各自按不同频率摆
+  for (let i = 0; i < 3; i += 1) {
+    const fx = cx + (i - 1) * 5.5;
+    const sway = Math.sin(t * (5.2 + i * 1.7) + i * 2.1) * 2.6;
+    const hgt = 12 + Math.sin(t * (3.4 + i) + i) * 3 + (i === 1 ? 4 : 0);
+    ctx.fillStyle = i === 1 ? "rgba(255,196,96,0.85)" : "rgba(232,140,52,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(fx - 3.2, gy - 2);
+    ctx.quadraticCurveTo(fx - 2.6, gy - hgt * 0.5, fx + sway, gy - 2 - hgt);
+    ctx.quadraticCurveTo(fx + 3.0, gy - hgt * 0.45, fx + 3.2, gy - 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // 芯上最亮那一点
+  ctx.fillStyle = "rgba(255,238,180,0.9)";
+  ctx.beginPath();
+  ctx.ellipse(cx, gy - 5, 2.6, 3.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 热气：从锅沿（画布上方）一缕一缕，向上散
+  ctx.strokeStyle = "rgba(214,222,228,0.30)";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 2; i += 1) {
+    const ph = (t * 0.35 + i * 0.5) % 1;
+    const sy = gy - 44 - ph * 22;
+    const sx = cx - 4 + i * 8 + Math.sin(t * 1.3 + i * 2) * 3;
+    ctx.globalAlpha = 0.5 * (1 - ph);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + 10);
+    ctx.quadraticCurveTo(sx + 3, sy + 5, sx - 2, sy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// 靴子踩上翻板：板缝里落下来的灰（World 摆位置与淡出，这儿只画一撮）
+export function DrawSlatDust(ctx, ax, ay, id) {
+  ctx.save();
+  // 两三道细流
+  ctx.strokeStyle = "rgba(168,152,128,0.5)";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.lineWidth = 1.2 + Hash(id + "w" + i) * 0.8;
+    const dx = ax + (i - 1) * 7 + Sym(id + "x", i, 2.5);
+    ctx.beginPath();
+    ctx.moveTo(dx, ay - 52 + Hash(id + "t" + i) * 6);
+    ctx.lineTo(dx + Sym(id + "dx", i, 2), ay - 14 - Hash(id + "b" + i) * 8);
+    ctx.stroke();
+  }
+  // 尘粒
+  ctx.fillStyle = "rgba(178,162,138,0.5)";
+  for (let i = 0; i < 7; i += 1) {
+    ctx.beginPath();
+    ctx.arc(ax + Sym(id + "px", i, 9), ay - 10 - Hash(id + "py" + i) * 38,
+      0.8 + Hash(id + "pr" + i) * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 舀水那一下：缸口的水圈（随瓢抬起往下沉）＋两道回滴
+export function DrawScoopRing(ctx, ax, ay, id) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(150,178,192,0.7)";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(ax, ay - 6, 15, 4.2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(150,178,192,0.4)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(ax, ay - 6, 9, 2.6, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // 回滴：两粒
+  ctx.fillStyle = "rgba(150,178,192,0.7)";
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(ax - 4 + i * 8 + Sym(id, i, 2), ay - 14 - i * 4, 1.1, 1.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 伤员肩上的那圈蓝花布（World 钉在躺着的人肩头）：两道缠过的布带压着叠。
+// **尺寸按实物来**：肩上缠一圈布，正面看约 0.25×0.16m ——画大了就是那块
+// 著名的"悬空蓝板"（二轮视觉审查抓过一次，这儿不许再犯）
+export function DrawBandage(ctx, ax, ay, id) {
+  InkFill(ctx, [[ax - 5.4, ay - 1.2], [ax + 4.8, ay - 2.6], [ax + 5.6, ay + 1.2], [ax - 4.4, ay + 2.6]],
+    id + "b1", "#2a3442", { amp: 0.5, lw: 0.8, shade: "rgba(0,0,0,0.28)" });
+  InkFill(ctx, [[ax - 5.8, ay + 0.6], [ax + 4.2, ay - 0.6], [ax + 5.2, ay + 2.4], [ax - 4.8, ay + 3.6]],
+    id + "b2", "#242e3b", { amp: 0.5, lw: 0.7, shade: "rgba(0,0,0,0.24)" });
+  // 压进布层的那个末端：一小角翻边
+  InkLine(ctx, ax + 1.8, ay + 0.6, ax + 3.8, ay - 1.1, id + "tuck",
+    { lw: 0.6, color: "rgba(120,132,150,0.55)", amp: 0.3 });
+  // 白花一点（同一块料子的记号）
+  ctx.save();
+  ctx.fillStyle = "rgba(168,176,190,0.5)";
+  ctx.beginPath();
+  ctx.arc(ax - 1.6, ay + 0.4, 0.6, 0, Math.PI * 2);
+  ctx.arc(ax + 2.4, ay + 1.6, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 妹妹袖口那截接上的蓝花布（jacketOn 之后，睡姿手腕边那一小块）。
+// 同蓝布带：尺寸按实物（袖口一截约 0.16×0.10m），大了就成一块悬空的板
+export function DrawCuff(ctx, ax, ay, id) {
+  InkFill(ctx, [[ax - 3.6, ay - 1.6], [ax + 3.2, ay - 2.0], [ax + 3.8, ay + 1.2], [ax - 3.2, ay + 1.6]],
+    id + "cuff", "#2a3442", { amp: 0.4, lw: 0.7, shade: "rgba(0,0,0,0.26)" });
+  // 接缝那道针脚：三个歪歪扭扭的小点
+  ctx.save();
+  ctx.strokeStyle = "rgba(150,160,176,0.6)";
+  ctx.lineWidth = 0.4;
+  for (let i = 0; i < 3; i += 1) {
+    const sx = ax - 2.4 + i * 2.0;
+    ctx.beginPath();
+    ctx.moveTo(sx, ay - 1.4 + (i % 2) * 0.6);
+    ctx.lineTo(sx + 0.7, ay - 0.6 + (i % 2) * 0.4);
+    ctx.stroke();
+  }
+  // 白花一小簇
+  ctx.fillStyle = "rgba(168,176,190,0.5)";
+  ctx.beginPath();
+  ctx.arc(ax + 0.6, ay + 0.4, 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  void id;
+}
+
+// ---------------------------------------------------------------------------
+// 撕布活卡（八稿 §12）。版面 TEAR_CARD；月光下的菜窖，整布摊在草苫上。
+// 三把：绷紧（布跟手走到 tautLen 就绷住）→ 裂口（nick）→ 撕开（tearK 推进，
+// 撕下来的那条挂在手上、裂口处一线毛边发白）。
+// ---------------------------------------------------------------------------
+export function DrawTearCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  LiveCardBase(ctx, W, H, "#0e1118");
+
+  const y0 = L.cloth.y * W, h = L.cloth.h * W;
+  const x0 = L.cloth.x0 * W, x1 = L.cloth.x1 * W;
+  const cor = { x: (view.corner?.x ?? L.corner.x) * W, y: (view.corner?.y ?? L.corner.y) * W };
+  const pull = (view.pull || 0) * W;
+  const tearK = view.tearK || 0;
+  const stripH = L.stripW * W;
+
+  // ── 草苫：布底下垫着的那层，横着几把干草 ──
+  ctx.save();
+  ctx.strokeStyle = "rgba(96,84,58,0.5)";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 14; i += 1) {
+    ctx.lineWidth = (2 + Hash("trStraw" + i) * 2.2) * S;
+    const sy = y0 + h * 0.75 + Hash("trStrawY" + i) * h * 0.75;
+    ctx.beginPath();
+    ctx.moveTo(x0 - 30 * S + Hash("trStrawX" + i) * (x1 - x0), sy);
+    ctx.lineTo(x0 + 30 * S + Hash("trStrawX" + i) * (x1 - x0) + 60 * S, sy + Sym("trStrawD", i, 6 * S));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── 整布本体。撕开的那条沿顶边走：rip 前锋在 ripX（从东往西推进） ──
+  const ripLen = tearK * (x1 - x0) * 0.62;
+  const ripX = x1 - 26 * S - ripLen;
+  const nicked = !!view.nick;
+  // 主体（撕走的条以下的部分 + 没撕到的顶段）
+  const body = [
+    [x0, y0 + (nicked ? stripH : 0)],
+  ];
+  if (nicked) {
+    // 顶边：西段还连着条，rip 前锋以西仍是整的
+    body.unshift([x0, y0]);
+    body.splice(1, 0, [Math.max(x0, ripX), y0]);
+    body.splice(2, 0, [Math.max(x0, ripX), y0 + stripH]);
+  } else {
+    // 没裂口：顶边一路到布角（被拉紧时角带着布边往西）
+    body.length = 0;
+    body.push([x0, y0 + 4 * S], [cor.x, cor.y]);
+  }
+  body.push([x1 - pull * 0.4, y0 + stripH + 2 * S]);
+  body.push([x1 - pull * 0.3, y0 + h]);
+  body.push([x0 + 8 * S, y0 + h + 6 * S]);
+  InkFill(ctx, body, "trBody" + (nicked ? 1 : 0), "#1f2937",
+    { amp: 4 * S, lw: 5 * S, line: "rgba(3,4,6,0.9)", shade: "rgba(0,0,0,0.3)" });
+
+  // 布纹、垂坠的褶、白花（主体上）
+  ctx.save();
+  ctx.strokeStyle = "rgba(84,98,118,0.28)";
+  ctx.lineWidth = 1.4 * S;
+  for (let i = 0; i < 5; i += 1) {
+    const gy2 = y0 + stripH + (i + 0.5) * (h - stripH) / 5;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 10 * S, gy2);
+    ctx.quadraticCurveTo((x0 + x1) / 2, gy2 + Sym("trWeave", i, 5 * S), x1 - 14 * S, gy2 - 2 * S);
+    ctx.stroke();
+  }
+  // 竖着的几道大褶：布摊下去自己堆出来的。没有它，整幅读成一张蓝纸板
+  ctx.strokeStyle = "rgba(8,12,18,0.55)";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i += 1) {
+    const fx = x0 + (i + 0.7) * (x1 - x0) / 5;
+    ctx.lineWidth = (5 - i * 0.6) * S;
+    ctx.beginPath();
+    ctx.moveTo(fx, y0 + stripH + 2 * S);
+    ctx.quadraticCurveTo(fx - 10 * S + Sym("trFold", i, 14 * S), y0 + h * 0.6,
+      fx + Sym("trFoldE", i, 10 * S), y0 + h - 2 * S);
+    ctx.stroke();
+    // 褶的亮侧：紧挨着暗线一条浅的（布才有厚度）
+    ctx.strokeStyle = "rgba(120,138,166,0.28)";
+    ctx.lineWidth = (2.6 - i * 0.3) * S;
+    ctx.beginPath();
+    ctx.moveTo(fx + 5 * S, y0 + stripH + 2 * S);
+    ctx.quadraticCurveTo(fx - 5 * S + Sym("trFold", i, 14 * S), y0 + h * 0.6,
+      fx + 5 * S + Sym("trFoldE", i, 10 * S), y0 + h - 2 * S);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(8,12,18,0.55)";
+  }
+  // 白花：满布的碎花（同 motherJacket 那支笔的排法——网格挂簇、按 hash 空掉两三成）
+  for (let gx = 0; gx < 8; gx += 1) {
+    for (let gy = 0; gy < 3; gy += 1) {
+      if (Hash("trBloomG" + gx + "_" + gy) < 0.24) continue;
+      const bx = x0 + 16 * S + (gx + 0.2 + Hash("trBX" + gx + "_" + gy) * 0.6) * (x1 - x0 - 32 * S) / 8;
+      const by = y0 + stripH + 8 * S
+        + (gy + 0.2 + Hash("trBY" + gx + "_" + gy) * 0.6) * (h - stripH - 16 * S) / 3;
+      const sc = 0.8 + Hash("trBS" + gx + "_" + gy) * 0.6;
+      ctx.fillStyle = `rgba(196,204,218,${0.5 + Hash("trBA" + gx + "_" + gy) * 0.2})`;
+      for (let p2 = 0; p2 < 5; p2 += 1) {
+        const pa = (p2 / 5) * Math.PI * 2 + Hash("trBP" + gx + "_" + gy) * 2;
+        ctx.beginPath();
+        ctx.ellipse(bx + Math.cos(pa) * 4.4 * sc * S, by + Math.sin(pa) * 3.4 * sc * S,
+          2.6 * sc * S, 1.9 * sc * S, pa, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(150,160,176,0.45)";
+      ctx.beginPath();
+      ctx.arc(bx, by, 1.6 * sc * S, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // ── 绷紧的皱：抓着角拉的时候，从角上放射出去的几道抻痕 ──
+  if (pull > 2 * S && !nicked) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(10,14,20,0.6)";
+    ctx.lineCap = "round";
+    for (let i = 0; i < 4; i += 1) {
+      ctx.lineWidth = (3.4 - i * 0.6) * S;
+      ctx.beginPath();
+      ctx.moveTo(cor.x + 4 * S, cor.y + 2 * S);
+      ctx.quadraticCurveTo(cor.x - (30 + i * 26) * S, cor.y + (10 + i * 16) * S,
+        cor.x - (70 + i * 40) * S, cor.y + (30 + i * 30) * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 裂口之后：撕下来的那条（rip 前锋 → 手上的角），毛边发白 ──
+  if (nicked) {
+    const sag = 14 * S + Math.sin(t * 2.2) * 3 * S;
+    InkFill(ctx, [
+      [Math.max(x0, ripX), y0], [cor.x - 6 * S, cor.y - stripH * 0.5],
+      [cor.x + 6 * S, cor.y + stripH * 0.45],
+      [Math.max(x0, ripX) + 8 * S, y0 + stripH + sag * 0.2],
+    ], "trStrip", "#26303f", { amp: 3.4 * S, lw: 4 * S, shade: "rgba(0,0,0,0.24)" });
+    // rip 前锋：一撮发白的毛边线头
+    ctx.save();
+    ctx.strokeStyle = "rgba(190,198,212,0.75)";
+    ctx.lineWidth = 1.6 * S;
+    for (let i = 0; i < 5; i += 1) {
+      const fx = Math.max(x0, ripX) + Sym("trFray", i, 5 * S);
+      ctx.beginPath();
+      ctx.moveTo(fx, y0 + stripH * 0.2);
+      ctx.lineTo(fx + Sym("trFrayD", i, 4 * S), y0 + stripH * 0.9);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── 手：抓着布角（grab）或伸过去（reaching）；没上手时布角自己招呼 ──
+  if (view.grab) {
+    SplitHand(ctx, cor.x + 8 * S, cor.y + 4 * S, S, 1, true);
+    SplitHand(ctx, x0 + 40 * S, y0 + h * 0.55, S, -1, true);   // 另一只手压着布身
+  } else {
+    SplitHand(ctx, x0 + 40 * S, y0 + h * 0.6, S, -1, false);
+    const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.4 + 0.3 * Math.sin(t * 3.0);
+    KnotGlow(ctx, cor.x, cor.y, L.grabR * W * 1.3, 0.12 + pulse * 0.22);
+  }
+
+  // ── 板缝漏下来的月光条：两条，斜着（加色） ──
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const [bu, bw] of [[0.30, 0.05], [0.62, 0.034]]) {
+    const bx0 = bu * W, bw2 = bw * W, dx = Math.tan(-0.42) * H;
+    const gr = ctx.createLinearGradient(bx0, 0, bx0 + dx, H);
+    gr.addColorStop(0, "rgba(96,116,150,0.12)");
+    gr.addColorStop(1, "rgba(96,116,150,0.02)");
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(bx0, -10 * S);
+    ctx.lineTo(bx0 + bw2, -10 * S);
+    ctx.lineTo(bx0 + bw2 + dx, H + 10 * S);
+    ctx.lineTo(bx0 + dx, H + 10 * S);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 角晕：夜往里收
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.95);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(1,1,2,0.65)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------------------
+// 缝三针活卡（八稿 §13）。版面 SEW_CARD；黎明青灰，窖口的光。
+// 旧褂袖口（暗红）+ 蓝布条，竖着一道接缝；针捏在手里：送到进针点穿出、
+// 拉线到头。三针的歪（偏高/偏低小褶/折回）由版面钉死，画笔照着还原。
+// ---------------------------------------------------------------------------
+export function DrawSewCard(ctx, W, H, view, L, t) {
+  const S = H / 720;
+  LiveCardBase(ctx, W, H, "#2b323c");
+
+  const P = (p) => [p.x * W, p.y * W];
+  const n = view.n || 0;
+
+  // ── 膝头/门板案：底下一条暗木沿（他坐在窖口最上一级梯子上缝）──
+  const kneeY = (L.sleeve.y + L.sleeve.h + 0.10) * W;
+  ctx.save();
+  ctx.fillStyle = "#241d15";
+  ctx.fillRect(-8 * S, kneeY, W + 16 * S, H - kneeY + 8 * S);
+  ctx.restore();
+  InkLine(ctx, -10 * S, kneeY, W + 10 * S, kneeY - 4 * S, "swKnee",
+    { lw: 4 * S, color: "rgba(8,5,2,0.9)", amp: 4 * S });
+
+  // ── 旧褂袖筒（暗红，磨旧）──
+  const sl = L.sleeve;
+  const slPts = [
+    [sl.x0 * W, sl.y * W + 3 * S], [sl.x1 * W, sl.y * W],
+    [(sl.x1 + 0.004) * W, (sl.y + sl.h) * W],
+    [sl.x0 * W, (sl.y + sl.h) * W + 5 * S],
+    [(sl.x0 - 0.03) * W, (sl.y + sl.h * 0.5) * W],
+  ];
+  InkFill(ctx, slPts, "swSleeve", "#4a2622",
+    { amp: 3.4 * S, lw: 4.6 * S, line: "rgba(6,3,3,0.9)", shade: "rgba(0,0,0,0.28)" });
+  // 袖筒的两道旧褶 + 磨飞的边（贴近接缝那头绒毛毛的）
+  ctx.save();
+  ctx.strokeStyle = "rgba(20,8,8,0.55)";
+  ctx.lineWidth = 3 * S;
+  for (let i = 0; i < 2; i += 1) {
+    ctx.beginPath();
+    ctx.moveTo((sl.x0 + 0.05 + i * 0.1) * W, sl.y * W + 4 * S);
+    ctx.quadraticCurveTo((sl.x0 + 0.04 + i * 0.1) * W, (sl.y + sl.h * 0.6) * W,
+      (sl.x0 + 0.06 + i * 0.1) * W, (sl.y + sl.h) * W);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(150,110,104,0.5)";
+  ctx.lineWidth = 1.2 * S;
+  for (let i = 0; i < 6; i += 1) {
+    const fy = (sl.y + 0.012 + i * (sl.h - 0.02) / 6) * W;
+    ctx.beginPath();
+    ctx.moveTo(L.seamX * W - 2 * S, fy);
+    ctx.lineTo(L.seamX * W - 7 * S - Hash("swFray" + i) * 5 * S, fy + Sym("swFrayD", i, 3 * S));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── 蓝布条（接上去的那截）──
+  const pa2 = L.patch;
+  // 第二针拉出的小褶：pucker 之后布条中腰往里拧一点
+  const pk = n >= 2 ? 1 : 0;
+  const paPts = [
+    [pa2.x0 * W, pa2.y * W + 2 * S],
+    [(pa2.x0 + 0.09) * W, pa2.y * W + pk * 5 * S],
+    [pa2.x1 * W, pa2.y * W + 3 * S],
+    [(pa2.x1 + 0.006) * W, (pa2.y + pa2.h) * W],
+    [(pa2.x0 + 0.10) * W, (pa2.y + pa2.h) * W + pk * 4 * S],
+    [pa2.x0 * W, (pa2.y + pa2.h) * W + 2 * S],
+  ];
+  InkFill(ctx, paPts, "swPatch" + pk, "#243244",
+    { amp: 3 * S, lw: 4.2 * S, line: "rgba(3,5,8,0.9)", shade: "rgba(0,0,0,0.24)" });
+  // 蓝布上的白花
+  ctx.save();
+  ctx.fillStyle = "rgba(186,194,208,0.55)";
+  for (let i = 0; i < 6; i += 1) {
+    const bx = (pa2.x0 + 0.03 + Hash("swBloomX" + i) * (pa2.x1 - pa2.x0 - 0.05)) * W;
+    const by = (pa2.y + 0.015 + Hash("swBloomY" + i) * (pa2.h - 0.03)) * W;
+    for (let p3 = 0; p3 < 4; p3 += 1) {
+      const paA = (p3 / 4) * Math.PI * 2 + Hash("swBloomP" + i) * 2;
+      ctx.beginPath();
+      ctx.ellipse(bx + Math.cos(paA) * 3.0 * S, by + Math.sin(paA) * 2.2 * S,
+        1.8 * S, 1.3 * S, paA, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // ── 已经缝上的针脚：一针一个样（偏高/偏低小褶/折回绕线头）──
+  ctx.save();
+  ctx.strokeStyle = "#cdd4de";
+  ctx.lineCap = "round";
+  for (let i = 0; i < Math.min(n, L.stitches.length); i += 1) {
+    const st = L.stitches[i];
+    const sy = (st.send.y + (st.off || 0)) * W;
+    ctx.lineWidth = 2.6 * S;
+    ctx.beginPath();
+    ctx.moveTo(L.seamX * W - 9 * S, sy + Sym("swStA", i, 2 * S));
+    ctx.lineTo(L.seamX * W + 9 * S, sy + Sym("swStB", i, 3 * S));
+    ctx.stroke();
+    if (st.pucker) {
+      // 小褶：针脚两侧布被拉出的一道挤纹
+      ctx.lineWidth = 2 * S;
+      ctx.strokeStyle = "rgba(10,6,8,0.6)";
+      ctx.beginPath();
+      ctx.moveTo(L.seamX * W - 16 * S, sy - 7 * S);
+      ctx.quadraticCurveTo(L.seamX * W, sy + 2 * S, L.seamX * W + 15 * S, sy - 6 * S);
+      ctx.stroke();
+      ctx.strokeStyle = "#cdd4de";
+    }
+    if (st.back) {
+      // 折回绕线头：针脚上一个小线圈，勒紧
+      ctx.lineWidth = 1.8 * S;
+      ctx.beginPath();
+      ctx.ellipse(L.seamX * W + 3 * S, sy, 5.5 * S, 3.4 * S, 0.4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // ── 针与线 ──
+  const ndl = view.needle || L.needle0;
+  const nx = ndl.x * W, ny = ndl.y * W;
+  const stz = L.stitches[Math.min(n, L.stitches.length - 1)];
+  // 线：针眼拖着一段，连回上一针（或布边）
+  const from = n > 0 ? { x: L.seamX, y: L.stitches[n - 1].send.y + (L.stitches[n - 1].off || 0) }
+    : { x: pa2.x1 - 0.02, y: pa2.y + pa2.h };
+  ctx.save();
+  ctx.strokeStyle = "rgba(206,212,222,0.65)";
+  ctx.lineWidth = 1.6 * S;
+  ctx.beginPath();
+  ctx.moveTo(from.x * W, from.y * W);
+  ctx.quadraticCurveTo((from.x * W + nx) / 2 + Math.sin(t * 1.7) * 8 * S,
+    Math.max(from.y * W, ny) + 26 * S, nx, ny);
+  ctx.stroke();
+  // 针身：一根亮的细杆，斜着
+  ctx.strokeStyle = "#d8dde6";
+  ctx.lineWidth = 2.4 * S;
+  ctx.beginPath();
+  ctx.moveTo(nx - 9 * S, ny + 7 * S);
+  ctx.lineTo(nx + 9 * S, ny - 7 * S);
+  ctx.stroke();
+  ctx.fillStyle = "#d8dde6";
+  ctx.beginPath();
+  ctx.arc(nx - 8 * S, ny + 6.4 * S, 1.6 * S, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  if (view.grab) {
+    SplitHand(ctx, nx + 12 * S, ny + 10 * S, S, 1, true);
+    // 另一只手把两块布捏在一起（接缝底下）
+    SplitHand(ctx, L.seamX * W - 26 * S, (sl.y + sl.h + 0.02) * W, S, -1, true);
+  } else {
+    SplitHand(ctx, L.seamX * W - 26 * S, (sl.y + sl.h + 0.02) * W, S, -1, false);
+    const pulse = view.reaching ? 0.55 + 0.4 * Math.sin(t * 13) : 0.4 + 0.3 * Math.sin(t * 3.0);
+    KnotGlow(ctx, nx, ny, L.grabR * W * 1.25, 0.12 + pulse * 0.22);
+  }
+  // 目标点的呼吸光：这一针该去的地方（穿出点 / 拉线的落点）
+  if (view.grab && n < L.stitches.length) {
+    const aim = view.phase === "pull" ? stz.pull : stz.send;
+    KnotGlow(ctx, aim.x * W, aim.y * W, 0.035 * W, 0.16 + 0.14 * Math.sin(t * 6));
+  }
+
+  // 晨光从右上斜进来一条（窖口的方向）
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const gr = ctx.createLinearGradient(W * 0.86, 0, W * 0.6, H);
+  gr.addColorStop(0, "rgba(150,168,190,0.14)");
+  gr.addColorStop(1, "rgba(150,168,190,0)");
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.95);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(2,2,3,0.55)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  void P;
 }
