@@ -5,7 +5,7 @@ import {
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt, BeatHintIcon,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
   KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
-  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn,
 } from "./Script_Core.mjs";
 import { DrawRelic, DrawHudBadge } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
@@ -943,9 +943,9 @@ function SyncHud(state, dt, shotFade) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
     // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
     // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    ui.touchControls.classList.toggle("gone",
-      !!(state.scribeCard || state.planeCard || state.knotCard || state.foldCard || state.wrapCard)
-      && state.phase === "playing");
+    // 名单走 Core 的 LiveCardOn（唯一一份）——这儿原先手抄了五张，撕布/缝针/
+    // 分食三张没跟上，手机上摇杆就一直压在卡的左下角截胡手指
+    ui.touchControls.classList.toggle("gone", LiveCardOn(state) && state.phase === "playing");
   }
 
   if (state.toast !== toastShown) {

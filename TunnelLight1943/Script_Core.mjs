@@ -714,8 +714,12 @@ export const TEAR_CARD = {
   aspect: 16 / 9,
   // 整布摊在画框中带（对折过，横着）；草苫在底下垫着
   cloth: { x0: 0.14, x1: 0.86, y: 0.205, h: 0.20 },
-  corner: { x: 0.80, y: 0.19 },    // 抓的那个角（东上角）
-  grabR: 0.10,
+  // 抓的那个角（东上角）。**必须落在布身上**：老版 y=0.19 比布的上沿
+  // （0.205）还高出一指，那团招呼人的光整个浮在布外头的黑地上，玩家去揪的
+  // 自然是布——而按在布身上原来一点回音都没有（2026-08-14 用户：「拖什么都
+  // 没反应」）。现在它压在上沿里一指，且画成一个真的翘起来的角（DrawTearCard）
+  corner: { x: 0.795, y: 0.228 },
+  grabR: 0.115,
   slipR: 0.16,
   speed: 0.85,                     // 布有分量：一秒最多跟手走这么多卡宽
   tautLen: 0.115,                  // 一把拖到这儿＝绷紧到头
@@ -752,6 +756,22 @@ export const SEW_CARD = {
   sendTol: 0.032,                  // 送针进点的容差
   pullTol: 0.035,                  // 拉线到位的容差
 };
+
+// ---------------------------------------------------------------------------
+// 铺满画框的活卡一共这几张。**名单只有这一份**——新加一张就往这儿添一个词，
+// 别在别的文件里手抄（`onLiveCard` 与 EdgeHint 各抄过一遍，后加的四张一张都
+// 没跟上：撕布那一拍因此整幅卡当中常驻着一句「W · 上梯子」，玩家看见的唯一
+// 一句指示指的是另一件事，2026-08-14 用户报的就是它）。
+// ---------------------------------------------------------------------------
+export const LIVE_CARD_FIELDS = [
+  "scribeCard", "planeCard", "knotCard", "foldCard",
+  "wrapCard", "splitCard", "tearCard", "sewCard",
+];
+
+/** 眼下有没有一张活卡铺在画框上（世界里的找路 UI、摇杆一律让位） */
+export function LiveCardOn(state) {
+  return LIVE_CARD_FIELDS.some((k) => !!state[k]);
+}
 
 // ---------------------------------------------------------------------------
 // 拉耧（第七稿第一章·地头）。耧要一个人在前面拉、一个人在后面扶——
@@ -2359,7 +2379,15 @@ function StepChain(state, def, input, dt) {
       const w = b.tear || (b.tear = {
         pulls: 0, phase: "taut", grab: false, reaching: false,
         corner: { ...L.corner }, pull: 0, tearK: 0, rip: 0,
+        press: null, missed: 0, said: false, slipSaid: false,
       });
+      // 卡一摆上来先说清这一下要干嘛（同打水那四道手：每换一道手就有一句话
+      // 交代"这会儿拿手干什么"）。撕布原先一句都不给，画面上只有一大块蓝布，
+      // 玩家不知道它是能拽的——2026-08-14 用户："到底怎么操作啊？完全不会"
+      if (!w.said) {
+        w.said = true;
+        state.toast = { text: "碎布压不住了。揪住蓝布翘起来的那个角——横着往回拽。", t: 4.4 };
+      }
       // 站定在草苫跟前：画面整个交给那张卡（同解扎口）
       const standX = st.zone.x + 0.3;
       if (Math.abs(p.x - standX) > 0.02) {
@@ -2371,11 +2399,25 @@ function StepChain(state, def, input, dt) {
       const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
 
       // ① 按下那一帧手必须落在布角上
-      if (held && state.ptrPressed && !w.grab
-        && Math.hypot(hand.x - w.corner.x, hand.y - w.corner.y) < L.grabR) {
-        w.grab = true;
-        Cue(state, "pickup", { gain: 0.3 });
+      if (held && state.ptrPressed && !w.grab) {
+        if (Math.hypot(hand.x - w.corner.x, hand.y - w.corner.y) < L.grabR) {
+          w.grab = true;
+          w.press = null;
+          Cue(state, "pickup", { gain: 0.3 });
+        } else if (hand.x > L.cloth.x0 && hand.x < L.cloth.x1
+          && hand.y > L.cloth.y - 0.02 && hand.y < L.cloth.y + L.cloth.h + 0.02) {
+          // **按在布身上、可没揪住角**：老版这一下什么也不做——没有声音、没有
+          // 画面、没有一个字，读出来就是"这玩意儿坏了"。布该答话：按出一个窝，
+          // 抻痕顺着布纹朝那个角跑（画在布上，不是悬空画箭头——第 8 条）
+          w.press = { x: hand.x, y: hand.y, t: 1.1 };
+          w.missed += 1;
+          Cue(state, "clothLift", { gain: 0.22, rate: 0.85 });
+          if (w.missed <= 2) {
+            state.toast = { text: "平摊的布面揪不住——手落到右上角那个翘起来的角上。", t: 3.6 };
+          }
+        }
       }
+      if (w.press && (w.press.t -= dt) <= 0) w.press = null;
       if (!held) w.grab = false;
       w.reaching = held && !w.grab;
 
@@ -2384,6 +2426,12 @@ function StepChain(state, def, input, dt) {
           // 手甩得比布快：脱手
           w.grab = false;
           Cue(state, "drop", { gain: 0.3 });
+          // 头一回脱手要说清脱在哪儿——"角自己滑走了"看着和"我按错地方了"
+          // 一模一样，不说的话玩家只会再快甩一次
+          if (!w.slipSaid) {
+            w.slipSaid = true;
+            state.toast = { text: "手甩得比布快，角从指头里滑脱了——慢些拽，让布跟着手走。", t: 3.6 };
+          }
         } else if (w.phase === "taut") {
           // 横向拖（往西）：布跟手走，但拖到 tautLen 它就绷住不走了
           const want = Math.max(0, Math.min(L.tautLen, L.corner.x - hand.x));
@@ -2404,6 +2452,9 @@ function StepChain(state, def, input, dt) {
               w.nick = true;
               Cue(state, "crackle", { gain: 0.65, rate: 1.5 });
               Cue(state, "clothLift", { gain: 0.5, rate: 0.5, delay: 0.1 });
+              // 第三把跟前两把不是一回事（前两把拽到头就自己停，这一把要一直
+              // 拽到底），不说的话玩家会照前两把的短拽再来一次然后以为卡住了
+              state.toast = { text: "咔——布边裂开一道口。再攥住那个角，顺着裂口一路拽到头。", t: 4.0 };
             }
           }
         } else {
@@ -2434,6 +2485,8 @@ function StepChain(state, def, input, dt) {
         grab: !!w.grab, reaching: !!w.reaching,
         corner: { x: w.corner.x, y: w.corner.y },
         pull: w.pull, tearK: Math.min(1, w.tearK / L.tearLen),
+        // 按空的那一下（手落在布面上、没揪住角）：布上按出的那个窝
+        press: w.press ? { x: w.press.x, y: w.press.y, k: Math.min(1, w.press.t / 1.1) } : null,
       };
       p.pose = "kneel";
 
@@ -8025,6 +8078,12 @@ export function CreateGame(chapterIndex = 0) {
     groundSeq: 0,
     knotCard: null,        // 接绳（见 case "knot"：铺满画框的活卡）
     foldCard: null,        // 叠衣裳/裹包袱（见 case "fold"：同一套活卡）
+    // 活卡一共这几张（LIVE_CARD_FIELDS）——新加一张就往那张表里添，
+    // 别在别处再手抄一遍名单
+    wrapCard: null,        // 解扎口
+    splitCard: null,       // 掰红薯干
+    tearCard: null,        // 撕布
+    sewCard: null,         // 缝三针
     stamina: null,         // 手劲读数（辘轳吊着桶时才有）
     thrown: null,
     noiseAt: null,
@@ -9119,8 +9178,11 @@ function MovePlayer(state, input, dt) {
   // 活卡那一拍**世界里的找路 UI 要收掉**（CLAUDE.md 拟物交互第 4 条②）：
   // 手上的活正做到一半，脚底下那句「W · 上梯子」只会糊在卡当中打岔。
   // 判据用活卡在不在，不用景别。MovePlayer 跑在 beat 执行器之前，读的是上一
-  // 帧的值——和辘轳锁同一条时序，卡活着的那几十帧一直是真的
-  const onLiveCard = !!(state.scribeCard || state.planeCard || state.knotCard || state.foldCard);
+  // 帧的值——和辘轳锁同一条时序，卡活着的那几十帧一直是真的。
+  // **名单只有 LiveCardOn 这一份**：这儿原先手抄了四张，后加的 wrap/split/
+  // tear/sew 一张都没补上——撕布那一拍整幅卡当中因此常驻着「W · 上梯子」，
+  // 玩家读到的唯一一句指示指的是另一件事（2026-08-14 用户报的第一现场）
+  const onLiveCard = LiveCardOn(state);
   let peek = 0;
   for (const shaft of scene.shafts) {
     if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
@@ -11055,9 +11117,7 @@ export function BeatHintIcon(state) {
 export function EdgeHint(state, camX, viewW) {
   if (state.phase !== "playing" || state.microCine) return null;
   // 特写/活卡里没有"远方"：手上的活正做到一半，别拿路标打岔
-  if (state.closeUp || state.scribeCard || state.planeCard || state.knotCard
-    || state.foldCard || state.wrapCard || state.splitCard
-    || state.tearCard || state.sewCard) return null;
+  if (state.closeUp || LiveCardOn(state)) return null;
   const def = CurrentBeatDef(state);
   if (!def || def.kind === "cinematic") return null;
   const tg = GetBeatTarget(state);
