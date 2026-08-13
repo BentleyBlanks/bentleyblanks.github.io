@@ -1769,25 +1769,17 @@ function StepChain(state, def, input, dt) {
           }
           return;
         }
-        // 打盹门（匀稠的）：st.gate 关着的时候手必须停住——停住不丢进度；
-        // 还在使劲（按着键、或手在画面里继续拖）就是叫她看见了：st.caught
-        // 兜走这一下（进度清零、她把碗推回来），只能等她下回低头。
-        if (st.gate && !st.gate(state)) {
-          state.prompt = st.waitPrompt || st.prompt;
-          state.promptFill = b.holdP / st.hold;
-          const pw = input.pointerWorld;
-          const moved = pw && b.gateP
-            ? Math.hypot(pw.x - b.gateP.x, pw.y - b.gateP.y) > 0.05 : false;
-          b.gateP = pw ? { x: pw.x, y: pw.y } : null;
-          if (input.interactHeld || (input.pointerHeld && moved)) {
-            b.holdP = 0;
-            b.strokeMem = null;
-            if (st.pose) { p.pose = null; p.poseU = undefined; }
-            st.caught?.(state);
-          }
-          return;
-        }
-        b.gateP = null;
+        // 【2026-08-14 删】这儿原来有一道「打盹门」（st.gate/st.caught）：她抬头
+        // 的时候手必须停住，还在使劲就是叫她看见了——进度清零、她把碗推回来，
+        // 只能等下个 6.2 秒周期。全作只有「匀稠的」一拍用它，用户当场退回
+        // （「推来推去……我一点提示也没有」）。两条病根记在这儿，别再照抄：
+        // ① **门的开关没画在画面上**。`state.doze` 写了三处、零个读取方——
+        //    "危险先看得见再生效"那条规矩在这一拍只兑现了半句（她点头的动画
+        //    在，可玩家不知道那和自己的手有关系）。
+        // ② **罚的是唯一一个没写输入方式的步骤**。它的 prompt 是「趁她打盹 ·
+        //    ……」，全场别的长按都写「按住 E · ……」——玩家连该按什么都不知道，
+        //    先挨了一巴掌。要再做这类偷渡门，两件事一起做：把门画出来，
+        //    并且照旧把输入写进 prompt。
         state.prompt = st.prompt;          // 百分比不进文案，promptFill 画成进度环
         state.promptFill = b.holdP / st.hold;
         // 动词姿势（规范：每个玩法动词必须配角色动画，不许「人站着不动、
@@ -5456,15 +5448,20 @@ export const SCRIPTS = {
       ],
     },
     {
-      // §8 匀稠的（八稿）：趁她低头打盹的空当，把自己碗底那点稠渣拨进她的
-      // 空碗。她一抬头，手就得停住；**叫她看见了，她会按住两只碗，把柱子的
-      // 碗推回来：「哥，你也吃。」**（八稿新写的反应——推回来的不再是无言的）。
-      // 拨完，舀一点水晃匀是柱子自己的手（过场）；递过去那一下：
-      // 「涮锅水。」「别糟践了。」
-      // （打盹的节奏是可读的：她先动一下（衣角窸窣）、头再抬起来——
-      // 跟第二章巡逻兵回头扫的"先举灯"同一条规矩：危险先看得见再生效。）
+      // §8 匀稠的（2026-08-14 重做）：把自己碗底那点稠渣拨进她的空碗——**一道手
+      // 做完，中间不设门**。拨完她就醒了：按住两只碗把柱子的碗推回来，
+      // 「哥，你也吃。」于是第二道手不是"再拨一次"，是**兑上水晃匀**再递过去，
+      // 「涮锅水。」「别糟践了。」——这一章叫《善意的谎言》，戏眼在这句谎上，
+      // 不在偷渡上。
+      // 老版是趁她打盹偷着拨、被看见就清零重来（`st.gate`/`st.caught`，机制已
+      // 从 StepChain 删掉，那儿留了病根说明）。用户退回的原话：「推来推去……
+      // 我一点提示也没有，我都不知道要干什么」。两条教训：
+      // ① **同一场戏一章只演一遍**。§3 分食（c1_meal）已经演过"她把长的推给你
+      //    → 你换回去"；这儿再演一遍推让，第二遍就只剩机械。她推回来现在是
+      //    **一次性的转折**（引出兑水那句谎），不是失败态。
+      // ② 罚玩家的前提是他知道自己在干什么——见步骤①的 prompt。
       kind: "chain", id: "c1_share", timeOfDay: "dusk",
-      objective: "把稠的匀给她", hint: "她隔一会儿就抬头看一眼——趁她打盹",
+      objective: "把稠的匀给她", hint: "碗底那点稠的，拨到她碗里去",
       onStart: (state) => {
         state.beat.indoorScene = true;
         const sis = FindActor(state, "sister");
@@ -5474,85 +5471,62 @@ export const SCRIPTS = {
         state.player.x = 33.4;
         state.player.heading = -1;
       },
-      tick: (state, dt) => {
-        const b = state.beat;
-        // 她看见了那一下的反应：把碗推回来的那口气（1.4s），完了继续打盹
-        if (b.pushT > 0) {
-          b.pushT -= dt;
-          b.dozeT = 0;   // 被撞见之后她清醒一阵，重新入盹
-          const sis = FindActor(state, "sister");
-          if (sis && sis.track?.name !== "pushBowlBack") {
-            sis.pose = "sitStool"; sis.track = { name: "pushBowlBack", t: 0 };
-          }
-          if (b.pushT <= 0) {
-            const sis2 = FindActor(state, "sister");
-            if (sis2) { sis2.pose = "sitStool"; sis2.track = null; }
-          }
-          state.doze = { k: 1 };
-          b.dozeDown = false;
-          return;
-        }
-        // 打盹的节奏（定拍，可学）：低头 3.4s → 动一下 0.7s（预告）→ 抬头 2.1s
-        const D = { down: 3.4, stir: 0.7, up: 2.1 };
-        const cyc = D.down + D.stir + D.up;
-        b.dozeT = (b.dozeT || 0) + dt;
-        const t = b.dozeT % cyc;
-        b.dozeDown = t < D.down;
-        const stir = t >= D.down && t < D.down + D.stir;
-        const k = t < D.down ? 0 : stir ? (t - D.down) / D.stir : 1;
-        state.doze = { k };
-        // 预告那一下：衣角窸窣——听见这声手就该停了
-        if (stir && !b.stirCued) { b.stirCued = true; Cue(state, "clothLift", { gain: 0.2, rate: 1.25 }); }
-        if (!stir) b.stirCued = false;
-        // 她的头由 dozeNod 轨道演，t 与这里的钟硬同步
+      tick: (state) => {
+        // 她坐在凳上打盹：**纯氛围**。dozeNod 是 6.2 秒的循环轨（点两下、抬头
+        // 望一会儿、又耷拉下去），t 由 StepActors 自己走——这儿只负责挂上去，
+        // 别再往它身上挂判定（老版把这条轨的相位当成偷渡窗口，玩家却看不出
+        // 那和自己的手有关系）。推碗那一下由步骤①的过场接管，接管期间不抢轨。
         const sis = FindActor(state, "sister");
-        if (sis && sis.pose === "sitStool") {
-          sis.track = { name: "dozeNod", t, ambient: true };
+        if (sis && sis.pose === "sitStool" && sis.track?.name !== "dozeNod"
+            && sis.track?.name !== "pushBowlBack") {
+          sis.track = { name: "dozeNod", t: 0, ambient: true };
         }
       },
       steps: [
-        // ① 拨稠渣：趁她低头，把自己碗底那点稠的拨进她的空碗。
-        // 叫她看见了：她按住两只碗，把柱子的碗推回来——「哥，你也吃。」
-        // （台词只演头一回；之后再被撞见走 toast，别把同一句演成复读）
+        // ① 拨稠渣：把自己碗底那点稠的拨进她的空碗。**一道手做完，不设门**——
+        // 输入照全场的规矩写进 prompt（「按住 E · ……」），这一步以前是全作唯一
+        // 一个不写输入方式的做功步。
+        // 拨完她就醒了：按住两只碗把柱子的碗推回来，「哥，你也吃。」——这一下
+        // 现在是**必然发生的转折**（引出步骤②那句谎），不再是撞见了才演、
+        // 演完还要重来。
         { type: "use", zone: { x: 32.9, w: 2.4 }, hold: 1.8, stroke: "down", gestureY: 0.6,
           pose: "bow", cue: "waterDrip",
-          prompt: "趁她打盹 · 把稠的拨进她碗里",
-          waitPrompt: "她抬头了——手停住",
-          gate: (state) => !!state.beat.dozeDown,
-          caught: (state) => {
-            state.beat.pushT = 1.4;
-            Cue(state, "drop", { gain: 0.4, rate: 1.1 });
-            if (!state.beat.caughtOnce) {
-              state.beat.caughtOnce = true;
-              StartMicroCine(state, [
-                { act: "妹妹按住两只碗，把柱子的碗推回来。", d: 2.8,
-                  cam: { kind: "insert", x: 32.6, y: 0.95, dist: 2.6 },
-                  on: (s) => {
-                    const k = FindActor(s, "sister");
-                    // 老版给的是 bow（弯腰拾东西那个造型）挂 2.8 秒——推这一下
-                    // 是她全章唯一一次跟哥哥较劲，不能只有字幕
-                    if (k) { k.pose = "sitStool"; k.track = { name: "pushBowlBack", t: 0 }; }
-                    Cue(s, "drop", { gain: 0.35, rate: 0.9, delay: 0.6 });
-                  } },
-                { who: "妹妹", say: "哥，你也吃。", d: 2.6,
-                  cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.5 },
-                  on: (s) => {
-                    const k = FindActor(s, "sister");
-                    if (k) k.pose = "sitStool";
-                  } },
-              ]);
-            } else {
-              state.toast = { text: "又叫她看见了。她把碗推了回来——只能等她下回打盹。", t: 3.2 };
-            }
-          },
-          effect: (state) => { Cue(state, "waterDrip", { gain: 0.4 }); } },
-        // ② 递过去（舀水晃匀是柱子自己的手——过场里做，不再单开一道）
-        { type: "use", zone: { x: 32.9, w: 2.4 }, prompt: "E · 递过去",
+          prompt: "按住 E · 把稠的拨过去",
+          effect: (state) => {
+            Cue(state, "waterDrip", { gain: 0.4 });
+            StartMicroCine(state, [
+              // 先睁眼、先看碗——推那一下才不是凭空来的
+              { act: "妹妹睁开眼。她先看柱子的碗，又看自己的。", d: 2.4,
+                cam: { kind: "insert", x: 32.4, y: 1.0, dist: 2.6 },
+                on: (s) => {
+                  const k = FindActor(s, "sister");
+                  if (k) { k.pose = "sitStool"; k.track = null; }   // 停掉打盹的点头
+                  Cue(s, "clothLift", { gain: 0.2, rate: 1.25 });
+                } },
+              { act: "妹妹按住两只碗，把柱子的碗推回来。", d: 2.8,
+                cam: { kind: "insert", x: 32.6, y: 0.95, dist: 2.6 },
+                on: (s) => {
+                  const k = FindActor(s, "sister");
+                  // 老版给的是 bow（弯腰拾东西那个造型）挂 2.8 秒——推这一下
+                  // 是她全章唯一一次跟哥哥较劲，不能只有字幕
+                  if (k) { k.pose = "sitStool"; k.track = { name: "pushBowlBack", t: 0 }; }
+                  Cue(s, "drop", { gain: 0.35, rate: 0.9, delay: 0.6 });
+                } },
+              { who: "妹妹", say: "哥，你也吃。", d: 2.6,
+                cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.5 },
+                on: (s) => {
+                  const k = FindActor(s, "sister");
+                  if (k) k.pose = "sitStool";
+                } },
+            ]);
+          } },
+        // ② 兑上水再递过去：她刚把碗推回来，所以这一下不是"再拨一次"，是把稠的
+        // 搅得看不出来——「涮锅水。」这句谎就是这一章的章名。
+        { type: "use", zone: { x: 32.9, w: 2.4 }, prompt: "E · 兑水再递过去",
           effect: (state) => {
             state.flags.shareDone = true;
             const sis = FindActor(state, "sister");
             if (sis) sis.track = null;
-            state.doze = null;
             StartMicroCine(state, [
               { act: "柱子舀一点水倒进碗里，轻轻晃匀。", d: 3.0,
                 cam: { kind: "insert", x: 33.1, y: 0.95, dist: 2.6 },
