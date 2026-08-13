@@ -270,7 +270,25 @@ async function CmdState(o) {
   const DT = 1 / 30;
   const state = C.CreateGame(ci);
   C.DebugJump(state, ci, bi);
-  const step = (inp = {}, n = 1) => { for (let i = 0; i < n; i += 1) C.StepGame(state, { ...IDLE, ...inp }, DT); };
+  // --cues：这一段**响了些什么**。声音是唯一一样截图问不出来的东西
+  //（序章那团扫荡的动静整个长在耳朵里，画面上一个人都没有），
+  // 以前只能现写探针把 state.cues 掏出来。
+  // **收完必须清空**：Core 只管往 state.cues 里推，清空是宿主的活
+  //（Script_Soundtrack 每帧 `cues.length = 0`）。不照做就是每帧把整条队列
+  // 重数一遍——18 秒的序章报出"响了 20951 声"，全是这么来的
+  const heard = new Map();
+  const step = (inp = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      C.StepGame(state, { ...IDLE, ...inp }, DT);
+      for (const c of state.cues || []) {
+        const h = heard.get(c.name) || { n: 0, gain: [] };
+        h.n += 1;
+        if (Number.isFinite(c.gain)) h.gain.push(c.gain);
+        heard.set(c.name, h);
+      }
+      if (state.cues) state.cues.length = 0;
+    }
+  };
   step({}, 1);
   // 跳进来先把 onStart 起的小过场演完——不然什么提示都还没出来
   if (o.cine !== "keep") for (let i = 0; i < 900 && state.microCine; i += 1) step({ advance: true });
@@ -350,6 +368,15 @@ async function CmdState(o) {
   if (dump.bubbles.length) console.log(`气泡  ${dump.bubbles.join("  ")}`);
   if (Object.keys(changed).length) console.log(`旗标变化  ${Brief(changed)}`);
   for (const [k, v] of Object.entries(live)) console.log(`${k.padEnd(10)}${typeof v === "object" ? Brief(v) : v}`);
+  if (o.cues) {
+    const rows = [...heard.entries()].sort((a, b) => b[1].n - a[1].n);
+    console.log(`声音  这一段响了 ${rows.length} 种、共 ${rows.reduce((s, r) => s + r[1].n, 0)} 声：`);
+    for (const [name, h] of rows) {
+      const g = h.gain.length
+        ? `  音量 ${Math.min(...h.gain).toFixed(2)}~${Math.max(...h.gain).toFixed(2)}` : "";
+      console.log(`  ${name.padEnd(12)}${String(h.n).padStart(3)} 声${g}`);
+    }
+  }
   if (trace.length) { console.log("轨迹："); trace.forEach((t) => console.log("  " + t)); }
 }
 
@@ -551,6 +578,12 @@ async function CmdShot(o) {
           await page.evaluate((n) => window.TunnelLight.StepFrames(n, {}), Math.max(1, Math.round(slice * 30)));
           await page.waitForTimeout(420);   // 等镜头缓动与下一次真合成追上推完的状态
         }
+        // **渲染侧也得推同样多帧**：镜头缓动、立面淡出、昼夜换挡（2.6 秒）、
+        // 板缝光柱的亮度吸附都只在 rAF 里前进，而无头浏览器没有合成器、rAF
+        // 几乎不跑（实测按住键推 12 秒，游戏钟只走了 0.58 秒）。光靠上面那
+        // 420ms 的干等追不上，拍到的会是"过渡刚开始"那一格——序章那间该黑的
+        // 窖因此一直拍成亮的。至少推够一次换挡（LIGHT_FADE 2.6s）
+        await page.evaluate((n) => window.TunnelLight.Settle?.(n), Math.max(90, Math.round(dur * 30)));
         const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
         await page.screenshot({ path: file, clip });
         // @zoom=sister / @zoom=player / @zoom=31.15[:0.6]：顺手再裁一张近景。

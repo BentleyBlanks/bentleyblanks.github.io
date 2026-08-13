@@ -897,6 +897,50 @@ function Build(ac, options) {
       }
       Tone(t + 0.1, { level: 0.03 * k, attack: 0.01, decay: 0.12, type: "sine", freq: 3400, to: 4200, pan });
     },
+    // ── 扫荡进村时院外那团混杂的动静（2026-08-13 用户：「开局各种混杂的音效
+    //    是序章的关键」）。序章里没有一样东西在画面里，全靠耳朵：狗、喊、跑、
+    //    砸门、牲口、远处的枪。三条都吃 rate 当**远近**：r 小＝远（闷、钝、
+    //    尾巴拖长），r 大＝近（脆、亮、收得快）。
+    //
+    // 村狗狂吠：一串急促的"汪"，每一声是喉音掉下来 + 一记炸开的气声。
+    // 狗是最早知道的——它在人喊起来之前就叫了
+    dogBark(t, k, pan, r) {
+      const n = 2 + Math.floor(Rand(0, 2.4));
+      for (let i = 0; i < n; i += 1) {
+        const at = t + i * (0.19 + Rand(0, 0.09));
+        const f = (270 + Rand(-40, 40)) * r;
+        Tone(at, { level: 0.085 * k, attack: 0.004, decay: 0.11 / r, type: "sawtooth", freq: f * 1.5, to: f * 0.62, pan });
+        NoiseHit(at, { level: 0.055 * k, attack: 0.002, decay: 0.07 / r, freq: 900 * r, sweep: -320, q: 1.5, pan });
+        // 远处的狗只剩这口闷的
+        NoiseHit(at + 0.02, { level: 0.03 * k, attack: 0.01, decay: 0.2 / r, freq: 320, sweep: -90, q: 2.2, brown: true, pan });
+      }
+    },
+    // 听不懂的喊声：**不给词**，只给喊的轮廓——两三个短音节，一个比一个急。
+    // 日语不日语在这儿不重要（本作日语一律无字幕）；重要的是"有人在外面
+    // 冲着谁吼"。锯齿过带通＝人嗓的共振峰，气声垫在底下
+    shout(t, k, pan, r) {
+      const n = 2 + Math.floor(Rand(0, 2));
+      let at = t;
+      for (let i = 0; i < n; i += 1) {
+        const dur = 0.16 + Rand(0, 0.13);
+        const f0 = (128 + Rand(-16, 22)) * r;
+        // 音节自己的调子：起高、掉下来（吼出来的话都是这个形）
+        Tone(at, { level: 0.05 * k, attack: 0.018, decay: dur, type: "sawtooth", freq: f0 * 1.22, to: f0 * 0.82, pan });
+        Tone(at, { level: 0.032 * k, attack: 0.02, decay: dur, type: "square", freq: f0 * 2.4, to: f0 * 1.7, pan });
+        // 共振峰那一撮（元音的颜色）
+        NoiseHit(at + 0.01, { level: 0.026 * k, attack: 0.02, decay: dur * 0.9, freq: (760 + Rand(-160, 240)) * r, q: 4.5, pan });
+        NoiseHit(at + 0.01, { level: 0.014 * k, attack: 0.03, decay: dur * 0.8, freq: 1650 * r, q: 3.2, pan });
+        at += dur + Rand(0.04, 0.14);
+      }
+    },
+    // 远处滚过来的那团响：说不清是什么，跑步、车、塌下来的东西混在一起。
+    // 它是垫在所有单点音效底下的**底噪**，由远及近全靠它——
+    // 单独听什么都不是，撤掉整段就"安静"了
+    raidRumble(t, k, pan, r) {
+      NoiseHit(t, { level: 0.075 * k, attack: 0.9, decay: 2.6 / r, freq: 190 * r, sweep: 120, q: 0.5, brown: true, pan });
+      NoiseHit(t + 0.4, { level: 0.038 * k, attack: 0.7, decay: 2.2 / r, freq: 520 * r, sweep: 260, q: 0.7, brown: true, pan });
+      Tone(t + 0.2, { level: 0.03 * k, attack: 1.1, decay: 1.9, type: "sine", freq: 62 * r, to: 44, pan });
+    },
     // 空肚子叫：小孩那种咕噜噜的空响——三两声软的、滚下去的低音，
     // 不是大人的闷雷（第一章开场黑屏里的那一声）
     bellyGrowl(t, k, pan) {

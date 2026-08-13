@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
-import { BuildOccluder, CreateOccludedLight, SceneOccluders } from "./Script_Light.mjs";
+import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
 import {
@@ -567,8 +567,9 @@ export function CreateWorld(canvasEl) {
   let reedPivot = null, reedBaseMesh = null, troughMesh = null, troughKey = "", seedBagMesh = null;
   // 拉耧那一拍的动态耧（state.lou 驱动：位置随拖、耧腿歪进垄沟的角度）
   let louMesh = null;
-  // 窖口板缝漏下来的那几条光（lidShut 的板缝光 / 夜里的月光同一支）
-  let hatchBeamMesh = null, hatchBeamKey = "";
+  // 窖口板缝打进来的那几束光（lidShut 的板缝光 / 夜里的月光同一支）。
+  // hatchBeamK 是它当前的亮度，跨帧吸附——盖板合上那一下光要收得像光，不像拉闸
+  let hatchBeamMesh = null, hatchBeamKey = "", hatchBeamK = 0;
   // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
   const CART_COVER_Z = 1.5;
 
@@ -2345,47 +2346,39 @@ export function CreateWorld(canvasEl) {
       }
       group.add(beam);
 
-      // 板缝光条（第七稿·序与夜窖）：盖板**合上**之后从板缝漏下来的三条细光
+      // 板缝光条（第七稿·序与夜窖）：盖板**合上**之后从板缝打进来的那几束光
       //（flags.lidShut），夜里翻板敞着给月色版（state.hatchMoon）。
-      // 「光从直的变成斜的」是序的收尾一镜——直/斜两份都烘好，
-      // 按 state.beamSlant 切换，别为一次切换造重烘机制
-      if (g.id === "cellarHatch") {
-        const MakeSlats = (slant, tag) => {
-          const slats = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
-            ctx.save();
-            Silhouette(ctx);
-            ctx.clip();
-            const drop = slant * hp * 0.55;   // 斜：光条落到墙上的那头往东偏
-            for (const [x0, wTop] of [[wp * 0.33, 6], [wp * 0.47, 5], [wp * 0.59, 7]]) {
-              const grd = ctx.createLinearGradient(0, 0, drop, hp);
-              // 亮度给足：加色混合下 0.5 档在土壁上读不出「几条光」（首轮视觉
-              // 审查退回），顶亮 0.9、中段 0.3 才立得住
-              grd.addColorStop(0, "rgba(232,220,182,0.9)");
-              grd.addColorStop(0.55, "rgba(232,220,182,0.3)");
-              grd.addColorStop(1, "rgba(232,220,182,0)");
-              ctx.fillStyle = grd;
-              ctx.beginPath();
-              ctx.moveTo(x0, 0);
-              ctx.lineTo(x0 + wTop, 0);
-              ctx.lineTo(x0 + wTop - 3 + drop, hp * 0.97);
-              ctx.lineTo(x0 - 3 + drop, hp * 0.97);
-              ctx.closePath();
-              ctx.fill();
-            }
-            ctx.restore();
-          });
-          PlaceSprite(slats, g.wx, wallBotY, NEAR_Z);
-          FixOrder(slats, SHAFT_WALL_ORDER + 1);
-          slats.userData.dofKeep = true;
-          slats.userData.slatTag = tag;
-          slats.material.blending = THREE.AdditiveBlending;
-          slats.material.depthWrite = false;
-          slats.material.opacity = 0;
-          group.add(slats);
-          return slats;
-        };
-        hatchBeamMesh = MakeSlats(0, "straight");
-        hatchBeamMesh.userData.alt = MakeSlats(0.4, "slanted");
+      //
+      // 2026-08-13 整个重做（用户：「序章里的打进来的光要做出来」）。老版是把
+      // 三条渐变**烘在井壁贴图上**、剪在井筒剪影里——于是光只存在于洞顶以上
+      // 那截土管子里，窖底那间屋（两个孩子蹲的地方）一丝都没有；而且画的是
+      // "墙上有几道亮痕"，不是"空气里有一束光"。现在走 SDF 现算的光柱
+      //（Script_Light 的 CreateLightShafts）：柔边、沿程张开、按掩码被土层吃掉、
+      // **被人挡断**、里头有浮尘、落地有一摊亮斑。直/斜由 uDir 一个参数切，
+      // 不用再烘两份。
+      if (g.id === "cellarHatch" && occluder) {
+        hatchBeamMesh = CreateLightShafts(occluder, {
+          color: 0xe8dcb6, span: 11, height: SURFACE_Y - UNDER_Y + 1.2,
+        });
+        // 板缝在盖板那一层（地表），光往窖里打
+        hatchBeamMesh.userData.SetOrigin(g.wx, SURFACE_Y + 0.08, 0.62);
+        hatchBeamMesh.userData.SetFloor(UNDER_Y + 0.05);
+        // 三条缝：宽窄不一（板是三块拼的，缝也就不匀）。
+        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽。
+        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起——
+        // 画面上是一根胖柱子，不是"板缝里漏下来几条光"
+        hatchBeamMesh.userData.SetShafts([
+          { off: -0.37, half: 0.022, spread: 0.020, gain: 0.90 },
+          { off: -0.02, half: 0.017, spread: 0.016, gain: 1.15 },
+          { off: 0.33, half: 0.029, spread: 0.025, gain: 0.75 },
+        ]);
+        hatchBeamMesh.userData.SetIntensity(0);
+        // **必须走 FixOrder**：光柱要排在压暗罩（ORDER_DARK）**之后**——
+        // 排在前面的话罩子把它一起压暗，等于没画。裸 renderOrder 会被
+        // ApplyDepthOrder 按 z 重新派号盖掉（实测被派成 6252，正压在罩子底下）
+        FixOrder(hatchBeamMesh, ORDER_GLOW - 1);      // 演员与罩子之后：光在空气里，不在墙上
+        hatchBeamMesh.userData.dofKeep = true;
+        group.add(hatchBeamMesh);
       }
     }
 
@@ -3383,16 +3376,30 @@ export function CreateWorld(canvasEl) {
         bm.material.opacity = bm.userData.beamBase * (0.12 + 0.88 * Math.max(k, story));
       }
     }
-    // 板缝光条：盖板合上（lidShut）才漏那几条；夜里翻板敞着给月色（hatchMoon）。
-    // 白天亮、拂晓次之、夜里只剩月色——跟井口那道 beam 同一条昼夜账
+    // 打进来的光：盖板合上（lidShut）才从板缝漏那几束；夜里翻板敞着给月色
+    //（hatchMoon）。白天亮、拂晓次之、夜里只剩月色——跟井口那道 beam 同一条
+    // 昼夜账。**亮度是渐变的**：盖板"咚"地合上那一下光要收，但收成阶跃就像
+    // 有人拉了闸；1.1 秒的指数吸附，读出来才是"光被盖住了"
     if (hatchBeamMesh) {
       const mood = ShownLight(state);
-      const dayK = mood === "day" ? 1 : mood === "dawn" ? 0.6 : 0.45;
-      const on = !!state.flags.lidShut || !!state.hatchMoon;
-      const slanted = (state.beamSlant || 0) > 0.2;
-      hatchBeamMesh.material.opacity = on && !slanted ? dayK : 0;
-      const alt = hatchBeamMesh.userData.alt;
-      if (alt) alt.material.opacity = on && slanted ? dayK : 0;
+      // 有多亮，看的是**外头**的天光，不是窖里的暗。序那一场外面是大白天
+      //（盖板合上、没立夜里那面 hatchMoon 旗），板缝里就该是白晃晃的三道；
+      // 夜里（hatchMoon）才只剩一点月色，拂晓再亮回来一档。
+      // 拿窖里的 mood 当亮度用是反的——窖里越黑说明盖板压得越严，
+      // 可外面的日头一点没变，那样只会越该亮的时候越暗
+      const night = !!state.hatchMoon;
+      const dayK = night ? (mood === "dawn" ? 0.5 : 0.3) : 1.15;
+      const on = !!state.flags.lidShut || night;
+      // 「光从直的变成斜的」——序的收尾一镜，现在只是转一下 uDir
+      hatchBeamMesh.userData.SetSlant(state.beamSlant || 0);
+      hatchBeamMesh.userData.SetTime(time);
+      // 人挡得住光：躯干进了光柱，光柱就在他身上断一截
+      hatchBeamMesh.userData.SetBlockers(bodyBlockers);
+      hatchBeamK += ((on ? dayK : 0) - hatchBeamK) * Math.min(1, dt / 1.1);
+      hatchBeamMesh.visible = hatchBeamK > 0.004;
+      hatchBeamMesh.userData.SetIntensity(hatchBeamK);
+      // 浮尘只在光柱够亮时看得见（夜里那点月色照不出灰）
+      hatchBeamMesh.userData.SetDust(0.55 * hatchBeamK);
     }
     StepBackdropFolk(dt, state);
     // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：

@@ -1372,6 +1372,25 @@ window.TunnelLight = {
       }, 1 / 30);
     }
   },
+  // 只推**渲染侧**的每帧更新，游戏钟不动（2026-08-13 加）。
+  //
+  // StepFrames 推的只是 StepGame；镜头缓动、立面淡出、**昼夜换挡（2.6 秒）**、
+  // 板缝光柱的亮度吸附全都活在渲染这一侧，只在 rAF 真的跑一帧时才前进——
+  // 而无头浏览器没有合成器，rAF 慢到几乎不动（实测 --hold e --dur 12 之后
+  // 游戏钟只走了 0.58 秒）。于是"推完 dur 再截图"拍到的是**过渡刚开始**
+  // 那一格：窖里该黑的还亮着，光柱该亮的还没起来，看图的人会判成"没做出来"。
+  // 截图前把这边也推够数，`--dur` 才真是"这一拍走到第几秒"。
+  Settle: (n = 90, dt = 1 / 30) => {
+    if (!state) return;
+    for (let i = 0; i < n; i += 1) {
+      const now = performance.now() / 1000 + i * dt;
+      world.BuildEnvironment(state);
+      world.UpdateActors(state, now, dt);
+      world.UpdateProps(state, now, dt);
+      UpdateCamera(state, dt);
+      StepIris(state, dt);
+    }
+  },
   // 转场的圆形黑幕拉开了没有（0 全黑 → 1 全开）。跳幕之后要等它拉开再截图，
   // 不然拍出来是个圆洞——Script_Cli 的 shot 靠轮询这个值定拍摄时机，
   // 比"死等 0.6 秒"稳（等待时间随机器快慢变，猜不准）

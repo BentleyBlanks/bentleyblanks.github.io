@@ -257,6 +257,60 @@ if (!shaftCheck.walls.length) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 板缝里打进来的那几束光：盖板合上才亮、而且必须排在压暗罩之后
+//
+// 2026-08-13 重做（用户：「序章里的打进来的光要做出来」）。这条守两件事，
+// 都是当天真的踩到的：
+//   ① **绘制序要在全屏压暗罩（ORDER_DARK 8500）之后。** 光柱是加色的，排在
+//      罩子前面就被罩子一起压掉，等于没画。而且不能写裸 renderOrder——
+//      ApplyDepthOrder 会按 z 重新派号盖掉它（实测被派成 6252，正压在罩底），
+//      必须走 FixOrder。
+//   ② **盖板合上（lidShut）才有光。** 板子敞着的时候漏进来的是整格天光，
+//      不是板缝那三条；这几束要跟着旗标走，不然白天窖里凭空多三道光。
+const beamCheck = await page.evaluate(() => {
+  const tl = window.TunnelLight;
+  const w = tl.world;
+  const { THREE } = w.debugLayers();
+  let beam = null;
+  w.scene.traverse((o) => { if (o.material?.uniforms?.uShafts) beam = o; });
+  if (!beam) return { missing: true };
+  let dark = -1;
+  w.scene.traverse((o) => { if (o.isMesh && o.renderOrder === 8500) dark = o.renderOrder; });
+  const Read = () => ({
+    inten: +beam.material.uniforms.uIntensity.value.toFixed(3),
+    vis: beam.visible,
+  });
+  // 亮度是跨帧吸附的，得让渲染侧真的走几十帧才追得上
+  tl.state.flags.lidShut = false;
+  tl.state.hatchMoon = false;
+  tl.Settle(120);
+  const off = Read();
+  tl.state.flags.lidShut = true;
+  tl.Settle(120);
+  const on = Read();
+  return {
+    ord: beam.renderOrder, fixed: beam.userData.fixedOrder, dark,
+    count: beam.material.uniforms.uCount.value, off, on, THREE: !!THREE,
+  };
+});
+if (beamCheck.missing) {
+  failed += 1;
+  console.error("✗ 板缝光柱：一束都没建出来（第一章那口窖口该有）");
+} else {
+  const 排在罩后 = beamCheck.dark < 0 || beamCheck.ord > beamCheck.dark;
+  const 钉住了 = beamCheck.fixed !== undefined;
+  const 跟着旗标 = beamCheck.on.inten > 0.3 && beamCheck.off.inten < 0.05;
+  if (!排在罩后 || !钉住了 || !跟着旗标 || beamCheck.count < 2) {
+    failed += 1;
+    console.error(`✗ 板缝光柱不对：${JSON.stringify(beamCheck)}`
+      + `（要 ①绘制序 > 压暗罩 ${beamCheck.dark} 且走 FixOrder ②lidShut 落下才亮 ③至少两束）`);
+  } else {
+    console.log(`✓ 板缝光柱：${beamCheck.count} 束 / 绘制序 ${beamCheck.ord} > 压暗罩 ${beamCheck.dark}`
+      + ` / 合板才亮（${beamCheck.off.inten} → ${beamCheck.on.inten}）`);
+  }
+}
+
 await browser.close();
 server.close();
 if (failed) {

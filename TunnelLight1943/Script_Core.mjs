@@ -3637,21 +3637,29 @@ export const SCRIPTS = {
     },
     {
       // ── 序 · 那天（第七稿新增，可玩约一分钟） ──
-      // 无标题，直接进。白天，屋里。很吵，吵的都在外面：枪、砸门、听不懂的喊。
-      // 娘冲进屋——镜头贴着她身侧过去：蓝底白花的短褂，补丁摞补丁（这一眼是
-      // 全章那块布的第一面，活动插卡 motherJacket）。她拽起妹妹、掀开翻板：
-      // 「下去。」
+      // 无标题，直接进。白天，屋里。很吵，吵的都在外面：狗、枪、砸门、听不懂
+      // 的喊。娘冲进屋，拽起妹妹、掀开翻板：「下去。」
+      //
+      // 2026-08-13 用户退回了两样，一并重做：
+      // ① **娘衣服的特写整个删掉**（原来是活动插卡 motherJacket，镜头贴着她
+      //    身侧扫过那件蓝底白花的短褂）。用户原话：「娘衣服的特写完全没必要，
+      //    还不如就好好交待」。那块布是全章的暗线不假，但**用一记特写去"交代"
+      //    一件她正穿在身上的衣裳，是把观众从这一刻里拽出去**——门砸开、孩子
+      //    还在炕上，镜头却去拍布料。现在改成一句话跟着动作说完（她本来就穿着
+      //    它，画面上就是那件蓝的），眼睛不用离开这间屋。
+      // ② **交代要自己演完**：整段拆成"冲进屋 / 拽起妹妹 / 掀开翻板 / 下去"
+      //    四个真动作——演员真的走过去、真的伸手、盖板真的绕铰链掀起来
+      //    （state.lid 带 to，StepGame 自己转过去），一句都不用玩家按。
+      // ③ 外面那团动静交给调度器（SetDin）：由远及近是一条连着的曲线，
+      //    不再是几行零散的 Cue。
       kind: "cinematic", id: "c1_thatday", timeOfDay: "day",
       lines: [
-        { stage: "", d: 3.0, cam: { kind: "dark" },
+        { stage: "", d: 3.4, cam: { kind: "dark" },
           on: (state) => {
-            // 吵的都在外面，由远及近：枪、砸门、牲口——没有一样在画里
-            Cue(state, "gunshot", { gain: 0.16, rate: 0.72, delay: 0.3 });
-            Cue(state, "knock", { gain: 0.5, rate: 0.85, delay: 1.2 });
-            Cue(state, "henSquawk", { gain: 0.4, delay: 1.9 });
-            Cue(state, "gunshot", { gain: 0.22, rate: 0.8, delay: 2.4 });
+            // 黑屏里先响起来：还在村外，狗先知道。爬到 0.55 用掉这一句
+            SetDin(state, 0.06, 0.55, 0.17);
           } },
-        { stage: "", d: 2.6, cam: { kind: "shot", x: 32.2, y: 1.15, dist: 3.8 },
+        { stage: "", d: 2.8, cam: { kind: "shot", x: 32.2, y: 1.15, dist: 3.8 },
           on: (state) => {
             state.beat.indoorScene = true;
             // 屋里：妹妹在铺盖上，柱子在屋当间。外面的动静一声近过一声
@@ -3659,31 +3667,64 @@ export const SCRIPTS = {
             if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.0;
             state.player.heading = -1;
-            Cue(state, "knock", { gain: 0.7, rate: 0.9, delay: 0.8 });
-            Cue(state, "step", { gain: 0.6, rate: 1.2, delay: 1.6 });
+            SetDin(state, null, 0.78, 0.16);
           } },
-        { stage: "娘冲进屋。", d: 2.2,
-          cam: { kind: "shot", x: 34.5, y: 1.2, dist: 4.2 },
+        // 蓝底白花那一眼：不切特写，跟着她冲进来这一下说完
+        { stage: "娘冲进屋。蓝底白花的短褂，补丁摞补丁——衣角被风掀起来，又落下去。", d: 4.2,
+          cam: { kind: "shot", x: 34.2, y: 1.2, dist: 4.4 },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
-            if (m) { m.visible = true; m.level = "surface"; m.x = 38.5; m.heading = -1; m.cineTarget = { x: 31.9 }; m.cineSpeed = 3.0; }
-            Cue(state, "doorCreak", { gain: 0.7 });
-            Cue(state, "step", { gain: 0.7, rate: 1.3 });
+            if (m) { m.visible = true; m.level = "surface"; m.x = 38.6; m.heading = -1; m.cineTarget = { x: 31.6 }; m.cineSpeed = 3.4; }
+            Cue(state, "doorCreak", { gain: 0.85, rate: 1.15 });
+            Cue(state, "knock", { gain: 0.9, rate: 1.05, delay: 0.1 });
+            // 门一开，外面那团东西整个灌进来
+            SetDin(state, null, 1.0, 0.5);
           } },
-        // 镜头贴着她身侧过去——蓝底白花的短褂。补丁摞补丁。衣角被风掀起来，
-        // 又落下去。（活动插卡：这块布的第一面）
-        { stage: "", d: 3.4, cam: { kind: "insertCard", card: "motherJacket", seg: 0 } },
-        { who: "娘", say: "下去。", d: 2.2,
-          cam: { kind: "shot", x: 31.4, y: 1.1, dist: 3.4 },
+        // 接触戏的老规矩：先站到一臂之内（上臂+小臂 ≈ 0.49m）。娘 31.45、
+        // 妹妹 31.0 差 0.45m，手才够得着——首轮让妹妹在这一句里就往窖口走，
+        // 拉到 1.2m 开外，画面上成了"冲着空气伸手"
+        { stage: "她一把拽起炕上的妹妹。", d: 2.4,
+          cam: { kind: "shot", x: 31.2, y: 1.15, dist: 3.4 },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
-            if (m) { m.cineTarget = null; m.x = 31.9; m.heading = -1; m.pose = "bow"; }
-            // 她一把拽起炕上的妹妹
+            // haulIn 由 poseK 驱动（0＝探出去够，1＝拽到怀里）：钉在半道上，
+            // 读出来是"已经攥住了、正往起带"
+            if (m) { m.cineTarget = null; m.x = 31.45; m.heading = -1; m.pose = "haulIn"; m.poseK = 0.55; }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.pose = null; sis.x = 31.0; sis.heading = -1; }
-            Cue(state, "doorCreak", { gain: 0.8, rate: 0.8, delay: 0.9 });
+            if (sis) { sis.pose = null; sis.cineTarget = null; sis.x = 31.0; sis.heading = -1; }
+            Cue(state, "clothLift", { gain: 0.6 });
+          } },
+        // 换机位＝换一镜（每一行本来就是一个镜头），所以人直接摆到窖口，
+        // 不在这一句里演走位——走位只留给"冲进屋"那一下，那是要看的
+        { stage: "另一只手掀开屋角的翻板。", d: 2.6,
+          cam: { kind: "shot", x: 29.8, y: 1.0, dist: 3.4 },
+          on: (state) => {
+            state.beat.indoorScene = true;
+            const m = FindActor(state, "mother");
+            // heaveMat 由 poseU 驱动（掀苫草同一套：蹲着抠住边 → 腰一节节直起来）
+            if (m) { m.cineTarget = null; m.x = 28.95; m.heading = 1; m.pose = "heaveMat"; m.poseU = 0.7; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.cineTarget = null; sis.x = 30.5; sis.heading = -1; }
+            // 板子真的绕铰链掀起来——不是切一镜"它已经开了"
+            state.lid = { id: "cellarHatch", open: 0, to: 1, rate: 1.5 };
+            Cue(state, "vault", { gain: 0.5, rate: 0.8, delay: 0.5 });
+            Cue(state, "drop", { gain: 0.7, rate: 0.62, delay: 1.4 });
+          } },
+        { who: "娘", say: "下去。", d: 2.4,
+          cam: { kind: "shot", x: 29.9, y: 1.05, dist: 3.4 },
+          on: (state) => {
+            state.beat.indoorScene = true;
+            const m = FindActor(state, "mother");
+            // 掀着板守在窖口、冲着孩子这头——摆位与下一拍 c1_descend 的 onStart
+            // 对齐（她 28.2/bow），切过去人不跳。
+            // **别用 pointLow**：那是地道专用的"指着洞顶那处"，手抬到 1.15m 高、
+            // 头跟着往上看，站在屋里用就成了指着房梁说话（首轮实拍退回）
+            if (m) { m.cineTarget = null; m.x = 28.5; m.heading = 1; m.pose = "bow"; m.poseU = 0; m.poseK = 0; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.cineTarget = null; sis.x = 30.4; sis.heading = -1; }
+            state.lid = { id: "cellarHatch", open: 1, to: 1, rate: 1.5 };
           } },
       ],
     },
@@ -3700,15 +3741,10 @@ export const SCRIPTS = {
         if (m) { m.visible = true; m.level = "surface"; m.cineTarget = null; m.x = 28.2; m.heading = 1; m.pose = "bow"; }
         const sis = FindActor(state, "sister");
         if (sis) { sis.visible = true; sis.level = "surface"; sis.pose = null; sis.cineTarget = null; sis.following = true; }
-      },
-      tick: (state) => {
-        const b = state.beat;
-        b.dinT = (b.dinT || 0) + 1 / 60;
-        if (b.dinT > 4.5) {
-          b.dinT = 0;
-          Cue(state, "knock", { gain: 0.45, rate: 0.9 });
-          Cue(state, "gunshot", { gain: 0.12, rate: 0.75, delay: 1.4 });
-        }
+        // 娘掀着翻板等着——板子这一整拍都敞着（跳幕直落这儿也要敞）
+        state.lid = { id: "cellarHatch", open: 1, to: 1, rate: 2.4 };
+        // 外面还在闹。玩家操作的这一段动静不再往上爬，就压在头顶上
+        SetDin(state, 0.95, 0.95, 0.2);
       },
       steps: [
         { type: "goto", zone: { x: 29.4, w: 2.2 } },
@@ -3730,11 +3766,17 @@ export const SCRIPTS = {
                 } },
               { who: "娘", say: "搂紧她。不叫你们，别上来。", d: 3.2,
                 cam: { kind: "insert", x: 29.2, y: UNDER_Y + 2.2, dist: 2.6 } },
-              { stage: "", d: 2.6, cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 },
+              { stage: "", d: 3.2, cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 },
                 on: (s) => {
-                  // 翻板合上。光没了——只剩板缝里漏下来的几条。
-                  Cue(s, "drop", { gain: 0.7, rate: 0.7 });
+                  // 翻板合上。光没了——只剩板缝里打进来的那几束。
+                  // 板子真的落下来（绕铰链转回去），落到底才是那声闷响
+                  s.lid = { id: "cellarHatch", open: 1, to: 0, rate: 1.8 };
                   Cue(s, "doorCreak", { gain: 0.5, rate: 0.75 });
+                  Cue(s, "drop", { gain: 0.8, rate: 0.62, delay: 0.62 });
+                  // 盖板一合，窖里就黑下来（World 的罩子按这个档走 2.6 秒的曲线，
+                  // 板缝那几束光同时从"整格天光"收成三条）。旗标仍落在 effect 里，
+                  // on() 只管画面——跳幕直落 c1_hide 时由它自己的 timeOfDay 接手
+                  s.lightOverride = "dark";
                   const m = FindActor(s, "mother");
                   if (m) { m.pose = null; m.cineTarget = { x: 60 }; m.cineSpeed = 2.4; m.heading = 1; m.cineVanish = true; }
                 } },
@@ -3755,7 +3797,10 @@ export const SCRIPTS = {
       // 松手不算失败——只是她的抖会从怀里传出去（sustain：量的是时间本身，
       // 长按在这儿是诚实的，同 c2_hush）。外面的动静一段一段从板缝灌下来：
       // 跑步、砸门、喊、牲口叫。一声枪响，远。又一声，更远。
-      kind: "hold", id: "c1_hide", timeOfDay: "day", indoorScene: true,
+      // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
+      // 「打进来的光」要有黑给它打进来才成立——2026-08-13 之前这一拍是
+      // timeOfDay:"day"，窖里亮堂堂，板缝那几条光在画面上根本读不出来
+      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true,
       zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 14, sustain: true,
       holdPose: "shelter",
       holdPrompt: "按住 E · 搂紧她",
@@ -3774,26 +3819,17 @@ export const SCRIPTS = {
         state.flags.lidShut = true;
         state.player.x = 31.45;
         state.player.heading = -1;
+        state.lid = null;                    // 板已经合上了
+        // 头顶那阵动静从最近处开始，整整 14 秒一路退远——「声音过去了」
+        // 是这一拍要玩家**听出来**的东西，所以它是一条连着走的曲线，
+        // 不是一张定时表（老版是九条写死的 Cue，听着像九个音效依次响过）
+        SetDin(state, 1.0, 0, 0.085);
       },
       tick: (state, dt) => {
         const b = state.beat;
-        b.hideT = (b.hideT || 0) + 1 / 60;
-        // 声音脚本：由近及远，一段一段压过去（照 hideT 走，不循环）
-        const CUES = [
-          [1.0, "step", 0.7, 1.2], [2.0, "step", 0.75, 1.15],
-          [3.2, "knock", 0.9, 0.85], [4.0, "knock", 0.8, 0.8],
-          [5.0, "henSquawk", 0.5, 0.95], [6.5, "gunshot", 0.2, 0.82],
-          [8.8, "gunshot", 0.12, 0.72], [10.5, "step", 0.45, 0.9],
-          [12.2, "windGust", 0.4, 0.9],
-        ];
-        b.hideFired = b.hideFired || new Set();
-        for (let i = 0; i < CUES.length; i += 1) {
-          const [t, name, gain, rate] = CUES[i];
-          if (b.hideT >= t && !b.hideFired.has(i)) {
-            b.hideFired.add(i);
-            Cue(state, name, { gain, rate });
-          }
-        }
+        b.hideT = (b.hideT || 0) + dt;
+        // 快过去的时候来一阵风，把最后那点声音扫走
+        if (!b.gusted && b.hideT > 11.6) { b.gusted = true; Cue(state, "windGust", { gain: 0.4, rate: 0.9 }); }
         // 妹妹在怀里抖。你能数出来她抖了多少下——按住时抖得轻，
         // 松手那阵抖从怀里传出去（tremble 轨道的幅度跟着手走）
         const sis = FindActor(state, "sister");
@@ -3824,7 +3860,9 @@ export const SCRIPTS = {
       // 缰绳是**解走的**）、屋里蜷着的妹妹——镜头钉在她那件褂子上：袖子短了
       // 一截，手腕露在外面（这一眼是章末接袖那针线的由头）。
       // 全程没有一个活人上镜：安静本身就是伤。
-      kind: "cinematic", id: "c1_open", timeOfDay: "dawn",
+      // 头一句还在合着盖板的窖底（接 c1_hide 的黑），所以这一拍从 dark 起，
+      // 「三天后」那一句才翻回拂晓
+      kind: "cinematic", id: "c1_open", timeOfDay: "dark",
       lines: [
         // 序的收尾：声音过去了，没人来叫。光从直的变成斜的（beamSlant 已由
         // c1_hide 落下）。然后黑场——三天后
@@ -3833,6 +3871,7 @@ export const SCRIPTS = {
           on: (state) => {
             state.beat.indoorScene = true;
             state.beamSlant = 0.4;
+            StopDin(state);
             const sis = FindActor(state, "sister");
             if (sis) { sis.visible = true; sis.level = "under"; sis.x = 30.9; sis.heading = 1; sis.pose = "leanIn"; }
             state.player.x = 31.3;
@@ -3841,9 +3880,10 @@ export const SCRIPTS = {
           } },
         { stage: "三天后。", d: 3.0, cam: { kind: "dark" },
           on: (state) => {
-            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起
+            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来
             state.flags.lidShut = false;
             state.beamSlant = 0;
+            state.lightOverride = "dawn";
             const m = FindActor(state, "mother");
             if (m) { m.visible = false; m.cineTarget = null; }
             const sis = FindActor(state, "sister");
@@ -7177,6 +7217,7 @@ export function CreateGame(chapterIndex = 0) {
     microCine: null,
     lamps: null,
     lightOverride: null,
+    din: null,            // 院外那团混杂的动静（见 StepDin）
     flood: null,
     floodDepth: 0,
     flags: {
@@ -7231,6 +7272,7 @@ export function StartChapter(state, index) {
   state.microCine = null;
   state.lamps = null;
   state.lightOverride = null;
+  state.din = null;
   state.flood = null;
   state.floodDepth = 0;
   state.caption = null;
@@ -7592,6 +7634,75 @@ function StepMicroCine(state, input, dt) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 院外那团混杂的动静（2026-08-13 用户定：「开局各种混杂的音效是序章的关键」）
+//
+// 序章从头到尾**没有一样东西在画面里**——狗、喊、跑、砸门、牲口、远处的枪，
+// 全在墙外、全在头顶。所以它不能像原来那样在几行台词的 on() 里点几发单响：
+// 那听起来是"三个音效"，不是"外面出事了"。这儿是个**调度器**：
+//
+//   · 一个 near（0=还在村外 1=就在头顶）同时管四件事——发声的密度、音量、
+//     rate（远的闷、近的脆）、左右（远的偏一边，近了压过来居中）；
+//   · near 自己往 target 爬（by 每秒多少），所以"由远及近"是**一条曲线**，
+//     不是几个台阶。一句台词只要给个 target，后面的事它自己走；
+//   · 底噪 raidRumble 一直垫着：单独听什么都不是，撤掉整段就"安静"了；
+//   · 跨拍活着（挂在 state 上不是 beat 上）——序的三拍（娘冲进屋 / 下窖 /
+//     按住她）本来就是一段连续的声音，不该在切拍那一下断掉。
+//
+// 随机走自带的 LCG，不用 Math.random：无头实拍与自动通关得能复现。
+const DIN_LAYERS = [
+  // name, 远时的间隔, 近时的间隔, 远时音量, 近时音量, 远时 rate, 近时 rate
+  { name: "raidRumble", far: 3.0, near: 1.9, gFar: 0.10, gNear: 0.42, rFar: 0.78, rNear: 1.10 },
+  { name: "dogBark", far: 2.4, near: 1.0, gFar: 0.16, gNear: 0.58, rFar: 0.74, rNear: 1.14 },
+  { name: "shout", far: 3.6, near: 1.4, gFar: 0.12, gNear: 0.52, rFar: 0.80, rNear: 1.10 },
+  { name: "step", far: 1.9, near: 0.55, gFar: 0.16, gNear: 0.60, rFar: 1.05, rNear: 1.35 },
+  { name: "knock", far: 4.4, near: 1.7, gFar: 0.22, gNear: 0.80, rFar: 0.76, rNear: 0.98 },
+  { name: "henSquawk", far: 6.0, near: 3.1, gFar: 0.18, gNear: 0.48, rFar: 0.88, rNear: 1.05 },
+  // 枪声**始终是远的**：剧本里写的就是"一声枪响，远。又一声，更远"。
+  // 它不跟着 near 往近里走，只是变密
+  { name: "gunshot", far: 7.5, near: 3.4, gFar: 0.10, gNear: 0.26, rFar: 0.70, rNear: 0.84 },
+];
+
+/** 开一段动静。near 起点，target 终点，by 每秒爬多少 */
+export function SetDin(state, near, target = near, by = 0.12) {
+  const d = state.din;
+  if (d) { d.target = target; d.by = by; if (near !== null) d.near = near; return d; }
+  state.din = { near: near ?? 0, target, by, seed: 0x2f6e2b1, timers: DIN_LAYERS.map(() => 0) };
+  return state.din;
+}
+
+export function StopDin(state) { state.din = null; }
+
+function StepDin(state, dt) {
+  const d = state.din;
+  if (!d) return;
+  // near 只走一条斜线（by 是每秒的量）——到了就停住
+  if (d.near < d.target) d.near = Math.min(d.target, d.near + d.by * dt);
+  else if (d.near > d.target) d.near = Math.max(d.target, d.near - d.by * dt);
+  const n = Math.max(0, Math.min(1, d.near));
+  // 整段的总音量：远得听不见时干脆不发（省得一堆 0.02 的声音堆在一起糊成噪音）
+  if (n <= 0.02) return;
+  const Rnd = () => {
+    d.seed = (d.seed * 1103515245 + 12345) & 0x7fffffff;
+    return d.seed / 0x7fffffff;
+  };
+  for (let i = 0; i < DIN_LAYERS.length; i += 1) {
+    const L = DIN_LAYERS[i];
+    d.timers[i] -= dt;
+    if (d.timers[i] > 0) continue;
+    const gap = L.far + (L.near - L.far) * n;
+    // 间隔要抖：等间距的狗叫是节拍器，不是狗
+    d.timers[i] = gap * (0.65 + Rnd() * 0.7);
+    // 远的偏在一边（还没进院），近了压过来居中
+    const pan = (Rnd() * 2 - 1) * (0.85 - 0.6 * n);
+    Cue(state, L.name, {
+      gain: L.gFar + (L.gNear - L.gFar) * n,
+      rate: L.rFar + (L.rNear - L.rFar) * n,
+      pan,
+    });
+  }
+}
+
 function StepCinematic(state, input, dt) {
   const lines = state.beatLines;
   const line = lines[state.beat.lineIndex];
@@ -7637,6 +7748,16 @@ export function StepGame(state, input, dt) {
   state.ptrWasHeld = !!input.pointerHeld;
   state.slingTicked = false;   // 拟物投掷每帧只步进一次（链内代管则链外让位）
   if (state.toast && (state.toast.t -= dt) <= 0) state.toast = null;
+  // 院外那团动静：挂在 state 上、跨拍连着走（序的三拍是一段连续的声音）
+  StepDin(state, dt);
+  // 过场里自己开合的窖盖（娘掀翻板那一下）。爬梯时这块板由 MovePlayer 逐帧
+  // 改写，不走这儿——这儿只认剧本立起来的那种带 to 的：一句 on() 立上去，
+  // 剩下的自己转过去，过场不用逐帧脚本
+  if (state.lid && state.lid.to !== undefined && !state.player.climbDur) {
+    const l = state.lid;
+    const s = (l.rate || 2.2) * dt;
+    l.open = l.open < l.to ? Math.min(l.to, l.open + s) : Math.max(l.to, l.open - s);
+  }
   // 动词姿势到时收回（过场里由脚本设的 pose 没有 poseT，不受影响）
   if (state.player.poseT !== undefined && (state.player.poseT -= dt) <= 0) {
     state.player.pose = null;
