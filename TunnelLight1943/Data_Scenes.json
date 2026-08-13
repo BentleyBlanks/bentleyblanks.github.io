@@ -143,6 +143,7 @@
           "kind": "mendedJacket",
           "x": 31.95,
           "showFlag": "mended",
+          "hideFlag": "jacketOn",
           "name": "枕头边的小褂子",
           "note": "缝·改的收梢：袖口接了一截蓝底白花的小褂子，天亮前放在妹妹枕头边（枕头在朝东那头——睡姿躺倒后头落在朝向反侧，mended 立旗才现）"
         },
@@ -188,6 +189,21 @@
           "note": "开场第一眼：灶是冷的。摆屋里西墙根（interior 区），与窖口(29)、木凳(32)错开"
         },
         {
+          "id": "grainUrn",
+          "kind": "vat",
+          "x": 26.7,
+          "name": "粮瓮",
+          "note": "八稿冷灶新镜：掀开，瓮底只剩薄薄一层糜子。陶瓮借腌菜缸那支笔（filled 只认 yardVat，这只永远是干的）"
+        },
+        {
+          "id": "coopHome",
+          "kind": "henCoop",
+          "x": 36.6,
+          "tipped": true,
+          "name": "倒了的鸡笼",
+          "note": "八稿冷灶新镜：鸡笼倒在墙边，里面是空的（tipped 由 World 撂倒）"
+        },
+        {
           "id": "cellarMouth",
           "kind": "hatch",
           "x": 29.0,
@@ -230,25 +246,24 @@
           "level": "under",
           "showFlag": "manGrab",
           "name": "草堆底下伸出来的手",
-          "note": "抓住手腕那一镜的静帧：manGrab 立起才现（c1_cellar 抓腕效果落旗），c1_rescue 第一行收走（换成真演员躺着）"
+          "note": "抓住手腕那一镜的静帧：manGrab 立起才现（c1_cellar 抓腕效果落旗），c1_rescue 的 onStart 收走（换成真演员躺着）"
+        },
+        {
+          "id": "wholeClothRest",
+          "kind": "wholeClothRest",
+          "x": 27.95,
+          "level": "under",
+          "showFlag": "manFound",
+          "name": "草苫旁的整布",
+          "note": "八稿 §9 末：整块蓝布留在草苫旁；§12 撕布之后（clothTorn）重烘成撕剩的半块（propRedraw）"
         },
         {
           "id": "cellarSundries",
           "kind": "cellarSundries",
           "x": 33.3,
           "level": "under",
-          "hideFlag": "cellarTidy",
           "name": "散着的家什",
-          "note": "破笸箩歪着、豁口碗一只倒扣、纺锭拖着线头——摸黑归置前的样子（三下手做完由 cellarTidy 换成摆正的那份）"
-        },
-        {
-          "id": "cellarSundriesTidy",
-          "kind": "cellarSundriesTidy",
-          "x": 33.3,
-          "level": "under",
-          "showFlag": "cellarTidy",
-          "name": "归置好的家什",
-          "note": "笸箩靠墙摆正、碗摞成摞、纺锭线绕紧搁在碗旁——玩家亲手归置出来的样子"
+          "note": "破笸箩歪着、豁口碗一只倒扣、纺锭拖着线头——八稿删了摸黑归置，它们就这么散着（家里那三天就是这样）"
         },
         {
           "id": "sewBasket",
@@ -348,6 +363,31 @@
           "note": "第二块。两处坐标必须与 c1_dig 的 brace zones 一致——支在哪儿，画面上就得在哪儿多一根顶木"
         },
         {
+          "id": "elmRoadA",
+          "kind": "tree",
+          "x": 47.9,
+          "stripped": true,
+          "bare": true,
+          "name": "路边的秃榆",
+          "note": "八稿 §5：去井台的路上那两棵——树皮被一圈圈刮掉，只剩发白的树干。她没有停"
+        },
+        {
+          "id": "elmRoadB",
+          "kind": "tree",
+          "x": 52.4,
+          "stripped": true,
+          "bare": true,
+          "name": "路边的秃榆"
+        },
+        {
+          "id": "ridgeWell",
+          "kind": "ridge",
+          "x": 54.8,
+          "w": 2.0,
+          "name": "田埂",
+          "note": "八稿 §5：妹妹蹲下挖苦菜的那道田埂（去井台路边）"
+        },
+        {
           "id": "qishuVat",
           "kind": "vat",
           "x": 49.4,
@@ -373,18 +413,10 @@
           "id": "wellElm",
           "kind": "tree",
           "x": 56.3,
-          "name": "井边的榆树",
-          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_elm 的 throwHit 指着它）",
-          "stripped": true
-        },
-        {
-          "id": "elmCoat",
-          "kind": "spreadCoat",
-          "x": 55.9,
-          "showFlag": "coatSpread",
-          "hideFlag": "elmBagged",
-          "name": "铺在树下的破褂子",
-          "note": "打榆钱那场（c1_elm）柱子脱下来接榆钱的褂子：铺开出现、兜成包袱就收走；砸下第二把后布面铺一层绿（propRedraw 看 flags.elmDown）"
+          "name": "井边的秃榆",
+          "note": "八稿删了打榆钱：这棵也秃了——村里的榆树一棵不剩（树皮也被刮了）",
+          "stripped": true,
+          "bare": true
         },
         {
           "id": "well",
@@ -563,7 +595,7 @@
           "stripped": true,
           "bare": true,
           "name": "场院边的秃榆",
-          "note": "第七稿 5b：回来的路上第一棵——秃的，一片叶子也没有，下半截树皮被人一圈一圈刮走了，露着白茬。她头都没抬"
+          "note": "村东的荒相：秃的，一片叶子也没有，下半截树皮被人一圈一圈刮走了（八稿的路过戏挪去了西路那两棵）"
         },
         {
           "id": "elmBareB",
@@ -572,7 +604,7 @@
           "stripped": true,
           "bare": true,
           "name": "又一棵秃榆",
-          "note": "第七稿 5b：又路过一棵。也秃着。她也没停"
+          "note": "村东又一棵。也秃着"
         },
         {
           "id": "hangLantern",

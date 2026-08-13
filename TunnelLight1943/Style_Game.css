@@ -393,6 +393,18 @@ body.touchDevice #touchControls.gone { display: none; }
 #chapterCard span { margin-top: 34px; font-size: 13px; letter-spacing: 0.3em; color: var(--lamp); animation: blink 1.8s infinite; }
 @keyframes blink { 50% { opacity: 0.25; } }
 
+/* 戏里的章名字样（state.titleCard）：黑场上浮出来的一行字，不挡任何操作 */
+#sceneTitle {
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; text-align: center;
+  opacity: 0; transition: opacity 0.55s ease;
+}
+#sceneTitle.show { opacity: 1; }
+#sceneTitle small { font-size: 14px; letter-spacing: 0.5em; color: var(--dim); }
+#sceneTitle small:empty { display: none; }
+#sceneTitle h2 { font-size: 38px; letter-spacing: 0.26em; color: var(--paper); font-weight: 600; text-shadow: 0 0 22px rgba(0,0,0,0.9); }
+
 /* 抉择 */
 #choiceOverlay {
   position: absolute; inset: 0;

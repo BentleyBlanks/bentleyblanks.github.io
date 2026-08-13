@@ -4,7 +4,8 @@ import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
-  KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
+  KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
 import { DrawRelic } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
@@ -92,6 +93,7 @@ for (const id of [
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
+  "sceneTitle", "sceneTitleNum", "sceneTitleText",
   "choiceOverlay", "choicePrompt", "choiceList",
   "endScreen", "endRestart", "touchControls", "rotateHint", "btnSound",
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
@@ -510,6 +512,8 @@ function UpdateCamera(state, dt) {
           : playing && state.foldCard ? { kind: "fold", view: state.foldCard, layout: FOLD_CARD }
             : playing && state.wrapCard ? { kind: "wrap", view: state.wrapCard, layout: WRAP_CARD }
             : playing && state.splitCard ? { kind: "split", view: state.splitCard, layout: SPLIT_CARD }
+            : playing && state.tearCard ? { kind: "tear", view: state.tearCard, layout: TEAR_CARD }
+            : playing && state.sewCard ? { kind: "sew", view: state.sewCard, layout: SEW_CARD }
             : null,
     dt,
   );
@@ -825,6 +829,21 @@ function SyncHud(state, dt, shotFade) {
 
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
     ? Math.min(0.85, state.detection.level) : 0;
+
+  // 戏里的章名字样（八稿：序末的「第一章 · 蓝底白花」、章末的「第一章结束」）
+  // ——不是章节卡，不挡操作；淡入淡出交给 CSS 的过渡
+  if (state.titleCard) {
+    ui.sceneTitle.hidden = false;
+    ui.sceneTitleNum.textContent = state.titleCard.num || "";
+    ui.sceneTitleText.textContent = state.titleCard.title || "";
+    const tc = state.titleCard;
+    const fadeIn = tc.t > 0.05;
+    const fadeOut = tc.t > (tc.dur || 3.2) - 0.6;
+    ui.sceneTitle.classList.toggle("show", fadeIn && !fadeOut);
+  } else if (!ui.sceneTitle.hidden) {
+    ui.sceneTitle.classList.remove("show");
+    ui.sceneTitle.hidden = true;
+  }
 
   const demoEnd = DemoEnd(state);
   if (!demoEnd && (state.phase === "chapterCard" || state.phase === "chapterEnd")) {
