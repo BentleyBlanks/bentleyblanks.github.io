@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "title": "《地道里的光》过场分镜",
+    "source": "线上可玩前两章 + 代码全八章 cinematic；Notion 第八稿口径（MCP 未登录）",
+    "style": "handmade paper-cut / parchment grain / 2D side-scroll",
+    "prologue": "../StoryboardPrologue/"
+  },
+  "chapters": [
+    {
+      "id": "c1",
+      "title": "第一章 · 蓝底白花",
+      "subtitle": "序之后的过场（c1_open 起）",
+      "shots": [
+        {"id":"01","file":"Texture_C1Open01_ColdStove.jpg","beat":"c1_open","dur":"4.0s","cam":"insert","picture":"灶是冷的。柱子蹲在灶前，摸了一把锅底——干的。","line":""},
+        {"id":"02","file":"Texture_C1Open02_GrainUrn.jpg","beat":"c1_open","dur":"3.8s","cam":"insert","picture":"他掀开粮瓮。瓮底只剩薄薄一层糜子。","line":""},
+        {"id":"03","file":"Texture_C1Open07_WaterVat.jpg","beat":"c1_open","dur":"5.6s","cam":"insert","picture":"水缸见了底。瓢探下去刮着缸底，提上来小半瓢。","line":""},
+        {"id":"04","file":"Texture_C1Open03_CollapsedShed.jpg","beat":"c1_open","dur":"5.6s","cam":"shot","picture":"牲口棚塌了半边。橛子还在，缰绳没有断口——是解走的。","line":""},
+        {"id":"05","file":"Texture_C1Open04_EmptyCoop.jpg","beat":"c1_open","dur":"3.0s","cam":"insert","picture":"鸡笼倒在墙边。里面是空的。","line":""},
+        {"id":"06","file":"Texture_C1Open05_ShortSleeve.jpg","beat":"c1_open","dur":"3.8s","cam":"insert","picture":"妹妹蜷在炕上。去年的褂子短了一截，袖口遮不住手腕。","line":""},
+        {"id":"07","file":"Texture_C1Open06_ThirdDay.jpg","beat":"c1_open","dur":"3.2s","cam":"insert","picture":"第三天。还是没人来叫。","line":"旁白：「第三天。还是没人来叫。」"},
+        {"id":"08","file":"Texture_C1Count01_ThreeMarks.jpg","beat":"c1_count","dur":"3.0+4.1s","cam":"insert","picture":"妹妹吹掉石粉，一道一道点门框上的正字。","line":"妹妹：「一。」「二。」「三。」"},
+        {"id":"09","file":"Texture_C1Count02_WhenReturn.jpg","beat":"c1_count","dur":"2.8+2.4s","cam":"insert → close","picture":"她回头看柱子。柱子没有回答。只剩风吹窗纸。","line":"妹妹：「他们啥时候回来？」"},
+        {"id":"10","file":"Texture_C1Uncle01_AfterBell.jpg","beat":"c1_uncle","dur":"3.4+5.4s","cam":"shot","picture":"链条声远去。水还在。七叔扶墙站起来——他也蹲着的。","line":""},
+        {"id":"11","file":"Texture_C1Uncle02_BlackBeans.jpg","beat":"c1_uncle","dur":"4.8+3.2s","cam":"shot → insert","picture":"七叔往柱子怀里塞一把黑豆。柱子往回推，七叔按住他的手。","line":"七叔：「晚上过来吃。」"},
+        {"id":"12","file":"Texture_C1Uncle03_ISaidSo.jpg","beat":"c1_uncle","dur":"2.2+1.4+2.2s","cam":"insert","picture":"七叔再次按住他的手，把那笔债说成是真的。","line":"七叔：「我说有。」「就有。」"},
+        {"id":"13","file":"Texture_C1Knows01_SisterWaiting.jpg","beat":"c1_knows","dur":"3.6+3.2s","cam":"shot → insert","picture":"柱子爬出菜窖，没有盖翻板。三步外站着赤脚的妹妹。","line":"妹妹：「我当你也走了。」"},
+        {"id":"14","file":"Texture_C1Mend01_DawnWounded.jpg","beat":"c1_mend","dur":"4.6+4.2s","cam":"shot → insert","picture":"板缝里的光从黑变成青灰。伤员肩上仍扎着蓝花布。","line":""},
+        {"id":"15","file":"Texture_C1Mend02_LadderSew.jpg","beat":"c1_mend","dur":"3.6s","cam":"shot","picture":"柱子坐在最上一级梯子上，拿着妹妹的旧褂和针线。","line":""},
+        {"id":"16","file":"Texture_C1Home01_BlueCuff.jpg","beat":"c1_home","dur":"3.8+2.2s","cam":"insert","picture":"蓝花袖口滑下来，盖住她的手腕。妹妹睁开眼。","line":"妹妹：「哥？」"},
+        {"id":"17","file":"Texture_C1End02_DoorGap.jpg","beat":"c1_end","dur":"4.4+4.2s","cam":"shot","picture":"从没有关严的屋门，看见柱子走到菜窖旁，翻板只留半尺缝。","line":""},
+        {"id":"18","file":"Texture_C1End01_TwoLevels.jpg","beat":"c1_end","dur":"3.4+3.6+4.4s","cam":"insert 剖面","picture":"地上妹妹的手腕、地下伤员肩上，同一块蓝花布。门和翻板都留着缝。","line":"章名卡：「第一章结束」"}
+      ]
+    },
+    {
+      "id": "c2",
+      "title": "第二章 · 地洞里的眼睛",
+      "subtitle": "线上可玩 · 梳篦扫荡",
+      "shots": [
+        {"id":"01","file":"Texture_C2Open01_CrowsRaid.jpg","beat":"c2_open","dur":"3.2+5.0s","cam":"shot","picture":"谷雨过了。村东头乌鸦全飞起来。鬼子梳篦式进村。","line":"七叔：「柱子！开窖口！」"},
+        {"id":"02","file":"Texture_C2Worse01_CellarCough.jpg","beat":"c2_worse","dur":"4.4+3.0s","cam":"insert","picture":"田大爷把咳压在嗓子眼里。刘嫂把水葫芦倒过来——空的。","line":""},
+        {"id":"03","file":"Texture_C2Endure01_ClothBite.jpg","beat":"c2_endure","dur":"3.0+4.0s","cam":"insert","picture":"柱子把布巾叠成三折递过去。田大爷咬住。妹妹把脸埋进怀里。","line":""},
+        {"id":"04","file":"Texture_C2Found01_HatchPry.jpg","beat":"c2_found","dur":"3.0+3.8+4.6s","cam":"insert 仰看","picture":"头顶脚步停在屋当间。枪托砸到窖口是空的。有东西顺着盖板缝别进来。","line":"七叔：「……要开了。」"},
+        {"id":"05","file":"Texture_C2Found02_LooseSoil.jpg","beat":"c2_found","dur":"3.8s","cam":"insert","picture":"柱子退到窖底最里头。脚跟碾着的那块土——是松的。","line":""},
+        {"id":"06","file":"Texture_C2Out01_WoodshedLight.jpg","beat":"c2_out","dur":"3.6+4.0s","cam":"shot","picture":"从七叔家柴房旧窖口爬上来。田大爷靠着柴垛咳出了声。","line":"七叔：「光躲不行。得想办法打。」"},
+        {"id":"07","file":"Texture_C2End01_EyeInEarth.jpg","beat":"c2_end","dur":"2.2+3.8+3.2s","cam":"shot → dark","picture":"柴房底下那个黑黢黢的洞口，像一只睁开的眼睛。不是坟墓。","line":"旁白：「是个起点。」"}
+      ]
+    },
+    {
+      "id": "c3",
+      "title": "第三章 · 半袋烟的工夫",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C3Open01_WatchFort.jpg","beat":"c3_open","dur":"3.4+3.8+3.2s","cam":"wide → shot","picture":"被抓的人关进河东据点。柱子沿着车辙摸到庄稼地。他先学会了看。","line":""},
+        {"id":"02","file":"Texture_C3Rescue01_DitchPull.jpg","beat":"c3_rescue","dur":"3.6+3.6s","cam":"close → shot","picture":"身后一只手把柱子按进田埂下面。巡逻队从田埂上过去。","line":"高传宝：「梁家村的柱子？」"},
+        {"id":"03","file":"Texture_C3Rescue02_Messenger.jpg","beat":"c3_rescue","dur":"4.0+4.2s","cam":"ots","picture":"满身泥的交通员摸进沟来，鞋底磨穿了。","line":"交通员：「柱子的妹妹，也在里面。」"}
+      ]
+    },
+    {
+      "id": "c4",
+      "title": "第四章 · 最后一盏灯",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C4Open01_TunnelVillage.jpg","beat":"c4_open","dur":"3.6+4.4s","cam":"wide 剖面","picture":"沙河庄的地道通向的是：藏得住人，转移得走，活得下去。","line":"高传宝：「想救人，先学会怎么把人藏好。」"},
+        {"id":"02","file":"Texture_C4Smoke01_EastSmoke.jpg","beat":"c4_smokeStart","dur":"3.2+3.4s","cam":"shot","picture":"头顶闷响，泥土往下掉。一股烟顺着东口灌进来。","line":"民兵：「鬼子发现东口了！」"},
+        {"id":"03","file":"Texture_C4Flood01_WaterIn.jpg","beat":"c4_floodStart","dur":"3.2+4.2s","cam":"wide","picture":"第二天水泵来了。浑浊的泥水顺着东口灌下来，先淹最低的一段。","line":""},
+        {"id":"04","file":"Texture_C4Loss01_CountTwice.jpg","beat":"c4_loss","dur":"3.8+4.2s","cam":"shot","picture":"西口外乡亲趴在田里咳嗽。人数了两遍。顺子没出来，拴柱大爷也没有。","line":"高传宝：「准备下一次行动。」"}
+      ]
+    },
+    {
+      "id": "c5",
+      "title": "第五章 · 东口的铃",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C5Open01_ThreeMarks.jpg","beat":"c5_open","dur":"4.0+3.6s","cam":"shot","picture":"东口封死了。门板上三个记号：翻口、新暗口、预警铃。柱子的墨斗和刨子成了地道家伙什。","line":""},
+        {"id":"02","file":"Texture_C5Alarm01_Again.jpg","beat":"c5_alarm","dur":"3.8s","cam":"shot 剖面","picture":"没过几天，又来了。还是老一套：堵口，灌烟。","line":""},
+        {"id":"03","file":"Texture_C5Test01_SmokeBend.jpg","beat":"c5_test","dur":"4.0+4.2s","cam":"shot","picture":"烟堵在弯里一夜没退。地面上什么也看不出来。一个年轻民兵被土石压住了腿。","line":""},
+        {"id":"04","file":"Texture_C5Gun01_PushAway.jpg","beat":"c5_gun","dur":"3.6+4.2s","cam":"insert","picture":"那只手从土里伸出来，把柱子推开，把手里的枪递出去。","line":"年轻民兵：「带乡亲们走。」"}
+      ]
+    },
+    {
+      "id": "c6",
+      "title": "第六章 · 没套的骡车",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C6Open01_ExtraGuards.jpg","beat":"c6_open","dur":"3.4+4.8s","cam":"wide","picture":"押送定在后天。据点里外都加了岗。地面打出动静，地下把人接走。","line":""},
+        {"id":"02","file":"Texture_C6Brief01_DoorMap.jpg","beat":"c6_brief","dur":"4.0+4.2s","cam":"shot","picture":"高传宝在门板上把日子和那辆骡车圈到一起。柱子说不上来。","line":"高传宝：「套是套。人，也是真的人。」"},
+        {"id":"03","file":"Texture_C6Eve01_IWillGo.jpg","beat":"c6_eve","dur":"3.6+2.4s","cam":"shot → ots","picture":"行动前夜。油灯把门板图照得发黄。柱子指着据点的方向。","line":"柱子：「我去。」"}
+      ]
+    },
+    {
+      "id": "c7",
+      "title": "第七章 · 地道里的光",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C7Open01_DarkMarch.jpg","beat":"c7_open","dur":"3.2+3.6s","cam":"shot","picture":"二更天，地道里一盏灯也没点。队伍在黑暗里贴着墙根移动。","line":""},
+        {"id":"02","file":"Texture_C7Sister01_Forehead.jpg","beat":"c7_sister","dur":"4.0+5.0s","cam":"ots","picture":"地沿木板顶开一条缝。柱子看见妹妹。她问娘，慢慢把额头抵在他肩上。","line":"妹妹：「哥，娘呢？」"},
+        {"id":"03","file":"Texture_C7Turn01_LookBack.jpg","beat":"c7_turn","dur":"3.2+4.0s","cam":"shot","picture":"入口上面就是庄稼地，就是活路。东边旁洞里还有乡亲。","line":"民兵：「还有人没出来！」"},
+        {"id":"04","file":"Texture_C7Done01_BlowLamp.jpg","beat":"c7_done","dur":"4.2+2.6s","cam":"insert → close","picture":"人数了三遍，一个不少。柱子坐在田埂上，把烧到头的灯吹灭。","line":"旁白：「天亮了。」"}
+      ]
+    },
+    {
+      "id": "c8",
+      "title": "第八章 · 第二道刻痕",
+      "subtitle": "代码在、线上未开",
+      "shots": [
+        {"id":"01","file":"Texture_C8Open01_MonthLater.jpg","beat":"c8_open","dur":"2.6+3.4s","cam":"dark → wide","picture":"一个月后。柱子带着妹妹，回了一趟梁家村。","line":"旁白：「一个月后。」"},
+        {"id":"02","file":"Texture_C8Wall01_Doorframe.jpg","beat":"c8_wall","dur":"3.6+4.0s","cam":"shot","picture":"院子烧毁了。只剩一堵残墙。门框还在。妹妹伸手摸爹刻的那道线。","line":""},
+        {"id":"03","file":"Texture_C8Call01_SecondMark.jpg","beat":"c8_call","dur":"3.0+3.8s","cam":"shot","picture":"第二道刻痕刻下。妹妹抱着爹留下的旧木凳，点了点头。","line":"民兵：「柱子，地道那边还缺人。」"},
+        {"id":"04","file":"Texture_C8End01_WalkOut.jpg","beat":"c8_end","dur":"3.0+6.2s","cam":"shot","picture":"柱子走出院子。门框上的两道刻痕，留在了身后。","line":""}
+      ]
+    }
+  ]
+}
