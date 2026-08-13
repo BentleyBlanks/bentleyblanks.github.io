@@ -705,7 +705,8 @@ function SyncHud(state, dt, shotFade) {
   const slit = inCinematic && state.camHint?.slit;
   if (ui.slitMatte) ui.slitMatte.classList.toggle("active", !!slit);
 
-  // 序章可跳过：只在 c1_prologue 这一段亮出跳过键
+  // 声明了 prologue 的整段可跳过（2026-08-13 视频序章删掉后暂时没有这样的拍，
+  // 钮就一直不亮——机制留着，再加不可玩的长段落时写 `prologue: true` 即可）
   if (ui.btnSkipCine) ui.btnSkipCine.hidden = !(def?.prologue && state.phase === "playing");
 
   if (hasCaption) {
@@ -1160,11 +1161,14 @@ function OpenBag(open) {
     clearTimeout(bagPeekTimer);
     RebuildBagStrip();
     ui.bagPanel.hidden = false;
+    // open ≠ show：show 是"滑进来了"（探头也会加），open 是"玩家真打开了"。
+    // 只有 open 那一档才接管触摸——探头期间世界还在跑，纸带不许截拇指
+    ui.bagPanel.classList.add("open");
     requestAnimationFrame(() => ui.bagPanel.classList.add("show"));
     if (bagSelected) SelectBagSlot(bagSelected);
     if (state) state.bagOpen = true;      // 世界冻结（Core 的闸）
   } else {
-    ui.bagPanel.classList.remove("show");
+    ui.bagPanel.classList.remove("show", "open");
     ui.bagPanel.hidden = true;
     ui.bagNote.hidden = true;
     if (state) state.bagOpen = false;
@@ -1181,7 +1185,7 @@ function PeekBag(freshId) {
   clearTimeout(bagPeekTimer);
   bagPeekTimer = setTimeout(() => {
     if (state?.bagOpen) return;          // 其间被玩家点开了就别收
-    ui.bagPanel.classList.remove("show");
+    ui.bagPanel.classList.remove("show", "open");
     ui.bagPanel.hidden = true;
   }, 3200);
 }

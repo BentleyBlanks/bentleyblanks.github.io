@@ -311,6 +311,89 @@ if (beamCheck.missing) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 拇指落点上不许压着别的东西（横屏手机）
+//
+// 2026-08-13 用户报的「移动端的按钮触发位置好像有点偏移了」。DOM 按钮的画与
+// 点是同一个盒子，不可能真的错位——「偏移」只有一个来源：**被别的元素盖住了
+// 一半**，剩下那弯月牙还能按，于是读起来就是触发点挪了地方。
+// 当时的真凶是包袱条：右缘一条竖纸带，76vh 高，在 375~430 的画高里必然长到
+// 拇指那一排上去，实测盖掉互动钮 52% 的面积；而它拾取时会自己滑出来探头
+// 3.2 秒，那会儿世界没冻结，玩家正要按互动。
+// 这条按圆形按钮的**有效面积**逐点验：正常玩法、包袱探头、包袱打开三种状态下，
+// 摇杆与两颗钮都必须一格不缺。设置面板不在此列——那是玩家自己打开的模态面板，
+// 点面板外面本来就是关掉它。
+const TOUCH_SIZES = [
+  { name: "iPhoneSE 横屏", w: 667, h: 375 },
+  { name: "iPhone14 横屏", w: 844, h: 390 },
+  { name: "iPhone15PM 横屏", w: 932, h: 430 },
+];
+for (const size of TOUCH_SIZES) {
+  const mob = await browser.newPage({
+    viewport: { width: size.w, height: size.h },
+    deviceScaleFactor: 3, isMobile: true, hasTouch: true,
+  });
+  await mob.goto(`http://127.0.0.1:${port}/TunnelLight1943/?chapter=1&fast=1`, { waitUntil: "load", timeout: 60000 });
+  await mob.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+  await mob.evaluate(() => {
+    for (let i = 0; i < 400; i += 1) {
+      if (window.TunnelLight.state?.phase === "playing") break;
+      window.TunnelLight.StepFrames(1, { advance: true });
+    }
+  });
+  const touch = await mob.evaluate(async () => {
+    // 圆形按钮：只数落在圆里的采样点，方角上的空白不算数
+    const Free = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return { id, bad: 1, total: 1, thief: "元素不存在" };
+      const b = el.getBoundingClientRect();
+      let bad = 0, total = 0, thief = null;
+      for (let iy = 0; iy < 5; iy += 1) {
+        for (let ix = 0; ix < 5; ix += 1) {
+          const x = b.left + b.width * (0.1 + 0.2 * ix);
+          const y = b.top + b.height * (0.1 + 0.2 * iy);
+          const dx = (x - b.left - b.width / 2) / (b.width / 2);
+          const dy = (y - b.top - b.height / 2) / (b.height / 2);
+          if (dx * dx + dy * dy > 1) continue;
+          total += 1;
+          const top = document.elementFromPoint(x, y);
+          if (top && (top === el || el.contains(top))) continue;
+          bad += 1;
+          let n = top;
+          while (n && !n.id && n.parentElement) n = n.parentElement;
+          thief = n?.id || top?.tagName || "?";
+        }
+      }
+      return { id, bad, total, thief };
+    };
+    const Sweep = () => ["stick", "btnAct", "btnCrouch"].map(Free).filter((r) => r.bad > 0);
+    const out = {};
+    out.玩法 = Sweep();
+    const bp = document.getElementById("bagPanel");
+    bp.hidden = false; bp.classList.add("show");        // 探头（只 show 不 open）
+    await new Promise((r) => setTimeout(r, 380));
+    out.包袱探头 = Sweep();
+    bp.classList.remove("show"); bp.hidden = true;
+    document.getElementById("btnBag").click();          // 真打开
+    await new Promise((r) => setTimeout(r, 380));
+    out.包袱打开 = Sweep();
+    return out;
+  });
+  await mob.close();
+  const blocked = Object.entries(touch).filter(([, v]) => v.length);
+  if (blocked.length) {
+    failed += 1;
+    for (const [phase, list] of blocked) {
+      for (const r of list) {
+        console.error(`✗ ${size.name} · ${phase}：${r.id} 有 ${r.bad}/${r.total} 的面积被 `
+          + `#${r.thief} 盖住——玩家按在钮上没反应，读起来就是"触发位置偏了"`);
+      }
+    }
+  } else {
+    console.log(`✓ ${size.name} 拇指控件三态无遮挡（摇杆 / 互动 / 蹲）`);
+  }
+}
+
 await browser.close();
 server.close();
 if (failed) {

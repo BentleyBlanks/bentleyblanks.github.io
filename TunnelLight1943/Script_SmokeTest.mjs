@@ -2693,7 +2693,7 @@ console.log("— 全流程自动通关（第六章走『地下进人』，第二
   // 自动驾驶会卡超时，但那个报错读不出是哪个动词坏了，这里点名盯住。
   // ——第一章（蓝底白花，第七稿）——
   assert.equal(state.flags.jarDug, true, "C1 刨灰堆必须刨出那个小口坛");
-  assert.equal(state.flags.seedKept, true, "C1 谷种必须看过一眼又原样扎回去（这一下是序章 8 镜的收口）");
+  assert.equal(state.flags.seedKept, true, "C1 谷种必须看过一眼又原样扎回去（饿着也不动留种，这一章最硬的一下）");
   assert.equal(state.flags.mealSplit, true, "C1 分食必须亲手掰过、又把长的那截搁回她碗里");
   assert.equal(state.flags.tallied, true, "C1 正字那一道必须真的画上（她自己的手，玩家抱着）");
   assert.equal(state.flags.soilFelt, true, "C1 地头那把土必须亲手攥过");
