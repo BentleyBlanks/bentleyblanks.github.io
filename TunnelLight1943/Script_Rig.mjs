@@ -1122,6 +1122,66 @@ export const TRACKS = {
       { t: 1.6, hipY: -0.03, hipX: -0.04, torso: -4, head: -24, armF: -58, foreF: -34, armB: -52, foreB: -32 },
     ],
   },
+  // ── §9 草苫底下那只手（2026-08-14 用户退回：「这个陌生人你完全没做出来」）──
+  // 老版这一镜是**一张贴在地上的静帧贴图**（strawArm 道具）加柱子站在一米外
+  // 举着胳膊：没有人、没有接触、没有动。两条轨道现在把它演出来。
+  //
+  // 躺着的人怎么写：World 见到 `sleep` 就把**整具骨架转 90°**（LIE_POSES），
+  // 所以这支轨道跟妹妹的睡姿一样，写的是"站着的时候是什么样"，转过去才是
+  // 躺着那个画面。两条换算记牢（伤员 heading -1，头落在东边、朝着柱子）：
+  //   · 站姿的「上」（头顶方向）→ 躺下之后的**东**（柱子那一侧）
+  //   · 站姿的「前」（面朝方向）→ 躺下之后的**上**（肚皮朝天）
+  // 要让手落在东 +0.40m、高 +0.25m 处（＝蹲着的柱子那只垂着的手），
+  // 就得在站姿里把胳膊举过头顶再往前偏 32°：armF ≈ −148°、前臂几乎伸直。
+  // 照"站着伸手去够"的手感写（armF −90 上下）的话，躺下来是直挺挺指着天。
+  strawReach: {
+    dur: 9.4, loop: false,
+    keys: [
+      // 蜷着（同 sleep：两手掖在下巴底下、膝盖朝上拱）
+      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 14, head: 14, armF: -14, foreF: -150, armB: -10, foreB: -148, thighB: -45, shinB: 111, footB: 0, thighF: -45, shinF: 111, footF: 0 },
+      // 胳膊从草底下探出来：0.16 秒——快，是抓住，不是伸手要东西
+      { t: 0.16, torso: 20, head: -4, armF: -148, foreF: -14 },
+      // 攥住。头跟着仰过去（躺着的人要看头顶那边的人，是**仰脖**不是收下巴）
+      { t: 0.42, torso: 24, head: -18, armF: -140, foreF: -26 },
+      // 攥着不放，往回带一点点（他没力气，能做的只有不松手）
+      { t: 0.95, torso: 22, head: -16, armF: -133, foreF: -34 },
+      // 剩下的六七秒是三行台词：只留很慢的起伏，下半身一个数不改
+      { t: 2.4, torso: 24, head: -19, armF: -136, foreF: -31 },
+      { t: 4.0, torso: 21, head: -15, armF: -131, foreF: -36 },
+      { t: 5.8, torso: 24, head: -18, armF: -135, foreF: -32 },
+      { t: 7.6, torso: 21, head: -14, armF: -130, foreF: -37 },
+      { t: 9.4, torso: 23, head: -17, armF: -134, foreF: -33 },
+    ],
+  },
+  // 手松开、落回草里（单次）：胳膊先软下来，才整条落回身侧，头也躺平
+  strawSink: {
+    dur: 2.0, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 23, head: -17, armF: -134, foreF: -33, armB: -10, foreB: -148, thighB: -45, shinB: 111, footB: 0, thighF: -45, shinF: 111, footF: 0 },
+      { t: 0.30, torso: 20, head: -12, armF: -118, foreF: -52 },   // 手先松（指头张开那一下由角度带出来）
+      { t: 0.90, torso: 17, head: 2, armF: -72, foreF: -96 },      // 整条胳膊落下去
+      { t: 2.0, torso: 14, head: 14, armF: -18, foreF: -142 },     // 躺回蜷着那一团
+    ],
+  },
+  // 蹲着被攥住手腕（单次，9 秒＝这一镜三行台词）。柱子蹲在草苫跟前、
+  // 朝西（heading −1），所以**被攥住的是前手**（armF）。
+  // 顺序是有讲究的：先是那条胳膊被拽沉（0.1 秒，只有胳膊动），人才跟着往前
+  // 伏一下，然后猛地往回抽——**没抽出来**，胳膊仍旧被扯在原处。
+  // 后半段只剩呼吸的起伏，两条腿一个数不改（蹲着的脚一动就是滑步）。
+  wristSeized: {
+    dur: 9.0, loop: false,
+    keys: [
+      { t: 0.0, hipY: -0.40, hipX: 0.04, torso: 22, head: 16, armF: -58, foreF: -46, armB: -34, foreB: -40, thighB: -78, shinB: 92, footB: 12, thighF: -70, shinF: 86, footF: 10 },
+      { t: 0.10, torso: 30, head: 24, armF: -86, foreF: -16 },                          // 手被攥住：先动的只有这条胳膊
+      { t: 0.32, hipY: -0.44, hipX: 0.16, torso: 40, head: 20, armB: -52, foreB: -30 }, // 整个人被带得往前伏
+      { t: 0.64, hipY: -0.41, hipX: -0.06, torso: 10, head: 12, armF: -78, foreF: -30, armB: -60, foreB: -24 },  // 猛地往回抽
+      { t: 1.05, hipY: -0.42, hipX: 0.02, torso: 18, head: 18, armF: -83, foreF: -21 }, // 没抽出来
+      { t: 2.6, torso: 20, head: 16, armF: -85, foreF: -19 },
+      { t: 4.4, torso: 17, head: 19, armF: -81, foreF: -23 },
+      { t: 6.2, torso: 20, head: 15, armF: -85, foreF: -19 },
+      { t: 9.0, torso: 18, head: 18, armF: -82, foreF: -22 },
+    ],
+  },
 };
 
 const TRACK_JOINTS = ["torso", "head", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "armF", "foreF"];

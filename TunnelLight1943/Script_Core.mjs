@@ -5651,6 +5651,14 @@ export const SCRIPTS = {
         state.stoveFire = false;   // 夜里灶熄了
         // 夜里窖口那几条月光（World 认这面旗；lidShut 的板缝光同一支画笔）
         state.hatchMoon = true;
+        // 跳幕落回这一拍时（manFound 已经立着）：草苫底下那个人得还在，
+        // 不然回头看一眼，说「水」的人凭空没了
+        const w = FindActor(state, "wounded");
+        if (w) {
+          const found = !!state.flags.manFound;
+          w.visible = found; w.level = "under"; w.x = 27.1; w.heading = -1;
+          w.pose = "sleep"; w.track = null;
+        }
       },
       steps: [
         // 下到底：板缝里漏下来几条光，打在土壁上。跟三天前一样——
@@ -5692,8 +5700,8 @@ export const SCRIPTS = {
             // 旗标落 effect；carry 是画面，只在微过场行里挂/收——落在 effect 里
             // 的话跳幕结算会把一块"整布"永远糊在手上（二轮视觉审查的悬空蓝板）
             state.flags.clothOut = true;
-            state.flags.manFound = true;
-            state.flags.manGrab = true;
+            // manFound / manGrab 落在各自那一格里（放下布 / 手攥住），不再一开头
+            // 就全立起来——旗标一立，画面上的东西就跟着现，早立就是穿帮
             Cue(state, "clothLift", { gain: 0.5, rate: 0.8 });
             StartMicroCine(state, [
               { stage: "草苫底下，露出一块对折的布。", d: 2.8,
@@ -5721,36 +5729,76 @@ export const SCRIPTS = {
                   FlashTrack(s, "pressFace", 3.6);
                   Cue(s, "sobBreath", { gain: 0.18, rate: 0.7, delay: 1.6 });
                 } },
-              // 抱着布走向梯子
-              { stage: "他将布抱在胸前，转身走向梯子。", d: 2.8,
-                cam: { kind: "shot", x: 28.6, y: UNDER_Y + 1.05, dist: 3.2 },
+              // 抱着布走向梯子——**只走一步**。老版走到 28.6（离草苫 1.3 米）
+              // 才被"抓住手腕"，可躺在地上的人肩膀离地才 0.3 米，胳膊伸直也够
+              // 不到那儿：画面上是一只趴在地上的手，和一米开外自己举着胳膊的
+              // 柱子，中间空着。接触戏那条定式（先站到一臂之内）在这一拍是硬的
+              { stage: "他将布抱在胸前，转身走向梯子。", d: 2.6,
+                cam: { kind: "shot", x: 28.3, y: UNDER_Y + 1.05, dist: 3.2 },
                 on: (s) => { s.player.cineWalk = { x: 28.6, speed: 1.0 }; } },
-              { stage: "草苫下面忽然动了一下。", d: 2.2,
-                cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.5, dist: 2.0 },
+              // 草苫先动。人还没露出来——这一格里草堆是自己抖的（state.matStir，
+              // World 把那一垛真晃 1.2 秒），光同时压到 tunnel 档：
+              // 「从黑暗里伸出来」得先有黑
+              { stage: "草苫下面忽然动了一下。", d: 2.4,
+                cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.4, dist: 1.8 },
                 on: (s) => {
                   s.player.cineWalk = null;
                   s.player.x = 28.6;
+                  s.player.heading = -1;         // 回过身，朝着草苫
+                  s.lightOverride = "tunnel";
+                  s.matStir = { t: 0 };
                   Cue(s, "flutter", { gain: 0.25, rate: 0.7 });
                 } },
-              // 一只手从黑暗里伸出来，抓住手腕。抓得很紧
-              { stage: "一只手从黑暗里伸出来，抓住柱子的手腕。柱子猛地停住。", d: 3.0,
-                cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 },
+              // 柱子蹲下去看——蹲下这一下不是修饰：躺着的人只能够到这么高。
+              // 站位是量出来的（World.LimbTipsOf）：伤员躺在 27.1、头落在 28.0、
+              // 探出来的手够到 28.10/离地 0.53；柱子蹲在 28.6 时前手正落在
+              // 28.10/离地 0.56——两只手在同一个点上，这一镜才是"攥住"
+              { stage: "柱子放下布，蹲下去。", d: 2.2,
+                cam: { kind: "shot", x: 28.3, y: UNDER_Y + 0.7, dist: 2.6 },
                 on: (s) => {
-                  s.player.track = { name: "heldBack", t: 0 };
+                  s.player.carry = null;
+                  // 整布这会儿才撂在草苫旁（wholeClothRest 认 manFound 这面旗）——
+                  // 老版在 effect 开头就立了它：布还抱在怀里，地上已经躺着一块
+                  s.flags.manFound = true;
+                  FlashPose(s, "kneel", 2.2);
+                  Cue(s, "clothDrop", { gain: 0.3, rate: 0.85, delay: 0.9 });
+                } },
+              // 一只手从黑暗里伸出来，抓住手腕：**伤员是真演员**（不再是地上
+              // 一张静帧贴图）。他从草苫底下把胳膊探出来攥住柱子的手腕，
+              // 柱子那条被攥住的胳膊被拽得往前一沉——两条轨道对在同一个落点上
+              { stage: "一只手从草苫底下伸出来，攥住柱子的手腕。柱子猛地僵住。", d: 3.2,
+                cam: { kind: "insert", x: 28.15, y: UNDER_Y + 0.5, dist: 1.7 },
+                on: (s) => {
+                  const w = FindActor(s, "wounded");
+                  if (w) {
+                    w.visible = true; w.level = "under"; w.x = 27.1; w.heading = -1;
+                    w.pose = "sleep";
+                    w.track = { name: "strawReach", t: -0.12 };   // 负数起步＝等柱子蹲稳
+                  }
+                  s.player.pose = null;
+                  s.player.track = { name: "wristSeized", t: 0 };
+                  s.flags.manGrab = true;
                   Cue(s, "pickup", { gain: 0.6, rate: 0.5 });
                 } },
-              { stage: "那只手抓得很紧。黑暗里传来一口短促的喘息。", d: 3.0,
-                cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 },
+              { stage: "那只手攥得很紧。草底下传来一口短促的喘息。", d: 3.0,
+                cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.45, dist: 1.6 },
                 on: (s) => { Cue(s, "sobBreath", { gain: 0.3, rate: 0.6, delay: 0.8 }); } },
+              // 说话的人得在画面里。骨架在窖底给不出一张脸（整具转 90°、
+              // 脑袋二十来个像素），所以这两行走手绘活卡——同"整幅蓝布"那一族
+              { stage: "草苫掀开一角。一张脸横在草里，仰着，胡子拉碴。", d: 3.2,
+                cam: { kind: "insertCard", card: "strangerFace", seg: 0 } },
               { who: "陌生人", say: "水。", d: 3.0,
-                cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.6, dist: 1.8 } },
-              // 慢慢抽回手。整块蓝布留在草苫旁
-              { stage: "柱子慢慢抽回手。整块蓝布留在草苫旁。", d: 3.4,
-                cam: { kind: "shot", x: 28.6, y: UNDER_Y + 1.0, dist: 3.0 },
+                cam: { kind: "insertCard", card: "strangerFace", seg: 1 } },
+              // 慢慢抽回手：他的胳膊落回草里（strawSink），柱子才站起来
+              { stage: "那只手松开，落回草里。柱子慢慢站起来。整块蓝布留在草苫旁。", d: 3.4,
+                cam: { kind: "shot", x: 28.4, y: UNDER_Y + 0.95, dist: 3.0 },
                 on: (s) => {
                   s.player.track = null;
                   s.player.carry = null;
-                  s.player.x = 28.9;
+                  s.player.x = 28.75;
+                  s.player.heading = 1;
+                  const w = FindActor(s, "wounded");
+                  if (w) w.track = { name: "strawSink", t: 0 };
                   Cue(s, "clothDrop", { gain: 0.35, rate: 0.8 });
                 } },
             ]);
@@ -8166,6 +8214,7 @@ export function StartChapter(state, index) {
   state.stoveFire = false;
   state.slatDust = null;
   state.vatScoop = null;
+  state.matStir = null;
   state.hatchMoon = false;
   state.beamSlant = 0;
   // 从章节菜单单独进某一章时，本章谜题的旗标要归零
@@ -8710,6 +8759,8 @@ export function StepGame(state, input, dt) {
   }
   // 舀水那一下的水线（渲染层照 t 演 1.6s）
   if (state.vatScoop && (state.vatScoop.t += dt) > 1.6) state.vatScoop = null;
+  // 草苫底下动的那一下（§9 陌生人现身之前；渲染层照 t 晃 1.2s）
+  if (state.matStir && (state.matStir.t += dt) > 1.2) state.matStir = null;
   for (const key of ["sparrowBurst", "henFlee", "mouseFlee", "vaultDust", "elmRain", "slatDust"]) {
     const fx = state[key];
     if (fx && (fx.t += dt) > 2.2) state[key] = null;
@@ -11256,6 +11307,7 @@ export function DebugJump(state, chapterIndex, beatIndex = 0) {
   state.titleCard = null;
   state.slatDust = null;
   state.vatScoop = null;
+  state.matStir = null;
   state.stoveFire = false;
   state.detection = { level: 0, spotter: null };
   // 结算过程里可能留下没走完的走位指令，别让它们接管玩家刚接手的这一幕。

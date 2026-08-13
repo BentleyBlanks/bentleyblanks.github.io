@@ -57,9 +57,9 @@ import("./Script_Audio.js")
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
 
-// 声音默认开着：旁白是这一版叙事的主体，关掉就少了一半。真正的"别吵到人"
-// 由浏览器兜底——AudioContext 在第一次手势之前一直是挂起的，静静躺着不出声，
-// 玩家点"从第一章开始"那一下才真正启动。不想听的按 M 或右上角关掉，记在本地。
+// **声音默认关着**（用户定的，2026-08-14 又被"默认开"回归过一次）：旁白/音效/
+// 配乐三路全在这一个开关底下，没点开之前一声不出。想听的按 M 或右上角打开，
+// 开关记在本地——所以只有第一次进来是静的。
 const SOUND_KEY = "tunnelLight1943.sound";
 // 三路音量各自记住。默认配乐低一些——它只是底噪，不该压住旁白。
 const VOL_KEY = "tunnelLight1943.vol";
@@ -75,7 +75,7 @@ function ApplyVolumes() {
   audio.SetSfxVolume(vol.sfx / 100);
   audio.SetMusicVolume(vol.music / 100);
 }
-let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
+let soundOn = localStorage.getItem(SOUND_KEY) === "on";
 audio.SetEnabled(soundOn);
 
 // iOS/Chrome 都要求音频在真实手势里启动，任何一次输入都拿来解锁
@@ -1522,8 +1522,20 @@ window.TunnelLight = {
   Freeze: (v = true) => { frozen = !!v; return frozen; },
   // 把游戏推到"第 line 句台词的第 at 秒"。实拍最常要的就是这个，别再拿 --dur
   // 一秒一秒地猜（猜出来的还随机器快慢漂）。返回真正落在哪儿。
+  // 微过场（chain 步骤 effect 里起的那种）同样认这把尺子：微过场在跑的时候
+  // 数的是 microCine.i，不是 beat.lineIndex——不然 @line= 打在窖里那段抓腕戏上
+  // 会一直空转到超时（2026-08-14）。
   SeekLine: (line, at = 0) => {
     if (!state) return null;
+    if (state.microCine) {
+      for (let i = 0; i < 20000 && state.microCine && (state.microCine.i ?? 0) < line; i += 1) {
+        StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+      }
+      for (let i = 0; i < Math.round(at * 30); i += 1) {
+        StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+      }
+      return { line: state.microCine?.i ?? null, lineT: state.microCine?.t ?? null, micro: true };
+    }
     for (let i = 0; i < 20000 && (state.beat?.lineIndex ?? 0) < line; i += 1) {
       StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
     }

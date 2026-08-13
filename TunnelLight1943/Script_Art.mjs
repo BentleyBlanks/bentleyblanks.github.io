@@ -3815,7 +3815,7 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
         const a1 = P(SH.x1 - 0.020, top + 0.112 + sy);
         const a2 = P(SH.x1 - 0.016, bodyB - 0.014 + sy);
         ctx.save();
-        ctx.strokeStyle = "rgba(6,5,4,0.7)";
+        ctx.strokeStyle = `rgba(6,5,4,${0.7 * dim})`;
         ctx.lineWidth = 2.8 * S;
         ctx.beginPath();
         ctx.moveTo(a0[0], a0[1]);
@@ -6426,8 +6426,14 @@ export function DrawStrawMat(ctx, x, groundY, id) {
 }
 
 /**
- * 从草堆底下伸出来的一条前臂和手（抓住手腕那一镜的静帧）。
- * 横着，约 30×14px。粗布袖子破着口，手指张开半攥；皮肤压得很暗——是夜里。
+ * 从草堆底下伸出来的一条前臂和手。
+ *
+ * **2026-08-14 退役**（用户：「这个陌生人你完全没做出来」）：这一镜原本靠这张
+ * 静帧顶着——一只贴在地上的手，离柱子一米远，不动、也没有主人。现在那只手
+ * 是真演员（wounded）的胳膊，走 Rig 的 `strawReach`/`strawSink` 两条轨道。
+ * 画笔留着不删：地上那只手将来还会有别的用处（缴械、拖走伤员），
+ * 尺寸与画法都是量过的。挂回去要三处一起补：Data_Scenes 的物体、
+ * Data_PropArt 的画笔与尺寸、World 那张 switch 的一行（漏了 switch 是静默不画）。
  */
 export function DrawStrawArm(ctx, x, groundY, id) {
   // 前臂：从西头（草堆那边）伸出来，微微离地
@@ -9973,6 +9979,235 @@ export function DrawWholeClothCard(ctx, W, H, seg, t) {
 }
 
 // ---------------------------------------------------------------------------
+// 夜窖·陌生人（c1 §9 末，两段）。2026-08-14 用户退回：「这个陌生人你完全没
+// 做出来啊？这就说 水 了？」——说话的人一直不在画面里。
+//
+// 骨架顶不住这一镜：躺着的人整具转了 90°、脑袋在 3.6 米的窖底只有二十来个
+// 像素，脸上什么都读不出来（同刨子/石笔那两条老账——手指按不着、眼睛认不出
+// 的东西，推镜头治不好，得换成铺满画框的手绘卡）。所以这一段跟"整幅蓝布"
+// 一样走活动插卡：
+//   seg 0  草苫掀开一角，一张仰着的脸横在草里——胡子拉碴、眼窝陷着、嘴唇干裂
+//   seg 1  同一张脸，嘴张开一条缝（「水。」那一声就是从这儿出来的）
+// 画法照 wholeCloth 那一族：整组画两遍，暗的一遍给形，再按板缝月光条裁着
+// 画亮的一遍——细节只活在光里。色全体压得极暗（看着像纯黑的源色才是对的）。
+// ---------------------------------------------------------------------------
+export function DrawStrangerFaceCard(ctx, W, H, seg, t) {
+  const S = H / 420;
+  // 呼吸：又快又浅（他失着血）。整张脸跟着轻轻起伏
+  const br = Math.sin(t * Math.PI * 2 * 0.55) * 2.0 * S;
+  // 嘴：seg 1 那一声「水」——张开一条缝又合上一点。不做"一张一合地说话"，
+  // 他没有那个力气；这一声是挤出来的
+  const mouth = seg === 1 ? 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 0.3) : 0.08;
+
+  // 底：窖的黑
+  const bg = ctx.createRadialGradient(W * 0.46, H * 0.44, H * 0.1, W * 0.5, H * 0.55, H * 1.0);
+  bg.addColorStop(0, "#0c0b0c");
+  bg.addColorStop(1, "#040404");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 他仰面躺着，所以这是一张**侧脸、脸朝上**的近景。
+  // 局部坐标：一个头长＝1.0，u 从后脑指向下巴，v 从脸里指向天。
+  // 三条教训写在这儿（都是画出来才看见的）：
+  //   ① **画布的 y 朝下，v 要取负号**——第一版漏了，整张脸倒着画：
+  //      鼻子朝下、脖子长在天上，读出来是一块石头；
+  //   ② 一张脸读不读得出来全在**外轮廓**：额、眉骨、鼻根的凹、鼻尖、人中、
+  //      上下唇、颏唇沟、下巴，这几个起伏必须长在轮廓线上；
+  //   ③ **起伏要真的凸出去**。第三版把这些点全排在"额→下巴"那条直线上，
+  //      每个只离线三五个像素——比 InkFill 的笔迹抖动还小，出来是一条毛边，
+  //      不是一张脸。所以现在整条脸的轮廓是**照一条脸线算出来的**：
+  //      沿线走 s，再沿法线推出 o（鼻尖 o=0.10 个头长，那才叫鼻子）。
+  const cx = W * 0.44, cy = H * 0.52 + br;
+  const A = 0.16;                                    // 头略仰、下巴朝右上
+  const K = 0.80 * H;                                // 一个头长占画框高的八成
+  const ca = Math.cos(A), sa = Math.sin(A);
+  const P = (u, v) => [cx + (u * ca - v * sa) * K, cy - (u * sa + v * ca) * K];
+
+  // 脸线：从额顶到下巴；n 是它的外法线（脸朝天的那一侧）
+  const F0 = [0.02, 0.33], FD = [0.40, -0.41], FN = [0.71, 0.70];
+  const FP = (s, o) => [F0[0] + FD[0] * s + FN[0] * o, F0[1] + FD[1] * s + FN[1] * o];
+  const Pf = (s, o) => { const [u, v] = FP(s, o); return P(u, v); };
+  // 脸线在画布上的方向（眼睛的长轴顺着它，嘴缝垂直于它）
+  const [ax0, ay0] = P(0, 0), [ax1, ay1] = P(FD[0], FD[1]);
+  const faceAng = Math.atan2(ay1 - ay0, ax1 - ax0);
+
+  const line = "rgba(3,3,4,0.92)";
+  const Head = (bright) => {
+    const skin = bright ? "#4a3620" : "#181209";
+    // 脖子与半个肩膀：脸不能是个飘着的头（从下颌角往左下出画）
+    InkFill(ctx, [
+      P(0.06, -0.19), P(-0.12, -0.17), P(-0.30, -0.52), P(-0.92, -0.58), P(-0.88, -0.10),
+    ], "sfNeck" + (bright ? 1 : 0), bright ? "#312516" : "#0f0b06",
+    { amp: 2.6 * S, lw: 3.2 * S, line, shade: "rgba(0,0,0,0.34)" });
+    // 头：脸的那一段照脸线算（s 沿线、o 出法线），后脑与下颌直接给点
+    InkFill(ctx, [
+      Pf(0.00, 0.000),                 // 额顶
+      Pf(0.30, 0.030), Pf(0.36, -0.020),   // 眉骨凸、鼻根凹
+      Pf(0.52, 0.100),                 // 鼻尖：整张脸最靠外的一点
+      Pf(0.56, 0.010), Pf(0.62, -0.020),   // 鼻底、人中
+      Pf(0.68, 0.030), Pf(0.72, 0.000), Pf(0.76, 0.030),   // 上唇、唇缝、下唇
+      Pf(0.84, -0.030), Pf(0.95, 0.040),   // 颏唇沟、下巴
+      Pf(1.00, -0.030),                // 下巴底
+      P(0.300, -0.170), P(0.100, -0.200), P(-0.100, -0.170),
+      P(-0.260, -0.130), P(-0.400, -0.080),
+      P(-0.400, 0.160), P(-0.220, 0.300),
+    ], "sfHead" + (bright ? 1 : 0), skin,
+    { amp: 2.2 * S, lw: bright ? 3.2 * S : 4.2 * S, line, shade: "rgba(0,0,0,0.30)" });
+    // 头发：结成绺的一片，压在颅顶与后脑（**不许盖过眉骨**——盖过去就没有
+    // 额头，剩下的轮廓读不出是张脸）。夜里它比皮肤还要暗两档
+    InkFill(ctx, [
+      P(-0.412, -0.060), P(-0.408, 0.164), P(-0.226, 0.306), P(0.020, 0.334),
+      P(0.000, 0.272), P(-0.180, 0.236), P(-0.330, 0.120), P(-0.352, -0.030),
+    ], "sfHair" + (bright ? 1 : 0), bright ? "#1d150c" : "#080605",
+    { amp: 2.6 * S, lw: 2.8 * S, line, shade: "rgba(0,0,0,0.34)" });
+
+    // 五官**两遍都画**，暗的一遍压淡：只在光条里画的话，眼睛和嘴全看运气——
+    // 光条压不到那一块，画面上就还是一个没有五官的头（第二版如此）
+    const dim = bright ? 1 : 0.45;
+    const Seg = (p0, p1, color, lw) => {
+      ctx.strokeStyle = color; ctx.lineWidth = lw * S;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
+    };
+    ctx.save();
+    // 眼窝：陷进去的一片暗，就在眉骨后头。脸本来就暗，"暗上加暗"看不见——
+    // 这只眼睛靠**那一点亮**读出来：一道月光落在半睁的眼白上
+    ctx.fillStyle = `rgba(4,3,3,${0.78 * dim})`;
+    const [ex, ey] = Pf(0.34, -0.070);
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, K * 0.090, K * 0.046, faceAng, 0, Math.PI * 2);
+    ctx.fill();
+    Seg(Pf(0.245, -0.040), Pf(0.330, -0.005), `rgba(6,5,4,${0.85 * dim})`, 4.0);   // 眉
+    Seg(Pf(0.300, -0.062), Pf(0.375, -0.038), `rgba(206,194,168,${0.78 * dim})`, 2.8);  // 睁开的那条缝
+    Seg(Pf(0.300, -0.092), Pf(0.380, -0.068), `rgba(5,4,3,${0.72 * dim})`, 2.6);   // 上睑的影
+    // 颧骨一道高光、底下一道凹：瘦得只剩骨头
+    Seg(Pf(0.45, -0.075), Pf(0.62, -0.115), `rgba(152,126,94,${0.44 * dim})`, 3.6);
+    Seg(Pf(0.52, -0.150), Pf(0.72, -0.180), `rgba(8,6,5,${0.42 * dim})`, 4.6);
+    // 耳朵：一小圈，在下颌的转角后头（别摆到腮帮子当中去）
+    ctx.strokeStyle = `rgba(118,94,68,${0.55 * dim})`;
+    ctx.lineWidth = 2.2 * S;
+    const [erx, ery] = P(-0.170, 0.010);
+    ctx.beginPath();
+    ctx.ellipse(erx, ery, K * 0.062, K * 0.042, -A + 0.4, -0.5, Math.PI * 1.4);
+    ctx.stroke();
+    ctx.restore();
+
+    // 嘴：张开的那条缝。缝**垂直于脸线**（在侧脸上，嘴是往脸里去的一道口）
+    const [mx, my] = Pf(0.72, -0.018);
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(faceAng + Math.PI / 2);
+    // 别画大：嘴张开也就一条缝。第一版给到 0.085 个头长，读出来是鱼嘴
+    const mw = K * 0.050, mh = K * (0.005 + 0.022 * mouth);
+    ctx.fillStyle = `rgba(5,3,3,${0.92 * dim})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, mw, mh, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(138,102,76,${0.62 * dim})`;
+    ctx.lineWidth = 2.2 * S;
+    for (const sd of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(-mw, sd * mh * 0.3);
+      ctx.quadraticCurveTo(0, sd * (mh + 3.0 * S), mw, sd * mh * 0.3);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = `rgba(76,46,34,${0.62 * dim})`;   // 唇上的裂口
+    ctx.lineWidth = 1.4 * S;
+    for (let i = 0; i < 3; i += 1) {
+      const ux = -mw * 0.5 + i * mw * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(ux, -mh - 3.0 * S);
+      ctx.lineTo(ux + 1.0 * S, -mh + 0.5 * S);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 胡子拉碴：下颌那一片碎点（十来天没刮，不是一撮胡子）
+    ctx.save();
+    ctx.fillStyle = `rgba(20,15,10,${0.6 * dim})`;
+    for (let i = 0; i < 70; i += 1) {
+      const s2 = 0.55 + Hash("sfStubS" + i) * 0.48;
+      const o2 = -0.20 + Hash("sfStubO" + i) * 0.20;
+      const [sx, sy] = Pf(s2, o2);
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 1.7 * S, 1.3 * S, faceAng, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 太阳穴那道干了的血：从发际淌到眉骨，暗得几乎看不出是红的
+    ctx.save();
+    ctx.strokeStyle = `rgba(62,26,20,${0.75 * dim})`;
+    ctx.lineWidth = 3.4 * S;
+    const b0 = Pf(0.05, 0.010), b1 = Pf(0.16, -0.020), b2 = Pf(0.26, 0.005);
+    ctx.beginPath();
+    ctx.moveTo(b0[0], b0[1]);
+    ctx.quadraticCurveTo(b1[0], b1[1], b2[0], b2[1]);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // 草：他还在草苫底下——短短的几根横在脸的上下两头，有两根搭在额上
+  const Straw = (bright) => {
+    const col = bright ? "rgba(104,86,50,0.6)" : "rgba(26,21,13,0.72)";
+    for (let i = 0; i < 26; i += 1) {
+      const y0 = H * (0.04 + Hash("sfStrawY" + i) * 0.94);
+      const x0 = W * (0.0 + Hash("sfStrawX" + i) * 0.9);
+      const len = W * (0.035 + Hash("sfStrawL" + i) * 0.085);
+      const tilt = -0.7 + Hash("sfStrawA" + i) * 1.4;
+      InkLine(ctx, x0, y0, x0 + len, y0 + len * tilt, "sfStraw" + i,
+        { lw: (i % 3 ? 1.4 : 2.2) * S, color: col, amp: 1.6 * S });
+    }
+  };
+
+  // 压在脸上的那几根草：**画在头之后**——他是从草苫底下露出来的，
+  // 草全在人身后的话，这张脸就是搁在草堆前面，不是埋在草里
+  const StrawOver = (bright) => {
+    const col = bright ? "rgba(112,92,54,0.72)" : "rgba(30,24,15,0.8)";
+    for (let i = 0; i < 7; i += 1) {
+      const s2 = -0.05 + i * 0.17;
+      const a = Pf(s2, 0.10 + Hash("sfOverA" + i) * 0.06);
+      const b = Pf(s2 + 0.10, -0.26 - Hash("sfOverB" + i) * 0.10);
+      InkLine(ctx, a[0], a[1], b[0], b[1], "sfOver" + i,
+        { lw: (i % 2 ? 1.8 : 2.8) * S, color: col, amp: 2.0 * S });
+    }
+  };
+
+  Straw(false);
+  Head(false);
+  StrawOver(false);
+
+  // 板缝漏下来的月光条：斜切过画面，光条里的那一遍才有血色与高光。
+  // **别再往光条里加色**（第一版加了，四条读成四块斜着的玻璃）
+  const beams = [[0.16, 0.075], [0.42, 0.052], [0.70, 0.090]];
+  const ba = -0.40;
+  for (let i = 0; i < beams.length; i += 1) {
+    const [bu, bw] = beams[i];
+    const x0 = W * bu, w2 = W * bw;
+    const dx = Math.tan(ba) * H;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x0, -10 * S);
+    ctx.lineTo(x0 + w2, -10 * S);
+    ctx.lineTo(x0 + w2 + dx, H + 10 * S);
+    ctx.lineTo(x0 + dx, H + 10 * S);
+    ctx.closePath();
+    ctx.clip();
+    Head(true);
+    Straw(true);
+    StrawOver(true);
+    ctx.restore();
+  }
+
+  // 角晕 + 颗粒（同族）
+  const v = ctx.createRadialGradient(W * 0.46, H * 0.5, H * 0.24, W * 0.5, H * 0.5, H * 0.9);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(1,1,2,0.8)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "sfGrain", { count: Math.round(W / 7), alpha: 0.05, size: 2.2 });
+}
+
+// ---------------------------------------------------------------------------
 // 缝·改（c1 天蒙蒙亮，两段）：一双手把小褂子提起来对着天光看。
 //   seg 0  看整件：暗红小褂逆着晨光，一只袖口接了一截蓝底白花，
 //          两只袖子明显不一样长
@@ -10189,6 +10424,7 @@ export const INSERT_LIVE = {
   motherJacket: DrawMotherJacketCard,
   villageRiders: DrawVillageRidersCard,
   wholeCloth: DrawWholeClothCard,
+  strangerFace: DrawStrangerFaceCard,
   mendedSleeve: DrawMendedSleeveCard,
 };
 

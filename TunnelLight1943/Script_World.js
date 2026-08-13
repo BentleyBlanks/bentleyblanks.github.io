@@ -581,6 +581,9 @@ export function CreateWorld(canvasEl) {
   let slatDustMesh = null;
   // 舀水那一下的水圈（state.vatScoop）
   let vatScoopMesh = null;
+  // 窖角那一垛草苫（§9「草苫下面忽然动了一下」：state.matStir 一立就真晃 1.2 秒）。
+  // 抓着建场时那张网格不放，是因为这一晃不能重烘贴图——晃的是整垛草，不是草的画法
+  let strawMatMesh = null, strawMatBase = null, strawMatOver = false;
   // 伤员肩上的蓝花布 / 妹妹袖口那截蓝花（八稿两处特写认它们）
   let bandageMesh = null, cuffMesh = null;
   // 窖口板缝打进来的那几束光（lidShut 的板缝光 / 夜里的月光同一支）。
@@ -1717,8 +1720,14 @@ export function CreateWorld(canvasEl) {
       case "louDrill": mk((ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, p.id)); break;
       case "stubbleField": mk((ctx, ax, ay) => ART.DrawStubbleField(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "sownField": mk((ctx, ax, ay) => ART.DrawSownField(ctx, ax, ay, p.w * PPM, p.id)); break;
-      case "strawMat": mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id)); break;
-      case "strawArm": mk((ctx, ax, ay) => ART.DrawStrawArm(ctx, ax, ay, p.id)); break;
+      case "strawMat": {
+        // 建场时把这张网格记下来：§9 那一下抖的就是它（matStir）
+        strawMatMesh = mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id));
+        strawMatBase = strawMatMesh
+          ? { x: strawMatMesh.position.x, y: strawMatMesh.position.y, rot: strawMatMesh.rotation.z }
+          : null;
+        break;
+      }
       case "cellarSundries": mk((ctx, ax, ay) => ART.DrawCellarSundries(ctx, ax, ay, p.id)); break;
       case "cellarSundriesTidy": mk((ctx, ax, ay) => ART.DrawCellarSundriesTidy(ctx, ax, ay, p.id)); break;
       case "sewBasket": mk((ctx, ax, ay) => ART.DrawSewBasket(ctx, ax, ay, p.id)); break;
@@ -2545,6 +2554,9 @@ export function CreateWorld(canvasEl) {
     builtKey = key;
     flagProps = [];
     propRedraw = [];
+    // 整场重建会把上一场的网格全清掉：抓在手里的那几张也得跟着松手，
+    // 不然帧循环里动的是一张已经被 dispose 的图
+    strawMatMesh = null; strawMatBase = null; strawMatOver = false;
     carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
     carveRebuild = null;
     ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
@@ -4511,6 +4523,32 @@ export function CreateWorld(canvasEl) {
       vatScoopMesh.visible = false;
     }
 
+    // ── 草苫下面动的那一下（state.matStir，1.2s）：整垛草自己晃两下再停。
+    // 「一只手从黑暗里伸出来」之前得先有这一下——不然人是凭空出现在草堆上的。
+    // 幅度按一个人在草底下翻身给：抬起 3cm、转 2°，不是被风吹 ──
+    if (strawMatMesh && strawMatBase) {
+      // 人一躺进来，这一垛草就得**盖在他身上**：演员画在道具之前（ACTOR_Z 0.6 >
+      // loose 0.3），照默认序出来是"一个人整整齐齐躺在草垛前面"，那就不叫藏了。
+      // 只改绘制序不改 z——z 是透视深度，动了它草垛就不站在同一条地平线上了。
+      const hide = !!state.actors?.find((a) => a.id === "wounded" && a.visible && a.level === "under");
+      if (hide !== strawMatOver) {
+        strawMatOver = hide;
+        SetPlayOrder(strawMatMesh, hide ? CARRY_Z - 0.05 : BAND.loose, "strawMat");
+      }
+      const st = state.matStir;
+      if (st) {
+        const k = Math.min(1, (st.t || 0) / 1.2);
+        const fade = 1 - k * k;                       // 越晃越轻，最后一下最小
+        const w = Math.sin((st.t || 0) * 17.5);       // 两下半
+        strawMatMesh.position.set(strawMatBase.x + w * 0.022 * fade,
+          strawMatBase.y + Math.abs(w) * 0.03 * fade, strawMatMesh.position.z);
+        strawMatMesh.rotation.z = strawMatBase.rot + w * 0.035 * fade;
+      } else if (strawMatMesh.rotation.z !== strawMatBase.rot) {
+        strawMatMesh.position.set(strawMatBase.x, strawMatBase.y, strawMatMesh.position.z);
+        strawMatMesh.rotation.z = strawMatBase.rot;
+      }
+    }
+
     // ── 伤员肩上的蓝花布（actor.bandage）：躺在草苫上的那个人，肩头缠着
     // 从整布上撕下来的那条。骨架不管衣饰，这一小块钉在世界里跟人走 ──
     {
@@ -6110,6 +6148,18 @@ export function CreateWorld(canvasEl) {
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
+    // 谁的手在哪儿（世界坐标，米）。接触戏是量出来的不是看出来的：
+    // 「一只手抓住他的手腕」得两只手真的落在同一个点上，差 20 厘米在画面上
+    // 就是"对着空气比划"。躺着的人尤其要量——整具骨架转了 90°，
+    // 照站姿的手感写角度，出来的方向是错的
+    LimbTipsOf: (id) => {
+      const s = actorSprites.get(id);
+      if (!s?.rig) return null;
+      const tips = LimbTips(s.rig);
+      const out = {};
+      for (const k of Object.keys(tips)) out[k] = { x: +tips[k].x.toFixed(3), y: +tips[k].y.toFixed(3) };
+      return out;
+    },
     PlayerLimbTips: () => {
       const ps = actorSprites.get("player");
       if (!ps?.rig || ps.ground === undefined) return null;

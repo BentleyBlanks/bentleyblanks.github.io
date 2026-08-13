@@ -240,15 +240,6 @@
           "note": "第七稿：夜里那块整布抽出来的地方，也是伤员藏身的地方——那只手就从这堆草底下伸出来。**窖腔画出来的内壁到 27.2 才展开**，再往西就埋进剖面的墙弧里"
         },
         {
-          "id": "strawArm",
-          "kind": "strawArm",
-          "x": 27.7,
-          "level": "under",
-          "showFlag": "manGrab",
-          "name": "草堆底下伸出来的手",
-          "note": "抓住手腕那一镜的静帧：manGrab 立起才现（c1_cellar 抓腕效果落旗），c1_rescue 的 onStart 收走（换成真演员躺着）"
-        },
-        {
           "id": "wholeClothRest",
           "kind": "wholeClothRest",
           "x": 27.95,

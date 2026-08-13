@@ -18,6 +18,29 @@ page.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
 await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html`, { waitUntil: "domcontentloaded" });
 const dataUrl = await page.evaluate(async (what) => {
   const ART = await import("./Script_Art.mjs");
+  // 过场活动插卡：`card:<名字>` 把 INSERT_LIVE 里那张卡按真尺寸（16:9）
+  // 铺开来画，两段并排。改一张卡的版面不用每次跑整拍实拍——那是三十秒一轮，
+  // 这条是十秒一轮，而卡的画法要改十几轮（2026-08-14 陌生人那张脸）
+  if (what.startsWith("card:")) {
+    const name = what.slice(5);
+    const fn = ART.INSERT_LIVE?.[name];
+    if (!fn) throw new Error(`INSERT_LIVE 里没有叫「${name}」的卡`);
+    const cw = 900, chh = 506;
+    const c = document.createElement("canvas");
+    c.width = cw * 2; c.height = chh;
+    const ctx = c.getContext("2d");
+    for (const seg of [0, 1]) {
+      ctx.save();
+      ctx.translate(seg * cw, 0);
+      ctx.beginPath(); ctx.rect(0, 0, cw, chh); ctx.clip();
+      fn(ctx, cw, chh, seg, 1.4);
+      ctx.fillStyle = "rgba(230,220,200,0.75)";
+      ctx.font = "18px sans-serif";
+      ctx.fillText(`seg ${seg}`, 14, 26);
+      ctx.restore();
+    }
+    return c.toDataURL("image/png");
+  }
   const kinds = what === "lamp"
     ? ["hurricane", "lantern"]
     : ["player", "father", "sister", "militia", "soldier", "puppet"];
