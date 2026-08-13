@@ -46,6 +46,8 @@ for (const m of src.matchAll(/\{\s*who:\s*"([^"]+)"\s*,\s*say:\s*"([^"]+)"/g)) {
   Add(m[1], m[2]);
 }
 // 旁白：{ stage: "…" }
+// **`act:` 一律不抽**——那是演出说明（镜头／无声动作／音效），不上字幕也不配音。
+// 第一章（含序）已经全部改成 act:，只剩两句真旁白还是 stage:。
 for (const m of src.matchAll(/\{\s*stage:\s*"([^"]*)"/g)) {
   Add("", m[1]);
 }
