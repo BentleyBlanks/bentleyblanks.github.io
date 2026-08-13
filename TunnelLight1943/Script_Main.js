@@ -1323,14 +1323,40 @@ function RunFrame(now, dt) {
   tapEdge = false;
 }
 
+// 画面被拉伸，十有八九是**画布缓冲的长宽比跟 CSS 盒对不上**：WebGL 的
+// drawing buffer 是一张固定尺寸的图，浏览器把它拉满 `width:100%;height:100%`
+// 的盒子——盒子的比例一变而缓冲没跟着改，整幅画就横着抻开（或竖着压扁）。
+//
+// 手机上这件事**不只在 `resize` 时发生**（2026-08-13 用户报「移动端横屏会被
+// 拉伸」）：iOS/Android 的地址栏收起、系统手势条让位、旋转后的两段式布局、
+// 分屏与画中画，都会改这个盒子，而 `window.resize` 要么不发、要么发得比布局早
+// 一拍（老版为此在 orientationchange 上挂了 200ms 的 setTimeout——那是在赌）。
+//
+// 所以改成**盯着画布这个元素本身**：ResizeObserver 在盒子真的变了之后才回调，
+// 谁改的、为什么改一概不用管；visualViewport 那两条补上 iOS 收/放地址栏时
+// 盒子没变、但可视区变了的那一档。尺寸取 `getBoundingClientRect()` 的**分数**
+// 值——`clientWidth` 是取整过的，2.17:1 这种比例上取整会引进零点几个百分点的
+// 偏差，正是"看着有点不对劲又说不上哪儿不对"。
+let lastCssW = 0, lastCssH = 0;
 function Resize() {
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
+  const r = canvas.getBoundingClientRect();
+  const w = r.width || canvas.clientWidth || window.innerWidth;
+  const h = r.height || canvas.clientHeight || window.innerHeight;
+  if (!(w > 0 && h > 0)) return;              // 布局还没落地：这一次不算数
+  if (Math.abs(w - lastCssW) < 0.5 && Math.abs(h - lastCssH) < 0.5) return;
+  lastCssW = w; lastCssH = h;
   world.Resize(w, h);
   CheckOrientation();
 }
 window.addEventListener("resize", Resize);
 window.addEventListener("orientationchange", () => setTimeout(Resize, 200));
+if (typeof ResizeObserver === "function") {
+  new ResizeObserver(Resize).observe(canvas);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", Resize);
+  window.visualViewport.addEventListener("scroll", Resize);
+}
 SetupTouch();
 Resize();
 BuildTitle();

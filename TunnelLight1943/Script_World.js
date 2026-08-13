@@ -5790,9 +5790,22 @@ export function CreateWorld(canvasEl) {
 
   function ApplyCamera(camX, camY, halfWidth) {
     const aspect = camera.userData.aspect || 16 / 9;
+    // 景别（halfWidth）是**按 16:9 的画框调的**：人占画高多少、头顶留多少、
+    // 地面退多远，全是在那个比例上定的数。
+    //
+    // 屏幕比它更宽时（横屏手机常见 2.16:1、折叠屏还要宽），照着画宽走就等于
+    // **把上下裁掉近两成**——天和地各少一截，人贴着画框底边，读起来就是
+    // "画面被拉扁了"（2026-08-13 用户报的移动端横屏）。所以超宽的那一档
+    // **改成保画高**：竖直方向仍是 16:9 那么多米，多出来的比例往两边加宽。
+    // 人在屏幕上的大小于是跟桌面一模一样，多出来的只有左右两侧的村子。
+    //
+    // 比 16:9 窄的（iPad 4:3、竖屏）不动：那一头保画宽、画面往上下长，
+    // 多出来的是天和地，什么也不会被切掉。
+    const REF_ASPECT = 16 / 9;
+    const hw = aspect > REF_ASPECT ? halfWidth * (aspect / REF_ASPECT) : halfWidth;
     // 由目标景别反推机位距离：视差与地面退缩随之自然发生
-    const dist = halfWidth / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
-    viewW = halfWidth * 2;
+    const dist = hw / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
+    viewW = hw * 2;
     viewH = viewW / aspect;
     camera.aspect = aspect;
     camera.position.set(camX, camY, dist);
@@ -5820,6 +5833,12 @@ export function CreateWorld(canvasEl) {
 
   let rendererCssW = 0, rendererCssH = 0;
   function Resize(width, height) {
+    // **缓冲的比例必须等于 CSS 盒的比例**，否则整幅画横着抻开（Main 的
+    // Resize 那段有账）。setSize 的第三个参数是 false＝不许 three 去改
+    // canvas 的行内样式：尺寸由 CSS（100%/100%）说了算，这里只管缓冲。
+    // 像素比每次都重设一遍：手机在不同显示模式间切换时 devicePixelRatio 会变，
+    // 只在启动时设一次的话，缓冲会按老的 dpr 算，同样是拉伸
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
     camera.userData.aspect = width / height;
     rendererCssW = width;
