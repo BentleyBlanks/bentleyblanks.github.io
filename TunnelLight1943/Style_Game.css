@@ -302,8 +302,12 @@ body.touchDevice #touchControls.dimmed { opacity: 0.28; }
 body.touchDevice #touchControls.gone { display: none; }
 /* 摇杆：一个盘子 + 一个跟着手指走的钮。走路是横推，爬梯下地道是竖推——
    两个动作共用一根拇指，右手就只剩蹲和动手两个键。 */
+/* 底边也要让开安全区。左右一直让着，底下没让——横屏 iPhone 的 home 指示条
+   占着最底下那 21px，系统会先把那一条上的触摸当成上滑手势收走，落在盘子/钮
+   下缘的拇指就白按了：读起来同样是"按钮的触发位置偏了一点"。 */
 #stick {
-  position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: 16px;
+  position: absolute; left: max(14px, env(safe-area-inset-left));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   width: 148px; height: 148px;
   pointer-events: auto; touch-action: none;
   -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
@@ -330,7 +334,8 @@ body.touchDevice #touchControls.gone { display: none; }
 #stick.climbing #stickKnob { border-color: rgba(255, 232, 160, 0.9); }
 
 #touchControls .padRight {
-  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 20px;
+  position: absolute; right: max(16px, env(safe-area-inset-right));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
   display: flex; align-items: flex-end; gap: 12px;
 }
 #touchControls button {
@@ -938,9 +943,14 @@ body.touchDevice #touchControls.gone { display: none; }
   align-items: center;
   gap: 10px;
   z-index: 8;
-  pointer-events: auto;
+  /* 探头（拾取时自动滑出的那 3.2 秒）**不许吃触摸**：那时世界没冻结，玩家
+     还在操作，而这条纸带正压在右下角那颗互动钮上——实测 844×390 上它盖掉
+     互动钮 52% 的面积，按下去半点反应没有，读起来就是"按钮的触发位置偏了"。
+     只有真打开（.open，世界冻结）才该接管拇指。 */
+  pointer-events: none;
   transition: transform 0.28s ease;
 }
+#bagPanel.open { pointer-events: auto; }
 #bagPanel.show { transform: translateY(-50%) translateX(0); }
 #bagPanel[hidden] { display: none; }
 /* 纸底竖条：亚麻纸色 + 墨线框，格子里是画笔现烘的小图 */
@@ -999,3 +1009,30 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #bagNote p { margin: 0; font-size: 12.5px; line-height: 1.75; letter-spacing: 0.03em; }
 #bagNote small { display: block; margin-top: 7px; font-size: 10.5px; opacity: 0.6; letter-spacing: 0.1em; }
+
+/* 横屏手机：竖着的一条纸带在 375~430 的画高里必然长到拇指那一排上去
+   （76vh 就是 285~327 高，而互动钮的顶沿在 279~334）。改成右上角一小片
+   3×3 的方格——正好九件，不用滚；下沿留出整排触屏钮的地方（含安全区），
+   谁也不压谁。判据用画高不用画宽：竖着的东西撞的是高度。 */
+@media (max-height: 520px) {
+  #bagPanel {
+    top: calc(env(safe-area-inset-top, 0px) + 58px);
+    transform: translateX(115%);
+    align-items: flex-start;
+  }
+  #bagPanel.show { transform: translateX(0); }
+  #bagStrip {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    gap: 4px;
+    padding: 6px;
+    max-height: calc(100vh - 170px - env(safe-area-inset-bottom, 0px));
+  }
+  #bagStrip li { width: 40px; height: 40px; border-radius: 5px; }
+  #bagStrip canvas { width: 34px; height: 34px; }
+  #bagNote {
+    width: min(52vw, 280px);
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+  }
+}
