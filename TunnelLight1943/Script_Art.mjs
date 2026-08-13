@@ -8223,6 +8223,27 @@ export function DrawEdgeHud(ctx, W, H, icon, { dir = 1, climb = null } = {}) {
   ctx.restore();
 }
 
+// 角上那枚常驻的「下一件事」：跟画框边那张牌同一张纸、同一套图，只是**不带箭头**
+// ——角上的牌不指方向（方向仍旧归画框边那一枚，目标出框时才有方向可指）。
+// 画在 DOM 的一小块 canvas 上（Script_Main 的 PaintObjectiveIcon），所以牌心
+// 就是画布正中，不像 DrawEdgeHud 那样要给箭头让出半边。
+export function DrawHudBadge(ctx, W, H, icon) {
+  const R = Math.min(W, H) * 0.46;
+  const cx = W / 2, cy = H / 2;
+  ctx.save();
+  ctx.lineJoin = "round";
+  InkFill(ctx, DiskPts(cx, cy, R), "hudDisk", "rgba(236,223,188,0.95)",
+    { amp: R * 0.045, lw: R * 0.10 });
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.90, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  HudGlyph(ctx, icon || { kind: "walk" }, R);
+  ctx.restore();
+  ctx.restore();
+}
+
 // 「你是哪一个」：三个同样身高的土布短褂站在夜里的村道上，玩家分不出哪个是自己。
 // 目标标记是黄色实心三角（指路），玩家标记就得长得完全不一样——
 // 一枚空心的细线人字标，只有轮廓，不抢画面。

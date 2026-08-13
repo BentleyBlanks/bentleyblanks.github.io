@@ -377,6 +377,27 @@ for (const size of TOUCH_SIZES) {
     document.getElementById("btnBag").click();          // 真打开
     await new Promise((r) => setTimeout(r, 380));
     out.包袱打开 = Sweep();
+    document.getElementById("btnBag").click();          // 关回去，别影响下面那段
+    await new Promise((r) => setTimeout(r, 380));
+
+    // 角上那枚「下一件事」：它自己也是个按得着的钮，同样不许被谁盖住；
+    // 而左上角还住着跳过序章那颗钮（现在没有 prologue 拍，但机制留着），
+    // 两枚一旦同时亮就得错开——这条是摆位对错，跟画高无关，所以在这儿一起验
+    const tab = document.getElementById("objectiveTab");
+    out.目标牌 = [];
+    for (let i = 0; i < 600 && tab.hidden; i += 1) window.TunnelLight.StepFrames(2, { advance: true });
+    if (!tab.hidden) {
+      out.目标牌 = [Free("objectiveTab")].filter((r) => r.bad > 0);
+      // 下面几行中间不许 await：SyncHud 每帧都会把这两个开关拨回去
+      const skip = document.getElementById("btnSkipCine");
+      skip.hidden = false;
+      tab.classList.add("lower");
+      const a = tab.getBoundingClientRect(), b = skip.getBoundingClientRect();
+      const 错开 = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      if (!错开) out.目标牌.push({ id: "objectiveTab", bad: 1, total: 1, thief: "btnSkipCine" });
+      skip.hidden = true;
+      tab.classList.remove("lower");
+    }
     return out;
   });
   await mob.close();
@@ -390,7 +411,7 @@ for (const size of TOUCH_SIZES) {
       }
     }
   } else {
-    console.log(`✓ ${size.name} 拇指控件三态无遮挡（摇杆 / 互动 / 蹲）`);
+    console.log(`✓ ${size.name} 拇指控件三态无遮挡（摇杆 / 互动 / 蹲）＋ 角上目标牌不被压、不跟跳过键叠`);
   }
 }
 

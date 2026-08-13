@@ -58,6 +58,76 @@ body {
   line-height: 1.65; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.98), 0 0 6px rgba(0, 0, 0, 0.8);
 }
 
+/* 角上那枚「下一件事」：常驻的只有一枚图，字要看的时候才给。
+   目标条那一闪过去之后，"我这会儿要干嘛"永远还有处可查，而画面上多出来的
+   只是一枚拇指盖大的牌——克制那条规矩没破。
+   展开走 grid-template-columns 的 0fr→1fr（裁剪的活全在外面那层）；
+   `.bump` 是换了图的时候顶一下。 */
+#objectiveTab {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  top: max(14px, calc(env(safe-area-inset-top) + 10px));
+  z-index: 12;
+  display: flex; align-items: center;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  opacity: 0.74; transition: opacity 0.25s ease;
+}
+#objectiveTab.lower { top: max(58px, calc(env(safe-area-inset-top) + 54px)); }
+#objectiveTabIcon {
+  width: 44px; height: 44px; display: block; flex: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+}
+#objectiveTab.bump #objectiveTabIcon { animation: objBump 0.9s ease-out; }
+@keyframes objBump {
+  0% { transform: scale(1); }
+  22% { transform: scale(1.2); filter: drop-shadow(0 0 9px rgba(246, 214, 140, 0.85)); }
+  100% { transform: scale(1); }
+}
+#objectiveTabBody {
+  display: grid; grid-template-columns: 0fr;
+  transition: grid-template-columns 0.28s ease, opacity 0.22s ease, margin 0.28s ease;
+  opacity: 0; margin-left: -8px; text-align: left;
+}
+/* 收起来靠外面这一层裁（列宽 0fr），字自己的宽度是钉死的——不然展开的那 0.28 秒
+   里中文会一路重排行，读起来像在抖。
+   **裁剪壳必须是网格的直接子项**：0fr 只有在子项自己 `overflow:hidden`（自动最小
+   尺寸因此归零）时才真的收到 0；把固定宽度写在直接子项上，收起来的牌照样是
+   三百多像素宽的一块隐形板子，还照吃点击（第一版就是这么量出来的）。 */
+#objectiveTabBody > .clip { overflow: hidden; min-width: 0; }
+#objectiveTabCard {
+  display: block; width: min(46vw, 300px);
+  padding: 7px 15px 7px 13px; border-radius: 0 10px 10px 0;
+  background: rgba(8, 6, 4, 0.62);
+}
+#objectiveTabText {
+  display: block; font-size: 14.5px; font-weight: 600; letter-spacing: 0.06em;
+  line-height: 1.45; color: #f6ecd8;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
+}
+#objectiveTabHint {
+  display: block; margin-top: 3px; font-size: 12px; font-style: normal;
+  line-height: 1.55; color: #cdbf9f;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.98), 0 0 6px rgba(0, 0, 0, 0.8);
+}
+#objectiveTab.noHint #objectiveTabHint { display: none; }
+#objectiveTab:focus-visible, #objectiveTab.open { opacity: 1; }
+#objectiveTab:focus-visible #objectiveTabBody,
+#objectiveTab.open #objectiveTabBody {
+  grid-template-columns: 1fr; opacity: 1; margin-left: 0;
+}
+/* 悬停展开只给真有指针的设备：手机上点一下之后 :hover 会**粘住**，
+   再点一下 `.open` 摘掉了，牌却还张着——读起来就是"收不回去" */
+@media (hover: hover) and (pointer: fine) {
+  #objectiveTab:hover { opacity: 1; }
+  #objectiveTab:hover #objectiveTabBody { grid-template-columns: 1fr; opacity: 1; margin-left: 0; }
+}
+/* 横屏手机（判据是画高，同包袱条那条）：牌收一档，字也收一档 */
+@media (max-height: 520px) {
+  #objectiveTabIcon { width: 36px; height: 36px; }
+  #objectiveTabText { font-size: 13px; }
+  #objectiveTabHint { font-size: 11px; }
+}
+
 #crouchTag {
   position: absolute; top: 22px; right: 26px;
   padding: 6px 12px; font-size: 12.5px; letter-spacing: 0.08em;

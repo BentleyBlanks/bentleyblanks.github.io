@@ -2,12 +2,12 @@
 // 镜头语法（硬切 / 慢推 / 横移 / 过肩正反打 / 插入特写）、HUD。
 import {
   GAME_VERSION, CHAPTERS, SURFACE_Y, UNDER_Y, CreateGame, StepGame,
-  CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt,
+  CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt, BeatHintIcon,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
   KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
   PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics,
 } from "./Script_Core.mjs";
-import { DrawRelic } from "./Script_Art.mjs";
+import { DrawRelic, DrawHudBadge } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
@@ -90,6 +90,7 @@ const ui = {};
 for (const id of [
   "titleScreen", "startButton", "chapterList",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
+  "objectiveTab", "objectiveTabIcon", "objectiveTabText", "objectiveTabHint",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
   "chapterCard", "cardNum", "cardTitle", "cardYear", "cardContinue",
@@ -696,6 +697,90 @@ function SyncActPrompt(state, pr, fill) {
   el.style.top = Math.round(Math.max(10, Math.min(chh - actBox.h - 10, sy - actBox.h - 6))) + "px";
 }
 
+// ---------------------------------------------------------------------------
+// 角上那枚「下一件事」（勇敢的心式）
+//
+// 中间那条目标只在变化时闪 6.5 秒，闪完玩家再想问"我这会儿到底要干嘛"就没处查
+// 了；可常驻一行字又会把画面读成任务列表。所以常驻的只有**一枚图**——画框边那张
+// 提示牌的同一支画笔、同一套推导（Core.BeatHintIcon → Art.DrawHudBadge），角上
+// 认得的图走到框边还是同一张。字要看的时候才给：鼠标悬停（CSS 管）/ 点一下。
+// 换了图只顶一下，不展开字——那会儿中间的目标条正把全文说着，两处同时说同一句
+// 就是重复。
+// ---------------------------------------------------------------------------
+let objIconFp = "";
+let objTextFp = "";
+let objTabT = 0;          // 点开之后自己收回去的倒计时（悬停那条归 CSS，不进这儿）
+
+function PaintObjectiveIcon(icon) {
+  const cv = ui.objectiveTabIcon;
+  if (!cv) return;
+  // 牌在 DOM 上只有 44px，按最高的 DPR 顶到 4 倍就够看（World 那边 HINT_SS=12
+  // 是给过肩特写量的，这里照那个倍率烘纯属白扔内存）
+  const ss = 4, w = 48;
+  cv.width = w * ss;
+  cv.height = w * ss;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(ss, 0, 0, ss, 0, 0);
+  DrawHudBadge(ctx, w, w, icon);
+}
+
+function SetObjTabOpen(open) {
+  const el = ui.objectiveTab;
+  if (!el) return;
+  el.classList.toggle("open", open);
+  el.setAttribute("aria-expanded", open ? "true" : "false");
+  objTabT = open ? 7 : 0;
+}
+
+function SyncObjectiveTab(state, inCinematic, objective, dt) {
+  const el = ui.objectiveTab;
+  if (!el) return;
+  const show = state.phase === "playing" && !inCinematic && !!objective;
+  if (!show) {
+    if (!el.hidden) { el.hidden = true; SetObjTabOpen(false); }
+    return;
+  }
+  el.hidden = false;
+  // 跳过序章那颗钮也占着左上角：它亮着的时候牌让到它底下去
+  el.classList.toggle("lower", !ui.btnSkipCine?.hidden);
+
+  const icon = BeatHintIcon(state) || { kind: "walk" };
+  const fp = [icon.kind, icon.who || icon.item || icon.gesture || "", icon.id || ""].join("|");
+  if (fp !== objIconFp) {
+    objIconFp = fp;
+    PaintObjectiveIcon(icon);
+    // 顶一下。先摘 class 再回流一次，同一枚图连着换两回也还能重新触发
+    el.classList.remove("bump");
+    void el.offsetWidth;
+    el.classList.add("bump");
+  }
+
+  const hint = GetHint(state) || "";
+  const tfp = `${objective}|${hint}`;
+  if (tfp !== objTextFp) {
+    objTextFp = tfp;
+    ui.objectiveTabText.textContent = objective;
+    ui.objectiveTabHint.textContent = hint;
+    el.classList.toggle("noHint", !hint);
+    el.setAttribute("aria-label", hint ? `${objective}。${hint}` : objective);
+  }
+
+  if (objTabT > 0) {
+    objTabT -= dt;
+    if (objTabT <= 0) SetObjTabOpen(false);
+  }
+}
+
+if (ui.objectiveTab) {
+  ui.objectiveTab.addEventListener("click", (e) => {
+    e.stopPropagation();
+    SetObjTabOpen(!ui.objectiveTab.classList.contains("open"));
+    // 鼠标/手指点的那一下别把键盘焦点扣在这枚牌上——玩家接着还要按 E
+    //（e.detail 为 0 的是键盘敲出来的，那种就该留着焦点）
+    if (e.detail) ui.objectiveTab.blur();
+  });
+}
+
 function SyncHud(state, dt, shotFade) {
   const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
   const inCinematic = def?.kind === "cinematic" || !!state.microCine;
@@ -740,6 +825,8 @@ function SyncHud(state, dt, shotFade) {
   if (objectiveT > 0) objectiveT -= dt;
   const objVisible = objectiveT > 0 && !inCinematic;
   ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
+  // 那一闪过去之后，「下一件事」仍旧挂在左上角那枚牌上
+  SyncObjectiveTab(state, inCinematic, objective, dt);
 
   // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来。
   // 带按键的走头顶那枚徽章，没按键的状态行（"跟上娘""！探杆就在头顶"）
