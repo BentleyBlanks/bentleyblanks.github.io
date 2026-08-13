@@ -357,7 +357,10 @@ function Build(ac, options) {
   // 合成器那一套一个都不删：采样是**盖在**它上面的一层。清单拉不到、解码失败、
   // 或者某个 cue 还没烘出来，Sfx() 自动落回合成——离线、单测、老浏览器全都还有声。
   // -------------------------------------------------------------------------
-  const samples = new Map();          // cue 名 → AudioBuffer
+  // cue 名 → AudioBuffer[]。**是个数组不是单个**：每一两秒就要响一次的音
+  //（狗叫、喊）只有一个样本的话，循环起来就是机关枪——烘的时候从同一段素材里
+  // 切好几下（Script_SfxBake 的 variants），这里每次随机挑一个
+  const samples = new Map();
 
   function LoadSamples(baseUrl) {
     if (offline || typeof fetch !== "function" || !baseUrl) return;
@@ -366,24 +369,35 @@ function Build(ac, options) {
       .then((r) => (r.ok ? r.json() : null))
       .then((manifest) => {
         if (!manifest?.cues) return;
-        const jobs = Object.keys(manifest.cues).map((cue) => fetch(base + manifest.cues[cue].file)
-          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("404"))))
-          // decodeAudioData 的 Promise 形式在 Safari 上要老回调签名兜一下
-          .then((buf) => new Promise((res, rej) => {
-            const ok = ac.decodeAudioData(buf, res, rej);
-            if (ok && typeof ok.then === "function") ok.then(res, rej);
-          }))
-          .then((audioBuffer) => { if (!disposed) samples.set(cue, audioBuffer); })
-          .catch(() => { /* 缺一个就少一个，退回合成 */ }));
+        const jobs = Object.keys(manifest.cues).map((cue) => {
+          const entry = manifest.cues[cue];
+          const files = entry.files?.length ? entry.files : [entry.file];
+          return Promise.all(files.map((file) => fetch(base + file)
+            .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("404"))))
+            // decodeAudioData 的 Promise 形式在 Safari 上要老回调签名兜一下
+            .then((buf) => new Promise((res, rej) => {
+              const ok = ac.decodeAudioData(buf, res, rej);
+              if (ok && typeof ok.then === "function") ok.then(res, rej);
+            }))
+            .then((audioBuffer) => audioBuffer)
+            .catch(() => null)))
+            // 变体缺几个不要紧，剩下的照用；一个都没解出来才退回合成
+            .then((list) => {
+              const ok = list.filter(Boolean);
+              if (ok.length && !disposed) samples.set(cue, ok);
+            })
+            .catch(() => { /* 缺一个就少一个，退回合成 */ });
+        });
         return Promise.all(jobs);
       })
       .catch(() => { /* 整包拉不到就整包用合成 */ });
   }
 
-  /** 放一发采样。同一个音连着触发时轻微变速变调，免得听出"贴图"感 */
+  /** 放一发采样。变体里随机挑一个，再轻微变速变调，免得听出"贴图"感 */
   function PlaySample(name, t, k, pan, r) {
-    const buffer = samples.get(name);
-    if (!buffer || Full()) return false;
+    const list = samples.get(name);
+    if (!list || !list.length || Full()) return false;
+    const buffer = list.length === 1 ? list[0] : list[Math.floor(Math.random() * list.length)];
     const s = ac.createBufferSource();
     s.buffer = buffer;
     s.playbackRate.value = Clamp(r * (0.96 + Math.random() * 0.08), 0.25, 4);

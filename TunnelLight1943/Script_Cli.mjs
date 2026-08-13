@@ -533,16 +533,20 @@ async function CmdShot(o) {
       // 全靠现写一次性探针脚本。页面里能拿到 TunnelLight.{state,world,...}，
       // 表达式或函数体都行（`world.debugLayers().layers.play.children.length`）。
       // 页面渲染只在浏览器窗口真的合成时才跑，所以只有这条实拍路子问得到渲染层。
+      // **返回 Promise 也认**（2026-08-13 加）：查资源的活天生是异步的
+      //（fetch 一个 mp3 再 decodeAudioData 才知道它是不是一段静音）。
+      // 原来这儿把结果直接塞进 { ok }，Playwright 只 await 最外层那个 Promise，
+      // 嵌在对象里的那个照原样序列化——打出来是一个空的 `{}`，看着像"没结果"。
       if (o.eval) {
-        const r = await page.evaluate((src) => {
+        const r = await page.evaluate(async (src) => {
           const tl = window.TunnelLight;
           // eslint-disable-next-line no-new-func
           const fn = new Function("tl", "state", "world", `return (${src})`);
-          try { return { ok: fn(tl, tl.state, tl.world) }; }
+          try { return { ok: await fn(tl, tl.state, tl.world) }; }
           catch (e) {
             try {
               // eslint-disable-next-line no-new-func
-              return { ok: new Function("tl", "state", "world", src)(tl, tl.state, tl.world) };
+              return { ok: await new Function("tl", "state", "world", src)(tl, tl.state, tl.world) };
             } catch (e2) { return { err: String(e2) }; }
           }
         }, String(o.eval));

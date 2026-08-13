@@ -105,7 +105,39 @@
       "seconds": 0.34,
       "atSeconds": 46.72,
       "bytes": 3069
+    },
+    "dogBark": {
+      "file": "dogBark.mp3",
+      "files": [
+        "dogBark.mp3",
+        "dogBark2.mp3",
+        "dogBark3.mp3"
+      ],
+      "group": "dogs",
+      "seconds": 0.85,
+      "bytes": 6597
+    },
+    "shout": {
+      "file": "shout.mp3",
+      "files": [
+        "shout.mp3",
+        "shout2.mp3",
+        "shout3.mp3"
+      ],
+      "group": "shouting",
+      "seconds": 0.95,
+      "bytes": 7353
+    },
+    "raidRumble": {
+      "file": "raidRumble.mp3",
+      "files": [
+        "raidRumble.mp3",
+        "raidRumble2.mp3"
+      ],
+      "group": "raid",
+      "seconds": 2.6,
+      "bytes": 18945
     }
   },
-  "bakedAt": "2026-08-06"
+  "bakedAt": "2026-08-13"
 }

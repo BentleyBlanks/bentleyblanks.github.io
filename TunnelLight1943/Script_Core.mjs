@@ -7628,8 +7628,12 @@ function StepMicroCine(state, input, dt) {
 const DIN_LAYERS = [
   // name, 远时的间隔, 近时的间隔, 远时音量, 近时音量, 远时 rate, 近时 rate
   { name: "raidRumble", far: 3.0, near: 1.9, gFar: 0.10, gNear: 0.42, rFar: 0.78, rNear: 1.10 },
-  { name: "dogBark", far: 2.4, near: 1.0, gFar: 0.16, gNear: 0.58, rFar: 0.74, rNear: 1.14 },
-  { name: "shout", far: 3.6, near: 1.4, gFar: 0.12, gNear: 0.52, rFar: 0.80, rNear: 1.10 },
+  // 狗和喊这两样烘成了真录音（Script_SfxBake 的 dogs/shouting 组），而采样的
+  // rate 是**连音高一起变**的：合成器上 0.74 只是"闷一点的狗"，压在一段真狗叫
+  // 上就成了另一种动物；人嗓更娇气，降两成就不是喊而是吼。所以这两条的 rate
+  // 收窄一档——远近主要交给音量、密度和左右，音高只帮个忙
+  { name: "dogBark", far: 2.4, near: 1.0, gFar: 0.16, gNear: 0.58, rFar: 0.84, rNear: 1.12 },
+  { name: "shout", far: 3.6, near: 1.4, gFar: 0.12, gNear: 0.52, rFar: 0.88, rNear: 1.07 },
   { name: "step", far: 1.9, near: 0.55, gFar: 0.16, gNear: 0.60, rFar: 1.05, rNear: 1.35 },
   { name: "knock", far: 4.4, near: 1.7, gFar: 0.22, gNear: 0.80, rFar: 0.76, rNear: 0.98 },
   { name: "henSquawk", far: 6.0, near: 3.1, gFar: 0.18, gNear: 0.48, rFar: 0.88, rNear: 1.05 },

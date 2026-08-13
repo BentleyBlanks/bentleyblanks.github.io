@@ -127,6 +127,44 @@ const GROUPS = [
       { cue: "scribe", tail: 0.9, gain: 0.55, prefer: "sustain", decay: [0.35, 1.6] },
     ],
   },
+  // ── 序章那团院外的动静（2026-08-13）──
+  // 这三样是序章的全部：画面上一个人都没有，扫荡整场长在耳朵里。
+  // 前两样**必须烘多个变体**：它们在序里每一两秒就响一次，而这个流水线的老账
+  // 写在 dirt 组上——脚步故意没换成采样，就因为"一个固定样本循环起来是机关枪"。
+  // 变体 + PlaySample 的随机挑 + din 按远近改的 rate，三样合起来才不像贴图。
+  {
+    id: "dogs",
+    prompt: PREFIX + "A village dog barks hard at strangers coming up the lane: two or "
+      + "three sharp throaty barks in a row, dry and close, then silence. Another dog "
+      + "answers from much further away. Repeat several times with long pauses.",
+    cuts: [
+      { cue: "dogBark", tail: 0.85, gain: 0.8, variants: 3, decay: [0.12, 1.1] },
+    ],
+  },
+  {
+    id: "shouting",
+    prompt: PREFIX + "Men shouting short angry orders at each other across a village "
+      + "courtyard — two or three clipped barked syllables at a time, heard from behind a "
+      + "wall so no words are intelligible. Male voices only, no singing, no melody. "
+      + "Repeat several times with pauses.",
+    cuts: [
+      { cue: "shout", tail: 0.95, gain: 0.7, variants: 3, decay: [0.12, 1.3] },
+    ],
+  },
+  {
+    // 底噪不是一次性音，所以它**不走找起音那条路**（见 window 选项）：
+    // 连续的一团响没有"前面是静的、起来是陡的"这个特征，FindHits 在它上面
+    // 要么一个都挑不出、要么挑出一堆半截
+    id: "raid",
+    prompt: "Foley ambience only, this is NOT music: no instruments, no melody, no drums, "
+      + "no rhythm, no singing. The confused distant roar of a 1940s north-China village "
+      + "being raided, heard from inside a cellar with the lid shut: many running feet on "
+      + "dry dirt, doors banged open, livestock, men's voices — all blurred together into a "
+      + "low rolling rumble that swells and fades. Muffled and low, no single sound stands out.",
+    cuts: [
+      { cue: "raidRumble", tail: 2.6, gain: 0.62, variants: 2, window: true },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -258,6 +296,34 @@ function Pick(hits, prefer, used, decay) {
   return chosen;
 }
 
+/**
+ * 挑一段**持续**的（底噪、风、一团响）。这类素材没有起音点可找——
+ * 连续的一团响本来就不满足"前面是静的、起来是陡的"，拿 FindHits 去挑
+ * 要么一个都挑不出、要么挑出一堆半截。改成扫一遍：取 tail 秒的滑窗里
+ * 平均能量最高的那一段，且**与已用过的窗错开**（变体之间不能是同一段）。
+ */
+function PickWindow(pcm, tailS, used) {
+  const { env, hop } = Envelope(pcm);
+  const win = Math.max(1, Math.round(tailS / 0.005));
+  if (env.length <= win) return null;
+  // 前缀和求滑窗均值
+  const sum = new Float64Array(env.length + 1);
+  for (let i = 0; i < env.length; i += 1) sum[i + 1] = sum[i] + env[i];
+  let best = -1, bestAt = -1;
+  for (let f = 0; f + win < env.length; f += 1) {
+    const at = f * hop;
+    // 和已挑过的窗至少错开一整窗，不然两个"变体"是同一段的两个偏移
+    let clash = false;
+    for (const u of used) if (Math.abs(u - at) < tailS * SR) { clash = true; break; }
+    if (clash) continue;
+    const mean = (sum[f + win] - sum[f]) / win;
+    if (mean > best) { best = mean; bestAt = at; }
+  }
+  if (bestAt < 0) return null;
+  used.add(bestAt);
+  return { at: bestAt, peak: best, decayS: tailS, attack: 1, quiet: 1, score: best };
+}
+
 function WriteWav(file, pcm) {
   const n = pcm.length;
   const buf = Buffer.alloc(44 + n * 2);
@@ -324,19 +390,32 @@ async function Main() {
     console.log(`[切割] ${group.id}：素材 ${(pcm.length / SR).toFixed(1)}s，候选响动 ${hits.length} 处`);
     const used = new Set();
     for (const cut of group.cuts) {
-      const hit = Pick(hits, cut.prefer, used, cut.decay);
-      if (!hit) { console.log(`   ! ${cut.cue}：没挑出合适的一下`); continue; }
-      const outMp3 = path.join(OUT_DIR, `${cut.cue}.mp3`);
-      const info = CutOne(pcm, hit, cut, path.join(OUT_DIR, `_${cut.cue}.wav`), outMp3);
+      // variants>1：同一段素材里切好几下，播放时随机挑一个。
+      // 每一两秒就要响一次的音（狗叫、喊）非有它不可——一个固定样本
+      // 循环起来就是机关枪（dirt 组当年为此干脆没换成采样）
+      const n = Math.max(1, cut.variants || 1);
+      const files = [];
+      let firstInfo = null;
+      for (let v = 0; v < n; v += 1) {
+        const hit = cut.window ? PickWindow(pcm, cut.tail, used) : Pick(hits, cut.prefer, used, cut.decay);
+        if (!hit) { console.log(`   ! ${cut.cue}：第 ${v + 1} 个变体没挑出合适的一下`); break; }
+        const name = v === 0 ? cut.cue : `${cut.cue}${v + 1}`;
+        const outMp3 = path.join(OUT_DIR, `${name}.mp3`);
+        const info = CutOne(pcm, hit, cut, path.join(OUT_DIR, `_${name}.wav`), outMp3);
+        files.push(`${name}.mp3`);
+        if (!firstInfo) firstInfo = info;
+        console.log(`   · ${name}  ${info.seconds.toFixed(2)}s  ${(info.bytes / 1024).toFixed(1)}KB  `
+          + `(素材 ${(hit.at / SR).toFixed(1)}s 处，衰减 ${hit.decayS.toFixed(2)}s)`);
+      }
+      if (!files.length) { console.log(`   ! ${cut.cue}：一个变体都没切出来`); continue; }
       manifest.cues[cut.cue] = {
-        file: `${cut.cue}.mp3`,
+        // file 保留单数形式给老读法兜底；files 是真相
+        file: files[0],
+        ...(files.length > 1 ? { files } : {}),
         group: group.id,
-        seconds: Number(info.seconds.toFixed(3)),
-        atSeconds: Number((hit.at / SR).toFixed(2)),
-        bytes: info.bytes,
+        seconds: Number(firstInfo.seconds.toFixed(3)),
+        bytes: firstInfo.bytes,
       };
-      console.log(`   · ${cut.cue}  ${info.seconds.toFixed(2)}s  ${(info.bytes / 1024).toFixed(1)}KB  `
-        + `(素材 ${(hit.at / SR).toFixed(1)}s 处，衰减 ${hit.decayS.toFixed(2)}s)`);
     }
   }
 
