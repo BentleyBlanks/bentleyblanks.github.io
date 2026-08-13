@@ -3927,14 +3927,18 @@ export const SCRIPTS = {
       // 外面那团动静交给调度器（SetDin）：由远及近是一条连着的曲线。
       kind: "cinematic", id: "c1_thatday", timeOfDay: "day",
       lines: [
-        { stage: "", d: 3.4, cam: { kind: "dark" },
+        // 开场这两句是全作唯一"该黑一会儿"的黑屏（声音先到、画面后到），但也
+        // 只该黑到听清楚为止：老版 3.4+2.6＝六秒的纯黑开局，玩家还没进门就在
+        // 等（2026-08-14 用户：「明明一转眼就可以解决的事情结果还在黑屏」）。
+        // 收到 2.0+1.9，枪声跟着往前提——din 是跨拍连着爬的，曲线不受影响。
+        { stage: "", d: 2.0, cam: { kind: "dark" },
           on: (state) => {
-            // 黑屏里先响起来：还在村外，狗先知道。爬到 0.55 用掉这一句
-            SetDin(state, 0.06, 0.55, 0.17);
-            Cue(state, "gunshot", { gain: 0.18, rate: 0.75, delay: 2.3 });
+            // 黑屏里先响起来：还在村外，狗先知道
+            SetDin(state, 0.06, 0.55, 0.26);
+            Cue(state, "gunshot", { gain: 0.18, rate: 0.75, delay: 1.15 });
           } },
         // 八稿：黑屏里那句喊——听得懂的就这一句，所以它自己占一行
-        { who: "伪军", say: "出来！都出来！", d: 2.6, cam: { kind: "dark" },
+        { who: "伪军", say: "出来！都出来！", d: 1.9, cam: { kind: "dark" },
           on: (state) => {
             SetDin(state, null, 0.72, 0.22);
             Cue(state, "shout", { gain: 0.7, rate: 0.98, delay: 0.1 });
@@ -4342,12 +4346,16 @@ export const SCRIPTS = {
             state.player.pose = null;
             state.player.track = { name: "hugTight", t: 0 };
           } },
-        { stage: "没人来叫。", d: 2.8, cam: { kind: "dark" } },
+        // 序的收尾这一串黑屏原来是 2.8+3.6+3.0+2.6＝**十二秒**连着的黑：
+        // 一句四个字的旁白、一张章名卡、一句"三天后"、一声肚子叫，全在黑里
+        // 各占三秒（2026-08-14 用户退回）。四句都收到"说完就走"，章名卡只留
+        // 它自己淡入淡出要的那点时间。
+        { stage: "没人来叫。", d: 1.6, cam: { kind: "dark" } },
         // 章名卡：第一章 · 蓝底白花（八稿明令——章名出现在序的末尾，
         // 不在开局；state.titleCard 由 Main 画成居中的章名字样）
-        { stage: "", d: 3.6, cam: { kind: "dark" },
-          on: (state) => { state.titleCard = { num: "第一章", title: "蓝底白花", t: 0, dur: 3.4 }; } },
-        { stage: "三天后。", d: 3.0, cam: { kind: "dark" },
+        { stage: "", d: 2.7, cam: { kind: "dark" },
+          on: (state) => { state.titleCard = { num: "第一章", title: "蓝底白花", t: 0, dur: 2.5 }; } },
+        { stage: "三天后。", d: 1.5, cam: { kind: "dark" },
           on: (state) => {
             // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来
             state.flags.lidShut = false;
@@ -4361,8 +4369,8 @@ export const SCRIPTS = {
             state.player.x = 33.2;
           } },
         // 黑屏一声肚子叫——不是大人的，是小孩那种咕噜噜的空响
-        { stage: "", d: 2.6, cam: { kind: "dark" },
-          on: (state) => { Cue(state, "bellyGrowl", { gain: 0.9, delay: 0.6 }); } },
+        { stage: "", d: 1.4, cam: { kind: "dark" },
+          on: (state) => { Cue(state, "bellyGrowl", { gain: 0.9, delay: 0.25 }); } },
         { stage: "灶是冷的。柱子蹲在灶前，摸了一把锅底——干的。", d: 4.0,
           cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.8 },
           on: (state) => {
@@ -5130,8 +5138,9 @@ export const SCRIPTS = {
             { stage: "一个人影从墙外转向巷口。", d: 1.8,
               cam: { kind: "shot", x: 48.6, y: 1.25, dist: 4.0 },
               on: (s) => { Cue(s, "step", { gain: 0.5, rate: 1.1 }); } },
-            // 画面迅速收黑，回到车铃第一次响起时
-            { stage: "", d: 1.8, cam: { kind: "dark" },
+            // 画面迅速收黑，回到车铃第一次响起时。**"迅速"就得真的迅速**：
+            // 这是重试路上的一格，玩家早知道自己被看见了，多黑一秒都是罚站
+            { stage: "", d: 0.9, cam: { kind: "dark" },
               on: (s) => { RewindBeat(s); } },
           ]);
         }
@@ -6282,8 +6291,8 @@ export const SCRIPTS = {
             Cue(state, "windGust", { gain: 0.45, rate: 0.85, delay: 0.5 });
           } },
         // 黑屏：第一章结束（章末字样走 titleCard，同章名卡一支笔）
-        { stage: "", d: 3.6, cam: { kind: "dark" },
-          on: (state) => { state.titleCard = { num: "", title: "第一章结束", t: 0, dur: 3.2 }; } },
+        { stage: "", d: 2.9, cam: { kind: "dark" },
+          on: (state) => { state.titleCard = { num: "", title: "第一章结束", t: 0, dur: 2.7 }; } },
       ],
     },
   ],
@@ -6896,8 +6905,9 @@ export const SCRIPTS = {
           } },
         { stage: "柴房底下，那个黑黢黢的洞口，像一只睁开的眼睛。", d: 3.8,
           cam: { kind: "insert", x: 52.6, y: 0.62, dist: 2.3 } },
-        { stage: "他头一回觉得，那底下不是个坟墓。", d: 3.2, cam: { kind: "dark" } },
-        { stage: "是个起点。", d: 3.0, cam: { kind: "dark" } },
+        { stage: "他头一回觉得，那底下不是个坟墓。", d: 3.0, cam: { kind: "dark" } },
+        // 五个字不值三秒的黑：说完就走，留白靠下一章的开场给
+        { stage: "是个起点。", d: 1.8, cam: { kind: "dark" } },
       ],
     },
   ],
@@ -7271,7 +7281,8 @@ export const SCRIPTS = {
         { who: "年轻民兵", say: "带乡亲们走。", d: 3.0, cam: { kind: "ots", subject: "pinned", other: "player", dist: 3.4 } },
         // 柱子的反应镜头：这场戏此前完全没有他，看完像是别人的事
         { stage: "", d: 2.6, cam: { kind: "ots", subject: "player", other: "pinned", dist: 3.2 } },
-        { d: 2.4, cam: { kind: "dark" } },
+        // 落幕的那一记黑：没有字、没有声，一秒多就够——空着的黑屏是标点，不是一场戏
+        { d: 1.2, cam: { kind: "dark" } },
       ],
     },
   ],
@@ -7520,7 +7531,7 @@ export const SCRIPTS = {
     {
       kind: "cinematic", id: "c8_open",
       lines: [
-        { stage: "一个月后。", d: 2.6, cam: { kind: "dark" } },
+        { stage: "一个月后。", d: 1.6, cam: { kind: "dark" } },
         { stage: "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "wide", x: 90 } },
         { stage: "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。", d: 4.8, cam: { kind: "wide", x: 130, pan: 5 } },
         { stage: "柱子带着妹妹，回了一趟梁家村。", d: 3.4, cam: { kind: "wide", x: 100, pan: -8 } },
