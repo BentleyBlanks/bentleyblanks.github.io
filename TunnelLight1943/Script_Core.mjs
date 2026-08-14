@@ -3976,7 +3976,10 @@ export const SCRIPTS = {
       // **交代要自己演完**：冲进屋 / 抱住妹妹 / 掀开翻板 / 「快。」都是真动作
       // （state.lid 带 to，盖板真的绕铰链转过去）。
       // 外面那团动静交给调度器（SetDin）：由远及近是一条连着的曲线。
-      kind: "cinematic", id: "c1_thatday", timeOfDay: "day",
+      // bgm: null ＝这一拍**没有音乐**（剧本首句〔音〕「没有音乐。」）。
+      // 第一章那首 BGM 是按章无条件铺的，序章因此一直有配乐在响，
+      // 「吵的都在墙外」这个设计在实机里从来没成立过（2026-08-14 修）
+      kind: "cinematic", id: "c1_thatday", timeOfDay: "day", bgm: null,
       lines: [
         // 开场这两句是全作唯一"该黑一会儿"的黑屏（声音先到、画面后到），但也
         // 只该黑到听清楚为止：老版 3.4+2.6＝六秒的纯黑开局，玩家还没进门就在
@@ -3994,33 +3997,53 @@ export const SCRIPTS = {
             SetDin(state, null, 0.72, 0.22);
             Cue(state, "shout", { gain: 0.7, rate: 0.98, delay: 0.1 });
           } },
-        // 运镜（2026-08-13 用户定：序章要勇敢的心过场那种连续运动的镜头，
-        // 不拘泥玩法段的 2D 视角）：显影先落在两个孩子身上，缓缓后拉把整间屋
-        // 带出来。**门始终留在画框边上不给正脸**——门是画在立面上的，过场里
-        // 第四堵墙不画（见 World 的 filmic），真给门个特写就穿帮成一个空门洞；
-        // 撞门全靠声音演，比看见更瘆人
-        { act: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。", d: 4.0,
-          cam: { kind: "free", from: [33.0, 0.9, 4.3], to: [32.5, 1.15, 5.7], at: [31.9, 0.95], atTo: [31.9, 0.9] },
+        // ── 显影：左右分屏（2026-08-14 用户拿勇敢的心的截图定的：「也有这种
+        // 左右分的镜头」）。剧本这一句本来就是并排的两件事——「柱子站在屋
+        // 中央。妹妹缩在炕沿下，两只手捂着耳朵。」一维横版里这两个人隔着两米，
+        // 一个整屏镜头装下他们，就只能退到"半间屋"的景别，于是谁也不大、
+        // 中间还空着。分屏把这一句拆成两格竖画幅：**各自顶天立地，各自一个人**。
+        //
+        // 两格的画框绝不许互相看见对方（左格 30.3~31.5、右格 31.9~33.0），
+        // 不然同一个人在两边各出现一次。
+        //
+        // **门始终不给正脸**——门是画在立面上的，过场里第四堵墙不画（见 World
+        // 的 filmic），真给门个特写就穿帮成一个空门洞；撞门全靠声音演。
+        { act: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。柱子站在屋当间。妹妹缩在炕沿下，两只手捂着耳朵。", d: 4.2,
+          cam: {
+            kind: "split",
+            left: { from: [30.52, 0.62, 2.55], to: [30.56, 0.60, 2.35], at: [31.02, 0.32], atTo: [31.02, 0.31] },
+            right: { from: [31.95, 0.80, 3.10], to: [31.98, 0.79, 2.90], at: [32.45, 0.62], atTo: [32.45, 0.61] },
+            fg: [
+              // 左格：炕沿压在画框下沿（她正缩在炕沿底下）
+              { art: "kangEdge", side: "left", u: 0, v: -0.82, z: 1.02, w: 0.85, h: 0.24 },
+              // 右格：门框柱竖在画框右缘——他盯着的就是那头
+              { art: "doorJamb", side: "right", u: 0.94, v: 0.05, z: 1.30, w: 0.44, h: 1.00, flip: true },
+            ],
+          },
           on: (state) => {
             state.beat.indoorScene = true;
-            // 屋里：柱子在屋当间，妹妹缩在炕沿下，两只手捂着耳朵
+            // 屋里：柱子在屋当间（脸冲着门那头），妹妹缩在炕沿下捂着耳朵
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.9; sis.heading = -1; sis.pose = "leanIn"; }
-            state.player.x = 33.0;
-            state.player.heading = -1;
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.9; sis.heading = -1; sis.pose = null; sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.7; }
+            state.player.x = 32.45;
+            state.player.heading = 1;
             SetDin(state, null, 0.82, 0.16);
             Cue(state, "doorCreak", { gain: 0.25, rate: 1.4, delay: 1.1 });
             Cue(state, "doorCreak", { gain: 0.25, rate: 1.45, delay: 2.8 });
           } },
         // 蓝底白花那一眼：不切特写，跟着她冲进来这一下说完
-        // 孩子视线的低机位：贴着妹妹的高度看门被撞开，注视点跟着娘冲进来
-        // 的路线从门口摇回屋当间——镜头追人，不是人走进画框
+        // 孩子视线的低机位：贴着炕沿的高度看她冲进来，注视点从门口摇回屋当间
+        // ——镜头追人，不是人走进画框。前景压一道炕沿：她从画框深处冲到近前，
+        // 那道横边就是"距离"的量尺
         { act: "一阵急促脚步冲进院子。门板猛地向里打开，撞在墙上——娘冲进来。蓝底白花的短褂被树枝扯开一道口，袖口沾着土。", d: 4.6,
-          cam: { kind: "free", from: [31.6, 0.85, 4.6], to: [31.8, 0.85, 4.3], at: [34.0, 1.1], atTo: [32.3, 0.98] },
+          cam: { kind: "free", from: [30.70, 0.80, 3.20], to: [30.85, 0.78, 2.90], at: [32.60, 0.82], atTo: [31.90, 0.70],
+            fg: [{ art: "kangEdge", u: -0.20, v: -0.69, z: 1.55, w: 1.6, h: 0.42 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
             if (m) { m.visible = true; m.level = "surface"; m.x = 38.6; m.heading = -1; m.cineTarget = { x: 31.6 }; m.cineSpeed = 3.4; }
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 1; }
             Cue(state, "doorCreak", { gain: 0.85, rate: 1.15 });
             Cue(state, "knock", { gain: 0.9, rate: 1.05, delay: 0.1 });
             // 门一开，外面那团东西整个灌进来
@@ -4030,7 +4053,9 @@ export const SCRIPTS = {
         // 妹妹 31.0 差 0.45m，手才够得着
         // 这一场最重的一下给一个不停的缓推：从半间屋慢慢压到怀抱上
         { act: "院外又响一枪。娘猛地回头，把门推回去，却没顾上关严——转身冲到妹妹面前，一把将她拉进怀里，上下摸了一遍。", d: 5.2,
-          cam: { kind: "free", from: [31.35, 1.1, 5.2], to: [31.2, 0.98, 3.6], at: [31.15, 0.92], atTo: [31.15, 0.88] },
+          cam: { kind: "free", from: [31.30, 0.98, 3.85], to: [31.20, 0.86, 2.42], at: [31.15, 0.80], atTo: [31.15, 0.74],
+            // 推到头时房梁压下来盖住画框上沿：屋子越推越"低"，怀里那一下才闷得住
+            fg: [{ art: "wallEdge", u: -0.82, v: 0, z: 1.30, w: 0.32, h: 0.75 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             Cue(state, "gunshot", { gain: 0.3, rate: 0.8, delay: 0.2 });
@@ -4055,7 +4080,17 @@ export const SCRIPTS = {
         // 正反打盖在她脸朝的那一侧（她 heading -1，机位在西），带一点偏航——
         // 纸戏台斜着看有厚度，正打永远是一张平贴
         { who: "娘", say: "柱子。", d: 1.8,
-          cam: { kind: "free", from: [30.5, 1.02, 4.6], to: [30.6, 1.0, 4.3], at: [31.45, 1.0] },
+          cam: { kind: "free", from: [30.86, 0.90, 2.06], to: [30.88, 0.89, 1.96], at: [31.38, 0.82],
+            // **画框右缘不许越过 x≈32.4**：屋子的东山墙到那儿就没了，过场里第四堵墙
+            // 又整个不画，再往东就直接望见野地和炮楼（实拍抓的）。这一镜是反打
+            // 她一个人，柱子（32.45）本来就该在画外
+            fg: [
+              { art: "wallEdge", u: -0.82, v: 0, z: 1.05, w: 0.30, h: 0.72 },
+              // **挡东山墙那道口子的板要按世界坐标钉**，不能写 u/v：u/v 是按
+              // 这一行**起手**那一格的机位折算的，镜头一推，它就跟着往画框外挪，
+              // 而要挡的那道口子是钉在世界里的（实拍连错两轮）
+              { art: "doorJamb", x: 31.45, y: 0.86, z: 1.05, w: 0.52, h: 1.6, flip: true },
+            ] },
           on: (state) => {
             const m = FindActor(state, "mother");
             if (m) m.track = { name: "huddleBreath", t: 0 };
@@ -4064,15 +4099,29 @@ export const SCRIPTS = {
             // tremble 的底子是蹲成一团（那是窖底在哥哥怀里那一拍）
             if (sis) { sis.track = { name: "heldTremble", t: 0 }; sis.trembleK = 1; }
           } },
-        // 「抱她」是说给柱子的——他得完整站在画框右侧接这句话，不许裁半个
+        // 「抱她。」**跟上一句同机位**（构图指纹一样＝不切）：两句一镜说完，
+        // 她抬着头没有低下去，那口气也没喘匀——切一刀反而把这口气切断了。
+        // 原来这一句是给柱子的双人镜，退回来的原因是**屋子的后墙只画到 x≈32**，
+        // 而他站在 32.45：任何装得下他的画框，右边都会直接望见野地和炮楼
+        //（过场里第四堵墙不画，东山墙那头是空的）。前景板挡不住——他就站在
+        // 那道口子跟前，板要么盖住野地也盖住他，要么两个都露。
+        // **真正的修法是把后墙往东接够**（Data_Scenes 的 house 摊到 34），
+        // 那是场景美术的活，不在这一轮里；接上之后这一句可以改回双人镜。
         { who: "娘", say: "抱她。", d: 2.0,
-          cam: { kind: "free", from: [30.75, 0.85, 4.3], to: [30.7, 0.87, 4.1], at: [31.6, 0.95] } },
+          cam: { kind: "free", from: [30.86, 0.90, 2.06], to: [30.88, 0.89, 1.96], at: [31.38, 0.82],
+            fg: [
+              { art: "wallEdge", u: -0.82, v: 0, z: 1.05, w: 0.30, h: 0.72 },
+              { art: "doorJamb", x: 31.45, y: 0.86, z: 1.05, w: 0.52, h: 1.6, flip: true },
+            ] } },
         // 换机位＝换一镜（每一行本来就是一个镜头），所以人直接摆到窖口，
         // 不在这一句里演走位——走位只留给"冲进屋"那一下，那是要看的
         // 俯角看翻板（滑开/蹭汗/再攥住/掀开都在手上），镜头缓缓沉下去凑近——
         // 俯的是这一小块窖口，不是全村（那条禁令管的是景别，不是角度）
         { act: "娘去拉菜窖翻板。手指第一次从铁环上滑开。她在衣襟上蹭了一把汗，第二次攥住铁环，将翻板猛地掀开。", d: 5.4,
-          cam: { kind: "free", from: [30.6, 2.3, 6.4], to: [30.25, 2.0, 5.5], at: [29.55, 0.55], atTo: [29.6, 0.45] },
+          cam: { kind: "free", from: [30.35, 1.15, 3.05], to: [30.20, 1.02, 2.62], at: [29.78, 0.52], atTo: [29.80, 0.44],
+            // 窖口边上那堆柴草压住画框下沿——俯角最怕的是"一片地面"，
+            // 底下有东西挡着，这一俯才有落点
+            fg: [{ art: "vat", u: -0.62, v: -0.40, z: 1.40, w: 0.60, h: 0.60 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
@@ -4102,7 +4151,9 @@ export const SCRIPTS = {
         // 收尾反打：贴着孩子那头的低机位仰看跪在窖口的娘，掀开的洞口
         // 黑在画框下沿——「快」字说给谁、往哪儿快，一目了然
         { who: "娘", say: "快。", d: 2.2,
-          cam: { kind: "free", from: [31.35, 0.6, 4.4], to: [31.15, 0.62, 4.1], at: [30.1, 0.88] },
+          cam: { kind: "free", from: [31.10, 0.40, 2.55], to: [30.98, 0.42, 2.36], at: [30.15, 0.70],
+            // 掀开的板沿黑在画框下沿：「快」字往哪儿快，一目了然
+            fg: [{ art: "hatchLip", u: 0, v: -0.73, z: 1.30, w: 1.3, h: 0.36 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
@@ -4125,7 +4176,9 @@ export const SCRIPTS = {
       // 娘掀着翻板守在窖口；玩家若往屋门走，她挡在门前朝菜窖指：「下去！」
       // 到了窖底她只探进半张脸：「搂紧她。」「不叫你们，别上来。」翻板合上——
       // 最后消失在板缝里的，是她那截蓝底白花的袖子。
-      kind: "chain", id: "c1_descend", timeOfDay: "day", indoorScene: true,
+      kind: "chain", id: "c1_descend", timeOfDay: "day", indoorScene: true, bgm: null,
+      // 序这三拍是一段连着的戏，分级也不许中途换脸（玩法段默认不分级）
+      grade: 0.82,
       objective: "带妹妹下窖", hint: "娘掀着翻板等着你们",
       onStart: (state) => {
         state.player.cineWalk = null;
@@ -4210,7 +4263,8 @@ export const SCRIPTS = {
             if (sis) { sis.lift = 0; sis.level = "under"; sis.x = 30.7; sis.heading = 1; sis.pose = "leanIn"; sis.cineTarget = null; }
             StartMicroCine(state, [
               { act: "柱子先坐到窖沿，把妹妹放上梯子。妹妹抓着他的衣襟不肯松手。", d: 3.4,
-                cam: { kind: "shot", x: 29.6, y: 1.0, dist: 3.2 },
+                cam: { kind: "free", from: [30.62, 0.86, 2.90], to: [30.55, 0.84, 2.70], at: [29.78, 0.46], atTo: [29.80, 0.42],
+                  fg: [{ art: "vat", u: -0.72, v: -0.44, z: 1.40, w: 0.55, h: 0.55 }] },
                 on: (s) => {
                   // 坐下去→往下送→她不撒手→一根根掰开（老版：跪姿定格挂 3 秒）
                   FlashTrack(s, "lowerChild", 3.0);
@@ -4229,21 +4283,29 @@ export const SCRIPTS = {
             if (sis) { sis.following = false; sis.level = "under"; sis.x = 30.9; sis.heading = 1; sis.pose = "leanIn"; sis.lift = 0; }
             StartMicroCine(state, [
               { act: "娘跪在窖口，一只手压着翻板。外面的脚步已经到了院门口。", d: 3.2,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
+                cam: { kind: "free", from: [30.98, 0.54, 3.02], to: [30.92, 0.52, 2.86], at: [29.95, 0.54], atTo: [29.95, 0.52],
+                  // **机位不许沉到地平线以下**（2026-08-14 实拍抓的）：想从窖底仰头看
+                  // 洞口的娘，机位得摆在窖顶与地表之间——那儿是**实心土**，近侧剖面
+                  // （NEAR_Z 的那刀土）只在窖室那一块掏了洞。拍出来是满屏土，人不见了。
+                  // 所以这三句改成贴着地面的平视 + 缓推；"从底下看"那股劲交给低机位。
+                  fg: [{ art: "vat", u: -0.76, v: -0.52, z: 1.50, w: 0.55, h: 0.55 }] },
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.x = 29.95; m.heading = -1; m.pose = null; m.track = { name: "hatchGuard", t: 0 }; }
                   Cue(s, "step", { gain: 0.4, rate: 1.2, delay: 1.6 });
                 } },
               { who: "娘", say: "搂紧她。", d: 2.2,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 } },
+                cam: { kind: "free", from: [30.98, 0.54, 3.02], to: [30.92, 0.52, 2.86], at: [29.95, 0.54], atTo: [29.95, 0.52],
+                  fg: [{ art: "vat", u: -0.76, v: -0.52, z: 1.50, w: 0.55, h: 0.55 }] } },
               { who: "娘", say: "不叫你们，别上来。", d: 3.0,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 } },
+                cam: { kind: "free", from: [30.98, 0.54, 3.02], to: [30.92, 0.52, 2.86], at: [29.95, 0.54], atTo: [29.95, 0.52],
+                  fg: [{ art: "vat", u: -0.76, v: -0.52, z: 1.50, w: 0.55, h: 0.55 }] } },
               // 翻板合上。最后消失在板缝里的是娘那截蓝底白花的袖子——
               // **同一个仰角机位演完**（不切特写：那条规矩这一场通用），
               // 盖板真的绕铰链落回去，落到底才是那声闷响
               { act: "翻板合上。最后消失在板缝里的，是娘那截蓝底白花的袖子。", d: 4.0,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
+                cam: { kind: "free", from: [30.78, 0.46, 2.62], to: [30.74, 0.45, 2.48], at: [29.92, 0.44], atTo: [29.92, 0.42],
+                  fg: [{ art: "vat", u: -0.78, v: -0.56, z: 1.35, w: 0.5, h: 0.5 }] },
                 on: (s) => {
                   // rate 1.8 ＝ 0.56 秒就扣死，而 lidLower 那只手 t=0.9 才够到
                   // 地面那条缝、t=1.2 才抽回来——板在她手落下去之前就合上了，
@@ -4262,8 +4324,18 @@ export const SCRIPTS = {
                   const m = FindActor(s, "mother");
                   if (m) { m.pose = null; m.cineTarget = null; m.x = 29.95; m.heading = -1; m.track = { name: "lidLower", t: 0 }; }
                 } },
+              // ── 第二处左右分屏：一格底下、一格头顶，同一刻。
+              // 这一句剧本里本来就是**只有声音**的一行（〔音〕头顶传来娘急促的
+              // 脚步）。整屏镜头只能二选一：拍窖底就听不见上头、拍上头就丢了
+              // 两个孩子。分屏把「命藏在脚底下」这个题眼直接摆成一张画——
+              // 左边黑的那一格里有两个人，右边亮的那一格里一个人也没有了。
               { act: "头顶传来娘急促的脚步。她从后门跑出去了。", d: 4.4,
-                cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 },
+                cam: {
+                  kind: "split",
+                  left: { from: [31.62, UNDER_Y + 0.98, 2.95], to: [31.56, UNDER_Y + 0.96, 2.72], at: [31.05, UNDER_Y + 0.58], atTo: [31.05, UNDER_Y + 0.56] },
+                  right: { from: [31.18, 1.06, 3.20], to: [31.20, 1.05, 3.02], at: [30.25, 0.82], atTo: [30.25, 0.81] },
+                  fg: [{ art: "ladder", side: "left", u: -0.86, v: 0, z: 1.30, w: 0.34, h: 1.0 }],
+                },
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.track = null; m.pose = null; m.cineTarget = { x: 60 }; m.cineSpeed = 3.0; m.heading = 1; m.cineVanish = true; }
@@ -4283,7 +4355,7 @@ export const SCRIPTS = {
       // 粮袋割破；靴子踩上翻板，灰从板缝落下来；屋外一声喊，靴子离开。
       // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
       // 「打进来的光」要有黑给它打进来才成立。
-      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true,
+      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null, grade: 0.82,
       zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 15, sustain: true,
       // 按住的十五秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
       // holdPose 留着当兜底口径
@@ -4299,9 +4371,13 @@ export const SCRIPTS = {
           sis.cineTarget = null; sis.x = 30.98; sis.heading = 1; sis.pose = "leanIn"; sis.lift = 0;
           sis.track = { name: "tremble", t: 0, ambient: true };
         }
-        // 跳幕直落这一拍时，娘的走位过场没演——她这会儿已经出院了
-        const m = FindActor(state, "mother");
-        if (m) { m.cineTarget = null; m.visible = false; }
+        // **娘不在这儿收**（2026-08-14 实拍抓出来的老 bug）：上一拍的最后一步
+        // 在 effect 里起了微过场，而它同时是链的**最后一步**——AdvanceBeat 当帧
+        // 就把这一拍压上来（CLAUDE.md 那条"微过场起在最后一步要垫一步 goto"说的
+        // 就是它），于是 onEnter 在微过场第 0 行还没播的时候先把她抹了。
+        // 结果是：「搂紧她。」「不叫你们，别上来。」连同**最后消失在板缝里的
+        // 那截蓝底白花袖子**，整段演给一个空画框看。
+        // 收人的活挪进 tick，等微过场演完再收（她自己会跑出画外，见 cineVanish）。
         state.flags.lidShut = true;
         state.player.x = 31.45;
         state.player.heading = -1;
@@ -4313,6 +4389,11 @@ export const SCRIPTS = {
       },
       tick: (state, dt) => {
         const b = state.beat;
+        // 微过场演完（或跳幕直落这儿压根没演）才把娘收走——她这会儿已经出了院
+        if (!state.microCine) {
+          const m = FindActor(state, "mother");
+          if (m && m.visible) { m.cineTarget = null; m.visible = false; }
+        }
         const holding = state.player.track?.name === "hugTight" || state.player.pose === "shelter";
         // 头顶那场翻箱倒柜只在按住时往前走：松手，脚步停住听你们（八稿）
         if (holding) b.hideT = (b.hideT || 0) + dt;
@@ -4383,7 +4464,9 @@ export const SCRIPTS = {
         // 序的收尾：柱子仍然搂着妹妹。板缝里的光从直的变成斜的（beamSlant
         // 已由 c1_hide 落下），又一点点暗下去
         { act: "柱子仍然搂着妹妹。板缝里的光从直的变成斜的，又一点点暗下去。", d: 4.2,
-          cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.8 },
+          cam: { kind: "free", from: [31.62, UNDER_Y + 1.00, 3.05], to: [31.56, UNDER_Y + 0.97, 2.68], at: [31.10, UNDER_Y + 0.60],
+            // 梯子帮竖在画框左缘：这一格里唯一的出路，也是他们不许上去的那条
+            fg: [{ art: "ladder", u: -0.86, v: 0, z: 1.30, w: 0.34, h: 1.0 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             state.beamSlant = 0.4;
@@ -4401,7 +4484,10 @@ export const SCRIPTS = {
         // 一句四个字的旁白、一张章名卡、一句"三天后"、一声肚子叫，全在黑里
         // 各占三秒（2026-08-14 用户退回）。四句都收到"说完就走"，章名卡只留
         // 它自己淡入淡出要的那点时间。
-        { stage: "没人来叫。", d: 1.6, cam: { kind: "dark" } },
+        // 全序场唯一一句真旁白，也是音乐**唯一**该进来的地方：前面十几分钟
+        // 一个音符都没有，这一句才压得住（曲子见 Data_BgmConfig.EXTRA_BGM）
+        { stage: "没人来叫。", d: 1.6, cam: { kind: "dark" },
+          on: (state) => { state.bgmOverride = "thatDay"; } },
         // 章名卡：第一章 · 蓝底白花（八稿明令——章名出现在序的末尾，
         // 不在开局；state.titleCard 由 Main 画成居中的章名字样）
         { act: "", d: 2.7, cam: { kind: "dark" },
@@ -4430,6 +4516,8 @@ export const SCRIPTS = {
           cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.8 },
           on: (state) => {
             state.beat.indoorScene = true;
+            // 序的那首曲子托完四行黑屏就交班：画面一回来，第一章的底色接上
+            state.bgmOverride = undefined;
             state.player.x = 28.4;
             state.player.heading = -1;
             FlashTrack(state, "panBottom", 3.2);
@@ -8464,6 +8552,8 @@ function AdvanceBeat(state) {
   state.beatIndex += 1;
   state.caption = null;
   state.prompt = null;
+  // 行级 BGM 覆盖只活在它自己那一行所在的拍里（序收尾那首「那天」）
+  state.bgmOverride = undefined;
   state.planing = null;
   state.scribe = null;
   state.scribeCard = null;

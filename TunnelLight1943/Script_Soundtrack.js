@@ -7,7 +7,7 @@
 // 台词），所以声音的主体是一个念舞台提示的旁白，跟《勇敢的心》一路。
 
 import { CurrentBeatDef, SetVoiceDurations, SetVoiceGate, VoiceLineId } from "./Script_Core.mjs";
-import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
+import { CHAPTER_BGM, EXTRA_BGM } from "./Data_BgmConfig.mjs";
 
 const VOICE_RELEASE = "20260809Carve053";
 
@@ -65,13 +65,22 @@ export function CreateSoundtrack(audio) {
     if (!state) return;
 
     // 每帧幂等同步，保证异步到位的 Audio 模块也能拿到当前章节，而不漏掉开局首帧。
-    const bgm = CHAPTER_BGM[state.chapterIndex];
+    //
+    // 三级优先：**行**（`state.bgmOverride`，过场行的 on() 里立）＞ **拍**
+    //（`def.bgm`）＞ 章（`CHAPTER_BGM`）。两处都认 `null` ＝这一段没有音乐——
+    // 序 · 那天整场靠这个才真的静得下来（剧本第一句就是「没有音乐」）。
+    const def = CurrentBeatDef(state);
+    const override = state.bgmOverride !== undefined ? state.bgmOverride
+      : (def && Object.prototype.hasOwnProperty.call(def, "bgm")) ? def.bgm
+        : undefined;
+    const bgm = override === undefined ? CHAPTER_BGM[state.chapterIndex]
+      : override === null ? null
+        : EXTRA_BGM[override];
     if (bgm) audio.SetBgm({ ...bgm, url: new URL(bgm.file, import.meta.url).href });
     else audio.StopBgm();
 
     // —— 配乐情绪：按章定底色，抓捕/淹水这类段落临时压过去
     const chapterMood = CHAPTER_MOOD[state.chapterIndex] || "calm";
-    const def = CurrentBeatDef(state);
     let mood = chapterMood;
     if (state.flags?.motherLost || def?.id?.includes("loss")) mood = "grief";
     else if (state.detection?.level > 0.55) mood = "raid";

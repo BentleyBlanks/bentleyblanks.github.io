@@ -384,6 +384,8 @@ let camSnap = true;
 // 冻帧开关：只给实拍/调试用（TunnelLight.Freeze）。见 RunFrame 里那段注释
 let frozen = false;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
+// 过场分级的当前档（0=一个字节都不动）。见 UpdateCamera 末尾与 World.SetCineGrade
+let gradeNow = 0;
 
 function ActorAt(state, id) {
   if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
@@ -488,28 +490,52 @@ function HintShot(state, hint) {
       // at→atTo 注视点按本行时长插值（smoothstep），roll 单位是度。
       // 数值口径：FOV 30° 下画宽 ≈ 机位到注视点的距离（16:9），
       // 也就是旧 hint 的 dist（半宽）× 2。VO 拖长行时插值钉在终点不再动。
-      const d = Math.max(0.6, state.camLineD || 3.4);
-      const k = Math.min(1, (state.camLineT || 0) / d);
-      const e = hint.ease === "linear" ? k : k * k * (3 - 2 * k);
-      const L = (a, b) => a + (b - a) * e;
-      const f = hint.from, t = hint.to || hint.from;
-      const a = hint.at, a2 = hint.atTo || hint.at;
-      const r0 = hint.roll || 0, r1 = hint.rollTo ?? r0;
+      const e = CineEase(state, hint);
+      const F = FreeAt(hint, e);
       return {
-        free: {
-          px: L(f[0], t[0]), py: L(f[1], t[1]), pz: L(f[2], t[2]),
-          tx: L(a[0], a2[0]), ty: L(a[1], a2[1]), tz: L(a[2] || 0, a2[2] || 0),
-          roll: (r0 + (r1 - r0) * e) * Math.PI / 180,
-        },
+        free: F,
         // 指纹必须取自 hint 本身：插值出来的位置每帧都变，拿它当指纹
         // 等于每帧都在"换镜头"
-        freeKey: `${f}|${t}|${a}|${a2}`,
-        x: L(a[0], a2[0]), y: L(a[1], a2[1]), hw: 6,
+        freeKey: `${hint.from}|${hint.to}|${hint.at}|${hint.atTo}`,
+        x: F.tx, y: F.ty, hw: 6,
+      };
+    }
+    case "split": {
+      // 左右分屏（2026-08-14）：两台过场相机各占半屏，中间一道撕口白缝。
+      // 半屏的画幅是竖的（≈8:9），**同一个 dist 下人物比整屏大一圈**——
+      // 所以两侧的机位要各自按"这一格里要装下什么"给，别照整屏那套抄。
+      const e = CineEase(state, hint);
+      const L = FreeAt(hint.left, e);
+      const R = FreeAt(hint.right, e);
+      return {
+        free: L,                       // 主相机跟左格：画幅/雾色/层闸门都由它定
+        split: { left: L, right: R, gap: hint.gap ?? 0.014 },
+        freeKey: `S|${hint.left.from}|${hint.left.at}|${hint.right.from}|${hint.right.at}`,
+        x: L.tx, y: L.ty, hw: 6,
       };
     }
     default:
       return BaseShot(state);
   }
+}
+
+// 过场行的插值进度：按本行时长 smoothstep（VO 把行拖长时钉在终点不再动）
+function CineEase(state, hint) {
+  const d = Math.max(0.6, state.camLineD || 3.4);
+  const k = Math.min(1, (state.camLineT || 0) / d);
+  return hint.ease === "linear" ? k : k * k * (3 - 2 * k);
+}
+
+function FreeAt(spec, e) {
+  const L = (a, b) => a + (b - a) * e;
+  const f = spec.from, t = spec.to || spec.from;
+  const a = spec.at, a2 = spec.atTo || spec.at;
+  const r0 = spec.roll || 0, r1 = spec.rollTo ?? r0;
+  return {
+    px: L(f[0], t[0]), py: L(f[1], t[1]), pz: L(f[2], t[2]),
+    tx: L(a[0], a2[0]), ty: L(a[1], a2[1]), tz: L(a[2] || 0, a2[2] || 0),
+    roll: (r0 + (r1 - r0) * e) * Math.PI / 180,
+  };
 }
 
 function UpdateCamera(state, dt) {
@@ -546,6 +572,19 @@ function UpdateCamera(state, dt) {
     }
     world.SetOverShoulder(state, shot.ots || null);
     world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0, shot.cardSeg || 0);
+    // 框景与分屏都是**这一行**的事（换行＝换镜头），所以跟着 hint 走，
+    // 不挂在节拍上；插卡那几行没有世界可看，框景一律让开。
+    // 框景的 u/v 折算要按**这一格的画幅**：分屏时半屏是竖的（≈0.88），
+    // 拿整屏的 16:9 去折，板子会横着跑出画外
+    const fgAspect = shot.split
+      ? Math.max(0.2, (world.viewSize.w / world.viewSize.h) * (1 - shot.split.gap) / 2)
+      : (world.viewSize.w / world.viewSize.h);
+    world.SetCineFore(
+      shot.card ? null : (hint.fg || null),
+      shot.split || (shot.free ? { left: shot.free } : null),
+      fgAspect, fp,
+    );
+    world.SetSplitShot(shot.split || null);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
@@ -558,6 +597,21 @@ function UpdateCamera(state, dt) {
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
+    // 玩法段的框景只有一处来源：节拍自己声明的 `fg`，而且**只能写世界坐标**
+    // （u/v 是按画框折算的，跟随镜头下画框一直在动，板子会跟着人漂）
+    world.SetCineFore((def?.fg && state.phase === "playing") ? def.fg : null, null, 16 / 9, "play:" + (def?.id || ""));
+    world.SetSplitShot(null);
+  }
+  // 过场分级：过场满档，玩法段只有节拍显式声明 `grade` 才给（序章那三拍）。
+  // 换挡走 6/s 的吸附——硬切会在跳幕/暂停这些不走 iris 的地方"啪"地跳一下
+  {
+    const def2 = state.phase === "playing" ? CurrentBeatDef(state) : null;
+    const want = state.phase !== "playing" ? 0
+      : inCinematic ? 1
+        : (def2?.grade ?? 0);
+    gradeNow += (want - gradeNow) * Math.min(1, dt * 6);
+    if (Math.abs(want - gradeNow) < 0.01) gradeNow = want;
+    world.SetCineGrade(gradeNow);
   }
   // 做功那几拍的活卡（划线 / 刨料 / 接绳 / 叠衣裳）：铺满画框、每帧重画，玩家
   // 的手就按在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、
