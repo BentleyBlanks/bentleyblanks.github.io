@@ -1193,8 +1193,8 @@ function TestKnotIsASheetBend() {
 // 原 TestFoldIsHandsOnCloth 随玩法一起退役（2026-08-13）。
 
 function TestGrabbablesAreBigEnoughToRead() {
-  const VIEW_W = 12.3;          // 玩法景别画宽（BaseShot 的 hw 6.15 ×2）
-  const PX = 1600 / VIEW_W;     // 130 px/米
+  const VIEW_W = 9.6;           // 玩法景别画宽（Main 的 PLAY_HW.surfaceNight 4.8 ×2）
+  const PX = 1600 / VIEW_W;     // 167 px/米
   const MIN_PX = 128;
   const items = [
     ["苫草（整片）", FORAGE.mat.half * 2],
@@ -1767,7 +1767,7 @@ function TestDayNightIsContinuous() {
 // 画框边缘的指路标（勇敢的心式）：目标出了画框且离得远 → 必须指、指对边；
 // 目标就在画框里或人已到近旁 → 不指；特写里不指；目标在另一层 → 先指梯口。
 function TestEdgeHintPointsOffscreenTargets() {
-  const VIEW = 12.3;   // 地表玩法景别的画框宽（hw 6.15 × 2）
+  const VIEW = 9.6;    // 地表玩法景别的画框宽（Main 的 PLAY_HW.surfaceNight 4.8 × 2）
   // 第一章里找一幕带同层空间目标的玩法拍（剧本再改也不至于失效）
   let s = null, tg = null;
   const list = ChapterBeatList(0);
