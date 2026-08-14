@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="从签下全部身家开始，在九个横版 2D 场景里熬出一家游戏公司的开发生存 demo。">
   <title>甲方是我：工作室跑断腿</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815k">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815l">
   <script type="importmap">
     {
       "imports": {
@@ -117,7 +117,7 @@
       <span class="ceremonyEyebrow">2.5D FOUNDING CEREMONY · 2026</span>
       <h1>今天，<br>你将成立一家<br><em>随时会倒闭的公司</em></h1>
       <p>灯会亮，礼花会响，银行也会在同一秒开始计时。仪式结束后，才轮到现实动手。</p>
-      <div class="controlPills"><span>全部身家担保</span><span>放款 ¥68,000</span><span>M08 前还 ¥82,000</span><span>逾期直接清算</span></div>
+      <div class="controlPills"><span class="winPill">唯一胜利：游戏收入 100 亿元</span><span>全部身家担保</span><span>放款 ¥68,000</span><span>M08 前还 ¥82,000</span><span>逾期直接清算</span></div>
       <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><span>进入 2.5D 成立仪式</span><strong>让灯亮起来 →</strong></button>
       <button id="continueButton" class="continueButton hidden" type="button">跳过仪式，继续上次的公司</button>
     </div>
@@ -178,6 +178,24 @@
     </section>
   </section>
 
+  <section id="goalReveal" class="goalReveal hidden" role="dialog" aria-modal="true" aria-labelledby="goalRevealTitle" aria-describedby="goalRevealDescription">
+    <div class="goalRevealGrid" aria-hidden="true"></div>
+    <div class="goalRevealCard">
+      <p class="goalRevealKicker"><span></span>合同生效 · 唯一胜利条件<span></span></p>
+      <h2 id="goalRevealTitle">让你的游戏挣到</h2>
+      <div class="goalRevealNumber" role="img" aria-label="一百亿元">
+        <span id="goalRevealCounter">0</span><b>亿元</b>
+      </div>
+      <div class="goalRevealTrack" aria-hidden="true"><i></i><b>¥10,000,000,000</b></div>
+      <p id="goalRevealDescription" class="goalRevealDescription">累计游戏收入达到 <strong>100 亿元</strong>，才算真正胜利。</p>
+      <div class="goalRevealRules" aria-label="目标收入计算规则">
+        <div class="goalRevenueCounts"><span>计入目标</span><strong>游戏首发 · 版本更新 · 持续运营净收入</strong></div>
+        <div class="goalRevenueExcluded"><span>不计入</span><strong>贷款 · 彩票 · 炒股</strong></div>
+      </div>
+      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><span>目标明确</span><strong>开工，挣到 100 亿 →</strong></button>
+    </div>
+  </section>
+
   <div id="modalLayer" class="modalLayer hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <button id="modalBackdrop" class="modalBackdrop" type="button" aria-label="关闭交互窗口"></button>
     <section class="worldPanel">
@@ -199,6 +217,6 @@
     <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>再跑一家公司</span><strong>这次少走弯路 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815k"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815l"></script>
 </body>
 </html>

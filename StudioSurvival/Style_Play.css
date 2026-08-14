@@ -551,6 +551,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .setupTitle p { max-width: 510px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .controlPills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
 .controlPills span { padding: 5px 9px; border: 1px solid var(--line); border-radius: 99px; color: #dad6ed; font-size: 9px; }
+.controlPills .winPill { border-color: rgba(101,216,255,.62); background: rgba(101,216,255,.09); color: #bcefff; font-weight: 850; }
 .setupPicker { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line); border-radius: 24px; background: rgba(13,15,24,.72); box-shadow: 0 28px 70px rgba(0,0,0,.35); backdrop-filter: blur(12px); }
 .pickerBlock { display: grid; gap: 9px; }
 .pickerHeading { display: flex; align-items: center; gap: 9px; }
@@ -681,6 +682,69 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .sealButton.sealed { background: #a42435; color: #fff1df; transform: rotate(-2deg); }
 @keyframes sealHold { to { transform: translateX(0); } }
 .projectContract.signed::after { content:"已签署"; position: fixed; right: 7%; bottom: 9%; display:grid; place-items:center; width:100px; height:100px; border:7px double rgba(164,36,53,.72); border-radius:50%; color:rgba(164,36,53,.72); font:950 24px/1 "Songti SC",serif; transform:rotate(-13deg); pointer-events:none; }
+
+/* Unmissable win-condition reveal ----------------------------------------- */
+.goalReveal {
+  --goalRevealProgress: 0;
+  position: fixed;
+  z-index: 140;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 43%, rgba(101,216,255,.14), transparent 32%),
+    radial-gradient(circle at 50% 62%, rgba(157,140,255,.16), transparent 42%),
+    #070910;
+  isolation: isolate;
+}
+.goalReveal::before,
+.goalReveal::after { content:""; position:absolute; z-index:-1; pointer-events:none; }
+.goalReveal::before { inset:-30%; opacity:0; background:conic-gradient(from 90deg at 50% 50%, transparent 0 43%, rgba(101,216,255,.1) 48%, transparent 53% 100%); }
+.goalReveal::after { left:50%; top:50%; width:min(980px,86vw); height:1px; opacity:0; background:linear-gradient(90deg,transparent,rgba(101,216,255,.95),transparent); box-shadow:0 0 34px rgba(101,216,255,.9); transform:translate(-50%,-50%) scaleX(.12); }
+.goalReveal.active::before { animation:goalRevealRadar 7s linear infinite, goalRevealFade .8s ease .15s both; }
+.goalReveal.active::after { animation:goalRevealScan .72s cubic-bezier(.2,.8,.2,1) .16s both; }
+.goalRevealGrid { position:absolute; inset:0; z-index:-2; opacity:.17; background-image:linear-gradient(rgba(101,216,255,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(101,216,255,.14) 1px,transparent 1px); background-size:42px 42px; mask-image:radial-gradient(circle at center,#000 0 30%,transparent 76%); }
+.goalRevealCard { width:min(900px,94vw); display:grid; justify-items:center; gap:clamp(7px,1.4vh,14px); text-align:center; }
+.goalRevealKicker { margin:0; display:flex; align-items:center; gap:12px; color:#9feaff; font-size:clamp(8px,1.2vw,11px); font-weight:900; letter-spacing:.24em; opacity:0; transform:translateY(10px); }
+.goalRevealKicker span { width:clamp(24px,6vw,70px); height:1px; background:linear-gradient(90deg,transparent,#65d8ff); }
+.goalRevealKicker span:last-child { transform:scaleX(-1); }
+.goalReveal h2 { margin:0; font-size:clamp(22px,3.8vw,46px); line-height:1; letter-spacing:-.045em; opacity:0; transform:translateY(18px); }
+.goalRevealNumber { min-height:1em; display:flex; align-items:baseline; justify-content:center; color:#fff; line-height:.8; filter:drop-shadow(0 0 28px rgba(101,216,255,.2)); opacity:0; transform:scale(.72); }
+.goalRevealNumber span { min-width:2.35ch; font-size:clamp(64px,20vh,184px); font-weight:950; letter-spacing:-.105em; font-variant-numeric:tabular-nums; background:linear-gradient(180deg,#fff 10%,#bcefff 52%,#8d7cff 100%); background-clip:text; -webkit-background-clip:text; color:transparent; }
+.goalRevealNumber b { margin-left:clamp(7px,1.5vw,16px); color:#d8f7ff; font-size:clamp(18px,4.5vh,43px); letter-spacing:-.05em; }
+.goalRevealTrack { position:relative; width:min(680px,82vw); height:22px; overflow:hidden; border:1px solid rgba(101,216,255,.34); border-radius:3px; background:rgba(255,255,255,.045); opacity:0; }
+.goalRevealTrack::before { content:"0"; position:absolute; z-index:2; left:8px; top:50%; color:rgba(255,255,255,.52); font-size:7px; transform:translateY(-50%); }
+.goalRevealTrack i { position:absolute; inset:0; transform:scaleX(var(--goalRevealProgress)); transform-origin:left; background:linear-gradient(90deg,#6252e5,#65d8ff 72%,#fff); box-shadow:0 0 25px rgba(101,216,255,.55); }
+.goalRevealTrack b { position:absolute; z-index:2; right:8px; top:50%; color:#071018; font-size:8px; letter-spacing:.1em; text-shadow:0 0 7px rgba(255,255,255,.72); transform:translateY(-50%); }
+.goalRevealDescription { margin:0; color:#c7c4d5; font-size:clamp(11px,1.35vw,14px); line-height:1.5; opacity:0; }
+.goalRevealDescription strong { color:#fff; }
+.goalRevealRules { width:min(680px,86vw); display:grid; grid-template-columns:1.25fr .75fr; gap:7px; opacity:0; transform:translateY(12px); }
+.goalRevealRules > div { min-width:0; padding:8px 11px; display:grid; gap:2px; border:1px solid rgba(255,255,255,.12); border-radius:5px; background:rgba(255,255,255,.035); text-align:left; }
+.goalRevealRules span { font-size:7px; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
+.goalRevealRules strong { overflow:hidden; font-size:clamp(8px,1.15vw,11px); text-overflow:ellipsis; white-space:nowrap; }
+.goalRevenueCounts { border-color:rgba(104,224,160,.35)!important; }
+.goalRevenueCounts span { color:#68e0a0; }
+.goalRevenueExcluded { border-color:rgba(255,98,110,.35)!important; }
+.goalRevenueExcluded span { color:#ff7f89; }
+.goalRevealButton { min-width:min(370px,82vw); min-height:44px; margin-top:2px; padding:11px 16px; display:flex; justify-content:space-between; align-items:center; gap:18px; border:1px solid #3d318f; border-radius:6px; background:linear-gradient(180deg,#9f90ff,#7562e7 52%,#5946bf); color:#fff; cursor:pointer; opacity:0; pointer-events:none; transform:translateY(14px); text-shadow:0 -1px 0 #392b91; box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -3px 0 rgba(40,26,112,.46),0 8px 24px rgba(0,0,0,.42); }
+.goalRevealButton span { font-size:9px; }
+.goalRevealButton strong { font-size:11px; }
+.goalReveal.ready .goalRevealButton { pointer-events:auto; animation:goalRevealButtonIn .36s cubic-bezier(.2,.85,.25,1.25) both; }
+.goalRevealButton:active { transform:translateY(2px); box-shadow:inset 0 2px 5px rgba(35,24,91,.55),0 1px 2px rgba(0,0,0,.35); }
+.goalReveal.active .goalRevealKicker { animation:goalRevealRise .48s ease .12s both; }
+.goalReveal.active h2 { animation:goalRevealRise .55s ease .32s both; }
+.goalReveal.active .goalRevealNumber { animation:goalRevealNumberIn .7s cubic-bezier(.18,.85,.24,1.24) .5s both; }
+.goalReveal.active .goalRevealTrack { animation:goalRevealFade .36s ease .72s both; }
+.goalReveal.active .goalRevealDescription { animation:goalRevealFade .42s ease 1s both; }
+.goalReveal.active .goalRevealRules { animation:goalRevealRise .46s ease 1.18s both; }
+@keyframes goalRevealFade { to { opacity:1; } }
+@keyframes goalRevealRise { to { opacity:1; transform:translateY(0); } }
+@keyframes goalRevealNumberIn { 65% { opacity:1; transform:scale(1.045); } 100% { opacity:1; transform:scale(1); } }
+@keyframes goalRevealScan { 45% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-50%) scaleX(1); } }
+@keyframes goalRevealRadar { to { transform:rotate(360deg); } }
+@keyframes goalRevealButtonIn { to { opacity:1; transform:translateY(0); } }
 
 .modalLayer, .resultLayer {
   position: fixed;
@@ -1903,6 +1967,15 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .contractFinePrint { margin-top: 4px; padding: 4px 6px; }
   .signatureRow { margin-top: 3px; }
   .sealButton { height: 42px; }
+  .goalRevealCard { gap:5px; }
+  .goalRevealKicker { font-size:7px; }
+  .goalReveal h2 { font-size:clamp(18px,5vh,27px); }
+  .goalRevealNumber span { font-size:clamp(58px,22vh,106px); }
+  .goalRevealNumber b { font-size:clamp(17px,6vh,29px); }
+  .goalRevealTrack { height:17px; }
+  .goalRevealDescription { font-size:9px; }
+  .goalRevealRules > div { padding:5px 8px; }
+  .goalRevealButton { padding:8px 12px; }
   .computerActions { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
   .computerActions button { min-height: 57px; padding: 6px; }
   .worldPanel { max-height: 92vh; }
@@ -2337,6 +2410,14 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .interactButton.available { animation: none; }
   .settlementSignal i { animation: none; }
   .settlementButton, .settlementLever i, .settlementLever b, .mobileControls, .mobileControls button { transition: none; }
+  .goalReveal *, .goalReveal::before, .goalReveal::after { animation:none!important; transition:none!important; }
+  .goalReveal.active .goalRevealKicker,
+  .goalReveal.active h2,
+  .goalReveal.active .goalRevealNumber,
+  .goalReveal.active .goalRevealTrack,
+  .goalReveal.active .goalRevealDescription,
+  .goalReveal.active .goalRevealRules,
+  .goalReveal.ready .goalRevealButton { opacity:1; transform:none; }
 }
 
 @keyframes interactReady {

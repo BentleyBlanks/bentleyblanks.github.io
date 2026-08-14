@@ -95,6 +95,7 @@ const dom = Object.fromEntries([
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderSkillPresets", "founderSkillError", "founderConfirmButton",
   "projectContract", "contractStudioName", "contractFounderSkills", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "goalReveal", "goalRevealCounter", "goalRevealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
   "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats", "restartButton",
@@ -170,6 +171,8 @@ let ceremonyBurstStep = -1;
 let sealHoldTimer = null;
 let sealHoldComplete = false;
 let sealKeyboardMode = false;
+let pendingGoalState = null;
+let goalRevealAnimationFrame = null;
 let activeScratchSession = null;
 let lastScratchSoundAt = 0;
 let mobileControlSignature = "";
@@ -177,6 +180,7 @@ const inputState = { left: false, right: false, jump: false };
 
 function IsOverlayOpen() {
   return landingOpen
+    || !dom.goalReveal.classList.contains("hidden")
     || !dom.modalLayer.classList.contains("hidden")
     || !dom.resultLayer.classList.contains("hidden")
     || !dom.endingScreen.classList.contains("hidden")
@@ -2895,7 +2899,70 @@ function RenderEnding() {
   dom.endingScreen.classList.remove("hidden");
 }
 
+function HideGoalReveal() {
+  if (goalRevealAnimationFrame !== null) window.cancelAnimationFrame(goalRevealAnimationFrame);
+  goalRevealAnimationFrame = null;
+  pendingGoalState = null;
+  dom.goalReveal.classList.add("hidden");
+  dom.goalReveal.classList.remove("active", "ready");
+  dom.goalReveal.style.removeProperty("--goalRevealProgress");
+  dom.goalRevealCounter.textContent = "0";
+  dom.goalRevealButton.disabled = true;
+}
+
+function FinishGoalRevealAnimation() {
+  goalRevealAnimationFrame = null;
+  dom.goalRevealCounter.textContent = "100";
+  dom.goalReveal.style.setProperty("--goalRevealProgress", "1");
+  dom.goalReveal.classList.add("ready");
+  dom.goalRevealButton.disabled = false;
+  dom.goalRevealButton.focus({ preventScroll: true });
+  PlayTone("release");
+}
+
+function ShowGoalReveal(nextState) {
+  pendingGoalState = nextState;
+  onboardingPhase = "goal";
+  landingOpen = true;
+  dom.setupScreen.classList.add("hidden");
+  dom.goalReveal.classList.remove("hidden", "active", "ready");
+  dom.goalReveal.style.setProperty("--goalRevealProgress", "0");
+  dom.goalRevealCounter.textContent = "0";
+  dom.goalRevealButton.disabled = true;
+
+  const reducedMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  if (reducedMotion) {
+    dom.goalReveal.classList.add("active");
+    FinishGoalRevealAnimation();
+    return;
+  }
+
+  goalRevealAnimationFrame = window.requestAnimationFrame(() => {
+    dom.goalReveal.classList.add("active");
+    const startedAt = performance.now();
+    const duration = 1800;
+    const TickGoalReveal = (now) => {
+      const progress = Clamp((now - startedAt) / duration, 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      dom.goalRevealCounter.textContent = String(Math.min(100, Math.floor(eased * 100)));
+      dom.goalReveal.style.setProperty("--goalRevealProgress", progress.toFixed(4));
+      if (progress < 1) goalRevealAnimationFrame = window.requestAnimationFrame(TickGoalReveal);
+      else FinishGoalRevealAnimation();
+    };
+    goalRevealAnimationFrame = window.requestAnimationFrame(TickGoalReveal);
+  });
+  PlayTone("good");
+}
+
+function CompleteGoalReveal() {
+  if (!pendingGoalState || dom.goalRevealButton.disabled) return;
+  const nextState = pendingGoalState;
+  HideGoalReveal();
+  BeginWorld(nextState);
+}
+
 function BeginWorld(nextState) {
+  HideGoalReveal();
   state = nextState;
   onboardingPhase = "game";
   landingOpen = false;
@@ -3055,7 +3122,7 @@ function CompleteContractSigning() {
   dom.contractError.textContent = "合同已生效。银行倒计时与公司同时启动。";
   SpawnParticles(6, 3.7, 0xff445f, 48);
   PlayTone("release");
-  window.setTimeout(() => BeginWorld(result.state), 1250);
+  window.setTimeout(() => ShowGoalReveal(result.state), 1050);
 }
 
 function BeginSealHold(event) {
@@ -3077,6 +3144,7 @@ function BeginSealHold(event) {
 }
 
 function ResetOnboarding() {
+  HideGoalReveal();
   onboardingPhase = "intro";
   ceremonyElapsed = 0;
   ceremonyBurstStep = -1;
@@ -3287,6 +3355,7 @@ function BindControls() {
     } else CancelSealHold();
   });
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
+  dom.goalRevealButton.addEventListener("click", CompleteGoalReveal);
   dom.restartButton.addEventListener("click", () => {
     state = CreateInitialState();
     selectedProjectId = PROJECTS[0].id;
