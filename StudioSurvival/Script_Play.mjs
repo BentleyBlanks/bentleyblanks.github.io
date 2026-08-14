@@ -119,6 +119,8 @@ let ceremonyBurstStep = -1;
 let sealHoldTimer = null;
 let sealHoldComplete = false;
 let sealKeyboardMode = false;
+let activeScratchSession = null;
+let lastScratchSoundAt = 0;
 const inputState = { left: false, right: false, jump: false };
 
 function IsOverlayOpen() {
@@ -155,6 +157,34 @@ function PlayTone(kind = "tap") {
     oscillator.start(now);
     oscillator.stop(now + duration);
   } catch { /* Sound should never block play. */ }
+}
+
+function PlayScratchNoise(intensity = 1) {
+  if (!soundEnabled) return;
+  const nowMs = performance.now();
+  if (nowMs - lastScratchSoundAt < 55) return;
+  lastScratchSoundAt = nowMs;
+  try {
+    audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+    const duration = .045;
+    const frameCount = Math.max(1, Math.floor(audioContext.sampleRate * duration));
+    const buffer = audioContext.createBuffer(1, frameCount, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < frameCount; index += 1) {
+      const envelope = 1 - index / frameCount;
+      data[index] = (Math.random() * 2 - 1) * envelope;
+    }
+    const source = audioContext.createBufferSource();
+    const filter = audioContext.createBiquadFilter();
+    const gain = audioContext.createGain();
+    filter.type = "bandpass";
+    filter.frequency.value = 1550 + Math.random() * 900;
+    filter.Q.value = .65;
+    gain.gain.value = .012 + Clamp(intensity, 0, 1) * .014;
+    source.buffer = buffer;
+    source.connect(filter).connect(gain).connect(audioContext.destination);
+    source.start();
+  } catch { /* Scratching stays usable without audio. */ }
 }
 
 function ShowToast(message, tone = "normal") {
@@ -1040,7 +1070,17 @@ function ClosePanel() {
   dom.sheetBody.onchange = null;
 }
 
+function ResetScratchSession() {
+  if (activeScratchSession?.autoFrame) cancelAnimationFrame(activeScratchSession.autoFrame);
+  activeScratchSession = null;
+  dom.resultLayer.classList.remove("scratchMode");
+  dom.resultCloseButton.classList.remove("hidden");
+  dom.resultCloseButton.disabled = false;
+  dom.resultCloseButton.textContent = "继续跑";
+}
+
 function ShowResult(kicker, title, html, onClose = null) {
+  ResetScratchSession();
   ClosePanel();
   dom.resultKicker.textContent = kicker;
   dom.resultTitle.textContent = title;
@@ -1050,9 +1090,16 @@ function ShowResult(kicker, title, html, onClose = null) {
 }
 
 function CloseResult() {
+  if (activeScratchSession && !activeScratchSession.revealed) {
+    ShowToast("彩票已经买下了。先把银色涂层刮开。", "warning");
+    PlayTone("warning");
+    activeScratchSession.canvas?.focus({ preventScroll: true });
+    return;
+  }
   dom.resultLayer.classList.add("hidden");
   const handler = resultCloseHandler;
   resultCloseHandler = null;
+  ResetScratchSession();
   handler?.();
   if (state.status !== "playing") RenderEnding();
 }
@@ -1070,7 +1117,7 @@ function ApplyInteractiveResult(result, options = {}) {
   if (options.rebuildStaff) RebuildStaffActors();
   UpdateWorldFromGameState();
   if (options.toast !== false) ShowToast(result.message || "完成", options.tone || "good");
-  PlayTone(options.tone === "warning" ? "warning" : "good");
+  if (options.sound !== false) PlayTone(options.tone === "warning" ? "warning" : "good");
   if (state.status !== "playing" && !options.deferEnding) RenderEnding();
   return true;
 }
@@ -1376,6 +1423,353 @@ function OutcomeOdds(option) {
   });
 }
 
+function DrawScratchCoating(context, width, height, optionId) {
+  context.save();
+  const metal = context.createLinearGradient(0, 0, width, height);
+  metal.addColorStop(0, "#777d80");
+  metal.addColorStop(.16, "#e8e9e7");
+  metal.addColorStop(.34, "#969da0");
+  metal.addColorStop(.52, "#f7f5ef");
+  metal.addColorStop(.7, "#858b8f");
+  metal.addColorStop(.88, "#d9dcda");
+  metal.addColorStop(1, "#6e7478");
+  context.fillStyle = metal;
+  context.fillRect(0, 0, width, height);
+
+  context.globalAlpha = .2;
+  for (let x = -height; x < width + height; x += 13) {
+    context.fillStyle = x % 26 ? "#ffffff" : "#3d4245";
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x + height, height);
+    context.lineTo(x + height + 3, height);
+    context.lineTo(x + 3, 0);
+    context.closePath();
+    context.fill();
+  }
+
+  context.globalAlpha = .32;
+  for (let index = 0; index < 260; index += 1) {
+    const x = ((index * 73) % 257) / 257 * width;
+    const y = ((index * 41 + index * index * 3) % 211) / 211 * height;
+    const radius = .45 + (index % 4) * .22;
+    context.fillStyle = index % 3 ? "#ffffff" : "#363b3e";
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  const titleSize = Clamp(Math.round(height * .19), 18, 30);
+  context.globalAlpha = .74;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.font = `900 ${titleSize}px "Microsoft YaHei UI", sans-serif`;
+  context.lineWidth = 1.5;
+  context.strokeStyle = "rgba(255,255,255,.68)";
+  context.fillStyle = "rgba(53,58,61,.72)";
+  context.strokeText("刮 开 兑 奖", width / 2 + 1, height * .47 + 1);
+  context.fillText("刮 开 兑 奖", width / 2, height * .47);
+
+  context.font = `800 ${Clamp(Math.round(height * .075), 9, 13)}px "Microsoft YaHei UI", sans-serif`;
+  context.letterSpacing = "2px";
+  context.fillStyle = "rgba(45,50,53,.74)";
+  context.fillText(optionId === "lottery" ? "用硬币刮开这一沓的兑奖区" : "用硬币来回刮开银色涂层", width / 2, height * .7);
+
+  context.globalAlpha = .42;
+  context.font = `900 ${Clamp(Math.round(height * .12), 13, 20)}px Georgia, serif`;
+  context.fillStyle = "#ffffff";
+  for (let x = 24; x < width; x += 68) context.fillText("¥", x, height * .18);
+  for (let x = 52; x < width; x += 68) context.fillText("¥", x, height * .86);
+  context.restore();
+}
+
+function ScratchPointerPosition(session, event) {
+  const rect = session.canvas.getBoundingClientRect();
+  return {
+    x: Clamp((event.clientX - rect.left) / Math.max(1, rect.width) * session.width, 0, session.width),
+    y: Clamp((event.clientY - rect.top) / Math.max(1, rect.height) * session.height, 0, session.height),
+  };
+}
+
+function UpdateScratchCoin(session, point, active = true) {
+  if (!session.coin) return;
+  session.coinTurn = (session.coinTurn || 0) + 11;
+  session.coin.style.left = `${point.x / session.width * 100}%`;
+  session.coin.style.top = `${point.y / session.height * 100}%`;
+  session.coin.style.setProperty("--coinTurn", `${session.coinTurn}deg`);
+  session.coin.classList.toggle("active", active);
+}
+
+function SpawnScratchDust(session, point) {
+  if (!session.window || session.dustCount > 30) return;
+  session.dustCount += 1;
+  const dust = document.createElement("i");
+  dust.className = "scratchDust";
+  dust.style.left = `${point.x / session.width * 100}%`;
+  dust.style.top = `${point.y / session.height * 100}%`;
+  dust.style.setProperty("--dustX", `${(Math.random() - .5) * 34}px`);
+  dust.style.setProperty("--dustY", `${9 + Math.random() * 22}px`);
+  dust.style.setProperty("--dustSpin", `${(Math.random() - .5) * 260}deg`);
+  session.window.append(dust);
+  window.setTimeout(() => {
+    dust.remove();
+    session.dustCount = Math.max(0, session.dustCount - 1);
+  }, 620);
+}
+
+function MeasureScratchCoverage(session, force = false) {
+  if (!session.context || session.revealed) return;
+  const now = performance.now();
+  if (!force && now - session.lastMeasureAt < 90) return;
+  session.lastMeasureAt = now;
+  const { width, height } = session.canvas;
+  const pixels = session.context.getImageData(0, 0, width, height).data;
+  const step = Math.max(6, Math.floor(session.pixelRatio * 6));
+  let cleared = 0;
+  let sampled = 0;
+  for (let y = Math.floor(step / 2); y < height; y += step) {
+    for (let x = Math.floor(step / 2); x < width; x += step) {
+      sampled += 1;
+      if (pixels[(y * width + x) * 4 + 3] < 72) cleared += 1;
+    }
+  }
+  session.coverage = sampled ? cleared / sampled : 0;
+  const percent = Math.min(100, Math.round(session.coverage * 100));
+  session.progressBar.style.width = `${percent}%`;
+  session.progressText.textContent = percent < 12
+    ? "先刮出第一道痕迹"
+    : percent < 40 ? `已刮开 ${percent}% · 再来几下` : "正在核对兑奖区……";
+  session.canvas.setAttribute("aria-valuenow", String(percent));
+  if (session.coverage >= .4) RevealScratchTicket(session);
+}
+
+function EraseScratchSegment(session, from, to, options = {}) {
+  if (!session.context || session.revealed) return;
+  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+  session.context.save();
+  session.context.globalCompositeOperation = "destination-out";
+  session.context.lineCap = "round";
+  session.context.lineJoin = "round";
+  session.context.lineWidth = session.brushSize;
+  session.context.beginPath();
+  session.context.moveTo(from.x, from.y);
+  session.context.lineTo(to.x, to.y);
+  session.context.stroke();
+  session.context.beginPath();
+  session.context.arc(to.x, to.y, session.brushSize * .47, 0, Math.PI * 2);
+  session.context.fill();
+  session.context.restore();
+
+  UpdateScratchCoin(session, to, true);
+  session.dustTravel += distance;
+  if (session.dustTravel > 11) {
+    session.dustTravel = 0;
+    SpawnScratchDust(session, to);
+  }
+  if (distance > 1 || options.forceSound) PlayScratchNoise(Clamp(distance / 18, .25, 1));
+  MeasureScratchCoverage(session, Boolean(options.forceMeasure));
+}
+
+function PlayScratchReveal(result) {
+  if (result.profit > 0) {
+    PlayTone("coin");
+    window.setTimeout(() => PlayTone("good"), 115);
+    window.setTimeout(() => PlayTone("coin"), 245);
+    navigator.vibrate?.([18, 32, 45]);
+  } else if (result.profit === 0) {
+    PlayTone("coin");
+    window.setTimeout(() => PlayTone("tap"), 130);
+    navigator.vibrate?.(20);
+  } else {
+    PlayTone("warning");
+    navigator.vibrate?.([24, 42, 24]);
+  }
+}
+
+function RevealScratchTicket(session) {
+  if (!session || session.revealed) return;
+  session.revealed = true;
+  session.pointerId = null;
+  if (session.autoFrame) cancelAnimationFrame(session.autoFrame);
+  session.autoFrame = 0;
+  session.canvas.classList.add("cleared");
+  session.coin?.classList.remove("active");
+  session.ticket.classList.add("revealed");
+  session.ticket.classList.add(session.result.profit > 0 ? "winner" : session.result.profit === 0 ? "breakEven" : "loser");
+  session.progressBar.style.width = "100%";
+  session.progressText.textContent = "兑奖区已完全揭开";
+  session.status.textContent = `${session.result.outcome.label}，返还 ${FormatMoney(session.result.payout)}`;
+  dom.resultKicker.textContent = session.result.profit > 0 ? "SCRATCH WIN" : session.result.profit === 0 ? "MONEY BACK" : "SCRATCH RESULT";
+  dom.resultTitle.textContent = session.result.outcome.label;
+  dom.resultCloseButton.disabled = false;
+  dom.resultCloseButton.textContent = session.result.profit > 0 ? "收好奖金，继续跑" : session.result.profit === 0 ? "拿回本金，继续跑" : "认了，继续跑";
+  PlayScratchReveal(session.result);
+  window.setTimeout(() => dom.resultCloseButton.focus({ preventScroll: true }), 720);
+}
+
+function StartAutoScratch(session) {
+  if (!session || session.revealed || session.autoFrame) return;
+  session.progressText.textContent = "硬币正在一行一行刮开……";
+  const startedAt = performance.now();
+  const duration = 1450;
+  const rows = 6;
+  let previousPoint = null;
+  let previousRow = -1;
+  const Tick = (now) => {
+    if (!activeScratchSession || activeScratchSession !== session || session.revealed) return;
+    const progress = Clamp((now - startedAt) / duration, 0, 1);
+    const rowProgress = progress * rows;
+    const row = Math.min(rows - 1, Math.floor(rowProgress));
+    const along = rowProgress - row;
+    const leftToRight = row % 2 === 0;
+    const x = (leftToRight ? along : 1 - along) * (session.width - session.brushSize) + session.brushSize / 2;
+    const y = (row + .5) / rows * session.height;
+    const point = { x, y };
+    if (row !== previousRow) previousPoint = point;
+    EraseScratchSegment(session, previousPoint || point, point, { forceSound: true });
+    previousPoint = point;
+    previousRow = row;
+    if (!session.revealed && progress < 1) session.autoFrame = requestAnimationFrame(Tick);
+    else {
+      session.autoFrame = 0;
+      MeasureScratchCoverage(session, true);
+    }
+  };
+  session.autoFrame = requestAnimationFrame(Tick);
+}
+
+function BindScratchCanvas(session) {
+  if (!session || activeScratchSession !== session) return;
+  const canvas = dom.resultBody.querySelector("[data-scratch-canvas]");
+  const scratchWindow = dom.resultBody.querySelector("[data-scratch-window]");
+  const ticket = dom.resultBody.querySelector("[data-scratch-ticket]");
+  const coin = dom.resultBody.querySelector("[data-scratch-coin]");
+  const progressBar = dom.resultBody.querySelector("[data-scratch-progress]");
+  const progressText = dom.resultBody.querySelector("[data-scratch-progress-text]");
+  const status = dom.resultBody.querySelector("[data-scratch-status]");
+  if (!canvas || !scratchWindow || !ticket || !progressBar || !progressText || !status) {
+    session.revealed = true;
+    dom.resultCloseButton.disabled = false;
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(260, Math.round(rect.width || 520));
+  const height = Math.max(92, Math.round(rect.height || 146));
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * pixelRatio);
+  canvas.height = Math.round(height * pixelRatio);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  Object.assign(session, {
+    canvas, context, window: scratchWindow, ticket, coin, progressBar, progressText, status,
+    width, height, pixelRatio, brushSize: Clamp(height * .24, 25, 38),
+    pointerId: null, lastPoint: null, lastMeasureAt: 0, coverage: 0,
+    dustTravel: 0, dustCount: 0, coinTurn: 0, autoFrame: 0,
+  });
+  if (!context) {
+    RevealScratchTicket(session);
+    return;
+  }
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  DrawScratchCoating(context, width, height, session.result.option.id);
+
+  const FinishPointer = (event) => {
+    if (session.pointerId !== event.pointerId) return;
+    session.pointerId = null;
+    session.lastPoint = null;
+    session.coin?.classList.remove("active");
+    MeasureScratchCoverage(session, true);
+  };
+  canvas.addEventListener("pointerdown", (event) => {
+    if (session.revealed) return;
+    event.preventDefault();
+    canvas.focus({ preventScroll: true });
+    canvas.setPointerCapture?.(event.pointerId);
+    session.pointerId = event.pointerId;
+    session.lastPoint = ScratchPointerPosition(session, event);
+    EraseScratchSegment(session, session.lastPoint, session.lastPoint, { forceSound: true, forceMeasure: true });
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (session.pointerId !== event.pointerId || session.revealed) return;
+    event.preventDefault();
+    const coalescedEvents = event.getCoalescedEvents?.();
+    const samples = coalescedEvents?.length ? coalescedEvents : [event];
+    for (const sample of samples) {
+      const point = ScratchPointerPosition(session, sample);
+      EraseScratchSegment(session, session.lastPoint || point, point);
+      session.lastPoint = point;
+    }
+  });
+  canvas.addEventListener("pointerup", FinishPointer);
+  canvas.addEventListener("pointercancel", FinishPointer);
+  canvas.addEventListener("lostpointercapture", (event) => {
+    if (session.pointerId === event.pointerId) {
+      session.pointerId = null;
+      session.lastPoint = null;
+      session.coin?.classList.remove("active");
+    }
+  });
+  canvas.addEventListener("keydown", (event) => {
+    if (!event.repeat && ["Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      StartAutoScratch(session);
+    }
+  });
+  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+  canvas.focus({ preventScroll: true });
+}
+
+function ShowScratchTicket(result) {
+  ResetScratchSession();
+  ClosePanel();
+  const bulk = result.option.id === "lottery";
+  const resultTone = result.profit > 0 ? "win" : result.profit === 0 ? "even" : "loss";
+  const profitText = result.profit > 0
+    ? `净赚 ${FormatMoney(result.profit)}`
+    : result.profit === 0 ? "刚好回本" : `净亏 ${FormatMoney(Math.abs(result.profit))}`;
+  const serial = `M${String(state.month).padStart(2, "0")}-${String(state.speculationHistory.length).padStart(3, "0")}-${bulk ? "PACK" : "ONE"}`;
+  dom.resultKicker.textContent = "LOTTERY COUNTER · PAID";
+  dom.resultTitle.textContent = "把它亲手刮开";
+  dom.resultBody.innerHTML = `
+    <div class="scratchStage ${bulk ? "bulk" : "single"}">
+      <article class="scratchTicket" data-scratch-ticket>
+        <div class="scratchTicketMasthead"><span>甲方是我 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
+        <div class="scratchTicketTitle">
+          <div><small>STUDIO SURVIVAL LUCKY TICKET</small><strong>${bulk ? "工作室续命刮刮乐" : "回本符 · 即开型彩票"}</strong></div>
+          <span class="scratchTicketPrice"><small>票面</small><b>${FormatMoney(result.stake)}</b></span>
+        </div>
+        <div class="scratchTicketRule"><span>售出即扣款</span><b>银色兑奖区 · 刮开见结果</b><span>每月限一次</span></div>
+        <div class="scratchWindow" data-scratch-window>
+          <div class="scratchPrize ${resultTone}">
+            <span>本 券 兑 奖 结 果</span>
+            <strong>${EscapeHtml(result.outcome.label)}</strong>
+            <b>返还 ${FormatMoney(result.payout)}</b>
+            <small>${profitText} · 不计入游戏收入</small>
+          </div>
+          <canvas class="scratchCanvas" data-scratch-canvas tabindex="0" role="slider" aria-label="银色刮奖涂层。按住鼠标或手指来回刮，键盘按空格自动刮开" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></canvas>
+          <div class="scratchCoin" data-scratch-coin aria-hidden="true"><i>¥</i><span>刮</span></div>
+          <div class="scratchRevealShine" aria-hidden="true"></div>
+        </div>
+        <div class="scratchProgress" aria-hidden="true"><i data-scratch-progress></i></div>
+        <div class="scratchTicketFooter">
+          <strong data-scratch-progress-text>先刮出第一道痕迹</strong>
+          <span>鼠标 / 手指来回刮 · 键盘按空格自动刮</span>
+        </div>
+        <div class="scratchFinePrint"><span>本票售出不退。中奖只改善现金，不证明你的游戏做得好。</span><b>兑奖码 ${serial}</b></div>
+      </article>
+      <p class="scratchStatus" data-scratch-status aria-live="polite">银粉还完整地盖着命运。</p>
+    </div>`;
+  resultCloseHandler = () => { if (state.status !== "playing") RenderEnding(); };
+  dom.resultLayer.classList.add("scratchMode");
+  dom.resultLayer.classList.remove("hidden");
+  dom.resultCloseButton.classList.remove("hidden");
+  dom.resultCloseButton.disabled = true;
+  dom.resultCloseButton.textContent = "先把涂层刮开";
+  const session = { result, revealed: false, canvas: null, autoFrame: 0 };
+  activeScratchSession = session;
+  requestAnimationFrame(() => BindScratchCanvas(session));
+}
+
 function OpenSpeculationSheet() {
   const used = state.lastSpeculationMonth === state.month;
   OpenPanel("LOTTERY / STOCKS", "彩票机与妖股终端", `
@@ -1385,7 +1779,7 @@ function OpenSpeculationSheet() {
         <div class="choiceTop"><strong>${option.icon} ${EscapeHtml(option.name)}</strong><span>${EscapeHtml(option.risk)}</span></div>
         <p>${EscapeHtml(option.description)}</p>
         <div class="oddsList">${OutcomeOdds(option).map((outcome) => `<div class="oddsLine"><span>${(outcome.chance * 100).toFixed(outcome.chance < .01 ? 1 : 0)}% · ${EscapeHtml(outcome.label)}</span><b>返还 ×${outcome.payoutMultiplier}</b></div>`).join("")}</div>
-        <div class="choiceFooter" style="margin-top:9px"><span>本金 ${option.stakeMode === "allIn" ? "全部现金" : FormatMoney(option.stake)}</span><button class="${option.stakeMode === "allIn" ? "dangerButton" : "miniButton"}" data-speculation-id="${option.id}" type="button" ${used ? "disabled" : ""}>${used ? "本月已赌" : "下注"}</button></div>
+        <div class="choiceFooter" style="margin-top:9px"><span>本金 ${option.stakeMode === "allIn" ? "全部现金" : FormatMoney(option.stake)}</span><button class="${option.stakeMode === "allIn" ? "dangerButton" : "miniButton"}" data-speculation-id="${option.id}" type="button" ${used ? "disabled" : ""}>${used ? "本月已赌" : option.category === "lottery" ? "买来刮开" : option.stakeMode === "allIn" ? "全仓买入" : "做一月短线"}</button></div>
       </article>`).join("")}</div>
     <div class="panelSection sectionHeading"><strong>投机历史</strong><span>累计 ${state.speculationProfit >= 0 ? "赚" : "亏"} ${FormatMoney(Math.abs(state.speculationProfit))}</span></div>
     <div class="logList">${state.speculationHistory.length ? [...state.speculationHistory].reverse().map((item) => `<div class="logLine"><b>M${String(item.month).padStart(2, "0")}</b><span>${EscapeHtml(SPECULATION_OPTIONS.find((option) => option.id === item.optionId)?.name || item.optionId)}：${EscapeHtml(item.label)}，${item.profit >= 0 ? "+" : "-"}${FormatMoney(Math.abs(item.profit))}</span></div>`).join("") : `<div class="note">还没有历史。你的现金正在享受最后的宁静。</div>`}</div>`, () => {
@@ -1395,7 +1789,12 @@ function OpenSpeculationSheet() {
       const option = SPECULATION_OPTIONS.find((item) => item.id === button.dataset.speculationId);
       if (option?.stakeMode === "allIn" && !window.confirm("这会押上当前全部现金，并有 42% 概率直接破产。确定？")) return;
       const result = Speculate(state, button.dataset.speculationId);
-      if (!ApplyInteractiveResult(result, { deferEnding: true, tone: result?.profit >= 0 ? "good" : "warning", toast: false })) return;
+      const isLottery = option?.category === "lottery";
+      if (!ApplyInteractiveResult(result, { deferEnding: true, tone: result?.profit >= 0 ? "good" : "warning", toast: false, sound: !isLottery })) return;
+      if (isLottery) {
+        ShowScratchTicket(result);
+        return;
+      }
       ShowResult("SPECULATION RESULT", result.outcome.label, `
         <div class="resultHero"><b>${result.profit >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(result.profit))}</b><p>本金 ${FormatMoney(result.stake)}，返还 ${FormatMoney(result.payout)}。<br>这不是游戏收入，只是命运临时借你一张 Excel。</p></div>`, () => { if (state.status !== "playing") RenderEnding(); });
     };

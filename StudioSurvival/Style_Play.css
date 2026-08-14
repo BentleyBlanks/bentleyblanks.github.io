@@ -472,6 +472,269 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .note { padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,.035); color: #cbc7d8; font-size: 9px; }
 .note.danger { background: rgba(255,98,110,.09); color: #ffb2b8; }
 .note.good { background: rgba(104,224,160,.09); color: #a9f1c9; }
+
+/* Lottery scratch ritual ---------------------------------------------------- */
+.resultLayer.scratchMode {
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 220, 145, .18), transparent 38%),
+    radial-gradient(ellipse at 50% 100%, rgba(73, 35, 16, .34), transparent 52%),
+    linear-gradient(155deg, rgba(23, 12, 7, .94), rgba(6, 6, 8, .96));
+  backdrop-filter: blur(7px) saturate(.75);
+}
+.resultLayer.scratchMode .resultCard {
+  width: min(700px, 96vw);
+  padding: 13px 17px 15px;
+  border-color: rgba(229, 190, 112, .28);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 209, 112, .08), transparent 34%),
+    linear-gradient(145deg, rgba(31, 23, 20, .98), rgba(12, 11, 13, .98));
+  box-shadow: 0 34px 110px rgba(0,0,0,.78), inset 0 1px rgba(255,255,255,.07);
+}
+.resultLayer.scratchMode #resultKicker { display: block; color: #d9ad57; text-align: center; }
+.resultLayer.scratchMode .resultCard h2 {
+  margin: 3px 0 9px;
+  color: #fff4d0;
+  text-align: center;
+  font: 900 25px/1.1 "Songti SC", "Microsoft YaHei UI", serif;
+  letter-spacing: .08em;
+  text-shadow: 0 2px 0 #4f2815, 0 8px 22px rgba(0,0,0,.48);
+}
+.resultLayer.scratchMode .resultCard > .primaryButton {
+  display: block;
+  min-width: 210px;
+  margin: 10px auto 0;
+  border: 1px solid #efd387;
+  color: #40210d;
+  background: linear-gradient(180deg, #fff1b1, #d79c36);
+  box-shadow: inset 0 1px #fff8dc, 0 4px 0 #815017, 0 10px 24px rgba(0,0,0,.35);
+}
+.resultLayer.scratchMode .resultCard > .primaryButton:disabled {
+  color: #938772;
+  border-color: #746a5c;
+  background: linear-gradient(180deg, #4d4841, #2d2a27);
+  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 3px 0 #151311;
+}
+.scratchStage {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  padding: 5px 0 0;
+  perspective: 1000px;
+  isolation: isolate;
+}
+.scratchStage.bulk::before,
+.scratchStage.bulk::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 15px;
+  left: 50%;
+  width: min(590px, 91%);
+  height: calc(100% - 38px);
+  border: 1px solid #9f5b2f;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #c85d34, #f1bd55 48%, #a63e2d);
+  box-shadow: 0 16px 30px rgba(0,0,0,.36);
+}
+.scratchStage.bulk::before { transform: translateX(-50%) rotate(-2.2deg) translate(-7px, 7px); }
+.scratchStage.bulk::after { transform: translateX(-50%) rotate(1.8deg) translate(7px, 11px); filter: brightness(.8); }
+.scratchTicket {
+  position: relative;
+  width: min(610px, 94%);
+  margin: 0 auto;
+  padding: 13px 16px 11px;
+  overflow: visible;
+  border: 1px solid #b45f27;
+  border-radius: 10px;
+  color: #3f210f;
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255,255,255,.58) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 73% 68%, rgba(95,44,11,.11) 0 1px, transparent 1.5px),
+    repeating-linear-gradient(96deg, rgba(115,62,19,.025) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, #fff0b9, #efd079 46%, #f9e49c 72%, #e0b45c);
+  background-size: 19px 17px, 23px 21px, auto, auto;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.92),
+    inset 0 -4px rgba(117,57,18,.16),
+    0 5px 0 #9f5426,
+    0 18px 38px rgba(0,0,0,.48);
+  transform: rotate(-.3deg);
+  transform-origin: 50% 75%;
+  transition: transform .5s cubic-bezier(.2,.9,.2,1), filter .5s ease;
+}
+.scratchTicket::before,
+.scratchTicket::after {
+  content: "";
+  position: absolute;
+  top: 48%;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #9c5427;
+  border-radius: 50%;
+  background: #1a1210;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,.7);
+}
+.scratchTicket::before { left: -10px; }
+.scratchTicket::after { right: -10px; }
+.scratchTicket.revealed { transform: rotate(.25deg) translateY(-2px); }
+.scratchTicket.revealed.winner { filter: drop-shadow(0 0 19px rgba(255,210,95,.25)); animation: ticketWin .62s ease both; }
+.scratchTicket.revealed.loser { animation: ticketLose .5s ease both; }
+@keyframes ticketWin { 0%,100% { transform: rotate(.25deg) translateY(-2px); } 35% { transform: rotate(-.9deg) translateY(-5px) scale(1.012); } 65% { transform: rotate(.8deg) translateY(-3px); } }
+@keyframes ticketLose { 0%,100% { transform: rotate(.25deg) translateY(-2px); } 30% { transform: rotate(-.45deg) translate(-3px,-2px); } 60% { transform: rotate(.6deg) translate(3px,-2px); } }
+.scratchTicketMasthead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(111,55,19,.3);
+  color: #865126;
+  font: 800 7px/1.2 "Microsoft YaHei UI", sans-serif;
+  letter-spacing: .1em;
+}
+.scratchTicketMasthead b { font-family: "Courier New", monospace; letter-spacing: .04em; }
+.scratchTicketTitle { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 8px 2px 7px; }
+.scratchTicketTitle > div { display: grid; gap: 1px; }
+.scratchTicketTitle small { color: #9d3c27; font: 900 7px/1.2 Arial, sans-serif; letter-spacing: .13em; }
+.scratchTicketTitle strong {
+  color: #a52827;
+  font: 950 clamp(20px, 3.1vw, 30px)/1.05 "Songti SC", "STSong", serif;
+  letter-spacing: .08em;
+  text-shadow: 0 1px #fff2c6, 0 2px rgba(101,35,16,.16);
+}
+.scratchTicketPrice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 78px;
+  min-height: 48px;
+  border: 2px double #b12d2c;
+  border-radius: 50%;
+  color: #9c2527;
+  background: rgba(255,244,196,.34);
+  transform: rotate(4deg);
+}
+.scratchTicketPrice::after { content: "★"; position: absolute; right: 5px; bottom: 1px; font-size: 9px; }
+.scratchTicketPrice small { font-size: 7px; line-height: 1; }
+.scratchTicketPrice b { font: 950 13px/1.1 Georgia, serif; }
+.scratchTicketRule {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 9px;
+  border: 1px solid rgba(133,59,21,.28);
+  border-radius: 4px 4px 0 0;
+  color: #7a4e2e;
+  background: rgba(132,69,20,.075);
+  font-size: 7px;
+  text-align: center;
+}
+.scratchTicketRule span:last-child { text-align: right; }
+.scratchTicketRule span:first-child { text-align: left; }
+.scratchTicketRule b { color: #9f2928; font-size: 8px; letter-spacing: .1em; }
+.scratchWindow {
+  position: relative;
+  height: clamp(124px, 22vh, 168px);
+  overflow: hidden;
+  border: 5px solid #c68a3e;
+  border-radius: 0 0 9px 9px;
+  background: #f7ead1;
+  box-shadow:
+    inset 0 0 0 1px #76431e,
+    inset 0 5px 13px rgba(67,35,13,.35),
+    0 1px rgba(255,255,255,.8);
+}
+.scratchPrize {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 3px;
+  padding: 9px;
+  text-align: center;
+  background:
+    repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,.22) 0deg 8deg, transparent 8deg 16deg),
+    radial-gradient(circle, #fff8db 0, #f6d67a 66%, #cf852d 100%);
+}
+.scratchPrize::before,
+.scratchPrize::after { content: "★"; position: absolute; top: 50%; color: rgba(145,51,31,.34); font-size: 22px; transform: translateY(-50%) rotate(-12deg); }
+.scratchPrize::before { left: 9%; }
+.scratchPrize::after { right: 9%; transform: translateY(-50%) rotate(12deg); }
+.scratchPrize > span { color: #8d5e2d; font: 900 7px/1.2 Arial, sans-serif; letter-spacing: .2em; }
+.scratchPrize > strong { color: #a52827; font: 950 clamp(20px, 3.7vw, 34px)/1.05 "Songti SC", serif; text-shadow: 0 1px #fff8d9; }
+.scratchPrize > b { color: #53250e; font: 950 14px/1.1 Georgia, "Microsoft YaHei UI", serif; }
+.scratchPrize > small { color: #72502d; font-size: 8px; }
+.scratchPrize.loss { background: repeating-linear-gradient(-45deg, #eee4d1 0 8px, #e2d3bc 8px 16px); }
+.scratchPrize.loss > strong { color: #5c5248; }
+.scratchPrize.loss::before, .scratchPrize.loss::after { color: rgba(80,72,64,.2); }
+.scratchPrize.even { background: radial-gradient(circle, #f4ffe7, #b9dea1 68%, #78a45e); }
+.scratchCanvas {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+  transition: opacity .72s ease, filter .72s ease, transform .72s ease;
+}
+.scratchCanvas:focus-visible { outline: 3px solid #a42827; outline-offset: -5px; }
+.scratchCanvas.cleared { opacity: 0; filter: blur(2px) brightness(1.5); transform: scale(1.015); pointer-events: none; }
+.scratchCoin {
+  --coinTurn: 0deg;
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-content: center;
+  width: 46px;
+  height: 46px;
+  border: 2px solid #6d4617;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  color: #6a410e;
+  background:
+    radial-gradient(circle at 32% 28%, #fff4ac 0 5%, #dcae40 7% 34%, #805316 36% 41%, #dba940 43% 69%, #6b4210 72% 76%, #e3b946 78%);
+  box-shadow: 2px 5px 8px rgba(0,0,0,.42), inset 0 0 0 2px rgba(255,243,155,.55);
+  transform: translate(-28%, -78%) rotate(var(--coinTurn));
+  transition: opacity .08s ease;
+}
+.scratchCoin.active { opacity: .98; }
+.scratchCoin i { font: 900 17px/1 Georgia, serif; }
+.scratchCoin span { margin-top: 1px; font: 900 6px/1 "Microsoft YaHei UI", sans-serif; text-align: center; }
+.scratchDust {
+  position: absolute;
+  z-index: 5;
+  width: 5px;
+  height: 2px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(90deg, #6f7476, #e2e3df);
+  box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  animation: scratchDustFall .62s ease-out forwards;
+}
+@keyframes scratchDustFall { to { opacity: 0; transform: translate(var(--dustX), var(--dustY)) rotate(var(--dustSpin)); } }
+.scratchRevealShine { position: absolute; z-index: 3; inset: -40%; pointer-events: none; opacity: 0; background: linear-gradient(110deg, transparent 38%, rgba(255,255,255,.75) 49%, transparent 60%); transform: translateX(-50%); }
+.scratchTicket.revealed.winner .scratchRevealShine { animation: scratchShine .9s .15s ease-out; }
+@keyframes scratchShine { 0% { opacity: 0; transform: translateX(-60%); } 35% { opacity: .75; } 100% { opacity: 0; transform: translateX(60%); } }
+.scratchProgress { height: 5px; margin: 8px 2px 0; overflow: hidden; border: 1px solid rgba(103,50,17,.3); border-radius: 99px; background: rgba(101,54,21,.14); }
+.scratchProgress i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #9f2928, #d98d2f, #f1c65b); box-shadow: 0 0 8px rgba(190,94,29,.32); transition: width .12s linear; }
+.scratchTicketFooter { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 5px 2px 4px; color: #704826; }
+.scratchTicketFooter strong { color: #9c2928; font-size: 8px; }
+.scratchTicketFooter span { font-size: 7px; }
+.scratchFinePrint { display: flex; justify-content: space-between; gap: 12px; padding-top: 5px; border-top: 1px dashed rgba(112,58,21,.38); color: #806347; font-size: 6.5px; }
+.scratchFinePrint b { flex: none; font-family: "Courier New", monospace; }
+.scratchStatus { min-height: 13px; margin: 12px 0 0; color: #c8b995; font: 800 8px/1.3 "Microsoft YaHei UI", sans-serif; text-align: center; letter-spacing: .05em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scratchTicket.revealed, .scratchRevealShine, .scratchDust { animation: none !important; }
+}
 .worldChoice select {
   width: 100%;
   margin-top: 10px;
@@ -1066,6 +1329,33 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .worldPanel > header { padding: 8px 11px; }
   .worldGrid { gap: 5px; }
   .worldChoice, .staffCard, .oddsCard, .featureCard { padding: 8px; }
+  .resultLayer.scratchMode { padding: 5px max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left)); }
+  .resultLayer.scratchMode .resultCard { width: min(720px, 97vw); max-height: 96vh; padding: 7px 11px 9px; }
+  .resultLayer.scratchMode .resultCard h2 { margin: 1px 0 5px; font-size: 18px; }
+  .resultLayer.scratchMode #resultKicker { font-size: 6.5px; }
+  .resultLayer.scratchMode .resultCard > .primaryButton { min-width: 190px; margin-top: 6px; padding: 7px 11px; font-size: 8px; }
+  .scratchStage { padding-top: 1px; }
+  .scratchTicket { width: min(640px, 96%); padding: 7px 13px 6px; box-shadow: inset 0 1px rgba(255,255,255,.9), inset 0 -3px rgba(117,57,18,.16), 0 3px 0 #9f5426, 0 10px 24px rgba(0,0,0,.45); }
+  .scratchTicketMasthead { padding-bottom: 3px; font-size: 5.5px; }
+  .scratchTicketTitle { padding: 4px 2px; }
+  .scratchTicketTitle strong { font-size: 18px; }
+  .scratchTicketTitle small { font-size: 5.5px; }
+  .scratchTicketPrice { flex-basis: 66px; min-height: 35px; }
+  .scratchTicketPrice small { font-size: 5.5px; }
+  .scratchTicketPrice b { font-size: 10px; }
+  .scratchTicketRule { padding: 3px 7px; font-size: 5.5px; }
+  .scratchTicketRule b { font-size: 6.5px; }
+  .scratchWindow { height: 94px; border-width: 4px; }
+  .scratchPrize > strong { font-size: 21px; }
+  .scratchPrize > b { font-size: 11px; }
+  .scratchPrize > small, .scratchPrize > span { font-size: 6px; }
+  .scratchProgress { height: 4px; margin-top: 5px; }
+  .scratchTicketFooter { padding: 3px 2px 2px; }
+  .scratchTicketFooter strong { font-size: 6.5px; }
+  .scratchTicketFooter span { font-size: 5.5px; }
+  .scratchFinePrint { padding-top: 3px; font-size: 5px; }
+  .scratchStatus { min-height: 9px; margin-top: 7px; font-size: 6.5px; }
+  .scratchStage.bulk::before, .scratchStage.bulk::after { top: 7px; height: calc(100% - 18px); }
   .moveControls button { width: 52px; height: 48px; }
   .jumpButton, .interactButton { width: 51px; height: 51px; }
   .jumpButton { right: 61px; }
