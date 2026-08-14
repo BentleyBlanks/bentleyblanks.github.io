@@ -26,10 +26,12 @@ import {
   PIVOT_REASONS,
   PROJECTS,
   REVIEW_LINES,
+  SCRATCH_OPTION,
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
+  STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815n";
+} from "./Data_Game.mjs?v=20260815q";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -39,6 +41,8 @@ export const STARTUP_LOAN_TERMS = Object.freeze({
   dueMonth: 8,
 });
 export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
+export const STOCK_ACCOUNT_UNLOCK_CASH = 100000;
+export const STOCK_BUY_STEP = 1000;
 export const MARKET_INDEPENDENT_ID = "independent";
 export const OWNER_HAIR_STAGES = Object.freeze({
   full: "full",
@@ -441,8 +445,12 @@ export function CreateInitialState() {
     lastSettlement: null,
     incomeHistory: [],
     lastSpeculationMonth: 0,
+    lastScratchMonth: 0,
     speculationProfit: 0,
     speculationHistory: [],
+    stockAccountUnlocked: false,
+    stockPosition: null,
+    stockHistory: [],
     lastRelaxationMonth: 0,
     relaxationHistory: [],
   };
@@ -1540,6 +1548,7 @@ export function ReleaseBuild(currentState) {
 export function AdvanceMonth(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing" || !state.project) return { state, ok: false, message: "当前不能推进月份。" };
+  const stockSettlement = ResolveStockPosition(state);
   const finance = ProcessFinances(state);
   const production = state.status === "playing"
     ? ProgressProject(
@@ -1570,6 +1579,7 @@ export function AdvanceMonth(currentState) {
     painEvents: production.painEvents,
     buildStatus: production.buildStatus,
     finance,
+    stockSettlement,
     tensions,
     anxiety,
     directiveId: state.selectedDirective,
@@ -1602,6 +1612,7 @@ export function AdvanceMonth(currentState) {
     buildStatus: production.buildStatus,
     anxiety,
     finance,
+    stockSettlement,
     tensions,
     message: "月报已结算",
   };
@@ -1813,14 +1824,55 @@ export function VisitRelaxationVenue(currentState, venueId) {
   };
 }
 
-export function Speculate(currentState, optionId) {
+function EnsureInvestmentState(state) {
+  state.speculationHistory ||= [];
+  state.speculationProfit = Number.isFinite(state.speculationProfit) ? state.speculationProfit : 0;
+  if (!Number.isInteger(state.lastScratchMonth)) {
+    const legacyScratch = [...state.speculationHistory].reverse().find((entry) => (
+      entry?.kind === "scratch"
+      || [SCRATCH_OPTION.id, "lottery"].includes(entry?.optionId)
+      || SPECULATION_OPTIONS.find((option) => option.id === entry?.optionId)?.category === "lottery"
+    ));
+    state.lastScratchMonth = legacyScratch?.month || 0;
+  }
+  state.stockAccountUnlocked = state.stockAccountUnlocked === true;
+  state.stockPosition ??= null;
+  state.stockHistory ||= [];
+}
+
+export function GetStockAccountAccess(state) {
+  const cash = Math.max(0, Number(state?.cash) || 0);
+  const permanentlyUnlocked = state?.stockAccountUnlocked === true;
+  return {
+    unlocked: permanentlyUnlocked || cash >= STOCK_ACCOUNT_UNLOCK_CASH,
+    permanentlyUnlocked,
+    minimumCash: STOCK_ACCOUNT_UNLOCK_CASH,
+    shortfall: Math.max(0, STOCK_ACCOUNT_UNLOCK_CASH - cash),
+  };
+}
+
+export function UnlockStockAccount(currentState) {
   const state = Clone(currentState);
-  const option = SPECULATION_OPTIONS.find((candidate) => candidate.id === optionId);
-  if (state.status !== "playing") return { state, ok: false, message: "本局已经结束，券商拒绝为精神状态开户。" };
-  if (!option) return { state, ok: false, message: "这项投机不存在，已经算今天最好的财务消息。" };
-  if (state.lastSpeculationMonth === state.month) return { state, ok: false, message: "本月已经赌过一次。先把手从刷新按钮上拿开。" };
-  const stake = option.stakeMode === "allIn" ? state.cash : option.stake;
-  if (stake <= 0 || state.cash < stake) return { state, ok: false, message: `连 ${option.name} 的本金都没有，暂时保住了破产资格。` };
+  EnsureInvestmentState(state);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "公司未成立。" };
+  if (state.stockAccountUnlocked) return { state, ok: true, alreadyUnlocked: true, message: "股票账户已解锁。" };
+  const access = GetStockAccountAccess(state);
+  if (!access.unlocked) {
+    return { state, ok: false, access, message: `炒股需 ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}；还差 ¥${access.shortfall.toLocaleString("zh-CN")}。` };
+  }
+  state.stockAccountUnlocked = true;
+  PushLog(state, `股票账户已解锁 · ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}`, "good");
+  return { state, ok: true, access: GetStockAccountAccess(state), message: "股票账户已解锁" };
+}
+
+export function BuyScratchTicket(currentState) {
+  const state = Clone(currentState);
+  EnsureInvestmentState(state);
+  const option = SCRATCH_OPTION;
+  if (state.status !== "playing") return { state, ok: false, message: "本局已结束。" };
+  if (state.lastScratchMonth === state.month) return { state, ok: false, message: "本月已刮。" };
+  const stake = option.stake;
+  if (state.cash < stake) return { state, ok: false, message: `需 ¥${stake.toLocaleString("zh-CN")}；现金不足。` };
 
   const roll = SeededUnit(state.seed + state.month * 733 + option.id.length * 97 + state.speculationHistory.length * 31);
   const outcome = option.outcomes.find((candidate) => roll < candidate.ceiling) || option.outcomes.at(-1);
@@ -1829,23 +1881,13 @@ export function Speculate(currentState, optionId) {
   state.cash = Math.max(0, state.cash - stake + payout);
   state.totalCosts += stake;
   state.speculationProfit += profit;
+  state.lastScratchMonth = state.month;
   state.lastSpeculationMonth = state.month;
-  state.speculationHistory.push({ month: state.month, optionId, stake, payout, profit, label: outcome.label });
+  state.speculationHistory.push({ kind: "scratch", month: state.month, optionId: option.id, stake, payout, profit, label: outcome.label });
   state.speculationHistory = state.speculationHistory.slice(-12);
-
-  if (option.stakeMode === "allIn" && payout === 0) {
-    state.status = "gameover";
-    state.outcome = {
-      kind: "speculationBankruptcy",
-      title: "妖股替你发布了最终版本",
-      subtitle: "全仓归零，创业现金当场清空。它没有算作游戏收入，甚至没有留下崩溃日志。",
-    };
-    PushLog(state, `${option.name}：${outcome.label}。现金归零，工作室直接破产。`, "danger");
-  } else {
-    state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
-    PushLog(state, `${option.name}：${outcome.label}，${profit >= 0 ? "赚" : "亏"} ¥${Math.abs(profit).toLocaleString("zh-CN")}。投机收益不算游戏收入。`, profit > 0 ? "good" : "danger");
-    CheckAnxietyFailure(state);
-  }
+  state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
+  PushLog(state, `${option.name} · ${outcome.label} · ${profit >= 0 ? "+" : "−"}¥${Math.abs(profit).toLocaleString("zh-CN")} · 不计游戏收入`, profit > 0 ? "good" : "warning");
+  CheckAnxietyFailure(state);
   return {
     state,
     ok: true,
@@ -1856,6 +1898,115 @@ export function Speculate(currentState, optionId) {
     profit,
     message: `${option.name}：${outcome.label}`,
   };
+}
+
+export function PlaceStockOrder(currentState, optionId, requestedStake) {
+  const state = Clone(currentState);
+  EnsureInvestmentState(state);
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === optionId);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "当前不能下单。" };
+  if (!option) return { state, ok: false, message: "仅可选择列表中的股票。" };
+  const access = GetStockAccountAccess(state);
+  if (!access.unlocked) return { state, ok: false, access, message: `炒股需 ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}；还差 ¥${access.shortfall.toLocaleString("zh-CN")}。` };
+  if (state.stockPosition) return { state, ok: false, message: "本月已有持仓。" };
+
+  const requested = Number(requestedStake);
+  if (!Number.isFinite(requested) || requested <= 0) return { state, ok: false, message: "请输入买入金额。" };
+  const stake = Math.floor(requested / STOCK_BUY_STEP) * STOCK_BUY_STEP;
+  if (stake < option.minimumBuy) return { state, ok: false, message: `最低 ¥${option.minimumBuy.toLocaleString("zh-CN")}；按千元取整。` };
+  if (stake > state.cash) return { state, ok: false, message: `需 ¥${stake.toLocaleString("zh-CN")}；现金不足。` };
+
+  state.stockAccountUnlocked = true;
+  state.cash -= stake;
+  state.stockPosition = {
+    openedMonth: state.month,
+    optionId: option.id,
+    stake,
+  };
+  PushLog(state, `${option.symbol} 买入 ¥${stake.toLocaleString("zh-CN")} · M${String(state.month + 1).padStart(2, "0")} 收盘`, "warning");
+  return {
+    state,
+    ok: true,
+    option,
+    position: { ...state.stockPosition },
+    stake,
+    message: `${option.symbol} 已买入 · 次月收盘`,
+  };
+}
+
+function BuildStockTrend(option, finalMultiplier, seed) {
+  const days = 22;
+  const startPrice = 100;
+  const finalPrice = Math.max(1, startPrice * finalMultiplier);
+  const turns = 2 + Math.floor(SeededUnit(seed + 17) * 3);
+  return Array.from({ length: days + 1 }, (_, index) => {
+    const progress = index / days;
+    const envelope = Math.sin(Math.PI * progress);
+    const randomMove = (SeededUnit(seed + index * 173) - 0.5) * 2 * option.volatility * 100 * envelope;
+    const marketWave = Math.sin(progress * Math.PI * turns) * option.volatility * 24 * envelope;
+    const price = Math.max(1, startPrice + (finalPrice - startPrice) * progress + randomMove + marketWave);
+    return { day: index, price: Number(price.toFixed(1)) };
+  });
+}
+
+function ResolveStockPosition(state) {
+  EnsureInvestmentState(state);
+  const position = state.stockPosition;
+  if (!position) return null;
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === position.optionId);
+  if (!option) {
+    state.cash += position.stake;
+    state.stockPosition = null;
+    return null;
+  }
+
+  const seed = state.seed + position.openedMonth * 911 + option.id.length * 131 + state.stockHistory.length * 47;
+  const roll = SeededUnit(seed);
+  const outcome = option.outcomes.find((candidate) => roll < candidate.ceiling) || option.outcomes.at(-1);
+  const payout = RoundMoney(position.stake * outcome.payoutMultiplier);
+  const profit = payout - position.stake;
+  const finalMultiplier = payout / position.stake;
+  const trend = BuildStockTrend(option, finalMultiplier, seed + 409);
+  const settlement = {
+    kind: "stock",
+    month: position.openedMonth,
+    settledMonth: state.month + 1,
+    optionId: option.id,
+    stake: position.stake,
+    payout,
+    profit,
+    returnRate: profit / position.stake,
+    label: outcome.label,
+    trend,
+  };
+  state.cash += payout;
+  state.speculationProfit += profit;
+  state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
+  state.stockHistory.push(settlement);
+  state.stockHistory = state.stockHistory.slice(-12);
+  state.speculationHistory.push({
+    kind: settlement.kind,
+    month: settlement.month,
+    settledMonth: settlement.settledMonth,
+    optionId: settlement.optionId,
+    stake: settlement.stake,
+    payout: settlement.payout,
+    profit: settlement.profit,
+    returnRate: settlement.returnRate,
+    label: settlement.label,
+  });
+  state.speculationHistory = state.speculationHistory.slice(-12);
+  state.stockPosition = null;
+  PushLog(state, `${option.symbol} 收盘 · ${outcome.label} · ${profit >= 0 ? "+" : "−"}¥${Math.abs(profit).toLocaleString("zh-CN")} · 不计游戏收入`, profit >= 0 ? "good" : "danger");
+  return { ...settlement, option, outcome };
+}
+
+// Retained for older consumers; the playable UI now calls the separated
+// scratch-card and stock-order functions directly.
+export function Speculate(currentState, optionId, requestedStake) {
+  if (optionId === SCRATCH_OPTION.id) return BuyScratchTicket(currentState);
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === optionId);
+  return PlaceStockOrder(currentState, optionId, requestedStake ?? option?.minimumBuy ?? 0);
 }
 
 export function BuyMarketingCampaign(currentState, campaignId) {
@@ -2155,6 +2306,8 @@ export function GetPublicCatalog() {
     aiSubscriptionLevels: AI_SUBSCRIPTION_LEVELS,
     pivotReasons: PIVOT_REASONS,
     speculationOptions: SPECULATION_OPTIONS,
+    scratchOption: SCRATCH_OPTION,
+    stockOptions: STOCK_OPTIONS,
     collateral: COLLATERAL_OPTIONS,
   };
 }
@@ -2179,6 +2332,25 @@ export function ValidateState(candidate) {
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)
     || !Array.isArray(candidate.incomeHistory) || !Array.isArray(candidate.speculationHistory)) return false;
+  if (candidate.lastScratchMonth !== undefined
+    && (!Number.isInteger(candidate.lastScratchMonth) || candidate.lastScratchMonth < 0 || candidate.lastScratchMonth > candidate.month)) return false;
+  if (candidate.stockAccountUnlocked !== undefined && typeof candidate.stockAccountUnlocked !== "boolean") return false;
+  if (candidate.stockPosition !== undefined && candidate.stockPosition !== null) {
+    const position = candidate.stockPosition;
+    if (!STOCK_OPTIONS.some((option) => option.id === position?.optionId)
+      || !Number.isInteger(position.openedMonth) || position.openedMonth < 1 || position.openedMonth > candidate.month
+      || !Number.isFinite(position.stake) || position.stake < STOCK_BUY_STEP) return false;
+  }
+  if (candidate.stockHistory !== undefined) {
+    if (!Array.isArray(candidate.stockHistory) || candidate.stockHistory.some((entry) => (
+      !STOCK_OPTIONS.some((option) => option.id === entry?.optionId)
+      || ![entry.month, entry.settledMonth, entry.stake, entry.payout, entry.profit, entry.returnRate].every(Number.isFinite)
+      || entry.month < 1 || entry.month > candidate.month || entry.settledMonth < entry.month || entry.settledMonth > candidate.month + 1
+      || entry.stake < STOCK_BUY_STEP || entry.payout < 0
+      || !Array.isArray(entry.trend) || entry.trend.length < 2
+      || entry.trend.some((point) => !Number.isFinite(point?.day) || !Number.isFinite(point?.price) || point.day < 0 || point.price <= 0)
+    ))) return false;
+  }
   if (candidate.lastRelaxationMonth !== undefined
     && (!Number.isInteger(candidate.lastRelaxationMonth) || candidate.lastRelaxationMonth < 0 || candidate.lastRelaxationMonth > candidate.month)) return false;
   if (candidate.relaxationHistory !== undefined) {

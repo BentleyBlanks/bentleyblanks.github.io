@@ -18,12 +18,14 @@ import {
   MODULE_KEYS,
   MODULE_META,
   PROJECTS,
-  SPECULATION_OPTIONS,
+  SCRATCH_OPTION,
   STAFF_CATALOG,
+  STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815n";
+} from "./Data_Game.mjs?v=20260815q";
 import {
   AdvanceMonth,
+  BuyScratchTicket,
   BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
@@ -43,9 +45,11 @@ import {
   GetMemberMonthlyCost,
   GetMarketSnapshot,
   GetOwnerHairStage,
+  GetStockAccountAccess,
   HireStaff,
   OWNER_HAIR_STAGES,
   NormalizeFounderSkills,
+  PlaceStockOrder,
   PerformOwnerTask,
   PivotProject,
   PurchaseWorkstation,
@@ -56,15 +60,16 @@ import {
   SelectDirective,
   SelectFoodPlan,
   SetStaffInvestmentLevel,
-  Speculate,
   StartProject,
   STARTUP_LOAN_TERMS,
+  STOCK_ACCOUNT_UNLOCK_CASH,
   TakeLoan,
   TalkToStaff,
   ValidateState,
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
-} from "./Script_Rules.mjs?v=20260815n";
+  UnlockStockAccount,
+} from "./Script_Rules.mjs?v=20260815q";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -74,13 +79,13 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815p";
+} from "./Data_World.mjs?v=20260815q";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
-} from "./Script_World.mjs?v=20260815k";
+} from "./Script_World.mjs?v=20260815q";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -128,6 +133,12 @@ function LoadSavedState() {
     const candidate = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (!ValidateState(candidate)) return null;
     candidate.founderSkills = NormalizeFounderSkills(candidate.founderSkills);
+    candidate.lastScratchMonth ??= [...candidate.speculationHistory].reverse().find((entry) => (
+      [SCRATCH_OPTION.id, "lottery"].includes(entry?.optionId)
+    ))?.month || 0;
+    candidate.stockAccountUnlocked ??= false;
+    candidate.stockPosition ??= null;
+    candidate.stockHistory ??= [];
     candidate.lastRelaxationMonth ??= 0;
     candidate.relaxationHistory ??= [];
     return candidate;
@@ -844,7 +855,7 @@ const FacilityLooks = {
   homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
   diner: ["小菜馆", "便宜充饥套餐", 0xffd166],
   snackShelf: ["零食架", "泡面饼干顶一顶", 0x68e0a0],
-  speculation: ["彩票柜台", "本月限疯一次", 0xff6eae],
+  scratch: ["刮刮乐柜台", "本月限刮一张", 0xff6eae],
   equipmentShop: ["设备柜台", "先买电脑再招人", 0x66b8ff],
   talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
   bank: ["银行", "启动贷 M08 到期", 0xff6eae],
@@ -856,7 +867,7 @@ const FacilityLooks = {
 
 function GetFacilityKind(interaction) {
   return {
-    lotteryMachine: "speculation",
+    lotteryMachine: "scratch",
   }[interaction.kind] || interaction.kind;
 }
 
@@ -2461,6 +2472,8 @@ function OpenAiTerminalSheet() {
 function OpenHomeComputerSheet() {
   const evaluation = EvaluateProject(state);
   const loan = state.startupLoan;
+  const stockAccess = GetStockAccountAccess(state);
+  const stockOption = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
   const monthsLeft = loan?.status === "active" ? Math.max(0, loan.dueMonth - state.month + 1) : 0;
   const founderSkillReadout = FOUNDER_SKILL_KEYS.map((skillKey) => {
     const meta = FOUNDER_SKILL_META[skillKey];
@@ -2479,6 +2492,7 @@ function OpenHomeComputerSheet() {
       <button data-computer-action="chat" type="button"><span>▤</span><strong>群聊 / 垃圾话</strong><small>自己、大学生、AI</small></button>
       <button data-computer-action="direction" type="button"><span>⌁</span><strong>项目方向</strong><small>策略、玩法、换赛道</small></button>
       <button data-computer-action="marketing" type="button"><span>◈</span><strong>线上宣发</strong><small>吹大了就退款</small></button>
+      <button class="stockComputerAction ${state.stockPosition ? "active" : ""}" data-computer-action="stocks" type="button" ${stockAccess.unlocked ? "" : "disabled"}><span>↗</span><strong>${state.stockPosition ? `${stockOption?.symbol || "股票"} 持仓中` : stockAccess.permanentlyUnlocked ? "炒股" : stockAccess.unlocked ? "解锁炒股" : "炒股 · 未解锁"}</strong><small>${state.stockPosition ? `${FormatMoney(state.stockPosition.stake)} · 次月收盘` : stockAccess.unlocked ? "2 只 · 填金额" : `还差 ${FormatMoney(stockAccess.shortfall)}`}</small></button>
       <button data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "发布更新" : "提交商店"}</strong><small>${state.project.age < 2 ? "至少再熬两个月" : "评分差也能发"}</small></button>
     </div>
     <div class="panelSection">${RenderLog(5)}</div>`, () => {
@@ -2490,6 +2504,7 @@ function OpenHomeComputerSheet() {
       if (action === "chat") return OpenAiTerminalSheet();
       if (action === "direction") return OpenDirectiveSheet();
       if (action === "marketing") return OpenMarketingSheet();
+      if (action === "stocks") return OpenStockSheet();
       if (action === "release") return OpenReleaseSheet();
     };
   });
@@ -2579,7 +2594,7 @@ function OutcomeOdds(option) {
   });
 }
 
-function DrawScratchCoating(context, width, height, optionId) {
+function DrawScratchCoating(context, width, height) {
   context.save();
   const metal = context.createLinearGradient(0, 0, width, height);
   metal.addColorStop(0, "#777d80");
@@ -2629,7 +2644,7 @@ function DrawScratchCoating(context, width, height, optionId) {
   context.font = `800 ${Clamp(Math.round(height * .075), 9, 13)}px "Microsoft YaHei UI", sans-serif`;
   context.letterSpacing = "2px";
   context.fillStyle = "rgba(45,50,53,.74)";
-  context.fillText(optionId === "lottery" ? "用硬币刮开这一沓的兑奖区" : "用硬币来回刮开银色涂层", width / 2, height * .7);
+  context.fillText("用硬币来回刮开银色涂层", width / 2, height * .7);
 
   context.globalAlpha = .42;
   context.font = `900 ${Clamp(Math.round(height * .12), 13, 20)}px Georgia, serif`;
@@ -2827,7 +2842,7 @@ function BindScratchCanvas(session) {
     return;
   }
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  DrawScratchCoating(context, width, height, session.result.option.id);
+  DrawScratchCoating(context, width, height);
 
   const FinishPointer = (event) => {
     if (session.pointerId !== event.pointerId) return;
@@ -2878,20 +2893,19 @@ function BindScratchCanvas(session) {
 function ShowScratchTicket(result) {
   ResetScratchSession();
   ClosePanel();
-  const bulk = result.option.id === "lottery";
   const resultTone = result.profit > 0 ? "win" : result.profit === 0 ? "even" : "loss";
   const profitText = result.profit > 0
     ? `净赚 ${FormatMoney(result.profit)}`
     : result.profit === 0 ? "刚好回本" : `净亏 ${FormatMoney(Math.abs(result.profit))}`;
-  const serial = `M${String(state.month).padStart(2, "0")}-${String(state.speculationHistory.length).padStart(3, "0")}-${bulk ? "PACK" : "ONE"}`;
+  const serial = `M${String(state.month).padStart(2, "0")}-${String(state.speculationHistory.length).padStart(3, "0")}-ONE`;
   dom.resultKicker.textContent = "LOTTERY COUNTER · PAID";
   dom.resultTitle.textContent = "刮开彩票";
   dom.resultBody.innerHTML = `
-    <div class="scratchStage ${bulk ? "bulk" : "single"}">
+    <div class="scratchStage single">
       <article class="scratchTicket" data-scratch-ticket>
         <div class="scratchTicketMasthead"><span>甲方是我 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
         <div class="scratchTicketTitle">
-          <div><small>STUDIO SURVIVAL LUCKY TICKET</small><strong>${bulk ? "工作室续命刮刮乐" : "回本符 · 即开型彩票"}</strong></div>
+          <div><small>STUDIO SURVIVAL LUCKY TICKET</small><strong>工作室续命刮刮乐</strong></div>
           <span class="scratchTicketPrice"><small>票面</small><b>${FormatMoney(result.stake)}</b></span>
         </div>
         <div class="scratchTicketRule"><span>已扣款</span><b>刮开见结果</b><span>每月 1 次</span></div>
@@ -2926,32 +2940,104 @@ function ShowScratchTicket(result) {
   requestAnimationFrame(() => BindScratchCanvas(session));
 }
 
-function OpenSpeculationSheet() {
-  const used = state.lastSpeculationMonth === state.month;
-  OpenPanel("LOTTERY / STOCKS", "彩票与股票", `
-    <p class="panelIntro">每月 1 次；收益不计游戏收入。妖股可能破产。</p>
-    <div class="worldGrid">${SPECULATION_OPTIONS.map((option) => `
-      <article class="oddsCard">
-        <div class="choiceTop"><strong>${option.icon} ${EscapeHtml(option.name)}</strong><span>${EscapeHtml(option.risk)}</span></div>
-        <div class="oddsList">${OutcomeOdds(option).map((outcome) => `<div class="oddsLine"><span>${(outcome.chance * 100).toFixed(outcome.chance < .01 ? 1 : 0)}% · ${EscapeHtml(outcome.label)}</span><b>返还 ×${outcome.payoutMultiplier}</b></div>`).join("")}</div>
-        <div class="choiceFooter" style="margin-top:9px"><span>本金 ${option.stakeMode === "allIn" ? "全部现金" : FormatMoney(option.stake)}</span><button class="${option.stakeMode === "allIn" ? "dangerButton" : "miniButton"}" data-speculation-id="${option.id}" type="button" ${used ? "disabled" : ""}>${used ? "本月已赌" : option.category === "lottery" ? "买来刮开" : option.stakeMode === "allIn" ? "全仓买入" : "做一月短线"}</button></div>
-      </article>`).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>投机历史</strong><span>累计 ${state.speculationProfit >= 0 ? "赚" : "亏"} ${FormatMoney(Math.abs(state.speculationProfit))}</span></div>
-    <div class="logList">${state.speculationHistory.length ? [...state.speculationHistory].reverse().map((item) => `<div class="logLine"><b>M${String(item.month).padStart(2, "0")}</b><span>${EscapeHtml(SPECULATION_OPTIONS.find((option) => option.id === item.optionId)?.name || item.optionId)}：${EscapeHtml(item.label)}，${item.profit >= 0 ? "+" : "-"}${FormatMoney(Math.abs(item.profit))}</span></div>`).join("") : `<div class="note">暂无记录。</div>`}</div>`, () => {
+function OpenScratchSheet() {
+  const used = state.lastScratchMonth === state.month;
+  const history = state.speculationHistory.filter((item) => [SCRATCH_OPTION.id, "lottery"].includes(item.optionId));
+  OpenPanel("SCRATCH CARD", "刮刮乐", `
+    <div class="worldGrid singleChoiceGrid">
+      <article class="oddsCard scratchCounterCard">
+        <div class="choiceTop"><strong>${SCRATCH_OPTION.icon} ${EscapeHtml(SCRATCH_OPTION.name)}</strong><span>${EscapeHtml(SCRATCH_OPTION.risk)}</span></div>
+        <div class="oddsList">${OutcomeOdds(SCRATCH_OPTION).map((outcome) => `<div class="oddsLine"><span>${(outcome.chance * 100).toFixed(outcome.chance < .01 ? 1 : 0)}% · ${EscapeHtml(outcome.label)}</span><b>返还 ×${outcome.payoutMultiplier}</b></div>`).join("")}</div>
+        <div class="choiceFooter" style="margin-top:9px"><span>${FormatMoney(SCRATCH_OPTION.stake)}</span><button class="miniButton" data-buy-scratch type="button" ${used || state.cash < SCRATCH_OPTION.stake ? "disabled" : ""}>${used ? "本月已刮" : state.cash < SCRATCH_OPTION.stake ? "现金不足" : "买 1 张"}</button></div>
+      </article>
+    </div>
+    <div class="panelSection sectionHeading"><strong>最近刮奖</strong><span>6 次</span></div>
+    <div class="logList">${history.length ? [...history].reverse().slice(0, 6).map((item) => `<div class="logLine"><b>M${String(item.month).padStart(2, "0")}</b><span>${EscapeHtml(item.label)}，${item.profit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(item.profit))}</span></div>`).join("") : `<div class="note">暂无记录。</div>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      const button = event.target.closest("[data-speculation-id]");
-      if (!button) return;
-      const option = SPECULATION_OPTIONS.find((item) => item.id === button.dataset.speculationId);
-      if (option?.stakeMode === "allIn" && !window.confirm("这会押上当前全部现金，并有 42% 概率直接破产。确定？")) return;
-      const result = Speculate(state, button.dataset.speculationId);
-      const isLottery = option?.category === "lottery";
-      if (!ApplyInteractiveResult(result, { deferEnding: true, tone: result?.profit >= 0 ? "good" : "warning", toast: false, sound: !isLottery })) return;
-      if (isLottery) {
-        ShowScratchTicket(result);
+      if (!event.target.closest("[data-buy-scratch]")) return;
+      const result = BuyScratchTicket(state);
+      if (!ApplyInteractiveResult(result, { deferEnding: true, tone: result?.profit >= 0 ? "good" : "warning", toast: false, sound: false })) return;
+      ShowScratchTicket(result);
+    };
+  });
+}
+
+function StockHistoryHtml() {
+  return state.stockHistory.length
+    ? [...state.stockHistory].reverse().slice(0, 6).map((item) => {
+      const option = STOCK_OPTIONS.find((candidate) => candidate.id === item.optionId);
+      return `<div class="logLine"><b>M${String(item.month).padStart(2, "0")}</b><span>${EscapeHtml(option?.name || item.optionId)}：${EscapeHtml(item.label)}，${item.profit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(item.profit))}</span></div>`;
+    }).join("")
+    : `<div class="note">暂无记录。</div>`;
+}
+
+function StockProfitTotal() {
+  return state.stockHistory.reduce((total, item) => total + (item.profit || 0), 0);
+}
+
+function OpenStockSheet() {
+  const access = GetStockAccountAccess(state);
+  if (!access.unlocked) {
+    ShowToast(`现金 ≥ ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 解锁炒股。`, "warning");
+    PlayTone("warning");
+    return;
+  }
+  if (!access.permanentlyUnlocked) {
+    const unlock = UnlockStockAccount(state);
+    if (!ApplyInteractiveResult(unlock, { tone: "good" })) return;
+  }
+
+  const position = state.stockPosition;
+  if (position) {
+    const option = STOCK_OPTIONS.find((candidate) => candidate.id === position.optionId);
+    const stockProfit = StockProfitTotal();
+    OpenPanel("STOCK POSITION", "股票持仓", `
+      <section class="stockPositionCard" style="--stockColor:${option?.color || "#66b8ff"}">
+        <span>M${String(position.openedMonth).padStart(2, "0")} 持仓中</span>
+        <strong>${EscapeHtml(option?.symbol || "STOCK")} · ${EscapeHtml(option?.name || position.optionId)}</strong>
+        <div><b>${FormatMoney(position.stake)}</b><small>M${String(position.openedMonth + 1).padStart(2, "0")} 收盘</small></div>
+      </section>
+      <div class="panelSection sectionHeading"><strong>股票历史</strong><span>累计 ${stockProfit >= 0 ? "赚" : "亏"} ${FormatMoney(Math.abs(stockProfit))}</span></div>
+      <div class="logList">${StockHistoryHtml()}</div>`);
+    return;
+  }
+
+  const minimumBuy = Math.min(...STOCK_OPTIONS.map((option) => option.minimumBuy));
+  const maximumBuy = Math.floor(state.cash / 1000) * 1000;
+  const canBuy = maximumBuy >= minimumBuy;
+  const defaultStake = canBuy ? Math.min(20000, maximumBuy) : 0;
+  const quickAmounts = [5000, 10000, 30000, 50000];
+  OpenPanel("STOCK ACCOUNT", "炒股 · 选股票与金额", `
+    <form class="stockOrderForm" data-stock-form>
+      <div class="stockPickGrid">${STOCK_OPTIONS.map((option, index) => `
+        <label class="stockPick" style="--stockColor:${option.color}">
+          <input type="radio" name="stockOption" value="${option.id}" ${index === 0 ? "checked" : ""}>
+          <span><em>${EscapeHtml(option.symbol)}</em><strong>${option.icon} ${EscapeHtml(option.name)}</strong><small>${EscapeHtml(option.risk)}</small></span>
+        </label>`).join("")}</div>
+      <section class="stockAmountPanel">
+        <div><span>买入金额</span><strong>可用 ${FormatMoney(state.cash)}</strong></div>
+        <label class="stockAmountInput"><span>¥</span><input name="stockAmount" type="number" inputmode="numeric" min="${minimumBuy}" max="${Math.max(minimumBuy, maximumBuy)}" step="1000" value="${defaultStake}" aria-label="股票买入金额" ${canBuy ? "" : "disabled"}></label>
+        <div class="stockQuickAmounts">${quickAmounts.map((amount) => `<button data-stock-amount="${amount}" type="button" ${amount > state.cash ? "disabled" : ""}>${FormatGoalMoney(amount)}</button>`).join("")}</div>
+        <div class="marketCommit"><span>${canBuy ? "¥1,000 取整 · 每月 1 只 · 不计游戏收入" : `最低 ${FormatMoney(minimumBuy)} · 账户仍已解锁`}</span><button class="primaryButton" data-stock-buy type="button" ${canBuy ? "" : "disabled"}>买入 · 次月结算</button></div>
+      </section>
+    </form>
+    <div class="panelSection sectionHeading"><strong>股票历史</strong><span>最近 6 次</span></div>
+    <div class="logList">${StockHistoryHtml()}</div>`, () => {
+    const form = dom.sheetBody.querySelector("[data-stock-form]");
+    const amountInput = form?.querySelector('[name="stockAmount"]');
+    dom.sheetBody.onclick = (event) => {
+      const quickAmount = event.target.closest("[data-stock-amount]");
+      if (quickAmount && amountInput) {
+        amountInput.value = quickAmount.dataset.stockAmount;
+        amountInput.focus();
         return;
       }
-      ShowResult("SPECULATION RESULT", result.outcome.label, `
-        <div class="resultHero"><b>${result.profit >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(result.profit))}</b><p>本金 ${FormatMoney(result.stake)} · 返还 ${FormatMoney(result.payout)} · 不计游戏收入</p></div>`, () => { if (state.status !== "playing") RenderEnding(); });
+      if (!event.target.closest("[data-stock-buy]")) return;
+      const optionId = form?.querySelector('[name="stockOption"]:checked')?.value;
+      const result = PlaceStockOrder(state, optionId, amountInput?.value);
+      if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
+      ShowResult("ORDER PLACED", `${result.option.symbol} 已买入`, `
+        <div class="resultHero"><b>${FormatGoalMoney(result.stake)}</b><p>M${String(state.month + 1).padStart(2, "0")} 显示 22 日走势、返还与盈亏。</p></div>`);
     };
   });
 }
@@ -3138,6 +3224,47 @@ function RevenueAnalysis() {
   return `近 ${recent.length} 笔平均 ${FormatGoalMoney(recentAverage)}，曲线${trend}；退款与随机事件少拿 ${FormatGoalMoney(losses)}。`;
 }
 
+function StockSettlementReport(settlement) {
+  if (!settlement?.trend?.length) return "";
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === settlement.optionId);
+  const points = settlement.trend;
+  const width = 620;
+  const height = 170;
+  const chartTop = 14;
+  const chartBottom = 28;
+  const values = points.map((point) => point.price);
+  const minimum = Math.min(...values, 100);
+  const maximum = Math.max(...values, 100);
+  const padding = Math.max(4, (maximum - minimum) * .14);
+  const floor = Math.max(0, minimum - padding);
+  const ceiling = maximum + padding;
+  const range = Math.max(1, ceiling - floor);
+  const PointPosition = (point, index) => ({
+    x: index / Math.max(1, points.length - 1) * width,
+    y: chartTop + (ceiling - point.price) / range * (height - chartTop - chartBottom),
+  });
+  const polyline = points.map((point, index) => {
+    const position = PointPosition(point, index);
+    return `${position.x.toFixed(1)},${position.y.toFixed(1)}`;
+  }).join(" ");
+  const first = PointPosition(points[0], 0);
+  const last = PointPosition(points.at(-1), points.length - 1);
+  const baselineY = chartTop + (ceiling - 100) / range * (height - chartTop - chartBottom);
+  const profitTone = settlement.profit >= 0 ? "gain" : "loss";
+  const profitText = `${settlement.profit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(settlement.profit))}`;
+  return `<section class="stockMonthReport ${profitTone}" style="--stockColor:${option?.color || "#66b8ff"}">
+    <header><div><span>M${String(settlement.month).padStart(2, "0")} · 22 个交易日</span><strong>${EscapeHtml(option?.symbol || "STOCK")} · ${EscapeHtml(option?.name || settlement.optionId)}</strong></div><b>${profitText}</b></header>
+    <div class="stockReturnGrid"><span><small>投入本金</small><b>${FormatMoney(settlement.stake)}</b></span><span><small>收盘返还</small><b>${FormatMoney(settlement.payout)}</b></span><span><small>本月收益率</small><b>${settlement.returnRate >= 0 ? "+" : ""}${(settlement.returnRate * 100).toFixed(1)}%</b></span><span><small>收盘消息</small><b>${EscapeHtml(settlement.label)}</b></span></div>
+    <div class="stockTrendChart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${EscapeHtml(option?.name || "股票")}一个月走势，最终${settlement.profit >= 0 ? "盈利" : "亏损"}${FormatMoney(Math.abs(settlement.profit))}">
+      <defs><linearGradient id="stockLineGradient" x1="0" x2="1"><stop stop-color="var(--stockColor)"/><stop offset="1" stop-color="${settlement.profit >= 0 ? "#68e0a0" : "#ff6675"}"/></linearGradient></defs>
+      <path d="M0 ${baselineY.toFixed(1)}H${width}" class="stockBaseline"/><polyline points="${polyline}" fill="none" stroke="url(#stockLineGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${first.x}" cy="${first.y}" r="5"/><circle class="stockClosePoint" cx="${last.x}" cy="${last.y}" r="6"/>
+      <text x="2" y="${height - 5}">D01 · 100.0</text><text x="${width - 2}" y="${height - 5}" text-anchor="end">D22 · ${points.at(-1).price.toFixed(1)}</text>
+    </svg></div>
+    <footer><span>资金已返还</span><b>不计游戏收入</b></footer>
+  </section>`;
+}
+
 function OpenReleaseSheet() {
   const evaluation = EvaluateProject(state);
   const marketFit = EvaluateMarketFit(state);
@@ -3173,6 +3300,7 @@ function OpenReleaseSheet() {
 function OpenMonthSheet() {
   if (!state.project || state.status !== "playing") return;
   const costs = ForecastMonthlyCosts(state);
+  const pendingStock = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
   const shortfall = Math.max(0, costs.total - state.cash - (state.project.isReleased ? state.project.monthlyRevenue : 0));
   const startupLoan = state.startupLoan;
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
@@ -3184,6 +3312,7 @@ function OpenMonthSheet() {
       <div class="metricTile"><span>预计总支出</span><strong>${FormatMoney(costs.total)}</strong></div>
       <div class="metricTile"><span>危险缺口</span><strong>${FormatMoney(shortfall)}</strong></div>
     </div>
+    ${state.stockPosition ? `<div class="note good">股票待收盘 · ${EscapeHtml(pendingStock?.symbol || state.stockPosition.optionId)} ${FormatMoney(state.stockPosition.stake)} · 月结后显示走势与盈亏</div>` : ""}
     ${startupLoan?.status === "active" ? `<div class="noteList"><div class="note danger">启动贷 ${FormatMoney(startupLoan.remaining)} · M${String(startupLoan.dueMonth).padStart(2, "0")} 到期 · 剩 ${monthsLeft} 月</div></div>` : `<div class="noteList"><div class="note good">启动贷已结清。</div></div>`}
     <div class="panelSection worldGrid three">
       <div class="worldChoice"><div class="choiceTop"><strong>生活硬账</strong><span>${FormatMoney(costs.living)}</span></div><p>房租、贷款、水电网</p></div>
@@ -3209,6 +3338,7 @@ function OpenMonthSheet() {
       ShowResult("MONTHLY DAMAGE REPORT", `M${String(originalMonth).padStart(2, "0")} 熬过去了`, `
         <div class="resultHero"><b>${result.buildStatus?.label || "还活着"}</b><p>收入 ${FormatMoney(finance.income)}，支出 ${FormatMoney(finance.costs?.total || 0)}。<br>${EscapeHtml(result.painEvents?.[0] || "这个月居然没有第一时间能想起的痛。")}</p></div>
         <div class="metricGrid"><div class="metricTile"><span>本月游戏收入</span><strong>${FormatGoalMoney(finance.income)}</strong></div><div class="metricTile"><span>浪费产出</span><strong>${(result.wastedTotal || 0).toFixed(1)}</strong></div><div class="metricTile"><span>焦虑变化</span><strong>${result.anxiety.delta >= 0 ? "+" : ""}${result.anxiety.delta.toFixed(1)}</strong></div></div>
+        ${StockSettlementReport(result.stockSettlement)}
         <div class="noteList">
           ${(result.painEvents || []).slice(0, 5).map((note) => `<div class="note danger">${EscapeHtml(note)}</div>`).join("")}
           ${removed.map((staff) => `<div class="note danger">付不起费用，${EscapeHtml(staff.name)} ${staff.kind === "ai" ? "被自动退订" : "收拾东西走了"}。</div>`).join("")}
@@ -3228,12 +3358,13 @@ function OpenHelpSheet() {
   OpenPanel("HELP", "操作与目标", `
     <div class="resultHero"><b>A/D</b><p>移动 · W/↑/空格跳 · E 交互<br>移动端请横屏使用底部按钮。</p></div>
     <div class="noteList">
-      <div class="note">家中电脑：开发、聊天、宣发、发布；右下角按钮结束本月。</div>
+      <div class="note">家中电脑：开发、聊天、宣发、发布、炒股；炒股 ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 解锁。</div>
       <div class="note good">手机：看风向和事件，选 1 个主推特色。命中增收，选错退款；也可不追风。</div>
       <div class="note">招聘前先买工位；每人 1 套。</div>
+      <div class="note">超市：${FormatMoney(SCRATCH_OPTION.stake)} 刮刮乐，每月 1 张。电脑股票：2 只，只填金额，次月看走势与盈亏。</div>
       <div class="note">饮食有现金门槛；足浴每月 1 次，降低焦虑。</div>
       <div class="note danger">M08 前还清 ¥82,000，否则倒闭。</div>
-      <div class="note good">目标：游戏净收入 100 亿元；贷款与投机不计。</div>
+      <div class="note good">目标：游戏净收入 100 亿元；贷款、刮奖、炒股不计。</div>
     </div>`);
 }
 
@@ -3360,7 +3491,7 @@ function TriggerInteraction() {
     case "footbathCity": return OpenRelaxationSheet("footbathCity");
     case "maleModelClub": return OpenRelaxationSheet("maleModelClub");
     case "bank": return OpenBankSheet();
-    case "lotteryMachine": return OpenSpeculationSheet();
+    case "lotteryMachine": return OpenScratchSheet();
     case "equipmentShop": return OpenEquipmentSheet();
     case "talentMarket": return OpenTalentSheet();
     default: ShowToast("这个物件还在等需求评审。", "warning");

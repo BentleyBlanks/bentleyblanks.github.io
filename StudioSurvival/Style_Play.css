@@ -800,6 +800,7 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .note { padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,.035); color: #cbc7d8; font-size: 9px; }
 .note.danger { background: rgba(255,98,110,.09); color: #ffb2b8; }
 .note.good { background: rgba(104,224,160,.09); color: #a9f1c9; }
+.note.warning { background: rgba(255,209,102,.09); color: #ffe29a; }
 
 /* Lottery scratch ritual ---------------------------------------------------- */
 .resultLayer.scratchMode {
@@ -1093,6 +1094,72 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .computerActions button strong { align-self: end; font-size: 10px; }
 .computerActions button small { color: var(--muted); font-size: 7.5px; }
 .computerActions button.danger { border-color: rgba(255,98,110,.35); }
+.computerActions button:disabled { opacity: .42; cursor: not-allowed; filter: saturate(.45); }
+.computerActions .stockComputerAction { border-color: rgba(102,184,255,.38); background: linear-gradient(145deg, rgba(102,184,255,.09), transparent 52%), rgba(255,255,255,.03); }
+.computerActions .stockComputerAction.active { border-color: rgba(104,224,160,.56); box-shadow: inset 0 0 0 1px rgba(104,224,160,.12); }
+
+.singleChoiceGrid { grid-template-columns: minmax(0, 540px); justify-content: center; }
+.scratchCounterCard { background: linear-gradient(145deg, rgba(255,209,102,.08), transparent 50%), rgba(255,255,255,.025); }
+.stockOrderForm { display: grid; gap: 10px; }
+.stockPickGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stockPick { position: relative; display: block; min-width: 0; cursor: pointer; }
+.stockPick input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.stockPick > span {
+  min-height: 106px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #343943;
+  border-radius: 8px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--stockColor) 8%, transparent), transparent 52%), #1d2027;
+  transition: border-color .14s ease, transform .14s ease, background .14s ease;
+}
+.stockPick:hover > span { border-color: color-mix(in srgb, var(--stockColor) 65%, white); transform: translateY(-1px); }
+.stockPick:has(input:checked) > span { border-color: var(--stockColor); background: linear-gradient(145deg, color-mix(in srgb, var(--stockColor) 18%, transparent), transparent 58%), #242731; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--stockColor) 30%, transparent); }
+.stockPick:has(input:focus-visible) > span { outline: 2px solid #fff; outline-offset: 2px; }
+.stockPick em { width: max-content; padding: 2px 6px; border-radius: 4px; color: #10131a; background: var(--stockColor); font-size: 8px; font-style: normal; font-weight: 950; letter-spacing: .08em; }
+.stockPick strong { color: #f2eff8; font-size: 12px; }
+.stockPick small { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.stockAmountPanel { padding: 12px; border: 1px solid #363b45; border-radius: 8px; background: #171a21; }
+.stockAmountPanel > div:first-child { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.stockAmountPanel > div:first-child span { color: #f0edf7; font-size: 11px; font-weight: 900; }
+.stockAmountPanel > div:first-child strong { color: #9da4af; font-size: 8px; }
+.stockAmountInput { display: grid; grid-template-columns: 38px 1fr; align-items: center; margin-top: 8px; overflow: hidden; border: 1px solid #4b515d; border-radius: 7px; background: #0d1015; }
+.stockAmountInput > span { display: grid; place-items: center; align-self: stretch; color: #90d6ff; background: rgba(102,184,255,.11); font-size: 16px; font-weight: 950; }
+.stockAmountInput input { width: 100%; min-height: 46px; padding: 8px 11px; border: 0; outline: 0; color: #f7f5fb; background: transparent; font: 900 18px/1.1 "Courier New", monospace; }
+.stockAmountInput:focus-within { border-color: #66b8ff; box-shadow: 0 0 0 2px rgba(102,184,255,.16); }
+.stockQuickAmounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 7px; }
+.stockQuickAmounts button { min-height: 36px; border: 1px solid #3f4550; border-radius: 6px; color: #ccd2dd; background: #252a32; font-size: 8px; cursor: pointer; }
+.stockQuickAmounts button:hover:not(:disabled) { border-color: #66b8ff; color: white; }
+.stockQuickAmounts button:disabled { opacity: .32; cursor: not-allowed; }
+.stockPositionCard { display: grid; gap: 7px; padding: 15px; border: 1px solid color-mix(in srgb, var(--stockColor) 52%, #343943); border-left: 5px solid var(--stockColor); border-radius: 8px; background: linear-gradient(110deg, color-mix(in srgb, var(--stockColor) 15%, transparent), transparent 58%), #171a21; }
+.stockPositionCard > span { color: color-mix(in srgb, var(--stockColor) 70%, white); font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.stockPositionCard > strong { color: #f4f1f8; font-size: 17px; }
+.stockPositionCard > div { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.stockPositionCard > div b { color: #fff; font-size: 23px; }
+.stockPositionCard > div small { color: var(--muted); font-size: 8px; }
+
+.resultCard:has(.stockMonthReport) { width: min(720px, 94vw); }
+.stockMonthReport { --profitColor: #68e0a0; margin-top: 10px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--profitColor) 48%, #303641); border-radius: 9px; background: linear-gradient(145deg, color-mix(in srgb, var(--profitColor) 8%, transparent), transparent 46%), #11151b; }
+.stockMonthReport.loss { --profitColor: #ff6675; }
+.stockMonthReport > header { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 11px 13px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.stockMonthReport > header div { display: grid; gap: 2px; }
+.stockMonthReport > header span { color: color-mix(in srgb, var(--stockColor) 74%, white); font-size: 7px; font-weight: 900; letter-spacing: .11em; }
+.stockMonthReport > header strong { color: #f5f2fa; font-size: 14px; }
+.stockMonthReport > header > b { color: var(--profitColor); font-size: 25px; }
+.stockReturnGrid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: rgba(255,255,255,.05); }
+.stockReturnGrid > span { min-width: 0; padding: 8px 10px; background: #171b22; }
+.stockReturnGrid small { display: block; color: #858c98; font-size: 6.5px; }
+.stockReturnGrid b { display: block; margin-top: 2px; overflow: hidden; color: #e9e6ef; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.stockTrendChart { padding: 8px 10px 2px; }
+.stockTrendChart svg { display: block; width: 100%; height: 170px; overflow: visible; }
+.stockTrendChart text { fill: #7f8793; font-size: 8px; }
+.stockTrendChart circle { fill: var(--stockColor); stroke: #11151b; stroke-width: 3; }
+.stockTrendChart .stockClosePoint { fill: var(--profitColor); }
+.stockBaseline { stroke: rgba(255,255,255,.16); stroke-width: 1; stroke-dasharray: 5 5; }
+.stockMonthReport > footer { display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px 9px; color: #858c98; font-size: 7px; }
+.stockMonthReport > footer b { color: #b7bdc7; }
 
 .workstationPreview { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-top: 12px; }
 .workstationPreview > div { display: grid; justify-items: center; gap: 3px; padding: 11px 6px; border: 1px dashed rgba(255,255,255,.16); border-radius: 11px; color: var(--muted); }
@@ -1966,6 +2033,9 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .missionCard { width: 185px; }
   .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }
   .marketPickGrid.focusGrid { grid-template-columns: 1fr; }
+  .stockPickGrid { grid-template-columns: 1fr; }
+  .stockQuickAmounts, .stockReturnGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stockTrendChart svg { height: 132px; }
 }
 
 /* Mobile landscape controls -------------------------------------------------
@@ -2224,6 +2294,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .miniButton,
   .dangerButton,
   .primaryButton,
+  .stockQuickAmounts button,
   .ceremonyStartButton,
   .continueButton,
   .documentButton {

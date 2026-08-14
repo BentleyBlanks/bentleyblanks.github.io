@@ -822,91 +822,66 @@ export const MARKETING_CAMPAIGNS = [
   },
 ];
 
-export const SPECULATION_OPTIONS = [
-  {
-    id: "scratchTicket",
-    name: "刮一张回本符",
-    icon: "□",
-    category: "lottery",
-    risk: "低额碰运气",
-    stakeMode: "fixed",
-    stake: 500,
-    description: "成本只够一顿便饭，中奖概率也很尊重这个投入。",
-    outcomes: [
-      { ceiling: 0.72, payoutMultiplier: 0, label: "刮出‘谢谢参与’", anxiety: 1 },
-      { ceiling: 0.94, payoutMultiplier: 1, label: "刚好回本", anxiety: 0 },
-      { ceiling: 0.992, payoutMultiplier: 6, label: "中了三千元", anxiety: -2 },
-      { ceiling: 1, payoutMultiplier: 80, label: "四万元小奖", anxiety: -7 },
-    ],
-  },
-  {
-    id: "lottery",
-    name: "买一沓彩票",
-    icon: "✦",
-    category: "lottery",
-    risk: "高损耗彩票",
-    stakeMode: "fixed",
-    stake: 2000,
-    description: "大概率得到一把彩色纸屑，小概率突然觉得做游戏只是副业。",
-    outcomes: [
-      { ceiling: 0.82, payoutMultiplier: 0, label: "全部没中", anxiety: 3 },
-      { ceiling: 0.97, payoutMultiplier: 2, label: "中了点饭钱", anxiety: -1 },
-      { ceiling: 0.997, payoutMultiplier: 30, label: "中了六万元", anxiety: -8 },
-      { ceiling: 1, payoutMultiplier: 400, label: "八十万元大奖", anxiety: -18 },
-    ],
-  },
+export const SCRATCH_OPTION = {
+  id: "scratchTicket",
+  name: "工作室续命刮刮乐",
+  icon: "□",
+  category: "lottery",
+  risk: "每月限刮一张",
+  stake: 500,
+  description: "柜台只卖这一种。付五百元，亲手刮开银色兑奖区。",
+  outcomes: [
+    { ceiling: 0.72, payoutMultiplier: 0, label: "谢谢参与", anxiety: 1 },
+    { ceiling: 0.94, payoutMultiplier: 1, label: "刚好回本", anxiety: 0 },
+    { ceiling: 0.992, payoutMultiplier: 6, label: "中了三千元", anxiety: -2 },
+    { ceiling: 1, payoutMultiplier: 80, label: "四万元小奖", anxiety: -7 },
+  ],
+};
+
+export const STOCK_OPTIONS = [
   {
     id: "engineEtf",
-    name: "游戏引擎 ETF",
+    symbol: "GAME",
+    name: "游戏产业 ETF",
     icon: "▦",
     category: "stock",
-    risk: "中低波动",
-    stakeMode: "fixed",
-    stake: 12000,
-    description: "做一个月短线。赚得像理财，亏起来仍像独立开发。",
+    risk: "稳健 · 中低波动",
+    color: "#66b8ff",
+    volatility: 0.1,
+    minimumBuy: 5000,
+    description: "游戏引擎、平台和发行商打成一篮子，涨跌都比较克制。",
     outcomes: [
-      { ceiling: 0.15, payoutMultiplier: 0.72, label: "行业集体回调", anxiety: 6 },
+      { ceiling: 0.15, payoutMultiplier: 0.78, label: "行业集体回调", anxiety: 6 },
       { ceiling: 0.48, payoutMultiplier: 0.94, label: "小跌，手续费很努力", anxiety: 2 },
-      { ceiling: 0.82, payoutMultiplier: 1.1, label: "稳稳涨了一点", anxiety: -2 },
-      { ceiling: 0.97, payoutMultiplier: 1.35, label: "吃到一波行情", anxiety: -5 },
-      { ceiling: 1, payoutMultiplier: 1.9, label: "行业突然起飞", anxiety: -9 },
+      { ceiling: 0.82, payoutMultiplier: 1.08, label: "稳稳涨了一点", anxiety: -2 },
+      { ceiling: 0.97, payoutMultiplier: 1.22, label: "吃到一波行情", anxiety: -4 },
+      { ceiling: 1, payoutMultiplier: 1.55, label: "行业突然起飞", anxiety: -7 },
     ],
   },
   {
     id: "aiConceptStock",
+    symbol: "AIPW",
     name: "AI 算力概念股",
     icon: "AI",
     category: "stock",
-    risk: "高波动短线",
-    stakeMode: "fixed",
-    stake: 30000,
+    risk: "激进 · 高波动",
+    color: "#9d8cff",
+    volatility: 0.24,
+    minimumBuy: 5000,
     description: "公司介绍里 AI 出现 47 次，产品介绍只出现 1 次。",
     outcomes: [
-      { ceiling: 0.24, payoutMultiplier: 0.18, label: "概念被证实只有概念", anxiety: 14 },
-      { ceiling: 0.55, payoutMultiplier: 0.62, label: "大跌，群里还在喊格局", anxiety: 9 },
-      { ceiling: 0.76, payoutMultiplier: 1.18, label: "蹭热点小赚", anxiety: 1 },
-      { ceiling: 0.94, payoutMultiplier: 1.85, label: "算力订单传闻发酵", anxiety: -8 },
-      { ceiling: 1, payoutMultiplier: 4.2, label: "四倍神话，截图留念", anxiety: -16 },
-    ],
-  },
-  {
-    id: "allInStock",
-    name: "全仓神秘妖股",
-    icon: "↗",
-    category: "stock",
-    risk: "可能直接破产",
-    stakeMode: "allIn",
-    stake: 0,
-    description: "把当前全部现金押进去。可能翻倍，也可能让工作室当场进入片尾字幕。",
-    outcomes: [
-      { ceiling: 0.42, payoutMultiplier: 0, label: "停牌退市，全部归零", anxiety: 100 },
-      { ceiling: 0.72, payoutMultiplier: 0.45, label: "腰斩之后又补了一刀", anxiety: 14 },
-      { ceiling: 0.9, payoutMultiplier: 1.28, label: "小赚，但心脏不小亏", anxiety: 3 },
-      { ceiling: 0.98, payoutMultiplier: 2.6, label: "翻了两倍多", anxiety: -10 },
-      { ceiling: 1, payoutMultiplier: 8, label: "八倍暴涨，突然像个投资人", anxiety: -22 },
+      { ceiling: 0.24, payoutMultiplier: 0.35, label: "概念被证实只有概念", anxiety: 14 },
+      { ceiling: 0.55, payoutMultiplier: 0.7, label: "大跌，群里还在喊格局", anxiety: 9 },
+      { ceiling: 0.76, payoutMultiplier: 1.15, label: "蹭热点小赚", anxiety: 1 },
+      { ceiling: 0.94, payoutMultiplier: 1.65, label: "算力订单传闻发酵", anxiety: -8 },
+      { ceiling: 1, payoutMultiplier: 2.8, label: "概念股走出神话", anxiety: -14 },
     ],
   },
 ];
+
+// Compatibility catalog for analytics and older consumers. Player-facing
+// screens deliberately keep the scratch card and stock account separate.
+export const SPECULATION_OPTIONS = [SCRATCH_OPTION, ...STOCK_OPTIONS];
 
 export const FEATURE_CHOICES = [
   {

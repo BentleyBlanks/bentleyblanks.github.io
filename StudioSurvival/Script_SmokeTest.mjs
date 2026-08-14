@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   AdvanceMonth,
+  BuyScratchTicket,
   BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
@@ -19,15 +20,17 @@ import {
   GetAnxietyState,
   GetOwnerHairStage,
   GetFounderSkillEffect,
+  GetStockAccountAccess,
   HireStaff,
   NormalizeFounderSkills,
+  PlaceStockOrder,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
   SetMarketStrategy,
   SetStaffInvestmentLevel,
-  Speculate,
   StartProject,
+  STOCK_ACCOUNT_UNLOCK_CASH,
   TakeLoan,
   TalkToStaff,
   PivotProject,
@@ -51,7 +54,8 @@ import {
   MARKET_EVENTS,
   PIVOT_REASONS,
   PROJECTS,
-  SPECULATION_OPTIONS,
+  SCRATCH_OPTION,
+  STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
 } from "./Data_Game.mjs";
 
@@ -431,54 +435,69 @@ function HasRecordedId(collection, id) {
 }
 
 {
-  const lottery = SPECULATION_OPTIONS.find((option) => option.id === "lottery");
-  const allIn = SPECULATION_OPTIONS.find((option) => option.stakeMode === "allIn");
-  assert(lottery && allIn, "speculation catalog must include lottery and all-in options");
-  let lotteryWin = null;
-  let lotteryLoss = null;
-  for (let seed = 0; seed < 3000 && (!lotteryWin || !lotteryLoss); seed += 1) {
-    const state = Begin();
-    state.seed = seed;
-    state.cash = 100_000;
-    const beforeRevenue = state.gameRevenue;
-    const result = Speculate(state, lottery.id);
-    assert.equal(result.ok, true);
-    assert.equal(result.state.gameRevenue, beforeRevenue, "speculation must not count as game revenue");
-    if (result.profit > 0 && !lotteryWin) lotteryWin = result;
-    if (result.profit < 0 && !lotteryLoss) lotteryLoss = result;
-  }
-  assert(lotteryWin, "lottery must have a deterministic winning seed");
-  assert(lotteryLoss, "lottery must have a deterministic losing seed");
+  assert.equal(SCRATCH_OPTION.category, "lottery", "the counter must expose one dedicated scratch option");
+  assert.equal(STOCK_OPTIONS.length, 2, "the computer stock picker must stay deliberately small");
+  assert(STOCK_OPTIONS.every((option) => option.category === "stock" && !Object.hasOwn(option, "stake")), "stock choices must only define the asset, not a fixed bet");
 
-  let allInBankruptcy = null;
-  let allInProfit = null;
-  for (let seed = 0; seed < 3000 && (!allInBankruptcy || !allInProfit); seed += 1) {
+  let scratchWin = null;
+  let scratchLoss = null;
+  for (let seed = 0; seed < 3000 && (!scratchWin || !scratchLoss); seed += 1) {
     const state = Begin();
     state.seed = seed;
     state.cash = 100_000;
     const beforeRevenue = state.gameRevenue;
-    const result = Speculate(state, allIn.id);
+    const result = BuyScratchTicket(state);
     assert.equal(result.ok, true);
-    assert.equal(result.state.gameRevenue, beforeRevenue, "all-in speculation must not count as game revenue");
-    if (result.state.outcome?.kind === "speculationBankruptcy") {
-      allInBankruptcy = result;
-      assert.equal(result.state.cash, 0, "a losing all-in speculation must zero the cash balance");
-    } else if (result.profit > 0 && !allInProfit) {
-      allInProfit = result;
-    }
+    assert.equal(result.state.gameRevenue, beforeRevenue, "scratch winnings must not count as game revenue");
+    if (result.profit > 0 && !scratchWin) scratchWin = result;
+    if (result.profit < 0 && !scratchLoss) scratchLoss = result;
   }
-  assert(allInBankruptcy, "the all-in option must have a deterministic bankruptcy seed");
-  assert.equal(allInBankruptcy.state.outcome.kind, "speculationBankruptcy");
-  assert(allInProfit, "the all-in option must also have a deterministic profitable seed");
+  assert(scratchWin, "the single scratch card must have a deterministic winning seed");
+  assert(scratchLoss, "the single scratch card must have a deterministic losing seed");
 
   const once = Begin();
   once.cash = 100_000;
-  const first = Speculate(once, lottery.id);
+  const first = BuyScratchTicket(once);
   assert.equal(first.ok, true);
-  const second = Speculate(first.state, lottery.id);
-  assert.equal(second.ok, false, "speculation must be limited to one action per month");
+  const second = BuyScratchTicket(first.state);
+  assert.equal(second.ok, false, "the counter must sell only one scratch card per month");
   assert.equal(second.state.speculationHistory.length, 1);
   assert.equal(second.state.cash, first.state.cash);
+
+  const belowGate = Begin();
+  belowGate.cash = STOCK_ACCOUNT_UNLOCK_CASH - 1000;
+  assert.equal(GetStockAccountAccess(belowGate).unlocked, false, "stock trading must stay locked below the cash threshold");
+  const lockedOrder = PlaceStockOrder(belowGate, STOCK_OPTIONS[0].id, 10_000);
+  assert.equal(lockedOrder.ok, false);
+  assert.equal(lockedOrder.state.stockPosition, null);
+
+  const funded = first.state;
+  funded.cash = 200_000;
+  const order = PlaceStockOrder(funded, STOCK_OPTIONS[1].id, 12_500);
+  assert.equal(order.ok, true, "the computer must accept a stock order after the capital gate is met");
+  assert.equal(order.stake, 12_000, "stock buy amounts must be rounded down to whole thousands");
+  assert.equal(order.state.cash, 188_000, "the chosen buy amount must leave available cash immediately");
+  assert.equal(order.state.stockAccountUnlocked, true, "crossing the gate must permanently unlock the computer feature");
+  assert.equal(order.state.stockHistory.length, 0, "the order must not reveal its result immediately");
+  assert.equal(order.state.stockPosition.optionId, STOCK_OPTIONS[1].id);
+  assert.equal(PlaceStockOrder(order.state, STOCK_OPTIONS[0].id, 5000).ok, false, "only one stock may be held during a month");
+
+  const beforeStockRevenue = order.state.gameRevenue;
+  const close = AdvanceMonth(order.state);
+  assert.equal(close.ok, true);
+  assert(close.stockSettlement, "the next turn must return a stock settlement for the monthly report");
+  assert.equal(close.stockSettlement.optionId, STOCK_OPTIONS[1].id);
+  assert.equal(close.stockSettlement.trend.length, 23, "the stock report must include open plus 22 trading-day points");
+  assert.equal(close.stockSettlement.trend[0].price, 100);
+  assert.equal(
+    close.stockSettlement.trend.at(-1).price,
+    Number((close.stockSettlement.payout / close.stockSettlement.stake * 100).toFixed(1)),
+    "the chart close must match the actual payout multiplier",
+  );
+  assert.equal(close.state.stockPosition, null, "the position must close when the turn advances");
+  assert.equal(close.state.stockHistory.length, 1);
+  assert.equal(close.state.gameRevenue, beforeStockRevenue, "stock returns must not count toward the game-revenue goal");
+  assert.equal(ValidateState(close.state), true, "a state containing stock history and chart points must remain saveable");
 }
 
 {
@@ -1018,4 +1037,4 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market phone fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");

@@ -17,8 +17,8 @@ assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visib
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
-assert.match(html, /Style_Play\.css\?v=20260815q/, "the simplified project setup must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815q/, "the simplified project setup logic must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815q/, "project setup and stock-account changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815q/, "gameplay changes must bypass the Pages cache");
 assert.doesNotMatch(html, /contractParties|contractFinePrint|signatureRow|按住 1 秒/, "project setup must only show game name, theme, type, and confirmation");
 assert.match(html, /id="projectConfirmButton" class="documentButton contractSubmitButton"[^>]*><strong>开始开发<\/strong>/, "project setup needs one direct confirmation action");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
@@ -38,6 +38,9 @@ assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*4
 assert.match(css, /\.goalReveal\.active \.goalRevealNumber/, "the 100-yuan-billion target needs a dedicated entrance animation");
 assert.match(css, /\.goalRevealCard\s*\{\s*gap:5px;/, "the target reveal must compact itself on short landscape phones");
 assert.match(css, /\.goalRevealButton\s*\{[^}]*min-height:44px;/, "the target acknowledgement must remain a full touch target");
+assert.match(css, /\.stockPickGrid\s*\{/, "the computer stock picker needs a responsive two-choice layout");
+assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");
+assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
 
 assert.match(script, /SetTouchButtonPressed/, "held controls need deterministic visual state updates");
 assert.match(script, /classList\.toggle\("available", interactionAvailable\)/, "interaction readiness must track the nearest target");
@@ -52,5 +55,9 @@ assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", Complete
 assert.match(script, /AddPhysicalLabel\(roomGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
 assert.doesNotMatch(script, /BeginSealHold|CancelSealHold|sealHoldTimer|sealHoldComplete/, "project setup must not restore hold-to-confirm");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
+assert.match(script, /data-computer-action="stocks"/, "stock trading must enter through the home computer");
+assert.match(script, /function OpenScratchSheet\(/, "the supermarket counter must have its own scratch-card screen");
+assert.match(script, /function StockSettlementReport\(/, "the next turn must render the monthly stock trend and return");
+assert.doesNotMatch(script, /LOTTERY \/ STOCKS/, "stocks and scratch cards must not share the old combined entry");
 
 console.log("StudioSurvival mobile UI contract test passed");
