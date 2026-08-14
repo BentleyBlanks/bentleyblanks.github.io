@@ -27,7 +27,7 @@ import {
 } from "./Data_Game.mjs";
 
 export const SAVE_KEY = "studio_survival_v1";
-export const RULES_VERSION = 7;
+export const RULES_VERSION = 8;
 
 function Clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -177,6 +177,8 @@ export function CreateInitialState() {
     status: "setup",
     outcome: null,
     month: 1,
+    ownerWorkMonth: 1,
+    ownerWorkCount: 0,
     revenueGoal: 10000000000,
     gameRevenue: 0,
     cash: 68000,
@@ -1223,7 +1225,11 @@ export function AdvanceMonth(currentState) {
   };
   state.talkPoints = 2;
   state.selectedDirective = "integration";
-  if (state.status === "playing") state.month += 1;
+  if (state.status === "playing") {
+    state.month += 1;
+    state.ownerWorkMonth = state.month;
+    state.ownerWorkCount = 0;
+  }
   return {
     state,
     ok: true,
@@ -1446,6 +1452,79 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   return { state, ok: true, feature, sourceId, consequence, message: `玩法「${feature.title}」已写进项目。` };
 }
 
+const OWNER_TASK_EFFECTS = {
+  art: {
+    bugs: 1.1,
+    scopeDebt: 0.7,
+    technicalDebt: 1.8,
+    line: "老板亲自画美术：鼠标突然获得了艺术指导资格。",
+  },
+  design: {
+    bugs: 1.4,
+    scopeDebt: 2.2,
+    technicalDebt: 0.9,
+    line: "老板亲自做策划：需求文档长出了第四个结局。",
+  },
+  client: {
+    bugs: 1.6,
+    scopeDebt: 2.4,
+    technicalDebt: 0.8,
+    line: "老板亲自接客户端：按钮被说服了，Bug 也决定留下。",
+  },
+  performance: {
+    bugs: 1.3,
+    scopeDebt: 0.8,
+    technicalDebt: 2.5,
+    line: "老板亲自做性能：帧率和自尊一起开始优化。",
+  },
+};
+
+export function PerformOwnerTask(currentState, moduleKey) {
+  const state = Clone(currentState);
+  if (state.status !== "playing" || !state.project) {
+    return { state, ok: false, message: "当前没有可亲自开工的项目。" };
+  }
+  if (!MODULE_KEYS.includes(moduleKey)) {
+    return { state, ok: false, message: "这个工位不存在，老板只能在四个真实模块上干活。" };
+  }
+
+  // Keep the action usable even when a caller advances the month by restoring a save
+  // directly instead of going through AdvanceMonth.
+  if (state.ownerWorkMonth !== state.month) {
+    state.ownerWorkMonth = state.month;
+    state.ownerWorkCount = 0;
+  }
+  if (state.ownerWorkCount >= 3) {
+    return { state, ok: false, message: "本月老板已经亲自干满三次了，继续敲键盘只会制造新的传说。" };
+  }
+
+  const effect = OWNER_TASK_EFFECTS[moduleKey];
+  const before = state.project.modules[moduleKey];
+  const requestedGain = 2 + Math.floor(SeededUnit(
+    state.seed + state.month * 137 + state.ownerWorkCount * 17 + moduleKey.length * 31,
+  ) * 3);
+  const after = Clamp(before + requestedGain, 0, 100);
+  const gain = after - before;
+  state.project.modules[moduleKey] = after;
+  state.project.bugs = Clamp(state.project.bugs + effect.bugs, 0, 80);
+  state.project.scopeDebt = Clamp(state.project.scopeDebt + effect.scopeDebt, 0, 80);
+  state.project.technicalDebt = Clamp(state.project.technicalDebt + effect.technicalDebt, 0, 80);
+  state.ownerWorkCount += 1;
+  state.ownerWorkMonth = state.month;
+  state.hunger = Clamp(state.hunger + 7, 0, 100);
+  state.anxiety = Clamp(state.anxiety + 5, 0, 100);
+  PushLog(state, `${effect.line} ${moduleKey} 模块进度 +${gain.toFixed(1)}，Bug 也顺手学会了复制。`, "warning");
+  CheckHungerFailure(state);
+  CheckAnxietyFailure(state);
+  return {
+    state,
+    ok: true,
+    moduleKey,
+    gain,
+    message: `老板亲自完成 ${moduleKey} 工位：低质量进度 +${gain.toFixed(1)}。`,
+  };
+}
+
 function SelectLine(staff, tone, seed) {
   const key = tone === "pressure" ? "pressureLines" : tone === "encourage" ? "encourageLines" : tone === "roast" ? "roastLines" : tone === "sync" ? "syncLines" : "idleLines";
   const lines = staff[key] || staff.idleLines;
@@ -1551,6 +1630,10 @@ export function ValidateState(candidate) {
   if (!candidate || candidate.rulesVersion !== RULES_VERSION) return false;
   if (!["setup", "playing", "gameover", "ended"].includes(candidate.status)) return false;
   if (!Number.isInteger(candidate.month) || candidate.month < 1) return false;
+  if (!Number.isInteger(candidate.ownerWorkMonth) || candidate.ownerWorkMonth < 1
+    || candidate.ownerWorkMonth > candidate.month
+    || !Number.isInteger(candidate.ownerWorkCount) || candidate.ownerWorkCount < 0
+    || candidate.ownerWorkCount > 3) return false;
   if (![candidate.cash, candidate.gameRevenue, candidate.arrears, candidate.totalRevenue, candidate.totalCosts,
     candidate.anxiety, candidate.hunger, candidate.reputation, candidate.fans, candidate.speculationProfit]
     .every(Number.isFinite)) return false;

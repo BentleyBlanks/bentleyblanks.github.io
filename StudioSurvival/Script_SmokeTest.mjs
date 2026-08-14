@@ -21,6 +21,7 @@ import {
   TakeLoan,
   TalkToStaff,
   PivotProject,
+  PerformOwnerTask,
   ValidateState,
 } from "./Script_Rules.mjs";
 import {
@@ -678,4 +679,62 @@ function HasRecordedId(collection, id) {
   assert(state.month <= 32, "the 10B target should be reachable in a bounded campaign rather than geological time");
 }
 
-console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, live events, customization, marketing commerce, anxiety, food, updates, collateral, and fail states.");
+{
+  const modules = ["art", "design", "client", "performance"];
+  for (const moduleKey of modules) {
+    const state = Begin();
+    const before = {
+      module: state.project.modules[moduleKey],
+      bugs: state.project.bugs,
+      scopeDebt: state.project.scopeDebt,
+      technicalDebt: state.project.technicalDebt,
+    };
+    const result = PerformOwnerTask(state, moduleKey);
+    assert.equal(result.ok, true, `${moduleKey} owner work must be accepted`);
+    assert(result.gain >= 2 && result.gain <= 4, "owner work must add about 2-4 points");
+    assert.equal(result.state.project.modules[moduleKey], before.module + result.gain);
+    assert(result.state.project.bugs > before.bugs, "owner work must add bugs");
+    assert(result.state.project.scopeDebt > before.scopeDebt, "owner work must add scope debt");
+    assert(result.state.project.technicalDebt > before.technicalDebt, "owner work must add technical debt");
+    assert(result.state.hunger >= 7 && result.state.anxiety >= 5, "owner work must consume the owner's energy");
+  }
+
+  const invalidState = Begin();
+  const invalid = PerformOwnerTask(invalidState, "audio");
+  assert.equal(invalid.ok, false, "an unknown owner workstation must be rejected");
+  assert.equal(invalid.state.ownerWorkCount, 0);
+
+  let limitedState = Begin();
+  for (let workIndex = 0; workIndex < 3; workIndex += 1) {
+    const result = PerformOwnerTask(limitedState, "design");
+    assert.equal(result.ok, true, "the first three owner tasks in a month must work");
+    limitedState = result.state;
+  }
+  assert.equal(limitedState.ownerWorkCount, 3);
+  const fourth = PerformOwnerTask(limitedState, "design");
+  assert.equal(fourth.ok, false, "a fourth owner task in one month must be rejected");
+  assert.equal(fourth.state.ownerWorkCount, 3);
+
+  const nextMonth = AdvanceMonth(limitedState);
+  assert.equal(nextMonth.ok, true);
+  assert.equal(nextMonth.state.ownerWorkCount, 0, "advancing the month must reset owner work count");
+  assert.equal(nextMonth.state.ownerWorkMonth, nextMonth.state.month);
+  const refreshed = PerformOwnerTask(nextMonth.state, "performance");
+  assert.equal(refreshed.ok, true, "owner work must be available again next month");
+
+  const hungry = Begin();
+  hungry.hunger = 95;
+  const starvation = PerformOwnerTask(hungry, "art");
+  assert.equal(starvation.ok, true);
+  assert.equal(starvation.state.status, "gameover", "owner work can trigger starvation");
+  assert.equal(starvation.state.outcome?.kind, "starvation");
+
+  const anxious = Begin();
+  anxious.anxiety = 95;
+  const breakdown = PerformOwnerTask(anxious, "client");
+  assert.equal(breakdown.ok, true);
+  assert.equal(breakdown.state.status, "gameover", "owner work can trigger a mental breakdown");
+  assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
+}
+
+console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");
