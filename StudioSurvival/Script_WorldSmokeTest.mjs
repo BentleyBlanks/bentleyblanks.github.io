@@ -14,11 +14,12 @@ import {
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
+  TravelWorld,
 } from "./Script_World.mjs";
 
 const Tick = (state, input, delta) => TickWorld(state, input, delta);
 
-assert.equal(WorldConfig.width, 90, "the nine-location city should span ninety world units");
+assert.equal(WorldConfig.width, 144, "nine discrete sixteen-unit interiors should span one hundred forty-four world units");
 assert.deepEqual(Locations.map((location) => location.id), ["home", "diner", "market", "talent", "bank", "hotel", "footbath", "footbathCity", "maleModelClub"]);
 assert.deepEqual(Locations.map((location) => location.name), ["自己家", "小菜馆", "小超市", "人才市场", "银行", "大酒店", "普通足浴店", "洗脚城", "男模店"]);
 assert.equal(Locations.some((location) => "subtitle" in location), false, "scene signs should contain place names only");
@@ -28,19 +29,31 @@ assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving ha
 
 const requiredInteractionIds = [
   "homeComputer",
+  "planningBoard",
+  "marketingPhone",
+  "homeCalendar",
   "homeFridge",
+  "homeExit",
   "dinerCounter",
+  "dinerExit",
   "snackShelf",
   "lotteryCounter",
+  "marketExit",
   "equipmentCounter",
   "talentCounter",
+  "talentExit",
   "bankCounter",
+  "bankExit",
   "hotelRestaurant",
+  "hotelExit",
   "regularFootbathCounter",
+  "footbathExit",
   "footbathCityCounter",
+  "footbathCityExit",
   "maleModelCounter",
+  "maleModelClubExit",
 ];
-assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "all interactions inside the nine places should exist in route order");
+assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "each place should expose its own actions and a real exit");
 
 const consumerInteractions = InteractionPoints.filter((point) => point.consumerVenueId);
 assert.equal(consumerInteractions.length, CONSUMER_VENUES.length, "every personal-consumption venue needs one world interaction");
@@ -60,6 +73,7 @@ const initial = CreateWorldState(1);
 assert.equal(initial.month, 1);
 assert.equal(initial.x, WorldConfig.spawn.x);
 assert.equal(initial.y, WorldConfig.spawn.y);
+assert.equal(initial.activeLocationId, "home");
 assert.equal(initial.grounded, true);
 assert.deepEqual(initial.hazards, []);
 assert.deepEqual(initial.collectibles, []);
@@ -82,9 +96,21 @@ assert.equal(groundLanded.state.grounded, true);
 assert.equal(groundLanded.state.y, WorldConfig.groundY);
 
 for (const interaction of InteractionPoints) {
-  assert.equal(NearestInteraction({ ...initial, x: interaction.x, y: interaction.y })?.id, interaction.id);
+  assert.equal(NearestInteraction({ ...initial, activeLocationId: interaction.locationId, x: interaction.x, y: interaction.y })?.id, interaction.id);
 }
 assert.equal(NearestInteraction({ ...initial, x: 0, y: 8 }), null);
+
+const home = Locations.find((location) => location.id === "home");
+const stoppedAtDoor = Tick(initial, { right: true }, 20).state;
+assert.equal(stoppedAtDoor.activeLocationId, "home", "walking cannot silently change rooms");
+assert.ok(stoppedAtDoor.x < home.endX, "the home wall should stop the player before the next scene");
+assert.equal(FindLocationAt(stoppedAtDoor.x)?.id, "home");
+const travelResult = TravelWorld(stoppedAtDoor, "diner");
+assert.equal(travelResult.ok, true);
+assert.equal(travelResult.state.activeLocationId, "diner", "only explicit travel changes the active room");
+assert.equal(travelResult.state.x, Locations.find((location) => location.id === "diner").entryX);
+assert.equal(stoppedAtDoor.activeLocationId, "home", "TravelWorld must be pure");
+assert.equal(TravelWorld(initial, "nowhere").ok, false, "unknown destinations should be rejected");
 
 const paused = Tick(initial, { right: true, pause: true }, 1).state;
 assert.equal(paused.paused, true);
@@ -101,4 +127,4 @@ assert.equal(reset.x, WorldConfig.spawn.x);
 assert.equal(reset.y, WorldConfig.spawn.y);
 assert.equal(movedResult.state.month, 1, "ResetWorldMonth must not mutate the previous month");
 
-console.log("StudioSurvival 2D city world smoke test passed");
+console.log("StudioSurvival room travel world smoke test passed");

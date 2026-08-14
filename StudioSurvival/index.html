@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="经营独立游戏工作室，开发、发行并活到收入达到 100 亿元。">
-  <title>甲方是我：工作室跑断腿</title>
+  <title>甲方是我</title>
   <link rel="stylesheet" href="./Style_Play.css?v=20260815t">
   <script type="importmap">
     {
@@ -66,8 +66,7 @@
         <div class="consoleHeader"><span class="statusLamp systemLamp" aria-hidden="true"></span><strong>设置</strong></div>
         <div class="systemControls">
           <button id="soundButton" class="roundButton" type="button" aria-label="关闭音效"><span id="soundButtonIcon" aria-hidden="true">♪</span><small>声音</small></button>
-          <button id="phoneButton" class="roundButton phoneButton" type="button" aria-label="市场"><span aria-hidden="true">▯</span><small>市场</small></button>
-          <button id="helpButton" class="roundButton" type="button" aria-label="手册"><span aria-hidden="true">?</span><small>手册</small></button>
+          <button id="helpButton" class="roundButton" type="button" aria-label="查看操作说明"><span aria-hidden="true">?</span><small>手册</small></button>
         </div>
       </section>
     </header>
@@ -90,12 +89,6 @@
 
     <div class="desktopHint"><b>A/D</b> 移动　<b>W</b> 跳　<b>E</b> 交互</div>
 
-    <button id="settlementButton" class="settlementButton" type="button" aria-label="结算 M01 并进入 M02" aria-keyshortcuts="N">
-      <span class="settlementSignal" aria-hidden="true"><i></i><b>↻</b></span>
-      <span class="settlementCopy"><small>月结</small><strong id="settlementMonthLabel">结算 M01</strong><em id="settlementDetailLabel">支出 ¥0 · M02</em></span>
-      <span class="settlementLever" aria-hidden="true"><small>N</small><i></i><b>→</b></span>
-    </button>
-
     <nav id="mobileControls" class="mobileControls" aria-label="移动端游戏控制">
       <div class="moveControls" role="group" aria-label="移动方向">
         <button id="moveLeftButton" type="button" aria-label="按住向左移动" aria-pressed="false"><span aria-hidden="true">←</span><small>左移</small></button>
@@ -108,69 +101,131 @@
     </nav>
 
     <div id="toastStack" class="toastStack" aria-live="polite"></div>
+    <div id="travelCurtain" class="travelCurtain" aria-hidden="true"><span>正在出门</span></div>
   </main>
 
   <section id="setupScreen" class="setupScreen" aria-label="成立公司并创建第一款游戏">
     <div class="setupNoise" aria-hidden="true"></div>
+    <div class="titleOfficeArt" aria-hidden="true">
+      <div class="titleMonitor"><i></i><b>甲</b></div>
+      <div class="titleKeyboard"></div>
+      <div class="titleCoffee"></div>
+      <div class="titleBill"><span>还款日</span><strong>M08</strong></div>
+      <div class="titleDesk"></div>
+    </div>
     <div id="ceremonyIntro" class="ceremonyIntro">
-      <span class="ceremonyEyebrow">成立工作室</span>
-      <h1>今天，<br>你将成立一家<br><em>随时会倒闭的公司</em></h1>
-      <div class="controlPills"><span class="winPill">目标 100 亿元</span><span>¥68,000 → M08 ¥82,000</span><span>逾期倒闭</span></div>
-      <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><strong>开始 →</strong></button>
-      <button id="continueButton" class="continueButton hidden" type="button">继续上次游戏</button>
+      <h1><span>甲方是我</span></h1>
+      <div class="titleMenu">
+        <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><span>新游戏</span><strong>成立工作室</strong><i>→</i></button>
+        <button id="continueButton" class="continueButton hidden" type="button"><span>继续游戏</span><strong>回到上次存档</strong><i>→</i></button>
+      </div>
     </div>
 
-    <button id="skipCeremonyButton" class="skipCeremonyButton hidden" type="button">跳过</button>
-    <div id="ceremonyCaption" class="ceremonyCaption hidden" aria-live="polite"><strong id="ceremonyCaptionText">入场</strong></div>
+    <button id="skipCeremonyButton" class="skipCeremonyButton hidden" type="button">跳过动画</button>
+    <div id="ceremonyCaption" class="ceremonyCaption hidden" aria-live="polite"><span>公司成立</span><strong id="ceremonyCaptionText">创始人入场</strong></div>
 
-    <section id="foundingNamePanel" class="foundingNamePanel hidden" aria-labelledby="foundingTitle">
-      <header><span>公司登记</span><b>01 / 03</b></header>
+    <section id="foundingNamePanel" class="foundingNamePanel foundingBook hidden" aria-labelledby="foundingTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><span>工作室成立登记册</span><b>01 / 06</b></header>
       <div class="registrySeal">筹</div>
-      <h2 id="foundingTitle">公司名</h2>
-      <label class="contractField"><span>公司名</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="今晚上线"></label>
-      <div id="studioNameSuggestions" class="nameSuggestions">
-        <button type="button" data-studio-name="今晚一定上线">今晚一定上线</button>
-        <button type="button" data-studio-name="需求不会再改">需求不会再改</button>
-        <button type="button" data-studio-name="电脑不能抵押">电脑不能抵押</button>
+      <main class="bookPageBody">
+        <p class="documentKicker">第一项 · 工作室名称</p>
+        <h2 id="foundingTitle">你的工作室叫什么？</h2>
+        <p>先写下唯一需要决定的事。这个名字会出现在家门口、合同、作品和结局里。</p>
+        <label class="contractField"><span>工作室全称</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="在这里写下工作室名"></label>
+        <div id="studioNameSuggestions" class="nameSuggestions" aria-label="工作室名灵感">
+          <button type="button" data-studio-name="今晚一定上线">今晚一定上线</button>
+          <button type="button" data-studio-name="需求不会再改">需求不会再改</button>
+          <button type="button" data-studio-name="电脑不能抵押">电脑不能抵押</button>
+        </div>
+        <p id="setupError" class="setupError" aria-live="polite"></p>
+      </main>
+      <div class="bookPageFooter">
+        <span>写下名字，翻开创业的下一页</span>
+        <button id="nameConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>确认创始人能力</strong><i>→</i></button>
       </div>
-      <p id="setupError" class="setupError" aria-live="polite"></p>
-      <button id="nameConfirmButton" class="documentButton" type="button"><strong>下一步 →</strong></button>
     </section>
 
-    <section id="founderProfilePanel" class="founderProfilePanel hidden" aria-labelledby="founderProfileTitle">
-      <header><span id="founderProfileTitle" tabindex="-1">技能</span><b>02 / 03</b></header>
+    <section id="founderProfilePanel" class="founderProfilePanel foundingBook hidden" aria-labelledby="founderProfileTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><span id="founderProfileTitle" tabindex="-1">创始人能力</span><b>02 / 06</b></header>
       <div id="founderSkillEditor" class="founderSkillEditor"></div>
       <div class="founderProfileFooter">
-        <strong id="founderSkillBudget" aria-live="polite">剩余0</strong>
-        <button id="founderConfirmButton" class="documentButton" type="button"><strong>继续</strong></button>
+        <strong id="founderSkillBudget" aria-live="polite">剩余 0</strong>
+      </div>
+      <div class="contractBookNav founderBookNav">
+        <button id="founderBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
+        <span>共 9 点</span>
+        <button id="founderConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>填写游戏名</strong><i>→</i></button>
       </div>
     </section>
 
-    <section id="projectContract" class="projectContract hidden" aria-labelledby="contractTitle">
-      <header><h2 id="contractTitle">游戏立项</h2><b>03 / 03</b></header>
-      <label class="contractField gameNameField"><span>游戏名</span><input id="gameNameInput" type="text" maxlength="20" autocomplete="off" inputmode="text" placeholder="给游戏取名"></label>
-      <div class="contractSection"><strong class="contractLabel">题材</strong><div id="projectChoices" class="choiceRail"></div></div>
-      <div class="contractSection"><strong class="contractLabel">类型</strong><div id="typeChoices" class="choiceRail compactRail"></div></div>
-      <p id="contractError" class="setupError" aria-live="polite"></p>
-      <button id="projectConfirmButton" class="documentButton contractSubmitButton" type="button"><strong>开始开发</strong></button>
+    <section id="projectContract" class="projectContract foundingBook hidden" aria-labelledby="contractTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><div><span>第一款游戏立项书</span><small>合同编号：M01-NO-MONEY</small></div><b id="contractPageCounter">03 / 06</b></header>
+      <div class="contractParties"><span>工作室：<strong id="contractStudioName">未命名工作室</strong></span><span>创始人：<strong id="contractFounderSkills">策 3 / 程 3 / 美 3</strong></span><span>本页只做一个决定</span></div>
+
+      <div id="contractPageViewport" class="contractPageViewport" aria-live="polite">
+        <article class="contractPage active" data-contract-page="0">
+          <p class="documentKicker">第三项 · 游戏名称</p>
+          <h2 id="contractTitle">第一款游戏叫什么？</h2>
+          <p class="contractLead">这是玩家以后在商店里看见的名字。先别想副标题，也别写融资故事。</p>
+          <label class="contractField gameNameField"><span>游戏正式名称</span><input id="gameNameInput" type="text" maxlength="20" autocomplete="off" inputmode="text" placeholder="在这里写下游戏名"></label>
+        </article>
+
+        <article class="contractPage" data-contract-page="1">
+          <p class="documentKicker">第四项 · 游戏题材</p>
+          <h2>你准备做什么游戏？</h2>
+          <p class="contractLead">题材决定第一批玩家为什么点进来。选定后再换方向，会烧掉大量时间和钱。</p>
+          <div id="projectChoices" class="choiceRail"></div>
+        </article>
+
+        <article class="contractPage" data-contract-page="2">
+          <p class="documentKicker">第五项 · 发行方式</p>
+          <h2>这款游戏卖给谁？</h2>
+          <p class="contractLead">不同发行方式有不同成本、风险和评价短板。第一次创业，活下来比规模更重要。</p>
+          <div id="typeChoices" class="choiceRail compactRail"></div>
+        </article>
+
+        <article class="contractPage contractReviewPage" data-contract-page="3">
+          <p class="documentKicker">第六项 · 核对并签字</p>
+          <h2>最后看一眼，再落章</h2>
+          <div class="contractReview">
+            <div><span>工作室</span><strong id="contractReviewStudio">等待命名</strong></div>
+            <div><span>创始人能力</span><strong id="contractReviewFounder">策 3 / 程 3 / 美 3</strong></div>
+            <div><span>第一款游戏</span><strong id="contractReviewGame">等待命名</strong></div>
+            <div><span>题材</span><strong id="contractReviewTheme">尚未选择</strong></div>
+            <div><span>发行</span><strong id="contractReviewType">尚未选择</strong></div>
+          </div>
+          <div class="contractFinePrint"><b>启动贷</b><span>到账 ¥68,000；M08 结束前须还清 ¥82,000。到期未清，工作室倒闭。</span></div>
+          <p id="contractError" class="setupError" aria-live="polite"></p>
+          <div class="signatureRow"><div><small>创始人签章</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>签字盖章</strong><i></i></button></div>
+        </article>
+      </div>
+
+      <div class="contractBookNav">
+        <button id="contractBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
+        <span id="contractPageHint">先写下游戏名</span>
+        <button id="contractNextButton" class="documentButton" type="button"><span>下一页</span><strong>选择游戏题材</strong><i>→</i></button>
+      </div>
     </section>
   </section>
 
   <section id="goalReveal" class="goalReveal hidden" role="dialog" aria-modal="true" aria-labelledby="goalRevealTitle" aria-describedby="goalRevealDescription">
     <div class="goalRevealGrid" aria-hidden="true"></div>
     <div class="goalRevealCard">
-      <p class="goalRevealKicker"><span></span>目标<span></span></p>
-      <h2 id="goalRevealTitle">游戏净收入</h2>
+      <p class="goalRevealKicker"><span></span>立项完成 · 唯一胜利条件<span></span></p>
+      <h2 id="goalRevealTitle">让你的游戏挣到</h2>
       <div class="goalRevealNumber" role="img" aria-label="一百亿元">
         <span id="goalRevealCounter">0</span><b>亿元</b>
       </div>
       <div class="goalRevealTrack" aria-hidden="true"><i></i><b>¥10,000,000,000</b></div>
-      <p id="goalRevealDescription" class="goalRevealDescription">达到 <strong>100 亿元</strong> 即胜利</p>
+      <p id="goalRevealDescription" class="goalRevealDescription">累计游戏收入达到 <strong>100 亿元</strong>，才算真正胜利。</p>
       <div class="goalRevealRules" aria-label="目标收入计算规则">
-        <div class="goalRevenueCounts"><span>计入</span><strong>首发 · 更新 · 运营</strong></div>
-        <div class="goalRevenueExcluded"><span>不计</span><strong>贷款 · 投机</strong></div>
+        <div class="goalRevenueCounts"><span>计入目标</span><strong>游戏首发 · 版本更新 · 持续运营净收入</strong></div>
+        <div class="goalRevenueExcluded"><span>不计入</span><strong>贷款 · 彩票 · 炒股</strong></div>
       </div>
-      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><strong>开始 →</strong></button>
+      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><span>目标明确</span><strong>开工，挣到 100 亿 →</strong></button>
     </div>
   </section>
 

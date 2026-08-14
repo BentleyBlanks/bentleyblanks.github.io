@@ -1,18 +1,18 @@
 /**
- * Flat side-scrolling city layout for Studio Survival.
+ * Room-scoped city layout for Studio Survival.
  *
- * The nine named locations are the whole playable world. Business actions live
- * inside believable places instead of appearing as abstract office gates.
+ * Each named location is a discrete interior. The player can walk only inside
+ * the current room and must use its exit to choose another destination.
  */
 
 const FreezeList = (items) => Object.freeze(items.map((item) => Object.freeze({ ...item })));
 
 export const WorldConfig = Object.freeze({
-  width: 90,
+  width: 144,
   height: 9,
   groundY: 0,
-  cameraViewportWidth: 14,
-  cameraFollowOffset: 7,
+  cameraViewportWidth: 16,
+  cameraFollowOffset: 8,
   playerWidth: 0.72,
   playerHeight: 1.55,
   moveSpeed: 7,
@@ -23,7 +23,7 @@ export const WorldConfig = Object.freeze({
   hazardDamageCooldown: 0.9,
   maxHealth: 100,
   hazardDamage: 0,
-  spawn: Object.freeze({ x: 2.1, y: 0 }),
+  spawn: Object.freeze({ x: 2.8, y: 0, locationId: "home" }),
 });
 
 export const WorldBounds = Object.freeze({
@@ -44,15 +44,15 @@ export const Ground = Object.freeze({
 });
 
 export const Locations = FreezeList([
-  { id: "home", name: "自己家", startX: 0, endX: 10, color: "#3b3553", accent: "#9d8cff" },
-  { id: "diner", name: "小菜馆", startX: 10, endX: 20, color: "#4b372b", accent: "#ffd166" },
-  { id: "market", name: "小超市", startX: 20, endX: 30, color: "#263e3b", accent: "#68e0a0" },
-  { id: "talent", name: "人才市场", startX: 30, endX: 40, color: "#303a56", accent: "#66b8ff" },
-  { id: "bank", name: "银行", startX: 40, endX: 50, color: "#3f3447", accent: "#ff6eae" },
-  { id: "hotel", name: "大酒店", startX: 50, endX: 60, color: "#493c2c", accent: "#ffb45f" },
-  { id: "footbath", name: "普通足浴店", startX: 60, endX: 70, color: "#263f43", accent: "#72e0d1" },
-  { id: "footbathCity", name: "洗脚城", startX: 70, endX: 80, color: "#39314d", accent: "#c69cff" },
-  { id: "maleModelClub", name: "男模店", startX: 80, endX: 90, color: "#482d43", accent: "#ff86c8" },
+  { id: "home", name: "自己家", startX: 0, endX: 16, entryX: 13.2, color: "#3b3553", accent: "#9d8cff" },
+  { id: "diner", name: "小菜馆", startX: 16, endX: 32, entryX: 29.2, color: "#4b372b", accent: "#ffd166" },
+  { id: "market", name: "小超市", startX: 32, endX: 48, entryX: 45.2, color: "#263e3b", accent: "#68e0a0" },
+  { id: "talent", name: "人才市场", startX: 48, endX: 64, entryX: 61.2, color: "#303a56", accent: "#66b8ff" },
+  { id: "bank", name: "银行", startX: 64, endX: 80, entryX: 77.2, color: "#3f3447", accent: "#ff6eae" },
+  { id: "hotel", name: "大酒店", startX: 80, endX: 96, entryX: 93.2, color: "#493c2c", accent: "#ffb45f" },
+  { id: "footbath", name: "普通足浴店", startX: 96, endX: 112, entryX: 109.2, color: "#263f43", accent: "#72e0d1" },
+  { id: "footbathCity", name: "洗脚城", startX: 112, endX: 128, entryX: 125.2, color: "#39314d", accent: "#c69cff" },
+  { id: "maleModelClub", name: "男模店", startX: 128, endX: 144, entryX: 141.2, color: "#482d43", accent: "#ff86c8" },
 ]);
 
 // The city is deliberately flat. Jumping remains available for game feel,
@@ -60,18 +60,30 @@ export const Locations = FreezeList([
 export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  { id: "homeComputer", kind: "homeComputer", label: "电脑", detail: "", x: 2.35, y: 0, radius: 1.55, action: "computer" },
-  { id: "homeFridge", kind: "homeFridge", label: "冰箱", detail: "本月吃法", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
-  { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
-  { id: "snackShelf", kind: "snackShelf", label: "零食架", detail: "零食", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },
-  { id: "lotteryCounter", kind: "lotteryMachine", label: "刮刮乐", detail: "每月 1 张", x: 27.2, y: 0, radius: 1.55, action: "scratch" },
-  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "每人 1 工位", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
-  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "招人", x: 37.1, y: 0, radius: 1.6, action: "talent" },
-  { id: "bankCounter", kind: "bank", label: "银行柜台", detail: "还款 / 抵押", x: 45.1, y: 0, radius: 1.75, action: "finance" },
-  { id: "hotelRestaurant", kind: "hotel", label: "大酒店餐厅", detail: "大餐", x: 55.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
-  { id: "regularFootbathCounter", kind: "regularFootbath", label: "普通足浴店", detail: "焦虑 -8", x: 65.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
-  { id: "footbathCityCounter", kind: "footbathCity", label: "洗脚城", detail: "焦虑 -20", x: 75.1, y: 0, radius: 1.75, action: "relaxPremium", consumerVenueId: "footbathCity" },
-  { id: "maleModelCounter", kind: "maleModelClub", label: "男模店", detail: "焦虑 -36", x: 85.1, y: 0, radius: 1.75, action: "relaxLuxury", consumerVenueId: "maleModelClub" },
+  { id: "homeComputer", locationId: "home", kind: "homeComputer", label: "开发电脑", detail: "本月开发 / 发布", x: 2.8, y: 0, radius: 1.35, action: "computer" },
+  { id: "planningBoard", locationId: "home", kind: "planningBoard", label: "项目白板", detail: "方向 / 玩法提案", x: 6.3, y: 0, radius: 1.2, action: "direction" },
+  { id: "marketingPhone", locationId: "home", kind: "marketingPhone", label: "宣发手机", detail: "风向 / 宣传 / 投放", x: 9.2, y: 0, radius: 1.1, action: "marketing" },
+  { id: "homeCalendar", locationId: "home", kind: "homeCalendar", label: "墙上月历", detail: "核账 / 进入下月", x: 11.45, y: 0, radius: 1.05, action: "month" },
+  { id: "homeFridge", locationId: "home", kind: "homeFridge", label: "冰箱", detail: "选择本月吃法", x: 13.35, y: 0, radius: 1.05, action: "homeFood" },
+  { id: "homeExit", locationId: "home", kind: "exit", label: "出门", detail: "选择要去的地方", x: 15.15, y: 0, radius: 1, action: "travel" },
+  { id: "dinerCounter", locationId: "diner", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 23.5, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
+  { id: "dinerExit", locationId: "diner", kind: "exit", label: "出门", detail: "选择要去的地方", x: 31.15, y: 0, radius: 1, action: "travel" },
+  { id: "snackShelf", locationId: "market", kind: "snackShelf", label: "零食架", detail: "超市小吃", x: 37.2, y: 0, radius: 1.45, action: "snack", consumerVenueId: "marketSnack" },
+  { id: "lotteryCounter", locationId: "market", kind: "lotteryMachine", label: "刮刮乐", detail: "每月 1 张", x: 42.6, y: 0, radius: 1.45, action: "scratch" },
+  { id: "marketExit", locationId: "market", kind: "exit", label: "出门", detail: "选择要去的地方", x: 47.15, y: 0, radius: 1, action: "travel" },
+  { id: "equipmentCounter", locationId: "talent", kind: "equipmentShop", label: "设备柜台", detail: "每名员工需 1 套", x: 53.2, y: 0, radius: 1.5, action: "equipment" },
+  { id: "talentCounter", locationId: "talent", kind: "talentMarket", label: "人才招聘", detail: "大学生 / AI", x: 59.1, y: 0, radius: 1.55, action: "talent" },
+  { id: "talentExit", locationId: "talent", kind: "exit", label: "出门", detail: "选择要去的地方", x: 63.15, y: 0, radius: 1, action: "travel" },
+  { id: "bankCounter", locationId: "bank", kind: "bank", label: "银行柜台", detail: "还款 / 抵押", x: 72.1, y: 0, radius: 1.75, action: "finance" },
+  { id: "bankExit", locationId: "bank", kind: "exit", label: "出门", detail: "选择要去的地方", x: 79.15, y: 0, radius: 1, action: "travel" },
+  { id: "hotelRestaurant", locationId: "hotel", kind: "hotel", label: "大酒店餐厅", detail: "大餐", x: 88.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
+  { id: "hotelExit", locationId: "hotel", kind: "exit", label: "出门", detail: "选择要去的地方", x: 95.15, y: 0, radius: 1, action: "travel" },
+  { id: "regularFootbathCounter", locationId: "footbath", kind: "regularFootbath", label: "普通足浴店", detail: "焦虑 -8", x: 104.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
+  { id: "footbathExit", locationId: "footbath", kind: "exit", label: "出门", detail: "选择要去的地方", x: 111.15, y: 0, radius: 1, action: "travel" },
+  { id: "footbathCityCounter", locationId: "footbathCity", kind: "footbathCity", label: "洗脚城", detail: "焦虑 -20", x: 120.1, y: 0, radius: 1.75, action: "relaxPremium", consumerVenueId: "footbathCity" },
+  { id: "footbathCityExit", locationId: "footbathCity", kind: "exit", label: "出门", detail: "选择要去的地方", x: 127.15, y: 0, radius: 1, action: "travel" },
+  { id: "maleModelCounter", locationId: "maleModelClub", kind: "maleModelClub", label: "男模店", detail: "焦虑 -36", x: 136.1, y: 0, radius: 1.75, action: "relaxLuxury", consumerVenueId: "maleModelClub" },
+  { id: "maleModelClubExit", locationId: "maleModelClub", kind: "exit", label: "出门", detail: "选择要去的地方", x: 143.15, y: 0, radius: 1, action: "travel" },
 ]);
 
 export const Collectibles = FreezeList([]);
@@ -81,6 +93,10 @@ export const QuestFragments = Collectibles;
 export function FindLocationAt(x) {
   const position = Number.isFinite(Number(x)) ? Number(x) : WorldConfig.spawn.x;
   return Locations.find((location) => position >= location.startX && position < location.endX) || Locations.at(-1);
+}
+
+export function FindLocation(locationId) {
+  return Locations.find((location) => location.id === locationId) || null;
 }
 
 export const WorldData = Object.freeze({

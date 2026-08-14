@@ -71,6 +71,7 @@ import {
   UnlockStockAccount,
 } from "./Script_Rules.mjs?v=20260815r";
 import {
+  FindLocation,
   FindLocationAt,
   Locations as WorldLocations,
   WorldBounds,
@@ -85,19 +86,21 @@ import {
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
+  TravelWorld,
 } from "./Script_World.mjs?v=20260815t";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
-  "phoneButton",
-  "settlementButton", "settlementMonthLabel", "settlementDetailLabel",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
+  "travelCurtain",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
-  "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderConfirmButton",
-  "projectContract", "gameNameInput", "contractError", "projectConfirmButton",
+  "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderBackButton", "founderConfirmButton",
+  "projectContract", "contractStudioName", "contractFounderSkills", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "contractPageViewport", "contractPageCounter", "contractBackButton", "contractNextButton", "contractPageHint",
+  "contractReviewStudio", "contractReviewFounder", "contractReviewGame", "contractReviewTheme", "contractReviewType",
   "goalReveal", "goalRevealCounter", "goalRevealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
@@ -164,16 +167,28 @@ let rebuildingWorld = false;
 let onboardingPhase = "intro";
 let ceremonyElapsed = 0;
 let ceremonyBurstStep = -1;
-let projectSetupComplete = false;
+let sealHoldTimer = null;
+let sealHoldComplete = false;
+let sealKeyboardMode = false;
 let pendingGoalState = null;
 let goalRevealAnimationFrame = null;
 let activeScratchSession = null;
 let lastScratchSoundAt = 0;
 let mobileControlSignature = "";
+let contractPageIndex = 0;
+let contractPageTimer = null;
+let traveling = false;
 const inputState = { left: false, right: false, jump: false };
+const CONTRACT_PAGE_COPY = [
+  { counter: "03 / 06", hint: "先写下游戏名", next: "选择游戏题材" },
+  { counter: "04 / 06", hint: "只选一个题材", next: "选择发行方式" },
+  { counter: "05 / 06", hint: "发行方式会改变成本", next: "核对整份合同" },
+  { counter: "06 / 06", hint: "确认无误后按住盖章", next: "" },
+];
 
 function IsOverlayOpen() {
-  return landingOpen
+  return traveling
+    || landingOpen
     || !dom.goalReveal.classList.contains("hidden")
     || !dom.modalLayer.classList.contains("hidden")
     || !dom.resultLayer.classList.contains("hidden")
@@ -851,18 +866,22 @@ function DisposeGroup(group) {
 }
 
 const FacilityLooks = {
-  homeComputer: ["电脑", "", 0x9d8cff],
-  homeFridge: ["冰箱", "", 0x9fd7ff],
-  diner: ["小菜馆", "", 0xffd166],
-  snackShelf: ["零食", "", 0x68e0a0],
-  scratch: ["刮刮乐", "每月 1 张", 0xff6eae],
-  equipmentShop: ["设备", "", 0x66b8ff],
-  talentMarket: ["人才", "", 0x9d8cff],
-  bank: ["银行", "M08", 0xff6eae],
-  hotel: ["大餐", "", 0xffb45f],
-  regularFootbath: ["足浴", "-8", 0x72e0d1],
-  footbathCity: ["洗脚城", "-20", 0xc69cff],
-  maleModelClub: ["男模店", "-36", 0xff86c8],
+  homeComputer: ["开发电脑", "本月精力只在这里投入开发", 0x9d8cff],
+  planningBoard: ["项目白板", "方向、范围与玩法写在这里", 0xffd166],
+  marketingPhone: ["宣发手机", "作品成形后再处理投放", 0xff6eae],
+  homeCalendar: ["墙上月历", "核对本月投入并进入下月", 0x66b8ff],
+  homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
+  exit: ["出门", "选择下一站", 0xf5f3ff],
+  diner: ["小菜馆", "便宜充饥套餐", 0xffd166],
+  snackShelf: ["零食架", "泡面饼干顶一顶", 0x68e0a0],
+  scratch: ["刮刮乐柜台", "本月限刮一张", 0xff6eae],
+  equipmentShop: ["设备柜台", "先买电脑再招人", 0x66b8ff],
+  talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
+  bank: ["银行", "启动贷 M08 到期", 0xff6eae],
+  hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
+  regularFootbath: ["普通足浴店", "焦虑 -8 · 本月限一次", 0x72e0d1],
+  footbathCity: ["洗脚城", "焦虑 -20 · 验资开放", 0xc69cff],
+  maleModelClub: ["男模店", "焦虑 -36 · 百万验资", 0xff86c8],
 };
 
 function GetFacilityKind(interaction) {
@@ -996,6 +1015,37 @@ function BuildFacility(interaction) {
     Place(group, Box(.5, .58, .7, 0x32363c, { surface: "metal", metalness: .35 }), .72, 1.2, -.02);
     for (const ventY of [1.02, 1.14, 1.26, 1.38]) Place(group, Box(.28, .018, .02, 0x101318, { castShadow: false }), .72, ventY, .345);
     AddPaperStack(group, .26, .96, .35, .4, 0xe5dac5, 5);
+  } else if (kind === "planningBoard") {
+    Place(group, Box(2.5, 1.62, .11, 0xe4ddc9, { surface: "paper", roughness: .96 }), 0, 1.8, -.03);
+    for (const frameX of [-1.31, 1.31]) Place(group, Box(.09, 1.78, .13, 0x6d5136, { surface: "wood", roughness: .68 }), frameX, 1.8, -.02);
+    for (const frameY of [1.0, 2.6]) Place(group, Box(2.68, .09, .13, 0x6d5136, { surface: "wood", roughness: .68 }), 0, frameY, -.02);
+    Place(group, Box(.62, .46, .026, 0xffd166, { surface: "paper", castShadow: false }), -.54, 1.98, .055, -.025);
+    Place(group, Box(.56, .4, .026, 0xff8eae, { surface: "paper", castShadow: false }), .58, 1.57, .055, .035);
+    Place(group, Box(1.78, .055, .028, color, { emissive: color, emissiveIntensity: .28, castShadow: false }), 0, 2.34, .06);
+    AddPaperStack(group, .7, .94, .28, .42, 0xe8dfca, 4);
+  } else if (kind === "marketingPhone") {
+    Place(group, Box(1.6, .12, .72, 0x6c4934, { surface: "wood", roughness: .72 }), 0, .86, .02);
+    for (const legX of [-.57, .57]) Place(group, Box(.1, .82, .1, 0x493326, { surface: "wood" }), legX, .43, -.02);
+    const phone = Box(.56, .94, .1, 0x12141c, { surface: "metal", metalness: .44, roughness: .3 });
+    Place(group, phone, -.08, 1.43, .2, -.08);
+    Place(group, Box(.43, .72, .026, color, { emissive: color, emissiveIntensity: .82, roughness: .16, castShadow: false }), -.08, 1.43, .258, -.08);
+    Place(group, Sphere(.025, 0xbcc5cf, { surface: "metal", metalness: .7, castShadow: false }), -.08, 1.82, .26);
+    AddPaperStack(group, .45, .95, .26, .35, 0xe8deca, 3);
+  } else if (kind === "homeCalendar") {
+    Place(group, Box(1.48, 1.58, .07, 0xeee6d6, { surface: "paper", roughness: .98 }), 0, 1.76, -.02);
+    Place(group, Box(1.3, .3, .028, color, { emissive: color, emissiveIntensity: .26, castShadow: false }), 0, 2.3, .035);
+    for (let row = 0; row < 3; row += 1) {
+      Place(group, Box(1.08, .03, .022, 0x706b63, { surface: "paper", castShadow: false }), 0, 1.89 - row * .28, .04);
+    }
+    for (const ringX of [-.42, .42]) Place(group, Torus(.07, .018, 0xa6a8aa, { surface: "metal", metalness: .78, radialSegments: 8, tubularSegments: 16 }), ringX, 2.56, .07);
+  } else if (kind === "exit") {
+    Place(group, Box(1.42, 3.16, .22, 0x403027, { surface: "wood", roughness: .62 }), 0, 1.58, -.02);
+    Place(group, Box(1.06, 2.72, .05, 0x2d2421, { surface: "wood", roughness: .7 }), 0, 1.54, .12);
+    for (const insetY of [.86, 1.58, 2.3]) Place(group, Box(.82, .48, .028, 0x392c27, { surface: "wood", castShadow: false }), 0, insetY, .16);
+    const handle = Cylinder(.07, .07, .18, color, 12);
+    handle.rotation.x = Math.PI / 2;
+    Place(group, handle, .39, 1.5, .29);
+    Place(group, Box(.86, .075, .028, color, { emissive: color, emissiveIntensity: .48, castShadow: false }), 0, 2.77, .19);
   } else if (kind === "homeFridge") {
     const fridge = Box(1.34, 2.62, 1.12, 0xc7d0d2, { surface: "metal", metalness: .34, roughness: .42 });
     fridge.position.y = 1.28;
@@ -1631,16 +1681,21 @@ function SetPlayableWorldVisible(visible) {
   collectibleGroup.visible = visible;
   hazardGroup.visible = visible;
   foregroundGroup.visible = visible;
-  ceremonyGroup.visible = !visible && onboardingPhase !== "intro";
+  ceremonyGroup.visible = !visible && ["cinematic", "plaque"].includes(onboardingPhase);
 }
 
 function ShowFoundingNamePanel() {
-  if (onboardingPhase === "naming") return;
   onboardingPhase = "naming";
   ceremonyElapsed = 0;
+  dom.ceremonyIntro.classList.add("hidden");
+  dom.founderProfilePanel.classList.add("hidden");
+  dom.projectContract.classList.add("hidden");
   dom.skipCeremonyButton.classList.add("hidden");
   dom.ceremonyCaption.classList.add("hidden");
+  dom.setupScreen.classList.add("bookMode");
   dom.foundingNamePanel.classList.remove("hidden");
+  dom.foundingNamePanel.classList.add("bookEnterForward");
+  window.setTimeout(() => dom.foundingNamePanel.classList.remove("bookEnterForward"), 320);
   dom.studioNameInput.focus({ preventScroll: true });
 }
 
@@ -1680,29 +1735,60 @@ function ShowFounderProfilePanel() {
   if (onboardingPhase === "profile") return;
   onboardingPhase = "profile";
   ceremonyElapsed = 0;
-  dom.foundingNamePanel.classList.add("hidden");
   dom.projectContract.classList.add("hidden");
-  dom.founderProfilePanel.classList.remove("hidden");
   RenderFounderSkills();
-  window.setTimeout(() => dom.founderProfileTitle.focus({ preventScroll: true }), 220);
+  const revealProfile = () => {
+    dom.foundingNamePanel.classList.add("hidden");
+    dom.foundingNamePanel.classList.remove("bookExitForward");
+    dom.founderProfilePanel.classList.remove("hidden");
+    dom.founderProfilePanel.classList.add("bookEnterForward");
+    window.setTimeout(() => dom.founderProfilePanel.classList.remove("bookEnterForward"), 320);
+    window.setTimeout(() => dom.founderProfileTitle.focus({ preventScroll: true }), 220);
+  };
+  if (dom.foundingNamePanel.classList.contains("hidden")) revealProfile();
+  else {
+    dom.foundingNamePanel.classList.add("bookExitForward");
+    window.setTimeout(revealProfile, 190);
+  }
+}
+
+function ReturnFounderProfile() {
+  if (onboardingPhase !== "profile") return;
+  onboardingPhase = "naming";
+  dom.founderProfilePanel.classList.add("bookExitBackward");
+  window.setTimeout(() => {
+    dom.founderProfilePanel.classList.add("hidden");
+    dom.founderProfilePanel.classList.remove("bookExitBackward");
+    dom.foundingNamePanel.classList.remove("hidden");
+    dom.foundingNamePanel.classList.add("bookEnterBackward");
+    window.setTimeout(() => dom.foundingNamePanel.classList.remove("bookEnterBackward"), 300);
+    dom.studioNameInput.focus({ preventScroll: true });
+  }, 190);
 }
 
 function ShowProjectContract() {
   onboardingPhase = "contract";
   ceremonyElapsed = 0;
   dom.foundingNamePanel.classList.add("hidden");
-  dom.founderProfilePanel.classList.add("hidden");
-  dom.projectContract.classList.remove("hidden");
-  if (!dom.gameNameInput.value.trim()) {
-    const template = FindProject(selectedProjectId);
-    dom.gameNameInput.value = template?.title?.replace(/[《》]/g, "") || "";
-  }
+  dom.contractStudioName.textContent = draftStudioName;
+  dom.contractFounderSkills.textContent = `策 ${draftFounderSkills.design} / 程 ${draftFounderSkills.programming} / 美 ${draftFounderSkills.art}`;
+  dom.contractSignatureName.textContent = draftStudioName;
+  contractPageIndex = 0;
   RenderSetupChoices();
-  window.setTimeout(() => dom.gameNameInput.focus({ preventScroll: true }), 220);
+  RenderContractPage();
+  dom.founderProfilePanel.classList.add("bookExitForward");
+  window.setTimeout(() => {
+    dom.founderProfilePanel.classList.add("hidden");
+    dom.founderProfilePanel.classList.remove("bookExitForward");
+    dom.projectContract.classList.remove("hidden");
+    dom.projectContract.classList.add("bookEnterForward");
+    window.setTimeout(() => dom.projectContract.classList.remove("bookEnterForward"), 320);
+    dom.gameNameInput.focus({ preventScroll: true });
+  }, 190);
 }
 
 function UpdateCeremony(delta, time) {
-  if (onboardingPhase === "intro" || onboardingPhase === "game") return false;
+  if (!["cinematic", "plaque"].includes(onboardingPhase)) return false;
   ceremonyElapsed += delta;
   const stageX = 6;
   const founder = ceremonyFounder;
@@ -1971,7 +2057,7 @@ function HandleWorldEvents(events = []) {
 }
 
 function UpdateLocationIndicator() {
-  const location = FindLocationAt(worldState.x);
+  const location = FindLocation(worldState.activeLocationId) || FindLocationAt(worldState.x);
   if (!location) return;
   dom.locationValue.textContent = location.name;
   dom.locationRoute.innerHTML = WorldLocations.map((item) => `<i class="${item.id === location.id ? "active" : ""}" title="${EscapeHtml(item.name)}"></i>`).join("");
@@ -2064,8 +2150,9 @@ function Animate() {
   if (!ceremonyActive) {
     const anxiety = Clamp((state.anxiety - 45) / 55, 0, 1);
     const shake = anxiety * anxiety;
-    const location = FindLocationAt(worldState.x);
-    const rawCameraX = (worldState.cameraX ?? Math.max(0, worldState.x - 7)) + 7;
+    const location = FindLocation(worldState.activeLocationId) || FindLocationAt(worldState.x);
+    const rawCameraX = worldState.cameraCenterX
+      ?? ((worldState.cameraX ?? Math.max(0, worldState.x - WorldConfig.cameraFollowOffset)) + WorldConfig.cameraViewportWidth / 2);
     const lookAhead = Clamp((worldState.vx || 0) * .075, -.45, .45);
     const targetCameraX = rawCameraX + lookAhead;
     smoothCameraX += (targetCameraX - smoothCameraX) * (1 - Math.exp(-delta * 5.4));
@@ -2109,6 +2196,110 @@ function RenderSetupChoices() {
       <strong>${gameType.icon} ${EscapeHtml(gameType.name)}</strong>
     </button>`).join("");
   dom.continueButton.classList.toggle("hidden", !savedState?.project);
+  UpdateContractReview();
+}
+
+function UpdateContractReview() {
+  if (!dom.contractReviewStudio) return;
+  const project = FindProject(selectedProjectId);
+  const gameType = FindGameType(selectedGameTypeId);
+  dom.contractReviewStudio.textContent = draftStudioName || "等待命名";
+  dom.contractReviewFounder.textContent = `策 ${draftFounderSkills.design} / 程 ${draftFounderSkills.programming} / 美 ${draftFounderSkills.art}`;
+  dom.contractReviewGame.textContent = dom.gameNameInput?.value.trim() || "等待命名";
+  dom.contractReviewTheme.textContent = project?.title || "尚未选择";
+  dom.contractReviewType.textContent = gameType?.name || "尚未选择";
+}
+
+function RenderContractPage(options = {}) {
+  const meta = CONTRACT_PAGE_COPY[contractPageIndex] || CONTRACT_PAGE_COPY[0];
+  dom.contractPageViewport.querySelectorAll("[data-contract-page]").forEach((page) => {
+    const active = Number(page.dataset.contractPage) === contractPageIndex;
+    page.classList.toggle("active", active);
+    page.setAttribute("aria-hidden", active ? "false" : "true");
+  });
+  dom.contractPageCounter.textContent = meta.counter;
+  dom.contractPageHint.textContent = meta.hint;
+  dom.contractNextButton.classList.toggle("hidden", contractPageIndex === CONTRACT_PAGE_COPY.length - 1);
+  const nextStrong = dom.contractNextButton.querySelector("strong");
+  if (nextStrong) nextStrong.textContent = meta.next;
+  UpdateContractReview();
+  if (options.focus) {
+    const activePage = dom.contractPageViewport.querySelector("[data-contract-page].active");
+    window.setTimeout(() => activePage?.querySelector("input, button")?.focus({ preventScroll: true }), 90);
+  }
+}
+
+function TurnContractPage(nextIndex, direction = "forward") {
+  const safeIndex = Clamp(nextIndex, 0, CONTRACT_PAGE_COPY.length - 1);
+  if (safeIndex === contractPageIndex) return;
+  window.clearTimeout(contractPageTimer);
+  dom.projectContract.classList.remove("pageArriving", "turningForward", "turningBackward");
+  dom.projectContract.classList.add(direction === "back" ? "turningBackward" : "turningForward");
+  contractPageTimer = window.setTimeout(() => {
+    contractPageIndex = safeIndex;
+    RenderContractPage({ focus: true });
+    dom.projectContract.classList.remove("turningForward", "turningBackward");
+    dom.projectContract.classList.add("pageArriving");
+    contractPageTimer = window.setTimeout(() => dom.projectContract.classList.remove("pageArriving"), 260);
+    PlayTone("tap");
+  }, 180);
+}
+
+function ValidateContractPage() {
+  dom.contractError.textContent = "";
+  if (contractPageIndex !== 0) return true;
+  const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
+  if (projectName.length >= 2) return true;
+  dom.contractError.textContent = "游戏名至少两个字。";
+  dom.contractPageHint.textContent = "请先写至少两个字的游戏名";
+  dom.projectContract.classList.add("hasPageError");
+  window.setTimeout(() => dom.projectContract.classList.remove("hasPageError"), 360);
+  dom.gameNameInput.focus();
+  PlayTone("warning");
+  return false;
+}
+
+function AdvanceContractPage() {
+  if (!ValidateContractPage()) return;
+  TurnContractPage(contractPageIndex + 1, "forward");
+}
+
+function ReturnContractPage() {
+  if (contractPageIndex > 0) return TurnContractPage(contractPageIndex - 1, "back");
+  onboardingPhase = "profile";
+  dom.projectContract.classList.add("bookExitBackward");
+  window.setTimeout(() => {
+    dom.projectContract.classList.add("hidden");
+    dom.projectContract.classList.remove("bookExitBackward");
+    dom.founderProfilePanel.classList.remove("hidden");
+    dom.founderProfilePanel.classList.add("bookEnterBackward");
+    RenderFounderSkills();
+    window.setTimeout(() => dom.founderProfilePanel.classList.remove("bookEnterBackward"), 300);
+    dom.founderProfileTitle.focus({ preventScroll: true });
+  }, 190);
+}
+
+function GetGuidedMission(project, gameType, tensions, anxietyState) {
+  if (!project) return "先完成立项，再从家里的开发电脑开始。";
+  const energyLeft = Math.max(0, 3 - (state.ownerWorkCount || 0));
+  if (project.age === 0 && state.ownerWorkCount === 0) {
+    return "第一步：走到开发电脑前按 E，把本月 3 格精力投入游戏开发。";
+  }
+  if (project.age === 0 && energyLeft > 0) {
+    return `本月还剩 ${energyLeft} 格精力。继续开发，先把四项基础做起来。`;
+  }
+  if (project.age === 0) {
+    return "本月精力已经用完。关掉电脑，走到墙上月历前结算第一个月。";
+  }
+  if (project.age < 2) {
+    return `继续开发第 ${project.age + 1} 个月；做满两个月后，电脑才会出现“提交商店”。`;
+  }
+  if (project.lastReleaseMonth !== state.month && !project.isReleased) {
+    return "游戏已经可以提交商店。回到开发电脑，检查版本后决定是否上线。";
+  }
+  return tensions[0]?.title
+    || project.buildStatus?.detail
+    || `${gameType?.name || "开发中"} · ${project.isReleased ? `v${project.version}.0 已上线` : `开发第 ${project.age + 1} 月`} · ${anxietyState.label}`;
 }
 
 function RenderHud() {
@@ -2119,20 +2310,6 @@ function RenderHud() {
   dom.studioNameHud.textContent = studioName;
   dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
-  const nextMonth = state.month + 1;
-  const settlementCosts = project ? ForecastMonthlyCosts(state) : null;
-  const canSettle = Boolean(project) && state.status === "playing";
-  dom.settlementButton.disabled = !canSettle;
-  dom.settlementMonthLabel.textContent = `结算 M${String(state.month).padStart(2, "0")}`;
-  dom.settlementDetailLabel.textContent = settlementCosts
-    ? `支出 ${FormatGoalMoney(settlementCosts.total)} · M${String(nextMonth).padStart(2, "0")}`
-    : `→ M${String(nextMonth).padStart(2, "0")}`;
-  dom.settlementButton.setAttribute("aria-label", `结算 M${String(state.month).padStart(2, "0")}`);
-  dom.settlementButton.title = "月结（N）";
-  dom.settlementButton.classList.toggle(
-    "deadline",
-    Boolean(state.startupLoan?.status === "active" && state.startupLoan.dueMonth <= state.month),
-  );
   ApplyOwnerHairStage();
   dom.cashValue.textContent = FormatMoney(state.cash);
   const startupLoan = state.startupLoan;
@@ -2153,22 +2330,12 @@ function RenderHud() {
   dom.anxietyBar.style.width = `${Clamp(state.anxiety, 0, 100)}%`;
   dom.anxietyValue.textContent = Math.round(state.anxiety);
   dom.sceneVignette.style.opacity = String(.38 + Clamp(state.anxiety / 100, 0, 1) * .4);
-  const marketFit = project ? EvaluateMarketFit(state) : null;
-  const marketSetMonth = project?.marketStrategy?.setMonth || 0;
-  const marketNeedsAttention = Boolean(project && (marketSetMonth !== state.month || marketFit?.backlash));
-  dom.phoneButton.disabled = !project || state.status !== "playing";
-  dom.phoneButton.classList.toggle("marketAlert", marketNeedsAttention);
-  dom.phoneButton.classList.toggle("marketPerfect", Boolean(marketFit?.perfect && marketSetMonth === state.month));
-  dom.phoneButton.setAttribute(
-    "aria-label",
-    marketFit ? `市场：${marketFit.label}` : "市场",
-  );
-  dom.projectTitle.textContent = project?.name ? `《${project.name}》` : template?.title || "先开一家公司";
+  dom.projectTitle.textContent = project?.age === 0
+    ? "新手目标 · 做出第一版"
+    : project?.name ? `《${project.name}》` : template?.title || "先开一家公司";
   const tensions = project ? CalculateTensions(project) : [];
   const anxietyState = GetAnxietyState(state.anxiety);
-  dom.missionText.textContent = tensions[0]?.title
-    || project?.buildStatus?.label
-    || (gameType ? `${gameType.name} · ${project.isReleased ? `v${project.version}.0` : `开发 M${project.age + 1}`} · ${anxietyState.label}` : `${anxietyState.label} · 到地点按 E`);
+  dom.missionText.textContent = GetGuidedMission(project, gameType, tensions, anxietyState);
   dom.moduleStrip.innerHTML = MODULE_KEYS.map((moduleKey) => {
     const value = project?.modules?.[moduleKey] || 0;
     const meta = MODULE_META[moduleKey];
@@ -2178,15 +2345,15 @@ function RenderHud() {
 
 function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   if (state.status !== "playing" || !state.project) return;
-  const mode = typeof options === "string" ? options : options.mode || "";
-  dom.modalLayer.classList.toggle("computerMode", mode === "computer");
+  const panelOptions = typeof options === "string" ? { mode: options } : options;
+  dom.modalLayer.classList.toggle("computerMode", panelOptions.mode === "computer");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
   dom.sheetBody.scrollTop = 0;
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
-  dom.modalLayer.classList.toggle("monthCloseMode", mode === "monthClose");
+  dom.modalLayer.classList.toggle("monthCloseMode", panelOptions.mode === "monthClose");
   dom.modalLayer.classList.remove("hidden");
   inputState.left = false;
   inputState.right = false;
@@ -2195,7 +2362,8 @@ function OpenPanel(kicker, title, html, onReady = null, options = {}) {
 
 function ClosePanel() {
   dom.modalLayer.classList.add("hidden");
-  dom.modalLayer.classList.remove("computerMode", "monthCloseMode");
+  dom.modalLayer.classList.remove("monthCloseMode");
+  dom.modalLayer.classList.remove("computerMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -2475,53 +2643,69 @@ function OpenAiTerminalSheet() {
 
 function OpenHomeComputerSheet() {
   const evaluation = EvaluateProject(state);
-  const loan = state.startupLoan;
-  const stockAccess = GetStockAccountAccess(state);
-  const stockOption = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
-  const energyLeft = Math.max(0, 3 - state.ownerWorkCount);
-  const founderSkillReadout = FOUNDER_SKILL_KEYS.map((skillKey) => {
-    const meta = FOUNDER_SKILL_META[skillKey];
-    const effect = GetFounderSkillEffect(state.founderSkills, skillKey);
-    return `<span style="--skillColor:${meta.color}"><b>${meta.label}</b>${effect.level}</span>`;
-  }).join("");
-  const debtLabel = loan?.status === "repaid" ? "已清" : FormatGoalMoney(loan?.remaining || 0);
-  const releaseLabel = state.project.isReleased ? `v${state.project.version}.0` : state.project.age < 2 ? `M${state.project.age}/2` : "可发";
-  const stockLabel = state.stockPosition ? stockOption?.symbol || "股票" : stockAccess.permanentlyUnlocked ? "股票" : stockAccess.unlocked ? "开户" : "股票";
-  const stockValue = state.stockPosition ? FormatGoalMoney(state.stockPosition.stake) : stockAccess.unlocked ? "可开" : `差 ${FormatGoalMoney(stockAccess.shortfall)}`;
-  OpenPanel("STUDIO OS", `《${EscapeHtml(state.project.name)}》`, `
-    <div class="computerDesktop">
-      <div class="computerStatusStrip" aria-label="项目状态">
-        <span><small>评分</small><strong>${evaluation.rating.toFixed(1)}</strong></span>
-        <span><small>精力</small><strong>${energyLeft}/3</strong></span>
-        <span><small>债务</small><strong>${debtLabel}</strong></span>
+  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
+  const energyLeft = 3 - energyUsed;
+  const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
+  const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
+  const averageProgress = moduleValues.reduce((sum, item) => sum + item.value, 0) / moduleValues.length;
+  const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
+  const objectiveTitle = energyLeft > 0
+    ? state.project.age === 0 ? "先做出能运行的第一版" : "把本月精力投进最薄弱的部分"
+    : "本月精力已经用完";
+  const objectiveDetail = energyLeft > 0
+    ? `还剩 ${energyLeft} 格。每点一次开发，就会投入 1 格精力并立刻推进对应模块。`
+    : "关掉电脑，走到墙上月历前核对账单并进入下个月。";
+  OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
+    <div class="computerDeskScene">
+      <div class="computerMonitorShell">
+        <div class="computerBezel"><span>STUDIO OS</span><i></i><b>M${String(state.month).padStart(2, "0")}</b></div>
+        <div class="computerScreenContent">
+          <section class="computerObjective">
+            <div><span>现在要做什么</span><h3>${objectiveTitle}</h3><p>${objectiveDetail}</p></div>
+            <div class="energyBudget" aria-label="本月精力剩余 ${energyLeft} 格">
+              <span>本月精力</span>
+              <div>${[0, 1, 2].map((slot) => `<i class="${slot < energyLeft ? "available" : "spent"}">${slot < energyLeft ? "●" : "×"}</i>`).join("")}</div>
+              <strong>${energyLeft} / 3</strong>
+            </div>
+          </section>
+
+          <section class="developmentWorkbench">
+            <header><div><span>本月投入</span><strong>${energyLeft > 0 ? "下一格精力投到哪里？" : "四项开发进度"}</strong></div><b>总体 ${Math.round(averageProgress)}%</b></header>
+            <div class="energyModuleGrid">
+              ${moduleValues.map(({ moduleKey, value }) => {
+                const meta = MODULE_META[moduleKey];
+                const isRecommended = moduleKey === recommended && energyLeft > 0;
+                return `<button class="energyModule ${isRecommended ? "recommended" : ""}" style="--moduleColor:${meta.color}" data-energy-module="${moduleKey}" type="button" ${energyLeft <= 0 ? "disabled" : ""}>
+                  <div class="energyModuleTop"><span>${meta.icon}</span><strong>${meta.label}</strong>${isRecommended ? "<b>建议优先</b>" : ""}</div>
+                  <div class="moduleProgress"><i style="width:${Clamp(value, 0, 100)}%"></i></div>
+                  <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? "投入 1 格" : "等待下月"}</strong></footer>
+                </button>`;
+              }).join("")}
+            </div>
+            <p class="workCostNote">老板亲自开发每次获得 2–4 点进度，同时增加饥饿、焦虑和少量债务。四项差距太大时，成品会互相拖累。</p>
+          </section>
+
+          ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
+
+          <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>项目方向在墙上白板；宣发用桌边手机；招聘必须出门去人才市场；月结在墙上月历。</span></div>
+        </div>
+        <div class="computerPower"><i></i><span>POWER</span></div>
       </div>
-      <div class="computerActions" aria-label="电脑功能">
-        ${MODULE_KEYS.map((moduleKey) => {
-          const meta = MODULE_META[moduleKey];
-          const value = Math.round(state.project.modules[moduleKey]);
-          return `<button class="computerApp moduleApp" style="--appColor:${meta.color};--appProgress:${Clamp(value, 0, 100)}%" data-computer-action="work" data-module-key="${moduleKey}" type="button" aria-label="${meta.label} ${value}"><span>${meta.icon}</span><strong>${meta.label}</strong><i></i><b>${value}</b></button>`;
-        }).join("")}
-        <button class="computerApp" data-computer-action="chat" type="button"><span>▤</span><strong>群聊</strong><b>${state.talkPoints}</b></button>
-        <button class="computerApp" data-computer-action="direction" type="button"><span>⌁</span><strong>方向</strong></button>
-        <button class="computerApp" data-computer-action="marketing" type="button"><span>◈</span><strong>宣发</strong><b>${state.project.wishlists.toLocaleString("zh-CN")}</b></button>
-        <button class="computerApp releaseApp" data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "更新" : "发布"}</strong><b>${releaseLabel}</b></button>
-      </div>
-      <div class="computerDock">
-        <div class="founderSkillReadout">${founderSkillReadout}</div>
-        <button class="computerStockKey ${state.stockPosition ? "active" : ""}" data-computer-action="stocks" type="button" ${stockAccess.unlocked ? "" : "disabled"} aria-label="股票 ${stockValue}"><span>↗</span><strong>${stockLabel}</strong><b>${stockValue}</b></button>
-        <span class="computerClock">M${String(state.month).padStart(2, "0")}</span>
-      </div>
+      <div class="computerStand"><i></i></div>
+      <div class="computerKeyboardVisual">${Array.from({ length: 18 }, (_, index) => `<i class="${index === 16 ? "space" : ""}"></i>`).join("")}</div>
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      const button = event.target.closest("[data-computer-action]");
+      if (event.target.closest("[data-computer-release]")) return OpenReleaseSheet();
+      const button = event.target.closest("[data-energy-module]");
       if (!button) return;
-      const action = button.dataset.computerAction;
-      if (action === "work") return OpenWorkstationSheet({ moduleKey: button.dataset.moduleKey });
-      if (action === "chat") return OpenAiTerminalSheet();
-      if (action === "direction") return OpenDirectiveSheet();
-      if (action === "marketing") return OpenMarketingSheet();
-      if (action === "stocks") return OpenStockSheet();
-      if (action === "release") return OpenReleaseSheet();
+      const moduleKey = button.dataset.energyModule;
+      const result = PerformOwnerTask(state, moduleKey);
+      if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
+      const left = Math.max(0, 3 - state.ownerWorkCount);
+      ShowToast(left > 0
+        ? `已把 1 格精力投入${MODULE_META[moduleKey].label}，本月还剩 ${left} 格。`
+        : "本月 3 格精力已经用完。下一步：去墙上月历结算。", left > 0 ? "good" : "warning");
+      OpenHomeComputerSheet();
     };
   }, { mode: "computer" });
 }
@@ -2541,12 +2725,11 @@ function OpenWorkstationSheet(interaction) {
       <div class="metricTile"><span>能力</span><strong style="color:${skillMeta.color}">${skillMeta.label} ${skillEffect.level}</strong></div>
       <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
-    <div class="panelSection choiceFooter"><span>精力 ${Math.max(0, 3 - state.ownerWorkCount)}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>开发</button></div>
-    <div class="panelSection sectionHeading"><strong>成员</strong><span>${workers.length ? "月底产出" : "暂无"}</span></div>
-    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<button class="miniButton" data-talent type="button">招人</button>`}</div>
-    ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">无模块冲突</div></div>`}`, () => {
+    <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>亲自开发</button></div>
+    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
+    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<span class="chip">没有人手。关掉电脑，从门口出发去人才市场招聘。</span>`}</div>
+    ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
-      if (event.target.closest("[data-talent]")) return OpenTalentSheet();
       const worker = event.target.closest("[data-worker-id]");
       if (worker) return OpenStaffSheet(worker.dataset.workerId);
       if (!event.target.closest("[data-owner-work]")) return;
@@ -2560,6 +2743,8 @@ function OpenBankSheet() {
   const costs = ForecastMonthlyCosts(state);
   const activeLoans = state.loans.filter((loan) => loan.status === "active");
   const startupLoan = state.startupLoan;
+  const stockAccess = GetStockAccountAccess(state);
+  const stockOption = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
   OpenPanel("贷款", "银行", `
     <p class="panelIntro">到期清零 · 抵押电脑即结束</p>
@@ -2568,6 +2753,13 @@ function OpenBankSheet() {
       <div class="loanDeadline"><b>${startupLoan?.status === "repaid" ? "✓" : `M${String(startupLoan?.dueMonth || 0).padStart(2, "0")}`}</b></div>
     </section>
     ${startupLoan?.status === "active" ? `<div class="loanPaymentRow"><button data-startup-payment="10000" type="button" ${state.cash < 10000 ? "disabled" : ""}>先还 ¥10,000</button><button data-startup-payment="30000" type="button" ${state.cash < 30000 ? "disabled" : ""}>先还 ¥30,000</button><button data-startup-payment="full" type="button" ${state.cash < startupLoan.remaining ? "disabled" : ""}>一次结清 ${FormatMoney(startupLoan.remaining)}</button></div>` : ""}
+    <div class="panelSection sectionHeading"><strong>证券柜台</strong><span>股票只在银行办理</span></div>
+    <div class="worldGrid singleChoiceGrid">
+      <button class="worldChoice ${state.stockPosition ? "selected" : ""}" data-open-stock type="button" ${stockAccess.unlocked ? "" : "disabled"}>
+        <div class="choiceTop"><strong>↗ ${state.stockPosition ? `${EscapeHtml(stockOption?.symbol || "股票")} 持仓中` : "股票账户"}</strong><span>${state.stockPosition ? `本金 ${FormatMoney(state.stockPosition.stake)}` : stockAccess.permanentlyUnlocked ? "已开户" : stockAccess.unlocked ? "可以开户" : `现金满 ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 开放`}</span></div>
+        <p>${state.stockPosition ? `M${String(state.stockPosition.openedMonth + 1).padStart(2, "0")} 收盘结算` : "选择股票与金额；次月显示走势和盈亏。不计入游戏收入。"}</p>
+      </button>
+    </div>
     <div class="metricGrid">
       <div class="metricTile"><span>下月总成本</span><strong>${FormatMoney(costs.total)}</strong></div>
       <div class="metricTile"><span>现有贷款月供</span><strong>${FormatMoney(costs.loanPayments)}</strong></div>
@@ -2583,6 +2775,7 @@ function OpenBankSheet() {
     <div class="panelSection sectionHeading"><strong>抵押贷</strong><span>${activeLoans.length} 笔</span></div>
     <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · ${loan.remaining} 期 · ${FormatMoney(loan.monthlyPayment)}/月</div>`; }).join("") : `<div class="note good">无</div>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-open-stock]")) return OpenStockSheet();
       const startupPayment = event.target.closest("[data-startup-payment]");
       if (startupPayment) {
         const value = startupPayment.dataset.startupPayment === "full" ? "full" : Number(startupPayment.dataset.startupPayment);
@@ -3060,19 +3253,23 @@ function OpenStockSheet() {
 
 function OpenDirectiveSheet() {
   const pivotCost = ForecastPivotCost(state);
-  OpenPanel("方向", "项目策略", `
-    <p class="panelIntro">月结生效 · 失衡损产出</p>
-    <div class="worldGrid three">${DIRECTIVES.map((directive) => `
+  const earlyStage = state.project.age < 1;
+  const visibleDirectives = earlyStage
+    ? DIRECTIVES.filter((directive) => ["integration", "artSprint", "clientCrush"].includes(directive.id))
+    : DIRECTIVES;
+  OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 项目方向", `
+    <p class="panelIntro">决定这个月往哪使劲。首月只显示三个基础方向。</p>
+    <div class="worldGrid three">${visibleDirectives.map((directive) => `
       <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive-id="${directive.id}" type="button">
         <div class="choiceTop"><strong style="color:${directive.color}">${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
       </button>`).join("")}</div>
-    <div class="panelSection choiceFooter"><span>沟通 −1</span><button class="miniButton" data-owner-customize type="button">加玩法</button></div>
-    <div class="panelSection sectionHeading"><strong>换赛道</strong><span>${FormatMoney(pivotCost)}</span></div>
+    ${earlyStage ? `<div class="noteList"><div class="note good">先完成第一个月，之后再开放玩法定制和换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>本月可补一个玩法提案</span><button class="miniButton" data-owner-customize type="button">定制玩法</button></div>
+    <div class="panelSection sectionHeading"><strong>承认做错了：换赛道</strong><span>预计烧掉 ${FormatMoney(pivotCost)}</span></div>
     <div class="worldGrid">
       <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.title)} · ${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
       <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
     </div>
-    <div class="panelSection choiceFooter"><span>进度↓ · 宣发↓ · 玩法↓ · 焦虑 +14 · 饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>转向</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>进度、宣发、玩法都会大量损失；焦虑 +14，饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 强行转向</button></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
       const directiveButton = event.target.closest("[data-directive-id]");
       if (directiveButton) {
@@ -3090,12 +3287,17 @@ function OpenDirectiveSheet() {
         <div class="resultHero"><b>−${FormatGoalMoney(result.cost)}</b><p>${EscapeHtml(result.reason)}<br>丢失愿望单 ${result.lostWishlists.toLocaleString("zh-CN")}，废弃玩法 ${result.discardedFeatures} 个。</p></div>
         `, () => { if (state.status !== "playing") RenderEnding(); });
     };
-  }, { mode: "computer" });
+  });
 }
 
 function OpenMarketingSheet() {
-  OpenPanel("宣发", "愿望单", `
-    <p class="panelIntro">愿望单↑ · 预期↑ · 质量不足退款</p>
+  if (state.project.age < 1 && !state.project.isReleased) {
+    ShowToast("现在只有一份合同，没东西可宣发。先开发并结算第一个月。", "warning");
+    PlayTone("warning");
+    return;
+  }
+  OpenPanel("MARKETING PHONE", "宣发手机 · 付费投放", `
+    <p class="panelIntro">投放增加愿望单，也会抬高玩家预期。</p>
     <div class="metricGrid">
       <div class="metricTile"><span>累计宣发</span><strong>${FormatMoney(state.project.marketingSpent)}</strong></div>
       <div class="metricTile"><span>愿望单</span><strong>${state.project.wishlists.toLocaleString("zh-CN")}</strong></div>
@@ -3116,7 +3318,7 @@ function OpenMarketingSheet() {
         if (state.status === "playing") OpenMarketingSheet(); else RenderEnding();
       }
     };
-  }, { mode: "computer" });
+  });
 }
 
 function MarketFitPreviewHtml(marketFit) {
@@ -3136,6 +3338,15 @@ function MarketFitPreviewHtml(marketFit) {
 }
 
 function OpenMarketPhoneSheet() {
+  if (state.project.age < 1 && !state.project.isReleased) {
+    OpenPanel("MARKETING PHONE", "宣发手机 · 现在还没有可宣传的内容", `
+      <div class="marketPhone phoneLockedIntro">
+        <div class="phoneStatusBar"><span>M${String(state.month).padStart(2, "0")} · 09:41</span><b>宣发中心</b><span>5G ▰</span></div>
+        <div class="resultHero"><b>先开发</b><p>游戏连第一版都没有，市场口径和付费投放暂时不展示。先把电脑里的 3 格精力用完，再去月历结算第一个月。</p></div>
+        <div class="note good">首月结束后，这里会开放市场风向、宣传口径与付费投放。</div>
+      </div>`);
+    return;
+  }
   const snapshot = GetMarketSnapshot(state);
   const strategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
   const projectMeta = FindProject(state.project.templateId);
@@ -3170,7 +3381,7 @@ function OpenMarketPhoneSheet() {
   ].join("");
   const actionLabel = locked ? "已选" : "确认";
 
-  OpenPanel("MARKET OS · PHONE", "手机：市场", (
+  OpenPanel("MARKETING PHONE", "桌边手机 · 宣发", (
     '<div class="marketPhone">'
       + '<div class="phoneStatusBar"><span>M' + String(state.month).padStart(2, "0") + '</span><b>市场</b><span>▰</span></div>'
       + '<section class="marketHero" style="--marketColor:' + snapshot.effectiveDirection.color + '">'
@@ -3181,9 +3392,11 @@ function OpenMarketPhoneSheet() {
       + '<div class="marketFeed">'
         + '<article class="phoneStory breaking"><span>事件</span><strong>' + EscapeHtml(snapshot.event.title) + "</strong></article>"
       + "</div>"
+      + '<div class="marketFeatureAction"><span>付费投放同样只在这台手机里处理。</span><button class="miniButton" data-open-paid-campaigns type="button">付费投放</button></div>'
       + '<form class="marketStrategyForm" data-market-form>'
         + '<div class="phoneSectionTitle"><strong>主推</strong><span>选 1 项</span></div>'
         + '<div class="marketPickGrid focusGrid">' + focusMarkup + "</div>"
+        + '<p class="workCostNote">要新增玩法，请关掉手机去墙上白板。</p>'
         + '<div data-market-preview>' + MarketFitPreviewHtml(currentFit) + "</div>"
         + '<div class="marketCommit"><span>每月 1 次</span><button class="primaryButton" data-market-commit type="button" ' + (locked ? "disabled" : "") + ">" + actionLabel + "</button></div>"
       + "</form>"
@@ -3198,6 +3411,7 @@ function OpenMarketPhoneSheet() {
     };
     dom.sheetBody.onchange = RefreshPreview;
     dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-open-paid-campaigns]")) return OpenMarketingSheet();
       if (!event.target.closest("[data-market-commit]")) return;
       const focusId = form?.querySelector('[name="marketFocus"]:checked')?.value || "independent";
       const result = SetMarketStrategy(state, focusId);
@@ -3303,7 +3517,8 @@ function GetMonthCloseActions() {
   const ownerWorkRemaining = Math.max(0, 3 - state.ownerWorkCount);
   if (ownerWorkRemaining > 0) actions.push(`亲自开发 ${ownerWorkRemaining} 次`);
   if (state.talkPoints > 0) actions.push(`沟通 / 拍板 ${state.talkPoints} 次`);
-  if ((state.project.marketStrategy?.setMonth || 0) !== state.month) actions.push("市场主推未定");
+  if ((state.project.age >= 1 || state.project.isReleased)
+    && (state.project.marketStrategy?.setMonth || 0) !== state.month) actions.push("手机里的市场主推未定");
   if (state.project.age >= 2 && state.project.lastReleaseMonth !== state.month) {
     actions.push(state.project.isReleased ? "可发布更新" : "可提交商店");
   }
@@ -3340,7 +3555,7 @@ function OpenMonthSheet() {
   const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
   const openActions = GetMonthCloseActions();
   const hasOpenActions = openActions.length > 0;
-  OpenPanel("CLOSE MONTH", `${currentMonthLabel} 月结`, `
+  OpenPanel("WALL CALENDAR", `墙上月历 · ${currentMonthLabel} 月结`, `
     <div class="monthCloseRitual">
       <section class="monthCloseLedger" aria-label="${currentMonthLabel} 结束，进入 ${nextMonthLabel}">
         <div class="monthCloseLeaf"><small>本月封账</small><strong>${currentMonthLabel}</strong><span>→ ${nextMonthLabel}</span></div>
@@ -3399,17 +3614,18 @@ function OpenMonthSheet() {
 }
 
 function OpenHelpSheet() {
-  OpenPanel("手册", "操作", `
-    <div class="resultHero"><b>A/D</b><p>移动 · W 跳 · E 交互 · N 月结</p></div>
+  OpenPanel("HOW TO PLAY", "怎么开始", `
+    <div class="resultHero"><b>A / D</b><p>在当前房间移动；W、↑ 或空格跳；靠近物件按 E。去别处必须先走到门口选目的地。</p></div>
     <div class="noteList">
-      <div class="note">电脑 · 开发 / 聊天 / 宣发 / 发布 / 股票</div>
-      <div class="note good">手机 · 主推 1 项 · 错配退款</div>
-      <div class="note">工位 → 招人 · 每人 1 套</div>
-      <div class="note">刮刮乐 · 每月 1 张；股票 · 次月结算</div>
-      <div class="note">饮食 · 现金门槛；足浴 · 每月 1 次 · 焦虑↓</div>
-      <div class="note danger">M08 还 ¥82,000 · 逾期倒闭</div>
-      <div class="note good">目标 100 亿元 · 贷款 / 刮奖 / 股票不计</div>
-    </div>`);
+      <div class="note"><b>开发</b>：家里的电脑，每月 3 格精力。</div>
+      <div class="note"><b>项目方向</b>：墙上白板。</div>
+      <div class="note"><b>宣发</b>：桌边手机，首月结束后开放。</div>
+      <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
+      <div class="note"><b>结束本月</b>：墙上月历。</div>
+      <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
+      <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元即胜利。</div>
+    </div>
+    <div class="panelSection">${RenderLog(6)}</div>`);
 }
 
 function RenderEnding() {
@@ -3508,7 +3724,69 @@ function BeginWorld(nextState) {
   RenderHud();
   UpdateWorldFromGameState();
   UpdateLocationIndicator();
+  if (state.project?.age === 0 && state.ownerWorkCount === 0) {
+    window.setTimeout(() => ShowToast("第一步：走到开发电脑前按 E，分配本月 3 格精力。", "good"), 420);
+  }
   if (state.status !== "playing") RenderEnding();
+}
+
+function OpenTravelSheet() {
+  const current = FindLocation(worldState.activeLocationId) || FindLocationAt(worldState.x);
+  const locationPurpose = {
+    home: "开发电脑、项目白板、宣发手机、月历与冰箱",
+    diner: "选择本月的便宜充饥套餐",
+    market: "买零食，或者把现金交给运气",
+    talent: "购买工位并招聘大学生或订阅 AI",
+    bank: "还启动贷、借款与抵押",
+    hotel: "花钱吃一顿能恢复状态的饭",
+    footbath: "普通足浴，每月可放松一次",
+    footbathCity: "现金宽裕后再来的洗脚城",
+    maleModelClub: "高消费的男模店",
+  };
+  OpenPanel("AT THE DOOR", "出门去哪里？", `
+    <p class="panelIntro">在门口选目的地，确认后直接抵达。</p>
+    <div class="travelGrid">${WorldLocations.filter((location) => location.id !== current?.id).map((location) => `
+      <button class="travelChoice" style="--destinationColor:${location.accent}" data-travel-location="${location.id}" type="button">
+        <span>${EscapeHtml(location.name)}</span>
+        <strong>${EscapeHtml(locationPurpose[location.id] || "到访")}</strong>
+        <i>出发 →</i>
+      </button>`).join("")}</div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      const button = event.target.closest("[data-travel-location]");
+      if (!button) return;
+      TravelTo(button.dataset.travelLocation);
+    };
+  });
+}
+
+function TravelTo(locationId) {
+  const result = TravelWorld(worldState, locationId);
+  if (!result.ok) {
+    ShowToast(result.message, "warning");
+    return;
+  }
+  traveling = true;
+  activeInteraction = null;
+  inputState.left = false;
+  inputState.right = false;
+  inputState.jump = false;
+  dom.travelCurtain.querySelector("span").textContent = `去往${result.location.name}`;
+  dom.travelCurtain.classList.add("active");
+  ClosePanel();
+  window.setTimeout(() => {
+    worldState = result.state;
+    if (playerActor) {
+      playerActor.position.x = worldState.x;
+      playerActor.position.y = worldState.y;
+    }
+    UpdateLocationIndicator();
+    PlayTone("good");
+  }, 210);
+  window.setTimeout(() => {
+    dom.travelCurtain.classList.remove("active");
+    traveling = false;
+    ShowToast(`已到达：${result.location.name}`, "good");
+  }, 620);
 }
 
 function TriggerInteraction() {
@@ -3527,7 +3805,11 @@ function TriggerInteraction() {
   }
   switch (activeInteraction.kind) {
     case "homeComputer": return OpenHomeComputerSheet();
+    case "planningBoard": return OpenDirectiveSheet();
+    case "marketingPhone": return OpenMarketPhoneSheet();
+    case "homeCalendar": return OpenMonthSheet();
     case "homeFridge": return OpenFoodSheet("leftovers", "自己家的冰箱");
+    case "exit": return OpenTravelSheet();
     case "diner": return OpenFoodSheet("sustenance", "小菜馆：便宜充饥套餐");
     case "snackShelf": return OpenFoodSheet("snack", "小超市：买点小吃顶一顶");
     case "hotel": return OpenFoodSheet("feast", "大酒店：吃顿像人的饭");
@@ -3543,19 +3825,10 @@ function TriggerInteraction() {
 }
 
 function StartFoundingCeremony() {
-  onboardingPhase = "cinematic";
-  ceremonyElapsed = 0;
-  ceremonyBurstStep = -1;
   landingOpen = true;
-  dom.ceremonyIntro.classList.add("hidden");
-  dom.foundingNamePanel.classList.add("hidden");
-  dom.founderProfilePanel.classList.add("hidden");
-  dom.projectContract.classList.add("hidden");
-  dom.skipCeremonyButton.classList.remove("hidden");
-  dom.ceremonyCaption.classList.remove("hidden");
-  dom.setupScreen.classList.add("cinematic");
   document.body.classList.add("onboarding");
   SetPlayableWorldVisible(false);
+  ShowFoundingNamePanel();
   PlayTone("good");
 }
 
@@ -3569,11 +3842,10 @@ function ConfirmStudioName() {
   }
   draftStudioName = proposedName.slice(0, 18);
   dom.setupError.textContent = "";
-  ReplaceCeremonyPlaque(draftStudioName);
-  dom.foundingNamePanel.classList.add("hidden");
-  onboardingPhase = "plaque";
-  ceremonyElapsed = 0;
-  ceremonyBurstStep = 0;
+  dom.contractStudioName.textContent = draftStudioName;
+  dom.contractSignatureName.textContent = draftStudioName;
+  UpdateContractReview();
+  ShowFounderProfilePanel();
   PlayTone("good");
 }
 
@@ -3599,11 +3871,20 @@ function ConfirmFounderProfile() {
   ShowProjectContract();
 }
 
-function ConfirmProjectSetup() {
-  if (projectSetupComplete) return;
+function CancelSealHold() {
+  if (sealHoldComplete) return;
+  window.clearTimeout(sealHoldTimer);
+  sealHoldTimer = null;
+  sealKeyboardMode = false;
+  dom.sealButton.classList.remove("holding");
+}
+
+function CompleteContractSigning() {
+  if (sealHoldComplete) return;
   const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
   if (projectName.length < 2) {
     dom.contractError.textContent = "游戏名至少 2 个字。";
+    CancelSealHold();
     dom.gameNameInput.focus();
     PlayTone("warning");
     return;
@@ -3616,16 +3897,39 @@ function ConfirmProjectSetup() {
   });
   if (!result.ok) {
     dom.contractError.textContent = result.message;
+    CancelSealHold();
     return;
   }
-  projectSetupComplete = true;
+  sealHoldComplete = true;
+  sealHoldTimer = null;
   onboardingPhase = "signing";
-  dom.projectConfirmButton.disabled = true;
-  dom.projectConfirmButton.querySelector("strong").textContent = "已确认";
-  dom.contractError.textContent = "";
+  dom.sealButton.classList.remove("holding");
+  dom.sealButton.classList.add("sealed");
+  dom.sealButton.querySelector("span").textContent = "合同生效";
+  dom.sealButton.querySelector("strong").textContent = "已确认";
+  dom.projectContract.classList.add("signed");
+  dom.contractError.textContent = "合同生效；贷款开始计时。";
   SpawnParticles(6, 3.7, 0xff445f, 48);
   PlayTone("release");
-  window.setTimeout(() => ShowGoalReveal(result.state), 250);
+  window.setTimeout(() => ShowGoalReveal(result.state), 1050);
+}
+
+function BeginSealHold(event) {
+  if (sealHoldComplete || onboardingPhase !== "contract") return;
+  if (event.type === "pointerdown" && event.button !== 0) return;
+  event.preventDefault();
+  const projectName = dom.gameNameInput.value.trim();
+  if (projectName.length < 2) {
+    dom.contractError.textContent = "请先填写游戏名。";
+    dom.gameNameInput.focus();
+    PlayTone("warning");
+    return;
+  }
+  dom.contractError.textContent = "按住 1 秒。";
+  sealKeyboardMode = event.type === "keydown";
+  dom.sealButton.classList.add("holding");
+  window.clearTimeout(sealHoldTimer);
+  sealHoldTimer = window.setTimeout(CompleteContractSigning, 1050);
 }
 
 function ResetOnboarding() {
@@ -3633,7 +3937,8 @@ function ResetOnboarding() {
   onboardingPhase = "intro";
   ceremonyElapsed = 0;
   ceremonyBurstStep = -1;
-  projectSetupComplete = false;
+  sealHoldComplete = false;
+  CancelSealHold();
   draftStudioName = "";
   draftFounderSkills = { ...DEFAULT_FOUNDER_SKILLS };
   landingOpen = true;
@@ -3641,20 +3946,25 @@ function ResetOnboarding() {
   SetPlayableWorldVisible(false);
   document.body.classList.add("onboarding");
   dom.setupScreen.classList.remove("hidden", "cinematic");
+  dom.setupScreen.classList.remove("bookMode");
   dom.ceremonyIntro.classList.remove("hidden");
   dom.foundingNamePanel.classList.add("hidden");
   dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.add("hidden");
+  dom.projectContract.classList.remove("signed");
   dom.skipCeremonyButton.classList.add("hidden");
   dom.ceremonyCaption.classList.add("hidden");
   dom.studioNameInput.value = "";
   dom.gameNameInput.value = "";
   dom.setupError.textContent = "";
   dom.contractError.textContent = "";
-  dom.projectConfirmButton.disabled = false;
-  dom.projectConfirmButton.querySelector("strong").textContent = "开始开发";
+  contractPageIndex = 0;
+  dom.sealButton.classList.remove("holding", "sealed");
+  dom.sealButton.querySelector("span").textContent = "按住 1 秒";
+  dom.sealButton.querySelector("strong").textContent = "确认开局";
   RenderFounderSkills();
   RenderSetupChoices();
+  RenderContractPage();
 }
 
 function SetMovement(key, pressed) {
@@ -3686,9 +3996,6 @@ function UpdateMobileControlState(interactionAvailable, interaction) {
   dom.mobileControls.classList.toggle("suppressed", suppressed);
   dom.mobileControls.toggleAttribute("inert", suppressed);
   dom.mobileControls.setAttribute("aria-hidden", String(suppressed));
-  dom.settlementButton.classList.toggle("suppressed", suppressed);
-  dom.settlementButton.toggleAttribute("inert", suppressed);
-  dom.settlementButton.setAttribute("aria-hidden", String(suppressed));
   dom.moveLeftButton.disabled = suppressed;
   dom.moveRightButton.disabled = suppressed;
   dom.jumpButton.disabled = suppressed;
@@ -3722,7 +4029,7 @@ function BindHoldButton(button, key) {
 
 function BindControls() {
   window.addEventListener("resize", ResizeScene);
-  window.addEventListener("blur", ResetTouchControls);
+  window.addEventListener("blur", () => { ResetTouchControls(); CancelSealHold(); });
   window.addEventListener("keydown", (event) => {
     const activeElement = document.activeElement;
     if (["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName) || activeElement?.isContentEditable) return;
@@ -3732,8 +4039,6 @@ function BindControls() {
     if (event.code === "KeyD" || event.code === "ArrowRight") SetMovement("right", true);
     if (["KeyW", "ArrowUp", "Space"].includes(event.code) && !event.repeat) inputState.jump = true;
     if (event.code === "KeyE" && !event.repeat) TriggerInteraction();
-    if (event.code === "KeyM" && !event.repeat && !IsOverlayOpen()) OpenMarketPhoneSheet();
-    if (event.code === "KeyN" && !event.repeat && !IsOverlayOpen()) OpenMonthSheet();
     if (event.code === "Escape") { if (!dom.resultLayer.classList.contains("hidden")) CloseResult(); else ClosePanel(); }
   }, { passive: false });
   window.addEventListener("keyup", (event) => {
@@ -3763,13 +4068,6 @@ function BindControls() {
   dom.sheetCloseButton.addEventListener("click", ClosePanel);
   dom.resultCloseButton.addEventListener("click", CloseResult);
   dom.helpButton.addEventListener("click", OpenHelpSheet);
-  dom.phoneButton.addEventListener("click", OpenMarketPhoneSheet);
-  dom.settlementButton.addEventListener("click", () => {
-    if (IsOverlayOpen()) return;
-    PlayTouchFeedback(14);
-    PlayTone("warning");
-    OpenMonthSheet();
-  });
   dom.soundButton.addEventListener("click", () => {
     soundEnabled = !soundEnabled;
     dom.soundButton.classList.toggle("muted", !soundEnabled);
@@ -3780,18 +4078,16 @@ function BindControls() {
   dom.projectChoices.addEventListener("click", (event) => {
     const button = event.target.closest("[data-project-id]");
     if (!button) return;
-    const oldTemplate = FindProject(selectedProjectId)?.title?.replace(/[《》]/g, "") || "";
     selectedProjectId = button.dataset.projectId;
-    if (!dom.gameNameInput.value.trim() || dom.gameNameInput.value.trim() === oldTemplate) {
-      dom.gameNameInput.value = FindProject(selectedProjectId)?.title?.replace(/[《》]/g, "") || "";
-    }
     RenderSetupChoices();
+    PlayTone("tap");
   });
   dom.typeChoices.addEventListener("click", (event) => {
     const button = event.target.closest("[data-type-id]");
     if (!button) return;
     selectedGameTypeId = button.dataset.typeId;
     RenderSetupChoices();
+    PlayTone("tap");
   });
   dom.ceremonyStartButton.addEventListener("click", StartFoundingCeremony);
   dom.skipCeremonyButton.addEventListener("click", ShowFoundingNamePanel);
@@ -3803,6 +4099,9 @@ function BindControls() {
     PlayTone("tap");
   });
   dom.nameConfirmButton.addEventListener("click", ConfirmStudioName);
+  dom.founderBackButton.addEventListener("click", ReturnFounderProfile);
+  dom.contractBackButton.addEventListener("click", ReturnContractPage);
+  dom.contractNextButton.addEventListener("click", AdvanceContractPage);
   dom.studioNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); ConfirmStudioName(); }
   });
@@ -3812,14 +4111,32 @@ function BindControls() {
     AdjustFounderSkill(button.dataset.skillKey, button.dataset.skillAction === "increase" ? 1 : -1);
   });
   dom.founderConfirmButton.addEventListener("click", ConfirmFounderProfile);
-  dom.gameNameInput.addEventListener("input", () => { dom.contractError.textContent = ""; });
-  dom.gameNameInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      ConfirmProjectSetup();
-    }
+  dom.gameNameInput.addEventListener("input", () => {
+    dom.contractError.textContent = "";
+    if (contractPageIndex === 0) dom.contractPageHint.textContent = CONTRACT_PAGE_COPY[0].hint;
+    UpdateContractReview();
   });
-  dom.projectConfirmButton.addEventListener("click", ConfirmProjectSetup);
+  dom.gameNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); AdvanceContractPage(); }
+  });
+  dom.sealButton.addEventListener("pointerdown", BeginSealHold);
+  dom.sealButton.addEventListener("pointerup", CancelSealHold);
+  dom.sealButton.addEventListener("pointercancel", CancelSealHold);
+  dom.sealButton.addEventListener("pointerleave", (event) => { if (event.buttons === 0) CancelSealHold(); });
+  dom.sealButton.addEventListener("contextmenu", (event) => event.preventDefault());
+  dom.sealButton.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key) || event.repeat) return;
+    BeginSealHold(event);
+  });
+  dom.sealButton.addEventListener("keyup", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    if (sealKeyboardMode) {
+      window.clearTimeout(sealHoldTimer);
+      sealHoldTimer = null;
+      sealKeyboardMode = false;
+      CompleteContractSigning();
+    } else CancelSealHold();
+  });
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
   dom.goalRevealButton.addEventListener("click", CompleteGoalReveal);
   dom.restartButton.addEventListener("click", () => {
