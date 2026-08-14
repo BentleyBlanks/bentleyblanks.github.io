@@ -182,6 +182,10 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .modulePip span { font-size: 8px; color: var(--muted); }
 .modulePip div { height: 3px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
 .modulePip i { display: block; height: 100%; border-radius: inherit; }
+.locationRoute { display: grid; grid-template-columns: repeat(6,1fr); gap: 3px; margin-top: 6px; }
+.locationRoute i { height: 3px; border-radius: 99px; background: rgba(255,255,255,.12); }
+.locationRoute i.active { background: var(--cyan); box-shadow: 0 0 8px rgba(101,216,255,.65); }
+.debtStat strong { color: #ff9aa2; font-size: 11px; }
 
 .interactionPrompt {
   position: fixed;
@@ -304,6 +308,78 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .startButton strong { font-size: 12px; }
 .continueButton { padding: 10px; background: rgba(255,255,255,.07); color: #d7d3e6; }
 
+/* Founding ceremony and contract onboarding -------------------------------- */
+.setupScreen { display: grid; grid-template-columns: 1fr; place-items: center; gap: 0; padding: max(18px,4vh) max(18px,5vw); overflow: hidden; transition: background .7s ease; }
+.setupScreen.cinematic { background: linear-gradient(180deg, rgba(4,5,10,.2), rgba(4,5,10,.58)); }
+.onboarding .gameHud, .onboarding .missionCard, .onboarding .interactionPrompt, .onboarding .desktopHint, .onboarding .mobileControls { opacity: 0; pointer-events: none; }
+.ceremonyIntro { position: relative; z-index: 3; width: min(820px,91vw); padding: clamp(24px,4vw,52px); border: 1px solid rgba(255,255,255,.15); border-radius: 30px; background: linear-gradient(145deg, rgba(11,13,23,.93), rgba(23,19,38,.87)); box-shadow: 0 42px 130px rgba(0,0,0,.62); backdrop-filter: blur(18px); }
+.ceremonyIntro::after { content: "成立"; position: absolute; right: clamp(20px,5vw,58px); top: clamp(18px,4vw,48px); color: rgba(255,209,102,.09); font-size: clamp(72px,15vw,170px); font-weight: 950; line-height: .8; pointer-events: none; }
+.ceremonyEyebrow { color: #ffd166; font-size: 10px; letter-spacing: .2em; }
+.ceremonyIntro h1 { position: relative; z-index: 1; margin: 14px 0; font-size: clamp(42px,6.6vw,86px); line-height: .96; letter-spacing: -.065em; }
+.ceremonyIntro h1 em { color: var(--cyan); font-style: normal; }
+.ceremonyIntro p { position: relative; z-index: 1; max-width: 590px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.ceremonyStartButton { position: relative; z-index: 1; width: min(520px,100%); margin-top: 22px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border: 0; border-radius: 15px; background: linear-gradient(135deg,#9d8cff,#6252e5); box-shadow: 0 18px 46px rgba(98,82,229,.3); cursor: pointer; }
+.ceremonyStartButton span { font-size: 10px; }
+.ceremonyStartButton strong { font-size: 13px; }
+.ceremonyIntro .continueButton { position: relative; z-index: 2; width: min(520px,100%); margin-top: 7px; }
+.skipCeremonyButton { position: fixed; z-index: 8; top: var(--safeTop); right: var(--safeRight); padding: 7px 11px; border: 1px solid rgba(255,255,255,.16); border-radius: 99px; background: rgba(8,10,17,.62); color: rgba(255,255,255,.65); font-size: 9px; cursor: pointer; backdrop-filter: blur(8px); }
+.ceremonyCaption { position: fixed; z-index: 7; left: 50%; bottom: calc(var(--safeBottom) + 22px); transform: translateX(-50%); min-width: min(390px,80vw); padding: 9px 16px; display: flex; justify-content: center; align-items: baseline; gap: 10px; border-top: 1px solid rgba(255,209,102,.55); background: linear-gradient(90deg,transparent,rgba(8,10,17,.85) 18%,rgba(8,10,17,.85) 82%,transparent); text-align: center; }
+.ceremonyCaption span { color: #ffd166; font-size: 8px; letter-spacing: .18em; }
+.ceremonyCaption strong { font-size: 12px; }
+
+.foundingNamePanel, .projectContract { position: relative; z-index: 5; color: #251f1a; background: #eee8d8; box-shadow: 0 42px 130px rgba(0,0,0,.72); }
+.foundingNamePanel { width: min(620px,90vw); padding: clamp(22px,4vw,42px); border: 1px solid #c6b995; transform: rotate(-.35deg); }
+.foundingNamePanel::before, .projectContract::before { content: ""; position: absolute; inset: 8px; border: 1px solid rgba(65,50,37,.2); pointer-events: none; }
+.foundingNamePanel > header, .projectContract > header { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid #41352a; color: #453a30; font-size: 9px; letter-spacing: .12em; }
+.registrySeal { position: absolute; right: 32px; top: 67px; display: grid; place-items: center; width: 78px; height: 78px; border: 4px double rgba(172,36,49,.34); border-radius: 50%; color: rgba(172,36,49,.34); font-size: 34px; font-weight: 950; transform: rotate(12deg); }
+.documentKicker { margin: 18px 0 6px !important; color: #9f2637 !important; font-size: 8px !important; letter-spacing: .19em; }
+.foundingNamePanel h2, .projectContract h2 { position: relative; z-index: 1; margin: 5px 0 7px; color: #231d18; font-family: Georgia,"Songti SC",serif; font-size: clamp(25px,4vw,39px); }
+.foundingNamePanel > p { position: relative; z-index: 1; margin: 0; max-width: 440px; color: #665c51; font-size: 10px; line-height: 1.6; }
+.contractField { position: relative; z-index: 1; display: grid; gap: 6px; margin-top: 18px; }
+.contractField > span { color: #6b5b4c; font-size: 9px; letter-spacing: .08em; }
+.contractField input { width: 100%; padding: 11px 12px; border: 0; border-bottom: 2px solid #514439; border-radius: 0; outline: 0; background: rgba(255,255,255,.38); color: #241d18; font: 800 18px/1.2 Inter,"Microsoft YaHei UI",sans-serif; user-select: text; -webkit-user-select: text; }
+.contractField input:focus { background: rgba(255,255,255,.72); border-color: #a42435; }
+.nameSuggestions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.nameSuggestions button { padding: 5px 8px; border: 1px solid #b5a98c; border-radius: 99px; background: rgba(255,255,255,.32); color: #5b5045; font-size: 8px; cursor: pointer; }
+.setupError { position: relative; z-index: 1; min-height: 16px; margin: 8px 0 0 !important; color: #a42435 !important; font-size: 9px !important; }
+.documentButton { position: relative; z-index: 1; width: 100%; margin-top: 4px; padding: 12px 14px; display: flex; justify-content: space-between; gap: 10px; border: 0; background: #30283d; color: #fff; cursor: pointer; }
+.documentButton span { font-size: 9px; }
+.documentButton strong { font-size: 11px; }
+
+.projectContract { width: min(940px,94vw); max-height: 92vh; padding: 17px 22px 18px; overflow: auto; border: 1px solid #c6b995; transform: rotate(.16deg); }
+.projectContract > header { position: sticky; top: -17px; z-index: 4; padding: 11px 0 9px; background: #eee8d8; }
+.projectContract > header div { display: grid; gap: 2px; }
+.projectContract > header small { color: #776a5d; font-size: 7px; }
+.contractParties { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #b8ad96; color: #63574b; font-size: 8px; }
+.contractParties strong { color: #2d251f; }
+.projectContract h2 { margin: 8px 0 2px; font-size: clamp(21px,3vw,31px); }
+.gameNameField { margin-top: 6px; }
+.gameNameField input { padding: 7px 9px; font-size: 14px; }
+.contractSection { position: relative; z-index: 1; margin-top: 8px; }
+.contractHeading { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.contractHeading > b { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; background: #41352a; color: #f4eedf; font-size: 8px; }
+.contractHeading span { display: grid; gap: 0; }
+.contractHeading strong { font-size: 10px; }
+.contractHeading small { color: #776a5d; font-size: 7px; }
+.projectContract .choiceCard { min-height: 57px; padding: 7px 8px; border-color: #b7ad96; border-radius: 5px; background: rgba(255,255,255,.28); color: #2a231e; }
+.projectContract .choiceCard p { margin: 2px 0; color: #766a5e; font-size: 7px; }
+.projectContract .choiceCard small { color: #66584b; font-size: 7px; }
+.projectContract .choiceCard.selected { background: color-mix(in srgb,var(--choiceColor,#8d7cff) 19%,#fff8e8); }
+.contractFinePrint { position: relative; z-index: 1; display: grid; grid-template-columns: 70px 1fr; gap: 8px; margin-top: 9px; padding: 7px 9px; border: 1px solid #9d2437; color: #6e2430; font-size: 7.5px; line-height: 1.45; }
+.signatureRow { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 175px; gap: 12px; align-items: end; margin-top: 6px; }
+.signatureRow > div { display: grid; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid #796e61; }
+.signatureRow small { color: #776b5e; font-size: 7px; }
+.signatureRow > div strong { font-family:"KaiTi","STKaiti",serif; font-size: 16px; }
+.sealButton { position: relative; height: 50px; overflow: hidden; border: 2px solid #a42435; border-radius: 4px; background: rgba(164,36,53,.06); color: #8e2030; cursor: pointer; touch-action: none; }
+.sealButton span, .sealButton strong { position: relative; z-index: 2; display: block; }
+.sealButton span { font-size: 7px; letter-spacing: .12em; }
+.sealButton strong { font: 900 13px/1.25 "Songti SC",serif; }
+.sealButton i { position: absolute; z-index: 1; inset: 0; transform: translateX(-102%); background: rgba(164,36,53,.16); }
+.sealButton.holding i { animation: sealHold 1.05s linear forwards; }
+.sealButton.sealed { background: #a42435; color: #fff1df; transform: rotate(-2deg); }
+@keyframes sealHold { to { transform: translateX(0); } }
+.projectContract.signed::after { content:"已签署"; position: fixed; right: 7%; bottom: 9%; display:grid; place-items:center; width:100px; height:100px; border:7px double rgba(164,36,53,.72); border-radius:50%; color:rgba(164,36,53,.72); font:950 24px/1 "Songti SC",serif; transform:rotate(-13deg); pointer-events:none; }
+
 .modalLayer, .resultLayer {
   position: fixed;
   z-index: 120;
@@ -419,6 +495,35 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .chartAxis { stroke: rgba(255,255,255,.13); stroke-width: 1; }
 .revenueEmpty { color: var(--muted); font-size: 9px; text-align: center; }
 
+.computerActions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; margin-top: 11px; }
+.computerActions button { min-height: 76px; display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto; gap: 1px 7px; align-content: center; padding: 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.03); text-align: left; cursor: pointer; }
+.computerActions button:hover { border-color: rgba(157,140,255,.55); background: rgba(157,140,255,.08); }
+.computerActions button > span { grid-row: 1/3; align-self: center; font-size: 20px; font-weight: 900; }
+.computerActions button strong { align-self: end; font-size: 10px; }
+.computerActions button small { color: var(--muted); font-size: 7.5px; }
+.computerActions button.danger { border-color: rgba(255,98,110,.35); }
+
+.workstationPreview { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-top: 12px; }
+.workstationPreview > div { display: grid; justify-items: center; gap: 3px; padding: 11px 6px; border: 1px dashed rgba(255,255,255,.16); border-radius: 11px; color: var(--muted); }
+.workstationPreview span { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; background: rgba(255,255,255,.06); font-weight: 900; }
+.workstationPreview strong { font-size: 9px; }
+.workstationPreview small { font-size: 7px; }
+.workstationPreview .owned { border-style: solid; border-color: rgba(104,224,160,.42); color: #a9f1c9; }
+.workstationPreview .next { border-style: solid; border-color: rgba(157,140,255,.55); color: #d1caff; }
+
+.startupLoanCard { display: flex; justify-content: space-between; gap: 14px; align-items: center; margin: 10px 0; padding: 12px; border: 1px solid rgba(255,98,110,.42); border-radius: 13px; background: linear-gradient(135deg,rgba(255,98,110,.11),rgba(255,255,255,.02)); }
+.startupLoanCard > div:first-child { display: grid; gap: 2px; }
+.startupLoanCard span, .startupLoanCard small { color: var(--muted); font-size: 8px; }
+.startupLoanCard strong { color: #ffb2b8; font-size: 16px; }
+.startupLoanCard.repaid { border-color: rgba(104,224,160,.4); background: rgba(104,224,160,.08); }
+.startupLoanCard.repaid strong { color: #a9f1c9; }
+.loanDeadline { display: grid; justify-items: center; min-width: 68px; padding: 7px; border: 2px solid currentColor; border-radius: 50%; color: #ff7883; transform: rotate(5deg); }
+.loanDeadline b { font-size: 16px; }
+.loanDeadline span { color: inherit; font-size: 6px; letter-spacing: .12em; }
+.loanPaymentRow { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 12px; }
+.loanPaymentRow button { padding: 8px; border: 1px solid rgba(157,140,255,.34); border-radius: 9px; background: rgba(157,140,255,.1); cursor: pointer; font-size: 8px; }
+.loanPaymentRow button:disabled { opacity: .35; cursor: not-allowed; }
+
 .endingScreen { display: grid; place-items: center; padding: 24px; text-align: center; }
 .endingScreen > div { width: min(620px,90vw); }
 .endingScreen span { color: #a99eff; font-size: 10px; letter-spacing: .18em; }
@@ -480,7 +585,7 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
   .missionCard p { margin: 2px 0 5px; font-size: 8px; }
   .modulePip span { font-size: 6.5px; }
   .toastStack { top: calc(var(--safeTop) + 49px); }
-  .setupScreen { grid-template-columns: .7fr 1.3fr; gap: 3vw; padding: 3vh 4vw; }
+  .setupScreen { grid-template-columns: 1fr; gap: 0; padding: 2vh 3vw; }
   .setupTitle h1 { font-size: clamp(36px,7vw,58px); margin: 7px 0; }
   .setupTitle p { margin: 6px 0; font-size: 9px; line-height: 1.45; }
   .controlPills { margin-top: 8px; }
@@ -489,6 +594,32 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
   .choiceCard p { display: none; }
   .pickerHeading small { display: none; }
   .startButton { padding: 8px 10px; }
+  .ceremonyIntro { width: min(760px,94vw); padding: 17px 22px; border-radius: 20px; }
+  .ceremonyIntro::after { right: 24px; top: 25px; font-size: 105px; }
+  .ceremonyIntro h1 { margin: 7px 0; font-size: clamp(35px,7vw,52px); line-height: .93; }
+  .ceremonyIntro p { max-width: 520px; font-size: 9px; line-height: 1.45; }
+  .ceremonyEyebrow { font-size: 7px; }
+  .ceremonyStartButton { margin-top: 10px; padding: 9px 11px; }
+  .foundingNamePanel { width: min(650px,92vw); padding: 16px 24px; }
+  .foundingNamePanel h2 { font-size: 25px; }
+  .registrySeal { top: 45px; width: 60px; height: 60px; font-size: 25px; }
+  .contractField { margin-top: 10px; }
+  .contractField input { padding: 7px 9px; font-size: 14px; }
+  .documentButton { padding: 8px 10px; }
+  .projectContract { width: min(970px,96vw); max-height: 96vh; padding: 10px 16px 12px; }
+  .projectContract > header { top: -10px; padding: 5px 0; }
+  .projectContract h2 { margin: 3px 0; font-size: 20px; }
+  .contractParties { padding: 4px 0; }
+  .contractSection { margin-top: 4px; }
+  .contractHeading { margin-bottom: 3px; }
+  .contractHeading > b { width: 20px; height: 20px; }
+  .projectContract .choiceCard { min-height: 42px; padding: 5px 6px; }
+  .projectContract .choiceCard p { display: none; }
+  .contractFinePrint { margin-top: 4px; padding: 4px 6px; }
+  .signatureRow { margin-top: 3px; }
+  .sealButton { height: 42px; }
+  .computerActions { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
+  .computerActions button { min-height: 57px; padding: 6px; }
   .worldPanel { max-height: 92vh; }
   .sheetBody { max-height: calc(92vh - 54px); padding: 10px; }
   .worldPanel > header { padding: 8px 11px; }

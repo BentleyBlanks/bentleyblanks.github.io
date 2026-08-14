@@ -1,37 +1,35 @@
 /**
- * Static layout data for the Studio Survival side-scrolling office.
+ * Flat side-scrolling city layout for Studio Survival.
  *
- * Coordinates use a small 2D convention that is convenient for both Canvas
- * and a future 2.5D renderer: x grows from left to right, y grows upwards,
- * and a character's x/y position is the centre of its feet. Rectangles use
- * x as their left edge and y as their top edge unless noted otherwise.
+ * The six named locations are the whole playable world. Business actions live
+ * inside believable places instead of appearing as abstract office gates.
  */
 
 const FreezeList = (items) => Object.freeze(items.map((item) => Object.freeze({ ...item })));
 
 export const WorldConfig = Object.freeze({
-  width: 40,
-  height: 12,
+  width: 60,
+  height: 9,
   groundY: 0,
-  cameraViewportWidth: 12,
-  cameraFollowOffset: 6,
+  cameraViewportWidth: 14,
+  cameraFollowOffset: 7,
   playerWidth: 0.72,
   playerHeight: 1.55,
-  moveSpeed: 6,
-  jumpSpeed: 10.5,
+  moveSpeed: 7,
+  jumpSpeed: 9.5,
   gravity: -25,
-  interactionRange: 2.15,
+  interactionRange: 1.65,
   collectibleRadius: 0.45,
   hazardDamageCooldown: 0.9,
   maxHealth: 100,
-  hazardDamage: 18,
-  spawn: Object.freeze({ x: 1.8, y: 0 }),
+  hazardDamage: 0,
+  spawn: Object.freeze({ x: 2.1, y: 0 }),
 });
 
 export const WorldBounds = Object.freeze({
   minX: 0,
   maxX: WorldConfig.width,
-  minY: -8,
+  minY: -4,
   maxY: WorldConfig.height,
 });
 
@@ -45,317 +43,45 @@ export const Ground = Object.freeze({
   solid: true,
 });
 
-export const Platforms = FreezeList([
-  {
-    id: "platformCoffee",
-    x: 5.0,
-    y: 1.8,
-    width: 4.4,
-    height: 0.32,
-    top: 1.8,
-    solid: true,
-  },
-  {
-    id: "platformArchive",
-    x: 12.8,
-    y: 3.65,
-    width: 4.7,
-    height: 0.32,
-    top: 3.65,
-    solid: true,
-  },
-  {
-    id: "platformServer",
-    x: 20.4,
-    y: 2.2,
-    width: 4.2,
-    height: 0.32,
-    top: 2.2,
-    solid: true,
-  },
-  {
-    id: "platformRoof",
-    x: 28.1,
-    y: 4.05,
-    width: 4.8,
-    height: 0.32,
-    top: 4.05,
-    solid: true,
-  },
-  {
-    id: "platformLaunch",
-    x: 34.1,
-    y: 2.75,
-    width: 3.8,
-    height: 0.32,
-    top: 2.75,
-    solid: true,
-  },
+export const Locations = FreezeList([
+  { id: "home", name: "自己的家", subtitle: "一台电脑，一只冰箱，和全部身家", startX: 0, endX: 10, color: "#3b3553", accent: "#9d8cff" },
+  { id: "diner", name: "小菜馆", subtitle: "能吃饱，但梦想要另点", startX: 10, endX: 20, color: "#4b372b", accent: "#ffd166" },
+  { id: "market", name: "小超市", subtitle: "小吃、彩票和财务幻觉", startX: 20, endX: 30, color: "#263e3b", accent: "#68e0a0" },
+  { id: "talent", name: "人才市场", subtitle: "先买设备，再敢谈梦想", startX: 30, endX: 40, color: "#303a56", accent: "#66b8ff" },
+  { id: "bank", name: "银行", subtitle: "未来的你已经签过字了", startX: 40, endX: 50, color: "#3f3447", accent: "#ff6eae" },
+  { id: "hotel", name: "大酒店", subtitle: "吃一顿像个人的饭", startX: 50, endX: 60, color: "#493c2c", accent: "#ffb45f" },
 ]);
+
+// The city is deliberately flat. Jumping remains available for game feel,
+// but there are no collectible platforms or moving hazards.
+export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  {
-    id: "fridge",
-    kind: "fridge",
-    label: "冰箱",
-    x: 3.7,
-    y: 0,
-    radius: 2.0,
-    action: "food",
-  },
-  {
-    id: "bank",
-    kind: "bank",
-    label: "银行",
-    x: 7.6,
-    y: 0,
-    radius: 1.8,
-    action: "finance",
-  },
-  {
-    id: "lotteryMachine",
-    kind: "lotteryMachine",
-    label: "彩票机",
-    x: 10.8,
-    y: 0,
-    radius: 1.65,
-    action: "lottery",
-  },
-  {
-    id: "talentMachine",
-    kind: "talentMachine",
-    label: "人才机",
-    x: 14.2,
-    y: 0,
-    radius: 1.65,
-    action: "talent",
-  },
-  {
-    id: "workstationArt",
-    kind: "workstation",
-    moduleKey: "art",
-    label: "美术工位",
-    x: 17.9,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationDesign",
-    kind: "workstation",
-    moduleKey: "design",
-    label: "策划工位",
-    x: 19.8,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationClient",
-    kind: "workstation",
-    moduleKey: "client",
-    label: "客户端工位",
-    x: 21.7,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationPerformance",
-    kind: "workstation",
-    moduleKey: "performance",
-    label: "性能工位",
-    x: 23.6,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "whiteboard",
-    kind: "whiteboard",
-    label: "白板",
-    x: 27.1,
-    y: 0,
-    radius: 1.8,
-    action: "directive",
-  },
-  {
-    id: "promoSign",
-    kind: "promoSign",
-    label: "宣发牌",
-    x: 30.1,
-    y: 0,
-    radius: 1.8,
-    action: "marketing",
-  },
-  {
-    id: "releaseDoor",
-    kind: "releaseDoor",
-    label: "发布门",
-    x: 33.3,
-    y: 0,
-    radius: 1.85,
-    action: "release",
-  },
-  {
-    id: "monthCalendar",
-    kind: "monthCalendar",
-    label: "月历",
-    x: 35.9,
-    y: 0,
-    radius: 1.65,
-    action: "nextMonth",
-  },
-  {
-    id: "offWorkDoor",
-    kind: "offWorkDoor",
-    label: "下班门",
-    x: 37.7,
-    y: 0,
-    radius: 1.65,
-    action: "nextMonth",
-  },
-  {
-    id: "aiTerminal",
-    kind: "aiTerminal",
-    label: "AI终端",
-    x: 39.25,
-    y: 0,
-    radius: 1.55,
-    action: "ai",
-  },
+  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发、聊天、宣发、发布、熬到下月", x: 2.35, y: 0, radius: 1.55, action: "computer" },
+  { id: "homeFridge", kind: "homeFridge", label: "自己家的冰箱", detail: "看看还能翻出什么", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
+  { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "点一份便宜充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance" },
+  { id: "snackShelf", kind: "snackShelf", label: "小超市零食架", detail: "买便宜小吃顶一顶", x: 23.1, y: 0, radius: 1.55, action: "snack" },
+  { id: "lotteryCounter", kind: "lotteryMachine", label: "小超市彩票柜台", detail: "刮奖、买彩票、顺便看妖股", x: 27.2, y: 0, radius: 1.55, action: "speculation" },
+  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "电脑、显示器、桌椅：每招一人先有一套", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
+  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "雇大学生，或按月租一个 AI", x: 37.1, y: 0, radius: 1.6, action: "talent" },
+  { id: "bankCounter", kind: "bank", label: "银行柜台", detail: "还启动贷，或继续抵押家当", x: 45.1, y: 0, radius: 1.75, action: "finance" },
+  { id: "hotelRestaurant", kind: "hotel", label: "大酒店餐厅", detail: "花大钱吃顿好的，短暂恢复人形", x: 55.1, y: 0, radius: 1.8, action: "feast" },
 ]);
 
-export const Collectibles = FreezeList([
-  {
-    id: "questFragmentBrief",
-    kind: "questFragment",
-    moduleKey: "art",
-    label: "需求碎片·简报",
-    x: 6.2,
-    y: 2.4,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentMoodboard",
-    kind: "questFragment",
-    moduleKey: "design",
-    label: "需求碎片·情绪板",
-    x: 14.8,
-    y: 4.2,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentScope",
-    kind: "questFragment",
-    moduleKey: "client",
-    label: "需求碎片·范围",
-    x: 22.2,
-    y: 2.75,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentPitch",
-    kind: "questFragment",
-    moduleKey: "performance",
-    label: "需求碎片·提案",
-    x: 29.2,
-    y: 4.6,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentMetrics",
-    kind: "questFragment",
-    moduleKey: "art",
-    label: "需求碎片·指标",
-    x: 35.3,
-    y: 3.3,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentCredit",
-    kind: "questFragment",
-    moduleKey: "design",
-    label: "需求碎片·署名",
-    x: 38.45,
-    y: 1.1,
-    radius: 0.32,
-    value: 1,
-  },
-]);
-
-export const MovingHazards = FreezeList([
-  {
-    id: "printerCart",
-    kind: "movingHazard",
-    label: "失控打印车",
-    x: 9.1,
-    y: 0,
-    width: 0.95,
-    height: 0.8,
-    axis: "x",
-    amplitude: 1.8,
-    speed: 1.2,
-    phase: 0,
-    damage: 18,
-  },
-  {
-    id: "serverDrone",
-    kind: "movingHazard",
-    label: "服务器无人机",
-    x: 22.1,
-    y: 3.0,
-    width: 0.9,
-    height: 0.62,
-    axis: "x",
-    amplitude: 1.6,
-    speed: 1.55,
-    phase: 1.2,
-    damage: 22,
-  },
-  {
-    id: "coffeeRobot",
-    kind: "movingHazard",
-    label: "咖啡机器人",
-    x: 31.9,
-    y: 0,
-    width: 0.78,
-    height: 1.0,
-    axis: "y",
-    amplitude: 1.1,
-    speed: 1.35,
-    phase: 2.1,
-    damage: 16,
-  },
-  {
-    id: "launchConveyor",
-    kind: "movingHazard",
-    label: "发布传送带",
-    x: 36.2,
-    y: 2.75,
-    width: 1.15,
-    height: 0.72,
-    axis: "x",
-    amplitude: 1.0,
-    speed: 1.8,
-    phase: 2.8,
-    damage: 20,
-  },
-]);
-
-// Friendly aliases make the intent of the static data obvious to callers
-// without duplicating arrays or creating a second source of truth.
+export const Collectibles = FreezeList([]);
+export const MovingHazards = FreezeList([]);
 export const QuestFragments = Collectibles;
+
+export function FindLocationAt(x) {
+  const position = Number.isFinite(Number(x)) ? Number(x) : WorldConfig.spawn.x;
+  return Locations.find((location) => position >= location.startX && position < location.endX) || Locations.at(-1);
+}
 
 export const WorldData = Object.freeze({
   config: WorldConfig,
   bounds: WorldBounds,
   ground: Ground,
+  locations: Locations,
   platforms: Platforms,
   interactions: InteractionPoints,
   collectibles: Collectibles,

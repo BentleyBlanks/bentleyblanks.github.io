@@ -22,6 +22,10 @@ import {
   TalkToStaff,
   PivotProject,
   PerformOwnerTask,
+  PurchaseWorkstation,
+  RepayStartupLoan,
+  STARTUP_LOAN_TERMS,
+  WORKSTATION_COSTS,
   ValidateState,
 } from "./Script_Rules.mjs";
 import {
@@ -39,6 +43,10 @@ import {
 function Begin() {
   const result = StartProject(CreateInitialState(), "zeroGStore", "online");
   assert.equal(result.ok, true);
+  // Most legacy rule fixtures study staffing output rather than equipment
+  // procurement. Give those fixtures four paid-off desks; dedicated tests
+  // below lock the real player-facing purchase gate.
+  result.state.workstations = 4;
   return result.state;
 }
 
@@ -93,6 +101,42 @@ function ApplyResult(target, result) {
 function HasRecordedId(collection, id) {
   if (Array.isArray(collection)) return collection.some((item) => item === id || item?.id === id || item?.featureId === id);
   return Boolean(collection && typeof collection === "object" && collection[id]);
+}
+
+{
+  const start = StartProject(CreateInitialState(), "zeroGStore", "premium", {
+    studioName: "今晚一定上线",
+    projectName: "老板别催",
+  });
+  assert.equal(start.ok, true);
+  assert.equal(start.state.studioName, "今晚一定上线");
+  assert.equal(start.state.project.name, "老板别催");
+  assert.equal(start.state.cash, STARTUP_LOAN_TERMS.principal, "all starting cash must come from the founding loan");
+  assert.equal(start.state.startupLoan.remaining, STARTUP_LOAN_TERMS.totalDue);
+  assert.equal(start.state.startupLoan.dueMonth, STARTUP_LOAN_TERMS.dueMonth);
+  assert.equal(start.state.workstations, 0, "the owner begins with only their personal computer");
+  const blockedHire = HireStaff(start.state, "linMo");
+  assert.equal(blockedHire.ok, false, "the first hire must be blocked until equipment is purchased");
+  const equipment = PurchaseWorkstation(start.state);
+  assert.equal(equipment.ok, true);
+  assert.equal(equipment.cost, WORKSTATION_COSTS[0]);
+  assert.equal(equipment.state.workstations, 1);
+  assert.equal(HireStaff(equipment.state, "linMo").ok, true, "one purchased workstation unlocks one hire");
+
+  const partial = RepayStartupLoan({ ...start.state, cash: 100000 }, 10000);
+  assert.equal(partial.ok, true);
+  assert.equal(partial.state.startupLoan.remaining, STARTUP_LOAN_TERMS.totalDue - 10000);
+  const paid = RepayStartupLoan({ ...partial.state, cash: 100000 }, "full");
+  assert.equal(paid.ok, true);
+  assert.equal(paid.state.startupLoan.status, "repaid");
+
+  const due = structuredClone(start.state);
+  due.cash = 1000000;
+  due.month = STARTUP_LOAN_TERMS.dueMonth;
+  due.ownerWorkMonth = due.month;
+  const defaulted = AdvanceMonth(due);
+  assert.equal(defaulted.state.status, "gameover", "an unpaid startup loan must liquidate the studio at its deadline");
+  assert.equal(defaulted.state.outcome?.kind, "startupLoanDefault");
 }
 
 {
@@ -666,6 +710,7 @@ function HasRecordedId(collection, id) {
 {
   let state = Begin();
   state.cash = 1000000000;
+  state = RepayStartupLoan(state, "full").state;
   state.project.age = 3;
   state.project.modules = { art: 92, design: 92, client: 92, performance: 92 };
   state.project.buildStatus = { level: "stable", label: "稳定", detail: "", score: 92 };

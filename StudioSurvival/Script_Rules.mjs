@@ -27,7 +27,13 @@ import {
 } from "./Data_Game.mjs";
 
 export const SAVE_KEY = "studio_survival_v1";
-export const RULES_VERSION = 8;
+export const RULES_VERSION = 9;
+export const STARTUP_LOAN_TERMS = Object.freeze({
+  principal: 68000,
+  totalDue: 82000,
+  dueMonth: 8,
+});
+export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
 
 function Clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -39,6 +45,11 @@ function Clamp(value, minimum, maximum) {
 
 function RoundMoney(value) {
   return Math.round(value / 100) * 100;
+}
+
+function CleanName(value, fallback, maximumLength = 18) {
+  const cleaned = String(value ?? "").replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
+  return (cleaned || fallback).slice(0, maximumLength);
 }
 
 function SeededUnit(seed) {
@@ -108,6 +119,25 @@ function CheckHungerFailure(state) {
   return true;
 }
 
+function CheckStartupLoanDeadline(state) {
+  const loan = state.startupLoan;
+  if (state.status !== "playing" || !loan || loan.status !== "active" || state.month < loan.dueMonth) return false;
+  if (loan.remaining <= 0) {
+    loan.remaining = 0;
+    loan.status = "repaid";
+    return false;
+  }
+  loan.status = "defaulted";
+  state.status = "gameover";
+  state.outcome = {
+    kind: "startupLoanDefault",
+    title: "成立合同变成了清算通知",
+    subtitle: `M${String(loan.dueMonth).padStart(2, "0")} 到期仍欠 ¥${Math.round(loan.remaining).toLocaleString("zh-CN")}。你押上的全部身家被处置，工作室就地倒闭。`,
+  };
+  PushLog(state, `创业启动贷到期未清：尚欠 ¥${Math.round(loan.remaining).toLocaleString("zh-CN")}。${state.studioName || "工作室"} 被强制清算。`, "danger");
+  return true;
+}
+
 function TryAbstractBreakthrough(state) {
   if (state.status !== "playing" || state.anxiety < 42 || state.anxiety > 88) return null;
   const usedIds = new Set(state.project.abstractIdeas.map((idea) => idea.id));
@@ -129,10 +159,12 @@ function TryAbstractBreakthrough(state) {
   return idea;
 }
 
-function FreshProject(projectId, gameTypeId) {
+function FreshProject(projectId, gameTypeId, projectName = "") {
+  const templateName = FindProject(projectId)?.title?.replace(/[《》]/g, "") || "还没想好名字的游戏";
   return {
     templateId: projectId,
     gameTypeId,
+    name: CleanName(projectName, templateName, 20),
     modules: { art: 12, design: 12, client: 12, performance: 12 },
     technicalDebt: 0,
     scopeDebt: 0,
@@ -181,15 +213,26 @@ export function CreateInitialState() {
     ownerWorkCount: 0,
     revenueGoal: 10000000000,
     gameRevenue: 0,
-    cash: 68000,
+    cash: STARTUP_LOAN_TERMS.principal,
+    studioName: "",
+    startupLoan: {
+      principal: STARTUP_LOAN_TERMS.principal,
+      totalDue: STARTUP_LOAN_TERMS.totalDue,
+      remaining: STARTUP_LOAN_TERMS.totalDue,
+      dueMonth: STARTUP_LOAN_TERMS.dueMonth,
+      status: "pending",
+      payments: [],
+    },
     arrears: 0,
     hunger: 0,
-    foodPlan: "sustenance",
+    foodPlan: "leftovers",
     anxiety: 18,
     reputation: 0,
     fans: 0,
     project: null,
     team: [],
+    workstations: 0,
+    equipmentSpent: 0,
     selectedDirective: "integration",
     talkPoints: 2,
     loans: [],
@@ -208,14 +251,27 @@ export function CreateInitialState() {
   };
 }
 
-export function StartProject(currentState, projectId, gameTypeId) {
+export function StartProject(currentState, projectId, gameTypeId, identity = {}) {
   const state = Clone(currentState);
   if (!FindProject(projectId) || !FindGameType(gameTypeId)) {
     return { state, ok: false, message: "立项参数不存在，像极了第一次需求会。" };
   }
+  const studioName = CleanName(identity.studioName || state.studioName, "没想好工作室");
+  const projectName = CleanName(identity.projectName, FindProject(projectId).title.replace(/[《》]/g, ""), 20);
   state.status = "playing";
-  state.project = FreshProject(projectId, gameTypeId);
-  PushLog(state, `${FindProject(projectId).title} 正式立项：${FindGameType(gameTypeId).name}。`, "good");
+  state.studioName = studioName;
+  state.startupLoan ||= {
+    principal: STARTUP_LOAN_TERMS.principal,
+    totalDue: STARTUP_LOAN_TERMS.totalDue,
+    remaining: STARTUP_LOAN_TERMS.totalDue,
+    dueMonth: STARTUP_LOAN_TERMS.dueMonth,
+    status: "pending",
+    payments: [],
+  };
+  state.startupLoan.status = "active";
+  state.project = FreshProject(projectId, gameTypeId, projectName);
+  PushLog(state, `${studioName} 签下《${projectName}》开发合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
+  PushLog(state, `创业启动贷到账 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}，M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前须还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，逾期整家公司清算。`, "danger");
   PushLog(state, "你宣布目标是游戏收入 100 亿元。所有人礼貌地没有追问依据。", "normal");
   return { state, ok: true, message: "立项成功" };
 }
@@ -852,6 +908,7 @@ function ProcessFinances(state) {
     };
   }
 
+  const startupDefault = CheckStartupLoanDeadline(state);
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   CheckRevenueGoal(state);
@@ -866,6 +923,7 @@ function ProcessFinances(state) {
     costs,
     defaults,
     removedStaff,
+    startupDefault,
     skippedFood,
     shortfall,
     selectedFoodPlanId: selectedFoodPlan.id,
@@ -1109,7 +1167,7 @@ function CheckRevenueGoal(state) {
 export function ReleaseBuild(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing" || !state.project) return { state, ok: false, message: "目前没有能发布的项目。" };
-  if (state.project.age < 2) return { state, ok: false, message: "至少做满两个月再上线，不然商店截图只能放办公室。" };
+  if (state.project.age < 2) return { state, ok: false, message: "至少做满两个月再上线，不然商店截图只能放你家客厅。" };
   if (state.project.lastReleaseMonth === state.month) return { state, ok: false, message: "这个月已经发过版本。给玩家一点下载补丁的时间。" };
 
   const evaluation = EvaluateProject(state);
@@ -1170,7 +1228,7 @@ export function ReleaseBuild(currentState) {
   const review = PickReview(evaluation.rating, state.seed + state.month * 113 + state.project.version);
   const verb = isUpdate ? `v${state.project.version}.0 更新` : "首发上线";
   const refundText = commercial.refunds > 0 ? `，退款 ¥${commercial.refunds.toLocaleString("zh-CN")}` : "";
-  PushLog(state, `${verb}：${evaluation.rating.toFixed(1)} 分，净到账 ¥${revenue.toLocaleString("zh-CN")}${refundText}。${review}`, commercial.backlash ? "danger" : evaluation.rating >= 6.7 ? "good" : "warning");
+  PushLog(state, `《${state.project.name}》${verb}：${evaluation.rating.toFixed(1)} 分，净到账 ¥${revenue.toLocaleString("zh-CN")}${refundText}。${review}`, commercial.backlash ? "danger" : evaluation.rating >= 6.7 ? "good" : "warning");
   CheckRevenueGoal(state);
   return {
     state,
@@ -1251,7 +1309,10 @@ export function HireStaff(currentState, staffId) {
   if (!staff) return { state, ok: false, message: "人才不存在，可能已被别的创业者画饼带走。" };
   if (state.status !== "playing") return { state, ok: false, message: "请先立项。" };
   if (state.team.some((member) => member.id === staffId)) return { state, ok: false, message: `${staff.name} 已经在工位上了。` };
-  if (state.team.length >= 4) return { state, ok: false, message: "办公室只有四张外包工位。先结束一段缘分。" };
+  if (state.team.length >= WORKSTATION_COSTS.length) return { state, ok: false, message: "家里已经塞满四张额外工位。再来一个人只能坐冰箱。" };
+  if (state.team.length >= (state.workstations || 0)) {
+    return { state, ok: false, message: state.workstations > 0 ? "没有空工位。先去人才市场设备柜台再买一套电脑桌椅。" : "家里只有老板自己的电脑。第一次招聘前，先在人才市场买第一套工位。" };
+  }
   state.team.push({ id: staffId, morale: 70, stress: 18, drift: 12, boost: 0, months: 0, investmentLevel: 0 });
   PushLog(
     state,
@@ -1261,6 +1322,22 @@ export function HireStaff(currentState, staffId) {
     "good",
   );
   return { state, ok: true, message: staff.kind === "ai" ? "AI 已开始计费" : "大学生已入职" };
+}
+
+export function PurchaseWorkstation(currentState) {
+  const state = Clone(currentState);
+  if (state.status !== "playing") return { state, ok: false, message: "公司还没成立，设备发票暂时没有抬头。" };
+  const currentCount = Math.max(0, Math.floor(state.workstations || 0));
+  if (currentCount >= WORKSTATION_COSTS.length) return { state, ok: false, message: "四套额外工位已经把家塞满了。" };
+  const cost = WORKSTATION_COSTS[currentCount];
+  if (state.cash < cost) return { state, ok: false, message: `第 ${currentCount + 1} 套工位要 ¥${cost.toLocaleString("zh-CN")}，现金不够。` };
+  state.cash -= cost;
+  state.totalCosts += cost;
+  state.workstations = currentCount + 1;
+  state.equipmentSpent = (state.equipmentSpent || 0) + cost;
+  state.anxiety = Clamp(state.anxiety + 1, 0, 100);
+  PushLog(state, `购入第 ${state.workstations} 套员工工位：电脑、显示器、桌椅共 ¥${cost.toLocaleString("zh-CN")}。家又小了一点。`, "warning");
+  return { state, ok: true, cost, workstations: state.workstations, message: `第 ${state.workstations} 套工位已搬回家` };
 }
 
 export function FireStaff(currentState, staffId) {
@@ -1579,6 +1656,32 @@ export function TalkToStaff(currentState, staffId, tone) {
   return { state, ok: true, message: "对话完成", line };
 }
 
+export function RepayStartupLoan(currentState, requestedAmount) {
+  const state = Clone(currentState);
+  const loan = state.startupLoan;
+  if (state.status !== "playing" || !loan || loan.status !== "active") {
+    return { state, ok: false, message: loan?.status === "repaid" ? "创业启动贷已经结清。" : "当前没有可偿还的创业启动贷。" };
+  }
+  const numericAmount = requestedAmount === "full" ? loan.remaining : Number(requestedAmount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) return { state, ok: false, message: "还款金额无效。银行暂时拒绝收下空气。" };
+  const payment = Math.min(loan.remaining, Math.round(numericAmount));
+  if (state.cash < payment) return { state, ok: false, message: `现金不够，还差 ¥${Math.ceil(payment - state.cash).toLocaleString("zh-CN")}。` };
+  state.cash -= payment;
+  loan.remaining = Math.max(0, loan.remaining - payment);
+  loan.payments ||= [];
+  loan.payments.push({ month: state.month, amount: payment });
+  state.totalCosts += payment;
+  if (loan.remaining <= 0) {
+    loan.remaining = 0;
+    loan.status = "repaid";
+    state.anxiety = Math.max(0, state.anxiety - 8);
+    PushLog(state, `创业启动贷全部结清。${state.studioName || "工作室"} 暂时重新属于你。`, "good");
+    return { state, ok: true, payment, repaid: true, message: "启动贷已结清，全部身家暂时保住了" };
+  }
+  PushLog(state, `偿还创业启动贷 ¥${payment.toLocaleString("zh-CN")}，仍欠 ¥${loan.remaining.toLocaleString("zh-CN")}。`, "normal");
+  return { state, ok: true, payment, repaid: false, message: `已还 ¥${payment.toLocaleString("zh-CN")}` };
+}
+
 export function TakeLoan(currentState, collateralId) {
   const state = Clone(currentState);
   const collateral = FindCollateral(collateralId);
@@ -1629,6 +1732,7 @@ export function GetPublicCatalog() {
 export function ValidateState(candidate) {
   if (!candidate || candidate.rulesVersion !== RULES_VERSION) return false;
   if (!["setup", "playing", "gameover", "ended"].includes(candidate.status)) return false;
+  if (typeof candidate.studioName !== "string" || candidate.studioName.length > 18) return false;
   if (!Number.isInteger(candidate.month) || candidate.month < 1) return false;
   if (!Number.isInteger(candidate.ownerWorkMonth) || candidate.ownerWorkMonth < 1
     || candidate.ownerWorkMonth > candidate.month
@@ -1643,6 +1747,13 @@ export function ValidateState(candidate) {
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)
     || !Array.isArray(candidate.incomeHistory) || !Array.isArray(candidate.speculationHistory)) return false;
+  if (!Number.isInteger(candidate.workstations) || candidate.workstations < 0 || candidate.workstations > WORKSTATION_COSTS.length
+    || !Number.isFinite(candidate.equipmentSpent) || candidate.equipmentSpent < 0) return false;
+  const startupLoan = candidate.startupLoan;
+  if (!startupLoan || !["pending", "active", "repaid", "defaulted"].includes(startupLoan.status)
+    || ![startupLoan.principal, startupLoan.totalDue, startupLoan.remaining, startupLoan.dueMonth].every(Number.isFinite)
+    || startupLoan.principal <= 0 || startupLoan.totalDue < startupLoan.principal || startupLoan.remaining < 0
+    || !Array.isArray(startupLoan.payments)) return false;
 
   if (!Array.isArray(candidate.team) || candidate.team.length > 4) return false;
   const teamIds = new Set();
@@ -1660,6 +1771,7 @@ export function ValidateState(candidate) {
   const project = candidate.project;
   if (!project) return candidate.status === "setup";
   if (!FindProject(project.templateId) || !FindGameType(project.gameTypeId)) return false;
+  if (!candidate.studioName || typeof project.name !== "string" || !project.name || project.name.length > 20) return false;
   if (!project.modules || !project.featureLoad
     || MODULE_KEYS.some((moduleKey) => !Number.isFinite(project.modules[moduleKey])
       || project.modules[moduleKey] < 0 || project.modules[moduleKey] > 100

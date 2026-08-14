@@ -36,6 +36,8 @@ import {
   HireStaff,
   PerformOwnerTask,
   PivotProject,
+  PurchaseWorkstation,
+  RepayStartupLoan,
   ReleaseBuild,
   SAVE_KEY,
   SelectDirective,
@@ -43,11 +45,15 @@ import {
   SetStaffInvestmentLevel,
   Speculate,
   StartProject,
+  STARTUP_LOAN_TERMS,
   TakeLoan,
   TalkToStaff,
   ValidateState,
+  WORKSTATION_COSTS,
 } from "./Script_Rules.mjs";
 import {
+  FindLocationAt,
+  Locations as WorldLocations,
   WorldBounds,
   Collectibles as WorldCollectibles,
   MovingHazards as WorldHazards,
@@ -63,10 +69,13 @@ import {
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
-  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "helpButton", "projectType",
-  "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
+  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "helpButton", "studioMonogram",
+  "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
-  "projectChoices", "typeChoices", "startButton", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
+  "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
+  "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
+  "projectContract", "contractStudioName", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
   "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats", "restartButton",
 ].map((id) => [id, document.getElementById(id)]));
@@ -93,6 +102,7 @@ let savedState = LoadSavedState();
 let state = savedState || CreateInitialState();
 let selectedProjectId = state.project?.templateId || PROJECTS[0].id;
 let selectedGameTypeId = state.project?.gameTypeId || GAME_TYPES[0].id;
+let draftStudioName = state.studioName || "";
 let landingOpen = true;
 let worldState = CreateWorldState(state.month);
 let soundEnabled = true;
@@ -101,6 +111,12 @@ let activeInteraction = null;
 let resultCloseHandler = null;
 let actionCooldown = 0;
 let rebuildingWorld = false;
+let onboardingPhase = "intro";
+let ceremonyElapsed = 0;
+let ceremonyBurstStep = -1;
+let sealHoldTimer = null;
+let sealHoldComplete = false;
+let sealKeyboardMode = false;
 const inputState = { left: false, right: false, jump: false };
 
 function IsOverlayOpen() {
@@ -185,7 +201,8 @@ const actorGroup = new THREE.Group();
 const collectibleGroup = new THREE.Group();
 const hazardGroup = new THREE.Group();
 const fxGroup = new THREE.Group();
-scene.add(roomGroup, facilityGroup, actorGroup, collectibleGroup, hazardGroup, fxGroup);
+const ceremonyGroup = new THREE.Group();
+scene.add(roomGroup, facilityGroup, actorGroup, collectibleGroup, hazardGroup, fxGroup, ceremonyGroup);
 
 const facilityVisuals = new Map();
 const staffActors = new Map();
@@ -195,6 +212,11 @@ const particles = [];
 let playerActor = null;
 let playerParts = null;
 let nearbyRing = null;
+let ceremonyFounder = null;
+let ceremonyParts = null;
+let ceremonyCurtains = null;
+let ceremonyPlaque = null;
+let ceremonySpotlights = [];
 
 function HexColor(value) { return Number.parseInt(String(value).replace("#", ""), 16); }
 
@@ -293,6 +315,45 @@ function BuildHumanActor(color = 0x8d7cff, owner = false) {
   return group;
 }
 
+function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
+  const group = new THREE.Group();
+  const material = (fill) => new THREE.MeshBasicMaterial({ color: fill, toneMapped: false });
+  const rectangle = (width, height, fill, z = 0) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material(fill));
+    mesh.position.z = z;
+    return mesh;
+  };
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(.48, 24),
+    new THREE.MeshBasicMaterial({ color: 0x05050a, transparent: true, opacity: .25, depthWrite: false, toneMapped: false }),
+  );
+  shadow.scale.y = .24;
+  shadow.position.set(0, .07, -.02);
+  group.add(shadow);
+  const torso = rectangle(.76, .88, color, .04);
+  torso.position.y = 1.23;
+  group.add(torso);
+  const head = new THREE.Mesh(new THREE.CircleGeometry(.31, 20), material(owner ? 0xe2ad86 : 0xd9a985));
+  head.position.set(0, 1.95, .05);
+  group.add(head);
+  const hair = new THREE.Mesh(new THREE.CircleGeometry(.32, 20, 0, Math.PI), material(owner ? 0x11121a : 0x24212a));
+  hair.position.set(0, 2.04, .06);
+  group.add(hair);
+  const leftLeg = rectangle(.21, .7, 0x24283a, .02);
+  const rightLeg = rectangle(.21, .7, 0x24283a, .02);
+  leftLeg.position.set(-.2, .46, .02);
+  rightLeg.position.set(.2, .46, .02);
+  group.add(leftLeg, rightLeg);
+  const leftArm = rectangle(.17, .68, color, .03);
+  const rightArm = rectangle(.17, .68, color, .03);
+  leftArm.position.set(-.48, 1.3, .03);
+  rightArm.position.set(.48, 1.3, .03);
+  group.add(leftArm, rightArm);
+  group.userData.flat = true;
+  group.userData.parts = { torso, head, leftLeg, rightLeg, leftArm, rightArm, shadow };
+  return group;
+}
+
 function BuildAiActor(color = 0x66b8ff) {
   const group = new THREE.Group();
   const ring = new THREE.Mesh(
@@ -314,6 +375,29 @@ function BuildAiActor(color = 0x66b8ff) {
   return group;
 }
 
+function BuildFlatAiActor(color = 0x66b8ff) {
+  const group = new THREE.Group();
+  const glow = new THREE.Mesh(
+    new THREE.CircleGeometry(.54, 24),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .18, toneMapped: false }),
+  );
+  glow.position.set(0, 1.25, -.02);
+  const body = new THREE.Mesh(
+    new THREE.CircleGeometry(.43, 4),
+    new THREE.MeshBasicMaterial({ color, toneMapped: false }),
+  );
+  body.rotation.z = Math.PI / 4;
+  body.position.set(0, 1.25, .03);
+  const face = Box(.42, .18, .03, 0x080a10, { castShadow: false });
+  face.position.set(0, 1.25, .07);
+  const stand = Box(.11, .7, .02, color, { castShadow: false });
+  stand.position.set(0, .55, .01);
+  group.add(glow, body, face, stand);
+  group.userData.flat = true;
+  group.userData.parts = { ring: glow, body };
+  return group;
+}
+
 function DisposeGroup(group) {
   while (group.children.length) {
     const child = group.children.pop();
@@ -326,32 +410,20 @@ function DisposeGroup(group) {
 }
 
 const FacilityLooks = {
-  fridge: ["冰箱", "吃饭不是 DLC", 0xffd166],
-  bank: ["抵押银行", "电脑禁止入内", 0x68e0a0],
-  speculation: ["彩票 · 妖股", "本月限疯一次", 0xff6eae],
-  talent: ["人才机", "工资 / 月租", 0x9d8cff],
-  terminal: ["AI 群聊", "也可自己硬做", 0x66b8ff],
-  art: ["美术工位", "自己画会长债", 0xff6eae],
-  design: ["策划工位", "需求正在繁殖", 0xffd166],
-  client: ["客户端工位", "能编译不等于能玩", 0x66b8ff],
-  performance: ["性能工位", "先救一下帧率", 0x68e0a0],
-  directive: ["失控白板", "方向 / 换赛道", 0xf0a6ff],
-  marketing: ["宣发墙", "吹大了会退款", 0xff8c69],
-  release: ["上线闸门", "把垃圾推出去", 0x68e0a0],
-  calendar: ["下班门", "结算并进入下月", 0xffffff],
+  homeComputer: ["家里的电脑", "唯一的初始工位", 0x9d8cff],
+  homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
+  diner: ["小菜馆", "便宜充饥套餐", 0xffd166],
+  snackShelf: ["零食架", "泡面饼干顶一顶", 0x68e0a0],
+  speculation: ["彩票柜台", "本月限疯一次", 0xff6eae],
+  equipmentShop: ["设备柜台", "先买电脑再招人", 0x66b8ff],
+  talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
+  bank: ["银行", "启动贷 M08 到期", 0xff6eae],
+  hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
 };
 
 function GetFacilityKind(interaction) {
-  if (interaction.kind === "workstation") return interaction.moduleKey;
   return {
     lotteryMachine: "speculation",
-    talentMachine: "talent",
-    aiTerminal: "terminal",
-    whiteboard: "directive",
-    promoSign: "marketing",
-    releaseDoor: "release",
-    monthCalendar: "calendar",
-    offWorkDoor: "calendar",
   }[interaction.kind] || interaction.kind;
 }
 
@@ -363,55 +435,67 @@ function BuildFacility(interaction) {
   const group = new THREE.Group();
   const kind = GetFacilityKind(interaction);
   const [title, subtitle, color] = FacilityLooks[kind] || [interaction.label || interaction.id, "靠近按 E", 0x9d8cff];
-  group.position.set(interaction.x, interaction.y || 0, 0);
+  group.position.set(interaction.x, interaction.y || 0, .08);
   const marker = new THREE.Mesh(
     new THREE.RingGeometry(.72, .86, 32),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .34, side: THREE.DoubleSide, toneMapped: false }),
   );
-  marker.rotation.x = -Math.PI / 2;
-  marker.position.y = .025;
+  marker.scale.y = .28;
+  marker.position.set(0, .08, -.02);
   group.add(marker);
-  if (["art", "design", "client", "performance"].includes(kind)) {
-    const desk = Box(2.1, .16, 1.05, 0x363345);
-    desk.position.y = 1.05;
-    group.add(desk);
-    for (const offset of [-.78, .78]) {
-      const leg = Box(.1, 1, .1, 0x20232e, { metalness: .35 });
-      leg.position.set(offset, .52, 0);
-      group.add(leg);
-    }
-    const monitor = Box(.82, .57, .09, 0x080a11, { roughness: .3 });
-    monitor.position.set(0, 1.48, -.18);
-    const screen = Box(.68, .43, .02, color, { emissive: color, emissiveIntensity: .9, castShadow: false });
-    screen.position.set(0, 1.48, -.125);
-    group.add(monitor, screen);
-  } else if (kind === "fridge") {
+  if (kind === "homeComputer" || kind === "equipmentShop") {
+    const desk = Box(1.9, .16, .08, 0x302f42, { castShadow: false });
+    desk.position.y = .92;
+    const monitor = Box(.92, .66, .08, 0x10111a, { castShadow: false });
+    monitor.position.set(0, 1.38, .02);
+    const screen = Box(.75, .49, .02, color, { emissive: color, emissiveIntensity: .65, castShadow: false });
+    screen.position.set(0, 1.38, .07);
+    const legLeft = Box(.1, .9, .06, 0x242534, { castShadow: false });
+    const legRight = legLeft.clone();
+    legLeft.position.set(-.7, .46, 0);
+    legRight.position.set(.7, .46, 0);
+    group.add(desk, monitor, screen, legLeft, legRight);
+  } else if (kind === "homeFridge") {
     const fridge = Box(1.25, 2.55, 1.05, 0x343a4b, { metalness: .18 });
     fridge.position.y = 1.28;
     const glow = Box(.78, .15, .04, color, { emissive: color, emissiveIntensity: 1.1, castShadow: false });
     glow.position.set(0, 1.75, .55);
     group.add(fridge, glow);
-  } else if (["bank", "speculation", "talent", "terminal"].includes(kind)) {
+  } else if (["bank", "speculation"].includes(kind)) {
     const kiosk = Box(1.35, 2.1, .8, 0x242838, { metalness: .22 });
     kiosk.position.y = 1.05;
     const screen = Box(.88, .72, .03, color, { emissive: color, emissiveIntensity: .92, castShadow: false });
     screen.position.set(0, 1.42, .42);
     group.add(kiosk, screen);
-  } else if (kind === "directive" || kind === "marketing") {
-    const board = Box(2.45, 1.65, .15, 0x25283a);
-    board.position.y = 1.65;
-    const inner = Box(2.14, 1.32, .03, color, { emissive: color, emissiveIntensity: .25, castShadow: false });
-    inner.position.set(0, 1.65, .1);
-    group.add(board, inner);
+  } else if (kind === "talentMarket") {
+    const counter = Box(2.4, .85, .08, 0x28314a, { castShadow: false });
+    counter.position.y = .43;
+    const personA = BuildFlatHumanActor(0x66b8ff, false);
+    const personB = BuildFlatHumanActor(0xffd166, false);
+    personA.scale.setScalar(.72);
+    personB.scale.setScalar(.72);
+    personA.position.set(-.58, .78, -.03);
+    personB.position.set(.58, .78, -.03);
+    group.add(counter, personA, personB);
+  } else if (kind === "snackShelf") {
+    const shelf = Box(2.2, 2.1, .08, 0x28423c, { castShadow: false });
+    shelf.position.y = 1.05;
+    for (const y of [.5, 1.05, 1.6]) {
+      const row = Box(1.85, .12, .04, color, { emissive: color, emissiveIntensity: .3, castShadow: false });
+      row.position.set(0, y, .08);
+      group.add(row);
+    }
+    group.add(shelf);
   } else {
-    const gate = Box(1.8, 3.15, .38, 0x252839, { metalness: .2 });
-    gate.position.y = 1.58;
-    const light = Box(1.24, .18, .04, color, { emissive: color, emissiveIntensity: 1, castShadow: false });
-    light.position.set(0, 2.72, .23);
-    group.add(gate, light);
+    const counter = Box(2.4, 1.05, .12, kind === "hotel" ? 0x6b4d32 : 0x4b3a2e, { castShadow: false });
+    counter.position.y = .53;
+    const bowl = Cylinder(.34, .24, .18, color, 18);
+    bowl.rotation.x = Math.PI / 2;
+    bowl.position.set(0, 1.18, .05);
+    group.add(counter, bowl);
   }
   const sign = TextPlane(title, subtitle, 2.5, `#${color.toString(16).padStart(6, "0")}`);
-  sign.position.set(0, kind === "calendar" || kind === "release" ? 3.65 : 2.9, .4);
+  sign.position.set(0, 3.05, .22);
   group.add(sign);
   group.userData.marker = marker;
   group.userData.interactionId = interaction.id;
@@ -422,50 +506,202 @@ function BuildFacility(interaction) {
 
 function BuildRoom() {
   const width = Math.abs(WorldBounds.maxX - WorldBounds.minX) + 4;
-  const floor = Box(width, .24, 5.6, 0x181b27, { castShadow: false, roughness: .95 });
+  const floor = Box(width, .24, .18, 0x171925, { castShadow: false, roughness: .95 });
   floor.position.set((WorldBounds.maxX + WorldBounds.minX) / 2, -.14, 0);
   roomGroup.add(floor);
-  const backWall = Box(width, 6.6, .28, 0x10141f, { castShadow: false });
-  backWall.position.set((WorldBounds.maxX + WorldBounds.minX) / 2, 3.2, -2.7);
-  roomGroup.add(backWall);
-  const grid = new THREE.GridHelper(width, Math.round(width), 0x34394f, 0x232738);
-  grid.position.y = .015;
-  grid.scale.z = .18;
-  grid.material.transparent = true;
-  grid.material.opacity = .32;
-  roomGroup.add(grid);
-  for (let index = 0; index < Math.ceil(width / 5); index += 1) {
-    const x = WorldBounds.minX - 1 + index * 5;
-    const windowFrame = Box(3.5, 2.2, .12, 0x080b12, { castShadow: false });
-    windowFrame.position.set(x, 4.35, -2.5);
-    const glass = Box(3.16, 1.86, .03, index % 2 ? 0x1e3351 : 0x192b47, { emissive: 0x132848, emissiveIntensity: .45, castShadow: false });
-    glass.position.set(x, 4.35, -2.32);
-    roomGroup.add(windowFrame, glass);
-  }
-  WorldPlatforms.forEach((platform) => {
-    if ((platform.y || 0) <= .05) return;
-    const mesh = Box(platform.width, .24, 1.35, 0x3b3d52, { metalness: .08 });
-    mesh.position.set(platform.x + platform.width / 2, platform.y - .12, 0);
-    roomGroup.add(mesh);
+  WorldLocations.forEach((location, index) => {
+    const locationWidth = location.endX - location.startX;
+    const centerX = location.startX + locationWidth / 2;
+    const wall = Box(locationWidth - .08, 6.5, .08, HexColor(location.color), { castShadow: false, roughness: 1 });
+    wall.position.set(centerX, 3.15, -.32);
+    roomGroup.add(wall);
+    const lowerBand = Box(locationWidth - .08, .75, .05, index % 2 ? 0x161824 : 0x1d1d2b, { castShadow: false });
+    lowerBand.position.set(centerX, .38, -.18);
+    roomGroup.add(lowerBand);
+    const locationSign = TextPlane(location.name, location.subtitle, 5.4, location.accent);
+    locationSign.position.set(centerX, 5.55, -.12);
+    roomGroup.add(locationSign);
+    const divider = Box(.1, 6.55, .05, 0x090b12, { castShadow: false });
+    divider.position.set(location.endX, 3.15, -.08);
+    roomGroup.add(divider);
+    for (let windowIndex = 0; windowIndex < 2; windowIndex += 1) {
+      const pane = Box(1.7, 1.4, .03, index % 2 ? 0x222b3b : 0x1e293a, { emissive: HexColor(location.accent), emissiveIntensity: .06, castShadow: false });
+      pane.position.set(location.startX + 2.2 + windowIndex * 5.4, 3.85, -.22);
+      roomGroup.add(pane);
+    }
   });
   WorldInteractions.forEach(BuildFacility);
-  const sign = TextPlane("甲方是我", "RUN · JUMP · BUILD · SURVIVE", 6.5, "#d7d1ff");
-  sign.position.set(0, 5.72, -2.28);
-  roomGroup.add(sign);
-  const ambient = new THREE.HemisphereLight(0xaeb9ff, 0x251a31, 1.45);
-  const key = new THREE.DirectionalLight(0xdce2ff, 2.25);
-  key.position.set(4, 12, 8);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.left = -12;
-  key.shadow.camera.right = 12;
-  key.shadow.camera.top = 10;
-  key.shadow.camera.bottom = -5;
-  const pink = new THREE.PointLight(0xff6eae, 2.6, 14, 2);
-  pink.position.set(-10, 3, 3);
-  const blue = new THREE.PointLight(0x66b8ff, 2.7, 14, 2);
-  blue.position.set(10, 3, 2);
-  scene.add(ambient, key, pink, blue);
+  const ambient = new THREE.HemisphereLight(0xd8deff, 0x6a506e, 2.55);
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(4, 8, 10);
+  scene.add(ambient, key);
+}
+
+function BuildCeremonyScene() {
+  DisposeGroup(ceremonyGroup);
+  ceremonySpotlights = [];
+  const stageX = 6;
+  const floor = Box(13, .42, 4.8, 0x191726, { roughness: .45, metalness: .08 });
+  floor.position.set(stageX, -.15, 0);
+  const carpet = Box(10.5, .04, 1.75, 0x5b1734, { roughness: .9, castShadow: false });
+  carpet.position.set(stageX - 2, .08, .9);
+  const backdrop = Box(9.4, 6.2, .25, 0x131525, { castShadow: false });
+  backdrop.position.set(stageX, 3.05, -2.05);
+  ceremonyGroup.add(floor, carpet, backdrop);
+  for (const offset of [-4.35, 4.35]) {
+    const column = Cylinder(.32, .48, 5.6, 0x3a3454, 16);
+    column.position.set(stageX + offset, 2.7, -1.72);
+    ceremonyGroup.add(column);
+  }
+  const header = TextPlane("公司成立仪式", "FOUNDING · DEBT · SURVIVAL", 6.8, "#ffd166");
+  header.position.set(stageX, 5.35, -1.75);
+  ceremonyGroup.add(header);
+  ceremonyPlaque = TextPlane("等待命名", "今天成立 · M08 可能清算", 5.6, "#f5f0dd");
+  ceremonyPlaque.position.set(stageX, 3.55, -1.68);
+  ceremonyPlaque.scale.set(.82, .82, .82);
+  ceremonyGroup.add(ceremonyPlaque);
+  const leftCurtain = Box(2.75, 3.2, .18, 0x6f1736, { roughness: .92 });
+  const rightCurtain = leftCurtain.clone();
+  leftCurtain.position.set(stageX - 1.38, 3.55, -1.48);
+  rightCurtain.position.set(stageX + 1.38, 3.55, -1.48);
+  ceremonyCurtains = { left: leftCurtain, right: rightCurtain, closedLeftX: stageX - 1.38, closedRightX: stageX + 1.38 };
+  ceremonyGroup.add(leftCurtain, rightCurtain);
+  const ribbon = Box(5.3, .1, .08, 0xffd166, { emissive: 0xffb347, emissiveIntensity: .45 });
+  ribbon.position.set(stageX, 1.08, 1.22);
+  ceremonyGroup.add(ribbon);
+  ceremonyFounder = BuildHumanActor(0x9d8cff, true);
+  ceremonyFounder.position.set(-2.2, 0, .72);
+  ceremonyParts = ceremonyFounder.userData.parts;
+  ceremonyGroup.add(ceremonyFounder);
+  for (const [index, x] of [1.25, 10.7].entries()) {
+    const cameraBody = Box(.75, .52, .55, 0x171923, { metalness: .35 });
+    cameraBody.position.set(x, 1.25, 1.75);
+    const lens = Cylinder(.18, .23, .3, 0x0a0b11, 16);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(x, 1.25, 1.42);
+    const flash = new THREE.PointLight(0xeaf3ff, 0, 8, 2);
+    flash.position.set(x, 2.1, 2.2);
+    flash.userData.phase = index * 1.7;
+    ceremonySpotlights.push(flash);
+    ceremonyGroup.add(cameraBody, lens, flash);
+  }
+  const warm = new THREE.SpotLight(0xffd166, 42, 24, .42, .5, 1.5);
+  warm.position.set(stageX - 4, 8, 6);
+  warm.target.position.set(stageX, 1.5, 0);
+  const violet = new THREE.SpotLight(0x9d8cff, 35, 24, .46, .55, 1.5);
+  violet.position.set(stageX + 4, 7, 5);
+  violet.target.position.set(stageX, 1.7, 0);
+  ceremonySpotlights.push(warm, violet);
+  ceremonyGroup.add(warm, warm.target, violet, violet.target);
+  ceremonyGroup.visible = false;
+}
+
+function ReplaceCeremonyPlaque(studioName) {
+  if (ceremonyPlaque) {
+    ceremonyGroup.remove(ceremonyPlaque);
+    ceremonyPlaque.geometry?.dispose?.();
+    ceremonyPlaque.material?.map?.dispose?.();
+    ceremonyPlaque.material?.dispose?.();
+  }
+  ceremonyPlaque = TextPlane(studioName, "今日成立 · 全部身家担保", 5.8, "#fff1b8");
+  ceremonyPlaque.position.set(6, 3.55, -1.68);
+  ceremonyPlaque.scale.set(.35, .35, .35);
+  ceremonyGroup.add(ceremonyPlaque);
+}
+
+function SetPlayableWorldVisible(visible) {
+  roomGroup.visible = visible;
+  facilityGroup.visible = visible;
+  actorGroup.visible = visible;
+  collectibleGroup.visible = visible;
+  hazardGroup.visible = visible;
+  ceremonyGroup.visible = !visible && onboardingPhase !== "intro";
+}
+
+function ShowFoundingNamePanel() {
+  if (onboardingPhase === "naming") return;
+  onboardingPhase = "naming";
+  ceremonyElapsed = 0;
+  dom.skipCeremonyButton.classList.add("hidden");
+  dom.ceremonyCaption.classList.add("hidden");
+  dom.foundingNamePanel.classList.remove("hidden");
+  dom.studioNameInput.focus({ preventScroll: true });
+}
+
+function ShowProjectContract() {
+  onboardingPhase = "contract";
+  ceremonyElapsed = 0;
+  dom.foundingNamePanel.classList.add("hidden");
+  dom.projectContract.classList.remove("hidden");
+  dom.contractStudioName.textContent = draftStudioName;
+  dom.contractSignatureName.textContent = draftStudioName;
+  if (!dom.gameNameInput.value.trim()) {
+    const template = FindProject(selectedProjectId);
+    dom.gameNameInput.value = template?.title?.replace(/[《》]/g, "") || "";
+  }
+  RenderSetupChoices();
+  window.setTimeout(() => dom.gameNameInput.focus({ preventScroll: true }), 220);
+}
+
+function UpdateCeremony(delta, time) {
+  if (onboardingPhase === "intro" || onboardingPhase === "game") return false;
+  ceremonyElapsed += delta;
+  const stageX = 6;
+  const founder = ceremonyFounder;
+  ceremonyGroup.visible = true;
+  if (onboardingPhase === "cinematic") {
+    const walk = Clamp((ceremonyElapsed - .35) / 2.45, 0, 1);
+    founder.position.x = -2.2 + (stageX - .55 + 2.2) * (1 - Math.pow(1 - walk, 3));
+    const stride = walk < 1 ? Math.sin(ceremonyElapsed * 11) * .72 : 0;
+    ceremonyParts.leftLeg.rotation.x = stride;
+    ceremonyParts.rightLeg.rotation.x = -stride;
+    ceremonyParts.leftArm.rotation.x = -stride * .75;
+    ceremonyParts.rightArm.rotation.x = stride * .75;
+    founder.rotation.y = 0;
+    const open = Clamp((ceremonyElapsed - 2.75) / 1.15, 0, 1);
+    ceremonyCurtains.left.position.x = ceremonyCurtains.closedLeftX - open * 2.05;
+    ceremonyCurtains.right.position.x = ceremonyCurtains.closedRightX + open * 2.05;
+    ceremonyPlaque.scale.setScalar(.82 + open * .18);
+    const caption = ceremonyElapsed < 1.55 ? "创始人入场"
+      : ceremonyElapsed < 2.8 ? "全部身家担保文件已生效"
+        : ceremonyElapsed < 4.25 ? "为一家尚未赚钱的公司揭牌"
+          : "请为公司命名";
+    dom.ceremonyCaptionText.textContent = caption;
+    if (ceremonyElapsed > 3.75 && ceremonyBurstStep < 0) {
+      ceremonyBurstStep = 0;
+      SpawnParticles(stageX, 3.9, 0xffd166, 34);
+      PlayTone("release");
+    }
+    ceremonySpotlights.slice(0, 2).forEach((light, index) => {
+      const pulse = Math.sin(ceremonyElapsed * 8 + index * 2.3) > .93 ? 9 : 0;
+      light.intensity = pulse;
+    });
+    if (ceremonyElapsed >= 5.25) ShowFoundingNamePanel();
+  } else {
+    founder.position.set(stageX - .55, 0, .72);
+    ceremonyParts.leftLeg.rotation.x = 0;
+    ceremonyParts.rightLeg.rotation.x = 0;
+    ceremonyParts.leftArm.rotation.x = -.18 + Math.sin(time * 1.7) * .05;
+    ceremonyParts.rightArm.rotation.x = .18;
+    ceremonyCurtains.left.position.x = ceremonyCurtains.closedLeftX - 2.05;
+    ceremonyCurtains.right.position.x = ceremonyCurtains.closedRightX + 2.05;
+  }
+  if (onboardingPhase === "plaque") {
+    const reveal = Clamp(ceremonyElapsed / .9, 0, 1);
+    ceremonyPlaque.scale.setScalar(.35 + (1 - Math.pow(1 - reveal, 3)) * .65);
+    ceremonyPlaque.rotation.z = (1 - reveal) * -.08;
+    if (ceremonyElapsed > .35 && ceremonyBurstStep < 1) {
+      ceremonyBurstStep = 1;
+      SpawnParticles(stageX, 3.9, 0x9d8cff, 42);
+      PlayTone("release");
+    }
+    if (ceremonyElapsed > 1.85) ShowProjectContract();
+  }
+  camera.position.set(stageX + Math.sin(time * .38) * .12, 5.35, 13.4);
+  camera.lookAt(stageX, 2.15, 0);
+  renderer.toneMappingExposure = 1.15;
+  scene.background.setHex(0x080910);
+  return true;
 }
 
 function BuildCollectibles() {
@@ -507,18 +743,29 @@ function BuildHazards() {
 function RebuildStaffActors() {
   staffActors.clear();
   DisposeGroup(actorGroup);
-  playerActor = BuildHumanActor(0x9d8cff, true);
+  playerActor = BuildFlatHumanActor(0x9d8cff, true);
   playerActor.position.set(worldState.x, worldState.y, .65);
   playerParts = playerActor.userData.parts;
   actorGroup.add(playerActor);
-  const moduleInteractions = Object.fromEntries(WorldInteractions.filter((item) => item.kind === "workstation").map((item) => [item.moduleKey, item]));
+  playerActor.visible = onboardingPhase === "game";
+  for (let index = 0; index < (state.workstations || 0); index += 1) {
+    const desk = new THREE.Group();
+    const tabletop = Box(.78, .08, .04, 0x343247, { castShadow: false });
+    tabletop.position.y = .82;
+    const monitor = Box(.44, .34, .025, 0x10121b, { castShadow: false });
+    monitor.position.set(0, 1.08, .02);
+    const screen = Box(.34, .24, .015, index < state.team.length ? 0x66b8ff : 0x292c38, { emissive: index < state.team.length ? 0x66b8ff : 0, emissiveIntensity: .45, castShadow: false });
+    screen.position.set(0, 1.08, .04);
+    desk.position.set(3.75 + index * 1.02, 0, .02);
+    desk.add(tabletop, monitor, screen);
+    actorGroup.add(desk);
+  }
   state.team.forEach((member, index) => {
     const staff = FindStaff(member.id);
-    const station = moduleInteractions[staff.specialty] || moduleInteractions[MODULE_KEYS[index % MODULE_KEYS.length]];
-    if (!station) return;
     const color = HexColor(staff.color);
-    const actor = staff.kind === "ai" ? BuildAiActor(color) : BuildHumanActor(color, false);
-    actor.position.set(station.x + (index % 2 ? .62 : -.62), station.y || 0, -.72);
+    const actor = staff.kind === "ai" ? BuildFlatAiActor(color) : BuildFlatHumanActor(color, false);
+    actor.scale.setScalar(.72);
+    actor.position.set(3.75 + index * 1.02, .02, .12);
     actor.userData.baseY = actor.position.y;
     actor.userData.staffId = staff.id;
     actor.userData.phase = index * 1.7;
@@ -596,53 +843,14 @@ function UpdateWorldFromGameState() {
 function HandleWorldEvents(events = []) {
   events.forEach((event) => {
     if (event.type === "jump") PlayTone("jump");
-    if (event.type === "collectible") {
-      const item = WorldCollectibles.find((candidate) => candidate.id === event.id);
-      let consumed = false;
-      if (item && state.status === "playing") {
-        const itemIndex = WorldCollectibles.findIndex((candidate) => candidate.id === event.id);
-        const moduleKey = GetCollectibleModule(item, itemIndex);
-        const result = PerformOwnerTask(state, moduleKey);
-        if (result.ok) {
-          state = result.state;
-          consumed = true;
-          SaveState();
-          RenderHud();
-          ShowToast(`捡到 ${MODULE_META[moduleKey].label} 碎片：老板被迫亲自干了一段`, "good");
-          if (state.status !== "playing") RenderEnding();
-        } else {
-          worldState.collectedIds = worldState.collectedIds.filter((id) => id !== event.id);
-          ShowToast(result.message, "warning");
-        }
-      }
-      const visual = collectibleVisuals.get(event.id);
-      if (visual && consumed) {
-        SpawnParticles(visual.position.x, visual.position.y, visual.material.color.getHex(), 12);
-        visual.visible = false;
-      }
-      PlayTone(consumed ? "coin" : "warning");
-    }
-    if (event.type === "hazardHit") {
-      state.anxiety = Clamp(state.anxiety + 8, 0, 100);
-      SaveState();
-      RenderHud();
-      SpawnParticles(worldState.x, worldState.y + .5, 0xff425d, 14);
-      ShowToast("你撞上了会移动的 Bug：焦虑 +8。它拒绝提供复现步骤。", "warning");
-      PlayTone("hit");
-      if (state.anxiety >= 100) {
-        state.status = "gameover";
-        state.outcome = { kind: "mentalBreakdown", title: "Bug 把现实撞散了", subtitle: "焦虑到达 100。你开始对着碰撞箱开需求评审。" };
-        SaveState();
-        RenderEnding();
-      }
-    }
-    if (event.type === "playerDown" && state.status === "playing") {
-      worldState = ResetWorldMonth(worldState, state.month);
-      ShowToast("你被 Bug 撞回入口。需求碎片也趁机恢复了。", "warning");
-      BuildCollectibles();
-      BuildHazards();
-    }
   });
+}
+
+function UpdateLocationIndicator() {
+  const location = FindLocationAt(worldState.x);
+  if (!location) return;
+  dom.locationValue.textContent = location.name;
+  dom.locationRoute.innerHTML = WorldLocations.map((item) => `<i class="${item.id === location.id ? "active" : ""}" title="${EscapeHtml(item.name)}"></i>`).join("");
 }
 
 function Animate() {
@@ -663,19 +871,20 @@ function Animate() {
     playerActor.position.y = worldState.y;
     const moving = Math.abs(worldState.vx || 0) > .12;
     const stride = moving && worldState.grounded ? Math.sin(time * 10) * .65 : 0;
-    playerParts.leftLeg.rotation.x = stride;
-    playerParts.rightLeg.rotation.x = -stride;
-    playerParts.leftArm.rotation.x = -stride * .8;
-    playerParts.rightArm.rotation.x = stride * .8;
+    const rotationAxis = playerActor.userData.flat ? "z" : "x";
+    playerParts.leftLeg.rotation[rotationAxis] = stride;
+    playerParts.rightLeg.rotation[rotationAxis] = -stride;
+    playerParts.leftArm.rotation[rotationAxis] = -stride * .8;
+    playerParts.rightArm.rotation[rotationAxis] = stride * .8;
     playerActor.scale.x += ((worldState.facing || 1) - playerActor.scale.x) * .28;
     playerParts.torso.rotation.z = moving ? -(worldState.vx || 0) * .015 : Math.sin(time * 1.7) * .008;
-    if (worldState.y > previousY + .02) playerParts.leftArm.rotation.x = -1.05;
+    if (worldState.y > previousY + .02) playerParts.leftArm.rotation[rotationAxis] = -1.05;
   }
 
   staffActors.forEach((actor) => {
     if (actor.userData.parts?.ring) {
       actor.position.y = actor.userData.baseY + Math.sin(time * 2 + actor.userData.phase) * .08;
-      actor.userData.parts.body.rotation.y += delta * .55;
+      actor.userData.parts.body.rotation[actor.userData.flat ? "z" : "y"] += delta * .55;
     } else actor.rotation.z = Math.sin(time * 1.25 + actor.userData.phase) * .01;
   });
 
@@ -703,13 +912,17 @@ function Animate() {
     if (particle.userData.life <= 0) { fxGroup.remove(particle); particle.geometry.dispose(); particle.material.dispose(); particles.splice(index, 1); }
   }
 
-  const anxiety = Clamp((state.anxiety - 45) / 55, 0, 1);
-  const shake = anxiety * anxiety;
-  const targetCameraX = (worldState.cameraX ?? Math.max(0, worldState.x - 6)) + 6;
-  camera.position.set(targetCameraX + Math.sin(time * 17) * shake * .11, 5.7 + Math.cos(time * 14) * shake * .07, 14.2);
-  camera.lookAt(targetCameraX, 1.55, 0);
-  renderer.toneMappingExposure = 1.08 + Math.sin(time * 8) * shake * .08;
-  scene.background.setRGB(.035 + shake * .08, .047 - shake * .015, .09 + shake * .015);
+  const ceremonyActive = UpdateCeremony(delta, time);
+  if (!ceremonyActive) {
+    const anxiety = Clamp((state.anxiety - 45) / 55, 0, 1);
+    const shake = anxiety * anxiety;
+    const targetCameraX = (worldState.cameraX ?? Math.max(0, worldState.x - 7)) + 7;
+    camera.position.set(targetCameraX + Math.sin(time * 17) * shake * .1, 3.4 + Math.cos(time * 14) * shake * .06, 13.5);
+    camera.lookAt(targetCameraX, 3.1, 0);
+    renderer.toneMappingExposure = 1.42 + Math.sin(time * 8) * shake * .06;
+    scene.background.setRGB(.028 + shake * .075, .034 - shake * .01, .06 + shake * .012);
+  }
+  UpdateLocationIndicator();
   UpdateInteractionPrompt();
   renderer.render(scene, camera);
 }
@@ -736,8 +949,17 @@ function RenderHud() {
   const project = state.project;
   const template = project ? FindProject(project.templateId) : null;
   const gameType = project ? FindGameType(project.gameTypeId) : null;
+  const studioName = state.studioName || "尚未成立";
+  dom.studioNameHud.textContent = studioName;
+  dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
   dom.cashValue.textContent = FormatMoney(state.cash);
+  const startupLoan = state.startupLoan;
+  dom.startupDebtValue.textContent = startupLoan?.status === "repaid"
+    ? "已结清"
+    : startupLoan?.status === "defaulted"
+      ? "已清算"
+      : `M${String(startupLoan?.dueMonth || STARTUP_LOAN_TERMS.dueMonth).padStart(2, "0")} / ${FormatGoalMoney(startupLoan?.remaining ?? STARTUP_LOAN_TERMS.totalDue)}`;
   dom.revenueValue.textContent = `${FormatGoalMoney(state.gameRevenue)} / 100亿元`;
   const directProgress = Clamp(state.gameRevenue / state.revenueGoal, 0, 1);
   const readableProgress = state.gameRevenue > 0
@@ -749,14 +971,13 @@ function RenderHud() {
   dom.hungerValue.textContent = Math.round(state.hunger);
   dom.anxietyBar.style.width = `${Clamp(state.anxiety, 0, 100)}%`;
   dom.anxietyValue.textContent = Math.round(state.anxiety);
-  dom.sceneVignette.style.opacity = String(.72 + Clamp(state.anxiety / 100, 0, 1) * .28);
-  dom.projectTitle.textContent = template?.title || "先开一家公司";
-  dom.projectType.textContent = gameType ? `${gameType.name} · ${project.isReleased ? `v${project.version}.0 已上线` : `开发第 ${project.age + 1} 月`}` : "尚未立项";
+  dom.sceneVignette.style.opacity = String(.38 + Clamp(state.anxiety / 100, 0, 1) * .4);
+  dom.projectTitle.textContent = project?.name ? `《${project.name}》` : template?.title || "先开一家公司";
   const tensions = project ? CalculateTensions(project) : [];
   const anxietyState = GetAnxietyState(state.anxiety);
   dom.missionText.textContent = tensions[0]?.title
     || project?.buildStatus?.detail
-    || `${anxietyState.label}。移动到设施旁按 E。`;
+    || (gameType ? `${gameType.name} · ${project.isReleased ? `v${project.version}.0 已上线` : `开发第 ${project.age + 1} 月`} · ${anxietyState.label}` : `${anxietyState.label}。移动到对应地点按 E。`);
   dom.moduleStrip.innerHTML = MODULE_KEYS.map((moduleKey) => {
     const value = project?.modules?.[moduleKey] || 0;
     const meta = MODULE_META[moduleKey];
@@ -828,19 +1049,23 @@ function RenderLog(limit = 5) {
     <div class="logLine"><b>M${String(line.month || state.month).padStart(2, "0")}</b><span>${EscapeHtml(line.text || line.message || String(line))}</span></div>`).join("")}</div>` : `<p class="panelIntro">项目群暂时安静得可疑。</p>`;
 }
 
-function OpenFoodSheet() {
-  OpenPanel("FRIDGE · MONTHLY FUEL", "冰箱：决定这个月怎么活", `
-    <p class="panelIntro">食物不是装饰。选择会在月结时扣钱，并直接影响饥饿、焦虑和全组有效产出。</p>
-    <div class="worldGrid three">${FOOD_PLANS.map((food) => `
+function OpenFoodSheet(planId, placeName) {
+  const plan = FindFoodPlan(planId);
+  if (!plan) return;
+  const options = planId === "leftovers" ? [plan, FindFoodPlan("skip")] : [plan];
+  OpenPanel("FOOD IS PRODUCTION", placeName, `
+    <p class="panelIntro">你是在决定这个月的主要吃法。月结时扣钱，并直接改变饥饿、焦虑和整个团队的有效产出。</p>
+    <div class="worldGrid">${options.map((food) => `
       <button class="worldChoice ${state.foodPlan === food.id ? "selected" : ""}" data-food-id="${food.id}" type="button">
         <div class="choiceTop"><strong>${food.icon} ${EscapeHtml(food.name)}</strong><span>${FormatMoney(food.monthlyCost)}/月</span></div>
         <p>${EscapeHtml(food.description)}</p>
         <div class="choiceFooter"><span>饥饿 ${food.hungerDelta >= 0 ? "+" : ""}${food.hungerDelta}</span><b>产出 ×${food.outputMultiplier}</b></div>
-      </button>`).join("")}</div>`, () => {
+      </button>`).join("")}</div>
+    <div class="noteList"><div class="note ${planId === "feast" ? "good" : ""}">${state.foodPlan === planId ? "本月已经决定在这里解决吃饭。" : `当前吃法：${EscapeHtml(FindFoodPlan(state.foodPlan)?.name || "未知")}`}</div></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const button = event.target.closest("[data-food-id]");
       if (!button) return;
-      if (ApplyInteractiveResult(SelectFoodPlan(state, button.dataset.foodId))) OpenFoodSheet();
+      if (ApplyInteractiveResult(SelectFoodPlan(state, button.dataset.foodId))) OpenFoodSheet(planId, placeName);
     };
   });
 }
@@ -859,12 +1084,34 @@ function OpenInvestmentSheet(staffId) {
         <p>${EscapeHtml(plan.description)}</p><div class="choiceFooter"><span>产出 ×${plan.outputMultiplier}</span><b>质量 +${Math.round(plan.qualityBonus * 100)}%</b></div>
       </button>`;
     }).join("")}</div>
-    <div class="panelSection"><button class="miniButton" data-back type="button">← 返回人才机</button></div>`, () => {
+    <div class="panelSection"><button class="miniButton" data-back type="button">← 返回人才市场</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-back]")) return OpenTalentSheet();
       const button = event.target.closest("[data-level]");
       if (!button) return;
       if (ApplyInteractiveResult(SetStaffInvestmentLevel(state, staffId, Number(button.dataset.level)))) OpenInvestmentSheet(staffId);
+    };
+  });
+}
+
+function OpenEquipmentSheet() {
+  const count = state.workstations || 0;
+  const nextCost = WORKSTATION_COSTS[count];
+  const freeSeats = Math.max(0, count - state.team.length);
+  OpenPanel("EQUIPMENT COUNTER", "人才市场：先买设备，再谈梦想", `
+    <p class="panelIntro">老板自己的电脑只能老板用。大学生和 AI 每人都要占一套额外工位：电脑、显示器、桌椅和一只假装能保护颈椎的支架。员工离开后，设备会留下。</p>
+    <div class="metricGrid">
+      <div class="metricTile"><span>已购工位</span><strong>${count}/4</strong></div>
+      <div class="metricTile"><span>已被占用</span><strong>${state.team.length}</strong></div>
+      <div class="metricTile"><span>空工位</span><strong>${freeSeats}</strong></div>
+    </div>
+    <div class="workstationPreview">${WORKSTATION_COSTS.map((cost, index) => `<div class="${index < count ? "owned" : index === count ? "next" : ""}"><span>${index < count ? "✓" : index + 1}</span><strong>工位 ${index + 1}</strong><small>${index < count ? "已经搬回家" : FormatMoney(cost)}</small></div>`).join("")}</div>
+    <div class="noteList"><div class="note danger">第一次招聘也不例外：没有第一套设备，就不能雇第一个人或租第一个 AI。</div></div>
+    <div class="panelSection choiceFooter"><span>${nextCost ? `下一套设备 ${FormatMoney(nextCost)}` : "家里已经塞不下第五套"}</span><button class="primaryButton" data-buy-workstation type="button" ${!nextCost || state.cash < nextCost ? "disabled" : ""}>${nextCost ? `购买第 ${count + 1} 套` : "已买满"}</button></div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      if (!event.target.closest("[data-buy-workstation]")) return;
+      const result = PurchaseWorkstation(state);
+      if (ApplyInteractiveResult(result, { rebuildStaff: true, tone: "warning" })) OpenEquipmentSheet();
     };
   });
 }
@@ -878,18 +1125,20 @@ function OpenTalentSheet() {
       <div class="staffTop"><strong style="color:${staff.color}">${EscapeHtml(staff.name)} · ${EscapeHtml(staff.role)}</strong><span>${EscapeHtml(staff.kind === "ai" ? "AI 月租" : "大学生工资")}</span></div>
       <p>${EscapeHtml(staff.tagline)}<br>${EscapeHtml(staff.intro)}</p>
       <div class="chipRow"><span class="chip">${EscapeHtml(MODULE_META[staff.specialty].label)}</span><span class="chip">${EscapeHtml(staff.quirk)}</span><span class="chip">${FormatMoney(hired ? GetMemberMonthlyCost(member) : staff.monthlyCost)}/月</span></div>
-      <div class="choiceFooter" style="margin-top:9px"><span>${hired ? "已占用一张工位" : "雇了下月开始烧钱"}</span><span>${hired
+      <div class="choiceFooter" style="margin-top:9px"><span>${hired ? "已占用一套设备" : state.team.length < state.workstations ? "有空工位，雇了下月开始烧钱" : "没有空工位"}</span><span>${hired
         ? `<button class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}" type="button">聊聊</button> <button class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}" type="button">调待遇</button> <button class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}" type="button">${staff.kind === "ai" ? "退订" : "开除"}</button>`
-        : `<button class="miniButton" data-staff-action="hire" data-staff-id="${staff.id}" type="button">${staff.kind === "ai" ? "开始月租" : "雇佣"}</button>`}</span></div>
+        : `<button class="miniButton" data-staff-action="hire" data-staff-id="${staff.id}" type="button" ${state.team.length >= state.workstations ? "disabled" : ""}>${staff.kind === "ai" ? "开始月租" : "雇佣"}</button>`}</span></div>
     </article>`;
   };
-  OpenPanel("TALENT VENDING MACHINE", `人才机 · ${state.team.length}/4 工位`, `
-    <p class="panelIntro">大学生有真实姓名、工资和情绪；AI 有月租、上下文漂移和自动续费。当前预计人力成本 ${FormatMoney(costs.studentWages + costs.aiRent)}/月。</p>
+  OpenPanel("TALENT MARKET", `人才市场 · ${state.team.length}/${state.workstations || 0} 工位`, `
+    <p class="panelIntro">大学生有真实姓名、工资和情绪；AI 有月租、上下文漂移和自动续费。当前预计人力成本 ${FormatMoney(costs.studentWages + costs.aiRent)}/月。${state.workstations ? "" : "你还没买第一套员工设备。"}</p>
+    <div class="choiceFooter"><span>设备不会随员工离开，但每个人都必须有空工位</span><button class="miniButton" data-equipment type="button">去设备柜台</button></div>
     <div class="sectionHeading"><strong>大学生</strong><span>加薪提升有限，但会少想跑路</span></div>
     <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderStaffCard).join("")}</div>
     <div class="panelSection sectionHeading"><strong>AI 订阅</strong><span>贵模型速度和质量提升更明显</span></div>
     <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderStaffCard).join("")}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-equipment]")) return OpenEquipmentSheet();
       const button = event.target.closest("[data-staff-action]");
       if (!button) return;
       const staffId = button.dataset.staffId;
@@ -965,7 +1214,7 @@ function OpenAiTerminalSheet() {
       ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div><p>${EscapeHtml(staff.intro)}</p></button>`).join("")}
     </div>
     <div class="panelSection sectionHeading"><strong>群聊最近的精神状态</strong><span>点击成员也可先聊垃圾话</span></div>
-    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<span class="chip">没人。去人才机雇一个会回消息的。</span>`}</div>`, () => {
+    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<span class="chip">没人。先去人才市场买设备，再雇一个会回消息的。</span>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const chat = event.target.closest("[data-chat-id]");
       if (chat) return OpenStaffSheet(chat.dataset.chatId);
@@ -975,13 +1224,47 @@ function OpenAiTerminalSheet() {
   });
 }
 
+function OpenHomeComputerSheet() {
+  const evaluation = EvaluateProject(state);
+  const loan = state.startupLoan;
+  const monthsLeft = loan?.status === "active" ? Math.max(0, loan.dueMonth - state.month + 1) : 0;
+  OpenPanel("HOME COMPUTER", `家里的电脑 · 《${EscapeHtml(state.project.name)}》`, `
+    <p class="panelIntro">这是老板唯一不需要额外购买的工位。开发、对话、项目方向、宣发、发布和月结都从这台电脑处理；员工只能使用你另买的设备。</p>
+    <div class="metricGrid">
+      <div class="metricTile"><span>当前预估评分</span><strong>${evaluation.rating.toFixed(1)}</strong></div>
+      <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
+      <div class="metricTile"><span>启动贷</span><strong>${loan?.status === "repaid" ? "已清" : `${monthsLeft} 月 / ${FormatGoalMoney(loan?.remaining || 0)}`}</strong></div>
+    </div>
+    <div class="computerActions">
+      ${MODULE_KEYS.map((moduleKey) => { const meta = MODULE_META[moduleKey]; return `<button data-computer-action="work" data-module-key="${moduleKey}" type="button"><span style="color:${meta.color}">${meta.icon}</span><strong>${meta.label}开发</strong><small>${Math.round(state.project.modules[moduleKey])} / 100</small></button>`; }).join("")}
+      <button data-computer-action="chat" type="button"><span>▤</span><strong>群聊 / 垃圾话</strong><small>自己、大学生、AI</small></button>
+      <button data-computer-action="direction" type="button"><span>⌁</span><strong>项目方向</strong><small>策略、玩法、换赛道</small></button>
+      <button data-computer-action="marketing" type="button"><span>◈</span><strong>线上宣发</strong><small>吹大了就退款</small></button>
+      <button data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "发布更新" : "提交商店"}</strong><small>${state.project.age < 2 ? "至少再熬两个月" : "评分差也能发"}</small></button>
+      <button class="danger" data-computer-action="month" type="button"><span>◷</span><strong>熬完这个月</strong><small>工资、房租、饭钱一起扣</small></button>
+    </div>
+    <div class="panelSection">${RenderLog(5)}</div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      const button = event.target.closest("[data-computer-action]");
+      if (!button) return;
+      const action = button.dataset.computerAction;
+      if (action === "work") return OpenWorkstationSheet({ moduleKey: button.dataset.moduleKey });
+      if (action === "chat") return OpenAiTerminalSheet();
+      if (action === "direction") return OpenDirectiveSheet();
+      if (action === "marketing") return OpenMarketingSheet();
+      if (action === "release") return OpenReleaseSheet();
+      if (action === "month") return OpenMonthSheet();
+    };
+  });
+}
+
 function OpenWorkstationSheet(interaction) {
   const moduleKey = interaction.moduleKey;
   const meta = MODULE_META[moduleKey];
   const workers = state.team.map((member) => ({ member, staff: FindStaff(member.id) })).filter((item) => item.staff?.specialty === moduleKey);
   const relatedTensions = CalculateTensions(state.project).filter((tension) => tension.from === moduleKey || tension.to === moduleKey);
-  OpenPanel("REALTIME WORKSTATION", `${meta.icon} ${meta.label}工位`, `
-    <p class="panelIntro">在场景里亲自干活会立刻得到 2–4 点低质量进度，也会产生 Bug、范围债和技术债。老板每月最多硬干三次。</p>
+  OpenPanel("OWNER WORK", `${meta.icon} 老板亲自做${meta.label}`, `
+    <p class="panelIntro">你坐回家里唯一的电脑亲自干活：立刻得到 2–4 点低质量进度，也会产生 Bug、范围债和技术债。老板每月最多硬干三次。</p>
     ${RenderBar(`${meta.label}进度`, state.project.modules[moduleKey], meta.color)}
     <div class="metricGrid">
       <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
@@ -989,8 +1272,8 @@ function OpenWorkstationSheet(interaction) {
       <div class="metricTile"><span>技术债 / 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
     <div class="panelSection choiceFooter"><span>${EscapeHtml(meta.description)}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>亲自干一次</button></div>
-    <div class="panelSection sectionHeading"><strong>这个工位上的人</strong><span>${workers.length ? "月结时才产出" : "目前只有老板的背影"}</span></div>
-    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<button class="miniButton" data-talent type="button">去人才机找人</button>`}</div>
+    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
+    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<button class="miniButton" data-talent type="button">去人才市场找人</button>`}</div>
     ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-talent]")) return OpenTalentSheet();
@@ -1006,8 +1289,15 @@ function OpenWorkstationSheet(interaction) {
 function OpenBankSheet() {
   const costs = ForecastMonthlyCosts(state);
   const activeLoans = state.loans.filter((loan) => loan.status === "active");
-  OpenPanel("COLLATERAL BANK", "抵押银行：未来的你已读不回", `
-    <p class="panelIntro">贷款只增加现金，不算游戏收入。月供在月结时扣；断供会没收抵押物。开发电脑一旦抵押，立即结束。</p>
+  const startupLoan = state.startupLoan;
+  const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
+  OpenPanel("BANK", "银行：成立仪式的掌声已经开始计息", `
+    <p class="panelIntro">最上面那笔创业启动贷来自你的全部身家：没有月供缓冲，到期必须清零。其他抵押贷按月扣款；开发电脑一旦抵押，立即结束。</p>
+    <section class="startupLoanCard ${startupLoan?.status || "pending"}">
+      <div><span>创业启动贷 · 全部身家担保</span><strong>${startupLoan?.status === "repaid" ? "已结清" : `尚欠 ${FormatMoney(startupLoan?.remaining || 0)}`}</strong><small>${startupLoan?.status === "active" ? `距离 M${String(startupLoan.dueMonth).padStart(2, "0")} 清算还有 ${monthsLeft} 个月` : startupLoan?.status === "repaid" ? "公司暂时重新属于你" : "等待合同生效"}</small></div>
+      <div class="loanDeadline"><b>${startupLoan?.status === "repaid" ? "✓" : `M${String(startupLoan?.dueMonth || 0).padStart(2, "0")}`}</b><span>${startupLoan?.status === "repaid" ? "PAID" : "DEADLINE"}</span></div>
+    </section>
+    ${startupLoan?.status === "active" ? `<div class="loanPaymentRow"><button data-startup-payment="10000" type="button" ${state.cash < 10000 ? "disabled" : ""}>先还 ¥10,000</button><button data-startup-payment="30000" type="button" ${state.cash < 30000 ? "disabled" : ""}>先还 ¥30,000</button><button data-startup-payment="full" type="button" ${state.cash < startupLoan.remaining ? "disabled" : ""}>一次结清 ${FormatMoney(startupLoan.remaining)}</button></div>` : ""}
     <div class="metricGrid">
       <div class="metricTile"><span>下月总成本</span><strong>${FormatMoney(costs.total)}</strong></div>
       <div class="metricTile"><span>现有贷款月供</span><strong>${FormatMoney(costs.loanPayments)}</strong></div>
@@ -1021,8 +1311,15 @@ function OpenBankSheet() {
       </button>`;
     }).join("")}</div>
     <div class="panelSection sectionHeading"><strong>贷款簿</strong><span>${activeLoans.length} 笔还在追你</span></div>
-    <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · 剩 ${loan.remaining} 期 · 月供 ${FormatMoney(loan.monthlyPayment)}</div>`; }).join("") : `<div class="note good">暂时没有贷款。银行替你感到遗憾。</div>`}</div>`, () => {
+    <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · 剩 ${loan.remaining} 期 · 月供 ${FormatMoney(loan.monthlyPayment)}</div>`; }).join("") : `<div class="note good">没有追加抵押贷。但创业启动贷仍然算贷款。</div>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
+      const startupPayment = event.target.closest("[data-startup-payment]");
+      if (startupPayment) {
+        const value = startupPayment.dataset.startupPayment === "full" ? "full" : Number(startupPayment.dataset.startupPayment);
+        const result = RepayStartupLoan(state, value);
+        if (ApplyInteractiveResult(result, { tone: result?.repaid ? "good" : "normal" })) OpenBankSheet();
+        return;
+      }
       const button = event.target.closest("[data-collateral-id]");
       if (!button) return;
       const asset = FindCollateral(button.dataset.collateralId);
@@ -1071,7 +1368,7 @@ function OpenSpeculationSheet() {
 
 function OpenDirectiveSheet() {
   const pivotCost = ForecastPivotCost(state);
-  OpenPanel("WALL OF CHANGING MINDS", "失控白板：方向、玩法与换赛道", `
+  OpenPanel("PROJECT DOCUMENT", "电脑里的项目文档：方向、玩法与换赛道", `
     <p class="panelIntro">策略只在本月月结时生效。美术过强会压垮性能，策划飞太高会让客户端接不住；联调不是口号，是防止产出被直接浪费。</p>
     <div class="worldGrid three">${DIRECTIVES.map((directive) => `
       <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive-id="${directive.id}" type="button">
@@ -1105,7 +1402,7 @@ function OpenDirectiveSheet() {
 }
 
 function OpenMarketingSheet() {
-  OpenPanel("HYPE BEFORE QUALITY", "宣发墙：先吹，还是先做", `
+  OpenPanel("HYPE BEFORE QUALITY", "电脑：先吹，还是先做", `
     <p class="panelIntro">宣发提高热度和愿望单，也提高玩家预期。上线质量接不住时，会被喷、退款、掉口碑，甚至把巨额曝光变成巨额处刑。</p>
     <div class="metricGrid">
       <div class="metricTile"><span>累计宣发</span><strong>${FormatMoney(state.project.marketingSpent)}</strong></div>
@@ -1164,7 +1461,7 @@ function OpenReleaseSheet() {
   const evaluation = EvaluateProject(state);
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const tensions = evaluation?.tensions || [];
-  OpenPanel("SHIP IT / REGRET IT", state.project.isReleased ? "上线闸门：发布更新" : "上线闸门：把垃圾推出去", `
+  OpenPanel("SHIP IT / REGRET IT", state.project.isReleased ? `《${EscapeHtml(state.project.name)}》发布更新` : `把《${EscapeHtml(state.project.name)}》提交商店`, `
     <div class="resultHero"><b>${evaluation.rating.toFixed(1)}</b><p>当前预测评分。${EscapeHtml(state.project.buildStatus.detail)}<br>${tensions[0] ? EscapeHtml(tensions[0].description) : "四模块暂时没互相掐死。"}</p></div>
     <div class="metricGrid">
       <div class="metricTile"><span>开发时长</span><strong>${state.project.age} 个月</strong></div>
@@ -1192,13 +1489,16 @@ function OpenReleaseSheet() {
 function OpenMonthSheet() {
   const costs = ForecastMonthlyCosts(state);
   const shortfall = Math.max(0, costs.total - state.cash - (state.project.isReleased ? state.project.monthlyRevenue : 0));
-  OpenPanel("END THE MONTH", "下班门：让所有痛苦一起结算", `
-    <p class="panelIntro">穿过这扇门，工资、AI 月租、房租水电、车贷房贷、饭钱和贷款月供一起扣；随后团队才开始产出。钱不够会退订、开人、断供、挨饿或丢东西。</p>
+  const startupLoan = state.startupLoan;
+  const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
+  OpenPanel("END THE MONTH", "电脑：保存、关机，让所有痛苦一起结算", `
+    <p class="panelIntro">点击关机后，工资、AI 月租、房租水电、车贷房贷、饭钱和贷款月供一起扣；随后团队才开始产出。钱不够会退订、开人、断供、挨饿或丢东西。</p>
     <div class="metricGrid">
       <div class="metricTile"><span>现金</span><strong>${FormatMoney(state.cash)}</strong></div>
       <div class="metricTile"><span>预计总支出</span><strong>${FormatMoney(costs.total)}</strong></div>
       <div class="metricTile"><span>危险缺口</span><strong>${FormatMoney(shortfall)}</strong></div>
     </div>
+    ${startupLoan?.status === "active" ? `<div class="noteList"><div class="note danger">启动贷还剩 ${FormatMoney(startupLoan.remaining)}，M${String(startupLoan.dueMonth).padStart(2, "0")} 月结时强制检查。当前还剩 ${monthsLeft} 个结算月；到期未清直接倒闭。</div></div>` : `<div class="noteList"><div class="note good">创业启动贷已经结清，这个月不会因成立合同被清算。</div></div>`}
     <div class="panelSection worldGrid three">
       <div class="worldChoice"><div class="choiceTop"><strong>生活硬账</strong><span>${FormatMoney(costs.living)}</span></div><p>工作室、房贷、车贷、水电网。现实世界的四大模块。</p></div>
       <div class="worldChoice"><div class="choiceTop"><strong>人类工资</strong><span>${FormatMoney(costs.studentWages)}</span></div><p>大学生也要活着，且比老板更懂劳动法。</p></div>
@@ -1227,6 +1527,7 @@ function OpenMonthSheet() {
           ${(result.painEvents || []).slice(0, 5).map((note) => `<div class="note danger">${EscapeHtml(note)}</div>`).join("")}
           ${removed.map((staff) => `<div class="note danger">付不起费用，${EscapeHtml(staff.name)} ${staff.kind === "ai" ? "被自动退订" : "收拾东西走了"}。</div>`).join("")}
           ${defaults.map((loan) => `<div class="note danger">贷款断供：${EscapeHtml(FindCollateral(loan.collateralId)?.name || loan.collateralId)} 被没收。</div>`).join("")}
+          ${finance.startupDefault ? `<div class="note danger">创业启动贷到期未清，全部身家被处置，公司进入强制清算。</div>` : ""}
           ${finance.skippedFood ? `<div class="note danger">饭钱没付出来，本月自动改成硬扛不吃。</div>` : ""}
           ${finance.appliedEvents?.map((liveEvent) => `<div class="note danger">收入事件：${EscapeHtml(liveEvent.title)}，流水乘数 ×${liveEvent.multiplier}。</div>`).join("") || ""}
           ${result.anxiety.idea ? `<div class="note good">焦虑迸发抽象创意：${EscapeHtml(result.anxiety.idea.title)}——${EscapeHtml(result.anxiety.idea.pitch)}</div>` : ""}
@@ -1237,13 +1538,14 @@ function OpenMonthSheet() {
 }
 
 function OpenHelpSheet() {
-  OpenPanel("HOW TO SUFFER", "这不是经营表：你得跑过去", `
-    <div class="resultHero"><b>A/D</b><p>左右跑；W、↑ 或空格跳；靠近设施按 E。移动端横屏使用屏幕底部四个按钮。</p></div>
+  OpenPanel("HOW TO SUFFER", "六个 2D 场景：你得亲自跑过去", `
+    <div class="resultHero"><b>A/D</b><p>左右穿过自己的家、小菜馆、小超市、人才市场、银行和大酒店；W、↑ 或空格跳；靠近柜台按 E。移动端横屏使用底部按钮。</p></div>
     <div class="noteList">
-      <div class="note">跳上平台捡发光需求碎片，会让老板亲自完成一次低质量开发，同时更饿、更焦虑、债更多。</div>
-      <div class="note danger">红色移动 Bug 会撞掉“今天还能扛几次”的体力并提高焦虑；被撞趴会回到入口。</div>
-      <div class="note">所有业务都在世界里：冰箱吃饭、人才机雇人、工位开发、白板换方向、宣发墙吹牛、发布门上线、下班门月结。</div>
-      <div class="note good">唯一胜利：累计游戏收入达到 100 亿元。贷款、彩票和炒股发财都不算。</div>
+      <div class="note">家里只有老板自己的电脑。开发、聊天、宣发、发布和月结都在电脑上完成。</div>
+      <div class="note danger">第一次招聘前必须先在人才市场设备柜台买第一套工位；以后每增加一人都要再有一套空设备。</div>
+      <div class="note">冰箱是剩饭，小菜馆是充饥套餐，小超市卖小吃和彩票，大酒店才有能提升产出的大餐。</div>
+      <div class="note danger">启动资金 ¥68,000 全部来自身家担保贷款，M08 前要还 ¥82,000；到期未清直接倒闭。</div>
+      <div class="note good">唯一胜利仍是累计游戏收入达到 100 亿元。贷款、彩票和炒股发财都不算。</div>
     </div>
     <div class="panelSection">${RenderLog(6)}</div>`);
 }
@@ -1255,7 +1557,8 @@ function RenderEnding() {
   dom.modalLayer.classList.add("hidden");
   dom.resultLayer.classList.add("hidden");
   dom.endingTitle.textContent = state.outcome?.title || (state.status === "ended" ? "你影响了世界" : "工作室倒下了");
-  dom.endingSubtitle.textContent = state.outcome?.subtitle || "至少电脑在日志里留下了最后一句话。";
+  const identity = [state.studioName, state.project?.name ? `《${state.project.name}》` : ""].filter(Boolean).join(" · ");
+  dom.endingSubtitle.textContent = `${identity}${identity ? "｜" : ""}${state.outcome?.subtitle || "至少电脑在日志里留下了最后一句话。"}`;
   dom.endingStats.innerHTML = `
     <div><span>撑过</span><strong>${state.month} 个月</strong></div>
     <div><span>游戏收入</span><strong>${FormatGoalMoney(state.gameRevenue)}</strong></div>
@@ -1265,16 +1568,21 @@ function RenderEnding() {
 
 function BeginWorld(nextState) {
   state = nextState;
+  onboardingPhase = "game";
   landingOpen = false;
   worldState = CreateWorldState(state.month);
   dom.setupScreen.classList.add("hidden");
+  dom.setupScreen.classList.remove("cinematic");
   dom.endingScreen.classList.add("hidden");
+  document.body.classList.remove("onboarding");
+  SetPlayableWorldVisible(true);
   SaveState();
   RebuildStaffActors();
   BuildCollectibles();
   BuildHazards();
   RenderHud();
   UpdateWorldFromGameState();
+  UpdateLocationIndicator();
   if (state.status !== "playing") RenderEnding();
 }
 
@@ -1284,19 +1592,141 @@ function TriggerInteraction() {
   PlayTone("tap");
   if (activeInteraction.kind === "staff") return OpenStaffSheet(activeInteraction.staffId);
   switch (activeInteraction.kind) {
-    case "fridge": return OpenFoodSheet();
+    case "homeComputer": return OpenHomeComputerSheet();
+    case "homeFridge": return OpenFoodSheet("leftovers", "自己家的冰箱");
+    case "diner": return OpenFoodSheet("sustenance", "小菜馆：便宜充饥套餐");
+    case "snackShelf": return OpenFoodSheet("snack", "小超市：买点小吃顶一顶");
+    case "hotel": return OpenFoodSheet("feast", "大酒店：吃顿像人的饭");
     case "bank": return OpenBankSheet();
     case "lotteryMachine": return OpenSpeculationSheet();
-    case "talentMachine": return OpenTalentSheet();
-    case "workstation": return OpenWorkstationSheet(activeInteraction);
-    case "whiteboard": return OpenDirectiveSheet();
-    case "promoSign": return OpenMarketingSheet();
-    case "releaseDoor": return OpenReleaseSheet();
-    case "monthCalendar":
-    case "offWorkDoor": return OpenMonthSheet();
-    case "aiTerminal": return OpenAiTerminalSheet();
+    case "equipmentShop": return OpenEquipmentSheet();
+    case "talentMarket": return OpenTalentSheet();
     default: ShowToast("这个物件还在等需求评审。", "warning");
   }
+}
+
+function StartFoundingCeremony() {
+  onboardingPhase = "cinematic";
+  ceremonyElapsed = 0;
+  ceremonyBurstStep = -1;
+  landingOpen = true;
+  dom.ceremonyIntro.classList.add("hidden");
+  dom.foundingNamePanel.classList.add("hidden");
+  dom.projectContract.classList.add("hidden");
+  dom.skipCeremonyButton.classList.remove("hidden");
+  dom.ceremonyCaption.classList.remove("hidden");
+  dom.setupScreen.classList.add("cinematic");
+  document.body.classList.add("onboarding");
+  SetPlayableWorldVisible(false);
+  PlayTone("good");
+}
+
+function ConfirmStudioName() {
+  const proposedName = dom.studioNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
+  if (proposedName.length < 2) {
+    dom.setupError.textContent = "至少取两个字。一个标点符号还承担不起全部身家。";
+    dom.studioNameInput.focus();
+    PlayTone("warning");
+    return;
+  }
+  draftStudioName = proposedName.slice(0, 18);
+  dom.setupError.textContent = "";
+  dom.contractStudioName.textContent = draftStudioName;
+  dom.contractSignatureName.textContent = draftStudioName;
+  ReplaceCeremonyPlaque(draftStudioName);
+  dom.foundingNamePanel.classList.add("hidden");
+  onboardingPhase = "plaque";
+  ceremonyElapsed = 0;
+  ceremonyBurstStep = 0;
+  PlayTone("good");
+}
+
+function CancelSealHold() {
+  if (sealHoldComplete) return;
+  window.clearTimeout(sealHoldTimer);
+  sealHoldTimer = null;
+  sealKeyboardMode = false;
+  dom.sealButton.classList.remove("holding");
+}
+
+function CompleteContractSigning() {
+  if (sealHoldComplete) return;
+  const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
+  if (projectName.length < 2) {
+    dom.contractError.textContent = "游戏名至少两个字。不能把商店页标题留给发行平台猜。";
+    CancelSealHold();
+    dom.gameNameInput.focus();
+    PlayTone("warning");
+    return;
+  }
+  const fresh = CreateInitialState();
+  const result = StartProject(fresh, selectedProjectId, selectedGameTypeId, {
+    studioName: draftStudioName,
+    projectName,
+  });
+  if (!result.ok) {
+    dom.contractError.textContent = result.message;
+    CancelSealHold();
+    return;
+  }
+  sealHoldComplete = true;
+  sealHoldTimer = null;
+  onboardingPhase = "signing";
+  dom.sealButton.classList.remove("holding");
+  dom.sealButton.classList.add("sealed");
+  dom.sealButton.querySelector("span").textContent = "合同生效";
+  dom.sealButton.querySelector("strong").textContent = "已签字盖章";
+  dom.projectContract.classList.add("signed");
+  dom.contractError.textContent = "合同已生效。银行倒计时与公司同时启动。";
+  SpawnParticles(6, 3.7, 0xff445f, 48);
+  PlayTone("release");
+  window.setTimeout(() => BeginWorld(result.state), 1250);
+}
+
+function BeginSealHold(event) {
+  if (sealHoldComplete || onboardingPhase !== "contract") return;
+  if (event.type === "pointerdown" && event.button !== 0) return;
+  event.preventDefault();
+  const projectName = dom.gameNameInput.value.trim();
+  if (projectName.length < 2) {
+    dom.contractError.textContent = "先写游戏名，再按住公章。";
+    dom.gameNameInput.focus();
+    PlayTone("warning");
+    return;
+  }
+  dom.contractError.textContent = "按住不松手，直到公章真的落下。";
+  sealKeyboardMode = event.type === "keydown";
+  dom.sealButton.classList.add("holding");
+  window.clearTimeout(sealHoldTimer);
+  sealHoldTimer = window.setTimeout(CompleteContractSigning, 1050);
+}
+
+function ResetOnboarding() {
+  onboardingPhase = "intro";
+  ceremonyElapsed = 0;
+  ceremonyBurstStep = -1;
+  sealHoldComplete = false;
+  CancelSealHold();
+  draftStudioName = "";
+  landingOpen = true;
+  BuildCeremonyScene();
+  SetPlayableWorldVisible(false);
+  document.body.classList.add("onboarding");
+  dom.setupScreen.classList.remove("hidden", "cinematic");
+  dom.ceremonyIntro.classList.remove("hidden");
+  dom.foundingNamePanel.classList.add("hidden");
+  dom.projectContract.classList.add("hidden");
+  dom.projectContract.classList.remove("signed");
+  dom.skipCeremonyButton.classList.add("hidden");
+  dom.ceremonyCaption.classList.add("hidden");
+  dom.studioNameInput.value = "";
+  dom.gameNameInput.value = "";
+  dom.setupError.textContent = "";
+  dom.contractError.textContent = "";
+  dom.sealButton.classList.remove("holding", "sealed");
+  dom.sealButton.querySelector("span").textContent = "按住 1 秒";
+  dom.sealButton.querySelector("strong").textContent = "签字盖章";
+  RenderSetupChoices();
 }
 
 function SetMovement(key, pressed) {
@@ -1318,7 +1748,7 @@ function BindHoldButton(button, key) {
 
 function BindControls() {
   window.addEventListener("resize", ResizeScene);
-  window.addEventListener("blur", () => { inputState.left = false; inputState.right = false; inputState.jump = false; });
+  window.addEventListener("blur", () => { inputState.left = false; inputState.right = false; inputState.jump = false; CancelSealHold(); });
   window.addEventListener("keydown", (event) => {
     if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) event.preventDefault();
@@ -1349,7 +1779,11 @@ function BindControls() {
   dom.projectChoices.addEventListener("click", (event) => {
     const button = event.target.closest("[data-project-id]");
     if (!button) return;
+    const oldTemplate = FindProject(selectedProjectId)?.title?.replace(/[《》]/g, "") || "";
     selectedProjectId = button.dataset.projectId;
+    if (!dom.gameNameInput.value.trim() || dom.gameNameInput.value.trim() === oldTemplate) {
+      dom.gameNameInput.value = FindProject(selectedProjectId)?.title?.replace(/[《》]/g, "") || "";
+    }
     RenderSetupChoices();
   });
   dom.typeChoices.addEventListener("click", (event) => {
@@ -1358,10 +1792,37 @@ function BindControls() {
     selectedGameTypeId = button.dataset.typeId;
     RenderSetupChoices();
   });
-  dom.startButton.addEventListener("click", () => {
-    const fresh = CreateInitialState();
-    const result = StartProject(fresh, selectedProjectId, selectedGameTypeId);
-    if (result.ok) BeginWorld(result.state);
+  dom.ceremonyStartButton.addEventListener("click", StartFoundingCeremony);
+  dom.skipCeremonyButton.addEventListener("click", ShowFoundingNamePanel);
+  dom.studioNameSuggestions.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-studio-name]");
+    if (!button) return;
+    dom.studioNameInput.value = button.dataset.studioName;
+    dom.studioNameInput.focus();
+    PlayTone("tap");
+  });
+  dom.nameConfirmButton.addEventListener("click", ConfirmStudioName);
+  dom.studioNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); ConfirmStudioName(); }
+  });
+  dom.gameNameInput.addEventListener("input", () => { dom.contractError.textContent = ""; });
+  dom.sealButton.addEventListener("pointerdown", BeginSealHold);
+  dom.sealButton.addEventListener("pointerup", CancelSealHold);
+  dom.sealButton.addEventListener("pointercancel", CancelSealHold);
+  dom.sealButton.addEventListener("pointerleave", (event) => { if (event.buttons === 0) CancelSealHold(); });
+  dom.sealButton.addEventListener("contextmenu", (event) => event.preventDefault());
+  dom.sealButton.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key) || event.repeat) return;
+    BeginSealHold(event);
+  });
+  dom.sealButton.addEventListener("keyup", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    if (sealKeyboardMode) {
+      window.clearTimeout(sealHoldTimer);
+      sealHoldTimer = null;
+      sealKeyboardMode = false;
+      CompleteContractSigning();
+    } else CancelSealHold();
   });
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
   dom.restartButton.addEventListener("click", () => {
@@ -1370,16 +1831,15 @@ function BindControls() {
     selectedGameTypeId = GAME_TYPES[0].id;
     localStorage.removeItem(SAVE_KEY);
     savedState = null;
-    landingOpen = true;
     dom.endingScreen.classList.add("hidden");
-    dom.setupScreen.classList.remove("hidden");
-    RenderSetupChoices();
+    ResetOnboarding();
     RenderHud();
   });
 }
 
 function Initialize() {
   BuildRoom();
+  BuildCeremonyScene();
   BuildCollectibles();
   BuildHazards();
   RebuildStaffActors();
@@ -1388,6 +1848,7 @@ function Initialize() {
   RenderHud();
   BindControls();
   UpdateWorldFromGameState();
+  ResetOnboarding();
   window.setTimeout(() => dom.loadingScreen.classList.add("loaded"), 180);
   Animate();
 }
