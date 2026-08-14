@@ -529,7 +529,6 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   state.startupLoan.status = "active";
   state.project = FreshProject(projectId, gameTypeId, projectName);
   PushLog(state, `${studioName} 签下《${projectName}》开发合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
-  PushLog(state, `创始人能力备案：策划 ${state.founderSkills.design} / 程序 ${state.founderSkills.programming} / 美术 ${state.founderSkills.art}。这三行数字会真的进入后续产出。`, "normal");
   PushLog(state, `创业启动贷到账 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}，M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前须还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，逾期整家公司清算。`, "danger");
   PushLog(state, "你宣布目标是游戏收入 100 亿元。所有人礼貌地没有追问依据。", "normal");
   return { state, ok: true, message: "立项成功" };
@@ -2014,7 +2013,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   const consequence = isOwner
-    ? `你以策划 ${GetFounderSkillEffect(state.founderSkills, "design").level} 级亲自开工：不花工资，饥饿 +10、焦虑 +7；能力越高，落地更多、返工更少。`
+    ? `策划 ${GetFounderSkillEffect(state.founderSkills, "design").level}：饥饿 +10，焦虑 +7。`
     : staff.kind === "ai"
       ? `${staff.name} 已生成第一版，并顺手把上下文漂移提高了 9。`
       : `${staff.name} 接下提案，压力 +8；这次至少有人知道需求在说什么。`;

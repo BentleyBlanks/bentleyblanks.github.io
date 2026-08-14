@@ -613,41 +613,20 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .documentButton strong { font-size: 11px; }
 .documentButton:disabled { opacity:.42; cursor:not-allowed; }
 
-.founderProfilePanel { width: min(820px,94vw); max-height: 92vh; padding: 20px 24px 22px; overflow: auto; border: 1px solid #c6b995; transform: rotate(-.12deg); }
-.founderProfileIntro { position: relative; z-index: 1; display: grid; grid-template-columns: 94px 1fr; gap: 16px; align-items: center; margin-top: 12px; }
-.founderProfileIntro .documentKicker { margin-top: 0 !important; }
-.founderProfileIntro h2 { margin: 3px 0 5px; font-size: clamp(24px,3.4vw,36px); }
-.founderProfileIntro p:last-child { max-width: 590px; margin: 0; color: #665c51; font-size: 9px; line-height: 1.55; }
-.founderPortrait { position: relative; height: 92px; overflow: hidden; border: 2px solid #3c322b; background: linear-gradient(145deg,#d9cfb8,#f7f0df); }
-.founderPortrait::before { content:""; position:absolute; inset:0; opacity:.3; background-image:linear-gradient(rgba(65,53,42,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(65,53,42,.18) 1px,transparent 1px); background-size:12px 12px; }
-.founderPortrait i { position:absolute; left:50%; top:15px; width:29px; height:31px; border:3px solid #342b25; border-radius:48% 48% 44% 44%; background:#d9a985; transform:translateX(-50%); }
-.founderPortrait span { position:absolute; left:50%; bottom:-19px; width:64px; height:61px; border:3px solid #342b25; border-radius:44% 44% 10% 10%; background:#6652b9; transform:translateX(-50%); }
-.founderPortrait b { position:absolute; z-index:2; right:5px; bottom:4px; padding:2px 4px; background:#30283d; color:#fff6e5; font-size:6px; letter-spacing:.14em; }
-.founderSkillEditor { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 13px; }
-.founderSkillCard { display: grid; gap: 7px; min-width: 0; padding: 10px; border: 1px solid #b7ad96; border-top: 4px solid var(--skillColor,#6252e5); background: rgba(255,255,255,.34); }
-.founderSkillCard > header { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
-.founderSkillCard > header strong { font: 900 14px/1.1 Georgia,"Songti SC",serif; }
-.founderSkillCard > header span { color:#75685b; font-size:7px; }
-.founderSkillCard p { min-height: 31px; margin:0; color:#6d6054; font-size:7.5px; line-height:1.4; }
-.founderSkillControls { display:grid; grid-template-columns:40px 1fr 40px; gap:5px; align-items:center; }
-.founderSkillControls button { height:40px; border:1px solid #9f927c; background:rgba(255,255,255,.55); color:#342b25; font-size:15px; font-weight:900; cursor:pointer; touch-action:manipulation; }
+.founderProfilePanel { width: min(640px,92vw); padding: 20px 24px 22px; border: 1px solid #c6b995; transform: rotate(-.12deg); }
+.founderSkillEditor { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+.founderSkillCard { display: grid; gap: 14px; min-width: 0; padding: 18px; border: 1px solid #b7ad96; border-top: 4px solid var(--skillColor,#6252e5); background: rgba(255,255,255,.34); }
+.founderSkillCard > header { text-align:center; }
+.founderSkillCard > header strong { font: 900 18px/1.1 Georgia,"Songti SC",serif; }
+.founderSkillControls { display:grid; grid-template-columns:44px 1fr 44px; gap:8px; align-items:center; }
+.founderSkillControls button { height:44px; border:1px solid #9f927c; background:rgba(255,255,255,.55); color:#342b25; font-size:18px; font-weight:900; cursor:pointer; touch-action:manipulation; }
 .founderSkillControls button:disabled { opacity:.28; cursor:not-allowed; }
-.founderSkillLevel { display:grid; justify-items:center; gap:2px; }
-.founderSkillLevel strong { color:var(--skillColor,#6252e5); font-size:16px; }
-.founderSkillLevel small { color:#66594d; font-size:6.5px; }
-.founderSkillDots { display:flex; justify-content:center; gap:3px; }
-.founderSkillDots i { width:12px; height:3px; background:#c7bba3; }
-.founderSkillDots i.active { background:var(--skillColor,#6252e5); }
-.founderSkillImpact { padding-top:6px; border-top:1px dashed #b8ad96; color:#493e34; font-size:7px; line-height:1.35; }
-.founderProfileFooter { position:relative; z-index:1; display:grid; grid-template-columns:minmax(170px,.75fr) 1.25fr; gap:12px; align-items:end; margin-top:10px; }
-.founderProfileFooter > div:first-child { display:grid; gap:2px; }
-.founderProfileFooter strong { font-size:10px; }
+.founderSkillLevel { display:grid; place-items:center; }
+.founderSkillLevel strong { color:var(--skillColor,#6252e5); font-size:34px; }
+.founderProfileFooter { position:relative; z-index:1; display:grid; grid-template-columns:1fr 150px; gap:12px; align-items:center; margin-top:12px; }
+.founderProfileFooter > strong { font-size:12px; }
 .founderProfileFooter strong.invalid { color:#a42435; }
-.founderProfileFooter small { color:#75685b; font-size:7px; line-height:1.4; }
-.founderSkillPresets { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px; }
-.founderSkillPresets button { min-height:32px; padding:5px 7px; border:1px solid #aa9d86; background:rgba(255,255,255,.4); color:#51463b; font-size:7px; cursor:pointer; touch-action:manipulation; }
-.founderSkillPresets button.selected { border-color:#30283d; background:#30283d; color:#fff; }
-.founderProfilePanel .documentButton { min-height:44px; }
+.founderProfilePanel .documentButton { min-height:44px; margin:0; justify-content:center; }
 
 .projectContract { width: min(940px,94vw); max-height: 92vh; padding: 17px 22px 18px; overflow: auto; border: 1px solid #c6b995; transform: rotate(.16deg); }
 .projectContract > header { position: sticky; top: -17px; z-index: 4; padding: 11px 0 9px; background: #eee8d8; }
@@ -1936,24 +1915,14 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .contractField { margin-top: 10px; }
   .contractField input { padding: 7px 9px; font-size: 14px; }
   .documentButton { padding: 8px 10px; }
-  .founderProfilePanel { width:min(860px,96vw); max-height:96vh; padding:10px 16px 12px; }
+  .founderProfilePanel { width:min(640px,96vw); padding:10px 16px 12px; }
   .founderProfilePanel > header { padding-bottom:5px; }
-  .founderProfileIntro { grid-template-columns:60px 1fr; gap:10px; margin-top:5px; }
-  .founderProfileIntro h2 { margin:1px 0 2px; font-size:20px; }
-  .founderProfileIntro p:last-child { font-size:7px; line-height:1.35; }
-  .founderProfileIntro .documentKicker { margin-bottom:2px !important; }
-  .founderPortrait { height:58px; }
-  .founderPortrait i { top:7px; width:20px; height:22px; }
-  .founderPortrait span { bottom:-24px; width:45px; height:52px; }
-  .founderSkillEditor { gap:5px; margin-top:6px; }
-  .founderSkillCard { gap:4px; padding:6px 7px; border-top-width:3px; }
-  .founderSkillCard p { min-height:0; }
-  .founderSkillControls { grid-template-columns:36px 1fr 36px; }
-  .founderSkillControls button { height:36px; }
-  .founderSkillLevel strong { font-size:13px; }
-  .founderSkillImpact { padding-top:3px; }
-  .founderProfileFooter { margin-top:5px; }
-  .founderSkillPresets button { min-height:28px; padding:3px 5px; }
+  .founderSkillEditor { gap:6px; margin-top:8px; }
+  .founderSkillCard { gap:8px; padding:9px; border-top-width:3px; }
+  .founderSkillControls { grid-template-columns:38px 1fr 38px; }
+  .founderSkillControls button { height:38px; }
+  .founderSkillLevel strong { font-size:24px; }
+  .founderProfileFooter { grid-template-columns:1fr 130px; margin-top:8px; }
   .founderProfilePanel .documentButton { min-height:40px; }
   .projectContract { width: min(970px,96vw); max-height: 96vh; padding: 10px 16px 12px; }
   .projectContract > header { top: -10px; padding: 5px 0; }
