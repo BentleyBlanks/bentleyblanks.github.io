@@ -17,8 +17,8 @@ assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visib
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
-assert.match(html, /Style_Play\.css\?v=20260815q/, "project setup and stock-account changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815q/, "gameplay changes must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815r/, "project setup and stock-account changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815r/, "gameplay changes must bypass the Pages cache");
 assert.doesNotMatch(html, /contractParties|contractFinePrint|signatureRow|按住 1 秒/, "project setup must only show game name, theme, type, and confirmation");
 assert.match(html, /id="projectConfirmButton" class="documentButton contractSubmitButton"[^>]*><strong>开始开发<\/strong>/, "project setup needs one direct confirmation action");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");

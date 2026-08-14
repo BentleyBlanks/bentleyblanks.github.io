@@ -6,7 +6,7 @@ import {
   Platforms,
   WorldConfig,
   WorldData,
-} from "./Data_World.mjs?v=20260815q";
+} from "./Data_World.mjs?v=20260815r";
 
 const Epsilon = 1e-7;
 const FixedStep = 1 / 60;

@@ -22,7 +22,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815q";
+} from "./Data_Game.mjs?v=20260815r";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -69,7 +69,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815q";
+} from "./Script_Rules.mjs?v=20260815r";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -79,13 +79,13 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815q";
+} from "./Data_World.mjs?v=20260815r";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
-} from "./Script_World.mjs?v=20260815q";
+} from "./Script_World.mjs?v=20260815r";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
