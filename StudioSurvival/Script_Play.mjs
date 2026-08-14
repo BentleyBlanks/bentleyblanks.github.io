@@ -12,20 +12,23 @@ import {
   FindStaff,
   FOOD_PLANS,
   GAME_TYPES,
+  LIVE_REVENUE_EVENTS,
   MARKETING_CAMPAIGNS,
+  MARKET_DIRECTIONS,
   MODULE_KEYS,
   MODULE_META,
   PROJECTS,
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs";
+} from "./Data_Game.mjs?v=20260815h";
 import {
   AdvanceMonth,
   BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
   CustomizeProject,
+  EvaluateMarketFit,
   EvaluateProject,
   FireStaff,
   ForecastMonthlyCosts,
@@ -33,6 +36,7 @@ import {
   GetAnxietyState,
   GetIdleLine,
   GetMemberMonthlyCost,
+  GetMarketSnapshot,
   GetOwnerHairStage,
   HireStaff,
   OWNER_HAIR_STAGES,
@@ -42,6 +46,7 @@ import {
   RepayStartupLoan,
   ReleaseBuild,
   SAVE_KEY,
+  SetMarketStrategy,
   SelectDirective,
   SelectFoodPlan,
   SetStaffInvestmentLevel,
@@ -52,7 +57,7 @@ import {
   TalkToStaff,
   ValidateState,
   WORKSTATION_COSTS,
-} from "./Script_Rules.mjs?v=20260815c";
+} from "./Script_Rules.mjs?v=20260815h";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -73,6 +78,7 @@ import {
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
+  "phoneButton",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
@@ -1520,6 +1526,16 @@ function RenderHud() {
   dom.anxietyBar.style.width = `${Clamp(state.anxiety, 0, 100)}%`;
   dom.anxietyValue.textContent = Math.round(state.anxiety);
   dom.sceneVignette.style.opacity = String(.38 + Clamp(state.anxiety / 100, 0, 1) * .4);
+  const marketFit = project ? EvaluateMarketFit(state) : null;
+  const marketSetMonth = project?.marketStrategy?.setMonth || 0;
+  const marketNeedsAttention = Boolean(project && (marketSetMonth !== state.month || marketFit?.backlash));
+  dom.phoneButton.disabled = !project || state.status !== "playing";
+  dom.phoneButton.classList.toggle("marketAlert", marketNeedsAttention);
+  dom.phoneButton.classList.toggle("marketPerfect", Boolean(marketFit?.perfect && marketSetMonth === state.month));
+  dom.phoneButton.setAttribute(
+    "aria-label",
+    marketFit ? "打开市场手机：" + marketFit.label : "打开手机查看市场动向",
+  );
   dom.projectTitle.textContent = project?.name ? `《${project.name}》` : template?.title || "先开一家公司";
   const tensions = project ? CalculateTensions(project) : [];
   const anxietyState = GetAnxietyState(state.anxiety);
@@ -1754,6 +1770,7 @@ function OpenCustomizationSheet(sourceId = "owner") {
         <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
         <p>${EscapeHtml(feature.pitch)}</p>
         <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
+        <div class="chipRow marketFeatureTags">${MarketDirectionChips(feature.marketDirections)}</div>
       </button>`).join("")}</div>
     <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换个提案人</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
@@ -2346,6 +2363,137 @@ function OpenMarketingSheet() {
   });
 }
 
+function MarketDirectionById(directionId) {
+  return MARKET_DIRECTIONS.find((direction) => direction.id === directionId) || null;
+}
+
+function MarketDirectionChips(directionIds = []) {
+  return directionIds.map((directionId) => {
+    const direction = MarketDirectionById(directionId);
+    if (!direction) return "";
+    return '<span class="marketTag" style="--marketTagColor:' + direction.color + '">' + direction.icon + " " + EscapeHtml(direction.shortName) + "</span>";
+  }).join("");
+}
+
+function MarketFitPreviewHtml(marketFit) {
+  if (!marketFit) return "";
+  const refundPoints = Math.round(Math.abs(marketFit.refundRateDelta || 0) * 100);
+  const refundLabel = marketFit.refundRateDelta < 0
+    ? "退款率 −" + refundPoints + " 点"
+    : marketFit.refundRateDelta > 0
+      ? "退款率 +" + refundPoints + " 点"
+      : "退款率不变";
+  const directionLabel = marketFit.direction ? marketFit.direction.name : "不主动追风";
+  return '<div class="marketFitPreview ' + marketFit.tone + '">'
+    + '<div class="marketFitStatus"><span>当前组合预判</span><strong>' + EscapeHtml(marketFit.label) + '</strong></div>'
+    + '<p>' + EscapeHtml(marketFit.description) + '</p>'
+    + '<div class="marketFitMetrics">'
+    + '<span><small>营收乘数</small><b>×' + marketFit.revenueMultiplier.toFixed(2) + '</b></span>'
+    + '<span><small>退款影响</small><b>' + refundLabel + '</b></span>'
+    + '<span><small>主推口径</small><b>' + EscapeHtml(directionLabel) + '</b></span>'
+    + '</div></div>';
+}
+
+function OpenMarketPhoneSheet() {
+  const snapshot = GetMarketSnapshot(state);
+  const strategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
+  const projectMeta = FindProject(state.project.templateId);
+  const focusOptions = [{
+    id: "concept",
+    title: "立项特色 · " + projectMeta.trend,
+    description: projectMeta.pitch,
+    marketDirections: projectMeta.marketDirections || [],
+  }, ...state.project.features.map((item) => {
+    const feature = FEATURE_CHOICES.find((candidate) => candidate.id === item.id);
+    return feature ? {
+      id: feature.id,
+      title: feature.title,
+      description: feature.pitch,
+      marketDirections: feature.marketDirections || [],
+    } : null;
+  }).filter(Boolean)];
+  const selectedFocusId = focusOptions.some((option) => option.id === strategy.focusId) ? strategy.focusId : "concept";
+  const selectedDirectionId = strategy.directionId || "independent";
+  const locked = strategy.setMonth === state.month;
+  const disabledAttribute = locked ? " disabled" : "";
+  const currentFit = EvaluateMarketFit(state);
+  const tabooDirection = MarketDirectionById(snapshot.event?.tabooDirectionId);
+  const activeLiveEvents = (state.project.activeLiveEvents || []).map((active) => {
+    const liveEvent = LIVE_REVENUE_EVENTS.find((candidate) => candidate.id === active.id);
+    return liveEvent ? '<div class="phoneAlert danger"><b>' + EscapeHtml(liveEvent.title) + '</b><span>还影响 ' + active.remaining + " 个月 · 流水 ×" + liveEvent.multiplier + "</span></div>" : "";
+  }).join("");
+  const focusMarkup = focusOptions.map((option) => (
+    '<label class="marketPick focusPick">'
+      + '<input type="radio" name="marketFocus" value="' + option.id + '"' + (option.id === selectedFocusId ? " checked" : "") + disabledAttribute + ">"
+      + '<span><b>' + EscapeHtml(option.title) + '</b><small>' + EscapeHtml(option.description) + '</small><em>' + MarketDirectionChips(option.marketDirections) + "</em></span>"
+    + "</label>"
+  )).join("");
+  const directionMarkup = [
+    '<label class="marketPick directionPick">'
+      + '<input type="radio" name="marketDirection" value="independent"' + (selectedDirectionId === "independent" ? " checked" : "") + disabledAttribute + ">"
+      + '<span><b>不主动追风</b><small>营收 ×0.82；只有自然流量，但不会因选错热点挨骂。</small></span>'
+    + "</label>",
+    ...MARKET_DIRECTIONS.map((direction) => (
+      '<label class="marketPick directionPick" style="--pickColor:' + direction.color + '">'
+        + '<input type="radio" name="marketDirection" value="' + direction.id + '"' + (direction.id === selectedDirectionId ? " checked" : "") + disabledAttribute + ">"
+        + '<span><b>' + direction.icon + " " + EscapeHtml(direction.name) + '</b><small>' + EscapeHtml(direction.description) + '</small><em>完美命中最高 ×' + direction.perfectMultiplier.toFixed(2) + "</em></span>"
+      + "</label>"
+    )),
+  ].join("");
+  const actionDisabled = locked || state.talkPoints <= 0;
+  const actionLabel = locked
+    ? "本月口径已锁定"
+    : state.talkPoints <= 0
+      ? "本月没有拍板次数"
+      : "发布本月市场口径";
+
+  OpenPanel("MARKET OS · PHONE", "手机：热搜、风口与翻车预警", (
+    '<div class="marketPhone">'
+      + '<div class="phoneStatusBar"><span>M' + String(state.month).padStart(2, "0") + ' · 09:41</span><b>市场雷达</b><span>5G ▰</span></div>'
+      + '<section class="marketHero" style="--marketColor:' + snapshot.effectiveDirection.color + '">'
+        + '<span>本月实际结算风向</span>'
+        + '<strong>' + snapshot.effectiveDirection.icon + " " + EscapeHtml(snapshot.effectiveDirection.name) + "</strong>"
+        + '<p>' + EscapeHtml(snapshot.effectiveDirection.description) + "</p>"
+        + '<div><b>命中风口最高 ×' + (snapshot.effectiveDirection.perfectMultiplier * snapshot.heatMultiplier).toFixed(2) + '</b><small>特色与迎合方向必须同时命中</small></div>'
+      + "</section>"
+      + '<div class="marketFeed">'
+        + '<article class="phoneStory"><span>结构性动向 · 至 M' + String(snapshot.trendEndsMonth).padStart(2, "0") + '</span><strong>' + snapshot.trend.icon + " " + EscapeHtml(snapshot.trend.name) + '</strong><p>' + EscapeHtml(snapshot.trend.description) + "</p></article>"
+        + '<article class="phoneStory breaking"><span>随机事件 · 刚刚</span><strong>' + EscapeHtml(snapshot.event.title) + '</strong><p>' + EscapeHtml(snapshot.event.description) + (tabooDirection ? " 当前尤其忌讳「" + EscapeHtml(tabooDirection.name) + "」。" : "") + "</p></article>"
+        + '<article class="phoneStory rumor"><span>下月传闻 · 可信度 ' + snapshot.nextRumor.confidence + '%</span><strong>' + snapshot.nextRumor.direction.icon + " " + EscapeHtml(snapshot.nextRumor.direction.name) + '</strong><p>这是结构趋势预报；下月突发事件仍可能临时把风向带走。</p></article>'
+      + "</div>"
+      + (activeLiveEvents ? '<section class="phoneLiveAlerts"><div class="phoneSectionTitle"><strong>正在发生的运营事故</strong><span>与市场风向叠乘</span></div>' + activeLiveEvents + "</section>" : "")
+      + '<form class="marketStrategyForm" data-market-form>'
+        + '<div class="phoneSectionTitle"><strong>① 本月主打特色</strong><span>真正交付什么</span></div>'
+        + '<div class="marketPickGrid focusGrid">' + focusMarkup + "</div>"
+        + '<div class="marketFeatureAction"><span>没有合适特色？先把玩法真的做进游戏。</span><button class="miniButton" data-open-market-customization type="button" ' + (state.talkPoints <= 0 || state.project.features.length >= 6 ? "disabled" : "") + ">去电脑加特色</button></div>"
+        + '<div class="phoneSectionTitle"><strong>② 本月迎合方向</strong><span>对市场说什么</span></div>'
+        + '<div class="marketPickGrid directionGrid">' + directionMarkup + "</div>"
+        + '<div data-market-preview>' + MarketFitPreviewHtml(currentFit) + "</div>"
+        + '<div class="marketCommit"><span>每月只能拍板一次，消耗 1 次有效沟通；追风会增加少量范围债。</span><button class="primaryButton" data-market-commit type="button" ' + (actionDisabled ? "disabled" : "") + ">" + actionLabel + "</button></div>"
+      + "</form>"
+    + "</div>"
+  ), () => {
+    const form = dom.sheetBody.querySelector("[data-market-form]");
+    const RefreshPreview = () => {
+      const focusId = form?.querySelector('[name="marketFocus"]:checked')?.value || "concept";
+      const directionId = form?.querySelector('[name="marketDirection"]:checked')?.value || "independent";
+      const preview = dom.sheetBody.querySelector("[data-market-preview]");
+      if (preview) preview.innerHTML = MarketFitPreviewHtml(EvaluateMarketFit(state, { focusId, directionId }));
+    };
+    dom.sheetBody.onchange = RefreshPreview;
+    dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-open-market-customization]")) return OpenCustomizationSheet("owner");
+      if (!event.target.closest("[data-market-commit]")) return;
+      const focusId = form?.querySelector('[name="marketFocus"]:checked')?.value || "concept";
+      const directionId = form?.querySelector('[name="marketDirection"]:checked')?.value || "independent";
+      const result = SetMarketStrategy(state, focusId, directionId);
+      if (ApplyInteractiveResult(result, { tone: result.marketFit?.backlash ? "warning" : result.marketFit?.perfect ? "good" : "normal" })) {
+        OpenMarketPhoneSheet();
+      }
+    };
+  });
+}
+
 function RevenueChart(history = state.incomeHistory) {
   const points = history.slice(-16);
   if (!points.length) return `<div class="revenueEmpty">还没有真实游戏收入。贷款和彩票被曲线礼貌地拒绝了。</div>`;
@@ -2372,12 +2520,15 @@ function RevenueAnalysis() {
   const recentAverage = recent.reduce((sum, item) => sum + (item.income || 0), 0) / recent.length;
   const earlierAverage = earlier.length ? earlier.reduce((sum, item) => sum + (item.income || 0), 0) / earlier.length : recentAverage;
   const trend = recentAverage > earlierAverage * 1.12 ? "正在上行" : recentAverage < earlierAverage * .88 ? "正在下坠" : "暂时横盘";
-  const losses = recent.reduce((sum, item) => sum + (item.refunds || 0) + (item.eventLoss || 0), 0);
+  const losses = recent.reduce((sum, item) => (
+    sum + (item.refunds || 0) + (item.eventLoss || 0) + Math.max(0, -(item.marketDelta || 0))
+  ), 0);
   return `近 ${recent.length} 笔平均 ${FormatGoalMoney(recentAverage)}，曲线${trend}；退款与随机事件少拿 ${FormatGoalMoney(losses)}。`;
 }
 
 function OpenReleaseSheet() {
   const evaluation = EvaluateProject(state);
+  const marketFit = EvaluateMarketFit(state);
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const tensions = evaluation?.tensions || [];
   OpenPanel("SHIP IT / REGRET IT", state.project.isReleased ? `《${EscapeHtml(state.project.name)}》发布更新` : `把《${EscapeHtml(state.project.name)}》提交商店`, `
@@ -2388,6 +2539,7 @@ function OpenReleaseSheet() {
       <div class="metricTile"><span>Bug / 两种债</span><strong>${Math.round(state.project.bugs)} / ${Math.round(state.project.scopeDebt + state.project.technicalDebt)}</strong></div>
     </div>
     <div class="noteList">${tensions.length ? tensions.slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}：${EscapeHtml(tension.description)}</div>`).join("") : `<div class="note good">没有严重跨模块冲突。这个状态很珍贵，也很短暂。</div>`}</div>
+    <div class="note ${marketFit.backlash ? "danger" : marketFit.perfect ? "good" : ""}">手机风向预判：${EscapeHtml(marketFit.label)} · 营收 ×${marketFit.revenueMultiplier.toFixed(2)}。${EscapeHtml(marketFit.description)}</div>
     <div class="panelSection">${RevenueChart()}</div>
     <div class="note">收入分析：${EscapeHtml(RevenueAnalysis())}</div>
     <div class="panelSection choiceFooter"><span>${state.project.age < 2 ? `还要开发 ${2 - state.project.age} 个月才能提交商店` : state.project.lastReleaseMonth === state.month ? "本月已经发布过" : "评分差也能发，只是玩家也能退款"}</span><button class="primaryButton" data-release type="button" ${canRelease ? "" : "disabled"}>${state.project.isReleased ? "发布更新" : "现在上线"}</button></div>`, () => {
@@ -2397,8 +2549,9 @@ function OpenReleaseSheet() {
       if (!ApplyInteractiveResult(result, { deferEnding: true, toast: false })) return;
       const commercial = result.commercial;
       ShowResult(result.isUpdate ? "UPDATE LIVE" : "LAUNCH LIVE", `${result.evaluation.rating.toFixed(1)} 分 · ${result.review}`, `
-        <div class="resultHero"><b>+${FormatGoalMoney(result.revenue)}</b><p>净游戏收入已计入 100 亿元目标。<br>${commercial.backlash ? "宣发反噬：玩家把退款键当成核心玩法。" : "至少这次商店页没有立刻变成追悼会。"}</p></div>
+        <div class="resultHero"><b>+${FormatGoalMoney(result.revenue)}</b><p>净游戏收入已计入 100 亿元目标。<br>${commercial.marketBacklash ? "市场时机踩空：宣传截图正在被全网转发群嘲。" : commercial.backlash ? "宣发反噬：玩家把退款键当成核心玩法。" : "至少这次商店页没有立刻变成追悼会。"}</p></div>
         <div class="metricGrid"><div class="metricTile"><span>毛收入</span><strong>${FormatGoalMoney(commercial.grossRevenue)}</strong></div><div class="metricTile"><span>退款</span><strong>${FormatGoalMoney(commercial.refunds)}</strong></div><div class="metricTile"><span>退款率</span><strong>${(commercial.refundRate * 100).toFixed(1)}%</strong></div></div>
+        <div class="note ${result.marketFit.backlash ? "danger" : result.marketFit.perfect ? "good" : ""}">市场结算：${EscapeHtml(result.marketFit.label)} · 风向乘数 ×${result.marketFit.revenueMultiplier.toFixed(2)}。${EscapeHtml(result.marketFit.description)}</div>
         <div class="panelSection">${RevenueChart()}</div>`, () => { if (state.status !== "playing") RenderEnding(); });
       PlayTone("release");
     };
@@ -2449,6 +2602,7 @@ function OpenMonthSheet() {
           ${finance.startupDefault ? `<div class="note danger">创业启动贷到期未清，全部身家被处置，公司进入强制清算。</div>` : ""}
           ${finance.skippedFood ? `<div class="note danger">饭钱没付出来，本月自动改成硬扛不吃。</div>` : ""}
           ${finance.appliedEvents?.map((liveEvent) => `<div class="note danger">收入事件：${EscapeHtml(liveEvent.title)}，流水乘数 ×${liveEvent.multiplier}。</div>`).join("") || ""}
+          ${finance.marketFit && state.project.isReleased ? `<div class="note ${finance.marketFit.backlash ? "danger" : finance.marketFit.perfect ? "good" : ""}">市场口径：${EscapeHtml(finance.marketFit.label)}，常态流水 ×${finance.marketFit.revenueMultiplier.toFixed(2)}，市场增减 ${finance.marketDelta >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(finance.marketDelta || 0))}。</div>` : ""}
           ${result.anxiety.idea ? `<div class="note good">焦虑迸发抽象创意：${EscapeHtml(result.anxiety.idea.title)}——${EscapeHtml(result.anxiety.idea.pitch)}</div>` : ""}
         </div>
         <div class="panelSection">${RevenueChart()}</div>`, () => { if (state.status !== "playing") RenderEnding(); });
@@ -2461,6 +2615,7 @@ function OpenHelpSheet() {
     <div class="resultHero"><b>A/D</b><p>左右穿过自己的家、小菜馆、小超市、人才市场、银行和大酒店；W、↑ 或空格跳；靠近柜台按 E。移动端横屏使用底部按钮。</p></div>
     <div class="noteList">
       <div class="note">家里只有老板自己的电脑。开发、聊天、宣发、发布和月结都在电脑上完成。</div>
+      <div class="note good">顶部手机会播报持续风向、每月随机事件和下月传闻。每月可用 1 次沟通拍板“主打特色 + 迎合方向”；两项同时命中才吃风口，错时硬蹭会退款、掉粉并被群嘲。</div>
       <div class="note danger">第一次招聘前必须先在人才市场设备柜台买第一套工位；以后每增加一人都要再有一套空设备。</div>
       <div class="note">冰箱是剩饭，小菜馆是充饥套餐，小超市卖小吃和彩票，大酒店才有能提升产出的大餐。</div>
       <div class="note danger">启动资金 ¥68,000 全部来自身家担保贷款，M08 前要还 ¥82,000；到期未清直接倒闭。</div>
@@ -2718,6 +2873,7 @@ function BindControls() {
     if (event.code === "KeyD" || event.code === "ArrowRight") SetMovement("right", true);
     if (["KeyW", "ArrowUp", "Space"].includes(event.code) && !event.repeat) inputState.jump = true;
     if (event.code === "KeyE" && !event.repeat) TriggerInteraction();
+    if (event.code === "KeyM" && !event.repeat && !IsOverlayOpen()) OpenMarketPhoneSheet();
     if (event.code === "Escape") { if (!dom.resultLayer.classList.contains("hidden")) CloseResult(); else ClosePanel(); }
   }, { passive: false });
   window.addEventListener("keyup", (event) => {
@@ -2747,6 +2903,7 @@ function BindControls() {
   dom.sheetCloseButton.addEventListener("click", ClosePanel);
   dom.resultCloseButton.addEventListener("click", CloseResult);
   dom.helpButton.addEventListener("click", OpenHelpSheet);
+  dom.phoneButton.addEventListener("click", OpenMarketPhoneSheet);
   dom.soundButton.addEventListener("click", () => {
     soundEnabled = !soundEnabled;
     dom.soundButton.classList.toggle("muted", !soundEnabled);

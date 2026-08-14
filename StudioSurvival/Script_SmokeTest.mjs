@@ -5,17 +5,20 @@ import {
   CalculateTensions,
   CreateInitialState,
   CustomizeProject,
+  EvaluateMarketFit,
   EvaluateProject,
   FireStaff,
   ForecastMonthlyCosts,
   ForecastPivotCost,
   GetMemberMonthlyCost,
+  GetMarketSnapshot,
   GetAnxietyState,
   GetOwnerHairStage,
   HireStaff,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
+  SetMarketStrategy,
   SetStaffInvestmentLevel,
   Speculate,
   StartProject,
@@ -36,6 +39,8 @@ import {
   GAME_TYPES,
   LIVE_REVENUE_EVENTS,
   MARKETING_CAMPAIGNS,
+  MARKET_DIRECTIONS,
+  MARKET_EVENTS,
   PIVOT_REASONS,
   PROJECTS,
   SPECULATION_OPTIONS,
@@ -711,8 +716,61 @@ function HasRecordedId(collection, id) {
 }
 
 {
+  const state = Begin();
+  const snapshot = GetMarketSnapshot(state);
+  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.trend.id), "the structural market trend must come from the public catalog");
+  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.effectiveDirection.id), "the effective monthly direction must be actionable");
+  assert(MARKET_EVENTS.some((marketEvent) => marketEvent.id === snapshot.event.id), "the phone must surface a deterministic random market event");
+  assert.equal(snapshot.nextRumor.direction.id, GetMarketSnapshot(state, state.month + 1).trend.id, "the next-month rumor must preview the structural trend rather than silently changing rules");
+  assert.deepEqual(GetMarketSnapshot(state), snapshot, "market news must be deterministic for a save and month");
+  assert.equal(EvaluateMarketFit(state).tier, "independent", "a new project must remain neutral until the player publishes a pander direction");
+}
+
+{
+  const base = MakeLaunchReady(Begin(), 92);
+  const snapshot = GetMarketSnapshot(base);
+  const matchingFeature = FEATURE_CHOICES.find((feature) => feature.marketDirections.includes(snapshot.effectiveDirection.id));
+  const mismatchingFeature = FEATURE_CHOICES.find((feature) => !feature.marketDirections.includes(snapshot.effectiveDirection.id));
+  const wrongDirection = MARKET_DIRECTIONS.find((direction) => direction.id !== snapshot.effectiveDirection.id);
+  assert(matchingFeature && mismatchingFeature && wrongDirection, "the market fixture needs both a fit and a miss");
+
+  let perfectState = CustomizeProject(structuredClone(base), "owner", matchingFeature.id).state;
+  perfectState = MakeLaunchReady(perfectState, 92);
+  const perfectStrategy = SetMarketStrategy(perfectState, matchingFeature.id, snapshot.effectiveDirection.id);
+  assert.equal(perfectStrategy.ok, true);
+  assert.equal(perfectStrategy.state.talkPoints, 0, "publishing the monthly market position must consume one effective conversation");
+  assert.equal(perfectStrategy.marketFit.perfect, true, "matching feature and pander direction must create a perfect market fit");
+  assert(perfectStrategy.marketFit.revenueMultiplier > 1.4, "a perfect fit must visibly amplify revenue");
+  const duplicateStrategy = SetMarketStrategy(perfectStrategy.state, matchingFeature.id, snapshot.effectiveDirection.id);
+  assert.equal(duplicateStrategy.ok, false, "the public market position can only be locked once per month");
+
+  let missedState = CustomizeProject(structuredClone(base), "owner", mismatchingFeature.id).state;
+  missedState = MakeLaunchReady(missedState, 92);
+  const missedStrategy = SetMarketStrategy(missedState, mismatchingFeature.id, wrongDirection.id);
+  assert.equal(missedStrategy.ok, true);
+  assert.equal(missedStrategy.marketFit.backlash, true, "mistimed pander direction and unsupported feature must trigger backlash");
+  assert(missedStrategy.marketFit.revenueMultiplier < 0.75, "a mistimed market chase must cut revenue before refunds");
+
+  const perfectRelease = ReleaseBuild(perfectStrategy.state);
+  const missedRelease = ReleaseBuild(missedStrategy.state);
+  assert.equal(perfectRelease.ok, true);
+  assert.equal(missedRelease.ok, true);
+  assert(perfectRelease.revenue > missedRelease.revenue * 2, "hitting the trend with a real matching feature must earn materially more than mistimed pandering");
+  assert.equal(missedRelease.commercial.marketBacklash, true, "the commercial report must identify market backlash");
+  assert(missedRelease.commercial.refundRate > perfectRelease.commercial.refundRate, "being loudly wrong must produce more refunds");
+  assert(missedRelease.state.reputation < perfectRelease.state.reputation, "being loudly wrong must damage reputation");
+}
+
+{
   const validState = Begin();
   assert.equal(ValidateState(validState), true, "a fresh run must be a valid save");
+  const legacyMarketState = structuredClone(validState);
+  delete legacyMarketState.project.marketStrategy;
+  delete legacyMarketState.project.marketStrategyHistory;
+  assert.equal(ValidateState(legacyMarketState), true, "pre-phone saves must remain loadable");
+  const badMarketState = structuredClone(validState);
+  badMarketState.project.marketStrategy.directionId = "imaginaryTrend";
+  assert.equal(ValidateState(badMarketState), false, "unknown market directions must invalidate a damaged save");
   const badProject = structuredClone(validState);
   badProject.project.templateId = "missingProject";
   assert.equal(ValidateState(badProject), false, "unknown project IDs must invalidate a damaged save");
@@ -811,4 +869,4 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");
+console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");

@@ -423,6 +423,7 @@ export const PROJECTS = [
     genre: "荒诞生存模拟",
     pitch: "在停电的太空便利店里，一边理货一边躲避会报税的外星人。",
     trend: "反常识模拟",
+    marketDirections: ["systemDepth", "antiRoutine"],
     accent: "#8d7cff",
   },
   {
@@ -431,6 +432,7 @@ export const PROJECTS = [
     genre: "动作经营",
     pitch: "末班地铁变成夜市，用砍价连招对抗通勤焦虑。",
     trend: "都市怪谈",
+    marketDirections: ["streamerSpectacle", "systemDepth"],
     accent: "#ff8c69",
   },
   {
@@ -439,6 +441,7 @@ export const PROJECTS = [
     genre: "叙事冒险",
     pitch: "驾驶一艘工位飞船，把离职信送到宇宙尽头的老板手里。",
     trend: "情绪叙事",
+    marketDirections: ["emotionalStory", "antiRoutine"],
     accent: "#55d6be",
   },
   {
@@ -447,6 +450,7 @@ export const PROJECTS = [
     genre: "账单 Roguelike",
     pitch: "每月一场 Boss 战，伤害数字就是本月账单。",
     trend: "现实主义恐怖",
+    marketDirections: ["antiRoutine", "systemDepth"],
     accent: "#f45b69",
   },
 ];
@@ -487,6 +491,121 @@ export const GAME_TYPES = [
     liveDecay: 0.84,
     requirements: { art: 1.05, design: 1.05, client: 1, performance: 1.18 },
     warning: "低端机差评会额外放大性能短板",
+  },
+];
+
+export const MARKET_DIRECTIONS = [
+  {
+    id: "systemDepth",
+    name: "系统深挖",
+    shortName: "深系统",
+    icon: "⌘",
+    color: "#ffd166",
+    perfectMultiplier: 1.72,
+    description: "玩家想要能研究、能复盘、能长出意外故事的复杂系统。",
+  },
+  {
+    id: "emotionalStory",
+    name: "情绪共鸣",
+    shortName: "共情",
+    icon: "♥",
+    color: "#ff7cae",
+    perfectMultiplier: 1.58,
+    description: "角色关系和真实情绪比功能数量更容易让玩家主动安利。",
+  },
+  {
+    id: "streamerSpectacle",
+    name: "直播奇观",
+    shortName: "节目效果",
+    icon: "◉",
+    color: "#8d7cff",
+    perfectMultiplier: 1.84,
+    description: "十秒能看懂、一次能笑出声、方便剪成短视频的玩法正在抢流量。",
+  },
+  {
+    id: "lowSpecFriendly",
+    name: "低配友好",
+    shortName: "低配",
+    icon: "▤",
+    color: "#68e0a0",
+    perfectMultiplier: 1.46,
+    description: "加载快、按钮少、旧设备也能顺畅玩的产品口碑正在抬头。",
+  },
+  {
+    id: "antiRoutine",
+    name: "反套路表达",
+    shortName: "反套路",
+    icon: "↯",
+    color: "#ff8c69",
+    perfectMultiplier: 1.76,
+    description: "玩家厌倦熟悉配方，愿意为一句从没见过的玩法描述买单。",
+  },
+];
+
+export const MARKET_EVENTS = [
+  {
+    id: "spreadsheetStream",
+    title: "主播靠一张系统表播了十小时",
+    directionId: "systemDepth",
+    tabooDirectionId: null,
+    heatMultiplier: 1.08,
+    description: "观众突然把‘看不懂但想研究’当成最高评价，本月风向转向系统深挖。",
+  },
+  {
+    id: "storyFestival",
+    title: "叙事游戏节把全网评论区哭穿了",
+    directionId: "emotionalStory",
+    tabooDirectionId: null,
+    heatMultiplier: 1.06,
+    description: "玩家开始追问角色有没有灵魂，而不是地图有没有八百个图标。",
+  },
+  {
+    id: "clipChallenge",
+    title: "十秒挑战玩法席卷短视频",
+    directionId: "streamerSpectacle",
+    tabooDirectionId: "emotionalStory",
+    heatMultiplier: 1.12,
+    description: "所有人都在找下一段能剪成爆款的意外瞬间，慢热宣传会被当场划走。",
+  },
+  {
+    id: "oldPhoneWave",
+    title: "旧手机玩家集体给发热大作打一星",
+    directionId: "lowSpecFriendly",
+    tabooDirectionId: "streamerSpectacle",
+    heatMultiplier: 1.1,
+    description: "能在三年前的设备上稳定运行，突然比光追和同屏人数更像卖点。",
+  },
+  {
+    id: "cloneFatigue",
+    title: "年度换皮大作因同质化遭到群嘲",
+    directionId: "antiRoutine",
+    tabooDirectionId: "systemDepth",
+    heatMultiplier: 1.13,
+    description: "功能越多越像旧配方，玩家开始奖励一句真正没听过的怪点子。",
+  },
+  {
+    id: "metaJokeFatigue",
+    title: "玩家厌倦所有角色都知道自己在游戏里",
+    directionId: "emotionalStory",
+    tabooDirectionId: "antiRoutine",
+    heatMultiplier: 1.09,
+    description: "自嘲梗突然显得油腻，真诚角色关系成为本月最稀缺的东西。",
+  },
+  {
+    id: "patchSizeScandal",
+    title: "某大作首日补丁突破 180GB",
+    directionId: "lowSpecFriendly",
+    tabooDirectionId: "systemDepth",
+    heatMultiplier: 1.08,
+    description: "玩家把小体积和快速启动刷上热搜，堆功能的宣传词暂时成了危险品。",
+  },
+  {
+    id: "bugMuseumViral",
+    title: "一个穿模视频被玩家二创成连续剧",
+    directionId: "streamerSpectacle",
+    tabooDirectionId: null,
+    heatMultiplier: 1.14,
+    description: "可传播的意外比完美宣传片更吸睛，本月节目效果压过传统卖相。",
   },
 ];
 
@@ -737,6 +856,7 @@ export const FEATURE_CHOICES = [
     id: "grudgeNpc",
     title: "所有 NPC 都记仇",
     pitch: "玩家砍过一次价，十小时后全城商贩同时翻旧账。",
+    marketDirections: ["systemDepth", "emotionalStory"],
     modules: { art: 1, design: 7, client: 5, performance: 2 },
     scopeDebt: 5,
     technicalDebt: 2,
@@ -748,6 +868,7 @@ export const FEATURE_CHOICES = [
     id: "weatherMood",
     title: "天气读取玩家情绪",
     pitch: "玩家越急，雨越横着下；停下来发呆，太阳才敢出来。",
+    marketDirections: ["emotionalStory", "streamerSpectacle"],
     modules: { art: 6, design: 4, client: 3, performance: 4 },
     scopeDebt: 4,
     technicalDebt: 3,
@@ -759,6 +880,7 @@ export const FEATURE_CHOICES = [
     id: "physicsInventory",
     title: "背包也要物理模拟",
     pitch: "苹果会压坏面包，贷款合同永远沉在最底下。",
+    marketDirections: ["systemDepth", "streamerSpectacle"],
     modules: { art: 2, design: 5, client: 7, performance: 7 },
     scopeDebt: 6,
     technicalDebt: 6,
@@ -770,6 +892,7 @@ export const FEATURE_CHOICES = [
     id: "oneButtonDrama",
     title: "一个按钮演完人生",
     pitch: "同一个按钮负责跳跃、道歉、辞职和签贷款合同。",
+    marketDirections: ["lowSpecFriendly", "emotionalStory"],
     modules: { art: 2, design: 7, client: 3, performance: 1 },
     scopeDebt: 3,
     technicalDebt: 1,
@@ -781,6 +904,7 @@ export const FEATURE_CHOICES = [
     id: "crowdAi",
     title: "一万名会摸鱼的路人",
     pitch: "每个路人都有日程，但九千八百个选择在茶水间堵路。",
+    marketDirections: ["streamerSpectacle", "systemDepth"],
     modules: { art: 5, design: 5, client: 6, performance: 9 },
     scopeDebt: 7,
     technicalDebt: 8,
@@ -792,6 +916,7 @@ export const FEATURE_CHOICES = [
     id: "honestLoading",
     title: "读条公开项目债务",
     pitch: "加载时不放提示，直接滚动展示尚未偿还的技术债。",
+    marketDirections: ["lowSpecFriendly", "antiRoutine"],
     modules: { art: 3, design: 4, client: 4, performance: 3 },
     scopeDebt: 2,
     technicalDebt: -2,
@@ -803,6 +928,7 @@ export const FEATURE_CHOICES = [
     id: "refundEnding",
     title: "退款按钮是真结局",
     pitch: "玩家按下退款，主角才终于逃出游戏。",
+    marketDirections: ["antiRoutine", "emotionalStory"],
     modules: { art: 3, design: 8, client: 4, performance: 2 },
     scopeDebt: 5,
     technicalDebt: 2,
@@ -814,6 +940,7 @@ export const FEATURE_CHOICES = [
     id: "bugMuseum",
     title: "把 Bug 做成博物馆",
     pitch: "每次修掉穿模，就把它的尸体陈列在主菜单。",
+    marketDirections: ["antiRoutine", "streamerSpectacle"],
     modules: { art: 5, design: 5, client: 5, performance: 2 },
     scopeDebt: 4,
     technicalDebt: 1,
@@ -983,4 +1110,8 @@ export function FindMarketingCampaign(campaignId) {
 
 export function FindFeatureChoice(featureId) {
   return FEATURE_CHOICES.find((feature) => feature.id === featureId);
+}
+
+export function FindMarketDirection(directionId) {
+  return MARKET_DIRECTIONS.find((direction) => direction.id === directionId);
 }

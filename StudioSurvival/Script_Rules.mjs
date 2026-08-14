@@ -9,6 +9,7 @@ import {
   FindFeatureChoice,
   FindFoodPlan,
   FindGameType,
+  FindMarketDirection,
   FindMarketingCampaign,
   FindProject,
   FindStaff,
@@ -17,6 +18,8 @@ import {
   FOOD_PLANS,
   LIVING_BILLS,
   LIVE_REVENUE_EVENTS,
+  MARKET_DIRECTIONS,
+  MARKET_EVENTS,
   MODULE_KEYS,
   PIVOT_REASONS,
   PROJECTS,
@@ -24,7 +27,7 @@ import {
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs";
+} from "./Data_Game.mjs?v=20260815h";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -34,6 +37,7 @@ export const STARTUP_LOAN_TERMS = Object.freeze({
   dueMonth: 8,
 });
 export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
+export const MARKET_INDEPENDENT_ID = "independent";
 export const OWNER_HAIR_STAGES = Object.freeze({
   full: "full",
   thinning: "thinning",
@@ -74,6 +78,173 @@ function SeededUnit(seed) {
 
 function Average(values) {
   return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
+}
+
+function MarketTrendForMonth(state, requestedMonth) {
+  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
+  const trendPeriod = Math.floor((month - 1) / 2);
+  const trendIndex = Math.floor(SeededUnit((state?.seed || 82417) + trendPeriod * 733 + 17) * MARKET_DIRECTIONS.length) % MARKET_DIRECTIONS.length;
+  return MARKET_DIRECTIONS[trendIndex];
+}
+
+function MarketEventForMonth(state, requestedMonth) {
+  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
+  const eventIndex = Math.floor(SeededUnit((state?.seed || 82417) + month * 787 + 29) * MARKET_EVENTS.length) % MARKET_EVENTS.length;
+  return MARKET_EVENTS[eventIndex];
+}
+
+export function GetMarketSnapshot(state, requestedMonth = state?.month || 1) {
+  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
+  const trend = MarketTrendForMonth(state, month);
+  const marketEvent = MarketEventForMonth(state, month);
+  const effectiveDirection = FindMarketDirection(marketEvent?.directionId) || trend;
+  const nextTrend = MarketTrendForMonth(state, month + 1);
+  const confidence = 62 + Math.floor(SeededUnit((state?.seed || 82417) + month * 809 + 41) * 24);
+  return {
+    month,
+    trend,
+    event: marketEvent,
+    effectiveDirection,
+    heatMultiplier: marketEvent?.heatMultiplier || 1,
+    trendEndsMonth: (Math.floor((month - 1) / 2) + 1) * 2,
+    nextRumor: {
+      direction: nextTrend,
+      confidence,
+    },
+  };
+}
+
+function MarketFocusFor(state, requestedFocusId) {
+  if (!state?.project) return null;
+  const focusId = requestedFocusId || "concept";
+  if (focusId === "concept") {
+    const project = FindProject(state.project.templateId);
+    return project ? {
+      id: "concept",
+      title: "立项特色 · " + project.trend,
+      marketDirections: project.marketDirections || [],
+    } : null;
+  }
+  if (!state.project.features.some((feature) => feature.id === focusId)) return null;
+  const feature = FindFeatureChoice(focusId);
+  return feature ? {
+    id: feature.id,
+    title: feature.title,
+    marketDirections: feature.marketDirections || [],
+  } : null;
+}
+
+export function EvaluateMarketFit(state, overrides = {}) {
+  if (!state?.project) return null;
+  const savedStrategy = state.project.marketStrategy || {};
+  const hasFocusOverride = Object.prototype.hasOwnProperty.call(overrides, "focusId");
+  const hasDirectionOverride = Object.prototype.hasOwnProperty.call(overrides, "directionId");
+  const focusId = hasFocusOverride ? overrides.focusId : (savedStrategy.focusId || "concept");
+  let directionId = hasDirectionOverride ? overrides.directionId : (savedStrategy.directionId || null);
+  if (directionId === MARKET_INDEPENDENT_ID) directionId = null;
+  const focus = MarketFocusFor(state, focusId) || MarketFocusFor(state, "concept");
+  const snapshot = GetMarketSnapshot(state);
+  const effectiveDirection = snapshot.effectiveDirection;
+  const focusMatch = Boolean(focus?.marketDirections.includes(effectiveDirection.id));
+  const directionMatch = directionId === effectiveDirection.id;
+  const taboo = Boolean(directionId && snapshot.event?.tabooDirectionId === directionId);
+  const setMonth = Number(savedStrategy.setMonth) || 0;
+  const stale = setMonth > 0 && setMonth < state.month;
+  let result;
+
+  if (!directionId) {
+    result = {
+      tier: "independent",
+      label: "不追风，靠自然口碑",
+      description: focusMatch
+        ? "特色碰巧和风口沾边，但你没有主动迎合；只能吃到自然流量，也不会因蹭错热点挨骂。"
+        : "没有迎合承诺，市场只给自然流量。安全，但不调整就会少拿收入。",
+      revenueMultiplier: 0.82,
+      refundRateDelta: 0,
+      reputationDelta: 0,
+      fanMultiplier: 1,
+      backlash: false,
+      perfect: false,
+      tone: "neutral",
+    };
+  } else if (taboo) {
+    result = {
+      tier: "taboo",
+      label: "踩中雷区 · 人人喊打",
+      description: "突发事件刚把这套说法变成全网靶子，你却在最糟的时机把它写进宣传头条。",
+      revenueMultiplier: 0.28,
+      refundRateDelta: 0.32,
+      reputationDelta: -11,
+      fanMultiplier: 0.2,
+      backlash: true,
+      perfect: false,
+      tone: "danger",
+    };
+  } else if (directionMatch && focusMatch) {
+    result = {
+      tier: "perfect",
+      label: "特色 × 风向 · 正中风口",
+      description: "主打特色真的兑现了当月需求，迎合话术也恰好说中了玩家正在找的东西。",
+      revenueMultiplier: Clamp(effectiveDirection.perfectMultiplier * snapshot.heatMultiplier, 1.45, 2.25),
+      refundRateDelta: -0.035,
+      reputationDelta: 4,
+      fanMultiplier: 1.28,
+      backlash: false,
+      perfect: true,
+      tone: "good",
+    };
+  } else if (directionMatch) {
+    result = {
+      tier: "hollow",
+      label: "只改话术 · 硬蹭风口",
+      description: "宣传方向对了，主打特色却拿不出对应内容。玩家把这叫关键词诈骗。",
+      revenueMultiplier: 0.72,
+      refundRateDelta: 0.18,
+      reputationDelta: -5,
+      fanMultiplier: 0.55,
+      backlash: true,
+      perfect: false,
+      tone: "danger",
+    };
+  } else if (focusMatch) {
+    result = {
+      tier: "mixed",
+      label: "内容对了，时机说错了",
+      description: "游戏里明明有玩家想要的特色，你却沿用旧热点的话术，评论区开始质疑团队到底懂不懂自己的游戏。",
+      revenueMultiplier: 0.68,
+      refundRateDelta: 0.14,
+      reputationDelta: -4,
+      fanMultiplier: 0.7,
+      backlash: true,
+      perfect: false,
+      tone: "warning",
+    };
+  } else {
+    result = {
+      tier: "miss",
+      label: "方向过期 · 人人喊打",
+      description: "特色和迎合方向都没对上本月市场，宣传截图成了玩家群嘲新素材。",
+      revenueMultiplier: 0.42,
+      refundRateDelta: 0.25,
+      reputationDelta: -8,
+      fanMultiplier: 0.35,
+      backlash: true,
+      perfect: false,
+      tone: "danger",
+    };
+  }
+
+  return {
+    ...result,
+    snapshot,
+    focus,
+    direction: directionId ? FindMarketDirection(directionId) : null,
+    focusMatch,
+    directionMatch,
+    taboo,
+    stale,
+    setMonth,
+  };
 }
 
 function PushLog(state, text, tone = "normal") {
@@ -189,6 +360,8 @@ function FreshProject(projectId, gameTypeId, projectName = "") {
     features: [],
     featureLoad: { art: 0, design: 0, client: 0, performance: 0 },
     lastCommercial: null,
+    marketStrategy: { focusId: "concept", directionId: null, setMonth: 0 },
+    marketStrategyHistory: [],
     pivotCount: 0,
     pivotHistory: [],
     activeLiveEvents: [],
@@ -341,6 +514,8 @@ export function PivotProject(currentState, newProjectId, newGameTypeId) {
   project.campaigns = [];
   project.features = [];
   project.featureLoad = { art: 0, design: 0, client: 0, performance: 0 };
+  project.marketStrategy = { focusId: "concept", directionId: null, setMonth: 0 };
+  project.marketStrategyHistory = [];
   project.abstractIdeas = [];
   project.activeLiveEvents = [];
   project.age = 0;
@@ -778,7 +953,17 @@ function BaseLiveIncome(state) {
 
 function ResolveLiveIncome(state) {
   if (!state.project?.isReleased) {
-    return { income: 0, baseIncome: 0, eventLoss: 0, eventMultiplier: 1, liveEvent: null, appliedEvents: [] };
+    return {
+      income: 0,
+      baseIncome: 0,
+      marketBaseIncome: 0,
+      marketDelta: 0,
+      eventLoss: 0,
+      eventMultiplier: 1,
+      liveEvent: null,
+      appliedEvents: [],
+      marketFit: EvaluateMarketFit(state),
+    };
   }
   const project = state.project;
   project.activeLiveEvents ||= [];
@@ -799,22 +984,51 @@ function ResolveLiveIncome(state) {
     return event ? { ...event, remaining: active.remaining } : null;
   }).filter(Boolean);
   const eventMultiplier = Clamp(appliedEvents.reduce((value, event) => value * event.multiplier, 1), 0.16, 1);
-  const baseIncome = BaseLiveIncome(state);
+  const marketFit = EvaluateMarketFit(state);
+  const marketBaseIncome = BaseLiveIncome(state);
+  const baseIncome = RoundMoney(marketBaseIncome * (marketFit?.revenueMultiplier || 1));
+  const marketDelta = baseIncome - marketBaseIncome;
   const income = RoundMoney(baseIncome * eventMultiplier);
   const eventLoss = Math.max(0, baseIncome - income);
+  if (marketFit?.backlash) {
+    const lostFans = Math.max(20, Math.round(state.fans * (1 - marketFit.fanMultiplier) * 0.08));
+    state.fans = Math.max(0, state.fans - lostFans);
+    state.reputation = Clamp(state.reputation + marketFit.reputationDelta * 0.35, 0, 100);
+    state.anxiety = Clamp(state.anxiety + (marketFit.tier === "taboo" ? 5 : 3), 0, 100);
+    PushLog(state, marketFit.label + "：" + marketFit.description + " 本月常态流水被市场反噬。", "danger");
+  } else if (marketFit?.perfect) {
+    state.reputation = Clamp(state.reputation + 1, 0, 100);
+    PushLog(state, marketFit.label + "：本月常态流水乘数 ×" + marketFit.revenueMultiplier.toFixed(2) + "。", "good");
+  }
   project.activeLiveEvents.forEach((active) => { active.remaining -= 1; });
   project.activeLiveEvents = project.activeLiveEvents.filter((active) => active.remaining > 0);
   state.incomeHistory.push({
     month: state.month,
     source: "live",
     baseIncome,
+    marketBaseIncome,
+    marketDelta,
+    marketTier: marketFit?.tier || "independent",
     income,
     eventLoss,
     eventMultiplier,
-    events: appliedEvents.map((event) => event.title),
+    events: [
+      ...(marketFit?.backlash ? [marketFit.label] : marketFit?.perfect ? [marketFit.label] : []),
+      ...appliedEvents.map((event) => event.title),
+    ],
   });
   state.incomeHistory = state.incomeHistory.slice(-36);
-  return { income, baseIncome, eventLoss, eventMultiplier, liveEvent, appliedEvents };
+  return {
+    income,
+    baseIncome,
+    marketBaseIncome,
+    marketDelta,
+    eventLoss,
+    eventMultiplier,
+    liveEvent,
+    appliedEvents,
+    marketFit,
+  };
 }
 
 function RemoveUnpayableTeam(state, availableBudget, baseCosts) {
@@ -928,6 +1142,9 @@ function ProcessFinances(state) {
   return {
     income,
     baseIncome: liveRevenue.baseIncome,
+    marketBaseIncome: liveRevenue.marketBaseIncome,
+    marketDelta: liveRevenue.marketDelta,
+    marketFit: liveRevenue.marketFit,
     eventLoss: liveRevenue.eventLoss,
     eventMultiplier: liveRevenue.eventMultiplier,
     liveEvent: liveRevenue.liveEvent,
@@ -1077,18 +1294,28 @@ function RevenueForRating(state, rating, isUpdate) {
   return RoundMoney(Math.max(0, launchBase * updateLift));
 }
 
-function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
+function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue, marketFit) {
+  const marketMultiplier = marketFit?.revenueMultiplier || 1;
+  const marketRefundDelta = marketFit?.refundRateDelta || 0;
   if (isUpdate) {
+    const marketBaseRevenue = baseRevenue;
+    const grossRevenue = RoundMoney(marketBaseRevenue * marketMultiplier);
+    const refundRate = marketFit?.backlash ? Clamp(0.06 + marketRefundDelta, 0.08, 0.72) : 0;
+    const refunds = RoundMoney(grossRevenue * refundRate);
     return {
-      grossRevenue: baseRevenue,
-      refunds: 0,
-      refundRate: 0,
-      netRevenue: baseRevenue,
-      backlash: false,
+      marketBaseRevenue,
+      marketMultiplier,
+      grossRevenue,
+      refunds,
+      refundRate,
+      netRevenue: Math.max(0, grossRevenue - refunds),
+      backlash: Boolean(marketFit?.backlash),
+      marketBacklash: Boolean(marketFit?.backlash),
       delivered: rating >= 7.6,
       promisedRating: state.project.lastCommercial?.promisedRating || 0,
       expectationGap: 0,
       wishlistSales: 0,
+      marketLabel: marketFit?.label || "",
     };
   }
   const gameType = FindGameType(state.project.gameTypeId);
@@ -1096,7 +1323,8 @@ function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
   const purchaseRate = Clamp(0.06 + rating * 0.045, 0.08, 0.48);
   const wishlistSales = Math.round(state.project.wishlists * purchaseRate);
   const wishlistGross = wishlistSales * saleValue;
-  const grossRevenue = RoundMoney(baseRevenue + wishlistGross);
+  const marketBaseRevenue = RoundMoney(baseRevenue + wishlistGross);
+  const grossRevenue = RoundMoney(marketBaseRevenue * marketMultiplier);
   const marketingPressure = Clamp(state.project.expectation / 45, 0, 1.35);
   const promisedRating = state.project.expectation > 0 ? 4.6 + state.project.expectation * 0.087 : 0;
   const expectationGap = promisedRating > 0 ? promisedRating - rating : 0;
@@ -1107,21 +1335,27 @@ function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
           : rating < 6.5 ? 0.06
             : 0.025;
   const expectationRefund = Math.max(0, expectationGap) * (0.045 + marketingPressure * 0.08);
-  const refundRate = Clamp(qualityRefund + expectationRefund, 0.02, 0.92);
+  const refundRate = Clamp(qualityRefund + expectationRefund + marketRefundDelta, 0.02, 0.96);
   const refunds = RoundMoney(grossRevenue * refundRate);
   const netRevenue = Math.max(0, grossRevenue - refunds);
-  const backlash = state.project.marketingSpent > 0 && (refundRate >= 0.24 || expectationGap >= 1.25);
-  const delivered = state.project.marketingSpent > 0 && rating >= promisedRating - 0.35;
+  const marketingBacklash = state.project.marketingSpent > 0 && (refundRate >= 0.24 || expectationGap >= 1.25);
+  const marketBacklash = Boolean(marketFit?.backlash);
+  const backlash = marketingBacklash || marketBacklash;
+  const delivered = state.project.marketingSpent > 0 && rating >= promisedRating - 0.35 && !marketBacklash;
   return {
+    marketBaseRevenue,
+    marketMultiplier,
     grossRevenue,
     refunds,
     refundRate,
     netRevenue,
     backlash,
+    marketBacklash,
     delivered,
     promisedRating,
     expectationGap,
     wishlistSales,
+    marketLabel: marketFit?.label || "",
   };
 }
 
@@ -1145,7 +1379,8 @@ function ResolveReleaseAnxiety(state, rating, isUpdate, oldRating, commercial) {
   if (commercial?.backlash) delta += Math.round(6 + commercial.refundRate * 18);
   else if (commercial?.delivered) delta -= 4;
   state.anxiety = Clamp(state.anxiety + delta, 0, 100);
-  if (commercial?.backlash) PushLog(state, `宣发吹得太响，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，老板焦虑 +${delta}。`, "danger");
+  if (commercial?.marketBacklash) PushLog(state, `市场时机踩空，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，评论区开团，老板焦虑 +${delta}。`, "danger");
+  else if (commercial?.backlash) PushLog(state, `宣发吹得太响，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，老板焦虑 +${delta}。`, "danger");
   else if (delta >= 8) PushLog(state, `玩家把烂版本骂上热评，老板焦虑 +${delta}。`, "danger");
   else if (delta < 0) PushLog(state, `版本口碑让老板短暂相信自己，焦虑 ${delta}。`, "good");
   CheckAnxietyFailure(state);
@@ -1184,8 +1419,9 @@ export function ReleaseBuild(currentState) {
 
   const evaluation = EvaluateProject(state);
   const isUpdate = state.project.isReleased;
+  const marketFit = EvaluateMarketFit(state);
   const baseRevenue = RevenueForRating(state, evaluation.rating, isUpdate);
-  const commercial = ResolveCommercialOutcome(state, evaluation.rating, isUpdate, baseRevenue);
+  const commercial = ResolveCommercialOutcome(state, evaluation.rating, isUpdate, baseRevenue, marketFit);
   const revenue = commercial.netRevenue;
   const oldRating = state.project.lastRating;
   state.project.isReleased = true;
@@ -1193,16 +1429,30 @@ export function ReleaseBuild(currentState) {
   state.project.lastRating = evaluation.rating;
   state.project.bestRating = Math.max(state.project.bestRating || 0, evaluation.rating);
   const ratingDelta = oldRating == null ? 0 : evaluation.rating - oldRating;
-  const earnedFans = Math.max(0, evaluation.rating - 4) * (isUpdate ? 310 : 820);
-  const backlashFans = commercial.backlash ? Math.round(state.project.wishlists * commercial.refundRate * 0.22) : 0;
+  const earnedFans = Math.max(0, evaluation.rating - 4) * (isUpdate ? 310 : 820) * (marketFit?.fanMultiplier || 1);
+  const marketBacklashFans = marketFit?.backlash
+    ? Math.round(350 + state.fans * (1 - marketFit.fanMultiplier) * 0.18 + commercial.grossRevenue / 900)
+    : 0;
+  const backlashFans = commercial.backlash
+    ? Math.round(state.project.wishlists * commercial.refundRate * 0.22) + marketBacklashFans
+    : 0;
   state.fans = Math.max(0, Math.round(state.fans + earnedFans - backlashFans));
   const backlashMarketPenalty = commercial.backlash
     ? Clamp(1 - commercial.refundRate * 0.8 - Math.max(0, commercial.expectationGap) * 0.06, 0.35, 1)
     : 1;
   const launchMarketScale = (1 + Math.min(3.2, state.project.wishlists / 25000)
-    * Clamp((evaluation.rating - 2.5) / 6.5, 0.05, 1)) * backlashMarketPenalty;
+    * Clamp((evaluation.rating - 2.5) / 6.5, 0.05, 1))
+    * backlashMarketPenalty
+    * (marketFit?.perfect ? 1.16 : 1);
   state.project.marketScale = isUpdate
-    ? Clamp(state.project.marketScale * MarketGrowthForRating(evaluation.rating, ratingDelta), 0.5, 100000000)
+    ? Clamp(
+      state.project.marketScale
+        * MarketGrowthForRating(evaluation.rating, ratingDelta)
+        * backlashMarketPenalty
+        * (marketFit?.perfect ? 1.08 : 1),
+      0.5,
+      100000000,
+    )
     : Clamp(launchMarketScale, 0.5, 4.2);
   state.project.monthlyRevenue = MonthlyRevenueForRating(state, evaluation.rating)
     * (commercial.backlash ? Clamp(1 - commercial.refundRate * 0.72, 0.32, 1) : 1);
@@ -1216,6 +1466,9 @@ export function ReleaseBuild(currentState) {
     rating: evaluation.rating,
     revenue,
     grossRevenue: commercial.grossRevenue,
+    marketBaseRevenue: commercial.marketBaseRevenue,
+    marketMultiplier: commercial.marketMultiplier,
+    marketTier: marketFit?.tier || "independent",
     refunds: commercial.refunds,
     refundRate: commercial.refundRate,
   });
@@ -1226,15 +1479,25 @@ export function ReleaseBuild(currentState) {
     month: state.month,
     source: isUpdate ? "update" : "launch",
     baseIncome: commercial.grossRevenue,
+    marketBaseIncome: commercial.marketBaseRevenue,
+    marketDelta: commercial.grossRevenue - commercial.marketBaseRevenue,
+    marketTier: marketFit?.tier || "independent",
     income: revenue,
     refunds: commercial.refunds,
     eventLoss: 0,
-    events: commercial.backlash ? ["宣发反噬与集中退款"] : [],
+    events: [
+      ...(marketFit?.perfect || marketFit?.backlash ? [marketFit.label] : []),
+      ...(commercial.backlash ? ["集中退款与口碑反噬"] : []),
+    ],
   });
   state.incomeHistory = state.incomeHistory.slice(-36);
   state.bestRating = Math.max(state.bestRating || 0, evaluation.rating);
   const backlashReputation = commercial.backlash ? 5 + commercial.refundRate * 16 + Math.max(0, commercial.expectationGap) * 1.8 : 0;
-  state.reputation = Clamp(state.reputation + (evaluation.rating - 5) * 1.4 - backlashReputation, 0, 100);
+  state.reputation = Clamp(
+    state.reputation + (evaluation.rating - 5) * 1.4 - backlashReputation + (marketFit?.reputationDelta || 0),
+    0,
+    100,
+  );
   const anxiety = ResolveReleaseAnxiety(state, evaluation.rating, isUpdate, oldRating, commercial);
 
   const review = PickReview(evaluation.rating, state.seed + state.month * 113 + state.project.version);
@@ -1249,6 +1512,7 @@ export function ReleaseBuild(currentState) {
     evaluation,
     revenue,
     commercial,
+    marketFit,
     oldRating,
     anxiety,
     review,
@@ -1402,6 +1666,53 @@ export function SetStaffInvestmentLevel(currentState, staffId, requestedLevel) {
     plan,
     monthlyCost: GetMemberMonthlyCost(member),
     message: staff.kind === "ai" ? `AI 已切换到 ${plan.name}` : `${staff.name} 的工资档位已调整`,
+  };
+}
+
+export function SetMarketStrategy(currentState, requestedFocusId, requestedDirectionId) {
+  const state = Clone(currentState);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "现在没有项目可供市场部糟蹋。" };
+  const previousStrategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
+  if (previousStrategy.setMonth === state.month) {
+    return { state, ok: false, message: "本月市场口径已经发出去了。再改就会同时留下两套互相打脸的截图。" };
+  }
+  if (state.talkPoints <= 0) return { state, ok: false, message: "本月有效拍板次数用完了。市场部的消息只能先标成未读。" };
+  const focusId = requestedFocusId || "concept";
+  const focus = MarketFocusFor(state, focusId);
+  if (!focus) return { state, ok: false, message: "这个主打特色还没做进游戏，不能先把它写进热搜。" };
+  const directionId = requestedDirectionId === MARKET_INDEPENDENT_ID ? null : requestedDirectionId;
+  if (directionId && !FindMarketDirection(directionId)) return { state, ok: false, message: "这个迎合方向不存在，可能是市场部刚编的词。" };
+
+  const switchedDirection = Boolean(previousStrategy.directionId && previousStrategy.directionId !== directionId);
+  state.talkPoints -= 1;
+  state.project.marketStrategy = {
+    focusId: focus.id,
+    directionId,
+    setMonth: state.month,
+  };
+  state.project.marketStrategyHistory ||= [];
+  state.project.marketStrategyHistory.push({
+    month: state.month,
+    focusId: focus.id,
+    directionId,
+  });
+  state.project.marketStrategyHistory = state.project.marketStrategyHistory.slice(-24);
+  if (directionId) {
+    state.project.hype = Clamp(state.project.hype + 3, 0, 100);
+    state.project.scopeDebt = Clamp(state.project.scopeDebt + (switchedDirection ? 2 : 1), 0, 80);
+  }
+  const marketFit = EvaluateMarketFit(state);
+  const directionName = marketFit.direction?.name || "不主动追风";
+  PushLog(
+    state,
+    "手机市场口径拍板：主打「" + focus.title + "」，方向「" + directionName + "」。预判：" + marketFit.label + "。",
+    marketFit.backlash ? "warning" : marketFit.perfect ? "good" : "normal",
+  );
+  return {
+    state,
+    ok: true,
+    marketFit,
+    message: marketFit.perfect ? "本月特色与风口正好对上" : marketFit.backlash ? "口径已发出，但评论区可能开团" : "本月市场口径已锁定",
   };
 }
 
@@ -1744,6 +2055,8 @@ export function GetPublicCatalog() {
     foodPlans: FOOD_PLANS,
     marketingCampaigns: MARKETING_CAMPAIGNS,
     featureChoices: FEATURE_CHOICES,
+    marketDirections: MARKET_DIRECTIONS,
+    marketEvents: MARKET_EVENTS,
     studentPayLevels: STUDENT_PAY_LEVELS,
     aiSubscriptionLevels: AI_SUBSCRIPTION_LEVELS,
     pivotReasons: PIVOT_REASONS,
@@ -1801,6 +2114,19 @@ export function ValidateState(candidate) {
       || !Number.isFinite(project.featureLoad[moduleKey]) || project.featureLoad[moduleKey] < 0)) return false;
   if (!Array.isArray(project.features) || project.features.some((feature) => !FindFeatureChoice(feature?.id))) return false;
   if (!Array.isArray(project.campaigns) || project.campaigns.some((campaignId) => !FindMarketingCampaign(campaignId))) return false;
+  if (project.marketStrategy) {
+    const strategy = project.marketStrategy;
+    if (!MarketFocusFor(candidate, strategy.focusId)
+      || (strategy.directionId !== null && !FindMarketDirection(strategy.directionId))
+      || !Number.isInteger(strategy.setMonth) || strategy.setMonth < 0 || strategy.setMonth > candidate.month) return false;
+  }
+  if (project.marketStrategyHistory !== undefined) {
+    if (!Array.isArray(project.marketStrategyHistory) || project.marketStrategyHistory.some((entry) => (
+      !Number.isInteger(entry?.month) || entry.month < 1 || entry.month > candidate.month
+      || !MarketFocusFor(candidate, entry.focusId)
+      || (entry.directionId !== null && !FindMarketDirection(entry.directionId))
+    ))) return false;
+  }
   if (!Array.isArray(project.abstractIdeas) || project.abstractIdeas.some((idea) => !ABSTRACT_IDEAS.some((candidateIdea) => candidateIdea.id === idea?.id))) return false;
   if (!Array.isArray(project.pivotHistory) || !Array.isArray(project.releaseHistory)
     || !Array.isArray(project.activeLiveEvents) || !Array.isArray(project.painHistory)) return false;

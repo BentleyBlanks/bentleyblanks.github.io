@@ -14,8 +14,8 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815g/, "mobile CSS changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815g/, "mobile input changes must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815h/, "mobile CSS changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815h/, "mobile input changes must bypass the Pages cache");
 
 assert.match(css, /--controlSize:\s*clamp\(58px,\s*15\.5vh,\s*70px\)/, "primary controls must scale with short landscape screens");
 assert.match(css, /\.interactButton\.available/, "the contextual action needs a high-confidence ready state");

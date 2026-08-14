@@ -828,7 +828,7 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .gameHud {
   min-height: 88px;
   display: grid;
-  grid-template-columns: minmax(198px, 228px) minmax(470px, 1fr) minmax(250px, 300px) 132px;
+  grid-template-columns: minmax(198px, 228px) minmax(470px, 1fr) minmax(250px, 300px) 172px;
   align-items: stretch;
   gap: 10px;
 }
@@ -1028,7 +1028,7 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .anxietyHud .conditionTrack i { background: linear-gradient(90deg, #ff72b2, #f04f65); }
 
 .systemConsole { display: grid; grid-template-rows: 17px 1fr; }
-.systemControls { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+.systemControls { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
 .roundButton {
   width: auto;
   min-width: 0;
@@ -1048,6 +1048,245 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .roundButton:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(0,0,0,.6), 0 1px 1px rgba(0,0,0,.5); }
 .roundButton.muted { background: linear-gradient(180deg, #755054, #52363b 48%, #302429); }
 .roundButton.muted span { color: #ff9a9f; }
+.roundButton:disabled { opacity: .42; cursor: not-allowed; filter: grayscale(.55); }
+.phoneButton { position: relative; }
+.phoneButton::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #201012;
+  border-radius: 50%;
+  background: #62666c;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.25);
+  opacity: 0;
+}
+.phoneButton.marketAlert::after {
+  opacity: 1;
+  background: #ff5767;
+  box-shadow: inset 0 1px 1px #ffd7da, 0 0 8px rgba(255,71,88,.95);
+  animation: phoneMarketPulse .9s ease-in-out infinite alternate;
+}
+.phoneButton.marketPerfect {
+  background: linear-gradient(180deg, #4d7863, #335542 48%, #253a30);
+}
+.phoneButton.marketPerfect span { color: #a9f1c9; }
+@keyframes phoneMarketPulse { to { transform: scale(1.28); filter: brightness(1.2); } }
+
+/* Market phone ------------------------------------------------------------- */
+.marketPhone {
+  width: min(690px, 100%);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #4a4e58;
+  border-radius: 19px;
+  background:
+    radial-gradient(circle at 82% 0, rgba(141,124,255,.16), transparent 30%),
+    #090b10;
+  box-shadow: inset 0 0 0 4px #05060a, 0 18px 45px rgba(0,0,0,.35);
+}
+.phoneStatusBar {
+  height: 27px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 17px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: #aeb1ba;
+  font: 700 7px/1 Consolas, monospace;
+  letter-spacing: .08em;
+}
+.phoneStatusBar b { color: #f0edf9; font-size: 7px; letter-spacing: .15em; text-align: center; }
+.phoneStatusBar span:last-child { text-align: right; }
+.marketHero {
+  position: relative;
+  padding: 18px 19px 16px;
+  overflow: hidden;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--marketColor) 34%, #11131a), #12151d 72%),
+    #141720;
+}
+.marketHero::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  bottom: -62px;
+  width: 180px;
+  height: 180px;
+  border: 26px solid color-mix(in srgb, var(--marketColor) 22%, transparent);
+  border-radius: 50%;
+}
+.marketHero > span {
+  position: relative;
+  z-index: 1;
+  color: color-mix(in srgb, var(--marketColor) 76%, white);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+.marketHero > strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 4px;
+  color: #fff;
+  font-size: 25px;
+  letter-spacing: -.04em;
+}
+.marketHero > p {
+  position: relative;
+  z-index: 1;
+  max-width: 470px;
+  margin: 5px 0 11px;
+  color: #c7cad3;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.marketHero > div {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.marketHero > div b { color: color-mix(in srgb, var(--marketColor) 70%, white); font-size: 11px; }
+.marketHero > div small { color: #969aa6; font-size: 7px; }
+.marketFeed {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 6px;
+  padding: 8px;
+  background: #0f1218;
+}
+.phoneStory {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #292e38;
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 46%), #171a21;
+}
+.phoneStory > span { color: #888e9a; font-size: 6.5px; letter-spacing: .06em; }
+.phoneStory > strong { display: block; margin-top: 4px; color: #ece9f5; font-size: 9px; line-height: 1.25; }
+.phoneStory > p { margin: 5px 0 0; color: #a7abb5; font-size: 7.5px; line-height: 1.42; }
+.phoneStory.breaking { border-color: rgba(255,92,106,.42); background: linear-gradient(145deg, rgba(255,83,100,.12), transparent 50%), #1b171d; }
+.phoneStory.breaking > span, .phoneStory.breaking > strong { color: #ff98a2; }
+.phoneStory.rumor { border-style: dashed; }
+.phoneStory.rumor > strong { color: #b9adff; }
+.phoneLiveAlerts, .marketStrategyForm { padding: 0 11px 11px; }
+.phoneLiveAlerts { padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); }
+.phoneSectionTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin: 11px 0 7px;
+}
+.phoneSectionTitle strong { color: #f1eef9; font-size: 10px; }
+.phoneSectionTitle span { color: #7f8490; font-size: 7px; }
+.phoneAlert {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 1px solid #3a3136;
+  border-radius: 6px;
+  background: rgba(255,83,100,.07);
+  font-size: 8px;
+}
+.phoneAlert b { color: #ff9da6; }
+.phoneAlert span { color: #b8a4aa; }
+.marketPickGrid { display: grid; gap: 6px; }
+.marketPickGrid.focusGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.marketPickGrid.directionGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.marketPick {
+  position: relative;
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+}
+.marketPick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.marketPick > span {
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid #30343e;
+  border-radius: 7px;
+  background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 42%), #171a21;
+  transition: border-color .12s ease, background .12s ease, transform .12s ease;
+}
+.marketPick:hover > span { border-color: #69627e; background-color: #20232d; }
+.marketPick:has(input:checked) > span {
+  border-color: var(--pickColor, #8d7cff);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--pickColor, #8d7cff) 17%, transparent), transparent 52%), #20212b;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pickColor, #8d7cff) 34%, transparent);
+}
+.marketPick:has(input:focus-visible) > span { outline: 2px solid #fff; outline-offset: 2px; }
+.marketPick:has(input:disabled) { cursor: not-allowed; opacity: .66; }
+.marketPick b { color: #eeebf6; font-size: 8.5px; line-height: 1.25; }
+.marketPick small { color: #969ba7; font-size: 7px; line-height: 1.4; }
+.marketPick em { display: flex; flex-wrap: wrap; gap: 3px; color: #8d93a0; font-size: 6.5px; font-style: normal; }
+.marketTag {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--marketTagColor) 45%, transparent);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--marketTagColor) 10%, transparent);
+  color: color-mix(in srgb, var(--marketTagColor) 72%, white);
+  font-size: 6.5px;
+  font-style: normal;
+}
+.marketFeatureTags { margin-top: 6px; }
+.marketFeatureAction, .marketCommit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  color: #8d929e;
+  font-size: 7px;
+}
+.marketFeatureAction button:disabled { opacity: .38; cursor: not-allowed; }
+.marketFitPreview {
+  margin-top: 11px;
+  padding: 11px;
+  border: 1px solid #363b45;
+  border-left: 4px solid #777d89;
+  border-radius: 7px;
+  background: #15181e;
+}
+.marketFitPreview.good { border-left-color: #68e0a0; background: linear-gradient(110deg, rgba(104,224,160,.09), transparent 45%), #15181e; }
+.marketFitPreview.warning { border-left-color: #ffd166; background: linear-gradient(110deg, rgba(255,209,102,.08), transparent 45%), #15181e; }
+.marketFitPreview.danger { border-left-color: #ff5f70; background: linear-gradient(110deg, rgba(255,83,100,.11), transparent 48%), #17161b; }
+.marketFitStatus { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.marketFitStatus span { color: #8e939e; font-size: 7px; }
+.marketFitStatus strong { color: #f3effb; font-size: 12px; }
+.marketFitPreview.good .marketFitStatus strong { color: #9cf0c3; }
+.marketFitPreview.warning .marketFitStatus strong { color: #ffe092; }
+.marketFitPreview.danger .marketFitStatus strong { color: #ff9ba5; }
+.marketFitPreview > p { margin: 5px 0 8px; color: #aaafba; font-size: 8px; line-height: 1.45; }
+.marketFitMetrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.marketFitMetrics span { padding: 6px 7px; border-radius: 5px; background: rgba(255,255,255,.035); }
+.marketFitMetrics small { display: block; color: #7d838e; font-size: 6px; }
+.marketFitMetrics b { display: block; margin-top: 2px; color: #e7e4ef; font-size: 8px; }
+.marketCommit {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.marketCommit span { max-width: 390px; line-height: 1.45; }
+.marketCommit .primaryButton { flex: 0 0 auto; }
 
 .missionCard {
   top: calc(var(--safeTop) + 101px);
@@ -1243,7 +1482,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 .portraitBlocker { display: none; }
 
 @media (max-width: 1050px) {
-  .gameHud { grid-template-columns: 54px minmax(400px,1fr) minmax(205px,245px) 104px; gap: 7px; }
+  .gameHud { grid-template-columns: 54px minmax(400px,1fr) minmax(205px,245px) 138px; gap: 7px; }
   .identityConsole { padding: 6px; }
   .brandChip { width: 100%; min-width: 0; padding: 5px; }
   .brandChip > span { width: 36px; height: 36px; margin: 0; }
@@ -1301,6 +1540,22 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .conditionHud b { min-height: 14px; font-size: 8px; }
   .roundButton { width: auto; border-radius: 5px; }
   .roundButton span { font-size: 13px; }
+  .marketPhone { border-radius: 12px; }
+  .phoneStatusBar { height: 21px; padding-inline: 12px; }
+  .marketHero { padding: 10px 13px 9px; }
+  .marketHero > strong { font-size: 18px; }
+  .marketHero > p { margin-block: 3px 6px; font-size: 7px; }
+  .marketFeed { padding: 5px; gap: 4px; }
+  .phoneStory { padding: 6px; }
+  .phoneStory > p { font-size: 6.5px; }
+  .phoneLiveAlerts, .marketStrategyForm { padding: 0 7px 7px; }
+  .phoneSectionTitle { margin: 7px 0 4px; }
+  .marketPickGrid { gap: 4px; }
+  .marketPick > span { padding: 6px; gap: 2px; }
+  .marketPick small { font-size: 6px; }
+  .marketFitPreview { margin-top: 7px; padding: 7px; }
+  .marketFitPreview > p { margin: 3px 0 5px; font-size: 6.5px; }
+  .marketCommit { margin-top: 6px; padding-top: 6px; }
   .missionCard { top: calc(var(--safeTop) + 84px); width: min(315px,32vw); min-height: 0; padding: 17px 13px 11px; border-radius: 2px; }
   .missionCard::after { top: 40px; }
   .missionHeading { padding-bottom: 4px; }
@@ -1406,7 +1661,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 640px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(320px,1fr) 155px 86px; gap: 4px; }
+  .gameHud { grid-template-columns: minmax(320px,1fr) 155px 112px; gap: 4px; }
   .identityConsole { display: none; }
   .businessConsoleBody { grid-template-columns: minmax(190px,1fr) minmax(120px,.62fr); gap: 4px; }
   .businessReadouts { gap: 3px; }
@@ -1417,16 +1672,18 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .systemControls { gap: 3px; }
   .missionCard { width: 210px; }
   .worldGrid.three { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .marketPickGrid.directionGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
 @media (max-width: 520px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(260px,1fr) 140px 78px; }
+  .gameHud { grid-template-columns: minmax(260px,1fr) 140px 102px; }
   .businessConsoleBody { grid-template-columns: 1fr; }
   .goalHud { display: none; }
   .anxietyHud { display: grid; }
   .gameHud { max-width: calc(100vw - var(--safeLeft) - var(--safeRight)); }
   .missionCard { width: 185px; }
   .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }
+  .marketPickGrid.focusGrid { grid-template-columns: 1fr; }
 }
 
 /* Mobile landscape controls -------------------------------------------------
