@@ -41,8 +41,29 @@
           "innerArt": "DrawHomeInterior",
           "innerBand": "building",
           "facadeArt": "DrawHouse",
-          "facadeBand": "facade"
+          "facadeBand": "facade",
+          "wingArt": "DrawRoomWing",
+          "wingKind": "roomWing",
+          "wingSpan": 6.5
         }
+      }
+    },
+    "roomWing": {
+      "note": "屋子东/西两头的山墙内侧。不摆在场景里——由 Script_World 跟着 house 的 interior 变体一起建，只在过场撤掉第四堵墙那一档现身（不然院子里就凭空立着两堵墙）。wingSpan 是从墙角往外铺多少米：第一章屋内过场逐镜量过（shot --eval 把 NDC±1 反解成墙面深度上的世界 x），最宽的两镜要东 4.7（序·娘冲进来）与西 5.4（c1_end 收尾），6.5 是那个数加一档余量。这是一张定宽的贴图，所以最宽的那一镜定了它：换来的代价是最远的几镜里墙比屋子长，见 CLAUDE.md「山墙内侧」一节",
+      "art": "DrawRoomWing",
+      "band": "building",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 24,
+          "per": "w"
+        },
+        "h": {
+          "pad": 90,
+          "per": "h"
+        },
+        "anchor": "center",
+        "baseline": 6
       }
     },
     "doorframe": {

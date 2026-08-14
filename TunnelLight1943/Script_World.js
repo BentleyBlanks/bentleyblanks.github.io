@@ -535,6 +535,9 @@ export function CreateWorld(canvasEl) {
   let ropeLineMesh = null, ropeCoilMesh = null;
   let homeFacade = null, homeRange = null;
   let facadeBehind = false;   // 立面淡下去之后有没有让到演员后头（见 UpdateProps）
+  // 屋子东西两头的山墙内侧（见 Art.DrawRoomWing 顶上那段）：过场撤掉第四堵墙
+  // 之后，画框越过后墙的边就望见野地——这两片是屋子本来就有的墙
+  let homeWings = null;
 
   // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
   // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
@@ -643,6 +646,7 @@ export function CreateWorld(canvasEl) {
     wellShaft = null; wellDeepBucket = null; wellDeepFull = null; wellRipple = null; wellDeepRope = null;
     ropeLineMesh = null; ropeCoilMesh = null;
     homeFacade = null; homeRange = null; facadeBehind = false;
+    homeWings = null;
     coneMeshes = [];
     shadeMeshes = [];
     lightStrip = null; lightBeam = null; lightKey = "";
@@ -1560,8 +1564,10 @@ export function CreateWorld(canvasEl) {
     // 摆位走 PlaceZ、排序走 DepthOrder：行走线上的道具（walk/loose/facade）
     // 一律压回地平面 z=0，与演员踩同一条地平线；深度带只剩绘制顺序这一个职责
     //（见 Data_DepthSpec 的「地平线规范」）。
-    const mk = (fn, { z = S.z, x = gx, y = gy } = {}) => {
-      const mesh = BakeSprite(S.w, S.h, S.ax, S.ay, fn, 0, S.ss);
+    // sp：换一张烘焙画布（同一件物体身上还挂着别的贴图时用，例如屋子的山墙内侧
+    // ——它的画布比屋子本身窄得多，尺寸另在 Data_PropArt 的 roomWing 里登记）
+    const mk = (fn, { z = S.z, x = gx, y = gy, sp = S } = {}) => {
+      const mesh = BakeSprite(sp.w, sp.h, sp.ax, sp.ay, fn, 0, sp.ss);
       PlaceSprite(mesh, x, y, PlaceZ(z));
       FixOrder(mesh, DepthOrder("play", z));
       mesh.userData.kind = p.kind;
@@ -1588,11 +1594,35 @@ export function CreateWorld(canvasEl) {
             { z: BAND[V2.innerBand] });
           homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
             { z: BAND[V2.facadeBand] });
+          // 东西两头的山墙内侧。后墙那片按透视只占到画框的一小截，过场又把
+          // 第四堵墙整个撤掉——越过后墙的边就是野地和炮楼。屋子那两头本来就有
+          // 一道墙，这里把它接上（画法与三条约束见 Art.DrawRoomWing）。
+          // 建出来就一直在，露不露由 UpdateProps 每帧定。
+          const span = V2.wingSpan;
+          const WING = SpriteOf(V2.wingKind, { w: span, h: p.h });
+          homeWings = [1, -1].map((side) => {
+            const mesh = mk((ctx, ax, ay) => ART.DrawRoomWing(ctx, ax, ay, span * PPM, H,
+              p.id + (side > 0 ? "wingE" : "wingW"),
+              // 灯窝在炕这一头（炕在西头），东头那道墙上只有一根空着的木橛
+              { side, night, feature: side > 0 ? "peg" : "niche" }),
+            { z: BAND[V2.innerBand], x: p.x + side * (p.w / 2 + span / 2), sp: WING });
+            mesh.userData.kind = V2.wingKind;
+            // 摆在 building 带（跟后墙同一个平面），**绘制序却要往前挪一档**：
+            // 院里那些 yard 带的东西（老榆树、告示墙、鸡笼、猪圈）按 z 排在
+            // 后墙之前，画框往两头一开，它们就贴在屋里这道墙上了。挪到 nearBack
+            // 正好压过 yard、又稳稳低于行走线与演员——柱子还站在墙前面。
+            // （院里那些 walk 带的杂物压不住，那是这一档能做到的边界，见 CLAUDE.md）
+            SetPlayOrder(mesh, BAND.nearBack, "roomWing");
+            mesh.visible = false;
+            return mesh;
+          });
           // 屋子占的那段街由 Core 的 HouseSpan 给（判定与画面共用一份边界）。
           // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
           // 洞宽 30px）——那是画笔的事，留在这儿。NPC 得走到门口才消失在
           // 屋里，不能一挨着东墙就没影
-          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
+          // mid/half 是**屋子的足迹**（山墙到山墙），跟 HouseSpan 那段街不是一回事：
+          // 山墙内侧该不该画拿它当闸，见 UpdateProps
+          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM, mid: p.x, half: p.w / 2 };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night, slogan: p.slogan }));
@@ -4997,6 +5027,19 @@ export function CreateWorld(canvasEl) {
       if (facadeBehind !== behind) {
         facadeBehind = behind;
         SetPlayOrder(homeFacade, behind ? BAND.nearBack : BAND.facade, "homeFacade");
+      }
+      // 山墙内侧：第四堵墙撤掉的那一档才画（见 Art.DrawRoomWing）。
+      // 两条判据缺一不可：
+      //  ① filmic——玩法景别下屋子那两头由立面和门框交代，这两片墙一露就成了
+      //    "院子里凭空立着两堵墙"（后墙在 −3.4，视差让它必然探出立面的东缘）；
+      //  ② **镜头得在屋里这一段**——`state.beat.indoorScene` 是行内 on() 拨的、
+      //    一拍之内不会自己撤回去，而同一拍里插着屋外的镜（c1_open 的水缸、
+      //    牲口棚、鸡笼就在东边 36.6）。拿镜头位置当第二道闸，谁也不用记着去清。
+      // **不做渐变**：过场是硬切进来的，跟着立面那条 0.3 秒的曲线淡入，等于每一场
+      // 屋内戏开头都闪一下野地。露不露是个是非题，不是一档亮度。
+      if (homeWings) {
+        const camIn = Math.abs(camera.position.x - homeRange.mid) < homeRange.half + 1;
+        for (const wing of homeWings) wing.visible = filmic && camIn;
       }
       // 屋里的地窖口/梯子**不做隐现**：它们画在 loose(0.3) 带、立面在
       // facade(0.4) 带——墙本来就排在它们前面，合着的时候地面以上那一截

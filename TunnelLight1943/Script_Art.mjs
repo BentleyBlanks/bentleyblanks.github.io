@@ -1594,6 +1594,174 @@ export function DrawHomeInterior(ctx, x, groundY, w, h, id, { night = false } = 
     { lw: 1.2, color: "rgba(70,50,30,0.7)" });
 }
 
+// 山墙内侧：屋子东/西两头那道墙，从后墙的墙角折过来、朝着镜头铺开的那一面。
+//
+// **为什么非有它不可**（2026-08-14 逐镜实拍抓的）：2.5D 的屋子只画了两片——
+// 后墙（building −3.4）与立面（facade 0.4）。后墙那片按透视只占到画框的一小截：
+// 序里「柱子。」那一镜（机位 x=30.88 z=1.96）后墙的东缘落在 NDC 0.60，右边那
+// 两成画框已经在屋外了；而过场把第四堵墙整个撤掉，于是越过那条缝就直接望见
+// 野地、地平线上的炮楼。老办法是躲——机距收到 1.96、右缘钉一块前景板挡住，
+// 「抱她。」本该是娘和柱子的双人镜也只好退成单人镜。真实的屋子那两头本来
+// 就有一道山墙，把它画出来，画框就有东西挡了，镜头也不必再躲。
+//
+// 三条落地约束，缺一条就露馅：
+//   ① **远端必须冲出画布**：InkFill 是闭合描边，边落在画布里就是画面当中凭空
+//      竖一根黑线。远端一律画到画布外让它被裁掉。
+//   ② **墙角那条线不用自己描**——后墙那张贴图的外沿正好落在同一条世界线上，
+//      它就是墙角。这里只补**墙角的暗部**：角落是暗的，有那一道，墙才读成
+//      "折过来的一面"，而不是又一块拼在旁边的平贴。
+//   ③ **顶沿与后墙同高**（groundY − H），两张贴图同一个带、同一条基线，
+//      接缝才看不出来。檩条到这儿是断的，所以墙角上补两个檩头。
+//
+// side：+1 ＝ 东山墙（墙角在画布左边，墙面往右铺）；−1 ＝ 西山墙。
+export function DrawRoomWing(ctx, x, groundY, w, h, id,
+  { side = 1, night = false, feature = null } = {}) {
+  const H = h;
+  const cx = x - side * (w / 2);            // 墙角：与后墙的东/西缘同一条世界线
+  const far = cx + side * (w + 40);         // 远端冲出画布（约束①）
+  const xa = Math.min(cx, far), xb = Math.max(cx, far);
+  const top = groundY - H;
+  const Ink = (a, b) => (night ? a : b);
+
+  // ① 墙面。**整片压在后墙之下一档**：后墙迎着西头那扇纸窗，这一面是折过去的，
+  //    只吃得到从敞着的那一侧擦进来的光。两面同值就没有墙角，只有一张更宽的平贴
+  InkFill(ctx, Rect(xa, top, xb - xa, H), id + "wing", Ink("#383026", "#8d7a55"),
+    { amp: 1.4, lw: 2.4 });
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(xa, top, xb - xa, H);
+  ctx.clip();
+
+  // ② 墙角的暗部（约束②）。**窄而深、外带一条长尾**：一道均匀摊开一米的灰
+  //    读出来是"这面墙脏了"，不是"这儿是个角"——角是有接触阴影的
+  const corner = ctx.createLinearGradient(cx, 0, cx + side * H * 0.62, 0);
+  corner.addColorStop(0, "rgba(32,22,14,0.52)");
+  corner.addColorStop(0.16, "rgba(32,22,14,0.26)");
+  corner.addColorStop(0.5, "rgba(32,22,14,0.10)");
+  corner.addColorStop(1, "rgba(32,22,14,0)");
+  ctx.fillStyle = corner;
+  ctx.fillRect(xa, top, xb - xa, H);
+
+  // ②.2 越靠近敞开的那一侧越亮：光是从画框外那一头擦进来的
+  const wash = ctx.createLinearGradient(cx + side * w * 0.35, 0, cx + side * w, 0);
+  wash.addColorStop(0, "rgba(232,208,158,0)");
+  wash.addColorStop(1, Ink("rgba(150,140,120,0.10)", "rgba(232,208,158,0.16)"));
+  ctx.fillStyle = wash;
+  ctx.fillRect(xa, top, xb - xa, H);
+
+  // ③ 檐下：屋顶的秫秸泥背压在墙头上，那一条是屋里最暗的地方
+  const eave = ctx.createLinearGradient(0, top, 0, top + H * 0.28);
+  eave.addColorStop(0, "rgba(40,30,20,0.58)");
+  eave.addColorStop(1, "rgba(40,30,20,0)");
+  ctx.fillStyle = eave;
+  ctx.fillRect(xa, top, xb - xa, H * 0.28);
+
+  // ④ 墙根：土墙脚下常年扫不净的一道灰，墙有了它才落在地上
+  const foot = ctx.createLinearGradient(0, groundY, 0, groundY - H * 0.14);
+  foot.addColorStop(0, "rgba(48,36,24,0.34)");
+  foot.addColorStop(1, "rgba(48,36,24,0)");
+  ctx.fillStyle = foot;
+  ctx.fillRect(xa, groundY - H * 0.14, xb - xa, H * 0.14);
+
+  // ⑤ 抹泥的接茬：这面墙是拿抹子横着一道一道抹上去的，压不平的地方留一道痕。
+  //    **不许等距等长**——那读出来是横格纸，不是墙（首轮实拍就是这么翻的）：
+  //    行距随机、起止各不相同、宽窄不一，反差压到几乎看不见
+  for (let i = 0; i < 5; i += 1) {
+    const sy = top + H * (0.16 + i * 0.15 + Sym(id + "tr", i, 0.055));
+    const sx0 = cx + side * (0.02 + Rnd(id + "tr2", i) * 0.5) * w;
+    const sx1 = sx0 + side * (0.18 + Rnd(id + "tr3", i) * 0.5) * w;
+    InkLine(ctx, sx0, sy, sx1, sy + Sym(id + "tr4", i, 4.5), id + "trowel" + i,
+      { lw: 2.4 + Rnd(id + "tr5", i) * 5, amp: 2.6,
+        color: i % 2 ? "rgba(60,45,28,0.055)" : "rgba(226,206,166,0.055)" });
+  }
+
+  // ⑥ 抹层脱落的坑洼：**轮廓不许有直边**（画笔通用毛病之二）。数量跟着墙面
+  //    长度走，不然 6.5 米的墙上就散着三个点
+  const patches = Math.max(4, Math.round(w / 42));
+  for (let i = 0; i < patches; i += 1) {
+    const px = cx + side * (0.04 + Rnd(id + "pt", i) * 0.92) * w;
+    const py = top + H * (0.24 + Rnd(id + "pt2", i) * 0.56);
+    const pw = 10 + Rnd(id + "pt3", i) * 20, ph = 8 + Rnd(id + "pt4", i) * 13;
+    // **边必须是化开的**：平色一块（哪怕轮廓抖过、点给到十一个）在近景机位下
+    // 还是一块贴在墙上的补丁——那一镜的墙放大了八倍，抖动量早被抹平了
+    // （c1_count 那一镜实拍连退两轮）。抹泥的起伏本来就没有边界：形状交给
+    // 抖过的轮廓，值交给一圈化到零的径向渐变，两个一起才读成"墙面不平"
+    const pts = [];
+    for (let k = 0; k < 11; k += 1) {
+      const a = (k / 11) * Math.PI * 2;
+      const rr = 0.66 + Rnd(id + "pr" + i, k) * 0.62;
+      pts.push([px + Math.cos(a) * pw * rr, py + Math.sin(a) * ph * rr]);
+    }
+    const tone = i % 3 === 2
+      ? Ink("18,14,10", "74,60,40")          // 掉了皮的：暗
+      : Ink("150,140,124", "226,206,166");   // 新抹上去的：亮
+    ctx.save();
+    WobblyPath(ctx, pts, id + "patch" + i, 2.2, true);
+    ctx.clip();
+    const pg = ctx.createRadialGradient(px, py, 0, px, py, Math.max(pw, ph) * 1.08);
+    pg.addColorStop(0, `rgba(${tone},0.115)`);
+    pg.addColorStop(0.5, `rgba(${tone},0.070)`);
+    pg.addColorStop(1, `rgba(${tone},0)`);
+    ctx.fillStyle = pg;
+    ctx.fillRect(px - pw * 1.8, py - ph * 1.8, pw * 3.6, ph * 3.6);
+    ctx.restore();
+  }
+  Speckle(ctx, xa, top, xb - xa, H, id + "wsp", { count: Math.round(w / 9), alpha: 0.09, size: 1.7 });
+
+  // ⑥ 檩头：后墙上那两根檩到这儿就断了（DrawHomeInterior 画到墙内 4px 为止），
+  //    山墙上看见的是它们的头——从墙角探出来一小截
+  const Stub = (yTop, len, thick, tag, color) => {
+    const sx = side > 0 ? cx - 2 : cx - len + 2;
+    InkFill(ctx, Rect(sx, yTop, len, thick), id + tag, color, { amp: 0.8, lw: 1.4 });
+  };
+  Stub(top + 6.5, 16, 6.5, "purlinA", Ink("#332a20", "#4a3826"));
+  Stub(top + 21, 13, 4.6, "purlinB", Ink("#2f281f", "#57432e"));
+
+  // ⑦ 这一头墙上的那一件东西。空墙是"半屏没内容"，可也不能堆杂物——
+  //    一件就够，而且得是这面墙上本来就该有的
+  // 摆位按**离墙角多远**给（不是按墙面长度的比例）：墙面铺多长是为了填满画框，
+  // 可画框里十有八九只看得见靠墙角这一米——挂在墙中间等于没画
+  const fx0 = cx + side * 52;
+  if (feature === "niche") {
+    // 灯窝：炕头这一头的墙上掏一个浅龛，晚上把油灯搁进去。**不许画成一个
+    // 黑窟窿**——那在这套画里读作"墙上有个洞、外头是黑的"，正好把这道墙
+    // 要办的事办反了。所以龛底留一道被灯烤亮的台沿，龛口上方一片熏黑
+    const nx = fx0, ny = groundY - H * 0.52;
+    const nw = 11, nh = 13;
+    InkFill(ctx, Rect(nx - nw / 2, ny - nh, nw, nh), id + "niche", Ink("#2a241d", "#6b5c46"),
+      { amp: 0.9, lw: 1.6 });
+    // 龛底的台沿：常年搁灯，烤得比墙面亮
+    InkFill(ctx, Rect(nx - nw / 2 - 1.5, ny - 2.4, nw + 3, 3.4), id + "nicheSill",
+      Ink("#524739", "#ad9878"), { amp: 0.7, lw: 1.2 });
+    // 熏黑：灯烟贴着墙往上爬。**不许画成一个上宽下窄的梯形**——那个形状在这套
+    // 画里读作"一束光打上去"，正好把意思弄反（首轮实拍退回）。改成一叠越往上
+    // 越大越淡的团，边缘自己就毛了
+    // 一叠**很多很淡**的小团堆出来的：五个大团各自有边，画面上就是五个泡泡
+    // （首轮实拍的第二次退回）。数量上去、单个压到看不见，边才自己毛掉
+    ctx.save();
+    ctx.fillStyle = "rgba(26,20,15,1)";
+    ctx.globalAlpha = 0.042;
+    for (let i = 0; i < 30; i += 1) {
+      const t = Rnd(id + "sot", i);                 // 越往上越淡越散
+      const r = 2.4 + (1 - t) * 3.4 + Rnd(id + "sor", i) * 2.2;
+      ctx.beginPath();
+      ctx.ellipse(nx + Sym(id + "sox", i, 2.4 + t * 7), ny - nh - 1 - t * 26,
+        r, r * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else if (feature === "peg") {
+    // 木橛：楔进墙里挂东西的那种，这会儿空着。橛头一道亮、墙上一道影
+    const gx = fx0, gy = groundY - H * 0.60, len = 13;
+    InkFill(ctx, Rect(Math.min(gx, gx + side * len), gy - 2.8, len, 5.4), id + "peg",
+      Ink("#3a3026", "#6d5738"), { amp: 0.7, lw: 1.4 });
+    InkLine(ctx, gx + side * 2, gy + 3.2, gx + side * (len - 1), gy + 5.0, id + "pegSh",
+      { lw: 2.2, color: "rgba(40,30,20,0.30)", amp: 0.6 });
+  }
+  ctx.restore();
+}
+
 export function DrawHouse(ctx, x, groundY, w, h, id,
   { burnt = false, night = false, door = false, slogan = null } = {}) {
   const W = w, H = h;
