@@ -6,15 +6,20 @@ import {
   CreateInitialState,
   CustomizeProject,
   EvaluateMarketFit,
+  DEFAULT_FOUNDER_SKILLS,
   EvaluateProject,
   FireStaff,
+  FOUNDER_SKILL_KEYS,
+  FOUNDER_SKILL_POINTS,
   ForecastMonthlyCosts,
   ForecastPivotCost,
   GetMemberMonthlyCost,
   GetMarketSnapshot,
   GetAnxietyState,
   GetOwnerHairStage,
+  GetFounderSkillEffect,
   HireStaff,
+  NormalizeFounderSkills,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
@@ -135,6 +140,84 @@ function HasRecordedId(collection, id) {
   assert.equal(result.state.month, 19);
   assert.equal(GetOwnerHairStage(result.state.month), OWNER_HAIR_STAGES.bald);
   assert(result.state.log.some((entry) => entry.month === 19 && entry.text.includes("彻底秃")), "the baldness month must be recorded");
+
+  const initial = CreateInitialState();
+  assert.deepEqual(initial.founderSkills, DEFAULT_FOUNDER_SKILLS, "new founders must begin with a balanced 3/3/3 profile");
+  assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + initial.founderSkills[skillKey], 0), FOUNDER_SKILL_POINTS);
+
+  const specialized = StartProject(initial, "zeroGStore", "premium", {
+    studioName: "专长真的有用",
+    projectName: "履历模拟器",
+    founderSkills: { design: 5, programming: 2, art: 2 },
+  });
+  assert.equal(specialized.ok, true);
+  assert.deepEqual(specialized.state.founderSkills, { design: 5, programming: 2, art: 2 }, "opening skill allocation must persist into the run");
+  assert.equal(ValidateState(specialized.state), true, "a legal specialized founder profile must survive save validation");
+
+  const normalized = NormalizeFounderSkills({ design: 5, programming: 5, art: 5 });
+  assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + normalized[skillKey], 0), FOUNDER_SKILL_POINTS, "normalization must enforce the nine-point budget");
+  assert(FOUNDER_SKILL_KEYS.every((skillKey) => normalized[skillKey] >= 1 && normalized[skillKey] <= 5));
+
+  const legacy = structuredClone(specialized.state);
+  delete legacy.founderSkills;
+  assert.equal(ValidateState(legacy), true, "pre-skill version-9 saves must remain loadable for balanced migration");
+  assert.deepEqual(NormalizeFounderSkills(legacy.founderSkills), DEFAULT_FOUNDER_SKILLS);
+
+  const corrupted = structuredClone(specialized.state);
+  corrupted.founderSkills = { design: 5, programming: 5, art: -1 };
+  assert.equal(ValidateState(corrupted), false, "invalid founder skill totals must be rejected instead of poisoning production");
+
+  const MonthlyPotential = (skills) => GetFounderSkillEffect(skills, "design").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "art").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "client").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "performance").monthlyOutputMultiplier;
+  const presetPotentials = [
+    MonthlyPotential({ design: 5, programming: 2, art: 2 }),
+    MonthlyPotential({ design: 2, programming: 5, art: 2 }),
+    MonthlyPotential({ design: 2, programming: 2, art: 5 }),
+  ];
+  assert(Math.max(...presetPotentials) - Math.min(...presetPotentials) < 1e-9, "three specialist presets must have equal total monthly founder potential");
+}
+
+{
+  function FounderMonth(founderSkills) {
+    const start = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills });
+    start.state.cash = 1_000_000;
+    start.state.project.modules = { art: 50, design: 50, client: 50, performance: 50 };
+    start.state.project.scopeDebt = 0;
+    start.state.project.technicalDebt = 0;
+    start.state.project.bugs = 0;
+    return AdvanceMonth(start.state);
+  }
+
+  const designExpert = FounderMonth({ design: 5, programming: 2, art: 2 });
+  const designNovice = FounderMonth({ design: 1, programming: 4, art: 4 });
+  assert(designExpert.output.design > designNovice.output.design, "design skill must raise monthly design production");
+
+  const artExpert = FounderMonth({ design: 2, programming: 2, art: 5 });
+  const artNovice = FounderMonth({ design: 4, programming: 4, art: 1 });
+  assert(artExpert.output.art > artNovice.output.art, "art skill must raise monthly art production");
+
+  const programmingExpert = FounderMonth({ design: 2, programming: 5, art: 2 });
+  const programmingNovice = FounderMonth({ design: 4, programming: 1, art: 4 });
+  assert(programmingExpert.output.client > programmingNovice.output.client, "programming skill must raise monthly client production");
+  assert(programmingExpert.output.performance > programmingNovice.output.performance, "programming skill must also raise monthly performance production");
+
+  const expertState = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 2, programming: 2, art: 5 } }).state;
+  const noviceState = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 4, programming: 4, art: 1 } }).state;
+  const expertWork = PerformOwnerTask(expertState, "art");
+  const noviceWork = PerformOwnerTask(noviceState, "art");
+  assert(expertWork.gain > noviceWork.gain, "high founder skill must increase direct owner-work progress");
+  assert(expertWork.state.project.bugs - expertState.project.bugs < noviceWork.state.project.bugs - noviceState.project.bugs, "high founder skill must reduce owner-work rework risk");
+  assert.equal(GetFounderSkillEffect({ design: 2, programming: 5, art: 2 }, "performance").skillKey, "programming", "performance work must use the programming skill");
+
+  const expertDesigner = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 5, programming: 2, art: 2 } }).state;
+  const noviceDesigner = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 1, programming: 4, art: 4 } }).state;
+  expertDesigner.project.bugs = 10;
+  noviceDesigner.project.bugs = 10;
+  const expertFix = CustomizeProject(expertDesigner, "owner", "bugMuseum");
+  const noviceFix = CustomizeProject(noviceDesigner, "owner", "bugMuseum");
+  assert(expertFix.state.project.bugs < noviceFix.state.project.bugs, "high design skill must amplify a bug-reducing owner feature instead of weakening it");
 }
 
 {
@@ -869,4 +952,4 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");

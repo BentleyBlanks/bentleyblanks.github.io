@@ -29,17 +29,22 @@ import {
   CreateInitialState,
   CustomizeProject,
   EvaluateMarketFit,
+  DEFAULT_FOUNDER_SKILLS,
   EvaluateProject,
   FireStaff,
+  FOUNDER_SKILL_KEYS,
+  FOUNDER_SKILL_POINTS,
   ForecastMonthlyCosts,
   ForecastPivotCost,
   GetAnxietyState,
+  GetFounderSkillEffect,
   GetIdleLine,
   GetMemberMonthlyCost,
   GetMarketSnapshot,
   GetOwnerHairStage,
   HireStaff,
   OWNER_HAIR_STAGES,
+  NormalizeFounderSkills,
   PerformOwnerTask,
   PivotProject,
   PurchaseWorkstation,
@@ -57,7 +62,7 @@ import {
   TalkToStaff,
   ValidateState,
   WORKSTATION_COSTS,
-} from "./Script_Rules.mjs?v=20260815h";
+} from "./Script_Rules.mjs?v=20260815i";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -83,7 +88,8 @@ const dom = Object.fromEntries([
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
-  "projectContract", "contractStudioName", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderSkillPresets", "founderSkillError", "founderConfirmButton",
+  "projectContract", "contractStudioName", "contractFounderSkills", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
   "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats", "restartButton",
@@ -98,10 +104,40 @@ const EscapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
+const FOUNDER_SKILL_META = Object.freeze({
+  design: Object.freeze({
+    label: "策划",
+    color: "#e6a23c",
+    description: "决定需求能否落地，影响策划月产出、亲自写方案和定制玩法的返工。",
+    modules: "策划模块",
+  }),
+  programming: Object.freeze({
+    label: "程序",
+    color: "#65b8ff",
+    description: "一项能力扛两条线，影响客户端与性能月产出，以及两类亲自开发。",
+    modules: "客户端 + 性能",
+  }),
+  art: Object.freeze({
+    label: "美术",
+    color: "#ff7f9f",
+    description: "决定素材质量与返工速度，影响美术月产出和老板亲自画图。",
+    modules: "美术模块",
+  }),
+});
+
+const FOUNDER_SKILL_PRESETS = Object.freeze({
+  planner: Object.freeze({ design: 5, programming: 2, art: 2 }),
+  programmer: Object.freeze({ design: 2, programming: 5, art: 2 }),
+  artist: Object.freeze({ design: 2, programming: 2, art: 5 }),
+  balanced: DEFAULT_FOUNDER_SKILLS,
+});
+
 function LoadSavedState() {
   try {
     const candidate = JSON.parse(localStorage.getItem(SAVE_KEY));
-    return ValidateState(candidate) ? candidate : null;
+    if (!ValidateState(candidate)) return null;
+    candidate.founderSkills = NormalizeFounderSkills(candidate.founderSkills);
+    return candidate;
   } catch {
     return null;
   }
@@ -112,6 +148,7 @@ let state = savedState || CreateInitialState();
 let selectedProjectId = state.project?.templateId || PROJECTS[0].id;
 let selectedGameTypeId = state.project?.gameTypeId || GAME_TYPES[0].id;
 let draftStudioName = state.studioName || "";
+let draftFounderSkills = NormalizeFounderSkills(state.founderSkills);
 let landingOpen = true;
 let worldState = CreateWorldState(state.month);
 let soundEnabled = true;
@@ -1090,12 +1127,77 @@ function ShowFoundingNamePanel() {
   dom.studioNameInput.focus({ preventScroll: true });
 }
 
+function FounderSkillTotal(skills = draftFounderSkills) {
+  return FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + (skills[skillKey] || 0), 0);
+}
+
+function MatchingFounderPreset() {
+  return Object.entries(FOUNDER_SKILL_PRESETS).find(([, preset]) => (
+    FOUNDER_SKILL_KEYS.every((skillKey) => preset[skillKey] === draftFounderSkills[skillKey])
+  ))?.[0] || "";
+}
+
+function RenderFounderSkills(focusTarget = null) {
+  const total = FounderSkillTotal();
+  const remaining = FOUNDER_SKILL_POINTS - total;
+  dom.founderSkillEditor.innerHTML = FOUNDER_SKILL_KEYS.map((skillKey) => {
+    const meta = FOUNDER_SKILL_META[skillKey];
+    const effect = GetFounderSkillEffect(draftFounderSkills, skillKey);
+    const minimumGain = Number.isInteger(effect.minimumGain) ? effect.minimumGain : effect.minimumGain.toFixed(1);
+    const maximumGain = Number.isInteger(effect.maximumGain) ? effect.maximumGain : effect.maximumGain.toFixed(1);
+    return `<article class="founderSkillCard" style="--skillColor:${meta.color}">
+      <header><strong>${meta.label}</strong><span>${meta.modules}</span></header>
+      <p>${meta.description}</p>
+      <div class="founderSkillControls">
+        <button type="button" data-skill-action="decrease" data-skill-key="${skillKey}" aria-label="降低${meta.label}能力" ${effect.level <= 1 ? "disabled" : ""}>−</button>
+        <div class="founderSkillLevel"><strong>Lv.${effect.level}</strong><small>${effect.label}</small></div>
+        <button type="button" data-skill-action="increase" data-skill-key="${skillKey}" aria-label="提高${meta.label}能力" ${effect.level >= 5 || remaining <= 0 ? "disabled" : ""}>＋</button>
+      </div>
+      <div class="founderSkillDots" aria-hidden="true">${Array.from({ length: 5 }, (_, index) => `<i class="${index < effect.level ? "active" : ""}"></i>`).join("")}</div>
+      <div class="founderSkillImpact">月基础产出 ×${effect.monthlyOutputMultiplier.toFixed(2)} · 亲自开发 ${minimumGain}–${maximumGain} · 返工 ×${effect.riskMultiplier.toFixed(2)}</div>
+    </article>`;
+  }).join("");
+  dom.founderSkillBudget.textContent = remaining === 0
+    ? `已分配 ${total} / ${FOUNDER_SKILL_POINTS}`
+    : remaining > 0
+      ? `还剩 ${remaining} 点未分配`
+      : `超出 ${Math.abs(remaining)} 点`;
+  dom.founderSkillBudget.classList.toggle("invalid", remaining !== 0);
+  const matchingPreset = MatchingFounderPreset();
+  dom.founderSkillPresets.querySelectorAll("[data-skill-preset]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.skillPreset === matchingPreset);
+  });
+  dom.founderSkillError.textContent = remaining === 0 ? "" : "必须把 9 点全部分完，履历不接受‘以后再学’。";
+  dom.founderConfirmButton.disabled = remaining !== 0;
+  if (focusTarget) {
+    const selector = `[data-skill-action="${focusTarget.action}"][data-skill-key="${focusTarget.skillKey}"]`;
+    const requestedButton = dom.founderSkillEditor.querySelector(selector);
+    const focusButton = requestedButton?.disabled
+      ? dom.founderSkillEditor.querySelector("button:not(:disabled)")
+      : requestedButton;
+    focusButton?.focus({ preventScroll: true });
+  }
+}
+
+function ShowFounderProfilePanel() {
+  if (onboardingPhase === "profile") return;
+  onboardingPhase = "profile";
+  ceremonyElapsed = 0;
+  dom.foundingNamePanel.classList.add("hidden");
+  dom.projectContract.classList.add("hidden");
+  dom.founderProfilePanel.classList.remove("hidden");
+  RenderFounderSkills();
+  window.setTimeout(() => dom.founderProfileTitle.focus({ preventScroll: true }), 220);
+}
+
 function ShowProjectContract() {
   onboardingPhase = "contract";
   ceremonyElapsed = 0;
   dom.foundingNamePanel.classList.add("hidden");
+  dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.remove("hidden");
   dom.contractStudioName.textContent = draftStudioName;
+  dom.contractFounderSkills.textContent = `策 ${draftFounderSkills.design} / 程 ${draftFounderSkills.programming} / 美 ${draftFounderSkills.art}`;
   dom.contractSignatureName.textContent = draftStudioName;
   if (!dom.gameNameInput.value.trim()) {
     const template = FindProject(selectedProjectId);
@@ -1160,7 +1262,7 @@ function UpdateCeremony(delta, time) {
       SpawnParticles(stageX, 3.9, 0x9d8cff, 42);
       PlayTone("release");
     }
-    if (ceremonyElapsed > 1.85) ShowProjectContract();
+    if (ceremonyElapsed > 1.85) ShowFounderProfilePanel();
   }
   camera.position.set(stageX + Math.sin(time * .38) * .12, 5.35, 13.4);
   camera.lookAt(stageX, 2.15, 0);
@@ -1812,6 +1914,11 @@ function OpenHomeComputerSheet() {
   const evaluation = EvaluateProject(state);
   const loan = state.startupLoan;
   const monthsLeft = loan?.status === "active" ? Math.max(0, loan.dueMonth - state.month + 1) : 0;
+  const founderSkillReadout = FOUNDER_SKILL_KEYS.map((skillKey) => {
+    const meta = FOUNDER_SKILL_META[skillKey];
+    const effect = GetFounderSkillEffect(state.founderSkills, skillKey);
+    return `<span style="--skillColor:${meta.color}"><b>${meta.label} ${effect.level}</b><small>月基础 ×${effect.monthlyOutputMultiplier.toFixed(2)}</small></span>`;
+  }).join("");
   OpenPanel("HOME COMPUTER", `家里的电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <p class="panelIntro">这是老板唯一不需要额外购买的工位。开发、对话、项目方向、宣发、发布和月结都从这台电脑处理；员工只能使用你另买的设备。</p>
     <div class="metricGrid">
@@ -1819,6 +1926,7 @@ function OpenHomeComputerSheet() {
       <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
       <div class="metricTile"><span>启动贷</span><strong>${loan?.status === "repaid" ? "已清" : `${monthsLeft} 月 / ${FormatGoalMoney(loan?.remaining || 0)}`}</strong></div>
     </div>
+    <div class="founderSkillReadout">${founderSkillReadout}</div>
     <div class="computerActions">
       ${MODULE_KEYS.map((moduleKey) => { const meta = MODULE_META[moduleKey]; return `<button data-computer-action="work" data-module-key="${moduleKey}" type="button"><span style="color:${meta.color}">${meta.icon}</span><strong>${meta.label}开发</strong><small>${Math.round(state.project.modules[moduleKey])} / 100</small></button>`; }).join("")}
       <button data-computer-action="chat" type="button"><span>▤</span><strong>群聊 / 垃圾话</strong><small>自己、大学生、AI</small></button>
@@ -1845,17 +1953,19 @@ function OpenHomeComputerSheet() {
 function OpenWorkstationSheet(interaction) {
   const moduleKey = interaction.moduleKey;
   const meta = MODULE_META[moduleKey];
+  const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
+  const skillMeta = FOUNDER_SKILL_META[skillEffect.skillKey];
   const workers = state.team.map((member) => ({ member, staff: FindStaff(member.id) })).filter((item) => item.staff?.specialty === moduleKey);
   const relatedTensions = CalculateTensions(state.project).filter((tension) => tension.from === moduleKey || tension.to === moduleKey);
   OpenPanel("OWNER WORK", `${meta.icon} 老板亲自做${meta.label}`, `
-    <p class="panelIntro">你坐回家里唯一的电脑亲自干活：立刻得到 2–4 点低质量进度，也会产生 Bug、范围债和技术债。老板每月最多硬干三次。</p>
+    <p class="panelIntro">你以${skillMeta.label} Lv.${skillEffect.level} 坐回唯一的电脑：本次可得 ${skillEffect.minimumGain}–${skillEffect.maximumGain} 点进度，返工与债务按 ×${skillEffect.riskMultiplier.toFixed(2)} 结算。老板每月最多硬干三次。</p>
     ${RenderBar(`${meta.label}进度`, state.project.modules[moduleKey], meta.color)}
     <div class="metricGrid">
       <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
-      <div class="metricTile"><span>Bug</span><strong>${Math.round(state.project.bugs)}</strong></div>
+      <div class="metricTile"><span>对应人物能力</span><strong style="color:${skillMeta.color}">${skillMeta.label} ${skillEffect.level} · ${skillEffect.label}</strong></div>
       <div class="metricTile"><span>技术债 / 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
-    <div class="panelSection choiceFooter"><span>${EscapeHtml(meta.description)}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>亲自干一次</button></div>
+    <div class="panelSection choiceFooter"><span>${EscapeHtml(meta.description)}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>以 ${skillMeta.label} Lv.${skillEffect.level} 亲自干</button></div>
     <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
     <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<button class="miniButton" data-talent type="button">去人才市场找人</button>`}</div>
     ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
@@ -2619,6 +2729,7 @@ function OpenHelpSheet() {
       <div class="note danger">第一次招聘前必须先在人才市场设备柜台买第一套工位；以后每增加一人都要再有一套空设备。</div>
       <div class="note">冰箱是剩饭，小菜馆是充饥套餐，小超市卖小吃和彩票，大酒店才有能提升产出的大餐。</div>
       <div class="note danger">启动资金 ¥68,000 全部来自身家担保贷款，M08 前要还 ¥82,000；到期未清直接倒闭。</div>
+      <div class="note good">开局分配的策划、程序、美术能力会持续影响老板的月基础产出；程序同时覆盖客户端与性能。亲自开发时，能力越高，进度越多、Bug 与债务越少。</div>
       <div class="note good">唯一胜利仍是累计游戏收入达到 100 亿元。贷款、彩票和炒股发财都不算。</div>
     </div>
     <div class="panelSection">${RenderLog(6)}</div>`);
@@ -2686,6 +2797,7 @@ function StartFoundingCeremony() {
   landingOpen = true;
   dom.ceremonyIntro.classList.add("hidden");
   dom.foundingNamePanel.classList.add("hidden");
+  dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.add("hidden");
   dom.skipCeremonyButton.classList.remove("hidden");
   dom.ceremonyCaption.classList.remove("hidden");
@@ -2715,6 +2827,38 @@ function ConfirmStudioName() {
   PlayTone("good");
 }
 
+function AdjustFounderSkill(skillKey, delta) {
+  if (onboardingPhase !== "profile" || !FOUNDER_SKILL_KEYS.includes(skillKey) || ![-1, 1].includes(delta)) return;
+  const currentLevel = draftFounderSkills[skillKey];
+  if (delta > 0 && FounderSkillTotal() >= FOUNDER_SKILL_POINTS) return;
+  const nextLevel = Clamp(currentLevel + delta, 1, 5);
+  if (nextLevel === currentLevel) return;
+  draftFounderSkills = { ...draftFounderSkills, [skillKey]: nextLevel };
+  RenderFounderSkills({ skillKey, action: delta > 0 ? "increase" : "decrease" });
+  PlayTone("tap");
+}
+
+function ApplyFounderSkillPreset(presetId) {
+  const preset = FOUNDER_SKILL_PRESETS[presetId];
+  if (onboardingPhase !== "profile" || !preset) return;
+  draftFounderSkills = { ...preset };
+  RenderFounderSkills();
+  PlayTone("tap");
+}
+
+function ConfirmFounderProfile() {
+  if (onboardingPhase !== "profile") return;
+  if (FounderSkillTotal() !== FOUNDER_SKILL_POINTS) {
+    dom.founderSkillError.textContent = "必须把 9 点全部分完，才能把这份履历写进合同。";
+    PlayTone("warning");
+    return;
+  }
+  draftFounderSkills = NormalizeFounderSkills(draftFounderSkills);
+  dom.founderSkillError.textContent = "";
+  PlayTone("good");
+  ShowProjectContract();
+}
+
 function CancelSealHold() {
   if (sealHoldComplete) return;
   window.clearTimeout(sealHoldTimer);
@@ -2737,6 +2881,7 @@ function CompleteContractSigning() {
   const result = StartProject(fresh, selectedProjectId, selectedGameTypeId, {
     studioName: draftStudioName,
     projectName,
+    founderSkills: draftFounderSkills,
   });
   if (!result.ok) {
     dom.contractError.textContent = result.message;
@@ -2782,6 +2927,7 @@ function ResetOnboarding() {
   sealHoldComplete = false;
   CancelSealHold();
   draftStudioName = "";
+  draftFounderSkills = { ...DEFAULT_FOUNDER_SKILLS };
   landingOpen = true;
   BuildCeremonyScene();
   SetPlayableWorldVisible(false);
@@ -2789,6 +2935,7 @@ function ResetOnboarding() {
   dom.setupScreen.classList.remove("hidden", "cinematic");
   dom.ceremonyIntro.classList.remove("hidden");
   dom.foundingNamePanel.classList.add("hidden");
+  dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.add("hidden");
   dom.projectContract.classList.remove("signed");
   dom.skipCeremonyButton.classList.add("hidden");
@@ -2796,10 +2943,12 @@ function ResetOnboarding() {
   dom.studioNameInput.value = "";
   dom.gameNameInput.value = "";
   dom.setupError.textContent = "";
+  dom.founderSkillError.textContent = "";
   dom.contractError.textContent = "";
   dom.sealButton.classList.remove("holding", "sealed");
   dom.sealButton.querySelector("span").textContent = "按住 1 秒";
   dom.sealButton.querySelector("strong").textContent = "签字盖章";
+  RenderFounderSkills();
   RenderSetupChoices();
 }
 
@@ -2940,6 +3089,16 @@ function BindControls() {
   dom.studioNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); ConfirmStudioName(); }
   });
+  dom.founderSkillEditor.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-skill-action]");
+    if (!button) return;
+    AdjustFounderSkill(button.dataset.skillKey, button.dataset.skillAction === "increase" ? 1 : -1);
+  });
+  dom.founderSkillPresets.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-skill-preset]");
+    if (button) ApplyFounderSkillPreset(button.dataset.skillPreset);
+  });
+  dom.founderConfirmButton.addEventListener("click", ConfirmFounderProfile);
   dom.gameNameInput.addEventListener("input", () => { dom.contractError.textContent = ""; });
   dom.sealButton.addEventListener("pointerdown", BeginSealHold);
   dom.sealButton.addEventListener("pointerup", CancelSealHold);

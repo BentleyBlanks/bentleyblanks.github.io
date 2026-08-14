@@ -51,6 +51,25 @@ export function GetOwnerHairStage(monthValue) {
   return OWNER_HAIR_STAGES.full;
 }
 
+export const FOUNDER_SKILL_POINTS = 9;
+export const FOUNDER_SKILL_KEYS = Object.freeze(["design", "programming", "art"]);
+export const DEFAULT_FOUNDER_SKILLS = Object.freeze({ design: 3, programming: 3, art: 3 });
+
+const FOUNDER_SKILL_EFFECTS = Object.freeze({
+  1: Object.freeze({ label: "刚入门", outputMultiplier: 0.7, riskMultiplier: 1.35 }),
+  2: Object.freeze({ label: "能交差", outputMultiplier: 0.85, riskMultiplier: 1.17 }),
+  3: Object.freeze({ label: "熟练", outputMultiplier: 1, riskMultiplier: 1 }),
+  4: Object.freeze({ label: "资深", outputMultiplier: 1.2, riskMultiplier: 0.84 }),
+  5: Object.freeze({ label: "专家", outputMultiplier: 1.45, riskMultiplier: 0.7 }),
+});
+
+const FOUNDER_SKILL_BY_MODULE = Object.freeze({
+  art: "art",
+  design: "design",
+  client: "programming",
+  performance: "programming",
+});
+
 function Clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -247,6 +266,54 @@ export function EvaluateMarketFit(state, overrides = {}) {
   };
 }
 
+function IsFounderSkillSetValid(candidate) {
+  return Boolean(candidate)
+    && FOUNDER_SKILL_KEYS.every((skillKey) => Number.isInteger(candidate[skillKey])
+      && candidate[skillKey] >= 1 && candidate[skillKey] <= 5)
+    && FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + candidate[skillKey], 0) === FOUNDER_SKILL_POINTS;
+}
+
+export function NormalizeFounderSkills(candidate) {
+  if (IsFounderSkillSetValid(candidate)) {
+    return Object.fromEntries(FOUNDER_SKILL_KEYS.map((skillKey) => [skillKey, candidate[skillKey]]));
+  }
+  const skills = Object.fromEntries(FOUNDER_SKILL_KEYS.map((skillKey) => {
+    const requestedLevel = Math.round(Number(candidate?.[skillKey]));
+    return [skillKey, Number.isFinite(requestedLevel) ? Clamp(requestedLevel, 1, 5) : DEFAULT_FOUNDER_SKILLS[skillKey]];
+  }));
+  let remaining = FOUNDER_SKILL_POINTS - FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + skills[skillKey], 0);
+  while (remaining !== 0) {
+    const direction = Math.sign(remaining);
+    const adjustable = FOUNDER_SKILL_KEYS.find((skillKey) => direction > 0 ? skills[skillKey] < 5 : skills[skillKey] > 1);
+    if (!adjustable) break;
+    skills[adjustable] += direction;
+    remaining -= direction;
+  }
+  return skills;
+}
+
+export function GetFounderSkillEffect(founderSkills, moduleKey) {
+  const skillKey = FOUNDER_SKILL_BY_MODULE[moduleKey] || (FOUNDER_SKILL_KEYS.includes(moduleKey) ? moduleKey : null);
+  if (!skillKey) return null;
+  const requestedLevel = Math.round(Number(founderSkills?.[skillKey]));
+  const level = Number.isFinite(requestedLevel) ? Clamp(requestedLevel, 1, 5) : DEFAULT_FOUNDER_SKILLS[skillKey];
+  const effect = FOUNDER_SKILL_EFFECTS[level];
+  return {
+    skillKey,
+    level,
+    label: effect.label,
+    outputMultiplier: effect.outputMultiplier,
+    // Programming feeds two production tracks, so its monthly lift is split
+    // across client and performance. Direct owner work still gets the full lift.
+    monthlyOutputMultiplier: skillKey === "programming"
+      ? 1 + (effect.outputMultiplier - 1) / 2
+      : effect.outputMultiplier,
+    riskMultiplier: effect.riskMultiplier,
+    minimumGain: Math.round(2 * effect.outputMultiplier * 10) / 10,
+    maximumGain: Math.round(4 * effect.outputMultiplier * 10) / 10,
+  };
+}
+
 function PushLog(state, text, tone = "normal") {
   state.log.unshift({ month: state.month, text, tone, id: `${state.month}_${state.logSerial}` });
   state.logSerial += 1;
@@ -400,6 +467,7 @@ export function CreateInitialState() {
     gameRevenue: 0,
     cash: STARTUP_LOAN_TERMS.principal,
     studioName: "",
+    founderSkills: { ...DEFAULT_FOUNDER_SKILLS },
     startupLoan: {
       principal: STARTUP_LOAN_TERMS.principal,
       totalDue: STARTUP_LOAN_TERMS.totalDue,
@@ -445,6 +513,7 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   const projectName = CleanName(identity.projectName, FindProject(projectId).title.replace(/[《》]/g, ""), 20);
   state.status = "playing";
   state.studioName = studioName;
+  state.founderSkills = NormalizeFounderSkills(identity.founderSkills || state.founderSkills);
   state.startupLoan ||= {
     principal: STARTUP_LOAN_TERMS.principal,
     totalDue: STARTUP_LOAN_TERMS.totalDue,
@@ -456,6 +525,7 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   state.startupLoan.status = "active";
   state.project = FreshProject(projectId, gameTypeId, projectName);
   PushLog(state, `${studioName} 签下《${projectName}》开发合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
+  PushLog(state, `创始人能力备案：策划 ${state.founderSkills.design} / 程序 ${state.founderSkills.programming} / 美术 ${state.founderSkills.art}。这三行数字会真的进入后续产出。`, "normal");
   PushLog(state, `创业启动贷到账 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}，M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前须还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，逾期整家公司清算。`, "danger");
   PushLog(state, "你宣布目标是游戏收入 100 亿元。所有人礼貌地没有追问依据。", "normal");
   return { state, ok: true, message: "立项成功" };
@@ -712,8 +782,12 @@ function StaffFactor(member) {
 }
 
 function BuildMonthlyOutput(state, foodMultiplier = 1, foodPlanName = "本月吃法") {
-  const output = { art: 1.8, design: 1.8, client: 1.8, performance: 1.8 };
-  const idealOutput = { art: 1.8, design: 1.8, client: 1.8, performance: 1.8 };
+  const founderOutput = Object.fromEntries(MODULE_KEYS.map((moduleKey) => [
+    moduleKey,
+    1.8 * GetFounderSkillEffect(state.founderSkills, moduleKey).monthlyOutputMultiplier,
+  ]));
+  const output = { ...founderOutput };
+  const idealOutput = { ...founderOutput };
   const wastedOutput = { art: 0, design: 0, client: 0, performance: 0 };
   const painEvents = [];
   const directiveOutput = DirectiveOutput(state.selectedDirective);
@@ -1814,6 +1888,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
 
   let sourceQuality = 0.58;
   let debtMultiplier = 1.35;
+  let ownerProgressMultiplier = 1;
   let sourceLabel = "老板脑内群聊";
   if (staff?.kind === "student") {
     sourceQuality = Clamp(0.82 + member.morale / 500 - member.stress / 520 + (InvestmentPlanForMember(member)?.qualityBonus || 0), 0.62, 1.05);
@@ -1829,6 +1904,11 @@ export function CustomizeProject(currentState, sourceId, featureId) {
     sourceLabel = `${staff.name} · AI`;
     state.anxiety = Clamp(state.anxiety + 1.5, 0, 100);
   } else {
+    const designEffect = GetFounderSkillEffect(state.founderSkills, "design");
+    sourceQuality = Clamp(0.58 * designEffect.outputMultiplier, 0.42, 0.86);
+    ownerProgressMultiplier = designEffect.outputMultiplier;
+    debtMultiplier *= designEffect.riskMultiplier;
+    sourceLabel = `老板脑内群聊 · 策划 ${designEffect.level}`;
     state.hunger = Clamp(state.hunger + 10, 0, 100);
     state.anxiety = Clamp(state.anxiety + 7, 0, 100);
   }
@@ -1836,12 +1916,15 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   MODULE_KEYS.forEach((moduleKey) => {
     const demand = feature.modules[moduleKey] || 0;
     state.project.featureLoad[moduleKey] += demand;
-    const directProgress = isOwner ? 0.35 + demand * 0.08 : 0.7 + demand * sourceQuality * 0.18;
+    const directProgress = isOwner ? (0.35 + demand * 0.08) * ownerProgressMultiplier : 0.7 + demand * sourceQuality * 0.18;
     state.project.modules[moduleKey] = Clamp(state.project.modules[moduleKey] + directProgress, 0, 100);
   });
   state.project.scopeDebt = Clamp(state.project.scopeDebt + Math.max(0, feature.scopeDebt) * debtMultiplier, 0, 80);
   state.project.technicalDebt = Clamp(state.project.technicalDebt + Math.max(0, feature.technicalDebt) * debtMultiplier, 0, 80);
-  state.project.bugs = Clamp(state.project.bugs + Math.max(-1, feature.bugs) * (isOwner ? 1.6 : 1), 0, 80);
+  const featureBugDelta = Math.max(-1, feature.bugs);
+  const ownerRiskMultiplier = isOwner ? GetFounderSkillEffect(state.founderSkills, "design").riskMultiplier : 1;
+  const ownerBugMultiplier = featureBugDelta < 0 ? 1.6 / ownerRiskMultiplier : 1.6 * ownerRiskMultiplier;
+  state.project.bugs = Clamp(state.project.bugs + featureBugDelta * (isOwner ? ownerBugMultiplier : 1), 0, 80);
   state.project.hype = Clamp(state.project.hype + feature.hype, 0, 100);
   state.project.features.push({
     id: feature.id,
@@ -1856,7 +1939,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   const consequence = isOwner
-    ? "你亲自开工：不花工资，但饥饿 +10、焦虑 +7，而且实现质量很像教程看了一半。"
+    ? `你以策划 ${GetFounderSkillEffect(state.founderSkills, "design").level} 级亲自开工：不花工资，饥饿 +10、焦虑 +7；能力越高，落地更多、返工更少。`
     : staff.kind === "ai"
       ? `${staff.name} 已生成第一版，并顺手把上下文漂移提高了 9。`
       : `${staff.name} 接下提案，压力 +8；这次至少有人知道需求在说什么。`;
@@ -1910,29 +1993,32 @@ export function PerformOwnerTask(currentState, moduleKey) {
   }
 
   const effect = OWNER_TASK_EFFECTS[moduleKey];
+  const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
   const before = state.project.modules[moduleKey];
-  const requestedGain = 2 + Math.floor(SeededUnit(
+  const baseGain = 2 + Math.floor(SeededUnit(
     state.seed + state.month * 137 + state.ownerWorkCount * 17 + moduleKey.length * 31,
   ) * 3);
+  const requestedGain = Math.round(baseGain * skillEffect.outputMultiplier * 10) / 10;
   const after = Clamp(before + requestedGain, 0, 100);
   const gain = after - before;
   state.project.modules[moduleKey] = after;
-  state.project.bugs = Clamp(state.project.bugs + effect.bugs, 0, 80);
-  state.project.scopeDebt = Clamp(state.project.scopeDebt + effect.scopeDebt, 0, 80);
-  state.project.technicalDebt = Clamp(state.project.technicalDebt + effect.technicalDebt, 0, 80);
+  state.project.bugs = Clamp(state.project.bugs + effect.bugs * skillEffect.riskMultiplier, 0, 80);
+  state.project.scopeDebt = Clamp(state.project.scopeDebt + effect.scopeDebt * skillEffect.riskMultiplier, 0, 80);
+  state.project.technicalDebt = Clamp(state.project.technicalDebt + effect.technicalDebt * skillEffect.riskMultiplier, 0, 80);
   state.ownerWorkCount += 1;
   state.ownerWorkMonth = state.month;
   state.hunger = Clamp(state.hunger + 7, 0, 100);
   state.anxiety = Clamp(state.anxiety + 5, 0, 100);
-  PushLog(state, `${effect.line} ${moduleKey} 模块进度 +${gain.toFixed(1)}，Bug 也顺手学会了复制。`, "warning");
+  PushLog(state, `${effect.line} ${skillEffect.skillKey} ${skillEffect.level} 级让进度 +${gain.toFixed(1)}，返工系数 ×${skillEffect.riskMultiplier.toFixed(2)}。`, "warning");
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   return {
     state,
     ok: true,
     moduleKey,
+    skillEffect,
     gain,
-    message: `老板亲自完成 ${moduleKey} 工位：低质量进度 +${gain.toFixed(1)}。`,
+    message: `老板以 ${skillEffect.skillKey} ${skillEffect.level} 级完成 ${moduleKey} 工位：进度 +${gain.toFixed(1)}。`,
   };
 }
 
@@ -2069,6 +2155,8 @@ export function ValidateState(candidate) {
   if (!candidate || candidate.rulesVersion !== RULES_VERSION) return false;
   if (!["setup", "playing", "gameover", "ended"].includes(candidate.status)) return false;
   if (typeof candidate.studioName !== "string" || candidate.studioName.length > 18) return false;
+  // Saves created before founder skills existed remain loadable and are normalized by the UI loader.
+  if (candidate.founderSkills != null && !IsFounderSkillSetValid(candidate.founderSkills)) return false;
   if (!Number.isInteger(candidate.month) || candidate.month < 1) return false;
   if (!Number.isInteger(candidate.ownerWorkMonth) || candidate.ownerWorkMonth < 1
     || candidate.ownerWorkMonth > candidate.month
