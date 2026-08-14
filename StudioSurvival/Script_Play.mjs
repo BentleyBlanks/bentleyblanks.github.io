@@ -22,7 +22,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815s";
+} from "./Data_Game.mjs?v=20260815u";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -69,7 +69,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815s";
+} from "./Script_Rules.mjs?v=20260815u";
 import {
   FindLocation,
   FindLocationAt,
@@ -80,14 +80,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815t";
+} from "./Data_World.mjs?v=20260815u";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815t";
+} from "./Script_World.mjs?v=20260815u";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -2644,7 +2644,7 @@ function OpenFeatureSourceSheet() {
       const source = event.target.closest("[data-source-id]");
       if (source) OpenCustomizationSheet(source.dataset.sourceId);
     };
-  }, { mode: "computer" });
+  });
 }
 
 function OpenHomeComputerSheet() {

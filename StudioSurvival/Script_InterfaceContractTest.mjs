@@ -46,6 +46,9 @@ const customizationBlock = script.match(/function OpenCustomizationSheet[\s\S]*?
 assert.match(customizationBlock, /state\.project\.age < 1/, "direct feature customization must keep the early-stage gate");
 assert.match(customizationBlock, /PROJECT WHITEBOARD/, "feature proposals should retain their whiteboard context");
 
+const featureSourceBlock = script.match(/function OpenFeatureSourceSheet[\s\S]*?function OpenHomeComputerSheet/)?.[0] || "";
+assert.doesNotMatch(featureSourceBlock, /mode: "computer"/, "the project whiteboard must not reuse the computer surface");
+
 const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
 assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
 assert.doesNotMatch(
