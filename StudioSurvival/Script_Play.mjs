@@ -74,7 +74,7 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815n";
+} from "./Data_World.mjs?v=20260815p";
 import {
   CreateWorldState,
   NearestInteraction,
@@ -1466,7 +1466,7 @@ function BuildRoom() {
     Place(roomGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
     Place(roomGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
     BuildLocationEnvironment(location, index);
-    AddPhysicalLabel(roomGroup, location.name, location.subtitle, 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
+    AddPhysicalLabel(roomGroup, location.name, "", 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
     Place(roomGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 3.15, -.18);
     Place(roomGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 6.36, -.16);
     for (let markerIndex = 0; markerIndex < 4; markerIndex += 1) {

@@ -20,6 +20,8 @@ const Tick = (state, input, delta) => TickWorld(state, input, delta);
 
 assert.equal(WorldConfig.width, 90, "the nine-location city should span ninety world units");
 assert.deepEqual(Locations.map((location) => location.id), ["home", "diner", "market", "talent", "bank", "hotel", "footbath", "footbathCity", "maleModelClub"]);
+assert.deepEqual(Locations.map((location) => location.name), ["自己家", "小菜馆", "小超市", "人才市场", "银行", "大酒店", "普通足浴店", "洗脚城", "男模店"]);
+assert.equal(Locations.some((location) => "subtitle" in location), false, "scene signs should contain place names only");
 assert.equal(Platforms.length, 0, "the flat 2D city must not contain collectible platforms");
 assert.equal(Collectibles.length, 0, "the 2D city must not use development fragments");
 assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving hazards");

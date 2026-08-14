@@ -17,7 +17,7 @@ assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
 assert.match(html, /Style_Play\.css\?v=20260815o/, "skeuomorphic UI and goal-reveal changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815o/, "skeuomorphic world and gameplay changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815p/, "scene-name changes must bypass the Pages cache");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward victory");
@@ -46,5 +46,6 @@ assert.match(script, /navigator\.vibrate\?\./, "coarse-pointer actions should pr
 assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet must open at its own beginning");
 assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must show the target before entering the playable world");
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the win condition before play begins");
+assert.match(script, /AddPhysicalLabel\(roomGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
 
 console.log("StudioSurvival mobile UI contract test passed");

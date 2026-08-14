@@ -44,15 +44,15 @@ export const Ground = Object.freeze({
 });
 
 export const Locations = FreezeList([
-  { id: "home", name: "自己的家", subtitle: "一台电脑，一只冰箱，和全部身家", startX: 0, endX: 10, color: "#3b3553", accent: "#9d8cff" },
-  { id: "diner", name: "小菜馆", subtitle: "能吃饱，但梦想要另点", startX: 10, endX: 20, color: "#4b372b", accent: "#ffd166" },
-  { id: "market", name: "小超市", subtitle: "小吃、彩票和财务幻觉", startX: 20, endX: 30, color: "#263e3b", accent: "#68e0a0" },
-  { id: "talent", name: "人才市场", subtitle: "先买设备，再敢谈梦想", startX: 30, endX: 40, color: "#303a56", accent: "#66b8ff" },
-  { id: "bank", name: "银行", subtitle: "未来的你已经签过字了", startX: 40, endX: 50, color: "#3f3447", accent: "#ff6eae" },
-  { id: "hotel", name: "大酒店", subtitle: "吃一顿像个人的饭", startX: 50, endX: 60, color: "#493c2c", accent: "#ffb45f" },
-  { id: "footbath", name: "普通足浴店", subtitle: "开局唯一亮着的解压灯", startX: 60, endX: 70, color: "#263f43", accent: "#72e0d1" },
-  { id: "footbathCity", name: "洗脚城", subtitle: "现金宽裕，焦虑退潮", startX: 70, endX: 80, color: "#39314d", accent: "#c69cff" },
-  { id: "maleModelClub", name: "男模店", subtitle: "情绪价值按灯牌计费", startX: 80, endX: 90, color: "#482d43", accent: "#ff86c8" },
+  { id: "home", name: "自己家", startX: 0, endX: 10, color: "#3b3553", accent: "#9d8cff" },
+  { id: "diner", name: "小菜馆", startX: 10, endX: 20, color: "#4b372b", accent: "#ffd166" },
+  { id: "market", name: "小超市", startX: 20, endX: 30, color: "#263e3b", accent: "#68e0a0" },
+  { id: "talent", name: "人才市场", startX: 30, endX: 40, color: "#303a56", accent: "#66b8ff" },
+  { id: "bank", name: "银行", startX: 40, endX: 50, color: "#3f3447", accent: "#ff6eae" },
+  { id: "hotel", name: "大酒店", startX: 50, endX: 60, color: "#493c2c", accent: "#ffb45f" },
+  { id: "footbath", name: "普通足浴店", startX: 60, endX: 70, color: "#263f43", accent: "#72e0d1" },
+  { id: "footbathCity", name: "洗脚城", startX: 70, endX: 80, color: "#39314d", accent: "#c69cff" },
+  { id: "maleModelClub", name: "男模店", startX: 80, endX: 90, color: "#482d43", accent: "#ff86c8" },
 ]);
 
 // The city is deliberately flat. Jumping remains available for game feel,
