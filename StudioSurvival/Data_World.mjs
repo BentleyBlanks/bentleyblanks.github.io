@@ -60,7 +60,7 @@ export const Locations = FreezeList([
 export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发、聊天、宣发、发布、熬到下月", x: 2.35, y: 0, radius: 1.55, action: "computer" },
+  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发、聊天、宣发、发布；月结在右下角", x: 2.35, y: 0, radius: 1.55, action: "computer" },
   { id: "homeFridge", kind: "homeFridge", label: "自己家的冰箱", detail: "看看还能翻出什么", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
   { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "点一份便宜充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
   { id: "snackShelf", kind: "snackShelf", label: "小超市零食架", detail: "买便宜小吃顶一顶", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },

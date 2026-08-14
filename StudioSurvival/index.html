@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="从签下全部身家开始，在九个横版 2D 场景里熬出一家游戏公司的开发生存 demo。">
   <title>甲方是我：工作室跑断腿</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815j">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815k">
   <script type="importmap">
     {
       "imports": {
@@ -90,6 +90,12 @@
     </div>
 
     <div class="desktopHint"><b>A D / ← →</b> 穿过九处场景　<b>W / ↑ / 空格</b> 跳　<b>E</b> 交互</div>
+
+    <button id="settlementButton" class="settlementButton" type="button" aria-label="结算 M01 并进入 M02" aria-keyshortcuts="N">
+      <span class="settlementSignal" aria-hidden="true"><i></i><b>↻</b></span>
+      <span class="settlementCopy"><small>回合结算 · END TURN</small><strong id="settlementMonthLabel">结算 M01</strong><em id="settlementDetailLabel">预计支出 ¥0 · 进入 M02</em></span>
+      <span class="settlementLever" aria-hidden="true"><small>N</small><i></i><b>→</b></span>
+    </button>
 
     <nav id="mobileControls" class="mobileControls" aria-label="移动端游戏控制">
       <div class="moveControls" role="group" aria-label="移动方向">
@@ -193,6 +199,6 @@
     <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>再跑一家公司</span><strong>这次少走弯路 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815j"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815k"></script>
 </body>
 </html>

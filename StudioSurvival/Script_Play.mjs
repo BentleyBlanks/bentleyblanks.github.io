@@ -76,18 +76,19 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815j";
+} from "./Data_World.mjs?v=20260815k";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
-} from "./Script_World.mjs?v=20260815j";
+} from "./Script_World.mjs?v=20260815k";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
   "phoneButton",
+  "settlementButton", "settlementMonthLabel", "settlementDetailLabel",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
@@ -1696,6 +1697,20 @@ function RenderHud() {
   dom.studioNameHud.textContent = studioName;
   dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
+  const nextMonth = state.month + 1;
+  const settlementCosts = project ? ForecastMonthlyCosts(state) : null;
+  const canSettle = Boolean(project) && state.status === "playing";
+  dom.settlementButton.disabled = !canSettle;
+  dom.settlementMonthLabel.textContent = `结算 M${String(state.month).padStart(2, "0")}`;
+  dom.settlementDetailLabel.textContent = settlementCosts
+    ? `预计支出 ${FormatGoalMoney(settlementCosts.total)} · 进入 M${String(nextMonth).padStart(2, "0")}`
+    : `结束当前回合 · 进入 M${String(nextMonth).padStart(2, "0")}`;
+  dom.settlementButton.setAttribute("aria-label", `结算 M${String(state.month).padStart(2, "0")} 并进入 M${String(nextMonth).padStart(2, "0")}`);
+  dom.settlementButton.title = `下一回合（N）· 结算 M${String(state.month).padStart(2, "0")}`;
+  dom.settlementButton.classList.toggle(
+    "deadline",
+    Boolean(state.startupLoan?.status === "active" && state.startupLoan.dueMonth <= state.month),
+  );
   ApplyOwnerHairStage();
   dom.cashValue.textContent = FormatMoney(state.cash);
   const startupLoan = state.startupLoan;
@@ -2049,7 +2064,7 @@ function OpenHomeComputerSheet() {
     return `<span style="--skillColor:${meta.color}"><b>${meta.label} ${effect.level}</b><small>月基础 ×${effect.monthlyOutputMultiplier.toFixed(2)}</small></span>`;
   }).join("");
   OpenPanel("HOME COMPUTER", `家里的电脑 · 《${EscapeHtml(state.project.name)}》`, `
-    <p class="panelIntro">这是老板唯一不需要额外购买的工位。开发、对话、项目方向、宣发、发布和月结都从这台电脑处理；员工只能使用你另买的设备。</p>
+    <p class="panelIntro">这是老板唯一不需要额外购买的工位。开发、对话、项目方向、宣发和发布从这里处理；员工只能使用你另买的设备。月结是全局回合操作，直接使用屏幕右下角的常驻按钮。</p>
     <div class="metricGrid">
       <div class="metricTile"><span>当前预估评分</span><strong>${evaluation.rating.toFixed(1)}</strong></div>
       <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
@@ -2062,7 +2077,6 @@ function OpenHomeComputerSheet() {
       <button data-computer-action="direction" type="button"><span>⌁</span><strong>项目方向</strong><small>策略、玩法、换赛道</small></button>
       <button data-computer-action="marketing" type="button"><span>◈</span><strong>线上宣发</strong><small>吹大了就退款</small></button>
       <button data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "发布更新" : "提交商店"}</strong><small>${state.project.age < 2 ? "至少再熬两个月" : "评分差也能发"}</small></button>
-      <button class="danger" data-computer-action="month" type="button"><span>◷</span><strong>熬完这个月</strong><small>工资、房租、饭钱一起扣</small></button>
     </div>
     <div class="panelSection">${RenderLog(5)}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
@@ -2074,7 +2088,6 @@ function OpenHomeComputerSheet() {
       if (action === "direction") return OpenDirectiveSheet();
       if (action === "marketing") return OpenMarketingSheet();
       if (action === "release") return OpenReleaseSheet();
-      if (action === "month") return OpenMonthSheet();
     };
   });
 }
@@ -2798,12 +2811,13 @@ function OpenReleaseSheet() {
 }
 
 function OpenMonthSheet() {
+  if (!state.project || state.status !== "playing") return;
   const costs = ForecastMonthlyCosts(state);
   const shortfall = Math.max(0, costs.total - state.cash - (state.project.isReleased ? state.project.monthlyRevenue : 0));
   const startupLoan = state.startupLoan;
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
-  OpenPanel("END THE MONTH", "电脑：保存、关机，让所有痛苦一起结算", `
-    <p class="panelIntro">点击关机后，工资、AI 月租、房租水电、车贷房贷、饭钱和贷款月供一起扣；随后团队才开始产出。钱不够会退订、开人、断供、挨饿或丢东西。</p>
+  OpenPanel("END TURN · MONTHLY CLOSE", `月结台：结束 M${String(state.month).padStart(2, "0")}，进入下一回合`, `
+    <p class="panelIntro">确认结算后，工资、AI 月租、房租水电、车贷房贷、饭钱和贷款月供一起扣；随后团队才开始产出。钱不够会退订、开人、断供、挨饿或丢东西。</p>
     <div class="metricGrid">
       <div class="metricTile"><span>现金</span><strong>${FormatMoney(state.cash)}</strong></div>
       <div class="metricTile"><span>预计总支出</span><strong>${FormatMoney(costs.total)}</strong></div>
@@ -2819,7 +2833,7 @@ function OpenMonthSheet() {
       <div class="worldChoice"><div class="choiceTop"><strong>上线服务</strong><span>${FormatMoney(costs.service)}</span></div><p>网游和手游在你睡觉时也继续烧钱。</p></div>
     </div>
     <div class="noteList">${CalculateTensions(state.project).slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}：${EscapeHtml(tension.description)}</div>`).join("") || `<div class="note good">本月四组关系勉强可以出现在同一张合影里。</div>`}</div>
-    <div class="panelSection choiceFooter"><span>策略：${EscapeHtml(FindDirective(state.selectedDirective).name)} · 老板已硬干 ${state.ownerWorkCount}/3 · 有效沟通剩 ${state.talkPoints}</span><button class="primaryButton" data-advance-month type="button">结算并进入下月</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>策略：${EscapeHtml(FindDirective(state.selectedDirective).name)} · 老板已硬干 ${state.ownerWorkCount}/3 · 有效沟通剩 ${state.talkPoints}</span><button class="primaryButton" data-advance-month type="button">确认结算 · 进入 M${String(state.month + 1).padStart(2, "0")}</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (!event.target.closest("[data-advance-month]")) return;
       const result = AdvanceMonth(state);
@@ -2853,7 +2867,7 @@ function OpenHelpSheet() {
   OpenPanel("HOW TO SUFFER", "九个 2D 场景：你得亲自跑过去", `
     <div class="resultHero"><b>A/D</b><p>左右穿过家、菜馆、超市、人才市场、银行、酒店和三档足浴场所；W、↑ 或空格跳；靠近柜台按 E。移动端横屏使用底部按钮。</p></div>
     <div class="noteList">
-      <div class="note">家里只有老板自己的电脑。开发、聊天、宣发、发布和月结都在电脑上完成。</div>
+      <div class="note">家里的电脑负责开发、聊天、宣发和发布；结束回合不必再跑回家，随时点击屏幕右下角的“结算本月”。</div>
       <div class="note good">顶部手机会播报持续风向、每月随机事件和下月传闻。每月可用 1 次沟通拍板“主打特色 + 迎合方向”；两项同时命中才吃风口，错时硬蹭会退款、掉粉并被群嘲。</div>
       <div class="note danger">第一次招聘前必须先在人才市场设备柜台买第一套工位；以后每增加一人都要再有一套空设备。</div>
       <div class="note">冰箱是永远可用的生存保底。小菜馆、小超市和大酒店都要先看当前现金是否达到门口写明的准入门槛；门槛不扣钱，饭钱仍在月结时支付。</div>
@@ -3123,6 +3137,9 @@ function UpdateMobileControlState(interactionAvailable, interaction) {
   dom.mobileControls.classList.toggle("suppressed", suppressed);
   dom.mobileControls.toggleAttribute("inert", suppressed);
   dom.mobileControls.setAttribute("aria-hidden", String(suppressed));
+  dom.settlementButton.classList.toggle("suppressed", suppressed);
+  dom.settlementButton.toggleAttribute("inert", suppressed);
+  dom.settlementButton.setAttribute("aria-hidden", String(suppressed));
   dom.moveLeftButton.disabled = suppressed;
   dom.moveRightButton.disabled = suppressed;
   dom.jumpButton.disabled = suppressed;
@@ -3158,13 +3175,16 @@ function BindControls() {
   window.addEventListener("resize", ResizeScene);
   window.addEventListener("blur", () => { ResetTouchControls(); CancelSealHold(); });
   window.addEventListener("keydown", (event) => {
-    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+    const activeElement = document.activeElement;
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName) || activeElement?.isContentEditable) return;
+    if (activeElement?.matches?.("button, a, [role='button']") && ["Space", "Enter"].includes(event.code)) return;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) event.preventDefault();
     if (event.code === "KeyA" || event.code === "ArrowLeft") SetMovement("left", true);
     if (event.code === "KeyD" || event.code === "ArrowRight") SetMovement("right", true);
     if (["KeyW", "ArrowUp", "Space"].includes(event.code) && !event.repeat) inputState.jump = true;
     if (event.code === "KeyE" && !event.repeat) TriggerInteraction();
     if (event.code === "KeyM" && !event.repeat && !IsOverlayOpen()) OpenMarketPhoneSheet();
+    if (event.code === "KeyN" && !event.repeat && !IsOverlayOpen()) OpenMonthSheet();
     if (event.code === "Escape") { if (!dom.resultLayer.classList.contains("hidden")) CloseResult(); else ClosePanel(); }
   }, { passive: false });
   window.addEventListener("keyup", (event) => {
@@ -3195,6 +3215,12 @@ function BindControls() {
   dom.resultCloseButton.addEventListener("click", CloseResult);
   dom.helpButton.addEventListener("click", OpenHelpSheet);
   dom.phoneButton.addEventListener("click", OpenMarketPhoneSheet);
+  dom.settlementButton.addEventListener("click", () => {
+    if (IsOverlayOpen()) return;
+    PlayTouchFeedback(14);
+    PlayTone("warning");
+    OpenMonthSheet();
+  });
   dom.soundButton.addEventListener("click", () => {
     soundEnabled = !soundEnabled;
     dom.soundButton.classList.toggle("muted", !soundEnabled);

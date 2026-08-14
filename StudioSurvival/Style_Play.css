@@ -236,14 +236,255 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .desktopHint {
   position: fixed;
   z-index: 12;
-  right: var(--safeRight);
-  bottom: calc(var(--safeBottom) + 2px);
+  right: calc(var(--safeRight) + 274px);
+  bottom: calc(var(--safeBottom) + 8px);
   color: rgba(255,255,255,.55);
   font-size: 9px;
   pointer-events: none;
   text-shadow: 0 2px 6px #000;
 }
 .desktopHint b { color: rgba(255,255,255,.84); }
+
+.settlementButton {
+  --settlementAccent: #ffc56b;
+  --settlementLampCore: #ffd06c;
+  --settlementLampGlow: rgba(255,177,72,.88);
+  position: fixed;
+  z-index: 28;
+  right: var(--safeRight);
+  bottom: calc(var(--safeBottom) + 17px);
+  width: 258px;
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 46px;
+  align-items: stretch;
+  gap: 7px;
+  padding: 8px 9px;
+  overflow: hidden;
+  border: 1px solid #777b83;
+  border-bottom-color: #111319;
+  border-radius: 8px;
+  background:
+    linear-gradient(112deg, rgba(255,255,255,.13), transparent 24%, transparent 69%, rgba(0,0,0,.22)),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 3px),
+    #30343c;
+  color: #f3f0e7;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    inset 0 -3px 0 rgba(0,0,0,.52),
+    0 7px 0 rgba(4,5,8,.26),
+    0 15px 32px rgba(0,0,0,.48);
+  cursor: pointer;
+  isolation: isolate;
+  text-align: left;
+  touch-action: manipulation;
+  transition: opacity .18s ease, transform .12s ease, filter .12s ease, visibility 0s linear;
+}
+
+.settlementButton::before,
+.settlementButton::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #111318;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #b5b7bc 0 15%, #666970 23% 50%, #22242a 54% 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 1px 1px #000;
+  pointer-events: none;
+}
+.settlementButton::before { left: 4px; }
+.settlementButton::after { right: 4px; }
+
+.settlementButton:not(:disabled):hover {
+  border-color: #92969f;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.settlementButton:not(:disabled):active {
+  filter: brightness(.98);
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 3px 7px rgba(0,0,0,.36),
+    inset 0 -1px 0 rgba(255,255,255,.13),
+    0 2px 0 rgba(4,5,8,.35),
+    0 7px 16px rgba(0,0,0,.42);
+}
+
+.settlementButton:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: grayscale(.72);
+}
+
+.settlementButton.suppressed {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(18px) scale(.96);
+  transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+}
+
+.settlementSignal,
+.settlementLever {
+  position: relative;
+  min-width: 0;
+  border: 1px solid #0a0c0f;
+  border-radius: 5px;
+  background: #121519;
+  box-shadow: inset 0 3px 7px rgba(0,0,0,.86), 0 1px 0 rgba(255,255,255,.16);
+}
+
+.settlementSignal {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+}
+
+.settlementSignal i {
+  width: 15px;
+  height: 15px;
+  border: 1px solid #4f3511;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #fff5c8 0 8%, #ffd477 17% 42%, #b96b20 57% 75%, #4f2811 82% 100%);
+  box-shadow: inset 0 -2px 3px rgba(79,32,6,.54), 0 0 4px #ffd06c, 0 0 13px rgba(255,177,72,.76);
+  animation: settlementReady 1.8s ease-in-out infinite alternate;
+}
+
+.settlementSignal b {
+  color: #d8b26b;
+  font: 900 14px/1 Consolas, monospace;
+  text-shadow: 0 0 7px rgba(255,194,91,.44);
+}
+
+.settlementCopy {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 1px 2px;
+}
+
+.settlementCopy small {
+  overflow: hidden;
+  color: #a9a69d;
+  font: 800 6.5px/1.1 Consolas, "Microsoft YaHei UI", monospace;
+  letter-spacing: .12em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlementCopy strong {
+  overflow: hidden;
+  color: #fff1d4;
+  font: 950 15px/1.15 "Microsoft YaHei UI", sans-serif;
+  letter-spacing: .02em;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 #191109, 0 0 9px rgba(255,196,92,.2);
+  white-space: nowrap;
+}
+
+.settlementCopy em {
+  overflow: hidden;
+  color: #c8aa75;
+  font: 700 7px/1.25 Consolas, "Microsoft YaHei UI", monospace;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlementLever {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #20242a, #101216);
+}
+
+.settlementLever::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 19px;
+  bottom: 6px;
+  width: 9px;
+  border: 1px solid #050607;
+  border-radius: 6px;
+  background: #080a0d;
+  box-shadow: inset 0 1px 4px #000, 0 1px 0 rgba(255,255,255,.12);
+  transform: translateX(-50%);
+}
+
+.settlementLever small {
+  position: absolute;
+  z-index: 3;
+  top: 4px;
+  right: 5px;
+  color: #8d9198;
+  font: 800 6px/1 Consolas, monospace;
+}
+
+.settlementLever i {
+  position: absolute;
+  z-index: 1;
+  left: calc(50% - 2px);
+  bottom: 9px;
+  width: 5px;
+  height: 27px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #50545b, #dadde0 40%, #73777e 74%, #24262b);
+  box-shadow: 1px 1px 2px #000;
+  transform: rotate(15deg);
+  transform-origin: 50% 100%;
+  transition: transform .1s ease;
+}
+
+.settlementLever b {
+  position: absolute;
+  z-index: 2;
+  top: 13px;
+  left: 11px;
+  width: 25px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #70451a;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #ffd47e, #d38b34 54%, #8c4e1d);
+  color: #321b08;
+  font: 950 14px/1 Consolas, monospace;
+  text-shadow: 0 1px 0 rgba(255,255,255,.28);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.45), inset -2px -3px 0 rgba(92,45,11,.35), 0 3px 4px rgba(0,0,0,.56);
+  transition: transform .1s ease;
+}
+
+.settlementButton:not(:disabled):active .settlementLever i { transform: rotate(1deg) translateY(4px); }
+.settlementButton:not(:disabled):active .settlementLever b { transform: translate(-2px, 5px); }
+
+.settlementButton.deadline {
+  --settlementAccent: #ff7278;
+  --settlementLampCore: #ff6f73;
+  --settlementLampGlow: rgba(255,65,77,.9);
+  border-color: #a15a60;
+  background:
+    linear-gradient(112deg, rgba(255,255,255,.12), transparent 24%, transparent 69%, rgba(80,0,8,.23)),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px),
+    #3b3035;
+}
+.settlementButton.deadline .settlementSignal i {
+  border-color: #6d171c;
+  background: radial-gradient(circle at 36% 30%, #ffe1df 0 8%, #ff817f 17% 42%, #c42d3a 58% 76%, #5a1018 83% 100%);
+  box-shadow: inset 0 -2px 3px rgba(79,6,12,.58), 0 0 5px #ff6f73, 0 0 15px rgba(255,65,77,.82);
+}
+.settlementButton.deadline .settlementSignal b,
+.settlementButton.deadline .settlementCopy em { color: #ffaaa9; }
+.settlementButton.deadline .settlementCopy strong { color: #ffe0dc; }
+
+@keyframes settlementReady {
+  to { filter: brightness(1.16); box-shadow: inset 0 -2px 3px rgba(79,32,6,.45), 0 0 6px var(--settlementLampCore), 0 0 18px var(--settlementLampGlow); }
+}
 
 .mobileControls { display: none; }
 
@@ -335,7 +576,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 /* Founding ceremony and contract onboarding -------------------------------- */
 .setupScreen { display: grid; grid-template-columns: 1fr; place-items: center; gap: 0; padding: max(18px,4vh) max(18px,5vw); overflow: hidden; transition: background .7s ease; }
 .setupScreen.cinematic { background: linear-gradient(180deg, rgba(4,5,10,.2), rgba(4,5,10,.58)); }
-.onboarding .gameHud, .onboarding .missionCard, .onboarding .interactionPrompt, .onboarding .desktopHint, .onboarding .mobileControls { opacity: 0; pointer-events: none; }
+.onboarding .gameHud, .onboarding .missionCard, .onboarding .interactionPrompt, .onboarding .desktopHint, .onboarding .settlementButton, .onboarding .mobileControls { opacity: 0; pointer-events: none; }
 .ceremonyIntro { position: relative; z-index: 3; width: min(820px,91vw); padding: clamp(24px,4vw,52px); border: 1px solid rgba(255,255,255,.15); border-radius: 30px; background: linear-gradient(145deg, rgba(11,13,23,.93), rgba(23,19,38,.87)); box-shadow: 0 42px 130px rgba(0,0,0,.62); backdrop-filter: blur(18px); }
 .ceremonyIntro::after { content: "成立"; position: absolute; right: clamp(20px,5vw,58px); top: clamp(18px,4vw,48px); color: rgba(255,209,102,.09); font-size: clamp(72px,15vw,170px); font-weight: 950; line-height: .8; pointer-events: none; }
 .ceremonyEyebrow { color: #ffd166; font-size: 10px; letter-spacing: .2em; }
@@ -1751,6 +1992,11 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
    Keep movement under the left thumb, actions under the right thumb, and
    preserve a clear strip of world view between them. */
 @media (hover: none), (pointer: coarse), (max-width: 920px) {
+  .gameRoot {
+    --controlSize: clamp(58px, 15.5vh, 70px);
+    --settlementWidth: clamp(156px, 38vw, 190px);
+  }
+
   .gameHud {
     min-height: 74px;
     grid-template-columns: 54px minmax(420px, 1fr) minmax(180px, 210px) 104px;
@@ -1819,7 +2065,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   }
 
   .mobileControls {
-    --controlSize: clamp(58px, 15.5vh, 70px);
     left: calc(var(--safeLeft) + 2px);
     right: calc(var(--safeRight) + 2px);
     bottom: calc(var(--safeBottom) + 2px);
@@ -1835,6 +2080,30 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
     transform: translateY(20px);
     pointer-events: none;
   }
+
+  .settlementButton {
+    z-index: 31;
+    right: calc(var(--safeRight) + 2px);
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 13px);
+    width: var(--settlementWidth);
+    min-height: 62px;
+    grid-template-columns: 32px minmax(0, 1fr) 35px;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 7px;
+  }
+
+  .settlementSignal { gap: 4px; }
+  .settlementSignal i { width: 12px; height: 12px; }
+  .settlementSignal b { font-size: 11px; }
+  .settlementCopy { gap: 1px; }
+  .settlementCopy small { font-size: 5.6px; letter-spacing: .08em; }
+  .settlementCopy strong { font-size: 12px; }
+  .settlementCopy em { font-size: 6px; }
+  .settlementLever::before { top: 17px; bottom: 5px; }
+  .settlementLever small { top: 3px; right: 4px; font-size: 5px; }
+  .settlementLever i { bottom: 7px; height: 22px; }
+  .settlementLever b { top: 11px; left: 7px; width: 21px; height: 19px; font-size: 12px; }
 
   .moveControls,
   .actionControls {
@@ -1925,11 +2194,11 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 
   .interactionPrompt {
     left: auto;
-    right: calc(var(--safeRight) + 2px);
-    bottom: calc(var(--safeBottom) + var(--controlSize, 62px) + 12px);
-    width: min(250px, 43vw);
+    right: calc(var(--safeRight) + var(--settlementWidth) + 13px);
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 12px);
+    width: min(230px, 41vw);
     min-width: 0;
-    max-width: 250px;
+    max-width: 230px;
     transform: none;
     padding: 8px 10px;
     border-radius: 13px;
@@ -1999,10 +2268,22 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-height: 430px) and (orientation: landscape) {
-  .mobileControls { --controlSize: 54px; }
+  .gameRoot {
+    --controlSize: 54px;
+    --settlementWidth: clamp(150px, 36vw, 180px);
+  }
   .moveControls button { width: clamp(62px, 11.5vw, 76px); }
   .mobileControls span { font-size: 19px; }
-  .interactionPrompt { bottom: calc(var(--safeBottom) + 66px); width: min(220px, 41vw); }
+  .settlementButton {
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 12px);
+    width: var(--settlementWidth);
+    min-height: 58px;
+  }
+  .interactionPrompt {
+    right: calc(var(--safeRight) + var(--settlementWidth) + 12px);
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 12px);
+    width: min(220px, 41vw);
+  }
   .missionCard { max-height: 104px; overflow: hidden; }
   .missionCard p { margin-block: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .missionCard .locationRoute { display: none; }
@@ -2028,15 +2309,34 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-height: 350px) and (orientation: landscape) {
+  .gameRoot { --settlementWidth: clamp(142px, 35vw, 166px); }
   .missionCard { max-height: 82px; padding: 12px 10px 8px; }
   .missionCard .moduleLabel,
   .missionCard .moduleStrip,
   .missionCard .locationRoute { display: none; }
+  .settlementButton {
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 10px);
+    width: var(--settlementWidth);
+    min-height: 50px;
+    grid-template-columns: 27px minmax(0, 1fr) 31px;
+    padding: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.52), 0 3px 0 rgba(4,5,8,.26), 0 6px 12px rgba(0,0,0,.42);
+  }
+  .settlementCopy small { display: none; }
+  .settlementCopy strong { font-size: 11px; }
+  .settlementSignal b { display: none; }
+  .settlementLever b { left: 6px; }
+  .interactionPrompt {
+    right: calc(var(--safeRight) + var(--settlementWidth) + 10px);
+    bottom: calc(var(--safeBottom) + var(--controlSize) + 10px);
+    width: min(200px, 39vw);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .interactButton.available { animation: none; }
-  .mobileControls, .mobileControls button { transition: none; }
+  .settlementSignal i { animation: none; }
+  .settlementButton, .settlementLever i, .settlementLever b, .mobileControls, .mobileControls button { transition: none; }
 }
 
 @keyframes interactReady {
