@@ -3371,47 +3371,62 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = nul
  *
  * @param w 朝街那面的宽（画布像素），@param h 墙头高（画布像素）
  */
-export function DrawYardWallEnd(ctx, x, groundY, w, h, id, { slogan = null } = {}) {
+/**
+ * **齐胸的土坯院墙（前景挡人的那一种）** —— 勇敢的心式的藏身处。
+ *
+ * 2026-08-14 用户第二轮退回：「勇敢的心里面就是在前景加了一个可以遮挡的物体
+ * 比如墙 人操控躲在后面就可以 你他妈的画个阴影是什么意思啊」。所以这一件的
+ * 职责只有一个：**站在演员前面，把躲在它后面的人真的挡住**（clutter 带）。
+ *
+ * 尺度是被这个职责钉死的，别乱调：
+ *  · 墙身 0.72m（塌了半截的那种）—— 柱子蹲下去头顶 0.97m，**只露出脑袋一小截**
+ *    （玩家还看得见自己在哪儿）；站起来 1.38m，大半个人亮在墙外＝暴露。
+ *    **这个高度差就是玩法本身**，改了这一拍就废了。第一版给 1.0m，实拍出来
+ *    两个孩子整个不见了——前景件被透视放大 1.17 倍、地平线还往下掉 0.16m，
+ *    纸面上的"齐胸"到画面上就成了"没顶"。
+ *  · 东头（朝村口那头）一个 ×1.45 的门垛 —— 危险来的那一侧要厚要高；
+ *    仍在 clutter 的 1.2m 上限内。
+ *
+ * 前景件的三条画法（比背景件都要狠一档，因为它离镜头最近、被放大 1.18 倍）：
+ *  ① 色号再压一档：近处的东西必须比背景实，一样的明度就又糊成背景；
+ *  ② 顶沿是**看人的那条线**，所以它要平稳可读（起伏但不塌腰）——玩家是照着
+ *    这条线判断自己露没露头的；
+ *  ③ 墙根壅土往镜头这边堆，把"它站在你前面"这件事在下缘也说一遍。
+ *
+ * @param w 墙全长（画布像素），@param h 墙身高（画布像素）
+ */
+export function DrawYardWallLow(ctx, x, groundY, w, h, id, { pier = true, slogan = null } = {}) {
   const x0 = x - w / 2, x1 = x + w / 2;
-  // 东头那截**门垛**（土坯垒的方墩子，比墙身厚也高）与它西边接着的**墙身**。
-  // 第一版把整件画成等高的一堵、西边再糊一块暗面，实拍读出来是"一间带门的
-  // 小房子"——因为「一块暗板 + 一条亮边 + 一顶苫草」正好是门洞的语汇。
-  // 现在靠**高低差**说话：墙身矮一截、门垛拔起来，剪影自己就是个拐角。
-  const pierW = Math.min(w * 0.48, 1.9 * 48);
-  const xp = x1 - pierW;                    // 墙身与门垛的分界
-  const runH = h * 0.70;
+  const pierW = pier ? Math.min(w * 0.26, 42) : 0;
+  const xp = x1 - pierW;                     // 墙身与门垛的分界（东头＝朝村口那头）
+  // 门垛比墙身高半头：**朝危险那一侧要厚要高**（挡住的正是伪军来的方向），
+  // 而墙身要矮到让玩家看得见自己的脑袋——一件东西两个高度，两件事各得其所
+  const pierH = h * 1.45;
 
-  const seg = (a, b, hh, fill, shade, seed) => {
-    const top = RaggedTop(a, b, groundY - hh, id + seed, { sag: 3.2, n: Math.max(5, Math.round((b - a) / 9)) });
-    InkFill(ctx, top.concat([[b, groundY], [a, groundY]]), id + "f" + seed,
-      fill, { amp: 1.8, lw: 2.3, shade });
-    WeatherAdobe(ctx, a, groundY - hh, b - a, hh, id + "wa" + seed,
-      { course: 13, gullies: 3, cracks: 2, patches: 2 });
-    return top;
-  };
+  // ① 墙身
+  const runTop = RaggedTop(x0, xp + (pier ? 2 : 0), groundY - h, id + "rt",
+    { sag: 2.6, n: Math.max(6, Math.round(w / 14)) });
+  InkFill(ctx, runTop.concat([[xp + (pier ? 2 : 0), groundY], [x0, groundY]]), id + "run",
+    "#453922", { amp: 1.7, lw: 2.4, shade: "rgba(18,12,6,0.42)", shadeAt: 0.42 });
+  // 前景件是全画面离镜头最近的东西，纹理得比背景狠一档；但**大补丁只留一块**
+  //（两块以上在这个尺度下就是墙上贴了两张白纸）
+  WeatherAdobe(ctx, x0, groundY - h, (xp + 2) - x0, h, id + "rwa",
+    { course: 10, gullies: 4, cracks: 3, patches: 1, seam: 0.34 });
+  Speckle(ctx, x0, groundY - h, (xp + 2) - x0, h, id + "sp", { count: 26, alpha: 0.13 });
 
-  // ① 墙身（西，矮一截）：往西一直接到背景那堵自家院墙上去
-  seg(x0, xp + 3, runH, "#4b4029", "rgba(28,20,11,0.30)", "run");
-  // ② 门垛（东，拔起来）
-  const pierTop = seg(xp, x1, h, "#453a26", "rgba(28,20,11,0.32)", "pier");
-  Speckle(ctx, xp, groundY - h, pierW, h, id + "sp", { count: 16, alpha: 0.10 });
+  // ② 门垛（东头拔高一点：拐角靠高低差读，不靠另糊一块暗板）
+  let pierTop = null;
+  if (pier) {
+    pierTop = RaggedTop(xp, x1, groundY - pierH, id + "pt", { sag: 1.8, n: 5 });
+    InkFill(ctx, pierTop.concat([[x1, groundY], [xp, groundY]]), id + "pier",
+      "#3c311b", { amp: 1.7, lw: 2.4, shade: "rgba(16,11,5,0.44)", shadeAt: 0.40 });
+    WeatherAdobe(ctx, xp, groundY - pierH, pierW, pierH, id + "pwa",
+      { course: 10, gullies: 2, cracks: 2, patches: 0, seam: 0.34 });
+    InkLine(ctx, xp + Sym(id + "cn", 0, 1.2), groundY - h + 2, xp + Sym(id + "cn", 1, 1.2), groundY,
+      id + "corner", { lw: 2.0, color: IN.inkSoft, amp: 0.7 });
+  }
 
-  // ③ 门垛朝西那面是背光的：一层化开的暗，**不许是一块方板**
-  //（方板＝门洞。第一版就栽在这儿）
-  ctx.save();
-  const g = ctx.createLinearGradient(xp - pierW * 0.35, 0, xp + pierW * 0.55, 0);
-  g.addColorStop(0, "rgba(14,10,6,0)");
-  g.addColorStop(0.55, "rgba(14,10,6,0.34)");
-  g.addColorStop(1, "rgba(14,10,6,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(xp - pierW * 0.35, groundY - h - 6, pierW * 0.9, h + 8);
-  ctx.restore();
-  // 阳角那道棱：拐角之所以读得出是拐角，全靠这一条竖线 + 上头的高低差
-  InkLine(ctx, xp + Sym(id + "cn", 0, 1.4), groundY - runH + 2, xp + Sym(id + "cn", 1, 1.4), groundY,
-    id + "corner", { lw: 2.0, color: IN.inkSoft, amp: 0.7 });
-
-  // ④ 墙头苫的谷草（照 DrawYardWall 那条：一整领压上去，不是一排牌位）。
-  //   两截各苫各的，门垛那顶厚一档——高低差在草上也要看得出来
+  // ③ 墙头苫的谷草：**顶沿这条线玩家要照着看**，所以起伏给得克制
   const cap = (a, b, topPts, thick, seed) => {
     const capTopY = (px) => {
       const t = Math.max(0, Math.min(1, (px - a) / Math.max(1, b - a)));
@@ -3420,57 +3435,59 @@ export function DrawYardWallEnd(ctx, x, groundY, w, h, id, { slogan = null } = {
       return topPts[i0][1] + (topPts[i0 + 1][1] - topPts[i0][1]) * (f - i0);
     };
     const sd = Hash(id + seed) * 6.28;
-    const bald = (a + b) / 2 + Sym(id + "bd" + seed, 0, (b - a) * 0.25);
+    const bald = (a + b) / 2 + Sym(id + "bd" + seed, 0, (b - a) * 0.24);
     const Thick = (px) => {
-      const worn = Math.max(0, 1 - ((px - bald) / Math.max(8, (b - a) * 0.28)) ** 2);
-      return Math.max(0, (thick + Math.sin(px * 0.07 + sd) * 1.7) * (1 - worn * 0.85));
+      const worn = Math.max(0, 1 - ((px - bald) / Math.max(8, (b - a) * 0.26)) ** 2);
+      return Math.max(0, (thick + Math.sin(px * 0.07 + sd) * 1.5) * (1 - worn * 0.8));
     };
     const lower = [], upper = [];
     const n2 = Math.max(8, Math.round((b - a) / 3.5));
     for (let i = 0; i <= n2; i += 1) {
       const px = a + ((b - a) * i) / n2;
       const base = capTopY(px);
-      const burr = (i % 2 ? 1.7 : 0) + Rnd(id + "cpt" + seed, i) * 2.0;
-      lower.push([px, base + 2.5]);
+      const burr = (i % 2 ? 1.6 : 0) + Rnd(id + "cpt" + seed, i) * 1.9;
+      lower.push([px, base + 2.4]);
       upper.push([px, base - Thick(px) - (Thick(px) > 1 ? burr : 0)]);
     }
+    // **往暖里拧**：R 与 G 挨得太近，上屏（CanvasTexture 提亮）就是一条青苔绿的
+    // 带子，读成墙头长了草。干谷草是暖赭，R−G 要拉开一档
     InkFill(ctx, lower.concat(upper.reverse()), id + "cap" + seed,
-      "#443919", { amp: 0.9, lw: 1.2, line: IN.inkSoft, shade: "rgba(22,16,6,0.32)" });
+      "#4a3410", { amp: 0.9, lw: 1.2, line: IN.inkSoft, shade: "rgba(22,13,3,0.38)" });
     ctx.save();
     ctx.lineWidth = 0.9;
     for (let i = 0; i < Math.round((b - a) / 3); i += 1) {
       const px = a + 2 + Rnd(id + "cw" + seed, i) * (b - a - 4);
       const th = Thick(px);
-      if (th < 1.5) continue;
+      if (th < 1.4) continue;
       const py = capTopY(px) - th * (0.15 + Rnd(id + "cv" + seed, i) * 0.7);
-      ctx.globalAlpha = 0.26 + Rnd(id + "ca" + seed, i) * 0.3;
-      ctx.strokeStyle = i % 3 === 0 ? "#413516" : "#7b6b42";
+      ctx.globalAlpha = 0.28 + Rnd(id + "ca" + seed, i) * 0.3;
+      ctx.strokeStyle = i % 3 === 0 ? "#3b2806" : "#7d6537";
       ctx.beginPath();
       ctx.moveTo(px, py);
-      ctx.lineTo(px + (i % 2 ? 4 : -4), py + 1.7);
+      ctx.lineTo(px + (i % 2 ? 4 : -4), py + 1.6);
       ctx.stroke();
     }
     ctx.restore();
     for (let i = 0; i < 4; i += 1) {
       const px = a + 4 + Rnd(id + "dg" + seed, i) * (b - a - 8);
       if (Thick(px) < 2) continue;
-      InkLine(ctx, px, capTopY(px) + 2, px + Sym(id + "dg2" + seed, i, 2.4),
-        capTopY(px) + 6 + Rnd(id + "dg3" + seed, i) * 7,
-        id + "drp" + seed + i, { lw: 1.1, color: "#5f5233", amp: 1.2 });
+      InkLine(ctx, px, capTopY(px) + 2, px + Sym(id + "dg2" + seed, i, 2.3),
+        capTopY(px) + 6 + Rnd(id + "dg3" + seed, i) * 6,
+        id + "drp" + seed + i, { lw: 1.1, color: "#63501f", amp: 1.2 });
     }
   };
-  cap(xp - 2, x1 + 2, pierTop, 6.2, "pier");
-  cap(x0 - 2, xp - 1, RaggedTop(x0, xp + 3, groundY - runH, id + "run", { sag: 3.2, n: Math.max(5, Math.round((xp + 3 - x0) / 9)) }), 4.6, "run");
+  cap(x0 - 2, xp + (pier ? 1 : 2), runTop, 5.0, "run");
+  if (pier) cap(xp - 2, x1 + 2, pierTop, 6.0, "pier");
 
-  // ⑤ 墙根壅土：一坨堆上去的东西，四边不许直
-  InkFill(ctx, [[x0 - 5, groundY], [x0 + 4, groundY - 6], [(x0 + xp) / 2, groundY - 8],
-    [xp, groundY - 7], [(xp + x1) / 2, groundY - 9], [x1 - 3, groundY - 6], [x1 + 6, groundY]],
-    id + "ft", "#3e3423", { amp: 1.5, lw: 1.5, shade: "rgba(17,12,7,0.30)" });
+  // ④ 墙根壅土（往镜头这边堆一点：下缘也说一句"它在你前面"）
+  InkFill(ctx, [[x0 - 6, groundY + 3], [x0 + 5, groundY - 5], [(x0 + x1) * 0.38, groundY - 7],
+    [(x0 + x1) * 0.62, groundY - 6], [x1 - 4, groundY - 5], [x1 + 7, groundY + 3]],
+    id + "ft", "#3b3122", { amp: 1.6, lw: 1.5, shade: "rgba(15,11,6,0.30)" });
 
-  // ⑥ 石灰刷的日伪口号刷在墙身上（这年月的村墙本来就压着两层字）
+  // ⑤ 石灰刷的日伪口号（这年月的村墙本来就压着两层字）
   if (slogan) {
-    const size = Math.min(22, (xp - x0) * 0.72 / (slogan.text.length * 1.22));
-    DrawWallSlogan(ctx, (x0 + xp) / 2, groundY - runH * 0.55, slogan.text, size, id + "sl", slogan);
+    const size = Math.min(20, (xp - x0) * 0.7 / (slogan.text.length * 1.22));
+    DrawWallSlogan(ctx, (x0 + xp) / 2, groundY - h * 0.52, slogan.text, size, id + "sl", slogan);
   }
 }
 
@@ -4401,7 +4418,7 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
 // state.wrapCard，L = WRAP_CARD，t = 秒。版面坐标全在 L 里（卡宽单位），
 // **这儿绝不另抄一套**。
 //
-// 为什么非得是一张卡：坛口拢共 0.22m，玩法景别的画宽 9.6m——2%，
+// 为什么非得是一张卡：坛口拢共 0.22m，玩法景别的画宽 8.7m——2.5%，
 // 屏幕上是一粒扣子。同石笔/刨子/接绳（CLAUDE.md 拟物交互第 4 条）。
 //
 // 第七稿的封法：**坛口糊着一圈干泥，泥上盖半块碗底**（豁口碗的底，圈足朝上），
