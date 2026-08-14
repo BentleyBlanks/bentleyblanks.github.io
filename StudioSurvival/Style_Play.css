@@ -534,14 +534,437 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .endingStats span { display:block; font-size:8px; letter-spacing:0; color:var(--muted); }
 .endingStats strong { display:block; margin-top:3px; }
 
+/* Skeuomorphic gameplay desk -------------------------------------------------
+   The HUD is built as four physical instruments: identity, business status,
+   survival, and system controls. Project information lives on its own paper
+   job sheet instead of competing with the global game state. */
+.gameHud {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(198px, 228px) minmax(470px, 1fr) minmax(250px, 300px) 132px;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.hudConsole {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px 10px 10px;
+  border: 1px solid #5d6069;
+  border-bottom-color: #111319;
+  border-radius: 9px;
+  background:
+    linear-gradient(112deg, rgba(255,255,255,.075), transparent 22%, transparent 72%, rgba(0,0,0,.2)),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+    #292c34;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.23),
+    inset 0 -2px 0 rgba(0,0,0,.58),
+    0 8px 0 rgba(4,5,8,.18),
+    0 16px 28px rgba(0,0,0,.34);
+  pointer-events: none;
+}
+
+.hudConsole::before,
+.hudConsole::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #0e1015;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #a1a4aa 0 16%, #565962 24% 50%, #1c1e24 54% 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 1px 1px #000;
+}
+.hudConsole::before { top: 5px; left: 5px; }
+.hudConsole::after { right: 5px; bottom: 5px; }
+
+.consoleHeader {
+  height: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 3px 7px;
+  color: #d8d8d3;
+  text-shadow: 0 -1px 0 #08090c;
+}
+.consoleHeader strong { font-size: 9px; letter-spacing: .11em; }
+.consoleHeader small { margin-left: auto; color: #92959c; font: 700 7px/1 Consolas, monospace; letter-spacing: .13em; }
+.statusLamp {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border: 1px solid #0b0c0f;
+  border-radius: 50%;
+  background: #5d615e;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.25), 0 1px 2px #000;
+}
+.businessLamp { background: #78e8b1; box-shadow: inset 0 1px 1px #e3fff0, 0 0 7px rgba(104,224,160,.72), 0 1px 2px #000; }
+.survivalLamp { background: #ffc16e; box-shadow: inset 0 1px 1px #fff2ce, 0 0 7px rgba(255,172,91,.68), 0 1px 2px #000; }
+.systemLamp { background: #85c8ff; box-shadow: inset 0 1px 1px #e5f5ff, 0 0 7px rgba(101,184,255,.65), 0 1px 2px #000; }
+
+.identityConsole { display: flex; padding: 8px; }
+.brandChip,
+.hudStat,
+.goalHud,
+.conditionHud,
+.roundButton {
+  border: 1px solid #090b0f;
+  backdrop-filter: none;
+}
+.brandChip {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), transparent 40%),
+    #151820;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.82), 0 1px 0 rgba(255,255,255,.16);
+}
+.brandChip > span {
+  width: 48px;
+  height: 48px;
+  margin-right: 10px;
+  border: 1px solid #332678;
+  border-radius: 7px;
+  background: linear-gradient(145deg, #a99aff 0%, #7865ec 46%, #5543bb 100%);
+  color: #fff;
+  font-size: 19px;
+  text-shadow: 0 2px 1px #3a2d92;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.45), inset -2px -3px 0 rgba(33,24,96,.48), 0 3px 5px rgba(0,0,0,.5);
+}
+.brandChip div { min-width: 0; align-content: center; gap: 1px; }
+.brandChip small { color: #b7acee; font-size: 7px; letter-spacing: .16em; }
+.brandChip strong { overflow: hidden; color: #f2f1eb; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.brandChip em { color: #747986; font-size: 7px; font-style: normal; letter-spacing: .07em; }
+
+.businessConsole { display: grid; grid-template-rows: 17px 1fr; }
+.businessConsoleBody { min-width: 0; display: grid; grid-template-columns: minmax(270px, 1.05fr) minmax(210px, .95fr); gap: 7px; }
+.businessReadouts { min-width: 0; display: grid; grid-template-columns: .68fr .88fr 1.2fr; gap: 5px; }
+.hudStat {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  align-content: center;
+  gap: 2px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 35%),
+    #0d1214;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.18);
+}
+.hudStat span,
+.goalHud span { overflow: hidden; color: #7d8585; font-size: 7px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.hudStat strong {
+  overflow: hidden;
+  color: #d6e0d6;
+  font: 800 13px/1.05 Consolas, "Microsoft YaHei UI", monospace;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 7px currentColor;
+  white-space: nowrap;
+}
+.monthStat strong { color: #d9e9e5; }
+.cashStat strong { color: #71dfa4; }
+.debtStat strong { color: #ff9a91; font-size: 10px; }
+
+.goalHud {
+  min-width: 0;
+  max-width: none;
+  padding: 6px 8px;
+  border-radius: 4px;
+  gap: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 35%),
+    #0b0f13;
+  box-shadow: inset 0 2px 7px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.18);
+}
+.goalHud > div:first-child { min-width: 0; }
+.goalHud strong {
+  overflow: hidden;
+  color: #f0eddb;
+  font: 800 11px/1 Consolas, "Microsoft YaHei UI", monospace;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 6px rgba(240,237,219,.25);
+  white-space: nowrap;
+}
+.goalTrack,
+.conditionTrack {
+  position: relative;
+  height: 10px !important;
+  overflow: hidden;
+  border: 1px solid #030507;
+  border-radius: 2px !important;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(255,255,255,.12) calc(10% - 1px) 10%),
+    #161a1d !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.92), 0 1px 0 rgba(255,255,255,.12);
+}
+.goalTrack::after,
+.conditionTrack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.2), transparent 40%, rgba(0,0,0,.18));
+  pointer-events: none;
+}
+.goalTrack i,
+.conditionTrack i { box-shadow: 0 0 8px currentColor; }
+.goalTrack i { background: linear-gradient(90deg, #806ce8, #60c8ef); }
+
+.survivalConsole { display: grid; grid-template-rows: 17px 1fr; }
+.survivalMeters { display: grid; align-content: center; gap: 5px; }
+.conditionHud {
+  width: auto;
+  padding: 5px 6px;
+  border-radius: 4px;
+  grid-template-columns: 32px minmax(40px,1fr) 28px;
+  gap: 6px;
+  background: #111517;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.82), 0 1px 0 rgba(255,255,255,.15);
+}
+.conditionHud span { color: #a1a29d; font-size: 8px; font-weight: 800; letter-spacing: .04em; }
+.conditionHud b {
+  display: grid;
+  place-items: center;
+  min-height: 17px;
+  border: 1px solid #07090a;
+  border-radius: 2px;
+  background: #080c0d;
+  font: 800 10px/1 Consolas, monospace;
+  box-shadow: inset 0 1px 3px #000;
+}
+.hungerHud b { color: #ffc471; text-shadow: 0 0 6px rgba(255,181,91,.65); }
+.anxietyHud b { color: #ff7999; text-shadow: 0 0 6px rgba(255,110,174,.68); }
+.hungerHud .conditionTrack i { background: linear-gradient(90deg, #ffd166, #ff875a); }
+.anxietyHud .conditionTrack i { background: linear-gradient(90deg, #ff72b2, #f04f65); }
+
+.systemConsole { display: grid; grid-template-rows: 17px 1fr; }
+.systemControls { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+.roundButton {
+  width: auto;
+  min-width: 0;
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  border-color: #111319;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #626771 0%, #3c4049 44%, #2a2d34 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.5), 0 3px 4px rgba(0,0,0,.55);
+  text-shadow: 0 -1px 0 #000;
+  transition: transform .08s ease, filter .08s ease, box-shadow .08s ease;
+}
+.roundButton span { font: 900 16px/1 Consolas, monospace; }
+.roundButton small { color: #b9bcc2; font-size: 6.5px; letter-spacing: .04em; }
+.roundButton:hover { border-color: #111319; background: linear-gradient(180deg, #747a86, #454a54 48%, #2c3038); filter: brightness(1.06); }
+.roundButton:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(0,0,0,.6), 0 1px 1px rgba(0,0,0,.5); }
+.roundButton.muted { background: linear-gradient(180deg, #755054, #52363b 48%, #302429); }
+.roundButton.muted span { color: #ff9a9f; }
+
+.missionCard {
+  top: calc(var(--safeTop) + 101px);
+  width: min(315px, 35vw);
+  min-height: 182px;
+  padding: 20px 16px 14px;
+  overflow: visible;
+  border: 1px solid #ad9e7d;
+  border-radius: 3px 5px 4px 2px;
+  background:
+    linear-gradient(105deg, rgba(111,80,37,.07), transparent 18%, transparent 82%, rgba(91,66,30,.08)),
+    repeating-linear-gradient(0deg, transparent 0 19px, rgba(76,91,101,.075) 19px 20px),
+    #eee3c9;
+  color: #28251f;
+  box-shadow: 2px 3px 0 #8d826b, 7px 11px 22px rgba(0,0,0,.34);
+  backdrop-filter: none;
+  transform: rotate(-.22deg);
+}
+.missionCard::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(93,77,53,.17);
+  pointer-events: none;
+}
+.missionCard::after {
+  content: "进行中";
+  position: absolute;
+  right: 13px;
+  top: 46px;
+  padding: 3px 5px;
+  border: 2px double rgba(151,45,52,.5);
+  color: rgba(151,45,52,.58);
+  font: 900 7px/1 "Songti SC", serif;
+  letter-spacing: .12em;
+  transform: rotate(7deg);
+}
+.paperClip {
+  position: absolute;
+  z-index: 4;
+  top: -11px;
+  left: 34px;
+  width: 24px;
+  height: 42px;
+  border: 3px solid #b9bbc0;
+  border-bottom: 0;
+  border-radius: 13px 13px 4px 4px;
+  box-shadow: inset 1px 0 0 #5e6268, 1px 2px 2px rgba(0,0,0,.32);
+  transform: rotate(4deg);
+}
+.missionHeading { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 2px solid #403b32; }
+.missionHeading span { font: 900 9px/1 "Microsoft YaHei UI", sans-serif; letter-spacing: .13em; }
+.missionHeading b { color: #82755d; font: 800 7px/1 Georgia, serif; letter-spacing: .12em; }
+.locationPlate { position: relative; z-index: 1; display: inline-flex; align-items: baseline; gap: 7px; margin: 8px 0 4px; padding: 4px 7px; background: #34312b; color: #f0e7d2; box-shadow: 1px 2px 0 rgba(0,0,0,.22); }
+.locationPlate span { color: #bdb29c; font-size: 6.5px; letter-spacing: .08em; }
+.locationPlate strong { font-size: 8px; }
+.missionCard > strong { position: relative; z-index: 1; display: block; max-width: calc(100% - 52px); margin-top: 3px; color: #201e1a; font: 900 17px/1.25 "Microsoft YaHei UI", sans-serif; }
+.missionCard p { position: relative; z-index: 1; margin: 5px 0 9px; color: #675f50; font-size: 9px; line-height: 1.5; }
+.moduleLabel { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; padding-top: 6px; border-top: 1px dashed #a79a80; color: #5b5447; }
+.moduleLabel span { font-size: 7px; font-weight: 900; letter-spacing: .08em; }
+.moduleLabel small { color: #8c806a; font-size: 6.5px; }
+.moduleStrip { position: relative; z-index: 1; gap: 6px; }
+.modulePip { gap: 4px; }
+.modulePip span { color: #635a4a; font-size: 7px; font-weight: 800; }
+.modulePip div { height: 5px; border: 1px solid rgba(72,62,48,.38); border-radius: 1px; background: rgba(78,66,49,.13); box-shadow: inset 0 1px 2px rgba(55,43,28,.18); }
+.modulePip i { box-shadow: inset 0 1px 0 rgba(255,255,255,.28); }
+.locationRoute { position: relative; z-index: 1; margin-top: 8px; gap: 6px; }
+.locationRoute i { height: 5px; border: 1px solid rgba(76,64,47,.26); border-radius: 1px; background: rgba(75,64,48,.18); }
+.locationRoute i.active { background: #39788b; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 0 5px rgba(55,128,148,.35); }
+
+.interactionPrompt {
+  padding: 8px 10px;
+  border: 1px solid #656972;
+  border-bottom-color: #15171c;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #363a43, #22252c);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -2px 0 rgba(0,0,0,.42), 0 9px 0 rgba(0,0,0,.12), 0 17px 32px rgba(0,0,0,.48);
+}
+.promptKey {
+  border: 1px solid #3e338e;
+  border-radius: 5px;
+  background: linear-gradient(145deg, #b0a2ff, #7160da 55%, #5544b3);
+  color: #fff;
+  text-shadow: 0 -1px 0 #352889;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.45), inset -2px -3px 0 rgba(38,26,108,.4), 0 3px 3px rgba(0,0,0,.45);
+}
+.interactionPrompt small { color: #adb0b7; }
+
+.toast {
+  position: relative;
+  padding: 10px 13px 10px 18px;
+  border-color: #b8a98c;
+  border-radius: 2px;
+  background: #eee3c9;
+  color: #3a352d;
+  box-shadow: 2px 3px 0 #817661, 5px 9px 18px rgba(0,0,0,.3);
+  transform: rotate(.25deg);
+}
+.toast::before { content: ""; position: absolute; left: 7px; top: 7px; bottom: 7px; border-left: 2px solid rgba(108,91,65,.22); }
+.toast.good { border-color: #719a78; color: #2f6744; }
+.toast.warning { border-color: #b2625d; color: #873b39; }
+
+.worldPanel,
+.resultCard {
+  border: 1px solid #686b73;
+  border-bottom-color: #121419;
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at 10px 10px, #92959b 0 2px, #26282e 2.5px 4px, transparent 4.5px),
+    radial-gradient(circle at calc(100% - 10px) 10px, #92959b 0 2px, #26282e 2.5px 4px, transparent 4.5px),
+    linear-gradient(125deg, rgba(255,255,255,.06), transparent 28%),
+    #292c33;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.23), inset 0 -3px 0 rgba(0,0,0,.5), 0 28px 80px rgba(0,0,0,.68);
+}
+.worldPanel > header {
+  padding: 14px 17px 12px;
+  border-bottom: 1px solid #0b0d11;
+  background: linear-gradient(180deg, #3a3e47, #272a31);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.17), 0 2px 0 rgba(255,255,255,.06);
+}
+.worldPanel > header span,
+#resultKicker { color: #b8adef; text-shadow: 0 -1px 0 #111; }
+.sheetBody {
+  margin: 0 8px 9px;
+  padding: 15px;
+  border: 1px solid #090b0e;
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
+    #101319;
+  box-shadow: inset 0 3px 9px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.13);
+}
+.closeButton {
+  border-color: #13151a;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #676c76, #3b3f48);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.42), 0 2px 3px rgba(0,0,0,.45);
+}
+.worldChoice,
+.staffCard,
+.oddsCard,
+.featureCard,
+.metricTile,
+.resultHero,
+.revenueChart,
+.revenueEmpty,
+.startupLoanCard {
+  border-color: #343943;
+  border-radius: 5px;
+  background: linear-gradient(145deg, rgba(255,255,255,.045), transparent 38%), #1c2027;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -2px 3px rgba(0,0,0,.35), 0 2px 3px rgba(0,0,0,.32);
+}
+button.worldChoice:hover,
+button.featureCard:hover { border-color: #68617f; background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%), #262631; }
+.worldChoice.selected { border-color: #67a784; box-shadow: inset 0 0 0 1px rgba(104,224,160,.22), 0 2px 3px rgba(0,0,0,.32); }
+.computerActions button,
+.talkGrid button,
+.loanPaymentRow button {
+  border-color: #3f434c;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #30343d, #20232a);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), inset 0 -3px 0 rgba(0,0,0,.36), 0 2px 3px rgba(0,0,0,.34);
+}
+.computerActions button:hover,
+.talkGrid button:hover,
+.loanPaymentRow button:hover:not(:disabled) { border-color: #706797; background: linear-gradient(180deg, #3a3a4a, #252630); }
+.computerActions button:active,
+.talkGrid button:active,
+.loanPaymentRow button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(0,0,0,.45); }
+.miniButton,
+.primaryButton,
+.ceremonyStartButton,
+.documentButton {
+  border: 1px solid #3d318f;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #9f90ff, #7562e7 52%, #5946bf);
+  color: #fff;
+  text-shadow: 0 -1px 0 #392b91;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 -3px 0 rgba(40,26,112,.46), 0 4px 7px rgba(0,0,0,.32);
+}
+.primaryButton:active,
+.ceremonyStartButton:active,
+.documentButton:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(35,24,91,.55), 0 1px 2px rgba(0,0,0,.35); }
+
+.mobileControls button {
+  border-color: #15171c !important;
+  background: linear-gradient(155deg, #555a65, #2f333c 55%, #23262d) !important;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.28), inset -3px -4px 0 rgba(0,0,0,.35), 0 5px 7px rgba(0,0,0,.5) !important;
+  backdrop-filter: none !important;
+}
+.mobileControls button.pressed { transform: translateY(3px) scale(.97); filter: brightness(1.12); box-shadow: inset 0 3px 6px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.45) !important; }
+
 .portraitBlocker { display: none; }
 
 @media (max-width: 1050px) {
-  .brandChip { min-width: 48px; width: 48px; padding: 6px; }
-  .brandChip > span { margin: 0; }
+  .gameHud { grid-template-columns: 54px minmax(400px,1fr) minmax(205px,245px) 104px; gap: 7px; }
+  .identityConsole { padding: 6px; }
+  .brandChip { width: 100%; min-width: 0; padding: 5px; }
+  .brandChip > span { width: 36px; height: 36px; margin: 0; }
   .brandChip div { display: none; }
-  .conditionHud { width: 82px; }
-  .goalHud { min-width: 150px; }
+  .conditionHud { width: auto; grid-template-columns: 29px minmax(34px,1fr) 26px; }
+  .businessConsoleBody { grid-template-columns: minmax(250px,1.1fr) minmax(175px,.9fr); }
+  .hudStat { min-width: 0; }
+  .goalHud { min-width: 0; }
 }
 
 @media (hover: none), (max-width: 920px) {
@@ -571,20 +994,38 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 }
 
 @media (max-height: 540px) and (orientation: landscape) {
-  .gameHud { min-height: 44px; gap: 4px; }
-  .brandChip { width: 42px; min-width: 42px; border-radius: 12px; }
-  .brandChip > span { width: 30px; height: 30px; border-radius: 9px; }
-  .hudStat { min-width: 70px; padding: 5px 8px; border-radius: 11px; }
+  .gameHud { min-height: 74px; gap: 7px; }
+  .hudConsole { padding: 6px 8px 8px; }
+  .identityConsole { padding: 6px; }
+  .brandChip { width: 100%; min-width: 0; padding: 5px 7px; border-radius: 4px; }
+  .brandChip > span { width: 38px; height: 38px; border-radius: 6px; }
+  .brandChip strong { font-size: 11px; }
+  .brandChip em { font-size: 6px; }
+  .consoleHeader { height: 14px; padding-bottom: 2px; }
+  .businessConsole, .survivalConsole, .systemConsole { grid-template-rows: 14px 1fr; }
+  .hudStat { min-width: 0; padding: 4px 6px; border-radius: 3px; }
+  .hudStat span { font-size: 6px; }
   .hudStat strong { font-size: 11px; }
-  .goalHud { padding: 5px 8px; border-radius: 11px; }
+  .debtStat strong { font-size: 8px; }
+  .goalHud { min-width: 0; padding: 4px 6px; border-radius: 3px; gap: 4px; }
   .goalHud strong { font-size: 9px; }
-  .conditionHud { width: 70px; padding: 5px 6px; grid-template-columns: 15px 1fr 18px; border-radius: 11px; }
-  .roundButton { width: 35px; border-radius: 11px; }
-  .missionCard { top: calc(var(--safeTop) + 50px); width: min(232px,31vw); padding: 7px 9px; border-radius: 11px; }
-  .missionCard > strong { font-size: 11px; }
-  .missionCard p { margin: 2px 0 5px; font-size: 8px; }
-  .modulePip span { font-size: 6.5px; }
-  .toastStack { top: calc(var(--safeTop) + 49px); }
+  .goalTrack, .conditionTrack { height: 8px !important; }
+  .conditionHud { width: auto; padding: 3px 5px; grid-template-columns: 29px minmax(34px,1fr) 25px; border-radius: 3px; }
+  .conditionHud b { min-height: 14px; font-size: 8px; }
+  .roundButton { width: auto; border-radius: 5px; }
+  .roundButton span { font-size: 13px; }
+  .missionCard { top: calc(var(--safeTop) + 84px); width: min(315px,32vw); min-height: 0; padding: 17px 13px 11px; border-radius: 2px; }
+  .missionCard::after { top: 40px; }
+  .missionHeading { padding-bottom: 4px; }
+  .locationPlate { margin: 5px 0 2px; padding: 3px 6px; }
+  .missionCard > strong { font-size: 14px; }
+  .missionCard p { margin: 3px 0 5px; font-size: 8px; }
+  .moduleLabel { margin-bottom: 3px; padding-top: 4px; }
+  .modulePip span { font-size: 6px; }
+  .modulePip div { height: 4px; }
+  .locationRoute { margin-top: 5px; }
+  .locationRoute i { height: 4px; }
+  .toastStack { top: calc(var(--safeTop) + 82px); }
   .setupScreen { grid-template-columns: 1fr; gap: 0; padding: 2vh 3vw; }
   .setupTitle h1 { font-size: clamp(36px,7vw,58px); margin: 7px 0; }
   .setupTitle p { margin: 6px 0; font-size: 9px; line-height: 1.45; }
@@ -651,15 +1092,24 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 }
 
 @media (max-width: 640px) and (orientation: landscape) {
-  .cashStat { display: none; }
-  .goalHud { max-width: 150px; }
-  .conditionHud { width: 64px; }
+  .gameHud { grid-template-columns: minmax(320px,1fr) 155px 86px; gap: 4px; }
+  .identityConsole { display: none; }
+  .businessConsoleBody { grid-template-columns: minmax(190px,1fr) minmax(120px,.62fr); gap: 4px; }
+  .businessReadouts { gap: 3px; }
+  .hudStat { padding-inline: 4px; }
+  .goalHud { max-width: none; padding-inline: 4px; }
+  .conditionHud { width: auto; grid-template-columns: 26px minmax(28px,1fr) 22px; gap: 3px; padding-inline: 3px; }
+  .consoleHeader small { display: none; }
+  .systemControls { gap: 3px; }
   .missionCard { width: 210px; }
   .worldGrid.three { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
 @media (max-width: 520px) and (orientation: landscape) {
-  .goalHud, .anxietyHud { display: none; }
+  .gameHud { grid-template-columns: minmax(260px,1fr) 140px 78px; }
+  .businessConsoleBody { grid-template-columns: 1fr; }
+  .goalHud { display: none; }
+  .anxietyHud { display: grid; }
   .gameHud { max-width: calc(100vw - var(--safeLeft) - var(--safeRight)); }
   .missionCard { width: 185px; }
   .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }

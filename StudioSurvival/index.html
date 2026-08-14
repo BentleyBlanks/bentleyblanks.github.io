@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="从签下全部身家开始，在六个横版 2D 场景里熬出一家游戏公司的开发生存 demo。">
   <title>甲方是我：工作室跑断腿</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260814b">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815b">
   <script type="importmap">
     {
       "imports": {
@@ -32,25 +32,53 @@
     <canvas id="sceneCanvas" aria-label="2.5D 公司成立仪式与可操控的横版 2D 城市"></canvas>
     <div id="sceneVignette" class="sceneVignette" aria-hidden="true"></div>
 
-    <header class="gameHud" aria-label="玩家状态">
-      <div class="brandChip"><span id="studioMonogram">未</span><div><small>STUDIO SURVIVAL</small><strong id="studioNameHud">尚未成立</strong></div></div>
-      <div class="hudStat"><span>月份</span><strong id="monthValue">M01</strong></div>
-      <div class="hudStat cashStat"><span>现金</span><strong id="cashValue">¥68,000</strong></div>
-      <div class="hudStat debtStat"><span>启动贷</span><strong id="startupDebtValue">M08 / ¥82,000</strong></div>
-      <div class="goalHud">
-        <div><span>游戏收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
-        <div class="goalTrack"><i id="goalBar"></i></div>
-      </div>
-      <div class="conditionHud hungerHud"><span>饿</span><div><i id="hungerBar"></i></div><b id="hungerValue">0</b></div>
-      <div class="conditionHud anxietyHud"><span>焦</span><div><i id="anxietyBar"></i></div><b id="anxietyValue">18</b></div>
-      <button id="soundButton" class="roundButton" type="button" aria-label="开关音效">♪</button>
-      <button id="helpButton" class="roundButton" type="button" aria-label="查看操作说明">?</button>
+    <header class="gameHud" aria-label="工作室状态仪表台">
+      <section class="hudConsole identityConsole" aria-label="工作室身份">
+        <div class="brandChip">
+          <span id="studioMonogram">未</span>
+          <div><small>STUDIO SURVIVAL</small><strong id="studioNameHud">尚未成立</strong><em>独立游戏工作室</em></div>
+        </div>
+      </section>
+
+      <section class="hudConsole businessConsole" aria-label="经营与游戏状态">
+        <div class="consoleHeader"><span class="statusLamp businessLamp" aria-hidden="true"></span><strong>经营仪表</strong><small>GAME STATUS</small></div>
+        <div class="businessConsoleBody">
+          <div class="businessReadouts">
+            <div class="hudStat monthStat"><span>当前月份</span><strong id="monthValue">M01</strong></div>
+            <div class="hudStat cashStat"><span>可用现金</span><strong id="cashValue">¥68,000</strong></div>
+            <div class="hudStat debtStat"><span>启动贷到期 / 待还</span><strong id="startupDebtValue">M08 / ¥82,000</strong></div>
+          </div>
+          <div class="goalHud">
+            <div><span>唯一胜利目标 · 游戏收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
+            <div class="goalTrack"><i id="goalBar"></i></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="hudConsole survivalConsole" aria-label="生存状态">
+        <div class="consoleHeader"><span class="statusLamp survivalLamp" aria-hidden="true"></span><strong>生存监测</strong><small>BODY &amp; MIND</small></div>
+        <div class="survivalMeters">
+          <div class="conditionHud hungerHud"><span>饥饿</span><div class="conditionTrack"><i id="hungerBar"></i></div><b id="hungerValue">0</b></div>
+          <div class="conditionHud anxietyHud"><span>焦虑</span><div class="conditionTrack"><i id="anxietyBar"></i></div><b id="anxietyValue">18</b></div>
+        </div>
+      </section>
+
+      <section class="hudConsole systemConsole" aria-label="系统设置">
+        <div class="consoleHeader"><span class="statusLamp systemLamp" aria-hidden="true"></span><strong>设置</strong><small>SYSTEM</small></div>
+        <div class="systemControls">
+          <button id="soundButton" class="roundButton" type="button" aria-label="关闭音效"><span id="soundButtonIcon" aria-hidden="true">♪</span><small>声音</small></button>
+          <button id="helpButton" class="roundButton" type="button" aria-label="查看操作说明"><span aria-hidden="true">?</span><small>手册</small></button>
+        </div>
+      </section>
     </header>
 
-    <aside class="missionCard" aria-live="polite">
-      <span id="locationValue">自己的家</span>
+    <aside class="missionCard" aria-live="polite" aria-label="当前项目状态">
+      <span class="paperClip" aria-hidden="true"></span>
+      <div class="missionHeading"><span>项目状态</span><b>ACTIVE FILE</b></div>
+      <div class="locationPlate"><span>当前位置</span><strong id="locationValue">自己的家</strong></div>
       <strong id="projectTitle">先开一家公司</strong>
       <p id="missionText">先签完成立合同，再回家打开那台唯一的电脑。</p>
+      <div class="moduleLabel"><span>制作进度</span><small>四项能力</small></div>
       <div id="moduleStrip" class="moduleStrip"></div>
       <div id="locationRoute" class="locationRoute" aria-hidden="true"></div>
     </aside>
@@ -138,6 +166,6 @@
     <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>再跑一家公司</span><strong>这次少走弯路 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260814b"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815b"></script>
 </body>
 </html>

@@ -69,7 +69,7 @@ import {
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
-  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "helpButton", "studioMonogram",
+  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
@@ -1772,7 +1772,8 @@ function BindControls() {
   dom.helpButton.addEventListener("click", OpenHelpSheet);
   dom.soundButton.addEventListener("click", () => {
     soundEnabled = !soundEnabled;
-    dom.soundButton.textContent = soundEnabled ? "♪" : "×";
+    dom.soundButton.classList.toggle("muted", !soundEnabled);
+    dom.soundButtonIcon.textContent = soundEnabled ? "♪" : "×";
     dom.soundButton.setAttribute("aria-label", soundEnabled ? "关闭音效" : "开启音效");
     if (soundEnabled) PlayTone("good");
   });
