@@ -587,6 +587,11 @@ body.touchDevice #touchControls.gone { display: none; }
    守这条的是 RenderHealthTest 的「标题页四档画高都点得着」。 */
 #titleScreen {
   position: absolute; inset: 0; overflow-y: auto;
+  /* 必须压过收黑罩（#fadeOverlay 26）：那层罩子 CSS 默认全黑，开机没有游戏循环
+     去把它降下来，标题页没编号就整个被它盖死——玩家一打开是纯黑，按钮还
+     盲点得着（罩子 pointer-events:none，所以"点得着"的测试全绿）。
+     上限是调试面板（61），它要能盖住标题页。 */
+  z-index: 33;
   display: flex; align-items: flex-start; justify-content: center;
   background:
     radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),

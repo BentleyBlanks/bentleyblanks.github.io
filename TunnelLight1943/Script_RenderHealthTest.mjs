@@ -447,9 +447,19 @@ for (const size of TITLE_SIZES) {
     const last = l.children[l.children.length - 1].getBoundingClientRect();
     const n = l.children.length;
     t.scrollTop = 0;
-    return { top, lastBottom: last.bottom, vh: window.innerHeight, n };
+    // 收黑罩（#fadeOverlay）CSS 默认全黑、开机没有游戏循环去降它——标题页的
+    // z-index 必须压过它，否则玩家一打开是纯黑（2026-08-14 线上就是这么黑的；
+    // 罩子 pointer-events:none，按钮盲点得着，所以光测"点得着"抓不住）。
+    const zOf = (el) => { const z = parseInt(getComputedStyle(el).zIndex, 10); return Number.isFinite(z) ? z : -1; };
+    return { top, lastBottom: last.bottom, vh: window.innerHeight, n,
+      titleZ: zOf(t), fadeZ: zOf(document.getElementById("fadeOverlay")) };
   });
   await tp.close();
+  if (r.titleZ <= r.fadeZ) {
+    failed += 1;
+    console.error(`✗ ${size.name} 标题页被收黑罩盖死：#titleScreen z=${r.titleZ} ≤ #fadeOverlay z=${r.fadeZ}`
+      + `——开机就是纯黑，玩家什么都看不见`);
+  }
   // 0.5px 的余量给亚像素布局
   if (r.top < -0.5 || r.lastBottom > r.vh + 0.5 || r.n < 8) {
     failed += 1;
