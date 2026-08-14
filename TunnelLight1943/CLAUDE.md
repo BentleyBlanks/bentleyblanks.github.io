@@ -12,6 +12,10 @@
 （或直接 `node Script_Cli.mjs beats c1` / `beat <id>`——从代码现挖，永远最新）；
 被砍掉的旧设计（视频序章、七稿场次）的来龙去脉在
 [`Data_DesignHistory.md`](./Data_DesignHistory.md)。本节只留**口径规矩**。
+**剧本代码按章在 `Data_ScriptC1..C8.mjs`**（2026-08-15 从 Core 拆出：一章一个
+文件，工厂＋Core 末尾的 SCRIPT_KIT 组装）——改台词/节拍去章文件，帮手函数
+（Cue/FindActor/Spawn* 一族）还在 `Script_Core.mjs`；新增章文件要登进
+index.html 的 import map（TestModuleGraphIsCacheBusted 盯着）。
 
 - c1「**蓝底白花**」（第八稿：Notion《第一章 · 善意的谎言》＋独立的《序 · 那天》
   两页为准；章名按布的暗线取）、c2「地洞里的眼睛」（梳篦扫荡：下窖/捂嘴听声/

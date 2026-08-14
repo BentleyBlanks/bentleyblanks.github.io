@@ -49,10 +49,15 @@ function Opts(list) {
 // where：一张全仓索引。**纯正则扫文件，不 import**——Script_World/Script_Rig
 // 都 import three，在 node 里加载不起来，而"这东西在哪"恰恰最需要能随时问。
 // ---------------------------------------------------------------------------
+// 剧本按章拆在 Data_ScriptC1..C8.mjs（2026-08-15）——节拍的正则打在章文件上
+const CHAPTER_FILES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Data_ScriptC${n}.mjs`);
+const BEAT_PATTERNS = [
+  [/^\s*(?:kind|id): "([a-zA-Z0-9_]+)",?\s*id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
+  [/^\s*kind: "([a-zA-Z]+)", id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
+];
 const INDEX_SOURCES = [
+  ...CHAPTER_FILES.map((f) => [f, BEAT_PATTERNS]),
   ["Script_Core.mjs", [
-    [/^\s*(?:kind|id): "([a-zA-Z0-9_]+)",?\s*id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
-    [/^\s*kind: "([a-zA-Z]+)", id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
     [/^\s*export function ([A-Za-z0-9_]+)/, (m) => [[m[1], "Core 导出函数"]]],
     [/^\s*function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], "Core 内部函数"]]],
     [/^\s*(?:export )?const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "Core 常量"]]],
@@ -200,8 +205,10 @@ async function CmdBeat(o) {
     });
     if (def.lines.length > (Number(o.lines || 6))) console.log(`  …（--lines 调）`);
   }
-  // 这一拍碰了哪些旗标：从源码文本里扫，比人翻快
-  const src = fs.readFileSync(path.join(DIR, "Script_Core.mjs"), "utf8");
+  // 这一拍碰了哪些旗标：从源码文本里扫，比人翻快。
+  // 剧本按章拆在 Data_ScriptC*.mjs（2026-08-15），按 id 的章号直接开对应文件
+  const chFile = `Data_ScriptC${(id.match(/^c(\d)_/) || [])[1] || "1"}.mjs`;
+  const src = fs.readFileSync(path.join(DIR, chFile), "utf8");
   const key = new RegExp(`id: "${id}"`);
   const at = src.split(/\r?\n/).findIndex((l) => key.test(l));
   if (at >= 0) {
@@ -214,7 +221,7 @@ async function CmdBeat(o) {
     const chunk = lines.slice(at, end).join("\n");
     const flags = [...new Set([...chunk.matchAll(/flags\.([a-zA-Z0-9_]+)/g)].map((m) => m[1]))];
     if (flags.length) console.log(`旗标  ${flags.join(" ")}`);
-    console.log(`源码  TunnelLight1943/Script_Core.mjs:${at + 1}`);
+    console.log(`源码  TunnelLight1943/${chFile}:${at + 1}`);
   }
 }
 
