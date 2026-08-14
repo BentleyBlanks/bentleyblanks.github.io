@@ -79,13 +79,13 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815r";
+} from "./Data_World.mjs?v=20260815t";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
-} from "./Script_World.mjs?v=20260815r";
+} from "./Script_World.mjs?v=20260815t";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -851,18 +851,18 @@ function DisposeGroup(group) {
 }
 
 const FacilityLooks = {
-  homeComputer: ["家里的电脑", "唯一的初始工位", 0x9d8cff],
-  homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
-  diner: ["小菜馆", "便宜充饥套餐", 0xffd166],
-  snackShelf: ["零食架", "泡面饼干顶一顶", 0x68e0a0],
-  scratch: ["刮刮乐柜台", "本月限刮一张", 0xff6eae],
-  equipmentShop: ["设备柜台", "先买电脑再招人", 0x66b8ff],
-  talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
-  bank: ["银行", "启动贷 M08 到期", 0xff6eae],
-  hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
-  regularFootbath: ["普通足浴店", "焦虑 -8 · 本月限一次", 0x72e0d1],
-  footbathCity: ["洗脚城", "焦虑 -20 · 验资开放", 0xc69cff],
-  maleModelClub: ["男模店", "焦虑 -36 · 百万验资", 0xff86c8],
+  homeComputer: ["电脑", "", 0x9d8cff],
+  homeFridge: ["冰箱", "", 0x9fd7ff],
+  diner: ["小菜馆", "", 0xffd166],
+  snackShelf: ["零食", "", 0x68e0a0],
+  scratch: ["刮刮乐", "每月 1 张", 0xff6eae],
+  equipmentShop: ["设备", "", 0x66b8ff],
+  talentMarket: ["人才", "", 0x9d8cff],
+  bank: ["银行", "M08", 0xff6eae],
+  hotel: ["大餐", "", 0xffb45f],
+  regularFootbath: ["足浴", "-8", 0x72e0d1],
+  footbathCity: ["洗脚城", "-20", 0xc69cff],
+  maleModelClub: ["男模店", "-36", 0xff86c8],
 };
 
 function GetFacilityKind(interaction) {
@@ -959,7 +959,7 @@ function AddTaskLamp(group, x, y, z, color = 0xd4b270, facing = 1) {
 function BuildFacility(interaction) {
   const group = new THREE.Group();
   const kind = GetFacilityKind(interaction);
-  const [title, subtitle, color] = FacilityLooks[kind] || [interaction.label || interaction.id, "靠近按 E", 0x9d8cff];
+  const [title, subtitle, color] = FacilityLooks[kind] || [interaction.label || interaction.id, "E", 0x9d8cff];
   group.position.set(interaction.x, interaction.y || 0, .22);
   const marker = new THREE.Mesh(
     new THREE.RingGeometry(.72, .86, 32),
@@ -1543,10 +1543,10 @@ function BuildCeremonyScene() {
     capital.position.set(stageX + offset, 5.5, -1.72);
     ceremonyGroup.add(capital);
   }
-  const header = TextPlane("公司成立仪式", "FOUNDING · DEBT · SURVIVAL", 5.7, "#ffd166");
+  const header = TextPlane("公司成立", "", 5.7, "#ffd166");
   header.position.set(stageX, 5.7, -1.12);
   ceremonyGroup.add(header);
-  ceremonyPlaque = TextPlane("等待命名", "今天成立 · M08 可能清算", 5.6, "#f5f0dd");
+  ceremonyPlaque = TextPlane("等待命名", "M08 清算", 5.6, "#f5f0dd");
   ceremonyPlaque.position.set(stageX, 3.55, -1.68);
   ceremonyPlaque.scale.set(.82, .82, .82);
   ceremonyGroup.add(ceremonyPlaque);
@@ -1663,7 +1663,7 @@ function RenderFounderSkills(focusTarget = null) {
       </div>
     </article>`;
   }).join("");
-  dom.founderSkillBudget.textContent = `剩余 ${remaining}`;
+  dom.founderSkillBudget.textContent = `剩余${remaining}`;
   dom.founderSkillBudget.classList.toggle("invalid", remaining !== 0);
   dom.founderConfirmButton.disabled = remaining !== 0;
   if (focusTarget) {
@@ -1721,10 +1721,10 @@ function UpdateCeremony(delta, time) {
     ceremonyCurtains.left.position.x = ceremonyCurtains.closedLeftX - open * 2.05;
     ceremonyCurtains.right.position.x = ceremonyCurtains.closedRightX + open * 2.05;
     ceremonyPlaque.scale.setScalar(.82 + open * .18);
-    const caption = ceremonyElapsed < 1.55 ? "创始人入场"
-      : ceremonyElapsed < 2.8 ? "启动贷生效"
-        : ceremonyElapsed < 4.25 ? "公司成立"
-          : "命名公司";
+    const caption = ceremonyElapsed < 1.55 ? "入场"
+      : ceremonyElapsed < 2.8 ? "贷款生效"
+        : ceremonyElapsed < 4.25 ? "成立"
+          : "命名";
     dom.ceremonyCaptionText.textContent = caption;
     if (ceremonyElapsed > 3.75 && ceremonyBurstStep < 0) {
       ceremonyBurstStep = 0;
@@ -1913,8 +1913,8 @@ function ConsumerVenuePrompt(interaction) {
   if (!venue) return { interaction, venue: null, access: null };
   const access = GetConsumerVenueAccess(state, venue.id);
   const admission = access.ok
-    ? `验资 ${FormatMoney(access.minimumCash)} · 已达标`
-    : `🔒 验资 ${FormatMoney(access.minimumCash)} · 还差 ${FormatMoney(access.shortfall)}`;
+    ? `验资 ${FormatMoney(access.minimumCash)} ✓`
+    : `🔒 需 ${FormatMoney(access.minimumCash)} · 差 ${FormatMoney(access.shortfall)}`;
   return {
     interaction: { ...interaction, detail: `${interaction.detail || venue.description} · ${admission}` },
     venue,
@@ -1930,7 +1930,7 @@ function UpdateInteractionPrompt() {
     const distance = Math.hypot(worldState.x - actor.position.x, worldState.y - actor.userData.baseY);
     if (distance < 1.15 && distance < nearestDistance) {
       const staff = FindStaff(staffId);
-      nearest = { id: `staff_${staffId}`, kind: "staff", staffId, x: actor.position.x, label: `和 ${staff.name} 对话`, detail: "按 E 对话" };
+      nearest = { id: `staff_${staffId}`, kind: "staff", staffId, x: actor.position.x, label: staff.name, detail: "E 对话" };
       nearestDistance = distance;
     }
   });
@@ -1944,7 +1944,7 @@ function UpdateInteractionPrompt() {
     return;
   }
   const nearestKind = nearest.kind === "staff" ? "staff" : GetFacilityKind(nearest);
-  const look = FacilityLooks[nearestKind] || [nearest.label || "交互", nearest.detail || "按 E", 0x9d8cff];
+  const look = FacilityLooks[nearestKind] || [nearest.label || "交互", nearest.detail || "E", 0x9d8cff];
   dom.interactionTitle.textContent = `${prompt.access && !prompt.access.ok ? "🔒 " : ""}${nearest.label || look[0]}`;
   dom.interactionDetail.textContent = prompt.interaction?.detail || look[1];
   dom.interactionPrompt.classList.remove("hidden");
@@ -2125,10 +2125,10 @@ function RenderHud() {
   dom.settlementButton.disabled = !canSettle;
   dom.settlementMonthLabel.textContent = `结算 M${String(state.month).padStart(2, "0")}`;
   dom.settlementDetailLabel.textContent = settlementCosts
-    ? `预计支出 ${FormatGoalMoney(settlementCosts.total)} · 进入 M${String(nextMonth).padStart(2, "0")}`
-    : `结束当前回合 · 进入 M${String(nextMonth).padStart(2, "0")}`;
-  dom.settlementButton.setAttribute("aria-label", `结算 M${String(state.month).padStart(2, "0")} 并进入 M${String(nextMonth).padStart(2, "0")}`);
-  dom.settlementButton.title = `下一回合（N）· 结算 M${String(state.month).padStart(2, "0")}`;
+    ? `支出 ${FormatGoalMoney(settlementCosts.total)} · M${String(nextMonth).padStart(2, "0")}`
+    : `→ M${String(nextMonth).padStart(2, "0")}`;
+  dom.settlementButton.setAttribute("aria-label", `结算 M${String(state.month).padStart(2, "0")}`);
+  dom.settlementButton.title = "月结（N）";
   dom.settlementButton.classList.toggle(
     "deadline",
     Boolean(state.startupLoan?.status === "active" && state.startupLoan.dueMonth <= state.month),
@@ -2161,14 +2161,14 @@ function RenderHud() {
   dom.phoneButton.classList.toggle("marketPerfect", Boolean(marketFit?.perfect && marketSetMonth === state.month));
   dom.phoneButton.setAttribute(
     "aria-label",
-    marketFit ? "打开市场手机：" + marketFit.label : "打开手机查看市场动向",
+    marketFit ? `市场：${marketFit.label}` : "市场",
   );
   dom.projectTitle.textContent = project?.name ? `《${project.name}》` : template?.title || "先开一家公司";
   const tensions = project ? CalculateTensions(project) : [];
   const anxietyState = GetAnxietyState(state.anxiety);
   dom.missionText.textContent = tensions[0]?.title
-    || project?.buildStatus?.detail
-    || (gameType ? `${gameType.name} · ${project.isReleased ? `v${project.version}.0 已上线` : `开发第 ${project.age + 1} 月`} · ${anxietyState.label}` : `${anxietyState.label}。移动到对应地点按 E。`);
+    || project?.buildStatus?.label
+    || (gameType ? `${gameType.name} · ${project.isReleased ? `v${project.version}.0` : `开发 M${project.age + 1}`} · ${anxietyState.label}` : `${anxietyState.label} · 到地点按 E`);
   dom.moduleStrip.innerHTML = MODULE_KEYS.map((moduleKey) => {
     const value = project?.modules?.[moduleKey] || 0;
     const meta = MODULE_META[moduleKey];
@@ -2176,8 +2176,10 @@ function RenderHud() {
   }).join("");
 }
 
-function OpenPanel(kicker, title, html, onReady = null, mode = "") {
+function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   if (state.status !== "playing" || !state.project) return;
+  const mode = typeof options === "string" ? options : options.mode || "";
+  dom.modalLayer.classList.toggle("computerMode", mode === "computer");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
@@ -2193,7 +2195,7 @@ function OpenPanel(kicker, title, html, onReady = null, mode = "") {
 
 function ClosePanel() {
   dom.modalLayer.classList.add("hidden");
-  dom.modalLayer.classList.remove("monthCloseMode");
+  dom.modalLayer.classList.remove("computerMode", "monthCloseMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -2349,15 +2351,15 @@ function OpenEquipmentSheet() {
   const count = state.workstations || 0;
   const nextCost = WORKSTATION_COSTS[count];
   const freeSeats = Math.max(0, count - state.team.length);
-  OpenPanel("EQUIPMENT COUNTER", "设备柜台", `
-    <p class="panelIntro">每名员工占 1 套工位；离职后设备保留。</p>
+  OpenPanel("设备", "工位", `
+    <p class="panelIntro">每人 1 工位</p>
     <div class="metricGrid">
       <div class="metricTile"><span>已购工位</span><strong>${count}/4</strong></div>
       <div class="metricTile"><span>已被占用</span><strong>${state.team.length}</strong></div>
       <div class="metricTile"><span>空工位</span><strong>${freeSeats}</strong></div>
     </div>
-    <div class="workstationPreview">${WORKSTATION_COSTS.map((cost, index) => `<div class="${index < count ? "owned" : index === count ? "next" : ""}"><span>${index < count ? "✓" : index + 1}</span><strong>工位 ${index + 1}</strong><small>${index < count ? "已经搬回家" : FormatMoney(cost)}</small></div>`).join("")}</div>
-    <div class="panelSection choiceFooter"><span>${nextCost ? `下一套设备 ${FormatMoney(nextCost)}` : "家里已经塞不下第五套"}</span><button class="primaryButton" data-buy-workstation type="button" ${!nextCost || state.cash < nextCost ? "disabled" : ""}>${nextCost ? `购买第 ${count + 1} 套` : "已买满"}</button></div>`, () => {
+    <div class="workstationPreview">${WORKSTATION_COSTS.map((cost, index) => `<div class="${index < count ? "owned" : index === count ? "next" : ""}"><span>${index < count ? "✓" : index + 1}</span><strong>工位 ${index + 1}</strong><small>${index < count ? "已购" : FormatMoney(cost)}</small></div>`).join("")}</div>
+    <div class="panelSection choiceFooter"><span>${nextCost ? FormatMoney(nextCost) : "已满"}</span><button class="primaryButton" data-buy-workstation type="button" ${!nextCost || state.cash < nextCost ? "disabled" : ""}>${nextCost ? "购买" : "已满"}</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (!event.target.closest("[data-buy-workstation]")) return;
       const result = PurchaseWorkstation(state);
@@ -2375,17 +2377,17 @@ function OpenTalentSheet() {
       <div class="staffTop"><strong style="color:${staff.color}">${EscapeHtml(staff.name)} · ${EscapeHtml(staff.role)}</strong><span>${EscapeHtml(staff.kind === "ai" ? "AI 月租" : "大学生工资")}</span></div>
       <p>${EscapeHtml(staff.tagline)}</p>
       <div class="chipRow"><span class="chip">${EscapeHtml(MODULE_META[staff.specialty].label)}</span><span class="chip">${EscapeHtml(staff.quirk)}</span><span class="chip">${FormatMoney(hired ? GetMemberMonthlyCost(member) : staff.monthlyCost)}/月</span></div>
-      <div class="choiceFooter" style="margin-top:9px"><span>${hired ? "已占用一套设备" : state.team.length < state.workstations ? "有空工位，雇了下月开始烧钱" : "没有空工位"}</span><span>${hired
+      <div class="choiceFooter" style="margin-top:9px"><span>${hired ? "已占用" : state.team.length < state.workstations ? "下月起收费" : "无工位"}</span><span>${hired
         ? `<button class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}" type="button">聊聊</button> <button class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}" type="button">调待遇</button> <button class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}" type="button">${staff.kind === "ai" ? "退订" : "开除"}</button>`
         : `<button class="miniButton" data-staff-action="hire" data-staff-id="${staff.id}" type="button" ${state.team.length >= state.workstations ? "disabled" : ""}>${staff.kind === "ai" ? "开始月租" : "雇佣"}</button>`}</span></div>
     </article>`;
   };
-  OpenPanel("TALENT MARKET", `人才市场 · ${state.team.length}/${state.workstations || 0} 工位`, `
-    <p class="panelIntro">人力 ${FormatMoney(costs.studentWages + costs.aiRent)}/月。${state.workstations ? "" : "请先买工位。"}</p>
-    <div class="choiceFooter"><span>每人需 1 个空工位</span><button class="miniButton" data-equipment type="button">设备柜台</button></div>
-    <div class="sectionHeading"><strong>大学生</strong><span>工资 + 情绪</span></div>
+  OpenPanel("人才", `${state.team.length}/${state.workstations || 0} 工位`, `
+    <p class="panelIntro">人力 ${FormatMoney(costs.studentWages + costs.aiRent)}/月${state.workstations ? "" : " · 先买工位"}</p>
+    <div class="choiceFooter"><span>每人 1 工位</span><button class="miniButton" data-equipment type="button">设备</button></div>
+    <div class="sectionHeading"><strong>大学生</strong><span>工资</span></div>
     <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderStaffCard).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>AI 订阅</strong><span>月租 + 漂移</span></div>
+    <div class="panelSection sectionHeading"><strong>AI</strong><span>月租</span></div>
     <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderStaffCard).join("")}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-equipment]")) return OpenEquipmentSheet();
@@ -2405,16 +2407,16 @@ function OpenStaffSheet(staffId, spokenLine = "") {
   const staff = FindStaff(staffId);
   if (!member || !staff) return OpenTalentSheet();
   const pressureValue = staff.kind === "student" ? member.stress : member.drift;
-  OpenPanel("PRESET CHAT", `和 ${staff.name} 对话`, `
+  OpenPanel("对话", staff.name, `
     <p class="speechLine">“${EscapeHtml(spokenLine || GetIdleLine(state, staffId))}”</p>
     <div class="panelSection">${staff.kind === "student" ? `${RenderBar("士气", member.morale, "#68e0a0")}${RenderBar("压力", member.stress, "#ff626e")}` : `${RenderBar("漂移", member.drift, "#ff626e")}${RenderBar("本月加速", member.boost, "#66b8ff")}`}</div>
     <div class="talkGrid">
-      <button data-tone="pressure" type="button">催死线<br><small>快，但人会裂</small></button>
-      <button data-tone="encourage" type="button">说人话<br><small>稳住情绪</small></button>
-      <button data-tone="roast" type="button">互喷垃圾话<br><small>有一点产出</small></button>
-      <button data-tone="sync" type="button">拉群联调<br><small>减两种债</small></button>
+      <button data-tone="pressure" type="button">催死线<br><small>快 · 压力+</small></button>
+      <button data-tone="encourage" type="button">说人话<br><small>压力−</small></button>
+      <button data-tone="roast" type="button">互喷<br><small>微增</small></button>
+      <button data-tone="sync" type="button">联调<br><small>减债</small></button>
     </div>
-    <div class="panelSection choiceFooter"><span>本月还可有效对话/拍板 ${state.talkPoints} 次 · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `上下文漂移 ${Math.round(pressureValue)}`}</span><button class="miniButton" data-customize type="button">让 TA 定制玩法</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>沟通 ${state.talkPoints} · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `漂移 ${Math.round(pressureValue)}`}</span><button class="miniButton" data-customize type="button">加玩法</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-customize]")) return OpenCustomizationSheet(staffId);
       const button = event.target.closest("[data-tone]");
@@ -2429,16 +2431,15 @@ function OpenCustomizationSheet(sourceId = "owner") {
   const staff = sourceId === "owner" ? null : FindStaff(sourceId);
   const sourceLabel = staff ? staff.name : "你自己";
   const usedIds = new Set(state.project.features.map((item) => item.id));
-  OpenPanel("DESIGN BY DIALOGUE", `${sourceLabel}：添加玩法`, `
-    <p class="panelIntro">老板做：饥饿 +10、焦虑 +7、质量较低；员工或 AI 消耗其状态。</p>
-    <div class="choiceFooter"><span>本月有效对话/拍板 ${state.talkPoints} 次</span><b>已塞 ${state.project.features.length}/6 个玩法</b></div>
+  OpenPanel("玩法", sourceLabel, `
+    <p class="panelIntro">老板：饥 +10 · 焦虑 +7 · 质量↓</p>
+    <div class="choiceFooter"><span>沟通 ${state.talkPoints}</span><b>玩法 ${state.project.features.length}/6</b></div>
     <div class="panelSection worldGrid">${FEATURE_CHOICES.map((feature) => `
       <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) ? "disabled" : ""}>
         <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
-        <p>${EscapeHtml(feature.pitch)}</p>
         <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
       </button>`).join("")}</div>
-    <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换个提案人</button></div>`, () => {
+    <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-source-select]")) return OpenAiTerminalSheet();
       const button = event.target.closest("[data-feature-id]");
@@ -2456,22 +2457,20 @@ function OpenCustomizationSheet(sourceId = "owner") {
 
 function OpenAiTerminalSheet() {
   const hired = state.team.map((member) => FindStaff(member.id)).filter(Boolean);
-  OpenPanel("COMPUTER CHAT", "选择提案人", `
-    <p class="speechLine">本月有效沟通：${state.talkPoints} 次。</p>
-    <div class="sectionHeading panelSection"><strong>选择提案人</strong></div>
+  OpenPanel("群聊", `沟通 ${state.talkPoints}`, `
     <div class="worldGrid three">
       <button class="worldChoice danger" data-source-id="owner" type="button"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div></button>
       ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div></button>`).join("")}
     </div>
-    <div class="panelSection sectionHeading"><strong>成员状态</strong><span>可先对话</span></div>
-    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<span class="chip">暂无成员。</span>`}</div>`, () => {
+    <div class="panelSection sectionHeading"><strong>成员</strong></div>
+    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<span class="chip">无</span>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const chat = event.target.closest("[data-chat-id]");
       if (chat) return OpenStaffSheet(chat.dataset.chatId);
       const source = event.target.closest("[data-source-id]");
       if (source) OpenCustomizationSheet(source.dataset.sourceId);
     };
-  });
+  }, { mode: "computer" });
 }
 
 function OpenHomeComputerSheet() {
@@ -2479,28 +2478,40 @@ function OpenHomeComputerSheet() {
   const loan = state.startupLoan;
   const stockAccess = GetStockAccountAccess(state);
   const stockOption = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
-  const monthsLeft = loan?.status === "active" ? Math.max(0, loan.dueMonth - state.month + 1) : 0;
+  const energyLeft = Math.max(0, 3 - state.ownerWorkCount);
   const founderSkillReadout = FOUNDER_SKILL_KEYS.map((skillKey) => {
     const meta = FOUNDER_SKILL_META[skillKey];
     const effect = GetFounderSkillEffect(state.founderSkills, skillKey);
-    return `<span style="--skillColor:${meta.color}"><b>${meta.label} ${effect.level}</b></span>`;
+    return `<span style="--skillColor:${meta.color}"><b>${meta.label}</b>${effect.level}</span>`;
   }).join("");
-  OpenPanel("HOME COMPUTER", `家里的电脑 · 《${EscapeHtml(state.project.name)}》`, `
-    <div class="metricGrid">
-      <div class="metricTile"><span>当前预估评分</span><strong>${evaluation.rating.toFixed(1)}</strong></div>
-      <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
-      <div class="metricTile"><span>启动贷</span><strong>${loan?.status === "repaid" ? "已清" : `${monthsLeft} 月 / ${FormatGoalMoney(loan?.remaining || 0)}`}</strong></div>
-    </div>
-    <div class="founderSkillReadout">${founderSkillReadout}</div>
-    <div class="computerActions">
-      ${MODULE_KEYS.map((moduleKey) => { const meta = MODULE_META[moduleKey]; return `<button data-computer-action="work" data-module-key="${moduleKey}" type="button"><span style="color:${meta.color}">${meta.icon}</span><strong>${meta.label}开发</strong><small>${Math.round(state.project.modules[moduleKey])} / 100</small></button>`; }).join("")}
-      <button data-computer-action="chat" type="button"><span>▤</span><strong>群聊 / 垃圾话</strong><small>自己、大学生、AI</small></button>
-      <button data-computer-action="direction" type="button"><span>⌁</span><strong>项目方向</strong><small>策略、玩法、换赛道</small></button>
-      <button data-computer-action="marketing" type="button"><span>◈</span><strong>线上宣发</strong><small>吹大了就退款</small></button>
-      <button class="stockComputerAction ${state.stockPosition ? "active" : ""}" data-computer-action="stocks" type="button" ${stockAccess.unlocked ? "" : "disabled"}><span>↗</span><strong>${state.stockPosition ? `${stockOption?.symbol || "股票"} 持仓中` : stockAccess.permanentlyUnlocked ? "炒股" : stockAccess.unlocked ? "解锁炒股" : "炒股 · 未解锁"}</strong><small>${state.stockPosition ? `${FormatMoney(state.stockPosition.stake)} · 次月收盘` : stockAccess.unlocked ? "2 只 · 填金额" : `还差 ${FormatMoney(stockAccess.shortfall)}`}</small></button>
-      <button data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "发布更新" : "提交商店"}</strong><small>${state.project.age < 2 ? "至少再熬两个月" : "评分差也能发"}</small></button>
-    </div>
-    <div class="panelSection">${RenderLog(5)}</div>`, () => {
+  const debtLabel = loan?.status === "repaid" ? "已清" : FormatGoalMoney(loan?.remaining || 0);
+  const releaseLabel = state.project.isReleased ? `v${state.project.version}.0` : state.project.age < 2 ? `M${state.project.age}/2` : "可发";
+  const stockLabel = state.stockPosition ? stockOption?.symbol || "股票" : stockAccess.permanentlyUnlocked ? "股票" : stockAccess.unlocked ? "开户" : "股票";
+  const stockValue = state.stockPosition ? FormatGoalMoney(state.stockPosition.stake) : stockAccess.unlocked ? "可开" : `差 ${FormatGoalMoney(stockAccess.shortfall)}`;
+  OpenPanel("STUDIO OS", `《${EscapeHtml(state.project.name)}》`, `
+    <div class="computerDesktop">
+      <div class="computerStatusStrip" aria-label="项目状态">
+        <span><small>评分</small><strong>${evaluation.rating.toFixed(1)}</strong></span>
+        <span><small>精力</small><strong>${energyLeft}/3</strong></span>
+        <span><small>债务</small><strong>${debtLabel}</strong></span>
+      </div>
+      <div class="computerActions" aria-label="电脑功能">
+        ${MODULE_KEYS.map((moduleKey) => {
+          const meta = MODULE_META[moduleKey];
+          const value = Math.round(state.project.modules[moduleKey]);
+          return `<button class="computerApp moduleApp" style="--appColor:${meta.color};--appProgress:${Clamp(value, 0, 100)}%" data-computer-action="work" data-module-key="${moduleKey}" type="button" aria-label="${meta.label} ${value}"><span>${meta.icon}</span><strong>${meta.label}</strong><i></i><b>${value}</b></button>`;
+        }).join("")}
+        <button class="computerApp" data-computer-action="chat" type="button"><span>▤</span><strong>群聊</strong><b>${state.talkPoints}</b></button>
+        <button class="computerApp" data-computer-action="direction" type="button"><span>⌁</span><strong>方向</strong></button>
+        <button class="computerApp" data-computer-action="marketing" type="button"><span>◈</span><strong>宣发</strong><b>${state.project.wishlists.toLocaleString("zh-CN")}</b></button>
+        <button class="computerApp releaseApp" data-computer-action="release" type="button"><span>↑</span><strong>${state.project.isReleased ? "更新" : "发布"}</strong><b>${releaseLabel}</b></button>
+      </div>
+      <div class="computerDock">
+        <div class="founderSkillReadout">${founderSkillReadout}</div>
+        <button class="computerStockKey ${state.stockPosition ? "active" : ""}" data-computer-action="stocks" type="button" ${stockAccess.unlocked ? "" : "disabled"} aria-label="股票 ${stockValue}"><span>↗</span><strong>${stockLabel}</strong><b>${stockValue}</b></button>
+        <span class="computerClock">M${String(state.month).padStart(2, "0")}</span>
+      </div>
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const button = event.target.closest("[data-computer-action]");
       if (!button) return;
@@ -2512,7 +2523,7 @@ function OpenHomeComputerSheet() {
       if (action === "stocks") return OpenStockSheet();
       if (action === "release") return OpenReleaseSheet();
     };
-  });
+  }, { mode: "computer" });
 }
 
 function OpenWorkstationSheet(interaction) {
@@ -2522,18 +2533,18 @@ function OpenWorkstationSheet(interaction) {
   const skillMeta = FOUNDER_SKILL_META[skillEffect.skillKey];
   const workers = state.team.map((member) => ({ member, staff: FindStaff(member.id) })).filter((item) => item.staff?.specialty === moduleKey);
   const relatedTensions = CalculateTensions(state.project).filter((tension) => tension.from === moduleKey || tension.to === moduleKey);
-  OpenPanel("OWNER WORK", `${meta.icon} 老板亲自做${meta.label}`, `
+  OpenPanel("开发", `${meta.icon} ${meta.label}`, `
     <p class="panelIntro">${skillMeta.label} ${skillEffect.level} · +${skillEffect.minimumGain}–${skillEffect.maximumGain}</p>
     ${RenderBar(`${meta.label}进度`, state.project.modules[moduleKey], meta.color)}
     <div class="metricGrid">
-      <div class="metricTile"><span>老板本月硬干</span><strong>${state.ownerWorkCount}/3</strong></div>
+      <div class="metricTile"><span>已用精力</span><strong>${state.ownerWorkCount}/3</strong></div>
       <div class="metricTile"><span>能力</span><strong style="color:${skillMeta.color}">${skillMeta.label} ${skillEffect.level}</strong></div>
-      <div class="metricTile"><span>技术债 / 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
+      <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
-    <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>亲自开发</button></div>
-    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
-    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<button class="miniButton" data-talent type="button">去人才市场找人</button>`}</div>
-    ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
+    <div class="panelSection choiceFooter"><span>精力 ${Math.max(0, 3 - state.ownerWorkCount)}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>开发</button></div>
+    <div class="panelSection sectionHeading"><strong>成员</strong><span>${workers.length ? "月底产出" : "暂无"}</span></div>
+    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<button class="miniButton" data-talent type="button">招人</button>`}</div>
+    ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">无模块冲突</div></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-talent]")) return OpenTalentSheet();
       const worker = event.target.closest("[data-worker-id]");
@@ -2542,7 +2553,7 @@ function OpenWorkstationSheet(interaction) {
       const result = PerformOwnerTask(state, moduleKey);
       if (ApplyInteractiveResult(result, { tone: "warning" })) OpenWorkstationSheet(interaction);
     };
-  });
+  }, { mode: "computer" });
 }
 
 function OpenBankSheet() {
@@ -2550,11 +2561,11 @@ function OpenBankSheet() {
   const activeLoans = state.loans.filter((loan) => loan.status === "active");
   const startupLoan = state.startupLoan;
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
-  OpenPanel("BANK", "银行", `
-    <p class="panelIntro">启动贷到期须清零；抵押贷按月扣。抵押电脑会立即结束。</p>
+  OpenPanel("贷款", "银行", `
+    <p class="panelIntro">到期清零 · 抵押电脑即结束</p>
     <section class="startupLoanCard ${startupLoan?.status || "pending"}">
-      <div><span>创业启动贷 · 全部身家担保</span><strong>${startupLoan?.status === "repaid" ? "已结清" : `尚欠 ${FormatMoney(startupLoan?.remaining || 0)}`}</strong><small>${startupLoan?.status === "active" ? `距离 M${String(startupLoan.dueMonth).padStart(2, "0")} 清算还有 ${monthsLeft} 个月` : startupLoan?.status === "repaid" ? "公司暂时重新属于你" : "等待合同生效"}</small></div>
-      <div class="loanDeadline"><b>${startupLoan?.status === "repaid" ? "✓" : `M${String(startupLoan?.dueMonth || 0).padStart(2, "0")}`}</b><span>${startupLoan?.status === "repaid" ? "PAID" : "DEADLINE"}</span></div>
+      <div><span>启动贷 · 身家担保</span><strong>${startupLoan?.status === "repaid" ? "已清" : `欠 ${FormatMoney(startupLoan?.remaining || 0)}`}</strong><small>${startupLoan?.status === "active" ? `M${String(startupLoan.dueMonth).padStart(2, "0")} · 剩 ${monthsLeft} 月` : startupLoan?.status === "repaid" ? "已还清" : "未生效"}</small></div>
+      <div class="loanDeadline"><b>${startupLoan?.status === "repaid" ? "✓" : `M${String(startupLoan?.dueMonth || 0).padStart(2, "0")}`}</b></div>
     </section>
     ${startupLoan?.status === "active" ? `<div class="loanPaymentRow"><button data-startup-payment="10000" type="button" ${state.cash < 10000 ? "disabled" : ""}>先还 ¥10,000</button><button data-startup-payment="30000" type="button" ${state.cash < 30000 ? "disabled" : ""}>先还 ¥30,000</button><button data-startup-payment="full" type="button" ${state.cash < startupLoan.remaining ? "disabled" : ""}>一次结清 ${FormatMoney(startupLoan.remaining)}</button></div>` : ""}
     <div class="metricGrid">
@@ -2569,8 +2580,8 @@ function OpenBankSheet() {
         <p>${EscapeHtml(asset.consequence)}</p><div class="choiceFooter"><span>${asset.term} 个月</span><b>月供 ${FormatMoney(asset.monthlyPayment)}</b></div>
       </button>`;
     }).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>贷款簿</strong><span>${activeLoans.length} 笔还在追你</span></div>
-    <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · 剩 ${loan.remaining} 期 · 月供 ${FormatMoney(loan.monthlyPayment)}</div>`; }).join("") : `<div class="note good">没有追加抵押贷。但创业启动贷仍然算贷款。</div>`}</div>`, () => {
+    <div class="panelSection sectionHeading"><strong>抵押贷</strong><span>${activeLoans.length} 笔</span></div>
+    <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · ${loan.remaining} 期 · ${FormatMoney(loan.monthlyPayment)}/月</div>`; }).join("") : `<div class="note good">无</div>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const startupPayment = event.target.closest("[data-startup-payment]");
       if (startupPayment) {
@@ -2582,7 +2593,7 @@ function OpenBankSheet() {
       const button = event.target.closest("[data-collateral-id]");
       if (!button) return;
       const asset = FindCollateral(button.dataset.collateralId);
-      if (asset?.fatal && !window.confirm("抵押电脑会立即结束本局。确定？")) return;
+      if (asset?.fatal && !window.confirm("抵押电脑 = 结束本局。确定？")) return;
       const result = TakeLoan(state, button.dataset.collateralId);
       if (!ApplyInteractiveResult(result, { tone: "warning", deferEnding: true })) return;
       if (result.fatal) RenderEnding(); else OpenBankSheet();
@@ -3049,19 +3060,19 @@ function OpenStockSheet() {
 
 function OpenDirectiveSheet() {
   const pivotCost = ForecastPivotCost(state);
-  OpenPanel("PROJECT DOCUMENT", "项目方向", `
-    <p class="panelIntro">策略在月结生效；模块失衡会浪费产出。</p>
+  OpenPanel("方向", "项目策略", `
+    <p class="panelIntro">月结生效 · 失衡损产出</p>
     <div class="worldGrid three">${DIRECTIVES.map((directive) => `
       <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive-id="${directive.id}" type="button">
         <div class="choiceTop"><strong style="color:${directive.color}">${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
       </button>`).join("")}</div>
-    <div class="panelSection choiceFooter"><span>消耗 1 次有效沟通</span><button class="miniButton" data-owner-customize type="button">添加玩法</button></div>
-    <div class="panelSection sectionHeading"><strong>承认做错了：换赛道</strong><span>预计烧掉 ${FormatMoney(pivotCost)}</span></div>
+    <div class="panelSection choiceFooter"><span>沟通 −1</span><button class="miniButton" data-owner-customize type="button">加玩法</button></div>
+    <div class="panelSection sectionHeading"><strong>换赛道</strong><span>${FormatMoney(pivotCost)}</span></div>
     <div class="worldGrid">
-      <label class="worldChoice"><div class="choiceTop"><strong>换题材</strong><span>不可抗力生成器</span></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.title)} · ${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
-      <label class="worldChoice"><div class="choiceTop"><strong>换商业形态</strong><span>旧代码只保留债务</span></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
+      <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.title)} · ${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
+      <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
     </div>
-    <div class="panelSection choiceFooter"><span>进度、宣发、玩法都会大量损失；焦虑 +14，饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 强行转向</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>进度↓ · 宣发↓ · 玩法↓ · 焦虑 +14 · 饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>转向</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const directiveButton = event.target.closest("[data-directive-id]");
       if (directiveButton) {
@@ -3072,19 +3083,19 @@ function OpenDirectiveSheet() {
       if (!event.target.closest("[data-pivot]")) return;
       const projectId = document.getElementById("pivotProjectSelect")?.value;
       const typeId = document.getElementById("pivotTypeSelect")?.value;
-      if (!window.confirm(`换赛道将立即烧掉 ${FormatMoney(pivotCost)}，大量进度作废。还换吗？`)) return;
+      if (!window.confirm(`${FormatMoney(pivotCost)} · 进度大损。确定？`)) return;
       const result = PivotProject(state, projectId, typeId);
       if (!ApplyInteractiveResult(result, { tone: "warning", deferEnding: true })) return;
-      ShowResult("FORCE MAJEURE", "赛道被迫重做", `
+      ShowResult("转向", "赛道重做", `
         <div class="resultHero"><b>−${FormatGoalMoney(result.cost)}</b><p>${EscapeHtml(result.reason)}<br>丢失愿望单 ${result.lostWishlists.toLocaleString("zh-CN")}，废弃玩法 ${result.discardedFeatures} 个。</p></div>
-        <div class="note danger">旧项目能复用的只有启动图标、几行代码和全部心理阴影。</div>`, () => { if (state.status !== "playing") RenderEnding(); });
+        `, () => { if (state.status !== "playing") RenderEnding(); });
     };
-  });
+  }, { mode: "computer" });
 }
 
 function OpenMarketingSheet() {
-  OpenPanel("HYPE BEFORE QUALITY", "线上宣发", `
-    <p class="panelIntro">宣发增加愿望单与预期；质量不足会退款。</p>
+  OpenPanel("宣发", "愿望单", `
+    <p class="panelIntro">愿望单↑ · 预期↑ · 质量不足退款</p>
     <div class="metricGrid">
       <div class="metricTile"><span>累计宣发</span><strong>${FormatMoney(state.project.marketingSpent)}</strong></div>
       <div class="metricTile"><span>愿望单</span><strong>${state.project.wishlists.toLocaleString("zh-CN")}</strong></div>
@@ -3105,7 +3116,7 @@ function OpenMarketingSheet() {
         if (state.status === "playing") OpenMarketingSheet(); else RenderEnding();
       }
     };
-  });
+  }, { mode: "computer" });
 }
 
 function MarketFitPreviewHtml(marketFit) {
@@ -3117,10 +3128,10 @@ function MarketFitPreviewHtml(marketFit) {
       ? "退款率 +" + refundPoints + " 点"
       : "退款率不变";
   return '<div class="marketFitPreview ' + marketFit.tone + '">'
-    + '<div class="marketFitStatus"><span>结果预判</span><strong>' + EscapeHtml(marketFit.label) + '</strong></div>'
+    + '<div class="marketFitStatus"><span>结果</span><strong>' + EscapeHtml(marketFit.label) + '</strong></div>'
     + '<div class="marketFitMetrics">'
-    + '<span><small>营收乘数</small><b>×' + marketFit.revenueMultiplier.toFixed(2) + '</b></span>'
-    + '<span><small>退款影响</small><b>' + refundLabel + '</b></span>'
+    + '<span><small>营收</small><b>×' + marketFit.revenueMultiplier.toFixed(2) + '</b></span>'
+    + '<span><small>退款</small><b>' + refundLabel + '</b></span>'
     + '</div></div>';
 }
 
@@ -3147,7 +3158,7 @@ function OpenMarketPhoneSheet() {
   const focusMarkup = [
     '<label class="marketPick directionPick">'
       + '<input type="radio" name="marketFocus" value="independent"' + (selectedFocusId === "independent" ? " checked" : "") + disabledAttribute + ">"
-      + '<span><b>不主动追风</b><small>营收 ×0.82 · 无惩罚</small></span>'
+      + '<span><b>不追风</b><small>×0.82 · 无惩罚</small></span>'
     + "</label>",
     ...focusOptions.map((option) => {
       const preview = EvaluateMarketFit(state, { focusId: option.id, directionId: snapshot.effectiveDirection.id });
@@ -3157,24 +3168,24 @@ function OpenMarketPhoneSheet() {
       + "</label>"
     }),
   ].join("");
-  const actionLabel = locked ? "本月已选择" : "确认本月主推";
+  const actionLabel = locked ? "已选" : "确认";
 
   OpenPanel("MARKET OS · PHONE", "手机：市场", (
     '<div class="marketPhone">'
-      + '<div class="phoneStatusBar"><span>M' + String(state.month).padStart(2, "0") + ' · 09:41</span><b>市场雷达</b><span>5G ▰</span></div>'
+      + '<div class="phoneStatusBar"><span>M' + String(state.month).padStart(2, "0") + '</span><b>市场</b><span>▰</span></div>'
       + '<section class="marketHero" style="--marketColor:' + snapshot.effectiveDirection.color + '">'
-        + '<span>本月风向</span>'
+        + '<span>风向</span>'
         + '<strong>' + snapshot.effectiveDirection.icon + " " + EscapeHtml(snapshot.effectiveDirection.name) + "</strong>"
-        + '<div><b>命中 ×' + (snapshot.effectiveDirection.perfectMultiplier * snapshot.heatMultiplier).toFixed(2) + '</b><small>选匹配特色即可</small></div>'
+        + '<div><b>命中 ×' + (snapshot.effectiveDirection.perfectMultiplier * snapshot.heatMultiplier).toFixed(2) + '</b></div>'
       + "</section>"
       + '<div class="marketFeed">'
-        + '<article class="phoneStory breaking"><span>本月随机事件</span><strong>' + EscapeHtml(snapshot.event.title) + "</strong></article>"
+        + '<article class="phoneStory breaking"><span>事件</span><strong>' + EscapeHtml(snapshot.event.title) + "</strong></article>"
       + "</div>"
       + '<form class="marketStrategyForm" data-market-form>'
-        + '<div class="phoneSectionTitle"><strong>本月主推</strong><span>只选 1 项</span></div>'
+        + '<div class="phoneSectionTitle"><strong>主推</strong><span>选 1 项</span></div>'
         + '<div class="marketPickGrid focusGrid">' + focusMarkup + "</div>"
         + '<div data-market-preview>' + MarketFitPreviewHtml(currentFit) + "</div>"
-        + '<div class="marketCommit"><span>每月可改 1 次</span><button class="primaryButton" data-market-commit type="button" ' + (locked ? "disabled" : "") + ">" + actionLabel + "</button></div>"
+        + '<div class="marketCommit"><span>每月 1 次</span><button class="primaryButton" data-market-commit type="button" ' + (locked ? "disabled" : "") + ">" + actionLabel + "</button></div>"
       + "</form>"
     + "</div>"
   ), () => {
@@ -3213,20 +3224,6 @@ function RevenueChart(history = state.incomeHistory) {
     <path d="M0 ${height - 12}H${width}" class="chartAxis"/><polyline points="${polyline}" fill="none" stroke="url(#revenueGlow)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
     ${points.map((item, index) => { const x = points.length === 1 ? width / 2 : index / (points.length - 1) * width; const y = height - 12 - (item.income || 0) / maximum * (height - 28); return `<circle cx="${x}" cy="${y}" r="4"/><text x="${x}" y="${height - 1}" text-anchor="middle">M${item.month}</text>`; }).join("")}
   </svg><div class="choiceFooter"><span>最高 ${FormatGoalMoney(maximum)}</span><b>只统计游戏净收入</b></div></div>`;
-}
-
-function RevenueAnalysis() {
-  const entries = state.incomeHistory.slice(-6);
-  if (!entries.length) return "上线后显示。";
-  const recent = entries.slice(-3);
-  const earlier = entries.slice(-6, -3);
-  const recentAverage = recent.reduce((sum, item) => sum + (item.income || 0), 0) / recent.length;
-  const earlierAverage = earlier.length ? earlier.reduce((sum, item) => sum + (item.income || 0), 0) / earlier.length : recentAverage;
-  const trend = recentAverage > earlierAverage * 1.12 ? "正在上行" : recentAverage < earlierAverage * .88 ? "正在下坠" : "暂时横盘";
-  const losses = recent.reduce((sum, item) => (
-    sum + (item.refunds || 0) + (item.eventLoss || 0) + Math.max(0, -(item.marketDelta || 0))
-  ), 0);
-  return `近 ${recent.length} 笔平均 ${FormatGoalMoney(recentAverage)}，曲线${trend}；退款与随机事件少拿 ${FormatGoalMoney(losses)}。`;
 }
 
 function StockSettlementReport(settlement) {
@@ -3275,31 +3272,30 @@ function OpenReleaseSheet() {
   const marketFit = EvaluateMarketFit(state);
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const tensions = evaluation?.tensions || [];
-  OpenPanel("SHIP IT / REGRET IT", state.project.isReleased ? `《${EscapeHtml(state.project.name)}》发布更新` : `把《${EscapeHtml(state.project.name)}》提交商店`, `
+  OpenPanel("发布", state.project.isReleased ? `更新《${EscapeHtml(state.project.name)}》` : `提交《${EscapeHtml(state.project.name)}》`, `
     <div class="resultHero"><b>${evaluation.rating.toFixed(1)}</b><p>${EscapeHtml(state.project.buildStatus.label)}${tensions[0] ? ` · ${EscapeHtml(tensions[0].title)}` : " · 无严重冲突"}</p></div>
     <div class="metricGrid">
-      <div class="metricTile"><span>开发时长</span><strong>${state.project.age} 个月</strong></div>
-      <div class="metricTile"><span>热度 / 愿望单</span><strong>${Math.round(state.project.hype)} / ${state.project.wishlists.toLocaleString("zh-CN")}</strong></div>
-      <div class="metricTile"><span>Bug / 两种债</span><strong>${Math.round(state.project.bugs)} / ${Math.round(state.project.scopeDebt + state.project.technicalDebt)}</strong></div>
+      <div class="metricTile"><span>开发</span><strong>${state.project.age} 月</strong></div>
+      <div class="metricTile"><span>热度 · 愿望单</span><strong>${Math.round(state.project.hype)} / ${state.project.wishlists.toLocaleString("zh-CN")}</strong></div>
+      <div class="metricTile"><span>Bug · 债</span><strong>${Math.round(state.project.bugs)} / ${Math.round(state.project.scopeDebt + state.project.technicalDebt)}</strong></div>
     </div>
-    <div class="noteList">${tensions.length ? tensions.slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}：${EscapeHtml(tension.description)}</div>`).join("") : `<div class="note good">无严重模块冲突。</div>`}</div>
+    <div class="noteList">${tensions.length ? tensions.slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}</div>`).join("") : `<div class="note good">无冲突</div>`}</div>
     <div class="note ${marketFit.backlash ? "danger" : marketFit.perfect ? "good" : ""}">市场：${EscapeHtml(marketFit.label)} · 营收 ×${marketFit.revenueMultiplier.toFixed(2)}</div>
     <div class="panelSection">${RevenueChart()}</div>
-    <div class="note">收入分析：${EscapeHtml(RevenueAnalysis())}</div>
-    <div class="panelSection choiceFooter"><span>${state.project.age < 2 ? `还要开发 ${2 - state.project.age} 个月才能提交商店` : state.project.lastReleaseMonth === state.month ? "本月已经发布过" : "评分差也能发，只是玩家也能退款"}</span><button class="primaryButton" data-release type="button" ${canRelease ? "" : "disabled"}>${state.project.isReleased ? "发布更新" : "现在上线"}</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>${state.project.age < 2 ? `还需 ${2 - state.project.age} 月` : state.project.lastReleaseMonth === state.month ? "本月已发" : "可发 · 低分退款"}</span><button class="primaryButton" data-release type="button" ${canRelease ? "" : "disabled"}>${state.project.isReleased ? "更新" : "上线"}</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (!event.target.closest("[data-release]")) return;
       const result = ReleaseBuild(state);
       if (!ApplyInteractiveResult(result, { deferEnding: true, toast: false })) return;
       const commercial = result.commercial;
-      ShowResult(result.isUpdate ? "UPDATE LIVE" : "LAUNCH LIVE", `${result.evaluation.rating.toFixed(1)} 分 · ${result.review}`, `
-        <div class="resultHero"><b>+${FormatGoalMoney(result.revenue)}</b><p>${commercial.marketBacklash ? "市场错配，退款上升。" : commercial.backlash ? "质量不足，退款上升。" : "已计入游戏收入。"}</p></div>
+      ShowResult(result.isUpdate ? "更新" : "上线", `${result.evaluation.rating.toFixed(1)} 分 · ${result.review}`, `
+        <div class="resultHero"><b>+${FormatGoalMoney(result.revenue)}</b><p>${commercial.marketBacklash ? "市场错配 · 退款↑" : commercial.backlash ? "质量不足 · 退款↑" : "已计入收入"}</p></div>
         <div class="metricGrid"><div class="metricTile"><span>毛收入</span><strong>${FormatGoalMoney(commercial.grossRevenue)}</strong></div><div class="metricTile"><span>退款</span><strong>${FormatGoalMoney(commercial.refunds)}</strong></div><div class="metricTile"><span>退款率</span><strong>${(commercial.refundRate * 100).toFixed(1)}%</strong></div></div>
         <div class="note ${result.marketFit.backlash ? "danger" : result.marketFit.perfect ? "good" : ""}">市场：${EscapeHtml(result.marketFit.label)} · 营收 ×${result.marketFit.revenueMultiplier.toFixed(2)}</div>
         <div class="panelSection">${RevenueChart()}</div>`, () => { if (state.status !== "playing") RenderEnding(); });
       PlayTone("release");
     };
-  });
+  }, { mode: "computer" });
 }
 
 function GetMonthCloseActions() {
@@ -3403,16 +3399,16 @@ function OpenMonthSheet() {
 }
 
 function OpenHelpSheet() {
-  OpenPanel("HELP", "操作与目标", `
-    <div class="resultHero"><b>A/D</b><p>移动 · W/↑/空格跳 · E 交互<br>移动端请横屏使用底部按钮。</p></div>
+  OpenPanel("手册", "操作", `
+    <div class="resultHero"><b>A/D</b><p>移动 · W 跳 · E 交互 · N 月结</p></div>
     <div class="noteList">
-      <div class="note">家中电脑：开发、聊天、宣发、发布、炒股；炒股 ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 解锁。</div>
-      <div class="note good">手机：看风向和事件，选 1 个主推特色。命中增收，选错退款；也可不追风。</div>
-      <div class="note">招聘前先买工位；每人 1 套。</div>
-      <div class="note">超市：${FormatMoney(SCRATCH_OPTION.stake)} 刮刮乐，每月 1 张。电脑股票：2 只，只填金额，次月看走势与盈亏。</div>
-      <div class="note">饮食有现金门槛；足浴每月 1 次，降低焦虑。</div>
-      <div class="note danger">M08 前还清 ¥82,000，否则倒闭。</div>
-      <div class="note good">目标：游戏净收入 100 亿元；贷款、刮奖、炒股不计。</div>
+      <div class="note">电脑 · 开发 / 聊天 / 宣发 / 发布 / 股票</div>
+      <div class="note good">手机 · 主推 1 项 · 错配退款</div>
+      <div class="note">工位 → 招人 · 每人 1 套</div>
+      <div class="note">刮刮乐 · 每月 1 张；股票 · 次月结算</div>
+      <div class="note">饮食 · 现金门槛；足浴 · 每月 1 次 · 焦虑↓</div>
+      <div class="note danger">M08 还 ¥82,000 · 逾期倒闭</div>
+      <div class="note good">目标 100 亿元 · 贷款 / 刮奖 / 股票不计</div>
     </div>`);
 }
 
@@ -3424,11 +3420,11 @@ function RenderEnding() {
   dom.resultLayer.classList.add("hidden");
   dom.endingTitle.textContent = state.outcome?.title || (state.status === "ended" ? "你影响了世界" : "工作室倒下了");
   const identity = [state.studioName, state.project?.name ? `《${state.project.name}》` : ""].filter(Boolean).join(" · ");
-  dom.endingSubtitle.textContent = `${identity}${identity ? "｜" : ""}${state.outcome?.subtitle || "至少电脑在日志里留下了最后一句话。"}`;
+  dom.endingSubtitle.textContent = `${identity}${identity ? "｜" : ""}${state.outcome?.subtitle || ""}`;
   dom.endingStats.innerHTML = `
-    <div><span>撑过</span><strong>${state.month} 个月</strong></div>
+    <div><span>存活</span><strong>${state.month} 月</strong></div>
     <div><span>游戏收入</span><strong>${FormatGoalMoney(state.gameRevenue)}</strong></div>
-    <div><span>最好评分</span><strong>${state.bestRating ? state.bestRating.toFixed(1) : "没发出来"}</strong></div>`;
+    <div><span>最高分</span><strong>${state.bestRating ? state.bestRating.toFixed(1) : "未上线"}</strong></div>`;
   dom.endingScreen.classList.remove("hidden");
 }
 

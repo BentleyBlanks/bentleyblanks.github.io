@@ -7,6 +7,10 @@ const html = ReadLocal("./index.html");
 const css = ReadLocal("./Style_Play.css");
 const script = ReadLocal("./Script_Play.mjs");
 const setupChoiceScript = script.match(/function RenderSetupChoices\(\) \{[^]*?dom\.continueButton[^]*?\n\}/)?.[0] || "";
+const homeComputerSource = script.slice(
+  script.indexOf("function OpenHomeComputerSheet"),
+  script.indexOf("function OpenWorkstationSheet"),
+);
 
 assert.match(html, /viewport-fit=cover/, "the page must preserve phone safe-area insets");
 assert.match(html, /id="mobileControls"/, "the touch-control region needs a stable DOM hook");
@@ -17,13 +21,13 @@ assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visib
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
-assert.match(html, /Style_Play\.css\?v=20260815s/, "project setup and month-close styling must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815s/, "project setup and month-close logic must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815t/, "computer and month-close styling must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815t/, "computer and month-close logic must bypass the Pages cache");
 assert.doesNotMatch(html, /contractParties|contractFinePrint|signatureRow|按住 1 秒/, "project setup must only show game name, theme, type, and confirmation");
 assert.match(html, /id="projectConfirmButton" class="documentButton contractSubmitButton"[^>]*><strong>开始开发<\/strong>/, "project setup needs one direct confirmation action");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
-assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward victory");
+assert.match(html, /贷款 · 投机/, "the compact reveal must preserve which cash sources do not count toward victory");
 
 assert.match(css, /--controlSize:\s*clamp\(58px,\s*15\.5vh,\s*70px\)/, "primary controls must scale with short landscape screens");
 assert.match(css, /\.interactButton\.available/, "the contextual action needs a high-confidence ready state");
@@ -44,6 +48,10 @@ assert.match(css, /\.goalRevealButton\s*\{[^}]*min-height:44px;/, "the target ac
 assert.match(css, /\.stockPickGrid\s*\{/, "the computer stock picker needs a responsive two-choice layout");
 assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");
 assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
+assert.match(css, /\.modalLayer\.computerMode \.worldPanel\s*\{/, "the home computer needs its own physical monitor shell");
+assert.match(css, /\.modalLayer\.computerMode \.worldPanel::after\s*\{/, "the physical computer needs a keyboard silhouette");
+assert.match(css, /\.computerStatusStrip\s*\{/, "the computer screen must use compact instrument readouts");
+assert.match(css, /\.computerActions \.computerApp\s*\{/, "computer actions must render as tactile desktop keys");
 
 assert.match(script, /SetTouchButtonPressed/, "held controls need deterministic visual state updates");
 assert.match(script, /classList\.toggle\("available", interactionAvailable\)/, "interaction readiness must track the nearest target");
@@ -66,5 +74,9 @@ assert.match(script, /data-computer-action="stocks"/, "stock trading must enter 
 assert.match(script, /function OpenScratchSheet\(/, "the supermarket counter must have its own scratch-card screen");
 assert.match(script, /function StockSettlementReport\(/, "the next turn must render the monthly stock trend and return");
 assert.doesNotMatch(script, /LOTTERY \/ STOCKS/, "stocks and scratch cards must not share the old combined entry");
+assert.match(script, /classList\.toggle\("computerMode", mode === "computer"\)/, "computer sheets need an isolated presentation mode");
+assert.match(homeComputerSource, /class="computerDesktop"/, "the home computer must render an operating surface inside the monitor");
+assert.match(homeComputerSource, /\{ mode: "computer" \}/, "the home computer must open in the physical monitor mode");
+assert.doesNotMatch(homeComputerSource, /RenderLog|panelIntro|<p[ >]/, "the computer home screen must not bring back explanatory prose or activity logs");
 
 console.log("StudioSurvival mobile UI contract test passed");

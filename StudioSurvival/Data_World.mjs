@@ -60,13 +60,13 @@ export const Locations = FreezeList([
 export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发 / 炒股 / 宣发 / 发布；右下角月结", x: 2.35, y: 0, radius: 1.55, action: "computer" },
-  { id: "homeFridge", kind: "homeFridge", label: "自己家的冰箱", detail: "选择本月吃法", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
+  { id: "homeComputer", kind: "homeComputer", label: "电脑", detail: "", x: 2.35, y: 0, radius: 1.55, action: "computer" },
+  { id: "homeFridge", kind: "homeFridge", label: "冰箱", detail: "本月吃法", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
   { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
-  { id: "snackShelf", kind: "snackShelf", label: "小超市零食架", detail: "超市小吃", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },
-  { id: "lotteryCounter", kind: "lotteryMachine", label: "刮刮乐柜台", detail: "每月 1 张", x: 27.2, y: 0, radius: 1.55, action: "scratch" },
-  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "每名员工需 1 套", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
-  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "大学生 / AI", x: 37.1, y: 0, radius: 1.6, action: "talent" },
+  { id: "snackShelf", kind: "snackShelf", label: "零食架", detail: "零食", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },
+  { id: "lotteryCounter", kind: "lotteryMachine", label: "刮刮乐", detail: "每月 1 张", x: 27.2, y: 0, radius: 1.55, action: "scratch" },
+  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "每人 1 工位", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
+  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "招人", x: 37.1, y: 0, radius: 1.6, action: "talent" },
   { id: "bankCounter", kind: "bank", label: "银行柜台", detail: "还款 / 抵押", x: 45.1, y: 0, radius: 1.75, action: "finance" },
   { id: "hotelRestaurant", kind: "hotel", label: "大酒店餐厅", detail: "大餐", x: 55.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
   { id: "regularFootbathCounter", kind: "regularFootbath", label: "普通足浴店", detail: "焦虑 -8", x: 65.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
