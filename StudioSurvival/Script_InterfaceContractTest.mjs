@@ -5,6 +5,7 @@ import { InteractionPoints } from "./Data_World.mjs";
 const ReadLocal = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 const script = ReadLocal("./Script_Play.mjs");
 const html = ReadLocal("./index.html");
+const css = ReadLocal("./Style_Play.css");
 const ById = (id) => InteractionPoints.find((point) => point.id === id);
 
 assert.deepEqual(
@@ -63,8 +64,9 @@ assert.match(marketPhoneBlock, /去墙上白板/);
 assert.doesNotMatch(marketPhoneBlock, /OpenCustomizationSheet\("owner"\)/, "the phone must not bypass the project whiteboard");
 
 assert.equal([...script.matchAll(/\bTravelWorld\(/g)].length, 1, "only the exit travel flow may call TravelWorld");
+assert.match(html, /<title>甲方是我<\/title>/, "the browser title should use the game name only");
 assert.match(html, /<h1><span>甲方是我<\/span><\/h1>/, "the title screen should lead with the game name only");
-assert.doesNotMatch(html, /进入\s*2\.5D|灯会亮/, "the title screen should use normal player-facing language");
+assert.doesNotMatch(`${html}\n${css}`, /进入\s*2\.5D|2\.5D\s+FOUNDING|灯会亮/, "the title screen should use normal player-facing language");
 assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be available from a global HUD shortcut");
 assert.doesNotMatch(html, /id="settlementButton"/, "monthly close must stay on the physical wall calendar");
 assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global shortcut");
