@@ -3000,3 +3000,360 @@ body {
   .goalRevealNumber span { font-size:clamp(52px,20vh,92px); }
   .goalRevealRules > div { padding:5px 8px; }
 }
+
+/* Month-close ritual ------------------------------------------------------- */
+.monthCloseMode .modalBackdrop {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(168, 104, 49, .2), transparent 42%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 1px, transparent 1px 9px),
+    rgba(14, 7, 5, .91);
+  backdrop-filter: blur(6px) saturate(.68);
+}
+
+.modalLayer.monthCloseMode .worldPanel {
+  width: min(650px, 92vw);
+  border: 1px solid #7a5535;
+  border-bottom-color: #1c0e09;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 16px 15px, #c08b4f 0 2px, #342116 2.5px 5px, transparent 5.5px),
+    radial-gradient(circle at calc(100% - 16px) 15px, #c08b4f 0 2px, #342116 2.5px 5px, transparent 5.5px),
+    repeating-linear-gradient(91deg, rgba(255,255,255,.016) 0 1px, transparent 1px 8px),
+    #3b2418;
+  box-shadow: inset 0 1px rgba(255,255,255,.15), inset 0 -7px rgba(9,4,2,.28), 0 9px 0 #170c08, 0 38px 100px rgba(0,0,0,.76);
+  animation: monthCloseIn .28s cubic-bezier(.2,.85,.24,1.08) both;
+}
+
+.monthCloseMode .worldPanel > header {
+  padding: 11px 15px 10px;
+  border-bottom: 1px solid #160c08;
+  background: linear-gradient(180deg, rgba(92,57,36,.96), rgba(48,29,20,.98));
+  box-shadow: inset 0 1px rgba(255,255,255,.12), 0 2px rgba(231,191,130,.08);
+}
+
+.monthCloseMode .worldPanel > header span { color: #d9b77d; }
+.monthCloseMode .worldPanel h2 { color: #f5e7c8; font: 900 19px/1.1 Georgia,"Songti SC",serif; letter-spacing: .03em; }
+.monthCloseMode .closeButton { border-color:#27150d; background:linear-gradient(180deg,#8c6845,#5b3a25); color:#f8e6c3; }
+
+.monthCloseMode .sheetBody {
+  max-height: calc(min(610px, 90vh) - 58px);
+  margin: 0 8px 9px;
+  padding: 13px;
+  border-color: #130b08;
+  background:
+    radial-gradient(circle at 18% 23%, rgba(100,72,37,.055) 0 1px, transparent 1.5px),
+    repeating-linear-gradient(0deg, transparent 0 21px, rgba(77,91,100,.055) 22px 23px),
+    #e9ddc1;
+  background-size: 21px 19px, auto, auto;
+  box-shadow: inset 0 3px 10px rgba(66,43,22,.3), 0 1px rgba(255,255,255,.2);
+}
+
+.monthCloseRitual { display: grid; gap: 9px; color: #332c23; }
+
+.monthCloseLedger {
+  display: grid;
+  grid-template-columns: 158px minmax(0, 1fr);
+  gap: 9px;
+  align-items: stretch;
+}
+
+.monthCloseLeaf {
+  position: relative;
+  min-height: 102px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 16px 12px 12px;
+  border: 1px solid #812d2e;
+  border-radius: 3px;
+  color: #fff6dd;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.1), transparent 28%),
+    #923438;
+  box-shadow: inset 0 1px rgba(255,255,255,.27), inset 0 -4px rgba(56,13,14,.24), 2px 3px 0 rgba(76,48,29,.28);
+  transform: rotate(-.35deg);
+}
+
+.monthCloseLeaf::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  top: 7px;
+  height: 8px;
+  background: radial-gradient(circle, #3e2518 0 2px, #e1c89c 2.5px 4px, transparent 4.5px) 0 0 / 25% 8px repeat-x;
+  opacity: .9;
+}
+
+.monthCloseLeaf::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 6px;
+  border-bottom: 1px dashed rgba(255,239,200,.42);
+}
+
+.monthCloseLeaf small { font-size: 7px; font-weight: 900; letter-spacing: .16em; }
+.monthCloseLeaf strong { font: 950 39px/.95 Georgia,"Songti SC",serif; letter-spacing: -.04em; text-shadow: 0 2px #5c1c1f; }
+.monthCloseLeaf span { margin-top: 5px; color: #f0cf98; font-size: 9px; font-weight: 900; }
+
+.monthCloseForecast {
+  display: grid;
+  align-content: center;
+  padding: 14px 18px;
+  border: 1px solid #aa9a7d;
+  border-radius: 3px;
+  background: rgba(255,255,255,.31);
+  box-shadow: inset 0 1px rgba(255,255,255,.72), 2px 3px 0 rgba(88,65,38,.2);
+}
+
+.monthCloseForecast small { color: #736754; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.monthCloseForecast strong { margin: 3px 0 2px; color: #2d5d41; font: 950 32px/1 Georgia,"Songti SC",serif; }
+.monthCloseForecast span { color: #6a6050; font-size: 8px; }
+.monthCloseForecast.danger { border-color: #a65d58; background: rgba(157,54,54,.09); }
+.monthCloseForecast.danger strong { color: #9a2932; }
+
+.monthCloseDeadline {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 10px;
+  border: 1px solid #b07a69;
+  border-radius: 2px;
+  color: #713b36;
+  background: rgba(161,67,58,.08);
+  box-shadow: inset 3px 0 #9e3c3d;
+}
+
+.monthCloseDeadline span,
+.monthCloseDeadline em { font-size: 8px; font-style: normal; }
+.monthCloseDeadline strong { font-size: 11px; }
+.monthCloseDeadline em { color: #8a5d4d; font-weight: 800; }
+
+.monthClosePosition {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 10px;
+  border: 1px solid #7893a0;
+  border-radius: 2px;
+  color: #35596a;
+  background: rgba(63,113,135,.08);
+  box-shadow: inset 3px 0 #39788b;
+}
+
+.monthClosePosition span,
+.monthClosePosition em { font-size: 8px; font-style: normal; }
+.monthClosePosition strong { font-size: 11px; letter-spacing: .06em; }
+.monthClosePosition em { color: #5c7280; font-weight: 800; }
+
+.monthCloseTasks {
+  padding: 9px 10px;
+  border: 1px solid #a5987e;
+  border-radius: 3px;
+  background: rgba(255,255,255,.24);
+  box-shadow: inset 0 1px rgba(255,255,255,.56);
+}
+
+.monthCloseTasks header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.monthCloseTasks header span { color: #776d5d; font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.monthCloseTasks header strong { font-size: 11px; }
+.monthCloseTasks > div { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.monthCloseTasks > div span { padding: 4px 7px; border: 1px solid rgba(120,66,46,.28); border-radius: 99px; color: #713c2f; background: #f1d9aa; font-size: 8px; font-weight: 900; }
+.monthCloseTasks.attention { border-color: #b28351; background: rgba(205,148,62,.1); }
+.monthCloseTasks.attention header strong { color: #8b4b28; }
+.monthCloseTasks.clear { border-color: #7f9a80; background: rgba(79,133,91,.08); }
+.monthCloseTasks.clear header strong { color: #356244; }
+
+.monthCloseConfirm {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  padding: 8px 13px;
+  border: 1px solid #311716;
+  border-radius: 5px;
+  color: #fff3dc;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.13), transparent 30%),
+    linear-gradient(180deg, #85413c, #652b2b 58%, #4e1e21);
+  cursor: pointer;
+  text-align: left;
+  text-shadow: 0 -1px #381113;
+  box-shadow: inset 0 1px rgba(255,255,255,.27), inset 0 -4px rgba(34,9,11,.28), 0 4px 0 #2c1512, 0 8px 15px rgba(73,43,24,.25);
+  touch-action: manipulation;
+}
+
+.monthCloseConfirm small { grid-column: 1; color: #d7b39a; font-size: 7px; letter-spacing: .08em; }
+.monthCloseConfirm strong { grid-column: 1; font-size: 13px; }
+.monthCloseConfirm span { grid-column: 2; grid-row: 1 / 3; font-size: 10px; font-weight: 900; }
+.monthCloseTasks.clear + .monthCloseConfirm { border-color:#1e3524; background:linear-gradient(180deg,#547052,#354b38 58%,#26372a); box-shadow:inset 0 1px rgba(255,255,255,.28),inset 0 -4px rgba(8,24,11,.28),0 4px 0 #18241b,0 8px 15px rgba(73,43,24,.2); }
+.monthCloseConfirm:hover { filter: brightness(1.07); }
+.monthCloseConfirm:active { transform: translateY(3px); box-shadow: inset 0 3px 7px rgba(30,8,9,.42), 0 1px 0 #2c1512; }
+.monthCloseConfirm:focus-visible { outline-color: #e3bb6c; }
+
+.resultLayer.monthResultMode {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(212,165,87,.24), transparent 35%),
+    radial-gradient(ellipse at 50% 105%, rgba(91,43,22,.4), transparent 50%),
+    rgba(13,7,5,.94);
+  backdrop-filter: blur(8px) saturate(.64);
+}
+
+.resultLayer.monthResultMode .resultCard {
+  width: min(540px, 90vw);
+  padding: 26px 25px 21px;
+  overflow: visible;
+  border: 1px solid #a99a7d;
+  border-radius: 3px;
+  color: #342e25;
+  background:
+    radial-gradient(circle at 16% 15%, rgba(95,65,31,.07) 0 1px, transparent 1.5px),
+    repeating-linear-gradient(0deg, transparent 0 23px, rgba(71,86,94,.065) 24px 25px),
+    #efe3c7;
+  background-size: 19px 17px, auto, auto;
+  box-shadow: 4px 5px 0 #766b57, 12px 16px 0 rgba(40,20,9,.28), 20px 42px 90px rgba(0,0,0,.75);
+  transform: rotate(-.18deg);
+  animation: monthResultIn .46s cubic-bezier(.16,.9,.25,1.08) both;
+}
+
+.resultLayer.monthResultMode .resultCard::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 190px;
+  height: 22px;
+  border: 1px solid #4e3518;
+  border-radius: 4px 4px 10px 10px;
+  background: linear-gradient(180deg,#e1c17c,#9c7435 58%,#5c401c);
+  box-shadow: inset 0 1px rgba(255,255,255,.64), inset 0 -3px rgba(71,40,11,.38), 0 5px 10px rgba(0,0,0,.45);
+  transform: translateX(-50%);
+}
+
+.resultLayer.monthResultMode .resultCard::after {
+  content: "结";
+  position: absolute;
+  right: 24px;
+  top: 18px;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 4px double rgba(143,41,48,.66);
+  border-radius: 50%;
+  color: rgba(143,41,48,.7);
+  font: 950 18px/1 "Songti SC",serif;
+  box-shadow: inset 0 0 0 4px rgba(143,41,48,.08);
+  transform: rotate(13deg) scale(.78);
+  animation: monthResultStamp .36s cubic-bezier(.2,1.3,.35,1) .32s both;
+}
+
+.resultLayer.monthResultMode #resultKicker { display: block; color: #8f2934; text-align: center; letter-spacing: .22em; }
+.resultLayer.monthResultMode .resultCard h2 { margin: 4px 0 13px; color: #2b261f; text-align: center; font: 950 28px/1 Georgia,"Songti SC",serif; letter-spacing: .04em; }
+
+.monthResultRitual { display: grid; gap: 9px; }
+.monthResultVerdict {
+  display: grid;
+  grid-template-columns: 145px minmax(0,1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 15px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #a9997b;
+  border-radius: 3px;
+  background: rgba(255,255,255,.25);
+  box-shadow: inset 0 1px rgba(255,255,255,.72), 2px 3px 0 rgba(77,57,34,.19);
+}
+
+.monthResultVerdict span { grid-column: 1; color: #796d5a; font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.monthResultVerdict strong { grid-column: 1; color: #39788b; font: 950 28px/1.05 Georgia,"Songti SC",serif; }
+.monthResultVerdict p { grid-column: 2; grid-row: 1 / 3; margin: 0; color: #554d40; font-size: 9px; line-height: 1.55; }
+
+.monthResultMetrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.monthResultMetrics > div { min-width: 0; padding: 9px; border: 1px solid #aa9b7f; border-radius: 2px; background: rgba(255,255,255,.18); box-shadow: inset 0 1px rgba(255,255,255,.56); }
+.monthResultMetrics span,
+.monthResultMetrics small { display: block; overflow: hidden; color: #796e5c; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.monthResultMetrics strong { display: block; margin: 2px 0; overflow: hidden; color: #302b24; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.monthResultMetrics small { color: #8b3c3d; font-weight: 900; }
+.monthResultFootnote { margin: 0; padding: 7px 9px; border-left: 3px solid #9a4c42; color: #69483f; background: rgba(151,63,56,.07); font-size: 8px; line-height: 1.45; }
+
+.monthResultMode .stockMonthReport {
+  margin-top: 0;
+  border-radius: 3px;
+  box-shadow: 2px 3px 0 rgba(77,57,34,.19);
+}
+.monthResultMode .stockMonthReport > header { padding: 7px 9px; }
+.monthResultMode .stockMonthReport > header strong { font-size: 11px; }
+.monthResultMode .stockMonthReport > header > b { font-size: 18px; }
+.monthResultMode .stockReturnGrid { display: none; }
+.monthResultMode .stockTrendChart { padding: 3px 8px 0; }
+.monthResultMode .stockTrendChart svg { height: 68px; }
+.monthResultMode .stockTrendChart text { font-size: 7px; }
+.monthResultMode .stockMonthReport > footer { padding: 3px 9px 5px; }
+
+.resultLayer.monthResultMode .resultCard > .primaryButton {
+  display: block;
+  min-width: 220px;
+  min-height: 46px;
+  margin: 13px auto 0;
+  border: 1px solid #2b3824;
+  border-radius: 5px;
+  color: #f5edd8;
+  background: linear-gradient(180deg,#65745b,#3f513c 58%,#2a382b);
+  text-shadow: 0 -1px #172017;
+  box-shadow: inset 0 1px rgba(255,255,255,.3), inset 0 -4px rgba(10,20,9,.27), 0 4px 0 #202b21, 0 9px 16px rgba(60,39,22,.26);
+}
+
+@keyframes monthCloseIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes monthResultIn {
+  from { opacity: 0; transform: translateY(-24px) rotate(-1.4deg) scale(.94); }
+  to { opacity: 1; transform: translateY(0) rotate(-.18deg) scale(1); }
+}
+
+@keyframes monthResultStamp {
+  from { opacity: 0; transform: rotate(13deg) scale(1.55); }
+  to { opacity: 1; transform: rotate(13deg) scale(.78); }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .modalLayer.monthCloseMode .worldPanel { width: min(710px, 96vw); }
+  .monthCloseMode .worldPanel > header { padding: 7px 11px 6px; }
+  .monthCloseMode .worldPanel h2 { font-size: 15px; }
+  .monthCloseMode .sheetBody { max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 54px); padding: 7px; }
+  .monthCloseRitual { gap: 5px; }
+  .monthCloseLedger { grid-template-columns: 118px minmax(0,1fr); gap: 6px; }
+  .monthCloseLeaf { min-height: 65px; padding: 12px 8px 7px; }
+  .monthCloseLeaf strong { font-size: 26px; }
+  .monthCloseLeaf span { margin-top: 2px; font-size: 7px; }
+  .monthCloseForecast { padding: 8px 12px; }
+  .monthCloseForecast strong { font-size: 23px; }
+  .monthCloseDeadline { padding: 5px 8px; }
+  .monthClosePosition { padding: 5px 8px; }
+  .monthCloseTasks { padding: 6px 8px; }
+  .monthCloseTasks > div { margin-top: 4px; }
+  .monthCloseTasks > div span { padding: 3px 6px; font-size: 7px; }
+  .monthCloseConfirm { min-height: 44px; padding: 5px 10px; }
+
+  .resultLayer.monthResultMode .resultCard { width: min(640px, 94vw); padding: 17px 20px 13px; }
+  .resultLayer.monthResultMode .resultCard::before { top: -8px; height: 15px; }
+  .resultLayer.monthResultMode .resultCard::after { right: 17px; top: 12px; width: 38px; height: 38px; }
+  .resultLayer.monthResultMode .resultCard h2 { margin: 2px 0 7px; font-size: 20px; }
+  .monthResultRitual { gap: 5px; }
+  .monthResultVerdict { grid-template-columns: 120px minmax(0,1fr); padding: 8px 10px; }
+  .monthResultVerdict strong { font-size: 21px; }
+  .monthResultMetrics > div { padding: 6px 8px; }
+  .monthResultMode .stockMonthReport > header { padding: 5px 8px; }
+  .monthResultMode .stockTrendChart svg { height: 48px; }
+  .monthResultMode .stockMonthReport > footer { padding: 2px 8px 4px; }
+  .monthResultFootnote { padding: 5px 8px; }
+  .resultLayer.monthResultMode .resultCard > .primaryButton { min-height: 42px; margin-top: 7px; }
+}

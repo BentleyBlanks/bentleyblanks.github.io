@@ -17,8 +17,8 @@ assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visib
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
-assert.match(html, /Style_Play\.css\?v=20260815r/, "project setup and stock-account changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815r/, "gameplay changes must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815s/, "project setup and month-close styling must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815s/, "project setup and month-close logic must bypass the Pages cache");
 assert.doesNotMatch(html, /contractParties|contractFinePrint|signatureRow|按住 1 秒/, "project setup must only show game name, theme, type, and confirmation");
 assert.match(html, /id="projectConfirmButton" class="documentButton contractSubmitButton"[^>]*><strong>开始开发<\/strong>/, "project setup needs one direct confirmation action");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
@@ -33,6 +33,9 @@ assert.match(css, /\.mobileControls\.suppressed/, "world controls must disappear
 assert.match(css, /\.settlementButton\s*\{[^}]*position:\s*fixed;[^}]*right:\s*var\(--safeRight\);[^}]*bottom:/s, "settlement must be a fixed bottom-right game control");
 assert.match(css, /\.settlementButton\.suppressed/, "settlement must disappear behind modal interactions");
 assert.match(css, /\.settlementButton\s*\{[^}]*touch-action:\s*manipulation;/s, "settlement must respond as a direct touch control");
+assert.match(css, /\.modalLayer\.monthCloseMode \.worldPanel/, "monthly confirmation needs its own compact ritual surface");
+assert.match(css, /\.resultLayer\.monthResultMode \.resultCard/, "monthly results need a distinct ceremonial reveal");
+assert.match(css, /\.monthResultMode \.stockReturnGrid\s*\{\s*display:\s*none;/, "stock settlement must stay compact inside the monthly reveal");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
 assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s, "utility controls must remain full touch targets");
 assert.match(css, /\.goalReveal\.active \.goalRevealNumber/, "the 100-yuan-billion target needs a dedicated entrance animation");
@@ -47,6 +50,10 @@ assert.match(script, /classList\.toggle\("available", interactionAvailable\)/, "
 assert.match(script, /toggleAttribute\("inert", suppressed\)/, "hidden controls must leave the accessibility and touch order");
 assert.match(script, /event\.code === "KeyN"[^\n]+OpenMonthSheet\(\)/, "next turn needs a keyboard shortcut");
 assert.match(script, /dom\.settlementButton\.addEventListener\("click"[^]*?OpenMonthSheet\(\)/, "the persistent control must open the monthly close sheet");
+assert.match(script, /function GetMonthCloseActions\(\)[^]*?亲自开发[^]*?沟通 \/ 拍板[^]*?市场主推未定/, "monthly close must preserve concise unfinished-action warnings");
+assert.match(script, /hasOpenActions \? "仍然月结" : "确认月结"/, "monthly close must make abandoning remaining actions explicit");
+assert.match(script, /monthClosePosition[^]*?股票待收盘[^]*?pendingStock[^]*?state\.stockPosition\.stake/, "monthly close must keep a compact pending-stock warning");
+assert.match(script, /const stockCashReturn = result\.stockSettlement\?\.payout \|\| 0;[^]*?StockSettlementReport\(result\.stockSettlement\)/, "monthly results must include stock cash and its compact settlement report");
 assert.match(script, /matches\?\.\("button, a, \[role='button'\]"\)[^\n]+\["Space", "Enter"\]/, "focused physical controls must retain native keyboard activation");
 assert.match(script, /navigator\.vibrate\?\./, "coarse-pointer actions should provide optional tactile confirmation");
 assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet must open at its own beginning");

@@ -2176,7 +2176,7 @@ function RenderHud() {
   }).join("");
 }
 
-function OpenPanel(kicker, title, html, onReady = null) {
+function OpenPanel(kicker, title, html, onReady = null, mode = "") {
   if (state.status !== "playing" || !state.project) return;
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
@@ -2184,6 +2184,7 @@ function OpenPanel(kicker, title, html, onReady = null) {
   dom.sheetBody.scrollTop = 0;
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
+  dom.modalLayer.classList.toggle("monthCloseMode", mode === "monthClose");
   dom.modalLayer.classList.remove("hidden");
   inputState.left = false;
   inputState.right = false;
@@ -2192,6 +2193,7 @@ function OpenPanel(kicker, title, html, onReady = null) {
 
 function ClosePanel() {
   dom.modalLayer.classList.add("hidden");
+  dom.modalLayer.classList.remove("monthCloseMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -2200,18 +2202,21 @@ function ResetScratchSession() {
   if (activeScratchSession?.autoFrame) cancelAnimationFrame(activeScratchSession.autoFrame);
   activeScratchSession = null;
   dom.resultLayer.classList.remove("scratchMode");
+  dom.resultLayer.classList.remove("monthResultMode");
   dom.resultCloseButton.classList.remove("hidden");
   dom.resultCloseButton.disabled = false;
   dom.resultCloseButton.textContent = "继续";
 }
 
-function ShowResult(kicker, title, html, onClose = null) {
+function ShowResult(kicker, title, html, onClose = null, options = {}) {
   ResetScratchSession();
   ClosePanel();
   dom.resultKicker.textContent = kicker;
   dom.resultTitle.textContent = title;
   dom.resultBody.innerHTML = html;
   dom.resultBody.closest(".resultCard").scrollTop = 0;
+  dom.resultLayer.classList.toggle("monthResultMode", options.mode === "monthResult");
+  dom.resultCloseButton.textContent = options.closeLabel || "继续";
   resultCloseHandler = onClose;
   dom.resultLayer.classList.remove("hidden");
 }
@@ -3297,33 +3302,70 @@ function OpenReleaseSheet() {
   });
 }
 
+function GetMonthCloseActions() {
+  const actions = [];
+  const ownerWorkRemaining = Math.max(0, 3 - state.ownerWorkCount);
+  if (ownerWorkRemaining > 0) actions.push(`亲自开发 ${ownerWorkRemaining} 次`);
+  if (state.talkPoints > 0) actions.push(`沟通 / 拍板 ${state.talkPoints} 次`);
+  if ((state.project.marketStrategy?.setMonth || 0) !== state.month) actions.push("市场主推未定");
+  if (state.project.age >= 2 && state.project.lastReleaseMonth !== state.month) {
+    actions.push(state.project.isReleased ? "可发布更新" : "可提交商店");
+  }
+  return actions;
+}
+
+function GetMonthResultHighlights(result, finance) {
+  const highlights = [];
+  const removed = finance.removedStaff || [];
+  const defaults = finance.defaults || [];
+  if (finance.startupDefault) highlights.push("启动贷逾期，公司被强制清算。");
+  defaults.forEach((loan) => highlights.push(`断供：${FindCollateral(loan.collateralId)?.name || loan.collateralId} 被没收。`));
+  removed.forEach((staff) => highlights.push(`${staff.name}${staff.kind === "ai" ? "被退订" : "离开了团队"}。`));
+  if (finance.skippedFood) highlights.push("饭钱不足，本月没吃饭。");
+  (finance.appliedEvents || []).forEach((liveEvent) => highlights.push(`收入事件：${liveEvent.title}。`));
+  if (finance.marketFit && state.project.isReleased && Math.abs(finance.marketDelta || 0) > 0) {
+    highlights.push(`市场：${finance.marketFit.label}，${finance.marketDelta >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(finance.marketDelta))}。`);
+  }
+  if (result.anxiety.idea) highlights.push(`焦虑催生新点子：${result.anxiety.idea.title}。`);
+  highlights.push(...(result.painEvents || []));
+  return [...new Set(highlights)].slice(0, 2);
+}
+
 function OpenMonthSheet() {
   if (!state.project || state.status !== "playing") return;
   const costs = ForecastMonthlyCosts(state);
   const pendingStock = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
-  const shortfall = Math.max(0, costs.total - state.cash - (state.project.isReleased ? state.project.monthlyRevenue : 0));
+  const expectedIncome = state.project.isReleased ? state.project.monthlyRevenue : 0;
+  const projectedCash = state.cash + expectedIncome - costs.total;
+  const shortfall = Math.max(0, -projectedCash);
   const startupLoan = state.startupLoan;
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
-  const foodPlan = FindFoodPlan(state.foodPlan);
-  OpenPanel("END TURN", `月结 · 结束 M${String(state.month).padStart(2, "0")}`, `
-    <p class="panelIntro">确认后扣费，再结算团队产出。</p>
-    <div class="metricGrid">
-      <div class="metricTile"><span>现金</span><strong>${FormatMoney(state.cash)}</strong></div>
-      <div class="metricTile"><span>预计总支出</span><strong>${FormatMoney(costs.total)}</strong></div>
-      <div class="metricTile"><span>危险缺口</span><strong>${FormatMoney(shortfall)}</strong></div>
-    </div>
-    ${state.stockPosition ? `<div class="note good">股票待收盘 · ${EscapeHtml(pendingStock?.symbol || state.stockPosition.optionId)} ${FormatMoney(state.stockPosition.stake)} · 月结后显示走势与盈亏</div>` : ""}
-    ${startupLoan?.status === "active" ? `<div class="noteList"><div class="note danger">启动贷 ${FormatMoney(startupLoan.remaining)} · M${String(startupLoan.dueMonth).padStart(2, "0")} 到期 · 剩 ${monthsLeft} 月</div></div>` : `<div class="noteList"><div class="note good">启动贷已结清。</div></div>`}
-    <div class="panelSection worldGrid three">
-      <div class="worldChoice"><div class="choiceTop"><strong>生活硬账</strong><span>${FormatMoney(costs.living)}</span></div><p>房租、贷款、水电网</p></div>
-      <div class="worldChoice"><div class="choiceTop"><strong>人类工资</strong><span>${FormatMoney(costs.studentWages)}</span></div></div>
-      <div class="worldChoice"><div class="choiceTop"><strong>AI 月租</strong><span>${FormatMoney(costs.aiRent)}</span></div></div>
-      <div class="worldChoice"><div class="choiceTop"><strong>食物</strong><span>${FormatMoney(costs.food)}</span></div><p>饥饿 ${foodPlan?.hungerDelta >= 0 ? "+" : ""}${foodPlan?.hungerDelta || 0} · 焦虑 ${foodPlan?.anxietyDelta >= 0 ? "+" : ""}${foodPlan?.anxietyDelta || 0} · 产出 ×${foodPlan?.outputMultiplier || 1}</p></div>
-      <div class="worldChoice"><div class="choiceTop"><strong>贷款月供</strong><span>${FormatMoney(costs.loanPayments)}</span></div><p>断供没收；电脑没收即结束</p></div>
-      <div class="worldChoice"><div class="choiceTop"><strong>上线服务</strong><span>${FormatMoney(costs.service)}</span></div><p>上线后持续扣费</p></div>
-    </div>
-    <div class="noteList">${CalculateTensions(state.project).slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}：${EscapeHtml(tension.description)}</div>`).join("") || `<div class="note good">无模块冲突。</div>`}</div>
-    <div class="panelSection choiceFooter"><span>策略：${EscapeHtml(FindDirective(state.selectedDirective).name)} · 老板已硬干 ${state.ownerWorkCount}/3 · 有效沟通剩 ${state.talkPoints}</span><button class="primaryButton" data-advance-month type="button">结算并进入 M${String(state.month + 1).padStart(2, "0")}</button></div>`, () => {
+  const currentMonthLabel = `M${String(state.month).padStart(2, "0")}`;
+  const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
+  const openActions = GetMonthCloseActions();
+  const hasOpenActions = openActions.length > 0;
+  OpenPanel("CLOSE MONTH", `${currentMonthLabel} 月结`, `
+    <div class="monthCloseRitual">
+      <section class="monthCloseLedger" aria-label="${currentMonthLabel} 结束，进入 ${nextMonthLabel}">
+        <div class="monthCloseLeaf"><small>本月封账</small><strong>${currentMonthLabel}</strong><span>→ ${nextMonthLabel}</span></div>
+        <div class="monthCloseForecast ${shortfall > 0 ? "danger" : ""}">
+          <small>${shortfall > 0 ? `现金缺口${state.stockPosition ? "（未计股票）" : ""}` : state.stockPosition ? "账单后现金（未计股票）" : "月结后预计现金"}</small>
+          <strong>${shortfall > 0 ? `−${FormatMoney(shortfall)}` : FormatMoney(projectedCash)}</strong>
+          <span>${expectedIncome > 0 ? `收入 +${FormatMoney(expectedIncome)} · ` : ""}支出 −${FormatMoney(costs.total)}</span>
+        </div>
+      </section>
+      ${startupLoan?.status === "active" ? `<div class="monthCloseDeadline"><span>启动贷</span><strong>${FormatMoney(startupLoan.remaining)}</strong><em>M${String(startupLoan.dueMonth).padStart(2, "0")} · 剩 ${monthsLeft} 月</em></div>` : ""}
+      ${state.stockPosition ? `<div class="monthClosePosition"><span>股票待收盘</span><strong>${EscapeHtml(pendingStock?.symbol || state.stockPosition.optionId)}</strong><em>本金 ${FormatMoney(state.stockPosition.stake)}</em></div>` : ""}
+      <section class="monthCloseTasks ${hasOpenActions ? "attention" : "clear"}" aria-live="polite">
+        <header><span>月结前检查</span><strong>${hasOpenActions ? `还有 ${openActions.length} 类可做` : "本月事项已清"}</strong></header>
+        ${hasOpenActions ? `<div>${openActions.map((action) => `<span>${EscapeHtml(action)}</span>`).join("")}</div>` : ""}
+      </section>
+      <button class="monthCloseConfirm" data-advance-month type="button">
+        <small>${hasOpenActions ? "放弃剩余行动" : "本月封账"}</small>
+        <strong>${hasOpenActions ? "仍然月结" : "确认月结"}</strong>
+        <span>进入 ${nextMonthLabel} →</span>
+      </button>
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (!event.target.closest("[data-advance-month]")) return;
       const result = AdvanceMonth(state);
@@ -3332,26 +3374,32 @@ function OpenMonthSheet() {
       BuildCollectibles();
       BuildHazards();
       const finance = result.finance;
-      const removed = finance.removedStaff || [];
-      const defaults = finance.defaults || [];
       const originalMonth = state.lastSettlement?.month || Math.max(1, state.month - 1);
-      ShowResult("MONTHLY DAMAGE REPORT", `M${String(originalMonth).padStart(2, "0")} 熬过去了`, `
-        <div class="resultHero"><b>${result.buildStatus?.label || "还活着"}</b><p>收入 ${FormatMoney(finance.income)}，支出 ${FormatMoney(finance.costs?.total || 0)}。<br>${EscapeHtml(result.painEvents?.[0] || "这个月居然没有第一时间能想起的痛。")}</p></div>
-        <div class="metricGrid"><div class="metricTile"><span>本月游戏收入</span><strong>${FormatGoalMoney(finance.income)}</strong></div><div class="metricTile"><span>浪费产出</span><strong>${(result.wastedTotal || 0).toFixed(1)}</strong></div><div class="metricTile"><span>焦虑变化</span><strong>${result.anxiety.delta >= 0 ? "+" : ""}${result.anxiety.delta.toFixed(1)}</strong></div></div>
-        ${StockSettlementReport(result.stockSettlement)}
-        <div class="noteList">
-          ${(result.painEvents || []).slice(0, 5).map((note) => `<div class="note danger">${EscapeHtml(note)}</div>`).join("")}
-          ${removed.map((staff) => `<div class="note danger">付不起费用，${EscapeHtml(staff.name)} ${staff.kind === "ai" ? "被自动退订" : "收拾东西走了"}。</div>`).join("")}
-          ${defaults.map((loan) => `<div class="note danger">贷款断供：${EscapeHtml(FindCollateral(loan.collateralId)?.name || loan.collateralId)} 被没收。</div>`).join("")}
-          ${finance.startupDefault ? `<div class="note danger">创业启动贷到期未清，全部身家被处置，公司进入强制清算。</div>` : ""}
-          ${finance.skippedFood ? `<div class="note danger">饭钱没付出来，本月自动改成硬扛不吃。</div>` : ""}
-          ${finance.appliedEvents?.map((liveEvent) => `<div class="note danger">收入事件：${EscapeHtml(liveEvent.title)}，流水乘数 ×${liveEvent.multiplier}。</div>`).join("") || ""}
-          ${finance.marketFit && state.project.isReleased ? `<div class="note ${finance.marketFit.backlash ? "danger" : finance.marketFit.perfect ? "good" : ""}">市场：${EscapeHtml(finance.marketFit.label)} · ×${finance.marketFit.revenueMultiplier.toFixed(2)} · ${finance.marketDelta >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(finance.marketDelta || 0))}</div>` : ""}
-          ${result.anxiety.idea ? `<div class="note good">焦虑迸发抽象创意：${EscapeHtml(result.anxiety.idea.title)}——${EscapeHtml(result.anxiety.idea.pitch)}</div>` : ""}
-        </div>
-        <div class="panelSection">${RevenueChart()}</div>`, () => { if (state.status !== "playing") RenderEnding(); });
+      const resultMonthLabel = `M${String(originalMonth).padStart(2, "0")}`;
+      const stockCashReturn = result.stockSettlement?.payout || 0;
+      const netCash = finance.income + stockCashReturn - (finance.costs?.total || 0);
+      const totalOutput = Object.values(result.output || {}).reduce((total, value) => total + value, 0);
+      const highlights = GetMonthResultHighlights(result, finance);
+      ShowResult("MONTH SEALED", `${resultMonthLabel} 已封账`, `
+        <div class="monthResultRitual">
+          <section class="monthResultVerdict">
+            <span>项目状态</span>
+            <strong>${EscapeHtml(result.buildStatus?.label || "还活着")}</strong>
+            <p>${EscapeHtml(highlights[0] || "本月没有重大变故。")}</p>
+          </section>
+          <div class="monthResultMetrics">
+            <div><span>月末现金</span><strong>${FormatMoney(state.cash)}</strong><small>${netCash >= 0 ? "+" : "−"}${FormatMoney(Math.abs(netCash))}</small></div>
+            <div><span>本月产出</span><strong>+${totalOutput.toFixed(1)}</strong><small>${EscapeHtml(result.buildStatus?.label || "已结算")}</small></div>
+            <div><span>焦虑</span><strong>${Math.round(state.anxiety)}</strong><small>${result.anxiety.delta >= 0 ? "+" : ""}${result.anxiety.delta.toFixed(1)}</small></div>
+          </div>
+          ${StockSettlementReport(result.stockSettlement)}
+          ${highlights[1] ? `<p class="monthResultFootnote">${EscapeHtml(highlights[1])}</p>` : ""}
+        </div>`, () => { if (state.status !== "playing") RenderEnding(); }, {
+        mode: "monthResult",
+        closeLabel: state.status === "playing" ? `进入 M${String(state.month).padStart(2, "0")}` : "查看结局",
+      });
     };
-  });
+  }, "monthClose");
 }
 
 function OpenHelpSheet() {
