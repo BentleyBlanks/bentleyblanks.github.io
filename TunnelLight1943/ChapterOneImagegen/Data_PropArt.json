@@ -1,0 +1,982 @@
+{
+  "_readme": [
+    "每种物体「长什么样、埋多深」的唯一事实来源。Data_Scenes.json 只说某个物体在哪，",
+    "它的贴图与深度按 kind 查这里。加载与校验走 Data_Scenes.mjs。",
+    "",
+    "art —— 这套白盒没有图片文件：所有贴图都由 Script_Art.mjs 的手绘矢量画笔实时烘到",
+    "  离屏 canvas。所以「引用的贴图」= 这里的画笔函数名。换皮 = 换这个名字。",
+    "band —— 深度带名，取自 Data_DepthSpec.mjs 的 BAND 表。禁止写裸数字。",
+    "ss —— 贴图超采样档：prop=4（会被特写的道具）/ detail=3（小件）/ hint=4（提示图标）。",
+    "sprite —— 烘焙画布的尺寸与锚点，单位是贴图像素（标尺 48 px/米）：",
+    "    w / h    数字=固定；{pad, per, default} = pad + 物体的 per 轴(米) × 48",
+    "    anchor   \"center\" 或像素数：贴图里哪一列对准物体的世界 x",
+    "    baseline 贴图底边往上数多少像素是「脚」——物体的脚永远踩在所在层的地平线上",
+    "yOffset —— 可选，锚点抬离地平线的米数（挂在树上的东西才用）",
+    "placeAt —— 可选，\"left\" 表示世界 x 对准物体左边缘而不是中心",
+    "shadow —— 可选，地面投影强度；省略=不投影",
+    "drawnBy —— 有这个字段的 kind 不在 AddProp 里画（地道剖面/动态道具自己管），",
+    "    登记在这里只为让校验器知道它是有意为之，不是漏配"
+  ],
+  "props": {
+    "house": {
+      "art": "DrawHouse",
+      "band": "building",
+      "ss": "prop",
+      "shadow": 0.42,
+      "sprite": {
+        "w": {
+          "pad": 90,
+          "per": "w"
+        },
+        "h": {
+          "pad": 90,
+          "per": "h"
+        },
+        "anchor": "center",
+        "baseline": 6
+      },
+      "variants": {
+        "interior": {
+          "note": "可进入的屋子=里外两层：室内剖面画在 building 带，立面盖在 facade 带（家具之上、演员之下），人走进门 UpdateProps 把立面淡出",
+          "innerArt": "DrawHomeInterior",
+          "innerBand": "building",
+          "facadeArt": "DrawHouse",
+          "facadeBand": "facade"
+        }
+      }
+    },
+    "doorframe": {
+      "art": "DrawDoorframe",
+      "band": "walk",
+      "ss": "closeup",
+      "sprite": {
+        "w": 120,
+        "h": 130,
+        "anchor": "center",
+        "baseline": 10
+      },
+      "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档"
+    },
+    "doorLeaf": {
+      "art": "DrawDoorLeaf",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 72,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "王家订的门扇（半成品）：合完榫（flags.tenonDone）才立到工作台边——搬料/刨料这两件活的去处，画面自己交代"
+    },
+    "bench": {
+      "art": "DrawBench",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 130,
+        "h": 70,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "stool": {
+      "art": "DrawStool",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 60,
+        "h": 40,
+        "anchor": "center",
+        "baseline": 6
+      }
+    },
+    "wallSeg": {
+      "art": "DrawWall",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": {
+          "pad": 40,
+          "per": "h",
+          "default": 1.8
+        },
+        "anchor": "center",
+        "baseline": 10
+      },
+      "shadow": 0.26
+    },
+    "hatch": {
+      "art": "DrawHatch",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 70,
+        "h": 50,
+        "anchor": "center",
+        "baseline": 24
+      }
+    },
+    "well": {
+      "art": "DrawWell",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 140,
+        "h": 120,
+        "anchor": "center",
+        "baseline": 12
+      },
+      "note": "圆井台(0.73m 高、0.52m 半径，画法见画笔顶上的说明)+辘轳架+鼓。轴心定在 groundY-45px（＝Core 的 WINCH_HUB_Y 0.9375m，48像素/米），摇把钉在**西端面**（＝WINCH_CRANK_DX -0.44m，摇的人站在西边才够得着），柄长 5.8px＝WINCH_CRANK_R 0.12m。改画法或改高度就要连 Core 那三个常量一起动——判定、Rig 反解前手、画面用的是同一份数。flags.wellRopeBroken：井绳只剩一截毛茬朝下的断头。摇起来那一刻（state.winchView）静态摇把让位给会转的那只，只走 World 的 propRedraw，不重载盒"
+    },
+    "millstone": {
+      "art": "DrawMillstone",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 110,
+        "h": 70,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "woodpile": {
+      "art": "DrawWoodpile",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 120,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "没拿走绳之前（!flags.ropeTaken）堆里露一截绳头——目标同屏露一角"
+    },
+    "hen": {
+      "art": "DrawHen",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 60,
+        "h": 50,
+        "anchor": "center",
+        "baseline": 6
+      }
+    },
+    "woodStack": {
+      "art": "DrawWoodStack",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": {
+          "pad": 34,
+          "per": "w"
+        },
+        "h": {
+          "pad": 34,
+          "per": "h",
+          "default": 1.24
+        },
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "码好的柴垛：可翻越物的轮廓样板（肩高、顶沿磨亮、缺一角）"
+    },
+    "ridge": {
+      "art": "DrawRidge",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 50,
+          "per": "w",
+          "default": 3
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 12
+      }
+    },
+    "fallenWood": {
+      "art": "DrawFallenWood",
+      "band": "obstacle",
+      "ss": "prop",
+      "sprite": {
+        "w": 96,
+        "h": 56,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "扫荡中撞塌的柴垛：塌下来就是矮矮摊一片（0.72m＝柱子的胯高），跨得过去。同 brokenWall 走 obstacle 带——横在路上的东西得挡得住小腿"
+    },
+    "tree": {
+      "art": "DrawTree",
+      "band": "yard",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 150,
+        "h": 200,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "spriteBig": {
+        "w": 220,
+        "h": 250,
+        "anchor": "center",
+        "baseline": 6
+      }
+    },
+    "lamppost": {
+      "art": "DrawLamppost",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 70,
+        "h": 130,
+        "anchor": "center",
+        "baseline": 6
+      }
+    },
+    "stonePile": {
+      "art": "DrawStonePile",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 80,
+        "h": 50,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "dog": {
+      "art": "DrawDog",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 12
+      }
+    },
+    "hangLantern": {
+      "art": "DrawHangLantern",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 150,
+        "h": 130,
+        "anchor": 60,
+        "baseline": 8
+      },
+      "note": "锚点不是画布中心：灯挂在杆子一侧，60 才对得上杆脚"
+    },
+    "cloth": {
+      "art": "DrawCloth",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 80,
+        "h": 100,
+        "anchor": "center",
+        "baseline": 50
+      },
+      "yOffset": 2.43,
+      "note": "挂在老槐树杈上，所以是全场唯一抬离地平线的道具；只在第一章且没被打下来时出现。yOffset 必须跟着 DrawTree 的树冠走：big 树 H=150px、分叉在 groundY-66px、枝梢挂的叶团铺开在 groundY-74…-175px（1.55m~3.65m），勾住的那一角画在锚点上方 20px(0.42m)，所以 2.43 落在冠内偏下、正对着几根侧枝，布巾下缘落在 2.0m——刚好高过柱子伸手够得着的高度（够得着就不用投石子了）。原先写 5.2——那是树顶再往上两米多的空中，布巾整个飘在天上。改这个数就要同步改 Core 里 c1_cloth 的投掷靶心与插入镜头"
+    },
+    "vat": {
+      "art": "DrawVat",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 80,
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "地道里的水瓮（level: under）。原先在代码里写死 z=0.2 绕开了深度带，externalize 时归入 loose"
+    },
+    "yardWall": {
+      "art": "DrawYardWall",
+      "band": "building",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人",
+      "shadow": 0.3
+    },
+    "henCoop": {
+      "art": "DrawHenCoop",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 84,
+        "h": 48,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "土坯垒的矮鸡窝，倚在背风墙根（houseB 的东山墙下）。窝身齐膝≈0.55m——上一版画成 1.4m 见方的对称人字顶小房子，那是西式狗窝；画幅跟着改宽改矮，右边要留出食槽、左边留出挪开的挡板石",
+      "shadow": 0.24
+    },
+    "clothesline": {
+      "art": "DrawClothesline",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "tuberPile": {
+      "art": "DrawTuberPile",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 50,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "地窖里过冬的红薯堆，搭半领草苫（level: under 的陈设）"
+    },
+    "cellarShelf": {
+      "art": "DrawCellarShelf",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 96,
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "地窖搁板：木桩架旧板，荆条筐+布盖坛（level: under 的陈设）"
+    },
+    "mapBoard": {
+      "art": "DrawMapBoard",
+      "band": "nearBack",
+      "ss": "prop",
+      "sprite": {
+        "w": 140,
+        "h": 112,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "drawSize": {
+        "w": 2.4,
+        "h": 1.9
+      },
+      "note": "卸下来的旧门板斜靠在歇脚点；第六章把情报一条条钉上去（pinnedNotes）"
+    },
+    "ditch": {
+      "art": "DrawDitch",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 40,
+          "per": "w"
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 50
+      }
+    },
+    "crops": {
+      "art": "DrawCrops",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 40,
+          "per": "w"
+        },
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "fortWall": {
+      "art": "DrawFortWall",
+      "band": "building",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": {
+          "pad": 90,
+          "per": "h"
+        },
+        "anchor": "center",
+        "baseline": 24
+      }
+    },
+    "fortGate": {
+      "art": "DrawFortWall+DrawLamppost",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 160,
+        "h": 150,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "两垛墙夹一盏灯：一张贴图里画三笔（左右墙各 34×116，中间灯）"
+    },
+    "blockhouse": {
+      "art": "DrawBlockhouse",
+      "band": "backdrop",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 190,
+        "h": 300,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "prison": {
+      "art": "DrawPrison",
+      "band": "building",
+      "ss": "prop",
+      "shadow": 0.26,
+      "sprite": {
+        "w": 180,
+        "h": 160,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "fortSilhouette": {
+      "art": "inline:据点剪影",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 0,
+          "per": "w"
+        },
+        "h": 300,
+        "anchor": 0,
+        "baseline": 6
+      },
+      "placeAt": "left",
+      "note": "围墙+垛口+铁丝网+院内房脊+炮楼探照灯杆，整幅现画（不走单个 Draw 函数）"
+    },
+    "pump": {
+      "art": "inline:水泵风箱",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 140,
+        "h": 120,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "日军灌烟灌水用的家伙。目前没有场景摆它，留着备用"
+    },
+    "barrow": {
+      "drawnBy": "UpdateProps",
+      "note": "独轮车是动态件：装几根木料、推到哪儿都随玩法变"
+    },
+    "chamber": {
+      "drawnBy": "AddUnderground",
+      "note": "藏人洞：在地道剖面上掏一个拱顶"
+    },
+    "pocket": {
+      "drawnBy": "AddUnderground",
+      "note": "旁洞：同上，小一号"
+    },
+    "waterTrap": {
+      "drawnBy": "AddUnderground",
+      "note": "翻口（水封）"
+    },
+    "bell": {
+      "drawnBy": "AddUnderground",
+      "note": "预警铃的线"
+    },
+    "collapse": {
+      "drawnBy": "AddUnderground",
+      "note": "塌方堆：清挖进度由 state.collapses 驱动"
+    },
+    "brokenWall": {
+      "art": "DrawBrokenWall",
+      "band": "obstacle",
+      "ss": "prop",
+      "sprite": {
+        "w": 104,
+        "h": 64,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "塌进巷子的土坯墙残段（可翻越）。**band 必须是 obstacle**：挂在 walk 上演员永远画在它前面，那读起来就是「墙在路后头的景里」，看不出它拦路；挂到 clutter 又会被透视放大成齐胸的一堵大墙。顶沿磨圆+豁口=翻越轮廓语法；根脚散着掉下来的坯块"
+    },
+    "shed": {
+      "art": "DrawShed",
+      "band": "building",
+      "ss": "prop",
+      "shadow": 0.28,
+      "sprite": {
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": 150,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "废牲口棚：两根歪柱撑半面草顶，里侧全黑——牲口被牵走后就空了"
+    },
+    "oldDoors": {
+      "art": "DrawOldDoors",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 150,
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "斜靠着的两块旧门板+一根枣木杠——第一章挖通道的全部木料",
+      "shadow": 0.24
+    },
+    "cartShafts": {
+      "art": "DrawCartShafts",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "空着的车辕斜搭在地上：牲口被日伪牵走了，车还在",
+      "shadow": 0.2
+    },
+    "wallNotice": {
+      "art": "DrawNoticeWall",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 120,
+        "anchor": "center",
+        "baseline": 10
+      },
+      "note": "半截土墙，征粮征夫的告示一层压一层",
+      "shadow": 0.26
+    },
+    "pigpen": {
+      "art": "DrawPigpen",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": 130,
+        "h": 80,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "低矮的猪圈：半圈土坯矮墙+食槽，猪早卖了换粮",
+      "shadow": 0.26
+    },
+    "nook": {
+      "art": "DrawNook",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 90,
+        "h": 100,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "窖壁上的藏口：浅坑+靠着的覆土板。grainHidden 画进粮袋、nookClosed 把板合上（World propRedraw）"
+    },
+    "tunnelBrace": {
+      "art": "DrawTunnelBrace",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 44,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "玩家亲手支上去的顶木（bracedA/bracedB 两处松土段）。level: under；band 走 loose——它在爬行段的行走线上，必须压在近侧土层剖面之前，否则支完了什么也看不见。爬行段净高 0.72m，所以贴图只有 44px 高（≈0.9m 含楔子）"
+    },
+    "freshDirt": {
+      "art": "DrawFreshDirt",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 150,
+        "h": 20,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "摊开的新土：倒土那一拍留在地上的薄薄一层（showFlag 切出没）。画布只有 20px 高是故意的——它必须薄，铺厚了就是台词里说的「一堆显眼的新土」"
+    },
+    "dungHeap": {
+      "art": "DrawDungHeap",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 110,
+        "h": 70,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "粪堆：自家院内墙根拍实的方堆（带粪叉粪筐）/ 街边公共堆（顶上撒草木灰、插秫秸做记号）。street 旗标切两种",
+      "shadow": 0.26
+    },
+    "stalkFence": {
+      "art": "DrawStalkFence",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      },
+      "note": "秫秸障子：透光透风、歪斜缺牙。比满高土坯院墙穷得多，1943 冀中很多院子只有这个",
+      "shadow": 0.22
+    },
+    "emptyKennel": {
+      "art": "DrawEmptyKennel",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 96,
+        "h": 56,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "空狗窝：村里的狗 1939 年就统一打光了（狗叫暴露夜间行动）。要画出\"狗不在了的位置\"",
+      "shadow": 0.24
+    },
+    "stove": {
+      "art": "DrawStove",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.22,
+      "sprite": {
+        "w": 96,
+        "h": 84,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "土坯灶：新剧本第一章开场那眼冷灶（柱子家 interior 陈设，立面半隐才看得见）"
+    },
+    "beddingMat": {
+      "art": "DrawBeddingMat",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.14,
+      "sprite": {
+        "w": 84,
+        "h": 26,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "屋里的铺盖（苇席+被卷）：妹妹睡觉那几镜躺在这上头，与冷灶同属 interior 陈设"
+    },
+    "spinWheelBroken": {
+      "art": "DrawSpinWheelBroken",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.2,
+      "sprite": {
+        "w": 96,
+        "h": 64,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "踩碎的纺车：娘的纺车倒在屋山墙外，扫荡的痕迹——纯布景，无交互无手记（2026-08-13）"
+    },
+    "clothBundle": {
+      "art": "DrawClothBundle",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 64,
+        "h": 40,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "窖角草苫下的深色包袱（带血的衣裳）：第一章夜里唯一的特写；埋掉后 hideFlag 收走。渍色按 sRGB 老账压两档，不做清晰血污"
+    },
+    "spreadCoat": {
+      "art": "DrawSpreadCoat",
+      "band": "loose",
+      "ss": "prop",
+      "sprite": {
+        "w": 76,
+        "h": 22,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "铺在榆树底下接榆钱的破褂子（2026-08-12 打榆钱拆场）：showFlag=coatSpread 出、hideFlag=elmBagged 收；砸下第二把后 propRedraw 铺一层绿（flags.elmDown）"
+    },
+    "louDrill": {
+      "art": "DrawLou",
+      "band": "walk",
+      "ss": "prop",
+      "shadow": 0.2,
+      "sprite": {
+        "w": 72,
+        "h": 60,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "地头那架耧（第七稿 5a）：拉耧那拍 louPlay 藏静态、state.lou 的动态网格接管；收耧交还——两份同位同角，换手不露痕"
+    },
+    "stubbleField": {
+      "art": "DrawStubbleField",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 30,
+        "anchor": "center",
+        "baseline": 6
+      },
+      "note": "去年的谷茬地：割剩的短茬一排一排齐刷刷指着天。贴地矮物，退到 yard 带当景"
+    },
+    "sownField": {
+      "art": "DrawSownField",
+      "band": "yard",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 30,
+          "per": "w"
+        },
+        "h": 22,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "东邻新耩的湿垄：一趟一趟直得像用线量过。贴地，yard 带"
+    },
+    "strawMat": {
+      "art": "DrawStrawMat",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 56,
+        "h": 30,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "窖角的草苫堆（第七稿）：整布抽出来的地方、伤员藏身的地方。低矮一垛，边缘发毛"
+    },
+    "strawArm": {
+      "art": "DrawStrawArm",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 38,
+        "h": 20,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "草堆底下伸出来的前臂和手（manGrab 那一镜的静帧）：loose 带压在草堆之前，插入镜里才看得清"
+    },
+    "cellarSundries": {
+      "art": "DrawCellarSundries",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 68,
+        "h": 32,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "摸黑归置前：破笸箩歪着、豁口碗倒扣、纺锭拖线（cellarTidy 收走）"
+    },
+    "cellarSundriesTidy": {
+      "art": "DrawCellarSundriesTidy",
+      "band": "walk",
+      "ss": "prop",
+      "sprite": {
+        "w": 62,
+        "h": 30,
+        "anchor": "center",
+        "baseline": 5
+      },
+      "note": "摸黑归置后：笸箩摆正、碗摞成摞、纺锭线绕紧（cellarTidy 立起才现）"
+    },
+    "sewBasket": {
+      "art": "DrawSewBasket",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 40,
+        "h": 24,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "针线笸箩：叠得整整齐齐的旧小褂 + 领口那根针。窖角/梯子底下两个摆位共用这一份"
+    },
+    "mendedJacket": {
+      "art": "DrawMendedJacket",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 32,
+        "h": 18,
+        "anchor": "center",
+        "baseline": 4
+      },
+      "note": "缝好的小褂子（袖口接蓝底白花）：mended 立旗后出现在枕头边。loose 带——放下的东西永远看得见"
+    },
+    "mealBowls": {
+      "art": "DrawMealBowls",
+      "band": "loose",
+      "ss": "detail",
+      "sprite": {
+        "w": 34,
+        "h": 14,
+        "anchor": "center",
+        "baseline": 3
+      },
+      "note": "屋里那两只粗瓷碗（黄昏·匀稠的对着它们做）：一只漂着榆钱、一只喝空斜倚。loose 带——匀稠那拍它们是主角，不许被地面道具盖掉"
+    }
+  },
+  "_coversNote": [
+    "掩体的深度不能抽签：高过腰的一旦落到人前面，会把角色连人带扛的木料整个吞掉。",
+    "所以矮的（h ≤ 1.2 且不在 alwaysTall 里）进 clutter 带挡人，高的退到 yard/building —",
+    "两者之间按 id 的哈希稳定二选一，让一排草垛不至于全部一样深。"
+  ],
+  "coverBands": {
+    "low": "clutter",
+    "tallPick": [
+      "yard",
+      "building"
+    ],
+    "lowMaxHeight": 1.2,
+    "alwaysTall": [
+      "haystack",
+      "bush",
+      "wallSeg",
+      "tree"
+    ]
+  },
+  "covers": {
+    "haystack": {
+      "art": "DrawHaystack",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": {
+          "pad": 90,
+          "per": "w"
+        },
+        "anchor": "center",
+        "baseline": 10
+      },
+      "note": "高度按宽度长：草垛是个堆，越宽越高。烧过的场景（ruined）改画焦黑底+残秆"
+    },
+    "firewood": {
+      "art": "DrawFirewood",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "wallSeg": {
+      "art": "DrawWall",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 40,
+          "per": "w"
+        },
+        "h": 120,
+        "anchor": "center",
+        "baseline": 14
+      },
+      "drawHeightPx": 72
+    },
+    "bush": {
+      "art": "DrawBush",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 70,
+          "per": "w"
+        },
+        "h": 110,
+        "anchor": "center",
+        "baseline": 10
+      }
+    },
+    "ridge": {
+      "art": "DrawRidge",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 50,
+          "per": "w"
+        },
+        "h": 90,
+        "anchor": "center",
+        "baseline": 12
+      }
+    },
+    "crops": {
+      "art": "DrawCrops",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 40,
+          "per": "w"
+        },
+        "h": 110,
+        "anchor": "center",
+        "baseline": 8
+      }
+    },
+    "ditch": {
+      "drawnBy": "AddProp",
+      "note": "交通沟由 props 里的同名物体画，掩体项只提供躲藏判定"
+    }
+  }
+}

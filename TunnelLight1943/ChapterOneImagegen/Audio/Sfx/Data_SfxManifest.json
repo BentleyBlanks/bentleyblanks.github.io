@@ -1,0 +1,111 @@
+{
+  "source": "MiniMax Hub · music-3.0（拟音提示词）",
+  "cues": {
+    "vault": {
+      "file": "vault.mp3",
+      "group": "woodstack",
+      "seconds": 0.52,
+      "atSeconds": 42.26,
+      "bytes": 4329
+    },
+    "vaultHeavy": {
+      "file": "vaultHeavy.mp3",
+      "group": "woodstack",
+      "seconds": 0.72,
+      "atSeconds": 52.66,
+      "bytes": 5589
+    },
+    "pickup": {
+      "file": "pickup.mp3",
+      "group": "plank",
+      "seconds": 0.34,
+      "atSeconds": 111.7,
+      "bytes": 3069
+    },
+    "drop": {
+      "file": "drop.mp3",
+      "group": "plank",
+      "seconds": 0.44,
+      "atSeconds": 107.11,
+      "bytes": 3825
+    },
+    "crank": {
+      "file": "crank.mp3",
+      "group": "well",
+      "seconds": 0.85,
+      "atSeconds": 6.4,
+      "bytes": 6597
+    },
+    "waterSplash": {
+      "file": "waterSplash.mp3",
+      "group": "well",
+      "seconds": 0.75,
+      "atSeconds": 57.72,
+      "bytes": 5841
+    },
+    "whoosh": {
+      "file": "whoosh.mp3",
+      "group": "stone",
+      "seconds": 0.28,
+      "atSeconds": 111.44,
+      "bytes": 2565
+    },
+    "stoneLand": {
+      "file": "stoneLand.mp3",
+      "group": "stone",
+      "seconds": 0.4,
+      "atSeconds": 45.38,
+      "bytes": 3573
+    },
+    "henSquawk": {
+      "file": "henSquawk.mp3",
+      "group": "birds",
+      "seconds": 0.85,
+      "atSeconds": 43.34,
+      "bytes": 6597
+    },
+    "flutter": {
+      "file": "flutter.mp3",
+      "group": "birds",
+      "seconds": 0.95,
+      "atSeconds": 19.57,
+      "bytes": 7353
+    },
+    "gong": {
+      "file": "gong.mp3",
+      "group": "gong",
+      "seconds": 2.6,
+      "atSeconds": 81.17,
+      "bytes": 18945
+    },
+    "scribe": {
+      "file": "scribe.mp3",
+      "group": "scribe",
+      "seconds": 0.9,
+      "atSeconds": 82.28,
+      "bytes": 6849
+    },
+    "vaultLand": {
+      "file": "vaultLand.mp3",
+      "group": "dirt",
+      "seconds": 0.42,
+      "atSeconds": 180.4,
+      "bytes": 3573
+    },
+    "tenon": {
+      "file": "tenon.mp3",
+      "group": "mallet",
+      "seconds": 0.3,
+      "atSeconds": 49.05,
+      "bytes": 2817
+    },
+    "knock": {
+      "file": "knock.mp3",
+      "group": "mallet",
+      "seconds": 0.34,
+      "atSeconds": 46.72,
+      "bytes": 3069
+    }
+  },
+  "bakedAt": "2026-08-06"
+}

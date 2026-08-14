@@ -1,0 +1,266 @@
+﻿{
+    "generated_at":  "2026-08-13",
+    "model":  "5.0Pro",
+    "width":  1536,
+    "height":  1536,
+    "resolution_type":  "2k",
+    "reference_target":  "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\2D\\地道里的光\\06_ProductionOutputs\\20260813_ChapterOneTenStageImagegen\\Texture_ChapterOne01_DawnAftermath.png",
+    "style_anchor":  "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\2D\\地道里的光\\04_HeavyStyleShots\\Texture_Heavy03_HouseSearch.png",
+    "second_pass_generated_at": "2026-08-13",
+    "second_pass_note": "Five original candidates were rejected after visual QA. Exactly one retry was submitted per asset; four retries succeeded and replaced canonical final filenames, while the stove retry failed. Original candidates remain under *_RejectedV1.png and original raw source paths.",
+    "assets":  [
+                   {
+                       "asset":  "Texture_HouseFacadeDamaged.png",
+                       "submit_id":  "cdf46ff3-2989-4c90-8e6e-0522b75cc65c",
+                       "prompt":  "Create one isolated production prop: a damaged rural North China 1940s house facade, front-facing orthographic architectural fragment, broken mud-plaster wall with cracked timber beam, one boarded window and one jagged blast scar, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references, no perspective scene. Place the single facade centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No characters, no people, no furniture, no ground, no shadows outside the object, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\cdf46ff3-2989-4c90-8e6e-0522b75cc65c_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_HouseFacadeDamaged.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "659A89C9401DD0FE7449D35A88E938A73BC9755F4EBC00BC8ED794630373324B",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted"
+                   },
+                   {
+                       "asset":  "Texture_DoorFrameTimber.png",
+                       "submit_id":  "fc3c4f7b-21da-4fb0-82e5-eebb19729342",
+                       "prompt":  "Create one isolated production prop: a freestanding weathered timber door frame from a 1940s rural North China mud house, front-facing orthographic side-view game asset, two rough vertical posts and a cracked lintel, warped dark wood with chipped mud plaster remnants, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single door frame centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No door leaf, no house wall, no ground, no cast shadow, no characters, no furniture, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\fc3c4f7b-21da-4fb0-82e5-eebb19729342_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_DoorFrameTimber.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "BB02157B1DAD16DA4DEE2D796F870D3CFF91736F9B6F51D611BE1F29F83064B7",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted"
+                   },
+                   {
+                       "asset":  "Texture_StoveCold.png",
+                       "submit_id":  "632f9119-5291-4431-b3d1-a28900b1cb7f",
+                       "prompt":  "Create one isolated production prop: a small cold clay-and-brick stove from a 1940s rural North China home, squat front-facing orthographic side-view game asset, soot-blackened mouth, cracked earthen body, simple iron grate, no flame, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single stove centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No cooking pot, no room, no ground, no cast shadow, no characters, no furniture, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\632f9119-5291-4431-b3d1-a28900b1cb7f_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_StoveCold_RejectedV1.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "D88F48C48A19007233A0CF26627B24A0065630E1B46C71CC3D45EE7E9961E24C",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "rejected",
+                       "rejection_reason":  "Second-pass visual QA rejected the first candidate: too photorealistic and perspective-heavy versus the authoritative flat side-orthographic 2D layered paper-cut concept. Retry 490d9883-b7e4-4a3c-a29d-bf8a07d30095 failed generation; no accepted replacement.",
+                       "retry_submit_id": "490d9883-b7e4-4a3c-a29d-bf8a07d30095",
+                       "retry_prompt": "Using the first image as the authoritative target composition/material language and the second only as the approved heavy-style anchor, create exactly ONE flat 2D production sprite: a cold clay stove from a 1940s rural North China mud home. Strict front-facing side elevation / orthographic cut-paper view: a simple squat rectangular stove body, square dark fire mouth and one thin grate line, all surfaces represented as flat layered geometric paper shapes. No visible top plane, no ellipse, no receding depth, no perspective, no foreshortening, no realistic camera, no photographic clay texture. Approved heavy sad minimalist fibrous handmade paper-cut style, visible paper fibers, restrained charcoal, ash brown and dusty taupe shapes with sparse charcoal contour. Center only the stove on perfectly uniform pure #ff00ff magenta chroma background, generous margin. No flame, pot, room, floor, cast shadow, characters, text, HUD, logo or extra objects.",
+                       "retry_status": "failed",
+                       "retry_fail_reason": "generation failed: final generation failed"
+                   },
+                   {
+                       "asset":  "Texture_KangBed.png",
+                       "submit_id":  "3137ae49-e008-482a-80f5-85f86fc65d2b",
+                       "prompt":  "Create one isolated production prop: a low kang bed platform from a 1940s rural North China mud house, front-facing orthographic side-view game asset, broad rectangular earthen heated bed with worn plaster lip and one ragged quilt folded on top, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single kang bed centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No room, no wall, no stove, no ground, no cast shadow, no characters, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\3137ae49-e008-482a-80f5-85f86fc65d2b_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_KangBed.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "001ED0BDF2314C638F9D0C01A126FCABB02B44565FEC2A4E607F287F560CC946",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted",
+                       "original_status":  "rejected",
+                       "original_rejection_reason":  "Too photorealistic and perspective-heavy versus the authoritative flat side-orthographic 2D layered paper-cut concept.",
+                       "rejected_candidate_final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_KangBed_RejectedV1.png",
+                       "rejected_candidate_sha256":  "910C11F0E08EFD6BE7ADF5B1C0EA2CF3AEAF52133ADA98EE8437CEBC5C12DD60",
+                       "retry_submit_id": "725c486f-e348-4009-99e1-daa4a6e7c0c4",
+                       "retry_prompt": "Using the first image as the authoritative target composition/material language and the second only as the approved heavy-style anchor, create exactly ONE flat 2D production sprite: a kang bed platform from a 1940s rural North China mud home. Strict front-facing side elevation / orthographic cut-paper view: a long simple rectangular earthen platform with a straight horizontal top edge, straight front face, one folded rag quilt shown as a flat angular silhouette on top. No visible top plane depth, no receding lines, no perspective, no foreshortening, no realistic camera, no photographic clay or cloth texture. Approved heavy sad minimalist fibrous handmade paper-cut style, visible paper fibers, simplified layered geometric shapes, restrained charcoal, ash brown, dusty taupe and faded indigo. Center only the bed on perfectly uniform pure #ff00ff magenta chroma background, generous margin. No room, wall, stove, floor, cast shadow, characters, text, HUD, logo or extra objects.",
+                       "retry_source": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\725c486f-e348-4009-99e1-daa4a6e7c0c4_image_1.png",
+                       "retry_final": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_KangBed.png",
+                       "retry_sha256": "001ED0BDF2314C638F9D0C01A126FCABB02B44565FEC2A4E607F287F560CC946",
+                       "retry_status": "accepted",
+                       "retry_dimensions": { "width": 1536, "height": 1536 },
+                       "retry_pixel_format": "Format32bppArgb",
+                       "retry_alpha_corners": [0, 0, 0, 0],
+                       "retry_chroma_removal": { "auto_key": "border", "soft_matte": true, "transparent_threshold": 12, "opaque_threshold": 55, "tolerance": 24, "edge_feather": 1, "edge_contract": 1, "despill": true }
+                   },
+                   {
+                       "asset":  "Texture_StoolLow.png",
+                       "submit_id":  "c9cac83e-921a-4a56-8252-aa74222902f8",
+                       "prompt":  "Create one isolated production prop: a low three-legged wooden stool from a 1940s rural North China courtyard, clear side-view orthographic game asset, rough square seat, uneven legs, chipped dark timber, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single stool centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No person, no table, no ground, no cast shadow, no room, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\c9cac83e-921a-4a56-8252-aa74222902f8_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_StoolLow.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "B154F635151C9B48843365E1C2A57E1B3BB4404F8A74F0385DAE7362CE1C1589",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted",
+                       "original_status":  "rejected",
+                       "original_rejection_reason":  "Too photorealistic and perspective-heavy versus the authoritative flat side-orthographic 2D layered paper-cut concept.",
+                       "rejected_candidate_final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_StoolLow_RejectedV1.png",
+                       "rejected_candidate_sha256":  "97F7D42FE08B078CB193C4D48F0EF227854502F210A896317B8500DFB65758DC",
+                       "retry_submit_id": "39595b66-814a-4af7-9115-f0894ee4985d",
+                       "retry_prompt": "Using the first image as the authoritative target composition/material language and the second only as the approved heavy-style anchor, create exactly ONE flat 2D production sprite: a low wooden stool from a 1940s rural North China courtyard. Strict side elevation / orthographic cut-paper view: one flat rectangular seat as a horizontal shape and two simple straight vertical legs, with one thin crossbar, no visible top plane. No 3D rotation, no three-quarter view, no receding depth, no foreshortening, no realistic camera, no photographic wood grain. Approved heavy sad minimalist fibrous handmade paper-cut style, visible paper fibers, simplified geometric layered shapes, restrained charcoal and dark ash-brown palette. Center only the stool on perfectly uniform pure #ff00ff magenta chroma background, generous margin. No person, table, floor, cast shadow, room, text, HUD, logo or extra objects.",
+                       "retry_source": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\39595b66-814a-4af7-9115-f0894ee4985d_image_1.png",
+                       "retry_final": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_StoolLow.png",
+                       "retry_sha256": "B154F635151C9B48843365E1C2A57E1B3BB4404F8A74F0385DAE7362CE1C1589",
+                       "retry_status": "accepted",
+                       "retry_dimensions": { "width": 1536, "height": 1536 },
+                       "retry_pixel_format": "Format32bppArgb",
+                       "retry_alpha_corners": [0, 0, 0, 0],
+                       "retry_chroma_removal": { "auto_key": "border", "soft_matte": true, "transparent_threshold": 12, "opaque_threshold": 55, "tolerance": 24, "edge_feather": 1, "edge_contract": 1, "despill": true }
+                   },
+                   {
+                       "asset":  "Texture_WaterJarCracked.png",
+                       "submit_id":  "81a8840d-a6dd-4e0f-9efe-25af30e32798",
+                       "prompt":  "One isolated cracked earthenware water jar only. 1940s rural North China household prop, squat round jar with short neck, side-view orthographic paper-cut game asset, one prominent vertical crack and chipped rim, dark dirty taupe ceramic with charcoal contour and subtle fibrous handmade paper texture, sad restrained palette. Centered with generous margin on an absolutely uniform pure #ff00ff magenta chroma background. No water, no lid, no basket, no scene, no wall, no floor, no shadow, no people, no text, no HUD, no extra object.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\81a8840d-a6dd-4e0f-9efe-25af30e32798_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_WaterJarCracked.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "82F355ED2EC6358BF684C9D4615647FC31F63403184324A633CAA92ED9A9C3C9",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted",
+                       "original_status":  "rejected",
+                       "original_rejection_reason":  "Too photorealistic and perspective-heavy versus the authoritative flat side-orthographic 2D layered paper-cut concept.",
+                       "rejected_candidate_final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_WaterJarCracked_RejectedV1.png",
+                       "rejected_candidate_sha256":  "0460C49565522D88CB1A34E548895DFCBBDEA0586F06F2468C60F0C61604D1EC",
+                       "retry_submit_id": "77f701bf-81af-419f-b53e-d0c469476d95",
+                       "retry_prompt": "Using the first image as the authoritative target composition/material language and the second only as the approved heavy-style anchor, create exactly ONE flat 2D production sprite: a cracked household water jar from a 1940s rural North China home. Strict side elevation / orthographic cut-paper view: a simple symmetrical jar silhouette with straight-edged neck and body, a single jagged dark crack as a paper-cut mark. No visible opening ellipse, no visible top plane, no perspective, no foreshortening, no realistic camera, no photographic ceramic glaze or reflections. Approved heavy sad minimalist fibrous handmade paper-cut style, visible paper fibers, simplified layered geometric shapes, restrained charcoal and dusty taupe. Center only the jar on perfectly uniform pure #ff00ff magenta chroma background, generous margin. No water, lid, basket, room, floor, cast shadow, characters, text, HUD, logo or extra objects.",
+                       "retry_source": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\77f701bf-81af-419f-b53e-d0c469476d95_image_1.png",
+                       "retry_final": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_WaterJarCracked.png",
+                       "retry_sha256": "82F355ED2EC6358BF684C9D4615647FC31F63403184324A633CAA92ED9A9C3C9",
+                       "retry_status": "accepted",
+                       "retry_dimensions": { "width": 1536, "height": 1536 },
+                       "retry_pixel_format": "Format32bppArgb",
+                       "retry_alpha_corners": [0, 0, 0, 0],
+                       "retry_chroma_removal": { "auto_key": "border", "soft_matte": true, "transparent_threshold": 12, "opaque_threshold": 55, "tolerance": 24, "edge_feather": 1, "edge_contract": 1, "despill": true }
+                   },
+                   {
+                       "asset":  "Texture_BeddingRagged.png",
+                       "submit_id":  "861f2027-b2f8-4c83-99cc-26181a50e979",
+                       "prompt":  "Create one isolated production prop: a ragged folded bedding quilt from a 1940s rural North China home, side-view orthographic game asset, patched faded indigo and dirty ochre cloth, frayed corners, a few hand stitches and thin straw stuffing showing at one tear, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single bedding bundle centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No bed, no room, no ground, no cast shadow, no characters, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\861f2027-b2f8-4c83-99cc-26181a50e979_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_BeddingRagged.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "6104C0A6606246E2A44BD533CA90D16341DB01B0A6643CB39B67A534156FB914",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted",
+                       "original_status":  "rejected",
+                       "original_rejection_reason":  "Too photorealistic and perspective-heavy versus the authoritative flat side-orthographic 2D layered paper-cut concept.",
+                       "rejected_candidate_final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_BeddingRagged_RejectedV1.png",
+                       "rejected_candidate_sha256":  "1C343DE0D2FC2FF80FFAAA43453ED68BB2664FF46E2E00807280C1060FC19C06",
+                       "retry_submit_id": "91583ce2-442e-4af5-99f3-1c585c7abbc3",
+                       "retry_prompt": "Using the first image as the authoritative target composition/material language and the second only as the approved heavy-style anchor, create exactly ONE flat 2D production sprite: a ragged folded bedding quilt from a 1940s rural North China home. Strict side elevation / orthographic cut-paper view: a low flat rectangular folded bundle, angular layered patches and a few short stitch marks, one small torn corner. No rounded pillow-like volume, no 3D rotation, no receding depth, no foreshortening, no realistic camera, no photographic cloth weave or glossy fabric. Approved heavy sad minimalist fibrous handmade paper-cut style, visible paper fibers, simplified geometric paper layers, restrained charcoal, faded indigo, dirty taupe and desaturated ochre. Center only the folded bedding on perfectly uniform pure #ff00ff magenta chroma background, generous margin. No bed, room, floor, cast shadow, person, straw, text, HUD, logo or extra objects.",
+                       "retry_source": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\91583ce2-442e-4af5-99f3-1c585c7abbc3_image_1.png",
+                       "retry_final": "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_BeddingRagged.png",
+                       "retry_sha256": "6104C0A6606246E2A44BD533CA90D16341DB01B0A6643CB39B67A534156FB914",
+                       "retry_status": "accepted",
+                       "retry_dimensions": { "width": 1536, "height": 1536 },
+                       "retry_pixel_format": "Format32bppArgb",
+                       "retry_alpha_corners": [0, 0, 0, 0],
+                       "retry_chroma_removal": { "auto_key": "border", "soft_matte": true, "transparent_threshold": 12, "opaque_threshold": 55, "tolerance": 24, "edge_feather": 1, "edge_contract": 1, "despill": true }
+                   },
+                   {
+                       "asset":  "Texture_CellarOpeningLadder.png",
+                       "submit_id":  "b5b6549f-9f95-4bf6-bea7-26f21482e3b6",
+                       "prompt":  "Create one isolated production prop: a cellar opening with a short wooden ladder descending into a rural North China mud house floor, front-facing orthographic side-view game asset, square dark earthen hatch rim, three rough timber ladder rungs and side rails, chipped plaster edges, heavy sad minimalist fibrous paper-cut illustration, subdued charcoal ash brown and dusty ochre palette matching the references. Place only the single cellar opening and ladder centered with generous margin on a perfectly flat pure #ff00ff magenta background for chroma key. No cellar room interior beyond a dark opening, no house wall, no floor plane, no cast shadow, no characters, no text, no HUD, no extra objects.",
+                       "source":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Source\\SceneOne\\b5b6549f-9f95-4bf6-bea7-26f21482e3b6_image_1.png",
+                       "final":  "C:\\Users\\Bentl\\Documents\\Program\\bentleyblanks_Codex_TunnelLightChapterOneImagegen_20260813\\TunnelLight1943\\ChapterOneImagegen\\Texture\\Generated\\SceneOne\\Texture_CellarOpeningLadder.png",
+                       "dimensions":  {
+                                          "width":  1536,
+                                          "height":  1536
+                                      },
+                       "pixel_format":  "Format32bppArgb",
+                       "sha256":  "D9DE4692F9B9CEE824175E602345BB652FDEA33F5472207929ED6B16E35B5B85",
+                       "chroma_removal":  {
+                                              "auto_key":  "border",
+                                              "soft_matte":  true,
+                                              "transparent_threshold":  12,
+                                              "opaque_threshold":  55,
+                                              "tolerance":  24,
+                                              "edge_feather":  1,
+                                              "edge_contract":  1,
+                                              "despill":  true
+                                          },
+                       "status":  "accepted"
+                   }
+               ]
+}

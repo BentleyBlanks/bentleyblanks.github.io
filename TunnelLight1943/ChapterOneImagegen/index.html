@@ -1,0 +1,255 @@
+<!doctype html>
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0908">
+  <meta name="description" content="《地道里的光》第一章美术还原版——1943 年华北敌后，一段关于饥饿、照料与地窖微光的可玩叙事">
+  <title>地道里的光 · 第一章美术还原版</title>
+  <!-- 正文字体必须真的加载下来。CSS 里写着 Noto Serif SC 却没人去取，Windows 上
+       就回退到 SimSun；而 HUD 用了 500/600 字重，SimSun 根本没有这两档，浏览器
+       只好合成假粗体——糊就是这么来的。这里把 400/500/600/700 四档都取回来。
+       Google Fonts 的 CJK 走 unicode-range 分片，只下用到的那几片。 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="./Style_Game.css?v=one010">
+  <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
+       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
+       它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
+       新 Main 不再发 dragX、旧 Core 只认 dragX，于是刨子怎么拖都不动；而旧 Core
+       写的 dragTrack 又没有元素接（新 index.html 已删），连那根轨道都不出来。
+       桌面一刷新就好，手机 Safari 的模块缓存黏得多——所以只在移动端复现。
+       修法：用 import map 把每一个第一方模块重映射到带版本的 URL。版本只写在
+       这一张表里（连同上面的 Style_Game.css 与下面的 Script_Main.js 一起改），
+       谁 import 谁都拿到同一个带戳的 URL，模块实例仍然只有一份。
+       **新增模块必须登记在这里**，否则它又会独自留在缓存里；源码里则一律不许
+       再自己写 ?v=（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
+       TestModuleGraphIsCacheBusted 盯着。 -->
+  <!-- three.js 收进仓库 vendor（同 TunnelBell1942 的做法）：不再吃 CDN——
+       jsdelivr 在部分网络（国内、离线、代理环境）连不上时整个模块图会挂，
+       页面就是一张黑屏。0.185.1 原版文件，见 vendor/three/LICENSE。 -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js?v=one010",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=one010",
+
+        "./Script_Core.mjs": "./Script_Core.mjs?v=one010",
+        "./Script_World.js": "./Script_World.js?v=one010",
+        "./Script_GeneratedAssets.mjs": "./Script_GeneratedAssets.mjs?v=one010",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=one010",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=one010",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=one010",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=one010",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=one010",
+        "./Script_Audio.js": "./Script_Audio.js?v=one010",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=one010",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=one010",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=one010",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=one010",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=one010"
+      }
+    }
+  </script>
+</head>
+<body>
+<main id="gameShell">
+  <canvas id="gameCanvas" aria-label="地道里的光 第一章剪纸场景"></canvas>
+
+  <div id="hud" aria-hidden="false">
+    <section id="objectivePanel">
+      <b id="objectiveText"></b>
+      <span id="hintText"></span>
+    </section>
+    <div id="crouchTag" hidden>潜行 · 再按 C 起身</div>
+    <div id="itemTag" hidden><small>手里</small><b id="itemName"></b><i id="itemThrow" class="pKey" hidden></i></div>
+    <div id="topRight">
+      <!-- 包袱（收藏品）：布包的线描。角标 = 已收 / 总数 -->
+      <button id="btnBag" type="button" aria-label="包袱" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M5.2 10.6 L12 7.2 L18.8 10.6 L17.6 19.2 L6.4 19.2 Z"/>
+          <path d="M9.6 7.9 C9.6 5.4 14.4 5.4 14.4 7.9"/>
+          <path d="M10.4 6.8 L12 4.6 L13.6 6.8"/>
+        </svg>
+        <b id="bagBadge" hidden>0</b>
+      </button>
+      <!-- 三道滑轨：比齿轮省事，也正好是面板里的东西 -->
+      <button id="btnSettings" type="button" aria-label="设置" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3.6 7.4h16.8M3.6 12h16.8M3.6 16.6h16.8"/>
+          <circle cx="9.1" cy="7.4" r="2.3"/>
+          <circle cx="15.2" cy="12" r="2.3"/>
+          <circle cx="7.4" cy="16.6" r="2.3"/>
+        </svg>
+      </button>
+    </div>
+    <section id="settingsPanel" hidden aria-label="设置">
+      <h4>声音</h4>
+      <button id="btnSound" type="button" aria-pressed="false">
+        <span>旁白 · 音效 · 配乐</span><b class="state">开</b>
+      </button>
+      <label for="volVoice">旁白 <output id="volVoiceOut">100%</output></label>
+      <input id="volVoice" type="range" min="0" max="100" step="5" value="100">
+      <label for="volSfx">音效 <output id="volSfxOut">80%</output></label>
+      <input id="volSfx" type="range" min="0" max="100" step="5" value="80">
+      <label for="volMusic">配乐 <output id="volMusicOut">70%</output></label>
+      <input id="volMusic" type="range" min="0" max="100" step="5" value="70">
+      <!-- 「纯器乐政策」是制作纪律，不该说给玩家听；这里只留 CC BY 4.0 要求的
+           那一行署名（少了它就是违约，不能一起删）。 -->
+      <p class="bgmCredit">配乐
+        <a href="https://www.scottbuckley.com.au/library/with-these-hands/" target="_blank" rel="noopener">With These Hands</a>
+        · <a href="https://www.scottbuckley.com.au/library/the-long-dark/" target="_blank" rel="noopener">The Long Dark</a>
+        — Scott Buckley（CC BY 4.0）</p>
+      <hr>
+      <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+    </section>
+    <!-- 包袱条（勇敢的心式收藏品栏）：右缘一条纸底竖条，一格一件老物件。
+         收到新东西时整条滑进来亮一下那格（peek），平时按 B 或点包袱钮打开。
+         打开时左侧出注解卡：名目 + 一段史实。还没找到的格子只给深色剪影——
+         形状本身就是唯一的提示。 -->
+    <section id="bagPanel" hidden aria-label="包袱">
+      <ul id="bagStrip"></ul>
+      <aside id="bagNote" hidden>
+        <h4 id="bagNoteName"></h4>
+        <p id="bagNoteText"></p>
+        <small id="bagNoteCount"></small>
+      </aside>
+    </section>
+    <div id="toast"></div>
+    <!-- 交互徽章（勇敢的心式）：一枚按钮 + 一个短动词，浮在柱子头顶上。
+         按钮的脸由当前输入设备决定——键盘是键帽，手指是右下角那几个钮的
+         同一套线描图形。文案里一个键名都不写。 -->
+    <div id="actPrompt" hidden><i class="pKey"></i><b class="pVerb"></b></div>
+    <!-- 底部那条只剩没有按键的状态行（"跟上娘""！探杆就在头顶"） -->
+    <div id="prompt" hidden></div>
+    <!-- 后果小窗（勇敢的心式画中画）：玩家的操作在画面外起了作用，角落里开一扇
+         照片小窗给他看一眼。相框是 DOM，画面是 WebGL 在同一块画布上的剪裁区
+         （world.RenderPip），中间必须透出去——框用 border 画，不用背景色。 -->
+    <div id="pipFrame" hidden aria-hidden="true"><i id="pipView"></i></div>
+    <!-- 做功的节拍没有 HUD 轨道（禁 slider）：划线攥特写卡上那支笔，
+         刨料攥世界里那把刨子。这里曾有一条 #scribeGuide 拖动轨道，已拆。 -->
+    <!-- 手势提示：转辘轳（绕圈）/ 打结（绕圈）/ 勒紧（下拽）的动效小图标，
+         纯 CSS 循环动画，data-kind 切换 -->
+    <!-- 手劲条：辘轳上吊着一桶水时才出现。这是**读数**，不是做功进度条——
+         做功仍然只认手上那圈绕/那下按键（禁 slider 那条规矩没破）。
+         撑不住的时候它见底，桶就自己一顿一顿往下溜。 -->
+    <div id="staminaBar" hidden aria-hidden="true"><b></b><i></i></div>
+    <div id="detectionVignette" aria-hidden="true"></div>
+    <div id="irisOverlay" aria-hidden="true"></div>
+    <div id="slitMatte" aria-hidden="true"><i></i><i></i></div>
+    <div id="cineBars" aria-hidden="true"><i class="barTop"></i><i class="barBottom"></i></div>
+    <button id="btnSkipCine" type="button" hidden>跳过序章 ▸</button>
+    <div id="captionScrim" aria-hidden="true"></div>
+    <section id="caption" hidden>
+      <b id="capSpeaker" hidden></b>
+      <p id="capText"></p>
+    </section>
+    <div id="fadeOverlay" aria-hidden="true"></div>
+
+    <section id="chapterCard" hidden>
+      <img id="cardLamp" src="./Icon/Icon_Lamp.png" alt="">
+      <small id="cardNum"></small>
+      <h2 id="cardTitle"></h2>
+      <p id="cardYear"></p>
+      <span id="cardContinue">按 E 继续</span>
+    </section>
+
+    <section id="choiceOverlay" hidden>
+      <h3 id="choicePrompt"></h3>
+      <div id="choiceList"></div>
+    </section>
+
+    <section id="endScreen" hidden>
+      <small>《地道里的光》</small>
+      <h2 id="endTitle">门框上的两道刻痕，留在了身后</h2>
+      <p id="endText">地道还在。人还在。日子还要往下过。</p>
+      <button id="endRestart" type="button">回到标题</button>
+    </section>
+
+    <!-- 征夫告示阅读层：背景保留当前场景并压暗（不切黑、不换房间），
+         左图右文 42/58，窄屏改上图下文；文字可滚，关闭键始终可见。
+         文案从 Core 的 ZHENGFU_NOTICE 注入——右栏是权威版本，不指望图上的小字 -->
+    <section id="noticeOverlay" hidden aria-label="征夫告示">
+      <div id="noticePanel">
+        <button id="noticeClose" type="button" aria-label="关闭">✕</button>
+        <!-- 抠好背景的成品（Script_TextureKey.py 从 Texture/Source/ 的白底原图生成）：
+             带 alpha 的 WebP，撕口的纸形直接落在面板上。别改回 Source 里那张白底 JPG -->
+        <img id="noticeImg" src="./Texture/Texture_NoticeZhengfu.webp?v=one010" alt="贴在土墙上的征夫告示">
+        <div id="noticeText"></div>
+      </div>
+    </section>
+
+    <div id="touchControls" aria-label="触屏操作">
+      <!-- 一个摇杆管走路和上下梯：横推走，竖推爬（竖直分量明显压过水平才算，
+           免得走着走着手指一飘就被送上梯子） -->
+      <div id="stick" aria-label="移动摇杆">
+        <div id="stickBase">
+          <i class="axisH"></i><i class="axisV"></i>
+          <div id="stickKnob"></div>
+        </div>
+      </div>
+      <div class="padRight">
+        <!-- 与右上角设置图标同一套线描：stroke currentColor，按下随按钮变色 -->
+        <button id="btnCrouch" type="button" aria-label="蹲下">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="6.6" r="2.2"/>
+            <path d="M10.6 8.9c2.6 1 4.1 2.6 4.3 5.2l-3.5 3.3.4 3.2"/>
+            <path d="M12.4 11.6l-3.4 2.6 1 3.4"/>
+          </svg>
+        </button>
+        <!-- 投掷键已撤：扔石子是「攥住手里那颗往后拽开、松手出手」，
+             屏幕上直接拖就行，没有按一下就飞出去的路。留一颗按了没反应的钮
+             比没有更糟（同 F 键，见 Script_Main.js 的键盘分支） -->
+        <button id="btnAct" type="button" aria-label="互动">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M8.2 12.2V7.4M11.4 11.6V6.2M14.6 12.2V7.4"/>
+            <path d="M8.2 12.2v1.5c0 3 1.8 5 4.3 5s4.3-2 4.3-5V9.6"/>
+            <path d="M8.2 13.4l-2.4-2.2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotateHint" hidden><span>请把手机横过来</span></div>
+
+  <section id="debugPanel" hidden aria-label="调试面板">
+    <header>
+      <b>调试 · 跳到第 N 幕</b>
+      <span id="debugNow"></span>
+      <button id="debugClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <nav id="debugChapters"></nav>
+    <ol id="debugBeats"></ol>
+    <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
+  </section>
+
+  <section id="titleScreen">
+    <div class="titleInner">
+      <p class="eyebrow">CHAPTER ONE · IMAGEGEN ART RESTORATION · 1943 华北敌后</p>
+      <h1><span>地道里的光</span></h1>
+      <p class="thesis">一个只想保护母亲和妹妹的普通青年，在一次次失去之后，被迫学会保护更多人。</p>
+      <div class="titleActions">
+        <button id="startButton" type="button">从第一章开始</button>
+      </div>
+      <div id="chapterList" aria-label="章节选择"></div>
+      <dl id="controlsNote">
+        <div><dt>A / D</dt><dd>左右移动（手机：左下摇杆横推）</dd></div>
+        <div><dt>W / S</dt><dd>在梯口 / 地道口上下（手机：摇杆竖推）</dd></div>
+        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车；手里有东西随时可放下（手机：右下大圆钮）</dd></div>
+        <div><dt>鼠标</dt><dd>直接上手：摇辘轳转盘、绕圈打结、攥笔划线、点按抡锤（键盘同样能做）</dd></div>
+        <div><dt>F</dt><dd>投掷，先捡石子（手机：手里有能扔的东西才冒出来的那个钮）</dd></div>
+        <div><dt>C</dt><dd>蹲低，躲在草垛断墙后能避开视线（手机：右下蹲人钮）</dd></div>
+        <div><dt>1 / 2</dt><dd>做出抉择（手机：直接点那张牌）</dd></div>
+        <div><dt>M</dt><dd>开关声音（旁白 / 音效 / 配乐）</dd></div>
+      </dl>
+      <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
+      <p class="contentNote">本作依据抗战史实创作，包含日军针对平民的战争暴行场景（不含血腥特写）。</p>
+    </div>
+  </section>
+</main>
+<script type="module" src="./Script_Main.js?v=one010"></script>
+</body>
+</html>

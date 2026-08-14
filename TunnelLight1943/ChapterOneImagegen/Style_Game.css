@@ -1,0 +1,1255 @@
+/* 《地道里的光》第一章美术还原版 UI —— 炭灰旧纸 + 克制脏赭色 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+:root {
+  --lamp: #e8c15a;
+  --paper: #d8cbb0;
+  --ink: #171310;
+  --dim: #9a8f7a;
+}
+
+html, body { height: 100%; }
+body {
+  background: #0a0908;
+  color: var(--paper);
+  /* 回退链故意不落到宋体：SimSun 只有一档字重，HUD 用的 500/600 会被合成
+     假粗体，小字号下糊成一团。微软雅黑是 Windows 上唯一为屏幕做过 hinting
+     的中文字体，取不到网络字体时至少还是清楚的。 */
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+  /* 移动端长按不弹选词/放大镜/回调菜单 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#gameShell { position: fixed; inset: 0; isolation: isolate; }
+#gameCanvas { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; display: block; }
+
+/* Seedream paper texture, integrated as a restrained material veil.  The
+   texture never intercepts input and stays beneath every readable control. */
+#gameShell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("./Texture/Texture_PaperCharcoal.png");
+  background-position: 0 0;
+  background-size: 768px 768px;
+  background-repeat: repeat;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
+}
+
+/* A second, very faint charcoal rub breaks up broad sky and plaster planes.
+   Both layers use the accepted 1.5K material; neither is a scene image. */
+#gameShell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("./Texture/Texture_PaperCharcoal.png");
+  background-position: 173px 91px;
+  background-size: 1152px 1152px;
+  background-repeat: repeat;
+  opacity: 0.055;
+  mix-blend-mode: soft-light;
+}
+
+#hud { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+#hud button { pointer-events: auto; }
+
+/* 居中一律走布局（left:0/right:0 + margin auto），不用 translateX(-50%)。
+   transform 会让 Chrome 关掉次像素抗锯齿，宽度为奇数时还会把整块文字钉在
+   半个像素上——两件事叠起来就是「HUD 有点糊」。 */
+
+/* 目标：只在变化时露一下，之后让画面自己说话（克制 HUD） */
+#objectivePanel {
+  position: absolute; top: 26px; left: 0; right: 0;
+  margin-inline: auto; width: fit-content;
+  max-width: 520px; text-align: center; padding: 0;
+  background: none; border: none;
+  transition: opacity 0.7s ease;
+}
+#objectivePanel b {
+  display: inline-block; padding: 6px 18px;
+  font-size: 16px; letter-spacing: 0.1em; font-weight: 600; color: #f6ecd8;
+  background: rgba(8, 6, 4, 0.55); border-radius: 999px;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
+}
+#objectivePanel span {
+  display: block; margin-top: 7px; font-size: 13px; color: #d6c9ac;
+  /* 13px 的字配 12px 的光晕，等于给每个笔画糊一圈；收成贴身的一圈暗边，
+     该有的对比度还在，字的边缘干净了 */
+  line-height: 1.65; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.98), 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+#crouchTag {
+  position: absolute; top: 22px; right: 26px;
+  padding: 6px 12px; font-size: 12.5px; letter-spacing: 0.08em;
+  color: #b8c4d8; background: rgba(14, 18, 28, 0.66);
+  border: 1px solid rgba(150, 170, 200, 0.35);
+}
+
+/* 单格物品栏：手里拿着什么，一直挂在左下角 */
+#itemTag {
+  position: absolute; left: 26px; bottom: 26px;
+  padding: 7px 13px; display: flex; align-items: baseline; gap: 8px;
+  color: #e8dcbc; background: rgba(20, 16, 10, 0.72);
+  border: 1px solid rgba(214, 190, 140, 0.4);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
+}
+#itemTag small { font-size: 11px; color: #a89878; letter-spacing: 0.12em; }
+#itemTag b { font-size: 14.5px; letter-spacing: 0.05em; }
+
+/* 交互徽章：勇敢的心式——按钮画出来，动词写一个词，两样都浮在人头顶上。
+   键名不进文案（手机上没有键盘），徽章的脸随输入设备换：键帽 / 触屏线描图标。 */
+#actPrompt {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  pointer-events: none;
+}
+#actPrompt .pKey {
+  position: relative; width: 36px; height: 36px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: rgba(12, 9, 6, 0.72);
+  box-shadow: inset 0 0 0 2px rgba(240, 222, 180, 0.88), 0 3px 12px rgba(0, 0, 0, 0.55);
+  color: #f6e6bc; font-size: 17px; font-weight: 600; line-height: 1;
+}
+#actPrompt .pKey svg {
+  width: 21px; height: 21px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+#actPrompt .pKey svg circle.solid { fill: currentColor; stroke: none; }
+/* 招手的一圈涟漪：把眼睛引过去，但不动徽章本身——缩放静止的字会糊 */
+#actPrompt .pKey::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid rgba(242, 207, 114, 0.7);
+  animation: actPing 2.1s ease-out infinite;
+}
+@keyframes actPing {
+  0% { transform: scale(1); opacity: 0.7; }
+  70%, 100% { transform: scale(1.75); opacity: 0; }
+}
+/* 长按：徽章外面套一圈进度环。百分比不写成字——环走到头就是走到头 */
+#actPrompt.hold .pKey::before { animation: none; opacity: 0; }
+#actPrompt.hold .pKey::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(#f2cf72 calc(var(--fill) * 1%), rgba(240, 222, 180, 0.18) 0);
+  -webkit-mask: radial-gradient(circle, transparent 0 62%, #000 64%);
+  mask: radial-gradient(circle, transparent 0 62%, #000 64%);
+}
+#actPrompt .pVerb {
+  font-size: 13.5px; font-weight: 500; letter-spacing: 0.1em;
+  color: #f4e4bd; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.98), 0 0 7px rgba(0, 0, 0, 0.75);
+}
+
+/* 手里那格上的投掷键：同一枚徽章，缩小一号 */
+#itemTag .pKey {
+  position: relative; width: 22px; height: 22px;
+  display: inline-grid; place-items: center; border-radius: 50%;
+  background: rgba(12, 9, 6, 0.6); box-shadow: inset 0 0 0 1.5px rgba(240, 222, 180, 0.75);
+  color: #f6e6bc; font-size: 11.5px; font-weight: 600; line-height: 1;
+}
+#itemTag .pKey svg {
+  width: 14px; height: 14px; fill: none; stroke: currentColor;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+#itemTag .pKey svg circle.solid { fill: currentColor; stroke: none; }
+
+/* 后果小窗（勇敢的心式画中画）：一张压在角落的老照片。画面本体是 WebGL 在
+   同一块画布上的剪裁区，从相框中间透出来——所以框只能用 border 画，
+   背景必须是透的；#pipView 的矩形每帧量给渲染层对剪裁区。
+   注意不能用 transform 做出场（旋转/缩放会让 DOM 相框和 GL 剪裁区对不上），
+   出场就靠一记快门白闪 + 边框浮现。 */
+#pipFrame {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  /* 窗里是几十米外的一个人直起腰回望——小了就只剩一个色块，读不出她在看谁。
+     按原先的两倍多开；窄屏靠 vw 收着别挤掉顶上的目标条，手机横屏那种扁画幅
+     再靠 vh 收一道，否则这扇窗要占掉半个屏 */
+  width: min(34vw, 55vh, 520px);
+  border: 8px solid #d8c69c;
+  border-bottom-width: 18px;                 /* 照片的白边下宽 */
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(90, 70, 40, 0.55);
+  pointer-events: none;
+  z-index: 24;
+}
+#pipView {
+  display: block; width: 100%; aspect-ratio: 16 / 10;
+  position: relative;
+}
+/* 照片感：一圈压角的暗晕 + 很淡的暖色罩（盖在 GL 上面） */
+#pipView::after {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(214, 176, 96, 0.07);
+  box-shadow: inset 0 0 22px rgba(10, 6, 2, 0.72);
+}
+/* 快门白闪：小窗弹出那一下"拍了张照" */
+#pipView::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: #f4ecd8; opacity: 0;
+}
+#pipFrame.show #pipView::before { animation: pipFlash 0.45s ease-out; }
+@keyframes pipFlash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+/* 交互提示 */
+#prompt {
+  position: absolute; left: 0; right: 0; bottom: 15%;
+  margin-inline: auto; width: fit-content;
+  padding: 7px 20px; font-size: 15px; letter-spacing: 0.14em; font-weight: 500;
+  color: #f7dd9a; white-space: nowrap;
+  background: rgba(8, 6, 4, 0.62);
+  border-radius: 999px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* 短提示 */
+/* 手记条：像从本子上撕下来的一条纸 */
+#toast {
+  position: absolute; left: 0; right: 0; top: 12%;
+  margin-inline: auto; width: fit-content;
+  transform: translateY(-8px);
+  max-width: 520px; padding: 12px 24px; text-align: center;
+  font-size: 14px; line-height: 1.85; color: #2e2418;
+  background: linear-gradient(180deg, #e0d0aa 0%, #d2bf95 100%);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(1% 6%, 99% 0%, 100% 94%, 0% 100%);
+  opacity: 0; transition: opacity 0.45s, transform 0.45s;
+}
+/* 停稳之后 transform 归零：动画期间糊一点没人看得出，停下来读的时候必须是清的 */
+#toast.show { opacity: 1; transform: none; }
+
+/* 被发现红晕 */
+#detectionVignette {
+  position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 46%, rgba(150, 30, 18, 0.55) 100%);
+  transition: opacity 0.2s;
+}
+
+/* 电影黑边 */
+#cineBars .barTop, #cineBars .barBottom {
+  position: absolute; left: 0; right: 0; height: 0; background: #000;
+  transition: height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#cineBars .barTop { top: 0; }
+#cineBars .barBottom { bottom: 0; }
+#cineBars.active .barTop, #cineBars.active .barBottom { height: 6vh; }
+
+/* 序章跳过键：压在**上**黑边上，左上角一枚安静的字钮——看得见、不抢戏。
+   原先在右下角，手机上正压着右侧那排触屏钮（互动/蹲/投掷）——两层东西叠在
+   同一块拇指落点上。左上是全屏唯一没人占的角：目标条居中、手里那格在左下、
+   设置在右上、触屏操作全在下半屏。 */
+#btnSkipCine {
+  position: absolute; left: max(16px, env(safe-area-inset-left)); top: max(3.2vh, env(safe-area-inset-top));
+  z-index: 30; pointer-events: auto;
+  padding: 7px 14px; border: 1px solid rgba(232, 217, 184, 0.34); border-radius: 4px;
+  background: rgba(10, 8, 6, 0.55); color: rgba(232, 217, 184, 0.82);
+  font: 500 13px/1 "Noto Serif SC", serif; letter-spacing: 0.14em;
+  cursor: pointer; transition: background 0.2s ease, color 0.2s ease;
+}
+#btnSkipCine:hover { background: rgba(28, 22, 16, 0.8); color: #f2e6c4; }
+
+/* 字幕：勇敢的心式——底部一条压暗的渐变把字托住，
+   旁白与对白分成两种字体色阶，任何画面亮度下都读得清 */
+#captionScrim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42vh;
+  background: linear-gradient(180deg, rgba(6, 5, 4, 0) 0%, rgba(6, 5, 4, 0.55) 55%, rgba(6, 5, 4, 0.86) 100%);
+  opacity: 0; transition: opacity 0.45s ease; pointer-events: none;
+}
+#captionScrim.active { opacity: 1; }
+
+#caption {
+  position: absolute; left: 0; right: 0; bottom: 9vh;
+  margin-inline: auto;
+  width: min(760px, 88vw); text-align: center;
+}
+/* 说话人：一枚小铭牌，两侧带短横线 */
+#capSpeaker {
+  display: inline-flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+  font-size: 14.5px; letter-spacing: 0.34em; font-weight: 600;
+  color: #f2cf72;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+}
+#capSpeaker::before, #capSpeaker::after {
+  content: ""; width: 26px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(242, 207, 114, 0.8), transparent);
+}
+#capText {
+  font-size: 20px; line-height: 1.95; font-weight: 500;
+  color: #f6ecd8;
+  /* 底下已经有 captionScrim 那道压暗的渐变托着，字自己不必再背 18px 的光晕 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.98), 0 0 10px rgba(0, 0, 0, 0.7);
+}
+/* 旁白：比对白略小、略冷，但对比度一样足 */
+#capText.stage {
+  color: #e6dcc6; font-size: 17.5px; font-weight: 400; letter-spacing: 0.02em;
+}
+
+#fadeOverlay {
+  position: absolute; inset: 0; background: #030202;
+  opacity: 1; pointer-events: none;
+}
+
+/* 圆形收光转场（勇敢的心式 iris）：圆内透明、圆外黑，半径由 JS 控制 */
+#irisOverlay {
+  position: absolute; inset: 0;
+  opacity: 0; pointer-events: none;
+}
+
+/* 地窖板缝 matte：从缝里往外看 */
+#slitMatte i {
+  position: absolute; left: 0; right: 0; height: 0; background: #050403;
+  transition: height 0.5s ease;
+}
+#slitMatte i:first-child { top: 0; }
+#slitMatte i:last-child { bottom: 0; }
+#slitMatte.active i:first-child { height: 33vh; }
+#slitMatte.active i:last-child { height: 30vh; }
+
+/* 触屏操作 */
+#touchControls { display: none; }
+body.touchDevice #touchControls {
+  display: block; position: absolute; inset: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+body.touchDevice #touchControls.dimmed { opacity: 0.28; }
+/* 划线那一拍：整张特写卡就是操作面，摇杆和按钮全让开（那一拍走不动路，
+   留着只会把落在小臂上的手指截走） */
+body.touchDevice #touchControls.gone { display: none; }
+/* 摇杆：一个盘子 + 一个跟着手指走的钮。走路是横推，爬梯下地道是竖推——
+   两个动作共用一根拇指，右手就只剩蹲和动手两个键。 */
+/* 底边也要让开安全区。左右一直让着，底下没让——横屏 iPhone 的 home 指示条
+   占着最底下那 21px，系统会先把那一条上的触摸当成上滑手势收走，落在盘子/钮
+   下缘的拇指就白按了：读起来同样是"按钮的触发位置偏了一点"。 */
+#stick {
+  position: absolute; left: max(14px, env(safe-area-inset-left));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 148px; height: 148px;
+  pointer-events: auto; touch-action: none;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+}
+#stickBase {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(28, 23, 16, 0.52), rgba(12, 10, 7, 0.42));
+  border: 1.5px solid rgba(232, 193, 90, 0.3);
+  backdrop-filter: blur(2px);
+}
+/* 两道很淡的十字：告诉拇指这盘子认得上下，不只是左右 */
+#stickBase i { position: absolute; background: rgba(232, 193, 90, 0.16); }
+#stickBase .axisH { left: 16%; right: 16%; top: 50%; height: 1px; }
+#stickBase .axisV { top: 16%; bottom: 16%; left: 50%; width: 1px; }
+#stickKnob {
+  position: absolute; left: 50%; top: 50%; width: 62px; height: 62px;
+  margin: -31px 0 0 -31px; border-radius: 50%;
+  background: rgba(232, 193, 90, 0.26);
+  border: 1.5px solid rgba(232, 193, 90, 0.52);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.09s ease-out, background 0.15s;
+}
+#stick.active #stickKnob { background: rgba(232, 193, 90, 0.44); transition: background 0.15s; }
+#stick.climbing #stickKnob { border-color: rgba(255, 232, 160, 0.9); }
+
+#touchControls .padRight {
+  position: absolute; right: max(16px, env(safe-area-inset-right));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  display: flex; align-items: flex-end; gap: 12px;
+}
+#touchControls button {
+  pointer-events: auto; width: 62px; height: 62px; border-radius: 50%;
+  background: rgba(16, 13, 10, 0.5); color: var(--lamp);
+  border: 1.5px solid rgba(232, 193, 90, 0.42);
+  font-family: inherit; font-size: 20px; line-height: 1;
+  -webkit-tap-highlight-color: transparent; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  backdrop-filter: blur(2px);
+}
+#touchControls #btnAct { width: 76px; height: 76px; font-size: 24px; background: rgba(232, 193, 90, 0.24); }
+#touchControls #btnCrouch { font-size: 17px; }
+/* 投掷键只在手里真有能扔的东西时冒出来——平时右手就两个键 */
+#touchControls button.pressed { background: rgba(232, 193, 90, 0.45); color: var(--ink); }
+/* 操作键图标与右上角设置钮同一套线描：stroke 走 currentColor，
+   按下时随按钮的 color 一起翻成墨色，不用再滤镜换色 */
+#touchControls button svg {
+  width: 58%; height: 58%;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+}
+#touchControls button svg circle { fill: currentColor; stroke: none; }
+#touchControls #btnCrouch svg circle { fill: none; stroke: currentColor; }
+
+/* 竖屏提示 */
+#rotateHint {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: #070605; color: var(--lamp);
+  font-size: 18px; letter-spacing: 0.24em;
+}
+#rotateHint span::before { content: "⟳"; display: block; font-size: 44px; margin-bottom: 18px; }
+
+
+#prompt.danger { color: #e86048; border-color: rgba(232, 96, 72, 0.55); }
+
+/* 章节卡 */
+#chapterCard {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: #050403; text-align: center;
+}
+#cardLamp {
+  width: 92px; margin-bottom: 18px; opacity: 0.92;
+  filter: drop-shadow(0 0 26px rgba(255, 190, 92, 0.35));
+  animation: lampBreath 4.5s ease-in-out infinite;
+}
+@keyframes lampBreath { 50% { opacity: 0.72; filter: drop-shadow(0 0 34px rgba(255, 190, 92, 0.5)); } }
+#chapterCard small { font-size: 14px; letter-spacing: 0.5em; color: var(--dim); }
+#chapterCard h2 { font-size: 40px; letter-spacing: 0.24em; color: var(--paper); font-weight: 600; }
+#chapterCard p { font-size: 14px; letter-spacing: 0.2em; color: #8f8371; }
+#chapterCard span { margin-top: 34px; font-size: 13px; letter-spacing: 0.3em; color: var(--lamp); animation: blink 1.8s infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+
+/* 抉择 */
+#choiceOverlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  background: rgba(5, 4, 3, 0.86); padding: 20px;
+}
+#choicePrompt { font-size: 21px; letter-spacing: 0.12em; }
+#choiceList { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+#choiceList button {
+  width: min(330px, 84vw); padding: 18px 20px; text-align: left; cursor: pointer;
+  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  border: 1px solid rgba(232, 193, 90, 0.35);
+  font-family: inherit; transition: border-color 0.2s, background 0.2s;
+}
+#choiceList button:hover { border-color: var(--lamp); background: rgba(38, 31, 21, 0.95); }
+#choiceList button b { display: block; font-size: 17px; margin-bottom: 8px; color: var(--lamp); }
+.choiceIcon {
+  display: block; width: 100%; max-width: 190px; margin: 0 auto 12px;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));
+}
+#choiceList button span { font-size: 13.5px; line-height: 1.7; color: var(--dim); }
+
+/* 结局 */
+#endScreen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #050403; text-align: center; padding: 20px;
+}
+#endScreen small { letter-spacing: 0.4em; color: var(--dim); }
+#endScreen h2 { font-size: 27px; letter-spacing: 0.14em; font-weight: 600; }
+#endScreen p { color: var(--dim); font-size: 14.5px; }
+#endScreen button {
+  margin-top: 26px; padding: 12px 34px; cursor: pointer;
+  background: none; color: var(--lamp); border: 1px solid rgba(232, 193, 90, 0.5);
+  font-family: inherit; font-size: 15px; letter-spacing: 0.2em;
+}
+#endScreen button:hover { background: rgba(232, 193, 90, 0.12); }
+
+/* 征夫告示阅读层：背景压暗但透出场景（不切黑）；左图 42% / 右文 58%，
+   窄屏改上图下文。关闭键钉在面板右上角，文字自己滚 */
+#noticeOverlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 6, 4, 0.62); padding: 4vmin;
+}
+#noticePanel {
+  position: relative; display: flex; gap: 3.2%;
+  width: min(920px, 94%); max-height: 88%;
+  background: rgba(24, 20, 15, 0.94);
+  border: 1px solid rgba(154, 143, 122, 0.4);
+  padding: 22px;
+}
+/* 告示是**抠掉白底**的一张纸（不是一块图版）：所以没有边框——给纸加边框，
+   等于把撕出来的毛边又装回一个方框里。落影贴着纸的真实轮廓走，靠的是
+   drop-shadow（读 alpha）而不是 box-shadow（只认盒子） */
+#noticeImg {
+  width: 42%; align-self: flex-start;
+  max-height: 100%; object-fit: contain;
+  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.55));
+}
+#noticeText {
+  width: 58%; overflow-y: auto; padding-right: 6px;
+  color: var(--paper); font-size: 14.5px; line-height: 1.9;
+}
+#noticeText h3 { font-size: 19px; letter-spacing: 0.3em; margin-bottom: 10px; font-weight: 600; }
+#noticeText p { margin-bottom: 7px; }
+#noticeText .nDate { margin-top: 14px; color: var(--dim); }
+#noticeText .nSign { text-align: right; color: var(--dim); }
+#noticeClose {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 34px; height: 34px; cursor: pointer;
+  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  border: 1px solid rgba(154, 143, 122, 0.5);
+  font-family: inherit; font-size: 15px;
+}
+#noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
+@media (max-width: 700px), (orientation: portrait) {
+  /* 竖屏是上图下文，图必须让出下半屏给正文。height 是**必须**的：
+     子元素的 max-height:38% 要有一个确定的父高度才解析得出来，只写
+     max-height:88% 的话父高是 auto，那 38% 等于没写——图照旧长到自然高度，
+     正文被挤到只剩两三行（抠图后纸不再有白边，长得更满，这条就更明显了） */
+  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; height: 88%; }
+  #noticeImg { width: auto; max-width: 100%; max-height: 38%; align-self: center; }
+  #noticeText { width: auto; flex: 1; min-height: 0; }
+}
+
+
+/* 标题 */
+#titleScreen {
+  position: absolute; inset: 0; overflow-y: auto;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),
+    #070605;
+}
+.titleInner { width: min(760px, 92vw); padding: 48px 0; text-align: center; }
+.eyebrow { font-size: 12px; letter-spacing: 0.4em; color: var(--dim); }
+#titleScreen h1 { margin: 18px 0 14px; }
+#titleScreen h1 span {
+  font-size: clamp(44px, 8vw, 68px); letter-spacing: 0.22em; font-weight: 700;
+  color: var(--paper);
+  text-shadow: 0 0 34px rgba(232, 193, 90, 0.35);
+}
+.thesis { max-width: 520px; margin: 0 auto; font-size: 15px; line-height: 2; color: #b3a78e; }
+.titleActions { margin: 30px 0 26px; }
+#startButton {
+  padding: 14px 44px; cursor: pointer; font-family: inherit;
+  font-size: 17px; letter-spacing: 0.24em;
+  color: var(--ink); background: var(--lamp); border: none;
+}
+#startButton:hover { background: #f4d47c; }
+#chapterList {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  max-width: 640px; margin: 0 auto 30px;
+}
+#chapterList button {
+  padding: 12px 6px; cursor: pointer; font-family: inherit;
+  background: rgba(24, 20, 15, 0.8); color: var(--paper);
+  border: 1px solid rgba(154, 143, 122, 0.3);
+  transition: border-color 0.2s;
+}
+#chapterList button:hover:not(:disabled) { border-color: var(--lamp); }
+#chapterList button:disabled { opacity: 0.38; cursor: default; }
+/* 还没做完的章：比"没解锁"更暗一档，标题去掉衬线的分量，一眼看出是占位 */
+#chapterList button.coming { opacity: 0.24; border-style: dashed; }
+#chapterList button.coming b { font-weight: 400; letter-spacing: 0.08em; }
+#chapterList button small { display: block; font-size: 10.5px; letter-spacing: 0.2em; color: var(--dim); margin-bottom: 5px; }
+#chapterList button b { font-size: 13.5px; font-weight: 600; }
+#controlsNote {
+  display: flex; gap: 26px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+#controlsNote div { display: flex; gap: 8px; align-items: baseline; }
+#controlsNote dt {
+  font-size: 12px; padding: 3px 8px; letter-spacing: 0.1em;
+  border: 1px solid rgba(154, 143, 122, 0.45); color: var(--lamp);
+}
+#controlsNote dd { font-size: 12.5px; color: var(--dim); }
+.titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
+
+/* 历史战争暴力内容提示（关卡设计文档要求）：小字，不抢标题 */
+#titleScreen .contentNote {
+  margin-top: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: rgba(196, 178, 138, 0.52);
+}
+
+@media (max-width: 700px) {
+  #chapterList { grid-template-columns: repeat(2, 1fr); }
+  #objectivePanel { max-width: 62vw; }
+}
+
+/* 声音开关：贴在右上角，克制到几乎看不见——勇敢的心的 HUD 从不抢戏 */
+/* 右上角这一排：声音、设置。用 flex 排，安全区只在容器上算一次——
+   两个按钮各自算 safe-area 时，有刘海的机器上一个会挪、一个不会，直接叠在一起。 */
+#topRight {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  display: flex; align-items: center; gap: 10px;
+  z-index: 8;
+  pointer-events: auto;
+}
+
+/* 声音开关搬进设置面板了：右上角只留一个入口。这里是面板里的一行。 */
+#btnSound {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 11px;
+  border: 1px solid rgba(214, 190, 140, 0.28);
+  border-radius: 6px;
+  background: rgba(30, 24, 15, 0.5);
+  color: #d9c9a4;
+  font-family: inherit; font-size: 12.5px; letter-spacing: 0.05em;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+#btnSound .state {
+  font-size: 12px; letter-spacing: 0.14em;
+  padding: 2px 9px; border-radius: 999px;
+}
+#btnSound[aria-pressed="true"] .state { color: #ffce82; background: rgba(255, 206, 130, 0.16); }
+#btnSound[aria-pressed="false"] { color: #9a8f7a; }
+#btnSound[aria-pressed="false"] .state { color: #9a8f7a; background: rgba(154, 143, 122, 0.14); }
+/* 关掉声音时把三条音量滑轨压暗——它们此刻不起作用 */
+#settingsPanel.muted label,
+#settingsPanel.muted input[type="range"] { opacity: 0.38; }
+
+
+/* 设置：跟声音开关并排的一个小齿轮，点开是一张压在右上角的窄面板。
+   刻意做得小而暗——它不该跟画面抢注意力。 */
+#btnSettings {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(214, 190, 140, 0.34);
+  background: rgba(18, 15, 11, 0.52);
+  color: #d8c79c;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+}
+#btnSettings:hover { background: rgba(30, 25, 18, 0.72); }
+#btnSettings svg {
+  width: 21px; height: 21px;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round;
+}
+#btnSettings svg circle { fill: rgba(18, 15, 11, 0.95); }
+#btnSettings[aria-expanded="true"] { color: #ffce82; border-color: rgba(255, 206, 130, 0.5); }
+
+#settingsPanel {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 60px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  width: 228px;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 190, 140, 0.26);
+  background: rgba(16, 13, 10, 0.9);
+  color: #ddcfae;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  z-index: 9;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  /* #hud 整层是 pointer-events:none，只给 button 开了例外——
+     不在这儿显式开，面板里的滑块永远拖不动（触屏上尤其明显）。 */
+  pointer-events: auto;
+  /* 面板比可视区高的时候要能滚。横屏手机上一定会高：三条滑块 + 署名 + 调试入口
+     加起来就超过 390px 的屏高，「调试 · 跳到第 N 幕」那一行永远够不着。
+     #hud 是 inset:0，所以百分比就是可视区高；减掉顶上那 60px 让位给齿轮，
+     底下留 16px 余地，安全区两头都扣掉。 */
+  max-height: calc(100% - 76px
+    - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  /* 滚到头别把滚动手势甩给外层（触屏上会连带把整页拽动） */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 190, 140, 0.34) transparent;
+  /* 底下还有内容，得看得出来——滚动条是 overlay 的，不滚就不露面，
+     于是面板看着像"到此为止"。经典的 scroll-shadow：跟着内容走的那层（local）
+     是块跟面板同色的盖板，钉在容器上的那层（scroll）是阴影；没滚到底时盖板
+     还在视野外，阴影就露出来，滚到底盖板正好压上去，阴影自己消失。 */
+  background-image:
+    linear-gradient(to top, rgba(16, 13, 10, 0.96), rgba(16, 13, 10, 0)),
+    linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size: 100% 20px, 100% 15px;
+  background-position: bottom, bottom;
+  background-attachment: local, scroll;
+}
+/* 滚动条也按面板的调子来：细、暗、不抢眼 */
+#settingsPanel::-webkit-scrollbar { width: 6px; }
+#settingsPanel::-webkit-scrollbar-track { background: transparent; }
+#settingsPanel::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(214, 190, 140, 0.3);
+}
+#settingsPanel::-webkit-scrollbar-thumb:hover { background: rgba(214, 190, 140, 0.5); }
+#settingsPanel[hidden] { display: none; }
+#settingsPanel h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: #b9a681;
+}
+#settingsPanel label {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 4px;
+  color: #c8b894;
+}
+#settingsPanel output { color: #9d8a63; }
+#settingsPanel .bgmCredit {
+  margin: 8px 0 2px;
+  color: #8f846d;
+  font-size: 10px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+}
+#settingsPanel .bgmCredit a { color: #bda574; text-underline-offset: 2px; }
+/* 滑块自己画：默认样式在触屏上滑钮太小，拇指按不准；
+   touch-action:none 是关键——否则拖动被浏览器当成页面滚动手势吃掉。 */
+#settingsPanel input[type="range"] {
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#settingsPanel input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 3px;
+  background: rgba(214, 190, 140, 0.26);
+}
+#settingsPanel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; margin-top: -10px;
+  border-radius: 50%;
+  background: #c8a05e;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+#settingsPanel input[type="range"]::-moz-range-track {
+  height: 5px; border-radius: 3px;
+  background: rgba(214, 190, 140, 0.26);
+}
+#settingsPanel input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #c8a05e; border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+
+/* 提示条上的进度：用背景填充，不用字符拼。字体里没有 ▮▯ 这类方块，
+   拼出来是一排豆腐块。 */
+#prompt.metered {
+  position: relative;
+  overflow: hidden;
+}
+#prompt.metered::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--fill, 0%);
+  background: linear-gradient(90deg, rgba(200, 160, 94, 0.34), rgba(226, 196, 132, 0.5));
+  transition: width 90ms linear;
+  pointer-events: none;
+}
+#prompt.metered > * { position: relative; }
+
+/* ---------------------------------------------------------------------------
+   划线：镜头推到门框上，这条轨道告诉手往哪儿使劲。粉笔头跟着进度走，
+   走到头线就划完了。桌面按住 E 左右推，触屏直接拖。
+   --------------------------------------------------------------------------- */
+/* 手势提示：一枚会动的小圆点，演示当前节拍要的那只手——
+   dragDown 往下拖 / pullUp 一把一把上拉 / circle 绕圈 / tap 点按。
+   纯 CSS 动画，无文字（提示语在中央那条 prompt 里）。 */
+/* 手劲条：辘轳吊着一桶水的那一拍。**读数，不是做功进度条**——做功仍然只认
+   手上那圈绕/那下按键（CLAUDE.md 禁 slider 那条没破）。压在画面下沿、窄、暗，
+   不抢那口井；见底了才跳出来喊一声（out 那一档在闪）。
+   居中一律走布局（left/right + margin-inline），不用 transform —— 半像素上的
+   边框就是"HUD 有点糊"的老根。 */
+#staminaBar {
+  position: absolute; left: 0; right: 0; bottom: calc(15% + 6px);
+  margin-inline: auto;
+  width: 148px; height: 9px;
+  pointer-events: none;
+  border: 1px solid rgba(226, 196, 132, 0.34);
+  border-radius: 5px;
+  background: rgba(8, 6, 4, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+#staminaBar > b {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: var(--fill, 100%);
+  background: linear-gradient(90deg, #b98d4a, #e8c887);
+  transition: background 220ms linear;
+}
+#staminaBar > i {
+  /* 手劲那一格的刻度：三道，读得出"还剩几成"而不用写字 */
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg,
+    rgba(0, 0, 0, 0) 0 calc(25% - 1px), rgba(20, 14, 8, 0.55) calc(25% - 1px) 25%);
+}
+#staminaBar.low > b { background: linear-gradient(90deg, #a8552e, #d98a4a); }
+#staminaBar.out { animation: stamOut 0.5s ease-in-out infinite; }
+#staminaBar.out > b { background: #8e3b22; }
+@keyframes stamOut {
+  0%, 100% { border-color: rgba(226, 196, 132, 0.34); }
+  50% { border-color: rgba(226, 130, 92, 0.85); }
+}
+
+/* 手势提示的小黑饼（暗圆盘 + 一粒点按方向做动画的那个 HUD 元素）已整体拆除
+   （2026-08-10 用户：「明明是按键交互 非要装自己是个圈 还给个方向？」）。
+   抽象图形说不了任何事：方向写进提示文案，上手的交互由实物自己招呼
+   （辘轳的引导圈、卡上会蹭的绳头、拉弓预览弧）。那一族圆点动画随之埋在
+   这里，别刨。 */
+
+/* 做功的节拍没有 HUD 轨道（禁 slider）：这里曾有一块 #scribeGuide 拖动
+   QTE 轨道的样式（轨道+旋钮+提示行），随交互一并拆除，别加回来。 */
+
+/* ---------------------------------------------------------------------------
+   调试面板：跳到任意一章的任意一幕。白盒期的开发工具，故意做成等宽字 + 冷灰，
+   跟游戏本身的昏黄美术划清界限——一眼就知道这不是游戏的一部分。
+   --------------------------------------------------------------------------- */
+/* 入口收在设置面板里。它是开发工具，不该在玩家的画面上常驻占一个角。 */
+#settingsPanel hr {
+  border: none; border-top: 1px solid rgba(214, 190, 140, 0.18);
+  margin: 14px 0 12px;
+}
+#btnDebug {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(150, 180, 210, 0.28);
+  border-radius: 5px;
+  background: rgba(12, 16, 22, 0.5);
+  color: rgba(168, 196, 220, 0.72);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.2s, border-color 0.2s;
+}
+#btnDebug small { font-size: 9.5px; letter-spacing: 0.12em; color: rgba(150, 180, 210, 0.5); }
+#btnDebug:hover { color: rgba(190, 220, 245, 0.95); border-color: rgba(150, 180, 210, 0.6); }
+
+#debugPanel {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  z-index: 61;
+  width: min(400px, 46vw);
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(150, 180, 210, 0.3);
+  border-radius: 6px;
+  background: rgba(10, 14, 19, 0.93);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  color: #c3d3e0;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  pointer-events: auto;
+}
+#debugPanel header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(150, 180, 210, 0.18);
+  font-size: 12px;
+}
+#debugPanel header b { letter-spacing: 0.06em; color: #9fc6e4; }
+#debugNow { flex: 1; text-align: right; font-size: 10.5px; color: #6f8595; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#debugClose {
+  flex: none; width: 20px; height: 20px;
+  border: 0; border-radius: 3px;
+  background: rgba(120, 150, 175, 0.14);
+  color: #9fc6e4; font-size: 14px; line-height: 1; cursor: pointer;
+}
+#debugChapters {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(150, 180, 210, 0.18);
+}
+#debugChapters button {
+  padding: 5px 0;
+  border: 1px solid rgba(150, 180, 210, 0.22);
+  border-radius: 3px;
+  background: transparent;
+  color: #8fa9bd;
+  font: 500 11px/1.35 inherit;
+  cursor: pointer;
+}
+#debugChapters button:hover { background: rgba(120, 160, 190, 0.16); }
+#debugChapters button[aria-selected="true"] {
+  background: rgba(110, 165, 210, 0.26);
+  border-color: rgba(150, 200, 235, 0.6);
+  color: #e2f0fb;
+}
+#debugBeats { flex: 1; overflow-y: auto; list-style: none; padding: 6px; }
+#debugBeats li { margin-bottom: 3px; }
+#debugBeats button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 7px;
+  align-items: baseline;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #a8bccc;
+  font: 400 11px/1.45 inherit;
+  text-align: left;
+  cursor: pointer;
+}
+#debugBeats button:hover { background: rgba(120, 160, 190, 0.14); border-color: rgba(150, 180, 210, 0.3); }
+#debugBeats button.current { background: rgba(110, 165, 210, 0.2); border-color: rgba(150, 200, 235, 0.5); }
+#debugBeats i { color: #5f7686; font-style: normal; }
+#debugBeats em { display: block; font-style: normal; color: #dbe7f0; }
+#debugBeats small { color: #67808f; font-size: 10px; letter-spacing: 0.05em; }
+#debugPanel footer {
+  padding: 6px 10px;
+  border-top: 1px solid rgba(150, 180, 210, 0.18);
+  font-size: 10px; line-height: 1.5; color: #63788a;
+}
+@media (max-width: 700px) {
+  #debugPanel { width: min(340px, 72vw); }
+}
+
+/* ── 包袱（收藏品）─────────────────────────────────────────────
+   按钮长在 #topRight 里（同齿轮一排）；包袱条是右缘的纸底竖条，
+   peek = 收到新东西时自己滑进来亮一下，open = 按 B/点钮展开并配注解卡。 */
+#btnBag {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(214, 190, 140, 0.34);
+  background: rgba(18, 15, 11, 0.52);
+  color: #d8c79c;
+  cursor: pointer;
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+}
+#btnBag:hover { background: rgba(30, 25, 18, 0.72); }
+#btnBag svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+#btnBag[aria-expanded="true"] { color: #ffce82; border-color: rgba(255, 206, 130, 0.5); }
+#btnBag b {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #8a6a3c;
+  color: #f2e6c8;
+  font-size: 9.5px;
+  line-height: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+#bagPanel {
+  position: absolute;
+  top: 50%;
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  transform: translateY(-50%) translateX(110%);
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 10px;
+  z-index: 8;
+  /* 探头（拾取时自动滑出的那 3.2 秒）**不许吃触摸**：那时世界没冻结，玩家
+     还在操作，而这条纸带正压在右下角那颗互动钮上——实测 844×390 上它盖掉
+     互动钮 52% 的面积，按下去半点反应没有，读起来就是"按钮的触发位置偏了"。
+     只有真打开（.open，世界冻结）才该接管拇指。 */
+  pointer-events: none;
+  transition: transform 0.28s ease;
+}
+#bagPanel.open { pointer-events: auto; }
+#bagPanel.show { transform: translateY(-50%) translateX(0); }
+#bagPanel[hidden] { display: none; }
+/* 纸底竖条：亚麻纸色 + 墨线框，格子里是画笔现烘的小图 */
+#bagStrip {
+  margin: 0;
+  padding: 8px 6px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 8px;
+  border: 2px solid rgba(43, 31, 22, 0.85);
+  background: linear-gradient(173deg, #d8c8a4, #cbb890 62%, #c2ae84);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  max-height: min(76vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+#bagStrip::-webkit-scrollbar { display: none; }
+#bagStrip li {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  border: 1.6px solid rgba(43, 31, 22, 0.55);
+  background: rgba(255, 248, 226, 0.30);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+#bagStrip li.miss { opacity: 0.62; }
+#bagStrip li.sel { border-color: #6e3428; box-shadow: 0 0 0 1.6px rgba(110, 52, 40, 0.5); }
+#bagStrip li.fresh { animation: bagFresh 1.4s ease 2; }
+@keyframes bagFresh {
+  0%, 100% { background: rgba(255, 248, 226, 0.30); }
+  40% { background: rgba(255, 214, 140, 0.85); }
+}
+#bagStrip canvas { width: 46px; height: 46px; display: block; }
+/* 注解卡：左侧铺开，同一张纸的调子 */
+#bagNote {
+  width: min(46vw, 300px);
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(43, 31, 22, 0.85);
+  background: linear-gradient(168deg, #d8c8a4, #c8b48c);
+  color: #2b1f16;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+#bagNote[hidden] { display: none; }
+#bagNote h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(43, 31, 22, 0.35);
+  padding-bottom: 5px;
+}
+#bagNote p { margin: 0; font-size: 12.5px; line-height: 1.75; letter-spacing: 0.03em; }
+#bagNote small { display: block; margin-top: 7px; font-size: 10.5px; opacity: 0.6; letter-spacing: 0.1em; }
+
+/* 横屏手机：竖着的一条纸带在 375~430 的画高里必然长到拇指那一排上去
+   （76vh 就是 285~327 高，而互动钮的顶沿在 279~334）。改成右上角一小片
+   3×3 的方格——正好九件，不用滚；下沿留出整排触屏钮的地方（含安全区），
+   谁也不压谁。判据用画高不用画宽：竖着的东西撞的是高度。 */
+@media (max-height: 520px) {
+  #bagPanel {
+    top: calc(env(safe-area-inset-top, 0px) + 58px);
+    transform: translateX(115%);
+    align-items: flex-start;
+  }
+  #bagPanel.show { transform: translateX(0); }
+  #bagStrip {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    gap: 4px;
+    padding: 6px;
+    max-height: calc(100vh - 170px - env(safe-area-inset-bottom, 0px));
+  }
+  #bagStrip li { width: 40px; height: 40px; border-radius: 5px; }
+  #bagStrip canvas { width: 34px; height: 34px; }
+  #bagNote {
+    width: min(52vw, 280px);
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Chapter One production grade: charcoal paper, dirty ochre, and quiet
+   interfaces.  The reference shots keep warmth in small worn details rather
+   than bright gold chrome; these overrides preserve the existing layout and
+   touch targets while lowering saturation and polish across overlays.
+   --------------------------------------------------------------------------- */
+:root {
+  --lamp: #b7a06a;
+  --paper: #cbc3b4;
+  --ink: #211d19;
+  --dim: #979187;
+  --charcoal-paper: #211e1a;
+  --dirty-ochre: #a58b58;
+}
+
+body { background: #11100e; }
+
+#objectivePanel b,
+#itemTag,
+#prompt,
+#crouchTag,
+#btnSkipCine,
+#topRight > button,
+#settingsPanel,
+#choiceOverlay,
+#chapterCard,
+#endScreen,
+#noticeOverlay,
+#debugPanel {
+  background-image:
+    linear-gradient(rgba(255, 244, 214, 0.018), rgba(255, 244, 214, 0.018)),
+    repeating-linear-gradient(0deg, rgba(215, 196, 157, 0.018) 0 1px, transparent 1px 4px);
+}
+
+#objectivePanel b {
+  color: #d1c7b6;
+  background-color: rgba(28, 25, 21, 0.78);
+  border: 1px solid rgba(177, 157, 111, 0.30);
+  border-radius: 3px;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.38);
+}
+#objectivePanel span { color: #bdb5a8; }
+
+#crouchTag {
+  color: #bdb8ae;
+  background-color: rgba(27, 28, 27, 0.76);
+  border-color: rgba(168, 162, 146, 0.34);
+}
+#itemTag {
+  color: #c7bca7;
+  background-color: rgba(30, 27, 22, 0.82);
+  border-color: rgba(174, 151, 103, 0.38);
+}
+#itemTag small { color: #9d917d; }
+
+#actPrompt .pKey,
+#itemTag .pKey {
+  background-color: rgba(32, 29, 25, 0.88);
+  box-shadow: inset 0 0 0 2px rgba(196, 177, 133, 0.72), 0 3px 12px rgba(0, 0, 0, 0.55);
+  color: #d0bd8d;
+}
+#actPrompt .pKey::before { border-color: rgba(183, 160, 106, 0.62); }
+#actPrompt .pVerb { color: #d0c6b6; }
+
+#prompt {
+  color: #d2bd8a;
+  background-color: rgba(28, 25, 21, 0.84);
+  border: 1px solid rgba(177, 153, 100, 0.28);
+  border-radius: 3px;
+}
+#prompt.danger { color: #d88d70; border-color: rgba(174, 96, 70, 0.56); }
+
+#captionScrim {
+  background: linear-gradient(180deg, rgba(9, 9, 8, 0) 0%, rgba(17, 15, 13, 0.52) 55%, rgba(17, 15, 13, 0.90) 100%);
+}
+#capSpeaker { color: #c0a873; }
+#capSpeaker::before, #capSpeaker::after { background: linear-gradient(90deg, transparent, rgba(192, 168, 115, 0.66), transparent); }
+#capText { color: #ddd6ca; }
+#capText.stage { color: #c9c2b7; }
+
+#chapterCard,
+#endScreen {
+  background-color: #141210;
+  background-image:
+    radial-gradient(ellipse 60% 42% at 50% 42%, rgba(150, 127, 78, 0.09), transparent 72%),
+    repeating-linear-gradient(0deg, rgba(255, 240, 209, 0.018) 0 1px, transparent 1px 5px);
+}
+#chapterCard h2 { color: #cfc6b7; }
+#chapterCard span { color: #c2a86f; }
+#endScreen h2 { color: #d0c7b8; }
+#endScreen p { color: #9f978a; }
+#endScreen button {
+  color: #c2a86f;
+  border-color: rgba(176, 150, 96, 0.58);
+}
+#endScreen button:hover { background: rgba(166, 139, 85, 0.14); }
+
+#choiceOverlay { background-color: rgba(21, 19, 16, 0.92); }
+#choicePrompt { color: #d0c7b8; }
+#choiceList button {
+  background-color: rgba(34, 30, 25, 0.92);
+  color: #cec5b5;
+  border-color: rgba(166, 145, 103, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 209, 0.025);
+}
+#choiceList button:hover { border-color: #ad9561; background-color: rgba(49, 42, 32, 0.94); }
+#choiceList button b { color: #c1a56b; }
+#choiceList button span { color: #a59c90; }
+
+#noticeOverlay { background-color: rgba(14, 13, 11, 0.72); }
+#noticePanel {
+  background-color: rgba(42, 37, 31, 0.96);
+  border-color: rgba(168, 153, 128, 0.40);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.60);
+}
+#noticeText { color: #d0c6b6; }
+#noticeText .nDate, #noticeText .nSign { color: #a59b8d; }
+#noticeClose { background-color: rgba(38, 33, 27, 0.92); color: #c9c0b2; }
+#noticeClose:hover { border-color: #b39b67; color: #cbb078; }
+
+#titleScreen {
+  background-color: #151311;
+  background-image:
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(157, 130, 78, 0.10), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 240, 209, 0.018) 0 1px, transparent 1px 5px);
+}
+.eyebrow { color: #9e968a; }
+#titleScreen h1 span {
+  color: #d0c7b8;
+  text-shadow: 0 0 28px rgba(170, 145, 92, 0.18);
+}
+.thesis { color: #aaa195; }
+#startButton {
+  color: #211d19;
+  background: #aa915c;
+  border: 1px solid rgba(210, 188, 133, 0.66);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.28);
+}
+#startButton:hover { background: #b39b67; }
+#chapterList button {
+  background-color: rgba(35, 31, 26, 0.88);
+  border-color: rgba(157, 147, 131, 0.34);
+}
+#chapterList button:hover:not(:disabled) { border-color: #ad9561; background-color: rgba(48, 42, 33, 0.92); }
+#chapterList button small { color: #9e968a; }
+#controlsNote dt { color: #bda36c; border-color: rgba(169, 148, 105, 0.48); }
+#controlsNote dd { color: #9e968a; }
+.titleFoot { color: #82796e; }
+#titleScreen .contentNote { color: rgba(193, 176, 140, 0.55); }
+
+#topRight > button,
+#btnBag,
+#btnSettings {
+  background-color: rgba(27, 25, 21, 0.72);
+  border-color: rgba(172, 151, 105, 0.42);
+  color: #bca875;
+}
+#topRight > button:hover,
+#btnBag:hover,
+#btnSettings:hover { background-color: rgba(45, 39, 30, 0.82); }
+#btnBag[aria-expanded="true"], #btnSettings[aria-expanded="true"] { color: #cfb47a; border-color: rgba(202, 175, 115, 0.64); }
+
+#settingsPanel {
+  background-color: rgba(29, 26, 22, 0.94);
+  border-color: rgba(158, 147, 127, 0.34);
+  color: #c8bfaf;
+}
+#btnSound { background-color: rgba(44, 38, 29, 0.56); color: #c5b99f; border-color: rgba(173, 151, 104, 0.32); }
+#settingsPanel h4 { color: #b4a382; }
+#settingsPanel label { color: #b8ad9b; }
+#settingsPanel output { color: #9e8c69; }
+#settingsPanel input[type="range"]::-webkit-slider-thumb,
+#settingsPanel input[type="range"]::-moz-range-thumb { background: #a98f59; }
+
+#debugPanel {
+  background-color: rgba(27, 30, 29, 0.95);
+  border-color: rgba(161, 157, 139, 0.36);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #c9af76;
+  outline-offset: 3px;
+}

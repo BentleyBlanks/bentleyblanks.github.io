@@ -1,0 +1,630 @@
+{
+  "schemaVersion": 1,
+  "generator": "OpenAI built-in ImageGen",
+  "requiredCanvas": {
+    "width": 1536,
+    "height": 1536
+  },
+  "assets": [
+    {
+      "key": "houseFacadeDamaged",
+      "name": "Texture_HouseFacadeDamaged.png",
+      "path": "Generated/SceneOne/Texture_HouseFacadeDamaged.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "659a89c9401dd0fe7449d35a88e938a73bc9755f4ebc00bc8ed794630373324b",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "doorFrameTimber",
+      "name": "Texture_DoorFrameTimber.png",
+      "path": "Generated/SceneOne/Texture_DoorFrameTimber.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "bb02157b1dad16da4dee2d796f870d3cff91736f9b6f51d611be1f29f83064b7",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "kangBed",
+      "name": "Texture_KangBed.png",
+      "path": "Generated/SceneOne/Texture_KangBed.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "001ed0bdf2314c638f9d0c01a126fcabb02b44565fec2a4e607f287f560cc946",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "stoolLow",
+      "name": "Texture_StoolLow.png",
+      "path": "Generated/SceneOne/Texture_StoolLow.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "b154f635151c9b48843365e1c2a57e1b3bb4404f8a74f0385dae7362ce1c1589",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "waterJarCracked",
+      "name": "Texture_WaterJarCracked.png",
+      "path": "Generated/SceneOne/Texture_WaterJarCracked.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "82f355ed2ec6358bf684c9d4615647fc31f63403184324a633caa92ed9a9c3c9",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "beddingRagged",
+      "name": "Texture_BeddingRagged.png",
+      "path": "Generated/SceneOne/Texture_BeddingRagged.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "6104c0a6606246e2a44bd533ca90d16341db01b0a6643cb39b67a534156fb914",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "stoveColdPaperCut",
+      "name": "Texture_StoveColdPaperCut.png",
+      "path": "Generated/SceneOne/Texture_StoveColdPaperCut.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "7fdb0cf3c91a2371f9ba98be28a5d9153dfab4c8096d4bf869c4d55ef31464aa",
+      "status": "connected",
+      "group": "sceneOne"
+    },
+    {
+      "key": "elmSparse",
+      "name": "Texture_ElmNearBare.png",
+      "path": "Generated/SharedSurface/Texture_ElmNearBare.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "f253191befd86dd85774b0e81c18769b0286b2e23969de56e19c6b609d0d2427",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "wellWinchFrame",
+      "name": "Texture_WellWinchFrame.png",
+      "path": "Generated/SharedSurface/Texture_WellWinchFrame.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "2f65de76025d1099a6881d265e2f5cd88727f7555b5ba3dd29c904aef1e0c8bb",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "wellStoneBase",
+      "name": "Texture_WellStoneBase.png",
+      "path": "Generated/SharedSurface/Texture_WellStoneBase.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "1bd03463c7221744bf0d69f29861f6f82f9a8f0b2b0871c03e21015c63091bf0",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "wellBucket",
+      "name": "Texture_WellBucket.png",
+      "path": "Generated/SharedSurface/Texture_WellBucket.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "dfb987bff3e9b7b13389c3856e65a123f534b0a46d3ccb072ffb4cb5b73f4fad",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedBurned",
+      "name": "Texture_ShedBurned.png",
+      "path": "Generated/SharedSurface/Texture_ShedBurned.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "f9d6a38bd50a9e17468692e06c775c9b3d08b5e3d4e245f647cea2c66b7886e3",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "ashDebrisPile",
+      "name": "Texture_AshDebrisPile.png",
+      "path": "Generated/SharedSurface/Texture_AshDebrisPile.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "72dfa9b2d3bc09f208666a81303a81b960b9af0e66c31f4dfb336cc9bf753676",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "wellRopeDrum",
+      "name": "Texture_WellRopeDrum.png",
+      "path": "Generated/SharedSurface/Texture_WellRopeDrum.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "5d754e7d18b04a78ebc1e4d0cc82ab7d4225ea5aa28dd2083498afe746fd2523",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "wellCrankHandle",
+      "name": "Texture_WellCrankHandle.png",
+      "path": "Generated/SharedSurface/Texture_WellCrankHandle.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "847583b2973146b6f7f92a9b656d9288846e2e8f456d0d5f0f938f73f512d6cc",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedLooseTimberTools",
+      "name": "Texture_ShedLooseTimberTools.png",
+      "path": "Generated/SharedSurface/Texture_ShedLooseTimberTools.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "ada97223e7dd7e44b9889b05918afb9bda98ec516bb371a894ccefb2451f8e7c",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedThatchMat",
+      "name": "Texture_ShedThatchMat.png",
+      "path": "Generated/SharedSurface/Texture_ShedThatchMat.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "a2ac82f4296775f749b8cf43b7ea164c104a3535b4c3a6d807be2d6528df0758",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedReedMat",
+      "name": "Texture_ShedReedMat.png",
+      "path": "Generated/SharedSurface/Texture_ShedReedMat.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "bb2c05e60fe58b6291a9ede0f2eefa62579dda78204674f2639db47ed82bbf7c",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedCharredDoorPlank",
+      "name": "Texture_ShedCharredDoorPlank.png",
+      "path": "Generated/SharedSurface/Texture_ShedCharredDoorPlank.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "4a6f20d64b7ade6c3364b135e5d22a92e1955561193a2a7871d89b0f80ad6cab",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "shedFeedTrough",
+      "name": "Texture_ShedFeedTrough.png",
+      "path": "Generated/SharedSurface/Texture_ShedFeedTrough.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "94d0f626c54cbfaa307edcb7384d0369ca16c97afb3c9176b230de315be7f85e",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "cellarEarthWallTile",
+      "name": "Texture_CellarEarthWallTile.png",
+      "path": "Generated/Cellar/Texture_CellarEarthWallTile.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "6f1a1d6017e0dae3edf0bb96298210372514b574b79e55e4c1954f004c741e4e",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "cellarTimberPost",
+      "name": "Texture_CellarTimberPost.png",
+      "path": "Generated/Cellar/Texture_CellarTimberPost.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "9cbd161c849584938ae973eba5b573450940dbc013e2446dbb1d2d1df4896045",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "cellarTimberBeam",
+      "name": "Texture_CellarTimberBeam.png",
+      "path": "Generated/Cellar/Texture_CellarTimberBeam.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "223e81357215f4f7ce71410c38b3980662c37102215a777442302ca7250cf5ec",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "oilLampWeak",
+      "name": "Texture_OilLampWeak.png",
+      "path": "Generated/Cellar/Texture_OilLampWeak.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "bd4fea78037ac1115695e0d29f063adb482297abafc7a8ad81eadceb6bebcb4e",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "clothBundleOld",
+      "name": "Texture_ClothBundleOld.png",
+      "path": "Generated/Cellar/Texture_ClothBundleOld.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "796a9714ad69fcd255269c472318124746492d284256eee39932a60e95e963e8",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "freshEarthMound",
+      "name": "Texture_FreshEarthMound.png",
+      "path": "Generated/Cellar/Texture_FreshEarthMound.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "80f0df35e0835bc282e515d45551acc3ee1aa19350ed383a11fc22d649ebb270",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "cellarLongLadder",
+      "name": "Texture_CellarLongLadder.png",
+      "path": "Generated/Cellar/Texture_CellarLongLadder.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "8dcce86202a1bef6e25c0a8ac82345cb20101d74b2e1e69a9e4365c5f90f5e48",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "cellarStorageCluster",
+      "name": "Texture_CellarStorageCluster.png",
+      "path": "Generated/Cellar/Texture_CellarStorageCluster.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "2348b372a71461610ab55c1562d876b8e5a062b597d27908668e562463f46d3f",
+      "status": "connected",
+      "group": "cellar"
+    },
+    {
+      "key": "ashGroundCrackedStrip",
+      "name": "Texture_AshGroundCrackedStrip.png",
+      "path": "Generated/SharedSurface/Texture_AshGroundCrackedStrip.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "6e00f2e1a8b61589ca0a2e3700d24d67f26aa6a7981e190f4c7778263bbabc15",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "distantVillageWatchtowers",
+      "name": "Texture_DistantVillageWatchtowers.png",
+      "path": "Generated/SharedSurface/Texture_DistantVillageWatchtowers.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "25f14935de245f0c80d4b530e4bb92c04a09bb0a28610dac74a49b05e968df05",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "villageHouseFacadeQishu",
+      "name": "Texture_VillageHouseFacadeQishu.png",
+      "path": "Generated/SharedSurface/Texture_VillageHouseFacadeQishu.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "7d316feac136beb291bafca3da9e6028c901bdce326fabedd9cb42c81c2f65df",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "villageHouseFacadeB",
+      "name": "Texture_VillageHouseFacadeB.png",
+      "path": "Generated/SharedSurface/Texture_VillageHouseFacadeB.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "b87eacfb2bdf0d90790755492279186d3054188aaae0cfaacb4d59e87f1f082b",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "villageHouseFacadeC",
+      "name": "Texture_VillageHouseFacadeC.png",
+      "path": "Generated/SharedSurface/Texture_VillageHouseFacadeC.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "b1c68e2903580c977353abed783f5623bdcfbfa88c5bbc69b8bb951edb19b61d",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "villageHouseFacadeD",
+      "name": "Texture_VillageHouseFacadeD.png",
+      "path": "Generated/SharedSurface/Texture_VillageHouseFacadeD.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "676fe14e47a5bdb2f35399893ce08fd27c8f6c68967bf00862d4898a506feb94",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "haystackFull",
+      "name": "Texture_HaystackFull.png",
+      "path": "Generated/SharedSurface/Texture_HaystackFull.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "f1f5797812e49743626b2cc6858d62a9f8ed850ba69bca655c123cf326d25fb9",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "haystackRaided",
+      "name": "Texture_HaystackRaided.png",
+      "path": "Generated/SharedSurface/Texture_HaystackRaided.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "20bc27bdf62a0678b8dce96a9d77e51bb31ad8b2d956a6793c7dc72e67b29d89",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "yardWallIntact",
+      "name": "Texture_YardWallIntact.png",
+      "path": "Generated/SharedSurface/Texture_YardWallIntact.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "77edd8c2918fabdedef97cd6944e419871d3ae097c97e03d23ddd6cba6826283",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "yardWallGate",
+      "name": "Texture_YardWallGate.png",
+      "path": "Generated/SharedSurface/Texture_YardWallGate.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "e4549703a66196eefe550103f2f66cfb8060e74d00da6105da1b9f65c4217b23",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "yardWallBroken",
+      "name": "Texture_YardWallBroken.png",
+      "path": "Generated/SharedSurface/Texture_YardWallBroken.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "4a1d21a13570f6dd348404ec786ab4ee1834a0909d78dfa6302cd8c839d73fd3",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "oldWoodDoors",
+      "name": "Texture_OldWoodDoors.png",
+      "path": "Generated/SharedSurface/Texture_OldWoodDoors.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "926c5b4b2bafd965961ab23670c05376e5b041cffdf58775ad68edc367a24165",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "noticeWall",
+      "name": "Texture_NoticeWall.png",
+      "path": "Generated/SharedSurface/Texture_NoticeWall.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "3b53eac167776dea2588321d77484b39f344ce672ce02cfa8515a31d5cb6f3b8",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "pigpenEmpty",
+      "name": "Texture_PigpenEmpty.png",
+      "path": "Generated/SharedSurface/Texture_PigpenEmpty.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "491ceff26dbdd3c86c5f848b05c6975eac59330807e825a1892c49f997d7ba94",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "stalkFence",
+      "name": "Texture_StalkFence.png",
+      "path": "Generated/SharedSurface/Texture_StalkFence.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "8ee840e7e72ae0481d98ef2add66edd3407c771d36f1d6855e586ef3ad8d1d05",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "cropRowsSparse",
+      "name": "Texture_CropRowsSparse.png",
+      "path": "Generated/SharedSurface/Texture_CropRowsSparse.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "dc27139846aa80e9b2799255728da465fa18683648194121d9377d6cc26f278d",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "stubbleField",
+      "name": "Texture_StubbleField.png",
+      "path": "Generated/SharedSurface/Texture_StubbleField.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "427b384528317d1c6883715225fd1a9e14444855fcc6e73a592e6f9bc3969cec",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "sownField",
+      "name": "Texture_SownField.png",
+      "path": "Generated/SharedSurface/Texture_SownField.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "8803f20eea23050293c3fa7ca3460aaee9f41144bb61d12168c37b479462d6f5",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "woodpile",
+      "name": "Texture_Woodpile.png",
+      "path": "Generated/SharedSurface/Texture_Woodpile.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "84efb17603bfe4237e53270c489bde3a8bec19b4b9b0d3bad58148f8866dcc25",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "firewoodBundle",
+      "name": "Texture_FirewoodBundle.png",
+      "path": "Generated/SharedSurface/Texture_FirewoodBundle.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "ddb89a09317f792c83593047008f33946d4e3c5f01eb118f0a6e838e2e324e41",
+      "status": "connected",
+      "group": "sharedSurface"
+    },
+    {
+      "key": "brotherHeadSide",
+      "name": "Texture_BrotherHeadSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherHeadSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "5024e4f39299175afe899b2be5f2abe084dbbecb0c3a2ab190a7d553b4ecf1bf",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherTorsoSide",
+      "name": "Texture_BrotherTorsoSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherTorsoSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "8096a4a7540b608612b2c8b5a9113af0cd029e4e8eea1b422cd4f531874600ba",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherUpperArmSide",
+      "name": "Texture_BrotherUpperArmSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherUpperArmSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "b4536c82cb61b437ae9202fec5afbdac411b66f0fffacb612b895e6b090c9639",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherForearmHandSide",
+      "name": "Texture_BrotherForearmHandSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherForearmHandSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "7f386fb001a4e10d42e4aa32ec3e0d471fe17cfc16e1039646120d5d5123ad09",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherThighSide",
+      "name": "Texture_BrotherThighSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherThighSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "7115a2d4bbf30b054cc69903dac53fd73f526d9d36a5d5a1d5fffced50c4472b",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherShinSide",
+      "name": "Texture_BrotherShinSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherShinSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "16c75e41765d4b7cddfe2d78bee9c4f279e99a55d7f23fc6e18ed55b24b9c5b8",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "brotherFootSide",
+      "name": "Texture_BrotherFootSide.png",
+      "path": "Generated/CharacterRig/Texture_BrotherFootSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "e0d6cfe9d0a5525393b0dc02147561582028888e30e6dbb710b4414cbf4a3635",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterHeadSide",
+      "name": "Texture_SisterHeadSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterHeadSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "9a3bd3fea9c252c39dd05b77f36c37a1d3121532479825c3576e40f85a9c3cba",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterTorsoSide",
+      "name": "Texture_SisterTorsoSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterTorsoSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "67a8aeecf928ae387ceeb7e3baf233c946c3eb91f1e4d660ce87f8c09643bcf2",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterUpperArmSide",
+      "name": "Texture_SisterUpperArmSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterUpperArmSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "010daeef885462f8b673ba1d8e80cbf87b4185b3bced0dcf5dfe7480a079865c",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterForearmHandSide",
+      "name": "Texture_SisterForearmHandSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterForearmHandSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "7826dbb5ef118d228b6056a2091b64e37e8c63c97e4bd265960a0f34b497b022",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterThighSide",
+      "name": "Texture_SisterThighSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterThighSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "73e1a87e62f22edead93ee8f49eb75c5bf50084182f663cdb4cc7fbbe4863b2e",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterShinSide",
+      "name": "Texture_SisterShinSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterShinSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "0ef2eedd87649889fbaede39aae1c0f152e003885ea322452ca67b511221e69c",
+      "status": "connected",
+      "group": "characterRig"
+    },
+    {
+      "key": "sisterFootSide",
+      "name": "Texture_SisterFootSide.png",
+      "path": "Generated/CharacterRig/Texture_SisterFootSide.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "mode": "RGBA",
+      "sha256": "d93b7e710dd027318dccfce05c95f6df65a7e411a207e82f8972de9efd94ee33",
+      "status": "connected",
+      "group": "characterRig"
+    }
+  ]
+}
