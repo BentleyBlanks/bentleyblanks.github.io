@@ -1830,9 +1830,9 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .founderSkillEditor { gap:6px; margin-top:8px; }
   .founderSkillCard { gap:8px; padding:9px; border-top-width:3px; }
   .founderSkillControls { grid-template-columns:44px 1fr 44px; }
-  .founderSkillControls button { height:44px; }
+  .founderSkillControls button { min-height:44px; height:44px; }
   .founderSkillLevel strong { font-size:24px; }
-  .founderProfileFooter { grid-template-columns:1fr 130px; margin-top:8px; }
+  .founderProfileFooter { grid-template-columns:1fr; margin-top:8px; }
   .founderProfilePanel .documentButton { min-height:44px; }
   .projectContract { width: min(970px,96vw); max-height: 96vh; padding: 10px 16px 12px; }
   .projectContract > header { top: -10px; padding: 5px 0; }

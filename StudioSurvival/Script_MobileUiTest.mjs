@@ -50,6 +50,7 @@ assert.match(css, /\.stockPickGrid\s*\{/, "the bank stock picker needs a respons
 assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");
 assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
 assert.match(css, /\.founderSkillControls button\s*\{[^}]*min-height:\s*44px;/s, "founder skill steppers must remain full touch targets");
+assert.doesNotMatch(css, /\.founderSkillPresets/, "founder setup must stay focused on the three editable abilities");
 assert.match(css, /\.computerReleaseCallout button\s*\{[^}]*min-height:\s*44px;/s, "the release action must remain a full touch target");
 assert.doesNotMatch(css, /\.documentButton,\.bookBackButton\s*\{[^}]*min-height:\s*(?:3\d|4[0-3])px;/s, "book navigation must not shrink below a 44px touch target");
 assert.doesNotMatch(css, /\.sealButton\s*\{[^}]*height:\s*(?:3\d|4[0-3])px;/s, "the signing seal must not shrink below a 44px touch target");

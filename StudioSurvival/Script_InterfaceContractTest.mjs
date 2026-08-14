@@ -45,12 +45,33 @@ const customizationBlock = script.match(/function OpenCustomizationSheet[\s\S]*?
 assert.match(customizationBlock, /state\.project\.age < 1/, "direct feature customization must keep the early-stage gate");
 assert.match(customizationBlock, /PROJECT WHITEBOARD/, "feature proposals should retain their whiteboard context");
 
-const marketingBlock = script.match(/function OpenMarketingSheet[\s\S]*?function OpenReleaseSheet/)?.[0] || "";
-assert.match(marketingBlock, /state\.project\.age < 1/, "marketing must remain unavailable before the first development month is complete");
+const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
+assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
+assert.doesNotMatch(
+  computerBlock,
+  /data-computer-action|OpenDirectiveSheet\(|OpenMarketingSheet\(|OpenMarketPhoneSheet\(|OpenMonthSheet\(|OpenTalentSheet\(/,
+  "direction, marketing, settlement, and recruitment must never return to the development computer",
+);
+
+const paidMarketingBlock = script.match(/function OpenMarketingSheet[\s\S]*?function MarketFitPreviewHtml/)?.[0] || "";
+assert.match(paidMarketingBlock, /state\.project\.age < 1/, "paid marketing must remain unavailable before the first development month is complete");
+
+const marketPhoneBlock = script.match(/function OpenMarketPhoneSheet[\s\S]*?function RevenueChart/)?.[0] || "";
+assert.match(marketPhoneBlock, /state\.project\.age < 1/, "the first month must hide advanced market controls");
+assert.match(marketPhoneBlock, /data-open-paid-campaigns/, "the physical phone owns the paid-promotion entry");
+assert.match(marketPhoneBlock, /去墙上白板/);
+assert.doesNotMatch(marketPhoneBlock, /OpenCustomizationSheet\("owner"\)/, "the phone must not bypass the project whiteboard");
 
 assert.equal([...script.matchAll(/\bTravelWorld\(/g)].length, 1, "only the exit travel flow may call TravelWorld");
 assert.match(html, /<h1><span>甲方是我<\/span><\/h1>/, "the title screen should lead with the game name only");
 assert.doesNotMatch(html, /进入\s*2\.5D|灯会亮/, "the title screen should use normal player-facing language");
-assert.equal([...html.matchAll(/data-contract-page=/g)].length, 4, "the four contract decisions follow the separate studio-name page");
+assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be available from a global HUD shortcut");
+assert.doesNotMatch(html, /id="settlementButton"/, "monthly close must stay on the physical wall calendar");
+assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global shortcut");
+assert.doesNotMatch(script, /event\.code === "KeyN"|dom\.settlementButton/, "monthly close must not gain a global shortcut");
+assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 06/);
+assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 06/);
+assert.match(html, /id="contractPageCounter">03 \/ 06/);
+assert.equal([...html.matchAll(/data-contract-page=/g)].length, 4, "four contract pages follow the separate studio-name and founder-profile pages");
 
 console.log("StudioSurvival interface separation contract test passed");
