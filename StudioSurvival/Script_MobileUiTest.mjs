@@ -16,8 +16,8 @@ assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visib
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
 assert.match(html, /id="settlementButton"[^>]+aria-label=/, "the next-turn settlement control needs a persistent accessible hook");
 assert.match(html, /id="settlementButton"[^>]+aria-keyshortcuts="N"/, "the next-turn control must advertise its keyboard shortcut");
-assert.match(html, /Style_Play\.css\?v=20260815m/, "turn-control and goal-reveal CSS changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815m/, "gameplay changes must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815n/, "skeuomorphic UI and goal-reveal changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815n/, "skeuomorphic world and gameplay changes must bypass the Pages cache");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward victory");

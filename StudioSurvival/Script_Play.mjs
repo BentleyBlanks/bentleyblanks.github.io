@@ -310,30 +310,197 @@ const sceneToneByLocation = new Map([
   ["maleModelClub", new THREE.Color(0x1d0d18)],
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
+const surfaceTextureCache = new Map();
+const worldPracticalLights = [];
 
 function HexColor(value) { return Number.parseInt(String(value).replace("#", ""), 16); }
+
+function SeededRandom(seed = 1) {
+  let value = Math.max(1, Math.floor(seed)) % 2147483647;
+  return () => {
+    value = value * 16807 % 2147483647;
+    return (value - 1) / 2147483646;
+  };
+}
+
+function CreateSurfaceTexture(kind = "plaster") {
+  if (surfaceTextureCache.has(kind)) return surfaceTextureCache.get(kind);
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  const random = SeededRandom([...kind].reduce((sum, character) => sum + character.charCodeAt(0) * 17, 173));
+  const FillNoise = (base, spread = 16, count = 4300) => {
+    context.fillStyle = base;
+    context.fillRect(0, 0, 256, 256);
+    for (let index = 0; index < count; index += 1) {
+      const value = Math.round(190 + random() * spread);
+      context.fillStyle = `rgba(${value},${value},${value},${.02 + random() * .055})`;
+      const size = random() > .91 ? 2 : 1;
+      context.fillRect(random() * 256, random() * 256, size, size);
+    }
+  };
+
+  if (kind === "wood") {
+    FillNoise("#c8c1b3", 28, 2800);
+    for (let line = 0; line < 38; line += 1) {
+      const y = random() * 256;
+      context.beginPath();
+      context.moveTo(-8, y);
+      for (let x = -8; x <= 264; x += 12) context.lineTo(x, y + Math.sin(x * .045 + line) * (1.2 + random() * 2.4));
+      context.strokeStyle = `rgba(62,49,38,${.035 + random() * .08})`;
+      context.lineWidth = .6 + random() * 1.2;
+      context.stroke();
+    }
+    for (let knot = 0; knot < 5; knot += 1) {
+      context.beginPath();
+      context.ellipse(random() * 256, random() * 256, 7 + random() * 12, 2 + random() * 4, random() * .2, 0, Math.PI * 2);
+      context.strokeStyle = "rgba(74,53,38,.11)";
+      context.stroke();
+    }
+  } else if (kind === "tile") {
+    FillNoise("#dedbd0", 11, 2300);
+    context.strokeStyle = "rgba(45,48,47,.3)";
+    context.lineWidth = 5;
+    for (let line = 0; line <= 256; line += 64) {
+      context.beginPath(); context.moveTo(line, 0); context.lineTo(line, 256); context.stroke();
+      context.beginPath(); context.moveTo(0, line); context.lineTo(256, line); context.stroke();
+    }
+    context.strokeStyle = "rgba(255,255,255,.42)";
+    context.lineWidth = 1;
+    for (let line = 3; line < 256; line += 64) {
+      context.beginPath(); context.moveTo(line, 3); context.lineTo(line, 253); context.stroke();
+      context.beginPath(); context.moveTo(3, line); context.lineTo(253, line); context.stroke();
+    }
+  } else if (kind === "fabric") {
+    FillNoise("#bab8b5", 18, 3000);
+    context.strokeStyle = "rgba(255,255,255,.12)";
+    context.lineWidth = 1;
+    for (let line = 0; line < 256; line += 4) {
+      context.beginPath(); context.moveTo(line, 0); context.lineTo(line, 256); context.stroke();
+      context.beginPath(); context.moveTo(0, line); context.lineTo(256, line); context.stroke();
+    }
+    context.strokeStyle = "rgba(31,27,30,.055)";
+    for (let line = 2; line < 256; line += 8) {
+      context.beginPath(); context.moveTo(line, 0); context.lineTo(line, 256); context.stroke();
+      context.beginPath(); context.moveTo(0, line); context.lineTo(256, line); context.stroke();
+    }
+  } else if (kind === "stone") {
+    FillNoise("#c6c5c0", 22, 5200);
+    for (let chip = 0; chip < 530; chip += 1) {
+      const shade = random() > .54 ? 52 : 235;
+      context.fillStyle = `rgba(${shade},${shade},${shade},${.07 + random() * .16})`;
+      const size = .4 + random() * 1.8;
+      context.beginPath(); context.arc(random() * 256, random() * 256, size, 0, Math.PI * 2); context.fill();
+    }
+  } else if (kind === "paper") {
+    FillNoise("#e4decf", 12, 2600);
+    context.strokeStyle = "rgba(102,79,52,.07)";
+    context.lineWidth = .7;
+    for (let fiber = 0; fiber < 150; fiber += 1) {
+      const x = random() * 256;
+      const y = random() * 256;
+      context.beginPath(); context.moveTo(x, y); context.lineTo(x + 5 + random() * 25, y + (random() - .5) * 4); context.stroke();
+    }
+  } else if (kind === "metal") {
+    FillNoise("#c8cbd0", 15, 1800);
+    for (let line = 0; line < 256; line += 2) {
+      const shade = 255 - Math.floor(random() * 40);
+      context.fillStyle = `rgba(${shade},${shade},${shade},${.018 + random() * .05})`;
+      context.fillRect(0, line, 256, 1);
+    }
+    for (let scratch = 0; scratch < 70; scratch += 1) {
+      const y = random() * 256;
+      context.fillStyle = `rgba(30,34,39,${.025 + random() * .05})`;
+      context.fillRect(random() * 210, y, 18 + random() * 62, .5);
+    }
+  } else if (kind === "linoleum") {
+    FillNoise("#c9cac3", 19, 6200);
+    for (let swirl = 0; swirl < 50; swirl += 1) {
+      context.beginPath();
+      context.arc(random() * 256, random() * 256, 4 + random() * 18, random() * 3, random() * 3 + Math.PI * .8);
+      context.strokeStyle = `rgba(54,61,58,${.025 + random() * .055})`;
+      context.lineWidth = 1 + random() * 2;
+      context.stroke();
+    }
+  } else if (kind === "leather") {
+    FillNoise("#b6afa8", 18, 7500);
+    for (let pore = 0; pore < 1050; pore += 1) {
+      context.fillStyle = `rgba(35,28,25,${.025 + random() * .06})`;
+      context.beginPath(); context.arc(random() * 256, random() * 256, .35 + random() * .8, 0, Math.PI * 2); context.fill();
+    }
+  } else {
+    FillNoise("#d0cfca", 15, 5000);
+    for (let mark = 0; mark < 75; mark += 1) {
+      context.fillStyle = `rgba(62,60,57,${.018 + random() * .045})`;
+      context.beginPath(); context.ellipse(random() * 256, random() * 256, 2 + random() * 10, .4 + random() * 2, random() * Math.PI, 0, Math.PI * 2); context.fill();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(kind === "wood" ? 1.5 : 2.4, kind === "wood" ? 1.5 : 2.4);
+  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  texture.userData.sharedSurface = true;
+  surfaceTextureCache.set(kind, texture);
+  return texture;
+}
+
+function SurfaceMaterial(surface, color, options = {}) {
+  const texture = surface ? CreateSurfaceTexture(surface) : null;
+  return new THREE.MeshStandardMaterial({
+    color,
+    map: texture,
+    bumpMap: options.bump === false ? null : texture,
+    bumpScale: options.bumpScale ?? (surface === "fabric" ? .022 : surface === "metal" ? .012 : .035),
+    roughness: options.roughness ?? ({ metal: .36, leather: .68, tile: .4, stone: .78, wood: .72, fabric: .96, paper: .92 }[surface] ?? .82),
+    metalness: options.metalness ?? (surface === "metal" ? .58 : .025),
+    emissive: options.emissive ?? 0,
+    emissiveIntensity: options.emissiveIntensity ?? 0,
+    transparent: Boolean(options.transparent),
+    opacity: options.opacity ?? 1,
+  });
+}
 
 function Box(width, height, depth, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, height, depth),
-    new THREE.MeshStandardMaterial({
-      color, roughness: options.roughness ?? .76, metalness: options.metalness ?? .06,
-      emissive: options.emissive ?? 0, emissiveIntensity: options.emissiveIntensity ?? 0,
-      transparent: Boolean(options.transparent), opacity: options.opacity ?? 1,
-    }),
+    options.material || SurfaceMaterial(options.surface, color, options),
   );
   mesh.castShadow = options.castShadow ?? true;
   mesh.receiveShadow = options.receiveShadow ?? true;
   return mesh;
 }
 
-function Cylinder(radiusTop, radiusBottom, height, color, radialSegments = 12) {
+function Cylinder(radiusTop, radiusBottom, height, color, radialSegments = 12, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments),
-    new THREE.MeshStandardMaterial({ color, roughness: .72 }),
+    options.material || SurfaceMaterial(options.surface, color, options),
   );
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.castShadow = options.castShadow ?? true;
+  mesh.receiveShadow = options.receiveShadow ?? true;
+  return mesh;
+}
+
+function Sphere(radius, color, options = {}) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, options.segments ?? 18, options.rings ?? 12),
+    options.material || SurfaceMaterial(options.surface, color, options),
+  );
+  mesh.castShadow = options.castShadow ?? true;
+  mesh.receiveShadow = options.receiveShadow ?? true;
+  return mesh;
+}
+
+function Torus(radius, tube, color, options = {}) {
+  const mesh = new THREE.Mesh(
+    new THREE.TorusGeometry(radius, tube, options.radialSegments ?? 10, options.tubularSegments ?? 32),
+    options.material || SurfaceMaterial(options.surface, color, options),
+  );
+  mesh.castShadow = options.castShadow ?? true;
+  mesh.receiveShadow = options.receiveShadow ?? true;
   return mesh;
 }
 
@@ -668,7 +835,10 @@ function DisposeGroup(group) {
     child.traverse?.((object) => {
       object.geometry?.dispose?.();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      materials.filter(Boolean).forEach((material) => { material.map?.dispose?.(); material.dispose?.(); });
+      materials.filter(Boolean).forEach((material) => {
+        if (material.map && !material.map.userData?.sharedSurface) material.map.dispose?.();
+        material.dispose?.();
+      });
     });
   }
 }
@@ -698,99 +868,248 @@ function GetCollectibleModule(item, index = 0) {
   return item.moduleKey || MODULE_KEYS[index % MODULE_KEYS.length];
 }
 
+function Place(group, object, x, y, z = 0, rotationZ = 0) {
+  object.position.set(x, y, z);
+  if (rotationZ) object.rotation.z = rotationZ;
+  group.add(object);
+  return object;
+}
+
+function AddPhysicalLabel(group, title, subtitle, width, x, y, z, accent, options = {}) {
+  const height = width * (options.compact ? .21 : .29);
+  const backing = Place(group, Box(width, height, .14, options.backing ?? 0x211f1d, {
+    surface: options.surface ?? "wood",
+    roughness: options.roughness ?? .64,
+    metalness: options.metalness ?? .04,
+  }), x, y, z);
+  const inner = Place(group, Box(width - .14, height - .13, .035, options.face ?? 0x101315, {
+    surface: options.faceSurface ?? "metal",
+    roughness: .38,
+    metalness: .3,
+    castShadow: false,
+  }), x, y, z + .085);
+  const strip = Place(group, Box(width - .22, .045, .025, accent, {
+    emissive: accent,
+    emissiveIntensity: .22,
+    roughness: .4,
+    castShadow: false,
+  }), x, y - height * .34, z + .12);
+  const text = TextPlane(title, subtitle, width - .28, `#${accent.toString(16).padStart(6, "0")}`);
+  text.position.set(x, y + height * .04, z + .13);
+  group.add(text);
+  for (const screwX of [x - width * .44, x + width * .44]) {
+    const screw = Sphere(.035, 0xb9b9b5, { surface: "metal", roughness: .24, metalness: .78, castShadow: false, segments: 10, rings: 7 });
+    screw.scale.z = .35;
+    Place(group, screw, screwX, y + height * .32, z + .13);
+  }
+  return { backing, inner, strip, text };
+}
+
+function AddPackage(group, x, y, z, color, scale = 1, round = false) {
+  const packageObject = round
+    ? Cylinder(.1 * scale, .1 * scale, .3 * scale, color, 14, { surface: "paper", roughness: .84 })
+    : Box(.2 * scale, .32 * scale, .16 * scale, color, { surface: "paper", roughness: .88 });
+  if (round) packageObject.rotation.z = Math.PI / 2;
+  Place(group, packageObject, x, y, z, (x * 1.7 + y) % .05);
+  const label = Box(round ? .035 : .13 * scale, .05 * scale, round ? .205 * scale : .012, 0xe8ddc6, { surface: "paper", castShadow: false });
+  Place(group, label, x, y, z + (round ? .02 : .09));
+  return packageObject;
+}
+
+function AddStool(group, x, y, z, seatColor = 0x6b4430) {
+  const seat = Cylinder(.28, .3, .16, seatColor, 20, { surface: "leather", roughness: .72 });
+  Place(group, seat, x, y + .76, z);
+  for (const legX of [-.18, .18]) {
+    const leg = Box(.06, .73, .06, 0x3a3430, { surface: "metal", metalness: .45, roughness: .44 });
+    Place(group, leg, x + legX, y + .37, z, legX * .08);
+  }
+  const brace = Box(.54, .05, .05, 0x3a3430, { surface: "metal", metalness: .45, roughness: .44 });
+  Place(group, brace, x, y + .3, z);
+  return seat;
+}
+
+function AddPaperStack(group, x, y, z, width = .48, color = 0xe9dfc9, count = 4) {
+  for (let index = 0; index < count; index += 1) {
+    Place(group, Box(width, .018, width * .68, index % 2 ? color : 0xd9cfba, {
+      surface: "paper", roughness: .94, castShadow: false,
+    }), x + (index % 2 ? .012 : -.01), y + index * .018, z + index * .005, (index - count * .5) * .009);
+  }
+}
+
+function AddTaskLamp(group, x, y, z, color = 0xd4b270, facing = 1) {
+  const base = Cylinder(.23, .27, .08, 0x3c3d3b, 20, { surface: "metal", metalness: .58, roughness: .32 });
+  Place(group, base, x, y, z);
+  const arm = Box(.055, .72, .055, 0x555753, { surface: "metal", metalness: .6, roughness: .28 });
+  Place(group, arm, x + facing * .14, y + .39, z, facing * -.23);
+  const shade = Cylinder(.12, .28, .25, 0x353735, 20, { surface: "metal", metalness: .45, roughness: .35 });
+  shade.rotation.z = facing * (Math.PI / 2.7);
+  Place(group, shade, x + facing * .31, y + .76, z);
+  const bulb = Sphere(.07, color, { emissive: color, emissiveIntensity: 1.6, roughness: .25, castShadow: false, segments: 12, rings: 8 });
+  Place(group, bulb, x + facing * .39, y + .68, z + .01);
+  return bulb;
+}
+
 function BuildFacility(interaction) {
   const group = new THREE.Group();
   const kind = GetFacilityKind(interaction);
   const [title, subtitle, color] = FacilityLooks[kind] || [interaction.label || interaction.id, "靠近按 E", 0x9d8cff];
-  group.position.set(interaction.x, interaction.y || 0, .08);
+  group.position.set(interaction.x, interaction.y || 0, .22);
   const marker = new THREE.Mesh(
     new THREE.RingGeometry(.72, .86, 32),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .34, side: THREE.DoubleSide, toneMapped: false }),
   );
   marker.scale.y = .28;
-  marker.position.set(0, .08, -.02);
+  marker.position.set(0, .08, .1);
   group.add(marker);
-  if (kind === "homeComputer" || kind === "equipmentShop") {
-    const desk = Box(1.9, .16, .08, 0x302f42, { castShadow: false });
-    desk.position.y = .92;
-    const monitor = Box(.92, .66, .08, 0x10111a, { castShadow: false });
-    monitor.position.set(0, 1.38, .02);
-    const screen = Box(.75, .49, .02, color, { emissive: color, emissiveIntensity: .65, castShadow: false });
-    screen.position.set(0, 1.38, .07);
-    const legLeft = Box(.1, .9, .06, 0x242534, { castShadow: false });
-    const legRight = legLeft.clone();
-    legLeft.position.set(-.7, .46, 0);
-    legRight.position.set(.7, .46, 0);
-    group.add(desk, monitor, screen, legLeft, legRight);
+  if (kind === "homeComputer") {
+    Place(group, Box(2.15, .16, .82, 0x6f4931, { surface: "wood", roughness: .7 }), 0, .88, .02);
+    for (const legX of [-.82, .82]) Place(group, Box(.12, .86, .12, 0x493326, { surface: "wood" }), legX, .44, -.02);
+    Place(group, Box(.98, .72, .16, 0x17191d, { surface: "metal", metalness: .35, roughness: .38 }), -.18, 1.39, .12);
+    Place(group, Box(.82, .55, .025, 0x8475ff, { emissive: color, emissiveIntensity: .72, roughness: .18, castShadow: false }), -.18, 1.4, .22);
+    Place(group, Box(.1, .32, .1, 0x303238, { surface: "metal", metalness: .55 }), -.18, 1.0, .1);
+    Place(group, Box(.5, .07, .25, 0x25272c, { surface: "metal", metalness: .32 }), -.18, .91, .3);
+    Place(group, Box(.76, .045, .28, 0x34353a, { surface: "metal", metalness: .22 }), .22, .99, .4);
+    for (let keyIndex = 0; keyIndex < 9; keyIndex += 1) Place(group, Box(.055, .018, .035, 0xc4c6ca, { castShadow: false }), -.08 + keyIndex * .075, 1.018, .545);
+    const mug = Cylinder(.12, .105, .22, 0xe1d9ca, 18, { surface: "paper", roughness: .58 });
+    Place(group, mug, .78, 1.05, .12);
+    const mugHandle = Torus(.105, .025, 0xe1d9ca, { roughness: .58, radialSegments: 8, tubularSegments: 20 });
+    mugHandle.rotation.y = Math.PI / 2;
+    Place(group, mugHandle, .9, 1.08, .12);
+    AddTaskLamp(group, -.87, .98, .05, color, 1);
+    AddPaperStack(group, .66, .98, .36, .34, 0xe9dfc9, 3);
+  } else if (kind === "equipmentShop") {
+    Place(group, Box(2.5, .82, .92, 0x294059, { surface: "metal", metalness: .28, roughness: .47 }), 0, .42, -.02);
+    Place(group, Box(2.6, .11, 1.02, 0x9eb1c1, { surface: "metal", metalness: .52, roughness: .3 }), 0, .87, .02);
+    for (const drawerX of [-.78, 0, .78]) {
+      Place(group, Box(.65, .52, .045, 0x243243, { surface: "metal", metalness: .25 }), drawerX, .42, .46);
+      Place(group, Box(.24, .035, .025, 0xacc6d9, { surface: "metal", metalness: .75, roughness: .22 }), drawerX, .48, .49);
+    }
+    Place(group, Box(.9, .65, .13, 0x15191f, { surface: "metal", metalness: .42 }), -.47, 1.43, .08);
+    Place(group, Box(.75, .5, .025, 0x65bdf1, { emissive: color, emissiveIntensity: .68, roughness: .16, castShadow: false }), -.47, 1.43, .16);
+    Place(group, Box(.5, .58, .7, 0x32363c, { surface: "metal", metalness: .35 }), .72, 1.2, -.02);
+    for (const ventY of [1.02, 1.14, 1.26, 1.38]) Place(group, Box(.28, .018, .02, 0x101318, { castShadow: false }), .72, ventY, .345);
+    AddPaperStack(group, .26, .96, .35, .4, 0xe5dac5, 5);
   } else if (kind === "homeFridge") {
-    const fridge = Box(1.25, 2.55, 1.05, 0x343a4b, { metalness: .18 });
+    const fridge = Box(1.34, 2.62, 1.12, 0xc7d0d2, { surface: "metal", metalness: .34, roughness: .42 });
     fridge.position.y = 1.28;
-    const glow = Box(.78, .15, .04, color, { emissive: color, emissiveIntensity: 1.1, castShadow: false });
-    glow.position.set(0, 1.75, .55);
-    group.add(fridge, glow);
-  } else if (["bank", "speculation"].includes(kind)) {
-    const kiosk = Box(1.35, 2.1, .8, 0x242838, { metalness: .22 });
-    kiosk.position.y = 1.05;
-    const screen = Box(.88, .72, .03, color, { emissive: color, emissiveIntensity: .92, castShadow: false });
-    screen.position.set(0, 1.42, .42);
-    group.add(kiosk, screen);
+    group.add(fridge);
+    Place(group, Box(1.16, .045, .035, 0x596065, { surface: "metal", metalness: .7, roughness: .22 }), 0, 1.58, .575);
+    for (const handleY of [.95, 1.9]) Place(group, Box(.08, .48, .08, 0x83898b, { surface: "metal", metalness: .82, roughness: .2 }), .45, handleY, .62);
+    for (const [magnetX, magnetY, magnetColor] of [[-.36,1.95,0xd9636d],[-.1,2.13,0x5c9ccc],[.17,1.82,0xd6b54c]]) {
+      Place(group, Box(.16, .18, .025, magnetColor, { surface: "paper", castShadow: false }), magnetX, magnetY, .59, magnetX * .08);
+    }
+    Place(group, Box(.78, .08, .025, color, { emissive: color, emissiveIntensity: .35, castShadow: false }), 0, .42, .59);
+  } else if (kind === "speculation") {
+    Place(group, Box(2.25, .88, .92, 0x436b55, { surface: "wood", roughness: .7 }), 0, .45, -.02);
+    Place(group, Box(2.38, .12, 1.02, 0xd8cda9, { surface: "stone", roughness: .54 }), 0, .93, .02);
+    Place(group, Box(1.02, .055, .62, 0x245b3b, { surface: "fabric", roughness: .98 }), -.34, 1.02, .18);
+    for (let ticketIndex = 0; ticketIndex < 5; ticketIndex += 1) {
+      Place(group, Box(.23, .018, .42, ticketIndex % 2 ? 0xf0be4d : 0xd95759, { surface: "paper", castShadow: false }), -.67 + ticketIndex * .18, 1.06 + ticketIndex * .008, .25, (ticketIndex - 2) * .025);
+    }
+    Place(group, Box(.55, .72, .38, 0x2c3036, { surface: "metal", metalness: .36 }), .66, 1.3, -.02);
+    Place(group, Box(.42, .34, .025, color, { emissive: color, emissiveIntensity: .82, roughness: .15, castShadow: false }), .66, 1.38, .19);
+    const lamp = Sphere(.09, 0xffd166, { emissive: 0xffb33f, emissiveIntensity: 1.4, castShadow: false });
+    Place(group, lamp, .88, 1.83, .05);
+  } else if (kind === "bank") {
+    Place(group, Box(2.65, 1.0, 1.02, 0x5b3b38, { surface: "wood", roughness: .65 }), 0, .5, -.04);
+    Place(group, Box(2.75, .13, 1.12, 0xc2a578, { surface: "stone", roughness: .5 }), 0, 1.04, 0);
+    const glassMaterial = new THREE.MeshPhysicalMaterial({ color: 0xdbe8e8, transparent: true, opacity: .24, roughness: .08, metalness: 0, transmission: .12 });
+    Place(group, Box(2.24, 1.12, .025, 0xd9e7e7, { material: glassMaterial, castShadow: false }), 0, 1.7, .1);
+    for (const grilleX of [-.9,-.6,-.3,0,.3,.6,.9]) Place(group, Box(.025, 1.15, .025, 0xb79553, { surface: "metal", metalness: .86, roughness: .22 }), grilleX, 1.7, .15);
+    Place(group, Box(.62, .045, .32, 0x211c1b, { surface: "metal", metalness: .44 }), 0, 1.13, .34);
+    AddPaperStack(group, -.7, 1.14, .28, .42, 0xe8dfcd, 5);
+    Place(group, Box(.42, .52, .22, 0x292c31, { surface: "metal", metalness: .42 }), .72, 1.42, .22);
+    Place(group, Box(.31, .23, .02, color, { emissive: color, emissiveIntensity: .52, castShadow: false }), .72, 1.48, .345);
   } else if (kind === "talentMarket") {
-    const counter = Box(2.4, .85, .08, 0x28314a, { castShadow: false });
-    counter.position.y = .43;
+    const counter = Box(2.7, .86, .9, 0x38506b, { surface: "wood", roughness: .72 });
+    counter.position.set(0, .43, -.03);
     const personA = BuildFlatHumanActor(0x66b8ff, false);
     const personB = BuildFlatHumanActor(0xffd166, false);
-    personA.scale.setScalar(.72);
-    personB.scale.setScalar(.72);
-    personA.position.set(-.58, .78, -.03);
-    personB.position.set(.58, .78, -.03);
+    personA.scale.setScalar(.68);
+    personB.scale.setScalar(.68);
+    personA.position.set(-.62, .77, -.11);
+    personB.position.set(.62, .77, -.11);
     group.add(counter, personA, personB);
+    Place(group, Box(2.82, .12, 1.0, 0xa8b6bf, { surface: "metal", metalness: .4, roughness: .35 }), 0, .91, 0);
+    AddPaperStack(group, 0, .99, .34, .62, 0xe6dcc8, 7);
+    Place(group, Box(.5, .4, .16, 0x1c2028, { surface: "metal", metalness: .32 }), 1.0, 1.25, .08);
+    Place(group, Box(.4, .28, .02, 0x66b8ff, { emissive: 0x66b8ff, emissiveIntensity: .55, castShadow: false }), 1.0, 1.25, .17);
   } else if (kind === "snackShelf") {
-    const shelf = Box(2.2, 2.1, .08, 0x28423c, { castShadow: false });
-    shelf.position.y = 1.05;
-    for (const y of [.5, 1.05, 1.6]) {
-      const row = Box(1.85, .12, .04, color, { emissive: color, emissiveIntensity: .3, castShadow: false });
-      row.position.set(0, y, .08);
-      group.add(row);
-    }
+    const shelf = Box(2.4, 2.35, .48, 0x35534a, { surface: "metal", metalness: .24, roughness: .55 });
+    shelf.position.set(0, 1.17, -.12);
     group.add(shelf);
+    for (const [rowIndex, y] of [.45, 1.02, 1.59, 2.16].entries()) {
+      Place(group, Box(2.22, .12, .62, rowIndex === 3 ? 0x4a7d67 : 0x61766d, { surface: "metal", metalness: .35, roughness: .48 }), 0, y, .05);
+      for (let itemIndex = 0; itemIndex < 7; itemIndex += 1) {
+        const palette = [0xd85b58,0xe0b848,0x5a9bc1,0x8a6bc1,0x69a875];
+        AddPackage(group, -.91 + itemIndex * .3, y + .22, .29, palette[(itemIndex + rowIndex * 2) % palette.length], .78 + (itemIndex % 2) * .1, itemIndex % 4 === 0);
+      }
+    }
+    Place(group, Box(2.18, .06, .03, color, { emissive: color, emissiveIntensity: .28, castShadow: false }), 0, 2.32, .18);
   } else if (["regularFootbath", "footbathCity", "maleModelClub"].includes(kind)) {
-    const premium = kind !== "regularFootbath";
-    const chair = Box(1.55, 1.22, .12, premium ? 0x3b334c : 0x234347, { castShadow: false });
-    chair.position.set(-.38, 1.15, -.02);
-    chair.rotation.z = -.08;
-    const cushion = Box(1.25, .36, .08, premium ? 0x5b486e : 0x346065, { castShadow: false });
-    cushion.position.set(-.25, .62, .04);
-    const basin = Cylinder(.62, .48, .38, premium ? 0x755a88 : 0x4d7779, 24);
-    basin.position.set(.72, .32, .04);
-    const water = Cylinder(.5, .5, .035, color, 24);
-    water.position.set(.72, .53, .05);
-    group.add(chair, cushion, basin, water);
-    [0, 1, 2].forEach((steamIndex) => {
+    const isCity = kind === "footbathCity";
+    const isLuxury = kind === "maleModelClub";
+    const upholstery = isLuxury ? 0x641f3f : isCity ? 0x493d64 : 0x315b5c;
+    const trim = isLuxury ? 0xc29a62 : isCity ? 0x9d82bd : 0x6e8b83;
+    Place(group, Box(1.48, 1.22, .3, upholstery, { surface: "leather", roughness: .74 }), -.42, 1.35, -.06, -.09);
+    Place(group, Box(1.32, .34, .7, new THREE.Color(upholstery).multiplyScalar(1.18).getHex(), { surface: "leather", roughness: .8 }), -.27, .66, .16, -.025);
+    Place(group, Box(1.22, .18, .54, 0x2b2627, { surface: "wood", roughness: .66 }), -.22, .42, .12);
+    for (const armX of [-.93, .3]) Place(group, Box(.16, .46, .48, trim, { surface: isLuxury ? "wood" : "metal", metalness: isLuxury ? .12 : .42, roughness: .45 }), armX, .78, .12);
+    const basin = Cylinder(.63, .5, .42, isLuxury ? 0x7d526c : isCity ? 0x66567c : 0x6d8d89, 28, { surface: isLuxury ? "stone" : "tile", roughness: .44 });
+    Place(group, basin, .78, .31, .22);
+    const basinRim = Torus(.565, .045, trim, { surface: "metal", metalness: .74, roughness: .24 });
+    basinRim.rotation.x = Math.PI / 2;
+    Place(group, basinRim, .78, .53, .22);
+    Place(group, Cylinder(.51, .51, .028, color, 30, { emissive: color, emissiveIntensity: .32, transparent: true, opacity: .72, roughness: .16, castShadow: false }), .78, .545, .22);
+    for (let towelIndex = 0; towelIndex < 3; towelIndex += 1) {
+      Place(group, Box(.38, .055, .28, towelIndex % 2 ? 0xe4dccd : 0xcfc5b3, { surface: "fabric", roughness: .98 }), .84 + towelIndex * .018, .63 + towelIndex * .055, -.08, (towelIndex - 1) * .02);
+    }
+    for (let steamIndex = 0; steamIndex < 3; steamIndex += 1) {
       const steam = new THREE.Mesh(
         new THREE.RingGeometry(.09 + steamIndex * .025, .12 + steamIndex * .025, 18, 1, 0, Math.PI * 1.45),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .28, side: THREE.DoubleSide, toneMapped: false }),
+        new THREE.MeshBasicMaterial({ color: 0xf7efe3, transparent: true, opacity: .24, side: THREE.DoubleSide, toneMapped: false }),
       );
-      steam.position.set(.45 + steamIndex * .25, .9 + steamIndex * .08, .12);
+      steam.position.set(.54 + steamIndex * .23, .88 + steamIndex * .09, .42);
       steam.rotation.z = steamIndex % 2 ? .42 : -.28;
       group.add(steam);
-    });
-    if (kind === "maleModelClub") {
+    }
+    if (isLuxury) {
       const host = BuildFlatHumanActor(0xff86c8, false);
       host.scale.setScalar(.62);
-      host.position.set(-.98, .55, -.04);
+      host.position.set(-1.08, .55, .03);
       group.add(host);
+      Place(group, Sphere(.075, color, { emissive: color, emissiveIntensity: 1.35, castShadow: false }), 1.06, 1.34, .12);
     }
-  } else {
-    const counter = Box(2.4, 1.05, .12, kind === "hotel" ? 0x6b4d32 : 0x4b3a2e, { castShadow: false });
-    counter.position.y = .53;
-    const bowl = Cylinder(.34, .24, .18, color, 18);
+  } else if (kind === "diner") {
+    Place(group, Box(2.65, .92, 1.08, 0x73472d, { surface: "wood", roughness: .72 }), 0, .46, -.04);
+    Place(group, Box(2.78, .14, 1.18, 0x9b6b42, { surface: "wood", roughness: .6 }), 0, .97, 0);
+    const bowl = Cylinder(.34, .25, .19, 0xe4ddd0, 22, { surface: "stone", roughness: .52 });
     bowl.rotation.x = Math.PI / 2;
-    bowl.position.set(0, 1.18, .05);
-    group.add(counter, bowl);
+    Place(group, bowl, 0, 1.18, .1);
+    for (const offset of [-.05,.05]) Place(group, Box(.025, .54, .025, 0x6e3324, { surface: "wood", castShadow: false }), .48 + offset, 1.18, .22, -.78);
+    const pot = Cylinder(.38, .42, .42, 0x343434, 22, { surface: "metal", metalness: .62, roughness: .38 });
+    Place(group, pot, -.76, 1.22, -.05);
+    Place(group, Cylinder(.22, .22, .06, 0x242424, 18, { surface: "metal", metalness: .62 }), -.76, 1.46, -.05);
+    AddStool(group, -1.02, 0, .52, 0x6d3027);
+    AddStool(group, .95, 0, .52, 0x6d3027);
+  } else {
+    const table = Cylinder(.92, .92, .11, 0xe7dcc9, 36, { surface: "fabric", roughness: .96 });
+    Place(group, table, 0, .9, .02);
+    Place(group, Cylinder(.12, .18, .84, 0x6a503d, 18, { surface: "wood" }), 0, .43, 0);
+    Place(group, Cylinder(.48, .58, .08, 0x594234, 24, { surface: "wood" }), 0, .06, 0);
+    const plate = Cylinder(.34, .34, .045, 0xece8dc, 28, { surface: "stone", roughness: .38 });
+    Place(group, plate, 0, .99, .03);
+    const cloche = new THREE.Mesh(
+      new THREE.SphereGeometry(.28, 24, 14, 0, Math.PI * 2, 0, Math.PI * .54),
+      SurfaceMaterial("metal", 0xc6b277, { metalness: .86, roughness: .2 }),
+    );
+    cloche.scale.y = .72;
+    Place(group, cloche, 0, 1.1, .03);
+    Place(group, Sphere(.055, 0xc6b277, { surface: "metal", metalness: .9, roughness: .16 }), 0, 1.34, .03);
+    AddStool(group, -.92, 0, .38, 0x7d293d);
+    AddStool(group, .92, 0, .38, 0x7d293d);
   }
-  const sign = TextPlane(title, subtitle, 2.5, `#${color.toString(16).padStart(6, "0")}`);
-  sign.position.set(0, 3.05, .22);
-  group.add(sign);
+  AddPhysicalLabel(group, title, subtitle, 2.75, 0, 3.03, -.02, color, { compact: true, backing: kind === "hotel" ? 0x513828 : 0x26272a });
   group.userData.marker = marker;
   group.userData.interactionId = interaction.id;
   group.userData.kind = kind;
@@ -848,16 +1167,93 @@ function AddSceneRing(group, innerRadius, outerRadius, x, y, color, options = {}
 }
 
 function AddPendant(group, x, accent, cableTop = 5.15, lampY = 4.35) {
-  AddScenePanel(group, .035, cableTop - lampY, x, lampY + (cableTop - lampY) * .5, 0x34303b, { z: -.1 });
-  AddSceneDisc(group, .33, x, lampY, accent, { z: -.16, opacity: .09 });
-  const shade = new THREE.Mesh(
-    new THREE.CircleGeometry(.23, 18, 0, Math.PI),
-    new THREE.MeshBasicMaterial({ color: 0x252431, toneMapped: false, side: THREE.DoubleSide }),
-  );
-  shade.position.set(x, lampY + .04, -.09);
-  shade.rotation.z = Math.PI;
-  group.add(shade);
-  return AddSceneDisc(group, .075, x, lampY - .08, accent, { z: -.07, opacity: .9, segments: 14 });
+  const cable = Cylinder(.018, .018, cableTop - lampY, 0x292826, 10, { surface: "metal", metalness: .55, roughness: .38, castShadow: false });
+  Place(group, cable, x, lampY + (cableTop - lampY) * .5, .22);
+  const shade = Cylinder(.13, .34, .3, 0x343331, 24, { surface: "metal", metalness: .48, roughness: .36 });
+  Place(group, shade, x, lampY + .08, .22);
+  const rim = Torus(.32, .025, 0x7b7366, { surface: "metal", metalness: .72, roughness: .28 });
+  rim.rotation.x = Math.PI / 2;
+  Place(group, rim, x, lampY - .07, .22);
+  const bulb = Sphere(.085, accent, { emissive: accent, emissiveIntensity: 1.7, roughness: .2, castShadow: false, segments: 14, rings: 9 });
+  Place(group, bulb, x, lampY - .13, .22);
+  AddSceneDisc(group, .52, x, lampY - .18, accent, { z: -.2, opacity: .075, scaleY: .72, segments: 32 });
+  const light = new THREE.PointLight(accent, 2.8, 5.4, 2);
+  light.position.set(x, lampY - .22, 1.6);
+  light.castShadow = false;
+  worldPracticalLights.push(light);
+  group.add(light);
+  return bulb;
+}
+
+function AddFramedPanel(group, x, y, width, height, faceColor, frameColor = 0x4f3b2b, options = {}) {
+  Place(group, Box(width, height, .08, faceColor, {
+    surface: options.surface ?? "fabric", roughness: options.roughness ?? .88, castShadow: false,
+  }), x, y, options.z ?? -.08);
+  const frameDepth = .14;
+  const frameWidth = options.frameWidth ?? .1;
+  for (const [partWidth, partHeight, partX, partY] of [
+    [width + frameWidth * 2, frameWidth, x, y + height * .5 + frameWidth * .5],
+    [width + frameWidth * 2, frameWidth, x, y - height * .5 - frameWidth * .5],
+    [frameWidth, height, x - width * .5 - frameWidth * .5, y],
+    [frameWidth, height, x + width * .5 + frameWidth * .5, y],
+  ]) Place(group, Box(partWidth, partHeight, frameDepth, frameColor, { surface: options.frameSurface ?? "wood", metalness: options.frameMetalness ?? .04 }), partX, partY, (options.z ?? -.08) + .06);
+}
+
+function AddWallClock(group, x, y, accent = 0xd7bc78, radius = .54) {
+  const face = Cylinder(radius, radius, .1, 0xe6dfcd, 32, { surface: "paper", roughness: .78, castShadow: false });
+  face.rotation.x = Math.PI / 2;
+  Place(group, face, x, y, -.01);
+  Place(group, Torus(radius, .055, accent, { surface: "metal", metalness: .72, roughness: .28 }), x, y, .06);
+  for (let index = 0; index < 12; index += 1) {
+    const angle = index / 12 * Math.PI * 2;
+    Place(group, Box(.025, index % 3 ? .07 : .11, .018, 0x39342d, { castShadow: false }), x + Math.sin(angle) * radius * .78, y + Math.cos(angle) * radius * .78, .13, -angle);
+  }
+  Place(group, Box(.035, radius * .58, .018, 0x332d28, { castShadow: false }), x, y + radius * .22, .15, -.38);
+  Place(group, Box(.028, radius * .42, .02, 0x9e3638, { castShadow: false }), x, y + radius * .15, .16, 1.02);
+  Place(group, Sphere(.045, accent, { surface: "metal", metalness: .8, castShadow: false, segments: 10, rings: 7 }), x, y, .18);
+}
+
+function AddPlant(group, x, y, z, scale = 1) {
+  const pot = Cylinder(.27 * scale, .2 * scale, .42 * scale, 0x8d5339, 18, { surface: "stone", roughness: .9 });
+  Place(group, pot, x, y + .21 * scale, z);
+  for (let stemIndex = 0; stemIndex < 5; stemIndex += 1) {
+    const offset = (stemIndex - 2) * .08 * scale;
+    Place(group, Box(.025 * scale, (.52 + stemIndex % 2 * .18) * scale, .025 * scale, 0x395e3b, { castShadow: false }), x + offset, y + (.64 + stemIndex % 2 * .09) * scale, z, offset * -1.2);
+    const leaf = Sphere(.15 * scale, stemIndex % 2 ? 0x527c4f : 0x416b43, { surface: "fabric", roughness: .94, segments: 12, rings: 8 });
+    leaf.scale.set(.55, 1.25, .28);
+    Place(group, leaf, x + offset * 2.1, y + (.82 + stemIndex % 3 * .13) * scale, z + .02, offset * -2);
+  }
+}
+
+function AddQueuePost(group, x, ropeTargetX = null, color = 0xc2a05f) {
+  Place(group, Cylinder(.18, .23, .08, color, 20, { surface: "metal", metalness: .8, roughness: .22 }), x, .05, .72);
+  Place(group, Cylinder(.035, .045, 1.05, color, 14, { surface: "metal", metalness: .82, roughness: .2 }), x, .58, .72);
+  Place(group, Sphere(.09, color, { surface: "metal", metalness: .86, roughness: .18 }), x, 1.13, .72);
+  if (ropeTargetX !== null) {
+    const width = Math.abs(ropeTargetX - x);
+    const rope = Box(width, .055, .055, 0x6f2439, { surface: "fabric", roughness: .95 });
+    Place(group, rope, (x + ropeTargetX) * .5, .95, .72, (ropeTargetX > x ? -1 : 1) * .035);
+  }
+}
+
+function AddFluorescent(group, x, y, color = 0xe6fff7, width = 1.6) {
+  Place(group, Box(width + .16, .16, .2, 0x545a58, { surface: "metal", metalness: .58, roughness: .34 }), x, y, .03);
+  Place(group, Box(width, .075, .08, color, { emissive: color, emissiveIntensity: 1.35, roughness: .18, castShadow: false }), x, y - .045, .16);
+  const light = new THREE.PointLight(color, 2.15, 5.1, 2.15);
+  light.position.set(x, y - .18, 1.25);
+  worldPracticalLights.push(light);
+  group.add(light);
+}
+
+function AddTuftedPanel(group, x, y, width, height, color) {
+  Place(group, Box(width, height, .16, color, { surface: "fabric", roughness: .94, castShadow: false }), x, y, -.08);
+  const columns = Math.max(2, Math.round(width / .55));
+  const rows = Math.max(2, Math.round(height / .48));
+  for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) {
+    const button = Sphere(.032, 0x3a1822, { surface: "leather", roughness: .82, castShadow: false, segments: 9, rings: 6 });
+    button.scale.z = .35;
+    Place(group, button, x - width * .42 + column * width * .84 / Math.max(1, columns - 1), y - height * .38 + row * height * .76 / Math.max(1, rows - 1), .02);
+  }
 }
 
 function BuildLocationEnvironment(location, index) {
@@ -866,185 +1262,238 @@ function BuildLocationEnvironment(location, index) {
   const end = location.endX;
   const center = (start + end) * .5;
   const accent = HexColor(location.accent);
-  const deepAccent = new THREE.Color(accent).multiplyScalar(.36).getHex();
   const paleAccent = new THREE.Color(accent).lerp(new THREE.Color(0xffffff), .32).getHex();
-
-  const halo = AddSceneDisc(group, 3.2, center, 3.6, accent, { z: -.27, opacity: .035, scaleY: .68, segments: 36 });
-  const ceilingBar = AddScenePanel(group, 6.4, .055, center, 6.12, accent, { z: -.08, opacity: .42 });
-  AddScenePanel(group, 9.1, .13, center, .78, index % 2 ? 0x20202c : 0x252432, { z: -.09, opacity: .72 });
-  AddScenePanel(group, .05, 5.3, start + .34, 3.36, accent, { z: -.1, opacity: .24 });
-  AddScenePanel(group, .05, 5.3, end - .34, 3.36, accent, { z: -.1, opacity: .16 });
+  const roomWidth = end - start;
+  const halo = AddSceneDisc(group, 3.45, center, 3.45, accent, { z: -.29, opacity: .025, scaleY: .8, segments: 42 });
+  const ceilingBar = AddScenePanel(group, 6.4, .04, center, 6.08, accent, { z: -.04, opacity: .3 });
+  Place(group, Box(roomWidth - .28, .18, .18, location.id === "bank" || location.id === "hotel" ? 0xaa9164 : 0x544d45, { surface: location.id === "bank" ? "stone" : "wood", roughness: .62 }), center, .72, -.06);
+  Place(group, Box(roomWidth - .26, .1, .16, location.id === "hotel" ? 0xb89358 : 0x5d554d, { surface: location.id === "bank" ? "stone" : "wood", roughness: .58 }), center, 5.06, -.06);
+  for (const jambX of [start + .28, end - .28]) Place(group, Box(.16, 4.45, .18, index % 2 ? 0x3e3833 : 0x48413b, { surface: location.id === "bank" ? "stone" : "wood" }), jambX, 2.85, -.04);
 
   if (location.id === "home") {
-    AddScenePanel(group, 3.25, 2.25, center + .55, 3.42, 0x101829, { z: -.18 });
-    AddScenePanel(group, 3.42, .09, center + .55, 4.58, deepAccent, { z: -.1 });
-    AddScenePanel(group, 3.42, .09, center + .55, 2.26, deepAccent, { z: -.1 });
-    AddScenePanel(group, .075, 2.28, center + .55, 3.42, deepAccent, { z: -.09 });
-    AddScenePanel(group, 3.3, .055, center + .55, 3.42, deepAccent, { z: -.09 });
+    const windowX = center + .55;
+    AddFramedPanel(group, windowX, 3.42, 3.3, 2.28, 0x14213a, 0x70523c, { surface: "metal", frameWidth: .11, z: -.13 });
+    Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, 3.42, .02);
+    Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, 3.42, .02);
     [0, 1, 2, 3, 4].forEach((buildingIndex) => {
       const width = .38 + (buildingIndex % 2) * .18;
       const height = .52 + ((buildingIndex * 7) % 3) * .24;
       const x = center - .72 + buildingIndex * .37;
-      AddScenePanel(group, width, height, x, 2.32 + height * .5, buildingIndex % 2 ? 0x19243b : 0x151d31, { z: -.11 });
-      AddScenePanel(group, .045, .045, x + .07, 2.48 + height * .35, accent, { z: -.08, opacity: .35 });
+      Place(group, Box(width, height, .03, buildingIndex % 2 ? 0x26324a : 0x202a40, { surface: "plaster", castShadow: false }), x, 2.3 + height * .5, -.035);
+      Place(group, Box(.045, .045, .015, buildingIndex % 2 ? 0xe8c96d : accent, { emissive: accent, emissiveIntensity: .25, castShadow: false }), x + .07, 2.48 + height * .35, -.005);
     });
-    AddScenePanel(group, 1.55, 1.5, start + 1.05, 1.63, 0x252438, { z: -.12 });
-    [.38, .82, 1.25].forEach((y) => AddScenePanel(group, 1.25, .055, start + 1.05, y + .55, 0x4d4868, { z: -.07 }));
-    [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
-      AddScenePanel(group, .38, .26, x, y, noteIndex === 1 ? 0xffd166 : paleAccent, { z: -.07, opacity: .68, rotation: (noteIndex - 1) * .06 });
-    });
-  } else if (location.id === "diner") {
-    AddScenePanel(group, 7.4, 1.38, center, 3.42, 0x241b1c, { z: -.18 });
-    for (let stripe = 0; stripe < 12; stripe += 1) {
-      AddScenePanel(group, .62, .42, start + 1.28 + stripe * .62, 4.55, stripe % 2 ? 0x3c2630 : deepAccent, { z: -.09, rotation: stripe % 2 ? -.08 : .08 });
+    Place(group, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
+    [.78, 1.22, 1.66, 2.1].forEach((y) => Place(group, Box(1.36, .075, .5, 0x8a6547, { surface: "wood" }), start + 1.05, y, .04));
+    for (let bookIndex = 0; bookIndex < 12; bookIndex += 1) {
+      const row = Math.floor(bookIndex / 4);
+      const colors = [0x8d4851,0x496680,0x887244,0x526f59];
+      Place(group, Box(.16, .3 + (bookIndex % 3) * .05, .28, colors[bookIndex % colors.length], { surface: "paper" }), start + .58 + bookIndex % 4 * .31, .98 + row * .44, .2, (bookIndex % 2 ? 1 : -1) * .025);
     }
-    AddScenePanel(group, 1.85, 1.12, start + 2.1, 3.35, 0x12141a, { z: -.07 });
-    [.28, .05, -.18].forEach((offset, lineIndex) => AddScenePanel(group, 1.34 - lineIndex * .14, .05, start + 2.1, 3.35 + offset, lineIndex === 0 ? accent : 0xd6c8ad, { z: -.05, opacity: .56 }));
+    AddFramedPanel(group, start + 3.04, 3.3, 1.6, 1.28, 0x8b6b46, 0x5b3d2b, { surface: "wood", z: -.08, frameWidth: .08 });
+    [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
+      Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
+    });
+    AddWallClock(group, start + 8.85, 3.8, 0xb8a26c, .48);
+    Place(group, Box(4.3, .045, 1.28, 0x5e466c, { surface: "fabric", roughness: .98 }), start + 4.45, .055, .72, -.02);
+  } else if (location.id === "diner") {
+    Place(group, Box(8.7, 1.42, .12, 0xd8c8ac, { surface: "tile", roughness: .45, castShadow: false }), center, 1.48, -.12);
+    AddFramedPanel(group, start + 2.1, 3.42, 1.92, 1.16, 0x181719, 0x7c4f32, { surface: "plaster", z: -.06, frameWidth: .09 });
+    const menu = TextPlane("今日小炒", "米饭另算 · 不许赊账", 1.65, "#f0d7a0");
+    menu.position.set(start + 2.1, 3.42, .04);
+    group.add(menu);
+    for (let stripe = 0; stripe < 12; stripe += 1) {
+      Place(group, Box(.61, .46, .11, stripe % 2 ? 0xe8ddc8 : 0x8d3442, { surface: "fabric", roughness: .96 }), start + 1.27 + stripe * .62, 4.48, -.04, stripe % 2 ? -.045 : .045);
+    }
     const bulbA = AddPendant(group, center - 1.4, accent);
     const bulbB = AddPendant(group, center + 1.45, accent, 5.15, 4.18);
     bulbA.userData.pulseOffset = .4;
     bulbB.userData.pulseOffset = 1.7;
-    for (let tile = 0; tile < 17; tile += 1) AddScenePanel(group, .025, 1.25, start + .45 + tile * .55, 1.48, 0x58464b, { z: -.07, opacity: .32 });
+    for (const hookX of [start + 7.7,start + 8.3,start + 8.9]) {
+      Place(group, Torus(.12, .018, 0x8b8275, { surface: "metal", metalness: .66, roughness: .28, castShadow: false }), hookX, 3.15, .02);
+      Place(group, Cylinder(.16, .12, .12, 0x44413b, 16, { surface: "metal", metalness: .52, roughness: .36 }), hookX, 2.88, .02);
+    }
+    Place(group, Box(5.2, .045, 1.18, 0x753727, { surface: "fabric", roughness: .98 }), center + .8, .055, .72);
   } else if (location.id === "market") {
-    AddScenePanel(group, 9.15, 2.65, center, 2.7, 0x14231f, { z: -.18 });
+    Place(group, Box(9.05, 2.68, .11, 0xc9d7cd, { surface: "tile", roughness: .42, castShadow: false }), center, 2.63, -.12);
     [start + 1.65, start + 5.05, start + 8.35].forEach((shelfX, shelfIndex) => {
-      AddScenePanel(group, 2.55, 2.15, shelfX, 2.35, shelfIndex === 1 ? 0x1d302b : 0x192a27, { z: -.11 });
+      Place(group, Box(2.55, 2.15, .34, shelfIndex === 1 ? 0x3e6257 : 0x35574f, { surface: "metal", metalness: .3, roughness: .52 }), shelfX, 2.35, -.06);
       [.72, 1.35, 1.98].forEach((y, rowIndex) => {
-        AddScenePanel(group, 2.25, .065, shelfX, y, rowIndex === 1 ? accent : 0x53736a, { z: -.06, opacity: .56 });
-        for (let item = 0; item < 5; item += 1) AddScenePanel(group, .18, .22 + (item % 2) * .08, shelfX - .82 + item * .4, y + .15, item % 3 === 0 ? paleAccent : 0x5c786f, { z: -.055, opacity: .54 });
+        Place(group, Box(2.28, .075, .45, rowIndex === 1 ? 0x6c927c : 0x63756e, { surface: "metal", metalness: .34, roughness: .5 }), shelfX, y, .08);
+        for (let item = 0; item < 7; item += 1) {
+          const colors = [0xdf6258,0xe4b64f,0x67a2bd,0x866bc0,0x7aaa72];
+          AddPackage(group, shelfX - .91 + item * .3, y + .19, .34, colors[(item + shelfIndex + rowIndex) % colors.length], .72 + (item % 2) * .08, item % 5 === 0);
+        }
       });
     });
     [center - 2.35, center, center + 2.35].forEach((x) => {
-      AddScenePanel(group, 1.55, .12, x, 5.05, 0xdfffea, { z: -.08, opacity: .72 });
-      AddScenePanel(group, 1.9, .34, x, 5.05, accent, { z: -.16, opacity: .045 });
+      AddFluorescent(group, x, 4.93, 0xe7fff5, 1.55);
     });
-    for (let flag = 0; flag < 9; flag += 1) AddScenePanel(group, .34, .28, start + .95 + flag * .96, 4.2 + (flag % 2) * .08, flag % 2 ? accent : 0xffd166, { z: -.06, opacity: .55, rotation: flag % 2 ? .12 : -.12 });
+    for (let flag = 0; flag < 9; flag += 1) Place(group, Box(.34, .28, .018, flag % 2 ? accent : 0xffd166, { surface: "paper", castShadow: false }), start + .95 + flag * .96, 4.18 + (flag % 2) * .07, .02, flag % 2 ? .12 : -.12);
+    Place(group, Box(8.0, .04, 1.1, 0x4a675e, { surface: "linoleum", roughness: .86 }), center, .055, .75);
   } else if (location.id === "talent") {
-    AddScenePanel(group, 9.1, 3.35, center, 3.0, 0x111c2d, { z: -.18 });
+    const glassMaterial = new THREE.MeshPhysicalMaterial({ color: 0x9fb8c9, transparent: true, opacity: .25, roughness: .36, metalness: .02, transmission: .08 });
     for (let paneIndex = 0; paneIndex < 5; paneIndex += 1) {
       const x = start + 1.05 + paneIndex * 1.95;
-      AddScenePanel(group, 1.72, 2.78, x, 3.12, paneIndex % 2 ? 0x182a42 : 0x14243a, { z: -.11, opacity: .88 });
-      AddScenePanel(group, .035, 2.78, x + .86, 3.12, accent, { z: -.07, opacity: .2 });
+      Place(group, Box(1.72, 2.78, .035, 0xa7bfd0, { material: glassMaterial.clone(), castShadow: false }), x, 3.02, -.06);
+      Place(group, Box(.055, 2.9, .12, 0x5f7589, { surface: "metal", metalness: .56, roughness: .34 }), x + .92, 3.02, .01);
     }
-    AddScenePanel(group, 2.2, .88, start + 2.2, 4.55, 0x0b101b, { z: -.05 });
-    [0, 1, 2].forEach((row) => AddScenePanel(group, 1.55 - row * .18, .05, start + 2.2, 4.76 - row * .22, row === 0 ? accent : 0xa9c7ec, { z: -.03, opacity: .58 }));
-    [start + 1.6, start + 4.15, start + 6.7].forEach((x) => {
-      AddScenePanel(group, .055, .9, x, 1.18, 0x6683aa, { z: -.04, opacity: .55 });
-      AddScenePanel(group, 2.45, .045, x + 1.2, 1.58, accent, { z: -.04, opacity: .35 });
-    });
-    [[start + 6.3, 4.28], [start + 7.15, 4.04], [start + 7.95, 4.37]].forEach(([x, y], cardIndex) => AddScenePanel(group, .58, .82, x, y, cardIndex === 1 ? paleAccent : 0xd8e6ff, { z: -.05, opacity: .5, rotation: (cardIndex - 1) * .035 }));
+    AddPhysicalLabel(group, "候选人登记", "先看作品，再谈梦想", 2.35, start + 2.05, 4.46, .06, accent, { compact: true, backing: 0x2e4359, surface: "metal" });
+    AddFramedPanel(group, start + 7.25, 3.75, 2.5, 1.5, 0x9a744b, 0x4b392b, { surface: "wood", z: -.01, frameWidth: .08 });
+    [[start + 6.35,4.05],[start + 7.15,3.75],[start + 7.95,4.12],[start + 6.65,3.35],[start + 7.65,3.3]].forEach(([x,y],cardIndex) => Place(group, Box(.56, .76, .018, cardIndex % 2 ? paleAccent : 0xe3d9c6, { surface: "paper", castShadow: false }), x, y, .09, (cardIndex - 2) * .02));
+    for (const chairX of [start + 1.25,start + 2.2,start + 6.2]) {
+      Place(group, Box(.72, .12, .52, 0x3b5a76, { surface: "fabric" }), chairX, .58, .35);
+      Place(group, Box(.72, .72, .14, 0x3b5a76, { surface: "fabric" }), chairX, .96, .05, -.08);
+      for (const legX of [-.25,.25]) Place(group, Box(.045, .48, .045, 0x6c7680, { surface: "metal", metalness: .62 }), chairX + legX, .27, .3, legX * .06);
+    }
+    AddFluorescent(group, center, 4.93, 0xdceeff, 2.4);
   } else if (location.id === "bank") {
-    AddScenePanel(group, 9.1, 3.8, center, 3.02, 0x211927, { z: -.18 });
+    Place(group, Box(9.08, 3.78, .12, 0x9c9388, { surface: "stone", roughness: .65, castShadow: false }), center, 2.9, -.13);
     [start + .95, start + 3.0, start + 7.0, start + 9.05].forEach((x, columnIndex) => {
-      AddScenePanel(group, .5, 3.9, x, 2.72, columnIndex % 2 ? 0x30243a : 0x382a40, { z: -.08 });
-      AddScenePanel(group, .78, .15, x, 4.69, accent, { z: -.06, opacity: .28 });
-      AddScenePanel(group, .78, .15, x, .77, accent, { z: -.06, opacity: .16 });
+      Place(group, Cylinder(.24, .28, 3.82, columnIndex % 2 ? 0x8a817a : 0xaba299, 22, { surface: "stone", roughness: .62 }), x, 2.69, -.02);
+      Place(group, Box(.72, .18, .42, 0xb69c69, { surface: "stone", roughness: .48 }), x, 4.64, -.01);
+      Place(group, Box(.72, .16, .42, 0xb69c69, { surface: "stone", roughness: .48 }), x, .78, -.01);
     });
-    AddSceneDisc(group, 1.22, start + 8.02, 2.78, 0x11131d, { z: -.06, segments: 32 });
-    AddSceneRing(group, .85, 1.06, start + 8.02, 2.78, accent, { z: -.04, opacity: .38 });
-    AddSceneDisc(group, .12, start + 8.02, 2.78, paleAccent, { z: -.02, segments: 14 });
-    for (let spoke = 0; spoke < 8; spoke += 1) AddScenePanel(group, .56, .035, start + 8.02, 2.78, accent, { z: -.025, opacity: .3, rotation: spoke * Math.PI / 4 });
-    AddScenePanel(group, 5.7, .055, start + 4.6, 1.56, paleAccent, { z: -.04, opacity: .26 });
+    const vaultX = start + 8.02;
+    const vault = Cylinder(1.22, 1.22, .28, 0x30353a, 36, { surface: "metal", metalness: .68, roughness: .31 });
+    vault.rotation.x = Math.PI / 2;
+    Place(group, vault, vaultX, 2.78, .02);
+    Place(group, Torus(1.03, .095, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .2);
+    Place(group, Torus(.48, .055, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .25);
+    for (let spoke = 0; spoke < 8; spoke += 1) Place(group, Box(.76, .045, .06, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .28, spoke * Math.PI / 4);
+    Place(group, Sphere(.13, 0xd2b46e, { surface: "metal", metalness: .9, roughness: .16 }), vaultX, 2.78, .32);
+    AddQueuePost(group, start + 2.9, start + 4.2);
+    AddQueuePost(group, start + 4.2, start + 5.5);
+    AddQueuePost(group, start + 5.5, null);
+    AddWallClock(group, start + 1.85, 3.72, 0xb59556, .44);
+    Place(group, Box(6.7, .04, 1.2, 0x58616a, { surface: "stone", roughness: .66 }), center - .45, .055, .72);
   } else if (location.id === "hotel") {
-    AddScenePanel(group, 9.1, 4.35, center, 3.1, 0x2c231b, { z: -.18 });
-    AddSceneDisc(group, 1.62, center, 2.92, 0x17151a, { z: -.09, segments: 36 });
-    AddSceneRing(group, 1.47, 1.62, center, 2.92, accent, { z: -.05, opacity: .5, segments: 36 });
-    AddScenePanel(group, 3.26, 1.75, center, 1.62, 0x17151a, { z: -.07 });
-    [start + 1.05, start + 2.05, start + 7.95, start + 8.95].forEach((x, lineIndex) => {
-      AddScenePanel(group, .055, 3.85 - (lineIndex % 2) * .45, x, 2.85, accent, { z: -.05, opacity: .34 });
-      AddSceneDisc(group, .13, x, 4.8 - (lineIndex % 2) * .3, accent, { z: -.04, opacity: .52, segments: 12 });
-    });
-    AddScenePanel(group, .035, .92, center, 5.08, 0x5b4d3d, { z: -.05 });
-    AddSceneRing(group, .62, .68, center, 4.56, paleAccent, { z: -.04, opacity: .55, segments: 20 });
-    [-.48, 0, .48].forEach((offset) => {
-      AddScenePanel(group, .025, .5, center + offset, 4.25, 0x695b47, { z: -.03 });
-      AddSceneDisc(group, .075, center + offset, 3.98, accent, { z: -.02, opacity: .86, segments: 12 });
-    });
+    Place(group, Box(9.06, 1.72, .15, 0x503728, { surface: "wood", roughness: .66, castShadow: false }), center, 1.65, -.12);
+    AddTuftedPanel(group, center, 3.55, 3.3, 2.16, 0x702a3b);
+    AddTuftedPanel(group, start + 2.0, 3.55, 2.55, 2.16, 0x5f2535);
+    AddTuftedPanel(group, end - 2.0, 3.55, 2.55, 2.16, 0x5f2535);
+    for (const x of [start + .95,start + 2.95,end - 2.95,end - .95]) {
+      Place(group, Box(.11, 4.1, .18, 0xb19059, { surface: "wood", roughness: .5 }), x, 2.82, .03);
+      const sconce = Sphere(.1, accent, { emissive: accent, emissiveIntensity: 1.35, castShadow: false });
+      Place(group, sconce, x, 4.55, .15);
+      Place(group, Torus(.18, .028, 0xb69c62, { surface: "metal", metalness: .78, roughness: .24 }), x, 4.55, .12);
+    }
+    Place(group, Cylinder(.018, .018, .74, 0x6a5844, 10, { surface: "metal", castShadow: false }), center, 4.82, .24);
+    for (const offset of [-.52,0,.52]) {
+      Place(group, Box(.025, .46, .025, 0xb4955e, { surface: "metal", metalness: .78 }), center + offset, 4.28, .24, offset * -.55);
+      Place(group, Sphere(.08, accent, { emissive: accent, emissiveIntensity: 1.45, castShadow: false }), center + offset, 4.04, .24);
+    }
+    Place(group, Torus(.66, .055, 0xb4955e, { surface: "metal", metalness: .8, roughness: .22 }), center, 4.46, .22);
+    AddFramedPanel(group, start + 2.05, 2.78, 1.28, .92, 0x39495b, 0xb59762, { surface: "fabric", frameMetalness: .25, z: .03 });
+    AddFramedPanel(group, end - 2.05, 2.78, 1.28, .92, 0x544235, 0xb59762, { surface: "fabric", frameMetalness: .25, z: .03 });
+    AddPlant(group, start + .75, .04, .55, .78);
+    AddPlant(group, end - .75, .04, .55, .78);
+    Place(group, Box(8.4, .05, 1.32, 0x6d2637, { surface: "fabric", roughness: .98 }), center, .06, .76);
   } else if (["footbath", "footbathCity", "maleModelClub"].includes(location.id)) {
     const isCity = location.id === "footbathCity";
     const isLuxury = location.id === "maleModelClub";
-    const wallColor = isLuxury ? 0x2d1828 : isCity ? 0x211a30 : 0x12282a;
-    AddScenePanel(group, 9.1, 4.15, center, 3.08, wallColor, { z: -.18 });
-    for (let tile = 0; tile < 15; tile += 1) {
-      AddScenePanel(group, .025, 3.65, start + .55 + tile * .63, 2.86, paleAccent, { z: -.11, opacity: .08 + (tile % 3) * .025 });
+    const upholstery = isLuxury ? 0x65213f : isCity ? 0x46395f : 0x315759;
+    const trim = isLuxury ? 0xbd965c : isCity ? 0x9b82b9 : 0x78948d;
+    const wallSurface = isLuxury ? "leather" : isCity ? "stone" : "tile";
+    Place(group, Box(9.06, 1.58, .16, isLuxury ? 0x4a2638 : isCity ? 0x39334d : 0x476a67, { surface: wallSurface, roughness: isLuxury ? .8 : .58, castShadow: false }), center, 1.58, -.12);
+    Place(group, Box(9.02, .16, .2, trim, { surface: "metal", metalness: .62, roughness: .3 }), center, 2.4, -.03);
+    for (const [seatIndex, seatX] of [center - 2.55, center, center + 2.55].entries()) {
+      AddFramedPanel(group, seatX, 3.35, 1.92, 1.72, seatIndex === 1 ? upholstery : new THREE.Color(upholstery).multiplyScalar(.82).getHex(), trim, {
+        surface: "leather", frameSurface: isLuxury ? "wood" : "metal", frameMetalness: isLuxury ? .18 : .6, frameWidth: .085, z: -.05,
+      });
+      AddTuftedPanel(group, seatX, 3.36, 1.56, 1.38, seatIndex === 1 ? upholstery : new THREE.Color(upholstery).multiplyScalar(.9).getHex());
+      Place(group, Box(1.46, .26, .72, upholstery, { surface: "leather", roughness: .82 }), seatX, 1.28, .18);
+      Place(group, Box(1.22, .07, .34, 0xe2dac9, { surface: "fabric", roughness: .98, castShadow: false }), seatX, 1.47, .28, seatIndex % 2 ? .025 : -.025);
     }
-    [center - 2.45, center, center + 2.45].forEach((seatX, seatIndex) => {
-      AddScenePanel(group, 1.45, 1.12, seatX, 2.15, seatIndex === 1 ? deepAccent : wallColor, { z: -.08, rotation: seatIndex === 1 ? 0 : (seatIndex - 1) * .025 });
-      AddScenePanel(group, 1.12, .28, seatX, 1.52, accent, { z: -.05, opacity: .24 });
-      AddSceneDisc(group, .42, seatX + .55, .83, accent, { z: -.04, opacity: .16, scaleY: .42, segments: 24 });
-      [0, 1].forEach((steamIndex) => AddSceneRing(group, .09, .12, seatX + .42 + steamIndex * .24, 1.18 + steamIndex * .19, paleAccent, { z: -.03, opacity: .28, segments: 16 }));
-    });
-    const lampCount = isLuxury ? 7 : isCity ? 5 : 3;
-    for (let lampIndex = 0; lampIndex < lampCount; lampIndex += 1) {
-      const lampX = start + 1.15 + lampIndex * (7.7 / Math.max(1, lampCount - 1));
-      AddScenePanel(group, .035, .72, lampX, 5.0, accent, { z: -.04, opacity: .42 });
-      AddSceneDisc(group, .115, lampX, 4.62, accent, { z: -.02, opacity: .78, segments: 16 });
+    for (const cabinetX of [start + .72, end - .72]) {
+      Place(group, Box(.82, 2.02, .46, isLuxury ? 0x513225 : 0x4c5d58, { surface: "wood", roughness: .7 }), cabinetX, 1.73, -.03);
+      [.95,1.34,1.73,2.12].forEach((shelfY, shelfIndex) => {
+        Place(group, Box(.69, .055, .5, trim, { surface: "metal", metalness: .48, roughness: .34 }), cabinetX, shelfY, .13);
+        Place(group, Box(.48, .12, .34, shelfIndex % 2 ? 0xe4dccf : paleAccent, { surface: "fabric", roughness: .98 }), cabinetX, shelfY + .1, .24);
+      });
+    }
+    AddPendant(group, center, accent, 5.18, 4.52);
+    for (const lampX of [center - 2.55, center + 2.55]) {
+      Place(group, Box(.05, .52, .08, trim, { surface: "metal", metalness: .75, roughness: .22 }), lampX, 4.68, .05);
+      Place(group, Sphere(.09, accent, { emissive: accent, emissiveIntensity: 1.28, castShadow: false }), lampX, 4.42, .14);
     }
     if (isLuxury) {
-      AddSceneRing(group, 1.15, 1.27, center, 3.55, accent, { z: -.035, opacity: .5, segments: 36 });
-      [-.55, 0, .55].forEach((offset, silhouetteIndex) => {
-        AddSceneDisc(group, .2, center + offset, 3.82 - Math.abs(offset) * .12, paleAccent, { z: -.02, opacity: .38, segments: 20 });
-        AddScenePanel(group, .34, .78, center + offset, 3.22, silhouetteIndex === 1 ? accent : paleAccent, { z: -.025, opacity: .24 });
-      });
+      AddPhysicalLabel(group, "情绪价值会所", "黄铜灯牌 · 真皮卡座", 3.45, center, 4.02, .13, accent, { compact: true, backing: 0x472638, surface: "leather" });
+      AddPlant(group, start + 1.32, .04, .52, .68);
+      AddPlant(group, end - 1.32, .04, .52, .68);
     } else if (isCity) {
-      AddScenePanel(group, 4.6, .34, center, 4.25, accent, { z: -.04, opacity: .16 });
-      AddScenePanel(group, 3.8, .055, center, 4.25, paleAccent, { z: -.02, opacity: .58 });
+      Place(group, Box(4.4, .08, .1, accent, { emissive: accent, emissiveIntensity: .36, castShadow: false }), center, 4.12, .13);
+    } else {
+      for (let tileLine = 0; tileLine < 8; tileLine += 1) Place(group, Box(.035, 1.5, .03, 0xd4ddd6, { castShadow: false }), start + 1.3 + tileLine * 1.05, 1.6, .01);
     }
+    Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
 
-  locationVisuals.set(location.id, { group, halo, ceilingBar, accent: new THREE.Color(accent), phase: index * 1.37 });
+  const practicalColors = { home: 0xffd6ad, diner: 0xffc77f, market: 0xdfffee, talent: 0xdbeaff, bank: 0xffe0c6, hotel: 0xffc47d, footbath: 0xc8fff4, footbathCity: 0xe0cfff, maleModelClub: 0xffc6e4 };
+  const roomLight = new THREE.PointLight(practicalColors[location.id] || accent, 1.55, 9.2, 2.05);
+  roomLight.position.set(center, 3.8, 3.1);
+  roomLight.castShadow = false;
+  worldPracticalLights.push(roomLight);
+  group.add(roomLight);
+  locationVisuals.set(location.id, { group, halo, ceilingBar, roomLight, accent: new THREE.Color(accent), phase: index * 1.37 });
   roomGroup.add(group);
 }
 
 function BuildRoom() {
   const width = Math.abs(WorldBounds.maxX - WorldBounds.minX) + 4;
   const worldCenter = (WorldBounds.maxX + WorldBounds.minX) * .5;
-  const upperVoid = FlatPanel(width + 8, 2.2, 0x05070e, { z: -.62 });
-  upperVoid.position.set(worldCenter, 7.05, -.62);
-  distantGroup.add(upperVoid);
-  for (let line = 0; line < 9; line += 1) {
-    const cable = FlatPanel(width + 5, .018, line % 3 ? 0x161724 : 0x29263a, { z: -.58, opacity: line % 3 ? .2 : .32, rotation: (line - 4) * .0025 });
-    cable.position.set(worldCenter, 6.38 + line * .14, -.58);
-    distantGroup.add(cable);
+  Place(distantGroup, Box(width + 8, 2.2, .16, 0x18191b, { surface: "fabric", roughness: .98, castShadow: false }), worldCenter, 7.05, -1.2);
+  for (let beamIndex = 0; beamIndex < 13; beamIndex += 1) {
+    Place(distantGroup, Box(width + 5, .045, .08, beamIndex % 3 ? 0x292825 : 0x6b5a43, { surface: beamIndex % 3 ? "metal" : "wood", metalness: beamIndex % 3 ? .3 : .02, castShadow: false }), worldCenter, 6.28 + beamIndex * .12, -1.02, (beamIndex - 6) * .0018);
   }
-  const floor = Box(width, .24, .18, 0x171925, { castShadow: false, roughness: .95 });
-  floor.position.set(worldCenter, -.14, 0);
-  roomGroup.add(floor);
-  const floorLip = FlatPanel(width, .18, 0x080a11, { z: 1.1, opacity: .58 });
-  floorLip.position.set(worldCenter, -.04, 1.1);
-  foregroundGroup.add(floorLip);
+  Place(roomGroup, Box(width, .3, 3.4, 0x322d2a, { surface: "wood", roughness: .76 }), worldCenter, -.17, .55);
+  Place(foregroundGroup, Box(width, .2, .18, 0x141416, { surface: "metal", metalness: .3, roughness: .48 }), worldCenter, -.02, 1.62);
+  const roomLooks = {
+    home: { wall: 0x817696, surface: "plaster", floor: 0x493a35, floorSurface: "wood", sign: 0x41354f },
+    diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile", sign: 0x5b302d },
+    market: { wall: 0x718d80, surface: "tile", floor: 0x465d55, floorSurface: "linoleum", sign: 0x2e5145 },
+    talent: { wall: 0x72869d, surface: "plaster", floor: 0x40536a, floorSurface: "linoleum", sign: 0x31485f },
+    bank: { wall: 0x8d8289, surface: "stone", floor: 0x514d50, floorSurface: "stone", sign: 0x563a4d },
+    hotel: { wall: 0x806553, surface: "fabric", floor: 0x5e3b3b, floorSurface: "fabric", sign: 0x68412f },
+    footbath: { wall: 0x66817d, surface: "tile", floor: 0x405c59, floorSurface: "tile", sign: 0x315452 },
+    footbathCity: { wall: 0x685c77, surface: "stone", floor: 0x493f58, floorSurface: "stone", sign: 0x45375a },
+    maleModelClub: { wall: 0x78465f, surface: "leather", floor: 0x573047, floorSurface: "fabric", sign: 0x5b2944 },
+  };
   WorldLocations.forEach((location, index) => {
     const locationWidth = location.endX - location.startX;
     const centerX = location.startX + locationWidth / 2;
-    const wall = Box(locationWidth - .08, 6.5, .08, HexColor(location.color), { castShadow: false, roughness: 1 });
-    wall.position.set(centerX, 3.15, -.32);
+    const look = roomLooks[location.id];
+    const wall = Box(locationWidth - .08, 6.5, .18, look.wall, { surface: look.surface, castShadow: false, roughness: .92 });
+    wall.position.set(centerX, 3.15, -.72);
     roomGroup.add(wall);
-    const lowerBand = Box(locationWidth - .08, .75, .05, index % 2 ? 0x161824 : 0x1d1d2b, { castShadow: false });
-    lowerBand.position.set(centerX, .38, -.18);
-    roomGroup.add(lowerBand);
+    Place(roomGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
+    Place(roomGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
     BuildLocationEnvironment(location, index);
-    const signPlate = FlatPanel(6.3, .92, 0x080a12, { z: -.16, opacity: .58 });
-    signPlate.position.set(centerX, 5.56, -.16);
-    roomGroup.add(signPlate);
-    const locationSign = TextPlane(location.name, location.subtitle, 5.4, location.accent);
-    locationSign.position.set(centerX, 5.55, -.12);
-    roomGroup.add(locationSign);
-    const divider = Box(.1, 6.55, .05, 0x090b12, { castShadow: false });
-    divider.position.set(location.endX, 3.15, -.08);
-    roomGroup.add(divider);
+    AddPhysicalLabel(roomGroup, location.name, location.subtitle, 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
+    Place(roomGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 3.15, -.18);
+    Place(roomGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 6.36, -.16);
     for (let markerIndex = 0; markerIndex < 4; markerIndex += 1) {
-      const marker = FlatPanel(.56, .025, HexColor(location.accent), { z: 1.12, opacity: .2 + markerIndex * .04 });
-      marker.position.set(location.startX + 1.4 + markerIndex * 2.3, .08, 1.12);
-      foregroundGroup.add(marker);
+      Place(foregroundGroup, Box(.56, .025, .11, HexColor(location.accent), { surface: "metal", metalness: .58, roughness: .34, emissive: HexColor(location.accent), emissiveIntensity: .08 + markerIndex * .015, castShadow: false }), location.startX + 1.4 + markerIndex * 2.3, .075, 1.7);
     }
   });
   WorldInteractions.forEach(BuildFacility);
-  const ambient = new THREE.HemisphereLight(0xd8deff, 0x5b405f, 2.35);
-  const key = new THREE.DirectionalLight(0xf7f2ff, 1.85);
-  key.position.set(4, 8, 10);
-  worldAccentLight = new THREE.PointLight(0x9d8cff, 4.8, 11, 1.8);
-  worldAccentLight.position.set(WorldLocations[0].startX + 5, 4.3, 5.5);
-  scene.add(ambient, key, worldAccentLight);
+  const ambient = new THREE.HemisphereLight(0xfff4e1, 0x342d43, 1.42);
+  const key = new THREE.DirectionalLight(0xfff2dc, 2.65);
+  key.position.set(5, 9, 11);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = -18;
+  key.shadow.camera.right = 18;
+  key.shadow.camera.top = 10;
+  key.shadow.camera.bottom = -4;
+  key.shadow.camera.near = .5;
+  key.shadow.camera.far = 45;
+  key.shadow.bias = -.00055;
+  key.shadow.normalBias = .035;
+  const fill = new THREE.DirectionalLight(0xaecbff, .72);
+  fill.position.set(-8, 4, 7);
+  worldAccentLight = new THREE.PointLight(0x9d8cff, 3.4, 10.5, 1.9);
+  worldAccentLight.position.set(WorldLocations[0].startX + 5, 4.1, 4.2);
+  scene.add(ambient, key, fill, worldAccentLight);
 }
 
 function BuildCeremonyScene() {
@@ -1616,9 +2065,9 @@ function Animate() {
     const lookAhead = Clamp((worldState.vx || 0) * .075, -.45, .45);
     const targetCameraX = rawCameraX + lookAhead;
     smoothCameraX += (targetCameraX - smoothCameraX) * (1 - Math.exp(-delta * 5.4));
-    camera.position.set(smoothCameraX + Math.sin(time * 17) * shake * .1, 3.4 + Math.cos(time * 14) * shake * .06, 13.5);
-    camera.lookAt(smoothCameraX, 3.08, 0);
-    renderer.toneMappingExposure = 1.34 + Math.sin(time * 8) * shake * .055;
+    camera.position.set(smoothCameraX + Math.sin(time * 17) * shake * .1, 3.64 + Math.cos(time * 14) * shake * .06, 13.35);
+    camera.lookAt(smoothCameraX, 2.98, 0);
+    renderer.toneMappingExposure = 1.25 + Math.sin(time * 8) * shake * .055;
     sceneToneTarget.copy(sceneToneByLocation.get(location?.id) || sceneToneByLocation.get("home"));
     sceneToneTarget.offsetHSL(0, 0, shake * .035);
     const toneLerp = 1 - Math.exp(-delta * 2.2);
@@ -1635,6 +2084,7 @@ function Animate() {
       const pulse = active ? Math.sin(time * 1.6 + visual.phase) * .04 : 0;
       visual.halo.material.opacity += (((active ? .072 : .026) + pulse * .12) - visual.halo.material.opacity) * (1 - Math.exp(-delta * 4));
       visual.ceilingBar.material.opacity += ((active ? .66 + pulse : .2) - visual.ceilingBar.material.opacity) * (1 - Math.exp(-delta * 5));
+      if (visual.roomLight) visual.roomLight.intensity += ((active ? 2.45 + pulse * 2 : .72) - visual.roomLight.intensity) * (1 - Math.exp(-delta * 3.8));
     });
   }
   UpdateLocationIndicator();
