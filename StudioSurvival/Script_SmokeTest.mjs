@@ -436,7 +436,7 @@ function HasRecordedId(collection, id) {
 
 {
   assert.equal(SCRATCH_OPTION.category, "lottery", "the counter must expose one dedicated scratch option");
-  assert.equal(STOCK_OPTIONS.length, 2, "the computer stock picker must stay deliberately small");
+  assert.equal(STOCK_OPTIONS.length, 2, "the bank stock picker must stay deliberately small");
   assert(STOCK_OPTIONS.every((option) => option.category === "stock" && !Object.hasOwn(option, "stake")), "stock choices must only define the asset, not a fixed bet");
 
   let scratchWin = null;
@@ -474,10 +474,10 @@ function HasRecordedId(collection, id) {
   const funded = first.state;
   funded.cash = 200_000;
   const order = PlaceStockOrder(funded, STOCK_OPTIONS[1].id, 12_500);
-  assert.equal(order.ok, true, "the computer must accept a stock order after the capital gate is met");
+  assert.equal(order.ok, true, "the bank must accept a stock order after the capital gate is met");
   assert.equal(order.stake, 12_000, "stock buy amounts must be rounded down to whole thousands");
   assert.equal(order.state.cash, 188_000, "the chosen buy amount must leave available cash immediately");
-  assert.equal(order.state.stockAccountUnlocked, true, "crossing the gate must permanently unlock the computer feature");
+  assert.equal(order.state.stockAccountUnlocked, true, "crossing the gate must permanently unlock the bank account");
   assert.equal(order.state.stockHistory.length, 0, "the order must not reveal its result immediately");
   assert.equal(order.state.stockPosition.optionId, STOCK_OPTIONS[1].id);
   assert.equal(PlaceStockOrder(order.state, STOCK_OPTIONS[0].id, 5000).ok, false, "only one stock may be held during a month");

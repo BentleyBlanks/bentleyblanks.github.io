@@ -31,7 +31,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815r";
+} from "./Data_Game.mjs?v=20260815s";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;

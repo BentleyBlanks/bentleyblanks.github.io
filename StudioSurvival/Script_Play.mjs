@@ -22,7 +22,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815r";
+} from "./Data_Game.mjs?v=20260815s";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -69,7 +69,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815r";
+} from "./Script_Rules.mjs?v=20260815s";
 import {
   FindLocation,
   FindLocationAt,
@@ -1056,7 +1056,7 @@ function BuildFacility(interaction) {
       Place(group, Box(.16, .18, .025, magnetColor, { surface: "paper", castShadow: false }), magnetX, magnetY, .59, magnetX * .08);
     }
     Place(group, Box(.78, .08, .025, color, { emissive: color, emissiveIntensity: .35, castShadow: false }), 0, .42, .59);
-  } else if (kind === "speculation") {
+  } else if (kind === "scratch") {
     Place(group, Box(2.25, .88, .92, 0x436b55, { surface: "wood", roughness: .7 }), 0, .45, -.02);
     Place(group, Box(2.38, .12, 1.02, 0xd8cda9, { surface: "stone", roughness: .54 }), 0, .93, .02);
     Place(group, Box(1.02, .055, .62, 0x245b3b, { surface: "fabric", roughness: .98 }), -.34, 1.02, .18);

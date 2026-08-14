@@ -74,6 +74,7 @@ assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", Complete
 assert.match(script, /AddPhysicalLabel\(roomGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");
+assert.doesNotMatch(script, /function OpenHomeComputerSheet[\s\S]*?data-open-stock[\s\S]*?function OpenWorkstationSheet/, "the development computer must not expose stock trading");
 assert.match(script, /function OpenScratchSheet\(/, "the supermarket counter must have its own scratch-card screen");
 assert.match(script, /function StockSettlementReport\(/, "the next turn must render the monthly stock trend and return");
 assert.doesNotMatch(script, /LOTTERY \/ STOCKS/, "stocks and scratch cards must not share the old combined entry");

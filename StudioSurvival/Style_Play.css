@@ -1841,7 +1841,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .contractSection { margin-top: 4px; }
   .contractHeading { margin-bottom: 3px; }
   .contractHeading > b { width: 20px; height: 20px; }
-  .projectContract .choiceCard { min-height: 42px; padding: 5px 6px; }
+  .projectContract .choiceCard { min-height: 44px; padding: 5px 6px; }
   .projectContract .choiceCard p { display: none; }
   .contractFinePrint { margin-top: 4px; padding: 4px 6px; }
   .signatureRow { margin-top: 3px; }
@@ -3212,7 +3212,7 @@ body {
   .monthResultMode .stockTrendChart svg { height: 48px; }
   .monthResultMode .stockMonthReport > footer { padding: 2px 8px 4px; }
   .monthResultFootnote { padding: 5px 8px; }
-  .resultLayer.monthResultMode .resultCard > .primaryButton { min-height: 42px; margin-top: 7px; }
+  .resultLayer.monthResultMode .resultCard > .primaryButton { min-height: 44px; margin-top: 7px; }
 }
 @media (max-width: 980px) and (orientation: landscape) {
   .ceremonyIntro { width:52vw; }

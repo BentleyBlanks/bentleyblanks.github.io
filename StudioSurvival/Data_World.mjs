@@ -69,7 +69,7 @@ export const InteractionPoints = FreezeList([
   { id: "dinerCounter", locationId: "diner", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 23.5, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
   { id: "dinerExit", locationId: "diner", kind: "exit", label: "出门", detail: "选择要去的地方", x: 31.15, y: 0, radius: 1, action: "travel" },
   { id: "snackShelf", locationId: "market", kind: "snackShelf", label: "零食架", detail: "超市小吃", x: 37.2, y: 0, radius: 1.45, action: "snack", consumerVenueId: "marketSnack" },
-  { id: "lotteryCounter", locationId: "market", kind: "lotteryMachine", label: "刮刮乐", detail: "每月 1 张", x: 42.6, y: 0, radius: 1.45, action: "scratch" },
+  { id: "lotteryCounter", locationId: "market", kind: "lotteryMachine", label: "刮刮乐柜台", detail: "每月限刮一张", x: 42.6, y: 0, radius: 1.45, action: "scratch" },
   { id: "marketExit", locationId: "market", kind: "exit", label: "出门", detail: "选择要去的地方", x: 47.15, y: 0, radius: 1, action: "travel" },
   { id: "equipmentCounter", locationId: "talent", kind: "equipmentShop", label: "设备柜台", detail: "每名员工需 1 套", x: 53.2, y: 0, radius: 1.5, action: "equipment" },
   { id: "talentCounter", locationId: "talent", kind: "talentMarket", label: "人才招聘", detail: "大学生 / AI", x: 59.1, y: 0, radius: 1.55, action: "talent" },
