@@ -44,7 +44,10 @@
     "刘嫂": "Mother",
     "伪保长": "Traitor",
     "伪军头目": "Traitor",
-    "日军军曹": "Enemy"
+    "日军军曹": "Enemy",
+    "伪军": "Traitor",
+    "娘的声音": "Mother",
+    "陌生人": "Elder"
   },
   "roles": {
     "Narrator": {
@@ -119,6 +122,44 @@
         "speed": 1.05
       },
       "instruction": "四十来岁的中国男性，替日军传话的翻译官。中低音偏粗，喝问时端着借来的威风——音量大、字咬得重，但底子里有一点讨好主子的急切。华北口音的普通话。"
+    }
+  },
+  "minimaxVoices": {
+    "Narrator": {
+      "voice_id": "Chinese (Mandarin)_Gentleman",
+      "speed": "0.9",
+      "note": "中低音、克制；不用 Radio_Host——那是播音腔，声线设计里明令不要"
+    },
+    "Mother": {
+      "voice_id": "Chinese (Mandarin)_Mature_Woman",
+      "speed": "1",
+      "emotion": "fearful",
+      "note": "四十岁农妇，急但压着嗓子"
+    },
+    "Father": {
+      "voice_id": "Chinese (Mandarin)_Gentleman",
+      "speed": "0.9"
+    },
+    "Zhuzi": {
+      "voice_id": "Chinese (Mandarin)_Sincere_Adult",
+      "speed": "1"
+    },
+    "Sister": {
+      "voice_id": "Chinese (Mandarin)_Lovely_Girl",
+      "speed": "1"
+    },
+    "Elder": {
+      "voice_id": "Chinese (Mandarin)_Kind-hearted_Antie",
+      "speed": "0.9"
+    },
+    "Militia": {
+      "voice_id": "Chinese (Mandarin)_Sincere_Adult",
+      "speed": "1.1"
+    },
+    "Traitor": {
+      "voice_id": "Chinese_gravelly_storyteller_nv1",
+      "speed": "1.05",
+      "emotion": "angry"
     }
   }
 }

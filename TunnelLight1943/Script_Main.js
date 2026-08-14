@@ -57,9 +57,9 @@ import("./Script_Audio.js")
   })
   .catch((e) => { console.warn("声音模块未加载，按静音运行", e); });
 
-// 声音默认开着：旁白是这一版叙事的主体，关掉就少了一半。真正的"别吵到人"
-// 由浏览器兜底——AudioContext 在第一次手势之前一直是挂起的，静静躺着不出声，
-// 玩家点"从第一章开始"那一下才真正启动。不想听的按 M 或右上角关掉，记在本地。
+// **声音默认关着**（用户定的，2026-08-14 又被"默认开"回归过一次）：旁白/音效/
+// 配乐三路全在这一个开关底下，没点开之前一声不出。想听的按 M 或右上角打开，
+// 开关记在本地——所以只有第一次进来是静的。
 const SOUND_KEY = "tunnelLight1943.sound";
 // 三路音量各自记住。默认配乐低一些——它只是底噪，不该压住旁白。
 const VOL_KEY = "tunnelLight1943.vol";
@@ -75,7 +75,7 @@ function ApplyVolumes() {
   audio.SetSfxVolume(vol.sfx / 100);
   audio.SetMusicVolume(vol.music / 100);
 }
-let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
+let soundOn = localStorage.getItem(SOUND_KEY) === "on";
 audio.SetEnabled(soundOn);
 
 // iOS/Chrome 都要求音频在真实手势里启动，任何一次输入都拿来解锁
@@ -356,11 +356,36 @@ function ReadInput() {
 //   过场：构图变了才硬切；同构图连续行不重切、推进累计（一个镜头屏住呼吸）
 //   语汇：wide 全景 / shot 定点 / close 特写 / ots 过肩正反打 / insert 插入特写 / dark 黑场
 // ---------------------------------------------------------------------------
+// **景别的唯一标尺**（2026-08-14 用户拿《勇敢的心》的截图重定：「现在太宽了」）。
+// 量的是同一件事——**人在画高里占多少**：那张图里的大人占画高 21~22%；本作原来
+// 地表 hw 6.3（画高 7.09m），骨架实高 1.37m 的大人只占 19%、柱子（体型 0.80，
+// 实高 1.10m）只占 15.5%，一屏摆得下十二米村街，读出来就是"人小、街长、天多"。
+// 现在按这张表收：地表画高 5.01m，柱子占 22%、大人占 27%
+//（第一版收到 4.9／画高 5.5m，用户当天回「还可以再大一点（10%）」，全表除以 1.1）。
+// **特写不跟着收**——那几档是照着卡面、一张脸、门框上的刻痕量出来的，
+// 缩下去只会把主体挤出画（见 TightenHw 的下限）。
+const PLAY_HW = {
+  surface: 4.45,       // 地表白天
+  surfaceNight: 4.35,  // 夜里再紧一点点（暗处看得见的本来就少）
+  tunnelVillage: 5.65, // 地道村：一间洞室连着走廊，比街面退一档才装得下
+  tunnelFort: 4.25,
+};
+// 中远景的定点镜跟着同一把尺子收。下限 3.8 是本作最宽的那一档特写——
+// 比它还近的镜头一律原样过，别把脸和卡面挤出画框。
+const HW_TIGHTEN = 0.71;
+const HW_CLOSE = 3.8;
+const HW_WIDE_MAX = 8.5;   // 「退一档」的封顶（本作没有全景，见 CLAUDE.md 镜头规范）
+function TightenHw(d) {
+  return d <= HW_CLOSE ? d : Math.max(HW_CLOSE, d * HW_TIGHTEN);
+}
+
 const cam = { x: 60, y: 2.0, hw: 7.2 };
 let camSnap = true;
 // 冻帧开关：只给实拍/调试用（TunnelLight.Freeze）。见 RunFrame 里那段注释
 let frozen = false;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
+// 过场分级的当前档（0=一个字节都不动）。见 UpdateCamera 末尾与 World.SetCineGrade
+let gradeNow = 0;
 
 function ActorAt(state, id) {
   if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
@@ -376,8 +401,8 @@ function BaseShot(state) {
   const lookAhead = (p.heading || 1) * 2.0;
   // 景别整体推近一档（勇敢的心式：人物更大、更贴戏）——画面外的后果
   // 由角落的照片小窗兜着，不用为了"都看见"把镜头拉远
-  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.0 };
-  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.0 };
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: PLAY_HW.tunnelVillage };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: PLAY_HW.tunnelFort };
   // 地表：中近景，人物约占画高三分之一强；视平线略高于人头，地面向后退
   //
   // 爬梯子那两秒镜头**跟着人往下走**：Core 一按下 S 就把 level 翻成 under
@@ -385,7 +410,7 @@ function BaseShot(state) {
   // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
   const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
   let y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
-  const hw = ch.light === "night" ? 6.15 : 6.3;
+  const hw = ch.light === "night" ? PLAY_HW.surfaceNight : PLAY_HW.surface;
   // 走到窖口上头，镜头沉一档，把脚底下那间窖带进画框（Core 的 cellarPeek）。
   //
   // 地窖一直是画好的，可地表机位的下边沿只到 −1.7m、窖底在 −3.6m，整间窖
@@ -422,11 +447,13 @@ function HintShot(state, hint) {
       // 现在 wide 的意思只剩「比玩法机位退一档」，并且封顶：写多大都不许越过 12
       return {
         x: hint.x, y: hint.y ?? 2.4,
-        hw: Math.min(hint.hw ?? 9.5, 12),
+        hw: Math.min(TightenHw(hint.hw ?? 9.5), HW_WIDE_MAX),
         pan: hint.pan || 0,
       };
     case "shot":
-      return { x: hint.x, y: hint.y ?? 1.6, hw: hint.dist ?? 8, pan: hint.pan || 0 };
+      // 定点镜写的 dist 有一百多处，逐个改数字只会漏、也没法一眼看出全片的
+      // 景别是一把尺子。统一从 TightenHw 过一道：中远景收一档、特写原样。
+      return { x: hint.x, y: hint.y ?? 1.6, hw: Math.min(TightenHw(hint.dist ?? 8), HW_WIDE_MAX), pan: hint.pan || 0 };
     case "insert":
       return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
     case "insertCard":
@@ -438,7 +465,7 @@ function HintShot(state, hint) {
       return { ...BaseShot(state), card: hint.card, video: hint.clip };
     case "close": {
       const t = ActorAt(state, hint.on || "player") || { x: state.player.x, level: state.player.level };
-      return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: hint.dist ?? 4.2 };
+      return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: TightenHw(hint.dist ?? 4.2) };
     }
     case "ots": {
       // 过肩：主体在画面偏一侧，被越过的肩膀作为前景剪影
@@ -463,28 +490,52 @@ function HintShot(state, hint) {
       // at→atTo 注视点按本行时长插值（smoothstep），roll 单位是度。
       // 数值口径：FOV 30° 下画宽 ≈ 机位到注视点的距离（16:9），
       // 也就是旧 hint 的 dist（半宽）× 2。VO 拖长行时插值钉在终点不再动。
-      const d = Math.max(0.6, state.camLineD || 3.4);
-      const k = Math.min(1, (state.camLineT || 0) / d);
-      const e = hint.ease === "linear" ? k : k * k * (3 - 2 * k);
-      const L = (a, b) => a + (b - a) * e;
-      const f = hint.from, t = hint.to || hint.from;
-      const a = hint.at, a2 = hint.atTo || hint.at;
-      const r0 = hint.roll || 0, r1 = hint.rollTo ?? r0;
+      const e = CineEase(state, hint);
+      const F = FreeAt(hint, e);
       return {
-        free: {
-          px: L(f[0], t[0]), py: L(f[1], t[1]), pz: L(f[2], t[2]),
-          tx: L(a[0], a2[0]), ty: L(a[1], a2[1]), tz: L(a[2] || 0, a2[2] || 0),
-          roll: (r0 + (r1 - r0) * e) * Math.PI / 180,
-        },
+        free: F,
         // 指纹必须取自 hint 本身：插值出来的位置每帧都变，拿它当指纹
         // 等于每帧都在"换镜头"
-        freeKey: `${f}|${t}|${a}|${a2}`,
-        x: L(a[0], a2[0]), y: L(a[1], a2[1]), hw: 6,
+        freeKey: `${hint.from}|${hint.to}|${hint.at}|${hint.atTo}`,
+        x: F.tx, y: F.ty, hw: 6,
+      };
+    }
+    case "split": {
+      // 左右分屏（2026-08-14）：两台过场相机各占半屏，中间一道撕口白缝。
+      // 半屏的画幅是竖的（≈8:9），**同一个 dist 下人物比整屏大一圈**——
+      // 所以两侧的机位要各自按"这一格里要装下什么"给，别照整屏那套抄。
+      const e = CineEase(state, hint);
+      const L = FreeAt(hint.left, e);
+      const R = FreeAt(hint.right, e);
+      return {
+        free: L,                       // 主相机跟左格：画幅/雾色/层闸门都由它定
+        split: { left: L, right: R, gap: hint.gap ?? 0.014 },
+        freeKey: `S|${hint.left.from}|${hint.left.at}|${hint.right.from}|${hint.right.at}`,
+        x: L.tx, y: L.ty, hw: 6,
       };
     }
     default:
       return BaseShot(state);
   }
+}
+
+// 过场行的插值进度：按本行时长 smoothstep（VO 把行拖长时钉在终点不再动）
+function CineEase(state, hint) {
+  const d = Math.max(0.6, state.camLineD || 3.4);
+  const k = Math.min(1, (state.camLineT || 0) / d);
+  return hint.ease === "linear" ? k : k * k * (3 - 2 * k);
+}
+
+function FreeAt(spec, e) {
+  const L = (a, b) => a + (b - a) * e;
+  const f = spec.from, t = spec.to || spec.from;
+  const a = spec.at, a2 = spec.atTo || spec.at;
+  const r0 = spec.roll || 0, r1 = spec.rollTo ?? r0;
+  return {
+    px: L(f[0], t[0]), py: L(f[1], t[1]), pz: L(f[2], t[2]),
+    tx: L(a[0], a2[0]), ty: L(a[1], a2[1]), tz: L(a[2] || 0, a2[2] || 0),
+    roll: (r0 + (r1 - r0) * e) * Math.PI / 180,
+  };
 }
 
 function UpdateCamera(state, dt) {
@@ -521,6 +572,19 @@ function UpdateCamera(state, dt) {
     }
     world.SetOverShoulder(state, shot.ots || null);
     world.SetInsertCard(shot.card || null, shot.video || null, state.camLineT || 0, shot.cardSeg || 0);
+    // 框景与分屏都是**这一行**的事（换行＝换镜头），所以跟着 hint 走，
+    // 不挂在节拍上；插卡那几行没有世界可看，框景一律让开。
+    // 框景的 u/v 折算要按**这一格的画幅**：分屏时半屏是竖的（≈0.88），
+    // 拿整屏的 16:9 去折，板子会横着跑出画外
+    const fgAspect = shot.split
+      ? Math.max(0.2, (world.viewSize.w / world.viewSize.h) * (1 - shot.split.gap) / 2)
+      : (world.viewSize.w / world.viewSize.h);
+    world.SetCineFore(
+      shot.card ? null : (hint.fg || null),
+      shot.split || (shot.free ? { left: shot.free } : null),
+      fgAspect, fp,
+    );
+    world.SetSplitShot(shot.split || null);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
     // 全景里那道线只是一个像素在动。这里不硬切，让常规的跟随插值把镜头推过去。
@@ -533,6 +597,21 @@ function UpdateCamera(state, dt) {
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
+    // 玩法段的框景只有一处来源：节拍自己声明的 `fg`，而且**只能写世界坐标**
+    // （u/v 是按画框折算的，跟随镜头下画框一直在动，板子会跟着人漂）
+    world.SetCineFore((def?.fg && state.phase === "playing") ? def.fg : null, null, 16 / 9, "play:" + (def?.id || ""));
+    world.SetSplitShot(null);
+  }
+  // 过场分级：过场满档，玩法段只有节拍显式声明 `grade` 才给（序章那三拍）。
+  // 换挡走 6/s 的吸附——硬切会在跳幕/暂停这些不走 iris 的地方"啪"地跳一下
+  {
+    const def2 = state.phase === "playing" ? CurrentBeatDef(state) : null;
+    const want = state.phase !== "playing" ? 0
+      : inCinematic ? 1
+        : (def2?.grade ?? 0);
+    gradeNow += (want - gradeNow) * Math.min(1, dt * 6);
+    if (Math.abs(want - gradeNow) < 0.01) gradeNow = want;
+    world.SetCineGrade(gradeNow);
   }
   // 做功那几拍的活卡（划线 / 刨料 / 接绳 / 叠衣裳）：铺满画框、每帧重画，玩家
   // 的手就按在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、
@@ -1530,8 +1609,20 @@ window.TunnelLight = {
   Freeze: (v = true) => { frozen = !!v; return frozen; },
   // 把游戏推到"第 line 句台词的第 at 秒"。实拍最常要的就是这个，别再拿 --dur
   // 一秒一秒地猜（猜出来的还随机器快慢漂）。返回真正落在哪儿。
+  // 微过场（chain 步骤 effect 里起的那种）同样认这把尺子：微过场在跑的时候
+  // 数的是 microCine.i，不是 beat.lineIndex——不然 @line= 打在窖里那段抓腕戏上
+  // 会一直空转到超时（2026-08-14）。
   SeekLine: (line, at = 0) => {
     if (!state) return null;
+    if (state.microCine) {
+      for (let i = 0; i < 20000 && state.microCine && (state.microCine.i ?? 0) < line; i += 1) {
+        StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+      }
+      for (let i = 0; i < Math.round(at * 30); i += 1) {
+        StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
+      }
+      return { line: state.microCine?.i ?? null, lineT: state.microCine?.t ?? null, micro: true };
+    }
     for (let i = 0; i < 20000 && (state.beat?.lineIndex ?? 0) < line; i += 1) {
       StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, 1 / 30);
     }

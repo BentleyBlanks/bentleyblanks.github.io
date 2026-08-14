@@ -13,7 +13,11 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 // BGM 用的是 new Audio()（不在 DOM 上），测试要把播放头推到绕圈点，
 // 得在页面脚本跑起来之前把构造器钩住
+// 声音默认是**关**的（2026-08-14 用户定：进来先静着）。这一支测的是
+// "开了声音之后 BGM 怎么走"，所以在页面脚本跑起来之前先把那面本地开关拨开——
+// 与玩家按右上角那枚按钮是同一条路（按钮在游戏里才出现，测试点不着）
 await page.addInitScript(() => {
+  localStorage.setItem("tunnelLight1943.sound", "on");
   window.__bgmEls = [];
   const OrigAudio = window.Audio;
   window.Audio = function PatchedAudio(...args) {
@@ -35,8 +39,21 @@ page.on("console", (message) => {
 try {
   await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
   await page.click("#startButton");
-  await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.active === "withTheseHands", null, { timeout: 30000 });
+  // —— 序 · 那天必须是**静的**（2026-08-14）——
+  //
+  // 剧本第一句就是〔音〕「没有音乐。」，吵的都在墙外。可 BGM 一直是按
+  // `CHAPTER_BGM[chapterIndex]` 无条件铺的，第一章那首从开机就在响——这个设计
+  // 在实机里一秒都没成立过。现在序的三拍声明 `bgm: null`，这条断言守着它。
+  // 进来先是章节卡（phase="chapterCard"），序的第一拍已经在跑
+  await page.waitForFunction(() => !!window.TunnelLight?.state, null, { timeout: 30000 });
+  await page.waitForTimeout(2500);
   let state = await page.evaluate(() => window.TunnelLight.GetBgmState());
+  assert.ok(!state?.active, `序 · 那天不许有配乐（剧本首句：没有音乐），实际 active=${state?.active}`);
+
+  // 跳过序（c1_forage 是第一章正片的头一拍）之后，章 BGM 才该接上
+  await page.evaluate(() => window.TunnelLight.JumpToBeat(0, 4));
+  await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.active === "withTheseHands", null, { timeout: 30000 });
+  state = await page.evaluate(() => window.TunnelLight.GetBgmState());
   assert.equal(state.paused, false, "第一章 BGM 应在用户点击后起播");
   assert.ok(state.currentTime >= CHAPTER_BGM[0].cue - 0.5, "第一章应从指定 cue 起播");
 
@@ -65,7 +82,10 @@ try {
   // 老做法一路放到 ended 再 seek 回 cue，技术上只断 0.01 秒，可耳朵听见的是
   // "音乐没了 → 静十几秒 → 又从头响"。所以这里量的不是"断没断"，是
   // **有没有走进尾奏**、以及**接缝处音乐有没有掉下去**。
-  await page.evaluate(() => window.TunnelLight.JumpToChapter(0));
+  // 回第一章要**跳过序**（序那三拍是静的），否则等的是一首本来就不该响的曲子
+  await page.evaluate(() => { window.TunnelLight.JumpToChapter(0); });
+  await page.waitForFunction(() => !!window.TunnelLight?.state, null, { timeout: 10000 });
+  await page.evaluate(() => window.TunnelLight.JumpToBeat(0, 4));
   await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.active === "withTheseHands", null, { timeout: 30000 });
   await page.waitForFunction(() => window.TunnelLight?.GetBgmState()?.paused === false, null, { timeout: 30000 });
   const loopEnd = CHAPTER_BGM[0].loopEnd;

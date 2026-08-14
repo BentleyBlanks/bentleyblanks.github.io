@@ -798,18 +798,6 @@
       },
       "note": "窖角的草苫堆（第七稿）：整布抽出来的地方、伤员藏身的地方。低矮一垛，边缘发毛"
     },
-    "strawArm": {
-      "art": "DrawStrawArm",
-      "band": "loose",
-      "ss": "detail",
-      "sprite": {
-        "w": 38,
-        "h": 20,
-        "anchor": "center",
-        "baseline": 4
-      },
-      "note": "草堆底下伸出来的前臂和手（manGrab 那一镜的静帧）：loose 带压在草堆之前，插入镜里才看得清"
-    },
     "wholeClothRest": {
       "art": "DrawClothRest",
       "band": "loose",

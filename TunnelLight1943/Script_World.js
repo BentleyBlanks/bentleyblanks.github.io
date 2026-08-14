@@ -306,10 +306,15 @@ export function CreateWorld(canvasEl) {
     fore: new THREE.Group(),       // 前景（掠过镜头，微糊）——**目前是空的**，见 AddForeground 那处的说明
     fx: new THREE.Group(),
     ots: new THREE.Group(),        // 过肩前景
+    // 过场框景（`SetCineFore`）：门框柱、房梁、炕沿、水瓮肩——压得很暗、被画框
+    // 切掉的那几块近景。勇敢的心每一张过场都有这一层，它才是"这是一幅画"与
+    // "这是游戏截图"的分界。**位置与尺寸全由剧本行给的世界坐标说了算**（层不做
+    // 视差补偿，scale 恒为 1），所以镜头一推近它自己就按透视胀开、扫过画框。
+    cine: new THREE.Group(),
   };
   const LAYER_Z = {
     sky: -150, ridge: -62, hills: -44, farTown: -26, midTrees: -15,
-    nearTrees: -7.5, play: 0, fore: 3.4, fx: 0, ots: 12,
+    nearTrees: -7.5, play: 0, fore: 3.4, fx: 0, ots: 12, cine: 0,
   };
   // 透视补偿：整层按 (D_REF - z)/D_REF 放大，于是每个元素仍落在作者标注的
   // 世界坐标与尺寸上，只是移动速率按透视自然变慢——经典视差，且随推拉变化
@@ -367,7 +372,10 @@ export function CreateWorld(canvasEl) {
   // 这里只保留层间的绘制序表。
   const LAYER_ORDER = {
     sky: 0, ridge: 1000, hills: 2000, farTown: 3000, midTrees: 4000,
-    nearTrees: 5000, play: 6000, fx: 7000, fore: 8000, ots: 9000,
+    // cine（过场框景）排在**压暗罩之前**（ORDER_DARK 8500）：夜里/窖里那层罩子
+    // 得压得着它。排在罩子后头的话，一进地窖它就是整幅画里最亮的东西——
+    // 一根发光的梯子帮杵在两个孩子前面（2026-08-14 实拍抓的）
+    nearTrees: 5000, play: 6000, fx: 7000, fore: 8000, cine: 8450, ots: 9000,
   };
   const ORDER_DARK = 8500, ORDER_GLOW = 8600, ORDER_INSERT = 9500;
   // 层内深度 → 绘制序号。z 越大（越近）画得越晚，压在上面。
@@ -581,6 +589,9 @@ export function CreateWorld(canvasEl) {
   let slatDustMesh = null;
   // 舀水那一下的水圈（state.vatScoop）
   let vatScoopMesh = null;
+  // 窖角那一垛草苫（§9「草苫下面忽然动了一下」：state.matStir 一立就真晃 1.2 秒）。
+  // 抓着建场时那张网格不放，是因为这一晃不能重烘贴图——晃的是整垛草，不是草的画法
+  let strawMatMesh = null, strawMatBase = null, strawMatOver = false;
   // 伤员肩上的蓝花布 / 妹妹袖口那截蓝花（八稿两处特写认它们）
   let bandageMesh = null, cuffMesh = null;
   // 窖口板缝打进来的那几束光（lidShut 的板缝光 / 夜里的月光同一支）。
@@ -1717,8 +1728,14 @@ export function CreateWorld(canvasEl) {
       case "louDrill": mk((ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, p.id)); break;
       case "stubbleField": mk((ctx, ax, ay) => ART.DrawStubbleField(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "sownField": mk((ctx, ax, ay) => ART.DrawSownField(ctx, ax, ay, p.w * PPM, p.id)); break;
-      case "strawMat": mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id)); break;
-      case "strawArm": mk((ctx, ax, ay) => ART.DrawStrawArm(ctx, ax, ay, p.id)); break;
+      case "strawMat": {
+        // 建场时把这张网格记下来：§9 那一下抖的就是它（matStir）
+        strawMatMesh = mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id));
+        strawMatBase = strawMatMesh
+          ? { x: strawMatMesh.position.x, y: strawMatMesh.position.y, rot: strawMatMesh.rotation.z }
+          : null;
+        break;
+      }
       case "cellarSundries": mk((ctx, ax, ay) => ART.DrawCellarSundries(ctx, ax, ay, p.id)); break;
       case "cellarSundriesTidy": mk((ctx, ax, ay) => ART.DrawCellarSundriesTidy(ctx, ax, ay, p.id)); break;
       case "sewBasket": mk((ctx, ax, ay) => ART.DrawSewBasket(ctx, ax, ay, p.id)); break;
@@ -2554,10 +2571,16 @@ export function CreateWorld(canvasEl) {
     builtKey = key;
     flagProps = [];
     propRedraw = [];
+    // 整场重建会把上一场的网格全清掉：抓在手里的那几张也得跟着松手，
+    // 不然帧循环里动的是一张已经被 dispose 的图
+    strawMatMesh = null; strawMatBase = null; strawMatOver = false;
     carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
     carveRebuild = null;
     ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
-    for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
+    // cine 层不在此列：它是**这一行镜头**的框景，跟场景重建没关系。跟着清掉的话，
+    // 过场中途换个昼夜档就把门框柱抹了，而 cineForeKey 还记着"已经建过"——
+    // 再也长不回来
+    for (const k of Object.keys(layers)) if (k !== "ots" && k !== "cine") ClearGroup(layers[k]);
     InvalidateSceneCaches();
     for (const g of glows) scene.remove(g);
     glows.length = 0;
@@ -4520,6 +4543,32 @@ export function CreateWorld(canvasEl) {
       vatScoopMesh.visible = false;
     }
 
+    // ── 草苫下面动的那一下（state.matStir，1.2s）：整垛草自己晃两下再停。
+    // 「一只手从黑暗里伸出来」之前得先有这一下——不然人是凭空出现在草堆上的。
+    // 幅度按一个人在草底下翻身给：抬起 3cm、转 2°，不是被风吹 ──
+    if (strawMatMesh && strawMatBase) {
+      // 人一躺进来，这一垛草就得**盖在他身上**：演员画在道具之前（ACTOR_Z 0.6 >
+      // loose 0.3），照默认序出来是"一个人整整齐齐躺在草垛前面"，那就不叫藏了。
+      // 只改绘制序不改 z——z 是透视深度，动了它草垛就不站在同一条地平线上了。
+      const hide = !!state.actors?.find((a) => a.id === "wounded" && a.visible && a.level === "under");
+      if (hide !== strawMatOver) {
+        strawMatOver = hide;
+        SetPlayOrder(strawMatMesh, hide ? CARRY_Z - 0.05 : BAND.loose, "strawMat");
+      }
+      const st = state.matStir;
+      if (st) {
+        const k = Math.min(1, (st.t || 0) / 1.2);
+        const fade = 1 - k * k;                       // 越晃越轻，最后一下最小
+        const w = Math.sin((st.t || 0) * 17.5);       // 两下半
+        strawMatMesh.position.set(strawMatBase.x + w * 0.022 * fade,
+          strawMatBase.y + Math.abs(w) * 0.03 * fade, strawMatMesh.position.z);
+        strawMatMesh.rotation.z = strawMatBase.rot + w * 0.035 * fade;
+      } else if (strawMatMesh.rotation.z !== strawMatBase.rot) {
+        strawMatMesh.position.set(strawMatBase.x, strawMatBase.y, strawMatMesh.position.z);
+        strawMatMesh.rotation.z = strawMatBase.rot;
+      }
+    }
+
     // ── 伤员肩上的蓝花布（actor.bandage）：躺在草苫上的那个人，肩头缠着
     // 从整布上撕下来的那条。骨架不管衣饰，这一小块钉在世界里跟人走 ──
     {
@@ -4849,7 +4898,11 @@ export function CreateWorld(canvasEl) {
       // 过场（cinematic）里的室内戏：第四堵墙整个不画。0.30 的纱在玩法景别下
       // 读得出"这儿有堵墙"，可过场机位贴得近，它就是糊在整间屋上的一层白蒙蒙
       //（2026-08-13 序章重运镜实拍抓的）。玩法段照旧半隐——玩家得知道墙在。
-      const filmic = staged && def?.kind === "cinematic";
+      // **微过场也算过场**（2026-08-14）：序里"娘跪在窖口"「搂紧她」「翻板合上」
+      // 都是链的 effect 里起的 micro-cine，节拍 kind 是 chain——于是那几镜一直
+      // 顶着 0.30 的立面拍，贴到 2.8m 的机位上就是整幅画蒙一层灰白，人都找不着。
+      // 是不是过场看的是**这会儿谁在掌镜**，不是这一拍挂在哪个 kind 上。
+      const filmic = staged && (def?.kind === "cinematic" || !!state.microCine);
       const goal = filmic ? 0 : inside ? 0.07 : (staged ? 0.30 : 1);
       const cur = homeFacade.material.opacity ?? 1;
       if (Math.abs(cur - goal) > 0.005) {
@@ -5872,6 +5925,69 @@ export function CreateWorld(canvasEl) {
     return { viewW, viewH, dist };
   }
 
+  // -------------------------------------------------------------------------
+  // 过场框景（勇敢的心式）：镜头与主体之间压一两块很暗的近景——门框柱、房梁、
+  // 炕沿、瓮肩。参考图里每一张过场都有这层：石砌门洞的两根柱、两棵树干、
+  // 贴着镜头的那具尸体。它干三件事，缺一件画面就还是"游戏截图"：
+  //   ① 把空荡荡的画框吃掉一大块（这套白盒的屋里一堵大白墙占半屏）；
+  //   ② 给出一个**很近的深度**，镜头一动它扫过去，纵深立刻成立；
+  //   ③ 压出画面里唯一的黑——分级再狠，也得先有东西是黑的。
+  // **摆位按画框给，落地是世界坐标**（`fg: [{ art, u, v, z, w, h, flip, dim }]`）：
+  //   · z＝这块板离行走线多近（米，越大越贴镜头）；
+  //   · u/v＝板心在**它自己那个深度上的画框**里的位置，−1..1（u=−1 贴左缘、
+  //     v=−1 贴下缘）；w/h 仍是真实米数。
+  // 为什么不直接写世界坐标：贴镜头 0.8m 的那个平面上，整个画框才三四十厘米宽——
+  // 写世界 x 等于要作者心算一遍透视，第一版五块板有四块落在画框外（实拍才看见）。
+  // u/v **只在换行那一下按当时的机位折算一次**，之后板子钉死在世界里：所以镜头
+  // 一推一摇，它照真透视扫过去，不是贴在镜头上的一张贴纸。
+  // 老写法（直接给 x/y）仍然认——真要钉在某件实物上时用它。
+  // -------------------------------------------------------------------------
+  let cineForeKey = "";
+  function ForePlace(f, cam, aspect) {
+    const z = f.z ?? 2.2;
+    if (f.x !== undefined) return { x: f.x, y: f.y ?? 0, z };
+    if (!cam) return { x: f.u || 0, y: f.v || 0, z };
+    const span = Math.max(0.001, cam.pz - (cam.tz || 0));
+    const t = Math.max(0, Math.min(1, (cam.pz - z) / span));
+    const cx = cam.px + (cam.tx - cam.px) * t;      // 画框中心落在这块板的平面上
+    const cy = cam.py + (cam.ty - cam.py) * t;
+    const dz = Math.max(0.05, cam.pz - z);
+    const fh = 2 * dz * Math.tan((CAM_FOV * Math.PI / 180) / 2);
+    const fw = fh * aspect;
+    return { x: cx + (f.u || 0) * fw / 2, y: cy + (f.v || 0) * fh / 2, z };
+  }
+  // shotKey＝这一镜的构图指纹（Main 算的那个）。**折算只在换镜头那一下做一次**，
+  // 拿机位当指纹的话每帧都会重摆——板子就粘在镜头上了，视差当场没了
+  function SetCineFore(list, cams, aspect = 16 / 9, shotKey = "") {
+    const key = list && list.length ? shotKey + "|" + JSON.stringify(list) : "";
+    if (key === cineForeKey) return;
+    cineForeKey = key;
+    ClearGroup(layers.cine);
+    if (!list || !list.length) return;
+    list.forEach((f, i) => {
+      const w = f.w ?? 1.2, h = f.h ?? 2.4;
+      // 分屏时按 `side` 挑相机：两格各有各的画框，拿左格的机位去折右格那块板，
+      // 它会落到左格里去
+      const at = ForePlace(f, (f.side === "right" ? cams?.right : cams?.left) || cams?.left, aspect);
+      // 画布密度与世界尺寸脱钩：这几块贴在镜头跟前一米以内，透视会把它放大
+      // 好几倍，照 PPM(48px/米) 烘出来必糊成一团（同 HINT_SS 那本账）。
+      // 1100px/米 是量出来的：0.5m 宽的一块板在半屏里铺满 800px，1.5 倍放大
+      const wPx = Math.max(48, Math.min(1600, Math.round(w * 1100)));
+      const hPx = Math.max(48, Math.min(1600, Math.round(h * 1100)));
+      const canvas = MakeCanvas(wPx, hPx);
+      ART.DrawCineFore(canvas.getContext("2d"), wPx, hPx, f.art, f.dim ?? 1);
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+      );
+      if (f.flip) mesh.scale.x = -1;
+      mesh.position.set(at.x, at.y, at.z);
+      FixOrder(mesh, LAYER_ORDER.cine + i);
+      mesh.frustumCulled = false;
+      layers.cine.add(mesh);
+    });
+  }
+
   let rendererCssW = 0, rendererCssH = 0;
   function Resize(width, height) {
     // **缓冲的比例必须等于 CSS 盒的比例**，否则整幅画横着抻开（Main 的
@@ -6018,7 +6134,209 @@ export function CreateWorld(canvasEl) {
     return hidden.length ? hidden : null;
   }
 
+  // =========================================================================
+  // 过场分级（2026-08-14）：整幅画再走一遍全屏后期。
+  //
+  // 为什么非做不可：这套画的贴图全是 CanvasTexture，没声明 colorSpace，上屏被
+  // 当线性值提亮一大截（CLAUDE.md 里"配色一律往下压两档"那条说的就是它）。
+  // 单张贴图能靠压色号救回来，**整幅画的调子救不回来**——序章实拍出来是一屏
+  // 米黄压米黄，最暗的地方也有 0.55 的明度，画面里根本没有黑。而参考的那几张
+  // 勇敢的心过场，黑是构图的一部分：墨线、暗角、逆光的门洞。
+  //
+  // 所以分级不是"加个滤镜"，是把这套渲染欠的那两档还回来，并且**只在过场还**
+  //（玩法段的辨识度靠亮，压黑会让人找不着路）。五件事：
+  //   ① 以 0.46 为轴提对比——轴要低于中灰，才吃得住这套偏亮的底；
+  //   ② 分离色调：暗部推向冷青灰（土屋的阴影是冷的）、亮部推向纸黄；
+  //   ③ 略去一点饱和（手绘水彩上屏容易过艳）；
+  //   ④ 重晕影——参考图四角全是压下去的；
+  //   ⑤ 一层很细的颗粒（纸纹），把大片平色的"塑料感"打散。
+  // 强度由 `SetCineGrade(k)` 给，0＝一个字节都不动（玩法段照旧原样）。
+  // =========================================================================
+  let cineGrade = 0;
+  function SetCineGrade(k) { cineGrade = Math.max(0, Math.min(1, k || 0)); }
+  let gradeRT = null, gradeQuad = null, gradeScene = null, gradeCam = null;
+  let gradeW = 0, gradeH = 0, gradeSeed = 0;
+  const GRADE_SHADER = {
+    uniforms: {
+      uTex: { value: null },
+      uK: { value: 1 },
+      uPx: { value: new THREE.Vector2(1600, 900) },
+      uSeed: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: `
+      uniform sampler2D uTex;
+      uniform float uK;
+      uniform vec2 uPx;
+      uniform float uSeed;
+      varying vec2 vUv;
+      void main() {
+        vec3 src = clamp(texture2D(uTex, vUv).rgb, 0.0, 1.0);
+        // ① 对比走 S 曲线，**不走直线**。直线 (c-0.46)*1.4+0.40 在白天那几拍很漂亮，
+        //    可它把 0.12 以下一律压成 0——序章收尾那间黑窖整幅变成纯黑，
+        //    两个孩子看不见了（2026-08-14 实拍）。S 曲线两头都留得住。
+        vec3 c = mix(src, src * src * (3.0 - 2.0 * src), 0.70);
+        c = c * 0.97 + 0.012;                       // 抬一点黑位，暗部不糊死
+        // ② 分离色调：**只染不压**。第一版暗部乘 0.42（等于再暗一半），
+        //    暗场当场全军覆没——压是对比和晕影的活，不是色调的活
+        float l = dot(c, vec3(0.299, 0.587, 0.114));
+        vec3 lo = vec3(0.88, 0.95, 1.14);
+        vec3 hi = vec3(1.06, 1.00, 0.88);
+        c *= mix(lo, hi, smoothstep(0.05, 0.72, l));
+        // ③ 收一点饱和
+        c = mix(vec3(l), c, 0.90);
+        // ④ 晕影（横向略松，免得宽屏上两侧压成两条黑边）
+        vec2 d = vUv - 0.5;
+        float r = length(vec2(d.x * 0.94, d.y * 1.12));
+        c *= 1.0 - smoothstep(0.26, 0.88, r) * 0.74;
+        // ⑤ 纸纹颗粒
+        float n = fract(sin(dot(vUv * uPx + uSeed, vec2(12.9898, 78.233))) * 43758.5453);
+        c += (n - 0.5) * 0.028;
+        gl_FragColor = vec4(mix(src, clamp(c, 0.0, 1.0), uK), 1.0);
+      }
+    `,
+  };
+
+  function EnsureGrade() {
+    const w = Math.max(8, Math.round(rendererCssW * renderer.getPixelRatio()));
+    const h = Math.max(8, Math.round(rendererCssH * renderer.getPixelRatio()));
+    if (!gradeRT || w !== gradeW || h !== gradeH) {
+      gradeW = w; gradeH = h;
+      gradeRT?.dispose?.();
+      gradeRT = new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+        depthBuffer: true, stencilBuffer: false,
+        colorSpace: THREE.SRGBColorSpace,
+      });
+    }
+    if (!gradeQuad) {
+      gradeScene = new THREE.Scene();
+      gradeCam = new THREE.Camera();
+      gradeQuad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: THREE.UniformsUtils.clone(GRADE_SHADER.uniforms),
+          vertexShader: GRADE_SHADER.vertexShader,
+          fragmentShader: GRADE_SHADER.fragmentShader,
+          depthTest: false, depthWrite: false,
+        }),
+      );
+      gradeQuad.frustumCulled = false;
+      gradeScene.add(gradeQuad);
+    }
+    return true;
+  }
+
+  // =========================================================================
+  // 左右分屏（2026-08-14 用户拿参考图点的：「也有这种左右分的镜头」）
+  //
+  // 两台过场相机各渲半屏，中间一道手绘的撕口白缝。它不是花活——一维横版里
+  // "同一时刻两个地方"本来没法同框（镜头只有一个），而序章最要紧的两下正是
+  // 这个：屋里两个孩子各自缩在一处；窖底两个孩子头顶上就是那双靴子。
+  // 半屏的画幅是竖的（≈8:9），所以每一格都天然是"人物顶天立地"的构图。
+  // =========================================================================
+  let splitShot = null;
+  function SetSplitShot(spec) { splitShot = spec || null; }
+  let seamQuad = null, seamScene = null, seamCam = null;
+  function EnsureSeam() {
+    if (seamQuad) return;
+    // 缝画在一张 256×1024 的窄画布上，**不横向拉满**——顶点着色器把这块四边形
+    // 收成屏幕正中一条竖带（uHalf 是它的半宽，单位是 NDC），1 texel ≈ 1 像素，
+    // 撕口的毛边才不会被抻成一条软糊的渐变
+    const cv = MakeCanvas(256, 1024);
+    ART.DrawSplitSeam(cv.getContext("2d"), 256, 1024);
+    seamScene = new THREE.Scene();
+    seamCam = new THREE.Camera();
+    seamQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: { uTex: { value: CanvasTexture(cv) }, uHalf: { value: 0.022 } },
+        vertexShader: `
+          uniform float uHalf;
+          varying vec2 vUv;
+          void main() { vUv = uv; gl_Position = vec4(position.x * uHalf, position.y, 0.0, 1.0); }
+        `,
+        fragmentShader: `
+          uniform sampler2D uTex;
+          varying vec2 vUv;
+          void main() { gl_FragColor = texture2D(uTex, vUv); }
+        `,
+        transparent: true, depthTest: false, depthWrite: false,
+      }),
+    );
+    seamQuad.frustumCulled = false;
+    seamScene.add(seamQuad);
+  }
+
+  // 一格半屏：按半屏的画幅重设相机（画幅变竖，同一个注视点会更"贴脸"）
+  function AimSplitHalf(spec, aspect) {
+    camera.aspect = aspect;
+    camera.position.set(spec.px, spec.py, spec.pz);
+    camera.lookAt(spec.tx, spec.ty, spec.tz || 0);
+    if (spec.roll) camera.rotateZ(spec.roll);
+    camera.updateProjectionMatrix();
+  }
+
+  function RenderSplit() {
+    const sp = splitShot;
+    const gap = sp.gap ?? 0.012;                       // 缝占画宽的比例
+    const halfW = rendererCssW * (1 - gap) / 2;
+    const rects = [
+      { spec: sp.left, x: 0 },
+      { spec: sp.right, x: rendererCssW - halfW },
+    ];
+    const aspect = Math.max(0.2, halfW / rendererCssH);
+    const prevAuto = renderer.autoClear;
+    renderer.clear();
+    renderer.autoClear = false;
+    renderer.setScissorTest(true);
+    for (const r of rects) {
+      if (!r.spec) continue;
+      AimSplitHalf(r.spec, aspect);
+      renderer.setScissor(r.x, 0, halfW, rendererCssH);
+      renderer.setViewport(r.x, 0, halfW, rendererCssH);
+      renderer.render(scene, camera);
+    }
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, rendererCssW, rendererCssH);
+    EnsureSeam();
+    // 白带比两格之间的空当略宽——它要**咬进两边的画里**才像画在同一张纸上，
+    // 留一条黑缝就成了两个并排的窗口
+    seamQuad.material.uniforms.uHalf.value = gap * 1.5;
+    renderer.render(seamScene, seamCam);
+    renderer.autoClear = prevAuto;
+    // 相机的画幅还给主画面（HUD 的世界→屏幕换算读 viewSize，别留着半屏那份）
+    camera.aspect = camera.userData.aspect || 16 / 9;
+    camera.updateProjectionMatrix();
+  }
+
   function Render() {
+    // 分级要把整幅画先渲进离屏靶。**setRenderTarget 会重置视口与剪裁区**，
+    // 所以它必须排在分屏那几下 setScissor/setViewport 之前
+    const grading = cineGrade > 0.004 && rendererCssW > 0 && EnsureGrade();
+    if (grading) renderer.setRenderTarget(gradeRT);
+    if (splitShot) RenderSplit();
+    else RenderMain();
+    if (grading) {
+      renderer.setRenderTarget(null);
+      const u = gradeQuad.material.uniforms;
+      u.uTex.value = gradeRT.texture;
+      u.uK.value = cineGrade;
+      u.uPx.value.set(gradeW, gradeH);
+      // 颗粒每帧换一次种子会满屏爬虫，隔几帧换一次就够（也让无头实拍可复现）
+      gradeSeed = (gradeSeed + 1) % 4;
+      u.uSeed.value = gradeSeed * 37.7;
+      const prevAuto = renderer.autoClear;
+      renderer.autoClear = true;
+      renderer.render(gradeScene, gradeCam);
+      renderer.autoClear = prevAuto;
+    }
+  }
+
+  function RenderMain() {
     // 没有活卡：照老路一遍渲完，一分钱不多花
     if (!dofOn || !insertMesh?.visible || !rendererCssW || !EnsureDof()) {
       const nearHidden = HideNearForInsert();
@@ -6116,6 +6434,7 @@ export function CreateWorld(canvasEl) {
     THREE, renderer, scene, camera,
     BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
     SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, ApplyCineCamera, Resize, Render,
+    SetCineFore, SetCineGrade, SetSplitShot,
     SetPip, RenderPip, ScreenToWorld, ScreenToCard,
     // 卡面↔画框的尺寸比（测试要把卡上的坐标换回屏幕像素去点）
     __cardFrac: () => ({ ...cardFrac }),
@@ -6139,6 +6458,18 @@ export function CreateWorld(canvasEl) {
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
+    // 谁的手在哪儿（世界坐标，米）。接触戏是量出来的不是看出来的：
+    // 「一只手抓住他的手腕」得两只手真的落在同一个点上，差 20 厘米在画面上
+    // 就是"对着空气比划"。躺着的人尤其要量——整具骨架转了 90°，
+    // 照站姿的手感写角度，出来的方向是错的
+    LimbTipsOf: (id) => {
+      const s = actorSprites.get(id);
+      if (!s?.rig) return null;
+      const tips = LimbTips(s.rig);
+      const out = {};
+      for (const k of Object.keys(tips)) out[k] = { x: +tips[k].x.toFixed(3), y: +tips[k].y.toFixed(3) };
+      return out;
+    },
     PlayerLimbTips: () => {
       const ps = actorSprites.get("player");
       if (!ps?.rig || ps.ground === undefined) return null;

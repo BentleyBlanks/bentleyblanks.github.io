@@ -9,6 +9,23 @@
 //   跟卡顿、跟网络都没关系，是这首曲子真的放完了。
 //   数值由 ffmpeg 逐段量出来：正常段的响度打底，从尾巴往前找第一个
 //   "还没开始收"的 4 秒窗口。改曲子就重量一次，别拍脑袋。
+// 章之外的短曲：某一拍/某一行要的一段音乐，不是整章的底色。
+// 剧本里写 `bgm: "thatDay"`（节拍级）或在过场行的 on() 里 `state.bgmOverride = "thatDay"`
+//（行级）；写 `bgm: null` 就是**这一拍没有音乐**。
+//
+// 序 · 那天为什么要这一条：剧本第一句就是〔音〕*没有音乐。* ——吵的都在墙外。
+// 可 BGM 是按 `CHAPTER_BGM[chapterIndex]` 无条件铺的，第一章那首从开机就在响，
+// 整场"没有音乐"的设计在实机里一秒都没成立过（2026-08-14 查出来的）。
+// 现在序的三拍静音，音乐只在收尾那句「没人来叫。」进来，一直托到章名卡。
+// 曲子由本机 MiniMax Hub 的 music-3.0 生成（提示词见项目记忆），
+// 从 184 秒的成品里切 26 秒＋两头淡入淡出——一段过场用不着一首整曲。
+export const EXTRA_BGM = Object.freeze({
+  thatDay: {
+    id: "thatDay", title: "那天", file: "./Audio/Bgm/AudioBgm_ThatDay.mp3",
+    cue: 0, gain: 0.62, loopEnd: 20.5, hasVocals: false,
+  },
+});
+
 export const CHAPTER_BGM = Object.freeze([
   { id: "withTheseHands", title: "With These Hands", file: "./Audio/Bgm/AudioBgm_WithTheseHands.mp3", cue: 42, gain: 0.82, loopEnd: 285.7, hasVocals: false },
   { id: "theLongDark", title: "The Long Dark", file: "./Audio/Bgm/AudioBgm_TheLongDark.mp3", cue: 28, gain: 0.70, loopEnd: 403.8, hasVocals: false },
