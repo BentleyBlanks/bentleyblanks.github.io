@@ -147,3 +147,10 @@ Rules:
 - Publish human-facing manuals as responsive HTML pages, not copied Markdown files from the private repository.
 - Documentation pages must be self-contained or use public-safe assets already tracked in this website repository. Never copy or publish BehindTheLines `assets/audio/` content or any other restricted reference assets.
 - Validate internal links and both desktop and mobile layout before publishing documentation updates.
+
+## Cursor Cloud specific instructions
+
+- This repo is a **static GitHub Pages site** (a collection of self-contained browser games/demos), not a compiled app. There is **no build step** — see `.github/workflows/pages.yml`, which uploads the repo root as-is. "Running the app" means serving the repo root over HTTP and opening a page, e.g. `python3 -m http.server 8000` then browse `http://127.0.0.1:8000/PrairieFire1937/index.html`. Games mount via importmap against the in-repo `*/vendor/three`; there is zero external runtime dependency, so no CDN/network is needed.
+- The only npm dependency is `playwright-core` (`npm install`). It does **not** bundle a browser. Browser/render tests (`npm run test:*:browser`) rely on a system Chrome; this VM has one at `/usr/local/bin/google-chrome`, which `Script_BrowserTestKit.mjs` finds via Playwright's `channel: "chrome"`. If a browser test can't find one, set `PF_BROWSER_PATH` to a Chrome/Edge executable.
+- Node smoke tests are pure logic and need no browser: `npm test` runs the full suite (~2.5 min); per-project scripts are in `package.json` (e.g. `npm run test:prairieFire1937`). Browser render-health tests use SwiftShader software GL and are slow (give generous timeouts).
+- The git checkout may land in **detached HEAD**. The prominent "Git Worktree Workflow" rules at the top of this file are written for the author's Windows multi-agent checkout and do **not** apply to this Linux cloud VM — commit/push on your branch normally here.
