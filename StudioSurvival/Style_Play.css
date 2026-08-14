@@ -1,0 +1,535 @@
+:root {
+  color-scheme: dark;
+  --ink: #f5f3ff;
+  --muted: #a9a6b8;
+  --line: rgba(255, 255, 255, .13);
+  --panel: rgba(13, 15, 24, .94);
+  --violet: #9d8cff;
+  --cyan: #65d8ff;
+  --pink: #ff6eae;
+  --yellow: #ffd166;
+  --green: #68e0a0;
+  --danger: #ff626e;
+  --safeTop: max(8px, env(safe-area-inset-top));
+  --safeRight: max(10px, env(safe-area-inset-right));
+  --safeBottom: max(9px, env(safe-area-inset-bottom));
+  --safeLeft: max(10px, env(safe-area-inset-left));
+  font-family: Inter, "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #080a11;
+  color: var(--ink);
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+button { font: inherit; color: inherit; }
+button, canvas { -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.hidden { display: none !important; }
+
+.gameRoot, #sceneCanvas, .sceneVignette {
+  position: fixed;
+  inset: 0;
+}
+
+#sceneCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.sceneVignette {
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(3, 5, 10, .52), transparent 18%, transparent 70%, rgba(3, 4, 9, .66)),
+    radial-gradient(circle at 50% 52%, transparent 48%, rgba(2, 3, 8, .62) 118%);
+  mix-blend-mode: normal;
+}
+
+.gameHud {
+  position: fixed;
+  top: var(--safeTop);
+  left: var(--safeLeft);
+  right: var(--safeRight);
+  z-index: 20;
+  min-height: 54px;
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.brandChip, .hudStat, .goalHud, .conditionHud, .roundButton {
+  border: 1px solid var(--line);
+  background: rgba(10, 12, 20, .76);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(12px);
+}
+
+.brandChip {
+  display: flex;
+  align-items: center;
+  min-width: 168px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 15px;
+}
+
+.brandChip > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 9px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--violet), #6252de);
+  font-weight: 950;
+}
+
+.brandChip div { display: grid; gap: 1px; }
+.brandChip small { color: #aaa2e8; font-size: 8px; letter-spacing: .13em; }
+.brandChip strong { font-size: 13px; }
+
+.hudStat {
+  min-width: 88px;
+  padding: 8px 11px;
+  border-radius: 14px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.hudStat span, .goalHud span { color: var(--muted); font-size: 9px; }
+.hudStat strong { font-size: 14px; }
+.cashStat strong { color: var(--green); }
+
+.goalHud {
+  flex: 1 1 260px;
+  min-width: 170px;
+  max-width: 390px;
+  padding: 7px 11px;
+  border-radius: 14px;
+  display: grid;
+  gap: 5px;
+}
+
+.goalHud > div:first-child { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.goalHud strong { font-size: 12px; }
+.goalTrack, .conditionHud > div {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.09);
+}
+.goalTrack i, .conditionHud i { display: block; width: 0; height: 100%; border-radius: inherit; transition: width .35s ease; }
+.goalTrack i { background: linear-gradient(90deg, var(--violet), var(--cyan)); box-shadow: 0 0 10px rgba(101,216,255,.7); }
+
+.conditionHud {
+  width: 98px;
+  padding: 7px 9px;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 20px 1fr 22px;
+  align-items: center;
+  gap: 5px;
+}
+.conditionHud span { font-size: 10px; color: var(--muted); }
+.conditionHud b { font-size: 10px; text-align: right; }
+.hungerHud i { background: linear-gradient(90deg, var(--yellow), #ff8a57); }
+.anxietyHud i { background: linear-gradient(90deg, var(--pink), var(--danger)); }
+
+.roundButton {
+  pointer-events: auto;
+  width: 42px;
+  border-radius: 14px;
+  border-color: var(--line);
+  cursor: pointer;
+  font-weight: 900;
+}
+.roundButton:hover { border-color: rgba(255,255,255,.35); background: rgba(30,32,48,.9); }
+
+.missionCard {
+  position: fixed;
+  z-index: 18;
+  left: var(--safeLeft);
+  top: calc(var(--safeTop) + 64px);
+  width: min(285px, 38vw);
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(12,14,23,.79), rgba(21,18,38,.71));
+  box-shadow: 0 14px 35px rgba(0,0,0,.24);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+.missionCard > span { color: #afa7e9; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.missionCard > strong { display: block; margin-top: 2px; font-size: 15px; }
+.missionCard p { margin: 4px 0 8px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.moduleStrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.modulePip { display: grid; gap: 3px; }
+.modulePip span { font-size: 8px; color: var(--muted); }
+.modulePip div { height: 3px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+.modulePip i { display: block; height: 100%; border-radius: inherit; }
+
+.interactionPrompt {
+  position: fixed;
+  z-index: 22;
+  left: 50%;
+  bottom: calc(var(--safeBottom) + 25px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 230px;
+  padding: 8px 11px;
+  border: 1px solid rgba(157,140,255,.55);
+  border-radius: 14px;
+  background: rgba(10,12,20,.9);
+  box-shadow: 0 14px 40px rgba(0,0,0,.42), 0 0 28px rgba(157,140,255,.13);
+  pointer-events: none;
+}
+.promptKey { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--violet); color: #090a12; font-weight: 950; }
+.interactionPrompt div { display: grid; gap: 1px; }
+.interactionPrompt strong { font-size: 12px; }
+.interactionPrompt small { color: var(--muted); font-size: 9px; }
+
+.desktopHint {
+  position: fixed;
+  z-index: 12;
+  right: var(--safeRight);
+  bottom: calc(var(--safeBottom) + 2px);
+  color: rgba(255,255,255,.55);
+  font-size: 9px;
+  pointer-events: none;
+  text-shadow: 0 2px 6px #000;
+}
+.desktopHint b { color: rgba(255,255,255,.84); }
+
+.mobileControls { display: none; }
+
+.toastStack {
+  position: fixed;
+  z-index: 80;
+  right: var(--safeRight);
+  top: calc(var(--safeTop) + 65px);
+  width: min(300px, 42vw);
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  justify-self: end;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(11,13,21,.92);
+  color: #eeecf8;
+  font-size: 10px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  animation: toastIn .25s ease both;
+}
+.toast.good { border-color: rgba(104,224,160,.5); }
+.toast.warning { border-color: rgba(255,98,110,.55); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(16px); } }
+
+.loadingScreen {
+  position: fixed;
+  z-index: 300;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: #080a11;
+  transition: opacity .45s ease, visibility .45s ease;
+}
+.loadingScreen.loaded { opacity: 0; visibility: hidden; }
+.loadingMark { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 19px; background: linear-gradient(135deg, var(--violet), #4d40bb); font-size: 26px; font-weight: 950; box-shadow: 0 0 50px rgba(157,140,255,.35); }
+.loadingScreen strong { font-size: 12px; }
+.loadingTrack { width: 210px; height: 3px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+.loadingTrack i { display: block; width: 45%; height: 100%; background: var(--cyan); animation: loading 1s ease-in-out infinite alternate; }
+@keyframes loading { to { transform: translateX(125%); } }
+
+.setupScreen, .endingScreen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(157,140,255,.18), transparent 35%),
+    radial-gradient(circle at 82% 80%, rgba(101,216,255,.12), transparent 38%),
+    #090b12;
+  overflow: auto;
+}
+
+.setupScreen { display: grid; grid-template-columns: minmax(290px, .72fr) minmax(520px, 1.28fr); gap: 6vw; align-items: center; padding: 5vh 6vw; }
+.setupNoise { position: fixed; inset: 0; pointer-events: none; opacity: .17; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(circle, black, transparent 80%); }
+.setupTitle, .setupPicker { position: relative; z-index: 2; }
+.setupTitle > span { color: #a99eff; font-size: 10px; letter-spacing: .17em; }
+.setupTitle h1 { margin: 12px 0; font-size: clamp(45px, 6vw, 82px); line-height: .93; letter-spacing: -.07em; }
+.setupTitle h1 em { color: var(--cyan); font-style: normal; }
+.setupTitle p { max-width: 510px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.controlPills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.controlPills span { padding: 5px 9px; border: 1px solid var(--line); border-radius: 99px; color: #dad6ed; font-size: 9px; }
+.setupPicker { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line); border-radius: 24px; background: rgba(13,15,24,.72); box-shadow: 0 28px 70px rgba(0,0,0,.35); backdrop-filter: blur(12px); }
+.pickerBlock { display: grid; gap: 9px; }
+.pickerHeading { display: flex; align-items: center; gap: 9px; }
+.pickerHeading > b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: rgba(157,140,255,.18); color: #b9afff; font-size: 10px; }
+.pickerHeading span { display: grid; gap: 1px; }
+.pickerHeading strong { font-size: 12px; }
+.pickerHeading small { color: var(--muted); font-size: 9px; }
+.choiceRail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.compactRail { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.choiceCard { position: relative; min-height: 82px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.025); text-align: left; cursor: pointer; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.choiceCard:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.27); }
+.choiceCard.selected { border-color: var(--choiceColor, var(--violet)); background: color-mix(in srgb, var(--choiceColor, var(--violet)) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--choiceColor, var(--violet)) 35%, transparent); }
+.choiceCard strong { display: block; font-size: 11px; }
+.choiceCard p { margin: 4px 0; color: var(--muted); font-size: 8.5px; line-height: 1.35; }
+.choiceCard small { color: #c7c1e6; font-size: 8px; }
+.compactRail .choiceCard { min-height: 72px; }
+.startButton, .continueButton, .primaryButton { width: 100%; border: 0; border-radius: 14px; cursor: pointer; }
+.startButton { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, var(--violet), #6252e5); color: white; box-shadow: 0 16px 32px rgba(98,82,229,.25); }
+.startButton span { font-size: 10px; }
+.startButton strong { font-size: 12px; }
+.continueButton { padding: 10px; background: rgba(255,255,255,.07); color: #d7d3e6; }
+
+.modalLayer, .resultLayer {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+.modalBackdrop { position: absolute; inset: 0; border: 0; background: rgba(3,4,8,.73); backdrop-filter: blur(4px); }
+.worldPanel, .resultCard {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 92vw);
+  max-height: min(680px, 88vh);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: 0 30px 90px rgba(0,0,0,.62);
+}
+.worldPanel > header { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border-bottom: 1px solid var(--line); }
+.worldPanel > header div { display: grid; gap: 1px; }
+.worldPanel > header span, #resultKicker { color: #a99eff; font-size: 8px; letter-spacing: .15em; }
+.worldPanel h2, .resultCard h2 { margin: 0; font-size: 18px; }
+.closeButton { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.04); cursor: pointer; }
+.sheetBody { max-height: calc(min(680px, 88vh) - 62px); overflow: auto; padding: 14px; overscroll-behavior: contain; }
+
+.panelIntro { margin: 0 0 12px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.panelSection { margin-top: 14px; }
+.sectionHeading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+.sectionHeading strong { font-size: 11px; }
+.sectionHeading span { color: var(--muted); font-size: 8px; }
+.worldGrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.worldGrid.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.worldChoice, .staffCard, .oddsCard, .featureCard {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255,255,255,.025);
+  padding: 11px;
+}
+button.worldChoice, button.featureCard { text-align: left; cursor: pointer; }
+button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.055); }
+.worldChoice.selected { border-color: var(--green); box-shadow: inset 0 0 0 1px rgba(104,224,160,.25); }
+.worldChoice.danger { border-color: rgba(255,98,110,.38); }
+.worldChoice:disabled, .primaryButton:disabled { opacity: .38; cursor: not-allowed; }
+.choiceTop, .staffTop { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.choiceTop strong, .staffTop strong { font-size: 11px; }
+.choiceTop span, .staffTop span { color: #c6bfeb; font-size: 8px; }
+.worldChoice p, .staffCard p, .featureCard p, .oddsCard p { margin: 5px 0 8px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.choiceFooter { display: flex; justify-content: space-between; gap: 8px; align-items: center; color: #d7d2eb; font-size: 8px; }
+.miniButton, .dangerButton, .primaryButton {
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 9px;
+}
+.miniButton { background: var(--violet); color: #090a12; }
+.dangerButton { background: rgba(255,98,110,.18); color: #ff9aa2; border: 1px solid rgba(255,98,110,.35); }
+.primaryButton { padding: 11px 14px; background: linear-gradient(135deg, var(--violet), #6252e5); }
+.chipRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { padding: 3px 6px; border-radius: 99px; background: rgba(255,255,255,.06); color: #c8c3d8; font-size: 7.5px; }
+.barRow { display: grid; grid-template-columns: 52px 1fr 30px; gap: 7px; align-items: center; margin-top: 5px; font-size: 8px; color: var(--muted); }
+.barRow div { height: 4px; background: rgba(255,255,255,.08); border-radius: 9px; overflow: hidden; }
+.barRow i { display: block; height: 100%; background: var(--barColor, var(--violet)); }
+.talkGrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 10px; }
+.talkGrid button { min-height: 50px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.035); cursor: pointer; font-size: 9px; }
+.talkGrid button:hover { border-color: #8e82db; }
+.speechLine { padding: 12px; border-left: 3px solid var(--violet); border-radius: 0 11px 11px 0; background: rgba(157,140,255,.08); color: #e9e6f5; font-size: 11px; line-height: 1.6; }
+.oddsList { display: grid; gap: 3px; margin-top: 7px; }
+.oddsLine { display: flex; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,.06); color: var(--muted); font-size: 8px; }
+.oddsLine b { color: #e7e3f2; }
+.logList { display: grid; gap: 5px; }
+.logLine { display: grid; grid-template-columns: 32px 1fr; gap: 7px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.025); font-size: 8px; color: var(--muted); }
+.logLine b { color: #b8aff3; }
+
+.resultLayer { background: rgba(4,5,10,.72); backdrop-filter: blur(5px); }
+.resultCard { width: min(590px, 90vw); padding: 18px; max-height: 86vh; overflow: auto; }
+.resultCard h2 { margin: 5px 0 13px; font-size: 28px; }
+.resultCard .primaryButton { margin-top: 14px; }
+.resultHero { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 13px; background: rgba(255,255,255,.035); }
+.resultHero b { font-size: 32px; color: var(--cyan); }
+.resultHero p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.metricGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 9px; }
+.metricTile { padding: 9px; border: 1px solid var(--line); border-radius: 10px; }
+.metricTile span { display: block; color: var(--muted); font-size: 8px; }
+.metricTile strong { display: block; margin-top: 2px; font-size: 12px; }
+.noteList { display: grid; gap: 5px; margin-top: 9px; }
+.note { padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,.035); color: #cbc7d8; font-size: 9px; }
+.note.danger { background: rgba(255,98,110,.09); color: #ffb2b8; }
+.note.good { background: rgba(104,224,160,.09); color: #a9f1c9; }
+.worldChoice select {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #151826;
+  color: var(--ink);
+  font-size: 9px;
+}
+.dangerButton:disabled, .miniButton:disabled { opacity: .38; cursor: not-allowed; }
+.revenueChart, .revenueEmpty {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(4, 7, 13, .38);
+}
+.revenueChart svg { display: block; width: 100%; height: 128px; overflow: visible; }
+.revenueChart circle { fill: #68e0a0; stroke: #10131e; stroke-width: 2; }
+.revenueChart text { fill: #827e92; font-size: 7px; }
+.chartAxis { stroke: rgba(255,255,255,.13); stroke-width: 1; }
+.revenueEmpty { color: var(--muted); font-size: 9px; text-align: center; }
+
+.endingScreen { display: grid; place-items: center; padding: 24px; text-align: center; }
+.endingScreen > div { width: min(620px,90vw); }
+.endingScreen span { color: #a99eff; font-size: 10px; letter-spacing: .18em; }
+.endingScreen h1 { margin: 10px 0; font-size: clamp(42px,8vw,88px); letter-spacing: -.06em; }
+.endingScreen p { color: var(--muted); }
+.endingStats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 18px 0; }
+.endingStats div { padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.endingStats span { display:block; font-size:8px; letter-spacing:0; color:var(--muted); }
+.endingStats strong { display:block; margin-top:3px; }
+
+.portraitBlocker { display: none; }
+
+@media (max-width: 1050px) {
+  .brandChip { min-width: 48px; width: 48px; padding: 6px; }
+  .brandChip > span { margin: 0; }
+  .brandChip div { display: none; }
+  .conditionHud { width: 82px; }
+  .goalHud { min-width: 150px; }
+}
+
+@media (hover: none), (max-width: 920px) {
+  .desktopHint { display: none; }
+  .mobileControls {
+    position: fixed;
+    z-index: 30;
+    left: var(--safeLeft);
+    right: var(--safeRight);
+    bottom: var(--safeBottom);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    pointer-events: none;
+  }
+  .mobileControls button { pointer-events: auto; touch-action: none; border: 1px solid rgba(255,255,255,.19); background: rgba(12,14,23,.72); box-shadow: 0 12px 30px rgba(0,0,0,.3); backdrop-filter: blur(9px); }
+  .moveControls { display: flex; gap: 7px; }
+  .moveControls button { width: 58px; height: 54px; border-radius: 17px; font-size: 22px; }
+  .jumpButton, .interactButton { position: absolute; bottom: 0; width: 57px; height: 57px; border-radius: 50%; display: grid; place-content: center; gap: 0; }
+  .jumpButton { right: 68px; }
+  .interactButton { right: 0; border-color: rgba(157,140,255,.65) !important; background: rgba(103,84,221,.78) !important; }
+  .mobileControls button.pressed { transform: scale(.92); filter: brightness(1.3); }
+  .mobileControls span { font-size: 16px; font-weight: 900; line-height: 1; }
+  .mobileControls small { font-size: 7px; }
+  .interactionPrompt { bottom: calc(var(--safeBottom) + 65px); min-width: 190px; padding: 6px 9px; }
+  .promptKey { width: 28px; height: 28px; }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .gameHud { min-height: 44px; gap: 4px; }
+  .brandChip { width: 42px; min-width: 42px; border-radius: 12px; }
+  .brandChip > span { width: 30px; height: 30px; border-radius: 9px; }
+  .hudStat { min-width: 70px; padding: 5px 8px; border-radius: 11px; }
+  .hudStat strong { font-size: 11px; }
+  .goalHud { padding: 5px 8px; border-radius: 11px; }
+  .goalHud strong { font-size: 9px; }
+  .conditionHud { width: 70px; padding: 5px 6px; grid-template-columns: 15px 1fr 18px; border-radius: 11px; }
+  .roundButton { width: 35px; border-radius: 11px; }
+  .missionCard { top: calc(var(--safeTop) + 50px); width: min(232px,31vw); padding: 7px 9px; border-radius: 11px; }
+  .missionCard > strong { font-size: 11px; }
+  .missionCard p { margin: 2px 0 5px; font-size: 8px; }
+  .modulePip span { font-size: 6.5px; }
+  .toastStack { top: calc(var(--safeTop) + 49px); }
+  .setupScreen { grid-template-columns: .7fr 1.3fr; gap: 3vw; padding: 3vh 4vw; }
+  .setupTitle h1 { font-size: clamp(36px,7vw,58px); margin: 7px 0; }
+  .setupTitle p { margin: 6px 0; font-size: 9px; line-height: 1.45; }
+  .controlPills { margin-top: 8px; }
+  .setupPicker { gap: 7px; padding: 10px; border-radius: 16px; }
+  .choiceCard { min-height: 58px; padding: 7px; }
+  .choiceCard p { display: none; }
+  .pickerHeading small { display: none; }
+  .startButton { padding: 8px 10px; }
+  .worldPanel { max-height: 92vh; }
+  .sheetBody { max-height: calc(92vh - 54px); padding: 10px; }
+  .worldPanel > header { padding: 8px 11px; }
+  .worldGrid { gap: 5px; }
+  .worldChoice, .staffCard, .oddsCard, .featureCard { padding: 8px; }
+  .moveControls button { width: 52px; height: 48px; }
+  .jumpButton, .interactButton { width: 51px; height: 51px; }
+  .jumpButton { right: 61px; }
+}
+
+@media (orientation: portrait) {
+  .portraitBlocker {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding: 30px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 35%, rgba(157,140,255,.2), transparent 38%), #090b12;
+  }
+  .portraitBlocker h1 { margin: 4px 0 0; font-size: 25px; }
+  .portraitBlocker p { max-width: 280px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .rotateGlyph { width: 62px; height: 82px; border: 3px solid #9d8cff; border-radius: 13px; transform: rotate(90deg); animation: rotatePulse 1.3s ease-in-out infinite alternate; }
+  .rotateGlyph span { display:block; width:8px; height:8px; margin:65px auto 0; border-radius:50%; background:#9d8cff; }
+  @keyframes rotatePulse { to { transform: rotate(90deg) scale(1.08); filter: drop-shadow(0 0 14px rgba(157,140,255,.6)); } }
+}
+
+@media (max-width: 640px) and (orientation: landscape) {
+  .cashStat { display: none; }
+  .goalHud { max-width: 150px; }
+  .conditionHud { width: 64px; }
+  .missionCard { width: 210px; }
+  .worldGrid.three { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 520px) and (orientation: landscape) {
+  .goalHud, .anxietyHud { display: none; }
+  .gameHud { max-width: calc(100vw - var(--safeLeft) - var(--safeRight)); }
+  .missionCard { width: 185px; }
+  .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }
+}

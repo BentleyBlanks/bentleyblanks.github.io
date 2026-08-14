@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#080b16">
-  <meta name="description" content="一款关于雇大学生、月租 AI、做游戏和保住开发电脑的 Three.js 经营生存 demo。">
-  <title>甲方是我：独游生存月报</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=3">
+  <meta name="theme-color" content="#090b12">
+  <meta name="description" content="一款能跑、能跳、能撞 Bug 的 Three.js 横版 2.5D 独立游戏开发生存 demo。">
+  <title>甲方是我：工作室跑断腿</title>
+  <link rel="stylesheet" href="./Style_Play.css?v=20260814a">
   <script type="importmap">
     {
       "imports": {
@@ -16,195 +16,99 @@
   </script>
 </head>
 <body>
-  <div id="loadingScreen" class="loadingScreen">
-    <div class="loadingLogo">甲方是我</div>
-    <div class="loadingBar"><span></span></div>
-    <p>正在把商业计划书编译成风险……</p>
+  <div id="loadingScreen" class="loadingScreen" aria-live="polite">
+    <div class="loadingMark">甲</div>
+    <strong>正在把管理面板拆成地板……</strong>
+    <div class="loadingTrack"><i></i></div>
   </div>
 
-  <div id="portraitBlocker" class="portraitBlocker" aria-live="polite">
-    <div class="rotateDevice" aria-hidden="true"><span></span></div>
-    <h1>请把手机横过来</h1>
-    <p>工作室已经够窄了，竖屏里实习生会叠在一起。</p>
-  </div>
+  <section id="portraitBlocker" class="portraitBlocker" aria-live="polite">
+    <div class="rotateGlyph"><span></span></div>
+    <h1>横过来，才能跑起来</h1>
+    <p>这是横版 2.5D 游戏。竖屏会把老板卡进墙里。</p>
+  </section>
 
   <main id="gameRoot" class="gameRoot">
-    <canvas id="sceneCanvas" class="sceneCanvas" aria-label="可交互的 2.5D 游戏工作室"></canvas>
+    <canvas id="sceneCanvas" aria-label="可操控的横版 2.5D 游戏工作室"></canvas>
     <div id="sceneVignette" class="sceneVignette" aria-hidden="true"></div>
-    <div id="sceneLabels" class="sceneLabels" aria-label="工作室成员"></div>
 
-    <header class="topBar">
-      <div class="brandBlock">
-        <span class="brandEyebrow">INDIE DEBT SIMULATOR</span>
-        <strong>甲方是我</strong>
+    <header class="gameHud" aria-label="玩家状态">
+      <div class="brandChip"><span>甲</span><div><small>2.5D OFFICE RUN</small><strong>工作室跑断腿</strong></div></div>
+      <div class="hudStat"><span>月份</span><strong id="monthValue">M01</strong></div>
+      <div class="hudStat cashStat"><span>现金</span><strong id="cashValue">¥68,000</strong></div>
+      <div class="goalHud">
+        <div><span>游戏收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
+        <div class="goalTrack"><i id="goalBar"></i></div>
       </div>
-      <div class="topStats" aria-label="核心状态">
-        <div class="topStat monthStat"><span>月份 · 焦虑 / 饥饿</span><strong id="monthValue">M01 · 18 / 0</strong></div>
-        <div class="topStat"><span>现金</span><strong id="cashValue">¥68,000</strong></div>
-        <div class="topStat dangerStat"><span>下月燃烧</span><strong id="burnValue">−¥12,100</strong></div>
-        <div class="topStat ratingStat goalStat"><span>世界影响力目标 · 累计游戏收入</span><strong id="ratingValue">¥0 / 100 亿元</strong><div class="goalTrack"><i id="goalBar"></i></div></div>
-      </div>
-      <button id="soundButton" class="iconButton" type="button" aria-label="开关音效" title="音效">♪</button>
-      <button id="helpButton" class="iconButton" type="button" aria-label="玩法说明" title="玩法说明">?</button>
+      <div class="conditionHud hungerHud"><span>饿</span><div><i id="hungerBar"></i></div><b id="hungerValue">0</b></div>
+      <div class="conditionHud anxietyHud"><span>焦</span><div><i id="anxietyBar"></i></div><b id="anxietyValue">18</b></div>
+      <button id="soundButton" class="roundButton" type="button" aria-label="开关音效">♪</button>
+      <button id="helpButton" class="roundButton" type="button" aria-label="查看操作说明">?</button>
     </header>
 
-    <section id="projectPanel" class="projectPanel glassPanel" aria-label="项目模块状态">
-      <div class="panelHeading">
-        <div>
-          <span id="gameTypeBadge" class="typeBadge">尚未立项</span>
-          <h1 id="projectTitle">商业计划书加载中</h1>
-        </div>
-        <span id="versionBadge" class="versionBadge">DEV</span>
-      </div>
-      <p id="projectPitch" class="projectPitch">先选一个足够荒唐、又似乎能卖钱的点子。</p>
-      <div id="projectSignals" class="projectSignals" aria-label="项目卖点、愿望单与玩家预期"></div>
-
-      <div id="moduleGrid" class="moduleGrid"></div>
-
-      <div class="constraintHeader">
-        <span>部门互害实况</span>
-        <span id="debtValue">范围债 0 · 技术债 0</span>
-      </div>
-      <div id="tensionList" class="tensionList">
-        <div class="emptyTension">四组还没开始互相甩锅。</div>
-      </div>
-    </section>
-
-    <aside id="financePanel" class="financePanel glassPanel" aria-label="现金流和团队">
-      <div class="panelHeading compactHeading">
-        <div><span class="miniLabel">MONTHLY BURN</span><h2>本月账单</h2></div>
-        <button id="financeDetailButton" class="textButton" type="button">展开</button>
-      </div>
-      <div id="costBreakdown" class="costBreakdown"></div>
-      <div class="cashForecast">
-        <span>结算后预计</span>
-        <strong id="forecastValue">¥55,900</strong>
-      </div>
-      <div class="teamHeader"><span>工位</span><small id="teamCount">0 / 4</small></div>
-      <div id="teamMiniList" class="teamMiniList"></div>
-      <div class="playerCondition">
-        <span>老板饥饿度</span>
-        <div class="conditionTrack"><i id="hungerBar"></i></div>
-        <b id="hungerValue">0</b>
-      </div>
-      <div class="playerCondition anxietyCondition">
-        <span>老板焦虑度</span>
-        <div class="conditionTrack"><i id="anxietyBar"></i></div>
-        <b id="anxietyValue">18</b>
-      </div>
+    <aside class="missionCard" aria-live="polite">
+      <span id="projectType">尚未立项</span>
+      <strong id="projectTitle">先开一家公司</strong>
+      <p id="missionText">移动到场景设施旁，按 E 或交互键。</p>
+      <div id="moduleStrip" class="moduleStrip"></div>
     </aside>
 
-    <div id="worldHint" class="worldHint">
-      <span class="mouseGlyph">↖</span>
-      <span>点击工位上的人，亲自画饼或互怼</span>
+    <div id="interactionPrompt" class="interactionPrompt hidden" aria-live="polite">
+      <span class="promptKey">E</span>
+      <div><strong id="interactionTitle">交互</strong><small id="interactionDetail">靠近一点</small></div>
     </div>
 
-    <nav class="bottomDock" aria-label="本月操作">
-      <button id="talentButton" class="dockButton" type="button">
-        <span class="dockIcon">＋</span><span><small>TEAM</small>人才市场</span>
-      </button>
-      <button id="directiveButton" class="dockButton" type="button">
-        <span class="dockIcon">◎</span><span><small>FOCUS</small><b id="directiveLabel">四组联调</b></span>
-      </button>
-      <button id="moneyButton" class="dockButton" type="button">
-        <span class="dockIcon">¥</span><span><small>RUNWAY</small>吃饭 / 宣发 / 抵押</span>
-      </button>
-      <button id="releaseButton" class="dockButton releaseButton" type="button" disabled>
-        <span class="dockIcon">↥</span><span><small>BUILD</small><b id="releaseLabel">上线游戏</b></span>
-      </button>
-      <button id="nextMonthButton" class="dockButton nextButton" type="button">
-        <span><small>COMMIT</small>进入下月</span><span class="dockIcon">→</span>
-      </button>
+    <div class="desktopHint"><b>A D / ← →</b> 移动　<b>W / ↑ / 空格</b> 跳跃　<b>E</b> 交互</div>
+
+    <nav class="mobileControls" aria-label="移动端游戏控制">
+      <div class="moveControls">
+        <button id="moveLeftButton" type="button" aria-label="向左移动">←</button>
+        <button id="moveRightButton" type="button" aria-label="向右移动">→</button>
+      </div>
+      <button id="jumpButton" class="jumpButton" type="button"><span>↑</span><small>跳</small></button>
+      <button id="interactButton" class="interactButton" type="button"><span>E</span><small>交互</small></button>
     </nav>
 
     <div id="toastStack" class="toastStack" aria-live="polite"></div>
   </main>
 
-  <section id="setupScreen" class="setupScreen" aria-label="游戏立项">
-    <div class="setupBackdrop" aria-hidden="true">
-      <div class="setupOrb orbOne"></div><div class="setupOrb orbTwo"></div>
+  <section id="setupScreen" class="setupScreen" aria-label="创建游戏项目">
+    <div class="setupNoise" aria-hidden="true"></div>
+    <div class="setupTitle">
+      <span>THREE.JS · SIDE-SCROLLING 2.5D</span>
+      <h1>甲方是我<br><em>工作室跑断腿</em></h1>
+      <p>这次不是盯表格。你得亲自在工作室里跑、跳、撞 Bug、找人、吃饭和借钱。</p>
+      <div class="controlPills"><span>能跑</span><span>能跳</span><span>会饿</span><span>会疯</span><span>电脑不能丢</span></div>
     </div>
-    <div class="setupContent">
-      <div class="setupHero">
-        <span class="setupKicker">A THREE.JS SELF-DEPRECATION GAME</span>
-        <h1>甲方是我<br><em>独游生存月报</em></h1>
-        <p>雇大学生，月租 AI，边聊天边定制游戏，把收入做到 100 亿元。<br>人会饿、会焦虑，开发电脑绝对不能抵押。</p>
-        <div class="rulePills">
-          <span>目标 100 亿元</span><span>4 张工位</span><span>2 次谈话 / 月</span><span>1 台命根子</span>
-        </div>
-      </div>
-      <div class="setupChoices">
-        <div class="setupStep">
-          <div class="stepTitle"><span>01</span><div><strong>挑游戏品类与题材</strong><small>名字越像能卖，风险越像不存在；开发中也能高价转向</small></div></div>
-          <div id="projectChoices" class="choiceRail projectChoices"></div>
-        </div>
-        <div class="setupStep">
-          <div class="stepTitle"><span>02</span><div><strong>选商业形态</strong><small>上线后仍可迭代，也仍可改炸</small></div></div>
-          <div id="typeChoices" class="choiceRail typeChoices"></div>
-        </div>
-        <button id="startButton" class="startButton" type="button">
-          <span>拿 ¥68,000 开始创业</span><b>反正上班也很累 →</b>
-        </button>
-        <button id="continueButton" class="continueButton hidden" type="button">继续上一次融资事故</button>
-      </div>
+    <div class="setupPicker">
+      <div class="pickerBlock"><div class="pickerHeading"><b>01</b><span><strong>挑一个要做的游戏</strong><small>以后想换赛道，得亲自跑去白板前承认错误</small></span></div><div id="projectChoices" class="choiceRail"></div></div>
+      <div class="pickerBlock"><div class="pickerHeading"><b>02</b><span><strong>决定怎么卖</strong><small>单机、网游、手游，都是不同形状的痛苦</small></span></div><div id="typeChoices" class="choiceRail compactRail"></div></div>
+      <button id="startButton" class="startButton" type="button"><span>进入 2.5D 工作室</span><strong>拿 ¥68,000 开跑 →</strong></button>
+      <button id="continueButton" class="continueButton hidden" type="button">继续上次跑断腿的项目</button>
     </div>
   </section>
 
   <div id="modalLayer" class="modalLayer hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-    <button id="modalBackdrop" class="modalBackdrop" type="button" aria-label="关闭面板"></button>
-    <section class="sheetPanel">
-      <header class="sheetHeader">
-        <div><span id="sheetKicker" class="sheetKicker">MANAGEMENT</span><h2 id="sheetTitle">面板</h2></div>
-        <button id="sheetCloseButton" class="closeButton" type="button" aria-label="关闭">×</button>
-      </header>
+    <button id="modalBackdrop" class="modalBackdrop" type="button" aria-label="关闭交互窗口"></button>
+    <section class="worldPanel">
+      <header><div><span id="sheetKicker">WORLD INTERACTION</span><h2 id="sheetTitle">场景交互</h2></div><button id="sheetCloseButton" class="closeButton" type="button" aria-label="关闭">×</button></header>
       <div id="sheetBody" class="sheetBody"></div>
     </section>
   </div>
 
-  <div id="conversationLayer" class="conversationLayer hidden" role="dialog" aria-modal="true" aria-labelledby="conversationName">
-    <button id="conversationBackdrop" class="modalBackdrop" type="button" aria-label="结束对话"></button>
-    <section class="conversationCard">
-      <button id="conversationCloseButton" class="closeButton conversationClose" type="button" aria-label="结束对话">×</button>
-      <div id="conversationPortrait" class="conversationPortrait"><span>AI</span></div>
-      <div class="conversationIdentity">
-        <span id="conversationKind">按月租用</span>
-        <h2 id="conversationName">角色</h2>
-        <p id="conversationRole">职位</p>
-      </div>
-      <div class="speechBubble"><p id="conversationLine">……</p></div>
-      <div id="conversationStats" class="conversationStats"></div>
-      <div class="talkBudget">本月嘴遁次数 <strong id="talkPointsValue">2 / 2</strong></div>
-      <div id="conversationFeatureList" class="conversationFeatureList"></div>
-      <div id="conversationActions" class="conversationActions">
-        <button type="button" data-tone="encourage"><span>♡</span><b>夸两句</b><small>稳心态，少量加速</small></button>
-        <button type="button" data-tone="pressure"><span>!</span><b>今晚要</b><small>猛加速，压力/漂移上升</small></button>
-        <button type="button" data-tone="sync"><span>◎</span><b>拉通一下</b><small>减范围债与技术债</small></button>
-        <button type="button" data-tone="roast"><span>※</span><b>互相伤害</b><small>有点产出，非常伤感情</small></button>
-      </div>
-    </section>
-  </div>
-
   <div id="resultLayer" class="resultLayer hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-    <div class="resultGlow" aria-hidden="true"></div>
     <section class="resultCard">
-      <span id="resultKicker" class="resultKicker">MONTHLY REPORT</span>
-      <h2 id="resultTitle">月报</h2>
-      <div id="resultBody" class="resultBody"></div>
-      <button id="resultCloseButton" class="resultCloseButton" type="button">好的，继续燃烧现金</button>
+      <span id="resultKicker">SPRINT RESULT</span>
+      <h2 id="resultTitle">结果</h2>
+      <div id="resultBody"></div>
+      <button id="resultCloseButton" class="primaryButton" type="button">继续跑</button>
     </section>
   </div>
 
   <section id="endingScreen" class="endingScreen hidden" aria-live="polite">
-    <div class="endingNoise" aria-hidden="true"></div>
-    <div class="endingContent">
-      <span>AFTER MANY PAINFUL PATCHES</span>
-      <h1 id="endingTitle">电脑还在</h1>
-      <p id="endingSubtitle">已经是商业奇迹。</p>
-      <div id="endingStats" class="endingStats"></div>
-      <button id="restartButton" class="startButton" type="button"><span>再创业一次</span><b>这次一定控制范围 →</b></button>
-    </div>
+    <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>再跑一家公司</span><strong>这次少走弯路 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Game.mjs?v=3"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260814a"></script>
 </body>
 </html>
