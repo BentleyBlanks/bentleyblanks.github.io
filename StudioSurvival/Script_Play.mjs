@@ -2584,9 +2584,8 @@ function OpenStaffSheet(staffId, spokenLine = "") {
       <button data-tone="roast" type="button">互喷<br><small>微增</small></button>
       <button data-tone="sync" type="button">联调<br><small>减债</small></button>
     </div>
-    <div class="panelSection choiceFooter"><span>沟通 ${state.talkPoints} · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `漂移 ${Math.round(pressureValue)}`}</span><button class="miniButton" data-customize type="button">加玩法</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>本月还可有效对话 ${state.talkPoints} 次 · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `上下文漂移 ${Math.round(pressureValue)}`}</span><small>项目方向与玩法提案统一在墙上白板处理</small></div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      if (event.target.closest("[data-customize]")) return OpenCustomizationSheet(staffId);
       const button = event.target.closest("[data-tone]");
       if (!button) return;
       const result = TalkToStaff(state, staffId, button.dataset.tone);
@@ -2596,12 +2595,16 @@ function OpenStaffSheet(staffId, spokenLine = "") {
 }
 
 function OpenCustomizationSheet(sourceId = "owner") {
+  if (!state.project || state.project.age < 1) {
+    ShowToast("先完成第一个开发月；有东西可改后，项目白板才会开放玩法提案。", "warning");
+    return OpenDirectiveSheet();
+  }
   const staff = sourceId === "owner" ? null : FindStaff(sourceId);
   const sourceLabel = staff ? staff.name : "你自己";
   const usedIds = new Set(state.project.features.map((item) => item.id));
-  OpenPanel("玩法", sourceLabel, `
-    <p class="panelIntro">老板：饥 +10 · 焦虑 +7 · 质量↓</p>
-    <div class="choiceFooter"><span>沟通 ${state.talkPoints}</span><b>玩法 ${state.project.features.length}/6</b></div>
+  OpenPanel("PROJECT WHITEBOARD", `${sourceLabel} 的玩法提案`, `
+    <p class="panelIntro">从白板选一个提案写进需求。老板亲自做会增加饥饿与焦虑；交给成员会消耗其状态。</p>
+    <div class="choiceFooter"><span>本月有效对话/拍板 ${state.talkPoints} 次</span><b>已塞 ${state.project.features.length}/6 个玩法</b></div>
     <div class="panelSection worldGrid">${FEATURE_CHOICES.map((feature) => `
       <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) ? "disabled" : ""}>
         <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
@@ -2609,7 +2612,7 @@ function OpenCustomizationSheet(sourceId = "owner") {
       </button>`).join("")}</div>
     <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      if (event.target.closest("[data-source-select]")) return OpenAiTerminalSheet();
+      if (event.target.closest("[data-source-select]")) return OpenFeatureSourceSheet();
       const button = event.target.closest("[data-feature-id]");
       if (!button) return;
       const result = CustomizeProject(state, sourceId, button.dataset.featureId);
@@ -2623,15 +2626,18 @@ function OpenCustomizationSheet(sourceId = "owner") {
   });
 }
 
-function OpenAiTerminalSheet() {
+function OpenFeatureSourceSheet() {
+  if (!state.project || state.project.age < 1) return OpenDirectiveSheet();
   const hired = state.team.map((member) => FindStaff(member.id)).filter(Boolean);
-  OpenPanel("群聊", `沟通 ${state.talkPoints}`, `
+  OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 选择提案人", `
+    <p class="speechLine">本月还能拍板 ${state.talkPoints} 次。</p>
+    <div class="sectionHeading panelSection"><strong>这次由谁提玩法？</strong><span>玩法方向只从白板进入</span></div>
     <div class="worldGrid three">
       <button class="worldChoice danger" data-source-id="owner" type="button"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div></button>
       ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div></button>`).join("")}
     </div>
-    <div class="panelSection sectionHeading"><strong>成员</strong></div>
-    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">${EscapeHtml(staff.name)}</button>`).join("") : `<span class="chip">无</span>`}</div>`, () => {
+    <div class="panelSection sectionHeading"><strong>团队状态</strong><span>招聘仍只在人才市场</span></div>
+    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场买设备并招聘后，他们才会出现在白板旁。</span>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const chat = event.target.closest("[data-chat-id]");
       if (chat) return OpenStaffSheet(chat.dataset.chatId);
@@ -3263,7 +3269,7 @@ function OpenDirectiveSheet() {
       <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive-id="${directive.id}" type="button">
         <div class="choiceTop"><strong style="color:${directive.color}">${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
       </button>`).join("")}</div>
-    ${earlyStage ? `<div class="noteList"><div class="note good">先完成第一个月，之后再开放玩法定制和换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>本月可补一个玩法提案</span><button class="miniButton" data-owner-customize type="button">定制玩法</button></div>
+    ${earlyStage ? `<div class="noteList"><div class="note good">先完成第一个月，之后再开放玩法定制和换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案只在这块白板处理</span><button class="miniButton" data-feature-source type="button">安排玩法提案</button></div>
     <div class="panelSection sectionHeading"><strong>承认做错了：换赛道</strong><span>预计烧掉 ${FormatMoney(pivotCost)}</span></div>
     <div class="worldGrid">
       <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.title)} · ${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
@@ -3276,7 +3282,7 @@ function OpenDirectiveSheet() {
         if (ApplyInteractiveResult(SelectDirective(state, directiveButton.dataset.directiveId))) OpenDirectiveSheet();
         return;
       }
-      if (event.target.closest("[data-owner-customize]")) return OpenCustomizationSheet("owner");
+      if (event.target.closest("[data-feature-source]")) return OpenFeatureSourceSheet();
       if (!event.target.closest("[data-pivot]")) return;
       const projectId = document.getElementById("pivotProjectSelect")?.value;
       const typeId = document.getElementById("pivotTypeSelect")?.value;
