@@ -2254,3 +2254,1171 @@ button:disabled {
   .setupContent { grid-template-columns: 200px minmax(500px, 1fr); gap: 20px; }
   .rulePills { display: none; }
 }
+
+/* Studio Survival state layer -------------------------------------------------
+   These selectors are intentionally additive: the renderer can toggle the
+   body state classes without changing the scene or the existing card markup. */
+
+.playerCondition {
+  min-height: 24px;
+}
+
+.playerCondition > span {
+  color: #8f95a7;
+  white-space: nowrap;
+}
+
+.conditionTrack {
+  min-width: 0;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+#hungerBar,
+#anxietyBar {
+  min-width: 0;
+  transition: width 420ms cubic-bezier(0.22, 0.8, 0.2, 1), filter 180ms ease;
+}
+
+#hungerBar {
+  background: linear-gradient(90deg, #68e0a0 0%, #ffd166 56%, #ff6a6a 100%);
+  box-shadow: 0 0 11px rgba(255, 178, 102, 0.35);
+}
+
+#anxietyBar {
+  background: linear-gradient(90deg, #66b8ff 0%, #8d7cff 35%, #ffd166 67%, #ff6a6a 100%);
+  box-shadow: 0 0 11px rgba(141, 124, 255, 0.38);
+}
+
+.anxietyCondition {
+  border-top-color: rgba(141, 124, 255, 0.2);
+}
+
+.anxietyCondition > span {
+  color: #a8a2dd;
+}
+
+.anxietyCondition b {
+  color: #bdb5ff;
+}
+
+body.anxietyMedium #anxietyBar {
+  filter: saturate(1.08);
+  box-shadow: 0 0 13px rgba(255, 209, 102, 0.48);
+}
+
+body.anxietyMedium .anxietyCondition > span,
+body.anxietyMedium .anxietyCondition b {
+  color: #ffd88b;
+}
+
+body.anxietyHigh #anxietyBar {
+  filter: saturate(1.2) brightness(1.05);
+  box-shadow: 0 0 15px rgba(255, 154, 103, 0.6);
+}
+
+body.anxietyHigh .anxietyCondition > span,
+body.anxietyHigh .anxietyCondition b {
+  color: #ffad87;
+}
+
+body.anxietyCritical #anxietyBar {
+  filter: saturate(1.4) brightness(1.1);
+  box-shadow: 0 0 18px rgba(255, 76, 91, 0.82);
+}
+
+body.anxietyCritical .anxietyCondition > span,
+body.anxietyCritical .anxietyCondition b {
+  color: #ff817a;
+}
+
+/* Food plans can be rendered as the existing choiceCard, or as a compact card
+   inside the finance sheet. Both forms keep the cost and wellbeing trade-off
+   scannable at a glance. */
+
+.foodPlanGrid,
+.foodPlans,
+.foodPlanList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.foodPlanCard,
+button[data-food-plan] {
+  --choiceColor: var(--yellow);
+  position: relative;
+  min-width: 0;
+  padding: 11px;
+  overflow: hidden;
+  border: 1px solid var(--softLine);
+  border-radius: 10px;
+  color: #ddddea;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.028);
+  cursor: pointer;
+  font: inherit;
+  touch-action: manipulation;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.foodPlanCard::after,
+button[data-food-plan]::after {
+  content: "";
+  position: absolute;
+  top: -34px;
+  right: -28px;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--choiceColor);
+  filter: blur(24px);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.foodPlanCard:hover,
+button[data-food-plan]:hover {
+  border-color: color-mix(in srgb, var(--choiceColor) 62%, transparent);
+  transform: translateY(-1px);
+}
+
+.foodPlanCard.selected,
+.foodPlanCard.isSelected,
+button[data-food-plan].selected,
+button[data-food-plan][aria-pressed="true"] {
+  border-color: var(--choiceColor);
+  background: color-mix(in srgb, var(--choiceColor) 10%, rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 0 20px color-mix(in srgb, var(--choiceColor) 8%, transparent), 0 0 0 1px color-mix(in srgb, var(--choiceColor) 22%, transparent);
+}
+
+.foodPlanCard.selected::before,
+.foodPlanCard.isSelected::before,
+button[data-food-plan].selected::before,
+button[data-food-plan][aria-pressed="true"]::before {
+  content: "✓";
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  color: var(--choiceColor);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.foodPlanCard strong,
+button[data-food-plan] strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding-right: 15px;
+  font-size: 10px;
+}
+
+.foodPlanCard p,
+button[data-food-plan] p {
+  position: relative;
+  z-index: 1;
+  min-height: 28px;
+  margin: 5px 0 0;
+  color: #8e95a8;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.foodPlanCard small,
+button[data-food-plan] small,
+.foodPlanMeta {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 6px;
+  color: var(--choiceColor);
+  font-size: 7px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.foodPlanIcon {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 6px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--choiceColor) 45%, transparent);
+  border-radius: 6px;
+  color: var(--choiceColor);
+  background: color-mix(in srgb, var(--choiceColor) 11%, transparent);
+  font-size: 12px;
+}
+
+/* Development-period宣发 card. The aliases let the UI call this promoCard,
+   marketingCard, or devPromoCard while keeping one visual treatment. */
+
+.devPromoCard,
+.promoCard,
+.marketingCard,
+.developmentPromoCard {
+  position: relative;
+  min-width: 0;
+  margin: 10px 0 12px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 209, 102, 0.24);
+  border-radius: 11px;
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.09), rgba(255, 110, 174, 0.045) 58%, rgba(141, 124, 255, 0.07)),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 24px rgba(255, 209, 102, 0.045);
+}
+
+.devPromoCard::after,
+.promoCard::after,
+.marketingCard::after,
+.developmentPromoCard::after {
+  content: "";
+  position: absolute;
+  right: -44px;
+  bottom: -52px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 110, 174, 0.16);
+  filter: blur(25px);
+  pointer-events: none;
+}
+
+.promoHeader,
+.marketingHeader,
+.devPromoHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.promoHeader strong,
+.marketingHeader strong,
+.devPromoHeader strong {
+  display: block;
+  color: #f6e5bb;
+  font-size: 11px;
+}
+
+.promoHeader small,
+.marketingHeader small,
+.devPromoHeader small {
+  display: block;
+  margin-top: 3px;
+  color: #9c91a1;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.promoBadge,
+.marketingBadge,
+.devPromoBadge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 209, 102, 0.34);
+  border-radius: 99px;
+  color: #ffd98b;
+  background: rgba(255, 209, 102, 0.09);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.promoCard > p,
+.devPromoCard > p,
+.marketingCard > p,
+.developmentPromoCard > p {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 10px;
+  color: #aaa3b1;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.promoMetricGrid,
+.marketingMetricGrid,
+.promoStats,
+.marketingStats {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.promoMetric,
+.marketingMetric,
+.promoStat,
+.marketingStat {
+  min-width: 0;
+  padding: 7px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(9, 12, 24, 0.38);
+}
+
+.promoMetric span,
+.marketingMetric span,
+.promoStat span,
+.marketingStat span {
+  display: block;
+  overflow: hidden;
+  color: #878b9d;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promoMetric strong,
+.marketingMetric strong,
+.promoStat strong,
+.marketingStat strong {
+  display: block;
+  margin-top: 3px;
+  color: #e8e5f0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.promoMetric small,
+.marketingMetric small,
+.promoStat small,
+.marketingStat small {
+  display: block;
+  margin-top: 2px;
+  color: #72788b;
+  font-size: 6px;
+  line-height: 1.25;
+}
+
+.promoMetric.wishlist,
+.promoMetric.wishlisted,
+.wishlistMetric,
+.wishlistedMetric,
+.promoMetric[data-promo-kind="wishlist"],
+.promoMetric[data-kind="wishlist"] { border-color: rgba(141, 124, 255, 0.35); }
+
+.promoMetric.refund,
+.refundMetric,
+.promoMetric[data-promo-kind="refund"],
+.promoMetric[data-kind="refund"] { border-color: rgba(255, 106, 106, 0.32); }
+
+.promoMetric.review,
+.reviewMetric,
+.promoMetric.reputation,
+.reputationMetric,
+.promoMetric[data-promo-kind="review"],
+.promoMetric[data-promo-kind="reputation"],
+.promoMetric[data-kind="review"],
+.promoMetric[data-kind="reputation"] { border-color: rgba(104, 224, 160, 0.3); }
+
+.promoFooter,
+.marketingFooter,
+.devPromoFooter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  margin-top: 9px;
+  color: #888d9e;
+  font-size: 7px;
+  line-height: 1.35;
+}
+
+.promoFooter strong,
+.marketingFooter strong,
+.devPromoFooter strong { color: #ffd98b; }
+
+/* Conversation feature choices. These are compact enough to sit beside the
+   existing talk actions, but retain a strong selected state for touch users. */
+
+.featureChoiceGrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.featureChoiceCard {
+  position: relative;
+  min-width: 0;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid var(--softLine);
+  border-radius: 9px;
+  color: #d9dbe4;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.028);
+  cursor: pointer;
+  font: inherit;
+  touch-action: manipulation;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.featureChoiceCard:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--featureColor, var(--violet)) 55%, transparent);
+  background: color-mix(in srgb, var(--featureColor, var(--violet)) 7%, rgba(255, 255, 255, 0.028));
+  transform: translateY(-1px);
+}
+
+.featureChoiceCard.selected,
+.featureChoiceCard[aria-pressed="true"] {
+  border-color: var(--featureColor, var(--violet));
+  background: color-mix(in srgb, var(--featureColor, var(--violet)) 12%, rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 0 20px color-mix(in srgb, var(--featureColor, var(--violet)) 8%, transparent);
+}
+
+.featureChoiceCard:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.featureChoiceCard > strong {
+  display: block;
+  padding-right: 8px;
+  color: #eeeef4;
+  font-size: 10px;
+}
+
+.featureChoiceCard > p {
+  margin: 5px 0 0;
+  color: #898fa2;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.featureSourceBadge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--featureColor, var(--violet)) 35%, transparent);
+  border-radius: 99px;
+  color: color-mix(in srgb, var(--featureColor, var(--violet)) 70%, white);
+  background: color-mix(in srgb, var(--featureColor, var(--violet)) 8%, transparent);
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.featureEffects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.featureEffects > * {
+  padding: 3px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: #8e94a7;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 6px;
+  line-height: 1.2;
+}
+
+.featureEffects .positive,
+.featureEffects .good { color: #83e7b0; border-color: rgba(104, 224, 160, 0.25); }
+.featureEffects .negative,
+.featureEffects .danger { color: #ff9b91; border-color: rgba(255, 106, 106, 0.25); }
+.featureEffects .warning { color: #ffd98b; border-color: rgba(255, 209, 102, 0.25); }
+
+.ownerTalkCard {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid rgba(141, 124, 255, 0.23);
+  border-radius: 9px;
+  color: #b8b7d1;
+  background: linear-gradient(110deg, rgba(141, 124, 255, 0.09), rgba(255, 255, 255, 0.025));
+}
+
+.ownerTalkCard > strong {
+  display: block;
+  color: #e1defe;
+  font-size: 9px;
+}
+
+.ownerTalkCard p {
+  margin: 2px 0 0;
+  color: #898fa2;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.ownerTalkCard > span:first-child {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(141, 124, 255, 0.3);
+  border-radius: 7px;
+  color: #c6bfff;
+  background: rgba(141, 124, 255, 0.1);
+  font-size: 12px;
+}
+
+.ownerTalkCard button {
+  min-width: 60px;
+  padding: 6px 8px;
+  border: 1px solid rgba(141, 124, 255, 0.38);
+  border-radius: 7px;
+  color: #dedaff;
+  background: rgba(141, 124, 255, 0.1);
+  cursor: pointer;
+  font-size: 7px;
+  touch-action: manipulation;
+}
+
+.ownerTalkCard button:hover:not(:disabled) { background: rgba(141, 124, 255, 0.2); }
+.ownerTalkCard button:disabled { cursor: not-allowed; opacity: 0.4; }
+
+.projectSignals {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+  margin: -6px 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.projectSignals::-webkit-scrollbar { display: none; }
+
+.projectSignals > span,
+.projectSignals > b {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  color: #9096a8;
+  background: rgba(255, 255, 255, 0.028);
+  font-size: 7px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.projectSignals > b {
+  border-color: rgba(141, 124, 255, 0.28);
+  color: #c4bcff;
+  background: rgba(141, 124, 255, 0.09);
+}
+
+.projectSignals > span[data-signal="wishlist"],
+.projectSignals > b[data-signal="wishlist"],
+.projectSignals > .wishlistSignal {
+  border-color: rgba(141, 124, 255, 0.3);
+  color: #c1b9ff;
+}
+
+.projectSignals > span[data-signal="refund"],
+.projectSignals > b[data-signal="refund"],
+.projectSignals > .refundSignal {
+  border-color: rgba(255, 106, 106, 0.28);
+  color: #ffaaa1;
+}
+
+.projectSignals > span[data-signal="review"],
+.projectSignals > b[data-signal="review"],
+.projectSignals > .reviewSignal,
+.projectSignals > span[data-signal="reputation"],
+.projectSignals > b[data-signal="reputation"],
+.projectSignals > .reputationSignal {
+  border-color: rgba(104, 224, 160, 0.26);
+  color: #91e5b9;
+}
+
+/* Anxiety atmosphere: only the game canvas receives the distortion wash;
+   panels and controls stay crisp and usable even at the critical level. */
+
+.gameRoot::before,
+.gameRoot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+}
+
+body.anxietyMedium .gameRoot::before {
+  opacity: 0.16;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 9px, rgba(141, 124, 255, 0.06) 10px 11px),
+    radial-gradient(circle at 49% 48%, rgba(255, 209, 102, 0.09), transparent 52%);
+  mix-blend-mode: screen;
+}
+
+body.anxietyHigh .gameRoot::before {
+  opacity: 0.26;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(255, 110, 174, 0.075) 9px 10px),
+    radial-gradient(ellipse at 52% 48%, rgba(255, 155, 112, 0.16), transparent 62%);
+  mix-blend-mode: screen;
+  animation: anxietyDrift 4.8s ease-in-out infinite alternate;
+}
+
+body.anxietyCritical .gameRoot::before {
+  opacity: 0.36;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 6px, rgba(255, 106, 106, 0.1) 7px 8px),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 70, 78, 0.2), transparent 64%);
+  mix-blend-mode: screen;
+  animation: anxietyCriticalWash 1.55s steps(2, end) infinite;
+}
+
+body.anxietyCritical .gameRoot::after {
+  inset: 6px;
+  border: 1px solid rgba(255, 106, 106, 0.42);
+  border-radius: 10px;
+  box-shadow: inset 0 0 34px rgba(255, 55, 75, 0.11), 0 0 26px rgba(255, 55, 75, 0.13);
+  opacity: 0.72;
+  animation: anxietyPulse 1.15s ease-in-out infinite;
+}
+
+@keyframes anxietyDrift {
+  from { transform: translate3d(-1px, 0, 0); }
+  to { transform: translate3d(1px, 1px, 0); }
+}
+
+@keyframes anxietyCriticalWash {
+  0%, 100% { transform: translate3d(0, 0, 0); filter: hue-rotate(0deg); }
+  48% { transform: translate3d(1px, -1px, 0); filter: hue-rotate(-8deg); }
+  52% { transform: translate3d(-1px, 1px, 0); filter: hue-rotate(8deg); }
+}
+
+@keyframes anxietyPulse {
+  0%, 100% { opacity: 0.44; }
+  50% { opacity: 0.86; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 760px) and (max-width: 900px) and (max-height: 430px) {
+  .bottomDock {
+    min-width: 0;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .dockButton {
+    min-width: 0;
+    padding-inline: 4px;
+    touch-action: manipulation;
+  }
+
+  .dockButton > span:not(.dockIcon) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sheetPanel {
+    width: min(620px, calc(100vw - 18px));
+  }
+
+  .foodPlanGrid,
+  .foodPlans,
+  .foodPlanList {
+    gap: 5px;
+    margin-block: 5px 8px;
+  }
+
+  .foodPlanCard,
+  button[data-food-plan] {
+    padding: 7px;
+    border-radius: 7px;
+  }
+
+  .foodPlanCard p,
+  button[data-food-plan] p {
+    min-height: 20px;
+    margin-top: 3px;
+    font-size: 6px;
+  }
+
+  .foodPlanCard strong,
+  button[data-food-plan] strong { font-size: 7px; }
+
+  .foodPlanCard small,
+  button[data-food-plan] small,
+  .foodPlanMeta { margin-top: 3px; font-size: 5px; }
+
+  .foodPlanIcon { width: 18px; height: 18px; margin-bottom: 3px; font-size: 9px; }
+
+  .devPromoCard,
+  .promoCard,
+  .marketingCard,
+  .developmentPromoCard {
+    margin-block: 5px 8px;
+    padding: 8px;
+  }
+
+  .promoHeader strong,
+  .marketingHeader strong,
+  .devPromoHeader strong { font-size: 8px; }
+
+  .promoHeader small,
+  .marketingHeader small,
+  .devPromoHeader small,
+  .promoCard > p,
+  .devPromoCard > p,
+  .marketingCard > p,
+  .developmentPromoCard > p { font-size: 6px; }
+
+  .promoMetricGrid,
+  .marketingMetricGrid,
+  .promoStats,
+  .marketingStats { gap: 3px; }
+
+  .promoMetric,
+  .marketingMetric,
+  .promoStat,
+  .marketingStat { padding: 5px 4px; }
+
+  .promoMetric span,
+  .marketingMetric span,
+  .promoStat span,
+  .marketingStat span { font-size: 5px; }
+
+  .promoMetric strong,
+  .marketingMetric strong,
+  .promoStat strong,
+  .marketingStat strong { margin-top: 2px; font-size: 7px; }
+
+  .promoMetric small,
+  .marketingMetric small,
+  .promoStat small,
+  .marketingStat small { font-size: 5px; }
+
+  .featureChoiceGrid { gap: 4px; }
+  .featureChoiceCard { padding: 6px; border-radius: 6px; }
+  .featureChoiceCard > strong { font-size: 7px; }
+  .featureChoiceCard > p { margin-top: 3px; font-size: 5px; }
+  .featureSourceBadge { margin-bottom: 3px; padding: 2px 4px; font-size: 5px; }
+  .featureEffects { gap: 2px; margin-top: 4px; }
+  .featureEffects > * { padding: 2px 3px; font-size: 4px; }
+  .ownerTalkCard { gap: 5px; padding: 6px 7px; }
+  .ownerTalkCard > span:first-child { width: 20px; height: 20px; border-radius: 5px; font-size: 9px; }
+  .ownerTalkCard > strong { font-size: 7px; }
+  .ownerTalkCard p { font-size: 5px; }
+  .ownerTalkCard button { min-width: 45px; padding: 4px 5px; font-size: 5px; }
+
+  .projectSignals { gap: 3px; margin: -4px 0 7px; }
+  .projectSignals > span,
+  .projectSignals > b { min-height: 15px; padding: 2px 5px; font-size: 5px; }
+}
+
+/* Talent card additions ------------------------------------------------------- */
+
+.staffIntroduction {
+  min-height: 28px;
+  margin: 9px 0 10px;
+  padding: 8px 9px;
+  border-left: 2px solid color-mix(in srgb, var(--staffColor, var(--violet)) 65%, transparent);
+  border-radius: 0 7px 7px 0;
+  color: #a7adbd;
+  background: color-mix(in srgb, var(--staffColor, var(--violet)) 5%, rgba(255, 255, 255, 0.025));
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.staffIntroduction strong {
+  display: inline;
+  color: color-mix(in srgb, var(--staffColor, var(--violet)) 68%, white);
+}
+
+.investmentControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 10px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.investmentLevel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+  color: #81889b;
+  font-size: 7px;
+}
+
+.investmentLevel strong {
+  color: #d8d6e9;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.investmentOption {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #8e94a7;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 7px;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.investmentOption:hover:not(:disabled),
+.investmentOption.selected,
+.investmentOption[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--staffColor, var(--violet)) 65%, transparent);
+  color: #eeeaff;
+  background: color-mix(in srgb, var(--staffColor, var(--violet)) 13%, transparent);
+}
+
+.investmentOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.investmentOption small {
+  display: block;
+  margin-top: 2px;
+  color: #6f7689;
+  font-size: 6px;
+}
+
+/* Optional wrapper form for callers that group the option buttons. */
+.investmentOptions,
+.investmentOptionGroup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.investmentOptions .investmentOption,
+.investmentOptionGroup .investmentOption { width: auto; }
+
+.staffTierBadge,
+.aiBadge,
+.studentBadge,
+.investmentBadge,
+.staffKindBadge,
+[data-staff-kind="ai"].staffBadge,
+[data-staff-kind="student"].staffBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 17px;
+  padding: 3px 6px;
+  border: 1px solid rgba(141, 124, 255, 0.28);
+  border-radius: 99px;
+  color: #bdb7ff;
+  background: rgba(141, 124, 255, 0.09);
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.staffTierBadge.ai,
+.aiBadge,
+[data-staff-kind="ai"].staffBadge {
+  border-color: rgba(141, 124, 255, 0.36);
+  color: #c2bbff;
+  background: rgba(141, 124, 255, 0.11);
+}
+
+.staffTierBadge.student,
+.studentBadge,
+[data-staff-kind="student"].staffBadge {
+  border-color: rgba(104, 224, 160, 0.32);
+  color: #91e5b9;
+  background: rgba(104, 224, 160, 0.09);
+}
+
+.staffTop .staffTierBadge,
+.staffTop .aiBadge,
+.staffTop .studentBadge,
+.staffTop .investmentBadge,
+.staffTop .staffKindBadge {
+  margin-left: auto;
+}
+
+@media (orientation: landscape) and (min-width: 760px) and (max-width: 900px) and (max-height: 430px) {
+  .staffIntroduction {
+    min-height: 18px;
+    margin: 5px 0 6px;
+    padding: 5px 6px;
+    font-size: 5px;
+  }
+
+  .investmentControls {
+    gap: 4px;
+    margin: 5px 0 6px;
+    padding: 5px;
+    border-radius: 6px;
+  }
+
+  .investmentLevel { font-size: 5px; }
+  .investmentLevel strong { font-size: 6px; }
+  .investmentOption { padding: 3px 4px; border-radius: 4px; font-size: 5px; }
+  .investmentOptions,
+  .investmentOptionGroup { gap: 2px; }
+  .investmentOption small { margin-top: 1px; font-size: 4px; }
+
+  .staffTierBadge,
+  .aiBadge,
+  .studentBadge,
+  .investmentBadge,
+  .staffKindBadge,
+  [data-staff-kind="ai"].staffBadge,
+  [data-staff-kind="student"].staffBadge {
+    min-height: 13px;
+    padding: 2px 4px;
+    font-size: 4px;
+  }
+}
+
+/* Revenue history ------------------------------------------------------------ */
+
+.revenueChartPanel {
+  min-width: 0;
+  margin: 10px 0 12px;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(141, 124, 255, 0.2);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(141, 124, 255, 0.065), rgba(255, 255, 255, 0.018));
+}
+
+.revenueChart {
+  position: relative;
+  min-width: 0;
+  min-height: 150px;
+  padding: 4px 2px 0;
+}
+
+.revenueChart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+
+.revenueChartGrid,
+.revenueChartGrid line,
+.revenueChartGrid path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.revenueChartGrid line:nth-child(2n) { stroke: rgba(255, 255, 255, 0.055); }
+
+.revenueChartArea {
+  fill: color-mix(in srgb, var(--chartColor, var(--violet)) 18%, transparent);
+  stroke: none;
+  opacity: 0.75;
+}
+
+.revenueChartLine {
+  fill: none;
+  stroke: var(--chartColor, #a99eff);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--chartColor, var(--violet)) 42%, transparent));
+}
+
+.revenueChartDot {
+  fill: #0d1020;
+  stroke: var(--chartColor, #c4bcff);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.revenueChartDot:hover {
+  fill: var(--chartColor, #c4bcff);
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+
+.revenueChartAxis,
+.revenueChartAxis text {
+  fill: #777e92;
+  color: #777e92;
+  font-size: 7px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.revenueChartAxis line,
+.revenueChartAxis path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.revenueAnalysis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.analysisTile {
+  min-width: 0;
+  padding: 7px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(8, 11, 22, 0.38);
+}
+
+.analysisTile span {
+  display: block;
+  overflow: hidden;
+  color: #7c8294;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysisTile strong {
+  display: block;
+  margin-top: 3px;
+  color: #e6e3f2;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysisTile small {
+  display: block;
+  margin-top: 2px;
+  color: #72788a;
+  font-size: 6px;
+  line-height: 1.3;
+}
+
+.analysisTile.good,
+.analysisTile.positive { border-color: rgba(104, 224, 160, 0.28); }
+.analysisTile.good strong,
+.analysisTile.positive strong { color: #8ce8b6; }
+.analysisTile.warning { border-color: rgba(255, 209, 102, 0.28); }
+.analysisTile.warning strong { color: #ffd98b; }
+.analysisTile.danger,
+.analysisTile.negative { border-color: rgba(255, 106, 106, 0.28); }
+.analysisTile.danger strong,
+.analysisTile.negative strong { color: #ff9d94; }
+
+.eventLossNote {
+  margin-top: 7px;
+  padding: 7px 8px;
+  border-left: 2px solid rgba(255, 106, 106, 0.7);
+  border-radius: 0 6px 6px 0;
+  color: #b09b9e;
+  background: rgba(255, 106, 106, 0.055);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.eventLossNote strong { color: #ffada3; }
+
+.pivotGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.pivotCard {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--softLine);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pivotCard > span {
+  display: block;
+  overflow: hidden;
+  color: #7f8698;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pivotCard strong {
+  display: block;
+  margin-top: 3px;
+  color: #dfe0e9;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pivotCard p {
+  margin: 4px 0 0;
+  color: #858c9e;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+@media (orientation: landscape) and (min-width: 760px) and (max-width: 900px) and (max-height: 430px) {
+  .revenueChartPanel { margin: 5px 0 8px; padding: 7px; border-radius: 8px; }
+  .revenueChart { min-height: 100px; padding-top: 2px; }
+  .revenueChart svg { height: 100px; }
+  .revenueChartAxis,
+  .revenueChartAxis text { font-size: 5px; }
+  .revenueAnalysis { gap: 3px; margin-top: 5px; }
+  .analysisTile { padding: 5px 4px; border-radius: 5px; }
+  .analysisTile span { font-size: 5px; }
+  .analysisTile strong { margin-top: 2px; font-size: 7px; }
+  .analysisTile small { margin-top: 1px; font-size: 5px; }
+  .eventLossNote { margin-top: 4px; padding: 5px 6px; font-size: 5px; }
+  .pivotGrid { gap: 3px; }
+  .pivotCard { padding: 5px; border-radius: 5px; }
+  .pivotCard > span { font-size: 5px; }
+  .pivotCard strong { margin-top: 2px; font-size: 7px; }
+  .pivotCard p { margin-top: 2px; font-size: 5px; }
+}

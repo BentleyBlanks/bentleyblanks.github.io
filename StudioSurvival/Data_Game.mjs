@@ -31,6 +31,63 @@ export const MODULE_META = {
   },
 };
 
+export const STUDENT_PAY_LEVELS = [
+  {
+    level: 0,
+    name: "基础工资",
+    extraCost: 0,
+    outputMultiplier: 1,
+    qualityBonus: 0,
+    description: "按入职约定发薪。能干活，但不会把创业当慈善。",
+  },
+  {
+    level: 1,
+    name: "认真加薪",
+    extraCost: 1800,
+    outputMultiplier: 1.055,
+    qualityBonus: 0.025,
+    description: "心态和专注略有提升；人类不会因为多两千块突然进化。",
+  },
+  {
+    level: 2,
+    name: "诚意留人",
+    extraCost: 4400,
+    outputMultiplier: 1.11,
+    qualityBonus: 0.06,
+    description: "明显更稳，但提升有上限，远没有账单增长得快。",
+  },
+];
+
+export const AI_SUBSCRIPTION_LEVELS = [
+  {
+    level: 0,
+    name: "基础模型",
+    costMultiplier: 1,
+    outputMultiplier: 1,
+    qualityBonus: 0,
+    driftMultiplier: 1,
+    description: "便宜、够快，也会很自信地引用不存在的接口。",
+  },
+  {
+    level: 1,
+    name: "Pro 模型",
+    costMultiplier: 2.15,
+    outputMultiplier: 1.34,
+    qualityBonus: 0.16,
+    driftMultiplier: 0.8,
+    description: "速度和实现质量都上一个档，月租也开始像一份工资。",
+  },
+  {
+    level: 2,
+    name: "Max 算力",
+    costMultiplier: 4.1,
+    outputMultiplier: 1.72,
+    qualityBonus: 0.38,
+    driftMultiplier: 0.6,
+    description: "真的又快又强；每月自动续费时，房本会轻轻震动。",
+  },
+];
+
 export const STAFF_CATALOG = [
   {
     id: "linMo",
@@ -363,6 +420,7 @@ export const PROJECTS = [
   {
     id: "zeroGStore",
     title: "《失重便利店》",
+    genre: "荒诞生存模拟",
     pitch: "在停电的太空便利店里，一边理货一边躲避会报税的外星人。",
     trend: "反常识模拟",
     accent: "#8d7cff",
@@ -370,6 +428,7 @@ export const PROJECTS = [
   {
     id: "subwayMarket",
     title: "《末班菜市场》",
+    genre: "动作经营",
     pitch: "末班地铁变成夜市，用砍价连招对抗通勤焦虑。",
     trend: "都市怪谈",
     accent: "#ff8c69",
@@ -377,6 +436,7 @@ export const PROJECTS = [
   {
     id: "resignGalaxy",
     title: "《银河离职信》",
+    genre: "叙事冒险",
     pitch: "驾驶一艘工位飞船，把离职信送到宇宙尽头的老板手里。",
     trend: "情绪叙事",
     accent: "#55d6be",
@@ -384,6 +444,7 @@ export const PROJECTS = [
   {
     id: "landlordBoss",
     title: "《房东是最终 Boss》",
+    genre: "账单 Roguelike",
     pitch: "每月一场 Boss 战，伤害数字就是本月账单。",
     trend: "现实主义恐怖",
     accent: "#f45b69",
@@ -429,12 +490,317 @@ export const GAME_TYPES = [
   },
 ];
 
+export const LIVE_REVENUE_EVENTS = [
+  {
+    id: "algorithmBurial",
+    title: "平台算法把你埋了",
+    multiplier: 0.58,
+    duration: 2,
+    anxiety: 4,
+    description: "商店曝光突然归零，客服回复‘排序系统运行正常’。",
+  },
+  {
+    id: "serverSmoke",
+    title: "服务器周末冒烟",
+    multiplier: 0.38,
+    duration: 1,
+    anxiety: 7,
+    description: "玩家最有空的时候，登录按钮最没空。",
+  },
+  {
+    id: "competitorSale",
+    title: "竞品突然打一折",
+    multiplier: 0.65,
+    duration: 2,
+    anxiety: 3,
+    description: "同品类大作进入史低，你的原价显得像一种挑衅。",
+  },
+  {
+    id: "reviewRaid",
+    title: "差评区遭到团建",
+    multiplier: 0.5,
+    duration: 1,
+    anxiety: 8,
+    description: "一条 Bug 视频爆了，播放量比宣传片高二十倍。",
+  },
+  {
+    id: "paymentReview",
+    title: "支付渠道临时复审",
+    multiplier: 0.3,
+    duration: 1,
+    anxiety: 6,
+    description: "钱不是没赚到，只是正在一个没人说得清的流程里。",
+  },
+  {
+    id: "streamerMisread",
+    title: "主播把玩法理解反了",
+    multiplier: 0.72,
+    duration: 2,
+    anxiety: 4,
+    description: "十万人看见他卡在教程，评论统一认为是你没教会。",
+  },
+];
+
 export const LIVING_BILLS = [
   { id: "studioRent", label: "工作室房租", amount: 4200, icon: "⌂" },
   { id: "utilities", label: "水电网", amount: 900, icon: "⚡" },
   { id: "mortgage", label: "房贷", amount: 3600, icon: "▰" },
   { id: "carPayment", label: "车贷", amount: 1600, icon: "▱" },
-  { id: "food", label: "饭钱（可饿）", amount: 1800, icon: "●" },
+];
+
+export const PIVOT_REASONS = [
+  "平台突然更新审核规则：这个题材暂时不让碰",
+  "竞争对手昨晚发布了同款，而且免费",
+  "发行商看完试玩，只回复了‘市场已经凉了’",
+  "投资人坚持年轻人现在只爱另一种品类",
+  "试玩玩家把核心循环玩成了一个无法修复的漏洞",
+  "不可抗力：项目群里没人敢解释具体是什么力",
+];
+
+export const FOOD_PLANS = [
+  {
+    id: "feast",
+    name: "吃顿大餐",
+    icon: "◉",
+    monthlyCost: 3800,
+    hungerDelta: -28,
+    anxietyDelta: -6,
+    outputMultiplier: 1.12,
+    description: "终于像个人一样吃饭。四组有效产出 +12%，也能缓一口气。",
+  },
+  {
+    id: "sustenance",
+    name: "充饥套餐",
+    icon: "●",
+    monthlyCost: 900,
+    hungerDelta: -7,
+    anxietyDelta: 1,
+    outputMultiplier: 0.96,
+    description: "能活，但谈不上生活。便宜，产出质量 -4%。",
+  },
+  {
+    id: "skip",
+    name: "硬扛不吃",
+    icon: "○",
+    monthlyCost: 0,
+    hungerDelta: 27,
+    anxietyDelta: 5,
+    outputMultiplier: 0.78,
+    description: "省下饭钱，饥饿 +27、焦虑 +5，四组有效产出 -22%。连续硬扛真的会死。",
+  },
+];
+
+export const MARKETING_CAMPAIGNS = [
+  {
+    id: "midnightDevlog",
+    name: "半夜发开发日志",
+    icon: "◇",
+    cost: 6000,
+    hype: 7,
+    expectation: 3,
+    wishlists: 900,
+    anxiety: 1,
+    description: "剪掉所有崩溃片段，假装项目一直这么顺。",
+  },
+  {
+    id: "platformAds",
+    name: "买平台首页曝光",
+    icon: "▣",
+    cost: 36000,
+    hype: 20,
+    expectation: 12,
+    wishlists: 6500,
+    anxiety: 3,
+    description: "愿望单涨得很真，玩家开始期待你真的做得出来。",
+  },
+  {
+    id: "everywhereCampaign",
+    name: "铺天盖地大宣发",
+    icon: "◎",
+    cost: 180000,
+    hype: 44,
+    expectation: 30,
+    wishlists: 48000,
+    anxiety: 8,
+    description: "地铁、电梯和厕所都在吹你的游戏。质量接不住就会退款上热搜。",
+  },
+];
+
+export const SPECULATION_OPTIONS = [
+  {
+    id: "scratchTicket",
+    name: "刮一张回本符",
+    icon: "□",
+    category: "lottery",
+    risk: "低额碰运气",
+    stakeMode: "fixed",
+    stake: 500,
+    description: "成本只够一顿便饭，中奖概率也很尊重这个投入。",
+    outcomes: [
+      { ceiling: 0.72, payoutMultiplier: 0, label: "刮出‘谢谢参与’", anxiety: 1 },
+      { ceiling: 0.94, payoutMultiplier: 1, label: "刚好回本", anxiety: 0 },
+      { ceiling: 0.992, payoutMultiplier: 6, label: "中了三千元", anxiety: -2 },
+      { ceiling: 1, payoutMultiplier: 80, label: "四万元小奖", anxiety: -7 },
+    ],
+  },
+  {
+    id: "lottery",
+    name: "买一沓彩票",
+    icon: "✦",
+    category: "lottery",
+    risk: "高损耗彩票",
+    stakeMode: "fixed",
+    stake: 2000,
+    description: "大概率得到一把彩色纸屑，小概率突然觉得做游戏只是副业。",
+    outcomes: [
+      { ceiling: 0.82, payoutMultiplier: 0, label: "全部没中", anxiety: 3 },
+      { ceiling: 0.97, payoutMultiplier: 2, label: "中了点饭钱", anxiety: -1 },
+      { ceiling: 0.997, payoutMultiplier: 30, label: "中了六万元", anxiety: -8 },
+      { ceiling: 1, payoutMultiplier: 400, label: "八十万元大奖", anxiety: -18 },
+    ],
+  },
+  {
+    id: "engineEtf",
+    name: "游戏引擎 ETF",
+    icon: "▦",
+    category: "stock",
+    risk: "中低波动",
+    stakeMode: "fixed",
+    stake: 12000,
+    description: "做一个月短线。赚得像理财，亏起来仍像独立开发。",
+    outcomes: [
+      { ceiling: 0.15, payoutMultiplier: 0.72, label: "行业集体回调", anxiety: 6 },
+      { ceiling: 0.48, payoutMultiplier: 0.94, label: "小跌，手续费很努力", anxiety: 2 },
+      { ceiling: 0.82, payoutMultiplier: 1.1, label: "稳稳涨了一点", anxiety: -2 },
+      { ceiling: 0.97, payoutMultiplier: 1.35, label: "吃到一波行情", anxiety: -5 },
+      { ceiling: 1, payoutMultiplier: 1.9, label: "行业突然起飞", anxiety: -9 },
+    ],
+  },
+  {
+    id: "aiConceptStock",
+    name: "AI 算力概念股",
+    icon: "AI",
+    category: "stock",
+    risk: "高波动短线",
+    stakeMode: "fixed",
+    stake: 30000,
+    description: "公司介绍里 AI 出现 47 次，产品介绍只出现 1 次。",
+    outcomes: [
+      { ceiling: 0.24, payoutMultiplier: 0.18, label: "概念被证实只有概念", anxiety: 14 },
+      { ceiling: 0.55, payoutMultiplier: 0.62, label: "大跌，群里还在喊格局", anxiety: 9 },
+      { ceiling: 0.76, payoutMultiplier: 1.18, label: "蹭热点小赚", anxiety: 1 },
+      { ceiling: 0.94, payoutMultiplier: 1.85, label: "算力订单传闻发酵", anxiety: -8 },
+      { ceiling: 1, payoutMultiplier: 4.2, label: "四倍神话，截图留念", anxiety: -16 },
+    ],
+  },
+  {
+    id: "allInStock",
+    name: "全仓神秘妖股",
+    icon: "↗",
+    category: "stock",
+    risk: "可能直接破产",
+    stakeMode: "allIn",
+    stake: 0,
+    description: "把当前全部现金押进去。可能翻倍，也可能让工作室当场进入片尾字幕。",
+    outcomes: [
+      { ceiling: 0.42, payoutMultiplier: 0, label: "停牌退市，全部归零", anxiety: 100 },
+      { ceiling: 0.72, payoutMultiplier: 0.45, label: "腰斩之后又补了一刀", anxiety: 14 },
+      { ceiling: 0.9, payoutMultiplier: 1.28, label: "小赚，但心脏不小亏", anxiety: 3 },
+      { ceiling: 0.98, payoutMultiplier: 2.6, label: "翻了两倍多", anxiety: -10 },
+      { ceiling: 1, payoutMultiplier: 8, label: "八倍暴涨，突然像个投资人", anxiety: -22 },
+    ],
+  },
+];
+
+export const FEATURE_CHOICES = [
+  {
+    id: "grudgeNpc",
+    title: "所有 NPC 都记仇",
+    pitch: "玩家砍过一次价，十小时后全城商贩同时翻旧账。",
+    modules: { art: 1, design: 7, client: 5, performance: 2 },
+    scopeDebt: 5,
+    technicalDebt: 2,
+    bugs: 1,
+    hype: 5,
+    qualityPotential: 0.16,
+  },
+  {
+    id: "weatherMood",
+    title: "天气读取玩家情绪",
+    pitch: "玩家越急，雨越横着下；停下来发呆，太阳才敢出来。",
+    modules: { art: 6, design: 4, client: 3, performance: 4 },
+    scopeDebt: 4,
+    technicalDebt: 3,
+    bugs: 1,
+    hype: 6,
+    qualityPotential: 0.18,
+  },
+  {
+    id: "physicsInventory",
+    title: "背包也要物理模拟",
+    pitch: "苹果会压坏面包，贷款合同永远沉在最底下。",
+    modules: { art: 2, design: 5, client: 7, performance: 7 },
+    scopeDebt: 6,
+    technicalDebt: 6,
+    bugs: 3,
+    hype: 7,
+    qualityPotential: 0.2,
+  },
+  {
+    id: "oneButtonDrama",
+    title: "一个按钮演完人生",
+    pitch: "同一个按钮负责跳跃、道歉、辞职和签贷款合同。",
+    modules: { art: 2, design: 7, client: 3, performance: 1 },
+    scopeDebt: 3,
+    technicalDebt: 1,
+    bugs: 0,
+    hype: 5,
+    qualityPotential: 0.17,
+  },
+  {
+    id: "crowdAi",
+    title: "一万名会摸鱼的路人",
+    pitch: "每个路人都有日程，但九千八百个选择在茶水间堵路。",
+    modules: { art: 5, design: 5, client: 6, performance: 9 },
+    scopeDebt: 7,
+    technicalDebt: 8,
+    bugs: 3,
+    hype: 9,
+    qualityPotential: 0.23,
+  },
+  {
+    id: "honestLoading",
+    title: "读条公开项目债务",
+    pitch: "加载时不放提示，直接滚动展示尚未偿还的技术债。",
+    modules: { art: 3, design: 4, client: 4, performance: 3 },
+    scopeDebt: 2,
+    technicalDebt: -2,
+    bugs: 0,
+    hype: 4,
+    qualityPotential: 0.14,
+  },
+  {
+    id: "refundEnding",
+    title: "退款按钮是真结局",
+    pitch: "玩家按下退款，主角才终于逃出游戏。",
+    modules: { art: 3, design: 8, client: 4, performance: 2 },
+    scopeDebt: 5,
+    technicalDebt: 2,
+    bugs: 1,
+    hype: 8,
+    qualityPotential: 0.21,
+  },
+  {
+    id: "bugMuseum",
+    title: "把 Bug 做成博物馆",
+    pitch: "每次修掉穿模，就把它的尸体陈列在主菜单。",
+    modules: { art: 5, design: 5, client: 5, performance: 2 },
+    scopeDebt: 4,
+    technicalDebt: 1,
+    bugs: -1,
+    hype: 6,
+    qualityPotential: 0.18,
+  },
 ];
 
 export const COLLATERAL_OPTIONS = [
@@ -474,6 +840,73 @@ export const COLLATERAL_OPTIONS = [
     term: 4,
     consequence: "一旦抵押，游戏立即结束",
     fatal: true,
+  },
+];
+
+export const ABSTRACT_IDEAS = [
+  {
+    id: "lagWorld",
+    title: "《掉帧才存在的世界》",
+    pitch: "只有画面卡顿时，隐藏角色才会移动；优化越好，真相越少。",
+    modules: { art: 4, design: 8, client: 2, performance: -2 },
+    hype: 13,
+    scopeDebt: 5,
+  },
+  {
+    id: "debtBoss",
+    title: "《利率就是 Boss 血条》",
+    pitch: "贷款利率实时改变最终 Boss 的体型，提前还款就是削甲。",
+    modules: { art: 3, design: 9, client: 3, performance: 0 },
+    hype: 11,
+    scopeDebt: 4,
+  },
+  {
+    id: "bugReligion",
+    title: "《Bug 神学》",
+    pitch: "每次穿模都是神迹，修复 Bug 会让世界里的信徒失去信仰。",
+    modules: { art: 4, design: 8, client: 2, performance: 1 },
+    hype: 14,
+    scopeDebt: 6,
+  },
+  {
+    id: "saveEscape",
+    title: "《删除存档就是跑路》",
+    pitch: "存档是一张催收单，玩家删除它，角色会在下局追来讨债。",
+    modules: { art: 2, design: 9, client: 4, performance: 0 },
+    hype: 12,
+    scopeDebt: 5,
+  },
+  {
+    id: "oneNpc",
+    title: "《全城共用一段记忆》",
+    pitch: "所有 NPC 都是同一个 AI 上下文的分身，谁记住玩家，其他人就会忘记。",
+    modules: { art: 3, design: 8, client: 3, performance: 1 },
+    hype: 15,
+    scopeDebt: 7,
+  },
+  {
+    id: "menuEnding",
+    title: "《主菜单就是结局》",
+    pitch: "玩家花十小时回到主菜单，才发现所有设置选项都是人生选择。",
+    modules: { art: 3, design: 10, client: 2, performance: 0 },
+    hype: 12,
+    scopeDebt: 4,
+  },
+  {
+    id: "refundRoguelike",
+    title: "《退款 Roguelike》",
+    pitch: "每次申请退款都会开启新周目，理由写得越真诚，敌人越强。",
+    modules: { art: 2, design: 8, client: 4, performance: 1 },
+    hype: 16,
+    scopeDebt: 6,
+  },
+  {
+    id: "cursorHorror",
+    title: "《光标在看你》",
+    pitch: "玩家停止移动鼠标后，光标会自己继续玩，并逐步取代玩家。",
+    modules: { art: 4, design: 8, client: 4, performance: 0 },
+    hype: 15,
+    scopeDebt: 6,
   },
 ];
 
@@ -518,4 +951,16 @@ export function FindGameType(gameTypeId) {
 
 export function FindCollateral(collateralId) {
   return COLLATERAL_OPTIONS.find((option) => option.id === collateralId);
+}
+
+export function FindFoodPlan(foodPlanId) {
+  return FOOD_PLANS.find((foodPlan) => foodPlan.id === foodPlanId);
+}
+
+export function FindMarketingCampaign(campaignId) {
+  return MARKETING_CAMPAIGNS.find((campaign) => campaign.id === campaignId);
+}
+
+export function FindFeatureChoice(featureId) {
+  return FEATURE_CHOICES.find((feature) => feature.id === featureId);
 }

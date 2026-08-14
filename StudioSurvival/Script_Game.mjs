@@ -1,31 +1,48 @@
 import * as THREE from "three";
 import {
+  AI_SUBSCRIPTION_LEVELS,
   COLLATERAL_OPTIONS,
   DIRECTIVES,
+  FEATURE_CHOICES,
   FindCollateral,
   FindDirective,
+  FindFoodPlan,
   FindGameType,
   FindProject,
   FindStaff,
   GAME_TYPES,
+  FOOD_PLANS,
   LIVING_BILLS,
+  LIVE_REVENUE_EVENTS,
+  MARKETING_CAMPAIGNS,
   MODULE_KEYS,
   MODULE_META,
   PROJECTS,
+  SPECULATION_OPTIONS,
   STAFF_CATALOG,
+  STUDENT_PAY_LEVELS,
 } from "./Data_Game.mjs";
 import {
   AdvanceMonth,
+  BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
+  CustomizeProject,
   EvaluateProject,
   FireStaff,
   ForecastMonthlyCosts,
+  ForecastPivotCost,
+  GetMemberMonthlyCost,
+  GetAnxietyState,
   GetIdleLine,
   HireStaff,
+  PivotProject,
   ReleaseBuild,
   SAVE_KEY,
   SelectDirective,
+  SelectFoodPlan,
+  SetStaffInvestmentLevel,
+  Speculate,
   StartProject,
   TakeLoan,
   TalkToStaff,
@@ -35,14 +52,14 @@ import {
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneLabels", "monthValue", "cashValue", "burnValue",
   "ratingValue", "goalBar", "soundButton", "helpButton", "projectPanel", "gameTypeBadge", "projectTitle",
-  "versionBadge", "projectPitch", "moduleGrid", "debtValue", "tensionList", "financePanel",
+  "versionBadge", "projectPitch", "projectSignals", "moduleGrid", "debtValue", "tensionList", "financePanel",
   "financeDetailButton", "costBreakdown", "forecastValue", "teamCount", "teamMiniList", "hungerBar",
-  "hungerValue", "worldHint", "talentButton", "directiveButton", "directiveLabel", "moneyButton",
+  "hungerValue", "anxietyBar", "anxietyValue", "worldHint", "talentButton", "directiveButton", "directiveLabel", "moneyButton",
   "releaseButton", "releaseLabel", "nextMonthButton", "toastStack", "setupScreen", "projectChoices",
   "typeChoices", "startButton", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker", "sheetTitle",
   "sheetBody", "sheetCloseButton", "conversationLayer", "conversationBackdrop", "conversationCloseButton",
   "conversationPortrait", "conversationKind", "conversationName", "conversationRole", "conversationLine",
-  "conversationStats", "talkPointsValue", "conversationActions", "resultLayer", "resultKicker", "resultTitle",
+  "conversationStats", "talkPointsValue", "conversationFeatureList", "conversationActions", "resultLayer", "resultKicker", "resultTitle",
   "resultBody", "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats",
   "restartButton",
 ].map((id) => [id, document.getElementById(id)]));
@@ -60,6 +77,33 @@ const EscapeHtml = (value) => String(value)
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#039;");
+
+const anxietyFragments = [
+  "墙上的插座在催版本",
+  "不是我在做游戏，是游戏在做我",
+  "先把月亮合进主分支",
+  "贷款利率正在呼吸",
+  "这个 Bug 昨晚叫我老板",
+  "需求文档长出了第二个结局",
+  "不要关灯，帧率会跑出去",
+  "我们是不是已经上线过了",
+];
+
+function DistortDialogue(textValue, salt = 0) {
+  const text = String(textValue);
+  const anxiety = state.anxiety || 0;
+  if (anxiety < 56) return text;
+  const fragmentIndex = Math.abs(text.length * 7 + state.month * 11 + salt * 13) % anxietyFragments.length;
+  const fragment = anxietyFragments[fragmentIndex];
+  if (anxiety < 70) return `${text}……${fragment}？`;
+  if (anxiety < 87) {
+    const fractured = text.replace(/[，。！？]/g, "……").replace(/游戏/g, "那个会呼吸的文件夹");
+    return `${fractured}……不对，${fragment}。`;
+  }
+  const shards = text.split("").filter((_, index) => index % 2 === salt % 2).join("");
+  const second = anxietyFragments[(fragmentIndex + 3) % anxietyFragments.length];
+  return `${fragment}……${shards || "版本版本版本"}……${second}。`;
+}
 
 function LoadSavedState() {
   try {
@@ -152,6 +196,9 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0d19);
 scene.fog = new THREE.FogExp2(0x0a0d19, 0.025);
+const calmSceneColor = new THREE.Color(0x0a0d19);
+const panicSceneColor = new THREE.Color(0x2a071d);
+const mixedSceneColor = new THREE.Color();
 
 const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 80);
 camera.position.set(10.5, 12.6, 14.2);
@@ -586,7 +633,7 @@ function RebuildStaffVisuals() {
   terminalLabel.type = "button";
   terminalLabel.className = "sceneTag terminalTag";
   terminalLabel.style.setProperty("--tagColor", "#a99eff");
-  terminalLabel.innerHTML = '<span class="sceneTagDot"></span><span><strong>AI 群聊终端</strong><small>点击电脑，质问那些蠢货 AI</small></span>';
+  terminalLabel.innerHTML = '<span class="sceneTagDot"></span><span><strong>自己 / AI 群聊</strong><small>聊天定制游戏；自己做免费但费命</small></span>';
   terminalLabel.addEventListener("click", () => OpenAiTerminalSheet());
   dom.sceneLabels.append(terminalLabel);
 
@@ -802,11 +849,26 @@ function Animate() {
     }
   }
 
-  const cameraOffsetX = pointerTarget.x * 0.32;
-  const cameraOffsetY = pointerTarget.y * 0.16;
-  camera.position.x += (10.5 + cameraOffsetX - camera.position.x) * 0.035;
-  camera.position.y += (12.6 + cameraOffsetY - camera.position.y) * 0.035;
-  camera.lookAt(0, 0.45, -0.5);
+  const anxietyFactor = Clamp(((state.anxiety || 0) - 42) / 58, 0, 1);
+  const jitter = anxietyFactor * anxietyFactor;
+  const cameraOffsetX = pointerTarget.x * 0.32 + Math.sin(time * 13.7) * jitter * 0.24;
+  const cameraOffsetY = pointerTarget.y * 0.16 + Math.cos(time * 17.3) * jitter * 0.18;
+  const cameraOffsetZ = Math.sin(time * 11.1 + 0.8) * jitter * 0.16;
+  camera.position.x += (10.5 + cameraOffsetX - camera.position.x) * (0.035 + jitter * 0.09);
+  camera.position.y += (12.6 + cameraOffsetY - camera.position.y) * (0.035 + jitter * 0.09);
+  camera.position.z += (14.2 + cameraOffsetZ - camera.position.z) * (0.035 + jitter * 0.09);
+  camera.lookAt(
+    Math.sin(time * 9.1) * jitter * 0.18,
+    0.45 + Math.cos(time * 7.4) * jitter * 0.12,
+    -0.5,
+  );
+  roomGroup.rotation.z = Math.sin(time * 4.7) * jitter * 0.012;
+  staffGroup.rotation.z = -roomGroup.rotation.z * 0.55;
+  renderer.toneMappingExposure = 1.05 + Math.sin(time * 8.3) * jitter * 0.14;
+  mixedSceneColor.copy(calmSceneColor).lerp(panicSceneColor, anxietyFactor * 0.56);
+  scene.background.copy(mixedSceneColor);
+  scene.fog.color.copy(mixedSceneColor);
+  scene.fog.density = 0.025 + anxietyFactor * 0.012;
   UpdateLabels();
   renderer.render(scene, camera);
 }
@@ -848,7 +910,7 @@ function RenderSetupChoices() {
     <button type="button" class="choiceCard ${selectedProjectId === project.id ? "selected" : ""}" data-project-choice="${project.id}" style="--choiceColor:${project.accent}">
       <strong>${EscapeHtml(project.title)}</strong>
       <p>${EscapeHtml(project.pitch)}</p>
-      <small>${EscapeHtml(project.trend)}</small>
+      <small>${EscapeHtml(project.genre)} · ${EscapeHtml(project.trend)}</small>
     </button>
   `).join("");
   dom.typeChoices.innerHTML = GAME_TYPES.map((gameType) => `
@@ -883,7 +945,11 @@ function RenderSetupChoices() {
 function EstimatedLiveIncome() {
   if (!state.project?.isReleased) return 0;
   const gameType = FindGameType(state.project.gameTypeId);
-  return Math.round(state.project.monthlyRevenue * Math.pow(gameType.liveDecay, state.project.monthsSinceUpdate) / 100) * 100;
+  const eventMultiplier = (state.project.activeLiveEvents || []).reduce((multiplier, active) => {
+    const event = LIVE_REVENUE_EVENTS.find((candidate) => candidate.id === active.id);
+    return multiplier * (event?.multiplier || 1);
+  }, 1);
+  return Math.round(state.project.monthlyRevenue * Math.pow(gameType.liveDecay, state.project.monthsSinceUpdate) * eventMultiplier / 100) * 100;
 }
 
 function ModuleStatusText(moduleKey, value) {
@@ -940,18 +1006,24 @@ function RenderFinance() {
   const income = EstimatedLiveIncome();
   const projected = state.cash + income - costs.total;
   dom.costBreakdown.innerHTML = [
-    ["生活与硬账单", costs.living],
+    ["房租水电车贷房贷", costs.living],
+    [`吃饭 · ${FindFoodPlan(state.foodPlan)?.name || "充饥"}`, costs.food],
     ["大学生工资", costs.studentWages],
     ["AI 月租", costs.aiRent],
     ["贷款月供", costs.loanPayments],
     ["服务器", costs.service],
-  ].filter(([, value], index) => value > 0 || index < 3).map(([label, value]) => `
+    ["历史欠款 + 8% 滞纳", costs.arrearsDue],
+  ].filter(([, value], index) => value > 0 || index < 4).map(([label, value]) => `
     <div class="costRow"><span>${label}</span><strong>−${FormatMoney(value)}</strong></div>
   `).join("");
   dom.forecastValue.textContent = FormatMoney(projected);
   dom.forecastValue.classList.toggle("negative", projected < 0);
   dom.hungerValue.textContent = Math.round(state.hunger);
-  dom.hungerBar.style.width = `${state.hunger}%`;
+  dom.hungerBar.style.width = `${Clamp(state.hunger, 0, 100)}%`;
+  const anxietyState = GetAnxietyState(state.anxiety);
+  dom.anxietyValue.textContent = Math.round(state.anxiety);
+  dom.anxietyValue.title = `${anxietyState.label}：${anxietyState.description}`;
+  dom.anxietyBar.style.width = `${Clamp(state.anxiety, 0, 100)}%`;
   dom.teamCount.textContent = `${state.team.length} / 4`;
   dom.teamMiniList.innerHTML = state.team.length ? state.team.map((member) => {
     const staff = FindStaff(member.id);
@@ -974,11 +1046,12 @@ function RenderProjectHeader() {
     dom.projectTitle.textContent = "商业计划书加载中";
     dom.versionBadge.textContent = "DEV";
     dom.projectPitch.textContent = "先选一个足够荒唐、又似乎能卖钱的点子。";
+    dom.projectSignals.innerHTML = "";
     return;
   }
   const project = FindProject(state.project.templateId);
   const gameType = FindGameType(state.project.gameTypeId);
-  dom.gameTypeBadge.textContent = `${gameType.icon} ${gameType.name}`;
+  dom.gameTypeBadge.textContent = `${gameType.icon} ${project.genre} · ${gameType.name}`;
   dom.gameTypeBadge.style.borderColor = `${gameType.accent}66`;
   dom.gameTypeBadge.style.color = gameType.accent;
   dom.projectTitle.textContent = project.title;
@@ -988,13 +1061,25 @@ function RenderProjectHeader() {
     : estimate
       ? `DEV · 预估 ${estimate}`
       : "DEV";
-  dom.projectPitch.textContent = project.pitch;
+  const latestFeature = state.project.features.at(-1);
+  dom.projectPitch.textContent = latestFeature
+    ? `${project.pitch} · 最新定制：${latestFeature.title}`
+    : project.pitch;
+  const promisedRating = state.project.expectation > 0 ? 4.6 + state.project.expectation * 0.087 : 0;
+  const lastRefundRate = state.project.lastCommercial?.refundRate || 0;
+  dom.projectSignals.innerHTML = `
+    <span data-signal="wishlist">愿望单 <b>${Math.round(state.project.wishlists).toLocaleString("zh-CN")}</b></span>
+    <span>玩家预期 <b>${promisedRating ? promisedRating.toFixed(1) : "无人知道"}</b></span>
+    <span>定制玩法 <b>${state.project.features.length} / 6</b></span>
+    ${state.project.abstractIdeas.length ? `<span>焦虑灵感 <b>${state.project.abstractIdeas.length}</b></span>` : ""}
+    ${lastRefundRate > 0 ? `<span data-signal="refund">上次退款 <b>${Math.round(lastRefundRate * 100)}%</b></span>` : ""}
+  `;
 }
 
 function RenderTopBar() {
   const costs = ForecastMonthlyCosts(state);
   const income = EstimatedLiveIncome();
-  dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
+  dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")} · ${Math.round(state.anxiety)} / ${Math.round(state.hunger)}`;
   dom.cashValue.textContent = FormatMoney(state.cash);
   const netBurn = costs.total - income;
   dom.burnValue.textContent = `${netBurn >= 0 ? "−" : "+"}${FormatMoney(Math.abs(netBurn))}`;
@@ -1003,6 +1088,15 @@ function RenderTopBar() {
   dom.ratingValue.textContent = `${FormatGoalMoney(gameRevenue)} / 100 亿元`;
   const goalProgress = gameRevenue / goal * 100;
   dom.goalBar.style.width = `${Clamp(goalProgress, 0, 100)}%`;
+}
+
+function RenderAnxietyVisuals() {
+  const anxietyState = GetAnxietyState(state.anxiety);
+  document.body.classList.toggle("anxietyMedium", anxietyState.level === "medium");
+  document.body.classList.toggle("anxietyHigh", anxietyState.level === "high");
+  document.body.classList.toggle("anxietyCritical", anxietyState.level === "critical");
+  document.body.style.setProperty("--anxietyLevel", String(Clamp(state.anxiety / 100, 0, 1)));
+  dom.gameRoot.dataset.anxiety = anxietyState.label;
 }
 
 function RenderActions() {
@@ -1043,6 +1137,7 @@ function RenderAll(options = {}) {
   RenderModules();
   RenderTensions();
   RenderFinance();
+  RenderAnxietyVisuals();
   RenderActions();
   RenderEnding();
   const hintText = dom.worldHint.querySelector("span:last-child");
@@ -1097,10 +1192,61 @@ function CloseSheet() {
   dom.modalLayer.classList.add("hidden");
 }
 
-function OutputDotHtml(staff, moduleKey) {
-  const value = staff.output[moduleKey] || 0;
+function OutputDotHtml(staff, moduleKey, multiplier = 1) {
+  const rawValue = staff.output[moduleKey] || 0;
+  const value = Math.round(rawValue * multiplier * 10) / 10;
   const sign = value > 0 ? "+" : "";
   return `<div class="outputDot" style="--dotColor:${MODULE_META[moduleKey].color}">${MODULE_META[moduleKey].shortLabel}<strong>${sign}${value}</strong></div>`;
+}
+
+function FeatureSourceMeta(sourceId) {
+  if (sourceId === "owner") {
+    return { kind: "自己硬做", warning: "饥饿 +10 · 焦虑 +7 · 实现质量偏低", color: "#ff9b73" };
+  }
+  const staff = FindStaff(sourceId);
+  if (staff?.kind === "student") return { kind: "大学生提案", warning: "压力 +8 · 不额外加工资", color: staff.color };
+  return { kind: "AI 提案", warning: "上下文漂移 +9 · 继续收月租", color: staff?.color || "#8d7cff" };
+}
+
+function FeatureChoiceCardsHtml(sourceId, limit = 3) {
+  const chosen = new Set(state.project.features.map((feature) => feature.id));
+  const available = FEATURE_CHOICES.filter((feature) => !chosen.has(feature.id));
+  if (!available.length || state.project.features.length >= 6) {
+    return '<div class="teamEmpty">六个核心玩法已经把项目塞满。现在最定制化的操作是把它们做完。</div>';
+  }
+  const salt = [...sourceId].reduce((total, character) => total + character.charCodeAt(0), state.month * 7);
+  const offset = available.length ? salt % available.length : 0;
+  const ordered = [...available.slice(offset), ...available.slice(0, offset)].slice(0, limit);
+  const sourceMeta = FeatureSourceMeta(sourceId);
+  return `<div class="featureSourceBadge" style="--staffColor:${sourceMeta.color}"><strong>${sourceMeta.kind}</strong><span>${sourceMeta.warning}</span></div>
+    <div class="featureChoiceGrid">${ordered.map((feature) => {
+    const hardestModule = MODULE_KEYS.reduce((best, moduleKey) => feature.modules[moduleKey] > feature.modules[best] ? moduleKey : best, MODULE_KEYS[0]);
+    return `<button type="button" class="featureChoiceCard" data-feature-source="${sourceId}" data-feature-choice="${feature.id}" ${state.talkPoints <= 0 || state.status !== "playing" ? "disabled" : ""}>
+        <strong>${EscapeHtml(feature.title)}</strong>
+        <p>${EscapeHtml(feature.pitch)}</p>
+        <span class="featureEffects"><b style="color:${MODULE_META[hardestModule].color}">${MODULE_META[hardestModule].label}需求 +${feature.modules[hardestModule]}</b><small>卖点 +${feature.hype}</small></span>
+      </button>`;
+  }).join("")}</div>`;
+}
+
+function BindFeatureChoiceButtons(root, onSuccess) {
+  root.querySelectorAll("[data-feature-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = CustomizeProject(state, button.dataset.featureSource, button.dataset.featureChoice);
+      if (!result.ok) {
+        ShowToast(result.message, "warning");
+        PlayTone("warning");
+        return;
+      }
+      state = result.state;
+      SaveState();
+      RenderAll({ rebuildStaff: false });
+      ShowToast(result.message, button.dataset.featureSource === "owner" ? "warning" : "good");
+      PlayTone(button.dataset.featureSource === "owner" ? "warning" : "good");
+      if (onSuccess) onSuccess(result);
+      RenderEnding();
+    });
+  });
 }
 
 function OpenTalentSheet() {
@@ -1108,19 +1254,35 @@ function OpenTalentSheet() {
     const member = state.team.find((candidate) => candidate.id === staff.id);
     const teamFull = state.team.length >= 4 && !member;
     const employment = staff.kind === "ai" ? "AI 月租" : "大学生工资";
+    const levels = staff.kind === "ai" ? AI_SUBSCRIPTION_LEVELS : STUDENT_PAY_LEVELS;
+    const currentLevel = member?.investmentLevel || 0;
+    const currentPlan = levels.find((plan) => plan.level === currentLevel) || levels[0];
+    const currentCost = member ? GetMemberMonthlyCost(member) : staff.monthlyCost;
     const action = member
       ? `<button type="button" class="smallDangerButton" data-fire="${staff.id}">${staff.kind === "ai" ? "取消订阅" : "解除雇用"}</button>`
       : `<button type="button" class="actionButton" data-hire="${staff.id}" ${teamFull ? "disabled" : ""}>${teamFull ? "工位已满" : staff.kind === "ai" ? "开始租用" : "发 Offer"}</button>`;
+    const investment = member ? `<div class="investmentControls" data-staff-kind="${staff.kind}">
+      <div class="investmentLevel"><strong>${staff.kind === "ai" ? "模型 / 算力档" : "工资投入"}</strong><span>${EscapeHtml(currentPlan.description)}</span></div>
+      ${levels.map((plan) => {
+    const planCost = GetMemberMonthlyCost({ id: staff.id, investmentLevel: plan.level });
+    const speedLift = Math.round((plan.outputMultiplier - 1) * 100);
+    return `<button type="button" class="investmentOption ${plan.level === currentLevel ? "selected" : ""}" data-invest-staff="${staff.id}" data-invest-level="${plan.level}" ${plan.level === currentLevel || state.status !== "playing" ? "disabled" : ""}>
+          <b>${EscapeHtml(plan.name)}</b><span>${FormatMoney(planCost)} / 月</span><small>${speedLift ? `速度 +${speedLift}% · 质量 +${Math.round(plan.qualityBonus * 100)}` : "基础产出"}</small>
+        </button>`;
+  }).join("")}
+    </div>` : `<div class="investmentLevel"><span>${staff.kind === "ai" ? "租用后可升级 Pro / Max：贵很多，速度与质量也真的更高。" : "入职后可加薪两档：产出会更稳，但提升远小于高阶 AI。"}</span></div>`;
     return `<article class="staffCard ${member ? "hired" : ""}" style="--staffColor:${staff.color}">
       <div class="staffTop">
         <span class="staffPortrait">${EscapeHtml(staff.portrait)}</span>
         <div><h3>${EscapeHtml(staff.name)}</h3><p>${EscapeHtml(staff.role)}</p></div>
-        <span class="employmentBadge">${employment}</span>
+        <span class="staffTierBadge ${staff.kind === "ai" ? "aiBadge" : "studentBadge"}">${employment}</span>
       </div>
       <p class="staffTagline">${EscapeHtml(staff.tagline)}<br><b>怪癖：</b>${EscapeHtml(staff.quirk)}</p>
-      <div class="outputDots">${MODULE_KEYS.map((moduleKey) => OutputDotHtml(staff, moduleKey)).join("")}</div>
+      <p class="staffIntroduction"><b>${staff.kind === "ai" ? "启动自述" : "自我介绍"}：</b>${EscapeHtml(staff.intro)}</p>
+      <div class="outputDots">${MODULE_KEYS.map((moduleKey) => OutputDotHtml(staff, moduleKey, currentPlan.outputMultiplier)).join("")}</div>
+      ${investment}
       <div class="staffBottom">
-        <div class="staffPrice"><strong>${FormatMoney(staff.monthlyCost)} / 月</strong><small>${staff.kind === "ai" ? "每月自动续费" : "月底必须发薪"}</small></div>
+        <div class="staffPrice"><strong>${FormatMoney(currentCost)} / 月</strong><small>${staff.kind === "ai" ? `${currentPlan.name} · 自动续费` : `${currentPlan.name} · 月底发薪`}</small></div>
         ${action}
       </div>
     </article>`;
@@ -1141,11 +1303,19 @@ function OpenTalentSheet() {
       if (ApplyResult(result, "warning")) OpenTalentSheet();
     });
   });
+  dom.sheetBody.querySelectorAll("[data-invest-staff]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = SetStaffInvestmentLevel(state, button.dataset.investStaff, Number(button.dataset.investLevel));
+      if (ApplyResult(result, Number(button.dataset.investLevel) > 0 ? "good" : "warning")) OpenTalentSheet();
+    });
+  });
 }
 
 function OpenDirectiveSheet() {
   const currentTensions = state.project ? CalculateTensions(state.project) : [];
   const warning = currentTensions[0]?.title || "当前没有明显失衡，可以放心制造新的失衡。";
+  const pivotCost = ForecastPivotCost(state);
+  const pivotLocked = state.project.isReleased || state.status !== "playing";
   const cards = DIRECTIVES.map((directive) => `
     <button type="button" class="directiveCard ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive="${directive.id}" style="--directiveColor:${directive.color}">
       <span class="directiveIcon">${directive.icon}</span>
@@ -1153,9 +1323,27 @@ function OpenDirectiveSheet() {
       <span class="directiveCheck">${state.selectedDirective === directive.id ? "✓" : ""}</span>
     </button>
   `).join("");
+  const projectPivots = PROJECTS.map((project) => {
+    const current = project.id === state.project.templateId;
+    return `<button type="button" class="pivotCard ${current ? "selected" : ""}" data-pivot-project="${project.id}" ${current || pivotLocked || state.cash < pivotCost ? "disabled" : ""}>
+      <strong>${EscapeHtml(project.title)}</strong><span>${EscapeHtml(project.genre)}</span><small>${current ? "当前题材" : `改做此题材 · ${FormatMoney(pivotCost)}`}</small>
+    </button>`;
+  }).join("");
+  const typePivots = GAME_TYPES.map((gameType) => {
+    const current = gameType.id === state.project.gameTypeId;
+    return `<button type="button" class="pivotCard ${current ? "selected" : ""}" data-pivot-type="${gameType.id}" ${current || pivotLocked || state.cash < pivotCost ? "disabled" : ""}>
+      <strong>${gameType.icon} ${EscapeHtml(gameType.name)}</strong><span>${EscapeHtml(gameType.warning)}</span><small>${current ? "当前商业形态" : `切换形态 · ${FormatMoney(pivotCost)}`}</small>
+    </button>`;
+  }).join("");
   OpenSheet("MONTHLY FOCUS", "本月制作策略", `
     <div class="sheetIntro"><span>策略在<strong>进入下月</strong>时生效。当前头号问题：${EscapeHtml(warning)}</span><span>每月 1 项</span></div>
     <div class="directiveList">${cards}</div>
+    <div class="financeSectionTitle"><strong>不可抗力换赛道</strong><span>${state.project.isReleased ? "已经发售，不能转向" : `当前代价 ${FormatMoney(pivotCost)}`}</span></div>
+    <div class="reportNote danger">转向会立刻烧现金、废掉大量模块进度、玩法与愿望单，还会增加债务和焦虑。旧项目不发售就没有一分钱收入。</div>
+    <div class="financeSectionTitle"><strong>更换题材 / 品类</strong><span>保留少量代码，主要损失美术与策划</span></div>
+    <div class="pivotGrid">${projectPivots}</div>
+    <div class="financeSectionTitle"><strong>更换商业形态</strong><span>单机 / 网游 / 手游需求权重不同</span></div>
+    <div class="pivotGrid">${typePivots}</div>
   `);
   dom.sheetBody.querySelectorAll("[data-directive]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1166,18 +1354,35 @@ function OpenDirectiveSheet() {
       }
     });
   });
+  dom.sheetBody.querySelectorAll("[data-pivot-project]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = PivotProject(state, button.dataset.pivotProject, state.project.gameTypeId);
+      if (ApplyResult(result, "danger") && result.state.status === "playing") OpenDirectiveSheet();
+    });
+  });
+  dom.sheetBody.querySelectorAll("[data-pivot-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = PivotProject(state, state.project.templateId, button.dataset.pivotType);
+      if (ApplyResult(result, "danger") && result.state.status === "playing") OpenDirectiveSheet();
+    });
+  });
 }
 
 function CostTableRows(costs) {
   const rows = LIVING_BILLS.map((bill) => [bill.icon, bill.label, bill.amount]);
+  const foodPlan = FindFoodPlan(state.foodPlan);
+  if (foodPlan) rows.push([foodPlan.icon, `${foodPlan.name} · 本月吃法`, costs.food]);
   state.team.forEach((member) => {
     const staff = FindStaff(member.id);
-    rows.push([staff.kind === "ai" ? "AI" : "人", `${staff.name} · ${staff.kind === "ai" ? "月租" : "工资"}`, staff.monthlyCost]);
+    const levels = staff.kind === "ai" ? AI_SUBSCRIPTION_LEVELS : STUDENT_PAY_LEVELS;
+    const plan = levels.find((candidate) => candidate.level === (member.investmentLevel || 0)) || levels[0];
+    rows.push([staff.kind === "ai" ? "AI" : "人", `${staff.name} · ${staff.kind === "ai" ? "月租" : "工资"} · ${plan.name}`, GetMemberMonthlyCost(member)]);
   });
   state.loans.filter((loan) => loan.status === "active").forEach((loan) => {
     rows.push(["¥", `${FindCollateral(loan.collateralId).name} · 月供（余 ${loan.remaining} 期）`, loan.monthlyPayment]);
   });
   if (costs.service > 0) rows.push(["◎", `${FindGameType(state.project.gameTypeId).name} · 服务器`, costs.service]);
+  if (costs.arrearsDue > 0) rows.push(["!", "历史欠款 · 含 8% 滞纳", costs.arrearsDue]);
   return rows.map(([icon, label, amount]) => `<div class="costRow"><span>${icon} ${EscapeHtml(label)}</span><strong>−${FormatMoney(amount)}</strong></div>`).join("");
 }
 
@@ -1187,6 +1392,68 @@ function AssetStatusText(assetId) {
   if (status === "pledged") return "抵押中";
   if (status === "seized") return "已被收走";
   return status;
+}
+
+function IncomeChartHtml() {
+  const grouped = new Map();
+  (state.incomeHistory || []).forEach((entry) => {
+    const current = grouped.get(entry.month) || { month: entry.month, income: 0, baseIncome: 0, refunds: 0, eventLoss: 0, events: [] };
+    current.income += entry.income || 0;
+    current.baseIncome += entry.baseIncome || entry.income || 0;
+    current.refunds += entry.refunds || 0;
+    current.eventLoss += entry.eventLoss || 0;
+    current.events.push(...(entry.events || []));
+    grouped.set(entry.month, current);
+  });
+  const data = [...grouped.values()].sort((a, b) => a.month - b.month).slice(-12);
+  const totalRefunds = (state.incomeHistory || []).reduce((total, entry) => total + (entry.refunds || 0), 0);
+  const totalEventLoss = (state.incomeHistory || []).reduce((total, entry) => total + (entry.eventLoss || 0), 0);
+  const recent = data.slice(-3);
+  const previous = data.slice(-6, -3);
+  const recentAverage = recent.reduce((total, entry) => total + entry.income, 0) / Math.max(1, recent.length);
+  const previousAverage = previous.reduce((total, entry) => total + entry.income, 0) / Math.max(1, previous.length);
+  const trend = previous.length ? (recentAverage - previousAverage) / Math.max(1, previousAverage) : 0;
+  const netRecovery = (state.gameRevenue || 0) - (state.totalCosts || 0);
+  if (!data.length) {
+    return `<div class="revenueChartPanel"><div class="teamEmpty">游戏还没发售，收入曲线目前是一条非常专业的 ¥0 直线。</div>
+      <div class="revenueAnalysis"><div class="analysisTile"><span>累计游戏收入</span><strong>¥0</strong><small>彩票和贷款不算</small></div><div class="analysisTile"><span>累计投入</span><strong>${FormatMoney(state.totalCosts || 0)}</strong><small>不发售就全是沉没成本</small></div></div></div>`;
+  }
+  const width = 720;
+  const height = 170;
+  const padX = 24;
+  const padTop = 18;
+  const padBottom = 30;
+  const maxLog = Math.max(1, ...data.map((entry) => Math.log10(entry.income + 1)));
+  const points = data.map((entry, index) => {
+    const x = data.length === 1 ? width / 2 : padX + index * (width - padX * 2) / (data.length - 1);
+    const y = padTop + (1 - Math.log10(entry.income + 1) / maxLog) * (height - padTop - padBottom);
+    return { ...entry, x, y };
+  });
+  const pointText = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const areaPath = `M ${points[0].x.toFixed(1)} ${height - padBottom} L ${points.map((point) => `${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" L ")} L ${points.at(-1).x.toFixed(1)} ${height - padBottom} Z`;
+  const grids = [0, 1, 2, 3].map((index) => {
+    const y = padTop + index * (height - padTop - padBottom) / 3;
+    return `<line class="revenueChartGrid" x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}"></line>`;
+  }).join("");
+  const dots = points.map((point) => `<circle class="revenueChartDot" cx="${point.x}" cy="${point.y}" r="4"><title>M${point.month} · 净收入 ${FormatMoney(point.income)}${point.events.length ? ` · ${point.events.join(" / ")}` : ""}</title></circle>`).join("");
+  const activeEvents = (state.project.activeLiveEvents || []).map((active) => {
+    const event = LIVE_REVENUE_EVENTS.find((candidate) => candidate.id === active.id);
+    return event ? `${event.title}（余 ${active.remaining} 月）` : null;
+  }).filter(Boolean);
+  return `<div class="revenueChartPanel">
+    <div class="financeSectionTitle"><strong>游戏净收入曲线</strong><span>近 12 月 · 对数刻度</span></div>
+    <svg class="revenueChart" viewBox="0 0 ${width} ${height}" role="img" aria-label="游戏净收入曲线">
+      ${grids}<path class="revenueChartArea" d="${areaPath}"></path><polyline class="revenueChartLine" points="${pointText}"></polyline>${dots}
+      <text class="revenueChartAxis" x="${padX}" y="${height - 8}">M${points[0].month}</text><text class="revenueChartAxis" x="${width - padX}" y="${height - 8}" text-anchor="end">M${points.at(-1).month}</text>
+    </svg>
+    <div class="revenueAnalysis">
+      <div class="analysisTile"><span>近 3 月均值</span><strong>${FormatMoney(recentAverage)}</strong><small>${previous.length ? `趋势 ${trend >= 0 ? "+" : ""}${Math.round(trend * 100)}%` : "刚开始卖"}</small></div>
+      <div class="analysisTile"><span>玩家退款</span><strong>−${FormatMoney(totalRefunds)}</strong><small>宣发承诺没接住</small></div>
+      <div class="analysisTile"><span>事件损失</span><strong>−${FormatMoney(totalEventLoss)}</strong><small>平台与现实的抽成</small></div>
+      <div class="analysisTile"><span>收入减累计投入</span><strong>${netRecovery >= 0 ? "+" : "−"}${FormatMoney(Math.abs(netRecovery))}</strong><small>${netRecovery >= 0 ? "账面已经回本" : "仍在燃烧家当"}</small></div>
+    </div>
+    ${activeEvents.length ? `<div class="eventLossNote">正在影响收入：${EscapeHtml(activeEvents.join("、"))}</div>` : ""}
+  </div>`;
 }
 
 function OpenFinanceSheet() {
@@ -1204,6 +1471,52 @@ function OpenFinanceSheet() {
       </div>
     </article>`;
   }).join("");
+  const foodCards = FOOD_PLANS.map((foodPlan) => `
+    <button type="button" class="foodPlanCard ${state.foodPlan === foodPlan.id ? "selected" : ""}" data-food-plan="${foodPlan.id}" ${state.status === "playing" ? "" : "disabled"}>
+      <span class="foodPlanIcon">${foodPlan.icon}</span>
+      <strong>${EscapeHtml(foodPlan.name)}</strong>
+      <p>${EscapeHtml(foodPlan.description)}</p>
+      <span class="foodPlanMeta"><b>${foodPlan.monthlyCost ? `${FormatMoney(foodPlan.monthlyCost)} / 月` : "¥0 / 真挨饿"}</b><small>产出 ×${foodPlan.outputMultiplier.toFixed(2)}</small></span>
+    </button>
+  `).join("");
+  const campaignCards = MARKETING_CAMPAIGNS.map((campaign) => {
+    const purchased = state.project.campaigns.includes(campaign.id);
+    const locked = purchased || state.project.isReleased || state.cash < campaign.cost || state.status !== "playing";
+    return `<article class="promoCard marketingCard ${purchased ? "selected" : ""}">
+      <div class="promoHeader"><span class="promoBadge">${campaign.icon}</span><div><strong>${EscapeHtml(campaign.name)}</strong><small>${purchased ? "已投放 · 玩家记住了" : `${FormatMoney(campaign.cost)} · 一次性`}</small></div></div>
+      <p>${EscapeHtml(campaign.description)}</p>
+      <div class="promoMetricGrid">
+        <div class="promoMetric wishlist" data-kind="wishlist"><span>愿望单</span><strong>+${campaign.wishlists.toLocaleString("zh-CN")}</strong></div>
+        <div class="promoMetric review" data-kind="review"><span>玩家预期</span><strong>+${campaign.expectation}</strong></div>
+      </div>
+      <div class="promoFooter"><strong>${purchased ? "宣传已经说出口" : locked && state.cash < campaign.cost ? "现金不够，可抵押再投" : state.project.isReleased ? "首发窗口已关" : "质量接不住会退款"}</strong><button type="button" class="actionButton" data-marketing-campaign="${campaign.id}" ${locked ? "disabled" : ""}>${purchased ? "已购买" : "花钱宣发"}</button></div>
+    </article>`;
+  }).join("");
+  const speculationCards = SPECULATION_OPTIONS.map((option) => {
+    const stake = option.stakeMode === "allIn" ? state.cash : option.stake;
+    const used = state.lastSpeculationMonth === state.month;
+    const disabled = used || state.status !== "playing" || stake <= 0 || state.cash < stake;
+    const worstOutcome = option.outcomes[0];
+    const bestOutcome = option.outcomes.at(-1);
+    let previousCeiling = 0;
+    const odds = option.outcomes.map((outcome) => {
+      const probability = Math.max(0, outcome.ceiling - previousCeiling);
+      previousCeiling = outcome.ceiling;
+      return `<div class="costRow"><span>${Math.round(probability * 1000) / 10}% · ${EscapeHtml(outcome.label)}</span><strong>${outcome.payoutMultiplier ? `返还 ×${outcome.payoutMultiplier}` : "本金归零"}</strong></div>`;
+    }).join("");
+    return `<article class="promoCard ${option.stakeMode === "allIn" ? "fatal" : ""}">
+      <div class="promoHeader"><span class="promoBadge">${option.icon}</span><div><strong>${EscapeHtml(option.name)}</strong><small>${EscapeHtml(option.risk)} · ${option.stakeMode === "allIn" ? `全仓 ${FormatMoney(stake)}` : `本金 ${FormatMoney(stake)}`}</small></div></div>
+      <p>${EscapeHtml(option.description)}</p>
+      <div class="promoMetricGrid"><div class="promoMetric refund"><span>最坏</span><strong>${worstOutcome.payoutMultiplier ? `×${worstOutcome.payoutMultiplier}` : "归零"}</strong></div><div class="promoMetric wishlist"><span>最好</span><strong>×${bestOutcome.payoutMultiplier}</strong></div></div>
+      <div class="financeTable">${odds}</div>
+      <div class="promoFooter"><strong>${used ? "本月已经投机过" : "收益不计入 100 亿目标"}</strong><button type="button" class="${option.stakeMode === "allIn" ? "smallDangerButton" : "actionButton"}" data-speculation="${option.id}" ${disabled ? "disabled" : ""}>${option.stakeMode === "allIn" ? "全仓买入" : option.category === "stock" ? "做一月短线" : "现在开奖"}</button></div>
+    </article>`;
+  }).join("");
+  const speculationHistory = state.speculationHistory || [];
+  const speculationWins = speculationHistory.filter((entry) => entry.profit > 0).length;
+  const speculationHistoryHtml = speculationHistory.length ? speculationHistory.slice(-6).reverse().map((entry) => `
+    <div class="logItem ${entry.profit >= 0 ? "good" : "danger"}"><span>M${String(entry.month).padStart(2, "0")}</span><div><strong>${EscapeHtml(SPECULATION_OPTIONS.find((option) => option.id === entry.optionId)?.name || "未知投机")}</strong> · ${EscapeHtml(entry.label)} · ${entry.profit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(entry.profit))}</div></div>
+  `).join("") : '<div class="teamEmpty">尚无开奖记录。至少目前，亏损还是可控的。</div>';
   const logs = state.log.length ? state.log.slice(0, 10).map((entry) => `
     <div class="logItem ${entry.tone}"><span>M${String(entry.month).padStart(2, "0")}</span><div>${EscapeHtml(entry.text)}</div></div>
   `).join("") : '<div class="teamEmpty">账本还很干净，像暴风雨前的新建表格。</div>';
@@ -1215,11 +1528,63 @@ function OpenFinanceSheet() {
     </div>
     <div class="financeSectionTitle"><strong>下月账单</strong><span>合计 −${FormatMoney(costs.total)} · 预估流水 +${FormatMoney(income)}</span></div>
     <div class="financeTable">${CostTableRows(costs)}</div>
+    ${costs.arrearsDue > 0 ? `<div class="reportNote danger">欠款不会凭创业热情消失：本月历史欠款 ${FormatMoney(state.arrears)}，下月连同 8% 滞纳一起优先扣款。</div>` : ""}
+    <div class="financeSectionTitle"><strong>老板本月吃什么</strong><span>大餐提质；充饥降质；不吃会死</span></div>
+    <div class="foodPlanGrid">${foodCards}</div>
+    <div class="financeSectionTitle"><strong>开发期宣发</strong><span>已花 ${FormatMoney(state.project.marketingSpent)} · ${state.project.wishlists.toLocaleString("zh-CN")} 愿望单</span></div>
+    <div class="promoMetricGrid promoStats">
+      <div class="promoMetric wishlist"><span>愿望单</span><strong>${state.project.wishlists.toLocaleString("zh-CN")}</strong><small>高质量会转化成销量</small></div>
+      <div class="promoMetric review"><span>玩家预期</span><strong>${state.project.expectation > 0 ? (4.6 + state.project.expectation * 0.087).toFixed(1) : "暂无"}</strong><small>吹得越狠，落差退款越凶</small></div>
+      <div class="promoMetric refund"><span>上次退款</span><strong>${state.project.lastCommercial ? `${Math.round(state.project.lastCommercial.refundRate * 100)}%` : "—"}</strong><small>只算净收入进 100 亿目标</small></div>
+    </div>
+    ${IncomeChartHtml()}
+    <div class="loanGrid">${campaignCards}</div>
+    <div class="financeSectionTitle"><strong>彩票与妖股</strong><span>可能发财，也可能直接结束</span></div>
+    <div class="reportNote danger">这里赚的钱只进现金，不算游戏收入。全仓妖股归零会立即破产。</div>
+    <div class="revenueAnalysis">
+      <div class="analysisTile"><span>累计投机盈亏</span><strong>${state.speculationProfit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(state.speculationProfit || 0))}</strong><small>不计入游戏收入</small></div>
+      <div class="analysisTile"><span>命中率</span><strong>${speculationHistory.length ? `${Math.round(speculationWins / speculationHistory.length * 100)}%` : "—"}</strong><small>${speculationWins} 赢 / ${speculationHistory.length - speculationWins} 亏或回本</small></div>
+    </div>
+    <div class="loanGrid">${speculationCards}</div>
+    <div class="financeSectionTitle"><strong>近期开奖 / 交易</strong><span>最近 6 次</span></div>
+    <div class="logList">${speculationHistoryHtml}</div>
     <div class="financeSectionTitle"><strong>抵押家当</strong><span>钱不够时，贷款抵押物会先被收走</span></div>
     <div class="loanGrid">${loanCards}</div>
     <div class="financeSectionTitle"><strong>创业流水账</strong><span>最近 10 条</span></div>
     <div class="logList">${logs}</div>
   `);
+  dom.sheetBody.querySelectorAll("[data-food-plan]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = SelectFoodPlan(state, button.dataset.foodPlan);
+      if (ApplyResult(result, result.state.foodPlan === "feast" ? "good" : "warning")) OpenFinanceSheet();
+    });
+  });
+  dom.sheetBody.querySelectorAll("[data-marketing-campaign]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = BuyMarketingCampaign(state, button.dataset.marketingCampaign);
+      if (ApplyResult(result, "warning") && result.state.status === "playing") OpenFinanceSheet();
+    });
+  });
+  dom.sheetBody.querySelectorAll("[data-speculation]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const option = SPECULATION_OPTIONS.find((candidate) => candidate.id === button.dataset.speculation);
+      if (option?.stakeMode === "allIn" && button.dataset.armed !== "true") {
+        button.dataset.armed = "true";
+        button.textContent = "再点一次，全部押上";
+        ShowToast("全仓归零会立即破产。再点一次才买。", "danger");
+        PlayTone("danger");
+        return;
+      }
+      const result = Speculate(state, button.dataset.speculation);
+      state = result.state;
+      SaveState();
+      RenderAll();
+      ShowToast(`${result.message}${result.ok ? ` · ${result.profit >= 0 ? "+" : "−"}${FormatMoney(Math.abs(result.profit))}` : ""}`, result.profit > 0 ? "good" : "danger");
+      PlayTone(result.profit > 0 ? "good" : "danger");
+      if (result.ok && result.state.status === "playing") OpenFinanceSheet();
+      else CloseSheet();
+    });
+  });
   dom.sheetBody.querySelectorAll("[data-loan]").forEach((button) => {
     button.addEventListener("click", () => {
       const asset = FindCollateral(button.dataset.loan);
@@ -1252,73 +1617,112 @@ const terminalPrompts = [
 
 function EnsureTerminalHistory(staff) {
   if (!terminalHistory.has(staff.id)) {
+    const member = state.team.find((candidate) => candidate.id === staff.id);
     terminalHistory.set(staff.id, [
-      { role: "system", text: `${staff.name} 已接入。本月订阅费 ${FormatMoney(staff.monthlyCost)}。` },
+      { role: "system", text: `${staff.name} 已接入。本月订阅费 ${FormatMoney(GetMemberMonthlyCost(member))}。` },
       { role: "ai", text: staff.intro },
     ]);
   }
   return terminalHistory.get(staff.id);
 }
 
-function OpenAiTerminalSheet(preferredAiId = null) {
+const ownerPrompts = [
+  { id: "why", text: "我为什么还在做这个？" },
+  { id: "food", text: "是不是该先吃点东西？" },
+  { id: "quality", text: "现在这垃圾到底能打几分？" },
+  { id: "scope", text: "我再亲自加一个玩法会怎样？" },
+];
+
+function OwnerReply(promptId) {
+  const evaluation = state.project ? EvaluateProject(state) : null;
+  const foodPlan = FindFoodPlan(state.foodPlan);
+  const replies = {
+    why: state.anxiety >= 68 ? "因为停下来以后，墙上的插座就会问你版本什么时候发。" : "因为那 100 亿元还在屏幕右上角，而且辞职信已经撤回了。",
+    food: state.hunger >= 65 ? "是。鼠标垫不是海苔，需求文档也没有蛋白质。" : `本月计划是「${foodPlan?.name || "充饥"}」。至少先活到结算。`,
+    quality: evaluation ? `内部预估 ${evaluation.rating.toFixed(1)} 分。剩下的分数正在范围债和 Bug 里服刑。` : "现在唯一完成的是文件夹命名。",
+    scope: "可以。自己做不花工资，但会饥饿 +10、焦虑 +7，而且教程通常只看到一半。",
+  };
+  return replies[promptId] || "先别想了，进入下月会替你想。";
+}
+
+function EnsureOwnerHistory() {
+  if (!terminalHistory.has("owner")) {
+    terminalHistory.set("owner", [
+      { role: "system", text: "脑内群聊已连接。参与者：你，以及不肯闭嘴的另一个你。" },
+      { role: "ai", text: "别急着做梦。先决定今天是吃饭、做功能，还是花钱让别人知道我们做不完。" },
+    ]);
+  }
+  return terminalHistory.get("owner");
+}
+
+function OpenAiTerminalSheet(preferredAiId = "owner") {
   const hiredAi = state.team
     .map((member) => FindStaff(member.id))
     .filter((staff) => staff?.kind === "ai");
-  if (!hiredAi.length) {
-    OpenSheet("OWNER COMPUTER", "AI 群聊终端", `
-      <div class="terminalEmpty">
-        <span class="terminalEmptyIcon">▣</span>
-        <h3>联系人列表为空</h3>
-        <p>你还没租任何 AI。电脑目前只能用来搜索“独立游戏众筹失败怎么办”。</p>
-        <button id="terminalMarketButton" type="button" class="actionButton">去租一个蠢货 AI</button>
-      </div>
-    `);
-    document.getElementById("terminalMarketButton").addEventListener("click", OpenTalentSheet);
-    return;
-  }
-  const activeAi = hiredAi.find((staff) => staff.id === preferredAiId) || hiredAi[0];
-  const member = state.team.find((candidate) => candidate.id === activeAi.id);
-  const history = EnsureTerminalHistory(activeAi);
+  const activeAi = hiredAi.find((staff) => staff.id === preferredAiId) || null;
+  const isOwner = !activeAi;
+  const activeId = isOwner ? "owner" : activeAi.id;
+  const member = activeAi ? state.team.find((candidate) => candidate.id === activeAi.id) : null;
+  const history = isOwner ? EnsureOwnerHistory() : EnsureTerminalHistory(activeAi);
   const aiTabs = hiredAi.map((staff) => `
-    <button type="button" class="terminalContact ${staff.id === activeAi.id ? "selected" : ""}" data-ai-contact="${staff.id}" style="--staffColor:${staff.color}">
+    <button type="button" class="terminalContact ${staff.id === activeId ? "selected" : ""}" data-terminal-contact="${staff.id}" style="--staffColor:${staff.color}">
       <span>${EscapeHtml(staff.portrait)}</span><div><strong>${EscapeHtml(staff.name)}</strong><small>${EscapeHtml(staff.role)}</small></div><i></i>
     </button>
   `).join("");
-  const messages = history.slice(-10).map((message) => `
+  const ownerTab = `<button type="button" class="terminalContact ${isOwner ? "selected" : ""}" data-terminal-contact="owner" style="--staffColor:#ff9b73">
+    <span>我</span><div><strong>老板本人</strong><small>脑内群聊 / 免费但费命</small></div><i></i>
+  </button>`;
+  const messages = history.slice(-10).map((message, index) => `
     <div class="terminalMessage ${message.role}">
-      <span>${message.role === "user" ? "老板" : message.role === "ai" ? EscapeHtml(activeAi.name) : "系统"}</span>
-      <p>${EscapeHtml(message.text)}</p>
+      <span>${message.role === "user" ? "老板" : message.role === "ai" ? (isOwner ? "脑内另一个我" : EscapeHtml(activeAi.name)) : "系统"}</span>
+      <p>${EscapeHtml(DistortDialogue(message.text, index + activeId.length))}</p>
     </div>
   `).join("");
-  const promptButtons = terminalPrompts.map((prompt) => `
-    <button type="button" data-terminal-prompt="${prompt.id}" ${prompt.tone && state.talkPoints <= 0 ? "disabled" : ""}>${prompt.tone ? "⚡ " : ""}${EscapeHtml(prompt.text)}</button>
+  const prompts = isOwner ? ownerPrompts : terminalPrompts;
+  const promptButtons = prompts.map((prompt, index) => `
+    <button type="button" data-terminal-prompt="${prompt.id}" ${prompt.tone && state.talkPoints <= 0 ? "disabled" : ""}>${prompt.tone ? "⚡ " : ""}${EscapeHtml(DistortDialogue(prompt.text, index))}</button>
   `).join("");
-  OpenSheet("OWNER COMPUTER", "AI 群聊终端", `
+  const activeColor = isOwner ? "#ff9b73" : activeAi.color;
+  const activeTitle = isOwner ? "老板本人" : activeAi.name;
+  const activeSubtitle = isOwner ? "自己做 · ¥0 / 饥饿与精神另算" : `${activeAi.role} · ${FormatMoney(GetMemberMonthlyCost(member))} / 月`;
+  const activeCondition = isOwner ? `焦虑 ${Math.round(state.anxiety)} · 饥饿 ${Math.round(state.hunger)}` : `上下文漂移 ${Math.round(member.drift)}%`;
+  OpenSheet("OWNER COMPUTER", "自己 / AI 群聊与游戏定制", `
     <div class="terminalShell">
       <aside class="terminalContacts">
         <div class="terminalLogo"><span>▣</span><div><strong>笨蛋协作台</strong><small>DUMB OPS v0.9</small></div></div>
+        ${ownerTab}
         ${aiTabs}
+        ${hiredAi.length ? "" : '<button id="terminalMarketButton" type="button" class="textButton">＋ 去月租一个 AI</button>'}
         <div class="terminalBudget"><span>本月可用嘴遁</span><strong>${state.talkPoints} / 2</strong></div>
       </aside>
       <section class="terminalChat">
-        <header class="terminalChatHeader" style="--staffColor:${activeAi.color}">
-          <div><strong>${EscapeHtml(activeAi.name)}</strong><small>${EscapeHtml(activeAi.role)} · ${FormatMoney(activeAi.monthlyCost)} / 月</small></div>
-          <span>上下文漂移 ${Math.round(member.drift)}%</span>
+        <header class="terminalChatHeader" style="--staffColor:${activeColor}">
+          <div><strong>${EscapeHtml(activeTitle)}</strong><small>${EscapeHtml(activeSubtitle)}</small></div>
+          <span>${EscapeHtml(activeCondition)}</span>
         </header>
         <div class="terminalMessages">${messages}</div>
-        <div class="terminalPromptLabel">预设开发问题 · 带 ⚡ 的回复会消耗本月谈话次数</div>
+        <div class="terminalPromptLabel">${isOwner ? "和自己说两句 · 不耗嘴遁" : "预设开发问题 · 带 ⚡ 的回复会消耗本月谈话次数"}</div>
         <div class="terminalPrompts">${promptButtons}</div>
+        <div class="terminalPromptLabel">选择玩法提案 · 真写进游戏并消耗 1 次嘴遁</div>
+        <div class="ownerTalkCard">${FeatureChoiceCardsHtml(activeId, 3)}</div>
       </section>
     </div>
   `);
-  dom.sheetBody.querySelectorAll("[data-ai-contact]").forEach((button) => {
-    button.addEventListener("click", () => OpenAiTerminalSheet(button.dataset.aiContact));
+  document.getElementById("terminalMarketButton")?.addEventListener("click", OpenTalentSheet);
+  dom.sheetBody.querySelectorAll("[data-terminal-contact]").forEach((button) => {
+    button.addEventListener("click", () => OpenAiTerminalSheet(button.dataset.terminalContact));
   });
   dom.sheetBody.querySelectorAll("[data-terminal-prompt]").forEach((button) => {
     button.addEventListener("click", () => {
-      const prompt = terminalPrompts.find((candidate) => candidate.id === button.dataset.terminalPrompt);
+      const prompt = prompts.find((candidate) => candidate.id === button.dataset.terminalPrompt);
       if (!prompt) return;
       history.push({ role: "user", text: prompt.text });
+      if (isOwner) {
+        history.push({ role: "ai", text: OwnerReply(prompt.id) });
+        OpenAiTerminalSheet("owner");
+        PlayTone("tap");
+        return;
+      }
       if (!prompt.tone) {
         history.push({ role: "ai", text: GetIdleLine(state, activeAi.id) });
         OpenAiTerminalSheet(activeAi.id);
@@ -1340,19 +1744,29 @@ function OpenAiTerminalSheet(preferredAiId = null) {
       PlayTone(prompt.tone === "pressure" || prompt.tone === "roast" ? "warning" : "good");
     });
   });
+  BindFeatureChoiceButtons(dom.sheetBody, (result) => {
+    history.push({ role: "user", text: `那就把「${result.feature.title}」塞进去。` });
+    history.push({ role: "ai", text: result.consequence });
+    if (state.status === "playing") OpenAiTerminalSheet(activeId);
+    else CloseSheet();
+  });
 }
 
 function OpenHelpSheet() {
   OpenSheet("HOW TO SURVIVE", "玩法说明与自救指南", `
     <div class="helpFlow">
-      <div class="helpStep"><b>1 · 雇人 / 租 AI</b><p>四张工位，月底分别付工资与月租。</p></div>
-      <div class="helpStep"><b>2 · 对话鞭策</b><p>每月两次，催得越狠，副作用越真。</p></div>
-      <div class="helpStep"><b>3 · 选制作策略</b><p>补短板、联调，或继续假装风险不存在。</p></div>
-      <div class="helpStep"><b>4 · 冲 100 亿元</b><p>高分版本扩大市场规模，持续迭代形成收入复利。</p></div>
+      <div class="helpStep"><b>1 · 雇人 / 租 AI</b><p>四张工位。学生可加薪但提升有限；AI 可升级昂贵模型，速度和质量涨得更狠。去留都由你决定。</p></div>
+      <div class="helpStep"><b>2 · 聊天定制</b><p>和自己、学生或 AI 选玩法提案；自己做免费，但很费命。</p></div>
+      <div class="helpStep"><b>3 · 吃饭 / 宣发</b><p>大餐提质，充饥降质；宣传越猛，玩家预期和退款风险越高。</p></div>
+      <div class="helpStep"><b>4 · 补短板 / 换赛道</b><p>四模块互相制衡；开发中能高价转向，但会废进度、玩法和愿望单。</p></div>
+      <div class="helpStep"><b>5 · 冲 100 亿元</b><p>高分版本扩大市场规模，持续迭代形成收入复利。</p></div>
     </div>
     <div class="helpRule" style="--ruleColor:${MODULE_META.art.color}"><span>◆</span><div><strong>美术 ↔ 性能</strong><p>美术领先会堆显存与资源压力，拖慢客户端、制造技术债；性能领先太多则变成稳定的土豆画质。</p></div></div>
     <div class="helpRule" style="--ruleColor:${MODULE_META.design.color}"><span>✦</span><div><strong>策划 ↔ 客户端</strong><p>策划领先会产生范围债，客户端产出先拿去填坑；客户端领先太多，则得到一套优雅但无聊的程序。</p></div></div>
-    <div class="helpRule" style="--ruleColor:#ff9b73"><span>¥</span><div><strong>人能饿，电脑不能抵押</strong><p>现金不足时会先违约丢抵押物，再停 AI、欠工资。饭钱可以跳过并增加饥饿；抵押开发电脑则立即结束。</p></div></div>
+    <div class="helpRule" style="--ruleColor:#ff9b73"><span>¥</span><div><strong>人会饿，也会疯；电脑不能抵押</strong><p>大餐贵但提升产出，充饥便宜却稍降质量，不吃会饿死。烂构建、欠款和差评会堆焦虑；中度焦虑偶尔爆出抽象创意，100 就精神崩溃。抵押开发电脑则立即结束。</p></div></div>
+    <div class="helpRule" style="--ruleColor:#ffd166"><span>↗</span><div><strong>先宣传，后兑现</strong><p>开发期可花钱买愿望单。高质量上线把预期变成销量；质量接不住会差评轰炸、退款、掉口碑，而且只把扣完退款的净收入算进目标。</p></div></div>
+    <div class="helpRule" style="--ruleColor:#66b8ff"><span>⌁</span><div><strong>流水不是直线</strong><p>发售后会遇到平台算法、竞品打折、服务器事故等收入事件。账单页的曲线会记录首发、更新、月流水、退款和事件损失。</p></div></div>
+    <div class="helpRule" style="--ruleColor:#f45b69"><span>✦</span><div><strong>彩票与妖股不是捷径</strong><p>每月可投机一次，面板公开每档概率与历史盈亏。盈利只进现金、不算游戏收入；全仓妖股归零会让工作室当场破产。</p></div></div>
     <div class="helpRule" style="--ruleColor:#8d7cff"><span>◎</span><div><strong>唯一胜利目标：游戏收入 100 亿元</strong><p>高评分更新会让市场规模加速复利；低分版本增长很慢。贷款到账不算游戏收入，别想抵押房本刷成世界制作人。</p></div></div>
     <div class="resetArea"><button id="resetRunButton" type="button" class="smallDangerButton">清空存档，重新创业</button></div>
   `);
@@ -1369,10 +1783,10 @@ function RenderConversation() {
   dom.conversationLayer.style.setProperty("--staffColor", staff.color);
   dom.conversationPortrait.style.setProperty("--staffColor", staff.color);
   dom.conversationPortrait.innerHTML = `<span>${EscapeHtml(staff.portrait)}</span>`;
-  dom.conversationKind.textContent = staff.kind === "ai" ? `AI 月租 · ${FormatMoney(staff.monthlyCost)} / 月` : `大学生工资 · ${FormatMoney(staff.monthlyCost)} / 月`;
+  dom.conversationKind.textContent = staff.kind === "ai" ? `AI 月租 · ${FormatMoney(GetMemberMonthlyCost(member))} / 月` : `大学生工资 · ${FormatMoney(GetMemberMonthlyCost(member))} / 月`;
   dom.conversationName.textContent = staff.name;
   dom.conversationRole.textContent = `${staff.role} · ${staff.quirk}`;
-  if (!dom.conversationLine.dataset.locked) dom.conversationLine.textContent = GetIdleLine(state, staff.id);
+  if (!dom.conversationLine.dataset.locked) dom.conversationLine.textContent = DistortDialogue(GetIdleLine(state, staff.id), staff.id.length);
   const conditionLabel = staff.kind === "ai" ? "上下文稳定" : "心态";
   const conditionValue = staff.kind === "ai" ? 100 - member.drift : member.morale;
   const pressureLabel = staff.kind === "ai" ? "幻觉漂移" : "压力";
@@ -1383,6 +1797,16 @@ function RenderConversation() {
     <div class="conversationStat"><span>${pressureLabel}</span><strong>${Math.round(pressureValue)} / 100</strong></div>
   `;
   dom.talkPointsValue.textContent = `${state.talkPoints} / 2`;
+  dom.conversationFeatureList.innerHTML = `<div class="terminalPromptLabel">聊一个真会写进项目的玩法 · 同样消耗嘴遁</div>${FeatureChoiceCardsHtml(staff.id, 3)}`;
+  BindFeatureChoiceButtons(dom.conversationFeatureList, (result) => {
+    if (state.status !== "playing") {
+      CloseConversation();
+      return;
+    }
+    dom.conversationLine.textContent = DistortDialogue(result.consequence, result.feature.id.length);
+    dom.conversationLine.dataset.locked = "true";
+    RenderConversation();
+  });
   dom.conversationActions.querySelectorAll("button").forEach((button) => {
     button.disabled = state.talkPoints <= 0 || state.status !== "playing";
   });
@@ -1424,27 +1848,38 @@ function CloseResult() {
 }
 
 function OpenReleaseResult(result) {
-  const { evaluation, revenue, review, isUpdate, oldRating } = result;
+  const { evaluation, revenue, review, isUpdate, oldRating, commercial, anxiety } = result;
   const project = FindProject(state.project.templateId);
   const ratingDelta = oldRating == null ? "首发" : `${evaluation.rating - oldRating >= 0 ? "+" : ""}${(evaluation.rating - oldRating).toFixed(1)}`;
   const primaryTensions = evaluation.tensions.slice(0, 2);
   const tensionHtml = primaryTensions.length
     ? primaryTensions.map((tension) => `<div class="reportNote ${tension.severity}">${EscapeHtml(tension.title)}：${EscapeHtml(tension.description)}</div>`).join("")
     : '<div class="reportNote">难得：评测员认为四个模块像同一款游戏。</div>';
+  const commercialHtml = !isUpdate && commercial
+    ? `<div class="reportNote ${commercial.backlash ? "danger" : "good"}">${commercial.backlash
+      ? `宣发反噬：玩家预期 ${commercial.promisedRating.toFixed(1)}，实际 ${evaluation.rating.toFixed(1)}；退款率 ${Math.round(commercial.refundRate * 100)}%，评论区正在团建。`
+      : state.project.marketingSpent > 0
+        ? `宣发兑现：${commercial.wishlistSales.toLocaleString("zh-CN")} 份愿望单转化，玩家暂时没有把你挂上退款热榜。`
+        : `裸奔首发：没有大宣发，也仍有 ${Math.round(commercial.refundRate * 100)}% 的玩家选择退款。`}</div>`
+    : "";
+  const featureHtml = state.project.features.length
+    ? `<div class="reportNote">定制玩法：${state.project.features.map((feature) => feature.title).join("、")}。</div>`
+    : "";
   OpenResult(
     isUpdate ? "PATCH NOTES ARE REAL" : "LAUNCH DAY",
     isUpdate ? `v${state.project.version}.0 更新上线` : `${project.title} 首发`,
     `<div class="ratingHero">
       <div class="ratingNumber" style="color:${project.accent}">${evaluation.rating.toFixed(1)}<small>/10</small></div>
-      <div class="ratingMeta"><strong>${evaluation.rating >= 8.2 ? "玩家开始替你宣传" : evaluation.rating >= 6.7 ? "能玩，而且有点东西" : evaluation.rating >= 4.7 ? "想法比帧率稳定" : "商店页比游戏完整"}</strong><p>${isUpdate ? `较上版 ${ratingDelta} 分。` : "第一批玩家已把你的梦想编译成评价。"} 本次到账 ${FormatMoney(revenue)}。</p></div>
+      <div class="ratingMeta"><strong>${evaluation.rating >= 8.2 ? "玩家开始替你宣传" : evaluation.rating >= 6.7 ? "能玩，而且有点东西" : evaluation.rating >= 4.7 ? "想法比帧率稳定" : "商店页比游戏完整"}</strong><p>${isUpdate ? `较上版 ${ratingDelta} 分。` : "第一批玩家已把你的梦想编译成评价。"} 本次净到账 ${FormatMoney(revenue)}，焦虑 ${anxiety.delta >= 0 ? "+" : ""}${Math.round(anxiety.delta)}。</p></div>
     </div>
     <div class="resultMetrics">
-      <div class="resultMetric"><span>版本收入</span><strong>+${FormatMoney(revenue)}</strong></div>
+      <div class="resultMetric"><span>${commercial?.refunds ? "扣退款后" : "版本收入"}</span><strong>+${FormatMoney(revenue)}</strong></div>
       <div class="resultMetric"><span>月流水基准</span><strong>${FormatMoney(state.project.monthlyRevenue)}</strong></div>
       <div class="resultMetric"><span>累计目标</span><strong>${FormatGoalMoney(state.gameRevenue || 0)} / 100亿</strong></div>
     </div>
+    ${commercial?.refunds ? `<div class="resultMetrics"><div class="resultMetric"><span>毛销售额</span><strong>${FormatMoney(commercial.grossRevenue)}</strong></div><div class="resultMetric"><span>玩家退款</span><strong>−${FormatMoney(commercial.refunds)}</strong></div><div class="resultMetric"><span>退款率</span><strong>${Math.round(commercial.refundRate * 100)}%</strong></div></div>` : ""}
     <blockquote class="reviewQuote">${EscapeHtml(review)}</blockquote>
-    <div class="reportNotes">${tensionHtml}</div>`,
+    <div class="reportNotes">${commercialHtml}${featureHtml}${tensionHtml}</div>`,
     project.accent,
     isUpdate ? "收到，继续把下个版本做坏" : "上线了，接着迭代",
   );
@@ -1453,10 +1888,18 @@ function OpenReleaseResult(result) {
 function SettlementNotes(result) {
   const notes = [];
   if (result.finance.income > 0) notes.push({ tone: "", text: `在线流水到账 +${FormatMoney(result.finance.income)}。` });
+  if (result.finance.eventLoss > 0) notes.push({
+    tone: "danger",
+    text: `${result.finance.appliedEvents.map((event) => event.title).join("、")}：原本 ${FormatMoney(result.finance.baseIncome)}，实际只到账 ${FormatMoney(result.finance.income)}，损失 ${FormatMoney(result.finance.eventLoss)}。`,
+  });
   notes.push({ tone: "", text: `本月支出 −${FormatMoney(result.finance.costs.total)}，剩余现金 ${FormatMoney(state.cash)}。` });
   if (result.finance.defaults.length) result.finance.defaults.forEach((loan) => notes.push({ tone: "danger", text: `${FindCollateral(loan.collateralId).name} 断供，被处置。` }));
   if (result.finance.removedStaff.length) result.finance.removedStaff.forEach((staff) => notes.push({ tone: "danger", text: `${staff.name} 因断供离开团队。` }));
-  if (result.finance.skippedFood) notes.push({ tone: "warning", text: "饭钱被砍：人先饿着，电脑继续开机。" });
+  const eatenPlan = FindFoodPlan(result.finance.effectiveFoodPlanId);
+  if (result.finance.skippedFood) notes.push({ tone: "warning", text: `${eatenPlan?.name || "硬扛不吃"}：老板饥饿 ${Math.round(state.hunger)} / 100，电脑继续开机。` });
+  else if (eatenPlan) notes.push({ tone: eatenPlan.id === "feast" ? "good" : "", text: `本月吃法：${eatenPlan.name}，产出 ×${eatenPlan.outputMultiplier.toFixed(2)}。` });
+  if (result.anxiety) notes.push({ tone: result.anxiety.delta > 0 ? "warning" : "good", text: `焦虑 ${result.anxiety.delta >= 0 ? "+" : ""}${Math.round(result.anxiety.delta)}，当前 ${Math.round(result.anxiety.after)} / 100：${GetAnxietyState(result.anxiety.after).label}。` });
+  if (result.anxiety?.idea) notes.push({ tone: "good", text: `精神裂缝掉出抽象创意 ${result.anxiety.idea.title}：${result.anxiety.idea.pitch}` });
   if (result.wastedTotal > 0.4) notes.push({ tone: "danger", text: `本月 ${result.wastedTotal.toFixed(1)} 点工时被返工、等待和部门互害吃掉。` });
   result.painEvents.slice(0, 3).forEach((event) => notes.push({ tone: "warning", text: event }));
   if (result.buildStatus) notes.push({ tone: result.buildStatus.level === "broken" ? "danger" : result.buildStatus.level === "fragile" ? "warning" : "", text: `构建：${result.buildStatus.label}。${result.buildStatus.detail}` });
@@ -1475,11 +1918,11 @@ function OpenMonthResult(result) {
   OpenResult(
     "MONTHLY REPORT",
     `M${String(settledMonth).padStart(2, "0")} 创业月报`,
-    `<div class="reportHeadline"><strong>${EscapeHtml(directive.name)}</strong><span>${state.status === "playing" ? `进入 M${String(state.month).padStart(2, "0")}` : "100 亿元目标已达成"}</span></div>
+    `<div class="reportHeadline"><strong>${EscapeHtml(directive.name)}</strong><span>${state.status === "playing" ? `进入 M${String(state.month).padStart(2, "0")}` : state.outcome?.kind === "worldMaker" ? "100 亿元目标已达成" : `本局失败 · ${EscapeHtml(state.outcome?.title || "工作室停摆")}`}</span></div>
     <div class="outputGrid">${outputHtml}</div>
     <div class="reportNotes">${notes.map((note) => `<div class="reportNote ${note.tone}">${EscapeHtml(note.text)}</div>`).join("")}</div>`,
     directive.color,
-    state.status === "playing" ? "月报已读，继续创业" : "查看影响世界的自己",
+    state.status === "playing" ? "月报已读，继续创业" : state.outcome?.kind === "worldMaker" ? "查看影响世界的自己" : "面对创业结局",
   );
 }
 
@@ -1539,7 +1982,7 @@ dom.conversationActions.querySelectorAll("[data-tone]").forEach((button) => {
       return;
     }
     state = result.state;
-    dom.conversationLine.textContent = result.line;
+    dom.conversationLine.textContent = DistortDialogue(result.line, activeStaffId.length);
     dom.conversationLine.dataset.locked = "true";
     SaveState();
     RenderAll({ rebuildStaff: false });
