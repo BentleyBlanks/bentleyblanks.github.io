@@ -628,39 +628,17 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .founderProfileFooter strong.invalid { color:#a42435; }
 .founderProfilePanel .documentButton { min-height:44px; margin:0; justify-content:center; }
 
-.projectContract { width: min(940px,94vw); max-height: 92vh; padding: 17px 22px 18px; overflow: auto; border: 1px solid #c6b995; transform: rotate(.16deg); }
-.projectContract > header { position: sticky; top: -17px; z-index: 4; padding: 11px 0 9px; background: #eee8d8; }
-.projectContract > header div { display: grid; gap: 2px; }
-.projectContract > header small { color: #776a5d; font-size: 7px; }
-.contractParties { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #b8ad96; color: #63574b; font-size: 8px; }
-.contractParties strong { color: #2d251f; }
-.projectContract h2 { margin: 8px 0 2px; font-size: clamp(21px,3vw,31px); }
-.gameNameField { margin-top: 6px; }
-.gameNameField input { padding: 7px 9px; font-size: 14px; }
-.contractSection { position: relative; z-index: 1; margin-top: 8px; }
-.contractHeading { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
-.contractHeading > b { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; background: #41352a; color: #f4eedf; font-size: 8px; }
-.contractHeading span { display: grid; gap: 0; }
-.contractHeading strong { font-size: 10px; }
-.contractHeading small { color: #776a5d; font-size: 7px; }
-.projectContract .choiceCard { min-height: 57px; padding: 7px 8px; border-color: #b7ad96; border-radius: 5px; background: rgba(255,255,255,.28); color: #2a231e; }
-.projectContract .choiceCard p { margin: 2px 0; color: #766a5e; font-size: 7px; }
+.projectContract { width: min(720px,94vw); padding: 20px 24px 22px; border: 1px solid #c6b995; transform: rotate(.16deg); }
+.projectContract > header { align-items: center; padding-bottom: 8px; }
+.projectContract > header h2 { margin: 0; font-size: 22px; letter-spacing: 0; }
+.gameNameField { margin-top: 12px; }
+.gameNameField input { padding: 9px 10px; font-size: 16px; }
+.contractSection { position: relative; z-index: 1; margin-top: 12px; }
+.contractLabel { display: block; margin-bottom: 5px; color: #56493d; font-size: 10px; }
+.projectContract .choiceCard { min-height: 52px; padding: 8px 10px; border-color: #b7ad96; border-radius: 5px; background: rgba(255,255,255,.28); color: #2a231e; }
 .projectContract .choiceCard small { color: #66584b; font-size: 7px; }
 .projectContract .choiceCard.selected { background: color-mix(in srgb,var(--choiceColor,#8d7cff) 19%,#fff8e8); }
-.contractFinePrint { position: relative; z-index: 1; display: grid; grid-template-columns: 70px 1fr; gap: 8px; margin-top: 9px; padding: 7px 9px; border: 1px solid #9d2437; color: #6e2430; font-size: 7.5px; line-height: 1.45; }
-.signatureRow { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 175px; gap: 12px; align-items: end; margin-top: 6px; }
-.signatureRow > div { display: grid; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid #796e61; }
-.signatureRow small { color: #776b5e; font-size: 7px; }
-.signatureRow > div strong { font-family:"KaiTi","STKaiti",serif; font-size: 16px; }
-.sealButton { position: relative; height: 50px; overflow: hidden; border: 2px solid #a42435; border-radius: 4px; background: rgba(164,36,53,.06); color: #8e2030; cursor: pointer; touch-action: none; }
-.sealButton span, .sealButton strong { position: relative; z-index: 2; display: block; }
-.sealButton span { font-size: 7px; letter-spacing: .12em; }
-.sealButton strong { font: 900 13px/1.25 "Songti SC",serif; }
-.sealButton i { position: absolute; z-index: 1; inset: 0; transform: translateX(-102%); background: rgba(164,36,53,.16); }
-.sealButton.holding i { animation: sealHold 1.05s linear forwards; }
-.sealButton.sealed { background: #a42435; color: #fff1df; transform: rotate(-2deg); }
-@keyframes sealHold { to { transform: translateX(0); } }
-.projectContract.signed::after { content:"已签署"; position: fixed; right: 7%; bottom: 9%; display:grid; place-items:center; width:100px; height:100px; border:7px double rgba(164,36,53,.72); border-radius:50%; color:rgba(164,36,53,.72); font:950 24px/1 "Songti SC",serif; transform:rotate(-13deg); pointer-events:none; }
+.contractSubmitButton { min-height: 46px; margin-top: 0; justify-content: center; }
 
 /* Unmissable win-condition reveal ----------------------------------------- */
 .goalReveal {
@@ -1891,18 +1869,12 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .founderSkillLevel strong { font-size:24px; }
   .founderProfileFooter { grid-template-columns:1fr 130px; margin-top:8px; }
   .founderProfilePanel .documentButton { min-height:40px; }
-  .projectContract { width: min(970px,96vw); max-height: 96vh; padding: 10px 16px 12px; }
-  .projectContract > header { top: -10px; padding: 5px 0; }
-  .projectContract h2 { margin: 3px 0; font-size: 20px; }
-  .contractParties { padding: 4px 0; }
-  .contractSection { margin-top: 4px; }
-  .contractHeading { margin-bottom: 3px; }
-  .contractHeading > b { width: 20px; height: 20px; }
-  .projectContract .choiceCard { min-height: 42px; padding: 5px 6px; }
-  .projectContract .choiceCard p { display: none; }
-  .contractFinePrint { margin-top: 4px; padding: 4px 6px; }
-  .signatureRow { margin-top: 3px; }
-  .sealButton { height: 42px; }
+  .projectContract { width: min(720px,96vw); padding: 10px 16px 12px; }
+  .projectContract > header { padding-bottom: 5px; }
+  .projectContract > header h2 { font-size: 18px; }
+  .contractSection { margin-top: 6px; }
+  .projectContract .choiceCard { min-height: 42px; padding: 5px 7px; }
+  .contractSubmitButton { min-height: 40px; }
   .goalRevealCard { gap:5px; }
   .goalRevealKicker { font-size:7px; }
   .goalReveal h2 { font-size:clamp(18px,5vh,27px); }
@@ -2563,13 +2535,6 @@ body {
 }
 .contractField input { box-shadow: inset 0 -1px rgba(255,255,255,.52); font-family: "Courier New","Microsoft YaHei UI",monospace; }
 .nameSuggestions button { border-radius: 3px; box-shadow: inset 0 1px rgba(255,255,255,.65), 0 2px 1px rgba(73,54,30,.18); }
-.sealButton {
-  border-width: 2px;
-  border-radius: 5px;
-  background: linear-gradient(180deg,#f4e9d3,#d8c9aa);
-  box-shadow: inset 0 1px #fff8e9, inset 0 -3px rgba(101,75,42,.18), 0 4px 0 #8f7a5b, 0 8px 13px rgba(0,0,0,.23);
-}
-.sealButton.holding { transform: translateY(3px); box-shadow: inset 0 3px 6px rgba(84,58,29,.25), 0 1px 0 #8f7a5b; }
 .desktopHint {
   padding: 5px 8px;
   border: 1px solid #555961;

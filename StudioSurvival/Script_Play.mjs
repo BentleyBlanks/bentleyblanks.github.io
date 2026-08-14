@@ -92,7 +92,7 @@ const dom = Object.fromEntries([
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderConfirmButton",
-  "projectContract", "contractStudioName", "contractFounderSkills", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "projectContract", "gameNameInput", "contractError", "projectConfirmButton",
   "goalReveal", "goalRevealCounter", "goalRevealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
@@ -153,9 +153,7 @@ let rebuildingWorld = false;
 let onboardingPhase = "intro";
 let ceremonyElapsed = 0;
 let ceremonyBurstStep = -1;
-let sealHoldTimer = null;
-let sealHoldComplete = false;
-let sealKeyboardMode = false;
+let projectSetupComplete = false;
 let pendingGoalState = null;
 let goalRevealAnimationFrame = null;
 let activeScratchSession = null;
@@ -1684,9 +1682,6 @@ function ShowProjectContract() {
   dom.foundingNamePanel.classList.add("hidden");
   dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.remove("hidden");
-  dom.contractStudioName.textContent = draftStudioName;
-  dom.contractFounderSkills.textContent = `策 ${draftFounderSkills.design} / 程 ${draftFounderSkills.programming} / 美 ${draftFounderSkills.art}`;
-  dom.contractSignatureName.textContent = draftStudioName;
   if (!dom.gameNameInput.value.trim()) {
     const template = FindProject(selectedProjectId);
     dom.gameNameInput.value = template?.title?.replace(/[《》]/g, "") || "";
@@ -2096,13 +2091,11 @@ function RenderSetupChoices() {
   dom.projectChoices.innerHTML = PROJECTS.map((project) => `
     <button class="choiceCard ${project.id === selectedProjectId ? "selected" : ""}" style="--choiceColor:${project.accent}" data-project-id="${project.id}" type="button">
       <strong>${EscapeHtml(project.title)}</strong>
-      <p>${EscapeHtml(project.pitch)}</p>
-      <small>${EscapeHtml(project.genre)} · ${EscapeHtml(project.trend)}</small>
+      <small>${EscapeHtml(project.genre)}</small>
     </button>`).join("");
   dom.typeChoices.innerHTML = GAME_TYPES.map((gameType) => `
     <button class="choiceCard ${gameType.id === selectedGameTypeId ? "selected" : ""}" style="--choiceColor:${gameType.accent}" data-type-id="${gameType.id}" type="button">
       <strong>${gameType.icon} ${EscapeHtml(gameType.name)}</strong>
-      <small>${EscapeHtml(gameType.warning)}</small>
     </button>`).join("");
   dom.continueButton.classList.toggle("hidden", !savedState?.project);
 }
@@ -3401,8 +3394,6 @@ function ConfirmStudioName() {
   }
   draftStudioName = proposedName.slice(0, 18);
   dom.setupError.textContent = "";
-  dom.contractStudioName.textContent = draftStudioName;
-  dom.contractSignatureName.textContent = draftStudioName;
   ReplaceCeremonyPlaque(draftStudioName);
   dom.foundingNamePanel.classList.add("hidden");
   onboardingPhase = "plaque";
@@ -3433,20 +3424,11 @@ function ConfirmFounderProfile() {
   ShowProjectContract();
 }
 
-function CancelSealHold() {
-  if (sealHoldComplete) return;
-  window.clearTimeout(sealHoldTimer);
-  sealHoldTimer = null;
-  sealKeyboardMode = false;
-  dom.sealButton.classList.remove("holding");
-}
-
-function CompleteContractSigning() {
-  if (sealHoldComplete) return;
+function ConfirmProjectSetup() {
+  if (projectSetupComplete) return;
   const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
   if (projectName.length < 2) {
     dom.contractError.textContent = "游戏名至少 2 个字。";
-    CancelSealHold();
     dom.gameNameInput.focus();
     PlayTone("warning");
     return;
@@ -3459,39 +3441,16 @@ function CompleteContractSigning() {
   });
   if (!result.ok) {
     dom.contractError.textContent = result.message;
-    CancelSealHold();
     return;
   }
-  sealHoldComplete = true;
-  sealHoldTimer = null;
+  projectSetupComplete = true;
   onboardingPhase = "signing";
-  dom.sealButton.classList.remove("holding");
-  dom.sealButton.classList.add("sealed");
-  dom.sealButton.querySelector("span").textContent = "合同生效";
-  dom.sealButton.querySelector("strong").textContent = "已确认";
-  dom.projectContract.classList.add("signed");
-  dom.contractError.textContent = "合同生效；贷款开始计时。";
+  dom.projectConfirmButton.disabled = true;
+  dom.projectConfirmButton.querySelector("strong").textContent = "已确认";
+  dom.contractError.textContent = "";
   SpawnParticles(6, 3.7, 0xff445f, 48);
   PlayTone("release");
-  window.setTimeout(() => ShowGoalReveal(result.state), 1050);
-}
-
-function BeginSealHold(event) {
-  if (sealHoldComplete || onboardingPhase !== "contract") return;
-  if (event.type === "pointerdown" && event.button !== 0) return;
-  event.preventDefault();
-  const projectName = dom.gameNameInput.value.trim();
-  if (projectName.length < 2) {
-    dom.contractError.textContent = "请先填写游戏名。";
-    dom.gameNameInput.focus();
-    PlayTone("warning");
-    return;
-  }
-  dom.contractError.textContent = "按住 1 秒。";
-  sealKeyboardMode = event.type === "keydown";
-  dom.sealButton.classList.add("holding");
-  window.clearTimeout(sealHoldTimer);
-  sealHoldTimer = window.setTimeout(CompleteContractSigning, 1050);
+  window.setTimeout(() => ShowGoalReveal(result.state), 250);
 }
 
 function ResetOnboarding() {
@@ -3499,8 +3458,7 @@ function ResetOnboarding() {
   onboardingPhase = "intro";
   ceremonyElapsed = 0;
   ceremonyBurstStep = -1;
-  sealHoldComplete = false;
-  CancelSealHold();
+  projectSetupComplete = false;
   draftStudioName = "";
   draftFounderSkills = { ...DEFAULT_FOUNDER_SKILLS };
   landingOpen = true;
@@ -3512,16 +3470,14 @@ function ResetOnboarding() {
   dom.foundingNamePanel.classList.add("hidden");
   dom.founderProfilePanel.classList.add("hidden");
   dom.projectContract.classList.add("hidden");
-  dom.projectContract.classList.remove("signed");
   dom.skipCeremonyButton.classList.add("hidden");
   dom.ceremonyCaption.classList.add("hidden");
   dom.studioNameInput.value = "";
   dom.gameNameInput.value = "";
   dom.setupError.textContent = "";
   dom.contractError.textContent = "";
-  dom.sealButton.classList.remove("holding", "sealed");
-  dom.sealButton.querySelector("span").textContent = "按住 1 秒";
-  dom.sealButton.querySelector("strong").textContent = "确认开局";
+  dom.projectConfirmButton.disabled = false;
+  dom.projectConfirmButton.querySelector("strong").textContent = "开始开发";
   RenderFounderSkills();
   RenderSetupChoices();
 }
@@ -3591,7 +3547,7 @@ function BindHoldButton(button, key) {
 
 function BindControls() {
   window.addEventListener("resize", ResizeScene);
-  window.addEventListener("blur", () => { ResetTouchControls(); CancelSealHold(); });
+  window.addEventListener("blur", ResetTouchControls);
   window.addEventListener("keydown", (event) => {
     const activeElement = document.activeElement;
     if (["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName) || activeElement?.isContentEditable) return;
@@ -3682,24 +3638,13 @@ function BindControls() {
   });
   dom.founderConfirmButton.addEventListener("click", ConfirmFounderProfile);
   dom.gameNameInput.addEventListener("input", () => { dom.contractError.textContent = ""; });
-  dom.sealButton.addEventListener("pointerdown", BeginSealHold);
-  dom.sealButton.addEventListener("pointerup", CancelSealHold);
-  dom.sealButton.addEventListener("pointercancel", CancelSealHold);
-  dom.sealButton.addEventListener("pointerleave", (event) => { if (event.buttons === 0) CancelSealHold(); });
-  dom.sealButton.addEventListener("contextmenu", (event) => event.preventDefault());
-  dom.sealButton.addEventListener("keydown", (event) => {
-    if (!["Enter", " "].includes(event.key) || event.repeat) return;
-    BeginSealHold(event);
+  dom.gameNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      ConfirmProjectSetup();
+    }
   });
-  dom.sealButton.addEventListener("keyup", (event) => {
-    if (!["Enter", " "].includes(event.key)) return;
-    if (sealKeyboardMode) {
-      window.clearTimeout(sealHoldTimer);
-      sealHoldTimer = null;
-      sealKeyboardMode = false;
-      CompleteContractSigning();
-    } else CancelSealHold();
-  });
+  dom.projectConfirmButton.addEventListener("click", ConfirmProjectSetup);
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
   dom.goalRevealButton.addEventListener("click", CompleteGoalReveal);
   dom.restartButton.addEventListener("click", () => {
