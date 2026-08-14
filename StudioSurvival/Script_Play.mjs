@@ -2,9 +2,11 @@ import * as THREE from "three";
 import {
   AI_SUBSCRIPTION_LEVELS,
   COLLATERAL_OPTIONS,
+  CONSUMER_VENUES,
   DIRECTIVES,
   FEATURE_CHOICES,
   FindCollateral,
+  FindConsumerVenue,
   FindDirective,
   FindFoodPlan,
   FindGameType,
@@ -21,7 +23,7 @@ import {
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815h";
+} from "./Data_Game.mjs?v=20260815i";
 import {
   AdvanceMonth,
   BuyMarketingCampaign,
@@ -37,6 +39,7 @@ import {
   ForecastMonthlyCosts,
   ForecastPivotCost,
   GetAnxietyState,
+  GetConsumerVenueAccess,
   GetFounderSkillEffect,
   GetIdleLine,
   GetMemberMonthlyCost,
@@ -61,8 +64,9 @@ import {
   TakeLoan,
   TalkToStaff,
   ValidateState,
+  VisitRelaxationVenue,
   WORKSTATION_COSTS,
-} from "./Script_Rules.mjs?v=20260815i";
+} from "./Script_Rules.mjs?v=20260815j";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -72,13 +76,13 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs";
+} from "./Data_World.mjs?v=20260815j";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
-} from "./Script_World.mjs";
+} from "./Script_World.mjs?v=20260815j";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -137,6 +141,8 @@ function LoadSavedState() {
     const candidate = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (!ValidateState(candidate)) return null;
     candidate.founderSkills = NormalizeFounderSkills(candidate.founderSkills);
+    candidate.lastRelaxationMonth ??= 0;
+    candidate.relaxationHistory ??= [];
     return candidate;
   } catch {
     return null;
@@ -307,6 +313,9 @@ const sceneToneByLocation = new Map([
   ["talent", new THREE.Color(0x09131f)],
   ["bank", new THREE.Color(0x130d19)],
   ["hotel", new THREE.Color(0x17110d)],
+  ["footbath", new THREE.Color(0x0c1a1b)],
+  ["footbathCity", new THREE.Color(0x151020)],
+  ["maleModelClub", new THREE.Color(0x1d0d18)],
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 
@@ -682,6 +691,9 @@ const FacilityLooks = {
   talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
   bank: ["银行", "启动贷 M08 到期", 0xff6eae],
   hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
+  regularFootbath: ["普通足浴店", "焦虑 -8 · 本月限一次", 0x72e0d1],
+  footbathCity: ["洗脚城", "焦虑 -20 · 验资开放", 0xc69cff],
+  maleModelClub: ["男模店", "焦虑 -36 · 百万验资", 0xff86c8],
 };
 
 function GetFacilityKind(interaction) {
@@ -749,6 +761,33 @@ function BuildFacility(interaction) {
       group.add(row);
     }
     group.add(shelf);
+  } else if (["regularFootbath", "footbathCity", "maleModelClub"].includes(kind)) {
+    const premium = kind !== "regularFootbath";
+    const chair = Box(1.55, 1.22, .12, premium ? 0x3b334c : 0x234347, { castShadow: false });
+    chair.position.set(-.38, 1.15, -.02);
+    chair.rotation.z = -.08;
+    const cushion = Box(1.25, .36, .08, premium ? 0x5b486e : 0x346065, { castShadow: false });
+    cushion.position.set(-.25, .62, .04);
+    const basin = Cylinder(.62, .48, .38, premium ? 0x755a88 : 0x4d7779, 24);
+    basin.position.set(.72, .32, .04);
+    const water = Cylinder(.5, .5, .035, color, 24);
+    water.position.set(.72, .53, .05);
+    group.add(chair, cushion, basin, water);
+    [0, 1, 2].forEach((steamIndex) => {
+      const steam = new THREE.Mesh(
+        new THREE.RingGeometry(.09 + steamIndex * .025, .12 + steamIndex * .025, 18, 1, 0, Math.PI * 1.45),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .28, side: THREE.DoubleSide, toneMapped: false }),
+      );
+      steam.position.set(.45 + steamIndex * .25, .9 + steamIndex * .08, .12);
+      steam.rotation.z = steamIndex % 2 ? .42 : -.28;
+      group.add(steam);
+    });
+    if (kind === "maleModelClub") {
+      const host = BuildFlatHumanActor(0xff86c8, false);
+      host.scale.setScalar(.62);
+      host.position.set(-.98, .55, -.04);
+      group.add(host);
+    }
   } else {
     const counter = Box(2.4, 1.05, .12, kind === "hotel" ? 0x6b4d32 : 0x4b3a2e, { castShadow: false });
     counter.position.y = .53;
@@ -929,6 +968,36 @@ function BuildLocationEnvironment(location, index) {
       AddScenePanel(group, .025, .5, center + offset, 4.25, 0x695b47, { z: -.03 });
       AddSceneDisc(group, .075, center + offset, 3.98, accent, { z: -.02, opacity: .86, segments: 12 });
     });
+  } else if (["footbath", "footbathCity", "maleModelClub"].includes(location.id)) {
+    const isCity = location.id === "footbathCity";
+    const isLuxury = location.id === "maleModelClub";
+    const wallColor = isLuxury ? 0x2d1828 : isCity ? 0x211a30 : 0x12282a;
+    AddScenePanel(group, 9.1, 4.15, center, 3.08, wallColor, { z: -.18 });
+    for (let tile = 0; tile < 15; tile += 1) {
+      AddScenePanel(group, .025, 3.65, start + .55 + tile * .63, 2.86, paleAccent, { z: -.11, opacity: .08 + (tile % 3) * .025 });
+    }
+    [center - 2.45, center, center + 2.45].forEach((seatX, seatIndex) => {
+      AddScenePanel(group, 1.45, 1.12, seatX, 2.15, seatIndex === 1 ? deepAccent : wallColor, { z: -.08, rotation: seatIndex === 1 ? 0 : (seatIndex - 1) * .025 });
+      AddScenePanel(group, 1.12, .28, seatX, 1.52, accent, { z: -.05, opacity: .24 });
+      AddSceneDisc(group, .42, seatX + .55, .83, accent, { z: -.04, opacity: .16, scaleY: .42, segments: 24 });
+      [0, 1].forEach((steamIndex) => AddSceneRing(group, .09, .12, seatX + .42 + steamIndex * .24, 1.18 + steamIndex * .19, paleAccent, { z: -.03, opacity: .28, segments: 16 }));
+    });
+    const lampCount = isLuxury ? 7 : isCity ? 5 : 3;
+    for (let lampIndex = 0; lampIndex < lampCount; lampIndex += 1) {
+      const lampX = start + 1.15 + lampIndex * (7.7 / Math.max(1, lampCount - 1));
+      AddScenePanel(group, .035, .72, lampX, 5.0, accent, { z: -.04, opacity: .42 });
+      AddSceneDisc(group, .115, lampX, 4.62, accent, { z: -.02, opacity: .78, segments: 16 });
+    }
+    if (isLuxury) {
+      AddSceneRing(group, 1.15, 1.27, center, 3.55, accent, { z: -.035, opacity: .5, segments: 36 });
+      [-.55, 0, .55].forEach((offset, silhouetteIndex) => {
+        AddSceneDisc(group, .2, center + offset, 3.82 - Math.abs(offset) * .12, paleAccent, { z: -.02, opacity: .38, segments: 20 });
+        AddScenePanel(group, .34, .78, center + offset, 3.22, silhouetteIndex === 1 ? accent : paleAccent, { z: -.025, opacity: .24 });
+      });
+    } else if (isCity) {
+      AddScenePanel(group, 4.6, .34, center, 4.25, accent, { z: -.04, opacity: .16 });
+      AddScenePanel(group, 3.8, .055, center, 4.25, paleAccent, { z: -.02, opacity: .58 });
+    }
   }
 
   locationVisuals.set(location.id, { group, halo, ceilingBar, accent: new THREE.Color(accent), phase: index * 1.37 });
@@ -1410,6 +1479,24 @@ function ResizeScene() {
   camera.updateProjectionMatrix();
 }
 
+function ConsumerVenueForInteraction(interaction) {
+  return interaction?.consumerVenueId ? FindConsumerVenue(interaction.consumerVenueId) : null;
+}
+
+function ConsumerVenuePrompt(interaction) {
+  const venue = ConsumerVenueForInteraction(interaction);
+  if (!venue) return { interaction, venue: null, access: null };
+  const access = GetConsumerVenueAccess(state, venue.id);
+  const admission = access.ok
+    ? `验资 ${FormatMoney(access.minimumCash)} · 已达标`
+    : `🔒 验资 ${FormatMoney(access.minimumCash)} · 还差 ${FormatMoney(access.shortfall)}`;
+  return {
+    interaction: { ...interaction, detail: `${interaction.detail || venue.description} · ${admission}` },
+    venue,
+    access,
+  };
+}
+
 function UpdateInteractionPrompt() {
   const baseInteraction = NearestInteraction(worldState);
   let nearest = baseInteraction;
@@ -1424,7 +1511,8 @@ function UpdateInteractionPrompt() {
   });
   activeInteraction = nearest;
   const interactionAvailable = Boolean(nearest) && !IsOverlayOpen();
-  UpdateMobileControlState(interactionAvailable, nearest);
+  const prompt = ConsumerVenuePrompt(nearest);
+  UpdateMobileControlState(interactionAvailable, prompt.interaction);
   if (!interactionAvailable) {
     dom.interactionPrompt.classList.add("hidden");
     facilityVisuals.forEach((visual) => { visual.userData.marker.material.opacity = .25; });
@@ -1432,8 +1520,8 @@ function UpdateInteractionPrompt() {
   }
   const nearestKind = nearest.kind === "staff" ? "staff" : GetFacilityKind(nearest);
   const look = FacilityLooks[nearestKind] || [nearest.label || "交互", nearest.detail || "按 E", 0x9d8cff];
-  dom.interactionTitle.textContent = nearest.label || look[0];
-  dom.interactionDetail.textContent = nearest.detail || look[1];
+  dom.interactionTitle.textContent = `${prompt.access && !prompt.access.ok ? "🔒 " : ""}${nearest.label || look[0]}`;
+  dom.interactionDetail.textContent = prompt.interaction?.detail || look[1];
   dom.interactionPrompt.classList.remove("hidden");
   facilityVisuals.forEach((visual, id) => { visual.userData.marker.material.opacity = id === nearest.id ? .9 : .25; });
 }
@@ -1751,6 +1839,47 @@ function OpenFoodSheet(planId, placeName) {
       const button = event.target.closest("[data-food-id]");
       if (!button) return;
       if (ApplyInteractiveResult(SelectFoodPlan(state, button.dataset.foodId))) OpenFoodSheet(planId, placeName);
+    };
+  });
+}
+
+function OpenRelaxationSheet(venueId) {
+  const venue = FindConsumerVenue(venueId);
+  if (!venue || venue.category !== "relaxation") return;
+  const access = GetConsumerVenueAccess(state, venue.id);
+  const usedThisMonth = state.lastRelaxationMonth === state.month;
+  const ladder = CONSUMER_VENUES.filter((candidate) => candidate.category === "relaxation");
+  const actionLabel = usedThisMonth
+    ? "本月已经放松过"
+    : !access.ok
+      ? `还差 ${FormatMoney(access.shortfall)}`
+      : state.cash < venue.cost
+        ? "付不起本次消费"
+        : `消费 ${FormatMoney(venue.cost)}`;
+  OpenPanel("ANXIETY RELIEF", `${venue.name}：把项目群静音一会儿`, `
+    <div class="resultHero"><b>−${venue.anxietyRelief}</b><p>${EscapeHtml(venue.description)}<br>当前焦虑 ${Math.round(state.anxiety)} / 100；效果不会让焦虑低于 0。</p></div>
+    <div class="metricGrid">
+      <div class="metricTile"><span>准入资金</span><strong>${FormatMoney(venue.minimumCash)}</strong></div>
+      <div class="metricTile"><span>本次消费</span><strong>${FormatMoney(venue.cost)}</strong></div>
+      <div class="metricTile"><span>焦虑缓解</span><strong>−${venue.anxietyRelief}</strong></div>
+    </div>
+    <div class="panelSection"><h3>足浴解压线</h3><div class="worldGrid three">${ladder.map((candidate) => {
+      const candidateAccess = GetConsumerVenueAccess(state, candidate.id);
+      return `<div class="worldChoice ${candidate.id === venue.id ? "selected" : ""} ${candidateAccess.ok ? "" : "locked"}">
+        <div class="choiceTop"><strong>${candidateAccess.ok ? "✓" : "🔒"} ${EscapeHtml(candidate.name)}</strong><span>${FormatMoney(candidate.minimumCash)} 准入</span></div>
+        <p>${EscapeHtml(candidate.description)}</p>
+        <div class="choiceFooter"><span>${FormatMoney(candidate.cost)} / 次</span><b>焦虑 −${candidate.anxietyRelief}</b></div>
+      </div>`;
+    }).join("")}</div></div>
+    <div class="panelSection choiceFooter"><span>每月只能安排一次解压消费；验资门槛本身不扣钱。</span><button class="primaryButton" data-relax-venue="${venue.id}" type="button" ${usedThisMonth || !access.ok || state.cash < venue.cost ? "disabled" : ""}>${actionLabel}</button></div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      const button = event.target.closest("[data-relax-venue]");
+      if (!button) return;
+      const result = VisitRelaxationVenue(state, button.dataset.relaxVenue);
+      if (!ApplyInteractiveResult(result, { toast: false, tone: "good" })) return;
+      ShowResult("ANXIETY RELIEF", `${venue.name}：脑子终于不响了`, `
+        <div class="resultHero"><b>${Math.round(result.anxietyBefore)} → ${Math.round(result.anxietyAfter)}</b><p>现金 −${FormatMoney(result.cost)}，焦虑 −${result.relieved}。<br>项目没有自动变好，但你暂时又能看清屏幕上的字。</p></div>
+        <div class="note good">${EscapeHtml(result.message)}</div>`);
     };
   });
 }
@@ -2721,13 +2850,14 @@ function OpenMonthSheet() {
 }
 
 function OpenHelpSheet() {
-  OpenPanel("HOW TO SUFFER", "六个 2D 场景：你得亲自跑过去", `
-    <div class="resultHero"><b>A/D</b><p>左右穿过自己的家、小菜馆、小超市、人才市场、银行和大酒店；W、↑ 或空格跳；靠近柜台按 E。移动端横屏使用底部按钮。</p></div>
+  OpenPanel("HOW TO SUFFER", "九个 2D 场景：你得亲自跑过去", `
+    <div class="resultHero"><b>A/D</b><p>左右穿过家、菜馆、超市、人才市场、银行、酒店和三档足浴场所；W、↑ 或空格跳；靠近柜台按 E。移动端横屏使用底部按钮。</p></div>
     <div class="noteList">
       <div class="note">家里只有老板自己的电脑。开发、聊天、宣发、发布和月结都在电脑上完成。</div>
       <div class="note good">顶部手机会播报持续风向、每月随机事件和下月传闻。每月可用 1 次沟通拍板“主打特色 + 迎合方向”；两项同时命中才吃风口，错时硬蹭会退款、掉粉并被群嘲。</div>
       <div class="note danger">第一次招聘前必须先在人才市场设备柜台买第一套工位；以后每增加一人都要再有一套空设备。</div>
-      <div class="note">冰箱是剩饭，小菜馆是充饥套餐，小超市卖小吃和彩票，大酒店才有能提升产出的大餐。</div>
+      <div class="note">冰箱是永远可用的生存保底。小菜馆、小超市和大酒店都要先看当前现金是否达到门口写明的准入门槛；门槛不扣钱，饭钱仍在月结时支付。</div>
+      <div class="note good">普通足浴店准入 ¥50,000，开局就能去；现金达到 ¥300,000 解锁洗脚城，达到 ¥1,000,000 解锁男模店。每月可消费一次，档次越高，缓解焦虑越多。</div>
       <div class="note danger">启动资金 ¥68,000 全部来自身家担保贷款，M08 前要还 ¥82,000；到期未清直接倒闭。</div>
       <div class="note good">开局分配的策划、程序、美术能力会持续影响老板的月基础产出；程序同时覆盖客户端与性能。亲自开发时，能力越高，进度越多、Bug 与债务越少。</div>
       <div class="note good">唯一胜利仍是累计游戏收入达到 100 亿元。贷款、彩票和炒股发财都不算。</div>
@@ -2776,12 +2906,24 @@ function TriggerInteraction() {
   actionCooldown = .28;
   PlayTone("tap");
   if (activeInteraction.kind === "staff") return OpenStaffSheet(activeInteraction.staffId);
+  const consumerVenue = ConsumerVenueForInteraction(activeInteraction);
+  if (consumerVenue) {
+    const access = GetConsumerVenueAccess(state, consumerVenue.id);
+    if (!access.ok) {
+      ShowToast(`${consumerVenue.name}准入 ${FormatMoney(access.minimumCash)}，还差 ${FormatMoney(access.shortfall)}。`, "warning");
+      PlayTone("warning");
+      return;
+    }
+  }
   switch (activeInteraction.kind) {
     case "homeComputer": return OpenHomeComputerSheet();
     case "homeFridge": return OpenFoodSheet("leftovers", "自己家的冰箱");
     case "diner": return OpenFoodSheet("sustenance", "小菜馆：便宜充饥套餐");
     case "snackShelf": return OpenFoodSheet("snack", "小超市：买点小吃顶一顶");
     case "hotel": return OpenFoodSheet("feast", "大酒店：吃顿像人的饭");
+    case "regularFootbath": return OpenRelaxationSheet("regularFootbath");
+    case "footbathCity": return OpenRelaxationSheet("footbathCity");
+    case "maleModelClub": return OpenRelaxationSheet("maleModelClub");
     case "bank": return OpenBankSheet();
     case "lotteryMachine": return OpenSpeculationSheet();
     case "equipmentShop": return OpenEquipmentSheet();

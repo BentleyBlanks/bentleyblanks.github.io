@@ -13,6 +13,7 @@ import {
   FOUNDER_SKILL_POINTS,
   ForecastMonthlyCosts,
   ForecastPivotCost,
+  GetConsumerVenueAccess,
   GetMemberMonthlyCost,
   GetMarketSnapshot,
   GetAnxietyState,
@@ -37,9 +38,11 @@ import {
   STARTUP_LOAN_TERMS,
   WORKSTATION_COSTS,
   ValidateState,
+  VisitRelaxationVenue,
 } from "./Script_Rules.mjs";
 import {
   AI_SUBSCRIPTION_LEVELS,
+  CONSUMER_VENUES,
   FEATURE_CHOICES,
   GAME_TYPES,
   LIVE_REVENUE_EVENTS,
@@ -727,6 +730,65 @@ function HasRecordedId(collection, id) {
 }
 
 {
+  const relaxationVenues = CONSUMER_VENUES.filter((venue) => venue.category === "relaxation");
+  assert.deepEqual(
+    relaxationVenues.map((venue) => venue.id),
+    ["regularFootbath", "footbathCity", "maleModelClub"],
+    "the relaxation ladder must progress from ordinary footbath to footbath city to male-model club",
+  );
+  assert.deepEqual(
+    relaxationVenues.map((venue) => venue.minimumCash),
+    [50_000, 300_000, 1_000_000],
+    "each relaxation tier must expose a materially higher cash-admission threshold",
+  );
+
+  let state = Begin();
+  state.anxiety = 61;
+  assert.equal(GetConsumerVenueAccess(state, "regularFootbath").ok, true, "startup cash must unlock the ordinary footbath");
+  assert.equal(GetConsumerVenueAccess(state, "footbathCity").ok, false, "startup cash must not unlock footbath city");
+  assert.equal(GetConsumerVenueAccess(state, "maleModelClub").ok, false, "startup cash must not unlock the male-model club");
+
+  const regularVisit = VisitRelaxationVenue(state, "regularFootbath");
+  assert.equal(regularVisit.ok, true);
+  assert.equal(regularVisit.state.cash, 66_800, "ordinary footbath spending must leave the cash ledger honestly reduced");
+  assert.equal(regularVisit.state.anxiety, 53, "ordinary footbath must relieve eight anxiety");
+  assert.equal(regularVisit.state.totalCosts, state.totalCosts + 1_200, "relaxation spending must enter total costs");
+  assert.equal(regularVisit.state.relaxationHistory.at(-1)?.venueId, "regularFootbath");
+  assert.equal(VisitRelaxationVenue(regularVisit.state, "regularFootbath").ok, false, "only one relaxation purchase is allowed per month");
+
+  const cityState = Begin();
+  cityState.cash = 300_000;
+  cityState.anxiety = 70;
+  const cityVisit = VisitRelaxationVenue(cityState, "footbathCity");
+  assert.equal(cityVisit.ok, true);
+  assert.equal(cityVisit.state.anxiety, 50, "footbath city must provide the middle relief tier");
+
+  const luxuryState = Begin();
+  luxuryState.cash = 1_000_000;
+  luxuryState.anxiety = 70;
+  const luxuryVisit = VisitRelaxationVenue(luxuryState, "maleModelClub");
+  assert.equal(luxuryVisit.ok, true);
+  assert.equal(luxuryVisit.state.anxiety, 34, "the top-tier venue must provide the strongest relief");
+}
+
+{
+  const state = Begin();
+  assert.equal(GetConsumerVenueAccess(state, "marketSnack").ok, true);
+  assert.equal(GetConsumerVenueAccess(state, "dinerMeal").ok, true);
+  assert.equal(GetConsumerVenueAccess(state, "hotelMeal").ok, false, "startup cash must not pass the hotel admission threshold");
+  const lockedHotel = SelectFoodPlan(state, "feast");
+  assert.equal(lockedHotel.ok, false, "food-plan rules must enforce venue admission even when called outside the world UI");
+  assert.equal(lockedHotel.access.shortfall, 52_000);
+  state.cash = 120_000;
+  assert.equal(SelectFoodPlan(state, "feast").ok, true, "hotel dining must unlock exactly at its published threshold");
+
+  const oldSave = structuredClone(state);
+  delete oldSave.lastRelaxationMonth;
+  delete oldSave.relaxationHistory;
+  assert.equal(ValidateState(oldSave), true, "pre-relaxation v9 saves must remain valid for UI normalization");
+}
+
+{
   const feastState = Begin();
   const sustenanceState = Begin();
   feastState.cash = 1_000_000;
@@ -952,4 +1014,4 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, speculation, market phone fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");

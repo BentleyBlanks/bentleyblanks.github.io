@@ -8,6 +8,7 @@ import {
   Platforms,
   WorldConfig,
 } from "./Data_World.mjs";
+import { CONSUMER_VENUES, FindConsumerVenue } from "./Data_Game.mjs";
 import {
   CreateWorldState,
   NearestInteraction,
@@ -17,8 +18,8 @@ import {
 
 const Tick = (state, input, delta) => TickWorld(state, input, delta);
 
-assert.equal(WorldConfig.width, 60, "the six-location city should span sixty world units");
-assert.deepEqual(Locations.map((location) => location.id), ["home", "diner", "market", "talent", "bank", "hotel"]);
+assert.equal(WorldConfig.width, 90, "the nine-location city should span ninety world units");
+assert.deepEqual(Locations.map((location) => location.id), ["home", "diner", "market", "talent", "bank", "hotel", "footbath", "footbathCity", "maleModelClub"]);
 assert.equal(Platforms.length, 0, "the flat 2D city must not contain collectible platforms");
 assert.equal(Collectibles.length, 0, "the 2D city must not use development fragments");
 assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving hazards");
@@ -33,8 +34,20 @@ const requiredInteractionIds = [
   "talentCounter",
   "bankCounter",
   "hotelRestaurant",
+  "regularFootbathCounter",
+  "footbathCityCounter",
+  "maleModelCounter",
 ];
-assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "only interactions inside the six requested places should exist");
+assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "all interactions inside the nine places should exist in route order");
+
+const consumerInteractions = InteractionPoints.filter((point) => point.consumerVenueId);
+assert.equal(consumerInteractions.length, CONSUMER_VENUES.length, "every personal-consumption venue needs one world interaction");
+for (const interaction of consumerInteractions) {
+  const venue = FindConsumerVenue(interaction.consumerVenueId);
+  assert(venue, `${interaction.id} must reference a registered consumer venue`);
+  assert.equal(venue.interactionId, interaction.id, `${venue.name} must point back to its world interaction`);
+  assert(venue.minimumCash > 0, `${venue.name} must publish a positive cash-admission threshold`);
+}
 
 for (const location of Locations) {
   const probeX = (location.startX + location.endX) / 2;

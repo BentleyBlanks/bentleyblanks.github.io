@@ -206,7 +206,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .modulePip span { font-size: 8px; color: var(--muted); }
 .modulePip div { height: 3px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
 .modulePip i { display: block; height: 100%; border-radius: inherit; }
-.locationRoute { display: grid; grid-template-columns: repeat(6,1fr); gap: 3px; margin-top: 6px; }
+.locationRoute { display: grid; grid-template-columns: repeat(9,1fr); gap: 3px; margin-top: 6px; }
 .locationRoute i { height: 3px; border-radius: 99px; background: rgba(255,255,255,.12); }
 .locationRoute i.active { background: var(--cyan); box-shadow: 0 0 8px rgba(101,216,255,.65); }
 .debtStat strong { color: #ff9aa2; font-size: 11px; }
@@ -488,6 +488,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 button.worldChoice, button.featureCard { text-align: left; cursor: pointer; }
 button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.055); }
 .worldChoice.selected { border-color: var(--green); box-shadow: inset 0 0 0 1px rgba(104,224,160,.25); }
+.worldChoice.locked { opacity: .56; border-style: dashed; filter: saturate(.58); }
 .worldChoice.danger { border-color: rgba(255,98,110,.38); }
 .worldChoice:disabled, .primaryButton:disabled { opacity: .38; cursor: not-allowed; }
 .choiceTop, .staffTop { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }

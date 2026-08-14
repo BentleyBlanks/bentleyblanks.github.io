@@ -729,6 +729,71 @@ export const FOOD_PLANS = [
   },
 ];
 
+/**
+ * Personal-consumption venues use a cash-on-hand admission threshold before
+ * the player can open their interaction. The threshold is not an entry fee:
+ * food is still paid at month end, while relaxation is paid immediately.
+ */
+export const CONSUMER_VENUES = [
+  {
+    id: "marketSnack",
+    interactionId: "snackShelf",
+    category: "food",
+    name: "小超市零食架",
+    minimumCash: 1000,
+    foodPlanId: "snack",
+    description: "兜里至少有一点现金，收银台才愿意让你继续把泡面当营养学。",
+  },
+  {
+    id: "dinerMeal",
+    interactionId: "dinerCounter",
+    category: "food",
+    name: "小菜馆",
+    minimumCash: 10000,
+    foodPlanId: "sustenance",
+    description: "先验资再点单。门槛不扣钱，套餐仍在月结时支付。",
+  },
+  {
+    id: "hotelMeal",
+    interactionId: "hotelRestaurant",
+    category: "food",
+    name: "大酒店餐厅",
+    minimumCash: 120000,
+    foodPlanId: "feast",
+    description: "现金达到六位数，门童才相信你不是来借充电器的。",
+  },
+  {
+    id: "regularFootbath",
+    interactionId: "regularFootbathCounter",
+    category: "relaxation",
+    name: "普通足浴店",
+    minimumCash: 50000,
+    cost: 1200,
+    anxietyRelief: 8,
+    description: "热水、药包和四十分钟没人催版本。足浴线开局只够进这一家。",
+  },
+  {
+    id: "footbathCity",
+    interactionId: "footbathCityCounter",
+    category: "relaxation",
+    name: "洗脚城",
+    minimumCash: 300000,
+    cost: 8800,
+    anxietyRelief: 20,
+    description: "包间、果盘和整套放空流程。现金宽裕后才会亮起欢迎灯。",
+  },
+  {
+    id: "maleModelClub",
+    interactionId: "maleModelCounter",
+    category: "relaxation",
+    name: "男模店",
+    minimumCash: 1000000,
+    cost: 38000,
+    anxietyRelief: 36,
+    description: "昂贵的灯牌、仪式感和情绪价值；今晚项目群暂时不配拥有你。",
+  },
+];
+
 export const MARKETING_CAMPAIGNS = [
   {
     id: "midnightDevlog",
@@ -1102,6 +1167,10 @@ export function FindCollateral(collateralId) {
 
 export function FindFoodPlan(foodPlanId) {
   return FOOD_PLANS.find((foodPlan) => foodPlan.id === foodPlanId);
+}
+
+export function FindConsumerVenue(venueId) {
+  return CONSUMER_VENUES.find((venue) => venue.id === venueId);
 }
 
 export function FindMarketingCampaign(campaignId) {

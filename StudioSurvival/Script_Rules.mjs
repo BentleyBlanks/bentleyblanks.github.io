@@ -2,9 +2,11 @@ import {
   ABSTRACT_IDEAS,
   AI_SUBSCRIPTION_LEVELS,
   COLLATERAL_OPTIONS,
+  CONSUMER_VENUES,
   DIRECTIVES,
   FEATURE_CHOICES,
   FindCollateral,
+  FindConsumerVenue,
   FindDirective,
   FindFeatureChoice,
   FindFoodPlan,
@@ -27,7 +29,7 @@ import {
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815h";
+} from "./Data_Game.mjs?v=20260815i";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -501,6 +503,8 @@ export function CreateInitialState() {
     lastSpeculationMonth: 0,
     speculationProfit: 0,
     speculationHistory: [],
+    lastRelaxationMonth: 0,
+    relaxationHistory: [],
   };
 }
 
@@ -1802,8 +1806,79 @@ export function SelectFoodPlan(currentState, foodPlanId) {
   const state = Clone(currentState);
   const foodPlan = FindFoodPlan(foodPlanId);
   if (!foodPlan) return { state, ok: false, message: "这份饭不存在，可能已被实习生吃了。" };
+  const venue = CONSUMER_VENUES.find((candidate) => candidate.foodPlanId === foodPlanId);
+  if (venue) {
+    const access = GetConsumerVenueAccess(state, venue.id);
+    if (!access.ok) {
+      return {
+        state,
+        ok: false,
+        access,
+        message: `${venue.name}要先验资 ¥${venue.minimumCash.toLocaleString("zh-CN")}，还差 ¥${access.shortfall.toLocaleString("zh-CN")}。`,
+      };
+    }
+  }
   state.foodPlan = foodPlanId;
   return { state, ok: true, message: `本月吃法：${foodPlan.name}` };
+}
+
+export function GetConsumerVenueAccess(currentState, venueId) {
+  const venue = FindConsumerVenue(venueId);
+  if (!venue) return { ok: false, venue: null, cash: Number(currentState?.cash) || 0, minimumCash: 0, shortfall: 0 };
+  const cash = Math.max(0, Number(currentState?.cash) || 0);
+  const minimumCash = Math.max(0, Number(venue.minimumCash) || 0);
+  return {
+    ok: cash >= minimumCash,
+    venue,
+    cash,
+    minimumCash,
+    shortfall: Math.max(0, minimumCash - cash),
+  };
+}
+
+export function VisitRelaxationVenue(currentState, venueId) {
+  const state = Clone(currentState);
+  const venue = FindConsumerVenue(venueId);
+  if (state.status !== "playing") return { state, ok: false, message: "本局已经结束，前台只接受活着的老板。" };
+  if (!venue || venue.category !== "relaxation") return { state, ok: false, message: "这家店没有登记解压服务。" };
+  const access = GetConsumerVenueAccess(state, venueId);
+  if (!access.ok) {
+    return {
+      state,
+      ok: false,
+      access,
+      message: `${venue.name}准入资金 ¥${venue.minimumCash.toLocaleString("zh-CN")}，还差 ¥${access.shortfall.toLocaleString("zh-CN")}。`,
+    };
+  }
+  if (state.lastRelaxationMonth === state.month) return { state, ok: false, message: "本月已经放松过一次。再泡下去，项目会先泡发。" };
+  if (state.cash < venue.cost) return { state, ok: false, message: `${venue.name}本次要 ¥${venue.cost.toLocaleString("zh-CN")}，现金不够。` };
+
+  const anxietyBefore = state.anxiety;
+  state.cash -= venue.cost;
+  state.totalCosts += venue.cost;
+  state.anxiety = Clamp(state.anxiety - venue.anxietyRelief, 0, 100);
+  state.lastRelaxationMonth = state.month;
+  state.relaxationHistory ||= [];
+  state.relaxationHistory.push({
+    month: state.month,
+    venueId,
+    cost: venue.cost,
+    anxietyBefore,
+    anxietyAfter: state.anxiety,
+  });
+  state.relaxationHistory = state.relaxationHistory.slice(-12);
+  const relieved = Math.round(anxietyBefore - state.anxiety);
+  PushLog(state, `${venue.name}消费 ¥${venue.cost.toLocaleString("zh-CN")}，焦虑 -${relieved}。项目群被静音了一会儿。`, "good");
+  return {
+    state,
+    ok: true,
+    venue,
+    cost: venue.cost,
+    anxietyBefore,
+    anxietyAfter: state.anxiety,
+    relieved,
+    message: `${venue.name}：焦虑 -${relieved}`,
+  };
 }
 
 export function Speculate(currentState, optionId) {
@@ -2139,6 +2214,7 @@ export function GetPublicCatalog() {
     gameTypes: GAME_TYPES,
     bills: LIVING_BILLS,
     foodPlans: FOOD_PLANS,
+    consumerVenues: CONSUMER_VENUES,
     marketingCampaigns: MARKETING_CAMPAIGNS,
     featureChoices: FEATURE_CHOICES,
     marketDirections: MARKET_DIRECTIONS,
@@ -2171,6 +2247,16 @@ export function ValidateState(candidate) {
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)
     || !Array.isArray(candidate.incomeHistory) || !Array.isArray(candidate.speculationHistory)) return false;
+  if (candidate.lastRelaxationMonth !== undefined
+    && (!Number.isInteger(candidate.lastRelaxationMonth) || candidate.lastRelaxationMonth < 0 || candidate.lastRelaxationMonth > candidate.month)) return false;
+  if (candidate.relaxationHistory !== undefined) {
+    if (!Array.isArray(candidate.relaxationHistory) || candidate.relaxationHistory.some((entry) => (
+      !FindConsumerVenue(entry?.venueId)
+      || ![entry.month, entry.cost, entry.anxietyBefore, entry.anxietyAfter].every(Number.isFinite)
+      || entry.month < 1 || entry.month > candidate.month || entry.cost < 0
+      || entry.anxietyBefore < 0 || entry.anxietyBefore > 100 || entry.anxietyAfter < 0 || entry.anxietyAfter > 100
+    ))) return false;
+  }
   if (!Number.isInteger(candidate.workstations) || candidate.workstations < 0 || candidate.workstations > WORKSTATION_COSTS.length
     || !Number.isFinite(candidate.equipmentSpent) || candidate.equipmentSpent < 0) return false;
   const startupLoan = candidate.startupLoan;
