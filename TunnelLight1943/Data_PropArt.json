@@ -322,25 +322,6 @@
       "note": "邻家院墙+柴门：把村街的后沿围起来。building 带，跟房子同深，纯背景不挡人",
       "shadow": 0.3
     },
-    "yardWallEnd": {
-      "art": "DrawYardWallEnd",
-      "band": "yard",
-      "ss": "prop",
-      "sprite": {
-        "w": {
-          "pad": 46,
-          "per": "w"
-        },
-        "h": {
-          "pad": 44,
-          "per": "h"
-        },
-        "anchor": "center",
-        "baseline": 8
-      },
-      "note": "院墙的东山头（墙到这儿拐进院里）。**yard 带不是随手挑的**：它高过人头，进 clutter 会把人整个吞掉（见 Data_DepthSpec 的 1.2m 上限）；可它又必须比背景院墙(building)近一档、大一圈，横在人与街之间才挡得住——车铃那一拍「躲在墙后头」全靠这一件",
-      "shadow": 0.4
-    },
     "henCoop": {
       "art": "DrawHenCoop",
       "band": "yard",
@@ -953,6 +934,23 @@
         "baseline": 14
       },
       "drawHeightPx": 72
+    },
+    "yardWallLow": {
+      "art": "DrawYardWallLow",
+      "ss": "prop",
+      "sprite": {
+        "w": {
+          "pad": 44,
+          "per": "w"
+        },
+        "h": {
+          "pad": 40,
+          "per": "h"
+        },
+        "anchor": "center",
+        "baseline": 10
+      },
+      "note": "齐胸的土坯院墙——**前景挡人的那一种**（h≤1.2 ⇒ coverBands.low ⇒ clutter 带，画在演员之前）。勇敢的心式的藏身处：蹲下去整个人没在墙后头，站起来露出胸口以上。**不许进 alwaysTall**——退到 yard/building 去它就又成了背景里的一张纸片，人照样杵在街上"
     },
     "bush": {
       "art": "DrawBush",
