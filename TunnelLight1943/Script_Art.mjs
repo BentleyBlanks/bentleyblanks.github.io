@@ -12694,3 +12694,262 @@ export function DrawSewCard(ctx, W, H, view, L, t) {
   ctx.fillRect(0, 0, W, H);
   void P;
 }
+
+// ===========================================================================
+// 过场框景（`World.SetCineFore`）与左右分屏的撕口缝（`World.SetSplitShot`）
+//
+// 2026-08-14 用户拿勇敢的心的过场截图定的方向。看那几张图：石砌门洞的两根柱、
+// 前后两棵树干、贴着镜头躺着的那具尸体——**每一张过场都有一块压得很暗、被画框
+// 切掉的近景**。它不是装饰：
+//   · 这套白盒的屋里是一堵大土墙，不给近景就有半屏是空的；
+//   · 一块很近的东西才能把"纵深"这件事说出来（镜头一动它扫过去）；
+//   · 它是画面里唯一真正黑的地方——分级能提对比，但提不出没有的黑。
+//
+// 三条画法（都是画废了才看出来的那种）：
+//   ① **不许糊**。参考图里的门柱、树干都是实的。糊开只会读成"镜头脏了"
+//      （fore 层当年那"两根白白的模糊一坨"就是这么来的）。
+//   ② **背光的那条边要留一道亮边**。全黑的一块就是贴纸；亮边一出来，
+//      它立刻变成"挡在光前面的东西"。
+//   ③ **里头要有纹理**（木纹、坯缝、草茬），不然还是块黑板。
+// ===========================================================================
+// 前景块的色号是**跟分级一起算的**：分级把暗部乘到 0.42 左右，所以这里画
+// 0.42 上屏才落到 0.18——"很暗但看得出是根木头"。第一版按"近乎全黑"画
+// （#332c23），分级之后是一块纯黑剪影，实拍读出来是"贴了张黑纸"，
+// 只好再拿一条很亮的边去救，那条边又变成一根发光的线（两轮实拍各错一次）。
+// **暗到看不出材质就过头了**：参考图里的门柱能看见石缝、树干能看见皮。
+const FORE_INK = {
+  body: "#6b5c46", dark: "#4c4133", deep: "#2b2519",
+  rim: "#d8c49a", rimCool: "#a9b8c8",
+};
+// dim：1＝按上表画；>1 更黑（贴得更近的那块）。这几个色号看着"黑得离谱"才是对的
+// ——CanvasTexture 没声明 colorSpace，上屏会整体提亮一大截。
+function ForeMix(hex, dim) {
+  const n = parseInt(hex.slice(1), 16);
+  const k = Math.max(0, Math.min(1, 1 / Math.max(0.35, dim)));
+  const r = Math.round(((n >> 16) & 255) * k), g = Math.round(((n >> 8) & 255) * k), b = Math.round((n & 255) * k);
+  return `rgb(${r},${g},${b})`;
+}
+
+export function DrawCineFore(ctx, W, H, kind, dim = 1) {
+  const C = (key) => ForeMix(FORE_INK[key], key === "rim" || key === "rimCool" ? 1 : dim);
+  const id = "fg" + kind;
+  ctx.clearRect(0, 0, W, H);
+  switch (kind) {
+    // 门框立柱：一根立木 + 顶上一小截门楣。摆在画框一侧，剩下的一边留给戏
+    case "doorJamb": {
+      const w = W * 0.62;
+      InkFill(ctx, [[0, 0], [w, H * 0.02], [w * 0.94, H * 0.55], [w, H], [0, H]], id, C("body"),
+        { amp: W * 0.012, line: C("deep"), lw: Math.max(2, W * 0.018) });
+      // 木纹：顺着立柱走的几道
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      for (let i = 1; i <= 5; i += 1) {
+        const x = w * (0.16 + i * 0.15);
+        InkLine(ctx, x, H * 0.04, x + Sym(id + "g", i, W * 0.02), H * 0.97, id + i,
+          { amp: W * 0.01, lw: Math.max(1, W * 0.008), color: i % 2 ? C("dark") : C("deep") });
+      }
+      ctx.restore();
+      // 门楣：从柱顶往画框里探出一截（读作"门洞"而不是"电线杆"）
+      InkFill(ctx, Rect(0, 0, W, H * 0.085), id + "l", C("dark"),
+        { amp: W * 0.01, line: C("deep"), lw: Math.max(1.5, W * 0.012) });
+      // 亮边：屋里的光打在柱子朝内的那条棱上
+      ctx.save();
+      ctx.globalAlpha = 0.42;
+      InkLine(ctx, w * 0.97, H * 0.09, w * 0.92, H * 0.98, id + "r",
+        { amp: W * 0.008, lw: Math.max(2, W * 0.030), color: C("rim") });
+      ctx.restore();
+      break;
+    }
+    // 房梁：横在画框上沿的一根梁，底下垂着椽子头与苇箔的茬。
+    // **梁身要占大半张画布**——第一版 0.62 配上长短不一的长齿，梁身整个被推出
+    // 画框，屏幕上只剩一排黑方块，读成城墙垛口（实拍抓的）
+    case "beam": {
+      const hb = H * 0.74;
+      InkFill(ctx, [[0, 0], [W, 0], [W, hb], [W * 0.5, hb * 1.06], [0, hb * 0.96]], id, C("body"),
+        { amp: H * 0.012, line: C("deep"), lw: Math.max(2, H * 0.016) });
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      for (let i = 1; i <= 4; i += 1) {
+        const y = hb * (0.2 + i * 0.17);
+        InkLine(ctx, W * 0.02, y, W * 0.98, y + Sym(id + "g", i, H * 0.02), id + i,
+          { amp: H * 0.008, lw: Math.max(1, H * 0.008), color: C("dark") });
+      }
+      ctx.restore();
+      // 椽子头：一排短齿，长短不一
+      for (let i = 0; i < 9; i += 1) {
+        const x = W * (0.04 + i * 0.108);
+        const len = (H - hb) * (0.28 + Rnd(id + "r", i) * 0.46);
+        InkFill(ctx, Rect(x, hb * 0.98, W * 0.052, len), id + "r" + i, C("dark"),
+          { amp: W * 0.006, line: C("deep"), lw: Math.max(1, W * 0.006) });
+      }
+      // 梁底那条亮边：屋里的光从底下打上来，这一条就是"梁"与"一块黑板"的分界
+      ctx.save();
+      ctx.globalAlpha = 0.40;
+      InkLine(ctx, 0, hb * 0.97, W, hb * 1.01, id + "rim", { amp: H * 0.006, lw: Math.max(2, H * 0.018), color: C("rim") });
+      ctx.restore();
+      break;
+    }
+    // 炕沿：画框下沿的一道土台，上头压着卷起来的被褥
+    case "kangEdge": {
+      const top = H * 0.42;
+      InkFill(ctx, [[0, top], [W * 0.35, top - H * 0.03], [W, top + H * 0.02], [W, H], [0, H]], id, C("body"),
+        { amp: W * 0.008, line: C("deep"), lw: Math.max(2, W * 0.012) });
+      // 坯缝
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      for (let i = 1; i <= 3; i += 1) {
+        const y = top + (H - top) * (i / 4);
+        InkLine(ctx, 0, y, W, y + Sym(id + "s", i, H * 0.012), id + "s" + i,
+          { amp: W * 0.006, lw: Math.max(1, W * 0.005), color: C("deep") });
+      }
+      ctx.restore();
+      // 被褥卷：压在炕沿上的一团，轮廓要有瓣不能是半个椭圆
+      const bx = W * 0.58, by = top - H * 0.01;
+      InkFill(ctx, [[bx - W * 0.30, by], [bx - W * 0.22, by - H * 0.13], [bx, by - H * 0.17],
+        [bx + W * 0.24, by - H * 0.12], [bx + W * 0.34, by + H * 0.01]], id + "q", C("dark"),
+        { amp: W * 0.012, line: C("deep"), lw: Math.max(1.5, W * 0.01) });
+      // 炕沿那道亮边：横贯整幅、够亮，读出来才是"一道台沿"而不是一片黑
+      ctx.save();
+      ctx.globalAlpha = 0.44;
+      InkLine(ctx, 0, top + H * 0.004, W * 0.36, top - H * 0.028, id + "rimA", { amp: W * 0.005, lw: Math.max(2, H * 0.020), color: C("rim") });
+      InkLine(ctx, W * 0.36, top - H * 0.028, W, top + H * 0.024, id + "rimB", { amp: W * 0.005, lw: Math.max(2, H * 0.020), color: C("rim") });
+      ctx.restore();
+      break;
+    }
+    // 水瓮的肩：画框一角鼓出来的一大块圆
+    case "vat": {
+      ctx.save();
+      ctx.beginPath();
+      const cx = W * 0.5, cy = H * 1.06, r = W * 0.56;
+      ctx.moveTo(cx - r, H);
+      for (let i = 0; i <= 24; i += 1) {
+        const a = Math.PI + (i / 24) * Math.PI;
+        ctx.lineTo(cx + Math.cos(a) * (r + Sym(id, i, W * 0.012)), cy + Math.sin(a) * (r * 0.86));
+      }
+      ctx.closePath();
+      ctx.fillStyle = C("body");
+      ctx.fill();
+      ctx.strokeStyle = C("deep");
+      ctx.lineWidth = Math.max(2, W * 0.016);
+      ctx.stroke();
+      ctx.restore();
+      // 瓮口那圈：一道亮边压在肩上
+      ctx.save();
+      ctx.globalAlpha = 0.44;
+      ctx.beginPath();
+      ctx.ellipse(W * 0.5, H * 0.52, W * 0.40, H * 0.075, 0, Math.PI, Math.PI * 2);
+      ctx.strokeStyle = C("rim");
+      ctx.lineWidth = Math.max(2, W * 0.024);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    // 窖口的板沿：从底下往上看时，画框下沿那道厚木边（亮边在上，光从屋里来）
+    case "hatchLip": {
+      InkFill(ctx, [[0, H * 0.30], [W * 0.42, H * 0.24], [W, H * 0.31], [W, H], [0, H]], id, C("dark"),
+        { amp: W * 0.006, line: C("deep"), lw: Math.max(2, W * 0.012) });
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      for (let i = 1; i <= 3; i += 1) {
+        const y = H * (0.30 + i * 0.17);
+        InkLine(ctx, 0, y, W, y + Sym(id + "p", i, H * 0.01), id + "p" + i,
+          { amp: W * 0.005, lw: Math.max(1, W * 0.005), color: C("deep") });
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.46;
+      InkLine(ctx, 0, H * 0.295, W, H * 0.305, id + "rim", { amp: W * 0.005, lw: Math.max(2, H * 0.022), color: C("rim") });
+      ctx.restore();
+      break;
+    }
+    // 梯子帮：一根边梃 + 两三根横档伸出画框
+    case "ladder": {
+      const w = W * 0.30;
+      InkFill(ctx, Rect(W * 0.30, 0, w, H), id, C("body"),
+        { amp: W * 0.01, line: C("deep"), lw: Math.max(2, W * 0.016) });
+      for (let i = 0; i < 3; i += 1) {
+        const y = H * (0.16 + i * 0.33);
+        InkFill(ctx, Rect(W * 0.30, y, W * 0.70, H * 0.055), id + "r" + i, C("dark"),
+          { amp: W * 0.008, line: C("deep"), lw: Math.max(1.5, W * 0.01) });
+      }
+      ctx.save();
+      ctx.globalAlpha = 0.40;
+      InkLine(ctx, W * 0.30 + w * 0.94, H * 0.02, W * 0.30 + w * 0.9, H * 0.98, id + "rim",
+        { amp: W * 0.008, lw: Math.max(2, W * 0.030), color: C("rimCool") });
+      ctx.restore();
+      break;
+    }
+    // 草苫/柴草的一角：底下一排乱茬，茬尖长短不一
+    case "strawEdge": {
+      InkFill(ctx, [[0, H * 0.56], [W, H * 0.50], [W, H], [0, H]], id, C("dark"),
+        { amp: W * 0.01, line: null, lw: 0 });
+      ctx.strokeStyle = C("body");
+      ctx.lineCap = "round";
+      for (let i = 0; i < 46; i += 1) {
+        const x = W * (i / 45) + Sym(id + "x", i, W * 0.012);
+        const top = H * (0.52 - Rnd(id + "h", i) * 0.30);
+        ctx.beginPath();
+        ctx.lineWidth = Math.max(1.2, W * (0.004 + Rnd(id + "w", i) * 0.006));
+        ctx.moveTo(x, H * 0.62);
+        ctx.lineTo(x + Sym(id + "t", i, W * 0.03), top);
+        ctx.stroke();
+      }
+      break;
+    }
+    // 一堵墙的立边（最省的一档：转角、灶台侧面、门扇的背面）
+    default: {
+      InkFill(ctx, [[0, 0], [W * 0.86, H * 0.03], [W * 0.92, H * 0.48], [W * 0.84, H], [0, H]], id, C("body"),
+        { amp: W * 0.014, line: C("deep"), lw: Math.max(2, W * 0.016) });
+      ctx.save();
+      ctx.globalAlpha = 0.24;
+      for (let i = 0; i < 14; i += 1) {
+        const x = W * (0.08 + Rnd(id + "px", i) * 0.72);
+        const y = H * Rnd(id + "py", i);
+        ctx.beginPath();
+        ctx.ellipse(x, y, W * 0.03, H * 0.012, Rnd(id + "pr", i) * 3, 0, Math.PI * 2);
+        ctx.fillStyle = C("deep");
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.42;
+      InkLine(ctx, W * 0.86, H * 0.04, W * 0.83, H * 0.98, id + "rim",
+        { amp: W * 0.01, lw: Math.max(2, W * 0.028), color: C("rim") });
+      ctx.restore();
+      break;
+    }
+  }
+}
+
+// 左右分屏中间那道缝：参考图里是**画上去的一道白**，不是两块画之间的黑边——
+// 它带手的痕迹（边是撕的、宽窄不匀、微微歪），所以两格才读成"同一张纸上的两幅"。
+// 画在一张窄画布上，由 World 摆成屏幕正中一条竖带（不拉伸，1 texel ≈ 1 像素）。
+export function DrawSplitSeam(ctx, W, H) {
+  ctx.clearRect(0, 0, W, H);
+  const pts = [];
+  const steps = 40;
+  for (let i = 0; i <= steps; i += 1) {           // 左沿
+    const t = i / steps;
+    pts.push([W * (0.24 + Math.sin(t * 2.3) * 0.05) + Sym("seamL", i, W * 0.05), H * t]);
+  }
+  for (let i = steps; i >= 0; i -= 1) {           // 右沿（回来）
+    const t = i / steps;
+    pts.push([W * (0.76 + Math.sin(t * 1.7 + 1.2) * 0.05) + Sym("seamR", i, W * 0.05), H * t]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (const p of pts) ctx.lineTo(p[0], p[1]);
+  ctx.closePath();
+  ctx.fillStyle = "#f2e8d2";
+  ctx.fill();
+  // 纸的脏：两侧各压一道很淡的暖影，白带不至于像一根荧光棒
+  ctx.save();
+  ctx.clip();
+  const g = ctx.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, "rgba(120,104,78,0.42)");
+  g.addColorStop(0.5, "rgba(120,104,78,0)");
+  g.addColorStop(1, "rgba(120,104,78,0.42)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}

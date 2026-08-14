@@ -2380,6 +2380,69 @@ function TestChapterOneShowsOnlyRealNarration() {
   console.log(`  ✓ 第一章只有 2 句真旁白上字幕（${acts} 行演出说明不出字幕）`);
 }
 
+// 序 · 那天的三条演出契约（2026-08-14 重做过场时立的，三条都被实拍抓过）：
+//   ① 序的三拍**没有音乐**（剧本首句〔音〕「没有音乐。」）；
+//   ② 左右分屏的两格**不许互相看见对方**——两台相机各拍半屏，画框一重叠，
+//      同一个人就在左右各出现一次；
+//   ③ 过场机位**不许沉到地平线以下**：窖顶(−1.55)与地表(0)之间是实心土
+//      （近侧剖面只在窖室那块掏了洞），机位摆进去拍出来满屏是土。
+function TestPrologueStaging() {
+  const FOV = 30;
+  const c1 = SCRIPTS.c1 || [];
+  const byId = Object.fromEntries(c1.map((d) => [d.id, d]));
+  for (const id of ["c1_thatday", "c1_descend", "c1_hide"]) {
+    assert.ok(byId[id] && byId[id].bgm === null,
+      `${id} 必须声明 bgm: null——序章不许有配乐（剧本首句：没有音乐）`);
+  }
+
+  // 扫源码：分屏与自由机位既写在节拍上，也写在微过场里
+  const here3 = path.dirname(fileURLToPath(import.meta.url));
+  const src3 = fs.readFileSync(path.join(here3, "Script_Core.mjs"), "utf8");
+  const from = src3.indexOf('id: "c1_thatday"');
+  const to = src3.indexOf('id: "c2_');
+  const chunk = src3.slice(from, to);
+
+  // ② 分屏两格的画框不许交叠。逐个 `left:`/`right:` 机位取"注视点所在平面上
+  //    的半屏画宽"，两段区间不许有公共部分
+  // 坐标可能写成 `UNDER_Y + 0.98`（窖底那一格）——不认它就会漏掉半个分屏
+  const N = "(-?[\\d.]+|UNDER_Y *[-+] *[\\d.]+)";
+  const Num = (t) => (t.includes("UNDER_Y")
+    ? -3.6 + (t.includes("-") && t.indexOf("-") > t.indexOf("UNDER_Y") ? -1 : 1) * parseFloat(t.split(/[-+]/).pop())
+    : parseFloat(t));
+  const panes = [...chunk.matchAll(new RegExp(
+    `(left|right): \\{ from: \\[${N}, *${N}, *${N}\\][\\s\\S]*?at: \\[${N}, *${N}\\]`, "g",
+  ))].map((m) => {
+    const [px, py, pz, tx, ty] = [m[2], m[3], m[4], m[5], m[6]].map(Num);
+    const dist = Math.hypot(tx - px, ty - py, pz);
+    // 半屏画幅（16:9 去掉中缝之后的一半）
+    const half = dist * Math.tan((FOV * Math.PI / 180) / 2) * ((16 / 9) * 0.493);
+    return { side: m[1], lo: tx - half, hi: tx + half, ty };
+  });
+  assert.ok(panes.length >= 4 && panes.length % 2 === 0,
+    `序里该有两处左右分屏（共 4 格），解析到 ${panes.length} 格`);
+  const splits = panes.length / 2;
+  for (let i = 0; i < panes.length; i += 2) {
+    const L = panes[i], R = panes[i + 1];
+    assert.equal(`${L.side}${R.side}`, "leftright", "分屏要按 left → right 的顺序写");
+    // 两格拍的是**同一层**时才要求 x 上分开；一上一下（窖底 vs 头顶那间屋）
+    // 本来就隔着一层楼，x 重叠是对的——那正是"底下有人、上头空了"这张画
+    const sameFloor = Math.abs(L.ty - R.ty) < 1.5;
+    assert.ok(!sameFloor || L.hi < R.lo || R.hi < L.lo,
+      `分屏两格的画框交叠了（左 ${L.lo.toFixed(2)}~${L.hi.toFixed(2)} / 右 ${R.lo.toFixed(2)}~${R.hi.toFixed(2)}）——同一个人会在两边各出现一次`);
+  }
+
+  // ③ 机位不许落在"窖顶与地表之间"那层实心土里
+  let cams = 0, bad = [];
+  for (const m of chunk.matchAll(new RegExp(`(?:from|to): \\[${N}, *${N}, *${N}\\]`, "g"))) {
+    cams += 1;
+    const y = Num(m[2]);
+    if (y < -0.05 && y > -1.55) bad.push(y.toFixed(2));
+  }
+  assert.equal(bad.length, 0,
+    `过场机位落进了地表与窖顶之间的实心土：y=${bad.join(",")}（要么在地面之上，要么下到窖里去）`);
+  console.log(`  ✓ 序 · 那天：三拍无配乐 / ${splits} 处分屏两格不交叠 / ${cams} 个机位都不在土里`);
+}
+
 // ---------------------------------------------------------------------------
 console.log("《地道里的光》冒烟测试（横版 2.5D）");
 console.log("— 机制定点断言 —");
@@ -2654,6 +2717,7 @@ function TestPoseNamesExist() {
 
 TestPromptsAreDeviceNeutral();
 TestChapterOneShowsOnlyRealNarration();
+TestPrologueStaging();
 TestStrokeWork();
 TestPoseNamesExist();
 TestVaultC1();
