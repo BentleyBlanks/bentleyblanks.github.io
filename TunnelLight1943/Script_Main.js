@@ -88,7 +88,7 @@ for (const evt of ["pointerdown", "keydown", "touchstart"]) {
 
 const ui = {};
 for (const id of [
-  "titleScreen", "startButton", "chapterList",
+  "titleScreen", "startButton", "titleJump", "chapterList",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
   "objectiveTab", "objectiveTabIcon", "objectiveTabText", "objectiveTabHint",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
@@ -1251,6 +1251,9 @@ ui.btnDebug?.addEventListener("click", () => {
   ToggleDebug(true);
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
+// 标题页上的第二条路：直接开跳幕面板选章节/选幕。**面板要压在标题页上头**
+// （z-index 见 Style_Game.css：debugPanel 61 > titleScreen），不然点开了看不见
+ui.titleJump?.addEventListener("click", () => ToggleDebug(true));
 
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);

@@ -415,6 +415,52 @@ for (const size of TOUCH_SIZES) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 标题页：四档画高都点得着（章节选择）
+//
+// 2026-08-14 用户报「移动端横屏过来以及 pc 端不能选择章节了」。病根是一句
+// `#titleScreen { display:flex; align-items:center }` 配 `overflow-y:auto`：
+// **flex 的居中会把超出的那一半顶到容器上方**，而 scrollTop 的下限是 0——
+// 上半截既画不出来也滚不到。实测 1280×620 的桌面窗口 h1 落在 y=−44、
+// 667×375 的横屏手机「从第一章开始」落在 y=−75，两处都按不着；机器再矮一档，
+// 被顶出去的就轮到章节列表了。
+// 这条按**能不能点着**验：滚到顶时不许有东西在 y<0（上方没有够不着的内容），
+// 滚到底时最后一枚章节牌必须整个在画框里。
+const TITLE_SIZES = [
+  { name: "iPhoneSE 横屏", w: 667, h: 375 },
+  { name: "iPhone14 横屏", w: 844, h: 390 },
+  { name: "矮桌面窗口", w: 1280, h: 620 },
+  { name: "桌面 16:9", w: 1280, h: 720 },
+];
+for (const size of TITLE_SIZES) {
+  const tp = await browser.newPage({ viewport: { width: size.w, height: size.h } });
+  await tp.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
+  await tp.waitForFunction(() => document.getElementById("chapterList")?.children.length > 0, { timeout: 60000 });
+  const r = await tp.evaluate(() => {
+    const t = document.getElementById("titleScreen");
+    const l = document.getElementById("chapterList");
+    const s2 = document.getElementById("startButton");
+    t.scrollTop = 0;
+    const top = Math.min(s2.getBoundingClientRect().top,
+      ...[...l.children].map((b) => b.getBoundingClientRect().top));
+    t.scrollTop = t.scrollHeight;
+    const last = l.children[l.children.length - 1].getBoundingClientRect();
+    const n = l.children.length;
+    t.scrollTop = 0;
+    return { top, lastBottom: last.bottom, vh: window.innerHeight, n };
+  });
+  await tp.close();
+  // 0.5px 的余量给亚像素布局
+  if (r.top < -0.5 || r.lastBottom > r.vh + 0.5 || r.n < 8) {
+    failed += 1;
+    console.error(`✗ ${size.name} 标题页够不着：滚到顶时最上沿在 y=${r.top.toFixed(0)}`
+      + `（<0 ＝ 被 flex 居中顶出去了，滚不回来）、滚到底时末章下沿 ${r.lastBottom.toFixed(0)} / 画高 ${r.vh}`
+      + `、章节 ${r.n} 枚——玩家点不着「开始」或「选章节」`);
+  } else {
+    console.log(`✓ ${size.name} 标题页开始键与 ${r.n} 枚章节牌都点得着`);
+  }
+}
+
 // 画面不许被拉伸（横屏手机）
 //
 // 2026-08-13 用户报「移动端横屏会被拉伸」。两件事分开钉：
