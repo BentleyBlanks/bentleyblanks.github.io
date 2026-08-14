@@ -73,7 +73,7 @@ const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
-  "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
+  "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "projectContract", "contractStudioName", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
@@ -121,6 +121,7 @@ let sealHoldComplete = false;
 let sealKeyboardMode = false;
 let activeScratchSession = null;
 let lastScratchSoundAt = 0;
+let mobileControlSignature = "";
 const inputState = { left: false, right: false, jump: false };
 
 function IsOverlayOpen() {
@@ -879,7 +880,9 @@ function UpdateInteractionPrompt() {
     }
   });
   activeInteraction = nearest;
-  if (!nearest || IsOverlayOpen()) {
+  const interactionAvailable = Boolean(nearest) && !IsOverlayOpen();
+  UpdateMobileControlState(interactionAvailable, nearest);
+  if (!interactionAvailable) {
     dom.interactionPrompt.classList.add("hidden");
     facilityVisuals.forEach((visual) => { visual.userData.marker.material.opacity = .25; });
     return;
@@ -1056,6 +1059,7 @@ function OpenPanel(kicker, title, html, onReady = null) {
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
+  dom.sheetBody.scrollTop = 0;
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
   dom.modalLayer.classList.remove("hidden");
@@ -1085,6 +1089,7 @@ function ShowResult(kicker, title, html, onClose = null) {
   dom.resultKicker.textContent = kicker;
   dom.resultTitle.textContent = title;
   dom.resultBody.innerHTML = html;
+  dom.resultBody.closest(".resultCard").scrollTop = 0;
   resultCloseHandler = onClose;
   dom.resultLayer.classList.remove("hidden");
 }
@@ -2169,21 +2174,64 @@ function SetMovement(key, pressed) {
   if (pressed && audioContext?.state === "suspended") audioContext.resume();
 }
 
+function SetTouchButtonPressed(button, pressed) {
+  button.classList.toggle("pressed", pressed);
+  button.setAttribute("aria-pressed", String(pressed));
+}
+
+function ResetTouchControls() {
+  inputState.left = false;
+  inputState.right = false;
+  inputState.jump = false;
+  SetTouchButtonPressed(dom.moveLeftButton, false);
+  SetTouchButtonPressed(dom.moveRightButton, false);
+  SetTouchButtonPressed(dom.jumpButton, false);
+}
+
+function UpdateMobileControlState(interactionAvailable, interaction) {
+  const suppressed = IsOverlayOpen();
+  const interactionLabel = interaction?.label || "靠近可交互对象";
+  const interactionDetail = interaction?.detail || "";
+  const signature = `${suppressed}:${interactionAvailable}:${interactionLabel}:${interactionDetail}`;
+  if (signature === mobileControlSignature) return;
+  mobileControlSignature = signature;
+  dom.mobileControls.classList.toggle("suppressed", suppressed);
+  dom.mobileControls.toggleAttribute("inert", suppressed);
+  dom.mobileControls.setAttribute("aria-hidden", String(suppressed));
+  dom.moveLeftButton.disabled = suppressed;
+  dom.moveRightButton.disabled = suppressed;
+  dom.jumpButton.disabled = suppressed;
+  dom.interactButton.disabled = !interactionAvailable;
+  dom.interactButton.classList.toggle("available", interactionAvailable);
+  dom.interactButton.setAttribute("aria-label", interactionAvailable ? [interactionLabel, interactionDetail].filter(Boolean).join("。") : "靠近可交互对象");
+  if (suppressed) ResetTouchControls();
+}
+
+function PlayTouchFeedback(duration = 9) {
+  if (!window.matchMedia?.("(pointer: coarse)").matches) return;
+  try { navigator.vibrate?.(duration); } catch { /* Haptics are optional. */ }
+}
+
 function BindHoldButton(button, key) {
-  const release = (event) => { event.preventDefault(); SetMovement(key, false); };
+  const release = (event) => {
+    event?.preventDefault?.();
+    SetMovement(key, false);
+    SetTouchButtonPressed(button, false);
+  };
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     button.setPointerCapture?.(event.pointerId);
     SetMovement(key, true);
+    SetTouchButtonPressed(button, true);
   });
   button.addEventListener("pointerup", release);
   button.addEventListener("pointercancel", release);
-  button.addEventListener("lostpointercapture", () => SetMovement(key, false));
+  button.addEventListener("lostpointercapture", release);
 }
 
 function BindControls() {
   window.addEventListener("resize", ResizeScene);
-  window.addEventListener("blur", () => { inputState.left = false; inputState.right = false; inputState.jump = false; CancelSealHold(); });
+  window.addEventListener("blur", () => { ResetTouchControls(); CancelSealHold(); });
   window.addEventListener("keydown", (event) => {
     if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) event.preventDefault();
@@ -2199,8 +2247,23 @@ function BindControls() {
   });
   BindHoldButton(dom.moveLeftButton, "left");
   BindHoldButton(dom.moveRightButton, "right");
-  dom.jumpButton.addEventListener("pointerdown", (event) => { event.preventDefault(); inputState.jump = true; PlayTone("jump"); });
-  dom.interactButton.addEventListener("click", (event) => { event.preventDefault(); TriggerInteraction(); });
+  dom.jumpButton.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    dom.jumpButton.setPointerCapture?.(event.pointerId);
+    SetTouchButtonPressed(dom.jumpButton, true);
+    inputState.jump = true;
+    PlayTouchFeedback(8);
+    PlayTone("jump");
+  });
+  const releaseJump = (event) => { event?.preventDefault?.(); SetTouchButtonPressed(dom.jumpButton, false); };
+  dom.jumpButton.addEventListener("pointerup", releaseJump);
+  dom.jumpButton.addEventListener("pointercancel", releaseJump);
+  dom.jumpButton.addEventListener("lostpointercapture", releaseJump);
+  dom.interactButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    PlayTouchFeedback(12);
+    TriggerInteraction();
+  });
   dom.modalBackdrop.addEventListener("click", ClosePanel);
   dom.sheetCloseButton.addEventListener("click", ClosePanel);
   dom.resultCloseButton.addEventListener("click", CloseResult);

@@ -1404,3 +1404,299 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .missionCard { width: 185px; }
   .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }
 }
+
+/* Mobile landscape controls -------------------------------------------------
+   Keep movement under the left thumb, actions under the right thumb, and
+   preserve a clear strip of world view between them. */
+@media (hover: none), (pointer: coarse), (max-width: 920px) {
+  .gameHud {
+    min-height: 74px;
+    grid-template-columns: 54px minmax(420px, 1fr) minmax(180px, 210px) 104px;
+    gap: 5px;
+  }
+
+  .hudConsole { padding: 6px 7px 7px; }
+  .identityConsole { padding: 6px; }
+
+  .brandChip {
+    width: 100%;
+    min-width: 0;
+    padding: 5px;
+    border-radius: 4px;
+  }
+
+  .brandChip > span {
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    border-radius: 6px;
+  }
+
+  .brandChip div { display: none; }
+  .consoleHeader { height: 14px; padding-bottom: 2px; }
+  .businessConsole, .survivalConsole, .systemConsole { grid-template-rows: 14px 1fr; }
+  .businessConsoleBody { grid-template-columns: minmax(255px, 1fr) minmax(145px, .58fr); gap: 4px; }
+  .businessReadouts { gap: 3px; }
+
+  .hudStat {
+    min-width: 0;
+    padding: 4px 5px;
+    border-radius: 3px;
+  }
+
+  .hudStat strong { font-size: 11px; white-space: nowrap; }
+  .hudStat span, .goalHud span { font-size: 7px; }
+
+  .goalHud {
+    min-width: 0;
+    max-width: none;
+    padding: 4px 5px;
+    border-radius: 3px;
+    gap: 4px;
+  }
+
+  .goalHud strong { min-width: 0; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+  .conditionHud {
+    width: auto;
+    grid-template-columns: 24px minmax(30px, 1fr) 20px;
+    gap: 3px;
+    padding: 3px 4px;
+    border-radius: 3px;
+  }
+
+  .conditionHud span, .conditionHud b { font-size: 8px; }
+  .survivalMeters { gap: 4px; }
+  .systemControls { gap: 4px; }
+
+  .roundButton {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 5px;
+  }
+
+  .mobileControls {
+    --controlSize: clamp(58px, 15.5vh, 70px);
+    left: calc(var(--safeLeft) + 2px);
+    right: calc(var(--safeRight) + 2px);
+    bottom: calc(var(--safeBottom) + 2px);
+    height: var(--controlSize);
+    align-items: center;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity .18s ease, transform .18s ease;
+  }
+
+  .mobileControls.suppressed {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+  }
+
+  .moveControls,
+  .actionControls {
+    display: flex;
+    align-items: center;
+    pointer-events: auto;
+  }
+
+  .moveControls {
+    gap: 3px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 22px;
+    background: rgba(7,9,16,.58);
+    box-shadow: 0 14px 34px rgba(0,0,0,.32);
+    backdrop-filter: blur(10px);
+  }
+
+  .actionControls {
+    gap: 9px;
+    margin-left: auto;
+  }
+
+  .mobileControls button {
+    position: relative;
+    bottom: auto;
+    display: grid;
+    place-content: center;
+    gap: 2px;
+    height: var(--controlSize);
+    border: 1px solid rgba(255,255,255,.22);
+    background: linear-gradient(155deg, rgba(31,34,49,.9), rgba(10,12,20,.82));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 25px rgba(0,0,0,.3);
+    backdrop-filter: blur(10px);
+    transition: transform .1s ease, filter .1s ease, opacity .16s ease, border-color .16s ease, background .16s ease;
+  }
+
+  .moveControls button {
+    width: clamp(64px, 12vw, 84px);
+    border-radius: 18px;
+  }
+
+  .jumpButton,
+  .interactButton {
+    right: auto;
+    border-radius: 22px;
+  }
+
+  .jumpButton { width: var(--controlSize); }
+
+  .interactButton {
+    width: calc(var(--controlSize) + 12px);
+    border-color: rgba(157,140,255,.36) !important;
+    background: linear-gradient(155deg, rgba(75,65,132,.72), rgba(26,23,47,.78)) !important;
+  }
+
+  .mobileControls button:disabled {
+    opacity: .42;
+    filter: saturate(.55);
+  }
+
+  .interactButton.available {
+    opacity: 1;
+    border-color: rgba(123,226,255,.9) !important;
+    background: linear-gradient(145deg, #8d7cff, #4e78e7) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 0 0 3px rgba(101,216,255,.13), 0 10px 30px rgba(55,91,220,.42);
+    animation: interactReady 1.55s ease-in-out infinite;
+  }
+
+  .mobileControls button.pressed,
+  .mobileControls button:active {
+    transform: translateY(2px) scale(.95);
+    filter: brightness(1.28);
+  }
+
+  .mobileControls span {
+    font-size: clamp(19px, 5.4vh, 25px);
+    font-weight: 950;
+    line-height: .9;
+  }
+
+  .mobileControls small {
+    color: rgba(255,255,255,.8);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .06em;
+  }
+
+  .interactionPrompt {
+    left: auto;
+    right: calc(var(--safeRight) + 2px);
+    bottom: calc(var(--safeBottom) + var(--controlSize, 62px) + 12px);
+    width: min(250px, 43vw);
+    min-width: 0;
+    max-width: 250px;
+    transform: none;
+    padding: 8px 10px;
+    border-radius: 13px;
+  }
+
+  .interactionPrompt .promptKey { display: none; }
+  .interactionPrompt strong { font-size: 11px; }
+  .interactionPrompt small { display: block; overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+
+  .modalLayer,
+  .resultLayer {
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .worldPanel,
+  .resultCard {
+    width: min(820px, calc(100vw - var(--safeLeft) - var(--safeRight)));
+    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 4px);
+    border-radius: 17px;
+  }
+
+  .worldPanel > header { padding: 8px 10px; }
+  .worldPanel h2, .resultCard h2 { font-size: 16px; }
+
+  .closeButton {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 12px;
+  }
+
+  .sheetBody {
+    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 65px);
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  button.worldChoice,
+  button.featureCard,
+  .talkGrid button,
+  .loanPaymentRow button,
+  .nameSuggestions button,
+  .miniButton,
+  .dangerButton,
+  .primaryButton,
+  .ceremonyStartButton,
+  .continueButton,
+  .documentButton {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .miniButton,
+  .dangerButton,
+  .primaryButton { padding: 9px 11px; font-size: 10px; }
+  .worldChoice, .staffCard, .oddsCard, .featureCard { padding: 9px; }
+  .computerActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .computerActions button { min-height: 62px; }
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .gameHud { grid-template-columns: minmax(350px, 1fr) 170px 108px; gap: 4px; }
+  .identityConsole { display: none; }
+  .businessConsoleBody { grid-template-columns: minmax(215px, 1fr) minmax(125px, .58fr); }
+  .conditionHud { grid-template-columns: 24px minmax(28px, 1fr) 20px; }
+  .roundButton { width: auto; min-width: 44px; }
+}
+
+@media (max-height: 430px) and (orientation: landscape) {
+  .mobileControls { --controlSize: 54px; }
+  .moveControls button { width: clamp(62px, 11.5vw, 76px); }
+  .mobileControls span { font-size: 19px; }
+  .interactionPrompt { bottom: calc(var(--safeBottom) + 66px); width: min(220px, 41vw); }
+  .missionCard { max-height: 104px; overflow: hidden; }
+  .missionCard p { margin-block: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .missionCard .locationRoute { display: none; }
+  .computerActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) and (orientation: landscape) {
+  .gameHud { grid-template-columns: minmax(300px, 1fr) 130px 99px; gap: 3px; }
+  .hudConsole { padding-inline: 4px; }
+  .hudStat { min-width: 50px; padding-inline: 5px; }
+  .cashStat { display: grid; }
+  .businessConsoleBody { grid-template-columns: minmax(185px, 1fr) minmax(95px, .55fr); }
+  .goalHud { min-width: 0; max-width: none; padding-inline: 5px; }
+  .conditionHud { width: auto; grid-template-columns: 20px minmax(24px, 1fr) 18px; padding-inline: 3px; }
+  .systemControls { gap: 3px; }
+  .roundButton { width: auto; min-width: 44px; }
+  .computerActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) and (orientation: landscape) {
+  .gameHud { grid-template-columns: minmax(235px, 1fr) 115px 99px; }
+  .businessConsoleBody { grid-template-columns: 1fr; }
+}
+
+@media (max-height: 350px) and (orientation: landscape) {
+  .missionCard { max-height: 82px; padding: 12px 10px 8px; }
+  .missionCard .moduleLabel,
+  .missionCard .moduleStrip,
+  .missionCard .locationRoute { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactButton.available { animation: none; }
+  .mobileControls, .mobileControls button { transition: none; }
+}
+
+@keyframes interactReady {
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 0 0 5px rgba(101,216,255,.08), 0 12px 32px rgba(55,91,220,.5); }
+}
