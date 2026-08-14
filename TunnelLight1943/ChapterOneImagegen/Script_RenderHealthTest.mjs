@@ -256,12 +256,26 @@ page.on("console", (message) => {
 });
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/ChapterOneImagegen/?chapter=1&fast=1`, {
+  await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/ChapterOneImagegen/?fast=1`, {
     waitUntil: "load",
     timeout: 60000,
   });
   await page.waitForFunction(() => window.TunnelLight !== undefined, undefined, { timeout: 60000 });
+  const titleHealth = await page.evaluate(() => {
+    const zOf = (id) => Number.parseInt(getComputedStyle(document.getElementById(id)).zIndex, 10);
+    return {
+      hidden: document.getElementById("titleScreen").hidden,
+      titleZ: zOf("titleScreen"),
+      hudZ: zOf("hud"),
+    };
+  });
+  assert.equal(titleHealth.hidden, false, "plain page load must show the title screen");
+  assert.ok(
+    titleHealth.titleZ > titleHealth.hudZ,
+    `title screen z=${titleHealth.titleZ} must sit above the opaque HUD fade layer z=${titleHealth.hudZ}`,
+  );
   await page.evaluate(() => {
+    window.TunnelLight.StartGame(0);
     window.TunnelLight.StepFrames(60, { advance: true });
     window.TunnelLight.JumpToChapter(0);
     window.TunnelLight.StepFrames(30, { advance: true });
