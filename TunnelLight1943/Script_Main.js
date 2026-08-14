@@ -356,6 +356,28 @@ function ReadInput() {
 //   过场：构图变了才硬切；同构图连续行不重切、推进累计（一个镜头屏住呼吸）
 //   语汇：wide 全景 / shot 定点 / close 特写 / ots 过肩正反打 / insert 插入特写 / dark 黑场
 // ---------------------------------------------------------------------------
+// **景别的唯一标尺**（2026-08-14 用户拿《勇敢的心》的截图重定：「现在太宽了」）。
+// 量的是同一件事——**人在画高里占多少**：那张图里的大人占画高 21~22%；本作原来
+// 地表 hw 6.3（画高 7.09m），骨架实高 1.37m 的大人只占 19%、柱子（体型 0.80，
+// 实高 1.10m）只占 15.5%，一屏摆得下十二米村街，读出来就是"人小、街长、天多"。
+// 现在按这张表收一档：地表画高 5.5m，柱子占 20%、大人占 25%。
+// **特写不跟着收**——那几档是照着卡面、一张脸、门框上的刻痕量出来的，
+// 缩下去只会把主体挤出画（见 TightenHw 的下限）。
+const PLAY_HW = {
+  surface: 4.9,        // 地表白天
+  surfaceNight: 4.8,   // 夜里再紧一点点（暗处看得见的本来就少）
+  tunnelVillage: 6.2,  // 地道村：一间洞室连着走廊，比街面退一档才装得下
+  tunnelFort: 4.7,
+};
+// 中远景的定点镜跟着同一把尺子收。下限 4.2 是本作最宽的那一档特写——
+// 比它还近的镜头一律原样过，别把脸和卡面挤出画框。
+const HW_TIGHTEN = 0.78;
+const HW_CLOSE = 4.2;
+const HW_WIDE_MAX = 9.4;   // 「退一档」的封顶（本作没有全景，见 CLAUDE.md 镜头规范）
+function TightenHw(d) {
+  return d <= HW_CLOSE ? d : Math.max(HW_CLOSE, d * HW_TIGHTEN);
+}
+
 const cam = { x: 60, y: 2.0, hw: 7.2 };
 let camSnap = true;
 // 冻帧开关：只给实拍/调试用（TunnelLight.Freeze）。见 RunFrame 里那段注释
@@ -378,8 +400,8 @@ function BaseShot(state) {
   const lookAhead = (p.heading || 1) * 2.0;
   // 景别整体推近一档（勇敢的心式：人物更大、更贴戏）——画面外的后果
   // 由角落的照片小窗兜着，不用为了"都看见"把镜头拉远
-  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: 8.0 };
-  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: 6.0 };
+  if (ch.scene === "tunnelVillage") return { x: p.x + lookAhead, y: -1.15, hw: PLAY_HW.tunnelVillage };
+  if (ch.scene === "tunnelFort") return { x: p.x + lookAhead, y: UNDER_Y + 1.15, hw: PLAY_HW.tunnelFort };
   // 地表：中近景，人物约占画高三分之一强；视平线略高于人头，地面向后退
   //
   // 爬梯子那两秒镜头**跟着人往下走**：Core 一按下 S 就把 level 翻成 under
@@ -387,7 +409,7 @@ function BaseShot(state) {
   // lift 的话就会当帧切到井底，人从画框上边慢慢掉下来——看着还是像瞬移。
   const climbing = p.climbT > 0 ? (p.lift || 0) : 0;
   let y = LevelY(p.level) + climbing + (p.level === "under" ? 1.25 : 1.85);
-  const hw = ch.light === "night" ? 6.15 : 6.3;
+  const hw = ch.light === "night" ? PLAY_HW.surfaceNight : PLAY_HW.surface;
   // 走到窖口上头，镜头沉一档，把脚底下那间窖带进画框（Core 的 cellarPeek）。
   //
   // 地窖一直是画好的，可地表机位的下边沿只到 −1.7m、窖底在 −3.6m，整间窖
@@ -424,11 +446,13 @@ function HintShot(state, hint) {
       // 现在 wide 的意思只剩「比玩法机位退一档」，并且封顶：写多大都不许越过 12
       return {
         x: hint.x, y: hint.y ?? 2.4,
-        hw: Math.min(hint.hw ?? 9.5, 12),
+        hw: Math.min(TightenHw(hint.hw ?? 9.5), HW_WIDE_MAX),
         pan: hint.pan || 0,
       };
     case "shot":
-      return { x: hint.x, y: hint.y ?? 1.6, hw: hint.dist ?? 8, pan: hint.pan || 0 };
+      // 定点镜写的 dist 有一百多处，逐个改数字只会漏、也没法一眼看出全片的
+      // 景别是一把尺子。统一从 TightenHw 过一道：中远景收一档、特写原样。
+      return { x: hint.x, y: hint.y ?? 1.6, hw: Math.min(TightenHw(hint.dist ?? 8), HW_WIDE_MAX), pan: hint.pan || 0 };
     case "insert":
       return { x: hint.x, y: hint.y ?? 1.4, hw: hint.dist ?? 2.4, pan: hint.pan || 0 };
     case "insertCard":
@@ -440,7 +464,7 @@ function HintShot(state, hint) {
       return { ...BaseShot(state), card: hint.card, video: hint.clip };
     case "close": {
       const t = ActorAt(state, hint.on || "player") || { x: state.player.x, level: state.player.level };
-      return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: hint.dist ?? 4.2 };
+      return { x: t.x + (hint.dx || 0), y: LevelY(t.level) + 1.25, hw: TightenHw(hint.dist ?? 4.2) };
     }
     case "ots": {
       // 过肩：主体在画面偏一侧，被越过的肩膀作为前景剪影
