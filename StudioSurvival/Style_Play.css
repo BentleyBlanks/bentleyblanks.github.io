@@ -49,14 +49,38 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
   width: 100%;
   height: 100%;
   touch-action: none;
+  filter: saturate(1.04) contrast(1.025);
 }
 
 .sceneVignette {
+  z-index: 4;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(3, 5, 10, .52), transparent 18%, transparent 70%, rgba(3, 4, 9, .66)),
-    radial-gradient(circle at 50% 52%, transparent 48%, rgba(2, 3, 8, .62) 118%);
+    linear-gradient(180deg, rgba(3, 5, 10, .6), transparent 19%, transparent 69%, rgba(3, 4, 9, .72)),
+    radial-gradient(circle at 18% 72%, rgba(157, 140, 255, .08), transparent 27%),
+    radial-gradient(circle at 82% 35%, rgba(101, 216, 255, .045), transparent 24%),
+    radial-gradient(circle at 50% 52%, transparent 44%, rgba(2, 3, 8, .66) 118%);
   mix-blend-mode: normal;
+  transition: opacity .45s ease;
+}
+
+.sceneVignette::before,
+.sceneVignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.sceneVignette::before {
+  opacity: .12;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .035) 4px);
+  mix-blend-mode: soft-light;
+}
+
+.sceneVignette::after {
+  inset: auto 0 0;
+  height: 18%;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .28));
 }
 
 .gameHud {
