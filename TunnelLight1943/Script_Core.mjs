@@ -5191,8 +5191,11 @@ export const SCRIPTS = {
       holdPrompt: "按住 E · 按住妹妹",
       objective: "蹲住。等它过去", hint: "别从墙后头出来。别松手",
       // 固定机位：**前景一堵院墙横在下半幅，墙头后面两个孩子，墙那边村口的
-      // 自行车**——"隔着一堵墙"是看出来的，不是读出来的
-      cam: { kind: "shot", x: 47.6, y: 1.2, dist: 5.2 },
+      // 自行车**——"隔着一堵墙"是看出来的，不是读出来的。
+      // dist 给 7.3 是因为 `HintShot` 会过一道 `TightenHw`（×0.71）：折完 5.18，
+      // 才装得下 42.4~52.8 这一段（两辆车停在 50.3 / 51.6）。**这一拍不能再收**
+      // ——收了就只剩墙和一颗脑袋，"他们就在墙那头"这句话没了主语
+      cam: { kind: "shot", x: 47.6, y: 1.2, dist: 7.3 },
       onEnter: (state) => {
         const sis = FindActor(state, "sister");
         if (sis) {
