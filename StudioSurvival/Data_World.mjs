@@ -60,18 +60,18 @@ export const Locations = FreezeList([
 export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发、聊天、宣发、发布；月结在右下角", x: 2.35, y: 0, radius: 1.55, action: "computer" },
-  { id: "homeFridge", kind: "homeFridge", label: "自己家的冰箱", detail: "看看还能翻出什么", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
-  { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "点一份便宜充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
-  { id: "snackShelf", kind: "snackShelf", label: "小超市零食架", detail: "买便宜小吃顶一顶", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },
-  { id: "lotteryCounter", kind: "lotteryMachine", label: "小超市彩票柜台", detail: "刮奖、买彩票、顺便看妖股", x: 27.2, y: 0, radius: 1.55, action: "speculation" },
-  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "电脑、显示器、桌椅：每招一人先有一套", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
-  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "雇大学生，或按月租一个 AI", x: 37.1, y: 0, radius: 1.6, action: "talent" },
-  { id: "bankCounter", kind: "bank", label: "银行柜台", detail: "还启动贷，或继续抵押家当", x: 45.1, y: 0, radius: 1.75, action: "finance" },
-  { id: "hotelRestaurant", kind: "hotel", label: "大酒店餐厅", detail: "花大钱吃顿好的，短暂恢复人形", x: 55.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
-  { id: "regularFootbathCounter", kind: "regularFootbath", label: "普通足浴店", detail: "热水泡脚，缓一口焦虑", x: 65.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
-  { id: "footbathCityCounter", kind: "footbathCity", label: "洗脚城", detail: "现金够厚，才能整套放空", x: 75.1, y: 0, radius: 1.75, action: "relaxPremium", consumerVenueId: "footbathCity" },
-  { id: "maleModelCounter", kind: "maleModelClub", label: "男模店", detail: "高价购买一晚情绪价值", x: 85.1, y: 0, radius: 1.75, action: "relaxLuxury", consumerVenueId: "maleModelClub" },
+  { id: "homeComputer", kind: "homeComputer", label: "开发电脑", detail: "开发 / 聊天 / 宣发 / 发布；右下角月结", x: 2.35, y: 0, radius: 1.55, action: "computer" },
+  { id: "homeFridge", kind: "homeFridge", label: "自己家的冰箱", detail: "选择本月吃法", x: 8.1, y: 0, radius: 1.5, action: "homeFood" },
+  { id: "dinerCounter", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 15.1, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
+  { id: "snackShelf", kind: "snackShelf", label: "小超市零食架", detail: "超市小吃", x: 23.1, y: 0, radius: 1.55, action: "snack", consumerVenueId: "marketSnack" },
+  { id: "lotteryCounter", kind: "lotteryMachine", label: "彩票柜台", detail: "彩票 / 股票", x: 27.2, y: 0, radius: 1.55, action: "speculation" },
+  { id: "equipmentCounter", kind: "equipmentShop", label: "设备柜台", detail: "每名员工需 1 套", x: 33.1, y: 0, radius: 1.55, action: "equipment" },
+  { id: "talentCounter", kind: "talentMarket", label: "人才市场", detail: "大学生 / AI", x: 37.1, y: 0, radius: 1.6, action: "talent" },
+  { id: "bankCounter", kind: "bank", label: "银行柜台", detail: "还款 / 抵押", x: 45.1, y: 0, radius: 1.75, action: "finance" },
+  { id: "hotelRestaurant", kind: "hotel", label: "大酒店餐厅", detail: "大餐", x: 55.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
+  { id: "regularFootbathCounter", kind: "regularFootbath", label: "普通足浴店", detail: "焦虑 -8", x: 65.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
+  { id: "footbathCityCounter", kind: "footbathCity", label: "洗脚城", detail: "焦虑 -20", x: 75.1, y: 0, radius: 1.75, action: "relaxPremium", consumerVenueId: "footbathCity" },
+  { id: "maleModelCounter", kind: "maleModelClub", label: "男模店", detail: "焦虑 -36", x: 85.1, y: 0, radius: 1.75, action: "relaxLuxury", consumerVenueId: "maleModelClub" },
 ]);
 
 export const Collectibles = FreezeList([]);

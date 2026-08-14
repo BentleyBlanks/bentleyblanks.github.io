@@ -29,7 +29,7 @@ import {
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815i";
+} from "./Data_Game.mjs?v=20260815n";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -101,13 +101,6 @@ function Average(values) {
   return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
 }
 
-function MarketTrendForMonth(state, requestedMonth) {
-  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
-  const trendPeriod = Math.floor((month - 1) / 2);
-  const trendIndex = Math.floor(SeededUnit((state?.seed || 82417) + trendPeriod * 733 + 17) * MARKET_DIRECTIONS.length) % MARKET_DIRECTIONS.length;
-  return MARKET_DIRECTIONS[trendIndex];
-}
-
 function MarketEventForMonth(state, requestedMonth) {
   const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
   const eventIndex = Math.floor(SeededUnit((state?.seed || 82417) + month * 787 + 29) * MARKET_EVENTS.length) % MARKET_EVENTS.length;
@@ -116,22 +109,13 @@ function MarketEventForMonth(state, requestedMonth) {
 
 export function GetMarketSnapshot(state, requestedMonth = state?.month || 1) {
   const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
-  const trend = MarketTrendForMonth(state, month);
   const marketEvent = MarketEventForMonth(state, month);
-  const effectiveDirection = FindMarketDirection(marketEvent?.directionId) || trend;
-  const nextTrend = MarketTrendForMonth(state, month + 1);
-  const confidence = 62 + Math.floor(SeededUnit((state?.seed || 82417) + month * 809 + 41) * 24);
+  const effectiveDirection = FindMarketDirection(marketEvent?.directionId) || MARKET_DIRECTIONS[0];
   return {
     month,
-    trend,
     event: marketEvent,
     effectiveDirection,
     heatMultiplier: marketEvent?.heatMultiplier || 1,
-    trendEndsMonth: (Math.floor((month - 1) / 2) + 1) * 2,
-    nextRumor: {
-      direction: nextTrend,
-      confidence,
-    },
   };
 }
 
@@ -161,25 +145,21 @@ export function EvaluateMarketFit(state, overrides = {}) {
   const hasFocusOverride = Object.prototype.hasOwnProperty.call(overrides, "focusId");
   const hasDirectionOverride = Object.prototype.hasOwnProperty.call(overrides, "directionId");
   const focusId = hasFocusOverride ? overrides.focusId : (savedStrategy.focusId || "concept");
-  let directionId = hasDirectionOverride ? overrides.directionId : (savedStrategy.directionId || null);
-  if (directionId === MARKET_INDEPENDENT_ID) directionId = null;
+  const requestedDirectionId = hasDirectionOverride ? overrides.directionId : (savedStrategy.directionId ?? null);
+  const independent = requestedDirectionId === null || requestedDirectionId === MARKET_INDEPENDENT_ID;
   const focus = MarketFocusFor(state, focusId) || MarketFocusFor(state, "concept");
   const snapshot = GetMarketSnapshot(state);
   const effectiveDirection = snapshot.effectiveDirection;
   const focusMatch = Boolean(focus?.marketDirections.includes(effectiveDirection.id));
-  const directionMatch = directionId === effectiveDirection.id;
-  const taboo = Boolean(directionId && snapshot.event?.tabooDirectionId === directionId);
   const setMonth = Number(savedStrategy.setMonth) || 0;
   const stale = setMonth > 0 && setMonth < state.month;
   let result;
 
-  if (!directionId) {
+  if (independent) {
     result = {
       tier: "independent",
-      label: "不追风，靠自然口碑",
-      description: focusMatch
-        ? "特色碰巧和风口沾边，但你没有主动迎合；只能吃到自然流量，也不会因蹭错热点挨骂。"
-        : "没有迎合承诺，市场只给自然流量。安全，但不调整就会少拿收入。",
+      label: "不追风",
+      description: "无额外惩罚。",
       revenueMultiplier: 0.82,
       refundRateDelta: 0,
       reputationDelta: 0,
@@ -188,24 +168,11 @@ export function EvaluateMarketFit(state, overrides = {}) {
       perfect: false,
       tone: "neutral",
     };
-  } else if (taboo) {
-    result = {
-      tier: "taboo",
-      label: "踩中雷区 · 人人喊打",
-      description: "突发事件刚把这套说法变成全网靶子，你却在最糟的时机把它写进宣传头条。",
-      revenueMultiplier: 0.28,
-      refundRateDelta: 0.32,
-      reputationDelta: -11,
-      fanMultiplier: 0.2,
-      backlash: true,
-      perfect: false,
-      tone: "danger",
-    };
-  } else if (directionMatch && focusMatch) {
+  } else if (focusMatch) {
     result = {
       tier: "perfect",
-      label: "特色 × 风向 · 正中风口",
-      description: "主打特色真的兑现了当月需求，迎合话术也恰好说中了玩家正在找的东西。",
+      label: "正中风口",
+      description: "特色命中本月风向。",
       revenueMultiplier: Clamp(effectiveDirection.perfectMultiplier * snapshot.heatMultiplier, 1.45, 2.25),
       refundRateDelta: -0.035,
       reputationDelta: 4,
@@ -214,37 +181,11 @@ export function EvaluateMarketFit(state, overrides = {}) {
       perfect: true,
       tone: "good",
     };
-  } else if (directionMatch) {
-    result = {
-      tier: "hollow",
-      label: "只改话术 · 硬蹭风口",
-      description: "宣传方向对了，主打特色却拿不出对应内容。玩家把这叫关键词诈骗。",
-      revenueMultiplier: 0.72,
-      refundRateDelta: 0.18,
-      reputationDelta: -5,
-      fanMultiplier: 0.55,
-      backlash: true,
-      perfect: false,
-      tone: "danger",
-    };
-  } else if (focusMatch) {
-    result = {
-      tier: "mixed",
-      label: "内容对了，时机说错了",
-      description: "游戏里明明有玩家想要的特色，你却沿用旧热点的话术，评论区开始质疑团队到底懂不懂自己的游戏。",
-      revenueMultiplier: 0.68,
-      refundRateDelta: 0.14,
-      reputationDelta: -4,
-      fanMultiplier: 0.7,
-      backlash: true,
-      perfect: false,
-      tone: "warning",
-    };
   } else {
     result = {
       tier: "miss",
-      label: "方向过期 · 人人喊打",
-      description: "特色和迎合方向都没对上本月市场，宣传截图成了玩家群嘲新素材。",
+      label: "选错特色 · 人人喊打",
+      description: "特色不符本月风向。",
       revenueMultiplier: 0.42,
       refundRateDelta: 0.25,
       reputationDelta: -8,
@@ -259,10 +200,9 @@ export function EvaluateMarketFit(state, overrides = {}) {
     ...result,
     snapshot,
     focus,
-    direction: directionId ? FindMarketDirection(directionId) : null,
+    direction: independent ? null : effectiveDirection,
     focusMatch,
-    directionMatch,
-    taboo,
+    chasing: !independent,
     stale,
     setMonth,
   };
@@ -529,8 +469,8 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   state.startupLoan.status = "active";
   state.project = FreshProject(projectId, gameTypeId, projectName);
   PushLog(state, `${studioName} 签下《${projectName}》开发合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
-  PushLog(state, `创业启动贷到账 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}，M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前须还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，逾期整家公司清算。`, "danger");
-  PushLog(state, "你宣布目标是游戏收入 100 亿元。所有人礼貌地没有追问依据。", "normal");
+  PushLog(state, `启动贷 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}；M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，否则清算。`, "danger");
+  PushLog(state, "目标：游戏净收入 100 亿元。", "normal");
   return { state, ok: true, message: "立项成功" };
 }
 
@@ -645,7 +585,7 @@ export function CalculateTensions(project) {
       to: "performance",
       gap: artGap,
       title: "美术把显存吃成自助餐",
-      description: `美术领先性能 ${Math.round(artGap)} 点，客户端集成变慢，首发掉帧风险上升。`,
+      description: `领先 ${Math.round(artGap)}：集成变慢、掉帧风险上升。`,
     });
   }
 
@@ -658,7 +598,7 @@ export function CalculateTensions(project) {
       to: "client",
       gap: scopeGap,
       title: "策划已经设计到续作",
-      description: `策划领先客户端 ${Math.round(scopeGap)} 点，新需求正在把旧需求挤出工期。`,
+      description: `领先 ${Math.round(scopeGap)}：范围失控。`,
     });
   }
 
@@ -670,7 +610,7 @@ export function CalculateTensions(project) {
       to: "design",
       gap: clientGap,
       title: "架构优雅，但游戏呢",
-      description: `客户端领先策划 ${Math.round(clientGap)} 点，技术完整度正在制造一款无聊的好程序。`,
+      description: `领先 ${Math.round(clientGap)}：内容不足。`,
     });
   }
 
@@ -682,7 +622,7 @@ export function CalculateTensions(project) {
       to: "art",
       gap: performanceGap,
       title: "优化到只剩土豆",
-      description: `性能领先美术 ${Math.round(performanceGap)} 点，帧率很稳，玩家也很难看清内容。`,
+      description: `领先 ${Math.round(performanceGap)}：画面缩水。`,
     });
   }
 
@@ -694,7 +634,7 @@ export function CalculateTensions(project) {
       to: "client",
       gap: project.scopeDebt,
       title: "范围债正在收利息",
-      description: `还有 ${Math.round(project.scopeDebt)} 点范围债。客户端产出会先拿去填策划留下的坑。`,
+      description: `${Math.round(project.scopeDebt)} 点：吞掉客户端产出。`,
     });
   }
 
@@ -706,7 +646,7 @@ export function CalculateTensions(project) {
       to: "performance",
       gap: project.technicalDebt,
       title: "技术债学会了繁殖",
-      description: `技术债 ${Math.round(project.technicalDebt)} 点，会吞掉性能产出并增加 Bug。`,
+      description: `${Math.round(project.technicalDebt)} 点：吞掉性能产出并增加 Bug。`,
     });
   }
 
@@ -946,21 +886,21 @@ function CalculateBuildStatus(project) {
     - project.technicalDebt * 0.27;
   const score = Clamp(integrationScore, 0, 100);
   if (project.modules.client < 25) {
-    return { level: "broken", label: "打不开", detail: "主场景仍然是一个充满希望的空文件夹。", score };
+    return { level: "broken", label: "打不开", detail: "客户端不足 25。", score };
   }
   if (project.scopeDebt > 46) {
-    return { level: "broken", label: "需求把构建憋死了", detail: "入口有七个，能走通的流程是零个。", score };
+    return { level: "broken", label: "范围失控", detail: "范围债超过 46。", score };
   }
   if (project.technicalDebt > 46) {
-    return { level: "broken", label: "编译通过，运行去世", detail: "启动画面之后是一段很稳定的黑屏。", score };
+    return { level: "broken", label: "技术债爆表", detail: "技术债超过 46。", score };
   }
   if (score < 40 || project.bugs > 32) {
-    return { level: "fragile", label: "偶尔能进主菜单", detail: "能做出垃圾之前，先得让垃圾成功启动。", score };
+    return { level: "fragile", label: "构建不稳", detail: "评分过低或 Bug 过多。", score };
   }
   if (score < 63 || project.bugs > 18) {
-    return { level: "playable", label: "能玩，但别乱点", detail: "沿着演示路线走，像一款已经完成的游戏。", score };
+    return { level: "playable", label: "勉强能玩", detail: "仅能沿演示流程运行。", score };
   }
-  return { level: "stable", label: "终于有稳定构建", detail: "它不一定好玩，但至少可以连续运行十分钟。", score };
+  return { level: "stable", label: "构建稳定", detail: "可稳定运行。", score };
 }
 
 function ProgressProject(state, foodMultiplier = 1, foodPlanName = "本月吃法") {
@@ -1071,7 +1011,7 @@ function ResolveLiveIncome(state) {
     const lostFans = Math.max(20, Math.round(state.fans * (1 - marketFit.fanMultiplier) * 0.08));
     state.fans = Math.max(0, state.fans - lostFans);
     state.reputation = Clamp(state.reputation + marketFit.reputationDelta * 0.35, 0, 100);
-    state.anxiety = Clamp(state.anxiety + (marketFit.tier === "taboo" ? 5 : 3), 0, 100);
+    state.anxiety = Clamp(state.anxiety + 3, 0, 100);
     PushLog(state, marketFit.label + "：" + marketFit.description + " 本月常态流水被市场反噬。", "danger");
   } else if (marketFit?.perfect) {
     state.reputation = Clamp(state.reputation + 1, 0, 100);
@@ -1746,22 +1686,20 @@ export function SetStaffInvestmentLevel(currentState, staffId, requestedLevel) {
   };
 }
 
-export function SetMarketStrategy(currentState, requestedFocusId, requestedDirectionId) {
+export function SetMarketStrategy(currentState, requestedFocusId, requestedDirectionId = undefined) {
   const state = Clone(currentState);
-  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "现在没有项目可供市场部糟蹋。" };
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "没有开发中项目。" };
   const previousStrategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
   if (previousStrategy.setMonth === state.month) {
-    return { state, ok: false, message: "本月市场口径已经发出去了。再改就会同时留下两套互相打脸的截图。" };
+    return { state, ok: false, message: "本月主推已锁定。" };
   }
-  if (state.talkPoints <= 0) return { state, ok: false, message: "本月有效拍板次数用完了。市场部的消息只能先标成未读。" };
-  const focusId = requestedFocusId || "concept";
+  const independent = requestedFocusId === MARKET_INDEPENDENT_ID || requestedDirectionId === MARKET_INDEPENDENT_ID;
+  const focusId = independent
+    ? (MarketFocusFor(state, previousStrategy.focusId)?.id || "concept")
+    : (requestedFocusId || "concept");
   const focus = MarketFocusFor(state, focusId);
-  if (!focus) return { state, ok: false, message: "这个主打特色还没做进游戏，不能先把它写进热搜。" };
-  const directionId = requestedDirectionId === MARKET_INDEPENDENT_ID ? null : requestedDirectionId;
-  if (directionId && !FindMarketDirection(directionId)) return { state, ok: false, message: "这个迎合方向不存在，可能是市场部刚编的词。" };
-
-  const switchedDirection = Boolean(previousStrategy.directionId && previousStrategy.directionId !== directionId);
-  state.talkPoints -= 1;
+  if (!focus) return { state, ok: false, message: "该特色尚未加入项目。" };
+  const directionId = independent ? null : GetMarketSnapshot(state).effectiveDirection.id;
   state.project.marketStrategy = {
     focusId: focus.id,
     directionId,
@@ -1774,22 +1712,17 @@ export function SetMarketStrategy(currentState, requestedFocusId, requestedDirec
     directionId,
   });
   state.project.marketStrategyHistory = state.project.marketStrategyHistory.slice(-24);
-  if (directionId) {
-    state.project.hype = Clamp(state.project.hype + 3, 0, 100);
-    state.project.scopeDebt = Clamp(state.project.scopeDebt + (switchedDirection ? 2 : 1), 0, 80);
-  }
   const marketFit = EvaluateMarketFit(state);
-  const directionName = marketFit.direction?.name || "不主动追风";
   PushLog(
     state,
-    "手机市场口径拍板：主打「" + focus.title + "」，方向「" + directionName + "」。预判：" + marketFit.label + "。",
+    independent ? "市场：本月不追风。" : "市场：主推「" + focus.title + "」；" + marketFit.label + "。",
     marketFit.backlash ? "warning" : marketFit.perfect ? "good" : "normal",
   );
   return {
     state,
     ok: true,
     marketFit,
-    message: marketFit.perfect ? "本月特色与风口正好对上" : marketFit.backlash ? "口径已发出，但评论区可能开团" : "本月市场口径已锁定",
+    message: marketFit.perfect ? "主推特色正中风口" : marketFit.backlash ? "主推特色与风向不符" : "本月不追风",
   };
 }
 

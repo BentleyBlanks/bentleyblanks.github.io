@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#090b12">
-  <meta name="description" content="从签下全部身家开始，在九个横版 2D 场景里熬出一家游戏公司的开发生存 demo。">
+  <meta name="description" content="经营独立游戏工作室，开发、发行并活到收入达到 100 亿元。">
   <title>甲方是我：工作室跑断腿</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815n">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815o">
   <script type="importmap">
     {
       "imports": {
@@ -18,14 +18,14 @@
 <body>
   <div id="loadingScreen" class="loadingScreen" aria-live="polite">
     <div class="loadingMark">甲</div>
-    <strong>正在打印成立合同与清算条款……</strong>
+    <strong>正在进入工作室……</strong>
     <div class="loadingTrack"><i></i></div>
   </div>
 
   <section id="portraitBlocker" class="portraitBlocker" aria-live="polite">
     <div class="rotateGlyph"><span></span></div>
-    <h1>横过来，才能跑起来</h1>
-    <p>这是 2.5D 成立仪式加横版 2D 游戏。竖屏会把老板卡进墙里。</p>
+    <h1>请横屏游玩</h1>
+    <p>横屏操作更方便。</p>
   </section>
 
   <main id="gameRoot" class="gameRoot">
@@ -49,7 +49,7 @@
             <div class="hudStat debtStat"><span>启动贷到期 / 待还</span><strong id="startupDebtValue">M08 / ¥82,000</strong></div>
           </div>
           <div class="goalHud">
-            <div><span>唯一胜利目标 · 游戏收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
+            <div><span>胜利 · 游戏收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
             <div class="goalTrack"><i id="goalBar"></i></div>
           </div>
         </div>
@@ -78,7 +78,7 @@
       <div class="missionHeading"><span>项目状态</span><b>ACTIVE FILE</b></div>
       <div class="locationPlate"><span>当前位置</span><strong id="locationValue">自己的家</strong></div>
       <strong id="projectTitle">先开一家公司</strong>
-      <p id="missionText">先签完成立合同，再回家打开那台唯一的电脑。</p>
+      <p id="missionText">签合同，再用家中电脑开发。</p>
       <div class="moduleLabel"><span>制作进度</span><small>四项能力</small></div>
       <div id="moduleStrip" class="moduleStrip"></div>
       <div id="locationRoute" class="locationRoute" aria-hidden="true"></div>
@@ -89,7 +89,7 @@
       <div><strong id="interactionTitle">交互</strong><small id="interactionDetail">靠近一点</small></div>
     </div>
 
-    <div class="desktopHint"><b>A D / ← →</b> 穿过九处场景　<b>W / ↑ / 空格</b> 跳　<b>E</b> 交互</div>
+    <div class="desktopHint"><b>A/D</b> 移动　<b>W</b> 跳　<b>E</b> 交互</div>
 
     <button id="settlementButton" class="settlementButton" type="button" aria-label="结算 M01 并进入 M02" aria-keyshortcuts="N">
       <span class="settlementSignal" aria-hidden="true"><i></i><b>↻</b></span>
@@ -116,29 +116,27 @@
     <div id="ceremonyIntro" class="ceremonyIntro">
       <span class="ceremonyEyebrow">2.5D FOUNDING CEREMONY · 2026</span>
       <h1>今天，<br>你将成立一家<br><em>随时会倒闭的公司</em></h1>
-      <p>灯会亮，礼花会响，银行也会在同一秒开始计时。仪式结束后，才轮到现实动手。</p>
-      <div class="controlPills"><span class="winPill">唯一胜利：游戏收入 100 亿元</span><span>全部身家担保</span><span>放款 ¥68,000</span><span>M08 前还 ¥82,000</span><span>逾期直接清算</span></div>
-      <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><span>进入 2.5D 成立仪式</span><strong>让灯亮起来 →</strong></button>
-      <button id="continueButton" class="continueButton hidden" type="button">跳过仪式，继续上次的公司</button>
+      <div class="controlPills"><span class="winPill">唯一胜利：游戏收入 100 亿元</span><span>启动贷 ¥68,000</span><span>M08 前还 ¥82,000</span><span>逾期倒闭</span></div>
+      <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><span>成立公司</span><strong>开始 →</strong></button>
+      <button id="continueButton" class="continueButton hidden" type="button">继续上次游戏</button>
     </div>
 
     <button id="skipCeremonyButton" class="skipCeremonyButton hidden" type="button">跳过动画</button>
     <div id="ceremonyCaption" class="ceremonyCaption hidden" aria-live="polite"><span>公司成立仪式</span><strong id="ceremonyCaptionText">创始人入场</strong></div>
 
     <section id="foundingNamePanel" class="foundingNamePanel hidden" aria-labelledby="foundingTitle">
-      <header><span>市场主体登记申请书 · 极不严谨版</span><b>01 / 03</b></header>
+      <header><span>公司登记</span><b>01 / 03</b></header>
       <div class="registrySeal">筹</div>
       <p class="documentKicker">FOUNDING REGISTRATION</p>
       <h2 id="foundingTitle">请给这家公司一个名字</h2>
-      <p>这个名字会出现在家门口、电脑、合同、发布记录和最后的清算通知上。</p>
-      <label class="contractField"><span>公司 / 工作室全称</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="例如：今晚一定上线工作室"></label>
+      <label class="contractField"><span>工作室名称</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="例如：今晚一定上线工作室"></label>
       <div id="studioNameSuggestions" class="nameSuggestions">
         <button type="button" data-studio-name="今晚一定上线">今晚一定上线</button>
         <button type="button" data-studio-name="需求不会再改">需求不会再改</button>
         <button type="button" data-studio-name="电脑不能抵押">电脑不能抵押</button>
       </div>
       <p id="setupError" class="setupError" aria-live="polite"></p>
-      <button id="nameConfirmButton" class="documentButton" type="button"><span>签名并正式揭牌</span><strong>我对这个名字负责 →</strong></button>
+      <button id="nameConfirmButton" class="documentButton" type="button"><span>确认名称</span><strong>下一步 →</strong></button>
     </section>
 
     <section id="founderProfilePanel" class="founderProfilePanel hidden" aria-labelledby="founderProfileTitle">
@@ -151,15 +149,15 @@
     </section>
 
     <section id="projectContract" class="projectContract hidden" aria-labelledby="contractTitle">
-      <header><div><span>独立游戏开发立项合同</span><small>合同编号：M01-NO-MONEY</small></div><b>03 / 03</b></header>
+      <header><div><span>游戏立项</span><small>M01</small></div><b>03 / 03</b></header>
       <div class="contractParties"><span>甲方（也是乙方）：<strong id="contractStudioName">未命名工作室</strong></span><span>创始人能力：<strong id="contractFounderSkills">策 3 / 程 3 / 美 3</strong></span><span>目标收入：<strong>人民币壹佰亿元整</strong></span></div>
-      <h2 id="contractTitle">把第一款游戏写进合同</h2>
-      <label class="contractField gameNameField"><span>项目正式名称</span><input id="gameNameInput" type="text" maxlength="20" autocomplete="off" inputmode="text" placeholder="亲自给你的游戏取名"></label>
-      <div class="contractSection"><div class="contractHeading"><b>第一条</b><span><strong>选择游戏题材</strong><small>题材决定初始方向；以后强行换赛道会非常贵</small></span></div><div id="projectChoices" class="choiceRail"></div></div>
-      <div class="contractSection"><div class="contractHeading"><b>第二条</b><span><strong>选择发行类型</strong><small>单机、网游、手游会带来不同成本和评分短板</small></span></div><div id="typeChoices" class="choiceRail compactRail"></div></div>
-      <div class="contractFinePrint"><b>特别条款</b><span>启动资金并非赠款：以创始人全部身家担保，实收 ¥68,000，M08 结束前应还 ¥82,000。到期未清，工作室立即倒闭。</span></div>
+      <h2 id="contractTitle">确定第一款游戏</h2>
+      <label class="contractField gameNameField"><span>游戏名称</span><input id="gameNameInput" type="text" maxlength="20" autocomplete="off" inputmode="text" placeholder="给游戏取名"></label>
+      <div class="contractSection"><div class="contractHeading"><b>01</b><span><strong>选择题材</strong></span></div><div id="projectChoices" class="choiceRail"></div></div>
+      <div class="contractSection"><div class="contractHeading"><b>02</b><span><strong>选择发行类型</strong></span></div><div id="typeChoices" class="choiceRail compactRail"></div></div>
+      <div class="contractFinePrint"><b>启动贷</b><span>到账 ¥68,000；M08 前还 ¥82,000，否则倒闭。</span></div>
       <p id="contractError" class="setupError" aria-live="polite"></p>
-      <div class="signatureRow"><div><small>创始人签章</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>签字盖章</strong><i></i></button></div>
+      <div class="signatureRow"><div><small>创始人</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>确认开局</strong><i></i></button></div>
     </section>
   </section>
 
@@ -194,14 +192,14 @@
       <span id="resultKicker">SPRINT RESULT</span>
       <h2 id="resultTitle">结果</h2>
       <div id="resultBody"></div>
-      <button id="resultCloseButton" class="primaryButton" type="button">继续跑</button>
+      <button id="resultCloseButton" class="primaryButton" type="button">继续</button>
     </section>
   </div>
 
   <section id="endingScreen" class="endingScreen hidden" aria-live="polite">
-    <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>再跑一家公司</span><strong>这次少走弯路 →</strong></button></div>
+    <div><span>RUN ENDED</span><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><span>重新开始</span><strong>再开一家公司 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815n"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815o"></script>
 </body>
 </html>

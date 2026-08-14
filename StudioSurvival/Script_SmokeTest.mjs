@@ -863,12 +863,10 @@ function HasRecordedId(collection, id) {
 {
   const state = Begin();
   const snapshot = GetMarketSnapshot(state);
-  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.trend.id), "the structural market trend must come from the public catalog");
-  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.effectiveDirection.id), "the effective monthly direction must be actionable");
+  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.effectiveDirection.id), "the monthly direction must come from the public catalog");
   assert(MARKET_EVENTS.some((marketEvent) => marketEvent.id === snapshot.event.id), "the phone must surface a deterministic random market event");
-  assert.equal(snapshot.nextRumor.direction.id, GetMarketSnapshot(state, state.month + 1).trend.id, "the next-month rumor must preview the structural trend rather than silently changing rules");
   assert.deepEqual(GetMarketSnapshot(state), snapshot, "market news must be deterministic for a save and month");
-  assert.equal(EvaluateMarketFit(state).tier, "independent", "a new project must remain neutral until the player publishes a pander direction");
+  assert.equal(EvaluateMarketFit(state).tier, "independent", "a new project must remain safe until the player chooses a featured hook");
 }
 
 {
@@ -876,31 +874,37 @@ function HasRecordedId(collection, id) {
   const snapshot = GetMarketSnapshot(base);
   const matchingFeature = FEATURE_CHOICES.find((feature) => feature.marketDirections.includes(snapshot.effectiveDirection.id));
   const mismatchingFeature = FEATURE_CHOICES.find((feature) => !feature.marketDirections.includes(snapshot.effectiveDirection.id));
-  const wrongDirection = MARKET_DIRECTIONS.find((direction) => direction.id !== snapshot.effectiveDirection.id);
-  assert(matchingFeature && mismatchingFeature && wrongDirection, "the market fixture needs both a fit and a miss");
+  assert(matchingFeature && mismatchingFeature, "the market fixture needs both a fit and a miss");
 
   let perfectState = CustomizeProject(structuredClone(base), "owner", matchingFeature.id).state;
   perfectState = MakeLaunchReady(perfectState, 92);
-  const perfectStrategy = SetMarketStrategy(perfectState, matchingFeature.id, snapshot.effectiveDirection.id);
+  const talkPointsBeforeMarket = perfectState.talkPoints;
+  const scopeDebtBeforeMarket = perfectState.project.scopeDebt;
+  const perfectStrategy = SetMarketStrategy(perfectState, matchingFeature.id);
   assert.equal(perfectStrategy.ok, true);
-  assert.equal(perfectStrategy.state.talkPoints, 0, "publishing the monthly market position must consume one effective conversation");
-  assert.equal(perfectStrategy.marketFit.perfect, true, "matching feature and pander direction must create a perfect market fit");
+  assert.equal(perfectStrategy.state.talkPoints, talkPointsBeforeMarket, "choosing one featured hook must not consume a conversation");
+  assert.equal(perfectStrategy.state.project.scopeDebt, scopeDebtBeforeMarket, "choosing one featured hook must not create scope debt");
+  assert.equal(perfectStrategy.marketFit.perfect, true, "a matching featured hook must create a perfect market fit");
   assert(perfectStrategy.marketFit.revenueMultiplier > 1.4, "a perfect fit must visibly amplify revenue");
-  const duplicateStrategy = SetMarketStrategy(perfectStrategy.state, matchingFeature.id, snapshot.effectiveDirection.id);
-  assert.equal(duplicateStrategy.ok, false, "the public market position can only be locked once per month");
+  const duplicateStrategy = SetMarketStrategy(perfectStrategy.state, matchingFeature.id);
+  assert.equal(duplicateStrategy.ok, false, "the featured hook can only be locked once per month");
 
   let missedState = CustomizeProject(structuredClone(base), "owner", mismatchingFeature.id).state;
   missedState = MakeLaunchReady(missedState, 92);
-  const missedStrategy = SetMarketStrategy(missedState, mismatchingFeature.id, wrongDirection.id);
+  const missedStrategy = SetMarketStrategy(missedState, mismatchingFeature.id);
   assert.equal(missedStrategy.ok, true);
-  assert.equal(missedStrategy.marketFit.backlash, true, "mistimed pander direction and unsupported feature must trigger backlash");
-  assert(missedStrategy.marketFit.revenueMultiplier < 0.75, "a mistimed market chase must cut revenue before refunds");
+  assert.equal(missedStrategy.marketFit.backlash, true, "a mismatching featured hook must trigger backlash");
+  assert(missedStrategy.marketFit.revenueMultiplier < 0.75, "a wrong featured hook must cut revenue before refunds");
+
+  const safeStrategy = SetMarketStrategy(structuredClone(base), "independent");
+  assert.equal(safeStrategy.ok, true);
+  assert.equal(safeStrategy.marketFit.tier, "independent", "the one-click safe option must avoid market backlash");
 
   const perfectRelease = ReleaseBuild(perfectStrategy.state);
   const missedRelease = ReleaseBuild(missedStrategy.state);
   assert.equal(perfectRelease.ok, true);
   assert.equal(missedRelease.ok, true);
-  assert(perfectRelease.revenue > missedRelease.revenue * 2, "hitting the trend with a real matching feature must earn materially more than mistimed pandering");
+  assert(perfectRelease.revenue > missedRelease.revenue * 2, "hitting the trend with a real matching feature must earn materially more than a wrong feature");
   assert.equal(missedRelease.commercial.marketBacklash, true, "the commercial report must identify market backlash");
   assert(missedRelease.commercial.refundRate > perfectRelease.commercial.refundRate, "being loudly wrong must produce more refunds");
   assert(missedRelease.state.reputation < perfectRelease.state.reputation, "being loudly wrong must damage reputation");
