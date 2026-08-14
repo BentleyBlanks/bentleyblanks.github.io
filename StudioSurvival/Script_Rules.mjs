@@ -34,6 +34,18 @@ export const STARTUP_LOAN_TERMS = Object.freeze({
   dueMonth: 8,
 });
 export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
+export const OWNER_HAIR_STAGES = Object.freeze({
+  full: "full",
+  thinning: "thinning",
+  bald: "bald",
+});
+
+export function GetOwnerHairStage(monthValue) {
+  const month = Math.max(1, Math.floor(Number(monthValue) || 1));
+  if (month >= 19) return OWNER_HAIR_STAGES.bald;
+  if (month >= 13) return OWNER_HAIR_STAGES.thinning;
+  return OWNER_HAIR_STAGES.full;
+}
 
 function Clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1284,9 +1296,20 @@ export function AdvanceMonth(currentState) {
   state.talkPoints = 2;
   state.selectedDirective = "integration";
   if (state.status === "playing") {
+    const previousHairStage = GetOwnerHairStage(state.month);
     state.month += 1;
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
+    const currentHairStage = GetOwnerHairStage(state.month);
+    if (currentHairStage !== previousHairStage) {
+      PushLog(
+        state,
+        currentHairStage === OWNER_HAIR_STAGES.thinning
+          ? "连续做游戏满一年，老板的发际线正式进入抢先体验。"
+          : "又做了半年，老板彻底秃了；游戏还在继续长头发。",
+        "warning",
+      );
+    }
   }
   return {
     state,

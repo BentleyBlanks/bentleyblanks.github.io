@@ -33,7 +33,9 @@ import {
   GetAnxietyState,
   GetIdleLine,
   GetMemberMonthlyCost,
+  GetOwnerHairStage,
   HireStaff,
+  OWNER_HAIR_STAGES,
   PerformOwnerTask,
   PivotProject,
   PurchaseWorkstation,
@@ -50,7 +52,7 @@ import {
   TalkToStaff,
   ValidateState,
   WORKSTATION_COSTS,
-} from "./Script_Rules.mjs";
+} from "./Script_Rules.mjs?v=20260815c";
 import {
   FindLocationAt,
   Locations as WorldLocations,
@@ -339,6 +341,29 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
   const hair = new THREE.Mesh(new THREE.CircleGeometry(.32, 20, 0, Math.PI), material(owner ? 0x11121a : 0x24212a));
   hair.position.set(0, 2.04, .06);
   group.add(hair);
+  let thinningHair = null;
+  let scalpShine = null;
+  if (owner) {
+    thinningHair = new THREE.Group();
+    const hairMaterial = material(0x11121a);
+    const tuftOffsets = [-.19, 0, .19];
+    tuftOffsets.forEach((xOffset, tuftIndex) => {
+      const tuft = new THREE.Mesh(new THREE.PlaneGeometry(.045, tuftIndex === 1 ? .16 : .2), hairMaterial);
+      tuft.position.set(xOffset, 2.17 - Math.abs(xOffset) * .1, .07);
+      tuft.rotation.z = xOffset * -2.8;
+      thinningHair.add(tuft);
+    });
+    group.add(thinningHair);
+    scalpShine = new THREE.Mesh(
+      new THREE.CircleGeometry(.065, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffead7, transparent: true, opacity: .72, depthWrite: false, toneMapped: false }),
+    );
+    scalpShine.scale.set(.58, 1, 1);
+    scalpShine.position.set(.095, 2.14, .071);
+    group.add(scalpShine);
+    thinningHair.visible = false;
+    scalpShine.visible = false;
+  }
   const leftLeg = rectangle(.21, .7, 0x24283a, .02);
   const rightLeg = rectangle(.21, .7, 0x24283a, .02);
   leftLeg.position.set(-.2, .46, .02);
@@ -350,8 +375,17 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
   rightArm.position.set(.48, 1.3, .03);
   group.add(leftArm, rightArm);
   group.userData.flat = true;
-  group.userData.parts = { torso, head, leftLeg, rightLeg, leftArm, rightArm, shadow };
+  group.userData.parts = { torso, head, hair, thinningHair, scalpShine, leftLeg, rightLeg, leftArm, rightArm, shadow };
   return group;
+}
+
+function ApplyOwnerHairStage() {
+  if (!playerParts?.hair) return;
+  const hairStage = GetOwnerHairStage(state.month);
+  playerParts.hair.visible = hairStage === OWNER_HAIR_STAGES.full;
+  if (playerParts.thinningHair) playerParts.thinningHair.visible = hairStage === OWNER_HAIR_STAGES.thinning;
+  if (playerParts.scalpShine) playerParts.scalpShine.visible = hairStage !== OWNER_HAIR_STAGES.full;
+  if (playerActor) playerActor.userData.hairStage = hairStage;
 }
 
 function BuildAiActor(color = 0x66b8ff) {
@@ -775,6 +809,7 @@ function RebuildStaffActors() {
     staffActors.set(staff.id, actor);
     actorGroup.add(actor);
   });
+  ApplyOwnerHairStage();
 }
 
 function SpawnParticles(x, y, color = 0x9d8cff, count = 9) {
@@ -953,6 +988,7 @@ function RenderHud() {
   dom.studioNameHud.textContent = studioName;
   dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
+  ApplyOwnerHairStage();
   dom.cashValue.textContent = FormatMoney(state.cash);
   const startupLoan = state.startupLoan;
   dom.startupDebtValue.textContent = startupLoan?.status === "repaid"

@@ -11,6 +11,7 @@ import {
   ForecastPivotCost,
   GetMemberMonthlyCost,
   GetAnxietyState,
+  GetOwnerHairStage,
   HireStaff,
   ReleaseBuild,
   SelectDirective,
@@ -24,6 +25,7 @@ import {
   PerformOwnerTask,
   PurchaseWorkstation,
   RepayStartupLoan,
+  OWNER_HAIR_STAGES,
   STARTUP_LOAN_TERMS,
   WORKSTATION_COSTS,
   ValidateState,
@@ -101,6 +103,33 @@ function ApplyResult(target, result) {
 function HasRecordedId(collection, id) {
   if (Array.isArray(collection)) return collection.some((item) => item === id || item?.id === id || item?.featureId === id);
   return Boolean(collection && typeof collection === "object" && collection[id]);
+}
+
+{
+  assert.equal(GetOwnerHairStage(12), OWNER_HAIR_STAGES.full, "the owner's hair must survive the first year");
+  assert.equal(GetOwnerHairStage(13), OWNER_HAIR_STAGES.thinning, "month 13 must visibly begin hair loss");
+  assert.equal(GetOwnerHairStage(18), OWNER_HAIR_STAGES.thinning, "hair loss must persist through the next half year");
+  assert.equal(GetOwnerHairStage(19), OWNER_HAIR_STAGES.bald, "month 19 must make the owner bald");
+  assert.equal(GetOwnerHairStage(120), OWNER_HAIR_STAGES.bald, "baldness must persist for the rest of the campaign");
+
+  let state = Begin();
+  state.cash = 1_000_000;
+  state.startupLoan.status = "repaid";
+  state.startupLoan.remaining = 0;
+  state.month = 12;
+  state.ownerWorkMonth = 12;
+  let result = AdvanceMonth(state);
+  assert.equal(result.state.month, 13);
+  assert.equal(GetOwnerHairStage(result.state.month), OWNER_HAIR_STAGES.thinning);
+  assert(result.state.log.some((entry) => entry.month === 13 && entry.text.includes("发际线")), "the first hair-loss month must be recorded");
+
+  state = result.state;
+  state.month = 18;
+  state.ownerWorkMonth = 18;
+  result = AdvanceMonth(state);
+  assert.equal(result.state.month, 19);
+  assert.equal(GetOwnerHairStage(result.state.month), OWNER_HAIR_STAGES.bald);
+  assert(result.state.log.some((entry) => entry.month === 19 && entry.text.includes("彻底秃")), "the baldness month must be recorded");
 }
 
 {
