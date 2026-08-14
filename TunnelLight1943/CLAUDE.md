@@ -213,6 +213,12 @@ npm run scene:tunnelLight1943
 
 画面全是不写深度缓冲的半透明贴图，**前后完全由绘制顺序决定**。规则：
 
+> 绘制序小工具（`LAYER_ORDER`/`DepthOrder`/`FixOrder`/`SetPlayOrder`）、烘焙工具
+> （`BakeSprite` 一族）与无状态的地形/影子画笔 2026-08-15 起在
+> `Script_WorldPaint.mjs`（从 CreateWorld 闭包抽出，可单独 import）；
+> 跟着 state 走的绘制（AddProp/AddUnderground/UpdateOne）仍在 `Script_World.js`。
+> 可变雾色走参数（`AddRidgeBand` 的 `hazeTint`），画笔不偷读闭包。
+
 1. **带的数值**在 `Data_DepthSpec.mjs`（`BAND` + `ACTOR_Z/CARRY_Z/NEAR_CLUTTER`），
    **哪类物体用哪个带**在 `Data_PropArt.json` 的 `band` 字段。两处都不许写裸数字。
 2. **动态物**（放下的、飞着的、演出用的）用
