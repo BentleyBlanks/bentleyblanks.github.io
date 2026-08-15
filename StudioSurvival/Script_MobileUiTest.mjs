@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815z/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815z/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!z)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!z)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815aa/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815aa/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!aa)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!aa)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -49,6 +49,10 @@ assert.match(css, /\.mobileControls\.suppressed/, "world controls must disappear
 assert.match(css, /\.settlementButton\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?right:\s*var\(--safeRight\);[\s\S]*?bottom:\s*var\(--safeBottom\);/, "next turn must be pinned to the desktop bottom-right safe area");
 assert.match(css, /\.settlementButton\s*\{[\s\S]*?bottom:\s*calc\(var\(--safeBottom\) \+ var\(--controlSize\) \+ 10px\);/, "touch layouts must keep next turn above the right-thumb controls");
 assert.match(css, /\.modalLayer\.monthCloseMode \.worldPanel/, "monthly confirmation needs its own compact ritual surface");
+assert.match(css, /\.modalLayer\.travelMapMode \.worldPanel/, "the destination map needs its own physical surface");
+assert.match(css, /\.travelMapPaper\s*\{[^}]*aspect-ratio:/s, "the folded map must preserve its landscape layout");
+assert.match(css, /\.travelMapPlace\s*\{[^}]*min-height:\s*52px/s, "desktop map places must read as substantial physical markers");
+assert.match(css, /@media \(hover:none\), \(pointer:coarse\), \(max-width:920px\)[\s\S]*?\.travelMapPlace\s*\{[^}]*min-height:\s*44px/s, "phone map places must retain full touch targets");
 assert.match(css, /\.resultLayer\.monthResultMode \.resultCard/, "monthly results need a distinct ceremonial reveal");
 assert.match(css, /\.monthResultMode \.stockReturnGrid\s*\{\s*display:\s*none;/, "stock settlement must stay compact inside the monthly reveal");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
@@ -96,7 +100,8 @@ assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet mu
 assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must show the target before entering the playable world");
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
 assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
-assert.match(script, /AddPhysicalLabel\(roomGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
+assert.match(script, /AddPhysicalLabel\(sceneGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
+assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");
 assert.doesNotMatch(script, /function OpenHomeComputerSheet[\s\S]*?data-open-stock[\s\S]*?function OpenWorkstationSheet/, "the development computer must not expose stock trading");

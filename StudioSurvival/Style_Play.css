@@ -206,9 +206,6 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .modulePip span { font-size: 8px; color: var(--muted); }
 .modulePip div { height: 3px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
 .modulePip i { display: block; height: 100%; border-radius: inherit; }
-.locationRoute { display: grid; grid-template-columns: repeat(9,1fr); gap: 3px; margin-top: 6px; }
-.locationRoute i { height: 3px; border-radius: 99px; background: rgba(255,255,255,.12); }
-.locationRoute i.active { background: var(--cyan); box-shadow: 0 0 8px rgba(101,216,255,.65); }
 .debtStat strong { color: #ff9aa2; font-size: 11px; }
 
 .interactionPrompt {
@@ -1081,14 +1078,195 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .travelCurtain.active { opacity:1; visibility:visible; }
 .travelCurtain.active::before { animation:travelSweep .62s ease both; }
 .travelCurtain span { position:relative; color:#eeeafa; font-size:12px; font-weight:900; letter-spacing:.16em; }
-.travelCurtain span::after { content:"…"; color:var(--cyan); }
 @keyframes travelSweep { to { transform:translateX(100%); } }
-.travelGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.travelChoice { min-height:92px; display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto; gap:5px 12px; padding:13px 14px; border:1px solid var(--line); border-left:4px solid var(--destinationColor,var(--violet)); border-radius:11px; background:rgba(255,255,255,.03); text-align:left; cursor:pointer; }
-.travelChoice:hover { background:rgba(255,255,255,.075); transform:translateX(3px); }
-.travelChoice span { color:var(--destinationColor,var(--cyan)); font-size:13px; font-weight:900; }
-.travelChoice strong { grid-column:1; color:#c3bfd0; font-size:9px; font-weight:500; }
-.travelChoice i { grid-column:2; grid-row:1/3; align-self:center; color:#f5f3ff; font-size:9px; font-style:normal; }
+
+/* A folded city map replaces the old destination list. */
+.modalLayer.travelMapMode {
+  background: radial-gradient(ellipse at 50% 42%, rgba(183,138,78,.12), transparent 58%), rgba(13,9,7,.9);
+}
+.travelMapMode .modalBackdrop {
+  background: radial-gradient(ellipse at 50% 38%, rgba(88,57,32,.24), transparent 52%), rgba(8,6,5,.74);
+  backdrop-filter: blur(8px) saturate(.72);
+}
+.modalLayer.travelMapMode .worldPanel {
+  width: min(920px,96vw);
+  max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 12px);
+  padding: 8px;
+  overflow: visible;
+  border: 1px solid #2b180f;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 12px 12px,#c29d5e 0 2px,#3b2113 2.5px 5px,transparent 5.5px),
+    radial-gradient(circle at calc(100% - 12px) 12px,#c29d5e 0 2px,#3b2113 2.5px 5px,transparent 5.5px),
+    linear-gradient(155deg,rgba(255,255,255,.08),transparent 24%),
+    #52311f;
+  box-shadow: inset 0 1px 0 rgba(255,235,195,.22), inset 0 -5px 0 rgba(29,14,8,.52), 0 30px 90px rgba(0,0,0,.76);
+}
+.travelMapMode .worldPanel > header {
+  min-height: 44px;
+  margin: 0 7px 5px;
+  padding: 6px 10px 7px;
+  border: 1px solid #8d7a58;
+  border-radius: 2px;
+  background: linear-gradient(96deg,rgba(102,76,38,.07),transparent 32%,rgba(85,60,31,.08)),#e7d9ba;
+  color: #31291e;
+  box-shadow: 2px 3px 0 #2d1b11, inset 0 0 0 1px rgba(255,255,255,.34);
+}
+.travelMapMode .worldPanel > header span { color:#8f3b35; text-shadow:none; }
+.travelMapMode .worldPanel h2 { color:#2e281f; font:900 20px/1.05 Georgia,"Songti SC",serif; letter-spacing:.06em; }
+.travelMapMode .closeButton {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border: 1px solid #564a36;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%,#fff4d5,#bca97e 57%,#6e5e43 61%);
+  color: #372e21;
+  box-shadow: inset 1px 1px 0 #fff8e5,inset -2px -3px 0 rgba(61,48,28,.34),0 3px 0 #3f3323;
+}
+.travelMapMode .sheetBody {
+  max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 76px);
+  margin: 0;
+  padding: 7px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.travelMapPaper {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 2.14;
+  overflow: hidden;
+  border: 1px solid #9b8966;
+  border-radius: 2px 5px 3px 4px;
+  background:
+    radial-gradient(ellipse at 14% 18%,rgba(110,75,37,.11),transparent 17%),
+    radial-gradient(ellipse at 78% 77%,rgba(107,72,37,.1),transparent 18%),
+    repeating-linear-gradient(7deg,rgba(89,75,53,.025) 0 1px,transparent 1px 8px),
+    #e9ddbe;
+  box-shadow: 3px 4px 0 #392318, 8px 12px 26px rgba(0,0,0,.47), inset 0 0 38px rgba(78,57,30,.15);
+  transform: rotate(-.12deg);
+}
+.travelMapPaper::before {
+  content:"";
+  position:absolute;
+  z-index:0;
+  inset:0;
+  background:
+    linear-gradient(90deg,transparent 32.6%,rgba(91,69,42,.14) 33%,rgba(255,255,255,.23) 33.35%,transparent 33.8%),
+    linear-gradient(90deg,transparent 65.9%,rgba(88,65,39,.14) 66.3%,rgba(255,255,255,.2) 66.65%,transparent 67.1%),
+    linear-gradient(0deg,transparent 49%,rgba(90,66,38,.1) 49.6%,rgba(255,255,255,.18) 50.1%,transparent 50.7%);
+  pointer-events:none;
+}
+.travelMapPaper::after {
+  content:"";
+  position:absolute;
+  z-index:2;
+  inset:5px;
+  border:1px dashed rgba(83,67,44,.22);
+  pointer-events:none;
+}
+.travelMapRoads { position:absolute; z-index:1; inset:0; width:100%; height:100%; overflow:visible; }
+.travelMapRoads path { fill:none; vector-effect:non-scaling-stroke; stroke-linecap:round; stroke-linejoin:round; }
+.travelMapContour { stroke:#9d8d6e; stroke-width:1; stroke-dasharray:2 4; opacity:.45; }
+.travelMapWater { stroke:#71979b; stroke-width:7; opacity:.42; }
+.travelMapRoadShadow { stroke:#6f5c41; stroke-width:5; opacity:.42; }
+.travelMapRoad { stroke:#f8edcf; stroke-width:2.7; stroke-dasharray:7 2; }
+.travelMapPlace {
+  position:absolute;
+  z-index:3;
+  left:var(--mapX);
+  top:var(--mapY);
+  width:clamp(70px,11vw,106px);
+  min-height:52px;
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr);
+  align-items:center;
+  gap:5px;
+  padding:5px 7px;
+  border:1px solid #6e5d42;
+  border-top:4px solid var(--destinationColor,#8a6d4c);
+  border-radius:3px;
+  background:linear-gradient(145deg,rgba(255,255,255,.42),transparent 42%),#d7c7a4;
+  color:#30291f;
+  text-align:left;
+  box-shadow:1px 2px 0 #67563d,3px 5px 8px rgba(58,39,20,.3),inset 0 0 0 1px rgba(255,255,255,.34);
+  transform:translate(-50%,-50%);
+  transform-origin:center;
+  transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;
+}
+button.travelMapPlace { cursor:pointer; touch-action:manipulation; }
+button.travelMapPlace:hover,
+button.travelMapPlace:focus-visible {
+  z-index:5;
+  outline:0;
+  filter:brightness(1.06);
+  transform:translate(-50%,-55%) scale(1.04);
+  box-shadow:1px 3px 0 #67563d,5px 9px 13px rgba(58,39,20,.38),0 0 0 3px rgba(255,247,218,.65);
+}
+.travelMapPlace i {
+  display:grid;
+  place-items:center;
+  width:26px;
+  height:26px;
+  border:1px solid color-mix(in srgb,var(--destinationColor) 68%,#574831);
+  border-radius:50%;
+  background:color-mix(in srgb,var(--destinationColor) 22%,#eee2c5);
+  color:#31291f;
+  font:900 14px/1 Georgia,"Songti SC",serif;
+  font-style:normal;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.54),0 1px 1px rgba(55,39,23,.28);
+}
+.travelMapPlace strong { overflow:hidden; font-size:10px; line-height:1.08; white-space:nowrap; text-overflow:clip; }
+.travelMapPlace.current {
+  border-color:#652622;
+  border-top-color:#c84b43;
+  background:linear-gradient(145deg,rgba(255,255,255,.19),transparent 42%),#9c3a35;
+  color:#fff4dc;
+  box-shadow:1px 2px 0 #4f1e1b,4px 7px 12px rgba(75,26,22,.42),0 0 0 4px rgba(165,55,48,.13);
+}
+.travelMapPlace.current i { border-color:#f1d5b1; background:#efe0bd; color:#7b2825; }
+.travelMapPlace.current::after {
+  content:"";
+  position:absolute;
+  top:-10px;
+  left:50%;
+  width:10px;
+  height:10px;
+  border:2px solid #f3dec0;
+  border-radius:50%;
+  background:#bd3f39;
+  box-shadow:0 0 0 3px rgba(153,45,41,.22),0 4px 6px rgba(63,21,18,.34);
+  transform:translateX(-50%);
+}
+
+@media (hover:none), (pointer:coarse), (max-width:920px) {
+  .modalLayer.travelMapMode { padding:max(4px,var(--safeTop)) max(6px,var(--safeRight)) max(4px,var(--safeBottom)) max(6px,var(--safeLeft)); }
+  .modalLayer.travelMapMode .worldPanel { width:min(880px,calc(100vw - var(--safeLeft) - var(--safeRight) - 6px)); padding:5px; }
+  .travelMapMode .worldPanel > header { min-height:46px; margin:0 4px 3px; padding:1px 7px; }
+  .travelMapMode .worldPanel h2 { font-size:16px; }
+  .travelMapMode .sheetBody { max-height:calc(100dvh - var(--safeTop) - var(--safeBottom) - 58px); padding:4px; }
+  .travelMapPaper { aspect-ratio:2.22; }
+  .travelMapPlace {
+    width:clamp(68px,11vw,82px);
+    min-height:44px;
+    grid-template-columns:22px minmax(0,1fr);
+    gap:4px;
+    padding:3px 5px;
+    border-top-width:3px;
+  }
+  .travelMapPlace i { width:22px; height:22px; font-size:12px; }
+  .travelMapPlace strong { font-size:9px; }
+}
+
+@media (max-height:430px) and (orientation:landscape) {
+  .travelMapMode .worldPanel > header span { display:none; }
+  .travelMapMode .worldPanel > header { min-height:44px; }
+  .travelMapMode .sheetBody { max-height:calc(100dvh - var(--safeTop) - var(--safeBottom) - 54px); padding:3px; }
+  .travelMapPaper { aspect-ratio:2.28; }
+}
 
 /* A complete late-1990s desktop, not a web panel wearing a thin monitor border. */
 .modalLayer.computerMode { background:#17130f; }
@@ -1690,10 +1868,6 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .modulePip span { color: #635a4a; font-size: 7px; font-weight: 800; }
 .modulePip div { height: 5px; border: 1px solid rgba(72,62,48,.38); border-radius: 1px; background: rgba(78,66,49,.13); box-shadow: inset 0 1px 2px rgba(55,43,28,.18); }
 .modulePip i { box-shadow: inset 0 1px 0 rgba(255,255,255,.28); }
-.locationRoute { position: relative; z-index: 1; margin-top: 8px; gap: 6px; }
-.locationRoute i { height: 5px; border: 1px solid rgba(76,64,47,.26); border-radius: 1px; background: rgba(75,64,48,.18); }
-.locationRoute i.active { background: #39788b; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 0 5px rgba(55,128,148,.35); }
-
 .interactionPrompt {
   padding: 8px 10px;
   border: 1px solid #656972;
@@ -1901,8 +2075,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .moduleLabel { margin-bottom: 3px; padding-top: 4px; }
   .modulePip span { font-size: 6px; }
   .modulePip div { height: 4px; }
-  .locationRoute { margin-top: 5px; }
-  .locationRoute i { height: 4px; }
   .toastStack { top: calc(var(--safeTop) + 82px); }
   .setupScreen { grid-template-columns: 1fr; gap: 0; padding: 2vh 3vw; }
   .setupTitle h1 { font-size: clamp(36px,7vw,58px); margin: 7px 0; }
@@ -2308,7 +2480,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   }
   .missionCard { max-height: 104px; overflow: hidden; }
   .missionCard p { margin-block: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .missionCard .locationRoute { display: none; }
   .computerActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
@@ -2333,8 +2504,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 @media (max-height: 350px) and (orientation: landscape) {
   .missionCard { max-height: 82px; padding: 12px 10px 8px; }
   .missionCard .moduleLabel,
-  .missionCard .moduleStrip,
-  .missionCard .locationRoute { display: none; }
+  .missionCard .moduleStrip { display: none; }
   .interactionPrompt {
     right: calc(var(--safeRight) + 2px);
     bottom: calc(var(--safeBottom) + var(--controlSize) + 10px);

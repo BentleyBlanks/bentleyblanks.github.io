@@ -95,7 +95,7 @@ import {
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
-  "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
+  "studioNameHud", "startupDebtValue", "locationValue", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
   "travelCurtain",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
@@ -312,12 +312,14 @@ const staffActors = new Map();
 const collectibleVisuals = new Map();
 const hazardVisuals = new Map();
 const locationVisuals = new Map();
+const locationSceneGroups = new Map();
 const particles = [];
 let playerActor = null;
 let playerParts = null;
 let nearbyRing = null;
 let worldAccentLight = null;
 let smoothCameraX = 7;
+let visibleLocationId = null;
 let ceremonyFounder = null;
 let ceremonyParts = null;
 let ceremonyCurtains = null;
@@ -1355,8 +1357,9 @@ function BuildFacility(interaction) {
   group.userData.marker = marker;
   group.userData.interactionId = interaction.id;
   group.userData.kind = kind;
+  group.userData.locationId = interaction.locationId;
   facilityVisuals.set(interaction.id, group);
-  facilityGroup.add(group);
+  (locationSceneGroups.get(interaction.locationId) || facilityGroup).add(group);
 }
 
 function AddScenePanel(group, width, height, x, y, color, options = {}) {
@@ -1593,7 +1596,7 @@ function AddAbsurdLocationSigil(group, location, index, center, accent, paleAcce
   return sigil;
 }
 
-function BuildLocationEnvironment(location, index) {
+function BuildLocationEnvironment(location, index, sceneGroup) {
   const group = new THREE.Group();
   const start = location.startX;
   const end = location.endX;
@@ -1773,7 +1776,7 @@ function BuildLocationEnvironment(location, index) {
   worldPracticalLights.push(roomLight);
   group.add(roomLight);
   locationVisuals.set(location.id, { group, halo, ceilingBar, sigil, roomLight, accent: new THREE.Color(accent), phase: index * 1.37 });
-  roomGroup.add(group);
+  sceneGroup.add(group);
 }
 
 function BuildRoom() {
@@ -1797,20 +1800,28 @@ function BuildRoom() {
     maleModelClub: { wall: 0x78465f, surface: "leather", floor: 0x573047, floorSurface: "fabric", sign: 0x5b2944 },
   };
   WorldLocations.forEach((location, index) => {
+    const sceneGroup = new THREE.Group();
+    sceneGroup.name = `Scene_${location.id}`;
+    sceneGroup.userData.locationId = location.id;
+    sceneGroup.visible = false;
+    locationSceneGroups.set(location.id, sceneGroup);
+    roomGroup.add(sceneGroup);
     const locationWidth = location.endX - location.startX;
     const centerX = location.startX + locationWidth / 2;
     const look = roomLooks[location.id];
     const wall = Box(locationWidth - .08, 6.5, .18, look.wall, { surface: look.surface, castShadow: false, roughness: .92 });
     wall.position.set(centerX, 3.15, -.72);
-    roomGroup.add(wall);
-    Place(roomGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
-    Place(roomGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
-    BuildLocationEnvironment(location, index);
-    AddPhysicalLabel(roomGroup, location.name, "", 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
-    Place(roomGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 3.15, -.18);
-    Place(roomGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), location.endX, 6.36, -.16);
+    sceneGroup.add(wall);
+    Place(sceneGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
+    Place(sceneGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
+    BuildLocationEnvironment(location, index, sceneGroup);
+    AddPhysicalLabel(sceneGroup, location.name, "", 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
+    for (const boundaryX of [location.startX, location.endX]) {
+      Place(sceneGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 3.15, -.18);
+      Place(sceneGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 6.36, -.16);
+    }
     for (let markerIndex = 0; markerIndex < 4; markerIndex += 1) {
-      Place(foregroundGroup, Box(.56, .025, .11, HexColor(location.accent), { surface: "metal", metalness: .58, roughness: .34, emissive: HexColor(location.accent), emissiveIntensity: .08 + markerIndex * .015, castShadow: false }), location.startX + 1.4 + markerIndex * 2.3, .075, 1.7);
+      Place(sceneGroup, Box(.56, .025, .11, HexColor(location.accent), { surface: "metal", metalness: .58, roughness: .34, emissive: HexColor(location.accent), emissiveIntensity: .08 + markerIndex * .015, castShadow: false }), location.startX + 1.4 + markerIndex * 2.3, .075, 1.7);
     }
   });
   WorldInteractions.forEach(BuildFacility);
@@ -1832,6 +1843,37 @@ function BuildRoom() {
   worldAccentLight = new THREE.PointLight(0x9d8cff, 3.4, 10.5, 1.9);
   worldAccentLight.position.set(WorldLocations[0].startX + 5, 4.1, 4.2);
   scene.add(ambient, key, fill, worldAccentLight);
+  SyncActiveLocationScene(worldState.activeLocationId, true);
+}
+
+function SyncActiveLocationScene(locationId = worldState.activeLocationId, force = false) {
+  const location = FindLocation(locationId) || FindLocationAt(worldState.x);
+  if (!location) return null;
+  const changed = visibleLocationId !== location.id;
+  if (!changed && !force) return location;
+
+  visibleLocationId = location.id;
+  locationSceneGroups.forEach((group, id) => { group.visible = id === location.id; });
+  actorGroup.children.forEach((actor) => {
+    actor.visible = actor === playerActor
+      ? onboardingPhase === "game"
+      : actor.userData.locationId === location.id;
+  });
+  collectibleVisuals.forEach((visual) => {
+    visual.visible = visual.userData.locationId === location.id
+      && !worldState.collectedIds?.includes(visual.userData.collectibleId);
+  });
+  hazardVisuals.forEach((visual) => { visual.visible = visual.userData.locationId === location.id; });
+  activeInteraction = null;
+
+  const cameraCenter = Number.isFinite(worldState.cameraCenterX)
+    ? worldState.cameraCenterX
+    : (location.startX + location.endX) * .5;
+  smoothCameraX = cameraCenter;
+  camera.position.set(cameraCenter, 3.64, 13.35);
+  camera.lookAt(cameraCenter, 2.98, 0);
+  if (worldAccentLight) worldAccentLight.position.x = cameraCenter;
+  return location;
 }
 
 function BuildCeremonyScene() {
@@ -2145,9 +2187,12 @@ function BuildCollectibles() {
     mesh.position.set(item.x, item.y, .2);
     mesh.userData.baseY = item.y;
     mesh.userData.phase = index * 1.4;
+    mesh.userData.collectibleId = item.id;
+    mesh.userData.locationId = item.locationId || FindLocationAt(item.x)?.id;
     collectibleVisuals.set(item.id, mesh);
     collectibleGroup.add(mesh);
   });
+  SyncActiveLocationScene(worldState.activeLocationId, true);
 }
 
 function BuildHazards() {
@@ -2163,9 +2208,11 @@ function BuildHazards() {
     group.add(label);
     group.position.set(hazard.x, hazard.y || 0, .25);
     group.userData.phase = index * 1.9;
+    group.userData.locationId = hazard.locationId || FindLocationAt(hazard.x)?.id;
     hazardVisuals.set(hazard.id, group);
     hazardGroup.add(group);
   });
+  SyncActiveLocationScene(worldState.activeLocationId, true);
 }
 
 function RebuildStaffActors() {
@@ -2185,6 +2232,7 @@ function RebuildStaffActors() {
     const screen = Box(.34, .24, .015, index < state.team.length ? 0x66b8ff : 0x292c38, { emissive: index < state.team.length ? 0x66b8ff : 0, emissiveIntensity: .45, castShadow: false });
     screen.position.set(0, 1.08, .04);
     desk.position.set(3.75 + index * 1.02, 0, .02);
+    desk.userData.locationId = "home";
     desk.add(tabletop, monitor, screen);
     actorGroup.add(desk);
   }
@@ -2197,6 +2245,7 @@ function RebuildStaffActors() {
     actor.userData.baseY = actor.position.y;
     actor.userData.staffId = staff.id;
     actor.userData.phase = index * 1.7;
+    actor.userData.locationId = "home";
     actor.userData.label = TextPlane(staff.name, staff.kind === "ai" ? "按月计费" : staff.role, 1.65, staff.color);
     actor.userData.label.position.set(0, staff.kind === "ai" ? 2.25 : 2.55, .1);
     actor.add(actor.userData.label);
@@ -2204,6 +2253,7 @@ function RebuildStaffActors() {
     actorGroup.add(actor);
   });
   ApplyOwnerHairStage();
+  SyncActiveLocationScene(worldState.activeLocationId, true);
 }
 
 function SpawnParticles(x, y, color = 0x9d8cff, count = 9) {
@@ -2293,7 +2343,7 @@ function UpdateInteractionPrompt() {
   const baseInteraction = NearestInteraction(worldState);
   let nearest = baseInteraction;
   let nearestDistance = baseInteraction ? Math.hypot(worldState.x - baseInteraction.x, worldState.y - baseInteraction.y) : Infinity;
-  staffActors.forEach((actor, staffId) => {
+  if (worldState.activeLocationId === "home") staffActors.forEach((actor, staffId) => {
     const distance = Math.hypot(worldState.x - actor.position.x, worldState.y - actor.userData.baseY);
     if (distance < 1.15 && distance < nearestDistance) {
       const staff = FindStaff(staffId);
@@ -2338,10 +2388,9 @@ function HandleWorldEvents(events = []) {
 }
 
 function UpdateLocationIndicator() {
-  const location = FindLocation(worldState.activeLocationId) || FindLocationAt(worldState.x);
+  const location = SyncActiveLocationScene(worldState.activeLocationId);
   if (!location) return;
   dom.locationValue.textContent = location.name;
-  dom.locationRoute.innerHTML = WorldLocations.map((item) => `<i class="${item.id === location.id ? "active" : ""}" title="${EscapeHtml(item.name)}"></i>`).join("");
 }
 
 function Animate() {
@@ -2398,13 +2447,15 @@ function Animate() {
   });
 
   collectibleVisuals.forEach((visual, id) => {
-    visual.visible = !worldState.collectedIds?.includes(id);
+    visual.visible = visual.userData.locationId === visibleLocationId && !worldState.collectedIds?.includes(id);
     if (!visual.visible) return;
     visual.position.y = visual.userData.baseY + Math.sin(time * 2.6 + visual.userData.phase) * .16;
     visual.rotation.y += delta * 1.8;
     visual.rotation.x += delta * .65;
   });
   hazardVisuals.forEach((visual, id) => {
+    visual.visible = visual.userData.locationId === visibleLocationId;
+    if (!visual.visible) return;
     const hazardState = worldState.hazards?.find?.((item) => item.id === id);
     if (hazardState) {
       visual.position.x = hazardState.x;
@@ -2621,6 +2672,7 @@ function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   const panelOptions = typeof options === "string" ? { mode: options } : options;
   dom.modalLayer.classList.toggle("computerMode", panelOptions.mode === "computer");
   dom.modalLayer.classList.toggle("whiteboardMode", panelOptions.mode === "whiteboard");
+  dom.modalLayer.classList.toggle("travelMapMode", panelOptions.mode === "travelMap");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
@@ -2639,6 +2691,7 @@ function ClosePanel() {
   dom.modalLayer.classList.remove("monthCloseMode");
   dom.modalLayer.classList.remove("computerMode");
   dom.modalLayer.classList.remove("whiteboardMode");
+  dom.modalLayer.classList.remove("travelMapMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -3890,6 +3943,8 @@ function OpenMonthSheet() {
       const result = AdvanceMonth(state);
       if (!ApplyInteractiveResult(result, { rebuildStaff: true, deferEnding: true, toast: false })) return;
       worldState = ResetWorldMonth(worldState, state.month);
+      SyncActiveLocationScene(worldState.activeLocationId, true);
+      UpdateLocationIndicator();
       BuildCollectibles();
       BuildHazards();
       const finance = result.finance;
@@ -4027,6 +4082,7 @@ function BeginWorld(nextState) {
   SetPlayableWorldVisible(true);
   SaveState();
   RebuildStaffActors();
+  SyncActiveLocationScene(worldState.activeLocationId, true);
   BuildCollectibles();
   BuildHazards();
   RenderHud();
@@ -4040,31 +4096,41 @@ function BeginWorld(nextState) {
 
 function OpenTravelSheet() {
   const current = FindLocation(worldState.activeLocationId) || FindLocationAt(worldState.x);
-  const locationPurpose = {
-    home: "开发电脑、项目白板、宣发手机、月历与冰箱",
-    diner: "选择本月的便宜充饥套餐",
-    market: "买零食，或者把现金交给运气",
-    talent: "购买工位并招聘大学生或订阅 AI",
-    bank: "还启动贷、借款与抵押",
-    hotel: "花钱吃一顿能恢复状态的饭",
-    footbath: "普通足浴，每月可放松一次",
-    footbathCity: "现金宽裕后再来的洗脚城",
-    maleModelClub: "高消费的男模店",
+  const mapPlaces = {
+    home: { x: 8, y: 72, icon: "⌂" },
+    diner: { x: 26, y: 72, icon: "碗" },
+    market: { x: 44, y: 72, icon: "▣" },
+    talent: { x: 62, y: 72, icon: "人" },
+    bank: { x: 82, y: 72, icon: "¥" },
+    hotel: { x: 82, y: 28, icon: "★" },
+    footbath: { x: 62, y: 28, icon: "♨" },
+    footbathCity: { x: 42, y: 28, icon: "♨" },
+    maleModelClub: { x: 20, y: 28, icon: "♛" },
   };
-  OpenPanel("AT THE DOOR", "出门去哪里？", `
-    <p class="panelIntro">在门口选目的地，确认后直接抵达。</p>
-    <div class="travelGrid">${WorldLocations.filter((location) => location.id !== current?.id).map((location) => `
-      <button class="travelChoice" style="--destinationColor:${location.accent}" data-travel-location="${location.id}" type="button">
-        <span>${EscapeHtml(location.name)}</span>
-        <strong>${EscapeHtml(locationPurpose[location.id] || "到访")}</strong>
-        <i>出发 →</i>
-      </button>`).join("")}</div>`, () => {
+  const PlaceMarkup = (location) => {
+    const place = mapPlaces[location.id];
+    const style = `--mapX:${place.x}%;--mapY:${place.y}%;--destinationColor:${location.accent}`;
+    const contents = `<i aria-hidden="true">${place.icon}</i><strong>${EscapeHtml(location.name)}</strong>`;
+    return location.id === current?.id
+      ? `<span class="travelMapPlace current" style="${style}" aria-current="location" aria-label="当前地点：${EscapeHtml(location.name)}">${contents}</span>`
+      : `<button class="travelMapPlace" style="${style}" data-travel-location="${location.id}" type="button" aria-label="前往${EscapeHtml(location.name)}">${contents}</button>`;
+  };
+  OpenPanel("地图", "去哪？", `
+    <div class="travelMapPaper" role="group" aria-label="城市目的地地图">
+      <svg class="travelMapRoads" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path class="travelMapContour" d="M4 19C18 7 35 13 49 8S78 2 96 17M1 88C23 80 34 94 53 86S82 78 99 89"/>
+        <path class="travelMapWater" d="M-4 49C12 37 24 58 40 47S68 36 104 51"/>
+        <path class="travelMapRoadShadow" d="M8 72H82V28H20M26 72C27 52 27 43 20 28M44 72C44 55 44 45 42 28M62 72V28"/>
+        <path class="travelMapRoad" d="M8 72H82V28H20M26 72C27 52 27 43 20 28M44 72C44 55 44 45 42 28M62 72V28"/>
+      </svg>
+      ${WorldLocations.map(PlaceMarkup).join("")}
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const button = event.target.closest("[data-travel-location]");
       if (!button) return;
       TravelTo(button.dataset.travelLocation);
     };
-  });
+  }, { mode: "travelMap" });
 }
 
 function TravelTo(locationId) {
@@ -4078,7 +4144,7 @@ function TravelTo(locationId) {
   inputState.left = false;
   inputState.right = false;
   inputState.jump = false;
-  dom.travelCurtain.querySelector("span").textContent = `去往${result.location.name}`;
+  dom.travelCurtain.querySelector("span").textContent = result.location.name;
   dom.travelCurtain.classList.add("active");
   ClosePanel();
   window.setTimeout(() => {
@@ -4087,13 +4153,13 @@ function TravelTo(locationId) {
       playerActor.position.x = worldState.x;
       playerActor.position.y = worldState.y;
     }
+    SyncActiveLocationScene(worldState.activeLocationId, true);
     UpdateLocationIndicator();
     PlayTone("good");
   }, 210);
   window.setTimeout(() => {
     dom.travelCurtain.classList.remove("active");
     traveling = false;
-    ShowToast(`已到达：${result.location.name}`, "good");
   }, 620);
 }
 
