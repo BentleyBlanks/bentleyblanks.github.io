@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ac/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ac/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ac)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ac)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ad/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ad/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ad)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ad)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -80,6 +80,9 @@ assert.doesNotMatch(css, /\.sealButton\s*\{[^}]*height:\s*(?:3\d|4[0-3])px;/s, "
 assert.match(css, /\.modalLayer\.computerMode \.worldPanel\s*\{/, "the home computer needs its own physical monitor shell");
 assert.match(css, /\.computerMonitorShell\s*\{/, "the home computer must retain its monitor frame");
 assert.match(css, /\.energyModuleGrid\s*\{/, "the computer must expose its four development work areas");
+assert.match(css, /@media \(orientation: landscape\)\s*\{\s*\.modalLayer\.computerMode \.sheetBody\s*\{\s*overflow:hidden;/s, "the landscape computer must fit without an outer scrollbar");
+assert.match(css, /@media \(max-height: 820px\) and \(min-height: 651px\) and \(orientation: landscape\)[\s\S]*?\.computerDeskScene\s*\{[^}]*padding:0 132px 82px 0;/, "medium-height screens must compact the physical computer before it overflows");
+assert.match(css, /@media \(max-height: 500px\) and \(orientation: landscape\)[\s\S]*?\.computerObjective p,\.workCostNote,\.computerLocationHint\s*\{\s*display:none;/, "short screens must drop redundant monitor copy before hiding the keyboard");
 assert.match(css, /\.modalLayer\.whiteboardMode \.worldPanel\s*\{/, "the project board needs its own enamel-board frame");
 assert.match(css, /\.whiteboardMarkerSet\s*\{/, "the project board must retain its marker tray props");
 assert.match(css, /\.whiteboardMode \.worldChoice::before/, "direction notes must stay physically pinned to the board");

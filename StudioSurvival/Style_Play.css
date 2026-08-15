@@ -1279,6 +1279,9 @@ button.travelMapPlace:focus-visible {
 .modalLayer.computerMode .closeButton { width:34px; height:34px; border:1px solid #4f493e; border-radius:50%; color:#332d25; background:radial-gradient(circle at 35% 28%,#fff9e7,#c6bba3 54%,#827967 58%); text-shadow:0 1px rgba(255,255,255,.7); box-shadow:inset 0 1px #fff,0 3px 0 #4d463b,0 8px 15px rgba(0,0,0,.48); }
 .modalLayer.computerMode .closeButton:active { transform:translateY(3px); box-shadow:inset 0 2px 5px rgba(62,54,42,.4),0 1px 0 #4d463b; }
 .modalLayer.computerMode .sheetBody { max-height:calc(98vh - 42px); margin:0; padding:0 12px 8px; overflow:auto; border:0; background:transparent; box-shadow:none; }
+@media (orientation: landscape) {
+  .modalLayer.computerMode .sheetBody { overflow:hidden; }
+}
 .computerDeskScene { position:relative; width:100%; padding:0 154px 104px 0; isolation:isolate; }
 .computerDeskScene::before { content:""; position:absolute; z-index:0; left:-6vw; right:-6vw; bottom:-5px; height:106px; border-top:2px solid #8a6040; background:repeating-linear-gradient(91deg,rgba(255,255,255,.03) 0 1px,transparent 1px 38px),linear-gradient(180deg,#68482f,#3d291d 56%,#281a13); box-shadow:inset 0 3px rgba(255,255,255,.08),0 28px 0 #160e0b,0 40px 70px rgba(0,0,0,.66); }
 .computerDeskScene::after { content:""; position:absolute; z-index:1; left:6%; right:17%; bottom:69px; height:45px; border-radius:50%; background:rgba(0,0,0,.44); filter:blur(13px); transform:skewX(-8deg); }
@@ -3461,6 +3464,49 @@ body {
   .computerMouseVisual { left:72%; }
 }
 
+@media (max-height: 820px) and (min-height: 651px) and (orientation: landscape) {
+  .modalLayer.computerMode .worldPanel > header { width:calc(100% - 142px); min-height:32px; padding:3px 6px; }
+  .modalLayer.computerMode .closeButton { width:32px; height:32px; min-width:32px; }
+  .modalLayer.computerMode .sheetBody { max-height:calc(100dvh - var(--safeTop) - var(--safeBottom) - 36px); padding:0 9px 5px; }
+  .computerDeskScene { padding:0 132px 82px 0; }
+  .computerDeskScene::before { height:84px; }
+  .computerDeskScene::after { bottom:53px; height:35px; }
+  .computerDeskMat { bottom:5px; height:68px; }
+  .computerMonitorShell { padding:12px 18px 14px; border-radius:34px 32px 23px 25px; box-shadow:inset 4px 4px 0 rgba(255,255,255,.48),inset -10px -11px 14px rgba(76,66,50,.22),9px 10px 0 #766d5d,14px 16px 0 #514a40,0 30px 52px rgba(0,0,0,.58); }
+  .computerMonitorShell::after { right:-12px; width:12px; }
+  .computerTopVent { height:10px; margin-bottom:1px; gap:4px; }
+  .computerBezel { height:18px; }
+  .computerGlassFrame { padding:9px 10px 10px; border-radius:22px; }
+  .computerScreenContent { min-height:0; padding:12px; }
+  .computerObjective { grid-template-columns:1fr 190px; gap:10px; margin-bottom:10px; }
+  .computerObjective > div:first-child { padding:10px 12px; }
+  .computerObjective h3 { margin:3px 0; font-size:18px; }
+  .computerObjective p { font-size:9px; }
+  .energyBudget { padding:9px 11px; }
+  .energyBudget i { width:28px; height:28px; }
+  .developmentWorkbench { padding:10px; }
+  .developmentWorkbench > header { margin-bottom:7px; }
+  .energyModuleGrid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .energyModule { min-height:96px; gap:8px; padding:9px; }
+  .energyModuleTop { grid-template-columns:22px 1fr auto; gap:5px; }
+  .energyModuleTop > span { font-size:17px; }
+  .energyModuleTop > strong { font-size:10px; }
+  .workCostNote { margin-top:7px; }
+  .computerReleaseCallout { margin-top:7px; padding:8px 10px; }
+  .computerLocationHint { grid-template-columns:150px 1fr; gap:9px; margin-top:7px; padding:7px 9px; }
+  .computerControlDeck { min-height:28px; padding:5px 8px 0; }
+  .computerStand { bottom:43px; width:150px; height:50px; }
+  .computerTowerVisual { bottom:62px; width:108px; height:335px; padding:18px 13px; }
+  .computerTowerVisual > i { left:13px; right:13px; }
+  .towerOpticalDrive { top:52px; height:19px; }
+  .towerFloppyDrive { top:82px; left:23px!important; height:11px; }
+  .towerVent { left:19px; right:19px; top:126px; height:83px; }
+  .towerPower { right:16px; bottom:25px; width:27px; height:27px; }
+  .computerKeyboardVisual { left:6%; bottom:3px; width:65%; height:66px; gap:3px; padding:8px 10px 10px; border-bottom-width:6px; }
+  .computerMouseVisual { left:72%; bottom:14px; width:46px; height:59px; }
+  .computerCableVisual { left:74%; bottom:52px; width:96px; height:60px; }
+}
+
 @media (max-height: 650px) and (orientation: landscape) {
   .setupScreen { padding:2vh 4vw; }
   .titleOfficeArt { height:76vh; }
@@ -3571,13 +3617,34 @@ body {
   .projectContract .contractReviewPage { padding-bottom:max(6px,var(--safeBottom)); }
   .projectContract .contractReview { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .projectContract .contractReview > div { min-width:0; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .modalLayer.computerMode { padding:max(2px,var(--safeTop)) max(4px,var(--safeRight)) max(2px,var(--safeBottom)) max(4px,var(--safeLeft)); }
+  .modalLayer.computerMode .sheetBody { max-height:calc(100dvh - var(--safeTop) - var(--safeBottom) - 30px); }
   .modalLayer.computerMode .worldPanel > header span { display:none; }
   .modalLayer.computerMode .worldPanel > header h2 { font-size:10px; }
-  .computerDeskScene { padding-right:82px; padding-bottom:52px; }
+  .computerDeskScene { padding-right:82px; padding-bottom:40px; }
+  .computerDeskScene::before { height:46px; }
+  .computerDeskScene::after { bottom:27px; height:22px; }
+  .computerDeskMat { height:37px; }
+  .computerTopVent { display:none; }
+  .computerBezel { height:13px; }
+  .computerScreenContent { padding:6px; }
   .computerObjective { grid-template-columns:1fr 142px; }
-  .computerObjective p,.workCostNote,.computerLocationHint { font-size:5.5px; }
+  .computerObjective p,.workCostNote,.computerLocationHint { display:none; }
+  .developmentWorkbench { padding:6px; }
+  .developmentWorkbench > header { margin-bottom:4px; }
+  .energyModule { min-height:64px; gap:5px; padding:6px; }
+  .computerReleaseCallout { min-height:46px; margin-top:4px; padding:0 0 0 7px; }
+  .computerReleaseCallout button { min-height:44px; }
+  .computerControlDeck { min-height:18px; padding:2px 5px 0; }
+  .computerStand { bottom:24px; height:34px; }
   .computerTowerVisual { width:70px; height:225px; bottom:40px; }
   .towerVent { top:82px; height:55px; }
+  .computerKeyboardVisual { bottom:0; height:38px; }
+  .computerMouseVisual { bottom:5px; width:32px; height:41px; }
+  .computerCableVisual { bottom:29px; height:38px; }
   .computerControlDeck > strong { font-size:6px; }
   .computerTurbo { display:none; }
 }
