@@ -48,6 +48,8 @@ import {
   AI_SUBSCRIPTION_LEVELS,
   CONSUMER_VENUES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
+  FindFeatureChoice,
   GAME_TYPES,
   LIVE_REVENUE_EVENTS,
   MARKETING_CAMPAIGNS,
@@ -59,6 +61,18 @@ import {
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
 } from "./Data_Game.mjs";
+
+{
+  const expectedFeatureIds = ["saveSlotsFight", "corpseInheritance", "potatoTruth", "chatGravity"];
+  const retiredFeatureIds = ["grudgeNpc", "weatherMood", "physicsInventory", "oneButtonDrama", "crowdAi", "honestLoading", "refundEnding", "bugMuseum"];
+  const featureIds = FEATURE_CHOICES.map((feature) => feature.id);
+  assert.equal(FEATURE_CHOICES.length, 4, "the whiteboard must stay limited to four distinct proposals");
+  assert.deepEqual(featureIds, expectedFeatureIds, "the whiteboard must expose the new wildcard proposal set");
+  assert.equal(new Set(featureIds).size, featureIds.length, "feature proposal IDs must remain unique");
+  assert(retiredFeatureIds.every((featureId) => FindFeatureChoice(featureId)), "every retired proposal must remain readable for old saves");
+  assert(retiredFeatureIds.every((featureId) => !featureIds.includes(featureId)), "retired proposals must stay off the active whiteboard");
+  assert.equal(FEATURE_LIMIT, 3, "a project must stop before swallowing the entire proposal board");
+}
 
 function Begin() {
   const result = StartProject(CreateInitialState(), "zeroGStore", "online");
@@ -659,6 +673,20 @@ function HasRecordedId(collection, id) {
 }
 
 {
+  let state = Begin();
+  for (const feature of FEATURE_CHOICES.slice(0, FEATURE_LIMIT)) {
+    state.talkPoints = 1;
+    const result = CustomizeProject(state, "owner", feature.id);
+    assert.equal(result.ok, true, `feature ${feature.id} must fit before the project limit`);
+    state = result.state;
+  }
+  state.talkPoints = 1;
+  const overflow = CustomizeProject(state, "owner", FEATURE_CHOICES[FEATURE_LIMIT].id);
+  assert.equal(overflow.ok, false, "the fourth proposal must be rejected once three are locked");
+  assert.match(overflow.message, /最多保留 3 个/, "the limit rejection must explain the three-feature cap");
+}
+
+{
   const campaigns = MARKETING_CAMPAIGNS.filter((campaign) => campaign?.id);
   assert(campaigns.length > 0, "at least one pre-launch marketing campaign must exist");
   const campaign = [...campaigns].sort((a, b) => CampaignCost(b) - CampaignCost(a))[0];
@@ -956,6 +984,17 @@ function HasRecordedId(collection, id) {
   delete legacyMarketState.project.marketStrategy;
   delete legacyMarketState.project.marketStrategyHistory;
   assert.equal(ValidateState(legacyMarketState), true, "pre-phone saves must remain loadable");
+  const retiredFeatureIds = ["grudgeNpc", "weatherMood", "physicsInventory", "oneButtonDrama", "crowdAi", "honestLoading", "refundEnding", "bugMuseum"];
+  for (const featureId of retiredFeatureIds) {
+    const legacyFeatureState = structuredClone(validState);
+    legacyFeatureState.project.features = [{ id: featureId }];
+    assert.equal(ValidateState(legacyFeatureState), true, `a save containing retired proposal ${featureId} must remain loadable`);
+  }
+  const legacyMarketFocusState = structuredClone(validState);
+  legacyMarketFocusState.project.features = [{ id: "grudgeNpc" }];
+  const legacyMarketStrategy = SetMarketStrategy(legacyMarketFocusState, "grudgeNpc");
+  assert.equal(legacyMarketStrategy.ok, true, "a retired proposal must remain selectable when an old save already owns it");
+  assert.equal(ValidateState(legacyMarketStrategy.state), true, "a retired proposal market strategy must remain saveable");
   const badMarketState = structuredClone(validState);
   badMarketState.project.marketStrategy.directionId = "imaginaryTrend";
   assert.equal(ValidateState(badMarketState), false, "unknown market directions must invalidate a damaged save");

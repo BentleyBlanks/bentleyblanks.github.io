@@ -5,6 +5,7 @@ import {
   CONSUMER_VENUES,
   DIRECTIVES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
   FindCollateral,
   FindConsumerVenue,
   FindDirective,
@@ -31,7 +32,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815v";
+} from "./Data_Game.mjs?v=20260815y";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -2050,7 +2051,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   if (!feature) return { state, ok: false, message: "这个玩法只存在于会议纪要的另一个版本。" };
   if (state.talkPoints <= 0) return { state, ok: false, message: "本月已经聊到语言失效。进入下月再画饼。" };
   if (state.project.features.some((item) => item.id === feature.id)) return { state, ok: false, message: "这个玩法已经写进项目，再讲一遍不会自动完工。" };
-  if (state.project.features.length >= 6) return { state, ok: false, message: "项目已经塞了 6 个核心玩法。再定制下去只能改名叫需求坟场。" };
+  if (state.project.features.length >= FEATURE_LIMIT) return { state, ok: false, message: `项目最多保留 ${FEATURE_LIMIT} 个核心玩法。` };
 
   const isOwner = sourceId === "owner";
   const member = isOwner ? null : state.team.find((candidate) => candidate.id === sourceId);

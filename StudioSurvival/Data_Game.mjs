@@ -883,7 +883,62 @@ export const STOCK_OPTIONS = [
 // screens deliberately keep the scratch card and stock account separate.
 export const SPECULATION_OPTIONS = [SCRATCH_OPTION, ...STOCK_OPTIONS];
 
+export const FEATURE_LIMIT = 3;
+
 export const FEATURE_CHOICES = [
+  {
+    id: "saveSlotsFight",
+    title: "存档槽互相篡改",
+    pitch: "一号档救下的人，会在二号档成为凶手。读档不是回头，是选谁在撒谎。",
+    marketDirections: ["systemDepth", "emotionalStory"],
+    modules: { art: 3, design: 8, client: 7, performance: 2 },
+    scopeDebt: 6,
+    technicalDebt: 4,
+    bugs: 2,
+    hype: 8,
+    qualityPotential: 0.22,
+  },
+  {
+    id: "corpseInheritance",
+    title: "死后接管杀你的怪",
+    pitch: "没有复活；谁杀了玩家，下一秒谁就是主角。旧尸体留在原地当路标。",
+    marketDirections: ["antiRoutine", "systemDepth"],
+    modules: { art: 5, design: 9, client: 6, performance: 4 },
+    scopeDebt: 7,
+    technicalDebt: 5,
+    bugs: 2,
+    hype: 9,
+    qualityPotential: 0.23,
+  },
+  {
+    id: "potatoTruth",
+    title: "最低画质才看得见门",
+    pitch: "关掉阴影、贴图和特效后，假墙剥落，真正的关卡才露出来。",
+    marketDirections: ["lowSpecFriendly", "antiRoutine"],
+    modules: { art: 2, design: 7, client: 4, performance: 6 },
+    scopeDebt: 4,
+    technicalDebt: 2,
+    bugs: 1,
+    hype: 7,
+    qualityPotential: 0.2,
+  },
+  {
+    id: "chatGravity",
+    title: "弹幕每十秒重写重力",
+    pitch: "观众刷“左”，整座城就向左坠；没人看时，只能挂在天花板等开播。",
+    marketDirections: ["streamerSpectacle", "emotionalStory"],
+    modules: { art: 6, design: 8, client: 8, performance: 8 },
+    scopeDebt: 8,
+    technicalDebt: 7,
+    bugs: 3,
+    hype: 11,
+    qualityPotential: 0.25,
+  },
+];
+
+// Keep retired proposals readable in existing saves without putting them back
+// on the player-facing whiteboard.
+const legacyFeatureChoices = [
   {
     id: "grudgeNpc",
     title: "所有 NPC 都记仇",
@@ -981,6 +1036,8 @@ export const FEATURE_CHOICES = [
     qualityPotential: 0.18,
   },
 ];
+
+const allFeatureChoices = [...FEATURE_CHOICES, ...legacyFeatureChoices];
 
 export const COLLATERAL_OPTIONS = [
   {
@@ -1145,7 +1202,7 @@ export function FindMarketingCampaign(campaignId) {
 }
 
 export function FindFeatureChoice(featureId) {
-  return FEATURE_CHOICES.find((feature) => feature.id === featureId);
+  return allFeatureChoices.find((feature) => feature.id === featureId);
 }
 
 export function FindMarketDirection(directionId) {

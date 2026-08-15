@@ -5,10 +5,12 @@ import {
   CONSUMER_VENUES,
   DIRECTIVES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
   FindCollateral,
   FindConsumerVenue,
   FindDirective,
   FindFoodPlan,
+  FindFeatureChoice,
   FindGameType,
   FindProject,
   FindStaff,
@@ -22,7 +24,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815v";
+} from "./Data_Game.mjs?v=20260815y";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -70,7 +72,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815w";
+} from "./Script_Rules.mjs?v=20260815y";
 import {
   FindLocation,
   FindLocationAt,
@@ -2632,13 +2634,16 @@ function OpenCustomizationSheet(sourceId = "owner") {
   const staff = sourceId === "owner" ? null : FindStaff(sourceId);
   const sourceLabel = staff ? staff.name : "你自己";
   const usedIds = new Set(state.project.features.map((item) => item.id));
+  const featureCountLabel = state.project.features.length >= FEATURE_LIMIT
+    ? "玩法已满"
+    : `玩法 ${state.project.features.length}/${FEATURE_LIMIT}`;
   OpenPanel("PROJECT WHITEBOARD", `${sourceLabel} 的玩法提案`, `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
       <p class="panelIntro">选一个提案写进需求。</p>
-      <div class="choiceFooter"><span>本月拍板 ${state.talkPoints} 次</span><b>玩法 ${state.project.features.length}/6</b></div>
+      <div class="choiceFooter"><span>本月拍板 ${state.talkPoints} 次</span><b>${featureCountLabel}</b></div>
       <div class="panelSection worldGrid whiteboardNoteGrid">${FEATURE_CHOICES.map((feature) => `
-        <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) ? "disabled" : ""}>
+        <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) || state.project.features.length >= FEATURE_LIMIT ? "disabled" : ""}>
           <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
           <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
         </button>`).join("")}</div>
@@ -3414,7 +3419,7 @@ function OpenMarketPhoneSheet() {
     id: "concept",
     title: "立项特色 · " + projectMeta.trend,
   }, ...state.project.features.map((item) => {
-    const feature = FEATURE_CHOICES.find((candidate) => candidate.id === item.id);
+    const feature = FindFeatureChoice(item.id);
     return feature ? {
       id: feature.id,
       title: feature.title,
