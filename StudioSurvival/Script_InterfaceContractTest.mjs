@@ -132,6 +132,8 @@ assert.doesNotMatch(travelToBlock, /已到达/, "the map transition must not add
 assert.doesNotMatch(html, /id="locationRoute"/, "the connected-world route strip must be removed from the HUD");
 assert.match(html, /<title>老板兼牛马<\/title>/, "the browser title should use the game name only");
 assert.match(html, /<h1><span>老板兼牛马<\/span><\/h1>/, "the title screen should lead with the game name only");
+assert.match(html, /class="titleMonitor"[^]*?<em>牛马 486<\/em>/, "the title-screen computer must use the in-world 牛马 486 branding");
+assert.doesNotMatch(html, /OVERTIME 486/, "the rejected English computer branding must not return");
 assert.doesNotMatch(`${html}\n${css}`, /进入\s*2\.5D|2\.5D\s+FOUNDING|灯会亮/, "the title screen should use normal player-facing language");
 assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be available from a global HUD shortcut");
 assert.match(html, /id="settlementButton"[^>]*>[\s\S]*?下一回合/, "the primary next-turn action must stay visible in the global bottom-right HUD");
