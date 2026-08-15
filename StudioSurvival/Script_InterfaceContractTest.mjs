@@ -159,7 +159,7 @@ assert.match(travelToBlock, /worldState = result\.state[\s\S]*SyncActiveLocation
 assert.doesNotMatch(travelToBlock, /已到达/, "the map transition must not add a redundant arrival toast");
 assert.doesNotMatch(html, /id="locationRoute"/, "the connected-world route strip must be removed from the HUD");
 assert.match(html, /<title>做游戏真的会死<\/title>/, "the browser title should use the game name only");
-assert.match(html, /<h1><span>做游戏真的会死<\/span><\/h1>/, "the title screen should lead with the game name only");
+assert.match(html, /<h1><span>做游戏<\/span><span>真的会死<\/span><\/h1>/, "the title screen should lead with the game name only");
 assert.match(html, /class="titleMonitor"[^]*?<em>牛马 486<\/em>/, "the title-screen computer must use the in-world 牛马 486 branding");
 assert.doesNotMatch(html, /OVERTIME 486/, "the rejected English computer branding must not return");
 assert.doesNotMatch(`${html}\n${css}`, /进入\s*2\.5D|2\.5D\s+FOUNDING|灯会亮/, "the title screen should use normal player-facing language");
