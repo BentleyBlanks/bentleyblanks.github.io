@@ -10,7 +10,7 @@ const contractDecisionPage = html.match(/<article class="contractPage contractDe
 const ById = (id) => InteractionPoints.find((point) => point.id === id);
 
 assert.deepEqual(
-  ["homeComputer", "planningBoard", "marketingPhone", "homeCalendar", "talentCounter", "equipmentCounter"]
+  ["homeComputer", "planningBoard", "homeCalendar", "talentCounter", "equipmentCounter"]
     .map((id) => {
       const point = ById(id);
       return [point.id, point.locationId, point.action];
@@ -18,27 +18,26 @@ assert.deepEqual(
   [
     ["homeComputer", "home", "computer"],
     ["planningBoard", "home", "direction"],
-    ["marketingPhone", "home", "marketing"],
     ["homeCalendar", "home", "month"],
     ["talentCounter", "talent", "talent"],
     ["equipmentCounter", "talent", "equipment"],
   ],
-  "development, direction, marketing, settlement, recruitment, and equipment need distinct physical entry points",
+  "development, direction, project calendar, recruitment, and equipment need distinct physical entry points",
 );
 
 const triggerBlock = script.match(/function TriggerInteraction\(\)[\s\S]*?function StartFoundingCeremony/)?.[0] || "";
 assert.match(triggerBlock, /case "homeComputer": return OpenHomeComputerSheet\(\)/);
 assert.match(triggerBlock, /case "planningBoard": return OpenDirectiveSheet\(\)/);
-assert.match(triggerBlock, /case "marketingPhone": return OpenMarketPhoneSheet\(\)/);
 assert.match(triggerBlock, /case "homeCalendar": return OpenMonthSheet\(\)/);
 assert.match(triggerBlock, /case "talentMarket": return OpenTalentSheet\(\)/);
 assert.match(triggerBlock, /case "exit": return OpenTravelSheet\(\)/);
+assert.doesNotMatch(triggerBlock, /marketingPhone|OpenMarketPhoneSheet/, "the redundant physical phone must be removed");
 
 const staffBlock = script.match(/function OpenStaffSheet[\s\S]*?function OpenCustomizationSheet/)?.[0] || "";
 assert.doesNotMatch(staffBlock, /data-customize|OpenCustomizationSheet\(staffId\)/, "staff chat must not duplicate the project-direction button");
 assert.match(staffBlock, /项目方向与玩法提案统一在墙上白板处理/);
 
-const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function OpenMarketingSheet/)?.[0] || "";
+const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function RevenueChart/)?.[0] || "";
 assert.match(directiveBlock, /data-feature-source/, "the project whiteboard owns the feature-proposal entry");
 assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");
@@ -57,18 +56,19 @@ const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?functi
 assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
 assert.doesNotMatch(
   computerBlock,
-  /data-computer-action|OpenDirectiveSheet\(|OpenMarketingSheet\(|OpenMarketPhoneSheet\(|OpenMonthSheet\(|OpenTalentSheet\(/,
-  "direction, marketing, settlement, and recruitment must never return to the development computer",
+  /data-computer-action|OpenDirectiveSheet\(|OpenMonthSheet\(|OpenTalentSheet\(/,
+  "direction, settlement, and recruitment must never return to the development computer",
 );
 
-const paidMarketingBlock = script.match(/function OpenMarketingSheet[\s\S]*?function MarketFitPreviewHtml/)?.[0] || "";
-assert.match(paidMarketingBlock, /state\.project\.age < 1/, "paid marketing must remain unavailable before the first development month is complete");
-
-const marketPhoneBlock = script.match(/function OpenMarketPhoneSheet[\s\S]*?function RevenueChart/)?.[0] || "";
-assert.match(marketPhoneBlock, /state\.project\.age < 1/, "the first month must hide advanced market controls");
-assert.match(marketPhoneBlock, /data-open-paid-campaigns/, "the physical phone owns the paid-promotion entry");
-assert.match(marketPhoneBlock, /去墙上白板/);
-assert.doesNotMatch(marketPhoneBlock, /OpenCustomizationSheet\("owner"\)/, "the phone must not bypass the project whiteboard");
+const projectCalendarBlock = script.match(/function GetProjectCalendarReminders[\s\S]*?function OpenHelpSheet/)?.[0] || "";
+assert.match(projectCalendarBlock, /PROJECT CALENDAR/);
+assert.match(projectCalendarBlock, /项目日历/);
+assert.match(projectCalendarBlock, /state\.project\.isReleased/, "store information must remain hidden before launch");
+assert.match(projectCalendarBlock, /商店评分/);
+assert.match(projectCalendarBlock, /事件提醒/);
+assert.match(projectCalendarBlock, /activeLiveEvents/);
+assert.match(projectCalendarBlock, /lastSettlement\?\.finance\?\.appliedEvents/, "the calendar must retain one-month event reminders");
+assert.doesNotMatch(`${script}\n${css}`, /marketingPhone|OpenMarketPhoneSheet|OpenMarketingSheet|MARKETING PHONE|\.marketPhone\b/, "the removed phone must leave no player-facing implementation behind");
 
 assert.equal([...script.matchAll(/\bTravelWorld\(/g)].length, 1, "only the exit travel flow may call TravelWorld");
 const sceneSyncBlock = script.match(/function SyncActiveLocationScene[\s\S]*?function BuildCeremonyScene/)?.[0] || "";
@@ -94,8 +94,8 @@ assert.match(html, /<h1><span>甲方是我<\/span><\/h1>/, "the title screen sho
 assert.doesNotMatch(`${html}\n${css}`, /进入\s*2\.5D|2\.5D\s+FOUNDING|灯会亮/, "the title screen should use normal player-facing language");
 assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be available from a global HUD shortcut");
 assert.match(html, /id="settlementButton"[^>]*>[\s\S]*?下一回合/, "the primary next-turn action must stay visible in the global bottom-right HUD");
-assert.match(script, /dom\.settlementButton\.addEventListener\("click"[\s\S]*?OpenMonthSheet\(\)/, "the global next-turn button must open the same confirmation sheet as the wall calendar");
-assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global shortcut");
+assert.match(script, /dom\.settlementButton\.addEventListener\("click"[\s\S]*?OpenMonthSheet\(\)/, "the global next-turn button must open the same project calendar sheet as the wall calendar");
+assert.doesNotMatch(script, /event\.code === "KeyM"|marketingPhone|OpenMarketPhoneSheet|OpenMarketingSheet|dom\.phoneButton/, "the removed phone must not gain a global or physical shortcut");
 assert.doesNotMatch(script, /event\.code === "KeyN"/, "monthly close must not gain an undocumented keyboard shortcut");
 assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/);
 assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/);

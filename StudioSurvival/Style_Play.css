@@ -1622,149 +1622,7 @@ button.travelMapPlace:focus-visible {
 .roundButton.muted { background: linear-gradient(180deg, #755054, #52363b 48%, #302429); }
 .roundButton.muted span { color: #ff9a9f; }
 .roundButton:disabled { opacity: .42; cursor: not-allowed; filter: grayscale(.55); }
-/* Market phone ------------------------------------------------------------- */
-.marketPhone {
-  width: min(690px, 100%);
-  margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid #4a4e58;
-  border-radius: 19px;
-  background:
-    radial-gradient(circle at 82% 0, rgba(141,124,255,.16), transparent 30%),
-    #090b10;
-  box-shadow: inset 0 0 0 4px #05060a, 0 18px 45px rgba(0,0,0,.35);
-}
-.phoneStatusBar {
-  height: 27px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 0 17px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  color: #aeb1ba;
-  font: 700 7px/1 Consolas, monospace;
-  letter-spacing: .08em;
-}
-.phoneStatusBar b { color: #f0edf9; font-size: 7px; letter-spacing: .15em; text-align: center; }
-.phoneStatusBar span:last-child { text-align: right; }
-.marketHero {
-  position: relative;
-  padding: 18px 19px 16px;
-  overflow: hidden;
-  background:
-    linear-gradient(120deg, color-mix(in srgb, var(--marketColor) 34%, #11131a), #12151d 72%),
-    #141720;
-}
-.marketHero::after {
-  content: "";
-  position: absolute;
-  right: -28px;
-  bottom: -62px;
-  width: 180px;
-  height: 180px;
-  border: 26px solid color-mix(in srgb, var(--marketColor) 22%, transparent);
-  border-radius: 50%;
-}
-.marketHero > span {
-  position: relative;
-  z-index: 1;
-  color: color-mix(in srgb, var(--marketColor) 76%, white);
-  font-size: 7px;
-  font-weight: 900;
-  letter-spacing: .18em;
-}
-.marketHero > strong {
-  position: relative;
-  z-index: 1;
-  display: block;
-  margin-top: 4px;
-  color: #fff;
-  font-size: 25px;
-  letter-spacing: -.04em;
-}
-.marketHero > p {
-  position: relative;
-  z-index: 1;
-  max-width: 470px;
-  margin: 5px 0 11px;
-  color: #c7cad3;
-  font-size: 9px;
-  line-height: 1.5;
-}
-.marketHero > div {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-}
-.marketHero > div b { color: color-mix(in srgb, var(--marketColor) 70%, white); font-size: 11px; }
-.marketHero > div small { color: #969aa6; font-size: 7px; }
-.marketFeed {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  padding: 8px;
-  background: #0f1218;
-}
-.phoneStory {
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid #292e38;
-  border-radius: 8px;
-  background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 46%), #171a21;
-}
-.phoneStory > span { color: #888e9a; font-size: 6.5px; letter-spacing: .06em; }
-.phoneStory > strong { display: block; margin-top: 4px; color: #ece9f5; font-size: 9px; line-height: 1.25; }
-.phoneStory > p { margin: 5px 0 0; color: #a7abb5; font-size: 7.5px; line-height: 1.42; }
-.phoneStory.breaking { border-color: rgba(255,92,106,.42); background: linear-gradient(145deg, rgba(255,83,100,.12), transparent 50%), #1b171d; }
-.phoneStory.breaking > span, .phoneStory.breaking > strong { color: #ff98a2; }
-.marketStrategyForm { padding: 0 11px 11px; }
-.phoneSectionTitle {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin: 11px 0 7px;
-}
-.phoneSectionTitle strong { color: #f1eef9; font-size: 10px; }
-.phoneSectionTitle span { color: #7f8490; font-size: 7px; }
-.marketPickGrid { display: grid; gap: 6px; }
-.marketPickGrid.focusGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-.marketPick {
-  position: relative;
-  display: block;
-  min-width: 0;
-  cursor: pointer;
-}
-.marketPick input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-.marketPick > span {
-  height: 100%;
-  display: grid;
-  align-content: start;
-  gap: 4px;
-  padding: 9px;
-  border: 1px solid #30343e;
-  border-radius: 7px;
-  background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 42%), #171a21;
-  transition: border-color .12s ease, background .12s ease, transform .12s ease;
-}
-.marketPick:hover > span { border-color: #69627e; background-color: #20232d; }
-.marketPick:has(input:checked) > span {
-  border-color: var(--pickColor, #8d7cff);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--pickColor, #8d7cff) 17%, transparent), transparent 52%), #20212b;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pickColor, #8d7cff) 34%, transparent);
-}
-.marketPick:has(input:focus-visible) > span { outline: 2px solid #fff; outline-offset: 2px; }
-.marketPick:has(input:disabled) { cursor: not-allowed; opacity: .66; }
-.marketPick b { color: #eeebf6; font-size: 8.5px; line-height: 1.25; }
-.marketPick small { color: #969ba7; font-size: 7px; line-height: 1.4; }
+/* Shared action row -------------------------------------------------------- */
 .marketCommit {
   display: flex;
   justify-content: space-between;
@@ -1774,27 +1632,6 @@ button.travelMapPlace:focus-visible {
   color: #8d929e;
   font-size: 7px;
 }
-.marketFitPreview {
-  margin-top: 11px;
-  padding: 11px;
-  border: 1px solid #363b45;
-  border-left: 4px solid #777d89;
-  border-radius: 7px;
-  background: #15181e;
-}
-.marketFitPreview.good { border-left-color: #68e0a0; background: linear-gradient(110deg, rgba(104,224,160,.09), transparent 45%), #15181e; }
-.marketFitPreview.warning { border-left-color: #ffd166; background: linear-gradient(110deg, rgba(255,209,102,.08), transparent 45%), #15181e; }
-.marketFitPreview.danger { border-left-color: #ff5f70; background: linear-gradient(110deg, rgba(255,83,100,.11), transparent 48%), #17161b; }
-.marketFitStatus { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.marketFitStatus span { color: #8e939e; font-size: 7px; }
-.marketFitStatus strong { color: #f3effb; font-size: 12px; }
-.marketFitPreview.good .marketFitStatus strong { color: #9cf0c3; }
-.marketFitPreview.warning .marketFitStatus strong { color: #ffe092; }
-.marketFitPreview.danger .marketFitStatus strong { color: #ff9ba5; }
-.marketFitMetrics { display: grid; grid-template-columns: repeat(2,1fr); gap: 5px; }
-.marketFitMetrics span { padding: 6px 7px; border-radius: 5px; background: rgba(255,255,255,.035); }
-.marketFitMetrics small { display: block; color: #7d838e; font-size: 6px; }
-.marketFitMetrics b { display: block; margin-top: 2px; color: #e7e4ef; font-size: 8px; }
 .marketCommit {
   margin-top: 9px;
   padding-top: 9px;
@@ -2051,20 +1888,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .conditionHud b { min-height: 14px; font-size: 8px; }
   .roundButton { width: auto; border-radius: 5px; }
   .roundButton span { font-size: 13px; }
-  .marketPhone { border-radius: 12px; }
-  .phoneStatusBar { height: 21px; padding-inline: 12px; }
-  .marketHero { padding: 10px 13px 9px; }
-  .marketHero > strong { font-size: 18px; }
-  .marketHero > p { margin-block: 3px 6px; font-size: 7px; }
-  .marketFeed { padding: 5px; gap: 4px; }
-  .phoneStory { padding: 6px; }
-  .phoneStory > p { font-size: 6.5px; }
-  .marketStrategyForm { padding: 0 7px 7px; }
-  .phoneSectionTitle { margin: 7px 0 4px; }
-  .marketPickGrid { gap: 4px; }
-  .marketPick > span { padding: 6px; gap: 2px; }
-  .marketPick small { font-size: 6px; }
-  .marketFitPreview { margin-top: 7px; padding: 7px; }
   .marketCommit { margin-top: 6px; padding-top: 6px; }
   .missionCard { top: calc(var(--safeTop) + 84px); width: min(315px,32vw); min-height: 0; padding: 17px 13px 11px; border-radius: 2px; }
   .missionCard::after { top: 40px; }
@@ -2208,7 +2031,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .gameHud { max-width: calc(100vw - var(--safeLeft) - var(--safeRight)); }
   .missionCard { width: 185px; }
   .worldGrid, .worldGrid.three { grid-template-columns: 1fr; }
-  .marketPickGrid.focusGrid { grid-template-columns: 1fr; }
   .stockPickGrid { grid-template-columns: 1fr; }
   .stockQuickAmounts, .stockReturnGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stockTrendChart svg { height: 132px; }
@@ -3241,6 +3063,66 @@ body {
 .monthCloseForecast.danger { border-color: #a65d58; background: rgba(157,54,54,.09); }
 .monthCloseForecast.danger strong { color: #9a2932; }
 
+.projectCalendarLive {
+  display: grid;
+  grid-template-columns: 158px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.projectCalendarStore {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 88px;
+  padding: 10px;
+  border: 1px solid #7893a0;
+  border-radius: 3px;
+  color: #294f61;
+  background: rgba(65,126,151,.09);
+  box-shadow: inset 0 1px rgba(255,255,255,.66), 2px 3px 0 rgba(88,65,38,.16);
+}
+
+.projectCalendarStore small { font-size: 7px; font-weight: 900; letter-spacing: .14em; }
+.projectCalendarStore strong { margin: 2px 0; font: 950 31px/1 Georgia,"Songti SC",serif; }
+.projectCalendarStore strong i { font-size: 9px; font-style: normal; }
+.projectCalendarStore span { color: #687984; font-size: 7px; font-weight: 800; }
+.projectCalendarStore.excellent { border-color: #729377; color: #2f6642; background: rgba(69,135,83,.09); }
+.projectCalendarStore.mixed { border-color: #b28b52; color: #8b562b; background: rgba(194,137,54,.1); }
+.projectCalendarStore.poor { border-color: #ae6e68; color: #992f37; background: rgba(166,60,60,.09); }
+
+.projectCalendarReminders {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid #a5987e;
+  border-radius: 3px;
+  background: rgba(255,255,255,.24);
+  box-shadow: inset 0 1px rgba(255,255,255,.56);
+}
+
+.projectCalendarReminders header { display: flex; justify-content: space-between; align-items: baseline; }
+.projectCalendarReminders header span { color: #776d5d; font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.projectCalendarReminders header b { font-size: 10px; }
+.projectCalendarReminder {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 5px 7px;
+  border-left: 3px solid #a77a49;
+  color: #67462d;
+  background: rgba(192,129,54,.1);
+}
+.projectCalendarReminder i { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #a77a49; color: #fff8e8; font: 900 9px/1 Georgia,serif; }
+.projectCalendarReminder strong { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.projectCalendarReminder span { color: #7a6651; font-size: 7px; white-space: nowrap; }
+.projectCalendarReminder.active { border-left-color: #a43e46; color: #8c2c34; background: rgba(167,61,68,.1); }
+.projectCalendarReminder.active i { background: #a43e46; }
+.projectCalendarReminder.clear { border-left-color: #5e8968; color: #3d6949; background: rgba(75,130,87,.08); }
+.projectCalendarReminder.clear i { background: #5e8968; }
+
 .monthCloseDeadline {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -3535,6 +3417,11 @@ body {
   .monthCloseLeaf span { margin-top: 2px; font-size: 7px; }
   .monthCloseForecast { padding: 8px 12px; }
   .monthCloseForecast strong { font-size: 23px; }
+  .projectCalendarLive { grid-template-columns: 118px minmax(0,1fr); gap: 6px; }
+  .projectCalendarStore { min-height: 64px; padding: 6px; }
+  .projectCalendarStore strong { font-size: 23px; }
+  .projectCalendarReminders { gap: 3px; padding: 5px 6px; }
+  .projectCalendarReminder { padding: 3px 5px; }
   .monthCloseDeadline { padding: 5px 8px; }
   .monthClosePosition { padding: 5px 8px; }
   .monthCloseTasks { padding: 6px 8px; }

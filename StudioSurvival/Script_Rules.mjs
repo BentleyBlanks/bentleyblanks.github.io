@@ -32,7 +32,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815z";
+} from "./Data_Game.mjs?v=20260815ab";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -165,7 +165,7 @@ export function EvaluateMarketFit(state, overrides = {}) {
       tier: "independent",
       label: "不追风",
       description: "无额外惩罚。",
-      revenueMultiplier: 0.82,
+      revenueMultiplier: 1,
       refundRateDelta: 0,
       reputationDelta: 0,
       fanMultiplier: 1,

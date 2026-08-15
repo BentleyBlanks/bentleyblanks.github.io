@@ -62,8 +62,7 @@ export const Platforms = FreezeList([]);
 export const InteractionPoints = FreezeList([
   { id: "homeComputer", locationId: "home", kind: "homeComputer", label: "开发电脑", detail: "本月开发 / 发布", x: 2.8, y: 0, radius: 1.35, action: "computer" },
   { id: "planningBoard", locationId: "home", kind: "planningBoard", label: "项目白板", detail: "方向 / 玩法提案", x: 6.3, y: 0, radius: 1.2, action: "direction" },
-  { id: "marketingPhone", locationId: "home", kind: "marketingPhone", label: "宣发手机", detail: "风向 / 宣传 / 投放", x: 9.2, y: 0, radius: 1.1, action: "marketing" },
-  { id: "homeCalendar", locationId: "home", kind: "homeCalendar", label: "墙上月历", detail: "核账 / 进入下月", x: 11.45, y: 0, radius: 1.05, action: "month" },
+  { id: "homeCalendar", locationId: "home", kind: "homeCalendar", label: "项目日历", detail: "项目状态 / 进入下月", x: 10.35, y: 0, radius: 1.3, action: "month" },
   { id: "homeFridge", locationId: "home", kind: "homeFridge", label: "冰箱", detail: "选择本月吃法", x: 13.35, y: 0, radius: 1.05, action: "homeFood" },
   { id: "homeExit", locationId: "home", kind: "exit", label: "出门", detail: "选择要去的地方", x: 15.15, y: 0, radius: 1, action: "travel" },
   { id: "dinerCounter", locationId: "diner", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 23.5, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },

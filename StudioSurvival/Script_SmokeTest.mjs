@@ -931,7 +931,7 @@ function HasRecordedId(collection, id) {
   const state = Begin();
   const snapshot = GetMarketSnapshot(state);
   assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.effectiveDirection.id), "the monthly direction must come from the public catalog");
-  assert(MARKET_EVENTS.some((marketEvent) => marketEvent.id === snapshot.event.id), "the phone must surface a deterministic random market event");
+  assert(MARKET_EVENTS.some((marketEvent) => marketEvent.id === snapshot.event.id), "the market simulation must pick a deterministic monthly event");
   assert.deepEqual(GetMarketSnapshot(state), snapshot, "market news must be deterministic for a save and month");
   assert.equal(EvaluateMarketFit(state).tier, "independent", "a new project must remain safe until the player chooses a featured hook");
 }
@@ -983,7 +983,7 @@ function HasRecordedId(collection, id) {
   const legacyMarketState = structuredClone(validState);
   delete legacyMarketState.project.marketStrategy;
   delete legacyMarketState.project.marketStrategyHistory;
-  assert.equal(ValidateState(legacyMarketState), true, "pre-phone saves must remain loadable");
+  assert.equal(ValidateState(legacyMarketState), true, "legacy market saves must remain loadable after the phone is removed");
   const retiredFeatureIds = ["grudgeNpc", "weatherMood", "physicsInventory", "oneButtonDrama", "crowdAi", "honestLoading", "refundEnding", "bugMuseum"];
   for (const featureId of retiredFeatureIds) {
     const legacyFeatureState = structuredClone(validState);
@@ -1097,4 +1097,4 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market phone fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");

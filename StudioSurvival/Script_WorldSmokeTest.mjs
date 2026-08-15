@@ -30,7 +30,6 @@ assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving ha
 const requiredInteractionIds = [
   "homeComputer",
   "planningBoard",
-  "marketingPhone",
   "homeCalendar",
   "homeFridge",
   "homeExit",

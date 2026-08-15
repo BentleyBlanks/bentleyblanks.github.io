@@ -21,17 +21,17 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815aa/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815aa/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!aa)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!aa)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ab/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ab/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ab)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ab)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
 assert.match(html, /你将成为成功的游戏制作人/, "the 100-yuan-billion goal must describe the creator milestone rather than victory");
 assert.doesNotMatch(html, /胜利|通关/, "the active page must not frame 100-yuan-billion revenue as winning the game");
 assert.match(html, /id="settlementButton"[^>]*aria-label="下一回合[^>]*>[\s\S]*?id="settlementMonthValue"/, "the bottom-right next-turn button needs a stable accessible DOM contract");
-assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must stay on the physical desk phone");
+assert.doesNotMatch(html, /id="phoneButton"/, "the removed phone must not return as a HUD shortcut");
 assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/, "the founding book must begin with the first of four pages");
 assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/, "the founder profile must remain the second book page");
 assert.match(html, /id="contractPageCounter">03 \/ 04/, "the project contract must continue the four-page book");
@@ -53,6 +53,8 @@ assert.match(css, /\.modalLayer\.travelMapMode \.worldPanel/, "the destination m
 assert.match(css, /\.travelMapPaper\s*\{[^}]*aspect-ratio:/s, "the folded map must preserve its landscape layout");
 assert.match(css, /\.travelMapPlace\s*\{[^}]*min-height:\s*52px/s, "desktop map places must read as substantial physical markers");
 assert.match(css, /@media \(hover:none\), \(pointer:coarse\), \(max-width:920px\)[\s\S]*?\.travelMapPlace\s*\{[^}]*min-height:\s*44px/s, "phone map places must retain full touch targets");
+assert.match(css, /\.projectCalendarLive\s*\{[^}]*grid-template-columns:/s, "post-launch store status needs a compact calendar layout");
+assert.match(css, /\.projectCalendarReminder\s*\{/, "random events need a visible calendar reminder row");
 assert.match(css, /\.resultLayer\.monthResultMode \.resultCard/, "monthly results need a distinct ceremonial reveal");
 assert.match(css, /\.monthResultMode \.stockReturnGrid\s*\{\s*display:\s*none;/, "stock settlement must stay compact inside the monthly reveal");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
@@ -83,9 +85,9 @@ assert.match(css, /\.whiteboardMode \.worldChoice::before/, "direction notes mus
 assert.match(script, /SetTouchButtonPressed/, "held controls need deterministic visual state updates");
 assert.match(script, /classList\.toggle\("available", interactionAvailable\)/, "interaction readiness must track the nearest target");
 assert.match(script, /toggleAttribute\("inert", suppressed\)/, "hidden controls must leave the accessibility and touch order");
-assert.match(script, /dom\.settlementButton\.addEventListener\("click"[\s\S]*?OpenMonthSheet\(\)/, "the permanent next-turn button must open monthly confirmation");
+assert.match(script, /dom\.settlementButton\.addEventListener\("click"[\s\S]*?OpenMonthSheet\(\)/, "the permanent next-turn button must open project calendar confirmation");
 assert.doesNotMatch(script, /event\.code === "KeyN"/, "monthly close must not gain an undocumented keyboard shortcut");
-assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global keyboard or HUD shortcut");
+assert.doesNotMatch(script, /event\.code === "KeyM"|marketingPhone|OpenMarketPhoneSheet|OpenMarketingSheet|dom\.phoneButton/, "the phone surface and its controls must be gone");
 assert.match(script, /function TurnContractPage\(/, "the contract must support explicit page turns");
 assert.match(script, /function BeginSealHold\(/, "the contract must retain its deliberate signing gesture");
 assert.doesNotMatch(script, /确认开局/, "the signing action must never fall back to generic start-game copy");
@@ -117,6 +119,6 @@ assert.match(homeComputerSource, /class="computerTowerVisual"/, "the home comput
 assert.match(homeComputerSource, /class="computerKeyboardVisual"/, "the home computer must include its physical keyboard");
 assert.match(homeComputerSource, /class="computerMouseVisual"/, "the home computer must include its physical mouse");
 assert.match(homeComputerSource, /\{ mode: "computer" \}/, "the home computer must open in the physical monitor mode");
-assert.doesNotMatch(homeComputerSource, /data-computer-action|OpenDirectiveSheet|OpenMarketingSheet|OpenStockSheet|OpenTalentSheet|OpenMonthSheet/, "the development computer must not expose unrelated systems");
+assert.doesNotMatch(homeComputerSource, /data-computer-action|OpenDirectiveSheet|OpenStockSheet|OpenTalentSheet|OpenMonthSheet/, "the development computer must not expose unrelated systems");
 
 console.log("StudioSurvival mobile UI contract test passed");

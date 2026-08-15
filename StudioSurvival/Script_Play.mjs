@@ -16,7 +16,7 @@ import {
   FindStaff,
   FOOD_PLANS,
   GAME_TYPES,
-  MARKETING_CAMPAIGNS,
+  LIVE_REVENUE_EVENTS,
   MODULE_KEYS,
   MODULE_META,
   PROJECTS,
@@ -24,15 +24,13 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815z";
+} from "./Data_Game.mjs?v=20260815ab";
 import {
   AdvanceMonth,
   BuyScratchTicket,
-  BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
   CustomizeProject,
-  EvaluateMarketFit,
   DEFAULT_FOUNDER_SKILLS,
   EvaluateProject,
   FireStaff,
@@ -45,7 +43,6 @@ import {
   GetFounderSkillEffect,
   GetIdleLine,
   GetMemberMonthlyCost,
-  GetMarketSnapshot,
   GetOwnerHairStage,
   GetStockAccountAccess,
   HireStaff,
@@ -59,7 +56,6 @@ import {
   ReleaseBuild,
   RestartProject,
   SAVE_KEY,
-  SetMarketStrategy,
   SelectDirective,
   SelectFoodPlan,
   SetStaffInvestmentLevel,
@@ -72,7 +68,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815z";
+} from "./Script_Rules.mjs?v=20260815ab";
 import {
   FindLocation,
   FindLocationAt,
@@ -83,14 +79,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815z";
+} from "./Data_World.mjs?v=20260815ab";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815z";
+} from "./Script_World.mjs?v=20260815ab";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -147,6 +143,10 @@ function LoadSavedState() {
     candidate.stockHistory ??= [];
     candidate.lastRelaxationMonth ??= 0;
     candidate.relaxationHistory ??= [];
+    if (candidate.project) {
+      candidate.project.marketStrategy = { focusId: "concept", directionId: null, setMonth: 0 };
+      candidate.project.marketStrategyHistory = [];
+    }
     if (candidate.status === "ended" && candidate.outcome?.kind === "worldMaker") {
       candidate.outcome.title = "你成为了成功的游戏制作人！";
       candidate.outcome.subtitle = "累计游戏收入达到 100 亿元。你从一份合同出发，终于做出了被玩家认可的游戏。电脑也还在。";
@@ -1012,8 +1012,7 @@ function DisposeGroup(group) {
 const FacilityLooks = {
   homeComputer: ["开发电脑", "本月精力只在这里投入开发", 0x9d8cff],
   planningBoard: ["项目白板", "方向、范围与玩法写在这里", 0xffd166],
-  marketingPhone: ["宣发手机", "作品成形后再处理投放", 0xff6eae],
-  homeCalendar: ["墙上月历", "核对本月投入并进入下月", 0x66b8ff],
+  homeCalendar: ["项目日历", "月结、评分与事件提醒", 0x66b8ff],
   homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
   exit: ["出门", "选择下一站", 0xf5f3ff],
   diner: ["小菜馆", "便宜充饥套餐", 0xffd166],
@@ -1210,21 +1209,17 @@ function BuildFacility(interaction) {
       Place(group, Box(.36, .04, .055, markerColor, { roughness: .45, castShadow: false }), markerX, .995, .25, markerX * .04);
       Place(group, Box(.06, .045, .058, 0xe4e5dd, { roughness: .65, castShadow: false }), markerX + .19, .995, .25, markerX * .04);
     }
-  } else if (kind === "marketingPhone") {
-    Place(group, Box(1.6, .12, .72, 0x6c4934, { surface: "wood", roughness: .72 }), 0, .86, .02);
-    for (const legX of [-.57, .57]) Place(group, Box(.1, .82, .1, 0x493326, { surface: "wood" }), legX, .43, -.02);
-    const phone = Box(.56, .94, .1, 0x12141c, { surface: "metal", metalness: .44, roughness: .3 });
-    Place(group, phone, -.08, 1.43, .2, -.08);
-    Place(group, Box(.43, .72, .026, color, { emissive: color, emissiveIntensity: .82, roughness: .16, castShadow: false }), -.08, 1.43, .258, -.08);
-    Place(group, Sphere(.025, 0xbcc5cf, { surface: "metal", metalness: .7, castShadow: false }), -.08, 1.82, .26);
-    AddPaperStack(group, .45, .95, .26, .35, 0xe8deca, 3);
   } else if (kind === "homeCalendar") {
-    Place(group, Box(1.48, 1.58, .07, 0xeee6d6, { surface: "paper", roughness: .98 }), 0, 1.76, -.02);
-    Place(group, Box(1.3, .3, .028, color, { emissive: color, emissiveIntensity: .26, castShadow: false }), 0, 2.3, .035);
-    for (let row = 0; row < 3; row += 1) {
-      Place(group, Box(1.08, .03, .022, 0x706b63, { surface: "paper", castShadow: false }), 0, 1.89 - row * .28, .04);
+    Place(group, Box(2.08, 1.72, .07, 0xeee6d6, { surface: "paper", roughness: .98 }), 0, 1.76, -.02);
+    Place(group, Box(1.9, .34, .028, color, { emissive: color, emissiveIntensity: .26, castShadow: false }), 0, 2.34, .035);
+    for (let row = 0; row < 4; row += 1) {
+      Place(group, Box(1.72, .026, .022, 0x817a6d, { surface: "paper", castShadow: false }), 0, 2.02 - row * .25, .04);
     }
-    for (const ringX of [-.42, .42]) Place(group, Torus(.07, .018, 0xa6a8aa, { surface: "metal", metalness: .78, radialSegments: 8, tubularSegments: 16 }), ringX, 2.56, .07);
+    for (const columnX of [-.57, 0, .57]) {
+      Place(group, Box(.026, .93, .022, 0xa09a8d, { surface: "paper", castShadow: false }), columnX, 1.64, .04);
+    }
+    Place(group, Sphere(.055, 0xff6675, { emissive: 0xff6675, emissiveIntensity: .62, castShadow: false, segments: 12, rings: 8 }), .57, 1.65, .075);
+    for (const ringX of [-.62, .62]) Place(group, Torus(.07, .018, 0xa6a8aa, { surface: "metal", metalness: .78, radialSegments: 8, tubularSegments: 16 }), ringX, 2.62, .07);
   } else if (kind === "exit") {
     Place(group, Box(1.42, 3.16, .22, 0x403027, { surface: "wood", roughness: .62 }), 0, 1.58, -.02);
     Place(group, Box(1.06, 2.72, .05, 0x2d2421, { surface: "wood", roughness: .7 }), 0, 1.54, .12);
@@ -2609,7 +2604,7 @@ function GetGuidedMission(project, gameType, tensions, anxietyState) {
     return `本月还剩 ${energyLeft} 格精力。继续开发，先把四项基础做起来。`;
   }
   if (project.age === 0) {
-    return "本月精力已经用完。点右下角“下一回合”结算第一个月。";
+    return "本月精力已经用完。打开项目日历，或点右下角“下一回合”结算。";
   }
   if (project.age < 2) {
     return `继续开发第 ${project.age + 1} 个月；做满两个月后，电脑才会出现“提交商店”。`;
@@ -2999,7 +2994,7 @@ function OpenHomeComputerSheet() {
     : "本月精力已经用完";
   const objectiveDetail = energyLeft > 0
     ? `还剩 ${energyLeft} 格。每点一次开发，就会投入 1 格精力并立刻推进对应模块。`
-    : "关掉电脑，点右下角“下一回合”核账并进入下个月。";
+    : "关掉电脑，去项目日历核账；也可点右下角“下一回合”。";
   OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <div class="computerDeskScene">
       <div class="computerDeskMat" aria-hidden="true"></div>
@@ -3035,7 +3030,7 @@ function OpenHomeComputerSheet() {
 
             ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
 
-            <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>方向在白板；宣发用手机；招聘去人才市场；月结点右下角“下一回合”。</span></div>
+            <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>方向在白板；招聘在人才市场；评分、事件与月结在项目日历，右下角也可打开。</span></div>
           </div>
         </div>
         <div class="computerControlDeck" aria-hidden="true">
@@ -3061,7 +3056,7 @@ function OpenHomeComputerSheet() {
       const left = Math.max(0, 3 - state.ownerWorkCount);
       ShowToast(left > 0
         ? `已把 1 格精力投入${MODULE_META[moduleKey].label}，本月还剩 ${left} 格。`
-        : "本月 3 格精力已经用完。点右下角“下一回合”。", left > 0 ? "good" : "warning");
+        : "本月 3 格精力已经用完。打开项目日历或点“下一回合”。", left > 0 ? "good" : "warning");
       OpenHomeComputerSheet();
     };
   }, { mode: "computer" });
@@ -3651,138 +3646,6 @@ function OpenDirectiveSheet() {
   }, { mode: "whiteboard" });
 }
 
-function OpenMarketingSheet() {
-  if (state.project.age < 1 && !state.project.isReleased) {
-    ShowToast("现在只有一份合同，没东西可宣发。先开发并结算第一个月。", "warning");
-    PlayTone("warning");
-    return;
-  }
-  OpenPanel("MARKETING PHONE", "宣发手机 · 付费投放", `
-    <p class="panelIntro">投放增加愿望单，也会抬高玩家预期。</p>
-    <div class="metricGrid">
-      <div class="metricTile"><span>累计宣发</span><strong>${FormatMoney(state.project.marketingSpent)}</strong></div>
-      <div class="metricTile"><span>愿望单</span><strong>${state.project.wishlists.toLocaleString("zh-CN")}</strong></div>
-      <div class="metricTile"><span>预期压力</span><strong>${Math.round(state.project.expectation)} / 60</strong></div>
-    </div>
-    <div class="panelSection worldGrid three">${MARKETING_CAMPAIGNS.map((campaign) => {
-      const bought = state.project.campaigns.includes(campaign.id);
-      return `<button class="worldChoice ${campaign.id === "everywhereCampaign" ? "danger" : ""}" data-campaign-id="${campaign.id}" type="button" ${bought || state.project.isReleased ? "disabled" : ""}>
-        <div class="choiceTop"><strong>${campaign.icon} ${EscapeHtml(campaign.name)}</strong><span>${FormatMoney(campaign.cost)}</span></div>
-        <div class="choiceFooter"><span>愿望单 +${campaign.wishlists.toLocaleString("zh-CN")} · 热度 +${campaign.hype}</span><b>${bought ? "已投放" : `预期 +${campaign.expectation} · 焦虑 +${campaign.anxiety}`}</b></div>
-      </button>`;
-    }).join("")}</div>`, () => {
-    dom.sheetBody.onclick = (event) => {
-      const button = event.target.closest("[data-campaign-id]");
-      if (!button) return;
-      const result = BuyMarketingCampaign(state, button.dataset.campaignId);
-      if (ApplyInteractiveResult(result, { tone: "warning", deferEnding: true })) {
-        if (state.status === "playing") OpenMarketingSheet(); else RenderEnding();
-      }
-    };
-  });
-}
-
-function MarketFitPreviewHtml(marketFit) {
-  if (!marketFit) return "";
-  const refundPoints = Math.round(Math.abs(marketFit.refundRateDelta || 0) * 100);
-  const refundLabel = marketFit.refundRateDelta < 0
-    ? "退款率 −" + refundPoints + " 点"
-    : marketFit.refundRateDelta > 0
-      ? "退款率 +" + refundPoints + " 点"
-      : "退款率不变";
-  return '<div class="marketFitPreview ' + marketFit.tone + '">'
-    + '<div class="marketFitStatus"><span>结果</span><strong>' + EscapeHtml(marketFit.label) + '</strong></div>'
-    + '<div class="marketFitMetrics">'
-    + '<span><small>营收</small><b>×' + marketFit.revenueMultiplier.toFixed(2) + '</b></span>'
-    + '<span><small>退款</small><b>' + refundLabel + '</b></span>'
-    + '</div></div>';
-}
-
-function OpenMarketPhoneSheet() {
-  if (state.project.age < 1 && !state.project.isReleased) {
-    OpenPanel("MARKETING PHONE", "宣发手机 · 现在还没有可宣传的内容", `
-      <div class="marketPhone phoneLockedIntro">
-        <div class="phoneStatusBar"><span>M${String(state.month).padStart(2, "0")} · 09:41</span><b>宣发中心</b><span>5G ▰</span></div>
-        <div class="resultHero"><b>先开发</b><p>先把电脑里的 3 格精力用完，再点右下角“下一回合”。</p></div>
-        <div class="note good">首月结束后，这里会开放市场风向、宣传口径与付费投放。</div>
-      </div>`);
-    return;
-  }
-  const snapshot = GetMarketSnapshot(state);
-  const strategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
-  const projectMeta = FindProject(state.project.templateId);
-  const focusOptions = [{
-    id: "concept",
-    title: "立项特色 · " + projectMeta.trend,
-  }, ...state.project.features.map((item) => {
-    const feature = FindFeatureChoice(item.id);
-    return feature ? {
-      id: feature.id,
-      title: feature.title,
-    } : null;
-  }).filter(Boolean)];
-  const selectedFocusId = strategy.directionId && focusOptions.some((option) => option.id === strategy.focusId)
-    ? strategy.focusId
-    : "independent";
-  const locked = strategy.setMonth === state.month;
-  const disabledAttribute = locked ? " disabled" : "";
-  const currentFit = EvaluateMarketFit(state);
-  const focusMarkup = [
-    '<label class="marketPick directionPick">'
-      + '<input type="radio" name="marketFocus" value="independent"' + (selectedFocusId === "independent" ? " checked" : "") + disabledAttribute + ">"
-      + '<span><b>不追风</b><small>×0.82 · 无惩罚</small></span>'
-    + "</label>",
-    ...focusOptions.map((option) => {
-      const preview = EvaluateMarketFit(state, { focusId: option.id, directionId: snapshot.effectiveDirection.id });
-      return '<label class="marketPick focusPick">'
-        + '<input type="radio" name="marketFocus" value="' + option.id + '"' + (option.id === selectedFocusId ? " checked" : "") + disabledAttribute + ">"
-        + '<span><b>' + EscapeHtml(option.title) + '</b><small>' + EscapeHtml(preview.label) + ' · ×' + preview.revenueMultiplier.toFixed(2) + "</small></span>"
-      + "</label>"
-    }),
-  ].join("");
-  const actionLabel = locked ? "已选" : "确认";
-
-  OpenPanel("MARKETING PHONE", "桌边手机 · 宣发", (
-    '<div class="marketPhone">'
-      + '<div class="phoneStatusBar"><span>M' + String(state.month).padStart(2, "0") + '</span><b>市场</b><span>▰</span></div>'
-      + '<section class="marketHero" style="--marketColor:' + snapshot.effectiveDirection.color + '">'
-        + '<span>风向</span>'
-        + '<strong>' + snapshot.effectiveDirection.icon + " " + EscapeHtml(snapshot.effectiveDirection.name) + "</strong>"
-        + '<div><b>命中 ×' + (snapshot.effectiveDirection.perfectMultiplier * snapshot.heatMultiplier).toFixed(2) + '</b></div>'
-      + "</section>"
-      + '<div class="marketFeed">'
-        + '<article class="phoneStory breaking"><span>事件</span><strong>' + EscapeHtml(snapshot.event.title) + "</strong></article>"
-      + "</div>"
-      + '<div class="marketFeatureAction"><span>付费投放同样只在这台手机里处理。</span><button class="miniButton" data-open-paid-campaigns type="button">付费投放</button></div>'
-      + '<form class="marketStrategyForm" data-market-form>'
-        + '<div class="phoneSectionTitle"><strong>主推</strong><span>选 1 项</span></div>'
-        + '<div class="marketPickGrid focusGrid">' + focusMarkup + "</div>"
-        + '<p class="workCostNote">要新增玩法，请关掉手机去墙上白板。</p>'
-        + '<div data-market-preview>' + MarketFitPreviewHtml(currentFit) + "</div>"
-        + '<div class="marketCommit"><span>每月 1 次</span><button class="primaryButton" data-market-commit type="button" ' + (locked ? "disabled" : "") + ">" + actionLabel + "</button></div>"
-      + "</form>"
-    + "</div>"
-  ), () => {
-    const form = dom.sheetBody.querySelector("[data-market-form]");
-    const RefreshPreview = () => {
-      const focusId = form?.querySelector('[name="marketFocus"]:checked')?.value || "independent";
-      const directionId = focusId === "independent" ? "independent" : snapshot.effectiveDirection.id;
-      const preview = dom.sheetBody.querySelector("[data-market-preview]");
-      if (preview) preview.innerHTML = MarketFitPreviewHtml(EvaluateMarketFit(state, { focusId, directionId }));
-    };
-    dom.sheetBody.onchange = RefreshPreview;
-    dom.sheetBody.onclick = (event) => {
-      if (event.target.closest("[data-open-paid-campaigns]")) return OpenMarketingSheet();
-      if (!event.target.closest("[data-market-commit]")) return;
-      const focusId = form?.querySelector('[name="marketFocus"]:checked')?.value || "independent";
-      const result = SetMarketStrategy(state, focusId);
-      if (ApplyInteractiveResult(result, { tone: result.marketFit?.backlash ? "warning" : result.marketFit?.perfect ? "good" : "normal" })) {
-        OpenMarketPhoneSheet();
-      }
-    };
-  });
-}
-
 function RevenueChart(history = state.incomeHistory) {
   const points = history.slice(-16);
   if (!points.length) return `<div class="revenueEmpty">暂无游戏净收入。</div>`;
@@ -3844,7 +3707,6 @@ function StockSettlementReport(settlement) {
 
 function OpenReleaseSheet() {
   const evaluation = EvaluateProject(state);
-  const marketFit = EvaluateMarketFit(state);
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const tensions = evaluation?.tensions || [];
   OpenPanel("发布", state.project.isReleased ? `更新《${EscapeHtml(state.project.name)}》` : `提交《${EscapeHtml(state.project.name)}》`, `
@@ -3855,7 +3717,6 @@ function OpenReleaseSheet() {
       <div class="metricTile"><span>Bug · 债</span><strong>${Math.round(state.project.bugs)} / ${Math.round(state.project.scopeDebt + state.project.technicalDebt)}</strong></div>
     </div>
     <div class="noteList">${tensions.length ? tensions.slice(0, 3).map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}">${EscapeHtml(tension.title)}</div>`).join("") : `<div class="note good">无冲突</div>`}</div>
-    <div class="note ${marketFit.backlash ? "danger" : marketFit.perfect ? "good" : ""}">市场：${EscapeHtml(marketFit.label)} · 营收 ×${marketFit.revenueMultiplier.toFixed(2)}</div>
     <div class="panelSection">${RevenueChart()}</div>
     <div class="panelSection choiceFooter"><span>${state.project.age < 2 ? `还需 ${2 - state.project.age} 月` : state.project.lastReleaseMonth === state.month ? "本月已发" : "可发 · 低分退款"}</span><button class="primaryButton" data-release type="button" ${canRelease ? "" : "disabled"}>${state.project.isReleased ? "更新" : "上线"}</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
@@ -3866,7 +3727,6 @@ function OpenReleaseSheet() {
       ShowResult(result.isUpdate ? "更新" : "上线", `${result.evaluation.rating.toFixed(1)} 分 · ${result.review}`, `
         <div class="resultHero"><b>+${FormatGoalMoney(result.revenue)}</b><p>${commercial.marketBacklash ? "市场错配 · 退款↑" : commercial.backlash ? "质量不足 · 退款↑" : "已计入收入"}</p></div>
         <div class="metricGrid"><div class="metricTile"><span>毛收入</span><strong>${FormatGoalMoney(commercial.grossRevenue)}</strong></div><div class="metricTile"><span>退款</span><strong>${FormatGoalMoney(commercial.refunds)}</strong></div><div class="metricTile"><span>退款率</span><strong>${(commercial.refundRate * 100).toFixed(1)}%</strong></div></div>
-        <div class="note ${result.marketFit.backlash ? "danger" : result.marketFit.perfect ? "good" : ""}">市场：${EscapeHtml(result.marketFit.label)} · 营收 ×${result.marketFit.revenueMultiplier.toFixed(2)}</div>
         <div class="panelSection">${RevenueChart()}</div>`, () => { if (state.status !== "playing") RenderEnding(); });
       PlayTone("release");
     };
@@ -3878,8 +3738,6 @@ function GetMonthCloseActions() {
   const ownerWorkRemaining = Math.max(0, 3 - state.ownerWorkCount);
   if (ownerWorkRemaining > 0) actions.push(`亲自开发 ${ownerWorkRemaining} 次`);
   if (state.talkPoints > 0) actions.push(`沟通 / 拍板 ${state.talkPoints} 次`);
-  if ((state.project.age >= 1 || state.project.isReleased)
-    && (state.project.marketStrategy?.setMonth || 0) !== state.month) actions.push("手机里的市场主推未定");
   if (state.project.age >= 2 && state.project.lastReleaseMonth !== state.month) {
     actions.push(state.project.isReleased ? "可发布更新" : "可提交商店");
   }
@@ -3903,6 +3761,35 @@ function GetMonthResultHighlights(result, finance) {
   return [...new Set(highlights)].slice(0, 2);
 }
 
+function GetProjectCalendarReminders() {
+  const reminders = [];
+  const activeIds = new Set();
+  for (const active of state.project.activeLiveEvents || []) {
+    const liveEvent = LIVE_REVENUE_EVENTS.find((candidate) => candidate.id === active.id);
+    if (!liveEvent) continue;
+    activeIds.add(liveEvent.id);
+    reminders.push({
+      title: liveEvent.title,
+      detail: `${liveEvent.description} · 余 ${Math.max(1, active.remaining)} 月`,
+      tone: "active",
+    });
+  }
+  const settledMonth = state.lastSettlement?.month;
+  for (const liveEvent of state.lastSettlement?.finance?.appliedEvents || []) {
+    if (!liveEvent?.id || activeIds.has(liveEvent.id)) continue;
+    activeIds.add(liveEvent.id);
+    reminders.push({
+      title: liveEvent.title,
+      detail: `M${String(settledMonth || state.month).padStart(2, "0")} 已发生`,
+      tone: "recent",
+    });
+  }
+  if (!reminders.length) {
+    reminders.push({ title: "暂无随机事件", detail: "月结时刷新", tone: "clear" });
+  }
+  return reminders.slice(0, 2);
+}
+
 function OpenMonthSheet() {
   if (!state.project || state.status !== "playing") return;
   const costs = ForecastMonthlyCosts(state);
@@ -3916,7 +3803,10 @@ function OpenMonthSheet() {
   const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
   const openActions = GetMonthCloseActions();
   const hasOpenActions = openActions.length > 0;
-  OpenPanel("NEXT TURN", `${currentMonthLabel} 月末结算`, `
+  const calendarReminders = state.project.isReleased ? GetProjectCalendarReminders() : [];
+  const rating = state.project.lastRating || 0;
+  const ratingTone = rating >= 8.2 ? "excellent" : rating >= 6.7 ? "good" : rating >= 4.7 ? "mixed" : "poor";
+  OpenPanel("PROJECT CALENDAR", `项目日历 · ${currentMonthLabel}`, `
     <div class="monthCloseRitual">
       <section class="monthCloseLedger" aria-label="${currentMonthLabel} 结束，进入 ${nextMonthLabel}">
         <div class="monthCloseLeaf"><small>本月封账</small><strong>${currentMonthLabel}</strong><span>→ ${nextMonthLabel}</span></div>
@@ -3926,6 +3816,17 @@ function OpenMonthSheet() {
           <span>${expectedIncome > 0 ? `收入 +${FormatMoney(expectedIncome)} · ` : ""}支出 −${FormatMoney(costs.total)}</span>
         </div>
       </section>
+      ${state.project.isReleased ? `<section class="projectCalendarLive" aria-label="商店评分与随机事件提醒">
+        <div class="projectCalendarStore ${ratingTone}">
+          <small>商店评分</small>
+          <strong>${rating.toFixed(1)}<i>/10</i></strong>
+          <span>v${state.project.version}.0 · M${String(state.project.lastReleaseMonth).padStart(2, "0")} 更新</span>
+        </div>
+        <div class="projectCalendarReminders">
+          <header><span>事件提醒</span><b>${calendarReminders[0]?.tone === "clear" ? "0" : calendarReminders.length}</b></header>
+          ${calendarReminders.map((reminder) => `<article class="projectCalendarReminder ${reminder.tone}"><i aria-hidden="true">${reminder.tone === "clear" ? "○" : "!"}</i><strong>${EscapeHtml(reminder.title)}</strong><span>${EscapeHtml(reminder.detail)}</span></article>`).join("")}
+        </div>
+      </section>` : ""}
       ${startupLoan?.status === "active" ? `<div class="monthCloseDeadline"><span>启动贷</span><strong>${FormatMoney(startupLoan.remaining)}</strong><em>M${String(startupLoan.dueMonth).padStart(2, "0")} · 剩 ${monthsLeft} 月</em></div>` : ""}
       ${state.stockPosition ? `<div class="monthClosePosition"><span>股票待收盘</span><strong>${EscapeHtml(pendingStock?.symbol || state.stockPosition.optionId)}</strong><em>本金 ${FormatMoney(state.stockPosition.stake)}</em></div>` : ""}
       <section class="monthCloseTasks ${hasOpenActions ? "attention" : "clear"}" aria-live="polite">
@@ -3982,9 +3883,8 @@ function OpenHelpSheet() {
     <div class="noteList">
       <div class="note"><b>开发</b>：家里的电脑，每月 3 格精力。</div>
       <div class="note"><b>项目方向</b>：墙上白板。</div>
-      <div class="note"><b>宣发</b>：桌边手机，首月结束后开放。</div>
       <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
-      <div class="note"><b>结束本月</b>：右下角“下一回合”；墙上月历也可。</div>
+      <div class="note"><b>评分、事件、月结</b>：项目日历；右下角“下一回合”也可打开。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
       <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元，你将成为成功的游戏制作人。</div>
     </div>
@@ -4180,7 +4080,6 @@ function TriggerInteraction() {
   switch (activeInteraction.kind) {
     case "homeComputer": return OpenHomeComputerSheet();
     case "planningBoard": return OpenDirectiveSheet();
-    case "marketingPhone": return OpenMarketPhoneSheet();
     case "homeCalendar": return OpenMonthSheet();
     case "homeFridge": return OpenFoodSheet("leftovers", "自己家的冰箱");
     case "exit": return OpenTravelSheet();
