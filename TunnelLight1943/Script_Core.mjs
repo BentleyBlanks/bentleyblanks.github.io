@@ -1561,10 +1561,50 @@ function StrokeWork(state, mem, input, dt, opts) {
 
 // 链式谜题：有序的一串步骤——拾取 / 使用 / 投中 / 交谈 / 推。
 // 单格物品栏：步骤自己管理手里那格；失败重置不清链、不清物品。
+/**
+ * 「三处任翻」当前该跑哪一小步（`type:"searchAny"`）。
+ *
+ * 2026-08-14 用户退回推焦木：「太奇怪了 解密也不算 也很不直观 我都不知道要
+ * 操作这里 只有一个 hint」。病根不在那根木头，在**链是一条直线**：找吃的这场
+ * 戏本该是"翻翻看"，玩家却只能按剧本写死的顺序、在指定的一处做指定的一下。
+ * 现在棚里三处各摆各的（食槽／苇席／墙根的烧土），**先翻哪处由玩家挑**，
+ * 各给各的东西；三处都翻过了这一整步才算完。
+ *
+ * 只读：进度（每处翻到第几小步、哪几处翻完了）挂在 `beat.search` 上、由
+ * StepChain 建档——HUD 那两个调用方每帧都问，不许在它们手里凭空建状态。
+ *
+ * @returns {{spot, sub, near, left}} sub 为空 ＝ 人不在任何一处里，near 是最近的那处
+ */
+export function SearchSpotNow(state, st) {
+  const S = state.beat?.search || { sub: {}, done: {} };
+  const p = state.player;
+  const lvl = p.level || "surface";
+  const left = (st.spots || []).filter((s) => !S.done[s.key]);
+  if (!left.length) return { spot: null, sub: null, near: null, left };
+  // 同时站在两处的判定区里（挨得近的时候会有）：取近的那处
+  let best = null, bestD = Infinity;
+  for (const s of left) {
+    const sub = s.steps[S.sub[s.key] || 0];
+    const z = sub?.zone;
+    if (!z || (z.level || "surface") !== lvl) continue;
+    const d = Math.abs(p.x - z.x);
+    if (d <= z.w / 2 && d < bestD) { bestD = d; best = { spot: s, sub }; }
+  }
+  if (best) return { ...best, near: best.spot, left };
+  let near = left[0], nd = Infinity;
+  for (const s of left) {
+    const d = Math.abs(p.x - s.x);
+    if (d < nd) { nd = d; near = s; }
+  }
+  return { spot: null, sub: null, near, left };
+}
+
 function StepChain(state, def, input, dt) {
   const b = state.beat;
   if (b.stepIndex === undefined) { b.stepIndex = 0; b.holdP = 0; def.onStart?.(state); }
-  const st = def.steps[b.stepIndex];
+  // let 不是笔误：`searchAny` 会把当前步骤换成"玩家这会儿站的那一处"的小步骤，
+  // 底下那个几百行的 switch 与 finish() 因此一个字都不用改（见 SearchSpotNow）
+  let st = def.steps[b.stepIndex];
   if (!st) { AdvanceBeat(state); return; }
   const p = state.player;
   const lvl = p.level || "surface";
@@ -1632,10 +1672,14 @@ function StepChain(state, def, input, dt) {
     }
   }
 
+  // finStep ＝ 这一下该跑谁的 note/effect（三处任翻时是那一小步，不是外层那一步）
+  let finStep = st;
+  let subDone = null;
   const finish = () => {
-    if (st.note) state.toast = { text: st.note, t: 4.5 };
-    if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);   // 口信也是情报，入账供第六章推理
-    st.effect?.(state);
+    if (finStep.note) state.toast = { text: finStep.note, t: 4.5 };
+    if (finStep.noteAdd) state.flags.notesSeen.push(finStep.noteAdd);   // 口信也是情报，入账供第六章推理
+    finStep.effect?.(state);
+    if (subDone) { subDone(); return; }                       // 小步骤：不推进外层的 stepIndex
     b.stepIndex += 1;
     b.holdP = 0;
     b.pipIdleT = 0;                // 链动了一步，"没动静"从头计
@@ -1664,6 +1708,45 @@ function StepChain(state, def, input, dt) {
         t: 3.2,
       };
     }
+  }
+
+  // 「三处任翻」：把当前活跃的那一处顶替成本帧要跑的小步骤
+  if (st.type === "searchAny") {
+    const owner = st;
+    if (!b.search) b.search = { sub: {}, done: {}, idle: 0 };
+    const r = SearchSpotNow(state, owner);
+    if (!r.sub) {
+      // 人不在任何一处里：**这会儿最容易迷路**（用户原话「我都不知道要操作
+      // 这里」）。站着不动久了递一句话，说的是"往哪儿翻"，不是"按哪个键"
+      b.search.idle += dt;
+      if (owner.idleNote && b.search.idle > (owner.idleAfter ?? 9) && !b.search.idleSaid) {
+        b.search.idleSaid = true;
+        state.toast = { text: owner.idleNote, t: 5.0 };
+      }
+      return;                       // 往哪儿走由画框边那张牌指（GetBeatTarget）
+    }
+    b.search.idle = 0;
+    const spot = r.spot;
+    st = r.sub;
+    finStep = r.sub;
+    subDone = () => {
+      const S = b.search;
+      S.sub[spot.key] = (S.sub[spot.key] || 0) + 1;
+      b.holdP = 0;
+      b.pipIdleT = 0;
+      input.interact = false;
+      if (S.sub[spot.key] >= spot.steps.length) {
+        S.done[spot.key] = true;
+        if (spot.note) state.toast = { text: spot.note, t: 4.8 };
+        spot.effect?.(state);
+      }
+      if ((owner.spots || []).every((s2) => S.done[s2.key])) {
+        if (owner.note) state.toast = { text: owner.note, t: 4.5 };
+        owner.effect?.(state);
+        b.stepIndex += 1;
+        if (b.stepIndex >= def.steps.length) AdvanceBeat(state);
+      }
+    };
   }
 
   switch (st.type) {
@@ -4610,8 +4693,10 @@ export const SCRIPTS = {
       // 路过三婶家的纺车、墙上的弹孔：**没有字幕，镜头不停**（八稿明令——
       // 七稿的两个停顿注视删了，看见就走）。
       kind: "chain", id: "c1_forage", timeOfDay: "day",
-      objective: "去牲口棚翻一翻", hint: "西头。棚顶塌了半边，地上压着焦木、苇席和破门板",
-      forage: { plank: 11.2, plankStyle: "beam", ash: 7.6 },
+      objective: "棚里翻翻，看有没有能下锅的",
+      hint: "西头那间棚。能翻的有三处：翻倒的食槽、压着苇席的那堆、墙根一片发白的烧土",
+      // 三处的坐标（World 照这三个数把三件东西画出来）。**先翻哪处玩家自己挑**
+      forage: { trough: 11.6, reed: 9.7, ash: 7.4 },
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）；序里的人早收干净了
         const sis = FindActor(state, "sister");
@@ -4627,84 +4712,112 @@ export const SCRIPTS = {
         // note→toast；纺车连手记也砍了，它离弹孔墙才两米半，两句会互相顶掉）
         { type: "goto", zone: { x: 22.8, w: 2.2 },
           note: "贴告示那面墙上，一排弹孔。" },
-        { type: "goto", zone: { x: 12.4, w: 2.8 } },
-        // ① 推焦木：攥住露在外头的那一头往旁边拖。判定区给得宽（5m）：
-        // 拖的时候人是**退着走**的，区窄了会在最后一寸掉出判定区，链当场卡死
-        { type: "shiftPlank", zone: { x: 11.2, w: 5.0 },
-          note: "木头蹭着地，落下一层黑灰。底下露出半袋粮食。",
-          effect: (state) => { Cue(state, "flutter", { gain: 0.4, rate: 0.8 }); } },
-        // ② 解袋口看一眼：袋里全是谷种。娘的话在这儿响起来——不是回忆画面，
-        // 是声音自己找上来的
-        { type: "use", zone: { x: 11.2, w: 2.8 }, prompt: "E · 解开袋口",
-          effect: (state) => {
-            Cue(state, "clothLift", { gain: 0.5 });
-            StartMicroCine(state, [
-              { act: "柱子解开袋口。袋里全是谷种。", d: 3.2,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.3 },
-                on: (s) => { FlashPose(s, "kneel", 3.0); } },
-              { who: "娘的声音", say: "留种。谁也不能动。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 } },
-              { act: "柱子捻起几粒谷种，看了一会。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 },
-                on: (s) => { FlashPose(s, "kneel", 2.8); } },
-            ]);
-          } },
-        // ③ 扎回袋口：拧紧、绕绳、压回砖下。这一下不靠旁白解释：饿着的人
-        // 把一袋**能吃的**谷种原样扎回去——留种是明年的命，道理由手做出来
-        { type: "use", zone: { x: 11.2, w: 2.8 }, hold: 1.6, stroke: "circle", gestureY: 0.55,
-          pose: "twistTie", cue: "clothFold",
-          prompt: "拧紧袋口 · 绕绳扎回去",
-          effect: (state) => {
-            state.flags.seedKept = true;
-            StartMicroCine(state, [
-              { act: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.2 },
-                on: (s) => {
-                  FlashPose(s, "kneel", 2.8);
-                  Cue(s, "stoneLand", { gain: 0.35, delay: 1.6 });
-                } },
-              { act: "柱子把苇席重新盖在粮种上。", d: 2.8,
-                cam: { kind: "shot", x: 11.4, y: 1.0, dist: 3.2 },
-                on: (s) => {
-                  FlashPose(s, "bow", 2.2);
-                  Cue(s, "clothDrop", { gain: 0.5, delay: 0.8 });
-                } },
-            ]);
-          } },
-        // ④ 刨开灰堆：棚角一片松软的灰土。第一下是灰，第二下露出硬土，
-        // 第三下指甲碰到陶器（FORAGE.ash 的 jarAt）；再扒一把，坛子露出来
-        { type: "scoopAsh", zone: { x: 7.6, w: 3.0 },
-          note: "扒开周围的土——一个小口坛。坛口糊着泥，上面压着半块碗底。",
-          effect: (state) => { state.flags.jarDug = true; } },
-        // ⑤ 抠开泥封、揭碗片（活卡）。碗片底下垫着一圈碎布——蓝底白花。
-        // 画面短暂切回娘跪在窖口的手臂（序里那半张脸的机位），再切回坛子
-        { type: "unwrapJar", zone: { x: 7.6, w: 3.0 },
-          effect: (state) => {
-            StartMicroCine(state, [
-              { act: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
-              // 闪回：娘跪在窖口的手臂（一秒出头，硬切）
-              { act: "", d: 1.3,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
-                on: (s) => {
-                  const m = FindActor(s, "mother");
-                  if (m) { m.visible = true; m.level = "surface"; m.x = 29.95; m.heading = -1; m.pose = null; m.track = { name: "lidLower", t: 1.0 }; }
-                } },
-              // 再切回坛子
-              { act: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
-                on: (s) => {
-                  const m = FindActor(s, "mother");
-                  if (m) { m.visible = false; m.pose = null; }
-                } },
-              { act: "他将碎布叠好，揣进怀里。", d: 2.6,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
-                on: (s) => { FlashPose(s, "bow", 1.4); } },
-              { act: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
-            ]);
-          } },
-        { type: "pickup", x: 7.6, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 抱起坛子",
+        { type: "goto", zone: { x: 13.2, w: 2.8 },
+          note: "棚顶塌了半边。地上的东西一样样都还在，就是都埋了半截。" },
+        // ── 翻三处，顺序随玩家（2026-08-14 重做，见 SearchSpotNow 的注释）──
+        // 老版是「推焦木」：拖一根横在地上的烧焦檩条，用户退回——
+        // 「太奇怪了 解密也不算 也很不直观 我都不知道要操作这里 只有一个 hint」。
+        // 现在这一整步只有一件事：**在棚里翻东西吃**。三处各摆各的、各给各的，
+        // 玩家想先翻哪处就先翻哪处；三处都翻过了才走。
+        { type: "searchAny",
+          idleAfter: 9,
+          idleNote: "过道当中的土是硬的。娘不会把东西埋在人走的地方——挨着墙根、压在东西底下找。",
+          note: "棚里能翻的都翻遍了。",
+          spots: [
+            // ① 翻倒的食槽：槽底那层秕谷壳，一把一把扫进兜里。**最好懂的一处**，
+            // 也是三处里最先撞见的（从东边进棚，它就在门口）
+            {
+              key: "trough", x: 11.6, hintIcon: "dig",
+              note: "槽底扫出一小把秕谷壳。不多，撒进锅里能顶点数。",
+              effect: (state) => { state.flags.chaffGot = true; },
+              steps: [
+                { type: "scoopAsh", part: "trough", zone: { x: 11.6, w: 2.2 } },
+              ],
+            },
+            // ② 压着苇席的那堆：掀开是娘留的谷种。**全章的题眼在这儿**——
+            // 饿着的人把一袋能吃的谷种原样扎回去，道理由手做出来，不靠旁白
+            {
+              key: "reed", x: 9.7, hintIcon: "fold",
+              note: "谷种原样扎回去，苇席重新盖上。",
+              steps: [
+                { type: "heaveMat", part: "reed", zone: { x: 9.7, w: 2.2 },
+                  note: "席子底下压着半袋东西。",
+                  effect: (state) => { Cue(state, "flutter", { gain: 0.4, rate: 0.8 }); } },
+                { type: "use", zone: { x: 9.7, w: 2.2 }, prompt: "E · 解开袋口",
+                  effect: (state) => {
+                    Cue(state, "clothLift", { gain: 0.5 });
+                    StartMicroCine(state, [
+                      { act: "柱子解开袋口。袋里全是谷种。", d: 3.2,
+                        cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.3 },
+                        on: (s) => { FlashPose(s, "kneel", 3.0); } },
+                      { who: "娘的声音", say: "留种。谁也不能动。", d: 3.0,
+                        cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 } },
+                      { act: "柱子捻起几粒谷种，看了一会。", d: 3.0,
+                        cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 },
+                        on: (s) => { FlashPose(s, "kneel", 2.8); } },
+                    ]);
+                  } },
+                { type: "use", zone: { x: 9.7, w: 2.2 }, hold: 1.6, stroke: "circle", gestureY: 0.55,
+                  pose: "twistTie", cue: "clothFold",
+                  prompt: "拧紧袋口 · 绕绳扎回去",
+                  effect: (state) => {
+                    state.flags.seedKept = true;
+                    StartMicroCine(state, [
+                      { act: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
+                        cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.2 },
+                        on: (s) => {
+                          FlashPose(s, "kneel", 2.8);
+                          Cue(s, "stoneLand", { gain: 0.35, delay: 1.6 });
+                        } },
+                      { act: "柱子把苇席重新盖在粮种上。", d: 2.8,
+                        cam: { kind: "shot", x: 9.9, y: 1.0, dist: 3.2 },
+                        on: (s) => {
+                          FlashPose(s, "bow", 2.2);
+                          Cue(s, "clothDrop", { gain: 0.5, delay: 0.8 });
+                        } },
+                    ]);
+                  } },
+              ],
+            },
+            // ③ 墙根一片发白的烧土：第三下指甲碰着坛肩（FORAGE.ash 的 jarAt）。
+            // 这一处给的是这顿饭的主料，所以摆在最里头——玩家得走进棚子最深处
+            {
+              key: "ash", x: 7.4, hintIcon: "dig",
+              note: "十来片红薯干。够熬一锅。",
+              steps: [
+                { type: "scoopAsh", part: "ash", zone: { x: 7.4, w: 2.2 },
+                  note: "扒开周围的土——一个小口坛。坛口糊着泥，上面压着半块碗底。",
+                  effect: (state) => { state.flags.jarDug = true; } },
+                { type: "unwrapJar", zone: { x: 7.4, w: 2.2 },
+                  effect: (state) => {
+                    StartMicroCine(state, [
+                      { act: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
+                        cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
+                      // 闪回：娘跪在窖口的手臂（一秒出头，硬切）
+                      { act: "", d: 1.3,
+                        cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
+                        on: (s) => {
+                          const m = FindActor(s, "mother");
+                          if (m) { m.visible = true; m.level = "surface"; m.x = 29.95; m.heading = -1; m.pose = null; m.track = { name: "lidLower", t: 1.0 }; }
+                        } },
+                      // 再切回坛子
+                      { act: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
+                        cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
+                        on: (s) => {
+                          const m = FindActor(s, "mother");
+                          if (m) { m.visible = false; m.pose = null; }
+                        } },
+                      { act: "他将碎布叠好，揣进怀里。", d: 2.6,
+                        cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
+                        on: (s) => { FlashPose(s, "bow", 1.4); } },
+                      { act: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
+                        cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
+                    ]);
+                  } },
+              ],
+            },
+          ] },
+        { type: "pickup", x: 7.4, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 抱起坛子",
           note: "坛子夹在胳膊底下，往回走。" },
         { type: "goto", zone: { x: 33.6, w: 2.6 } },
       ],
@@ -5564,7 +5677,11 @@ export const SCRIPTS = {
             state.flags.mealCooked = true;
             state.stoveFire = true;   // 旗标在 effect 里落：跳幕过去灶也得是着过火的
             StartMicroCine(state, [
-              { act: "柱子把最后一把糜子倒进锅里。", d: 3.0,
+              // 秕谷壳只有在棚里扫过食槽才有（flags.chaffGot）：**玩家自己翻着的
+              // 那一样，得在锅里看得见**——不然"三处各有各的东西"只是三条 toast
+              { act: state.flags.chaffGot
+                ? "柱子把最后一把糜子倒进锅里，又把兜里那点秕谷壳抖进去。"
+                : "柱子把最后一把糜子倒进锅里。", d: 3.0,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.6 },
                 on: (s) => {
                   s.beat.indoorScene = true;
@@ -10854,8 +10971,18 @@ export function GetBeatTarget(state) {
       };
     }
     case "chain": {
-      const st = def.steps[state.beat.stepIndex || 0];
+      let st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;
+      // 三处任翻：不在任何一处里就先走过去（驱动器与画框边那张牌都读这一条）
+      if (st.type === "searchAny") {
+        const r = SearchSpotNow(state, st);
+        if (!r.sub) {
+          return r.near
+            ? { action: "walk", x: r.near.x, level: r.near.level || "surface", reach: 0.8 }
+            : null;
+        }
+        st = r.sub;
+      }
       switch (st.type) {
         case "pickup": return { action: "interactAt", x: st.x, level: st.level || "surface" };
         case "drop": return { action: "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
@@ -11222,8 +11349,14 @@ export function BeatHintIcon(state) {
       return { kind: "dig" };
     }
     case "chain": {
-      const st = def.steps[state.beat.stepIndex || 0];
+      let st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;
+      if (st.type === "searchAny") {
+        const r = SearchSpotNow(state, st);
+        // 牌上画的是"下一处翻什么"——三处各有各的图，玩家一眼知道该找哪件东西
+        if (!r.sub) return NormHintIcon(r.near?.hintIcon || "hand");
+        st = r.sub;
+      }
       if (st.hintIcon) return NormHintIcon(st.hintIcon);
       switch (st.type) {
         case "pickup": case "pickupGround": return Item(st.item?.label);

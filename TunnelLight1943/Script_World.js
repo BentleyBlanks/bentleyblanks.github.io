@@ -4450,7 +4450,7 @@ export function CreateWorld(canvasEl) {
         PlaceSprite(seedBagMesh, fg.reed.x - 0.25, SURFACE_Y, PlaceZ(BAND.walk));
       }
 
-      // ── 食槽（门板拖开才露出来）：槽底秕谷壳随刮走的把数变少 ──
+      // ── 食槽：翻倒在棚门口，槽底那层秕谷壳随扫走的把数变少 ──
       if (fg.trough) {
         const tKey = `${Math.round((fg.trough.k || 0) * 4)}`;
         if (!troughMesh) {
@@ -4466,8 +4466,10 @@ export function CreateWorld(canvasEl) {
           RedrawProp(troughMesh, { w: 70, h: 26, ax: 35, ay: 22, ss: DETAIL_SS },
             (ctx, ax, ay) => ART.DrawFeedTrough(ctx, ax, ay, "forageTrough", { k: fg.trough.k || 0 }));
         }
-        // 门板还压着的时候只露一个角（题眼是"板子底下压着食槽的角"）
-        troughMesh.visible = !!fg.plank.done || (fg.plank.dx || 0) > 0.3;
+        // 2026-08-14：三处任翻之后食槽是**独立的一处**，不再压在门板底下。
+        // 老写法 `!!fg.plank.done` 在没有 plank 那一档会读 undefined 的属性
+        // 当场抛——"声明了坐标才建档"那条对读的一侧同样成立
+        troughMesh.visible = !fg.plank || !!fg.plank.done || (fg.plank.dx || 0) > 0.3;
         PlaceSprite(troughMesh, fg.trough.x, SURFACE_Y, PlaceZ(BAND.walk));
       }
     } else {
