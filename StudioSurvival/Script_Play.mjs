@@ -1436,7 +1436,8 @@ function BuildFacility(interaction) {
     AddStool(group, -.92, 0, .38, 0x7d293d);
     AddStool(group, .92, 0, .38, 0x7d293d);
   }
-  AddPhysicalLabel(group, title, subtitle, 2.75, 0, 3.03, -.02, color, { compact: true, backing: kind === "hotel" ? 0x513828 : 0x26272a });
+  const sceneName = FindLocation(interaction.locationId)?.name;
+  if (title !== sceneName) AddPhysicalLabel(group, title, subtitle, 2.75, 0, 3.03, -.02, color, { compact: true, backing: 0x26272a });
   group.userData.marker = marker;
   group.userData.interactionId = interaction.id;
   group.userData.kind = kind;

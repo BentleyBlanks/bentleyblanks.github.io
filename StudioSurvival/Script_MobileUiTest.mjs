@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ah/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ah/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ah)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ah)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ai/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ai/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ai)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ai)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /class="hudConsole identityConsole sceneConsole" aria-label="当前场景">[\s\S]*?id="locationValue"/, "the top-left console must show the current scene name");
 assert.match(html, /class="missionHeading"><span>项目<\/span><b id="studioNameHud">/, "the project sheet must own the company name");
 assert.doesNotMatch(html, /studioMonogram|locationPlate/, "the HUD must not repeat scene or company identity through the old icon and place plate");
@@ -116,6 +116,7 @@ assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must sh
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
 assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
 assert.doesNotMatch(script, /AddPhysicalLabel\(sceneGroup, location\.name/, "the room wall must not repeat the scene name already shown in the HUD");
+assert.match(script, /const sceneName = FindLocation\(interaction\.locationId\)\?\.name;[\s\S]*?if \(title !== sceneName\) AddPhysicalLabel/, "a venue prop must not repeat the current scene name as another physical sign");
 assert.doesNotMatch(script, /studioMonogram/, "scene identity must not fall back to a company monogram icon");
 assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
