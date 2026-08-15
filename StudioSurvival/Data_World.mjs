@@ -60,7 +60,8 @@ export const Locations = FreezeList([
 export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  { id: "planningBoard", locationId: "home", kind: "planningBoard", label: "项目白板", detail: "开发 / 方向 / 发布", x: 6.3, y: 0, radius: 1.2, action: "direction" },
+  { id: "homeComputer", locationId: "home", kind: "homeComputer", label: "开发电脑", detail: "亲自开发 / 发布", x: 2.8, y: 0, radius: 1.35, action: "computer" },
+  { id: "planningBoard", locationId: "home", kind: "planningBoard", label: "项目白板", detail: "制作方针 / 玩法提案", x: 6.3, y: 0, radius: 1.2, action: "direction" },
   { id: "homeCalendar", locationId: "home", kind: "homeCalendar", label: "项目日历", detail: "项目状态 / 进入下月", x: 10.35, y: 0, radius: 1.3, action: "month" },
   { id: "homeFridge", locationId: "home", kind: "homeFridge", label: "冰箱", detail: "选择本月吃法", x: 13.35, y: 0, radius: 1.05, action: "homeFood" },
   { id: "homeExit", locationId: "home", kind: "exit", label: "出门", detail: "选择要去的地方", x: 15.15, y: 0, radius: 1, action: "travel" },

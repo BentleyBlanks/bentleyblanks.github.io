@@ -572,15 +572,37 @@ export const FORAGE = {
     snagBack: 0.16,    // 往回让这么多，才让得过去
     standGap: 0.55,
   },
-  // ③ 灰堆：一把一把往怀里刨（第七稿：棚角的灰堆，第三下碰着坛肩）
+  // ③ 灰堆（2026-08-15 重做。用户对老版的原话：「手插进灰堆的玩法太愚蠢了
+  // 既没有代入感 也不好玩 也没有解密感」——老版是同一个手势重复五把，第三把
+  // 弹一条 toast 说碰到坛肩：发现时刻是**字幕说的**，不是手感觉到的）。
+  // 现在这一堆分三层，每层的手感不一样，剧本那句「第一下是灰、第二下露硬土、
+  // 第三下指甲碰到陶器」逐字长在手上：
+  //   第一把 浮灰——轻，手是滑的（looseV），一把带走一大片；
+  //   第二把 硬土——拖不快（packedV 砍到三成，手落后于鼠标），分量全在阻力里；
+  //   第三把 拽到半道**手钉住**（catchAt）：一声闷响、灰扑起来，这一把永远
+  //   拉不完——指甲碰上坛肩了。不上屏一个字。
+  // 钉住之后「往怀里扒」这个动词就死了：再拽只有闷响（拽两把才给一句归因）。
+  // 出路是**换方向**——贴着那个硬东西横着抹（wipes），一把带走一片土，
+  // 坛肩抹哪儿露哪儿。前面机制刚教过「划横的是抹，不算扒」，这里整个翻过来：
+  // 埋着的东西改写了动词，解密感就押在这一下上。
   ash: {
     half: 0.60, top: 0.50,
     grabR: 0.80,       // 手要落在土堆上
     keepR: 1.25,       // 扒的当中手飘出这么远 = 这一把作废
-    strokes: 5,
     len: 0.26,         // 一把至少扒这么远才算一下
     skew: 0.80,        // 横向偏出这个比例 = 划歪了，不算扒
-    jarAt: 3,          // 第几下碰着坛肩
+    digs: 2,           // 真扒进度只有头两把：浮灰一把、硬土一把
+    looseV: 1.9,       // 浮灰：手跟得上（米/秒）
+    packedV: 0.55,     // 硬土：拖不快——手落后于鼠标，重量就是这么读出来的
+    catchAt: 0.60,     // 第三把拽到 len 的这个比例，指甲碰上坛肩，手钉住
+    pinHold: 0.40,     // 钉住之后还死攥着不放，过这么久指头自己滑脱（也解自动通关）
+    jarDx: -0.08,      // 坛肩埋在堆心偏西这点（判定与作画共用）
+    shoulderY: 0.16,   // 坛肩顶离地这么高（钉点、抹土的圈都锚在这儿）
+    wipeR: 0.46,       // 抹土时手要贴着坛肩这一圈
+    wipes: 3,          // 顺着坛肩抹这几把，肩一段段露出来
+    wipeLen: 0.17,     // 一把至少抹这么远
+    wipeSkew: 0.42,    // 竖向超过横向的四成＝那是拽/按，不是顺着抹——必须收在
+                       // 扒的方向（竖横比 0.58）以内，不然往怀里拽也被算成抹
     standGap: 0.90,
   },
   // ④ 苇席（第七稿新增）：机制同苫草，但席子轻、没烧脆——甩快了只脱手，
@@ -1605,7 +1627,13 @@ function StepChain(state, def, input, dt) {
         };
       }
       if (def.forage.ash !== undefined) {
-        b.forage.ash = { x: def.forage.ash, k: 0, done: 0, grab: false, acc: 0, jar: false, open: false };
+        b.forage.ash = {
+          x: def.forage.ash, k: 0, done: 0, grab: false, acc: 0, jar: false, open: false,
+          // 重做（2026-08-15）：钉住/抹坛肩那一段的状态。jarX 是坛肩的世界 x，
+          // 判定与作画共用这一个数（Art 拿 jarX−x 折像素）
+          caught: false, pinT: 0, tug: 0, wipesDone: 0, wacc: 0, clear: 0,
+          jarX: def.forage.ash + FORAGE.ash.jarDx,
+        };
       }
       if (def.forage.reed !== undefined) {
         b.forage.reed = {
@@ -2024,8 +2052,12 @@ function StepChain(state, def, input, dt) {
       }
       return;
     }
-    // ③ 扒烧土：手落在土堆上，一把一把往自己怀里扒。一把够长够斜才算一下，
-    // 每一下土堆真矮一截；扒到第三下指头碰着硬的——罐肩露出来了。
+    // ③ 扒烧土（2026-08-15 重做，设计账在 FORAGE.ash 头上）：
+    //   扒——浮灰滑、硬土沉（速度上限分档，手落后于鼠标就是分量）；
+    //   钉住——第三把拽到半道指甲碰上坛肩，闷响一声，这一把永远拉不完，
+    //   一个字不上屏（老版在这儿弹 toast，发现时刻被字幕抢走了）；
+    //   抹——换方向贴着坛肩横着抹，抹哪儿露哪儿。
+    // 食槽（part:"trough"）还是老的一把一把：槽底下没埋东西。
     case "scoopAsh": {
       const part = st.part || "ash";
       const L = FORAGE[part];
@@ -2037,23 +2069,71 @@ function StepChain(state, def, input, dt) {
       const u = ForageScoopDir(dirX);
       // 土堆越扒越矮，手要落的地方跟着往下走
       const mound = { x: f.x, y: gy + L.top * (1 - 0.55 * f.k) * 0.55 };
+      const phased = L.wipes !== undefined;
+      const sh = phased ? { x: f.jarX, y: gy + L.shoulderY } : null;   // 坛肩
       const pw = input.pointerWorld;
       const held = !!input.pointerHeld && !!pw;
+      // 攥得住的地方：土堆本身；钉住之后坛肩那一圈也算（它就埋在堆顶底下，
+      // 两块地方叠着——所以**这一把是什么不看按在哪儿，看手往哪儿走**）
       if (held && state.ptrPressed && !f.grab
-        && Math.hypot(pw.x - mound.x, pw.y - mound.y) < L.grabR) {
-        f.grab = true; f.from = { x: pw.x, y: pw.y }; f.acc = 0;
+        && (Math.hypot(pw.x - mound.x, pw.y - mound.y) < L.grabR
+          || (phased && f.caught && Math.hypot(pw.x - sh.x, pw.y - sh.y) < L.wipeR))) {
+        f.grab = true;
+        f.from = { x: pw.x, y: pw.y }; f.acc = 0;
+        f.wfrom = { x: pw.x, y: pw.y }; f.wacc = 0;
       }
-      if (!held) { f.grab = false; f.acc = 0; }
+      if (!held) {
+        // 钉着的时候撒手＝拽了一把没拽动（攒归因）；抹到半道撒手＝这一把作废
+        if (f.pinned) { f.tug += 1; f.pinned = false; }
+        f.grab = false; f.acc = 0; f.wacc = 0;
+      }
       if (f.grab) {
         if (Math.hypot(pw.x - mound.x, pw.y - mound.y) > L.keepR) {
-          f.grab = false; f.acc = 0;                       // 手飘出土堆＝这一把作废
+          if (f.pinned) { f.tug += 1; f.pinned = false; }
+          f.grab = false; f.acc = 0; f.wacc = 0;           // 手飘出土堆＝这一把作废
         } else {
+          // ── 扒：朝自己斜下。浮灰滑、硬土沉；钉住之后这个方向只剩闷响 ──
           const vx = pw.x - f.from.x, vy = pw.y - f.from.y;
           const along = vx * u.x + vy * u.y;
           const side = Math.abs(vx * -u.y + vy * u.x);
           if (along < -0.02 || side > Math.abs(along) * L.skew + 0.05) {
             // 划歪了、或者往回推：这一把重新算（扒是朝自己斜下，不是抹来抹去）
-            f.from = { x: pw.x, y: pw.y }; f.acc = 0;
+            f.from = { x: pw.x, y: pw.y }; f.acc = 0; f.pinned = false;
+          } else if (phased) {
+            // 手感分层：acc 是手真带走了多少，不是鼠标划了多少——浮灰跟得上，
+            // 硬土砍到三成，甩再快也只能一寸寸挪
+            const cap = (f.done === 0 ? L.looseV : L.packedV) * dt;
+            f.acc = Math.min(Math.max(0, along), f.acc + cap);
+            if (f.done >= L.digs) {
+              const pin = L.catchAt * L.len;
+              if (side < along * 0.5 && f.acc >= pin) {
+                // 真往怀里拽的那一把，拽到半道手钉住——指甲碰上坛肩了。
+                // 发现由手说，不上屏一个字
+                f.acc = pin;
+                if (!f.pinned) {
+                  f.pinned = true; f.pinT = 0;
+                  Cue(state, "stoneLand", f.caught ? { gain: 0.4, rate: 0.85 } : { gain: 0.55, rate: 0.7 });
+                  state.vaultDust = { x: sh.x, t: f.caught ? 0.3 : 0.5 };
+                  f.caught = true;
+                }
+                // 死攥着不放，指头从上头滑脱（顺带把自动通关的手也解下来）
+                f.pinT += dt;
+                if (f.pinT > L.pinHold) {
+                  f.grab = false; f.acc = 0; f.pinned = false; f.tug += 1;
+                }
+              } else if (f.acc >= L.len) {
+                // 方向不对着坛肩的一把：只带走一把灰，什么也顶不着
+                f.grab = false; f.acc = 0;
+                Cue(state, "dig", { gain: 0.4, rate: 1.05 });
+              }
+            } else if (f.acc >= L.len) {
+              f.done += 1;
+              f.k = Math.min(1, f.done * 0.22);
+              f.grab = false; f.acc = 0;                   // 一下一下：手得重新按下去
+              // 第一把是灰（轻、散），第二把露硬土（沉、闷）——剧本那两句长在声音上
+              Cue(state, "dig", f.done === 1 ? { gain: 0.6, rate: 1.12 } : { gain: 0.78, rate: 0.8 });
+              state.vaultDust = { x: f.x + dirX * 0.22, t: f.done === 1 ? 0.5 : 0.36 };
+            }
           } else {
             f.acc = Math.max(0, along);
             if (f.acc >= L.len) {
@@ -2062,10 +2142,31 @@ function StepChain(state, def, input, dt) {
               f.grab = false; f.acc = 0;                   // 一下一下：手得重新按下去
               Cue(state, "dig", { gain: 0.72, rate: 0.88 + f.done * 0.05 });
               state.vaultDust = { x: f.x + dirX * 0.22, t: 0.42 };
-              if (L.jarAt > 0 && f.done === L.jarAt) {
-                f.jar = true;
-                Cue(state, "stoneLand", { gain: 0.5 });
-                state.toast = { text: "指甲盖碰着个硬东西——是个坛肩。", t: 3.4 };
+            }
+          }
+          // ── 抹：钉住之后贴着坛肩近水平地走，抹哪儿露哪儿 ──
+          if (phased && f.caught && f.grab) {
+            if (Math.hypot(pw.x - sh.x, pw.y - sh.y) > L.wipeR + 0.22) {
+              f.wfrom = { x: pw.x, y: pw.y }; f.wacc = 0;  // 手离了坛肩，这一段不算抹
+            } else {
+              const wx = pw.x - f.wfrom.x, wy = pw.y - f.wfrom.y;
+              if (Math.abs(wy) > Math.abs(wx) * L.wipeSkew + 0.015) {
+                // 斜着拽、竖着按——那都不是顺着肩抹，这一把重新算
+                f.wfrom = { x: pw.x, y: pw.y }; f.wacc = 0;
+              } else {
+                f.wacc = Math.min(Math.abs(wx), f.wacc + L.looseV * dt);
+                if (f.wacc >= L.wipeLen) {
+                  f.wipesDone += 1;
+                  f.clear = Math.min(1, f.wipesDone / L.wipes);
+                  f.k = Math.min(1, f.k + 0.10);
+                  f.grab = false; f.wacc = 0; f.pinned = false;  // 一把一把：手得重新落下去
+                  Cue(state, "flutter", { gain: 0.42, rate: 1.0 + f.wipesDone * 0.08 });
+                  state.vaultDust = { x: sh.x + Math.sign(wx || 1) * 0.16, t: 0.4 };
+                  if (f.wipesDone >= L.wipes) {
+                    f.jar = true;
+                    Cue(state, "stoneLand", { gain: 0.3, rate: 1.35 });  // 陶肩磕着指甲的一声脆
+                  }
+                }
               }
             }
           }
@@ -2076,15 +2177,28 @@ function StepChain(state, def, input, dt) {
         p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 2.0 * dt);
         p.heading = dirX > 0 ? -1 : 1;
         p.pose = "scoopAsh";
-        p.poseU = Math.max(0, Math.min(1, f.acc / L.len));
         p.poseT = undefined;
-        // 手真的插在土里：扒到哪儿手就在哪儿（没扒的时候搭在堆顶上）
-        const k = Math.min(1, f.acc / L.len);
-        f.grip = { x: mound.x + u.x * L.len * k, y: mound.y + u.y * L.len * k };
+        if (f.grab && f.wacc > 0.01) {
+          p.poseU = Math.max(0, Math.min(1, f.wacc / L.wipeLen));
+          // 抹土的手贴着坛肩走
+          f.grip = { x: Math.max(sh.x - 0.30, Math.min(sh.x + 0.30, pw.x)), y: sh.y + 0.02 };
+        } else if (f.pinned) {
+          p.poseU = Math.max(0, Math.min(1, f.acc / L.len));
+          f.grip = { x: sh.x, y: sh.y };                   // 钉住：手停在坛肩上，拽不动
+        } else {
+          // 手真的插在土里：扒到哪儿手就在哪儿（没扒的时候搭在堆顶上）
+          const k = Math.min(1, f.acc / L.len);
+          p.poseU = k;
+          f.grip = { x: mound.x + u.x * L.len * k, y: mound.y + u.y * L.len * k };
+        }
       } else f.grip = null;
-      state.prompt = f.done > 0 ? null
-        : part === "trough" ? "手伸进槽底 · 把秕谷壳扫进兜里" : "手插进灰堆 · 一把一把往回刨";
-      if (f.done >= L.strokes) {
+      // 归因（拟物交互第 5 条）：拽了两把都只有闷响，才说一句该换的方向；
+      // 自动通关与看得懂灰尘的玩家一把都不用听
+      state.prompt = phased && f.caught
+        ? (f.wipesDone === 0 && f.tug >= 2 ? "拽不动——顺着它把土抹开" : null)
+        : f.done > 0 ? null
+          : part === "trough" ? "手伸进槽底 · 把秕谷壳扫进兜里" : "手插进灰堆 · 一把一把往怀里刨";
+      if (phased ? f.wipesDone >= L.wipes : f.done >= L.strokes) {
         p.pose = null; p.poseU = undefined;
         f.grip = null;   // 收尾清挂点：同姿势的另一件（灰堆/食槽）才接得上手
         finish();
@@ -7056,6 +7170,20 @@ export function GetBeatTarget(state) {
           const L = FORAGE[part];
           const f = state.forage?.[part];
           const dirX = Math.sign((p.x || 0) - st.zone.x) || 1;
+          // 钉住之后的目标是**抹坛肩**（来回抹）。to 顶到圈沿外一点：驱动器
+          // 是把手一步挪到 to 停住的，wfrom 可能落在圈里任何一处（钉住那一把
+          // 攥到半道目标就换了）——to 不出圈的话位移凑不满 wipeLen，手就停
+          // 在半道死等（首轮实测栽的就是这条）
+          if (L.wipes !== undefined && f?.caught) {
+            const sh = { x: f.jarX, y: gy + L.shoulderY };
+            const dir = f.wipesDone % 2 === 0 ? 1 : -1;
+            return {
+              action: "scoopAt", part,
+              x: st.zone.x + dirX * L.standGap, level: st.zone.level || "surface", reach: 0.55,
+              grab: sh,
+              to: { x: sh.x + dir * (L.wipeR + L.wipeLen + 0.01), y: sh.y },
+            };
+          }
           const u = ForageScoopDir(dirX);
           const mound = { x: st.zone.x, y: gy + L.top * (1 - 0.55 * (f?.k || 0)) * 0.55 };
           const span = L.len + 0.07;

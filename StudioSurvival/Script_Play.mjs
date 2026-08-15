@@ -4,6 +4,8 @@ import {
   COLLATERAL_OPTIONS,
   CONSUMER_VENUES,
   DIRECTIVES,
+  FEATURE_CHOICES,
+  FEATURE_LIMIT,
   FindCollateral,
   FindConsumerVenue,
   FindDirective,
@@ -21,12 +23,13 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815al";
+} from "./Data_Game.mjs?v=20260815av";
 import {
   AdvanceMonth,
   BuyScratchTicket,
   CalculateTensions,
   CreateInitialState,
+  CustomizeProject,
   DEFAULT_FOUNDER_SKILLS,
   EvaluateProject,
   FireStaff,
@@ -46,10 +49,12 @@ import {
   GetOwnerTaskAnxietyCost,
   GetStockAccountAccess,
   HireStaff,
+  MigratePolicySemantics,
   NormalizeFounderSkills,
   PlaceStockOrder,
   PerformOwnerTask,
   PivotProject,
+  POLICY_SEMANTICS_VERSION,
   PurchaseWorkstation,
   RedeemCollateral,
   RepayStartupLoan,
@@ -67,7 +72,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815ao";
+} from "./Script_Rules.mjs?v=20260815av";
 import {
   FindLocation,
   FindLocationAt,
@@ -78,14 +83,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815ao";
+} from "./Data_World.mjs?v=20260815av";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815ao";
+} from "./Script_World.mjs?v=20260815av";
 
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -135,8 +140,10 @@ const FOUNDER_SKILL_META = Object.freeze({
 
 function LoadSavedState() {
   try {
-    const candidate = JSON.parse(localStorage.getItem(SAVE_KEY));
+    let candidate = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (!ValidateState(candidate)) return null;
+    const migratedPolicy = candidate.policySemanticsVersion !== POLICY_SEMANTICS_VERSION;
+    candidate = MigratePolicySemantics(candidate);
     candidate.founderSkills = NormalizeFounderSkills(candidate.founderSkills);
     candidate.lastScratchMonth ??= [...candidate.speculationHistory].reverse().find((entry) => (
       [SCRATCH_OPTION.id, "lottery"].includes(entry?.optionId)
@@ -155,6 +162,7 @@ function LoadSavedState() {
       candidate.outcome.title = "你成为了成功的游戏制作人！";
       candidate.outcome.subtitle = "累计游戏收入达到 100 亿元。你从一份合同出发，终于做出了被玩家认可的游戏。电脑也还在。";
     }
+    if (migratedPolicy) localStorage.setItem(SAVE_KEY, JSON.stringify(candidate));
     return candidate;
   } catch {
     return null;
@@ -215,8 +223,51 @@ function SaveState() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch { /* Local saves are optional. */ }
 }
 
+// ── 音效：MiniMax Hub 生成的采样优先，合成音兜底 ────────────────────────────
+const SFX_FILES = {
+  tap: "AudioSfx_Tap.mp3",
+  good: "AudioSfx_Good.mp3",
+  warning: "AudioSfx_Warning.mp3",
+  jump: "AudioSfx_Jump.mp3",
+  hit: "AudioSfx_Hit.mp3",
+  coin: "AudioSfx_Coin.mp3",
+  release: "AudioSfx_Release.mp3",
+};
+const sfxCache = new Map();
+const sfxBroken = new Set();
+
+function GetSfxElement(file) {
+  if (!sfxCache.has(file)) {
+    const element = new Audio(file);
+    element.preload = "auto";
+    sfxCache.set(file, element);
+  }
+  return sfxCache.get(file);
+}
+
+function PlaySfxSample(file, volume = 0.55) {
+  if (sfxBroken.has(file)) return false;
+  try {
+    const element = GetSfxElement(file);
+    element.volume = volume;
+    element.currentTime = 0;
+    const promise = element.play();
+    if (promise !== undefined) promise.catch(() => sfxBroken.add(file));
+    return true;
+  } catch {
+    sfxBroken.add(file);
+    return false;
+  }
+}
+
 function PlayTone(kind = "tap") {
   if (!soundEnabled) return;
+  const file = SFX_FILES[kind];
+  if (file !== undefined && PlaySfxSample(file)) return;
+  PlaySynthesizedTone(kind);
+}
+
+function PlaySynthesizedTone(kind = "tap") {
   try {
     audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
     const now = audioContext.currentTime;
@@ -237,6 +288,56 @@ function PlayTone(kind = "tap") {
     oscillator.start(now);
     oscillator.stop(now + duration);
   } catch { /* Sound should never block play. */ }
+}
+
+// ── 背景音乐：标题页与游戏内各一条循环（Kevin MacLeod, CC-BY 4.0） ─────────
+const BGM_TRACKS = {
+  title: { src: "AudioBgm_OfficeElevator.mp3", volume: 0.3 },
+  game: { src: "AudioBgm_OfficeLight.mp3", volume: 0.16 },
+};
+let bgmElements = null;
+let bgmKind = null;
+
+function GetBgmElements() {
+  if (bgmElements === null) {
+    bgmElements = {};
+    for (const [kind, track] of Object.entries(BGM_TRACKS)) {
+      const element = new Audio(track.src);
+      element.loop = true;
+      element.preload = "auto";
+      element.volume = track.volume;
+      bgmElements[kind] = element;
+    }
+  }
+  return bgmElements;
+}
+
+function SwitchBgm(kind) {
+  if (bgmKind === kind) return;
+  const tracks = GetBgmElements();
+  const next = tracks[kind];
+  if (next === undefined) return;
+  if (bgmKind !== null) { try { tracks[bgmKind].pause(); } catch { /* BGM must never block play. */ } }
+  bgmKind = kind;
+  if (!soundEnabled) return;
+  try {
+    next.currentTime = 0;
+    const promise = next.play();
+    if (promise !== undefined) promise.catch(() => {});
+  } catch { /* BGM must never block play. */ }
+}
+
+function PauseBgm() {
+  if (bgmKind === null) return;
+  try { GetBgmElements()[bgmKind].pause(); } catch { /* BGM must never block play. */ }
+}
+
+function ResumeBgm() {
+  if (!soundEnabled || bgmKind === null) return;
+  try {
+    const promise = GetBgmElements()[bgmKind].play();
+    if (promise !== undefined) promise.catch(() => {});
+  } catch { /* BGM must never block play. */ }
 }
 
 function PlayScratchNoise(intensity = 1) {
@@ -1291,8 +1392,8 @@ function DisposeGroup(group) {
 }
 
 const FacilityLooks = {
-  homeComputer: ["旧电脑", "", 0x9d8cff],
-  planningBoard: ["项目白板", "开发 / 方向 / 发布", 0xffd166],
+  homeComputer: ["开发电脑", "老板亲自干活，立即推进模块", 0x9d8cff],
+  planningBoard: ["项目白板", "方针月结生效，影响全组", 0xffd166],
   homeCalendar: ["项目日历", "月结、评分与事件提醒", 0x66b8ff],
   homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
   exit: ["出门", "选择下一站", 0xf5f3ff],
@@ -1910,9 +2011,11 @@ function UpdateWallClocks(time) {
   const timeOfDay = cyclePhase * 24;
   const hourAngle = timeOfDay % 12 / 12 * Math.PI * 2;
   const minuteAngle = timeOfDay % 1 * Math.PI * 2;
+  // Hands are built pointing up (+Y); a positive rotation.z would sweep them
+  // counterclockwise on screen, so negate to move like a real clock.
   wallClockHands.forEach(({ hourHand, minuteHand }) => {
-    hourHand.rotation.z = hourAngle;
-    minuteHand.rotation.z = minuteAngle;
+    hourHand.rotation.z = -hourAngle;
+    minuteHand.rotation.z = -minuteAngle;
   });
 }
 
@@ -2317,7 +2420,6 @@ function BuildRoom() {
     }
   });
   WorldInteractions.forEach(BuildFacility);
-  BuildFacility({ id: "homeComputerProp", locationId: "home", kind: "homeComputer", x: 2.8, y: 0, decorative: true });
   const ambient = new THREE.HemisphereLight(0xfff4e1, 0x342d43, 1.42);
   const key = new THREE.DirectionalLight(0xfff2dc, 2.65);
   key.position.set(5, 9, 11);
@@ -3177,22 +3279,22 @@ function ReturnContractPage() {
 }
 
 function GetGuidedMission(project, gameType, tensions, anxietyState) {
-  if (!project) return "先完成立项，再打开项目白板。";
+  if (!project) return "先完成立项，再从家里的开发电脑开始。";
   const energyLeft = Math.max(0, 3 - (state.ownerWorkCount || 0));
   if (project.age === 0 && state.ownerWorkCount === 0) {
-    return "第一步：走到项目白板前按 E，投入本月精力。";
+    return "第一步：走到开发电脑前按 E，亲自开发 3 次。";
   }
   if (project.age === 0 && energyLeft > 0) {
-    return `本月还剩 ${energyLeft} 格精力。继续开发，先把四项基础做起来。`;
+    return `本月还能亲自开发 ${energyLeft} 次。先把四项基础做起来。`;
   }
   if (project.age === 0) {
-    return "本月精力已经用完。打开项目日历，或点右下角“下一回合”结算。";
+    return "本月已经干满 3 次。打开项目日历，或点右下角“下一回合”结算。";
   }
   if (project.age < 2) {
-    return `继续开发第 ${project.age + 1} 个月；满两个月后可在白板发布。`;
+    return `继续开发第 ${project.age + 1} 个月；满两个月后可在电脑发布。`;
   }
   if (project.lastReleaseMonth !== state.month && !project.isReleased) {
-    return "游戏可以提交商店。回到项目白板决定是否上线。";
+    return "游戏可以提交商店。回到开发电脑决定是否上线。";
   }
   return tensions[0]?.title
     || project.buildStatus?.detail
@@ -3532,7 +3634,7 @@ function OpenStaffSheet(staffId, spokenLine = "") {
       <button data-tone="roast" type="button">互喷<br><small>微增</small></button>
       <button data-tone="sync" type="button">联调<br><small>减债</small></button>
     </div>
-    <div class="panelSection choiceFooter"><span>本月还可有效对话 ${state.talkPoints} 次 · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `上下文漂移 ${Math.round(pressureValue)}`}</span><small>开发与方向都在项目白板</small></div>`, () => {
+    <div class="panelSection choiceFooter"><span>本月还可有效对话 ${state.talkPoints} 次 · ${staff.kind === "student" ? `压力 ${Math.round(pressureValue)}` : `上下文漂移 ${Math.round(pressureValue)}`}</span><small>制作方针与玩法提案统一在墙上白板处理</small></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const button = event.target.closest("[data-tone]");
       if (!button) return;
@@ -3540,6 +3642,190 @@ function OpenStaffSheet(staffId, spokenLine = "") {
       if (ApplyInteractiveResult(result)) OpenStaffSheet(staffId, result.line);
     };
   });
+}
+
+function OpenCustomizationSheet(sourceId = "owner") {
+  if (!state.project || state.project.age < 1) {
+    ShowToast("先完成第一个开发月；有东西可改后，项目白板才会开放玩法提案。", "warning");
+    return OpenDirectiveSheet();
+  }
+  const staff = sourceId === "owner" ? null : FindStaff(sourceId);
+  const sourceLabel = staff ? staff.name : "你自己";
+  const usedIds = new Set(state.project.features.map((item) => item.id));
+  const featureCountLabel = state.project.features.length >= FEATURE_LIMIT
+    ? "玩法已满"
+    : `玩法 ${state.project.features.length}/${FEATURE_LIMIT}`;
+  OpenPanel("PROJECT WHITEBOARD", `${sourceLabel} 的玩法提案`, `
+    <div class="projectWhiteboardScene">
+      <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
+      <div class="whiteboardFocus">
+        <span>本次提案</span><strong>${EscapeHtml(sourceLabel)}</strong><small>点选便签写入</small>
+      </div>
+      <div class="choiceFooter"><span>本月拍板 ${state.talkPoints} 次</span><b>${featureCountLabel}</b></div>
+      <div class="panelSection worldGrid whiteboardNoteGrid">${FEATURE_CHOICES.map((feature) => {
+        const isUsed = usedIds.has(feature.id);
+        const isFull = state.project.features.length >= FEATURE_LIMIT;
+        const actionLabel = isUsed ? "已写入" : isFull ? "玩法已满" : "点选 →";
+        return `
+        <button class="featureCard" data-feature-id="${feature.id}" type="button" aria-label="${isUsed ? "已写入" : isFull ? "玩法已满" : "选择玩法提案"}：${EscapeHtml(feature.title)}" ${isUsed || isFull ? "disabled" : ""}>
+          <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
+          <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
+          <span class="whiteboardAction" aria-hidden="true">${actionLabel}</span>
+        </button>`;
+      }).join("")}</div>
+      <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>
+      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    </div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-source-select]")) return OpenFeatureSourceSheet();
+      const button = event.target.closest("[data-feature-id]");
+      if (!button) return;
+      const result = CustomizeProject(state, sourceId, button.dataset.featureId);
+      if (!ApplyInteractiveResult(result, { tone: sourceId === "owner" ? "warning" : "good" })) return;
+      ShowResult("FEATURE LOCKED", result.feature.title, `
+        <div class="resultHero"><b>${sourceId === "owner" ? "我" : "TA"}</b><p>${EscapeHtml(result.consequence)}</p></div>
+        <div class="noteList"><div class="note">${EscapeHtml(result.feature.pitch)}</div></div>`, () => {
+        if (state.status !== "playing") RenderEnding();
+      });
+    };
+  }, { mode: "whiteboard" });
+}
+
+function OpenFeatureSourceSheet() {
+  if (!state.project || state.project.age < 1) return OpenDirectiveSheet();
+  const hired = state.team.map((member) => FindStaff(member.id)).filter(Boolean);
+  OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 选择提案人", `
+    <div class="projectWhiteboardScene">
+      <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
+      <div class="whiteboardFocus">
+        <span>提案人</span><strong>谁来提？</strong><small>点选便签继续</small>
+      </div>
+      <div class="sectionHeading panelSection"><strong>本月还能拍板 ${state.talkPoints} 次</strong></div>
+      <div class="worldGrid three whiteboardNoteGrid">
+        <button class="worldChoice danger" data-source-id="owner" type="button" aria-label="选择老板亲自提案"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div><span class="whiteboardAction" aria-hidden="true">点选 →</span></button>
+        ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button" aria-label="选择 ${EscapeHtml(staff.name)} 提案"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div><span class="whiteboardAction" aria-hidden="true">点选 →</span></button>`).join("")}
+      </div>
+      <div class="panelSection sectionHeading"><strong>团队</strong></div>
+      <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场招聘。</span>`}</div>
+      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    </div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      const chat = event.target.closest("[data-chat-id]");
+      if (chat) return OpenStaffSheet(chat.dataset.chatId);
+      const source = event.target.closest("[data-source-id]");
+      if (source) OpenCustomizationSheet(source.dataset.sourceId);
+    };
+  }, { mode: "whiteboard" });
+}
+
+function OpenHomeComputerSheet() {
+  const evaluation = EvaluateProject(state);
+  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
+  const energyLeft = 3 - energyUsed;
+  const nextAnxietyCost = energyLeft > 0 ? GetOwnerTaskAnxietyCost(energyUsed) : 0;
+  const restRelief = GetOwnerRestRelief(energyUsed);
+  const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
+  const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
+  const averageProgress = moduleValues.reduce((sum, item) => sum + item.value, 0) / moduleValues.length;
+  const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
+  const objectiveTitle = energyLeft > 0
+    ? state.project.age === 0 ? "亲手做出能运行的第一版" : "亲手补最薄弱的模块"
+    : "本月已经干满 3 次";
+  const objectiveDetail = energyLeft > 0
+    ? `还可开发 ${energyLeft} 次。立即推进一个模块；本次焦虑 +${nextAnxietyCost}。`
+    : "关掉电脑，去项目日历核账；也可点右下角“下一回合”。";
+  OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
+    <div class="computerDeskScene">
+      <div class="computerDeskMat" aria-hidden="true"></div>
+      <div class="computerMonitorShell">
+        <div class="computerTopVent" aria-hidden="true">${Array.from({ length: 11 }, () => "<i></i>").join("")}</div>
+        <div class="computerBezel"><span>STUDIO OS</span><i></i><b>M${String(state.month).padStart(2, "0")}</b></div>
+        <div class="computerGlassFrame">
+          <div class="computerScreenContent">
+            <section class="computerObjective">
+              <div><span>现在要做什么</span><h3>${objectiveTitle}</h3><p>${objectiveDetail}</p></div>
+              <div class="energyBudget" aria-label="本月还能亲自开发 ${energyLeft} 次">
+                <span>老板工时</span>
+                <div>${[0, 1, 2].map((slot) => `<i class="${slot < energyLeft ? "available" : "spent"}">${slot < energyLeft ? "●" : "×"}</i>`).join("")}</div>
+                <strong>${energyLeft} 次</strong>
+              </div>
+            </section>
+
+            <section class="developmentWorkbench">
+              <header><div><span>亲自开发</span><strong>${energyLeft > 0 ? "下一次做哪块？" : "四项开发进度"}</strong></div><b>总体 ${Math.round(averageProgress)}%</b></header>
+              <div class="energyModuleGrid">
+                ${moduleValues.map(({ moduleKey, value }) => {
+                  const meta = MODULE_META[moduleKey];
+                  const isRecommended = moduleKey === recommended && energyLeft > 0;
+                  return `<button class="energyModule ${isRecommended ? "recommended" : ""}" style="--moduleColor:${meta.color}" data-energy-module="${moduleKey}" type="button" ${energyLeft <= 0 ? "disabled" : ""}>
+                    <div class="energyModuleTop"><span>${meta.icon}</span><strong>${meta.label}</strong>${isRecommended ? "<b>建议优先</b>" : ""}</div>
+                    <div class="moduleProgress"><i style="width:${Clamp(value, 0, 100)}%"></i></div>
+                    <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? `干 1 次 · 焦虑 +${nextAnxietyCost}` : "等待下月"}</strong></footer>
+                  </button>`;
+                }).join("")}
+              </div>
+              <p class="workCostNote">三次焦虑依次 +1 / +2 / +5；空下 ${energyLeft} 次，月结焦虑 −${restRelief}。白板方针另在月底作用全组。</p>
+            </section>
+
+            ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
+
+            <div class="computerLocationHint"><b>电脑：亲自开发${canRelease ? " / 发布" : ""}</b><span>白板方针月结生效；项目日历结算。</span></div>
+          </div>
+        </div>
+        <div class="computerControlDeck" aria-hidden="true">
+          <strong>牛马 486DX</strong>
+          <span class="computerSpeaker">${Array.from({ length: 9 }, () => "<i></i>").join("")}</span>
+          <span class="computerTurbo"><i></i>TURBO</span>
+          <div class="computerPower"><i></i><span>POWER</span></div>
+        </div>
+      </div>
+      <div class="computerStand"><i></i></div>
+      <div class="computerTowerVisual" aria-hidden="true"><strong>牛马 486</strong><i class="towerOpticalDrive"></i><i class="towerFloppyDrive"></i><span class="towerVent"></span><b class="towerPower"><i></i></b></div>
+      <div class="computerKeyboardVisual" aria-hidden="true">${Array.from({ length: 50 }, (_, index) => `<i class="${index === 43 ? "space" : [13, 27, 41].includes(index) ? "wide" : ""}"></i>`).join("")}</div>
+      <div class="computerMouseVisual" aria-hidden="true"><i></i></div>
+      <div class="computerCableVisual" aria-hidden="true"></div>
+    </div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-computer-release]")) return OpenReleaseSheet();
+      const button = event.target.closest("[data-energy-module]");
+      if (!button) return;
+      const moduleKey = button.dataset.energyModule;
+      const result = PerformOwnerTask(state, moduleKey);
+      if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
+      const left = Math.max(0, 3 - state.ownerWorkCount);
+      ShowToast(`${MODULE_META[moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}${left ? ` · 余 ${left} 次` : ""}`, left > 0 ? "good" : "warning");
+      OpenHomeComputerSheet();
+    };
+  }, { mode: "computer" });
+}
+
+function OpenWorkstationSheet(interaction) {
+  const moduleKey = interaction.moduleKey;
+  const meta = MODULE_META[moduleKey];
+  const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
+  const skillMeta = FOUNDER_SKILL_META[skillEffect.skillKey];
+  const workers = state.team.map((member) => ({ member, staff: FindStaff(member.id) })).filter((item) => item.staff?.specialty === moduleKey);
+  const relatedTensions = CalculateTensions(state.project).filter((tension) => tension.from === moduleKey || tension.to === moduleKey);
+  OpenPanel("开发", `${meta.icon} ${meta.label}`, `
+    <p class="panelIntro">${skillMeta.label} ${skillEffect.level} · +${skillEffect.minimumGain}–${skillEffect.maximumGain}</p>
+    ${RenderBar(`${meta.label}进度`, state.project.modules[moduleKey], meta.color)}
+    <div class="metricGrid">
+      <div class="metricTile"><span>亲自干活</span><strong>${state.ownerWorkCount}/3</strong></div>
+      <div class="metricTile"><span>能力</span><strong style="color:${skillMeta.color}">${skillMeta.label} ${skillEffect.level}</strong></div>
+      <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
+    </div>
+    <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>干 1 次</button></div>
+    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
+    <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<span class="chip">没有人手。关掉电脑，从门口出发去人才市场招聘。</span>`}</div>
+    ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
+    dom.sheetBody.onclick = (event) => {
+      const worker = event.target.closest("[data-worker-id]");
+      if (worker) return OpenStaffSheet(worker.dataset.workerId);
+      if (!event.target.closest("[data-owner-work]")) return;
+      const result = PerformOwnerTask(state, moduleKey);
+      if (ApplyInteractiveResult(result, { tone: "warning" })) OpenWorkstationSheet(interaction);
+    };
+  }, { mode: "computer" });
 }
 
 function OpenBankSheet() {
@@ -4073,41 +4359,23 @@ function OpenStockSheet() {
 function OpenDirectiveSheet() {
   const pivotCost = ForecastPivotCost(state);
   const earlyStage = state.project.age < 1;
-  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
-  const energyLeft = 3 - energyUsed;
-  const nextAnxietyCost = GetOwnerTaskAnxietyCost(energyUsed);
-  const restRelief = GetOwnerRestRelief(energyUsed);
-  const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
-  const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
-  const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const visibleDirectives = earlyStage
-    ? DIRECTIVES.filter((directive) => ["integration", "artSprint", "clientCrush"].includes(directive.id))
+    ? DIRECTIVES.filter((directive) => ["integration", "artSprint", "scopeParty"].includes(directive.id))
     : DIRECTIVES;
   const currentDirective = FindDirective(state.selectedDirective) || visibleDirectives[0];
-  OpenPanel("PROJECT WHITEBOARD", `项目白板 · 《${EscapeHtml(state.project.name)}》`, `
+  OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 制作方针", `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
       <div class="whiteboardFocus" aria-live="polite">
-        <span>本月计划</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>余 ${energyLeft} 格 · 休息 −${restRelief}</small>
+        <span>制作方针</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>持续生效 · 月结影响全组</small>
       </div>
-      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong>老板开发</strong><span>${energyLeft ? "焦虑依次 +1 / +2 / +5" : "本月已满"}</span></div>
-      <div class="whiteboardDevelopmentGrid">${moduleValues.map(({ moduleKey, value }) => {
-        const meta = MODULE_META[moduleKey];
-        return `<button class="whiteboardDevelopmentCard ${moduleKey === recommended && energyLeft ? "recommended" : ""}" style="--noteInk:${meta.color}" data-owner-task="${moduleKey}" type="button" ${energyLeft ? "" : "disabled"}>
-          <span>${meta.icon}</span><strong>${meta.label}</strong><b>${Math.round(value)}</b><i style="--moduleProgress:${Clamp(value, 0, 100)}%"></i><small>${energyLeft ? `1 格 · 焦虑 +${nextAnxietyCost}` : "等下月"}</small>
-        </button>`;
-      }).join("")}</div>
-      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong>本月方向</strong><span>点选切换</span></div>
       <div class="worldGrid three whiteboardNoteGrid">${visibleDirectives.map((directive) => `
         <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" style="--noteInk:${directive.color}" data-directive-id="${directive.id}" type="button" aria-pressed="${state.selectedDirective === directive.id}" aria-label="${state.selectedDirective === directive.id ? "当前采用" : "切换为"}：${EscapeHtml(directive.name)}">
-          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "当前" : ""}</span></div>
-          <span class="whiteboardAction" aria-hidden="true">${state.selectedDirective === directive.id ? "✓ 采用中" : "点选 →"}</span>
+          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "当前" : ""}</span></div><p>${EscapeHtml(directive.description)}</p>
+          <span class="whiteboardAction" aria-hidden="true">${state.selectedDirective === directive.id ? "✓ 持续中" : "点选 →"}</span>
         </button>`).join("")}</div>
-      <div class="whiteboardReleaseBar">
-        <div><span>${state.project.isReleased ? `v${state.project.version}.0` : "未发布"}</span><strong>${state.project.age < 2 ? `还需 ${2 - state.project.age} 月` : state.project.lastReleaseMonth === state.month ? "本月已发" : "版本就绪"}</strong></div>
-        <button data-whiteboard-release type="button" ${canRelease ? "" : "disabled"}>${state.project.isReleased ? "发布更新" : "提交商店"}</button>
-      </div>
-      ${earlyStage ? `<div class="noteList"><div class="note good">首月后可换赛道。</div></div>` : `<div class="panelSection sectionHeading"><strong>换赛道</strong><span>−${FormatMoney(pivotCost)}</span></div>
+      ${earlyStage ? `<div class="noteList"><div class="note good">首月后开放恢复、还债、砍范围、玩法与换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案</span><button class="miniButton" data-feature-source type="button">安排提案</button></div>
+      <div class="panelSection sectionHeading"><strong>换赛道</strong><span>−${FormatMoney(pivotCost)}</span></div>
       <div class="worldGrid whiteboardPivotGrid">
         <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
         <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
@@ -4116,21 +4384,12 @@ function OpenDirectiveSheet() {
       <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      const ownerTaskButton = event.target.closest("[data-owner-task]");
-      if (ownerTaskButton) {
-        const result = PerformOwnerTask(state, ownerTaskButton.dataset.ownerTask);
-        if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
-        const left = Math.max(0, 3 - state.ownerWorkCount);
-        ShowToast(`${MODULE_META[result.moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}${left ? ` · 余 ${left} 格` : ""}`, left ? "good" : "warning");
-        OpenDirectiveSheet();
-        return;
-      }
-      if (event.target.closest("[data-whiteboard-release]")) return OpenReleaseSheet();
       const directiveButton = event.target.closest("[data-directive-id]");
       if (directiveButton) {
         if (ApplyInteractiveResult(SelectDirective(state, directiveButton.dataset.directiveId))) OpenDirectiveSheet();
         return;
       }
+      if (event.target.closest("[data-feature-source]")) return OpenFeatureSourceSheet();
       if (!event.target.closest("[data-pivot]")) return;
       const projectId = document.getElementById("pivotProjectSelect")?.value;
       const typeId = document.getElementById("pivotTypeSelect")?.value;
@@ -4430,6 +4689,7 @@ function OpenMonthSheet() {
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
   const currentMonthLabel = `M${String(state.month).padStart(2, "0")}`;
   const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
+  const currentDirective = FindDirective(state.selectedDirective);
   const openActions = GetMonthCloseActions();
   const hasOpenActions = openActions.length > 0;
   const calendarReminders = state.project.isReleased ? GetProjectCalendarReminders() : [];
@@ -4445,6 +4705,7 @@ function OpenMonthSheet() {
           <span>${expectedIncome > 0 ? `收入 +${FormatMoney(expectedIncome)} · ` : ""}支出 −${FormatMoney(costs.total)}</span>
         </div>
       </section>
+      <div class="monthClosePosition"><span>制作方针</span><strong>${currentDirective?.icon || "◎"} ${EscapeHtml(currentDirective?.name || "稳住版本")}</strong><em>${EscapeHtml(currentDirective?.description?.split(" · ")[0] || "月结影响全组")}</em></div>
       ${state.project.isReleased ? `<section class="projectCalendarLive" aria-label="商店评分与随机事件提醒">
         <div class="projectCalendarStore ${ratingTone}">
           <small>商店评分</small>
@@ -4497,11 +4758,13 @@ function OpenHelpSheet() {
   OpenPanel("HOW TO PLAY", "怎么开始", `
     <div class="resultHero"><b>A / D</b><p>在当前房间移动；W、↑ 或空格跳；靠近物件按 E。去别处必须先走到门口选目的地。</p></div>
     <div class="noteList">
-      <div class="note"><b>项目白板</b>：开发、方向、发布。</div>
+      <div class="note"><b>亲自开发</b>：家里的电脑，每月 3 次，立即生效。</div>
+      <div class="note"><b>制作方针</b>：墙上白板，持续生效，月底影响全组。</div>
       <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
       <div class="note"><b>评分、事件、月结</b>：项目日历；右下角“下一回合”也可打开。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
       <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元，你将成为成功的游戏制作人。</div>
+      <div class="note">音乐：Kevin MacLeod (incompetech.com)，CC-BY 4.0。</div>
     </div>
     <div class="panelSection">${RenderLog(6)}</div>`);
 }
@@ -4589,6 +4852,7 @@ function BeginWorld(nextState) {
   state = nextState;
   onboardingPhase = "game";
   landingOpen = false;
+  SwitchBgm("game");
   worldState = CreateWorldState(state.month);
   dom.setupScreen.classList.add("hidden");
   dom.setupScreen.classList.remove("cinematic");
@@ -4604,7 +4868,7 @@ function BeginWorld(nextState) {
   UpdateWorldFromGameState();
   UpdateLocationIndicator();
   if (state.project?.age === 0 && state.ownerWorkCount === 0) {
-    window.setTimeout(() => ShowToast("第一步：走到项目白板前按 E，分配本月 3 格精力。", "good"), 420);
+    window.setTimeout(() => ShowToast("第一步：走到开发电脑前按 E，亲自开发 3 次。", "good"), 420);
   }
   if (state.status !== "playing") RenderEnding();
 }
@@ -4693,6 +4957,7 @@ function TriggerInteraction() {
     }
   }
   switch (activeInteraction.kind) {
+    case "homeComputer": return OpenHomeComputerSheet();
     case "planningBoard": return OpenDirectiveSheet();
     case "homeCalendar": return OpenMonthSheet();
     case "homeFridge": return OpenFoodSheet("leftovers", "自己家的冰箱");
@@ -4717,6 +4982,7 @@ function StartFoundingCeremony() {
   document.body.classList.add("onboarding");
   SetPlayableWorldVisible(false);
   ShowFoundingNamePanel();
+  SwitchBgm("title");
   PlayTone("good");
 }
 
@@ -4805,6 +5071,7 @@ function BeginSealHold(event) {
 function ResetOnboarding() {
   HideGoalReveal();
   onboardingPhase = "intro";
+  SwitchBgm("title");
   ceremonyElapsed = 0;
   ceremonyBurstStep = -1;
   sealHoldComplete = false;
@@ -4974,7 +5241,8 @@ function BindControls() {
     dom.soundButton.classList.toggle("muted", !soundEnabled);
     dom.soundButtonIcon.textContent = soundEnabled ? "♪" : "×";
     dom.soundButton.setAttribute("aria-label", soundEnabled ? "关闭音效" : "开启音效");
-    if (soundEnabled) PlayTone("good");
+    if (soundEnabled) { ResumeBgm(); PlayTone("good"); }
+    else PauseBgm();
   });
   dom.projectChoices.addEventListener("click", (event) => {
     const button = event.target.closest("[data-project-id]");

@@ -3743,8 +3743,10 @@ export function CreateWorld(canvasEl) {
           layers.play.add(ashMesh);
           ashKey = "";
         }
-        // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）
-        const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`;
+        // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）。
+        // 钉住/抹开几成也入档——坛肩是抹哪儿露哪儿，一把一档
+        const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`
+          + `:${fg.ash.caught ? 1 : 0}:${Math.round((fg.ash.clear || 0) * 3)}:${fg.ash.taken ? 1 : 0}`;
         if (key !== ashKey) {
           ashKey = key;
           RedrawProp(ashMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
@@ -4801,7 +4803,10 @@ export function CreateWorld(canvasEl) {
       const from = state.beat.stepIndex || 0;
       for (let i = from; i < def.steps.length; i += 1) {
         const st = def.steps[i];
-        if (st?.type === "pickup") chainPickups.push(st);
+        // worldDrawn：这件东西由世界层自己画（埋在灰堆里的坛子——DrawAshMound
+        // 挖到哪儿露哪儿），预先摆一份地面道具等于把"埋着"这件事整个剧透掉
+        //（2026-08-15 实拍抓出来的：坛子从进拍第一帧就蹲在灰堆顶上）
+        if (st?.type === "pickup" && !st.worldDrawn) chainPickups.push(st);
       }
     }
     while (chainItemMeshes.length < chainPickups.length) chainItemMeshes.push({ mesh: null, label: null });

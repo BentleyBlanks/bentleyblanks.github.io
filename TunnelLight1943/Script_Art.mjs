@@ -6335,9 +6335,17 @@ export function DrawCharredPlank(ctx, ax, ay, id, { len = 72 } = {}) {
 
 /**
  * 墙根那片烧土（埋着瓦罐的那一堆）。ax/ay = 堆的中心与地平线。
- * k = 扒掉了几成（堆真的一次比一次矮）；jar = 罐肩露出来了；open = 扎口解开了。
+ * World 把玩法状态整个递进来（fg.ash）：
+ *   k = 扒掉了几成（堆真的一次比一次矮）；
+ *   caught / clear = 指甲碰上坛肩了 / 顺着肩抹开了几成——**抹哪儿露哪儿**，
+ *     露出的宽度跟 clear 走，抹过的地方留指痕（反馈长在工件上，不上 HUD）；
+ *   jarX−x = 坛肩埋在堆心哪一侧（判定与作画共用 Core 那一个数）；
+ *   jar = 整个肩都出来了；open = 泥封抠开了。
+ * 封口是八稿的口径：**干泥糊口＋半块碗底压着**（WRAP 卡抠的就是它）。
+ * 蓝底白花的碎布垫在碗片**底下**，揭开之前一寸都不许露——那是暗线的包袱。
  */
-export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false } = {}) {
+export function DrawAshMound(ctx, ax, ay, id,
+  { k = 0, jar = false, open = false, caught = false, clear = 0, taken = false, jarX, x } = {}) {
   const hw = 29;                                  // 半幅 0.6m
   const h = 24 * (1 - 0.55 * Math.max(0, Math.min(1, k)));
   const N = 9;
@@ -6373,44 +6381,101 @@ export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false
     ctx.fill();
   }
   ctx.restore();
-  if (!jar) return;
-  // 罐肩：土里探出来的那一圈。罐是灰陶，比土沉一档，边上一道亮沿才立得住
-  const jy = ay - h * 0.34;
-  InkFill(ctx, [[ax - 11, ay], [ax - 12, jy + 4], [ax - 8, jy - 3], [ax, jy - 5],
-    [ax + 8, jy - 3], [ax + 12, jy + 4], [ax + 11, ay]],
-  id + "jar", "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
-  if (open) {
-    // 扎口解开了：罐口张着，那块蓝底白花的碎布垂在罐肩上
+  if (!jar && !caught && clear <= 0 && !taken) return;
+  // 坛肩锚在 Core 的 shoulderY 上（0.16m×48px/米），不跟着堆矮——
+  // 坛子埋在土里，矮下去的是堆，不是它
+  const jd = jarX !== undefined && x !== undefined ? (jarX - x) * 48 : 0;
+  const jx = ax + jd;
+  const jy = ay - 8;
+  if (taken) {
+    // 坛子抱走了：堆上只剩那个刨开的坑，坑沿散着几块泥渣
+    InkFill(ctx, [[jx - 14, ay], [jx - 15, jy + 3], [jx - 7, jy - 2], [jx + 7, jy - 2],
+      [jx + 15, jy + 3], [jx + 14, ay]],
+    id + "pitEmpty", "#332c25", { amp: 1.6, lw: 1.6, shade: "rgba(0,0,0,0.34)" });
     ctx.save();
-    ctx.fillStyle = "#1a150f";
-    ctx.beginPath();
-    ctx.ellipse(ax, jy - 4, 7.6, 2.6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    InkFill(ctx, [[ax + 4, jy - 4], [ax + 13, jy - 6], [ax + 15, jy + 3], [ax + 6, jy + 2]],
-      id + "cloth", "#2a3448", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
-    ctx.save();
-    ctx.fillStyle = "rgba(196,204,214,0.6)";
-    ctx.beginPath(); ctx.ellipse(ax + 9, jy - 2, 0.9, 0.7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(ax + 12, jy + 0.6, 0.8, 0.6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  } else {
-    // 罐口拿碎布扎着：蓝底白花的一顶布帽（娘那件短褂上的），腰上缠三道细绳
-    InkFill(ctx, [[ax - 9, jy - 2], [ax - 7, jy - 8], [ax, jy - 10], [ax + 7, jy - 8],
-      [ax + 9, jy - 2], [ax, jy + 1]], id + "wrap", "#2a3448",
-    { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
-    ctx.save();
-    ctx.fillStyle = "rgba(196,204,214,0.6)";
+    ctx.fillStyle = "#6b5844";
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
-      ctx.ellipse(ax - 4 + i * 4, jy - 8 + Hash(id + "bd" + i) * 3, 0.9, 0.7, 0, 0, Math.PI * 2);
+      ctx.ellipse(jx - 12 + Hash(id + "tx" + i) * 24, ay - 1.4 - Hash(id + "ty" + i) * 2.4,
+        1.6 + Hash(id + "tr" + i) * 1.2, 1.0, Hash(id + "ta" + i), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
-    for (let i = 0; i < 3; i += 1) {
-      InkLine(ctx, ax - 8.5, jy - 2.4 - i * 1.7, ax + 8.5, jy - 2.6 - i * 1.7,
-        id + "lash" + i, { lw: 1.1, color: "#6d5a3a", amp: 0.5 });
+    return;
+  }
+  if (!jar) {
+    // 刨出来的坑：灰底下露出的硬土，比灰沉一档、比坛子糙
+    InkFill(ctx, [[jx - 14, ay], [jx - 15, jy + 3], [jx - 7, jy - 3], [jx + 7, jy - 3],
+      [jx + 15, jy + 3], [jx + 14, ay]],
+    id + "pit" + Math.round(clear * 3), "#39312a", { amp: 1.6, lw: 1.6, shade: "rgba(0,0,0,0.3)" });
+    // 坛肩露出来的那一段：抹了几把露多宽（clear=0 只有指甲碰着的那一点）
+    const w = 7 + clear * 19;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(jx - w / 2, 0, w, ay);
+    ctx.clip();
+    InkFill(ctx, [[jx - 11, ay], [jx - 12, jy + 4], [jx - 8, jy - 3], [jx, jy - 5],
+      [jx + 8, jy - 3], [jx + 12, jy + 4], [jx + 11, ay]],
+    id + "shold" + Math.round(clear * 3), "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
+    ctx.restore();
+    // 抹过的指痕：一把一道，顺着肩横着走
+    const wipes = Math.round(clear * 3);
+    for (let i = 0; i < wipes; i += 1) {
+      InkLine(ctx, jx - w / 2 + 2, jy - 2 + i * 2.2, jx + w / 2 - 2, jy - 2.6 + i * 2.2,
+        id + "wipe" + i, { lw: 1.0, color: "rgba(138,128,116,0.55)", amp: 0.8 });
     }
+    // 肩顶一道亮沿：灰陶比土亮，指甲碰的就是这儿
+    InkLine(ctx, jx - w * 0.32, jy - 4.2, jx + w * 0.32, jy - 4.4, id + "rim",
+      { lw: 1.2, color: "rgba(168,160,148,0.7)", amp: 0.6 });
+    return;
+  }
+  // 罐肩整个出来了：土里探出来的那一圈。罐是灰陶，比土沉一档
+  InkFill(ctx, [[jx - 11, ay], [jx - 12, jy + 4], [jx - 8, jy - 3], [jx, jy - 5],
+    [jx + 8, jy - 3], [jx + 12, jy + 4], [jx + 11, ay]],
+  id + "jar", "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
+  if (open) {
+    // 泥封抠开了：罐口空张着（碗片与那圈碎布都在他怀里，坛边只剩几块泥渣）
+    ctx.save();
+    ctx.fillStyle = "#1a150f";
+    ctx.beginPath();
+    ctx.ellipse(jx, jy - 4, 7.6, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = "#6b5844";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(jx + 9 + Hash(id + "mx" + i) * 6, ay - 1.5 - Hash(id + "my" + i) * 3,
+        1.8 + Hash(id + "mr" + i) * 1.2, 1.1, Hash(id + "ma" + i), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else {
+    // 八稿封口：坛口糊着一圈干泥，上面压着半块碗底（WRAP 卡抠的就是这两样；
+    // 蓝花碎布垫在碗片底下，这儿一寸都不露）
+    InkFill(ctx, [[jx - 8, jy - 1.5], [jx - 6.5, jy - 6.5], [jx, jy - 8], [jx + 6.5, jy - 6.5],
+      [jx + 8, jy - 1.5], [jx, jy + 0.5]], id + "mud", "#6b5844",
+    { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.22)" });
+    // 干泥上的裂纹
+    InkLine(ctx, jx - 5, jy - 4.5, jx - 1, jy - 3.2, id + "crkA",
+      { lw: 0.9, color: "rgba(52,40,28,0.6)", amp: 0.7 });
+    InkLine(ctx, jx + 2, jy - 6, jx + 5, jy - 3.5, id + "crkB",
+      { lw: 0.9, color: "rgba(52,40,28,0.6)", amp: 0.7 });
+    // 半块碗底：浅釉色的一弯，断口冲着东边
+    ctx.save();
+    ctx.fillStyle = "#a09a8e";
+    ctx.beginPath();
+    ctx.ellipse(jx + 1, jy - 7.5, 6.2, 2.3, 0.12, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40,32,24,0.75)";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    // 圈足：碗底朝天扣着，中间那圈足最认得出“这是个碗底”
+    ctx.beginPath();
+    ctx.ellipse(jx + 0.5, jy - 8.6, 2.6, 0.9, 0.12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 

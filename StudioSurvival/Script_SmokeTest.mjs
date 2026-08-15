@@ -26,8 +26,10 @@ import {
   GetFounderSkillEffect,
   GetStockAccountAccess,
   HireStaff,
+  MigratePolicySemantics,
   NormalizeFounderSkills,
   PlaceStockOrder,
+  POLICY_SEMANTICS_VERSION,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
@@ -51,6 +53,7 @@ import {
 import {
   AI_SUBSCRIPTION_LEVELS,
   CONSUMER_VENUES,
+  DIRECTIVES,
   FEATURE_CHOICES,
   FEATURE_LIMIT,
   FindFeatureChoice,
@@ -199,6 +202,16 @@ function HasRecordedId(collection, id) {
   delete legacy.founderSkills;
   assert.equal(ValidateState(legacy), true, "pre-skill version-9 saves must remain loadable for balanced migration");
   assert.deepEqual(NormalizeFounderSkills(legacy.founderSkills), DEFAULT_FOUNDER_SKILLS);
+
+  const legacyPolicy = structuredClone(specialized.state);
+  legacyPolicy.selectedDirective = "clientCrush";
+  delete legacyPolicy.policySemanticsVersion;
+  assert.equal(ValidateState(legacyPolicy), true, "pre-redesign v9 policy saves must remain loadable");
+  const migratedPolicy = MigratePolicySemantics(legacyPolicy);
+  assert.equal(migratedPolicy.selectedDirective, "integration", "legacy one-month directive IDs must not silently become persistent policies");
+  assert.equal(migratedPolicy.policySemanticsVersion, POLICY_SEMANTICS_VERSION);
+  migratedPolicy.selectedDirective = "cutScope";
+  assert.equal(MigratePolicySemantics(migratedPolicy).selectedDirective, "cutScope", "current policy semantics must migrate only once");
 
   const corrupted = structuredClone(specialized.state);
   corrupted.founderSkills = { design: 5, programming: 5, art: -1 };
@@ -382,6 +395,7 @@ function HasRecordedId(collection, id) {
   original.project.wishlists = 12_000;
   original.project.expectation = 20;
   original.project.features = [{ id: FEATURE_CHOICES[0].id }];
+  original.selectedDirective = "scopeParty";
   const targetProject = PROJECTS.find((project) => project.id !== original.project.templateId);
   const targetGameType = GAME_TYPES.find((gameType) => gameType.id !== original.project.gameTypeId);
   assert(targetProject && targetGameType, "pivot fixture needs a distinct project and game type");
@@ -410,6 +424,7 @@ function HasRecordedId(collection, id) {
   assert.equal(pivot.state.project.pivotHistory[0].cost, pivotCost);
   assert.equal(pivot.state.project.pivotHistory[0].toProjectId, targetProject.id);
   assert.equal(pivot.state.project.pivotHistory[0].toGameTypeId, targetGameType.id);
+  assert.equal(pivot.state.selectedDirective, "scopeParty", "the team's persistent production policy must survive a project pivot");
 
   const same = Begin();
   same.cash = 1_000_000;
@@ -1081,12 +1096,18 @@ function HasRecordedId(collection, id) {
     assert.equal(result.ok, true, `${moduleKey} owner work must be accepted`);
     assert(result.gain >= 2 && result.gain <= 4, "owner work must add about 2-4 points");
     assert.equal(result.state.project.modules[moduleKey], before.module + result.gain);
+    modules.filter((candidate) => candidate !== moduleKey).forEach((candidate) => {
+      assert.equal(result.state.project.modules[candidate], state.project.modules[candidate], "owner work must change only its requested module immediately");
+    });
+    assert.equal(result.state.ownerWorkCount, 1, "one owner task must consume exactly one founder work action");
+    assert.equal(result.state.selectedDirective, state.selectedDirective, "owner work must not change the team policy");
     assert(result.state.project.bugs > before.bugs, "owner work must add bugs");
     assert(result.state.project.scopeDebt > before.scopeDebt, "owner work must add scope debt");
     assert(result.state.project.technicalDebt > before.technicalDebt, "owner work must add technical debt");
     assert.equal(result.anxietyCost, 1, "the first owner task must add only one anxiety");
     assert.equal(result.state.hunger, state.hunger + 7, "owner work must consume the owner's energy");
     assert.equal(result.state.anxiety, state.anxiety + 1, "the first owner task must use the escalating anxiety schedule");
+    assert(result.state.hunger >= 7 && result.state.anxiety >= 5, "owner work must cost the founder hunger and anxiety");
   }
 
   const invalidState = Begin();
@@ -1186,4 +1207,119 @@ function HasRecordedId(collection, id) {
   assert.equal(recovering.workstations, 0, "the recovery route must not receive free workstations");
 }
 
-console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");
+{
+  const expectedPolicyIds = ["integration", "artSprint", "scopeParty", "clientCrush", "performanceDebt", "cutScope"];
+  assert.deepEqual(DIRECTIVES.map((directive) => directive.id), expectedPolicyIds, "existing policy IDs must stay stable for old saves");
+  assert(
+    DIRECTIVES.every((directive) => directive.description.includes("全组月产出")),
+    "every whiteboard policy must affect team-wide production instead of granting a module task",
+  );
+  assert(DIRECTIVES.every((directive) => Number.isFinite(directive.effects?.outputMultiplier)), "policy output and ledger values must live beside their UI definition");
+  assert(
+    DIRECTIVES.every((directive) => !/(美术|策划|客户端|性能)\s*[+＋]/.test(directive.description)),
+    "whiteboard policies must never return to targeted module-point grants",
+  );
+
+  const PolicyFixture = (directiveId) => {
+    let policyState = Begin();
+    policyState.cash = 1_000_000;
+    policyState.project.scopeDebt = 24;
+    policyState.project.technicalDebt = 24;
+    policyState.project.bugs = 12;
+    policyState = HireStaff(policyState, "linMo").state;
+    policyState = HireStaff(policyState, "dreamBrush").state;
+    const selected = SelectDirective(policyState, directiveId);
+    assert.equal(selected.ok, true);
+    assert.deepEqual(selected.state.project, policyState.project, "choosing a policy must defer every project effect until month-end");
+    assert.deepEqual(selected.state.team, policyState.team, "choosing a policy must defer every team effect until month-end");
+    assert.equal(selected.state.ownerWorkCount, policyState.ownerWorkCount, "choosing a policy must not consume founder work");
+    assert.equal(selected.state.hunger, policyState.hunger, "choosing a policy must not immediately consume founder hunger");
+    assert.equal(selected.state.anxiety, policyState.anxiety, "choosing a policy must not immediately change founder anxiety");
+    return AdvanceMonth(selected.state);
+  };
+
+  const stable = PolicyFixture("integration");
+  const publicity = PolicyFixture("artSprint");
+  const crunch = PolicyFixture("scopeParty");
+  const recovery = PolicyFixture("clientCrush");
+  const debtCleanup = PolicyFixture("performanceDebt");
+  const scopeCut = PolicyFixture("cutScope");
+  [stable, publicity, crunch, recovery, debtCleanup, scopeCut].forEach((result) => assert.equal(result.ok, true));
+
+  const CleanOutputFixture = (directiveId) => {
+    let policyState = Begin();
+    policyState.cash = 1_000_000;
+    policyState.project.scopeDebt = 0;
+    policyState.project.technicalDebt = 0;
+    policyState.project.bugs = 0;
+    for (const staffId of ["linMo", "zhaoXiaobei", "chenXu", "taoRan"]) policyState = HireStaff(policyState, staffId).state;
+    return AdvanceMonth(SelectDirective(policyState, directiveId).state);
+  };
+  const stableCleanOutput = CleanOutputFixture("integration");
+  const publicityCleanOutput = CleanOutputFixture("artSprint");
+  const crunchCleanOutput = CleanOutputFixture("scopeParty");
+  const recoveryCleanOutput = CleanOutputFixture("clientCrush");
+  const debtCleanupCleanOutput = CleanOutputFixture("performanceDebt");
+  const scopeCutCleanOutput = CleanOutputFixture("cutScope");
+
+  assert.equal(crunch.state.selectedDirective, "scopeParty", "a production policy must persist until the player changes it");
+  assert.equal(crunch.state.lastSettlement.directiveId, "scopeParty", "the month report must record the policy that actually settled");
+  assert(SumOutput(crunch.output) > SumOutput(stable.output), "crunch must speed up the whole team rather than one module");
+  Object.keys(crunchCleanOutput.output).forEach((moduleKey) => {
+    assert(
+      crunchCleanOutput.output[moduleKey] > stableCleanOutput.output[moduleKey],
+      `crunch must increase clean ${moduleKey} output: ${crunchCleanOutput.output[moduleKey]} vs ${stableCleanOutput.output[moduleKey]}`,
+    );
+  });
+  assert(stable.state.project.scopeDebt < 24, "stability must reduce scope debt");
+  assert(stable.state.project.technicalDebt < 24, "stability must reduce technical debt");
+  assert(stable.state.project.bugs < 12, "stability must reduce the starting Bug load");
+  assert(Member(crunch.state, "linMo").stress > Member(stable.state, "linMo").stress, "crunch must raise student stress");
+  assert(Member(crunch.state, "dreamBrush").drift > Member(stable.state, "dreamBrush").drift, "crunch must raise AI drift");
+  assert(crunch.state.project.scopeDebt > 24, "crunch must add scope debt");
+  assert(crunch.state.project.technicalDebt > 24, "crunch must add technical debt");
+  assert(crunch.state.project.bugs > 12, "crunch must add Bugs");
+  assert(crunch.state.anxiety > stable.state.anxiety, "crunch must cost founder anxiety");
+  assert(SumOutput(publicity.output) < SumOutput(stable.output), "publicity must trade production time for market heat");
+  assert(SumOutput(publicityCleanOutput.output) < SumOutput(stableCleanOutput.output), "publicity must reduce clean global output");
+  assert(publicity.state.project.hype > stable.state.project.hype, "publicity must raise project heat");
+  assert(publicity.state.project.expectation > stable.state.project.expectation, "publicity must raise audience expectations");
+  assert(SumOutput(recoveryCleanOutput.output) < SumOutput(stableCleanOutput.output), "recovery must reduce clean global output");
+  assert(Member(recovery.state, "linMo").stress < Member(stable.state, "linMo").stress, "recovery must lower student stress");
+  assert(Member(recovery.state, "linMo").morale > Member(stable.state, "linMo").morale, "recovery must restore student morale");
+  assert(Member(recovery.state, "dreamBrush").drift < Member(stable.state, "dreamBrush").drift, "recovery must lower AI drift");
+  assert(recovery.state.anxiety < stable.state.anxiety, "recovery must lower founder anxiety despite its output tradeoff");
+  assert(SumOutput(debtCleanupCleanOutput.output) < SumOutput(stableCleanOutput.output), "debt cleanup must reduce clean global output");
+  assert(debtCleanup.state.project.technicalDebt < stable.state.project.technicalDebt, "debt cleanup must beat the balanced policy on technical debt");
+  assert(debtCleanup.state.project.bugs < 12, "debt cleanup must lower the starting Bug load");
+  assert(SumOutput(scopeCutCleanOutput.output) < SumOutput(stableCleanOutput.output), "scope cutting must reduce clean global output");
+  assert(scopeCut.state.project.scopeDebt < stable.state.project.scopeDebt, "scope cutting must beat the balanced policy on scope debt");
+  assert(scopeCut.state.project.technicalDebt < 24, "scope cutting must also trim technical debt");
+  assert(scopeCut.state.project.hype < stable.state.project.hype, "scope cutting must cost project heat");
+  assert.equal(crunchCleanOutput.state.project.scopeDebt, 4, "a productive team must not erase crunch scope debt in the same settlement");
+  assert.equal(crunchCleanOutput.state.project.technicalDebt, 4, "a productive team must not erase crunch technical debt in the same settlement");
+  assert.equal(crunchCleanOutput.state.project.bugs, 2, "a productive team must not erase crunch Bugs in the same settlement");
+
+  const directBase = Begin();
+  const directPolicy = SelectDirective(directBase, "scopeParty").state;
+  const stableOwnerWork = PerformOwnerTask(directBase, "art");
+  const crunchOwnerWork = PerformOwnerTask(directPolicy, "art");
+  assert.equal(
+    crunchOwnerWork.gain,
+    stableOwnerWork.gain,
+    "the team policy must not buff the founder's separate immediate work action",
+  );
+  assert.equal(crunchOwnerWork.state.project.bugs, stableOwnerWork.state.project.bugs, "team policy must not change owner-work Bug risk");
+  assert.equal(crunchOwnerWork.state.project.scopeDebt, stableOwnerWork.state.project.scopeDebt, "team policy must not change owner-work scope risk");
+  assert.equal(crunchOwnerWork.state.project.technicalDebt, stableOwnerWork.state.project.technicalDebt, "team policy must not change owner-work technical risk");
+
+  let lifecycleState = SelectDirective(Begin(), "clientCrush").state;
+  for (const moduleKey of ["art", "design", "client"]) lifecycleState = PerformOwnerTask(lifecycleState, moduleKey).state;
+  assert.equal(lifecycleState.ownerWorkCount, 3, "the lifecycle fixture must spend all founder work actions");
+  const nextMonth = AdvanceMonth(lifecycleState);
+  assert.equal(nextMonth.state.ownerWorkCount, 0, "founder work actions must refresh at the start of a new month");
+  assert.equal(nextMonth.state.selectedDirective, "clientCrush", "the team policy must remain selected across the month boundary");
+  assert.equal(nextMonth.state.lastSettlement.directiveId, "clientCrush", "the settlement must record the policy applied before refreshing owner work");
+}
+
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market fit, live events, customization, distinct team policies and owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");
