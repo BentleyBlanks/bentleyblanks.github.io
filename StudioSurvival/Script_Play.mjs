@@ -89,7 +89,7 @@ import {
 } from "./Script_World.mjs?v=20260815ab";
 
 const dom = Object.fromEntries([
-  "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
+  "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton",
   "studioNameHud", "startupDebtValue", "locationValue", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
@@ -2847,6 +2847,46 @@ function GetGuidedMission(project, gameType, tensions, anxietyState) {
     || `${gameType?.name || "开发中"} · ${project.isReleased ? `v${project.version}.0 已上线` : `开发第 ${project.age + 1} 月`} · ${anxietyState.label}`;
 }
 
+function RenderAnxietyPostFx() {
+  const anxiety = Clamp(state.anxiety, 0, 100);
+  const anxietyRatio = anxiety / 100;
+  const anxietyFx = Clamp((anxiety - 55) / 45, 0, 1);
+  const criticalFx = Clamp((anxiety - 90) / 10, 0, 1);
+  const swayX = .5 + anxietyFx * 8 + criticalFx * 5;
+  const swayY = .25 + anxietyFx * 3.5 + criticalFx * 2.5;
+  const tilt = .03 + anxietyFx * .28 + criticalFx * .24;
+  const rootStyle = dom.gameRoot.style;
+
+  rootStyle.setProperty("--anxietySwayX", `${swayX.toFixed(2)}px`);
+  rootStyle.setProperty("--anxietySwayXNegative", `${(-swayX).toFixed(2)}px`);
+  rootStyle.setProperty("--anxietySwayY", `${swayY.toFixed(2)}px`);
+  rootStyle.setProperty("--anxietySwayYNegative", `${(-swayY).toFixed(2)}px`);
+  rootStyle.setProperty("--anxietyTilt", `${tilt.toFixed(2)}deg`);
+  rootStyle.setProperty("--anxietyTiltNegative", `${(-tilt).toFixed(2)}deg`);
+  rootStyle.setProperty("--anxietySceneScale", (1 + anxietyFx * .012 + criticalFx * .018).toFixed(3));
+  rootStyle.setProperty("--anxietySceneBlur", `${(.08 + anxietyFx * .62 + criticalFx * .72).toFixed(2)}px`);
+  rootStyle.setProperty("--anxietySceneSaturation", (1.02 - anxietyFx * .11 - criticalFx * .07).toFixed(3));
+  rootStyle.setProperty("--anxietySceneContrast", (1.055 + anxietyFx * .1 + criticalFx * .06).toFixed(3));
+  rootStyle.setProperty("--anxietySceneBrightness", (1.015 - anxietyFx * .045 - criticalFx * .035).toFixed(3));
+  rootStyle.setProperty("--anxietyHue", `${(anxietyFx * 2.8 + criticalFx * 2.2).toFixed(2)}deg`);
+  rootStyle.setProperty("--anxietyHueNegative", `${(-anxietyFx * 2.8 - criticalFx * 2.2).toFixed(2)}deg`);
+  rootStyle.setProperty("--anxietyEdgeAlpha", (.12 + anxietyFx * .58 + criticalFx * .18).toFixed(3));
+  rootStyle.setProperty("--anxietyOuterAlpha", (.2 + anxietyFx * .52 + criticalFx * .2).toFixed(3));
+  rootStyle.setProperty("--anxietySideAlpha", (.05 + anxietyFx * .43 + criticalFx * .16).toFixed(3));
+  rootStyle.setProperty("--anxietyEchoAlpha", (anxietyFx * .25 + criticalFx * .2).toFixed(3));
+  rootStyle.setProperty("--anxietyEchoBlur", `${(.2 + anxietyFx * 1.05 + criticalFx * .85).toFixed(2)}px`);
+  rootStyle.setProperty("--anxietyEdgeBlur", `${(7 + anxietyFx * 9 + criticalFx * 4).toFixed(2)}px`);
+  rootStyle.setProperty("--anxietyEdgeShift", `${(.1 + anxietyFx * 1.25 + criticalFx * .75).toFixed(2)}%`);
+  rootStyle.setProperty("--anxietyEdgeShiftNegative", `${(-.1 - anxietyFx * 1.25 - criticalFx * .75).toFixed(2)}%`);
+  rootStyle.setProperty("--anxietyBreathScale", (1.008 + anxietyFx * .027 + criticalFx * .025).toFixed(3));
+  rootStyle.setProperty("--anxietySwayDuration", `${(4.6 - anxietyFx * 1.55 - criticalFx * .65).toFixed(2)}s`);
+  rootStyle.setProperty("--anxietyEdgeDuration", `${(3.8 - anxietyFx * 1.05 - criticalFx * .55).toFixed(2)}s`);
+  rootStyle.setProperty("--anxietyEchoDuration", `${(5.1 - anxietyFx * 1.45 - criticalFx * .85).toFixed(2)}s`);
+  dom.gameRoot.classList.toggle("anxietyHigh", anxietyFx > .01);
+  dom.gameRoot.classList.toggle("anxietyCritical", criticalFx > .01);
+  dom.sceneVignette.style.opacity = String(.38 + anxietyRatio * .24 + anxietyFx * .22 + criticalFx * .08);
+}
+
 function RenderHud() {
   const project = state.project;
   const template = project ? FindProject(project.templateId) : null;
@@ -2877,7 +2917,7 @@ function RenderHud() {
   dom.hungerValue.textContent = Math.round(state.hunger);
   dom.anxietyBar.style.width = `${Clamp(state.anxiety, 0, 100)}%`;
   dom.anxietyValue.textContent = Math.round(state.anxiety);
-  dom.sceneVignette.style.opacity = String(.38 + Clamp(state.anxiety / 100, 0, 1) * .4);
+  RenderAnxietyPostFx();
   dom.projectTitle.textContent = project?.age === 0
     ? "新手目标 · 做出第一版"
     : project?.name ? `《${project.name}》` : template?.title || "先开一家公司";

@@ -3702,3 +3702,163 @@ body {
   }
   .interactionPrompt { bottom: calc(var(--safeBottom) + var(--controlSize) + 61px); }
 }
+
+/* Anxiety post-processing --------------------------------------------------
+   The world view buckles under pressure while every HUD and dialog stays put. */
+.gameRoot {
+  --anxietySwayX: .5px;
+  --anxietySwayXNegative: -.5px;
+  --anxietySwayY: .25px;
+  --anxietySwayYNegative: -.25px;
+  --anxietyTilt: .03deg;
+  --anxietyTiltNegative: -.03deg;
+  --anxietySceneScale: 1;
+  --anxietySceneBlur: .08px;
+  --anxietySceneSaturation: 1.02;
+  --anxietySceneContrast: 1.055;
+  --anxietySceneBrightness: 1.015;
+  --anxietyHue: 0deg;
+  --anxietyHueNegative: 0deg;
+  --anxietyEdgeAlpha: .12;
+  --anxietyOuterAlpha: .2;
+  --anxietySideAlpha: .05;
+  --anxietyEchoAlpha: 0;
+  --anxietyEchoBlur: .2px;
+  --anxietyEdgeBlur: 7px;
+  --anxietyEdgeShift: .1%;
+  --anxietyEdgeShiftNegative: -.1%;
+  --anxietyBreathScale: 1.008;
+  --anxietySwayDuration: 4.6s;
+  --anxietyEdgeDuration: 3.8s;
+  --anxietyEchoDuration: 5.1s;
+  isolation: isolate;
+}
+
+#sceneCanvas {
+  transform-origin: 50% 52%;
+  filter:
+    saturate(var(--anxietySceneSaturation))
+    contrast(var(--anxietySceneContrast))
+    brightness(var(--anxietySceneBrightness));
+  transition: filter .45s ease, transform .45s ease;
+}
+
+.sceneVignette {
+  overflow: hidden;
+  transition: opacity .45s ease, box-shadow .55s ease;
+}
+
+.sceneVignette::before {
+  inset: -14%;
+  height: auto;
+  opacity: 1;
+  background:
+    radial-gradient(
+      ellipse at 50% 49%,
+      transparent 0 40%,
+      rgba(0, 0, 0, var(--anxietyEdgeAlpha)) 72%,
+      rgba(0, 0, 0, var(--anxietyOuterAlpha)) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, var(--anxietySideAlpha)) 0%,
+      transparent 17% 83%,
+      rgba(0, 0, 0, var(--anxietySideAlpha)) 100%
+    );
+  filter: blur(var(--anxietyEdgeBlur));
+  mix-blend-mode: normal;
+  transform: scale(1.01);
+  transform-origin: 50% 50%;
+}
+
+.sceneVignette::after {
+  inset: -7%;
+  height: auto;
+  opacity: var(--anxietyEchoAlpha);
+  background:
+    radial-gradient(ellipse at 9% 53%, rgba(255, 28, 53, .32), transparent 38%),
+    radial-gradient(ellipse at 91% 46%, rgba(28, 128, 255, .3), transparent 38%),
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(235, 241, 255, .055) 6px, transparent 7px 11px);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, transparent 0 39%, rgba(0, 0, 0, .36) 59%, #000 86%);
+  mask-image: radial-gradient(ellipse at 50% 50%, transparent 0 39%, rgba(0, 0, 0, .36) 59%, #000 86%);
+  mix-blend-mode: screen;
+  transform: scale(1.025);
+  transform-origin: 50% 50%;
+}
+
+.gameRoot.anxietyHigh #sceneCanvas {
+  will-change: transform, filter;
+  animation: anxietySceneSway var(--anxietySwayDuration) cubic-bezier(.42, 0, .58, 1) infinite;
+}
+
+.gameRoot.anxietyHigh .sceneVignette::before {
+  will-change: transform, opacity;
+  animation: anxietyEdgeBreath var(--anxietyEdgeDuration) cubic-bezier(.44, .05, .4, .96) infinite;
+}
+
+.gameRoot.anxietyHigh .sceneVignette::after {
+  -webkit-backdrop-filter: blur(var(--anxietyEchoBlur)) saturate(1.3);
+  backdrop-filter: blur(var(--anxietyEchoBlur)) saturate(1.3);
+  will-change: transform;
+  animation: anxietyPeripheralDrift var(--anxietyEchoDuration) ease-in-out infinite;
+}
+
+.gameRoot.anxietyCritical .sceneVignette {
+  box-shadow:
+    inset 0 0 9vw rgba(0, 0, 0, .82),
+    inset 0 0 3vw rgba(44, 0, 4, .22);
+}
+
+@keyframes anxietySceneSway {
+  0%, 100% {
+    transform: translate3d(var(--anxietySwayXNegative), 0, 0) scale(var(--anxietySceneScale)) rotate(var(--anxietyTiltNegative));
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness)) blur(.08px) hue-rotate(var(--anxietyHueNegative));
+  }
+  18% {
+    transform: translate3d(0, var(--anxietySwayYNegative), 0) scale(var(--anxietySceneScale)) rotate(var(--anxietyTilt));
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness)) blur(var(--anxietySceneBlur)) hue-rotate(var(--anxietyHue));
+  }
+  41% {
+    transform: translate3d(var(--anxietySwayX), var(--anxietySwayY), 0) scale(var(--anxietySceneScale)) rotate(var(--anxietyTilt));
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness)) blur(.18px) hue-rotate(var(--anxietyHueNegative));
+  }
+  67% {
+    transform: translate3d(var(--anxietySwayXNegative), var(--anxietySwayY), 0) scale(var(--anxietySceneScale)) rotate(0deg);
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness)) blur(var(--anxietySceneBlur)) hue-rotate(var(--anxietyHue));
+  }
+  84% {
+    transform: translate3d(var(--anxietySwayX), var(--anxietySwayYNegative), 0) scale(var(--anxietySceneScale)) rotate(var(--anxietyTiltNegative));
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness)) blur(.1px) hue-rotate(0deg);
+  }
+}
+
+@keyframes anxietyEdgeBreath {
+  0%, 100% { opacity: .76; transform: translate3d(var(--anxietyEdgeShiftNegative), 0, 0) scale(1.01); }
+  28% { opacity: 1; transform: translate3d(var(--anxietyEdgeShift), var(--anxietyEdgeShiftNegative), 0) scale(var(--anxietyBreathScale)); }
+  57% { opacity: .84; transform: translate3d(var(--anxietyEdgeShift), var(--anxietyEdgeShift), 0) scale(1.018); }
+  79% { opacity: .96; transform: translate3d(var(--anxietyEdgeShiftNegative), var(--anxietyEdgeShift), 0) scale(var(--anxietyBreathScale)); }
+}
+
+@keyframes anxietyPeripheralDrift {
+  0%, 100% { transform: translate3d(var(--anxietyEdgeShiftNegative), 0, 0) scale(1.025); }
+  33% { transform: translate3d(var(--anxietyEdgeShift), var(--anxietyEdgeShiftNegative), 0) scale(1.055) rotate(.22deg); }
+  71% { transform: translate3d(0, var(--anxietyEdgeShift), 0) scale(1.035) rotate(-.18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gameRoot.anxietyHigh #sceneCanvas,
+  .gameRoot.anxietyHigh .sceneVignette::before,
+  .gameRoot.anxietyHigh .sceneVignette::after {
+    animation: none !important;
+  }
+
+  .gameRoot.anxietyHigh #sceneCanvas {
+    transform: none;
+    filter: saturate(var(--anxietySceneSaturation)) contrast(var(--anxietySceneContrast)) brightness(var(--anxietySceneBrightness));
+  }
+
+  .gameRoot.anxietyHigh .sceneVignette::before,
+  .gameRoot.anxietyHigh .sceneVignette::after {
+    transform: none;
+  }
+}

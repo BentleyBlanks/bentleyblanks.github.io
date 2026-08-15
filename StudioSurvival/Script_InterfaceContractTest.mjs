@@ -136,4 +136,15 @@ assert.doesNotMatch(homeWindowUpdateBlock, /new THREE\./, "the per-frame home-wi
 assert.equal([...script.matchAll(/homeWindowVisual = BuildHomeWindowDayNight\(/g)].length, 1, "only the home scene may construct the day/night window");
 assert.match(animateBlock, /const time = clock\.elapsedTime;[\s\S]*UpdateHomeWindowDayNight\(time\)/, "the window cycle must follow global elapsed time instead of resetting on travel");
 
+const anxietyPostFxBlock = script.match(/function RenderAnxietyPostFx\(\)[\s\S]*?function RenderHud\(\)/)?.[0] || "";
+const anxietyPostFxCss = css.slice(css.indexOf("/* Anxiety post-processing"));
+assert.match(anxietyPostFxBlock, /Clamp\(\(anxiety - 55\) \/ 45, 0, 1\)/, "high anxiety must progressively drive the scene treatment");
+assert.match(anxietyPostFxBlock, /Clamp\(\(anxiety - 90\) \/ 10, 0, 1\)/, "the strongest post-processing must be reserved for near-max anxiety");
+assert.match(anxietyPostFxBlock, /classList\.toggle\("anxietyHigh"[\s\S]*classList\.toggle\("anxietyCritical"/, "the scene needs distinct high and critical anxiety states");
+assert.match(anxietyPostFxCss, /\.gameRoot\.anxietyHigh #sceneCanvas[\s\S]*animation:\s*anxietySceneSway/, "high anxiety must make the world view sway and lose focus");
+assert.match(anxietyPostFxCss, /\.gameRoot\.anxietyHigh \.sceneVignette::before[\s\S]*animation:\s*anxietyEdgeBreath/, "high anxiety must animate the black peripheral tunnel");
+assert.match(anxietyPostFxCss, /@keyframes anxietyPeripheralDrift/, "critical peripheral color echo needs its own irregular drift");
+assert.match(anxietyPostFxCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation:\s*none !important/, "motion-sensitive players must keep a static, non-swaying anxiety treatment");
+assert.doesNotMatch(anxietyPostFxCss, /\.gameHud|\.missionCard|\.modalLayer|\.resultLayer/, "anxiety motion must never shake HUD, text, or dialogs");
+
 console.log("StudioSurvival interface separation contract test passed");
