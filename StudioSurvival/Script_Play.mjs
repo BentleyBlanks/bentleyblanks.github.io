@@ -1042,13 +1042,32 @@ function BuildFacility(interaction) {
     for (const ventY of [1.02, 1.14, 1.26, 1.38]) Place(group, Box(.28, .018, .02, 0x101318, { castShadow: false }), .72, ventY, .345);
     AddPaperStack(group, .26, .96, .35, .4, 0xe5dac5, 5);
   } else if (kind === "planningBoard") {
-    Place(group, Box(2.5, 1.62, .11, 0xe4ddc9, { surface: "paper", roughness: .96 }), 0, 1.8, -.03);
-    for (const frameX of [-1.31, 1.31]) Place(group, Box(.09, 1.78, .13, 0x6d5136, { surface: "wood", roughness: .68 }), frameX, 1.8, -.02);
-    for (const frameY of [1.0, 2.6]) Place(group, Box(2.68, .09, .13, 0x6d5136, { surface: "wood", roughness: .68 }), 0, frameY, -.02);
-    Place(group, Box(.62, .46, .026, 0xffd166, { surface: "paper", castShadow: false }), -.54, 1.98, .055, -.025);
-    Place(group, Box(.56, .4, .026, 0xff8eae, { surface: "paper", castShadow: false }), .58, 1.57, .055, .035);
-    Place(group, Box(1.78, .055, .028, color, { emissive: color, emissiveIntensity: .28, castShadow: false }), 0, 2.34, .06);
-    AddPaperStack(group, .7, .94, .28, .42, 0xe8dfca, 4);
+    const boardMetal = 0xa8ada9;
+    Place(group, Box(2.66, 1.76, .16, boardMetal, { surface: "metal", metalness: .5, roughness: .28 }), 0, 1.8, -.055);
+    Place(group, Box(2.48, 1.55, .035, 0xf0f2e9, { roughness: .24, castShadow: false }), 0, 1.82, .055);
+    for (const frameX of [-1.29, 1.29]) Place(group, Box(.08, 1.69, .17, 0xc8cbc6, { surface: "metal", metalness: .72, roughness: .22 }), frameX, 1.8, .015);
+    for (const frameY of [1.0, 2.62]) Place(group, Box(2.62, .08, .17, 0xc8cbc6, { surface: "metal", metalness: .72, roughness: .22 }), 0, frameY, .015);
+    for (const [magnetX, magnetY, magnetColor] of [[-1.12, 2.48, 0xd74f52], [1.1, 2.46, 0x4e82b8], [-1.1, 1.16, 0xe1b83c]]) {
+      const magnet = Sphere(.055, magnetColor, { roughness: .38, castShadow: false, segments: 12, rings: 8 });
+      magnet.scale.z = .38;
+      Place(group, magnet, magnetX, magnetY, .105);
+    }
+    Place(group, Box(.64, .46, .025, 0xffdf72, { surface: "paper", castShadow: false }), -.62, 1.99, .09, -.025);
+    Place(group, Box(.57, .4, .025, 0xffa8bd, { surface: "paper", castShadow: false }), .61, 1.6, .09, .035);
+    for (const [noteX, noteY, magnetColor] of [[-.62, 2.19, 0xd74f52], [.61, 1.79, 0x4e82b8]]) {
+      const noteMagnet = Sphere(.038, magnetColor, { roughness: .35, castShadow: false, segments: 10, rings: 7 });
+      noteMagnet.scale.z = .32;
+      Place(group, noteMagnet, noteX, noteY, .122);
+    }
+    Place(group, Box(1.56, .045, .018, 0x376c91, { castShadow: false }), -.02, 2.34, .094, -.015);
+    Place(group, Box(.78, .035, .018, 0x376c91, { castShadow: false }), -.38, 2.24, .094, .02);
+    const markerCircle = Torus(.22, .023, 0xb64f4e, { roughness: .48, castShadow: false, radialSegments: 8, tubularSegments: 24 });
+    Place(group, markerCircle, .78, 2.18, .102, -.12);
+    Place(group, Box(1.78, .09, .26, 0xb7bbb8, { surface: "metal", metalness: .62, roughness: .26 }), .22, .93, .13);
+    for (const [markerX, markerColor] of [[-.42, 0x254f69], [.02, 0xb64f4e], [.46, 0x242a29]]) {
+      Place(group, Box(.36, .04, .055, markerColor, { roughness: .45, castShadow: false }), markerX, .995, .25, markerX * .04);
+      Place(group, Box(.06, .045, .058, 0xe4e5dd, { roughness: .65, castShadow: false }), markerX + .19, .995, .25, markerX * .04);
+    }
   } else if (kind === "marketingPhone") {
     Place(group, Box(1.6, .12, .72, 0x6c4934, { surface: "wood", roughness: .72 }), 0, .86, .02);
     for (const legX of [-.57, .57]) Place(group, Box(.1, .82, .1, 0x493326, { surface: "wood" }), legX, .43, -.02);
@@ -2356,6 +2375,7 @@ function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   if (state.status !== "playing" || !state.project) return;
   const panelOptions = typeof options === "string" ? { mode: options } : options;
   dom.modalLayer.classList.toggle("computerMode", panelOptions.mode === "computer");
+  dom.modalLayer.classList.toggle("whiteboardMode", panelOptions.mode === "whiteboard");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
@@ -2373,6 +2393,7 @@ function ClosePanel() {
   dom.modalLayer.classList.add("hidden");
   dom.modalLayer.classList.remove("monthCloseMode");
   dom.modalLayer.classList.remove("computerMode");
+  dom.modalLayer.classList.remove("whiteboardMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -2612,14 +2633,18 @@ function OpenCustomizationSheet(sourceId = "owner") {
   const sourceLabel = staff ? staff.name : "你自己";
   const usedIds = new Set(state.project.features.map((item) => item.id));
   OpenPanel("PROJECT WHITEBOARD", `${sourceLabel} 的玩法提案`, `
-    <p class="panelIntro">从白板选一个提案写进需求。老板亲自做会增加饥饿与焦虑；交给成员会消耗其状态。</p>
-    <div class="choiceFooter"><span>本月有效对话/拍板 ${state.talkPoints} 次</span><b>已塞 ${state.project.features.length}/6 个玩法</b></div>
-    <div class="panelSection worldGrid">${FEATURE_CHOICES.map((feature) => `
-      <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) ? "disabled" : ""}>
-        <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
-        <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
-      </button>`).join("")}</div>
-    <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>`, () => {
+    <div class="projectWhiteboardScene">
+      <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
+      <p class="panelIntro">选一个提案写进需求。</p>
+      <div class="choiceFooter"><span>本月拍板 ${state.talkPoints} 次</span><b>玩法 ${state.project.features.length}/6</b></div>
+      <div class="panelSection worldGrid whiteboardNoteGrid">${FEATURE_CHOICES.map((feature) => `
+        <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) ? "disabled" : ""}>
+          <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
+          <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
+        </button>`).join("")}</div>
+      <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>
+      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-source-select]")) return OpenFeatureSourceSheet();
       const button = event.target.closest("[data-feature-id]");
@@ -2632,28 +2657,32 @@ function OpenCustomizationSheet(sourceId = "owner") {
         if (state.status !== "playing") RenderEnding();
       });
     };
-  });
+  }, { mode: "whiteboard" });
 }
 
 function OpenFeatureSourceSheet() {
   if (!state.project || state.project.age < 1) return OpenDirectiveSheet();
   const hired = state.team.map((member) => FindStaff(member.id)).filter(Boolean);
   OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 选择提案人", `
-    <p class="speechLine">本月还能拍板 ${state.talkPoints} 次。</p>
-    <div class="sectionHeading panelSection"><strong>这次由谁提玩法？</strong><span>玩法方向只从白板进入</span></div>
-    <div class="worldGrid three">
-      <button class="worldChoice danger" data-source-id="owner" type="button"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div></button>
-      ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div></button>`).join("")}
-    </div>
-    <div class="panelSection sectionHeading"><strong>团队状态</strong><span>招聘仍只在人才市场</span></div>
-    <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场买设备并招聘后，他们才会出现在白板旁。</span>`}</div>`, () => {
+    <div class="projectWhiteboardScene">
+      <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
+      <p class="speechLine">本月还能拍板 ${state.talkPoints} 次。</p>
+      <div class="sectionHeading panelSection"><strong>谁提玩法？</strong></div>
+      <div class="worldGrid three whiteboardNoteGrid">
+        <button class="worldChoice danger" data-source-id="owner" type="button"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div></button>
+        ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div></button>`).join("")}
+      </div>
+      <div class="panelSection sectionHeading"><strong>团队</strong></div>
+      <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场招聘。</span>`}</div>
+      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const chat = event.target.closest("[data-chat-id]");
       if (chat) return OpenStaffSheet(chat.dataset.chatId);
       const source = event.target.closest("[data-source-id]");
       if (source) OpenCustomizationSheet(source.dataset.sourceId);
     };
-  });
+  }, { mode: "whiteboard" });
 }
 
 function OpenHomeComputerSheet() {
@@ -3285,18 +3314,22 @@ function OpenDirectiveSheet() {
     ? DIRECTIVES.filter((directive) => ["integration", "artSprint", "clientCrush"].includes(directive.id))
     : DIRECTIVES;
   OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 项目方向", `
-    <p class="panelIntro">决定这个月往哪使劲。首月只显示三个基础方向。</p>
-    <div class="worldGrid three">${visibleDirectives.map((directive) => `
-      <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" data-directive-id="${directive.id}" type="button">
-        <div class="choiceTop"><strong style="color:${directive.color}">${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
-      </button>`).join("")}</div>
-    ${earlyStage ? `<div class="noteList"><div class="note good">先完成第一个月，之后再开放玩法定制和换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案只在这块白板处理</span><button class="miniButton" data-feature-source type="button">安排玩法提案</button></div>
-    <div class="panelSection sectionHeading"><strong>承认做错了：换赛道</strong><span>预计烧掉 ${FormatMoney(pivotCost)}</span></div>
-    <div class="worldGrid">
-      <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
-      <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
-    </div>
-    <div class="panelSection choiceFooter"><span>进度、宣发、玩法都会大量损失；焦虑 +14，饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 强行转向</button></div>`}`, () => {
+    <div class="projectWhiteboardScene">
+      <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
+      <p class="panelIntro">这个月往哪使劲？</p>
+      <div class="worldGrid three whiteboardNoteGrid">${visibleDirectives.map((directive) => `
+        <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" style="--noteInk:${directive.color}" data-directive-id="${directive.id}" type="button">
+          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
+        </button>`).join("")}</div>
+      ${earlyStage ? `<div class="noteList"><div class="note good">首月完成后开放玩法与换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案</span><button class="miniButton" data-feature-source type="button">安排提案</button></div>
+      <div class="panelSection sectionHeading"><strong>换赛道</strong><span>−${FormatMoney(pivotCost)}</span></div>
+      <div class="worldGrid whiteboardPivotGrid">
+        <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
+        <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
+      </div>
+      <div class="panelSection choiceFooter"><span>进度、宣发、玩法大量损失 · 焦虑 +14 · 饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 转向</button></div>`}
+      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const directiveButton = event.target.closest("[data-directive-id]");
       if (directiveButton) {
@@ -3314,7 +3347,7 @@ function OpenDirectiveSheet() {
         <div class="resultHero"><b>−${FormatGoalMoney(result.cost)}</b><p>${EscapeHtml(result.reason)}<br>丢失愿望单 ${result.lostWishlists.toLocaleString("zh-CN")}，废弃玩法 ${result.discardedFeatures} 个。</p></div>
         `, () => { if (state.status !== "playing") RenderEnding(); });
     };
-  });
+  }, { mode: "whiteboard" });
 }
 
 function OpenMarketingSheet() {

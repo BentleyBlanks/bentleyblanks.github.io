@@ -3240,7 +3240,79 @@ body {
   to { opacity: 1; transform: rotate(13deg) scale(.78); }
 }
 
+/* The project-direction sheet is the wall-mounted enamel board seen in the room. */
+.modalLayer.whiteboardMode .modalBackdrop { background:radial-gradient(ellipse at 50% 14%,rgba(255,233,183,.3),transparent 43%),repeating-linear-gradient(88deg,rgba(255,255,255,.018) 0 1px,transparent 1px 36px),rgba(38,31,26,.92); backdrop-filter:blur(5px) saturate(.72); }
+.modalLayer.whiteboardMode .worldPanel { width:min(1080px,96vw); max-height:94vh; overflow:visible; border:10px solid #aeb4b2; border-top-color:#d7dad6; border-left-color:#c9cecb; border-right-color:#858c8b; border-bottom-color:#6c7372; border-radius:8px; color:#27383c; background:linear-gradient(118deg,rgba(255,255,255,.95),rgba(237,241,232,.97) 56%,rgba(221,228,219,.96)); box-shadow:inset 0 0 0 2px #f8faf3,inset 0 0 34px rgba(84,105,94,.12),7px 10px 0 #4a504f,0 34px 90px rgba(0,0,0,.67); }
+.modalLayer.whiteboardMode .worldPanel::before { content:""; position:absolute; z-index:5; inset:-7px; border-radius:6px; background:radial-gradient(circle at 11px 11px,#ecede8 0 2px,#555b5b 2.5px 4px,transparent 4.5px),radial-gradient(circle at calc(100% - 11px) 11px,#ecede8 0 2px,#555b5b 2.5px 4px,transparent 4.5px),radial-gradient(circle at 11px calc(100% - 11px),#ecede8 0 2px,#555b5b 2.5px 4px,transparent 4.5px),radial-gradient(circle at calc(100% - 11px) calc(100% - 11px),#ecede8 0 2px,#555b5b 2.5px 4px,transparent 4.5px); pointer-events:none; }
+.modalLayer.whiteboardMode .worldPanel::after { content:""; position:absolute; z-index:4; left:18%; right:8%; bottom:-28px; height:28px; border:1px solid #606766; border-top-color:#e2e5e0; border-radius:0 0 8px 8px; background:linear-gradient(180deg,#cdd1ce,#858c8b 62%,#626968); box-shadow:inset 0 2px rgba(255,255,255,.54),7px 8px 0 rgba(28,31,30,.48),0 14px 24px rgba(0,0,0,.32); }
+.modalLayer.whiteboardMode .worldPanel > header { min-height:54px; padding:9px 18px 7px; border:0; border-bottom:2px solid rgba(48,99,132,.23); background:transparent; box-shadow:none; }
+.modalLayer.whiteboardMode .worldPanel > header span { color:#a4484b; font:800 8px/1 "KaiTi","STKaiti",serif; letter-spacing:.1em; text-shadow:none; transform:rotate(-1deg); }
+.modalLayer.whiteboardMode .worldPanel h2 { color:#315f7d; font:900 22px/1.1 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; letter-spacing:.02em; text-shadow:none; transform:rotate(-.35deg); }
+.modalLayer.whiteboardMode .closeButton { width:42px; height:42px; min-width:42px; border:2px solid #973a3d; border-radius:50%; color:#fff5e8; background:radial-gradient(circle at 35% 28%,#ff8e8c,#c44f51 48%,#7b272b 54%); text-shadow:0 -1px #711d23; box-shadow:inset 0 2px rgba(255,255,255,.45),0 3px 0 #6d2628,0 8px 13px rgba(0,0,0,.34); }
+.modalLayer.whiteboardMode .closeButton:active { transform:translateY(3px); box-shadow:inset 0 3px 5px rgba(86,20,22,.44),0 1px 0 #6d2628; }
+.modalLayer.whiteboardMode .sheetBody { position:relative; max-height:calc(94vh - 74px); margin:0; padding:11px 18px 17px; overflow:auto; border:0; border-radius:0; color:#2d4043; background:linear-gradient(8deg,transparent 0 22%,rgba(53,107,137,.035) 22.4%,transparent 22.8% 76%,rgba(173,68,72,.025) 76.3%,transparent 76.8%),radial-gradient(ellipse at 68% 31%,rgba(70,120,142,.035),transparent 28%),transparent; box-shadow:none; scrollbar-color:#a4aaa5 #e8ece4; }
+.projectWhiteboardScene { position:relative; min-height:280px; padding:4px 4px 27px; }
+.whiteboardBoardMeta { position:absolute; z-index:3; right:8px; top:-51px; display:flex; align-items:center; gap:7px; color:#765f45; font:900 8px/1 "KaiTi","STKaiti",serif; transform:rotate(1.2deg); }
+.whiteboardBoardMeta span { padding:4px 7px; border:1px solid #d6c87e; color:#655532; background:#fff0a9; box-shadow:1px 2px 0 rgba(83,68,36,.2); }
+.whiteboardBoardMeta i { width:10px; height:10px; border:1px solid #8a3033; border-radius:50%; background:radial-gradient(circle at 35% 28%,#ff8e8c,#bd4548 55%,#74262a 60%); box-shadow:0 2px 2px rgba(0,0,0,.25); }
+.whiteboardBoardMeta i:nth-of-type(2) { border-color:#315c83; background:radial-gradient(circle at 35% 28%,#9bc8ed,#4e82b8 55%,#28547d 60%); }
+.whiteboardBoardMeta i:nth-of-type(3) { border-color:#97702a; background:radial-gradient(circle at 35% 28%,#ffe38a,#d8ad3c 55%,#8b681e 60%); }
+.whiteboardMode .panelIntro { margin:0 0 10px; color:#315f7d; font:900 15px/1.25 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; transform:rotate(-.25deg); }
+.whiteboardMode .speechLine { margin:0 0 8px; padding:7px 10px; border:0; border-left:4px solid #376d90; border-radius:0; color:#315f7d; background:rgba(64,117,145,.045); font:900 13px/1.25 "KaiTi","STKaiti",sans-serif; transform:rotate(-.2deg); }
+.whiteboardMode .sectionHeading { margin:8px 0 5px; padding-bottom:3px; border-bottom:2px solid rgba(49,95,125,.22); color:#315f7d; font-family:"KaiTi","STKaiti",sans-serif; }
+.whiteboardMode .sectionHeading strong { font-size:13px; }
+.whiteboardMode .sectionHeading span { color:#9b4548; font-weight:900; }
+.whiteboardMode .worldGrid { gap:12px; }
+.whiteboardMode .worldChoice,
+.whiteboardMode .featureCard { --notePaper:#fff0a9; --noteRotate:-.55deg; position:relative; min-height:96px; padding:19px 13px 12px; overflow:visible; border:0; border-radius:1px; color:#334345; background:linear-gradient(150deg,rgba(255,255,255,.42),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 3px 0 rgba(101,82,44,.22),6px 9px 17px rgba(65,55,40,.18); transform:rotate(var(--noteRotate)); transform-origin:50% 20%; }
+.whiteboardMode .worldGrid > :nth-child(3n+2) { --notePaper:#ffd7e2; --noteRotate:.65deg; }
+.whiteboardMode .worldGrid > :nth-child(3n+3) { --notePaper:#d8ecff; --noteRotate:-.3deg; }
+.whiteboardMode .worldChoice::before,
+.whiteboardMode .featureCard::before { content:""; position:absolute; z-index:2; left:50%; top:5px; width:10px; height:10px; border:1px solid #893033; border-radius:50%; background:radial-gradient(circle at 35% 28%,#ff9290,#c34d50 55%,#79272b 60%); box-shadow:0 2px 2px rgba(0,0,0,.24); transform:translateX(-50%); }
+.whiteboardMode .worldGrid > :nth-child(3n+2)::before { border-color:#315a80; background:radial-gradient(circle at 35% 28%,#a8d3f5,#5488bd 55%,#2b587e 60%); }
+.whiteboardMode .worldGrid > :nth-child(3n+3)::before { border-color:#987329; background:radial-gradient(circle at 35% 28%,#ffe38d,#d8ae3f 55%,#89671e 60%); }
+.whiteboardMode button.worldChoice:hover,
+.whiteboardMode button.featureCard:hover:not(:disabled) { border:0; background:linear-gradient(150deg,rgba(255,255,255,.54),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 4px 0 rgba(101,82,44,.22),9px 14px 21px rgba(65,55,40,.24); transform:translateY(-3px) rotate(0); }
+.whiteboardMode .worldChoice.selected { --notePaper:#d9f0c9; box-shadow:inset 0 0 0 3px rgba(54,126,79,.62),2px 3px 0 rgba(63,103,61,.27),7px 10px 18px rgba(65,55,40,.18); }
+.whiteboardMode .worldChoice.selected::after { content:"✓"; position:absolute; right:8px; top:4px; width:25px; height:25px; display:grid; place-items:center; border:3px solid #3f8259; border-radius:50%; color:#3f8259; font:950 18px/1 "KaiTi",sans-serif; transform:rotate(-12deg); }
+.whiteboardMode .choiceTop strong { color:#30464a; font-family:"KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; font-size:13px; }
+.whiteboardMode [data-directive-id] .choiceTop strong { color:color-mix(in srgb,var(--noteInk) 58%,#19353b); }
+.whiteboardMode .choiceTop span { color:#7a504c; font:800 8px/1.2 "KaiTi","STKaiti",sans-serif; }
+.whiteboardMode .worldChoice p { margin:7px 0 0; color:#3e4c4b; font:700 10px/1.45 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; }
+.whiteboardMode .featureCard:disabled { opacity:.48; filter:saturate(.55); }
+.whiteboardMode .chip { border:1px solid rgba(71,91,88,.22); border-radius:2px; color:#38545a; background:rgba(255,255,255,.35); font-weight:800; }
+.whiteboardMode .choiceFooter { margin-top:10px; padding:8px 10px; border:0; border-top:3px solid rgba(49,95,125,.2); border-radius:0; color:#43565a; background:transparent; box-shadow:none; }
+.whiteboardMode .choiceFooter > span { color:#486067; font-family:"KaiTi","STKaiti",sans-serif; font-size:10px; font-weight:900; }
+.whiteboardMode .choiceFooter > b { color:#a4484b; }
+.whiteboardMode .note { border:0; border-radius:1px; color:#365647; background:#dcefc5; box-shadow:2px 3px 0 rgba(74,98,58,.2); transform:rotate(.3deg); }
+.whiteboardMode .miniButton { min-height:44px; border:1px solid #9b832f; border-radius:3px; color:#4f411c; background:linear-gradient(#ffeb87,#d6b948); text-shadow:0 1px rgba(255,255,255,.58); box-shadow:inset 0 1px rgba(255,255,255,.62),0 3px 0 #8c7426,0 6px 10px rgba(55,46,25,.22); }
+.whiteboardMode .miniButton:active { transform:translateY(3px); box-shadow:inset 0 2px 4px rgba(94,74,18,.32),0 1px 0 #8c7426; }
+.whiteboardMode .dangerButton { min-height:44px; border:3px double #a74648; border-radius:2px; color:#a74648; background:rgba(255,245,229,.5); font-family:"KaiTi","STKaiti",sans-serif; text-shadow:none; box-shadow:none; transform:rotate(-.5deg); }
+.whiteboardMode select { width:100%; margin-top:9px; padding:8px 9px; border:1px solid #879592; border-radius:2px; color:#30464a; background:rgba(255,255,255,.7); font:800 10px/1.2 "Microsoft YaHei UI",sans-serif; box-shadow:inset 0 1px 3px rgba(44,62,58,.16); }
+.whiteboardMarkerSet { position:sticky; z-index:6; bottom:-10px; height:24px; display:flex; justify-content:flex-end; align-items:end; gap:8px; margin-top:10px; padding-right:8%; pointer-events:none; }
+.whiteboardMarkerSet i { width:82px; height:10px; border:1px solid #1d3f52; border-radius:6px 2px 2px 6px; background:linear-gradient(180deg,#477897,#234f69); box-shadow:inset 0 1px rgba(255,255,255,.3),2px 3px 3px rgba(0,0,0,.22); transform:rotate(-1deg); }
+.whiteboardMarkerSet i:nth-child(2) { width:71px; border-color:#762b2e; background:linear-gradient(#d56b6c,#a83e42); transform:rotate(1deg); }
+.whiteboardMarkerSet i:nth-child(3) { width:64px; border-color:#202726; background:linear-gradient(#535b58,#252b2a); transform:rotate(-.4deg); }
+.whiteboardMarkerSet b { width:44px; height:18px; border:1px solid #555d5b; border-radius:3px; background:linear-gradient(#eff0e9 0 42%,#55656a 43%); box-shadow:2px 3px 3px rgba(0,0,0,.22); }
+
 @media (max-height: 540px) and (orientation: landscape) {
+  .modalLayer.whiteboardMode .worldPanel { width:min(1030px,98vw); max-height:96vh; border-width:6px; }
+  .modalLayer.whiteboardMode .worldPanel > header { min-height:44px; padding:4px 10px; }
+  .modalLayer.whiteboardMode .worldPanel h2 { font-size:16px; }
+  .modalLayer.whiteboardMode .closeButton { width:44px; height:44px; min-width:44px; }
+  .modalLayer.whiteboardMode .sheetBody { max-height:calc(96vh - 55px); padding:6px 10px 11px; }
+  .projectWhiteboardScene { min-height:0; padding-bottom:17px; }
+  .whiteboardBoardMeta { top:-41px; }
+  .whiteboardMode .panelIntro { margin-bottom:5px; font-size:11px; }
+  .whiteboardMode .worldGrid { gap:7px; }
+  .whiteboardMode .worldChoice,.whiteboardMode .featureCard { min-height:70px; padding:14px 9px 8px; }
+  .whiteboardMode .worldChoice p { margin-top:4px; font-size:7px; }
+  .whiteboardMode .choiceFooter { margin-top:5px; padding:4px 7px; }
+  .whiteboardMode .sectionHeading { margin:5px 0 3px; }
+  .whiteboardMarkerSet { height:15px; margin-top:5px; }
+  .whiteboardMarkerSet i { width:55px; height:7px; }
+  .whiteboardMarkerSet b { width:32px; height:13px; }
+  .modalLayer.whiteboardMode .worldPanel::after { bottom:-19px; height:19px; }
   .modalLayer.monthCloseMode .worldPanel { width: min(710px, 96vw); }
   .monthCloseMode .worldPanel > header { padding: 7px 11px 6px; }
   .monthCloseMode .worldPanel h2 { font-size: 15px; }

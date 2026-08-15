@@ -42,13 +42,16 @@ const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function
 assert.match(directiveBlock, /data-feature-source/, "the project whiteboard owns the feature-proposal entry");
 assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");
+assert.match(directiveBlock, /\{ mode: "whiteboard" \}/, "project direction must open on the physical whiteboard surface");
 
 const customizationBlock = script.match(/function OpenCustomizationSheet[\s\S]*?function OpenFeatureSourceSheet/)?.[0] || "";
 assert.match(customizationBlock, /state\.project\.age < 1/, "direct feature customization must keep the early-stage gate");
 assert.match(customizationBlock, /PROJECT WHITEBOARD/, "feature proposals should retain their whiteboard context");
+assert.match(customizationBlock, /\{ mode: "whiteboard" \}/, "feature proposals must stay on the physical whiteboard surface");
 
 const featureSourceBlock = script.match(/function OpenFeatureSourceSheet[\s\S]*?function OpenHomeComputerSheet/)?.[0] || "";
 assert.doesNotMatch(featureSourceBlock, /mode: "computer"/, "the project whiteboard must not reuse the computer surface");
+assert.match(featureSourceBlock, /mode: "whiteboard"/, "proposal ownership must stay on the physical whiteboard surface");
 
 const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
 assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
