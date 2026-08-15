@@ -19,6 +19,8 @@ import {
   GetMarketSnapshot,
   GetAnxietyState,
   GetOwnerHairStage,
+  GetOwnerRestRelief,
+  GetOwnerTaskAnxietyCost,
   GetFounderSkillEffect,
   GetStockAccountAccess,
   HireStaff,
@@ -531,6 +533,7 @@ function HasRecordedId(collection, id) {
   assert.equal(close.state.stockPosition, null, "the position must close when the turn advances");
   assert.equal(close.state.stockHistory.length, 1);
   assert.equal(close.state.gameRevenue, beforeStockRevenue, "stock returns must not count toward the game-revenue goal");
+  assert.equal(close.anxiety.delta, close.state.anxiety - order.state.anxietyAtMonthStart, "the complete monthly anxiety report must include the delayed stock outcome");
   assert.equal(ValidateState(close.state), true, "a state containing stock history and chart points must remain saveable");
 }
 
@@ -744,6 +747,7 @@ function HasRecordedId(collection, id) {
   const broken = Begin();
   broken.cash = 1_000_000;
   broken.anxiety = 10;
+  broken.anxietyAtMonthStart = 10;
   broken.project.modules = { art: 12, design: 12, client: 12, performance: 12 };
   broken.project.scopeDebt = 10;
   broken.project.technicalDebt = 80;
@@ -754,6 +758,7 @@ function HasRecordedId(collection, id) {
   assert.equal(result.ok, true);
   assert.equal(result.buildStatus.level, "broken", "a failed build must remain visibly broken");
   assert(result.state.anxiety > before, "a broken build and wasted work must increase anxiety");
+  assert(result.anxiety.delta >= 8 && result.anxiety.delta <= 15, "a catastrophic build must remain a high-pressure month even when all owner energy is rested");
 }
 
 {
@@ -805,8 +810,8 @@ function HasRecordedId(collection, id) {
   );
   assert.deepEqual(
     relaxationVenues.map((venue) => venue.minimumCash),
-    [50_000, 300_000, 1_000_000],
-    "each relaxation tier must expose a materially higher cash-admission threshold",
+    [1_200, 300_000, 1_000_000],
+    "ordinary recovery must only require its real price while luxury tiers remain wealth-gated",
   );
 
   let state = Begin();
@@ -814,6 +819,9 @@ function HasRecordedId(collection, id) {
   assert.equal(GetConsumerVenueAccess(state, "regularFootbath").ok, true, "startup cash must unlock the ordinary footbath");
   assert.equal(GetConsumerVenueAccess(state, "footbathCity").ok, false, "startup cash must not unlock footbath city");
   assert.equal(GetConsumerVenueAccess(state, "maleModelClub").ok, false, "startup cash must not unlock the male-model club");
+  state.cash = 1_200;
+  assert.equal(GetConsumerVenueAccess(state, "regularFootbath").ok, true, "ordinary recovery must remain available without a hidden wealth gate");
+  state.cash = 68_000;
 
   const regularVisit = VisitRelaxationVenue(state, "regularFootbath");
   assert.equal(regularVisit.ok, true);
@@ -852,7 +860,8 @@ function HasRecordedId(collection, id) {
   const oldSave = structuredClone(state);
   delete oldSave.lastRelaxationMonth;
   delete oldSave.relaxationHistory;
-  assert.equal(ValidateState(oldSave), true, "pre-relaxation v9 saves must remain valid for UI normalization");
+  delete oldSave.anxietyAtMonthStart;
+  assert.equal(ValidateState(oldSave), true, "pre-rebalance v9 saves must remain valid for UI normalization");
 }
 
 {
@@ -1056,7 +1065,9 @@ function HasRecordedId(collection, id) {
     assert(result.state.project.bugs > before.bugs, "owner work must add bugs");
     assert(result.state.project.scopeDebt > before.scopeDebt, "owner work must add scope debt");
     assert(result.state.project.technicalDebt > before.technicalDebt, "owner work must add technical debt");
-    assert(result.state.hunger >= 7 && result.state.anxiety >= 5, "owner work must consume the owner's energy");
+    assert.equal(result.anxietyCost, 1, "the first owner task must add only one anxiety");
+    assert.equal(result.state.hunger, state.hunger + 7, "owner work must consume the owner's energy");
+    assert.equal(result.state.anxiety, state.anxiety + 1, "the first owner task must use the escalating anxiety schedule");
   }
 
   const invalidState = Begin();
@@ -1065,11 +1076,21 @@ function HasRecordedId(collection, id) {
   assert.equal(invalid.state.ownerWorkCount, 0);
 
   let limitedState = Begin();
+  const anxietyBeforeThreeTasks = limitedState.anxiety;
+  const anxietyCosts = [];
   for (let workIndex = 0; workIndex < 3; workIndex += 1) {
     const result = PerformOwnerTask(limitedState, "design");
     assert.equal(result.ok, true, "the first three owner tasks in a month must work");
+    anxietyCosts.push(result.anxietyCost);
     limitedState = result.state;
   }
+  assert.deepEqual(anxietyCosts, [1, 2, 5], "owner task anxiety must escalate across the month's three energy slots");
+  assert.equal(limitedState.anxiety, anxietyBeforeThreeTasks + 8, "three owner tasks must add eight anxiety in total instead of fifteen");
+  assert.equal(GetOwnerTaskAnxietyCost(0), 1);
+  assert.equal(GetOwnerTaskAnxietyCost(1), 2);
+  assert.equal(GetOwnerTaskAnxietyCost(2), 5);
+  assert.equal(GetOwnerRestRelief(0), 9);
+  assert.equal(GetOwnerRestRelief(2), 3);
   assert.equal(limitedState.ownerWorkCount, 3);
   const fourth = PerformOwnerTask(limitedState, "design");
   assert.equal(fourth.ok, false, "a fourth owner task in one month must be rejected");
@@ -1090,11 +1111,60 @@ function HasRecordedId(collection, id) {
   assert.equal(starvation.state.outcome?.kind, "starvation");
 
   const anxious = Begin();
-  anxious.anxiety = 95;
+  anxious.anxiety = 99;
   const breakdown = PerformOwnerTask(anxious, "client");
   assert.equal(breakdown.ok, true);
   assert.equal(breakdown.state.status, "gameover", "owner work can trigger a mental breakdown");
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
+}
+
+{
+  const StartRealRun = (anxiety = 18) => {
+    const state = StartProject(CreateInitialState(), "zeroGStore", "online", { studioName: "真实工作室", projectName: "真实开局" }).state;
+    state.anxiety = anxiety;
+    state.anxietyAtMonthStart = anxiety;
+    return state;
+  };
+  const WorkWeakestTwice = (currentState) => {
+    let state = currentState;
+    for (let workIndex = 0; workIndex < 2; workIndex += 1) {
+      const moduleKey = Object.entries(state.project.modules).sort((left, right) => left[1] - right[1])[0][0];
+      const result = PerformOwnerTask(state, moduleKey);
+      assert.equal(result.ok, true);
+      state = result.state;
+    }
+    return state;
+  };
+
+  let normal = WorkWeakestTwice(StartRealRun());
+  const normalBefore = normal.anxietyAtMonthStart;
+  const normalMonth = AdvanceMonth(normal);
+  assert(normalMonth.anxiety.delta >= -3 && normalMonth.anxiety.delta <= 3, `a normal two-task month must stay near neutral, got ${normalMonth.anxiety.delta}`);
+  assert.equal(normalMonth.anxiety.delta, normalMonth.state.anxiety - normalBefore, "the month report must include actions, food, rest, and settlement in one anxiety delta");
+  assert.equal(normalMonth.anxiety.restRelief, 3, "one unused owner-energy slot must recover three anxiety");
+
+  let overworked = StartRealRun();
+  for (let workIndex = 0; workIndex < 3; workIndex += 1) {
+    const moduleKey = Object.entries(overworked.project.modules).sort((left, right) => left[1] - right[1])[0][0];
+    overworked = PerformOwnerTask(overworked, moduleKey).state;
+  }
+  const overworkMonth = AdvanceMonth(overworked);
+  assert(overworkMonth.anxiety.delta >= 8 && overworkMonth.anxiety.delta <= 15, `a fully overworked month must be visibly dangerous, got ${overworkMonth.anxiety.delta}`);
+  assert.equal(overworkMonth.anxiety.restRelief, 0);
+
+  let recovering = StartRealRun(60);
+  for (let monthIndex = 0; monthIndex < 3; monthIndex += 1) {
+    const visit = VisitRelaxationVenue(recovering, "regularFootbath");
+    assert.equal(visit.ok, true, `ordinary recovery must remain affordable in real month ${monthIndex + 1}`);
+    recovering = WorkWeakestTwice(visit.state);
+    const month = AdvanceMonth(recovering);
+    assert.equal(month.ok, true);
+    assert(month.anxiety.delta < 0, `ordinary recovery must visibly lower the complete month ledger in month ${monthIndex + 1}`);
+    recovering = month.state;
+  }
+  assert(recovering.anxiety < 42, `a real-cash, no-free-workstation route must recover from 60 below the anxiety threshold, got ${recovering.anxiety}`);
+  assert(recovering.cash > 0, "the recovery route must use the real startup cash instead of a gifted test bankroll");
+  assert.equal(recovering.workstations, 0, "the recovery route must not receive free workstations");
 }
 
 console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");

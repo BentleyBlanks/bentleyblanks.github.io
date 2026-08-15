@@ -759,7 +759,7 @@ export const CONSUMER_VENUES = [
     interactionId: "regularFootbathCounter",
     category: "relaxation",
     name: "普通足浴店",
-    minimumCash: 50000,
+    minimumCash: 1200,
     cost: 1200,
     anxietyRelief: 8,
     description: "消费 ¥1,200，焦虑 -8。",

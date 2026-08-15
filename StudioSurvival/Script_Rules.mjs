@@ -32,7 +32,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815ab";
+} from "./Data_Game.mjs?v=20260815aj";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -50,12 +50,24 @@ export const OWNER_HAIR_STAGES = Object.freeze({
   thinning: "thinning",
   bald: "bald",
 });
+export const OWNER_TASK_ANXIETY_COSTS = Object.freeze([1, 2, 5]);
+export const OWNER_REST_RELIEF_PER_UNUSED_ENERGY = 3;
 
 export function GetOwnerHairStage(monthValue) {
   const month = Math.max(1, Math.floor(Number(monthValue) || 1));
   if (month >= 19) return OWNER_HAIR_STAGES.bald;
   if (month >= 13) return OWNER_HAIR_STAGES.thinning;
   return OWNER_HAIR_STAGES.full;
+}
+
+export function GetOwnerTaskAnxietyCost(completedTaskCount) {
+  const taskIndex = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_TASK_ANXIETY_COSTS.length - 1);
+  return OWNER_TASK_ANXIETY_COSTS[taskIndex];
+}
+
+export function GetOwnerRestRelief(completedTaskCount) {
+  const completed = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_TASK_ANXIETY_COSTS.length);
+  return (OWNER_TASK_ANXIETY_COSTS.length - completed) * OWNER_REST_RELIEF_PER_UNUSED_ENERGY;
 }
 
 export const FOUNDER_SKILL_POINTS = 9;
@@ -410,6 +422,7 @@ export function CreateInitialState() {
     month: 1,
     ownerWorkMonth: 1,
     ownerWorkCount: 0,
+    anxietyAtMonthStart: 18,
     revenueGoal: 10000000000,
     gameRevenue: 0,
     cash: STARTUP_LOAN_TERMS.principal,
@@ -465,6 +478,7 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   const studioName = CleanName(identity.studioName || state.studioName, "没想好工作室");
   const projectName = CleanName(identity.projectName, "第一款游戏", 20);
   state.status = "playing";
+  state.anxietyAtMonthStart = state.anxiety;
   state.studioName = studioName;
   state.founderSkills = NormalizeFounderSkills(identity.founderSkills || state.founderSkills);
   state.startupLoan ||= {
@@ -1200,32 +1214,56 @@ function ProcessFinances(state) {
   };
 }
 
-function ResolveMonthlyAnxiety(state, production, finance, tensions) {
-  const before = state.anxiety;
-  if (state.status !== "playing") return { before, after: before, delta: 0, idea: null };
-  let delta = production.wastedTotal * 0.32;
-  if (production.buildStatus.level === "broken") delta += 9;
-  else if (production.buildStatus.level === "fragile") delta += 4;
-  else if (production.buildStatus.level === "stable") delta -= 4;
-  delta += tensions.filter((tension) => tension.severity === "critical").length * 3;
-  delta += tensions.filter((tension) => tension.severity === "warning").length * 1.2;
-  delta += finance.defaults.length * 10;
-  delta += finance.removedStaff.length * 6;
-  delta += finance.shortfall > 0 ? 12 : 0;
-  delta += finance.skippedFood ? 4 : 0;
-  if (state.cash < finance.costs.total) delta += 3;
-  if (state.selectedDirective === "integration") delta -= 3;
-  if (state.selectedDirective === "cutScope") delta -= 2;
-  if (state.project.isReleased && finance.income > finance.costs.total) delta -= 4;
-  delta = Clamp(delta, -9, 28);
-  state.anxiety = Clamp(state.anxiety + delta, 0, 100);
+function ResolveMonthlyAnxiety(state, production, finance, tensions, monthStartAnxiety) {
+  const before = Clamp(Number(monthStartAnxiety) || 0, 0, 100);
+  const settlementBefore = state.anxiety;
+  const restRelief = GetOwnerRestRelief(state.ownerWorkCount);
+  if (state.status !== "playing") {
+    const after = state.anxiety;
+    return { before, settlementBefore, after, delta: after - before, settlementDelta: 0, restRelief: 0, idea: null };
+  }
+
+  const catastrophicBuild = production.buildStatus.level === "broken"
+    && (state.project.scopeDebt > 46 || state.project.technicalDebt > 46 || state.project.bugs > 32);
+  const buildPressure = catastrophicBuild ? 18
+    : production.buildStatus.level === "broken" ? 3
+      : production.buildStatus.level === "fragile" ? 1.5
+        : production.buildStatus.level === "stable" ? -3
+          : 0;
+  const tensionPressure = tensions.some((tension) => tension.severity === "critical") ? 3
+    : tensions.some((tension) => tension.severity === "warning") ? 1
+      : 0;
+  const financePressure = finance.defaults.length ? 20
+    : finance.shortfall > 0 ? 18
+      : finance.removedStaff.length ? 12
+        : finance.skippedFood ? 6
+          : state.cash < finance.costs.total ? 1
+            : 0;
+  const positivePressure = Math.max(0, buildPressure, tensionPressure, financePressure);
+  const conditionDelta = positivePressure > 0 ? positivePressure : buildPressure;
+
+  let settlementDelta = Math.min(4, production.wastedTotal * 0.1) + conditionDelta - restRelief;
+  if (state.selectedDirective === "integration") settlementDelta -= 3;
+  if (state.selectedDirective === "cutScope") settlementDelta -= 2;
+  if (state.project.isReleased && finance.income > finance.costs.total) settlementDelta -= 4;
+  settlementDelta = Clamp(settlementDelta, -10, 20);
+  state.anxiety = Clamp(state.anxiety + settlementDelta, 0, 100);
   const idea = TryAbstractBreakthrough(state);
   CheckAnxietyFailure(state);
   const after = state.anxiety;
-  if (Math.abs(after - before) >= 5) {
+  const delta = after - before;
+  if (Math.abs(delta) >= 5) {
     PushLog(state, `老板焦虑 ${after > before ? "+" : ""}${Math.round(after - before)}，当前 ${Math.round(after)} / 100：${GetAnxietyState(after).label}。`, after > before ? "warning" : "good");
   }
-  return { before, after, delta: after - before, idea };
+  return {
+    before,
+    settlementBefore,
+    after,
+    delta,
+    settlementDelta: after - settlementBefore,
+    restRelief,
+    idea,
+  };
 }
 
 function EvaluateFeatureDelivery(project) {
@@ -1562,6 +1600,7 @@ export function ReleaseBuild(currentState) {
 export function AdvanceMonth(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing" || !state.project) return { state, ok: false, message: "当前不能推进月份。" };
+  const monthStartAnxiety = Number.isFinite(state.anxietyAtMonthStart) ? state.anxietyAtMonthStart : state.anxiety;
   const stockSettlement = ResolveStockPosition(state);
   const finance = ProcessFinances(state);
   const production = state.status === "playing"
@@ -1579,7 +1618,7 @@ export function AdvanceMonth(currentState) {
     };
   const output = production.output;
   const tensions = CalculateTensions(state.project);
-  const anxiety = ResolveMonthlyAnxiety(state, production, finance, tensions);
+  const anxiety = ResolveMonthlyAnxiety(state, production, finance, tensions, monthStartAnxiety);
   const directive = FindDirective(state.selectedDirective);
   if (state.status === "playing") {
     const tensionText = tensions[0]?.title || "四组暂时没有互相拉黑";
@@ -1605,6 +1644,7 @@ export function AdvanceMonth(currentState) {
     state.month += 1;
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
+    state.anxietyAtMonthStart = state.anxiety;
     const currentHairStage = GetOwnerHairStage(state.month);
     if (currentHairStage !== previousHairStage) {
       PushLog(
@@ -2166,6 +2206,7 @@ export function PerformOwnerTask(currentState, moduleKey) {
 
   const effect = OWNER_TASK_EFFECTS[moduleKey];
   const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
+  const anxietyCost = GetOwnerTaskAnxietyCost(state.ownerWorkCount);
   const before = state.project.modules[moduleKey];
   const baseGain = 2 + Math.floor(SeededUnit(
     state.seed + state.month * 137 + state.ownerWorkCount * 17 + moduleKey.length * 31,
@@ -2180,7 +2221,7 @@ export function PerformOwnerTask(currentState, moduleKey) {
   state.ownerWorkCount += 1;
   state.ownerWorkMonth = state.month;
   state.hunger = Clamp(state.hunger + 7, 0, 100);
-  state.anxiety = Clamp(state.anxiety + 5, 0, 100);
+  state.anxiety = Clamp(state.anxiety + anxietyCost, 0, 100);
   PushLog(state, `${effect.line} ${skillEffect.skillKey} ${skillEffect.level} 级让进度 +${gain.toFixed(1)}，返工系数 ×${skillEffect.riskMultiplier.toFixed(2)}。`, "warning");
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
@@ -2190,6 +2231,7 @@ export function PerformOwnerTask(currentState, moduleKey) {
     moduleKey,
     skillEffect,
     gain,
+    anxietyCost,
     message: `老板以 ${skillEffect.skillKey} ${skillEffect.level} 级完成 ${moduleKey} 工位：进度 +${gain.toFixed(1)}。`,
   };
 }
@@ -2342,6 +2384,8 @@ export function ValidateState(candidate) {
     .every(Number.isFinite)) return false;
   if (candidate.cash < 0 || candidate.gameRevenue < 0 || candidate.arrears < 0
     || candidate.anxiety < 0 || candidate.anxiety > 100 || candidate.hunger < 0 || candidate.hunger > 100) return false;
+  if (candidate.anxietyAtMonthStart !== undefined
+    && (!Number.isFinite(candidate.anxietyAtMonthStart) || candidate.anxietyAtMonthStart < 0 || candidate.anxietyAtMonthStart > 100)) return false;
   if (!FindFoodPlan(candidate.foodPlan) || !FindDirective(candidate.selectedDirective)) return false;
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)

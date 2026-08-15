@@ -24,7 +24,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815ab";
+} from "./Data_Game.mjs?v=20260815aj";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -44,6 +44,8 @@ import {
   GetIdleLine,
   GetMemberMonthlyCost,
   GetOwnerHairStage,
+  GetOwnerRestRelief,
+  GetOwnerTaskAnxietyCost,
   GetStockAccountAccess,
   HireStaff,
   OWNER_HAIR_STAGES,
@@ -68,7 +70,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815ab";
+} from "./Script_Rules.mjs?v=20260815aj";
 import {
   FindLocation,
   FindLocationAt,
@@ -147,6 +149,7 @@ function LoadSavedState() {
     candidate.stockHistory ??= [];
     candidate.lastRelaxationMonth ??= 0;
     candidate.relaxationHistory ??= [];
+    candidate.anxietyAtMonthStart ??= candidate.lastSettlement?.anxiety?.after ?? candidate.anxiety;
     if (candidate.project) {
       candidate.project.marketStrategy = { focusId: "concept", directionId: null, setMonth: 0 };
       candidate.project.marketStrategyHistory = [];
@@ -3264,6 +3267,7 @@ function OpenHomeComputerSheet() {
   const evaluation = EvaluateProject(state);
   const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
   const energyLeft = 3 - energyUsed;
+  const nextAnxietyCost = GetOwnerTaskAnxietyCost(energyUsed);
   const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
   const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
   const averageProgress = moduleValues.reduce((sum, item) => sum + item.value, 0) / moduleValues.length;
@@ -3272,7 +3276,7 @@ function OpenHomeComputerSheet() {
     ? state.project.age === 0 ? "先做出能运行的第一版" : "把本月精力投进最薄弱的部分"
     : "本月精力已经用完";
   const objectiveDetail = energyLeft > 0
-    ? `还剩 ${energyLeft} 格。每点一次开发，就会投入 1 格精力并立刻推进对应模块。`
+    ? "焦虑 +1 / +2 / +5；未用每格月结 −3。"
     : "关掉电脑，去项目日历核账；也可点右下角“下一回合”。";
   OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <div class="computerDeskScene">
@@ -3300,11 +3304,10 @@ function OpenHomeComputerSheet() {
                   return `<button class="energyModule ${isRecommended ? "recommended" : ""}" style="--moduleColor:${meta.color}" data-energy-module="${moduleKey}" type="button" ${energyLeft <= 0 ? "disabled" : ""}>
                     <div class="energyModuleTop"><span>${meta.icon}</span><strong>${meta.label}</strong>${isRecommended ? "<b>建议优先</b>" : ""}</div>
                     <div class="moduleProgress"><i style="width:${Clamp(value, 0, 100)}%"></i></div>
-                    <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? "投入 1 格" : "等待下月"}</strong></footer>
+                    <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? `投入 1 格 · 焦虑 +${nextAnxietyCost}` : "等待下月"}</strong></footer>
                   </button>`;
                 }).join("")}
               </div>
-              <p class="workCostNote">老板亲自开发每次获得 2–4 点进度，同时增加饥饿、焦虑和少量债务。四项差距太大时，成品会互相拖累。</p>
             </section>
 
             ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
@@ -3334,8 +3337,8 @@ function OpenHomeComputerSheet() {
       if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
       const left = Math.max(0, 3 - state.ownerWorkCount);
       ShowToast(left > 0
-        ? `已把 1 格精力投入${MODULE_META[moduleKey].label}，本月还剩 ${left} 格。`
-        : "本月 3 格精力已经用完。打开项目日历或点“下一回合”。", left > 0 ? "good" : "warning");
+        ? `${MODULE_META[moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost} · 余 ${left} 格`
+        : `${MODULE_META[moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}`, left > 0 ? "good" : "warning");
       OpenHomeComputerSheet();
     };
   }, { mode: "computer" });
@@ -4019,8 +4022,8 @@ function OpenReleaseSheet() {
 function GetMonthCloseActions() {
   const actions = [];
   const ownerWorkRemaining = Math.max(0, 3 - state.ownerWorkCount);
-  if (ownerWorkRemaining > 0) actions.push(`亲自开发 ${ownerWorkRemaining} 次`);
-  if (state.talkPoints > 0) actions.push(`沟通 / 拍板 ${state.talkPoints} 次`);
+  if (ownerWorkRemaining > 0) actions.push(`休息 ${ownerWorkRemaining} 格 · 焦虑 −${GetOwnerRestRelief(state.ownerWorkCount)}`);
+  if (state.talkPoints > 0) actions.push(`沟通 / 拍板可选 ${state.talkPoints} 次`);
   if (state.project.age >= 2 && state.project.lastReleaseMonth !== state.month) {
     actions.push(state.project.isReleased ? "可发布更新" : "可提交商店");
   }
@@ -4040,6 +4043,7 @@ function GetMonthResultHighlights(result, finance) {
     highlights.push(`市场：${finance.marketFit.label}，${finance.marketDelta >= 0 ? "+" : "−"}${FormatGoalMoney(Math.abs(finance.marketDelta))}。`);
   }
   if (result.anxiety.idea) highlights.push(`焦虑催生新点子：${result.anxiety.idea.title}。`);
+  if (result.anxiety.restRelief > 0) highlights.push(`休息恢复：焦虑 −${result.anxiety.restRelief}。`);
   highlights.push(...(result.painEvents || []));
   return [...new Set(highlights)].slice(0, 2);
 }
@@ -4112,13 +4116,13 @@ function OpenMonthSheet() {
       </section>` : ""}
       ${startupLoan?.status === "active" ? `<div class="monthCloseDeadline"><span>启动贷</span><strong>${FormatMoney(startupLoan.remaining)}</strong><em>M${String(startupLoan.dueMonth).padStart(2, "0")} · 剩 ${monthsLeft} 月</em></div>` : ""}
       ${state.stockPosition ? `<div class="monthClosePosition"><span>股票待收盘</span><strong>${EscapeHtml(pendingStock?.symbol || state.stockPosition.optionId)}</strong><em>本金 ${FormatMoney(state.stockPosition.stake)}</em></div>` : ""}
-      <section class="monthCloseTasks ${hasOpenActions ? "attention" : "clear"}" aria-live="polite">
-        <header><span>月结前检查</span><strong>${hasOpenActions ? `还有 ${openActions.length} 类可做` : "本月事项已清"}</strong></header>
+      <section class="monthCloseTasks clear" aria-live="polite">
+        <header><span>月结预览</span><strong>${hasOpenActions ? `${openActions.length} 项` : "可封账"}</strong></header>
         ${hasOpenActions ? `<div>${openActions.map((action) => `<span>${EscapeHtml(action)}</span>`).join("")}</div>` : ""}
       </section>
       <button class="monthCloseConfirm" data-advance-month type="button">
-        <small>${hasOpenActions ? "放弃剩余行动" : "本月封账"}</small>
-        <strong>${hasOpenActions ? "仍然月结" : "确认月结"}</strong>
+        <small>按当前安排</small>
+        <strong>确认月结</strong>
         <span>进入 ${nextMonthLabel} →</span>
       </button>
     </div>`, () => {
