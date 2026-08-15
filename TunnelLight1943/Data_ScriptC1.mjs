@@ -690,8 +690,10 @@ export function ChapterC1(K) {
       // 路过三婶家的纺车、墙上的弹孔：**没有字幕，镜头不停**（八稿明令——
       // 七稿的两个停顿注视删了，看见就走）。
       kind: "chain", id: "c1_forage", timeOfDay: "day",
-      objective: "去牲口棚翻一翻", hint: "西头。棚顶塌了半边，地上压着焦木、苇席和破门板",
-      forage: { plank: 11.2, plankStyle: "beam", ash: 7.6 },
+      objective: "棚里翻翻，看有没有能下锅的",
+      hint: "西头那间棚。能翻的有三处：翻倒的食槽、压着苇席的那堆、墙根一片发白的烧土",
+      // 三处的坐标（World 照这三个数把三件东西画出来）。**先翻哪处玩家自己挑**
+      forage: { trough: 11.6, reed: 9.7, ash: 7.4 },
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）；序里的人早收干净了
         const sis = FindActor(state, "sister");
@@ -707,63 +709,94 @@ export function ChapterC1(K) {
         // note→toast；纺车连手记也砍了，它离弹孔墙才两米半，两句会互相顶掉）
         { type: "goto", zone: { x: 22.8, w: 2.2 },
           note: "贴告示那面墙上，一排弹孔。" },
-        { type: "goto", zone: { x: 12.4, w: 2.8 } },
-        // ① 推焦木：攥住露在外头的那一头往旁边拖。判定区给得宽（5m）：
-        // 拖的时候人是**退着走**的，区窄了会在最后一寸掉出判定区，链当场卡死
-        { type: "shiftPlank", zone: { x: 11.2, w: 5.0 },
-          note: "木头蹭着地，落下一层黑灰。底下露出半袋粮食。",
-          effect: (state) => { Cue(state, "flutter", { gain: 0.4, rate: 0.8 }); } },
-        // ② 解袋口看一眼：袋里全是谷种。娘的话在这儿响起来——不是回忆画面，
+        { type: "goto", zone: { x: 13.2, w: 2.8 },
+          note: "棚顶塌了半边。地上的东西一样样都还在，就是都埋了半截。" },
+        // ── 翻三处，顺序随玩家（2026-08-15 重做，解析见 Core 的 SearchSpotNow）──
+        // 老版是「推焦木」：拖一根横在地上的烧焦檩条，用户退回——「太奇怪了
+        // 解密也不算 也很不直观 我都不知道要操作这里 只有一个 hint」。
+        // 病根不在那根木头，在**链是一条直线**：这一场叫"找吃的"，可玩家只能
+        // 走到剧本指定的那一处、做剧本指定的那一下。现在三处各摆各的、各给
+        // 各的，先翻哪处自己挑；三处都翻过了才走。
+        { type: "searchAny",
+          idleAfter: 9,
+          idleNote: "过道当中的土是硬的。娘不会把东西埋在人走的地方——挨着墙根、压在东西底下找。",
+          note: "棚里能翻的都翻遍了。",
+          spots: [
+            // ① 翻倒的食槽：槽底那层秕谷壳一把一把扫进兜里。**最好懂的一处**，
+            // 也是从东边进棚第一眼就撞见的
+            {
+              key: "trough", x: 11.6, hintIcon: "dig",
+              note: "槽底扫出一小把秕谷壳。不多，撒进锅里能顶点数。",
+              effect: (state) => { state.flags.chaffGot = true; },
+              steps: [
+                { type: "scoopAsh", part: "trough", zone: { x: 11.6, w: 2.2 } },
+              ],
+            },
+            // ② 压着苇席的那堆：掀开是娘留的谷种。**全章的题眼在这儿**——
+            // 饿着的人把一袋能吃的谷种原样扎回去，道理由手做出来，不靠旁白
+            {
+              key: "reed", x: 9.7, hintIcon: "fold",
+              note: "谷种原样扎回去，苇席重新盖上。",
+              steps: [
+                { type: "heaveMat", part: "reed", zone: { x: 9.7, w: 2.2 },
+                  note: "席子底下压着半袋东西。",
+                  effect: (state) => { Cue(state, "flutter", { gain: 0.4, rate: 0.8 }); } },
+                // 解袋口看一眼：袋里全是谷种。娘的话在这儿响起来——不是回忆画面，
         // 是声音自己找上来的
-        { type: "use", zone: { x: 11.2, w: 2.8 }, prompt: "E · 解开袋口",
+                { type: "use", zone: { x: 9.7, w: 2.2 }, prompt: "E · 解开袋口",
           effect: (state) => {
             Cue(state, "clothLift", { gain: 0.5 });
             StartMicroCine(state, [
               { act: "柱子解开袋口。袋里全是谷种。", d: 3.2,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.3 },
+                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.3 },
                 on: (s) => { FlashPose(s, "kneel", 3.0); } },
               { who: "娘的声音", say: "留种。谁也不能动。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 } },
+                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 } },
               { act: "柱子捻起几粒谷种，看了一会。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.1 },
+                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 },
                 on: (s) => { FlashPose(s, "kneel", 2.8); } },
             ]);
           } },
-        // ③ 扎回袋口：拧紧、绕绳、压回砖下。这一下不靠旁白解释：饿着的人
-        // 把一袋**能吃的**谷种原样扎回去——留种是明年的命，道理由手做出来
-        { type: "use", zone: { x: 11.2, w: 2.8 }, hold: 1.6, stroke: "circle", gestureY: 0.55,
+                // 扎回袋口：拧紧、绕绳、压回砖下。这一下不靠旁白解释：饿着的人
+                // 把一袋**能吃的**谷种原样扎回去——留种是明年的命，道理由手做出来
+                { type: "use", zone: { x: 9.7, w: 2.2 }, hold: 1.6, stroke: "circle", gestureY: 0.55,
           pose: "twistTie", cue: "clothFold",
           prompt: "拧紧袋口 · 绕绳扎回去",
           effect: (state) => {
             state.flags.seedKept = true;
             StartMicroCine(state, [
               { act: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
-                cam: { kind: "insert", x: 11.2, y: 0.62, dist: 2.2 },
+                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.2 },
                 on: (s) => {
                   FlashPose(s, "kneel", 2.8);
                   Cue(s, "stoneLand", { gain: 0.35, delay: 1.6 });
                 } },
               { act: "柱子把苇席重新盖在粮种上。", d: 2.8,
-                cam: { kind: "shot", x: 11.4, y: 1.0, dist: 3.2 },
+                cam: { kind: "shot", x: 9.9, y: 1.0, dist: 3.2 },
                 on: (s) => {
                   FlashPose(s, "bow", 2.2);
                   Cue(s, "clothDrop", { gain: 0.5, delay: 0.8 });
                 } },
             ]);
           } },
-        // ④ 刨开灰堆：棚角一片松软的灰土。第一把是灰、第二把硬土拖不快、
-        // 第三把拽到半道手钉住（指甲碰上坛肩，不上屏一个字）——换方向
-        // 顺着坛肩横着抹三把，肩一段段露出来（机制账在 FORAGE.ash 头上）
-        { type: "scoopAsh", zone: { x: 7.6, w: 3.0 },
+              ],
+            },
+            // ③ 墙根一片发白的烧土：分层挖掘那套原样留着（浮灰滑／硬土拖不快／
+            // 第三把手钉住／顺着坛肩抹）——它本来就是这一处的内容
+            {
+              key: "ash", x: 7.4, hintIcon: "dig",
+              note: "十来片红薯干。够熬一锅。",
+              steps: [
+                { type: "scoopAsh", zone: { x: 7.4, w: 2.2 },
           note: "扒开周围的土——一个小口坛。坛口糊着泥，上面压着半块碗底。",
           effect: (state) => { state.flags.jarDug = true; } },
-        // ⑤ 抠开泥封、揭碗片（活卡）。碗片底下垫着一圈碎布——蓝底白花。
-        // 画面短暂切回娘跪在窖口的手臂（序里那半张脸的机位），再切回坛子
-        { type: "unwrapJar", zone: { x: 7.6, w: 3.0 },
+                // 抠开泥封、揭碗片（活卡）。碗片底下垫着一圈碎布——蓝底白花。
+                // 画面短暂切回娘跪在窖口的手臂（序里那半张脸的机位），再切回坛子
+                { type: "unwrapJar", zone: { x: 7.4, w: 2.2 },
           effect: (state) => {
             StartMicroCine(state, [
               { act: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
+                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
               // 闪回：娘跪在窖口的手臂（一秒出头，硬切）
               { act: "", d: 1.3,
                 cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
@@ -773,21 +806,24 @@ export function ChapterC1(K) {
                 } },
               // 再切回坛子
               { act: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
+                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.visible = false; m.pose = null; }
                 } },
               { act: "他将碎布叠好，揣进怀里。", d: 2.6,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 },
+                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
                 on: (s) => { FlashPose(s, "bow", 1.4); } },
               { act: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
-                cam: { kind: "insert", x: 7.6, y: 0.72, dist: 2.2 } },
+                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
             ]);
           } },
+              ],
+            },
+          ] },
         // worldDrawn：坛子由 DrawAshMound 画（挖到哪儿露哪儿），不许再预摆一份
         // 地面道具——那份从进拍第一帧就蹲在灰堆顶上，把"埋着"整个剧透掉
-        { type: "pickup", x: 7.6, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 抱起坛子",
+        { type: "pickup", x: 7.4, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 抱起坛子",
           worldDrawn: true,
           note: "坛子夹在胳膊底下，往回走。",
           effect: (state) => {
@@ -1653,7 +1689,11 @@ export function ChapterC1(K) {
             state.flags.mealCooked = true;
             state.stoveFire = true;   // 旗标在 effect 里落：跳幕过去灶也得是着过火的
             StartMicroCine(state, [
-              { act: "柱子把最后一把糜子倒进锅里。", d: 3.0,
+              // 秕谷壳只有在棚里扫过食槽才有（flags.chaffGot）：**玩家自己翻着的
+              // 那一样，得在锅里看得见**——不然"三处各有各的东西"只是三条 toast
+              { act: state.flags.chaffGot
+                ? "柱子把最后一把糜子倒进锅里，又把兜里那点秕谷壳抖进去。"
+                : "柱子把最后一把糜子倒进锅里。", d: 3.0,
                 cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.6 },
                 on: (s) => {
                   s.beat.indoorScene = true;

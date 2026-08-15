@@ -1595,10 +1595,52 @@ function StrokeWork(state, mem, input, dt, opts) {
 
 // 链式谜题：有序的一串步骤——拾取 / 使用 / 投中 / 交谈 / 推。
 // 单格物品栏：步骤自己管理手里那格；失败重置不清链、不清物品。
+/**
+ * 「几处任翻」当前该跑哪一小步（`type:"searchAny"`）。
+ *
+ * 2026-08-15 用户退回推焦木：「太奇怪了 解密也不算 也很不直观 我都不知道要
+ * 操作这里 只有一个 hint……玩家要亲身有感觉好像真的在自己找东西 也是自己
+ * 找到的一样」。**病根不在那根木头，在链是一条直线**：这一场叫"找吃的"，
+ * 可玩家能做的只有走到剧本指定的那一处、做剧本指定的那一下。
+ *
+ * 现在一处一条小链（`spots[].steps[]`），**玩家站在哪一处就跑哪一处**，
+ * 几处都翻过了这一整步才完。
+ *
+ * 只读：进度（每处翻到第几小步、哪几处翻完了）挂在 `beat.search` 上、由
+ * StepChain 建档——HUD 那两个调用方每帧都问，不许在它们手里凭空建状态。
+ *
+ * @returns {{spot, sub, near, left}} sub 为空 ＝ 人不在任何一处里，near 是最近的那处
+ */
+export function SearchSpotNow(state, st) {
+  const S = state.beat?.search || { sub: {}, done: {} };
+  const p = state.player;
+  const lvl = p.level || "surface";
+  const left = (st.spots || []).filter((s) => !S.done[s.key]);
+  if (!left.length) return { spot: null, sub: null, near: null, left };
+  // 同时站在两处的判定区里（挨得近的时候会有）：取近的那处
+  let best = null, bestD = Infinity;
+  for (const s of left) {
+    const sub = s.steps[S.sub[s.key] || 0];
+    const z = sub?.zone;
+    if (!z || (z.level || "surface") !== lvl) continue;
+    const d = Math.abs(p.x - z.x);
+    if (d <= z.w / 2 && d < bestD) { bestD = d; best = { spot: s, sub }; }
+  }
+  if (best) return { ...best, near: best.spot, left };
+  let near = left[0], nd = Infinity;
+  for (const s of left) {
+    const d = Math.abs(p.x - s.x);
+    if (d < nd) { nd = d; near = s; }
+  }
+  return { spot: null, sub: null, near, left };
+}
+
 function StepChain(state, def, input, dt) {
   const b = state.beat;
   if (b.stepIndex === undefined) { b.stepIndex = 0; b.holdP = 0; def.onStart?.(state); }
-  const st = def.steps[b.stepIndex];
+  // let 不是笔误：`searchAny` 会把当前步骤换成"玩家这会儿站的那一处"的小步骤，
+  // 底下那个几百行的 switch 与 finish() 因此一个字都不用改（见 SearchSpotNow）
+  let st = def.steps[b.stepIndex];
   if (!st) { AdvanceBeat(state); return; }
   const p = state.player;
   const lvl = p.level || "surface";
@@ -1672,10 +1714,13 @@ function StepChain(state, def, input, dt) {
     }
   }
 
+  let finStep = st;
+  let subDone = null;
   const finish = () => {
-    if (st.note) state.toast = { text: st.note, t: 4.5 };
-    if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);   // 口信也是情报，入账供第六章推理
-    st.effect?.(state);
+    if (finStep.note) state.toast = { text: finStep.note, t: 4.5 };
+    if (finStep.noteAdd) state.flags.notesSeen.push(finStep.noteAdd);   // 口信也是情报，入账供第六章推理
+    finStep.effect?.(state);
+    if (subDone) { subDone(); return; }                       // 小步骤：不推进外层的 stepIndex
     b.stepIndex += 1;
     b.holdP = 0;
     b.pipIdleT = 0;                // 链动了一步，"没动静"从头计
@@ -1704,6 +1749,45 @@ function StepChain(state, def, input, dt) {
         t: 3.2,
       };
     }
+  }
+
+  // 「几处任翻」：把当前活跃的那一处顶替成本帧要跑的小步骤
+  if (st.type === "searchAny") {
+    const owner = st;
+    if (!b.search) b.search = { sub: {}, done: {}, idle: 0 };
+    const r = SearchSpotNow(state, owner);
+    if (!r.sub) {
+      // 人不在任何一处里：**这会儿最容易迷路**（用户原话「我都不知道要操作
+      // 这里」）。站着不动久了递一句话，说的是"往哪儿翻"，不是"按哪个键"
+      b.search.idle += dt;
+      if (owner.idleNote && b.search.idle > (owner.idleAfter ?? 9) && !b.search.idleSaid) {
+        b.search.idleSaid = true;
+        state.toast = { text: owner.idleNote, t: 5.0 };
+      }
+      return;                       // 往哪儿走由画框边那张牌指（GetBeatTarget）
+    }
+    b.search.idle = 0;
+    const spot = r.spot;
+    st = r.sub;
+    finStep = r.sub;
+    subDone = () => {
+      const S = b.search;
+      S.sub[spot.key] = (S.sub[spot.key] || 0) + 1;
+      b.holdP = 0;
+      b.pipIdleT = 0;
+      input.interact = false;
+      if (S.sub[spot.key] >= spot.steps.length) {
+        S.done[spot.key] = true;
+        if (spot.note) state.toast = { text: spot.note, t: 4.8 };
+        spot.effect?.(state);
+      }
+      if ((owner.spots || []).every((s2) => S.done[s2.key])) {
+        if (owner.note) state.toast = { text: owner.note, t: 4.5 };
+        owner.effect?.(state);
+        b.stepIndex += 1;
+        if (b.stepIndex >= def.steps.length) AdvanceBeat(state);
+      }
+    };
   }
 
   switch (st.type) {
@@ -7073,8 +7157,18 @@ export function GetBeatTarget(state) {
       };
     }
     case "chain": {
-      const st = def.steps[state.beat.stepIndex || 0];
+      let st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;
+      // 几处任翻：不在任何一处里就先走过去（驱动器与画框边那张牌都读这一条）
+      if (st.type === "searchAny") {
+        const r = SearchSpotNow(state, st);
+        if (!r.sub) {
+          return r.near
+            ? { action: "walk", x: r.near.x, level: r.near.level || "surface", reach: 0.8 }
+            : null;
+        }
+        st = r.sub;
+      }
       switch (st.type) {
         case "pickup": return { action: "interactAt", x: st.x, level: st.level || "surface" };
         case "drop": return { action: "interactAt", x: st.zone.x, level: st.zone.level || "surface" };
@@ -7455,8 +7549,14 @@ export function BeatHintIcon(state) {
       return { kind: "dig" };
     }
     case "chain": {
-      const st = def.steps[state.beat.stepIndex || 0];
+      let st = def.steps[state.beat.stepIndex || 0];
       if (!st) return null;
+      if (st.type === "searchAny") {
+        const r = SearchSpotNow(state, st);
+        // 牌上画的是"下一处翻什么"——几处各有各的图，玩家一眼知道该找哪件东西
+        if (!r.sub) return NormHintIcon(r.near?.hintIcon || "hand");
+        st = r.sub;
+      }
       if (st.hintIcon) return NormHintIcon(st.hintIcon);
       switch (st.type) {
         case "pickup": case "pickupGround": return Item(st.item?.label);
