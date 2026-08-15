@@ -5526,22 +5526,35 @@ export function CreateWorld(canvasEl) {
   // 勇敢的心过场，黑是构图的一部分：墨线、暗角、逆光的门洞。
   //
   // 所以分级不是"加个滤镜"，是把这套渲染欠的那两档还回来，并且**只在过场还**
-  //（玩法段的辨识度靠亮，压黑会让人找不着路）。五件事：
+  //（玩法段的辨识度靠亮，压黑会让人找不着路）。四件事：
   //   ① 以 0.46 为轴提对比——轴要低于中灰，才吃得住这套偏亮的底；
-  //   ② 分离色调：暗部推向冷青灰（土屋的阴影是冷的）、亮部推向纸黄；
-  //   ③ 略去一点饱和（手绘水彩上屏容易过艳）；
-  //   ④ 重晕影——参考图四角全是压下去的；
-  //   ⑤ 一层很细的颗粒（纸纹），把大片平色的"塑料感"打散。
+  //   ② 略去一点饱和（手绘水彩上屏容易过艳）；
+  //   ③ 重晕影——参考图四角全是压下去的；
+  //   ④ 一层很细的颗粒（纸纹），把大片平色的"塑料感"打散。
   // 强度由 `SetCineGrade(k)` 给，0＝一个字节都不动（玩法段照旧原样）。
+  //
+  // **分离色调已整个拆掉（2026-08-15 用户退回：「过场动画的后处理变色太严重了，
+  // 只需要一些 dof、边缘的效果，但不能用大范围的偏色」）。** 原来暗部乘
+  // (0.88,0.95,1.14)、亮部乘 (1.06,1.00,0.88)：暗处红蓝差 26 个点推向冷青灰、
+  // 亮处红蓝差 18 个点推向纸黄，两头方向还相反——整幅画从暗到亮一路在换色相，
+  // 这就是"变色"。**从此这一遍后期只许动明度，不许动色相**：对比、晕影、颗粒
+  // 都是各通道等量的，`uSat` 只往灰里收（收到 0 就是彩色转黑白，那一档用户
+  // 明说可以）。要再加风格化，加在明度或饱和上，别再引入通道差。
   // =========================================================================
   let cineGrade = 0;
-  function SetCineGrade(k) { cineGrade = Math.max(0, Math.min(1, k || 0)); }
+  // 饱和：1＝原样，0＝全黑白。等量作用于三个通道，不产生色相偏移。
+  let cineSat = 0.90;
+  function SetCineGrade(k, sat) {
+    cineGrade = Math.max(0, Math.min(1, k || 0));
+    if (sat !== undefined) cineSat = Math.max(0, Math.min(1, sat));
+  }
   let gradeRT = null, gradeQuad = null, gradeScene = null, gradeCam = null;
   let gradeW = 0, gradeH = 0, gradeSeed = 0;
   const GRADE_SHADER = {
     uniforms: {
       uTex: { value: null },
       uK: { value: 1 },
+      uSat: { value: 0.90 },
       uPx: { value: new THREE.Vector2(1600, 900) },
       uSeed: { value: 0 },
     },
@@ -5552,29 +5565,34 @@ export function CreateWorld(canvasEl) {
     fragmentShader: `
       uniform sampler2D uTex;
       uniform float uK;
+      uniform float uSat;
       uniform vec2 uPx;
       uniform float uSeed;
       varying vec2 vUv;
       void main() {
         vec3 src = clamp(texture2D(uTex, vUv).rgb, 0.0, 1.0);
+        const vec3 W = vec3(0.299, 0.587, 0.114);
         // ① 对比走 S 曲线，**不走直线**。直线 (c-0.46)*1.4+0.40 在白天那几拍很漂亮，
         //    可它把 0.12 以下一律压成 0——序章收尾那间黑窖整幅变成纯黑，
         //    两个孩子看不见了（2026-08-14 实拍）。S 曲线两头都留得住。
-        vec3 c = mix(src, src * src * (3.0 - 2.0 * src), 0.70);
-        c = c * 0.97 + 0.012;                       // 抬一点黑位，暗部不糊死
-        // ② 分离色调：**只染不压**。第一版暗部乘 0.42（等于再暗一半），
-        //    暗场当场全军覆没——压是对比和晕影的活，不是色调的活
-        float l = dot(c, vec3(0.299, 0.587, 0.114));
-        vec3 lo = vec3(0.88, 0.95, 1.14);
-        vec3 hi = vec3(1.06, 1.00, 0.88);
-        c *= mix(lo, hi, smoothstep(0.05, 0.72, l));
-        // ③ 收一点饱和
-        c = mix(vec3(l), c, 0.90);
-        // ④ 晕影（横向略松，免得宽屏上两侧压成两条黑边）
+        //    **曲线打在明度上、再把原色按比例缩回去**（不是逐通道各跑一遍）：
+        //    逐通道跑会把本来就偏暖的色拉得更开——实测高光的红蓝差比玩法段
+        //    多出 15 个点，那也是一种"变色"，只不过来自对比而非色调。
+        //    按比例缩只动明暗，色相与饱和比例一个字节都不动。
+        float l0 = dot(src, W);
+        float lc = mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.70);
+        vec3 c = src * (lc / max(l0, 0.02));
+        c = clamp(c, 0.0, 1.0) * 0.97 + 0.012;      // 抬一点黑位（等量加，中性）
+        // ② 收饱和。这是**唯一**允许动颜色的一步，而它只往灰里走（uSat=0 就是
+        //    黑白）——不许再回到"暗部推冷、亮部推暖"那种通道差，那是变色
+        //    （2026-08-15 用户退回，见上面那段）。
+        float l = dot(c, W);
+        c = mix(vec3(l), c, uSat);
+        // ③ 晕影（横向略松，免得宽屏上两侧压成两条黑边）
         vec2 d = vUv - 0.5;
         float r = length(vec2(d.x * 0.94, d.y * 1.12));
         c *= 1.0 - smoothstep(0.26, 0.88, r) * 0.74;
-        // ⑤ 纸纹颗粒
+        // ④ 纸纹颗粒
         float n = fract(sin(dot(vUv * uPx + uSeed, vec2(12.9898, 78.233))) * 43758.5453);
         c += (n - 0.5) * 0.028;
         gl_FragColor = vec4(mix(src, clamp(c, 0.0, 1.0), uK), 1.0);
@@ -5707,6 +5725,7 @@ export function CreateWorld(canvasEl) {
       const u = gradeQuad.material.uniforms;
       u.uTex.value = gradeRT.texture;
       u.uK.value = cineGrade;
+      u.uSat.value = cineSat;
       u.uPx.value.set(gradeW, gradeH);
       // 颗粒每帧换一次种子会满屏爬虫，隔几帧换一次就够（也让无头实拍可复现）
       gradeSeed = (gradeSeed + 1) % 4;
