@@ -333,6 +333,7 @@ let playerParts = null;
 let nearbyRing = null;
 let worldAccentLight = null;
 let homeWindowVisual = null;
+const wallClockHands = [];
 let smoothCameraX = 7;
 let visibleLocationId = null;
 let ceremonyFounder = null;
@@ -1893,9 +1894,26 @@ function AddWallClock(group, x, y, accent = 0xd7bc78, radius = .54) {
     const angle = index / 12 * Math.PI * 2;
     Place(group, Box(.025, index % 3 ? .07 : .11, .018, 0x39342d, { castShadow: false }), x + Math.sin(angle) * radius * .78, y + Math.cos(angle) * radius * .78, .13, -angle);
   }
-  Place(group, Box(.035, radius * .58, .018, 0x332d28, { castShadow: false }), x, y + radius * .22, .15, -.38);
-  Place(group, Box(.028, radius * .42, .02, 0x9e3638, { castShadow: false }), x, y + radius * .15, .16, 1.02);
+  const hourHand = new THREE.Group();
+  hourHand.position.set(x, y, .15);
+  Place(hourHand, Box(.035, radius * .58, .018, 0x332d28, { castShadow: false }), 0, radius * .29);
+  const minuteHand = new THREE.Group();
+  minuteHand.position.set(x, y, .16);
+  Place(minuteHand, Box(.028, radius * .42, .02, 0x9e3638, { castShadow: false }), 0, radius * .21);
+  group.add(hourHand, minuteHand);
   Place(group, Sphere(.045, accent, { surface: "metal", metalness: .8, castShadow: false, segments: 10, rings: 7 }), x, y, .18);
+  wallClockHands.push({ hourHand, minuteHand });
+}
+
+function UpdateWallClocks(time) {
+  const cyclePhase = (time / HOME_WINDOW_DAY_NIGHT_SECONDS + HOME_WINDOW_START_PHASE) % 1;
+  const timeOfDay = cyclePhase * 24;
+  const hourAngle = timeOfDay % 12 / 12 * Math.PI * 2;
+  const minuteAngle = timeOfDay % 1 * Math.PI * 2;
+  wallClockHands.forEach(({ hourHand, minuteHand }) => {
+    hourHand.rotation.z = hourAngle;
+    minuteHand.rotation.z = minuteAngle;
+  });
 }
 
 function AddPlant(group, x, y, z, scale = 1) {
@@ -2056,7 +2074,7 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
       Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
     });
-    AddWallClock(group, start + 8.85, 3.8, 0xb8a26c, .48);
+    AddWallClock(group, start + 5.4, 3.8, 0xb8a26c, .48);
     Place(group, Box(4.3, .045, 1.28, 0x5e466c, { surface: "fabric", roughness: .98 }), start + 4.45, .055, .72, -.02);
   } else if (location.id === "diner") {
     Place(group, Box(8.7, 1.42, .12, 0xd8c8ac, { surface: "tile", roughness: .45, castShadow: false }), center, 1.48, -.12);
@@ -2910,6 +2928,7 @@ function Animate() {
   const delta = Math.min(clock.getDelta(), .05);
   const time = clock.elapsedTime;
   UpdateHomeWindowDayNight(time);
+  UpdateWallClocks(time);
   actionCooldown = Math.max(0, actionCooldown - delta);
   const canMove = !IsOverlayOpen();
   const previousY = worldState.y;
