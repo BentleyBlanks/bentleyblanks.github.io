@@ -46,6 +46,8 @@ const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function
 assert.match(directiveBlock, /data-owner-task/, "the project whiteboard must expose owner development tasks");
 assert.match(directiveBlock, /PerformOwnerTask\(state,\s*[^)]+\)/, "owner development must execute from the project whiteboard");
 assert.match(directiveBlock, /(?:MODULE_KEYS|moduleValues)\.map/, "the project whiteboard must render every development module");
+assert.match(directiveBlock, /GetOwnerTaskAnxietyCost\(energyUsed\)[\s\S]*?焦虑依次 \+1 \/ \+2 \/ \+5/, "the board must preview escalating owner-work anxiety");
+assert.match(directiveBlock, /GetOwnerRestRelief\(energyUsed\)[\s\S]*?result\.anxietyCost/, "the board must preview rest relief and report the actual work cost");
 assert.match(directiveBlock, /data-directive-id[\s\S]*SelectDirective\(/, "project direction must remain selectable from the board");
 assert.match(directiveBlock, /data-whiteboard-release[\s\S]*OpenReleaseSheet\(\)/, "publishing must move onto the project whiteboard");
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");

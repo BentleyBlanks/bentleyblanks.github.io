@@ -21,7 +21,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815aj";
+} from "./Data_Game.mjs?v=20260815al";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -41,6 +41,7 @@ import {
   GetMemberMonthlyCost,
   GetOwnerHairStage,
   GetOwnerRestRelief,
+  GetOwnerTaskAnxietyCost,
   GetStockAccountAccess,
   HireStaff,
   OWNER_HAIR_STAGES,
@@ -65,7 +66,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815aj";
+} from "./Script_Rules.mjs?v=20260815al";
 import {
   FindLocation,
   FindLocationAt,
@@ -76,14 +77,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815ak";
+} from "./Data_World.mjs?v=20260815al";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815ak";
+} from "./Script_World.mjs?v=20260815al";
 
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -3711,7 +3712,10 @@ function OpenStockSheet() {
 function OpenDirectiveSheet() {
   const pivotCost = ForecastPivotCost(state);
   const earlyStage = state.project.age < 1;
-  const energyLeft = Math.max(0, 3 - (state.ownerWorkCount || 0));
+  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
+  const energyLeft = 3 - energyUsed;
+  const nextAnxietyCost = GetOwnerTaskAnxietyCost(energyUsed);
+  const restRelief = GetOwnerRestRelief(energyUsed);
   const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
   const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
@@ -3723,13 +3727,13 @@ function OpenDirectiveSheet() {
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
       <div class="whiteboardFocus" aria-live="polite">
-        <span>本月计划</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>精力 ${energyLeft} / 3</small>
+        <span>本月计划</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>余 ${energyLeft} 格 · 休息 −${restRelief}</small>
       </div>
-      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong>老板开发</strong><span>${energyLeft ? "点选投入" : "本月已满"}</span></div>
+      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong>老板开发</strong><span>${energyLeft ? "焦虑依次 +1 / +2 / +5" : "本月已满"}</span></div>
       <div class="whiteboardDevelopmentGrid">${moduleValues.map(({ moduleKey, value }) => {
         const meta = MODULE_META[moduleKey];
         return `<button class="whiteboardDevelopmentCard ${moduleKey === recommended && energyLeft ? "recommended" : ""}" style="--noteInk:${meta.color}" data-owner-task="${moduleKey}" type="button" ${energyLeft ? "" : "disabled"}>
-          <span>${meta.icon}</span><strong>${meta.label}</strong><b>${Math.round(value)}</b><i style="--moduleProgress:${Clamp(value, 0, 100)}%"></i><small>${energyLeft ? "投入 1 格" : "等下月"}</small>
+          <span>${meta.icon}</span><strong>${meta.label}</strong><b>${Math.round(value)}</b><i style="--moduleProgress:${Clamp(value, 0, 100)}%"></i><small>${energyLeft ? `1 格 · 焦虑 +${nextAnxietyCost}` : "等下月"}</small>
         </button>`;
       }).join("")}</div>
       <div class="panelSection sectionHeading whiteboardSectionHeading"><strong>本月方向</strong><span>点选切换</span></div>
@@ -3754,7 +3758,10 @@ function OpenDirectiveSheet() {
       const ownerTaskButton = event.target.closest("[data-owner-task]");
       if (ownerTaskButton) {
         const result = PerformOwnerTask(state, ownerTaskButton.dataset.ownerTask);
-        if (ApplyInteractiveResult(result, { tone: "warning" })) OpenDirectiveSheet();
+        if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
+        const left = Math.max(0, 3 - state.ownerWorkCount);
+        ShowToast(`${MODULE_META[result.moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}${left ? ` · 余 ${left} 格` : ""}`, left ? "good" : "warning");
+        OpenDirectiveSheet();
         return;
       }
       if (event.target.closest("[data-whiteboard-release]")) return OpenReleaseSheet();
