@@ -456,9 +456,180 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
+const ART_CACHE_VERSION = "20260815aw";
+const ArtTexturePaths = Object.freeze({
+  founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
+  founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
+  founderBald: `./Assets/Texture_CharacterFounderBaldWalkSheet.png?v=${ART_CACHE_VERSION}`,
+  homeComputer: `./Assets/Texture_PropHomeComputer.png?v=${ART_CACHE_VERSION}`,
+  homePlanningBoard: `./Assets/Texture_PropHomePlanningBoard.png?v=${ART_CACHE_VERSION}`,
+  homeCalendar: `./Assets/Texture_PropHomeCalendar.png?v=${ART_CACHE_VERSION}`,
+  homeFridge: `./Assets/Texture_PropHomeFridge.png?v=${ART_CACHE_VERSION}`,
+  homeExitDoor: `./Assets/Texture_PropHomeExitDoor.png?v=${ART_CACHE_VERSION}`,
+  homeShelf: `./Assets/Texture_PropHomeShelf.png?v=${ART_CACHE_VERSION}`,
+});
+const FounderArtStages = Object.freeze({
+  full: "full",
+  thinning: "thinning",
+  bald: "bald",
+});
+const FounderTextureKeys = Object.freeze({
+  [FounderArtStages.full]: "founderFull",
+  [FounderArtStages.thinning]: "founderThinning",
+  [FounderArtStages.bald]: "founderBald",
+});
+const FacilityArtSpecs = Object.freeze({
+  homeComputer: Object.freeze({ textureKey: "homeComputer", width: 2.17, height: 2.0, y: 1.0 }),
+  homeComputerProp: Object.freeze({ textureKey: "homeComputer", width: 2.17, height: 2.0, y: 1.0 }),
+  planningBoard: Object.freeze({ textureKey: "homePlanningBoard", width: 2.46, height: 1.9, y: 1.8 }),
+  homeCalendar: Object.freeze({ textureKey: "homeCalendar", width: 1.9, height: 1.9, y: 1.79 }),
+  homeFridge: Object.freeze({ textureKey: "homeFridge", width: 1.61, height: 2.65, y: 1.325 }),
+  homeExit: Object.freeze({ textureKey: "homeExitDoor", width: 1.74, height: 2.95, y: 1.475 }),
+});
+const artTextureCache = new Map();
 const worldPracticalLights = [];
 
 function HexColor(value) { return Number.parseInt(String(value).replace("#", ""), 16); }
+
+function ConfigureArtTexture(texture) {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.userData.sharedSurface = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+async function LoadArtTextures(textureKeys = Object.keys(ArtTexturePaths)) {
+  const loader = new THREE.TextureLoader();
+  await Promise.all(textureKeys.map(async (textureKey) => {
+    if (artTextureCache.has(textureKey)) return;
+    const source = ArtTexturePaths[textureKey];
+    if (!source) return;
+    try {
+      artTextureCache.set(textureKey, ConfigureArtTexture(await loader.loadAsync(source)));
+    } catch (error) {
+      console.warn(`Generated art unavailable; keeping procedural fallback: ${source}`, error);
+    }
+  }));
+}
+
+function CloneArtTexture(textureKey) {
+  const source = artTextureCache.get(textureKey);
+  if (!source) return null;
+  const texture = source.clone();
+  delete texture.userData.sharedSurface;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function AddArtPlane(group, textureKey, width, height, x, y, z = .02) {
+  const texture = artTextureCache.get(textureKey);
+  if (!texture) return null;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: .02,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    }),
+  );
+  plane.name = `ImageArt_${textureKey}`;
+  plane.position.set(x, y, z);
+  plane.renderOrder = 3;
+  group.add(plane);
+  return plane;
+}
+
+function GetFounderArtStage(hairAmount = 1) {
+  if (hairAmount <= .22) return FounderArtStages.bald;
+  if (hairAmount <= .7) return FounderArtStages.thinning;
+  return FounderArtStages.full;
+}
+
+function SetFounderSpriteStage(actor, artStage = FounderArtStages.full) {
+  const sprites = actor?.userData?.founderSprites;
+  if (!sprites) return;
+  const expectedTextureKey = FounderTextureKeys[artStage];
+  const useGeneratedArt = sprites[artStage]?.userData?.textureKey === expectedTextureKey;
+  Object.entries(sprites).forEach(([stage, sprite]) => { sprite.visible = useGeneratedArt && stage === artStage; });
+  actor.userData.proceduralFallback?.forEach((child) => { child.visible = !useGeneratedArt; });
+  actor.userData.founderArtStage = artStage;
+}
+
+function SetFounderSpriteFrame(actor, frameIndex = 0) {
+  const sprites = actor?.userData?.founderSprites;
+  if (!sprites) return;
+  const normalizedFrame = ((Math.floor(frameIndex) % 4) + 4) % 4;
+  Object.values(sprites).forEach((sprite) => {
+    sprite.material.map.offset.x = normalizedFrame * .25;
+  });
+  actor.userData.founderFrame = normalizedFrame;
+}
+
+function AttachFounderSprites(group, shadow, options = {}) {
+  const fallbackTextureKey = Object.values(FounderTextureKeys).find((textureKey) => artTextureCache.has(textureKey));
+  if (!fallbackTextureKey) return null;
+  const height = options.height ?? 2.42;
+  const width = height * (2 / 3);
+  const spriteGroup = new THREE.Group();
+  spriteGroup.name = "ImageArt_Founder";
+  const sprites = {};
+  Object.entries(FounderTextureKeys).forEach(([stage, textureKey]) => {
+    const loadedTextureKey = artTextureCache.has(textureKey) ? textureKey : fallbackTextureKey;
+    const texture = CloneArtTexture(loadedTextureKey);
+    texture.repeat.set(.25, 1);
+    texture.offset.set(0, 0);
+    const sprite = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        alphaTest: .02,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      }),
+    );
+    sprite.name = `ImageArt_Founder_${stage}`;
+    sprite.position.set(0, height * .5 + .015, options.z ?? .16);
+    sprite.renderOrder = 5;
+    sprite.userData.textureKey = loadedTextureKey;
+    sprites[stage] = sprite;
+    spriteGroup.add(sprite);
+  });
+  const proceduralVisuals = group.children.filter((child) => child !== shadow);
+  proceduralVisuals.forEach((child) => { child.visible = false; });
+  group.add(spriteGroup);
+  group.userData.founderSprites = sprites;
+  group.userData.proceduralFallback = proceduralVisuals;
+  SetFounderSpriteStage(group, FounderArtStages.full);
+  SetFounderSpriteFrame(group, 0);
+  return spriteGroup;
+}
+
+function RefreshFounderSpriteTextures(actor) {
+  const sprites = actor?.userData?.founderSprites;
+  if (!sprites) return;
+  Object.entries(sprites).forEach(([stage, sprite]) => {
+    const textureKey = FounderTextureKeys[stage];
+    if (!artTextureCache.has(textureKey) || sprite.userData.textureKey === textureKey) return;
+    const oldTexture = sprite.material.map;
+    const texture = CloneArtTexture(textureKey);
+    texture.repeat.set(.25, 1);
+    texture.offset.set((actor.userData.founderFrame || 0) * .25, 0);
+    sprite.material.map = texture;
+    sprite.material.needsUpdate = true;
+    sprite.userData.textureKey = textureKey;
+    oldTexture?.dispose?.();
+  });
+}
 
 function SeededRandom(seed = 1) {
   let value = Math.max(1, Math.floor(seed)) % 2147483647;
@@ -833,6 +1004,7 @@ function BuildHumanActor(color = 0x8d7cff, owner = false) {
     shadow,
   };
   group.userData.visualStyle = "absurd-paper-doll-v2";
+  if (owner) AttachFounderSprites(group, shadow, { height: 2.42, z: .34 });
   return group;
 }
 
@@ -1141,6 +1313,7 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
     stepIndex: -1,
   };
   group.userData.visualStyle = "absurd-paper-doll-v2";
+  if (owner) AttachFounderSprites(group, shadow, { height: 2.42, z: .16 });
   return group;
 }
 
@@ -1303,7 +1476,10 @@ function ApplyOwnerHairAmount() {
     playerParts.scalpShine.material.opacity = (1 - hairAmount) * .72;
     playerParts.scalpShine.scale.set(.58 + (1 - hairAmount) * 1.2, 1 + (1 - hairAmount) * .4, 1);
   }
-  if (playerActor) playerActor.userData.hairAmount = hairAmount;
+  if (playerActor) {
+    playerActor.userData.hairAmount = hairAmount;
+    SetFounderSpriteStage(playerActor, GetFounderArtStage(hairAmount));
+  }
 }
 
 function BuildAiActor(color = 0x66b8ff) {
@@ -1744,6 +1920,16 @@ function BuildFacility(interaction) {
     AddStool(group, -.92, 0, .38, 0x7d293d);
     AddStool(group, .92, 0, .38, 0x7d293d);
   }
+  const artSpec = FacilityArtSpecs[interaction.id];
+  if (artSpec) {
+    const proceduralVisuals = group.children.filter((child) => child !== marker);
+    const artPlane = AddArtPlane(group, artSpec.textureKey, artSpec.width, artSpec.height, 0, artSpec.y, .02);
+    if (artPlane) {
+      proceduralVisuals.forEach((child) => { child.visible = false; });
+      group.userData.artPlane = artPlane;
+      group.userData.proceduralFallback = proceduralVisuals;
+    }
+  }
   const sceneName = FindLocation(interaction.locationId)?.name;
   if (!decorative && title !== sceneName) AddPhysicalLabel(group, title, subtitle, 2.75, 0, 3.03, -.02, color, { compact: true, backing: kind === "hotel" ? 0x513828 : 0x26272a });
   if (marker) group.userData.marker = marker;
@@ -2166,13 +2352,17 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
   if (location.id === "home") {
     const windowX = center + .55;
     homeWindowVisual = BuildHomeWindowDayNight(group, windowX, accent);
-    Place(group, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
-    [.78, 1.22, 1.66, 2.1].forEach((y) => Place(group, Box(1.36, .075, .5, 0x8a6547, { surface: "wood" }), start + 1.05, y, .04));
+    const shelfFallback = new THREE.Group();
+    group.add(shelfFallback);
+    Place(shelfFallback, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
+    [.78, 1.22, 1.66, 2.1].forEach((y) => Place(shelfFallback, Box(1.36, .075, .5, 0x8a6547, { surface: "wood" }), start + 1.05, y, .04));
     for (let bookIndex = 0; bookIndex < 12; bookIndex += 1) {
       const row = Math.floor(bookIndex / 4);
       const colors = [0x8d4851,0x496680,0x887244,0x526f59];
-      Place(group, Box(.16, .3 + (bookIndex % 3) * .05, .28, colors[bookIndex % colors.length], { surface: "paper" }), start + .58 + bookIndex % 4 * .31, .98 + row * .44, .2, (bookIndex % 2 ? 1 : -1) * .025);
+      Place(shelfFallback, Box(.16, .3 + (bookIndex % 3) * .05, .28, colors[bookIndex % colors.length], { surface: "paper" }), start + .58 + bookIndex % 4 * .31, .98 + row * .44, .2, (bookIndex % 2 ? 1 : -1) * .025);
     }
+    const shelfArt = AddArtPlane(group, "homeShelf", 1.95, 2.17, start + 1.05, 1.1, -.02);
+    if (shelfArt) shelfFallback.visible = false;
     AddFramedPanel(group, start + 3.04, 3.3, 1.6, 1.28, 0x8b6b46, 0x5b3d2b, { surface: "wood", z: -.08, frameWidth: .08 });
     [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
       Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
@@ -2717,6 +2907,7 @@ function UpdateCeremony(delta, time) {
     const walkBlend = walk < 1 ? Math.min(1, walk * 4, (1 - walk) * 7) : 0;
     const walkPhase = ceremonyElapsed * 8.6;
     ApplyWalkPose(ceremonyParts, walkPhase, walkBlend);
+    SetFounderSpriteFrame(founder, walkBlend > .05 ? 1 + Math.floor((walkPhase % (Math.PI * 2)) / (Math.PI * 2 / 3)) : 0);
     founder.position.y = Math.abs(Math.cos(walkPhase)) * .045 * walkBlend;
     ceremonyParts.torso.rotation.z = -.045 * walkBlend;
     ceremonyParts.head.rotation.z = .025 * walkBlend;
@@ -2744,6 +2935,7 @@ function UpdateCeremony(delta, time) {
     founder.position.set(stageX - .55, 0, .72);
     founder.rotation.y = 0;
     ApplyWalkPose(ceremonyParts, 0, 0);
+    SetFounderSpriteFrame(founder, 0);
     ceremonyParts.leftArm.rotation.z = -.12 + Math.sin(time * 1.7) * .035;
     ceremonyParts.rightArm.rotation.z = .12;
     ceremonyParts.torso.rotation.z = 0;
@@ -3068,6 +3260,11 @@ function Animate() {
     } else {
       ApplyAirPose(playerParts, worldState.vy || (worldState.y - previousY) / Math.max(delta, .001));
     }
+    const spriteCycle = ((motion.phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const spriteFrame = grounded
+      ? motion.blend > .14 ? 1 + Math.floor(spriteCycle / (Math.PI * 2 / 3)) : 0
+      : (worldState.vy || 0) > 0 ? 1 : 2;
+    SetFounderSpriteFrame(playerActor, spriteFrame);
     const travelLean = moving ? -Math.sign(worldState.vx || 1) * .05 * motion.blend : Math.sin(time * 1.7) * .009;
     playerParts.upperBodyRig.position.x = 0;
     playerParts.upperBodyRig.position.y = playerParts.upperBodyRig.userData.baseY;
@@ -5302,7 +5499,17 @@ function BindControls() {
   dom.restartButton.addEventListener("click", RestartWithNewSetup);
 }
 
-function Initialize() {
+async function Initialize() {
+  const startupArtKeys = [
+    FounderTextureKeys[GetFounderArtStage(GetOwnerHairAmount(state.anxiety))],
+    "homeComputer",
+    "homePlanningBoard",
+    "homeCalendar",
+    "homeFridge",
+    "homeExitDoor",
+    "homeShelf",
+  ];
+  await LoadArtTextures([...new Set(startupArtKeys)]);
   BuildRoom();
   BuildCeremonyScene();
   BuildCollectibles();
@@ -5315,6 +5522,12 @@ function Initialize() {
   UpdateWorldFromGameState();
   ResetOnboarding();
   window.setTimeout(() => dom.loadingScreen.classList.add("loaded"), 180);
+  const deferredArtKeys = Object.keys(ArtTexturePaths).filter((textureKey) => !artTextureCache.has(textureKey));
+  if (deferredArtKeys.length) void LoadArtTextures(deferredArtKeys).then(() => {
+    RefreshFounderSpriteTextures(ceremonyFounder);
+    RefreshFounderSpriteTextures(playerActor);
+    ApplyOwnerHairAmount();
+  });
   Animate();
 }
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { InteractionPoints } from "./Data_World.mjs";
 
 const ReadLocal = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
@@ -15,6 +16,94 @@ const FunctionBlock = (name) => {
   const next = script.indexOf("\nfunction ", start + name.length + 9);
   return script.slice(start, next < 0 ? script.length : next);
 };
+const expectedArtAssets = [
+  "Texture_CharacterFounderFullWalkSheet.png",
+  "Texture_CharacterFounderThinningWalkSheet.png",
+  "Texture_CharacterFounderBaldWalkSheet.png",
+  "Texture_PropHomeComputer.png",
+  "Texture_PropHomePlanningBoard.png",
+  "Texture_PropHomeCalendar.png",
+  "Texture_PropHomeFridge.png",
+  "Texture_PropHomeExitDoor.png",
+  "Texture_PropHomeShelf.png",
+];
+const exactAssetNames = readdirSync(new URL("./Assets/", import.meta.url));
+const PaethPredictor = (left, up, upperLeft) => {
+  const prediction = left + up - upperLeft;
+  const leftDistance = Math.abs(prediction - left);
+  const upDistance = Math.abs(prediction - up);
+  const upperLeftDistance = Math.abs(prediction - upperLeft);
+  if (leftDistance <= upDistance && leftDistance <= upperLeftDistance) return left;
+  return upDistance <= upperLeftDistance ? up : upperLeft;
+};
+const ReadPngInfo = (fileName) => {
+  assert.ok(exactAssetNames.includes(fileName), `${fileName} must keep its exact Pages-safe filename`);
+  const png = readFileSync(new URL(`./Assets/${fileName}`, import.meta.url));
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${fileName} must be a PNG`);
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  assert.equal(png[24], 8, `${fileName} must use 8-bit channels`);
+  assert.equal(png[25], 6, `${fileName} must retain RGBA transparency`);
+  assert.equal(png[28], 0, `${fileName} must remain non-interlaced for deterministic decoding`);
+
+  const idatChunks = [];
+  for (let offset = 8; offset + 12 <= png.length;) {
+    const chunkLength = png.readUInt32BE(offset);
+    const chunkType = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + chunkLength;
+    if (chunkType === "IDAT") idatChunks.push(png.subarray(dataStart, dataEnd));
+    offset = dataEnd + 4;
+    if (chunkType === "IEND") break;
+  }
+  const decoded = inflateSync(Buffer.concat(idatChunks));
+  const stride = width * 4;
+  let sourceOffset = 0;
+  let priorRow = Buffer.alloc(stride);
+  let hasTransparentPixel = false;
+  for (let rowIndex = 0; rowIndex < height; rowIndex += 1) {
+    const filter = decoded[sourceOffset];
+    sourceOffset += 1;
+    const row = Buffer.allocUnsafe(stride);
+    for (let byteIndex = 0; byteIndex < stride; byteIndex += 1) {
+      const raw = decoded[sourceOffset];
+      sourceOffset += 1;
+      const left = byteIndex >= 4 ? row[byteIndex - 4] : 0;
+      const up = priorRow[byteIndex];
+      const upperLeft = byteIndex >= 4 ? priorRow[byteIndex - 4] : 0;
+      const predictor = filter === 1 ? left
+        : filter === 2 ? up
+          : filter === 3 ? Math.floor((left + up) / 2)
+            : filter === 4 ? PaethPredictor(left, up, upperLeft)
+              : 0;
+      row[byteIndex] = (raw + predictor) & 255;
+    }
+    for (let alphaIndex = 3; alphaIndex < stride; alphaIndex += 4) {
+      if (row[alphaIndex] < 255) { hasTransparentPixel = true; break; }
+    }
+    priorRow = row;
+  }
+  assert.ok(hasTransparentPixel, `${fileName} must contain genuinely transparent pixels`);
+  return { fileName, width, height, byteLength: png.length };
+};
+const artAssetInfo = expectedArtAssets.map(ReadPngInfo);
+artAssetInfo.slice(0, 3).forEach(({ fileName, width, height }) => {
+  assert.deepEqual([width, height], [2048, 768], `${fileName} must remain a four-frame 512x768 walk sheet`);
+});
+artAssetInfo.slice(3).forEach(({ fileName, width, height }) => {
+  assert.ok(width >= 200 && height >= 200, `${fileName} must have production dimensions`);
+});
+assert.ok(
+  artAssetInfo.reduce((total, asset) => total + asset.byteLength, 0) <= 4.5 * 1024 * 1024,
+  "generated art must stay within the mobile download budget",
+);
+const referencedArtAssets = [...script.matchAll(/\.\/Assets\/(Texture_[A-Za-z0-9]+\.png)\?v=\$\{ART_CACHE_VERSION\}/g)]
+  .map((match) => match[1]);
+assert.deepEqual([...referencedArtAssets].sort(), [...expectedArtAssets].sort(), "each generated PNG needs exactly one source path");
+const artCacheVersion = script.match(/const ART_CACHE_VERSION = "([^"]+)";/)?.[1];
+assert.ok(artCacheVersion, "generated art needs an explicit cache version");
+assert.match(html, new RegExp(`Style_Play\\.css\\?v=${artCacheVersion}`), "art and UI cache versions must stay synchronized");
+assert.match(html, new RegExp(`Script_Play\\.mjs\\?v=${artCacheVersion}`), "art and gameplay cache versions must stay synchronized");
 
 assert.deepEqual(
   ["homeComputer", "planningBoard", "homeCalendar", "talentCounter", "equipmentCounter"]
@@ -213,6 +302,11 @@ assert.match(ownerHairBlock, /thinningHair\.visible = true[\s\S]*scalpShine\.vis
 assert.doesNotMatch(ownerHairBlock, /(?:thinningHair|scalpShine)\.visible\s*=\s*(?:hairAmount|tuftStrength)/, "continuous hair changes must not jump at a visibility threshold");
 assert.doesNotMatch(rules, /GetOwnerHair(?:Stage|Amount)\(state\.month\)/, "monthly settlement must not drive the founder's hair");
 assert.doesNotMatch(`${script}\n${rules}`, /GetOwnerHairStage|OWNER_HAIR_STAGES|ApplyOwnerHairStage|hairStage|连续做游戏满一年|发际线正式进入抢先体验|彻底秃/, "the retired month-driven hair stages and messages must stay removed");
+assert.match(script, /function LoadArtTextures\([^)]*\)[\s\S]*?Promise\.all/, "generated character and prop art must preload together");
+assert.match(script, /function AttachFounderSprites[\s\S]*?proceduralFallback/, "the generated founder needs a procedural load-failure fallback");
+assert.match(script, /SetFounderSpriteFrame\(playerActor, spriteFrame\)/, "the founder walk sheet must advance during play");
+assert.match(ownerHairBlock, /SetFounderSpriteStage\(playerActor, GetFounderArtStage\(hairAmount\)\)/, "the generated hair image must follow anxiety-driven hair amount");
+assert.match(script, /FacilityArtSpecs\[interaction\.id\][\s\S]*?proceduralFallback/, "generated home props must retain their interaction geometry fallback");
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
 const maleModelDancerBlock = script.match(/function BuildMaleModelDancer[\s\S]*?function ApplyOwnerHairAmount/)?.[0] || "";
 const maleModelRoomBlock = script.match(/const dancerSpecs = \[[\s\S]*?maleModelDancers\.push\(dancer\);[\s\S]*?\}\);/)?.[0] || "";
