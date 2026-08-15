@@ -21,10 +21,13 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ag/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ag/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ag)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ag)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ah/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ah/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ah)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ah)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /class="hudConsole identityConsole sceneConsole" aria-label="当前场景">[\s\S]*?id="locationValue"/, "the top-left console must show the current scene name");
+assert.match(html, /class="missionHeading"><span>项目<\/span><b id="studioNameHud">/, "the project sheet must own the company name");
+assert.doesNotMatch(html, /studioMonogram|locationPlate/, "the HUD must not repeat scene or company identity through the old icon and place plate");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -58,6 +61,7 @@ assert.match(css, /\.projectCalendarReminder\s*\{/, "random events need a visibl
 assert.match(css, /\.resultLayer\.monthResultMode \.resultCard/, "monthly results need a distinct ceremonial reveal");
 assert.match(css, /\.monthResultMode \.stockReturnGrid\s*\{\s*display:\s*none;/, "stock settlement must stay compact inside the monthly reveal");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
+assert.doesNotMatch(css, /\.identityConsole\s*\{\s*display:\s*none;/, "the current scene name must remain visible at every supported landscape width");
 assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s, "utility controls must remain full touch targets");
 assert.match(css, /\.goalReveal\.active \.goalRevealNumber/, "the 100-yuan-billion target needs a dedicated entrance animation");
 assert.match(css, /\.goalRevealCard\s*\{\s*gap:5px;/, "the target reveal must compact itself on short landscape phones");
@@ -111,7 +115,8 @@ assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet mu
 assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must show the target before entering the playable world");
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
 assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
-assert.match(script, /AddPhysicalLabel\(sceneGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
+assert.doesNotMatch(script, /AddPhysicalLabel\(sceneGroup, location\.name/, "the room wall must not repeat the scene name already shown in the HUD");
+assert.doesNotMatch(script, /studioMonogram/, "scene identity must not fall back to a company monogram icon");
 assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");

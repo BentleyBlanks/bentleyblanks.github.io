@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="经营独立游戏工作室，以 100 亿元累计游戏收入成为成功的游戏制作人。">
   <title>甲方是我</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815ag">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815ah">
   <script type="importmap">
     {
       "imports": {
@@ -32,10 +32,9 @@
     <div id="sceneVignette" class="sceneVignette" aria-hidden="true"></div>
 
     <header class="gameHud" aria-label="工作室状态仪表台">
-      <section class="hudConsole identityConsole" aria-label="工作室身份">
-        <div class="brandChip">
-          <span id="studioMonogram">未</span>
-          <div><strong id="studioNameHud">尚未成立</strong></div>
+      <section class="hudConsole identityConsole sceneConsole" aria-label="当前场景">
+        <div class="brandChip sceneChip">
+          <div><strong id="locationValue">自己家</strong></div>
         </div>
       </section>
 
@@ -73,8 +72,7 @@
 
     <aside class="missionCard" aria-live="polite" aria-label="当前项目状态">
       <span class="paperClip" aria-hidden="true"></span>
-      <div class="missionHeading"><span>项目</span></div>
-      <div class="locationPlate"><strong id="locationValue">自己家</strong></div>
+      <div class="missionHeading"><span>项目</span><b id="studioNameHud">尚未成立</b></div>
       <strong id="projectTitle">先开一家公司</strong>
       <p id="missionText">签合同，再用家中电脑开发。</p>
       <div class="moduleLabel"><span>进度</span></div>
@@ -249,6 +247,6 @@
     <div><h1 id="endingTitle">你成为了成功的游戏制作人！</h1><p id="endingSubtitle">累计游戏收入达到 100 亿元。</p><div id="endingStats" class="endingStats"></div><div class="endingActions"><button id="quickRestartButton" class="startButton" type="button"><span>沿用上局设定</span><strong>快速重开 →</strong></button><button id="restartButton" class="continueButton" type="button"><strong>重新设定</strong></button></div></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815ag"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815ah"></script>
 </body>
 </html>

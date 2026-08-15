@@ -90,7 +90,7 @@ import {
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
-  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
+  "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton",
   "studioNameHud", "startupDebtValue", "locationValue", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
   "travelCurtain",
@@ -2013,15 +2013,15 @@ function BuildRoom() {
   Place(roomGroup, Box(width, .3, 3.4, 0x322d2a, { surface: "wood", roughness: .76 }), worldCenter, -.17, .55);
   Place(foregroundGroup, Box(width, .2, .18, 0x141416, { surface: "metal", metalness: .3, roughness: .48 }), worldCenter, -.02, 1.62);
   const roomLooks = {
-    home: { wall: 0x817696, surface: "plaster", floor: 0x493a35, floorSurface: "wood", sign: 0x41354f },
-    diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile", sign: 0x5b302d },
-    market: { wall: 0x718d80, surface: "tile", floor: 0x465d55, floorSurface: "linoleum", sign: 0x2e5145 },
-    talent: { wall: 0x72869d, surface: "plaster", floor: 0x40536a, floorSurface: "linoleum", sign: 0x31485f },
-    bank: { wall: 0x8d8289, surface: "stone", floor: 0x514d50, floorSurface: "stone", sign: 0x563a4d },
-    hotel: { wall: 0x806553, surface: "fabric", floor: 0x5e3b3b, floorSurface: "fabric", sign: 0x68412f },
-    footbath: { wall: 0x66817d, surface: "tile", floor: 0x405c59, floorSurface: "tile", sign: 0x315452 },
-    footbathCity: { wall: 0x685c77, surface: "stone", floor: 0x493f58, floorSurface: "stone", sign: 0x45375a },
-    maleModelClub: { wall: 0x78465f, surface: "leather", floor: 0x573047, floorSurface: "fabric", sign: 0x5b2944 },
+    home: { wall: 0x817696, surface: "plaster", floor: 0x493a35, floorSurface: "wood" },
+    diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile" },
+    market: { wall: 0x718d80, surface: "tile", floor: 0x465d55, floorSurface: "linoleum" },
+    talent: { wall: 0x72869d, surface: "plaster", floor: 0x40536a, floorSurface: "linoleum" },
+    bank: { wall: 0x8d8289, surface: "stone", floor: 0x514d50, floorSurface: "stone" },
+    hotel: { wall: 0x806553, surface: "fabric", floor: 0x5e3b3b, floorSurface: "fabric" },
+    footbath: { wall: 0x66817d, surface: "tile", floor: 0x405c59, floorSurface: "tile" },
+    footbathCity: { wall: 0x685c77, surface: "stone", floor: 0x493f58, floorSurface: "stone" },
+    maleModelClub: { wall: 0x78465f, surface: "leather", floor: 0x573047, floorSurface: "fabric" },
   };
   WorldLocations.forEach((location, index) => {
     const sceneGroup = new THREE.Group();
@@ -2039,7 +2039,6 @@ function BuildRoom() {
     Place(sceneGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
     Place(sceneGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
     BuildLocationEnvironment(location, index, sceneGroup);
-    AddPhysicalLabel(sceneGroup, location.name, "", 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
     for (const boundaryX of [location.startX, location.endX]) {
       Place(sceneGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 3.15, -.18);
       Place(sceneGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 6.36, -.16);
@@ -2853,7 +2852,6 @@ function RenderHud() {
   const gameType = project ? FindGameType(project.gameTypeId) : null;
   const studioName = state.studioName || "尚未成立";
   dom.studioNameHud.textContent = studioName;
-  dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
   const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
   dom.settlementMonthValue.textContent = `进入 ${nextMonthLabel}`;

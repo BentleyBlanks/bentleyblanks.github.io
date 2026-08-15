@@ -1399,13 +1399,13 @@ button.travelMapPlace:focus-visible {
 .endingActions .continueButton { border:1px solid #8f806b; background:rgba(255,255,255,.24); color:#3b332b; }
 
 /* Skeuomorphic gameplay desk -------------------------------------------------
-   The HUD is built as four physical instruments: identity, business status,
+   The HUD is built as four physical instruments: scene, business status,
    survival, and system controls. Project information lives on its own paper
    job sheet instead of competing with the global game state. */
 .gameHud {
   min-height: 88px;
   display: grid;
-  grid-template-columns: minmax(198px, 228px) minmax(470px, 1fr) minmax(250px, 300px) 172px;
+  grid-template-columns: minmax(148px, 176px) minmax(470px, 1fr) minmax(250px, 300px) 172px;
   align-items: stretch;
   gap: 10px;
 }
@@ -1504,6 +1504,9 @@ button.travelMapPlace:focus-visible {
 .brandChip small { color: #b7acee; font-size: 7px; letter-spacing: .16em; }
 .brandChip strong { overflow: hidden; color: #f2f1eb; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .brandChip em { color: #747986; font-size: 7px; font-style: normal; letter-spacing: .07em; }
+.brandChip.sceneChip { justify-content:center; padding-inline:10px; }
+.brandChip.sceneChip div { width:100%; display:grid; justify-items:center; }
+.brandChip.sceneChip strong { color:#f2f1eb; font-size:15px; line-height:1.15; text-align:center; white-space:normal; }
 
 .businessConsole { display: grid; grid-template-rows: 17px 1fr; }
 .businessConsoleBody { min-width: 0; display: grid; grid-template-columns: minmax(270px, 1.05fr) minmax(210px, .95fr); gap: 7px; }
@@ -1695,10 +1698,7 @@ button.travelMapPlace:focus-visible {
 }
 .missionHeading { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 2px solid #403b32; }
 .missionHeading span { font: 900 9px/1 "Microsoft YaHei UI", sans-serif; letter-spacing: .13em; }
-.missionHeading b { color: #82755d; font: 800 7px/1 Georgia, serif; letter-spacing: .12em; }
-.locationPlate { position: relative; z-index: 1; display: inline-flex; align-items: baseline; gap: 7px; margin: 8px 0 4px; padding: 4px 7px; background: #34312b; color: #f0e7d2; box-shadow: 1px 2px 0 rgba(0,0,0,.22); }
-.locationPlate span { color: #bdb29c; font-size: 6.5px; letter-spacing: .08em; }
-.locationPlate strong { font-size: 8px; }
+.missionHeading b { max-width:72%; overflow:hidden; color:#82755d; font:800 7px/1 "Microsoft YaHei UI",sans-serif; letter-spacing:.08em; text-overflow:ellipsis; white-space:nowrap; }
 .missionCard > strong { position: relative; z-index: 1; display: block; max-width: calc(100% - 52px); margin-top: 3px; color: #201e1a; font: 900 17px/1.25 "Microsoft YaHei UI", sans-serif; }
 .missionCard p { position: relative; z-index: 1; margin: 5px 0 9px; color: #675f50; font-size: 9px; line-height: 1.5; }
 .moduleLabel { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; padding-top: 6px; border-top: 1px dashed #a79a80; color: #5b5447; }
@@ -1834,11 +1834,12 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 .portraitBlocker { display: none; }
 
 @media (max-width: 1050px) {
-  .gameHud { grid-template-columns: 54px minmax(400px,1fr) minmax(205px,245px) 138px; gap: 7px; }
+  .gameHud { grid-template-columns: 88px minmax(340px,1fr) minmax(175px,210px) 116px; gap: 7px; }
   .identityConsole { padding: 6px; }
   .brandChip { width: 100%; min-width: 0; padding: 5px; }
   .brandChip > span { width: 36px; height: 36px; margin: 0; }
   .brandChip div { display: none; }
+  .brandChip.sceneChip strong { font-size:11px; }
   .conditionHud { width: auto; grid-template-columns: 29px minmax(34px,1fr) 26px; }
   .businessConsoleBody { grid-template-columns: minmax(250px,1.1fr) minmax(175px,.9fr); }
   .hudStat { min-width: 0; }
@@ -1896,7 +1897,6 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
   .missionCard { top: calc(var(--safeTop) + 84px); width: min(315px,32vw); min-height: 0; padding: 17px 13px 11px; border-radius: 2px; }
   .missionCard::after { top: 40px; }
   .missionHeading { padding-bottom: 4px; }
-  .locationPlate { margin: 5px 0 2px; padding: 3px 6px; }
   .missionCard > strong { font-size: 14px; }
   .missionCard p { margin: 3px 0 5px; font-size: 8px; }
   .moduleLabel { margin-bottom: 3px; padding-top: 4px; }
@@ -2014,8 +2014,8 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 640px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(320px,1fr) 155px 112px; gap: 4px; }
-  .identityConsole { display: none; }
+  .gameHud { grid-template-columns: 74px minmax(270px,1fr) 140px 100px; gap: 4px; }
+  .identityConsole { display: flex; }
   .businessConsoleBody { grid-template-columns: minmax(190px,1fr) minmax(120px,.62fr); gap: 4px; }
   .businessReadouts { gap: 3px; }
   .hudStat { padding-inline: 4px; }
@@ -2028,7 +2028,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 520px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(260px,1fr) 140px 102px; }
+  .gameHud { grid-template-columns: 60px minmax(210px,1fr) 120px 92px; gap:3px; }
   .businessConsoleBody { grid-template-columns: 1fr; }
   .goalHud { display: none; }
   .anxietyHud { display: grid; }
@@ -2050,7 +2050,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 
   .gameHud {
     min-height: 74px;
-    grid-template-columns: 54px minmax(420px, 1fr) minmax(180px, 210px) 104px;
+    grid-template-columns: 86px minmax(360px, 1fr) minmax(165px, 195px) 100px;
     gap: 5px;
   }
 
@@ -2288,8 +2288,8 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 760px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(350px, 1fr) 170px 108px; gap: 4px; }
-  .identityConsole { display: none; }
+  .gameHud { grid-template-columns: 74px minmax(280px,1fr) 145px 96px; gap:4px; }
+  .identityConsole { display:flex; }
   .businessConsoleBody { grid-template-columns: minmax(215px, 1fr) minmax(125px, .58fr); }
   .conditionHud { grid-template-columns: 24px minmax(28px, 1fr) 20px; }
   .roundButton { width: auto; min-width: 44px; }
@@ -2310,7 +2310,7 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 600px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(300px, 1fr) 130px 99px; gap: 3px; }
+  .gameHud { grid-template-columns: 66px minmax(225px,1fr) 122px 94px; gap:3px; }
   .hudConsole { padding-inline: 4px; }
   .hudStat { min-width: 50px; padding-inline: 5px; }
   .cashStat { display: grid; }
@@ -2323,7 +2323,8 @@ button.featureCard:hover { border-color: #68617f; background: linear-gradient(14
 }
 
 @media (max-width: 520px) and (orientation: landscape) {
-  .gameHud { grid-template-columns: minmax(235px, 1fr) 115px 99px; }
+  .gameHud { grid-template-columns: 58px minmax(190px,1fr) 110px 92px; gap:3px; }
+  .brandChip.sceneChip strong { font-size:9px; }
   .businessConsoleBody { grid-template-columns: 1fr; }
 }
 
