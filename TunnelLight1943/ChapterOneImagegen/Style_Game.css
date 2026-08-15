@@ -515,6 +515,10 @@ body.touchDevice #touchControls.gone { display: none; }
 /* 标题 */
 #titleScreen {
   position: absolute; inset: 0; overflow-y: auto;
+  /* 必须压过 #hud 里的收黑罩：#fadeOverlay 开机默认全黑，而标题页阶段
+     没有游戏循环去把它降下来。标题页没编号时，玩家看到的就是纯黑，
+     按钮却仍能被盲点（遮罩 pointer-events:none）。 */
+  z-index: 33;
   display: flex; align-items: center; justify-content: center;
   background:
     radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),

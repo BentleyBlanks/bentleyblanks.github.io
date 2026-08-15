@@ -159,7 +159,7 @@ for (const key of [
 ]) assert.ok(mainSource.includes(key), `missing isolated persistence key ${key}`);
 
 const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
-assert.match(html, /Script_Main\.js\?v=one010/, "sibling index must carry its own cache bust");
+assert.match(html, /Script_Main\.js\?v=one011/, "sibling index must carry its own cache bust");
 assert.match(html, /第一章美术还原版/, "sibling page must identify the Chapter One art restoration");
 assert.doesNotMatch(html, /白盒原型|WHITEBOX PROTOTYPE/, "restored page must not present itself as a whitebox prototype");
 assert.doesNotMatch(html, /(?:src|href)=["']\.\.\//, "sibling page must not reach parent media");

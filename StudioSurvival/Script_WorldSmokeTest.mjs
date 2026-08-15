@@ -1,65 +1,94 @@
 import assert from "node:assert/strict";
 import {
   Collectibles,
+  FindLocationAt,
   InteractionPoints,
+  Locations,
   MovingHazards,
   Platforms,
   WorldConfig,
 } from "./Data_World.mjs";
+import { CONSUMER_VENUES, FindConsumerVenue } from "./Data_Game.mjs";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
+  TravelWorld,
 } from "./Script_World.mjs";
 
-function Tick(state, input, delta) {
-  return TickWorld(state, input, delta);
-}
+const Tick = (state, input, delta) => TickWorld(state, input, delta);
 
-assert.equal(WorldConfig.width, 40, "the office should span approximately forty world units");
-assert.ok(Platforms.length >= 3, "the level should contain multiple solid platforms");
-assert.ok(Collectibles.length >= 5, "the level should contain quest fragments");
-assert.ok(MovingHazards.length >= 3, "the level should contain moving hazards");
+assert.equal(WorldConfig.width, 144, "nine discrete sixteen-unit interiors should span one hundred forty-four world units");
+assert.deepEqual(Locations.map((location) => location.id), ["home", "diner", "market", "talent", "bank", "hotel", "footbath", "footbathCity", "maleModelClub"]);
+assert.deepEqual(Locations.map((location) => location.name), ["自己家", "小菜馆", "小超市", "人才市场", "银行", "大酒店", "普通足浴店", "洗脚城", "男模店"]);
+assert.equal(Locations.some((location) => "subtitle" in location), false, "scene names should stay concise enough for the top-left HUD");
+assert.equal(Platforms.length, 0, "the flat 2D city must not contain collectible platforms");
+assert.equal(Collectibles.length, 0, "the 2D city must not use development fragments");
+assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving hazards");
 
 const requiredInteractionIds = [
-  "fridge",
-  "bank",
-  "lotteryMachine",
-  "talentMachine",
-  "workstationArt",
-  "workstationDesign",
-  "workstationClient",
-  "workstationPerformance",
-  "whiteboard",
-  "promoSign",
-  "releaseDoor",
-  "monthCalendar",
-  "offWorkDoor",
-  "aiTerminal",
+  "planningBoard",
+  "homeCalendar",
+  "homeFridge",
+  "homeExit",
+  "dinerCounter",
+  "dinerExit",
+  "snackShelf",
+  "lotteryCounter",
+  "marketExit",
+  "equipmentCounter",
+  "talentCounter",
+  "talentExit",
+  "bankStockCounter",
+  "bankCounter",
+  "bankExit",
+  "hotelRestaurant",
+  "hotelExit",
+  "regularFootbathCounter",
+  "footbathExit",
+  "footbathCityCounter",
+  "footbathCityExit",
+  "maleModelCounter",
+  "maleModelClubExit",
 ];
-for (const id of requiredInteractionIds) {
-  assert.ok(InteractionPoints.some((point) => point.id === id), `missing interaction point: ${id}`);
+assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "each place should expose its own actions and a real exit");
+assert.equal(InteractionPoints.some((point) => point.id === "homeComputer" || point.action === "computer"), false, "the home computer must remain scenery rather than a world interaction");
+
+const consumerInteractions = InteractionPoints.filter((point) => point.consumerVenueId);
+assert.equal(consumerInteractions.length, CONSUMER_VENUES.length, "every personal-consumption venue needs one world interaction");
+for (const interaction of consumerInteractions) {
+  const venue = FindConsumerVenue(interaction.consumerVenueId);
+  assert(venue, `${interaction.id} must reference a registered consumer venue`);
+  assert.equal(venue.interactionId, interaction.id, `${venue.name} must point back to its world interaction`);
+  assert(venue.minimumCash > 0, `${venue.name} must publish a positive cash-admission threshold`);
+}
+
+for (const location of Locations) {
+  const probeX = (location.startX + location.endX) / 2;
+  assert.equal(FindLocationAt(probeX)?.id, location.id, `location lookup must identify ${location.id}`);
 }
 
 const initial = CreateWorldState(1);
 assert.equal(initial.month, 1);
 assert.equal(initial.x, WorldConfig.spawn.x);
 assert.equal(initial.y, WorldConfig.spawn.y);
+assert.equal(initial.activeLocationId, "home");
 assert.equal(initial.grounded, true);
-assert.deepEqual(initial.collectedIds, []);
-assert.deepEqual(initial.disabledHazardIds, []);
+assert.deepEqual(initial.hazards, []);
+assert.deepEqual(initial.collectibles, []);
 
-// Horizontal movement is deterministic and does not mutate the source state.
 const movedResult = Tick(initial, { right: true }, 0.5);
 assert.ok(movedResult.state.x > initial.x, "right input should move the player");
 assert.equal(movedResult.state.facing, 1);
 assert.equal(initial.x, WorldConfig.spawn.x, "TickWorld must be pure");
+const hungryMoveResult = Tick(initial, { right: true, moveSpeedMultiplier: .55 }, 0.5);
+assert.equal(hungryMoveResult.state.vx, WorldConfig.moveSpeed * .55, "hunger may scale horizontal speed without changing the world constant");
+assert.ok(hungryMoveResult.state.x < movedResult.state.x, "a hungry player must cover less ground over the same time");
 const movedLeft = Tick(movedResult.state, { left: true }, 0.25).state;
 assert.ok(movedLeft.x < movedResult.state.x, "left input should move the player back");
 assert.equal(movedLeft.facing, -1);
 
-// Jumping leaves the floor and returns to it under gravity.
 const airborne = Tick(initial, { jump: true }, 0.05);
 assert.ok(airborne.events.some((event) => event.type === "jump"));
 assert.ok(airborne.state.y > initial.y);
@@ -69,52 +98,23 @@ assert.ok(groundLanded.events.some((event) => event.type === "landed"));
 assert.equal(groundLanded.state.grounded, true);
 assert.equal(groundLanded.state.y, WorldConfig.groundY);
 
-// The first raised platform is reachable and catches a descending player.
-let platformState = Tick(initial, { right: true }, 0.6).state;
-platformState = Tick(platformState, { jump: true }, 0.05).state;
-platformState = Tick(platformState, {}, 0.4).state;
-assert.equal(platformState.grounded, false, "the player should still be airborne above the platform");
-platformState = Tick(platformState, {}, 0.4).state;
-assert.equal(platformState.grounded, true);
-assert.equal(platformState.surfaceId, Platforms[0].id);
-assert.equal(platformState.y, Platforms[0].top);
-
-// Collecting a fragment is one-shot and produces a structured event.
-const fragment = Collectibles[0];
-const collectibleProbe = {
-  ...initial,
-  x: fragment.x,
-  y: fragment.y,
-  grounded: false,
-  surfaceId: null,
-};
-const picked = Tick(collectibleProbe, {}, 0).state;
-const pickedResult = Tick(collectibleProbe, {}, 0);
-assert.ok(pickedResult.events.some((event) => event.type === "collectible" && event.id === fragment.id));
-assert.ok(picked.collectedIds.includes(fragment.id));
-const pickedAgain = Tick(picked, {}, 0);
-assert.equal(pickedAgain.events.filter((event) => event.type === "collectible").length, 0);
-assert.deepEqual(collectibleProbe.collectedIds, [], "collecting must not mutate the source state");
-
-// Moving hazards damage once, then respect the cooldown.
-const hazard = MovingHazards[0];
-const hazardProbe = { ...initial, x: hazard.x, y: hazard.y, grounded: true, surfaceId: "ground" };
-const firstHit = Tick(hazardProbe, {}, 0.05);
-assert.ok(firstHit.events.some((event) => event.type === "hazardHit" && event.id === hazard.id));
-assert.ok(firstHit.state.health < firstHit.state.maxHealth);
-const healthAfterHit = firstHit.state.health;
-const cooldownHit = Tick(firstHit.state, {}, 0.2);
-assert.equal(cooldownHit.state.health, healthAfterHit, "damage cooldown should prevent repeated hits");
-assert.ok(cooldownHit.state.damageCooldown > 0);
-const hazardMoved = Tick(initial, {}, 0.5).state;
-assert.notEqual(hazardMoved.hazards[0].x, initial.hazards[0].x, "hazards should move with elapsed time");
-
-// Nearest interaction uses the player's feet and returns null out of range.
-const fridge = InteractionPoints.find((point) => point.id === "fridge");
-assert.equal(NearestInteraction({ ...initial, x: fridge.x, y: fridge.y })?.id, fridge.id);
+for (const interaction of InteractionPoints) {
+  assert.equal(NearestInteraction({ ...initial, activeLocationId: interaction.locationId, x: interaction.x, y: interaction.y })?.id, interaction.id);
+}
 assert.equal(NearestInteraction({ ...initial, x: 0, y: 8 }), null);
 
-// Pause freezes simulation, while a second pause edge resumes it.
+const home = Locations.find((location) => location.id === "home");
+const stoppedAtDoor = Tick(initial, { right: true }, 20).state;
+assert.equal(stoppedAtDoor.activeLocationId, "home", "walking cannot silently change rooms");
+assert.ok(stoppedAtDoor.x < home.endX, "the home wall should stop the player before the next scene");
+assert.equal(FindLocationAt(stoppedAtDoor.x)?.id, "home");
+const travelResult = TravelWorld(stoppedAtDoor, "diner");
+assert.equal(travelResult.ok, true);
+assert.equal(travelResult.state.activeLocationId, "diner", "only explicit travel changes the active room");
+assert.equal(travelResult.state.x, Locations.find((location) => location.id === "diner").entryX);
+assert.equal(stoppedAtDoor.activeLocationId, "home", "TravelWorld must be pure");
+assert.equal(TravelWorld(initial, "nowhere").ok, false, "unknown destinations should be rejected");
+
 const paused = Tick(initial, { right: true, pause: true }, 1).state;
 assert.equal(paused.paused, true);
 assert.equal(paused.x, initial.x);
@@ -124,22 +124,10 @@ const resumed = Tick(stillPaused, { right: true, pause: true }, 0.5).state;
 assert.equal(resumed.paused, false);
 assert.ok(resumed.x > stillPaused.x);
 
-// A month reset returns a fresh spawn and clears spatial progress.
-const progressed = {
-  ...movedResult.state,
-  collectedIds: [fragment.id],
-  disabledHazardIds: [hazard.id],
-  health: 12,
-  damageCooldown: 0.4,
-};
-const reset = ResetWorldMonth(progressed, 7);
+const reset = ResetWorldMonth(movedResult.state, 7);
 assert.equal(reset.month, 7);
 assert.equal(reset.x, WorldConfig.spawn.x);
 assert.equal(reset.y, WorldConfig.spawn.y);
-assert.equal(reset.health, reset.maxHealth);
-assert.deepEqual(reset.collectedIds, []);
-assert.deepEqual(reset.disabledHazardIds, []);
-assert.equal(progressed.month, 1, "ResetWorldMonth must not mutate the previous month");
+assert.equal(movedResult.state.month, 1, "ResetWorldMonth must not mutate the previous month");
 
-console.log("StudioSurvival world smoke test passed");
-
+console.log("StudioSurvival room travel world smoke test passed");

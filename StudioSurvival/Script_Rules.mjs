@@ -2,13 +2,17 @@ import {
   ABSTRACT_IDEAS,
   AI_SUBSCRIPTION_LEVELS,
   COLLATERAL_OPTIONS,
+  CONSUMER_VENUES,
   DIRECTIVES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
   FindCollateral,
+  FindConsumerVenue,
   FindDirective,
   FindFeatureChoice,
   FindFoodPlan,
   FindGameType,
+  FindMarketDirection,
   FindMarketingCampaign,
   FindProject,
   FindStaff,
@@ -17,17 +21,77 @@ import {
   FOOD_PLANS,
   LIVING_BILLS,
   LIVE_REVENUE_EVENTS,
+  MARKET_DIRECTIONS,
+  MARKET_EVENTS,
   MODULE_KEYS,
   PIVOT_REASONS,
   PROJECTS,
   REVIEW_LINES,
+  SCRATCH_OPTION,
   SPECULATION_OPTIONS,
   STAFF_CATALOG,
+  STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs";
+} from "./Data_Game.mjs?v=20260815al";
 
 export const SAVE_KEY = "studio_survival_v1";
-export const RULES_VERSION = 8;
+export const RULES_VERSION = 9;
+export const STARTUP_LOAN_TERMS = Object.freeze({
+  principal: 68000,
+  totalDue: 82000,
+  dueMonth: 8,
+});
+export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
+export const STOCK_ACCOUNT_UNLOCK_CASH = 100000;
+export const STOCK_BUY_STEP = 1000;
+export const MARKET_INDEPENDENT_ID = "independent";
+export const OWNER_TASK_ANXIETY_COSTS = Object.freeze([1, 2, 5]);
+export const OWNER_REST_RELIEF_PER_UNUSED_ENERGY = 3;
+
+export function GetOwnerHairAmount(anxietyValue) {
+  const anxiety = Clamp(Number(anxietyValue) || 0, 0, 100);
+  const pressure = Clamp((anxiety - 18) / 82, 0, 1);
+  const easedPressure = pressure * pressure * (3 - 2 * pressure);
+  return 1 - easedPressure;
+}
+
+export function GetHungerPoseWeight(hungerValue) {
+  const hunger = Clamp(Number(hungerValue) || 0, 0, 100);
+  return Clamp((hunger - 45) / 55, 0, 1);
+}
+
+export function GetHungerMovementMultiplier(hungerValue) {
+  return 1 - GetHungerPoseWeight(hungerValue) * .45;
+}
+
+export function GetOwnerTaskAnxietyCost(completedTaskCount) {
+  const taskIndex = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_TASK_ANXIETY_COSTS.length - 1);
+  return OWNER_TASK_ANXIETY_COSTS[taskIndex];
+}
+
+export function GetOwnerRestRelief(completedTaskCount) {
+  const completed = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_TASK_ANXIETY_COSTS.length);
+  return (OWNER_TASK_ANXIETY_COSTS.length - completed) * OWNER_REST_RELIEF_PER_UNUSED_ENERGY;
+}
+
+export const FOUNDER_SKILL_POINTS = 9;
+export const FOUNDER_SKILL_KEYS = Object.freeze(["design", "programming", "art"]);
+export const DEFAULT_FOUNDER_SKILLS = Object.freeze({ design: 3, programming: 3, art: 3 });
+
+const FOUNDER_SKILL_EFFECTS = Object.freeze({
+  1: Object.freeze({ label: "刚入门", outputMultiplier: 0.7, riskMultiplier: 1.35 }),
+  2: Object.freeze({ label: "能交差", outputMultiplier: 0.85, riskMultiplier: 1.17 }),
+  3: Object.freeze({ label: "熟练", outputMultiplier: 1, riskMultiplier: 1 }),
+  4: Object.freeze({ label: "资深", outputMultiplier: 1.2, riskMultiplier: 0.84 }),
+  5: Object.freeze({ label: "专家", outputMultiplier: 1.45, riskMultiplier: 0.7 }),
+});
+
+const FOUNDER_SKILL_BY_MODULE = Object.freeze({
+  art: "art",
+  design: "design",
+  client: "programming",
+  performance: "programming",
+});
 
 function Clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -41,6 +105,11 @@ function RoundMoney(value) {
   return Math.round(value / 100) * 100;
 }
 
+function CleanName(value, fallback, maximumLength = 18) {
+  const cleaned = String(value ?? "").replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
+  return (cleaned || fallback).slice(0, maximumLength);
+}
+
 function SeededUnit(seed) {
   let value = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b);
   value ^= value >>> 13;
@@ -51,6 +120,161 @@ function SeededUnit(seed) {
 
 function Average(values) {
   return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
+}
+
+function MarketEventForMonth(state, requestedMonth) {
+  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
+  const eventIndex = Math.floor(SeededUnit((state?.seed || 82417) + month * 787 + 29) * MARKET_EVENTS.length) % MARKET_EVENTS.length;
+  return MARKET_EVENTS[eventIndex];
+}
+
+export function GetMarketSnapshot(state, requestedMonth = state?.month || 1) {
+  const month = Math.max(1, Math.floor(Number(requestedMonth) || 1));
+  const marketEvent = MarketEventForMonth(state, month);
+  const effectiveDirection = FindMarketDirection(marketEvent?.directionId) || MARKET_DIRECTIONS[0];
+  return {
+    month,
+    event: marketEvent,
+    effectiveDirection,
+    heatMultiplier: marketEvent?.heatMultiplier || 1,
+  };
+}
+
+function MarketFocusFor(state, requestedFocusId) {
+  if (!state?.project) return null;
+  const focusId = requestedFocusId || "concept";
+  if (focusId === "concept") {
+    const project = FindProject(state.project.templateId);
+    return project ? {
+      id: "concept",
+      title: "立项特色 · " + project.trend,
+      marketDirections: project.marketDirections || [],
+    } : null;
+  }
+  if (!state.project.features.some((feature) => feature.id === focusId)) return null;
+  const feature = FindFeatureChoice(focusId);
+  return feature ? {
+    id: feature.id,
+    title: feature.title,
+    marketDirections: feature.marketDirections || [],
+  } : null;
+}
+
+export function EvaluateMarketFit(state, overrides = {}) {
+  if (!state?.project) return null;
+  const savedStrategy = state.project.marketStrategy || {};
+  const hasFocusOverride = Object.prototype.hasOwnProperty.call(overrides, "focusId");
+  const hasDirectionOverride = Object.prototype.hasOwnProperty.call(overrides, "directionId");
+  const focusId = hasFocusOverride ? overrides.focusId : (savedStrategy.focusId || "concept");
+  const requestedDirectionId = hasDirectionOverride ? overrides.directionId : (savedStrategy.directionId ?? null);
+  const independent = requestedDirectionId === null || requestedDirectionId === MARKET_INDEPENDENT_ID;
+  const focus = MarketFocusFor(state, focusId) || MarketFocusFor(state, "concept");
+  const snapshot = GetMarketSnapshot(state);
+  const effectiveDirection = snapshot.effectiveDirection;
+  const focusMatch = Boolean(focus?.marketDirections.includes(effectiveDirection.id));
+  const setMonth = Number(savedStrategy.setMonth) || 0;
+  const stale = setMonth > 0 && setMonth < state.month;
+  let result;
+
+  if (independent) {
+    result = {
+      tier: "independent",
+      label: "不追风",
+      description: "无额外惩罚。",
+      revenueMultiplier: 1,
+      refundRateDelta: 0,
+      reputationDelta: 0,
+      fanMultiplier: 1,
+      backlash: false,
+      perfect: false,
+      tone: "neutral",
+    };
+  } else if (focusMatch) {
+    result = {
+      tier: "perfect",
+      label: "正中风口",
+      description: "特色命中本月风向。",
+      revenueMultiplier: Clamp(effectiveDirection.perfectMultiplier * snapshot.heatMultiplier, 1.45, 2.25),
+      refundRateDelta: -0.035,
+      reputationDelta: 4,
+      fanMultiplier: 1.28,
+      backlash: false,
+      perfect: true,
+      tone: "good",
+    };
+  } else {
+    result = {
+      tier: "miss",
+      label: "选错特色 · 人人喊打",
+      description: "特色不符本月风向。",
+      revenueMultiplier: 0.42,
+      refundRateDelta: 0.25,
+      reputationDelta: -8,
+      fanMultiplier: 0.35,
+      backlash: true,
+      perfect: false,
+      tone: "danger",
+    };
+  }
+
+  return {
+    ...result,
+    snapshot,
+    focus,
+    direction: independent ? null : effectiveDirection,
+    focusMatch,
+    chasing: !independent,
+    stale,
+    setMonth,
+  };
+}
+
+function IsFounderSkillSetValid(candidate) {
+  return Boolean(candidate)
+    && FOUNDER_SKILL_KEYS.every((skillKey) => Number.isInteger(candidate[skillKey])
+      && candidate[skillKey] >= 1 && candidate[skillKey] <= 5)
+    && FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + candidate[skillKey], 0) === FOUNDER_SKILL_POINTS;
+}
+
+export function NormalizeFounderSkills(candidate) {
+  if (IsFounderSkillSetValid(candidate)) {
+    return Object.fromEntries(FOUNDER_SKILL_KEYS.map((skillKey) => [skillKey, candidate[skillKey]]));
+  }
+  const skills = Object.fromEntries(FOUNDER_SKILL_KEYS.map((skillKey) => {
+    const requestedLevel = Math.round(Number(candidate?.[skillKey]));
+    return [skillKey, Number.isFinite(requestedLevel) ? Clamp(requestedLevel, 1, 5) : DEFAULT_FOUNDER_SKILLS[skillKey]];
+  }));
+  let remaining = FOUNDER_SKILL_POINTS - FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + skills[skillKey], 0);
+  while (remaining !== 0) {
+    const direction = Math.sign(remaining);
+    const adjustable = FOUNDER_SKILL_KEYS.find((skillKey) => direction > 0 ? skills[skillKey] < 5 : skills[skillKey] > 1);
+    if (!adjustable) break;
+    skills[adjustable] += direction;
+    remaining -= direction;
+  }
+  return skills;
+}
+
+export function GetFounderSkillEffect(founderSkills, moduleKey) {
+  const skillKey = FOUNDER_SKILL_BY_MODULE[moduleKey] || (FOUNDER_SKILL_KEYS.includes(moduleKey) ? moduleKey : null);
+  if (!skillKey) return null;
+  const requestedLevel = Math.round(Number(founderSkills?.[skillKey]));
+  const level = Number.isFinite(requestedLevel) ? Clamp(requestedLevel, 1, 5) : DEFAULT_FOUNDER_SKILLS[skillKey];
+  const effect = FOUNDER_SKILL_EFFECTS[level];
+  return {
+    skillKey,
+    level,
+    label: effect.label,
+    outputMultiplier: effect.outputMultiplier,
+    // Programming feeds two production tracks, so its monthly lift is split
+    // across client and performance. Direct owner work still gets the full lift.
+    monthlyOutputMultiplier: skillKey === "programming"
+      ? 1 + (effect.outputMultiplier - 1) / 2
+      : effect.outputMultiplier,
+    riskMultiplier: effect.riskMultiplier,
+    minimumGain: Math.round(2 * effect.outputMultiplier * 10) / 10,
+    maximumGain: Math.round(4 * effect.outputMultiplier * 10) / 10,
+  };
 }
 
 function PushLog(state, text, tone = "normal") {
@@ -108,6 +332,25 @@ function CheckHungerFailure(state) {
   return true;
 }
 
+function CheckStartupLoanDeadline(state) {
+  const loan = state.startupLoan;
+  if (state.status !== "playing" || !loan || loan.status !== "active" || state.month < loan.dueMonth) return false;
+  if (loan.remaining <= 0) {
+    loan.remaining = 0;
+    loan.status = "repaid";
+    return false;
+  }
+  loan.status = "defaulted";
+  state.status = "gameover";
+  state.outcome = {
+    kind: "startupLoanDefault",
+    title: "成立合同变成了清算通知",
+    subtitle: `M${String(loan.dueMonth).padStart(2, "0")} 到期仍欠 ¥${Math.round(loan.remaining).toLocaleString("zh-CN")}。你押上的全部身家被处置，工作室就地倒闭。`,
+  };
+  PushLog(state, `创业启动贷到期未清：尚欠 ¥${Math.round(loan.remaining).toLocaleString("zh-CN")}。${state.studioName || "工作室"} 被强制清算。`, "danger");
+  return true;
+}
+
 function TryAbstractBreakthrough(state) {
   if (state.status !== "playing" || state.anxiety < 42 || state.anxiety > 88) return null;
   const usedIds = new Set(state.project.abstractIdeas.map((idea) => idea.id));
@@ -129,10 +372,12 @@ function TryAbstractBreakthrough(state) {
   return idea;
 }
 
-function FreshProject(projectId, gameTypeId) {
+function FreshProject(projectId, gameTypeId, projectName = "") {
+  const templateName = "第一款游戏";
   return {
     templateId: projectId,
     gameTypeId,
+    name: CleanName(projectName, templateName, 20),
     modules: { art: 12, design: 12, client: 12, performance: 12 },
     technicalDebt: 0,
     scopeDebt: 0,
@@ -145,6 +390,8 @@ function FreshProject(projectId, gameTypeId) {
     features: [],
     featureLoad: { art: 0, design: 0, client: 0, performance: 0 },
     lastCommercial: null,
+    marketStrategy: { focusId: "concept", directionId: null, setMonth: 0 },
+    marketStrategyHistory: [],
     pivotCount: 0,
     pivotHistory: [],
     activeLiveEvents: [],
@@ -179,17 +426,30 @@ export function CreateInitialState() {
     month: 1,
     ownerWorkMonth: 1,
     ownerWorkCount: 0,
+    anxietyAtMonthStart: 18,
     revenueGoal: 10000000000,
     gameRevenue: 0,
-    cash: 68000,
+    cash: STARTUP_LOAN_TERMS.principal,
+    studioName: "",
+    founderSkills: { ...DEFAULT_FOUNDER_SKILLS },
+    startupLoan: {
+      principal: STARTUP_LOAN_TERMS.principal,
+      totalDue: STARTUP_LOAN_TERMS.totalDue,
+      remaining: STARTUP_LOAN_TERMS.totalDue,
+      dueMonth: STARTUP_LOAN_TERMS.dueMonth,
+      status: "pending",
+      payments: [],
+    },
     arrears: 0,
     hunger: 0,
-    foodPlan: "sustenance",
+    foodPlan: "leftovers",
     anxiety: 18,
     reputation: 0,
     fans: 0,
     project: null,
     team: [],
+    workstations: 0,
+    equipmentSpent: 0,
     selectedDirective: "integration",
     talkPoints: 2,
     loans: [],
@@ -203,21 +463,55 @@ export function CreateInitialState() {
     lastSettlement: null,
     incomeHistory: [],
     lastSpeculationMonth: 0,
+    lastScratchMonth: 0,
     speculationProfit: 0,
     speculationHistory: [],
+    stockAccountUnlocked: false,
+    stockPosition: null,
+    stockHistory: [],
+    lastRelaxationMonth: 0,
+    relaxationHistory: [],
   };
 }
 
-export function StartProject(currentState, projectId, gameTypeId) {
+export function StartProject(currentState, projectId, gameTypeId, identity = {}) {
   const state = Clone(currentState);
   if (!FindProject(projectId) || !FindGameType(gameTypeId)) {
     return { state, ok: false, message: "立项参数不存在，像极了第一次需求会。" };
   }
+  const studioName = CleanName(identity.studioName || state.studioName, "没想好工作室");
+  const projectName = CleanName(identity.projectName, "第一款游戏", 20);
   state.status = "playing";
-  state.project = FreshProject(projectId, gameTypeId);
-  PushLog(state, `${FindProject(projectId).title} 正式立项：${FindGameType(gameTypeId).name}。`, "good");
-  PushLog(state, "你宣布目标是游戏收入 100 亿元。所有人礼貌地没有追问依据。", "normal");
-  return { state, ok: true, message: "立项成功" };
+  state.anxietyAtMonthStart = state.anxiety;
+  state.studioName = studioName;
+  state.founderSkills = NormalizeFounderSkills(identity.founderSkills || state.founderSkills);
+  state.startupLoan ||= {
+    principal: STARTUP_LOAN_TERMS.principal,
+    totalDue: STARTUP_LOAN_TERMS.totalDue,
+    remaining: STARTUP_LOAN_TERMS.totalDue,
+    dueMonth: STARTUP_LOAN_TERMS.dueMonth,
+    status: "pending",
+    payments: [],
+  };
+  state.startupLoan.status = "active";
+  state.project = FreshProject(projectId, gameTypeId, projectName);
+  PushLog(state, `${studioName} 签署第一款游戏发行合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
+  PushLog(state, `启动贷 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}；M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，否则清算。`, "danger");
+  PushLog(state, "制作人目标：游戏净收入 100 亿元。", "normal");
+  return { state, ok: true, message: "发行合同签署完成" };
+}
+
+export function RestartProject(previousState) {
+  return StartProject(
+    CreateInitialState(),
+    previousState?.project?.templateId,
+    previousState?.project?.gameTypeId,
+    {
+      studioName: previousState?.studioName,
+      projectName: previousState?.project?.name,
+      founderSkills: previousState?.founderSkills,
+    },
+  );
 }
 
 export function ForecastPivotCost(state) {
@@ -273,6 +567,8 @@ export function PivotProject(currentState, newProjectId, newGameTypeId) {
   project.campaigns = [];
   project.features = [];
   project.featureLoad = { art: 0, design: 0, client: 0, performance: 0 };
+  project.marketStrategy = { focusId: "concept", directionId: null, setMonth: 0 };
+  project.marketStrategyHistory = [];
   project.abstractIdeas = [];
   project.activeLiveEvents = [];
   project.age = 0;
@@ -329,7 +625,7 @@ export function CalculateTensions(project) {
       to: "performance",
       gap: artGap,
       title: "美术把显存吃成自助餐",
-      description: `美术领先性能 ${Math.round(artGap)} 点，客户端集成变慢，首发掉帧风险上升。`,
+      description: `领先 ${Math.round(artGap)}：集成变慢、掉帧风险上升。`,
     });
   }
 
@@ -342,7 +638,7 @@ export function CalculateTensions(project) {
       to: "client",
       gap: scopeGap,
       title: "策划已经设计到续作",
-      description: `策划领先客户端 ${Math.round(scopeGap)} 点，新需求正在把旧需求挤出工期。`,
+      description: `领先 ${Math.round(scopeGap)}：范围失控。`,
     });
   }
 
@@ -354,7 +650,7 @@ export function CalculateTensions(project) {
       to: "design",
       gap: clientGap,
       title: "架构优雅，但游戏呢",
-      description: `客户端领先策划 ${Math.round(clientGap)} 点，技术完整度正在制造一款无聊的好程序。`,
+      description: `领先 ${Math.round(clientGap)}：内容不足。`,
     });
   }
 
@@ -366,7 +662,7 @@ export function CalculateTensions(project) {
       to: "art",
       gap: performanceGap,
       title: "优化到只剩土豆",
-      description: `性能领先美术 ${Math.round(performanceGap)} 点，帧率很稳，玩家也很难看清内容。`,
+      description: `领先 ${Math.round(performanceGap)}：画面缩水。`,
     });
   }
 
@@ -378,7 +674,7 @@ export function CalculateTensions(project) {
       to: "client",
       gap: project.scopeDebt,
       title: "范围债正在收利息",
-      description: `还有 ${Math.round(project.scopeDebt)} 点范围债。客户端产出会先拿去填策划留下的坑。`,
+      description: `${Math.round(project.scopeDebt)} 点：吞掉客户端产出。`,
     });
   }
 
@@ -390,7 +686,7 @@ export function CalculateTensions(project) {
       to: "performance",
       gap: project.technicalDebt,
       title: "技术债学会了繁殖",
-      description: `技术债 ${Math.round(project.technicalDebt)} 点，会吞掉性能产出并增加 Bug。`,
+      description: `${Math.round(project.technicalDebt)} 点：吞掉性能产出并增加 Bug。`,
     });
   }
 
@@ -469,8 +765,12 @@ function StaffFactor(member) {
 }
 
 function BuildMonthlyOutput(state, foodMultiplier = 1, foodPlanName = "本月吃法") {
-  const output = { art: 1.8, design: 1.8, client: 1.8, performance: 1.8 };
-  const idealOutput = { art: 1.8, design: 1.8, client: 1.8, performance: 1.8 };
+  const founderOutput = Object.fromEntries(MODULE_KEYS.map((moduleKey) => [
+    moduleKey,
+    1.8 * GetFounderSkillEffect(state.founderSkills, moduleKey).monthlyOutputMultiplier,
+  ]));
+  const output = { ...founderOutput };
+  const idealOutput = { ...founderOutput };
   const wastedOutput = { art: 0, design: 0, client: 0, performance: 0 };
   const painEvents = [];
   const directiveOutput = DirectiveOutput(state.selectedDirective);
@@ -626,21 +926,21 @@ function CalculateBuildStatus(project) {
     - project.technicalDebt * 0.27;
   const score = Clamp(integrationScore, 0, 100);
   if (project.modules.client < 25) {
-    return { level: "broken", label: "打不开", detail: "主场景仍然是一个充满希望的空文件夹。", score };
+    return { level: "broken", label: "打不开", detail: "客户端不足 25。", score };
   }
   if (project.scopeDebt > 46) {
-    return { level: "broken", label: "需求把构建憋死了", detail: "入口有七个，能走通的流程是零个。", score };
+    return { level: "broken", label: "范围失控", detail: "范围债超过 46。", score };
   }
   if (project.technicalDebt > 46) {
-    return { level: "broken", label: "编译通过，运行去世", detail: "启动画面之后是一段很稳定的黑屏。", score };
+    return { level: "broken", label: "技术债爆表", detail: "技术债超过 46。", score };
   }
   if (score < 40 || project.bugs > 32) {
-    return { level: "fragile", label: "偶尔能进主菜单", detail: "能做出垃圾之前，先得让垃圾成功启动。", score };
+    return { level: "fragile", label: "构建不稳", detail: "评分过低或 Bug 过多。", score };
   }
   if (score < 63 || project.bugs > 18) {
-    return { level: "playable", label: "能玩，但别乱点", detail: "沿着演示路线走，像一款已经完成的游戏。", score };
+    return { level: "playable", label: "勉强能玩", detail: "仅能沿演示流程运行。", score };
   }
-  return { level: "stable", label: "终于有稳定构建", detail: "它不一定好玩，但至少可以连续运行十分钟。", score };
+  return { level: "stable", label: "构建稳定", detail: "可稳定运行。", score };
 }
 
 function ProgressProject(state, foodMultiplier = 1, foodPlanName = "本月吃法") {
@@ -710,7 +1010,17 @@ function BaseLiveIncome(state) {
 
 function ResolveLiveIncome(state) {
   if (!state.project?.isReleased) {
-    return { income: 0, baseIncome: 0, eventLoss: 0, eventMultiplier: 1, liveEvent: null, appliedEvents: [] };
+    return {
+      income: 0,
+      baseIncome: 0,
+      marketBaseIncome: 0,
+      marketDelta: 0,
+      eventLoss: 0,
+      eventMultiplier: 1,
+      liveEvent: null,
+      appliedEvents: [],
+      marketFit: EvaluateMarketFit(state),
+    };
   }
   const project = state.project;
   project.activeLiveEvents ||= [];
@@ -731,22 +1041,51 @@ function ResolveLiveIncome(state) {
     return event ? { ...event, remaining: active.remaining } : null;
   }).filter(Boolean);
   const eventMultiplier = Clamp(appliedEvents.reduce((value, event) => value * event.multiplier, 1), 0.16, 1);
-  const baseIncome = BaseLiveIncome(state);
+  const marketFit = EvaluateMarketFit(state);
+  const marketBaseIncome = BaseLiveIncome(state);
+  const baseIncome = RoundMoney(marketBaseIncome * (marketFit?.revenueMultiplier || 1));
+  const marketDelta = baseIncome - marketBaseIncome;
   const income = RoundMoney(baseIncome * eventMultiplier);
   const eventLoss = Math.max(0, baseIncome - income);
+  if (marketFit?.backlash) {
+    const lostFans = Math.max(20, Math.round(state.fans * (1 - marketFit.fanMultiplier) * 0.08));
+    state.fans = Math.max(0, state.fans - lostFans);
+    state.reputation = Clamp(state.reputation + marketFit.reputationDelta * 0.35, 0, 100);
+    state.anxiety = Clamp(state.anxiety + 3, 0, 100);
+    PushLog(state, marketFit.label + "：" + marketFit.description + " 本月常态流水被市场反噬。", "danger");
+  } else if (marketFit?.perfect) {
+    state.reputation = Clamp(state.reputation + 1, 0, 100);
+    PushLog(state, marketFit.label + "：本月常态流水乘数 ×" + marketFit.revenueMultiplier.toFixed(2) + "。", "good");
+  }
   project.activeLiveEvents.forEach((active) => { active.remaining -= 1; });
   project.activeLiveEvents = project.activeLiveEvents.filter((active) => active.remaining > 0);
   state.incomeHistory.push({
     month: state.month,
     source: "live",
     baseIncome,
+    marketBaseIncome,
+    marketDelta,
+    marketTier: marketFit?.tier || "independent",
     income,
     eventLoss,
     eventMultiplier,
-    events: appliedEvents.map((event) => event.title),
+    events: [
+      ...(marketFit?.backlash ? [marketFit.label] : marketFit?.perfect ? [marketFit.label] : []),
+      ...appliedEvents.map((event) => event.title),
+    ],
   });
   state.incomeHistory = state.incomeHistory.slice(-36);
-  return { income, baseIncome, eventLoss, eventMultiplier, liveEvent, appliedEvents };
+  return {
+    income,
+    baseIncome,
+    marketBaseIncome,
+    marketDelta,
+    eventLoss,
+    eventMultiplier,
+    liveEvent,
+    appliedEvents,
+    marketFit,
+  };
 }
 
 function RemoveUnpayableTeam(state, availableBudget, baseCosts) {
@@ -852,6 +1191,7 @@ function ProcessFinances(state) {
     };
   }
 
+  const startupDefault = CheckStartupLoanDeadline(state);
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   CheckRevenueGoal(state);
@@ -859,6 +1199,9 @@ function ProcessFinances(state) {
   return {
     income,
     baseIncome: liveRevenue.baseIncome,
+    marketBaseIncome: liveRevenue.marketBaseIncome,
+    marketDelta: liveRevenue.marketDelta,
+    marketFit: liveRevenue.marketFit,
     eventLoss: liveRevenue.eventLoss,
     eventMultiplier: liveRevenue.eventMultiplier,
     liveEvent: liveRevenue.liveEvent,
@@ -866,6 +1209,7 @@ function ProcessFinances(state) {
     costs,
     defaults,
     removedStaff,
+    startupDefault,
     skippedFood,
     shortfall,
     selectedFoodPlanId: selectedFoodPlan.id,
@@ -874,32 +1218,56 @@ function ProcessFinances(state) {
   };
 }
 
-function ResolveMonthlyAnxiety(state, production, finance, tensions) {
-  const before = state.anxiety;
-  if (state.status !== "playing") return { before, after: before, delta: 0, idea: null };
-  let delta = production.wastedTotal * 0.32;
-  if (production.buildStatus.level === "broken") delta += 9;
-  else if (production.buildStatus.level === "fragile") delta += 4;
-  else if (production.buildStatus.level === "stable") delta -= 4;
-  delta += tensions.filter((tension) => tension.severity === "critical").length * 3;
-  delta += tensions.filter((tension) => tension.severity === "warning").length * 1.2;
-  delta += finance.defaults.length * 10;
-  delta += finance.removedStaff.length * 6;
-  delta += finance.shortfall > 0 ? 12 : 0;
-  delta += finance.skippedFood ? 4 : 0;
-  if (state.cash < finance.costs.total) delta += 3;
-  if (state.selectedDirective === "integration") delta -= 3;
-  if (state.selectedDirective === "cutScope") delta -= 2;
-  if (state.project.isReleased && finance.income > finance.costs.total) delta -= 4;
-  delta = Clamp(delta, -9, 28);
-  state.anxiety = Clamp(state.anxiety + delta, 0, 100);
+function ResolveMonthlyAnxiety(state, production, finance, tensions, monthStartAnxiety) {
+  const before = Clamp(Number(monthStartAnxiety) || 0, 0, 100);
+  const settlementBefore = state.anxiety;
+  const restRelief = GetOwnerRestRelief(state.ownerWorkCount);
+  if (state.status !== "playing") {
+    const after = state.anxiety;
+    return { before, settlementBefore, after, delta: after - before, settlementDelta: 0, restRelief: 0, idea: null };
+  }
+
+  const catastrophicBuild = production.buildStatus.level === "broken"
+    && (state.project.scopeDebt > 46 || state.project.technicalDebt > 46 || state.project.bugs > 32);
+  const buildPressure = catastrophicBuild ? 18
+    : production.buildStatus.level === "broken" ? 3
+      : production.buildStatus.level === "fragile" ? 1.5
+        : production.buildStatus.level === "stable" ? -3
+          : 0;
+  const tensionPressure = tensions.some((tension) => tension.severity === "critical") ? 3
+    : tensions.some((tension) => tension.severity === "warning") ? 1
+      : 0;
+  const financePressure = finance.defaults.length ? 20
+    : finance.shortfall > 0 ? 18
+      : finance.removedStaff.length ? 12
+        : finance.skippedFood ? 6
+          : state.cash < finance.costs.total ? 1
+            : 0;
+  const positivePressure = Math.max(0, buildPressure, tensionPressure, financePressure);
+  const conditionDelta = positivePressure > 0 ? positivePressure : buildPressure;
+
+  let settlementDelta = Math.min(4, production.wastedTotal * 0.1) + conditionDelta - restRelief;
+  if (state.selectedDirective === "integration") settlementDelta -= 3;
+  if (state.selectedDirective === "cutScope") settlementDelta -= 2;
+  if (state.project.isReleased && finance.income > finance.costs.total) settlementDelta -= 4;
+  settlementDelta = Clamp(settlementDelta, -10, 20);
+  state.anxiety = Clamp(state.anxiety + settlementDelta, 0, 100);
   const idea = TryAbstractBreakthrough(state);
   CheckAnxietyFailure(state);
   const after = state.anxiety;
-  if (Math.abs(after - before) >= 5) {
+  const delta = after - before;
+  if (Math.abs(delta) >= 5) {
     PushLog(state, `老板焦虑 ${after > before ? "+" : ""}${Math.round(after - before)}，当前 ${Math.round(after)} / 100：${GetAnxietyState(after).label}。`, after > before ? "warning" : "good");
   }
-  return { before, after, delta: after - before, idea };
+  return {
+    before,
+    settlementBefore,
+    after,
+    delta,
+    settlementDelta: after - settlementBefore,
+    restRelief,
+    idea,
+  };
 }
 
 function EvaluateFeatureDelivery(project) {
@@ -1007,18 +1375,28 @@ function RevenueForRating(state, rating, isUpdate) {
   return RoundMoney(Math.max(0, launchBase * updateLift));
 }
 
-function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
+function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue, marketFit) {
+  const marketMultiplier = marketFit?.revenueMultiplier || 1;
+  const marketRefundDelta = marketFit?.refundRateDelta || 0;
   if (isUpdate) {
+    const marketBaseRevenue = baseRevenue;
+    const grossRevenue = RoundMoney(marketBaseRevenue * marketMultiplier);
+    const refundRate = marketFit?.backlash ? Clamp(0.06 + marketRefundDelta, 0.08, 0.72) : 0;
+    const refunds = RoundMoney(grossRevenue * refundRate);
     return {
-      grossRevenue: baseRevenue,
-      refunds: 0,
-      refundRate: 0,
-      netRevenue: baseRevenue,
-      backlash: false,
+      marketBaseRevenue,
+      marketMultiplier,
+      grossRevenue,
+      refunds,
+      refundRate,
+      netRevenue: Math.max(0, grossRevenue - refunds),
+      backlash: Boolean(marketFit?.backlash),
+      marketBacklash: Boolean(marketFit?.backlash),
       delivered: rating >= 7.6,
       promisedRating: state.project.lastCommercial?.promisedRating || 0,
       expectationGap: 0,
       wishlistSales: 0,
+      marketLabel: marketFit?.label || "",
     };
   }
   const gameType = FindGameType(state.project.gameTypeId);
@@ -1026,7 +1404,8 @@ function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
   const purchaseRate = Clamp(0.06 + rating * 0.045, 0.08, 0.48);
   const wishlistSales = Math.round(state.project.wishlists * purchaseRate);
   const wishlistGross = wishlistSales * saleValue;
-  const grossRevenue = RoundMoney(baseRevenue + wishlistGross);
+  const marketBaseRevenue = RoundMoney(baseRevenue + wishlistGross);
+  const grossRevenue = RoundMoney(marketBaseRevenue * marketMultiplier);
   const marketingPressure = Clamp(state.project.expectation / 45, 0, 1.35);
   const promisedRating = state.project.expectation > 0 ? 4.6 + state.project.expectation * 0.087 : 0;
   const expectationGap = promisedRating > 0 ? promisedRating - rating : 0;
@@ -1037,21 +1416,27 @@ function ResolveCommercialOutcome(state, rating, isUpdate, baseRevenue) {
           : rating < 6.5 ? 0.06
             : 0.025;
   const expectationRefund = Math.max(0, expectationGap) * (0.045 + marketingPressure * 0.08);
-  const refundRate = Clamp(qualityRefund + expectationRefund, 0.02, 0.92);
+  const refundRate = Clamp(qualityRefund + expectationRefund + marketRefundDelta, 0.02, 0.96);
   const refunds = RoundMoney(grossRevenue * refundRate);
   const netRevenue = Math.max(0, grossRevenue - refunds);
-  const backlash = state.project.marketingSpent > 0 && (refundRate >= 0.24 || expectationGap >= 1.25);
-  const delivered = state.project.marketingSpent > 0 && rating >= promisedRating - 0.35;
+  const marketingBacklash = state.project.marketingSpent > 0 && (refundRate >= 0.24 || expectationGap >= 1.25);
+  const marketBacklash = Boolean(marketFit?.backlash);
+  const backlash = marketingBacklash || marketBacklash;
+  const delivered = state.project.marketingSpent > 0 && rating >= promisedRating - 0.35 && !marketBacklash;
   return {
+    marketBaseRevenue,
+    marketMultiplier,
     grossRevenue,
     refunds,
     refundRate,
     netRevenue,
     backlash,
+    marketBacklash,
     delivered,
     promisedRating,
     expectationGap,
     wishlistSales,
+    marketLabel: marketFit?.label || "",
   };
 }
 
@@ -1075,7 +1460,8 @@ function ResolveReleaseAnxiety(state, rating, isUpdate, oldRating, commercial) {
   if (commercial?.backlash) delta += Math.round(6 + commercial.refundRate * 18);
   else if (commercial?.delivered) delta -= 4;
   state.anxiety = Clamp(state.anxiety + delta, 0, 100);
-  if (commercial?.backlash) PushLog(state, `宣发吹得太响，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，老板焦虑 +${delta}。`, "danger");
+  if (commercial?.marketBacklash) PushLog(state, `市场时机踩空，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，评论区开团，老板焦虑 +${delta}。`, "danger");
+  else if (commercial?.backlash) PushLog(state, `宣发吹得太响，玩家退款率 ${Math.round(commercial.refundRate * 100)}%，老板焦虑 +${delta}。`, "danger");
   else if (delta >= 8) PushLog(state, `玩家把烂版本骂上热评，老板焦虑 +${delta}。`, "danger");
   else if (delta < 0) PushLog(state, `版本口碑让老板短暂相信自己，焦虑 ${delta}。`, "good");
   CheckAnxietyFailure(state);
@@ -1099,23 +1485,24 @@ function CheckRevenueGoal(state) {
   state.status = "ended";
   state.outcome = {
     kind: "worldMaker",
-    title: "100 亿元，世界听见了",
-    subtitle: "你从做不出一个垃圾开始，最后做成了能影响世界的游戏制作人。电脑也还在。",
+    title: "你成为了成功的游戏制作人！",
+    subtitle: "累计游戏收入达到 100 亿元。你从一份合同出发，终于做出了被玩家认可的游戏。电脑也还在。",
   };
-  PushLog(state, "累计游戏收入达到 100 亿元。贷款公司第一次主动给你发了祝福。", "good");
+  PushLog(state, "累计游戏收入达到 100 亿元。你成为了成功的游戏制作人。", "good");
   return true;
 }
 
 export function ReleaseBuild(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing" || !state.project) return { state, ok: false, message: "目前没有能发布的项目。" };
-  if (state.project.age < 2) return { state, ok: false, message: "至少做满两个月再上线，不然商店截图只能放办公室。" };
+  if (state.project.age < 2) return { state, ok: false, message: "至少做满两个月再上线，不然商店截图只能放你家客厅。" };
   if (state.project.lastReleaseMonth === state.month) return { state, ok: false, message: "这个月已经发过版本。给玩家一点下载补丁的时间。" };
 
   const evaluation = EvaluateProject(state);
   const isUpdate = state.project.isReleased;
+  const marketFit = EvaluateMarketFit(state);
   const baseRevenue = RevenueForRating(state, evaluation.rating, isUpdate);
-  const commercial = ResolveCommercialOutcome(state, evaluation.rating, isUpdate, baseRevenue);
+  const commercial = ResolveCommercialOutcome(state, evaluation.rating, isUpdate, baseRevenue, marketFit);
   const revenue = commercial.netRevenue;
   const oldRating = state.project.lastRating;
   state.project.isReleased = true;
@@ -1123,16 +1510,30 @@ export function ReleaseBuild(currentState) {
   state.project.lastRating = evaluation.rating;
   state.project.bestRating = Math.max(state.project.bestRating || 0, evaluation.rating);
   const ratingDelta = oldRating == null ? 0 : evaluation.rating - oldRating;
-  const earnedFans = Math.max(0, evaluation.rating - 4) * (isUpdate ? 310 : 820);
-  const backlashFans = commercial.backlash ? Math.round(state.project.wishlists * commercial.refundRate * 0.22) : 0;
+  const earnedFans = Math.max(0, evaluation.rating - 4) * (isUpdate ? 310 : 820) * (marketFit?.fanMultiplier || 1);
+  const marketBacklashFans = marketFit?.backlash
+    ? Math.round(350 + state.fans * (1 - marketFit.fanMultiplier) * 0.18 + commercial.grossRevenue / 900)
+    : 0;
+  const backlashFans = commercial.backlash
+    ? Math.round(state.project.wishlists * commercial.refundRate * 0.22) + marketBacklashFans
+    : 0;
   state.fans = Math.max(0, Math.round(state.fans + earnedFans - backlashFans));
   const backlashMarketPenalty = commercial.backlash
     ? Clamp(1 - commercial.refundRate * 0.8 - Math.max(0, commercial.expectationGap) * 0.06, 0.35, 1)
     : 1;
   const launchMarketScale = (1 + Math.min(3.2, state.project.wishlists / 25000)
-    * Clamp((evaluation.rating - 2.5) / 6.5, 0.05, 1)) * backlashMarketPenalty;
+    * Clamp((evaluation.rating - 2.5) / 6.5, 0.05, 1))
+    * backlashMarketPenalty
+    * (marketFit?.perfect ? 1.16 : 1);
   state.project.marketScale = isUpdate
-    ? Clamp(state.project.marketScale * MarketGrowthForRating(evaluation.rating, ratingDelta), 0.5, 100000000)
+    ? Clamp(
+      state.project.marketScale
+        * MarketGrowthForRating(evaluation.rating, ratingDelta)
+        * backlashMarketPenalty
+        * (marketFit?.perfect ? 1.08 : 1),
+      0.5,
+      100000000,
+    )
     : Clamp(launchMarketScale, 0.5, 4.2);
   state.project.monthlyRevenue = MonthlyRevenueForRating(state, evaluation.rating)
     * (commercial.backlash ? Clamp(1 - commercial.refundRate * 0.72, 0.32, 1) : 1);
@@ -1146,6 +1547,9 @@ export function ReleaseBuild(currentState) {
     rating: evaluation.rating,
     revenue,
     grossRevenue: commercial.grossRevenue,
+    marketBaseRevenue: commercial.marketBaseRevenue,
+    marketMultiplier: commercial.marketMultiplier,
+    marketTier: marketFit?.tier || "independent",
     refunds: commercial.refunds,
     refundRate: commercial.refundRate,
   });
@@ -1156,21 +1560,31 @@ export function ReleaseBuild(currentState) {
     month: state.month,
     source: isUpdate ? "update" : "launch",
     baseIncome: commercial.grossRevenue,
+    marketBaseIncome: commercial.marketBaseRevenue,
+    marketDelta: commercial.grossRevenue - commercial.marketBaseRevenue,
+    marketTier: marketFit?.tier || "independent",
     income: revenue,
     refunds: commercial.refunds,
     eventLoss: 0,
-    events: commercial.backlash ? ["宣发反噬与集中退款"] : [],
+    events: [
+      ...(marketFit?.perfect || marketFit?.backlash ? [marketFit.label] : []),
+      ...(commercial.backlash ? ["集中退款与口碑反噬"] : []),
+    ],
   });
   state.incomeHistory = state.incomeHistory.slice(-36);
   state.bestRating = Math.max(state.bestRating || 0, evaluation.rating);
   const backlashReputation = commercial.backlash ? 5 + commercial.refundRate * 16 + Math.max(0, commercial.expectationGap) * 1.8 : 0;
-  state.reputation = Clamp(state.reputation + (evaluation.rating - 5) * 1.4 - backlashReputation, 0, 100);
+  state.reputation = Clamp(
+    state.reputation + (evaluation.rating - 5) * 1.4 - backlashReputation + (marketFit?.reputationDelta || 0),
+    0,
+    100,
+  );
   const anxiety = ResolveReleaseAnxiety(state, evaluation.rating, isUpdate, oldRating, commercial);
 
   const review = PickReview(evaluation.rating, state.seed + state.month * 113 + state.project.version);
   const verb = isUpdate ? `v${state.project.version}.0 更新` : "首发上线";
   const refundText = commercial.refunds > 0 ? `，退款 ¥${commercial.refunds.toLocaleString("zh-CN")}` : "";
-  PushLog(state, `${verb}：${evaluation.rating.toFixed(1)} 分，净到账 ¥${revenue.toLocaleString("zh-CN")}${refundText}。${review}`, commercial.backlash ? "danger" : evaluation.rating >= 6.7 ? "good" : "warning");
+  PushLog(state, `《${state.project.name}》${verb}：${evaluation.rating.toFixed(1)} 分，净到账 ¥${revenue.toLocaleString("zh-CN")}${refundText}。${review}`, commercial.backlash ? "danger" : evaluation.rating >= 6.7 ? "good" : "warning");
   CheckRevenueGoal(state);
   return {
     state,
@@ -1179,6 +1593,7 @@ export function ReleaseBuild(currentState) {
     evaluation,
     revenue,
     commercial,
+    marketFit,
     oldRating,
     anxiety,
     review,
@@ -1189,6 +1604,8 @@ export function ReleaseBuild(currentState) {
 export function AdvanceMonth(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing" || !state.project) return { state, ok: false, message: "当前不能推进月份。" };
+  const monthStartAnxiety = Number.isFinite(state.anxietyAtMonthStart) ? state.anxietyAtMonthStart : state.anxiety;
+  const stockSettlement = ResolveStockPosition(state);
   const finance = ProcessFinances(state);
   const production = state.status === "playing"
     ? ProgressProject(
@@ -1205,7 +1622,7 @@ export function AdvanceMonth(currentState) {
     };
   const output = production.output;
   const tensions = CalculateTensions(state.project);
-  const anxiety = ResolveMonthlyAnxiety(state, production, finance, tensions);
+  const anxiety = ResolveMonthlyAnxiety(state, production, finance, tensions, monthStartAnxiety);
   const directive = FindDirective(state.selectedDirective);
   if (state.status === "playing") {
     const tensionText = tensions[0]?.title || "四组暂时没有互相拉黑";
@@ -1219,6 +1636,7 @@ export function AdvanceMonth(currentState) {
     painEvents: production.painEvents,
     buildStatus: production.buildStatus,
     finance,
+    stockSettlement,
     tensions,
     anxiety,
     directiveId: state.selectedDirective,
@@ -1229,6 +1647,7 @@ export function AdvanceMonth(currentState) {
     state.month += 1;
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
+    state.anxietyAtMonthStart = state.anxiety;
   }
   return {
     state,
@@ -1240,6 +1659,7 @@ export function AdvanceMonth(currentState) {
     buildStatus: production.buildStatus,
     anxiety,
     finance,
+    stockSettlement,
     tensions,
     message: "月报已结算",
   };
@@ -1251,7 +1671,10 @@ export function HireStaff(currentState, staffId) {
   if (!staff) return { state, ok: false, message: "人才不存在，可能已被别的创业者画饼带走。" };
   if (state.status !== "playing") return { state, ok: false, message: "请先立项。" };
   if (state.team.some((member) => member.id === staffId)) return { state, ok: false, message: `${staff.name} 已经在工位上了。` };
-  if (state.team.length >= 4) return { state, ok: false, message: "办公室只有四张外包工位。先结束一段缘分。" };
+  if (state.team.length >= WORKSTATION_COSTS.length) return { state, ok: false, message: "家里已经塞满四张额外工位。再来一个人只能坐冰箱。" };
+  if (state.team.length >= (state.workstations || 0)) {
+    return { state, ok: false, message: state.workstations > 0 ? "没有空工位。先去人才市场设备柜台再买一套电脑桌椅。" : "家里只有老板自己的电脑。第一次招聘前，先在人才市场买第一套工位。" };
+  }
   state.team.push({ id: staffId, morale: 70, stress: 18, drift: 12, boost: 0, months: 0, investmentLevel: 0 });
   PushLog(
     state,
@@ -1261,6 +1684,22 @@ export function HireStaff(currentState, staffId) {
     "good",
   );
   return { state, ok: true, message: staff.kind === "ai" ? "AI 已开始计费" : "大学生已入职" };
+}
+
+export function PurchaseWorkstation(currentState) {
+  const state = Clone(currentState);
+  if (state.status !== "playing") return { state, ok: false, message: "公司还没成立，设备发票暂时没有抬头。" };
+  const currentCount = Math.max(0, Math.floor(state.workstations || 0));
+  if (currentCount >= WORKSTATION_COSTS.length) return { state, ok: false, message: "四套额外工位已经把家塞满了。" };
+  const cost = WORKSTATION_COSTS[currentCount];
+  if (state.cash < cost) return { state, ok: false, message: `第 ${currentCount + 1} 套工位要 ¥${cost.toLocaleString("zh-CN")}，现金不够。` };
+  state.cash -= cost;
+  state.totalCosts += cost;
+  state.workstations = currentCount + 1;
+  state.equipmentSpent = (state.equipmentSpent || 0) + cost;
+  state.anxiety = Clamp(state.anxiety + 1, 0, 100);
+  PushLog(state, `购入第 ${state.workstations} 套员工工位：电脑、显示器、桌椅共 ¥${cost.toLocaleString("zh-CN")}。家又小了一点。`, "warning");
+  return { state, ok: true, cost, workstations: state.workstations, message: `第 ${state.workstations} 套工位已搬回家` };
 }
 
 export function FireStaff(currentState, staffId) {
@@ -1305,6 +1744,46 @@ export function SetStaffInvestmentLevel(currentState, staffId, requestedLevel) {
   };
 }
 
+export function SetMarketStrategy(currentState, requestedFocusId, requestedDirectionId = undefined) {
+  const state = Clone(currentState);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "没有开发中项目。" };
+  const previousStrategy = state.project.marketStrategy || { focusId: "concept", directionId: null, setMonth: 0 };
+  if (previousStrategy.setMonth === state.month) {
+    return { state, ok: false, message: "本月主推已锁定。" };
+  }
+  const independent = requestedFocusId === MARKET_INDEPENDENT_ID || requestedDirectionId === MARKET_INDEPENDENT_ID;
+  const focusId = independent
+    ? (MarketFocusFor(state, previousStrategy.focusId)?.id || "concept")
+    : (requestedFocusId || "concept");
+  const focus = MarketFocusFor(state, focusId);
+  if (!focus) return { state, ok: false, message: "该特色尚未加入项目。" };
+  const directionId = independent ? null : GetMarketSnapshot(state).effectiveDirection.id;
+  state.project.marketStrategy = {
+    focusId: focus.id,
+    directionId,
+    setMonth: state.month,
+  };
+  state.project.marketStrategyHistory ||= [];
+  state.project.marketStrategyHistory.push({
+    month: state.month,
+    focusId: focus.id,
+    directionId,
+  });
+  state.project.marketStrategyHistory = state.project.marketStrategyHistory.slice(-24);
+  const marketFit = EvaluateMarketFit(state);
+  PushLog(
+    state,
+    independent ? "市场：本月不追风。" : "市场：主推「" + focus.title + "」；" + marketFit.label + "。",
+    marketFit.backlash ? "warning" : marketFit.perfect ? "good" : "normal",
+  );
+  return {
+    state,
+    ok: true,
+    marketFit,
+    message: marketFit.perfect ? "主推特色正中风口" : marketFit.backlash ? "主推特色与风向不符" : "本月不追风",
+  };
+}
+
 export function SelectDirective(currentState, directiveId) {
   const state = Clone(currentState);
   const directive = FindDirective(directiveId);
@@ -1317,18 +1796,130 @@ export function SelectFoodPlan(currentState, foodPlanId) {
   const state = Clone(currentState);
   const foodPlan = FindFoodPlan(foodPlanId);
   if (!foodPlan) return { state, ok: false, message: "这份饭不存在，可能已被实习生吃了。" };
+  const venue = CONSUMER_VENUES.find((candidate) => candidate.foodPlanId === foodPlanId);
+  if (venue) {
+    const access = GetConsumerVenueAccess(state, venue.id);
+    if (!access.ok) {
+      return {
+        state,
+        ok: false,
+        access,
+        message: `${venue.name}要先验资 ¥${venue.minimumCash.toLocaleString("zh-CN")}，还差 ¥${access.shortfall.toLocaleString("zh-CN")}。`,
+      };
+    }
+  }
   state.foodPlan = foodPlanId;
   return { state, ok: true, message: `本月吃法：${foodPlan.name}` };
 }
 
-export function Speculate(currentState, optionId) {
+export function GetConsumerVenueAccess(currentState, venueId) {
+  const venue = FindConsumerVenue(venueId);
+  if (!venue) return { ok: false, venue: null, cash: Number(currentState?.cash) || 0, minimumCash: 0, shortfall: 0 };
+  const cash = Math.max(0, Number(currentState?.cash) || 0);
+  const minimumCash = Math.max(0, Number(venue.minimumCash) || 0);
+  return {
+    ok: cash >= minimumCash,
+    venue,
+    cash,
+    minimumCash,
+    shortfall: Math.max(0, minimumCash - cash),
+  };
+}
+
+export function VisitRelaxationVenue(currentState, venueId) {
   const state = Clone(currentState);
-  const option = SPECULATION_OPTIONS.find((candidate) => candidate.id === optionId);
-  if (state.status !== "playing") return { state, ok: false, message: "本局已经结束，券商拒绝为精神状态开户。" };
-  if (!option) return { state, ok: false, message: "这项投机不存在，已经算今天最好的财务消息。" };
-  if (state.lastSpeculationMonth === state.month) return { state, ok: false, message: "本月已经赌过一次。先把手从刷新按钮上拿开。" };
-  const stake = option.stakeMode === "allIn" ? state.cash : option.stake;
-  if (stake <= 0 || state.cash < stake) return { state, ok: false, message: `连 ${option.name} 的本金都没有，暂时保住了破产资格。` };
+  const venue = FindConsumerVenue(venueId);
+  if (state.status !== "playing") return { state, ok: false, message: "本局已经结束，前台只接受活着的老板。" };
+  if (!venue || venue.category !== "relaxation") return { state, ok: false, message: "这家店没有登记解压服务。" };
+  const access = GetConsumerVenueAccess(state, venueId);
+  if (!access.ok) {
+    return {
+      state,
+      ok: false,
+      access,
+      message: `${venue.name}准入资金 ¥${venue.minimumCash.toLocaleString("zh-CN")}，还差 ¥${access.shortfall.toLocaleString("zh-CN")}。`,
+    };
+  }
+  if (state.lastRelaxationMonth === state.month) return { state, ok: false, message: "本月已经放松过一次。再泡下去，项目会先泡发。" };
+  if (state.cash < venue.cost) return { state, ok: false, message: `${venue.name}本次要 ¥${venue.cost.toLocaleString("zh-CN")}，现金不够。` };
+
+  const anxietyBefore = state.anxiety;
+  state.cash -= venue.cost;
+  state.totalCosts += venue.cost;
+  state.anxiety = Clamp(state.anxiety - venue.anxietyRelief, 0, 100);
+  state.lastRelaxationMonth = state.month;
+  state.relaxationHistory ||= [];
+  state.relaxationHistory.push({
+    month: state.month,
+    venueId,
+    cost: venue.cost,
+    anxietyBefore,
+    anxietyAfter: state.anxiety,
+  });
+  state.relaxationHistory = state.relaxationHistory.slice(-12);
+  const relieved = Math.round(anxietyBefore - state.anxiety);
+  PushLog(state, `${venue.name}消费 ¥${venue.cost.toLocaleString("zh-CN")}，焦虑 -${relieved}。项目群被静音了一会儿。`, "good");
+  return {
+    state,
+    ok: true,
+    venue,
+    cost: venue.cost,
+    anxietyBefore,
+    anxietyAfter: state.anxiety,
+    relieved,
+    message: `${venue.name}：焦虑 -${relieved}`,
+  };
+}
+
+function EnsureInvestmentState(state) {
+  state.speculationHistory ||= [];
+  state.speculationProfit = Number.isFinite(state.speculationProfit) ? state.speculationProfit : 0;
+  if (!Number.isInteger(state.lastScratchMonth)) {
+    const legacyScratch = [...state.speculationHistory].reverse().find((entry) => (
+      entry?.kind === "scratch"
+      || [SCRATCH_OPTION.id, "lottery"].includes(entry?.optionId)
+      || SPECULATION_OPTIONS.find((option) => option.id === entry?.optionId)?.category === "lottery"
+    ));
+    state.lastScratchMonth = legacyScratch?.month || 0;
+  }
+  state.stockAccountUnlocked = state.stockAccountUnlocked === true;
+  state.stockPosition ??= null;
+  state.stockHistory ||= [];
+}
+
+export function GetStockAccountAccess(state) {
+  const cash = Math.max(0, Number(state?.cash) || 0);
+  const permanentlyUnlocked = state?.stockAccountUnlocked === true;
+  return {
+    unlocked: permanentlyUnlocked || cash >= STOCK_ACCOUNT_UNLOCK_CASH,
+    permanentlyUnlocked,
+    minimumCash: STOCK_ACCOUNT_UNLOCK_CASH,
+    shortfall: Math.max(0, STOCK_ACCOUNT_UNLOCK_CASH - cash),
+  };
+}
+
+export function UnlockStockAccount(currentState) {
+  const state = Clone(currentState);
+  EnsureInvestmentState(state);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "公司未成立。" };
+  if (state.stockAccountUnlocked) return { state, ok: true, alreadyUnlocked: true, message: "股票账户已解锁。" };
+  const access = GetStockAccountAccess(state);
+  if (!access.unlocked) {
+    return { state, ok: false, access, message: `炒股需 ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}；还差 ¥${access.shortfall.toLocaleString("zh-CN")}。` };
+  }
+  state.stockAccountUnlocked = true;
+  PushLog(state, `股票账户已解锁 · ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}`, "good");
+  return { state, ok: true, access: GetStockAccountAccess(state), message: "股票账户已解锁" };
+}
+
+export function BuyScratchTicket(currentState) {
+  const state = Clone(currentState);
+  EnsureInvestmentState(state);
+  const option = SCRATCH_OPTION;
+  if (state.status !== "playing") return { state, ok: false, message: "本局已结束。" };
+  if (state.lastScratchMonth === state.month) return { state, ok: false, message: "本月已刮。" };
+  const stake = option.stake;
+  if (state.cash < stake) return { state, ok: false, message: `需 ¥${stake.toLocaleString("zh-CN")}；现金不足。` };
 
   const roll = SeededUnit(state.seed + state.month * 733 + option.id.length * 97 + state.speculationHistory.length * 31);
   const outcome = option.outcomes.find((candidate) => roll < candidate.ceiling) || option.outcomes.at(-1);
@@ -1337,23 +1928,13 @@ export function Speculate(currentState, optionId) {
   state.cash = Math.max(0, state.cash - stake + payout);
   state.totalCosts += stake;
   state.speculationProfit += profit;
+  state.lastScratchMonth = state.month;
   state.lastSpeculationMonth = state.month;
-  state.speculationHistory.push({ month: state.month, optionId, stake, payout, profit, label: outcome.label });
+  state.speculationHistory.push({ kind: "scratch", month: state.month, optionId: option.id, stake, payout, profit, label: outcome.label });
   state.speculationHistory = state.speculationHistory.slice(-12);
-
-  if (option.stakeMode === "allIn" && payout === 0) {
-    state.status = "gameover";
-    state.outcome = {
-      kind: "speculationBankruptcy",
-      title: "妖股替你发布了最终版本",
-      subtitle: "全仓归零，创业现金当场清空。它没有算作游戏收入，甚至没有留下崩溃日志。",
-    };
-    PushLog(state, `${option.name}：${outcome.label}。现金归零，工作室直接破产。`, "danger");
-  } else {
-    state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
-    PushLog(state, `${option.name}：${outcome.label}，${profit >= 0 ? "赚" : "亏"} ¥${Math.abs(profit).toLocaleString("zh-CN")}。投机收益不算游戏收入。`, profit > 0 ? "good" : "danger");
-    CheckAnxietyFailure(state);
-  }
+  state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
+  PushLog(state, `${option.name} · ${outcome.label} · ${profit >= 0 ? "+" : "−"}¥${Math.abs(profit).toLocaleString("zh-CN")} · 不计游戏收入`, profit > 0 ? "good" : "warning");
+  CheckAnxietyFailure(state);
   return {
     state,
     ok: true,
@@ -1364,6 +1945,115 @@ export function Speculate(currentState, optionId) {
     profit,
     message: `${option.name}：${outcome.label}`,
   };
+}
+
+export function PlaceStockOrder(currentState, optionId, requestedStake) {
+  const state = Clone(currentState);
+  EnsureInvestmentState(state);
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === optionId);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "当前不能下单。" };
+  if (!option) return { state, ok: false, message: "仅可选择列表中的股票。" };
+  const access = GetStockAccountAccess(state);
+  if (!access.unlocked) return { state, ok: false, access, message: `炒股需 ¥${STOCK_ACCOUNT_UNLOCK_CASH.toLocaleString("zh-CN")}；还差 ¥${access.shortfall.toLocaleString("zh-CN")}。` };
+  if (state.stockPosition) return { state, ok: false, message: "本月已有持仓。" };
+
+  const requested = Number(requestedStake);
+  if (!Number.isFinite(requested) || requested <= 0) return { state, ok: false, message: "请输入买入金额。" };
+  const stake = Math.floor(requested / STOCK_BUY_STEP) * STOCK_BUY_STEP;
+  if (stake < option.minimumBuy) return { state, ok: false, message: `最低 ¥${option.minimumBuy.toLocaleString("zh-CN")}；按千元取整。` };
+  if (stake > state.cash) return { state, ok: false, message: `需 ¥${stake.toLocaleString("zh-CN")}；现金不足。` };
+
+  state.stockAccountUnlocked = true;
+  state.cash -= stake;
+  state.stockPosition = {
+    openedMonth: state.month,
+    optionId: option.id,
+    stake,
+  };
+  PushLog(state, `${option.symbol} 买入 ¥${stake.toLocaleString("zh-CN")} · M${String(state.month + 1).padStart(2, "0")} 收盘`, "warning");
+  return {
+    state,
+    ok: true,
+    option,
+    position: { ...state.stockPosition },
+    stake,
+    message: `${option.symbol} 已买入 · 次月收盘`,
+  };
+}
+
+function BuildStockTrend(option, finalMultiplier, seed) {
+  const days = 22;
+  const startPrice = 100;
+  const finalPrice = Math.max(1, startPrice * finalMultiplier);
+  const turns = 2 + Math.floor(SeededUnit(seed + 17) * 3);
+  return Array.from({ length: days + 1 }, (_, index) => {
+    const progress = index / days;
+    const envelope = Math.sin(Math.PI * progress);
+    const randomMove = (SeededUnit(seed + index * 173) - 0.5) * 2 * option.volatility * 100 * envelope;
+    const marketWave = Math.sin(progress * Math.PI * turns) * option.volatility * 24 * envelope;
+    const price = Math.max(1, startPrice + (finalPrice - startPrice) * progress + randomMove + marketWave);
+    return { day: index, price: Number(price.toFixed(1)) };
+  });
+}
+
+function ResolveStockPosition(state) {
+  EnsureInvestmentState(state);
+  const position = state.stockPosition;
+  if (!position) return null;
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === position.optionId);
+  if (!option) {
+    state.cash += position.stake;
+    state.stockPosition = null;
+    return null;
+  }
+
+  const seed = state.seed + position.openedMonth * 911 + option.id.length * 131 + state.stockHistory.length * 47;
+  const roll = SeededUnit(seed);
+  const outcome = option.outcomes.find((candidate) => roll < candidate.ceiling) || option.outcomes.at(-1);
+  const payout = RoundMoney(position.stake * outcome.payoutMultiplier);
+  const profit = payout - position.stake;
+  const finalMultiplier = payout / position.stake;
+  const trend = BuildStockTrend(option, finalMultiplier, seed + 409);
+  const settlement = {
+    kind: "stock",
+    month: position.openedMonth,
+    settledMonth: state.month + 1,
+    optionId: option.id,
+    stake: position.stake,
+    payout,
+    profit,
+    returnRate: profit / position.stake,
+    label: outcome.label,
+    trend,
+  };
+  state.cash += payout;
+  state.speculationProfit += profit;
+  state.anxiety = Clamp(state.anxiety + outcome.anxiety, 0, 100);
+  state.stockHistory.push(settlement);
+  state.stockHistory = state.stockHistory.slice(-12);
+  state.speculationHistory.push({
+    kind: settlement.kind,
+    month: settlement.month,
+    settledMonth: settlement.settledMonth,
+    optionId: settlement.optionId,
+    stake: settlement.stake,
+    payout: settlement.payout,
+    profit: settlement.profit,
+    returnRate: settlement.returnRate,
+    label: settlement.label,
+  });
+  state.speculationHistory = state.speculationHistory.slice(-12);
+  state.stockPosition = null;
+  PushLog(state, `${option.symbol} 收盘 · ${outcome.label} · ${profit >= 0 ? "+" : "−"}¥${Math.abs(profit).toLocaleString("zh-CN")} · 不计游戏收入`, profit >= 0 ? "good" : "danger");
+  return { ...settlement, option, outcome };
+}
+
+// Retained for older consumers; the playable UI now calls the separated
+// scratch-card and stock-order functions directly.
+export function Speculate(currentState, optionId, requestedStake) {
+  if (optionId === SCRATCH_OPTION.id) return BuyScratchTicket(currentState);
+  const option = STOCK_OPTIONS.find((candidate) => candidate.id === optionId);
+  return PlaceStockOrder(currentState, optionId, requestedStake ?? option?.minimumBuy ?? 0);
 }
 
 export function BuyMarketingCampaign(currentState, campaignId) {
@@ -1394,7 +2084,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   if (!feature) return { state, ok: false, message: "这个玩法只存在于会议纪要的另一个版本。" };
   if (state.talkPoints <= 0) return { state, ok: false, message: "本月已经聊到语言失效。进入下月再画饼。" };
   if (state.project.features.some((item) => item.id === feature.id)) return { state, ok: false, message: "这个玩法已经写进项目，再讲一遍不会自动完工。" };
-  if (state.project.features.length >= 6) return { state, ok: false, message: "项目已经塞了 6 个核心玩法。再定制下去只能改名叫需求坟场。" };
+  if (state.project.features.length >= FEATURE_LIMIT) return { state, ok: false, message: `项目最多保留 ${FEATURE_LIMIT} 个核心玩法。` };
 
   const isOwner = sourceId === "owner";
   const member = isOwner ? null : state.team.find((candidate) => candidate.id === sourceId);
@@ -1403,6 +2093,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
 
   let sourceQuality = 0.58;
   let debtMultiplier = 1.35;
+  let ownerProgressMultiplier = 1;
   let sourceLabel = "老板脑内群聊";
   if (staff?.kind === "student") {
     sourceQuality = Clamp(0.82 + member.morale / 500 - member.stress / 520 + (InvestmentPlanForMember(member)?.qualityBonus || 0), 0.62, 1.05);
@@ -1418,6 +2109,11 @@ export function CustomizeProject(currentState, sourceId, featureId) {
     sourceLabel = `${staff.name} · AI`;
     state.anxiety = Clamp(state.anxiety + 1.5, 0, 100);
   } else {
+    const designEffect = GetFounderSkillEffect(state.founderSkills, "design");
+    sourceQuality = Clamp(0.58 * designEffect.outputMultiplier, 0.42, 0.86);
+    ownerProgressMultiplier = designEffect.outputMultiplier;
+    debtMultiplier *= designEffect.riskMultiplier;
+    sourceLabel = `老板脑内群聊 · 策划 ${designEffect.level}`;
     state.hunger = Clamp(state.hunger + 10, 0, 100);
     state.anxiety = Clamp(state.anxiety + 7, 0, 100);
   }
@@ -1425,12 +2121,15 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   MODULE_KEYS.forEach((moduleKey) => {
     const demand = feature.modules[moduleKey] || 0;
     state.project.featureLoad[moduleKey] += demand;
-    const directProgress = isOwner ? 0.35 + demand * 0.08 : 0.7 + demand * sourceQuality * 0.18;
+    const directProgress = isOwner ? (0.35 + demand * 0.08) * ownerProgressMultiplier : 0.7 + demand * sourceQuality * 0.18;
     state.project.modules[moduleKey] = Clamp(state.project.modules[moduleKey] + directProgress, 0, 100);
   });
   state.project.scopeDebt = Clamp(state.project.scopeDebt + Math.max(0, feature.scopeDebt) * debtMultiplier, 0, 80);
   state.project.technicalDebt = Clamp(state.project.technicalDebt + Math.max(0, feature.technicalDebt) * debtMultiplier, 0, 80);
-  state.project.bugs = Clamp(state.project.bugs + Math.max(-1, feature.bugs) * (isOwner ? 1.6 : 1), 0, 80);
+  const featureBugDelta = Math.max(-1, feature.bugs);
+  const ownerRiskMultiplier = isOwner ? GetFounderSkillEffect(state.founderSkills, "design").riskMultiplier : 1;
+  const ownerBugMultiplier = featureBugDelta < 0 ? 1.6 / ownerRiskMultiplier : 1.6 * ownerRiskMultiplier;
+  state.project.bugs = Clamp(state.project.bugs + featureBugDelta * (isOwner ? ownerBugMultiplier : 1), 0, 80);
   state.project.hype = Clamp(state.project.hype + feature.hype, 0, 100);
   state.project.features.push({
     id: feature.id,
@@ -1445,7 +2144,7 @@ export function CustomizeProject(currentState, sourceId, featureId) {
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   const consequence = isOwner
-    ? "你亲自开工：不花工资，但饥饿 +10、焦虑 +7，而且实现质量很像教程看了一半。"
+    ? `策划 ${GetFounderSkillEffect(state.founderSkills, "design").level}：饥饿 +10，焦虑 +7。`
     : staff.kind === "ai"
       ? `${staff.name} 已生成第一版，并顺手把上下文漂移提高了 9。`
       : `${staff.name} 接下提案，压力 +8；这次至少有人知道需求在说什么。`;
@@ -1499,29 +2198,34 @@ export function PerformOwnerTask(currentState, moduleKey) {
   }
 
   const effect = OWNER_TASK_EFFECTS[moduleKey];
+  const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
+  const anxietyCost = GetOwnerTaskAnxietyCost(state.ownerWorkCount);
   const before = state.project.modules[moduleKey];
-  const requestedGain = 2 + Math.floor(SeededUnit(
+  const baseGain = 2 + Math.floor(SeededUnit(
     state.seed + state.month * 137 + state.ownerWorkCount * 17 + moduleKey.length * 31,
   ) * 3);
+  const requestedGain = Math.round(baseGain * skillEffect.outputMultiplier * 10) / 10;
   const after = Clamp(before + requestedGain, 0, 100);
   const gain = after - before;
   state.project.modules[moduleKey] = after;
-  state.project.bugs = Clamp(state.project.bugs + effect.bugs, 0, 80);
-  state.project.scopeDebt = Clamp(state.project.scopeDebt + effect.scopeDebt, 0, 80);
-  state.project.technicalDebt = Clamp(state.project.technicalDebt + effect.technicalDebt, 0, 80);
+  state.project.bugs = Clamp(state.project.bugs + effect.bugs * skillEffect.riskMultiplier, 0, 80);
+  state.project.scopeDebt = Clamp(state.project.scopeDebt + effect.scopeDebt * skillEffect.riskMultiplier, 0, 80);
+  state.project.technicalDebt = Clamp(state.project.technicalDebt + effect.technicalDebt * skillEffect.riskMultiplier, 0, 80);
   state.ownerWorkCount += 1;
   state.ownerWorkMonth = state.month;
   state.hunger = Clamp(state.hunger + 7, 0, 100);
-  state.anxiety = Clamp(state.anxiety + 5, 0, 100);
-  PushLog(state, `${effect.line} ${moduleKey} 模块进度 +${gain.toFixed(1)}，Bug 也顺手学会了复制。`, "warning");
+  state.anxiety = Clamp(state.anxiety + anxietyCost, 0, 100);
+  PushLog(state, `${effect.line} ${skillEffect.skillKey} ${skillEffect.level} 级让进度 +${gain.toFixed(1)}，返工系数 ×${skillEffect.riskMultiplier.toFixed(2)}。`, "warning");
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
   return {
     state,
     ok: true,
     moduleKey,
+    skillEffect,
     gain,
-    message: `老板亲自完成 ${moduleKey} 工位：低质量进度 +${gain.toFixed(1)}。`,
+    anxietyCost,
+    message: `老板以 ${skillEffect.skillKey} ${skillEffect.level} 级完成 ${moduleKey} 工位：进度 +${gain.toFixed(1)}。`,
   };
 }
 
@@ -1579,6 +2283,52 @@ export function TalkToStaff(currentState, staffId, tone) {
   return { state, ok: true, message: "对话完成", line };
 }
 
+export function RepayStartupLoan(currentState, requestedAmount) {
+  const state = Clone(currentState);
+  const loan = state.startupLoan;
+  if (state.status !== "playing" || !loan || loan.status !== "active") {
+    return { state, ok: false, message: loan?.status === "repaid" ? "创业启动贷已经结清。" : "当前没有可偿还的创业启动贷。" };
+  }
+  const numericAmount = requestedAmount === "full" ? loan.remaining : Number(requestedAmount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) return { state, ok: false, message: "还款金额无效。银行暂时拒绝收下空气。" };
+  const payment = Math.min(loan.remaining, Math.round(numericAmount));
+  if (state.cash < payment) return { state, ok: false, message: `现金不够，还差 ¥${Math.ceil(payment - state.cash).toLocaleString("zh-CN")}。` };
+  state.cash -= payment;
+  loan.remaining = Math.max(0, loan.remaining - payment);
+  loan.payments ||= [];
+  loan.payments.push({ month: state.month, amount: payment });
+  state.totalCosts += payment;
+  if (loan.remaining <= 0) {
+    loan.remaining = 0;
+    loan.status = "repaid";
+    state.anxiety = Math.max(0, state.anxiety - 8);
+    PushLog(state, `创业启动贷全部结清。${state.studioName || "工作室"} 暂时重新属于你。`, "good");
+    return { state, ok: true, payment, repaid: true, message: "启动贷已结清，全部身家暂时保住了" };
+  }
+  PushLog(state, `偿还创业启动贷 ¥${payment.toLocaleString("zh-CN")}，仍欠 ¥${loan.remaining.toLocaleString("zh-CN")}。`, "normal");
+  return { state, ok: true, payment, repaid: false, message: `已还 ¥${payment.toLocaleString("zh-CN")}` };
+}
+
+export function RedeemCollateral(currentState, collateralId) {
+  const state = Clone(currentState);
+  const collateral = FindCollateral(collateralId);
+  const loan = state.loans.find((item) => item.collateralId === collateralId && item.status === "active");
+  if (state.status !== "playing" || !collateral || !loan || state.assets[collateralId] !== "pledged") {
+    return { state, ok: false, message: "当前没有这笔抵押。" };
+  }
+  const cost = RoundMoney(Math.max(0, loan.monthlyPayment * loan.remaining));
+  if (state.cash < cost) return { state, ok: false, cost, message: `赎回还差 ¥${Math.ceil(cost - state.cash).toLocaleString("zh-CN")}。` };
+  state.cash -= cost;
+  state.totalCosts += cost;
+  state.assets[collateralId] = "free";
+  loan.remaining = 0;
+  loan.status = "repaid";
+  loan.redeemedMonth = state.month;
+  state.anxiety = Math.max(0, state.anxiety - 3);
+  PushLog(state, `提前结清 ¥${cost.toLocaleString("zh-CN")}，赎回 ${collateral.name}。`, "good");
+  return { state, ok: true, collateral, cost, message: `${collateral.name} 已赎回` };
+}
+
 export function TakeLoan(currentState, collateralId) {
   const state = Clone(currentState);
   const collateral = FindCollateral(collateralId);
@@ -1616,12 +2366,17 @@ export function GetPublicCatalog() {
     gameTypes: GAME_TYPES,
     bills: LIVING_BILLS,
     foodPlans: FOOD_PLANS,
+    consumerVenues: CONSUMER_VENUES,
     marketingCampaigns: MARKETING_CAMPAIGNS,
     featureChoices: FEATURE_CHOICES,
+    marketDirections: MARKET_DIRECTIONS,
+    marketEvents: MARKET_EVENTS,
     studentPayLevels: STUDENT_PAY_LEVELS,
     aiSubscriptionLevels: AI_SUBSCRIPTION_LEVELS,
     pivotReasons: PIVOT_REASONS,
     speculationOptions: SPECULATION_OPTIONS,
+    scratchOption: SCRATCH_OPTION,
+    stockOptions: STOCK_OPTIONS,
     collateral: COLLATERAL_OPTIONS,
   };
 }
@@ -1629,6 +2384,9 @@ export function GetPublicCatalog() {
 export function ValidateState(candidate) {
   if (!candidate || candidate.rulesVersion !== RULES_VERSION) return false;
   if (!["setup", "playing", "gameover", "ended"].includes(candidate.status)) return false;
+  if (typeof candidate.studioName !== "string" || candidate.studioName.length > 18) return false;
+  // Saves created before founder skills existed remain loadable and are normalized by the UI loader.
+  if (candidate.founderSkills != null && !IsFounderSkillSetValid(candidate.founderSkills)) return false;
   if (!Number.isInteger(candidate.month) || candidate.month < 1) return false;
   if (!Number.isInteger(candidate.ownerWorkMonth) || candidate.ownerWorkMonth < 1
     || candidate.ownerWorkMonth > candidate.month
@@ -1639,10 +2397,48 @@ export function ValidateState(candidate) {
     .every(Number.isFinite)) return false;
   if (candidate.cash < 0 || candidate.gameRevenue < 0 || candidate.arrears < 0
     || candidate.anxiety < 0 || candidate.anxiety > 100 || candidate.hunger < 0 || candidate.hunger > 100) return false;
+  if (candidate.anxietyAtMonthStart !== undefined
+    && (!Number.isFinite(candidate.anxietyAtMonthStart) || candidate.anxietyAtMonthStart < 0 || candidate.anxietyAtMonthStart > 100)) return false;
   if (!FindFoodPlan(candidate.foodPlan) || !FindDirective(candidate.selectedDirective)) return false;
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)
     || !Array.isArray(candidate.incomeHistory) || !Array.isArray(candidate.speculationHistory)) return false;
+  if (candidate.lastScratchMonth !== undefined
+    && (!Number.isInteger(candidate.lastScratchMonth) || candidate.lastScratchMonth < 0 || candidate.lastScratchMonth > candidate.month)) return false;
+  if (candidate.stockAccountUnlocked !== undefined && typeof candidate.stockAccountUnlocked !== "boolean") return false;
+  if (candidate.stockPosition !== undefined && candidate.stockPosition !== null) {
+    const position = candidate.stockPosition;
+    if (!STOCK_OPTIONS.some((option) => option.id === position?.optionId)
+      || !Number.isInteger(position.openedMonth) || position.openedMonth < 1 || position.openedMonth > candidate.month
+      || !Number.isFinite(position.stake) || position.stake < STOCK_BUY_STEP) return false;
+  }
+  if (candidate.stockHistory !== undefined) {
+    if (!Array.isArray(candidate.stockHistory) || candidate.stockHistory.some((entry) => (
+      !STOCK_OPTIONS.some((option) => option.id === entry?.optionId)
+      || ![entry.month, entry.settledMonth, entry.stake, entry.payout, entry.profit, entry.returnRate].every(Number.isFinite)
+      || entry.month < 1 || entry.month > candidate.month || entry.settledMonth < entry.month || entry.settledMonth > candidate.month + 1
+      || entry.stake < STOCK_BUY_STEP || entry.payout < 0
+      || !Array.isArray(entry.trend) || entry.trend.length < 2
+      || entry.trend.some((point) => !Number.isFinite(point?.day) || !Number.isFinite(point?.price) || point.day < 0 || point.price <= 0)
+    ))) return false;
+  }
+  if (candidate.lastRelaxationMonth !== undefined
+    && (!Number.isInteger(candidate.lastRelaxationMonth) || candidate.lastRelaxationMonth < 0 || candidate.lastRelaxationMonth > candidate.month)) return false;
+  if (candidate.relaxationHistory !== undefined) {
+    if (!Array.isArray(candidate.relaxationHistory) || candidate.relaxationHistory.some((entry) => (
+      !FindConsumerVenue(entry?.venueId)
+      || ![entry.month, entry.cost, entry.anxietyBefore, entry.anxietyAfter].every(Number.isFinite)
+      || entry.month < 1 || entry.month > candidate.month || entry.cost < 0
+      || entry.anxietyBefore < 0 || entry.anxietyBefore > 100 || entry.anxietyAfter < 0 || entry.anxietyAfter > 100
+    ))) return false;
+  }
+  if (!Number.isInteger(candidate.workstations) || candidate.workstations < 0 || candidate.workstations > WORKSTATION_COSTS.length
+    || !Number.isFinite(candidate.equipmentSpent) || candidate.equipmentSpent < 0) return false;
+  const startupLoan = candidate.startupLoan;
+  if (!startupLoan || !["pending", "active", "repaid", "defaulted"].includes(startupLoan.status)
+    || ![startupLoan.principal, startupLoan.totalDue, startupLoan.remaining, startupLoan.dueMonth].every(Number.isFinite)
+    || startupLoan.principal <= 0 || startupLoan.totalDue < startupLoan.principal || startupLoan.remaining < 0
+    || !Array.isArray(startupLoan.payments)) return false;
 
   if (!Array.isArray(candidate.team) || candidate.team.length > 4) return false;
   const teamIds = new Set();
@@ -1660,12 +2456,26 @@ export function ValidateState(candidate) {
   const project = candidate.project;
   if (!project) return candidate.status === "setup";
   if (!FindProject(project.templateId) || !FindGameType(project.gameTypeId)) return false;
+  if (!candidate.studioName || typeof project.name !== "string" || !project.name || project.name.length > 20) return false;
   if (!project.modules || !project.featureLoad
     || MODULE_KEYS.some((moduleKey) => !Number.isFinite(project.modules[moduleKey])
       || project.modules[moduleKey] < 0 || project.modules[moduleKey] > 100
       || !Number.isFinite(project.featureLoad[moduleKey]) || project.featureLoad[moduleKey] < 0)) return false;
   if (!Array.isArray(project.features) || project.features.some((feature) => !FindFeatureChoice(feature?.id))) return false;
   if (!Array.isArray(project.campaigns) || project.campaigns.some((campaignId) => !FindMarketingCampaign(campaignId))) return false;
+  if (project.marketStrategy) {
+    const strategy = project.marketStrategy;
+    if (!MarketFocusFor(candidate, strategy.focusId)
+      || (strategy.directionId !== null && !FindMarketDirection(strategy.directionId))
+      || !Number.isInteger(strategy.setMonth) || strategy.setMonth < 0 || strategy.setMonth > candidate.month) return false;
+  }
+  if (project.marketStrategyHistory !== undefined) {
+    if (!Array.isArray(project.marketStrategyHistory) || project.marketStrategyHistory.some((entry) => (
+      !Number.isInteger(entry?.month) || entry.month < 1 || entry.month > candidate.month
+      || !MarketFocusFor(candidate, entry.focusId)
+      || (entry.directionId !== null && !FindMarketDirection(entry.directionId))
+    ))) return false;
+  }
   if (!Array.isArray(project.abstractIdeas) || project.abstractIdeas.some((idea) => !ABSTRACT_IDEAS.some((candidateIdea) => candidateIdea.id === idea?.id))) return false;
   if (!Array.isArray(project.pivotHistory) || !Array.isArray(project.releaseHistory)
     || !Array.isArray(project.activeLiveEvents) || !Array.isArray(project.painHistory)) return false;

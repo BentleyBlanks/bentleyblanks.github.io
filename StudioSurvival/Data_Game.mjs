@@ -376,42 +376,42 @@ export const DIRECTIVES = [
     id: "integration",
     name: "四组联调",
     icon: "◎",
-    description: "少做一点，确保做的是同一款游戏。降低范围债与资源压力。",
+    description: "全模块 +2.5；两种债 -6，Bug -1。",
     color: "#a8c7ff",
   },
   {
     id: "artSprint",
     name: "截图先赢",
     icon: "◆",
-    description: "美术猛冲，宣传图会很好看，设备可能会先冒烟。",
+    description: "美术 +8；技术债 +3，热度 +3。",
     color: "#ff6eae",
   },
   {
     id: "scopeParty",
     name: "灵感爆炸",
     icon: "✦",
-    description: "策划放飞。想法增长速度通常高于客户端的血压。",
+    description: "策划 +9；范围债 +7，热度 +2。",
     color: "#ffd166",
   },
   {
     id: "clientCrush",
     name: "先让它能跑",
     icon: "▣",
-    description: "客户端攻坚，砍掉解释不清的部分，先做出真东西。",
+    description: "客户端 +8、性能 +1；范围债 -5，Bug +2。",
     color: "#66b8ff",
   },
   {
     id: "performanceDebt",
     name: "清性能债",
     icon: "◌",
-    description: "还显存和帧时间的债。过量使用会喜提土豆画质。",
+    description: "性能 +9；技术债 -8。",
     color: "#68e0a0",
   },
   {
     id: "cutScope",
     name: "忍痛砍需求",
     icon: "✂",
-    description: "删除最酷但做不完的 30%。策划难过，项目活着。",
+    description: "范围债 -14、技术债 -3；热度 -2。",
     color: "#ff9b73",
   },
 ];
@@ -423,6 +423,7 @@ export const PROJECTS = [
     genre: "荒诞生存模拟",
     pitch: "在停电的太空便利店里，一边理货一边躲避会报税的外星人。",
     trend: "反常识模拟",
+    marketDirections: ["systemDepth", "antiRoutine"],
     accent: "#8d7cff",
   },
   {
@@ -431,6 +432,7 @@ export const PROJECTS = [
     genre: "动作经营",
     pitch: "末班地铁变成夜市，用砍价连招对抗通勤焦虑。",
     trend: "都市怪谈",
+    marketDirections: ["streamerSpectacle", "systemDepth"],
     accent: "#ff8c69",
   },
   {
@@ -439,6 +441,7 @@ export const PROJECTS = [
     genre: "叙事冒险",
     pitch: "驾驶一艘工位飞船，把离职信送到宇宙尽头的老板手里。",
     trend: "情绪叙事",
+    marketDirections: ["emotionalStory", "antiRoutine"],
     accent: "#55d6be",
   },
   {
@@ -447,6 +450,7 @@ export const PROJECTS = [
     genre: "账单 Roguelike",
     pitch: "每月一场 Boss 战，伤害数字就是本月账单。",
     trend: "现实主义恐怖",
+    marketDirections: ["antiRoutine", "systemDepth"],
     accent: "#f45b69",
   },
 ];
@@ -490,6 +494,113 @@ export const GAME_TYPES = [
   },
 ];
 
+export const MARKET_DIRECTIONS = [
+  {
+    id: "systemDepth",
+    name: "系统深挖",
+    shortName: "深系统",
+    icon: "⌘",
+    color: "#ffd166",
+    perfectMultiplier: 1.72,
+    description: "玩家想要能研究、能复盘、能长出意外故事的复杂系统。",
+  },
+  {
+    id: "emotionalStory",
+    name: "情绪共鸣",
+    shortName: "共情",
+    icon: "♥",
+    color: "#ff7cae",
+    perfectMultiplier: 1.58,
+    description: "角色关系和真实情绪比功能数量更容易让玩家主动安利。",
+  },
+  {
+    id: "streamerSpectacle",
+    name: "直播奇观",
+    shortName: "节目效果",
+    icon: "◉",
+    color: "#8d7cff",
+    perfectMultiplier: 1.84,
+    description: "十秒能看懂、一次能笑出声、方便剪成短视频的玩法正在抢流量。",
+  },
+  {
+    id: "lowSpecFriendly",
+    name: "低配友好",
+    shortName: "低配",
+    icon: "▤",
+    color: "#68e0a0",
+    perfectMultiplier: 1.46,
+    description: "加载快、按钮少、旧设备也能顺畅玩的产品口碑正在抬头。",
+  },
+  {
+    id: "antiRoutine",
+    name: "反套路表达",
+    shortName: "反套路",
+    icon: "↯",
+    color: "#ff8c69",
+    perfectMultiplier: 1.76,
+    description: "玩家厌倦熟悉配方，愿意为一句从没见过的玩法描述买单。",
+  },
+];
+
+export const MARKET_EVENTS = [
+  {
+    id: "spreadsheetStream",
+    title: "主播靠一张系统表播了十小时",
+    directionId: "systemDepth",
+    heatMultiplier: 1.08,
+    description: "本月转向系统深挖。",
+  },
+  {
+    id: "storyFestival",
+    title: "叙事游戏节把全网评论区哭穿了",
+    directionId: "emotionalStory",
+    heatMultiplier: 1.06,
+    description: "本月转向情绪共鸣。",
+  },
+  {
+    id: "clipChallenge",
+    title: "十秒挑战玩法席卷短视频",
+    directionId: "streamerSpectacle",
+    heatMultiplier: 1.12,
+    description: "本月转向直播奇观。",
+  },
+  {
+    id: "oldPhoneWave",
+    title: "旧手机玩家集体给发热大作打一星",
+    directionId: "lowSpecFriendly",
+    heatMultiplier: 1.1,
+    description: "本月转向低配友好。",
+  },
+  {
+    id: "cloneFatigue",
+    title: "年度换皮大作因同质化遭到群嘲",
+    directionId: "antiRoutine",
+    heatMultiplier: 1.13,
+    description: "本月转向反套路表达。",
+  },
+  {
+    id: "metaJokeFatigue",
+    title: "玩家厌倦所有角色都知道自己在游戏里",
+    directionId: "emotionalStory",
+    heatMultiplier: 1.09,
+    description: "本月转向情绪共鸣。",
+  },
+  {
+    id: "patchSizeScandal",
+    title: "某大作首日补丁突破 180GB",
+    directionId: "lowSpecFriendly",
+    heatMultiplier: 1.08,
+    description: "本月转向低配友好。",
+  },
+  {
+    id: "bugMuseumViral",
+    title: "一个穿模视频被玩家二创成连续剧",
+    directionId: "streamerSpectacle",
+    heatMultiplier: 1.14,
+    description: "本月转向直播奇观。",
+  },
+];
+
 export const LIVE_REVENUE_EVENTS = [
   {
     id: "algorithmBurial",
@@ -497,7 +608,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.58,
     duration: 2,
     anxiety: 4,
-    description: "商店曝光突然归零，客服回复‘排序系统运行正常’。",
+    description: "曝光骤降。",
   },
   {
     id: "serverSmoke",
@@ -505,7 +616,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.38,
     duration: 1,
     anxiety: 7,
-    description: "玩家最有空的时候，登录按钮最没空。",
+    description: "登录失败。",
   },
   {
     id: "competitorSale",
@@ -513,7 +624,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.65,
     duration: 2,
     anxiety: 3,
-    description: "同品类大作进入史低，你的原价显得像一种挑衅。",
+    description: "竞品分走销量。",
   },
   {
     id: "reviewRaid",
@@ -521,7 +632,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.5,
     duration: 1,
     anxiety: 8,
-    description: "一条 Bug 视频爆了，播放量比宣传片高二十倍。",
+    description: "Bug 视频引发差评。",
   },
   {
     id: "paymentReview",
@@ -529,7 +640,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.3,
     duration: 1,
     anxiety: 6,
-    description: "钱不是没赚到，只是正在一个没人说得清的流程里。",
+    description: "收入暂缓入账。",
   },
   {
     id: "streamerMisread",
@@ -537,7 +648,7 @@ export const LIVE_REVENUE_EVENTS = [
     multiplier: 0.72,
     duration: 2,
     anxiety: 4,
-    description: "十万人看见他卡在教程，评论统一认为是你没教会。",
+    description: "误解引发退款。",
   },
 ];
 
@@ -579,6 +690,26 @@ export const FOOD_PLANS = [
     description: "能活，但谈不上生活。便宜，产出质量 -4%。",
   },
   {
+    id: "snack",
+    name: "超市小吃",
+    icon: "▪",
+    monthlyCost: 520,
+    hungerDelta: -3,
+    anxietyDelta: 2,
+    outputMultiplier: 0.91,
+    description: "饼干、泡面和一瓶甜饮料。比饿着强，但脑子会慢慢变成包装袋。",
+  },
+  {
+    id: "leftovers",
+    name: "冰箱剩饭",
+    icon: "▫",
+    monthlyCost: 260,
+    hungerDelta: -1,
+    anxietyDelta: 2,
+    outputMultiplier: 0.88,
+    description: "在自己家翻出一点还能吃的东西。极便宜，也极难称为生活。",
+  },
+  {
     id: "skip",
     name: "硬扛不吃",
     icon: "○",
@@ -587,6 +718,71 @@ export const FOOD_PLANS = [
     anxietyDelta: 5,
     outputMultiplier: 0.78,
     description: "省下饭钱，饥饿 +27、焦虑 +5，四组有效产出 -22%。连续硬扛真的会死。",
+  },
+];
+
+/**
+ * Personal-consumption venues use a cash-on-hand admission threshold before
+ * the player can open their interaction. The threshold is not an entry fee:
+ * food is still paid at month end, while relaxation is paid immediately.
+ */
+export const CONSUMER_VENUES = [
+  {
+    id: "marketSnack",
+    interactionId: "snackShelf",
+    category: "food",
+    name: "小超市零食架",
+    minimumCash: 1000,
+    foodPlanId: "snack",
+    description: "准入 ¥1,000。",
+  },
+  {
+    id: "dinerMeal",
+    interactionId: "dinerCounter",
+    category: "food",
+    name: "小菜馆",
+    minimumCash: 10000,
+    foodPlanId: "sustenance",
+    description: "准入 ¥10,000。",
+  },
+  {
+    id: "hotelMeal",
+    interactionId: "hotelRestaurant",
+    category: "food",
+    name: "大酒店餐厅",
+    minimumCash: 120000,
+    foodPlanId: "feast",
+    description: "准入 ¥120,000。",
+  },
+  {
+    id: "regularFootbath",
+    interactionId: "regularFootbathCounter",
+    category: "relaxation",
+    name: "普通足浴店",
+    minimumCash: 1200,
+    cost: 1200,
+    anxietyRelief: 8,
+    description: "消费 ¥1,200，焦虑 -8。",
+  },
+  {
+    id: "footbathCity",
+    interactionId: "footbathCityCounter",
+    category: "relaxation",
+    name: "洗脚城",
+    minimumCash: 300000,
+    cost: 8800,
+    anxietyRelief: 20,
+    description: "消费 ¥8,800，焦虑 -20。",
+  },
+  {
+    id: "maleModelClub",
+    interactionId: "maleModelCounter",
+    category: "relaxation",
+    name: "男模店",
+    minimumCash: 1000000,
+    cost: 38000,
+    anxietyRelief: 36,
+    description: "消费 ¥38,000，焦虑 -36。",
   },
 ];
 
@@ -626,97 +822,128 @@ export const MARKETING_CAMPAIGNS = [
   },
 ];
 
-export const SPECULATION_OPTIONS = [
-  {
-    id: "scratchTicket",
-    name: "刮一张回本符",
-    icon: "□",
-    category: "lottery",
-    risk: "低额碰运气",
-    stakeMode: "fixed",
-    stake: 500,
-    description: "成本只够一顿便饭，中奖概率也很尊重这个投入。",
-    outcomes: [
-      { ceiling: 0.72, payoutMultiplier: 0, label: "刮出‘谢谢参与’", anxiety: 1 },
-      { ceiling: 0.94, payoutMultiplier: 1, label: "刚好回本", anxiety: 0 },
-      { ceiling: 0.992, payoutMultiplier: 6, label: "中了三千元", anxiety: -2 },
-      { ceiling: 1, payoutMultiplier: 80, label: "四万元小奖", anxiety: -7 },
-    ],
-  },
-  {
-    id: "lottery",
-    name: "买一沓彩票",
-    icon: "✦",
-    category: "lottery",
-    risk: "高损耗彩票",
-    stakeMode: "fixed",
-    stake: 2000,
-    description: "大概率得到一把彩色纸屑，小概率突然觉得做游戏只是副业。",
-    outcomes: [
-      { ceiling: 0.82, payoutMultiplier: 0, label: "全部没中", anxiety: 3 },
-      { ceiling: 0.97, payoutMultiplier: 2, label: "中了点饭钱", anxiety: -1 },
-      { ceiling: 0.997, payoutMultiplier: 30, label: "中了六万元", anxiety: -8 },
-      { ceiling: 1, payoutMultiplier: 400, label: "八十万元大奖", anxiety: -18 },
-    ],
-  },
+export const SCRATCH_OPTION = {
+  id: "scratchTicket",
+  name: "工作室续命刮刮乐",
+  icon: "□",
+  category: "lottery",
+  risk: "每月限刮一张",
+  stake: 500,
+  description: "柜台只卖这一种。付五百元，亲手刮开银色兑奖区。",
+  outcomes: [
+    { ceiling: 0.72, payoutMultiplier: 0, label: "谢谢参与", anxiety: 1 },
+    { ceiling: 0.94, payoutMultiplier: 1, label: "刚好回本", anxiety: 0 },
+    { ceiling: 0.992, payoutMultiplier: 6, label: "中了三千元", anxiety: -2 },
+    { ceiling: 1, payoutMultiplier: 80, label: "四万元小奖", anxiety: -7 },
+  ],
+};
+
+export const STOCK_OPTIONS = [
   {
     id: "engineEtf",
-    name: "游戏引擎 ETF",
+    symbol: "GAME",
+    name: "游戏产业 ETF",
     icon: "▦",
     category: "stock",
-    risk: "中低波动",
-    stakeMode: "fixed",
-    stake: 12000,
-    description: "做一个月短线。赚得像理财，亏起来仍像独立开发。",
+    risk: "稳健 · 中低波动",
+    color: "#66b8ff",
+    volatility: 0.1,
+    minimumBuy: 5000,
+    description: "游戏引擎、平台和发行商打成一篮子，涨跌都比较克制。",
     outcomes: [
-      { ceiling: 0.15, payoutMultiplier: 0.72, label: "行业集体回调", anxiety: 6 },
+      { ceiling: 0.15, payoutMultiplier: 0.78, label: "行业集体回调", anxiety: 6 },
       { ceiling: 0.48, payoutMultiplier: 0.94, label: "小跌，手续费很努力", anxiety: 2 },
-      { ceiling: 0.82, payoutMultiplier: 1.1, label: "稳稳涨了一点", anxiety: -2 },
-      { ceiling: 0.97, payoutMultiplier: 1.35, label: "吃到一波行情", anxiety: -5 },
-      { ceiling: 1, payoutMultiplier: 1.9, label: "行业突然起飞", anxiety: -9 },
+      { ceiling: 0.82, payoutMultiplier: 1.08, label: "稳稳涨了一点", anxiety: -2 },
+      { ceiling: 0.97, payoutMultiplier: 1.22, label: "吃到一波行情", anxiety: -4 },
+      { ceiling: 1, payoutMultiplier: 1.55, label: "行业突然起飞", anxiety: -7 },
     ],
   },
   {
     id: "aiConceptStock",
+    symbol: "AIPW",
     name: "AI 算力概念股",
     icon: "AI",
     category: "stock",
-    risk: "高波动短线",
-    stakeMode: "fixed",
-    stake: 30000,
+    risk: "激进 · 高波动",
+    color: "#9d8cff",
+    volatility: 0.24,
+    minimumBuy: 5000,
     description: "公司介绍里 AI 出现 47 次，产品介绍只出现 1 次。",
     outcomes: [
-      { ceiling: 0.24, payoutMultiplier: 0.18, label: "概念被证实只有概念", anxiety: 14 },
-      { ceiling: 0.55, payoutMultiplier: 0.62, label: "大跌，群里还在喊格局", anxiety: 9 },
-      { ceiling: 0.76, payoutMultiplier: 1.18, label: "蹭热点小赚", anxiety: 1 },
-      { ceiling: 0.94, payoutMultiplier: 1.85, label: "算力订单传闻发酵", anxiety: -8 },
-      { ceiling: 1, payoutMultiplier: 4.2, label: "四倍神话，截图留念", anxiety: -16 },
-    ],
-  },
-  {
-    id: "allInStock",
-    name: "全仓神秘妖股",
-    icon: "↗",
-    category: "stock",
-    risk: "可能直接破产",
-    stakeMode: "allIn",
-    stake: 0,
-    description: "把当前全部现金押进去。可能翻倍，也可能让工作室当场进入片尾字幕。",
-    outcomes: [
-      { ceiling: 0.42, payoutMultiplier: 0, label: "停牌退市，全部归零", anxiety: 100 },
-      { ceiling: 0.72, payoutMultiplier: 0.45, label: "腰斩之后又补了一刀", anxiety: 14 },
-      { ceiling: 0.9, payoutMultiplier: 1.28, label: "小赚，但心脏不小亏", anxiety: 3 },
-      { ceiling: 0.98, payoutMultiplier: 2.6, label: "翻了两倍多", anxiety: -10 },
-      { ceiling: 1, payoutMultiplier: 8, label: "八倍暴涨，突然像个投资人", anxiety: -22 },
+      { ceiling: 0.24, payoutMultiplier: 0.35, label: "概念被证实只有概念", anxiety: 14 },
+      { ceiling: 0.55, payoutMultiplier: 0.7, label: "大跌，群里还在喊格局", anxiety: 9 },
+      { ceiling: 0.76, payoutMultiplier: 1.15, label: "蹭热点小赚", anxiety: 1 },
+      { ceiling: 0.94, payoutMultiplier: 1.65, label: "算力订单传闻发酵", anxiety: -8 },
+      { ceiling: 1, payoutMultiplier: 2.8, label: "概念股走出神话", anxiety: -14 },
     ],
   },
 ];
 
+// Compatibility catalog for analytics and older consumers. Player-facing
+// screens deliberately keep the scratch card and stock account separate.
+export const SPECULATION_OPTIONS = [SCRATCH_OPTION, ...STOCK_OPTIONS];
+
+export const FEATURE_LIMIT = 3;
+
 export const FEATURE_CHOICES = [
+  {
+    id: "saveSlotsFight",
+    title: "存档槽互相篡改",
+    pitch: "一号档救下的人，会在二号档成为凶手。读档不是回头，是选谁在撒谎。",
+    marketDirections: ["systemDepth", "emotionalStory"],
+    modules: { art: 3, design: 8, client: 7, performance: 2 },
+    scopeDebt: 6,
+    technicalDebt: 4,
+    bugs: 2,
+    hype: 8,
+    qualityPotential: 0.22,
+  },
+  {
+    id: "corpseInheritance",
+    title: "死后接管杀你的怪",
+    pitch: "没有复活；谁杀了玩家，下一秒谁就是主角。旧尸体留在原地当路标。",
+    marketDirections: ["antiRoutine", "systemDepth"],
+    modules: { art: 5, design: 9, client: 6, performance: 4 },
+    scopeDebt: 7,
+    technicalDebt: 5,
+    bugs: 2,
+    hype: 9,
+    qualityPotential: 0.23,
+  },
+  {
+    id: "potatoTruth",
+    title: "最低画质才看得见门",
+    pitch: "关掉阴影、贴图和特效后，假墙剥落，真正的关卡才露出来。",
+    marketDirections: ["lowSpecFriendly", "antiRoutine"],
+    modules: { art: 2, design: 7, client: 4, performance: 6 },
+    scopeDebt: 4,
+    technicalDebt: 2,
+    bugs: 1,
+    hype: 7,
+    qualityPotential: 0.2,
+  },
+  {
+    id: "chatGravity",
+    title: "弹幕每十秒重写重力",
+    pitch: "观众刷“左”，整座城就向左坠；没人看时，只能挂在天花板等开播。",
+    marketDirections: ["streamerSpectacle", "emotionalStory"],
+    modules: { art: 6, design: 8, client: 8, performance: 8 },
+    scopeDebt: 8,
+    technicalDebt: 7,
+    bugs: 3,
+    hype: 11,
+    qualityPotential: 0.25,
+  },
+];
+
+// Keep retired proposals readable in existing saves without putting them back
+// on the player-facing whiteboard.
+const legacyFeatureChoices = [
   {
     id: "grudgeNpc",
     title: "所有 NPC 都记仇",
     pitch: "玩家砍过一次价，十小时后全城商贩同时翻旧账。",
+    marketDirections: ["systemDepth", "emotionalStory"],
     modules: { art: 1, design: 7, client: 5, performance: 2 },
     scopeDebt: 5,
     technicalDebt: 2,
@@ -728,6 +955,7 @@ export const FEATURE_CHOICES = [
     id: "weatherMood",
     title: "天气读取玩家情绪",
     pitch: "玩家越急，雨越横着下；停下来发呆，太阳才敢出来。",
+    marketDirections: ["emotionalStory", "streamerSpectacle"],
     modules: { art: 6, design: 4, client: 3, performance: 4 },
     scopeDebt: 4,
     technicalDebt: 3,
@@ -739,6 +967,7 @@ export const FEATURE_CHOICES = [
     id: "physicsInventory",
     title: "背包也要物理模拟",
     pitch: "苹果会压坏面包，贷款合同永远沉在最底下。",
+    marketDirections: ["systemDepth", "streamerSpectacle"],
     modules: { art: 2, design: 5, client: 7, performance: 7 },
     scopeDebt: 6,
     technicalDebt: 6,
@@ -750,6 +979,7 @@ export const FEATURE_CHOICES = [
     id: "oneButtonDrama",
     title: "一个按钮演完人生",
     pitch: "同一个按钮负责跳跃、道歉、辞职和签贷款合同。",
+    marketDirections: ["lowSpecFriendly", "emotionalStory"],
     modules: { art: 2, design: 7, client: 3, performance: 1 },
     scopeDebt: 3,
     technicalDebt: 1,
@@ -761,6 +991,7 @@ export const FEATURE_CHOICES = [
     id: "crowdAi",
     title: "一万名会摸鱼的路人",
     pitch: "每个路人都有日程，但九千八百个选择在茶水间堵路。",
+    marketDirections: ["streamerSpectacle", "systemDepth"],
     modules: { art: 5, design: 5, client: 6, performance: 9 },
     scopeDebt: 7,
     technicalDebt: 8,
@@ -772,6 +1003,7 @@ export const FEATURE_CHOICES = [
     id: "honestLoading",
     title: "读条公开项目债务",
     pitch: "加载时不放提示，直接滚动展示尚未偿还的技术债。",
+    marketDirections: ["lowSpecFriendly", "antiRoutine"],
     modules: { art: 3, design: 4, client: 4, performance: 3 },
     scopeDebt: 2,
     technicalDebt: -2,
@@ -783,6 +1015,7 @@ export const FEATURE_CHOICES = [
     id: "refundEnding",
     title: "退款按钮是真结局",
     pitch: "玩家按下退款，主角才终于逃出游戏。",
+    marketDirections: ["antiRoutine", "emotionalStory"],
     modules: { art: 3, design: 8, client: 4, performance: 2 },
     scopeDebt: 5,
     technicalDebt: 2,
@@ -794,6 +1027,7 @@ export const FEATURE_CHOICES = [
     id: "bugMuseum",
     title: "把 Bug 做成博物馆",
     pitch: "每次修掉穿模，就把它的尸体陈列在主菜单。",
+    marketDirections: ["antiRoutine", "streamerSpectacle"],
     modules: { art: 5, design: 5, client: 5, performance: 2 },
     scopeDebt: 4,
     technicalDebt: 1,
@@ -802,6 +1036,8 @@ export const FEATURE_CHOICES = [
     qualityPotential: 0.18,
   },
 ];
+
+const allFeatureChoices = [...FEATURE_CHOICES, ...legacyFeatureChoices];
 
 export const COLLATERAL_OPTIONS = [
   {
@@ -957,10 +1193,18 @@ export function FindFoodPlan(foodPlanId) {
   return FOOD_PLANS.find((foodPlan) => foodPlan.id === foodPlanId);
 }
 
+export function FindConsumerVenue(venueId) {
+  return CONSUMER_VENUES.find((venue) => venue.id === venueId);
+}
+
 export function FindMarketingCampaign(campaignId) {
   return MARKETING_CAMPAIGNS.find((campaign) => campaign.id === campaignId);
 }
 
 export function FindFeatureChoice(featureId) {
-  return FEATURE_CHOICES.find((feature) => feature.id === featureId);
+  return allFeatureChoices.find((feature) => feature.id === featureId);
+}
+
+export function FindMarketDirection(directionId) {
+  return MARKET_DIRECTIONS.find((direction) => direction.id === directionId);
 }

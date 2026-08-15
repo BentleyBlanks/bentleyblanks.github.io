@@ -1,37 +1,35 @@
 /**
- * Static layout data for the Studio Survival side-scrolling office.
+ * Room-scoped city layout for Studio Survival.
  *
- * Coordinates use a small 2D convention that is convenient for both Canvas
- * and a future 2.5D renderer: x grows from left to right, y grows upwards,
- * and a character's x/y position is the centre of its feet. Rectangles use
- * x as their left edge and y as their top edge unless noted otherwise.
+ * Each named location is a discrete interior. The player can walk only inside
+ * the current room and must use its exit to choose another destination.
  */
 
 const FreezeList = (items) => Object.freeze(items.map((item) => Object.freeze({ ...item })));
 
 export const WorldConfig = Object.freeze({
-  width: 40,
-  height: 12,
+  width: 144,
+  height: 9,
   groundY: 0,
-  cameraViewportWidth: 12,
-  cameraFollowOffset: 6,
+  cameraViewportWidth: 16,
+  cameraFollowOffset: 8,
   playerWidth: 0.72,
   playerHeight: 1.55,
-  moveSpeed: 6,
-  jumpSpeed: 10.5,
+  moveSpeed: 7,
+  jumpSpeed: 9.5,
   gravity: -25,
-  interactionRange: 2.15,
+  interactionRange: 1.65,
   collectibleRadius: 0.45,
   hazardDamageCooldown: 0.9,
   maxHealth: 100,
-  hazardDamage: 18,
-  spawn: Object.freeze({ x: 1.8, y: 0 }),
+  hazardDamage: 0,
+  spawn: Object.freeze({ x: 2.8, y: 0, locationId: "home" }),
 });
 
 export const WorldBounds = Object.freeze({
   minX: 0,
   maxX: WorldConfig.width,
-  minY: -8,
+  minY: -4,
   maxY: WorldConfig.height,
 });
 
@@ -45,317 +43,66 @@ export const Ground = Object.freeze({
   solid: true,
 });
 
-export const Platforms = FreezeList([
-  {
-    id: "platformCoffee",
-    x: 5.0,
-    y: 1.8,
-    width: 4.4,
-    height: 0.32,
-    top: 1.8,
-    solid: true,
-  },
-  {
-    id: "platformArchive",
-    x: 12.8,
-    y: 3.65,
-    width: 4.7,
-    height: 0.32,
-    top: 3.65,
-    solid: true,
-  },
-  {
-    id: "platformServer",
-    x: 20.4,
-    y: 2.2,
-    width: 4.2,
-    height: 0.32,
-    top: 2.2,
-    solid: true,
-  },
-  {
-    id: "platformRoof",
-    x: 28.1,
-    y: 4.05,
-    width: 4.8,
-    height: 0.32,
-    top: 4.05,
-    solid: true,
-  },
-  {
-    id: "platformLaunch",
-    x: 34.1,
-    y: 2.75,
-    width: 3.8,
-    height: 0.32,
-    top: 2.75,
-    solid: true,
-  },
+export const Locations = FreezeList([
+  { id: "home", name: "自己家", startX: 0, endX: 16, entryX: 13.2, color: "#3b3553", accent: "#9d8cff" },
+  { id: "diner", name: "小菜馆", startX: 16, endX: 32, entryX: 29.2, color: "#4b372b", accent: "#ffd166" },
+  { id: "market", name: "小超市", startX: 32, endX: 48, entryX: 45.2, color: "#263e3b", accent: "#68e0a0" },
+  { id: "talent", name: "人才市场", startX: 48, endX: 64, entryX: 61.2, color: "#303a56", accent: "#66b8ff" },
+  { id: "bank", name: "银行", startX: 64, endX: 80, entryX: 77.2, color: "#293941", accent: "#c9a45d" },
+  { id: "hotel", name: "大酒店", startX: 80, endX: 96, entryX: 93.2, color: "#493c2c", accent: "#ffb45f" },
+  { id: "footbath", name: "普通足浴店", startX: 96, endX: 112, entryX: 109.2, color: "#263f43", accent: "#72e0d1" },
+  { id: "footbathCity", name: "洗脚城", startX: 112, endX: 128, entryX: 125.2, color: "#39314d", accent: "#c69cff" },
+  { id: "maleModelClub", name: "男模店", startX: 128, endX: 144, entryX: 141.2, color: "#482d43", accent: "#ff86c8" },
 ]);
+
+// The city is deliberately flat. Jumping remains available for game feel,
+// but there are no collectible platforms or moving hazards.
+export const Platforms = FreezeList([]);
 
 export const InteractionPoints = FreezeList([
-  {
-    id: "fridge",
-    kind: "fridge",
-    label: "冰箱",
-    x: 3.7,
-    y: 0,
-    radius: 2.0,
-    action: "food",
-  },
-  {
-    id: "bank",
-    kind: "bank",
-    label: "银行",
-    x: 7.6,
-    y: 0,
-    radius: 1.8,
-    action: "finance",
-  },
-  {
-    id: "lotteryMachine",
-    kind: "lotteryMachine",
-    label: "彩票机",
-    x: 10.8,
-    y: 0,
-    radius: 1.65,
-    action: "lottery",
-  },
-  {
-    id: "talentMachine",
-    kind: "talentMachine",
-    label: "人才机",
-    x: 14.2,
-    y: 0,
-    radius: 1.65,
-    action: "talent",
-  },
-  {
-    id: "workstationArt",
-    kind: "workstation",
-    moduleKey: "art",
-    label: "美术工位",
-    x: 17.9,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationDesign",
-    kind: "workstation",
-    moduleKey: "design",
-    label: "策划工位",
-    x: 19.8,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationClient",
-    kind: "workstation",
-    moduleKey: "client",
-    label: "客户端工位",
-    x: 21.7,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "workstationPerformance",
-    kind: "workstation",
-    moduleKey: "performance",
-    label: "性能工位",
-    x: 23.6,
-    y: 0,
-    radius: 1.55,
-    action: "module",
-  },
-  {
-    id: "whiteboard",
-    kind: "whiteboard",
-    label: "白板",
-    x: 27.1,
-    y: 0,
-    radius: 1.8,
-    action: "directive",
-  },
-  {
-    id: "promoSign",
-    kind: "promoSign",
-    label: "宣发牌",
-    x: 30.1,
-    y: 0,
-    radius: 1.8,
-    action: "marketing",
-  },
-  {
-    id: "releaseDoor",
-    kind: "releaseDoor",
-    label: "发布门",
-    x: 33.3,
-    y: 0,
-    radius: 1.85,
-    action: "release",
-  },
-  {
-    id: "monthCalendar",
-    kind: "monthCalendar",
-    label: "月历",
-    x: 35.9,
-    y: 0,
-    radius: 1.65,
-    action: "nextMonth",
-  },
-  {
-    id: "offWorkDoor",
-    kind: "offWorkDoor",
-    label: "下班门",
-    x: 37.7,
-    y: 0,
-    radius: 1.65,
-    action: "nextMonth",
-  },
-  {
-    id: "aiTerminal",
-    kind: "aiTerminal",
-    label: "AI终端",
-    x: 39.25,
-    y: 0,
-    radius: 1.55,
-    action: "ai",
-  },
+  { id: "planningBoard", locationId: "home", kind: "planningBoard", label: "项目白板", detail: "开发 / 方向 / 发布", x: 6.3, y: 0, radius: 1.2, action: "direction" },
+  { id: "homeCalendar", locationId: "home", kind: "homeCalendar", label: "项目日历", detail: "项目状态 / 进入下月", x: 10.35, y: 0, radius: 1.3, action: "month" },
+  { id: "homeFridge", locationId: "home", kind: "homeFridge", label: "冰箱", detail: "选择本月吃法", x: 13.35, y: 0, radius: 1.05, action: "homeFood" },
+  { id: "homeExit", locationId: "home", kind: "exit", label: "出门", detail: "选择要去的地方", x: 15.15, y: 0, radius: 1, action: "travel" },
+  { id: "dinerCounter", locationId: "diner", kind: "diner", label: "小菜馆", detail: "充饥套餐", x: 23.5, y: 0, radius: 1.65, action: "sustenance", consumerVenueId: "dinerMeal" },
+  { id: "dinerExit", locationId: "diner", kind: "exit", label: "出门", detail: "选择要去的地方", x: 31.15, y: 0, radius: 1, action: "travel" },
+  { id: "snackShelf", locationId: "market", kind: "snackShelf", label: "零食架", detail: "超市小吃", x: 37.2, y: 0, radius: 1.45, action: "snack", consumerVenueId: "marketSnack" },
+  { id: "lotteryCounter", locationId: "market", kind: "lotteryMachine", label: "刮刮乐柜台", detail: "每月限刮一张", x: 42.6, y: 0, radius: 1.45, action: "scratch" },
+  { id: "marketExit", locationId: "market", kind: "exit", label: "出门", detail: "选择要去的地方", x: 47.15, y: 0, radius: 1, action: "travel" },
+  { id: "equipmentCounter", locationId: "talent", kind: "equipmentShop", label: "设备柜台", detail: "每名员工需 1 套", x: 53.2, y: 0, radius: 1.5, action: "equipment" },
+  { id: "talentCounter", locationId: "talent", kind: "talentMarket", label: "人才招聘", detail: "大学生 / AI", x: 59.1, y: 0, radius: 1.55, action: "talent" },
+  { id: "talentExit", locationId: "talent", kind: "exit", label: "出门", detail: "选择要去的地方", x: 63.15, y: 0, radius: 1, action: "travel" },
+  { id: "bankStockCounter", locationId: "bank", kind: "stockWindow", label: "股票窗口", detail: "开户 / 买入 / 持仓", x: 67.35, y: 0, radius: 1.45, action: "stock" },
+  { id: "bankCounter", locationId: "bank", kind: "bank", label: "贷款柜台", detail: "还款 / 抵押 / 赎回", x: 72.1, y: 0, radius: 1.75, action: "finance" },
+  { id: "bankExit", locationId: "bank", kind: "exit", label: "出门", detail: "选择要去的地方", x: 79.15, y: 0, radius: 1, action: "travel" },
+  { id: "hotelRestaurant", locationId: "hotel", kind: "hotel", label: "大酒店餐厅", detail: "大餐", x: 88.1, y: 0, radius: 1.8, action: "feast", consumerVenueId: "hotelMeal" },
+  { id: "hotelExit", locationId: "hotel", kind: "exit", label: "出门", detail: "选择要去的地方", x: 95.15, y: 0, radius: 1, action: "travel" },
+  { id: "regularFootbathCounter", locationId: "footbath", kind: "regularFootbath", label: "普通足浴店", detail: "焦虑 -8", x: 104.1, y: 0, radius: 1.75, action: "relaxRegular", consumerVenueId: "regularFootbath" },
+  { id: "footbathExit", locationId: "footbath", kind: "exit", label: "出门", detail: "选择要去的地方", x: 111.15, y: 0, radius: 1, action: "travel" },
+  { id: "footbathCityCounter", locationId: "footbathCity", kind: "footbathCity", label: "洗脚城", detail: "焦虑 -20", x: 120.1, y: 0, radius: 1.75, action: "relaxPremium", consumerVenueId: "footbathCity" },
+  { id: "footbathCityExit", locationId: "footbathCity", kind: "exit", label: "出门", detail: "选择要去的地方", x: 127.15, y: 0, radius: 1, action: "travel" },
+  { id: "maleModelCounter", locationId: "maleModelClub", kind: "maleModelClub", label: "男模店", detail: "焦虑 -36", x: 136.1, y: 0, radius: 1.75, action: "relaxLuxury", consumerVenueId: "maleModelClub" },
+  { id: "maleModelClubExit", locationId: "maleModelClub", kind: "exit", label: "出门", detail: "选择要去的地方", x: 143.15, y: 0, radius: 1, action: "travel" },
 ]);
 
-export const Collectibles = FreezeList([
-  {
-    id: "questFragmentBrief",
-    kind: "questFragment",
-    moduleKey: "art",
-    label: "需求碎片·简报",
-    x: 6.2,
-    y: 2.4,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentMoodboard",
-    kind: "questFragment",
-    moduleKey: "design",
-    label: "需求碎片·情绪板",
-    x: 14.8,
-    y: 4.2,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentScope",
-    kind: "questFragment",
-    moduleKey: "client",
-    label: "需求碎片·范围",
-    x: 22.2,
-    y: 2.75,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentPitch",
-    kind: "questFragment",
-    moduleKey: "performance",
-    label: "需求碎片·提案",
-    x: 29.2,
-    y: 4.6,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentMetrics",
-    kind: "questFragment",
-    moduleKey: "art",
-    label: "需求碎片·指标",
-    x: 35.3,
-    y: 3.3,
-    radius: 0.32,
-    value: 1,
-  },
-  {
-    id: "questFragmentCredit",
-    kind: "questFragment",
-    moduleKey: "design",
-    label: "需求碎片·署名",
-    x: 38.45,
-    y: 1.1,
-    radius: 0.32,
-    value: 1,
-  },
-]);
-
-export const MovingHazards = FreezeList([
-  {
-    id: "printerCart",
-    kind: "movingHazard",
-    label: "失控打印车",
-    x: 9.1,
-    y: 0,
-    width: 0.95,
-    height: 0.8,
-    axis: "x",
-    amplitude: 1.8,
-    speed: 1.2,
-    phase: 0,
-    damage: 18,
-  },
-  {
-    id: "serverDrone",
-    kind: "movingHazard",
-    label: "服务器无人机",
-    x: 22.1,
-    y: 3.0,
-    width: 0.9,
-    height: 0.62,
-    axis: "x",
-    amplitude: 1.6,
-    speed: 1.55,
-    phase: 1.2,
-    damage: 22,
-  },
-  {
-    id: "coffeeRobot",
-    kind: "movingHazard",
-    label: "咖啡机器人",
-    x: 31.9,
-    y: 0,
-    width: 0.78,
-    height: 1.0,
-    axis: "y",
-    amplitude: 1.1,
-    speed: 1.35,
-    phase: 2.1,
-    damage: 16,
-  },
-  {
-    id: "launchConveyor",
-    kind: "movingHazard",
-    label: "发布传送带",
-    x: 36.2,
-    y: 2.75,
-    width: 1.15,
-    height: 0.72,
-    axis: "x",
-    amplitude: 1.0,
-    speed: 1.8,
-    phase: 2.8,
-    damage: 20,
-  },
-]);
-
-// Friendly aliases make the intent of the static data obvious to callers
-// without duplicating arrays or creating a second source of truth.
+export const Collectibles = FreezeList([]);
+export const MovingHazards = FreezeList([]);
 export const QuestFragments = Collectibles;
+
+export function FindLocationAt(x) {
+  const position = Number.isFinite(Number(x)) ? Number(x) : WorldConfig.spawn.x;
+  return Locations.find((location) => position >= location.startX && position < location.endX) || Locations.at(-1);
+}
+
+export function FindLocation(locationId) {
+  return Locations.find((location) => location.id === locationId) || null;
+}
 
 export const WorldData = Object.freeze({
   config: WorldConfig,
   bounds: WorldBounds,
   ground: Ground,
+  locations: Locations,
   platforms: Platforms,
   interactions: InteractionPoints,
   collectibles: Collectibles,

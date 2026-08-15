@@ -1,12 +1,15 @@
 import {
   Collectibles,
+  FindLocation,
+  FindLocationAt,
   Ground,
   InteractionPoints,
   MovingHazards,
   Platforms,
+  WorldBounds,
   WorldConfig,
   WorldData,
-} from "./Data_World.mjs";
+} from "./Data_World.mjs?v=20260815ao";
 
 const Epsilon = 1e-7;
 const FixedStep = 1 / 60;
@@ -76,13 +79,13 @@ function MakePlayerSnapshot(state) {
 function UpdateCamera(state) {
   const viewportWidth = Math.min(WorldConfig.cameraViewportWidth, WorldConfig.width);
   const maximum = Math.max(0, WorldConfig.width - viewportWidth);
-  const target = Clamp(
-    state.x - ToNumber(WorldConfig.cameraFollowOffset, viewportWidth / 2),
-    0,
-    maximum,
-  );
+  const location = FindLocation(state.activeLocationId) || FindLocationAt(state.x);
+  const target = Clamp(location?.startX || 0, 0, maximum);
   state.cameraTargetX = target;
   state.cameraX = target;
+  state.cameraCenterX = location
+    ? (location.startX + location.endX) / 2
+    : target + viewportWidth / 2;
 }
 
 function AttachDerivedState(state) {
@@ -101,6 +104,7 @@ function BuildState(month) {
     elapsed: 0,
     x: WorldConfig.spawn.x,
     y: WorldConfig.spawn.y,
+    activeLocationId: WorldConfig.spawn.locationId,
     vx: 0,
     vy: 0,
     facing: 1,
@@ -132,6 +136,7 @@ function CloneState(source) {
     elapsed: Math.max(0, ToNumber(original.elapsed, 0)),
     x: position.x,
     y: position.y,
+    activeLocationId: FindLocation(original.activeLocationId)?.id || FindLocationAt(position.x)?.id || WorldConfig.spawn.locationId,
     vx: ToNumber(original.vx, 0),
     vy: ToNumber(original.vy, 0),
     facing: ToNumber(original.facing, 1) < 0 ? -1 : 1,
@@ -288,13 +293,14 @@ function UpdatePausedState(state, controls, events) {
 
 function ApplyPhysicsStep(state, controls, step, jumpPressed, events) {
   const moveAxis = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
+  const moveSpeedMultiplier = Clamp(ToNumber(controls.moveSpeedMultiplier, 1), .35, 1);
   const wasGrounded = state.grounded;
   if (state.grounded && !HasSupportAt(state.x, state.y)) {
     state.grounded = false;
     state.surfaceId = null;
   }
 
-  state.vx = moveAxis * WorldConfig.moveSpeed;
+  state.vx = moveAxis * WorldConfig.moveSpeed * moveSpeedMultiplier;
   if (moveAxis !== 0) {
     state.facing = moveAxis < 0 ? -1 : 1;
   }
@@ -308,10 +314,13 @@ function ApplyPhysicsStep(state, controls, step, jumpPressed, events) {
 
   const previousY = state.y;
   const previousVy = state.vy;
+  const activeLocation = FindLocation(state.activeLocationId) || FindLocationAt(state.x);
+  const roomMinimum = (activeLocation?.startX ?? WorldBounds.minX) + WorldConfig.playerWidth / 2;
+  const roomMaximum = (activeLocation?.endX ?? WorldBounds.maxX) - WorldConfig.playerWidth / 2;
   const nextX = Clamp(
     state.x + state.vx * step,
-    WorldConfig.playerWidth / 2,
-    WorldConfig.width - WorldConfig.playerWidth / 2,
+    roomMinimum,
+    roomMaximum,
   );
   // Walking past a platform edge should start a fall during this step rather
   // than leaving the player hovering until the following input frame.
@@ -379,9 +388,34 @@ export function ResetWorldMonth(currentState, month = null) {
 }
 
 /**
+ * Move through a room exit to another named destination. Walking never calls
+ * this function; only an explicit exit choice can change activeLocationId.
+ */
+export function TravelWorld(currentState, locationId) {
+  const destination = FindLocation(locationId);
+  if (!destination) {
+    return { state: AttachDerivedState(CloneState(currentState)), ok: false, message: "这个目的地不存在。" };
+  }
+  const state = CloneState(currentState);
+  state.activeLocationId = destination.id;
+  state.x = Clamp(
+    ToNumber(destination.entryX, (destination.startX + destination.endX) / 2),
+    destination.startX + WorldConfig.playerWidth / 2,
+    destination.endX - WorldConfig.playerWidth / 2,
+  );
+  state.y = WorldConfig.groundY;
+  state.vx = 0;
+  state.vy = 0;
+  state.grounded = true;
+  state.surfaceId = Ground.id;
+  return { state: AttachDerivedState(state), ok: true, location: destination };
+}
+
+/**
  * Advance the world by delta seconds. Input is a small, renderer-independent
- * control object: { left, right, jump, pause }. A new state and event list are
- * returned on every call; the input state is never mutated.
+ * control object: { left, right, jump, pause, moveSpeedMultiplier }. A new
+ * state and event list are returned on every call; the input state is never
+ * mutated.
  */
 export function TickWorld(currentState, input = {}, delta = FixedStep) {
   const state = CloneState(currentState);
@@ -421,9 +455,11 @@ export function TickWorld(currentState, input = {}, delta = FixedStep) {
  */
 export function NearestInteraction(state) {
   const position = GetPlayerPosition(state || {});
+  const activeLocationId = FindLocation(state?.activeLocationId)?.id || FindLocationAt(position.x)?.id;
   let nearest = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
   for (const interaction of InteractionPoints) {
+    if (interaction.locationId && interaction.locationId !== activeLocationId) continue;
     const distance = Math.hypot(position.x - interaction.x, position.y - interaction.y);
     const range = ToNumber(interaction.radius, WorldConfig.interactionRange);
     if (distance > range + Epsilon || distance >= nearestDistance) {

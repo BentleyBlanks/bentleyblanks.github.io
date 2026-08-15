@@ -4,6 +4,7 @@ import {
   COLLATERAL_OPTIONS,
   DIRECTIVES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
   FindCollateral,
   FindDirective,
   FindFoodPlan,
@@ -361,7 +362,7 @@ function BuildRoom() {
   const signFrame = Box(5.2, 0.94, 0.1, 0x0b0e19, { castShadow: false });
   signFrame.position.set(0, 5.2, -5.5);
   roomGroup.add(signFrame);
-  const texture = MakeTextTexture(["甲方是我", "BUILD · BORROW · SURVIVE"], "#d8d3ff", "#0b0e19", 1024, 180);
+  const texture = MakeTextTexture(["做游戏真的会死", "BUILD · BORROW · SURVIVE"], "#d8d3ff", "#0b0e19", 1024, 180);
   billboardTexture = texture;
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(5, 0.88),
@@ -676,7 +677,7 @@ function UpdateBillboard() {
   context.textBaseline = "middle";
   context.fillStyle = project ? project.accent : "#d8d3ff";
   context.font = '900 50px "Microsoft YaHei UI", sans-serif';
-  context.fillText(project ? project.title : "甲方是我", canvas.width / 2, canvas.height * 0.38);
+  context.fillText(project ? project.title : "做游戏真的会死", canvas.width / 2, canvas.height * 0.38);
   context.fillStyle = "rgba(225,228,240,.68)";
   context.font = '600 24px "Microsoft YaHei UI", sans-serif';
   const subtitle = state.project?.isReleased
@@ -1070,7 +1071,7 @@ function RenderProjectHeader() {
   dom.projectSignals.innerHTML = `
     <span data-signal="wishlist">愿望单 <b>${Math.round(state.project.wishlists).toLocaleString("zh-CN")}</b></span>
     <span>玩家预期 <b>${promisedRating ? promisedRating.toFixed(1) : "无人知道"}</b></span>
-    <span>定制玩法 <b>${state.project.features.length} / 6</b></span>
+    <span>定制玩法 <b>${state.project.features.length} / ${FEATURE_LIMIT}</b></span>
     ${state.project.abstractIdeas.length ? `<span>焦虑灵感 <b>${state.project.abstractIdeas.length}</b></span>` : ""}
     ${lastRefundRate > 0 ? `<span data-signal="refund">上次退款 <b>${Math.round(lastRefundRate * 100)}%</b></span>` : ""}
   `;
@@ -1211,8 +1212,8 @@ function FeatureSourceMeta(sourceId) {
 function FeatureChoiceCardsHtml(sourceId, limit = 3) {
   const chosen = new Set(state.project.features.map((feature) => feature.id));
   const available = FEATURE_CHOICES.filter((feature) => !chosen.has(feature.id));
-  if (!available.length || state.project.features.length >= 6) {
-    return '<div class="teamEmpty">六个核心玩法已经把项目塞满。现在最定制化的操作是把它们做完。</div>';
+  if (!available.length || state.project.features.length >= FEATURE_LIMIT) {
+    return '<div class="teamEmpty">核心玩法已满。先做完。</div>';
   }
   const salt = [...sourceId].reduce((total, character) => total + character.charCodeAt(0), state.month * 7);
   const offset = available.length ? salt % available.length : 0;

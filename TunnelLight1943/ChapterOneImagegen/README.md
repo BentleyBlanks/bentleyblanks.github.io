@@ -1,5 +1,11 @@
 # TunnelLight1943 · Chapter One Imagegen runtime
 
+> **⚠️ 冻结快照（2026-08-14 交付，不再维护）。**
+> 这是第一章 ImageGen 美术版的一次性发布副本，与上级 `TunnelLight1943/`
+> 已经分叉（Core/Art/World 各差两三千行），**不要在这棵树里修 bug、加功能、
+> 或把这里的代码当正主引用**——正主永远是上级目录。搜索/grep 命中本目录时
+> 一律跳过。真要基于它再发一版，先把美术差异合回主树再说。
+
 This is an isolated, self-contained Chapter One release of the
 TunnelLight1943 playable runtime. It preserves the complete current 23-beat
 Chapter One sequence while restoring the ten approved concept states as live

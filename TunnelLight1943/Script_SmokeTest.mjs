@@ -1990,7 +1990,7 @@ function TestCliAnswersQuestions() {
   // ① where：索引里必须找得到各类东西，且答案带 文件:行
   const w = run(["where", "c1_well"]);
   assert.match(w, /c1_well\s+节拍/, "where 得认得节拍 id");
-  assert.match(w, /Script_Core\.mjs:\d+/, "where 的答案必须带 文件:行，不然还得再 grep 一遍");
+  assert.match(w, /Data_ScriptC1\.mjs:\d+/, "where 的答案必须带 文件:行，不然还得再 grep 一遍");
   assert.match(run(["where", "DrawHenCoop"]), /画笔.*Script_Art\.mjs:\d+/, "where 得认得画笔");
   assert.match(run(["where", "henCoop"]), /Data_PropArt\.json:\d+/, "where 得认得道具登记");
 
@@ -2127,7 +2127,8 @@ function TestLiveCardGrabPointsSitOnTheThing() {
   }
   // 别处不许再手抄名单：抄一份就漏一份（这个 bug 出过两回）
   const here = path.dirname(fileURLToPath(import.meta.url));
-  for (const f of ["Script_Core.mjs", "Script_Main.js", "Script_Cli.mjs"]) {
+  const chapterFiles = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Data_ScriptC${n}.mjs`);
+  for (const f of ["Script_Core.mjs", "Script_Main.js", "Script_Cli.mjs", ...chapterFiles]) {
     // 名单自己那份声明当然要跳过（它就是那唯一一份）
     const src = fs.readFileSync(path.join(here, f), "utf8")
       .replace(/export const LIVE_CARD_FIELDS = \[[\s\S]*?\];/, "");
@@ -2269,7 +2270,8 @@ function TestModuleGraphIsCacheBusted() {
       if (seen.has(file)) return;
       seen.add(file);
       const src = fs.readFileSync(path.join(here, file), "utf8");
-      for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z_]+\.m?js)["']/g)) walk(m[1]);
+      // [A-Za-z0-9_]：文件名里有数字（Data_ScriptC1.mjs），漏了数字就走不全模块图
+      for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z0-9_]+\.m?js)["']/g)) walk(m[1]);
     };
     walk("Script_Main.js");
     seen.delete("Script_Main.js");            // 入口自己走 <script src>
@@ -2333,11 +2335,13 @@ function TestPromptsAreDeviceNeutral() {
   };
   for (const [ch, beats] of Object.entries(SCRIPTS)) walk(beats, ch);
 
-  // 执行器里写死的那些提示也过一遍同一把尺
+  // 执行器与章文件里写死的那些提示也过一遍同一把尺
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const src = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
-  for (const m of src.matchAll(/state\.(?:prompt|climbHint)\s*=\s*"([^"]+)"/g)) {
-    check("Core", m[1]);
+  for (const f of ["Script_Core.mjs", ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Data_ScriptC${n}.mjs`)]) {
+    const src = fs.readFileSync(path.join(here, f), "utf8");
+    for (const m of src.matchAll(/state\.(?:prompt|climbHint)\s*=\s*"([^"]+)"/g)) {
+      check(f, m[1]);
+    }
   }
 
   assert.deepEqual(bad, [], "提示文案里不许直接写键名／不许写成一句话：\n  " + bad.join("\n  "));
@@ -2357,12 +2361,12 @@ function TestChapterOneShowsOnlyRealNarration() {
   const VO = ["没人来叫。", "第三天。还是没人来叫。"];
   // 微过场的行是 `StartMicroCine(state, [...])` 里现写的，挂不到 def 上——
   // 所以这一条扫源码，玩法段插的那几镜才盖得住
+  // 剧本按章拆了（2026-08-15）：第一章整个就是 Data_ScriptC1.mjs 这一个文件
   const here2 = path.dirname(fileURLToPath(import.meta.url));
-  const src2 = fs.readFileSync(path.join(here2, "Script_Core.mjs"), "utf8");
+  const src2 = fs.readFileSync(path.join(here2, "Data_ScriptC1.mjs"), "utf8");
   const from = src2.indexOf('id: "c1_thatday"');
-  const to = src2.indexOf('id: "c2_');
-  assert.ok(from > 0 && to > from, "找不到第一章的源码范围");
-  const chunk = src2.slice(from, to);
+  assert.ok(from > 0, "找不到第一章的源码范围");
+  const chunk = src2.slice(from);
   const shown = [...chunk.matchAll(/\bstage: "([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(shown, VO,
     "第一章的字幕只许是那两句真旁白；描述请写成 act:\n  " + shown.join("\n  "));
@@ -2395,12 +2399,11 @@ function TestPrologueStaging() {
       `${id} 必须声明 bgm: null——序章不许有配乐（剧本首句：没有音乐）`);
   }
 
-  // 扫源码：分屏与自由机位既写在节拍上，也写在微过场里
+  // 扫源码：分屏与自由机位既写在节拍上，也写在微过场里（第一章＝Data_ScriptC1.mjs）
   const here3 = path.dirname(fileURLToPath(import.meta.url));
-  const src3 = fs.readFileSync(path.join(here3, "Script_Core.mjs"), "utf8");
+  const src3 = fs.readFileSync(path.join(here3, "Data_ScriptC1.mjs"), "utf8");
   const from = src3.indexOf('id: "c1_thatday"');
-  const to = src3.indexOf('id: "c2_');
-  const chunk = src3.slice(from, to);
+  const chunk = src3.slice(from);
 
   // ② 分屏两格的画框不许交叠。逐个 `left:`/`right:` 机位取"注视点所在平面上
   //    的半屏画宽"，两段区间不许有公共部分
@@ -2701,7 +2704,9 @@ function TestCineActorsClearOfObstacles() {
 function TestPoseNamesExist() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
-  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  // 剧本按章拆了：姿势名既写在 Core 执行器里，也写在章文件的节拍上，一起扫
+  const core = ["Script_Core.mjs", ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Data_ScriptC${n}.mjs`)]
+    .map((f) => fs.readFileSync(path.join(here, f), "utf8")).join("\n");
   const handled = new Set([...rig.matchAll(/s\.pose === "([A-Za-z]+)"/g)].map((m) => m[1]));
   assert.ok(handled.size > 15, `Rig 里应当有一整套姿势，实测只认出 ${handled.size} 个`);
   const used = new Set([...core.matchAll(/\.pose = "([A-Za-z]+)"/g)].map((m) => m[1]));

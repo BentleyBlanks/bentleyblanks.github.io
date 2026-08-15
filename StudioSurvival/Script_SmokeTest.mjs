@@ -1,44 +1,90 @@
 import assert from "node:assert/strict";
 import {
   AdvanceMonth,
+  BuyScratchTicket,
   BuyMarketingCampaign,
   CalculateTensions,
   CreateInitialState,
   CustomizeProject,
+  EvaluateMarketFit,
+  DEFAULT_FOUNDER_SKILLS,
   EvaluateProject,
   FireStaff,
+  FOUNDER_SKILL_KEYS,
+  FOUNDER_SKILL_POINTS,
   ForecastMonthlyCosts,
   ForecastPivotCost,
+  GetConsumerVenueAccess,
   GetMemberMonthlyCost,
+  GetMarketSnapshot,
   GetAnxietyState,
+  GetHungerMovementMultiplier,
+  GetHungerPoseWeight,
+  GetOwnerHairAmount,
+  GetOwnerRestRelief,
+  GetOwnerTaskAnxietyCost,
+  GetFounderSkillEffect,
+  GetStockAccountAccess,
   HireStaff,
+  NormalizeFounderSkills,
+  PlaceStockOrder,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
+  SetMarketStrategy,
   SetStaffInvestmentLevel,
-  Speculate,
   StartProject,
+  STOCK_ACCOUNT_UNLOCK_CASH,
   TakeLoan,
   TalkToStaff,
   PivotProject,
   PerformOwnerTask,
+  PurchaseWorkstation,
+  RedeemCollateral,
+  RepayStartupLoan,
+  RestartProject,
+  STARTUP_LOAN_TERMS,
+  WORKSTATION_COSTS,
   ValidateState,
+  VisitRelaxationVenue,
 } from "./Script_Rules.mjs";
 import {
   AI_SUBSCRIPTION_LEVELS,
+  CONSUMER_VENUES,
   FEATURE_CHOICES,
+  FEATURE_LIMIT,
+  FindFeatureChoice,
   GAME_TYPES,
   LIVE_REVENUE_EVENTS,
   MARKETING_CAMPAIGNS,
+  MARKET_DIRECTIONS,
+  MARKET_EVENTS,
   PIVOT_REASONS,
   PROJECTS,
-  SPECULATION_OPTIONS,
+  SCRATCH_OPTION,
+  STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
 } from "./Data_Game.mjs";
+
+{
+  const expectedFeatureIds = ["saveSlotsFight", "corpseInheritance", "potatoTruth", "chatGravity"];
+  const retiredFeatureIds = ["grudgeNpc", "weatherMood", "physicsInventory", "oneButtonDrama", "crowdAi", "honestLoading", "refundEnding", "bugMuseum"];
+  const featureIds = FEATURE_CHOICES.map((feature) => feature.id);
+  assert.equal(FEATURE_CHOICES.length, 4, "the whiteboard must stay limited to four distinct proposals");
+  assert.deepEqual(featureIds, expectedFeatureIds, "the whiteboard must expose the new wildcard proposal set");
+  assert.equal(new Set(featureIds).size, featureIds.length, "feature proposal IDs must remain unique");
+  assert(retiredFeatureIds.every((featureId) => FindFeatureChoice(featureId)), "every retired proposal must remain readable for old saves");
+  assert(retiredFeatureIds.every((featureId) => !featureIds.includes(featureId)), "retired proposals must stay off the active whiteboard");
+  assert.equal(FEATURE_LIMIT, 3, "a project must stop before swallowing the entire proposal board");
+}
 
 function Begin() {
   const result = StartProject(CreateInitialState(), "zeroGStore", "online");
   assert.equal(result.ok, true);
+  // Most legacy rule fixtures study staffing output rather than equipment
+  // procurement. Give those fixtures four paid-off desks; dedicated tests
+  // below lock the real player-facing purchase gate.
+  result.state.workstations = 4;
   return result.state;
 }
 
@@ -93,6 +139,158 @@ function ApplyResult(target, result) {
 function HasRecordedId(collection, id) {
   if (Array.isArray(collection)) return collection.some((item) => item === id || item?.id === id || item?.featureId === id);
   return Boolean(collection && typeof collection === "object" && collection[id]);
+}
+
+{
+  assert.equal(GetOwnerHairAmount(0), 1, "calm founders must keep full hair");
+  assert.equal(GetOwnerHairAmount(18), 1, "the opening anxiety level must still show full hair");
+  assert.equal(GetOwnerHairAmount(100), 0, "maximum anxiety must remove the remaining hair");
+  const anxietySamples = Array.from({ length: 101 }, (_, anxiety) => GetOwnerHairAmount(anxiety));
+  assert(anxietySamples.every((amount) => amount >= 0 && amount <= 1), "hair amount must stay normalized");
+  for (let index = 1; index < anxietySamples.length; index += 1) {
+    assert(anxietySamples[index] <= anxietySamples[index - 1], "hair must never increase as anxiety rises");
+    assert(anxietySamples[index - 1] - anxietySamples[index] < .025, "hair loss must stay gradual instead of jumping between stages");
+  }
+  assert(GetOwnerHairAmount(34) > GetOwnerHairAmount(88), "relieving anxiety must visibly restore hair");
+
+  assert.equal(GetHungerPoseWeight(45), 0, "mild hunger must preserve the normal posture");
+  assert.equal(GetHungerPoseWeight(100), 1, "starvation-level hunger must reach the full hunched pose");
+  assert.equal(GetHungerMovementMultiplier(45), 1, "mild hunger must preserve normal walking speed");
+  assert.equal(GetHungerMovementMultiplier(100), .55, "extreme hunger must slow walking to fifty-five percent");
+  assert(GetHungerMovementMultiplier(65) > GetHungerMovementMultiplier(87), "walking must slow progressively as hunger rises");
+
+  const initial = CreateInitialState();
+  assert.deepEqual(initial.founderSkills, DEFAULT_FOUNDER_SKILLS, "new founders must begin with a balanced 3/3/3 profile");
+  assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + initial.founderSkills[skillKey], 0), FOUNDER_SKILL_POINTS);
+
+  const noNameSetup = StartProject(initial, "zeroGStore", "premium", { studioName: "只选题材" });
+  assert.equal(noNameSetup.state.project.name, "第一款游戏", "the UI may omit game naming while the internal project record stays valid");
+
+  const specialized = StartProject(initial, "zeroGStore", "premium", {
+    studioName: "专长真的有用",
+    projectName: "履历模拟器",
+    founderSkills: { design: 5, programming: 2, art: 2 },
+  });
+  assert.equal(specialized.ok, true);
+  assert.deepEqual(specialized.state.founderSkills, { design: 5, programming: 2, art: 2 }, "opening skill allocation must persist into the run");
+  assert.equal(ValidateState(specialized.state), true, "a legal specialized founder profile must survive save validation");
+
+  const previousRun = structuredClone(specialized.state);
+  previousRun.status = "gameover";
+  previousRun.month = 7;
+  previousRun.cash = 123;
+  previousRun.project.modules.design = 91;
+  const quickRestart = RestartProject(previousRun);
+  assert.equal(quickRestart.ok, true);
+  assert.equal(quickRestart.state.studioName, "专长真的有用", "quick restart must keep the previous studio name");
+  assert.equal(quickRestart.state.project.name, "履历模拟器", "quick restart must keep the previous game name");
+  assert.equal(quickRestart.state.project.templateId, previousRun.project.templateId);
+  assert.equal(quickRestart.state.project.gameTypeId, previousRun.project.gameTypeId);
+  assert.deepEqual(quickRestart.state.founderSkills, previousRun.founderSkills);
+  assert.equal(quickRestart.state.month, 1, "quick restart must reset run progress");
+  assert.equal(quickRestart.state.cash, STARTUP_LOAN_TERMS.principal);
+  assert.equal(quickRestart.state.project.modules.design, 12);
+
+  const normalized = NormalizeFounderSkills({ design: 5, programming: 5, art: 5 });
+  assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + normalized[skillKey], 0), FOUNDER_SKILL_POINTS, "normalization must enforce the nine-point budget");
+  assert(FOUNDER_SKILL_KEYS.every((skillKey) => normalized[skillKey] >= 1 && normalized[skillKey] <= 5));
+
+  const legacy = structuredClone(specialized.state);
+  delete legacy.founderSkills;
+  assert.equal(ValidateState(legacy), true, "pre-skill version-9 saves must remain loadable for balanced migration");
+  assert.deepEqual(NormalizeFounderSkills(legacy.founderSkills), DEFAULT_FOUNDER_SKILLS);
+
+  const corrupted = structuredClone(specialized.state);
+  corrupted.founderSkills = { design: 5, programming: 5, art: -1 };
+  assert.equal(ValidateState(corrupted), false, "invalid founder skill totals must be rejected instead of poisoning production");
+
+  const MonthlyPotential = (skills) => GetFounderSkillEffect(skills, "design").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "art").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "client").monthlyOutputMultiplier
+    + GetFounderSkillEffect(skills, "performance").monthlyOutputMultiplier;
+  const presetPotentials = [
+    MonthlyPotential({ design: 5, programming: 2, art: 2 }),
+    MonthlyPotential({ design: 2, programming: 5, art: 2 }),
+    MonthlyPotential({ design: 2, programming: 2, art: 5 }),
+  ];
+  assert(Math.max(...presetPotentials) - Math.min(...presetPotentials) < 1e-9, "three specialist presets must have equal total monthly founder potential");
+}
+
+{
+  function FounderMonth(founderSkills) {
+    const start = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills });
+    start.state.cash = 1_000_000;
+    start.state.project.modules = { art: 50, design: 50, client: 50, performance: 50 };
+    start.state.project.scopeDebt = 0;
+    start.state.project.technicalDebt = 0;
+    start.state.project.bugs = 0;
+    return AdvanceMonth(start.state);
+  }
+
+  const designExpert = FounderMonth({ design: 5, programming: 2, art: 2 });
+  const designNovice = FounderMonth({ design: 1, programming: 4, art: 4 });
+  assert(designExpert.output.design > designNovice.output.design, "design skill must raise monthly design production");
+
+  const artExpert = FounderMonth({ design: 2, programming: 2, art: 5 });
+  const artNovice = FounderMonth({ design: 4, programming: 4, art: 1 });
+  assert(artExpert.output.art > artNovice.output.art, "art skill must raise monthly art production");
+
+  const programmingExpert = FounderMonth({ design: 2, programming: 5, art: 2 });
+  const programmingNovice = FounderMonth({ design: 4, programming: 1, art: 4 });
+  assert(programmingExpert.output.client > programmingNovice.output.client, "programming skill must raise monthly client production");
+  assert(programmingExpert.output.performance > programmingNovice.output.performance, "programming skill must also raise monthly performance production");
+
+  const expertState = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 2, programming: 2, art: 5 } }).state;
+  const noviceState = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 4, programming: 4, art: 1 } }).state;
+  const expertWork = PerformOwnerTask(expertState, "art");
+  const noviceWork = PerformOwnerTask(noviceState, "art");
+  assert(expertWork.gain > noviceWork.gain, "high founder skill must increase direct owner-work progress");
+  assert(expertWork.state.project.bugs - expertState.project.bugs < noviceWork.state.project.bugs - noviceState.project.bugs, "high founder skill must reduce owner-work rework risk");
+  assert.equal(GetFounderSkillEffect({ design: 2, programming: 5, art: 2 }, "performance").skillKey, "programming", "performance work must use the programming skill");
+
+  const expertDesigner = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 5, programming: 2, art: 2 } }).state;
+  const noviceDesigner = StartProject(CreateInitialState(), "zeroGStore", "premium", { founderSkills: { design: 1, programming: 4, art: 4 } }).state;
+  expertDesigner.project.bugs = 10;
+  noviceDesigner.project.bugs = 10;
+  const expertFix = CustomizeProject(expertDesigner, "owner", "bugMuseum");
+  const noviceFix = CustomizeProject(noviceDesigner, "owner", "bugMuseum");
+  assert(expertFix.state.project.bugs < noviceFix.state.project.bugs, "high design skill must amplify a bug-reducing owner feature instead of weakening it");
+}
+
+{
+  const start = StartProject(CreateInitialState(), "zeroGStore", "premium", {
+    studioName: "今晚一定上线",
+    projectName: "老板别催",
+  });
+  assert.equal(start.ok, true);
+  assert.equal(start.state.studioName, "今晚一定上线");
+  assert.equal(start.state.project.name, "老板别催");
+  assert.equal(start.state.cash, STARTUP_LOAN_TERMS.principal, "all starting cash must come from the founding loan");
+  assert.equal(start.state.startupLoan.remaining, STARTUP_LOAN_TERMS.totalDue);
+  assert.equal(start.state.startupLoan.dueMonth, STARTUP_LOAN_TERMS.dueMonth);
+  assert.equal(start.state.workstations, 0, "the owner begins with only their personal computer");
+  const blockedHire = HireStaff(start.state, "linMo");
+  assert.equal(blockedHire.ok, false, "the first hire must be blocked until equipment is purchased");
+  const equipment = PurchaseWorkstation(start.state);
+  assert.equal(equipment.ok, true);
+  assert.equal(equipment.cost, WORKSTATION_COSTS[0]);
+  assert.equal(equipment.state.workstations, 1);
+  assert.equal(HireStaff(equipment.state, "linMo").ok, true, "one purchased workstation unlocks one hire");
+
+  const partial = RepayStartupLoan({ ...start.state, cash: 100000 }, 10000);
+  assert.equal(partial.ok, true);
+  assert.equal(partial.state.startupLoan.remaining, STARTUP_LOAN_TERMS.totalDue - 10000);
+  const paid = RepayStartupLoan({ ...partial.state, cash: 100000 }, "full");
+  assert.equal(paid.ok, true);
+  assert.equal(paid.state.startupLoan.status, "repaid");
+
+  const due = structuredClone(start.state);
+  due.cash = 1000000;
+  due.month = STARTUP_LOAN_TERMS.dueMonth;
+  due.ownerWorkMonth = due.month;
+  const defaulted = AdvanceMonth(due);
+  assert.equal(defaulted.state.status, "gameover", "an unpaid startup loan must liquidate the studio at its deadline");
+  assert.equal(defaulted.state.outcome?.kind, "startupLoanDefault");
 }
 
 {
@@ -267,54 +465,70 @@ function HasRecordedId(collection, id) {
 }
 
 {
-  const lottery = SPECULATION_OPTIONS.find((option) => option.id === "lottery");
-  const allIn = SPECULATION_OPTIONS.find((option) => option.stakeMode === "allIn");
-  assert(lottery && allIn, "speculation catalog must include lottery and all-in options");
-  let lotteryWin = null;
-  let lotteryLoss = null;
-  for (let seed = 0; seed < 3000 && (!lotteryWin || !lotteryLoss); seed += 1) {
-    const state = Begin();
-    state.seed = seed;
-    state.cash = 100_000;
-    const beforeRevenue = state.gameRevenue;
-    const result = Speculate(state, lottery.id);
-    assert.equal(result.ok, true);
-    assert.equal(result.state.gameRevenue, beforeRevenue, "speculation must not count as game revenue");
-    if (result.profit > 0 && !lotteryWin) lotteryWin = result;
-    if (result.profit < 0 && !lotteryLoss) lotteryLoss = result;
-  }
-  assert(lotteryWin, "lottery must have a deterministic winning seed");
-  assert(lotteryLoss, "lottery must have a deterministic losing seed");
+  assert.equal(SCRATCH_OPTION.category, "lottery", "the counter must expose one dedicated scratch option");
+  assert.equal(STOCK_OPTIONS.length, 2, "the bank stock picker must stay deliberately small");
+  assert(STOCK_OPTIONS.every((option) => option.category === "stock" && !Object.hasOwn(option, "stake")), "stock choices must only define the asset, not a fixed bet");
 
-  let allInBankruptcy = null;
-  let allInProfit = null;
-  for (let seed = 0; seed < 3000 && (!allInBankruptcy || !allInProfit); seed += 1) {
+  let scratchWin = null;
+  let scratchLoss = null;
+  for (let seed = 0; seed < 3000 && (!scratchWin || !scratchLoss); seed += 1) {
     const state = Begin();
     state.seed = seed;
     state.cash = 100_000;
     const beforeRevenue = state.gameRevenue;
-    const result = Speculate(state, allIn.id);
+    const result = BuyScratchTicket(state);
     assert.equal(result.ok, true);
-    assert.equal(result.state.gameRevenue, beforeRevenue, "all-in speculation must not count as game revenue");
-    if (result.state.outcome?.kind === "speculationBankruptcy") {
-      allInBankruptcy = result;
-      assert.equal(result.state.cash, 0, "a losing all-in speculation must zero the cash balance");
-    } else if (result.profit > 0 && !allInProfit) {
-      allInProfit = result;
-    }
+    assert.equal(result.state.gameRevenue, beforeRevenue, "scratch winnings must not count as game revenue");
+    if (result.profit > 0 && !scratchWin) scratchWin = result;
+    if (result.profit < 0 && !scratchLoss) scratchLoss = result;
   }
-  assert(allInBankruptcy, "the all-in option must have a deterministic bankruptcy seed");
-  assert.equal(allInBankruptcy.state.outcome.kind, "speculationBankruptcy");
-  assert(allInProfit, "the all-in option must also have a deterministic profitable seed");
+  assert(scratchWin, "the single scratch card must have a deterministic winning seed");
+  assert(scratchLoss, "the single scratch card must have a deterministic losing seed");
 
   const once = Begin();
   once.cash = 100_000;
-  const first = Speculate(once, lottery.id);
+  const first = BuyScratchTicket(once);
   assert.equal(first.ok, true);
-  const second = Speculate(first.state, lottery.id);
-  assert.equal(second.ok, false, "speculation must be limited to one action per month");
+  const second = BuyScratchTicket(first.state);
+  assert.equal(second.ok, false, "the counter must sell only one scratch card per month");
   assert.equal(second.state.speculationHistory.length, 1);
   assert.equal(second.state.cash, first.state.cash);
+
+  const belowGate = Begin();
+  belowGate.cash = STOCK_ACCOUNT_UNLOCK_CASH - 1000;
+  assert.equal(GetStockAccountAccess(belowGate).unlocked, false, "stock trading must stay locked below the cash threshold");
+  const lockedOrder = PlaceStockOrder(belowGate, STOCK_OPTIONS[0].id, 10_000);
+  assert.equal(lockedOrder.ok, false);
+  assert.equal(lockedOrder.state.stockPosition, null);
+
+  const funded = first.state;
+  funded.cash = 200_000;
+  const order = PlaceStockOrder(funded, STOCK_OPTIONS[1].id, 12_500);
+  assert.equal(order.ok, true, "the bank must accept a stock order after the capital gate is met");
+  assert.equal(order.stake, 12_000, "stock buy amounts must be rounded down to whole thousands");
+  assert.equal(order.state.cash, 188_000, "the chosen buy amount must leave available cash immediately");
+  assert.equal(order.state.stockAccountUnlocked, true, "crossing the gate must permanently unlock the bank account");
+  assert.equal(order.state.stockHistory.length, 0, "the order must not reveal its result immediately");
+  assert.equal(order.state.stockPosition.optionId, STOCK_OPTIONS[1].id);
+  assert.equal(PlaceStockOrder(order.state, STOCK_OPTIONS[0].id, 5000).ok, false, "only one stock may be held during a month");
+
+  const beforeStockRevenue = order.state.gameRevenue;
+  const close = AdvanceMonth(order.state);
+  assert.equal(close.ok, true);
+  assert(close.stockSettlement, "the next turn must return a stock settlement for the monthly report");
+  assert.equal(close.stockSettlement.optionId, STOCK_OPTIONS[1].id);
+  assert.equal(close.stockSettlement.trend.length, 23, "the stock report must include open plus 22 trading-day points");
+  assert.equal(close.stockSettlement.trend[0].price, 100);
+  assert.equal(
+    close.stockSettlement.trend.at(-1).price,
+    Number((close.stockSettlement.payout / close.stockSettlement.stake * 100).toFixed(1)),
+    "the chart close must match the actual payout multiplier",
+  );
+  assert.equal(close.state.stockPosition, null, "the position must close when the turn advances");
+  assert.equal(close.state.stockHistory.length, 1);
+  assert.equal(close.state.gameRevenue, beforeStockRevenue, "stock returns must not count toward the game-revenue goal");
+  assert.equal(close.anxiety.delta, close.state.anxiety - order.state.anxietyAtMonthStart, "the complete monthly anxiety report must include the delayed stock outcome");
+  assert.equal(ValidateState(close.state), true, "a state containing stock history and chart points must remain saveable");
 }
 
 {
@@ -378,6 +592,31 @@ function HasRecordedId(collection, id) {
   state.cash = 0;
   state = AdvanceMonth(state).state;
   assert.equal(state.assets.drawingTablet, "seized", "an unaffordable collateral loan must seize its asset");
+}
+
+{
+  const pledged = TakeLoan(Begin(), "home").state;
+  const activeLoan = pledged.loans.find((loan) => loan.collateralId === "home" && loan.status === "active");
+  const redemptionCost = activeLoan.monthlyPayment * activeLoan.remaining;
+  const insufficientState = structuredClone(pledged);
+  insufficientState.cash = redemptionCost - 1;
+  const blocked = RedeemCollateral(insufficientState, "home");
+  assert.equal(blocked.ok, false, "collateral redemption must be blocked when cash is short");
+  assert.equal(blocked.cost, redemptionCost);
+  assert.deepEqual(blocked.state, insufficientState, "a blocked redemption must not mutate the pledged asset or loan");
+
+  const fundedState = structuredClone(pledged);
+  fundedState.cash = redemptionCost + 5000;
+  const costsBefore = fundedState.totalCosts;
+  const redeemed = RedeemCollateral(fundedState, "home");
+  const repaidLoan = redeemed.state.loans.find((loan) => loan.collateralId === "home");
+  assert.equal(redeemed.ok, true, "a funded player must be able to redeem collateral early");
+  assert.equal(redeemed.cost, redemptionCost);
+  assert.equal(redeemed.state.cash, 5000, "redemption must deduct every remaining installment");
+  assert.equal(redeemed.state.totalCosts, costsBefore + redemptionCost);
+  assert.equal(redeemed.state.assets.home, "free");
+  assert.equal(repaidLoan.status, "repaid");
+  assert.equal(repaidLoan.remaining, 0);
 }
 
 {
@@ -456,6 +695,20 @@ function HasRecordedId(collection, id) {
 }
 
 {
+  let state = Begin();
+  for (const feature of FEATURE_CHOICES.slice(0, FEATURE_LIMIT)) {
+    state.talkPoints = 1;
+    const result = CustomizeProject(state, "owner", feature.id);
+    assert.equal(result.ok, true, `feature ${feature.id} must fit before the project limit`);
+    state = result.state;
+  }
+  state.talkPoints = 1;
+  const overflow = CustomizeProject(state, "owner", FEATURE_CHOICES[FEATURE_LIMIT].id);
+  assert.equal(overflow.ok, false, "the fourth proposal must be rejected once three are locked");
+  assert.match(overflow.message, /最多保留 3 个/, "the limit rejection must explain the three-feature cap");
+}
+
+{
   const campaigns = MARKETING_CAMPAIGNS.filter((campaign) => campaign?.id);
   assert(campaigns.length > 0, "at least one pre-launch marketing campaign must exist");
   const campaign = [...campaigns].sort((a, b) => CampaignCost(b) - CampaignCost(a))[0];
@@ -513,6 +766,7 @@ function HasRecordedId(collection, id) {
   const broken = Begin();
   broken.cash = 1_000_000;
   broken.anxiety = 10;
+  broken.anxietyAtMonthStart = 10;
   broken.project.modules = { art: 12, design: 12, client: 12, performance: 12 };
   broken.project.scopeDebt = 10;
   broken.project.technicalDebt = 80;
@@ -523,6 +777,7 @@ function HasRecordedId(collection, id) {
   assert.equal(result.ok, true);
   assert.equal(result.buildStatus.level, "broken", "a failed build must remain visibly broken");
   assert(result.state.anxiety > before, "a broken build and wasted work must increase anxiety");
+  assert(result.anxiety.delta >= 8 && result.anxiety.delta <= 15, "a catastrophic build must remain a high-pressure month even when all owner energy is rested");
 }
 
 {
@@ -563,6 +818,69 @@ function HasRecordedId(collection, id) {
   }
   assert(found, "one of the deterministic seeds must surface an abstract idea at medium anxiety");
   assert(found.state.project.abstractIdeas.length >= 1);
+}
+
+{
+  const relaxationVenues = CONSUMER_VENUES.filter((venue) => venue.category === "relaxation");
+  assert.deepEqual(
+    relaxationVenues.map((venue) => venue.id),
+    ["regularFootbath", "footbathCity", "maleModelClub"],
+    "the relaxation ladder must progress from ordinary footbath to footbath city to male-model club",
+  );
+  assert.deepEqual(
+    relaxationVenues.map((venue) => venue.minimumCash),
+    [1_200, 300_000, 1_000_000],
+    "ordinary recovery must only require its real price while luxury tiers remain wealth-gated",
+  );
+
+  let state = Begin();
+  state.anxiety = 61;
+  assert.equal(GetConsumerVenueAccess(state, "regularFootbath").ok, true, "startup cash must unlock the ordinary footbath");
+  assert.equal(GetConsumerVenueAccess(state, "footbathCity").ok, false, "startup cash must not unlock footbath city");
+  assert.equal(GetConsumerVenueAccess(state, "maleModelClub").ok, false, "startup cash must not unlock the male-model club");
+  state.cash = 1_200;
+  assert.equal(GetConsumerVenueAccess(state, "regularFootbath").ok, true, "ordinary recovery must remain available without a hidden wealth gate");
+  state.cash = 68_000;
+
+  const regularVisit = VisitRelaxationVenue(state, "regularFootbath");
+  assert.equal(regularVisit.ok, true);
+  assert.equal(regularVisit.state.cash, 66_800, "ordinary footbath spending must leave the cash ledger honestly reduced");
+  assert.equal(regularVisit.state.anxiety, 53, "ordinary footbath must relieve eight anxiety");
+  assert.equal(regularVisit.state.totalCosts, state.totalCosts + 1_200, "relaxation spending must enter total costs");
+  assert.equal(regularVisit.state.relaxationHistory.at(-1)?.venueId, "regularFootbath");
+  assert.equal(VisitRelaxationVenue(regularVisit.state, "regularFootbath").ok, false, "only one relaxation purchase is allowed per month");
+
+  const cityState = Begin();
+  cityState.cash = 300_000;
+  cityState.anxiety = 70;
+  const cityVisit = VisitRelaxationVenue(cityState, "footbathCity");
+  assert.equal(cityVisit.ok, true);
+  assert.equal(cityVisit.state.anxiety, 50, "footbath city must provide the middle relief tier");
+
+  const luxuryState = Begin();
+  luxuryState.cash = 1_000_000;
+  luxuryState.anxiety = 70;
+  const luxuryVisit = VisitRelaxationVenue(luxuryState, "maleModelClub");
+  assert.equal(luxuryVisit.ok, true);
+  assert.equal(luxuryVisit.state.anxiety, 34, "the top-tier venue must provide the strongest relief");
+}
+
+{
+  const state = Begin();
+  assert.equal(GetConsumerVenueAccess(state, "marketSnack").ok, true);
+  assert.equal(GetConsumerVenueAccess(state, "dinerMeal").ok, true);
+  assert.equal(GetConsumerVenueAccess(state, "hotelMeal").ok, false, "startup cash must not pass the hotel admission threshold");
+  const lockedHotel = SelectFoodPlan(state, "feast");
+  assert.equal(lockedHotel.ok, false, "food-plan rules must enforce venue admission even when called outside the world UI");
+  assert.equal(lockedHotel.access.shortfall, 52_000);
+  state.cash = 120_000;
+  assert.equal(SelectFoodPlan(state, "feast").ok, true, "hotel dining must unlock exactly at its published threshold");
+
+  const oldSave = structuredClone(state);
+  delete oldSave.lastRelaxationMonth;
+  delete oldSave.relaxationHistory;
+  delete oldSave.anxietyAtMonthStart;
+  assert.equal(ValidateState(oldSave), true, "pre-rebalance v9 saves must remain valid for UI normalization");
 }
 
 {
@@ -638,8 +956,76 @@ function HasRecordedId(collection, id) {
 }
 
 {
+  const state = Begin();
+  const snapshot = GetMarketSnapshot(state);
+  assert(MARKET_DIRECTIONS.some((direction) => direction.id === snapshot.effectiveDirection.id), "the monthly direction must come from the public catalog");
+  assert(MARKET_EVENTS.some((marketEvent) => marketEvent.id === snapshot.event.id), "the market simulation must pick a deterministic monthly event");
+  assert.deepEqual(GetMarketSnapshot(state), snapshot, "market news must be deterministic for a save and month");
+  assert.equal(EvaluateMarketFit(state).tier, "independent", "a new project must remain safe until the player chooses a featured hook");
+}
+
+{
+  const base = MakeLaunchReady(Begin(), 92);
+  const snapshot = GetMarketSnapshot(base);
+  const matchingFeature = FEATURE_CHOICES.find((feature) => feature.marketDirections.includes(snapshot.effectiveDirection.id));
+  const mismatchingFeature = FEATURE_CHOICES.find((feature) => !feature.marketDirections.includes(snapshot.effectiveDirection.id));
+  assert(matchingFeature && mismatchingFeature, "the market fixture needs both a fit and a miss");
+
+  let perfectState = CustomizeProject(structuredClone(base), "owner", matchingFeature.id).state;
+  perfectState = MakeLaunchReady(perfectState, 92);
+  const talkPointsBeforeMarket = perfectState.talkPoints;
+  const scopeDebtBeforeMarket = perfectState.project.scopeDebt;
+  const perfectStrategy = SetMarketStrategy(perfectState, matchingFeature.id);
+  assert.equal(perfectStrategy.ok, true);
+  assert.equal(perfectStrategy.state.talkPoints, talkPointsBeforeMarket, "choosing one featured hook must not consume a conversation");
+  assert.equal(perfectStrategy.state.project.scopeDebt, scopeDebtBeforeMarket, "choosing one featured hook must not create scope debt");
+  assert.equal(perfectStrategy.marketFit.perfect, true, "a matching featured hook must create a perfect market fit");
+  assert(perfectStrategy.marketFit.revenueMultiplier > 1.4, "a perfect fit must visibly amplify revenue");
+  const duplicateStrategy = SetMarketStrategy(perfectStrategy.state, matchingFeature.id);
+  assert.equal(duplicateStrategy.ok, false, "the featured hook can only be locked once per month");
+
+  let missedState = CustomizeProject(structuredClone(base), "owner", mismatchingFeature.id).state;
+  missedState = MakeLaunchReady(missedState, 92);
+  const missedStrategy = SetMarketStrategy(missedState, mismatchingFeature.id);
+  assert.equal(missedStrategy.ok, true);
+  assert.equal(missedStrategy.marketFit.backlash, true, "a mismatching featured hook must trigger backlash");
+  assert(missedStrategy.marketFit.revenueMultiplier < 0.75, "a wrong featured hook must cut revenue before refunds");
+
+  const safeStrategy = SetMarketStrategy(structuredClone(base), "independent");
+  assert.equal(safeStrategy.ok, true);
+  assert.equal(safeStrategy.marketFit.tier, "independent", "the one-click safe option must avoid market backlash");
+
+  const perfectRelease = ReleaseBuild(perfectStrategy.state);
+  const missedRelease = ReleaseBuild(missedStrategy.state);
+  assert.equal(perfectRelease.ok, true);
+  assert.equal(missedRelease.ok, true);
+  assert(perfectRelease.revenue > missedRelease.revenue * 2, "hitting the trend with a real matching feature must earn materially more than a wrong feature");
+  assert.equal(missedRelease.commercial.marketBacklash, true, "the commercial report must identify market backlash");
+  assert(missedRelease.commercial.refundRate > perfectRelease.commercial.refundRate, "being loudly wrong must produce more refunds");
+  assert(missedRelease.state.reputation < perfectRelease.state.reputation, "being loudly wrong must damage reputation");
+}
+
+{
   const validState = Begin();
   assert.equal(ValidateState(validState), true, "a fresh run must be a valid save");
+  const legacyMarketState = structuredClone(validState);
+  delete legacyMarketState.project.marketStrategy;
+  delete legacyMarketState.project.marketStrategyHistory;
+  assert.equal(ValidateState(legacyMarketState), true, "legacy market saves must remain loadable after the phone is removed");
+  const retiredFeatureIds = ["grudgeNpc", "weatherMood", "physicsInventory", "oneButtonDrama", "crowdAi", "honestLoading", "refundEnding", "bugMuseum"];
+  for (const featureId of retiredFeatureIds) {
+    const legacyFeatureState = structuredClone(validState);
+    legacyFeatureState.project.features = [{ id: featureId }];
+    assert.equal(ValidateState(legacyFeatureState), true, `a save containing retired proposal ${featureId} must remain loadable`);
+  }
+  const legacyMarketFocusState = structuredClone(validState);
+  legacyMarketFocusState.project.features = [{ id: "grudgeNpc" }];
+  const legacyMarketStrategy = SetMarketStrategy(legacyMarketFocusState, "grudgeNpc");
+  assert.equal(legacyMarketStrategy.ok, true, "a retired proposal must remain selectable when an old save already owns it");
+  assert.equal(ValidateState(legacyMarketStrategy.state), true, "a retired proposal market strategy must remain saveable");
+  const badMarketState = structuredClone(validState);
+  badMarketState.project.marketStrategy.directionId = "imaginaryTrend";
+  assert.equal(ValidateState(badMarketState), false, "unknown market directions must invalidate a damaged save");
   const badProject = structuredClone(validState);
   badProject.project.templateId = "missingProject";
   assert.equal(ValidateState(badProject), false, "unknown project IDs must invalidate a damaged save");
@@ -659,13 +1045,15 @@ function HasRecordedId(collection, id) {
   state.project.buildStatus = { level: "stable", label: "稳定", detail: "", score: 88 };
   state.revenueGoal = 1;
   const launch = ReleaseBuild(state);
-  assert.equal(launch.state.status, "ended", "reaching the game-revenue goal must end in victory");
+  assert.equal(launch.state.status, "ended", "reaching the game-revenue goal must complete the successful-creator milestone");
   assert.equal(launch.state.outcome.kind, "worldMaker");
+  assert.equal(launch.state.outcome.title, "你成为了成功的游戏制作人！");
 }
 
 {
   let state = Begin();
   state.cash = 1000000000;
+  state = RepayStartupLoan(state, "full").state;
   state.project.age = 3;
   state.project.modules = { art: 92, design: 92, client: 92, performance: 92 };
   state.project.buildStatus = { level: "stable", label: "稳定", detail: "", score: 92 };
@@ -696,7 +1084,9 @@ function HasRecordedId(collection, id) {
     assert(result.state.project.bugs > before.bugs, "owner work must add bugs");
     assert(result.state.project.scopeDebt > before.scopeDebt, "owner work must add scope debt");
     assert(result.state.project.technicalDebt > before.technicalDebt, "owner work must add technical debt");
-    assert(result.state.hunger >= 7 && result.state.anxiety >= 5, "owner work must consume the owner's energy");
+    assert.equal(result.anxietyCost, 1, "the first owner task must add only one anxiety");
+    assert.equal(result.state.hunger, state.hunger + 7, "owner work must consume the owner's energy");
+    assert.equal(result.state.anxiety, state.anxiety + 1, "the first owner task must use the escalating anxiety schedule");
   }
 
   const invalidState = Begin();
@@ -705,11 +1095,21 @@ function HasRecordedId(collection, id) {
   assert.equal(invalid.state.ownerWorkCount, 0);
 
   let limitedState = Begin();
+  const anxietyBeforeThreeTasks = limitedState.anxiety;
+  const anxietyCosts = [];
   for (let workIndex = 0; workIndex < 3; workIndex += 1) {
     const result = PerformOwnerTask(limitedState, "design");
     assert.equal(result.ok, true, "the first three owner tasks in a month must work");
+    anxietyCosts.push(result.anxietyCost);
     limitedState = result.state;
   }
+  assert.deepEqual(anxietyCosts, [1, 2, 5], "owner task anxiety must escalate across the month's three energy slots");
+  assert.equal(limitedState.anxiety, anxietyBeforeThreeTasks + 8, "three owner tasks must add eight anxiety in total instead of fifteen");
+  assert.equal(GetOwnerTaskAnxietyCost(0), 1);
+  assert.equal(GetOwnerTaskAnxietyCost(1), 2);
+  assert.equal(GetOwnerTaskAnxietyCost(2), 5);
+  assert.equal(GetOwnerRestRelief(0), 9);
+  assert.equal(GetOwnerRestRelief(2), 3);
   assert.equal(limitedState.ownerWorkCount, 3);
   const fourth = PerformOwnerTask(limitedState, "design");
   assert.equal(fourth.ok, false, "a fourth owner task in one month must be rejected");
@@ -730,11 +1130,60 @@ function HasRecordedId(collection, id) {
   assert.equal(starvation.state.outcome?.kind, "starvation");
 
   const anxious = Begin();
-  anxious.anxiety = 95;
+  anxious.anxiety = 99;
   const breakdown = PerformOwnerTask(anxious, "client");
   assert.equal(breakdown.ok, true);
   assert.equal(breakdown.state.status, "gameover", "owner work can trigger a mental breakdown");
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
 }
 
-console.log("StudioSurvival smoke tests passed: wages, investment tiers, pivots, speculation, live events, customization, owner work, marketing commerce, anxiety, food, updates, collateral, and fail states.");
+{
+  const StartRealRun = (anxiety = 18) => {
+    const state = StartProject(CreateInitialState(), "zeroGStore", "online", { studioName: "真实工作室", projectName: "真实开局" }).state;
+    state.anxiety = anxiety;
+    state.anxietyAtMonthStart = anxiety;
+    return state;
+  };
+  const WorkWeakestTwice = (currentState) => {
+    let state = currentState;
+    for (let workIndex = 0; workIndex < 2; workIndex += 1) {
+      const moduleKey = Object.entries(state.project.modules).sort((left, right) => left[1] - right[1])[0][0];
+      const result = PerformOwnerTask(state, moduleKey);
+      assert.equal(result.ok, true);
+      state = result.state;
+    }
+    return state;
+  };
+
+  let normal = WorkWeakestTwice(StartRealRun());
+  const normalBefore = normal.anxietyAtMonthStart;
+  const normalMonth = AdvanceMonth(normal);
+  assert(normalMonth.anxiety.delta >= -3 && normalMonth.anxiety.delta <= 3, `a normal two-task month must stay near neutral, got ${normalMonth.anxiety.delta}`);
+  assert.equal(normalMonth.anxiety.delta, normalMonth.state.anxiety - normalBefore, "the month report must include actions, food, rest, and settlement in one anxiety delta");
+  assert.equal(normalMonth.anxiety.restRelief, 3, "one unused owner-energy slot must recover three anxiety");
+
+  let overworked = StartRealRun();
+  for (let workIndex = 0; workIndex < 3; workIndex += 1) {
+    const moduleKey = Object.entries(overworked.project.modules).sort((left, right) => left[1] - right[1])[0][0];
+    overworked = PerformOwnerTask(overworked, moduleKey).state;
+  }
+  const overworkMonth = AdvanceMonth(overworked);
+  assert(overworkMonth.anxiety.delta >= 8 && overworkMonth.anxiety.delta <= 15, `a fully overworked month must be visibly dangerous, got ${overworkMonth.anxiety.delta}`);
+  assert.equal(overworkMonth.anxiety.restRelief, 0);
+
+  let recovering = StartRealRun(60);
+  for (let monthIndex = 0; monthIndex < 3; monthIndex += 1) {
+    const visit = VisitRelaxationVenue(recovering, "regularFootbath");
+    assert.equal(visit.ok, true, `ordinary recovery must remain affordable in real month ${monthIndex + 1}`);
+    recovering = WorkWeakestTwice(visit.state);
+    const month = AdvanceMonth(recovering);
+    assert.equal(month.ok, true);
+    assert(month.anxiety.delta < 0, `ordinary recovery must visibly lower the complete month ledger in month ${monthIndex + 1}`);
+    recovering = month.state;
+  }
+  assert(recovering.anxiety < 42, `a real-cash, no-free-workstation route must recover from 60 below the anxiety threshold, got ${recovering.anxiety}`);
+  assert(recovering.cash > 0, "the recovery route must use the real startup cash instead of a gifted test bankroll");
+  assert.equal(recovering.workstations, 0, "the recovery route must not receive free workstations");
+}
+
+console.log("StudioSurvival smoke tests passed: founder skills, wages, investment tiers, pivots, separated scratch cards, delayed stock charts, market fit, live events, customization, owner work, marketing commerce, anxiety, admission-gated food and relaxation, updates, collateral, and fail states.");
