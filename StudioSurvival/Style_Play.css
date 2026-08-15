@@ -1171,6 +1171,9 @@ button.worldChoice:hover, button.featureCard:hover { border-color: rgba(255,255,
 .endingStats div { padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
 .endingStats span { display:block; font-size:8px; letter-spacing:0; color:var(--muted); }
 .endingStats strong { display:block; margin-top:3px; }
+.endingActions { display:grid; gap:8px; }
+.endingActions button { min-height:48px; }
+.endingActions .continueButton { border:1px solid #8f806b; background:rgba(255,255,255,.24); color:#3b332b; }
 
 /* Skeuomorphic gameplay desk -------------------------------------------------
    The HUD is built as four physical instruments: identity, business status,
@@ -3383,6 +3386,14 @@ body {
   .computerKeyboardVisual { left:5%; bottom:0; width:65%; height:43px; gap:2px; padding:5px 7px 7px; border-bottom-width:5px; }
   .computerMouseVisual { left:72%; bottom:8px; width:37px; height:47px; box-shadow:inset 2px 2px #fff8e4,4px 5px 0 #4f483e,0 9px 13px rgba(0,0,0,.42); }
   .computerCableVisual { left:74%; bottom:34px; width:75px; height:44px; border-width:2px; }
+  .endingScreen { padding:8px 18px; }
+  .endingScreen > div { width:min(720px,96vw); padding:22px 32px 18px; }
+  .endingScreen > div::before { left:18px; top:10px; }
+  .endingScreen h1 { margin:5px 0; font-size:clamp(30px,7vh,42px); }
+  .endingScreen p { margin:4px 0; font-size:10px; }
+  .endingStats { gap:6px; margin:8px 0; }
+  .endingStats div { padding:5px 8px; }
+  .endingActions { grid-template-columns:minmax(0,1.45fr) minmax(150px,.55fr); }
 }
 
 @media (max-height: 410px) and (orientation: landscape) {

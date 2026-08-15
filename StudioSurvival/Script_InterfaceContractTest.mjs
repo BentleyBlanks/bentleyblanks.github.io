@@ -83,5 +83,8 @@ assert.match(contractDecisionPage, /id="projectChoices"[\s\S]*id="typeChoices"/,
 assert.doesNotMatch(html, /gameNameInput|游戏正式名称|填写游戏名/, "the founding contract must not ask for a game name");
 assert.match(html, /id="sealButton"[\s\S]*签署发行合同/, "the contract must end in an explicit signing ritual");
 assert.doesNotMatch(script, /确认开局/, "contract signing must not be labeled as generic start confirmation");
+assert.match(html, /id="quickRestartButton"[\s\S]*沿用上局设定[\s\S]*快速重开/, "the ending must offer a one-click restart with the previous setup");
+assert.match(html, /id="restartButton"[\s\S]*重新设定/, "the ending must retain a route back through full setup");
+assert.match(script, /function QuickRestart\(\)[\s\S]*RestartProject\(state\)[\s\S]*BeginWorld\(result\.state\)/, "quick restart must enter a fresh run without reopening the naming book");
 
 console.log("StudioSurvival interface separation contract test passed");

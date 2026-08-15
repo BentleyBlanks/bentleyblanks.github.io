@@ -37,6 +37,7 @@ import {
   PerformOwnerTask,
   PurchaseWorkstation,
   RepayStartupLoan,
+  RestartProject,
   OWNER_HAIR_STAGES,
   STARTUP_LOAN_TERMS,
   WORKSTATION_COSTS,
@@ -163,6 +164,22 @@ function HasRecordedId(collection, id) {
   assert.equal(specialized.ok, true);
   assert.deepEqual(specialized.state.founderSkills, { design: 5, programming: 2, art: 2 }, "opening skill allocation must persist into the run");
   assert.equal(ValidateState(specialized.state), true, "a legal specialized founder profile must survive save validation");
+
+  const previousRun = structuredClone(specialized.state);
+  previousRun.status = "gameover";
+  previousRun.month = 7;
+  previousRun.cash = 123;
+  previousRun.project.modules.design = 91;
+  const quickRestart = RestartProject(previousRun);
+  assert.equal(quickRestart.ok, true);
+  assert.equal(quickRestart.state.studioName, "专长真的有用", "quick restart must keep the previous studio name");
+  assert.equal(quickRestart.state.project.name, "履历模拟器", "quick restart must keep the previous game name");
+  assert.equal(quickRestart.state.project.templateId, previousRun.project.templateId);
+  assert.equal(quickRestart.state.project.gameTypeId, previousRun.project.gameTypeId);
+  assert.deepEqual(quickRestart.state.founderSkills, previousRun.founderSkills);
+  assert.equal(quickRestart.state.month, 1, "quick restart must reset run progress");
+  assert.equal(quickRestart.state.cash, STARTUP_LOAN_TERMS.principal);
+  assert.equal(quickRestart.state.project.modules.design, 12);
 
   const normalized = NormalizeFounderSkills({ design: 5, programming: 5, art: 5 });
   assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + normalized[skillKey], 0), FOUNDER_SKILL_POINTS, "normalization must enforce the nine-point budget");

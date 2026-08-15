@@ -482,6 +482,19 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   return { state, ok: true, message: "发行合同签署完成" };
 }
 
+export function RestartProject(previousState) {
+  return StartProject(
+    CreateInitialState(),
+    previousState?.project?.templateId,
+    previousState?.project?.gameTypeId,
+    {
+      studioName: previousState?.studioName,
+      projectName: previousState?.project?.name,
+      founderSkills: previousState?.founderSkills,
+    },
+  );
+}
+
 export function ForecastPivotCost(state) {
   if (!state?.project) return 0;
   return RoundMoney(

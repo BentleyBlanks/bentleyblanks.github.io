@@ -55,6 +55,7 @@ import {
   PurchaseWorkstation,
   RepayStartupLoan,
   ReleaseBuild,
+  RestartProject,
   SAVE_KEY,
   SetMarketStrategy,
   SelectDirective,
@@ -69,7 +70,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815v";
+} from "./Script_Rules.mjs?v=20260815w";
 import {
   FindLocation,
   FindLocationAt,
@@ -104,7 +105,7 @@ const dom = Object.fromEntries([
   "goalReveal", "goalRevealCounter", "goalRevealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
-  "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats", "restartButton",
+  "resultCloseButton", "endingScreen", "endingTitle", "endingSubtitle", "endingStats", "quickRestartButton", "restartButton",
 ].map((id) => [id, document.getElementById(id)]));
 
 const FormatMoney = (value) => `¥${Math.round(value || 0).toLocaleString("zh-CN")}`;
@@ -3974,6 +3975,33 @@ function ResetOnboarding() {
   RenderContractPage();
 }
 
+function QuickRestart() {
+  const result = RestartProject(state);
+  if (!result.ok) {
+    ShowToast(result.message || "无法沿用上局设定。", "warning");
+    PlayTone("warning");
+    return;
+  }
+  selectedProjectId = result.state.project.templateId;
+  selectedGameTypeId = result.state.project.gameTypeId;
+  draftStudioName = result.state.studioName;
+  draftFounderSkills = NormalizeFounderSkills(result.state.founderSkills);
+  savedState = result.state;
+  BeginWorld(result.state);
+  PlayTone("good");
+}
+
+function RestartWithNewSetup() {
+  state = CreateInitialState();
+  selectedProjectId = PROJECTS[0].id;
+  selectedGameTypeId = GAME_TYPES[0].id;
+  localStorage.removeItem(SAVE_KEY);
+  savedState = null;
+  dom.endingScreen.classList.add("hidden");
+  ResetOnboarding();
+  RenderHud();
+}
+
 function SetMovement(key, pressed) {
   inputState[key] = pressed;
   if (pressed && audioContext?.state === "suspended") audioContext.resume();
@@ -4136,16 +4164,8 @@ function BindControls() {
   });
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
   dom.goalRevealButton.addEventListener("click", CompleteGoalReveal);
-  dom.restartButton.addEventListener("click", () => {
-    state = CreateInitialState();
-    selectedProjectId = PROJECTS[0].id;
-    selectedGameTypeId = GAME_TYPES[0].id;
-    localStorage.removeItem(SAVE_KEY);
-    savedState = null;
-    dom.endingScreen.classList.add("hidden");
-    ResetOnboarding();
-    RenderHud();
-  });
+  dom.quickRestartButton.addEventListener("click", QuickRestart);
+  dom.restartButton.addEventListener("click", RestartWithNewSetup);
 }
 
 function Initialize() {
