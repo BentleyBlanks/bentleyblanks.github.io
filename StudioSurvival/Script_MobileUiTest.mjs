@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ab/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ab/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ab)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ab)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ac/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ac/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ac)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ac)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -64,6 +64,8 @@ assert.match(css, /\.goalRevealCard\s*\{\s*gap:5px;/, "the target reveal must co
 assert.match(css, /\.goalRevealButton\s*\{[^}]*min-height:44px;/, "the target acknowledgement must remain a full touch target");
 assert.match(css, /\.contractDecisionGrid\s*\{[^}]*grid-template-columns:/s, "theme and release choices need a shared responsive contract grid");
 assert.match(css, /\.contractDecisionPage\.active\s*\{[^}]*overflow-y:auto;/s, "short landscape screens must be able to scroll every contract choice into view");
+assert.match(css, /\.contractReviewPage\.active\s*\{[^}]*height:100%;[^}]*overflow-y:auto;/s, "the signing page must scroll inside the book instead of hiding the seal behind navigation");
+assert.match(css, /@media \(max-height: 410px\) and \(orientation: landscape\)[\s\S]*?\.projectContract \.contractReview\s*\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\);/s, "very short landscape phones must keep the contract summary on one row so the signing seal stays visible");
 assert.doesNotMatch(css, /\.contractChoiceGroup \.compactRail\s*\{[^}]*grid-template-columns:\s*1fr/s, "three release modes must not stack into a clipped short-screen column");
 assert.match(css, /\.stockPickGrid\s*\{/, "the bank stock picker needs a responsive two-choice layout");
 assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");

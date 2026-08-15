@@ -512,6 +512,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .projectContract .choiceCard small { color:#5d5045; font-size:8px; }
 .projectContract .choiceCard.selected { border-color:var(--choiceColor,#8d7cff); background:color-mix(in srgb,var(--choiceColor,#8d7cff) 16%,#fff8e8); box-shadow:inset 5px 0 0 var(--choiceColor,#8d7cff); }
 .contractReviewPage { justify-content:flex-start; padding-top:18px; }
+.contractReviewPage.active { height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
 .contractReviewPage h2 { font-size:36px; }
 .contractReview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
 .contractReview > div { display:grid; gap:3px; min-height:68px; padding:11px 12px; border-bottom:2px solid #a99b83; background:rgba(255,255,255,.26); }
@@ -3567,6 +3568,9 @@ body {
 }
 
 @media (max-height: 410px) and (orientation: landscape) {
+  .projectContract .contractReviewPage { padding-bottom:max(6px,var(--safeBottom)); }
+  .projectContract .contractReview { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .projectContract .contractReview > div { min-width:0; }
   .modalLayer.computerMode .worldPanel > header span { display:none; }
   .modalLayer.computerMode .worldPanel > header h2 { font-size:10px; }
   .computerDeskScene { padding-right:82px; padding-bottom:52px; }
