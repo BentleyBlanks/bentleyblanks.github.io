@@ -293,13 +293,14 @@ function UpdatePausedState(state, controls, events) {
 
 function ApplyPhysicsStep(state, controls, step, jumpPressed, events) {
   const moveAxis = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
+  const moveSpeedMultiplier = Clamp(ToNumber(controls.moveSpeedMultiplier, 1), .35, 1);
   const wasGrounded = state.grounded;
   if (state.grounded && !HasSupportAt(state.x, state.y)) {
     state.grounded = false;
     state.surfaceId = null;
   }
 
-  state.vx = moveAxis * WorldConfig.moveSpeed;
+  state.vx = moveAxis * WorldConfig.moveSpeed * moveSpeedMultiplier;
   if (moveAxis !== 0) {
     state.facing = moveAxis < 0 ? -1 : 1;
   }
@@ -412,8 +413,9 @@ export function TravelWorld(currentState, locationId) {
 
 /**
  * Advance the world by delta seconds. Input is a small, renderer-independent
- * control object: { left, right, jump, pause }. A new state and event list are
- * returned on every call; the input state is never mutated.
+ * control object: { left, right, jump, pause, moveSpeedMultiplier }. A new
+ * state and event list are returned on every call; the input state is never
+ * mutated.
  */
 export function TickWorld(currentState, input = {}, delta = FixedStep) {
   const state = CloneState(currentState);

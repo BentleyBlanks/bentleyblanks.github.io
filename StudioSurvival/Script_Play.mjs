@@ -37,14 +37,15 @@ import {
   GetAnxietyState,
   GetConsumerVenueAccess,
   GetFounderSkillEffect,
+  GetHungerMovementMultiplier,
+  GetHungerPoseWeight,
   GetIdleLine,
   GetMemberMonthlyCost,
-  GetOwnerHairStage,
+  GetOwnerHairAmount,
   GetOwnerRestRelief,
   GetOwnerTaskAnxietyCost,
   GetStockAccountAccess,
   HireStaff,
-  OWNER_HAIR_STAGES,
   NormalizeFounderSkills,
   PlaceStockOrder,
   PerformOwnerTask,
@@ -66,7 +67,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815al";
+} from "./Script_Rules.mjs?v=20260815am";
 import {
   FindLocation,
   FindLocationAt,
@@ -84,7 +85,7 @@ import {
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815al";
+} from "./Script_World.mjs?v=20260815am";
 
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -898,19 +899,29 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
   hair.position.set(-.015, 2.105, .06);
   hair.scale.set(1.32, .84, 1);
   hair.rotation.z = -.16;
+  if (owner) {
+    hair.material.transparent = true;
+    hair.material.depthWrite = false;
+  }
   group.add(hair);
   let thinningHair = null;
   let scalpShine = null;
   if (owner) {
     thinningHair = new THREE.Group();
     const hairMaterial = material(0x11121a);
+    hairMaterial.transparent = true;
+    hairMaterial.depthWrite = false;
+    thinningHair.userData.material = hairMaterial;
     const tuftOffsets = [-.19, 0, .19];
+    const tufts = [];
     tuftOffsets.forEach((xOffset, tuftIndex) => {
       const tuft = new THREE.Mesh(new THREE.PlaneGeometry(.045, tuftIndex === 1 ? .16 : .2), hairMaterial);
       tuft.position.set(xOffset, 2.17 - Math.abs(xOffset) * .1, .07);
       tuft.rotation.z = xOffset * -2.8;
       thinningHair.add(tuft);
+      tufts.push(tuft);
     });
+    thinningHair.userData.tufts = tufts;
     group.add(thinningHair);
     scalpShine = new THREE.Mesh(
       new THREE.CircleGeometry(.065, 12),
@@ -996,26 +1007,64 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
   leftArm.position.set(-.42, 1.68, .025);
   rightArm.position.set(.43, 1.56, .075);
   group.add(leftArm, rightArm);
+  const upperBodyRig = new THREE.Group();
+  upperBodyRig.name = "UpperBodyRig";
+  upperBodyRig.position.y = .96;
+  group.add(upperBodyRig);
+  group.updateMatrixWorld(true);
+  upperBodyRig.updateMatrixWorld(true);
+  group.children
+    .filter((child) => child !== shadow && child !== leftLeg && child !== rightLeg && child !== upperBodyRig)
+    .forEach((child) => upperBodyRig.attach(child));
+  upperBodyRig.userData.baseY = upperBodyRig.position.y;
+  torso.userData.baseY = torso.position.y;
+  head.userData.baseY = head.position.y;
+  mouth.userData.baseY = mouth.position.y;
   group.userData.flat = true;
   group.userData.parts = {
-    torso, ownerClothingWear, head, hair, thinningHair, scalpShine, leftLeg, rightLeg,
+    upperBodyRig, torso, ownerClothingWear, head, hair, thinningHair, scalpShine, mouth, leftLeg, rightLeg,
     leftKnee: leftLeg.userData.joint, rightKnee: rightLeg.userData.joint,
     leftArm, rightArm, leftHand: leftArm.userData.hand, rightHand: rightArm.userData.hand,
     leftElbow: leftArm.userData.joint, rightElbow: rightArm.userData.joint,
     shadow,
   };
-  group.userData.motion = { phase: 0, blend: 0, landing: 0, wasGrounded: true, stepIndex: -1 };
+  group.userData.motion = {
+    phase: 0,
+    blend: 0,
+    landing: 0,
+    hungerBlend: 0,
+    hungerClock: 0,
+    wasGrounded: true,
+    stepIndex: -1,
+  };
   group.userData.visualStyle = "absurd-paper-doll-v2";
   return group;
 }
 
-function ApplyOwnerHairStage() {
+function ApplyOwnerHairAmount() {
   if (!playerParts?.hair) return;
-  const hairStage = GetOwnerHairStage(state.month);
-  playerParts.hair.visible = hairStage === OWNER_HAIR_STAGES.full;
-  if (playerParts.thinningHair) playerParts.thinningHair.visible = hairStage === OWNER_HAIR_STAGES.thinning;
-  if (playerParts.scalpShine) playerParts.scalpShine.visible = hairStage !== OWNER_HAIR_STAGES.full;
-  if (playerActor) playerActor.userData.hairStage = hairStage;
+  const hairAmount = GetOwnerHairAmount(state.anxiety);
+  const capScale = Math.max(.035, hairAmount);
+  playerParts.hair.visible = hairAmount > .012;
+  playerParts.hair.scale.set(1.32 * capScale, .84 * (.55 + hairAmount * .45), 1);
+  playerParts.hair.position.x = -.015 - .4224 * (1 - capScale);
+  playerParts.hair.material.opacity = Clamp((hairAmount - .16) / .84, 0, 1);
+  if (playerParts.thinningHair) {
+    const tuftStrength = Clamp(4 * hairAmount * (1 - hairAmount), 0, 1);
+    playerParts.thinningHair.visible = true;
+    playerParts.thinningHair.userData.tufts?.forEach((tuft) => {
+      tuft.scale.set(.72 + hairAmount * .28, .18 + tuftStrength * .82, 1);
+    });
+    if (playerParts.thinningHair.userData.material) {
+      playerParts.thinningHair.userData.material.opacity = Clamp(tuftStrength * 1.15, 0, 1);
+    }
+  }
+  if (playerParts.scalpShine) {
+    playerParts.scalpShine.visible = true;
+    playerParts.scalpShine.material.opacity = (1 - hairAmount) * .72;
+    playerParts.scalpShine.scale.set(.58 + (1 - hairAmount) * 1.2, 1 + (1 - hairAmount) * .4, 1);
+  }
+  if (playerActor) playerActor.userData.hairAmount = hairAmount;
 }
 
 function BuildAiActor(color = 0x66b8ff) {
@@ -2487,7 +2536,7 @@ function RebuildStaffActors() {
     staffActors.set(staff.id, actor);
     actorGroup.add(actor);
   });
-  ApplyOwnerHairStage();
+  ApplyOwnerHairAmount();
   SyncActiveLocationScene(worldState.activeLocationId, true);
 }
 
@@ -2541,6 +2590,43 @@ function ApplyAirPose(parts, velocityY) {
   parts.rightArm.rotation.z = rising ? .5 : .28;
   if (parts.leftElbow) parts.leftElbow.rotation.z = -.34;
   if (parts.rightElbow) parts.rightElbow.rotation.z = -.2;
+}
+
+function ApplyHungerPose(parts, time, hungerWeight, grounded, movementBlend) {
+  if (!parts) return 0;
+  const weight = Clamp(hungerWeight, 0, 1);
+  const postureWeight = SmoothStep(0, 1, weight) * (grounded ? 1 : .25);
+  const cycleSeconds = 5.4;
+  const cycle = ((time % cycleSeconds) + cycleSeconds) % cycleSeconds / cycleSeconds;
+  const gestureEnvelope = SmoothStep(.03, .12, cycle) * (1 - SmoothStep(.34, .5, cycle));
+  const bellyHold = grounded ? SmoothStep(.02, .58, weight) * (.82 + Math.sin(time * 2.7) * .06) : 0;
+  const idleWeight = grounded ? 1 - SmoothStep(.15, .65, movementBlend) : 0;
+  const foodGesture = SmoothStep(.12, .7, weight) * idleWeight * gestureEnvelope;
+
+  if (parts.upperBodyRig) {
+    parts.upperBodyRig.position.x += postureWeight * .018;
+    parts.upperBodyRig.position.y -= postureWeight * (.035 + Math.sin(time * 2.7) * .005);
+    parts.upperBodyRig.rotation.z -= postureWeight * .1;
+  }
+  if (parts.leftKnee) parts.leftKnee.rotation.z -= postureWeight * .05;
+  if (parts.rightKnee) parts.rightKnee.rotation.z -= postureWeight * .05;
+
+  if (bellyHold > 0) {
+    parts.leftArm.rotation.z += (.75 - parts.leftArm.rotation.z) * bellyHold;
+    parts.rightArm.rotation.z += (-.72 - parts.rightArm.rotation.z) * bellyHold;
+    if (parts.leftElbow) parts.leftElbow.rotation.z += (1.25 - parts.leftElbow.rotation.z) * bellyHold;
+    if (parts.rightElbow) parts.rightElbow.rotation.z += (-1.2 - parts.rightElbow.rotation.z) * bellyHold;
+  }
+  if (foodGesture > 0) {
+    parts.rightArm.rotation.z += (-1.7 - parts.rightArm.rotation.z) * foodGesture;
+    if (parts.rightElbow) parts.rightElbow.rotation.z += (-1.14 - parts.rightElbow.rotation.z) * foodGesture;
+  }
+  if (parts.mouth) {
+    parts.mouth.position.y = parts.mouth.userData.baseY - foodGesture * .014;
+    parts.mouth.rotation.z = -.12 + foodGesture * .08;
+    parts.mouth.scale.set(1 - foodGesture * .18, 1 + foodGesture * 3.2, 1);
+  }
+  return foodGesture;
 }
 
 function ResizeScene() {
@@ -2636,7 +2722,10 @@ function Animate() {
   actionCooldown = Math.max(0, actionCooldown - delta);
   const canMove = !IsOverlayOpen();
   const previousY = worldState.y;
-  const controls = canMove ? { ...inputState, paused: false } : { left: false, right: false, jump: false, paused: true };
+  const hungerMovementMultiplier = GetHungerMovementMultiplier(state.hunger);
+  const controls = canMove
+    ? { ...inputState, paused: false, moveSpeedMultiplier: hungerMovementMultiplier }
+    : { left: false, right: false, jump: false, paused: true, moveSpeedMultiplier: hungerMovementMultiplier };
   const result = TickWorld(worldState, controls, delta);
   worldState = result.state;
   inputState.jump = false;
@@ -2651,6 +2740,9 @@ function Animate() {
     const targetBlend = moving && grounded ? Clamp(speed / WorldConfig.moveSpeed, 0, 1) : 0;
     motion.blend += (targetBlend - motion.blend) * (1 - Math.exp(-delta * 11));
     motion.phase += speed * delta * 1.42;
+    const targetHungerBlend = GetHungerPoseWeight(state.hunger);
+    motion.hungerBlend += (targetHungerBlend - motion.hungerBlend) * (1 - Math.exp(-delta * 3.5));
+    motion.hungerClock += delta * (1 + motion.hungerBlend * .55);
     if (!motion.wasGrounded && grounded) motion.landing = 1;
     motion.landing = Math.max(0, motion.landing - delta * 5.8);
     const walkBob = grounded ? (1 - Math.abs(Math.cos(motion.phase))) * .075 * motion.blend : 0;
@@ -2665,10 +2757,16 @@ function Animate() {
       ApplyAirPose(playerParts, worldState.vy || (worldState.y - previousY) / Math.max(delta, .001));
     }
     const travelLean = moving ? -Math.sign(worldState.vx || 1) * .05 * motion.blend : Math.sin(time * 1.7) * .009;
-    playerParts.torso.rotation.z = travelLean + motion.landing * .035;
-    playerParts.torso.position.y = 1.35 - motion.landing * .025;
+    playerParts.upperBodyRig.position.x = 0;
+    playerParts.upperBodyRig.position.y = playerParts.upperBodyRig.userData.baseY;
+    playerParts.upperBodyRig.rotation.z = travelLean + motion.landing * .035;
+    playerParts.torso.rotation.z = 0;
+    playerParts.torso.position.y = playerParts.torso.userData.baseY - motion.landing * .025;
     playerParts.head.rotation.z = -travelLean * .45 + Math.sin(time * 1.15) * .006;
-    playerParts.head.position.y = 2.02 - motion.landing * .018;
+    playerParts.head.position.y = playerParts.head.userData.baseY - motion.landing * .018;
+    const hungerGesture = ApplyHungerPose(playerParts, motion.hungerClock, motion.hungerBlend, grounded, motion.blend);
+    playerActor.userData.hungerMovementMultiplier = hungerMovementMultiplier;
+    playerActor.userData.hungerGesture = hungerGesture;
     playerParts.shadow.scale.x = .98 + motion.blend * .16 - (grounded ? 0 : .18);
     playerParts.shadow.scale.y = .24 - motion.blend * .025 - (grounded ? 0 : .07);
     playerParts.shadow.material.opacity = grounded ? .22 + motion.landing * .08 : .12;
@@ -2909,7 +3007,7 @@ function RenderHud() {
   dom.settlementMonthValue.textContent = `进入 ${nextMonthLabel}`;
   dom.settlementButton.setAttribute("aria-label", `下一回合，进入 ${nextMonthLabel}`);
   dom.settlementButton.disabled = state.status !== "playing" || !project;
-  ApplyOwnerHairStage();
+  ApplyOwnerHairAmount();
   dom.cashValue.textContent = FormatMoney(state.cash);
   const startupLoan = state.startupLoan;
   dom.startupDebtValue.textContent = startupLoan?.status === "repaid"

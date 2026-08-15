@@ -4,6 +4,7 @@ import { InteractionPoints } from "./Data_World.mjs";
 
 const ReadLocal = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 const script = ReadLocal("./Script_Play.mjs");
+const rules = ReadLocal("./Script_Rules.mjs");
 const html = ReadLocal("./index.html");
 const css = ReadLocal("./Style_Play.css");
 const contractDecisionPage = html.match(/<article class="contractPage contractDecisionPage active"[^]*?<\/article>/)?.[0] || "";
@@ -154,18 +155,29 @@ assert.match(html, /id="quickRestartButton"[\s\S]*沿用上局设定[\s\S]*快�
 assert.match(html, /id="restartButton"[\s\S]*重新设定/, "the ending must retain a route back through full setup");
 assert.match(script, /function QuickRestart\(\)[\s\S]*RestartProject\(state\)[\s\S]*BeginWorld\(result\.state\)/, "quick restart must enter a fresh run without reopening the naming book");
 assert.match(script, /visualStyle = "absurd-paper-doll-v2"/, "human actors must keep the deliberately absurd asymmetric silhouette");
-const flatHumanBlock = script.match(/function BuildFlatHumanActor[\s\S]*?function ApplyOwnerHairStage/)?.[0] || "";
+const flatHumanBlock = script.match(/function BuildFlatHumanActor[\s\S]*?function ApplyOwnerHairAmount/)?.[0] || "";
+const ownerHairBlock = script.match(/function ApplyOwnerHairAmount[\s\S]*?function BuildAiActor/)?.[0] || "";
 assert.match(flatHumanBlock, /const BuildPaperHand =/, "flat humans need a deliberate palm-and-thumb silhouette");
 assert.doesNotMatch(flatHumanBlock, /CircleGeometry\(width \* \.62/, "hand size must not inherit mismatched arm widths");
 assert.match(flatHumanBlock, /handSide: "left"[\s\S]*handSide: "right"/, "left and right hand silhouettes must be mirrored intentionally");
 assert.match(flatHumanBlock, /raggedCuff: owner/, "the founder needs torn cuffs and exposed forearms");
 assert.match(flatHumanBlock, /OwnerClothingWear/, "the founder needs visible repairs and cloth tears");
+assert.match(flatHumanBlock, /upperBodyRig\.name = "UpperBodyRig"[\s\S]*upperBodyRig\.attach\(child\)/, "the head, clothes, torso, and arms must share one upper-body rig for hunger posture");
+assert.match(flatHumanBlock, /upperBodyRig\.attach\(child\)[\s\S]*mouth\.userData\.baseY = mouth\.position\.y/, "mouth animation must store its post-attach local baseline");
+assert.match(ownerHairBlock, /GetOwnerHairAmount\(state\.anxiety\)/, "the founder's hair amount must follow current anxiety");
+assert.doesNotMatch(ownerHairBlock, /state\.month|project\.age/, "hair loss must no longer follow time spent making games");
+assert.match(ownerHairBlock, /hair\.scale\.set[\s\S]*thinningHair[\s\S]*scalpShine\.material\.opacity/, "hair, loose tufts, and scalp shine must respond continuously to anxiety");
+assert.match(ownerHairBlock, /thinningHair\.visible = true[\s\S]*scalpShine\.visible = true/, "hair tufts and scalp shine must fade continuously without visibility thresholds");
+assert.doesNotMatch(ownerHairBlock, /(?:thinningHair|scalpShine)\.visible\s*=\s*(?:hairAmount|tuftStrength)/, "continuous hair changes must not jump at a visibility threshold");
+assert.doesNotMatch(rules, /GetOwnerHair(?:Stage|Amount)\(state\.month\)/, "monthly settlement must not drive the founder's hair");
+assert.doesNotMatch(`${script}\n${rules}`, /GetOwnerHairStage|OWNER_HAIR_STAGES|ApplyOwnerHairStage|hairStage|连续做游戏满一年|发际线正式进入抢先体验|彻底秃/, "the retired month-driven hair stages and messages must stay removed");
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
 assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
 
 const homeWindowCycleSeconds = Number(script.match(/const HOME_WINDOW_DAY_NIGHT_SECONDS = (\d+);/)?.[1]);
 const homeWindowBuilderBlock = script.match(/function BuildHomeWindowDayNight[\s\S]*?function UpdateHomeWindowDayNight/)?.[0] || "";
 const homeWindowUpdateBlock = script.match(/function UpdateHomeWindowDayNight[\s\S]*?function AddWallClock/)?.[0] || "";
+const hungerPoseBlock = script.match(/function ApplyHungerPose[\s\S]*?function ResizeScene/)?.[0] || "";
 const animateBlock = script.match(/function Animate\(\)[\s\S]*?\/\/ Compact world interactions/)?.[0] || "";
 assert.ok(homeWindowCycleSeconds >= 180, "the home-window day/night loop must remain deliberately slow");
 assert.match(homeWindowBuilderBlock, /sun[\s\S]*moon[\s\S]*stars[\s\S]*buildingWindows/, "the home window needs distinct celestial and skyline layers");
@@ -173,6 +185,11 @@ assert.match(homeWindowUpdateBlock, /Math\.sin\(solarAngle\)[\s\S]*SmoothStep[\s
 assert.doesNotMatch(homeWindowUpdateBlock, /new THREE\./, "the per-frame home-window update must reuse its visual objects and colors");
 assert.equal([...script.matchAll(/homeWindowVisual = BuildHomeWindowDayNight\(/g)].length, 1, "only the home scene may construct the day/night window");
 assert.match(animateBlock, /const time = clock\.elapsedTime;[\s\S]*UpdateHomeWindowDayNight\(time\)/, "the window cycle must follow global elapsed time instead of resetting on travel");
+assert.match(hungerPoseBlock, /upperBodyRig[\s\S]*leftKnee[\s\S]*rightKnee[\s\S]*leftArm[\s\S]*rightArm[\s\S]*mouth/, "hunger must combine a unified upper-body hunch, bent knees, a stomach hold, and a hand-to-mouth gesture");
+assert.match(hungerPoseBlock, /mouth\.position\.y = parts\.mouth\.userData\.baseY/, "the eating gesture must animate the mouth from its upper-body-rig local baseline");
+assert.doesNotMatch(hungerPoseBlock, /new THREE\./, "the per-frame hunger pose must not allocate render objects");
+assert.match(animateBlock, /GetHungerMovementMultiplier\(state\.hunger\)[\s\S]*moveSpeedMultiplier:[\s\S]*TickWorld\(/, "current hunger must scale the player's world movement every frame");
+assert.match(animateBlock, /ApplyWalkPose\([\s\S]*ApplyHungerPose\(/, "the owner-only hunger pose must layer after the normal walk pose");
 
 const anxietyPostFxBlock = script.match(/function RenderAnxietyPostFx\(\)[\s\S]*?function RenderHud\(\)/)?.[0] || "";
 const anxietyPostFxCss = css.slice(css.indexOf("/* Anxiety post-processing"));

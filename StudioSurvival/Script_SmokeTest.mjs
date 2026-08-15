@@ -18,7 +18,9 @@ import {
   GetMemberMonthlyCost,
   GetMarketSnapshot,
   GetAnxietyState,
-  GetOwnerHairStage,
+  GetHungerMovementMultiplier,
+  GetHungerPoseWeight,
+  GetOwnerHairAmount,
   GetOwnerRestRelief,
   GetOwnerTaskAnxietyCost,
   GetFounderSkillEffect,
@@ -40,7 +42,6 @@ import {
   PurchaseWorkstation,
   RepayStartupLoan,
   RestartProject,
-  OWNER_HAIR_STAGES,
   STARTUP_LOAN_TERMS,
   WORKSTATION_COSTS,
   ValidateState,
@@ -140,30 +141,22 @@ function HasRecordedId(collection, id) {
 }
 
 {
-  assert.equal(GetOwnerHairStage(12), OWNER_HAIR_STAGES.full, "the owner's hair must survive the first year");
-  assert.equal(GetOwnerHairStage(13), OWNER_HAIR_STAGES.thinning, "month 13 must visibly begin hair loss");
-  assert.equal(GetOwnerHairStage(18), OWNER_HAIR_STAGES.thinning, "hair loss must persist through the next half year");
-  assert.equal(GetOwnerHairStage(19), OWNER_HAIR_STAGES.bald, "month 19 must make the owner bald");
-  assert.equal(GetOwnerHairStage(120), OWNER_HAIR_STAGES.bald, "baldness must persist for the rest of the campaign");
+  assert.equal(GetOwnerHairAmount(0), 1, "calm founders must keep full hair");
+  assert.equal(GetOwnerHairAmount(18), 1, "the opening anxiety level must still show full hair");
+  assert.equal(GetOwnerHairAmount(100), 0, "maximum anxiety must remove the remaining hair");
+  const anxietySamples = Array.from({ length: 101 }, (_, anxiety) => GetOwnerHairAmount(anxiety));
+  assert(anxietySamples.every((amount) => amount >= 0 && amount <= 1), "hair amount must stay normalized");
+  for (let index = 1; index < anxietySamples.length; index += 1) {
+    assert(anxietySamples[index] <= anxietySamples[index - 1], "hair must never increase as anxiety rises");
+    assert(anxietySamples[index - 1] - anxietySamples[index] < .025, "hair loss must stay gradual instead of jumping between stages");
+  }
+  assert(GetOwnerHairAmount(34) > GetOwnerHairAmount(88), "relieving anxiety must visibly restore hair");
 
-  let state = Begin();
-  state.cash = 1_000_000;
-  state.startupLoan.status = "repaid";
-  state.startupLoan.remaining = 0;
-  state.month = 12;
-  state.ownerWorkMonth = 12;
-  let result = AdvanceMonth(state);
-  assert.equal(result.state.month, 13);
-  assert.equal(GetOwnerHairStage(result.state.month), OWNER_HAIR_STAGES.thinning);
-  assert(result.state.log.some((entry) => entry.month === 13 && entry.text.includes("发际线")), "the first hair-loss month must be recorded");
-
-  state = result.state;
-  state.month = 18;
-  state.ownerWorkMonth = 18;
-  result = AdvanceMonth(state);
-  assert.equal(result.state.month, 19);
-  assert.equal(GetOwnerHairStage(result.state.month), OWNER_HAIR_STAGES.bald);
-  assert(result.state.log.some((entry) => entry.month === 19 && entry.text.includes("彻底秃")), "the baldness month must be recorded");
+  assert.equal(GetHungerPoseWeight(45), 0, "mild hunger must preserve the normal posture");
+  assert.equal(GetHungerPoseWeight(100), 1, "starvation-level hunger must reach the full hunched pose");
+  assert.equal(GetHungerMovementMultiplier(45), 1, "mild hunger must preserve normal walking speed");
+  assert.equal(GetHungerMovementMultiplier(100), .55, "extreme hunger must slow walking to fifty-five percent");
+  assert(GetHungerMovementMultiplier(65) > GetHungerMovementMultiplier(87), "walking must slow progressively as hunger rises");
 
   const initial = CreateInitialState();
   assert.deepEqual(initial.founderSkills, DEFAULT_FOUNDER_SKILLS, "new founders must begin with a balanced 3/3/3 profile");

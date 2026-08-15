@@ -45,19 +45,23 @@ export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
 export const STOCK_ACCOUNT_UNLOCK_CASH = 100000;
 export const STOCK_BUY_STEP = 1000;
 export const MARKET_INDEPENDENT_ID = "independent";
-export const OWNER_HAIR_STAGES = Object.freeze({
-  full: "full",
-  thinning: "thinning",
-  bald: "bald",
-});
 export const OWNER_TASK_ANXIETY_COSTS = Object.freeze([1, 2, 5]);
 export const OWNER_REST_RELIEF_PER_UNUSED_ENERGY = 3;
 
-export function GetOwnerHairStage(monthValue) {
-  const month = Math.max(1, Math.floor(Number(monthValue) || 1));
-  if (month >= 19) return OWNER_HAIR_STAGES.bald;
-  if (month >= 13) return OWNER_HAIR_STAGES.thinning;
-  return OWNER_HAIR_STAGES.full;
+export function GetOwnerHairAmount(anxietyValue) {
+  const anxiety = Clamp(Number(anxietyValue) || 0, 0, 100);
+  const pressure = Clamp((anxiety - 18) / 82, 0, 1);
+  const easedPressure = pressure * pressure * (3 - 2 * pressure);
+  return 1 - easedPressure;
+}
+
+export function GetHungerPoseWeight(hungerValue) {
+  const hunger = Clamp(Number(hungerValue) || 0, 0, 100);
+  return Clamp((hunger - 45) / 55, 0, 1);
+}
+
+export function GetHungerMovementMultiplier(hungerValue) {
+  return 1 - GetHungerPoseWeight(hungerValue) * .45;
 }
 
 export function GetOwnerTaskAnxietyCost(completedTaskCount) {
@@ -1640,21 +1644,10 @@ export function AdvanceMonth(currentState) {
   state.talkPoints = 2;
   state.selectedDirective = "integration";
   if (state.status === "playing") {
-    const previousHairStage = GetOwnerHairStage(state.month);
     state.month += 1;
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
     state.anxietyAtMonthStart = state.anxiety;
-    const currentHairStage = GetOwnerHairStage(state.month);
-    if (currentHairStage !== previousHairStage) {
-      PushLog(
-        state,
-        currentHairStage === OWNER_HAIR_STAGES.thinning
-          ? "连续做游戏满一年，老板的发际线正式进入抢先体验。"
-          : "又做了半年，老板彻底秃了；游戏还在继续长头发。",
-        "warning",
-      );
-    }
   }
   return {
     state,
