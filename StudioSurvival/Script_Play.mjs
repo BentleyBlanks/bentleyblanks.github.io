@@ -426,6 +426,7 @@ const hazardVisuals = new Map();
 const locationVisuals = new Map();
 const locationSceneGroups = new Map();
 const maleModelDancers = [];
+const footbathGreeters = [];
 const HOME_WINDOW_DAY_NIGHT_SECONDS = 240;
 const HOME_WINDOW_START_PHASE = .34;
 const particles = [];
@@ -456,7 +457,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815aw";
+const ART_CACHE_VERSION = "20260815ax";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -1451,6 +1452,165 @@ function BuildMaleModelDancer(index = 0) {
   dancer.userData.speed = 2.25 + index * .16;
   dancer.userData.visualStyle = "twisting-male-model-v1";
   return dancer;
+}
+
+function BuildFootbathTherapist(index = 0, { venueStyle = "regular", presentation = "female", waveSide = 1 } = {}) {
+  const isCityHostess = venueStyle === "city";
+  const isFemale = presentation === "female";
+  const cityPalettes = [
+    { skin: 0xf0b99d, shade: 0xd98c79, hair: 0x281923, uniform: 0xff5f92, apron: 0xffd9e6, accent: 0xfff1a8 },
+    { skin: 0xd99b79, shade: 0xb86e5b, hair: 0x17141c, uniform: 0x55cce8, apron: 0xdffaff, accent: 0xffcf69 },
+    { skin: 0xf3c4a6, shade: 0xd68f78, hair: 0x6d2f30, uniform: 0xffb84f, apron: 0xfff0c2, accent: 0xc667ff },
+    { skin: 0xb9785f, shade: 0x925345, hair: 0x211423, uniform: 0xb986ff, apron: 0xefe2ff, accent: 0x6ff0d4 },
+  ];
+  const regularPalettes = [
+    { skin: 0xc98f70, shade: 0xa96655, hair: 0x211a17, uniform: 0x477f78, apron: 0xb9d5c7, accent: 0xe4d6a6 },
+    { skin: 0xe4ae90, shade: 0xc47a67, hair: 0x3b2723, uniform: 0x6d7f86, apron: 0xcfd5cf, accent: 0xd9c69a },
+  ];
+  const palette = (isCityHostess ? cityPalettes : regularPalettes)[index % (isCityHostess ? cityPalettes.length : regularPalettes.length)];
+  const therapist = new THREE.Group();
+  therapist.name = isCityHostess
+    ? `FootbathCityHostess_${index + 1}`
+    : `RegularFootbathTherapist_${presentation}_${index + 1}`;
+
+  const shadow = FlatDisc(.46, 0x091012, { z: -.03, opacity: .24, segments: 24 });
+  shadow.scale.y = .2;
+  shadow.position.y = .07;
+  therapist.add(shadow);
+
+  const trouserColor = isCityHostess && isFemale ? palette.skin : 0x293236;
+  const legWidth = isFemale ? .14 : .17;
+  const leftLeg = BuildDanceLimb({ color: trouserColor, upperLength: .42, lowerLength: .42, width: legWidth, z: .025, shoe: true });
+  const rightLeg = BuildDanceLimb({ color: trouserColor, upperLength: .42, lowerLength: .42, width: legWidth, z: .045, shoe: true });
+  leftLeg.position.set(-.15, .91, .025);
+  rightLeg.position.set(.15, .91, .045);
+  therapist.add(leftLeg, rightLeg);
+
+  const hips = new THREE.Group();
+  hips.position.set(0, .9, .06);
+  const lowerUniform = FlatPanel(isFemale ? .56 : .54, isFemale ? .36 : .29, isCityHostess ? palette.uniform : 0x30383c, { z: .064 });
+  lowerUniform.position.y = isFemale ? -.02 : .025;
+  if (isFemale) lowerUniform.scale.x = 1.08;
+  const waistTrim = FlatPanel(isFemale ? .5 : .53, .055, palette.accent, { z: .072 });
+  waistTrim.position.y = .16;
+  hips.add(lowerUniform, waistTrim);
+
+  const torso = new THREE.Group();
+  torso.position.set(0, .43, .08);
+  torso.userData.baseY = torso.position.y;
+  const shoulderWidth = isFemale ? .37 : .41;
+  const waistWidth = isFemale ? .24 : .31;
+  const torsoShape = new THREE.Shape();
+  torsoShape.moveTo(-waistWidth, -.38);
+  torsoShape.lineTo(-shoulderWidth, .29);
+  torsoShape.lineTo(-shoulderWidth * .78, .43);
+  torsoShape.lineTo(shoulderWidth * .78, .43);
+  torsoShape.lineTo(shoulderWidth, .29);
+  torsoShape.lineTo(waistWidth, -.38);
+  torsoShape.closePath();
+  const uniformBody = new THREE.Mesh(
+    new THREE.ShapeGeometry(torsoShape),
+    new THREE.MeshBasicMaterial({ color: palette.uniform, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  uniformBody.position.z = .08;
+  torso.add(uniformBody);
+
+  const apron = FlatPanel(isFemale ? .38 : .42, .5, palette.apron, { z: .092 });
+  apron.position.y = -.06;
+  torso.add(apron);
+  for (const side of [-1, 1]) {
+    const collar = FlatPanel(.15, .08, palette.accent, { z: .102, rotation: side * .46 });
+    collar.position.set(side * .07, .31, .102);
+    torso.add(collar);
+  }
+  const badge = FlatPanel(.1, .055, isCityHostess ? 0xffffff : 0xe4ddd0, { z: .106 });
+  badge.position.set(.2, .08, .106);
+  torso.add(badge);
+
+  const leftArm = BuildDanceLimb({ color: palette.skin, upperLength: .4, lowerLength: .38, width: .135, z: .065, endColor: palette.skin });
+  const rightArm = BuildDanceLimb({ color: palette.skin, upperLength: .4, lowerLength: .38, width: .135, z: .11, endColor: palette.skin });
+  leftArm.position.set(-shoulderWidth, .31, .065);
+  rightArm.position.set(shoulderWidth, .31, .11);
+  for (const arm of [leftArm, rightArm]) {
+    const sleeve = FlatPanel(.17, .22, palette.uniform, { z: .006 });
+    sleeve.position.y = -.11;
+    arm.add(sleeve);
+  }
+  torso.add(leftArm, rightArm);
+
+  const head = new THREE.Group();
+  head.position.set(0, .77, .12);
+  head.userData.baseY = head.position.y;
+  const backHair = FlatDisc(isFemale ? .34 : .31, palette.hair, { z: .108, segments: 24 });
+  backHair.scale.set(isFemale ? 1.08 : 1.04, isFemale ? 1.16 : .86, 1);
+  backHair.position.y = isFemale ? -.035 : .095;
+  head.add(backHair);
+  if (isFemale && index % 4 === 1) {
+    const ponytail = FlatDisc(.17, palette.hair, { z: .106, segments: 18 });
+    ponytail.scale.y = 1.35;
+    ponytail.position.set(.32, -.02, .106);
+    ponytail.rotation.z = -.32;
+    head.add(ponytail);
+  } else if (isFemale && index % 4 === 2) {
+    const bun = FlatDisc(.15, palette.hair, { z: .107, segments: 20 });
+    bun.position.set(.03, .32, .107);
+    head.add(bun);
+  } else if (isFemale && index % 4 === 3) {
+    for (const hairX of [-.27, .27]) {
+      const longHair = FlatDisc(.16, palette.hair, { z: .107, segments: 18 });
+      longHair.scale.y = 1.85;
+      longHair.position.set(hairX, -.22, .107);
+      head.add(longHair);
+    }
+  }
+  const face = FlatDisc(.285, palette.skin, { z: .12, segments: 22 });
+  face.scale.set(1.04, 1.14, 1);
+  head.add(face);
+  const fringe = new THREE.Mesh(
+    new THREE.CircleGeometry(.29, 20, 0, Math.PI),
+    new THREE.MeshBasicMaterial({ color: palette.hair, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  fringe.position.set(-.015, .11, .13);
+  fringe.scale.set(1.08, .72, 1);
+  head.add(fringe);
+  for (const eyeX of [-.09, .09]) {
+    const eye = FlatDisc(.026, 0x241c22, { z: .135, segments: 12 });
+    eye.scale.y = .72;
+    eye.position.set(eyeX, .025, .135);
+    head.add(eye);
+  }
+  const smile = FlatPanel(.13, .024, 0x983e52, { z: .138, rotation: -.06 });
+  smile.position.set(.012, -.12, .138);
+  head.add(smile);
+  if (isCityHostess) {
+    for (const cheekX of [-.15, .15]) {
+      const cheek = FlatDisc(.045, palette.shade, { z: .134, opacity: .38, segments: 12 });
+      cheek.scale.y = .52;
+      cheek.position.set(cheekX, -.065, .134);
+      head.add(cheek);
+    }
+    for (const earringX of [-.29, .29]) {
+      const earring = FlatDisc(.035, palette.accent, { z: .133, segments: 12 });
+      earring.position.set(earringX, -.04, .133);
+      head.add(earring);
+    }
+  }
+  torso.add(head);
+  hips.add(torso);
+  therapist.add(hips);
+
+  therapist.userData.parts = {
+    hips, torso, head, leftArm, rightArm,
+    leftElbow: leftArm.userData.joint, rightElbow: rightArm.userData.joint,
+    leftLeg, rightLeg, leftKnee: leftLeg.userData.joint, rightKnee: rightLeg.userData.joint,
+    shadow,
+  };
+  therapist.userData.phase = index * 1.51 + (isCityHostess ? .35 : 0);
+  therapist.userData.speed = (isCityHostess ? 1.45 : .92) + index * .08;
+  therapist.userData.waveSide = waveSide < 0 ? -1 : 1;
+  therapist.userData.venueStyle = venueStyle;
+  therapist.userData.visualStyle = isCityHostess ? "bright-footbath-hostess-v1" : "ordinary-footbath-therapist-v1";
+  return therapist;
 }
 
 function ApplyOwnerHairAmount() {
@@ -2527,10 +2687,10 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
       Place(group, Box(8.35, .2, 1.18, 0x28121f, { surface: "wood", roughness: .58 }), center, .18, .24);
       Place(group, Box(8.05, .055, .12, accent, { emissive: accent, emissiveIntensity: .48, castShadow: false }), center, .31, .8);
       const dancerSpecs = [
-        { offset: -3.05, scale: .92, z: .29 },
-        { offset: -1.05, scale: 1.02, z: .32 },
-        { offset: 1.05, scale: .98, z: .34 },
-        { offset: 3.05, scale: .94, z: .3 },
+        { offset: -3.05, scale: .92, z: .62 },
+        { offset: -1.05, scale: 1.02, z: .65 },
+        { offset: 1.05, scale: .98, z: .67 },
+        { offset: 3.05, scale: .94, z: .63 },
       ];
       dancerSpecs.forEach((spec, dancerIndex) => {
         const spot = Cylinder(.42, .42, .035, dancerIndex % 2 ? accent : paleAccent, 24, {
@@ -2548,8 +2708,38 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
       });
     } else if (isCity) {
       Place(group, Box(4.4, .08, .1, accent, { emissive: accent, emissiveIntensity: .36, castShadow: false }), center, 4.12, .13);
+      const hostessSpecs = [
+        { offset: -3.05, scale: .92, waveSide: -1 },
+        { offset: -1.48, scale: .97, waveSide: 1 },
+        { offset: 1.48, scale: .95, waveSide: -1 },
+        { offset: 3.05, scale: .9, waveSide: 1 },
+      ];
+      hostessSpecs.forEach((spec, hostessIndex) => {
+        const therapist = BuildFootbathTherapist(hostessIndex, { venueStyle: "city", presentation: "female", waveSide: spec.waveSide });
+        therapist.position.set(center + spec.offset, .32, .62 + hostessIndex * .012);
+        therapist.scale.setScalar(spec.scale);
+        therapist.userData.baseY = .32;
+        therapist.userData.baseScale = spec.scale;
+        therapist.userData.locationId = location.id;
+        footbathGreeters.push(therapist);
+        group.add(therapist);
+      });
     } else {
       for (let tileLine = 0; tileLine < 8; tileLine += 1) Place(group, Box(.035, 1.5, .03, 0xd4ddd6, { castShadow: false }), start + 1.3 + tileLine * 1.05, 1.6, .01);
+      const regularTherapistSpecs = [
+        { offset: -2.65, presentation: "male", scale: .94, waveSide: -1 },
+        { offset: 2.65, presentation: "female", scale: .92, waveSide: 1 },
+      ];
+      regularTherapistSpecs.forEach((spec, therapistIndex) => {
+        const therapist = BuildFootbathTherapist(therapistIndex, { venueStyle: "regular", presentation: spec.presentation, waveSide: spec.waveSide });
+        therapist.position.set(center + spec.offset, .32, .61 + therapistIndex * .015);
+        therapist.scale.setScalar(spec.scale);
+        therapist.userData.baseY = .32;
+        therapist.userData.baseScale = spec.scale;
+        therapist.userData.locationId = location.id;
+        footbathGreeters.push(therapist);
+        group.add(therapist);
+      });
     }
     Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
@@ -3320,6 +3510,43 @@ function Animate() {
     parts.shadow.scale.x = .88 + Math.abs(hipSwing) * .2;
     parts.shadow.scale.y = .2 - Math.abs(doubleBeat) * .025;
     parts.shadow.material.opacity = .22 + Math.abs(doubleBeat) * .08;
+  });
+
+  footbathGreeters.forEach((therapist, therapistIndex) => {
+    if (therapist.userData.locationId !== visibleLocationId) return;
+    const parts = therapist.userData.parts;
+    const isCityHostess = therapist.userData.venueStyle === "city";
+    const rhythm = time * therapist.userData.speed + therapist.userData.phase;
+    const sway = Math.sin(rhythm);
+    const wave = Math.sin(rhythm * 2.45 + therapistIndex * .7);
+    const bow = Math.max(0, (Math.sin(rhythm * .58 + therapistIndex * .83) - .68) / .32);
+    const energy = isCityHostess ? 1 : .48;
+    const waveSide = therapist.userData.waveSide;
+    const baseScale = therapist.userData.baseScale || 1;
+    therapist.position.y = therapist.userData.baseY + Math.sin(rhythm * 1.4) * .018 * energy;
+    therapist.rotation.z = sway * .018 * energy;
+    therapist.scale.set(baseScale * (1 + bow * .018), baseScale * (1 - bow * .045), baseScale);
+    parts.hips.position.x = sway * .045 * energy;
+    parts.hips.rotation.z = sway * .035 * energy;
+    parts.torso.position.y = parts.torso.userData.baseY - bow * .035;
+    parts.torso.rotation.x = bow * (isCityHostess ? .34 : .22);
+    parts.torso.rotation.z = -sway * .04 * energy;
+    parts.head.position.y = parts.head.userData.baseY - bow * .018;
+    parts.head.rotation.z = sway * .045 * energy + wave * .018;
+    const raisedArm = waveSide < 0 ? parts.leftArm : parts.rightArm;
+    const raisedElbow = waveSide < 0 ? parts.leftElbow : parts.rightElbow;
+    const restingArm = waveSide < 0 ? parts.rightArm : parts.leftArm;
+    const restingElbow = waveSide < 0 ? parts.rightElbow : parts.leftElbow;
+    raisedArm.rotation.z = waveSide * ((isCityHostess ? 2.12 : 1.72) + wave * .16 * energy);
+    raisedElbow.rotation.z = waveSide * (.48 + wave * .42 * energy);
+    restingArm.rotation.z = -waveSide * (.13 + sway * .08 * energy);
+    restingElbow.rotation.z = -waveSide * (.12 + Math.abs(sway) * .12 * energy);
+    parts.leftLeg.rotation.z = -.025 + sway * .025 * energy;
+    parts.rightLeg.rotation.z = .025 - sway * .025 * energy;
+    parts.leftKnee.rotation.z = -.035 - Math.max(0, sway) * .04 * energy;
+    parts.rightKnee.rotation.z = -.035 - Math.max(0, -sway) * .04 * energy;
+    parts.shadow.scale.x = .92 + Math.abs(sway) * .06;
+    parts.shadow.scale.y = .2 - bow * .018;
   });
 
   collectibleVisuals.forEach((visual, id) => {
