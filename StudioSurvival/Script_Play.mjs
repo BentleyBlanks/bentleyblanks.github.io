@@ -734,6 +734,26 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
     mesh.position.z = z;
     return mesh;
   };
+  const BuildPaperHand = (side, z = 0) => {
+    const hand = new THREE.Group();
+    const mirror = side === "left" ? 1 : -1;
+    const handShape = new THREE.Shape();
+    const handPoints = [
+      [-.04, .018], [.04, .018], [.052, -.02], [.082, -.049], [.064, -.078],
+      [.071, -.126], [.045, -.163], [-.038, -.17], [-.068, -.137], [-.063, -.075], [-.055, -.022],
+    ].map(([x, y]) => [x * mirror, y]);
+    handShape.moveTo(...handPoints[0]);
+    handPoints.slice(1).forEach((point) => handShape.lineTo(...point));
+    handShape.closePath();
+    const palm = new THREE.Mesh(new THREE.ShapeGeometry(handShape), material(owner ? 0xe2ad86 : 0xd9a985));
+    palm.position.z = z;
+    const palmCrease = rectangle(.032, .008, owner ? 0xc98f70 : 0xc18c6f, z + .001);
+    palmCrease.position.set(-.006 * mirror, -.104, z + .001);
+    palmCrease.rotation.z = .46 * mirror;
+    hand.add(palm, palmCrease);
+    hand.name = `PaperHand_${side}`;
+    return hand;
+  };
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(.48, 24),
     new THREE.MeshBasicMaterial({ color: 0x05050a, transparent: true, opacity: .25, depthWrite: false, toneMapped: false }),
@@ -741,20 +761,43 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
   shadow.scale.y = .24;
   shadow.position.set(0, .07, -.02);
   group.add(shadow);
-  const limb = ({ upperLength, lowerLength, width, fill, z, hand = false, shoe = false }) => {
+  const limb = ({ upperLength, lowerLength, width, fill, z, hand = false, handSide = "right", raggedCuff = false, shoe = false }) => {
     const pivot = new THREE.Group();
     pivot.position.z = z;
     const upper = rectangle(width, upperLength, fill, 0);
     upper.position.y = -upperLength * .5;
     const joint = new THREE.Group();
     joint.position.y = -upperLength;
-    const lower = rectangle(width * .88, lowerLength, fill, .002);
-    lower.position.y = -lowerLength * .5;
-    joint.add(lower);
+    if (raggedCuff) {
+      const lowerWidth = width * .88;
+      const exposedLength = Math.min(.11, lowerLength * .32);
+      const sleeveLength = lowerLength - exposedLength;
+      const sleeveShape = new THREE.Shape();
+      sleeveShape.moveTo(-lowerWidth * .5, 0);
+      sleeveShape.lineTo(lowerWidth * .5, 0);
+      sleeveShape.lineTo(lowerWidth * .5, -sleeveLength + .008);
+      sleeveShape.lineTo(lowerWidth * .28, -sleeveLength - .024);
+      sleeveShape.lineTo(0, -sleeveLength + .006);
+      sleeveShape.lineTo(-lowerWidth * .28, -sleeveLength - .018);
+      sleeveShape.lineTo(-lowerWidth * .5, -sleeveLength + .006);
+      sleeveShape.closePath();
+      const sleeve = new THREE.Mesh(new THREE.ShapeGeometry(sleeveShape), material(fill));
+      sleeve.position.z = .002;
+      const forearmWidth = Math.min(.1, Math.max(.065, width * .55));
+      const forearm = rectangle(forearmWidth, exposedLength + .035, owner ? 0xe2ad86 : 0xd9a985, .003);
+      forearm.position.set(0, -sleeveLength - exposedLength * .5 + .008, .003);
+      joint.add(sleeve, forearm);
+      pivot.userData.sleeve = sleeve;
+    } else {
+      const lower = rectangle(width * .88, lowerLength, fill, .002);
+      lower.position.y = -lowerLength * .5;
+      joint.add(lower);
+    }
     if (hand) {
-      const palm = new THREE.Mesh(new THREE.CircleGeometry(width * .62, 12), material(owner ? 0xe2ad86 : 0xd9a985));
-      palm.position.set(0, -lowerLength - width * .08, .004);
+      const palm = BuildPaperHand(handSide, .004);
+      palm.position.set(0, -lowerLength + .02, 0);
       joint.add(palm);
+      pivot.userData.hand = palm;
     }
     if (shoe) {
       const foot = rectangle(width * 1.75, width * .56, 0x11131d, .004);
@@ -786,16 +829,54 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
     group.add(bag, strap, receiptA, receiptB);
   }
   const torsoShape = new THREE.Shape();
-  torsoShape.moveTo(-.27, -.46);
+  torsoShape.moveTo(-.27, owner ? -.41 : -.46);
   torsoShape.lineTo(-.49, .16);
   torsoShape.lineTo(-.2, .49);
   torsoShape.lineTo(.34, .4);
   torsoShape.lineTo(.49, .08);
-  torsoShape.lineTo(.25, -.46);
+  torsoShape.lineTo(.25, owner ? -.39 : -.46);
+  if (owner) {
+    torsoShape.lineTo(.17, -.47);
+    torsoShape.lineTo(.09, -.41);
+    torsoShape.lineTo(.01, -.5);
+    torsoShape.lineTo(-.08, -.43);
+    torsoShape.lineTo(-.16, -.49);
+    torsoShape.lineTo(-.23, -.41);
+  }
   torsoShape.closePath();
   const torso = new THREE.Mesh(new THREE.ShapeGeometry(torsoShape), material(color));
   torso.position.set(0, 1.35, .04);
   group.add(torso);
+  let ownerClothingWear = null;
+  if (owner) {
+    ownerClothingWear = new THREE.Group();
+    ownerClothingWear.name = "OwnerClothingWear";
+    ownerClothingWear.position.z = .075;
+    const patchShape = new THREE.Shape([
+      new THREE.Vector2(-.064, -.045), new THREE.Vector2(-.055, .05),
+      new THREE.Vector2(.061, .041), new THREE.Vector2(.068, -.038),
+    ]);
+    const repairPatch = new THREE.Mesh(new THREE.ShapeGeometry(patchShape), material(0x7463bd));
+    repairPatch.position.set(.055, 1.08, 0);
+    repairPatch.rotation.z = -.08;
+    ownerClothingWear.add(repairPatch);
+    [-.035, .008, .05].forEach((xOffset, stitchIndex) => {
+      const stitch = rectangle(.027, .008, 0x463b62, .002);
+      stitch.position.set(.055 + xOffset, 1.13 - Math.abs(xOffset) * .2, .002);
+      stitch.rotation.z = stitchIndex % 2 ? -.18 : .18;
+      ownerClothingWear.add(stitch);
+    });
+    const tearShape = new THREE.Shape([
+      new THREE.Vector2(-.014, .055), new THREE.Vector2(.015, .018),
+      new THREE.Vector2(-.002, -.002), new THREE.Vector2(.018, -.055),
+      new THREE.Vector2(-.024, -.014), new THREE.Vector2(-.008, .009),
+    ]);
+    const clothTear = new THREE.Mesh(new THREE.ShapeGeometry(tearShape), material(0x352d45));
+    clothTear.position.set(.335, 1.2, .001);
+    clothTear.rotation.z = -.2;
+    ownerClothingWear.add(clothTear);
+    group.add(ownerClothingWear);
+  }
   const shirt = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([
     new THREE.Vector2(-.15, .12), new THREE.Vector2(0, -.08), new THREE.Vector2(.15, .12),
   ])), material(owner ? 0xf0ecff : 0xd9d6e7));
@@ -904,16 +985,16 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
     plug.rotation.z = .25;
     group.add(cableA, cableB, plug);
   }
-  const leftArm = limb({ upperLength: .44, lowerLength: .41, width: .12, fill: color, z: .025, hand: true });
-  const rightArm = limb({ upperLength: .29, lowerLength: .32, width: .22, fill: color, z: .075, hand: true });
+  const leftArm = limb({ upperLength: .44, lowerLength: .41, width: .12, fill: color, z: .025, hand: true, handSide: "left", raggedCuff: owner });
+  const rightArm = limb({ upperLength: .29, lowerLength: .32, width: .22, fill: color, z: .075, hand: true, handSide: "right", raggedCuff: owner });
   leftArm.position.set(-.42, 1.68, .025);
   rightArm.position.set(.43, 1.56, .075);
   group.add(leftArm, rightArm);
   group.userData.flat = true;
   group.userData.parts = {
-    torso, head, hair, thinningHair, scalpShine, leftLeg, rightLeg,
+    torso, ownerClothingWear, head, hair, thinningHair, scalpShine, leftLeg, rightLeg,
     leftKnee: leftLeg.userData.joint, rightKnee: rightLeg.userData.joint,
-    leftArm, rightArm,
+    leftArm, rightArm, leftHand: leftArm.userData.hand, rightHand: rightArm.userData.hand,
     leftElbow: leftArm.userData.joint, rightElbow: rightArm.userData.joint,
     shadow,
   };

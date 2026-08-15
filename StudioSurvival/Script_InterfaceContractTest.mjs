@@ -109,6 +109,12 @@ assert.match(html, /id="quickRestartButton"[\s\S]*沿用上局设定[\s\S]*快�
 assert.match(html, /id="restartButton"[\s\S]*重新设定/, "the ending must retain a route back through full setup");
 assert.match(script, /function QuickRestart\(\)[\s\S]*RestartProject\(state\)[\s\S]*BeginWorld\(result\.state\)/, "quick restart must enter a fresh run without reopening the naming book");
 assert.match(script, /visualStyle = "absurd-paper-doll-v2"/, "human actors must keep the deliberately absurd asymmetric silhouette");
+const flatHumanBlock = script.match(/function BuildFlatHumanActor[\s\S]*?function ApplyOwnerHairStage/)?.[0] || "";
+assert.match(flatHumanBlock, /const BuildPaperHand =/, "flat humans need a deliberate palm-and-thumb silhouette");
+assert.doesNotMatch(flatHumanBlock, /CircleGeometry\(width \* \.62/, "hand size must not inherit mismatched arm widths");
+assert.match(flatHumanBlock, /handSide: "left"[\s\S]*handSide: "right"/, "left and right hand silhouettes must be mirrored intentionally");
+assert.match(flatHumanBlock, /raggedCuff: owner/, "the founder needs torn cuffs and exposed forearms");
+assert.match(flatHumanBlock, /OwnerClothingWear/, "the founder needs visible repairs and cloth tears");
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
 assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
 
