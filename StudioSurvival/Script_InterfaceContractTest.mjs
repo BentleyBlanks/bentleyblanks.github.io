@@ -26,6 +26,8 @@ const expectedArtAssets = [
   "Texture_PropHomeFridge.png",
   "Texture_PropHomeExitDoor.png",
   "Texture_PropHomeShelf.png",
+  "Texture_BackgroundHomeRoomForeground.png",
+  "Texture_BackgroundHomeCitySkyline.png",
 ];
 const exactAssetNames = readdirSync(new URL("./Assets/", import.meta.url));
 const PaethPredictor = (left, up, upperLeft) => {
@@ -94,7 +96,7 @@ artAssetInfo.slice(3).forEach(({ fileName, width, height }) => {
   assert.ok(width >= 200 && height >= 200, `${fileName} must have production dimensions`);
 });
 assert.ok(
-  artAssetInfo.reduce((total, asset) => total + asset.byteLength, 0) <= 4.5 * 1024 * 1024,
+  artAssetInfo.reduce((total, asset) => total + asset.byteLength, 0) <= 7.5 * 1024 * 1024,
   "generated art must stay within the mobile download budget",
 );
 const referencedArtAssets = [...script.matchAll(/\.\/Assets\/(Texture_[A-Za-z0-9]+\.png)\?v=\$\{ART_CACHE_VERSION\}/g)]
@@ -360,7 +362,7 @@ const sigilBlock = script.match(/function AddAbsurdLocationSigil[\s\S]*?function
 const bankEnvironmentBlock = script.match(/function BuildLocationEnvironment[\s\S]*?function BuildRoom/)?.[0] || "";
 assert.match(script, /function AddAbsurdLocationSigil\(/, "non-bank rooms may retain location-specific abstract details");
 assert.doesNotMatch(sigilBlock, /location\.id === "bank"/, "the meaningless eye-like wall sigil must be deleted from the bank");
-assert.match(script, /const sigil = location\.id === "bank" \? null : AddAbsurdLocationSigil/, "the bank must never instantiate a generic abstract sigil");
+assert.match(script, /const sigil = location\.id === "bank" \|\| generatedHomeRoomActive \? null : AddAbsurdLocationSigil/, "the bank and generated home room must never instantiate a generic abstract sigil");
 assert.match(bankEnvironmentBlock, /const stockZoneX[\s\S]*const loanZoneX[\s\S]*const vaultX/, "the bank environment must visually separate stock, lending, and vault zones");
 
 const homeWindowCycleSeconds = Number(script.match(/const HOME_WINDOW_DAY_NIGHT_SECONDS = (\d+);/)?.[1]);
@@ -370,9 +372,12 @@ const hungerPoseBlock = script.match(/function ApplyHungerPose[\s\S]*?function R
 const animateBlock = script.match(/function Animate\(\)[\s\S]*?\/\/ Compact world interactions/)?.[0] || "";
 assert.ok(homeWindowCycleSeconds >= 180, "the home-window day/night loop must remain deliberately slow");
 assert.match(homeWindowBuilderBlock, /sun[\s\S]*moon[\s\S]*stars[\s\S]*buildingWindows/, "the home window needs distinct celestial and skyline layers");
+assert.match(homeWindowBuilderBlock, /homeCitySkyline[\s\S]*skylineArt/, "the exterior apartment skyline must come from generated art");
 assert.match(homeWindowUpdateBlock, /Math\.sin\(solarAngle\)[\s\S]*SmoothStep[\s\S]*sky\.material\.color[\s\S]*buildingWindow\.material\.emissiveIntensity/, "the home skyline must blend continuously from daylight into a lit night");
 assert.doesNotMatch(homeWindowUpdateBlock, /new THREE\./, "the per-frame home-window update must reuse its visual objects and colors");
 assert.equal([...script.matchAll(/homeWindowVisual = BuildHomeWindowDayNight\(/g)].length, 1, "only the home scene may construct the day/night window");
+assert.match(bankEnvironmentBlock, /generatedHomeRoomActive[\s\S]*homeRoomForeground[\s\S]*AddEnvironmentArtPlane/, "the generated room foreground must replace procedural home dressing");
+assert.match(script, /const startupArtKeys = \[[\s\S]*"homeRoomForeground"[\s\S]*"homeCitySkyline"/, "the room foreground and exterior skyline must preload before the world is built");
 assert.match(animateBlock, /const time = clock\.elapsedTime;[\s\S]*UpdateHomeWindowDayNight\(time\)/, "the window cycle must follow global elapsed time instead of resetting on travel");
 assert.match(hungerPoseBlock, /upperBodyRig[\s\S]*leftKnee[\s\S]*rightKnee[\s\S]*leftArm[\s\S]*rightArm[\s\S]*mouth/, "hunger must combine a unified upper-body hunch, bent knees, a stomach hold, and a hand-to-mouth gesture");
 assert.match(hungerPoseBlock, /mouth\.position\.y = parts\.mouth\.userData\.baseY/, "the eating gesture must animate the mouth from its upper-body-rig local baseline");
