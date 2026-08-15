@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815v/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815v/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!v)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!v)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815w/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815w/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!w)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!w)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -98,6 +98,11 @@ assert.doesNotMatch(script, /LOTTERY \/ STOCKS/, "stocks and scratch cards must 
 assert.match(script, /classList\.toggle\("computerMode", panelOptions\.mode === "computer"\)/, "computer sheets need an isolated presentation mode");
 assert.match(homeComputerSource, /class="computerDeskScene"/, "the home computer must render a desk scene inside the monitor");
 assert.match(homeComputerSource, /class="computerMonitorShell"/, "the home computer must retain its physical monitor shell");
+assert.match(homeComputerSource, /class="computerGlassFrame"/, "the CRT must have a separate curved-glass surround");
+assert.match(homeComputerSource, /class="computerTopVent"/, "the CRT casing must retain visible ventilation");
+assert.match(homeComputerSource, /class="computerTowerVisual"/, "the home computer must include a separate desktop tower");
+assert.match(homeComputerSource, /class="computerKeyboardVisual"/, "the home computer must include its physical keyboard");
+assert.match(homeComputerSource, /class="computerMouseVisual"/, "the home computer must include its physical mouse");
 assert.match(homeComputerSource, /\{ mode: "computer" \}/, "the home computer must open in the physical monitor mode");
 assert.doesNotMatch(homeComputerSource, /data-computer-action|OpenDirectiveSheet|OpenMarketingSheet|OpenStockSheet|OpenTalentSheet|OpenMonthSheet/, "the development computer must not expose unrelated systems");
 

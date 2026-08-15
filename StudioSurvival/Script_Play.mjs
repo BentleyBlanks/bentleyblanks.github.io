@@ -991,19 +991,43 @@ function BuildFacility(interaction) {
   if (kind === "homeComputer") {
     Place(group, Box(2.15, .16, .82, 0x6f4931, { surface: "wood", roughness: .7 }), 0, .88, .02);
     for (const legX of [-.82, .82]) Place(group, Box(.12, .86, .12, 0x493326, { surface: "wood" }), legX, .44, -.02);
-    Place(group, Box(.98, .72, .16, 0x17191d, { surface: "metal", metalness: .35, roughness: .38 }), -.18, 1.39, .12);
-    Place(group, Box(.82, .55, .025, 0x8475ff, { emissive: color, emissiveIntensity: .72, roughness: .18, castShadow: false }), -.18, 1.4, .22);
-    Place(group, Box(.1, .32, .1, 0x303238, { surface: "metal", metalness: .55 }), -.18, 1.0, .1);
-    Place(group, Box(.5, .07, .25, 0x25272c, { surface: "metal", metalness: .32 }), -.18, .91, .3);
-    Place(group, Box(.76, .045, .28, 0x34353a, { surface: "metal", metalness: .22 }), .22, .99, .4);
-    for (let keyIndex = 0; keyIndex < 9; keyIndex += 1) Place(group, Box(.055, .018, .035, 0xc4c6ca, { castShadow: false }), -.08 + keyIndex * .075, 1.018, .545);
+    const computerPlastic = 0xc9c0aa;
+    Place(group, Box(.98, .78, .44, computerPlastic, { roughness: .74 }), -.25, 1.42, .04);
+    Place(group, Box(.88, .66, .035, 0x756f62, { roughness: .78 }), -.25, 1.43, .275);
+    Place(group, Box(.74, .5, .026, 0x18201e, { surface: "metal", metalness: .12, roughness: .22 }), -.25, 1.46, .305);
+    Place(group, Box(.65, .4, .014, 0x8475ff, { emissive: color, emissiveIntensity: .66, roughness: .14, castShadow: false }), -.25, 1.46, .327);
+    Place(group, Box(.11, .27, .12, 0xa9a18e, { roughness: .76 }), -.25, 1.0, .08);
+    Place(group, Box(.58, .08, .38, 0xbab19d, { roughness: .77 }), -.25, .94, .12);
+    for (let ventIndex = 0; ventIndex < 6; ventIndex += 1) {
+      Place(group, Box(.06, .018, .018, 0x716a5d, { castShadow: false }), -.46 + ventIndex * .085, 1.79, .288);
+    }
+    Place(group, Box(.08, .035, .018, 0x2b322c, { castShadow: false }), .09, 1.11, .292);
+    Place(group, Sphere(.025, 0x68e0a0, { emissive: 0x68e0a0, emissiveIntensity: 1.2, castShadow: false, segments: 10, rings: 7 }), .18, 1.11, .3);
+
+    Place(group, Box(.42, .76, .56, 0xbeb59f, { roughness: .78 }), .68, 1.34, .02);
+    Place(group, Box(.31, .08, .025, 0x4b4a43, { surface: "metal", metalness: .16, castShadow: false }), .68, 1.58, .318);
+    Place(group, Box(.25, .045, .024, 0x252824, { castShadow: false }), .68, 1.46, .318);
+    for (let ventIndex = 0; ventIndex < 4; ventIndex += 1) {
+      Place(group, Box(.22, .018, .02, 0x766f61, { castShadow: false }), .68, 1.16 + ventIndex * .055, .318);
+    }
+    Place(group, Sphere(.05, 0x35372f, { surface: "metal", metalness: .22, castShadow: false, segments: 12, rings: 8 }), .68, 1.02, .324);
+
+    Place(group, Box(.83, .055, .34, 0xb8ae99, { roughness: .8 }), .04, .99, .46);
+    for (let row = 0; row < 3; row += 1) {
+      for (let column = 0; column < 10; column += 1) {
+        Place(group, Box(.052, .021, .043, 0xe1d9c7, { roughness: .86, castShadow: false }), -.28 + column * .068 + row * .012, 1.025, .37 + row * .065);
+      }
+    }
+    const mouse = Sphere(.11, 0xc6bda7, { roughness: .72, segments: 14, rings: 9 });
+    mouse.scale.set(.78, .38, 1.12);
+    Place(group, mouse, .67, 1.035, .48);
     const mug = Cylinder(.12, .105, .22, 0xe1d9ca, 18, { surface: "paper", roughness: .58 });
-    Place(group, mug, .78, 1.05, .12);
+    Place(group, mug, .99, 1.05, .22);
     const mugHandle = Torus(.105, .025, 0xe1d9ca, { roughness: .58, radialSegments: 8, tubularSegments: 20 });
     mugHandle.rotation.y = Math.PI / 2;
-    Place(group, mugHandle, .9, 1.08, .12);
-    AddTaskLamp(group, -.87, .98, .05, color, 1);
-    AddPaperStack(group, .66, .98, .36, .34, 0xe9dfc9, 3);
+    Place(group, mugHandle, 1.1, 1.08, .22);
+    AddTaskLamp(group, -.94, .98, .05, color, 1);
+    AddPaperStack(group, .3, .98, .66, .28, 0xe9dfc9, 3);
   } else if (kind === "equipmentShop") {
     Place(group, Box(2.5, .82, .92, 0x294059, { surface: "metal", metalness: .28, roughness: .47 }), 0, .42, -.02);
     Place(group, Box(2.6, .11, 1.02, 0x9eb1c1, { surface: "metal", metalness: .52, roughness: .3 }), 0, .87, .02);
@@ -2647,42 +2671,54 @@ function OpenHomeComputerSheet() {
     : "关掉电脑，走到墙上月历前核对账单并进入下个月。";
   OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <div class="computerDeskScene">
+      <div class="computerDeskMat" aria-hidden="true"></div>
       <div class="computerMonitorShell">
+        <div class="computerTopVent" aria-hidden="true">${Array.from({ length: 11 }, () => "<i></i>").join("")}</div>
         <div class="computerBezel"><span>STUDIO OS</span><i></i><b>M${String(state.month).padStart(2, "0")}</b></div>
-        <div class="computerScreenContent">
-          <section class="computerObjective">
-            <div><span>现在要做什么</span><h3>${objectiveTitle}</h3><p>${objectiveDetail}</p></div>
-            <div class="energyBudget" aria-label="本月精力剩余 ${energyLeft} 格">
-              <span>本月精力</span>
-              <div>${[0, 1, 2].map((slot) => `<i class="${slot < energyLeft ? "available" : "spent"}">${slot < energyLeft ? "●" : "×"}</i>`).join("")}</div>
-              <strong>${energyLeft} / 3</strong>
-            </div>
-          </section>
+        <div class="computerGlassFrame">
+          <div class="computerScreenContent">
+            <section class="computerObjective">
+              <div><span>现在要做什么</span><h3>${objectiveTitle}</h3><p>${objectiveDetail}</p></div>
+              <div class="energyBudget" aria-label="本月精力剩余 ${energyLeft} 格">
+                <span>本月精力</span>
+                <div>${[0, 1, 2].map((slot) => `<i class="${slot < energyLeft ? "available" : "spent"}">${slot < energyLeft ? "●" : "×"}</i>`).join("")}</div>
+                <strong>${energyLeft} / 3</strong>
+              </div>
+            </section>
 
-          <section class="developmentWorkbench">
-            <header><div><span>本月投入</span><strong>${energyLeft > 0 ? "下一格精力投到哪里？" : "四项开发进度"}</strong></div><b>总体 ${Math.round(averageProgress)}%</b></header>
-            <div class="energyModuleGrid">
-              ${moduleValues.map(({ moduleKey, value }) => {
-                const meta = MODULE_META[moduleKey];
-                const isRecommended = moduleKey === recommended && energyLeft > 0;
-                return `<button class="energyModule ${isRecommended ? "recommended" : ""}" style="--moduleColor:${meta.color}" data-energy-module="${moduleKey}" type="button" ${energyLeft <= 0 ? "disabled" : ""}>
-                  <div class="energyModuleTop"><span>${meta.icon}</span><strong>${meta.label}</strong>${isRecommended ? "<b>建议优先</b>" : ""}</div>
-                  <div class="moduleProgress"><i style="width:${Clamp(value, 0, 100)}%"></i></div>
-                  <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? "投入 1 格" : "等待下月"}</strong></footer>
-                </button>`;
-              }).join("")}
-            </div>
-            <p class="workCostNote">老板亲自开发每次获得 2–4 点进度，同时增加饥饿、焦虑和少量债务。四项差距太大时，成品会互相拖累。</p>
-          </section>
+            <section class="developmentWorkbench">
+              <header><div><span>本月投入</span><strong>${energyLeft > 0 ? "下一格精力投到哪里？" : "四项开发进度"}</strong></div><b>总体 ${Math.round(averageProgress)}%</b></header>
+              <div class="energyModuleGrid">
+                ${moduleValues.map(({ moduleKey, value }) => {
+                  const meta = MODULE_META[moduleKey];
+                  const isRecommended = moduleKey === recommended && energyLeft > 0;
+                  return `<button class="energyModule ${isRecommended ? "recommended" : ""}" style="--moduleColor:${meta.color}" data-energy-module="${moduleKey}" type="button" ${energyLeft <= 0 ? "disabled" : ""}>
+                    <div class="energyModuleTop"><span>${meta.icon}</span><strong>${meta.label}</strong>${isRecommended ? "<b>建议优先</b>" : ""}</div>
+                    <div class="moduleProgress"><i style="width:${Clamp(value, 0, 100)}%"></i></div>
+                    <footer><span>${Math.round(value)} / 100</span><strong>${energyLeft > 0 ? "投入 1 格" : "等待下月"}</strong></footer>
+                  </button>`;
+                }).join("")}
+              </div>
+              <p class="workCostNote">老板亲自开发每次获得 2–4 点进度，同时增加饥饿、焦虑和少量债务。四项差距太大时，成品会互相拖累。</p>
+            </section>
 
-          ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
+            ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
 
-          <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>项目方向在墙上白板；宣发用桌边手机；招聘必须出门去人才市场；月结在墙上月历。</span></div>
+            <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>项目方向在墙上白板；宣发用桌边手机；招聘必须出门去人才市场；月结在墙上月历。</span></div>
+          </div>
         </div>
-        <div class="computerPower"><i></i><span>POWER</span></div>
+        <div class="computerControlDeck" aria-hidden="true">
+          <strong>甲方 486DX</strong>
+          <span class="computerSpeaker">${Array.from({ length: 9 }, () => "<i></i>").join("")}</span>
+          <span class="computerTurbo"><i></i>TURBO</span>
+          <div class="computerPower"><i></i><span>POWER</span></div>
+        </div>
       </div>
       <div class="computerStand"><i></i></div>
-      <div class="computerKeyboardVisual">${Array.from({ length: 18 }, (_, index) => `<i class="${index === 16 ? "space" : ""}"></i>`).join("")}</div>
+      <div class="computerTowerVisual" aria-hidden="true"><strong>甲方 486</strong><i class="towerOpticalDrive"></i><i class="towerFloppyDrive"></i><span class="towerVent"></span><b class="towerPower"><i></i></b></div>
+      <div class="computerKeyboardVisual" aria-hidden="true">${Array.from({ length: 50 }, (_, index) => `<i class="${index === 43 ? "space" : [13, 27, 41].includes(index) ? "wide" : ""}"></i>`).join("")}</div>
+      <div class="computerMouseVisual" aria-hidden="true"><i></i></div>
+      <div class="computerCableVisual" aria-hidden="true"></div>
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-computer-release]")) return OpenReleaseSheet();
