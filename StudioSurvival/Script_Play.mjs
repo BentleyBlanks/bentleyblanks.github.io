@@ -3668,7 +3668,7 @@ function ShowScratchTicket(result) {
   dom.resultBody.innerHTML = `
     <div class="scratchStage single">
       <article class="scratchTicket" data-scratch-ticket>
-        <div class="scratchTicketMasthead"><span>老板兼牛马 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
+        <div class="scratchTicketMasthead"><span>做游戏真的会死 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
         <div class="scratchTicketTitle">
           <div><small>STUDIO SURVIVAL LUCKY TICKET</small><strong>工作室续命刮刮乐</strong></div>
           <span class="scratchTicketPrice"><small>票面</small><b>${FormatMoney(result.stake)}</b></span>
