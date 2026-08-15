@@ -4230,7 +4230,7 @@ body {
 .avatar-taoRan .trFace { left: 1.5px; top: 1.5px; width: 7px; height: 9px; border-radius: 1px; background: #fffdf4; box-shadow: inset 0 0 0 .5px rgba(90, 70, 30, .35); }
 .avatar-taoRan .trFps { left: 8px; top: 36px; padding: 2px 4px; border-radius: 3px; background: #14301f; color: #6fffb0; font: 950 8px/1 "Courier New", monospace; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); animation: talentFpsPing 2s ease-in-out infinite; }
 
-/* 梦笔 4.2 · 生成美术 AI：悬浮显示器、画笔尾巴与像素星尘。 */
+/* 六指琴魔 4.2 · 生成美术 AI：悬浮显示器、画笔尾巴与像素星尘。 */
 .avatar-dreamBrush .dbBody { left: 17px; top: 28px; width: 46px; height: 34px; border: 2px solid #8a6a4a; border-radius: 5px; background: linear-gradient(180deg, #f2e6cf, #d9c9a8 70%, #cdbb96); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), 0 2px 4px rgba(0, 0, 0, .3); }
 .avatar-dreamBrush .dbScreen { left: 3px; top: 3px; width: 36px; height: 24px; border-radius: 3px; background: radial-gradient(circle at 50% 38%, rgba(255, 157, 201, .9) 0 18%, #5a2a4a 62%, #331c2e); box-shadow: inset 0 0 8px rgba(255, 120, 190, .5), inset 0 0 2px #2a1224; }
 .avatar-dreamBrush .dbEye { top: 12px; width: 5px; height: 6px; border-radius: 50%; background: #fff2f8; box-shadow: 0 0 3px rgba(255, 255, 255, .8); animation: talentBlink 3.2s ease-in-out infinite; }
@@ -4250,7 +4250,7 @@ body {
 .avatar-dreamBrush .dbSpark.s2 { left: 70px; top: 26px; animation-delay: .8s; }
 .avatar-dreamBrush .dbSpark.s3 { left: 10px; top: 58px; animation-delay: 1.5s; }
 
-/* 范围鲸 · 脑暴策划 AI：打领带的鲸鱼，头顶冒点子气泡。 */
+/* 吞天鲸 · 脑暴策划 AI：打领带的鲸鱼，头顶冒点子气泡。 */
 .avatar-scopeWhale .swTail { left: 6px; top: 35px; width: 16px; height: 20px; transform-origin: 12px 10px; animation: talentTailWag 2.6s ease-in-out infinite; }
 .avatar-scopeWhale .swFin { width: 11px; height: 8px; background: #f0be54; }
 .avatar-scopeWhale .swFin.top { left: 2px; top: 2px; border-radius: 70% 0 60% 0; }
@@ -4264,7 +4264,7 @@ body {
 .avatar-scopeWhale .swDot.d1 { left: 41px; top: 24px; }
 .avatar-scopeWhale .swDot.d2 { left: 46px; top: 18px; animation-delay: .5s; }
 
-/* 结对熊猫 · 编码 AI：黑眼圈眨眼，终端光标一闪一闪。 */
+/* 赛博食铁兽 · 编码 AI：黑眼圈眨眼，终端光标一闪一闪。 */
 .avatar-pairPanda .ppHead { left: 17px; top: 24px; width: 50px; height: 44px; border-radius: 50%; background: #f4f1ea; box-shadow: inset -7px -6px 0 rgba(0, 0, 0, .07), 0 2px 3px rgba(0, 0, 0, .25); }
 .avatar-pairPanda .ppEar { top: 19px; width: 14px; height: 14px; border-radius: 50%; background: #23262e; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .35); }
 .avatar-pairPanda .ppEar.left { left: 21px; }
@@ -4284,7 +4284,7 @@ body {
 .avatar-pairPanda .ppLine.l2 { top: 12px; width: 9px; }
 .avatar-pairPanda .ppCursor { left: 3px; top: 15.5px; width: 6px; height: 2.5px; background: #6fffb0; animation: talentCursorBlink 1.1s steps(1) infinite; }
 
-/* 帧率水母 · 性能诊断 AI：发光内核、摆动触手与 60 帧徽章。 */
+/* 帧率克苏鲁 · 性能诊断 AI：发光内核、摆动触手与 60 帧徽章。 */
 .avatar-frameJelly .fjTentacle { top: 52px; width: 6px; height: 17px; border-radius: 0 0 6px 6px; background: linear-gradient(180deg, rgba(110, 230, 180, .85), rgba(70, 180, 150, .55)); transform-origin: top center; animation: talentTentacle 2.6s ease-in-out infinite; }
 .avatar-frameJelly .fjTentacle.t1 { left: 22px; --tiltA: -9deg; --tiltB: 8deg; }
 .avatar-frameJelly .fjTentacle.t2 { left: 31px; --tiltA: 8deg; --tiltB: -7deg; animation-delay: .2s; }

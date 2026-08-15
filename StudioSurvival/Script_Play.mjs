@@ -23,7 +23,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815aw";
+} from "./Data_Game.mjs?v=20260815bc";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -464,7 +464,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815bb";
+const ART_CACHE_VERSION = "20260815bc";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
