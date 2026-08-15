@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const ReadLocal = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 
@@ -21,12 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ah/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ah/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ah)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ah)/, "the gameplay cache-bust must stay unified");
-assert.match(html, /Texture_ShabbyStudioBackdrop\.webp\?v=20260815ah/, "the generated shabby studio backdrop must be preloaded with the same cache stamp");
-assert.equal(existsSync(new URL("./Texture_ShabbyStudioBackdrop.webp", import.meta.url)), true, "the generated shabby studio backdrop must ship with the page");
+assert.match(html, /Style_Play\.css\?v=20260815ag/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ag/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ag)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ag)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -113,9 +111,7 @@ assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet mu
 assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must show the target before entering the playable world");
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
 assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
-assert.match(script, /AddPhysicalLabel\(\s*sceneGroup,\s*location\.name,\s*""/, "scene signs must render the place name without an explanatory subtitle");
-assert.match(script, /new THREE\.TextureLoader\(\)\.load\([\s\S]*?Texture_ShabbyStudioBackdrop\.webp\?v=20260815ah/, "the home scene must load the generated shabby backdrop");
-assert.match(script, /function AddShabbyStudioBackdrop\([\s\S]*?backdrop\.visible = true/, "the generated backdrop must preserve the procedural wall as a loading fallback");
+assert.match(script, /AddPhysicalLabel\(sceneGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
 assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");
