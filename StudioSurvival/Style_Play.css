@@ -3354,6 +3354,11 @@ body {
 .whiteboardBoardMeta i { width:10px; height:10px; border:1px solid #8a3033; border-radius:50%; background:radial-gradient(circle at 35% 28%,#ff8e8c,#bd4548 55%,#74262a 60%); box-shadow:0 2px 2px rgba(0,0,0,.25); }
 .whiteboardBoardMeta i:nth-of-type(2) { border-color:#315c83; background:radial-gradient(circle at 35% 28%,#9bc8ed,#4e82b8 55%,#28547d 60%); }
 .whiteboardBoardMeta i:nth-of-type(3) { border-color:#97702a; background:radial-gradient(circle at 35% 28%,#ffe38a,#d8ad3c 55%,#8b681e 60%); }
+.whiteboardFocus { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:11px; margin:0 0 11px; padding:8px 11px 9px 13px; border:2px solid rgba(49,95,125,.72); border-left-width:7px; border-radius:4px; color:#294d62; background:linear-gradient(100deg,rgba(211,234,238,.82),rgba(255,255,255,.52)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.7),2px 4px 0 rgba(55,87,95,.16); transform:rotate(-.15deg); }
+.whiteboardFocus::after { content:""; position:absolute; left:13%; right:34%; bottom:4px; border-bottom:2px solid rgba(164,72,75,.35); transform:rotate(-.7deg); pointer-events:none; }
+.whiteboardFocus > span { color:#a4484b; font:950 9px/1 "KaiTi","STKaiti",sans-serif; letter-spacing:.12em; }
+.whiteboardFocus > strong { position:relative; z-index:1; color:#234f6a; font:950 18px/1.1 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; }
+.whiteboardFocus > small { position:relative; z-index:1; min-height:27px; display:inline-flex; align-items:center; padding:4px 8px; border:2px dashed #a4484b; border-radius:3px; color:#8c3438; background:rgba(255,245,220,.8); font:950 9px/1 "KaiTi","STKaiti",sans-serif; white-space:nowrap; transform:rotate(.8deg); }
 .whiteboardMode .panelIntro { margin:0 0 10px; color:#315f7d; font:900 15px/1.25 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; transform:rotate(-.25deg); }
 .whiteboardMode .speechLine { margin:0 0 8px; padding:7px 10px; border:0; border-left:4px solid #376d90; border-radius:0; color:#315f7d; background:rgba(64,117,145,.045); font:900 13px/1.25 "KaiTi","STKaiti",sans-serif; transform:rotate(-.2deg); }
 .whiteboardMode .sectionHeading { margin:8px 0 5px; padding-bottom:3px; border-bottom:2px solid rgba(49,95,125,.22); color:#315f7d; font-family:"KaiTi","STKaiti",sans-serif; }
@@ -3361,7 +3366,9 @@ body {
 .whiteboardMode .sectionHeading span { color:#9b4548; font-weight:900; }
 .whiteboardMode .worldGrid { gap:12px; }
 .whiteboardMode .worldChoice,
-.whiteboardMode .featureCard { --notePaper:#fff0a9; --noteRotate:-.55deg; position:relative; min-height:96px; padding:19px 13px 12px; overflow:visible; border:0; border-radius:1px; color:#334345; background:linear-gradient(150deg,rgba(255,255,255,.42),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 3px 0 rgba(101,82,44,.22),6px 9px 17px rgba(65,55,40,.18); transform:rotate(var(--noteRotate)); transform-origin:50% 20%; }
+.whiteboardMode .featureCard { --notePaper:#fff0a9; --noteRotate:-.55deg; position:relative; min-height:96px; padding:19px 13px 12px; overflow:visible; border:2px solid rgba(93,76,42,.28); border-radius:2px; color:#334345; background:linear-gradient(150deg,rgba(255,255,255,.42),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 4px 0 rgba(101,82,44,.28),7px 11px 18px rgba(65,55,40,.2); transform:rotate(var(--noteRotate)); transform-origin:50% 20%; }
+.whiteboardMode button.worldChoice,
+.whiteboardMode button.featureCard { padding-bottom:36px; cursor:pointer; touch-action:manipulation; }
 .whiteboardMode .worldGrid > :nth-child(3n+2) { --notePaper:#ffd7e2; --noteRotate:.65deg; }
 .whiteboardMode .worldGrid > :nth-child(3n+3) { --notePaper:#d8ecff; --noteRotate:-.3deg; }
 .whiteboardMode .worldChoice::before,
@@ -3369,14 +3376,22 @@ body {
 .whiteboardMode .worldGrid > :nth-child(3n+2)::before { border-color:#315a80; background:radial-gradient(circle at 35% 28%,#a8d3f5,#5488bd 55%,#2b587e 60%); }
 .whiteboardMode .worldGrid > :nth-child(3n+3)::before { border-color:#987329; background:radial-gradient(circle at 35% 28%,#ffe38d,#d8ae3f 55%,#89671e 60%); }
 .whiteboardMode button.worldChoice:hover,
-.whiteboardMode button.featureCard:hover:not(:disabled) { border:0; background:linear-gradient(150deg,rgba(255,255,255,.54),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 4px 0 rgba(101,82,44,.22),9px 14px 21px rgba(65,55,40,.24); transform:translateY(-3px) rotate(0); }
-.whiteboardMode .worldChoice.selected { --notePaper:#d9f0c9; box-shadow:inset 0 0 0 3px rgba(54,126,79,.62),2px 3px 0 rgba(63,103,61,.27),7px 10px 18px rgba(65,55,40,.18); }
+.whiteboardMode button.featureCard:hover:not(:disabled) { border-color:#315f7d; background:linear-gradient(150deg,rgba(255,255,255,.54),transparent 34%),var(--notePaper); box-shadow:inset 0 -1px rgba(105,87,48,.12),2px 5px 0 rgba(101,82,44,.25),10px 15px 22px rgba(65,55,40,.26); transform:translateY(-3px) rotate(0); }
+.whiteboardMode button.worldChoice:focus-visible,
+.whiteboardMode button.featureCard:focus-visible { z-index:4; outline:4px solid #2d6f98; outline-offset:3px; transform:translateY(-2px) rotate(0); }
+.whiteboardMode button.worldChoice:active:not(:disabled),
+.whiteboardMode button.featureCard:active:not(:disabled) { transform:translateY(3px) rotate(0); box-shadow:inset 0 3px 5px rgba(84,66,36,.22),1px 1px 0 rgba(101,82,44,.24),3px 5px 9px rgba(65,55,40,.15); }
+.whiteboardMode .worldChoice.selected { --notePaper:#d9f0c9; border-color:#3f8259; box-shadow:inset 0 0 0 3px rgba(54,126,79,.62),2px 4px 0 rgba(63,103,61,.31),7px 10px 18px rgba(65,55,40,.18); }
 .whiteboardMode .worldChoice.selected::after { content:"✓"; position:absolute; right:8px; top:4px; width:25px; height:25px; display:grid; place-items:center; border:3px solid #3f8259; border-radius:50%; color:#3f8259; font:950 18px/1 "KaiTi",sans-serif; transform:rotate(-12deg); }
 .whiteboardMode .choiceTop strong { color:#30464a; font-family:"KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; font-size:13px; }
 .whiteboardMode [data-directive-id] .choiceTop strong { color:color-mix(in srgb,var(--noteInk) 58%,#19353b); }
 .whiteboardMode .choiceTop span { color:#7a504c; font:800 8px/1.2 "KaiTi","STKaiti",sans-serif; }
 .whiteboardMode .worldChoice p { margin:7px 0 0; color:#3e4c4b; font:700 10px/1.45 "KaiTi","STKaiti","Microsoft YaHei UI",sans-serif; }
-.whiteboardMode .featureCard:disabled { opacity:.48; filter:saturate(.55); }
+.whiteboardAction { position:absolute; z-index:2; right:9px; bottom:8px; min-height:22px; display:inline-flex; align-items:center; padding:3px 7px; border:1px solid currentColor; border-radius:2px; color:#963c40; background:rgba(255,250,231,.72); box-shadow:1px 2px 0 rgba(103,65,54,.16); font:950 9px/1 "KaiTi","STKaiti",sans-serif; letter-spacing:.04em; transform:rotate(-1deg); }
+.whiteboardMode button:hover:not(:disabled) .whiteboardAction { transform:translateX(2px) rotate(0); }
+.whiteboardMode .selected .whiteboardAction { color:#2f744a; background:rgba(232,248,219,.88); }
+.whiteboardMode .featureCard:disabled { opacity:.58; filter:saturate(.45); cursor:not-allowed; }
+.whiteboardMode .featureCard:disabled .whiteboardAction { color:#606b67; background:rgba(238,239,228,.78); }
 .whiteboardMode .chip { border:1px solid rgba(71,91,88,.22); border-radius:2px; color:#38545a; background:rgba(255,255,255,.35); font-weight:800; }
 .whiteboardMode .choiceFooter { margin-top:10px; padding:8px 10px; border:0; border-top:3px solid rgba(49,95,125,.2); border-radius:0; color:#43565a; background:transparent; box-shadow:none; }
 .whiteboardMode .choiceFooter > span { color:#486067; font-family:"KaiTi","STKaiti",sans-serif; font-size:10px; font-weight:900; }
@@ -3400,10 +3415,14 @@ body {
   .modalLayer.whiteboardMode .sheetBody { max-height:calc(96vh - 55px); padding:6px 10px 11px; }
   .projectWhiteboardScene { min-height:0; padding-bottom:17px; }
   .whiteboardBoardMeta { top:-41px; }
+  .whiteboardFocus { gap:7px; margin-bottom:6px; padding:5px 8px; border-left-width:5px; }
+  .whiteboardFocus > strong { font-size:13px; }
+  .whiteboardFocus > small { min-height:22px; padding:3px 6px; font-size:7px; }
   .whiteboardMode .panelIntro { margin-bottom:5px; font-size:11px; }
   .whiteboardMode .worldGrid { gap:7px; }
-  .whiteboardMode .worldChoice,.whiteboardMode .featureCard { min-height:70px; padding:14px 9px 8px; }
+  .whiteboardMode .worldChoice,.whiteboardMode .featureCard { min-height:70px; padding:14px 9px 27px; }
   .whiteboardMode .worldChoice p { margin-top:4px; font-size:7px; }
+  .whiteboardAction { right:6px; bottom:5px; min-height:18px; padding:2px 5px; font-size:7px; }
   .whiteboardMode .choiceFooter { margin-top:5px; padding:4px 7px; }
   .whiteboardMode .sectionHeading { margin:5px 0 3px; }
   .whiteboardMarkerSet { height:15px; margin-top:5px; }

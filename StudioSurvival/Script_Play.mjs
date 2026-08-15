@@ -3161,13 +3161,21 @@ function OpenCustomizationSheet(sourceId = "owner") {
   OpenPanel("PROJECT WHITEBOARD", `${sourceLabel} 的玩法提案`, `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
-      <p class="panelIntro">选一个提案写进需求。</p>
+      <div class="whiteboardFocus">
+        <span>本次提案</span><strong>${EscapeHtml(sourceLabel)}</strong><small>点选便签写入</small>
+      </div>
       <div class="choiceFooter"><span>本月拍板 ${state.talkPoints} 次</span><b>${featureCountLabel}</b></div>
-      <div class="panelSection worldGrid whiteboardNoteGrid">${FEATURE_CHOICES.map((feature) => `
-        <button class="featureCard" data-feature-id="${feature.id}" type="button" ${usedIds.has(feature.id) || state.project.features.length >= FEATURE_LIMIT ? "disabled" : ""}>
+      <div class="panelSection worldGrid whiteboardNoteGrid">${FEATURE_CHOICES.map((feature) => {
+        const isUsed = usedIds.has(feature.id);
+        const isFull = state.project.features.length >= FEATURE_LIMIT;
+        const actionLabel = isUsed ? "已写入" : isFull ? "玩法已满" : "点选 →";
+        return `
+        <button class="featureCard" data-feature-id="${feature.id}" type="button" aria-label="${isUsed ? "已写入" : isFull ? "玩法已满" : "选择玩法提案"}：${EscapeHtml(feature.title)}" ${isUsed || isFull ? "disabled" : ""}>
           <div class="choiceTop"><strong>${EscapeHtml(feature.title)}</strong><span>热度 +${feature.hype}</span></div>
           <div class="chipRow">${MODULE_KEYS.filter((key) => feature.modules[key]).map((key) => `<span class="chip">${MODULE_META[key].label} ${feature.modules[key] > 0 ? "+" : ""}${feature.modules[key]}</span>`).join("")}</div>
-        </button>`).join("")}</div>
+          <span class="whiteboardAction" aria-hidden="true">${actionLabel}</span>
+        </button>`;
+      }).join("")}</div>
       <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>
       <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
     </div>`, () => {
@@ -3192,11 +3200,13 @@ function OpenFeatureSourceSheet() {
   OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 选择提案人", `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
-      <p class="speechLine">本月还能拍板 ${state.talkPoints} 次。</p>
-      <div class="sectionHeading panelSection"><strong>谁提玩法？</strong></div>
+      <div class="whiteboardFocus">
+        <span>提案人</span><strong>谁来提？</strong><small>点选便签继续</small>
+      </div>
+      <div class="sectionHeading panelSection"><strong>本月还能拍板 ${state.talkPoints} 次</strong></div>
       <div class="worldGrid three whiteboardNoteGrid">
-        <button class="worldChoice danger" data-source-id="owner" type="button"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div></button>
-        ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div></button>`).join("")}
+        <button class="worldChoice danger" data-source-id="owner" type="button" aria-label="选择老板亲自提案"><div class="choiceTop"><strong>老板亲自做</strong><span>饥饿 +10 · 焦虑 +7</span></div><span class="whiteboardAction" aria-hidden="true">点选 →</span></button>
+        ${hired.map((staff) => `<button class="worldChoice" data-source-id="${staff.id}" type="button" aria-label="选择 ${EscapeHtml(staff.name)} 提案"><div class="choiceTop"><strong>${EscapeHtml(staff.name)}</strong><span>${staff.kind === "ai" ? "AI" : "大学生"}</span></div><span class="whiteboardAction" aria-hidden="true">点选 →</span></button>`).join("")}
       </div>
       <div class="panelSection sectionHeading"><strong>团队</strong></div>
       <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场招聘。</span>`}</div>
@@ -3839,13 +3849,17 @@ function OpenDirectiveSheet() {
   const visibleDirectives = earlyStage
     ? DIRECTIVES.filter((directive) => ["integration", "artSprint", "clientCrush"].includes(directive.id))
     : DIRECTIVES;
+  const currentDirective = FindDirective(state.selectedDirective) || visibleDirectives[0];
   OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 项目方向", `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
-      <p class="panelIntro">这个月往哪使劲？</p>
+      <div class="whiteboardFocus" aria-live="polite">
+        <span>本月方向</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>点选便签切换</small>
+      </div>
       <div class="worldGrid three whiteboardNoteGrid">${visibleDirectives.map((directive) => `
-        <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" style="--noteInk:${directive.color}" data-directive-id="${directive.id}" type="button">
-          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "本月采用" : "改方向"}</span></div><p>${EscapeHtml(directive.description)}</p>
+        <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" style="--noteInk:${directive.color}" data-directive-id="${directive.id}" type="button" aria-pressed="${state.selectedDirective === directive.id}" aria-label="${state.selectedDirective === directive.id ? "当前采用" : "切换为"}：${EscapeHtml(directive.name)}">
+          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "当前" : ""}</span></div><p>${EscapeHtml(directive.description)}</p>
+          <span class="whiteboardAction" aria-hidden="true">${state.selectedDirective === directive.id ? "✓ 采用中" : "点选 →"}</span>
         </button>`).join("")}</div>
       ${earlyStage ? `<div class="noteList"><div class="note good">首月完成后开放玩法与换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案</span><button class="miniButton" data-feature-source type="button">安排提案</button></div>
       <div class="panelSection sectionHeading"><strong>换赛道</strong><span>−${FormatMoney(pivotCost)}</span></div>

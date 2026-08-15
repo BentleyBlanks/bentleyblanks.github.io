@@ -42,15 +42,22 @@ assert.match(directiveBlock, /data-feature-source/, "the project whiteboard owns
 assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");
 assert.match(directiveBlock, /\{ mode: "whiteboard" \}/, "project direction must open on the physical whiteboard surface");
+assert.match(directiveBlock, /class="whiteboardFocus"[^>]*>[\s\S]*?本月方向[\s\S]*?点选便签切换/, "the board must elevate the active monthly direction and explain the interaction");
+assert.match(directiveBlock, /aria-pressed="\$\{state\.selectedDirective === directive\.id\}"/, "direction notes need a programmatic selected state");
+assert.match(directiveBlock, /class="whiteboardAction"[\s\S]*?点选 →/, "direction notes must carry a persistent action cue");
 
 const customizationBlock = script.match(/function OpenCustomizationSheet[\s\S]*?function OpenFeatureSourceSheet/)?.[0] || "";
 assert.match(customizationBlock, /state\.project\.age < 1/, "direct feature customization must keep the early-stage gate");
 assert.match(customizationBlock, /PROJECT WHITEBOARD/, "feature proposals should retain their whiteboard context");
 assert.match(customizationBlock, /\{ mode: "whiteboard" \}/, "feature proposals must stay on the physical whiteboard surface");
+assert.match(customizationBlock, /点选便签写入/, "feature proposals must state that their notes are selectable");
+assert.match(customizationBlock, /class="whiteboardAction"/, "each feature note needs a persistent action or completion cue");
 
 const featureSourceBlock = script.match(/function OpenFeatureSourceSheet[\s\S]*?function OpenHomeComputerSheet/)?.[0] || "";
 assert.doesNotMatch(featureSourceBlock, /mode: "computer"/, "the project whiteboard must not reuse the computer surface");
 assert.match(featureSourceBlock, /mode: "whiteboard"/, "proposal ownership must stay on the physical whiteboard surface");
+assert.match(featureSourceBlock, /点选便签继续/, "proposal-owner notes must state their interaction");
+assert.match(featureSourceBlock, /class="whiteboardAction"[^>]*aria-hidden="true">点选 →/, "proposal-owner notes need a persistent action cue");
 
 const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
 assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");

@@ -21,10 +21,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815af/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815af/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!af)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!af)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ag/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ag/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ag)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ag)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
 assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
@@ -86,6 +86,10 @@ assert.match(css, /@media \(max-height: 500px\) and \(orientation: landscape\)[\
 assert.match(css, /\.modalLayer\.whiteboardMode \.worldPanel\s*\{/, "the project board needs its own enamel-board frame");
 assert.match(css, /\.whiteboardMarkerSet\s*\{/, "the project board must retain its marker tray props");
 assert.match(css, /\.whiteboardMode \.worldChoice::before/, "direction notes must stay physically pinned to the board");
+assert.match(css, /\.whiteboardFocus\s*\{/, "the project board needs a visually dominant current-focus strip");
+assert.match(css, /\.whiteboardAction\s*\{/, "selectable notes need a persistent touch-visible action cue");
+assert.match(css, /\.whiteboardMode button\.worldChoice:focus-visible,[\s\S]*?outline:4px solid/, "whiteboard notes need an unmistakable keyboard focus state");
+assert.match(css, /\.whiteboardMode button\.worldChoice:active:not\(:disabled\)/, "whiteboard notes need physical press feedback on touch screens");
 
 assert.match(script, /SetTouchButtonPressed/, "held controls need deterministic visual state updates");
 assert.match(script, /classList\.toggle\("available", interactionAvailable\)/, "interaction readiness must track the nearest target");
