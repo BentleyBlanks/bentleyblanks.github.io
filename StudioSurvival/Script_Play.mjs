@@ -97,7 +97,7 @@ const dom = Object.fromEntries([
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton",
   "studioNameHud", "startupDebtValue", "locationValue", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
-  "travelCurtain", "monthMontage", "montageStage", "montageMonthLabel", "montageDayValue", "montageActionLabel", "montagePlaceLabel",
+  "travelCurtain", "monthMontage", "montageStage", "montageMonthLabel", "montageDate", "montageDayValue",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderBackButton", "founderConfirmButton",
@@ -199,7 +199,7 @@ let traveling = false;
 let monthMontagePlaying = false;
 const inputState = { left: false, right: false, jump: false };
 const MONTH_MONTAGE_DAYS = 28;
-const MONTH_MONTAGE_DAY_MS = 170;
+const MONTH_MONTAGE_DAY_MS = 240;
 const MONTH_MONTAGE_OPEN_MS = 520;
 const MONTH_MONTAGE_CLOSE_MS = 680;
 const CONTRACT_PAGE_COPY = [
@@ -457,7 +457,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815ay";
+const ART_CACHE_VERSION = "20260815az";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -4998,6 +4998,7 @@ function CaptureMonthMontageSnapshot() {
     nextMonth: settledMonth + 1,
     ownerWorkCount: state.ownerWorkCount || 0,
     ownerWorked: (state.ownerWorkCount || 0) > 0,
+    ownerHairAmount: GetOwnerHairAmount(state.anxiety),
     foodPlan: state.foodPlan,
     relaxationVisit: relaxationVisit ? { ...relaxationVisit } : null,
   };
@@ -5008,7 +5009,6 @@ function BuildMonthMontageScenes(snapshot) {
     scene: "work",
     venue: "home",
     place: "自己家",
-    action: snapshot.ownerWorked ? "疯狂敲代码" : "昼夜飞逝",
   };
   const scenes = Array.from({ length: MONTH_MONTAGE_DAYS }, () => ({ ...workScene }));
   const SetScene = (day, scene) => {
@@ -5019,15 +5019,15 @@ function BuildMonthMontageScenes(snapshot) {
   };
   const food = MONTH_MONTAGE_FOOD_SCENES[snapshot.effectiveFoodPlanId || snapshot.foodPlan];
   if (food) {
-    if (food.external) SetScene(4, { scene: "out", venue: food.venue, place: food.place, action: "加速出门" });
-    SetRange(5, 7, { scene: "food", venue: food.venue, place: food.place, action: "加速吃饭" });
-    if (food.external) SetScene(8, { scene: "home", venue: "home", place: "自己家", action: "加速回家" });
+    if (food.external) SetScene(4, { scene: "out", venue: food.venue, place: food.place });
+    SetRange(5, 7, { scene: "food", venue: food.venue, place: food.place });
+    if (food.external) SetScene(8, { scene: "home", venue: "home", place: "自己家" });
   }
   const relaxation = MONTH_MONTAGE_RELAX_SCENES[snapshot.relaxationVisit?.venueId];
   if (relaxation) {
-    SetScene(17, { scene: "out", venue: relaxation.venue, place: relaxation.place, action: "加速出门" });
-    SetRange(18, 20, { scene: "relax", venue: relaxation.venue, place: relaxation.place, action: "加速泡脚" });
-    SetScene(21, { scene: "home", venue: "home", place: "自己家", action: "加速回家" });
+    SetScene(17, { scene: "out", venue: relaxation.venue, place: relaxation.place });
+    SetRange(18, 20, { scene: "relax", venue: relaxation.venue, place: relaxation.place });
+    SetScene(21, { scene: "home", venue: "home", place: "自己家" });
   }
   return scenes;
 }
@@ -5042,14 +5042,15 @@ async function PlayMonthMontage(snapshot) {
   const scenes = BuildMonthMontageScenes(snapshot);
   monthMontagePlaying = true;
   dom.monthMontage.style.setProperty("--month-day-ms", `${dayMilliseconds}ms`);
-  dom.monthMontage.style.setProperty("--month-screen-ms", `${dayMilliseconds * 3}ms`);
+  dom.monthMontage.style.setProperty("--month-screen-ms", `${dayMilliseconds * 5}ms`);
+  const ownerHairAmount = Clamp(snapshot.ownerHairAmount, 0, 1);
+  dom.monthMontage.dataset.ownerArt = GetFounderArtStage(ownerHairAmount);
   dom.monthMontage.classList.toggle("hasOwnerWork", snapshot.ownerWorked);
   dom.monthMontage.classList.remove("hidden", "isRunning", "isSealing");
   dom.monthMontage.classList.add("isOpening");
   dom.montageMonthLabel.textContent = `M${String(snapshot.settledMonth).padStart(2, "0")} 封账`;
   dom.montageDayValue.textContent = "01";
-  dom.montageActionLabel.textContent = "时间开始加速";
-  dom.montagePlaceLabel.textContent = "自己家";
+  dom.montageDate.setAttribute("aria-label", "本月第 1 天");
   dom.montageStage.dataset.scene = "work";
   dom.montageStage.dataset.venue = "home";
   try {
@@ -5059,8 +5060,7 @@ async function PlayMonthMontage(snapshot) {
     for (let day = 1; day <= MONTH_MONTAGE_DAYS; day += 1) {
       const scene = scenes[day - 1];
       dom.montageDayValue.textContent = String(day).padStart(2, "0");
-      dom.montageActionLabel.textContent = scene.action;
-      dom.montagePlaceLabel.textContent = scene.place;
+      dom.montageDate.setAttribute("aria-label", `本月第 ${day} 天`);
       dom.montageStage.dataset.scene = scene.scene;
       dom.montageStage.dataset.venue = scene.venue;
       await WaitForMonthMontage(dayMilliseconds);
@@ -5068,8 +5068,6 @@ async function PlayMonthMontage(snapshot) {
     dom.monthMontage.classList.remove("isRunning");
     dom.monthMontage.classList.add("isSealing");
     dom.montageMonthLabel.textContent = `M${String(snapshot.settledMonth).padStart(2, "0")} → M${String(snapshot.nextMonth).padStart(2, "0")}`;
-    dom.montageActionLabel.textContent = "本月封账";
-    dom.montagePlaceLabel.textContent = "进入下个月";
     await WaitForMonthMontage(closingMilliseconds);
   } finally {
     dom.monthMontage.classList.add("hidden");

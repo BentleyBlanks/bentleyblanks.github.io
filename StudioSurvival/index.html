@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090b12">
   <meta name="description" content="经营独立游戏工作室，以 100 亿元累计游戏收入成为成功的游戏制作人。">
   <title>做游戏真的会死</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815ay">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815az">
   <script type="importmap">
     {
       "imports": {
@@ -103,45 +103,54 @@
 
     <div id="toastStack" class="toastStack" aria-live="polite"></div>
     <div id="travelCurtain" class="travelCurtain" aria-hidden="true"><span>正在出门</span></div>
-    <section id="monthMontage" class="monthMontage hidden" aria-live="polite" aria-label="推进一个月">
+    <section id="monthMontage" class="monthMontage hidden" data-owner-art="full" aria-live="polite" aria-label="推进一个月">
       <div class="monthMontageSky" aria-hidden="true">
         <i class="montageSun"></i><i class="montageMoon"></i>
         <div class="montageStars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="montageCity"><i></i><i></i><i></i><i></i><i></i><i></i></div>
       </div>
       <header class="monthMontageHeader">
-        <span id="montageMonthLabel">M01 封账</span><strong>一个月，压成几秒</strong>
-        <div><small>DAY</small><b id="montageDayValue">01</b><i>/ 28</i></div>
+        <span id="montageMonthLabel">M01 封账</span>
+        <div id="montageDate" class="montageDate" aria-label="本月第 1 天"><small>DAY</small><b id="montageDayValue">01</b><i>/ 28</i></div>
       </header>
       <div id="montageStage" class="monthMontageStage" data-scene="work" data-venue="home" aria-hidden="true">
         <section class="montageWorkScene">
-          <div class="montageRoomWindow"><i></i><i></i></div>
-          <div class="montageMonitor">
-            <div class="montageScreenCode"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="montageScreenArt"><i></i><i></i><i></i><i></i></div>
-            <div class="montageScreenBuild"><i></i><i></i><i></i><b>BUILD</b></div>
+          <div class="montageHomeRug"></div>
+          <div class="montageHomeShelfArt"></div>
+          <div class="montageRoomWindow"><i></i><i></i><span></span></div>
+          <div class="montageHomeBoardArt"></div>
+          <div class="montageHomeClock"><i></i><b></b></div>
+          <div class="montageOwner montageWorkOwner"><i class="montageOwnerShadow"></i><i class="montageOwnerArt full"></i><i class="montageOwnerArt thinning"></i><i class="montageOwnerArt bald"></i></div>
+          <div class="montageHomeComputerArt">
+            <div class="montageMonitor">
+              <div class="montageIdeTopbar"><i></i><i></i><i></i><b>GAME_MAIN.MJS</b></div>
+              <div class="montageScreenCode">
+                <div class="montageCodeTrack">
+                  <div class="montageCodeLoop"><span><b>const</b> month = state.month;</span><span><b>for</b> (const task of backlog) {</span><span>&nbsp;&nbsp;await BuildFeature(task);</span><span>&nbsp;&nbsp;FixBugs(project);</span><span>&nbsp;&nbsp;RenderFrame(scene);</span><span>}</span><span>SaveProject(state);</span><span>requestAnimationFrame(loop);</span></div>
+                  <div class="montageCodeLoop" aria-hidden="true"><span><b>const</b> month = state.month;</span><span><b>for</b> (const task of backlog) {</span><span>&nbsp;&nbsp;await BuildFeature(task);</span><span>&nbsp;&nbsp;FixBugs(project);</span><span>&nbsp;&nbsp;RenderFrame(scene);</span><span>}</span><span>SaveProject(state);</span><span>requestAnimationFrame(loop);</span></div>
+                </div>
+                <i class="montageCodeCursor"></i>
+              </div>
+              <div class="montageIdeStatus"><span>Ln 128 · UTF-8</span><b>● RUNNING</b></div>
+            </div>
           </div>
-          <div class="montageTower"><i></i><i></i><b></b></div>
-          <div class="montageDesk"><i class="montageKeyboard"></i><i class="montageMug"></i></div>
-          <div class="montageCoder"><i class="montageCoderHead"></i><i class="montageCoderBody"></i><i class="montageCoderArm left"></i><i class="montageCoderArm right"></i></div>
         </section>
         <section class="montageTransitScene">
           <div class="montageDoor"><i></i><b></b></div>
-          <div class="montageWalker"><i></i><b></b><span></span></div>
+          <div class="montageOwner montageTransitOwner"><i class="montageOwnerShadow"></i><i class="montageOwnerArt full"></i><i class="montageOwnerArt thinning"></i><i class="montageOwnerArt bald"></i></div>
           <div class="montageStreet"><i></i><i></i><i></i></div>
         </section>
         <section class="montageFoodScene">
           <div class="montageEatSign">饭</div>
-          <div class="montageEater"><i></i><b></b><span class="left"></span><span class="right"></span></div>
+          <div class="montageOwner montageFoodOwner"><i class="montageOwnerShadow"></i><i class="montageOwnerArt full"></i><i class="montageOwnerArt thinning"></i><i class="montageOwnerArt bald"></i></div>
           <div class="montageFoodTable"><i class="montageBowl"></i><i class="montageSteam"></i><b></b></div>
         </section>
         <section class="montageRelaxScene">
           <div class="montageRelaxSign">汤</div>
-          <div class="montageSoaker"><i></i><b></b><span></span></div>
+          <div class="montageOwner montageRelaxOwner"><i class="montageOwnerShadow"></i><i class="montageOwnerArt full"></i><i class="montageOwnerArt thinning"></i><i class="montageOwnerArt bald"></i></div>
           <div class="montageBasin"><i></i><b></b><span></span></div>
         </section>
       </div>
-      <footer class="monthMontageFooter"><strong id="montageActionLabel">时间开始加速</strong><span id="montagePlaceLabel">自己家</span></footer>
     </section>
   </main>
 
@@ -287,6 +296,6 @@
     <div><h1 id="endingTitle">你成为了成功的游戏制作人！</h1><p id="endingSubtitle">累计游戏收入达到 100 亿元。</p><div id="endingStats" class="endingStats"></div><div class="endingActions"><button id="quickRestartButton" class="startButton" type="button"><span>沿用上局设定</span><strong>快速重开 →</strong></button><button id="restartButton" class="continueButton" type="button"><strong>重新设定</strong></button></div></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815ay"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815az"></script>
 </body>
 </html>

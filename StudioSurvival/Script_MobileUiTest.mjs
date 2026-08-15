@@ -31,10 +31,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815ay/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815ay/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ay)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ay)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815az/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815az/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!az)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!az)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /class="hudConsole identityConsole sceneConsole" aria-label="当前场景">[\s\S]*?id="locationValue"/, "the top-left console must show the current scene name");
 assert.match(html, /class="missionHeading"><span>项目<\/span><b id="studioNameHud">/, "the project sheet must own the company name");
 assert.doesNotMatch(html, /studioMonogram|locationPlate/, "the HUD must not repeat scene or company identity through the old icon and place plate");
@@ -77,6 +77,12 @@ assert.match(monthMontageCss, /inset:\s*0;/, "the month montage must cover every
 assert.match(monthMontageCss, /overflow:\s*hidden;/, "the month montage must not leak scroll on phones");
 assert.match(css, /\.monthMontage\.(?:isOpening|isRunning)/, "the full-screen montage needs an explicit visible playback state");
 assert.match(css, /@media \(max-height:\s*\d+px\) and \(orientation:\s*landscape\)[\s\S]*?\.monthMontage/s, "short landscape phones need a dedicated compact montage layout");
+assert.match(css, /\.montageDate\s*\{[^}]*justify-self:center;/s, "the montage date must stay centered on narrow screens");
+assert.match(css, /\.montageDate b\s*\{[^}]*clamp\(46px,7vw,82px\)/s, "the montage date must remain visually dominant");
+assert.match(css, /\.montageCodeTrack\s*\{[^}]*animation:montageCodeScroll/s, "the detailed code screen must keep moving on mobile");
+assert.match(html, /class="montageOwner\s+montageWorkOwner"/, "mobile montage scenes must show the actual protagonist");
+assert.match(css, /Texture_CharacterFounderFullWalkSheet\.png/, "mobile montage must reuse the playable founder art rather than a generic CSS figure");
+assert.doesNotMatch(html, /一个月，压成几秒|monthMontageFooter|montageActionLabel|montagePlaceLabel/, "mobile montage must not restore the removed slogan or bottom action strip");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
 assert.doesNotMatch(css, /\.identityConsole\s*\{\s*display:\s*none;/, "the current scene name must remain visible at every supported landscape width");
 assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s, "utility controls must remain full touch targets");
