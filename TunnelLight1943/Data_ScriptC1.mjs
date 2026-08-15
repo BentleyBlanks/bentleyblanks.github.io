@@ -45,6 +45,78 @@ export function ChapterC1(K) {
   // 而妹妹按 heldChild 坐着时胯离她自己脚底 0.40m —— 两个数一减就是她该垫多高。
   // 手心与她的胯差一寸都能看出来：差多了是"托着空气"，差少了是"陷进他胳膊里"。
   const SEAT_LIFT = 0.42;
+  // 那截手腕的机位——**全章出现三次**（§1 袖口遮不住 / §14 蓝花袖口盖住 /
+  // 章末同框），三次必须是同一格，所以只写一份。2026-08-16 照分镜图收紧：
+  // 原来是 `insert dist 1.9`＝画宽 3.8m，一屏摆下整间屋，"镜头停在她的手腕上"
+  // 这句话在画面上一次都没成立过。现在画宽 1.9m（机距＝画宽），
+  // 炕沿在画框下沿压一道黑
+  // **注视点是量出来的，不是照"炕该多高"估的**：她 sleep 那一支走 LIE_POSES，
+  // 整具骨架转 90° 又挪了半个身长，`world.LimbTipsOf('sister')` 报的是
+  // 头 (31.31, 0.25) / 手 (31.14, 0.25) / 脚 (30.67, 0.03)——她**贴着地面躺着**，
+  // 而老机位盯着 (30.72, 0.62)：那是她脚跟外侧、离地半米的一块空墙。
+  // 第一版照老坐标收紧画宽，实拍出来整幅画一个人都没有（画框正好从她头顶
+  // 掠过去）。手腕在 x 31.10 上，注视点就得钉在那儿
+  // ── 过场机位小工具（2026-08-16 照 Notion《过场分镜》第一章重排时立的）──────
+  // `CINE(x, y, 画宽, [框景])` ＝ 一台正对着 (x,y) 的过场自由相机。
+  //
+  // **为什么全章的过场都得换成 `free`**：框景（`fg`）的 u/v 折算只在
+  // `free`/`split` 两档拿得到相机（Main：`shot.free ? {left: shot.free} : null`），
+  // 裸 `insert`/`shot` 传进去的 u/v 会被 `ForePlace` 当**世界坐标**用，板子直接
+  // 飞到村东头去。而分镜图**每一张**都有一块压得很暗、被画框切掉的近景——
+  // 画面里唯一真正黑的地方就是它（CLAUDE.md「过场三件套」②）。
+  //
+  // **第三个参数给的是画宽（米），不是半宽**：分镜图上量"这一格里装了几米"
+  // 比量"半宽"好想。换算口径（FOV 30°，16:9）：
+  //   画高 = 0.536 × 机距，画宽 = 0.953 × 机距 ⇒ **机距 ≈ 画宽**。
+  //
+  // **但过场的上下黑边是盖在这幅 16:9 上头的，不是画外加的框**
+  // （`Style_Game.css` 的 `#cineBars.active` 上下各 11.5vh）——玩家看得见的
+  // 只剩画高的 **77%**，而先被吃掉的正是头顶和脚下那两条。第一版照整幅画高
+  // 配景别，实拍出来八格里的人不是切了头就是切了小腿（2026-08-16 视觉审查
+  // 一次报出 p02/p03/p13/p25/p26/p38/p39a/p52）。所以尺子是：
+  //   **可见画高 = 0.412 × 机距**，要让身高 h 的人占可见画高 f ⇒
+  //   **画宽 = h / (f × 0.432)**。
+  // 柱子 1.10m —— 占四成 ⇒ 6.4m，五成 ⇒ 5.1m，七成 ⇒ 3.6m，九成 ⇒ 2.8m；
+  // 大人 1.37m 占九成 ⇒ 3.5m。**跪着/蹲着的人按实测身高算**（跪着的柱子只有
+  // 0.59m，坐着 0.78m），照站姿配机距会松一整档。
+  // 配套一条：站在地上的主体，**注视点 y ≈ 0.15 × 画宽**（腰线落在画面当中、
+  // 脚下留一成半）。给到成人视平线那么高，地平线就钉在画框下沿，上半屏
+  // 一半是空墙——这一版全章封顶在 0.20 × 画宽。
+  //
+  // 默认带一记很轻的推镜（收 4%）——分镜是静帧，可实机里完全不动的一格
+  // 读起来是"卡住了"。要停住就给 `{ push: 1 }`。
+  const CINE = (x, y, spanW, fg, opt = {}) => {
+    const z = spanW / 0.953;
+    return {
+      kind: "free",
+      from: [x + (opt.dx ?? 0), y + (opt.dy ?? 0), z],
+      to: [x + (opt.dx ?? 0) * 0.85, y + (opt.dy ?? 0) * 0.85, z * (opt.push ?? 0.96)],
+      at: [x, y], atTo: [x, y],
+      ...(fg && fg.length ? { fg } : {}),
+    };
+  };
+  // 常用的几块框景。z 一律按"离行走线多近"给，**必须小于机距**；
+  // u/v 是板心在**它自己那个深度上的画框**里的位置（−1..1）。
+  // v 不许给到 0.7 以上——过场上下各压着一条黑边（画高的一成），梁身会整根
+  // 缩进上边框里，屏幕上只剩一排悬空的黑齿
+  const FG = {
+    jambL: (z, w = 0.30, h = 1.05, dim = 1.94) => ({ art: "doorJamb", u: -0.90, v: 0, z, w, h, dim }),
+    jambR: (z, w = 0.30, h = 1.05, dim = 1.94) => ({ art: "doorJamb", u: 0.90, v: 0, z, w, h, dim, flip: true }),
+    beamTop: (z, w = 1.6, h = 0.26, dim = 2.02) => ({ art: "beam", u: 0, v: 0.34, z, w, h, dim }),
+    kangLow: (z, w = 1.2, h = 0.22, dim = 1.78) => ({ art: "kangEdge", u: -0.28, v: -0.90, z, w, h, dim }),
+    strawLow: (z, w = 1.2, h = 0.26, dim = 1.86) => ({ art: "strawEdge", u: 0.10, v: -0.88, z, w, h, dim }),
+    ladderL: (z, w = 0.34, h = 1.0, dim = 1.86) => ({ art: "ladder", u: -0.86, v: 0, z, w, h, dim }),
+    vatL: (z, w = 0.46, h = 0.56, dim = 2.02) => ({ art: "vat", u: -0.84, v: -0.30, z, w, h, dim }),
+  };
+  const WRIST_CAM = {
+    kind: "free",
+    // 画宽 1.26m：手腕才 0.12m 宽，画宽给到 1.9m 就只剩几十个像素——
+    // 「镜头停在她的手腕上」这句话在画面上得真的成立（第二轮视觉审查）
+    from: [31.16, 0.32, 1.32], to: [31.15, 0.31, 1.24],
+    at: [31.13, 0.28], atTo: [31.13, 0.27],
+    // 前景压左缘，**不许压画框下沿**——她整条胳膊就躺在下沿那一带
+    fg: [{ art: "doorJamb", u: -0.88, v: 0, z: 0.80, w: 0.20, h: 0.42, dim: 2.02 }],
+  };
   return [
     {
       // ── 序 · 那天（第八稿独立成场；镜头调度沿用 2026-08-13 那版重做） ──
@@ -101,7 +173,7 @@ export function ChapterC1(K) {
               // w 是**实拍量出来的**：画笔改成铺满整张画布之后，同一个 w 比原来
               // 宽了四成——0.95 那一版门板盖掉了大半个画框，两个孩子只从缝里
               // 露出一颗头。0.42 ＝ 占画框左边三分之一，跟分镜图对得上
-              { art: "doorSlab", u: -0.70, v: 0, z: 1.05, w: 0.42, h: 1.34, dim: 1.15 },
+              { art: "doorSlab", u: -0.70, v: 0, z: 1.05, w: 0.42, h: 1.34, dim: 1.78 },
               // 画框下沿压一道炕沿（分镜图里他们就坐在炕沿底下）
               // 炕沿只在画框下沿露一条：v −0.88 那一版从画面正中横过去，
               // 把两个孩子齐腰切断（实拍抓的）
@@ -134,7 +206,7 @@ export function ChapterC1(K) {
           // 大半个画高），画左照旧留着那扇门——她就是从那儿撞进来的
           cam: { kind: "free", from: [30.86, 0.78, 2.38], to: [30.98, 0.76, 2.16], at: [32.20, 0.80], atTo: [31.72, 0.70],
             fg: [
-              { art: "doorSlab", u: -0.80, v: 0.02, z: 1.10, w: 0.34, h: 1.34, dim: 1.2 },
+              { art: "doorSlab", u: -0.80, v: 0.02, z: 1.10, w: 0.34, h: 1.34, dim: 1.86 },
               { art: "kangEdge", u: 0.10, v: -1.05, z: 1.55, w: 1.6, h: 0.32 },
             ] },
           on: (state) => {
@@ -220,7 +292,7 @@ export function ChapterC1(K) {
             // ——读成一串挂在电线上的黑方块（实拍连错两轮，跟 DrawCineFore 里
             // beam 那条注释写的是同一个坑）。0.20/0.68：梁顶刚好啃进上边框，
             // 梁身占住上边框到头顶那一条，椽头收在头顶之上
-            fg: [{ art: "beam", u: 0, v: 0.68, z: 1.35, w: 2.6, h: 0.20, dim: 1.35 }] },
+            fg: [{ art: "beam", u: 0, v: 0.42, z: 1.35, w: 2.6, h: 0.20, dim: 2.09 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             // 她叫了他一声，他这会儿是转过来的——上一句反打在她身上，这一下
@@ -274,7 +346,7 @@ export function ChapterC1(K) {
         { who: "娘", say: "快。", d: 2.2,
           cam: { kind: "free", from: [31.10, 0.40, 2.55], to: [30.98, 0.42, 2.36], at: [30.15, 0.70],
             // 掀开的板沿黑在画框下沿：「快」字往哪儿快，一目了然
-            fg: [{ art: "hatchLip", u: 0, v: -0.73, z: 1.30, w: 1.3, h: 0.36 }] },
+            fg: [{ art: "hatchLip", u: 0, v: -0.73, z: 1.0, w: 1.3, h: 0.36 }] },
           on: (state) => {
             state.beat.indoorScene = true;
             const m = FindActor(state, "mother");
@@ -364,7 +436,7 @@ export function ChapterC1(K) {
           state.player.x = 33.1;
           StartMicroCine(state, [
             { act: "娘挡在门前，朝菜窖指。", d: 1.8,
-              cam: { kind: "shot", x: 33.6, y: 1.15, dist: 3.4 },
+              cam: CINE(33.6, 0.55, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
               on: (s) => {
                 const m = FindActor(s, "mother");
                 if (m) { m.pose = null; m.track = { name: "pointHard", t: 0 }; m.x = 34.2; m.heading = -1; }
@@ -372,7 +444,7 @@ export function ChapterC1(K) {
             // 指着的那只手要一直指到话说完——所以这一句不清轨道也不走位。
             // 跑回窖口由下面 tick 里那段收尾（过场一结束才动身）
             { who: "娘", say: "下去！", d: 1.6,
-              cam: { kind: "insert", x: 34.0, y: 1.1, dist: 2.6 } },
+              cam: CINE(34.0, 0.46, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]) },
           ]);
         }
       },
@@ -654,8 +726,20 @@ export function ChapterC1(K) {
         // 黑屏一声肚子叫——不是大人的，是小孩那种咕噜噜的空响
         { act: "", d: 1.4, cam: { kind: "dark" },
           on: (state) => { Cue(state, "bellyGrowl", { gain: 0.9, delay: 0.25 }); } },
+        // ── §1 冷灶（2026-08-16 照 Notion《过场分镜》第一章 01~04 重排）──────
+        // 老版这四镜全是裸的 `insert`/`shot`：侧视、机位对着人、**一块前景都没有**。
+        // 而分镜图每一张都有一件压得很暗、被画框切掉的近景（灶台肩、瓮肚、缸沿、
+        // 炕沿），画面里唯一真正黑的地方就是它。`insert` 走不了这条路——
+        // `SetCineFore` 的 u/v 折算只在 `free`/`split` 那两档拿得到相机
+        // （Main 的 `shot.free ? {left: shot.free} : null`），裸 insert 传进去的
+        // u/v 会被 `ForePlace` 当成世界坐标，板子直接飞到村东头。
+        // 所以这四镜连同全章的过场一律改走 `free`。
+        // 换算口径见文件头 `CINE` 那段（黑边吃掉可见画高两成三，尺子是
+        // 画宽 = 身高 / (占可见画高 × 0.432)）。
+        // 分镜图 01：灶在画左，柱子蹲在灶右侧伸手进灶膛，蹲姿 0.66m 占可见
+        // 画高约四成 ⇒ 画宽 4.2m；注视点压到灶膛口那一带，地面才进得来
         { act: "灶是冷的。柱子蹲在灶前，摸了一把锅底——干的。", d: 4.0,
-          cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.8 },
+          cam: CINE(27.98, 0.58, 4.20, [FG.vatL(2.65, 0.72, 0.66, 2.02)]),
           on: (state) => {
             state.beat.indoorScene = true;
             // 序的那首曲子托完四行黑屏就交班：画面一回来，第一章的底色接上
@@ -665,8 +749,17 @@ export function ChapterC1(K) {
             FlashTrack(state, "panBottom", 3.2);
           } },
         // 粮瓮（八稿新增）：掀开，瓮底只剩薄薄一层糜子
+        // 分镜图 02：人和瓮各占半幅、顶天立地（人占画高七成半），头顶只留一线墙。
+        // 图上人在左瓮在右，游戏里瓮在西（画左）——**镜像等价就够了**，别翻世界
+        //（面朝 +z 的立牌绕到背面会被单面材质剔掉）
+        // 分镜图 02：人和瓮各占半幅、顶天立地。**画宽不能收到 2.5m**——
+        // 那样他从大腿往下就被下黑边吃掉了（第二轮视觉审查抓的）。
+        // 柱子站着 1.10m 占可见画高约七成 ⇒ 画宽 3.8m
         { act: "他掀开粮瓮。瓮底只剩薄薄一层糜子。", d: 3.8,
-          cam: { kind: "insert", x: 26.8, y: 0.85, dist: 2.4 },
+          // **梁的 v 不许给到 0.7 以上**：过场上下各压着一条黑边（可见画高的
+          // 一成一），梁身会整根缩进上边框里，屏幕上只剩一排悬空的黑齿——读成
+          // 「挂在电线上的黑方块」（CLAUDE.md 那条坑，第一版又踩了一次）
+          cam: CINE(27.12, 0.60, 3.80, [{ art: "beam", u: 0, v: 0.32, z: 2.39, w: 1.9, h: 0.30, dim: 2.02 }]),
           on: (state) => {
             state.beat.indoorScene = true;
             state.player.x = 27.5;
@@ -674,8 +767,14 @@ export function ChapterC1(K) {
             FlashTrack(state, "liftJarLid", 3.4);
             Cue(state, "stoneLand", { gain: 0.3, rate: 0.7, delay: 1.55 });   // 盖子落到一边
           } },
+        // 分镜图 03：柱子在画左、缸在画右，瓢探进缸里。人占画高七成
         { act: "水缸见了底。瓢探下去，刮着缸底响。提上来，小半瓢——凑着瓢沿抿了一口，剩下的倒进锅里。", d: 5.6,
-          cam: { kind: "insert", x: 43.4, y: 0.95, dist: 3.0 },
+          // 这一镜在院子里，上半屏本来是天和地平线上那排炮楼——而分镜 03
+          // 是贴着屋里那面平墙。压一根门框柱在画右把天际线吃掉
+          cam: CINE(43.05, 0.56, 4.00, [
+            { art: "doorJamb", u: 0.78, v: 0, z: 2.52, w: 0.82, h: 1.16, dim: 1.94, flip: true },
+            { art: "kangEdge", u: -0.74, v: -0.72, z: 2.68, w: 0.80, h: 0.26, dim: 1.94 },
+          ]),
           on: (state) => {
             // 字幕在摸瓢，画面里就得有人在缸边摸（首轮视觉审查退回的空缸镜）
             state.player.x = 42.7;
@@ -684,13 +783,29 @@ export function ChapterC1(K) {
             Cue(state, "bucketKnock", { gain: 0.4, rate: 0.8, delay: 1.2 });   // 瓢刮着缸底
             Cue(state, "waterDrip", { gain: 0.4, delay: 3.0 });
           } },
+        // 这两镜（棚子/鸡笼）在锁定镜表上没有对应格——空镜留着，但照分镜图
+        // 第二节那套语汇重排：塌下来的椽子压住上边框，画面里唯一的黑在前景上
         { act: "牲口棚塌了半边，棚里空着。拴牲口的橛子还钉在地上，缰绳没了——木桩上没有断口。不是断的，是解走的。", d: 5.6,
-          cam: { kind: "shot", x: 10.4, y: 1.6, dist: 5.2 } },
+          cam: { kind: "free", from: [10.60, 1.02, 6.30], to: [10.52, 1.00, 6.00],
+            at: [10.40, 0.95], atTo: [10.40, 0.94],
+            fg: [
+              { art: "beam", u: 0.05, v: 0.46, z: 3.9, w: 2.0, h: 0.22, dim: 2.09 },
+              { art: "doorJamb", u: -0.88, v: 0, z: 3.6, w: 0.34, h: 1.05, dim: 1.94 },
+            ] } },
         // 鸡笼（八稿新增）：倒在墙边。里面是空的
         { act: "鸡笼倒在墙边。里面是空的。", d: 3.0,
-          cam: { kind: "insert", x: 36.6, y: 0.7, dist: 2.6 } },
+          cam: { kind: "free", from: [36.68, 0.58, 2.30], to: [36.66, 0.57, 2.18],
+            at: [36.60, 0.52], atTo: [36.60, 0.51],
+            fg: [{ art: "strawEdge", u: 0.10, v: -0.86, z: 1.35, w: 1.2, h: 0.26, dim: 1.86 }] } },
+        // 分镜图 04 的前一格：他回到屋里，炕上那个人蜷着。双人镜，人占画高四成
         { act: "柱子回到屋里。妹妹蜷在炕上，头发贴着脸。破袄只盖住肚子，一只脚露在外面。", d: 4.6,
-          cam: { kind: "shot", x: 31.4, y: 1.05, dist: 3.8 },
+          cam: { kind: "free", from: [32.05, 1.02, 5.20], to: [31.98, 1.00, 4.95],
+            at: [31.85, 0.92], atTo: [31.82, 0.90],
+            fg: [
+              // 他刚从门口进来：门框柱压住画右
+              { art: "doorJamb", u: 0.86, v: 0, z: 3.5, w: 0.36, h: 1.05, dim: 1.86, flip: true },
+              { art: "kangEdge", u: -0.42, v: -0.92, z: 3.8, w: 1.4, h: 0.22, dim: 1.78 },
+            ] },
           on: (state) => {
             state.beat.indoorScene = true;
             // 说睡着就得真躺着：铺盖（beddingMat, 31.15）上侧躺蜷着
@@ -700,8 +815,16 @@ export function ChapterC1(K) {
             state.player.heading = -1;
           } },
         // 他蹲下去，替她把脚盖好
+        // 分镜图 04 正格：炕在画左（她侧躺着），柱子跪在炕沿外侧替她掖被，
+        // 人占画高四成出头。炕沿在画框下沿压一道
         { act: "柱子替她把脚盖好。", d: 2.8,
-          cam: { kind: "shot", x: 31.8, y: 0.95, dist: 3.4 },
+          // 分镜 04：炕在画左（她侧躺着），柱子跪在炕沿外侧替她掖被。
+          // **照站姿身高配机距会松一档**（跪着的柱子实测只有 0.59m）；注视点
+          // 还要压到炕面高度，不然上半屏一片空墙、两人的小腿又被下黑边切掉
+          cam: CINE(31.48, 0.40, 3.60, [
+            { art: "kangEdge", u: -0.34, v: -0.86, z: 2.27, w: 1.30, h: 0.26, dim: 1.86 },
+            { art: "doorJamb", u: 0.86, v: 0, z: 2.27, w: 0.50, h: 1.00, dim: 1.94, flip: true },
+          ]),
           on: (state) => {
             state.beat.indoorScene = true;
             state.player.x = 32.2;
@@ -712,10 +835,10 @@ export function ChapterC1(K) {
         // 镜头停在她的手腕上：去年的褂子短了一截，袖口遮不住手腕。
         // ——章末那一针一针，就是缝给这截手腕的
         { act: "去年的褂子已经短了一截，袖口遮不住手腕。", d: 3.8,
-          cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+          cam: WRIST_CAM,
           on: (state) => { state.beat.indoorScene = true; } },
         { stage: "第三天。还是没人来叫。", d: 3.2,
-          cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+          cam: WRIST_CAM,
           on: (state) => {
             // 章目标（八稿）：这一天全部的事，都归到这一句底下
             state.toast = { text: "章目标：天黑前，给妹妹弄一顿热饭。", t: 5.5 };
@@ -793,12 +916,12 @@ export function ChapterC1(K) {
             Cue(state, "clothLift", { gain: 0.5 });
             StartMicroCine(state, [
               { act: "柱子解开袋口。袋里全是谷种。", d: 3.2,
-                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.3 },
+                cam: CINE(9.7, 0.36, 2.90, [FG.jambL(1.83, 0.34, 1.0, 2.02)]),
                 on: (s) => { FlashPose(s, "kneel", 3.0); } },
               { who: "娘的声音", say: "留种。谁也不能动。", d: 3.0,
-                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 } },
+                cam: CINE(9.7, 0.36, 2.90, [FG.beamTop(1.82, 1.8, 0.28)]) },
               { act: "柱子捻起几粒谷种，看了一会。", d: 3.0,
-                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.1 },
+                cam: CINE(9.7, 0.36, 2.90, [FG.jambL(1.82, 0.34, 1.0, 2.02)]),
                 on: (s) => { FlashPose(s, "kneel", 2.8); } },
             ]);
           } },
@@ -811,13 +934,13 @@ export function ChapterC1(K) {
             state.flags.seedKept = true;
             StartMicroCine(state, [
               { act: "袋口拧紧，绕绳，再压回砖下。", d: 3.0,
-                cam: { kind: "insert", x: 9.7, y: 0.62, dist: 2.2 },
+                cam: CINE(9.7, 0.36, 2.90, [FG.beamTop(1.81, 1.8, 0.28)]),
                 on: (s) => {
                   FlashPose(s, "kneel", 2.8);
                   Cue(s, "stoneLand", { gain: 0.35, delay: 1.6 });
                 } },
               { act: "柱子把苇席重新盖在粮种上。", d: 2.8,
-                cam: { kind: "shot", x: 9.9, y: 1.0, dist: 3.2 },
+                cam: CINE(9.9, 0.52, 2.90, [FG.jambL(1.83, 0.34, 1.0, 2.02)]),
                 on: (s) => {
                   FlashPose(s, "bow", 2.2);
                   Cue(s, "clothDrop", { gain: 0.5, delay: 0.8 });
@@ -841,26 +964,26 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "碗片下面垫着一圈蓝底白花的碎布。", d: 3.2,
-                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
+                cam: CINE(7.4, 0.39, 2.90, [FG.beamTop(1.81, 1.8, 0.28)]) },
               // 闪回：娘跪在窖口的手臂（一秒出头，硬切）
               { act: "", d: 1.3,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
+                cam: CINE(29.6, UNDER_Y + 3.5 - 0.26, 2.99, [FG.kangLow(1.45, 1.2, 0.22)]),
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.visible = true; m.level = "surface"; m.x = 29.95; m.heading = -1; m.pose = null; m.track = { name: "lidLower", t: 1.0 }; }
                 } },
               // 再切回坛子
               { act: "柱子把碎布展开。布已经磨毛，只剩巴掌大。", d: 3.6,
-                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
+                cam: CINE(7.4, 0.39, 2.90, [FG.beamTop(1.81, 1.8, 0.28)]),
                 on: (s) => {
                   const m = FindActor(s, "mother");
                   if (m) { m.visible = false; m.pose = null; }
                 } },
               { act: "他将碎布叠好，揣进怀里。", d: 2.6,
-                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 },
+                cam: CINE(7.4, 0.39, 2.90, [FG.jambL(1.81, 0.34, 1.0, 2.02)]),
                 on: (s) => { FlashPose(s, "bow", 1.4); } },
               { act: "坛里装着十来片红薯干。他数了一遍。又数了一遍。", d: 4.2,
-                cam: { kind: "insert", x: 7.4, y: 0.72, dist: 2.2 } },
+                cam: CINE(7.4, 0.39, 2.90, [FG.beamTop(1.81, 1.8, 0.28)]) },
             ]);
           } },
               ],
@@ -902,7 +1025,7 @@ export function ChapterC1(K) {
             state.player.item = null;
             StartMicroCine(state, [
               { act: "柱子把两片红薯干泡进碗里。温水。泡了一会，软了点。", d: 4.0,
-                cam: { kind: "insert", x: 34.9, y: 0.95, dist: 3.0 },
+                cam: CINE(34.9, 0.53, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   s.beat.indoorScene = true;
                   FlashPose(s, "kneel", 3.8);
@@ -915,40 +1038,40 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "身后传来被褥摩擦声。", d: 2.0,
-                cam: { kind: "shot", x: 33.4, y: 1.1, dist: 3.8 },
+                cam: CINE(33.4, 0.61, 3.07, [FG.jambR(1.93, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.beat.indoorScene = true;
                   Cue(s, "clothLift", { gain: 0.3, rate: 0.9 });
                   s.player.heading = -1;
                 } },
               { who: "妹妹", say: "哥？", d: 1.8,
-                cam: { kind: "shot", x: 32.4, y: 1.05, dist: 3.6 },
+                cam: CINE(32.4, 0.58, 2.91, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.pose = "kneel"; sis.x = 31.6; sis.heading = 1; }
                 } },
               { act: "柱子回头。妹妹坐在炕上，头发还贴着脸。", d: 2.8,
-                cam: { kind: "shot", x: 32.4, y: 1.05, dist: 3.6 } },
+                cam: CINE(32.4, 0.58, 2.91, [FG.jambR(1.83, 0.32, 1.0, 1.98)]) },
               { who: "妹妹", say: "你上哪了？", d: 2.2,
-                cam: { kind: "insert", x: 31.8, y: 0.95, dist: 2.8 } },
+                cam: CINE(31.8, 0.50, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
               { who: "柱子", say: "没上哪。", d: 2.0,
-                cam: { kind: "shot", x: 33.6, y: 1.1, dist: 3.6 } },
+                cam: CINE(33.6, 0.58, 2.91, [FG.jambR(1.83, 0.32, 1.0, 1.98)]) },
               { act: "妹妹从炕上下来，走到桌边。她先看自己的碗，又看柱子的碗。", d: 3.8,
-                cam: { kind: "insert", x: 34.4, y: 0.9, dist: 2.9 },
+                cam: CINE(34.4, 0.51, 2.90, [FG.kangLow(1.84, 1.2, 0.22)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.pose = null; sis.cineTarget = { x: 34.0 }; sis.cineSpeed = 1.8; }
                 } },
               // 不管长的那截在谁碗里，她都做同一件事
               { act: "她伸手，把长的那截推到柱子面前。", d: 3.0,
-                cam: { kind: "insert", x: 34.5, y: 0.85, dist: 2.7 },
+                cam: CINE(34.5, 0.48, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.cineTarget = null; sis.x = 34.0; sis.heading = 1; sis.pose = "bow"; }
                   Cue(s, "pickup", { gain: 0.5, rate: 0.8 });
                 } },
               { act: "她低下头，不再看他。", d: 2.4,
-                cam: { kind: "insert", x: 34.0, y: 0.9, dist: 2.5 } },
+                cam: CINE(34.0, 0.44, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
             ]);
           } },
         // ③ 换回去（活卡第二段）：捞出来，提在半空沥两滴，放回她碗里
@@ -957,19 +1080,19 @@ export function ChapterC1(K) {
             state.flags.mealSplit = true;
             StartMicroCine(state, [
               { who: "柱子", say: "吃你的。", d: 2.6,
-                cam: { kind: "shot", x: 34.4, y: 1.0, dist: 3.4 },
+                cam: CINE(34.4, 0.55, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.pose = "kneel"; sis.heading = 1; sis.carry = "红薯干"; }
                   FlashPose(s, "bow", 1.6);
                 } },
               { act: "妹妹没再推。拿起来咬了一口。还是有些硬。", d: 3.2,
-                cam: { kind: "insert", x: 34.1, y: 0.9, dist: 2.8 } },
+                cam: CINE(34.1, 0.50, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
               { act: "她把红薯干重新泡回水里，等了一会，再拿起来咬。", d: 3.8,
-                cam: { kind: "insert", x: 34.1, y: 0.9, dist: 2.8 },
+                cam: CINE(34.1, 0.50, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]),
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.3, rate: 1.2, delay: 0.6 }); } },
               { act: "柱子端起自己的碗，把带甜味的水喝下去。", d: 3.6,
-                cam: { kind: "shot", x: 34.7, y: 1.2, dist: 4.2 },
+                cam: CINE(34.7, 0.68, 3.4, [FG.kangLow(2.14, 1.2, 0.22)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) sis.carry = null;
@@ -995,30 +1118,30 @@ export function ChapterC1(K) {
         // 但这段只有走位和台词，没有旗标）
         StartMicroCine(state, [
           { act: "妹妹吃完，舔了舔手指。她走到门框边，仰头看着门框低处的两道横线。", d: 4.4,
-            cam: { kind: "shot", x: 33.4, y: 1.1, dist: 3.6 },
+            cam: CINE(33.4, 0.58, 2.91, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
             on: (s) => {
               s.beat.indoorScene = true;
               const k = FindActor(s, "sister");
               if (k) { k.cineTarget = { x: 33.4 }; k.cineSpeed = 1.5; }
             } },
           { who: "妹妹", say: "今天还画吗？", d: 2.4,
-            cam: { kind: "insert", x: 33.4, y: 0.95, dist: 2.6 },
+            cam: CINE(33.4, 0.46, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
             on: (s) => {
               const k = FindActor(s, "sister");
               if (k) { k.cineTarget = null; k.x = 33.4; k.heading = -1; k.pose = "mark"; }
             } },
           { act: "柱子把碗放下。", d: 1.8,
-            cam: { kind: "shot", x: 34.3, y: 1.05, dist: 3.2 },
+            cam: CINE(34.3, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
             on: (s) => { Cue(s, "drop", { gain: 0.3, rate: 1.1 }); } },
           { who: "柱子", say: "画。", d: 1.6,
-            cam: { kind: "close", on: "player", dist: 3.0 } },
+            cam: { kind: "close", on: "player", dist: 3.0, fg: [FG.jambL(1.6, 0.30, 0.94, 2.02)] } },
           { act: "妹妹踮脚去够窗台上的石笔。她够不到。", d: 3.2,
-            cam: { kind: "shot", x: 34.0, y: 1.1, dist: 3.2 },
+            cam: CINE(34.0, 0.52, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
             on: (s) => {
               const k = FindActor(s, "sister");
               if (k) { k.x = 34.3; k.heading = 1; k.pose = null; k.track = { name: "reachJump", t: 0, ambient: true }; }
             } },
-          { act: "", d: 1.2, cam: { kind: "shot", x: 34.0, y: 1.1, dist: 3.2 },
+          { act: "", d: 1.2, cam: CINE(34.0, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
             on: (s) => {
               const k = FindActor(s, "sister");
               if (k) { k.track = null; k.x = 33.9; k.heading = 1; }
@@ -1036,7 +1159,7 @@ export function ChapterC1(K) {
               // 站位钉在**左立柱**（刻痕在 33.6-33.75）前——33.85 会把她按进
               // 黑门洞里，暗红衣裳当场隐形（实拍抓的）
               { act: "柱子蹲下，把妹妹抱起来，一只手托住她，另一只手从窗台拿过石笔。", d: 3.4,
-                cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 },
+                cam: CINE(34.0, 0.55, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   // 她被托在半空：腿垂着、一只手够门框、一只手扒着他的肩
@@ -1050,7 +1173,7 @@ export function ChapterC1(K) {
                   s.player.pose = "liftChild";
                 } },
               { act: "石笔是一截磨秃了的滑石。爹划线用的——木匠家里，比锥子还常使的东西。他把它塞进她手里。", d: 4.4,
-                cam: { kind: "shot", x: 33.9, y: 1.35, dist: 3.0 } },
+                cam: CINE(33.9, 0.49, 2.90, [FG.jambR(1.81, 0.32, 1.0, 1.98)]) },
             ]);
           } },
         // 收尾步：micro-cine 是 effect 起的，链在同一帧就会走完——没有这一步，
@@ -1085,7 +1208,7 @@ export function ChapterC1(K) {
       kind: "cinematic", id: "c1_count", timeOfDay: "day",
       lines: [
         { act: "妹妹吹掉石粉。她伸出手指，一道一道点。", d: 3.0,
-          cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
+          cam: CINE(33.72, 0.80, 3.55, [FG.jambL(1.85, 0.60, 1.05, 2.09)]),
           on: (state) => {
             state.beat.indoorScene = true;
             const sis = FindActor(state, "sister");
@@ -1100,30 +1223,30 @@ export function ChapterC1(K) {
             state.player.pose = "liftChild";
           } },
         { who: "妹妹", say: "一。", d: 1.3,
-          cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
+          cam: CINE(33.72, 0.80, 3.55, [FG.jambL(1.85, 0.60, 1.05, 2.09)]),
           on: (state) => { Cue(state, "pickup", { gain: 0.25, rate: 1.3 }); } },
         { who: "妹妹", say: "二。", d: 1.3,
-          cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
+          cam: CINE(33.72, 0.80, 3.55, [FG.jambL(1.85, 0.60, 1.05, 2.09)]),
           on: (state) => { Cue(state, "pickup", { gain: 0.25, rate: 1.35 }); } },
         { who: "妹妹", say: "三。", d: 1.5,
-          cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 },
+          cam: CINE(33.72, 0.80, 3.55, [FG.jambL(1.85, 0.60, 1.05, 2.09)]),
           on: (state) => { Cue(state, "pickup", { gain: 0.25, rate: 1.4 }); } },
         { act: "她看了一会第三道线。", d: 2.6,
-          cam: { kind: "insert", x: 33.68, y: 1.0, dist: 2.0 } },
+          cam: CINE(33.72, 0.39, 2.90, [FG.jambL(1.66, 0.36, 0.95, 2.09)]) },
         { who: "妹妹", say: "爹上回出门，画到第四道就回来了。", d: 3.8,
-          cam: { kind: "shot", x: 33.9, y: 1.3, dist: 3.2 } },
+          cam: CINE(33.85, 0.66, 4.60, [{ art: "beam", u: 0, v: 0.41, z: 2.90, w: 2.2, h: 0.20, dim: 2.09 }]) },
         { act: "她回头看柱子。", d: 2.2,
-          cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 } },
+          cam: CINE(33.86, 0.49, 2.90, [FG.jambL(1.67, 0.32, 1.0, 2.02)]) },
         { who: "妹妹", say: "他们啥时候回来？", d: 2.8,
-          cam: { kind: "insert", x: 33.66, y: 1.05, dist: 2.2 } },
+          cam: CINE(33.70, 0.40, 2.90, [FG.jambL(1.68, 0.34, 0.95, 2.09)]) },
         { act: "柱子没有回答。", d: 2.4,
-          cam: { kind: "close", on: "player", dist: 3.0 } },
+          cam: CINE(34.05, 0.36, 2.90, [FG.jambL(1.67, 0.30, 0.90, 2.09)]) },
         // 玩家控制还锁在过场里：房间只剩风吹窗纸的声音
         { act: "房间里只剩风吹窗纸的声音。", d: 3.0,
-          cam: { kind: "shot", x: 33.6, y: 1.15, dist: 3.8 },
+          cam: CINE(33.70, 0.80, 4.0, [FG.beamTop(2.54, 2.2, 0.32), FG.jambR(2.39, 0.34, 1.05)]),
           on: (state) => { Cue(state, "windGust", { gain: 0.3, rate: 1.2, delay: 0.5 }); } },
         { act: "水缸边的瓢轻轻滑了一下，磕在缸底。", d: 3.2,
-          cam: { kind: "insert", x: 43.4, y: 0.95, dist: 2.8 },
+          cam: CINE(43.30, 0.37, 2.90, [FG.kangLow(1.63, 0.55, 0.22, 1.94)]),
           on: (state) => { Cue(state, "bucketKnock", { gain: 0.4, rate: 0.85, delay: 1.0 }); } },
       ],
     },
@@ -1146,28 +1269,28 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { who: "柱子", say: "快了。", d: 2.2,
-                cam: { kind: "close", on: "player", dist: 3.0 } },
+                cam: { kind: "close", on: "player", dist: 3.0, fg: [FG.jambR(1.6, 0.30, 0.94, 2.02)] } },
               { act: "柱子把妹妹放到地上。", d: 2.4,
-                cam: { kind: "shot", x: 34.0, y: 1.15, dist: 3.4 },
+                cam: CINE(34.0, 0.55, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.lift = 0; k.pose = null; k.x = 32.9; k.heading = -1; }
                   s.player.pose = null;
                 } },
               { act: "他走到水缸边，把瓢往下压。瓢再次碰到缸底。", d: 4.0,
-                cam: { kind: "shot", x: 42.6, y: 1.1, dist: 4.2 },
+                cam: CINE(42.6, 0.68, 3.4, [FG.jambL(2.14, 0.34, 1.02, 2.02)]),
                 on: (s) => {
                   s.player.cineWalk = { x: 42.8, speed: 2.0 };
                   Cue(s, "bucketKnock", { gain: 0.5, rate: 0.85, delay: 2.6 });
                 } },
               { who: "柱子", say: "俺去打水。", d: 2.2,
-                cam: { kind: "close", on: "player", dist: 3.0 },
+                cam: { kind: "close", on: "player", dist: 3.0, fg: [FG.jambL(1.6, 0.30, 0.94, 2.02)] },
                 on: (s) => { s.player.cineWalk = null; s.player.x = 42.8; s.player.heading = -1; } },
               { act: "他看向妹妹。", d: 1.6,
-                cam: { kind: "shot", x: 42.4, y: 1.2, dist: 3.8 },
+                cam: CINE(42.4, 0.61, 3.07, [FG.jambL(1.93, 0.34, 1.02, 2.02)]),
                 on: (s) => { s.player.heading = -1; } },
               { who: "柱子", say: "你跟紧。", d: 2.0,
-                cam: { kind: "shot", x: 42.4, y: 1.2, dist: 3.8 } },
+                cam: CINE(42.4, 0.61, 3.07, [FG.jambL(1.93, 0.34, 1.02, 2.02)]) },
             ]);
           } },
       ],
@@ -1195,9 +1318,9 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "路边有两棵榆树。树皮已经被一圈圈刮掉，只剩发白的树干。", d: 4.2,
-                cam: { kind: "shot", x: 50.1, y: 1.5, dist: 5.4 } },
+                cam: CINE(50.1, 0.87, 4.37, [FG.jambL(2.75, 0.34, 1.02, 2.02)]) },
               { act: "妹妹没有停。", d: 2.2,
-                cam: { kind: "shot", x: 51.0, y: 1.2, dist: 4.0 } },
+                cam: CINE(51.0, 0.65, 3.23, [FG.jambL(2.04, 0.34, 1.02, 2.02)]) },
             ]);
           } },
         // 田埂边：她忽然蹲下，用小棍刨土——苦菜连根挖出来
@@ -1210,25 +1333,25 @@ export function ChapterC1(K) {
             if (g) g.label = "挂着布兜的空桶";
             StartMicroCine(state, [
               { act: "走到田埂边，妹妹忽然蹲下，用小棍刨土。", d: 3.2,
-                cam: { kind: "shot", x: 54.4, y: 1.05, dist: 3.6 },
+                cam: CINE(54.4, 0.58, 2.91, [FG.jambL(1.83, 0.34, 1.02, 2.02)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.following = false; k.cineTarget = null; k.x = 54.2; k.heading = -1; k.pose = "kneel"; }
                   Cue(s, "dig", { gain: 0.3, rate: 1.3, delay: 1.2 });
                 } },
               { act: "她挖出一棵苦菜，抓着根抖掉泥。", d: 3.0,
-                cam: { kind: "insert", x: 54.3, y: 0.85, dist: 2.6 },
+                cam: CINE(54.3, 0.46, 2.90, [FG.jambL(1.83, 0.34, 1.02, 2.02)]),
                 on: (s) => { Cue(s, "flutter", { gain: 0.25, rate: 1.4, delay: 0.8 }); } },
               { who: "妹妹", say: "哥，大的。", d: 2.2,
-                cam: { kind: "insert", x: 54.3, y: 0.9, dist: 2.4 } },
+                cam: CINE(54.3, 0.43, 2.90, [FG.jambL(1.82, 0.34, 1.02, 2.02)]) },
               { act: "柱子回头看一眼。", d: 1.6,
-                cam: { kind: "close", on: "player", dist: 3.2 } },
+                cam: { kind: "close", on: "player", dist: 3.2, fg: [FG.jambR(1.71, 0.30, 0.94, 2.02)] } },
               { who: "柱子", say: "嗯。", d: 1.4,
-                cam: { kind: "close", on: "player", dist: 3.2 } },
+                cam: { kind: "close", on: "player", dist: 3.2, fg: [FG.jambL(1.71, 0.30, 0.94, 2.02)] } },
               { who: "柱子", say: "搁兜里。", d: 1.8,
-                cam: { kind: "close", on: "player", dist: 3.2 } },
+                cam: { kind: "close", on: "player", dist: 3.2, fg: [FG.jambR(1.71, 0.30, 0.94, 2.02)] } },
               { act: "妹妹把苦菜放进桶边挂着的小布兜，追上柱子。", d: 3.2,
-                cam: { kind: "shot", x: 55.0, y: 1.1, dist: 3.8 },
+                cam: CINE(55.0, 0.61, 3.07, [FG.jambL(1.93, 0.34, 1.02, 2.02)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = null; k.following = true; }
@@ -1285,10 +1408,10 @@ export function ChapterC1(K) {
             if (sis) { sis.track = null; sis.following = true; sis.cineTarget = null; }
             StartMicroCine(state, [
               { act: "柱子抓住桶梁，把满桶提到地面。他掂了一下重量。沉。", d: 3.8,
-                cam: { kind: "insert", x: 58.0, y: 0.95, dist: 2.7 },
+                cam: CINE(58.0, 0.48, 2.90, [FG.jambL(1.82, 0.34, 1.02, 2.02)]),
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.5, delay: 0.6 }); } },
               { who: "柱子", say: "走了。", d: 2.0,
-                cam: { kind: "shot", x: 57.4, y: 1.2, dist: 4.0 } },
+                cam: CINE(57.4, 0.65, 3.23, [FG.jambL(2.04, 0.34, 1.02, 2.02)]) },
             ]);
           } },
       ],
@@ -1309,19 +1432,19 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "妹妹忽然站住。她抬起头。", d: 2.4,
-                cam: { kind: "shot", x: 48.0, y: 1.15, dist: 3.8 },
+                cam: CINE(48.0, 0.61, 3.07, [FG.jambL(1.93, 0.34, 1.02, 2.02)]),
                 on: (s) => {
                   const sis = FindActor(s, "sister");
                   if (sis) { sis.following = false; sis.cineTarget = null; sis.x = s.player.x + 1.4; sis.heading = -1; }
                 } },
               { act: "远处传来自行车链条声。一下车铃。", d: 2.8,
-                cam: { kind: "insert", x: 48.6, y: 0.95, dist: 2.5 },
+                cam: CINE(48.6, 0.44, 2.90, [FG.jambL(1.82, 0.34, 1.02, 2.02)]),
                 on: (s) => {
                   Cue(s, "crank", { gain: 0.16, rate: 2.4, delay: 0.3 });
                   Cue(s, "bikeBell", { gain: 0.4, rate: 0.98, delay: 1.2 });
                 } },
               { act: "声音从北边土路接近。", d: 2.4,
-                cam: { kind: "shot", x: 49.5, y: 1.3, dist: 4.6 },
+                cam: CINE(49.5, 0.74, 3.72, [FG.jambL(2.34, 0.34, 1.02, 2.02)]),
                 on: (s) => { Cue(s, "crank", { gain: 0.2, rate: 2.5, delay: 0.9 }); } },
             ]);
           } },
@@ -1347,7 +1470,7 @@ export function ChapterC1(K) {
             Cue(state, "waterDrip", { gain: 0.4, delay: 0.5 });
             StartMicroCine(state, [
               { act: "拐到院墙后头。柱子把水桶轻轻放在地上。水面仍在晃。", d: 2.8,
-                cam: { kind: "insert", x: 46.9, y: 0.7, dist: 2.3 } },
+                cam: CINE(46.9, 0.41, 2.90, [FG.jambL(1.83, 0.34, 1.02, 2.02)]) },
             ]);
           } },
       ],
@@ -1383,6 +1506,11 @@ export function ChapterC1(K) {
       // dist 给 7.3 是因为 `HintShot` 会过一道 `TightenHw`（×0.71）：折完 5.18，
       // 才装得下 42.4~52.8 这一段（两辆车停在 50.3 / 51.6）。**这一拍不能再收**
       // ——收了就只剩墙和一颗脑袋，"他们就在墙那头"这句话没了主语
+      // **这一拍是玩法段（hold），机位不许换成 `free`**：`free` 只走过场那条
+      // 路（HintShot 的 free 分支把 hw 写死成 6、运动交给 ApplyCineCamera），
+      // 玩法段的「跟随、永不旋转」一个字不动。框景改挂在节拍的 `fg` 上
+      //（玩法段的框景只有这一个来源，而且只能写世界坐标——u/v 是按画框折算的，
+      // 跟随镜头下画框一直在动，板子会跟着人漂）
       cam: { kind: "shot", x: 47.6, y: 1.2, dist: 7.3 },
       onEnter: (state) => {
         const sis = FindActor(state, "sister");
@@ -1484,12 +1612,12 @@ export function ChapterC1(K) {
           b.failing = true;
           StartMicroCine(state, [
             { act: "前面的自行车捏了闸。", d: 1.6,
-              cam: { kind: "shot", x: 49.8, y: 1.3, dist: 4.6 },
+              cam: CINE(49.8, 0.74, 3.72, [FG.jambL(2.34, 0.34, 1.02, 2.02)]),
               on: (s) => { Cue(s, "crank", { gain: 0.4, rate: 1.2 }); } },
             { who: "伪军", say: "谁在那儿？", d: 2.0,
-              cam: { kind: "shot", x: 49.8, y: 1.3, dist: 4.2 } },
+              cam: CINE(49.8, 0.68, 3.4, [FG.jambL(2.14, 0.34, 1.02, 2.02)]) },
             { act: "一个人影从墙外转向巷口。", d: 1.8,
-              cam: { kind: "shot", x: 48.6, y: 1.25, dist: 4.0 },
+              cam: CINE(48.6, 0.65, 3.23, [FG.jambL(2.04, 0.34, 1.02, 2.02)]),
               on: (s) => { Cue(s, "step", { gain: 0.5, rate: 1.1 }); } },
             // 画面迅速收黑，回到车铃第一次响起时。**"迅速"就得真的迅速**：
             // 这是重试路上的一格，玩家早知道自己被看见了，多黑一秒都是罚站
@@ -1512,21 +1640,24 @@ export function ChapterC1(K) {
       kind: "cinematic", id: "c1_uncle", timeOfDay: "day",
       lines: [
         { act: "链条声逐渐远去。柱子仍然没有松手。", d: 3.4,
-          cam: { kind: "shot", x: 47.0, y: 1.2, dist: 4.0 },
+          cam: CINE(46.62, 0.70, 3.54, [FG.jambR(2.23, 0.40, 1.10, 2.09)]),
           on: (state) => {
             for (const id of ["rider1", "rider2"]) {
               const r = FindActor(state, id);
               if (r) r.visible = false;
             }
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 46.3; sis.heading = 1; sis.pose = "leanIn"; }
+            // `lift = 0` 不许省：§4 把她托起来画正字时立的 0.52 会一路挂到这儿，
+            // 画面上她整个人浮在半空半米（实测脚底 0.582m）。清 lift 的地方在
+            // c1_walk 的 onStart，跳幕回放到 §7 时它未必跑过
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.lift = 0; sis.x = 46.3; sis.heading = 1; sis.pose = "leanIn"; }
             state.player.x = 46.9;
             state.player.heading = -1;
             FlashPose(state, "shelter", 3.2);
             Cue(state, "crank", { gain: 0.08, rate: 2.3, delay: 0.4 });
           } },
         { act: "等声音完全消失，柱子放开妹妹。", d: 2.8,
-          cam: { kind: "shot", x: 46.9, y: 1.15, dist: 3.6 },
+          cam: CINE(46.58, 0.60, 3.0, [FG.jambR(1.89, 0.36, 1.05, 2.02)]),
           on: (state) => {
             state.player.pose = null;
             const sis = FindActor(state, "sister");
@@ -1536,10 +1667,12 @@ export function ChapterC1(K) {
             if (sis) { sis.pose = null; sis.track = null; sis.trembleK = 0; }
           } },
         { act: "他第一眼看向水桶。水还在。", d: 3.0,
-          cam: { kind: "insert", x: 47.15, y: 0.7, dist: 2.2 } },
+          cam: CINE(47.15, 0.28, 2.90, [FG.strawLow(1.65, 0.9, 0.22)]) },
         // 七叔登场：他也蹲着的
         { act: "墙的另一头传来衣服摩擦声。七叔扶着墙站起来——他也蹲着的。一条腿蹲麻了，迈第一步时晃了一下。", d: 5.4,
-          cam: { kind: "shot", x: 51.6, y: 1.25, dist: 4.4 },
+          // 分镜 23：两个孩子蹲在墙这头（画一侧、很小）、七叔从墙那头站起来。
+          // 三样缺一这一格就不成立，画宽给到 6.1m（七叔占可见画高五成二）
+          cam: CINE(48.30, 0.72, 4.50, [FG.jambL(2.84, 0.80, 1.20, 2.02)]),
           on: (state) => {
             Cue(state, "clothLift", { gain: 0.4, rate: 0.8 });
             const q = FindActor(state, "qishu");
@@ -1547,12 +1680,12 @@ export function ChapterC1(K) {
             state.player.pose = null;
           } },
         { act: "他快步走过来，先蹲下，捏捏妹妹的胳膊，又看看她的脸和脚。", d: 4.6,
-          cam: { kind: "shot", x: 46.4, y: 1.05, dist: 3.8 },
+          cam: CINE(45.95, 0.65, 3.23, [FG.jambR(2.04, 0.36, 1.05, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.pose = null; q.cineTarget = { x: 45.1 }; q.cineSpeed = 2.6; }
           } },
-        { act: "", d: 2.4, cam: { kind: "insert", x: 45.3, y: 0.9, dist: 2.6 },
+        { act: "", d: 2.4, cam: CINE(45.55, 0.40, 2.90, [FG.jambL(1.68, 0.32, 0.92, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = null; q.x = 45.1; q.heading = 1; q.pose = "kneel"; }
@@ -1561,7 +1694,9 @@ export function ChapterC1(K) {
           } },
         // 确认妹妹没事，站起来，照柱子后脑勺轻轻拍了一巴掌
         { act: "确认妹妹没事，他站起来，轻轻拍了一下柱子的后脑勺。", d: 3.0,
-          cam: { kind: "shot", x: 46.0, y: 1.25, dist: 3.4 },
+          // 分镜 25：他抬起来的那只手落在 1.55m 上——注视点给低了手就被上黑边切掉，
+          // 而这一格演的就是「抬手」
+          cam: CINE(46.66, 0.80, 3.40, [FG.jambL(2.14, 0.60, 1.02, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             // 拍那一下要有抬臂（mark=抬臂点着，落在孩子后脑勺的高度上）；
@@ -1574,92 +1709,100 @@ export function ChapterC1(K) {
             Cue(state, "pickup", { gain: 0.3, rate: 0.7, delay: 1.2 });
           } },
         { who: "七叔", say: "铃一响就躲。", d: 2.2,
-          cam: { kind: "ots", subject: "qishu", other: "player", dist: 3.0 },
+          cam: CINE(46.68, 0.46, 2.90, [FG.jambL(1.66, 0.30, 0.96, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) q.pose = null;
           } },
         { who: "七叔", say: "好小子。", d: 2.0,
-          cam: { kind: "ots", subject: "qishu", other: "player", dist: 3.0 } },
+          cam: CINE(46.68, 0.46, 2.90, [FG.jambL(1.66, 0.30, 0.96, 2.09)]) },
         { act: "他喘匀一口气，压低声音。", d: 2.4,
-          cam: { kind: "shot", x: 46.4, y: 1.2, dist: 3.4 } },
+          cam: CINE(46.72, 0.49, 2.90, [FG.jambL(1.67, 0.30, 0.98, 2.09)]) },
         { who: "七叔", say: "这两天甭往北头去。听见没？", d: 3.2,
-          cam: { kind: "insert", x: 46.9, y: 1.15, dist: 2.6 } },
+          cam: CINE(46.92, 0.45, 2.90, [FG.jambL(1.68, 0.30, 0.96, 2.09)]) },
         { act: "柱子点头。七叔看见水桶，又看见妹妹布兜里的苦菜。", d: 4.2,
-          cam: { kind: "shot", x: 47.5, y: 1.25, dist: 4.4 },
+          cam: CINE(46.95, 0.71, 3.54, [FG.jambR(2.23, 0.38, 1.08, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 52.6 }; q.cineSpeed = 2.2; q.heading = 1; }
           } },
         { act: "他转身进屋，很快又出来，手里攥着一把黑豆，往柱子怀里塞。喂牲口的那种。", d: 4.8,
-          cam: { kind: "shot", x: 46.6, y: 1.15, dist: 3.6 },
+          // 分镜 24：大人占可见画高九成 ⇒ 画宽 3.6m；两只手在画面正中交接
+          cam: CINE(46.45, 0.62, 2.90, [FG.jambL(1.83, 0.52, 1.00, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.cineTarget = { x: 46.9 }; q.cineSpeed = 2.4; q.heading = -1; }
+            if (q) { q.cineTarget = { x: 46.75 }; q.cineSpeed = 2.4; q.heading = -1; }
+            // 站位次序照分镜 24：**七叔｜柱子｜妹妹**——她原来夹在两个人当中，
+            // 正挡着"把黑豆塞过来"那一下
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.cineTarget = null; sis.lift = 0; sis.x = 45.55; sis.heading = 1; }
             Cue(state, "drop", { gain: 0.3, rate: 1.2, delay: 2.2 });
           } },
         { act: "柱子往回推。七叔按住他的手，没松。", d: 3.2,
-          cam: { kind: "insert", x: 46.5, y: 1.0, dist: 2.4 },
+          // 分镜 25：注视点钉在两只手推来推去那个高度上，不是钉在脚下
+          cam: CINE(46.62, 0.72, 3.50, [FG.jambL(2.21, 0.32, 0.98, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.cineTarget = null; q.x = 46.9; q.heading = -1; q.pose = "bow"; }
+            if (q) { q.cineTarget = null; q.x = 46.75; q.heading = -1; q.pose = "bow"; }
           } },
         { who: "七叔", say: "晚上过来吃。", d: 2.2,
-          cam: { kind: "shot", x: 46.6, y: 1.2, dist: 3.4 },
+          cam: CINE(46.70, 0.48, 2.90, [FG.jambL(1.69, 0.30, 0.96, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) q.pose = null;
           } },
         { who: "七叔", say: "你婶子熬了糊糊。", d: 2.4,
-          cam: { kind: "shot", x: 46.6, y: 1.2, dist: 3.4 } },
+          cam: CINE(46.70, 0.48, 2.90, [FG.jambL(1.69, 0.30, 0.96, 2.09)]) },
         { who: "柱子", say: "不了。", d: 1.8,
-          cam: { kind: "close", on: "player", dist: 3.0 } },
+          cam: CINE(46.12, 0.36, 2.90, [FG.jambR(1.67, 0.28, 0.88, 2.09)]) },
         { act: "七叔看了柱子一会，没有再劝。他转身走出两步，又站住。", d: 4.0,
-          cam: { kind: "shot", x: 47.8, y: 1.25, dist: 4.2 },
+          cam: CINE(47.20, 0.71, 3.54, [FG.jambL(2.23, 0.38, 1.08, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 47.6 }; q.cineSpeed = 1.8; q.heading = 1; }
           } },
         { who: "七叔", say: "你家那二亩地，明儿我把牲口牵过来。", d: 3.8,
-          cam: { kind: "shot", x: 47.4, y: 1.2, dist: 3.6 },
+          cam: CINE(47.10, 0.52, 2.90, [FG.jambL(1.66, 0.32, 1.00, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = null; q.x = 47.6; q.heading = -1; }
           } },
         { who: "柱子", say: "七叔——", d: 1.8,
-          cam: { kind: "close", on: "player", dist: 3.0 } },
+          cam: CINE(46.12, 0.36, 2.90, [FG.jambR(1.67, 0.28, 0.88, 2.09)]) },
         { who: "七叔", say: "你爹那年借我三斗谷子。", d: 2.8,
-          cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 },
+          cam: CINE(47.32, 0.40, 2.90, [FG.jambL(1.68, 0.30, 0.94, 2.09)]),
           on: (state) => {
             // 插入镜里必须有他本人（首轮视觉审查抓过空墙）：钉死站位朝向
             const q = FindActor(state, "qishu");
             if (q) { q.visible = true; q.cineTarget = null; q.x = 47.6; q.heading = -1; }
           } },
         { who: "柱子", say: "俺爹没——", d: 1.8,
-          cam: { kind: "close", on: "player", dist: 3.0 } },
+          cam: CINE(46.12, 0.36, 2.90, [FG.jambR(1.67, 0.28, 0.88, 2.09)]) },
         { act: "七叔再次按住他的手。", d: 2.2,
-          cam: { kind: "insert", x: 46.9, y: 1.0, dist: 2.3 },
+          // 分镜 26：注视点钉在两只手扣在一起的那个点上（不是钉在人身上），
+          // 画宽收到 2.6m ＝ 分镜上那种"三个人肩挨肩"的紧镜
+          cam: CINE(46.62, 0.68, 2.60, [FG.jambL(1.64, 0.46, 0.94, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
-            if (q) { q.x = 47.0; q.heading = -1; q.pose = "bow"; }
+            if (q) { q.x = 46.78; q.heading = -1; q.pose = "bow"; }
           } },
         { who: "七叔", say: "我说有。", d: 2.2,
-          cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 },
+          cam: CINE(47.32, 0.40, 2.90, [FG.jambL(1.68, 0.30, 0.94, 2.09)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) q.pose = null;
           } },
-        { act: "", d: 1.4, cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
+        { act: "", d: 1.4, cam: CINE(47.32, 0.40, 2.90, [FG.jambL(1.68, 0.30, 0.94, 2.09)]) },
         { who: "七叔", say: "就有。", d: 2.2,
-          cam: { kind: "insert", x: 47.1, y: 1.15, dist: 2.2 } },
+          cam: CINE(47.32, 0.40, 2.90, [FG.jambL(1.68, 0.30, 0.94, 2.09)]) },
         { act: "他说完就走了。没等柱子再张嘴。", d: 3.2,
-          cam: { kind: "shot", x: 50.5, y: 1.25, dist: 4.4 },
+          cam: CINE(49.40, 0.83, 4.16, [FG.jambL(2.62, 0.40, 1.10, 2.02)]),
           on: (state) => {
             const q = FindActor(state, "qishu");
             if (q) { q.cineTarget = { x: 53.0 }; q.cineSpeed = 2.2; q.heading = 1; }
           } },
         { act: "柱子把黑豆揣好。妹妹重新抓住他的褂子角。", d: 3.6,
-          cam: { kind: "shot", x: 46.4, y: 1.2, dist: 3.6 },
+          cam: CINE(46.55, 0.55, 2.90, [FG.jambR(1.81, 0.34, 1.02, 2.02)]),
           on: (state) => {
             state.flags.beansGiven = true;
             const q = FindActor(state, "qishu");
@@ -1698,12 +1841,12 @@ export function ChapterC1(K) {
             FlashPose(state, "bow", 2.2);
             StartMicroCine(state, [
               { act: "柱子把满桶放到水缸边，提起桶底。水冲进缸里，咕咚咕咚砸在缸底。", d: 3.8,
-                cam: { kind: "insert", x: 43.4, y: 1.0, dist: 2.8 },
+                cam: CINE(43.4, 0.50, 2.90, [FG.jambL(1.82, 0.34, 1.02, 2.02)]),
                 on: (s) => { Cue(s, "waterDrip", { gain: 0.6, delay: 1.2 }); } },
               { act: "水声停下来，缸里留下浅浅一层水线。", d: 2.8,
-                cam: { kind: "insert", x: 43.4, y: 1.0, dist: 2.6 } },
+                cam: CINE(43.4, 0.46, 2.90, [FG.jambL(1.83, 0.34, 1.02, 2.02)]) },
               { act: "柱子舀一瓢水倒进锅里。", d: 2.8,
-                cam: { kind: "shot", x: 28.4, y: 1.05, dist: 3.4 },
+                cam: CINE(28.4, 0.55, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   s.beat.indoorScene = true;
                   s.player.x = 28.4;
@@ -1739,7 +1882,7 @@ export function ChapterC1(K) {
               { act: state.flags.chaffGot
                 ? "柱子把最后一把糜子倒进锅里，又把兜里那点秕谷壳抖进去。"
                 : "柱子把最后一把糜子倒进锅里。", d: 3.0,
-                cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.6 },
+                cam: CINE(27.6, 0.46, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.beat.indoorScene = true;
                   s.stoveFire = false;   // 画面顺序：点火那一行才见火
@@ -1747,14 +1890,14 @@ export function ChapterC1(K) {
                   Cue(s, "flutter", { gain: 0.3, rate: 1.2, delay: 0.7 });
                 } },
               { act: "剩下的红薯干被掰成小块，落进水中。", d: 3.2,
-                cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.4 },
+                cam: CINE(27.6, 0.43, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   s.player.track = { name: "cookDrop", t: 0.9 };   // 错开相位，别跟上一行同步
                   Cue(s, "tenon", { gain: 0.3, rate: 1.6, delay: 0.5 });
                   Cue(s, "waterSplash", { gain: 0.25, rate: 1.4, delay: 1.4 });
                 } },
               { act: "妹妹把苦菜递过来。柱子摘掉根，撕成几段，放进锅里。", d: 4.0,
-                cam: { kind: "shot", x: 28.6, y: 1.05, dist: 3.2 },
+                cam: CINE(28.6, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.cineTarget = { x: 28.6 }; k.cineSpeed = 1.6; }
@@ -1762,7 +1905,7 @@ export function ChapterC1(K) {
                   Cue(s, "clothLift", { gain: 0.3, rate: 1.2, delay: 1.6 });
                 } },
               { act: "七叔给的黑豆最后落进去。", d: 2.6,
-                cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.4 },
+                cam: CINE(27.6, 0.43, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.cineTarget = null; k.x = 28.9; k.heading = -1; }
@@ -1770,7 +1913,7 @@ export function ChapterC1(K) {
                   Cue(s, "drop", { gain: 0.3, rate: 1.4, delay: 0.6 });
                 } },
               { act: "柱子将最后两把谷秸塞入灶膛，用火镰点着草绒。火苗从灶口亮起。", d: 4.4,
-                cam: { kind: "insert", x: 27.5, y: 0.6, dist: 2.2 },
+                cam: CINE(27.5, 0.34, 2.90, [FG.jambR(1.81, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 0 };   // 塞谷秸、擦火镰：手上一直有活
                   Cue(s, "crank", { gain: 0.25, rate: 1.8, delay: 1.0 });   // 火镰擦石
@@ -1778,27 +1921,27 @@ export function ChapterC1(K) {
                   s.stoveFire = true;
                 } },
               { act: "柱子蹲下吹气。火苗先缩了一下，再沿着谷秸爬开。", d: 3.8,
-                cam: { kind: "insert", x: 27.5, y: 0.6, dist: 2.2 },
+                cam: CINE(27.5, 0.34, 2.90, [FG.kangLow(1.81, 1.2, 0.22)]),
                 on: (s) => {
                   s.player.track = { name: "blowFire", t: 0 };
                   Cue(s, "windGust", { gain: 0.2, rate: 1.6, delay: 1.4 });   // 对齐轨道 t=1.5 那一口
                   Cue(s, "crackle", { gain: 0.55, delay: 1.9 });
                 } },
               { act: "锅底逐渐传来细小的水响。画面外的天色从灰白变成暗黄。", d: 4.6,
-                cam: { kind: "shot", x: 30.5, y: 1.6, dist: 5.6 },
+                cam: CINE(30.5, 0.91, 4.53, [FG.jambR(2.85, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 0 };
                   Cue(s, "waterDrip", { gain: 0.3, rate: 1.5, delay: 1.2 });
                 } },
               { act: "锅盖边冒出第一缕热气。", d: 3.2,
-                cam: { kind: "insert", x: 27.6, y: 0.95, dist: 2.3 },
+                cam: CINE(27.6, 0.41, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   s.player.track = { name: "stirPot", t: 1.4 };
                   Cue(s, "crackle", { gain: 0.35, delay: 0.8 });
                 } },
               // 屋内：饭桌。妹妹两碗，锅就见了底
               { act: "妹妹捧着碗喝完第一碗。柱子又给她盛了一碗。", d: 4.0,
-                cam: { kind: "shot", x: 32.8, y: 1.15, dist: 4.0 },
+                cam: CINE(32.8, 0.65, 3.23, [FG.jambR(2.04, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.beat.indoorScene = true;
                   // 坐就得坐在凳子上：旧木凳在 32.0（Data_Scenes），人钉在凳上
@@ -1808,15 +1951,15 @@ export function ChapterC1(K) {
                   s.player.heading = -1;
                 } },
               { act: "第二碗喝完，锅底已经露出来。", d: 3.2,
-                cam: { kind: "insert", x: 32.2, y: 1.0, dist: 2.8 },
+                cam: CINE(32.2, 0.50, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) k.carry = null;
                 } },
               { act: "妹妹舔掉嘴角的一粒糜子，坐在炕边打盹。", d: 3.6,
-                cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.7 } },
+                cam: CINE(32.1, 0.48, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]) },
               { act: "柱子自己的碗里还剩一点稠渣。", d: 3.0,
-                cam: { kind: "insert", x: 33.2, y: 0.95, dist: 2.7 } },
+                cam: CINE(33.2, 0.48, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
             ]);
           } },
       ],
@@ -1871,14 +2014,14 @@ export function ChapterC1(K) {
             StartMicroCine(state, [
               // 先睁眼、先看碗——推那一下才不是凭空来的
               { act: "妹妹睁开眼。她先看柱子的碗，又看自己的。", d: 2.4,
-                cam: { kind: "insert", x: 32.4, y: 1.0, dist: 2.6 },
+                cam: CINE(32.4, 0.46, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = "sitStool"; k.track = null; }   // 停掉打盹的点头
                   Cue(s, "clothLift", { gain: 0.2, rate: 1.25 });
                 } },
               { act: "妹妹按住两只碗，把柱子的碗推回来。", d: 2.8,
-                cam: { kind: "insert", x: 32.6, y: 0.95, dist: 2.6 },
+                cam: CINE(32.6, 0.46, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   // 老版给的是 bow（弯腰拾东西那个造型）挂 2.8 秒——推这一下
@@ -1887,7 +2030,7 @@ export function ChapterC1(K) {
                   Cue(s, "drop", { gain: 0.35, rate: 0.9, delay: 0.6 });
                 } },
               { who: "妹妹", say: "哥，你也吃。", d: 2.6,
-                cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.5 },
+                cam: CINE(32.1, 0.44, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) k.pose = "sitStool";
@@ -1903,22 +2046,22 @@ export function ChapterC1(K) {
             if (sis) sis.track = null;
             StartMicroCine(state, [
               { act: "柱子舀一点水倒进碗里，轻轻晃匀。", d: 3.0,
-                cam: { kind: "insert", x: 33.1, y: 0.95, dist: 2.6 },
+                cam: CINE(33.1, 0.46, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   FlashPose(s, "bow", 2.8);
                   Cue(s, "waterSplash", { gain: 0.3, rate: 1.3, delay: 0.6 });
                 } },
               { who: "柱子", say: "涮锅水。", d: 2.0,
-                cam: { kind: "shot", x: 32.8, y: 1.05, dist: 3.2 },
+                cam: CINE(32.8, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = "sitStool"; k.carry = "豁口碗"; }
                   FlashPose(s, "bow", 2.0);
                 } },
               { who: "柱子", say: "别糟践了。", d: 2.2,
-                cam: { kind: "shot", x: 32.8, y: 1.05, dist: 3.2 } },
+                cam: CINE(32.8, 0.52, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]) },
               { act: "妹妹接过去，喝完。她把碗放下，眼皮已经睁不开。", d: 4.0,
-                cam: { kind: "insert", x: 32.1, y: 1.0, dist: 2.6 },
+                cam: CINE(32.1, 0.46, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   // 捧起来→仰头两口→放下（老版只是把 carry 换掉，人没动过）
@@ -1928,7 +2071,7 @@ export function ChapterC1(K) {
               // 这一行原来连 on() 都没有：字幕在演"缩肩膀、拽袖子"，人坐着一动
               // 不动 3.8 秒——而这截袖口正是全章的题眼（章末缝的就是它）
               { act: "她缩了缩肩膀，往下拉自己的袖子。袖口仍停在手腕上面。", d: 3.8,
-                cam: { kind: "insert", x: 31.9, y: 0.85, dist: 2.2 },
+                cam: CINE(31.9, 0.39, 2.90, [FG.kangLow(1.81, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.carry = null; k.pose = "sitStool"; k.track = { name: "tugSleeve", t: 0 }; }
@@ -1936,11 +2079,11 @@ export function ChapterC1(K) {
                   Cue(s, "clothLift", { gain: 0.35, rate: 1.05, delay: 2.4 });
                 } },
               { who: "妹妹", say: "哥……", d: 1.8,
-                cam: { kind: "insert", x: 32.0, y: 1.0, dist: 2.5 } },
+                cam: CINE(32.0, 0.44, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]) },
               { who: "妹妹", say: "冷。", d: 2.0,
-                cam: { kind: "insert", x: 32.0, y: 1.0, dist: 2.5 } },
+                cam: CINE(32.0, 0.44, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
               { act: "柱子将破袄向上拉，盖住她的肩膀。妹妹躺下，很快睡着。", d: 4.4,
-                cam: { kind: "shot", x: 31.4, y: 0.95, dist: 3.6 },
+                cam: CINE(31.4, 0.58, 2.91, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.x = 30.75; k.heading = -1; k.pose = "sleep"; k.track = null; }
@@ -1951,7 +2094,7 @@ export function ChapterC1(K) {
                 } },
               // 碎布贴上手腕：只够盖住一小块（这一下是下窖找布的全部理由）
               { act: "柱子从怀里取出坛口那块蓝底白花碎布。", d: 3.0,
-                cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
+                cam: CINE(31.6, 0.52, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   s.player.x = 31.9;
                   s.player.heading = -1;
@@ -1960,21 +2103,21 @@ export function ChapterC1(K) {
                 } },
               // 同一个机位：开场看过的那截手腕（首尾同框，接袖那一针的由头）
               { act: "他把碎布贴到妹妹露出的手腕旁。", d: 3.4,
-                cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+                cam: WRIST_CAM,
                 on: (s) => {
                   FlashPose(s, "kneel", 3.2);
                   Cue(s, "clothLift", { gain: 0.35, delay: 0.8 });
                 } },
               { act: "碎布只够盖住一小块。", d: 3.0,
-                cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 } },
+                cam: WRIST_CAM },
               { act: "他把碎布收回怀里。", d: 2.4,
-                cam: { kind: "shot", x: 31.8, y: 1.0, dist: 3.2 },
+                cam: CINE(31.8, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.player.carry = null;
                   FlashPose(s, "kneel", 2.2);
                 } },
               { act: "柱子看向院中的菜窖。", d: 3.0,
-                cam: { kind: "shot", x: 30.4, y: 1.15, dist: 4.0 },
+                cam: CINE(30.4, 0.65, 3.23, [FG.kangLow(2.04, 1.2, 0.22)]),
                 on: (s) => {
                   s.player.pose = null;
                   s.player.heading = -1;
@@ -2018,9 +2161,9 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "柱子掀开菜窖翻板。月光落进窖口——板缝里的光，与三天前一样。", d: 3.6,
-                cam: { kind: "insert", x: 29.6, y: UNDER_Y + 3.5, dist: 2.6 },
+                cam: CINE(29.6, UNDER_Y + 3.5 - 0.26, 2.99, [FG.jambR(1.45, 0.32, 1.0, 1.98)]),
                 on: (s) => { Cue(s, "doorCreak", { gain: 0.4, rate: 0.75 }); } },
-              { act: "", d: 2.4, cam: { kind: "shot", x: 30.4, y: UNDER_Y + 1.1, dist: 3.6 } },
+              { act: "", d: 2.4, cam: CINE(30.4, UNDER_Y + 1.1 - 0.34, 3.78, [FG.strawLow(1.83, 1.0, 0.24)]) },
             ]);
           } },
         // 笸箩：妹妹穿小了的旧褂子，一件摞一件，叠得整整齐齐。
@@ -2031,12 +2174,12 @@ export function ChapterC1(K) {
             Cue(state, "clothLift", { gain: 0.4, rate: 0.9 });
             StartMicroCine(state, [
               { act: "笸箩里叠着妹妹穿小的旧褂子。最上面一件袖口磨飞了边，也短了一截。", d: 4.2,
-                cam: { kind: "insert", x: 32.4, y: UNDER_Y + 0.55, dist: 1.9 },
+                cam: CINE(32.4, UNDER_Y + 0.55 - 0.26, 2.18, [FG.ladderL(1.05, 0.32, 0.96, 1.94)]),
                 on: (s) => { FlashPose(s, "kneel", 4.0); } },
               { act: "针别在衣领上，线还留着一段。", d: 3.0,
-                cam: { kind: "insert", x: 32.4, y: UNDER_Y + 0.5, dist: 1.5 } },
+                cam: CINE(32.4, UNDER_Y + 0.5 - 0.26, 1.72, [FG.strawLow(0.83, 1.0, 0.24)]) },
               { act: "柱子把旧褂和针线笸箩一起放到梯子旁。", d: 3.2,
-                cam: { kind: "shot", x: 31.0, y: UNDER_Y + 1.0, dist: 3.2 },
+                cam: CINE(31.0, UNDER_Y + 1.0 - 0.34, 3.36, [FG.ladderL(1.63, 0.32, 0.96, 1.94)]),
                 on: (s) => {
                   FlashPose(s, "bow", 2.8);
                   Cue(s, "drop", { gain: 0.3, rate: 0.9, delay: 1.2 });
@@ -2056,7 +2199,7 @@ export function ChapterC1(K) {
             Cue(state, "clothLift", { gain: 0.5, rate: 0.8 });
             StartMicroCine(state, [
               { act: "草苫底下，露出一块对折的布。", d: 2.8,
-                cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.0 },
+                cam: CINE(27.4, UNDER_Y + 0.5 - 0.26, 2.3, [FG.strawLow(1.12, 1.0, 0.24)]),
                 on: (s) => { FlashPose(s, "kneel", 2.6); } },
               // 光底下看清了：蓝底白花，整块，没下过剪子（活动插卡）
               { act: "蓝底白花。整块布还没有下过剪子。", d: 3.8,
@@ -2068,11 +2211,11 @@ export function ChapterC1(K) {
               { act: "两块布的花纹接在一起。", d: 3.4,
                 cam: { kind: "insertCard", card: "wholeCloth", seg: 1 } },
               { act: "柱子把碎布收回怀里。", d: 2.4,
-                cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.0 },
+                cam: CINE(27.4, UNDER_Y + 0.5 - 0.26, 2.3, [FG.ladderL(1.12, 0.32, 0.96, 1.94)]),
                 on: (s) => { Cue(s, "clothFold", { gain: 0.35, delay: 0.5 }); } },
               // 贴了一下。很快，就一下
               { act: "他抱起整布，低下头，将脸贴上去。只贴了一下。", d: 3.8,
-                cam: { kind: "insert", x: 27.7, y: UNDER_Y + 0.95, dist: 1.9 },
+                cam: CINE(27.7, UNDER_Y + 0.95 - 0.26, 2.18, [FG.strawLow(1.05, 1.0, 0.24)]),
                 on: (s) => {
                   s.player.carry = "整布";
                   // leanIn 是妹妹「把额头抵在别人肩上」那支：下巴其实是抬着的，
@@ -2085,13 +2228,13 @@ export function ChapterC1(K) {
               // 不到那儿：画面上是一只趴在地上的手，和一米开外自己举着胳膊的
               // 柱子，中间空着。接触戏那条定式（先站到一臂之内）在这一拍是硬的
               { act: "他将布抱在胸前，转身走向梯子。", d: 2.6,
-                cam: { kind: "shot", x: 28.3, y: UNDER_Y + 1.05, dist: 3.2 },
+                cam: CINE(28.3, UNDER_Y + 1.05 - 0.34, 3.36, [FG.ladderL(1.63, 0.32, 0.96, 1.94)]),
                 on: (s) => { s.player.cineWalk = { x: 28.6, speed: 1.0 }; } },
               // 草苫先动。人还没露出来——这一格里草堆是自己抖的（state.matStir，
               // World 把那一垛真晃 1.2 秒），光同时压到 tunnel 档：
               // 「从黑暗里伸出来」得先有黑
               { act: "草苫下面忽然动了一下。", d: 2.4,
-                cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.4, dist: 1.8 },
+                cam: CINE(27.5, UNDER_Y + 0.4 - 0.26, 2.07, [FG.strawLow(1.0, 1.0, 0.24)]),
                 on: (s) => {
                   s.player.cineWalk = null;
                   s.player.x = 28.6;
@@ -2105,7 +2248,7 @@ export function ChapterC1(K) {
               // 探出来的手够到 28.10/离地 0.53；柱子蹲在 28.6 时前手正落在
               // 28.10/离地 0.56——两只手在同一个点上，这一镜才是"攥住"
               { act: "柱子放下布，蹲下去。", d: 2.2,
-                cam: { kind: "shot", x: 28.3, y: UNDER_Y + 0.7, dist: 2.6 },
+                cam: CINE(28.3, UNDER_Y + 0.7 - 0.34, 2.73, [FG.ladderL(1.32, 0.32, 0.96, 1.94)]),
                 on: (s) => {
                   s.player.carry = null;
                   // 整布这会儿才撂在草苫旁（wholeClothRest 认 manFound 这面旗）——
@@ -2118,7 +2261,7 @@ export function ChapterC1(K) {
               // 一张静帧贴图）。他从草苫底下把胳膊探出来攥住柱子的手腕，
               // 柱子那条被攥住的胳膊被拽得往前一沉——两条轨道对在同一个落点上
               { act: "一只手从草苫底下伸出来，攥住柱子的手腕。柱子猛地僵住。", d: 3.2,
-                cam: { kind: "insert", x: 28.15, y: UNDER_Y + 0.5, dist: 1.7 },
+                cam: CINE(28.15, UNDER_Y + 0.5 - 0.26, 1.95, [FG.strawLow(0.95, 1.0, 0.24)]),
                 on: (s) => {
                   const w = FindActor(s, "wounded");
                   if (w) {
@@ -2132,7 +2275,7 @@ export function ChapterC1(K) {
                   Cue(s, "pickup", { gain: 0.6, rate: 0.5 });
                 } },
               { act: "那只手攥得很紧。草底下传来一口短促的喘息。", d: 3.0,
-                cam: { kind: "insert", x: 28.1, y: UNDER_Y + 0.45, dist: 1.6 },
+                cam: CINE(28.1, UNDER_Y + 0.45 - 0.26, 1.84, [FG.ladderL(0.89, 0.32, 0.96, 1.94)]),
                 on: (s) => { Cue(s, "sobBreath", { gain: 0.3, rate: 0.6, delay: 0.8 }); } },
               // 说话的人得在画面里。骨架在窖底给不出一张脸（整具转 90°、
               // 脑袋二十来个像素），所以这两行走手绘活卡——同"整幅蓝布"那一族
@@ -2142,7 +2285,7 @@ export function ChapterC1(K) {
                 cam: { kind: "insertCard", card: "strangerFace", seg: 1 } },
               // 慢慢抽回手：他的胳膊落回草里（strawSink），柱子才站起来
               { act: "那只手松开，落回草里。柱子慢慢站起来。整块蓝布留在草苫旁。", d: 3.4,
-                cam: { kind: "shot", x: 28.4, y: UNDER_Y + 0.95, dist: 3.0 },
+                cam: CINE(28.4, UNDER_Y + 0.95 - 0.34, 3.15, [FG.strawLow(1.52, 1.0, 0.24)]),
                 on: (s) => {
                   s.player.track = null;
                   s.player.carry = null;
@@ -2166,10 +2309,18 @@ export function ChapterC1(K) {
       kind: "cinematic", id: "c1_knows", timeOfDay: "night", indoorScene: true,
       lines: [
         { act: "柱子爬出菜窖，没有盖翻板。三步外站着妹妹。", d: 3.6,
-          cam: { kind: "shot", x: 29.6, y: 1.15, dist: 3.8 },
+          // 分镜 37：翻板撑起来立在画一侧、洞口黑在脚下，柱子从洞里出来、
+          // 妹妹抱着破袄站在三步外。**窖口在 x=29.0**（Data_Scenes.json 的
+          // `hatch`），老版这几镜一直照 29.4 拍，差着大半个板宽
+          cam: CINE(28.70, 0.48, 4.30, [{ art: "hatchLip", u: 0.42, v: -0.90, z: 2.71, w: 1.7, h: 0.38, dim: 1.86 }]),
           on: (state) => {
+            // 板得真的敞着——这一拍原来一句 state.lid 都没有，于是「没有盖翻板」
+            // 只在字幕上成立
+            state.flags.lidShut = false;
+            state.lid = { id: "cellarHatch", open: 1, to: 1, rate: 1.5 };
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 28.2; sis.heading = 1; sis.pose = null; sis.carry = "破袄子"; }
+            // lift 归零：§4 托她画正字时立的 0.52 会一路挂到这儿（同 §7 那条）
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.lift = 0; sis.x = 28.2; sis.heading = 1; sis.pose = null; sis.carry = "破袄子"; }
             state.player.level = "surface";
             state.player.x = 29.8;
             state.player.heading = -1;
@@ -2177,28 +2328,34 @@ export function ChapterC1(K) {
         // 机位抬到上身：骨架的鞋画不出赤脚，脚入画就跟字幕打架——
         // 「光着脚」交给句子，镜头看她抱着袄子的小身量（两轮视觉审查定的）
         { act: "她赤着脚，怀里抱着破袄。头发乱着，眼睛还没有完全睁开。", d: 4.0,
-          cam: { kind: "insert", x: 27.9, y: 1.05, dist: 2.2 },
+          cam: CINE(27.95, 0.56, 3.20, [FG.jambL(1.80, 0.58, 1.00, 2.09)]),
           on: (state) => {
             const sis = FindActor(state, "sister");
             if (sis) { sis.x = 27.9; sis.pose = "leanIn"; }
           } },
         { who: "妹妹", say: "哥。", d: 2.0,
-          cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.6 } },
+          cam: CINE(27.95, 0.37, 2.90, [FG.jambL(1.66, 0.28, 0.90, 2.09)]) },
         { act: "柱子停住。", d: 2.0,
-          cam: { kind: "close", on: "player", dist: 3.2 } },
+          cam: CINE(29.78, 0.39, 2.90, [{ art: "hatchLip", u: 0, v: -0.84, z: 1.68, w: 1.1, h: 0.30, dim: 1.94 }]) },
         { who: "妹妹", say: "我喊你了。", d: 2.4,
-          cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
-        { act: "", d: 1.4, cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
+          cam: CINE(27.95, 0.56, 3.20, [FG.jambL(1.80, 0.58, 1.00, 2.09)]) },
+        { act: "", d: 1.4, cam: CINE(27.95, 0.56, 3.20, [FG.jambL(1.80, 0.58, 1.00, 2.09)]) },
         { who: "妹妹", say: "可大声了。", d: 2.4,
-          cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.4 } },
+          cam: CINE(27.95, 0.56, 3.20, [FG.jambL(1.80, 0.58, 1.00, 2.09)]) },
         { act: "她的脚趾在冷土里一下下抓紧。", d: 3.0,
-          cam: { kind: "insert", x: 27.9, y: 1.05, dist: 2.2 } },
+          cam: CINE(27.95, 0.26, 2.90, [FG.jambL(1.66, 0.22, 0.70, 2.09)]) },
         // 双人镜别用过肩：窖口这一对离得近、又一高一矮，过肩的前景剪影
         // 立不住（二轮审查：柱子整个不在框里）——平拍双人，两人都在画里
         { who: "妹妹", say: "我当你也走了。", d: 3.2,
-          cam: { kind: "shot", x: 28.6, y: 1.05, dist: 2.9 } },
+          cam: CINE(28.85, 0.62, 4.20, [{ art: "hatchLip", u: 0.40, v: -0.88, z: 2.65, w: 1.6, h: 0.34, dim: 1.86 }]),
+          on: (state) => {
+            // 分镜 39 两个人挨得很近（一臂之内）。老版隔着 1.6m，正中 40% 是空墙
+            const sis = FindActor(state, "sister");
+            if (sis) { sis.x = 28.55; sis.heading = 1; }
+            state.player.x = 29.55;
+          } },
         { act: "柱子张了张嘴，没有立刻出声。", d: 2.6,
-          cam: { kind: "close", on: "player", dist: 3.0 } },
+          cam: CINE(29.76, 0.36, 2.90, [{ art: "hatchLip", u: 0, v: -0.84, z: 1.67, w: 1.1, h: 0.30, dim: 1.94 }]) },
       ],
     },
     {
@@ -2218,33 +2375,33 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { who: "柱子", say: "没走。", d: 2.2,
-                cam: { kind: "close", on: "player", dist: 3.0 } },
+                cam: { kind: "close", on: "player", dist: 3.0, fg: [FG.jambL(1.6, 0.30, 0.94, 2.02)] } },
               { act: "柱子向妹妹走近一步。", d: 2.2,
-                cam: { kind: "shot", x: 29.0, y: 1.1, dist: 3.4 },
+                cam: CINE(29.0, 0.55, 2.90, [FG.jambR(1.82, 0.32, 1.0, 1.98)]),
                 on: (s) => { s.player.cineWalk = { x: 29.0, speed: 1.2 }; } },
               { who: "柱子", say: "我去拿水。", d: 2.2,
-                cam: { kind: "shot", x: 28.8, y: 1.1, dist: 3.2 },
+                cam: CINE(28.8, 0.52, 2.90, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => { s.player.cineWalk = null; s.player.x = 29.0; s.player.heading = -1; } },
               { who: "柱子", say: "你回屋。", d: 2.0,
-                cam: { kind: "shot", x: 28.8, y: 1.1, dist: 3.2 } },
+                cam: CINE(28.8, 0.52, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]) },
               { act: "妹妹看着他。", d: 2.2,
-                cam: { kind: "insert", x: 27.9, y: 1.0, dist: 2.5 } },
+                cam: CINE(27.9, 0.44, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
               // 八稿新增的一下：柱子替她把破袄向上拉了拉
               { act: "柱子替她把破袄向上拉了拉。", d: 3.0,
-                cam: { kind: "shot", x: 28.5, y: 1.0, dist: 2.9 },
+                cam: CINE(28.5, 0.47, 2.90, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => {
                   s.player.x = 28.6;
                   FlashPose(s, "kneel", 2.8);
                   Cue(s, "clothLift", { gain: 0.35, delay: 0.6 });
                 } },
               { act: "妹妹转身进屋。走到门口时，她回头看了一眼。", d: 4.2,
-                cam: { kind: "shot", x: 29.6, y: 1.15, dist: 3.8 },
+                cam: CINE(29.6, 0.61, 3.07, [FG.kangLow(1.93, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = null; k.carry = null; k.cineTarget = { x: 31.4 }; k.cineSpeed = 1.3; k.heading = 1; }
                 } },
               { act: "她没有把门关严，留下了一条缝。", d: 3.2,
-                cam: { kind: "shot", x: 31.8, y: 1.1, dist: 3.6 },
+                cam: CINE(31.8, 0.58, 2.91, [FG.jambR(1.83, 0.32, 1.0, 1.98)]),
                 on: (s) => { Cue(s, "doorCreak", { gain: 0.3, rate: 0.85, delay: 1.4 }); } },
             ]);
           } },
@@ -2325,7 +2482,7 @@ export function ChapterC1(K) {
           effect: (state) => {
             StartMicroCine(state, [
               { act: "柱子端着瓢摸到墙边。他蹲下，顺着墙根摸到那个人的肩膀。", d: 4.0,
-                cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.6, dist: 2.2 },
+                cam: CINE(27.6, UNDER_Y + 0.6 - 0.26, 2.53, [FG.strawLow(1.22, 1.0, 0.24)]),
                 on: (s) => {
                   s.player.cineWalk = null;
                   s.player.x = 28.0;
@@ -2348,32 +2505,32 @@ export function ChapterC1(K) {
             state.player.item = null;
             StartMicroCine(state, [
               { act: "瓢里的水喝完了，那只手仍抓着瓢沿。柱子慢慢把瓢抽出来。", d: 3.8,
-                cam: { kind: "insert", x: 27.7, y: UNDER_Y + 0.55, dist: 1.9 },
+                cam: CINE(27.7, UNDER_Y + 0.55 - 0.26, 2.18, [FG.ladderL(1.05, 0.32, 0.96, 1.94)]),
                 on: (s) => {
                   FlashPose(s, "kneel", 3.6);
                   Cue(s, "drop", { gain: 0.25, rate: 0.8, delay: 1.8 });
                 } },
               { act: "伤员倒回草苫上。他的呼吸又快又浅。", d: 3.4,
-                cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.5, dist: 2.1 },
+                cam: CINE(27.4, UNDER_Y + 0.5 - 0.26, 2.42, [FG.strawLow(1.17, 1.0, 0.24)]),
                 on: (s) => { Cue(s, "sobBreath", { gain: 0.4, rate: 1.3, delay: 0.8 }); } },
               { act: "柱子伸手摸向他的肩膀。手指碰到一片湿黏。", d: 3.8,
-                cam: { kind: "insert", x: 27.6, y: UNDER_Y + 0.55, dist: 1.8 },
+                cam: CINE(27.6, UNDER_Y + 0.55 - 0.26, 2.07, [FG.ladderL(1.0, 0.32, 0.96, 1.94)]),
                 on: (s) => { FlashPose(s, "kneel", 3.6); } },
               { act: "他抬起手。月光从板缝照下来——指尖是一片暗色。", d: 4.0,
-                cam: { kind: "insert", x: 27.9, y: UNDER_Y + 0.85, dist: 1.6 } },
+                cam: CINE(27.9, UNDER_Y + 0.85 - 0.26, 1.84, [FG.strawLow(0.89, 1.0, 0.24)]) },
               { act: "柱子取出怀里的蓝花碎布，按在伤口上。", d: 3.4,
-                cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.9 },
+                cam: CINE(27.5, UNDER_Y + 0.55 - 0.26, 2.18, [FG.ladderL(1.05, 0.32, 0.96, 1.94)]),
                 on: (s) => {
                   FlashPose(s, "kneel", 3.2);
                   Cue(s, "clothLift", { gain: 0.4, rate: 0.9, delay: 0.6 });
                 } },
               { act: "暗色很快浸透碎布，沿着指缝继续渗出来。", d: 3.6,
-                cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.7 } },
+                cam: CINE(27.5, UNDER_Y + 0.55 - 0.26, 1.95, [FG.strawLow(0.95, 1.0, 0.24)]) },
               { act: "柱子加重力气。仍然压不住。", d: 3.0,
-                cam: { kind: "shot", x: 27.9, y: UNDER_Y + 0.85, dist: 2.7 },
+                cam: CINE(27.9, UNDER_Y + 0.85 - 0.34, 2.84, [FG.ladderL(1.38, 0.32, 0.96, 1.94)]),
                 on: (s) => { FlashPose(s, "kneel", 2.8); } },
               { act: "草苫旁放着那块完整的蓝底白花布。", d: 3.0,
-                cam: { kind: "insert", x: 27.9, y: UNDER_Y + 0.5, dist: 2.0 } },
+                cam: CINE(27.9, UNDER_Y + 0.5 - 0.26, 2.3, [FG.strawLow(1.12, 1.0, 0.24)]) },
             ]);
           } },
         // ② 撕开蓝布（活卡）：抓住布的一角，沿横向拖动——
@@ -2383,7 +2540,7 @@ export function ChapterC1(K) {
             state.flags.clothTorn = true;
             StartMicroCine(state, [
               { act: "撕裂声在菜窖里响开。一条长布从整块布上分离下来。", d: 3.2,
-                cam: { kind: "insert", x: 28.0, y: UNDER_Y + 0.7, dist: 2.0 },
+                cam: CINE(28.0, UNDER_Y + 0.7 - 0.26, 2.3, [FG.ladderL(1.12, 0.32, 0.96, 1.94)]),
                 on: (s) => { FlashPose(s, "bow", 3.0); } },
             ]);
           } },
@@ -2402,7 +2559,7 @@ export function ChapterC1(K) {
             if (w) w.bandage = true;   // 肩上那圈蓝花布（渲染层认这面小旗）
             StartMicroCine(state, [
               { act: "伤员突然疼醒，肩膀猛地抬起，喉咙里挤出一声闷哼。", d: 3.2,
-                cam: { kind: "insert", x: 27.5, y: UNDER_Y + 0.55, dist: 1.9 },
+                cam: CINE(27.5, UNDER_Y + 0.55 - 0.26, 2.18, [FG.strawLow(1.05, 1.0, 0.24)]),
                 on: (s) => {
                   Cue(s, "sobBreath", { gain: 0.55, rate: 0.7, delay: 0.4 });
                   const w2 = FindActor(s, "wounded");
@@ -2424,19 +2581,19 @@ export function ChapterC1(K) {
             if (w) { w.track = null; w.trembleK = 0; }
             StartMicroCine(state, [
               { act: "伤员的力气逐渐松下来。呼吸慢了一些。柱子没有立刻松手。", d: 4.4,
-                cam: { kind: "shot", x: 27.9, y: UNDER_Y + 0.85, dist: 2.7 },
+                cam: CINE(27.9, UNDER_Y + 0.85 - 0.34, 2.84, [FG.ladderL(1.38, 0.32, 0.96, 1.94)]),
                 on: (s) => { FlashPose(s, "shelter", 4.2); } },
               { act: "等伤员彻底不再挣动，柱子靠墙坐下。", d: 3.6,
-                cam: { kind: "shot", x: 28.8, y: UNDER_Y + 0.95, dist: 3.2 },
+                cam: CINE(28.8, UNDER_Y + 0.95 - 0.34, 3.36, [FG.strawLow(1.63, 1.0, 0.24)]),
                 on: (s) => {
                   s.player.x = 29.4;
                   s.player.heading = -1;
                   s.player.pose = "sitSide";
                 } },
               { act: "他手里仍攥着撕剩的一小条蓝布。", d: 3.2,
-                cam: { kind: "insert", x: 29.3, y: UNDER_Y + 0.6, dist: 1.7 } },
+                cam: CINE(29.3, UNDER_Y + 0.6 - 0.26, 1.95, [FG.ladderL(0.95, 0.32, 0.96, 1.94)]) },
               { act: "菜窖里只剩两个人的呼吸声。", d: 3.6,
-                cam: { kind: "shot", x: 28.6, y: UNDER_Y + 0.95, dist: 3.4 },
+                cam: CINE(28.6, UNDER_Y + 0.95 - 0.34, 3.57, [FG.strawLow(1.73, 1.0, 0.24)]),
                 on: (s) => {
                   Cue(s, "sobBreath", { gain: 0.16, rate: 0.65, delay: 1.2 });
                 } },
@@ -2453,7 +2610,8 @@ export function ChapterC1(K) {
       kind: "cinematic", id: "c1_mend", timeOfDay: "dawn",
       lines: [
         { act: "板缝里的光从黑变成青灰。柱子睁开眼。", d: 4.6,
-          cam: { kind: "shot", x: 29.2, y: UNDER_Y + 1.0, dist: 3.6 },
+          // 分镜 46：坐着的柱子占可见画高七成半。坐高 0.78m ⇒ 画宽 2.55m
+          cam: CINE(29.20, UNDER_Y + 0.40, 2.55, [FG.ladderL(1.60, 0.30, 0.92, 1.98)]),
           on: (state) => {
             // 布景（cinematic 不跑 onStart）：伤员裹着蓝花布睡在草苫上，
             // 妹妹在楼上睡；晨光走 hatchMoon 那几条
@@ -2468,11 +2626,11 @@ export function ChapterC1(K) {
             state.player.pose = "sitSide";
           } },
         { act: "伤员躺在草苫上，肩上的蓝花布仍然扎着。胸口缓慢起伏。", d: 4.2,
-          cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.55, dist: 2.1 } },
+          cam: CINE(27.40, UNDER_Y + 0.34, 2.90, [FG.strawLow(1.70, 1.0, 0.26)]) },
         { act: "柱子低头看向自己的手。手里还攥着最后一条蓝布。", d: 3.8,
-          cam: { kind: "insert", x: 29.3, y: UNDER_Y + 0.6, dist: 1.7 } },
+          cam: CINE(29.32, UNDER_Y + 0.26, 2.90, [FG.ladderL(1.70, 0.22, 0.62, 2.02)]) },
         { act: "他拿起梯子旁妹妹去年的旧褂子和针线。", d: 3.6,
-          cam: { kind: "insert", x: 29.8, y: UNDER_Y + 0.55, dist: 2.0 },
+          cam: CINE(29.72, UNDER_Y + 0.30, 2.30, [FG.ladderL(1.40, 0.46, 0.86, 1.98)]),
           on: (state) => {
             state.player.pose = null;
             state.player.x = 29.8;
@@ -2481,7 +2639,8 @@ export function ChapterC1(K) {
             Cue(state, "clothLift", { gain: 0.4, rate: 0.9, delay: 1.0 });
           } },
         { act: "柱子爬到窖口，坐在最上一级梯子上。", d: 3.6,
-          cam: { kind: "shot", x: 29.4, y: 1.05, dist: 3.2 },
+          // 窖口在 x=29.0（Data_Scenes.json 的 hatch），这几镜一直照 29.4 拍
+          cam: CINE(29.08, 0.46, 3.20, [{ art: "hatchLip", u: 0.12, v: -0.90, z: 2.01, w: 1.5, h: 0.34, dim: 1.86 }]),
           on: (state) => {
             state.player.level = "surface";
             state.player.x = 29.4;
@@ -2517,7 +2676,7 @@ export function ChapterC1(K) {
             state.player.carry = null;
             StartMicroCine(state, [
               { act: "柱子把衣裳提起来。", d: 2.6,
-                cam: { kind: "shot", x: 29.4, y: 1.1, dist: 3.0 },
+                cam: CINE(29.4, 0.49, 2.90, [FG.jambR(1.81, 0.32, 1.0, 1.98)]),
                 on: (s) => { s.player.carry = "小褂子"; } },
               // 接得歪。两只袖子不一样长。（活动插卡：举起来对着晨光看的
               // 那件小褂子——袖口接着一截蓝底白花）
@@ -2535,12 +2694,15 @@ export function ChapterC1(K) {
       // 妹妹睁开眼：「哥？」
       kind: "cinematic", id: "c1_home", timeOfDay: "dawn",
       lines: [
-        { act: "柱子走进屋。妹妹仍缩在炕上。", d: 3.6,
-          cam: { kind: "shot", x: 32.0, y: 1.05, dist: 3.8 },
+        { act: "柱子走进屋。妹妹醒着，坐在炕上。", d: 3.6,
+          cam: CINE(32.05, 0.42, 4.60, [FG.jambR(2.90, 0.82, 1.20, 1.94)]),
           on: (state) => {
             state.beat.indoorScene = true;
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
+            // **坐着，不是躺着**（Notion 镜 50「她醒着坐炕上」）。老版一路 sleep，
+            // 于是 51/52 那两格「面对面把袄子递过去」在实机里成了「对着一个
+            // 横躺的人比划」。lift 一并清掉（同 §7 那条）
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.lift = 0; sis.x = 31.05; sis.heading = 1; sis.pose = "kneel"; sis.track = null; }
             state.player.level = "surface";
             state.player.pose = null;
             state.player.carry = "小褂子";
@@ -2548,22 +2710,23 @@ export function ChapterC1(K) {
             Cue(state, "doorCreak", { gain: 0.3, rate: 0.9 });
           } },
         { act: "柱子坐到炕边，轻轻扶起她的胳膊，将旧褂套在她身上。", d: 4.4,
-          cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
+          // 分镜 51：两人面对面、不到一臂，褂子撑在两人正中
+          cam: CINE(31.55, 0.44, 3.60, [FG.jambR(2.27, 0.66, 1.04, 1.98)]),
           on: (state) => {
             state.player.cineWalk = null;
-            state.player.x = 32.2;
+            state.player.x = 31.95;
             state.player.heading = -1;
             FlashPose(state, "kneel", 4.2);
             Cue(state, "clothLift", { gain: 0.4, delay: 1.2 });
           } },
         { act: "妹妹迷迷糊糊地伸进一只手。", d: 3.0,
-          cam: { kind: "insert", x: 30.78, y: 0.75, dist: 2.2 },
+          cam: CINE(31.05, 0.32, 2.90, [FG.jambL(1.67, 0.24, 0.78, 2.02)]),
           on: (state) => { FlashPose(state, "kneel", 3.0); } },
         // 同一个机位第三次：那截手腕——这回被蓝花袖口盖住了。
         // jacketOn 落在这一行：袖口那块蓝花（World 的 cuffMesh）就是这句话的
         // 画面，落到下一拍才立的话，这一镜里手腕还是光的
         { act: "蓝花袖口滑下来，盖住她的手腕。", d: 3.8,
-          cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+          cam: WRIST_CAM,
           on: (state) => {
             state.flags.jacketOn = true;
             state.player.carry = null;      // 褂子上了身，手里那件收掉
@@ -2571,19 +2734,20 @@ export function ChapterC1(K) {
             Cue(state, "clothDrop", { gain: 0.3, rate: 1.1, delay: 0.8 });
           } },
         { act: "柱子又替她穿上另一边，把衣襟掖好。", d: 3.8,
-          cam: { kind: "shot", x: 31.6, y: 0.95, dist: 3.2 },
+          cam: CINE(31.55, 0.44, 3.40, [FG.jambR(2.14, 0.62, 1.02, 1.98)]),
           on: (state) => {
             state.player.carry = null;
             FlashPose(state, "kneel", 3.6);
           } },
         { act: "妹妹睁开眼。", d: 2.4,
-          cam: { kind: "insert", x: 31.2, y: 0.8, dist: 2.2 },
+          // 分镜 52：她坐着低头摸袖口，占可见画高六成 ⇒ 画宽 3.0m
+          cam: CINE(31.32, 0.62, 3.40, [FG.jambL(1.92, 0.62, 1.05, 2.02)]),
           on: (state) => {
             const sis = FindActor(state, "sister");
             if (sis) { sis.pose = "kneel"; sis.x = 31.2; sis.heading = 1; }
           } },
         { who: "妹妹", say: "哥？", d: 2.2,
-          cam: { kind: "insert", x: 31.2, y: 0.9, dist: 2.2 } },
+          cam: CINE(31.32, 0.62, 3.40, [FG.jambL(1.92, 0.62, 1.05, 2.02)]) },
       ],
     },
     {
@@ -2605,12 +2769,12 @@ export function ChapterC1(K) {
             state.flags.jacketOn = true;
             StartMicroCine(state, [
               { who: "柱子", say: "我在。", d: 2.4,
-                cam: { kind: "close", on: "player", dist: 3.0 } },
+                cam: { kind: "close", on: "player", dist: 3.0, fg: [FG.jambR(1.6, 0.30, 0.94, 2.02)] } },
               { act: "妹妹的手从被子里伸出来，攥住新接的蓝花袖口。", d: 4.0,
-                cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+                cam: WRIST_CAM,
                 on: (s) => { Cue(s, "clothLift", { gain: 0.3, rate: 1.05, delay: 1.0 }); } },
               { act: "柱子替她盖好破袄，起身走出屋门。", d: 3.8,
-                cam: { kind: "shot", x: 32.2, y: 1.05, dist: 3.6 },
+                cam: CINE(32.2, 0.58, 2.91, [FG.kangLow(1.83, 1.2, 0.22)]),
                 on: (s) => {
                   const k = FindActor(s, "sister");
                   if (k) { k.pose = "sleep"; k.x = 30.75; k.heading = -1; }
@@ -2631,10 +2795,13 @@ export function ChapterC1(K) {
       kind: "cinematic", id: "c1_end", timeOfDay: "dawn",
       lines: [
         { act: "妹妹侧过脸。从没有关严的屋门，可以看见柱子走到菜窖旁。", d: 4.4,
-          cam: { kind: "shot", x: 30.8, y: 1.1, dist: 4.2 },
+          // 分镜 56：越过近处的妹妹看画那头的窖口——**那块板得在画里**，
+          // 不然「看见柱子走到菜窖旁」这句话没有宾语
+          cam: CINE(29.85, 0.40, 4.40, [FG.jambR(2.77, 0.80, 1.18, 2.02)]),
           on: (state) => {
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 30.75; sis.heading = 1; sis.pose = "sleep"; }
+            // 章末她仍旧坐在炕上（同 §14 上半那条），lift 一并清掉
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.lift = 0; sis.x = 31.05; sis.heading = -1; sis.pose = "kneel"; sis.track = null; }
             const w = FindActor(state, "wounded");
             if (w) { w.visible = true; w.level = "under"; w.x = 27.1; w.heading = -1; w.pose = "sleep"; w.bandage = true; }
             state.player.level = "surface";
@@ -2642,10 +2809,14 @@ export function ChapterC1(K) {
             state.player.cineWalk = { x: 29.4, speed: 1.1 };
           } },
         { act: "柱子掀开翻板。他没有将翻板完全打开，只留下半尺宽的缝。", d: 4.2,
-          cam: { kind: "shot", x: 29.4, y: 1.05, dist: 3.4 },
+          // 注视点压到板面高度上：这一格看的是那道缝，不是人
+          cam: CINE(29.10, 0.58, 3.40, [{ art: "hatchLip", u: 0.14, v: -0.92, z: 2.14, w: 1.6, h: 0.36, dim: 1.86 }]),
           on: (state) => {
             state.player.cineWalk = null;
-            state.player.x = 29.4;
+            state.player.x = 29.65;
+            // 板真的先掀起来、再落回半尺宽的一道缝（老版只拨旗标，画面上
+            // 那块板从头到尾没动过）
+            state.lid = { id: "cellarHatch", open: 1, to: 0.34, rate: 0.5, delay: 1.4 };
             state.player.heading = -1;
             state.flags.lidShut = true;
             state.hatchMoon = true;
@@ -2653,7 +2824,7 @@ export function ChapterC1(K) {
             Cue(state, "doorCreak", { gain: 0.4, rate: 0.75, delay: 1.0 });
           } },
         { act: "柱子重新下到菜窖里，坐到伤员旁边。", d: 3.8,
-          cam: { kind: "shot", x: 28.8, y: UNDER_Y + 1.0, dist: 3.2 },
+          cam: CINE(28.70, UNDER_Y + 0.58, 2.93, [FG.ladderL(1.81, 0.34, 0.98, 1.94)]),
           on: (state) => {
             state.player.level = "under";
             state.player.x = 28.6;
@@ -2665,16 +2836,18 @@ export function ChapterC1(K) {
         // **indoorScene 必须开着**：不开的话立面盖着屋里，炕上那个人整个看不见
         // （八稿这一镜的题眼正是"同框"）
         { act: "地面上，妹妹的手腕被蓝花袖口盖住。", d: 3.4,
-          cam: { kind: "insert", x: 30.72, y: 0.62, dist: 1.9 },
+          cam: WRIST_CAM,
           on: (state) => { state.beat.indoorScene = true; } },
         { act: "地下，伤员肩上缠着同样的蓝花布。胸口仍在起伏。", d: 3.6,
-          cam: { kind: "insert", x: 27.4, y: UNDER_Y + 0.55, dist: 2.1 },
+          cam: CINE(27.40, UNDER_Y + 0.34, 2.90, [FG.strawLow(1.70, 1.0, 0.26)]),
           on: (state) => { state.beat.indoorScene = true; } },
         { act: "屋门和菜窖翻板，都留着一道缝。", d: 4.4,
-          cam: { kind: "shot", x: 30.2, y: 0.55, dist: 7.6 },
+          // **不许再退**：注视点一压低，近侧地道剖面就整个涨进画框，下四成糊成
+          // 一片土（CLAUDE.md 那条）。画宽封在 6.6m、注视点抬到 0.85m
+          cam: CINE(30.05, 0.55, 4.30, [FG.jambR(2.71, 0.78, 1.16, 2.02)]),
           on: (state) => { state.beat.indoorScene = true; } },
         { act: "没有音乐。风从村街上吹过。", d: 4.0,
-          cam: { kind: "shot", x: 30.2, y: 0.55, dist: 8.4 },
+          cam: CINE(30.05, 0.55, 4.60, [FG.jambR(2.90, 0.82, 1.20, 2.02)]),
           on: (state) => {
             state.beat.indoorScene = true;
             state.wind = { t: 0, dur: 3.4, x: 26, dir: 1 };

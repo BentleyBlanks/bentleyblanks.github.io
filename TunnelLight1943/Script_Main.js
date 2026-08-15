@@ -579,11 +579,17 @@ function UpdateCamera(state, dt) {
     const fgAspect = shot.split
       ? Math.max(0.2, (world.viewSize.w / world.viewSize.h) * (1 - shot.split.gap) / 2)
       : (world.viewSize.w / world.viewSize.h);
-    world.SetCineFore(
-      shot.card ? null : (hint.fg || null),
-      shot.split || (shot.free ? { left: shot.free } : null),
-      fgAspect, fp,
-    );
+    // 框景的 u/v 要按"这一格的画框"折算，而折算要一台相机。老版只在
+    // `free`/`split` 两档给得出（那两档 hint 里本来就写着机位），别的一律传 null
+    // ——而 `ForePlace` 见 cam 为空就**把 u/v 当世界坐标用**，板子直接飞到
+    // 村东头去。于是"给 insert/shot/close/ots 那几镜加块框景"这件事，写了也是白写
+    // （2026-08-16 照分镜图重排第一章时撞上的：分镜**每一张**都有一块压得很暗、
+    // 被画框切掉的近景，而全章的过场当时一块都没有）。
+    // 定点镜的机位是反推得出来的：FOV 30° 下 半宽 = 0.4765 × 机距。
+    const foreCam = shot.split || (shot.free ? { left: shot.free } : {
+      left: { px: shot.x, py: shot.y, pz: Math.max(0.3, shot.hw / 0.4765), tx: shot.x, ty: shot.y, tz: 0 },
+    });
+    world.SetCineFore(shot.card ? null : (hint.fg || null), foreCam, fgAspect, fp);
     world.SetSplitShot(shot.split || null);
   } else {
     // 玩法段一般是跟随。但个别节拍自己指定了构图——划线要推到门框上，
