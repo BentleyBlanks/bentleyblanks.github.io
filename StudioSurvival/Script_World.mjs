@@ -9,7 +9,7 @@ import {
   WorldBounds,
   WorldConfig,
   WorldData,
-} from "./Data_World.mjs?v=20260815av";
+} from "./Data_World.mjs?v=20260815aw";
 
 const Epsilon = 1e-7;
 const FixedStep = 1 / 60;

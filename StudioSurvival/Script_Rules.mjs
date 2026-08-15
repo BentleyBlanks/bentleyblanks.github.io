@@ -32,7 +32,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815av";
+} from "./Data_Game.mjs?v=20260815aw";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -46,8 +46,11 @@ export const WORKSTATION_COSTS = Object.freeze([18000, 26000, 36000, 50000]);
 export const STOCK_ACCOUNT_UNLOCK_CASH = 100000;
 export const STOCK_BUY_STEP = 1000;
 export const MARKET_INDEPENDENT_ID = "independent";
+export const OWNER_BASE_ENERGY = 3;
+export const OWNER_RELAXATION_ENERGY_BONUS = 1;
 export const OWNER_TASK_ANXIETY_COSTS = Object.freeze([1, 2, 5]);
 export const OWNER_REST_RELIEF_PER_UNUSED_ENERGY = 3;
+export const COMPUTER_GAME_ANXIETY_RELIEF = 5;
 
 export function GetOwnerHairAmount(anxietyValue) {
   const anxiety = Clamp(Number(anxietyValue) || 0, 0, 100);
@@ -70,9 +73,23 @@ export function GetOwnerTaskAnxietyCost(completedTaskCount) {
   return OWNER_TASK_ANXIETY_COSTS[taskIndex];
 }
 
+export function GetOwnerEnergyBonus(currentState) {
+  if (!currentState || currentState.lastRelaxationMonth !== currentState.month) return 0;
+  const relaxationHistory = Array.isArray(currentState.relaxationHistory) ? currentState.relaxationHistory : [];
+  const currentVisit = [...relaxationHistory]
+    .reverse()
+    .find((entry) => entry?.month === currentState.month);
+  const venue = currentVisit ? FindConsumerVenue(currentVisit.venueId) : null;
+  return Clamp(Number(venue?.ownerEnergyBonus) || OWNER_RELAXATION_ENERGY_BONUS, 0, OWNER_RELAXATION_ENERGY_BONUS);
+}
+
+export function GetOwnerEnergyLimit(currentState) {
+  return OWNER_BASE_ENERGY + GetOwnerEnergyBonus(currentState);
+}
+
 export function GetOwnerRestRelief(completedTaskCount) {
-  const completed = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_TASK_ANXIETY_COSTS.length);
-  return (OWNER_TASK_ANXIETY_COSTS.length - completed) * OWNER_REST_RELIEF_PER_UNUSED_ENERGY;
+  const completed = Clamp(Math.floor(Number(completedTaskCount) || 0), 0, OWNER_BASE_ENERGY);
+  return (OWNER_BASE_ENERGY - completed) * OWNER_REST_RELIEF_PER_UNUSED_ENERGY;
 }
 
 export const FOUNDER_SKILL_POINTS = 9;
@@ -427,6 +444,7 @@ export function CreateInitialState() {
     month: 1,
     ownerWorkMonth: 1,
     ownerWorkCount: 0,
+    ownerWorkHistory: [],
     anxietyAtMonthStart: 18,
     revenueGoal: 10000000000,
     gameRevenue: 0,
@@ -473,6 +491,7 @@ export function CreateInitialState() {
     stockHistory: [],
     lastRelaxationMonth: 0,
     relaxationHistory: [],
+    lastComputerGameMonth: 0,
   };
 }
 
@@ -487,6 +506,8 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   state.anxietyAtMonthStart = state.anxiety;
   state.studioName = studioName;
   state.founderSkills = NormalizeFounderSkills(identity.founderSkills || state.founderSkills);
+  state.ownerWorkHistory = [];
+  state.lastComputerGameMonth ??= 0;
   state.startupLoan ||= {
     principal: STARTUP_LOAN_TERMS.principal,
     totalDue: STARTUP_LOAN_TERMS.totalDue,
@@ -1614,6 +1635,7 @@ export function AdvanceMonth(currentState) {
     state.month += 1;
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
+    state.ownerWorkHistory = [];
     state.anxietyAtMonthStart = state.anxiety;
   }
   return {
@@ -1820,6 +1842,7 @@ export function VisitRelaxationVenue(currentState, venueId) {
   if (state.cash < venue.cost) return { state, ok: false, message: `${venue.name}本次要 ¥${venue.cost.toLocaleString("zh-CN")}，现金不够。` };
 
   const anxietyBefore = state.anxiety;
+  const energyLimitBefore = GetOwnerEnergyLimit(state);
   state.cash -= venue.cost;
   state.totalCosts += venue.cost;
   state.anxiety = Clamp(state.anxiety - venue.anxietyRelief, 0, 100);
@@ -1834,7 +1857,9 @@ export function VisitRelaxationVenue(currentState, venueId) {
   });
   state.relaxationHistory = state.relaxationHistory.slice(-12);
   const relieved = Math.round(anxietyBefore - state.anxiety);
-  PushLog(state, `${venue.name}消费 ¥${venue.cost.toLocaleString("zh-CN")}，焦虑 -${relieved}。项目群被静音了一会儿。`, "good");
+  const energyLimitAfter = GetOwnerEnergyLimit(state);
+  const ownerEnergyBonus = Math.max(0, energyLimitAfter - energyLimitBefore);
+  PushLog(state, `${venue.name}消费 ¥${venue.cost.toLocaleString("zh-CN")}，焦虑 -${relieved}，老板本月可用精力 +${ownerEnergyBonus}。项目群被静音了一会儿。`, "good");
   return {
     state,
     ok: true,
@@ -1843,7 +1868,30 @@ export function VisitRelaxationVenue(currentState, venueId) {
     anxietyBefore,
     anxietyAfter: state.anxiety,
     relieved,
-    message: `${venue.name}：焦虑 -${relieved}`,
+    ownerEnergyBonus,
+    energyLimitBefore,
+    energyLimitAfter,
+    message: `${venue.name}：焦虑 -${relieved} · 精力上限 +${ownerEnergyBonus}`,
+  };
+}
+
+export function PlayComputerGame(currentState) {
+  const state = Clone(currentState);
+  if (state.status !== "playing" || !state.project) return { state, ok: false, message: "现在没有心情开机。" };
+  if (state.lastComputerGameMonth === state.month) return { state, ok: false, message: "本月已经玩过一局了。再开一局就会变成新的开发任务。" };
+
+  const anxietyBefore = state.anxiety;
+  state.anxiety = Clamp(state.anxiety - COMPUTER_GAME_ANXIETY_RELIEF, 0, 100);
+  state.lastComputerGameMonth = state.month;
+  const relieved = Math.round(anxietyBefore - state.anxiety);
+  PushLog(state, `用牛马 486 玩了一局《像素坦克》，焦虑 -${relieved}。开发群暂时没有新消息。`, "good");
+  return {
+    state,
+    ok: true,
+    anxietyBefore,
+    anxietyAfter: state.anxiety,
+    relieved,
+    message: `玩完一局：焦虑 -${relieved}`,
   };
 }
 
@@ -2168,15 +2216,39 @@ export function PerformOwnerTask(currentState, moduleKey) {
   if (state.ownerWorkMonth !== state.month) {
     state.ownerWorkMonth = state.month;
     state.ownerWorkCount = 0;
+    state.ownerWorkHistory = [];
   }
-  if (state.ownerWorkCount >= 3) {
-    return { state, ok: false, message: "本月老板已经亲自干满三次了，继续敲键盘只会制造新的传说。" };
+  state.ownerWorkHistory ||= [];
+  const energyLimit = GetOwnerEnergyLimit(state);
+  if (state.ownerWorkCount >= energyLimit) {
+    return { state, ok: false, message: `本月 ${energyLimit} 格精力已经用完。足浴类消费可让当月上限 +1。` };
   }
 
   const effect = OWNER_TASK_EFFECTS[moduleKey];
   const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
   const anxietyCost = GetOwnerTaskAnxietyCost(state.ownerWorkCount);
   const before = state.project.modules[moduleKey];
+  const previousLogIds = new Set(state.log.map((entry) => entry.id));
+  const undoEntry = {
+    month: state.month,
+    moduleKey,
+    moduleValue: before,
+    bugs: state.project.bugs,
+    scopeDebt: state.project.scopeDebt,
+    technicalDebt: state.project.technicalDebt,
+    ownerWorkCount: state.ownerWorkCount,
+    hunger: state.hunger,
+    anxiety: state.anxiety,
+    status: state.status,
+    outcome: state.outcome ? Clone(state.outcome) : null,
+    moduleDelta: 0,
+    bugsDelta: 0,
+    scopeDebtDelta: 0,
+    technicalDebtDelta: 0,
+    hungerDelta: 0,
+    anxietyDelta: 0,
+    logIds: [],
+  };
   const baseGain = 2 + Math.floor(SeededUnit(
     state.seed + state.month * 137 + state.ownerWorkCount * 17 + moduleKey.length * 31,
   ) * 3);
@@ -2194,6 +2266,15 @@ export function PerformOwnerTask(currentState, moduleKey) {
   PushLog(state, `${effect.line} ${skillEffect.skillKey} ${skillEffect.level} 级让进度 +${gain.toFixed(1)}，返工系数 ×${skillEffect.riskMultiplier.toFixed(2)}。`, "warning");
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
+  undoEntry.moduleDelta = state.project.modules[moduleKey] - undoEntry.moduleValue;
+  undoEntry.bugsDelta = state.project.bugs - undoEntry.bugs;
+  undoEntry.scopeDebtDelta = state.project.scopeDebt - undoEntry.scopeDebt;
+  undoEntry.technicalDebtDelta = state.project.technicalDebt - undoEntry.technicalDebt;
+  undoEntry.hungerDelta = state.hunger - undoEntry.hunger;
+  undoEntry.anxietyDelta = state.anxiety - undoEntry.anxiety;
+  undoEntry.logIds = state.log.filter((entry) => !previousLogIds.has(entry.id)).map((entry) => entry.id);
+  state.ownerWorkHistory.push(undoEntry);
+  state.ownerWorkHistory = state.ownerWorkHistory.slice(-energyLimit);
   return {
     state,
     ok: true,
@@ -2202,6 +2283,41 @@ export function PerformOwnerTask(currentState, moduleKey) {
     gain,
     anxietyCost,
     message: `老板以 ${skillEffect.skillKey} ${skillEffect.level} 级完成 ${moduleKey} 工位：进度 +${gain.toFixed(1)}。`,
+  };
+}
+
+export function UndoOwnerTask(currentState) {
+  const state = Clone(currentState);
+  const history = state.ownerWorkHistory || [];
+  const entry = history.at(-1);
+  if (!state.project || !entry || entry.month !== state.month) {
+    return { state, ok: false, message: "本月还没有可撤回的老板开发。" };
+  }
+
+  const hasDeltas = [entry.moduleDelta, entry.bugsDelta, entry.scopeDebtDelta, entry.technicalDebtDelta, entry.hungerDelta, entry.anxietyDelta]
+    .every(Number.isFinite);
+  state.project.modules[entry.moduleKey] = hasDeltas
+    ? Clamp(state.project.modules[entry.moduleKey] - entry.moduleDelta, 0, 100)
+    : entry.moduleValue;
+  state.project.bugs = hasDeltas ? Clamp(state.project.bugs - entry.bugsDelta, 0, 80) : entry.bugs;
+  state.project.scopeDebt = hasDeltas ? Clamp(state.project.scopeDebt - entry.scopeDebtDelta, 0, 80) : entry.scopeDebt;
+  state.project.technicalDebt = hasDeltas ? Clamp(state.project.technicalDebt - entry.technicalDebtDelta, 0, 80) : entry.technicalDebt;
+  state.ownerWorkCount = entry.ownerWorkCount;
+  state.ownerWorkMonth = state.month;
+  state.hunger = hasDeltas ? Clamp(state.hunger - entry.hungerDelta, 0, 100) : entry.hunger;
+  state.anxiety = hasDeltas ? Clamp(state.anxiety - entry.anxietyDelta, 0, 100) : entry.anxiety;
+  state.status = entry.status;
+  state.outcome = entry.outcome ? Clone(entry.outcome) : null;
+  const removedLogIds = new Set(entry.logIds || []);
+  state.log = state.log.filter((logEntry) => !removedLogIds.has(logEntry.id));
+  state.ownerWorkHistory = history.slice(0, -1);
+  PushLog(state, `撤回最近一次老板开发：${entry.moduleKey}。进度、欠账、Bug、饥饿和焦虑已恢复。`, "normal");
+  return {
+    state,
+    ok: true,
+    moduleKey: entry.moduleKey,
+    energyLeft: Math.max(0, GetOwnerEnergyLimit(state) - state.ownerWorkCount),
+    message: "已撤回最近一次老板开发。",
   };
 }
 
@@ -2367,7 +2483,17 @@ export function ValidateState(candidate) {
   if (!Number.isInteger(candidate.ownerWorkMonth) || candidate.ownerWorkMonth < 1
     || candidate.ownerWorkMonth > candidate.month
     || !Number.isInteger(candidate.ownerWorkCount) || candidate.ownerWorkCount < 0
-    || candidate.ownerWorkCount > 3) return false;
+    || candidate.ownerWorkCount > GetOwnerEnergyLimit(candidate)) return false;
+  if (candidate.ownerWorkHistory !== undefined) {
+    if (!Array.isArray(candidate.ownerWorkHistory) || candidate.ownerWorkHistory.length > OWNER_BASE_ENERGY + OWNER_RELAXATION_ENERGY_BONUS
+      || candidate.ownerWorkHistory.some((entry) => (
+        !entry || entry.month !== candidate.month || !MODULE_KEYS.includes(entry.moduleKey)
+        || ![entry.moduleValue, entry.bugs, entry.scopeDebt, entry.technicalDebt, entry.ownerWorkCount, entry.hunger, entry.anxiety].every(Number.isFinite)
+        || ([entry.moduleDelta, entry.bugsDelta, entry.scopeDebtDelta, entry.technicalDebtDelta, entry.hungerDelta, entry.anxietyDelta]
+          .some((value) => value !== undefined) && ![entry.moduleDelta, entry.bugsDelta, entry.scopeDebtDelta, entry.technicalDebtDelta, entry.hungerDelta, entry.anxietyDelta].every(Number.isFinite))
+        || !Array.isArray(entry.logIds)
+      ))) return false;
+  }
   if (![candidate.cash, candidate.gameRevenue, candidate.arrears, candidate.totalRevenue, candidate.totalCosts,
     candidate.anxiety, candidate.hunger, candidate.reputation, candidate.fans, candidate.speculationProfit]
     .every(Number.isFinite)) return false;
@@ -2404,6 +2530,8 @@ export function ValidateState(candidate) {
   }
   if (candidate.lastRelaxationMonth !== undefined
     && (!Number.isInteger(candidate.lastRelaxationMonth) || candidate.lastRelaxationMonth < 0 || candidate.lastRelaxationMonth > candidate.month)) return false;
+  if (candidate.lastComputerGameMonth !== undefined
+    && (!Number.isInteger(candidate.lastComputerGameMonth) || candidate.lastComputerGameMonth < 0 || candidate.lastComputerGameMonth > candidate.month)) return false;
   if (candidate.relaxationHistory !== undefined) {
     if (!Array.isArray(candidate.relaxationHistory) || candidate.relaxationHistory.some((entry) => (
       !FindConsumerVenue(entry?.venueId)
