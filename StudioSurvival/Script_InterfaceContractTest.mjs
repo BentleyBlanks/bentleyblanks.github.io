@@ -112,4 +112,15 @@ assert.match(script, /visualStyle = "absurd-paper-doll-v2"/, "human actors must 
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
 assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
 
+const homeWindowCycleSeconds = Number(script.match(/const HOME_WINDOW_DAY_NIGHT_SECONDS = (\d+);/)?.[1]);
+const homeWindowBuilderBlock = script.match(/function BuildHomeWindowDayNight[\s\S]*?function UpdateHomeWindowDayNight/)?.[0] || "";
+const homeWindowUpdateBlock = script.match(/function UpdateHomeWindowDayNight[\s\S]*?function AddWallClock/)?.[0] || "";
+const animateBlock = script.match(/function Animate\(\)[\s\S]*?\/\/ Compact world interactions/)?.[0] || "";
+assert.ok(homeWindowCycleSeconds >= 180, "the home-window day/night loop must remain deliberately slow");
+assert.match(homeWindowBuilderBlock, /sun[\s\S]*moon[\s\S]*stars[\s\S]*buildingWindows/, "the home window needs distinct celestial and skyline layers");
+assert.match(homeWindowUpdateBlock, /Math\.sin\(solarAngle\)[\s\S]*SmoothStep[\s\S]*sky\.material\.color[\s\S]*buildingWindow\.material\.emissiveIntensity/, "the home skyline must blend continuously from daylight into a lit night");
+assert.doesNotMatch(homeWindowUpdateBlock, /new THREE\./, "the per-frame home-window update must reuse its visual objects and colors");
+assert.equal([...script.matchAll(/homeWindowVisual = BuildHomeWindowDayNight\(/g)].length, 1, "only the home scene may construct the day/night window");
+assert.match(animateBlock, /const time = clock\.elapsedTime;[\s\S]*UpdateHomeWindowDayNight\(time\)/, "the window cycle must follow global elapsed time instead of resetting on travel");
+
 console.log("StudioSurvival interface separation contract test passed");

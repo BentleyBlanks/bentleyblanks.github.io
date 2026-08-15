@@ -111,6 +111,10 @@ const FormatGoalMoney = (value) => value >= 100000000
   ? `${(value / 100000000).toFixed(value >= 1000000000 ? 1 : 2)}亿元`
   : value >= 10000 ? `${(value / 10000).toFixed(1)}万` : FormatMoney(value);
 const Clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+const SmoothStep = (edgeStart, edgeEnd, value) => {
+  const progress = Clamp((value - edgeStart) / (edgeEnd - edgeStart), 0, 1);
+  return progress * progress * (3 - 2 * progress);
+};
 const EscapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
@@ -313,11 +317,14 @@ const collectibleVisuals = new Map();
 const hazardVisuals = new Map();
 const locationVisuals = new Map();
 const locationSceneGroups = new Map();
+const HOME_WINDOW_DAY_NIGHT_SECONDS = 240;
+const HOME_WINDOW_START_PHASE = .34;
 const particles = [];
 let playerActor = null;
 let playerParts = null;
 let nearbyRing = null;
 let worldAccentLight = null;
+let homeWindowVisual = null;
 let smoothCameraX = 7;
 let visibleLocationId = null;
 let ceremonyFounder = null;
@@ -1439,6 +1446,156 @@ function AddFramedPanel(group, x, y, width, height, faceColor, frameColor = 0x4f
   ]) Place(group, Box(partWidth, partHeight, frameDepth, frameColor, { surface: options.frameSurface ?? "wood", metalness: options.frameMetalness ?? .04 }), partX, partY, (options.z ?? -.08) + .06);
 }
 
+function BuildHomeWindowDayNight(group, windowX, accent) {
+  const windowY = 3.42;
+  const windowWidth = 3.3;
+  const windowHeight = 2.28;
+  const frameColor = 0x70523c;
+  const frameWidth = .11;
+  const sky = AddScenePanel(group, windowWidth, windowHeight, windowX, windowY, 0x78b9df, { z: -.17 });
+  const horizon = AddScenePanel(group, windowWidth, .82, windowX, 2.69, 0xb8d9e5, { z: -.16, opacity: .9 });
+  const sun = AddSceneDisc(group, .15, windowX - 1.1, 3.15, 0xffd37b, { z: -.14, opacity: .01, segments: 28 });
+  const moon = AddSceneDisc(group, .14, windowX + 1.1, 3.15, 0xe9f2db, { z: -.14, opacity: .01, segments: 28 });
+  const moonMask = AddSceneDisc(group, .14, windowX + 1.16, 3.19, 0x78b9df, { z: -.135, opacity: .01, segments: 28 });
+  const stars = [
+    [-1.28, .72, .018], [-.93, .46, .026], [-.52, .83, .016], [-.12, .56, .021],
+    [.36, .76, .018], [.79, .5, .025], [1.24, .82, .017], [1.43, .38, .014],
+  ].map(([offsetX, offsetY, radius], starIndex) => {
+    const star = AddSceneDisc(group, radius, windowX + offsetX, 3.42 + offsetY, starIndex % 3 ? 0xe8f1ff : 0xffe4a8, {
+      z: -.15,
+      opacity: .01,
+      segments: starIndex % 2 ? 8 : 12,
+    });
+    star.userData.twinklePhase = starIndex * 1.73;
+    return star;
+  });
+
+  const buildings = [];
+  const buildingWindows = [];
+  [0, 1, 2, 3, 4].forEach((buildingIndex) => {
+    const width = .38 + (buildingIndex % 2) * .18;
+    const height = .52 + ((buildingIndex * 7) % 3) * .24;
+    const x = windowX - 1.27 + buildingIndex * .57;
+    const building = Place(group, Box(width, height, .03, buildingIndex % 2 ? 0x26324a : 0x202a40, {
+      surface: "plaster",
+      castShadow: false,
+    }), x, 2.3 + height * .5, -.08);
+    buildings.push({
+      material: building.material,
+      nightColor: new THREE.Color(buildingIndex % 2 ? 0x111a2d : 0x0d1629),
+      dayColor: new THREE.Color(buildingIndex % 2 ? 0x40536a : 0x344a64),
+    });
+
+    const columnCount = width > .45 ? 2 : 1;
+    const rowCount = height > .8 ? 3 : 2;
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+      for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        const lampColor = (buildingIndex + rowIndex + columnIndex) % 3 ? 0xffd37a : accent;
+        const lamp = Place(group, Box(.043, .05, .015, 0x273348, {
+          emissive: lampColor,
+          emissiveIntensity: .02,
+          roughness: .32,
+          castShadow: false,
+        }), x + (columnIndex - (columnCount - 1) * .5) * .18, 2.5 + rowIndex * .2, -.05);
+        buildingWindows.push({
+          material: lamp.material,
+          offColor: new THREE.Color(0x273348),
+          litColor: new THREE.Color(lampColor),
+          glowStrength: (buildingIndex + rowIndex * 2 + columnIndex) % 4 === 0 ? .42 : .9,
+          phase: buildingIndex * 1.31 + rowIndex * .73 + columnIndex * 2.11,
+        });
+      }
+    }
+  });
+
+  for (const [partWidth, partHeight, partX, partY] of [
+    [windowWidth + frameWidth * 2, frameWidth, windowX, windowY + windowHeight * .5 + frameWidth * .5],
+    [windowWidth + frameWidth * 2, frameWidth, windowX, windowY - windowHeight * .5 - frameWidth * .5],
+    [frameWidth, windowHeight, windowX - windowWidth * .5 - frameWidth * .5, windowY],
+    [frameWidth, windowHeight, windowX + windowWidth * .5 + frameWidth * .5, windowY],
+  ]) Place(group, Box(partWidth, partHeight, .14, frameColor, { surface: "wood" }), partX, partY, .02);
+  Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+  Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+
+  const windowLight = new THREE.PointLight(0xa8d8ff, .4, 4.8, 2.1);
+  windowLight.position.set(windowX, 3.35, 1.05);
+  windowLight.castShadow = false;
+  group.add(windowLight);
+
+  return {
+    windowX,
+    sky,
+    horizon,
+    sun,
+    moon,
+    moonMask,
+    stars,
+    buildings,
+    buildingWindows,
+    windowLight,
+    colors: {
+      nightSky: new THREE.Color(0x07142f),
+      daySky: new THREE.Color(0x78b9df),
+      dawnSky: new THREE.Color(0xd88478),
+      duskSky: new THREE.Color(0xb95f78),
+      nightHorizon: new THREE.Color(0x192340),
+      dayHorizon: new THREE.Color(0xb8d9e5),
+      dawnHorizon: new THREE.Color(0xf0a16f),
+      duskHorizon: new THREE.Color(0xe16f66),
+      sunriseSun: new THREE.Color(0xffa85c),
+      noonSun: new THREE.Color(0xffe8a1),
+    },
+  };
+}
+
+function UpdateHomeWindowDayNight(time) {
+  if (!homeWindowVisual) return;
+  const cyclePhase = (time / HOME_WINDOW_DAY_NIGHT_SECONDS + HOME_WINDOW_START_PHASE) % 1;
+  const solarAngle = cyclePhase * Math.PI * 2 - Math.PI * .5;
+  const solarHeight = Math.sin(solarAngle);
+  const moonHeight = -solarHeight;
+  const daylight = SmoothStep(-.12, .3, solarHeight);
+  const night = 1 - SmoothStep(-.36, .02, solarHeight);
+  const twilight = Math.pow(1 - Clamp(Math.abs(solarHeight) / .6, 0, 1), 2);
+  const colors = homeWindowVisual.colors;
+  const twilightSky = cyclePhase < .5 ? colors.dawnSky : colors.duskSky;
+  const twilightHorizon = cyclePhase < .5 ? colors.dawnHorizon : colors.duskHorizon;
+
+  homeWindowVisual.sky.material.color.copy(colors.nightSky).lerp(colors.daySky, daylight).lerp(twilightSky, twilight * .82);
+  homeWindowVisual.horizon.material.color.copy(colors.nightHorizon).lerp(colors.dayHorizon, daylight).lerp(twilightHorizon, twilight * .92);
+
+  const sunX = homeWindowVisual.windowX - Math.cos(solarAngle) * 1.25;
+  const sunY = 2.82 + Clamp(solarHeight, -.05, 1) * 1.27;
+  homeWindowVisual.sun.position.set(sunX, sunY, homeWindowVisual.sun.position.z);
+  homeWindowVisual.sun.material.opacity = SmoothStep(-.12, .03, solarHeight);
+  homeWindowVisual.sun.material.color.copy(colors.sunriseSun).lerp(colors.noonSun, SmoothStep(.02, .72, solarHeight));
+
+  const moonAngle = solarAngle + Math.PI;
+  const moonX = homeWindowVisual.windowX - Math.cos(moonAngle) * 1.25;
+  const moonY = 2.82 + Clamp(moonHeight, -.05, 1) * 1.27;
+  const moonOpacity = SmoothStep(-.12, .04, moonHeight);
+  homeWindowVisual.moon.position.set(moonX, moonY, homeWindowVisual.moon.position.z);
+  homeWindowVisual.moonMask.position.set(moonX + .065, moonY + .035, homeWindowVisual.moonMask.position.z);
+  homeWindowVisual.moon.material.opacity = moonOpacity;
+  homeWindowVisual.moonMask.material.opacity = moonOpacity;
+  homeWindowVisual.moonMask.material.color.copy(homeWindowVisual.sky.material.color);
+
+  homeWindowVisual.stars.forEach((star) => {
+    star.material.opacity = night * (.5 + Math.sin(time * .34 + star.userData.twinklePhase) * .18);
+  });
+  homeWindowVisual.buildings.forEach((building) => {
+    building.material.color.copy(building.nightColor).lerp(building.dayColor, daylight);
+  });
+  homeWindowVisual.buildingWindows.forEach((buildingWindow) => {
+    const slowPulse = .88 + Math.sin(time * .16 + buildingWindow.phase) * .08;
+    const glow = Clamp(night * buildingWindow.glowStrength * slowPulse, 0, 1);
+    buildingWindow.material.color.copy(buildingWindow.offColor).lerp(buildingWindow.litColor, glow * .82);
+    buildingWindow.material.emissiveIntensity = .02 + glow * 1.15;
+  });
+  homeWindowVisual.windowLight.color.copy(homeWindowVisual.horizon.material.color);
+  homeWindowVisual.windowLight.intensity = .14 + daylight * .38 + twilight * .16;
+}
+
 function AddWallClock(group, x, y, accent = 0xd7bc78, radius = .54) {
   const face = Cylinder(radius, radius, .1, 0xe6dfcd, 32, { surface: "paper", roughness: .78, castShadow: false });
   face.rotation.x = Math.PI / 2;
@@ -1607,16 +1764,7 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
 
   if (location.id === "home") {
     const windowX = center + .55;
-    AddFramedPanel(group, windowX, 3.42, 3.3, 2.28, 0x14213a, 0x70523c, { surface: "metal", frameWidth: .11, z: -.13 });
-    Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, 3.42, .02);
-    Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, 3.42, .02);
-    [0, 1, 2, 3, 4].forEach((buildingIndex) => {
-      const width = .38 + (buildingIndex % 2) * .18;
-      const height = .52 + ((buildingIndex * 7) % 3) * .24;
-      const x = center - .72 + buildingIndex * .37;
-      Place(group, Box(width, height, .03, buildingIndex % 2 ? 0x26324a : 0x202a40, { surface: "plaster", castShadow: false }), x, 2.3 + height * .5, -.035);
-      Place(group, Box(.045, .045, .015, buildingIndex % 2 ? 0xe8c96d : accent, { emissive: accent, emissiveIntensity: .25, castShadow: false }), x + .07, 2.48 + height * .35, -.005);
-    });
+    homeWindowVisual = BuildHomeWindowDayNight(group, windowX, accent);
     Place(group, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
     [.78, 1.22, 1.66, 2.1].forEach((y) => Place(group, Box(1.36, .075, .5, 0x8a6547, { surface: "wood" }), start + 1.05, y, .04));
     for (let bookIndex = 0; bookIndex < 12; bookIndex += 1) {
@@ -2392,6 +2540,7 @@ function Animate() {
   requestAnimationFrame(Animate);
   const delta = Math.min(clock.getDelta(), .05);
   const time = clock.elapsedTime;
+  UpdateHomeWindowDayNight(time);
   actionCooldown = Math.max(0, actionCooldown - delta);
   const canMove = !IsOverlayOpen();
   const previousY = worldState.y;
