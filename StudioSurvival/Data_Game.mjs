@@ -231,7 +231,7 @@ export const STAFF_CATALOG = [
   },
   {
     id: "dreamBrush",
-    name: "六指琴魔 4.2",
+    name: "显存诗人",
     kind: "ai",
     role: "生成美术 AI",
     specialty: "art",
@@ -266,7 +266,7 @@ export const STAFF_CATALOG = [
   },
   {
     id: "scopeWhale",
-    name: "吞天鲸",
+    name: "无限猴子",
     kind: "ai",
     role: "脑暴策划 AI",
     specialty: "design",
@@ -301,7 +301,7 @@ export const STAFF_CATALOG = [
   },
   {
     id: "pairPanda",
-    name: "赛博食铁兽",
+    name: "堆栈先知",
     kind: "ai",
     role: "客户端编码 AI",
     specialty: "client",
@@ -336,7 +336,7 @@ export const STAFF_CATALOG = [
   },
   {
     id: "frameJelly",
-    name: "帧率克苏鲁",
+    name: "帧率水母",
     kind: "ai",
     role: "性能诊断 AI",
     specialty: "performance",
