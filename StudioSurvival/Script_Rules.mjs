@@ -32,10 +32,11 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815al";
+} from "./Data_Game.mjs?v=20260815ap";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
+export const POLICY_SEMANTICS_VERSION = 2;
 export const STARTUP_LOAN_TERMS = Object.freeze({
   principal: 68000,
   totalDue: 82000,
@@ -451,6 +452,7 @@ export function CreateInitialState() {
     workstations: 0,
     equipmentSpent: 0,
     selectedDirective: "integration",
+    policySemanticsVersion: POLICY_SEMANTICS_VERSION,
     talkPoints: 2,
     loans: [],
     assets: Object.fromEntries(COLLATERAL_OPTIONS.map((asset) => [asset.id, "free"])),
@@ -592,7 +594,6 @@ export function PivotProject(currentState, newProjectId, newGameTypeId) {
     discardedFeatures: oldFeatures,
   });
   project.pivotHistory = project.pivotHistory.slice(-6);
-  state.selectedDirective = "integration";
   PushLog(state, `不可抗力转向：${reason}。${previous.title} / ${previousType.name} 改成 ${nextProject.title} / ${nextGameType.name}，烧掉 ¥${cost.toLocaleString("zh-CN")}。`, "danger");
   CheckHungerFailure(state);
   CheckAnxietyFailure(state);
@@ -693,65 +694,31 @@ export function CalculateTensions(project) {
   return tensions;
 }
 
-function DirectiveOutput(directiveId) {
-  const output = { art: 0, design: 0, client: 0, performance: 0 };
-  switch (directiveId) {
-    case "artSprint":
-      output.art = 8;
-      break;
-    case "scopeParty":
-      output.design = 9;
-      break;
-    case "clientCrush":
-      output.client = 8;
-      output.performance = 1;
-      break;
-    case "performanceDebt":
-      output.performance = 9;
-      break;
-    case "cutScope":
-      output.design = 2;
-      output.client = 5;
-      output.performance = 2;
-      break;
-    case "integration":
-    default:
-      MODULE_KEYS.forEach((moduleKey) => { output[moduleKey] = 2.5; });
-      break;
-  }
-  return output;
+function DirectiveOutputMultiplier(directiveId) {
+  return FindDirective(directiveId)?.effects?.outputMultiplier || 1;
 }
 
-function ApplyDirectiveDebtEffects(state) {
+function ApplyDirectiveProjectEffects(state) {
   const project = state.project;
-  switch (state.selectedDirective) {
-    case "artSprint":
-      project.technicalDebt += 3;
-      project.hype += 3;
-      break;
-    case "scopeParty":
-      project.scopeDebt += 7;
-      project.hype += 2;
-      break;
-    case "clientCrush":
-      project.scopeDebt = Math.max(0, project.scopeDebt - 5);
-      project.bugs += 2;
-      break;
-    case "performanceDebt":
-      project.technicalDebt = Math.max(0, project.technicalDebt - 8);
-      break;
-    case "cutScope":
-      project.scopeDebt = Math.max(0, project.scopeDebt - 14);
-      project.technicalDebt = Math.max(0, project.technicalDebt - 3);
-      project.hype = Math.max(0, project.hype - 2);
-      break;
-    case "integration":
-    default:
-      project.scopeDebt = Math.max(0, project.scopeDebt - 6);
-      project.technicalDebt = Math.max(0, project.technicalDebt - 6);
-      project.bugs = Math.max(0, project.bugs - 1);
-      break;
-  }
+  const effects = FindDirective(state.selectedDirective)?.effects;
+  const projectEffects = effects?.project || {};
+  project.scopeDebt += projectEffects.scopeDebt || 0;
+  project.technicalDebt += projectEffects.technicalDebt || 0;
+  project.bugs += projectEffects.bugs || 0;
+  project.hype += projectEffects.hype || 0;
+  project.expectation += projectEffects.expectation || 0;
+  state.team.forEach((member) => {
+    const staff = FindStaff(member.id);
+    if (staff?.kind === "student") {
+      member.stress = Clamp(member.stress + (effects?.student?.stress || 0), 0, 100);
+      member.morale = Clamp(member.morale + (effects?.student?.morale || 0), 0, 100);
+    } else if (staff?.kind === "ai") member.drift = Clamp(member.drift + (effects?.ai?.drift || 0), 0, 100);
+  });
+  project.scopeDebt = Clamp(project.scopeDebt, 0, 80);
+  project.technicalDebt = Clamp(project.technicalDebt, 0, 80);
+  project.bugs = Clamp(project.bugs, 0, 80);
+  project.hype = Clamp(project.hype, 0, 100);
+  project.expectation = Clamp(project.expectation, 0, 60);
 }
 
 function StaffFactor(member) {
@@ -767,18 +734,12 @@ function StaffFactor(member) {
 function BuildMonthlyOutput(state, foodMultiplier = 1, foodPlanName = "本月吃法") {
   const founderOutput = Object.fromEntries(MODULE_KEYS.map((moduleKey) => [
     moduleKey,
-    1.8 * GetFounderSkillEffect(state.founderSkills, moduleKey).monthlyOutputMultiplier,
+    4.5 * GetFounderSkillEffect(state.founderSkills, moduleKey).monthlyOutputMultiplier,
   ]));
   const output = { ...founderOutput };
   const idealOutput = { ...founderOutput };
   const wastedOutput = { art: 0, design: 0, client: 0, performance: 0 };
   const painEvents = [];
-  const directiveOutput = DirectiveOutput(state.selectedDirective);
-  MODULE_KEYS.forEach((moduleKey) => {
-    output[moduleKey] += directiveOutput[moduleKey];
-    idealOutput[moduleKey] += directiveOutput[moduleKey];
-  });
-
   state.team.forEach((member, memberIndex) => {
     const staff = FindStaff(member.id);
     if (!staff) return;
@@ -810,6 +771,12 @@ function BuildMonthlyOutput(state, foodMultiplier = 1, foodPlanName = "本月吃
       const driftIncrease = (5 + SeededUnit(state.seed + state.month * 47 + memberIndex) * 8) * driftMultiplier;
       member.drift = Clamp(member.drift + driftIncrease, 0, 100);
     }
+  });
+
+  const directiveMultiplier = DirectiveOutputMultiplier(state.selectedDirective);
+  MODULE_KEYS.forEach((moduleKey) => {
+    output[moduleKey] *= directiveMultiplier;
+    idealOutput[moduleKey] *= directiveMultiplier;
   });
 
   MODULE_KEYS.forEach((moduleKey) => {
@@ -898,11 +865,11 @@ function ApplyCrossModuleConstraints(state, rawOutput) {
   if (featureGap > 0) output.client *= Clamp(1 - featureGap * 0.012, 0.7, 1);
   if (performanceGap > 0) output.art *= Clamp(1 - performanceGap * 0.012, 0.68, 1);
 
-  const clientDebtPayment = Math.min(project.scopeDebt, Math.max(0, output.client) * (state.selectedDirective === "cutScope" ? 0.78 : 0.34));
+  const clientDebtPayment = Math.min(project.scopeDebt, Math.max(0, output.client) * 0.34);
   project.scopeDebt -= clientDebtPayment;
   output.client -= clientDebtPayment * 0.2;
 
-  const performanceDebtPayment = Math.min(project.technicalDebt, Math.max(0, output.performance) * (state.selectedDirective === "performanceDebt" ? 0.78 : 0.34));
+  const performanceDebtPayment = Math.min(project.technicalDebt, Math.max(0, output.performance) * 0.34);
   project.technicalDebt -= performanceDebtPayment;
   output.performance -= performanceDebtPayment * 0.2;
 
@@ -947,8 +914,10 @@ function ProgressProject(state, foodMultiplier = 1, foodPlanName = "本月吃法
   const project = state.project;
   const production = BuildMonthlyOutput(state, foodMultiplier, foodPlanName);
   const rawOutput = production.output;
-  ApplyDirectiveDebtEffects(state);
   const output = ApplyCrossModuleConstraints(state, rawOutput);
+  // Apply policy ledger changes after ordinary repair so advertised costs such as
+  // crunch debt cannot be erased by the same month's boosted production.
+  ApplyDirectiveProjectEffects(state);
   MODULE_KEYS.forEach((moduleKey) => {
     production.wastedOutput[moduleKey] += Math.max(0, rawOutput[moduleKey] - output[moduleKey]);
   });
@@ -1247,8 +1216,7 @@ function ResolveMonthlyAnxiety(state, production, finance, tensions, monthStartA
   const conditionDelta = positivePressure > 0 ? positivePressure : buildPressure;
 
   let settlementDelta = Math.min(4, production.wastedTotal * 0.1) + conditionDelta - restRelief;
-  if (state.selectedDirective === "integration") settlementDelta -= 3;
-  if (state.selectedDirective === "cutScope") settlementDelta -= 2;
+  settlementDelta += FindDirective(state.selectedDirective)?.effects?.anxiety || 0;
   if (state.project.isReleased && finance.income > finance.costs.total) settlementDelta -= 4;
   settlementDelta = Clamp(settlementDelta, -10, 20);
   state.anxiety = Clamp(state.anxiety + settlementDelta, 0, 100);
@@ -1642,7 +1610,6 @@ export function AdvanceMonth(currentState) {
     directiveId: state.selectedDirective,
   };
   state.talkPoints = 2;
-  state.selectedDirective = "integration";
   if (state.status === "playing") {
     state.month += 1;
     state.ownerWorkMonth = state.month;
@@ -1789,7 +1756,16 @@ export function SelectDirective(currentState, directiveId) {
   const directive = FindDirective(directiveId);
   if (!directive) return { state, ok: false, message: "策略不存在。" };
   state.selectedDirective = directiveId;
-  return { state, ok: true, message: `本月策略：${directive.name}` };
+  return { state, ok: true, message: `制作方针：${directive.name}（持续生效）` };
+}
+
+export function MigratePolicySemantics(currentState) {
+  const state = Clone(currentState);
+  if (!Number.isInteger(state.policySemanticsVersion) || state.policySemanticsVersion < POLICY_SEMANTICS_VERSION) {
+    state.selectedDirective = "integration";
+    state.policySemanticsVersion = POLICY_SEMANTICS_VERSION;
+  }
+  return state;
 }
 
 export function SelectFoodPlan(currentState, foodPlanId) {
@@ -2400,6 +2376,10 @@ export function ValidateState(candidate) {
   if (candidate.anxietyAtMonthStart !== undefined
     && (!Number.isFinite(candidate.anxietyAtMonthStart) || candidate.anxietyAtMonthStart < 0 || candidate.anxietyAtMonthStart > 100)) return false;
   if (!FindFoodPlan(candidate.foodPlan) || !FindDirective(candidate.selectedDirective)) return false;
+  if (candidate.policySemanticsVersion !== undefined
+    && (!Number.isInteger(candidate.policySemanticsVersion)
+      || candidate.policySemanticsVersion < 1
+      || candidate.policySemanticsVersion > POLICY_SEMANTICS_VERSION)) return false;
   if (!candidate.assets || COLLATERAL_OPTIONS.some((asset) => !["free", "pledged", "seized"].includes(candidate.assets[asset.id]))) return false;
   if (!Array.isArray(candidate.log) || !Array.isArray(candidate.loans)
     || !Array.isArray(candidate.incomeHistory) || !Array.isArray(candidate.speculationHistory)) return false;

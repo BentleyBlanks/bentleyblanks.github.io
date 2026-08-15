@@ -1102,7 +1102,7 @@ function RenderAnxietyVisuals() {
 
 function RenderActions() {
   const directive = FindDirective(state.selectedDirective);
-  dom.directiveLabel.textContent = directive?.name || "四组联调";
+  dom.directiveLabel.textContent = directive?.name || "稳住版本";
   const canRelease = state.status === "playing"
     && state.project
     && state.project.age >= 2
