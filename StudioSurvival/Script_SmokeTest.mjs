@@ -152,6 +152,9 @@ function HasRecordedId(collection, id) {
   assert.deepEqual(initial.founderSkills, DEFAULT_FOUNDER_SKILLS, "new founders must begin with a balanced 3/3/3 profile");
   assert.equal(FOUNDER_SKILL_KEYS.reduce((total, skillKey) => total + initial.founderSkills[skillKey], 0), FOUNDER_SKILL_POINTS);
 
+  const noNameSetup = StartProject(initial, "zeroGStore", "premium", { studioName: "只选题材" });
+  assert.equal(noNameSetup.state.project.name, "第一款游戏", "the UI may omit game naming while the internal project record stays valid");
+
   const specialized = StartProject(initial, "zeroGStore", "premium", {
     studioName: "专长真的有用",
     projectName: "履历模拟器",
@@ -958,8 +961,9 @@ function HasRecordedId(collection, id) {
   state.project.buildStatus = { level: "stable", label: "稳定", detail: "", score: 88 };
   state.revenueGoal = 1;
   const launch = ReleaseBuild(state);
-  assert.equal(launch.state.status, "ended", "reaching the game-revenue goal must end in victory");
+  assert.equal(launch.state.status, "ended", "reaching the game-revenue goal must complete the successful-creator milestone");
   assert.equal(launch.state.outcome.kind, "worldMaker");
+  assert.equal(launch.state.outcome.title, "你成为了成功的游戏制作人！");
 }
 
 {

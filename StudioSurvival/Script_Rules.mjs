@@ -31,7 +31,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815u";
+} from "./Data_Game.mjs?v=20260815v";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -356,7 +356,7 @@ function TryAbstractBreakthrough(state) {
 }
 
 function FreshProject(projectId, gameTypeId, projectName = "") {
-  const templateName = FindProject(projectId)?.title?.replace(/[《》]/g, "") || "还没想好名字的游戏";
+  const templateName = "第一款游戏";
   return {
     templateId: projectId,
     gameTypeId,
@@ -462,7 +462,7 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
     return { state, ok: false, message: "立项参数不存在，像极了第一次需求会。" };
   }
   const studioName = CleanName(identity.studioName || state.studioName, "没想好工作室");
-  const projectName = CleanName(identity.projectName, FindProject(projectId).title.replace(/[《》]/g, ""), 20);
+  const projectName = CleanName(identity.projectName, "第一款游戏", 20);
   state.status = "playing";
   state.studioName = studioName;
   state.founderSkills = NormalizeFounderSkills(identity.founderSkills || state.founderSkills);
@@ -476,10 +476,10 @@ export function StartProject(currentState, projectId, gameTypeId, identity = {})
   };
   state.startupLoan.status = "active";
   state.project = FreshProject(projectId, gameTypeId, projectName);
-  PushLog(state, `${studioName} 签下《${projectName}》开发合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
+  PushLog(state, `${studioName} 签署第一款游戏发行合同：${FindProject(projectId).genre} · ${FindGameType(gameTypeId).name}。`, "good");
   PushLog(state, `启动贷 ¥${STARTUP_LOAN_TERMS.principal.toLocaleString("zh-CN")}；M${String(state.startupLoan.dueMonth).padStart(2, "0")} 前还 ¥${state.startupLoan.remaining.toLocaleString("zh-CN")}，否则清算。`, "danger");
-  PushLog(state, "目标：游戏净收入 100 亿元。", "normal");
-  return { state, ok: true, message: "立项成功" };
+  PushLog(state, "制作人目标：游戏净收入 100 亿元。", "normal");
+  return { state, ok: true, message: "发行合同签署完成" };
 }
 
 export function ForecastPivotCost(state) {
@@ -1429,10 +1429,10 @@ function CheckRevenueGoal(state) {
   state.status = "ended";
   state.outcome = {
     kind: "worldMaker",
-    title: "100 亿元，世界听见了",
-    subtitle: "你从做不出一个垃圾开始，最后做成了能影响世界的游戏制作人。电脑也还在。",
+    title: "你成为了成功的游戏制作人！",
+    subtitle: "累计游戏收入达到 100 亿元。你从一份合同出发，终于做出了被玩家认可的游戏。电脑也还在。",
   };
-  PushLog(state, "累计游戏收入达到 100 亿元。贷款公司第一次主动给你发了祝福。", "good");
+  PushLog(state, "累计游戏收入达到 100 亿元。你成为了成功的游戏制作人。", "good");
   return true;
 }
 

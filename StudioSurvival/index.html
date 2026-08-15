@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#090b12">
-  <meta name="description" content="经营独立游戏工作室，开发、发行并活到收入达到 100 亿元。">
+  <meta name="description" content="经营独立游戏工作室，以 100 亿元累计游戏收入成为成功的游戏制作人。">
   <title>甲方是我</title>
-  <link rel="stylesheet" href="./Style_Play.css?v=20260815u">
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815v">
   <script type="importmap">
     {
       "imports": {
@@ -126,12 +126,12 @@
 
     <section id="foundingNamePanel" class="foundingNamePanel foundingBook hidden" aria-labelledby="foundingTitle">
       <div class="bookSpine" aria-hidden="true"></div>
-      <header><span>工作室成立登记册</span><b>01 / 06</b></header>
+      <header><span>工作室成立登记册</span><b>01 / 04</b></header>
       <div class="registrySeal">筹</div>
       <main class="bookPageBody">
         <p class="documentKicker">第一项 · 工作室名称</p>
         <h2 id="foundingTitle">你的工作室叫什么？</h2>
-        <p>先写下唯一需要决定的事。这个名字会出现在家门口、合同、作品和结局里。</p>
+        <p>写下工作室名称。它会出现在家门口、合同和结局里。</p>
         <label class="contractField"><span>工作室全称</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="在这里写下工作室名"></label>
         <div id="studioNameSuggestions" class="nameSuggestions" aria-label="工作室名灵感">
           <button type="button" data-studio-name="今晚一定上线">今晚一定上线</button>
@@ -148,7 +148,7 @@
 
     <section id="founderProfilePanel" class="founderProfilePanel foundingBook hidden" aria-labelledby="founderProfileTitle">
       <div class="bookSpine" aria-hidden="true"></div>
-      <header><span id="founderProfileTitle" tabindex="-1">创始人能力</span><b>02 / 06</b></header>
+      <header><span id="founderProfileTitle" tabindex="-1">创始人能力</span><b>02 / 04</b></header>
       <div id="founderSkillEditor" class="founderSkillEditor"></div>
       <div class="founderProfileFooter">
         <strong id="founderSkillBudget" aria-live="polite">剩余 0</strong>
@@ -156,57 +156,51 @@
       <div class="contractBookNav founderBookNav">
         <button id="founderBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
         <span>共 9 点</span>
-        <button id="founderConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>填写游戏名</strong><i>→</i></button>
+        <button id="founderConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>选择题材与发行</strong><i>→</i></button>
       </div>
     </section>
 
     <section id="projectContract" class="projectContract foundingBook hidden" aria-labelledby="contractTitle">
       <div class="bookSpine" aria-hidden="true"></div>
-      <header><div><span>第一款游戏立项书</span><small>合同编号：M01-NO-MONEY</small></div><b id="contractPageCounter">03 / 06</b></header>
-      <div class="contractParties"><span>工作室：<strong id="contractStudioName">未命名工作室</strong></span><span>创始人：<strong id="contractFounderSkills">策 3 / 程 3 / 美 3</strong></span><span>本页只做一个决定</span></div>
+      <header><div><span>第一款游戏发行合同</span><small>合同编号：M01-NO-MONEY</small></div><b id="contractPageCounter">03 / 04</b></header>
+      <div class="contractParties"><span>工作室：<strong id="contractStudioName">未命名工作室</strong></span><span>创始人：<strong id="contractFounderSkills">策 3 / 程 3 / 美 3</strong></span><span>题材与发行共同生效</span></div>
 
       <div id="contractPageViewport" class="contractPageViewport" aria-live="polite">
-        <article class="contractPage active" data-contract-page="0">
-          <p class="documentKicker">第三项 · 游戏名称</p>
-          <h2 id="contractTitle">第一款游戏叫什么？</h2>
-          <p class="contractLead">这是玩家以后在商店里看见的名字。先别想副标题，也别写融资故事。</p>
-          <label class="contractField gameNameField"><span>游戏正式名称</span><input id="gameNameInput" type="text" maxlength="20" autocomplete="off" inputmode="text" placeholder="在这里写下游戏名"></label>
+        <article class="contractPage contractDecisionPage active" data-contract-page="0">
+          <p class="documentKicker">第三项 · 立项与发行</p>
+          <h2 id="contractTitle">你准备做什么游戏？</h2>
+          <p class="contractLead">选定题材和发行方式，两项一起写进合同。</p>
+          <div class="contractDecisionGrid">
+            <section class="contractChoiceGroup" aria-labelledby="themeChoiceTitle">
+              <h3 id="themeChoiceTitle"><span>01</span>游戏题材</h3>
+              <div id="projectChoices" class="choiceRail"></div>
+            </section>
+            <section class="contractChoiceGroup" aria-labelledby="releaseChoiceTitle">
+              <h3 id="releaseChoiceTitle"><span>02</span>发行方式</h3>
+              <div id="typeChoices" class="choiceRail compactRail"></div>
+            </section>
+          </div>
         </article>
 
-        <article class="contractPage" data-contract-page="1">
-          <p class="documentKicker">第四项 · 游戏题材</p>
-          <h2>你准备做什么游戏？</h2>
-          <p class="contractLead">题材决定第一批玩家为什么点进来。选定后再换方向，会烧掉大量时间和钱。</p>
-          <div id="projectChoices" class="choiceRail"></div>
-        </article>
-
-        <article class="contractPage" data-contract-page="2">
-          <p class="documentKicker">第五项 · 发行方式</p>
-          <h2>这款游戏卖给谁？</h2>
-          <p class="contractLead">不同发行方式有不同成本、风险和评价短板。第一次创业，活下来比规模更重要。</p>
-          <div id="typeChoices" class="choiceRail compactRail"></div>
-        </article>
-
-        <article class="contractPage contractReviewPage" data-contract-page="3">
-          <p class="documentKicker">第六项 · 核对并签字</p>
-          <h2>最后看一眼，再落章</h2>
+        <article class="contractPage contractReviewPage" data-contract-page="1">
+          <p class="documentKicker">第四项 · 正式签署</p>
+          <h2>签下你的第一份发行合同</h2>
           <div class="contractReview">
             <div><span>工作室</span><strong id="contractReviewStudio">等待命名</strong></div>
             <div><span>创始人能力</span><strong id="contractReviewFounder">策 3 / 程 3 / 美 3</strong></div>
-            <div><span>第一款游戏</span><strong id="contractReviewGame">等待命名</strong></div>
-            <div><span>题材</span><strong id="contractReviewTheme">尚未选择</strong></div>
-            <div><span>发行</span><strong id="contractReviewType">尚未选择</strong></div>
+            <div><span>游戏题材</span><strong id="contractReviewTheme">尚未选择</strong></div>
+            <div><span>发行方式</span><strong id="contractReviewType">尚未选择</strong></div>
           </div>
           <div class="contractFinePrint"><b>启动贷</b><span>到账 ¥68,000；M08 结束前须还清 ¥82,000。到期未清，工作室倒闭。</span></div>
           <p id="contractError" class="setupError" aria-live="polite"></p>
-          <div class="signatureRow"><div><small>创始人签章</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>签字盖章</strong><i></i></button></div>
+          <div class="signatureRow"><div><small>创始人签章</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>签署发行合同</strong><i></i></button></div>
         </article>
       </div>
 
       <div class="contractBookNav">
         <button id="contractBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
-        <span id="contractPageHint">先写下游戏名</span>
-        <button id="contractNextButton" class="documentButton" type="button"><span>下一页</span><strong>选择游戏题材</strong><i>→</i></button>
+        <span id="contractPageHint">题材与发行一起生效</span>
+        <button id="contractNextButton" class="documentButton" type="button"><span>下一页</span><strong>核对发行合同</strong><i>→</i></button>
       </div>
     </section>
   </section>
@@ -214,18 +208,18 @@
   <section id="goalReveal" class="goalReveal hidden" role="dialog" aria-modal="true" aria-labelledby="goalRevealTitle" aria-describedby="goalRevealDescription">
     <div class="goalRevealGrid" aria-hidden="true"></div>
     <div class="goalRevealCard">
-      <p class="goalRevealKicker"><span></span>立项完成 · 唯一胜利条件<span></span></p>
+      <p class="goalRevealKicker"><span></span>立项完成 · 制作人目标<span></span></p>
       <h2 id="goalRevealTitle">让你的游戏挣到</h2>
       <div class="goalRevealNumber" role="img" aria-label="一百亿元">
         <span id="goalRevealCounter">0</span><b>亿元</b>
       </div>
       <div class="goalRevealTrack" aria-hidden="true"><i></i><b>¥10,000,000,000</b></div>
-      <p id="goalRevealDescription" class="goalRevealDescription">累计游戏收入达到 <strong>100 亿元</strong>，才算真正胜利。</p>
+      <p id="goalRevealDescription" class="goalRevealDescription">累计游戏收入达到 <strong>100 亿元</strong>，你将成为成功的游戏制作人。</p>
       <div class="goalRevealRules" aria-label="目标收入计算规则">
         <div class="goalRevenueCounts"><span>计入目标</span><strong>游戏首发 · 版本更新 · 持续运营净收入</strong></div>
         <div class="goalRevenueExcluded"><span>不计入</span><strong>贷款 · 彩票 · 炒股</strong></div>
       </div>
-      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><span>目标明确</span><strong>开工，挣到 100 亿 →</strong></button>
+      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><span>合同已签</span><strong>开工，向 100 亿出发 →</strong></button>
     </div>
   </section>
 
@@ -247,9 +241,9 @@
   </div>
 
   <section id="endingScreen" class="endingScreen hidden" aria-live="polite">
-    <div><h1 id="endingTitle">电脑还在</h1><p id="endingSubtitle">已经算小胜。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><strong>重新开始 →</strong></button></div>
+    <div><h1 id="endingTitle">你成为了成功的游戏制作人！</h1><p id="endingSubtitle">累计游戏收入达到 100 亿元。</p><div id="endingStats" class="endingStats"></div><button id="restartButton" class="startButton" type="button"><strong>重新开始 →</strong></button></div>
   </section>
 
-  <script type="module" src="./Script_Play.mjs?v=20260815u"></script>
+  <script type="module" src="./Script_Play.mjs?v=20260815v"></script>
 </body>
 </html>

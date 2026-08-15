@@ -7,6 +7,8 @@ const html = ReadLocal("./index.html");
 const css = ReadLocal("./Style_Play.css");
 const script = ReadLocal("./Script_Play.mjs");
 const setupChoiceScript = script.match(/function RenderSetupChoices\(\) \{[^]*?dom\.continueButton[^]*?\n\}/)?.[0] || "";
+const contractDecisionPage = html.match(/<article class="contractPage contractDecisionPage active"[^]*?<\/article>/)?.[0] || "";
+const sealKeyupSource = script.match(/dom\.sealButton\.addEventListener\("keyup"[^]*?\n  \}\);/)?.[0] || "";
 const homeComputerSource = script.slice(
   script.indexOf("function OpenHomeComputerSheet"),
   script.indexOf("function OpenWorkstationSheet"),
@@ -19,19 +21,25 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815u/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815u/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!u)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!u)/, "the gameplay cache-bust must stay unified");
-assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible modal win-condition reveal");
+assert.match(html, /Style_Play\.css\?v=20260815v/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815v/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!v)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!v)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /id="goalReveal"[^>]+role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="goalRevealTitle"/, "the opening must contain an accessible creator-goal reveal");
 assert.match(html, /id="goalRevealCounter">0<\/span><b>亿元<\/b>/, "the reveal must animate toward the explicit 100-yuan-billion target");
-assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward victory");
+assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash sources do not count toward the creator goal");
+assert.match(html, /你将成为成功的游戏制作人/, "the 100-yuan-billion goal must describe the creator milestone rather than victory");
+assert.doesNotMatch(html, /胜利|通关/, "the active page must not frame 100-yuan-billion revenue as winning the game");
 assert.doesNotMatch(html, /id="settlementButton"/, "monthly close must stay on the physical wall calendar");
 assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must stay on the physical desk phone");
-assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 06/, "the founding book must begin with the first of six pages");
-assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 06/, "the founder profile must remain the second book page");
-assert.match(html, /id="contractPageCounter">03 \/ 06/, "the project contract must continue the six-page book");
-assert.equal([...html.matchAll(/data-contract-page=/g)].length, 4, "four contract pages must follow the name and founder pages");
+assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/, "the founding book must begin with the first of four pages");
+assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/, "the founder profile must remain the second book page");
+assert.match(html, /id="contractPageCounter">03 \/ 04/, "the project contract must continue the four-page book");
+assert.equal([...html.matchAll(/data-contract-page=/g)].length, 2, "selection and signature must be the only contract pages");
+assert.match(contractDecisionPage, /id="projectChoices"/, "theme choices must appear on the combined decision page");
+assert.match(contractDecisionPage, /id="typeChoices"/, "release choices must appear beside the theme choices");
+assert.doesNotMatch(html, /gameNameInput|游戏正式名称|填写游戏名/, "project setup must not ask the player to name the game");
+assert.match(html, /签署发行合同/, "the final action must be presented as signing the publishing contract");
 
 assert.match(css, /--controlSize:\s*clamp\(58px,\s*15\.5vh,\s*70px\)/, "primary controls must scale with short landscape screens");
 assert.match(css, /\.interactButton\.available/, "the contextual action needs a high-confidence ready state");
@@ -46,6 +54,9 @@ assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*4
 assert.match(css, /\.goalReveal\.active \.goalRevealNumber/, "the 100-yuan-billion target needs a dedicated entrance animation");
 assert.match(css, /\.goalRevealCard\s*\{\s*gap:5px;/, "the target reveal must compact itself on short landscape phones");
 assert.match(css, /\.goalRevealButton\s*\{[^}]*min-height:44px;/, "the target acknowledgement must remain a full touch target");
+assert.match(css, /\.contractDecisionGrid\s*\{[^}]*grid-template-columns:/s, "theme and release choices need a shared responsive contract grid");
+assert.match(css, /\.contractDecisionPage\.active\s*\{[^}]*overflow-y:auto;/s, "short landscape screens must be able to scroll every contract choice into view");
+assert.doesNotMatch(css, /\.contractChoiceGroup \.compactRail\s*\{[^}]*grid-template-columns:\s*1fr/s, "three release modes must not stack into a clipped short-screen column");
 assert.match(css, /\.stockPickGrid\s*\{/, "the bank stock picker needs a responsive two-choice layout");
 assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");
 assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
@@ -65,12 +76,18 @@ assert.doesNotMatch(script, /event\.code === "KeyN"|dom\.settlementButton/, "mon
 assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global keyboard or HUD shortcut");
 assert.match(script, /function TurnContractPage\(/, "the contract must support explicit page turns");
 assert.match(script, /function BeginSealHold\(/, "the contract must retain its deliberate signing gesture");
+assert.doesNotMatch(script, /确认开局/, "the signing action must never fall back to generic start-game copy");
+assert.doesNotMatch(sealKeyupSource, /CompleteContractSigning/, "releasing a keyboard key early must cancel instead of bypassing the one-second signature hold");
+assert.match(script, /selectedProjectId = button\.dataset\.projectId;[\s\S]*?RenderSetupChoices\(\);[\s\S]*?data-project-id=[^\n]+\.focus\(/, "rebuilding theme cards must restore keyboard focus to the selected choice");
+assert.match(script, /selectedGameTypeId = button\.dataset\.typeId;[\s\S]*?RenderSetupChoices\(\);[\s\S]*?data-type-id=[^\n]+\.focus\(/, "rebuilding release cards must restore keyboard focus to the selected choice");
+assert.match(script, /addEventListener\("pointerleave", CancelSealHold\)/, "leaving the seal while pressed must cancel the signature timer");
 assert.match(script, /data-computer-release|function OpenReleaseSheet\(/, "publishing must remain reachable from the development computer");
 assert.match(script, /matches\?\.\("button, a, \[role='button'\]"\)[^\n]+\["Space", "Enter"\]/, "focused physical controls must retain native keyboard activation");
 assert.match(script, /navigator\.vibrate\?\./, "coarse-pointer actions should provide optional tactile confirmation");
 assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet must open at its own beginning");
 assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must show the target before entering the playable world");
-assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the win condition before play begins");
+assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
+assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
 assert.match(script, /AddPhysicalLabel\(roomGroup, location\.name, ""/, "scene signs must render the place name without an explanatory subtitle");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");

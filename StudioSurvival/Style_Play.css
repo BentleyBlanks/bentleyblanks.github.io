@@ -444,6 +444,15 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .contractPage h2 { font-size:clamp(31px,3.6vw,50px); }
 .contractPage .contractField { margin-top:34px; }
 .contractPage .choiceRail { margin-top:22px; }
+.contractDecisionPage { justify-content:flex-start; padding-top:18px; }
+.contractDecisionPage.active { height:100%; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.contractDecisionPage h2 { font-size:clamp(29px,3.2vw,43px); }
+.contractDecisionGrid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(250px,.85fr); gap:18px; min-height:0; margin-top:14px; }
+.contractChoiceGroup { min-width:0; padding:12px; border:1px solid #b7ad96; background:rgba(255,255,255,.16); }
+.contractChoiceGroup h3 { display:flex; align-items:center; gap:8px; margin:0 0 9px; color:#342a23; font:900 13px/1.2 Georgia,"Songti SC",serif; }
+.contractChoiceGroup h3 span { display:grid; place-items:center; width:24px; height:24px; border:1px solid #a42435; border-radius:50%; color:#902536; font:900 8px/1 Inter,sans-serif; }
+.contractChoiceGroup .choiceRail { margin-top:0; }
+.projectContract .contractDecisionPage .choiceCard { min-height:74px; display:flex; align-items:center; }
 .projectContract .choiceCard { min-height:112px; padding:14px 15px; border:1px solid #b7ad96; border-radius:4px; background:rgba(255,255,255,.32); color:#2a231e; }
 .projectContract .choiceCard:hover { border-color:#645549; background:rgba(255,255,255,.66); }
 .projectContract .choiceCard strong { font-size:14px; }
@@ -492,7 +501,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 @keyframes bookExitBackward { to { opacity:0; transform:translateX(12%) rotateY(-9deg); } }
 .projectContract.signed::after { content:"已签署"; z-index:30; left:auto; top:auto; right:7%; bottom:9%; width:110px; height:110px; display:grid; place-items:center; border:7px double rgba(164,36,53,.74); border-radius:50%; opacity:1; color:rgba(164,36,53,.74); background:transparent; box-shadow:none; font:950 25px/1 "Songti SC",serif; transform:rotate(-13deg); pointer-events:none; }
 
-/* Unmissable win-condition reveal ----------------------------------------- */
+/* Unmissable creator-success milestone ------------------------------------ */
 .goalReveal {
   --goalRevealProgress: 0;
   position: fixed;
@@ -2687,7 +2696,7 @@ body {
   box-shadow: inset 1px 1px rgba(255,255,255,.45), 0 1px 3px rgba(0,0,0,.65);
 }
 
-/* The win condition is a physical finance folio, not a detached sci-fi HUD. */
+/* The creator milestone is a physical finance folio, not a detached sci-fi HUD. */
 .goalReveal {
   color: var(--paperInk);
   background:
@@ -3255,7 +3264,15 @@ body {
   .contractPage { padding:8px 2% 6px; }
   .contractPage h2 { font-size:27px; }
   .contractPage .choiceRail { margin-top:8px; gap:5px; }
+  .contractDecisionPage { padding-top:5px; }
+  .contractDecisionPage h2 { font-size:24px; }
+  .contractDecisionGrid { grid-template-columns:minmax(0,1.15fr) minmax(150px,.85fr); gap:7px; margin-top:6px; }
+  .contractChoiceGroup { padding:5px; }
+  .contractChoiceGroup h3 { gap:5px; margin-bottom:5px; font-size:9px; }
+  .contractChoiceGroup h3 span { width:17px; height:17px; font-size:6px; }
+  .contractChoiceGroup .choiceRail { margin-top:0; }
   .projectContract .choiceCard { min-height:66px; padding:7px 9px; }
+  .projectContract .contractDecisionPage .choiceCard { min-height:52px; }
   .projectContract .choiceCard strong { font-size:10px; }
   .projectContract .choiceCard p { margin:3px 0; font-size:6.5px; }
   .projectContract .choiceCard small { font-size:6px; }
@@ -3296,7 +3313,7 @@ body {
   .computerKeyboardVisual { bottom:0; height:34px; padding:5px 8px; }
 }
 
-/* Touch targets stay usable across the six-page founding book. */
+/* Touch targets stay usable across the four-page founding book. */
 .founderSkillControls button,
 .founderBookNav .bookBackButton,
 .contractBookNav .bookBackButton,

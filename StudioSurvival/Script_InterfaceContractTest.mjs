@@ -6,6 +6,7 @@ const ReadLocal = (name) => readFileSync(new URL(name, import.meta.url), "utf8")
 const script = ReadLocal("./Script_Play.mjs");
 const html = ReadLocal("./index.html");
 const css = ReadLocal("./Style_Play.css");
+const contractDecisionPage = html.match(/<article class="contractPage contractDecisionPage active"[^]*?<\/article>/)?.[0] || "";
 const ById = (id) => InteractionPoints.find((point) => point.id === id);
 
 assert.deepEqual(
@@ -74,9 +75,13 @@ assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be avai
 assert.doesNotMatch(html, /id="settlementButton"/, "monthly close must stay on the physical wall calendar");
 assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global shortcut");
 assert.doesNotMatch(script, /event\.code === "KeyN"|dom\.settlementButton/, "monthly close must not gain a global shortcut");
-assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 06/);
-assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 06/);
-assert.match(html, /id="contractPageCounter">03 \/ 06/);
-assert.equal([...html.matchAll(/data-contract-page=/g)].length, 4, "four contract pages follow the separate studio-name and founder-profile pages");
+assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/);
+assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/);
+assert.match(html, /id="contractPageCounter">03 \/ 04/);
+assert.equal([...html.matchAll(/data-contract-page=/g)].length, 2, "theme/release selection and signature follow the studio-name and founder-profile pages");
+assert.match(contractDecisionPage, /id="projectChoices"[\s\S]*id="typeChoices"/, "theme and release mode must be selected together");
+assert.doesNotMatch(html, /gameNameInput|游戏正式名称|填写游戏名/, "the founding contract must not ask for a game name");
+assert.match(html, /id="sealButton"[\s\S]*签署发行合同/, "the contract must end in an explicit signing ritual");
+assert.doesNotMatch(script, /确认开局/, "contract signing must not be labeled as generic start confirmation");
 
 console.log("StudioSurvival interface separation contract test passed");

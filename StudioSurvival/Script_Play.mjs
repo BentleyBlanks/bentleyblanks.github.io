@@ -22,7 +22,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815u";
+} from "./Data_Game.mjs?v=20260815v";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -69,7 +69,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815u";
+} from "./Script_Rules.mjs?v=20260815v";
 import {
   FindLocation,
   FindLocationAt,
@@ -80,14 +80,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815u";
+} from "./Data_World.mjs?v=20260815v";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815u";
+} from "./Script_World.mjs?v=20260815v";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -98,9 +98,9 @@ const dom = Object.fromEntries([
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderBackButton", "founderConfirmButton",
-  "projectContract", "contractStudioName", "contractFounderSkills", "gameNameInput", "contractSignatureName", "contractError", "sealButton",
+  "projectContract", "contractStudioName", "contractFounderSkills", "contractSignatureName", "contractError", "sealButton",
   "contractPageViewport", "contractPageCounter", "contractBackButton", "contractNextButton", "contractPageHint",
-  "contractReviewStudio", "contractReviewFounder", "contractReviewGame", "contractReviewTheme", "contractReviewType",
+  "contractReviewStudio", "contractReviewFounder", "contractReviewTheme", "contractReviewType",
   "goalReveal", "goalRevealCounter", "goalRevealButton",
   "projectChoices", "typeChoices", "continueButton", "modalLayer", "modalBackdrop", "sheetKicker",
   "sheetTitle", "sheetBody", "sheetCloseButton", "resultLayer", "resultKicker", "resultTitle", "resultBody",
@@ -144,6 +144,10 @@ function LoadSavedState() {
     candidate.stockHistory ??= [];
     candidate.lastRelaxationMonth ??= 0;
     candidate.relaxationHistory ??= [];
+    if (candidate.status === "ended" && candidate.outcome?.kind === "worldMaker") {
+      candidate.outcome.title = "你成为了成功的游戏制作人！";
+      candidate.outcome.subtitle = "累计游戏收入达到 100 亿元。你从一份合同出发，终于做出了被玩家认可的游戏。电脑也还在。";
+    }
     return candidate;
   } catch {
     return null;
@@ -169,7 +173,6 @@ let ceremonyElapsed = 0;
 let ceremonyBurstStep = -1;
 let sealHoldTimer = null;
 let sealHoldComplete = false;
-let sealKeyboardMode = false;
 let pendingGoalState = null;
 let goalRevealAnimationFrame = null;
 let activeScratchSession = null;
@@ -180,10 +183,8 @@ let contractPageTimer = null;
 let traveling = false;
 const inputState = { left: false, right: false, jump: false };
 const CONTRACT_PAGE_COPY = [
-  { counter: "03 / 06", hint: "先写下游戏名", next: "选择游戏题材" },
-  { counter: "04 / 06", hint: "只选一个题材", next: "选择发行方式" },
-  { counter: "05 / 06", hint: "发行方式会改变成本", next: "核对整份合同" },
-  { counter: "06 / 06", hint: "确认无误后按住盖章", next: "" },
+  { counter: "03 / 04", hint: "题材与发行一起生效", next: "核对发行合同" },
+  { counter: "04 / 04", hint: "按住印章，正式签约", next: "" },
 ];
 
 function IsOverlayOpen() {
@@ -1783,7 +1784,7 @@ function ShowProjectContract() {
     dom.projectContract.classList.remove("hidden");
     dom.projectContract.classList.add("bookEnterForward");
     window.setTimeout(() => dom.projectContract.classList.remove("bookEnterForward"), 320);
-    dom.gameNameInput.focus({ preventScroll: true });
+    dom.projectChoices.querySelector("[data-project-id]")?.focus({ preventScroll: true });
   }, 190);
 }
 
@@ -2187,12 +2188,11 @@ function Animate() {
 
 function RenderSetupChoices() {
   dom.projectChoices.innerHTML = PROJECTS.map((project) => `
-    <button class="choiceCard ${project.id === selectedProjectId ? "selected" : ""}" style="--choiceColor:${project.accent}" data-project-id="${project.id}" type="button">
-      <strong>${EscapeHtml(project.title)}</strong>
-      <small>${EscapeHtml(project.genre)}</small>
+    <button class="choiceCard ${project.id === selectedProjectId ? "selected" : ""}" style="--choiceColor:${project.accent}" data-project-id="${project.id}" type="button" aria-pressed="${project.id === selectedProjectId}">
+      <strong>${EscapeHtml(project.genre)}</strong>
     </button>`).join("");
   dom.typeChoices.innerHTML = GAME_TYPES.map((gameType) => `
-    <button class="choiceCard ${gameType.id === selectedGameTypeId ? "selected" : ""}" style="--choiceColor:${gameType.accent}" data-type-id="${gameType.id}" type="button">
+    <button class="choiceCard ${gameType.id === selectedGameTypeId ? "selected" : ""}" style="--choiceColor:${gameType.accent}" data-type-id="${gameType.id}" type="button" aria-pressed="${gameType.id === selectedGameTypeId}">
       <strong>${gameType.icon} ${EscapeHtml(gameType.name)}</strong>
     </button>`).join("");
   dom.continueButton.classList.toggle("hidden", !savedState?.project);
@@ -2205,8 +2205,7 @@ function UpdateContractReview() {
   const gameType = FindGameType(selectedGameTypeId);
   dom.contractReviewStudio.textContent = draftStudioName || "等待命名";
   dom.contractReviewFounder.textContent = `策 ${draftFounderSkills.design} / 程 ${draftFounderSkills.programming} / 美 ${draftFounderSkills.art}`;
-  dom.contractReviewGame.textContent = dom.gameNameInput?.value.trim() || "等待命名";
-  dom.contractReviewTheme.textContent = project?.title || "尚未选择";
+  dom.contractReviewTheme.textContent = project?.genre || "尚未选择";
   dom.contractReviewType.textContent = gameType?.name || "尚未选择";
 }
 
@@ -2245,22 +2244,7 @@ function TurnContractPage(nextIndex, direction = "forward") {
   }, 180);
 }
 
-function ValidateContractPage() {
-  dom.contractError.textContent = "";
-  if (contractPageIndex !== 0) return true;
-  const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
-  if (projectName.length >= 2) return true;
-  dom.contractError.textContent = "游戏名至少两个字。";
-  dom.contractPageHint.textContent = "请先写至少两个字的游戏名";
-  dom.projectContract.classList.add("hasPageError");
-  window.setTimeout(() => dom.projectContract.classList.remove("hasPageError"), 360);
-  dom.gameNameInput.focus();
-  PlayTone("warning");
-  return false;
-}
-
 function AdvanceContractPage() {
-  if (!ValidateContractPage()) return;
   TurnContractPage(contractPageIndex + 1, "forward");
 }
 
@@ -3272,7 +3256,7 @@ function OpenDirectiveSheet() {
     ${earlyStage ? `<div class="noteList"><div class="note good">先完成第一个月，之后再开放玩法定制和换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案只在这块白板处理</span><button class="miniButton" data-feature-source type="button">安排玩法提案</button></div>
     <div class="panelSection sectionHeading"><strong>承认做错了：换赛道</strong><span>预计烧掉 ${FormatMoney(pivotCost)}</span></div>
     <div class="worldGrid">
-      <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.title)} · ${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
+      <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
       <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
     </div>
     <div class="panelSection choiceFooter"><span>进度、宣发、玩法都会大量损失；焦虑 +14，饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 强行转向</button></div>`}`, () => {
@@ -3629,7 +3613,7 @@ function OpenHelpSheet() {
       <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
       <div class="note"><b>结束本月</b>：墙上月历。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
-      <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元即胜利。</div>
+      <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元，你将成为成功的游戏制作人。</div>
     </div>
     <div class="panelSection">${RenderLog(6)}</div>`);
 }
@@ -3640,7 +3624,7 @@ function RenderEnding() {
   dom.setupScreen.classList.add("hidden");
   dom.modalLayer.classList.add("hidden");
   dom.resultLayer.classList.add("hidden");
-  dom.endingTitle.textContent = state.outcome?.title || (state.status === "ended" ? "你影响了世界" : "工作室倒下了");
+  dom.endingTitle.textContent = state.outcome?.title || (state.status === "ended" ? "你成为了成功的游戏制作人！" : "工作室倒下了");
   const identity = [state.studioName, state.project?.name ? `《${state.project.name}》` : ""].filter(Boolean).join(" · ");
   dom.endingSubtitle.textContent = `${identity}${identity ? "｜" : ""}${state.outcome?.subtitle || ""}`;
   dom.endingStats.innerHTML = `
@@ -3881,24 +3865,14 @@ function CancelSealHold() {
   if (sealHoldComplete) return;
   window.clearTimeout(sealHoldTimer);
   sealHoldTimer = null;
-  sealKeyboardMode = false;
   dom.sealButton.classList.remove("holding");
 }
 
 function CompleteContractSigning() {
   if (sealHoldComplete) return;
-  const projectName = dom.gameNameInput.value.replace(/[<>\r\n\t]/g, "").replace(/\s+/g, " ").trim();
-  if (projectName.length < 2) {
-    dom.contractError.textContent = "游戏名至少 2 个字。";
-    CancelSealHold();
-    dom.gameNameInput.focus();
-    PlayTone("warning");
-    return;
-  }
   const fresh = CreateInitialState();
   const result = StartProject(fresh, selectedProjectId, selectedGameTypeId, {
     studioName: draftStudioName,
-    projectName,
     founderSkills: draftFounderSkills,
   });
   if (!result.ok) {
@@ -3912,9 +3886,9 @@ function CompleteContractSigning() {
   dom.sealButton.classList.remove("holding");
   dom.sealButton.classList.add("sealed");
   dom.sealButton.querySelector("span").textContent = "合同生效";
-  dom.sealButton.querySelector("strong").textContent = "已确认";
+  dom.sealButton.querySelector("strong").textContent = "签署完成";
   dom.projectContract.classList.add("signed");
-  dom.contractError.textContent = "合同生效；贷款开始计时。";
+  dom.contractError.textContent = "发行合同已签署；M01 正式开始。";
   SpawnParticles(6, 3.7, 0xff445f, 48);
   PlayTone("release");
   window.setTimeout(() => ShowGoalReveal(result.state), 1050);
@@ -3924,15 +3898,7 @@ function BeginSealHold(event) {
   if (sealHoldComplete || onboardingPhase !== "contract") return;
   if (event.type === "pointerdown" && event.button !== 0) return;
   event.preventDefault();
-  const projectName = dom.gameNameInput.value.trim();
-  if (projectName.length < 2) {
-    dom.contractError.textContent = "请先填写游戏名。";
-    dom.gameNameInput.focus();
-    PlayTone("warning");
-    return;
-  }
   dom.contractError.textContent = "按住 1 秒。";
-  sealKeyboardMode = event.type === "keydown";
   dom.sealButton.classList.add("holding");
   window.clearTimeout(sealHoldTimer);
   sealHoldTimer = window.setTimeout(CompleteContractSigning, 1050);
@@ -3961,13 +3927,12 @@ function ResetOnboarding() {
   dom.skipCeremonyButton.classList.add("hidden");
   dom.ceremonyCaption.classList.add("hidden");
   dom.studioNameInput.value = "";
-  dom.gameNameInput.value = "";
   dom.setupError.textContent = "";
   dom.contractError.textContent = "";
   contractPageIndex = 0;
   dom.sealButton.classList.remove("holding", "sealed");
   dom.sealButton.querySelector("span").textContent = "按住 1 秒";
-  dom.sealButton.querySelector("strong").textContent = "确认开局";
+  dom.sealButton.querySelector("strong").textContent = "签署发行合同";
   RenderFounderSkills();
   RenderSetupChoices();
   RenderContractPage();
@@ -4086,6 +4051,7 @@ function BindControls() {
     if (!button) return;
     selectedProjectId = button.dataset.projectId;
     RenderSetupChoices();
+    dom.projectChoices.querySelector(`[data-project-id="${selectedProjectId}"]`)?.focus({ preventScroll: true });
     PlayTone("tap");
   });
   dom.typeChoices.addEventListener("click", (event) => {
@@ -4093,6 +4059,7 @@ function BindControls() {
     if (!button) return;
     selectedGameTypeId = button.dataset.typeId;
     RenderSetupChoices();
+    dom.typeChoices.querySelector(`[data-type-id="${selectedGameTypeId}"]`)?.focus({ preventScroll: true });
     PlayTone("tap");
   });
   dom.ceremonyStartButton.addEventListener("click", StartFoundingCeremony);
@@ -4117,18 +4084,10 @@ function BindControls() {
     AdjustFounderSkill(button.dataset.skillKey, button.dataset.skillAction === "increase" ? 1 : -1);
   });
   dom.founderConfirmButton.addEventListener("click", ConfirmFounderProfile);
-  dom.gameNameInput.addEventListener("input", () => {
-    dom.contractError.textContent = "";
-    if (contractPageIndex === 0) dom.contractPageHint.textContent = CONTRACT_PAGE_COPY[0].hint;
-    UpdateContractReview();
-  });
-  dom.gameNameInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") { event.preventDefault(); AdvanceContractPage(); }
-  });
   dom.sealButton.addEventListener("pointerdown", BeginSealHold);
   dom.sealButton.addEventListener("pointerup", CancelSealHold);
   dom.sealButton.addEventListener("pointercancel", CancelSealHold);
-  dom.sealButton.addEventListener("pointerleave", (event) => { if (event.buttons === 0) CancelSealHold(); });
+  dom.sealButton.addEventListener("pointerleave", CancelSealHold);
   dom.sealButton.addEventListener("contextmenu", (event) => event.preventDefault());
   dom.sealButton.addEventListener("keydown", (event) => {
     if (!["Enter", " "].includes(event.key) || event.repeat) return;
@@ -4136,12 +4095,8 @@ function BindControls() {
   });
   dom.sealButton.addEventListener("keyup", (event) => {
     if (!["Enter", " "].includes(event.key)) return;
-    if (sealKeyboardMode) {
-      window.clearTimeout(sealHoldTimer);
-      sealHoldTimer = null;
-      sealKeyboardMode = false;
-      CompleteContractSigning();
-    } else CancelSealHold();
+    event.preventDefault();
+    CancelSealHold();
   });
   dom.continueButton.addEventListener("click", () => BeginWorld(savedState));
   dom.goalRevealButton.addEventListener("click", CompleteGoalReveal);
