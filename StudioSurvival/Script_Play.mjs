@@ -215,8 +215,51 @@ function SaveState() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch { /* Local saves are optional. */ }
 }
 
+// ── 音效：MiniMax Hub 生成的采样优先，合成音兜底 ────────────────────────────
+const SFX_FILES = {
+  tap: "AudioSfx_Tap.mp3",
+  good: "AudioSfx_Good.mp3",
+  warning: "AudioSfx_Warning.mp3",
+  jump: "AudioSfx_Jump.mp3",
+  hit: "AudioSfx_Hit.mp3",
+  coin: "AudioSfx_Coin.mp3",
+  release: "AudioSfx_Release.mp3",
+};
+const sfxCache = new Map();
+const sfxBroken = new Set();
+
+function GetSfxElement(file) {
+  if (!sfxCache.has(file)) {
+    const element = new Audio(file);
+    element.preload = "auto";
+    sfxCache.set(file, element);
+  }
+  return sfxCache.get(file);
+}
+
+function PlaySfxSample(file, volume = 0.55) {
+  if (sfxBroken.has(file)) return false;
+  try {
+    const element = GetSfxElement(file);
+    element.volume = volume;
+    element.currentTime = 0;
+    const promise = element.play();
+    if (promise !== undefined) promise.catch(() => sfxBroken.add(file));
+    return true;
+  } catch {
+    sfxBroken.add(file);
+    return false;
+  }
+}
+
 function PlayTone(kind = "tap") {
   if (!soundEnabled) return;
+  const file = SFX_FILES[kind];
+  if (file !== undefined && PlaySfxSample(file)) return;
+  PlaySynthesizedTone(kind);
+}
+
+function PlaySynthesizedTone(kind = "tap") {
   try {
     audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
     const now = audioContext.currentTime;
@@ -237,6 +280,56 @@ function PlayTone(kind = "tap") {
     oscillator.start(now);
     oscillator.stop(now + duration);
   } catch { /* Sound should never block play. */ }
+}
+
+// ── 背景音乐：标题页与游戏内各一条循环（Kevin MacLeod, CC-BY 4.0） ─────────
+const BGM_TRACKS = {
+  title: { src: "AudioBgm_OfficeElevator.mp3", volume: 0.3 },
+  game: { src: "AudioBgm_OfficeLight.mp3", volume: 0.16 },
+};
+let bgmElements = null;
+let bgmKind = null;
+
+function GetBgmElements() {
+  if (bgmElements === null) {
+    bgmElements = {};
+    for (const [kind, track] of Object.entries(BGM_TRACKS)) {
+      const element = new Audio(track.src);
+      element.loop = true;
+      element.preload = "auto";
+      element.volume = track.volume;
+      bgmElements[kind] = element;
+    }
+  }
+  return bgmElements;
+}
+
+function SwitchBgm(kind) {
+  if (bgmKind === kind) return;
+  const tracks = GetBgmElements();
+  const next = tracks[kind];
+  if (next === undefined) return;
+  if (bgmKind !== null) { try { tracks[bgmKind].pause(); } catch { /* BGM must never block play. */ } }
+  bgmKind = kind;
+  if (!soundEnabled) return;
+  try {
+    next.currentTime = 0;
+    const promise = next.play();
+    if (promise !== undefined) promise.catch(() => {});
+  } catch { /* BGM must never block play. */ }
+}
+
+function PauseBgm() {
+  if (bgmKind === null) return;
+  try { GetBgmElements()[bgmKind].pause(); } catch { /* BGM must never block play. */ }
+}
+
+function ResumeBgm() {
+  if (!soundEnabled || bgmKind === null) return;
+  try {
+    const promise = GetBgmElements()[bgmKind].play();
+    if (promise !== undefined) promise.catch(() => {});
+  } catch { /* BGM must never block play. */ }
 }
 
 function PlayScratchNoise(intensity = 1) {
@@ -4504,6 +4597,7 @@ function OpenHelpSheet() {
       <div class="note"><b>评分、事件、月结</b>：项目日历；右下角“下一回合”也可打开。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
       <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元，你将成为成功的游戏制作人。</div>
+      <div class="note">音乐：Kevin MacLeod (incompetech.com)，CC-BY 4.0。</div>
     </div>
     <div class="panelSection">${RenderLog(6)}</div>`);
 }
@@ -4591,6 +4685,7 @@ function BeginWorld(nextState) {
   state = nextState;
   onboardingPhase = "game";
   landingOpen = false;
+  SwitchBgm("game");
   worldState = CreateWorldState(state.month);
   dom.setupScreen.classList.add("hidden");
   dom.setupScreen.classList.remove("cinematic");
@@ -4719,6 +4814,7 @@ function StartFoundingCeremony() {
   document.body.classList.add("onboarding");
   SetPlayableWorldVisible(false);
   ShowFoundingNamePanel();
+  SwitchBgm("title");
   PlayTone("good");
 }
 
@@ -4807,6 +4903,7 @@ function BeginSealHold(event) {
 function ResetOnboarding() {
   HideGoalReveal();
   onboardingPhase = "intro";
+  SwitchBgm("title");
   ceremonyElapsed = 0;
   ceremonyBurstStep = -1;
   sealHoldComplete = false;
@@ -4976,7 +5073,8 @@ function BindControls() {
     dom.soundButton.classList.toggle("muted", !soundEnabled);
     dom.soundButtonIcon.textContent = soundEnabled ? "♪" : "×";
     dom.soundButton.setAttribute("aria-label", soundEnabled ? "关闭音效" : "开启音效");
-    if (soundEnabled) PlayTone("good");
+    if (soundEnabled) { ResumeBgm(); PlayTone("good"); }
+    else PauseBgm();
   });
   dom.projectChoices.addEventListener("click", (event) => {
     const button = event.target.closest("[data-project-id]");
