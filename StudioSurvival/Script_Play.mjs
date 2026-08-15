@@ -457,7 +457,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815ax";
+const ART_CACHE_VERSION = "20260815ay";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -3817,6 +3817,7 @@ function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   dom.modalLayer.classList.toggle("travelMapMode", panelOptions.mode === "travelMap");
   dom.modalLayer.classList.toggle("bankMode", panelOptions.mode === "bank");
   dom.modalLayer.classList.toggle("stockWindowMode", panelOptions.mode === "stockWindow");
+  dom.modalLayer.classList.toggle("talentMarketMode", panelOptions.mode === "talentMarket");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
@@ -3838,6 +3839,7 @@ function ClosePanel() {
   dom.modalLayer.classList.remove("travelMapMode");
   dom.modalLayer.classList.remove("bankMode");
   dom.modalLayer.classList.remove("stockWindowMode");
+  dom.modalLayer.classList.remove("talentMarketMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -3986,7 +3988,7 @@ function OpenInvestmentSheet(staffId) {
       if (!button) return;
       if (ApplyInteractiveResult(SetStaffInvestmentLevel(state, staffId, Number(button.dataset.level)))) OpenInvestmentSheet(staffId);
     };
-  });
+  }, { mode: "talentMarket" });
 }
 
 function OpenEquipmentSheet() {
@@ -4007,30 +4009,90 @@ function OpenEquipmentSheet() {
       const result = PurchaseWorkstation(state);
       if (ApplyInteractiveResult(result, { rebuildStaff: true, tone: "warning" })) OpenEquipmentSheet();
     };
-  });
+  }, { mode: "talentMarket" });
+}
+
+function TalentAvatarHtml(staffId) {
+  const wrap = (inner) => `<span class="talentAvatar avatar-${staffId}" aria-hidden="true"><i class="avShadow"></i>${inner}</span>`;
+  switch (staffId) {
+    case "linMo":
+      return wrap(`<span class="avatarBob"><span class="lmBody"></span><span class="lmHead"></span><span class="lmHair"></span><span class="lmBun"></span><span class="lmEye left"></span><span class="lmEye right"></span><span class="lmSmile"></span><span class="lmTablet"><span class="lmScreen"></span></span><span class="lmPen"><span class="lmPenTip"></span></span></span><span class="lmSpark s1"></span><span class="lmSpark s2"></span><span class="lmSpark s3"></span>`);
+    case "zhaoXiaobei":
+      return wrap(`<span class="avatarBob"><span class="zbBody"></span><span class="zbHead"></span><span class="zbHair"></span><span class="zbSpike left"></span><span class="zbSpike right"></span><span class="zbLens left"></span><span class="zbLens right"></span><span class="zbBridge"></span><span class="zbEye left"></span><span class="zbEye right"></span><span class="zbSmile"></span></span><span class="zbBulb"><span class="zbFilament"></span></span><span class="zbBulbBase"></span><span class="zbNote n1"></span><span class="zbNote n2"></span>`);
+    case "chenXu":
+      return wrap(`<span class="avatarBob"><span class="cxBody"><span class="cxStrings"></span></span><span class="cxHood"></span><span class="cxHead"></span><span class="cxFringe"></span><span class="cxBand"></span><span class="cxCup left"></span><span class="cxCup right"></span><span class="cxEye left"></span><span class="cxEye right"></span><span class="cxSmile"></span><span class="cxLaptop"><span class="cxScreen"></span><span class="cxBase"></span></span><span class="cxHand left"></span><span class="cxHand right"></span></span>`);
+    case "taoRan":
+      return wrap(`<span class="avatarBob"><span class="trBody"></span><span class="trHead"></span><span class="trHair"></span><span class="trBand"></span><span class="trLens left"></span><span class="trLens right"></span><span class="trEye left"></span><span class="trEye right"></span><span class="trSmile"></span><span class="trArm"></span><span class="trWatch"><span class="trCrown"></span><span class="trFace"></span></span></span><span class="trFps">60</span>`);
+    case "dreamBrush":
+      return wrap(`<span class="dbFloat"><span class="dbBody"><span class="dbScreen"><span class="dbEye left"></span><span class="dbEye right"></span><span class="dbSmile"></span><span class="dbEq e1"></span><span class="dbEq e2"></span><span class="dbEq e3"></span></span></span><span class="dbBrush"><span class="dbHandle"></span><span class="dbFerrule"></span><span class="dbTip"></span></span></span><span class="dbSpark s1"></span><span class="dbSpark s2"></span><span class="dbSpark s3"></span>`);
+    case "scopeWhale":
+      return wrap(`<span class="swFloat"><span class="swTail"><span class="swFin top"></span><span class="swFin bottom"></span></span><span class="swBody"></span><span class="swBelly"></span><span class="swEye"></span><span class="swSmile"></span><span class="swTie"></span></span><span class="swDot d1"></span><span class="swDot d2"></span>`);
+    case "pairPanda":
+      return wrap(`<span class="ppTilt"><span class="ppEar left"></span><span class="ppEar right"></span><span class="ppHead"></span><span class="ppPatch left"></span><span class="ppPatch right"></span><span class="ppEye left"></span><span class="ppEye right"></span><span class="ppNose"></span><span class="ppSmile"></span></span><span class="ppTerm"><span class="ppLine l1"></span><span class="ppLine l2"></span><span class="ppCursor"></span></span>`);
+    case "frameJelly":
+      return wrap(`<span class="fjFloat"><span class="fjTentacle t1"></span><span class="fjTentacle t2"></span><span class="fjTentacle t3"></span><span class="fjTentacle t4"></span><span class="fjDome"></span><span class="fjCore"></span><span class="fjEye left"></span><span class="fjEye right"></span><span class="fjSmile"></span></span><span class="fjBadge">60</span>`);
+    default:
+      return wrap(`<span class="avFallback">?</span>`);
+  }
+}
+
+function TalentStatWidth(value) {
+  if (value < 0) return 10;
+  if (value === 0) return 0;
+  return Math.round(Clamp((value + 2) / 16, 0, 1) * 100);
 }
 
 function OpenTalentSheet() {
   const costs = ForecastMonthlyCosts(state);
-  const RenderStaffCard = (staff) => {
+  const seats = state.workstations || 0;
+  const occupied = state.team.length;
+  const freeSeats = Math.max(0, seats - occupied);
+  const RenderTalentFlyer = (staff) => {
     const member = state.team.find((item) => item.id === staff.id);
     const hired = Boolean(member);
-    return `<article class="staffCard">
-      <div class="staffTop"><strong style="color:${staff.color}">${EscapeHtml(staff.name)} · ${EscapeHtml(staff.role)}</strong><span>${EscapeHtml(staff.kind === "ai" ? "AI 月租" : "大学生工资")}</span></div>
-      <p>${EscapeHtml(staff.tagline)}</p>
-      <div class="chipRow"><span class="chip">${EscapeHtml(MODULE_META[staff.specialty].label)}</span><span class="chip">${EscapeHtml(staff.quirk)}</span><span class="chip">${FormatMoney(hired ? GetMemberMonthlyCost(member) : staff.monthlyCost)}/月</span></div>
-      <div class="choiceFooter" style="margin-top:9px"><span>${hired ? "已占用" : state.team.length < state.workstations ? "下月起收费" : "无工位"}</span><span>${hired
-        ? `<button class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}" type="button">聊聊</button> <button class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}" type="button">调待遇</button> <button class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}" type="button">${staff.kind === "ai" ? "退订" : "开除"}</button>`
-        : `<button class="miniButton" data-staff-action="hire" data-staff-id="${staff.id}" type="button" ${state.team.length >= state.workstations ? "disabled" : ""}>${staff.kind === "ai" ? "开始月租" : "雇佣"}</button>`}</span></div>
+    const levels = staff.kind === "ai" ? AI_SUBSCRIPTION_LEVELS : STUDENT_PAY_LEVELS;
+    const plan = hired ? (levels.find((item) => item.level === member.investmentLevel) || levels[0]) : levels[0];
+    const cost = hired ? GetMemberMonthlyCost(member) : staff.monthlyCost;
+    const stats = MODULE_KEYS.map((moduleKey) => {
+      const value = Math.round((staff.output[moduleKey] || 0) * plan.outputMultiplier);
+      return `<div class="talentStat ${value < 0 ? "negative" : ""}" style="--statColor:${MODULE_META[moduleKey].color}">
+        <span class="statLabel">${MODULE_META[moduleKey].icon} ${MODULE_META[moduleKey].shortLabel}</span>
+        <span class="statTrack"><i style="width:${TalentStatWidth(value)}%"></i></span>
+        <b class="statValue">${value > 0 ? "+" : value < 0 ? "−" : ""}${value < 0 ? Math.abs(value) : value}</b>
+      </div>`;
+    }).join("");
+    const priceNote = hired ? ` · ${EscapeHtml(plan.name)}` : "";
+    const actions = hired
+      ? `<button type="button" class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}">聊聊</button><button type="button" class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}">调待遇</button><button type="button" class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}">${staff.kind === "ai" ? "退订" : "开除"}</button>`
+      : `<button type="button" class="flyerHireButton ${staff.kind === "ai" ? "ai" : ""}" data-staff-action="hire" data-staff-id="${staff.id}" ${occupied >= seats ? "disabled" : ""}>${occupied >= seats ? "无工位" : staff.kind === "ai" ? "开始月租" : "发 Offer"}</button>`;
+    return `<article class="talentFlyer ${hired ? "hired" : ""}" data-kind="${staff.kind}" style="--staffColor:${staff.color}">
+      <div class="flyerHead">
+        <span class="avatarBox">${TalentAvatarHtml(staff.id)}${hired ? `<span class="flyerStamp">${staff.kind === "ai" ? "租用中" : "已入职"}</span>` : ""}</span>
+        <div class="flyerIdentity">
+          <span class="talentKindBadge ${staff.kind}">${staff.kind === "ai" ? "AI · 月租" : "大学生 · 月薪"}</span>
+          <h3>${EscapeHtml(staff.name)}</h3>
+          <p>${EscapeHtml(staff.role)}</p>
+        </div>
+        <span class="flyerPrice"><small>${staff.kind === "ai" ? "月租" : "月薪"}${priceNote}</small><strong>${FormatMoney(cost)}</strong><em>/月</em></span>
+      </div>
+      <div class="talentStats">${stats}</div>
+      <div class="flyerFoot">
+        <span class="flyerQuirk"><b>怪癖</b> · ${EscapeHtml(staff.quirk)}</span>
+        <span class="flyerActions">${actions}</span>
+      </div>
     </article>`;
   };
-  OpenPanel("人才", `${state.team.length}/${state.workstations || 0} 工位`, `
-    <p class="panelIntro">人力 ${FormatMoney(costs.studentWages + costs.aiRent)}/月${state.workstations ? "" : " · 先买工位"}</p>
-    <div class="choiceFooter"><span>每人 1 工位</span><button class="miniButton" data-equipment type="button">设备</button></div>
-    <div class="sectionHeading"><strong>大学生</strong><span>工资</span></div>
-    <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderStaffCard).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>AI</strong><span>月租</span></div>
-    <div class="worldGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderStaffCard).join("")}</div>`, () => {
+  OpenPanel("招聘公告栏", "人才市场", `
+    <div class="talentBoardBar">
+      <div class="talentBoardStat"><span>占用工位</span><strong>${occupied}<small> / ${seats}</small></strong></div>
+      <div class="talentBoardStat"><span>空工位</span><strong>${freeSeats}</strong></div>
+      <div class="talentBoardStat"><span>每月人力</span><strong>${FormatMoney(costs.studentWages + costs.aiRent)}</strong></div>
+      <button type="button" class="talentEquipmentButton" data-equipment><span>工位设备</span><strong>每人 1 工位</strong></button>
+    </div>
+    <div class="sectionHeading"><strong>大学生</strong><span>按月发薪</span></div>
+    <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderTalentFlyer).join("")}</div>
+    <div class="panelSection sectionHeading"><strong>AI</strong><span>按月收租</span></div>
+    <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderTalentFlyer).join("")}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-equipment]")) return OpenEquipmentSheet();
       const button = event.target.closest("[data-staff-action]");
@@ -4041,7 +4103,7 @@ function OpenTalentSheet() {
       const result = button.dataset.staffAction === "hire" ? HireStaff(state, staffId) : FireStaff(state, staffId);
       if (ApplyInteractiveResult(result, { rebuildStaff: true, tone: button.dataset.staffAction === "fire" ? "warning" : "good" })) OpenTalentSheet();
     };
-  });
+  }, { mode: "talentMarket" });
 }
 
 function OpenStaffSheet(staffId, spokenLine = "") {
@@ -4065,7 +4127,7 @@ function OpenStaffSheet(staffId, spokenLine = "") {
       const result = TalkToStaff(state, staffId, button.dataset.tone);
       if (ApplyInteractiveResult(result)) OpenStaffSheet(staffId, result.line);
     };
-  });
+  }, { mode: "talentMarket" });
 }
 
 function OpenCustomizationSheet(sourceId = "owner") {

@@ -160,6 +160,12 @@ const staffBlock = FunctionBlock("OpenStaffSheet");
 assert.doesNotMatch(staffBlock, /data-customize|OpenCustomizationSheet\(staffId\)/, "staff chat must not duplicate the project-direction button");
 assert.match(staffBlock, /制作方针与玩法提案统一在墙上白板处理/);
 
+const talentBlock = FunctionBlock("OpenTalentSheet");
+assert.match(talentBlock, /\{ mode: "talentMarket" \}/, "the talent counter needs its own recruitment-wall surface");
+assert.match(talentBlock, /TalentAvatarHtml\(/, "every talent flyer must carry an animated identity avatar");
+assert.match(talentBlock, /data-staff-action="hire"/, "recruitment flyers must keep a direct hire control");
+assert.match(talentBlock, /TalentStatWidth\(/, "flyers must surface module abilities as readable bars and numbers");
+
 const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function RevenueChart/)?.[0] || "";
 assert.match(directiveBlock, /data-feature-source/, "the project whiteboard owns the feature-proposal entry");
 assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
