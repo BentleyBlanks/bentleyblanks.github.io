@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>牛马指挥官 · 上帝视角做游戏</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=1" />
+</head>
+<body>
+  <main id="stage">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <header id="hud" class="hidden">
+      <div class="hud-group">
+        <span class="hud-label">月份</span>
+        <span class="hud-value" id="monthValue">M01</span>
+      </div>
+      <div class="hud-group">
+        <span class="hud-label">现金</span>
+        <span class="hud-value" id="cashValue">¥88,888</span>
+      </div>
+      <div class="hud-group hud-wide">
+        <span class="hud-label">小目标</span>
+        <div class="hud-bar"><div class="hud-bar-fill" id="goalFill"></div></div>
+        <span class="hud-value" id="revenueValue">¥0 / ¥500,000</span>
+      </div>
+      <div class="hud-group">
+        <span class="hud-label">老板头发</span>
+        <div class="hud-bar hud-bar-hair"><div class="hud-bar-fill" id="hairFill"></div></div>
+      </div>
+      <div class="hud-group hud-project">
+        <span class="hud-label">在制</span>
+        <span class="hud-value" id="projectValue">《赛博养猪场》 0/100</span>
+      </div>
+    </header>
+
+    <div id="bossBanner" class="hidden"></div>
+    <div id="selectionHint" class="hidden"></div>
+    <div id="toastStack"></div>
+
+    <nav id="commandBar" class="hidden">
+      <button id="pieButton" type="button">画大饼</button>
+      <button id="bossCodeButton" type="button">老板亲自写代码</button>
+      <button id="footbathButton" type="button">报销足浴 ¥1,999</button>
+      <button id="releaseButton" type="button" class="release">发售！</button>
+    </nav>
+
+    <section id="titleScreen">
+      <h1>牛马指挥官</h1>
+      <p class="subtitle">做游戏不会死，做游戏的牛马会。</p>
+      <ul class="howto">
+        <li><b>点牛马 → 点红色 BUG</b>：派活。「你，去堵这个！」</li>
+        <li><b>点牛马 → 点中间的游戏</b>：冲刺核心玩法。</li>
+        <li><b>直接点黄色需求瘤</b>：老板亲自砍需求，咔嚓，策划心碎。</li>
+        <li><b>画大饼</b>：全员提速，饼凉了掉士气。<b>亲自写代码</b>：进度暴涨，头发暴跌，随赠 BUG。</li>
+        <li><b>报销足浴</b>：¥1,999 买回一颗牛马的心。</li>
+        <li>进度满了就<b>发售</b>。带着 BUG 发售，评分会诚实。</li>
+      </ul>
+      <p class="goal">目标：累计流水 ¥500,000（毕生目标 100 亿的 0.005%）。<br />现金归负或牛马全跑 = 你死了。做游戏真的会死。</p>
+      <button id="startButton" type="button">开始压榨</button>
+      <p class="hint">仅支持 PC · 鼠标操作 · 右键/Esc 取消选中</p>
+    </section>
+
+    <section id="endScreen" class="hidden">
+      <h1 id="endTitle"></h1>
+      <p id="endReason"></p>
+      <ul id="endStats"></ul>
+      <button id="restartButton" type="button">再开一家</button>
+    </section>
+  </main>
+  <script type="module" src="./Script_Game.mjs?v=1"></script>
+</body>
+</html>
