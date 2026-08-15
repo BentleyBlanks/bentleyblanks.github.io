@@ -118,10 +118,10 @@ assert.deepEqual(
     ["talentCounter", "talent", "talent"],
     ["equipmentCounter", "talent", "equipment"],
   ],
-  "development, direction, project calendar, recruitment, and equipment need distinct physical entry points",
+  "computer work and leisure, direction, project calendar, recruitment, and equipment need distinct physical entry points",
 );
-assert.equal(ById("homeComputer").detail, "亲自开发 / 发布", "the computer interaction must describe immediate founder work");
-assert.equal(ById("planningBoard").detail, "制作方针 / 玩法提案", "the whiteboard interaction must describe team policy rather than module labor");
+assert.equal(ById("homeComputer").detail, "开发 / 游戏 / 发布", "the computer interaction must describe work, leisure, and release");
+assert.equal(ById("planningBoard").detail, "团队方针 / 玩法提案", "the whiteboard interaction must describe team policy rather than module labor");
 
 assert.deepEqual(
   ["bankStockCounter", "bankCounter"].map((id) => {
@@ -172,25 +172,31 @@ assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");
 assert.match(directiveBlock, /\{ mode: "whiteboard" \}/, "project direction must open on the physical whiteboard surface");
 assert.match(directiveBlock, /墙上白板 · 制作方针/, "the board must frame the choice as a production policy rather than another work allocation");
-assert.match(directiveBlock, /class="whiteboardFocus"[^>]*>[\s\S]*?制作方针[\s\S]*?持续生效 · 月结影响全组/, "the board must distinguish persistent team policy from immediate owner work");
+assert.match(directiveBlock, /class="whiteboardFocus"[^>]*>[\s\S]*?当前团队方针[\s\S]*?currentDirective\.description[\s\S]*?currentDirective\.effect/, "the board must explain the active policy in plain language and concrete terms");
 assert.match(directiveBlock, /aria-pressed="\$\{state\.selectedDirective === directive\.id\}"/, "direction notes need a programmatic selected state");
-assert.match(directiveBlock, /class="whiteboardAction"[\s\S]*?点选 →/, "direction notes must carry a persistent action cue");
-assert.doesNotMatch(directiveBlock, /data-energy-module|PerformOwnerTask|投入 1 格|亲自开发/, "the whiteboard must not contain the founder's immediate work loop");
+assert.match(directiveBlock, /class="whiteboardAction"[\s\S]*?选这个 →/, "direction notes must carry a persistent action cue");
+assert.match(directiveBlock, /directive\.description[\s\S]*directive\.effect/, "direction cards must explain their plain-language purpose and concrete outcome");
+assert.match(directiveBlock, /WhiteboardLegendHtml\(\)/, "the board must replace decorative marker bars with a labeled legend");
+assert.doesNotMatch(directiveBlock, /data-energy-module|PerformOwnerTask|亲自开发/, "the whiteboard must not contain the founder's immediate work loop");
 
 const releaseBlock = script.match(/function OpenReleaseSheet[\s\S]*?function GetMonthCloseActions/)?.[0] || "";
 assert.match(releaseBlock, /\{ mode: "whiteboard" \}/, "release review must remain on the physical project whiteboard");
-assert.doesNotMatch(releaseBlock, /mode: "computer"/, "release review must never reopen the decorative computer");
+assert.doesNotMatch(releaseBlock, /mode: "computer"/, "release review must keep its dedicated review surface");
 
 const featureSourceBlock = script.match(/function OpenFeatureSourceSheet[\s\S]*?function OpenHomeComputerSheet/)?.[0] || "";
 assert.doesNotMatch(featureSourceBlock, /mode: "computer"/, "the project whiteboard must not reuse the computer surface");
 assert.match(featureSourceBlock, /mode: "whiteboard"/, "proposal ownership must stay on the physical whiteboard surface");
 assert.match(featureSourceBlock, /点选便签继续/, "proposal-owner notes must state their interaction");
 assert.match(featureSourceBlock, /class="whiteboardAction"[^>]*aria-hidden="true">点选 →/, "proposal-owner notes need a persistent action cue");
+assert.match(script, /function WhiteboardLegendHtml\(\)[\s\S]*?普通操作[\s\S]*?代价[\s\S]*?当前选择[\s\S]*?暂不可用/, "the former unlabeled marker bars must become a useful color legend");
+assert.doesNotMatch(script, /whiteboardMarkerSet/, "unexplained marker props must leave every whiteboard screen");
 
 const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
-assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
-assert.match(computerBlock, /老板工时/, "the computer must name its budget as the founder's own work time");
-assert.match(computerBlock, /立即推进一个模块/, "owner work must clearly be immediate and module-targeted");
+assert.match(computerBlock, /GetOwnerEnergyLimit\(state\)[\s\S]*?老板本月可用精力[\s\S]*?computerEnergySlots/, "the computer must make remaining and total owner energy visually explicit");
+assert.match(computerBlock, /data-owner-undo[\s\S]*?UndoOwnerTask\(state\)/, "the computer must allow the most recent owner task to be fully undone");
+assert.match(computerBlock, /data-computer-game[\s\S]*?OpenComputerGameSheet\(\)/, "the computer must expose the requested anxiety-relief game");
+assert.match(computerBlock, /data-energy-module/, "the development computer must retain module-targeted owner work");
+assert.match(computerBlock, /data-computer-release[\s\S]*?OpenReleaseSheet\(\)/, "publishing must remain reachable from the computer");
 assert.match(computerBlock, /白板方针[^。]*月底[^。]*全组/, "the computer must contrast immediate owner work with the team-wide whiteboard policy");
 assert.match(computerBlock, /PerformOwnerTask\(state, moduleKey\)/, "a computer module choice must execute the founder's work action");
 assert.doesNotMatch(computerBlock, /SelectDirective|data-directive-id/, "the computer must not duplicate team policy selection");
@@ -211,8 +217,8 @@ assert.match(projectCalendarBlock, /activeLiveEvents/);
 assert.match(projectCalendarBlock, /lastSettlement\?\.finance\?\.appliedEvents/, "the calendar must retain one-month event reminders");
 assert.match(projectCalendarBlock, /FindDirective\(state\.selectedDirective\)/, "month close must read the persistent policy that is about to settle");
 assert.match(projectCalendarBlock, /制作方针[\s\S]*?currentDirective\?\.name[\s\S]*?currentDirective\?\.description/, "month close must remind the player which team policy remains active");
-assert.match(helpBlock, /亲自开发[\s\S]*每月 3 次，立即生效/, "help must explain the founder's short-horizon action");
-assert.match(helpBlock, /制作方针[\s\S]*持续生效，月底影响全组/, "help must explain the policy's long-horizon effect");
+assert.match(helpBlock, /牛马 486[\s\S]*开发、撤回、玩游戏和发布[\s\S]*足浴当月 \+1/, "help must explain the computer's work and leisure loop");
+assert.match(helpBlock, /团队方针[\s\S]*墙上白板选择，月底影响全组/, "help must explain the policy's long-horizon effect");
 assert.doesNotMatch(`${script}\n${css}`, /marketingPhone|OpenMarketPhoneSheet|OpenMarketingSheet|MARKETING PHONE|\.marketPhone\b/, "the removed phone must leave no player-facing implementation behind");
 
 assert.equal([...script.matchAll(/\bTravelWorld\(/g)].length, 1, "only the exit travel flow may call TravelWorld");
@@ -229,17 +235,22 @@ const monthSceneBlock = FunctionBlock("BuildMonthMontageScenes");
 const monthMontageBlock = FunctionBlock("PlayMonthMontage");
 const monthSceneConfigBlock = script.slice(script.indexOf("const MONTH_MONTAGE_FOOD_SCENES"), script.indexOf("function CaptureMonthMontageSnapshot"));
 const monthMontageTag = html.match(/<[^>]*\bid="monthMontage"[^>]*>/)?.[0] || "";
+const monthDayMilliseconds = Number(script.match(/const MONTH_MONTAGE_DAY_MS = (\d+);/)?.[1]);
 assert.match(monthMontageTag, /class="[^"]*monthMontage/, "the month transition needs a stable full-screen overlay hook");
 assert.match(monthMontageTag, /aria-live="polite"/, "the non-interactive montage must announce its accelerated progress without stealing focus");
 assert.match(facilityBlock, /kind === "homeComputer"/, "the interactive computer must retain a physical room prop");
+assert.match(buildRoomBlock, /WorldInteractions\.forEach\(BuildFacility\)/, "the interactive computer must be built from the world interaction catalog");
+assert.doesNotMatch(buildRoomBlock, /homeComputerProp/, "the computer must not be duplicated as a second decorative prop");
 assert.match(script, /const MONTH_MONTAGE_DAYS = 28;/, "each month montage must represent exactly twenty-eight days");
 assert.match(script, /const MONTH_MONTAGE_DAY_MS = \d+;/, "the accelerated day cadence needs one explicit timing constant");
+assert.ok(monthDayMilliseconds >= 220, "the month montage must leave enough time to read its animated details");
 assert.match(overlayBlock, /dom\.monthMontage/, "the full-screen montage must suppress world input while it is active");
 assert.match(monthSnapshotBlock, /state\.ownerWorkCount/, "the montage snapshot must remember whether the owner developed this month");
+assert.match(monthSnapshotBlock, /ownerHairAmount:\s*GetOwnerHairAmount\(state\.anxiety\)/, "the montage must use the current protagonist hair state");
 assert.match(monthSnapshotBlock, /state\.foodPlan/, "the montage snapshot must remember the selected eating plan");
 assert.match(monthSnapshotBlock, /state\.relaxationHistory/, "the montage snapshot must use actual relaxation visits");
 assert.match(monthSnapshotBlock, /entry\.month === (?:state\.month|settledMonth)/, "relaxation scenes must be limited to visits from the month being closed");
-assert.match(monthSceneBlock, /snapshot\.ownerWorked/, "the rapid coding scene must depend on actual owner work");
+assert.match(monthMontageBlock, /classList\.toggle\("hasOwnerWork", snapshot\.ownerWorked\)/, "the protagonist's coding pose must depend on actual owner work");
 assert.match(monthSceneBlock, /snapshot\.foodPlan/, "meal scenes must depend on the player's selected eating plan");
 assert.match(monthSceneBlock, /snapshot\.relaxation/, "footbath scenes must depend on actual venue history");
 assert.match(monthSceneBlock, /if \(food\)/, "an absent or skipped meal must not fabricate an eating scene");
@@ -250,6 +261,18 @@ assert.match(monthSceneConfigBlock, /regularFootbath[\s\S]*footbathCity[\s\S]*ma
 assert.match(monthMontageBlock, /MONTH_MONTAGE_DAYS/, "montage playback must consume the exact twenty-eight-day contract");
 assert.match(monthMontageBlock, /MONTH_MONTAGE_DAY_MS/, "montage playback must use the accelerated day cadence");
 assert.match(monthMontageBlock, /for \(let day = 1; day <= MONTH_MONTAGE_DAYS; day \+= 1\)/, "playback must render every one of the twenty-eight day/night changes");
+assert.match(monthMontageBlock, /dataset\.ownerArt = GetFounderArtStage\(ownerHairAmount\)/, "the montage must select the same generated founder stage as the playable protagonist");
+assert.match(html, /id="montageDate"[^>]*>[\s\S]*?id="montageDayValue"/, "the day must occupy the montage header's central date display");
+assert.match(css, /\.montageDate\s*\{[^}]*justify-self:center;[^}]*justify-content:center;/s, "the enlarged montage date must be centered rather than left or right aligned");
+assert.match(css, /\.montageDate b\s*\{[^}]*clamp\(46px,7vw,82px\)/s, "the montage day number must remain the strongest header element");
+assert.equal([...html.matchAll(/class="montageOwner\s+montage(?:Work|Transit|Food|Relax)Owner"/g)].length, 4, "each montage scene must contain the generated playable protagonist");
+assert.match(html, /montageOwnerArt full[\s\S]*montageOwnerArt thinning[\s\S]*montageOwnerArt bald/, "the montage must preserve all three live founder art stages");
+assert.match(css, /Texture_CharacterFounderFullWalkSheet\.png[\s\S]*Texture_CharacterFounderThinningWalkSheet\.png[\s\S]*Texture_CharacterFounderBaldWalkSheet\.png/, "the montage must directly reuse the playable founder sprite sheets");
+assert.match(html, /montageHomeShelfArt[\s\S]*montageRoomWindow[\s\S]*montageHomeBoardArt[\s\S]*montageHomeComputerArt/, "the coding scene must reuse recognizable props from the current home");
+assert.match(css, /Texture_PropHomeShelf\.png[\s\S]*Texture_PropHomePlanningBoard\.png[\s\S]*Texture_PropHomeComputer\.png/, "montage home props must use the same generated assets as the playable room");
+assert.match(html, /montageCodeTrack[\s\S]*montageCodeLoop[\s\S]*requestAnimationFrame\(loop\)/, "the home monitor must contain continuous detailed code rather than static bars");
+assert.match(css, /\.montageCodeTrack\s*\{[^}]*animation:montageCodeScroll/s, "the monitor code must keep scrolling throughout the montage");
+assert.doesNotMatch(`${html}\n${script}\n${css}`, /一个月，压成几秒|monthMontageFooter|montageActionLabel|montagePlaceLabel|montageCoder|montageWalker|montageEater|montageSoaker/, "the rejected slogan, action strip, and generic montage people must stay removed");
 const captureIndex = monthSheetBlock.indexOf("CaptureMonthMontageSnapshot(");
 const advanceIndex = monthSheetBlock.indexOf("AdvanceMonth(state)");
 const playIndex = monthSheetBlock.indexOf("await PlayMonthMontage(");
@@ -357,7 +380,9 @@ assert.match(animateBlock, /GetHungerMovementMultiplier\(state\.hunger\)[\s\S]*m
 assert.match(animateBlock, /ApplyWalkPose\([\s\S]*ApplyHungerPose\(/, "the owner-only hunger pose must layer after the normal walk pose");
 
 const anxietyPostFxBlock = script.match(/function RenderAnxietyPostFx\(\)[\s\S]*?function RenderHud\(\)/)?.[0] || "";
-const anxietyPostFxCss = css.slice(css.indexOf("/* Anxiety post-processing"));
+const anxietyPostFxCssStart = css.indexOf("/* Anxiety post-processing");
+const anxietyPostFxCssEnd = css.indexOf("/* The whiteboard now owns", anxietyPostFxCssStart);
+const anxietyPostFxCss = css.slice(anxietyPostFxCssStart, anxietyPostFxCssEnd);
 assert.match(anxietyPostFxBlock, /Clamp\(\(anxiety - 55\) \/ 45, 0, 1\)/, "high anxiety must progressively drive the scene treatment");
 assert.match(anxietyPostFxBlock, /Clamp\(\(anxiety - 90\) \/ 10, 0, 1\)/, "the strongest post-processing must be reserved for near-max anxiety");
 assert.match(anxietyPostFxBlock, /classList\.toggle\("anxietyHigh"[\s\S]*classList\.toggle\("anxietyCritical"/, "the scene needs distinct high and critical anxiety states");

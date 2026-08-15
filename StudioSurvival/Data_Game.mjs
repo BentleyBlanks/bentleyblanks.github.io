@@ -376,7 +376,8 @@ export const DIRECTIVES = [
     id: "integration",
     name: "稳住版本",
     icon: "◎",
-    description: "全组月产出 −5% · 两债 −5 · Bug −2 · 焦虑 −3",
+    description: "少赶一点进度，集中清欠账、修 Bug，也能降焦虑。",
+    effect: "全组产出 −5% · 两类欠账 −5 · Bug −2 · 焦虑 −3",
     color: "#a8c7ff",
     effects: {
       outputMultiplier: 0.95,
@@ -388,9 +389,10 @@ export const DIRECTIVES = [
   },
   {
     id: "artSprint",
-    name: "做传播点",
+    name: "先做宣传素材",
     icon: "◆",
-    description: "全组月产出 −15% · 热度 +8 · 预期 +1 · 焦虑 +1",
+    description: "少做一点开发，集中准备截图和传播素材。热度和玩家期待会上升。",
+    effect: "全组产出 −15% · 热度 +8 · 玩家预期 +1 · 焦虑 +1",
     color: "#ff6eae",
     effects: {
       outputMultiplier: 0.85,
@@ -404,7 +406,8 @@ export const DIRECTIVES = [
     id: "scopeParty",
     name: "全员赶工",
     icon: "⚡",
-    description: "全组月产出 +25% · 团队负荷↑ · 两债 +4 · Bug +2 · 焦虑 +5",
+    description: "用更高压力换本月产出；会堆欠账、Bug 和焦虑，团队状态也会变差。",
+    effect: "全组产出 +25% · 两类欠账 +4 · Bug +2 · 焦虑 +5",
     color: "#ffd166",
     effects: {
       outputMultiplier: 1.25,
@@ -416,9 +419,10 @@ export const DIRECTIVES = [
   },
   {
     id: "clientCrush",
-    name: "团队喘气",
+    name: "让团队喘口气",
     icon: "◇",
-    description: "全组月产出 −25% · 压力/漂移 −14 · 士气 +6 · 焦虑 −6",
+    description: "本月少做一些，让学生降压、AI 少跑偏，并恢复团队士气。",
+    effect: "全组产出 −25% · 压力/漂移 −14 · 士气 +6 · 焦虑 −6",
     color: "#66b8ff",
     effects: {
       outputMultiplier: 0.75,
@@ -430,9 +434,10 @@ export const DIRECTIVES = [
   },
   {
     id: "performanceDebt",
-    name: "集中还债",
+    name: "集中还技术债",
     icon: "◌",
-    description: "全组月产出 −18% · 技术债 −14 · Bug −2 · 焦虑 −1",
+    description: "少赶新进度，集中处理旧代码和 Bug，让后面更稳。",
+    effect: "全组产出 −18% · 技术债 −14 · Bug −2 · 焦虑 −1",
     color: "#68e0a0",
     effects: {
       outputMultiplier: 0.82,
@@ -444,9 +449,10 @@ export const DIRECTIVES = [
   },
   {
     id: "cutScope",
-    name: "砍到能发",
+    name: "删到能发布",
     icon: "✂",
-    description: "全组月产出 −18% · 范围债 −16 · 技术债 −2 · 热度 −2 · 焦虑 −2",
+    description: "主动删掉做不完的功能，换一个更容易发布的版本；热度会小降。",
+    effect: "全组产出 −18% · 范围债 −16 · 技术债 −2 · 热度 −2 · 焦虑 −2",
     color: "#ff9b73",
     effects: {
       outputMultiplier: 0.82,
@@ -804,7 +810,8 @@ export const CONSUMER_VENUES = [
     minimumCash: 1200,
     cost: 1200,
     anxietyRelief: 8,
-    description: "消费 ¥1,200，焦虑 -8。",
+    ownerEnergyBonus: 1,
+    description: "消费 ¥1,200，焦虑 -8，老板本月精力上限 +1。",
   },
   {
     id: "footbathCity",
@@ -814,7 +821,8 @@ export const CONSUMER_VENUES = [
     minimumCash: 300000,
     cost: 8800,
     anxietyRelief: 20,
-    description: "消费 ¥8,800，焦虑 -20。",
+    ownerEnergyBonus: 1,
+    description: "消费 ¥8,800，焦虑 -20，老板本月精力上限 +1。",
   },
   {
     id: "maleModelClub",
@@ -824,7 +832,8 @@ export const CONSUMER_VENUES = [
     minimumCash: 1000000,
     cost: 38000,
     anxietyRelief: 36,
-    description: "消费 ¥38,000，焦虑 -36。",
+    ownerEnergyBonus: 1,
+    description: "消费 ¥38,000，焦虑 -36，老板本月精力上限 +1。",
   },
 ];
 

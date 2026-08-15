@@ -21,6 +21,7 @@ import {
   GetHungerMovementMultiplier,
   GetHungerPoseWeight,
   GetOwnerHairAmount,
+  GetOwnerEnergyLimit,
   GetOwnerRestRelief,
   GetOwnerTaskAnxietyCost,
   GetFounderSkillEffect,
@@ -30,6 +31,7 @@ import {
   NormalizeFounderSkills,
   PlaceStockOrder,
   POLICY_SEMANTICS_VERSION,
+  PlayComputerGame,
   ReleaseBuild,
   SelectDirective,
   SelectFoodPlan,
@@ -39,6 +41,7 @@ import {
   STOCK_ACCOUNT_UNLOCK_CASH,
   TakeLoan,
   TalkToStaff,
+  UndoOwnerTask,
   PivotProject,
   PerformOwnerTask,
   PurchaseWorkstation,
@@ -861,6 +864,9 @@ function HasRecordedId(collection, id) {
   assert.equal(regularVisit.ok, true);
   assert.equal(regularVisit.state.cash, 66_800, "ordinary footbath spending must leave the cash ledger honestly reduced");
   assert.equal(regularVisit.state.anxiety, 53, "ordinary footbath must relieve eight anxiety");
+  assert.equal(regularVisit.ownerEnergyBonus, 1, "every footbath-tier visit must grant one extra owner-energy slot");
+  assert.equal(GetOwnerEnergyLimit(state), 3, "owner energy must start at three before leisure");
+  assert.equal(GetOwnerEnergyLimit(regularVisit.state), 4, "footbath leisure must raise this month's owner-energy limit to four");
   assert.equal(regularVisit.state.totalCosts, state.totalCosts + 1_200, "relaxation spending must enter total costs");
   assert.equal(regularVisit.state.relaxationHistory.at(-1)?.venueId, "regularFootbath");
   assert.equal(VisitRelaxationVenue(regularVisit.state, "regularFootbath").ok, false, "only one relaxation purchase is allowed per month");
@@ -894,6 +900,8 @@ function HasRecordedId(collection, id) {
   const oldSave = structuredClone(state);
   delete oldSave.lastRelaxationMonth;
   delete oldSave.relaxationHistory;
+  delete oldSave.lastComputerGameMonth;
+  delete oldSave.ownerWorkHistory;
   delete oldSave.anxietyAtMonthStart;
   assert.equal(ValidateState(oldSave), true, "pre-rebalance v9 saves must remain valid for UI normalization");
 }
@@ -1136,6 +1144,17 @@ function HasRecordedId(collection, id) {
   assert.equal(fourth.ok, false, "a fourth owner task in one month must be rejected");
   assert.equal(fourth.state.ownerWorkCount, 3);
 
+  let bonusState = Begin();
+  for (let workIndex = 0; workIndex < 3; workIndex += 1) bonusState = PerformOwnerTask(bonusState, "design").state;
+  const bonusVisit = VisitRelaxationVenue(bonusState, "regularFootbath");
+  assert.equal(bonusVisit.ok, true);
+  assert.equal(GetOwnerEnergyLimit(bonusVisit.state), 4);
+  const bonusFourth = PerformOwnerTask(bonusVisit.state, "performance");
+  assert.equal(bonusFourth.ok, true, "a footbath visit must unlock a real fourth owner-development action");
+  assert.equal(bonusFourth.anxietyCost, 5, "the leisure bonus slot must retain the late-month anxiety cost");
+  assert.equal(bonusFourth.state.ownerWorkCount, 4);
+  assert.equal(PerformOwnerTask(bonusFourth.state, "art").ok, false, "the leisure bonus must stop at one extra action");
+
   const nextMonth = AdvanceMonth(limitedState);
   assert.equal(nextMonth.ok, true);
   assert.equal(nextMonth.state.ownerWorkCount, 0, "advancing the month must reset owner work count");
@@ -1156,6 +1175,49 @@ function HasRecordedId(collection, id) {
   assert.equal(breakdown.ok, true);
   assert.equal(breakdown.state.status, "gameover", "owner work can trigger a mental breakdown");
   assert.equal(breakdown.state.outcome?.kind, "mentalBreakdown");
+}
+
+{
+  const before = Begin();
+  const worked = PerformOwnerTask(before, "art");
+  assert.equal(worked.ok, true);
+  assert.equal(worked.state.ownerWorkHistory.length, 1, "each owner action must save one reversible snapshot");
+  assert.equal(ValidateState(worked.state), true, "states with reversible owner-work history must remain saveable");
+  const undone = UndoOwnerTask(worked.state);
+  assert.equal(undone.ok, true);
+  assert.equal(undone.state.ownerWorkCount, 0, "undo must refund the consumed owner-energy slot");
+  assert.equal(undone.state.ownerWorkHistory.length, 0, "undo must consume only the most recent snapshot");
+  assert.equal(undone.state.project.modules.art, before.project.modules.art, "undo must restore module progress");
+  assert.equal(undone.state.project.bugs, before.project.bugs, "undo must restore bugs");
+  assert.equal(undone.state.project.scopeDebt, before.project.scopeDebt, "undo must restore scope debt");
+  assert.equal(undone.state.project.technicalDebt, before.project.technicalDebt, "undo must restore technical debt");
+  assert.equal(undone.state.hunger, before.hunger, "undo must restore hunger");
+  assert.equal(undone.state.anxiety, before.anxiety, "undo must restore anxiety");
+  assert.equal(undone.energyLeft, 3);
+  assert.equal(UndoOwnerTask(undone.state).ok, false, "undo must stop cleanly when no reversible owner action remains");
+}
+
+{
+  const before = Begin();
+  before.anxiety = 40;
+  const worked = PerformOwnerTask(before, "art");
+  const playedAfterWork = PlayComputerGame(worked.state);
+  const undoneAfterLeisure = UndoOwnerTask(playedAfterWork.state);
+  assert.equal(undoneAfterLeisure.ok, true);
+  assert.equal(undoneAfterLeisure.state.anxiety, 35, "undo must remove only the development anxiety while preserving later computer relief");
+  assert.equal(undoneAfterLeisure.state.lastComputerGameMonth, before.month, "undo must not erase later leisure actions");
+}
+
+{
+  const state = Begin();
+  state.anxiety = 31;
+  const played = PlayComputerGame(state);
+  assert.equal(played.ok, true);
+  assert.equal(played.state.anxiety, 26, "the home-computer game must lower anxiety by five");
+  assert.equal(played.state.lastComputerGameMonth, state.month);
+  assert.equal(PlayComputerGame(played.state).ok, false, "computer leisure must be limited to once per month");
+  const nextMonth = AdvanceMonth(played.state);
+  assert.equal(PlayComputerGame(nextMonth.state).ok, true, "the computer game must refresh next month");
 }
 
 {
@@ -1211,8 +1273,8 @@ function HasRecordedId(collection, id) {
   const expectedPolicyIds = ["integration", "artSprint", "scopeParty", "clientCrush", "performanceDebt", "cutScope"];
   assert.deepEqual(DIRECTIVES.map((directive) => directive.id), expectedPolicyIds, "existing policy IDs must stay stable for old saves");
   assert(
-    DIRECTIVES.every((directive) => directive.description.includes("全组月产出")),
-    "every whiteboard policy must affect team-wide production instead of granting a module task",
+    DIRECTIVES.every((directive) => directive.effect.includes("全组产出")),
+    "every whiteboard policy must state its team-wide production effect instead of implying a module task",
   );
   assert(DIRECTIVES.every((directive) => Number.isFinite(directive.effects?.outputMultiplier)), "policy output and ledger values must live beside their UI definition");
   assert(

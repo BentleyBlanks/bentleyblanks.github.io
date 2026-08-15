@@ -55,6 +55,11 @@ const requiredInteractionIds = [
 ];
 assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "each place should expose its own actions and a real exit");
 assert.equal(InteractionPoints.find((point) => point.id === "homeComputer")?.action, "computer", "the home computer must remain an explicit world interaction");
+assert.deepEqual(
+  [InteractionPoints[0].id, InteractionPoints[0].kind, InteractionPoints[0].action],
+  ["homeComputer", "homeComputer", "computer"],
+  "the home computer must be a real development, leisure, and release interaction",
+);
 
 const consumerInteractions = InteractionPoints.filter((point) => point.consumerVenueId);
 assert.equal(consumerInteractions.length, CONSUMER_VENUES.length, "every personal-consumption venue needs one world interaction");

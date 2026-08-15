@@ -23,11 +23,12 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815av";
+} from "./Data_Game.mjs?v=20260815aw";
 import {
   AdvanceMonth,
   BuyScratchTicket,
   CalculateTensions,
+  COMPUTER_GAME_ANXIETY_RELIEF,
   CreateInitialState,
   CustomizeProject,
   DEFAULT_FOUNDER_SKILLS,
@@ -45,13 +46,16 @@ import {
   GetIdleLine,
   GetMemberMonthlyCost,
   GetOwnerHairAmount,
+  GetOwnerEnergyLimit,
   GetOwnerRestRelief,
   GetOwnerTaskAnxietyCost,
   GetStockAccountAccess,
   HireStaff,
   MigratePolicySemantics,
   NormalizeFounderSkills,
+  OWNER_BASE_ENERGY,
   PlaceStockOrder,
+  PlayComputerGame,
   PerformOwnerTask,
   PivotProject,
   POLICY_SEMANTICS_VERSION,
@@ -68,11 +72,12 @@ import {
   STARTUP_LOAN_TERMS,
   TakeLoan,
   TalkToStaff,
+  UndoOwnerTask,
   ValidateState,
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815av";
+} from "./Script_Rules.mjs?v=20260815aw";
 import {
   FindLocation,
   FindLocationAt,
@@ -83,21 +88,21 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815av";
+} from "./Data_World.mjs?v=20260815aw";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815av";
+} from "./Script_World.mjs?v=20260815aw";
 
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton",
   "studioNameHud", "startupDebtValue", "locationValue", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
   "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
-  "travelCurtain", "monthMontage", "montageStage", "montageMonthLabel", "montageDayValue", "montageActionLabel", "montagePlaceLabel",
+  "travelCurtain", "monthMontage", "montageStage", "montageMonthLabel", "montageDate", "montageDayValue",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
   "founderProfilePanel", "founderProfileTitle", "founderSkillEditor", "founderSkillBudget", "founderBackButton", "founderConfirmButton",
@@ -153,6 +158,8 @@ function LoadSavedState() {
     candidate.stockHistory ??= [];
     candidate.lastRelaxationMonth ??= 0;
     candidate.relaxationHistory ??= [];
+    candidate.lastComputerGameMonth ??= 0;
+    candidate.ownerWorkHistory ??= [];
     candidate.anxietyAtMonthStart ??= candidate.lastSettlement?.anxiety?.after ?? candidate.anxiety;
     if (candidate.project) {
       candidate.project.marketStrategy = { focusId: "concept", directionId: null, setMonth: 0 };
@@ -199,7 +206,7 @@ let traveling = false;
 let monthMontagePlaying = false;
 const inputState = { left: false, right: false, jump: false };
 const MONTH_MONTAGE_DAYS = 28;
-const MONTH_MONTAGE_DAY_MS = 170;
+const MONTH_MONTAGE_DAY_MS = 240;
 const MONTH_MONTAGE_OPEN_MS = 520;
 const MONTH_MONTAGE_CLOSE_MS = 680;
 const CONTRACT_PAGE_COPY = [
@@ -457,7 +464,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815ay";
+const ART_CACHE_VERSION = "20260815ba";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -1728,8 +1735,8 @@ function DisposeGroup(group) {
 }
 
 const FacilityLooks = {
-  homeComputer: ["开发电脑", "老板亲自干活，立即推进模块", 0x9d8cff],
-  planningBoard: ["项目白板", "方针月结生效，影响全组", 0xffd166],
+  homeComputer: ["牛马 486", "开发 / 游戏 / 发布", 0x9d8cff],
+  planningBoard: ["项目白板", "团队方针月结生效", 0xffd166],
   homeCalendar: ["项目日历", "月结、评分与事件提醒", 0x66b8ff],
   homeFridge: ["自己家的冰箱", "剩饭也有保质期", 0x9fd7ff],
   exit: ["出门", "选择下一站", 0xf5f3ff],
@@ -1741,9 +1748,9 @@ const FacilityLooks = {
   stockWindow: ["股票窗口", "开户 / 买入 / 持仓", 0x66b8ff],
   bank: ["贷款柜台", "还款 / 抵押 / 赎回", 0xc9a45d],
   hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
-  regularFootbath: ["普通足浴店", "焦虑 -8 · 本月限一次", 0x72e0d1],
-  footbathCity: ["洗脚城", "焦虑 -20 · 验资开放", 0xc69cff],
-  maleModelClub: ["男模店", "焦虑 -36 · 百万验资", 0xff86c8],
+  regularFootbath: ["普通足浴店", "焦虑 -8 · 精力上限 +1", 0x72e0d1],
+  footbathCity: ["洗脚城", "焦虑 -20 · 精力上限 +1", 0xc69cff],
+  maleModelClub: ["男模店", "焦虑 -36 · 精力上限 +1", 0xff86c8],
 };
 
 function GetFacilityKind(interaction) {
@@ -3704,15 +3711,15 @@ function ReturnContractPage() {
 
 function GetGuidedMission(project, gameType, tensions, anxietyState) {
   if (!project) return "先完成立项，再从家里的开发电脑开始。";
-  const energyLeft = Math.max(0, 3 - (state.ownerWorkCount || 0));
+  const energyLeft = Math.max(0, GetOwnerEnergyLimit(state) - (state.ownerWorkCount || 0));
   if (project.age === 0 && state.ownerWorkCount === 0) {
-    return "第一步：走到开发电脑前按 E，亲自开发 3 次。";
+    return `第一步：走到开发电脑前按 E，分配 ${OWNER_BASE_ENERGY} 格精力。`;
   }
   if (project.age === 0 && energyLeft > 0) {
-    return `本月还能亲自开发 ${energyLeft} 次。先把四项基础做起来。`;
+    return `本月还有 ${energyLeft} 格精力。先补最薄弱的模块。`;
   }
   if (project.age === 0) {
-    return "本月已经干满 3 次。打开项目日历，或点右下角“下一回合”结算。";
+    return "本月精力已用完。打开项目日历，或点右下角“下一回合”结算。";
   }
   if (project.age < 2) {
     return `继续开发第 ${project.age + 1} 个月；满两个月后可在电脑发布。`;
@@ -3943,29 +3950,79 @@ function OpenRelaxationSheet(venueId) {
         ? "付不起本次消费"
         : `消费 ${FormatMoney(venue.cost)}`;
   OpenPanel("ANXIETY RELIEF", venue.name, `
-    <div class="resultHero"><b>−${venue.anxietyRelief}</b><p>当前焦虑 ${Math.round(state.anxiety)} / 100</p></div>
+    <div class="resultHero"><b>焦虑 −${venue.anxietyRelief}</b><p>老板本月精力上限 +${venue.ownerEnergyBonus || 1}</p></div>
     <div class="metricGrid">
       <div class="metricTile"><span>准入资金</span><strong>${FormatMoney(venue.minimumCash)}</strong></div>
       <div class="metricTile"><span>本次消费</span><strong>${FormatMoney(venue.cost)}</strong></div>
-      <div class="metricTile"><span>焦虑缓解</span><strong>−${venue.anxietyRelief}</strong></div>
+      <div class="metricTile"><span>老板可用精力</span><strong>${GetOwnerEnergyLimit(state)} → ${GetOwnerEnergyLimit(state) + (usedThisMonth ? 0 : venue.ownerEnergyBonus || 1)}</strong></div>
     </div>
     <div class="panelSection"><h3>足浴解压线</h3><div class="worldGrid three">${ladder.map((candidate) => {
       const candidateAccess = GetConsumerVenueAccess(state, candidate.id);
       return `<div class="worldChoice ${candidate.id === venue.id ? "selected" : ""} ${candidateAccess.ok ? "" : "locked"}">
         <div class="choiceTop"><strong>${candidateAccess.ok ? "✓" : "🔒"} ${EscapeHtml(candidate.name)}</strong><span>${FormatMoney(candidate.minimumCash)} 准入</span></div>
-        <div class="choiceFooter"><span>${FormatMoney(candidate.cost)} / 次</span><b>焦虑 −${candidate.anxietyRelief}</b></div>
+        <div class="choiceFooter"><span>${FormatMoney(candidate.cost)} / 次</span><b>焦虑 −${candidate.anxietyRelief} · 精力 +${candidate.ownerEnergyBonus || 1}</b></div>
       </div>`;
     }).join("")}</div></div>
-    <div class="panelSection choiceFooter"><span>每月 1 次；验资不扣钱。</span><button class="primaryButton" data-relax-venue="${venue.id}" type="button" ${usedThisMonth || !access.ok || state.cash < venue.cost ? "disabled" : ""}>${actionLabel}</button></div>`, () => {
+    <div class="panelSection choiceFooter"><span>每月 1 次；验资不扣钱；新增精力当月有效。</span><button class="primaryButton" data-relax-venue="${venue.id}" type="button" ${usedThisMonth || !access.ok || state.cash < venue.cost ? "disabled" : ""}>${actionLabel}</button></div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const button = event.target.closest("[data-relax-venue]");
       if (!button) return;
       const result = VisitRelaxationVenue(state, button.dataset.relaxVenue);
       if (!ApplyInteractiveResult(result, { toast: false, tone: "good" })) return;
       ShowResult("ANXIETY RELIEF", venue.name, `
-        <div class="resultHero"><b>${Math.round(result.anxietyBefore)} → ${Math.round(result.anxietyAfter)}</b><p>现金 −${FormatMoney(result.cost)} · 焦虑 −${result.relieved}</p></div>`);
+        <div class="resultHero"><b>焦虑 ${Math.round(result.anxietyBefore)} → ${Math.round(result.anxietyAfter)}</b><p>现金 −${FormatMoney(result.cost)} · 精力上限 ${result.energyLimitBefore} → ${result.energyLimitAfter}</p></div>`);
     };
   });
+}
+
+function OpenComputerGameSheet() {
+  const playedThisMonth = state.lastComputerGameMonth === state.month;
+  const anxietyAfter = Math.max(0, state.anxiety - COMPUTER_GAME_ANXIETY_RELIEF);
+  OpenPanel("牛马 486", "娱乐模式 · 《像素坦克》", `
+    <div class="computerDeskScene computerGameDesk">
+      <div class="computerDeskMat" aria-hidden="true"></div>
+      <div class="computerMonitorShell">
+        <div class="computerTopVent" aria-hidden="true">${Array.from({ length: 11 }, () => "<i></i>").join("")}</div>
+        <div class="computerBezel"><span>NIUMA 486</span><i></i><b>M${String(state.month).padStart(2, "0")}</b></div>
+        <div class="computerGlassFrame">
+          <div class="computerScreenContent computerGameScreen">
+            <section class="computerGameHeader">
+              <div><span>摸鱼程序</span><h3>玩一局《像素坦克》</h3><p>不耗开发精力。</p></div>
+              <div class="computerGameRelief"><span>焦虑</span><strong>${Math.round(state.anxiety)} → ${Math.round(anxietyAfter)}</strong><small>−${Math.round(state.anxiety - anxietyAfter)}</small></div>
+            </section>
+            <div class="pixelBattlefield" aria-hidden="true">
+              <i class="pixelTank playerTank"></i><i class="pixelTank enemyTank"></i><b class="pixelBullet"></b>
+              <span class="pixelWall wallOne"></span><span class="pixelWall wallTwo"></span><span class="pixelWall wallThree"></span>
+              <em>1 PLAYER · STAGE 01</em>
+            </div>
+            <div class="computerGameAction">
+              <div><span>本月娱乐次数</span><strong>${playedThisMonth ? "已用 1 / 1" : "可用 1 / 1"}</strong><button class="miniButton" data-computer-back type="button">← 返回开发</button></div>
+              <button data-play-computer-game type="button" ${playedThisMonth ? "disabled" : ""}>${playedThisMonth ? "本月已经玩过" : `开始游戏 · 焦虑 −${COMPUTER_GAME_ANXIETY_RELIEF}`}</button>
+            </div>
+          </div>
+        </div>
+        <div class="computerControlDeck" aria-hidden="true">
+          <strong>牛马 486DX</strong>
+          <span class="computerSpeaker">${Array.from({ length: 9 }, () => "<i></i>").join("")}</span>
+          <span class="computerTurbo"><i></i>TURBO</span>
+          <div class="computerPower"><i></i><span>POWER</span></div>
+        </div>
+      </div>
+      <div class="computerStand"><i></i></div>
+      <div class="computerTowerVisual" aria-hidden="true"><strong>牛马 486</strong><i class="towerOpticalDrive"></i><i class="towerFloppyDrive"></i><span class="towerVent"></span><b class="towerPower"><i></i></b></div>
+      <div class="computerKeyboardVisual" aria-hidden="true">${Array.from({ length: 50 }, (_, index) => `<i class="${index === 43 ? "space" : [13, 27, 41].includes(index) ? "wide" : ""}"></i>`).join("")}</div>
+      <div class="computerMouseVisual" aria-hidden="true"><i></i></div>
+      <div class="computerCableVisual" aria-hidden="true"></div>
+    </div>`, () => {
+    dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-computer-back]")) return OpenHomeComputerSheet();
+      if (!event.target.closest("[data-play-computer-game]")) return;
+      const result = PlayComputerGame(state);
+      if (!ApplyInteractiveResult(result, { toast: false, tone: "good" })) return;
+      ShowResult("GAME OVER", "摸鱼成功", `
+        <div class="resultHero"><b>焦虑 ${Math.round(result.anxietyBefore)} → ${Math.round(result.anxietyAfter)}</b><p>开发精力没有消耗 · 下个月可以再玩</p></div>`, OpenHomeComputerSheet);
+    };
+  }, { mode: "computer" });
 }
 
 function OpenInvestmentSheet(staffId) {
@@ -4130,6 +4187,12 @@ function OpenStaffSheet(staffId, spokenLine = "") {
   }, { mode: "talentMarket" });
 }
 
+function WhiteboardLegendHtml() {
+  return `<div class="whiteboardLegend" aria-label="白板颜色说明">
+    <span><i class="progress"></i>普通操作</span><span><i class="risk"></i>代价</span><span><i class="selected"></i>当前选择</span><span><i class="locked"></i>暂不可用</span>
+  </div>`;
+}
+
 function OpenCustomizationSheet(sourceId = "owner") {
   if (!state.project || state.project.age < 1) {
     ShowToast("先完成第一个开发月；有东西可改后，项目白板才会开放玩法提案。", "warning");
@@ -4160,7 +4223,7 @@ function OpenCustomizationSheet(sourceId = "owner") {
         </button>`;
       }).join("")}</div>
       <div class="panelSection"><button class="miniButton" data-source-select type="button">← 换人</button></div>
-      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+      ${WhiteboardLegendHtml()}
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-source-select]")) return OpenFeatureSourceSheet();
@@ -4193,7 +4256,7 @@ function OpenFeatureSourceSheet() {
       </div>
       <div class="panelSection sectionHeading"><strong>团队</strong></div>
       <div class="chipRow">${hired.length ? hired.map((staff) => `<button class="miniButton" data-chat-id="${staff.id}" type="button">和 ${EscapeHtml(staff.name)} 聊聊</button>`).join("") : `<span class="chip">还没有成员。去人才市场招聘。</span>`}</div>
-      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+      ${WhiteboardLegendHtml()}
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const chat = event.target.closest("[data-chat-id]");
@@ -4206,21 +4269,25 @@ function OpenFeatureSourceSheet() {
 
 function OpenHomeComputerSheet() {
   const evaluation = EvaluateProject(state);
-  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, 3);
-  const energyLeft = 3 - energyUsed;
+  const energyLimit = GetOwnerEnergyLimit(state);
+  const energyUsed = Clamp(state.ownerWorkCount || 0, 0, energyLimit);
+  const energyLeft = energyLimit - energyUsed;
+  const bonusEnergy = Math.max(0, energyLimit - OWNER_BASE_ENERGY);
   const nextAnxietyCost = energyLeft > 0 ? GetOwnerTaskAnxietyCost(energyUsed) : 0;
   const restRelief = GetOwnerRestRelief(energyUsed);
+  const undoEntry = state.ownerWorkHistory?.at(-1) || null;
+  const playedThisMonth = state.lastComputerGameMonth === state.month;
   const moduleValues = MODULE_KEYS.map((moduleKey) => ({ moduleKey, value: state.project.modules[moduleKey] || 0 }));
   const recommended = [...moduleValues].sort((left, right) => left.value - right.value)[0]?.moduleKey;
   const averageProgress = moduleValues.reduce((sum, item) => sum + item.value, 0) / moduleValues.length;
   const canRelease = state.project.age >= 2 && state.project.lastReleaseMonth !== state.month;
   const objectiveTitle = energyLeft > 0
     ? state.project.age === 0 ? "亲手做出能运行的第一版" : "亲手补最薄弱的模块"
-    : "本月已经干满 3 次";
+    : "本月精力已用完";
   const objectiveDetail = energyLeft > 0
-    ? `还可开发 ${energyLeft} 次。立即推进一个模块；本次焦虑 +${nextAnxietyCost}。`
-    : "关掉电脑，去项目日历核账；也可点右下角“下一回合”。";
-  OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
+    ? `选一个模块，消耗 1 格；本次焦虑 +${nextAnxietyCost}。`
+    : "可撤回上一步，或去项目日历结算。";
+  OpenPanel("NIUMA 486", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <div class="computerDeskScene">
       <div class="computerDeskMat" aria-hidden="true"></div>
       <div class="computerMonitorShell">
@@ -4230,11 +4297,16 @@ function OpenHomeComputerSheet() {
           <div class="computerScreenContent">
             <section class="computerObjective">
               <div><span>现在要做什么</span><h3>${objectiveTitle}</h3><p>${objectiveDetail}</p></div>
-              <div class="energyBudget" aria-label="本月还能亲自开发 ${energyLeft} 次">
-                <span>老板工时</span>
-                <div>${[0, 1, 2].map((slot) => `<i class="${slot < energyLeft ? "available" : "spent"}">${slot < energyLeft ? "●" : "×"}</i>`).join("")}</div>
-                <strong>${energyLeft} 次</strong>
-              </div>
+              <section class="computerEnergyPanel" aria-label="老板本月可用精力 ${energyLeft} 格，共 ${energyLimit} 格">
+                <header><span>老板可用精力</span><strong>${energyLeft}<small> / ${energyLimit}</small></strong></header>
+                <div class="computerEnergySlots">${Array.from({ length: energyLimit }, (_, slotIndex) => {
+                  const spent = slotIndex < energyUsed;
+                  const bonus = slotIndex >= OWNER_BASE_ENERGY;
+                  return `<i class="${spent ? "spent" : "available"} ${bonus ? "bonus" : ""}" title="第 ${slotIndex + 1} 格：${spent ? "已用" : "可用"}${bonus ? "（足浴奖励）" : ""}"><b>${slotIndex + 1}</b><span>${spent ? "已用" : "可用"}</span></i>`;
+                }).join("")}</div>
+                <p>${bonusEnergy ? `基础 ${OWNER_BASE_ENERGY} + 足浴奖励 ${bonusEnergy}` : `基础 ${OWNER_BASE_ENERGY} 格 · 足浴类消费当月 +1`}${restRelief ? ` · 月结最多减焦虑 ${restRelief}` : ""}</p>
+                <button class="computerUndoButton" data-owner-undo type="button" ${undoEntry ? "" : "disabled"}>${undoEntry ? `↶ 撤回：${MODULE_META[undoEntry.moduleKey]?.label || "上一步"}` : "暂无可撤回步骤"}</button>
+              </section>
             </section>
 
             <section class="developmentWorkbench">
@@ -4250,12 +4322,17 @@ function OpenHomeComputerSheet() {
                   </button>`;
                 }).join("")}
               </div>
-              <p class="workCostNote">三次焦虑依次 +1 / +2 / +5；空下 ${energyLeft} 次，月结焦虑 −${restRelief}。白板方针另在月底作用全组。</p>
+              <p class="workCostNote">基础 3 格焦虑依次 +1 / +2 / +5；${bonusEnergy ? "足浴奖励格焦虑 +5。" : "足浴类消费当月多 1 格。"}未用基础精力月结减焦虑 ${restRelief}。</p>
+            </section>
+
+            <section class="computerLeisureCallout">
+              <div><span>摸鱼程序</span><strong>《像素坦克》</strong><small>焦虑 −${COMPUTER_GAME_ANXIETY_RELIEF} · 每月 1 次 · 不耗精力</small></div>
+              <button data-computer-game type="button">${playedThisMonth ? "本月已玩" : "打开游戏"} →</button>
             </section>
 
             ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
 
-            <div class="computerLocationHint"><b>电脑：亲自开发${canRelease ? " / 发布" : ""}</b><span>白板方针月结生效；项目日历结算。</span></div>
+            <div class="computerLocationHint"><b>电脑：开发 / 游戏${canRelease ? " / 发布" : ""}</b><span>白板方针月底影响全组；项目日历负责结算。</span></div>
           </div>
         </div>
         <div class="computerControlDeck" aria-hidden="true">
@@ -4272,14 +4349,22 @@ function OpenHomeComputerSheet() {
       <div class="computerCableVisual" aria-hidden="true"></div>
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
+      if (event.target.closest("[data-owner-undo]")) {
+        const result = UndoOwnerTask(state);
+        if (!ApplyInteractiveResult(result, { tone: "normal", toast: false })) return;
+        ShowToast(`已撤回${MODULE_META[result.moduleKey]?.label || "上一步"}开发 · 可用精力 ${result.energyLeft} 格`, "good");
+        OpenHomeComputerSheet();
+        return;
+      }
+      if (event.target.closest("[data-computer-game]")) return OpenComputerGameSheet();
       if (event.target.closest("[data-computer-release]")) return OpenReleaseSheet();
       const button = event.target.closest("[data-energy-module]");
       if (!button) return;
       const moduleKey = button.dataset.energyModule;
       const result = PerformOwnerTask(state, moduleKey);
       if (!ApplyInteractiveResult(result, { tone: "warning", toast: false })) return;
-      const left = Math.max(0, 3 - state.ownerWorkCount);
-      ShowToast(`${MODULE_META[moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}${left ? ` · 余 ${left} 次` : ""}`, left > 0 ? "good" : "warning");
+      const left = Math.max(0, GetOwnerEnergyLimit(state) - state.ownerWorkCount);
+      ShowToast(`${MODULE_META[moduleKey].label} +${result.gain.toFixed(1)} · 焦虑 +${result.anxietyCost}${left ? ` · 余 ${left} 格` : ""}`, left > 0 ? "good" : "warning");
       OpenHomeComputerSheet();
     };
   }, { mode: "computer" });
@@ -4288,6 +4373,7 @@ function OpenHomeComputerSheet() {
 function OpenWorkstationSheet(interaction) {
   const moduleKey = interaction.moduleKey;
   const meta = MODULE_META[moduleKey];
+  const ownerEnergyLimit = GetOwnerEnergyLimit(state);
   const skillEffect = GetFounderSkillEffect(state.founderSkills, moduleKey);
   const skillMeta = FOUNDER_SKILL_META[skillEffect.skillKey];
   const workers = state.team.map((member) => ({ member, staff: FindStaff(member.id) })).filter((item) => item.staff?.specialty === moduleKey);
@@ -4296,11 +4382,11 @@ function OpenWorkstationSheet(interaction) {
     <p class="panelIntro">${skillMeta.label} ${skillEffect.level} · +${skillEffect.minimumGain}–${skillEffect.maximumGain}</p>
     ${RenderBar(`${meta.label}进度`, state.project.modules[moduleKey], meta.color)}
     <div class="metricGrid">
-      <div class="metricTile"><span>亲自干活</span><strong>${state.ownerWorkCount}/3</strong></div>
+      <div class="metricTile"><span>亲自干活</span><strong>${state.ownerWorkCount}/${ownerEnergyLimit}</strong></div>
       <div class="metricTile"><span>能力</span><strong style="color:${skillMeta.color}">${skillMeta.label} ${skillEffect.level}</strong></div>
       <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
-    <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/3</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= 3 ? "disabled" : ""}>干 1 次</button></div>
+    <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/${ownerEnergyLimit}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= ownerEnergyLimit ? "disabled" : ""}>干 1 次</button></div>
     <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
     <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<span class="chip">没有人手。关掉电脑，从门口出发去人才市场招聘。</span>`}</div>
     ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
@@ -4852,22 +4938,29 @@ function OpenDirectiveSheet() {
   OpenPanel("PROJECT WHITEBOARD", "墙上白板 · 制作方针", `
     <div class="projectWhiteboardScene">
       <div class="whiteboardBoardMeta" aria-hidden="true"><span>M${String(state.month).padStart(2, "0")}</span><i></i><i></i><i></i></div>
-      <div class="whiteboardFocus" aria-live="polite">
-        <span>制作方针</span><strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong><small>持续生效 · 月结影响全组</small>
-      </div>
+      <section class="whiteboardFocus" aria-live="polite">
+        <span>当前团队方针</span>
+        <strong>${currentDirective.icon} ${EscapeHtml(currentDirective.name)}</strong>
+        <p>${EscapeHtml(currentDirective.description)}<small class="whiteboardDirectionEffect">月结变化：${EscapeHtml(currentDirective.effect || "见月结")}</small></p>
+      </section>
+      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong><b>1</b> 本月团队方针</strong><span>月结生效 · 只选一个 · 可随时切换</span></div>
       <div class="worldGrid three whiteboardNoteGrid">${visibleDirectives.map((directive) => `
         <button class="worldChoice ${state.selectedDirective === directive.id ? "selected" : ""}" style="--noteInk:${directive.color}" data-directive-id="${directive.id}" type="button" aria-pressed="${state.selectedDirective === directive.id}" aria-label="${state.selectedDirective === directive.id ? "当前采用" : "切换为"}：${EscapeHtml(directive.name)}">
-          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "当前" : ""}</span></div><p>${EscapeHtml(directive.description)}</p>
-          <span class="whiteboardAction" aria-hidden="true">${state.selectedDirective === directive.id ? "✓ 持续中" : "点选 →"}</span>
+          <div class="choiceTop"><strong>${directive.icon} ${EscapeHtml(directive.name)}</strong><span>${state.selectedDirective === directive.id ? "当前" : ""}</span></div>
+          <p>${EscapeHtml(directive.description)}</p>
+          <small class="whiteboardDirectionEffect">月结变化：${EscapeHtml(directive.effect || "见月结")}</small>
+          <span class="whiteboardAction" aria-hidden="true">${state.selectedDirective === directive.id ? "✓ 已选" : "选这个 →"}</span>
         </button>`).join("")}</div>
-      ${earlyStage ? `<div class="noteList"><div class="note good">首月后开放恢复、还债、砍范围、玩法与换赛道。</div></div>` : `<div class="panelSection choiceFooter"><span>玩法提案</span><button class="miniButton" data-feature-source type="button">安排提案</button></div>
-      <div class="panelSection sectionHeading"><strong>换赛道</strong><span>−${FormatMoney(pivotCost)}</span></div>
+      ${earlyStage ? `<div class="noteList"><div class="note good">首月后开放另外 3 种方针、玩法提案和换赛道。</div></div>` : `
+      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong><b>2</b> 玩法提案</strong><span>把新玩法写进项目</span></div>
+      <div class="panelSection choiceFooter"><span>本月还能拍板 ${state.talkPoints} 次</span><button class="miniButton" data-feature-source type="button">安排提案</button></div>
+      <div class="panelSection sectionHeading whiteboardSectionHeading"><strong><b>3</b> 换赛道</strong><span>花 ${FormatMoney(pivotCost)}，并损失进度与宣发</span></div>
       <div class="worldGrid whiteboardPivotGrid">
         <label class="worldChoice"><div class="choiceTop"><strong>题材</strong></div><select id="pivotProjectSelect">${PROJECTS.map((project) => `<option value="${project.id}" ${project.id === state.project.templateId ? "selected" : ""}>${EscapeHtml(project.genre)}</option>`).join("")}</select></label>
         <label class="worldChoice"><div class="choiceTop"><strong>发行</strong></div><select id="pivotTypeSelect">${GAME_TYPES.map((gameType) => `<option value="${gameType.id}" ${gameType.id === state.project.gameTypeId ? "selected" : ""}>${EscapeHtml(gameType.name)} · ${EscapeHtml(gameType.warning)}</option>`).join("")}</select></label>
       </div>
       <div class="panelSection choiceFooter"><span>进度、宣发大量损失 · 焦虑 +14 · 饥饿 +4</span><button class="dangerButton" data-pivot type="button" ${state.project.isReleased ? "disabled" : ""}>花 ${FormatMoney(pivotCost)} 转向</button></div>`}
-      <div class="whiteboardMarkerSet" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+      ${WhiteboardLegendHtml()}
     </div>`, () => {
     dom.sheetBody.onclick = (event) => {
       const directiveButton = event.target.closest("[data-directive-id]");
@@ -4998,6 +5091,7 @@ function CaptureMonthMontageSnapshot() {
     nextMonth: settledMonth + 1,
     ownerWorkCount: state.ownerWorkCount || 0,
     ownerWorked: (state.ownerWorkCount || 0) > 0,
+    ownerHairAmount: GetOwnerHairAmount(state.anxiety),
     foodPlan: state.foodPlan,
     relaxationVisit: relaxationVisit ? { ...relaxationVisit } : null,
   };
@@ -5008,7 +5102,6 @@ function BuildMonthMontageScenes(snapshot) {
     scene: "work",
     venue: "home",
     place: "自己家",
-    action: snapshot.ownerWorked ? "疯狂敲代码" : "昼夜飞逝",
   };
   const scenes = Array.from({ length: MONTH_MONTAGE_DAYS }, () => ({ ...workScene }));
   const SetScene = (day, scene) => {
@@ -5019,15 +5112,15 @@ function BuildMonthMontageScenes(snapshot) {
   };
   const food = MONTH_MONTAGE_FOOD_SCENES[snapshot.effectiveFoodPlanId || snapshot.foodPlan];
   if (food) {
-    if (food.external) SetScene(4, { scene: "out", venue: food.venue, place: food.place, action: "加速出门" });
-    SetRange(5, 7, { scene: "food", venue: food.venue, place: food.place, action: "加速吃饭" });
-    if (food.external) SetScene(8, { scene: "home", venue: "home", place: "自己家", action: "加速回家" });
+    if (food.external) SetScene(4, { scene: "out", venue: food.venue, place: food.place });
+    SetRange(5, 7, { scene: "food", venue: food.venue, place: food.place });
+    if (food.external) SetScene(8, { scene: "home", venue: "home", place: "自己家" });
   }
   const relaxation = MONTH_MONTAGE_RELAX_SCENES[snapshot.relaxationVisit?.venueId];
   if (relaxation) {
-    SetScene(17, { scene: "out", venue: relaxation.venue, place: relaxation.place, action: "加速出门" });
-    SetRange(18, 20, { scene: "relax", venue: relaxation.venue, place: relaxation.place, action: "加速泡脚" });
-    SetScene(21, { scene: "home", venue: "home", place: "自己家", action: "加速回家" });
+    SetScene(17, { scene: "out", venue: relaxation.venue, place: relaxation.place });
+    SetRange(18, 20, { scene: "relax", venue: relaxation.venue, place: relaxation.place });
+    SetScene(21, { scene: "home", venue: "home", place: "自己家" });
   }
   return scenes;
 }
@@ -5042,14 +5135,15 @@ async function PlayMonthMontage(snapshot) {
   const scenes = BuildMonthMontageScenes(snapshot);
   monthMontagePlaying = true;
   dom.monthMontage.style.setProperty("--month-day-ms", `${dayMilliseconds}ms`);
-  dom.monthMontage.style.setProperty("--month-screen-ms", `${dayMilliseconds * 3}ms`);
+  dom.monthMontage.style.setProperty("--month-screen-ms", `${dayMilliseconds * 5}ms`);
+  const ownerHairAmount = Clamp(snapshot.ownerHairAmount, 0, 1);
+  dom.monthMontage.dataset.ownerArt = GetFounderArtStage(ownerHairAmount);
   dom.monthMontage.classList.toggle("hasOwnerWork", snapshot.ownerWorked);
   dom.monthMontage.classList.remove("hidden", "isRunning", "isSealing");
   dom.monthMontage.classList.add("isOpening");
   dom.montageMonthLabel.textContent = `M${String(snapshot.settledMonth).padStart(2, "0")} 封账`;
   dom.montageDayValue.textContent = "01";
-  dom.montageActionLabel.textContent = "时间开始加速";
-  dom.montagePlaceLabel.textContent = "自己家";
+  dom.montageDate.setAttribute("aria-label", "本月第 1 天");
   dom.montageStage.dataset.scene = "work";
   dom.montageStage.dataset.venue = "home";
   try {
@@ -5059,8 +5153,7 @@ async function PlayMonthMontage(snapshot) {
     for (let day = 1; day <= MONTH_MONTAGE_DAYS; day += 1) {
       const scene = scenes[day - 1];
       dom.montageDayValue.textContent = String(day).padStart(2, "0");
-      dom.montageActionLabel.textContent = scene.action;
-      dom.montagePlaceLabel.textContent = scene.place;
+      dom.montageDate.setAttribute("aria-label", `本月第 ${day} 天`);
       dom.montageStage.dataset.scene = scene.scene;
       dom.montageStage.dataset.venue = scene.venue;
       await WaitForMonthMontage(dayMilliseconds);
@@ -5068,8 +5161,6 @@ async function PlayMonthMontage(snapshot) {
     dom.monthMontage.classList.remove("isRunning");
     dom.monthMontage.classList.add("isSealing");
     dom.montageMonthLabel.textContent = `M${String(snapshot.settledMonth).padStart(2, "0")} → M${String(snapshot.nextMonth).padStart(2, "0")}`;
-    dom.montageActionLabel.textContent = "本月封账";
-    dom.montagePlaceLabel.textContent = "进入下个月";
     await WaitForMonthMontage(closingMilliseconds);
   } finally {
     dom.monthMontage.classList.add("hidden");
@@ -5080,7 +5171,7 @@ async function PlayMonthMontage(snapshot) {
 
 function GetMonthCloseActions() {
   const actions = [];
-  const ownerWorkRemaining = Math.max(0, 3 - state.ownerWorkCount);
+  const ownerWorkRemaining = Math.max(0, OWNER_BASE_ENERGY - state.ownerWorkCount);
   if (ownerWorkRemaining > 0) actions.push(`休息 ${ownerWorkRemaining} 格 · 焦虑 −${GetOwnerRestRelief(state.ownerWorkCount)}`);
   if (state.talkPoints > 0) actions.push(`沟通 / 拍板可选 ${state.talkPoints} 次`);
   if (state.project.age >= 2 && state.project.lastReleaseMonth !== state.month) {
@@ -5244,8 +5335,8 @@ function OpenHelpSheet() {
   OpenPanel("HOW TO PLAY", "怎么开始", `
     <div class="resultHero"><b>A / D</b><p>在当前房间移动；W、↑ 或空格跳；靠近物件按 E。去别处必须先走到门口选目的地。</p></div>
     <div class="noteList">
-      <div class="note"><b>亲自开发</b>：家里的电脑，每月 3 次，立即生效。</div>
-      <div class="note"><b>制作方针</b>：墙上白板，持续生效，月底影响全组。</div>
+      <div class="note"><b>牛马 486</b>：开发、撤回、玩游戏和发布；基础 ${OWNER_BASE_ENERGY} 格精力，足浴当月 +1。</div>
+      <div class="note"><b>团队方针</b>：墙上白板选择，月底影响全组。</div>
       <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
       <div class="note"><b>评分、事件、月结</b>：项目日历；右下角“下一回合”也可打开。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
@@ -5354,7 +5445,7 @@ function BeginWorld(nextState) {
   UpdateWorldFromGameState();
   UpdateLocationIndicator();
   if (state.project?.age === 0 && state.ownerWorkCount === 0) {
-    window.setTimeout(() => ShowToast("第一步：走到开发电脑前按 E，亲自开发 3 次。", "good"), 420);
+    window.setTimeout(() => ShowToast(`第一步：走到开发电脑前按 E，分配本月 ${OWNER_BASE_ENERGY} 格精力。`, "good"), 420);
   }
   if (state.status !== "playing") RenderEnding();
 }
