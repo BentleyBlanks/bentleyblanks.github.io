@@ -28,7 +28,6 @@ assert.equal(Collectibles.length, 0, "the 2D city must not use development fragm
 assert.equal(MovingHazards.length, 0, "the user explicitly removed all moving hazards");
 
 const requiredInteractionIds = [
-  "homeComputer",
   "planningBoard",
   "homeCalendar",
   "homeFridge",
@@ -53,6 +52,7 @@ const requiredInteractionIds = [
   "maleModelClubExit",
 ];
 assert.deepEqual(InteractionPoints.map((point) => point.id), requiredInteractionIds, "each place should expose its own actions and a real exit");
+assert.equal(InteractionPoints.some((point) => point.id === "homeComputer" || point.action === "computer"), false, "the home computer must remain scenery rather than a world interaction");
 
 const consumerInteractions = InteractionPoints.filter((point) => point.consumerVenueId);
 assert.equal(consumerInteractions.length, CONSUMER_VENUES.length, "every personal-consumption venue needs one world interaction");

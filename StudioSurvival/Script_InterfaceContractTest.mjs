@@ -8,64 +8,63 @@ const html = ReadLocal("./index.html");
 const css = ReadLocal("./Style_Play.css");
 const contractDecisionPage = html.match(/<article class="contractPage contractDecisionPage active"[^]*?<\/article>/)?.[0] || "";
 const ById = (id) => InteractionPoints.find((point) => point.id === id);
+const FunctionBlock = (name) => {
+  const start = script.indexOf(`function ${name}`);
+  if (start < 0) return "";
+  const next = script.indexOf("\nfunction ", start + name.length + 9);
+  return script.slice(start, next < 0 ? script.length : next);
+};
 
+assert.equal(ById("homeComputer"), undefined, "the home computer must remain scenery rather than a world interaction");
 assert.deepEqual(
-  ["homeComputer", "planningBoard", "homeCalendar", "talentCounter", "equipmentCounter"]
+  ["planningBoard", "homeCalendar", "talentCounter", "equipmentCounter"]
     .map((id) => {
       const point = ById(id);
       return [point.id, point.locationId, point.action];
     }),
   [
-    ["homeComputer", "home", "computer"],
     ["planningBoard", "home", "direction"],
     ["homeCalendar", "home", "month"],
     ["talentCounter", "talent", "talent"],
     ["equipmentCounter", "talent", "equipment"],
   ],
-  "development, direction, project calendar, recruitment, and equipment need distinct physical entry points",
+  "the project board, calendar, recruitment, and equipment need distinct physical entry points",
 );
 
 const triggerBlock = script.match(/function TriggerInteraction\(\)[\s\S]*?function StartFoundingCeremony/)?.[0] || "";
-assert.match(triggerBlock, /case "homeComputer": return OpenHomeComputerSheet\(\)/);
 assert.match(triggerBlock, /case "planningBoard": return OpenDirectiveSheet\(\)/);
 assert.match(triggerBlock, /case "homeCalendar": return OpenMonthSheet\(\)/);
 assert.match(triggerBlock, /case "talentMarket": return OpenTalentSheet\(\)/);
 assert.match(triggerBlock, /case "exit": return OpenTravelSheet\(\)/);
+assert.doesNotMatch(triggerBlock, /homeComputer|OpenHomeComputerSheet/, "the decorative computer must never receive an interaction route");
 assert.doesNotMatch(triggerBlock, /marketingPhone|OpenMarketPhoneSheet/, "the redundant physical phone must be removed");
 
-const staffBlock = script.match(/function OpenStaffSheet[\s\S]*?function OpenCustomizationSheet/)?.[0] || "";
+const staffBlock = script.match(/function OpenStaffSheet[\s\S]*?function OpenBankSheet/)?.[0] || "";
 assert.doesNotMatch(staffBlock, /data-customize|OpenCustomizationSheet\(staffId\)/, "staff chat must not duplicate the project-direction button");
-assert.match(staffBlock, /项目方向与玩法提案统一在墙上白板处理/);
 
 const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function RevenueChart/)?.[0] || "";
-assert.match(directiveBlock, /data-feature-source/, "the project whiteboard owns the feature-proposal entry");
-assert.match(directiveBlock, /OpenFeatureSourceSheet\(\)/);
+assert.match(directiveBlock, /data-owner-task/, "the project whiteboard must expose owner development tasks");
+assert.match(directiveBlock, /PerformOwnerTask\(state,\s*[^)]+\)/, "owner development must execute from the project whiteboard");
+assert.match(directiveBlock, /(?:MODULE_KEYS|moduleValues)\.map/, "the project whiteboard must render every development module");
+assert.match(directiveBlock, /data-directive-id[\s\S]*SelectDirective\(/, "project direction must remain selectable from the board");
+assert.match(directiveBlock, /data-whiteboard-release[\s\S]*OpenReleaseSheet\(\)/, "publishing must move onto the project whiteboard");
 assert.match(directiveBlock, /state\.project\.age < 1/, "advanced direction controls stay hidden during the first development month");
 assert.match(directiveBlock, /\{ mode: "whiteboard" \}/, "project direction must open on the physical whiteboard surface");
-assert.match(directiveBlock, /class="whiteboardFocus"[^>]*>[\s\S]*?本月方向[\s\S]*?点选便签切换/, "the board must elevate the active monthly direction and explain the interaction");
+assert.match(directiveBlock, /class="whiteboardFocus"[^>]*>[\s\S]*?本月计划[\s\S]*?currentDirective[\s\S]*?energyLeft/, "the board must elevate the active direction and remaining owner energy");
 assert.match(directiveBlock, /aria-pressed="\$\{state\.selectedDirective === directive\.id\}"/, "direction notes need a programmatic selected state");
 assert.match(directiveBlock, /class="whiteboardAction"[\s\S]*?点选 →/, "direction notes must carry a persistent action cue");
+assert.doesNotMatch(directiveBlock, /data-feature|OpenFeatureSourceSheet|OpenCustomizationSheet/, "the board must not retain a gameplay-proposal entry");
 
-const customizationBlock = script.match(/function OpenCustomizationSheet[\s\S]*?function OpenFeatureSourceSheet/)?.[0] || "";
-assert.match(customizationBlock, /state\.project\.age < 1/, "direct feature customization must keep the early-stage gate");
-assert.match(customizationBlock, /PROJECT WHITEBOARD/, "feature proposals should retain their whiteboard context");
-assert.match(customizationBlock, /\{ mode: "whiteboard" \}/, "feature proposals must stay on the physical whiteboard surface");
-assert.match(customizationBlock, /点选便签写入/, "feature proposals must state that their notes are selectable");
-assert.match(customizationBlock, /class="whiteboardAction"/, "each feature note needs a persistent action or completion cue");
+const releaseBlock = script.match(/function OpenReleaseSheet[\s\S]*?function GetMonthCloseActions/)?.[0] || "";
+assert.match(releaseBlock, /\{ mode: "whiteboard" \}/, "release review must remain on the physical project whiteboard");
+assert.doesNotMatch(releaseBlock, /mode: "computer"/, "release review must never reopen the decorative computer");
 
-const featureSourceBlock = script.match(/function OpenFeatureSourceSheet[\s\S]*?function OpenHomeComputerSheet/)?.[0] || "";
-assert.doesNotMatch(featureSourceBlock, /mode: "computer"/, "the project whiteboard must not reuse the computer surface");
-assert.match(featureSourceBlock, /mode: "whiteboard"/, "proposal ownership must stay on the physical whiteboard surface");
-assert.match(featureSourceBlock, /点选便签继续/, "proposal-owner notes must state their interaction");
-assert.match(featureSourceBlock, /class="whiteboardAction"[^>]*aria-hidden="true">点选 →/, "proposal-owner notes need a persistent action cue");
-
-const computerBlock = script.match(/function OpenHomeComputerSheet[\s\S]*?function OpenWorkstationSheet/)?.[0] || "";
-assert.match(computerBlock, /data-energy-module/, "the development computer must focus on the three monthly energy points");
 assert.doesNotMatch(
-  computerBlock,
-  /data-computer-action|OpenDirectiveSheet\(|OpenMonthSheet\(|OpenTalentSheet\(/,
-  "direction, settlement, and recruitment must never return to the development computer",
+  script,
+  /function OpenCustomizationSheet|function OpenFeatureSourceSheet|function OpenHomeComputerSheet|function OpenWorkstationSheet|\bCustomizeProject\b|\bFEATURE_CHOICES\b|\bFEATURE_LIMIT\b|data-feature-source|data-feature-id/,
+  "gameplay proposals and the interactive development computer must leave no player-facing implementation",
 );
+assert.doesNotMatch(`${html}\n${script}`, /玩法提案/u, "gameplay-proposal copy must be removed from every player-facing surface");
 
 const projectCalendarBlock = script.match(/function GetProjectCalendarReminders[\s\S]*?function OpenHelpSheet/)?.[0] || "";
 assert.match(projectCalendarBlock, /PROJECT CALENDAR/);
@@ -83,6 +82,41 @@ const travelSheetBlock = script.match(/function OpenTravelSheet[\s\S]*?function 
 const travelToBlock = script.match(/function TravelTo[\s\S]*?function TriggerInteraction/)?.[0] || "";
 const beginWorldBlock = script.match(/function BeginWorld[\s\S]*?function OpenTravelSheet/)?.[0] || "";
 const monthSheetBlock = script.match(/function OpenMonthSheet[\s\S]*?function OpenHelpSheet/)?.[0] || "";
+const overlayBlock = FunctionBlock("IsOverlayOpen");
+const buildRoomBlock = FunctionBlock("BuildRoom");
+const monthSnapshotBlock = FunctionBlock("CaptureMonthMontageSnapshot");
+const monthSceneBlock = FunctionBlock("BuildMonthMontageScenes");
+const monthMontageBlock = FunctionBlock("PlayMonthMontage");
+const monthSceneConfigBlock = script.slice(script.indexOf("const MONTH_MONTAGE_FOOD_SCENES"), script.indexOf("function CaptureMonthMontageSnapshot"));
+const monthMontageTag = html.match(/<[^>]*\bid="monthMontage"[^>]*>/)?.[0] || "";
+assert.match(monthMontageTag, /class="[^"]*monthMontage/, "the month transition needs a stable full-screen overlay hook");
+assert.match(monthMontageTag, /aria-live="polite"/, "the non-interactive montage must announce its accelerated progress without stealing focus");
+assert.match(buildRoomBlock, /homeComputerProp/, "the removed computer interaction must leave its room prop visible");
+assert.match(script, /const MONTH_MONTAGE_DAYS = 28;/, "each month montage must represent exactly twenty-eight days");
+assert.match(script, /const MONTH_MONTAGE_DAY_MS = \d+;/, "the accelerated day cadence needs one explicit timing constant");
+assert.match(overlayBlock, /dom\.monthMontage/, "the full-screen montage must suppress world input while it is active");
+assert.match(monthSnapshotBlock, /state\.ownerWorkCount/, "the montage snapshot must remember whether the owner developed this month");
+assert.match(monthSnapshotBlock, /state\.foodPlan/, "the montage snapshot must remember the selected eating plan");
+assert.match(monthSnapshotBlock, /state\.relaxationHistory/, "the montage snapshot must use actual relaxation visits");
+assert.match(monthSnapshotBlock, /entry\.month === (?:state\.month|settledMonth)/, "relaxation scenes must be limited to visits from the month being closed");
+assert.match(monthSceneBlock, /snapshot\.ownerWorked/, "the rapid coding scene must depend on actual owner work");
+assert.match(monthSceneBlock, /snapshot\.foodPlan/, "meal scenes must depend on the player's selected eating plan");
+assert.match(monthSceneBlock, /snapshot\.relaxation/, "footbath scenes must depend on actual venue history");
+assert.match(monthSceneBlock, /if \(food\)/, "an absent or skipped meal must not fabricate an eating scene");
+assert.match(monthSceneBlock, /if \(relaxation\)/, "a month without a footbath visit must not fabricate one");
+assert.match(monthSceneConfigBlock, /leftovers[\s\S]*snack[\s\S]*sustenance[\s\S]*feast/, "every real eating choice except skipping must map to its selected place");
+assert.doesNotMatch(monthSceneConfigBlock, /\bskip\s*:/, "skipping food must produce no eating montage");
+assert.match(monthSceneConfigBlock, /regularFootbath[\s\S]*footbathCity[\s\S]*maleModelClub/, "every footbath venue must preserve its actual location in the montage");
+assert.match(monthMontageBlock, /MONTH_MONTAGE_DAYS/, "montage playback must consume the exact twenty-eight-day contract");
+assert.match(monthMontageBlock, /MONTH_MONTAGE_DAY_MS/, "montage playback must use the accelerated day cadence");
+assert.match(monthMontageBlock, /for \(let day = 1; day <= MONTH_MONTAGE_DAYS; day \+= 1\)/, "playback must render every one of the twenty-eight day/night changes");
+const captureIndex = monthSheetBlock.indexOf("CaptureMonthMontageSnapshot(");
+const advanceIndex = monthSheetBlock.indexOf("AdvanceMonth(state)");
+const playIndex = monthSheetBlock.indexOf("await PlayMonthMontage(");
+const resultIndex = monthSheetBlock.indexOf("ShowMonthResult(result)");
+assert.ok(captureIndex >= 0 && captureIndex < advanceIndex, "the current-month montage snapshot must be captured before AdvanceMonth clears monthly state");
+assert.ok(advanceIndex >= 0 && advanceIndex < playIndex, "month settlement must finish before the montage begins");
+assert.ok(playIndex >= 0 && playIndex < resultIndex, "the month result must wait for the full montage to finish");
 assert.match(script, /sceneGroup\.name = `Scene_\$\{location\.id\}`/, "each location needs its own render root");
 assert.match(sceneSyncBlock, /locationSceneGroups\.forEach\(\(group, id\) => \{ group\.visible = id === location\.id; \}\)/, "only the active location render root may remain visible");
 assert.match(sceneSyncBlock, /smoothCameraX = cameraCenter[\s\S]*camera\.position\.set\(cameraCenter/, "scene changes must snap the camera before reveal");

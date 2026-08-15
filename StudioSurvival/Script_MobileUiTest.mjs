@@ -9,10 +9,8 @@ const script = ReadLocal("./Script_Play.mjs");
 const setupChoiceScript = script.match(/function RenderSetupChoices\(\) \{[^]*?dom\.continueButton[^]*?\n\}/)?.[0] || "";
 const contractDecisionPage = html.match(/<article class="contractPage contractDecisionPage active"[^]*?<\/article>/)?.[0] || "";
 const sealKeyupSource = script.match(/dom\.sealButton\.addEventListener\("keyup"[^]*?\n  \}\);/)?.[0] || "";
-const homeComputerSource = script.slice(
-  script.indexOf("function OpenHomeComputerSheet"),
-  script.indexOf("function OpenWorkstationSheet"),
-);
+const monthMontageTag = html.match(/<[^>]*\bid="monthMontage"[^>]*>/)?.[0] || "";
+const monthMontageCss = css.match(/\.monthMontage\s*\{[^}]*\}/s)?.[0] || "";
 
 assert.match(html, /viewport-fit=cover/, "the page must preserve phone safe-area insets");
 assert.match(html, /id="mobileControls"/, "the touch-control region needs a stable DOM hook");
@@ -21,10 +19,10 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815aj/, "UI changes must bypass the Pages cache");
-assert.match(html, /Script_Play\.mjs\?v=20260815aj/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!aj)/, "the stylesheet cache-bust must stay unified");
-assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!aj)/, "the gameplay cache-bust must stay unified");
+assert.match(html, /Style_Play\.css\?v=20260815ak/, "UI changes must bypass the Pages cache");
+assert.match(html, /Script_Play\.mjs\?v=20260815ak/, "gameplay changes must bypass the Pages cache");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ak)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ak)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /class="hudConsole identityConsole sceneConsole" aria-label="当前场景">[\s\S]*?id="locationValue"/, "the top-left console must show the current scene name");
 assert.match(html, /class="missionHeading"><span>项目<\/span><b id="studioNameHud">/, "the project sheet must own the company name");
 assert.doesNotMatch(html, /studioMonogram|locationPlate/, "the HUD must not repeat scene or company identity through the old icon and place plate");
@@ -34,6 +32,8 @@ assert.match(html, /贷款 · 彩票 · 炒股/, "the reveal must say which cash
 assert.match(html, /你将成为成功的游戏制作人/, "the 100-yuan-billion goal must describe the creator milestone rather than victory");
 assert.doesNotMatch(html, /胜利|通关/, "the active page must not frame 100-yuan-billion revenue as winning the game");
 assert.match(html, /id="settlementButton"[^>]*aria-label="下一回合[^>]*>[\s\S]*?id="settlementMonthValue"/, "the bottom-right next-turn button needs a stable accessible DOM contract");
+assert.match(monthMontageTag, /class="[^"]*monthMontage/, "the monthly montage needs a stable full-screen DOM surface");
+assert.match(monthMontageTag, /aria-live="polite"/, "the accelerated montage must announce progress without adding a mobile focus trap");
 assert.doesNotMatch(html, /id="phoneButton"/, "the removed phone must not return as a HUD shortcut");
 assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/, "the founding book must begin with the first of four pages");
 assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/, "the founder profile must remain the second book page");
@@ -60,6 +60,11 @@ assert.match(css, /\.projectCalendarLive\s*\{[^}]*grid-template-columns:/s, "pos
 assert.match(css, /\.projectCalendarReminder\s*\{/, "random events need a visible calendar reminder row");
 assert.match(css, /\.resultLayer\.monthResultMode \.resultCard/, "monthly results need a distinct ceremonial reveal");
 assert.match(css, /\.monthResultMode \.stockReturnGrid\s*\{\s*display:\s*none;/, "stock settlement must stay compact inside the monthly reveal");
+assert.match(monthMontageCss, /position:\s*fixed;/, "the month montage must be fixed to the viewport");
+assert.match(monthMontageCss, /inset:\s*0;/, "the month montage must cover every viewport edge");
+assert.match(monthMontageCss, /overflow:\s*hidden;/, "the month montage must not leak scroll on phones");
+assert.match(css, /\.monthMontage\.(?:isOpening|isRunning)/, "the full-screen montage needs an explicit visible playback state");
+assert.match(css, /@media \(max-height:\s*\d+px\) and \(orientation:\s*landscape\)[\s\S]*?\.monthMontage/s, "short landscape phones need a dedicated compact montage layout");
 assert.match(css, /\.cashStat\s*\{\s*display:\s*grid;/, "the smallest supported landscape must keep cash visible");
 assert.doesNotMatch(css, /\.identityConsole\s*\{\s*display:\s*none;/, "the current scene name must remain visible at every supported landscape width");
 assert.match(css, /\.roundButton\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s, "utility controls must remain full touch targets");
@@ -76,17 +81,10 @@ assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedic
 assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
 assert.match(css, /\.founderSkillControls button\s*\{[^}]*min-height:\s*44px;/s, "founder skill steppers must remain full touch targets");
 assert.doesNotMatch(css, /\.founderSkillPresets/, "founder setup must stay focused on the three editable abilities");
-assert.match(css, /\.computerReleaseCallout button\s*\{[^}]*min-height:\s*44px;/s, "the release action must remain a full touch target");
 assert.match(css, /\.endingActions button\s*\{[^}]*min-height:\s*48px;/s, "restart choices must remain full touch targets");
 assert.match(css, /\.endingActions \{ grid-template-columns:minmax\(0,1\.45fr\) minmax\(150px,\.55fr\); \}/, "short landscape endings must keep both restart choices above the fold");
 assert.doesNotMatch(css, /\.documentButton,\.bookBackButton\s*\{[^}]*min-height:\s*(?:3\d|4[0-3])px;/s, "book navigation must not shrink below a 44px touch target");
 assert.doesNotMatch(css, /\.sealButton\s*\{[^}]*height:\s*(?:3\d|4[0-3])px;/s, "the signing seal must not shrink below a 44px touch target");
-assert.match(css, /\.modalLayer\.computerMode \.worldPanel\s*\{/, "the home computer needs its own physical monitor shell");
-assert.match(css, /\.computerMonitorShell\s*\{/, "the home computer must retain its monitor frame");
-assert.match(css, /\.energyModuleGrid\s*\{/, "the computer must expose its four development work areas");
-assert.match(css, /@media \(orientation: landscape\)\s*\{\s*\.modalLayer\.computerMode \.sheetBody\s*\{\s*overflow:hidden;/s, "the landscape computer must fit without an outer scrollbar");
-assert.match(css, /@media \(max-height: 820px\) and \(min-height: 651px\) and \(orientation: landscape\)[\s\S]*?\.computerDeskScene\s*\{[^}]*padding:0 132px 82px 0;/, "medium-height screens must compact the physical computer before it overflows");
-assert.match(css, /@media \(max-height: 500px\) and \(orientation: landscape\)[\s\S]*?\.computerObjective p,\.workCostNote,\.computerLocationHint\s*\{\s*display:none;/, "short screens must drop redundant monitor copy before hiding the keyboard");
 assert.match(css, /\.modalLayer\.whiteboardMode \.worldPanel\s*\{/, "the project board needs its own enamel-board frame");
 assert.match(css, /\.whiteboardMarkerSet\s*\{/, "the project board must retain its marker tray props");
 assert.match(css, /\.whiteboardMode \.worldChoice::before/, "direction notes must stay physically pinned to the board");
@@ -108,7 +106,8 @@ assert.doesNotMatch(sealKeyupSource, /CompleteContractSigning/, "releasing a key
 assert.match(script, /selectedProjectId = button\.dataset\.projectId;[\s\S]*?RenderSetupChoices\(\);[\s\S]*?data-project-id=[^\n]+\.focus\(/, "rebuilding theme cards must restore keyboard focus to the selected choice");
 assert.match(script, /selectedGameTypeId = button\.dataset\.typeId;[\s\S]*?RenderSetupChoices\(\);[\s\S]*?data-type-id=[^\n]+\.focus\(/, "rebuilding release cards must restore keyboard focus to the selected choice");
 assert.match(script, /addEventListener\("pointerleave", CancelSealHold\)/, "leaving the seal while pressed must cancel the signature timer");
-assert.match(script, /data-computer-release|function OpenReleaseSheet\(/, "publishing must remain reachable from the development computer");
+assert.match(script, /function OpenDirectiveSheet[\s\S]*?data-whiteboard-release[\s\S]*?OpenReleaseSheet\(\)/, "publishing must remain reachable from the project whiteboard");
+assert.match(script, /function OpenDirectiveSheet[\s\S]*?data-owner-task[\s\S]*?PerformOwnerTask\(/, "all owner development controls must remain reachable from the project whiteboard");
 assert.match(script, /matches\?\.\("button, a, \[role='button'\]"\)[^\n]+\["Space", "Enter"\]/, "focused physical controls must retain native keyboard activation");
 assert.match(script, /navigator\.vibrate\?\./, "coarse-pointer actions should provide optional tactile confirmation");
 assert.match(script, /dom\.sheetBody\.scrollTop = 0/, "each interaction sheet must open at its own beginning");
@@ -116,24 +115,16 @@ assert.match(script, /ShowGoalReveal\(result\.state\)/, "fresh contracts must sh
 assert.match(script, /dom\.goalRevealButton\.addEventListener\("click", CompleteGoalReveal\)/, "the player must acknowledge the creator goal before play begins");
 assert.match(script, /candidate\.status === "ended"[\s\S]*candidate\.outcome\?\.kind === "worldMaker"[\s\S]*你成为了成功的游戏制作人！/, "completed legacy saves must receive the current successful-creator ending copy");
 assert.doesNotMatch(script, /AddPhysicalLabel\(sceneGroup, location\.name/, "the room wall must not repeat the scene name already shown in the HUD");
-assert.match(script, /const sceneName = FindLocation\(interaction\.locationId\)\?\.name;[\s\S]*?if \(title !== sceneName\) AddPhysicalLabel/, "a venue prop must not repeat the current scene name as another physical sign");
+assert.match(script, /const sceneName = FindLocation\(interaction\.locationId\)\?\.name;[\s\S]*?if \(!decorative && title !== sceneName\) AddPhysicalLabel/, "a venue prop must not repeat the current scene name as another physical sign");
 assert.doesNotMatch(script, /studioMonogram/, "scene identity must not fall back to a company monogram icon");
 assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
 assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");
-assert.doesNotMatch(script, /function OpenHomeComputerSheet[\s\S]*?data-open-stock[\s\S]*?function OpenWorkstationSheet/, "the development computer must not expose stock trading");
+assert.doesNotMatch(script, /function OpenHomeComputerSheet|function OpenWorkstationSheet/, "the decorative computer must not retain a modal interaction");
 assert.match(script, /function OpenScratchSheet\(/, "the supermarket counter must have its own scratch-card screen");
 assert.match(script, /function StockSettlementReport\(/, "the next turn must render the monthly stock trend and return");
 assert.doesNotMatch(script, /LOTTERY \/ STOCKS/, "stocks and scratch cards must not share the old combined entry");
-assert.match(script, /classList\.toggle\("computerMode", panelOptions\.mode === "computer"\)/, "computer sheets need an isolated presentation mode");
-assert.match(homeComputerSource, /class="computerDeskScene"/, "the home computer must render a desk scene inside the monitor");
-assert.match(homeComputerSource, /class="computerMonitorShell"/, "the home computer must retain its physical monitor shell");
-assert.match(homeComputerSource, /class="computerGlassFrame"/, "the CRT must have a separate curved-glass surround");
-assert.match(homeComputerSource, /class="computerTopVent"/, "the CRT casing must retain visible ventilation");
-assert.match(homeComputerSource, /class="computerTowerVisual"/, "the home computer must include a separate desktop tower");
-assert.match(homeComputerSource, /class="computerKeyboardVisual"/, "the home computer must include its physical keyboard");
-assert.match(homeComputerSource, /class="computerMouseVisual"/, "the home computer must include its physical mouse");
-assert.match(homeComputerSource, /\{ mode: "computer" \}/, "the home computer must open in the physical monitor mode");
-assert.doesNotMatch(homeComputerSource, /data-computer-action|OpenDirectiveSheet|OpenStockSheet|OpenTalentSheet|OpenMonthSheet/, "the development computer must not expose unrelated systems");
+assert.match(script, /function PlayMonthMontage\(/, "the next-turn flow needs a dedicated accelerated montage player");
+assert.match(script, /await PlayMonthMontage\(/, "the result reveal must wait for montage playback on mobile as well as desktop");
 
 console.log("StudioSurvival mobile UI contract test passed");
