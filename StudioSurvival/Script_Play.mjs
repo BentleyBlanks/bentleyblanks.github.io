@@ -324,6 +324,7 @@ const collectibleVisuals = new Map();
 const hazardVisuals = new Map();
 const locationVisuals = new Map();
 const locationSceneGroups = new Map();
+const maleModelDancers = [];
 const HOME_WINDOW_DAY_NIGHT_SECONDS = 240;
 const HOME_WINDOW_START_PHASE = .34;
 const particles = [];
@@ -1041,6 +1042,142 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default
   return group;
 }
 
+function BuildDanceLimb({ color, upperLength, lowerLength, width, z = 0, endColor = null, shoe = false }) {
+  const pivot = new THREE.Group();
+  pivot.position.z = z;
+  const upper = FlatPanel(width, upperLength, color, { z: 0 });
+  upper.position.y = -upperLength * .5;
+  const joint = new THREE.Group();
+  joint.position.y = -upperLength;
+  const lower = FlatPanel(width * .9, lowerLength, color, { z: .002 });
+  lower.position.y = -lowerLength * .5;
+  joint.add(lower);
+  if (endColor !== null) {
+    const hand = FlatDisc(width * .56, endColor, { z: .004, segments: 14 });
+    hand.scale.y = 1.18;
+    hand.position.y = -lowerLength - width * .12;
+    joint.add(hand);
+  }
+  if (shoe) {
+    const foot = FlatPanel(width * 1.75, width * .58, 0x111018, { z: .005 });
+    foot.position.set(width * .34, -lowerLength - width * .14, .005);
+    joint.add(foot);
+  }
+  pivot.add(upper, joint);
+  pivot.userData.joint = joint;
+  return pivot;
+}
+
+function BuildMaleModelDancer(index = 0) {
+  const palettes = [
+    { skin: 0xd8a17d, shade: 0xb8755c, hair: 0x16131a, accent: 0xff5aa9 },
+    { skin: 0xb97858, shade: 0x8d513f, hair: 0x25170f, accent: 0xffc45f },
+    { skin: 0xe2b494, shade: 0xbf8067, hair: 0x32241d, accent: 0x8fd6ff },
+    { skin: 0x9f634a, shade: 0x754433, hair: 0x0d0c10, accent: 0xd49cff },
+  ];
+  const palette = palettes[index % palettes.length];
+  const dancer = new THREE.Group();
+  dancer.name = `MaleModelDancer_${index + 1}`;
+
+  const shadow = FlatDisc(.48, 0x09050a, { z: -.03, opacity: .3, segments: 24 });
+  shadow.scale.y = .22;
+  shadow.position.y = .07;
+  dancer.add(shadow);
+
+  const leftLeg = BuildDanceLimb({ color: 0x211824, upperLength: .43, lowerLength: .43, width: .18, z: .025, shoe: true });
+  const rightLeg = BuildDanceLimb({ color: 0x2a1c2d, upperLength: .43, lowerLength: .43, width: .18, z: .045, shoe: true });
+  leftLeg.position.set(-.17, .93, .025);
+  rightLeg.position.set(.17, .93, .045);
+  dancer.add(leftLeg, rightLeg);
+
+  const hips = new THREE.Group();
+  hips.position.set(0, .91, .06);
+  const pelvis = FlatPanel(.57, .3, 0x251a29, { z: .06 });
+  const belt = FlatPanel(.58, .07, palette.accent, { z: .068 });
+  belt.position.y = .1;
+  hips.add(pelvis, belt);
+
+  const torso = new THREE.Group();
+  torso.position.set(0, .47, .08);
+  const torsoShape = new THREE.Shape();
+  torsoShape.moveTo(-.22, -.43);
+  torsoShape.lineTo(-.48, .28);
+  torsoShape.lineTo(-.33, .49);
+  torsoShape.lineTo(.33, .49);
+  torsoShape.lineTo(.48, .28);
+  torsoShape.lineTo(.22, -.43);
+  torsoShape.closePath();
+  const torsoBody = new THREE.Mesh(
+    new THREE.ShapeGeometry(torsoShape),
+    new THREE.MeshBasicMaterial({ color: palette.skin, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  torsoBody.position.z = .08;
+  torso.add(torsoBody);
+
+  for (const chestX of [-.17, .17]) {
+    const chest = FlatDisc(.145, palette.shade, { z: .092, opacity: .55, segments: 18 });
+    chest.scale.set(1.18, .56, 1);
+    chest.position.set(chestX, .18, .092);
+    torso.add(chest);
+  }
+  for (const [abX, abY] of [[-.075, .02], [.075, .02], [-.075, -.11], [.075, -.11], [-.075, -.24], [.075, -.24]]) {
+    const ab = FlatPanel(.105, .055, palette.shade, { z: .094, opacity: .52 });
+    ab.position.set(abX, abY, .094);
+    torso.add(ab);
+  }
+  for (const side of [-1, 1]) {
+    const lapel = FlatPanel(.075, .68, palette.accent, { z: .1, rotation: side * -.18 });
+    lapel.position.set(side * .34, .02, .1);
+    torso.add(lapel);
+    const bow = FlatPanel(.1, .065, 0x151018, { z: .105, rotation: side * .52 });
+    bow.position.set(side * .055, .36, .105);
+    torso.add(bow);
+  }
+  const necklace = new THREE.Mesh(
+    new THREE.RingGeometry(.17, .19, 22, 1, Math.PI * .1, Math.PI * .8),
+    new THREE.MeshBasicMaterial({ color: 0xe3bd68, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  necklace.position.set(0, .23, .103);
+  necklace.rotation.z = Math.PI * .05;
+  torso.add(necklace);
+
+  const leftArm = BuildDanceLimb({ color: palette.skin, upperLength: .42, lowerLength: .39, width: .15, z: .06, endColor: palette.skin });
+  const rightArm = BuildDanceLimb({ color: palette.skin, upperLength: .42, lowerLength: .39, width: .15, z: .11, endColor: palette.skin });
+  leftArm.position.set(-.43, .36, .06);
+  rightArm.position.set(.43, .36, .11);
+  torso.add(leftArm, rightArm);
+
+  const head = new THREE.Group();
+  head.position.set(0, .78, .12);
+  const face = FlatDisc(.3, palette.skin, { z: .12, segments: 22 });
+  face.scale.set(1.08, 1.18, 1);
+  const hair = new THREE.Mesh(
+    new THREE.CircleGeometry(.31, 20, 0, Math.PI),
+    new THREE.MeshBasicMaterial({ color: palette.hair, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  hair.position.set(-.02, .1, .126);
+  hair.scale.set(1.12, .84, 1);
+  const sunglasses = FlatPanel(.46, .075, 0x17131d, { z: .133 });
+  sunglasses.position.set(0, .035, .133);
+  const smile = FlatPanel(.16, .025, 0x6f303d, { z: .134, rotation: -.08 });
+  smile.position.set(.025, -.13, .134);
+  head.add(face, hair, sunglasses, smile);
+  torso.add(head);
+  hips.add(torso);
+  dancer.add(hips);
+
+  dancer.userData.parts = {
+    hips, torso, head, leftArm, rightArm,
+    leftElbow: leftArm.userData.joint, rightElbow: rightArm.userData.joint,
+    leftLeg, rightLeg, leftKnee: leftLeg.userData.joint, rightKnee: rightLeg.userData.joint,
+    shadow,
+  };
+  dancer.userData.phase = index * 1.37;
+  dancer.userData.speed = 2.25 + index * .16;
+  dancer.userData.visualStyle = "twisting-male-model-v1";
+  return dancer;
+}
+
 function ApplyOwnerHairAmount() {
   if (!playerParts?.hair) return;
   const hairAmount = GetOwnerHairAmount(state.anxiety);
@@ -1460,10 +1597,6 @@ function BuildFacility(interaction) {
       group.add(steam);
     }
     if (isLuxury) {
-      const host = BuildFlatHumanActor(0xff86c8, false);
-      host.scale.setScalar(.62);
-      host.position.set(-1.08, .55, .03);
-      group.add(host);
       Place(group, Sphere(.075, color, { emissive: color, emissiveIntensity: 1.35, castShadow: false }), 1.06, 1.34, .12);
     }
   } else if (kind === "diner") {
@@ -2044,6 +2177,28 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
       AddPhysicalLabel(group, "情绪价值会所", "黄铜灯牌 · 真皮卡座", 3.45, center, 4.02, .13, accent, { compact: true, backing: 0x472638, surface: "leather" });
       AddPlant(group, start + 1.32, .04, .52, .68);
       AddPlant(group, end - 1.32, .04, .52, .68);
+      Place(group, Box(8.35, .2, 1.18, 0x28121f, { surface: "wood", roughness: .58 }), center, .18, .24);
+      Place(group, Box(8.05, .055, .12, accent, { emissive: accent, emissiveIntensity: .48, castShadow: false }), center, .31, .8);
+      const dancerSpecs = [
+        { offset: -3.05, scale: .92, z: .29 },
+        { offset: -1.05, scale: 1.02, z: .32 },
+        { offset: 1.05, scale: .98, z: .34 },
+        { offset: 3.05, scale: .94, z: .3 },
+      ];
+      dancerSpecs.forEach((spec, dancerIndex) => {
+        const spot = Cylinder(.42, .42, .035, dancerIndex % 2 ? accent : paleAccent, 24, {
+          emissive: accent, emissiveIntensity: .38, transparent: true, opacity: .72, castShadow: false,
+        });
+        Place(group, spot, center + spec.offset, .32, spec.z - .02);
+        const dancer = BuildMaleModelDancer(dancerIndex);
+        dancer.position.set(center + spec.offset, .32, spec.z);
+        dancer.scale.setScalar(spec.scale);
+        dancer.userData.baseY = .32;
+        dancer.userData.baseScale = spec.scale;
+        dancer.userData.locationId = location.id;
+        maleModelDancers.push(dancer);
+        group.add(dancer);
+      });
     } else if (isCity) {
       Place(group, Box(4.4, .08, .1, accent, { emissive: accent, emissiveIntensity: .36, castShadow: false }), center, 4.12, .13);
     } else {
@@ -2778,6 +2933,39 @@ function Animate() {
       actor.position.y = actor.userData.baseY + Math.sin(time * 2 + actor.userData.phase) * .08;
       actor.userData.parts.body.rotation[actor.userData.flat ? "z" : "y"] += delta * .55;
     } else actor.rotation.z = Math.sin(time * 1.25 + actor.userData.phase) * .01;
+  });
+
+  maleModelDancers.forEach((dancer, dancerIndex) => {
+    if (dancer.userData.locationId !== visibleLocationId) return;
+    const parts = dancer.userData.parts;
+    const rhythm = time * dancer.userData.speed + dancer.userData.phase;
+    const hipSwing = Math.sin(rhythm);
+    const shoulderSwing = Math.sin(rhythm * 1.13 + dancerIndex * .62);
+    const doubleBeat = Math.sin(rhythm * 2 + .7);
+    const twist = Math.sin(rhythm * 1.37 + dancerIndex * .45);
+    const baseScale = dancer.userData.baseScale || 1;
+    dancer.position.y = dancer.userData.baseY + Math.abs(doubleBeat) * .055;
+    dancer.rotation.z = Math.sin(rhythm * .52) * .035;
+    dancer.scale.set(baseScale * (1 + Math.abs(twist) * .025), baseScale * (1 - Math.abs(twist) * .018), baseScale);
+    parts.hips.position.x = hipSwing * .18;
+    parts.hips.position.y = .91 + Math.abs(doubleBeat) * .035;
+    parts.hips.rotation.z = hipSwing * .2;
+    parts.hips.rotation.y = twist * .34;
+    parts.torso.rotation.z = -hipSwing * .24 + shoulderSwing * .07;
+    parts.torso.rotation.y = twist * .62;
+    parts.head.rotation.z = hipSwing * .16 - shoulderSwing * .08;
+    parts.head.rotation.y = -twist * .4;
+    parts.leftArm.rotation.z = -1.05 + shoulderSwing * .68 + dancerIndex * .07;
+    parts.rightArm.rotation.z = 1.05 + Math.sin(rhythm * 1.09 + 1.55) * .68 - dancerIndex * .05;
+    parts.leftElbow.rotation.z = -(.28 + Math.abs(Math.sin(rhythm * 1.7)) * .78);
+    parts.rightElbow.rotation.z = .28 + Math.abs(Math.cos(rhythm * 1.55)) * .78;
+    parts.leftLeg.rotation.z = -.08 + hipSwing * .16;
+    parts.rightLeg.rotation.z = .08 - hipSwing * .16;
+    parts.leftKnee.rotation.z = -(.08 + Math.max(0, doubleBeat) * .34);
+    parts.rightKnee.rotation.z = -(.08 + Math.max(0, -doubleBeat) * .34);
+    parts.shadow.scale.x = .88 + Math.abs(hipSwing) * .2;
+    parts.shadow.scale.y = .2 - Math.abs(doubleBeat) * .025;
+    parts.shadow.material.opacity = .22 + Math.abs(doubleBeat) * .08;
   });
 
   collectibleVisuals.forEach((visual, id) => {

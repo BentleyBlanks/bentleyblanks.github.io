@@ -173,6 +173,13 @@ assert.doesNotMatch(rules, /GetOwnerHair(?:Stage|Amount)\(state\.month\)/, "mont
 assert.doesNotMatch(`${script}\n${rules}`, /GetOwnerHairStage|OWNER_HAIR_STAGES|ApplyOwnerHairStage|hairStage|连续做游戏满一年|发际线正式进入抢先体验|彻底秃/, "the retired month-driven hair stages and messages must stay removed");
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
 assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
+const maleModelDancerBlock = script.match(/function BuildMaleModelDancer[\s\S]*?function ApplyOwnerHairAmount/)?.[0] || "";
+const maleModelRoomBlock = script.match(/const dancerSpecs = \[[\s\S]*?maleModelDancers\.push\(dancer\);[\s\S]*?\}\);/)?.[0] || "";
+assert.match(maleModelDancerBlock, /torsoShape[\s\S]*necklace[\s\S]*sunglasses/, "male models need a distinct shirtless stage silhouette");
+assert.match(maleModelDancerBlock, /visualStyle = "twisting-male-model-v1"/, "male models need an explicit visual identity");
+assert.equal([...maleModelRoomBlock.matchAll(/\{ offset:/g)].length, 4, "the male-model club needs several visible performers");
+assert.match(maleModelRoomBlock, /maleModelDancers\.push\(dancer\)/, "club performers must join the animation roster");
+assert.match(script, /maleModelDancers\.forEach[\s\S]*parts\.hips\.rotation\.z[\s\S]*parts\.torso\.rotation\.y[\s\S]*parts\.leftArm\.rotation\.z/, "club performers must keep twisting hips, shoulders, and arms");
 
 const homeWindowCycleSeconds = Number(script.match(/const HOME_WINDOW_DAY_NIGHT_SECONDS = (\d+);/)?.[1]);
 const homeWindowBuilderBlock = script.match(/function BuildHomeWindowDayNight[\s\S]*?function UpdateHomeWindowDayNight/)?.[0] || "";
