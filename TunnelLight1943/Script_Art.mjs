@@ -13408,6 +13408,77 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
       ctx.restore();
       break;
     }
+    // 门板：**整扇门**压在画框一侧——分镜 01/02/03 每张都是它占掉小半幅。
+    //
+    // 为什么不能拿立面上那扇门：过场里第四堵墙整个不画（World 的 filmic），
+    // 给门正脸就是一个透出地平线的空门洞（镜头规范里那条④）。所以门在过场里
+    // 只能当**前景框景**：它不是世界里那扇门，是"贴着镜头的一块门板"。
+    //
+    // 三样缺一不可（照分镜逐条对的）：
+    //  ① **一道竖着的光缝**——门闩没插，门缝里透进来外头的天光。它是整幅画里
+    //     唯一的亮，也是"门关着但没关严"这句话的全部；
+    //  ② **一副门闩**（横铁片＋两枚钉），高度落在画框中上部；
+    //  ③ **竖着的木纹**要密（板门是一条条竖板拼的），并且**光缝两侧各有一条
+    //     亮边**：光从缝里漏出来会舔亮两侧的板棱，只画一条缝是贴了张白纸。
+    case "doorSlab": {
+      // 缝落在板身**里头**（0.86），右边还留一条板——不然缝就成了板的边，
+      // 实拍读出来是"一根白棍子浮在人前面"（2026-08-16 第一版就是这样）
+      const seamX = W * 0.86;
+      const seamW = Math.max(2, W * 0.020);
+      // 门板本体：**画满整张画布**（左沿到右沿），外沿不许直（板门年久，边是啃过的）
+      InkFill(ctx, [[0, 0], [W, -H * 0.02], [W * 0.995, H * 0.5], [W, H * 1.02], [0, H]],
+        id, C("body"), { amp: W * 0.010, line: C("deep"), lw: Math.max(2, W * 0.016) });
+      // 竖板缝：板门是一条条竖板拼的，间距不匀
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      for (let i = 1; i <= 6; i += 1) {
+        const x = W * (0.08 + i * 0.145) + Sym(id + "p", i, W * 0.012);
+        InkLine(ctx, x, H * 0.03, x + Sym(id + "q", i, W * 0.014), H * 0.98, id + "v" + i,
+          { amp: W * 0.008, lw: Math.max(1, W * 0.007), color: i % 2 ? C("dark") : C("deep") });
+      }
+      ctx.restore();
+      // 门闩：横铁片压在板上，两枚钉。铁比木深一档
+      const bx = W * 0.30, by = H * 0.44, bw = W * 0.40, bh = H * 0.075;
+      InkFill(ctx, [[bx, by], [bx + bw, by - bh * 0.18], [bx + bw, by + bh * 0.82], [bx, by + bh]],
+        id + "b", C("deep"), { amp: W * 0.006, line: C("deep"), lw: Math.max(1.5, W * 0.010) });
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < 2; i += 1) {
+        const nx = bx + bw * (0.18 + i * 0.55);
+        InkFill(ctx, [[nx - W * 0.010, by + bh * 0.22], [nx + W * 0.010, by + bh * 0.18],
+          [nx + W * 0.008, by + bh * 0.62], [nx - W * 0.011, by + bh * 0.66]], id + "n" + i,
+        C("rim"), { amp: W * 0.004, line: C("deep"), lw: Math.max(1, W * 0.006) });
+      }
+      ctx.restore();
+      // **那道光缝**：门闩没插，缝里透着外头的白天。缝本身给满，两侧舔一道亮边
+      ctx.save();
+      const g = ctx.createLinearGradient(seamX - seamW * 2.2, 0, seamX + seamW * 1.6, 0);
+      g.addColorStop(0, "rgba(0,0,0,0)");
+      g.addColorStop(0.42, C("rim"));
+      g.addColorStop(0.58, C("rim"));
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = g;
+      ctx.fillRect(seamX - seamW * 2.2, 0, seamW * 3.8, H);
+      // 缝不是一条直线：门板歪着，缝时宽时窄
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#000";
+      for (let i = 0; i < 7; i += 1) {
+        const y0 = H * (i / 7), y1 = H * ((i + 1) / 7);
+        const w2 = seamW * (0.35 + Rnd(id + "sw", i) * 0.5);
+        ctx.fillRect(seamX - seamW * 2.2, y0, seamW * 2.2 - w2 * 0.5, y1 - y0);
+        ctx.fillRect(seamX + w2 * 0.5, y0, seamW * 2.0, y1 - y0);
+      }
+      ctx.restore();
+      // 门板朝里那条棱：被缝里的光舔亮
+      ctx.save();
+      ctx.globalAlpha = 0.38;
+      InkLine(ctx, seamX - seamW * 1.5, H * 0.02, seamX - seamW * 1.7, H * 0.98, id + "rim",
+        { amp: W * 0.006, lw: Math.max(2, W * 0.016), color: C("rim") });
+      ctx.restore();
+      break;
+    }
     // 房梁：横在画框上沿的一根梁，底下垂着椽子头与苇箔的茬。
     // **梁身要占大半张画布**——第一版 0.62 配上长短不一的长齿，梁身整个被推出
     // 画框，屏幕上只剩一排黑方块，读成城墙垛口（实拍抓的）

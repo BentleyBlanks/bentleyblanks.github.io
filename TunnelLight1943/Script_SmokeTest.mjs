@@ -2478,8 +2478,16 @@ function TestPrologueStaging() {
     const half = dist * Math.tan((FOV * Math.PI / 180) / 2) * ((16 / 9) * 0.493);
     return { side: m[1], lo: tx - half, hi: tx + half, ty };
   });
-  assert.ok(panes.length >= 4 && panes.length % 2 === 0,
-    `序里该有两处左右分屏（共 4 格），解析到 ${panes.length} 格`);
+  // 2026-08-16 照 Notion《过场分镜》改：**镜 01 从分屏改回单画幅**——分镜图上
+  // 两个孩子是挤在一起的，画左整整小半幅是那扇门；分屏把这张图最要紧的两件事
+  // （"两个人在一起"＋"他们盯着的那扇门"同框）都拆没了。序里现在只剩收尾那一处
+  // 分屏（地表窄带＋窖底同框），它是"底下有人、上头空了"，分屏才成立。
+  assert.ok(panes.length >= 2 && panes.length % 2 === 0,
+    `序里的分屏要成对写（left→right），解析到 ${panes.length} 格`);
+  // 镜 01 现在必须是**单画幅 + 门在画里**：门走前景框景（过场里第四堵墙不画，
+  // 立面上那扇门给正脸就是个空门洞）
+  assert.ok(/art: "doorSlab"/.test(chunk),
+    "序的头一镜要有那扇门（doorSlab 前景板）——分镜图上它占掉画左小半幅");
   const splits = panes.length / 2;
   for (let i = 0; i < panes.length; i += 2) {
     const L = panes[i], R = panes[i + 1];

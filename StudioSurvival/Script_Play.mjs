@@ -23,7 +23,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815aw";
+} from "./Data_Game.mjs?v=20260815be";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -464,7 +464,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815bb";
+const ART_CACHE_VERSION = "20260816aa";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -475,6 +475,8 @@ const ArtTexturePaths = Object.freeze({
   homeFridge: `./Assets/Texture_PropHomeFridge.png?v=${ART_CACHE_VERSION}`,
   homeExitDoor: `./Assets/Texture_PropHomeExitDoor.png?v=${ART_CACHE_VERSION}`,
   homeShelf: `./Assets/Texture_PropHomeShelf.png?v=${ART_CACHE_VERSION}`,
+  homeRoomForeground: `./Assets/Texture_BackgroundHomeRoomForeground.png?v=${ART_CACHE_VERSION}`,
+  homeCitySkyline: `./Assets/Texture_BackgroundHomeCitySkyline.png?v=${ART_CACHE_VERSION}`,
 });
 const FounderArtStages = Object.freeze({
   full: "full",
@@ -551,6 +553,28 @@ function AddArtPlane(group, textureKey, width, height, x, y, z = .02) {
   plane.name = `ImageArt_${textureKey}`;
   plane.position.set(x, y, z);
   plane.renderOrder = 3;
+  group.add(plane);
+  return plane;
+}
+
+function AddEnvironmentArtPlane(group, textureKey, width, height, x, y, z, options = {}) {
+  const texture = artTextureCache.get(textureKey);
+  if (!texture) return null;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      color: options.color ?? 0xffffff,
+      transparent: true,
+      alphaTest: options.alphaTest ?? .025,
+      depthWrite: true,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    }),
+  );
+  plane.name = `ImageEnvironment_${textureKey}`;
+  plane.position.set(x, y, z);
+  plane.renderOrder = options.renderOrder ?? -2;
   group.add(plane);
   return plane;
 }
@@ -2189,23 +2213,28 @@ function AddFramedPanel(group, x, y, width, height, faceColor, frameColor = 0x4f
   ]) Place(group, Box(partWidth, partHeight, frameDepth, frameColor, { surface: options.frameSurface ?? "wood", metalness: options.frameMetalness ?? .04 }), partX, partY, (options.z ?? -.08) + .06);
 }
 
-function BuildHomeWindowDayNight(group, windowX, accent) {
-  const windowY = 3.42;
-  const windowWidth = 3.3;
-  const windowHeight = 2.28;
+function BuildHomeWindowDayNight(group, windowX, accent, options = {}) {
+  const generatedRoomActive = options.generatedRoomActive === true;
+  const roomCenter = options.roomCenter ?? windowX - .65;
+  const windowY = generatedRoomActive ? 3.78 : 3.42;
+  const windowWidth = generatedRoomActive ? 2.25 : 3.3;
+  const windowHeight = generatedRoomActive ? 3.72 : 2.28;
   const frameColor = 0x70523c;
   const frameWidth = .11;
-  const sky = AddScenePanel(group, windowWidth, windowHeight, windowX, windowY, 0x78b9df, { z: -.17 });
-  const horizon = AddScenePanel(group, windowWidth, .82, windowX, 2.69, 0xb8d9e5, { z: -.16, opacity: .9 });
-  const sun = AddSceneDisc(group, .15, windowX - 1.1, 3.15, 0xffd37b, { z: -.14, opacity: .01, segments: 28 });
-  const moon = AddSceneDisc(group, .14, windowX + 1.1, 3.15, 0xe9f2db, { z: -.14, opacity: .01, segments: 28 });
-  const moonMask = AddSceneDisc(group, .14, windowX + 1.16, 3.19, 0x78b9df, { z: -.135, opacity: .01, segments: 28 });
+  const skyDepth = generatedRoomActive ? -.78 : -.17;
+  const horizonDepth = generatedRoomActive ? -.77 : -.16;
+  const celestialDepth = generatedRoomActive ? -.74 : -.14;
+  const sky = AddScenePanel(group, windowWidth, windowHeight, windowX, windowY, 0x78b9df, { z: skyDepth });
+  const horizon = AddScenePanel(group, windowWidth, generatedRoomActive ? 1.38 : .82, windowX, generatedRoomActive ? 2.62 : 2.69, 0xb8d9e5, { z: horizonDepth, opacity: .9 });
+  const sun = AddSceneDisc(group, .15, windowX - .78, 3.15, 0xffd37b, { z: celestialDepth, opacity: .01, segments: 28 });
+  const moon = AddSceneDisc(group, .14, windowX + .78, 3.15, 0xe9f2db, { z: celestialDepth, opacity: .01, segments: 28 });
+  const moonMask = AddSceneDisc(group, .14, windowX + .84, 3.19, 0x78b9df, { z: celestialDepth + .005, opacity: .01, segments: 28 });
   const stars = [
     [-1.28, .72, .018], [-.93, .46, .026], [-.52, .83, .016], [-.12, .56, .021],
     [.36, .76, .018], [.79, .5, .025], [1.24, .82, .017], [1.43, .38, .014],
   ].map(([offsetX, offsetY, radius], starIndex) => {
     const star = AddSceneDisc(group, radius, windowX + offsetX, 3.42 + offsetY, starIndex % 3 ? 0xe8f1ff : 0xffe4a8, {
-      z: -.15,
+      z: generatedRoomActive ? -.735 : -.15,
       opacity: .01,
       segments: starIndex % 2 ? 8 : 12,
     });
@@ -2213,9 +2242,17 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
     return star;
   });
 
-  const buildings = [];
+  const skylineArt = AddEnvironmentArtPlane(group, "homeCitySkyline", 16, 9, roomCenter, 2.8, -.7, {
+    alphaTest: .035,
+    renderOrder: -1,
+  });
+  const buildings = skylineArt ? [{
+    material: skylineArt.material,
+    nightColor: new THREE.Color(0x17223b),
+    dayColor: new THREE.Color(0xffffff),
+  }] : [];
   const buildingWindows = [];
-  [0, 1, 2, 3, 4].forEach((buildingIndex) => {
+  if (!skylineArt) [0, 1, 2, 3, 4].forEach((buildingIndex) => {
     const width = .38 + (buildingIndex % 2) * .18;
     const height = .52 + ((buildingIndex * 7) % 3) * .24;
     const x = windowX - 1.27 + buildingIndex * .57;
@@ -2251,14 +2288,16 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
     }
   });
 
-  for (const [partWidth, partHeight, partX, partY] of [
-    [windowWidth + frameWidth * 2, frameWidth, windowX, windowY + windowHeight * .5 + frameWidth * .5],
-    [windowWidth + frameWidth * 2, frameWidth, windowX, windowY - windowHeight * .5 - frameWidth * .5],
-    [frameWidth, windowHeight, windowX - windowWidth * .5 - frameWidth * .5, windowY],
-    [frameWidth, windowHeight, windowX + windowWidth * .5 + frameWidth * .5, windowY],
-  ]) Place(group, Box(partWidth, partHeight, .14, frameColor, { surface: "wood" }), partX, partY, .02);
-  Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
-  Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+  if (!generatedRoomActive) {
+    for (const [partWidth, partHeight, partX, partY] of [
+      [windowWidth + frameWidth * 2, frameWidth, windowX, windowY + windowHeight * .5 + frameWidth * .5],
+      [windowWidth + frameWidth * 2, frameWidth, windowX, windowY - windowHeight * .5 - frameWidth * .5],
+      [frameWidth, windowHeight, windowX - windowWidth * .5 - frameWidth * .5, windowY],
+      [frameWidth, windowHeight, windowX + windowWidth * .5 + frameWidth * .5, windowY],
+    ]) Place(group, Box(partWidth, partHeight, .14, frameColor, { surface: "wood" }), partX, partY, .02);
+    Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+    Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+  }
 
   const windowLight = new THREE.PointLight(0xa8d8ff, .4, 4.8, 2.1);
   windowLight.position.set(windowX, 3.35, 1.05);
@@ -2275,6 +2314,7 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
     stars,
     buildings,
     buildingWindows,
+    skylineArt,
     windowLight,
     colors: {
       nightSky: new THREE.Color(0x07142f),
@@ -2510,15 +2550,22 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
   const accent = HexColor(location.accent);
   const paleAccent = new THREE.Color(accent).lerp(new THREE.Color(0xffffff), .32).getHex();
   const roomWidth = end - start;
-  const halo = AddSceneDisc(group, 3.45, center, 3.45, accent, { z: -.29, opacity: .025, scaleY: .8, segments: 42 });
-  const ceilingBar = AddScenePanel(group, 6.4, .04, center, 6.08, accent, { z: -.04, opacity: .3 });
-  Place(group, Box(roomWidth - .28, .18, .18, location.id === "bank" || location.id === "hotel" ? 0xaa9164 : 0x544d45, { surface: location.id === "bank" ? "stone" : "wood", roughness: .62 }), center, .72, -.06);
-  Place(group, Box(roomWidth - .26, .1, .16, location.id === "hotel" ? 0xb89358 : 0x5d554d, { surface: location.id === "bank" ? "stone" : "wood", roughness: .58 }), center, 5.06, -.06);
-  for (const jambX of [start + .28, end - .28]) Place(group, Box(.16, 4.45, .18, index % 2 ? 0x3e3833 : 0x48413b, { surface: location.id === "bank" ? "stone" : "wood" }), jambX, 2.85, -.04);
+  const generatedHomeRoomActive = location.id === "home" && artTextureCache.has("homeRoomForeground");
+  const halo = generatedHomeRoomActive ? null : AddSceneDisc(group, 3.45, center, 3.45, accent, { z: -.29, opacity: .025, scaleY: .8, segments: 42 });
+  const ceilingBar = generatedHomeRoomActive ? null : AddScenePanel(group, 6.4, .04, center, 6.08, accent, { z: -.04, opacity: .3 });
+  if (!generatedHomeRoomActive) {
+    Place(group, Box(roomWidth - .28, .18, .18, location.id === "bank" || location.id === "hotel" ? 0xaa9164 : 0x544d45, { surface: location.id === "bank" ? "stone" : "wood", roughness: .62 }), center, .72, -.06);
+    Place(group, Box(roomWidth - .26, .1, .16, location.id === "hotel" ? 0xb89358 : 0x5d554d, { surface: location.id === "bank" ? "stone" : "wood", roughness: .58 }), center, 5.06, -.06);
+    for (const jambX of [start + .28, end - .28]) Place(group, Box(.16, 4.45, .18, index % 2 ? 0x3e3833 : 0x48413b, { surface: location.id === "bank" ? "stone" : "wood" }), jambX, 2.85, -.04);
+  }
 
   if (location.id === "home") {
-    const windowX = center + .55;
-    homeWindowVisual = BuildHomeWindowDayNight(group, windowX, accent);
+    const windowX = center + .65;
+    homeWindowVisual = BuildHomeWindowDayNight(group, windowX, accent, { generatedRoomActive: generatedHomeRoomActive, roomCenter: center });
+    if (generatedHomeRoomActive) AddEnvironmentArtPlane(group, "homeRoomForeground", 16, 9, center, 2.8, -.64, {
+      alphaTest: .035,
+      renderOrder: 0,
+    });
     const shelfFallback = new THREE.Group();
     group.add(shelfFallback);
     Place(shelfFallback, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
@@ -2530,12 +2577,14 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     }
     const shelfArt = AddArtPlane(group, "homeShelf", 1.95, 2.17, start + 1.05, 1.1, -.02);
     if (shelfArt) shelfFallback.visible = false;
-    AddFramedPanel(group, start + 3.04, 3.3, 1.6, 1.28, 0x8b6b46, 0x5b3d2b, { surface: "wood", z: -.08, frameWidth: .08 });
-    [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
-      Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
-    });
-    AddWallClock(group, start + 5.4, 3.8, 0xb8a26c, .48);
-    Place(group, Box(4.3, .045, 1.28, 0x5e466c, { surface: "fabric", roughness: .98 }), start + 4.45, .055, .72, -.02);
+    if (!generatedHomeRoomActive) {
+      AddFramedPanel(group, start + 3.04, 3.3, 1.6, 1.28, 0x8b6b46, 0x5b3d2b, { surface: "wood", z: -.08, frameWidth: .08 });
+      [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
+        Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
+      });
+      AddWallClock(group, start + 5.4, 3.8, 0xb8a26c, .48);
+      Place(group, Box(4.3, .045, 1.28, 0x5e466c, { surface: "fabric", roughness: .98 }), start + 4.45, .055, .72, -.02);
+    }
   } else if (location.id === "diner") {
     Place(group, Box(8.7, 1.42, .12, 0xd8c8ac, { surface: "tile", roughness: .45, castShadow: false }), center, 1.48, -.12);
     AddFramedPanel(group, start + 2.1, 3.42, 1.92, 1.16, 0x181719, 0x7c4f32, { surface: "plaster", z: -.06, frameWidth: .09 });
@@ -2751,7 +2800,7 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
 
-  const sigil = location.id === "bank" ? null : AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
+  const sigil = location.id === "bank" || generatedHomeRoomActive ? null : AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
   const practicalColors = { home: 0xffd6ad, diner: 0xffc77f, market: 0xdfffee, talent: 0xdbeaff, bank: 0xffe0c6, hotel: 0xffc47d, footbath: 0xc8fff4, footbathCity: 0xe0cfff, maleModelClub: 0xffc6e4 };
   const roomLight = new THREE.PointLight(practicalColors[location.id] || accent, 1.55, 9.2, 2.05);
   roomLight.position.set(center, 3.8, 3.1);
@@ -2769,8 +2818,6 @@ function BuildRoom() {
   for (let beamIndex = 0; beamIndex < 13; beamIndex += 1) {
     Place(distantGroup, Box(width + 5, .045, .08, beamIndex % 3 ? 0x292825 : 0x6b5a43, { surface: beamIndex % 3 ? "metal" : "wood", metalness: beamIndex % 3 ? .3 : .02, castShadow: false }), worldCenter, 6.28 + beamIndex * .12, -1.02, (beamIndex - 6) * .0018);
   }
-  Place(roomGroup, Box(width, .3, 3.4, 0x322d2a, { surface: "wood", roughness: .76 }), worldCenter, -.17, .55);
-  Place(foregroundGroup, Box(width, .2, .18, 0x141416, { surface: "metal", metalness: .3, roughness: .48 }), worldCenter, -.02, 1.62);
   const roomLooks = {
     home: { wall: 0x817696, surface: "plaster", floor: 0x493a35, floorSurface: "wood" },
     diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile" },
@@ -2792,18 +2839,25 @@ function BuildRoom() {
     const locationWidth = location.endX - location.startX;
     const centerX = location.startX + locationWidth / 2;
     const look = roomLooks[location.id];
-    const wall = Box(locationWidth - .08, 6.5, .18, look.wall, { surface: look.surface, castShadow: false, roughness: .92 });
-    wall.position.set(centerX, 3.15, -.72);
-    sceneGroup.add(wall);
-    Place(sceneGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
-    Place(sceneGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
-    BuildLocationEnvironment(location, index, sceneGroup);
-    for (const boundaryX of [location.startX, location.endX]) {
-      Place(sceneGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 3.15, -.18);
-      Place(sceneGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 6.36, -.16);
+    const generatedHomeRoomActive = location.id === "home" && artTextureCache.has("homeRoomForeground");
+    if (!generatedHomeRoomActive) {
+      const wall = Box(locationWidth - .08, 6.5, .18, look.wall, { surface: look.surface, castShadow: false, roughness: .92 });
+      wall.position.set(centerX, 3.15, -.72);
+      sceneGroup.add(wall);
+      Place(sceneGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
+      Place(sceneGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
+      Place(sceneGroup, Box(locationWidth, .3, 3.4, 0x322d2a, { surface: "wood", roughness: .76 }), centerX, -.17, .55);
+      Place(sceneGroup, Box(locationWidth, .2, .18, 0x141416, { surface: "metal", metalness: .3, roughness: .48 }), centerX, -.02, 1.62);
     }
-    for (let markerIndex = 0; markerIndex < 4; markerIndex += 1) {
-      Place(sceneGroup, Box(.56, .025, .11, HexColor(location.accent), { surface: "metal", metalness: .58, roughness: .34, emissive: HexColor(location.accent), emissiveIntensity: .08 + markerIndex * .015, castShadow: false }), location.startX + 1.4 + markerIndex * 2.3, .075, 1.7);
+    BuildLocationEnvironment(location, index, sceneGroup);
+    if (!generatedHomeRoomActive) {
+      for (const boundaryX of [location.startX, location.endX]) {
+        Place(sceneGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 3.15, -.18);
+        Place(sceneGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 6.36, -.16);
+      }
+      for (let markerIndex = 0; markerIndex < 4; markerIndex += 1) {
+        Place(sceneGroup, Box(.56, .025, .11, HexColor(location.accent), { surface: "metal", metalness: .58, roughness: .34, emissive: HexColor(location.accent), emissiveIntensity: .08 + markerIndex * .015, castShadow: false }), location.startX + 1.4 + markerIndex * 2.3, .075, 1.7);
+      }
     }
   });
   WorldInteractions.forEach(BuildFacility);
@@ -3615,8 +3669,8 @@ function Animate() {
     locationVisuals.forEach((visual, id) => {
       const active = id === location?.id;
       const pulse = active ? Math.sin(time * 1.6 + visual.phase) * .04 : 0;
-      visual.halo.material.opacity += (((active ? .072 : .026) + pulse * .12) - visual.halo.material.opacity) * (1 - Math.exp(-delta * 4));
-      visual.ceilingBar.material.opacity += ((active ? .66 + pulse : .2) - visual.ceilingBar.material.opacity) * (1 - Math.exp(-delta * 5));
+      if (visual.halo) visual.halo.material.opacity += (((active ? .072 : .026) + pulse * .12) - visual.halo.material.opacity) * (1 - Math.exp(-delta * 4));
+      if (visual.ceilingBar) visual.ceilingBar.material.opacity += ((active ? .66 + pulse : .2) - visual.ceilingBar.material.opacity) * (1 - Math.exp(-delta * 5));
       if (visual.sigil) {
         const sigilScale = visual.sigil.userData.baseScale + (active ? Math.sin(time * 1.9 + visual.phase) * .025 : 0);
         visual.sigil.scale.setScalar(sigilScale);
@@ -4051,12 +4105,13 @@ function OpenInvestmentSheet(staffId) {
 function OpenEquipmentSheet() {
   const count = state.workstations || 0;
   const nextCost = WORKSTATION_COSTS[count];
-  const freeSeats = Math.max(0, count - state.team.length);
+  const seatedStudents = state.team.filter((member) => FindStaff(member.id)?.kind === "student").length;
+  const freeSeats = Math.max(0, count - seatedStudents);
   OpenPanel("设备", "工位", `
-    <p class="panelIntro">每人 1 工位</p>
+    <p class="panelIntro">学生每人 1 工位 · AI 云端免工位</p>
     <div class="metricGrid">
       <div class="metricTile"><span>已购工位</span><strong>${count}/4</strong></div>
-      <div class="metricTile"><span>已被占用</span><strong>${state.team.length}</strong></div>
+      <div class="metricTile"><span>已被占用</span><strong>${seatedStudents}</strong></div>
       <div class="metricTile"><span>空工位</span><strong>${freeSeats}</strong></div>
     </div>
     <div class="workstationPreview">${WORKSTATION_COSTS.map((cost, index) => `<div class="${index < count ? "owned" : index === count ? "next" : ""}"><span>${index < count ? "✓" : index + 1}</span><strong>工位 ${index + 1}</strong><small>${index < count ? "已购" : FormatMoney(cost)}</small></div>`).join("")}</div>
@@ -4102,7 +4157,7 @@ function TalentStatWidth(value) {
 function OpenTalentSheet() {
   const costs = ForecastMonthlyCosts(state);
   const seats = state.workstations || 0;
-  const occupied = state.team.length;
+  const occupied = state.team.filter((member) => FindStaff(member.id)?.kind === "student").length;
   const freeSeats = Math.max(0, seats - occupied);
   const RenderTalentFlyer = (staff) => {
     const member = state.team.find((item) => item.id === staff.id);
@@ -4119,14 +4174,15 @@ function OpenTalentSheet() {
       </div>`;
     }).join("");
     const priceNote = hired ? ` · ${EscapeHtml(plan.name)}` : "";
+    const hireLocked = staff.kind === "student" && occupied >= seats;
     const actions = hired
       ? `<button type="button" class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}">聊聊</button><button type="button" class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}">调待遇</button><button type="button" class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}">${staff.kind === "ai" ? "退订" : "开除"}</button>`
-      : `<button type="button" class="flyerHireButton ${staff.kind === "ai" ? "ai" : ""}" data-staff-action="hire" data-staff-id="${staff.id}" ${occupied >= seats ? "disabled" : ""}>${occupied >= seats ? "无工位" : staff.kind === "ai" ? "开始月租" : "发 Offer"}</button>`;
+      : `<button type="button" class="flyerHireButton ${staff.kind === "ai" ? "ai" : ""}" data-staff-action="hire" data-staff-id="${staff.id}" ${hireLocked ? "disabled" : ""}>${hireLocked ? "无工位" : staff.kind === "ai" ? "开始月租" : "发 Offer"}</button>`;
     return `<article class="talentFlyer ${hired ? "hired" : ""}" data-kind="${staff.kind}" style="--staffColor:${staff.color}">
       <div class="flyerHead">
         <span class="avatarBox">${TalentAvatarHtml(staff.id)}${hired ? `<span class="flyerStamp">${staff.kind === "ai" ? "租用中" : "已入职"}</span>` : ""}</span>
         <div class="flyerIdentity">
-          <span class="talentKindBadge ${staff.kind}">${staff.kind === "ai" ? "AI · 月租" : "大学生 · 月薪"}</span>
+          <span class="talentKindBadge ${staff.kind}">${staff.kind === "ai" ? "AI · 月租 · 免工位" : "大学生 · 月薪"}</span>
           <h3>${EscapeHtml(staff.name)}</h3>
           <p>${EscapeHtml(staff.role)}</p>
         </div>
@@ -4141,14 +4197,14 @@ function OpenTalentSheet() {
   };
   OpenPanel("招聘公告栏", "人才市场", `
     <div class="talentBoardBar">
-      <div class="talentBoardStat"><span>占用工位</span><strong>${occupied}<small> / ${seats}</small></strong></div>
+      <div class="talentBoardStat"><span>学生工位</span><strong>${occupied}<small> / ${seats}</small></strong></div>
       <div class="talentBoardStat"><span>空工位</span><strong>${freeSeats}</strong></div>
       <div class="talentBoardStat"><span>每月人力</span><strong>${FormatMoney(costs.studentWages + costs.aiRent)}</strong></div>
-      <button type="button" class="talentEquipmentButton" data-equipment><span>工位设备</span><strong>每人 1 工位</strong></button>
+      <button type="button" class="talentEquipmentButton" data-equipment><span>工位设备</span><strong>学生 1 人 1 工位</strong></button>
     </div>
-    <div class="sectionHeading"><strong>大学生</strong><span>按月发薪</span></div>
+    <div class="sectionHeading"><strong>大学生</strong><span>按月发薪 · 1 人 1 工位</span></div>
     <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderTalentFlyer).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>AI</strong><span>按月收租</span></div>
+    <div class="panelSection sectionHeading"><strong>AI</strong><span>按月收租 · 免工位</span></div>
     <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderTalentFlyer).join("")}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-equipment]")) return OpenEquipmentSheet();
@@ -4387,7 +4443,7 @@ function OpenWorkstationSheet(interaction) {
       <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
     <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/${ownerEnergyLimit}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= ownerEnergyLimit ? "disabled" : ""}>干 1 次</button></div>
-    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
+    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "月结时产出 · 学生坐工位，AI 在云端" : "目前只有老板的背影"}</span></div>
     <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<span class="chip">没有人手。关掉电脑，从门口出发去人才市场招聘。</span>`}</div>
     ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
@@ -5888,6 +5944,8 @@ async function Initialize() {
     "homeFridge",
     "homeExitDoor",
     "homeShelf",
+    "homeRoomForeground",
+    "homeCitySkyline",
   ];
   await LoadArtTextures([...new Set(startupArtKeys)]);
   BuildRoom();

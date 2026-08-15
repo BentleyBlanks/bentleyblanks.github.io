@@ -68,6 +68,7 @@ import {
   PIVOT_REASONS,
   PROJECTS,
   SCRATCH_OPTION,
+  STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
 } from "./Data_Game.mjs";
@@ -286,12 +287,20 @@ function HasRecordedId(collection, id) {
   assert.equal(start.state.startupLoan.dueMonth, STARTUP_LOAN_TERMS.dueMonth);
   assert.equal(start.state.workstations, 0, "the owner begins with only their personal computer");
   const blockedHire = HireStaff(start.state, "linMo");
-  assert.equal(blockedHire.ok, false, "the first hire must be blocked until equipment is purchased");
+  assert.equal(blockedHire.ok, false, "the first student hire must be blocked until equipment is purchased");
+  const aiNoDesk = HireStaff(start.state, "scopeWhale");
+  assert.equal(aiNoDesk.ok, true, "cloud AIs must not require a workstation");
+  assert.equal(aiNoDesk.state.workstations, 0, "an AI subscription must not consume a desk");
+  const studentStillBlocked = HireStaff(aiNoDesk.state, "linMo");
+  assert.equal(studentStillBlocked.ok, false, "students must still need a purchased desk beside a rented AI");
   const equipment = PurchaseWorkstation(start.state);
   assert.equal(equipment.ok, true);
   assert.equal(equipment.cost, WORKSTATION_COSTS[0]);
   assert.equal(equipment.state.workstations, 1);
-  assert.equal(HireStaff(equipment.state, "linMo").ok, true, "one purchased workstation unlocks one hire");
+  assert.equal(HireStaff(equipment.state, "linMo").ok, true, "one purchased workstation unlocks one student hire");
+  const oneDeskSeated = HireStaff(equipment.state, "linMo").state;
+  assert.equal(HireStaff(oneDeskSeated, "frameJelly").ok, true, "an AI can be rented beside a seated student");
+  assert.equal(HireStaff(oneDeskSeated, "zhaoXiaobei").ok, false, "one desk still admits only one student");
 
   const partial = RepayStartupLoan({ ...start.state, cash: 100000 }, 10000);
   assert.equal(partial.ok, true);
@@ -315,9 +324,17 @@ function HasRecordedId(collection, id) {
   state = HireStaff(state, "scopeWhale").state;
   const costs = ForecastMonthlyCosts(state);
   assert.equal(costs.studentWages, 6200, "student compensation must be a monthly wage");
-  assert.equal(costs.aiRent, 3300, "AI compensation must be a monthly subscription");
+  assert.equal(costs.aiRent, 17800, "AI compensation must be a monthly subscription");
   assert.equal(costs.service, 0, "server costs begin only after launch");
-  assert.equal(costs.total, costs.living + costs.food + 6200 + 3300);
+  assert.equal(costs.total, costs.living + costs.food + 6200 + 17800);
+}
+
+{
+  const maxStudentCost = Math.max(...STAFF_CATALOG.filter((staff) => staff.kind === "student").map((staff) => staff.monthlyCost));
+  const aiCosts = STAFF_CATALOG.filter((staff) => staff.kind === "ai").map((staff) => staff.monthlyCost);
+  for (const aiCost of aiCosts) {
+    assert(aiCost > maxStudentCost * 2, "every AI subscription must cost far more than the priciest human wage");
+  }
 }
 
 {
@@ -343,14 +360,14 @@ function HasRecordedId(collection, id) {
   const aiBaseState = InvestmentFixture("scopeWhale");
   const aiBaseMember = Member(aiBaseState, "scopeWhale");
   const aiBaseCost = GetMemberMonthlyCost(aiBaseMember);
-  assert.equal(aiBaseCost, 3300 * aiLevel0.costMultiplier);
+  assert.equal(aiBaseCost, 17800 * aiLevel0.costMultiplier);
   const aiUpgradeState = InvestmentFixture("scopeWhale");
   const aiUpgrade = SetStaffInvestmentLevel(aiUpgradeState, "scopeWhale", 2);
   assert.equal(aiUpgrade.ok, true, "a hired AI can receive a level-2 subscription");
   Object.assign(aiUpgradeState, aiUpgrade.state);
   const aiUpgradeMember = Member(aiUpgradeState, "scopeWhale");
   const aiUpgradeCost = GetMemberMonthlyCost(aiUpgradeMember);
-  assert.equal(aiUpgradeCost, Math.round(3300 * aiLevel2.costMultiplier / 100) * 100, "high-tier AI subscriptions must be substantially more expensive");
+  assert.equal(aiUpgradeCost, Math.round(17800 * aiLevel2.costMultiplier / 100) * 100, "high-tier AI subscriptions must be substantially more expensive");
   assert(aiUpgradeCost > aiBaseCost * 4 - 100, "the high-tier AI rent should be at least four times the base subscription");
   assert(aiUpgradeCost - aiBaseCost > studentUpgradeCost - studentBaseCost, "AI tier upgrades must cost more than a student raise");
 
