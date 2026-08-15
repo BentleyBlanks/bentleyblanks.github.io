@@ -408,7 +408,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .ceremonyIntro::before { content:""; display:block; width:46px; height:5px; margin-bottom:18px; background:#ff5f6d; }
 .ceremonyEyebrow { color:#c7bfdc; font-size:11px; font-weight:800; letter-spacing:.2em; }
 .ceremonyIntro h1 { margin:18px 0 16px; letter-spacing:-.075em; }
-.ceremonyIntro h1 span { display:block; color:#faf8ff; font-size:clamp(70px,8vw,132px); line-height:.86; }
+.ceremonyIntro h1 span { display:block; color:#faf8ff; font-size:clamp(64px,7vw,108px); line-height:.86; white-space:nowrap; }
 .ceremonyIntro h1 em { display:block; margin-top:14px; color:#68d7ff; font-size:clamp(25px,3.1vw,48px); font-style:normal; letter-spacing:-.045em; }
 .ceremonyIntro > p { max-width:510px; margin:0; color:#aaa5b5; font-size:14px; line-height:1.75; }
 .titleMenu { display:grid; gap:8px; width:min(420px,100%); margin-top:28px; }

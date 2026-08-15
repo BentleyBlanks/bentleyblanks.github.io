@@ -3273,14 +3273,14 @@ function OpenHomeComputerSheet() {
           </div>
         </div>
         <div class="computerControlDeck" aria-hidden="true">
-          <strong>甲方 486DX</strong>
+          <strong>牛马 486DX</strong>
           <span class="computerSpeaker">${Array.from({ length: 9 }, () => "<i></i>").join("")}</span>
           <span class="computerTurbo"><i></i>TURBO</span>
           <div class="computerPower"><i></i><span>POWER</span></div>
         </div>
       </div>
       <div class="computerStand"><i></i></div>
-      <div class="computerTowerVisual" aria-hidden="true"><strong>甲方 486</strong><i class="towerOpticalDrive"></i><i class="towerFloppyDrive"></i><span class="towerVent"></span><b class="towerPower"><i></i></b></div>
+      <div class="computerTowerVisual" aria-hidden="true"><strong>牛马 486</strong><i class="towerOpticalDrive"></i><i class="towerFloppyDrive"></i><span class="towerVent"></span><b class="towerPower"><i></i></b></div>
       <div class="computerKeyboardVisual" aria-hidden="true">${Array.from({ length: 50 }, (_, index) => `<i class="${index === 43 ? "space" : [13, 27, 41].includes(index) ? "wide" : ""}"></i>`).join("")}</div>
       <div class="computerMouseVisual" aria-hidden="true"><i></i></div>
       <div class="computerCableVisual" aria-hidden="true"></div>
@@ -3703,7 +3703,7 @@ function ShowScratchTicket(result) {
   dom.resultBody.innerHTML = `
     <div class="scratchStage single">
       <article class="scratchTicket" data-scratch-ticket>
-        <div class="scratchTicketMasthead"><span>甲方是我 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
+        <div class="scratchTicketMasthead"><span>老板兼牛马 · 小超市彩票柜台</span><b>NO. ${serial}</b></div>
         <div class="scratchTicketTitle">
           <div><small>STUDIO SURVIVAL LUCKY TICKET</small><strong>工作室续命刮刮乐</strong></div>
           <span class="scratchTicketPrice"><small>票面</small><b>${FormatMoney(result.stake)}</b></span>

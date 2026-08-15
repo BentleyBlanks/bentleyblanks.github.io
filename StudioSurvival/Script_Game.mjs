@@ -362,7 +362,7 @@ function BuildRoom() {
   const signFrame = Box(5.2, 0.94, 0.1, 0x0b0e19, { castShadow: false });
   signFrame.position.set(0, 5.2, -5.5);
   roomGroup.add(signFrame);
-  const texture = MakeTextTexture(["甲方是我", "BUILD · BORROW · SURVIVE"], "#d8d3ff", "#0b0e19", 1024, 180);
+  const texture = MakeTextTexture(["老板兼牛马", "BUILD · BORROW · SURVIVE"], "#d8d3ff", "#0b0e19", 1024, 180);
   billboardTexture = texture;
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(5, 0.88),
@@ -677,7 +677,7 @@ function UpdateBillboard() {
   context.textBaseline = "middle";
   context.fillStyle = project ? project.accent : "#d8d3ff";
   context.font = '900 50px "Microsoft YaHei UI", sans-serif';
-  context.fillText(project ? project.title : "甲方是我", canvas.width / 2, canvas.height * 0.38);
+  context.fillText(project ? project.title : "老板兼牛马", canvas.width / 2, canvas.height * 0.38);
   context.fillStyle = "rgba(225,228,240,.68)";
   context.font = '600 24px "Microsoft YaHei UI", sans-serif';
   const subtitle = state.project?.isReleased
