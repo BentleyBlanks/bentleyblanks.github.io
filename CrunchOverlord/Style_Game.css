@@ -1,30 +1,34 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* 牛马指挥官 · 样式。舞台固定 1280x720 世界坐标，JS 按窗口缩放整个 #stage。 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
+  width: 100%;
   height: 100%;
-  background: #0b0d14;
-  color: #e8e6df;
-  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
   overflow: hidden;
+  background: #14121c;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  touch-action: none;
+  position: relative;
 }
 
 #stage {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 1280px;
   height: 720px;
-  margin: 0 auto;
-  top: 50%;
-  transform: translateY(-50%);
   transform-origin: center center;
-  box-shadow: 0 0 80px rgba(0, 0, 0, 0.8);
 }
 
 #gameCanvas {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 1280px;
   height: 720px;
   cursor: none;
-  background: #12141f;
+  background: #241f2e;
+  border-radius: 10px;
+  touch-action: none;
 }
 
 .hidden { display: none !important; }
@@ -32,56 +36,56 @@ html, body {
 /* ---------- HUD ---------- */
 #hud {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
+  gap: 14px;
   align-items: center;
-  gap: 22px;
-  padding: 10px 18px;
-  background: linear-gradient(180deg, rgba(8, 9, 15, 0.92), rgba(8, 9, 15, 0.55) 80%, transparent);
+  background: rgba(16, 13, 24, 0.88);
+  border: 1px solid #4a3f66;
+  border-radius: 12px;
+  padding: 8px 18px;
   pointer-events: none;
   z-index: 5;
 }
-
-.hud-group { display: flex; align-items: center; gap: 8px; }
-.hud-label { font-size: 12px; color: #8f8b7f; letter-spacing: 2px; }
-.hud-value { font-size: 16px; font-weight: 700; color: #ffe9a8; font-variant-numeric: tabular-nums; }
-.hud-project .hud-value { color: #9fd4ff; }
-
+.hud-cell { display: flex; flex-direction: column; gap: 2px; min-width: 72px; }
+.hud-wide { min-width: 190px; }
+.hud-label { font-size: 11px; color: #9d92bd; letter-spacing: 1px; white-space: nowrap; }
+.hud-value { font-size: 18px; font-weight: 700; color: #f5efff; font-variant-numeric: tabular-nums; }
 .hud-bar {
-  width: 130px;
-  height: 10px;
+  width: 100%; height: 10px;
+  background: #2c2440;
   border-radius: 5px;
-  background: #262a3a;
   overflow: hidden;
-  border: 1px solid #3a3f55;
+  border: 1px solid #4a3f66;
 }
-.hud-bar-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #f7c948, #ff9f43);
-  transition: width 0.25s ease;
+.hud-bar i {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, #7a5cff, #43d9ad);
+  transition: width 0.2s;
 }
-.hud-bar-hair .hud-bar-fill { background: linear-gradient(90deg, #6b4f2f, #a8825a); }
+#hudProjectFill { background: linear-gradient(90deg, #ffb14e, #ff6eae); }
 
 /* ---------- 老板横幅 ---------- */
 #bossBanner {
   position: absolute;
-  top: 54px;
+  top: 84px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 26px;
-  background: #b3202c;
-  color: #fff4dc;
-  font-size: 20px;
+  background: #ffd166;
+  color: #241a05;
+  font-size: 21px;
   font-weight: 900;
-  letter-spacing: 2px;
-  border-radius: 4px;
-  box-shadow: 0 6px 0 #6d1017, 0 10px 24px rgba(0, 0, 0, 0.55);
-  z-index: 6;
+  padding: 8px 22px;
+  border-radius: 8px;
+  border: 3px solid #241a05;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+  z-index: 8;
   pointer-events: none;
-  animation: bannerPop 0.22s ease;
+  animation: bannerPop 0.25s ease-out;
+  max-width: 900px;
+  text-align: center;
 }
 @keyframes bannerPop {
   from { transform: translateX(-50%) scale(0.6); opacity: 0; }
@@ -90,154 +94,219 @@ html, body {
 
 #selectionHint {
   position: absolute;
-  bottom: 86px;
+  bottom: 128px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 6px 16px;
-  background: rgba(14, 16, 26, 0.85);
-  border: 1px solid #3a3f55;
-  border-radius: 20px;
-  font-size: 13px;
-  color: #cfe8ff;
-  z-index: 6;
+  color: #ffd166;
+  font-size: 15px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   pointer-events: none;
+  z-index: 6;
+  white-space: nowrap;
 }
 
 /* ---------- Toast ---------- */
 #toastStack {
   position: absolute;
-  right: 16px;
-  top: 64px;
-  width: 330px;
+  right: 14px;
+  top: 92px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 7;
   pointer-events: none;
+  width: 330px;
 }
 .toast {
-  padding: 9px 13px;
+  background: rgba(20, 16, 30, 0.94);
+  border-left: 4px solid #7a5cff;
+  color: #e8e2f5;
+  padding: 9px 12px;
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.5;
-  background: rgba(20, 23, 36, 0.94);
-  border-left: 4px solid #6b7395;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  animation: toastIn 0.25s ease;
+  animation: toastIn 0.22s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
-.toast.good { border-left-color: #58c47c; }
-.toast.warning { border-left-color: #f7c948; }
-.toast.danger { border-left-color: #ff5a6a; }
-.toast.fade { opacity: 0; transition: opacity 0.6s ease; }
-@keyframes toastIn {
-  from { transform: translateX(40px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
+.toast.good { border-left-color: #43d9ad; }
+.toast.warning { border-left-color: #ffb14e; }
+.toast.danger { border-left-color: #ff5d73; }
+.toast.leaving { animation: toastOut 0.3s ease-in forwards; }
+@keyframes toastIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes toastOut { to { transform: translateX(60px); opacity: 0; } }
 
-/* ---------- 命令条 ---------- */
+/* ---------- 新手引导 ---------- */
+#tutorialTip {
+  position: absolute;
+  bottom: 156px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(24, 19, 8, 0.95);
+  border: 2px solid #ffd166;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #ffe9b3;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+  z-index: 9;
+  max-width: 720px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+#tutorialSkip {
+  flex: none;
+  background: none;
+  border: 1px solid #9d8347;
+  color: #c9b075;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#tutorialSkip:hover { color: #ffe9b3; border-color: #ffd166; }
+
+/* ---------- 命令栏 ---------- */
 #commandBar {
   position: absolute;
-  bottom: 14px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
   z-index: 6;
 }
+.cmd-row { display: flex; gap: 8px; align-items: stretch; justify-content: center; }
+.cmd-tag {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #9d92bd;
+  letter-spacing: 2px;
+  writing-mode: vertical-lr;
+  padding: 2px 0;
+}
 #commandBar button {
-  padding: 12px 22px;
-  font-size: 16px;
-  font-weight: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: linear-gradient(180deg, #3d3357, #2a2340);
+  border: 1px solid #6a5a96;
+  color: #efe9fb;
   font-family: inherit;
-  color: #ffe9a8;
-  background: linear-gradient(180deg, #2a2f45, #1c2033);
-  border: 1px solid #4a5170;
-  border-bottom-width: 4px;
-  border-radius: 8px;
+  border-radius: 10px;
+  padding: 8px 14px;
   cursor: pointer;
-  letter-spacing: 1px;
-  transition: transform 0.08s ease, filter 0.15s ease;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  min-width: 168px;
 }
-#commandBar button:hover:not(:disabled) { filter: brightness(1.25); transform: translateY(-2px); }
-#commandBar button:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 1px; }
-#commandBar button:disabled { opacity: 0.42; cursor: not-allowed; }
-#commandBar button.release {
-  background: linear-gradient(180deg, #c8442e, #8f2b1c);
-  border-color: #e0664c;
-  color: #fff;
+#commandBar button b { font-size: 15px; font-weight: 800; }
+#commandBar button small { font-size: 10px; color: #b3a7d6; white-space: nowrap; }
+#commandBar button:hover { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(122, 92, 255, 0.35); }
+#commandBar button:active { transform: translateY(0); }
+#commandBar button:disabled { filter: grayscale(0.8) brightness(0.6); cursor: not-allowed; transform: none; box-shadow: none; }
+#releaseButton { background: linear-gradient(180deg, #7a3b8f, #4c2258); border-color: #b66ccc; }
+#releaseButton.ready { animation: readyPulse 0.9s infinite alternate; }
+#releaseButton.tut-glow, .tut-glow { animation: tutGlow 0.7s infinite alternate; }
+@keyframes readyPulse {
+  from { box-shadow: 0 0 6px rgba(255, 110, 174, 0.4); }
+  to { box-shadow: 0 0 22px rgba(255, 110, 174, 0.95); }
 }
-#commandBar button.release.ready {
-  animation: releaseGlow 0.9s ease-in-out infinite alternate;
-}
-@keyframes releaseGlow {
-  from { box-shadow: 0 0 6px rgba(255, 120, 80, 0.4); }
-  to { box-shadow: 0 0 26px rgba(255, 140, 90, 0.95); }
+@keyframes tutGlow {
+  from { box-shadow: 0 0 4px rgba(255, 209, 102, 0.5); border-color: #ffd166; }
+  to { box-shadow: 0 0 24px rgba(255, 209, 102, 1); border-color: #fff2c8; }
 }
 
 /* ---------- 标题 / 结算 ---------- */
 #titleScreen, #endScreen {
   position: absolute;
   inset: 0;
+  background: rgba(14, 11, 22, 0.93);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  background: radial-gradient(circle at 50% 35%, rgba(35, 40, 66, 0.96), rgba(9, 10, 17, 0.98));
-  z-index: 10;
+  gap: 18px;
+  z-index: 20;
+  border-radius: 10px;
   text-align: center;
-  padding: 0 120px;
 }
 #titleScreen h1, #endScreen h1 {
-  font-size: 58px;
-  font-weight: 900;
+  font-size: 64px;
+  color: #ffd166;
   letter-spacing: 10px;
-  color: #ffe9a8;
-  text-shadow: 0 6px 0 #6d4a12, 0 12px 30px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 6px 0 #6b4d0e, 0 12px 24px rgba(0, 0, 0, 0.6);
 }
-.subtitle { font-size: 18px; color: #b9b4a4; letter-spacing: 3px; }
+.subtitle { color: #9d92bd; font-size: 16px; letter-spacing: 2px; }
 .howto {
   list-style: none;
-  font-size: 14.5px;
-  line-height: 2.05;
-  color: #cfccc0;
+  color: #cfc6e8;
+  font-size: 15px;
+  line-height: 2.1;
   text-align: left;
-  background: rgba(12, 14, 24, 0.72);
-  border: 1px solid #333a55;
-  border-radius: 10px;
+  background: rgba(42, 35, 64, 0.6);
+  border: 1px solid #4a3f66;
+  border-radius: 12px;
   padding: 14px 26px;
 }
 .howto b { color: #ffd166; }
-.goal { font-size: 14px; color: #9aa3c0; line-height: 1.9; }
-.hint { font-size: 12px; color: #6b7395; }
-
+.tiny { color: #6f6590; font-size: 12px; }
 #startButton, #restartButton {
-  padding: 16px 54px;
-  font-size: 22px;
-  font-weight: 900;
   font-family: inherit;
-  letter-spacing: 6px;
-  color: #fff4dc;
-  background: linear-gradient(180deg, #c8442e, #8f2b1c);
-  border: 1px solid #e0664c;
-  border-bottom-width: 5px;
-  border-radius: 10px;
+  font-size: 24px;
+  font-weight: 900;
+  padding: 14px 52px;
+  border-radius: 14px;
+  border: 3px solid #241a05;
+  background: #ffd166;
+  color: #241a05;
   cursor: pointer;
-  transition: transform 0.08s ease, filter 0.15s ease;
+  box-shadow: 0 8px 0 #8f6b1a;
+  transition: transform 0.08s, box-shadow 0.08s;
 }
-#startButton:hover, #restartButton:hover { filter: brightness(1.2); transform: translateY(-2px); }
-#startButton:active, #restartButton:active { transform: translateY(2px); border-bottom-width: 1px; }
+#startButton:hover, #restartButton:hover { transform: translateY(-2px); }
+#startButton:active, #restartButton:active { transform: translateY(4px); box-shadow: 0 4px 0 #8f6b1a; }
+#endReason { color: #cfc6e8; font-size: 17px; max-width: 640px; line-height: 1.8; }
+#endStats { color: #9d92bd; font-size: 14px; line-height: 2; }
 
-#endReason { font-size: 17px; color: #d7d2c2; line-height: 1.9; max-width: 720px; }
-#endStats {
-  list-style: none;
-  font-size: 15px;
-  line-height: 2.1;
-  color: #b9c2de;
-  background: rgba(12, 14, 24, 0.72);
-  border: 1px solid #333a55;
-  border-radius: 10px;
-  padding: 12px 34px;
-  text-align: left;
+/* ---------- 横屏提示 ---------- */
+#rotateHint {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 16, 0.92);
+  z-index: 99;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-#endStats b { color: #ffe9a8; }
+.rotate-card {
+  color: #ffd166;
+  font-size: 26px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.9;
+}
+.rotate-card span { font-size: 14px; color: #9d92bd; font-weight: 400; }
+
+/* ---------- 小屏补偿：缩放小于 0.72 时字号整体抬高 ---------- */
+#stage.compact .hud-label { font-size: 15px; }
+#stage.compact .hud-value { font-size: 24px; }
+#stage.compact .hud-cell { min-width: 88px; }
+#stage.compact #commandBar button { min-width: 196px; padding: 12px 16px; }
+#stage.compact #commandBar button b { font-size: 21px; }
+#stage.compact #commandBar button small { font-size: 13px; }
+#stage.compact #selectionHint { font-size: 21px; bottom: 168px; }
+#stage.compact .toast { font-size: 17px; width: 360px; }
+#stage.compact #tutorialTip { font-size: 20px; bottom: 208px; }
+#stage.compact #tutorialSkip { font-size: 16px; }
+#stage.compact #bossBanner { font-size: 26px; }
+#stage.compact .howto { font-size: 19px; }
+#stage.compact .subtitle { font-size: 20px; }
+#stage.compact .tiny { font-size: 16px; }
+#stage.compact #endReason { font-size: 21px; }
+#stage.compact #endStats { font-size: 18px; }

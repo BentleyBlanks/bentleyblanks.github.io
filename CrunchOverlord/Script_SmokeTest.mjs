@@ -23,6 +23,11 @@ import {
   Release,
   GetSpeedMultiplier,
   ActiveWorkers,
+  BossGoOut,
+  BossAway,
+  BOSS_ACTIVITIES,
+  STOCK_STAKE,
+  CLUB_INVEST_GAIN,
 } from "./Script_Rules.mjs";
 
 const failures = [];
@@ -217,6 +222,87 @@ Check("完整循环压测：机器人打满 90 秒不崩、账目有界", () => 
     assert.ok(worker.morale >= 0 && worker.morale <= 100);
     assert.ok(worker.x >= -50 && worker.x <= WORLD.width + 50);
   });
+});
+
+Check("教学序列：前两个瘤固定先 BUG 后需求", () => {
+  const state = NewGame(59);
+  const kinds = [];
+  for (let t = 0; t < 45 && kinds.length < 2; t += 0.1) {
+    Tick(state, 0.1);
+    DrainEvents(state).forEach((event) => {
+      if (event.kind === "spawn") kinds.push(event.tumorKind);
+    });
+  }
+  assert.equal(kinds[0], "bug", `第一个瘤应是 BUG，实际 ${kinds[0]}`);
+  assert.equal(kinds[1], "scope", `第二个瘤应是需求，实际 ${kinds[1]}`);
+});
+
+Check("老板去足疗：扣钱、离岗期间命令全拒、回来头发+18", () => {
+  const state = NewGame(37);
+  state.hair = 50;
+  const cashBefore = state.cash;
+  const result = BossGoOut(state, "spa");
+  assert.ok(result.ok);
+  assert.equal(state.cash, cashBefore - BOSS_ACTIVITIES.spa.cost);
+  assert.ok(BossAway(state), "签发后老板应立即离岗");
+  const pie = PaintPie(state);
+  assert.equal(pie.ok, false, "老板不在时不许画饼");
+  const release = Release(state);
+  assert.equal(release.ok, false, "老板不在时不许发售");
+  Simulate(state, 20); // 走到门口 ~3.4s + 停留 6s + 走回来 ~3.4s
+  assert.equal(state.boss.phase, "office", "老板应已回到工位");
+  assert.equal(state.hair, 68, `足疗后头发应 50→68，实际 ${state.hair}`);
+  assert.equal(state.stats.spaTrips, 1);
+});
+
+Check("老板不在牛马摸鱼：进度变慢、士气回升", () => {
+  const slackGame = NewGame(41);
+  const controlGame = NewGame(41);
+  BossGoOut(slackGame, "spa");
+  Simulate(slackGame, 6);
+  Simulate(controlGame, 6);
+  assert.ok(
+    slackGame.project.progress < controlGame.project.progress,
+    `摸鱼局进度 ${slackGame.project.progress} 应低于对照局 ${controlGame.project.progress}`,
+  );
+  assert.ok(
+    slackGame.workers[0].morale > controlGame.workers[0].morale,
+    "老板不在时士气应回升",
+  );
+});
+
+Check("炒股：本金即刻划走，净收益落在允许集合内", () => {
+  const state = NewGame(43);
+  const cashBefore = state.cash;
+  const result = BossGoOut(state, "stock");
+  assert.ok(result.ok);
+  assert.equal(state.cash, cashBefore - STOCK_STAKE);
+  Simulate(state, 25);
+  assert.equal(state.boss.phase, "office");
+  assert.equal(state.stats.stockPlays, 1);
+  const allowed = [-STOCK_STAKE, -STOCK_STAKE / 2, Math.round(STOCK_STAKE * 0.8), Math.round(STOCK_STAKE * 2.2)];
+  assert.ok(allowed.includes(state.stats.stockNet), `净收益 ${state.stats.stockNet} 不在允许集合 ${allowed}`);
+});
+
+Check("高端会所：投资结果二选一，行程计数正确", () => {
+  const state = NewGame(47);
+  const result = BossGoOut(state, "club");
+  assert.ok(result.ok);
+  Simulate(state, 26);
+  assert.equal(state.boss.phase, "office");
+  assert.equal(state.stats.clubTrips, 1);
+  assert.ok([0, CLUB_INVEST_GAIN].includes(state.stats.investGained));
+});
+
+Check("发售弹幕：三条喷子如约而至", () => {
+  const state = NewGame(53);
+  state.project.progress = state.project.need;
+  Release(state);
+  const events = DrainEvents(state);
+  const release = events.find((event) => event.kind === "release");
+  assert.ok(release, "应有 release 事件");
+  assert.equal(release.danmaku.length, 3);
+  release.danmaku.forEach((line) => assert.ok(typeof line === "string" && line.length > 3));
 });
 
 if (failures.length) {
