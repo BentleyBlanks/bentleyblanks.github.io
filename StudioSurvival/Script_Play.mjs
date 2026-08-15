@@ -1910,9 +1910,11 @@ function UpdateWallClocks(time) {
   const timeOfDay = cyclePhase * 24;
   const hourAngle = timeOfDay % 12 / 12 * Math.PI * 2;
   const minuteAngle = timeOfDay % 1 * Math.PI * 2;
+  // Hands are built pointing up (+Y); a positive rotation.z would sweep them
+  // counterclockwise on screen, so negate to move like a real clock.
   wallClockHands.forEach(({ hourHand, minuteHand }) => {
-    hourHand.rotation.z = hourAngle;
-    minuteHand.rotation.z = minuteAngle;
+    hourHand.rotation.z = -hourAngle;
+    minuteHand.rotation.z = -minuteAngle;
   });
 }
 
