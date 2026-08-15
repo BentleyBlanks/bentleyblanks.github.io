@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#090b12">
+  <meta name="description" content="经营独立游戏工作室，以 100 亿元累计游戏收入成为成功的游戏制作人。">
+  <title>做游戏真的会死</title>
+  <link rel="stylesheet" href="./Style_Play.css?v=20260815ay">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../taihang/vendor/three/build/three.module.mjs"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="loadingScreen" class="loadingScreen" aria-live="polite">
+    <div class="loadingMark">苦</div>
+    <strong>加载中…</strong>
+    <div class="loadingTrack"><i></i></div>
+  </div>
+
+  <section id="portraitBlocker" class="portraitBlocker" aria-live="polite">
+    <div class="rotateGlyph"><span></span></div>
+    <h1>请横屏游玩</h1>
+  </section>
+
+  <main id="gameRoot" class="gameRoot">
+    <canvas id="sceneCanvas" aria-label="横版城市场景"></canvas>
+    <div id="sceneVignette" class="sceneVignette" aria-hidden="true"></div>
+
+    <header class="gameHud" aria-label="工作室状态仪表台">
+      <section class="hudConsole identityConsole sceneConsole" aria-label="当前场景">
+        <div class="brandChip sceneChip">
+          <div><strong id="locationValue">自己家</strong></div>
+        </div>
+      </section>
+
+      <section class="hudConsole businessConsole" aria-label="经营与游戏状态">
+        <div class="consoleHeader"><span class="statusLamp businessLamp" aria-hidden="true"></span><strong>经营</strong></div>
+        <div class="businessConsoleBody">
+          <div class="businessReadouts">
+            <div class="hudStat monthStat"><span>月份</span><strong id="monthValue">M01</strong></div>
+            <div class="hudStat cashStat"><span>现金</span><strong id="cashValue">¥68,000</strong></div>
+            <div class="hudStat debtStat"><span>贷款</span><strong id="startupDebtValue">M08 / ¥82,000</strong></div>
+          </div>
+          <div class="goalHud">
+            <div><span>目标收入</span><strong id="revenueValue">¥0 / 100亿元</strong></div>
+            <div class="goalTrack"><i id="goalBar"></i></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="hudConsole survivalConsole" aria-label="生存状态">
+        <div class="consoleHeader"><span class="statusLamp survivalLamp" aria-hidden="true"></span><strong>状态</strong></div>
+        <div class="survivalMeters">
+          <div class="conditionHud hungerHud"><span>饥饿</span><div class="conditionTrack"><i id="hungerBar"></i></div><b id="hungerValue">0</b></div>
+          <div class="conditionHud anxietyHud"><span>焦虑</span><div class="conditionTrack"><i id="anxietyBar"></i></div><b id="anxietyValue">18</b></div>
+        </div>
+      </section>
+
+      <section class="hudConsole systemConsole" aria-label="系统设置">
+        <div class="consoleHeader"><span class="statusLamp systemLamp" aria-hidden="true"></span><strong>设置</strong></div>
+        <div class="systemControls">
+          <button id="soundButton" class="roundButton" type="button" aria-label="关闭音效"><span id="soundButtonIcon" aria-hidden="true">♪</span><small>声音</small></button>
+          <button id="helpButton" class="roundButton" type="button" aria-label="查看操作说明"><span aria-hidden="true">?</span><small>手册</small></button>
+        </div>
+      </section>
+    </header>
+
+    <aside class="missionCard" aria-live="polite" aria-label="当前项目状态">
+      <span class="paperClip" aria-hidden="true"></span>
+      <div class="missionHeading"><span>项目</span><b id="studioNameHud">尚未成立</b></div>
+      <strong id="projectTitle">先开一家公司</strong>
+      <p id="missionText">签合同，再用家中电脑开发。</p>
+      <div class="moduleLabel"><span>进度</span></div>
+      <div id="moduleStrip" class="moduleStrip"></div>
+    </aside>
+
+    <div id="interactionPrompt" class="interactionPrompt hidden" aria-live="polite">
+      <span class="promptKey">E</span>
+      <div><strong id="interactionTitle">交互</strong><small id="interactionDetail">靠近</small></div>
+    </div>
+
+    <div class="desktopHint"><b>A/D</b> 移动　<b>W</b> 跳　<b>E</b> 交互</div>
+
+    <nav id="mobileControls" class="mobileControls" aria-label="移动端游戏控制">
+      <div class="moveControls" role="group" aria-label="移动方向">
+        <button id="moveLeftButton" type="button" aria-label="按住向左移动" aria-pressed="false"><span aria-hidden="true">←</span><small>左移</small></button>
+        <button id="moveRightButton" type="button" aria-label="按住向右移动" aria-pressed="false"><span aria-hidden="true">→</span><small>右移</small></button>
+      </div>
+      <div class="actionControls" role="group" aria-label="角色动作">
+        <button id="jumpButton" class="jumpButton" type="button" aria-label="跳跃" aria-pressed="false"><span aria-hidden="true">↑</span><small>跳跃</small></button>
+        <button id="interactButton" class="interactButton" type="button" aria-label="靠近可交互对象" disabled><span aria-hidden="true">◎</span><small>交互</small></button>
+      </div>
+    </nav>
+
+    <button id="settlementButton" class="settlementButton" type="button" aria-label="下一回合，进入 M02">
+      <span>下一回合</span><small id="settlementMonthValue">进入 M02</small><i aria-hidden="true">→</i>
+    </button>
+
+    <div id="toastStack" class="toastStack" aria-live="polite"></div>
+    <div id="travelCurtain" class="travelCurtain" aria-hidden="true"><span>正在出门</span></div>
+    <section id="monthMontage" class="monthMontage hidden" aria-live="polite" aria-label="推进一个月">
+      <div class="monthMontageSky" aria-hidden="true">
+        <i class="montageSun"></i><i class="montageMoon"></i>
+        <div class="montageStars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="montageCity"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <header class="monthMontageHeader">
+        <span id="montageMonthLabel">M01 封账</span><strong>一个月，压成几秒</strong>
+        <div><small>DAY</small><b id="montageDayValue">01</b><i>/ 28</i></div>
+      </header>
+      <div id="montageStage" class="monthMontageStage" data-scene="work" data-venue="home" aria-hidden="true">
+        <section class="montageWorkScene">
+          <div class="montageRoomWindow"><i></i><i></i></div>
+          <div class="montageMonitor">
+            <div class="montageScreenCode"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="montageScreenArt"><i></i><i></i><i></i><i></i></div>
+            <div class="montageScreenBuild"><i></i><i></i><i></i><b>BUILD</b></div>
+          </div>
+          <div class="montageTower"><i></i><i></i><b></b></div>
+          <div class="montageDesk"><i class="montageKeyboard"></i><i class="montageMug"></i></div>
+          <div class="montageCoder"><i class="montageCoderHead"></i><i class="montageCoderBody"></i><i class="montageCoderArm left"></i><i class="montageCoderArm right"></i></div>
+        </section>
+        <section class="montageTransitScene">
+          <div class="montageDoor"><i></i><b></b></div>
+          <div class="montageWalker"><i></i><b></b><span></span></div>
+          <div class="montageStreet"><i></i><i></i><i></i></div>
+        </section>
+        <section class="montageFoodScene">
+          <div class="montageEatSign">饭</div>
+          <div class="montageEater"><i></i><b></b><span class="left"></span><span class="right"></span></div>
+          <div class="montageFoodTable"><i class="montageBowl"></i><i class="montageSteam"></i><b></b></div>
+        </section>
+        <section class="montageRelaxScene">
+          <div class="montageRelaxSign">汤</div>
+          <div class="montageSoaker"><i></i><b></b><span></span></div>
+          <div class="montageBasin"><i></i><b></b><span></span></div>
+        </section>
+      </div>
+      <footer class="monthMontageFooter"><strong id="montageActionLabel">时间开始加速</strong><span id="montagePlaceLabel">自己家</span></footer>
+    </section>
+  </main>
+
+  <section id="setupScreen" class="setupScreen" aria-label="成立公司并创建第一款游戏">
+    <div class="setupNoise" aria-hidden="true"></div>
+    <div class="titleOfficeArt" aria-hidden="true">
+      <div class="titleMonitor"><span class="titleMonitorVent"></span><i class="titleMonitorGlass"></i><b>牛</b><em>牛马 486</em><span class="titleMonitorPower"></span></div>
+      <div class="titleTower"><em>牛马 486</em><i></i><i></i><span></span><b></b></div>
+      <div class="titleKeyboard"></div>
+      <div class="titleMouse"><i></i></div>
+      <div class="titleCoffee"></div>
+      <div class="titleBill"><span>还款日</span><strong>M08</strong></div>
+      <div class="titleDesk"></div>
+    </div>
+    <div id="ceremonyIntro" class="ceremonyIntro">
+      <h1><span>做游戏</span><span>真的会死</span></h1>
+      <div class="titleMenu">
+        <button id="ceremonyStartButton" class="ceremonyStartButton" type="button"><span>新游戏</span><strong>成立工作室</strong><i>→</i></button>
+        <button id="continueButton" class="continueButton hidden" type="button"><span>继续游戏</span><strong>回到上次存档</strong><i>→</i></button>
+      </div>
+    </div>
+
+    <button id="skipCeremonyButton" class="skipCeremonyButton hidden" type="button">跳过动画</button>
+    <div id="ceremonyCaption" class="ceremonyCaption hidden" aria-live="polite"><span>公司成立</span><strong id="ceremonyCaptionText">创始人入场</strong></div>
+
+    <section id="foundingNamePanel" class="foundingNamePanel foundingBook hidden" aria-labelledby="foundingTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><span>工作室成立登记册</span><b>01 / 04</b></header>
+      <div class="registrySeal">筹</div>
+      <main class="bookPageBody">
+        <p class="documentKicker">第一项 · 工作室名称</p>
+        <h2 id="foundingTitle">你的工作室叫什么？</h2>
+        <p>写下工作室名称。它会出现在家门口、合同和结局里。</p>
+        <label class="contractField"><span>工作室全称</span><input id="studioNameInput" type="text" maxlength="18" autocomplete="off" inputmode="text" placeholder="在这里写下工作室名"></label>
+        <div id="studioNameSuggestions" class="nameSuggestions" aria-label="工作室名灵感">
+          <button type="button" data-studio-name="今晚一定上线">今晚一定上线</button>
+          <button type="button" data-studio-name="需求不会再改">需求不会再改</button>
+          <button type="button" data-studio-name="电脑不能抵押">电脑不能抵押</button>
+        </div>
+        <p id="setupError" class="setupError" aria-live="polite"></p>
+      </main>
+      <div class="bookPageFooter">
+        <span>写下名字，翻开创业的下一页</span>
+        <button id="nameConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>确认创始人能力</strong><i>→</i></button>
+      </div>
+    </section>
+
+    <section id="founderProfilePanel" class="founderProfilePanel foundingBook hidden" aria-labelledby="founderProfileTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><span id="founderProfileTitle" tabindex="-1">创始人能力</span><b>02 / 04</b></header>
+      <div id="founderSkillEditor" class="founderSkillEditor"></div>
+      <div class="founderProfileFooter">
+        <strong id="founderSkillBudget" aria-live="polite">剩余 0</strong>
+      </div>
+      <div class="contractBookNav founderBookNav">
+        <button id="founderBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
+        <span>共 9 点</span>
+        <button id="founderConfirmButton" class="documentButton" type="button"><span>下一页</span><strong>选择题材与发行</strong><i>→</i></button>
+      </div>
+    </section>
+
+    <section id="projectContract" class="projectContract foundingBook hidden" aria-labelledby="contractTitle">
+      <div class="bookSpine" aria-hidden="true"></div>
+      <header><div><span>第一款游戏发行合同</span><small>合同编号：M01-NO-MONEY</small></div><b id="contractPageCounter">03 / 04</b></header>
+      <div class="contractParties"><span>工作室：<strong id="contractStudioName">未命名工作室</strong></span><span>创始人：<strong id="contractFounderSkills">策 3 / 程 3 / 美 3</strong></span><span>题材与发行共同生效</span></div>
+
+      <div id="contractPageViewport" class="contractPageViewport" aria-live="polite">
+        <article class="contractPage contractDecisionPage active" data-contract-page="0">
+          <p class="documentKicker">第三项 · 立项与发行</p>
+          <h2 id="contractTitle">你准备做什么游戏？</h2>
+          <p class="contractLead">选定题材和发行方式，两项一起写进合同。</p>
+          <div class="contractDecisionGrid">
+            <section class="contractChoiceGroup" aria-labelledby="themeChoiceTitle">
+              <h3 id="themeChoiceTitle"><span>01</span>游戏题材</h3>
+              <div id="projectChoices" class="choiceRail"></div>
+            </section>
+            <section class="contractChoiceGroup" aria-labelledby="releaseChoiceTitle">
+              <h3 id="releaseChoiceTitle"><span>02</span>发行方式</h3>
+              <div id="typeChoices" class="choiceRail compactRail"></div>
+            </section>
+          </div>
+        </article>
+
+        <article class="contractPage contractReviewPage" data-contract-page="1">
+          <p class="documentKicker">第四项 · 正式签署</p>
+          <h2>签下你的第一份发行合同</h2>
+          <div class="contractReview">
+            <div><span>工作室</span><strong id="contractReviewStudio">等待命名</strong></div>
+            <div><span>创始人能力</span><strong id="contractReviewFounder">策 3 / 程 3 / 美 3</strong></div>
+            <div><span>游戏题材</span><strong id="contractReviewTheme">尚未选择</strong></div>
+            <div><span>发行方式</span><strong id="contractReviewType">尚未选择</strong></div>
+          </div>
+          <div class="contractFinePrint"><b>启动贷</b><span>到账 ¥68,000；M08 结束前须还清 ¥82,000。到期未清，工作室倒闭。</span></div>
+          <p id="contractError" class="setupError" aria-live="polite"></p>
+          <div class="signatureRow"><div><small>创始人签章</small><strong id="contractSignatureName">等待命名</strong></div><button id="sealButton" class="sealButton" type="button"><span>按住 1 秒</span><strong>签署发行合同</strong><i></i></button></div>
+        </article>
+      </div>
+
+      <div class="contractBookNav">
+        <button id="contractBackButton" class="bookBackButton" type="button"><span>←</span><strong>上一页</strong></button>
+        <span id="contractPageHint">题材与发行一起生效</span>
+        <button id="contractNextButton" class="documentButton" type="button"><span>下一页</span><strong>核对发行合同</strong><i>→</i></button>
+      </div>
+    </section>
+  </section>
+
+  <section id="goalReveal" class="goalReveal hidden" role="dialog" aria-modal="true" aria-labelledby="goalRevealTitle" aria-describedby="goalRevealDescription">
+    <div class="goalRevealGrid" aria-hidden="true"></div>
+    <div class="goalRevealCard">
+      <p class="goalRevealKicker"><span></span>立项完成 · 制作人目标<span></span></p>
+      <h2 id="goalRevealTitle">让你的游戏挣到</h2>
+      <div class="goalRevealNumber" role="img" aria-label="一百亿元">
+        <span id="goalRevealCounter">0</span><b>亿元</b>
+      </div>
+      <div class="goalRevealTrack" aria-hidden="true"><i></i><b>¥10,000,000,000</b></div>
+      <p id="goalRevealDescription" class="goalRevealDescription">累计游戏收入达到 <strong>100 亿元</strong>，你将成为成功的游戏制作人。</p>
+      <div class="goalRevealRules" aria-label="目标收入计算规则">
+        <div class="goalRevenueCounts"><span>计入目标</span><strong>游戏首发 · 版本更新 · 持续运营净收入</strong></div>
+        <div class="goalRevenueExcluded"><span>不计入</span><strong>贷款 · 彩票 · 炒股</strong></div>
+      </div>
+      <button id="goalRevealButton" class="goalRevealButton" type="button" disabled><span>合同已签</span><strong>开工，向 100 亿出发 →</strong></button>
+    </div>
+  </section>
+
+  <div id="modalLayer" class="modalLayer hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <button id="modalBackdrop" class="modalBackdrop" type="button" aria-label="关闭交互窗口"></button>
+    <section class="worldPanel">
+      <header><div><span id="sheetKicker"></span><h2 id="sheetTitle">交互</h2></div><button id="sheetCloseButton" class="closeButton" type="button" aria-label="关闭">×</button></header>
+      <div id="sheetBody" class="sheetBody"></div>
+    </section>
+  </div>
+
+  <div id="resultLayer" class="resultLayer hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <section class="resultCard">
+      <span id="resultKicker"></span>
+      <h2 id="resultTitle">结果</h2>
+      <div id="resultBody"></div>
+      <button id="resultCloseButton" class="primaryButton" type="button">继续</button>
+    </section>
+  </div>
+
+  <section id="endingScreen" class="endingScreen hidden" aria-live="polite">
+    <div><h1 id="endingTitle">你成为了成功的游戏制作人！</h1><p id="endingSubtitle">累计游戏收入达到 100 亿元。</p><div id="endingStats" class="endingStats"></div><div class="endingActions"><button id="quickRestartButton" class="startButton" type="button"><span>沿用上局设定</span><strong>快速重开 →</strong></button><button id="restartButton" class="continueButton" type="button"><strong>重新设定</strong></button></div></div>
+  </section>
+
+  <script type="module" src="./Script_Play.mjs?v=20260815ay"></script>
+</body>
+</html>

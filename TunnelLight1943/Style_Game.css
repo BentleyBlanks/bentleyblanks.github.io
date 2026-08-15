@@ -526,53 +526,29 @@ body.touchDevice #touchControls.gone { display: none; }
 }
 #endScreen button:hover { background: rgba(232, 193, 90, 0.12); }
 
-/* 征夫告示阅读层：背景压暗但透出场景（不切黑）；左图 42% / 右文 58%，
-   窄屏改上图下文。关闭键钉在面板右上角，文字自己滚 */
+/* 征夫告示阅读层：背景压暗但透出场景（不切黑）。
+   **画框里只有一张纸**——没有面板、没有边框、没有右栏（2026-08-15 用户定）。
+   纸是程序化画的（#noticeSheet 是张 canvas，Main 按可用画框定尺寸后交给
+   Art.DrawNoticeSheet），落影与撕口都画在画布里，所以这儿一句样式都不用给它：
+   加 border / background 等于把撕出来的毛边又装回一个方框。 */
 #noticeOverlay {
   position: absolute; inset: 0; z-index: 60;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(8, 6, 4, 0.62); padding: 4vmin;
+  background: rgba(8, 6, 4, 0.68); padding: 2vmin;
 }
-#noticePanel {
-  position: relative; display: flex; gap: 3.2%;
-  width: min(920px, 94%); max-height: 88%;
-  background: rgba(24, 20, 15, 0.94);
-  border: 1px solid rgba(154, 143, 122, 0.4);
-  padding: 22px;
-}
-/* 告示是**抠掉白底**的一张纸（不是一块图版）：所以没有边框——给纸加边框，
-   等于把撕出来的毛边又装回一个方框里。落影贴着纸的真实轮廓走，靠的是
-   drop-shadow（读 alpha）而不是 box-shadow（只认盒子） */
-#noticeImg {
-  width: 42%; align-self: flex-start;
-  max-height: 100%; object-fit: contain;
-  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.55));
-}
-#noticeText {
-  width: 58%; overflow-y: auto; padding-right: 6px;
-  color: var(--paper); font-size: 14.5px; line-height: 1.9;
-}
-#noticeText h3 { font-size: 19px; letter-spacing: 0.3em; margin-bottom: 10px; font-weight: 600; }
-#noticeText p { margin-bottom: 7px; }
-#noticeText .nDate { margin-top: 14px; color: var(--dim); }
-#noticeText .nSign { text-align: right; color: var(--dim); }
+#noticeSheet { display: block; max-width: 100%; max-height: 100%; }
+/* 关闭键钉在**屏幕**角上（面板没了，没有别的东西可钉）。压在纸之上，
+   离安全区一指宽——横屏手机的圆角会把贴边的钮啃掉一半 */
 #noticeClose {
-  position: absolute; top: 8px; right: 8px; z-index: 2;
-  width: 34px; height: 34px; cursor: pointer;
-  background: rgba(24, 20, 15, 0.9); color: var(--paper);
+  position: absolute; z-index: 2;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  width: 38px; height: 38px; cursor: pointer;
+  background: rgba(24, 20, 15, 0.82); color: var(--paper);
   border: 1px solid rgba(154, 143, 122, 0.5);
   font-family: inherit; font-size: 15px;
 }
 #noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
-@media (max-width: 700px), (orientation: portrait) {
-  /* 竖屏是上图下文，图必须让出下半屏给正文。height 是**必须**的：
-     子元素的 max-height:38% 要有一个确定的父高度才解析得出来，只写
-     max-height:88% 的话父高是 auto，那 38% 等于没写——图照旧长到自然高度，
-     正文被挤到只剩两三行（抠图后纸不再有白边，长得更满，这条就更明显了） */
-  #noticePanel { flex-direction: column; gap: 12px; overflow: hidden; height: 88%; }
-  #noticeImg { width: auto; max-width: 100%; max-height: 38%; align-self: center; }
-  #noticeText { width: auto; flex: 1; min-height: 0; }
-}
 
 
 /* 标题 */
@@ -587,6 +563,11 @@ body.touchDevice #touchControls.gone { display: none; }
    守这条的是 RenderHealthTest 的「标题页四档画高都点得着」。 */
 #titleScreen {
   position: absolute; inset: 0; overflow-y: auto;
+  /* 必须压过收黑罩（#fadeOverlay 26）：那层罩子 CSS 默认全黑，开机没有游戏循环
+     去把它降下来，标题页没编号就整个被它盖死——玩家一打开是纯黑，按钮还
+     盲点得着（罩子 pointer-events:none，所以"点得着"的测试全绿）。
+     上限是调试面板（61），它要能盖住标题页。 */
+  z-index: 33;
   display: flex; align-items: flex-start; justify-content: center;
   background:
     radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),

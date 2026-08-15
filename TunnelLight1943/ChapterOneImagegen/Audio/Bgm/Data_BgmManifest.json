@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "policy": {
+    "instrumentalOnly": true,
+    "allowSinging": false,
+    "allowVocalTextures": false,
+    "notes": "正式项目只使用纯器乐；演唱、吟唱、合唱和人声氛围音色均淘汰。",
+    "loopNote": "每首都是完整成品曲，末尾是渐弱收尾。loopEnd = 尾奏开始之前的位置，播到这里就交叉淡回 cue；放进尾奏玩家会听成「音乐停了又重放」（2026-08-10）。数值由 ffmpeg 逐段量：正常段响度打底，从尾往前找第一个不低于它 4dB 的 4 秒窗口。"
+  },
+  "master": {
+    "format": "MP3",
+    "bitrateKbps": 320,
+    "targetIntegratedLoudnessLufs": -20,
+    "targetTruePeakDbtp": -2.5
+  },
+  "tracks": [
+    {
+      "chapter": 1,
+      "id": "withTheseHands",
+      "title": "With These Hands",
+      "file": "AudioBgm_WithTheseHands.mp3",
+      "cue": 42,
+      "gain": 0.82,
+      "hasVocals": false,
+      "source": "https://www.scottbuckley.com.au/library/with-these-hands/",
+      "credit": "'With These Hands' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au",
+      "duration": 305.7,
+      "loopEnd": 285.7
+    },
+    {
+      "chapter": 2,
+      "id": "theLongDark",
+      "title": "The Long Dark",
+      "file": "AudioBgm_TheLongDark.mp3",
+      "cue": 28,
+      "gain": 0.7,
+      "hasVocals": false,
+      "source": "https://www.scottbuckley.com.au/library/the-long-dark/",
+      "credit": "'The Long Dark' by Scott Buckley — CC BY 4.0 — www.scottbuckley.com.au",
+      "duration": 439.8,
+      "loopEnd": 403.8
+    },
+    {
+      "chapter": 3,
+      "id": "secretRendezvous",
+      "title": "高粱地接头",
+      "file": "AudioBgm_SecretRendezvous.mp3",
+      "cue": 12,
+      "gain": 0.68,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 175.8,
+      "loopEnd": 155.8
+    },
+    {
+      "chapter": 4,
+      "id": "tunnelExploration",
+      "title": "土壁深处",
+      "file": "AudioBgm_TunnelExploration.mp3",
+      "cue": 18,
+      "gain": 0.7,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 240.0,
+      "loopEnd": 236.0
+    },
+    {
+      "chapter": 5,
+      "id": "diggingTogether",
+      "title": "一锹一锹",
+      "file": "AudioBgm_DiggingTogether.mp3",
+      "cue": 18,
+      "gain": 0.76,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 218.5,
+      "loopEnd": 210.5
+    },
+    {
+      "chapter": 6,
+      "id": "enemyAssessment",
+      "title": "门板上的岗哨",
+      "file": "AudioBgm_EnemyAssessment.mp3",
+      "cue": 12,
+      "gain": 0.67,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 87.2,
+      "loopEnd": 83.2
+    },
+    {
+      "chapter": 7,
+      "id": "rescueRelay",
+      "title": "旁洞还有人",
+      "file": "AudioBgm_RescueRelay.mp3",
+      "cue": 20,
+      "gain": 0.75,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 166.0,
+      "loopEnd": 162.0
+    },
+    {
+      "chapter": 8,
+      "id": "ruinsAtDawn",
+      "title": "残墙见光",
+      "file": "AudioBgm_RuinsAtDawn.mp3",
+      "cue": 24,
+      "gain": 0.72,
+      "hasVocals": false,
+      "source": "https://www.lovart.ai/canvas?projectId=61159172b3bd4f63a2475dfe1e3e8f2a",
+      "duration": 202.0,
+      "loopEnd": 198.0
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "id": "whatWeDontSay",
+      "title": "What We Don't Say",
+      "reason": "含人声音色，不符合纯器乐政策。"
+    },
+    {
+      "id": "nightFalls",
+      "title": "暮色压下来",
+      "reason": "用户试听确认含有人声听感，已从正式项目及试听池移除。"
+    },
+    {
+      "id": "huabeiVillageDawn",
+      "title": "村口晨雾",
+      "reason": "用户试听确认含有人声听感，已从试听池移除。"
+    }
+  ]
+}

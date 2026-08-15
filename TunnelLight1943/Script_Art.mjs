@@ -6335,9 +6335,17 @@ export function DrawCharredPlank(ctx, ax, ay, id, { len = 72 } = {}) {
 
 /**
  * 墙根那片烧土（埋着瓦罐的那一堆）。ax/ay = 堆的中心与地平线。
- * k = 扒掉了几成（堆真的一次比一次矮）；jar = 罐肩露出来了；open = 扎口解开了。
+ * World 把玩法状态整个递进来（fg.ash）：
+ *   k = 扒掉了几成（堆真的一次比一次矮）；
+ *   caught / clear = 指甲碰上坛肩了 / 顺着肩抹开了几成——**抹哪儿露哪儿**，
+ *     露出的宽度跟 clear 走，抹过的地方留指痕（反馈长在工件上，不上 HUD）；
+ *   jarX−x = 坛肩埋在堆心哪一侧（判定与作画共用 Core 那一个数）；
+ *   jar = 整个肩都出来了；open = 泥封抠开了。
+ * 封口是八稿的口径：**干泥糊口＋半块碗底压着**（WRAP 卡抠的就是它）。
+ * 蓝底白花的碎布垫在碗片**底下**，揭开之前一寸都不许露——那是暗线的包袱。
  */
-export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false } = {}) {
+export function DrawAshMound(ctx, ax, ay, id,
+  { k = 0, jar = false, open = false, caught = false, clear = 0, taken = false, jarX, x } = {}) {
   const hw = 29;                                  // 半幅 0.6m
   const h = 24 * (1 - 0.55 * Math.max(0, Math.min(1, k)));
   const N = 9;
@@ -6373,44 +6381,101 @@ export function DrawAshMound(ctx, ax, ay, id, { k = 0, jar = false, open = false
     ctx.fill();
   }
   ctx.restore();
-  if (!jar) return;
-  // 罐肩：土里探出来的那一圈。罐是灰陶，比土沉一档，边上一道亮沿才立得住
-  const jy = ay - h * 0.34;
-  InkFill(ctx, [[ax - 11, ay], [ax - 12, jy + 4], [ax - 8, jy - 3], [ax, jy - 5],
-    [ax + 8, jy - 3], [ax + 12, jy + 4], [ax + 11, ay]],
-  id + "jar", "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
-  if (open) {
-    // 扎口解开了：罐口张着，那块蓝底白花的碎布垂在罐肩上
+  if (!jar && !caught && clear <= 0 && !taken) return;
+  // 坛肩锚在 Core 的 shoulderY 上（0.16m×48px/米），不跟着堆矮——
+  // 坛子埋在土里，矮下去的是堆，不是它
+  const jd = jarX !== undefined && x !== undefined ? (jarX - x) * 48 : 0;
+  const jx = ax + jd;
+  const jy = ay - 8;
+  if (taken) {
+    // 坛子抱走了：堆上只剩那个刨开的坑，坑沿散着几块泥渣
+    InkFill(ctx, [[jx - 14, ay], [jx - 15, jy + 3], [jx - 7, jy - 2], [jx + 7, jy - 2],
+      [jx + 15, jy + 3], [jx + 14, ay]],
+    id + "pitEmpty", "#332c25", { amp: 1.6, lw: 1.6, shade: "rgba(0,0,0,0.34)" });
     ctx.save();
-    ctx.fillStyle = "#1a150f";
-    ctx.beginPath();
-    ctx.ellipse(ax, jy - 4, 7.6, 2.6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    InkFill(ctx, [[ax + 4, jy - 4], [ax + 13, jy - 6], [ax + 15, jy + 3], [ax + 6, jy + 2]],
-      id + "cloth", "#2a3448", { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
-    ctx.save();
-    ctx.fillStyle = "rgba(196,204,214,0.6)";
-    ctx.beginPath(); ctx.ellipse(ax + 9, jy - 2, 0.9, 0.7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(ax + 12, jy + 0.6, 0.8, 0.6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  } else {
-    // 罐口拿碎布扎着：蓝底白花的一顶布帽（娘那件短褂上的），腰上缠三道细绳
-    InkFill(ctx, [[ax - 9, jy - 2], [ax - 7, jy - 8], [ax, jy - 10], [ax + 7, jy - 8],
-      [ax + 9, jy - 2], [ax, jy + 1]], id + "wrap", "#2a3448",
-    { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
-    ctx.save();
-    ctx.fillStyle = "rgba(196,204,214,0.6)";
+    ctx.fillStyle = "#6b5844";
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
-      ctx.ellipse(ax - 4 + i * 4, jy - 8 + Hash(id + "bd" + i) * 3, 0.9, 0.7, 0, 0, Math.PI * 2);
+      ctx.ellipse(jx - 12 + Hash(id + "tx" + i) * 24, ay - 1.4 - Hash(id + "ty" + i) * 2.4,
+        1.6 + Hash(id + "tr" + i) * 1.2, 1.0, Hash(id + "ta" + i), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
-    for (let i = 0; i < 3; i += 1) {
-      InkLine(ctx, ax - 8.5, jy - 2.4 - i * 1.7, ax + 8.5, jy - 2.6 - i * 1.7,
-        id + "lash" + i, { lw: 1.1, color: "#6d5a3a", amp: 0.5 });
+    return;
+  }
+  if (!jar) {
+    // 刨出来的坑：灰底下露出的硬土，比灰沉一档、比坛子糙
+    InkFill(ctx, [[jx - 14, ay], [jx - 15, jy + 3], [jx - 7, jy - 3], [jx + 7, jy - 3],
+      [jx + 15, jy + 3], [jx + 14, ay]],
+    id + "pit" + Math.round(clear * 3), "#39312a", { amp: 1.6, lw: 1.6, shade: "rgba(0,0,0,0.3)" });
+    // 坛肩露出来的那一段：抹了几把露多宽（clear=0 只有指甲碰着的那一点）
+    const w = 7 + clear * 19;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(jx - w / 2, 0, w, ay);
+    ctx.clip();
+    InkFill(ctx, [[jx - 11, ay], [jx - 12, jy + 4], [jx - 8, jy - 3], [jx, jy - 5],
+      [jx + 8, jy - 3], [jx + 12, jy + 4], [jx + 11, ay]],
+    id + "shold" + Math.round(clear * 3), "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
+    ctx.restore();
+    // 抹过的指痕：一把一道，顺着肩横着走
+    const wipes = Math.round(clear * 3);
+    for (let i = 0; i < wipes; i += 1) {
+      InkLine(ctx, jx - w / 2 + 2, jy - 2 + i * 2.2, jx + w / 2 - 2, jy - 2.6 + i * 2.2,
+        id + "wipe" + i, { lw: 1.0, color: "rgba(138,128,116,0.55)", amp: 0.8 });
     }
+    // 肩顶一道亮沿：灰陶比土亮，指甲碰的就是这儿
+    InkLine(ctx, jx - w * 0.32, jy - 4.2, jx + w * 0.32, jy - 4.4, id + "rim",
+      { lw: 1.2, color: "rgba(168,160,148,0.7)", amp: 0.6 });
+    return;
+  }
+  // 罐肩整个出来了：土里探出来的那一圈。罐是灰陶，比土沉一档
+  InkFill(ctx, [[jx - 11, ay], [jx - 12, jy + 4], [jx - 8, jy - 3], [jx, jy - 5],
+    [jx + 8, jy - 3], [jx + 12, jy + 4], [jx + 11, ay]],
+  id + "jar", "#57534a", { amp: 1.2, lw: 2.0, shade: "rgba(0,0,0,0.3)" });
+  if (open) {
+    // 泥封抠开了：罐口空张着（碗片与那圈碎布都在他怀里，坛边只剩几块泥渣）
+    ctx.save();
+    ctx.fillStyle = "#1a150f";
+    ctx.beginPath();
+    ctx.ellipse(jx, jy - 4, 7.6, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = "#6b5844";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(jx + 9 + Hash(id + "mx" + i) * 6, ay - 1.5 - Hash(id + "my" + i) * 3,
+        1.8 + Hash(id + "mr" + i) * 1.2, 1.1, Hash(id + "ma" + i), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else {
+    // 八稿封口：坛口糊着一圈干泥，上面压着半块碗底（WRAP 卡抠的就是这两样；
+    // 蓝花碎布垫在碗片底下，这儿一寸都不露）
+    InkFill(ctx, [[jx - 8, jy - 1.5], [jx - 6.5, jy - 6.5], [jx, jy - 8], [jx + 6.5, jy - 6.5],
+      [jx + 8, jy - 1.5], [jx, jy + 0.5]], id + "mud", "#6b5844",
+    { amp: 1.2, lw: 1.6, shade: "rgba(0,0,0,0.22)" });
+    // 干泥上的裂纹
+    InkLine(ctx, jx - 5, jy - 4.5, jx - 1, jy - 3.2, id + "crkA",
+      { lw: 0.9, color: "rgba(52,40,28,0.6)", amp: 0.7 });
+    InkLine(ctx, jx + 2, jy - 6, jx + 5, jy - 3.5, id + "crkB",
+      { lw: 0.9, color: "rgba(52,40,28,0.6)", amp: 0.7 });
+    // 半块碗底：浅釉色的一弯，断口冲着东边
+    ctx.save();
+    ctx.fillStyle = "#a09a8e";
+    ctx.beginPath();
+    ctx.ellipse(jx + 1, jy - 7.5, 6.2, 2.3, 0.12, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40,32,24,0.75)";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    // 圈足：碗底朝天扣着，中间那圈足最认得出“这是个碗底”
+    ctx.beginPath();
+    ctx.ellipse(jx + 0.5, jy - 8.6, 2.6, 0.9, 0.12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -7342,6 +7407,404 @@ export function DrawNoticeWall(ctx, x, groundY, w, id, { scars = false } = {}) {
     ctx.fillRect(p.px - p.pw / 2 + 3.5, p.py + p.ph - 8.5, 5, 5);
     ctx.restore();
   }
+}
+
+// ---------------------------------------------------------------------------
+// 征夫告示：阅读层的那张纸（2026-08-15 用户定：「界面里只有一张纸，程序化的
+// 在纸上写上文字内容」）
+//
+// 老版是「左边一张外部生成图 + 右边现代排版的转录」：两样东西说同一件事，
+// 玩家的眼睛在图与字之间来回跳；那张图还得走 Script_TypesetNotice.py 排版 +
+// Script_TextureKey.py 抠白底两道流水线，改一个字要重跑一遍。现在整张纸——
+// 连同纸上的字——都在这儿画。
+//
+// 三条规矩：
+// ① **1942 年的汉字**（全作铁律）：繁体、竖排、自右向左。简化字方案是 1956
+//    年的事，横排左起是 1955-56 年以后才成为规范的；「征召」的征那时写作**徵**。
+//    **标题也走竖排**——四个字横着码、按那时候的规矩自右向左，今天的人扫一眼
+//    读成「示告夫徵」，看着像 bug；竖排没有这个歧义，而且跟墙上那张小告示同款。
+// ② **画的顺序＝事情发生的顺序**（画笔三条通用毛病之一）：先有纸，纸上有折痕
+//    （揣在怀里带过来的），再有印上去的字，最后才是盖上去的朱印、贴了一年落下的
+//    黄斑水渍和四角的糨糊痕。倒过来画就成了「一张做旧贴图上摆了几个字」。
+// ③ **这是 DOM canvas，不是 CanvasTexture**：不会被提亮两档，照原色画（同包袱条）。
+//    别照世界贴图那套压两档的色号抄——那样在这儿会黑得像烧过。
+// ---------------------------------------------------------------------------
+// 麻纸/毛边纸：村里贴的从来不是白纸。底偏土黄、纤维粗、透光不匀
+const NOTICE_PAPER = {
+  base: "#cbb88d", lit: "#dccca4", shade: "#a08a62", edge: "#8a7550",
+  ink: "#241c14", inkPale: "#4b3d2c", seal: "#a02e25",
+};
+
+// 一条手裁/手撕的边：**两头收住**（角还得是角），中段才跑得开。
+// bite 是被啃掉的那一口——贴了一年的告示总有一块被风撕走，那口比毛边大一个量级。
+// 正的偏移一律朝纸里去（四条边各自的法线都朝内），所以 bite.depth 给正数就是缺角。
+function NoticeEdge(ax, ay, bx, by, id, amp, n, bite = null) {
+  const pts = [];
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  for (let i = 0; i <= n; i += 1) {
+    const t = i / n;
+    let o = Sym(id, i, amp) * Math.sin(Math.PI * t) ** 0.55;
+    if (bite && t > bite.a && t < bite.b) {
+      const u = (t - bite.a) / (bite.b - bite.a);
+      o += Math.sin(Math.PI * u) ** 0.7 * bite.depth;
+    }
+    pts.push([ax + dx * t + nx * o, ay + dy * t + ny * o]);
+  }
+  return pts;
+}
+
+function NoticeSheetPath(ctx, x0, y0, x1, y1, id) {
+  const w = x1 - x0, h = y1 - y0;
+  const pts = [
+    // 上沿是裁的（齐），下沿是撕的（毛），左下角被啃掉一口
+    ...NoticeEdge(x0, y0, x1, y0, id + "t", h * 0.004, 10),
+    ...NoticeEdge(x1, y0, x1, y1, id + "r", w * 0.006, 12).slice(1),
+    ...NoticeEdge(x1, y1, x0, y1, id + "b", h * 0.010, 16, { a: 0.66, b: 0.92, depth: h * 0.035 }).slice(1),
+    ...NoticeEdge(x0, y1, x0, y0, id + "l", w * 0.005, 12).slice(1, -1),
+  ];
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  return pts;
+}
+
+// 竖排右起的断列：避头点——、。，；等标点不许落在一列的头上，
+// 挤回上一列末尾（标点悬挂）。不管这条，读起来就是句子被切断了
+const NOTICE_NO_HEAD = "、。，；：！？」』）";
+function NoticeColumns(text, perCol) {
+  const cols = [];
+  let i = 0;
+  while (i < text.length) {
+    let n = Math.min(perCol, text.length - i);
+    while (i + n < text.length && NOTICE_NO_HEAD.includes(text[i + n])) n += 1;
+    cols.push(text.slice(i, i + n));
+    i += n;
+  }
+  return cols;
+}
+
+// 一个字：位置与大小各带一点抖（铅字是一个一个摆上去的，不会分毫不差），
+// 底下垫一层更淡更大的同一个字＝墨在纸上洇开的那一圈
+function NoticeChar(ctx, ch, cx, cy, size, id, i, { color = NOTICE_PAPER.ink, weight = 500, alpha = 1 } = {}) {
+  // 竖排里的句读点住在字格的**右上角**，不在正中
+  const punct = NOTICE_NO_HEAD.includes(ch) || ch === "。" || ch === "、";
+  const px = punct ? cx + size * 0.26 : cx;
+  const py = punct ? cy - size * 0.26 : cy;
+  const jx = Sym(id + "cx", i, size * 0.035);
+  const jy = Sym(id + "cy", i, size * 0.03);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.globalAlpha = alpha * 0.16;
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${size * 1.07}px 'Noto Serif SC', serif`;
+  ctx.fillText(ch, px + jx, py + jy);
+  ctx.globalAlpha = alpha * (0.86 + Rnd(id + "ca", i) * 0.14);
+  ctx.font = `${weight} ${size}px 'Noto Serif SC', serif`;
+  ctx.fillText(ch, px + jx, py + jy);
+  ctx.restore();
+}
+
+function NoticeColumn(ctx, text, cx, yTop, size, step, id, opts) {
+  for (let k = 0; k < text.length; k += 1) {
+    NoticeChar(ctx, text[k], cx, yTop + step * (k + 0.5), size, id, k, opts);
+  }
+}
+
+/**
+ * 把整张告示画进 W×H 的画框（DOM canvas，1:1 逻辑像素）。
+ * notice 就是 Core 的 ZHENGFU_NOTICE：{ title, lines, date, signs }。
+ */
+export function DrawNoticeSheet(ctx, W, H, notice, id = "zhengfu") {
+  const m = Math.min(W, H) * 0.028;          // 留给撕口与落影
+  const x0 = m, y0 = m, x1 = W - m, y1 = H - m;
+  const w = x1 - x0, h = y1 - y0;
+
+  // —— 1. 落影：贴着纸的真实轮廓（不是一个方框），左上角翘起来所以影子不匀
+  ctx.save();
+  ctx.translate(w * 0.008, h * 0.006);
+  NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.filter = `blur(${Math.max(2, w * 0.012)}px)`;
+  ctx.fill();
+  ctx.restore();
+
+  // —— 2. 纸本体
+  ctx.save();
+  NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+  ctx.save();
+  ctx.clip();
+  const g = ctx.createLinearGradient(x0, y0, x1 * 0.6, y1);
+  g.addColorStop(0, NOTICE_PAPER.lit);
+  g.addColorStop(0.55, NOTICE_PAPER.base);
+  g.addColorStop(1, NOTICE_PAPER.shade);
+  ctx.fillStyle = g;
+  ctx.fillRect(x0 - m, y0 - m, W + m, H + m);
+
+  // 帘纹：手工纸抄出来时竹帘留下的一道道竖痕，很淡，但没有它纸就是一块色板
+  ctx.strokeStyle = "rgba(122,102,70,0.055)";
+  ctx.lineWidth = Math.max(0.6, w * 0.0016);
+  for (let sx = x0; sx < x1; sx += w / 78) {
+    ctx.beginPath();
+    ctx.moveTo(sx + Sym(id + "lay", sx, 0.8), y0);
+    ctx.lineTo(sx + Sym(id + "lay2", sx, 0.8), y1);
+    ctx.stroke();
+  }
+  // 纤维：短的、斜的、深浅两色
+  for (let i = 0; i < 130; i += 1) {
+    const fx = x0 + Rnd(id + "fx", i) * w;
+    const fy = y0 + Rnd(id + "fy", i) * h;
+    const a = Rnd(id + "fa", i) * Math.PI;
+    const l = w * (0.004 + Rnd(id + "fl", i) * 0.012);
+    ctx.strokeStyle = Rnd(id + "fc", i) > 0.5 ? "rgba(96,78,52,0.13)" : "rgba(240,231,206,0.20)";
+    ctx.lineWidth = Math.max(0.5, w * 0.0012);
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx + Math.cos(a) * l, fy + Math.sin(a) * l);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // —— 3. 折痕：这张纸是折成三折带过来的，两道竖折一道横折。
+  // 折痕＝一条亮边贴着一条暗边（纸的两个坡面各朝一边），单画一条线读成"划痕"
+  //
+  // **裁之前必须把纸的轮廓重新走一遍**：canvas 的「当前路径」不进 save/restore，
+  // 上一段末尾那句 beginPath 画的是一根纤维，直接 clip() 就是裁在那根线上——
+  // 折痕与后面整层做旧因此一笔都没落到纸上（第一版实拍看着"纸很干净"，
+  // 真相是它们被裁没了，不是画淡了）。
+  ctx.save();
+  NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+  ctx.clip();
+  const folds = [
+    { v: true, at: 0.34 }, { v: true, at: 0.68 }, { v: false, at: 0.52 },
+  ];
+  for (let i = 0; i < folds.length; i += 1) {
+    const f = folds[i];
+    const p0 = f.v ? [x0 + w * f.at, y0] : [x0, y0 + h * f.at];
+    const p1 = f.v ? [x0 + w * f.at, y1] : [x1, y0 + h * f.at];
+    const off = Math.max(1, w * 0.004);
+    for (const [dx, dy, col] of [[0, 0, "rgba(126,104,68,0.26)"], [f.v ? off : 0, f.v ? 0 : off, "rgba(250,243,222,0.30)"]]) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(0.9, w * 0.0022);
+      ctx.beginPath();
+      const n = 14;
+      for (let k = 0; k <= n; k += 1) {
+        const t = k / n;
+        const px = p0[0] + (p1[0] - p0[0]) * t + dx + Sym(id + "fd" + i, k, w * 0.0018);
+        const py = p0[1] + (p1[1] - p0[1]) * t + dy + Sym(id + "fe" + i, k, w * 0.0018);
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // —— 4. 字：竖排、自右向左。版心四周留天头地脚（天头比地脚宽，竖排的规矩）
+  const padX = w * 0.055;
+  const padT = h * 0.075, padB = h * 0.055;
+  const bx0 = x0 + padX, bx1 = x1 - padX;
+  const by0 = y0 + padT, colH = h - padT - padB;
+
+  // 字号由版面反推：先按最大字号排一遍，装不下就收一档再排，直到塞进版心。
+  // （反过来"按列数算字号"会让一句长条文把整章的字压成蚂蚁）
+  // **从一个铁定装不下的大字号往下收**，收到刚好塞进版心为止——取的是
+  // "装得下的最大一档"，于是不管纸是什么形状，字总能给多大给多大、版心也总被
+  // 填满。起点给小了（第一版 0.040，头一轮就通过）等于没搜：字号成了拍脑袋
+  // 定的那个数，纸一宽左半张就空着，横屏手机上更是缩成 6px 的蚂蚁。
+  let size = Math.min(h * 0.075, w * 0.115);
+  let plan = null;
+  for (let guard = 0; guard < 140; guard += 1) {
+    const step = size * 1.05;                       // 列内字距
+    const perCol = Math.max(4, Math.floor(colH / step));
+    const bodyCols = notice.lines.flatMap((l) => NoticeColumns(l, perCol));
+    const colStep = size * 1.62;                    // 列距（比字距宽，列才分得开）
+    const titleSize = size * 2.0;
+    const titleW = titleSize * 1.35;
+    const gap = colStep * 0.55;
+    const tailCols = notice.signs.length + 1;       // 落款：本区公所 / 保公所 / 日期
+    const need = titleW + gap + bodyCols.length * colStep + gap + tailCols * colStep;
+    if (need <= bx1 - bx0 || size <= h * 0.012) {
+      plan = { size, step, perCol, bodyCols, colStep, titleSize, titleW, gap };
+      break;
+    }
+    size *= 0.972;
+  }
+
+  // 右起：标题占最右一列，往左依次是条文，最左边是落款
+  let cx = bx1;
+  {
+    const t = notice.title.replace(/\s/g, "");
+    const tStep = plan.titleSize * 1.16;
+    NoticeColumn(ctx, t, cx - plan.titleW / 2, by0, plan.titleSize, tStep, id + "ttl",
+      { weight: 700, color: NOTICE_PAPER.ink });
+    cx -= plan.titleW + plan.gap;
+  }
+  for (let i = 0; i < plan.bodyCols.length; i += 1) {
+    NoticeColumn(ctx, plan.bodyCols[i], cx - plan.colStep / 2, by0, plan.size, plan.step, id + "b" + i,
+      { weight: 500, color: NOTICE_PAPER.ink });
+    cx -= plan.colStep;
+  }
+  // 落款**沉到纸底**（公文的规矩：正文从天头顶格往下写，署名与日期落在地脚）。
+  // 第一版让它从三成高处起，于是三列字浮在半张纸的当中，下面空着一大片——
+  // 那不是"留白"，是"没写完"。逐列按各自的字数往上量，底边对齐
+  cx -= plan.gap;
+  // 署名收在八成高处，**底下那一段纸是留给印的**：印整个骑在黑字上，红压黑
+  // 糊成一团谁也读不出（上一版就是），得让它大半落在干净纸面上，只拿上沿
+  // 咬住署名末尾那一个字——真盖章也是这么盖的
+  const tailBase = by0 + colH * 0.82;
+  let sealAt = null;
+  for (let i = 0; i < notice.signs.length; i += 1) {
+    const sx = cx - plan.colStep / 2;
+    const top = tailBase - plan.step * notice.signs[i].length;
+    NoticeColumn(ctx, notice.signs[i], sx, top, plan.size, plan.step, id + "sg" + i,
+      { weight: 600, color: NOTICE_PAPER.ink });
+    // 印骑在**两个署名中间**盖下去，压着它们末尾那两三个字——公章本来就是
+    // 骑着落款盖的，挪到旁边空地上反而假（那成了"画在纸上的一枚章"）。
+    // 但它不许再往左吃到日期那一列上去：「三月初十」被红章糊住，玩家就不知道
+    // 什么时候要去村东口点名了——**盖章是气氛，日期是信息，信息优先**
+    if (i === notice.signs.length - 1) {
+      // 上沿**刚咬住**署名最后一个字就够了：再往上骑，红章压在黑字上两下都读不出
+      sealAt = { x: sx + plan.colStep * 0.5, y: tailBase + plan.colStep * 1.05 };
+    }
+    cx -= plan.colStep;
+  }
+  // 日期比署名再低一档（公文的落款就是这么错开的，齐平反而像表格）
+  NoticeColumn(ctx, notice.date, cx - plan.colStep / 2,
+    by0 + colH * 0.94 - plan.step * notice.date.length,
+    plan.size, plan.step, id + "dt", { weight: 500, color: NOTICE_PAPER.inkPale });
+
+  // —— 5. 朱印：盖在落款底下，压着笔画（先有字后有印，顺序不能反）。
+  // 六个字排两列三行，右列在前——印章本来就是竖排右起的
+  if (sealAt) {
+    // 印要压得住那一列字才算盖上去了：小于两个列宽就成了纸上一粒红点。
+    // 上限也在这儿——2.9 个列宽会横跨三列，连日期一起糊掉（上一版就是）
+    const s = plan.colStep * 2.3;
+    ctx.save();
+    ctx.translate(sealAt.x, Math.min(sealAt.y, y1 - padX - s * 0.5));
+    ctx.rotate(-0.045);
+    ctx.globalAlpha = 0.86;
+    // 边框：四条边各自断一两处（印泥不匀，边总有缺）
+    ctx.strokeStyle = NOTICE_PAPER.seal;
+    ctx.lineWidth = s * 0.075;
+    ctx.lineCap = "round";
+    const hs = s / 2;
+    const corners = [[-hs, -hs], [hs, -hs], [hs, hs], [-hs, hs]];
+    for (let i = 0; i < 4; i += 1) {
+      const a = corners[i], b = corners[(i + 1) % 4];
+      const cut0 = 0.04 + Rnd(id + "sc" + i, 0) * 0.12;
+      const cut1 = 0.86 + Rnd(id + "sc" + i, 1) * 0.10;
+      ctx.beginPath();
+      ctx.moveTo(a[0] + (b[0] - a[0]) * cut0, a[1] + (b[1] - a[1]) * cut0);
+      ctx.lineTo(a[0] + (b[0] - a[0]) * cut1, a[1] + (b[1] - a[1]) * cut1);
+      ctx.stroke();
+    }
+    // 「梁家村保公所之印」八个字排两列四行——印章本来就是竖排右起，
+    // 而八个字正好排满一个方印（六个字排 2×3 会剩半格，看着像刻废了）
+    const sealText = `${notice.signs[notice.signs.length - 1]}之印`;
+    const rows = Math.ceil(sealText.length / 2);
+    const cs = s * 0.78 / rows;
+    for (let i = 0; i < sealText.length; i += 1) {
+      const col = Math.floor(i / rows), row = i % rows;
+      NoticeChar(ctx, sealText[i], (0.5 - col) * s * 0.40, (row - (rows - 1) / 2) * cs * 1.08,
+        cs, id + "sl", i, { color: NOTICE_PAPER.seal, weight: 700, alpha: 1 });
+    }
+    // 印泥不匀：拿纸色啃掉几小块（**不是** destination-out——那会连纸一起穿孔）
+    for (let i = 0; i < 16; i += 1) {
+      ctx.globalAlpha = 0.12 + Rnd(id + "sm", i) * 0.3;
+      ctx.fillStyle = NOTICE_PAPER.base;
+      const mx = Sym(id + "smx", i, hs * 0.98), my = Sym(id + "smy", i, hs * 0.98);
+      const r = s * (0.012 + Rnd(id + "smr", i) * 0.05);
+      ctx.beginPath();
+      ctx.ellipse(mx, my, r, r * 0.8, Rnd(id + "sma", i) * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // —— 6. 这几年落在纸上的东西：黄斑、霉点、雨水淌痕、四角糨糊印、边缘发暗。
+  // 全压在字之上——它们是后来才有的。同第 3 段：**裁之前重走一遍轮廓**
+  //（这会儿的当前路径是印章上最后一粒墨斑）
+  ctx.save();
+  NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+  ctx.clip();
+  // 黄斑要读得出是"纸放了三年"，不是"泼了碗茶"：一团 0.26 的褐色压在落款上，
+  // 「本區公所」当场糊成一片（实拍第五版）。**做旧的上限由字定**——
+  // 同「盖章是气氛、日期是信息」那条，纸脏到看不清字就是本末倒置
+  for (let i = 0; i < 9; i += 1) {
+    const fx = x0 + Rnd(id + "sx", i) * w;
+    const fy = y0 + Rnd(id + "sy", i) * h;
+    const r = w * (0.05 + Rnd(id + "sr", i) * 0.10);
+    const rg = ctx.createRadialGradient(fx, fy, 0, fx, fy, r);
+    rg.addColorStop(0, "rgba(118,86,44,0.13)");
+    rg.addColorStop(0.7, "rgba(118,86,44,0.06)");
+    rg.addColorStop(1, "rgba(118,86,44,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(fx - r, fy - r, r * 2, r * 2);
+  }
+  // 霉点：几粒硬的深斑（一片片晕开的黄斑没有"点"，纸就还是干净的）
+  for (let i = 0; i < 26; i += 1) {
+    const mx = x0 + Rnd(id + "mx", i) * w;
+    const my = y0 + Rnd(id + "my", i) * h;
+    ctx.globalAlpha = 0.10 + Rnd(id + "ma", i) * 0.22;
+    ctx.fillStyle = "#6d5228";
+    ctx.beginPath();
+    ctx.ellipse(mx, my, w * (0.002 + Rnd(id + "mr", i) * 0.006),
+      w * (0.002 + Rnd(id + "mr2", i) * 0.005), Rnd(id + "mo", i) * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // 雨水从上沿淌下来的两道：上头宽下头收窄，边上有一圈更深的水线
+  // 雨水淌痕：细、长、上宽下尖。给宽了给浓了就不是水淌过，是一道烟熏
+  for (let i = 0; i < 2; i += 1) {
+    const sx = x0 + w * (0.22 + Rnd(id + "rn", i) * 0.55);
+    const len = h * (0.3 + Rnd(id + "rl", i) * 0.4);
+    const lg = ctx.createLinearGradient(0, y0, 0, y0 + len);
+    lg.addColorStop(0, "rgba(116,88,48,0.10)");
+    lg.addColorStop(1, "rgba(116,88,48,0)");
+    ctx.fillStyle = lg;
+    ctx.beginPath();
+    ctx.moveTo(sx - w * 0.018, y0);
+    ctx.lineTo(sx + w * 0.015, y0);
+    ctx.lineTo(sx + w * 0.004, y0 + len);
+    ctx.lineTo(sx - w * 0.006, y0 + len);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // 糨糊印：贴上墙时四角抹的那几刷，从背面透出来，比纸暗一点点
+  for (let i = 0; i < 4; i += 1) {
+    const gx = i % 2 === 0 ? x0 + w * 0.12 : x1 - w * 0.12;
+    const gy = i < 2 ? y0 + h * 0.07 : y1 - h * 0.07;
+    const r = w * 0.12;
+    const rg = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+    rg.addColorStop(0, "rgba(104,84,56,0.15)");
+    rg.addColorStop(1, "rgba(104,84,56,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(gx - r, gy - r, r * 2, r * 2);
+  }
+  ctx.restore();
+
+  // 边缘发暗：日晒雨淋先从边上来。**一条描边不够**——那只是给纸镶了道框；
+  // 要的是从纸沿往里一档档化开，所以沿同一条轮廓由粗到细叠几遍（剪在纸里，
+  // 粗的那几遍只有内侧半边留得下）
+  ctx.save();
+  NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+  ctx.clip();
+  for (let i = 0; i < 5; i += 1) {
+    ctx.strokeStyle = `rgba(112,86,50,${0.12 + i * 0.035})`;
+    ctx.lineWidth = Math.max(1.2, w * (0.055 - i * 0.011));
+    NoticeSheetPath(ctx, x0, y0, x1, y1, id);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+
+  // 排出来的字号交出去：**"字有多大"是这张纸唯一有明确对错的数**
+  // （好不好看得自己看图）。横屏手机上排成 6px 那一版，测试全绿、图上没人能读——
+  // RenderHealthTest 拿它逐档画高卡下限
+  return { size: plan.size, columns: plan.bodyCols.length, sheetW: w, sheetH: h };
 }
 
 // 空猪圈。猪圈墙是农家最糙的墙——**土坯干垒不抹泥**，顶边一块坯一个高低差；

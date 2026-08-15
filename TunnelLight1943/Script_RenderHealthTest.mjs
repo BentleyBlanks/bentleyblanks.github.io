@@ -447,9 +447,19 @@ for (const size of TITLE_SIZES) {
     const last = l.children[l.children.length - 1].getBoundingClientRect();
     const n = l.children.length;
     t.scrollTop = 0;
-    return { top, lastBottom: last.bottom, vh: window.innerHeight, n };
+    // 收黑罩（#fadeOverlay）CSS 默认全黑、开机没有游戏循环去降它——标题页的
+    // z-index 必须压过它，否则玩家一打开是纯黑（2026-08-14 线上就是这么黑的；
+    // 罩子 pointer-events:none，按钮盲点得着，所以光测"点得着"抓不住）。
+    const zOf = (el) => { const z = parseInt(getComputedStyle(el).zIndex, 10); return Number.isFinite(z) ? z : -1; };
+    return { top, lastBottom: last.bottom, vh: window.innerHeight, n,
+      titleZ: zOf(t), fadeZ: zOf(document.getElementById("fadeOverlay")) };
   });
   await tp.close();
+  if (r.titleZ <= r.fadeZ) {
+    failed += 1;
+    console.error(`✗ ${size.name} 标题页被收黑罩盖死：#titleScreen z=${r.titleZ} ≤ #fadeOverlay z=${r.fadeZ}`
+      + `——开机就是纯黑，玩家什么都看不见`);
+  }
   // 0.5px 的余量给亚像素布局
   if (r.top < -0.5 || r.lastBottom > r.vh + 0.5 || r.n < 8) {
     failed += 1;
@@ -460,6 +470,54 @@ for (const size of TITLE_SIZES) {
     console.log(`✓ ${size.name} 标题页开始键与 ${r.n} 枚章节牌都点得着`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// 征夫告示：那张纸上的字，每一档画高都得认得出
+//
+// 2026-08-15 改成程序化画的一张纸（Art.DrawNoticeSheet）之后量出来的账：
+// 纸是竖长的（1942 年贴墙的告示就是这个形），而横屏手机只有 390px 画高——
+// 竖纸在 844×390 上只有 264px 宽，字排到 **6px**，实拍图上一个字也读不出来。
+// 这正是全作那条老规矩的又一例：**认不出的东西，把镜头推近是治不好的，
+// 先量一遍再决定**（同石笔／刨子／接绳／叠衣裳四次栽跟头）。
+// 现在纸形跟着画高走、字号取"装得下的最大一档"，这条测试守着结果。
+const NOTICE_MIN_PX = 12;   // 中文正文的认读下限（再小就只剩一团墨）
+// **一个页面切视口跑完四档**，而且**不开局**：这张纸只认 ZHENGFU_NOTICE 与画框，
+// 跟游戏状态无关。一档开一个页面、每个页面再 StartGame 建一遍三维世界，等于白白
+// 多起四个 WebGL 上下文——头一版就是这么把整套测试挤到后面那档超时的
+// （那两个视口单独跑都是好的，是资源压垮的）。
+const noticePage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+await noticePage.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
+await noticePage.waitForFunction(() => !!window.TunnelLight?.NoticeMetrics, { timeout: 60000 });
+await noticePage.evaluate(() => document.fonts.ready);
+for (const size of TITLE_SIZES) {
+  await noticePage.setViewportSize({ width: size.w, height: size.h });
+  const m = await noticePage.evaluate(() => {
+    const metrics = window.TunnelLight.NoticeMetrics();
+    const cv = document.getElementById("noticeSheet");
+    return {
+      ...metrics,
+      cssW: parseFloat(cv.style.width), cssH: parseFloat(cv.style.height),
+      vw: window.innerWidth, vh: window.innerHeight,
+      hasImg: !!document.querySelector("#noticeOverlay img"),
+    };
+  });
+  const tooSmall = !m.size || m.size < NOTICE_MIN_PX;
+  const overflows = m.cssW > m.vw + 0.5 || m.cssH > m.vh + 0.5;
+  if (tooSmall || overflows || m.hasImg) {
+    failed += 1;
+    if (tooSmall) {
+      console.error(`✗ ${size.name} 告示的字只有 ${(m.size || 0).toFixed(1)}px（下限 ${NOTICE_MIN_PX}）`
+        + `——纸 ${m.cssW}×${m.cssH}，玩家读不了上面写的是什么`);
+    }
+    if (overflows) {
+      console.error(`✗ ${size.name} 告示那张纸出画框：${m.cssW}×${m.cssH} / 画框 ${m.vw}×${m.vh}`);
+    }
+    if (m.hasImg) console.error(`✗ ${size.name} 告示层里又出现了 <img>——这张纸是程序化画的，不吃外部成图`);
+  } else {
+    console.log(`✓ ${size.name} 告示字号 ${m.size.toFixed(1)}px / ${m.columns} 列，纸 ${m.cssW}×${m.cssH} 在画框内`);
+  }
+}
+await noticePage.close();
 
 // 画面不许被拉伸（横屏手机）
 //

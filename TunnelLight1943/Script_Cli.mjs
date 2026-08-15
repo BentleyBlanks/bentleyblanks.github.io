@@ -49,19 +49,43 @@ function Opts(list) {
 // where：一张全仓索引。**纯正则扫文件，不 import**——Script_World/Script_Rig
 // 都 import three，在 node 里加载不起来，而"这东西在哪"恰恰最需要能随时问。
 // ---------------------------------------------------------------------------
+// 剧本按章拆在 Data_ScriptC1..C8.mjs（2026-08-15）——节拍的正则打在章文件上。
+// 中文条目（台词/提示语/章目标/手记）也一起进索引：策划口里的名字（「车铃」
+// 「匀稠的」）多半只出现在这些字符串里，光索引英文标识符等于把一半的问题
+// 挡在门外（2026-08-15 补，起因是 `where 车铃` 查无此物）。
+const CHAPTER_FILES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Data_ScriptC${n}.mjs`);
+const ZH_TEXT_PATTERNS = [
+  [/\bprompt: "([^"]{2,})"/, (m) => [[m[1], "提示语"]]],
+  [/\bsay: "([^"]{2,})"/, (m) => [[m[1], "台词"]]],
+  [/\bstage: "([^"]{2,})"/, (m) => [[m[1], "旁白"]]],
+  [/\bobjective: "([^"]{2,})"/, (m) => [[m[1], "章目标"]]],
+  [/\bnote: "([^"]{2,})"/, (m) => [[m[1], "手记"]]],
+];
+const BEAT_PATTERNS = [
+  [/^\s*(?:kind|id): "([a-zA-Z0-9_]+)",?\s*id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
+  [/^\s*kind: "([a-zA-Z]+)", id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
+  ...ZH_TEXT_PATTERNS,
+];
+const FN_PATTERNS = (tag) => [
+  [/^\s*(?:export )?(?:async )?function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], tag]]],
+  [/^\s*(?:export )?const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], `${tag}常量`]]],
+];
 const INDEX_SOURCES = [
+  ...CHAPTER_FILES.map((f) => [f, BEAT_PATTERNS]),
   ["Script_Core.mjs", [
-    [/^\s*(?:kind|id): "([a-zA-Z0-9_]+)",?\s*id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
-    [/^\s*kind: "([a-zA-Z]+)", id: "([a-zA-Z0-9_]+)"/, (m) => [[m[2], `节拍 ${m[1]}`]]],
     [/^\s*export function ([A-Za-z0-9_]+)/, (m) => [[m[1], "Core 导出函数"]]],
     [/^\s*function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], "Core 内部函数"]]],
     [/^\s*(?:export )?const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "Core 常量"]]],
     [/\{ type: "([a-zA-Z]+)"/, (m) => [[m[1], "链步骤类型"]]],
+    [/^\s*title: "([^"]+)"/, (m) => [[m[1], "章名"]]],
+    ...ZH_TEXT_PATTERNS,          // 执行器里现写的微过场台词也在 Core
   ]],
   ["Script_World.js", [
     [/^\s*(?:export )?function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], "World 函数"]]],
     [/^\s*const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "World 常量"]]],
   ]],
+  // 无状态画笔/绘制序（2026-08-15 从 CreateWorld 闭包抽出）
+  ["Script_WorldPaint.mjs", FN_PATTERNS("World 画笔/绘制序")],
   ["Script_Art.mjs", [
     [/^export function (Draw[A-Za-z0-9_]*)/, (m) => [[m[1], "画笔"]]],
     [/label === "([^"]+)"/, (m) => [[m[1], "携带物画法（DrawCarry）"]]],
@@ -70,12 +94,44 @@ const INDEX_SOURCES = [
     [/^\s{2}([a-zA-Z][a-zA-Z0-9]*): \{$/, (m) => [[m[1], "骨架轨道"]]],
     [/s\.pose === "([a-zA-Z0-9]+)"/, (m) => [[m[1], "骨架姿势"]]],
   ]],
-  ["Script_Main.js", [[/^\s*function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], "外壳函数"]]]]],
+  ["Script_Main.js", [
+    [/^\s*function ([A-Za-z0-9_]+)\s*\(/, (m) => [[m[1], "外壳函数"]]],
+    [/^\s*const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "外壳常量"]]],  // PLAY_HW 这一级
+  ]],
   ["Script_SmokeTest.mjs", [[/^function (Test[A-Za-z0-9_]+)/, (m) => [[m[1], "回归测试"]]]]],
+  // 声音这一侧（2026-08-15 补：改声音以前只能退回 grep）
+  ["Script_Audio.js", FN_PATTERNS("Audio 函数")],
+  ["Script_Soundtrack.js", FN_PATTERNS("Soundtrack 函数")],
+  ["Script_Light.mjs", FN_PATTERNS("Light 函数")],
+  ["Script_Fluid.mjs", FN_PATTERNS("Fluid 函数")],
+  ["Data_BgmConfig.mjs", [
+    [/^\s*(?:export )?const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "BGM 配置"]]],
+    [/"(AudioBgm_[A-Za-z0-9_]+)/, (m) => [[m[1], "BGM 曲目"]]],
+  ]],
+  ["Data_AudioMix.mjs", [
+    [/^\s*(?:export )?const ([A-Z][A-Z0-9_]{2,})\s*=/, (m) => [[m[1], "混音配置"]]],
+    [/^\s*([a-zA-Z][a-zA-Z0-9]*):\s*-?[\d.]+,?/, (m) => [[m[1], "混音电平"]]],
+  ]],
+  ["Data_VoiceCast.json", [[/^\s{2}"([a-zA-Z0-9_]+)": \{/, (m) => [[m[1], "配音角色"]]]]],
+  ["Audio/Sfx/Data_SfxManifest.json", [[/^\s*"([a-zA-Z0-9_]+)": \{/, (m) => [[m[1], "音效 cue"]]]]],
+  // HUD：DOM 元素与样式选择器（拇指遮挡这类 bug 全在这两层）
+  ["index.html", [[/id="([A-Za-z0-9_]+)"/, (m) => [[m[1], "HUD 元素（DOM id）"]]]]],
+  ["Style_Game.css", [
+    [/^\s*#([A-Za-z][A-Za-z0-9_-]*)/, (m) => [[m[1], "样式（#id）"]]],
+    [/^\s*\.([A-Za-z][A-Za-z0-9_-]*)/, (m) => [[m[1], "样式（.class）"]]],
+  ]],
   ["Data_PropArt.json", [[/^\s{4}"([a-zA-Z0-9_]+)": \{/, (m) => [[m[1], "道具登记（画笔/深度带/画布）"]]]]],
-  ["Data_Scenes.json", [[/"kind": "([a-zA-Z0-9_]+)"/, (m) => [[m[1], "场景里摆着的物体"]]]]],
+  ["Data_Scenes.json", [
+    [/"kind": "([a-zA-Z0-9_]+)"/, (m) => [[m[1], "场景里摆着的物体"]]],
+    [/"name": "([^"]+)"/, (m) => [[m[1], "老物件（收藏品）"]]],
+  ]],
   ["Data_DepthSpec.mjs", [[/^\s*([a-zA-Z][a-zA-Z0-9]*):\s*-?[\d.]+,/, (m) => [[m[1], "深度带/尺度常量"]]]]],
-  ["CLAUDE.md", [[/^#{2,3} (.+)$/, (m) => [[m[1], "项目规范章节"]]]]],
+  ["CLAUDE.md", [[/^#{2,4} (.+)$/, (m) => [[m[1], "项目规范章节"]]]]],
+  ["Data_StoryC1.md", [
+    [/^#{1,3} (.+)$/, (m) => [[m[1], "剧情文档章节"]]],
+    [/^([①-⑮]) (?:§\d+ )?\*{0,2}([^（(*]+)/, (m) => [[m[2].trim(), "c1 场次（剧情文档）"]]],
+  ]],
+  ["Data_DesignHistory.md", [[/^#{1,3} (.+)$/, (m) => [[m[1], "沿革文档章节"]]]]],
 ];
 
 function BuildIndex() {
@@ -200,8 +256,10 @@ async function CmdBeat(o) {
     });
     if (def.lines.length > (Number(o.lines || 6))) console.log(`  …（--lines 调）`);
   }
-  // 这一拍碰了哪些旗标：从源码文本里扫，比人翻快
-  const src = fs.readFileSync(path.join(DIR, "Script_Core.mjs"), "utf8");
+  // 这一拍碰了哪些旗标：从源码文本里扫，比人翻快。
+  // 剧本按章拆在 Data_ScriptC*.mjs（2026-08-15），按 id 的章号直接开对应文件
+  const chFile = `Data_ScriptC${(id.match(/^c(\d)_/) || [])[1] || "1"}.mjs`;
+  const src = fs.readFileSync(path.join(DIR, chFile), "utf8");
   const key = new RegExp(`id: "${id}"`);
   const at = src.split(/\r?\n/).findIndex((l) => key.test(l));
   if (at >= 0) {
@@ -214,7 +272,7 @@ async function CmdBeat(o) {
     const chunk = lines.slice(at, end).join("\n");
     const flags = [...new Set([...chunk.matchAll(/flags\.([a-zA-Z0-9_]+)/g)].map((m) => m[1]))];
     if (flags.length) console.log(`旗标  ${flags.join(" ")}`);
-    console.log(`源码  TunnelLight1943/Script_Core.mjs:${at + 1}`);
+    console.log(`源码  TunnelLight1943/${chFile}:${at + 1}`);
   }
 }
 

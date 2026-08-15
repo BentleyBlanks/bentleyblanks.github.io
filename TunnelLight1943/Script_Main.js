@@ -7,7 +7,7 @@ import {
   KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
   PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn,
 } from "./Script_Core.mjs";
-import { DrawRelic, DrawHudBadge } from "./Script_Art.mjs";
+import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
@@ -100,7 +100,7 @@ for (const id of [
   "btnSettings", "settingsPanel", "volVoice", "volSfx", "volMusic",
   "volVoiceOut", "volSfxOut", "volMusicOut",
   "endTitle", "endText",
-  "noticeOverlay", "noticeText", "noticeClose",
+  "noticeOverlay", "noticeSheet", "noticeClose",
   "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
@@ -1090,6 +1090,9 @@ function SyncHud(state, dt, shotFade) {
     const open = !!state.noticeOpen;
     if (ui.noticeOverlay.hidden !== !open) {
       ui.noticeOverlay.hidden = !open;
+      // 纸得在**显示出来之后**画：hidden 的元素量不出画框（宽高全是 0），
+      // 而尺寸是按 window 取的，所以这儿的先后其实只关系到"画没画"这一件事
+      if (open) PaintNoticeSheet();
       audio.Duck(open);
     }
   }
@@ -1444,16 +1447,53 @@ ui.btnSkipCine?.addEventListener("click", () => {
 });
 
 ui.startButton.addEventListener("click", () => StartGame(0));
-// 征夫告示阅读层：右栏文字从 Core 注入（权威版本）；关闭钮直接清旗标。
-// hidden 切换与环境声收窄都在 UpdateHud 里跟 state.noticeOpen 走
-if (ui.noticeText) {
-  const N = ZHENGFU_NOTICE;
-  ui.noticeText.innerHTML =
-    `<h3>${N.title}</h3>`
-    + N.lines.map((l) => `<p>${l}</p>`).join("")
-    + `<p class="nDate">${N.date}</p>`
-    + N.signs.map((s) => `<p class="nSign">${s}</p>`).join("");
+
+// ---------------------------------------------------------------------------
+// 征夫告示阅读层：一张程序化画出来的纸（画笔在 Art.DrawNoticeSheet）
+//
+// 纸**竖长优先**（0.72）：1942 年贴墙的告示就是这个形，而且竖纸在 16:9 上正好
+// 把画高吃满、字最大，两边空出来的地方留给压暗的村子——本来就该看得见。
+// 只有画高矮到装不下的那一档才摊宽（见下面的 aspect），那是量出来的，不是选的。
+//
+// 只在**打开时与画框变了时**重画：这张纸没有一帧一帧的动画，逐帧重画一张
+// 两千像素的画布纯属白烧。
+// ---------------------------------------------------------------------------
+let noticePainted = "";
+let noticeMetrics = null;
+function PaintNoticeSheet() {
+  const cv = ui.noticeSheet;
+  if (!cv) return;
+  const availW = Math.max(120, window.innerWidth * 0.94);
+  const availH = Math.max(120, window.innerHeight * 0.94);
+  // 纸的形状：**竖长优先**（0.72）——那年头贴墙的告示就是竖的，而在 16:9 上
+  // 竖纸正好把画高吃满，字最大。只有画高矮到装不下的那一档（横屏手机 390px）
+  // 才把纸摊宽：实拍量过，竖纸在 844×390 上只有 264px 宽，字缩到 **6px**，
+  // 谁也读不了；摊到跟画框同形之后回到 17px 上下。
+  // **判据用画高不用画宽**（同"拇指落点"那条：竖着的东西撞的是高度）。
+  const aspect = availH >= 560 ? 0.72 : Math.min(1.75, availW / availH);
+  let h = availH, w = h * aspect;
+  if (w > availW) { w = availW; h = w / aspect; }
+  // 超采样：这张纸上全是要玩家盯着读的小字（同 HUD 那条规矩）。
+  // 封到 3 是画布尺寸的现实上限——再高在手机上就该丢显存了
+  const ss = Math.min(3, Math.max(1, window.devicePixelRatio || 1) * 1.5);
+  const key = `${Math.round(w)}x${Math.round(h)}@${ss.toFixed(2)}`;
+  if (key === noticePainted) return;
+  noticePainted = key;
+  cv.style.width = `${Math.round(w)}px`;
+  cv.style.height = `${Math.round(h)}px`;
+  cv.width = Math.round(w * ss);
+  cv.height = Math.round(h * ss);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(ss, 0, 0, ss, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  // 量出来的字号留给测试（单位是 CSS 像素，跟玩家眼睛看到的一致）
+  noticeMetrics = DrawNoticeSheet(ctx, w, h, ZHENGFU_NOTICE);
 }
+// 字体后到（Google Fonts 走 unicode-range 分片，CJK 那几片是异步取的）：
+// 不重画一次，玩家第一次打开看到的是 SimSun 顶上来的替身——一张 1942 年的
+// 告示排着一身假宋体，前功尽弃
+document.fonts?.ready?.then(() => { noticePainted = ""; if (state?.noticeOpen) PaintNoticeSheet(); });
+window.addEventListener("resize", () => { if (state?.noticeOpen) PaintNoticeSheet(); });
 ui.noticeClose?.addEventListener("click", () => { if (state) state.noticeOpen = false; });
 
 ui.endRestart.addEventListener("click", () => {
@@ -1603,6 +1643,9 @@ window.TunnelLight = {
   },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
+  // 征夫告示那张纸这一档排出来的字号／列数（CSS 像素）。给渲染健康测试用：
+  // 字小到认不出是这张纸唯一验得了对错的事
+  NoticeMetrics: () => { PaintNoticeSheet(); return noticeMetrics; },
   GetBgmState: () => audio.GetBgmState(),
   // 采样音效包装了几个（0 = 全靠合成器兜底）
   SfxPackSize: () => audio.SfxPackSize(),

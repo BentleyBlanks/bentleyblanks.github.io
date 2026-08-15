@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-13",
+  "generator": "Dreamina Seedream 5 Pro image2image",
+  "modelVersion": "5.0Pro",
+  "resolutionType": "2k",
+  "canvas": {
+    "width": 1536,
+    "height": 1536,
+    "generateNum": 1
+  },
+  "styleAnchor": "C:/Users/Bentl/OneDrive/Sync/饮河/2D/地道里的光/04_HeavyStyleShots/Texture_Heavy06_LastLamps.png",
+  "referencesInAttachmentOrder": [
+    "C:/Users/Bentl/OneDrive/Sync/饮河/2D/地道里的光/04_HeavyStyleShots/Texture_Heavy06_LastLamps.png",
+    "C:/Users/Bentl/OneDrive/Sync/饮河/2D/地道里的光/03_ConceptShots/Texture_Concept09_SisterRescue.png",
+    "C:/Users/Bentl/OneDrive/Sync/饮河/2D/地道里的光/03_ConceptShots/Texture_Concept10_SecondMark.png"
+  ],
+  "background": "pure #ff00ff chroma key",
+  "chromaRemoval": {
+    "script": "C:/Users/Bentl/.codex/skills/.system/imagegen/scripts/remove_chroma_key.py",
+    "autoKey": "border",
+    "softMatte": true,
+    "transparentThreshold": 12,
+    "opaqueThreshold": 220,
+    "edgeContract": 1,
+    "edgeFeather": 0.25,
+    "despill": true
+  },
+  "assets": [
+    {
+      "name": "Texture_CellarEarthWallTile.png",
+      "taskId": "5ec295e9-7100-4746-a058-36f2240a421e",
+      "prompt": "Create exactly one isolated production sprite: a seamless-repeatable rectangular tile of a thick tamped-earth cellar side wall for a 1940s rural North China tunnel. Strict front-facing side elevation, no perspective, no top plane, no floor, no corner, no doorway, no posts, no furniture, no characters. The tile is a broad horizontal rectangle with uneven hand-cut edges but straight enough for horizontal tiling; layered dark umber and charcoal soil strata, sparse compressed pebble flecks and restrained charcoal scoring, handmade aged-paper fibers visible. Approved heavy sad minimalist flat layered paper-cut game art, subdued ash brown / dirty taupe / charcoal palette matching the underground reference. Center the single wall tile with generous margin on a perfectly flat uniform pure #ff00ff magenta chroma-key background. No cast shadow, no glow, no text, no logo, no HUD, no extra objects, no photorealism, no 3D, no glossy lighting. Ensure all four corners are pure #ff00ff.",
+      "source": "Texture/Source/Cellar/5ec295e9-7100-4746-a058-36f2240a421e_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_CellarEarthWallTile.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [121, 422, 1429, 1080], "coverage": 0.351132, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "6f1a1d6017e0dae3edf0bb96298210372514b574b79e55e4c1954f004c741e4e",
+      "manualConclusion": "Accepted: broad layered tamped-earth tile, side elevation, restrained charcoal scoring and fibers; transparent corners and no visible magenta fringe."
+    },
+    {
+      "name": "Texture_CellarTimberPost.png",
+      "taskId": "9fb9d614-0307-467b-a5f1-adebf0a93f58",
+      "prompt": "Create exactly one isolated production sprite: a single thick rough timber support post from a 1940s rural North China cellar tunnel. Strict front-facing side elevation, perfectly vertical rectangular post with slightly irregular hand-cut edges, one simple darker bark strip and two or three restrained charcoal grain marks. Flat layered paper-cut geometry, aged handmade-paper fibers, heavy sad minimalist underground style matching the supplied references, dark weathered brown and charcoal palette. Center the one post upright with generous margin on a perfectly flat uniform pure #ff00ff magenta chroma-key background. No beam, no brace, no wall, no floor, no base shadow, no nails, no characters, no furniture, no text, no logo, no HUD, no extra objects, no perspective, no 3D, no photorealism, no gloss, no glow. Ensure all four corners are pure #ff00ff.",
+      "source": "Texture/Source/Cellar/9fb9d614-0307-467b-a5f1-adebf0a93f58_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_CellarTimberPost.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [639, 147, 902, 1395], "coverage": 0.13001, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "9cbd161c849584938ae973eba5b573450940dbc013e2446dbb1d2d1df4896045",
+      "manualConclusion": "Accepted: single tall rough post with flat layered wood and charcoal grain, strict vertical side view; transparent corners and no visible magenta fringe."
+    },
+    {
+      "name": "Texture_CellarTimberBeam.png",
+      "taskId": "8740ebe2-bb1e-421b-a678-67565806e920",
+      "prompt": "Create exactly one isolated production sprite: a single rough horizontal timber beam for a 1940s rural North China cellar tunnel. Strict front-facing side elevation, one long thick rectangular beam running left-to-right, slightly bowed with irregular hand-cut ends, one darker underside strip and a few restrained charcoal wood-grain marks. Flat layered paper-cut geometry, aged handmade-paper fibers, heavy sad minimalist underground style matching the supplied references, dark weathered brown and charcoal palette. Center the one horizontal beam with generous margin on a perfectly flat uniform pure #ff00ff magenta chroma-key background. No vertical post, no brace, no wall, no floor, no nails, no characters, no furniture, no text, no logo, no HUD, no extra objects, no perspective, no 3D, no photorealism, no gloss, no glow. Ensure all four corners are pure #ff00ff.",
+      "source": "Texture/Source/Cellar/8740ebe2-bb1e-421b-a678-67565806e920_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_CellarTimberBeam.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [153, 640, 1381, 896], "coverage": 0.112028, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "223e81357215f4f7ce71410c38b3980662c37102215a777442302ca7250cf5ec",
+      "manualConclusion": "Accepted: one long bowed horizontal beam with dark underside strip and sparse grain; strict side view, transparent corners, no visible magenta fringe."
+    },
+    {
+      "name": "Texture_OilLampWeak.png",
+      "taskId": "d7d3d3b9-5c7b-4438-a0ea-a726dad17351",
+      "prompt": "Create exactly one isolated production sprite: a small old kerosene oil lamp for a 1940s rural North China cellar tunnel, viewed strictly from the front in flat side elevation. One squat dark metal lamp body with a tiny glass chamber and short wick, simple handle silhouette, very weak muted amber paper accent only inside the lamp. No flame halo, no light rays, no cast glow, no reflection. Flat layered paper-cut geometry, aged handmade-paper fibers, restrained charcoal and dirty taupe with one tiny desaturated amber detail, heavy sad minimalist underground style matching the supplied references. Center the single lamp with generous margin on a perfectly flat uniform pure #ff00ff magenta chroma-key background. No floor, no shadow, no wall, no props, no characters, no text, no logo, no HUD, no extra objects, no perspective, no 3D, no photorealism, no glossy metal. Ensure all four corners are pure #ff00ff.",
+      "source": "Texture/Source/Cellar/d7d3d3b9-5c7b-4438-a0ea-a726dad17351_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_OilLampWeak.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [571, 572, 976, 1156], "coverage": 0.060375, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "bd4fea78037ac1115695e0d29f063adb482297abafc7a8ad81eadceb6bebcb4e",
+      "manualConclusion": "Accepted: compact old kerosene lamp with tiny muted amber wick accent and no halo/glow; transparent corners and no visible magenta fringe."
+    },
+    {
+      "name": "Texture_ClothBundleOld.png",
+      "taskId": "97a7e275-ad07-4ce8-b31d-a168b7d08702",
+      "retryOf": "d36e9bd4-ef55-4d65-a37d-85f293ae6e20",
+      "prompt": "One isolated old cloth bundle prop only: a low folded rag bundle tied with one thin cord, 1940s rural North China, strict flat side-view orthographic paper-cut sprite. Use simple angular layered shapes in faded indigo, dirty taupe and muted ochre, one torn corner, sparse charcoal stitch marks, subtle handmade aged-paper fibers. Centered with generous margin on a perfectly uniform pure #ff00ff magenta chroma-key background. No scene, no floor, no shadow, no person, no basket, no contents, no text, no logo, no HUD, no extra objects, no perspective, no 3D, no photorealism, no gloss, no glow. All four corners must be pure #ff00ff.",
+      "source": "Texture/Source/Cellar/97a7e275-ad07-4ce8-b31d-a168b7d08702_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_ClothBundleOld.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [474, 638, 1063, 912], "coverage": 0.049217, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "796a9714ad69fcd255269c472318124746492d284256eee39932a60e95e963e8",
+      "manualConclusion": "Accepted after retry: readable tied cloth bundle with indigo/taupe patches and torn opening; transparent corners and no visible magenta fringe."
+    },
+    {
+      "name": "Texture_FreshEarthMound.png",
+      "taskId": "da6958d7-2f9c-4d56-93b3-ea08a5240eb8",
+      "prompt": "Create exactly one isolated production sprite: a low irregular mound of freshly shoveled damp earth inside a 1940s rural North China cellar tunnel. Strict front-facing side elevation, squat horizontal mound with a few angular clods and sparse charcoal scoring, dark umber and muted taupe layered paper shapes, no shovel and no person. Flat layered paper-cut geometry, visible aged handmade-paper fibers, heavy sad minimalist underground style matching the supplied references. Center only the low fresh-earth mound with generous margin on a perfectly flat uniform pure #ff00ff magenta chroma-key background. No floor plane, no cast shadow, no wall, no tools, no props, no characters, no text, no logo, no HUD, no extra objects, no perspective, no 3D, no photorealism, no glossy wet shine, no glow. Ensure all four corners are pure #ff00ff.",
+      "source": "Texture/Source/Cellar/da6958d7-2f9c-4d56-93b3-ea08a5240eb8_image_1.png",
+      "final": "Texture/Generated/Cellar/Texture_FreshEarthMound.png",
+      "dimensions": { "width": 1536, "height": 1536 },
+      "alpha": { "mode": "RGBA", "cornerAlpha": [0, 0, 0, 0], "bbox": [317, 578, 1199, 878], "coverage": 0.071092, "opaqueMagenta": 0, "partialMagenta": 0 },
+      "sha256": "80f0df35e0835bc282e515d45551acc3ee1aa19350ed383a11fc22d649ebb270",
+      "manualConclusion": "Accepted: low layered fresh-earth mound with angular clods and charcoal scoring; strict side view, transparent corners, no visible magenta fringe."
+    }
+  ],
+  "rejectedTasks": [
+    {
+      "taskId": "d36e9bd4-ef55-4d65-a37d-85f293ae6e20",
+      "asset": "Texture_ClothBundleOld.png",
+      "reason": "Dreamina generation failed; replaced by retry task 97a7e275-ad07-4ce8-b31d-a168b7d08702."
+    }
+  ]
+}

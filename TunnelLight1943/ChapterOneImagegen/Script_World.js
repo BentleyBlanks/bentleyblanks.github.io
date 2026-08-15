@@ -1,0 +1,7549 @@
+// 《地道里的光》 —— Three.js 2D 渲染层（正交相机 + 手绘贴图精灵）。
+// 画面是纯 2D：所有形体由 Script_Art 的手绘矢量画笔烘到离屏 canvas，
+// 再作为带透明通道的平面贴图挂进 Three 场景。留在 Three 里是为了保留
+// 混合模式、加色光晕、暗场遮罩与后续着色器的自由度。
+//
+// 层次（z 越小越远）：远山 -30 / 远房 -20 / 近树 -12 / 玩法层 0 / 前景 +6 / 过肩前景 +9
+// 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
+
+import * as THREE from "three";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
+import * as ART from "./Script_Art.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
+import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
+import { CreateTunnelFluid } from "./Script_Fluid.mjs";
+import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
+import {
+  BAND, ACTOR_Z, ACTOR_SHADOW_Z, CARRY_Z, NEAR_CLUTTER, RankDz,
+  CheckBandZ, DepthViolations, PlaceZ, CAM_FOV,
+} from "./Data_DepthSpec.mjs";
+// 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
+// 这里只负责"照着数据把它烘出来放好"，不再自己写死尺寸与 z
+import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
+import {
+  TEXTURE_BACKGROUND_DAWN_FIELDS_URL,
+  TEXTURE_HOUSE_FACADE_DAMAGED_URL,
+  TEXTURE_DOOR_FRAME_TIMBER_URL,
+  TEXTURE_KANG_BED_URL,
+  TEXTURE_STOOL_LOW_URL,
+  TEXTURE_WATER_JAR_CRACKED_URL,
+  TEXTURE_BEDDING_RAGGED_URL,
+  TEXTURE_ELM_SPARSE_URL,
+  TEXTURE_WELL_WINCH_FRAME_URL,
+  TEXTURE_WELL_STONE_BASE_URL,
+  TEXTURE_WELL_BUCKET_URL,
+  TEXTURE_SHED_BURNED_URL,
+  TEXTURE_ASH_DEBRIS_PILE_URL,
+  TEXTURE_CELLAR_EARTH_WALL_TILE_URL,
+  TEXTURE_CELLAR_TIMBER_POST_URL,
+  TEXTURE_CELLAR_TIMBER_BEAM_URL,
+  TEXTURE_OIL_LAMP_WEAK_URL,
+  TEXTURE_CLOTH_BUNDLE_OLD_URL,
+  TEXTURE_FRESH_EARTH_MOUND_URL,
+  SCENE_ONE_GENERATED_ASSETS,
+  SURFACE_GENERATED_ASSETS,
+  CELLAR_GENERATED_ASSETS,
+  LoadGeneratedTexture,
+} from "./Script_GeneratedAssets.mjs";
+
+// 躺着的姿势：整具骨架转 90°（见 UpdateOne 里那段与 Rig 的 sleep）。
+// 新加一支"躺"的姿势时登记到这儿，别在别处另写一套旋转。
+const LIE_POSES = { sleep: true };
+const LIE_LEN = 0.90;        // 一个人躺下有多长（身长，骨架单位）
+const LIE_RISE = 0.15;       // 躺着垫起多高（半个身厚，免得半边陷进地里）
+
+const PROP_SS = SS.prop;     // 道具/遮蔽物的贴图超采样倍率（特写不糊）
+const DETAIL_SS = SS.detail; // 塌方堆、油灯这类会被特写到的小件
+// 世界内提示（气泡/目标标 / 人字标 / 楔子特写）：它们巴掌大，却总在过肩特写
+// 里出镜——3.2m 景别下画面密度到 600px/米，1x 烘出来必糊，一律走这个倍率
+// （档位数值在 Data_Scenes.mjs 的 SS.hint，实测 12 才顶得住特写）
+const HINT_SS = SS.hint;
+// 石笔那一拍是 2.9m 的特写（屏幕密度 ~330px/米，是 48px/米 标尺的七倍），
+// 笔与刻痕都得按这个密度烘，否则一放大就是两团糊的白斑
+// **只给小窗那台相机看的图层**。主相机的 layers 只开 0 号，pipCamera 额外开 1 号：
+// 井筒剖面就画在 1 号上。这条是绕开"地表看不到地平线以下"的唯一正路——
+// 主相机永远被那条近景地面带挡着，第二台相机却可以架进井筒里（用户 2026-08-10
+// 出的主意）。放在 1 号而不是靠位置藏，是因为主相机的画框在特写下会探到地面
+// 以下一点点，混在 0 号里迟早会露出一角黑方块。
+const PIP_LAYER = 1;
+const CHALK_SS = 8;
+const SCRIBE_SS = 3;
+// 石笔的世界尺寸：26×30 的贴图 ×0.22 ≈ 12×14cm 的画布，里面那支笔约 9cm 长——
+// 巴掌里攥得住的东西。别再让它长回 40cm。
+const CHALK_SCALE = 0.22;
+// 定向绳的半宽（米）：真麻绳才两三厘米，但那在屏幕上不到两个像素，趴在土路上
+// 根本看不见。7 厘米粗是"看得出是绳"的下限，同辘轳井绳一个量级
+const ROPE_HALF = 0.035;
+// 人物要顶得住特写：按 2.6 倍超采样烘焙，世界尺寸不变，只是贴图更密
+
+
+// ---------------------------------------------------------------------------
+// 贴图烘焙
+// ---------------------------------------------------------------------------
+function MakeCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(w));
+  c.height = Math.max(1, Math.ceil(h));
+  return c;
+}
+
+function CanvasTexture(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  // All canvases in this renderer are painted in display-space colors.  Keep
+  // them from being treated as linear data when the renderer is sRGB.
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// 把一段绘制烘成 sprite：drawFn(ctx, originX, groundY) 以 (originX, groundY) 为地面锚点
+// blur：假景深——越远的层烘焙时糊得越厉害，前景也糊一点
+// ss：超采样倍率。调用处仍按 48px/米 标注尺寸，内部把画布加密 ss 倍，
+// 世界尺寸不变、贴图密度变高 —— 特写推到 480px/米 也不糊。
+function BakeSprite(wPx, hPx, anchorX, groundYPx, drawFn, blur = 0, ss = 1, haze = null) {
+  const canvas = MakeCanvas(wPx * ss, hPx * ss);
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ss, ss);
+  if (blur > 0) ctx.filter = `blur(${blur}px)`;
+  drawFn(ctx, anchorX, groundYPx);
+  ctx.filter = "none";
+  // 空气透视：只染这一张精灵本身（source-atop），不是往画面上盖一层雾
+  if (haze && haze.amount > 0) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = haze.amount;
+    ctx.fillStyle = haze.color;
+    ctx.fillRect(0, 0, wPx, hPx);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+  const tex = CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(wPx / PPM, hPx / PPM);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  // 让世界坐标 (x, y) 对应贴图里的 (anchorX, groundYPx)
+  mesh.userData.offset = {
+    x: (wPx / 2 - anchorX) / PPM,
+    y: (groundYPx - hPx / 2) / PPM,
+  };
+  return mesh;
+}
+
+// 摇辘轳那一拍：摇把握手的**世界坐标** → 骨架**局部坐标**（Rig 拿它反解前手）。
+// 骨架挂在 (p.x, 地平线+lift) 上、整体缩放 bodyScale、朝向 −1 时整组镜像，
+// 所以换算要除以缩放、再按朝向翻 x。三条输入路（鼠标绕圈/键盘/脱手倒转）
+// 共用 Core 算好的那一份 gripX/gripY，World 绝不另算一遍摇把在哪儿。
+// 找吃的那三道手也走这条：Core 每帧把"手此刻该落在哪"发布成 forage.<件>.grip
+// 同一个姿势可能对应两件东西（苫草/苇席同走 heaveMat、灰堆/食槽同走 scoopAsh）：
+// 谁的 grip 立着就跟谁（Core 在各件收尾时会把 grip 置空，不会两头都亮）
+const FORAGE_GRIP = { heaveMat: ["reed", "mat"], dragPlank: ["plank"], scoopAsh: ["trough", "ash"] };
+
+function CrankAimLocal(state, p, bs) {
+  if (!bs) return null;
+  const groundY = (p.level === "under" ? UNDER_Y : SURFACE_Y) + (p.lift || 0);
+  const Local = (wx, wy) => ({
+    x: ((wx - p.x) / bs) * (p.heading >= 0 ? 1 : -1),
+    y: (wy - groundY) / bs,
+  });
+  const fgList = FORAGE_GRIP[p.pose];
+  if (fgList) {
+    for (const key of fgList) {
+      const g = state.forage?.[key]?.grip;
+      if (g) return Local(g.x, g.y);
+    }
+    return null;
+  }
+  const wv = state.winchView;
+  if (!wv || !wv.hooked || p.pose !== "crank") return null;
+  return Local(wv.gripX, wv.gripY);
+}
+
+function PlaceSprite(mesh, x, y, z) {
+  mesh.position.set(x + mesh.userData.offset.x, y + mesh.userData.offset.y, z);
+  mesh.userData.anchor = { x, y, z };
+}
+
+// 会掉头的贴图（独轮车这类有正反的家伙）：dir<0 时整张左右翻。
+// 镜像是绕**网格中心**发生的，所以锚点相对中心的偏移也得跟着翻号，
+// 否则车把一翻面、车身就整体平移出去半米。
+function PlaceSpriteFlip(mesh, x, y, z, dir) {
+  const s = dir < 0 ? -1 : 1;
+  mesh.scale.x = s;
+  mesh.position.set(x + mesh.userData.offset.x * s, y + mesh.userData.offset.y, z);
+  mesh.userData.anchor = { x, y, z };
+}
+
+// 缩放时保持地面锚点不动（否则远景会整体浮起来）
+function ScaleKeepGround(mesh, sx, sy = sx) {
+  mesh.scale.set(sx, sy, 1);
+  const h = mesh.geometry.parameters.height;
+  const w = mesh.geometry.parameters.width;
+  const a = mesh.userData.anchor;
+  mesh.position.set(
+    a.x + mesh.userData.offset.x * sx + (w / 2) * 0 ,
+    a.y + mesh.userData.offset.y * sy,
+    a.z,
+  );
+  // offset.y 是"锚点到中心"的距离，按 sy 缩放后即可保持贴地
+  void h;
+}
+
+// 同一只桶，一路上换了好几个叫法：链上是「空水桶」→「一桶水」，娘手里那只
+// 叫「桶」。哪张表漏认一个，桶就会被当成木料——横长条画布裁掉半只，还扛到肩上
+// 顶在脑袋上。所以只此一处列全，画布与挂点都从这里取。
+const BUCKETS = ["水桶", "空水桶", "桶", "空桶", "满桶水", "一桶水"];
+
+// 长家伙：也在手上，只是贴图要顺着前臂转（手臂一伸一屈，锯就一进一出）
+const ALONG_ARM = ["锯", "锄头", "步枪", "扫帚", "军刀", "木槌"];
+// 长家伙不都跟前臂**共线**：扫帚攥在手心里是斜的——柄比前臂平一档，帚苗才够得
+// 着身前的地。共线的话柄的上半截就叠在小臂上直戳脑袋，看着是根倚在身上的杆子。
+// 偏角（弧度）绕握点转，握点仍钉在手心；朝向翻转时符号跟着翻
+const ARM_TOOL_TILT = { "扫帚": 0.42 };
+// 提在手里 vs 扛在肩上：贴图挂点（HandPoint/ShoulderPoint）与姿势（Rig 的
+// hold/carry 两支）都看它，一处判定两处用，免得挂点和姿势各说各话。
+const HAND_HELD = [...BUCKETS, ...ALONG_ARM, "刨子", "石子", "窝头", "铃铛", "柴刀",
+  "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮", "铁皮桶",
+  "土筐", "粮袋", "种子粮", "名册", "保甲册", "木楔",
+  "包袱布", "榆钱包袱",
+  // 一碗红薯干、半瓢水、水葫芦都是**捧在手里**的：走肩挂那档会贴在肩窝，
+  // 妹妹那么小的个子，碗就正糊在脸上（视觉审查退回过「头是一只碗」）
+  "红薯干", "半瓢水", "水葫芦"];
+// 襁褓不在 HAND_HELD 里：抱在怀里走 carry（肩挂）那一档，贴身而不是拎着晃
+// 手里那件有多沉：0=拎块石子（几乎还是空手走），1=满满一桶水（人是另一个样子）。
+// Rig 的 hold 姿势按它插值——不列的按小件算。
+const HOLD_WEIGHT = {
+  "满桶水": 1, "一桶水": 1, "桶": 0.9, "铁皮桶": 0.55,
+  "水桶": 0.5, "空水桶": 0.42, "空桶": 0.42,
+  "锄头": 0.45, "锯": 0.4, "步枪": 0.4, "扫帚": 0.3, "刨子": 0.3, "麻绳": 0.25, "柴刀": 0.2,
+  "绳头": 0.12,          // 手里只有一截绳梢，绳的分量在地上那一长条上，不在手上
+  "军刀": 0.25, "木槌": 0.3,
+  "土筐": 0.8, "粮袋": 0.7, "种子粮": 0.7, "名册": 0.15, "保甲册": 0.15, "木楔": 0.05,
+  "包袱布": 0.12, "榆钱包袱": 0.06,   // 一包榆钱：孩子抱得动，也正因为轻，抢它才更难看
+};
+const IsHandHeld = (label) => !!label && HAND_HELD.includes(label);
+// 姿势进度（Rig 的 poseK）由**姿势名**挑驱动它的那个字段，不许拿 ?? 串下来：
+// vaultT/vaultK 一落地就停在 0，而 `0 ?? x` 取的正是 0——串起来的话，
+// 刨料的推程（poseU）和投石的拉弓量（poseK）永远传不到画面上，
+// 两个"由进度驱动"的姿势都被钉死在起手那一格。这条坑过一次，别再改回去。
+function PoseProgress(o) {
+  if (o.pose === "vault" || o.pose === "clamber") return o.vaultK;
+  // 刨料的推程 / 摇辘轳的摇把相位 / 接绳的拽劲 / 叠衣裳这一折走了多远，
+  // 都走 poseU
+  if (o.pose === "planePush" || o.pose === "crank" || o.pose === "knotPull"
+    || o.pose === "braceUp" || o.pose === "pourBasket"
+    || o.pose === "foldCloth" || o.pose === "layDown"
+    // 找吃的那四道手：掀苫草/拖门板/扒烧土/解扎口，全由进度驱动
+    || o.pose === "heaveMat" || o.pose === "dragPlank" || o.pose === "scoopAsh"
+    || o.pose === "unwrapJar") return o.poseU;
+  return o.poseK;
+}
+const HoldWeight = (label) => HOLD_WEIGHT[label] ?? 0.15;
+
+// ---------------------------------------------------------------------------
+// 人物精灵图集：每种角色一条横向帧带（8 走 + 站 + 蹲）
+// ---------------------------------------------------------------------------
+// 扛着的物件（单独一张小贴图，跟着手走）
+function MakeCarryMesh(label) {
+  // 木料/门板/顶木是横长条；桶是小方块；长家伙（锯/锄头）竖着画（顺前臂方向）；
+  // 其余小件给一块方画布免得圆形图案被裁
+  const ROUND = ["石子", "窝头", "铃铛", "柴刀", "麻绳", "绳头", "花布巾", "鞭炮", "一挂鞭炮",
+    ...BUCKETS, "棉被", "湿棉被", "铁皮桶", "刨子", "包袱布", "榆钱包袱"];
+  // 收窄后的画幅，别再给一根柱子留地方。
+  // **锚点在画布正中**（BakeSprite 传的是 wPx/2, hPx/2），所以画布必须比
+  // "握点到最远端 × 2" 还高，否则画笔画出界被裁。步枪的握点在护木上，
+  // 刺刀尖离握点 1.18m＝56.6px，所以半高至少 57 → 120。
+  const TALL = { "锯": [52, 80], "锄头": [48, 100], "步枪": [46, 120], "扫帚": [44, 92], "军刀": [34, 72], "木槌": [24, 60] };
+  const wPx = TALL[label]?.[0] ?? (label === "水桶" ? 46 : ROUND.includes(label) ? 90 : 120);
+  const hPx = TALL[label]?.[1] ?? (label === "水桶" ? 42 : ROUND.includes(label) ? 76 : 30);
+  return BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
+    ART.DrawCarry(ctx, ax, ay - (label === "水桶" ? 8 : 0), 1.5, 1, label);
+  }, 0, DETAIL_SS);
+}
+
+// 落地道具：同一支 DrawCarry 画笔，但锚点必须真的踩在贴图内容的最低像素上
+// ——每种道具画的高矮不一样，靠扫 alpha 找底边，落地才不会悬空/陷土
+//（深度规范：落地物贴图底边=地平线，y 不许为了好看手动抬）。
+function MakeGroundItemMesh(label) {
+  const wPx = 96, hPx = 84, ss = DETAIL_SS;
+  const canvas = MakeCanvas(wPx * ss, hPx * ss);
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ss, ss);
+  ART.DrawCarry(ctx, wPx / 2, hPx * 0.58, 2.0, 1, label);
+  // 扫内容底边（隔行抽样够用：只是找最低的不透明行）
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let bottomPx = hPx * ss;
+  for (let y = canvas.height - 1; y >= 0; y -= 1) {
+    let hit = false;
+    for (let x = 0; x < canvas.width; x += 3) {
+      if (data[(y * canvas.width + x) * 4 + 3] > 14) { hit = true; break; }
+    }
+    if (hit) { bottomPx = y + 1; break; }
+  }
+  const tex = CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(wPx / PPM, hPx / PPM);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  // 世界锚点 (x, y) 对准贴图 (wPx/2, 内容底边)
+  mesh.userData.offset = { x: 0, y: (bottomPx / ss - hPx / 2) / PPM };
+  return mesh;
+}
+
+// 独轮车上的一车料怎么摆：前两件是旧门板（平摞），第三件是枣木杠（圆杠压顶）
+const BarrowLoad = (n) => ({ planks: Math.min(2, n), pole: n >= 3 });
+
+// ---------------------------------------------------------------------------
+export function CreateWorld(canvasEl) {
+  const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+  // 浏览器直接播放的 MP4 是 BT.709/sRGB 显示内容。序章把同一帧上传成
+  // VideoTexture 时也必须显式声明 sRGB；否则 Three 会把它当线性数据再做一次
+  // 输出变换，网页里的对比度和独立播放原片就会明显不同。
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  // 插入特写卡 / 活卡单独一个场景：它本来就是"画在所有东西之上的一张画"
+  //（depthTest 关、renderOrder 顶格）。分出来是为了背景能单独走一遍离屏虚化，
+  // 再把卡原样盖上去——见 Render 里的景深那一段
+  const overlayScene = new THREE.Scene();
+  // 小视角透视相机：画面元素全是 2D 贴图，但分布在不同 z 上——
+  // 近大远小、地面向后退、视差随镜头推拉变化，2.5D 的纵深感由此而来。
+  const FOV = CAM_FOV;
+  const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 400);
+  // 参考机位距离：各层贴图按 (D_REF + z深度)/D_REF 预放大，保证默认景别下比例正确
+  const D_REF = 24;
+
+  // 视差层容器
+  const layers = {
+    sky: new THREE.Group(),        // 天光
+    ridge: new THREE.Group(),      // 最远的山脊（糊得最厉害）
+    hills: new THREE.Group(),      // 远山
+    farTown: new THREE.Group(),    // 远处的村落
+    midTrees: new THREE.Group(),   // 中景树列
+    nearTrees: new THREE.Group(),  // 近景树
+    play: new THREE.Group(),       // 玩法层（清晰）
+    fore: new THREE.Group(),       // 前景（掠过镜头，微糊）——**目前是空的**，见 AddForeground 那处的说明
+    fx: new THREE.Group(),
+    ots: new THREE.Group(),        // 过肩前景
+  };
+  const LAYER_Z = {
+    sky: -150, ridge: -62, hills: -44, farTown: -26, midTrees: -15,
+    nearTrees: -7.5, play: 0, fore: 3.4, fx: 0, ots: 12,
+  };
+  // 透视补偿：整层按 (D_REF - z)/D_REF 放大，于是每个元素仍落在作者标注的
+  // 世界坐标与尺寸上，只是移动速率按透视自然变慢——经典视差，且随推拉变化
+  const LAYER_COMP = {};
+  for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
+  // 假景深：离玩法层越远，烘焙时越糊
+  // The approved concepts read as stacked sheets, not a camera-depth blur.
+  // Keep just enough softness to separate planes while preserving the cut
+  // edges of distant roofs, forts, and bare branches.
+  const LAYER_BLUR = { ridge: 1.7, hills: 1.15, farTown: 0.65, midTrees: 0.35, nearTrees: 0.15, fore: 0.9 };
+  // 空气透视：越远越向雾色靠拢——在烘焙时染进贴图，见 BakeSprite 的 haze 参数
+  // Heavy-style depth is carried by shape and value separation, not a cream
+  // wash.  Keep distant layers hazy but let their silhouettes survive.
+  const LAYER_FADE = { ridge: 0.34, hills: 0.25, farTown: 0.18, midTrees: 0.10, nearTrees: 0.04, play: 0, fore: 0.12 };
+  let hazeColor = "#85837e";
+  const HazeFor = (key) => (LAYER_FADE[key] ? { color: hazeColor, amount: LAYER_FADE[key] } : null);
+  // **空气透视只许用染色，不许用半透明。** haze 是 source-atop 染在精灵自己
+  // 身上的，颜色推向雾色而精灵仍是实心；material.opacity 则让身后的东西透过来——
+  // 远村的房子里透出一座炮楼、炮楼里透出一间房，糊成一坨（2026-08-07 用户截图）。
+  // 旧的 (opacity a, haze f) 折算成等效的纯染色：f' = f + (1-a)(1-f)。
+  const HazeSolid = (key, oldAlpha = 1, scale = 1) => {
+    const f = Math.min(0.95, (LAYER_FADE[key] || 0) * scale);
+    const amount = Math.min(0.88, f + (1 - oldAlpha) * (1 - f));
+    return amount > 0.001 ? { color: hazeColor, amount } : null;
+  };
+
+  for (const k of Object.keys(layers)) {
+    layers[k].position.z = LAYER_Z[k];
+    layers[k].scale.setScalar(LAYER_COMP[k]);
+    scene.add(layers[k]);
+  }
+
+  // ===========================================================================
+  // Z 轴分配规范（唯一事实来源）
+  //
+  // 画面全是半透明贴图、都不写深度缓冲，先后完全由绘制顺序决定。绘制顺序 =
+  // renderOrder（层基数 + 层内深度），不再依赖 three.js 按中心点的自动排序，
+  // 免得同层元素在镜头推拉时前后翻面。
+  //
+  // 层间：见 LAYER_ORDER。层内（play 层，世界单位，+ 为靠近镜头）：
+  //   -6.0 ~ -1.0   大体量背景建筑（房屋/牢房/炮楼/围墙/树）
+  //   -0.9 ~ -0.2   紧贴行走线之后的物件（门框/庄稼/灯杆/柴垛/井台/磨盘）
+  //    0.0          行走线：地面、地道剖面、固定在地上的道具
+  //   +0.3          落地/待拾的活动道具（放下的桶、链上的待拾物）：压在行走
+  //                 线道具之前、演员之后——玩家放下的东西必须永远看得见
+  //   +0.6          演员：玩家与所有 NPC —— 永远在行走线物件之前
+  //   +0.8          演员携带物（木料/水桶），跟着演员走
+  //   +1.2 ~ +2.4   有意遮挡演员的近处物件；硬性约束：只允许 ≤1.2m 的矮物件
+  //                 进这一段，高过腰的东西（草垛/断墙/树丛）一律退到负值，
+  //                 否则会把人整个吞掉。
+  //   ≥ +3.4        fore 层：真前景，成片掠过镜头
+  //
+  // **带号是绘制顺序，不是位置。** 平视镜头下每一档 z 都有自己的地平线，
+  // 所以行走线上的一切（演员/影子/携带物/放下的东西/推的车/钉在地上的道具）
+  // 摆位时一律经 `PlaceZ()` 压回 z=0，只有真的站在别的纵深上的东西
+  //（负号的背景带、正号的前景掩体）才保留自己的 z。见 Data_DepthSpec 的
+  // 「地平线规范」——那里有各档地平线差多少像素的实测表。
+  // ===========================================================================
+  // 深度带的数值来自 Data_DepthSpec.mjs，物体用哪个带来自 Data_PropArt.json；
+  // 这里只保留层间的绘制序表。
+  const LAYER_ORDER = {
+    sky: 0, ridge: 1000, hills: 2000, farTown: 3000, midTrees: 4000,
+    nearTrees: 5000, play: 6000, fx: 7000, fore: 8000, ots: 9000,
+  };
+  const ORDER_DARK = 8500, ORDER_GLOW = 8600, ORDER_INSERT = 9500;
+  // 层内深度 → 绘制序号。z 越大（越近）画得越晚，压在上面。
+  const DepthOrder = (layerKey, z) =>
+    (LAYER_ORDER[layerKey] ?? 6000) + Math.round((Math.max(-12, Math.min(12, z)) + 12) * 20);
+  // 给一个动态对象（演员骨架、携带物、掉落物）派发 play 层的绘制序号。
+  // 骨架内部各骨头共用同一序号，彼此的前后仍由各自的局部 z 决定。
+  // 钉死一个元素的绘制序号：既写进 userData（ApplyDepthOrder 重跑时不会被
+  // 覆盖），也立刻生效——懒创建的元素（流体、标记）等不到下一趟派发。
+  function FixOrder(obj, order) {
+    obj.userData.fixedOrder = order;
+    obj.renderOrder = order;
+    return obj;
+  }
+
+  // 背景层里也有演员（远处那条街上干活的乡亲）：同一套深度带，只是层基数不同
+  function SetLayerOrder(obj, layerKey, z, tag = layerKey) {
+    CheckBandZ(tag, z);
+    const order = DepthOrder(layerKey, z);
+    obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
+  }
+
+  function SetPlayOrder(obj, z, tag = "SetPlayOrder") {
+    CheckBandZ(tag, z);
+    const order = DepthOrder("play", z);
+    // 同时写进 userData：BuildEnvironment 重建后 ApplyDepthOrder 重跑派发时，
+    // 不至于改按 position.z 重新猜（动态物的 position.z 与深度带曾经不一致，
+    // 「桶忽前忽后」就是这么来的）。对骨架尤其致命：骨头各自的**局部** z 全是
+    // 0，重派一次整个人就被打回行走线那一档，沉到房子立面后头去，而手上提的
+    // 桶是层的直接子物、局部 z 就是 CARRY_Z，照旧浮在墙外。
+    obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
+  }
+
+  // 给整层里所有还没被显式钉住的元素派发绘制序号
+  function ApplyDepthOrder() {
+    for (const key of Object.keys(layers)) {
+      layers[key].traverse((o) => {
+        if (!o.isMesh) return;
+        if (o.userData.fixedOrder !== undefined) { o.renderOrder = o.userData.fixedOrder; return; }
+        o.renderOrder = DepthOrder(key, o.position.z);
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 昼夜过渡：曲线本身（每档的浓淡与色相、白天奔夜里怎么经过黄昏、重烘该藏在
+  // 哪一帧）全在 Data_DayCycle——那是纯数据纯函数，好进 node 冒烟测试。
+  // 这儿只剩"眼下按哪一档烘环境"这个渲染层自己的状态机。
+  // -------------------------------------------------------------------------
+  let lightShown = null;         // 画面上正用着的档（＝已经烘出来的那一档）
+  let lightFrom = null, lightTo = null;
+  let lightMix = 1, lightSwapped = true;
+
+  /** 眼下该按哪一档烘环境（＝过渡里已经切过去的那一档） */
+  function ShownLight(state) {
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    return lightShown;
+  }
+
+  // 暗场遮罩（乘算）与光晕（加色）
+  // 全屏压暗罩：绝不能参与深度，否则会把后画的灯光晕整片剔掉
+  const darkMat = new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+  });
+  const darkPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), darkMat);
+  darkPlane.position.z = 8;
+  darkPlane.renderOrder = ORDER_DARK;
+  scene.add(darkPlane);
+
+  const glowTex = (() => {
+    const c = MakeCanvas(128, 128);
+    const g = c.getContext("2d");
+    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255,220,150,1)");
+    grad.addColorStop(0.35, "rgba(255,180,90,0.42)");
+    grad.addColorStop(1, "rgba(255,160,70,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    return CanvasTexture(c);
+  })();
+
+  let occluder = null;
+
+  // 灯：走遮挡光照着色器——照不穿土层与墙，能顺着竖井漏下去
+  function MakeGlow(radius, color = 0xffc878, opacity = 1) {
+    if (!occluder) {
+      // 掩码还没烘好时退回普通加色晕，避免首帧崩
+      const mat = new THREE.MeshBasicMaterial({
+        map: glowTex, transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, depthTest: false, color, opacity,
+      });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
+      m.renderOrder = ORDER_GLOW;
+      m.position.z = 0.4;
+      m.userData.SetLight = (x, y) => m.position.set(x, y, 0.4);
+      m.userData.SetIntensity = (v) => { mat.opacity = v; };
+      m.userData.SetBlockers = () => {};
+      return m;
+    }
+    const m = CreateOccludedLight(occluder, { radius, color, intensity: opacity });
+    m.renderOrder = ORDER_GLOW;
+    return m;
+  }
+
+  const actorSprites = new Map();
+  // 这一帧场上所有会挡光的人体，交给每盏灯做遮挡查询（见 Script_Light 的 uBlockers）。
+  // 只取躯干那一柱，不是整个人的包围盒——太宽的话人自己就先被自己的影子吃掉了。
+  const bodyBlockers = [];
+  // 这一帧场上所有的光源（提灯 / 玩家的煤油灯 / 地道油灯），用来定影子的方向
+  const lightSources = [];
+  const glows = [];
+  let builtKey = "";
+  let generatedBackdropMesh = null;
+  let generatedBackdropStatus = "idle";
+  let proceduralRidgeMesh = null;
+  let generatedBackdropEligible = false;
+  let lastBackdropState = null;
+  const generatedAssetMeshes = {
+    houseFacadeDamaged: null,
+    doorFrameTimber: null,
+    kangBed: null,
+    stoolLow: null,
+    waterJarCracked: null,
+    beddingRagged: null,
+    stoveColdPaperCut: null,
+  };
+  const generatedAssetStatuses = {
+    houseFacadeDamaged: "idle",
+    doorFrameTimber: "idle",
+    kangBed: "idle",
+    stoolLow: "idle",
+    waterJarCracked: "idle",
+    beddingRagged: "idle",
+    stoveColdPaperCut: "idle",
+  };
+  let generatedAssetEligible = false;
+  const generatedSurfaceMeshes = {
+    elmSparse: null,
+    wellWinchFrame: null,
+    wellStoneBase: null,
+    wellBucket: null,
+    shedBurned: null,
+    ashDebrisPile: null,
+    wellRopeDrum: null,
+    wellCrankHandle: null,
+    shedLooseTimberTools: null,
+    shedThatchMat: null,
+    shedReedMat: null,
+    shedCharredDoorPlank: null,
+    shedFeedTrough: null,
+    ashGroundCrackedStrip: null,
+    distantVillageWatchtowers: null,
+    qishuHouse: null,
+    houseB: null,
+    houseC: null,
+    houseD: null,
+    haystackFull: null,
+    haystackRaided: null,
+    yardWallIntact: null,
+    yardWallGate: null,
+    yardWallBroken: null,
+    oldWoodDoors: null,
+    noticeWall: null,
+    pigpenEmpty: null,
+    stalkFence: null,
+    cropRowsSparse: null,
+    stubbleField: null,
+    sownField: null,
+    woodpile: null,
+    firewoodBundle: null,
+  };
+  const generatedSurfaceStatuses = {
+    elmSparse: "idle",
+    wellWinchFrame: "idle",
+    wellStoneBase: "idle",
+    wellBucket: "idle",
+    shedBurned: "idle",
+    ashDebrisPile: "idle",
+    wellRopeDrum: "idle",
+    wellCrankHandle: "idle",
+    shedLooseTimberTools: "idle",
+    shedThatchMat: "idle",
+    shedReedMat: "idle",
+    shedCharredDoorPlank: "idle",
+    shedFeedTrough: "idle",
+    ashGroundCrackedStrip: "idle",
+    distantVillageWatchtowers: "idle",
+    qishuHouse: "idle",
+    houseB: "idle",
+    houseC: "idle",
+    houseD: "idle",
+    haystackFull: "idle",
+    haystackRaided: "idle",
+    yardWallIntact: "idle",
+    yardWallGate: "idle",
+    yardWallBroken: "idle",
+    oldWoodDoors: "idle",
+    noticeWall: "idle",
+    pigpenEmpty: "idle",
+    stalkFence: "idle",
+    cropRowsSparse: "idle",
+    stubbleField: "idle",
+    sownField: "idle",
+    woodpile: "idle",
+    firewoodBundle: "idle",
+  };
+  // One texture may be used by several scene objects (hay stacks, firewood,
+  // houses, walls).  Keep the legacy singular handles for dynamic code while
+  // retaining every generated plane for visibility/debug accounting.
+  const generatedSurfaceInstances = Object.fromEntries(
+    Object.keys(generatedSurfaceMeshes).map((key) => [key, []]),
+  );
+  const generatedSurfaceBase = new Set();
+  const generatedSurfaceBound = new Set();
+  let generatedSurfaceEligible = false;
+  const generatedCellarMeshes = {
+    cellarEarthWallTile: [],
+    cellarTimberPost: [],
+    cellarTimberBeam: [],
+    oilLampWeak: [],
+    clothBundleOld: [],
+    freshEarthMound: [],
+    cellarLongLadder: [],
+    cellarStorageCluster: [],
+  };
+  const generatedCellarStatuses = {
+    cellarEarthWallTile: "idle",
+    cellarTimberPost: "idle",
+    cellarTimberBeam: "idle",
+    oilLampWeak: "idle",
+    clothBundleOld: "idle",
+    freshEarthMound: "idle",
+    cellarLongLadder: "idle",
+    cellarStorageCluster: "idle",
+  };
+  let generatedCellarEligible = false;
+  const generatedPropFallbacks = new Map();
+  const generatedSceneOneFallbacks = new Map();
+  const generatedSurfaceFallbacks = new Map();
+  function RegisterGeneratedFallback(map, key, meshes) {
+    if (!meshes?.length) return meshes || [];
+    const registered = map.get(key) || [];
+    for (const mesh of meshes) {
+      mesh.userData.generatedFallback = key;
+      if (!registered.includes(mesh)) registered.push(mesh);
+    }
+    map.set(key, registered);
+    return meshes;
+  }
+  let sceneLights = [];   // 静态灯位 {x,y,r,mesh}
+  let fluid = null, fluidKey = "", fluidMesh = null, fluidCanvas = null, fluidCtx = null, fluidImage = null;
+  let probeMeshes = [];
+  let itemLabel = null;
+  let scribeMesh = null, scribeCanvas = null, scribeCtx = null, scribeLastT = 0, scribeTip = null;
+  let scribeDust = null;   // 笔尖扬起的粉末（只有真在蹭木头才有）
+  let markerMesh = null, markerCanvas = null, markerCtx = null;
+  // 画框边缘的「下一件事」HUD：一枚圆牌 + 指向框外的箭头。牌面按 icon 烘一次
+  // 存着——每帧重画一张 HINT_SS 的大图太贵，而牌面本来就不动（一探一探的怂
+  // 由网格位置做）。key 见 EdgeHudKey。
+  let edgeHudMesh = null;
+  const edgeHudTex = new Map();
+  let collapseMeshes = {};
+  let itemMeshes = [];
+  let carveState = { marked: false, carved: false, tally: 0 }, carveRebuild = null;
+  // 妹妹的正字画到第几道（剧本新生第一章）：开局门框上已有两道，
+  // 玩家添完第三道（tallied）；第二章跳到十三道（tallyMany）
+  const TallyCount = (state) => {
+    const f = state?.flags || {};
+    if (!f.tallyBase) return 0;
+    if (f.tallyMany) return 13;
+    return f.tallied ? 3 : 2;
+  };
+  let otsMesh = null;
+  let otsHiddenId = null;
+  let vignetteAlpha = 0;
+  let raidGloom = 0;      // 日伪在村时压上来的那层铅灰蓝（0→1 平滑吸附）
+  let dirtGrains = [], dirtGrainTex = null;   // 倒土时从筐口落下来的土（见 UpdateDirtPour）
+  let lampMeshes = [];
+  // 谜题动词层的动态元素：驴车、飞着的石子、探照灯光带、狗叫气泡、链上的待拾物
+  let cartMesh = null, cartWheel = null;
+  // 窖口盖板：每个竖井一块，绕铰链掀开（UpdateProps 每帧读 state.lid 转角度）
+  let lidMeshes = [];
+  // 村口窖井的天光贴片（光要跟着盖板走——盖严了还往下泼光，「捂住别出声」的
+  // 黑就没了）。只登记村子这两口窖；c3 起地道群像的光照不在本次翻新范围
+  let shaftBeamMeshes = [];
+  let thrownMesh = null;
+  let winchRope = null, winchBucket = null, winchBucketFull = null, winchBucketWater = null, winchCrank = null,
+    winchGuide = null, winchCoil = null;
+  // 井底那扇小窗要看的三样，全在 PIP_LAYER 上——**主相机看不见它们**
+  let wellShaft = null, wellDeepBucket = null, wellDeepFull = null, wellDeepWater = null,
+    wellRipple = null, wellDeepRope = null;
+  let wellDeepGeneratedBucket = null;
+  // 拉绳定向的绳：ribbon 网格（形状来自 Core 的 verlet 点串）＋锚点那盘没放完的绳
+  let ropeLineMesh = null, ropeCoilMesh = null;
+  let homeFacade = null, homeRange = null;
+  let doorframeFallbackMesh = null;
+  let facadeBehind = false;   // 立面淡下去之后有没有让到演员后头（见 UpdateProps）
+
+  // 走进自家门里的 NPC：立面还合着的时候，屋里本来就看不见——人跟着立面一起
+  // 隐去（娘接过桶进屋倒水缸就是这一下）。玩家跟进来立面淡出，她又在屋里露出来。
+  // 只管 NPC：玩家自己进门时立面正在淡，拿他当判据会闪一下。
+  const IndoorHidden = (x, level) => !!homeFacade && !!homeRange
+    && (homeFacade.material.opacity ?? 1) > 0.5
+    && level === "surface" && x > homeRange.x0 && x < homeRange.door;
+  let coneMeshes = [], coneTex = null;
+  let shadeMeshes = [], shadeTex = null;   // 掩体背光那一侧的影子（"安全在哪儿"要画出来）
+  let lightStrip = null, lightBeam = null, lightKey = "";
+  let barkMesh = null;
+  let chainItemMeshes = [];   // 链上还没捡的东西，一件一个槽（全都摆在场上）
+  // 第一章重做的动态件：独轮车、引导气泡、投掷弧线、小活物、木楔、失败「！」
+  let barrowMesh = null, barrowWheel = null;
+  // 收藏品：id → mesh（收走切 visible）；一枚共享的微光引导（走近了才闪）
+  const relicMeshes = new Map();
+  let relicGlow = null;
+  // 前景草丛（layers.fore）：本场景加的那几丛，重建时自己收
+  let foreTufts = [];
+  // 坐骑（骑车的伪军、挎斗摩托）：actorId → 车的贴图。车与骑手分开——
+  // 骑手是正常演员（pose/lift 由 Core 给），车只是一张跟着他走的贴图
+  const mountMeshes = new Map();
+  // 自由放下的落地道具：uid → mesh（uid 在 Core 里随放下动作分配）
+  const groundItemMeshes = new Map();
+  let bubbleMeshes = [];
+  const bubbleTex = new Map();
+  let throwAimLine = null;
+  let critterMesh = null, critterCanvas = null, critterCtx = null;
+  let dustMesh = null, dustCanvas = null, dustCtx = null;
+  // 一阵看得见的风：逐帧重画的尘土流线与草屑画布（state.wind 活着才画）
+  let windMesh = null, windCanvas = null, windCtx = null;
+  // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
+  let doorLeafPivot = null, doorLeafMesh = null, doorLeafLoose = null;
+  // 门枕石（臼窝）：钉在地上的那一件，与门扇分开（门扇会绕上轴摆，石头不会）
+  let doorSocketMesh = null, doorSocketSeat = -1;
+  let planeBoardMesh = null, planeBoardCanvas = null, planeBoardCtx = null;
+  let planeToolMesh = null;
+  let planeHandRig = null;      // 刨子挂在谁手上：示范时是爹，之后是柱子
+  let planeCurlMesh = null, planeCurlCanvas = null, planeCurlCtx = null;
+  let planePileMesh = null, planePileCanvas = null, planePileCtx = null;
+  let spotFlashMesh = null;
+  // 找吃的那几样能上手的东西（苫子折过来的那半幅 + 压在底下那半幅 / 门板 / 土堆
+  // / 苇席 / 食槽——后两样是第七稿加的，声明了坐标才建）
+  let matPivot = null, matMesh = null, matBaseMesh = null, matTorn = -1;
+  let plankMesh = null, ashMesh = null, ashOverlayMesh = null, ashKey = "";
+  let reedPivot = null, reedBaseMesh = null, troughMesh = null, troughKey = "", seedBagMesh = null;
+  // 拉耧那一拍的动态耧（state.lou 驱动：位置随拖、耧腿歪进垄沟的角度）
+  let louMesh = null;
+  // 窖口板缝打进来的那几束光（lidShut 的板缝光 / 夜里的月光同一支）。
+  // hatchBeamK 是它当前的亮度，跨帧吸附——盖板合上那一下光要收得像光，不像拉闸
+  let hatchBeamMesh = null, hatchBeamKey = "", hatchBeamK = 0;
+  // 移动掩体（板车/独轮车）的深度：NEAR_CLUTTER 区间内的固定一档
+  const CART_COVER_Z = 1.5;
+
+  // 清空一层。标了 persist 的（演员骨架、影子、手里的东西）留下来并且
+  // **绝不 dispose**：骨架的几何体与贴图是 rigCache 里所有角色共用的
+  // （CreateRig 只克隆材质），销毁一具就等于销毁了全场的人。
+  function ClearGroup(g) {
+    const keep = [];
+    while (g.children.length) {
+      const c = g.children.pop();
+      if (c.userData.persist) { keep.push(c); continue; }
+      c.geometry?.dispose?.();
+      if (c.material?.map && c.material.map !== glowTex) c.material.map.dispose?.();
+      c.material?.dispose?.();
+      g.remove(c);
+    }
+    for (const k of keep) g.add(k);
+  }
+
+  // BuildEnvironment 会把各层整个清掉重建，缓存在闭包里的那些懒创建网格
+  // （标记、探杆、油灯、流体面、车、石子…）也一并没了，可变量还指着已经
+  // dispose 的对象——于是 `if (!markerMesh)` 之类的判断全部落空，那些东西
+  // 再也不会回来。重建时把引用一起清零。
+  function InvalidateSceneCaches() {
+    probeMeshes = [];
+    lampMeshes = [];
+    itemMeshes = [];
+    itemLabel = null;
+    markerMesh = null; markerCanvas = null; markerCtx = null;
+    // 牌面缓存里只有当前挂着的那张被 ClearGroup 收掉了，其余几张得自己收
+    edgeHudMesh = null;
+    for (const t of edgeHudTex.values()) t.dispose?.();
+    edgeHudTex.clear();
+    scribeMesh = null; scribeCanvas = null; scribeCtx = null; scribeLastT = 0; scribeTip = null;
+    scribeDust = null;
+    collapseMeshes = {};
+    fluid = null; fluidKey = ""; fluidMesh = null;
+    fluidCanvas = null; fluidCtx = null; fluidImage = null;
+    cartMesh = null; cartWheel = null;
+    lidMeshes = [];
+    thrownMesh = null;
+    winchRope = null; winchBucket = null; winchBucketFull = null; winchBucketWater = null; winchCrank = null;
+    winchGuide = null; winchCoil = null;
+    wellShaft = null; wellDeepBucket = null; wellDeepFull = null; wellDeepWater = null;
+    wellRipple = null; wellDeepRope = null;
+    wellDeepGeneratedBucket = null;
+    ropeLineMesh = null; ropeCoilMesh = null;
+    homeFacade = null; homeRange = null; facadeBehind = false;
+    doorframeFallbackMesh = null;
+    generatedPropFallbacks.clear();
+    generatedSceneOneFallbacks.clear();
+    generatedSurfaceFallbacks.clear();
+    coneMeshes = [];
+    shadeMeshes = [];
+    lightStrip = null; lightBeam = null; lightKey = "";
+    barkMesh = null;
+    chainItemMeshes = [];
+    barrowMesh = null; barrowWheel = null;
+    relicMeshes.clear();
+    if (relicGlow) layers.play.remove(relicGlow);
+    relicGlow = null;
+    shaftBeamMeshes = [];
+    for (const m of foreTufts) layers.fore.remove(m);
+    foreTufts = [];
+    mountMeshes.clear();
+    groundItemMeshes.clear();
+    bubbleMeshes = [];
+    bubbleTex.clear();
+    throwAimLine = null;
+    critterMesh = null; critterCanvas = null; critterCtx = null;
+    dustMesh = null; dustCanvas = null; dustCtx = null;
+    windMesh = null; windCanvas = null; windCtx = null;
+    planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
+    doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
+    doorSocketMesh = null; doorSocketSeat = -1;
+    planeToolMesh = null; planeHandRig = null;
+    planeCurlMesh = null; planeCurlCanvas = null; planeCurlCtx = null;
+    planePileMesh = null; planePileCanvas = null; planePileCtx = null;
+    spotFlashMesh = null;
+    matPivot = null; matMesh = null; matBaseMesh = null; matTorn = -1;
+    plankMesh = null; ashMesh = null; ashOverlayMesh = null; ashKey = "";
+    reedPivot = null; reedBaseMesh = null; troughMesh = null; troughKey = ""; seedBagMesh = null;
+    louMesh = null;
+    hatchBeamMesh = null; hatchBeamKey = "";
+  }
+
+  // -------------------------------------------------------------------------
+  // 场景搭建
+  // -------------------------------------------------------------------------
+  function AddStrip(group, xFrom, xTo, topY, botY, colors, id) {
+    // 一条横向色带（地表/天空），带手绘边缘
+    const wPx = Math.ceil((xTo - xFrom) * PPM);
+    const hPx = Math.ceil((topY - botY) * PPM);
+    const mesh = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, hPx);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(1, colors[1] || colors[0]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, wPx, hPx);
+    });
+    PlaceSprite(mesh, xFrom, botY, 0);
+    group.add(mesh);
+    return mesh;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 纵深带（配合顶部 Z 轴分配规范使用）
+  //
+  // 相机永远平视（lookAt 与机位等高），所以地面在画面上是随纵深收缩的：
+  // 深度 z 处的地面，屏幕高度 ∝ -camY / (dist - z)。z 越负（越远），它的地平线
+  // 在画面上就越高。这是正确的透视，不是 bug——但如果那条地平线看不见，
+  // 站在远处的房子就会读成"浮在半空"。
+  //
+  // 所以：**落地物件一律把贴图底边放在所在层的地平线上（地面 y=0、地道
+  // y=UNDER_Y），y 永远不要为了"看起来贴地"而手动抬高**；纵深靠 z 表达，
+  // 而每一条纵深带都由 AddBandEdge 画出一道实际躺在该深度地面上的沿线
+  // （田埂 / 路沿 / 墙根），让眼睛读得出"它站在更靠后的地面上"。
+  //
+  // 反过来也成立：**没打算站在别的纵深上的东西，就不许用别的 z**。行走线上
+  // 的道具与演员之间那 0.6m 曾经是没人声明过的——结果人的脚比车轮低十来个
+  // 像素，读出来就是"车和人不在一条水平线上"。现在摆位统一走 PlaceZ()。
+  //
+  // 摆道具时从 Data_DepthSpec.mjs 的 BAND 表里挑 z，不要另取数值
+  //（表已含 backdrop/building/yard/nearBack/walk/loose/facade/clutter 八档）。
+  // 在某条纵深带的地面上画一道沿线：真正躺平在 y=地平线、深度 z 处，
+  // 于是它的投影就精确落在那条带的地平线上。
+  function AddBandEdge(group, xFrom, xTo, z, light, id) {
+    const wPx = 1024, hPx = 64;
+    const canvas = MakeCanvas(wPx, hPx);
+    const g = canvas.getContext("2d");
+    const ink = light === "night" || light === "dark" ? "rgba(18,20,26,0.55)" : "rgba(50,47,44,0.45)";
+    const grd = g.createLinearGradient(0, 0, 0, hPx);
+    grd.addColorStop(0, "rgba(0,0,0,0)");
+    grd.addColorStop(0.45, ink);
+    grd.addColorStop(0.62, ink);
+    grd.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, wPx, hPx);
+    // 沿线不是直的：踩出来的土棱会起伏
+    g.strokeStyle = ink;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(0, hPx * 0.5);
+    for (let px = 0; px <= wPx; px += 32) g.lineTo(px, hPx * 0.5 + (ART.Hash(id + px) - 0.5) * 9);
+    g.stroke();
+    const tex = CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(Math.max(1, Math.round((xTo - xFrom) / 26)), 1);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(xTo - xFrom, 0.85),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.9 }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set((xFrom + xTo) / 2, SURFACE_Y + 0.012, z);
+    FixOrder(mesh, LAYER_ORDER.play - 25 + Math.round(z));
+    group.add(mesh);
+    return mesh;
+  }
+
+  function AddGroundBand(group, xFrom, xTo, groundY, light, id, depthM = 3.2) {
+    const wPx = Math.ceil((xTo - xFrom) * PPM);
+    const hPx = Math.round(depthM * PPM);
+    const colors = {
+      // Dirty taupe/charcoal soil keeps the surface grounded without the
+      // yellow postcard look of the original earthDay palette.
+      day: ["#665f58", "#47423e"],
+      dawn: ["#605a56", "#403c39"],
+      dusk: ["#57504b", "#393532"],
+      night: ["#37414b", "#293139"],
+      dark: ["#464039", "#2c2925"],
+      tunnel: ["#403a34", "#292622"],
+    }[light] || ["#514b44", "#35312d"];
+    const grassColor = {
+      day: "#565850", dawn: "#50534e", dusk: "#4d504b",
+      night: "#3b4743", dark: "#353b38", tunnel: "#3b3a33",
+    }[light] || "#555d53";
+    const mesh = BakeSprite(wPx, hPx, 0, 6, (ctx) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, hPx);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(1, colors[1]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 6, wPx, hPx - 6);
+      // 地表线（手绘起伏）
+      ctx.beginPath();
+      ctx.moveTo(0, 6);
+      for (let px = 0; px <= wPx; px += 40) {
+        ctx.lineTo(px, 6 + (ART.Hash(id + px) - 0.5) * 4);
+      }
+      ctx.strokeStyle = ART.IN.ink;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      // 草簇与车辙
+      for (let i = 0; i < wPx / 34; i += 1) {
+        const gx = ART.Hash(id + "g" + i) * wPx;
+        ctx.strokeStyle = grassColor;
+        ctx.lineWidth = 1.5;
+        for (let b = 0; b < 3; b += 1) {
+          ctx.beginPath();
+          ctx.moveTo(gx + b * 2.5, 7);
+          ctx.lineTo(gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 7, 7 - 5 - ART.Hash(id + "h" + i + b) * 6);
+          ctx.stroke();
+        }
+      }
+      ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+      // 土路的实况（用户 2026-08-09："地面太现代了"）：1943 年冀中的村道是
+      // 独轮车和大车碾出来的，没有路沿、没有铺装——只有两道深深的车辙、
+      // 旱得裂开的泥皮、被踩塌的坑，和一层碾碎的料礓石。
+      // 全部画在**近处这一带**（y 8..40px），远了就成了噪点。
+      ctx.save();
+      // ① 两道车辙：顺路方向的长条压暗，深浅不匀（走一段就浅一段）
+      for (const [ry, alpha] of [[13, 0.16], [21, 0.11]]) {
+        ctx.strokeStyle = `rgba(42,39,36,${alpha})`;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        let drawing = false;
+        for (let px = 0; px <= wPx; px += 12) {
+          const on = ART.Hash(id + "rut" + ry + Math.floor(px / 96)) > 0.22;
+          const yy = ry + (ART.Hash(id + "rw" + ry + px) - 0.5) * 2.2;
+          if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+          else if (on) ctx.lineTo(px, yy);
+          else drawing = false;
+        }
+        ctx.stroke();
+      }
+      // ② 旱裂的泥皮：短短的折线，横七竖八
+      ctx.strokeStyle = "rgba(50,46,42,0.18)";
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < wPx / 30; i += 1) {
+        const cx = ART.Hash(id + "ck" + i) * wPx;
+        const cy = 9 + ART.Hash(id + "cy" + i) * 26;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        for (let k = 1; k <= 3; k += 1) {
+          ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 16,
+            cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 9);
+        }
+        ctx.stroke();
+      }
+      // ③ 踩塌的浅坑：贴地的小椭圆，边上一圈亮、里头一层暗
+      for (let i = 0; i < wPx / 150; i += 1) {
+        const hx = ART.Hash(id + "ho" + i) * wPx;
+        const hy = 12 + ART.Hash(id + "hy" + i) * 16;
+        const hr = 7 + ART.Hash(id + "hr" + i) * 11;
+        ctx.fillStyle = "rgba(44,41,38,0.16)";
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, hr, hr * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // ④ 碾碎的料礓石子：一层细碎的亮点
+      for (let i = 0; i < wPx / 18; i += 1) {
+        const sx = ART.Hash(id + "gv" + i) * wPx;
+        const sy = 8 + ART.Hash(id + "gy" + i) * 24;
+        ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+          ? "rgba(153,149,139,0.20)" : "rgba(76,70,63,0.26)";
+        ctx.fillRect(sx, sy, 1.6 + ART.Hash(id + "gs" + i) * 1.8, 1.4);
+      }
+      // ⑤ 糠秕与麦秸碎：碾道、场院、门口一层细碎亮屑，被风吹成条状积在
+      //    坑洼的背风侧。这一层是"农村"与"空地"的分界
+      for (let i = 0; i < wPx / 26; i += 1) {
+        const cx3 = ART.Hash(id + "cf" + i) * wPx;
+        const cy3 = 9 + ART.Hash(id + "cfy" + i) * 22;
+        ctx.strokeStyle = "rgba(145,139,127,0.22)";
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(cx3, cy3);
+        ctx.lineTo(cx3 + 2 + ART.Hash(id + "cfl" + i) * 5, cy3 + (ART.Hash(id + "cfa" + i) - 0.5) * 2);
+        ctx.stroke();
+      }
+      // ⑥ 粪蛋与扫街攒的粪土：**沿墙根一线**（路当中会被车碾平），
+      //    灰褐色小堆。一个没有粪的华北村子等于没有农业
+      for (let i = 0; i < wPx / 210; i += 1) {
+        const dx3 = ART.Hash(id + "dg" + i) * wPx;
+        const dy3 = 7 + ART.Hash(id + "dgy" + i) * 7;
+        ctx.fillStyle = "rgba(58,53,48,0.44)";
+        for (let k = 0; k < 4; k += 1) {
+          ctx.beginPath();
+          ctx.ellipse(dx3 + k * 3.4 + ART.Hash(id + "dk" + i + k) * 3, dy3 + ART.Hash(id + "dky" + i + k) * 3,
+            1.9, 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    });
+    PlaceSprite(mesh, xFrom, groundY, 0);
+    // 地表带钉在行走线**之下**：不钉的话它跟 walk 带道具同一个绘制序号，
+    // 房子的接地投影（AddGroundShadow）会被这张大贴图整个盖掉——
+    // 全画面一个暗部都没有，"干净得像小康村"有一半是这么来的
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 4);
+    group.add(mesh);
+  }
+
+  // 真正的水平地面：其余元素都是竖直广告牌，只有这块是躺平的几何。
+  // 相机在 y≈2.7 平视，于是它自然向地平线收敛 —— 垄沟与车辙的收敛线
+  // 就是 2.5D 纵深最强的读法，是此前一直缺的那一块。
+  function AddGroundPlane(group, length, light, id) {
+    const nearZ = 2.5, farZ = -72;
+    const depth = nearZ - farZ;
+    const wWorld = length + 220;
+    // 贴图：u 沿 x，v 沿纵深；沿 x 等距的线在透视下会收敛
+    const wPx = 1400, hPx = 900;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const pal = {
+      day: ["#5f5953", "#403d39"], dawn: ["#595451", "#3b3936"],
+      dusk: ["#514a47", "#363330"], night: ["#36404b", "#28313a"],
+      tunnel: ["#3c3833", "#272522"], dark: ["#302d29", "#1d1c1a"],
+    }[light] || ["#514b45", "#34302d"];
+    const g = ctx.createLinearGradient(0, 0, 0, hPx);
+    g.addColorStop(0, pal[1]);   // 远端更暗（空气透视）
+    g.addColorStop(1, pal[0]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, wPx, hPx);
+    // 庄稼：村子外头那一大片是**地**，不是空场。1943 年春的冀中，去年秋播的
+    // 冬麦已经返青——远处该是一块块青的。只铺在纵深的远半段（贴图上半部），
+    // 近处那一条留给村道与院子，不然人就走在麦田里了
+    const crop = {
+      day: ["#50534d", "#65645b"], dawn: ["#4c504c", "#5d5d57"],
+      dusk: ["#494c48", "#565650"], night: ["#354149", "#3d484c"],
+      tunnel: ["#333831", "#3c4038"], dark: ["#242b27", "#2e342e"],
+    }[light] || ["#626b59", "#7b806b"];
+    ctx.save();
+    for (let row = 0; row < 5; row += 1) {
+      // 行高按透视收：越远越扁
+      const v0 = (row / 5) ** 1.5, v1 = ((row + 1) / 5) ** 1.5;
+      const y0 = v0 * hPx * 0.62, y1 = v1 * hPx * 0.62;
+      let x = -ART.Hash(id + "fo" + row) * 200;
+      let i = 0;
+      while (x < wPx) {
+        const bw = 90 + ART.Hash(id + "fw" + row + i) * 190;
+        if (ART.Hash(id + "fc" + row + i) > 0.4) {
+          ctx.globalAlpha = 0.16 + row * 0.045;
+          ctx.fillStyle = ART.Hash(id + "fk" + row + i) > 0.5 ? crop[0] : crop[1];
+          ctx.fillRect(x, y0, bw, y1 - y0 + 1);
+        }
+        // 田埂：地块之间踩出来的土脊
+        ctx.globalAlpha = 0.24;
+        ctx.fillStyle = "#47443f";
+        ctx.fillRect(x, y0, 2.4, y1 - y0);
+        x += bw;
+        i += 1;
+      }
+    }
+    ctx.restore();
+    // 垄沟：沿纵深方向的长线，透视里会收敛到消失点
+    ctx.save();
+    ctx.globalAlpha = 0.30;
+    ctx.strokeStyle = "#45423e";
+    for (let i = 0; i < 46; i += 1) {
+      const x = (i / 46) * wPx + ART.Hash(id + i) * 12;
+      ctx.lineWidth = 1.6 + ART.Hash(id + "w" + i) * 2.6;
+      ctx.beginPath();
+      ctx.moveTo(x, hPx);
+      for (let t = 1; t <= 8; t += 1) {
+        ctx.lineTo(x + (ART.Hash(id + i + t) - 0.5) * 10, hPx - (t / 8) * hPx);
+      }
+      ctx.stroke();
+    }
+    // 横向的田埂与车辙
+    ctx.globalAlpha = 0.22;
+    for (let j = 0; j < 9; j += 1) {
+      const y = hPx - Math.pow(j / 9, 1.7) * hPx;
+      ctx.lineWidth = 2 + (8 - j) * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for (let t = 0; t <= 14; t += 1) ctx.lineTo((t / 14) * wPx, y + (ART.Hash(id + "h" + j + t) - 0.5) * 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ART.Speckle(ctx, 0, 0, wPx, hPx, id + "sp", { count: 520, alpha: 0.10, size: 3, color: "#3c3935" });
+
+    // 村道本身（贴图最下面那一条＝玩家脚下这一带）。老版这儿是一块平涂的土色，
+    // 干干净净——1943 年冀中的村道是独轮车和大车碾出来的：没有铺装、没有路沿，
+    // 只有两道深车辙、旱裂的泥皮、踩塌的坑，和一层碾碎的料礓石子
+    //（用户 2026-08-09："地面之类的太现代了"）。
+    // 只画贴图下缘 22% —— 再往上就是纵深里的田，不是路。
+    ctx.save();
+    const roadTop = hPx * 0.78;
+    // ① 路面比田里的土再压一档：常年碾压，颜色比生土深
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#4d4842";
+    ctx.fillRect(0, roadTop, wPx, hPx - roadTop);
+    // ② 两道车辙：顺路方向的长条，走一段浅一段（车轮跳过去了）
+    ctx.globalAlpha = 1;
+    for (const [vy, alpha, lw] of [[0.30, 0.26, 9], [0.62, 0.20, 8]]) {
+      const ry = roadTop + (hPx - roadTop) * vy;
+      ctx.strokeStyle = `rgba(47,43,39,${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.lineCap = "round";
+      let drawing = false;
+      ctx.beginPath();
+      for (let px = 0; px <= wPx; px += 14) {
+        const on = ART.Hash(id + "rut" + vy + Math.floor(px / 120)) > 0.18;
+        const yy = ry + (ART.Hash(id + "rw" + vy + px) - 0.5) * 7;
+        if (on && !drawing) { ctx.moveTo(px, yy); drawing = true; }
+        else if (on) ctx.lineTo(px, yy);
+        else drawing = false;
+      }
+      ctx.stroke();
+    }
+    // ③ 旱裂的泥皮
+    ctx.strokeStyle = "rgba(57,52,47,0.24)";
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 130; i += 1) {
+      const cx = ART.Hash(id + "ck" + i) * wPx;
+      const cy = roadTop + ART.Hash(id + "cy" + i) * (hPx - roadTop);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 1; k <= 3; k += 1) {
+        ctx.lineTo(cx + (ART.Hash(id + "cx" + i + k) - 0.5) * 34,
+          cy + (ART.Hash(id + "cz" + i + k) - 0.5) * 16);
+      }
+      ctx.stroke();
+    }
+    // ④ 踩塌的浅坑
+    for (let i = 0; i < 26; i += 1) {
+      const hx = ART.Hash(id + "ho" + i) * wPx;
+      const hy = roadTop + ART.Hash(id + "hy" + i) * (hPx - roadTop);
+      const hr = 14 + ART.Hash(id + "hr" + i) * 26;
+      ctx.fillStyle = "rgba(52,48,44,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, hr, hr * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ⑤ 碾碎的料礓石子
+    for (let i = 0; i < 420; i += 1) {
+      const sx = ART.Hash(id + "gv" + i) * wPx;
+      const sy = roadTop + ART.Hash(id + "gy" + i) * (hPx - roadTop);
+      ctx.fillStyle = ART.Hash(id + "gc" + i) > 0.5
+        ? "rgba(157,153,143,0.20)" : "rgba(76,70,63,0.25)";
+      ctx.fillRect(sx, sy, 2 + ART.Hash(id + "gs" + i) * 3, 1.8);
+    }
+    ctx.restore();
+    // Neutralize the residual ochre in legacy surface passes while retaining
+    // the hand-painted ruts, stones, and field structure beneath it.
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = "#6b6862";
+    ctx.fillRect(0, 0, wPx, hPx);
+    ctx.restore();
+
+    const tex = CanvasTexture(canvas);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(wWorld, depth),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: false, depthWrite: true }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(length / 2, SURFACE_Y - 0.02, (nearZ + farZ) / 2);
+    FixOrder(mesh, LAYER_ORDER.play - 40);   // 地面躺在整个玩法层之下
+    group.add(mesh);
+    return mesh;
+  }
+
+  // 地平线那两条远带。**这是冀中平原，不是山区**——地道战打的就是无险可守的
+  // 大平原（正因为一马平川，才只能往地下挖）。所以起伏一律压到几个像素：
+  // 剩下的纵深不靠山脊，靠一层层雾、地里的树行、和远处村落的剪影。
+  // 原来 amp 给到 40/26，画出来是两道山梁——地理错了，故事也就跟着不成立。
+  function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, haze = 0.4, rows = 0 } = {}) {
+    const worldW = length * 0.5 + 90;
+    const wPx = Math.ceil(worldW * PPM * 0.34);
+    const hPx = 180;
+    const mesh = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(0, hPx);
+      for (let px = 0; px <= wPx; px += 22) {
+        // 平原的地平线不是一把尺子：留一点极缓的起伏（田块与土路的高差）
+        const y = hPx - base - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
+        ctx.lineTo(px, y);
+      }
+      ctx.lineTo(wPx, hPx);
+      ctx.closePath();
+      ctx.fill();
+      // 平原的纵深全靠地平线上那一排小东西：防风林的树行、几户人家的屋脊。
+      // 跟带子同色同一张贴图里画完，不额外增加网格
+      // 比带子本身深一档：同色画上去等于没画（用户："背景里有一些山看不清"）
+      ctx.fillStyle = Darken(color, 0.82);
+      for (let i = 0; i < rows; i += 1) {
+        const px = (i + 0.5) * (wPx / rows) + ART.Hash(id + "r" + i) * 60 - 30;
+        const top = hPx - base - 2;
+        if (ART.Hash(id + "k" + i) > 0.45) {
+          // 树行：几团挨着的圆冠，一带就是一道防风林
+          const n = 3 + Math.floor(ART.Hash(id + "n" + i) * 4);
+          for (let t = 0; t < n; t += 1) {
+            const tx = px + t * 9 - n * 4.5;
+            const r = 4.5 + ART.Hash(id + "t" + i + t) * 3;
+            ctx.beginPath();
+            ctx.ellipse(tx, top - r * 0.5, r, r * 0.9, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          // 远处的一户：矮墙 + 一道屋脊
+          const w2 = 14 + ART.Hash(id + "w" + i) * 12;
+          ctx.fillRect(px - w2 / 2, top - 7, w2, 8);
+          ctx.beginPath();
+          ctx.moveTo(px - w2 / 2 - 3, top - 7);
+          ctx.lineTo(px, top - 13);
+          ctx.lineTo(px + w2 / 2 + 3, top - 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+      // 平原的地平线本来就淡，再叠一层半透明就整个化进天里读不出来了——
+      // 这两条带子也一律实心，退感只由染色量给（用户："背景里有一些山看不清"）
+    }, blur, 1, { color: hazeColor, amount: haze });
+    PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
+    ScaleKeepGround(mesh, 2.9, 1);
+    group.add(mesh);
+    if (group === layers.ridge) proceduralRidgeMesh = mesh;
+    }
+
+  function IsGeneratedVillageEligible(state) {
+    const chapter = CHAPTERS[state?.chapterIndex];
+    return !!state && state.chapterIndex === 0 && chapter?.scene === "village";
+  }
+
+  function SyncGeneratedBackdropVisibility(state) {
+    generatedBackdropEligible = IsGeneratedVillageEligible(state);
+    const ready = generatedBackdropStatus === "ready" && !!generatedBackdropMesh?.material?.map;
+    if (generatedBackdropMesh) generatedBackdropMesh.visible = ready && generatedBackdropEligible;
+    if (proceduralRidgeMesh) proceduralRidgeMesh.visible = !generatedBackdropEligible || !ready;
+  }
+
+  function EnsureGeneratedBackdrop() {
+    if (generatedBackdropMesh) return;
+    const comp = LAYER_COMP.ridge;
+    // Keep the source's 1:1 composition intact.  The square spans the whole
+    // village horizon while its mountain seam is aligned to the procedural
+    // ridge's surface horizon below.
+    const worldWidth = 230;
+    const worldHeight = worldWidth;
+    const mountainSeamY = SURFACE_Y + 1.45;
+    const mountainSeamFromTop = 0.66;
+    const centerY = mountainSeamY + (mountainSeamFromTop - 0.5) * worldHeight;
+    const material = new THREE.MeshBasicMaterial({ transparent: false, depthWrite: false });
+    generatedBackdropMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(worldWidth / comp, worldHeight / comp), material,
+    );
+    generatedBackdropMesh.position.set((95 / comp), centerY / comp, 0);
+    generatedBackdropMesh.userData.persist = true;
+    generatedBackdropMesh.userData.generatedAsset = TEXTURE_BACKGROUND_DAWN_FIELDS_URL;
+    FixOrder(generatedBackdropMesh, DepthOrder("ridge", -0.6));
+    generatedBackdropMesh.visible = false;
+    layers.ridge.add(generatedBackdropMesh);
+    generatedBackdropStatus = "loading";
+    LoadGeneratedTexture(TEXTURE_BACKGROUND_DAWN_FIELDS_URL).then((texture) => {
+      if (!generatedBackdropMesh) return;
+      generatedBackdropMesh.material.map = texture;
+      generatedBackdropMesh.material.needsUpdate = true;
+      generatedBackdropStatus = "ready";
+      SyncGeneratedBackdropVisibility(lastBackdropState);
+    }).catch(() => {
+      generatedBackdropStatus = "error";
+      SyncGeneratedBackdropVisibility(lastBackdropState);
+    });
+  }
+
+  // Accepted Scene One prop planes.  The source files are square with generous
+  // transparent margins; visibleBounds are alpha bounds in source pixels.  We
+  // size the world-space plane from the visible object, then offset its center
+  // so the existing prop anchor (x, surface ground) remains exact.
+  const GENERATED_SCENE_ONE_SPECS = Object.freeze({
+    houseFacadeDamaged: {
+      url: TEXTURE_HOUSE_FACADE_DAMAGED_URL,
+      visibleBounds: { minX: 318, minY: 473, maxX: 1216, maxY: 1121 },
+      target: { x: 30, groundY: SURFACE_Y, width: 8.0, height: 2.4 },
+      order: DepthOrder("play", BAND.facade),
+    },
+    doorFrameTimber: {
+      url: TEXTURE_DOOR_FRAME_TIMBER_URL,
+      visibleBounds: { minX: 420, minY: 174, maxX: 1115, maxY: 1360 },
+      target: { x: 34, groundY: SURFACE_Y, width: 1.24, height: 1.85 },
+      order: DepthOrder("play", BAND.walk) - 1,
+    },
+    kangBed: {
+      url: TEXTURE_KANG_BED_URL,
+      visibleBounds: { minX: 212, minY: 526, maxX: 1321, maxY: 1006 },
+      target: { x: 30.05, groundY: SURFACE_Y, width: 3.55, height: 1.02 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    stoolLow: {
+      url: TEXTURE_STOOL_LOW_URL,
+      visibleBounds: { minX: 337, minY: 379, maxX: 1177, maxY: 1285 },
+      target: { x: 32, groundY: SURFACE_Y, width: 0.58, height: 0.62 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    waterJarCracked: {
+      url: TEXTURE_WATER_JAR_CRACKED_URL,
+      visibleBounds: { minX: 485, minY: 371, maxX: 1052, maxY: 1165 },
+      target: { x: 43.4, groundY: SURFACE_Y, width: 0.78, height: 1.08 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    beddingRagged: {
+      url: TEXTURE_BEDDING_RAGGED_URL,
+      visibleBounds: { minX: 279, minY: 562, maxX: 1263, maxY: 988 },
+      target: { x: 31.15, groundY: SURFACE_Y + 0.035, width: 1.65, height: 0.44 },
+      order: DepthOrder("play", BAND.loose) + 2,
+    },
+    stoveColdPaperCut: {
+      url: SCENE_ONE_GENERATED_ASSETS.stoveColdPaperCut,
+      visibleBounds: { minX: 317, minY: 349, maxX: 1214, maxY: 1218 },
+      target: { x: 27.4, groundY: SURFACE_Y, width: 1.42, height: 1.30 },
+      order: DepthOrder("play", BAND.walk),
+    },
+  });
+
+  const GENERATED_SHARED_SURFACE_SPECS = Object.freeze({
+    elmSparse: {
+      url: TEXTURE_ELM_SPARSE_URL,
+      visibleBounds: { minX: 298, minY: 115, maxX: 1300, maxY: 1460 },
+      target: { x: 56.3, groundY: SURFACE_Y, width: 3.12, height: 4.18 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    wellWinchFrame: {
+      url: TEXTURE_WELL_WINCH_FRAME_URL,
+      visibleBounds: { minX: 344, minY: 251, maxX: 1192, maxY: 1285 },
+      target: { x: 58, groundY: SURFACE_Y, width: 1.36, height: 1.58 },
+      order: DepthOrder("play", BAND.walk),
+    },
+    wellStoneBase: {
+      url: TEXTURE_WELL_STONE_BASE_URL,
+      visibleBounds: { minX: 407, minY: 909, maxX: 1221, maxY: 1324 },
+      target: { x: 58, groundY: SURFACE_Y, width: 1.12, height: 0.76 },
+      order: DepthOrder("play", BAND.walk) + 1,
+    },
+    wellBucket: {
+      url: TEXTURE_WELL_BUCKET_URL,
+      visibleBounds: { minX: 396, minY: 238, maxX: 1146, maxY: 1284 },
+      target: { x: 58, groundY: SURFACE_Y + 0.66, width: 0.46, height: 0.54 },
+      order: DepthOrder("play", BAND.loose) + 1,
+    },
+    shedBurned: {
+      url: TEXTURE_SHED_BURNED_URL,
+      visibleBounds: { minX: 312, minY: 441, maxX: 1216, maxY: 1109 },
+      target: { x: 9, groundY: SURFACE_Y, width: 5.85, height: 2.18 },
+      order: DepthOrder("play", BAND.building),
+    },
+    ashDebrisPile: {
+      url: TEXTURE_ASH_DEBRIS_PILE_URL,
+      visibleBounds: { minX: 306, minY: 722, maxX: 1220, maxY: 905 },
+      target: { x: 7.6, groundY: SURFACE_Y, width: 1.36, height: 0.38 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    wellRopeDrum: {
+      url: SURFACE_GENERATED_ASSETS.wellRopeDrum,
+      visibleBounds: { minX: 136, minY: 606, maxX: 1404, maxY: 936 },
+      target: { x: 58, groundY: SURFACE_Y + WINCH_HUB_Y, width: 1.12, height: 0.30 },
+      order: DepthOrder("play", BAND.loose) + 2,
+    },
+    wellCrankHandle: {
+      url: SURFACE_GENERATED_ASSETS.wellCrankHandle,
+      visibleBounds: { minX: 626, minY: 626, maxX: 1312, maxY: 909 },
+      target: { x: 58, groundY: SURFACE_Y + WINCH_HUB_Y, width: 0.86, height: 0.56 },
+      order: DepthOrder("play", BAND.obstacle),
+    },
+    shedLooseTimberTools: {
+      url: SURFACE_GENERATED_ASSETS.shedLooseTimberTools,
+      visibleBounds: { minX: 46, minY: 656, maxX: 1490, maxY: 1013 },
+      target: { x: 8.4, groundY: SURFACE_Y, width: 1.62, height: 0.42 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    shedThatchMat: {
+      url: SURFACE_GENERATED_ASSETS.shedThatchMat,
+      visibleBounds: { minX: 95, minY: 602, maxX: 1459, maxY: 937 },
+      target: { x: 8.6, groundY: SURFACE_Y, width: 1.85, height: 0.44 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    shedReedMat: {
+      url: SURFACE_GENERATED_ASSETS.shedReedMat,
+      visibleBounds: { minX: 82, minY: 546, maxX: 1462, maxY: 989 },
+      target: { x: 9.0, groundY: SURFACE_Y, width: 1.80, height: 0.52 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    shedCharredDoorPlank: {
+      url: SURFACE_GENERATED_ASSETS.shedCharredDoorPlank,
+      visibleBounds: { minX: 31, minY: 634, maxX: 1502, maxY: 897 },
+      target: { x: 9.35, groundY: SURFACE_Y, width: 1.75, height: 0.34 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    shedFeedTrough: {
+      url: SURFACE_GENERATED_ASSETS.shedFeedTrough,
+      visibleBounds: { minX: 91, minY: 683, maxX: 1465, maxY: 966 },
+      target: { x: 10.1, groundY: SURFACE_Y, width: 1.25, height: 0.34 },
+      order: DepthOrder("play", BAND.walk),
+    },
+    ashGroundCrackedStrip: {
+      url: SURFACE_GENERATED_ASSETS.ashGroundCrackedStrip,
+      visibleBounds: { minX: 49, minY: 637, maxX: 1487, maxY: 898 },
+      target: { x: 9, groundY: SURFACE_Y + 0.015, width: 5.8, height: 0.48 },
+      order: DepthOrder("play", BAND.walk) - 2,
+      layer: "play",
+    },
+    distantVillageWatchtowers: {
+      url: SURFACE_GENERATED_ASSETS.distantVillageWatchtowers,
+      visibleBounds: { minX: 85, minY: 699, maxX: 1449, maxY: 988 },
+      target: { x: 91, groundY: SURFACE_Y + 0.02, width: 16.0, height: 1.30 },
+      order: DepthOrder("farTown", BAND.building),
+      layer: "farTown",
+    },
+    qishuHouse: {
+      url: SURFACE_GENERATED_ASSETS.qishuHouse,
+      visibleBounds: { minX: 63, minY: 448, maxX: 1476, maxY: 1108 },
+      target: { x: 51.5, groundY: SURFACE_Y, width: 7.0, height: 2.30 },
+      order: DepthOrder("play", BAND.building),
+    },
+    houseB: {
+      url: SURFACE_GENERATED_ASSETS.houseB,
+      visibleBounds: { minX: 42, minY: 475, maxX: 1500, maxY: 1111 },
+      target: { x: 64, groundY: SURFACE_Y, width: 8.5, height: 2.45 },
+      order: DepthOrder("play", BAND.building),
+    },
+    houseC: {
+      url: SURFACE_GENERATED_ASSETS.houseC,
+      visibleBounds: { minX: 62, minY: 507, maxX: 1475, maxY: 1088 },
+      target: { x: 92, groundY: SURFACE_Y, width: 9.0, height: 2.35 },
+      order: DepthOrder("play", BAND.building),
+    },
+    houseD: {
+      url: SURFACE_GENERATED_ASSETS.houseD,
+      visibleBounds: { minX: 106, minY: 357, maxX: 1431, maxY: 1185 },
+      target: { x: 148, groundY: SURFACE_Y, width: 8.0, height: 2.25 },
+      order: DepthOrder("play", BAND.building),
+    },
+    haystackFull: {
+      url: SURFACE_GENERATED_ASSETS.haystackFull,
+      visibleBounds: { minX: 305, minY: 268, maxX: 1220, maxY: 1274 },
+      target: { x: 54.6, groundY: SURFACE_Y, width: 2.6, height: 1.80 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    haystackRaided: {
+      url: SURFACE_GENERATED_ASSETS.haystackRaided,
+      visibleBounds: { minX: 68, minY: 537, maxX: 1465, maxY: 1100 },
+      target: { x: 88, groundY: SURFACE_Y, width: 2.6, height: 1.10 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    yardWallIntact: {
+      url: SURFACE_GENERATED_ASSETS.yardWallIntact,
+      visibleBounds: { minX: 72, minY: 588, maxX: 1454, maxY: 956 },
+      target: { x: 112, groundY: SURFACE_Y, width: 6.0, height: 1.10 },
+      order: DepthOrder("play", BAND.building),
+    },
+    yardWallGate: {
+      url: SURFACE_GENERATED_ASSETS.yardWallGate,
+      visibleBounds: { minX: 66, minY: 536, maxX: 1469, maxY: 995 },
+      target: { x: 45.9, groundY: SURFACE_Y, width: 2.8, height: 1.15 },
+      order: DepthOrder("play", BAND.building),
+    },
+    yardWallBroken: {
+      url: SURFACE_GENERATED_ASSETS.yardWallBroken,
+      visibleBounds: { minX: 158, minY: 526, maxX: 1388, maxY: 1055 },
+      target: { x: 84, groundY: SURFACE_Y, width: 1.5, height: 0.82 },
+      order: DepthOrder("play", BAND.obstacle),
+    },
+    oldWoodDoors: {
+      url: SURFACE_GENERATED_ASSETS.oldWoodDoors,
+      visibleBounds: { minX: 412, minY: 174, maxX: 1148, maxY: 1381 },
+      target: { x: 10.7, groundY: SURFACE_Y, width: 1.55, height: 1.80 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    noticeWall: {
+      url: SURFACE_GENERATED_ASSETS.noticeWall,
+      visibleBounds: { minX: 154, minY: 298, maxX: 1382, maxY: 1231 },
+      target: { x: 23.3, groundY: SURFACE_Y, width: 2.6, height: 1.55 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    pigpenEmpty: {
+      url: SURFACE_GENERATED_ASSETS.pigpenEmpty,
+      visibleBounds: { minX: 93, minY: 561, maxX: 1442, maxY: 1055 },
+      target: { x: 44.9, groundY: SURFACE_Y, width: 2.7, height: 0.98 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    stalkFence: {
+      url: SURFACE_GENERATED_ASSETS.stalkFence,
+      visibleBounds: { minX: 79, minY: 400, maxX: 1456, maxY: 1116 },
+      target: { x: 168.5, groundY: SURFACE_Y, width: 5.0, height: 1.35 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    cropRowsSparse: {
+      url: SURFACE_GENERATED_ASSETS.cropRowsSparse,
+      visibleBounds: { minX: 33, minY: 698, maxX: 1492, maxY: 940 },
+      target: { x: 13.6, groundY: SURFACE_Y, width: 5.0, height: 0.60 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    stubbleField: {
+      url: SURFACE_GENERATED_ASSETS.stubbleField,
+      visibleBounds: { minX: 35, minY: 670, maxX: 1500, maxY: 871 },
+      target: { x: 176.8, groundY: SURFACE_Y, width: 7.4, height: 0.52 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    sownField: {
+      url: SURFACE_GENERATED_ASSETS.sownField,
+      visibleBounds: { minX: 52, minY: 651, maxX: 1481, maxY: 951 },
+      target: { x: 183.8, groundY: SURFACE_Y, width: 4.6, height: 0.60 },
+      order: DepthOrder("play", BAND.yard),
+    },
+    woodpile: {
+      url: SURFACE_GENERATED_ASSETS.woodpile,
+      visibleBounds: { minX: 80, minY: 514, maxX: 1442, maxY: 1024 },
+      target: { x: 70, groundY: SURFACE_Y, width: 2.3, height: 0.86 },
+      order: DepthOrder("play", BAND.walk),
+    },
+    firewoodBundle: {
+      url: SURFACE_GENERATED_ASSETS.firewoodBundle,
+      visibleBounds: { minX: 134, minY: 518, maxX: 1418, maxY: 1002 },
+      target: { x: 44.5, groundY: SURFACE_Y, width: 2.2, height: 0.95 },
+      order: DepthOrder("play", BAND.clutter),
+    },
+  });
+
+  const GENERATED_CELLAR_SPECS = Object.freeze([
+    {
+      key: "cellarEarthWallTile", url: TEXTURE_CELLAR_EARTH_WALL_TILE_URL,
+      visibleBounds: { minX: 121, minY: 422, maxX: 1429, maxY: 1080 },
+      target: { x: 30.5, groundY: UNDER_Y, width: 8.35, height: 2.48 },
+      order: DepthOrder("play", BAND.building) + 1,
+    },
+    ...[27.4, 30.0, 32.6, 34.7].map((x) => ({
+      key: "cellarTimberPost", url: TEXTURE_CELLAR_TIMBER_POST_URL,
+      visibleBounds: { minX: 639, minY: 147, maxX: 902, maxY: 1395 },
+      target: { x, groundY: UNDER_Y, width: 0.34, height: 2.26 },
+      order: DepthOrder("play", BAND.nearBack),
+    })),
+    {
+      key: "cellarTimberBeam", url: TEXTURE_CELLAR_TIMBER_BEAM_URL,
+      visibleBounds: { minX: 153, minY: 640, maxX: 1381, maxY: 896 },
+      target: { x: 30.6, groundY: UNDER_Y + 2.18, width: 8.15, height: 0.28 },
+      order: DepthOrder("play", BAND.nearBack) + 1,
+    },
+    {
+      key: "oilLampWeak", url: TEXTURE_OIL_LAMP_WEAK_URL,
+      visibleBounds: { minX: 571, minY: 572, maxX: 976, maxY: 1156 },
+      target: { x: 25.95, groundY: UNDER_Y + 0.02, width: 0.48, height: 0.70 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    {
+      key: "clothBundleOld", url: TEXTURE_CLOTH_BUNDLE_OLD_URL,
+      visibleBounds: { minX: 474, minY: 638, maxX: 1063, maxY: 912 },
+      target: { x: 27.0, groundY: UNDER_Y + 0.02, width: 0.82, height: 0.38 },
+      order: DepthOrder("play", BAND.loose),
+    },
+    {
+      key: "freshEarthMound", url: TEXTURE_FRESH_EARTH_MOUND_URL,
+      visibleBounds: { minX: 317, minY: 578, maxX: 1199, maxY: 878 },
+      target: { x: 27.1, groundY: UNDER_Y + 0.02, width: 1.42, height: 0.48 },
+      order: DepthOrder("play", BAND.walk) + 2,
+    },
+    {
+      key: "cellarLongLadder", url: CELLAR_GENERATED_ASSETS.cellarLongLadder,
+      visibleBounds: { minX: 654, minY: 29, maxX: 881, maxY: 1507 },
+      target: { x: 29.0, groundY: UNDER_Y, width: 0.92, height: 3.92 },
+      order: DepthOrder("play", BAND.loose) + 1,
+    },
+    {
+      key: "cellarStorageCluster", url: CELLAR_GENERATED_ASSETS.cellarStorageCluster,
+      visibleBounds: { minX: 138, minY: 541, maxX: 1441, maxY: 1208 },
+      target: { x: 33.9, groundY: UNDER_Y + 0.04, width: 2.65, height: 1.34 },
+      order: DepthOrder("play", BAND.walk) + 2,
+    },
+  ]);
+
+  function PositionGeneratedPlane(mesh, spec) {
+    const b = spec.visibleBounds;
+    const t = spec.target;
+    const sourceW = 1536, sourceH = 1536;
+    const visibleW = Math.max(1, b.maxX - b.minX + 1);
+    const visibleH = Math.max(1, b.maxY - b.minY + 1);
+    const fullW = t.width * sourceW / visibleW;
+    const fullH = t.height * sourceH / visibleH;
+    const centerFractionX = ((b.minX + b.maxX) * 0.5) / sourceW;
+    const bottomFractionY = b.maxY / sourceH;
+    mesh.geometry.dispose?.();
+    mesh.geometry = new THREE.PlaneGeometry(fullW, fullH);
+    mesh.position.set(
+      t.x + (0.5 - centerFractionX) * fullW,
+      t.groundY - fullH * 0.5 + bottomFractionY * fullH,
+      0,
+    );
+    mesh.userData.generatedOffset = {
+      x: mesh.position.x - t.x,
+      y: mesh.position.y - t.groundY,
+    };
+    mesh.userData.anchor = { x: t.x, y: t.groundY, z: 0 };
+    mesh.userData.targetDimensions = { width: t.width, height: t.height };
+    mesh.userData.sourceDimensions = { width: sourceW, height: sourceH };
+    mesh.userData.visibleBounds = { ...b };
+  }
+
+  function PlaceGeneratedPlane(mesh, x, groundY, z = 0, { scaleX = 1, scaleY = 1 } = {}) {
+    if (!mesh) return;
+    const offset = mesh.userData.generatedOffset || { x: 0, y: 0 };
+    mesh.scale.set(scaleX, scaleY, 1);
+    mesh.position.set(x + offset.x * scaleX, groundY + offset.y * scaleY, z);
+    mesh.userData.anchor = { x, y: groundY, z: 0 };
+  }
+
+  function DrawForageAshOverlay(ctx, ax, ay, { k = 0, jar = false, open = false } = {}) {
+    if (!jar && !open) return;
+    const kk = Math.max(0, Math.min(1, k));
+    const moundHeight = 24 * (1 - 0.55 * kk);
+    const jarY = ay - moundHeight * 0.34;
+    const FillStroke = (points, fill, stroke = "rgba(30,25,20,0.88)", lineWidth = 1.8) => {
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    };
+
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    FillStroke([
+      [ax - 11, ay], [ax - 12, jarY + 4], [ax - 8, jarY - 3], [ax, jarY - 5],
+      [ax + 8, jarY - 3], [ax + 12, jarY + 4], [ax + 11, ay],
+    ], "#57534a");
+    if (open) {
+      ctx.fillStyle = "#1a150f";
+      ctx.beginPath();
+      ctx.ellipse(ax, jarY - 4, 7.6, 2.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      FillStroke([
+        [ax + 4, jarY - 4], [ax + 13, jarY - 6],
+        [ax + 15, jarY + 3], [ax + 6, jarY + 2],
+      ], "#2a3448", "rgba(24,28,38,0.9)", 1.6);
+      ctx.fillStyle = "rgba(196,204,214,0.6)";
+      ctx.beginPath(); ctx.ellipse(ax + 9, jarY - 2, 0.9, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(ax + 12, jarY + 0.6, 0.8, 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      FillStroke([
+        [ax - 9, jarY - 2], [ax - 7, jarY - 8], [ax, jarY - 10],
+        [ax + 7, jarY - 8], [ax + 9, jarY - 2], [ax, jarY + 1],
+      ], "#2a3448", "rgba(24,28,38,0.9)", 1.6);
+      ctx.fillStyle = "rgba(196,204,214,0.6)";
+      for (let i = 0; i < 3; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(ax - 4 + i * 4, jarY - 7.2 + (i % 2) * 1.2, 0.9, 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "#6d5a3a";
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < 3; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(ax - 8.5, jarY - 2.4 - i * 1.7);
+        ctx.lineTo(ax + 8.5, jarY - 2.6 - i * 1.7);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function ClearGeneratedCellarPlanes() {
+    for (const meshes of Object.values(generatedCellarMeshes)) {
+      while (meshes.length) {
+        const mesh = meshes.pop();
+        layers.play.remove(mesh);
+        mesh.geometry?.dispose?.();
+        mesh.material?.dispose?.();
+      }
+    }
+  }
+
+  function GeneratedCellarFlagVisible(key, state) {
+    if (key === "clothBundleOld") return !state?.flags?.clothesBuried;
+    if (key === "freshEarthMound") return !!state?.flags?.clothesBuried;
+    return true;
+  }
+
+  function SyncGeneratedCellarVisibility(state) {
+    generatedCellarEligible = IsGeneratedVillageEligible(state);
+    for (const [key, meshes] of Object.entries(generatedCellarMeshes)) {
+      const visible = generatedCellarEligible
+        && generatedCellarStatuses[key] === "ready"
+        && GeneratedCellarFlagVisible(key, state);
+      for (const mesh of meshes) mesh.visible = visible;
+    }
+    for (const [key, meshes] of generatedPropFallbacks) {
+      const generatedReady = generatedCellarEligible && generatedCellarStatuses[key] === "ready";
+      const visible = !generatedReady && GeneratedCellarFlagVisible(key, state);
+      for (const mesh of meshes) mesh.visible = visible;
+    }
+  }
+
+  function MakeGeneratedCellarPlane(key, spec) {
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true, alphaTest: 0.02, depthWrite: false,
+      side: THREE.DoubleSide, toneMapped: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    mesh.userData.persist = true;
+    mesh.userData.generatedAsset = spec.url;
+    mesh.userData.generatedAssetKey = key;
+    mesh.userData.generatedRole = key;
+    PositionGeneratedPlane(mesh, spec);
+    FixOrder(mesh, spec.order);
+    mesh.visible = false;
+    layers.play.add(mesh);
+    generatedCellarMeshes[key].push(mesh);
+    return mesh;
+  }
+
+  function BuildGeneratedCellarAssets(state, sceneKey) {
+    ClearGeneratedCellarPlanes();
+    if (state?.chapterIndex !== 0 || sceneKey !== "village") {
+      SyncGeneratedCellarVisibility(state);
+      return;
+    }
+    for (const spec of GENERATED_CELLAR_SPECS) {
+      MakeGeneratedCellarPlane(spec.key, spec);
+      // The same ladder art is intentionally instanced at both village
+      // shafts; keeping a plane per shaft preserves the climb/hatch read when
+      // the camera crosses from the home cellar to Qishu's cellar.
+      if (spec.key === "cellarLongLadder") {
+        MakeGeneratedCellarPlane(spec.key, {
+          ...spec,
+          target: { ...spec.target, x: 52.6 },
+        });
+      }
+    }
+    for (const [key, meshes] of Object.entries(generatedCellarMeshes)) {
+      if (!meshes.length) continue;
+      generatedCellarStatuses[key] = "loading";
+      const url = meshes[0].userData.generatedAsset;
+      LoadGeneratedTexture(url).then((texture) => {
+        for (const mesh of generatedCellarMeshes[key]) {
+          mesh.material.map = texture;
+          mesh.material.needsUpdate = true;
+        }
+        generatedCellarStatuses[key] = "ready";
+        SyncGeneratedCellarVisibility(lastBackdropState);
+      }).catch(() => {
+        generatedCellarStatuses[key] = "error";
+        SyncGeneratedCellarVisibility(lastBackdropState);
+      });
+    }
+    SyncGeneratedCellarVisibility(state);
+  }
+
+  function MakeGeneratedPropPlane(key, spec) {
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true,
+      alphaTest: 0.02,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    mesh.userData.persist = true;
+    mesh.userData.generatedAsset = spec.url;
+    mesh.userData.generatedAssetKey = key;
+    mesh.userData.generatedRole = key;
+    const layer = spec.layer || "play";
+    const comp = LAYER_COMP[layer] || 1;
+    const worldTarget = { ...spec.target };
+    const localSpec = {
+      ...spec,
+      target: {
+        ...spec.target,
+        x: spec.target.x / comp,
+        groundY: spec.target.groundY / comp,
+        width: spec.target.width / comp,
+        height: spec.target.height / comp,
+      },
+    };
+    PositionGeneratedPlane(mesh, localSpec);
+    mesh.userData.worldTarget = worldTarget;
+    mesh.userData.generatedLayer = layer;
+    mesh.userData.generatedBound = false;
+    FixOrder(mesh, spec.order);
+    mesh.visible = false;
+    (layers[layer] || layers.play).add(mesh);
+    return mesh;
+  }
+
+  function GeneratedSurfaceList(key) {
+    return generatedSurfaceInstances[key] || [];
+  }
+
+  function RemoveGeneratedSurfaceExtras() {
+    for (const [key, meshes] of Object.entries(generatedSurfaceInstances)) {
+      const keep = [];
+      for (const mesh of meshes) {
+        if (generatedSurfaceBase.has(mesh)) {
+          mesh.userData.generatedBound = false;
+          generatedSurfaceBound.delete(mesh);
+          keep.push(mesh);
+          continue;
+        }
+        const layer = layers[mesh.userData.generatedLayer || "play"] || layers.play;
+        layer.remove(mesh);
+        mesh.geometry?.dispose?.();
+        mesh.material?.dispose?.();
+        generatedSurfaceBound.delete(mesh);
+      }
+      generatedSurfaceInstances[key] = keep;
+    }
+  }
+
+  function ApplyGeneratedSurfaceTexture(key, texture) {
+    for (const mesh of GeneratedSurfaceList(key)) {
+      mesh.material.map = texture;
+      mesh.material.needsUpdate = true;
+    }
+  }
+
+  function BindGeneratedSurface(key, target, { bound = true } = {}) {
+    const spec = GENERATED_SHARED_SURFACE_SPECS[key];
+    if (!spec) return null;
+    const list = GeneratedSurfaceList(key);
+    let mesh = list.find((entry) => !entry.userData.generatedBound);
+    if (!mesh) {
+      mesh = MakeGeneratedPropPlane(key, { ...spec, target: { ...spec.target, ...target } });
+      list.push(mesh);
+      generatedSurfaceInstances[key] = list;
+      if (generatedSurfaceStatuses[key] === "ready") {
+        const texture = generatedSurfaceMeshes[key]?.material?.map;
+        if (texture) ApplyGeneratedSurfaceTexture(key, texture);
+      }
+    } else if (target) {
+      const next = { ...spec, target: { ...spec.target, ...target } };
+      const layer = spec.layer || "play";
+      const comp = LAYER_COMP[layer] || 1;
+      PositionGeneratedPlane(mesh, {
+        ...next,
+        target: {
+          ...next.target,
+          x: next.target.x / comp,
+          groundY: next.target.groundY / comp,
+          width: next.target.width / comp,
+          height: next.target.height / comp,
+        },
+      });
+      mesh.userData.worldTarget = { ...next.target };
+    }
+    mesh.userData.generatedBound = !!bound;
+    if (bound) generatedSurfaceBound.add(mesh);
+    return mesh;
+  }
+
+  function LinkGeneratedSurfaceFallback(key, meshes, target) {
+    const generated = BindGeneratedSurface(key, target);
+    const list = RegisterGeneratedFallback(generatedSurfaceFallbacks, key, meshes);
+    for (const mesh of list) {
+      if (!mesh.userData.generatedSurfaceMesh) mesh.userData.generatedSurfaceMesh = generated;
+    }
+    return generated;
+  }
+
+  function CreateGeneratedSurfaceFallback(key, target, draw, { layer = "play", order } = {}) {
+    const spec = GENERATED_SHARED_SURFACE_SPECS[key];
+    if (!spec) return null;
+    const comp = LAYER_COMP[layer] || 1;
+    const width = Math.max(1, Math.ceil((target.width / comp) * PPM));
+    const height = Math.max(1, Math.ceil((target.height / comp) * PPM));
+    const mesh = BakeSprite(width, height, width / 2, height, draw, 0, PROP_SS);
+    PlaceSprite(mesh, target.x / comp, target.groundY / comp, PlaceZ(BAND.walk));
+    FixOrder(mesh, order ?? spec.order);
+    mesh.userData.kind = "generatedFallback:" + key;
+    (layers[layer] || layers.play).add(mesh);
+    LinkGeneratedSurfaceFallback(key, [mesh], target);
+    return mesh;
+  }
+
+  // Marks are kept as a separate transparent overlay so the accepted timber
+  // door frame never discards the existing player-carved state.  The old
+  // procedural frame remains the complete fallback while this overlay is only
+  // shown with the generated frame.
+  let generatedDoorMarksCanvas = null;
+  let generatedDoorMarksTexture = null;
+  let generatedDoorMarksMesh = null;
+  function RedrawGeneratedDoorMarks() {
+    if (!generatedDoorMarksCanvas || !generatedDoorMarksTexture) return;
+    const ctx = generatedDoorMarksCanvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, generatedDoorMarksCanvas.width, generatedDoorMarksCanvas.height);
+    const b = GENERATED_SCENE_ONE_SPECS.doorFrameTimber.visibleBounds;
+    const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+    const mapX = (fraction) => b.minX + fraction * bw;
+    const mapYFromBottom = (fraction) => b.maxY - fraction * bh;
+    const stroke = (x0, y0, x1, y1, color, width = 10) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(mapX(x0), mapYFromBottom(y0));
+      ctx.lineTo(mapX(x1), mapYFromBottom(y1));
+      ctx.stroke();
+    };
+    // Existing marks are on the left post, aligned to the same relative
+    // heights as ART.DrawDoorframe's 52/57/47px strokes.
+    if (carveState.marked) stroke(0.10, 0.73, 0.20, 0.73, "#f0e0b0", 7);
+    if (carveState.carved) stroke(0.10, 0.62, 0.20, 0.62, "#fff0c8", 7);
+    for (let s = 0; s < carveState.tally; s += 1) {
+      const char = Math.floor(s / 5), st = s % 5;
+      const base = 0.56 - char * 0.11;
+      const x0 = 0.12, x1 = 0.22, mid = 0.17;
+      if (st === 0) stroke(x0, base + 0.035, x1, base + 0.035, "#f6ead0", 5);
+      else if (st === 1) stroke(mid, base + 0.035, mid, base - 0.04, "#f6ead0", 5);
+      else if (st === 2) stroke(x0, base, x1, base, "#f6ead0", 5);
+      else if (st === 3) stroke(x0 + 0.02, base, x0 + 0.02, base - 0.08, "#f6ead0", 5);
+      else stroke(x0, base - 0.08, x1, base - 0.08, "#f6ead0", 5);
+    }
+    generatedDoorMarksTexture.needsUpdate = true;
+  }
+
+  function EnsureGeneratedSceneOneAssets() {
+    if (!generatedAssetMeshes.houseFacadeDamaged) {
+      for (const [key, spec] of Object.entries(GENERATED_SCENE_ONE_SPECS)) {
+        generatedAssetMeshes[key] = MakeGeneratedPropPlane(key, spec);
+        generatedAssetStatuses[key] = "loading";
+        LoadGeneratedTexture(spec.url).then((texture) => {
+          const mesh = generatedAssetMeshes[key];
+          if (!mesh) return;
+          mesh.material.map = texture;
+          mesh.material.needsUpdate = true;
+          generatedAssetStatuses[key] = "ready";
+          SyncGeneratedAssetVisibility(lastBackdropState);
+        }).catch(() => {
+          generatedAssetStatuses[key] = "error";
+          SyncGeneratedAssetVisibility(lastBackdropState);
+        });
+      }
+      generatedDoorMarksCanvas = MakeCanvas(1536, 1536);
+      generatedDoorMarksTexture = CanvasTexture(generatedDoorMarksCanvas);
+      generatedDoorMarksMesh = new THREE.Mesh(
+        generatedAssetMeshes.doorFrameTimber.geometry,
+        new THREE.MeshBasicMaterial({
+          map: generatedDoorMarksTexture, transparent: true, alphaTest: 0.01,
+          depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+        }),
+      );
+      generatedDoorMarksMesh.userData.persist = true;
+      generatedDoorMarksMesh.userData.generatedAssetKey = "doorFrameMarks";
+      generatedDoorMarksMesh.userData.generatedRole = "doorFrameMarks";
+      generatedDoorMarksMesh.position.copy(generatedAssetMeshes.doorFrameTimber.position);
+      generatedDoorMarksMesh.userData.anchor = { ...generatedAssetMeshes.doorFrameTimber.userData.anchor };
+      FixOrder(generatedDoorMarksMesh, GENERATED_SCENE_ONE_SPECS.doorFrameTimber.order + 1);
+      layers.play.add(generatedDoorMarksMesh);
+      RedrawGeneratedDoorMarks();
+    }
+  }
+
+  function EnsureGeneratedSurfaceAssets() {
+    if (generatedSurfaceMeshes.elmSparse) return;
+    for (const [key, spec] of Object.entries(GENERATED_SHARED_SURFACE_SPECS)) {
+      const mesh = MakeGeneratedPropPlane(key, spec);
+      generatedSurfaceMeshes[key] = mesh;
+      generatedSurfaceInstances[key].push(mesh);
+      generatedSurfaceBase.add(mesh);
+      generatedSurfaceStatuses[key] = "loading";
+      LoadGeneratedTexture(spec.url).then((texture) => {
+        ApplyGeneratedSurfaceTexture(key, texture);
+        generatedSurfaceStatuses[key] = "ready";
+        SyncGeneratedSurfaceVisibility(lastBackdropState);
+      }).catch(() => {
+        generatedSurfaceStatuses[key] = "error";
+        SyncGeneratedSurfaceVisibility(lastBackdropState);
+      });
+    }
+  }
+
+  function SyncGeneratedAssetVisibility(state) {
+    generatedAssetEligible = IsGeneratedVillageEligible(state);
+    for (const [key, mesh] of Object.entries(generatedAssetMeshes)) {
+      const ready = generatedAssetStatuses[key] === "ready" && !!mesh?.material?.map;
+      const stateVisible = key !== "houseFacadeDamaged" || !state?.flags?.ruined;
+      if (mesh) mesh.visible = generatedAssetEligible && ready && stateVisible;
+    }
+    if (generatedDoorMarksMesh) {
+      generatedDoorMarksMesh.visible = generatedAssetEligible
+        && generatedAssetStatuses.doorFrameTimber === "ready";
+    }
+    for (const [key, meshes] of generatedSceneOneFallbacks) {
+      const generatedReady = generatedAssetEligible && generatedAssetStatuses[key] === "ready"
+        && (key !== "houseFacadeDamaged" || !state?.flags?.ruined);
+      for (const mesh of meshes) mesh.visible = !generatedReady;
+    }
+  }
+
+  function SurfaceStateVisible(key, state) {
+    if (key === "wellBucket") return !!state?.winchView?.hooked;
+    if (key === "wellRopeDrum" || key === "wellCrankHandle") return !!state?.winchView?.hooked;
+    if (key === "ashDebrisPile") return !!state?.forage?.ash;
+    // The burned-shed tools are a static village prop.  The other four keys
+    // are live forage pieces and must follow the object that owns their
+    // procedural fallback (otherwise a generated trough can flash before the
+    // door has been dragged far enough to expose it).
+    if (key === "shedLooseTimberTools") return true;
+    if (key === "shedThatchMat") return !!state?.forage?.mat;
+    if (key === "shedReedMat") return !!state?.forage?.reed;
+    if (key === "shedCharredDoorPlank") return !!state?.forage?.plank;
+    if (key === "shedFeedTrough") {
+      // Keep the accepted trough plane present for the active forage beat;
+      // the live plank remains as the occluding procedural read until it has
+      // been dragged clear.
+      return !!state?.forage?.trough;
+    }
+    if (["houseC"].includes(key)) return !state?.flags?.ruined;
+    return true;
+  }
+
+  function SyncGeneratedSurfaceVisibility(state) {
+    generatedSurfaceEligible = IsGeneratedVillageEligible(state);
+    for (const [key, meshes] of Object.entries(generatedSurfaceInstances)) {
+      const ready = generatedSurfaceStatuses[key] === "ready";
+      const stateVisible = SurfaceStateVisible(key, state);
+      for (const mesh of meshes) {
+        let variantVisible = true;
+        if (key === "haystackFull") variantVisible = !mesh.userData.generatedRaided;
+        if (key === "haystackRaided") variantVisible = !!mesh.userData.generatedRaided;
+        mesh.visible = generatedSurfaceEligible && ready && stateVisible && variantVisible
+          && !!mesh.userData.generatedBound;
+      }
+    }
+    for (const [key, meshes] of generatedSurfaceFallbacks) {
+      for (const mesh of meshes) {
+        const generated = mesh.userData.generatedSurfaceMesh
+          || GeneratedSurfaceList(key).find((entry) => entry.visible);
+        const generatedReady = generatedSurfaceEligible
+          && generatedSurfaceStatuses[key] === "ready"
+          && SurfaceStateVisible(key, state)
+          && (!!generated ? generated.visible : false);
+        mesh.visible = !generatedReady;
+      }
+    }
+  }
+
+  // 地平线上的炮楼。1942-43 年的冀中，日军「囚笼政策」把平原用公路、封锁沟和
+  // **每隔几里一座的炮楼**割成小块——站在村里往哪边看都能看见一两座，
+  // 这就是"敌后"两个字的字面意思。所以它们不是布景，是这一章的处境本身。
+  //
+  // 摆在 hills/farTown 层：一律**只画剪影**（层的糊与雾色会把细节吃掉，
+  // 画细了是白费）。夜里楼顶点一粒灯——这游戏讲的就是灯。
+  // 把远景带的颜色压深一档：炮楼是这片空地上唯一的硬边，跟地平线同色就白摆了
+  const Darken = (hex, k) => {
+    const n = parseInt(hex.slice(1), 16);
+    const f = (v) => Math.max(0, Math.round(v * k));
+    return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  };
+
+  function AddHorizonForts(list, pal, night, ruined) {
+    for (const spec of list || []) {
+      const key = spec.layer;
+      const group = layers[key];
+      if (!group) continue;
+      const hM = spec.h || 12;                   // 炮楼一般十来米，平原上老远就看得见
+      const wPx = 150, hPx = Math.ceil(hM * PPM * 0.42) + 40;
+      // 糊与雾都只给该层的一半：一片空地上竖着的砖石塔，本来就比田野的
+      // 轮廓硬、比远村的色深。按整层的量去糊，它就化进地平线里没了
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 6, (ctx, ax, ay) => {
+        ART.DrawHorizonFort(ctx, ax, ay, hM * PPM * 0.42, spec.id,
+          { color: Darken(pal, night ? 0.82 : 0.72), lit: night && !ruined });
+      }, (LAYER_BLUR[key] || 0) * 0.45, 1, HazeSolid(key, key === "hills" ? 0.95 : 0.88, 0.5));
+      PlaceSprite(mesh, spec.x, SURFACE_Y - 0.1, 0);
+      // 层的补偿只服务于铺满画框的背景板；离散的建筑要按透视自然变小
+      ScaleKeepGround(mesh, 1 / LAYER_COMP[key]);
+      group.add(mesh);
+    }
+  }
+
+  // 前景框景（草丛/垂枝/篱笆）已整个撤掉，2026-08-10 用户报的：
+  // 「镜头前面两根白白的模糊一坨的这个鬼东西」。查出来是两头都不成立：
+  //  · 它按 SURFACE_Y 摆位（草丛/篱笆锚在 SURFACE_Y-4.4，连缩放算下来覆盖
+  //    y −4.40→+1.06），而地道内部是 −3.60(地面)→−1.55(洞顶)——**整条地道
+  //    被它糊满**。这作品地表和地下在同一个场景里，"压到画框下缘之外"
+  //    这个前提只在地表机位成立，镜头一沉下去它就正对着画面中央。
+  //  · 而在它本该干活的地表中远景上，实拍逐像素比对只改动了 0.25% 的像素
+  //    （平均色差 0.07）——等于没画。地下反倒是 2.51%。
+  // 结论：不是调参能救的，删。fore 层本身留着（层表/绘制序不动），
+  // 以后真要做勇敢的心式的框景，**摆位必须跟着镜头所在的那一层的地平线走**，
+  // 而不是写死 SURFACE_Y；下面 ApplyCamera 里的可见性闸门已经把地下挡掉了。
+
+  // 空气里的浮尘（`AddDust`）已整个删除（2026-08-10 用户："不喜欢游戏里的雪花
+  // 噪点粒子"）。那批 18~26 个加色小亮点是**按画框循环**的，不跟着世界走——
+  // 镜头一横移它们原地打转，读出来不是光束里的尘，是蒙在屏幕上的一层雪花噪点。
+  // 真要再做光柱里的尘，得钉在光源的世界坐标上、只在光锥里出现，别再铺满画框。
+
+  // 倒土：从筐口真的落下来的那股土
+  //
+  // 姿势和筐都翻过去了，可要是筐口什么都不出来，玩家看到的还是"弯个腰"——
+  // 做功要看得着（CLAUDE.md 拟物交互第 1 条：物体要答话）。土是**成股**落的，
+  // 所以每帧撒几粒、各带一点横向散开，落到本层的地平线上就没。
+  // 挂 fx 层 +180（比刨花低一档，两者不会同时出现，留出次序好读）。
+  function UpdateDirtPour(state, p, dt) {
+    const pouring = p.pose === "pourBasket" && (p.poseU || 0) > 0.06;
+    const ground = p.level === "under" ? UNDER_Y : SURFACE_Y;
+    if (pouring && state.handAt) {
+      if (!dirtGrainTex) {
+        const c = MakeCanvas(16, 16);
+        const g = c.getContext("2d");
+        // 深层黏土：比表土深一档（这正是"撒进菜畦一眼就穿"的道理）。
+        // **颜色按 sRGB 没声明那条老账往下压两档**——第一版用 #5b4a33，
+        // 实拍出来是几粒发白的小点，跟土墙一个亮度，等于没画。
+        g.fillStyle = "#33281a";
+        g.beginPath(); g.ellipse(8, 8, 7, 5.6, 0.4, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(0,0,0,0.34)";
+        g.beginPath(); g.ellipse(9.4, 9.6, 3.4, 2.6, 0.4, 0, Math.PI * 2); g.fill();
+        dirtGrainTex = CanvasTexture(c);
+      }
+      // 倒得越狠出得越急；一筐土是有数的，末了自然稀下来
+      const rate = 34 * Math.min(1, (p.poseU || 0) * 1.6) * (1 - 0.45 * (p.poseU || 0));
+      let n = rate * dt;
+      while (n > 0) {
+        if (n < 1 && Math.random() > n) break;
+        n -= 1;
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.07 + Math.random() * 0.07, 0.06 + Math.random() * 0.06),
+          new THREE.MeshBasicMaterial({ map: dirtGrainTex, transparent: true, depthWrite: false }),
+        );
+        // 从**筐口**出，不是从手心出：筐扣下去之后口沿在手的前下方，
+        // 土要是从手心冒出来，看着就是"手在漏土"
+        const dir = p.heading >= 0 ? 1 : -1;
+        const lip = 0.16 + 0.14 * (p.poseU || 0);
+        m.position.set(state.handAt.x + dir * (lip + Math.random() * 0.12),
+          state.handAt.y - 0.10 - Math.random() * 0.08, PlaceZ(BAND.loose));
+        m.userData = {
+          vx: dir * (0.25 + Math.random() * 0.5), vy: -0.15 - Math.random() * 0.3,
+          spin: (Math.random() - 0.5) * 7,
+        };
+        FixOrder(m, LAYER_ORDER.fx + 180);
+        layers.fx.add(m);
+        dirtGrains.push(m);
+      }
+    }
+    for (let i = dirtGrains.length - 1; i >= 0; i -= 1) {
+      const m = dirtGrains[i];
+      const u = m.userData;
+      u.vy -= 9.0 * dt;                 // 土块不飘，落得干脆
+      m.position.x += u.vx * dt;
+      m.position.y += u.vy * dt;
+      m.rotation.z += u.spin * dt;
+      // 落到地平线就没了——地上那薄薄一层由 freshDirt 那件道具接着演（showFlag）
+      if (m.position.y <= ground + 0.02) {
+        layers.fx.remove(m);
+        m.geometry.dispose(); m.material.dispose();
+        dirtGrains.splice(i, 1);
+      }
+    }
+  }
+
+  function AddParallaxTown(group, xFrom, xTo, color, id, { ruined = false, objScale = 1, opacity = 0.62 } = {}) {
+    for (let x = xFrom; x < xTo; x += 9 + ART.Hash(id + x) * 9) {
+      const w = 9 + ART.Hash(id + "w" + x) * 7;
+      const h = 2.6 + ART.Hash(id + "h" + x) * 1.6;
+      const wPx = Math.ceil((w + 4) * PPM), hPx = Math.ceil((h + 1.6) * PPM);
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx, (ctx, ax, ay) => {
+        const W = w * PPM, H = h * PPM;
+        // 远景屋：墙 + 出檐坡顶 + 一点窗，比纯剪影耐看
+        ART.InkFill(ctx, ART.Rect(ax - W / 2, ay - H, W, H), id + x, color,
+          { amp: 1.6, lw: 1.6, line: "rgba(43,31,22,0.35)" });
+        ART.InkFill(ctx, [
+          [ax - W / 2 - 10, ay - H], [ax - W * 0.26, ay - H - 26],
+          [ax + W * 0.26, ay - H - 26], [ax + W / 2 + 10, ay - H],
+        ], id + "r" + x, color, { amp: 1.4, lw: 1.6, line: "rgba(43,31,22,0.35)", shade: "rgba(0,0,0,0.12)" });
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "rgba(30,22,16,0.6)";
+        ctx.fillRect(ax - W * 0.2, ay - H * 0.62, W * 0.16, H * 0.2);
+        ctx.globalAlpha = 1;
+        // 院落配件：矮院墙、柴垛、井架、旗杆——远处也要有生活痕迹
+        const v = ART.Hash(id + "v" + x);
+        ART.InkFill(ctx, ART.Rect(ax - W / 2 - 34, ay - 26, 34, 26), id + "yard" + x, color,
+          { amp: 1.4, lw: 1.4, line: "rgba(43,31,22,0.3)" });
+        if (v > 0.72) {
+          // 井架
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 10, ay - 46, 5, 46), id + "wp" + x, color, { amp: 1, lw: 1.2, line: null });
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 30, ay - 46, 5, 46), id + "wq" + x, color, { amp: 1, lw: 1.2, line: null });
+          ART.InkFill(ctx, ART.Rect(ax + W / 2 + 6, ay - 52, 33, 6), id + "wt" + x, color, { amp: 1, lw: 1.2, line: null });
+        } else if (v > 0.46) {
+          // 柴垛
+          for (let k = 0; k < 3; k += 1) {
+            ART.InkFill(ctx, ART.Rect(ax + W / 2 + 8, ay - 12 - k * 10, 30 - k * 6, 10),
+              id + "wd" + x + k, color, { amp: 1.2, lw: 1.2, line: null });
+          }
+        } else if (v > 0.3) {
+          // 旗杆
+          ART.InkFill(ctx, ART.Rect(ax - W / 2 - 18, ay - 74, 4, 74), id + "fp" + x, color, { amp: 1, lw: 1, line: null });
+        }
+        if (ruined) {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
+          ctx.globalCompositeOperation = "source-over";
+        }
+      }, LAYER_BLUR.farTown, 1, HazeSolid("farTown", opacity));
+      PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
+      // 层的补偿只服务于"铺满画框的背景板"；离散的房子要按透视自然变小
+      ScaleKeepGround(mesh, objScale * (0.86 + ART.Hash(id + "s" + x) * 0.4));
+      group.add(mesh);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 背景里的乡亲：远处那条街上也有人在过日子
+  //
+  // **不能拿一张静止贴图平移**——那正是"翻越做了等于没做"的老毛病，一眼看出是
+  // 块滑动的板子。这里用的是跟前景一模一样的骨架：远处的人真的在迈腿、真的在
+  // 一下一下落锄。代价是每人十来个小网格，几个人的量换得起。
+  //
+  // 摆位/缩放/隐没三件事都跟着所在层走：
+  //   · 层已经整体放大了 LAYER_COMP，离散物件要按 1/COMP 抵消回去，
+  //     人才会按透视自然变小（跟 AddParallaxTrees 的 scale 是同一回事）；
+  //   · 不透明度 = (1 - 该层空气透视量) × 该层树的不透明度，
+  //     人就跟树一起往雾色里退——背景层的糊是烘进贴图的，骨架糊不了，
+  //     只能靠这个把他们"推远"；
+  //   · 绘制序号走 ACTOR_Z，于是本层的人永远站在本层的树之前。
+  // ---------------------------------------------------------------------------
+  let backdropFolk = [];
+
+  // 各层树列用的不透明度（AddParallaxTrees 的 opacity）——背景里的人跟着树走，
+  // 一层里的东西该有一样的"实"度
+  const LAYER_TREE_ALPHA = { midTrees: 0.86, nearTrees: 0.96 };
+
+  // 干什么活 → 用哪条循环轨道、手里拿什么、朝哪边。走动的另给 from/to
+  const FOLK_ACT = {
+    hoe: { track: "hoeing", carry: "锄头" },
+    saw: { track: "sawing", carry: "锯" },
+    sweep: { track: "sweeping", carry: "扫帚" },
+    feed: { track: "scatterFeed", carry: null },
+    walk: { track: null, carry: null },
+    haul: { track: null, carry: "木料" },   // 扛着木料走的：carry 姿势 + 走路
+  };
+
+  function ClearBackdropFolk() {
+    // 骨架的 group 是 THREE.Group，ClearGroup 只 dispose 直接子级里的 Mesh，
+    // 碰不到它们——材质是 CloneMesh 克隆出来的（贴图共享，不能动），自己收
+    for (const f of backdropFolk) {
+      f.rig.group.traverse((o) => { if (o.isMesh) o.material.dispose(); });
+    }
+    backdropFolk = [];
+  }
+
+  function AddBackdropFolk(sceneDef, ch, night) {
+    const list = sceneDef.backdropFolk || [];
+    // 天黑了乡亲都在屋里（第二章是夜里的扫荡，街上只该有灯和兵）
+    if (night || !list.length) return;
+    for (const spec of list) {
+      const key = spec.layer;
+      const host = layers[key];
+      if (!host) continue;
+      const act = FOLK_ACT[spec.act];
+      if (!act) continue;
+      const kind = spec.kind || "villager";
+      // 骨架也走**染色**不走半透明：CreateRig 收一份雾量，按它单独烘一套零件
+      // （缓存键带雾量，一种角色最多多一两套）。半透明的人身上会透出树和炮楼。
+      // 系数比树再重半档——树是一团色块，人有一圈墨线，同样的量下人显得更"实"
+      const rig = CreateRig(kind, HazeSolid(key, LAYER_TREE_ALPHA[key] ?? 0.9, 1.5));
+      host.add(rig.group);
+      SetLayerOrder(rig.group, key, ACTOR_Z, "folk:" + key);
+      const scale = (BODY_SCALE[kind] ?? 1) / LAYER_COMP[key];
+      const f = {
+        rig, layerKey: key, bodyScale: scale, scale,
+        x: spec.x, from: spec.from, to: spec.to,
+        speed: spec.speed || 0.9, dir: spec.heading ?? 1,
+        heading: spec.heading ?? (spec.act === "hoe" || spec.act === "saw" ? -1 : 1),
+        track: act.track, trackT: ART.Hash(spec.id) * 2.4,   // 错开相位，免得几个人同手同脚
+        carryLabel: act.carry, shoulder: spec.act === "haul",
+        phase: ART.Hash(spec.id + "p") * 6, idleT: ART.Hash(spec.id + "i") * 6,
+        carryMesh: null, carryLabel0: null,
+        // 警讯响了要收工回屋，事后（重玩本章）还得能复原：原样存一份
+        track0: act.track, carry0: act.carry,
+        fleeDir: ART.Hash(spec.id + "f") < 0.5 ? -1 : 1,
+        flee: null,
+      };
+      rig.group.position.set(f.x, SURFACE_Y, 0);
+      backdropFolk.push(f);
+    }
+  }
+
+  // 背景乡亲收工的行程：撂下家伙、扭头小跑两秒半、进门没影
+  const FOLK_FLEE_T = 2.5, FOLK_FLEE_SPEED = 2.9;
+
+  function StepBackdropFolk(dt, state) {
+    // 警讯（民兵报信 / 村口喊声）一响，**背景层这一排也得收工进屋**。
+    // 只收前景那四个是不够的：远处照样在锄地扫院，"街上转眼就空了"
+    // 那句字幕当场被画面拆穿（用户 2026-08-08 报的）。
+    // 走 visible 切换，不进 builtKey——重建一次整场就是一个卡顿。
+    const alarm = !!state?.flags?.villageAlarm;
+    for (const f of backdropFolk) {
+      if (alarm && !f.flee) {
+        // 撂下手里的活：轨道停、家伙收进屋（SyncCarry 见 label 为空就摘网格）
+        f.flee = { t: 0 };
+        f.track = null;
+        f.carryLabel = null;
+        f.from = undefined; f.to = undefined;   // 来回踱步的也改成一头走
+      } else if (!alarm && f.flee) {
+        // 重玩本章：旗清了，人回到地里接着干活
+        f.flee = null;
+        f.track = f.track0;
+        f.carryLabel = f.carry0;
+        f.rig.group.visible = true;
+      }
+      if (f.flee) {
+        f.flee.t += dt;
+        if (f.flee.t >= FOLK_FLEE_T) { f.rig.group.visible = false; continue; }
+        f.rig.group.visible = true;
+        f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
+        f.heading = f.fleeDir;
+        f.rig.group.position.x = f.x;
+        f.phase += FOLK_FLEE_SPEED * dt * 3.4;
+        f.idleT += dt * 1.4;
+        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
+        f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
+        if (f.carryMesh) SyncCarry(f, null, f.heading);   // 家伙已经撂下了
+        continue;
+      }
+      let moved = 0;
+      if (f.from !== undefined && f.to !== undefined) {
+        const nx = f.x + f.dir * f.speed * dt;
+        if (nx >= f.to) { f.x = f.to; f.dir = -1; }
+        else if (nx <= f.from) { f.x = f.from; f.dir = 1; }
+        else { moved = Math.abs(nx - f.x); f.x = nx; }
+        f.heading = f.dir;
+        f.rig.group.position.x = f.x;
+      }
+      const moving = moved > 1e-4;
+      f.phase += moving ? moved * 3.4 : dt * 2.2;
+      f.idleT += dt * 1.4;
+      if (f.track) f.trackT += dt;
+      PoseRig(f.rig, {
+        phase: f.phase, breath: f.idleT, moving,
+        carry: f.shoulder, track: f.track, trackT: f.trackT,
+      }, dt);
+      f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
+      if (f.carryLabel) SyncCarry(f, f.carryLabel, f.heading);
+    }
+  }
+
+  function AddParallaxTrees(group, xFrom, xTo, night, id, { blur = 0, scale = 0.72, opacity = 0.85, step = 19, hazeOpt = null } = {}) {
+    for (let x = xFrom; x < xTo; x += step + ART.Hash(id + x) * 16) {
+      const wPx = 150, hPx = 200;
+      const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
+        ART.DrawTree(ctx, ax, ay, id + x, { big: false, night, bare: true });
+      }, blur, 1, hazeOpt);
+      PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
+      if (scale !== 1) ScaleKeepGround(mesh, scale);
+      group.add(mesh);
+    }
+  }
+
+  // 落地投影：没有影子的物件永远像浮在地面线上
+  // 光向：太阳偏在画面左后方，影子朝右前方斜出去
+  const SUN = { dx: 0.85, dz: 1.0 };
+
+  // 方向性投影：一片躺在地平面上的影子（随地面一起透视），
+  // 不再是贴在物件脚下的一团。有了它，东西才真的"站"在地上。
+  function MakeFlatShadow(lengthM, widthM, strength) {
+    const wPx = 256, hPx = 256;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createRadialGradient(wPx * 0.5, hPx * 0.32, 0, wPx * 0.5, hPx * 0.5, hPx * 0.5);
+    g.addColorStop(0, `rgba(28,20,12,${strength})`);
+    g.addColorStop(0.55, `rgba(28,20,12,${strength * 0.5})`);
+    g.addColorStop(1, "rgba(28,20,12,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, wPx, hPx);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(widthM, lengthM),
+      new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    FixOrder(mesh, LAYER_ORDER.play - 20);  // 投影压在地面上、在所有立面之下
+    return mesh;
+  }
+
+  // 灯打出来的影子：从脚下往背光方向拖一条，近端浓、远端散开。
+  // 贴图的 u=0 一端是脚下，靠 scale.x 的正负决定往哪边拖。
+  function MakeCastShadow(strength) {
+    const wPx = 256, hPx = 128;
+    const canvas = MakeCanvas(wPx, hPx);
+    const ctx = canvas.getContext("2d");
+    const gx = ctx.createLinearGradient(0, 0, wPx, 0);
+    gx.addColorStop(0, `rgba(20,14,8,${strength})`);
+    gx.addColorStop(0.42, `rgba(20,14,8,${strength * 0.55})`);
+    gx.addColorStop(1, "rgba(20,14,8,0)");
+    ctx.fillStyle = gx;
+    ctx.fillRect(0, 0, wPx, hPx);
+    // 纵向收成一条从脚下张开的椭圆，边缘不留硬口
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.save();
+    ctx.translate(0, hPx / 2);
+    ctx.scale(wPx, hPx / 2);
+    const gy = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gy.addColorStop(0, "rgba(0,0,0,1)");
+    gy.addColorStop(0.6, "rgba(0,0,0,0.92)");
+    gy.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = gy;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+    ctx.globalCompositeOperation = "source-over";
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+    );
+    mesh.rotation.x = -Math.PI / 2;   // 躺在地面上，长边沿世界 X
+    FixOrder(mesh, LAYER_ORDER.play - 19);
+    return mesh;
+  }
+
+  function AddGroundShadow(group, x, halfW, strength = 0.28, z = 0) {
+    const w = halfW * 2.3;
+    const len = halfW * 3.0;
+    const mesh = MakeFlatShadow(len, w, strength);
+    // 沿光向偏出去一段，影子才是"投"出来的而不是垫在脚下
+    mesh.position.set(x + SUN.dx * halfW * 0.7, SURFACE_Y + 0.015, PlaceZ(z) + SUN.dz * len * 0.34);
+    FixOrder(mesh, DepthOrder("play", BAND.walk) - 2);   // 压在地表带之上、道具之下
+    group.add(mesh);
+  }
+
+  // 摆一件场景物体。**尺寸、锚点、深度带、投影强度全部来自数据**
+  //（Data_Scenes.json 说它在哪，Data_PropArt.json 说它长什么样、埋多深）；
+  // 这里只剩"怎么画"那几笔——条件绘制的部分（断了的井绳、露出的绳头、
+  // 烧过的屋子）才是真正的代码。想挪一个东西、换一张贴图、改一档深度，
+  // 都不该动这个文件。
+  function AddProp(group, p, light, ruined, sceneKey, state) {
+    const night = light === "night" || light === "tunnel" || light === "dark";
+    // 旗标门（扫荡后才出现的柴垛石堆 / 被拿走就消失的母鸡顶针）：**一律先建出来**，
+    // 之后由 UpdateProps 每帧切 visible。以前这两个旗标编在 builtKey 里，于是
+    // "捡一枚顶针" ＝ 整个场景重建：几十张超采样贴图重烘，实测 931ms 的一卡。
+    // 出没是每帧状态，不该惊动环境构建。
+    const meshFrom = group.children.length;
+    const S = SpriteOf(p.kind, p);
+    if (!S) return;    // drawnBy：地道剖面 / 动态件自己画，这里不管
+    CheckBandZ("prop:" + p.kind, S.z);
+    // 落地：贴图底边踩在所在层的地平线上（yOffset 只给挂在树上的东西用）
+    const gy = (p.level === "under" ? UNDER_Y : SURFACE_Y) + S.yOffset;
+    const gx = S.placeAt === "left" ? p.x - (p.w || 0) / 2 : p.x;
+    // 摆位走 PlaceZ、排序走 DepthOrder：行走线上的道具（walk/loose/facade）
+    // 一律压回地平面 z=0，与演员踩同一条地平线；深度带只剩绘制顺序这一个职责
+    //（见 Data_DepthSpec 的「地平线规范」）。
+    const mk = (fn, { z = S.z, x = gx, y = gy } = {}) => {
+      const mesh = BakeSprite(S.w, S.h, S.ax, S.ay, fn, 0, S.ss);
+      PlaceSprite(mesh, x, y, PlaceZ(z));
+      FixOrder(mesh, DepthOrder("play", z));
+      mesh.userData.kind = p.kind;
+      group.add(mesh);
+      return mesh;
+    };
+    const rememberGeneratedFallback = (map, key, meshes = group.children.slice(meshFrom)) => {
+      return RegisterGeneratedFallback(map, key, meshes);
+    };
+    const rememberCellarFallback = (key) => {
+      const meshes = group.children.slice(meshFrom);
+      return rememberGeneratedFallback(generatedPropFallbacks, key, meshes);
+    };
+    if (S.shadow) AddGroundShadow(group, p.x, (p.w || 2.4) / 2 + 0.6, S.shadow, S.z);
+    switch (p.kind) {
+      case "mapBoard": {
+        // 卸下来的旧门板，斜靠在歇脚点：第六章把情报一条条钉上去
+        const { w: bw, h: bh } = S.drawSize;
+        mk((ctx, ax, ay) => ART.DrawMapBoard(ctx, ax, ay, bw * PPM, bh * PPM, p.id,
+          { pinned: pinnedNotes }));
+        break;
+      }
+      case "house": {
+        const W = p.w * PPM, H = p.h * PPM;
+        // 可进入的屋子：里外两层。室内剖面画在建筑带上，立面盖在 facade 带
+        //（家具之上、演员之下）；人走进门里，UpdateProps 把立面淡出——
+        // 勇敢的心式的里外切换。两个带都由 Data_PropArt 的 variants.interior 声明。
+        const V2 = S.variants?.interior;
+        if (V2 && p.interior && !(ruined && p.burnable)) {
+          mk((ctx, ax, ay) => ART.DrawHomeInterior(ctx, ax, ay, W, H, p.id,
+            { night, drawKang: false, drawQuilt: false }),
+            { z: BAND[V2.innerBand] });
+          const kangFallback = mk((ctx, ax, ay) => {
+            const kw = W * 0.42, kh = 26;
+            ART.InkFill(ctx, [[ax - W / 2 + 8, ay - kh], [ax - W / 2 + 8 + kw, ay - kh],
+              [ax - W / 2 + 8 + kw, ay], [ax - W / 2 + 8, ay]], p.id + "kangFallback", "#62584a",
+              { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.18)" });
+            ART.InkLine(ctx, ax - W / 2 + 10, ay - kh + 5, ax - W / 2 + 6 + kw, ay - kh + 5,
+              p.id + "matFallback", { lw: 1.2, color: "rgba(60,45,25,0.5)", amp: 1.4 });
+          }, { z: BAND[V2.innerBand] });
+          const quiltFallback = mk((ctx, ax, ay) => {
+            const kh = 26;
+            ART.InkFill(ctx, [[ax - W / 2 + 14, ay - kh], [ax - W / 2 + 16, ay - kh - 14],
+              [ax - W / 2 + 34, ay - kh - 12], [ax - W / 2 + 36, ay - kh]],
+            p.id + "quiltFallback", "#6f675c", { amp: 1.4, lw: 1.8, shade: "rgba(0,0,0,0.18)" });
+          }, { z: BAND[V2.innerBand] });
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "kangBed", [kangFallback]);
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "beddingRagged", [quiltFallback]);
+          homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
+            { z: BAND[V2.facadeBand] });
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "houseFacadeDamaged", [homeFacade]);
+          // 屋子占的那段街由 Core 的 HouseSpan 给（判定与画面共用一份边界）。
+          // door：门洞中线的世界坐标（DrawHouse 把门开在东头，右缘缩进 10px、
+          // 洞宽 30px）——那是画笔的事，留在这儿。NPC 得走到门口才消失在
+          // 屋里，不能一挨着东墙就没影
+          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM };
+          break;
+        }
+        const houseMesh = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id,
+          { burnt: ruined && p.burnable, night, slogan: p.slogan }));
+        const generatedHouseKey = ({ qishuHouse: "qishuHouse", houseB: "houseB",
+          houseC: "houseC", houseD: "houseD" })[p.id];
+        if (generatedHouseKey) {
+          LinkGeneratedSurfaceFallback(generatedHouseKey, [houseMesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: p.h,
+          });
+        }
+        break;
+      }
+      case "doorframe": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, carveState));
+        doorframeFallbackMesh = mesh;
+        rememberGeneratedFallback(generatedSceneOneFallbacks, "doorFrameTimber", [mesh]);
+        // 两道刻痕分别由 flags.marked / flags.carved 把门，划完才长出来
+        carveRebuild = (marks) => {
+          const c = mesh.material.map.image;
+          const ctx = c.getContext("2d");
+          // 就地重绘这张贴图：清空要按画布真实像素（含超采样），
+          // 画笔的锚点则用贴图坐标（S.ax/S.ay），不能写死数字
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, c.width, c.height);
+          ctx.restore();
+          ART.DrawDoorframe(ctx, S.ax, S.ay, p.id, marks);
+          mesh.material.map.needsUpdate = true;
+        };
+        break;
+      }
+      case "bench": mk((ctx, ax, ay) => ART.DrawBench(ctx, ax, ay, p.id)); break;
+      case "stool": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawStool(ctx, ax, ay, p.id));
+        if (p.id === "stool" && p.x === 32) {
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "stoolLow", [mesh]);
+        }
+        break;
+      }
+      case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, p.w * PPM, (p.h || 1.8) * PPM, p.id, { burnt: ruined })); break;
+      // 码好的柴垛：可翻越物的轮廓样板（肩高、顶沿磨亮、缺一角）
+      case "woodStack": mk((ctx, ax, ay) => ART.DrawWoodStack(ctx, ax, ay, p.w * PPM, (p.h || 1.24) * PPM, p.id)); break;
+      // 塌进巷子的院墙（可翻越）：宽高从场景数据来，画法见 DrawBrokenWall
+      case "brokenWall": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawBrokenWall(ctx, ax, ay, p.w * PPM, (p.h || 0.82) * PPM, p.id));
+        if (p.id === "laneWall" && p.x === 84) {
+          LinkGeneratedSurfaceFallback("yardWallBroken", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: p.h || 0.82,
+          });
+        }
+        break;
+      }
+      case "hatch": {
+        mk((ctx, ax, ay) => ART.DrawHatch(ctx, ax, ay, p.id, { open: true }));
+        break;
+      }
+      case "well": {
+        // 第一章：井绳断了半截——辘轳上垂着一小截断头，毛茬朝下。
+        // 断没断只改这一张贴图，所以它走 propRedraw 单张重烘，不进 builtKey。
+        // 摇把同理：摇辘轳那一拍 World 会在轴心贴一只**会转的**摇把，
+        // 静态贴图上那只必须让位——否则同一根轴上叉着两把手。
+        const PaintDynamic = (ctx, ax, ay, st) => ART.DrawWell(ctx, ax, ay, p.id, {
+          night,
+          broken: sceneKey === "village" && !!st?.flags.wellRopeBroken,
+          crank: !st?.winchView,
+          // **井绳也一样让位**：打水的时候绳是活的（跟着桶升降、跟着桶歪），
+          // 静态贴图上那根永远笔直垂进井口的绳得撤掉，不然桶都拽到井沿上了，
+          // 井口里还挂着另一根一动不动的绳
+          rope: !st?.winchView,
+          drawStoneBase: false,
+          drawWinchFrame: false,
+        });
+        const wellDynamicMesh = mk((ctx, ax, ay) => PaintDynamic(ctx, ax, ay, state));
+        const wellFrameMesh = mk((ctx, ax, ay) => ART.DrawWell(ctx, ax, ay, p.id, {
+          night, drawStoneBase: false, drawStaticCrank: false, drawStaticRope: false,
+        }));
+        const wellStoneMesh = mk((ctx, ax, ay) => ART.DrawWell(ctx, ax, ay, p.id, {
+          night, drawWinchFrame: false, drawStaticCrank: false, drawStaticRope: false,
+        }));
+        LinkGeneratedSurfaceFallback("wellWinchFrame", [wellFrameMesh], {
+          x: p.x, groundY: SURFACE_Y, width: 1.36, height: 1.58,
+        });
+        LinkGeneratedSurfaceFallback("wellStoneBase", [wellStoneMesh], {
+          x: p.x, groundY: SURFACE_Y, width: 1.12, height: 0.76,
+        });
+        propRedraw.push({
+          read: (st) => `${!!st.flags.wellRopeBroken}|${!!st.winchView}`,
+          last: `${!!state?.flags.wellRopeBroken}|${!!state?.winchView}`,
+          run: (st) => RedrawProp(wellDynamicMesh, S, (ctx, ax, ay) => PaintDynamic(ctx, ax, ay, st)),
+        });
+        break;
+      }
+      case "millstone": mk((ctx, ax, ay) => ART.DrawMillstone(ctx, ax, ay, p.id)); break;
+      case "spreadCoat": {
+        // 铺在榆树下接榆钱的褂子：砸下第二把（flags.elmDown）布面铺一层绿。
+        // 出没走 showFlag/hideFlag（flagProps），绿那一层走 propRedraw 单张重烘
+        const Paint = (ctx, ax, ay, green) => ART.DrawSpreadCoat(ctx, ax, ay, p.id, { green });
+        const coatMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.elmDown));
+        propRedraw.push({
+          flag: "elmDown", last: !!state?.flags.elmDown,
+          run: (st) => RedrawProp(coatMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.elmDown)),
+        });
+        break;
+      }
+      case "woodpile": {
+        // 第一章打水链：麻绳绳头从堆里露出一截（目标同屏露一角），拿走就没了
+        const Paint = (ctx, ax, ay, taken) => {
+          ART.DrawWoodpile(ctx, ax, ay, p.id);
+          if (sceneKey !== "village" || taken) return;
+          ctx.strokeStyle = "#9a7d4f";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ax + 18, ay - 34);
+          ctx.quadraticCurveTo(ax + 34, ay - 40, ax + 40, ay - 26);
+          ctx.quadraticCurveTo(ax + 44, ay - 16, ax + 38, ay - 12);
+          ctx.stroke();
+          ART.InkLine(ctx, ax + 38, ay - 12, ax + 44, ay - 6, p.id + "ropeTip", { lw: 2.4, color: "#8a6a45" });
+        };
+        const pileMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, !!state?.flags.ropeTaken));
+        if (sceneKey === "village") {
+          propRedraw.push({ flag: "ropeTaken", last: !!state?.flags.ropeTaken,
+            run: (st) => RedrawProp(pileMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, !!st.flags.ropeTaken)) });
+          if ([46.8, 70, 71.0, 133.5].includes(p.x)) {
+            LinkGeneratedSurfaceFallback("woodpile", [pileMesh], {
+              x: p.x, groundY: SURFACE_Y, width: 2.3, height: 0.86,
+            });
+          }
+        }
+        break;
+      }
+      // 母鸡蹲在那根待搬的木料上：爪子抬到 0.5m，让她整个落在木料上沿之上。
+      // 原来是 16px（0.33m），正好和木料重叠——同一条深度带谁先谁后全看进场
+      // 顺序，于是她时不时被自己蹲的那根木料盖住。分开画就没有先后可争。
+      // 栖高只属于蹲在木料堆上的那只（perch）；院里啄食的鸡贴地站。
+      // 夜里散养的鸡都回窝了——第二章的夜街上不该站着两只发呆的鸡
+      case "hen": {
+        if (night && !p.perch) break;
+        mk((ctx, ax, ay) => ART.DrawHen(ctx, ax, ay - (p.perch ? 13 : 0), p.id));
+        break;
+      }
+      case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
+      case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
+      case "tree": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id,
+          { big: p.big, stripped: !!p.stripped, night, bare: ruined || !!p.bare }));
+        if (p.id === "wellElm" && p.x === 56.3) {
+          LinkGeneratedSurfaceFallback("elmSparse", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: 3.12, height: 4.18,
+          });
+        }
+        break;
+      }
+      case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
+      case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
+      case "crops": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie }));
+        if (p.id === "veggieWest" && p.x === 13.6) {
+          LinkGeneratedSurfaceFallback("cropRowsSparse", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: 0.60,
+          });
+        }
+        break;
+      }
+      case "fortWall": mk((ctx, ax, ay) => ART.DrawFortWall(ctx, ax, ay, p.w * PPM, p.h * PPM, p.id)); break;
+      case "fortGate": {
+        mk((ctx, ax, ay) => {
+          ART.DrawFortWall(ctx, ax - 56, ay, 34, 116, p.id + "l");
+          ART.DrawFortWall(ctx, ax + 56, ay, 34, 116, p.id + "r");
+          ART.DrawLamppost(ctx, ax, ay, p.id + "lamp", { lit: true });
+        });
+        break;
+      }
+      case "blockhouse": mk((ctx, ax, ay) => ART.DrawBlockhouse(ctx, ax, ay, p.id, { lit: true })); break;
+      case "prison": mk((ctx, ax, ay) => ART.DrawPrison(ctx, ax, ay, p.id, { night: true })); break;
+      case "fortSilhouette": {
+        mk((ctx) => {
+          const W2 = S.w;
+          const base = S.ay;
+          // 围墙 + 垛口起伏
+          ctx.fillStyle = "#2f2921";
+          ctx.fillRect(0, base - 96, W2, 96);
+          for (let i = 0; i * 34 < W2; i += 1) {
+            const hh = 16 + ART.Hash(p.id + "cr" + i) * 12;
+            ctx.fillRect(i * 34, base - 96 - hh, 19, hh);
+          }
+          // 铁丝网
+          ctx.save();
+          ctx.globalAlpha = 0.55;
+          ctx.strokeStyle = "#3d3730";
+          ctx.lineWidth = 2;
+          for (let r = 0; r < 3; r += 1) {
+            ctx.beginPath();
+            ctx.moveTo(0, base - 122 - r * 8);
+            for (let t = 0; t <= 24; t += 1) {
+              ctx.lineTo((W2 * t) / 24, base - 122 - r * 8 + (ART.Hash(p.id + "w" + r + t) - 0.5) * 9);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+          // 院里错落的房脊
+          for (let i = 0; i < 5; i += 1) {
+            const rx = W2 * (0.12 + ART.Hash(p.id + "rx" + i) * 0.7);
+            const rw = 60 + ART.Hash(p.id + "rw" + i) * 70;
+            const rh = 34 + ART.Hash(p.id + "rh" + i) * 26;
+            ctx.fillStyle = "#332d25";
+            ctx.beginPath();
+            ctx.moveTo(rx - rw / 2, base - 96);
+            ctx.lineTo(rx - rw * 0.3, base - 96 - rh);
+            ctx.lineTo(rx + rw * 0.3, base - 96 - rh);
+            ctx.lineTo(rx + rw / 2, base - 96);
+            ctx.closePath();
+            ctx.fill();
+          }
+          // 炮楼与探照灯杆
+          ART.DrawBlockhouse(ctx, W2 * 0.74, base, p.id, { lit: false });
+          ctx.fillStyle = "#2b261f";
+          ctx.fillRect(W2 * 0.28, base - 200, 5, 104);
+          ctx.beginPath();
+          ctx.arc(W2 * 0.28 + 2, base - 204, 10, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        break;
+      }
+      case "dog": mk((ctx, ax, ay) => ART.DrawDog(ctx, ax, ay, p.id)); break;
+      // 村里不许有狗：1939 年冀中区党委统一"打狗"（狗叫会暴露夜间行动，
+      // 回忆材料原话「出进村庄无犬吠声」）。DrawDog 只留给据点那一侧
+      case "emptyKennel": mk((ctx, ax, ay) => ART.DrawEmptyKennel(ctx, ax, ay, p.id)); break;
+      case "freshDirt": {
+        mk((ctx, ax, ay) => ART.DrawFreshDirt(ctx, ax, ay, (p.w || 3) * PPM, p.id));
+        if (p.id === "graveDirt" && p.x === 27.1) rememberCellarFallback("freshEarthMound");
+        break;
+      }
+      case "dungHeap": mk((ctx, ax, ay) => ART.DrawDungHeap(ctx, ax, ay, p.id, { street: !!p.street })); break;
+      case "stalkFence": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawStalkFence(ctx, ax, ay, (p.w || 5) * PPM, p.id));
+        if (p.id === "yardWallD" && p.x === 168.5) {
+          LinkGeneratedSurfaceFallback("stalkFence", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w || 5, height: 1.35,
+          });
+        }
+        break;
+      }
+      case "stonePile": mk((ctx, ax, ay) => ART.DrawStonePile(ctx, ax, ay, p.id)); break;
+      case "hangLantern":
+        mk((ctx, ax, ay) =>
+          ART.DrawHangLantern(ctx, ax, ay, p.id, { lit: night && !state?.flags.lanternOut }));
+        break;
+      case "cloth": {
+        // 打没打下来由 hideFlag(clothDown) 走 flagProps 切 visible——命中那一帧
+        // 不重建（重建=打中卡一顿）。二章起 clothDown 已在结算里落真，自然不显示；
+        // 重玩一章由 StartChapter 把旗清回假，布巾重新挂上树
+        mk((ctx, ax, ay) => ART.DrawCloth(ctx, ax, ay, p.id));
+        break;
+      }
+      case "doorLeaf": mk((ctx, ax, ay) => ART.DrawDoorLeaf(ctx, ax, ay, p.id)); break;
+      case "vat": {
+        // 缸里有水没水是戏：开场空镜「水缸见了底」、打满水之后「照得见人影」，
+        // 缸口那条水色亮带不能两头都画（视觉审查退回过：空缸亮着水面；
+        // 夜里地窖两口封着的腌菜缸泛蓝光）。院里那口跟 vatFilled 旗走，
+        // 七叔家那口一直有水，腌菜缸永远是干口
+        const Wet = (st) => (p.id === "yardVat" ? !!st?.flags.vatFilled : p.id === "qishuVat");
+        if (p.id === "yardVat") {
+          const vatBodyMesh = mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id,
+            { filled: Wet(state), drawWater: false }));
+          const vatWaterMesh = mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id,
+            { filled: Wet(state), drawBody: false }));
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "waterJarCracked", [vatBodyMesh]);
+          propRedraw.push({
+            flag: "vatFilled",
+            last: !!state?.flags.vatFilled,
+            run: (st) => RedrawProp(vatWaterMesh, S,
+              (ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id, { filled: Wet(st), drawBody: false })),
+          });
+        } else mk((ctx, ax, ay) => ART.DrawVat(ctx, ax, ay, p.id, { filled: Wet(state) }));
+        break;
+      }
+      case "beddingMat": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawBeddingMat(ctx, ax, ay, p.id));
+        if (p.id === "beddingMat" && p.x === 31.15) {
+          rememberGeneratedFallback(generatedSceneOneFallbacks, "beddingRagged", [mesh]);
+        }
+        break;
+      }
+      case "tuberPile": mk((ctx, ax, ay) => ART.DrawTuberPile(ctx, ax, ay, p.id)); break;
+      case "cellarShelf": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawCellarShelf(ctx, ax, ay, p.id));
+        if (sceneKey === "village" && p.id === "cellarShelf" && p.x === 33.9) {
+          RegisterGeneratedFallback(generatedPropFallbacks, "cellarStorageCluster", [mesh]);
+        }
+        break;
+      }
+      case "shed": {
+        if (p.id === "shed" && p.x === 9) {
+          const structure = mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id,
+            { drawAsh: false, drawTrough: false }));
+          const details = mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id,
+            { drawStructure: false, drawAsh: true, drawTrough: true }));
+          LinkGeneratedSurfaceFallback("shedBurned", [structure], {
+            x: p.x, groundY: SURFACE_Y, width: p.w || 6, height: 2.18,
+          });
+          // The loose timber/tools pass is a separate accepted image.  Keep
+          // the broad procedural detail sprite as its fallback so the shed is
+          // still readable while the generated plane is loading.
+          LinkGeneratedSurfaceFallback("shedLooseTimberTools", [details]);
+        } else mk((ctx, ax, ay) => ART.DrawShed(ctx, ax, ay, p.id));
+        break;
+      }
+      case "oldDoors": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawOldDoors(ctx, ax, ay, p.id));
+        if (p.id === "oldDoors" && p.x === 10.7) {
+          LinkGeneratedSurfaceFallback("oldWoodDoors", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: 1.55, height: 1.80,
+          });
+        }
+        break;
+      }
+      case "cartShafts": mk((ctx, ax, ay) => ART.DrawCartShafts(ctx, ax, ay, p.id)); break;
+      case "wallNotice": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawNoticeWall(ctx, ax, ay, p.w * PPM, p.id, { scars: !!p.scars }));
+        if (p.id === "noticeWall" && p.x === 23.3) {
+          LinkGeneratedSurfaceFallback("noticeWall", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: 1.55,
+          });
+          // The generated notice-wall body intentionally replaces only the
+          // paper/mud surface.  Preserve the gameplay-readable scars and
+          // poster lettering as a transparent overlay above that plane.
+          const marks = BakeSprite(S.w, S.h, S.ax, S.ay, (ctx, ax, ay) => {
+            const w = p.w * PPM;
+            if (p.scars) {
+              for (let i = 0; i < 6; i += 1) {
+                const sx = ax - w / 2 * 0.7 + (i / 5) * w * 0.66 + ART.Hash(`${p.id}bhx#${i}`) * 8 - 4;
+                const sy = ay - 26 - ART.Hash(p.id + "bhy" + i) * 20;
+                const r = 1.6 + ART.Hash(p.id + "bhr" + i) * 1.1;
+                ctx.save();
+                ctx.fillStyle = "rgba(196,178,142,0.55)";
+                ctx.beginPath();
+                ctx.ellipse(sx + 0.6, sy + 0.4, r * 2.4, r * 1.9, ART.Hash(p.id + "bha" + i) * 1.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "rgba(30,23,16,0.88)";
+                ctx.beginPath(); ctx.ellipse(sx, sy, r, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = "rgba(70,55,36,0.42)";
+                ctx.lineWidth = 0.8;
+                for (let c = 0; c < 2; c += 1) {
+                  const a = Math.PI * (1.05 + ART.Hash(p.id + "bhc" + i + c) * 0.9);
+                  ctx.beginPath();
+                  ctx.moveTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r * 0.85);
+                  ctx.lineTo(sx + Math.cos(a) * r * 1.8, sy + Math.sin(a) * r * 1.5);
+                  ctx.stroke();
+                }
+                ctx.restore();
+              }
+            }
+            const posters = [
+              { px: ax - w / 2 * 0.5, py: ay - 62, pw: 22, ph: 30, c: "#a89268", torn: true },
+              { px: ax + 2, py: ay - 70, pw: 24, ph: 34, c: "#b09a72", torn: false },
+              { px: ax + w / 2 * 0.42, py: ay - 56, pw: 20, ph: 28, c: "#c2b189", torn: false },
+            ];
+            for (let i = 0; i < posters.length; i += 1) {
+              const q = posters[i];
+              const pts = q.torn
+                ? [[q.px - q.pw / 2, q.py], [q.px + q.pw / 2, q.py + 2],
+                  [q.px + q.pw / 2 - 3, q.py + q.ph], [q.px + 2, q.py + q.ph - 6],
+                  [q.px - q.pw / 2 + 2, q.py + q.ph - 2]]
+                : [[q.px - q.pw / 2, q.py], [q.px + q.pw / 2, q.py + 1],
+                  [q.px + q.pw / 2 - 1, q.py + q.ph], [q.px - q.pw / 2 + 1, q.py + q.ph - 1]];
+              ctx.fillStyle = q.c;
+              ctx.strokeStyle = "rgba(58,47,34,0.8)";
+              ctx.lineWidth = 1.4;
+              ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+              for (let j = 1; j < pts.length; j += 1) ctx.lineTo(pts[j][0], pts[j][1]);
+              ctx.closePath(); ctx.fill(); ctx.stroke();
+              ctx.save();
+              ctx.globalAlpha = 0.65;
+              ctx.strokeStyle = "#3a2f22";
+              ctx.lineWidth = 1.1;
+              for (let c = 0; c < 3; c += 1) {
+                const cx = q.px - q.pw / 2 + 5 + c * 6;
+                for (let row = 0; row < 5; row += 1) {
+                  const ry = q.py + 5 + row * 5;
+                  if (ART.Hash(p.id + i + c + "r" + row) > 0.25) {
+                    ctx.beginPath(); ctx.moveTo(cx, ry); ctx.lineTo(cx + 3.4, ry); ctx.stroke();
+                  }
+                }
+              }
+              ctx.restore();
+            }
+            const q = posters[1];
+            ctx.save();
+            ctx.fillStyle = "rgba(43,31,22,0.88)";
+            ctx.font = "600 7px 'Noto Serif SC', serif";
+            ctx.textAlign = "center";
+            const tx = q.px + q.pw / 2 - 5.5;
+            for (let k = 0; k < 4; k += 1) ctx.fillText("寰靛か鍛婄ず"[k], tx, q.py + 9.5 + k * 7.2);
+            ctx.fillStyle = "rgba(146,44,32,0.55)";
+            ctx.fillRect(q.px - q.pw / 2 + 3.5, q.py + q.ph - 8.5, 5, 5);
+            ctx.restore();
+          }, 0, S.ss);
+          PlaceSprite(marks, gx, gy, PlaceZ(S.z));
+          FixOrder(marks, GENERATED_SHARED_SURFACE_SPECS.noticeWall.order + 1);
+          marks.userData.kind = "generatedFallbackOverlay:noticeWall";
+          group.add(marks);
+        }
+        break;
+      }
+      case "stove": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawStove(ctx, ax, ay, p.id));
+        if (p.id === "stoveHome" && p.x === 27.4) {
+          RegisterGeneratedFallback(generatedSceneOneFallbacks, "stoveColdPaperCut", [mesh]);
+        }
+        break;
+      }
+      case "spinWheelBroken": mk((ctx, ax, ay) => ART.DrawSpinWheelBroken(ctx, ax, ay, p.id)); break;
+      case "clothBundle": {
+        mk((ctx, ax, ay) => ART.DrawClothBundle(ctx, ax, ay, p.id));
+        if (p.id === "clothBundle" && p.x === 27.0) rememberCellarFallback("clothBundleOld");
+        break;
+      }
+      // ── 第七稿第一章的新道具（2026-08-13）。教训入册：这张 switch 的 default
+      // 是 break——kind 在 Data 里登记全了、这儿漏一行照样**静默不画**
+      //（第一轮视觉审查抓的：耧/谷茬/草苫/笸箩九种全没上画面）──
+      case "louDrill": mk((ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, p.id)); break;
+      case "stubbleField": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawStubbleField(ctx, ax, ay, p.w * PPM, p.id));
+        if (p.id === "stubbleField" && p.x === 176.8) {
+          LinkGeneratedSurfaceFallback("stubbleField", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: 0.52,
+          });
+        }
+        break;
+      }
+      case "sownField": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawSownField(ctx, ax, ay, p.w * PPM, p.id));
+        if (p.id === "sownField" && p.x === 183.8) {
+          LinkGeneratedSurfaceFallback("sownField", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: 0.60,
+          });
+        }
+        break;
+      }
+      case "strawMat": mk((ctx, ax, ay) => ART.DrawStrawMat(ctx, ax, ay, p.id)); break;
+      case "strawArm": mk((ctx, ax, ay) => ART.DrawStrawArm(ctx, ax, ay, p.id)); break;
+      case "cellarSundries": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawCellarSundries(ctx, ax, ay, p.id));
+        if (sceneKey === "village" && p.x === 33.3) {
+          RegisterGeneratedFallback(generatedPropFallbacks, "cellarStorageCluster", [mesh]);
+        }
+        break;
+      }
+      case "cellarSundriesTidy": mk((ctx, ax, ay) => ART.DrawCellarSundriesTidy(ctx, ax, ay, p.id)); break;
+      case "sewBasket": mk((ctx, ax, ay) => ART.DrawSewBasket(ctx, ax, ay, p.id)); break;
+      case "mendedJacket": mk((ctx, ax, ay) => ART.DrawMendedJacket(ctx, ax, ay, p.id)); break;
+      case "mealBowls": mk((ctx, ax, ay) => ART.DrawMealBowls(ctx, ax, ay, p.id)); break;
+      case "pigpen": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawPigpen(ctx, ax, ay, p.id));
+        if (p.id === "pigpen" && p.x === 44.9) {
+          LinkGeneratedSurfaceFallback("pigpenEmpty", [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: 2.7, height: 0.98,
+          });
+        }
+        break;
+      }
+      case "nook": {
+        // 藏口的三态（敞着 / 塞了粮袋 / 上了覆土板）跟着旗标走，
+        // 单张重烘——藏粮那一拍不该触发整个场景重建
+        const Paint = (ctx, ax, ay, st) => ART.DrawNook(ctx, ax, ay, p.id, {
+          grain: !!st?.flags.grainHidden && !st?.flags.nookClosed,
+          closed: !!st?.flags.nookClosed,
+        });
+        const nookMesh = mk((ctx, ax, ay) => Paint(ctx, ax, ay, state));
+        propRedraw.push({
+          read: (st) => `${!!st.flags.grainHidden}|${!!st.flags.nookClosed}`,
+          last: `${!!state?.flags.grainHidden}|${!!state?.flags.nookClosed}`,
+          run: (st) => RedrawProp(nookMesh, S, (ctx, ax, ay) => Paint(ctx, ax, ay, st)),
+        });
+        break;
+      }
+      case "tunnelBrace":
+        // 玩家支上去的顶木：高度按爬行段的净高来（0.74m ≈ 36px），板面正好抵在
+        // 洞顶那条线上——比洞顶矮一截就成了"戳在半空的棍子"
+        mk((ctx, ax, ay) => ART.DrawTunnelBrace(ctx, ax, ay, S.w - 14, 0.74 * PPM, p.id));
+        break;
+      case "yardWall": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawYardWall(ctx, ax, ay, p.w * PPM, p.id, {
+          gate: p.gate !== false, slogan: p.slogan,
+        }));
+        const key = p.gate === false ? "yardWallIntact" : "yardWallGate";
+        if ([45.9, 100.5, 112].includes(p.x)) {
+          LinkGeneratedSurfaceFallback(key, [mesh], {
+            x: p.x, groundY: SURFACE_Y, width: p.w, height: 1.10,
+          });
+        }
+        break;
+      }
+      case "henCoop": mk((ctx, ax, ay) => ART.DrawHenCoop(ctx, ax, ay, p.id)); break;
+      case "clothesline": mk((ctx, ax, ay) => ART.DrawClothesline(ctx, ax, ay, p.id)); break;
+      case "pump": {
+        mk((ctx, ax, ay) => {
+          // 水泵/风箱：日军灌烟灌水用的家伙
+          ART.InkFill(ctx, ART.Rect(ax - 44, ay - 46, 88, 46), p.id, "#5f5a4a",
+            { amp: 1.4, lw: 2.4, shade: "rgba(0,0,0,0.24)" });
+          ART.InkFill(ctx, ART.Rect(ax - 12, ay - 74, 24, 30), p.id + "t", "#6b6555", { amp: 1.1, lw: 2.2 });
+          ART.InkLine(ctx, ax + 40, ay - 30, ax + 78, ay - 8, p.id + "hose", { lw: 5, color: "#3e372c", amp: 3 });
+          ART.InkLine(ctx, ax - 30, ay - 50, ax - 52, ay - 74, p.id + "handle", { lw: 4, color: "#7a5433" });
+        });
+        break;
+      }
+      default: break;
+    }
+    // 这个道具建了哪几个网格（含 AddGroundShadow 的影子）：从记号往后都是它的
+    if (p.showFlag || p.hideFlag) flagProps.push({ p, meshes: group.children.slice(meshFrom) });
+  }
+
+  function AddCover(group, c, light, ruinedScene = false) {
+    const night = light === "night" || light === "dark" || light === "tunnel";
+    const gy = SURFACE_Y;
+    // 深度按"这东西有多高"来定，不能抽签：高过腰的掩体一旦落到人前面，
+    // 就会把角色连人带扛的木料整个吞掉（见 Data_DepthSpec 的 Z 轴规范）。
+    // 判定规则（哪些算高、高的退到哪两个带里）写在 Data_PropArt 的 coverBands。
+    const cz = CoverBandOf(c, ART.Hash("cz" + c.id));
+    CheckBandZ("cover:" + c.kind, cz);
+    const S = SpriteOf(c.kind, c, { cover: true });
+    if (!S) return;     // ditch：由 props 里的同名物体画，掩体项只管躲藏判定
+    AddGroundShadow(group, c.x, (c.w || 2) / 2 + 0.5, 0.22, cz);
+    const mk = (fn) => {
+      const mesh = BakeSprite(S.w, S.h, S.ax, S.ay, fn, 0, S.ss);
+      PlaceSprite(mesh, c.x, gy, cz);
+      mesh.userData.kind = c.kind;
+      group.add(mesh);
+      return mesh;
+    };
+    switch (c.kind) {
+      case "haystack": {
+        const mesh = mk(
+        (ctx, ax, ay) => {
+          if (ruinedScene) {
+            // 烧塌的草垛：只剩一圈焦黑的底与几根残秆
+            ART.InkFill(ctx, [[ax - c.w * PPM * 0.5, ay], [ax - c.w * PPM * 0.3, ay - 22],
+              [ax + c.w * PPM * 0.28, ay - 16], [ax + c.w * PPM * 0.5, ay]],
+              c.id + "burn", "#3a332a", { amp: 2.4, lw: 2.2, shade: "rgba(0,0,0,0.3)" });
+            for (let i = 0; i < 5; i += 1) {
+              ART.InkLine(ctx, ax - 20 + i * 10, ay - 8, ax - 26 + i * 12, ay - 34 - ART.Hash(c.id + i) * 18,
+                c.id + "st" + i, { lw: 2, color: "#241f18" });
+            }
+          } else ART.DrawHaystack(ctx, ax, ay, c.w * PPM, c.id, { night, raided: !!c.raided });
+        });
+        if (c.id && /^hay[A-E]$/.test(c.id)) {
+          const key = c.raided ? "haystackRaided" : "haystackFull";
+          mesh.userData.generatedRaided = !!c.raided;
+          const generated = LinkGeneratedSurfaceFallback(key, [mesh], {
+            x: c.x, groundY: SURFACE_Y, width: c.w, height: c.raided ? 1.10 : 1.80,
+          });
+          if (generated) generated.userData.generatedRaided = !!c.raided;
+        }
+        break;
+      }
+      case "firewood": {
+        const mesh = mk((ctx, ax, ay) => ART.DrawFirewood(ctx, ax, ay, c.w * PPM, c.id));
+        if (c.id && ["firewood", "woodB"].includes(c.id)) {
+          LinkGeneratedSurfaceFallback("firewoodBundle", [mesh], {
+            x: c.x, groundY: SURFACE_Y, width: c.w, height: 0.95,
+          });
+        }
+        break;
+      }
+      case "wallSeg": mk((ctx, ax, ay) => ART.DrawWall(ctx, ax, ay, c.w * PPM, S.drawHeightPx, c.id, { burnt: false })); break;
+      case "bush": mk((ctx, ax, ay) => ART.DrawBush(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+      case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, c.w * PPM, c.id)); break;
+      case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, c.w * PPM, c.id, { night })); break;
+      default: break;
+    }
+  }
+
+  // 地下剖面：一整条烘成大贴图（含土层/空腔/支撑木/洞室/竖井）
+  function AddUnderground(group, sceneDef, state, sceneKey) {
+    const range = sceneDef.walk.under;
+    if (!range) return;
+    // **地下按段存在**：没挖通之前，自家窖与七叔家窖是两个互不相通的腔，
+    // 中间是实土（见 Core 的 UnderSegments / Data_Scenes 的 underDig）。
+    // 老版把整条 walk.under 一口气掏空，于是第一次下窖就能走到七叔家——
+    // 第七场"挖通道"因此在演一件已经完成的事（2026-08-10 用户退回）
+    const segs = UnderSegments(sceneDef, state.flags);
+    const headX = segs.length > 1 ? segs[0][1] : null;   // 掌子面（还没挖通的那一头）
+    // 地道不是一张平贴图：近侧土层剖面掏空 → 看进去是后退的地面 →
+    // 尽头是后壁；支撑木分布在不同 z 上，人从木柱之间穿过去。
+    const NEAR_Z = 2.2;     // 近侧剖面（被切开的那一刀）
+    const BACK_Z = -5.5;    // 地道后壁
+    const TUN_TOP = UNDER_Y + 2.05;   // 参考里的坑道能直腰走，窄段才猫腰
+    const cellarRoom = sceneKey === "village"
+      ? sceneDef.props.find((p) => p.id === "cellarRoom" && p.kind === "chamber")
+      : null;
+    let cellarBeamFallback = null;
+
+    const x0 = Math.min(range[0] - 6, -20);
+    const x1 = Math.max(range[1] + 6, sceneDef.length + 20);
+    const wPx = Math.ceil((x1 - x0) * PPM);
+    // 画布往地平线**以上**多留一指：这一刀的上沿要长出草茬、翻出土坷垃，
+    // 光靠地平线那条直边收口，画面上就是两块土色硬碰硬地拼在一起
+    const TURF_RISE = 0.3;
+    const topWorld = SURFACE_Y + TURF_RISE;
+    const botWorld = UNDER_Y - 2.6;
+    const hPx = Math.ceil((topWorld - botWorld) * PPM);
+    const toPx = (wx) => (wx - x0) * PPM;
+    const toPy = (wy) => (topWorld - wy) * PPM;
+    const tunTop = toPy(TUN_TOP);
+    const tunBot = toPy(UNDER_Y);
+
+    // 洞顶跟着各段净高走：该爬的地方顶就压下来。玩法、美术、光照都从
+    // TunnelPosture 取同一个值，免得"画得能站、走起来却要爬"
+    const CeilY = (wx) => toPy(UNDER_Y + POSTURE_HEAD[TunnelPosture(sceneDef, wx)])
+      + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).top * 0.5;
+
+    // 井筒的形状只算一次：掏土、描洞沿、井壁贴片三处都得用同一条轮廓，
+    // 各画各的就又会出现"三个宽度不一样的矩形套在一起"
+    const SHAFT_R = 0.86;                    // 井筒半径（米）：够一个人带着筐上下
+    const shaftGeom = (sceneDef.shafts || [])
+      .filter((s) => !s.builtFlag || state.flags[s.builtFlag])
+      .map((s) => {
+        const yTop = toPy(SURFACE_Y) - 0.10 * PPM;             // 井口啃掉地面一线
+        const yBot = Math.max(tunTop, CeilY(s.x)) + 0.12 * PPM; // 一直掏进走廊顶
+        const span = Math.max(1, yBot - yTop);
+        const half = (y) => {
+          const u = Math.max(0, Math.min(1, (y - yTop) / span));
+          // 井口塌出一圈、井底张成喇叭并进洞顶；中段两壁只有手挖的起伏
+          const flare = 1
+            + 0.55 * (u > 0.78 ? ((u - 0.78) / 0.22) ** 2 : 0)
+            + 0.34 * (u < 0.14 ? ((0.14 - u) / 0.14) ** 2 : 0);
+          const wob = Math.sin(y * 0.05 + ART.Hash(s.id) * 9) * 0.055
+            + Math.sin(y * 0.017 + ART.Hash(s.id + "b") * 6) * 0.045;
+          return (SHAFT_R + wob) * flare * PPM;
+        };
+        return { id: s.id, wx: s.x, x: toPx(s.x), yTop, yBot, half };
+      });
+
+    // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
+    const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+      ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
+      // 土体整体压暗：参考里的地下几乎是纯黑，细节只留在洞沿一圈
+      ctx.save();
+      ctx.globalCompositeOperation = "source-atop";
+      const dk = ctx.createLinearGradient(0, toPy(SURFACE_Y), 0, hPx);
+      dk.addColorStop(0, "rgba(12,9,5,0.44)");
+      dk.addColorStop(0.35, "rgba(10,7,4,0.80)");
+      dk.addColorStop(1, "rgba(6,4,2,0.92)");
+      ctx.fillStyle = dk;
+      ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
+      ctx.restore();
+
+      // —— 地平线那一刀：这是**地表被切开的断口**，不是两张贴图的接缝
+      //（2026-08-11 用户：「地道口那里为什么有一条分割线一样的，上面下面
+      // 有点土一样的颜色」）。老版上沿就是 fillRect 的直边：上头是地表的土色、
+      // 下头是剖面的土色，两块平色贴着一条razor直线，读出来只能是"贴图裁齐了"。
+      // 断口该有三样东西：翻耕过的表土比生土浅一档、一条起伏的墨线、
+      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）
+      {
+        const gy = toPy(SURFACE_Y);
+        const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
+          + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5;
+        const night = CHAPTERS[state.chapterIndex].light === "night"
+          || CHAPTERS[state.chapterIndex].light === "dark";
+        // ① 耕作层：常年翻的那 30 公分，比底下的生土松、浅。
+        //    **下缘要化开，不能又是一条边**——不然只是把一道接缝换成两道
+        const tilth = 0.34 * PPM;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, gy + Wob(0));
+        for (let px = 0; px <= wPx; px += 14) ctx.lineTo(px, gy + Wob(px));
+        ctx.lineTo(wPx, gy + tilth);
+        ctx.lineTo(0, gy + tilth);
+        ctx.closePath();
+        const til = ctx.createLinearGradient(0, gy, 0, gy + tilth);
+        til.addColorStop(0, night ? "rgba(104,86,60,0.5)" : "rgba(154,128,88,0.46)");
+        til.addColorStop(1, night ? "rgba(104,86,60,0)" : "rgba(154,128,88,0)");
+        ctx.fillStyle = til;
+        ctx.fill();
+        // ② 断口的墨线：跟着起伏走，不是一条直边
+        ctx.beginPath();
+        ctx.moveTo(0, gy + Wob(0));
+        for (let px = 0; px <= wPx; px += 20) ctx.lineTo(px, gy + Wob(px));
+        ctx.strokeStyle = "rgba(36,26,16,0.62)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // ③ 草茬与翻出来的土坷垃：长在沿上，把那条直线彻底啃断。
+        //    竖井口那一圈自己有碎土（见下面 shaftGeom 那段），这儿让开它
+        const nearShaft = (wx) => shaftGeom.some((g) => Math.abs(wx - g.wx) < SHAFT_R + 0.3);
+        const grass = night ? ART.PAL.grassNight : ART.PAL.grass;
+        for (let px = 0; px <= wPx; px += 17) {
+          const wx = x0 + px / PPM;
+          if (nearShaft(wx)) continue;
+          const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
+          const base = gy + Wob(px);
+          if (r > 0.42) {
+            ctx.strokeStyle = r > 0.72 ? grass : (night ? "rgba(120,104,72,0.7)" : "rgba(168,148,102,0.75)");
+            ctx.lineWidth = 1.6;
+            for (let b = 0; b < 3; b += 1) {
+              const bx = px + (b - 1) * 2.4;
+              ctx.beginPath();
+              ctx.moveTo(bx, base + 1);
+              ctx.lineTo(bx + (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 6,
+                base - 3 - ART.Hash(sceneKey + "th" + px + b) * 7);
+              ctx.stroke();
+            }
+          } else if (r < 0.14) {
+            // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
+            ctx.fillStyle = night ? "rgba(78,64,44,0.9)" : "rgba(112,90,60,0.9)";
+            ctx.beginPath();
+            ctx.ellipse(px, base + 1, 2.6 + r * 12, 2 + r * 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      // 走廊：沿 x 按起伏掏出来，边缘是波浪的土沿而不是直线
+      // **逐段**掏：没挖通之前自家窖与七叔家窖是两个腔，中间是实土
+      for (const [sa, sb] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), CeilY(sa));
+        for (let wx = sa; wx <= sb; wx += 0.8) ctx.lineTo(toPx(wx), CeilY(wx));
+        for (let wx = sb; wx >= sa; wx -= 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      // 洞室 / 旁洞：直得起腰的地方。顶要拱起来，不能是个平顶方盒——
+      // 走廊只有一米多，旁边突然接一个三米的方箱子，读起来像贴图错位。
+      //
+      // **但也不能是一道从地面划到地面的大圆弧**（2026-08-11 用户：「这个傻逼
+      // 一样的拱形是什么东西」）。老版一条三次贝塞尔，两个控制点都摁在洞顶：
+      // 画出来是个横跨全屋、两条腿一直扫到地面的券顶——那是砖砌的拱，不是
+      // 一镐一镐刨出来的窖。真的地窖是**近乎直上直下的两面墙 + 圆角 + 一顶
+      // 略鼓的土顶**，而且土顶不平不匀。
+      // 侧壁用超椭圆立起来（u 两端趋近竖直、中段平缓），再叠两道手挖的起伏。
+      const DomePts = (cx, halfW, hM, id) => {
+        const pts = [];
+        const N = 44;
+        for (let i = 0; i <= N; i += 1) {
+          const u = i / N;
+          const s = Math.abs(2 * u - 1);
+          // (1-s⁴)^0.4：肩以下几乎是竖墙，肩以上是一顶平缓的土顶
+          const shape = (1 - s ** 4) ** 0.4;
+          const wob = (Math.sin(u * 7.3 + ART.Hash(id) * 9) * 0.05
+            + Math.sin(u * 17.1 + ART.Hash(id + "b") * 6) * 0.028) * (1 - s);
+          const wx = cx - halfW + 2 * halfW * u;
+          pts.push({ wx, py: tunBot - Math.max(0, hM * shape + wob) * PPM });
+        }
+        return pts;
+      };
+      const DomePath = (pts) => {
+        ctx.beginPath();
+        ctx.moveTo(toPx(pts[0].wx), tunBot);
+        for (const p of pts) ctx.lineTo(toPx(p.wx), p.py);
+        ctx.lineTo(toPx(pts[pts.length - 1].wx), tunBot);
+        ctx.closePath();
+      };
+      const domes = [];
+      for (const p of sceneDef.props) {
+        let pts = null;
+        if (p.kind === "chamber") pts = DomePts(p.x, p.w / 2, 2.5, sceneKey + p.id);
+        else if (p.kind === "pocket") pts = DomePts(p.x, 2.8, 2.2, sceneKey + p.id);
+        if (!pts) continue;
+        DomePath(pts);
+        ctx.fill();
+        domes.push(pts);
+      }
+      // 翻口：地道在这一段往下沉一个 U 形弯，得跟走廊一样从土里掏出来
+      for (const p of sceneDef.props) {
+        if (p.kind !== "waterTrap") continue;
+        if (p.builtFlag && !state.flags[p.builtFlag]) continue;
+        const tw = 3.4 * PPM, td = 1.05 * PPM;
+        ctx.beginPath();
+        ctx.moveTo(toPx(p.x) - tw / 2, tunBot);
+        ctx.bezierCurveTo(toPx(p.x) - tw * 0.28, tunBot + td,
+          toPx(p.x) + tw * 0.28, tunBot + td, toPx(p.x) + tw / 2, tunBot);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // 竖井：一条**掏出来**的井筒，不是拿方框抠的洞。
+      // 老写法是一句 fillRect——笔直两壁、方角、井底与走廊硬碰硬地对接，
+      // 再加上 DrawShaft 里那根比洞还窄的浅色"井筒"贴片，三个宽度不一样的
+      // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。
+      // 现在：两壁带起伏、井口啃出一圈、井底张成喇叭口并进走廊顶，
+      // 而且**掏到本段走廊真正的洞顶**——窄段的顶比 TUN_TOP 低一米，
+      // 按 TUN_TOP 截会在井底与走廊之间留一块没挖通的土。
+      for (const g of shaftGeom) {
+        ctx.beginPath();
+        ctx.moveTo(g.x - g.half(g.yTop), g.yTop);
+        for (let y = g.yTop; y <= g.yBot; y += 5) ctx.lineTo(g.x - g.half(y), y);
+        for (let y = g.yBot; y >= g.yTop; y -= 5) ctx.lineTo(g.x + g.half(y), y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      // 洞沿：一圈粗墨线 + 往土里晕开的暗，让"掏出来的洞"读得出来。
+      // 走廊的顶沿**走到洞室就得断**：那一段的土早被穹顶掏到更高处，照着走廊
+      // 高度接着描，就是在窖子当中凭空拉一条横线（和穹顶那道大弧是同一个病）
+      ctx.globalCompositeOperation = "source-over";
+      const DomePyAt = (pts, wx) => {
+        if (wx < pts[0].wx || wx > pts[pts.length - 1].wx) return null;
+        const t = (wx - pts[0].wx) / (pts[pts.length - 1].wx - pts[0].wx) * (pts.length - 1);
+        const i = Math.max(0, Math.min(pts.length - 2, Math.floor(t)));
+        return pts[i].py + (pts[i + 1].py - pts[i].py) * (t - i);
+      };
+      const RoofOpen = (wx) => domes.some((pts) => {
+        const py = DomePyAt(pts, wx);
+        return py !== null && py < CeilY(wx) - 1;
+      });
+      for (const [sa, sb] of segs) {
+        ctx.strokeStyle = "rgba(24,17,10,0.75)";
+        ctx.lineWidth = 7;
+        let run = 0;
+        for (let wx = sa; wx <= sb; wx += 0.8) {
+          if (RoofOpen(wx)) { if (run > 1) ctx.stroke(); run = 0; continue; }
+          if (!run) { ctx.beginPath(); ctx.moveTo(toPx(wx), CeilY(wx)); run = 1; }
+          else { ctx.lineTo(toPx(wx), CeilY(wx)); run += 1; }
+        }
+        if (run > 1) ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(toPx(sa), tunBot);
+        for (let wx = sa; wx <= sb; wx += 1.2) {
+          ctx.lineTo(toPx(wx), tunBot + ART.CavityProfile(wx, sceneKey + "cav", 0, 0).bot);
+        }
+        ctx.strokeStyle = "rgba(24,17,10,0.6)";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      }
+      // 掌子面：挖到这儿为止的那一堵新土。要让玩家一眼看出"还没通"——
+      //   · 新土比周围的老土层浅一档（还没被烟熏、没被手摸黑）
+      //   · 一道道横的镢头印，越往下越密（人是弯着腰往下刨的）
+      //   · 脚下堆着刚刨下来还没运走的虚土
+      if (headX !== null) {
+        const fx = toPx(headX);
+        const ceil = CeilY(headX);
+        ctx.save();
+        const fresh = ctx.createLinearGradient(fx - 4, 0, fx + 26, 0);
+        fresh.addColorStop(0, "rgba(150,116,74,0.62)");
+        fresh.addColorStop(1, "rgba(150,116,74,0)");
+        ctx.fillStyle = fresh;
+        ctx.fillRect(fx - 4, ceil, 30, tunBot - ceil + 6);
+        // 镢头印
+        ctx.strokeStyle = "rgba(52,38,22,0.44)";
+        for (let k = 0; k < 9; k += 1) {
+          const gy = ceil + 4 + k * ((tunBot - ceil) / 9);
+          ctx.lineWidth = 1.4 + (k / 9) * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(fx - 2, gy);
+          ctx.lineTo(fx - 2 + 6 + ART.Hash(sceneKey + "hoe" + k) * 12, gy + 2.4);
+          ctx.stroke();
+        }
+        // 脚下的虚土
+        ctx.fillStyle = "rgba(118,90,56,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(fx - 30, tunBot + 2);
+        ctx.quadraticCurveTo(fx - 12, tunBot - 13, fx + 2, tunBot + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      // 洞室的穹顶也要有洞沿：走廊的墨线只描到 CeilY，洞室那一段是
+      // destination-out 掏出来的光边——没有这一圈，穹顶读起来像贴图漏了一块。
+      // **只描还挨着土的那一段**：洞室与走廊连通的地方本来就没有边，照着整条
+      // 轮廓描下去，等于在通着的空腔里凭空画一道线——那正是"一个大拱形横在
+      // 屋里、两条腿插进地道"的来历。
+      const InCorridor = (wx, py) => segs.some(([sa, sb]) => wx >= sa && wx <= sb && py >= CeilY(wx) - 1);
+      for (const pts of domes) {
+        ctx.strokeStyle = "rgba(24,17,10,0.7)";
+        ctx.lineWidth = 6;
+        let run = null;
+        for (const p of pts) {
+          if (InCorridor(p.wx, p.py)) {
+            if (run && run > 1) ctx.stroke();
+            run = null;
+            continue;
+          }
+          if (!run) { ctx.beginPath(); ctx.moveTo(toPx(p.wx), p.py); run = 1; }
+          else { ctx.lineTo(toPx(p.wx), p.py); run += 1; }
+        }
+        if (run && run > 1) ctx.stroke();
+      }
+      // 井壁也要洞沿：走廊、洞室都描了，唯独竖井没有，于是井口那一圈成了
+      // 土层贴图被裁掉的直边——"像 bug"最直接的一笔就是这里。
+      // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
+      for (const g of shaftGeom) {
+        const stopY = g.yBot - 0.42 * PPM;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
+          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.strokeStyle = "rgba(24,17,10,0.62)";
+          ctx.lineWidth = 5.5;
+          ctx.stroke();
+        }
+        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        for (let i = 0; i < 9; i += 1) {
+          const t = i / 8;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
+          ctx.beginPath();
+          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
+          ctx.fill();
+        }
+      }
+    });
+    PlaceSprite(face, x0, SURFACE_Y, NEAR_Z);
+    // 活卡的长焦背景板会把机位与主体之间的近景藏掉（Render 的 DOF_NEAR_CUT）——
+    // 唯独这刀剖面的土不能藏：藏了它，脚底下的地道就在背景板里剧透了
+    face.userData.dofKeep = true;
+    group.add(face);
+
+    // 洞口内侧的暗角：顶沿最重、往下渐收。"往里看"的纵深靠它。
+    // 高度要盖满这一段最高的空腔——村里的地窖直得起腰（2.5m 穹顶），
+    // 还按地道走廊的 1.55m 烘的话，暗角在窖里拦腰一道硬缝
+    const vignH = sceneDef.props.some((p) => p.kind === "chamber") ? 2.55 : 1.55;
+    const vign = BakeSprite(
+      Math.ceil((range[1] - range[0] + 4) * PPM), Math.ceil(vignH * PPM),
+      0, Math.ceil(vignH * PPM),
+      (ctx) => {
+        const w = Math.ceil((range[1] - range[0] + 4) * PPM);
+        const h = Math.ceil(vignH * PPM);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
+        grd.addColorStop(0, "rgba(18,13,8,0.72)");
+        grd.addColorStop(0.42, "rgba(18,13,8,0.18)");
+        grd.addColorStop(1, "rgba(18,13,8,0.30)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, w, h);
+      });
+    PlaceSprite(vign, range[0] - 2, UNDER_Y, NEAR_Z - 0.4);
+    vign.userData.dofKeep = true;   // 跟着剖面的土一起留下（同上）
+    vign.material.depthWrite = false;
+    group.add(vign);
+
+    // —— 2) 地道地面：躺平的几何，从近侧一直铺到后壁，会向纵深收
+    const floorTex = (() => {
+      const c = MakeCanvas(1200, 400);
+      const g = c.getContext("2d");
+      const grd = g.createLinearGradient(0, 0, 0, 400);
+      grd.addColorStop(0, "#373430");
+      grd.addColorStop(1, "#625a50");
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 1200, 400);
+      // 踩出来的一条路，和几道拖痕
+      g.save();
+      g.globalAlpha = 0.30;
+      g.strokeStyle = "#514b44";
+      for (let i = 0; i < 24; i += 1) {
+        const y = 40 + ART.Hash(sceneKey + "fl" + i) * 320;
+        g.lineWidth = 2 + ART.Hash(sceneKey + "fw" + i) * 5;
+        g.beginPath();
+        g.moveTo(0, y);
+        for (let t = 0; t <= 12; t += 1) g.lineTo((t / 12) * 1200, y + (ART.Hash(sceneKey + "f" + i + t) - 0.5) * 12);
+        g.stroke();
+      }
+      g.restore();
+      ART.Speckle(g, 0, 0, 1200, 400, sceneKey + "fsp", { count: 300, alpha: 0.15, size: 3, color: "#292725" });
+      return CanvasTexture(c);
+    })();
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(range[1] - range[0] + 4, NEAR_Z - BACK_Z),
+      new THREE.MeshBasicMaterial({ map: floorTex }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set((range[0] + range[1]) / 2, UNDER_Y, (NEAR_Z + BACK_Z) / 2);
+    FixOrder(floor, LAYER_ORDER.play - 30);
+    group.add(floor);
+
+    // —— 3) 后壁：地道尽头那面土墙，带镐痕
+    const backW = range[1] - range[0] + 4;
+    const back = BakeSprite(Math.ceil(backW * PPM), Math.ceil(3.6 * PPM), 0, Math.ceil(3.6 * PPM), (ctx) => {
+      const w = Math.ceil(backW * PPM), h = Math.ceil(3.6 * PPM);
+      const grd = ctx.createLinearGradient(0, 0, 0, h);
+      grd.addColorStop(0, "#2e2c2a");
+      grd.addColorStop(1, "#4f4943");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, w, h);
+      // 镐痕：一道道弧
+      ctx.save();
+      ctx.globalAlpha = 0.26;
+      ctx.strokeStyle = "#211f1d";
+      ctx.lineWidth = 3;
+      for (let i = 0; i < w / 26; i += 1) {
+        const px = i * 26 + ART.Hash(sceneKey + "pk" + i) * 14;
+        const py = 20 + ART.Hash(sceneKey + "pky" + i) * (h - 40);
+        ctx.beginPath();
+        ctx.arc(px, py, 12 + ART.Hash(sceneKey + "pr" + i) * 10, 0.6, 2.4);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ART.Speckle(ctx, 0, 0, w, h, sceneKey + "bsp", { count: Math.round(w / 12), alpha: 0.20, size: 3, color: "#1d1b1a" });
+    });
+    PlaceSprite(back, range[0] - 2, UNDER_Y, BACK_Z);
+    group.add(back);
+
+    // —— 4) 支撑木：分布在不同 z 上，人从木柱之间穿过去。
+    // **爬行段不栽**：柱子是按走廊净高（2m）烘的，插进 0.72m 的窄爬段就是
+    // 一块顶天立地的门板，z=1.6 那批还站在演员前面——第二章防兵洞里爬行的
+    // 玩家整个被它罩住（2026-08-11 染红排查出来的）。现实里窄爬段也立不起顶木
+    const beamZ = [BACK_Z + 1.2, -2.4, -0.3, 1.6];
+    let bi = 0;
+    const inSeg = (wx) => segs.some(([a, b]) => wx >= a + 0.5 && wx <= b - 0.5);
+    for (let x = range[0] + 3; x < range[1] - 2; x += 2.8 + ART.Hash(sceneKey + "gap" + Math.round(x)) * 3.4) {
+      if (!inSeg(x)) continue;
+      if (TunnelPosture(sceneDef, x) === "crawl") continue;
+      const z = beamZ[bi % beamZ.length];
+      bi += 1;
+      const beamH = Math.ceil((TUN_TOP - UNDER_Y) * PPM);
+      const beam = BakeSprite(170, beamH + 14, 85, beamH + 6, (ctx, ax, ay) => {
+        ART.DrawCrudeTimber(ctx, ax, 6, ay, sceneKey + "bm" + Math.round(x));
+      }, 0, 3);
+      PlaceSprite(beam, x, UNDER_Y, z);
+      // 越近越亮越大（挡在人前面），越远越暗越小 —— 前后关系就读出来了
+      const t = (z - BACK_Z) / (NEAR_Z - BACK_Z);          // 0 远 → 1 近
+      const tint = 0.52 + t * 0.22;
+      beam.material.color.setRGB(tint, tint * 0.95, tint * 0.88);
+      beam.material.opacity = 0.78 + t * 0.18;
+      group.add(beam);
+      if (cellarRoom && x >= cellarRoom.x - cellarRoom.w / 2 && x <= cellarRoom.x + cellarRoom.w / 2) {
+        RegisterGeneratedFallback(generatedPropFallbacks, "cellarTimberPost", [beam]);
+        if (!cellarBeamFallback) {
+          const beamWidth = Math.ceil(cellarRoom.w * PPM);
+          cellarBeamFallback = BakeSprite(beamWidth, 28, beamWidth / 2, 20, (ctx, ax, ay) => {
+            ART.InkFill(ctx, [[6, ay - 10], [beamWidth - 6, ay - 12], [beamWidth - 4, ay], [4, ay]],
+              "cellarRoomBeam", "#594e41", { amp: 1.4, lw: 2.4, shade: "rgba(0,0,0,0.22)" });
+          }, 0, DETAIL_SS);
+          PlaceSprite(cellarBeamFallback, cellarRoom.x, UNDER_Y + 2.18, PlaceZ(BAND.nearBack));
+          FixOrder(cellarBeamFallback, DepthOrder("play", BAND.nearBack) + 1);
+          group.add(cellarBeamFallback);
+          RegisterGeneratedFallback(generatedPropFallbacks, "cellarTimberBeam", [cellarBeamFallback]);
+        }
+      }
+    }
+
+    // —— 4.5) 井筒内壁：**掏开的洞得看得见里面**。
+    // 原先近侧剖面一挖穿，井口那一截就直接露出后面的背景，一片平色，
+    // 所以那个洞读起来是"贴图漏了"。这里在演员之后补一张井筒的后壁：
+    // 竖着的镐痕、越深越黑，井口再落一线天光下来——这作品叫《地道里的光》，
+    // 从井口漏下来的那一道就该是它最认得出的一张脸。
+    // **摆在哪一层是有讲究的**：近侧剖面在 NEAR_Z=2.2，比玩家近两米多，
+    // 所以透过它看出去的那个"窗口"被透视放大了一截。井壁要是跟地道后壁一样
+    // 摆到 BACK_Z 附近，它被缩得比窗口还小，四周就漏出后面的浅色——那正是
+    // 这个洞看着像"贴图漏了"的原因。井壁贴到玩家背后一点点（SHAFT_BACK_Z），
+    // 再按玩法机位的视差比放大，才刚好把窗口填满。
+    // 井壁**就画在剖面这一刀上**（同一个 z、同一套 toPx/toPy），洞口与内壁
+    // 因此一一对齐，镜头怎么摇都错不开。
+    // 老版把它摆在玩家背后（nearBack）再按视差比放大 1.4 倍去"填窗口"——两个
+    // 平面各走各的透视，比例只在一个机位上对得上：机位一低（下到地道里往上看），
+    // 井筒上半截当场漏出天光，一条水平的硬边横在井里（2026-08-11 用户报的
+    // 「井有点小渲染bug」）。放大到多少都治不好，因为错的是平面，不是尺寸。
+    // 纵深改由**绘制顺序**交代：压在近处那条地表断面带（walk−4）之后、梯子
+    // (loose)与演员之前——人还是从井筒前面爬过去。
+    // 排在断面带**之前**是不行的：那条带子从地平线往下铺 3.2 米、横贯全场，
+    // 正好糊在洞口上（老井壁排在 nearBack，于是从来没在画面上出现过，井里那片
+    // 灰蓝其实是这条带子，顶上那道亮边是带子顶沿与洞口顶沿的视差缝漏出来的天）。
+    const SHAFT_WALL_ORDER = DepthOrder("play", BAND.walk) - 2;
+    for (const g of shaftGeom) {
+      // 井壁只画到走廊洞顶为止，不跟着喇叭口一起张开——张开了就会在地道里
+      // 糊出一块带硬边的黑斑（走廊自己的后壁从那儿接手）
+      const yWallBot = g.yBot - 0.34 * PPM;
+      // 只夹住井底那个喇叭口（1.36 比井口的张度 1.34 略大，所以井口不被夹——
+      // 夹到井口，两边就会漏出一条亮土的窄缝，看着又像贴图没对齐）
+      const halfW = (y) => Math.min(g.half(y), SHAFT_R * 1.36 * PPM);
+      // 贴片就按井筒的实际尺寸烘：宽取最胖那一段（井底喇叭口），高就是井筒本身。
+      // 多留两像素给洞沿的墨线压边
+      let maxHalf = 0;
+      for (let y = g.yTop; y <= yWallBot; y += 5) maxHalf = Math.max(maxHalf, halfW(y));
+      const wp = Math.ceil(maxHalf * 2 + 4), hp = Math.ceil(yWallBot - g.yTop);
+      // 井壁按井筒的轮廓剪出来（不是一块方贴片）：外面透明，
+      // 洞口那一圈碎土啃出来的缺口也就跟着透出土色，不会糊成一块黑方块
+      const Silhouette = (ctx) => {
+        ctx.beginPath();
+        ctx.moveTo(wp / 2 - halfW(g.yTop), 0);
+        for (let y = g.yTop; y <= yWallBot; y += 5) ctx.lineTo(wp / 2 - halfW(y), y - g.yTop);
+        for (let y = yWallBot; y >= g.yTop; y -= 5) ctx.lineTo(wp / 2 + halfW(y), y - g.yTop);
+        ctx.closePath();
+      };
+      // 井筒底在世界里的高度：井壁贴片与剖面共用 toPy，所以直接反算回去
+      const wallBotY = SURFACE_Y - yWallBot / PPM;
+      const wall = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+      const grd = ctx.createLinearGradient(0, 0, 0, hp);
+      grd.addColorStop(0, "#554c43");
+      grd.addColorStop(0.38, "#2b2927");
+      grd.addColorStop(1, "#111213");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, wp, hp);
+        // 竖着一道道的镐痕：井是往下掏的，痕迹就该是竖的（走廊那面是横的）
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = "#120d08";
+        for (let i = 0; i < 11; i += 1) {
+          const px = 6 + ART.Hash(g.id + "pk" + i) * (wp - 12);
+          const py = 8 + ART.Hash(g.id + "py" + i) * hp * 0.72;
+          ctx.lineWidth = 2 + ART.Hash(g.id + "pw" + i) * 3;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + (ART.Hash(g.id + "pd" + i) - 0.5) * 9, py + 24 + ART.Hash(g.id + "pl" + i) * 46);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
+        ctx.restore();
+      });
+      PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
+      FixOrder(wall, SHAFT_WALL_ORDER);   // 位置在剖面这一刀上，前后关系另排
+      wall.userData.shaftWall = true;     // 渲染健康测试按它认人
+      wall.userData.dofKeep = true;       // 跟着剖面的土一起留在长焦背景板里
+      group.add(wall);
+
+      // 井口漏下来的一线光：上宽下窄，落到地道口就散了。
+      // 这作品叫《地道里的光》——从井口斜下来的那一道，就该是它最认得出的一张脸
+      const beam = BakeSprite(wp, hp, wp / 2, hp, (ctx) => {
+        ctx.save();
+        Silhouette(ctx);
+        ctx.clip();
+        const grd = ctx.createLinearGradient(0, 0, 0, hp);
+        grd.addColorStop(0, "rgba(226,202,157,0.34)");
+        grd.addColorStop(0.5, "rgba(205,181,139,0.10)");
+        grd.addColorStop(1, "rgba(185,165,132,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.moveTo(wp * 0.30, 0);
+        ctx.lineTo(wp * 0.72, 0);
+        ctx.lineTo(wp * 0.62, hp);
+        ctx.lineTo(wp * 0.40, hp);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+      PlaceSprite(beam, g.wx, wallBotY, NEAR_Z);
+      FixOrder(beam, SHAFT_WALL_ORDER + 1);   // 紧跟在井壁后头，仍在梯子与人之前
+      beam.userData.dofKeep = true;
+      beam.material.blending = THREE.AdditiveBlending;
+      beam.material.depthWrite = false;
+      // 夜里井口没有天光，只剩一点点月色；白天才是那道亮的
+      beam.material.opacity = (CHAPTERS[state.chapterIndex].light === "day" ? 0.78 : 0.22);
+      // 村里的窖口有盖板，光得跟盖板走（UpdateProps 的盖板循环里驱动）：
+      // 拉严了还往下泼整道天光，第二章「捂住别出声」的黑就不成立了
+      if (CHAPTERS[state.chapterIndex].scene === "village") {
+        beam.userData.beamShaftId = g.id;
+        beam.userData.beamBase = beam.material.opacity;
+        shaftBeamMeshes.push(beam);
+      }
+      group.add(beam);
+
+      // 板缝光条（第七稿·序与夜窖）：盖板**合上**之后从板缝打进来的那几束光
+      //（flags.lidShut），夜里翻板敞着给月色版（state.hatchMoon）。
+      //
+      // 2026-08-13 整个重做（用户：「序章里的打进来的光要做出来」）。老版是把
+      // 三条渐变**烘在井壁贴图上**、剪在井筒剪影里——于是光只存在于洞顶以上
+      // 那截土管子里，窖底那间屋（两个孩子蹲的地方）一丝都没有；而且画的是
+      // "墙上有几道亮痕"，不是"空气里有一束光"。现在走 SDF 现算的光柱
+      //（Script_Light 的 CreateLightShafts）：柔边、沿程张开、按掩码被土层吃掉、
+      // **被人挡断**、里头有浮尘、落地有一摊亮斑。直/斜由 uDir 一个参数切，
+      // 不用再烘两份。
+      if (g.id === "cellarHatch" && occluder) {
+        hatchBeamMesh = CreateLightShafts(occluder, {
+          color: 0xe8dcb6, span: 11, height: SURFACE_Y - UNDER_Y + 1.2,
+        });
+        // 板缝在盖板那一层（地表），光往窖里打
+        hatchBeamMesh.userData.SetOrigin(g.wx, SURFACE_Y + 0.08, 0.62);
+        hatchBeamMesh.userData.SetFloor(UNDER_Y + 0.05);
+        // 三条缝：宽窄不一（板是三块拼的，缝也就不匀）。
+        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽。
+        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起——
+        // 画面上是一根胖柱子，不是"板缝里漏下来几条光"
+        hatchBeamMesh.userData.SetShafts([
+          { off: -0.37, half: 0.022, spread: 0.020, gain: 0.90 },
+          { off: -0.02, half: 0.017, spread: 0.016, gain: 1.15 },
+          { off: 0.33, half: 0.029, spread: 0.025, gain: 0.75 },
+        ]);
+        hatchBeamMesh.userData.SetIntensity(0);
+        // **必须走 FixOrder**：光柱要排在压暗罩（ORDER_DARK）**之后**——
+        // 排在前面的话罩子把它一起压暗，等于没画。裸 renderOrder 会被
+        // ApplyDepthOrder 按 z 重新派号盖掉（实测被派成 6252，正压在罩子底下）
+        FixOrder(hatchBeamMesh, ORDER_GLOW - 1);      // 演员与罩子之后：光在空气里，不在墙上
+        hatchBeamMesh.userData.dofKeep = true;
+        group.add(hatchBeamMesh);
+      }
+    }
+
+    // —— 5) 竖井与洞里的零件（贴在中景，人可以从它前后经过）
+    for (const shaft of sceneDef.shafts) {
+      if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
+      const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
+        Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
+          // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
+          ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
+        }, 0, 2);
+      // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
+      // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
+      // 位置照旧压在地平面上（原来这里写的是裸 z=0.45，梯子因此比洞口高半拃）
+      PlaceSprite(sh, shaft.x, UNDER_Y, PlaceZ(BAND.loose));
+      FixOrder(sh, DepthOrder("play", BAND.loose));
+      group.add(sh);
+      if (sceneKey === "village") {
+        RegisterGeneratedFallback(generatedPropFallbacks, "cellarLongLadder", [sh]);
+        sh.userData.generatedCellarTargetX = shaft.x;
+      }
+
+      // 窖口的盖板：平时盖着（侧视里只看得见板厚那一条），上下地道时绕铰链
+      // 掀起来。**几何锚点在铰链边**（洞口左沿），这样转起来那一边不动，
+      // 板子是"掀"开的不是原地转的——锚在中心的话看着像块浮在洞上的板在翻跟头。
+      //
+      // 每个暗口默认都有一块板。个别口子自己另有伪装（第四章东口在磨盘底下、
+      // 第七章地里那个是覆土的），那种在 Data_Scenes 上写 "lid": false 关掉，
+      // 别在这儿写 id 白名单——摆位是数据的事。
+      if (shaft.lid !== false) {
+        // 尺寸按**真实的窖盖**给，不按画出来的洞口给：剖面上的井筒为了在地道视图里
+        // 读得清，半径画到了 0.86m（口沿还张开一圈），照那个尺寸配盖板就是一块
+        // 1.85m 的门板——立起来比人还高，看着像块靠在墙上的板，不像盖子。
+        const lidW = 1.24;                           // 一块旧门板改的，正常人抱得动
+        const lidT = 0.20;                           // 板厚：薄了平放时只剩一条线，读不出来
+        const wPxL = Math.ceil(lidW * PPM), hPxL = Math.ceil(lidT * PPM);
+        const lid = BakeSprite(wPxL, hPxL, 0, hPxL,
+          (ctx) => ART.DrawCellarLid(ctx, wPxL, hPxL, shaft.id + "lid"), 0, 3);
+        // 把几何整体右移半个板宽：mesh 原点＝铰链边，绕原点转就是绕铰链转
+        lid.geometry.translate(lidW / 2, 0, 0);
+        lid.position.set(shaft.x - lidW / 2, SURFACE_Y, PlaceZ(BAND.loose));
+        FixOrder(lid, DepthOrder("play", BAND.loose) + 1);   // 压在梯头之上
+        lid.userData.lidId = shaft.id;
+        lidMeshes.push(lid);
+        group.add(lid);
+      }
+    }
+    for (const p of sceneDef.props) {
+      if (p.kind === "waterTrap") {
+        // 挖好之前地上什么也没有——第四章那场烟正是因为还没有它
+        if (p.builtFlag && !state.flags[p.builtFlag]) continue;
+        const tw = 3.4;
+        const t = BakeSprite(Math.ceil(tw * PPM) + 24, 130, Math.ceil(tw * PPM) / 2 + 12, 8,
+          (ctx, ax, ay) => ART.DrawWaterTrap(ctx, ax, ay, tw * PPM, p.id), 0, PROP_SS);
+        // 近侧那一刀土在 z=2.2；弯要画在它之前，不然连同水一起被土盖掉
+        PlaceSprite(t, p.x, UNDER_Y, 2.0);
+        group.add(t);
+      } else if (p.kind === "vent") {
+        const v = BakeSprite(60, Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), 30,
+          Math.ceil((SURFACE_Y - TUN_TOP + 0.4) * PPM), (ctx, ax, ay) => {
+            ART.DrawVentPipe(ctx, ax, 4, ay, p.id);
+          }, 0, 2);
+        PlaceSprite(v, p.x, TUN_TOP, -2.0);
+        group.add(v);
+      } else if (p.kind === "bell") {
+        const b = BakeSprite(80, 90, 40, 78, (ctx, ax, ay) => ART.DrawBell(ctx, ax, ay - 40, p.id, {}), 0, 3);
+        PlaceSprite(b, p.x, TUN_TOP - 0.7, -1.0);
+        group.add(b);
+      } else if (p.kind === "chamber" || p.kind === "pocket") {
+        // 洞室的后壁再退一层，读出"这里更深"
+        const cw = (p.kind === "chamber" ? p.w : 5.6);
+        const cb = BakeSprite(Math.ceil(cw * PPM), Math.ceil(3.4 * PPM), 0, Math.ceil(3.4 * PPM), (ctx) => {
+          const w = Math.ceil(cw * PPM), h = Math.ceil(3.4 * PPM);
+          const grd = ctx.createLinearGradient(0, 0, 0, h);
+          grd.addColorStop(0, "#2e2317");
+          grd.addColorStop(1, "#4a3a26");
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, w, h);
+          ART.Speckle(ctx, 0, 0, w, h, p.id + "sp", { count: 90, alpha: 0.2, size: 3, color: "#1e1710" });
+        });
+        PlaceSprite(cb, p.x - cw / 2, UNDER_Y, BACK_Z - 2.5);
+        group.add(cb);
+        if (sceneKey === "village" && p.id === "cellarRoom") {
+          RegisterGeneratedFallback(generatedPropFallbacks, "cellarEarthWallTile", [cb]);
+        }
+      }
+    }
+  }
+
+  function AddCollapses(group, sceneDef) {
+    collapseMeshes = {};
+    for (const p of sceneDef.props) {
+      if (p.kind !== "collapse") continue;
+      const mesh = BakeSprite(130, 110, 65, 104, (ctx, ax, ay) => ART.DrawCollapsePile(ctx, ax, ay, 1, p.id), 0, DETAIL_SS);
+      PlaceSprite(mesh, p.x, UNDER_Y, 0);
+      group.add(mesh);
+      collapseMeshes[p.id] = mesh;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  let pinnedNotes = 0;
+
+  // 只随旗标"出没"的道具（建一次，切 visible）与"只改画法"的道具（只重烘自己那张）
+  let flagProps = [];
+  let propRedraw = [];
+
+  // 重烘一张道具贴图。BakeSprite 按 ss 给画布加了密，重画得把缩放补回去
+  function RedrawProp(mesh, S, drawFn) {
+    const canvas = mesh?.material?.map?.image;
+    if (!canvas?.getContext) return;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(S.ss, 0, 0, S.ss, 0, 0);
+    ctx.clearRect(0, 0, S.w, S.h);
+    drawFn(ctx, S.ax, S.ay);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    mesh.material.map.needsUpdate = true;
+  }
+
+  function BindGeneratedVillageStaticAssets(state, sceneDef, light) {
+    if (!IsGeneratedVillageEligible(state) || sceneDef !== SCENES.village) return;
+    const ashTarget = { x: 9, groundY: SURFACE_Y + 0.015, width: 5.8, height: 0.48 };
+    if (!generatedSurfaceFallbacks.has("ashGroundCrackedStrip")) {
+      CreateGeneratedSurfaceFallback("ashGroundCrackedStrip", ashTarget, (ctx, ax, ay) => {
+        ctx.strokeStyle = "rgba(41,31,23,0.75)";
+        ctx.lineWidth = 2.2;
+        for (let i = 0; i < 8; i += 1) {
+          const x = ax - 130 + i * 38;
+          ctx.beginPath();
+          ctx.moveTo(x, ay - 8);
+          ctx.lineTo(x + 13, ay - 15 - ART.Hash("ash" + i) * 8);
+          ctx.lineTo(x + 22, ay - 4);
+          ctx.stroke();
+        }
+        ART.Speckle(ctx, ax - 138, ay - 25, 276, 28, "ashGroundFallback", {
+          count: 34, alpha: 0.28, size: 2.4, color: "#3d2e22",
+        });
+      }, { layer: "play", order: GENERATED_SHARED_SURFACE_SPECS.ashGroundCrackedStrip.order });
+    } else BindGeneratedSurface("ashGroundCrackedStrip", ashTarget);
+
+    const watchTarget = { x: 91, groundY: SURFACE_Y + 0.02, width: 16.0, height: 1.30 };
+    if (!generatedSurfaceFallbacks.has("distantVillageWatchtowers")) {
+      CreateGeneratedSurfaceFallback("distantVillageWatchtowers", watchTarget, (ctx, ax, ay) => {
+        ctx.fillStyle = "#3d3934";
+        for (let i = 0; i < 4; i += 1) {
+          const x = ax - 230 + i * 150;
+          const h = 34 + ART.Hash("watch" + i) * 26;
+          ctx.fillRect(x - 12, ay - h, 24, h);
+          ctx.beginPath();
+          ctx.moveTo(x - 20, ay - h); ctx.lineTo(x, ay - h - 16);
+          ctx.lineTo(x + 20, ay - h); ctx.closePath(); ctx.fill();
+          ctx.fillRect(x - 19, ay - h + 8, 38, 5);
+        }
+      }, { layer: "farTown", order: GENERATED_SHARED_SURFACE_SPECS.distantVillageWatchtowers.order });
+    } else BindGeneratedSurface("distantVillageWatchtowers", watchTarget);
+  }
+
+  function BuildEnvironment(state) {
+    lastBackdropState = state;
+    EnsureGeneratedBackdrop();
+    SyncGeneratedBackdropVisibility(state);
+    EnsureGeneratedSceneOneAssets();
+    SyncGeneratedAssetVisibility(state);
+    EnsureGeneratedSurfaceAssets();
+    SyncGeneratedSurfaceVisibility(state);
+    // 门板上的纸条是烘进贴图的，钉一条就得重烘一次
+    const pins = state.beat?.pinned || 0;
+    if (pins !== pinnedNotes) { pinnedNotes = pins; builtKey = ""; }
+    const ch0 = CHAPTERS[state.chapterIndex];
+    // 光照档取**画面上正用着的那一档**（ShownLight），不是 beat 想要的那一档：
+    // 换挡时整村要重烘一遍，那一下推迟到过渡最暗处再做（见 LIGHT_MOOD 那一段）
+    const ch = { ...ch0, light: ShownLight(state) };
+    const f = state.flags;
+    const key = `${ch.scene}:${ch.light}:${f.ruined ? 1 : 0}:${f.hiddenBuilt ? 1 : 0}`
+      + `:${state.chapterIndex}:${f.lanternOut ? 1 : 0}:${f.quiltPlugged ? 1 : 0}:${f.trapBuilt ? 1 : 0}`
+      // 地道挖到哪儿了：这两个旗标改的是**剖面几何**（掏开哪几段土），
+      // 只能整场重建。一章里只翻两次，卡这两下值得
+      + `:${f.digStarted ? 1 : 0}:${f.tunnelDug ? 1 : 0}`;
+    // henFlew / thimbleFound / raidStarted / clothDown 只决定某个道具在不在
+    //（flagProps 切 visible），ropeTaken / wellRopeBroken 只改一张贴图的画法
+    //（propRedraw 单张重烘）——一个都不进 builtKey。进了就是"捡个顶针卡一下"
+    //（clothDown 就犯过：石子打中头巾那一帧整场重建，正打中的高兴劲卡个顿）。
+    if (key === builtKey) return;
+    builtKey = key;
+    RemoveGeneratedSurfaceExtras();
+    flagProps = [];
+    propRedraw = [];
+    carveState = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
+    carveRebuild = null;
+    ClearBackdropFolk();   // 骨架的材质 ClearGroup 收不到，得先自己收
+    for (const k of Object.keys(layers)) if (k !== "ots") ClearGroup(layers[k]);
+    InvalidateSceneCaches();
+    for (const g of glows) scene.remove(g);
+    glows.length = 0;
+    sceneLights = [];
+
+    const sceneDef = SCENES[ch.scene];
+    const L = sceneDef.length;
+    const night = ch.light === "night" || ch.light === "dark" || ch.light === "tunnel";
+    hazeColor = {
+      day: "#83827e", dawn: "#797a7b", dusk: "#696663", night: "#35404c", tunnel: "#302e2c", dark: "#1d1e20",
+    }[ch.light] || "#83827e";
+
+    // 遮挡掩码：土是实心的，地道/洞室/竖井是掏出来的空气
+    const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
+    occluder = BuildOccluder(occ.bounds, occ.solids, occ.air);
+
+    // 天空
+    const skyColors = {
+      day: ["#777a7a", "#92918b"], night: ["#0e1424", "#1e2740"],
+      dawn: ["#646a73", "#898987"], dusk: ["#494a55", "#776e69"], tunnel: ["#141a26", "#2a2928"], dark: ["#0a0d14", "#18191b"],
+    }[ch.light] || ["#777a7a", "#92918b"];
+    {
+      const skyW = Math.ceil((L + 160) * PPM * 0.14);
+      const skyH = 520;
+      const skyMesh = BakeSprite(skyW, skyH, 0, skyH, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, skyH);
+        g.addColorStop(0, skyColors[0]);
+        g.addColorStop(1, skyColors[1] || skyColors[0]);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, skyW, skyH);
+        ART.DrawSky(ctx, skyW, skyH, ch.light, ch.scene + "sky");
+      });
+      PlaceSprite(skyMesh, -80, -14, 0);
+      ScaleKeepGround(skyMesh, 7.2, (26 + 14) / (skyH / PPM));
+      layers.sky.add(skyMesh);
+    }
+    // 地平线暖雾：把天和地缝起来，也是纵深的一部分
+    {
+      const hazeColor = {
+        day: "rgba(116,117,114,0.22)", dawn: "rgba(110,111,113,0.25)", dusk: "rgba(102,96,93,0.24)",
+        night: "rgba(58,68,96,0.34)", tunnel: "rgba(52,50,47,0.34)", dark: "rgba(30,31,32,0.34)",
+      }[ch.light] || "rgba(116,117,114,0.22)";
+      const wPx = Math.ceil((L + 160) * PPM * 0.2);
+      const hPx = 200;
+      const haze = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, hPx);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, hazeColor);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, wPx, hPx);
+      }, 2);
+      PlaceSprite(haze, -80, SURFACE_Y - 0.5, 0);
+      ScaleKeepGround(haze, 5, 1);
+      layers.hills.add(haze);
+    }
+
+    // 远景分层（越远越糊越淡：假景深）
+    const pal = {
+      day: { ridge: "#626460", hill: "#555651", town: "#625f58" },
+      dawn: { ridge: "#606266", hill: "#505258", town: "#5d5b59" },
+      night: { ridge: "#2a3244", hill: "#212938", town: "#39415a" },
+      tunnel: { ridge: "#2a2a30", hill: "#232227", town: "#33313a" },
+      dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
+      }[ch.light] || { ridge: "#626460", hill: "#555651", town: "#625f58" };
+
+    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
+    proceduralRidgeMesh = null;
+    AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
+      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, haze: 0.32, rows: 26 });
+    AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
+      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, haze: 0.20, rows: 34 });
+    // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
+    AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
+
+    // 各深度层各铺一条地面：透视下它们逐级收向地平线，地就"退"出去了
+    const farEarth = {
+      day: ["#68645d", "#4e4b47"], dawn: ["#62615e", "#494947"], dusk: ["#59534f", "#42403d"],
+      night: ["#3a424b", "#2f363e"], tunnel: ["#373633", "#292825"], dark: ["#232426", "#1a1b1d"],
+    }[ch.light] || ["#68645d", "#4e4b47"];
+    // 田块的三种颜色：返青的冬麦 / 留茬翻过的地 / 田埂。
+    // 1943 春的冀中，麦子是去年秋播、开春返青的——地里该是绿的，不是荒的
+    const cropPal = {
+      day: { wheat: "#55594f", stubble: "#706c60", ridge: "rgba(55,52,48,0.58)" },
+      dawn: { wheat: "#515650", stubble: "#69675f", ridge: "rgba(51,50,48,0.58)" },
+      dusk: { wheat: "#484d49", stubble: "#5c5853", ridge: "rgba(44,42,40,0.60)" },
+      night: { wheat: "#39485044", stubble: "#3a4250", ridge: "rgba(22,28,38,0.55)" },
+      tunnel: { wheat: "#35362a", stubble: "#37332a", ridge: "rgba(24,20,14,0.5)" },
+      dark: { wheat: "#23241c", stubble: "#24221d", ridge: "rgba(16,14,10,0.5)" },
+    }[ch.light] || { wheat: "#55594f", stubble: "#706c60", ridge: "rgba(55,52,48,0.58)" };
+    for (const [key, tint, depth] of [
+      ["hills", 0.55, 9], ["farTown", 0.72, 7], ["midTrees", 0.85, 6], ["nearTrees", 1, 5],
+    ]) {
+      if (ch.scene === "tunnelFort" && key !== "nearTrees") continue;
+      const wPx = Math.ceil((L + 160) * PPM);
+      const hPx = Math.round(depth * PPM);
+      const band = BakeSprite(wPx, hPx, 0, 4, (ctx) => {
+        const g = ctx.createLinearGradient(0, 0, 0, hPx);
+        g.addColorStop(0, farEarth[0]);
+        g.addColorStop(1, farEarth[1]);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 4, wPx, hPx - 4);
+        // 冀中平原一眼望去全是耕地——地不能是一条纯色板
+        ART.PaintFarmland(ctx, wPx, hPx, key + "farm", {
+          wheat: cropPal.wheat, stubble: cropPal.stubble, ridge: cropPal.ridge,
+          // 越远的带子块越碎、垄沟越细（近处那条才看得出一垄一垄）
+          strips: depth >= 8 ? 26 : depth >= 7 ? 22 : 18, furrow: depth <= 6,
+        });
+        ctx.strokeStyle = "rgba(43,31,22,0.5)";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
+        ctx.stroke();
+        // 雾量只取该层本来的空气透视值：这点带压带的半透明原本混的是同为
+        // 土色的下一条带，不是天——照 HazeSolid 折算会把整块地洗成天色，
+        // 田块和麦子全看不见了
+      }, LAYER_BLUR[key] || 0, 1, HazeSolid(key, 1, 0.65));
+      PlaceSprite(band, -80, SURFACE_Y, 0);
+      layers[key].add(band);
+    }
+    if (ch.scene === "village" || ch.scene === "tunnelVillage") {
+      AddParallaxTown(layers.farTown, -10, L + 10,
+        state.flags.ruined && ch.light !== "night" ? "#7d7466" : pal.town,
+        ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown,
+          // 站在村街上，身后就是全村的房——村庄场景的远景要密一档、实一档，
+          // 不然中景一空整个画面只剩天和地两条色带
+          opacity: 0.88 });
+    }
+    if (ch.scene !== "tunnelFort") {
+      const dense = ch.scene === "village" || ch.scene === "tunnelVillage";
+      AddParallaxTrees(layers.midTrees, -4, L + 8, night, ch.scene + "mtree",
+        { blur: LAYER_BLUR.midTrees, scale: 1 / LAYER_COMP.midTrees,
+          step: dense ? 16 : 24, hazeOpt: HazeSolid("midTrees", 0.86) });
+      AddParallaxTrees(layers.nearTrees, 4, L - 8, night, ch.scene + "ptree",
+        { blur: LAYER_BLUR.nearTrees, scale: 1 / LAYER_COMP.nearTrees,
+          ...(dense ? { step: 14 } : {}), hazeOpt: HazeSolid("nearTrees", 0.96) });
+    }
+    // 背景层的乡亲最后放：他们要挂在已经建好的树列之间
+    AddBackdropFolk(sceneDef, ch, night);
+
+    // 真正的地面（躺平的几何，向地平线收敛）
+    AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
+    // 第八章：院子一带留下焦土
+    if (state.flags.ruined) {
+      for (const bx of [30, 62, 92]) {
+        const scorch = MakeFlatShadow(9, 16, 0.34);
+        scorch.position.set(bx, SURFACE_Y + 0.02, -1.2);
+        layers.play.add(scorch);
+      }
+    }
+    // 近处的断面带：把玩法线前缘收住，也遮住地平面的近端接缝
+    AddGroundBand(layers.play, -30, L + 30, SURFACE_Y, ch.light, ch.scene + "ground",
+      sceneDef.walk.under ? 3.2 : 16);
+
+    // 地下剖面
+    // 每条纵深带一道看得见的地平线：远处的房子/树才有"地"可站
+    if (!sceneDef.underOnly) {
+      for (const z of [BAND.backdrop, BAND.building, BAND.yard]) {
+        AddBandEdge(layers.play, -30, L + 30, z, ch.light, ch.scene + "be" + z);
+      }
+    }
+
+    AddUnderground(layers.play, sceneDef, state, ch.scene);
+    BuildGeneratedCellarAssets(state, ch.scene);
+    AddCollapses(layers.play, sceneDef);
+
+    // 地表道具与遮蔽
+    for (const p of sceneDef.props) {
+      if (["chamber", "pocket", "vent", "waterTrap", "bell", "collapse"].includes(p.kind)) continue;
+      AddProp(layers.play, p, ch.light, state.flags.ruined, ch.scene, state);
+    }
+    SyncGeneratedCellarVisibility(state);
+    for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
+    // Bind village-only generated ground/horizon assets after prop fallbacks
+    // exist, then refresh their visibility before the final depth pass.
+    BindGeneratedVillageStaticAssets(state, sceneDef, ch.light);
+    SyncGeneratedSurfaceVisibility(state);
+
+    // 收藏品（scene.relics）：小件、贴地、半掩在现有物件脚下。loose 序号——
+    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧
+    for (const r of sceneDef.relics || []) {
+      const m = BakeSprite(64, 60, 32, 52, (ctx, ax, ay) => ART.DrawRelic(ctx, ax, ay, r.art, r.id, { dim: true }), 0, DETAIL_SS);
+      PlaceSprite(m, r.x, r.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
+      SetPlayOrder(m, BAND.loose, "relic");
+      m.userData.kind = "relic:" + r.id;
+      layers.play.add(m);
+      relicMeshes.set(r.id, { mesh: m, r });
+    }
+
+    // 前景草丛（scene.fore）：layers.fore 是掠过镜头的那一层（z=+3.4，微糊、
+    // 特写与地下机位自动隐藏）。它的地平线比行走线低一截——草从画框下沿探
+    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头
+    for (const f of sceneDef.fore || []) {
+      const m = BakeSprite(120, 110, 60, 104,
+        (ctx, ax, ay) => ART.DrawForeTuft(ctx, ax, ay, "ft" + f.x, f.art), 1.1, 2, HazeFor("fore"));
+      // fore 组整层按 (D_REF-z)/D_REF 预缩过，作者坐标要除回去——不除的话
+      // x=125 的草被缩到世界 107，相机一到 125 它早滑出画框了（前景的视差
+      // 比玩法层快，锚点必须补偿）
+      PlaceSprite(m, f.x / LAYER_COMP.fore, SURFACE_Y, 0);
+      FixOrder(m, LAYER_ORDER.fore + 40);
+      layers.fore.add(m);
+      foreTufts.push(m);
+    }
+
+    // 可翻越物的顶沿缺口：统一轮廓语法的记号——肩高、顶沿磨亮/有缺口。
+    // 无按键交互的可读性全靠这一笔
+    for (const v of sceneDef.vaults || []) {
+      if (v.flag && !state.flags[v.flag]) continue;
+      const n = BakeSprite(50, 30, 25, 22, (ctx, ax, ay) => ART.DrawVaultNotch(ctx, ax, ay, "vn" + v.x), 0, DETAIL_SS);
+      PlaceSprite(n, v.x, SURFACE_Y + (v.top ?? 1.6), PlaceZ(BAND.loose));
+      layers.play.add(n);
+    }
+
+    // 第四章堵在东段卡口的湿棉被：堵上之后一直留在剖面里
+    if (ch.scene === "tunnelVillage" && state.flags.quiltPlugged) {
+      const m = BakeSprite(120, 130, 60, 118, (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 3.6, 1, "湿棉被"), 0, DETAIL_SS);
+      PlaceSprite(m, 124, UNDER_Y + 0.6, PlaceZ(BAND.loose));
+      layers.play.add(m);
+    }
+
+    // 静态灯位
+    const lampSpots = [];
+    for (const p of sceneDef.props) {
+      if (p.kind === "lamppost" && night) lampSpots.push({ x: p.x, y: 1.6, r: 4.5, i: 0.9 });
+      if (p.kind === "hangLantern" && night && !state.flags.lanternOut) lampSpots.push({ x: p.x + 0.5, y: 2.2, r: 4.6, i: 0.95 });
+      if (p.kind === "fortGate") lampSpots.push({ x: p.x, y: 2.6, r: 5.5, i: 1.0 });
+      if (p.kind === "blockhouse") lampSpots.push({ x: p.x, y: 6.4, r: 7, i: 1.1 });
+      if (p.kind === "prison") lampSpots.push({ x: p.x, y: 1.5, r: 4, i: 0.75 });
+      if (p.kind === "chamber" && ch.scene === "tunnelVillage") lampSpots.push({ x: p.x, y: UNDER_Y + 1.5, r: 4.2, i: 1.0 });
+    }
+    for (const spot of lampSpots) {
+      const g = MakeGlow(spot.r, 0xffc878, spot.i);
+      g.userData.SetLight(spot.x, spot.y);
+      scene.add(g);
+      glows.push(g);
+      sceneLights.push(spot);
+    }
+
+    // 最后统一派发绘制序号：层间靠基数、层内靠深度，先后关系从此确定，
+    // 不再受 three.js 按中心点自动排序的影响（镜头推拉时不会前后翻面）
+    ApplyDepthOrder();
+    SyncGeneratedBackdropVisibility(state);
+    SyncGeneratedAssetVisibility(state);
+    SyncGeneratedSurfaceVisibility(state);
+    SyncGeneratedCellarVisibility(state);
+  }
+
+  // -------------------------------------------------------------------------
+  // 角色
+  // -------------------------------------------------------------------------
+  function EnsureActorSprite(id, kind) {
+    let s = actorSprites.get(id);
+    if (!s) {
+      // 骨骼装配：每块骨头一张贴图，逐帧只转关节
+      const rig = CreateRig(kind);
+      rig.group.userData.persist = true;   // 见 ClearGroup：骨架资源是全场共享的
+      layers.play.add(rig.group);
+      SetPlayOrder(rig.group, ACTOR_Z);
+      const shadow = MakeFlatShadow(1.9, 1.15, 0.30);
+      shadow.userData.persist = true;
+      layers.play.add(shadow);
+      SetPlayOrder(shadow, ACTOR_SHADOW_Z, "actorShadow");
+      // 灯打出来的那条长影子，跟脚下那团分开管：一个说"他站在地上"，
+      // 一个说"光在他左边"。同时在的时候两条一起读，才像真的有盏灯
+      const castShadow = MakeCastShadow(0.42);
+      castShadow.visible = false;
+      layers.play.add(castShadow);
+      // 步频相位/呼吸相位按 id 打散：都从 0 起步的话，一队人会踩着完全相同的
+      // 步子、同时喘同一口气——横版里那就是一排复制人。背景层的路人早就这么
+      // 打散了（见 AddParallaxTrees 那边的 Hash 播种），演员这边一直漏着
+      s = {
+        rig, mesh: rig.group, prevX: null, phase: ART.Hash(id + "ph") * 6, kind,
+        carryMesh: null, glow: null,
+        shadow, castShadow, idleT: ART.Hash(id + "br") * 6, bodyScale: BODY_SCALE[kind] ?? 1,
+      };
+      actorSprites.set(id, s);
+    }
+    return s;
+  }
+
+
+  // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
+  function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
+    const ground = level === "under" ? UNDER_Y : SURFACE_Y;
+    s.ground = ground;                   // 供 PlayerLimbTips 量"手脚离地多高"
+    // 翻越时人真的离地（Core 算的抬升弧）；影子留在地上，只是缩小、变淡
+    const lift = extra.lift || 0;
+    const y = ground + lift;
+    const moved = s.prevX === null ? 0 : Math.abs(x - s.prevX);
+    const movedY = s.prevY === null || s.prevY === undefined ? 0 : Math.abs(y - s.prevY);
+    s.prevX = x;
+    s.prevY = y;
+    // 步频跟着实际位移走（不是定速循环），停下就自然收回站姿
+    const isMoving = moved > 0.006;
+    // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
+    // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
+    // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
+    if (extra.climbing) s.phase += movedY * 4.5;
+    else if (isMoving) s.phase += moved * 3.4;
+    else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
+    s.idleT += dt * 1.4;
+
+    const holding = IsHandHeld(held);
+    // 姿势名要留给 SyncCarry：有几个姿势会改变"东西挂在哪儿"（顶撑木那一拍
+    // 板子在**两只手上**，不在肩上），挂点必须跟着姿势走。
+    // 进度也一起留下：有的姿势还要让手里那件东西**跟着进度转**（倒土那一下
+    // 筐得一路扣到口朝下），SyncCarry 拿不到 extra 就只能端着个永远平的筐。
+    s.poseName = extra.pose || null;
+    s.poseProgress = extra.poseK;
+    PoseRig(s.rig, {
+      phase: s.phase, breath: s.idleT, moving: isMoving, crouch,
+      carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
+      climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
+      poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
+      track: extra.track, trackT: extra.trackT,
+    }, dt);
+
+    // 队列的后几排整体后移（人/影子/家伙一起走，见 Data_DepthSpec 的 RankDz）。
+    // 绘制顺序是 SetPlayOrder 钉死的，所以档位一变就得重新钉一次——
+    // 不重钉的话后排的人会画在前排之前，两个人叠成一个。
+    const dz = extra.rankDz || 0;
+    if (s.rankDz !== dz) {
+      s.rankDz = dz;
+      SetPlayOrder(s.rig.group, ACTOR_Z + dz);
+      if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow");
+      if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry");
+    }
+    // 位置压回地平面：演员脚下这条线必须与行走线道具（井台/磨盘/车）是同一条。
+    // 后一排（rankDz 是负的）是**有意**站在更靠后的地面上，PlaceZ 会原样放行——
+    // 那点抬高正是"两人并排"读得出来的原因。
+    const bs = extra.bodyScale || s.bodyScale || 1;
+    // 躺着：**整具骨架转 90°**，不是把关节一根根掰平（那条路走了三轮都没走通，
+    // 出来是一堆散落的方块——见 Rig 的 sleep 那一段）。转整具的好处是每一块的
+    // 相对关系一点没变：躺下的还是那个人。
+    // 方向：站着朝哪边，就往**背后**倒下去（人躺下是仰面朝天，不是脸埋进被窝），
+    // 所以头落在朝向的反侧、肚子朝上。
+    const lie = LIE_POSES[extra.pose] ? (heading >= 0 ? 1 : -1) : 0;
+    s.mesh.rotation.z = lie * Math.PI / 2;
+    // 转完之后原点还在脚底下、脊梁正压在地平线上：往躺倒的方向挪半个身长把人
+    // 摆正（锚点落在腰上），再垫起半个身厚，免得半个人陷进铺盖里
+    const lieDx = lie * LIE_LEN * 0.5 * bs;
+    const lieDy = lie ? LIE_RISE * bs : 0;
+    s.mesh.position.set(x + lieDx, y + lieDy, PlaceZ(ACTOR_Z + dz));
+    s.mesh.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
+    if (s.shadow) {
+      // 地下没有太阳，脚下这团只负责"他确实站在地上"
+      const under = level === "under";
+      // 人离地了影子就该缩、该淡——这是"他真的上去了"最便宜也最有效的一笔
+      const air = Math.min(1, lift / 1.1);
+      s.shadow.visible = true;
+      // 躺着的人影子摊在整个身长下面（脚底下那一小团会读成"人浮在铺盖上"）
+      s.shadow.scale.set(bs * (1 - air * 0.42) * (lie ? 2.2 : 1),
+        bs * (under ? 0.55 : 1) * (1 - air * 0.42) * (lie ? 0.6 : 1), 1);
+      s.shadow.position.set(
+        x + lieDx + (under ? 0 : SUN.dx * 0.55) * bs,
+        ground + 0.015,
+        PlaceZ(ACTOR_Z + dz) - 0.05 + (under ? 0.12 : SUN.dz * 0.62) * bs,
+      );
+      s.shadow.material.opacity = (under ? 0.5 : 1) * (1 - air * 0.55);
+    }
+    // 灯打出来的长影子：背着最近那盏灯拖出去，离得越远越长越淡
+    if (s.castShadow) {
+      const lit = extra.light;
+      if (lit) {
+        const dx = x - lit.x;
+        const dist = Math.abs(dx);
+        const dir = dx >= 0 ? 1 : -1;
+        // 灯低、人高 → 影子被拉得比人还长；这里按距离线性放，够读就行
+        const len = Math.min(6.4, (0.9 + dist * 0.78)) * bs;
+        const wid = (0.85 + dist * 0.10) * bs;
+        s.castShadow.visible = true;
+        s.castShadow.scale.set(dir * len, wid, 1);
+        s.castShadow.position.set(x + dir * len * 0.5, y + 0.02, PlaceZ(ACTOR_Z + dz) - 0.04);
+        // 站在灯正下方没有影子可言；出了灯的照射范围也就没影子了
+        const near = Math.min(1, dist / 0.75);
+        const far = 1 - Math.min(1, Math.max(0, (dist - lit.r * 0.55) / (lit.r * 0.5)));
+        s.castShadow.material.opacity = near * far * (lit.i ?? 1);
+      } else {
+        s.castShadow.visible = false;
+      }
+    }
+    return { x, y, isMoving };
+  }
+
+  // 手里/肩上的东西。原先只有玩家有，于是"梁木匠把刨子放下"这种戏只能靠
+  // 字幕说——演员手上空空。现在所有演员共用这一套。
+  // s.layerKey 缺省是 play；背景层的乡亲把自己那层的名字带进来，
+  // 手上的家伙就跟着挂到同一层（不然锄头会留在前景，隔着十几米跟着人走）
+  // 坐骑：车是一张贴图，骑手是正常演员。自行车摆在骑手**身后**（细钢管架，
+  // 人要整个压在车上才读得出"骑"）；挎斗摩托摆在**身前**（近侧的斗得盖住
+  // 斗里那个兵的下半身，他才是"坐在斗里"而不是"蹲在车顶上"）。
+  // 画笔一律画朝 -x（车头在左），朝 +x 走时整张镜像。
+  function SyncMount(a, show) {
+    let m = mountMeshes.get(a.id);
+    if (!a.mount || !show) {
+      if (m) m.visible = false;
+      return;
+    }
+    if (!m || m.userData.mountKind !== a.mount) {
+      if (m) layers.play.remove(m);
+      m = a.mount === "bicycle"
+        ? BakeSprite(130, 64, 65, 58, (ctx, ax, ay) => ART.DrawBicycle(ctx, ax, ay, a.id + "bike"), 0, PROP_SS)
+        : BakeSprite(160, 74, 80, 68, (ctx, ax, ay) => ART.DrawMotorcycle(ctx, ax, ay, a.id + "moto"), 0, PROP_SS);
+      m.userData.mountKind = a.mount;
+      SetPlayOrder(m, a.mount === "bicycle" ? BAND.loose : CARRY_Z, "mount:" + a.mount);
+      layers.play.add(m);
+      mountMeshes.set(a.id, m);
+    }
+    m.visible = true;
+    // 车的贴图中心不是**座位**：自行车的鞍座画在中心偏后 9px、摩托偏后 1px。
+    // 演员站在自己的 x 上，所以车要往前挪那么多，人才是「坐在座上」而不是
+    // 「站在车头边推着走」（实拍抓到的就是这个）。朝向翻转时偏移也跟着翻
+    const seatDx = (a.mount === "bicycle" ? 9 : 1) / PPM;
+    const dir = a.heading > 0 ? -1 : 1;
+    PlaceSprite(m, a.x - seatDx * dir, SURFACE_Y, PlaceZ(a.mount === "bicycle" ? BAND.loose : CARRY_Z));
+    m.scale.x = Math.abs(m.scale.x) * (a.heading > 0 ? -1 : 1);
+  }
+
+  function SyncCarry(s, label, heading) {
+    const layerKey = s.layerKey || "play";
+    const host = layers[layerKey];
+    if (label && (!s.carryMesh || s.carryLabel !== label)) {
+      if (s.carryMesh) host.remove(s.carryMesh);
+      s.carryMesh = MakeCarryMesh(label);
+      // 前景演员的家伙要挺过环境重建（人是 persist 的）；背景乡亲整批随层重建，
+      // 标了 persist 反而会剩一把没人的锄头浮在那儿
+      if (layerKey === "play") s.carryMesh.userData.persist = true;
+      s.carryLabel = label;
+      host.add(s.carryMesh);
+      // 后一排的人手里那把枪也得跟着退一档（rankDz 由 UpdateOne 先一步定好）
+      SetLayerOrder(s.carryMesh, layerKey, CARRY_Z + (s.rankDz || 0), "carry:" + layerKey);
+    } else if (!label && s.carryMesh) {
+      host.remove(s.carryMesh);
+      s.carryMesh = null;
+      s.carryLabel = null;
+    }
+    if (!s.carryMesh) return;
+    s.carryMesh.visible = true;   // 人从屋里出来了：手上那件跟着回到画面
+    // 小件提在手上，大件（木料/门板/顶木/棉被…）扛在肩上——挂点不同。
+    // 长家伙（锯/锄头）也在手上，但要顺着前臂的方向摆：手臂一伸一屈，
+    // 锯就一进一出；锄扬过肩、落进土——工具的动作全从手臂动作里来。
+    const alongArm = ALONG_ARM.includes(label);
+    // 顶撑木那一拍：板子离开肩膀，横在**两只手上**往洞顶推。挂点改走 HandPoint，
+    // 板面保持水平（顶木是横着抵住土的，歪着就成了戳）——不改这一处，
+    // 玩家举了半天手，板子还老老实实趴在肩上（"撑起来了却看不见"就是这么来的）
+    const overhead = s.poseName === "braceUp";
+    const inHand = overhead || IsHandHeld(label);
+    // HandPoint/ShoulderPoint 给的是**世界**坐标；背景层带着自己的缩放与 z 偏移，
+    // 直接拿去当局部坐标，锄头会飞到十几米外。换算回本层的局部系再摆
+    const ToLocal = (v) => (layerKey === "play" ? v : host.worldToLocal(v));
+    const anchor = ToLocal(inHand ? HandPoint(s.rig) : ShoulderPoint(s.rig));
+    const bs = s.bodyScale || 1;
+    // 提在手里的：贴图中心就是桶沿，挂在拳头底下一点点就够了。原先垂 0.20m 是
+    // 迁就旧的"扛"姿势（手抬在肩上），现在 hold 已经把胳膊坠直——再垂那么多，
+    // 柱子（才一米出头）手里的桶就杵在地上了。
+    // 侧视里手臂垂在身体正中，桶又整个盖在人身上——再往前挪一掌，剪影才分得开
+    const forward = inHand && !alongArm && !overhead ? (heading >= 0 ? 1 : -1) * 0.11 : 0;
+    s.carryMesh.position.set(anchor.x + forward,
+      anchor.y + (alongArm ? 0 : overhead ? 0.05 : inHand ? -0.05 : 0.10), PlaceZ(CARRY_Z + (s.rankDz || 0)));
+    // 顺前臂摆的长家伙**不做镜像**：朝向已经由世界系的旋转决定了，再乘一个
+    // scale.x=-1 等于先翻再转，两者打架——人一朝左，锯就指到天上去。
+    // （锯和锄本来就绕柄对称，不镜像也看不出来。）
+    // 咬布压咳：布举到嘴边时收小半档——整块布巾原尺寸糊在脸上，
+    // 读出来是"咬着一床被子"，头都看不见了（视觉审查退回过）
+    const shrink = s.poseName === "clothMouth" ? 0.5 : 1;
+    s.carryMesh.scale.set((alongArm || heading >= 0 ? 1 : -1) * bs * shrink, bs * shrink, 1);
+    if (alongArm) {
+      // 贴图里工具沿"手向下"画；把"下"转到前臂方向（肘→手）上，
+      // 再加上这件工具在手心里的固有偏角（扫帚不与前臂共线，见 ARM_TOOL_TILT）
+      const elbow = ToLocal(ElbowPoint(s.rig));
+      s.carryMesh.rotation.z = Math.atan2(anchor.x - elbow.x, -(anchor.y - elbow.y))
+        + (ARM_TOOL_TILT[label] || 0) * (heading >= 0 ? 1 : -1);
+    } else if (s.poseName === "pourBasket") {
+      // 倒土：**筐得真的翻过来**。土筐不在 ALONG_ARM 里，平时 rotation 恒为 0
+      // （拎着走本来就该是平的），可倒土那一下要是还端得四平八稳，画面上就只是
+      //「人弯了下腰」——土从哪儿出来的没人看得懂。
+      // 扣到 82° 就够，**不许过 90°**：土筐是个口宽底窄的梯形，翻过 90° 之后
+      // 它在侧视里只剩一条边，读出来是"手里举着块板子"（实拍验过 118° 就是这样）。
+      // 停在 82°：筐口朝着前下方、梯形还看得出来，"正在往下扣"这件事才成立。
+      const k = Math.max(0, Math.min(1, s.poseProgress ?? 0));
+      s.carryMesh.rotation.z = (heading >= 0 ? -1 : 1) * k * 82 * Math.PI / 180;
+    } else {
+      s.carryMesh.rotation.z = inHand ? 0 : (heading >= 0 ? -0.14 : 0.14);
+    }
+  }
+
+  // 夜戏里人得从背景里读得出来。全屏压暗罩会把演员和土墙一起压成一团，
+  // 在手机那种小屏 + 低亮度上就成了"人都看不见"。做法跟《勇敢的心》一样：
+  // 把演员本身提亮，让他们始终比环境亮一档——主角比配角再亮一点。
+  const NIGHT_LIFT = { day: 1, dawn: 1.06, night: 1.34, tunnel: 1.30, dark: 1.42 };
+  function LiftActor(s, light, isPlayer) {
+    const lift = (NIGHT_LIFT[light] ?? 1) * (isPlayer ? 1.08 : 1);
+    if (s.liftApplied === lift) return;
+    s.liftApplied = lift;
+    s.mesh.traverse((o) => { if (o.isMesh && o.material?.color) o.material.color.setScalar(lift); });
+  }
+
+  // 手里的灯：一盏实物挂在手上，光晕从它的火心发出去（不是人整个在发光）
+  const LAMP_W = 46, LAMP_H = 46;    // 贴图画幅（像素，PPM 密度）
+  const LAMP_AX = 18, LAMP_AY = 15;  // 握点在画幅里的位置
+  const LAMP_S = 0.92;               // DrawHandLamp 的绘制单位 → 贴图像素
+  function SyncHandLamp(s, on, kind, heading, hand, bs) {
+    if (!on || !hand) {
+      if (s.lampMesh) s.lampMesh.visible = false;
+      return null;
+    }
+    if (!s.lampMesh || s.lampKind !== kind) {
+      if (s.lampMesh) layers.play.remove(s.lampMesh);
+      // 灯会被特写扫到（"灯停住了"那一镜），按细节件的密度烘
+      s.lampMesh = BakeSprite(LAMP_W, LAMP_H, LAMP_AX, LAMP_AY, (ctx, ax, ay) => {
+        ART.DrawHandLamp(ctx, ax, ay, LAMP_S, kind);
+      }, 0, DETAIL_SS * 2);
+      s.lampKind = kind;
+      layers.play.add(s.lampMesh);
+      SetPlayOrder(s.lampMesh, CARRY_Z);
+    }
+    s.lampMesh.visible = true;
+    const dir = heading >= 0 ? 1 : -1;
+    s.lampMesh.scale.set(dir * bs, bs, 1);
+    s.lampMesh.position.set(
+      hand.x + dir * s.lampMesh.userData.offset.x * bs,
+      hand.y + s.lampMesh.userData.offset.y * bs,
+      PlaceZ(CARRY_Z),
+    );
+    // 火心的世界坐标：光就从这儿发出去（画布 y 向下，世界 y 向上）
+    const f = ART.HAND_LAMP_FLAME[kind] || ART.HAND_LAMP_FLAME.hurricane;
+    return {
+      x: hand.x + dir * (f.x * LAMP_S / PPM) * bs,
+      y: hand.y - (f.y * LAMP_S / PPM) * bs,
+    };
+  }
+
+  function UpdateActors(state, time, dt) {
+    const ch = CHAPTERS[state.chapterIndex];
+    const sceneDef = SCENES[ch.scene];
+    const seen = new Set(["player"]);
+    const p = state.player;
+    planeHandRig = null;   // 这一帧谁在推刨子（UpdateProps 拿它挂刨子）
+    const ps = EnsureActorSprite("player", "player");
+    const def = CurrentBeatDef(state);
+    const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
+
+    // ① 先把这一帧的光源点清出来：影子朝哪边拖、谁挡谁的光，都要先知道灯在哪
+    lightSources.length = 0;
+    if (p.lamp) lightSources.push({ x: p.x + p.heading * 0.42, y: LevelYOf(p.level) + 0.95, r: 6.5, i: 1.1 });
+    for (const a of state.actors) {
+      if (!a.lantern || a.visible === false) continue;
+      lightSources.push({ x: a.x + (a.heading || 1) * 0.42, y: LevelYOf(a.level) + 0.95, r: 4.6, i: 1 });
+    }
+    for (const l of state.lamps || []) if (l.lit) lightSources.push({ x: l.x, y: UNDER_Y + 1.4, r: 3.4, i: 0.8 });
+    for (const l of sceneLights) lightSources.push({ x: l.x, y: l.y, r: l.r, i: l.i });
+
+    // 离 x 最近、且还照得到的那盏灯负责投影（同一个人身上叠两条影子会很脏）
+    const NearestLight = (x, y) => {
+      let best = null, bestD = Infinity;
+      for (const l of lightSources) {
+        if (Math.abs(l.y - y) > 4) continue;             // 不是同一层的灯别管
+        const d = Math.abs(l.x - x);
+        if (d > l.r || d > bestD) continue;
+        bestD = d; best = l;
+      }
+      return best;
+    };
+
+    // ② 挡光的人体：只取躯干那一柱（半宽 0.17m），细长一条影子比一整块黑更像人
+    bodyBlockers.length = 0;
+    const PushBlocker = (x, level, crouch, bs) => {
+      const h = (crouch ? 0.62 : 0.92) * bs;
+      bodyBlockers.push({ x, y: LevelYOf(level) + h, hw: 0.20 * bs, hh: h });
+    };
+    // 施工中=长按进度在涨。原来看提示文案里有没有"%"，但百分比已经改画成
+    // 进度环、不进文案了——判据换成 promptFill 本身
+    const digging = !!(state.beat && !state.beat.quakeActive
+      && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
+        || def?.kind === "buildSpots" || def?.kind === "hold" || def?.kind === "chain")
+      && (state.promptFill || 0) > 0.001);
+    // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
+    const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
+    PushBlocker(p.x, p.level, p.crouch, boyScale);
+    for (const a of state.actors) {
+      if (a.visible === false) continue;
+      PushBlocker(a.x, a.level || "surface", false, BODY_SCALE[a.kind] ?? 1);
+    }
+
+    // 手里那一格（谜题链的物品）和肩上扛的木料一样要摆出携带姿势
+    const held = p.carry || (p.item ? p.item.label : null);
+    UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, held,
+      {
+        climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
+        // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
+        // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
+        // 翻越取 vaultK、刨料/顶撑木取 poseU、投石取 poseK（拉弓量），见 PoseProgress
+        lift: p.lift || 0, poseK: PoseProgress(p),
+        // 摇辘轳：把摇把握手的世界坐标换算成骨架局部坐标交给 Rig 反解——
+        // 手是真的攥在那根把手上，不是照着一条相位在半空画圈
+        poseStrain: p.poseStrain,
+        aimHand: CrankAimLocal(state, p, boyScale),
+        track: p.track?.name, trackT: p.track?.t,
+        // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
+        light: NearestLight(p.x, LevelYOf(p.level)),
+      });
+    ps.mesh.visible = otsHiddenId !== "player";
+    // 手在世界里的真位置，回填给玩法层。投石要求"按在手里那颗石子上"才攥得住，
+    // 判定圈就必须钉在**画出来的那只手**上——照 p.x + 朝向×0.24 估一个高度，
+    // 姿势一换（垂手 / 蓄力）手就差出大半米，玩家等于在空气里按。
+    // 同刨子那条：挂点由渲染层给，玩法层不自己猜。
+    {
+      const hp = HandPoint(ps.rig);
+      state.handAt = { x: hp.x, y: hp.y };
+    }
+    if (p.pose === "planePush") planeHandRig = ps.rig;
+    LiftActor(ps, ch.light, true);
+
+    SyncCarry(ps, held, p.heading);
+    UpdateDirtPour(state, p, dt);
+    UpdatePlayerTag(state, ps, p, boyScale, time, dt);
+
+    // 煤油灯
+    if (p.lamp) {
+      if (!ps.glow || ps.glowKey !== builtKey) {
+        if (ps.glow) scene.remove(ps.glow);
+        ps.glow = MakeGlow(6.5, 0xffb85c, 1.25);
+        ps.glowKey = builtKey;
+        scene.add(ps.glow);
+        // 暗适应：一圈很弱的大范围光，让走廊轮廓读得出，不至于是个黑洞
+        if (ps.adapt) scene.remove(ps.adapt);
+        ps.adapt = MakeGlow(17, 0xc9a878, 0.30);
+        scene.add(ps.adapt);
+      }
+      if (ps.adapt) ps.adapt.userData.SetLight(p.x, LevelYOf(p.level) + 1.0);
+      // 灯挂在手上，光从火心出去；SetLight 必须走 userData（着色器要拿 uLightPos，
+      // 直接改 mesh.position 的话灯的位置还留在世界原点，整片光会被距离判定丢掉）
+      const hand = HandPoint(ps.rig);
+      const flame = SyncHandLamp(ps, true, "hurricane", p.heading, hand, boyScale)
+        || { x: p.x + p.heading * 0.3, y: LevelYOf(p.level) + 1.05 };
+      ps.glow.userData.SetLight(flame.x, flame.y);
+      ps.glow.userData.SetIntensity(1.15 + Math.sin(time * 9.7) * 0.12 + Math.sin(time * 23) * 0.05);
+    } else if (ps.glow) {
+      SyncHandLamp(ps, false);
+      scene.remove(ps.glow);
+      if (ps.adapt) { scene.remove(ps.adapt); ps.adapt = null; }
+      ps.glow = null;
+    }
+
+    for (const a of state.actors) {
+      seen.add(a.id);
+      const s = EnsureActorSprite(a.id, a.kind);
+      // 跟着走的人（妹妹）不算"进屋"：玩家在地窖口下梯子的那一两秒她还在地面上，
+      // 按屋里算会让她凭空消失一下
+      s.mesh.visible = a.visible !== false && otsHiddenId !== a.id
+        && !(!a.following && IndoorHidden(a.x, a.level || "surface"));
+      if (!s.mesh.visible) {
+        // 人不在画面里，跟着他的那几件也得一起收：影子、手上提的、提着的灯。
+        // 不这么写，娘走进屋之后墙上会剩一只浮着的桶、门口留一团没人的影子
+        for (const m of [s.shadow, s.castShadow, s.carryMesh, s.lampMesh]) if (m) m.visible = false;
+        SyncMount(a, false);
+        continue;
+      }
+      // 坐骑（自行车/挎斗摩托）：车跟人走，人骑在车上（pose + lift 是 Core 给的）
+      SyncMount(a, true);
+      const sisterScale = a.id === "sister" ? (state.chapterIndex <= 1 ? 0.60 : 0.68) : null;
+      // 走廊里净高一米五，NPC 也得猫腰；洞室与旁洞才直得起腰。
+      // 村里的地下（两窖之间那条新掏的短通道）同一套规矩——tight 段得爬
+      const underTunnel = (a.level === "under")
+        && (ch.scene === "tunnelVillage" || ch.scene === "tunnelFort"
+          || (ch.scene === "village" && sceneDef.tight?.length));
+      // NPC 跟玩家走同一段净高：一群人猫着腰、里头一个直着腰，立刻出戏
+      const posture = underTunnel ? TunnelPosture(sceneDef, a.x) : "stand";
+      const bs = sisterScale || BODY_SCALE[a.kind] || 1;
+      UpdateOne(s, a.x, a.level || "surface", a.heading,
+        posture === "squat" || posture === "crawl" || !!a.crouch, dt, a.carry || null,
+        {
+          posture, pose: a.pose, track: a.track?.name, trackT: a.track?.t,
+          // 干活的乡亲也用得上躬身施工那套（原来只有玩家能挖）——
+          // 掌子面上抡站姿锄头，在净高只够爬的新掏段里一眼就假
+          digging: !!a.digging,
+          // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
+          // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
+          lift: a.lift || 0, poseK: PoseProgress(a), climbing: !!a.climbing,
+          // 队列里的第几排：横版里"并排"只能靠深度演（见 RankDz 的注释）
+          rankDz: RankDz(a.rank || 0),
+          ...(sisterScale ? { bodyScale: sisterScale } : {}),
+          light: NearestLight(a.x, LevelYOf(a.level)),
+        });
+      if (a.pose === "planePush") planeHandRig = s.rig;
+      // 兵手里默认有枪。剧本不必给每一处敌人写 carry——枪是他们的常态，
+      // 而且必须是**真握在手里**的物件：抡枪托那一下砸下来的就是它
+      const carry = a.carry ?? ((a.kind === "soldier" || a.kind === "puppet") ? "步枪" : null);
+      SyncCarry(s, carry, a.heading);
+      LiftActor(s, ch.light, false);
+      // 提灯：先把灯挂到手上，光晕再从灯的火心发出去
+      const lampKind = a.lantern ? (a.lanternKind || (a.kind === "puppet" ? "lantern" : "hurricane")) : null;
+      const hand = a.lantern ? HandPoint(s.rig) : null;
+      const flame = SyncHandLamp(s, !!a.lantern, lampKind, a.heading, hand, bs);
+      if (a.lantern) {
+        if (!s.glow || s.glowKey !== builtKey) {
+          if (s.glow) scene.remove(s.glow);
+          s.glow = MakeGlow(4.6, 0xffc878, 0.85);
+          s.glowKey = builtKey;
+          scene.add(s.glow);
+        }
+        s.glow.userData.SetLight(flame.x, flame.y);
+        // 油灯的火苗自己在抖，光斑也跟着抖
+        s.glow.userData.SetIntensity(0.85 + Math.sin(time * 8.3 + a.x) * 0.08 + Math.sin(time * 19.7) * 0.035);
+        s.glow.visible = true;
+      } else if (s.glow) {
+        s.glow.visible = false;
+      }
+    }
+
+    // ③ 每盏灯认领离自己最近的几个人体做遮挡：人挡在灯前，墙上、地上才有影子
+    for (const [, s] of actorSprites) {
+      if (s.glow?.visible) s.glow.userData.SetBlockers(bodyBlockers);
+    }
+    for (const g of glows) if (g.visible) g.userData.SetBlockers?.(bodyBlockers);
+    for (const m of lampMeshes) if (m.glow?.visible) m.glow.userData.SetBlockers?.(bodyBlockers);
+
+    // 人没了车也得收（SpawnRaidSoldiers 会整批换敌人）
+    for (const [id, m] of mountMeshes) {
+      if (!seen.has(id)) { layers.play.remove(m); mountMeshes.delete(id); }
+    }
+
+    for (const [id, s] of actorSprites) {
+      if (id !== "player" && !seen.has(id)) {
+        layers.play.remove(s.rig ? s.rig.group : s.mesh);
+        if (s.shadow) layers.play.remove(s.shadow);
+        if (s.castShadow) layers.play.remove(s.castShadow);
+        if (s.glow) scene.remove(s.glow);
+        if (s.carryMesh) layers.play.remove(s.carryMesh);
+        if (s.lampMesh) layers.play.remove(s.lampMesh);
+        actorSprites.delete(id);
+      } else if (id !== "player") {
+        const a = state.actors.find((x) => x.id === id);
+        if (!a || a.visible === false) {
+          if (s.glow) s.glow.visible = false;
+          if (s.lampMesh) s.lampMesh.visible = false;
+          if (s.castShadow) s.castShadow.visible = false;
+        }
+      }
+    }
+  }
+
+  // 「你控制的是哪一个」：夜里三个同样身高的土布短褂站在村道上，玩家分不出自己。
+  // 常驻一枚很淡的人字标（不是黄三角，那是指路的），刚接手 / 站着不动 / 刚被抓回来
+  // 的时候亮一下，一走起来就退回几乎看不见——不抢画面，但永远能找到自己。
+  let tagT = 0, tagKey = "", tagLevel = 0;
+  function UpdatePlayerTag(state, ps, p, bs, time, dt) {
+    if (!ps.tagMesh) {
+      const canvas = MakeCanvas(48 * HINT_SS, 32 * HINT_SS);
+      ps.tagCtx = canvas.getContext("2d");
+      ps.tagMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(48 / PPM * 0.72, 32 / PPM * 0.72),
+        new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+      );
+      FixOrder(ps.tagMesh, LAYER_ORDER.fx + 280);
+      layers.fx.add(ps.tagMesh);
+    }
+    const def = CurrentBeatDef(state);
+    const inCine = def?.kind === "cinematic" || !!state.microCine;
+    const key = `${state.chapterIndex}/${state.beatIndex}/${state.flags.resets}`;
+    if (key !== tagKey) { tagKey = key; tagT = 0; }
+    tagT += dt;
+    const moving = Math.abs(p.x - (ps.tagPrevX ?? p.x)) > 0.002;
+    ps.tagPrevX = p.x;
+    // 刚接手这一幕的前 3.2 秒、或者站着发呆超过 2.5 秒 → 亮起来
+    if (!moving) tagLevel += dt * 0.4; else tagLevel = 0;
+    // 近景里不要它：这枚标是给"夜里三个同样身高的短褂站在村道上"认人用的，
+    // 镜头推到 5 米以内时画面上就那么一两个人，它只会盖住真正在演的东西
+    //（划线那一拍它正好压在石笔上）
+    // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
+    const closeUp = viewW < 5.0 || liveCardOn;
+    const want = inCine || closeUp || otsHiddenId === "player" ? 0
+      : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
+    ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
+    ps.tagMesh.visible = ps.tagAlpha > 0.02;
+    if (!ps.tagMesh.visible) return;
+    ps.tagCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
+    ps.tagCtx.clearRect(0, 0, 48, 32);
+    ART.DrawPlayerTag(ps.tagCtx, 24, 18, time);
+    ps.tagMesh.material.map.needsUpdate = true;
+    ps.tagMesh.material.opacity = ps.tagAlpha;
+    // 贴着头顶上方一点点：再高就飘成 HUD 了，那是另一种出戏
+    // （用骨架实际的头顶高度，不是 POSTURE_HEAD——那量的是地道净空）
+    const TAG_HEAD = { stand: 1.35, stoop: 1.10, squat: 0.92, crawl: 0.62 };
+    const head = TAG_HEAD[p.posture] ?? (p.crouch ? 0.95 : 1.35);
+    ps.tagMesh.position.set(p.x, (p.level === "under" ? UNDER_Y : SURFACE_Y) + head * bs + 0.18, 0.62);
+  }
+
+  // -------------------------------------------------------------------------
+  // 特效层
+  // -------------------------------------------------------------------------
+  function UpdateProps(state, time, dt) {
+    const ch = CHAPTERS[state.chapterIndex];
+    const sceneDef = SCENES[ch.scene];
+    const def = CurrentBeatDef(state);
+
+    // 收藏品：收走的隐掉；离得近的那件闪一点微光（勇敢的心的引导手法——
+    // 光比东西先被看见）。只闪最近的一件，别一屏好几处都在眨。
+    // 过场/微过场/憋气的 hold 里不闪：那会儿玩家不掌镜也捡不了，一粒眨个
+    // 不停的白星挂在戏正中（c2 出洞那一镜的鞋底、捂嘴那拍的边区票都赶上过）
+    // 只会把眼睛从戏上拽走
+    {
+      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine;
+      let glowAt = null;
+      for (const [id, rec] of relicMeshes) {
+        const got = state.relicsGot?.has(id);
+        rec.mesh.visible = !got;
+        if (got || !glowOk) continue;
+        const sameLevel = (rec.r.level || "surface") === state.player.level;
+        const d = Math.abs(state.player.x - rec.r.x);
+        if (sameLevel && d < 4.5 && (!glowAt || d < glowAt.d)) glowAt = { rec, d };
+      }
+      if (glowAt) {
+        if (!relicGlow) {
+          // 闪星不是灯：白天的加色晕淹在土黄底里根本看不见（试过 0.4+ 的
+          // 强度照旧糊）。勇敢的心用的是一粒白闪——四芒星小贴图、普通混合、
+          // 缩放和透明度一起呼吸，日夜都读得出
+          relicGlow = BakeSprite(36, 36, 18, 18, (ctx, ax, ay) => {
+            const ray = (a, len, w) => {
+              ctx.save();
+              ctx.translate(ax, ay);
+              ctx.rotate(a);
+              ctx.beginPath();
+              ctx.moveTo(-w, 0); ctx.lineTo(0, -len); ctx.lineTo(w, 0); ctx.lineTo(0, len);
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+            };
+            ctx.fillStyle = "rgba(43,31,22,0.8)";
+            ray(0, 15, 3.4); ray(Math.PI / 2, 15, 3.4);
+            ctx.fillStyle = "#fff6da";
+            ray(0, 13, 2.3); ray(Math.PI / 2, 13, 2.3);
+            ray(Math.PI / 4, 6.5, 1.5); ray(-Math.PI / 4, 6.5, 1.5);
+          }, 0, DETAIL_SS);
+          SetPlayOrder(relicGlow, BAND.loose, "relicStar");
+          layers.play.add(relicGlow);
+        }
+        relicGlow.visible = true;
+        const gy = (glowAt.rec.r.level === "under" ? UNDER_Y : SURFACE_Y) + 0.58;
+        PlaceSprite(relicGlow, glowAt.rec.r.x + 0.16, gy, PlaceZ(BAND.loose));
+        const tw = 0.62 + 0.38 * Math.abs(Math.sin(time * 2.4));
+        relicGlow.scale.set(tw, tw, 1);
+        relicGlow.material.opacity = 0.45 + 0.5 * Math.abs(Math.sin(time * 2.4));
+      } else if (relicGlow) relicGlow.visible = false;
+    }
+
+    // 旗标门的道具：只切显隐，不重建世界（母鸡、扫荡后的柴垛石堆）
+    for (const fp of flagProps) {
+      const on = (!fp.p.showFlag || !!state.flags[fp.p.showFlag])
+        && (!fp.p.hideFlag || !state.flags[fp.p.hideFlag]);
+      for (const m of fp.meshes) m.visible = on;
+    }
+    SyncGeneratedAssetVisibility(state);
+    SyncGeneratedSurfaceVisibility(state);
+    SyncGeneratedCellarVisibility(state);
+    // 窖口盖板：平时躺在洞口上，上下地道那一下绕铰链掀起来再盖回去。
+    // 掀到 78°——立到 90° 侧视里就成了一条竖线，反而看不出是块板；
+    // 78° 还能看见一点板面（背带和拼缝就在那一面）。
+    for (const lid of lidMeshes) {
+      const open = state.lid && state.lid.id === lid.userData.lidId ? (state.lid.open || 0) : 0;
+      // 掀起来快、盖回去也快，中间那段"敞着"是平的：用 smoothstep 收两头
+      const k = open * open * (3 - 2 * open);
+      // 开到 62° 就够：竖到 78° 那块板在侧视里几乎成一条竖线，还压过人头顶
+      lid.rotation.z = k * (62 * Math.PI / 180);
+      // 光跟着盖板走（只有村口的窖登记在册）。爬梯的瞬时开合（state.lid）与
+      // 剧情的开合取更亮的那个：自家窖口在「拉严」旗标落下之前默认敞着
+      //（c1/c8 的老观感不动），拉严那一下光当场收死——那声闷响就该带走光；
+      // 七叔家的窖口默认盖着（柴禾还堵着），章末掀开才放光下来
+      const bm = shaftBeamMeshes.find((b) => b.userData.beamShaftId === lid.userData.lidId);
+      if (bm) {
+        const story = lid.userData.lidId === "cellarHatch" ? (state.flags.lidShut ? 0 : 1) : 0;
+        bm.material.opacity = bm.userData.beamBase * (0.12 + 0.88 * Math.max(k, story));
+      }
+    }
+    // 打进来的光：盖板合上（lidShut）才从板缝漏那几束；夜里翻板敞着给月色
+    //（hatchMoon）。白天亮、拂晓次之、夜里只剩月色——跟井口那道 beam 同一条
+    // 昼夜账。**亮度是渐变的**：盖板"咚"地合上那一下光要收，但收成阶跃就像
+    // 有人拉了闸；1.1 秒的指数吸附，读出来才是"光被盖住了"
+    if (hatchBeamMesh) {
+      const mood = ShownLight(state);
+      // 有多亮，看的是**外头**的天光，不是窖里的暗。序那一场外面是大白天
+      //（盖板合上、没立夜里那面 hatchMoon 旗），板缝里就该是白晃晃的三道；
+      // 夜里（hatchMoon）才只剩一点月色，拂晓再亮回来一档。
+      // 拿窖里的 mood 当亮度用是反的——窖里越黑说明盖板压得越严，
+      // 可外面的日头一点没变，那样只会越该亮的时候越暗
+      const night = !!state.hatchMoon;
+      const dayK = night ? (mood === "dawn" ? 0.5 : 0.3) : 1.15;
+      const on = !!state.flags.lidShut || night;
+      // 「光从直的变成斜的」——序的收尾一镜，现在只是转一下 uDir
+      hatchBeamMesh.userData.SetSlant(state.beamSlant || 0);
+      hatchBeamMesh.userData.SetTime(time);
+      // 人挡得住光：躯干进了光柱，光柱就在他身上断一截
+      hatchBeamMesh.userData.SetBlockers(bodyBlockers);
+      hatchBeamK += ((on ? dayK : 0) - hatchBeamK) * Math.min(1, dt / 1.1);
+      hatchBeamMesh.visible = hatchBeamK > 0.004;
+      hatchBeamMesh.userData.SetIntensity(hatchBeamK);
+      // 浮尘只在光柱够亮时看得见（夜里那点月色照不出灰）
+      hatchBeamMesh.userData.SetDust(0.55 * hatchBeamK);
+    }
+    StepBackdropFolk(dt, state);
+    // 画法随状态变的那几张（井绳断口、木料堆里露出的绳头、井上让位给会转的摇把）：
+    // 只重烘自己那一张。r.flag 是单个旗标的简写，r.read 是任意状态摘要
+    for (const r of propRedraw) {
+      const v = r.read ? r.read(state) : !!state.flags[r.flag];
+      if (r.last === v) continue;
+      r.last = v;
+      r.run(state);
+    }
+
+    // 可拾取物件
+    if (def?.kind === "collect" && state.beat.itemStates) {
+      // 贴图是按 label 烘的。上一拍搬木料、这一拍提水桶时，网格如果沿用
+      // 就会拿木料的贴图去当水桶——所以 label 一变就整批重建。
+      if (itemLabel !== def.carryLabel) {
+        for (const m of itemMeshes) layers.play.remove(m);
+        itemMeshes = [];
+        itemLabel = def.carryLabel;
+      }
+      while (itemMeshes.length < state.beat.itemStates.length) {
+        const m = MakeCarryMesh(itemLabel);
+        layers.play.add(m);
+        // 地上的待拾物走 loose 带：压在行走线道具之前、玩家之后
+        SetPlayOrder(m, BAND.loose, "collectItem");
+        itemMeshes.push(m);
+      }
+      const bucket = def.carryLabel === "水桶";
+      let stacked = 0;
+      state.beat.itemStates.forEach((it, i) => {
+        const m = itemMeshes[i];
+        m.visible = !it.carried;
+        if (it.delivered) {
+          // 放下的东西要留在原地看得见——堆在交付点上，一件一件摞起来。
+          // 原来一交付就整个隐藏，玩家会觉得自己刚放下的木料凭空没了。
+          //（y 的抬升是"摞"的表达，不是为了贴地——贴地由贴图锚点负责）
+          m.position.set(def.deliver.x + (stacked % 2) * 0.5 - 0.25,
+            SURFACE_Y + (bucket ? 0.32 : 0.16) + Math.floor(stacked / 2) * 0.2, PlaceZ(BAND.loose));
+          m.rotation.z = bucket ? 0 : (stacked % 2 ? 0.05 : -0.04);
+          stacked += 1;
+        } else {
+          m.position.set(it.x, SURFACE_Y + (bucket ? 0.32 : 0.22 + i * 0.16), PlaceZ(BAND.loose));
+          m.rotation.z = 0;
+        }
+      });
+    } else if (itemMeshes.length) {
+      for (const m of itemMeshes) layers.play.remove(m);
+      itemMeshes = [];
+      itemLabel = null;
+    }
+
+    // 划线：石笔真的在木头上蹭出一道印——不是一个变长的纯色片。
+    // 一张画布贴在门框那一段上，手每推进一点就往画布上补几粒粉痕：
+    // 颗粒、断续、深浅不匀，全是石笔蹭木纹该有的样子。手可以往回蹭，
+    // 已经划下的印子不会消失（Core 里 drawn 只进不退）。
+    if (state.scribe) {
+      const sc = state.scribe;
+      const spanW = (sc.x1 - sc.x0) + 0.36;
+      if (!scribeMesh) {
+        // 这道印子只在 2.9m 的特写里出镜，屏幕密度约 330px/米——按 48px/米
+        // 的标尺烘出来要放大七倍。画布加密 SCRIBE_SS 倍，逻辑坐标不变。
+        scribeCanvas = MakeCanvas(288 * SCRIBE_SS, 44 * SCRIBE_SS);
+        scribeCtx = scribeCanvas.getContext("2d");
+        scribeLastT = 0;
+        const tex = CanvasTexture(scribeCanvas);
+        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearFilter;
+        scribeMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(spanW, 0.22),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+        );
+        // 深度规范：刻痕压在门框（walk）之前、划线的人（actor）之后
+        FixOrder(scribeMesh, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(scribeMesh);
+        // 石笔：一支巴掌里攥得住的东西——**约 9 厘米长**。
+        // 它以前是 40 厘米的一根大白棍：当装饰没人看，可当玩家真去攥它，
+        // 尺寸不对整件事就假了。世界尺寸由 CHALK_SCALE 定，贴图照旧高密度烘。
+        scribeTip = BakeSprite(26, 30, 13, 15, (ctx, ax, ay) => {
+          ctx.save();
+          ctx.translate(ax, ay);
+          ctx.fillStyle = "#e8dbba";
+          ctx.strokeStyle = "rgba(60,45,25,0.85)";
+          ctx.lineWidth = 1.4;
+          // 笔身：上粗下细，磨秃的尖朝下
+          ctx.beginPath();
+          ctx.moveTo(-3.4, -11); ctx.lineTo(3.4, -11);
+          ctx.lineTo(2.2, 7); ctx.lineTo(1.1, 11.5);
+          ctx.lineTo(-1.1, 11.5); ctx.lineTo(-2.2, 7);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          // 侧面一道阴影，读得出是根柱子不是片纸
+          ctx.globalAlpha = 0.22;
+          ctx.fillStyle = "#6b5636";
+          ctx.beginPath();
+          ctx.moveTo(1.2, -11); ctx.lineTo(3.4, -11); ctx.lineTo(2.2, 7); ctx.lineTo(1.0, 7);
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }, 0, CHALK_SS);
+        scribeTip.scale.setScalar(CHALK_SCALE);
+        FixOrder(scribeTip, DepthOrder("play", BAND.loose) + 3);
+        layers.play.add(scribeTip);
+      }
+      // 章节重开（进度回到 0）：擦掉画布重来
+      if (sc.t < scribeLastT - 0.01) {
+        scribeCtx.setTransform(1, 0, 0, 1, 0, 0);
+        scribeCtx.clearRect(0, 0, scribeCanvas.width, scribeCanvas.height);
+        scribeLastT = 0;
+      }
+      // 把新推进的那一小段补上粉痕。手越慢压得越实——同一支笔，快划是虚的，
+      // 慢慢蹭才留得下深痕，于是"划得好不好"看得见
+      if (sc.t > scribeLastT) {
+        // 逻辑坐标恒为 288×44，画布本身加密了 SCRIBE_SS 倍
+        scribeCtx.setTransform(SCRIBE_SS, 0, 0, SCRIBE_SS, 0, 0);
+        const W = 288, H = 44;
+        const pad = (0.18 / spanW) * W;
+        const usable = W - pad * 2;
+        const press = 1 - Math.min(0.55, (sc.speed || 0) * 0.9);   // 慢=1，快≈0.45
+        scribeCtx.fillStyle = "#f2e6c4";
+        for (let u = scribeLastT; u < sc.t; u += 0.008) {
+          const px = pad + u * usable;
+          const wob = Math.sin(u * 61.7) * 1.7 + Math.sin(u * 23.3 + 1.2) * 1.1;
+          // 断续：偶尔跳过一粒，石笔蹭过木纹的坑（划得快，跳得多）
+          if (Math.sin(u * 197.3) > 0.60 + press * 0.28) continue;
+          const alpha = (0.5 + Math.abs(Math.sin(u * 83.1)) * 0.45) * press;
+          scribeCtx.globalAlpha = alpha;
+          scribeCtx.fillRect(px, H / 2 + wob - 1.6, 2.6, 3.2 * (0.7 + press * 0.3));
+          if (Math.sin(u * 311.9) > 0.3) {           // 掉下来的粉屑
+            scribeCtx.globalAlpha = alpha * 0.35;
+            scribeCtx.fillRect(px + 0.8, H / 2 + wob + 3.5, 1.2, 1.2);
+          }
+        }
+        scribeCtx.globalAlpha = 1;
+        scribeMesh.material.map.needsUpdate = true;
+        scribeLastT = sc.t;
+      }
+      scribeMesh.visible = true;
+      scribeMesh.position.set((sc.x0 + sc.x1) / 2, sc.y, PlaceZ(BAND.loose));
+      if (scribeTip) {
+        // 那支笔本身就是这一拍的全部 UI：攥住了就压进木头、随手劲倾斜；
+        // 没攥住就浮起来轻轻晃——招呼玩家"来拿我"，不需要一行字
+        scribeTip.visible = true;
+        const hx = sc.x0 + (sc.head ?? sc.t) * (sc.x1 - sc.x0);
+        const wob = (sc.idle || sc.reaching) && !sc.gripped
+          ? Math.sin(time * (sc.reaching ? 13 : 4.2)) * (sc.reaching ? 0.018 : 0.010)
+          : 0;
+        const lift = sc.gripped ? 0 : 0.022;          // 没压着木头就抬起来一点
+        // 笔尖落在刻线上：贴图中心要抬起「半支笔」那么高
+        scribeTip.position.set(hx + wob, sc.y + 0.046 + lift, PlaceZ(BAND.loose));
+        // 倾斜：压着走的时候笔杆往后倒（手在推），抬手就立回来
+        const lean = sc.gripped ? -0.12 - Math.min(0.22, (sc.speed || 0) * 0.4) : 0.06;
+        scribeTip.rotation.z += (lean - scribeTip.rotation.z) * Math.min(1, dt * 12);
+        // 笔尖的粉尘：只有真在蹭木头才扬起来，手停就散
+        if (!scribeDust) {
+          scribeDust = BakeSprite(22, 22, 11, 11, (ctx, ax, ay) => {
+            for (let i = 0; i < 7; i += 1) {
+              const a = i * 1.7;
+              ctx.globalAlpha = 0.5 - i * 0.05;
+              ctx.fillStyle = "#f2e6c4";
+              ctx.fillRect(ax + Math.cos(a) * (2 + i), ay + Math.sin(a) * (1.5 + i * 0.8), 1.6, 1.6);
+            }
+            ctx.globalAlpha = 1;
+          }, 0, DETAIL_SS);
+          FixOrder(scribeDust, DepthOrder("play", BAND.loose) + 4);
+          scribeDust.scale.setScalar(0.28);   // 一小撮粉末，不是一团烟
+          layers.play.add(scribeDust);
+        }
+        const dustWant = sc.gripped ? Math.min(0.85, (sc.speed || 0) * 1.9) : 0;
+        scribeDust.material.opacity = (scribeDust.material.opacity ?? 0)
+          + (dustWant - (scribeDust.material.opacity ?? 0)) * Math.min(1, dt * 9);
+        scribeDust.visible = scribeDust.material.opacity > 0.02;
+        scribeDust.position.set(hx, sc.y - 0.03 + Math.sin(time * 9) * 0.008, PlaceZ(BAND.loose));
+      }
+    } else {
+      if (scribeMesh) scribeMesh.visible = false;
+      if (scribeTip) scribeTip.visible = false;
+      if (scribeDust) scribeDust.visible = false;
+    }
+
+    // 烟与水：真解算（半拉格朗日平流 + 压力投影），固体边界就是地道剖面
+    const wantsFluid = !!(state.smoke?.active || state.flood?.active);
+    if (wantsFluid && sceneDef.walk.under) {
+      const range = sceneDef.walk.under;
+      if (!fluid || fluidKey !== builtKey) {
+        fluid = CreateTunnelFluid({
+          x0: range[0] - 3, x1: range[1] + 3,
+          yBottom: UNDER_Y - 0.15, yTop: UNDER_Y + 3.1,
+          cols: 200, rows: 26,
+        });
+        const occ = SceneOccluders(sceneDef, state, SURFACE_Y, UNDER_Y);
+        fluid.SetAirRects(occ.air);
+        fluid.SetVents(sceneDef.props.filter((pp) => pp.kind === "vent").map((pp) => pp.x));
+        // 翻口是水封：挖好之后，模拟出来的烟也必须在这儿停住，
+        // 否则一维的烟锋停了、画面上的烟还在往西飘，两套说法对不上
+        fluid.SetBarriers(sceneDef.props
+          .filter((pp) => pp.kind === "waterTrap" && (!pp.builtFlag || state.flags[pp.builtFlag]))
+          .map((pp) => pp.x));
+        fluidKey = builtKey;
+        fluidCanvas = MakeCanvas(fluid.cols, fluid.rows);
+        fluidCtx = fluidCanvas.getContext("2d");
+        fluidImage = fluidCtx.createImageData(fluid.cols, fluid.rows);
+        const tex = CanvasTexture(fluidCanvas);
+        tex.minFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        if (fluidMesh) layers.fx.remove(fluidMesh);
+        fluidMesh = new THREE.Mesh(new THREE.PlaneGeometry(
+          fluid.x1 - fluid.x0, fluid.yTop - fluid.yBottom), mat);
+        fluidMesh.position.set((fluid.x0 + fluid.x1) / 2, (fluid.yBottom + fluid.yTop) / 2, 0.35);
+        FixOrder(fluidMesh, LAYER_ORDER.fx + 220);
+        layers.fx.add(fluidMesh);
+      }
+      // 灌烟口/灌水口持续注入
+      if (state.smoke?.active) {
+        const src = state.smoke.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
+        fluid.Emit(src, UNDER_Y + 1.05, { smoke: 30 * Math.min(0.05, dt), vx: -2.6, vy: 0.15, radius: 1.15 });
+      }
+      if (state.flood?.active) {
+        const src = state.flood.sourceX ?? (sceneDef.shafts[0]?.x ?? fluid.x1 - 4);
+        fluid.Emit(src, UNDER_Y + 2.0, { water: 34 * Math.min(0.05, dt), vx: -0.8, vy: -1.6, radius: 0.8 });
+      }
+      fluid.Step(dt);
+      fluid.Paint(fluidImage);
+      fluidCtx.putImageData(fluidImage, 0, 0);
+      fluidMesh.material.map.needsUpdate = true;
+      fluidMesh.visible = true;
+      // 把解算出来的烟前锋回灌给玩法层，玩法与画面是同一件事。
+      // 只在解算确实有烟时才接管，否则保留核心层的解析推进——
+      // 玩法判定不能因为解算抽风就失效。
+      if (state.smoke?.active) {
+        const f = fluid.SmokeFrontX();
+        if (f < fluid.x1 - 1.5) state.smoke.frontX = Math.min(state.smoke.frontX, f);
+      }
+      if (state.flood?.active) state.floodDepth = fluid.WaterDepthAt(state.player.x);
+    } else if (fluidMesh) {
+      fluidMesh.visible = false;
+    }
+
+    // 探杆
+    const quakeOn = state.beat && (state.beat.quakeWarn || state.beat.quakeActive)
+      && (def?.kind === "digSeq" || def?.kind === "rescueLoop");
+    if (quakeOn) {
+      if (!probeMeshes.length) {
+        for (let i = 0; i < 3; i += 1) {
+          const m = BakeSprite(40, 200, 20, 0, () => {});
+          m.userData.canvas = m.material.map.image;
+          layers.fx.add(m);
+          probeMeshes.push(m);
+        }
+      }
+      probeMeshes.forEach((m, i) => {
+        m.visible = true;
+        const jab = state.beat.quakeActive ? Math.abs(Math.sin(time * 5 + i * 1.7)) : 0.15;
+        const c = m.userData.canvas;
+        const ctx = c.getContext("2d");
+        ctx.clearRect(0, 0, c.width, c.height);
+        ART.DrawProbeRod(ctx, 20, 6, 88, "rod" + i, { jab });
+        m.material.map.needsUpdate = true;
+        m.position.set(state.player.x - 3.2 + i * 3.1 + Math.sin(i * 7) * 1.1,
+          SURFACE_Y - (200 / 2 - 6) / PPM, 0.5);
+      });
+    } else {
+      for (const m of probeMeshes) m.visible = false;
+    }
+
+    // 地道油灯：熄灯那一段，灯是一盏盏灭下去的
+    if (state.lamps) {
+      while (lampMeshes.length < state.lamps.length) {
+        const i = lampMeshes.length;
+        const body = BakeSprite(46, 60, 23, 54, (ctx, ax, ay) => {
+          ART.InkFill(ctx, [[ax - 11, ay], [ax + 11, ay], [ax + 8, ay - 16], [ax - 8, ay - 16]],
+            "lampBody" + i, "#8a6a45", { amp: 1, lw: 2.2, shade: "rgba(0,0,0,0.2)" });
+          ART.InkFill(ctx, [[ax - 7, ay - 16], [ax + 7, ay - 16], [ax + 5, ay - 30], [ax - 5, ay - 30]],
+            "lampGlass" + i, "#d8c58a", { amp: 0.9, lw: 2 });
+          ART.InkLine(ctx, ax, ay - 30, ax, ay - 40, "lampWire" + i, { lw: 1.6, color: "#6b5a3f" });
+        }, 0, DETAIL_SS);
+        layers.play.add(body);
+        SetPlayOrder(body, BAND.walk);
+        const glow = MakeGlow(3.4, 0xffc06a, 1.0);
+        scene.add(glow);
+        lampMeshes.push({ body, glow });
+      }
+      state.lamps.forEach((l, i) => {
+        const m = lampMeshes[i];
+        if (!m) return;
+        PlaceSprite(m.body, l.x, UNDER_Y + 1.5, PlaceZ(BAND.loose));
+        const generatedLampReady = generatedCellarEligible
+          && generatedCellarStatuses.oilLampWeak === "ready"
+          && Math.abs(l.x - 25.95) < 0.2;
+        m.body.visible = !generatedLampReady;
+        if (Math.abs(l.x - 25.95) < 0.2) {
+          RegisterGeneratedFallback(generatedPropFallbacks, "oilLampWeak", [m.body]);
+        }
+        m.glow.visible = l.lit;
+        m.glow.userData.SetLight(l.x, UNDER_Y + 1.4);
+        m.body.material.opacity = l.lit ? 1 : 0.55;
+      });
+      for (let i = state.lamps.length; i < lampMeshes.length; i += 1) {
+        lampMeshes[i].body.visible = false;
+        lampMeshes[i].glow.visible = false;
+      }
+    } else if (lampMeshes.length) {
+      for (const m of lampMeshes) { m.body.visible = false; m.glow.visible = false; }
+    }
+
+    // 刻痕与正字（妹妹的正字跟刻痕同一张贴图：划完那一笔当帧长出来）
+    {
+      const marks = { marked: !!state.flags.marked, carved: !!state.flags.carved, tally: TallyCount(state) };
+      if (marks.marked !== carveState.marked || marks.carved !== carveState.carved
+        || marks.tally !== carveState.tally) {
+        carveState = marks;
+        carveRebuild?.(marks);
+        RedrawGeneratedDoorMarks();
+      }
+    }
+
+    // —— 谜题动词层的动态元素 ——
+    // 驴车（第三章推车/跟车）与独轮车（第一章运木料）：kind 决定画哪一种。
+    // 车画在演员前面一点，贴着车走就是躲进车影
+    if (state.cart) {
+      const cartKind = state.cart.kind || "cart";
+      // 玩家**推着**的独轮车（第一章）走 pushCart 带：人在近侧握着车把，
+      // 身子和手得画在车前面（所以在演员 0.6 之后）；但它是**街面上**的东西，
+      // 推着从自家屋前过的时候不能被立面(0.4)吃掉——夹在两者之间的 0.5 是
+      // 唯一同时成立的位置。第三章那辆驴车是**移动掩体**，得挡住人，留在
+      // CART_COVER_Z——两种角色，两个深度。
+      const pushed = cartKind === "barrow";
+      const cz = pushed ? BAND.pushCart : CART_COVER_Z;
+      // 新版第一章是空车推去、装上料再推回来——车上装了几件就画几件，
+      // 装载数进 key，变了才重烘（三件是「两块门板 + 一根枣木杠」，
+      // 第三件必须画成杠：截成 min(2) 的话「放上车」那一下画面毫无变化）
+      const loadNow = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      const cartKey = cartKind + ":" + (pushed ? loadNow : "");
+      if (!cartMesh || cartMesh.userData.cartKind !== cartKey) {
+        if (cartMesh) layers.play.remove(cartMesh);
+        if (cartWheel) { layers.play.remove(cartWheel); cartWheel = null; }
+        cartMesh = pushed
+          ? BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "pushBarrow", BarrowLoad(loadNow)), 0, PROP_SS)
+          : BakeSprite(200, 120, 100, 110, (ctx, ax, ay) => ART.DrawCart(ctx, ax, ay, "cart"), 0, PROP_SS);
+        cartMesh.userData.cartKind = cartKey;
+        layers.play.add(cartMesh);
+        SetPlayOrder(cartMesh, cz, "cart(" + cartKind + ")");
+        if (pushed) {
+          // 轮子单开一张，绕轮心转——车走多远轮转多少弧长，不是"贴图在平移"
+          const R = ART.BARROW_WHEEL_R;
+          cartWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "pushWheel"), 0, PROP_SS);
+          layers.play.add(cartWheel);
+          SetPlayOrder(cartWheel, cz, "cartWheel");
+        }
+      }
+      cartMesh.visible = true;
+      // 独轮车有正反：画笔画的是**往左推**的姿态（轮在前、两根车把伸向右手边
+      // 的人）。往右推就得整张翻过来，否则人在车尾、手却够不着车把——
+      // 回程那一趟正是这么穿帮的。驴车是侧面对称的景，不翻。
+      if (pushed) {
+        const pushDir = state.cart.dir || -1;            // 车往哪边走
+        PlaceSpriteFlip(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz),
+          pushDir === ART.BARROW_ART_DIR ? 1 : -1);
+      } else PlaceSprite(cartMesh, state.cart.x, SURFACE_Y, PlaceZ(cz));
+      if (cartWheel) {
+        cartWheel.visible = true;
+        const R = ART.BARROW_WHEEL_R / PPM;              // 轮半径（米）
+        cartWheel.position.set(state.cart.x, SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(cz));
+        // 滚过的弧长 = 走过的路程：θ = -s/R（往前走轮子顺时针转）
+        cartWheel.rotation.z = -((state.cart.roll || 0) / R);
+      }
+    } else {
+      if (cartMesh) cartMesh.visible = false;
+      if (cartWheel) cartWheel.visible = false;
+    }
+
+    // 独轮车（不在推的时候是静物）：装了几根木料照几根；推到家就停在爹跟前
+    {
+      const wantBarrow = ch.scene === "village" && state.chapterIndex === 0 && !state.cart;
+      const load = state.flags.barrowHome ? 0 : (state.flags.barrowPlanks || 0);
+      if (wantBarrow) {
+        const key = "b" + load;
+        if (!barrowMesh || barrowMesh.userData.k !== key) {
+          if (barrowMesh) layers.play.remove(barrowMesh);
+          if (barrowWheel) { layers.play.remove(barrowWheel); barrowWheel = null; }
+          barrowMesh = BakeSprite(140, 80, 62, 72, (ctx, ax, ay) => ART.DrawBarrow(ctx, ax, ay, "barrowP", BarrowLoad(load)), 0, PROP_SS);
+          barrowMesh.userData.k = key;
+          layers.play.add(barrowMesh);
+          SetPlayOrder(barrowMesh, BAND.walk);
+          // 停着的车轮子也单开一张（不转，但得跟推着的那辆长一个样）
+          const R = ART.BARROW_WHEEL_R;
+          barrowWheel = BakeSprite(R * 2 + 12, R * 2 + 12, R + 6, R + 6,
+            (ctx, ax, ay) => ART.DrawCartWheel(ctx, ax, ay, R, "parkWheel"), 0, PROP_SS);
+          layers.play.add(barrowWheel);
+          SetPlayOrder(barrowWheel, BAND.walk);
+        }
+        barrowMesh.visible = true;
+        if (barrowWheel) {
+          barrowWheel.visible = true;
+          barrowWheel.position.set(state.flags.barrowHome ? 41.6 : 19.8,
+            SURFACE_Y + ART.BARROW_WHEEL_Y / PPM, PlaceZ(BAND.walk));
+        }
+        // 平时停在西头磨盘旁（新剧本：村里几户合用的车就搁在磨盘边）；
+        // 拉完料停在工作台西边一步，别压着院里的水缸（43.4）
+        // 停着的车也有正反：西头那辆是等着人往左推走的（贴图原样）；
+        // 拉完料停在家门口的这辆是刚往右推回来的，车把自然朝西——翻过来
+        PlaceSpriteFlip(barrowMesh, state.flags.barrowHome ? 41.6 : 19.8, SURFACE_Y,
+          PlaceZ(BAND.walk), state.flags.barrowHome ? -1 : 1);
+      } else {
+        if (barrowMesh) barrowMesh.visible = false;
+        if (barrowWheel) barrowWheel.visible = false;
+      }
+    }
+
+    // 落地道具：手里放下的东西（自由放下 + 链里的「放下换手」共用一套）。
+    // 深度带 loose：压在行走线道具之前、演员之后——放下的东西永远看得见
+    {
+      const items = state.groundItems || [];
+      const live = new Set();
+      for (const g of items) {
+        live.add(g.uid);
+        let m = groundItemMeshes.get(g.uid);
+        if (!m) {
+          m = MakeGroundItemMesh(g.label);
+          layers.play.add(m);
+          SetPlayOrder(m, BAND.loose, "groundItem");
+          groundItemMeshes.set(g.uid, m);
+        }
+        m.visible = true;
+        PlaceSprite(m, g.x, g.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
+      }
+      for (const [uid, m] of groundItemMeshes) {
+        if (!live.has(uid)) { layers.play.remove(m); groundItemMeshes.delete(uid); }
+      }
+    }
+
+    // 引导图形气泡（「我缺什么」）＋一次性气泡（？/石子提示）
+    {
+      const wants = [];
+      for (const b of state.bubbles || []) wants.push(b);
+      if (state.bubbleFlash) wants.push(state.bubbleFlash);
+      while (bubbleMeshes.length < wants.length) {
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(56 / PPM, 48 / PPM),
+          new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
+        );
+        FixOrder(m, LAYER_ORDER.fx + 320);
+        layers.fx.add(m);
+        bubbleMeshes.push(m);
+      }
+      bubbleMeshes.forEach((m, i) => {
+        const b = wants[i];
+        if (!b) { m.visible = false; return; }
+        if (!bubbleTex.has(b.icon)) {
+          // HINT_SS 超采样：气泡常被镜头推近，1x 烘出来一放大就糊
+          const c = MakeCanvas(56 * HINT_SS, 48 * HINT_SS);
+          const g = c.getContext("2d");
+          g.scale(HINT_SS, HINT_SS);
+          // "item:标签" = 落地道具的悬浮提示：空气泡里画一枚道具本身的小样
+          const itemIcon = b.icon.startsWith("item:") ? b.icon.slice(5) : null;
+          ART.DrawIconBubble(g, 28, 44, itemIcon ? "" : b.icon, "bub" + b.icon);
+          if (itemIcon) ART.DrawCarry(g, 28, 44 - 28 * 0.58 - 4, 0.9, 1, itemIcon);
+          bubbleTex.set(b.icon, CanvasTexture(c));
+        }
+        if (m.material.map !== bubbleTex.get(b.icon)) {
+          m.material.map = bubbleTex.get(b.icon);
+          m.material.needsUpdate = true;
+        }
+        let bx = b.x, by = b.y;
+        if (b.who) {
+          const a = b.who === "player" ? state.player : state.actors.find((x) => x.id === b.who);
+          if (!a || a.visible === false) { m.visible = false; return; }
+          bx = a.x;
+          by = (a.level === "under" ? UNDER_Y : SURFACE_Y) + 2.15;
+        }
+        m.visible = true;
+        m.material.opacity = 0.8 + Math.sin(time * 5.2) * 0.12;
+        m.position.set(bx, (by ?? SURFACE_Y + 2.1) + Math.sin(time * 2.6) * 0.05, 0.62);
+      });
+    }
+
+    // 投掷弧线预览：点列由 Core 用**和真石子同一套**弹道物理跑出来，预览即所得。
+    // 灰/亮只说"够不够劲出手"，打不打得中要玩家自己看那条弧穿没穿进冠里——
+    // 这里曾经还有一条"站位够了就画直线连到靶心"的分支，那是按键必中版的遗物，
+    // 已随 StartThrow 一起删掉：站位不是瞄准
+    if (state.throwAim) {
+      const ta = state.throwAim;
+      if (!throwAimLine) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 22), 3));
+        throwAimLine = new THREE.Line(geo, new THREE.LineDashedMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.55, dashSize: 0.28, gapSize: 0.2, depthWrite: false,
+        }));
+        FixOrder(throwAimLine, LAYER_ORDER.fx + 240);
+        layers.fx.add(throwAimLine);
+      }
+      const pos = throwAimLine.geometry.attributes.position;
+      // 点列是世界坐标（Core 从攥住那一刻手的绝对高度积出来的），别再加一次地面高
+      for (let i = 0; i < 22; i += 1) {
+        const src = ta.pts[Math.min(ta.pts.length - 1, Math.round(i / 21 * (ta.pts.length - 1)))];
+        pos.setXYZ(i, src[0], src[1], 0.55);
+      }
+      pos.needsUpdate = true;
+      throwAimLine.computeLineDistances();
+      throwAimLine.material.color.setHex(ta.ok ? 0xffe9b0 : 0x9a9a92);
+      throwAimLine.material.opacity = ta.ok ? 0.85 : 0.4;
+      throwAimLine.material.dashSize = ta.ok ? 10 : 0.28;   // 实线=一段拉满的 dash
+      throwAimLine.visible = true;
+    } else if (throwAimLine) throwAimLine.visible = false;
+
+    // 惊飞的麻雀 / 扑棱下地的母鸡 / 蹿走的田鼠：一张小画布逐帧重画。
+    //
+    // 画布挂在 SURFACE_Y + CRITTER_LIFT 上，**世界地面在画布里是 CG**，不是画布
+    // 底边。原来几个 y 是写死的像素（母鸡 118→166、田鼠 186），换算过来是
+    // 母鸡落到地下 0.38m、田鼠一路在地下 0.8m 跑——"扑棱下地"成了钻地。
+    // 一律按"离地多少米"算。
+    const CRITTER_LIFT = 1.0;
+    const CG = 100 + CRITTER_LIFT * PPM;      // 地平线在这块画布里的 y
+    const AtY = (m) => CG - m * PPM;          // 离地 m 米 → 画布 y
+    {
+      const fx = state.sparrowBurst || state.henFlee || state.mouseFlee || state.elmRain;
+      if (fx) {
+        if (!critterMesh) {
+          critterCanvas = MakeCanvas(320 * 2, 200 * 2);   // 小活物动得快，2x 就够
+          critterCtx = critterCanvas.getContext("2d");
+          const tex = CanvasTexture(critterCanvas);
+          critterMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(320 / PPM, 200 / PPM),
+            new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+          );
+          // 小活物是玩法层里的东西，得和人、车、柴堆一起按深度排。挂在 fx 层
+          // （基序号比 play 高一整档）＝永远压在所有人前面：母鸡会从柱子脸前飞过去。
+          // loose 带正好是"看得见但不挡人"，比演员靠后一档。
+          layers.play.add(critterMesh);
+          SetPlayOrder(critterMesh, BAND.loose, "critter");
+        }
+        const c = critterCtx;
+        c.setTransform(2, 0, 0, 2, 0, 0);
+        c.clearRect(0, 0, 320, 200);
+        c.save();
+        if (state.sparrowBurst) {
+          const t = state.sparrowBurst.t;
+          c.globalAlpha = Math.max(0, 1 - t / 2.0);
+          for (let i = 0; i < 4; i += 1) {
+            const dir = i % 2 ? 1 : -1;
+            const sx = 160 + dir * (14 + t * (34 + i * 15));
+            // 从落石处炸窝：贴着地起飞，各自窜上去
+            const sy = AtY(0.18 + t * (1.38 + i * 0.46)) + Math.sin(t * 9 + i) * 6;
+            ART.DrawSparrow(c, sx, sy, "sp" + i, (t * 5 + i * 0.3) % 1);
+          }
+        } else if (state.henFlee) {
+          const t = state.henFlee.t;
+          c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.4));
+          // 从木料上（0.42m）扑棱到地面（0.06m），一路小跑着走开
+          const hx = 160 + t * 62;
+          const hy = AtY(0.27 - Math.min(1, t / 0.5) * 0.21) + Math.sin(t * 16) * 3;
+          ART.DrawHen(c, hx, hy, "fleeHen");
+          // 扑棱的翅
+          ART.InkLine(c, hx - 2, hy - 12, hx - 12, hy - 22 - Math.sin(t * 22) * 6, "henWing",
+            { lw: 3, color: "#8d6a3c", amp: 1 });
+        } else if (state.mouseFlee) {
+          const t = state.mouseFlee.t;
+          c.globalAlpha = Math.max(0, 1 - t / 1.1);
+          ART.DrawMouse(c, 160 - t * 150, AtY(0.05) + Math.sin(t * 30) * 2, "fleeMouse");
+        } else if (state.elmRain) {
+          // 榆钱雨：一把青黄的小圆片从冠里簌簌往下飘，左摇右摆地落
+          const t = state.elmRain.t;
+          c.globalAlpha = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.6);
+          // 起落高度由发起处给：树上抖下来是 1.9m（井台那棵老榆），
+          // 从被扯开的包袱里洒出来只有 0.75m——不写这一档，院子里没有树，
+          // 榆钱就是从半空凭空落下来的（实拍逮到的）
+          const H0 = state.elmRain.from ?? 1.9;
+          for (let i = 0; i < 14; i += 1) {
+            const h0 = H0 + ART.Hash("er" + i) * (H0 > 1.2 ? 0.5 : 0.18);   // 各自的起飞高度
+            const fall = Math.max(0, t - ART.Hash("ed" + i) * 0.5);       // 错峰往下掉
+            const y = Math.max(0.05, h0 - fall * 1.1);
+            const sx = 160 + (ART.Hash("ex" + i) - 0.5) * 66
+              + Math.sin(fall * 5 + i) * 9;                               // 边落边打摆
+            const sy = AtY(y);
+            c.save();
+            c.translate(sx, sy);
+            c.rotate(Math.sin(fall * 6 + i * 2) * 0.9);
+            c.beginPath();
+            c.ellipse(0, 0, 3.4, 2.4, 0, 0, Math.PI * 2);
+            c.fillStyle = i % 2 ? "#aebf72" : "#c2cf8a";
+            c.fill();
+            c.strokeStyle = "rgba(90,110,50,0.7)";
+            c.lineWidth = 0.8;
+            c.stroke();
+            c.restore();
+          }
+        }
+        c.restore();
+        critterMesh.material.map.needsUpdate = true;
+        critterMesh.visible = true;
+        const baseX = state.sparrowBurst?.x ?? state.henFlee?.x ?? state.mouseFlee?.x ?? state.elmRain?.x;
+        critterMesh.position.set(baseX, SURFACE_Y + CRITTER_LIFT, PlaceZ(BAND.loose));
+      } else if (critterMesh) critterMesh.visible = false;
+    }
+
+    // 一阵看得见的风（Core 写 state.wind = {t,dur,x,dir}；开场吹倒门那一镜等）。
+    // 2026-08-10 用户：「风一吹过 你至少把风的动效做出来」——原来只有一声呼
+    // 和门一荡，画面上什么都没刮过。风本身没形状，能画的是它**卷起来的东西**：
+    // 一把斜着掠过画面的尘土流线（快、直、淡）+ 几粒贴地打滚蹦跳的草屑枯叶
+    // （慢、弹、转）。快慢两层速度差就是"风"这个读法的全部来源。
+    // 挂 obstacle 带＝从人脸前扫过去——尘土在人和镜头之间，风才罩得住整个画面。
+    {
+      const wd = state.wind;
+      if (wd) {
+        if (!windMesh) {
+          windCanvas = MakeCanvas(480 * 2, 220 * 2);
+          windCtx = windCanvas.getContext("2d");
+          windMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(480 / PPM, 220 / PPM),
+            new THREE.MeshBasicMaterial({ map: CanvasTexture(windCanvas), transparent: true, depthWrite: false }),
+          );
+          layers.play.add(windMesh);
+          SetPlayOrder(windMesh, BAND.obstacle, "wind");
+        }
+        const c = windCtx;
+        c.setTransform(2, 0, 0, 2, 0, 0);
+        c.clearRect(0, 0, 480, 220);
+        const t = wd.t, dir = wd.dir || 1;
+        const GY = (m) => 214 - m * PPM;                       // 离地 m 米 → 画布 y
+        // 起得猛、收得缓：风头 0.2s 就到，尾巴拖 0.8s 散掉
+        const env = Math.min(1, t / 0.2) * Math.min(1, Math.max(0, (wd.dur - t) / 0.8));
+        // 力度全程有起伏：风不是恒速的，一阵紧一阵松
+        const surge = 0.75 + 0.25 * Math.sin(t * 2.3 + 1);
+        // ── 贴地的土雾：一条被风押着跑的软带子，给整阵风打底 ──
+        // 第一版没有它，只有细流线，实拍在昏黄雾底上几乎隐形
+        for (let i = 0; i < 3; i += 1) {
+          const h = ART.Hash("wfog" + i);
+          const fx = ((h * 11 + t * (5.5 + h * 2)) % 11) * PPM;
+          const fy = GY(0.22 + h * 0.35);
+          const grad = c.createRadialGradient(fx, fy, 4, fx, fy, 60 + h * 30);
+          grad.addColorStop(0, "rgba(168,140,96,0.34)");
+          grad.addColorStop(1, "rgba(168,140,96,0)");
+          c.globalAlpha = env * surge;
+          c.fillStyle = grad;
+          c.save();
+          c.translate(fx, fy); c.scale(2.6, 1); c.translate(-fx, -fy);   // 压扁：是掠地的土，不是烟团
+          c.beginPath(); c.arc(fx, fy, 60 + h * 30, 0, Math.PI * 2); c.fill();
+          c.restore();
+        }
+        // ── 尘土流线：一把快而斜的划痕，各自循环着掠过画布 ──
+        c.lineCap = "round";
+        for (let i = 0; i < 22; i += 1) {
+          const h1 = ART.Hash("wnA" + i), h2 = ART.Hash("wnB" + i), h3 = ART.Hash("wnC" + i);
+          const speed = 7.5 + h2 * 6;                          // 米/秒：比草屑快一倍多
+          // lane 分层铺、相位掺序号：纯 Hash 会聚簇（同 coverBands 那次），
+          // 实拍抓到过五六根挤在同一高度读成一抹烟
+          const lane = 0.2 + (i / 21) * 1.85 + (h1 - 0.5) * 0.22;
+          const len = (0.9 + h3 * 1.3) * PPM;
+          const x = ((h2 * 11 + i * 0.83 + t * speed) % 11) * PPM * dir - (dir > 0 ? len : -len);
+          const y = GY(lane) + Math.sin(t * 3.1 + i * 1.7) * 3;
+          const bright = i % 4 === 0;                          // 亮的留少数（宽亮线堆一起=烟）
+          c.globalAlpha = env * surge * (bright ? 0.22 : 0.3 + h3 * 0.25);
+          c.strokeStyle = bright ? "#e8d5a8" : "#7a6238";
+          c.lineWidth = bright ? 1.6 : 2 + h1 * 1.6;
+          c.beginPath();
+          c.moveTo(dir > 0 ? x : 480 - x, y);
+          // 略微下垂的肚子：直线是激光，带一点弧才是被风拖着的土
+          c.quadraticCurveTo((dir > 0 ? x : 480 - x) + dir * len * 0.5, y + 3,
+            (dir > 0 ? x : 480 - x) + dir * len, y - len * 0.05);
+          c.stroke();
+        }
+        // ── 草屑与枯叶：贴地蹦跳着往前打滚，越滚越低 ──
+        for (let i = 0; i < 6; i += 1) {
+          const h1 = ART.Hash("wlA" + i), h2 = ART.Hash("wlB" + i);
+          const speed = 4.8 + h1 * 2.6;
+          // 相位掺进 i×1.8m：光靠 Hash 会有几粒挤在同一处，实拍抓到过一堆"抓子"
+          const px = (((h2 * 11 + i * 1.8 + t * speed) % 11) * PPM) * dir + (dir > 0 ? 0 : 480);
+          const hop = Math.abs(Math.sin(t * (5 + h1 * 3) + i * 2.1));
+          const py = GY(0.06 + hop * (0.5 - Math.min(0.32, t * 0.14)));
+          c.save();
+          c.translate(dir > 0 ? px : 480 - px, py);
+          c.rotate(t * (7 + h2 * 5) * dir);
+          c.globalAlpha = env * (0.7 + h1 * 0.25);
+          if (i % 2) {
+            // 枯叶：小椭圆带一条中脉
+            c.fillStyle = "#5c4a26";
+            c.beginPath(); c.ellipse(0, 0, 5, 2.7, 0, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = "#3e321b"; c.lineWidth = 1;
+            c.beginPath(); c.moveTo(-4.2, 0); c.lineTo(4.2, 0); c.stroke();
+          } else {
+            // 草秸：一长一短两根平行的干草——交叉画会读成"抓子"，实拍退回过
+            c.strokeStyle = "#8d7442"; c.lineWidth = 1.6;
+            c.beginPath(); c.moveTo(-4.5, -0.8); c.lineTo(4.5, 0.8); c.stroke();
+            c.lineWidth = 1.2;
+            c.beginPath(); c.moveTo(-2.2, 1.8); c.lineTo(2.6, 2.6); c.stroke();
+          }
+          c.restore();
+        }
+        c.globalAlpha = 1;
+        windMesh.material.map.needsUpdate = true;
+        windMesh.visible = true;
+        windMesh.position.set(wd.x + dir * 0.6, SURFACE_Y + 220 / 2 / PPM - 0.12, PlaceZ(BAND.obstacle));
+      } else if (windMesh) windMesh.visible = false;
+    }
+
+    // 翻越落地扬起的干土：半秒就散，但没有它落地就是"啪"一声没有画面
+    {
+      const vd = state.vaultDust;
+      if (vd && vd.t < 0.62) {
+        if (!dustMesh) {
+          dustCanvas = MakeCanvas(160, 90);
+          dustCtx = dustCanvas.getContext("2d");
+          dustMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(160 / PPM, 90 / PPM),
+            new THREE.MeshBasicMaterial({ map: CanvasTexture(dustCanvas), transparent: true, depthWrite: false }),
+          );
+          FixOrder(dustMesh, LAYER_ORDER.fx + 250);
+          layers.fx.add(dustMesh);
+        }
+        const c = dustCtx;
+        c.clearRect(0, 0, 160, 90);
+        const t = vd.t;
+        c.globalAlpha = Math.max(0, 1 - t / 0.62) * 0.55;
+        for (let i = 0; i < 5; i += 1) {
+          const dir = i % 2 ? 1 : -1;
+          const px = 80 + dir * (6 + t * (46 + i * 12));
+          const py = 78 - t * (14 + i * 5);
+          c.beginPath();
+          c.arc(px, py, 5 + t * (13 + i * 2), 0, Math.PI * 2);
+          c.fillStyle = i % 2 ? "rgba(196,178,140,0.75)" : "rgba(172,152,116,0.65)";
+          c.fill();
+        }
+        dustMesh.material.map.needsUpdate = true;
+        dustMesh.visible = true;
+        // 顶撑木也用它（顶实那一下洞顶簌簌落土），所以这团土得认得出自己在哪一层
+        dustMesh.position.set(vd.x, (vd.level === "under" ? UNDER_Y : SURFACE_Y) + 0.42, 0.52);
+      } else if (dustMesh) dustMesh.visible = false;
+    }
+
+    // 刨料：台面上那块毛料 + 骑在手上的刨子 + 打着卷落下来的刨花 + 地上那堆。
+    // 这一拍镜头推到 2.9m，木头是主角——料的毛面要能看出一趟趟被削平。
+    // 那扇会晃的家门：整扇挂在**上门轴**上，转的是挂它的那个 Group——
+    // 于是"绕上轴摆"这件事由场景图负责，画笔（ART.DrawHungDoor）只管把门
+    // 从轴那一点往下画一扇，不必知道角度。
+    if (state.doorLeaf) {
+      const dl = state.doorLeaf;
+      if (!doorLeafPivot || doorLeafLoose !== !!dl.loose) {
+        if (doorLeafPivot) layers.play.remove(doorLeafPivot);
+        doorLeafLoose = !!dl.loose;
+        doorLeafPivot = new THREE.Group();
+        doorLeafMesh = BakeSprite(ART.HUNG_DOOR_W + 24, ART.HUNG_DOOR_H + 16, 20, 8,
+          (ctx, ax, ay) => ART.DrawHungDoor(ctx, ax, ay, "homeDoor", { loose: doorLeafLoose }),
+          0, PROP_SS);
+        // 贴图锚点＝上门轴：把网格按 BakeSprite 算好的锚点偏移摆进 Group，
+        // Group 的原点就落在门轴上，转 Group 就是绕轴摆。
+        //（偏移的 x 不能取负——PlaceSprite 用的就是 +offset.x，取负会让整扇门
+        //  往左错半个锚点差，门就挂到门框外面去了。）
+        doorLeafMesh.position.set(doorLeafMesh.userData.offset.x, doorLeafMesh.userData.offset.y, 0);
+        doorLeafPivot.add(doorLeafMesh);
+        // 门扇压在门框之前、演员之后：它是玩家要伸手按住的东西，不能被人挡住
+        SetPlayOrder(doorLeafPivot, BAND.loose, "doorLeaf");
+        layers.play.add(doorLeafPivot);
+      }
+      doorLeafPivot.visible = true;
+      doorLeafPivot.position.set(dl.x, SURFACE_Y + (dl.hingeY ?? 1.95), BAND.loose);
+      // 世界里 +lean 是"往外（+x）坠"，屏幕上就是顺时针 → 绕 z 负向转。
+      // strain（攥着它较劲时才有）在渲染层抖那一丝——两只手对着一扇门的分量，
+      // 谁也压不死谁。判定用的 lean 不掺这份演出（Core 只算物理）。
+      const trem = (dl.strain || 0) * 0.008 * Math.sin(time * 34);
+      doorLeafPivot.rotation.z = -((dl.lean || 0) + trem);
+
+      // 门枕石与臼窝：**钉在地上**，所以是独立一张贴图，不进 doorLeafPivot。
+      // 进去就会跟着门扇一起摆——门歪 15°，地上那块石头也歪 15°。
+      // 礅进去多少（work）画在石头上：窝里的轴头一点点填满、石面上木屑一记一记
+      // 攒起来。这一拍"爹在修什么"全靠这一处说（用户 2026-08-10 看不出来）。
+      // 礅进去多少：玩法里由 work 给；没有 work 的场合（开场那扇好好挂着的门、
+      // 修完之后）按"轴在不在窝里"给——不给默认值的话，门明明是好的，
+      // 窝里却空着一个黑口子
+      const seat = dl.work !== undefined ? Math.max(0, Math.min(1, dl.work)) : (dl.loose ? 0 : 1);
+      const seatBucket = Math.round(seat * 4);
+      if (!doorSocketMesh) {
+        doorSocketMesh = BakeSprite(34, 20, 17, 18,
+          (ctx, ax, ay) => ART.DrawDoorSocket(ctx, ax, ay, "homeSocket", { seat }), 0, PROP_SS);
+        doorSocketSeat = seatBucket;
+        SetPlayOrder(doorSocketMesh, BAND.obstacle, "doorSocket");
+        layers.play.add(doorSocketMesh);
+      } else if (doorSocketSeat !== seatBucket) {
+        doorSocketSeat = seatBucket;
+        RedrawProp(doorSocketMesh, { w: 34, h: 20, ax: 17, ay: 18, ss: PROP_SS },
+          (ctx, ax, ay) => ART.DrawDoorSocket(ctx, ax, ay, "homeSocket", { seat }));
+      }
+      doorSocketMesh.visible = true;
+      PlaceSprite(doorSocketMesh, dl.x, SURFACE_Y, PlaceZ(BAND.obstacle));
+    } else if (doorLeafPivot) {
+      doorLeafPivot.visible = false;
+      if (doorSocketMesh) doorSocketMesh.visible = false;
+    }
+
+    // 找吃的（第一章第一场）那三样能上手的东西：焦草苫子 / 半扇烧塌的门板 /
+    // 墙根那片烧土。位置与形状全由玩法状态驱动（Core 的 state.forage），跟那扇
+    // 会晃的门同一类，所以长在这儿、不进 Data_PropArt。
+    // 三样都排 **loose 带**：玩家要伸手去够的东西，得压在地面道具之前、演员
+    // 之后——永远看得见，又不会把人挡住。
+    if (state.forage) {
+      const fg = state.forage;
+      const MAT_PX = Math.round(FORAGE.mat.half * PPM);
+      const MAT_BOX = { w: MAT_PX + 30, h: 44, ax: 12, ay: 34, ss: PROP_SS };
+      const PLANK_PX = Math.round(FORAGE.plank.len * PPM);
+      // 三样东西都挂在自己的 Group 上转：苫子绕折痕折过去、门板绕西头（架在
+      // 食槽上那一头落下来）。转 Group ＝ 绕那个点转，画笔只管"平着长什么样"
+      const Pivot = (mesh) => {
+        const g = new THREE.Group();
+        mesh.position.set(mesh.userData.offset.x, mesh.userData.offset.y, 0);
+        g.add(mesh);
+        return g;
+      };
+      if (!matPivot) {
+        matMesh = BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+            { len: MAT_PX, torn: fg.mat.torn }), 0, PROP_SS);
+        matPivot = Pivot(matMesh);
+        SetPlayOrder(matPivot, BAND.loose, "forageMat");
+        layers.play.add(matPivot);
+        matTorn = fg.mat.torn;
+
+        // 压在底下那半幅：同一片苫子对折过去的另一半，落在西边地上
+        matBaseMesh = Pivot(BakeSprite(MAT_BOX.w, MAT_BOX.h, MAT_BOX.ax, MAT_BOX.ay,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatB", { len: MAT_PX }),
+          0, PROP_SS));
+        matBaseMesh.rotation.z = FORAGE.mat.westA;
+        SetPlayOrder(matBaseMesh, BAND.loose, "forageMatBase");
+        layers.play.add(matBaseMesh);
+        LinkGeneratedSurfaceFallback("shedThatchMat", [matPivot], {
+          x: fg.mat.x, groundY: SURFACE_Y + FORAGE.mat.pivotY, width: 1.85, height: 0.44,
+        });
+
+        plankMesh = Pivot(BakeSprite(PLANK_PX + 30, 40, 8, 30,
+          (ctx, ax, ay) => ART.DrawCharredPlank(ctx, ax, ay, "foragePlank", { len: PLANK_PX }),
+          0, PROP_SS));
+        SetPlayOrder(plankMesh, BAND.loose, "foragePlank");
+        layers.play.add(plankMesh);
+        LinkGeneratedSurfaceFallback("shedCharredDoorPlank", [plankMesh], {
+          x: fg.plank.x0, groundY: SURFACE_Y, width: 1.75, height: 0.34,
+        });
+
+        ashMesh = BakeSprite(76, 46, 38, 40,
+          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash), 0, DETAIL_SS);
+        SetPlayOrder(ashMesh, BAND.loose, "forageAsh");
+        layers.play.add(ashMesh);
+        LinkGeneratedSurfaceFallback("ashDebrisPile", [ashMesh], {
+          x: fg.ash.x, groundY: SURFACE_Y, width: 1.36, height: 0.38,
+        });
+        ashOverlayMesh = BakeSprite(76, 46, 38, 40,
+          (ctx, ax, ay) => DrawForageAshOverlay(ctx, ax, ay, fg.ash), 0, DETAIL_SS);
+        SetPlayOrder(ashOverlayMesh, BAND.loose, "forageAshOverlay");
+        layers.play.add(ashOverlayMesh);
+        ashKey = "";
+      }
+      // 撕掉一口就重烘一次苫子（进度长在实物上：撕过几次，外沿就缺几口）
+      if (matTorn !== fg.mat.torn) {
+        matTorn = fg.mat.torn;
+        RedrawProp(matMesh, MAT_BOX,
+          (ctx, ax, ay) => ART.DrawThatchMat(ctx, ax, ay, "forageMatA",
+            { len: MAT_PX, torn: fg.mat.torn }));
+      }
+      const generatedMatMesh = matPivot.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.shedThatchMat;
+      const generatedMatReady = generatedSurfaceEligible
+        && generatedSurfaceStatuses.shedThatchMat === "ready"
+        && !!generatedMatMesh?.material?.map
+        && generatedMatMesh.userData.generatedBound !== false;
+      matPivot.visible = !generatedMatReady;
+      // The old cross-hatched underside was the last large procedural half of
+      // this interaction.  Once the accepted ImageGen mat is ready, keep the
+      // fold motion but remove that mismatched duplicate footprint.
+      matBaseMesh.visible = !generatedMatReady;
+      // 折痕架在瓦砾上：整片苫子绕它转。世界里 +ang 是"外沿抬起来"，
+      // 屏幕上就是逆时针 → 绕 z 正向转
+      matPivot.position.set(fg.mat.x, SURFACE_Y + FORAGE.mat.pivotY, PlaceZ(BAND.loose));
+      matPivot.rotation.z = fg.mat.ang ?? FORAGE.mat.restA;
+      matBaseMesh.position.copy(matPivot.position);
+      if (generatedMatMesh) {
+        generatedMatMesh.visible = generatedMatReady;
+        PlaceGeneratedPlane(generatedMatMesh, fg.mat.x, SURFACE_Y + FORAGE.mat.pivotY, PlaceZ(BAND.loose));
+        generatedMatMesh.rotation.z = matPivot.rotation.z;
+      }
+
+      const generatedPlankMesh = plankMesh.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.shedCharredDoorPlank;
+      const generatedPlankReady = generatedSurfaceEligible
+        && generatedSurfaceStatuses.shedCharredDoorPlank === "ready"
+        && !!generatedPlankMesh?.material?.map
+        && generatedPlankMesh.userData.generatedBound !== false;
+      plankMesh.visible = !generatedPlankReady;
+      plankMesh.position.set(fg.plank.x0 + (fg.plank.dx || 0), SURFACE_Y, PlaceZ(BAND.loose));
+      plankMesh.rotation.z = fg.plank.tilt ?? FORAGE.plank.tilt;
+      if (generatedPlankMesh) {
+        generatedPlankMesh.visible = generatedPlankReady;
+        PlaceGeneratedPlane(generatedPlankMesh, fg.plank.x0 + (fg.plank.dx || 0), SURFACE_Y, PlaceZ(BAND.loose));
+        generatedPlankMesh.rotation.z = plankMesh.rotation.z;
+      }
+
+      // 土堆越扒越矮：按"扒了几下"分档重烘（每下一档，肉眼看得出它矮了一截）
+      const key = `${Math.round((fg.ash.k || 0) * 5)}:${fg.ash.jar ? 1 : 0}:${fg.ash.open ? 1 : 0}`;
+      if (key !== ashKey) {
+        ashKey = key;
+        RedrawProp(ashMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
+          (ctx, ax, ay) => ART.DrawAshMound(ctx, ax, ay, "forageAsh", fg.ash));
+        RedrawProp(ashOverlayMesh, { w: 76, h: 46, ax: 38, ay: 40, ss: DETAIL_SS },
+          (ctx, ax, ay) => DrawForageAshOverlay(ctx, ax, ay, fg.ash));
+      }
+      const ashGeneratedMesh = ashMesh.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.ashDebrisPile;
+      const generatedAsh = generatedSurfaceEligible
+        && generatedSurfaceStatuses.ashDebrisPile === "ready"
+        && !!ashGeneratedMesh?.material?.map
+        && ashGeneratedMesh.userData.generatedBound !== false;
+      ashMesh.visible = !generatedAsh;
+      PlaceSprite(ashMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+      ashOverlayMesh.visible = generatedAsh && (!!fg.ash.jar || !!fg.ash.open);
+      PlaceSprite(ashOverlayMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose));
+      if (ashGeneratedMesh && generatedAsh) {
+        const remaining = Math.max(0.18, 1 - (fg.ash.k || 0) * 0.72);
+        PlaceGeneratedPlane(ashGeneratedMesh, fg.ash.x, SURFACE_Y, PlaceZ(BAND.loose),
+          { scaleY: remaining });
+        ashGeneratedMesh.visible = true;
+      } else if (ashGeneratedMesh) ashGeneratedMesh.visible = false;
+
+      // ── 苇席（第七稿新增，机制同苫子：绕折痕折过去）＋席底下那半袋谷种 ──
+      if (fg.reed) {
+        const REED_PX = Math.round(FORAGE.reed.half * PPM);
+        const REED_BOX = { w: REED_PX + 26, h: 40, ax: 10, ay: 30, ss: PROP_SS };
+        if (!reedPivot) {
+          reedPivot = Pivot(BakeSprite(REED_BOX.w, REED_BOX.h, REED_BOX.ax, REED_BOX.ay,
+            (ctx, ax, ay) => ART.DrawReedMat(ctx, ax, ay, "forageReedA", { len: REED_PX }),
+            0, PROP_SS));
+          SetPlayOrder(reedPivot, BAND.loose, "forageReed");
+          layers.play.add(reedPivot);
+          reedBaseMesh = Pivot(BakeSprite(REED_BOX.w, REED_BOX.h, REED_BOX.ax, REED_BOX.ay,
+            (ctx, ax, ay) => ART.DrawReedMat(ctx, ax, ay, "forageReedB", { len: REED_PX }),
+            0, PROP_SS));
+          reedBaseMesh.rotation.z = FORAGE.reed.westA;
+          SetPlayOrder(reedBaseMesh, BAND.loose, "forageReedBase");
+          layers.play.add(reedBaseMesh);
+          LinkGeneratedSurfaceFallback("shedReedMat", [reedPivot], {
+            x: fg.reed.x, groundY: SURFACE_Y + FORAGE.reed.pivotY, width: 1.80, height: 0.52,
+          });
+          seedBagMesh = BakeSprite(34, 26, 17, 22,
+            (ctx, ax, ay) => ART.DrawSeedBag(ctx, ax, ay, "forageSeedBag"), 0, DETAIL_SS);
+          // 谷种袋在苇席**底下**：排得比苇席浅一档，掀开才见着
+          SetPlayOrder(seedBagMesh, BAND.walk, "forageSeedBag");
+          layers.play.add(seedBagMesh);
+        }
+        const generatedReedMesh = reedPivot.userData.generatedSurfaceMesh
+          || generatedSurfaceMeshes.shedReedMat;
+        const generatedReedReady = generatedSurfaceEligible
+          && generatedSurfaceStatuses.shedReedMat === "ready"
+          && !!generatedReedMesh?.material?.map
+          && generatedReedMesh.userData.generatedBound !== false;
+        reedPivot.visible = !generatedReedReady;
+        // As with the thatch mat, do not leave a bright procedural underside
+        // beside the generated reed texture after a successful load.
+        reedBaseMesh.visible = !generatedReedReady;
+        reedPivot.position.set(fg.reed.x, SURFACE_Y + FORAGE.reed.pivotY, PlaceZ(BAND.loose));
+        reedPivot.rotation.z = fg.reed.ang ?? FORAGE.reed.restA;
+        reedBaseMesh.position.copy(reedPivot.position);
+        if (generatedReedMesh) {
+          generatedReedMesh.visible = generatedReedReady;
+          PlaceGeneratedPlane(generatedReedMesh, fg.reed.x, SURFACE_Y + FORAGE.reed.pivotY, PlaceZ(BAND.loose));
+          generatedReedMesh.rotation.z = reedPivot.rotation.z;
+        }
+        // 席掀过 0.5rad 才看得见底下的袋子（贴着歇息角时它整个被席盖着）
+        seedBagMesh.visible = (fg.reed.ang ?? FORAGE.reed.restA) > FORAGE.reed.restA + 0.5
+          || !!fg.reed.done;
+        PlaceSprite(seedBagMesh, fg.reed.x - 0.25, SURFACE_Y, PlaceZ(BAND.walk));
+      }
+
+      // ── 食槽（门板拖开才露出来）：槽底秕谷壳随刮走的把数变少 ──
+      if (fg.trough) {
+        const tKey = `${Math.round((fg.trough.k || 0) * 4)}`;
+        if (!troughMesh) {
+          troughMesh = BakeSprite(70, 26, 35, 22,
+            (ctx, ax, ay) => ART.DrawFeedTrough(ctx, ax, ay, "forageTrough", { k: fg.trough.k || 0 }),
+            0, DETAIL_SS);
+          SetPlayOrder(troughMesh, BAND.walk, "forageTrough");
+          layers.play.add(troughMesh);
+          troughKey = tKey;
+          LinkGeneratedSurfaceFallback("shedFeedTrough", [troughMesh], {
+            x: fg.trough.x, groundY: SURFACE_Y, width: 1.25, height: 0.34,
+          });
+        }
+        if (tKey !== troughKey) {
+          troughKey = tKey;
+          RedrawProp(troughMesh, { w: 70, h: 26, ax: 35, ay: 22, ss: DETAIL_SS },
+            (ctx, ax, ay) => ART.DrawFeedTrough(ctx, ax, ay, "forageTrough", { k: fg.trough.k || 0 }));
+        }
+        // 门板还压着的时候只露一个角（题眼是"板子底下压着食槽的角"）
+        const troughVisible = !!fg.trough;
+        const generatedTroughMesh = troughMesh.userData.generatedSurfaceMesh
+          || generatedSurfaceMeshes.shedFeedTrough;
+        const generatedTroughReady = generatedSurfaceEligible
+          && generatedSurfaceStatuses.shedFeedTrough === "ready"
+          && !!generatedTroughMesh?.material?.map
+          && generatedTroughMesh.userData.generatedBound !== false;
+        troughMesh.visible = troughVisible && !generatedTroughReady;
+        PlaceSprite(troughMesh, fg.trough.x, SURFACE_Y, PlaceZ(BAND.walk));
+        if (generatedTroughMesh) {
+          generatedTroughMesh.visible = troughVisible && generatedTroughReady;
+          PlaceGeneratedPlane(generatedTroughMesh, fg.trough.x, SURFACE_Y, PlaceZ(BAND.walk));
+        }
+      }
+    } else if (matPivot) {
+      matPivot.visible = false;
+      matBaseMesh.visible = false;
+      plankMesh.visible = false;
+      ashMesh.visible = false;
+      if (ashOverlayMesh) ashOverlayMesh.visible = false;
+      if (reedPivot) { reedPivot.visible = false; reedBaseMesh.visible = false; seedBagMesh.visible = false; }
+      if (troughMesh) troughMesh.visible = false;
+    }
+
+    // ── 拉耧（state.lou 驱动的动态耧）：位置随拖、歪进垄沟的角度随 tilt。
+    // 静态那份 louDrill 由 louPlay 旗标藏起，这里接管；收耧时 Core 清 state.lou、
+    // 撤旗标，静态的原位接回——同位同角，换手不露痕 ──
+    if (state.lou) {
+      const lo = state.lou;
+      if (!louMesh) {
+        louMesh = BakeSprite(72, 60, 36, 54,
+          (ctx, ax, ay) => ART.DrawLou(ctx, ax, ay, "louPlayMesh"), 0, PROP_SS);
+        const g = new THREE.Group();
+        louMesh.position.set(louMesh.userData.offset.x, louMesh.userData.offset.y, 0);
+        g.add(louMesh);
+        louMesh = g;
+        SetPlayOrder(louMesh, BAND.walk, "louPlay");
+        layers.play.add(louMesh);
+      }
+      louMesh.visible = true;
+      louMesh.position.set(lo.x + (lo.dx || 0), SURFACE_Y, PlaceZ(BAND.walk));
+      // 歪进垄沟：往前（东）栽，屏幕上是顺时针 → 绕 z 负向转
+      louMesh.rotation.z = -(lo.tilt || 0);
+    } else if (louMesh) {
+      louMesh.visible = false;
+    }
+
+    if (state.planing) {
+      const pl = state.planing;
+      const boardW = pl.span + 0.26;
+      if (!planeBoardMesh) {
+        const wPx = Math.round(boardW * PPM);
+        planeBoardCanvas = MakeCanvas(wPx * PROP_SS, 40 * PROP_SS);
+        planeBoardCtx = planeBoardCanvas.getContext("2d");
+        planeBoardCtx.scale(PROP_SS, PROP_SS);
+        planeBoardMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(boardW, 40 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planeBoardCanvas), transparent: true, depthWrite: false }),
+        );
+        layers.play.add(planeBoardMesh);
+        // 料搁在台面上：压在行走线道具（台子）之前、演员之后 —— 正是 loose 带
+        SetPlayOrder(planeBoardMesh, BAND.loose, "planeBoard");
+        planeBoardMesh.userData.k = "";
+        // 刨子本体：真家伙就巴掌长（≈0.34m）。S=0.74 让 DrawCarry 的 22S 像素
+        // 正好落在这个尺寸上——上一版按 S=1.9 画，一把刨子有 0.9m 长
+        planeToolMesh = BakeSprite(26, 20, 13, 14,
+          (ctx, ax, ay) => ART.DrawCarry(ctx, ax, ay, 0.74, 1, "刨子"), 0, DETAIL_SS * 4);
+        layers.play.add(planeToolMesh);
+        SetPlayOrder(planeToolMesh, CARRY_Z, "planeTool");   // 攥在手里，与其它手持物同一层
+        // 地上的刨花堆
+        planePileCanvas = MakeCanvas(64 * PROP_SS, 26 * PROP_SS);
+        planePileCtx = planePileCanvas.getContext("2d");
+        planePileCtx.scale(PROP_SS, PROP_SS);
+        planePileMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(64 / PPM, 26 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planePileCanvas), transparent: true, depthWrite: false }),
+        );
+        layers.play.add(planePileMesh);
+        SetPlayOrder(planePileMesh, BAND.loose, "planePile");   // 落在台子这一侧的地上
+        planePileMesh.userData.k = -1;
+      }
+      // 毛面按 12 档重画（连续重画一块 PROP_SS 的画布太亏）
+      const bucket = Math.round(pl.smooth * 12);
+      if (planeBoardMesh.userData.k !== bucket) {
+        planeBoardMesh.userData.k = bucket;
+        const wPx = Math.round(boardW * PPM);
+        planeBoardCtx.clearRect(0, 0, wPx, 40);
+        ART.DrawPlaneBoard(planeBoardCtx, wPx / 2, 14, pl.span * PPM, bucket / 12, "c1board");
+        planeBoardMesh.material.map.needsUpdate = true;
+      }
+      planeBoardMesh.visible = true;
+      // 料的上沿画在画布 y=14，网格中心是 y=20。画布 y 向下、世界 y 向上，
+      // 所以中心要落在上沿**之下** 6px——符号写反的话料就飘在台面上方
+      planeBoardMesh.position.set(pl.x, SURFACE_Y + pl.y - (20 - 14) / PPM, PlaceZ(BAND.loose));
+
+      // 刨子：**挂在推刨那个人的手上**。位置不另算一份——手在哪它就在哪，
+      // 手是姿势给的、姿势是推程给的，于是"手推多远、刨子走多远"天然成立。
+      // （另算一份 u→x 的话，两条线迟早对不上，刨子就飘在手外面了。）
+      // 世界里这一份是替补：玩家真正操作的是铺满画框的那张刨料卡
+      //（Art.DrawPlaneCard），卡永远盖着它，只有卡没画出来时才露脸。
+      const hand = planeHandRig ? HandPoint(planeHandRig) : null;
+      planeToolMesh.visible = !!hand;
+      if (hand) planeToolMesh.position.set(hand.x + 0.02, hand.y - 0.05, CARRY_Z);
+
+      if (planePileMesh.userData.k !== pl.pile) {
+        planePileMesh.userData.k = pl.pile;
+        planePileCtx.clearRect(0, 0, 64, 26);
+        ART.DrawShavingPile(planePileCtx, 32, 22, pl.pile, "c1pile");
+        planePileMesh.material.map.needsUpdate = true;
+      }
+      planePileMesh.visible = pl.pile > 0;
+      planePileMesh.position.set(pl.x + pl.span / 2 + 0.22, SURFACE_Y + 13 / PPM, PlaceZ(BAND.loose));
+    } else {
+      if (planeBoardMesh) planeBoardMesh.visible = false;
+      if (planeToolMesh) planeToolMesh.visible = false;
+      if (planePileMesh) planePileMesh.visible = false;
+    }
+
+    // 刚削下来的那条刨花：从刨刃口弹出来，打着旋儿飘到地上
+    if (state.planeCurl) {
+      const cu = state.planeCurl;
+      if (!planeCurlMesh) {
+        planeCurlCanvas = MakeCanvas(26 * PROP_SS, 26 * PROP_SS);
+        planeCurlCtx = planeCurlCanvas.getContext("2d");
+        planeCurlCtx.scale(PROP_SS, PROP_SS);
+        planeCurlMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(26 / PPM, 26 / PPM),
+          new THREE.MeshBasicMaterial({ map: CanvasTexture(planeCurlCanvas), transparent: true, depthWrite: false }),
+        );
+        FixOrder(planeCurlMesh, LAYER_ORDER.fx + 200);   // 飞在空中的刨花：fx 层例外（见 CLAUDE.md 词汇表）
+        layers.fx.add(planeCurlMesh);
+        planeCurlMesh.userData.k = -1;
+      }
+      const lb = Math.round(cu.len * 4);
+      if (planeCurlMesh.userData.k !== lb) {
+        planeCurlMesh.userData.k = lb;
+        planeCurlCtx.clearRect(0, 0, 26, 26);
+        ART.DrawShaving(planeCurlCtx, 13, 13, 0.4, Math.max(0.3, lb / 4), "curl" + lb);
+        planeCurlMesh.material.map.needsUpdate = true;
+      }
+      // 自由落体 + 空气里打旋：飘得越久转得越慢
+      const t = cu.t;
+      const fall = 0.35 * t + 0.9 * t * t;
+      planeCurlMesh.visible = t < 1.6;
+      planeCurlMesh.material.opacity = Math.max(0, 1 - Math.max(0, t - 1.0) / 0.6);
+      planeCurlMesh.rotation.z = t * 3.4 * (0.4 + cu.len);
+      planeCurlMesh.position.set(
+        cu.x + 0.12 + Math.sin(t * 4.1) * 0.06,
+        Math.max(SURFACE_Y + 0.06, SURFACE_Y + cu.y - fall),
+        0.6,
+      );
+    } else if (planeCurlMesh) planeCurlMesh.visible = false;
+
+    // 潜行失败的视觉复盘：谁看见的，头顶亮一记「！」（首败不给文字，给这个）
+    if (state.spotFlash) {
+      if (!spotFlashMesh) {
+        spotFlashMesh = BakeSprite(48, 60, 24, 52, (ctx, ax, ay) => {
+          ctx.strokeStyle = "rgba(20,12,6,0.7)";
+          ctx.lineWidth = 7;
+          ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(ax, ay - 40); ctx.lineTo(ax, ay - 16); ctx.stroke();
+          ctx.beginPath(); ctx.arc(ax, ay - 5, 3.6, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = "#ffd98a";
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(ax, ay - 40); ctx.lineTo(ax, ay - 16); ctx.stroke();
+          ctx.fillStyle = "#ffd98a";
+          ctx.beginPath(); ctx.arc(ax, ay - 5, 2.6, 0, Math.PI * 2); ctx.fill();
+        }, 0, HINT_SS);
+        layers.fx.add(spotFlashMesh);
+        FixOrder(spotFlashMesh, LAYER_ORDER.fx + 340);
+      }
+      spotFlashMesh.visible = Math.sin(time * 16) > -0.5;
+      spotFlashMesh.material.opacity = Math.min(1, state.spotFlash.t / 0.4);
+      spotFlashMesh.position.set(state.spotFlash.x, SURFACE_Y + state.spotFlash.y, 0.66);
+    } else if (spotFlashMesh) spotFlashMesh.visible = false;
+
+    // 敌人视线可见化：每个巡逻兵面前一片**躺在地上的光池**，长度就是探测
+    // 逻辑用的视距（同一个数，画出来的和判出来的必须是同一条线）。
+    // 平铺而不是立一堵光墙——立着的光带会把夜里整条街的地面观感改掉；
+    // 躺平的光池只是"灯照到了这片地"，和影子同一种语言。
+    // 过场里也画：第二章教学幕全靠这片光扫过草垛来演示规则。
+    {
+      const showCones = state.stealthActive && state.phase === "playing";
+      const enemies = showCones
+        ? state.actors.filter((a) => (a.kind === "soldier" || a.kind === "puppet") && a.visible !== false && !a.decor)
+        : [];
+      if (enemies.length && !coneTex) {
+        // 一张横向渐变：靠人最亮，往视距尽头收干净；纵向（进深）也柔掉
+        const c = MakeCanvas(160, 40);
+        const cctx = c.getContext("2d");
+        const gh = cctx.createLinearGradient(0, 0, 160, 0);
+        gh.addColorStop(0, "rgba(255,224,150,1)");
+        gh.addColorStop(0.5, "rgba(255,224,150,0.55)");
+        gh.addColorStop(1, "rgba(255,224,150,0)");
+        cctx.fillStyle = gh;
+        cctx.fillRect(0, 0, 160, 40);
+        cctx.globalCompositeOperation = "destination-in";
+        const gv = cctx.createLinearGradient(0, 0, 0, 40);
+        gv.addColorStop(0, "rgba(0,0,0,0)");
+        gv.addColorStop(0.5, "rgba(0,0,0,1)");
+        gv.addColorStop(1, "rgba(0,0,0,0)");
+        cctx.fillStyle = gv;
+        cctx.fillRect(0, 0, 160, 40);
+        coneTex = CanvasTexture(c);
+        coneTex.generateMipmaps = false;
+        coneTex.minFilter = THREE.LinearFilter;
+      }
+      while (coneMeshes.length < enemies.length) {
+        // 贴地矮光带：竖片但只有 0.6m 高、下沿贴着地面、上沿在贴图里柔掉。
+        // 平视机位下躺平的光池会投影成几像素的细缝（和影子一样），根本读不出；
+        // 而 1.2m 的光墙又会把整条夜街的地面观感改掉——0.6m 是两头都留住的高度。
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(1, 0.6),
+          new THREE.MeshBasicMaterial({
+            map: coneTex, transparent: true, opacity: 0.2,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+            // 朝西的光带靠负缩放翻贴图，绕序跟着翻——单面材质会把它整个剔除，
+            // 于是"面朝西的兵没有视线光"这种只在一半情况出现的隐形 bug
+            side: THREE.DoubleSide,
+          }),
+        );
+        FixOrder(m, LAYER_ORDER.fx + 206);
+        layers.fx.add(m);
+        coneMeshes.push(m);
+      }
+      coneMeshes.forEach((m, i) => {
+        const a = enemies[i];
+        if (!a) { m.visible = false; return; }
+        const range = VISION_RANGE * VisionScale(state);
+        const dir = (a.heading || 1) >= 0 ? 1 : -1;
+        m.visible = true;
+        m.scale.set(dir * range, 1, 1);
+        m.position.set(a.x + dir * range / 2,
+          (a.level === "under" ? UNDER_Y : SURFACE_Y) + 0.28, 0.2);
+        // 夜里灯就是主角，光带要一眼读得出——白天淡一点（是"视线"不是灯）
+        const night2 = CHAPTERS[state.chapterIndex].light === "night" || CHAPTERS[state.chapterIndex].light === "dark";
+        // 夜里这一片光就是玩法本身（照到哪儿=不能站哪儿），得一眼读得出
+        const base = night2 ? 0.52 : 0.16;
+        // 举灯预兆（要回头扫了）：光收紧、亮一档——危险先看得见再生效
+        const lift = a.scanLift || 0;
+        m.material.opacity = base * (1 + lift * 0.9) + Math.sin(time * 2.6 + i * 1.9) * 0.04;
+      });
+
+      // 掩体的**影子**：这一段路真正的玩法长在这上面。
+      //
+      // 藏 = 站到掩体背光的那一面，所以"安全在哪儿"必须画出来，不能靠玩家
+      // 猜。每处被灯照到的掩体，在它背光的一侧铺一条暗带——那条暗带的长短
+      // 与判定用的余量（COVER_PAD）是同一个数，站进去就是藏住了。灯绕到另一
+      // 边，影子当场换头，玩家看见的就是"该挪窝了"。
+      {
+        const scene = SCENES[CHAPTERS[state.chapterIndex].scene];
+        const covers = (showCones ? scene.covers : null) || [];
+        const range = VISION_RANGE * VisionScale(state);
+        const shades = [];
+        for (const c of covers) {
+          // 谁在照它——取最近的那个，影子只有一条（一维里也只可能有一条主光）
+          let lit = null, bestD = Infinity;
+          for (const a of enemies) {
+            const dx = c.x - a.x;
+            if (Math.sign(dx) !== Math.sign(a.heading || 1)) continue;
+            const d = Math.abs(dx);
+            if (d > range + c.w / 2 || d >= bestD) continue;
+            bestD = d; lit = a;
+          }
+          if (!lit) continue;
+          const side = Math.sign(c.x - lit.x) || 1;      // 背光那一头
+          const x0 = c.x + side * (c.w / 2 - 0.15);
+          const x1 = c.x + side * (c.w / 2 + COVER_PAD);
+          shades.push({ x: (x0 + x1) / 2, w: Math.abs(x1 - x0), dir: side, tall: !!c.tall });
+        }
+        if (shades.length && !shadeTex) {
+          // 一张"贴着垛根最深、往外化开"的软影：硬边的方块读起来是 UI，
+          // 不是影子。横向从掩体那一头浓到淡，纵向两头收干净——和光池同一种语言
+          const c = MakeCanvas(96, 40);
+          const cctx = c.getContext("2d");
+          const gh = cctx.createLinearGradient(0, 0, 96, 0);
+          gh.addColorStop(0, "rgba(6,10,20,1)");
+          gh.addColorStop(0.45, "rgba(6,10,20,0.72)");
+          gh.addColorStop(1, "rgba(6,10,20,0)");
+          cctx.fillStyle = gh;
+          cctx.fillRect(0, 0, 96, 40);
+          cctx.globalCompositeOperation = "destination-in";
+          const gv = cctx.createLinearGradient(0, 0, 0, 40);
+          gv.addColorStop(0, "rgba(0,0,0,0)");
+          gv.addColorStop(0.62, "rgba(0,0,0,1)");
+          gv.addColorStop(1, "rgba(0,0,0,0.35)");
+          cctx.fillStyle = gv;
+          cctx.fillRect(0, 0, 96, 40);
+          shadeTex = CanvasTexture(c);
+          shadeTex.generateMipmaps = false;
+          shadeTex.minFilter = THREE.LinearFilter;
+        }
+        while (shadeMeshes.length < shades.length) {
+          const m = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 0.72),
+            new THREE.MeshBasicMaterial({
+              map: shadeTex, transparent: true, opacity: 0.3, depthWrite: false,
+              side: THREE.DoubleSide,          // 朝西的影子靠负缩放翻贴图，绕序跟着翻
+            }),
+          );
+          FixOrder(m, LAYER_ORDER.fx + 205);            // 压在光池之下：影子是被光衬出来的
+          layers.fx.add(m);
+          shadeMeshes.push(m);
+        }
+        shadeMeshes.forEach((m, i) => {
+          const s = shades[i];
+          if (!s) { m.visible = false; return; }
+          m.visible = true;
+          m.scale.set(s.dir * s.w, 1, 1);               // 浓的那一端贴着垛根
+          m.position.set(s.x, SURFACE_Y + 0.30, 0.19);
+          // 高掩体的影子实、矮掩体的虚一档——"这个得蹲下去"也在画面里说了
+          m.material.opacity = (s.tall ? 0.72 : 0.42) + Math.sin(time * 1.7 + i) * 0.04;
+        });
+      }
+    }
+
+    // 室内外切换：人走进门，立面淡出、屋里亮出来；走出去又合上。
+    // 演员本来就画在立面之前，所以只需要动立面这一张的透明度
+    if (homeFacade && homeRange) {
+      // 进没进屋由 Core 判（IndoorOpen）：位置只是必要条件——推着独轮车的人
+      // 走的是屋外那条道，车进不了堂屋
+      const inside = IndoorOpen(state, homeRange.x0, homeRange.x1);
+      // 戏在屋里演（爹修门那一场）：玩家还在门外，可墙合着的话他连爹在哪
+      // 都看不见——只看得见一双脚从墙根底下漏出来（用户 2026-08-09 报的）。
+      // 节拍声明 indoorScene 就把立面半隐掉：看得见屋里，也还看得出有堵墙。
+      const def = CurrentBeatDef(state);
+      const staged = !!(def?.indoorScene || state.beat?.indoorScene);
+      const goal = inside ? 0.07 : (staged ? 0.30 : 1);
+      const cur = homeFacade.material.opacity ?? 1;
+      if (Math.abs(cur - goal) > 0.005) {
+        homeFacade.material.transparent = true;
+        homeFacade.material.opacity = cur + (goal - cur) * Math.min(1, dt * 5.5);
+      }
+      // **淡下去的立面不许再压在玩法层前面。** 一层 16% 的膜糊在人和道具上，
+      // 读出来不是"墙半透明"，而是"门板也半透明了"（2026-08-10 用户报的：
+      // 半隐那一场里连扶着的门扇都成了透的）。所以墙一旦淡到不再挡人
+      //（与 IndoorHidden 同一条 0.5 线），就把它的**绘制序**挪到演员之后——
+      // 位置不动（摆位归 PlaceZ，绘制序归 SetPlayOrder，两个职责分开），
+      // 于是墙还在、还看得出是一堵墙，而人、门扇、工作台全是实的。
+      // 不挡人了反而可以画得实一点：半隐从 0.16 提到 0.30。
+      const behind = (homeFacade.material.opacity ?? 1) < 0.5;
+      if (facadeBehind !== behind) {
+        facadeBehind = behind;
+        SetPlayOrder(homeFacade, behind ? BAND.nearBack : BAND.facade, "homeFacade");
+        const generatedFacade = generatedAssetMeshes.houseFacadeDamaged;
+        if (generatedFacade) {
+          SetPlayOrder(generatedFacade, behind ? BAND.nearBack : BAND.facade, "generatedHomeFacade");
+        }
+      }
+      const generatedFacade = generatedAssetMeshes.houseFacadeDamaged;
+      if (generatedFacade && generatedAssetStatuses.houseFacadeDamaged === "ready") {
+        generatedFacade.material.transparent = true;
+        generatedFacade.material.opacity = homeFacade.material.opacity ?? 1;
+      }
+      // 屋里的地窖口/梯子**不做隐现**：它们画在 loose(0.3) 带、立面在
+      // facade(0.4) 带——墙本来就排在它们前面，合着的时候地面以上那一截
+      // 自然被墙挡住，地面以下那一截照常露着。于是从院里看过去就是
+      // 「地窖在屋子底下」——位置对了，画面自己说清楚了。
+      // 2026-08-09 那次「地窖怎么在家门口外面」的根因是**位置**（窖口摆在
+      // 院子里 x=37、根本不在屋子足迹内），不是画法；当时补的那层
+      // 「跟立面反着隐现」是治错了症：它把地下那截也一起灭了，玩家在院里
+      // 完全看不到自家地窖口，非得走进屋一米半才冒出来
+      //（用户 2026-08-10：「家里的地道为什么我在攀爬之前都是隐藏状态」）。
+    }
+
+    // 辘轳打水：井绳与桶跟着玩家的操作升降。绳从辘轳轴心垂到桶梁，
+    // 桶沉下井口、灌满、再一把一把摇上来——全程看得见。
+    // 转盘是真的在转：摇把角度由 Core 从绳的行程反推（crankA），
+    // 鼠标绕圈、键盘、脱手倒转三条路在画面上是同一根摇把在抡。
+    if (state.winchView) {
+      const wv = state.winchView;
+      if (!winchRope) {
+        winchRope = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.045, 1),
+          new THREE.MeshBasicMaterial({ color: 0x8a7350, transparent: true, opacity: 0.95, depthWrite: false }),
+        );
+        // 深度规范：绳与桶走 loose 带——压在井台（walk）之前、摇辘轳的人之后
+        FixOrder(winchRope, DepthOrder("play", BAND.loose));
+        layers.play.add(winchRope);
+        // 桶烘两只：空的、满的。**摇上来那一路得看得出桶里有东西**，
+        // 不然三道手摇完画面上什么也没变——满的那只桶口顶着一汪水、沿上挂着水痕
+        const BakeBucket = (full) => BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+          ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶");
+          if (!full) return;
+          // **只画桶口那一面水**：把整只桶涂成水色，上屏就是一只青塑料盒
+          ctx.save();
+          ctx.fillStyle = "#131a15";
+          ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.42;
+          ctx.fillStyle = "#6b7566";
+          ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = "rgba(58,72,62,0.55)";
+          ctx.lineWidth = 1.1;
+          ctx.beginPath(); ctx.moveTo(ax - 6.2, ay - 6); ctx.lineTo(ax - 6.6, ay + 1.5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ax + 4.4, ay - 6); ctx.lineTo(ax + 4.8, ay - 1.2); ctx.stroke();
+        }, 0, DETAIL_SS);
+        winchBucket = BakeBucket(false);
+        winchBucketFull = BakeBucket(true);
+        for (const m of [winchBucket, winchBucketFull]) {
+          FixOrder(m, DepthOrder("play", BAND.loose) + 1);
+          layers.play.add(m);
+        }
+        // The generated bucket replaces only the vessel body. Keep the live
+        // water face separate so the filled state still reads on that sprite.
+        winchBucketWater = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+          ctx.save();
+          ctx.fillStyle = "#131a15";
+          ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.42;
+          ctx.fillStyle = "#6b7566";
+          ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }, 0, DETAIL_SS);
+        FixOrder(winchBucketWater, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(winchBucketWater);
+        LinkGeneratedSurfaceFallback("wellBucket", [winchBucket, winchBucketFull], {
+          x: wv.x, groundY: SURFACE_Y + 0.66, width: 0.46, height: 0.54,
+        });
+        // **辘轳鼓上的那盘绳**：桶沉进井口的黑里之后就看不见了，绳盘是井下
+        // 那两道手唯一看得见的读数——放绳时一圈圈松出去、盘变窄，摇上来又缠回来。
+        // 真辘轳上你也就是这么看出"放了多少"的。比鼓身暗一档、两头压墨线，
+        // 眼睛跟的是那两条边线往里收（摇把的轴销还盖着中间）
+        winchCoil = BakeSprite(36, 16, 18, 8, (ctx, ax, ay) => {
+          ctx.fillStyle = "#54432a";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 11.6);
+          ctx.fillStyle = "rgba(255,240,205,0.18)";
+          ctx.fillRect(ax - 15, ay - 5.8, 30, 3.2);
+          ctx.fillStyle = "rgba(0,0,0,0.26)";
+          ctx.fillRect(ax - 15, ay + 2.6, 30, 3.2);
+          ctx.strokeStyle = "rgba(30,22,14,0.55)";
+          ctx.lineWidth = 1.0;
+          for (let i = 1; i < 8; i += 1) {
+            const cx0 = ax - 15 + (i / 8) * 30;
+            ctx.beginPath(); ctx.moveTo(cx0, ay - 5.6); ctx.lineTo(cx0, ay + 5.6); ctx.stroke();
+          }
+          ctx.strokeStyle = "rgba(24,17,10,0.9)";
+          ctx.lineWidth = 2.0;
+          for (const e of [-15, 15]) {
+            ctx.beginPath(); ctx.moveTo(ax + e, ay - 6.2); ctx.lineTo(ax + e, ay + 6.2); ctx.stroke();
+          }
+        }, 0, HINT_SS);
+        FixOrder(winchCoil, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(winchCoil);
+        LinkGeneratedSurfaceFallback("wellRopeDrum", [winchCoil], {
+          x: wv.x, groundY: SURFACE_Y + WINCH_HUB_Y, width: 1.12, height: 0.30,
+        });
+        // 摇把：轴销在画布正中，柄伸向 +x、末端一枚握手——旋转轴就是轴销。
+        // **柄长必须等于 Core 的 WINCH_CRANK_R**，画面里那个圈就是
+        // 判定用的那个圈，也是 Rig 反解前手的那个圈；三处对不上，手就抓空了。
+        const armPx = WINCH_CRANK_R * PPM;
+        winchCrank = BakeSprite(34, 34, 17, 17, (ctx, ax, ay) => {
+          ctx.strokeStyle = "rgba(43,31,22,0.9)";
+          ctx.lineCap = "round";
+          // 柄臂
+          ctx.lineWidth = 6.2;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + armPx, ay); ctx.stroke();
+          ctx.strokeStyle = "#7a5a33";
+          ctx.lineWidth = 4.0;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + armPx, ay); ctx.stroke();
+          // 握手：一节磨亮的木柄。**它要比周围亮一档**——整根摇把上只有它绕着
+          // 圈跑，玩家的眼睛盯的就是这一点（手攥在这儿，手也压在它后头）
+          ctx.strokeStyle = "rgba(38,26,14,0.95)";
+          ctx.lineWidth = 9.2;
+          ctx.beginPath(); ctx.moveTo(ax + armPx, ay - 5.6); ctx.lineTo(ax + armPx, ay + 5.6); ctx.stroke();
+          ctx.strokeStyle = "#c79a5c";
+          ctx.lineWidth = 6.0;
+          ctx.beginPath(); ctx.moveTo(ax + armPx, ay - 4.8); ctx.lineTo(ax + armPx, ay + 4.8); ctx.stroke();
+          // 轴销：**一枚铁销子，3 厘米**。第一版画了 3.4px＝7 厘米半径，排到人
+          // 之前以后就是一枚糊在脸上的大灰垫圈（实拍抓出来的）
+          ctx.fillStyle = "#4a3b2a";
+          ctx.strokeStyle = "rgba(26,18,10,0.9)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(ax, ay, 1.7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }, 0, HINT_SS);
+        // 摇把**排在人之前**（位置仍在井那条线上，只有绘制顺序往前提）：
+        // 排在人之后的话，他一伸手就把整根摇把盖住了——屏幕上又成了"空划拉"。
+        // 手落在握手上、握手压住手，读出来正好是"攥着把手"。
+        FixOrder(winchCrank, DepthOrder("play", BAND.obstacle));
+        layers.play.add(winchCrank);
+        LinkGeneratedSurfaceFallback("wellCrankHandle", [winchCrank], {
+          x: wv.crankX ?? wv.x, groundY: SURFACE_Y + WINCH_HUB_Y, width: 0.86, height: 0.56,
+        });
+        // 引导圈：没上手时绕轴心一圈虚线——「转这里」。同打结的引导圈一种语汇
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 48), 3));
+        winchGuide = new THREE.Line(geo, new THREE.LineDashedMaterial({
+          color: 0xbfb49a, transparent: true, opacity: 0.5, dashSize: 0.11, gapSize: 0.09, depthWrite: false,
+        }));
+        FixOrder(winchGuide, DepthOrder("play", BAND.loose) + 3);
+        layers.play.add(winchGuide);
+      }
+      const hubY = SURFACE_Y + WINCH_HUB_Y;                // 辘轳轴心（井架横杆中线）
+      // 摇到顶＝桶提到井口沿上（伸手就够得着），往下一路沉进井里。
+      // 沉多深不要按"井有多深"给——按**看得见多久**给：桶在头一小半程里
+      // 一直看得见，之后才淡进井筒的黑里（第一版 0.70−1.30d 走到两成深度
+      // 桶就没影了，玩家会以为它掉了）
+      const phase = wv.phase || (wv.filled ? "raise" : "lower");
+      const sway = wv.sway || 0, swing = wv.swing || 0, jolt = wv.jolt || 0;
+      const bucketY = SURFACE_Y + 0.66 - wv.depth * 1.25
+        + (jolt > 0 ? Math.sin(state.time * 46) * 0.018 * jolt : 0);
+      // 桶横着的位置：在绳上左右悠（sway），最后一道手被人横拽到井沿（swing）
+      const bucketX = wv.x - swing * WINCH_LAND_X + sway * 0.12;
+      // 绳只画到井口沿为止：再往下它就该钻进井筒的黑里了。不夹的话，桶沉到
+      // 底时会有一根木色的长条从辘轳一直拖到地面、还压在井台之前——读出来是
+      // "绳挂在井外面"，不是"桶下到井里去了"
+      const inWell = bucketY < SURFACE_Y + 0.62;
+      const ropeBottom = Math.max(bucketY, SURFACE_Y + 0.62);
+      const ropeX = inWell ? wv.x : bucketX;
+      const rdx = ropeX - wv.x, rlen = Math.max(0.05, Math.hypot(rdx, hubY - ropeBottom));
+      winchRope.visible = true;
+      winchRope.scale.set(1, rlen, 1);
+      // 绳跟着桶歪；桶在井里看不见的时候，每一墩还是得让绳抖一下——
+      // 那是井下那一道手在画面上唯一的动静
+      winchRope.rotation.z = Math.asin(Math.max(-1, Math.min(1, rdx / rlen)))
+        + (inWell ? Math.sin(state.time * 38) * 0.035 * jolt : 0);
+      winchRope.position.set((wv.x + ropeX) / 2, (hubY + ropeBottom) / 2, PlaceZ(BAND.loose));
+      // 桶沉到井台沿以下就淡进井口那团黑里——它画在井台**之前**（loose 带），
+      // 不淡的话整只桶会浮在石头台面上往下滑，读出来是"桶在井外掉"
+      const bucket = wv.filled ? winchBucketFull : winchBucket;
+      const spare = wv.filled ? winchBucket : winchBucketFull;
+      spare.visible = false;
+      const generatedBucketMesh = winchBucket.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.wellBucket;
+      const generatedBucket = generatedSurfaceEligible
+        && generatedSurfaceStatuses.wellBucket === "ready"
+        && !!generatedBucketMesh?.material?.map
+        && generatedBucketMesh.userData.generatedBound !== false;
+      const bucketOpacity = Math.max(0, Math.min(1, (bucketY - 0.05) / 0.30));
+      bucket.visible = !generatedBucket && wv.hooked && bucketY > 0.05;
+      bucket.material.opacity = bucketOpacity;
+      bucket.material.transparent = true;
+      bucket.position.set(bucketX, bucketY, PlaceZ(BAND.loose));
+      // 二道手的题眼：空桶是**浮着的**，一墩一墩才扣过去。tip 0→1 就是扣的过程
+      bucket.rotation.z = phase === "dunk"
+        ? (wv.tip || 0) * 2.1 + Math.sin(state.time * 3.4) * 0.10 * (1 - (wv.tip || 0))
+        : (phase === "lower" ? Math.sin(state.time * 2.1) * 0.08 : sway * 0.20);
+      if (generatedBucketMesh) {
+        generatedBucketMesh.visible = generatedBucket && wv.hooked && bucketY > 0.05;
+        generatedBucketMesh.material.transparent = true;
+        generatedBucketMesh.material.opacity = bucketOpacity;
+        PlaceGeneratedPlane(generatedBucketMesh, bucketX, bucketY, PlaceZ(BAND.loose));
+        generatedBucketMesh.rotation.z = bucket.rotation.z;
+      }
+      winchBucketWater.visible = wv.filled && wv.hooked && bucketY > 0.05;
+      winchBucketWater.material.transparent = true;
+      winchBucketWater.material.opacity = bucketOpacity;
+      winchBucketWater.position.set(bucketX, bucketY, PlaceZ(BAND.loose));
+      winchBucketWater.rotation.z = bucket.rotation.z;
+      // ── 井底：只画给小窗那台相机（PIP_LAYER） ──────────────────────
+      // 主相机看不到井口以下，所以桶一沉下去，四道手里有两道半在看不见的地方
+      // 发生。小窗是第二台相机，架在近景地面带**后头**、井筒**里头**——井底
+      // 那点事于是有地方演，而且顺带把「墩桶」教会了：玩家看见空桶口朝上浮着，
+      // 就知道为什么得墩（用户 2026-08-10 出的主意）。
+      if (!wellShaft) {
+        const topPx = 8;
+        const hPx = Math.ceil((WELL_MOUTH_Y - WELL_BOTTOM_Y) * PPM) + topPx * 2;
+        const wPx = 110;
+        const waterPx = topPx + (WELL_MOUTH_Y - WELL_WATER_Y) * PPM;
+        wellShaft = BakeSprite(wPx, hPx, wPx / 2, hPx / 2, (ctx, ax, ay) => {
+          const t = ay - hPx / 2 + topPx;
+          ART.DrawWellShaft(ctx, ax, t, ay - hPx / 2 + waterPx, hPx - topPx, "wellShaft");
+        }, 0, PROP_SS);
+        // **锚点取画布正中**：这只 mesh 手动摆位（不走 userData.offset）
+        wellShaft.userData.midY = WELL_MOUTH_Y - (hPx / 2 - topPx) / PPM;
+        wellShaft.layers.set(PIP_LAYER);
+        // 排在 loose 之前一位：**要压过那张土路贴图**（它在 walk−4，画得比
+        // 背景带晚），排到 nearBack 去的话小窗里只剩一片黄土，井筒看不见
+        FixOrder(wellShaft, DepthOrder("play", BAND.loose) - 1);
+        layers.play.add(wellShaft);
+        // 井筒里那一截绳（小窗里看得见它一路放下来）
+        wellDeepRope = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.045, 1),
+          new THREE.MeshBasicMaterial({ color: 0x6f5c3d, transparent: true, opacity: 0.95, depthWrite: false }),
+        );
+        wellDeepRope.layers.set(PIP_LAYER);
+        FixOrder(wellDeepRope, DepthOrder("play", BAND.loose));
+        layers.play.add(wellDeepRope);
+        // 井筒里那只桶：跟地面上那只是同一只，只是这一只画在真实的深度上
+        const DeepBucket = (full) => {
+          const m = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+            ART.DrawCarry(ctx, ax, ay - 8, 1.5, 1, "水桶");
+            if (!full) return;
+            ctx.save();
+            ctx.fillStyle = "#131a15";
+            ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.42;
+            ctx.fillStyle = "#6b7566";
+            ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }, 0, PROP_SS);
+          m.layers.set(PIP_LAYER);
+          FixOrder(m, DepthOrder("play", BAND.loose) + 1);
+          layers.play.add(m);
+          return m;
+        };
+        wellDeepBucket = DeepBucket(false);
+        wellDeepFull = DeepBucket(true);
+        wellDeepWater = BakeSprite(50, 46, 25, 23, (ctx, ax, ay) => {
+          ctx.save();
+          ctx.fillStyle = "#131a15";
+          ctx.beginPath(); ctx.ellipse(ax, ay - 8, 9.4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.42;
+          ctx.fillStyle = "#6b7566";
+          ctx.beginPath(); ctx.ellipse(ax - 2.4, ay - 8.4, 4.6, 1.0, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }, 0, PROP_SS);
+        wellDeepWater.layers.set(PIP_LAYER);
+        FixOrder(wellDeepWater, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(wellDeepWater);
+        const deepGeneratedMaterial = new THREE.MeshBasicMaterial({
+          map: generatedSurfaceMeshes.wellBucket?.material?.map || null,
+          transparent: true, alphaTest: 0.02, depthWrite: false,
+          side: THREE.DoubleSide, toneMapped: false,
+        });
+        wellDeepGeneratedBucket = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), deepGeneratedMaterial);
+        PositionGeneratedPlane(wellDeepGeneratedBucket, GENERATED_SHARED_SURFACE_SPECS.wellBucket);
+        wellDeepGeneratedBucket.layers.set(PIP_LAYER);
+        FixOrder(wellDeepGeneratedBucket, DepthOrder("play", BAND.loose) + 1);
+        wellDeepGeneratedBucket.visible = false;
+        layers.play.add(wellDeepGeneratedBucket);
+        // 水面上荡开的一圈：桶碰水、每一墩、灌满的那一下都要有
+        wellRipple = BakeSprite(72, 22, 36, 11, (ctx, ax, ay) => {
+          ctx.strokeStyle = "rgba(178,196,176,0.8)";
+          ctx.lineWidth = 1.8;
+          for (let i = 0; i < 2; i += 1) {
+            ctx.beginPath();
+            ctx.ellipse(ax, ay, 30 - i * 11, 7 - i * 2.6, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }, 0, PROP_SS);
+        wellRipple.layers.set(PIP_LAYER);
+        FixOrder(wellRipple, DepthOrder("play", BAND.loose) + 2);
+        layers.play.add(wellRipple);
+      }
+      {
+        const deepY = wv.deepY ?? WELL_MOUTH_Y;
+        const dx = sway * 0.10;
+        wellShaft.visible = true;
+        wellShaft.position.set(wv.x, wellShaft.userData.midY, PlaceZ(BAND.walk));
+        const deep = wv.filled ? wellDeepFull : wellDeepBucket;
+        const deepSpare = wv.filled ? wellDeepBucket : wellDeepFull;
+        deepSpare.visible = false;
+        deep.visible = !generatedBucket;
+        deep.position.set(wv.x + dx, deepY + (jolt > 0 ? Math.sin(state.time * 46) * 0.03 * jolt : 0),
+          PlaceZ(BAND.loose));
+        // 二道手的题眼：**空桶是浮着的**，一墩一墩才扣过去吃水。
+        // 小窗里看得见它口朝上晃、被拽得一头栽下去——这就是「为什么要墩」
+        deep.rotation.z = phase === "dunk"
+          ? (wv.tip || 0) * 2.2 + Math.sin(state.time * 2.6) * 0.13 * (1 - (wv.tip || 0))
+          : Math.sin(state.time * 2.1) * 0.07;
+        wellDeepGeneratedBucket.material.map = generatedSurfaceMeshes.wellBucket?.material?.map || null;
+        wellDeepGeneratedBucket.material.needsUpdate = true;
+        wellDeepGeneratedBucket.visible = generatedBucket;
+        PlaceGeneratedPlane(wellDeepGeneratedBucket, wv.x + dx, deep.position.y, PlaceZ(BAND.loose));
+        wellDeepGeneratedBucket.rotation.z = deep.rotation.z;
+        wellDeepWater.visible = generatedBucket && wv.filled;
+        wellDeepWater.position.copy(deep.position);
+        wellDeepWater.rotation.z = deep.rotation.z;
+        wellDeepRope.visible = true;
+        const ropeTopY = WELL_MOUTH_Y + 0.5;
+        wellDeepRope.scale.set(1, Math.max(0.05, ropeTopY - deepY), 1);
+        wellDeepRope.position.set(wv.x + dx * 0.5, (ropeTopY + deepY) / 2, PlaceZ(BAND.loose));
+        wellDeepRope.rotation.z = jolt > 0 ? Math.sin(state.time * 38) * 0.05 * jolt : 0;
+        const rippleOn = jolt > 0.02 && (phase === "dunk" || wv.depth > 0.9);
+        wellRipple.visible = rippleOn;
+        if (rippleOn) {
+          wellRipple.position.set(wv.x, WELL_WATER_Y + 0.02, PlaceZ(BAND.loose));
+          const k = 1 - jolt;
+          wellRipple.scale.set(0.45 + k * 1.2, 0.45 + k * 0.8, 1);
+          wellRipple.material.transparent = true;
+          wellRipple.material.opacity = jolt * 0.85;
+        }
+      }
+      // 鼓上的绳盘：放出去多少就窄多少
+      const generatedCoilMesh = winchCoil.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.wellRopeDrum;
+      const generatedCoilReady = generatedSurfaceEligible
+        && generatedSurfaceStatuses.wellRopeDrum === "ready"
+        && !!generatedCoilMesh?.material?.map
+        && generatedCoilMesh.userData.generatedBound !== false;
+      winchCoil.visible = !generatedCoilReady && wv.hooked;
+      winchCoil.position.set(wv.x, hubY, PlaceZ(BAND.loose));
+      const coilScale = 0.30 + 0.70 * (1 - wv.depth);
+      winchCoil.scale.set(coilScale, 1, 1);
+      if (generatedCoilMesh) {
+        generatedCoilMesh.visible = generatedCoilReady && wv.hooked;
+        PlaceGeneratedPlane(generatedCoilMesh, wv.x, hubY, PlaceZ(BAND.loose), { scaleX: coilScale });
+        generatedCoilMesh.rotation.z = winchCoil.rotation.z;
+      }
+      const generatedCrankMesh = winchCrank.userData.generatedSurfaceMesh
+        || generatedSurfaceMeshes.wellCrankHandle;
+      const generatedCrankReady = generatedSurfaceEligible
+        && generatedSurfaceStatuses.wellCrankHandle === "ready"
+        && !!generatedCrankMesh?.material?.map
+        && generatedCrankMesh.userData.generatedBound !== false;
+      winchCrank.visible = !generatedCrankReady && wv.hooked;
+      // 摇把排在人**之前**只在真摇的时候成立（手攥在握手上，握手压住手）。
+      // 墩桶和拽桶那两道手不碰摇把，它再挡在前头就成了一根横在戏前面的木头：
+      // 那两拍把它退回绳与桶的那一档
+      winchCrank.renderOrder = (phase === "lower" || phase === "raise")
+        ? DepthOrder("play", BAND.obstacle)
+        : DepthOrder("play", BAND.loose) + 3;
+      // 手上吃劲，摇把也跟着抖一丝——判定的 crankA 不掺演出，抖只加在画面上
+      const strain = wv.hooked ? Math.max(0, 1 - (wv.stam ?? 1) / 0.5) : 0;
+      const shake = strain * 0.012 * Math.sin(state.time * 34);
+      winchCrank.position.set(wv.crankX ?? wv.x, hubY + shake, PlaceZ(BAND.loose));
+      // 歇息角：静止时摇把斜垂着，别跟横杆平行混成一根木头（角度由 Core 定，
+      // 因为 gripX/gripY 与 Rig 的反解都照着同一个数算）
+      winchCrank.rotation.z = (wv.crankA || 0) + WINCH_REST_A;
+      if (generatedCrankMesh) {
+        generatedCrankMesh.visible = generatedCrankReady && wv.hooked;
+        PlaceGeneratedPlane(generatedCrankMesh, wv.crankX ?? wv.x, hubY, PlaceZ(BAND.loose));
+        generatedCrankMesh.rotation.z = winchCrank.rotation.z;
+        generatedCrankMesh.renderOrder = winchCrank.renderOrder;
+      }
+      // 引导圈只在挂好桶、手还没搭上去时呼吸；上手了就让开画面。
+      // 半径贴着摇把画的那个圈——「手绕这儿转」得指的是真的那一圈
+      // 只在**要转转盘的那两道手**里挂：墩桶与拽桶不绕圈，那两下该看的是
+      // 绳和桶自己在晃，不是一个圈
+      const showGuide = wv.hooked && !wv.engaged && (phase === "lower" || phase === "raise");
+      winchGuide.visible = showGuide;
+      if (showGuide) {
+        const pos = winchGuide.geometry.attributes.position;
+        const R = WINCH_CRANK_R * 1.25;
+        const gx = wv.crankX ?? wv.x;
+        for (let i = 0; i < 48; i += 1) {
+          const a = (i / 47) * Math.PI * 2;
+          pos.setXYZ(i, gx + Math.cos(a) * R, hubY + Math.sin(a) * R, PlaceZ(BAND.loose));
+        }
+        pos.needsUpdate = true;
+        winchGuide.computeLineDistances();
+        winchGuide.material.opacity = 0.3 + Math.sin(state.time * 3.2) * 0.15;
+      }
+    } else if (winchRope) {
+      winchRope.visible = false;
+      winchBucket.visible = false;
+      winchBucketFull.visible = false;
+      winchBucketWater.visible = false;
+      winchCrank.visible = false;
+      winchGuide.visible = false;
+      winchCoil.visible = false;
+      for (const key of ["wellBucket", "wellRopeDrum", "wellCrankHandle"]) {
+        for (const mesh of GeneratedSurfaceList(key)) mesh.visible = false;
+      }
+      if (wellShaft) {
+        wellShaft.visible = false; wellDeepBucket.visible = false;
+        wellDeepFull.visible = false; wellDeepWater.visible = false; wellDeepGeneratedBucket.visible = false;
+        wellRipple.visible = false; wellDeepRope.visible = false;
+      }
+    }
+
+    // 拉绳定向（c1_ropeline）：一根**真的**麻绳。形状全由 Core.StepRopeLine 的
+    // verlet 质点链给（ropeLine.pts），这里只把点串成一条有宽度的带子。
+    //
+    // 为什么是 ribbon 而不是别的两种画法：THREE.Line 的 linewidth 多数平台直接
+    // 吃掉，绳永远只有一个像素（CLAUDE.md 立过这条规矩）；逐帧重画的 canvas 那
+    // 套是给打结用的——18 米长的绳按 48px/米要三千多像素宽的画布，不可能。
+    // ribbon 有真几何宽度：垂、拖地、绷直、抽回去都画得出来。
+    {
+      const rl = state.ropeLine;
+      const pts = rl?.pts;
+      if (rl && pts && pts.length > 1) {
+        const n = pts.length;
+        if (!ropeLineMesh || ropeLineMesh.userData.n !== n) {
+          if (ropeLineMesh) layers.play.remove(ropeLineMesh);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
+          const idx = [];
+          for (let i = 0; i < n - 1; i += 1) {
+            const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+            idx.push(a, b, c, b, d, c);
+          }
+          geo.setIndex(idx);
+          ropeLineMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0x8a7350, transparent: true, opacity: 0.97, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          ropeLineMesh.frustumCulled = false;   // 包围球不逐帧重算，剔除会把它整条抹掉
+          ropeLineMesh.userData.n = n;
+          FixOrder(ropeLineMesh, DepthOrder("play", BAND.loose));
+          layers.play.add(ropeLineMesh);
+        }
+        ropeLineMesh.visible = true;
+        // 绳梢接到**真拳头**上。Core 的解算只认身位（那边写了为什么：手心是姿势
+        // 的产物，拿它当绳端会绕成"绳→姿势→手心→绳"的闭环，人会被自己的胳膊
+        // 卡住），所以"长在手上"这件事在画面这一侧办：把末尾三个点朝手心挪，
+        // 越靠末端挪得越多，收出一个不打折的弯。
+        // 攥在玩家手里、或者已经交到七叔手里——两种情况都要接到**那个人的**
+        // 真拳头上。少了后一种，绳交出去之后那一头就悬在他身前半米的空气里
+        //（2026-08-10 用户报的「虚空绳头」的另一半）
+        let tip = null;
+        const tipWho = rl.inHand ? "player" : (rl.x1 !== undefined ? rl.stakeId : null);
+        if (tipWho) {
+          const ps = actorSprites.get(tipWho);
+          if (ps) {
+            const hp = HandPoint(ps.rig);
+            const last = pts[n - 1];
+            tip = { dx: hp.x - last.x, dy: hp.y - last.y };
+          }
+        }
+        // 锚点那一头同理：盘子被拎起来之后（coilLift→1）它就在小周手里了，
+        // 也得接到**他的**真拳头上——不接的话绳梢悬在他手边半米的空气里，
+        // 还是一个虚空绳头（2026-08-10 实拍抓出来的第二处）
+        let head = null;
+        const lift = rl.coilLift ?? 0;
+        if (lift > 0.02 && rl.anchorId) {
+          const as = actorSprites.get(rl.anchorId);
+          if (as) {
+            const hp = HandPoint(as.rig);
+            const first = pts[0];
+            head = { dx: (hp.x - first.x) * lift, dy: (hp.y - first.y) * lift };
+          }
+        }
+        const TIP_W = [0.22, 0.55, 1];       // 末尾三点各吃多少修正
+        const HEAD_W = [1, 0.55, 0.22];      // 头三点同理（越靠头挪得越多）
+        const draw = (i) => {
+          const q = pts[i];
+          let x = q.x, y = q.y;
+          const k = tip ? (TIP_W[i - (n - TIP_W.length)] ?? 0) : 0;
+          if (k) { x += tip.dx * k; y += tip.dy * k; }
+          const hk = head ? (HEAD_W[i] ?? 0) : 0;
+          if (hk) { x += head.dx * hk; y += head.dy * hk; }
+          return { x, y };
+        };
+        const pos = ropeLineMesh.geometry.attributes.position;
+        for (let i = 0; i < n; i += 1) {
+          const q = draw(i);
+          const a = draw(Math.max(0, i - 1)), b = draw(Math.min(n - 1, i + 1));
+          let tx = b.x - a.x, ty = b.y - a.y;
+          const tl = Math.hypot(tx, ty) || 1e-6;
+          tx /= tl; ty /= tl;
+          // 绷直的时候略细一点：麻绳吃上劲会抻细，松着堆在地上显得粗
+          const half = ROPE_HALF * (1 - 0.18 * (rl.taut || 0));
+          pos.setXYZ(i * 2, q.x - ty * half, q.y + tx * half, PlaceZ(BAND.loose));
+          pos.setXYZ(i * 2 + 1, q.x + ty * half, q.y - tx * half, PlaceZ(BAND.loose));
+        }
+        pos.needsUpdate = true;
+        // 锚点那头的绳盘：放出去多少，盘就小多少——"绳是从这儿放出来的"
+        if (!ropeCoilMesh) {
+          ropeCoilMesh = MakeGroundItemMesh("麻绳");
+          layers.play.add(ropeCoilMesh);
+          SetPlayOrder(ropeCoilMesh, BAND.loose, "ropeCoil");
+        }
+        const remain = Math.max(0, 1 - (rl.pay || 0) / (rl.L || 1));
+        // 盘子被拎起来（coilLift→1）就不再画它：那一头此刻在小周手里，
+        // 地上不该还留着一盘绳。两处读同一个数，绳头永远有着落
+        ropeCoilMesh.visible = remain > 0.02 && (rl.coilLift ?? 0) < 0.92;
+        if (ropeCoilMesh.visible) {
+          const s = 0.4 + 0.6 * remain;
+          ropeCoilMesh.scale.set(s, s, 1);
+          // 贴地锚点得跟着缩：贴图绕中心缩，偏移量不缩的话盘子会浮起来
+          const off = ropeCoilMesh.userData.offset;
+          ropeCoilMesh.position.set(rl.x0 + off.x * s, SURFACE_Y + off.y * s, PlaceZ(BAND.loose));
+        }
+      } else {
+        if (ropeLineMesh) ropeLineMesh.visible = false;
+        if (ropeCoilMesh) ropeCoilMesh.visible = false;
+      }
+    }
+
+
+    // 飞出去的石子：一维横轴上的一道小弧线
+    if (state.thrown) {
+      if (!thrownMesh) {
+        thrownMesh = BakeSprite(16, 16, 8, 8, (ctx, ax, ay) => {
+          ctx.fillStyle = "#8b857a";
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(ax, ay, 4.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }, 0, DETAIL_SS);
+        layers.fx.add(thrownMesh);
+        FixOrder(thrownMesh, LAYER_ORDER.fx + 320);
+      }
+      // 真弹道：Core 每帧积分出 (x,y)，这里只把石子摆上去——飞哪儿是瞄出来的
+      const th = state.thrown;
+      thrownMesh.visible = true;
+      thrownMesh.position.set(th.x, SURFACE_Y + th.y, 0.6);
+    } else if (thrownMesh) thrownMesh.visible = false;
+
+    // 探照灯 / 马灯光带：亮的时候一条光落在地上，节奏一目了然
+    if (state.searchlight) {
+      const sl = state.searchlight;
+      const kkey = `${sl.x0}:${sl.x1}:${sl.src ? sl.src.x : "n"}`;
+      if (!lightStrip || lightKey !== kkey) {
+        if (lightStrip) layers.fx.remove(lightStrip);
+        if (lightBeam) layers.fx.remove(lightBeam);
+        lightKey = kkey;
+        lightStrip = new THREE.Mesh(
+          new THREE.PlaneGeometry(sl.x1 - sl.x0, 1.6),
+          new THREE.MeshBasicMaterial({
+            color: 0xffe9b0, transparent: true, opacity: 0.22,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        );
+        lightStrip.position.set((sl.x0 + sl.x1) / 2, SURFACE_Y + 0.8, 0.3);
+        FixOrder(lightStrip, LAYER_ORDER.fx + 210);
+        layers.fx.add(lightStrip);
+        lightBeam = null;
+        if (sl.src) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([
+            sl.src.x, sl.src.y, 0.28,
+            sl.x0, SURFACE_Y + 0.15, 0.28,
+            sl.x1, SURFACE_Y + 0.15, 0.28,
+          ]), 3));
+          lightBeam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: 0xffe9b0, transparent: true, opacity: 0.1,
+            blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          FixOrder(lightBeam, LAYER_ORDER.fx + 205);
+          layers.fx.add(lightBeam);
+        }
+      }
+      lightStrip.visible = sl.lit;
+      if (lightBeam) lightBeam.visible = sl.lit;
+      if (sl.lit) {
+        const flick = 0.85 + Math.sin(time * 13) * 0.1;
+        lightStrip.material.opacity = 0.22 * flick;
+        if (lightBeam) lightBeam.material.opacity = 0.1 * flick;
+      }
+    } else if (lightStrip) {
+      lightStrip.visible = false;
+      if (lightBeam) lightBeam.visible = false;
+    }
+
+    // 狗叫：头顶蹦出来的"汪！"
+    if (state.dogBark) {
+      if (!barkMesh) {
+        barkMesh = BakeSprite(96, 64, 48, 54, (ctx, ax, ay) => {
+          ctx.font = "700 30px 'Noto Serif SC', serif";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#e8dcbc";
+          ctx.strokeStyle = "rgba(0,0,0,0.75)";
+          ctx.lineWidth = 5;
+          ctx.strokeText("汪！", ax, ay - 16);
+          ctx.fillText("汪！", ax, ay - 16);
+        }, 0, DETAIL_SS);
+        layers.fx.add(barkMesh);
+        FixOrder(barkMesh, LAYER_ORDER.fx + 330);
+      }
+      barkMesh.visible = Math.sin(time * 14) > -0.4;
+      barkMesh.position.set(state.dogBark.x + 0.8, SURFACE_Y + 1.9 + Math.sin(time * 7) * 0.08, 0.6);
+    } else if (barkMesh) barkMesh.visible = false;
+
+    // 链上的待拾物：**这条链里还没捡的东西全都摆在那儿**。
+    // 原来只画"当前这一步"要捡的那一件，于是院子里那两根木料一次只出现一根：
+    // 扛走第一根，第二根才凭空冒出来——连带蹲在第二根上的母鸡也蹲在空气里。
+    // 东西本来就该在那儿，是玩家还没走到而已。
+    const chainPickups = [];
+    if (def?.kind === "chain" && state.beat) {
+      const from = state.beat.stepIndex || 0;
+      for (let i = from; i < def.steps.length; i += 1) {
+        const st = def.steps[i];
+        if (st?.type === "pickup") chainPickups.push(st);
+      }
+    }
+    while (chainItemMeshes.length < chainPickups.length) chainItemMeshes.push({ mesh: null, label: null });
+    chainItemMeshes.forEach((slot, i) => {
+      const st = chainPickups[i];
+      if (!st) { if (slot.mesh) slot.mesh.visible = false; return; }
+      if (!slot.mesh || slot.label !== st.item.label) {
+        if (slot.mesh) layers.play.remove(slot.mesh);
+        slot.label = st.item.label;
+        slot.mesh = MakeGroundItemMesh(slot.label);
+        layers.play.add(slot.mesh);
+        // loose+1：待拾物与放下物挤在同一处时（木料堆上的绳头 vs 搁下的桶），
+        // 要捡的那件永远在上面
+        FixOrder(slot.mesh, DepthOrder("play", BAND.loose) + 1);
+      }
+      slot.mesh.visible = true;
+      PlaceSprite(slot.mesh, st.x, st.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
+    });
+
+    // 目标指示
+    const target = state.phase === "playing" ? GetBeatTarget(state) : null;
+    // 指路的标记在特写里没有意义——你已经站在它跟前了
+    // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
+    // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
+    const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
+      && !state.microCine && !liveCardOn && viewW >= 5.0;
+    // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
+    // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
+    // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
+    const eh = canPoint ? EdgeHint(state, camera.position.x, viewW) : null;
+    if (canPoint && !eh) {
+      if (!markerMesh) {
+        markerCanvas = MakeCanvas(48 * HINT_SS, 48 * HINT_SS);
+        markerCtx = markerCanvas.getContext("2d");
+        const tex = CanvasTexture(markerCanvas);
+        markerMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(48 / PPM, 48 / PPM),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+        );
+        FixOrder(markerMesh, LAYER_ORDER.fx + 300);
+        layers.fx.add(markerMesh);
+      }
+      markerMesh.visible = true;
+      markerCtx.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
+      markerCtx.clearRect(0, 0, 48, 48);
+      ART.DrawMarker(markerCtx, 24, 30, time);
+      const by = (target.level === "under" ? UNDER_Y : SURFACE_Y);
+      markerMesh.position.set(target.x, by + 2.5, 0.6);
+      markerMesh.material.map.needsUpdate = true;
+    } else if (markerMesh) {
+      markerMesh.visible = false;
+    }
+    UpdateEdgeHud(state, eh, viewW, time);
+  }
+
+  // 画框边缘的「下一件事」HUD（勇敢的心式）。
+  // 目标出了画框，一枚方向键说不清楚"你接下来要干嘛"——所以边上立一枚牌：
+  // 图说事（要找的人／要拿的东西／要上的手），箭头说方向。
+  const EDGE_HUD_W = 58, EDGE_HUD_H = 48;    // 牌径 = 0.8×H = 0.8m，默认机位下约一百像素
+  const EDGE_HUD_Z = 0.6;                    // 跟原来那枚人字标同一层（挡在玩法层之前）
+  function EdgeHudKey(eh) {
+    const ic = eh.icon || {};
+    return [ic.kind, ic.who || ic.item || ic.gesture || "", eh.climb || "", eh.side].join("|");
+  }
+
+  function UpdateEdgeHud(state, eh, viewW, time) {
+    if (!eh) { if (edgeHudMesh) edgeHudMesh.visible = false; return; }
+    if (!edgeHudMesh) {
+      edgeHudMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(EDGE_HUD_W / PPM, EDGE_HUD_H / PPM),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
+      );
+      FixOrder(edgeHudMesh, LAYER_ORDER.fx + 300);
+      layers.fx.add(edgeHudMesh);
+    }
+    const key = EdgeHudKey(eh);
+    if (!edgeHudTex.has(key)) {
+      const c = MakeCanvas(EDGE_HUD_W * HINT_SS, EDGE_HUD_H * HINT_SS);
+      const g = c.getContext("2d");
+      g.setTransform(HINT_SS, 0, 0, HINT_SS, 0, 0);
+      ART.DrawEdgeHud(g, EDGE_HUD_W, EDGE_HUD_H, eh.icon, { dir: eh.side, climb: eh.climb });
+      edgeHudTex.set(key, CanvasTexture(c));
+    }
+    const tex = edgeHudTex.get(key);
+    if (edgeHudMesh.material.map !== tex) {
+      edgeHudMesh.material.map = tex;
+      edgeHudMesh.material.needsUpdate = true;
+    }
+    edgeHudMesh.visible = true;
+    // 一探一探地怂：牌整个朝框外挪一点点（牌面是烘死的，动的只有网格）
+    const nudge = Math.sin(time * 3.4) * 0.055 * eh.side;
+    const py = (state.player.level === "under" ? UNDER_Y : SURFACE_Y);
+    // 牌贴在 z=EDGE_HUD_Z（比玩法层更靠近镜头），**那一层的画框比 viewW 窄一档**。
+    // 不折算的话箭头尖正好探出画框被切掉（第一版就是这么切的）。
+    const dist = camera.userData.dist || 13.2;
+    const edge = (viewW / 2) * Math.max(0.1, (dist - EDGE_HUD_Z) / dist);
+    // 箭头尖离牌心多远（版面在 ART.EDGE_HUD 里，两边不许各写一份）
+    const R = EDGE_HUD_H * ART.EDGE_HUD.rOfH;
+    const tipOut = ((ART.EDGE_HUD.cxOfR + ART.EDGE_HUD.tipOfR) * R - EDGE_HUD_W / 2) / PPM;
+    edgeHudMesh.position.set(
+      camera.position.x + eh.side * (edge - 0.25 - tipOut) + nudge,
+      py + 2.30 + Math.sin(time * 2.2) * 0.03,
+      EDGE_HUD_Z,
+    );
+  }
+
+  // 暗场：地道章节压暗，灯光晕负责照明；昼夜换挡在这儿连续推进
+  function UpdateAtmosphere(state, viewW, viewH, camX, camY, dist, dt = 1 / 60) {
+    lastBackdropState = state;
+    SyncGeneratedBackdropVisibility(state);
+    SyncGeneratedAssetVisibility(state);
+    SyncGeneratedSurfaceVisibility(state);
+    SyncGeneratedCellarVisibility(state);
+    const ch0 = CHAPTERS[state.chapterIndex];
+    const want = state.lightOverride || ch0.light;
+    if (lightShown === null) { lightShown = want; lightFrom = want; lightTo = want; }
+    if (want !== lightTo) {
+      // 新目标：从**画面现在的样子**出发（半路又换目标也接得上）
+      lightFrom = lightShown === lightTo ? lightShown : lightFrom;
+      lightTo = want;
+      lightMix = 0;
+      lightSwapped = false;
+    }
+    if (lightMix < 1) {
+      lightMix = Math.min(1, lightMix + dt / LIGHT_FADE);
+      // 走到一半（罩子最浓的那一刻）才把整村换成新档：接缝藏在这一帧里
+      if (!lightSwapped && lightMix >= 0.5) { lightShown = lightTo; lightSwapped = true; }
+    }
+    const mood = MoodAt(lightFrom, lightTo, lightMix);
+    // 换挡途中多压一档（正弦鼓包）：重烘那一帧的调色板跳变被它盖住
+    const dip = DipAt(lightMix);
+    // 呛烟时压得更暗一点
+    const choke = (state.smoke?.active && SmokeCovers(state, state.player.x)) ? 0.18 : 0;
+    // 日伪在村的那段（2026-08-10 用户："日军的出现 帮我氛围也改的昏暗 阴森一些"）：
+    // 罩子加一档、颜色朝铅灰蓝拧过去。判据是**画面里有没有敌人**，不是旗标——
+    // 队伍撤了颜色自己还回来；夜/地道那几档本来就沉，不再叠。
+    // 渐变走 1.6 秒的指数吸附，跟昼夜那条连续曲线一个脾气：进拍不跳变
+    const enemyOut = state.actors.some((a) => (a.kind === "soldier" || a.kind === "officer" || a.kind === "puppet") && a.visible !== false);
+    const gloomDay = lightShown === "dawn" || lightShown === "day" || lightShown === "dusk";
+    raidGloom += (((enemyOut && gloomDay) ? 1 : 0) - raidGloom) * Math.min(1, dt / 1.6);
+    // The baked heavy palette already carries most of the nighttime density;
+    // keep the live overlay as a restrained tint/edge cue so it does not
+    // double-compress every surface into black.
+    const base = Math.min(0.44, mood.dark * 0.72 + dip * 0.55 + raidGloom * 0.10);
+    vignetteAlpha += ((base + choke * 0.78) - vignetteAlpha) * 0.08;
+    darkMat.opacity = vignetteAlpha;
+    // 罩子是**有颜色的**：夜里泛蓝、黄昏泛橙、地道泛土黑。纯黑罩子压出来的
+    // "夜"只是把白天调暗，看着像蒙了层灰。扫荡的阴森是铅灰蓝，不是黑
+    darkMat.color.setHex(raidGloom > 0.01 ? MixHex(mood.tint, 0x1c2334, raidGloom * 0.55) : mood.tint);
+    // 暗场贴在相机前 3m，按该距离处的视口尺寸铺满
+    const planeZ = dist - 3;
+    const k = 3 / dist;
+    darkPlane.scale.set(viewW * k * 1.2, viewH * k * 1.2, 1);
+    darkPlane.position.set(camX, camY, planeZ);
+  }
+
+  // 插入特写卡：镜头真正要看的那个细节，另画一张铺满画框
+  const insertCards = new Map();
+  let insertMesh = null;
+  let insertCardName = null, insertCardT = 0;
+  // 活动插卡（每帧重画的过场卡，如太君那一镜）
+  let insertAnimCanvas = null, insertAnimTex = null, insertAnimOn = false;
+
+  // 序章的插卡改成了即梦生成的过场短片（Video/Pro_NN.mp4，一行旁白一段）。
+  // 手绘卡没删——片子还没缓冲好就先顶上去，画面永远不会空一拍。
+  const insertVideos = new Map();
+  let insertVideoList = [];
+  let insertVideoName = null;
+  let insertVideoLive = false;      // 本段片子出过第一帧没有（出过就不再退回手绘卡）
+  let insertIsVideo = false;
+
+  function GetInsertVideo(name) {
+    let v = insertVideos.get(name);
+    if (v) return v;
+    const el = document.createElement("video");
+    el.src = new URL(`./Video/${name}.mp4?v=051`, import.meta.url).href;
+    // 静音是浏览器允许自动播放的前提；这些片子烘的时候本来也去掉了音轨
+    el.muted = true;
+    el.defaultMuted = true;
+    el.playsInline = true;
+    el.preload = "auto";
+    const tex = new THREE.VideoTexture(el);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;   // 视频贴图不能开 mipmap
+    tex.generateMipmaps = false;
+    v = { el, tex };
+    insertVideos.set(name, v);
+    return v;
+  }
+
+  // 片单只用来做"下一段提前拉"，切镜时才不会黑一下
+  function SetInsertVideoList(names) {
+    insertVideoList = names || [];
+    if (insertVideoList.length) GetInsertVideo(insertVideoList[0]);
+  }
+
+  // name=手绘卡名（兜底），video=片名，lineT=这一行已经走了多久，
+  // seg=活动插卡的段号（剧本行 cam.seg，动画按 (seg, lineT) 走——完全由游戏
+  // 时钟驱动，无头实拍逐帧对得上）
+  function SetInsertCard(name, video, lineT, seg) {
+    if (!name && !video) {
+      if (insertMesh) insertMesh.visible = false;
+      if (insertVideoName) { insertVideos.get(insertVideoName)?.el.pause(); insertVideoName = null; }
+      insertCardName = null;
+      insertVideoLive = false;
+      insertIsVideo = false;
+      insertAnimOn = false;
+      return;
+    }
+    // 定格画片的慢推（Ken Burns）：换一张卡从头推，同一张卡持续累积
+    if (name !== insertCardName) { insertCardName = name; insertCardT = 0; }
+    else insertCardT += 1 / 60;
+
+    let tex = null;
+    insertIsVideo = false;
+    if (video) {
+      const v = GetInsertVideo(video);
+      if (video !== insertVideoName) {
+        if (insertVideoName) insertVideos.get(insertVideoName)?.el.pause();
+        insertVideoName = video;
+        insertVideoLive = false;
+        try { v.el.currentTime = 0; } catch { /* 还没 metadata，等就绪后由对时补上 */ }
+        v.el.play().catch(() => { /* 自动播放被拦就一直用手绘卡 */ });
+        const i = insertVideoList.indexOf(video);
+        if (i >= 0 && i + 1 < insertVideoList.length) GetInsertVideo(insertVideoList[i + 1]);
+      }
+      const el = v.el;
+      // 出过第一帧就认了，之后不再回退到手绘卡：seek 会把 readyState 打回 1，
+      // 那时候切回卡片就是card/视频来回闪——贴图里存着的仍是最后一帧，稳得很。
+      if (!insertVideoLive && el.readyState >= 2) insertVideoLive = true;
+      if (insertVideoLive) {
+        // 对时只管真跑偏（暂停、切后台、?fast=1 快进）。起播本来就比旁白慢小半秒，
+        // 死区给窄了就会每帧 seek 一次，每次 seek 都是一下卡顿。
+        const want = Math.min(lineT || 0, Math.max(0, (el.duration || 0) - 0.05));
+        if (!el.seeking && Number.isFinite(want) && Math.abs(el.currentTime - want) > 1.0) el.currentTime = want;
+        if (el.paused && !el.seeking) el.play().catch(() => {});
+        // three 的 VideoTexture 靠 video.requestVideoFrameCallback 置 needsUpdate，
+        // 而它和 rAF 一样，页面不可见时根本不触发 —— 贴图于是一次都没上传过。
+        // 本项目的画面验证（DebugShot / ShotTest / cine-audit）全是在这个状态下
+        // 手动驱动渲染的，不补这一下，序章截出来永远是兜底手绘卡，还看不出错在哪。
+        // 只在 hidden 时补：正常游玩仍走 rVFC，不做多余的每帧上传。
+        if (document.hidden) v.tex.needsUpdate = true;
+        tex = v.tex;
+        insertIsVideo = true;
+      }
+    } else if (insertVideoName) {
+      insertVideos.get(insertVideoName)?.el.pause();
+      insertVideoName = null;
+    }
+
+    // 活动插卡（INSERT_LIVE 里登记过的）：跟定格卡同一块画框，但每帧重画。
+    // 太君那一镜要的是正脸和手势——侧视骨架给不出来，只能整张卡自己动
+    insertAnimOn = false;
+    if (!tex && name && ART.INSERT_LIVE?.[name]) {
+      if (!insertAnimCanvas) {
+        insertAnimCanvas = MakeCanvas(1280, 720);
+        insertAnimTex = CanvasTexture(insertAnimCanvas);
+        insertAnimTex.generateMipmaps = false;
+        insertAnimTex.minFilter = THREE.LinearFilter;
+      }
+      const c2 = insertAnimCanvas.getContext("2d");
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, insertAnimCanvas.width, insertAnimCanvas.height);
+      ART.INSERT_LIVE[name](c2, insertAnimCanvas.width, insertAnimCanvas.height, seg || 0, lineT || 0);
+      insertAnimTex.needsUpdate = true;
+      tex = insertAnimTex;
+      insertAnimOn = true;
+    }
+    if (!tex) {
+      if (!name) { if (insertMesh) insertMesh.visible = false; return; }
+      if (!insertCards.has(name)) {
+        const W = 1280, H = 720;
+        const canvas = MakeCanvas(W, H);
+        ART.DrawInsertCard(canvas.getContext("2d"), W, H, name);
+        insertCards.set(name, CanvasTexture(canvas));
+      }
+      tex = insertCards.get(name);
+    }
+    if (!insertMesh) {
+      insertMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, toneMapped: false }),
+      );
+      insertMesh.renderOrder = ORDER_INSERT;
+      overlayScene.add(insertMesh);
+    }
+    insertMesh.material.map = tex;
+    insertMesh.material.needsUpdate = true;
+    insertMesh.visible = true;
+  }
+
+  function PlaceInsertCard(camX, camY, viewW, viewH, dist) {
+    if (!insertMesh?.visible) return;
+    const z = dist - 2;
+    const k = 2 / dist;
+    // 按画框比例铺满：宽高取大者，保证不露边
+    const cw = viewW * k, chh = viewH * k;
+    const aspect = 1280 / 720;
+    // 慢推：十秒推 6%——定格画片不是幻灯片，镜头永远在呼吸。
+    // 但片子自己已经在推/横移了，再叠一层就是两个镜头打架，只留一点点安全溢出。
+    // 活卡（划线）不推：玩家的手正按在上面，画面一动手就跟着偏。
+    // 活动插卡也不推：卡自己在横摇，再叠一层就是两个镜头打架。
+    const kb = (insertIsVideo || liveCardOn || insertAnimOn) ? 1.015 : 1.015 + Math.min(0.06, insertCardT * 0.006);
+    const w = Math.max(cw, chh * aspect) * kb;
+    insertMesh.scale.set(w, w / aspect, 1);
+    insertMesh.position.set(camX, camY, z);
+    // 屏幕 ↔ 卡面的换算：卡与画框同在 z 平面上、同一个中心，于是屏幕上
+    // 的一段比例就是卡上的一段比例，只差画框与卡的尺寸比。ScreenToCard 靠它。
+    cardFrac.w = cw / w;
+    cardFrac.h = chh / (w / aspect);
+  }
+
+  // -------------------------------------------------------------------------
+  // 活卡：和插入特写卡同一个景别、同一块铺满画框的画布，区别是它每帧重画，
+  // 而且玩家的手就按在上面（划线那一拍——攥着画面里那支石笔拖）。
+  // 复用 insertMesh 的摆位，所以"铺满画框"这件事只有一份实现。
+  // -------------------------------------------------------------------------
+  let liveCanvas = null, liveCtx = null, liveTex = null, liveCardOn = false, liveT = 0;
+  // 活卡在不在（Render 靠它决定走不走离屏虚化那条路）
+  let dofOn = false;
+  const cardFrac = { w: 1, h: 1 };
+
+  // spec = { kind: "scribe" | "plane", view, layout }。做功的那几拍都长在这张
+  // 铺满画框的活卡上，画笔按 kind 分派。
+  const LIVE_CARD_ART = {
+    scribe: ART.DrawScribeCard, plane: ART.DrawPlaneCard,
+    knot: ART.DrawKnotCard, fold: ART.DrawFoldCard, wrap: ART.DrawWrapCard,
+    split: ART.DrawSplitCard,
+  };
+
+  function SetLiveCard(spec, dt) {
+    const view = spec?.view;
+    const layout = spec?.layout;
+    const draw = LIVE_CARD_ART[spec?.kind];
+    if (!view || !layout || !draw) {
+      // 只收自己那一张：同一帧里若已经换上了定格卡/过场片，别把人家关掉
+      if (liveCardOn) {
+        liveCardOn = false;
+        dofOn = false;
+        liveT = 0;
+        if (insertMesh && insertMesh.material.map === liveTex) insertMesh.visible = false;
+      }
+      return;
+    }
+    if (!liveCanvas) {
+      // 玩家会盯着笔尖/刨口看，这张卡烘得比定格卡密一档
+      liveCanvas = MakeCanvas(1600, 900);
+      liveCtx = liveCanvas.getContext("2d");
+      liveTex = CanvasTexture(liveCanvas);
+      liveTex.generateMipmaps = false;
+      liveTex.minFilter = THREE.LinearFilter;
+    }
+    liveT += Math.min(0.05, dt || 1 / 60);
+    liveCardOn = true;
+    // 活卡的底板是透明的（做功的那一拍不许把村子换成一块色板）——
+    // 背后那层真景由 Render 的离屏虚化铺上去
+    dofOn = true;
+    insertIsVideo = false;
+    insertCardName = null;
+    liveCtx.setTransform(1, 0, 0, 1, 0, 0);
+    liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+    draw(liveCtx, liveCanvas.width, liveCanvas.height, view, layout, liveT);
+    liveTex.needsUpdate = true;
+    if (!insertMesh) {
+      insertMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+      );
+      insertMesh.renderOrder = ORDER_INSERT;
+      overlayScene.add(insertMesh);
+    }
+    insertMesh.material.map = liveTex;
+    insertMesh.material.needsUpdate = true;
+    insertMesh.visible = true;
+  }
+
+  // 屏幕坐标 → 卡面归一化坐标（u 沿卡宽、v 沿卡高，0..1；画框裁掉的部分会出界）。
+  // 攥住画面里那支笔靠它——世界坐标在这一拍没有意义，玩家按的是卡。
+  function ScreenToCard(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const sx = (clientX - rect.left) / rect.width - 0.5;
+    const sy = (clientY - rect.top) / rect.height - 0.5;
+    return { u: 0.5 + sx * cardFrac.w, v: 0.5 + sy * cardFrac.h };
+  }
+
+  // 过肩前景：把某个角色的剪影放在画面边缘（正反打用）
+  function SetOverShoulder(state, spec) {
+    if (!spec) {
+      if (otsMesh) otsMesh.visible = false;
+      otsHiddenId = null;
+      return;
+    }
+    // 被越过的那个人由前景剪影代表，本体要藏起来，否则画面里会出现两个他
+    otsHiddenId = spec.id;
+    const a = spec.id === "player" ? { kind: "player" } : state.actors.find((x) => x.id === spec.id);
+    if (!a) { if (otsMesh) otsMesh.visible = false; return; }
+    const kind = spec.id === "player" ? "player" : a.kind;
+    if (!otsMesh || otsMesh.userData.kind !== kind) {
+      if (otsMesh) layers.ots.remove(otsMesh);
+      // 专画一张高分辨率头肩剪影：全身图集放大后会糊成一根柱子
+      otsMesh = BakeSprite(560, 460, 280, 400, (ctx, ax, ay) => {
+        ART.DrawShoulder(ctx, ax, ay - 210, 1.35, kind, "ots" + kind);
+      });
+      otsMesh.userData.kind = kind;
+      otsMesh.material.opacity = 0.97;
+      layers.ots.add(otsMesh);
+    }
+    otsMesh.visible = true;
+    otsMesh.scale.set((spec.facing || 1) * 1.9, 1.9, 1);
+    otsMesh.userData.place = spec;
+  }
+
+  function PlaceOverShoulder(camX, camY, viewW, viewH) {
+    if (!otsMesh?.visible) return;
+    const spec = otsMesh.userData.place;
+    const side = spec.side || -1;
+    const comp = LAYER_COMP.ots;        // 层被整体缩放过，位置要换算回局部坐标
+    const dist = camera.userData.dist || 24;
+    const otsZ = layers.ots.position.z;
+    // 该层比玩法层离相机近，投影会放大 M 倍；构图偏移与体量都要按 M 折算
+    const M = dist / Math.max(0.5, dist - otsZ);
+    // 剪影在屏幕上应占约 72% 画宽（实拍标定：层缩放 comp 又吃掉一档，
+    // 按 0.55 反解出来上屏只有三成半，小得读不出是个人）
+    const spriteW = otsMesh.geometry.parameters.width;
+    const S = (viewW * 0.72) / (M * spriteW);
+    otsMesh.scale.set((spec.facing || 1) * S, S, 1);
+    // 头肩落在画框一侧、**肩膀压出画框下缘**，说话的人留在另一侧。
+    // 0.62 那一版把锚点摆在画框下缘之上半米——剪影整个浮在半空，脚下还露着
+    // 路面，于是它既不是前景也不是布景，读出来就是"右边一坨奇怪的椭球"
+    //（用户 2026-08-09 原话）。过肩前景的定义就是**被画框切掉**：切掉了，
+    // 大脑才把它读成"贴着镜头的那个人"。0.95 让肩线落到下缘略外侧。
+    const worldX = camX + side * (viewW / 2) * 0.58 / M;
+    const worldY = camY - (viewH / 2) * 0.95 / M + otsMesh.userData.offset.y * S;
+    otsMesh.position.set(worldX / comp, worldY / comp, 0);
+  }
+
+  // -------------------------------------------------------------------------
+  let viewW = 20, viewH = 11.25;
+
+  function ApplyCamera(camX, camY, halfWidth) {
+    const aspect = camera.userData.aspect || 16 / 9;
+    // 由目标景别反推机位距离：视差与地面退缩随之自然发生
+    const dist = halfWidth / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
+    viewW = halfWidth * 2;
+    viewH = viewW / aspect;
+    camera.aspect = aspect;
+    camera.position.set(camX, camY, dist);
+    camera.lookAt(camX, camY, 0);   // 永远正视，不旋转
+    camera.updateProjectionMatrix();
+    camera.userData.dist = dist;
+
+    // 特写时机位很近（hw=2.2 → dist≈4.6m），固定 z 的前景层与过肩层会跑到
+    // 相机背后直接消失。把这两层的深度改成随机位距离浮动，始终在相机与
+    // 玩法层之间，正反打的过肩剪影才不会丢。
+    const otsZ = Math.min(12, dist * 0.5);
+    LAYER_COMP.ots = (D_REF - otsZ) / D_REF;
+    layers.ots.position.z = otsZ;
+    layers.ots.scale.setScalar(LAYER_COMP.ots);
+    // 前景只服务于**地表**中远景。两个条件缺一不可：
+    //  · dist > 7：特写/插入/过肩本来就不该有枝叶糊在镜头前；
+    //  · camY > SURFACE_Y：fore 层的东西都按地表地平线摆位，镜头一沉进地窖/
+    //    地道，那批贴图就正对着画框中央（2026-08-10 用户报的"两根白白的模糊
+    //    一坨"）。地下不存在草丛篱笆，这一层在地下永远该是空的。
+    layers.fore.visible = dist > 7 && camY > SURFACE_Y;
+    SyncGeneratedBackdropVisibility(lastBackdropState);
+    SyncGeneratedAssetVisibility(lastBackdropState);
+    SyncGeneratedSurfaceVisibility(lastBackdropState);
+    SyncGeneratedCellarVisibility(lastBackdropState);
+    PlaceOverShoulder(camX, camY, viewW, viewH);
+    PlaceInsertCard(camX, camY, viewW, viewH, dist);
+    return { viewW, viewH, dist };
+  }
+
+  let rendererCssW = 0, rendererCssH = 0;
+  function Resize(width, height) {
+    renderer.setSize(width, height, false);
+    camera.userData.aspect = width / height;
+    rendererCssW = width;
+    rendererCssH = height;
+  }
+
+  // -------------------------------------------------------------------------
+  // 特写卡背后的景深虚化
+  //
+  // 做功那几拍（刨料/划线/接绳）是一张铺满画框的活卡。老版这张卡自带一块
+  // 不透明底板（Art 的 CardBase），于是镜头一推近，整个村子就没了——
+  // 用户 2026-08-10 的原话：「搞的像在玩一个独立的游戏一样，为了沉浸感你
+  // 大可以远景做DOF嘛，但你搞了个纯色背景算什么」。
+  //
+  // 现在：世界照常渲，只是渲进一张离屏靶，糊开之后铺回画面当背景，
+  // 卡（底板已抠成透明）再画在上面。于是「推近」是真的推近——院子、房子、
+  // 手边干活的人还在那儿，只是散焦了。
+  //
+  // 便宜的散焦怎么来：先降采样到 ~30%（线性放大本身就是一层糊），再横竖
+  // 各来一遍 9 抽头高斯。两次全屏四边形，分辨率只有三成，代价可以忽略。
+  // -------------------------------------------------------------------------
+  const DOF_SCALE = 0.40;      // 离屏靶相对画布的边长比
+  const DOF_RADIUS = 1.8;      // 高斯抽头间距（离屏靶像素）
+  // 背景板**不是玩法机位的截图**（2026-08-10 用户：「你不能直接拍现成的游戏
+  // 截图……把当前物体之前的东西都隐藏吧，然后背景的FOV要搞大点，不然哪里像是
+  // 一个低FOV聚焦在前景上的样子」）。活卡是一颗怼在活儿跟前的长焦头，它背后
+  // 的世界就得按长焦的读法来，两件事各管一半：
+  //   · DOF_ZOOM——背景用收窄一档的相机重拍：远景放大、透视压缩，贴机头那半屏
+  //     地平线以下的土也顺势被推出画框。上限卡在 1.5：c1_plane 的机位（x40.2
+  //     hw4.6）是按"爹、扫院的娘、房子都在画里"选的，娘在 x37.2——再窄她就出画了。
+  //   · DOF_NEAR_CUT——机位与主体之间的近景整个藏掉（obstacle/clutter 那几档
+  //     矮掩体、过肩剪影）：特写是绕到活儿跟前拍的，镜头前不该还隔着半人高的
+  //     草垛。地道剖面近侧那刀土除外（userData.dofKeep）——藏了它，脚底下的
+  //     地道就在背景板里剧透了。
+  const DOF_ZOOM = 1.5;
+  const DOF_NEAR_CUT = 0.85;   // 演员(0.6)/loose(0.3)/walk(0) 留下，obstacle(0.95) 起藏
+  let dofCam = null;
+  let dofA = null, dofB = null, dofQuadScene = null, dofQuadCam = null, dofQuad = null;
+  let dofW = 0, dofH = 0;
+  const DOF_SHADER = {
+    uniforms: {
+      uTex: { value: null },
+      uStep: { value: new THREE.Vector2(0, 0) },
+      // 背景压一档、往暖里偏一点：清楚的活儿在前景，背景不跟它抢
+      uDim: { value: 1 },
+      uTint: { value: new THREE.Color(1, 1, 1) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: `
+      uniform sampler2D uTex;
+      uniform vec2 uStep;
+      uniform float uDim;
+      uniform vec3 uTint;
+      varying vec2 vUv;
+      void main() {
+        // 9 抽头高斯（权重和为 1）
+        float w[5];
+        w[0] = 0.2270; w[1] = 0.1945; w[2] = 0.1216; w[3] = 0.0540; w[4] = 0.0162;
+        vec3 c = texture2D(uTex, vUv).rgb * w[0];
+        for (int i = 1; i < 5; i++) {
+          vec2 o = uStep * float(i);
+          c += texture2D(uTex, vUv + o).rgb * w[i];
+          c += texture2D(uTex, vUv - o).rgb * w[i];
+        }
+        // 散焦的地方也该失一点色（镜头虚化本来就把细节连同饱和度一起抹平）；
+        // 但**对比要往回提一点**——这套画本来就淡，再糊一遍院子里那几样东西
+        // 就全化进天色里了，"后面还有个村子"就又说不出来
+        float g = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(c, vec3(g), 0.14);
+        c = (c - 0.5) * 1.16 + 0.5;
+        c = clamp(c, 0.0, 1.0) * uTint * uDim;
+        gl_FragColor = vec4(c, 1.0);
+      }
+    `,
+  };
+
+  function EnsureDof() {
+    const w = Math.max(8, Math.round(rendererCssW * renderer.getPixelRatio() * DOF_SCALE));
+    const h = Math.max(8, Math.round(rendererCssH * renderer.getPixelRatio() * DOF_SCALE));
+    if (dofA && w === dofW && h === dofH) return true;
+    dofW = w; dofH = h;
+    const mk = () => new THREE.WebGLRenderTarget(w, h, {
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      depthBuffer: true, stencilBuffer: false,
+      colorSpace: THREE.SRGBColorSpace,
+    });
+    if (dofA) dofA.dispose();
+    if (dofB) dofB.dispose();
+    dofA = mk();
+    dofB = mk();
+    if (!dofQuad) {
+      dofQuadScene = new THREE.Scene();
+      dofQuadCam = new THREE.Camera();
+      dofQuad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: THREE.UniformsUtils.clone(DOF_SHADER.uniforms),
+          vertexShader: DOF_SHADER.vertexShader,
+          fragmentShader: DOF_SHADER.fragmentShader,
+          depthTest: false, depthWrite: false,
+        }),
+      );
+      dofQuad.frustumCulled = false;
+      dofQuadScene.add(dofQuad);
+    }
+    return true;
+  }
+
+  // 卡永远画在世界之后（它本来就是 depthTest 关、renderOrder 顶格的一张覆盖画）
+  function RenderOverlay() {
+    if (!insertMesh?.visible) return;
+    const prev = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.render(overlayScene, camera);
+    renderer.autoClear = prev;
+  }
+
+  function Render() {
+    // 没有活卡：照老路一遍渲完，一分钱不多花
+    if (!dofOn || !insertMesh?.visible || !rendererCssW || !EnsureDof()) {
+      renderer.render(scene, camera);
+      RenderOverlay();
+      return;
+    }
+    const u = dofQuad.material.uniforms;
+    // ① 世界渲进离屏靶（卡自己先让开——它是要画在糊过的背景之上的）。
+    //    用长焦相机、藏掉主体跟前的近景重拍一遍：见 DOF_ZOOM / DOF_NEAR_CUT
+    insertMesh.visible = false;
+    if (!dofCam) dofCam = new THREE.PerspectiveCamera(FOV, camera.aspect, 0.5, 400);
+    dofCam.aspect = camera.aspect;
+    dofCam.zoom = DOF_ZOOM;
+    dofCam.position.copy(camera.position);
+    dofCam.quaternion.copy(camera.quaternion);
+    dofCam.updateProjectionMatrix();
+    const dofHidden = [];
+    for (const o of layers.play.children) {
+      if (o.visible && o.position.z > DOF_NEAR_CUT && !o.userData.dofKeep) {
+        o.visible = false;
+        dofHidden.push(o);
+      }
+    }
+    if (otsMesh?.visible) { otsMesh.visible = false; dofHidden.push(otsMesh); }
+    const prevTarget = renderer.getRenderTarget();
+    renderer.setRenderTarget(dofA);
+    renderer.clear();
+    renderer.render(scene, dofCam);
+    for (const o of dofHidden) o.visible = true;
+    // ② 横向糊一遍 A→B
+    u.uTex.value = dofA.texture;
+    u.uStep.value.set(DOF_RADIUS / dofW, 0);
+    u.uDim.value = 1;
+    u.uTint.value.setRGB(1, 1, 1);
+    renderer.setRenderTarget(dofB);
+    renderer.clear();
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ③ 竖向糊一遍 B→画面，顺手压暗压暖
+    u.uTex.value = dofB.texture;
+    u.uStep.value.set(0, DOF_RADIUS / dofH);
+    u.uDim.value = 0.86;
+    u.uTint.value.setRGB(1.04, 1.0, 0.94);
+    renderer.setRenderTarget(prevTarget);
+    renderer.render(dofQuadScene, dofQuadCam);
+    // ④ 卡画在上面（autoClear 关掉，别把刚铺好的背景冲了）
+    insertMesh.visible = true;
+    RenderOverlay();
+  }
+
+  // -------------------------------------------------------------------------
+  // 后果小窗（勇敢的心式画中画）：主画面渲染完后，用第二台相机把同一个世界
+  // 的另一处再画进角落的一块剪裁区。视差层都锚在世界坐标上，第二台相机
+  // 看过去透视自然成立，不用为它做任何搬动。
+  // -------------------------------------------------------------------------
+  const pipCamera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 400);
+  pipCamera.layers.enable(PIP_LAYER);   // 小窗多看一层：井筒剖面只画给它
+  let pipShot = null;
+  function SetPip(spec) { pipShot = spec; }
+
+  // rect：小窗在画布上的位置（CSS 像素，左上原点）——与 DOM 相框的内窗对齐
+  function RenderPip(rect) {
+    if (!pipShot || !rect || rect.w < 8 || rect.h < 8 || !rendererCssW) return;
+    const aspect = rect.w / rect.h;
+    const dist = pipShot.hw / (Math.tan((FOV * Math.PI / 180) / 2) * aspect);
+    pipCamera.aspect = aspect;
+    pipCamera.position.set(pipShot.x, pipShot.y, dist);
+    pipCamera.lookAt(pipShot.x, pipShot.y, 0);
+    pipCamera.updateProjectionMatrix();
+    const yUp = rendererCssH - rect.y - rect.h;   // WebGL 视口原点在左下
+    renderer.setScissorTest(true);
+    renderer.setScissor(rect.x, yUp, rect.w, rect.h);
+    renderer.setViewport(rect.x, yUp, rect.w, rect.h);
+    renderer.render(scene, pipCamera);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, rendererCssW, rendererCssH);
+  }
+
+  // 屏幕坐标 → 玩法层（z=0 平面）的世界坐标。沉浸式手势（打结绕圈、
+  // 拖绳）要知道手真的搭在画面里的哪个位置，不只是位移量
+  function ScreenToWorld(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((clientY - rect.top) / rect.height) * 2 + 1;
+    const v = new THREE.Vector3(nx, ny, 0.5).unproject(camera);
+    const dir = v.sub(camera.position).normalize();
+    if (Math.abs(dir.z) < 1e-6) return null;
+    const t = (0 - camera.position.z) / dir.z;
+    return { x: camera.position.x + dir.x * t, y: camera.position.y + dir.y * t };
+  }
+
+  return {
+    THREE, renderer, scene, camera,
+    BuildEnvironment, UpdateActors, UpdateProps, UpdateAtmosphere,
+    SetOverShoulder, SetInsertCard, SetInsertVideoList, SetLiveCard, ApplyCamera, Resize, Render,
+    SetPip, RenderPip, ScreenToWorld, ScreenToCard,
+    // 卡面↔画框的尺寸比（测试要把卡上的坐标换回屏幕像素去点）
+    __cardFrac: () => ({ ...cardFrac }),
+    // 过场短片在放没放，截图上看不出来（兜底手绘卡长得也像回事）——只能问它
+    __insertVideo() {
+      if (!insertVideoName) return null;
+      const el = insertVideos.get(insertVideoName)?.el;
+      return {
+        name: insertVideoName, live: insertIsVideo, readyState: el?.readyState ?? -1,
+        paused: el?.paused ?? true, t: +(el?.currentTime ?? 0).toFixed(2), d: el?.duration || 0,
+      };
+    },
+    // 背景乡亲动没动，截图上不好逐帧比——问它
+    __folk: () => backdropFolk.map((f) => ({
+      x: +f.x.toFixed(2), act: f.track || (f.shoulder ? "haul" : "walk"),
+      t: +f.trackT.toFixed(2), phase: +f.phase.toFixed(2), layer: f.layerKey,
+    })),
+    get __generatedBackdrop() {
+      return {
+        status: generatedBackdropStatus,
+        eligible: generatedBackdropEligible,
+        visible: !!generatedBackdropMesh?.visible,
+        url: TEXTURE_BACKGROUND_DAWN_FIELDS_URL,
+      };
+    },
+    get __generatedAssets() {
+      const assets = {};
+      for (const [key, mesh] of Object.entries(generatedAssetMeshes)) {
+        const spec = GENERATED_SCENE_ONE_SPECS[key];
+        const fallbacks = generatedSceneOneFallbacks.get(key) || [];
+        const instances = mesh ? [mesh] : [];
+        assets[key] = {
+          status: generatedAssetStatuses[key],
+          eligible: generatedAssetEligible,
+          visible: instances.some((entry) => entry.visible),
+          url: spec.url,
+          sourceDimensions: mesh?.userData.sourceDimensions || { width: 1536, height: 1536 },
+          targetDimensions: mesh?.userData.targetDimensions || spec.target,
+          anchor: mesh?.userData.anchor || { x: spec.target.x, y: spec.target.groundY, z: 0 },
+          fallbackVisible: fallbacks.some((fallback) => fallback.visible),
+          instanceCount: instances.length,
+          visibleCount: instances.filter((entry) => entry.visible).length,
+          fallbackVisibleCount: fallbacks.filter((fallback) => fallback.visible).length,
+        };
+      }
+      return assets;
+    },
+    get __generatedSurfaceAssets() {
+      const assets = {};
+      for (const [key, mesh] of Object.entries(generatedSurfaceMeshes)) {
+        const spec = GENERATED_SHARED_SURFACE_SPECS[key];
+        const instances = GeneratedSurfaceList(key);
+        const fallbacks = generatedSurfaceFallbacks.get(key) || [];
+        assets[key] = {
+          status: generatedSurfaceStatuses[key],
+          eligible: generatedSurfaceEligible,
+          visible: instances.some((entry) => entry.visible),
+          url: spec.url,
+          sourceDimensions: mesh?.userData.sourceDimensions || { width: 1536, height: 1536 },
+          targetDimensions: mesh?.userData.targetDimensions || spec.target,
+          anchor: mesh?.userData.anchor || { x: spec.target.x, y: spec.target.groundY, z: 0 },
+          fallbackVisible: fallbacks.some((fallback) => fallback.visible),
+          instanceCount: instances.length,
+          visibleCount: instances.filter((entry) => entry.visible).length,
+          fallbackVisibleCount: fallbacks.filter((fallback) => fallback.visible).length,
+        };
+      }
+      return assets;
+    },
+    get __generatedCellarAssets() {
+      const assets = {};
+      for (const [key, meshes] of Object.entries(generatedCellarMeshes)) {
+        const mesh = meshes[0];
+        const spec = GENERATED_CELLAR_SPECS.find((entry) => entry.key === key);
+        const fallbackMeshes = generatedPropFallbacks.get(key) || [];
+        const target = mesh?.userData.targetDimensions || spec?.target || { x: 0, groundY: 0, width: 0, height: 0 };
+        const anchor = mesh?.userData.anchor
+          || { x: spec?.target?.x || 0, y: spec?.target?.groundY || 0, z: 0 };
+        assets[key] = {
+          status: generatedCellarStatuses[key],
+          eligible: generatedCellarEligible,
+          visible: meshes.some((entry) => entry.visible),
+          url: mesh?.userData.generatedAsset || spec?.url || "",
+          sourceDimensions: mesh?.userData.sourceDimensions || { width: 1536, height: 1536 },
+          targetDimensions: target,
+          anchor,
+          fallbackVisible: fallbackMeshes.some((fallback) => fallback.visible),
+          instanceCount: meshes.length,
+          visibleCount: meshes.filter((entry) => entry.visible).length,
+          fallbackVisibleCount: fallbackMeshes.filter((fallback) => fallback.visible).length,
+        };
+      }
+      return assets;
+    },
+    get __fluid() { return fluid; },
+    // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
+    debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
+    DepthViolations,
+    // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
+    // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
+    PlayerLimbTips: () => {
+      const ps = actorSprites.get("player");
+      if (!ps?.rig || ps.ground === undefined) return null;
+      const ground = ps.ground;
+      const tips = LimbTips(ps.rig);
+      const out = {};
+      for (const k of Object.keys(tips)) out[k] = +(tips[k].y - ground).toFixed(3);
+      return out;
+    },
+    get viewSize() { return { w: viewW, h: viewH }; },
+  };
+}

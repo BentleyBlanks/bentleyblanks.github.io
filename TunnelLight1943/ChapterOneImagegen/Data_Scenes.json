@@ -1,0 +1,1741 @@
+{
+  "_readme": [
+    "场景布局的唯一事实来源：每个场景物体的坐标、尺寸、层、旗标门都在这里。",
+    "贴图与深度（z）不在本文件——它们按 kind 查 Data_PropArt.json；两份一起构成",
+    "「一个物体长什么样、站在哪、埋多深」的完整描述。加载与校验走 Data_Scenes.mjs。",
+    "",
+    "坐标系：x = 横轴（米，向东为正）；level = surface(地表 y=0) / under(地道 y=-3.6)；",
+    "w/h = 米。物体的贴图底边永远踩在所在层的地平线上，y 不在这里配（见深度规范）。",
+    "",
+    "改这个文件不用碰代码。新增 kind 必须同时在 Data_PropArt.json 登记，否则加载即报错。",
+    "校验/查看：node TunnelLight1943/Script_SceneAudit.mjs"
+  ],
+  "scenes": {
+    "village": {
+      "label": "村庄地面（第一/二/八章）",
+      "_nameNote": "村名待定：CHAPTERS 里写的是「梁家村」，tunnelVillage 那边沿用了「沙河庄」——两处对不上，定稿前需统一",
+      "length": 190,
+      "walk": {
+        "surface": [
+          4,
+          186
+        ],
+        "under": [
+          26.0,
+          54.5
+        ]
+      },
+      "_walkNote": "under = 自家地窖，不是地道",
+      "shafts": [
+        {
+          "id": "cellarHatch",
+          "x": 29.0,
+          "name": "梁家地窖口（在屋里）"
+        },
+        {
+          "id": "qishuHatch",
+          "x": 52.6,
+          "name": "七叔家窖口"
+        }
+      ],
+      "_propsNote": "interior 的那间是柱子家：门开在东墙（x≈34），刻身高线的门框就是它——露天立一个门框不成话",
+      "props": [
+        {
+          "id": "oldDoors",
+          "kind": "oldDoors",
+          "x": 10.7,
+          "name": "旧门板",
+          "note": "拆下来的两块旧门板斜靠在棚里还立着的东半边——烧塌的西半边（焦椽、灰堆、埋瓦罐的烧土）得露出来给人看"
+        },
+        {
+          "id": "shed",
+          "kind": "shed",
+          "x": 9,
+          "w": 6,
+          "name": "自家牲口棚",
+          "note": "扫荡那天烧塌了半边。牲口早被牵走，红薯干的瓦罐埋在墙根烧土底下——第一章「找吃的」翻的就是它"
+        },
+        {
+          "id": "henProp",
+          "kind": "hen",
+          "x": 11.3,
+          "perch": true,
+          "name": "母鸡",
+          "hideFlag": "henFlew",
+          "note": "蹲在牲口棚食槽上的母鸡——扫荡那天就没了（henFlew 常立，只在旧存档兜底）"
+        },
+        {
+          "id": "veggieWest",
+          "kind": "crops",
+          "x": 13.6,
+          "w": 5,
+          "veggie": true,
+          "name": "菜畦",
+          "note": "娘的活计：柱子跑腿时爹在锯木头、娘在这儿锄地——家里没有站着围观的人。veggie=贴地叶簇画法：春天的菜畦是低矮的秧苗，不是齐腰的秆子"
+        },
+        {
+          "id": "cartShafts",
+          "kind": "cartShafts",
+          "x": 15.6,
+          "name": "空车辕",
+          "note": "牲口被牵走后剩下的一副车辕——日伪统治的痕迹之一（新剧本第四场）"
+        },
+        {
+          "id": "millWest",
+          "kind": "millstone",
+          "x": 18.4,
+          "name": "磨盘"
+        },
+        {
+          "id": "barrow",
+          "kind": "barrow",
+          "x": 19.8,
+          "name": "独轮车",
+          "note": "村里几户合用的独轮木车，停在磨盘旁；实际网格由 UpdateProps 动态摆"
+        },
+        {
+          "id": "treeHome",
+          "kind": "tree",
+          "x": 21.5,
+          "name": "枣树"
+        },
+        {
+          "id": "spinWheel",
+          "kind": "spinWheelBroken",
+          "x": 24.9,
+          "name": "踩碎的纺车",
+          "note": "娘的纺车，扫荡那天被踩碎在屋山墙外。纯布景无交互（2026-08-13 用户两轮退回：先撤过场改手记，再连手记也砍——离弹孔墙太近，第一句话没站稳就被顶掉）"
+        },
+        {
+          "id": "noticeWall",
+          "kind": "wallNotice",
+          "x": 23.3,
+          "w": 2.6,
+          "name": "贴告示的土墙",
+          "note": "征粮征夫的告示一层压一层；扫荡留下的一排弹孔也在这面墙上（scars，剧本新生§1：看到，但什么都没说）",
+          "scars": true
+        },
+        {
+          "id": "homeHouse",
+          "kind": "house",
+          "x": 30,
+          "w": 8.0,
+          "h": 2.4,
+          "name": "柱子家",
+          "burnable": true,
+          "interior": true
+        },
+        {
+          "id": "stool",
+          "kind": "stool",
+          "x": 32,
+          "name": "旧木凳"
+        },
+        {
+          "id": "beddingMat",
+          "kind": "beddingMat",
+          "x": 31.15,
+          "name": "妹妹的铺盖",
+          "note": "屋里靠西：开场「还睡着」、黄昏「放平掖好被角」两镜都睡在这上头（interior 陈设）"
+        },
+        {
+          "id": "mendedJacket",
+          "kind": "mendedJacket",
+          "x": 31.95,
+          "showFlag": "mended",
+          "name": "枕头边的小褂子",
+          "note": "缝·改的收梢：袖口接了一截蓝底白花的小褂子，天亮前放在妹妹枕头边（枕头在朝东那头——睡姿躺倒后头落在朝向反侧，mended 立旗才现）"
+        },
+        {
+          "id": "mealBowls",
+          "kind": "mealBowls",
+          "x": 32.75,
+          "name": "凳边的两只碗",
+          "note": "黄昏·匀稠的两下手对着它们做：一只漂着榆钱、一只喝空斜倚。常设 interior 陈设（穷家的碗本来就搁在灶边地上）"
+        },
+        {
+          "id": "yardStool",
+          "kind": "stool",
+          "x": 35.9,
+          "name": "院里的小板凳"
+        },
+        {
+          "id": "doorframe",
+          "kind": "doorframe",
+          "x": 34,
+          "name": "门框"
+        },
+        {
+          "id": "cellarVat",
+          "kind": "vat",
+          "x": 28.3,
+          "level": "under",
+          "name": "腌菜缸",
+          "note": "从 27.4 挪到 28.3：西角腾给草苫堆与伤员（救人那几镜的手要落在人身上，不是缸上——首轮视觉审查抓的）"
+        },
+        {
+          "id": "cellarVatB",
+          "kind": "vat",
+          "x": 28.6,
+          "level": "under",
+          "name": "腌菜缸"
+        },
+        {
+          "id": "stoveHome",
+          "kind": "stove",
+          "x": 27.4,
+          "name": "灶台",
+          "note": "开场第一眼：灶是冷的。摆屋里西墙根（interior 区），与窖口(29)、木凳(32)错开"
+        },
+        {
+          "id": "cellarMouth",
+          "kind": "hatch",
+          "x": 29.0,
+          "name": "地窖口",
+          "note": "**必须落在屋子足迹内**（柱子家 26~34，所以取 29）。落在足迹外就成了「敞在院子里的一个洞」——2026-08-09 摆在 37 时被退回过。落在足迹内之后画法不用管：窖口/梯子在 loose(0.3) 带、屋子立面在 facade(0.4) 带，墙合着时地面以上那一截自然被墙挡住、地下那截照常露着，读出来就是「地窖在屋子底下」。别再给它加隐现——那会把地下那截也灭掉，玩家在院里就找不着自家窖口了（2026-08-10 退回）"
+        },
+        {
+          "id": "cellarRoom",
+          "kind": "chamber",
+          "x": 30.5,
+          "w": 8.4,
+          "name": "地窖",
+          "note": "自家地窖是**直得起腰**的：玩法侧早就按站立算（MovePlayer 的 inTunnel 不含 village），美术侧却拿地道的猫腰净高去掏土层剖面，于是近侧那张 z=2.2 的剖面把站在窖里的人整个盖住。登记成 chamber，TunnelPosture 与 AddUnderground 就都按站立掏了"
+        },
+        {
+          "id": "workbench",
+          "kind": "bench",
+          "x": 40.5,
+          "name": "工作台"
+        },
+        {
+          "id": "cellarTubers",
+          "kind": "tuberPile",
+          "x": 32.6,
+          "level": "under",
+          "name": "红薯堆"
+        },
+        {
+          "id": "graveDirt",
+          "kind": "freshDirt",
+          "x": 27.1,
+          "w": 1.6,
+          "level": "under",
+          "showFlag": "clothesBuried",
+          "name": "窖底新填的土",
+          "note": "埋下那件衣裳之后才有——第一章夜里的活，留在地上的样子"
+        },
+        {
+          "id": "clothBundle",
+          "kind": "clothBundle",
+          "x": 27.0,
+          "level": "under",
+          "hideFlag": "clothesBuried",
+          "name": "角落里的包袱",
+          "note": "草草塞在窖角草苫下的带血衣裳，挨着西头的腌菜缸——第一章夜里的特写；埋进窖底后由新土(graveDirt)接替。"
+        },
+        {
+          "id": "strawMat",
+          "kind": "strawMat",
+          "x": 27.3,
+          "level": "under",
+          "name": "窖角的草苫堆",
+          "note": "第七稿：夜里那块整布抽出来的地方，也是伤员藏身的地方——那只手就从这堆草底下伸出来。**窖腔画出来的内壁到 27.2 才展开**，再往西就埋进剖面的墙弧里"
+        },
+        {
+          "id": "strawArm",
+          "kind": "strawArm",
+          "x": 27.7,
+          "level": "under",
+          "showFlag": "manGrab",
+          "name": "草堆底下伸出来的手",
+          "note": "抓住手腕那一镜的静帧：manGrab 立起才现（c1_cellar 抓腕效果落旗），c1_rescue 第一行收走（换成真演员躺着）"
+        },
+        {
+          "id": "cellarSundries",
+          "kind": "cellarSundries",
+          "x": 33.3,
+          "level": "under",
+          "hideFlag": "cellarTidy",
+          "name": "散着的家什",
+          "note": "破笸箩歪着、豁口碗一只倒扣、纺锭拖着线头——摸黑归置前的样子（三下手做完由 cellarTidy 换成摆正的那份）"
+        },
+        {
+          "id": "cellarSundriesTidy",
+          "kind": "cellarSundriesTidy",
+          "x": 33.3,
+          "level": "under",
+          "showFlag": "cellarTidy",
+          "name": "归置好的家什",
+          "note": "笸箩靠墙摆正、碗摞成摞、纺锭线绕紧搁在碗旁——玩家亲手归置出来的样子"
+        },
+        {
+          "id": "sewBasket",
+          "kind": "sewBasket",
+          "x": 32.2,
+          "level": "under",
+          "hideFlag": "basketMoved",
+          "name": "针线笸箩",
+          "note": "妹妹穿小了的旧褂子一件摞一件叠得整整齐齐，针别在最上面那件的领口上——缝·改要用的针线都在这儿"
+        },
+        {
+          "id": "sewBasketLadder",
+          "kind": "sewBasket",
+          "x": 29.8,
+          "level": "under",
+          "showFlag": "basketMoved",
+          "name": "梯子底下的针线笸箩",
+          "note": "他把手在那叠衣裳上放了一会，然后把笸箩拎起来搁到梯子底下（basketMoved）——天亮缝袖口时伸手就够得着"
+        },
+        {
+          "id": "cellarShelf",
+          "kind": "cellarShelf",
+          "x": 33.9,
+          "level": "under",
+          "name": "搁板",
+          "note": "地窖陈设靠墙根摆，梯子口（29）脚下留空——躲扫荡那一幕一家人要挤在这儿"
+        },
+        {
+          "id": "yardVat",
+          "kind": "vat",
+          "x": 43.4,
+          "name": "院里的水缸"
+        },
+        {
+          "id": "pigpen",
+          "kind": "pigpen",
+          "x": 44.9,
+          "name": "猪圈",
+          "note": "猪早卖了换粮，圈还在——挖通道的新土分散到这儿"
+        },
+        {
+          "id": "dirtPigpen",
+          "kind": "freshDirt",
+          "x": 44.9,
+          "w": 3.1,
+          "showFlag": "dirtPigpen",
+          "name": "猪圈里垫的新土",
+          "note": "倒完那一筐才出现（c1_dig）。土真的落到了地上，这一层是它的去处"
+        },
+        {
+          "id": "dirtRoad",
+          "kind": "freshDirt",
+          "x": 48.0,
+          "w": 2.0,
+          "showFlag": "dirtRoad",
+          "name": "院路洼处垫的新土",
+          "note": "同上第二筐。两处都只敢薄薄一层——摊得开才不显眼。x 从 47.2 挪到 48.0 是为了让开 46.8 的柴堆（体检报过穿插），洼处本来就在柴堆过去一点"
+        },
+        {
+          "id": "courtWall",
+          "kind": "yardWall",
+          "x": 45.9,
+          "w": 2.8,
+          "name": "自家院墙",
+          "note": "院门口 zone(47) 正对柴门——「院门口」从此有门可指"
+        },
+        {
+          "id": "yardWood",
+          "kind": "woodpile",
+          "x": 46.8,
+          "name": "柴堆"
+        },
+        {
+          "id": "nook",
+          "kind": "nook",
+          "x": 47.6,
+          "level": "under",
+          "name": "藏口",
+          "note": "七叔家窖西壁挖的浅坑，配一块覆土板——种子粮藏进去（grainHidden 收粮袋、nookClosed 上板，propRedraw 单张重烘）"
+        },
+        {
+          "id": "braceA",
+          "kind": "tunnelBrace",
+          "x": 43.5,
+          "level": "under",
+          "showFlag": "bracedA",
+          "name": "松土段顶木（西）",
+          "note": "第八场玩家亲手支上去的第一块旧门板。支之前这儿什么也没有——旗标立起来才现（flagProps 切 visible，不进 builtKey）"
+        },
+        {
+          "id": "braceB",
+          "kind": "tunnelBrace",
+          "x": 45.3,
+          "level": "under",
+          "showFlag": "bracedB",
+          "name": "松土段顶木（东）",
+          "note": "第二块。两处坐标必须与 c1_dig 的 brace zones 一致——支在哪儿，画面上就得在哪儿多一根顶木"
+        },
+        {
+          "id": "qishuVat",
+          "kind": "vat",
+          "x": 49.4,
+          "level": "under",
+          "name": "七叔家的腌菜缸"
+        },
+        {
+          "id": "qishuHouse",
+          "kind": "house",
+          "x": 51.5,
+          "w": 7.0,
+          "h": 2.3,
+          "name": "七叔家"
+        },
+        {
+          "id": "qishuMouth",
+          "kind": "hatch",
+          "x": 52.6,
+          "level": "surface",
+          "name": "七叔家窖口"
+        },
+        {
+          "id": "wellElm",
+          "kind": "tree",
+          "x": 56.3,
+          "name": "井边的榆树",
+          "note": "春荒的口粮树：投石震榆钱的靶子在树冠里（c1_elm 的 throwHit 指着它）",
+          "stripped": true
+        },
+        {
+          "id": "elmCoat",
+          "kind": "spreadCoat",
+          "x": 55.9,
+          "showFlag": "coatSpread",
+          "hideFlag": "elmBagged",
+          "name": "铺在树下的破褂子",
+          "note": "打榆钱那场（c1_elm）柱子脱下来接榆钱的褂子：铺开出现、兜成包袱就收走；砸下第二把后布面铺一层绿（propRedraw 看 flags.elmDown）"
+        },
+        {
+          "id": "well",
+          "kind": "well",
+          "x": 58,
+          "name": "水井"
+        },
+        {
+          "id": "stonesWell",
+          "kind": "stonePile",
+          "x": 61.2,
+          "name": "石子堆"
+        },
+        {
+          "id": "houseB",
+          "kind": "house",
+          "x": 64,
+          "w": 8.5,
+          "h": 2.45,
+          "name": "刘家",
+          "slogan": {
+            "text": "共存共榮"
+          },
+          "_sloganNote": "新民会宣抚班刷的：日方在华北最常见的一条"
+        },
+        {
+          "id": "henYardA",
+          "kind": "hen",
+          "x": 65.7,
+          "hideFlag": "raidStarted",
+          "name": "芦花鸡"
+        },
+        {
+          "id": "henCoop",
+          "kind": "henCoop",
+          "x": 66.6,
+          "name": "刘家的鸡窝"
+        },
+        {
+          "id": "henYardB",
+          "kind": "hen",
+          "x": 67.9,
+          "hideFlag": "raidStarted",
+          "name": "芦花鸡"
+        },
+        {
+          "id": "woodpile",
+          "kind": "woodpile",
+          "x": 70,
+          "name": "木料堆"
+        },
+        {
+          "id": "stonesRoad",
+          "kind": "stonePile",
+          "x": 73.5,
+          "name": "石子堆",
+          "note": "二章掩体推进段的软窗口：88 之前那段路上唯一一堆石子，蹲着摸近、把石子扔到灯的背后去。位置卡在 hayB(69.6 终) 与 woodB(76.7 起) 之间的空档"
+        },
+        {
+          "id": "millstone",
+          "kind": "millstone",
+          "x": 76,
+          "name": "磨盘"
+        },
+        {
+          "id": "laneWall",
+          "kind": "brokenWall",
+          "x": 84,
+          "w": 1.5,
+          "h": 0.82,
+          "name": "塌进巷子的院墙",
+          "note": "教「翻越」的第一课。路当中码一垛柴说不通——两家院子的隔墙塌了半截，土坯碴子横在巷口，才有理由既绕不过去又只能跨过去。侧视里的 w 是**沿路方向的厚度**（塌下来的碴子摊开一米半），不是墙的长度；高 0.82m＝柱子的胯高（他 1.38m），一只手撑得住；顶沿被人踩磨得圆亮、豁一个口＝可翻越物的轮廓语法。离跑腿路线（院子 31~70）远，那趟路空着手来回"
+        },
+        {
+          "id": "houseC",
+          "kind": "house",
+          "x": 92,
+          "w": 9.0,
+          "h": 2.35,
+          "burnable": true,
+          "slogan": {
+            "text": "愛護皇軍"
+          },
+          "_sloganNote": "同上；离村口越近刷得越勤"
+        },
+        {
+          "id": "clotheslineC",
+          "kind": "clothesline",
+          "x": 94.5,
+          "name": "赵家的晾衣绳"
+        },
+        {
+          "id": "ridgeMid",
+          "kind": "ridge",
+          "x": 96,
+          "w": 3,
+          "name": "田埂",
+          "note": "去老槐树半道上的地形，跨得过去，不用翻"
+        },
+        {
+          "id": "yardWallB",
+          "kind": "yardWall",
+          "x": 100.5,
+          "w": 7,
+          "name": "赵家院墙",
+          "note": "96-107 那段长空地的后沿；柴门朝街",
+          "slogan": {
+            "text": "剿共安民"
+          },
+          "_sloganNote": "治安强化运动（1941-42 五次）的口号"
+        },
+        {
+          "id": "treeMid",
+          "kind": "tree",
+          "x": 104.5,
+          "name": "榆树",
+          "stripped": true
+        },
+        {
+          "id": "yardWallC",
+          "kind": "yardWall",
+          "x": 112,
+          "w": 6,
+          "gate": false,
+          "name": "院墙",
+          "slogan": {
+            "text": "抗日到底",
+            "ghost": true
+          },
+          "_sloganNote": "旧标语被白灰盖过，只剩透出来的影子——墙上压着两层字"
+        },
+        {
+          "id": "grindstone",
+          "kind": "millstone",
+          "x": 118,
+          "name": "石碾"
+        },
+        {
+          "id": "stonesTree",
+          "kind": "stonePile",
+          "x": 119,
+          "name": "石子堆",
+          "note": "投布巾用的弹药堆。必须离投掷站位（靶心西 6m）一米半以上——挨太近的话，捡完石子转身面朝东那一下会把人推出站位，然后走回来、再转身，来回没完（自动通关驱动器直接卡死）"
+        },
+        {
+          "id": "bigTree",
+          "kind": "tree",
+          "x": 126,
+          "big": true,
+          "name": "老槐树"
+        },
+        {
+          "id": "yardDog",
+          "kind": "emptyKennel",
+          "x": 138,
+          "name": "王家的狗",
+          "label": "空了的狗窝"
+        },
+        {
+          "id": "houseD",
+          "kind": "house",
+          "x": 148,
+          "w": 8.0,
+          "h": 2.25
+        },
+        {
+          "id": "stonesEast",
+          "kind": "stonePile",
+          "x": 154.8,
+          "name": "石子堆"
+        },
+        {
+          "id": "treeEast",
+          "kind": "tree",
+          "x": 158.5,
+          "stripped": true,
+          "bare": true,
+          "name": "场院边的秃榆",
+          "note": "第七稿 5b：回来的路上第一棵——秃的，一片叶子也没有，下半截树皮被人一圈一圈刮走了，露着白茬。她头都没抬"
+        },
+        {
+          "id": "elmBareB",
+          "kind": "tree",
+          "x": 143.0,
+          "stripped": true,
+          "bare": true,
+          "name": "又一棵秃榆",
+          "note": "第七稿 5b：又路过一棵。也秃着。她也没停"
+        },
+        {
+          "id": "hangLantern",
+          "kind": "hangLantern",
+          "x": 160,
+          "name": "巷口的马灯"
+        },
+        {
+          "id": "yardWallD",
+          "kind": "stalkFence",
+          "x": 168.5,
+          "w": 5,
+          "gate": false,
+          "name": "村东头的院墙"
+        },
+        {
+          "id": "stubbleField",
+          "kind": "stubbleField",
+          "x": 176.8,
+          "w": 7.4,
+          "name": "自家那二亩地",
+          "note": "第七稿 5a：去年的谷茬子还立在垄上，一排一排，齐刷刷指着天。地没翻"
+        },
+        {
+          "id": "sownField",
+          "kind": "sownField",
+          "x": 183.8,
+          "w": 4.6,
+          "name": "东邻耩好的地",
+          "note": "隔着一条垄沟，东边那块已经耩上了：垄是新的，土是湿的，一趟一趟直得像用线量过"
+        },
+        {
+          "id": "louDrill",
+          "kind": "louDrill",
+          "x": 174.3,
+          "hideFlag": "louPlay",
+          "name": "耧",
+          "note": "拉耧那一拍由 state.lou 的动态网格接管（louPlay 藏掉这份静态的）；收耧把它交还回来——位置角度都对得上，换手不露痕"
+        },
+        {
+          "id": "dungHome",
+          "kind": "dungHeap",
+          "x": 38.2
+        },
+        {
+          "id": "dungStreet",
+          "kind": "dungHeap",
+          "x": 71.8,
+          "street": true
+        },
+        {
+          "id": "dungPen",
+          "kind": "dungHeap",
+          "x": 45.6
+        },
+        {
+          "id": "stalksB",
+          "kind": "woodpile",
+          "x": 71.0
+        },
+        {
+          "id": "oldDoorsD",
+          "kind": "oldDoors",
+          "x": 144.2
+        },
+        {
+          "id": "stalksE",
+          "kind": "woodpile",
+          "x": 133.5
+        }
+      ],
+      "_vaultsNote": "可翻越物（挡路；贴上去出提示，按互动键才翻——不是走过去就自动翻）。轮廓语法=肩高、顶沿磨亮/有缺口。摆位铁律：一律不许压在跑腿路线上（院子 31~70 是打水/扛木料/推车的地方）——柴垛 84 在去老槐树那趟空手路上（教学+回程复用），倒塌柴垛 38 只在扫荡后出现（撤退也是空手）。top 必须与美术画出来的高度对齐，抬升弧按它算",
+      "vaults": [
+        {
+          "x": 84,
+          "w": 1.5,
+          "top": 0.82
+        }
+      ],
+      "_horizonFortsNote": [
+        "地平线上的炮楼。1942-43 年冀中的「囚笼政策」：公路、封锁沟，外加**每隔几里一座的炮楼**，",
+        "把一马平川切成小块——站在村里往哪边看都能看见一两座。这不是布景，是「敌后」两个字的字面意思，",
+        "也是全作地理的前提：正因为无险可守，才只能往地下挖。所以远景那两条带子是压平的平原，不是山梁。",
+        "layer：**只用 hills(-44m，comp 2.833)**，一条地平线一排塔。试过再往 farTown(-26m) 加一档近的——两层的视差速率不同，走着走着两座就叠在一起，同形同色叠出来是个畸形轮廓，读不成两座楼。同层排列间距固定，永远不会撞。",
+        "**x 是层内坐标**（同 backdropFolk）：某座在 camX ∈ x*COMP ± 6.3*(dist+|z|)/dist 时进画面，",
+        "村庄默认机位 dist=13.8 → hills ±26.4，一屏能看见 18.6 个层内单位。间距取 6~8（不匀）＝同屏两三座，这就是「囚笼」四个字看得见的样子。",
+        "h 是米（炮楼一般十来米）。夜里楼顶自动点一粒灯；村子烧过之后(ruined)不点。"
+      ],
+      "horizonForts": [
+        {
+          "id": "hf1",
+          "layer": "hills",
+          "x": 3,
+          "h": 12
+        },
+        {
+          "id": "hf2",
+          "layer": "hills",
+          "x": 10.5,
+          "h": 10.5
+        },
+        {
+          "id": "hf3",
+          "layer": "hills",
+          "x": 16,
+          "h": 13
+        },
+        {
+          "id": "hf4",
+          "layer": "hills",
+          "x": 24,
+          "h": 11
+        },
+        {
+          "id": "hf5",
+          "layer": "hills",
+          "x": 30.5,
+          "h": 12.5
+        },
+        {
+          "id": "hf6",
+          "layer": "hills",
+          "x": 38,
+          "h": 10
+        },
+        {
+          "id": "hf7",
+          "layer": "hills",
+          "x": 44,
+          "h": 13.5
+        },
+        {
+          "id": "hf8",
+          "layer": "hills",
+          "x": 51.5,
+          "h": 11.5
+        },
+        {
+          "id": "hf9",
+          "layer": "hills",
+          "x": 58,
+          "h": 12
+        },
+        {
+          "id": "hf10",
+          "layer": "hills",
+          "x": 65,
+          "h": 10.5
+        }
+      ],
+      "_coversNote": "掩体链=第二章的潜行场地，疏密就是关卡节奏。tall（草垛/齐胸断墙）站着就挡得住，矮的（柴堆/水瓮）得蹲。间距刻意不匀：88→107、107→132 两段长空地是难点，那里另有推着走的板车当移动掩体",
+      "covers": [
+        {
+          "id": "firewood",
+          "kind": "firewood",
+          "x": 44.5,
+          "w": 2.2,
+          "note": "在院门边：屋子做成可进入之后柴堆不能搁屋里；第一章「把刨子塞进柴堆」也才有处可塞"
+        },
+        {
+          "id": "hayA",
+          "kind": "haystack",
+          "x": 54.6,
+          "w": 2.6,
+          "note": "原来在 52，正压着七叔家窖口(52.6)，一垛草把玩家要下的那个口子盖住了；挪到房子东头、榆树底下",
+          "tall": true
+        },
+        {
+          "id": "vatA",
+          "kind": "wallSeg",
+          "x": 60,
+          "w": 2.4,
+          "h": 1.1
+        },
+        {
+          "id": "hayB",
+          "kind": "haystack",
+          "x": 68,
+          "w": 2.6,
+          "tall": true
+        },
+        {
+          "id": "woodB",
+          "kind": "firewood",
+          "x": 78,
+          "w": 2.6
+        },
+        {
+          "id": "hayC",
+          "kind": "haystack",
+          "x": 88,
+          "w": 2.6,
+          "tall": true,
+          "raided": true
+        },
+        {
+          "id": "ruinWall",
+          "kind": "wallSeg",
+          "x": 107,
+          "w": 5,
+          "h": 1.5,
+          "tall": true
+        },
+        {
+          "id": "hayD",
+          "kind": "haystack",
+          "x": 132,
+          "w": 2.6,
+          "tall": true,
+          "raided": true
+        },
+        {
+          "id": "wallB",
+          "kind": "wallSeg",
+          "x": 142,
+          "w": 4,
+          "h": 1.5,
+          "tall": true
+        },
+        {
+          "id": "hayE",
+          "kind": "haystack",
+          "x": 152,
+          "w": 2.6,
+          "tall": true,
+          "raided": true
+        },
+        {
+          "id": "wallC",
+          "kind": "wallSeg",
+          "x": 163,
+          "w": 4,
+          "h": 1.4,
+          "tall": true
+        }
+      ],
+      "_lookablesNote": "邻居家的细节：白天路过按 E 看一眼，出一条手记（Core 通用处理，每章每处一次；潜行/夜里不出）。村子不是布景——每一眼都是别人家正在过的日子",
+      "lookables": [
+        {
+          "id": "lookCoop",
+          "x": 64.8,
+          "note": "李婶家的芦花鸡又抱窝了。窝里攒着三个蛋，她数得比谁都勤。"
+        },
+        {
+          "id": "lookLine",
+          "x": 94.5,
+          "note": "赵家晾的粗布衫打着三块补丁。风一鼓，空袖子像在招手。"
+        },
+        {
+          "id": "lookMill",
+          "x": 118,
+          "w": 1.8,
+          "note": "碾盘上还留着昨儿碾谷的糠皮。全村就这一台碾子，谁家碾米都得排着来。"
+        },
+        {
+          "id": "lookDog",
+          "x": 138,
+          "w": 1.8,
+          "note": "王家的大黄狗睡得正沉，尾巴梢偶尔抖一下。村里人他一个都不咬。"
+        }
+      ],
+      "_backdropFolkNote": [
+        "背景层里干活的乡亲：视差层的树列之间也得有人。他们是**骨架不是贴图**——真迈腿、真落锄（静止贴图平移一眼就看出是块滑动的板子）。天黑不出，夜里乡亲都在屋里。",
+        "layer：一律 midTrees(-15m)。**别用 nearTrees**——那层只退到 -7.5m，人有前景的六成半大，会跟玩家抢戏，看着像第二个主角。midTrees 是四成八，一眼就是背景。",
+        "act 见 World 的 FOLK_ACT：hoe/saw/sweep/feed 是定点循环，walk/haul 要另给 from/to/speed。",
+        "**x 是层内坐标，不是前景的 x**——背景层整体放大过 LAYER_COMP，视差还会让它随镜头漂。",
+        "换算：某人在镜头 camX 时看起来落在前景的 apparent = camX + (x*COMP - camX)*dist/(dist+|z|)，",
+        "村庄默认机位 dist=13.8、画宽 12.6，于是他在玩家走到 camX ∈ x*COMP ± (6.3*(dist+|z|)/dist) 时出现在画面里：",
+        "midTrees(COMP 1.625) 覆盖 ±13.2 米、nearTrees(COMP 1.3125) 覆盖 ±9.7 米。",
+        "下面这串就是按这个窗口首尾相接排的，玩家沿街走过去总有人在远处干活；村东口(166 以东)故意留空——那是出村的路，本来就荒。"
+      ],
+      "backdropFolk": [
+        {
+          "id": "bfHoeW",
+          "layer": "midTrees",
+          "x": 8.6,
+          "act": "hoe",
+          "heading": -1,
+          "note": "村西头田里锄地的：跟娘的菜畦一远一近，同一件活"
+        },
+        {
+          "id": "bfSweepW",
+          "layer": "midTrees",
+          "x": 24.6,
+          "act": "sweep",
+          "heading": -1
+        },
+        {
+          "id": "bfWalkW",
+          "layer": "midTrees",
+          "x": 40.6,
+          "act": "walk",
+          "from": 38,
+          "to": 44,
+          "speed": 0.7
+        },
+        {
+          "id": "bfFeedM",
+          "layer": "midTrees",
+          "x": 56.6,
+          "act": "feed",
+          "heading": -1
+        },
+        {
+          "id": "bfSawE",
+          "layer": "midTrees",
+          "x": 72.6,
+          "act": "saw",
+          "heading": 1,
+          "note": "爹不是村里唯一的木匠。**别摆在工作台(40.5)正后方**——那一格的背景人跟爹同一个动作又同一条竖线，看着像重影；这个坑位覆盖的是玩家在老槐树一带(105~131)的时候"
+        },
+        {
+          "id": "bfHaulE",
+          "layer": "midTrees",
+          "x": 88.6,
+          "act": "haul",
+          "from": 86,
+          "to": 92,
+          "speed": 0.6
+        },
+        {
+          "id": "bfHoeE",
+          "layer": "midTrees",
+          "x": 104.6,
+          "act": "hoe",
+          "heading": 1
+        }
+      ],
+      "zones": {
+        "homeYard": {
+          "x": 37,
+          "w": 13,
+          "label": "家里的院子"
+        },
+        "doorframe": {
+          "x": 34,
+          "w": 3,
+          "label": "门框"
+        },
+        "workbench": {
+          "x": 40.5,
+          "w": 4,
+          "label": "工作台"
+        },
+        "courtGate": {
+          "x": 47,
+          "w": 4,
+          "label": "院门口"
+        },
+        "cellar": {
+          "x": 30.5,
+          "w": 8,
+          "level": "under",
+          "label": "梁家地窖"
+        },
+        "well": {
+          "x": 58,
+          "w": 5,
+          "label": "井台"
+        },
+        "sisterTree": {
+          "x": 124,
+          "w": 6,
+          "label": "老槐树下"
+        },
+        "eastExit": {
+          "x": 172,
+          "w": 7,
+          "label": "村东口"
+        },
+        "woodpile": {
+          "x": 71.4,
+          "w": 3.4,
+          "label": "木料堆",
+          "note": "放桶点：必须整段落在 hayB 草垛（终于 69.6）之东——掩体带专职挡人，压上去的话放下的桶会被草垛吞掉（2026-08-06 事故）"
+        },
+        "dogYard": {
+          "x": 138,
+          "w": 4,
+          "label": "王家院外"
+        },
+        "treeShade": {
+          "x": 130,
+          "w": 5,
+          "label": "槐树影里"
+        },
+        "shed": {
+          "x": 9,
+          "w": 5,
+          "label": "牲口棚"
+        },
+        "millW": {
+          "x": 19.2,
+          "w": 4.4,
+          "label": "磨盘旁"
+        },
+        "qishuYard": {
+          "x": 53.2,
+          "w": 4.6,
+          "label": "七叔家门口"
+        },
+        "qishuCellar": {
+          "x": 50.2,
+          "w": 6,
+          "level": "under",
+          "label": "七叔家窖"
+        },
+        "nook": {
+          "x": 47.6,
+          "w": 2.4,
+          "level": "under",
+          "label": "藏口"
+        },
+        "wellElm": {
+          "x": 56.3,
+          "w": 4,
+          "label": "榆树下"
+        }
+      },
+      "tight": [
+        {
+          "x0": 42.6,
+          "x1": 46.4,
+          "mode": "crawl",
+          "note": "梁家窖到七叔家窖的三四米新掏短通道——净高只够爬"
+        }
+      ],
+      "_underDigNote": "地下不是一开局就通的。两家各有地窖，中间隔着四米实土——第七场玩家送土支板（digStarted）掌子面推到 46.0，第九场七叔从那头扒开最后一层土（tunnelDug）才连成一条。wall=自家地窖东壁，face=开工后的掌子面，far=七叔家那头的窖（一直画着：看得见目标，才知道自己在挖什么）。见 Script_Core 的 UnderSegments",
+      "underDig": {
+        "wall": 42.6,
+        "face": 46.0,
+        "startFlag": "digStarted",
+        "doneFlag": "tunnelDug",
+        "far": [
+          46.4,
+          54.5
+        ]
+      },
+      "_relicsNote": "收藏品（老物件）：勇敢的心式的隐藏历史小物。走近出「收进包袱」，收走就从场上消失，进包袱条（Main 的 bagPanel）；每件配一段史实注解。摆位原则：塞在现有物件的角落（鸡窝苫草下/塌墙缝/槐树根/柴垛脚），且**正前方有 fore 前景草半遮**——要靠走动的视差才瞟得见。别摆在任务动线的正中。",
+      "relics": [
+        {
+          "id": "borderNote",
+          "x": 28.2,
+          "level": "under",
+          "art": "borderNote",
+          "name": "边区票",
+          "note": "晋察冀边区银行印的五角票。封锁圈里法币毛得快、伪钞更是废纸，根据地自己印钱自己认账；赶集的老乡把它缝在衣角里过卡子——被搜出来，就是通八路的罪名。"
+        },
+        {
+          "id": "shoeSole",
+          "x": 48.8,
+          "art": "shoeSole",
+          "name": "军鞋底和铜顶针",
+          "note": "纳了一半的千层底，锥眼里还别着麻线，铜顶针箍在上头。妇救会分下来的军鞋活计，一只鞋底一千二百针；前方的兵，一年就指着这几双鞋走路。"
+        },
+        {
+          "id": "newsSheet",
+          "x": 66.3,
+          "art": "newsSheet",
+          "name": "《晋察冀日报》残页",
+          "note": "垫在鸡窝苫草底下的半张报纸。报社跟着队伍打游击，八头骡子驮着铅字和机器，敌人来了埋进土里，走了刨出来接着印——这样的纸，糊在哪儿都不起眼。"
+        },
+        {
+          "id": "featherLetter",
+          "x": 84.6,
+          "art": "featherLetter",
+          "name": "鸡毛信",
+          "note": "信角插着三根鸡毛——十万火急。交通员把它藏在筐底、发辫里、驴驮的夹层里，一村传一村，昼夜不歇。塌墙缝里这一封，不知是送出去的，还是没来得及。"
+        },
+        {
+          "id": "cartridgeWhistle",
+          "x": 125.5,
+          "art": "cartridgeWhistle",
+          "name": "弹壳哨子",
+          "note": "三八式步枪的空弹壳，拿细绳一拴就是儿童团的哨子。民兵的子弹金贵，打完的壳都要捡回去复装；轮得到孩子手里当哨吹的，是复装不了的裂壳。"
+        },
+        {
+          "id": "mineFuse",
+          "x": 140.6,
+          "art": "mineFuse",
+          "name": "石雷拉火管",
+          "note": "石雷用的拉火管。冀中平原缺铁，民兵把碾盘、石臼凿空了装药，全凭这根小铜管发火——「铁雷不够石雷凑」，凿一颗石雷，一个石匠要蹲一整天。"
+        }
+      ],
+      "_foreNote": "前景层（layers.fore，z=+3.4，掠过镜头、微糊）：几丛乱草/秫秸，专职半遮收藏品；另掺疑兵位，免得前景草成了藏宝标记。特写与地下机位自动隐藏（ApplyCamera 的 fore.visible）。",
+      "fore": [
+        {
+          "x": 49.0,
+          "art": "grass"
+        },
+        {
+          "x": 66.5,
+          "art": "stalks"
+        },
+        {
+          "x": 84.8,
+          "art": "weeds"
+        },
+        {
+          "x": 125.7,
+          "art": "grass"
+        },
+        {
+          "x": 140.8,
+          "art": "stalks"
+        },
+        {
+          "x": 22.5,
+          "art": "weeds"
+        },
+        {
+          "x": 58.4,
+          "art": "grass"
+        },
+        {
+          "x": 103.5,
+          "art": "stalks"
+        },
+        {
+          "x": 161.0,
+          "art": "weeds"
+        }
+      ]
+    },
+    "fields": {
+      "label": "村外田野与据点外围（第三/六章）",
+      "length": 200,
+      "walk": {
+        "surface": [
+          3,
+          176
+        ],
+        "under": null
+      },
+      "_walkNote": "据点围墙在 x≈176，过不去",
+      "shafts": [],
+      "props": [
+        {
+          "id": "ditch",
+          "kind": "ditch",
+          "x": 8,
+          "w": 14,
+          "name": "交通沟"
+        },
+        {
+          "id": "northBank",
+          "kind": "ridge",
+          "x": 5,
+          "w": 3,
+          "name": "村北土坎"
+        },
+        {
+          "id": "mapBoard",
+          "kind": "mapBoard",
+          "x": 19,
+          "name": "门板",
+          "note": "歇脚点那扇卸下来的门板：第六章往上钉情报，得看得见它"
+        },
+        {
+          "id": "cropsA",
+          "kind": "crops",
+          "x": 34,
+          "w": 28
+        },
+        {
+          "id": "cropsB",
+          "kind": "crops",
+          "x": 106,
+          "w": 30
+        },
+        {
+          "id": "fortWall",
+          "kind": "fortWall",
+          "x": 178,
+          "w": 5,
+          "h": 2.8,
+          "name": "据点围墙"
+        },
+        {
+          "id": "gate",
+          "kind": "fortGate",
+          "x": 172,
+          "name": "据点南门"
+        },
+        {
+          "id": "blockhouse",
+          "kind": "blockhouse",
+          "x": 184,
+          "name": "炮楼"
+        },
+        {
+          "id": "prisonShed",
+          "kind": "prison",
+          "x": 192,
+          "name": "牢房"
+        }
+      ],
+      "horizonForts": [
+        {
+          "id": "hfF1",
+          "layer": "hills",
+          "x": 4,
+          "h": 12
+        },
+        {
+          "id": "hfF2",
+          "layer": "hills",
+          "x": 12,
+          "h": 10.5
+        },
+        {
+          "id": "hfF3",
+          "layer": "hills",
+          "x": 21,
+          "h": 13
+        },
+        {
+          "id": "hfF4",
+          "layer": "hills",
+          "x": 30,
+          "h": 11
+        },
+        {
+          "id": "hfF5",
+          "layer": "hills",
+          "x": 40,
+          "h": 12.5
+        },
+        {
+          "id": "hfF6",
+          "layer": "hills",
+          "x": 50,
+          "h": 11
+        }
+      ],
+      "covers": [
+        {
+          "id": "ditchCover",
+          "kind": "ditch",
+          "x": 8,
+          "w": 12
+        },
+        {
+          "id": "bushA",
+          "kind": "bush",
+          "x": 64,
+          "w": 3
+        },
+        {
+          "id": "hayS",
+          "kind": "haystack",
+          "x": 104,
+          "w": 2.6
+        },
+        {
+          "id": "ridge",
+          "kind": "ridge",
+          "x": 142,
+          "w": 4
+        },
+        {
+          "id": "cropCoverA",
+          "kind": "crops",
+          "x": 40,
+          "w": 16
+        },
+        {
+          "id": "cropCoverB",
+          "kind": "crops",
+          "x": 112,
+          "w": 18
+        }
+      ],
+      "zones": {
+        "campTable": {
+          "x": 19,
+          "w": 9,
+          "label": "民兵歇脚点"
+        },
+        "ditchSouth": {
+          "x": 8,
+          "w": 12,
+          "label": "交通沟"
+        },
+        "contactA": {
+          "x": 40,
+          "w": 6,
+          "label": "赶车的乡亲"
+        },
+        "contactB": {
+          "x": 120,
+          "w": 6,
+          "label": "拾柴的大娘"
+        },
+        "obsWest": {
+          "x": 64,
+          "w": 6,
+          "label": "灌木后"
+        },
+        "obsSouth": {
+          "x": 104,
+          "w": 6,
+          "label": "草垛后"
+        },
+        "obsEast": {
+          "x": 142,
+          "w": 6,
+          "label": "田埂下"
+        },
+        "gate": {
+          "x": 168,
+          "w": 6,
+          "label": "据点南门"
+        },
+        "auntSpot": {
+          "x": 120,
+          "w": 5,
+          "label": "拾柴的大娘"
+        },
+        "cartSpot": {
+          "x": 108,
+          "w": 5,
+          "label": "陷住的驴车"
+        },
+        "northBank": {
+          "x": 5,
+          "w": 4,
+          "label": "村北土坎"
+        }
+      },
+      "_relicsNote": "收藏品（老物件）：勇敢的心式的隐藏历史小物。走近出「收进包袱」，收走就从场上消失，进包袱条（Main 的 bagPanel）；每件配一段史实注解。摆位原则：塞在现有物件的角落（鸡窝苫草下/塌墙缝/槐树根/柴垛脚），且**正前方有 fore 前景草半遮**——要靠走动的视差才瞟得见。别摆在任务动线的正中。",
+      "relics": [
+        {
+          "id": "spearHead",
+          "x": 20.6,
+          "art": "spearHead",
+          "name": "红缨枪头",
+          "note": "儿童团查路条用的红缨枪，头掉在了歇脚点边上。红缨不只是好看——扎进去血顺着缨子散开，不顺杆流手。半大孩子扛着它站村口，生人一个也别想混进去。"
+        },
+        {
+          "id": "grenadeHandle",
+          "x": 104.8,
+          "art": "grenadeHandle",
+          "name": "边区造手榴弹柄",
+          "note": "边区造手榴弹的木柄。兵工厂藏在山沟里，铁壳浇得厚薄不匀，木柄倒是各村木匠帮着旋的。战士腰里别两颗，就是全部的「炮兵」。"
+        }
+      ],
+      "_foreNote": "前景层（layers.fore，z=+3.4，掠过镜头、微糊）：几丛乱草/秫秸，专职半遮收藏品；另掺疑兵位，免得前景草成了藏宝标记。特写与地下机位自动隐藏（ApplyCamera 的 fore.visible）。",
+      "fore": [
+        {
+          "x": 20.8,
+          "art": "weeds"
+        },
+        {
+          "x": 105.0,
+          "art": "grass"
+        },
+        {
+          "x": 46.0,
+          "art": "stalks"
+        },
+        {
+          "x": 132.0,
+          "art": "weeds"
+        }
+      ]
+    },
+    "tunnelVillage": {
+      "label": "沙河庄地道（第四/五章）",
+      "_note": "剖面：地表在上、地道在下，东口进烟往西灌",
+      "length": 170,
+      "walk": {
+        "surface": [
+          6,
+          164
+        ],
+        "under": [
+          12,
+          151
+        ]
+      },
+      "shafts": [
+        {
+          "id": "entE",
+          "x": 148,
+          "name": "东口（磨盘下）"
+        },
+        {
+          "id": "entW",
+          "x": 34,
+          "name": "西口（井台旁）"
+        },
+        {
+          "id": "hiddenExit",
+          "x": 18,
+          "name": "新暗口",
+          "builtFlag": "hiddenBuilt"
+        }
+      ],
+      "props": [
+        {
+          "id": "surfMill",
+          "kind": "millstone",
+          "x": 148,
+          "name": "磨盘"
+        },
+        {
+          "id": "surfWell",
+          "kind": "well",
+          "x": 34,
+          "name": "井台"
+        },
+        {
+          "id": "surfHouseA",
+          "kind": "house",
+          "x": 70,
+          "w": 8.5,
+          "h": 3.2
+        },
+        {
+          "id": "surfHouseB",
+          "kind": "house",
+          "x": 110,
+          "w": 8,
+          "h": 3
+        },
+        {
+          "id": "surfHouseC",
+          "kind": "house",
+          "x": 24,
+          "w": 8.5,
+          "h": 3.1
+        },
+        {
+          "id": "chamberA",
+          "kind": "chamber",
+          "x": 112,
+          "w": 12,
+          "name": "藏人洞·甲"
+        },
+        {
+          "id": "chamberB",
+          "kind": "chamber",
+          "x": 58,
+          "w": 12,
+          "name": "藏人洞·乙"
+        },
+        {
+          "id": "trapBend",
+          "kind": "waterTrap",
+          "x": 112,
+          "name": "翻口位",
+          "builtFlag": "trapBuilt"
+        },
+        {
+          "id": "bellWire",
+          "kind": "bell",
+          "x": 142,
+          "name": "预警铃位"
+        },
+        {
+          "id": "waterVat",
+          "kind": "vat",
+          "x": 116,
+          "level": "under",
+          "name": "水瓮",
+          "note": "藏人洞里备着的：四章浸棉被"
+        },
+        {
+          "id": "pigpenDog",
+          "kind": "dog",
+          "x": 22,
+          "name": "猪圈的狗",
+          "note": "西头第三家（五章）"
+        }
+      ],
+      "horizonForts": [
+        {
+          "id": "hfT1",
+          "layer": "hills",
+          "x": 3,
+          "h": 12
+        },
+        {
+          "id": "hfT2",
+          "layer": "hills",
+          "x": 11,
+          "h": 11
+        },
+        {
+          "id": "hfT3",
+          "layer": "hills",
+          "x": 19,
+          "h": 13
+        },
+        {
+          "id": "hfT4",
+          "layer": "hills",
+          "x": 27,
+          "h": 10.5
+        },
+        {
+          "id": "hfT5",
+          "layer": "hills",
+          "x": 35,
+          "h": 12.5
+        },
+        {
+          "id": "hfT6",
+          "layer": "hills",
+          "x": 44,
+          "h": 11.5
+        },
+        {
+          "id": "hfT7",
+          "layer": "hills",
+          "x": 52,
+          "h": 12
+        }
+      ],
+      "covers": [],
+      "_tightNote": "卡口与赶工掏出来的段：只能爬过去",
+      "tight": [
+        {
+          "x0": 19,
+          "x1": 29,
+          "mode": "crawl",
+          "note": "新暗口那一截，天不亮才掏通的"
+        },
+        {
+          "x0": 68,
+          "x1": 73,
+          "mode": "crawl",
+          "note": "卡口：敌人钻不过来，自己也得趴下"
+        },
+        {
+          "x0": 121,
+          "x1": 126,
+          "mode": "crawl",
+          "note": "东段卡口：四章拿湿棉被堵烟的地方"
+        }
+      ],
+      "zones": {
+        "entE": {
+          "x": 148,
+          "w": 6,
+          "level": "under",
+          "label": "东口"
+        },
+        "entW": {
+          "x": 34,
+          "w": 6,
+          "level": "under",
+          "label": "西口"
+        },
+        "chamberA": {
+          "x": 112,
+          "w": 11,
+          "level": "under",
+          "label": "藏人洞·甲"
+        },
+        "chamberB": {
+          "x": 58,
+          "w": 11,
+          "level": "under",
+          "label": "藏人洞·乙"
+        },
+        "trapSpot": {
+          "x": 112,
+          "w": 5,
+          "level": "under",
+          "label": "翻口"
+        },
+        "bellSpot": {
+          "x": 142,
+          "w": 5,
+          "level": "under",
+          "label": "预警铃"
+        },
+        "hiddenSpot": {
+          "x": 18,
+          "w": 7,
+          "level": "under",
+          "label": "新暗口"
+        },
+        "behindTrap": {
+          "x": 104,
+          "w": 7,
+          "level": "under",
+          "label": "翻口后面"
+        },
+        "plugSpot": {
+          "x": 124,
+          "w": 4,
+          "level": "under",
+          "label": "东段卡口"
+        },
+        "wellTop": {
+          "x": 34,
+          "w": 4,
+          "label": "井台"
+        },
+        "millTop": {
+          "x": 148,
+          "w": 4,
+          "label": "磨盘"
+        },
+        "dogPen": {
+          "x": 22,
+          "w": 4,
+          "label": "猪圈外"
+        }
+      },
+      "_relicsNote": "收藏品（老物件）：勇敢的心式的隐藏历史小物。走近出「收进包袱」，收走就从场上消失，进包袱条（Main 的 bagPanel）；每件配一段史实注解。摆位原则：塞在现有物件的角落（鸡窝苫草下/塌墙缝/槐树根/柴垛脚），且**正前方有 fore 前景草半遮**——要靠走动的视差才瞟得见。别摆在任务动线的正中。",
+      "relics": [
+        {
+          "id": "slateBoard",
+          "x": 57.2,
+          "level": "under",
+          "art": "slateBoard",
+          "name": "识字班石板",
+          "note": "识字班的小石板，磨得只剩巴掌大。冬学里一块板子传着用，白天下地晚上认字，头一课往往就是写自己的名字——地道里点着油灯，也有人接着写。"
+        }
+      ]
+    },
+    "tunnelFort": {
+      "label": "据点外围地道（第七章）",
+      "_note": "从地里入口向东摸到牢房地沿",
+      "length": 190,
+      "walk": {
+        "surface": null,
+        "under": [
+          10,
+          166
+        ]
+      },
+      "shafts": [
+        {
+          "id": "fieldEnt",
+          "x": 14,
+          "name": "地里入口"
+        },
+        {
+          "id": "cellHatch",
+          "x": 162,
+          "name": "牢房地沿"
+        }
+      ],
+      "props": [
+        {
+          "id": "fortSil",
+          "kind": "fortSilhouette",
+          "x": 150,
+          "w": 70
+        },
+        {
+          "id": "pocketA",
+          "kind": "pocket",
+          "x": 44,
+          "name": "旁洞·甲"
+        },
+        {
+          "id": "pocketB",
+          "kind": "pocket",
+          "x": 92,
+          "name": "旁洞·乙"
+        },
+        {
+          "id": "pocketC",
+          "kind": "pocket",
+          "x": 122,
+          "name": "旁洞·丙"
+        },
+        {
+          "id": "collapse1",
+          "kind": "collapse",
+          "x": 66,
+          "name": "塌方·一"
+        },
+        {
+          "id": "collapse2",
+          "kind": "collapse",
+          "x": 118,
+          "name": "塌方·二"
+        }
+      ],
+      "covers": [],
+      "_tightNote": "通到牢房地沿那最后几十步是这三天连夜掏的，最窄",
+      "tight": [
+        {
+          "x0": 132,
+          "x1": 150,
+          "mode": "crawl"
+        },
+        {
+          "x0": 150,
+          "x1": 166,
+          "mode": "squat"
+        }
+      ],
+      "zones": {
+        "fieldEnt": {
+          "x": 14,
+          "w": 7,
+          "level": "under",
+          "label": "地里入口"
+        },
+        "collapse1": {
+          "x": 66,
+          "w": 5,
+          "level": "under",
+          "label": "塌方处"
+        },
+        "collapse2": {
+          "x": 118,
+          "w": 5,
+          "level": "under",
+          "label": "塌方处"
+        },
+        "pocketA": {
+          "x": 44,
+          "w": 7,
+          "level": "under",
+          "label": "旁洞·甲"
+        },
+        "pocketB": {
+          "x": 92,
+          "w": 7,
+          "level": "under",
+          "label": "旁洞·乙"
+        },
+        "pocketC": {
+          "x": 122,
+          "w": 7,
+          "level": "under",
+          "label": "旁洞·丙"
+        },
+        "cellHatch": {
+          "x": 162,
+          "w": 6,
+          "level": "under",
+          "label": "牢房地沿"
+        }
+      }
+    }
+  }
+}
