@@ -4667,8 +4667,8 @@ body {
   z-index:3;
   left:50%;
   top:56%;
-  width:min(1040px,89vw);
-  height:min(570px,68vh);
+  width:min(1040px,89vw,calc(68vh * 1040 / 570));
+  aspect-ratio:1040/570;
   transform:translate(-50%,-50%);
 }
 .montageWorkScene,
@@ -4783,7 +4783,7 @@ body {
   .whiteboardSectionHeading { margin-top:5px; margin-bottom:4px; }
   .monthMontageHeader { min-height:62px; padding:4px 11px; }
   .montageDate { min-width:138px; }.montageDate b { font-size:44px; }.montageDate small { font-size:7px; }
-  .monthMontageStage { top:56%; width:min(840px,88vw); height:min(350px,69vh); }
+  .monthMontageStage { top:56%; width:min(840px,88vw,calc(69vh * 1040 / 570)); }
   .montageHomeComputerArt { width:45%; bottom:-4%; }
   .montageWorkOwner { left:30%; width:clamp(132px,18%,170px); }
   .montageHomeShelfArt,.montageHomeBoardArt { width:16%; }
@@ -4793,7 +4793,7 @@ body {
 @media (max-height: 410px) and (orientation: landscape) {
   .monthMontageHeader { min-height:52px; padding:2px 9px; }
   .monthMontageHeader > span { font-size:7px; }.montageDate { min-width:120px; }.montageDate b { font-size:36px; }.montageDate i { font-size:8px; }
-  .monthMontageStage { top:57%; width:min(760px,88vw); height:min(270px,68vh); }
+  .monthMontageStage { top:57%; width:min(760px,88vw,calc(68vh * 1040 / 570)); }
   .montageHomeComputerArt { width:41%; bottom:-7%; }
   .montageWorkOwner { left:31%; bottom:5%; width:118px; }
   .montageHomeShelfArt,.montageHomeBoardArt { width:14%; }
