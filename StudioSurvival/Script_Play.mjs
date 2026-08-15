@@ -1193,6 +1193,33 @@ function AddPaperStack(group, x, y, z, width = .48, color = 0xe9dfc9, count = 4)
   }
 }
 
+function AddCableRun(group, points, z = .02, color = 0x1c1b18, thickness = .035) {
+  for (let index = 1; index < points.length; index += 1) {
+    const [startX, startY] = points[index - 1];
+    const [endX, endY] = points[index];
+    const width = Math.hypot(endX - startX, endY - startY);
+    const cable = Box(width, thickness, thickness, color, {
+      roughness: .96,
+      castShadow: false,
+      receiveShadow: false,
+    });
+    Place(group, cable, (startX + endX) * .5, (startY + endY) * .5, z, Math.atan2(endY - startY, endX - startX));
+  }
+}
+
+function AddCardboardBox(group, x, y, z, width = .62, height = .48, depth = .52, rotation = 0) {
+  Place(group, Box(width, height, depth, 0x8d7148, { surface: "paper", roughness: .98 }), x, y + height * .5, z, rotation);
+  Place(group, Box(.075, height * .82, .018, 0xc0a36d, { surface: "paper", roughness: .98, castShadow: false }), x, y + height * .5, z + depth * .51, rotation);
+  Place(group, Box(width * .74, .05, depth * .54, 0x775a37, { surface: "paper", roughness: .98 }), x, y + height + .015, z, rotation + .035);
+}
+
+function AddPlasticStool(group, x, y, z, color = 0x657267) {
+  Place(group, Box(.58, .13, .5, color, { surface: "linoleum", roughness: .93 }), x, y + .64, z, -.025);
+  for (const [legX, legZ] of [[-.21, -.17], [.21, -.17], [-.21, .17], [.21, .17]]) {
+    Place(group, Box(.065, .61, .065, new THREE.Color(color).multiplyScalar(.72).getHex(), { surface: "linoleum", roughness: .96 }), x + legX, y + .31, z + legZ, legX * -.09);
+  }
+}
+
 function AddTaskLamp(group, x, y, z, color = 0xd4b270, facing = 1) {
   const base = Cylinder(.23, .27, .08, 0x3c3d3b, 20, { surface: "metal", metalness: .58, roughness: .32 });
   Place(group, base, x, y, z);
@@ -1219,8 +1246,9 @@ function BuildFacility(interaction) {
   marker.position.set(0, .08, .1);
   group.add(marker);
   if (kind === "homeComputer") {
-    Place(group, Box(2.15, .16, .82, 0x6f4931, { surface: "wood", roughness: .7 }), 0, .88, .02);
-    for (const legX of [-.82, .82]) Place(group, Box(.12, .86, .12, 0x493326, { surface: "wood" }), legX, .44, -.02);
+    Place(group, Box(2.15, .16, .82, 0x4d3526, { surface: "wood", roughness: .88 }), 0, .88, .02, -.018);
+    Place(group, Box(.12, .86, .12, 0x382a22, { surface: "wood", roughness: .94 }), -.82, .44, -.02, -.035);
+    Place(group, Box(.12, .82, .12, 0x59412d, { surface: "wood", roughness: .92 }), .82, .42, -.02, .045);
     const computerPlastic = 0xc9c0aa;
     Place(group, Box(.98, .78, .44, computerPlastic, { roughness: .74 }), -.25, 1.42, .04);
     Place(group, Box(.88, .66, .035, 0x756f62, { roughness: .78 }), -.25, 1.43, .275);
@@ -1233,6 +1261,7 @@ function BuildFacility(interaction) {
     }
     Place(group, Box(.08, .035, .018, 0x2b322c, { castShadow: false }), .09, 1.11, .292);
     Place(group, Sphere(.025, 0x68e0a0, { emissive: 0x68e0a0, emissiveIntensity: 1.2, castShadow: false, segments: 10, rings: 7 }), .18, 1.11, .3);
+    Place(group, Box(.18, .035, .018, 0xb89b65, { surface: "paper", roughness: .98, castShadow: false }), -.61, 1.72, .333, .34);
 
     Place(group, Box(.42, .76, .56, 0xbeb59f, { roughness: .78 }), .68, 1.34, .02);
     Place(group, Box(.31, .08, .025, 0x4b4a43, { surface: "metal", metalness: .16, castShadow: false }), .68, 1.58, .318);
@@ -1258,6 +1287,9 @@ function BuildFacility(interaction) {
     Place(group, mugHandle, 1.1, 1.08, .22);
     AddTaskLamp(group, -.94, .98, .05, color, 1);
     AddPaperStack(group, .3, .98, .66, .28, 0xe9dfc9, 3);
+    AddCableRun(group, [[-.62, 1.08], [-.82, .77], [-.55, .4], [-.12, .16]], -.24, 0x171614, .028);
+    AddCableRun(group, [[.73, 1.02], [.96, .68], [.73, .26], [.98, .08]], -.22, 0x24211d, .026);
+    AddCardboardBox(group, -.98, 0, -.15, .4, .34, .42, -.05);
   } else if (kind === "equipmentShop") {
     Place(group, Box(2.5, .82, .92, 0x294059, { surface: "metal", metalness: .28, roughness: .47 }), 0, .42, -.02);
     Place(group, Box(2.6, .11, 1.02, 0x9eb1c1, { surface: "metal", metalness: .52, roughness: .3 }), 0, .87, .02);
@@ -1271,11 +1303,11 @@ function BuildFacility(interaction) {
     for (const ventY of [1.02, 1.14, 1.26, 1.38]) Place(group, Box(.28, .018, .02, 0x101318, { castShadow: false }), .72, ventY, .345);
     AddPaperStack(group, .26, .96, .35, .4, 0xe5dac5, 5);
   } else if (kind === "planningBoard") {
-    const boardMetal = 0xa8ada9;
-    Place(group, Box(2.66, 1.76, .16, boardMetal, { surface: "metal", metalness: .5, roughness: .28 }), 0, 1.8, -.055);
-    Place(group, Box(2.48, 1.55, .035, 0xf0f2e9, { roughness: .24, castShadow: false }), 0, 1.82, .055);
-    for (const frameX of [-1.29, 1.29]) Place(group, Box(.08, 1.69, .17, 0xc8cbc6, { surface: "metal", metalness: .72, roughness: .22 }), frameX, 1.8, .015);
-    for (const frameY of [1.0, 2.62]) Place(group, Box(2.62, .08, .17, 0xc8cbc6, { surface: "metal", metalness: .72, roughness: .22 }), 0, frameY, .015);
+    const boardMetal = 0x747970;
+    Place(group, Box(2.66, 1.76, .16, boardMetal, { surface: "metal", metalness: .28, roughness: .66 }), 0, 1.8, -.055);
+    Place(group, Box(2.48, 1.55, .035, 0xd4d1bf, { roughness: .76, castShadow: false }), 0, 1.82, .055);
+    for (const frameX of [-1.29, 1.29]) Place(group, Box(.08, 1.69, .17, 0x8b8d82, { surface: "metal", metalness: .34, roughness: .62 }), frameX, 1.8, .015);
+    for (const frameY of [1.0, 2.62]) Place(group, Box(2.62, .08, .17, 0x8b8d82, { surface: "metal", metalness: .34, roughness: .62 }), 0, frameY, .015);
     for (const [magnetX, magnetY, magnetColor] of [[-1.12, 2.48, 0xd74f52], [1.1, 2.46, 0x4e82b8], [-1.1, 1.16, 0xe1b83c]]) {
       const magnet = Sphere(.055, magnetColor, { roughness: .38, castShadow: false, segments: 12, rings: 8 });
       magnet.scale.z = .38;
@@ -1298,7 +1330,7 @@ function BuildFacility(interaction) {
       Place(group, Box(.06, .045, .058, 0xe4e5dd, { roughness: .65, castShadow: false }), markerX + .19, .995, .25, markerX * .04);
     }
   } else if (kind === "homeCalendar") {
-    Place(group, Box(2.08, 1.72, .07, 0xeee6d6, { surface: "paper", roughness: .98 }), 0, 1.76, -.02);
+    Place(group, Box(2.08, 1.72, .07, 0xc9c0aa, { surface: "paper", roughness: .99 }), 0, 1.76, -.02, -.012);
     Place(group, Box(1.9, .34, .028, color, { emissive: color, emissiveIntensity: .26, castShadow: false }), 0, 2.34, .035);
     for (let row = 0; row < 4; row += 1) {
       Place(group, Box(1.72, .026, .022, 0x817a6d, { surface: "paper", castShadow: false }), 0, 2.02 - row * .25, .04);
@@ -1317,7 +1349,7 @@ function BuildFacility(interaction) {
     Place(group, handle, .39, 1.5, .29);
     Place(group, Box(.86, .075, .028, color, { emissive: color, emissiveIntensity: .48, castShadow: false }), 0, 2.77, .19);
   } else if (kind === "homeFridge") {
-    const fridge = Box(1.34, 2.62, 1.12, 0xc7d0d2, { surface: "metal", metalness: .34, roughness: .42 });
+    const fridge = Box(1.34, 2.62, 1.12, 0x77827c, { surface: "metal", metalness: .1, roughness: .86 });
     fridge.position.y = 1.28;
     group.add(fridge);
     Place(group, Box(1.16, .045, .035, 0x596065, { surface: "metal", metalness: .7, roughness: .22 }), 0, 1.58, .575);
@@ -1325,6 +1357,9 @@ function BuildFacility(interaction) {
     for (const [magnetX, magnetY, magnetColor] of [[-.36,1.95,0xd9636d],[-.1,2.13,0x5c9ccc],[.17,1.82,0xd6b54c]]) {
       Place(group, Box(.16, .18, .025, magnetColor, { surface: "paper", castShadow: false }), magnetX, magnetY, .59, magnetX * .08);
     }
+    Place(group, Box(.31, .12, .026, 0x74452d, { surface: "metal", metalness: .05, roughness: .96, castShadow: false }), -.36, .48, .595, -.08);
+    Place(group, Box(.09, .42, .026, 0x6d402a, { surface: "metal", metalness: .06, roughness: .96, castShadow: false }), .58, 1.25, .596, .04);
+    Place(group, Box(.42, .055, .025, 0xb59a68, { surface: "paper", roughness: .98, castShadow: false }), -.2, 2.48, .6, -.05);
     Place(group, Box(.78, .08, .025, color, { emissive: color, emissiveIntensity: .35, castShadow: false }), 0, .42, .59);
   } else if (kind === "scratch") {
     Place(group, Box(2.25, .88, .92, 0x436b55, { surface: "wood", roughness: .7 }), 0, .45, -.02);
@@ -1436,7 +1471,11 @@ function BuildFacility(interaction) {
     AddStool(group, -.92, 0, .38, 0x7d293d);
     AddStool(group, .92, 0, .38, 0x7d293d);
   }
-  AddPhysicalLabel(group, title, subtitle, 2.75, 0, 3.03, -.02, color, { compact: true, backing: kind === "hotel" ? 0x513828 : 0x26272a });
+  const homeLabel = interaction.locationId === "home";
+  AddPhysicalLabel(group, title, homeLabel ? "" : subtitle, homeLabel ? 2.24 : 2.75, 0, 3.03, -.02, color, {
+    compact: true,
+    backing: kind === "hotel" ? 0x513828 : homeLabel ? 0x24211c : 0x26272a,
+  });
   group.userData.marker = marker;
   group.userData.interactionId = interaction.id;
   group.userData.kind = kind;
@@ -1528,21 +1567,22 @@ function AddFramedPanel(group, x, y, width, height, faceColor, frameColor = 0x4f
 }
 
 function BuildHomeWindowDayNight(group, windowX, accent) {
-  const windowY = 3.42;
-  const windowWidth = 3.3;
-  const windowHeight = 2.28;
-  const frameColor = 0x70523c;
-  const frameWidth = .11;
-  const sky = AddScenePanel(group, windowWidth, windowHeight, windowX, windowY, 0x78b9df, { z: -.17 });
-  const horizon = AddScenePanel(group, windowWidth, .82, windowX, 2.69, 0xb8d9e5, { z: -.16, opacity: .9 });
-  const sun = AddSceneDisc(group, .15, windowX - 1.1, 3.15, 0xffd37b, { z: -.14, opacity: .01, segments: 28 });
-  const moon = AddSceneDisc(group, .14, windowX + 1.1, 3.15, 0xe9f2db, { z: -.14, opacity: .01, segments: 28 });
-  const moonMask = AddSceneDisc(group, .14, windowX + 1.16, 3.19, 0x78b9df, { z: -.135, opacity: .01, segments: 28 });
+  const windowY = 3.52;
+  const windowWidth = 2.62;
+  const windowHeight = 1.78;
+  const windowBottom = windowY - windowHeight * .5;
+  const frameColor = 0x493629;
+  const frameWidth = .09;
+  const sky = AddScenePanel(group, windowWidth, windowHeight, windowX, windowY, 0x6f8189, { z: -.17 });
+  const horizon = AddScenePanel(group, windowWidth, .62, windowX, windowBottom + .31, 0x8f9994, { z: -.16, opacity: .92 });
+  const sun = AddSceneDisc(group, .12, windowX - .86, windowY - .16, 0xd9bb78, { z: -.14, opacity: .01, segments: 24 });
+  const moon = AddSceneDisc(group, .11, windowX + .86, windowY - .16, 0xd9dfd0, { z: -.14, opacity: .01, segments: 24 });
+  const moonMask = AddSceneDisc(group, .11, windowX + .91, windowY - .13, 0x6f8189, { z: -.135, opacity: .01, segments: 24 });
   const stars = [
-    [-1.28, .72, .018], [-.93, .46, .026], [-.52, .83, .016], [-.12, .56, .021],
-    [.36, .76, .018], [.79, .5, .025], [1.24, .82, .017], [1.43, .38, .014],
+    [-1.02, .54, .014], [-.72, .34, .02], [-.4, .62, .013], [-.08, .42, .017],
+    [.28, .57, .014], [.61, .36, .02], [.96, .61, .014], [1.1, .28, .012],
   ].map(([offsetX, offsetY, radius], starIndex) => {
-    const star = AddSceneDisc(group, radius, windowX + offsetX, 3.42 + offsetY, starIndex % 3 ? 0xe8f1ff : 0xffe4a8, {
+    const star = AddSceneDisc(group, radius, windowX + offsetX, windowY + offsetY, starIndex % 3 ? 0xd7dfe2 : 0xe1cb96, {
       z: -.15,
       opacity: .01,
       segments: starIndex % 2 ? 8 : 12,
@@ -1556,11 +1596,11 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
   [0, 1, 2, 3, 4].forEach((buildingIndex) => {
     const width = .38 + (buildingIndex % 2) * .18;
     const height = .52 + ((buildingIndex * 7) % 3) * .24;
-    const x = windowX - 1.27 + buildingIndex * .57;
+    const x = windowX - 1.02 + buildingIndex * .5;
     const building = Place(group, Box(width, height, .03, buildingIndex % 2 ? 0x26324a : 0x202a40, {
       surface: "plaster",
       castShadow: false,
-    }), x, 2.3 + height * .5, -.08);
+    }), x, windowBottom + height * .5, -.08);
     buildings.push({
       material: building.material,
       nightColor: new THREE.Color(buildingIndex % 2 ? 0x111a2d : 0x0d1629),
@@ -1577,7 +1617,7 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
           emissiveIntensity: .02,
           roughness: .32,
           castShadow: false,
-        }), x + (columnIndex - (columnCount - 1) * .5) * .18, 2.5 + rowIndex * .2, -.05);
+        }), x + (columnIndex - (columnCount - 1) * .5) * .16, windowBottom + .18 + rowIndex * .18, -.05);
         buildingWindows.push({
           material: lamp.material,
           offColor: new THREE.Color(0x273348),
@@ -1595,16 +1635,21 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
     [frameWidth, windowHeight, windowX - windowWidth * .5 - frameWidth * .5, windowY],
     [frameWidth, windowHeight, windowX + windowWidth * .5 + frameWidth * .5, windowY],
   ]) Place(group, Box(partWidth, partHeight, .14, frameColor, { surface: "wood" }), partX, partY, .02);
-  Place(group, Box(.07, 2.2, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
-  Place(group, Box(3.25, .07, .09, 0x8d6849, { surface: "wood" }), windowX, windowY, .025);
+  Place(group, Box(.065, windowHeight - .04, .09, 0x614938, { surface: "wood", roughness: .92 }), windowX, windowY, .025, .012);
+  Place(group, Box(windowWidth - .04, .065, .09, 0x614938, { surface: "wood", roughness: .92 }), windowX, windowY, .025, -.008);
+  AddCableRun(group, [[windowX + .34, windowY + .84], [windowX + .2, windowY + .58], [windowX + .36, windowY + .35], [windowX + .25, windowY + .08]], .04, 0x9da09a, .012);
+  Place(group, Box(.28, .05, .018, 0xb79b69, { surface: "paper", roughness: .98, castShadow: false }), windowX - 1.1, windowY + .82, .045, -.17);
 
-  const windowLight = new THREE.PointLight(0xa8d8ff, .4, 4.8, 2.1);
-  windowLight.position.set(windowX, 3.35, 1.05);
+  const windowLight = new THREE.PointLight(0xa8c4cc, .34, 4.3, 2.1);
+  windowLight.position.set(windowX, windowY - .08, 1.05);
   windowLight.castShadow = false;
   group.add(windowLight);
 
   return {
     windowX,
+    windowY,
+    windowWidth,
+    windowHeight,
     sky,
     horizon,
     sun,
@@ -1615,16 +1660,16 @@ function BuildHomeWindowDayNight(group, windowX, accent) {
     buildingWindows,
     windowLight,
     colors: {
-      nightSky: new THREE.Color(0x07142f),
-      daySky: new THREE.Color(0x78b9df),
-      dawnSky: new THREE.Color(0xd88478),
-      duskSky: new THREE.Color(0xb95f78),
-      nightHorizon: new THREE.Color(0x192340),
-      dayHorizon: new THREE.Color(0xb8d9e5),
-      dawnHorizon: new THREE.Color(0xf0a16f),
-      duskHorizon: new THREE.Color(0xe16f66),
-      sunriseSun: new THREE.Color(0xffa85c),
-      noonSun: new THREE.Color(0xffe8a1),
+      nightSky: new THREE.Color(0x101821),
+      daySky: new THREE.Color(0x6f8189),
+      dawnSky: new THREE.Color(0x9a6b61),
+      duskSky: new THREE.Color(0x785866),
+      nightHorizon: new THREE.Color(0x202a32),
+      dayHorizon: new THREE.Color(0x8f9994),
+      dawnHorizon: new THREE.Color(0xb27c62),
+      duskHorizon: new THREE.Color(0xa3665e),
+      sunriseSun: new THREE.Color(0xd19a58),
+      noonSun: new THREE.Color(0xd9c995),
     },
   };
 }
@@ -1645,15 +1690,15 @@ function UpdateHomeWindowDayNight(time) {
   homeWindowVisual.sky.material.color.copy(colors.nightSky).lerp(colors.daySky, daylight).lerp(twilightSky, twilight * .82);
   homeWindowVisual.horizon.material.color.copy(colors.nightHorizon).lerp(colors.dayHorizon, daylight).lerp(twilightHorizon, twilight * .92);
 
-  const sunX = homeWindowVisual.windowX - Math.cos(solarAngle) * 1.25;
-  const sunY = 2.82 + Clamp(solarHeight, -.05, 1) * 1.27;
+  const sunX = homeWindowVisual.windowX - Math.cos(solarAngle) * homeWindowVisual.windowWidth * .38;
+  const sunY = homeWindowVisual.windowY - homeWindowVisual.windowHeight * .27 + Clamp(solarHeight, -.05, 1) * homeWindowVisual.windowHeight * .52;
   homeWindowVisual.sun.position.set(sunX, sunY, homeWindowVisual.sun.position.z);
   homeWindowVisual.sun.material.opacity = SmoothStep(-.12, .03, solarHeight);
   homeWindowVisual.sun.material.color.copy(colors.sunriseSun).lerp(colors.noonSun, SmoothStep(.02, .72, solarHeight));
 
   const moonAngle = solarAngle + Math.PI;
-  const moonX = homeWindowVisual.windowX - Math.cos(moonAngle) * 1.25;
-  const moonY = 2.82 + Clamp(moonHeight, -.05, 1) * 1.27;
+  const moonX = homeWindowVisual.windowX - Math.cos(moonAngle) * homeWindowVisual.windowWidth * .38;
+  const moonY = homeWindowVisual.windowY - homeWindowVisual.windowHeight * .27 + Clamp(moonHeight, -.05, 1) * homeWindowVisual.windowHeight * .52;
   const moonOpacity = SmoothStep(-.12, .04, moonHeight);
   homeWindowVisual.moon.position.set(moonX, moonY, homeWindowVisual.moon.position.z);
   homeWindowVisual.moonMask.position.set(moonX + .065, moonY + .035, homeWindowVisual.moonMask.position.z);
@@ -1829,6 +1874,44 @@ function AddAbsurdLocationSigil(group, location, index, center, accent, paleAcce
   return sigil;
 }
 
+function AddShabbyStudioBackdrop(sceneGroup, location) {
+  const width = location.endX - location.startX - .1;
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, 6.5),
+    new THREE.MeshBasicMaterial({
+      color: 0xe8e1d1,
+      transparent: true,
+      opacity: .94,
+      depthWrite: true,
+      toneMapped: false,
+    }),
+  );
+  backdrop.position.set((location.startX + location.endX) * .5, 1.96, -.56);
+  backdrop.castShadow = false;
+  backdrop.receiveShadow = false;
+  backdrop.visible = false;
+  backdrop.name = "Texture_ShabbyStudioBackdrop";
+  sceneGroup.add(backdrop);
+
+  new THREE.TextureLoader().load(
+    new URL("./Texture_ShabbyStudioBackdrop.webp?v=20260815ah", import.meta.url).href,
+    (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      backdrop.material.map = texture;
+      backdrop.material.needsUpdate = true;
+      backdrop.visible = true;
+    },
+    undefined,
+    () => { backdrop.visible = false; },
+  );
+  return backdrop;
+}
+
 function BuildLocationEnvironment(location, index, sceneGroup) {
   const group = new THREE.Group();
   const start = location.startX;
@@ -1837,8 +1920,9 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
   const accent = HexColor(location.accent);
   const paleAccent = new THREE.Color(accent).lerp(new THREE.Color(0xffffff), .32).getHex();
   const roomWidth = end - start;
-  const halo = AddSceneDisc(group, 3.45, center, 3.45, accent, { z: -.29, opacity: .025, scaleY: .8, segments: 42 });
-  const ceilingBar = AddScenePanel(group, 6.4, .04, center, 6.08, accent, { z: -.04, opacity: .3 });
+  const environmentAccent = location.id === "home" ? 0xa68d68 : accent;
+  const halo = AddSceneDisc(group, 3.45, center, 3.45, environmentAccent, { z: -.29, opacity: location.id === "home" ? .012 : .025, scaleY: .8, segments: 42 });
+  const ceilingBar = AddScenePanel(group, 6.4, .04, center, 6.08, environmentAccent, { z: -.04, opacity: location.id === "home" ? .12 : .3 });
   Place(group, Box(roomWidth - .28, .18, .18, location.id === "bank" || location.id === "hotel" ? 0xaa9164 : 0x544d45, { surface: location.id === "bank" ? "stone" : "wood", roughness: .62 }), center, .72, -.06);
   Place(group, Box(roomWidth - .26, .1, .16, location.id === "hotel" ? 0xb89358 : 0x5d554d, { surface: location.id === "bank" ? "stone" : "wood", roughness: .58 }), center, 5.06, -.06);
   for (const jambX of [start + .28, end - .28]) Place(group, Box(.16, 4.45, .18, index % 2 ? 0x3e3833 : 0x48413b, { surface: location.id === "bank" ? "stone" : "wood" }), jambX, 2.85, -.04);
@@ -1846,19 +1930,19 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
   if (location.id === "home") {
     const windowX = center + .55;
     homeWindowVisual = BuildHomeWindowDayNight(group, windowX, accent);
-    Place(group, Box(1.55, 1.52, .42, 0x5b4638, { surface: "wood" }), start + 1.05, 1.52, -.08);
-    [.78, 1.22, 1.66, 2.1].forEach((y) => Place(group, Box(1.36, .075, .5, 0x8a6547, { surface: "wood" }), start + 1.05, y, .04));
-    for (let bookIndex = 0; bookIndex < 12; bookIndex += 1) {
-      const row = Math.floor(bookIndex / 4);
-      const colors = [0x8d4851,0x496680,0x887244,0x526f59];
-      Place(group, Box(.16, .3 + (bookIndex % 3) * .05, .28, colors[bookIndex % colors.length], { surface: "paper" }), start + .58 + bookIndex % 4 * .31, .98 + row * .44, .2, (bookIndex % 2 ? 1 : -1) * .025);
-    }
-    AddFramedPanel(group, start + 3.04, 3.3, 1.6, 1.28, 0x8b6b46, 0x5b3d2b, { surface: "wood", z: -.08, frameWidth: .08 });
-    [[start + 2.65, 3.55], [start + 3.18, 3.28], [start + 2.92, 2.94]].forEach(([x, y], noteIndex) => {
-      Place(group, Box(.38, .26, .018, noteIndex === 1 ? 0xffd166 : paleAccent, { surface: "paper", castShadow: false }), x, y, .05, (noteIndex - 1) * .06);
+    [[start + 1.2, 4.22, .72, .18], [start + 7.8, 3.88, .94, .24], [start + 12.1, 4.45, .58, .16]].forEach(([x, y, radius, opacity]) => {
+      const stain = AddSceneDisc(group, radius, x, y, 0x302b24, { z: -.545, opacity, scaleY: 1.55, segments: 24 });
+      stain.rotation.z = (x - center) * .012;
     });
-    AddWallClock(group, start + 8.85, 3.8, 0xb8a26c, .48);
-    Place(group, Box(4.3, .045, 1.28, 0x5e466c, { surface: "fabric", roughness: .98 }), start + 4.45, .055, .72, -.02);
+    AddScenePanel(group, 1.18, .68, start + 6.7, 4.45, 0xb0a486, { z: -.54, opacity: .22, rotation: -.08 });
+    AddScenePanel(group, .74, .44, start + 7.05, 4.02, 0x493f32, { z: -.535, opacity: .18, rotation: .06 });
+    AddCableRun(group, [[start + .28, 4.86], [start + 3.1, 4.79], [start + 5.35, 4.58], [start + 8.4, 4.72], [start + 11.35, 4.42], [end - .3, 4.55]], -.015, 0x181713, .032);
+    AddCableRun(group, [[start + 5.35, 4.58], [start + 5.28, 3.72], [start + 5.55, 2.98]], -.01, 0x2b2924, .025);
+    AddFluorescent(group, start + 4.1, 4.96, 0xd8d1b7, 1.42);
+    AddCardboardBox(group, start + .82, .02, .18, .72, .46, .55, -.06);
+    AddCardboardBox(group, start + 11.72, .02, .1, .58, .4, .5, .035);
+    AddPlasticStool(group, start + 8.45, .02, .48, 0x617267);
+    Place(group, Box(4.1, .045, 1.18, 0x4b4034, { surface: "fabric", roughness: .99 }), start + 4.55, .055, .72, -.035);
   } else if (location.id === "diner") {
     Place(group, Box(8.7, 1.42, .12, 0xd8c8ac, { surface: "tile", roughness: .45, castShadow: false }), center, 1.48, -.12);
     AddFramedPanel(group, start + 2.1, 3.42, 1.92, 1.16, 0x181719, 0x7c4f32, { surface: "plaster", z: -.06, frameWidth: .09 });
@@ -1992,7 +2076,7 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
 
-  const sigil = AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
+  const sigil = location.id === "home" ? null : AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
   const practicalColors = { home: 0xffd6ad, diner: 0xffc77f, market: 0xdfffee, talent: 0xdbeaff, bank: 0xffe0c6, hotel: 0xffc47d, footbath: 0xc8fff4, footbathCity: 0xe0cfff, maleModelClub: 0xffc6e4 };
   const roomLight = new THREE.PointLight(practicalColors[location.id] || accent, 1.55, 9.2, 2.05);
   roomLight.position.set(center, 3.8, 3.1);
@@ -2013,7 +2097,7 @@ function BuildRoom() {
   Place(roomGroup, Box(width, .3, 3.4, 0x322d2a, { surface: "wood", roughness: .76 }), worldCenter, -.17, .55);
   Place(foregroundGroup, Box(width, .2, .18, 0x141416, { surface: "metal", metalness: .3, roughness: .48 }), worldCenter, -.02, 1.62);
   const roomLooks = {
-    home: { wall: 0x817696, surface: "plaster", floor: 0x493a35, floorSurface: "wood", sign: 0x41354f },
+    home: { wall: 0x716a58, surface: "plaster", floor: 0x3a3129, floorSurface: "wood", sign: 0x312b24 },
     diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile", sign: 0x5b302d },
     market: { wall: 0x718d80, surface: "tile", floor: 0x465d55, floorSurface: "linoleum", sign: 0x2e5145 },
     talent: { wall: 0x72869d, surface: "plaster", floor: 0x40536a, floorSurface: "linoleum", sign: 0x31485f },
@@ -2036,10 +2120,21 @@ function BuildRoom() {
     const wall = Box(locationWidth - .08, 6.5, .18, look.wall, { surface: look.surface, castShadow: false, roughness: .92 });
     wall.position.set(centerX, 3.15, -.72);
     sceneGroup.add(wall);
+    if (location.id === "home") AddShabbyStudioBackdrop(sceneGroup, location);
     Place(sceneGroup, Box(locationWidth - .1, .16, 3.0, look.floor, { surface: look.floorSurface, roughness: look.floorSurface === "stone" ? .54 : .82 }), centerX, -.015, .48);
     Place(sceneGroup, Box(locationWidth - .12, .72, .15, new THREE.Color(look.wall).multiplyScalar(.58).getHex(), { surface: look.surface, castShadow: false }), centerX, .38, -.49);
     BuildLocationEnvironment(location, index, sceneGroup);
-    AddPhysicalLabel(sceneGroup, location.name, "", 6.25, centerX, 5.56, -.31, HexColor(location.accent), { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" });
+    AddPhysicalLabel(
+      sceneGroup,
+      location.name,
+      "",
+      location.id === "home" ? 3.35 : 6.25,
+      centerX,
+      5.56,
+      -.31,
+      location.id === "home" ? 0xc0a06f : HexColor(location.accent),
+      { compact: true, backing: look.sign, surface: location.id === "bank" ? "stone" : "wood" },
+    );
     for (const boundaryX of [location.startX, location.endX]) {
       Place(sceneGroup, Box(.18, 6.55, .32, index % 2 ? 0x383331 : 0x45403b, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 3.15, -.18);
       Place(sceneGroup, Box(.62, .18, .48, 0x6f6559, { surface: location.id === "bank" ? "stone" : "wood" }), boundaryX, 6.36, -.16);
